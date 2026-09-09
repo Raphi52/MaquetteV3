@@ -1,0 +1,212 @@
+@* Ecran de la procedure PROC_DEMANDE.
+   Motif de RIG v2 : CRITERES DE RECHERCHE a gauche, RESULTATS a droite
+   (PROC_DEMANDE/RECHERCHE/OPE_SEARCH.cs et PROC_DEMANDE/RESULTATS).
+   Les colonnes viennent de PROC_DEMANDE/DemandeDataGridView.cs. *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Criteres de recherche</div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Demande</span>
+            <input class="rig-saisie-champ__saisie" placeholder="numero ou nom"
+                   @bind="CritDemande" @bind:event="oninput" />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Client</span>
+            <input class="rig-saisie-champ__saisie" placeholder="nom ou numero de compte"
+                   @bind="CritClient" @bind:event="oninput" />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Processus</span>
+            <select class="rig-saisie-champ__saisie" @bind="CritProcessus">
+                <option value="">Tous</option>
+                @foreach (var trait in JeuDemo.Demandes.Select(d => d.Traitement).Distinct().Order())
+                {
+                    <option value="@trait">@trait</option>
+                }
+            </select>
+        </label>
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Dates de la demande</div>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Du</span>
+                    <input class="rig-saisie-champ__saisie" type="date" @bind="CritDu" />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Au</span>
+                    <input class="rig-saisie-champ__saisie" type="date" @bind="CritAu" />
+                </label>
+            </div>
+        </div>
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Etats de la demande</div>
+            @foreach (var etat in JeuDemo.EtatsDemande)
+            {
+                var e = etat;
+                <button class="rig-bascule @(CritEtats.Contains(e) ? "rig-bascule--actif" : "")"
+                        @onclick="() => BasculerEtat(e)">
+                    <span class="rig-bascule__temoin"></span>
+                    <span>@e</span>
+                </button>
+            }
+        </div>
+
+        <div class="rig-criteres__bloc">
+            <button class="rig-bascule @(CritAlerte ? "rig-bascule--actif" : "")"
+                    @onclick="() => CritAlerte = !CritAlerte">
+                <span class="rig-bascule__temoin"></span>
+                <span>Alerte uniquement</span>
+            </button>
+            <button class="rig-bascule @(CritEnCours ? "rig-bascule--actif" : "")"
+                    @onclick="() => CritEnCours = !CritEnCours">
+                <span class="rig-bascule__temoin"></span>
+                <span>En cours uniquement</span>
+            </button>
+        </div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Nombre maxi. de demandes affichees</span>
+            <input class="rig-saisie-champ__saisie" type="number" min="1" max="500" @bind="CritTopMax" />
+        </label>
+
+        <div class="rig-criteres__actions">
+            <button class="rig-bouton" @onclick="Effacer">Effacer</button>
+        </div>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Resultats de la recherche</div>
+            <span class="rig-resultats-proc__compte">
+                @Trouvees.Length affichee(s) sur @JeuDemo.Demandes.Length
+            </span>
+        </div>
+
+        <div class="rig-table-cadre">
+            <table class="rig-table">
+                <thead>
+                    <tr>
+                        <th>N Demande</th>
+                        <th>Nom de la demande</th>
+                        <th>N Dossier</th>
+                        <th>Siren</th>
+                        <th>Client</th>
+                        <th>Traitement</th>
+                        <th>Etat</th>
+                        <th class="rig-table__centre">En cours</th>
+                        <th>Date de creation</th>
+                        <th>Date de validation</th>
+                        <th>Utilisateur</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in Trouvees)
+                    {
+                        var dem = d;
+                        var valide = EstValide(dem.Dossier);
+                        <tr class="@(dem.Alerte && !valide ? "rig-table__ligne--alerte" : "")"
+                            @onclick="() => Ouvrir.InvokeAsync(dem.Dossier)">
+                            <td class="rig-table__mono">@dem.Numero</td>
+                            <td>@dem.Nom</td>
+                            <td class="rig-table__mono">@dem.Dossier</td>
+                            <td class="rig-table__mono">@dem.Siren</td>
+                            <td>@dem.Client</td>
+                            <td class="rig-table__mono">@dem.Traitement</td>
+                            <td>
+                                <span class="rig-etat rig-etat--@(valide ? "ok" : dem.Statut)">
+                                    @(valide ? "Validee" : dem.Etat)
+                                </span>
+                            </td>
+                            <td class="rig-table__centre">@(!valide && dem.EnCours ? "oui" : "")</td>
+                            <td class="rig-table__mono">@dem.Creation</td>
+                            <td class="rig-table__mono">@(valide && string.IsNullOrEmpty(dem.Validation) ? JeuDemo.Aujourdhui.ToString("dd/MM/yyyy") : dem.Validation)</td>
+                            <td>@dem.Utilisateur</td>
+                        </tr>
+                    }
+                    @if (Trouvees.Length == 0)
+                    {
+                        <tr>
+                            <td colspan="11" class="rig-table__vide">
+                                Aucune demande ne repond a ces criteres.
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+@code {
+    /// <summary>Dit si un dossier a passe le controle final.</summary>
+    [Parameter, EditorRequired] public Func<string, bool> EstValide { get; set; } = _ => false;
+
+    /// <summary>Remonte le numero du dossier a ouvrir dans la visionneuse.</summary>
+    [Parameter] public EventCallback<string> Ouvrir { get; set; }
+
+    private string CritDemande = string.Empty;
+    private string CritClient = string.Empty;
+    private string CritProcessus = string.Empty;
+    private DateTime? CritDu;
+    private DateTime? CritAu;
+    private bool CritAlerte;
+    private bool CritEnCours;
+    private int CritTopMax = 50;
+    private readonly HashSet<string> CritEtats = new();
+
+    private void BasculerEtat(string etat)
+    {
+        if (!CritEtats.Add(etat)) CritEtats.Remove(etat);
+    }
+
+    private void Effacer()
+    {
+        CritDemande = string.Empty;
+        CritClient = string.Empty;
+        CritProcessus = string.Empty;
+        CritDu = null;
+        CritAu = null;
+        CritAlerte = false;
+        CritEnCours = false;
+        CritTopMax = 50;
+        CritEtats.Clear();
+    }
+
+    /// <summary>L etat affiche : la validation au controle final prime.</summary>
+    private string EtatReel(DemandeRcs d) => EstValide(d.Dossier) ? "Validee" : d.Etat;
+
+    private DemandeRcs[] Trouvees
+    {
+        get
+        {
+            IEnumerable<DemandeRcs> q = JeuDemo.Demandes;
+
+            if (!string.IsNullOrWhiteSpace(CritDemande))
+            {
+                var t = CritDemande.Trim();
+                q = q.Where(d => d.Numero.Contains(t, StringComparison.OrdinalIgnoreCase)
+                              || d.Nom.Contains(t, StringComparison.OrdinalIgnoreCase));
+            }
+            if (!string.IsNullOrWhiteSpace(CritClient))
+            {
+                var t = CritClient.Trim();
+                q = q.Where(d => d.Client.Contains(t, StringComparison.OrdinalIgnoreCase));
+            }
+            if (!string.IsNullOrWhiteSpace(CritProcessus)) q = q.Where(d => d.Traitement == CritProcessus);
+            if (CritDu is { } du) q = q.Where(d => d.Creation2.Date >= du.Date);
+            if (CritAu is { } au) q = q.Where(d => d.Creation2.Date <= au.Date);
+            if (CritEtats.Count > 0) q = q.Where(d => CritEtats.Contains(EtatReel(d)));
+            if (CritAlerte) q = q.Where(d => d.Alerte);
+            if (CritEnCours) q = q.Where(d => d.EnCours && !EstValide(d.Dossier));
+
+            return q.Take(Math.Clamp(CritTopMax, 1, 500)).ToArray();
+        }
+    }
+}

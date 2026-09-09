@@ -1,0 +1,438 @@
+/* ============================================================
+   RIG V3 - CHARTE GRAPHIQUE FIGEE
+   Direction V1 "filet large" - validee le 2026-09-09.
+
+   Regle fondatrice : aucun aplat de couleur, aucune carte coloree.
+   La couleur n'existe que dans des FILETS DEGRADES de 6 px et dans
+   les chiffres d'alerte.
+   Les degrades de statut sont IDENTIQUES en clair et en sombre :
+   seuls le fond, le texte et la teinte d'alerte s'inversent.
+
+   Aucun rouge dans l'interface (choix utilisateur du 2026-09-09).
+   Le rouge #C00000 de la charte Amitel reste reserve aux documents
+   PDF / Word - voir
+   Documentation/reference/90-transverse/documents-charte-amitel.md
+   ============================================================ */
+
+:root {
+  /* --- Degrades de statut : INVARIANTS entre les deux modes --- */
+  /* Palette ENCRE & LAITON.
+     Les teintes precedentes (indigo #4F46E5, cyan #22D3EE, jaune #FBBF24)
+     etaient tres saturees : lisibles, mais d'un registre "produit web"
+     qui jure avec un logiciel de greffe. On garde exactement les memes
+     QUATRE statuts, en tons rabattus : encre, acier, laiton, sauge. */
+  --rig-grad-action:  linear-gradient(90deg, #2C4363, #7E9AC0); /* depend de moi */
+  --rig-grad-attente: linear-gradient(90deg, #55606E, #9AA5B4); /* bloque par un tiers */
+  --rig-grad-alerte:  linear-gradient(90deg, #8A5A20, #C9A227); /* hors delai legal */
+  --rig-grad-ok:      linear-gradient(90deg, #3B6656, #8DBBA1); /* fait / conforme */
+  --rig-grad-marque:  linear-gradient(90deg, #22344B, #3E566F 55%, #B08D3F);
+
+  /* --- Typographie --- */
+  --rig-font: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --rig-font-mono: ui-monospace, Consolas, "Cascadia Mono", monospace;
+  --rig-fs-kpi: 34px;
+  --rig-fs-titre: 19px;
+  --rig-fs-corps: 14px;
+  --rig-fs-dense: 12px;
+  --rig-fs-kicker: 10px;
+  --rig-lh: 1.5;
+  --rig-ls-kicker: .12em;
+
+  /* --- Echelle d'espacement (multiples de 4) --- */
+  --rig-esp-1: 4px;
+  --rig-esp-2: 8px;
+  --rig-esp-3: 12px;
+  --rig-esp-4: 16px;
+  --rig-esp-5: 24px;
+  --rig-esp-6: 32px;
+
+  /* --- Formes --- */
+  --rig-radius: 10px;
+  --rig-radius-sm: 6px;
+  --rig-filet: 6px;      /* epaisseur du filet de statut : signature V1 */
+  --rig-filet-fin: 3px;  /* filet en liste */
+}
+
+/* --- MODE SOMBRE (defaut) --- */
+:root,
+[data-rig-theme="sombre"] {
+  --rig-fond: #0C0F16;
+  --rig-fond-2: rgba(255, 255, 255, .035);
+  --rig-bord: rgba(255, 255, 255, .11);
+  --rig-bord-faible: rgba(255, 255, 255, .06);
+  --rig-texte: #F2F5FA;
+  --rig-texte-2: #C3CCDA;
+  --rig-texte-3: #69748A;
+  --rig-ombre: 0 1px 2px rgba(0, 0, 0, .55), 0 10px 26px rgba(0, 0, 0, .40);
+  --rig-ombre-saisie: 0 2px 6px rgba(0, 0, 0, .60), 0 22px 48px rgba(0, 0, 0, .52);
+  --rig-alerte: #C9A227;
+  --rig-focus: #B08D3F;
+}
+
+/* --- MODE CLAIR --- */
+/* Pas de blanc pur : sur un grand ecran de travail il eblouit et fatigue.
+   Le fond garde la teinte bleutee du mode sombre (#0C0F16), en clair.
+   Contraste texte principal / fond : ~13:1, tres au-dela du seuil AA. */
+[data-rig-theme="clair"] {
+  --rig-fond: #D8DDE6;
+  --rig-fond-2: #CBD2DD;
+  --rig-bord: rgba(18, 24, 38, .22);
+  --rig-bord-faible: #BFC7D4;
+  --rig-texte: #171B24;
+  --rig-texte-2: #414A5C;
+  --rig-texte-3: #6E7889;
+  --rig-ombre: 0 1px 2px rgba(18, 24, 38, .12), 0 10px 24px rgba(18, 24, 38, .14);
+  --rig-ombre-saisie: 0 2px 6px rgba(18, 24, 38, .18), 0 22px 44px rgba(18, 24, 38, .22);
+  --rig-alerte: #8A5A20;
+  --rig-focus: #7A6224;
+}
+
+/* ============================================================
+   BASE
+   ============================================================ */
+
+/* Sans cette remise a plat, une largeur de 100 % s'ajoute au
+   remplissage interieur et a la bordure : tout champ de saisie
+   deborde alors de sa colonne (constate dans la saisie guidee). */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--rig-fond);
+  color: var(--rig-texte);
+  font-family: var(--rig-font);
+  font-size: var(--rig-fs-corps);
+  line-height: var(--rig-lh);
+}
+
+.rig-page {
+  padding: var(--rig-esp-4);
+}
+
+.rig-filet-marque {
+  height: 4px;
+  background: var(--rig-grad-marque);
+}
+
+.rig-kicker {
+  font: var(--rig-fs-kicker) / 1.3 var(--rig-font-mono);
+  letter-spacing: var(--rig-ls-kicker);
+  text-transform: uppercase;
+  color: var(--rig-texte-3);
+}
+
+.rig-titre {
+  font-size: var(--rig-fs-titre);
+  font-weight: 300;
+  color: var(--rig-texte);
+}
+
+.rig-titre b {
+  font-weight: 600;
+}
+
+.rig-entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--rig-esp-3);
+}
+
+.rig-badge {
+  font: var(--rig-fs-kicker) var(--rig-font-mono);
+  letter-spacing: .08em;
+  color: var(--rig-texte-3);
+  border: 1px solid var(--rig-bord);
+  border-radius: 14px;
+  padding: 3px 10px;
+}
+
+/* ============================================================
+   FILET DE STATUT : la signature de la charte
+   ============================================================ */
+.rig-filet {
+  height: var(--rig-filet);
+  border-radius: calc(var(--rig-filet) / 2);
+  margin-bottom: var(--rig-esp-2);
+}
+
+.rig-filet--action  { background: var(--rig-grad-action); }
+.rig-filet--attente { background: var(--rig-grad-attente); }
+.rig-filet--alerte  { background: var(--rig-grad-alerte); }
+.rig-filet--ok      { background: var(--rig-grad-ok); }
+
+.rig-filet-v {
+  width: var(--rig-filet-fin);
+  height: 26px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+
+/* Les filets VERTICAUX etaient restes sur l ancienne palette vive alors
+   que les filets horizontaux avaient ete rabattus : memes teintes pour les
+   deux, sinon une meme information change de couleur selon l orientation.
+   Le variant --ok manquait : une ligne validee n avait plus de filet. */
+.rig-filet-v--action  { background: linear-gradient(180deg, #2C4363, #7E9AC0); }
+.rig-filet-v--attente { background: linear-gradient(180deg, #55606E, #9AA5B4); }
+.rig-filet-v--alerte  { background: linear-gradient(180deg, #8A5A20, #C9A227); }
+.rig-filet-v--ok      { background: linear-gradient(180deg, #3B6656, #8DBBA1); }
+.rig-filet-v--neutre  { background: var(--rig-bord); }
+
+/* ============================================================
+   CHIFFRE CLE
+   ============================================================ */
+.rig-kpis {
+  display: flex;
+  gap: var(--rig-esp-4);
+  margin-bottom: var(--rig-esp-3);
+}
+
+.rig-kpi {
+  flex: 1;
+}
+
+.rig-kpi__valeur {
+  font-size: var(--rig-fs-kpi);
+  line-height: 1;
+  font-weight: 700;
+  color: var(--rig-texte);
+}
+
+.rig-kpi__valeur--alerte {
+  color: var(--rig-alerte);
+}
+
+.rig-kpi__libelle {
+  font-size: 11px;
+  color: var(--rig-texte-3);
+  margin-top: var(--rig-esp-1);
+}
+
+/* ============================================================
+   RECHERCHE UNIVERSELLE
+   ============================================================ */
+.rig-recherche {
+  display: flex;
+  align-items: center;
+  gap: var(--rig-esp-3);
+  background: var(--rig-fond-2);
+  border: 1px solid var(--rig-bord);
+  border-radius: var(--rig-radius);
+  padding: 9px var(--rig-esp-3);
+  color: var(--rig-texte-3);
+  margin-bottom: var(--rig-esp-3);
+}
+
+.rig-recherche__saisie {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--rig-texte);
+  font: var(--rig-fs-corps) var(--rig-font);
+}
+
+.rig-recherche:focus-within {
+  border-color: var(--rig-focus);
+}
+
+.rig-touche {
+  font: var(--rig-fs-kicker) var(--rig-font-mono);
+  color: var(--rig-texte-3);
+  border: 1px solid var(--rig-bord);
+  border-radius: var(--rig-radius-sm);
+  padding: 2px 6px;
+}
+
+/* ============================================================
+   LISTE DE DEMANDES
+   ============================================================ */
+.rig-colonnes {
+  display: flex;
+  gap: var(--rig-esp-5);
+  align-items: flex-start;
+}
+
+.rig-colonne--principale { flex: 1.4; }
+.rig-colonne--laterale   { flex: 1; }
+
+.rig-ligne {
+  display: flex;
+  align-items: center;
+  gap: var(--rig-esp-3);
+  padding: var(--rig-esp-2) 0;
+  border-bottom: 1px solid var(--rig-bord-faible);
+  font-size: var(--rig-fs-dense);
+  color: var(--rig-texte-2);
+}
+
+.rig-ligne:last-child {
+  border-bottom: 0;
+}
+
+.rig-ligne--verrouille {
+  opacity: .45;
+}
+
+.rig-ligne__id {
+  font-weight: 700;
+  color: var(--rig-texte);
+}
+
+.rig-ligne__objet {
+  color: var(--rig-texte-3);
+}
+
+.rig-ligne__droite {
+  margin-left: auto;
+  text-align: right;
+}
+
+.rig-ligne__delai--alerte {
+  color: var(--rig-alerte);
+  font-weight: 700;
+}
+
+/* ============================================================
+   BLOC "REPRENDRE"
+   ============================================================ */
+.rig-reprendre {
+  display: flex;
+  align-items: center;
+  gap: var(--rig-esp-3);
+  background: var(--rig-fond-2);
+  border-left: var(--rig-filet-fin) solid;
+  border-image: linear-gradient(180deg, #4F46E5, #22D3EE) 1;
+  padding: 9px var(--rig-esp-3);
+  margin-bottom: var(--rig-esp-3);
+}
+
+.rig-reprendre__corps {
+  flex: 1;
+}
+
+/* ============================================================
+   ETATS DES CONTROLES
+   ============================================================ */
+.rig-bouton {
+  border: 1px solid var(--rig-focus);
+  color: var(--rig-focus);
+  background: transparent;
+  border-radius: var(--rig-radius-sm);
+  padding: 6px 14px;
+  font: var(--rig-fs-corps) var(--rig-font);
+  cursor: pointer;
+}
+
+.rig-bouton:hover {
+  background: var(--rig-fond-2);
+}
+
+.rig-bouton:focus-visible {
+  outline: 2px solid var(--rig-focus);
+  outline-offset: 2px;
+}
+
+.rig-bouton:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+.rig-champ {
+  background: var(--rig-fond-2);
+  border: 0;
+  border-bottom: 1px solid var(--rig-bord);
+  color: var(--rig-texte);
+  padding: 2px 6px;
+  font: var(--rig-fs-dense) var(--rig-font);
+}
+
+.rig-champ:focus {
+  outline: 0;
+  border-bottom: 2px solid var(--rig-focus);
+}
+
+.rig-champ--erreur {
+  border-bottom: 2px solid var(--rig-alerte);
+}
+
+.rig-champ:disabled {
+  opacity: .5;
+}
+
+.rig-code {
+  font: 11px var(--rig-font-mono);
+  background: var(--rig-fond-2);
+  border: 1px solid var(--rig-bord);
+  border-radius: 4px;
+  padding: 0 5px;
+}
+
+/* ============================================================
+   ETAT DES SERVICES
+   ============================================================ */
+.rig-service {
+  display: flex;
+  align-items: center;
+  gap: var(--rig-esp-2);
+  padding: 2px 0;
+  font-size: var(--rig-fs-dense);
+  color: var(--rig-texte-2);
+}
+
+.rig-service__jauge {
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+
+/* --- Commandes de fenetre (client lourd, barre de titre native supprimee) --- */
+/* L'entete fait office de zone de deplacement : pas de selection de texte. */
+.rig-entete {
+  user-select: none;
+  cursor: default;
+}
+
+.rig-fenetre {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: var(--rig-esp-2);
+}
+
+.rig-fenetre__bouton {
+  /* Format d'une vraie barre de titre Windows : les 30x26 precedents
+     etaient trop petits pour etre vises sans effort. */
+  width: 46px;
+  height: 34px;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--rig-texte-2);
+  font-family: var(--rig-font-mono);
+  line-height: 1;
+  cursor: pointer;
+  transition: background .12s ease, color .12s ease;
+}
+
+.rig-fenetre__bouton:hover {
+  background: var(--rig-surface-2, rgba(127, 127, 127, .14));
+  color: var(--rig-texte);
+}
+
+.rig-fenetre__bouton--fermer:hover {
+  /* Sobre : l'ancien degrade orange vif etait la seule tache de couleur
+     saturee de toute l'interface, et il sautait au visage au survol. */
+  background: #C0392B;
+  color: #FFFFFF;
+}

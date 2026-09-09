@@ -1,0 +1,991 @@
+/* ============================================================
+   RIG V3 - ACCUEIL A TUILES POSABLES
+   Complement de rig-charte.css. Meme regle fondatrice :
+   aucun aplat de couleur, la couleur ne vit que dans les filets.
+   ============================================================ */
+
+/* ---------- Ossature : menu a gauche, plan de travail a droite ---------- */
+.rig-accueil {
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  min-height: 100vh;
+}
+
+/* ---------- Menu de gauche, groupes depliables ---------- */
+.rig-menu {
+  border-right: 1px solid var(--rig-bord);
+  padding: var(--rig-esp-4) var(--rig-esp-2);
+  overflow-y: auto;
+  max-height: 100vh;
+}
+.rig-menu__groupe { margin-bottom: var(--rig-esp-1); }
+.rig-menu__tete {
+  display: flex; align-items: center; gap: var(--rig-esp-2);
+  width: 100%;
+  background: none; border: 0; cursor: pointer;
+  color: var(--rig-texte-2);
+  font: 600 var(--rig-fs-dense)/1.4 var(--rig-font);
+  letter-spacing: var(--rig-ls-kicker); text-transform: uppercase;
+  padding: var(--rig-esp-2) var(--rig-esp-2);
+  border-radius: var(--rig-radius-sm);
+}
+.rig-menu__tete:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
+.rig-menu__chevron {
+  font: 10px var(--rig-font-mono);
+  color: var(--rig-texte-3);
+  transition: transform .15s ease;
+  display: inline-block;
+}
+.rig-menu__groupe--ouvert .rig-menu__chevron { transform: rotate(90deg); }
+.rig-menu__filet { width: 3px; height: 14px; border-radius: 2px; flex: none; }
+.rig-menu__compte { margin-left: auto; color: var(--rig-texte-3); font-size: 10px; }
+.rig-menu__liste { list-style: none; margin: 0; padding: 0 0 var(--rig-esp-2) 0; }
+.rig-menu__lien {
+  display: block; width: 100%; text-align: left;
+  background: none; border: 0; cursor: pointer;
+  color: var(--rig-texte-2);
+  font: var(--rig-fs-dense)/1.6 var(--rig-font);
+  padding: 3px var(--rig-esp-2) 3px 26px;
+  border-radius: var(--rig-radius-sm);
+}
+.rig-menu__lien:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
+.rig-menu__code {
+  font: 10px var(--rig-font-mono);
+  color: var(--rig-texte-3);
+  margin-right: var(--rig-esp-2);
+}
+
+/* ---------- Plan de travail ---------- */
+.rig-plan { padding: var(--rig-esp-4) var(--rig-esp-5) var(--rig-esp-6); min-width: 0; }
+
+/* ---------- Barre de recherche : fixe, centree, hors des tuiles ---------- */
+.rig-recherche--fixe {
+  position: sticky;
+  top: var(--rig-esp-3);
+  z-index: 40;
+  max-width: 720px;
+  margin: 0 auto var(--rig-esp-5);
+  background: var(--rig-fond);
+}
+.rig-resultats {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px);
+  border: 1px solid var(--rig-bord);
+  border-radius: var(--rig-radius);
+  background: var(--rig-fond);
+  overflow: hidden;
+  z-index: 41;
+}
+.rig-resultat {
+  display: flex; align-items: center; gap: var(--rig-esp-3);
+  width: 100%; text-align: left;
+  background: none; border: 0; border-bottom: 1px solid var(--rig-bord-faible);
+  cursor: pointer; color: var(--rig-texte);
+  font: var(--rig-fs-corps)/1.4 var(--rig-font);
+  padding: var(--rig-esp-3) var(--rig-esp-4);
+}
+.rig-resultat:last-child { border-bottom: 0; }
+.rig-resultat:hover { background: var(--rig-fond-2); }
+.rig-resultat__id { font: 12px var(--rig-font-mono); color: var(--rig-texte-3); }
+.rig-resultat__type { margin-left: auto; font-size: 11px; color: var(--rig-texte-3); }
+
+/* ---------- Grille de pose ---------- */
+.rig-grille {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-auto-rows: 116px;
+  gap: 12px;
+  position: relative;
+}
+.rig-grille--pose {
+  outline: 1px dashed var(--rig-bord-faible);
+  outline-offset: 6px;
+}
+
+/* ---------- Tuile ---------- */
+.rig-widget {
+  position: relative;
+  border: 1px solid var(--rig-bord);
+  border-radius: var(--rig-radius);
+  padding: var(--rig-esp-4);
+  overflow: hidden;
+  min-width: 0;
+  display: flex; flex-direction: column;
+  /* Le fond reprend celui de la page : la tuile n'est pas un aplat de
+     couleur, elle est juste OPAQUE pour que l'ombre la detache. */
+  background: var(--rig-fond);
+  box-shadow: var(--rig-ombre);
+  transition: box-shadow .14s ease, transform .14s ease;
+}
+.rig-widget:hover { box-shadow: var(--rig-ombre-saisie); }
+.rig-widget--saisi {
+  outline: 1px dashed var(--rig-focus);
+  box-shadow: var(--rig-ombre-saisie);
+  transform: scale(1.01);
+  opacity: .95;
+  cursor: grabbing;
+  z-index: 30;
+}
+.rig-widget__tete {
+  display: flex; align-items: center; gap: var(--rig-esp-2);
+  margin-bottom: var(--rig-esp-3);
+  cursor: grab;
+  user-select: none;
+}
+.rig-widget__poignee { font: 12px var(--rig-font-mono); color: var(--rig-texte-3); }
+.rig-widget__titre {
+  font: 600 var(--rig-fs-kicker)/1 var(--rig-font);
+  letter-spacing: var(--rig-ls-kicker); text-transform: uppercase;
+  color: var(--rig-texte-2);
+}
+.rig-widget__fermer {
+  margin-left: auto; background: none; border: 0; cursor: pointer;
+  color: var(--rig-texte-3); font: 12px var(--rig-font-mono); padding: 0 4px;
+}
+.rig-widget__fermer:hover { color: var(--rig-texte); }
+.rig-widget__corps { min-height: 0; overflow: auto; flex: 1 1 auto; }
+
+/* ---------- Panneau des tuiles (allumer / eteindre) ---------- */
+.rig-tuiles-panneau {
+  position: absolute; right: 0; top: calc(100% + 6px);
+  min-width: 240px; z-index: 42;
+  border: 1px solid var(--rig-bord);
+  border-radius: var(--rig-radius);
+  background: var(--rig-fond);
+  padding: var(--rig-esp-3);
+}
+.rig-bascule {
+  display: flex; align-items: center; gap: var(--rig-esp-3);
+  width: 100%; text-align: left;
+  background: none; border: 0; cursor: pointer;
+  color: var(--rig-texte-2); font: var(--rig-fs-dense)/1.6 var(--rig-font);
+  padding: var(--rig-esp-2); border-radius: var(--rig-radius-sm);
+  transition: background .14s ease, color .14s ease;
+}
+.rig-bascule:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
+.rig-bascule--actif { color: var(--rig-texte); }
+.rig-bascule:focus-visible {
+  outline: 2px solid var(--rig-focus);
+  outline-offset: 2px;
+}
+
+/* --- L'interrupteur lui-meme ---------------------------------------
+   La piste reste creuse et neutre a l'arret ; allumee, elle prend le
+   degrade de marque. Le pouce est un vrai palet : il glisse avec un
+   leger depassement, s'ecrase pendant le trajet, et porte une ombre
+   pour se detacher de la piste. */
+.rig-bascule__temoin {
+  --piste-l: 36px;
+  --piste-h: 20px;
+  --palet: 14px;
+  width: var(--piste-l); height: var(--piste-h);
+  border-radius: calc(var(--piste-h) / 2);
+  flex: none; position: relative;
+  background: var(--rig-fond-2);
+  box-shadow: inset 0 0 0 1px var(--rig-bord);
+  transition: box-shadow .2s ease, background .2s ease;
+}
+.rig-bascule__temoin::before {
+  /* Le degrade allume, revele par l'opacite : evite un saut de couleur. */
+  content: ""; position: absolute; inset: 0;
+  border-radius: inherit;
+  background: var(--rig-grad-marque);
+  opacity: 0;
+  transition: opacity .2s ease;
+}
+.rig-bascule__temoin::after {
+  content: ""; position: absolute;
+  top: calc((var(--piste-h) - var(--palet)) / 2);
+  left: calc((var(--piste-h) - var(--palet)) / 2);
+  width: var(--palet); height: var(--palet);
+  border-radius: 50%;
+  background: var(--rig-texte-3);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .45);
+  transition:
+    transform .24s cubic-bezier(.34, 1.56, .64, 1),
+    background .2s ease,
+    width .16s ease;
+}
+.rig-bascule:hover .rig-bascule__temoin { box-shadow: inset 0 0 0 1px var(--rig-texte-3); }
+.rig-bascule:active .rig-bascule__temoin::after { width: calc(var(--palet) + 4px); }
+
+.rig-bascule--actif .rig-bascule__temoin { box-shadow: inset 0 0 0 1px transparent; }
+.rig-bascule--actif .rig-bascule__temoin::before { opacity: 1; }
+.rig-bascule--actif .rig-bascule__temoin::after {
+  transform: translateX(calc(var(--piste-l) - var(--palet) - (var(--piste-h) - var(--palet))));
+  background: #FFFFFF;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rig-bascule__temoin::after { transition: none; }
+}
+
+/* ---------- Widget performance ---------- */
+.rig-perf { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--rig-esp-3); }
+.rig-perf__mesure { min-width: 0; }
+.rig-perf__valeur { font: 600 20px/1.1 var(--rig-font-mono); color: var(--rig-texte); }
+.rig-perf__libelle {
+  font-size: 11px; color: var(--rig-texte-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rig-perf__barre {
+  height: 3px; border-radius: 2px; margin-top: 4px;
+  background: var(--rig-bord-faible); overflow: hidden;
+}
+.rig-perf__barre > span { display: block; height: 100%; }
+
+/* ---------- Widget alertes ---------- */
+.rig-alerte {
+  display: flex; align-items: flex-start; gap: var(--rig-esp-3);
+  padding: var(--rig-esp-2) 0;
+  border-bottom: 1px solid var(--rig-bord-faible);
+}
+.rig-alerte:last-child { border-bottom: 0; }
+.rig-alerte--eteinte { opacity: .38; }
+.rig-alerte__corps { min-width: 0; }
+.rig-alerte__titre { font-size: var(--rig-fs-dense); color: var(--rig-texte); }
+.rig-alerte__detail { font-size: 11px; color: var(--rig-texte-3); }
+
+/* ---------- Visionneuse documentaire (esprit VGED) ---------- */
+.rig-vged {
+  position: fixed; inset: 0; z-index: 90;
+  background: var(--rig-fond);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+.rig-vged__entete {
+  display: flex; align-items: center; gap: var(--rig-esp-3);
+  padding: var(--rig-esp-3) var(--rig-esp-4);
+  border-bottom: 1px solid var(--rig-bord);
+}
+.rig-vged__corps {
+  display: grid; grid-template-columns: 280px 1fr 240px;
+  min-height: 0;
+}
+.rig-vged__arbre, .rig-vged__meta {
+  border-right: 1px solid var(--rig-bord);
+  padding: var(--rig-esp-3);
+  overflow-y: auto;
+}
+.rig-vged__meta { border-right: 0; border-left: 1px solid var(--rig-bord); }
+.rig-vged__apercu {
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: var(--rig-esp-5); overflow: auto;
+}
+.rig-vged__page {
+  width: 520px; max-width: 100%; min-height: 700px;
+  border: 1px solid var(--rig-bord);
+  border-radius: var(--rig-radius-sm);
+  padding: var(--rig-esp-6);
+  font: var(--rig-fs-dense)/1.7 var(--rig-font);
+  color: var(--rig-texte-2);
+}
+.rig-vged__doc {
+  display: flex; align-items: center; gap: var(--rig-esp-2);
+  width: 100%; text-align: left;
+  background: none; border: 0; cursor: pointer;
+  color: var(--rig-texte-2);
+  font: var(--rig-fs-dense)/1.6 var(--rig-font);
+  padding: 3px var(--rig-esp-2) 3px 24px; border-radius: var(--rig-radius-sm);
+}
+.rig-vged__doc:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
+.rig-vged__doc--actif { background: var(--rig-fond-2); color: var(--rig-texte); }
+.rig-vged__ligne-meta {
+  display: flex; justify-content: space-between; gap: var(--rig-esp-2);
+  font-size: 11px; padding: 3px 0; border-bottom: 1px solid var(--rig-bord-faible);
+}
+.rig-vged__ligne-meta > span:first-child { color: var(--rig-texte-3); }
+
+/* Bandeau d'erreur Blazor : masque tant que le framework ne le montre pas.
+   Sans cette regle, le template l'affiche en permanence (il n'a pas de
+   display:none par defaut hors des templates Microsoft). */
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    padding: 10px 16px;
+    background: var(--rig-alerte, #7f1d1d);
+    color: #fff;
+    font-size: 13px;
+}
+#blazor-error-ui .reload { color: #fff; text-decoration: underline; }
+
+
+/* ============================================================
+   BARRES DE DEFILEMENT
+   Les barres natives de Windows (17 px, gris opaque) cassent la
+   charte : on les remplace par un filet fin qui n'apparait qu'au
+   survol de la zone concernee.
+   ============================================================ */
+* { scrollbar-width: thin; scrollbar-color: var(--rig-bord) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+:hover::-webkit-scrollbar-thumb { background: var(--rig-bord); background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--rig-texte-3); background-clip: content-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* ============================================================
+   ADAPTATION A LA LARGEUR
+   La pose libre des tuiles suppose de la place. Sous 1100 px la
+   grille de 12 colonnes ecrase le contenu : on repasse alors en
+   colonne unique, dans l'ordre ou les tuiles ont ete posees, et le
+   menu devient une bande horizontale au-dessus du plan de travail.
+   Les positions enregistrees ne sont PAS perdues : elles sont
+   seulement neutralisees tant que la fenetre est etroite.
+   ============================================================ */
+@media (max-width: 1100px) {
+  .rig-accueil { grid-template-columns: 1fr; min-height: 0; }
+
+  .rig-menu {
+    border-right: 0;
+    border-bottom: 1px solid var(--rig-bord);
+    max-height: 30vh;
+    padding: var(--rig-esp-3) var(--rig-esp-3);
+  }
+
+  .rig-plan { padding: var(--rig-esp-3) var(--rig-esp-3) var(--rig-esp-5); }
+
+  .rig-grille {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+  }
+  /* Neutralise la pose absolue portee en style inline par Blazor. */
+  .rig-grille > .rig-widget {
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
+    overflow: visible;
+  }
+  .rig-widget__tete { cursor: default; }
+
+  .rig-recherche--fixe { max-width: none; }
+
+  /* L'entete tient sur une ligne en large ; ici elle se replie au lieu
+     de pousser les commandes de fenetre hors du cadre. */
+  .rig-entete { flex-wrap: wrap; gap: var(--rig-esp-2); }
+  .rig-titre { font-size: var(--rig-fs-corps); }
+
+  .rig-vged__corps { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+  .rig-vged__arbre { max-height: 30vh; border-right: 0; border-bottom: 1px solid var(--rig-bord); }
+  .rig-vged__meta { border-left: 0; border-top: 1px solid var(--rig-bord); max-height: 25vh; }
+  .rig-vged__apercu { padding: var(--rig-esp-3); }
+  .rig-vged__page { min-height: 0; padding: var(--rig-esp-4); }
+}
+
+@media (max-width: 720px) {
+  .rig-perf { grid-template-columns: 1fr 1fr; gap: var(--rig-esp-2); }
+  .rig-perf__valeur { font-size: 17px; }
+  .rig-menu { max-height: 26vh; }
+  .rig-badge { display: none; }
+  .rig-touche { display: none; }
+}
+
+/* ---------- Reglages d'une tuile (bouton engrenage de son entete) ---------- */
+.rig-widget__reglages {
+  margin-left: auto; background: none; border: 0; cursor: pointer;
+  color: var(--rig-texte-3); font-size: 13px; line-height: 1; padding: 0 4px;
+  opacity: 0; transition: opacity .12s ease, color .12s ease;
+}
+.rig-widget:hover .rig-widget__reglages,
+.rig-widget__reglages:focus-visible,
+.rig-widget__reglages--ouvert { opacity: 1; }
+.rig-widget__reglages:hover { color: var(--rig-texte); }
+.rig-widget__reglages--ouvert { color: var(--rig-focus); }
+
+.rig-reglages { display: flex; flex-direction: column; gap: 2px; }
+.rig-reglages__filet {
+  height: 1px; margin: var(--rig-esp-2) 0;
+  background: var(--rig-bord-faible);
+}
+.rig-vide { font-size: 11px; color: var(--rig-texte-3); padding: var(--rig-esp-2) 0; }
+
+/* ---------- Poignee de redimensionnement (coin bas-droit) ---------- */
+.rig-widget__taille {
+  position: absolute; right: 1px; bottom: 1px;
+  width: 20px; height: 20px;
+  cursor: nwse-resize;
+  opacity: .5; transition: opacity .12s ease;
+  touch-action: none;
+  z-index: 2;
+}
+.rig-widget:hover .rig-widget__taille { opacity: 1; }
+.rig-widget__taille::before,
+.rig-widget__taille::after {
+  content: ""; position: absolute; right: 3px;
+  height: 1px; background: var(--rig-texte-3);
+  transform: rotate(-45deg); transform-origin: right center;
+}
+.rig-widget__taille::before { bottom: 4px; width: 9px; }
+.rig-widget__taille::after  { bottom: 8px; width: 5px; }
+
+/* Sur fenetre etroite les tuiles occupent toute la largeur :
+   la poignee n'aurait plus rien a regler. */
+@media (max-width: 1100px) {
+  .rig-widget__taille { display: none; }
+}
+
+/* ============================================================
+   BARRE DE TITRE
+   Pleine largeur : toute la bande deplace la fenetre. L'ancienne
+   entete ne couvrait que la colonne de droite, donc le deplacement
+   ne repondait que sur une petite zone.
+   ============================================================ */
+.rig-barre {
+  display: flex; align-items: center; gap: var(--rig-esp-3);
+  padding: 0 0 0 var(--rig-esp-3);
+  height: 34px;
+  border-bottom: 1px solid var(--rig-bord);
+  user-select: none;
+  cursor: default;
+  /* Elle reste en haut quand la page defile : c'est la seule zone de
+     deplacement de la fenetre, la perdre en defilant la rend inutilisable.
+     Fond opaque obligatoire, sinon le contenu se lit au travers. */
+  position: sticky;
+  top: 4px;                /* sous le filet de marque, lui aussi colle */
+  z-index: 60;
+  background: var(--rig-fond);
+}
+.rig-barre__marque {
+  font: 600 var(--rig-fs-dense)/1 var(--rig-font);
+  letter-spacing: var(--rig-ls-kicker); text-transform: uppercase;
+  color: var(--rig-texte-2);
+}
+.rig-barre__marque b { color: var(--rig-texte); }
+.rig-barre__version { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); }
+.rig-barre__droite {
+  display: flex; align-items: center; gap: 0;
+  margin-left: auto; align-self: stretch;
+}
+.rig-barre__action {
+  width: 30px; height: 26px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 0; border-radius: 6px;
+  color: var(--rig-texte-3); font-size: 14px; cursor: pointer;
+  transition: background .12s ease, color .12s ease;
+}
+.rig-barre__action:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
+.rig-barre__action--ouvert { color: var(--rig-focus); background: var(--rig-fond-2); }
+
+/* Le panneau des reglages generaux s'ancre sous la barre. */
+.rig-barre .rig-tuiles-panneau { top: calc(100% + 10px); }
+
+/* L'entete du plan ne porte plus les commandes : elle ne fait plus
+   que presenter la journee. */
+.rig-entete { user-select: text; }
+
+/* Le filet de marque colle au bord haut, la barre juste dessous. */
+.rig-filet-marque { position: sticky; top: 0; z-index: 61; }
+
+/* La recherche se cale SOUS la barre de titre, pas dessous elle. */
+.rig-recherche--fixe { top: 54px; }
+
+/* ---------- Outils de l'entete du plan (dont le rouage de reglages) ---------- */
+.rig-entete { display: flex; align-items: center; justify-content: space-between; }
+.rig-entete__outils { display: flex; align-items: center; gap: var(--rig-esp-2); position: relative; }
+.rig-entete__action {
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid transparent; border-radius: var(--rig-radius-sm);
+  color: var(--rig-texte-3); font-size: 16px; cursor: pointer;
+  transition: background .14s ease, color .14s ease, border-color .14s ease;
+}
+.rig-entete__action:hover {
+  background: var(--rig-fond-2); color: var(--rig-texte);
+  border-color: var(--rig-bord);
+}
+.rig-entete__action--ouvert {
+  color: var(--rig-focus); background: var(--rig-fond-2);
+  border-color: var(--rig-bord);
+}
+.rig-entete__outils .rig-tuiles-panneau { top: calc(100% + 8px); }
+
+/* ---------- Barre de commandes de la visionneuse ---------- */
+.rig-vged__outils {
+  display: flex; align-items: center; gap: var(--rig-esp-2);
+  padding: var(--rig-esp-2) var(--rig-esp-4);
+  border-bottom: 1px solid var(--rig-bord);
+  flex-wrap: wrap;
+}
+.rig-bouton--plat {
+  font-size: 11px;
+  padding: 4px var(--rig-esp-3);
+}
+.rig-vged__compte {
+  margin-left: auto;
+  font: 10px var(--rig-font-mono);
+  color: var(--rig-texte-3);
+  letter-spacing: var(--rig-ls-kicker);
+}
+.rig-vged__vide {
+  font-size: 11px; color: var(--rig-texte-3);
+  padding: 2px var(--rig-esp-2) 6px 26px;
+}
+
+/* ============================================================
+   SAISIE GUIDEE : la frise + le formulaire de l'etape
+   ============================================================ */
+.rig-onglets { display: flex; gap: 2px; margin-right: var(--rig-esp-3); }
+.rig-onglet {
+  background: none; border: 1px solid transparent; border-radius: var(--rig-radius-sm);
+  color: var(--rig-texte-3); font: var(--rig-fs-dense)/1 var(--rig-font);
+  padding: 6px var(--rig-esp-3); cursor: pointer;
+  transition: color .12s ease, border-color .12s ease, background .12s ease;
+}
+.rig-onglet:hover { color: var(--rig-texte); background: var(--rig-fond-2); }
+.rig-onglet--actif {
+  color: var(--rig-texte); border-color: var(--rig-bord); background: var(--rig-fond-2);
+}
+
+.rig-saisie {
+  display: grid; grid-template-columns: 268px 1fr;
+  min-height: 0;
+}
+
+/* --- La frise : verticale, chaque pas porte son etat --- */
+.rig-frise {
+  list-style: none; margin: 0; padding: var(--rig-esp-4) var(--rig-esp-3);
+  border-right: 1px solid var(--rig-bord);
+  overflow-y: auto;
+  counter-reset: pas;
+}
+.rig-frise__pas { position: relative; }
+/* Le trait qui relie les pastilles : c'est lui qui fait la "frise". */
+.rig-frise__pas + .rig-frise__pas::before {
+  content: ""; position: absolute;
+  left: 25px; top: -10px; width: 1px; height: 14px;
+  background: var(--rig-bord);
+}
+.rig-frise__bouton {
+  display: flex; align-items: center; gap: var(--rig-esp-3);
+  width: 100%; text-align: left;
+  background: none; border: 1px solid transparent; border-radius: var(--rig-radius-sm);
+  cursor: pointer; color: var(--rig-texte-2);
+  font: var(--rig-fs-dense)/1.3 var(--rig-font);
+  padding: var(--rig-esp-2) var(--rig-esp-2);
+  margin-bottom: 10px;
+  transition: background .12s ease, border-color .12s ease;
+}
+.rig-frise__bouton:hover { background: var(--rig-fond-2); }
+.rig-frise__pastille {
+  width: 26px; height: 26px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--rig-bord);
+  font: 11px var(--rig-font-mono); color: var(--rig-texte-3);
+  transition: background .16s ease, color .16s ease, border-color .16s ease;
+}
+.rig-frise__libelle { flex: 1 1 auto; }
+.rig-frise__compte { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); }
+
+.rig-frise__pas--partiel .rig-frise__pastille { border-color: var(--rig-texte-3); color: var(--rig-texte-2); }
+.rig-frise__pas--complet .rig-frise__pastille {
+  border-color: transparent; background: var(--rig-grad-ok); color: var(--rig-fond);
+}
+.rig-frise__pas--courant .rig-frise__bouton {
+  background: var(--rig-fond-2); border-color: var(--rig-bord);
+  color: var(--rig-texte);
+}
+.rig-frise__pas--courant .rig-frise__pastille {
+  border-color: var(--rig-focus); color: var(--rig-focus);
+}
+
+/* --- Le formulaire --- */
+.rig-saisie__corps { padding: var(--rig-esp-5) var(--rig-esp-6); overflow-y: auto; min-width: 0; }
+.rig-saisie__entete {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--rig-esp-4); margin-bottom: var(--rig-esp-5);
+  padding-bottom: var(--rig-esp-3);
+  border-bottom: 1px solid var(--rig-bord);
+}
+.rig-saisie__titre { margin: 4px 0 2px; font: 300 var(--rig-fs-titre)/1.2 var(--rig-font); color: var(--rig-texte); }
+.rig-saisie__source { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); }
+.rig-saisie__navigation { display: flex; gap: var(--rig-esp-2); flex: none; }
+
+.rig-champs {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--rig-esp-4) var(--rig-esp-5);
+  max-width: 900px;
+}
+.rig-saisie-champ { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.rig-saisie-champ--pleine { grid-column: 1 / -1; }
+.rig-saisie-champ__libelle {
+  display: flex; align-items: center; gap: var(--rig-esp-2);
+  font-size: var(--rig-fs-dense); color: var(--rig-texte-2);
+}
+.rig-saisie-champ__requis {
+  font: 9px var(--rig-font-mono); letter-spacing: var(--rig-ls-kicker);
+  text-transform: uppercase; color: var(--rig-alerte);
+}
+.rig-saisie-champ__saisie {
+  background: var(--rig-fond-2);
+  border: 1px solid var(--rig-bord);
+  border-radius: var(--rig-radius-sm);
+  color: var(--rig-texte);
+  font: var(--rig-fs-corps)/1.3 var(--rig-font);
+  padding: 8px var(--rig-esp-3);
+  width: 100%;
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.rig-saisie-champ__saisie:focus {
+  outline: 0;
+  border-color: var(--rig-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rig-focus) 22%, transparent);
+}
+.rig-saisie-champ__colonne { font: 9px var(--rig-font-mono); color: var(--rig-texte-3); }
+
+@media (max-width: 1100px) {
+  .rig-saisie { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .rig-frise { border-right: 0; border-bottom: 1px solid var(--rig-bord); max-height: 28vh; }
+  .rig-champs { grid-template-columns: 1fr; }
+  .rig-saisie__corps { padding: var(--rig-esp-4) var(--rig-esp-3); }
+}
+
+/* ============================================================
+   ECRAN DE PROCEDURE : criteres a gauche, resultats a droite.
+   Motif repris de RIG v2 (PROC_DEMANDE : RECHERCHE + RESULTATS).
+   ============================================================ */
+.rig-proc {
+  position: fixed; inset: 0; z-index: 88;
+  background: var(--rig-fond);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.rig-proc__corps {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  min-height: 0;
+}
+
+.rig-criteres {
+  border-right: 1px solid var(--rig-bord);
+  padding: var(--rig-esp-4);
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--rig-esp-3);
+}
+.rig-criteres__bloc {
+  display: flex; flex-direction: column; gap: 2px;
+  padding-top: var(--rig-esp-3);
+  border-top: 1px solid var(--rig-bord-faible);
+}
+.rig-criteres__bloc .rig-kicker { margin-bottom: var(--rig-esp-2); }
+.rig-criteres__paire {
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--rig-esp-2);
+}
+.rig-criteres__actions {
+  margin-top: auto; padding-top: var(--rig-esp-3);
+  border-top: 1px solid var(--rig-bord-faible);
+}
+
+.rig-resultats-proc {
+  display: flex; flex-direction: column; min-width: 0; min-height: 0;
+}
+.rig-resultats-proc__entete {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--rig-esp-3) var(--rig-esp-4);
+  border-bottom: 1px solid var(--rig-bord);
+}
+.rig-resultats-proc__compte {
+  font: 10px var(--rig-font-mono); color: var(--rig-texte-3);
+  letter-spacing: var(--rig-ls-kicker);
+}
+
+/* --- La grille de resultats --- */
+.rig-table-cadre { overflow: auto; flex: 1 1 auto; min-height: 0; }
+.rig-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--rig-fs-dense);
+}
+.rig-table { width: 100%; }
+.rig-table thead th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--rig-fond);
+  text-align: left; font-weight: 600;
+  color: var(--rig-texte-3);
+  font-size: 10px; letter-spacing: var(--rig-ls-kicker); text-transform: uppercase;
+  padding: var(--rig-esp-2);
+  border-bottom: 1px solid var(--rig-bord);
+  white-space: nowrap;
+}
+.rig-table { table-layout: auto; }
+.rig-table tbody td {
+  padding: 7px var(--rig-esp-2);
+  border-bottom: 1px solid var(--rig-bord-faible);
+  color: var(--rig-texte-2);
+}
+/* Seules les colonnes techniques restent insecables : sinon la derniere
+   colonne (Utilisateur) sortait du cadre et il fallait defiler pour la lire. */
+.rig-table__mono, .rig-table__centre { white-space: nowrap; }
+.rig-table tbody tr { cursor: pointer; }
+.rig-table tbody tr:hover td { background: var(--rig-fond-2); color: var(--rig-texte); }
+.rig-table__mono { font-family: var(--rig-font-mono); font-size: 11px; }
+.rig-table__centre { text-align: center; }
+.rig-table__vide {
+  text-align: center; color: var(--rig-texte-3);
+  padding: var(--rig-esp-6) !important;
+}
+/* Une demande en alerte se repere au filet, pas a un fond colore. */
+.rig-table__ligne--alerte td:first-child {
+  box-shadow: inset 3px 0 0 0 var(--rig-alerte);
+}
+
+.rig-etat {
+  display: inline-block;
+  /* La pastille ne doit jamais casser sur deux lignes : elle grandirait
+     et deformerait la hauteur de la ligne. */
+  white-space: nowrap;
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--rig-bord);
+  color: var(--rig-texte-2);
+}
+.rig-etat--ok { border-color: transparent; box-shadow: inset 0 0 0 1px rgba(141, 187, 161, .55); }
+.rig-etat--alerte { border-color: transparent; box-shadow: inset 0 0 0 1px var(--rig-alerte); color: var(--rig-texte); }
+.rig-etat--action { border-color: transparent; box-shadow: inset 0 0 0 1px rgba(126, 154, 192, .55); }
+.rig-etat--attente { border-color: transparent; box-shadow: inset 0 0 0 1px rgba(154, 165, 180, .5); }
+
+.rig-menu__lien--actif {
+  background: var(--rig-fond-2);
+  color: var(--rig-texte);
+  box-shadow: inset 2px 0 0 0 var(--rig-focus);
+}
+
+@media (max-width: 1100px) {
+  .rig-proc__corps { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+  .rig-criteres { border-right: 0; border-bottom: 1px solid var(--rig-bord); max-height: 40vh; }
+}
+
+/* ---------- Fiches d une etape multiple (dirigeants, etablissements) ---------- */
+.rig-fiches {
+  display: flex; align-items: center; gap: var(--rig-esp-2);
+  flex-wrap: wrap;
+  margin: calc(var(--rig-esp-4) * -1) 0 var(--rig-esp-5);
+  padding-bottom: var(--rig-esp-3);
+  border-bottom: 1px solid var(--rig-bord-faible);
+}
+.rig-fiches__onglet {
+  background: none; border: 1px solid var(--rig-bord);
+  border-radius: 14px;
+  color: var(--rig-texte-3);
+  font: var(--rig-fs-dense)/1 var(--rig-font);
+  padding: 5px var(--rig-esp-3); cursor: pointer;
+  transition: color .12s ease, background .12s ease, border-color .12s ease;
+}
+.rig-fiches__onglet:hover { color: var(--rig-texte); background: var(--rig-fond-2); }
+.rig-fiches__onglet--actif {
+  color: var(--rig-texte); background: var(--rig-fond-2);
+  border-color: var(--rig-focus);
+}
+.rig-fiches__ajout, .rig-fiches__retrait {
+  background: none; border: 1px dashed var(--rig-bord);
+  border-radius: 14px; cursor: pointer;
+  color: var(--rig-texte-3);
+  font: var(--rig-fs-dense)/1 var(--rig-font);
+  padding: 5px var(--rig-esp-3);
+}
+.rig-fiches__ajout:hover { color: var(--rig-focus); border-color: var(--rig-focus); }
+.rig-fiches__retrait { margin-left: auto; }
+.rig-fiches__retrait:hover { color: var(--rig-alerte); border-color: var(--rig-alerte); }
+
+.rig-frise__libelle { display: flex; flex-direction: column; gap: 1px; }
+.rig-frise__fiches { font: 9px var(--rig-font-mono); color: var(--rig-texte-3); }
+.rig-frise__pas--complet .rig-frise__pastille { font-size: 9px; font-weight: 700; }
+
+/* ---------- Controle de validite ----------------------------------
+   Deux niveaux distincts : une valeur REFUSEE se voit tout de suite,
+   un champ seulement A RENSEIGNER reste discret — sinon un formulaire
+   vierge s afficherait entierement en alerte. */
+.rig-saisie-champ--refuse .rig-saisie-champ__saisie {
+  border-color: var(--rig-alerte);
+  box-shadow: inset 2px 0 0 0 var(--rig-alerte);
+}
+.rig-saisie-champ--manque .rig-saisie-champ__saisie {
+  border-style: dashed;
+}
+.rig-saisie-champ__refus {
+  font-size: 11px;
+  color: var(--rig-alerte);
+}
+.rig-saisie-champ__manque {
+  font-size: 11px;
+  color: var(--rig-texte-3);
+  font-style: italic;
+}
+
+.rig-frise__defaut { font: 9px var(--rig-font-mono); color: var(--rig-alerte); }
+.rig-frise__requis { font: 9px var(--rig-font-mono); color: var(--rig-texte-3); }
+.rig-frise__pas--refuse .rig-frise__pastille {
+  border-color: var(--rig-alerte);
+  color: var(--rig-alerte);
+  font-weight: 700;
+}
+
+/* ============================================================
+   CONTROLE FINAL : le recapitulatif de ce qui bloque
+   ============================================================ */
+.rig-recap {
+  margin: calc(var(--rig-esp-4) * -1) 0 var(--rig-esp-5);
+  padding-bottom: var(--rig-esp-4);
+  border-bottom: 1px solid var(--rig-bord-faible);
+}
+.rig-recap__entete {
+  display: flex; align-items: center; gap: var(--rig-esp-3);
+  padding: var(--rig-esp-3) 0 var(--rig-esp-4);
+}
+.rig-recap__pastille {
+  width: 38px; height: 38px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--rig-bord);
+  font: 600 13px var(--rig-font-mono);
+  color: var(--rig-texte-3);
+}
+.rig-recap__pastille--bloque { border-color: var(--rig-alerte); color: var(--rig-alerte); }
+.rig-recap__pastille--ok {
+  border-color: transparent; background: var(--rig-grad-ok);
+  color: var(--rig-fond); font-size: 11px;
+}
+.rig-recap__titre { font: 300 var(--rig-fs-titre)/1.2 var(--rig-font); color: var(--rig-texte); }
+.rig-recap__detail { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); margin-top: 3px; }
+
+/* Le bouton de validation : seul bouton "fort" de l'ecran, et il ne
+   s'allume que lorsque la liste est vide. */
+.rig-bouton--fort {
+  border-color: var(--rig-focus);
+  color: var(--rig-texte);
+  padding: 8px var(--rig-esp-5);
+}
+.rig-bouton--fort:disabled { border-color: var(--rig-bord); }
+
+.rig-recap__liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--rig-esp-3); }
+.rig-recap__groupe { border-left: 2px solid var(--rig-bord); padding-left: var(--rig-esp-3); }
+.rig-recap__aller {
+  display: flex; align-items: center; gap: var(--rig-esp-2);
+  width: 100%; text-align: left;
+  background: none; border: 0; cursor: pointer;
+  color: var(--rig-texte-2);
+  font: 600 var(--rig-fs-dense)/1.4 var(--rig-font);
+  padding: 4px var(--rig-esp-2); border-radius: var(--rig-radius-sm);
+}
+.rig-recap__aller:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
+.rig-recap__rang {
+  width: 18px; height: 18px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--rig-bord); border-radius: 50%;
+  font: 9px var(--rig-font-mono); color: var(--rig-texte-3);
+}
+.rig-recap__fiche { font: 9px var(--rig-font-mono); color: var(--rig-texte-3); margin-left: var(--rig-esp-2); }
+.rig-recap__nb { margin-left: auto; font: 10px var(--rig-font-mono); color: var(--rig-texte-3); }
+
+.rig-recap__points { list-style: none; margin: 2px 0 0; padding: 0 0 0 26px; }
+.rig-recap__point {
+  display: flex; align-items: baseline; gap: var(--rig-esp-3);
+  font-size: var(--rig-fs-dense);
+  color: var(--rig-texte-3);
+  padding: 2px 0;
+}
+.rig-recap__champ { color: var(--rig-texte-2); min-width: 190px; }
+.rig-recap__point--refuse .rig-recap__motif { color: var(--rig-alerte); }
+.rig-recap__motif { flex: 1 1 auto; }
+.rig-recap__colonne { font: 9px var(--rig-font-mono); color: var(--rig-texte-3); }
+
+@media (max-width: 1100px) {
+  .rig-recap__point { flex-direction: column; gap: 0; }
+  .rig-recap__champ { min-width: 0; }
+}
+
+/* ---------- Un dossier valide, vu depuis la file ----------
+   Il reste lisible mais se retire du premier plan : ce qui appelle une
+   action doit ressortir, pas ce qui est fini. */
+.rig-ligne--valide .rig-ligne__objet,
+.rig-ligne--valide .rig-ligne__id { opacity: .55; }
+.rig-ligne__valide {
+  font: 10px var(--rig-font-mono);
+  letter-spacing: var(--rig-ls-kicker);
+  text-transform: uppercase;
+  color: var(--rig-texte-3);
+  border: 1px solid var(--rig-bord);
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+
+/* Une arrivee sans demande rattachee ne mene nulle part : la ligne ne doit
+   pas faire croire au contraire. */
+.rig-table__ligne--inerte { cursor: default; }
+.rig-table__ligne--inerte:hover td { background: transparent; color: var(--rig-texte-2); }
+.rig-table__sans { color: var(--rig-texte-3); font-style: italic; font-family: var(--rig-font); }
+
+/* ============================================================
+   HISTORIQUE VGED — commande « Historique VGED » de RIG v2.
+   Lignes horodatees a l instant de l action, pas reconstituees.
+   ============================================================ */
+.rig-historique {
+  margin: 0 var(--rig-esp-4) var(--rig-esp-3);
+  padding: var(--rig-esp-3);
+  border: 1px solid var(--rig-bord-faible);
+  border-radius: var(--rig-radius-sm);
+  background: var(--rig-fond-2);
+}
+.rig-historique__titre {
+  display: flex; align-items: baseline; gap: var(--rig-esp-2);
+  font-size: var(--rig-fs-kicker);
+  letter-spacing: var(--rig-ls-kicker);
+  text-transform: uppercase;
+  color: var(--rig-texte-3);
+  margin-bottom: var(--rig-esp-2);
+}
+.rig-historique__compte { margin-left: auto; font-family: var(--rig-font-mono); }
+.rig-historique__vide { font-size: var(--rig-fs-dense); color: var(--rig-texte-3); }
+.rig-historique__liste { list-style: none; margin: 0; padding: 0; }
+.rig-historique__liste li {
+  font: var(--rig-fs-dense)/1.7 var(--rig-font-mono);
+  color: var(--rig-texte-2);
+  padding-left: var(--rig-esp-3);
+  border-left: 2px solid var(--rig-bord);
+}
+.rig-historique__liste li:first-child { color: var(--rig-texte); border-left-color: var(--rig-focus); }
+.rig-bouton--enfonce { border-color: var(--rig-focus); color: var(--rig-texte); }
+
+/* ============================================================
+   PROCEDURE NON MAQUETTEE — un ecran qui se nomme plutot qu un
+   ecran emprunte a une autre procedure.
+   ============================================================ */
+.rig-nonmaq { padding: var(--rig-esp-6) var(--rig-esp-5); max-width: 620px; }
+.rig-nonmaq__kicker {
+  font-size: var(--rig-fs-kicker);
+  letter-spacing: var(--rig-ls-kicker);
+  text-transform: uppercase;
+  color: var(--rig-texte-3);
+}
+.rig-nonmaq__titre {
+  font-size: var(--rig-fs-titre);
+  color: var(--rig-texte);
+  margin-top: var(--rig-esp-1);
+}
+.rig-nonmaq__code {
+  font: var(--rig-fs-dense)/1.6 var(--rig-font-mono);
+  color: var(--rig-focus);
+  margin-bottom: var(--rig-esp-4);
+}
+.rig-nonmaq__texte {
+  font-size: var(--rig-fs-corps);
+  line-height: var(--rig-lh);
+  color: var(--rig-texte-2);
+  margin: 0 0 var(--rig-esp-3);
+}
+.rig-nonmaq__texte--sourd { color: var(--rig-texte-3); font-size: var(--rig-fs-dense); }
+.rig-chip {
+  font-family: var(--rig-font-mono);
+  background: var(--rig-fond-2);
+  border: 1px solid var(--rig-bord);
+  border-radius: var(--rig-radius-sm);
+  padding: 1px 5px;
+}

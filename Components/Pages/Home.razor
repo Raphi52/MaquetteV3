@@ -1,0 +1,1413 @@
+@page "/"
+@implements IAsyncDisposable
+@inject FenetreInterop Fenetre
+@inject IJSRuntime JS
+
+<PageTitle>RIG V3 - Accueil</PageTitle>
+
+<div data-rig-theme="@(ThemeSombre ? "sombre" : "clair")"
+     style="background:var(--rig-fond);color:var(--rig-texte);min-height:100vh">
+
+<div class="rig-filet-marque"></div>
+
+<header class="rig-barre" @onmousedown="Fenetre.Deplacer">
+    <span class="rig-barre__marque">RIG <b>V3</b></span>
+    <span class="rig-barre__version">@Version</span>
+
+    <div class="rig-barre__droite">
+        <div class="rig-fenetre">
+            <button class="rig-fenetre__bouton" title="Reduire"
+                    @onclick="Fenetre.Reduire" @onmousedown:stopPropagation="true">&#8211;</button>
+            <button class="rig-fenetre__bouton" title="Agrandir"
+                    @onclick="Fenetre.BasculerAgrandissement" @onmousedown:stopPropagation="true">&#9633;</button>
+            <button class="rig-fenetre__bouton rig-fenetre__bouton--fermer" title="Fermer"
+                    @onclick="Fenetre.Fermer" @onmousedown:stopPropagation="true">&#10005;</button>
+        </div>
+    </div>
+</header>
+
+<div class="rig-accueil">
+
+    @* ============ MENU DE GAUCHE : les procs, ranges par domaine ============ *@
+    <nav class="rig-menu">
+        <div class="rig-kicker" style="padding:var(--rig-esp-2);margin-bottom:var(--rig-esp-2)">
+            Traitements
+        </div>
+        @foreach (var groupe in Groupes)
+        {
+            var ouvert = GroupesOuverts.Contains(groupe.Code);
+            <div class="rig-menu__groupe @(ouvert ? "rig-menu__groupe--ouvert" : "")">
+                <button class="rig-menu__tete" @onclick="() => BasculerGroupe(groupe.Code)">
+                    <span class="rig-menu__chevron">&#9656;</span>
+                    <span class="rig-menu__filet" style="background:var(--rig-grad-@groupe.Statut)"></span>
+                    <span>@groupe.Libelle</span>
+                    <span class="rig-menu__compte">@groupe.Procs.Length</span>
+                </button>
+                @if (ouvert)
+                {
+                    <ul class="rig-menu__liste">
+                        @foreach (var proc in groupe.Procs)
+                        {
+                            <li>
+                                <button class="rig-menu__lien @(ProcOuverte == proc ? "rig-menu__lien--actif" : "")"
+                                        title="@proc.Code"
+                                        @onclick="() => OuvrirProc(proc)">
+                                    <span class="rig-menu__code">@proc.Code.Replace("PROC_", "")</span>@proc.Libelle
+                                </button>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+    </nav>
+
+    @* ============ PLAN DE TRAVAIL ============ *@
+    <div class="rig-plan">
+
+        <div class="rig-entete">
+            <div class="rig-titre">
+                Bonjour <b>@Utilisateur</b>
+                <span style="color:var(--rig-texte-3);font-size:12px">
+                    &middot; greffe @Greffe &middot; @DateDuJour
+                </span>
+            </div>
+            <div class="rig-entete__outils">
+                <button class="rig-entete__action @(PanneauTuilesOuvert ? "rig-entete__action--ouvert" : "")"
+                                title="Reglages de l'accueil"
+                                @onclick="BasculerPanneauTuiles" @onmousedown:stopPropagation="true">&#9881;</button>
+                @if (PanneauTuilesOuvert)
+                {
+                    <div class="rig-tuiles-panneau" @onmousedown:stopPropagation="true">
+                                <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">
+                                    Tuiles affichees sur l'accueil
+                                </div>
+                                @foreach (var def in Definitions)
+                                {
+                                    var visible = Pose(def.Id).Visible;
+                                    <button class="rig-bascule @(visible ? "rig-bascule--actif" : "")"
+                                                    @onclick="() => BasculerTuile(def.Id)">
+                                                <span class="rig-bascule__temoin"></span>
+                                                <span>@def.Titre</span>
+                                    </button>
+                                }
+                                <div class="rig-reglages__filet"></div>
+                                <button class="rig-bascule @(ThemeSombre ? "" : "rig-bascule--actif")"
+                                                @onclick="BasculerTheme">
+                                    <span class="rig-bascule__temoin"></span>
+                                    <span>Mode clair</span>
+                                </button>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* --- Recherche : centree, toujours a la meme place, jamais deplacable --- *@
+        <div class="rig-recherche rig-recherche--fixe" style="position:sticky">
+            <span style="font:13px var(--rig-font-mono);color:var(--rig-focus)">&#8981;</span>
+            <input class="rig-recherche__saisie"
+                   placeholder="Rechercher un SIREN, une societe, un dirigeant, un n° de demande…"
+                   @bind="Recherche" @bind:event="oninput" />
+            <span class="rig-touche">Ctrl K</span>
+            @if (Resultats.Length > 0)
+            {
+                <div class="rig-resultats">
+                    @foreach (var r in Resultats)
+                    {
+                        <button class="rig-resultat" @onclick="() => OuvrirDossier(r)">
+                            <span class="rig-filet-v rig-filet-v--@r.Statut"></span>
+                            <span class="rig-resultat__id">@r.Numero</span>
+                            <span>@r.Objet<br />
+                                <span style="font-size:11px;color:var(--rig-texte-3)">SIREN @r.Siren</span>
+                            </span>
+                            <span class="rig-resultat__type">@r.Type</span>
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+
+        @* --- Grille : chaque tuile reste ou on l'a posee --- *@
+        <div class="rig-grille" @ref="Grille">
+            @foreach (var def in Definitions)
+            {
+                var p = Pose(def.Id);
+                if (!p.Visible) { continue; }
+                <section class="rig-widget"
+                         data-tuile="@def.Id"
+                         data-col="@p.Colonne" data-ligne="@p.Ligne"
+                         data-larg="@p.Largeur" data-haut="@p.Hauteur"
+                         style="grid-column:@p.Colonne / span @p.Largeur;grid-row:@p.Ligne / span @p.Hauteur">
+                    <header class="rig-widget__tete">
+                        <span class="rig-widget__poignee">&#8942;&#8942;</span>
+                        <span class="rig-widget__titre">@def.Titre</span>
+                        <button class="rig-widget__reglages @(ReglagesTuile == def.Id ? "rig-widget__reglages--ouvert" : "")"
+                                title="Reglages de la tuile"
+                                @onclick="() => BasculerReglages(def.Id)"
+                                @onmousedown:stopPropagation="true">&#9881;</button>
+                    </header>
+                    <div class="rig-widget__corps">
+                        @if (ReglagesTuile == def.Id)
+                        {
+                            @ReglagesDe(def)
+                        }
+                        else
+                        {
+                            @switch (def.Id)
+                            {
+                                case "performance": @CorpsPerformance; break;
+                                case "alertes":     @CorpsAlertes;     break;
+                                case "file":        @CorpsFile;        break;
+                                case "reprise":     @CorpsReprise;     break;
+                                case "services":    @CorpsServices;    break;
+                                case "brouillons":  @CorpsBrouillons;  break;
+                                case "nouveautes":  @CorpsNouveautes;  break;
+                            }
+                        }
+                    </div>
+                    <span class="rig-widget__taille" title="Redimensionner"></span>
+                </section>
+            }
+        </div>
+    </div>
+</div>
+
+@* ============ ECRAN DE PROCEDURE ============ *@
+@* Le cadre est commun ; chaque procedure a son composant dans
+   Components/Ecrans/. Les procedures sans ecran dedie retombent sur
+   celui des demandes. *@
+@if (ProcOuverte is not null)
+{
+    <div class="rig-proc">
+
+        <div class="rig-vged__entete">
+            <span class="rig-filet-v rig-filet-v--action"></span>
+            <b style="font:13px var(--rig-font-mono)">@ProcOuverte.Code</b>
+            <span>@ProcOuverte.Libelle</span>
+            <span style="margin-left:auto"></span>
+            <button class="rig-bouton" @onclick="FermerProc">Fermer</button>
+        </div>
+
+        @switch (ProcOuverte.Code)
+        {
+            case "PROC_ACTES_NUM":
+                <EcranActes OuvrirDossier="OuvrirParNumero" />
+                break;
+
+            case "PROC_ARRIVEE":
+                <EcranArrivee OuvrirDossier="OuvrirParNumero" />
+                break;
+
+            case "PROC_DEMANDE":
+                <EcranDemandes EstValide="EstValide" Ouvrir="OuvrirParNumero" />
+                break;
+
+            // Les autres procedures du menu ne sont pas portees : elles le
+            // DISENT, au lieu d'afficher l'ecran des demandes sous un autre
+            // nom.
+            default:
+                <EcranNonMaquette Code="@ProcOuverte.Code" Libelle="@ProcOuverte.Libelle" />
+                break;
+        }
+    </div>
+}
+
+@* ============ VISIONNEUSE DOCUMENTAIRE (esprit VGED) ============ *@
+@if (DossierOuvert is not null)
+{
+    <div class="rig-vged">
+        <div class="rig-vged__entete">
+            <span class="rig-filet-v rig-filet-v--@DossierOuvert.Statut"></span>
+            <b style="font:13px var(--rig-font-mono)">@DossierOuvert.Numero</b>
+            <span>@DossierOuvert.Objet</span>
+            <span style="color:var(--rig-texte-3);font-size:12px">
+                &middot; SIREN @DossierOuvert.Siren &middot; @DossierOuvert.Type
+            </span>
+            <span style="margin-left:auto"></span>
+            <button class="rig-bouton" @onclick="FermerDossier">Fermer</button>
+        </div>
+
+        @* Commandes reprises de ETP_VGED/OPE_VGED.cs (RIG v2). *@
+        <div class="rig-vged__outils">
+            <div class="rig-onglets">
+                <button class="rig-onglet @(ModeSaisie ? "" : "rig-onglet--actif")"
+                        @onclick="() => ModeSaisie = false">Documents</button>
+                <button class="rig-onglet @(ModeSaisie ? "rig-onglet--actif" : "")"
+                        @onclick="() => ModeSaisie = true">Saisie guidee</button>
+            </div>
+            <button class="rig-bouton rig-bouton--plat" disabled>Ajouter une piece jointe au dossier</button>
+            <button class="rig-bouton rig-bouton--plat" disabled>Importer sans bordereau</button>
+            <button class="rig-bouton rig-bouton--plat" disabled>Generation bordereau</button>
+            <button class="rig-bouton rig-bouton--plat" disabled>Envoi par courriel</button>
+            <button class="rig-bouton rig-bouton--plat @(HistoriqueOuvert ? "rig-bouton--enfonce" : "")"
+                    title="Evenements horodates de ce dossier"
+                    @onclick="() => HistoriqueOuvert = !HistoriqueOuvert">
+                Historique VGED@(HistoriqueAffaire.Count > 0 ? $" ({HistoriqueAffaire.Count})" : "")
+            </button>
+            <span class="rig-vged__compte">
+                @Categories.Sum(c => c.Documents.Length) pieces &middot;
+                @Categories.Count(c => c.Documents.Length > 0) / @Categories.Length dossiers servis
+            </span>
+        </div>
+
+        @* Historique VGED : lignes horodatees au moment de l action, lues
+           dans accueil.json. Le plus recent en haut. *@
+        @if (HistoriqueOuvert)
+        {
+            <div class="rig-historique">
+                <div class="rig-historique__titre">
+                    Historique VGED &middot; @DossierOuvert.Numero
+                    <span class="rig-historique__compte">@HistoriqueAffaire.Count evenement(s)</span>
+                </div>
+                @if (HistoriqueAffaire.Count == 0)
+                {
+                    <div class="rig-historique__vide">
+                        Aucun evenement : rien n'a encore ete saisi ni valide sur ce dossier.
+                    </div>
+                }
+                else
+                {
+                    <ul class="rig-historique__liste">
+                        @foreach (var ligne in HistoriqueAffaire)
+                        {
+                            <li>@ligne</li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+
+        @if (ModeSaisie)
+        {
+            <div class="rig-saisie">
+
+                @* --- La frise : une pastille par etape, l'etat se lit d'un coup --- *@
+                <ol class="rig-frise">
+                    @for (var i = 0; i < Etapes.Length; i++)
+                    {
+                        var index = i;
+                        var etape = Etapes[i];
+                        var (remplis, total) = Avancement(etape);
+                        var nbFiches = Fiches(etape.Code).Count;
+                        var (manquants, refuses) = Defauts(etape);
+                        var etat = refuses > 0 ? "refuse"
+                                 : total > 0 && remplis == total ? "complet"
+                                 : index == EtapeCourante ? "encours"
+                                 : remplis > 0 ? "partiel" : "vide";
+                        <li class="rig-frise__pas rig-frise__pas--@etat @(index == EtapeCourante ? "rig-frise__pas--courant" : "")">
+                            <button class="rig-frise__bouton" @onclick="() => AllerEtape(index)">
+                                <span class="rig-frise__pastille">
+                                    @(refuses > 0 ? "!" : total > 0 && remplis == total ? "OK" : (index + 1).ToString())
+                                </span>
+                                <span class="rig-frise__libelle">
+                                    @etape.Titre
+                                    @if (etape.Multiple && nbFiches > 1)
+                                    {
+                                        <span class="rig-frise__fiches">@nbFiches @(etape.Unite.ToLower())s</span>
+                                    }
+                                    @if (refuses > 0)
+                                    {
+                                        <span class="rig-frise__defaut">@refuses valeur(s) refusee(s)</span>
+                                    }
+                                    else if (manquants > 0)
+                                    {
+                                        <span class="rig-frise__requis">@manquants requis manquant(s)</span>
+                                    }
+                                </span>
+                                <span class="rig-frise__compte">@remplis / @total</span>
+                            </button>
+                        </li>
+                    }
+                </ol>
+
+                @* --- Le formulaire de l'etape courante --- *@
+                @{
+                    var courante = Etapes[EtapeCourante];
+                    var fiches = Fiches(courante.Code);
+                    var iFiche = Math.Clamp(FicheCourante, 0, fiches.Count - 1);
+                }
+                <div class="rig-saisie__corps">
+                    <div class="rig-saisie__entete">
+                        <div>
+                            <div class="rig-kicker">Etape @(EtapeCourante + 1) sur @Etapes.Length</div>
+                            <h2 class="rig-saisie__titre">@courante.Titre</h2>
+                            <div class="rig-saisie__source">@courante.Source</div>
+                        </div>
+                        <div class="rig-saisie__navigation">
+                            <button class="rig-bouton" disabled="@(EtapeCourante == 0)"
+                                    @onclick="() => AllerEtape(EtapeCourante - 1)">Precedent</button>
+                            <button class="rig-bouton" disabled="@(EtapeCourante == Etapes.Length - 1)"
+                                    @onclick="() => AllerEtape(EtapeCourante + 1)">Suivant</button>
+                        </div>
+                    </div>
+
+                    @* Une etape multiple presente ses fiches en onglets. *@
+                    @if (courante.Multiple)
+                    {
+                        <div class="rig-fiches">
+                            @for (var f = 0; f < fiches.Count; f++)
+                            {
+                                var indexFiche = f;
+                                <button class="rig-fiches__onglet @(indexFiche == iFiche ? "rig-fiches__onglet--actif" : "")"
+                                        @onclick="() => FicheCourante = indexFiche">
+                                    @courante.Unite @(indexFiche + 1)
+                                </button>
+                            }
+                            <button class="rig-fiches__ajout" title="Ajouter"
+                                    @onclick="() => AjouterFiche(courante)">+ Ajouter</button>
+                            @if (fiches.Count > 1)
+                            {
+                                <button class="rig-fiches__retrait" title="Retirer cette fiche"
+                                        @onclick="() => SupprimerFiche(courante)">Retirer</button>
+                            }
+                        </div>
+                    }
+
+                    @* --- Controle final : le recapitulatif de TOUT ce qui bloque --- *@
+                    @if (courante.Code == "CONTROLE")
+                    {
+                        var defauts = TousLesDefauts();
+                        <div class="rig-recap">
+                            @if (DossierValide)
+                            {
+                                <div class="rig-recap__entete rig-recap__entete--valide">
+                                    <span class="rig-recap__pastille rig-recap__pastille--ok">OK</span>
+                                    <div>
+                                        <div class="rig-recap__titre">Dossier valide</div>
+                                        <div class="rig-recap__detail">
+                                            Les 7 etapes sont completes et acceptees.
+                                        </div>
+                                    </div>
+                                    <button class="rig-bouton" style="margin-left:auto"
+                                            @onclick="RouvrirDossier">Rouvrir la saisie</button>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="rig-recap__entete">
+                                    <span class="rig-recap__pastille @(defauts.Count == 0 ? "rig-recap__pastille--ok" : "rig-recap__pastille--bloque")">
+                                        @(defauts.Count == 0 ? "OK" : defauts.Count.ToString())
+                                    </span>
+                                    <div>
+                                        <div class="rig-recap__titre">
+                                            @(defauts.Count == 0
+                                                ? "Rien ne bloque la validation"
+                                                : defauts.Count == 1
+                                                    ? "1 point bloque la validation"
+                                                    : $"{defauts.Count} points bloquent la validation")
+                                        </div>
+                                        <div class="rig-recap__detail">
+                                            @defauts.Count(d => d.EstManquant) a renseigner &middot;
+                                            @defauts.Count(d => !d.EstManquant) valeur(s) refusee(s)
+                                        </div>
+                                    </div>
+                                    <button class="rig-bouton rig-bouton--fort" style="margin-left:auto"
+                                            disabled="@(defauts.Count > 0)"
+                                            @onclick="ValiderDossier">Valider le dossier</button>
+                                </div>
+
+                                @if (defauts.Count > 0)
+                                {
+                                    <ul class="rig-recap__liste">
+                                        @foreach (var groupe in defauts.GroupBy(d => (d.IndexEtape, d.Etape, d.Fiche, d.Unite)))
+                                        {
+                                            var g = groupe;
+                                            var multi = Fiches(Etapes[g.Key.IndexEtape].Code).Count > 1;
+                                            <li class="rig-recap__groupe">
+                                                <button class="rig-recap__aller"
+                                                        @onclick="() => AllerAuDefaut(g.First())">
+                                                    <span class="rig-recap__rang">@(g.Key.IndexEtape + 1)</span>
+                                                    <span>
+                                                        @g.Key.Etape
+                                                        @if (multi)
+                                                        {
+                                                            <span class="rig-recap__fiche">@g.Key.Unite @(g.Key.Fiche + 1)</span>
+                                                        }
+                                                    </span>
+                                                    <span class="rig-recap__nb">@g.Count()</span>
+                                                </button>
+                                                <ul class="rig-recap__points">
+                                                    @foreach (var d in g)
+                                                    {
+                                                        <li class="rig-recap__point @(d.EstManquant ? "" : "rig-recap__point--refuse")">
+                                                            <span class="rig-recap__champ">@d.Champ</span>
+                                                            <span class="rig-recap__motif">@d.Motif</span>
+                                                            <span class="rig-recap__colonne">@d.Colonne</span>
+                                                        </li>
+                                                    }
+                                                </ul>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                            }
+                        </div>
+                    }
+
+                    <div class="rig-champs">
+                        @foreach (var champ in courante.Champs)
+                        {
+                            var c = champ;
+                            var e = courante;
+                            var refus = RefusDe(e, c);
+                            var manque = RequisManquant(e, c);
+                            var etatChamp = refus is not null ? "rig-saisie-champ--refuse"
+                                          : manque ? "rig-saisie-champ--manque" : "";
+                            <label class="rig-saisie-champ rig-saisie-champ--@c.Largeur @etatChamp">
+                                <span class="rig-saisie-champ__libelle">
+                                    @c.Libelle
+                                    @if (c.Obligatoire) { <span class="rig-saisie-champ__requis">requis</span> }
+                                </span>
+                                @if (c.Choix.Length > 0)
+                                {
+                                    <select class="rig-saisie-champ__saisie"
+                                            value="@Valeur(e, c)"
+                                            @onchange="ev => Ecrire(e, c, ev.Value?.ToString())">
+                                        <option value=""></option>
+                                        @foreach (var choix in c.Choix)
+                                        {
+                                            <option value="@choix">@choix</option>
+                                        }
+                                    </select>
+                                }
+                                else
+                                {
+                                    <input class="rig-saisie-champ__saisie" type="@c.Type"
+                                           placeholder="@c.Exemple"
+                                           value="@Valeur(e, c)"
+                                           @onchange="ev => Ecrire(e, c, ev.Value?.ToString())" />
+                                }
+                                @if (refus is not null)
+                                {
+                                    <span class="rig-saisie-champ__refus">@refus</span>
+                                }
+                                else if (manque)
+                                {
+                                    <span class="rig-saisie-champ__manque">a renseigner</span>
+                                }
+                                <span class="rig-saisie-champ__colonne">@c.Colonne</span>
+                            </label>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+        <div class="rig-vged__corps">
+
+            <div class="rig-vged__arbre">
+                <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">Documents numerises</div>
+                @foreach (var cat in Categories)
+                {
+                    var ouvert = CategoriesOuvertes.Contains(cat.Nom);
+                    <div class="rig-menu__groupe @(ouvert ? "rig-menu__groupe--ouvert" : "")">
+                        <button class="rig-menu__tete" @onclick="() => BasculerCategorie(cat.Nom)">
+                            <span class="rig-menu__chevron">&#9656;</span>
+                            <span>@cat.Libelle</span>
+                            <span class="rig-menu__compte">@cat.Documents.Length</span>
+                        </button>
+                        @if (ouvert && cat.Documents.Length == 0)
+                        {
+                            <div class="rig-vged__vide">aucune piece</div>
+                        }
+                        @if (ouvert)
+                        {
+                            @foreach (var doc in cat.Documents)
+                            {
+                                <button class="rig-vged__doc @(DocumentOuvert == doc ? "rig-vged__doc--actif" : "")"
+                                        @onclick="() => DocumentOuvert = doc">
+                                    <span class="rig-menu__code">@doc.Extension</span>@doc.Libelle
+                                </button>
+                            }
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="rig-vged__apercu">
+                @if (DocumentOuvert is null)
+                {
+                    <div style="color:var(--rig-texte-3);font-size:var(--rig-fs-dense);align-self:center">
+                        Choisissez une piece a gauche.
+                    </div>
+                }
+                else
+                {
+                    <div class="rig-vged__page">
+                        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-4)">
+                            @DocumentOuvert.Libelle
+                        </div>
+                        <div style="white-space:pre-wrap">@DocumentOuvert.Apercu</div>
+                    </div>
+                }
+            </div>
+
+            <div class="rig-vged__meta">
+                <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">Piece</div>
+                @if (DocumentOuvert is not null)
+                {
+                    <div class="rig-vged__ligne-meta"><span>Type</span><span>@DocumentOuvert.Extension</span></div>
+                    <div class="rig-vged__ligne-meta"><span>Depose le</span><span>@DocumentOuvert.Date</span></div>
+                    <div class="rig-vged__ligne-meta"><span>Pages</span><span>@DocumentOuvert.Pages</span></div>
+                    <div class="rig-vged__ligne-meta"><span>Origine</span><span>@DocumentOuvert.Origine</span></div>
+                }
+                else
+                {
+                    <div style="font-size:11px;color:var(--rig-texte-3)">Aucune piece selectionnee.</div>
+                }
+            </div>
+        </div>
+        }
+    </div>
+}
+
+</div>
+
+@code {
+    // ---------------------------------------------------------------
+    // Donnees de demonstration : la charte se juge sur du contenu reel.
+    // ---------------------------------------------------------------
+    private const string Utilisateur = "Raphael";
+    private const string Greffe = "9999";
+    private const string Version = "3.0.14";
+    private static readonly string DateDuJour = "mardi 9 septembre";
+
+    private bool ThemeSombre = true;
+    private void BasculerTheme() => ThemeSombre = !ThemeSombre;
+
+    // ================= Menu de gauche =================
+    private record Proc(string Code, string Libelle);
+    private record Groupe(string Code, string Libelle, string Statut, Proc[] Procs);
+
+    private readonly HashSet<string> GroupesOuverts = new() { "RCS" };
+    private void BasculerGroupe(string code)
+    {
+        if (!GroupesOuverts.Add(code)) GroupesOuverts.Remove(code);
+    }
+
+    private readonly Groupe[] Groupes =
+    [
+        new("RCS", "RCS", "action",
+        [
+            new("PROC_DEMANDE",   "Demandes"),
+            new("PROC_ARRIVEE",   "Arrivee du courrier"),
+            new("PROC_ACTES_NUM", "Actes numerises"),
+            new("PROC_CLOT",      "Cloture"),
+            new("PROC_ARCHIRAD",  "Archivage / radiation"),
+            new("BODACC",         "BODACC")
+        ]),
+        new("JUD", "Judiciaire", "attente",
+        [
+            new("PROC_DEPOTJUD",   "Depots judiciaires"),
+            new("PROC_ACTEUR_JUD", "Acteurs"),
+            new("PROC_CJUD",       "Consultation judiciaire"),
+            new("PROC_AUDIENCE",   "Audiences"),
+            new("PROC_EXPERT",     "Experts"),
+            new("PROC_GEDJUD",     "GED judiciaire")
+        ]),
+        new("GED", "Documents", "ok",
+        [
+            new("PROC_DOC_DEMAT",        "Documents demateralises"),
+            new("PROC_CONTROLE_VIDIGED", "Controle VidiGED"),
+            new("PROC_COFFRE_FORT",      "Coffre-fort")
+        ]),
+        new("FAC", "Facturation", "ok",
+        [
+            new("PROC_FACTURE", "Factures"),
+            new("PROC_ENCAISS", "Encaissements"),
+            new("PROC_CREANCE", "Creances"),
+            new("PROC_FCLIENT", "Fiches clients"),
+            new("PROC_GCLIENT", "Gestion clients")
+        ]),
+        new("ADM", "Administration", "attente",
+        [
+            new("PROC_ACCUEIL_PARAM", "Parametres d'accueil"),
+            new("PROC_GESTEMAIL",     "Messagerie"),
+            new("PROC_GESTBANQ",      "Banques"),
+            new("PROC_EDIT_MAQUETTE", "Maquettes d'edition")
+        ])
+    ];
+
+    // ================= Tuiles =================
+    private record DefinitionTuile(string Id, string Titre, PoseTuile Defaut);
+
+    private readonly DefinitionTuile[] Definitions =
+    [
+        new("reprise",     "Reprendre",    new() { Colonne = 1, Ligne = 1, Largeur = 12, Hauteur = 1 }),
+        new("performance", "Performance",  new() { Colonne = 1, Ligne = 2, Largeur = 4,  Hauteur = 2 }),
+        new("alertes",     "Alertes",      new() { Colonne = 5, Ligne = 2, Largeur = 4,  Hauteur = 2 }),
+        new("services",    "Services",     new() { Colonne = 9, Ligne = 2, Largeur = 4,  Hauteur = 2 }),
+        new("file",        "Ma file",      new() { Colonne = 1, Ligne = 4, Largeur = 8,  Hauteur = 3 }),
+        new("brouillons",  "Brouillons",   new() { Colonne = 9, Ligne = 4, Largeur = 4,  Hauteur = 2 }),
+        new("nouveautes",  "Nouveautes",   new() { Colonne = 9, Ligne = 6, Largeur = 4,  Hauteur = 1 })
+    ];
+
+    private AccueilEtat Etat = new();
+    private bool PanneauTuilesOuvert;
+    private ElementReference Grille;
+    private IJSObjectReference? Module;
+    private DotNetObjectReference<Home>? Lien;
+
+    private PoseTuile Pose(string id)
+    {
+        if (Etat.Tuiles.TryGetValue(id, out var pose)) return pose;
+        var defaut = Definitions.First(d => d.Id == id).Defaut;
+        var copie = new PoseTuile
+        {
+            Colonne = defaut.Colonne, Ligne = defaut.Ligne,
+            Largeur = defaut.Largeur, Hauteur = defaut.Hauteur,
+            Visible = true
+        };
+        Etat.Tuiles[id] = copie;
+        return copie;
+    }
+
+    private void BasculerPanneauTuiles() => PanneauTuilesOuvert = !PanneauTuilesOuvert;
+
+    private void BasculerTuile(string id)
+    {
+        var p = Pose(id);
+        p.Visible = !p.Visible;
+        Etat.Enregistrer();
+    }
+
+    /// <summary>Appelee par rig-accueil.js quand la tuile est lachee sur une case.</summary>
+    [JSInvokable]
+    public void PoserTuile(string id, int colonne, int ligne)
+    {
+        var p = Pose(id);
+        p.Colonne = Math.Clamp(colonne, 1, Math.Max(13 - p.Largeur, 1));
+        p.Ligne = Math.Max(ligne, 1);
+        Etat.Enregistrer();
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void DimensionnerTuile(string id, int largeur, int hauteur)
+    {
+        var p = Pose(id);
+        p.Largeur = Math.Clamp(largeur, 3, Math.Max(13 - p.Colonne, 3));
+        p.Hauteur = Math.Max(hauteur, 1);
+        Etat.Enregistrer();
+        StateHasChanged();
+    }
+
+    protected override void OnInitialized()
+    {
+        Etat = AccueilEtat.Charger();
+        RelevePerf();
+
+        foreach (var def in Definitions) { Pose(def.Id); }
+        foreach (var a in Alertes)
+        {
+            if (!Etat.Alertes.ContainsKey(a.Id)) Etat.Alertes[a.Id] = true;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool premierRendu)
+    {
+        if (!premierRendu) return;
+        Module = await JS.InvokeAsync<IJSObjectReference>("import", "./rig-accueil.js");
+        Lien = DotNetObjectReference.Create(this);
+        await Module.InvokeVoidAsync("activerPose", Grille, Lien);
+        MinuteurPerf = new Timer(_ =>
+        {
+            RelevePerf();
+            _ = InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (MinuteurPerf is not null) await MinuteurPerf.DisposeAsync();
+        if (Module is not null)
+        {
+            try { await Module.InvokeVoidAsync("arreterPose"); } catch (JSDisconnectedException) { }
+            try { await Module.DisposeAsync(); } catch (JSDisconnectedException) { }
+        }
+        Lien?.Dispose();
+    }
+
+    // ================= Recherche =================
+    private string _recherche = string.Empty;
+    private string Recherche
+    {
+        get => _recherche;
+        set { _recherche = value; }
+    }
+
+    private record Dossier(string Numero, string Objet, string Siren, string Type, string Statut);
+
+    private readonly Dossier[] Fonds =
+    [
+        new("0000",   "Affaire de demonstration - AMITEL SAS", "903 118 776", "RCS", "action"),
+        new("004176", "Modification - SCI DU PARC",     "812 445 901", "RCS", "alerte"),
+        new("004182", "Immatriculation - AMITEL SAS",   "903 118 776", "RCS", "action"),
+        new("004179", "Radiation - MARTIN EURL",        "521 004 332", "RCS", "attente"),
+        new("004168", "Immatriculation - BATIPRO SARL", "440 927 115", "RCS", "neutre"),
+        new("J-00931", "Depot de bilan - TRANSNORD SA", "318 552 004", "JUD", "alerte")
+    ];
+
+    private Dossier[] Resultats =>
+        string.IsNullOrWhiteSpace(_recherche) || _recherche.Trim().Length < 2
+            ? []
+            : Fonds.Where(d =>
+                    d.Numero.Contains(_recherche.Trim(), StringComparison.OrdinalIgnoreCase)
+                 || d.Objet.Contains(_recherche.Trim(), StringComparison.OrdinalIgnoreCase)
+                 || d.Siren.Replace(" ", "").Contains(_recherche.Trim().Replace(" ", ""),
+                        StringComparison.OrdinalIgnoreCase))
+               .Take(6).ToArray();
+
+    // ================= Visionneuse =================
+    private record Document(string Libelle, string Extension, string Date, int Pages,
+                            string Origine, string Apercu);
+    private record Categorie(string Nom, string Libelle, Document[] Documents);
+
+    private Dossier? DossierOuvert;
+    private Document? DocumentOuvert;
+    private readonly HashSet<string> CategoriesOuvertes = new() { "DOSSIER", "FORMALITES" };
+
+    private void OuvrirDossier(Dossier d)
+    {
+        DossierOuvert = d;
+        DocumentOuvert = Categories.First(c => c.Documents.Length > 0).Documents[0];
+        _recherche = string.Empty;
+    }
+
+    private void FermerDossier()
+    {
+        DossierOuvert = null;
+        DocumentOuvert = null;
+    }
+
+    private void BasculerCategorie(string nom)
+    {
+        if (!CategoriesOuvertes.Add(nom)) CategoriesOuvertes.Remove(nom);
+    }
+
+    // Arborescence calquee sur les dossiers REELS de l'arbre VGED de RIG v2 :
+    // D:\RigApplication\Source\RIG\DLL\Processus\PROC_VDOSSIER\Nodes\
+    // (Dossier RCS, Formalites, Actes, Bilans, Inscriptions, Judiciaire,
+    //  Ordonnances de prorogation, Bordereaux de requisition, Bordereau
+    //  mandataire, Divergences BE, Non inscrits, Pieces jointes).
+    // Les libelles de commandes viennent de ETP_VGED/OPE_VGED.cs.
+    private readonly Categorie[] Categories =
+    [
+        new("DOSSIER", "Dossier RCS",
+        [
+            new("Statuts signes", "PDF", "12/03/2024", 14, "Depot guichet",
+                "STATUTS DE LA SOCIETE\n\nArticle 1 - Forme\nLa societe est une societe par actions simplifiee regie par les dispositions du Code de commerce.\n\nArticle 2 - Objet\nPrestation de services informatiques.\n\nArticle 3 - Denomination\nAMITEL SAS."),
+            new("Liste des souscripteurs", "PDF", "12/03/2024", 2, "Depot guichet",
+                "LISTE DES SOUSCRIPTEURS\n\nNom / Actions / Montant\nDUPONT Jean   600   6 000 EUR\nMARTIN Claire 400   4 000 EUR")
+        ]),
+        new("FORMALITES", "Formalites",
+        [
+            new("Demande d'immatriculation M0", "PDF", "12/03/2024", 4, "Teletransmission",
+                "DEMANDE D'IMMATRICULATION - CERFA M0\n\nDenomination : AMITEL SAS\nForme : Societe par actions simplifiee\nCapital : 10 000 EUR\nSiege : 12 rue des Lilas"),
+            new("Declaration de non-condamnation", "PDF", "12/03/2024", 1, "Teletransmission",
+                "DECLARATION SUR L'HONNEUR DE NON-CONDAMNATION\n\nJe soussigne DUPONT Jean, ne le 4 avril 1978 a Lyon, declare n'avoir fait l'objet d'aucune condamnation penale ni sanction civile ou administrative de nature a m'interdire de gerer.")
+        ]),
+        new("ACTES", "Actes",
+        [
+            new("Depot d'acte n 2024/0141", "PDF", "12/03/2024", 9, "Depot guichet",
+                "DEPOT D'ACTE N 2024/0141\n\nNature : bail commercial\nEntre SCI DU PARC, bailleur, et AMITEL SAS, preneur.\nLocaux a usage de bureaux sis 12 rue des Lilas.")
+        ]),
+        new("BILANS", "Bilans - comptes annuels", []),
+        new("INSCRIPTIONS", "Inscriptions - privileges",
+        [
+            new("Etat des inscriptions", "PDF", "14/03/2024", 1, "Edition greffe",
+                "ETAT DES INSCRIPTIONS\n\nAucun privilege, nantissement ni protet inscrit a ce jour.")
+        ]),
+        new("JUDICIAIRE", "Judiciaire", []),
+        new("ORDONNANCES", "Ordonnances de prorogation", []),
+        new("BORDEREAUX", "Bordereaux de requisition",
+        [
+            new("Bordereau de numerisation", "PDF", "12/03/2024", 1, "Numerisation",
+                "BORDEREAU DE NUMERISATION D'UN DOSSIER\n\nSite de numerisation : greffe 9999\nNombre de pages : 31\nDate : 12/03/2024")
+        ]),
+        new("MANDATAIRE", "Bordereau mandataire", []),
+        new("DIVERGENCES", "Divergences BE", []),
+        new("NONINSCRITS", "Non inscrits", []),
+        new("PJ", "Pieces jointes",
+        [
+            new("Piece d'identite du president", "JPG", "12/03/2024", 1, "Numerisation",
+                "[Numerisation d'une carte nationale d'identite]"),
+            new("Extrait Kbis", "PDF", "14/03/2024", 2, "Edition greffe",
+                "EXTRAIT KBIS\n\nGreffe du tribunal de commerce 9999\nIdentifiant : 903 118 776 RCS\nDenomination : AMITEL SAS\nForme juridique : Societe par actions simplifiee\nCapital : 10 000 EUR")
+        ])
+    ];
+
+    // ================= Ecran de procedure =================
+    // Le cadre et l aiguillage vivent ici ; les criteres, les grilles et
+    // les jeux de donnees sont dans Components/Ecrans/ et Metier/JeuDemo.cs.
+
+    private Proc? ProcOuverte;
+
+    private void OuvrirProc(Proc proc)
+    {
+        ProcOuverte = proc;
+        DossierOuvert = null;
+    }
+
+    private void FermerProc() => ProcOuverte = null;
+
+    /// <summary>
+    /// Point d entree commun aux trois ecrans : ils remontent un NUMERO de
+    /// dossier, la page se charge de retrouver l affaire et d ouvrir la
+    /// visionneuse. Les ecrans n ont ainsi rien a savoir de la visionneuse.
+    /// </summary>
+    private void OuvrirParNumero(string numeroDossier)
+    {
+        if (string.IsNullOrWhiteSpace(numeroDossier)) return;
+
+        var connu = Fonds.FirstOrDefault(f => f.Numero == numeroDossier);
+        if (connu is null)
+        {
+            var demande = JeuDemo.Demandes.FirstOrDefault(d => d.Dossier == numeroDossier);
+            connu = new Dossier(numeroDossier,
+                                demande?.Nom ?? numeroDossier,
+                                demande?.Siren ?? string.Empty,
+                                "RCS",
+                                demande?.Statut ?? "action");
+        }
+
+        ProcOuverte = null;
+        OuvrirDossier(connu);
+    }
+
+    // ================= Saisie guidee (la frise) =================
+    // Les etapes et leurs champs sont calques sur les tables reelles du
+    // dossier RCS de RIG v2 (D:/RigApplication/Source/BaseDeDonnees/
+    // RigDatabase/dbo/Tables) : DEMANDE, DOSSIER_RCS, CAPITAL, SIEGER +
+    // ETABLISSEMENT, ACTIVITE, DIRIGEANT, OBSERVATION_RCS.
+    // La colonne d'origine est rappelee sous chaque champ : c'est ce qui
+    // permet de brancher la saisie sur la base sans deviner.
+
+    private bool ModeSaisie;
+    private int EtapeCourante;
+    private int FicheCourante;
+
+    // Ce qui est saisi est CONSERVE : il vit dans accueil.json, range par
+    // affaire puis par etape. Une etape marquee Multiple porte plusieurs
+    // fiches (plusieurs dirigeants, plusieurs etablissements), les autres
+    // une seule.
+    private string CleAffaire => DossierOuvert?.Numero ?? "sans-affaire";
+
+    private List<Dictionary<string, string>> Fiches(string etape)
+    {
+        if (!Etat.Saisies.TryGetValue(CleAffaire, out var parEtape))
+        {
+            parEtape = new Dictionary<string, List<Dictionary<string, string>>>();
+            Etat.Saisies[CleAffaire] = parEtape;
+        }
+        if (!parEtape.TryGetValue(etape, out var fiches) || fiches.Count == 0)
+        {
+            fiches = [new Dictionary<string, string>()];
+            parEtape[etape] = fiches;
+        }
+        return fiches;
+    }
+
+    private Dictionary<string, string> FicheVue(Etape etape)
+    {
+        var fiches = Fiches(etape.Code);
+        var i = Math.Clamp(FicheCourante, 0, fiches.Count - 1);
+        return fiches[i];
+    }
+
+    private string Valeur(Etape e, Champ c)
+        => FicheVue(e).TryGetValue(c.Colonne, out var v) ? v : string.Empty;
+
+    private void Ecrire(Etape e, Champ c, string? v)
+    {
+        FicheVue(e)[c.Colonne] = v ?? string.Empty;
+        Etat.Enregistrer();
+        // Journal au grain de l ETAPE, pas du champ : un evenement par frappe
+        // rendrait l historique illisible.
+        Etat.Journaliser(CleAffaire, $"Saisie de l'etape {e.Titre}");
+    }
+
+    // Avancement d'une etape : toutes fiches confondues, sinon une deuxieme
+    // fiche vide ferait reculer un pas deja complet sans qu'on comprenne.
+    private (int Remplis, int Total) Avancement(Etape e)
+    {
+        var fiches = Fiches(e.Code);
+        var remplis = fiches.Sum(f => e.Champs.Count(c =>
+            f.TryGetValue(c.Colonne, out var v) && !string.IsNullOrWhiteSpace(v)));
+        return (remplis, e.Champs.Length * fiches.Count);
+    }
+
+    private void AjouterFiche(Etape e)
+    {
+        var fiches = Fiches(e.Code);
+        fiches.Add(new Dictionary<string, string>());
+        FicheCourante = fiches.Count - 1;
+        Etat.Enregistrer();
+    }
+
+    private void SupprimerFiche(Etape e)
+    {
+        var fiches = Fiches(e.Code);
+        if (fiches.Count <= 1) return;
+        fiches.RemoveAt(Math.Clamp(FicheCourante, 0, fiches.Count - 1));
+        FicheCourante = Math.Max(0, FicheCourante - 1);
+        Etat.Enregistrer();
+    }
+
+    private void AllerEtape(int index)
+    {
+        EtapeCourante = index;
+        FicheCourante = 0;
+    }
+
+    // ---- Controle de validite --------------------------------------
+    // Deux natures de defaut, volontairement distinctes :
+    //  - REQUIS MANQUANT : le champ est vide alors qu'il est obligatoire ;
+    //  - VALEUR REFUSEE  : la valeur saisie ne tient pas (cle SIREN, date
+    //    posterieure a aujourd'hui, code NAF mal forme...).
+    // Melanger les deux ferait clignoter en rouge un formulaire vierge.
+
+    private static readonly DateTime Ajd = DateTime.Today;
+
+    private string? RefusDe(Etape e, Champ c)
+    {
+        var motif = ValiditeSaisie.Refus(c.Controle, Valeur(e, c), Ajd);
+        if (motif is not null) return motif;
+
+        // Coherences entre deux dates d'une meme fiche.
+        var fiche = FicheVue(e);
+        if (c.Colonne == "DSSRC_DATE_EFFET")
+        {
+            fiche.TryGetValue("DSSRC_DATE_IMMAT", out var immat);
+            fiche.TryGetValue("DSSRC_DATE_EFFET", out var effet);
+            return ValiditeSaisie.RefusOrdre(immat, effet, "la date d'immatriculation");
+        }
+        if (c.Colonne == "ETBLS_DATE_DOMICILIATION")
+        {
+            fiche.TryGetValue("ETBLS_DATE_DEBUT", out var debut);
+            fiche.TryGetValue("ETBLS_DATE_DOMICILIATION", out var domi);
+            return ValiditeSaisie.RefusOrdre(debut, domi, "la date de debut");
+        }
+        return null;
+    }
+
+    private bool RequisManquant(Etape e, Champ c)
+        => c.Obligatoire && string.IsNullOrWhiteSpace(Valeur(e, c));
+
+    /// <summary>Ce qui bloque une etape, toutes ses fiches confondues.</summary>
+    private (int Manquants, int Refuses) Defauts(Etape e)
+    {
+        var fiches = Fiches(e.Code);
+        var manquants = 0;
+        var refuses = 0;
+        var memoire = FicheCourante;
+        for (var i = 0; i < fiches.Count; i++)
+        {
+            FicheCourante = i;
+            foreach (var c in e.Champs)
+            {
+                if (RequisManquant(e, c)) manquants++;
+                else if (RefusDe(e, c) is not null) refuses++;
+            }
+        }
+        FicheCourante = memoire;
+        return (manquants, refuses);
+    }
+
+    /// <summary>Un defaut precis, tel qu'il sera montre au controle final.</summary>
+    private record Defaut(int IndexEtape, string Etape, int Fiche, string Unite,
+                         string Champ, string Colonne, string Motif, bool EstManquant);
+
+    /// <summary>
+    /// Tous les defauts des 7 etapes, a plat. C'est ce que le controle final
+    /// presente : sans cette liste, il faudrait rouvrir chaque etape une par
+    /// une pour savoir ce qui bloque.
+    /// </summary>
+    private List<Defaut> TousLesDefauts()
+    {
+        var liste = new List<Defaut>();
+        var memoireEtape = EtapeCourante;
+        var memoireFiche = FicheCourante;
+
+        for (var e = 0; e < Etapes.Length; e++)
+        {
+            var etape = Etapes[e];
+            var fiches = Fiches(etape.Code);
+            for (var f = 0; f < fiches.Count; f++)
+            {
+                FicheCourante = f;
+                foreach (var c in etape.Champs)
+                {
+                    if (RequisManquant(etape, c))
+                    {
+                        liste.Add(new Defaut(e, etape.Titre, f, etape.Unite,
+                            c.Libelle, c.Colonne, "a renseigner", true));
+                    }
+                    else if (RefusDe(etape, c) is { } motif)
+                    {
+                        liste.Add(new Defaut(e, etape.Titre, f, etape.Unite,
+                            c.Libelle, c.Colonne, motif, false));
+                    }
+                }
+            }
+        }
+
+        EtapeCourante = memoireEtape;
+        FicheCourante = memoireFiche;
+        return liste;
+    }
+
+    private void AllerAuDefaut(Defaut d)
+    {
+        EtapeCourante = d.IndexEtape;
+        FicheCourante = d.Fiche;
+    }
+
+    /// <summary>
+    /// Un dossier valide au controle final l est PARTOUT : grille de
+    /// resultats, tuile Ma file, visionneuse. Une seule source de verite,
+    /// sinon les trois ecrans se contrediraient.
+    /// </summary>
+    private bool EstValide(string numeroDossier) => Etat.Valides.Contains(numeroDossier);
+
+    private bool DossierValide => EstValide(CleAffaire);
+
+    private void ValiderDossier()
+    {
+        // Ceinture ET bretelles : le bouton est deja desactive, mais un
+        // dossier ne doit pas pouvoir etre valide par un autre chemin.
+        if (TousLesDefauts().Count > 0) return;
+        Etat.Valides.Add(CleAffaire);
+        Etat.Enregistrer();
+        Etat.Journaliser(CleAffaire, "Dossier VALIDE au controle final");
+    }
+
+    private void RouvrirDossier()
+    {
+        Etat.Valides.Remove(CleAffaire);
+        Etat.Enregistrer();
+        Etat.Journaliser(CleAffaire, "Saisie ROUVERTE apres validation");
+    }
+
+    /// <summary>Panneau « Historique VGED » ouvert ou non.</summary>
+    private bool HistoriqueOuvert;
+
+    private List<string> HistoriqueAffaire
+        => Etat.Journal.TryGetValue(CleAffaire, out var l)
+            ? Enumerable.Reverse(l).ToList()
+            : new List<string>();
+
+    private record Champ(string Libelle, string Colonne, string Type = "text",
+                         string Exemple = "", bool Obligatoire = false,
+                         string Largeur = "moitie", string[]? ChoixPossibles = null,
+                         string Controle = "")
+    {
+        public string[] Choix => ChoixPossibles ?? [];
+    }
+
+    private record Etape(string Code, string Titre, string Source, Champ[] Champs,
+                         bool Multiple = false, string Unite = "Fiche");
+
+    private readonly Etape[] Etapes =
+    [
+        new("DEMANDE", "Demande", "table DEMANDE",
+        [
+            new("Numero de demande", "DMND_NUM_DEMANDE", Exemple: "0000", Obligatoire: true),
+            new("Numero indicatif", "DMND_NUM_INDICATIF", Exemple: "2024/0141"),
+            new("Libelle a l'ecran", "DMND_LIBELLE_ECRAN", Exemple: "Immatriculation - AMITEL SAS", Largeur: "pleine"),
+            new("Etat de la demande", "DMND_ETAT_DEMANDE", Obligatoire: true,
+                ChoixPossibles: ["En saisie", "En controle", "Validee", "Rejetee"]),
+            new("Nom du deposant", "DMND_NOM", Exemple: "DUPONT Jean")
+        ]),
+
+        new("IDENTITE", "Identite", "table DOSSIER_RCS",
+        [
+            new("SIREN", "DSSRC_SIREN", Exemple: "903 118 776", Obligatoire: true, Controle: "siren"),
+            new("Numero de gestion", "DSSRC_NUM_GESTION", Exemple: "2024 B 00141", Obligatoire: true),
+            new("Type de dossier", "DSSRC_TYPE_RCS", Obligatoire: true,
+                ChoixPossibles: ["Personne morale", "Personne physique", "Etablissement principal"]),
+            new("Date d'immatriculation", "DSSRC_DATE_IMMAT", Type: "date", Obligatoire: true, Controle: "date-passee"),
+            new("Motif d'immatriculation", "DSSRC_MOTIF_IMMAT",
+                ChoixPossibles: ["Creation", "Transfert de siege", "Reprise", "Reactivation"]),
+            new("Date d'effet", "DSSRC_DATE_EFFET", Type: "date")
+        ]),
+
+        new("CAPITAL", "Capital", "table CAPITAL",
+        [
+            new("Montant du capital", "CPTL_MONTANT", Type: "number", Exemple: "10000", Obligatoire: true, Controle: "montant"),
+            new("Monnaie", "CPTL_MONNAIE", ChoixPossibles: ["EUR", "USD", "CHF"], Obligatoire: true),
+            new("Capital variable", "CPTL_VARIABLE", ChoixPossibles: ["Non", "Oui"]),
+            new("Minimum statutaire", "CPTL_MINIMUM_STATUTAIRE", Type: "number", Controle: "montant"),
+            new("Taux de liberation", "CPTL_TAUX_LIBERATION", Type: "number", Exemple: "100", Controle: "taux"),
+            new("Apports en nature", "CPTL_APPORTS_NATURE", ChoixPossibles: ["Non", "Oui"]),
+            new("Texte du capital", "CPTL_TEXTE_CAPITAL", Largeur: "pleine",
+                Exemple: "Capital de 10 000 EUR divise en 1 000 actions de 10 EUR")
+        ]),
+
+        new("SIEGE", "Siege et etablissements", "tables SIEGER et ETABLISSEMENT",
+        [
+            new("Type d'adresse", "ETBLS_TYPE_ADRESSE", Obligatoire: true,
+                ChoixPossibles: ["Siege social", "Etablissement principal", "Etablissement secondaire"]),
+            new("Date de debut", "ETBLS_DATE_DEBUT", Type: "date", Obligatoire: true, Controle: "date-passee"),
+            new("Statut du local", "ETBLS_STATUT_LOCAL",
+                ChoixPossibles: ["Proprietaire", "Locataire", "Domiciliataire", "Mise a disposition"]),
+            new("Mode d'exploitation", "ETBLS_MODE_EXPLOITATION",
+                ChoixPossibles: ["Exploitation directe", "Location-gerance", "Gerance mandat"]),
+            new("Origine du fonds", "ETBLS_ORIGINE_FONDS",
+                ChoixPossibles: ["Creation", "Achat", "Apport", "Succession"]),
+            new("Date de domiciliation", "ETBLS_DATE_DOMICILIATION", Type: "date")
+        ], Multiple: true, Unite: "Etablissement"),
+
+        new("ACTIVITE", "Activite", "table ACTIVITE",
+        [
+            new("Activite declaree", "ACTVT_ACTIVITE_DECLAREE", Largeur: "pleine", Obligatoire: true,
+                Exemple: "Prestation de services informatiques, conseil en systemes"),
+            new("Code NAF", "ACTVT_CODE_NAF", Exemple: "6202A", Controle: "naf"),
+            new("Code APE", "ACTVT_CODE_APE", Exemple: "6202A", Controle: "naf"),
+            new("Nature des activites", "ACTVT_NATURE_ACTIVITES",
+                ChoixPossibles: ["Commerciale", "Artisanale", "Liberale", "Agricole"]),
+            new("Date de debut", "ACTVT_DATE_DEBUT", Type: "date", Obligatoire: true, Controle: "date-passee"),
+            new("Activite reglementee", "ACTVT_ACTIVITE_REGLEMENTEE", ChoixPossibles: ["Non", "Oui"]),
+            new("Activite ambulante", "ACTVT_ACTIVITE_AMBULANTE", ChoixPossibles: ["Non", "Oui"]),
+            new("Activite permanente", "ACTVT_PERMANENTE", ChoixPossibles: ["Oui", "Non"])
+        ]),
+
+        new("DIRIGEANTS", "Dirigeants", "table DIRIGEANT",
+        [
+            new("Fonction", "DRGNT_FONCTION_DIRIGEANT", Obligatoire: true,
+                ChoixPossibles: ["President", "Directeur general", "Gerant", "Commissaire aux comptes", "Administrateur"]),
+            new("Personne physique", "DRGNT_PERSONNE_PHYSIQUE", ChoixPossibles: ["Oui", "Non"], Obligatoire: true),
+            new("Numero d'ordre", "DRGNT_NUM_ORDRE", Type: "number", Exemple: "1"),
+            new("Date d'entree", "DRGNT_DATE_ENTREE", Type: "date", Obligatoire: true, Controle: "date-passee"),
+            new("SIREN du dirigeant", "DRGNT_NUM_SIREN", Exemple: "si personne morale", Controle: "siren"),
+            new("Organe collegial", "DRGNT_ORGANE_COLLEGIAL", ChoixPossibles: ["Non", "Oui"]),
+            new("Associe indefiniment responsable", "DRGNT_ASSOCIE_ISR", ChoixPossibles: ["Non", "Oui"])
+        ], Multiple: true, Unite: "Dirigeant"),
+
+        new("CONTROLE", "Controle", "table OBSERVATION_RCS",
+        [
+            new("Texte de la mention", "OBSRC_TEXTE_MENTION", Largeur: "pleine",
+                Exemple: "Observation portee au registre"),
+            new("Etat du dossier", "DSSRC_ETAT_DOSSIER", Obligatoire: true,
+                ChoixPossibles: ["A controler", "Conforme", "En anomalie"])
+        ])
+    ];
+
+    // ================= Corps des tuiles =================
+
+    // --- Performance : mesures RELEVEES en direct sur le processus (MesuresPerf.cs).
+    //     Rien n'est ecrit en dur : le releve est refait toutes les secondes.
+    private readonly MesuresPerf Sonde = new();
+    private MesurePerf[] Mesures = [];
+    private Timer? MinuteurPerf;
+
+    private void RelevePerf()
+    {
+        Mesures = Sonde.Relever();
+    }
+
+    private bool MesureActive(string libelle)
+        => !Etat.Mesures.TryGetValue(libelle, out var v) || v;
+
+    private void BasculerMesure(string libelle)
+    {
+        Etat.Mesures[libelle] = !MesureActive(libelle);
+        Etat.Enregistrer();
+    }
+
+    private RenderFragment CorpsPerformance => @<div class="rig-perf">
+        @foreach (var m in Mesures.Where(m => MesureActive(m.Libelle)))
+        {
+            <div class="rig-perf__mesure">
+                <div class="rig-perf__valeur">@m.Valeur</div>
+                <div class="rig-perf__libelle" title="@m.Libelle">@m.Libelle</div>
+                <div class="rig-perf__barre">
+                    <span style="width:@(m.Part)%;background:var(--rig-grad-@m.Statut)"></span>
+                </div>
+            </div>
+        }
+    </div>;
+
+    // --- Alertes : chacune s'allume ou s'eteint independamment
+    private record Alerte(string Id, string Titre, string Detail, string Statut);
+
+    private readonly Alerte[] Alertes =
+    [
+        new("delai",   "3 demandes hors delai legal", "la plus ancienne : J+9", "alerte"),
+        new("verrou",  "1 dossier ouvert par un tiers", "004168 - M. DURAND", "attente"),
+        new("fusion",  "Fusion documentaire lente",   "file de 3 documents",  "attente"),
+        new("teletr",  "Teletransmission au vert",    "dernier envoi il y a 4 min", "ok")
+    ];
+
+    private void BasculerAlerte(string id)
+    {
+        Etat.Alertes[id] = !(Etat.Alertes.TryGetValue(id, out var v) && v);
+        Etat.Enregistrer();
+    }
+
+    private bool AlerteActive(string id) => !Etat.Alertes.TryGetValue(id, out var v) || v;
+
+    // Le corps ne montre QUE les alertes surveillees : les interrupteurs
+    // vivent dans les reglages de la tuile (bouton engrenage de son entete),
+    // pas dans la lecture courante.
+    private RenderFragment CorpsAlertes => @<div>
+        @if (!Alertes.Any(a => AlerteActive(a.Id)))
+        {
+            <div class="rig-vide">Aucune alerte surveillee. Ouvrir les reglages de la tuile pour en reactiver.</div>
+        }
+        @foreach (var a in Alertes.Where(a => AlerteActive(a.Id)))
+        {
+            <div class="rig-alerte">
+                <span class="rig-filet-v rig-filet-v--@a.Statut"></span>
+                <span class="rig-alerte__corps">
+                    <span class="rig-alerte__titre">@a.Titre</span><br />
+                    <span class="rig-alerte__detail">@a.Detail</span>
+                </span>
+            </div>
+        }
+    </div>;
+
+    // ================= Reglages d'une tuile =================
+    // Un seul panneau ouvert a la fois, dans le corps de la tuile concernee.
+    private string? ReglagesTuile;
+
+    private void BasculerReglages(string id)
+        => ReglagesTuile = ReglagesTuile == id ? null : id;
+
+    // Les reglages d'une tuile portent sur SON contenu (quelles alertes,
+    // quelles mesures). Retirer la tuile de l'accueil n'est pas un reglage
+    // de tuile : cela se fait dans les reglages generaux, dans la barre du
+    // haut, seul endroit d'ou l'on peut aussi la faire revenir.
+    private RenderFragment ReglagesDe(DefinitionTuile def) => @<div class="rig-reglages">
+        @switch (def.Id)
+        {
+            case "alertes":
+                <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">Alertes surveillees</div>
+                @foreach (var a in Alertes)
+                {
+                    var active = AlerteActive(a.Id);
+                    <button class="rig-bascule @(active ? "rig-bascule--actif" : "")"
+                            @onclick="() => BasculerAlerte(a.Id)">
+                        <span class="rig-bascule__temoin"></span>
+                        <span>@a.Titre</span>
+                    </button>
+                }
+                break;
+
+            case "performance":
+                <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">Mesures affichees</div>
+                @foreach (var m in Mesures)
+                {
+                    var vue = MesureActive(m.Libelle);
+                    <button class="rig-bascule @(vue ? "rig-bascule--actif" : "")"
+                            @onclick="() => BasculerMesure(m.Libelle)">
+                        <span class="rig-bascule__temoin"></span>
+                        <span>@m.Libelle</span>
+                    </button>
+                }
+                break;
+
+            default:
+                <div class="rig-vide">
+                    Cette tuile n'a pas de reglage propre.
+                    Pour la retirer de l'accueil, ouvrir les reglages en haut a droite.
+                </div>
+                break;
+        }
+    </div>;
+
+    // --- Le reste de l'accueil, inchange, simplement mis en tuiles
+    private record Demande(string Numero, string Objet, string Delai, string Etat,
+                           string Statut, string? VerrouillePar = null);
+    private record Service(string Nom, string Statut, string? Commentaire = null);
+    private record Contexte(string Numero, string Objet, string Etape, string Depuis);
+
+    private readonly Contexte? Reprise =
+        new("004182", "Immatriculation - AMITEL SAS", "3/7 - Dirigeants", "il y a 18 h");
+
+    private readonly Demande[] File =
+    [
+        new("004176", "Modification - SCI DU PARC",     "J+9", "hors delai",     "alerte"),
+        new("004182", "Immatriculation - AMITEL SAS",   "J+4", "en cours",       "action"),
+        new("004179", "Radiation - MARTIN EURL",        "J+1", "attente pieces", "attente"),
+        new("004168", "Immatriculation - BATIPRO SARL", "",    "",               "neutre", "M. DURAND")
+    ];
+
+    private readonly Service[] Services =
+    [
+        new("Base & editions",     "ok"),
+        new("Teletransmission",    "ok"),
+        new("Fusion documentaire", "alerte", "lente")
+    ];
+
+    private RenderFragment CorpsReprise => @<div style="display:flex;align-items:center;gap:var(--rig-esp-4)">
+        @if (Reprise is not null)
+        {
+            <span style="flex:1">
+                <span style="font-size:15px"><b>@Reprise.Numero</b> &middot; @Reprise.Objet</span><br />
+                <span style="font-size:12px;color:var(--rig-texte-3)">
+                    arrete a l'etape <b style="color:var(--rig-texte-2)">@Reprise.Etape</b> &mdash; @Reprise.Depuis
+                </span>
+            </span>
+            <button class="rig-bouton">Reprendre</button>
+        }
+    </div>;
+
+    private RenderFragment CorpsFile => @<div>
+        @foreach (var d in File)
+        {
+            var valide = EstValide(d.Numero);
+            <div class="rig-ligne @(d.VerrouillePar is not null ? "rig-ligne--verrouille" : "") @(valide ? "rig-ligne--valide" : "")">
+                <span class="rig-filet-v rig-filet-v--@(valide ? "ok" : d.Statut)"></span>
+                <span>
+                    <span class="rig-ligne__id">@d.Numero</span><br />
+                    <span class="rig-ligne__objet">@d.Objet</span>
+                </span>
+                <span class="rig-ligne__droite">
+                    @if (valide)
+                    {
+                        <span class="rig-ligne__valide">valide</span>
+                    }
+                    else if (d.VerrouillePar is not null)
+                    {
+                        <span style="font-size:11px;color:var(--rig-texte-3)">
+                            ouvert par<br /><b>@d.VerrouillePar</b>
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="@(d.Statut == "alerte" ? "rig-ligne__delai--alerte" : "")">@d.Delai</span>
+                        <br />
+                        <span style="font-size:11px;color:var(--rig-texte-3)">@d.Etat</span>
+                    }
+                </span>
+            </div>
+        }
+    </div>;
+
+    private RenderFragment CorpsServices => @<div>
+        @foreach (var s in Services)
+        {
+            <div class="rig-service">
+                <span class="rig-service__jauge" style="background:var(--rig-grad-@s.Statut)"></span>
+                @s.Nom
+                @if (s.Commentaire is not null)
+                {
+                    <span style="color:var(--rig-texte-3)">&middot; @s.Commentaire</span>
+                }
+            </div>
+        }
+    </div>;
+
+    private RenderFragment CorpsBrouillons => @<div style="font-size:var(--rig-fs-dense);color:var(--rig-texte-2)">
+        <div><b style="color:var(--rig-texte)">2</b> demandes commencees, jamais validees
+            <span style="color:var(--rig-texte-3)">&middot; 5 j et 12 j</span></div>
+        <div><b style="color:var(--rig-texte)">4</b> dossiers epingles</div>
+        <div style="color:var(--rig-texte-3)">10 dernieres demandes touchees</div>
+    </div>;
+
+    private RenderFragment CorpsNouveautes => @<div style="font-size:var(--rig-fs-dense);color:var(--rig-texte-2)">
+        La saisie en masse accepte desormais <b style="color:var(--rig-texte)">les fichiers .csv</b>.
+    </div>;
+}

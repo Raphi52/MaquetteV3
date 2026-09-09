@@ -1,0 +1,16 @@
+# Sorties de compilation .NET
+bin/
+obj/
+
+# Fichiers utilisateur Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+
+# Sauvegardes de travail : le depot est la memoire, pas les .bak
+*.bak
+*.orig
+*.rej
+
+# rig.ico est VERSIONNE : l'app en a besoin au build.

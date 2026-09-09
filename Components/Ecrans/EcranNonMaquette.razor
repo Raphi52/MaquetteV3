@@ -1,0 +1,29 @@
+@* Ecran des procedures du menu qui n'ont PAS encore de maquette.
+   Avant, elles retombaient sur l'ecran des Demandes : en demonstration,
+   cela laissait croire que « Cloture » ou « Factures » affichaient les
+   demandes. Un ecran qui se nomme est plus honnete qu'un ecran qui ment. *@
+
+<div class="rig-nonmaq">
+    <div class="rig-nonmaq__kicker">Procedure non maquettee</div>
+    <div class="rig-nonmaq__titre">@Libelle</div>
+    <div class="rig-nonmaq__code">@Code</div>
+    <p class="rig-nonmaq__texte">
+        Cette procedure existe dans le menu parce qu'elle existe dans RIG v2,
+        mais son ecran n'est pas encore porte dans la maquette.
+        Les trois procedures deja portees se trouvent en haut du groupe
+        <b>RCS</b> : <b>Demandes</b>, <b>Arrivee du courrier</b> et
+        <b>Actes numerises</b>.
+    </p>
+    <p class="rig-nonmaq__texte rig-nonmaq__texte--sourd">
+        Le portage suit toujours le meme chemin : lire les blocs
+        <span class="rig-chip">RECHERCHE</span> et
+        <span class="rig-chip">RESULTATS</span> du projet
+        <span class="rig-chip">@Code</span> dans RIG v2, puis reprendre
+        ses criteres et ses colonnes sans en inventer.
+    </p>
+</div>
+
+@code {
+    [Parameter] public string Code { get; set; } = string.Empty;
+    [Parameter] public string Libelle { get; set; } = string.Empty;
+}
