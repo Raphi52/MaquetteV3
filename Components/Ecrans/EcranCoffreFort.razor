@@ -1,9 +1,16 @@
-@* Ecran de la procedure PROC_COFFRE_FORT (RIG v2 : FORM_COFFRE_FORT,
-   blocs OPE_RECHERCHE_COFFRE, OPE_OPTION_RECHERCHE, OPE_TREEVIEW_TRANSMETTRE
-   / OPE_TREEVIEW_RETRANSMETTRE, OPE_RECHERCHE_HISTORIQUE, OPE_DESTINATAIRE,
-   OPE_PARAMETRAGE_COFFRE). Colonnes lues dans les grilles v2 : Code, Abrege,
-   Destinataire, Etat, Date envoi infogreffe, Date AR Infogreffe,
-   Date AR destinataire, Date lecture destinataire, Date traitement RIG,
+@* Ecran de la procedure PROC_COFFRE_FORT.
+
+   Sources RIG v2 (D:/RigApplication/Source/RIG/DLL/Processus/PROC_COFFRE_FORT) :
+     - OPE_RECHERCHE_COFFRE   : ult_DateDebut, ult_DateFin (bornes), et les
+       filtres de nature ult_Archive, ult_Audience, ult_Erreur, ult_GedJud,
+       ult_Message, ult_Reda
+     - OPE_FILTRE_DESTINATAIRE : cboDest, CBChoixDestinataire, txtNbLigneHisto
+     - OPE_DESTINATAIRE        : txtNomCoffre, cboType, cboMand, dtDateDemarrage
+     - OPE_PARAMETRAGE_COFFRE  : ult_GroupRadioButton1 (coffre par defaut)
+     - OPE_TREEVIEW_TRANSMETTRE / OPE_TREEVIEW_RETRANSMETTRE : les deux listes
+   Colonnes des grilles : Code, Abrege, Destinataire, Etat, Date envoi
+   infogreffe, Date AR Infogreffe, Date AR destinataire, Date lecture
+   destinataire, Date traitement RIG, Date avis de depot coffre,
    Code de depot dans le coffre, Erreur. *@
 
 <div class="rig-proc__corps">
@@ -35,6 +42,35 @@
                 <option value="CD">Sans code de depot</option>
             </select>
         </label>
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Periode</div>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Du</span>
+                    <input class="rig-saisie-champ__saisie" type="date" @bind="DateDebut" />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Au</span>
+                    <input class="rig-saisie-champ__saisie" type="date" @bind="DateFin" />
+                </label>
+            </div>
+        </div>
+
+        @* v2 : ult_Archive, ult_Audience, ult_Erreur, ult_GedJud,
+           ult_Message, ult_Reda -- les natures de contenu recherchees. *@
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Nature du contenu</div>
+            @foreach (var n in Natures)
+            {
+                var nature = n;
+                <button class="rig-bascule @(NaturesActives.Contains(nature) ? "rig-bascule--actif" : "")"
+                        @onclick="() => BasculerNature(nature)">
+                    <span class="rig-bascule__temoin"></span>
+                    <span>@nature</span>
+                </button>
+            }
+        </div>
 
         <div class="rig-criteres__bloc">
             <div class="rig-kicker">Historique</div>
@@ -77,6 +113,7 @@
                         <th>Date AR destinataire</th>
                         <th>Date lecture destinataire</th>
                         <th>Date traitement RIG</th>
+                        <th>Date avis de depot coffre</th>
                         <th>Code de depot</th>
                         <th>Erreur</th>
                     </tr>
@@ -96,13 +133,14 @@
                             <td class="rig-table__mono">@Jour(dep.ArDestinataire)</td>
                             <td class="rig-table__mono">@Jour(dep.LectureDestinataire)</td>
                             <td class="rig-table__mono">@Jour(dep.TraitementRig)</td>
+                            <td class="rig-table__mono">@Jour(dep.AvisDepotCoffre)</td>
                             <td class="rig-table__mono">@dep.CodeDepot</td>
                             <td>@dep.Erreur</td>
                         </tr>
                     }
                     @if (Trouves.Length == 0)
                     {
-                        <tr><td colspan="11" class="rig-table__vide">Aucun depot ne repond a ces criteres.</td></tr>
+                        <tr><td colspan="12" class="rig-table__vide">Aucun depot ne repond a ces criteres.</td></tr>
                     }
                 </tbody>
             </table>
@@ -128,16 +166,31 @@
                                       string TypeDecision, string Etat, string Statut,
                                       DateTime? EnvoiInfogreffe, DateTime? ArInfogreffe,
                                       DateTime? ArDestinataire, DateTime? LectureDestinataire,
-                                      DateTime? TraitementRig, string CodeDepot, string Erreur,
+                                      DateTime? TraitementRig, DateTime? AvisDepotCoffre,
+                                      string CodeDepot, string Erreur,
                                       string[] Historique);
 
     private static readonly DepotCoffre[] Depots =
     [
-        new("CF-2026-0412", "DUVAL",  "Me LEROY",  "COFFRE_LEROY", "ACAD", "Transmis",  "ok",      new(2026, 3, 7), new(2026, 3, 7), new(2026, 3, 8), new(2026, 3, 9), new(2026, 3, 7), "DEP-77120", "",                       ["07/03/2026 — depose", "08/03/2026 — accuse de reception", "09/03/2026 — lu"]),
-        new("CF-2026-0518", "MARNE",  "Me BLANC",  "COFFRE_BLANC", "ACAD", "Transmis",  "ok",      new(2026, 6, 3), new(2026, 6, 3), new(2026, 6, 4), null,            new(2026, 6, 3), "DEP-77455", "",                       ["03/06/2026 — depose", "04/06/2026 — accuse de reception"]),
-        new("CF-2026-0603", "MARIE",  "Me LEROY",  "COFFRE_LEROY", "CD",   "A envoyer", "attente", null,            null,            null,            null,            new(2026, 9, 1), "",          "",                       ["01/09/2026 — prepare"]),
-        new("CF-2026-0610", "MOULIN", "Me PETIT",  "COFFRE_PETIT", "CD",   "En erreur", "alerte",  new(2026, 9, 4), null,            null,            null,            new(2026, 9, 4), "",          "Destinataire inconnu",   ["04/09/2026 — envoi refuse par le coffre"])
+        new("CF-2026-0412", "DUVAL",  "Me LEROY",  "COFFRE_LEROY", "ACAD", "Transmis",  "ok",      new(2026, 3, 7), new(2026, 3, 7), new(2026, 3, 8), new(2026, 3, 9), new(2026, 3, 7), new(2026, 3, 8), "DEP-77120", "",                       ["07/03/2026 — depose", "08/03/2026 — accuse de reception", "09/03/2026 — lu"]),
+        new("CF-2026-0518", "MARNE",  "Me BLANC",  "COFFRE_BLANC", "ACAD", "Transmis",  "ok",      new(2026, 6, 3), new(2026, 6, 3), new(2026, 6, 4), null,            new(2026, 6, 3), new(2026, 6, 4), "DEP-77455", "",                       ["03/06/2026 — depose", "04/06/2026 — accuse de reception"]),
+        new("CF-2026-0603", "MARIE",  "Me LEROY",  "COFFRE_LEROY", "CD",   "A envoyer", "attente", null,            null,            null,            null,            new(2026, 9, 1), null,            "",          "",                       ["01/09/2026 — prepare"]),
+        new("CF-2026-0610", "MOULIN", "Me PETIT",  "COFFRE_PETIT", "CD",   "En erreur", "alerte",  new(2026, 9, 4), null,            null,            null,            new(2026, 9, 4), null,            "",          "Destinataire inconnu",   ["04/09/2026 — envoi refuse par le coffre"])
     ];
+
+    // Criteres de OPE_RECHERCHE_COFFRE (RIG v2).
+    private DateTime? DateDebut;
+    private DateTime? DateFin;
+
+    private static readonly string[] Natures =
+        ["Archive", "Audience", "Erreur", "GED judiciaire", "Message", "REDA"];
+
+    private readonly HashSet<string> NaturesActives = new();
+
+    private void BasculerNature(string n)
+    {
+        if (!NaturesActives.Add(n)) NaturesActives.Remove(n);
+    }
 
     private string Recherche = string.Empty;
     private string Coffre = string.Empty;

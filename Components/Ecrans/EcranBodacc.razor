@@ -1,9 +1,19 @@
-@* Ecran de la procedure BODACC (RIG v2 : « Generation des envois BODACC »).
-   v2 a trois blocs : OPE_RECH_BOD (recherche), OPE_A_ENVOYER et
-   OPE_DEJA_ENVOYER. Les colonnes sont les HeaderText des grilles v2 :
-   Num ann., Num parution, Date parution, Type annonce, Date envoi,
-   Date prevue d'envoi, Num bord., Num fact., Code eve pro, Date eve pro,
-   Num PC ou prevention, Texte Bodacc. *@
+@* Ecran de la procedure BODACC.
+
+   Sources RIG v2 (D:/RigApplication/Source/RIG/DLL/Processus/BODACC/PROC_ENV_BOD) :
+   v2 a DEUX grilles distinctes, pas une, avec des colonnes differentes
+   (HeaderText releves dans Controls/) :
+
+     - Controls/BodaccToSendRigDataGridView.cs (« a envoyer ») :
+       Num PC ou prevention, Code eve pro, Date eve pro, Texte Bodacc,
+       Date prevue d envoi, Type annonce
+     - Controls/BodaccAlreadySentRigDataGridView.cs (« deja envoye ») :
+       Num PC ou prevention, Code eve pro, Date eve pro, Date envoi,
+       Date trans., Num bord., Num fact., Date parution, Num parution,
+       Num ann., Type annonce, Texte Bodacc
+
+   Criteres : Operations/OPE_RECH_BOD.Designer.cs -> TextRechByNum,
+   TextNumBordereau, TextNumFacture, DateDu, DateAu. *@
 
 <div class="rig-proc__corps">
 
@@ -41,6 +51,17 @@
             </div>
         </div>
 
+        @* v2 : TextNumBordereau et TextNumFacture (OPE_RECH_BOD). *@
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Num bordereau</span>
+            <input class="rig-saisie-champ__saisie" @bind="CritNumBord" @bind:event="oninput" />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Num facture</span>
+            <input class="rig-saisie-champ__saisie" @bind="CritNumFact" @bind:event="oninput" />
+        </label>
+
         <div class="rig-criteres__actions">
             <button class="rig-bouton" @onclick="Effacer">Effacer</button>
         </div>
@@ -60,20 +81,36 @@
         <div class="rig-table-cadre">
             <table class="rig-table">
                 <thead>
-                    <tr>
-                        <th>Num ann.</th>
-                        <th>Num PC ou prevention</th>
-                        <th>Type annonce</th>
-                        <th>Code eve pro</th>
-                        <th>Date eve pro</th>
-                        <th>Date prevue d'envoi</th>
-                        <th>Date envoi</th>
-                        <th>Num parution</th>
-                        <th>Date parution</th>
-                        <th>Num bord.</th>
-                        <th>Num fact.</th>
-                        <th>Texte Bodacc</th>
-                    </tr>
+                    @if (AEnvoyer)
+                    {
+                        @* Colonnes de BodaccToSendRigDataGridView.cs (RIG v2). *@
+                        <tr>
+                            <th>Num PC ou prevention</th>
+                            <th>Code eve pro</th>
+                            <th>Date eve pro</th>
+                            <th>Texte Bodacc</th>
+                            <th>Date prevue d'envoi</th>
+                            <th>Type annonce</th>
+                        </tr>
+                    }
+                    else
+                    {
+                        @* Colonnes de BodaccAlreadySentRigDataGridView.cs (RIG v2). *@
+                        <tr>
+                            <th>Num PC ou prevention</th>
+                            <th>Code eve pro</th>
+                            <th>Date eve pro</th>
+                            <th>Date envoi</th>
+                            <th>Date trans.</th>
+                            <th>Num bord.</th>
+                            <th>Num fact.</th>
+                            <th>Date parution</th>
+                            <th>Num parution</th>
+                            <th>Num ann.</th>
+                            <th>Type annonce</th>
+                            <th>Texte Bodacc</th>
+                        </tr>
+                    }
                 </thead>
                 <tbody>
                     @foreach (var l in Trouvees)
@@ -82,23 +119,35 @@
                         var retard = AEnvoyer && ligne.PrevueEnvoi.Date < JeuDemo.Aujourdhui.Date;
                         <tr class="@(retard ? "rig-table__ligne--alerte" : "")"
                             @onclick="() => OuvrirDossier.InvokeAsync(ligne.Dossier)">
-                            <td class="rig-table__mono">@ligne.NumAnnonce</td>
-                            <td class="rig-table__mono">@ligne.NumPc</td>
-                            <td>@ligne.TypeAnnonce</td>
-                            <td class="rig-table__mono">@ligne.CodeEvePro</td>
-                            <td class="rig-table__mono">@ligne.DateEvePro.ToString("dd/MM/yyyy")</td>
-                            <td class="rig-table__mono">@ligne.PrevueEnvoi.ToString("dd/MM/yyyy")</td>
-                            <td class="rig-table__mono">@(ligne.Envoi?.ToString("dd/MM/yyyy") ?? "")</td>
-                            <td class="rig-table__mono">@ligne.NumParution</td>
-                            <td class="rig-table__mono">@(ligne.Parution?.ToString("dd/MM/yyyy") ?? "")</td>
-                            <td class="rig-table__mono">@ligne.NumBord</td>
-                            <td class="rig-table__mono">@ligne.NumFact</td>
-                            <td>@ligne.Texte</td>
+                            @if (AEnvoyer)
+                            {
+                                <td class="rig-table__mono">@ligne.NumPc</td>
+                                <td class="rig-table__mono">@ligne.CodeEvePro</td>
+                                <td class="rig-table__mono">@ligne.DateEvePro.ToString("dd/MM/yyyy")</td>
+                                <td>@ligne.Texte</td>
+                                <td class="rig-table__mono">@ligne.PrevueEnvoi.ToString("dd/MM/yyyy")</td>
+                                <td>@ligne.TypeAnnonce</td>
+                            }
+                            else
+                            {
+                                <td class="rig-table__mono">@ligne.NumPc</td>
+                                <td class="rig-table__mono">@ligne.CodeEvePro</td>
+                                <td class="rig-table__mono">@ligne.DateEvePro.ToString("dd/MM/yyyy")</td>
+                                <td class="rig-table__mono">@(ligne.Envoi?.ToString("dd/MM/yyyy") ?? "")</td>
+                                <td class="rig-table__mono">@(ligne.Transmission?.ToString("dd/MM/yyyy") ?? "")</td>
+                                <td class="rig-table__mono">@ligne.NumBord</td>
+                                <td class="rig-table__mono">@ligne.NumFact</td>
+                                <td class="rig-table__mono">@(ligne.Parution?.ToString("dd/MM/yyyy") ?? "")</td>
+                                <td class="rig-table__mono">@ligne.NumParution</td>
+                                <td class="rig-table__mono">@ligne.NumAnnonce</td>
+                                <td>@ligne.TypeAnnonce</td>
+                                <td>@ligne.Texte</td>
+                            }
                         </tr>
                     }
                     @if (Trouvees.Length == 0)
                     {
-                        <tr><td colspan="12" class="rig-table__vide">Aucune annonce ne repond a ces criteres.</td></tr>
+                        <tr><td colspan="@(AEnvoyer ? 6 : 12)" class="rig-table__vide">Aucune annonce ne repond a ces criteres.</td></tr>
                     }
                 </tbody>
             </table>
@@ -112,18 +161,21 @@
     private sealed record Annonce(string NumAnnonce, string NumPc, string TypeAnnonce, string CodeEvePro,
                                   DateTime DateEvePro, DateTime PrevueEnvoi, DateTime? Envoi,
                                   string NumParution, DateTime? Parution, string NumBord, string NumFact,
-                                  string Texte, string Dossier);
+                                  string Texte, string Dossier, DateTime? Transmission);
 
     private static readonly Annonce[] Lignes =
     [
-        new("A2026-1188", "PC2026-041", "Immatriculation",  "IMM", new(2026, 9, 2), new(2026, 9, 8),  null,             "",       null,             "",        "",        "Immatriculation SARL LES TILLEULS", "2026B00811"),
-        new("A2026-1189", "",           "Modification",     "MOD", new(2026, 9, 3), new(2026, 9, 9),  null,             "",       null,             "",        "",        "Changement de gerant",              "2019B00233"),
-        new("A2026-1190", "PC2026-042", "Procedure collective", "PCO", new(2026, 9, 1), new(2026, 9, 4), null,          "",       null,             "",        "",        "Ouverture de redressement",         "2026B00790"),
-        new("A2026-1150", "",           "Radiation",        "RAD", new(2026, 8, 12), new(2026, 8, 18), new(2026, 8, 18), "2026-171", new(2026, 8, 24), "BD-2610", "FA-45120", "Radiation EURL LE PETIT CAFE",   "2004B01344"),
-        new("A2026-1151", "",           "Depot des comptes","DCA", new(2026, 8, 14), new(2026, 8, 20), new(2026, 8, 20), "2026-172", new(2026, 8, 26), "BD-2610", "FA-45121", "Depot des comptes 2025",          "2011B00512")
+        new("A2026-1188", "PC2026-041", "Immatriculation",  "IMM", new(2026, 9, 2), new(2026, 9, 8),  null,             "",       null,             "",        "",        "Immatriculation SARL LES TILLEULS", "2026B00811", null),
+        new("A2026-1189", "",           "Modification",     "MOD", new(2026, 9, 3), new(2026, 9, 9),  null,             "",       null,             "",        "",        "Changement de gerant",              "2019B00233", null),
+        new("A2026-1190", "PC2026-042", "Procedure collective", "PCO", new(2026, 9, 1), new(2026, 9, 4), null,          "",       null,             "",        "",        "Ouverture de redressement",         "2026B00790", null),
+        new("A2026-1150", "",           "Radiation",        "RAD", new(2026, 8, 12), new(2026, 8, 18), new(2026, 8, 18), "2026-171", new(2026, 8, 24), "BD-2610", "FA-45120", "Radiation EURL LE PETIT CAFE",   "2004B01344", new DateTime(2026, 8, 19)),
+        new("A2026-1151", "",           "Depot des comptes","DCA", new(2026, 8, 14), new(2026, 8, 20), new(2026, 8, 20), "2026-172", new(2026, 8, 26), "BD-2610", "FA-45121", "Depot des comptes 2025",          "2011B00512", new DateTime(2026, 8, 21))
     ];
 
     private bool AEnvoyer = true;
+    private string CritNumBord = string.Empty;
+    private string CritNumFact = string.Empty;
+
     private string CritTexte = string.Empty;
     private string CritType = string.Empty;
     private DateTime? CritDu;
