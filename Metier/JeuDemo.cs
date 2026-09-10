@@ -45,9 +45,27 @@ public sealed record ActeNum(int Rang, string Dossier, string Depot, string Deno
         JeuDemo.CategoriesDepot.FirstOrDefault(c => c.Code == Categorie).Libelle ?? Categorie;
 }
 
+/// <summary>Un login de la maquette et son niveau d'acces (0 = le plus bas).</summary>
+public sealed record CompteRig(string Login, string Nom, int NiveauAcces, string Profil);
+
 public static class JeuDemo
 {
     public static readonly DateTime Aujourdhui = new(2026, 9, 9);
+
+    /// <summary>
+    /// Les comptes de demonstration. Le niveau d'acces se parametre par
+    /// login : c'est lui qui decide des dossiers visibles dans l'arbre de
+    /// l'affaire (voir AccesGed). Aucun annuaire n'est branche.
+    /// </summary>
+    public static readonly CompteRig[] Comptes =
+    [
+        new("rvilain", "Raphael", 2, "Greffier"),
+        new("cmartin", "Claire", 1, "Redacteur"),
+        new("pinvite", "Pauline", 0, "Accueil"),
+    ];
+
+    public static CompteRig Compte(string login)
+        => Comptes.FirstOrDefault(c => c.Login == login) ?? Comptes[^1];
 
     public static readonly string[] EtatsDemande =
         ["En saisie", "En controle", "Validee", "Rejetee"];

@@ -1,4 +1,4 @@
-@page "/"
+﻿@page "/"
 @implements IAsyncDisposable
 @inject FenetreInterop Fenetre
 @inject IJSRuntime JS
@@ -6,7 +6,7 @@
 <PageTitle>RIG V3 - Accueil</PageTitle>
 
 <div data-rig-theme="@(ThemeSombre ? "sombre" : "clair")"
-     style="background:var(--rig-fond);color:var(--rig-texte);min-height:100vh">
+     style="background:var(--rig-fond);color:var(--rig-texte);height:100vh;overflow:hidden;display:flex;flex-direction:column">
 
 <div class="rig-filet-marque"></div>
 
@@ -15,6 +15,23 @@
     <span class="rig-barre__version">@Version</span>
 
     <div class="rig-barre__droite">
+        @* Reglages de la BARRE : toujours atteignables, y compris quand un ecran de
+           procedure occupe le plan de travail. Ne contient que le theme pour l'instant. *@
+        <div class="rig-barre__reglages" @onmousedown:stopPropagation="true">
+            <button class="rig-barre__action @(PanneauBarreOuvert ? "rig-barre__action--ouvert" : "")"
+                    title="Reglages" @onclick="BasculerPanneauBarre">&#9881;</button>
+            @if (PanneauBarreOuvert)
+            {
+                <div class="rig-tuiles-panneau">
+                    <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">Affichage</div>
+                    <button class="rig-bascule @(ThemeSombre ? "rig-bascule--actif" : "")"
+                            @onclick="BasculerTheme">
+                        <span class="rig-bascule__temoin"></span>
+                        <span>Mode sombre</span>
+                    </button>
+                </div>
+            }
+        </div>
         <div class="rig-fenetre">
             <button class="rig-fenetre__bouton" title="Reduire"
                     @onclick="Fenetre.Reduire" @onmousedown:stopPropagation="true">&#8211;</button>
@@ -71,6 +88,18 @@
                 <span style="color:var(--rig-texte-3);font-size:12px">
                     &middot; greffe @Greffe &middot; @DateDuJour
                 </span>
+                @* Le niveau d'acces se parametre par login : changer de login
+                   change les dossiers visibles dans l'arbre de l'affaire. *@
+                <select class="rig-login" title="Login connecte et niveau d'acces"
+                        value="@LoginCourant"
+                        @onchange="ChangerLogin">
+                    @foreach (var compte in JeuDemo.Comptes)
+                    {
+                        <option value="@compte.Login">
+                            @compte.Login &middot; @compte.Profil (niveau @compte.NiveauAcces)
+                        </option>
+                    }
+                </select>
             </div>
             <div class="rig-entete__outils">
                 <button class="rig-entete__action @(PanneauTuilesOuvert ? "rig-entete__action--ouvert" : "")"
@@ -92,6 +121,12 @@
                                     </button>
                                 }
                                 <div class="rig-reglages__filet"></div>
+                                <button class="rig-bascule" title="Replace et redimensionne les tuiles selon la disposition d'origine"
+                                                @onclick="ReinitialiserDisposition">
+                                    <span class="rig-bascule__temoin"></span>
+                                    <span>Reinitialiser la disposition</span>
+                                </button>
+                                <div class="rig-reglages__filet"></div>
                                 <button class="rig-bascule @(ThemeSombre ? "" : "rig-bascule--actif")"
                                                 @onclick="BasculerTheme">
                                     <span class="rig-bascule__temoin"></span>
@@ -103,7 +138,7 @@
         </div>
 
         @* --- Recherche : centree, toujours a la meme place, jamais deplacable --- *@
-        <div class="rig-recherche rig-recherche--fixe" style="position:sticky">
+        <div class="rig-recherche rig-recherche--fixe">
             <span style="font:13px var(--rig-font-mono);color:var(--rig-focus)">&#8981;</span>
             <input class="rig-recherche__saisie"
                    placeholder="Rechercher un SIREN, une societe, un dirigeant, un n° de demande…"
@@ -137,10 +172,17 @@
                          data-tuile="@def.Id"
                          data-col="@p.Colonne" data-ligne="@p.Ligne"
                          data-larg="@p.Largeur" data-haut="@p.Hauteur"
-                         style="grid-column:@p.Colonne / span @p.Largeur;grid-row:@p.Ligne / span @p.Hauteur">
+                         style="grid-column:@p.Colonne / span @p.Largeur;grid-row:@p.Ligne / span @p.Hauteur;z-index:@p.Ordre">
                     <header class="rig-widget__tete">
                         <span class="rig-widget__poignee">&#8942;&#8942;</span>
                         <span class="rig-widget__titre">@def.Titre</span>
+                        @if (def.Id == "recents")
+                        {
+                            <button class="rig-bouton rig-bouton--tuile"
+                                    title="Ouvrir la recherche d'affaires (PROC_RECHAFF)"
+                                    @onclick="VoirToutesLesAffaires"
+                                    @onmousedown:stopPropagation="true">Voir toutes les affaires</button>
+                        }
                         <button class="rig-widget__reglages @(ReglagesTuile == def.Id ? "rig-widget__reglages--ouvert" : "")"
                                 title="Reglages de la tuile"
                                 @onclick="() => BasculerReglages(def.Id)"
@@ -162,6 +204,7 @@
                                 case "services":    @CorpsServices;    break;
                                 case "brouillons":  @CorpsBrouillons;  break;
                                 case "nouveautes":  @CorpsNouveautes;  break;
+                                case "recents":     @CorpsRecents;     break;
                             }
                         }
                     </div>
@@ -196,6 +239,10 @@
 
             case "PROC_ARRIVEE":
                 <EcranArrivee OuvrirDossier="OuvrirParNumero" />
+                break;
+
+            case "PROC_RECHAFF":
+                <EcranRechAffaires @key="CleRechAffaire" NoAffaire="@NoAffaireDemande" Ouvrir="OuvrirParNumero" />
                 break;
 
             case "PROC_DEMANDE":
@@ -318,15 +365,17 @@
                 <button class="rig-onglet @(ModeSaisie ? "rig-onglet--actif" : "")"
                         @onclick="() => ModeSaisie = true">Saisie guidee</button>
             </div>
-            <button class="rig-bouton rig-bouton--plat" disabled>Ajouter une piece jointe au dossier</button>
-            <button class="rig-bouton rig-bouton--plat" disabled>Importer sans bordereau</button>
-            <button class="rig-bouton rig-bouton--plat" disabled>Generation bordereau</button>
-            <button class="rig-bouton rig-bouton--plat" disabled>Envoi par courriel</button>
-            <button class="rig-bouton rig-bouton--plat @(HistoriqueOuvert ? "rig-bouton--enfonce" : "")"
-                    title="Evenements horodates de ce dossier"
-                    @onclick="() => HistoriqueOuvert = !HistoriqueOuvert">
-                Historique VGED@(HistoriqueAffaire.Count > 0 ? $" ({HistoriqueAffaire.Count})" : "")
+            <button class="rig-bouton rig-bouton--plat @(EditionsOuvertes ? "rig-bouton--enfonce" : "")"
+                    title="Le tableau des editions s'ouvre en plein ecran"
+                    @onclick="() => EditionsOuvertes = !EditionsOuvertes">
+                Tableau des editions@(Editions.Length > 0 ? $" ({Editions.Count(e => !e.EstGroupe)})" : "")
             </button>
+            @if (!GuideVisible)
+            {
+                <button class="rig-bouton rig-bouton--plat"
+                        title="Reafficher la saisie guidee a droite"
+                        @onclick="() => GuideVisible = true">Saisie guidee</button>
+            }
             <span class="rig-vged__compte">
                 @Arbre.NbPieces pieces &middot;
                 @Arbre.Enfants.Count(n => n.NbPieces > 0) / @Arbre.Enfants.Length dossiers servis &middot;
@@ -334,34 +383,13 @@
             </span>
         </div>
 
-        @* Historique VGED : lignes horodatees au moment de l action, lues
-           dans accueil.json. Le plus recent en haut. *@
-        @if (HistoriqueOuvert)
+        @if (EditionsOuvertes)
         {
-            <div class="rig-historique">
-                <div class="rig-historique__titre">
-                    Historique VGED &middot; @DossierOuvert.Numero
-                    <span class="rig-historique__compte">@HistoriqueAffaire.Count evenement(s)</span>
-                </div>
-                @if (HistoriqueAffaire.Count == 0)
-                {
-                    <div class="rig-historique__vide">
-                        Aucun evenement : rien n'a encore ete saisi ni valide sur ce dossier.
-                    </div>
-                }
-                else
-                {
-                    <ul class="rig-historique__liste">
-                        @foreach (var ligne in HistoriqueAffaire)
-                        {
-                            <li>@ligne</li>
-                        }
-                    </ul>
-                }
-            </div>
+            <EcranTableauEditions Editions="Editions"
+                                  Affaire="@($"{DossierOuvert.Numero} {DossierOuvert.Objet}")"
+                                  Fermer="() => EditionsOuvertes = false" />
         }
-
-        @if (ModeSaisie)
+        else if (ModeSaisie)
         {
             <div class="rig-saisie">
 
@@ -404,193 +432,205 @@
                     }
                 </ol>
 
-                @* --- Le formulaire de l'etape courante --- *@
-                @{
-                    var courante = Etapes[EtapeCourante];
+                @* --- Une page geante, mais paginee : les etapes s'enchainent
+                     au scroll et chacune se cale comme une page (scroll-snap).
+                     La frise suit la page visible, elle ne la commande plus
+                     seule. --- *@
+                <div class="rig-saisie__pages" @ref="ZonePages">
+                @for (var iEtape = 0; iEtape < Etapes.Length; iEtape++)
+                {
+                    var indexEtape = iEtape;
+                    var courante = Etapes[iEtape];
                     var fiches = Fiches(courante.Code);
-                    var iFiche = Math.Clamp(FicheCourante, 0, fiches.Count - 1);
+                    var iFiche = IndexFiche(courante);
+                    <section class="rig-saisie__page @(indexEtape == EtapeCourante ? "rig-saisie__page--courante" : "")"
+                             id="rig-etape-@indexEtape" data-etape="@indexEtape">
+                    <div class="rig-saisie__corps">
+                            <div class="rig-saisie__entete">
+                                <div>
+                                    <div class="rig-kicker">Etape @(indexEtape + 1) sur @Etapes.Length</div>
+                                    <h2 class="rig-saisie__titre">@courante.Titre</h2>
+                                    <div class="rig-saisie__source">@courante.Source</div>
+                                </div>
+                                <div class="rig-saisie__navigation">
+                                    <button class="rig-bouton" disabled="@(indexEtape == 0)"
+                                            @onclick="() => AllerEtape(indexEtape - 1)">Precedent</button>
+                                    <button class="rig-bouton" disabled="@(indexEtape == Etapes.Length - 1)"
+                                            @onclick="() => AllerEtape(indexEtape + 1)">Suivant</button>
+                                </div>
+                            </div>
+
+                            @* Une etape multiple presente ses fiches en onglets. *@
+                            @if (courante.Multiple)
+                            {
+                                <div class="rig-fiches">
+                                    @for (var f = 0; f < fiches.Count; f++)
+                                    {
+                                        var indexFiche = f;
+                                        <button class="rig-fiches__onglet @(indexFiche == iFiche ? "rig-fiches__onglet--actif" : "")"
+                                                @onclick="() => ChoisirFiche(courante, indexFiche)">
+                                            @courante.Unite @(indexFiche + 1)
+                                        </button>
+                                    }
+                                    <button class="rig-fiches__ajout" title="Ajouter"
+                                            @onclick="() => AjouterFiche(courante)">+ Ajouter</button>
+                                    @if (fiches.Count > 1)
+                                    {
+                                        <button class="rig-fiches__retrait" title="Retirer cette fiche"
+                                                @onclick="() => SupprimerFiche(courante)">Retirer</button>
+                                    }
+                                </div>
+                            }
+
+                            @* --- Controle final : le recapitulatif de TOUT ce qui bloque --- *@
+                            @if (courante.Code == "CONTROLE")
+                            {
+                                var defauts = TousLesDefauts();
+                                <div class="rig-recap">
+                                    @if (DossierValide)
+                                    {
+                                        <div class="rig-recap__entete rig-recap__entete--valide">
+                                            <span class="rig-recap__pastille rig-recap__pastille--ok">OK</span>
+                                            <div>
+                                                <div class="rig-recap__titre">Dossier valide</div>
+                                                <div class="rig-recap__detail">
+                                                    Les 7 etapes sont completes et acceptees.
+                                                </div>
+                                            </div>
+                                            <button class="rig-bouton" style="margin-left:auto"
+                                                    @onclick="RouvrirDossier">Rouvrir la saisie</button>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="rig-recap__entete">
+                                            <span class="rig-recap__pastille @(defauts.Count == 0 ? "rig-recap__pastille--ok" : "rig-recap__pastille--bloque")">
+                                                @(defauts.Count == 0 ? "OK" : defauts.Count.ToString())
+                                            </span>
+                                            <div>
+                                                <div class="rig-recap__titre">
+                                                    @(defauts.Count == 0
+                                                        ? "Rien ne bloque la validation"
+                                                        : defauts.Count == 1
+                                                            ? "1 point bloque la validation"
+                                                            : $"{defauts.Count} points bloquent la validation")
+                                                </div>
+                                                <div class="rig-recap__detail">
+                                                    @defauts.Count(d => d.EstManquant) a renseigner &middot;
+                                                    @defauts.Count(d => !d.EstManquant) valeur(s) refusee(s)
+                                                </div>
+                                            </div>
+                                            <button class="rig-bouton rig-bouton--fort" style="margin-left:auto"
+                                                    disabled="@(defauts.Count > 0)"
+                                                    @onclick="ValiderDossier">Valider le dossier</button>
+                                        </div>
+
+                                        @if (defauts.Count > 0)
+                                        {
+                                            <ul class="rig-recap__liste">
+                                                @foreach (var groupe in defauts.GroupBy(d => (d.IndexEtape, d.Etape, d.Fiche, d.Unite)))
+                                                {
+                                                    var g = groupe;
+                                                    var multi = Fiches(Etapes[g.Key.IndexEtape].Code).Count > 1;
+                                                    <li class="rig-recap__groupe">
+                                                        <button class="rig-recap__aller"
+                                                                @onclick="() => AllerAuDefaut(g.First())">
+                                                            <span class="rig-recap__rang">@(g.Key.IndexEtape + 1)</span>
+                                                            <span>
+                                                                @g.Key.Etape
+                                                                @if (multi)
+                                                                {
+                                                                    <span class="rig-recap__fiche">@g.Key.Unite @(g.Key.Fiche + 1)</span>
+                                                                }
+                                                            </span>
+                                                            <span class="rig-recap__nb">@g.Count()</span>
+                                                        </button>
+                                                        <ul class="rig-recap__points">
+                                                            @foreach (var d in g)
+                                                            {
+                                                                <li class="rig-recap__point @(d.EstManquant ? "" : "rig-recap__point--refuse")">
+                                                                    <span class="rig-recap__champ">@d.Champ</span>
+                                                                    <span class="rig-recap__motif">@d.Motif</span>
+                                                                    <span class="rig-recap__colonne">@d.Colonne</span>
+                                                                </li>
+                                                            }
+                                                        </ul>
+                                                    </li>
+                                                }
+                                            </ul>
+                                        }
+                                    }
+                                </div>
+                            }
+
+                            <div class="rig-champs">
+                                @foreach (var champ in courante.Champs)
+                                {
+                                    var c = champ;
+                                    var e = courante;
+                                    var refus = RefusDe(e, c);
+                                    var manque = RequisManquant(e, c);
+                                    var etatChamp = refus is not null ? "rig-saisie-champ--refuse"
+                                                  : manque ? "rig-saisie-champ--manque" : "";
+                                    <label class="rig-saisie-champ rig-saisie-champ--@c.Largeur @etatChamp">
+                                        <span class="rig-saisie-champ__libelle">
+                                            @c.Libelle
+                                            @if (c.Obligatoire) { <span class="rig-saisie-champ__requis">requis</span> }
+                                        </span>
+                                        @if (c.Choix.Length > 0)
+                                        {
+                                            <select class="rig-saisie-champ__saisie"
+                                                    value="@Valeur(e, c)"
+                                                    @onchange="ev => Ecrire(e, c, ev.Value?.ToString())">
+                                                <option value=""></option>
+                                                @foreach (var choix in c.Choix)
+                                                {
+                                                    <option value="@choix">@choix</option>
+                                                }
+                                            </select>
+                                        }
+                                        else
+                                        {
+                                            <input class="rig-saisie-champ__saisie" type="@c.Type"
+                                                   placeholder="@c.Exemple"
+                                                   value="@Valeur(e, c)"
+                                                   @onchange="ev => Ecrire(e, c, ev.Value?.ToString())" />
+                                        }
+                                        @if (refus is not null)
+                                        {
+                                            <span class="rig-saisie-champ__refus">@refus</span>
+                                        }
+                                        else if (manque)
+                                        {
+                                            <span class="rig-saisie-champ__manque">a renseigner</span>
+                                        }
+                                        <span class="rig-saisie-champ__colonne">@c.Colonne</span>
+                                    </label>
+                                }
+                            </div>
+                    </div>
+                    </section>
                 }
-                <div class="rig-saisie__corps">
-                    <div class="rig-saisie__entete">
-                        <div>
-                            <div class="rig-kicker">Etape @(EtapeCourante + 1) sur @Etapes.Length</div>
-                            <h2 class="rig-saisie__titre">@courante.Titre</h2>
-                            <div class="rig-saisie__source">@courante.Source</div>
-                        </div>
-                        <div class="rig-saisie__navigation">
-                            <button class="rig-bouton" disabled="@(EtapeCourante == 0)"
-                                    @onclick="() => AllerEtape(EtapeCourante - 1)">Precedent</button>
-                            <button class="rig-bouton" disabled="@(EtapeCourante == Etapes.Length - 1)"
-                                    @onclick="() => AllerEtape(EtapeCourante + 1)">Suivant</button>
-                        </div>
-                    </div>
-
-                    @* Une etape multiple presente ses fiches en onglets. *@
-                    @if (courante.Multiple)
-                    {
-                        <div class="rig-fiches">
-                            @for (var f = 0; f < fiches.Count; f++)
-                            {
-                                var indexFiche = f;
-                                <button class="rig-fiches__onglet @(indexFiche == iFiche ? "rig-fiches__onglet--actif" : "")"
-                                        @onclick="() => FicheCourante = indexFiche">
-                                    @courante.Unite @(indexFiche + 1)
-                                </button>
-                            }
-                            <button class="rig-fiches__ajout" title="Ajouter"
-                                    @onclick="() => AjouterFiche(courante)">+ Ajouter</button>
-                            @if (fiches.Count > 1)
-                            {
-                                <button class="rig-fiches__retrait" title="Retirer cette fiche"
-                                        @onclick="() => SupprimerFiche(courante)">Retirer</button>
-                            }
-                        </div>
-                    }
-
-                    @* --- Controle final : le recapitulatif de TOUT ce qui bloque --- *@
-                    @if (courante.Code == "CONTROLE")
-                    {
-                        var defauts = TousLesDefauts();
-                        <div class="rig-recap">
-                            @if (DossierValide)
-                            {
-                                <div class="rig-recap__entete rig-recap__entete--valide">
-                                    <span class="rig-recap__pastille rig-recap__pastille--ok">OK</span>
-                                    <div>
-                                        <div class="rig-recap__titre">Dossier valide</div>
-                                        <div class="rig-recap__detail">
-                                            Les 7 etapes sont completes et acceptees.
-                                        </div>
-                                    </div>
-                                    <button class="rig-bouton" style="margin-left:auto"
-                                            @onclick="RouvrirDossier">Rouvrir la saisie</button>
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="rig-recap__entete">
-                                    <span class="rig-recap__pastille @(defauts.Count == 0 ? "rig-recap__pastille--ok" : "rig-recap__pastille--bloque")">
-                                        @(defauts.Count == 0 ? "OK" : defauts.Count.ToString())
-                                    </span>
-                                    <div>
-                                        <div class="rig-recap__titre">
-                                            @(defauts.Count == 0
-                                                ? "Rien ne bloque la validation"
-                                                : defauts.Count == 1
-                                                    ? "1 point bloque la validation"
-                                                    : $"{defauts.Count} points bloquent la validation")
-                                        </div>
-                                        <div class="rig-recap__detail">
-                                            @defauts.Count(d => d.EstManquant) a renseigner &middot;
-                                            @defauts.Count(d => !d.EstManquant) valeur(s) refusee(s)
-                                        </div>
-                                    </div>
-                                    <button class="rig-bouton rig-bouton--fort" style="margin-left:auto"
-                                            disabled="@(defauts.Count > 0)"
-                                            @onclick="ValiderDossier">Valider le dossier</button>
-                                </div>
-
-                                @if (defauts.Count > 0)
-                                {
-                                    <ul class="rig-recap__liste">
-                                        @foreach (var groupe in defauts.GroupBy(d => (d.IndexEtape, d.Etape, d.Fiche, d.Unite)))
-                                        {
-                                            var g = groupe;
-                                            var multi = Fiches(Etapes[g.Key.IndexEtape].Code).Count > 1;
-                                            <li class="rig-recap__groupe">
-                                                <button class="rig-recap__aller"
-                                                        @onclick="() => AllerAuDefaut(g.First())">
-                                                    <span class="rig-recap__rang">@(g.Key.IndexEtape + 1)</span>
-                                                    <span>
-                                                        @g.Key.Etape
-                                                        @if (multi)
-                                                        {
-                                                            <span class="rig-recap__fiche">@g.Key.Unite @(g.Key.Fiche + 1)</span>
-                                                        }
-                                                    </span>
-                                                    <span class="rig-recap__nb">@g.Count()</span>
-                                                </button>
-                                                <ul class="rig-recap__points">
-                                                    @foreach (var d in g)
-                                                    {
-                                                        <li class="rig-recap__point @(d.EstManquant ? "" : "rig-recap__point--refuse")">
-                                                            <span class="rig-recap__champ">@d.Champ</span>
-                                                            <span class="rig-recap__motif">@d.Motif</span>
-                                                            <span class="rig-recap__colonne">@d.Colonne</span>
-                                                        </li>
-                                                    }
-                                                </ul>
-                                            </li>
-                                        }
-                                    </ul>
-                                }
-                            }
-                        </div>
-                    }
-
-                    <div class="rig-champs">
-                        @foreach (var champ in courante.Champs)
-                        {
-                            var c = champ;
-                            var e = courante;
-                            var refus = RefusDe(e, c);
-                            var manque = RequisManquant(e, c);
-                            var etatChamp = refus is not null ? "rig-saisie-champ--refuse"
-                                          : manque ? "rig-saisie-champ--manque" : "";
-                            <label class="rig-saisie-champ rig-saisie-champ--@c.Largeur @etatChamp">
-                                <span class="rig-saisie-champ__libelle">
-                                    @c.Libelle
-                                    @if (c.Obligatoire) { <span class="rig-saisie-champ__requis">requis</span> }
-                                </span>
-                                @if (c.Choix.Length > 0)
-                                {
-                                    <select class="rig-saisie-champ__saisie"
-                                            value="@Valeur(e, c)"
-                                            @onchange="ev => Ecrire(e, c, ev.Value?.ToString())">
-                                        <option value=""></option>
-                                        @foreach (var choix in c.Choix)
-                                        {
-                                            <option value="@choix">@choix</option>
-                                        }
-                                    </select>
-                                }
-                                else
-                                {
-                                    <input class="rig-saisie-champ__saisie" type="@c.Type"
-                                           placeholder="@c.Exemple"
-                                           value="@Valeur(e, c)"
-                                           @onchange="ev => Ecrire(e, c, ev.Value?.ToString())" />
-                                }
-                                @if (refus is not null)
-                                {
-                                    <span class="rig-saisie-champ__refus">@refus</span>
-                                }
-                                else if (manque)
-                                {
-                                    <span class="rig-saisie-champ__manque">a renseigner</span>
-                                }
-                                <span class="rig-saisie-champ__colonne">@c.Colonne</span>
-                            </label>
-                        }
-                    </div>
                 </div>
             </div>
         }
         else
         {
-        <div class="rig-vged__corps">
+        <div class="rig-vged__corps" style="@StyleCorps">
 
             @* ---- Arbre documentaire, colonnes de TreeviewGed (v2) ---- *@
             <div class="rig-vged__arbre">
                 <div class="rig-arbre__entete">
                     <span class="rig-arbre__libelle">Liste des pieces</span>
                     <span class="rig-arbre__date">Date</span>
-                    <span class="rig-arbre__pages">Nb pages</span>
+                    <button class="rig-arbre__nouveau" title="Ajouter un dossier ou une piece dans l'arbre"
+                            @onclick="OuvrirNouveau">+ Nouveau</button>
                 </div>
                 <div class="rig-arbre">
                     <ArbreGedNoeud Noeud="Arbre" Niveau="0" Ouverts="NoeudsOuverts"
                                    Selection="NoeudSelectionne"
-                                   Selectionner="ChoisirNoeud" />
+                                   Selectionner="OuvrirApercu"
+                                   NiveauAcces="NiveauAcces" Ajouts="AjoutsArbre" />
                 </div>
                 @if (NoeudSelectionne is not null && NoeudSelectionne.EstPiece)
                 {
@@ -610,108 +650,286 @@
                 }
             </div>
 
-            @* ---- Sidebar : tableau des editions + detail du destinataire ----
-                 Colonnes de PROC_TABLEAU_LOT3/Processus/TreeviewEditions.cs,
-                 champs de detail d'OPE_DESTINATAIRE.Designer.cs (v2). *@
-            <div class="rig-vged__editions">
-                <div class="rig-editions__titre">Tableau des editions</div>
-                <div class="rig-editions__cadre">
-                    <table class="rig-editions">
-                        <thead>
-                            <tr>
-                                <th class="rig-editions__dest">Destinataire</th>
-                                <th class="rig-editions__doc">Nom du document</th>
-                                <th class="rig-editions__drapeau" title="Envoi au coffre">Cf</th>
-                                <th class="rig-editions__drapeau" title="Envoi tribunal digital">Td</th>
-                                <th class="rig-editions__drapeau" title="Envoi par courriel">@@</th>
-                                <th class="rig-editions__ex" title="Nombre d'exemplaires">Ex.</th>
-                                <th class="rig-editions__drapeau" title="Imprimer">Imp</th>
-                                <th class="rig-editions__imprimante">Imprimante</th>
-                                <th class="rig-editions__file">File ou imprimante</th>
-                                <th class="rig-editions__file">File differee</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var e in Editions)
-                            {
-                                @if (e.EstGroupe)
-                                {
-                                    <tr class="rig-editions__groupe">
-                                        <td colspan="10" style="padding-left:@(6 + e.Niveau * 14)px">
-                                            <span class="rig-arbre__chevron rig-arbre__chevron--ouvert"></span>@e.Destinataire
-                                        </td>
-                                    </tr>
-                                }
-                                else
-                                {
-                                    <tr class="@(EditionSelectionnee == e ? "rig-editions__ligne--actif" : "")"
-                                        @onclick="() => EditionSelectionnee = e">
-                                        <td class="rig-editions__dest" style="padding-left:@(6 + e.Niveau * 14)px">@e.Destinataire</td>
-                                        <td class="rig-editions__doc">@e.NomDocument</td>
-                                        <td class="rig-editions__drapeau">@(e.CoffreFort ? "x" : "")</td>
-                                        <td class="rig-editions__drapeau">@(e.TribunalDigital ? "x" : "")</td>
-                                        <td class="rig-editions__drapeau">@(e.EnvoiParMail ? "x" : "")</td>
-                                        <td class="rig-editions__ex">@e.Exemplaires</td>
-                                        <td class="rig-editions__drapeau">@(e.Imprimer ? "x" : "")</td>
-                                        <td class="rig-editions__imprimante">@e.Imprimante</td>
-                                        <td class="rig-editions__file">@e.FileImprimante</td>
-                                        <td class="rig-editions__file">@e.FileDifferee</td>
-                                    </tr>
-                                }
-                            }
-                        </tbody>
-                    </table>
+            @* ---- Colonne de droite : SAISIE GUIDEE contextuelle ----
+                 Ce qui est clique dans l'arbre choisit l'etape a saisir :
+                 le tableau des editions a son propre ecran (bouton dans la
+                 barre d'outils ci-dessus). *@
+            @* ---- Separateur deplacable : regle la largeur de la colonne du milieu ---- *@
+            @if (GuideVisible)
+            {
+            @* preventDefault : sans lui, le navigateur demarre une SELECTION de
+               texte des l'appui et toute la vue se couvre de surlignage bleu. *@
+            <div class="rig-vged__poignee" title="Glisser pour ajuster la colonne"
+                 @onpointerdown="DebutRedim" @onpointerdown:preventDefault="true"></div>
+            }
+            @if (GuideVisible)
+            {
+            <div class="rig-vged__guide">
+                @{
+                    var eGuide = EtapeGuide();
+                    var fichesGuide = Fiches(eGuide.Code);
+                    var iFicheGuide = IndexFiche(eGuide);
+                    var (remplisG, totalG) = Avancement(eGuide);
+                }
+                <div class="rig-guide__entete">
+                    <div>
+                        <div class="rig-kicker">Saisie guidee</div>
+                        <h3 class="rig-guide__titre">@eGuide.Titre</h3>
+                        <div class="rig-guide__source">
+                            @(NoeudSelectionne is null
+                                ? "Cliquez dans l'arbre pour cibler la saisie"
+                                : $"d'apres : {NoeudSelectionne.Libelle}")
+                            &middot; @eGuide.Source
+                        </div>
+                    </div>
+                    <div class="rig-guide__compte">@remplisG / @totalG</div>
+                    <button class="rig-guide__fermer" title="Fermer le panneau"
+                            @onclick="() => GuideVisible = false">&times;</button>
                 </div>
 
-                <div class="rig-editions__titre">Detail de l'edition selectionnee</div>
-                <div class="rig-editions__detail">
-                    @if (EditionSelectionnee?.Detail is { } d)
+                @if (eGuide.Multiple)
+                {
+                    <div class="rig-fiches">
+                        @for (var f = 0; f < fichesGuide.Count; f++)
+                        {
+                            var indexFiche = f;
+                            <button class="rig-fiches__onglet @(indexFiche == iFicheGuide ? "rig-fiches__onglet--actif" : "")"
+                                    @onclick="() => ChoisirFiche(eGuide, indexFiche)">
+                                @eGuide.Unite @(indexFiche + 1)
+                            </button>
+                        }
+                        <button class="rig-fiches__ajout" @onclick="() => AjouterFiche(eGuide)">+ Ajouter</button>
+                        @if (fichesGuide.Count > 1)
+                        {
+                            <button class="rig-fiches__retrait" @onclick="() => SupprimerFiche(eGuide)">Retirer</button>
+                        }
+                    </div>
+                }
+
+                <div class="rig-guide__champs rig-champs">
+                    @foreach (var champ in eGuide.Champs)
                     {
-                        <label class="rig-champ-ed"><span>Designation</span>
-                            <input class="rig-saisie" value="@d.Designation" readonly /></label>
-                        <label class="rig-champ-ed"><span>A l'attention de</span>
-                            <input class="rig-saisie" value="@d.AttentionDe" readonly /></label>
-                        <label class="rig-champ-ed rig-champ-ed--large"><span>Adresse postale</span>
-                            <textarea class="rig-saisie" rows="3" readonly>@d.AdressePostale</textarea></label>
-                        <label class="rig-champ-ed"><span>Type de papier</span>
-                            <select class="rig-saisie" disabled>
-                                @foreach (var tp in ArbreDemo.TypesPapier)
-                                {
-                                    <option selected="@(tp == d.TypePapier)">@tp</option>
-                                }
-                            </select></label>
-                        <label class="rig-champ-ed"><span>Telephone</span>
-                            <input class="rig-saisie" value="@d.Telephone" readonly /></label>
-                        <label class="rig-champ-ed"><span>Siren</span>
-                            <input class="rig-saisie" value="@d.Siren" readonly /></label>
-                        <label class="rig-champ-ed"><span>Coffre-fort : nature du document</span>
-                            <input class="rig-saisie" value="@d.NatureCoffreFort" readonly /></label>
-                        <label class="rig-champ-ed"><span>Coffre-fort</span>
-                            <input class="rig-saisie" value="@d.CoffreFort" readonly /></label>
-                        <label class="rig-champ-ed"><span>Tribunal digital : nature du document</span>
-                            <input class="rig-saisie" value="@d.NatureTribunalDigital" readonly /></label>
-                        <label class="rig-champ-ed"><span>Tribunal digital</span>
-                            <input class="rig-saisie" value="@d.TribunalDigital" readonly /></label>
-                        <label class="rig-champ-ed rig-champ-ed--large"><span>Tribunal digital : Erreur</span>
-                            <input class="rig-saisie" value="@d.ErreurTribunalDigital" readonly /></label>
-                        <label class="rig-champ-ed"><span>Courriel</span>
-                            <input class="rig-saisie" value="@d.Courriel" readonly /></label>
-                        <label class="rig-champ-ed rig-champ-ed--case">
-                            <input type="checkbox" checked="@d.ConserverPjOrigine" disabled />
-                            <span>Conserver les PJ au format d'origine (ne pas convertir en PDF)</span></label>
-                        <label class="rig-champ-ed rig-champ-ed--large"><span>Observation</span>
-                            <textarea class="rig-saisie" rows="2" readonly>@d.Observation</textarea></label>
-                    }
-                    else
-                    {
-                        <div style="font-size:11px;color:var(--rig-texte-3)">
-                            Choisissez un destinataire dans le tableau des editions.
-                        </div>
+                        var c = champ;
+                        var e = eGuide;
+                        var refus = RefusDe(e, c);
+                        var manque = RequisManquant(e, c);
+                        var etatChamp = refus is not null ? "rig-saisie-champ--refuse"
+                                      : manque ? "rig-saisie-champ--manque" : "";
+                        <label class="rig-saisie-champ rig-saisie-champ--@c.Largeur @etatChamp">
+                            <span class="rig-saisie-champ__libelle">
+                                @c.Libelle
+                                @if (c.Obligatoire) { <span class="rig-saisie-champ__requis">requis</span> }
+                            </span>
+                            @if (c.Choix.Length > 0)
+                            {
+                                <select class="rig-saisie-champ__saisie"
+                                        value="@Valeur(e, c)"
+                                        @onchange="ev => Ecrire(e, c, ev.Value?.ToString())">
+                                    <option value=""></option>
+                                    @foreach (var choix in c.Choix)
+                                    {
+                                        <option value="@choix">@choix</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <input class="rig-saisie-champ__saisie" type="@c.Type"
+                                       placeholder="@c.Exemple"
+                                       value="@Valeur(e, c)"
+                                       @onchange="ev => Ecrire(e, c, ev.Value?.ToString())" />
+                            }
+                            @if (refus is not null)
+                            {
+                                <span class="rig-saisie-champ__refus">@refus</span>
+                            }
+                            else if (manque)
+                            {
+                                <span class="rig-saisie-champ__manque">a renseigner</span>
+                            }
+                            <span class="rig-saisie-champ__colonne">@c.Colonne</span>
+                        </label>
                     }
                 </div>
+
+                @* --- La frise, horizontale, en pied du panneau de droite :
+                     les 7 etapes se lisent d'un coup et se choisissent ici. --- *@
+                <ol class="rig-frise rig-frise--h">
+                    @for (var i = 0; i < Etapes.Length; i++)
+                    {
+                        var etapeH = Etapes[i];
+                        var (remplisH, totalH) = Avancement(etapeH);
+                        var (manquantsH, refusesH) = Defauts(etapeH);
+                        var courantH = etapeH.Code == eGuide.Code;
+                        var detailH = refusesH > 0 ? $"{refusesH} valeur(s) refusee(s)"
+                                   : manquantsH > 0 ? $"{manquantsH} requis manquant(s)" : "";
+                        var titreH = $"{etapeH.Titre} - {remplisH} / {totalH}"
+                                   + (detailH.Length > 0 ? " - " + detailH : "");
+                        var etatH = refusesH > 0 ? "refuse"
+                                  : totalH > 0 && remplisH == totalH ? "complet"
+                                  : courantH ? "encours"
+                                  : remplisH > 0 ? "partiel" : "vide";
+                        <li class="rig-frise__pas rig-frise__pas--@etatH @(courantH ? "rig-frise__pas--courant" : "")">
+                            <button class="rig-frise__bouton"
+                                    title="@titreH"
+                                    @onclick="() => ChoisirEtapeGuide(etapeH)">
+                                <span class="rig-frise__pastille">
+                                    @(refusesH > 0 ? "!" : totalH > 0 && remplisH == totalH ? "OK" : (i + 1).ToString())
+                                </span>
+                                <span class="rig-frise__libelle">
+                                    @etapeH.Titre
+                                    <span class="rig-frise__compte">@remplisH / @totalH</span>
+                                </span>
+                            </button>
+                        </li>
+                    }
+                </ol>
             </div>
+            }
+            @if (Redimensionne)
+            {
+                <div class="rig-vged__voile" @onpointermove="PendantRedim"
+                     @onpointerup="() => Redimensionne = false"
+                     @onpointerleave="() => Redimensionne = false"></div>
+            }
         </div>
         }
+    </div>
+}
+
+@* ---- Apercu du document clique, et choix de l'imprimante ----
+     v2 : PROC_VDOSSIER ouvre la piece dans une visionneuse avec les
+     actions Imprimer / Enregistrer / Transferer ; « Imprimer » passe par
+     la boite de parametres d'edition (OPE_DESTINATAIRE : file ou
+     imprimante, type de papier, recto-verso, exemplaires). *@
+@if (ApercuNoeud is not null)
+{
+    <div class="rig-voile" @onclick="FermerApercu">
+        <div class="rig-apercu" @onclick:stopPropagation="true">
+            <div class="rig-apercu__entete">
+                <div>
+                    <div class="rig-kicker">@ApercuNoeud.Extension &middot; @ApercuNoeud.Pages page(s) &middot; @ApercuNoeud.Date</div>
+                    <div class="rig-apercu__titre">@ApercuNoeud.Libelle</div>
+                </div>
+                <div class="rig-apercu__actions">
+                    <button class="rig-bouton rig-bouton--fort" @onclick="OuvrirImpression">Imprimer</button>
+                    <button class="rig-bouton" @onclick="Sauvegarder">Sauvegarder</button>
+                    <button class="rig-bouton" @onclick="Transferer">Transferer</button>
+                    <button class="rig-bouton rig-bouton--plat" @onclick="FermerApercu">Fermer</button>
+                </div>
+            </div>
+            @if (ApercuMessage.Length > 0)
+            {
+                <div class="rig-apercu__message">@ApercuMessage</div>
+            }
+            <div class="rig-apercu__pages">
+                @for (var feuille = 1; feuille <= Math.Max(1, ApercuNoeud.Pages); feuille++)
+                {
+                    <div class="rig-apercu__feuille">
+                        <div class="rig-apercu__feuille-texte">@TextePage(ApercuNoeud, feuille)</div>
+                        <div class="rig-apercu__folio">@feuille / @Math.Max(1, ApercuNoeud.Pages)</div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@if (ImpressionOuverte && ApercuNoeud is not null)
+{
+    <div class="rig-voile rig-voile--haut" @onclick="() => ImpressionOuverte = false">
+        <div class="rig-impression" @onclick:stopPropagation="true">
+            <div class="rig-kicker">Imprimer &laquo; @ApercuNoeud.Libelle &raquo;</div>
+
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">File ou imprimante</span>
+                <select class="rig-saisie-champ__saisie" @bind="ImprImprimante">
+                    @foreach (var i in ArbreDemo.Imprimantes)
+                    {
+                        <option value="@i">@i</option>
+                    }
+                </select>
+            </label>
+
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">File differee</span>
+                <select class="rig-saisie-champ__saisie" @bind="ImprFileDifferee">
+                    @foreach (var f in ArbreDemo.FilesDifferees)
+                    {
+                        <option value="@f">@f</option>
+                    }
+                </select>
+            </label>
+
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Type de papier</span>
+                <select class="rig-saisie-champ__saisie" @bind="ImprTypePapier">
+                    @foreach (var t in ArbreDemo.TypesPapier)
+                    {
+                        <option value="@t">@t</option>
+                    }
+                </select>
+            </label>
+
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Exemplaires</span>
+                <input class="rig-saisie-champ__saisie" type="number" min="1" max="99"
+                       @bind="ImprExemplaires" />
+            </label>
+
+            <button class="rig-bascule @(ImprRectoVerso ? "rig-bascule--actif" : "")"
+                    @onclick="() => ImprRectoVerso = !ImprRectoVerso">
+                <span class="rig-bascule__temoin"></span>
+                <span>Recto-verso</span>
+            </button>
+
+            <div class="rig-impression__pied">
+                <button class="rig-bouton rig-bouton--fort" @onclick="LancerImpression">Imprimer</button>
+                <button class="rig-bouton" @onclick="() => ImpressionOuverte = false">Annuler</button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ---- Bouton « Nouveau » de l'arbre : creation d'un dossier ou d'une piece ---- *@
+@if (NouveauOuvert)
+{
+    <div class="rig-voile rig-voile--haut" @onclick="() => NouveauOuvert = false">
+        <div class="rig-impression" @onclick:stopPropagation="true">
+            <div class="rig-kicker">Nouvel element dans &laquo; @DossierCible.Libelle &raquo;</div>
+
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Nature</span>
+                <select class="rig-saisie-champ__saisie" @bind="NouveauType">
+                    <option value="dossier">Dossier</option>
+                    <option value="piece">Piece</option>
+                </select>
+            </label>
+
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Libelle</span>
+                <input class="rig-saisie-champ__saisie" type="text"
+                       placeholder="Ex. : Depot n 2026/0042" @bind="NouveauLibelle" />
+            </label>
+
+            @if (NouveauType == "piece")
+            {
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Type de fichier</span>
+                    <select class="rig-saisie-champ__saisie" @bind="NouveauExtension">
+                        <option value="PDF">PDF</option>
+                        <option value="JPG">JPG</option>
+                        <option value="TIF">TIF</option>
+                    </select>
+                </label>
+            }
+
+            <div class="rig-impression__pied">
+                <button class="rig-bouton rig-bouton--fort" @onclick="AjouterElement"
+                        disabled="@(NouveauLibelle.Trim().Length == 0)">Ajouter</button>
+                <button class="rig-bouton" @onclick="() => NouveauOuvert = false">Annuler</button>
+            </div>
+        </div>
     </div>
 }
 
@@ -721,13 +939,161 @@
     // ---------------------------------------------------------------
     // Donnees de demonstration : la charte se juge sur du contenu reel.
     // ---------------------------------------------------------------
-    private const string Utilisateur = "Raphael";
+    // Le login connecte : son niveau d'acces decide des dossiers visibles.
+    private string LoginCourant = JeuDemo.Comptes[0].Login;
+    private CompteRig CompteCourant => JeuDemo.Compte(LoginCourant);
+    private string Utilisateur => CompteCourant.Nom;
+    private int NiveauAcces => CompteCourant.NiveauAcces;
+
+    private void ChangerLogin(ChangeEventArgs ev)
+    {
+        LoginCourant = ev.Value?.ToString() ?? LoginCourant;
+        // Un noeud devenu invisible ne doit pas rester selectionne ni ouvert.
+        if (NoeudSelectionne is not null
+            && !ArbreVisible().Any(n => ReferenceEquals(n, NoeudSelectionne)))
+        {
+            NoeudSelectionne = null;
+            ApercuNoeud = null;
+        }
+    }
+
+    /// <summary>Les noeuds que le login courant peut voir, ajouts compris.</summary>
+    private IEnumerable<NoeudGed> ArbreVisible()
+    {
+        var pile = new Stack<NoeudGed>();
+        pile.Push(Arbre);
+        while (pile.Count > 0)
+        {
+            var n = pile.Pop();
+            yield return n;
+            foreach (var e in AccesGed.EnfantsVisibles(n, NiveauAcces, AjoutsArbre)) pile.Push(e);
+        }
+    }
+
+    // ---- Bouton « Nouveau » de l'arbre : cree un dossier ou une piece ----
+    private readonly Dictionary<NoeudGed, List<NoeudGed>> AjoutsArbre = AccesGed.NouveauxAjouts();
+    private bool NouveauOuvert;
+    private string NouveauLibelle = "";
+    private string NouveauType = "dossier";
+    private string NouveauExtension = "PDF";
+
+    private void OuvrirNouveau()
+    {
+        NouveauLibelle = "";
+        NouveauType = "dossier";
+        NouveauOuvert = true;
+    }
+
+    /// <summary>Ou l'element va : le dossier clique, sinon la racine de l'affaire.</summary>
+    private NoeudGed DossierCible
+        => NoeudSelectionne is not null && !NoeudSelectionne.EstPiece ? NoeudSelectionne : Arbre;
+
+    private void AjouterElement()
+    {
+        var libelle = NouveauLibelle.Trim();
+        if (libelle.Length == 0) return;
+        var cible = DossierCible;
+        var element = NouveauType == "piece"
+            ? AccesGed.NouvellePiece(libelle, NouveauExtension, DateDepot)
+            : AccesGed.NouveauDossier(libelle);
+        if (!AjoutsArbre.TryGetValue(cible, out var liste))
+        {
+            liste = new List<NoeudGed>();
+            AjoutsArbre[cible] = liste;
+        }
+        liste.Add(element);
+        NoeudsOuverts.Add(cible);
+        NouveauOuvert = false;
+        NouveauLibelle = "";
+    }
+
+    private const string DateDepot = "10/09/2026";
     private const string Greffe = "9999";
     private const string Version = "3.0.14";
     private static readonly string DateDuJour = "mardi 9 septembre";
 
     private bool ThemeSombre = true;
-    private void BasculerTheme() => ThemeSombre = !ThemeSombre;
+
+    /// <summary>
+    /// Le theme ne peut pas rester porte par ce seul composant : le fond de la
+    /// page hote (html/body) et le fond de la fenetre WPF, qui borde le
+    /// WebView de 6 px, resteraient sombres et cerneraient le mode clair d'un
+    /// cadre noir. On propage donc la teinte aux deux hors-Blazor.
+    /// </summary>
+    private async Task BasculerTheme()
+    {
+        ThemeSombre = !ThemeSombre;
+        await AppliquerTheme();
+    }
+
+    private async Task AppliquerTheme()
+    {
+        Fenetre.AppliquerFond(ThemeSombre);
+        if (Module is null) return;
+        try { await Module.InvokeVoidAsync("appliquerTheme", ThemeSombre ? "sombre" : "clair"); }
+        catch (JSException) { }
+    }
+
+    // ================= Apercu d'une piece et impression =================
+    private NoeudGed? ApercuNoeud;
+    private string ApercuMessage = "";
+    private bool ImpressionOuverte;
+    private string ImprImprimante = ArbreDemo.Imprimantes[0];
+    private string ImprFileDifferee = ArbreDemo.FilesDifferees[0];
+    private string ImprTypePapier = ArbreDemo.TypesPapier[0];
+    private int ImprExemplaires = 1;
+    private bool ImprRectoVerso;
+
+    /// <summary>
+    /// Clic dans l'arbre : un dossier se replie, une PIECE s'ouvre en apercu.
+    /// La selection reste posee pour le panneau de saisie guidee.
+    /// </summary>
+    private void OuvrirApercu(NoeudGed n)
+    {
+        ChoisirNoeud(n);
+        if (!n.EstPiece) return;
+        ApercuNoeud = n;
+        ApercuMessage = "";
+        ImpressionOuverte = false;
+    }
+
+    private void FermerApercu()
+    {
+        ApercuNoeud = null;
+        ImpressionOuverte = false;
+    }
+
+    private void OuvrirImpression() => ImpressionOuverte = true;
+
+    private void LancerImpression()
+    {
+        ImpressionOuverte = false;
+        ApercuMessage = $"Envoye a {ImprImprimante} — {ImprExemplaires} ex., papier {ImprTypePapier}"
+                      + (ImprRectoVerso ? ", recto-verso" : "")
+                      + $", file {ImprFileDifferee}.";
+    }
+
+    private void Sauvegarder()
+        => ApercuMessage = $"Enregistre sous {ApercuNoeud?.Libelle}.{ApercuNoeud?.Extension.ToLowerInvariant()}.";
+
+    private void Transferer()
+        => ApercuMessage = "Transfert prepare : choix du destinataire dans le tableau des editions.";
+
+    /// <summary>
+    /// Le contenu d'une page de l'apercu. La maquette n'a pas de fichier PDF :
+    /// le texte de demonstration de la piece est decoupe en pages.
+    /// </summary>
+    private static string TextePage(NoeudGed n, int feuille)
+    {
+        if (n.Apercu.Length == 0)
+            return n.Libelle + "\n\n(page " + feuille + " - document numerise, " + n.Origine + ")";
+        var lignes = n.Apercu.Replace("\r\n", "\n").Split('\n');
+        const int parPage = 18;
+        var debut = (feuille - 1) * parPage;
+        if (debut >= lignes.Length)
+            return "(page " + feuille + " - suite du document)";
+        return string.Join("\n", lignes.Skip(debut).Take(parPage));
+    }
 
     // ================= Menu de gauche =================
     private record Proc(string Code, string Libelle);
@@ -743,6 +1109,7 @@
     [
         new("RCS", "RCS", "action",
         [
+            new("PROC_RECHAFF",   "Recherche d'affaires"),
             new("PROC_DEMANDE",   "Demandes"),
             new("PROC_ARRIVEE",   "Arrivee du courrier"),
             new("PROC_ACTES_NUM", "Actes numerises"),
@@ -793,11 +1160,16 @@
         new("services",    "Services",     new() { Colonne = 9, Ligne = 2, Largeur = 4,  Hauteur = 2 }),
         new("file",        "Ma file",      new() { Colonne = 1, Ligne = 4, Largeur = 8,  Hauteur = 3 }),
         new("brouillons",  "Brouillons",   new() { Colonne = 9, Ligne = 4, Largeur = 4,  Hauteur = 2 }),
-        new("nouveautes",  "Nouveautes",   new() { Colonne = 9, Ligne = 6, Largeur = 4,  Hauteur = 1 })
+        new("nouveautes",  "Nouveautes",   new() { Colonne = 9, Ligne = 6, Largeur = 4,  Hauteur = 1 }),
+        new("recents",     "Mes affaires recentes", new() { Colonne = 1, Ligne = 7, Largeur = 8, Hauteur = 2 })
     ];
 
     private AccueilEtat Etat = new();
     private bool PanneauTuilesOuvert;
+
+    /// <summary>Reglages ancres dans la barre du haut (theme). Distincts du panneau
+    /// des tuiles, qui vit dans l'accueil et disparait des qu'un ecran s'ouvre.</summary>
+    private bool PanneauBarreOuvert;
     private ElementReference Grille;
     private IJSObjectReference? Module;
     private DotNetObjectReference<Home>? Lien;
@@ -818,10 +1190,36 @@
 
     private void BasculerPanneauTuiles() => PanneauTuilesOuvert = !PanneauTuilesOuvert;
 
+    private void BasculerPanneauBarre() => PanneauBarreOuvert = !PanneauBarreOuvert;
+
+    /// <summary>
+    /// Remet CHAQUE tuile a sa pose d'origine (colonne, ligne, largeur,
+    /// hauteur) : la disposition par defaut est calee sur la grille 12
+    /// colonnes et ne comporte aucun chevauchement. Ce que l'utilisateur a
+    /// allume ou eteint est conserve : seule la geometrie est reprise.
+    /// </summary>
+    private void ReinitialiserDisposition()
+    {
+        var rang = 1;
+        foreach (var def in Definitions)
+        {
+            var pose = Pose(def.Id);
+            pose.Colonne = def.Defaut.Colonne;
+            pose.Ligne   = def.Defaut.Ligne;
+            pose.Largeur = def.Defaut.Largeur;
+            pose.Hauteur = def.Defaut.Hauteur;
+            pose.Ordre   = rang++;
+        }
+        Etat.Enregistrer();
+    }
+
     private void BasculerTuile(string id)
     {
         var p = Pose(id);
         p.Visible = !p.Visible;
+        // Une tuile qu'on rallume est la derniere manipulee : elle passe
+        // devant, sinon elle pourrait reapparaitre sous une voisine.
+        if (p.Visible) Etat.Avancer(id);
         Etat.Enregistrer();
     }
 
@@ -832,6 +1230,7 @@
         var p = Pose(id);
         p.Colonne = Math.Clamp(colonne, 1, Math.Max(13 - p.Largeur, 1));
         p.Ligne = Math.Max(ligne, 1);
+        Etat.Avancer(id);
         Etat.Enregistrer();
         StateHasChanged();
     }
@@ -842,6 +1241,7 @@
         var p = Pose(id);
         p.Largeur = Math.Clamp(largeur, 3, Math.Max(13 - p.Colonne, 3));
         p.Hauteur = Math.Max(hauteur, 1);
+        Etat.Avancer(id);
         Etat.Enregistrer();
         StateHasChanged();
     }
@@ -858,12 +1258,33 @@
         }
     }
 
+    private bool PaginationSuivie;
+
     protected override async Task OnAfterRenderAsync(bool premierRendu)
     {
-        if (!premierRendu) return;
+        // La saisie guidee n'existe pas au premier rendu : son observateur de
+        // defilement doit etre branche au rendu ou elle apparait.
+        if (!premierRendu)
+        {
+            if (Module is null) return;
+            if (ModeSaisie && !PaginationSuivie && Lien is not null)
+            {
+                PaginationSuivie = true;
+                try { await Module.InvokeVoidAsync("suivrePagination", ZonePages, Lien); }
+                catch (JSException) { PaginationSuivie = false; }
+            }
+            else if (!ModeSaisie && PaginationSuivie)
+            {
+                PaginationSuivie = false;
+                try { await Module.InvokeVoidAsync("arreterPagination"); }
+                catch (JSException) { }
+            }
+            return;
+        }
         Module = await JS.InvokeAsync<IJSObjectReference>("import", "./rig-accueil.js");
         Lien = DotNetObjectReference.Create(this);
         await Module.InvokeVoidAsync("activerPose", Grille, Lien);
+        await AppliquerTheme();
         MinuteurPerf = new Timer(_ =>
         {
             RelevePerf();
@@ -871,13 +1292,18 @@
         }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
     }
 
+    // Le rechargement de la vue (reprise a chaud du CSS) demonte ce composant
+    // APRES que la page JS a disparu : les appels de nettoyage levent alors
+    // JSException. Non attrapee, elle remonte au dispatcher WPF et FERME
+    // l'application -- exactement ce que la reprise a chaud doit eviter.
     public async ValueTask DisposeAsync()
     {
         if (MinuteurPerf is not null) await MinuteurPerf.DisposeAsync();
         if (Module is not null)
         {
-            try { await Module.InvokeVoidAsync("arreterPose"); } catch (JSDisconnectedException) { }
-            try { await Module.DisposeAsync(); } catch (JSDisconnectedException) { }
+            try { await Module.InvokeVoidAsync("arreterPose"); } catch (JSException) { }
+            try { await Module.InvokeVoidAsync("arreterPagination"); } catch (JSException) { }
+            try { await Module.DisposeAsync(); } catch (JSException) { }
         }
         Lien?.Dispose();
     }
@@ -922,13 +1348,118 @@
 
     // Le tableau des editions de l'affaire et la ligne selectionnee.
     private LigneEdition[] Editions = [];
-    private LigneEdition? EditionSelectionnee;
 
-    private void ChoisirNoeud(NoeudGed n) => NoeudSelectionne = n;
+    /// <summary>
+    /// Le tableau des editions n'est plus la colonne de droite de
+    /// l'affaire : c'est un ecran a part, ouvert par un bouton.
+    /// </summary>
+    private bool EditionsOuvertes;
+
+    // ================= Colonnes de la vue affaire =================
+    // Le panneau de droite se ferme (croix) et la colonne du milieu
+    // s'ajuste en glissant le separateur. Largeur en pixels, bornee.
+    private bool GuideVisible = true;
+    private bool Redimensionne;
+    private double LargeurArbre = 520;
+    private const double LargeurArbreMin = 280;
+    private const double LargeurArbreMax = 1100;
+
+    private string StyleCorps
+    {
+        get
+        {
+            var colonnes = GuideVisible
+                ? $"grid-template-columns: {LargeurArbre.ToString("0", System.Globalization.CultureInfo.InvariantCulture)}px 6px minmax(0, 1fr)"
+                : "grid-template-columns: minmax(0, 1fr)";
+            // Pendant le glissement, le navigateur selectionnerait le texte
+            // survole : la vue se couvrait de surlignage bleu.
+            return Redimensionne ? colonnes + "; user-select: none" : colonnes;
+        }
+    }
+
+    // Le deplacement se calcule en RELATIF, a partir du point de saisie : la
+    // position absolue du separateur dans la page n'est pas connue cote C# et
+    // une constante (largeur du menu de gauche) donne un decalage -- la vue
+    // affaire occupe tout l'ecran, sans menu.
+    private double XDepart;
+    private double LargeurDepart;
+
+    private void DebutRedim(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
+    {
+        XDepart = e.ClientX;
+        LargeurDepart = LargeurArbre;
+        Redimensionne = true;
+    }
+
+    private void PendantRedim(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
+    {
+        if (!Redimensionne) return;
+        var largeur = LargeurDepart + (e.ClientX - XDepart);
+        LargeurArbre = Math.Clamp(largeur, LargeurArbreMin, LargeurArbreMax);
+    }
+
+    /// <summary>
+    /// Ce qui est clique dans l'arbre choisit l'etape saisie a droite.
+    /// La correspondance suit les dossiers de PROC_VGED (v2) : chaque
+    /// dossier documentaire alimente une table de la demande.
+    /// </summary>
+    private Etape EtapeDuNoeud(NoeudGed? noeud)
+    {
+        var code = "DEMANDE";
+        var texte = (noeud?.Libelle ?? "").ToLowerInvariant();
+
+        if (noeud is null) code = "DEMANDE";
+        else if (texte.Contains("statut") || texte.Contains("souscripteur")
+              || texte.Contains("capital")) code = "CAPITAL";
+        else if (texte.Contains("bail") || texte.Contains("etablissement")
+              || texte.Contains("siege") || texte.Contains("depots d'actes")
+              || texte.Contains("depot n")) code = "SIEGE";
+        else if (texte.Contains("non-condamnation") || texte.Contains("dirigeant")
+              || texte.Contains("president") || texte.Contains("identite du"))
+            code = "DIRIGEANTS";
+        else if (texte.Contains("kbis") || texte.Contains("dossier rcs")
+              || texte.Contains("m0") || texte.Contains("immatriculation"))
+            code = "IDENTITE";
+        else if (texte.Contains("comptes annuels") || texte.Contains("bilan")
+              || texte.Contains("activite")) code = "ACTIVITE";
+        else if (texte.Contains("inscription") || texte.Contains("privilege")
+              || texte.Contains("judiciaire") || texte.Contains("ordonnance")
+              || texte.Contains("divergence") || texte.Contains("requisition")
+              || texte.Contains("mandataire")) code = "CONTROLE";
+        else if (texte.Contains("formalite") || texte.Contains("demande"))
+            code = "DEMANDE";
+
+        return Etapes.First(e => e.Code == code);
+    }
+
+    /// <summary>
+    /// L'etape du panneau de droite : celle choisie dans la frise en pied
+    /// si l'utilisateur y a clique, sinon celle deduite de l'arbre.
+    /// </summary>
+    private string? CodeEtapeGuide;
+
+    private Etape EtapeGuide()
+        => CodeEtapeGuide is not null
+            ? Etapes.FirstOrDefault(e => e.Code == CodeEtapeGuide) ?? EtapeDuNoeud(NoeudSelectionne)
+            : EtapeDuNoeud(NoeudSelectionne);
+
+    private void ChoisirEtapeGuide(Etape etape) => CodeEtapeGuide = etape.Code;
+
+    private void ChoisirNoeud(NoeudGed n)
+    {
+        NoeudSelectionne = n;
+        // Un clic dans l'arbre reprend la main sur la frise.
+        CodeEtapeGuide = null;
+    }
 
     private void OuvrirDossier(Dossier d)
     {
         DossierOuvert = d;
+
+        // Historique de consultation : horodate a l'instant du clic, jamais
+        // reconstitue a l'affichage. C'est ce que la tuile « Mes affaires
+        // recentes » lit.
+        Etat.Consulter(d.Numero, d.Objet, d.Siren, d.Type, d.Statut);
 
         // Ouvrir une affaire tombe sur l'arbre, jamais sur la saisie : c'est
         // l'ecran d'entree de VGED dans RIG v2.
@@ -936,7 +1467,7 @@
 
         Arbre = ArbreDemo.Racine(d.Numero, d.Objet, d.Siren);
         Editions = ArbreDemo.Editions(d.Numero, d.Objet);
-        EditionSelectionnee = Editions.FirstOrDefault(e => !e.EstGroupe);
+        EditionsOuvertes = false;
 
         // La racine et tous les dossiers servis sont deplies d'entree :
         // l'arbre s'ouvre sur du contenu, pas sur une ligne fermee.
@@ -953,7 +1484,7 @@
     {
         DossierOuvert = null;
         NoeudSelectionne = null;
-        EditionSelectionnee = null;
+        EditionsOuvertes = false;
     }
 
     // ================= Ecran de procedure =================
@@ -1019,7 +1550,13 @@
 
     private bool ModeSaisie;
     private int EtapeCourante;
-    private int FicheCourante;
+    private ElementReference ZonePages;
+    // Chaque etape garde SA fiche affichee : les 7 etapes sont a l'ecran en
+    // meme temps, un index unique les ferait basculer ensemble.
+    private readonly Dictionary<string, int> FicheParEtape = new();
+    // Les controles de validite parcourent toutes les fiches d'une etape :
+    // pendant ce parcours l'index affiche est mis de cote.
+    private int? FicheForcee;
 
     // Ce qui est saisi est CONSERVE : il vit dans accueil.json, range par
     // affaire puis par etape. Une etape marquee Multiple porte plusieurs
@@ -1042,12 +1579,19 @@
         return fiches;
     }
 
-    private Dictionary<string, string> FicheVue(Etape etape)
+    private int IndexFiche(Etape etape)
     {
         var fiches = Fiches(etape.Code);
-        var i = Math.Clamp(FicheCourante, 0, fiches.Count - 1);
-        return fiches[i];
+        if (FicheForcee is { } forcee) return Math.Clamp(forcee, 0, fiches.Count - 1);
+        var i = FicheParEtape.TryGetValue(etape.Code, out var v) ? v : 0;
+        return Math.Clamp(i, 0, fiches.Count - 1);
     }
+
+    private void ChoisirFiche(Etape etape, int index)
+        => FicheParEtape[etape.Code] = index;
+
+    private Dictionary<string, string> FicheVue(Etape etape)
+        => Fiches(etape.Code)[IndexFiche(etape)];
 
     private string Valeur(Etape e, Champ c)
         => FicheVue(e).TryGetValue(c.Colonne, out var v) ? v : string.Empty;
@@ -1075,7 +1619,7 @@
     {
         var fiches = Fiches(e.Code);
         fiches.Add(new Dictionary<string, string>());
-        FicheCourante = fiches.Count - 1;
+        FicheParEtape[e.Code] = fiches.Count - 1;
         Etat.Enregistrer();
     }
 
@@ -1083,15 +1627,34 @@
     {
         var fiches = Fiches(e.Code);
         if (fiches.Count <= 1) return;
-        fiches.RemoveAt(Math.Clamp(FicheCourante, 0, fiches.Count - 1));
-        FicheCourante = Math.Max(0, FicheCourante - 1);
+        fiches.RemoveAt(IndexFiche(e));
+        FicheParEtape[e.Code] = Math.Max(0, IndexFiche(e) - 1);
         Etat.Enregistrer();
     }
 
-    private void AllerEtape(int index)
+    /// <summary>
+    /// La frise et les boutons Precedent/Suivant ne changent plus de page :
+    /// ils FONT DEFILER la page geante jusqu'a l'etape voulue, qui se cale
+    /// d'elle-meme (scroll-snap).
+    /// </summary>
+    private async Task AllerEtape(int index)
     {
+        index = Math.Clamp(index, 0, Etapes.Length - 1);
         EtapeCourante = index;
-        FicheCourante = 0;
+        if (Module is not null)
+        {
+            try { await Module.InvokeVoidAsync("allerEtape", ZonePages, index); }
+            catch (JSException) { }
+        }
+    }
+
+    /// <summary>Appelee par rig-accueil.js : l'etape la plus visible a change.</summary>
+    [JSInvokable]
+    public void EtapeVisible(int index)
+    {
+        if (index == EtapeCourante) return;
+        EtapeCourante = Math.Clamp(index, 0, Etapes.Length - 1);
+        StateHasChanged();
     }
 
     // ---- Controle de validite --------------------------------------
@@ -1134,17 +1697,17 @@
         var fiches = Fiches(e.Code);
         var manquants = 0;
         var refuses = 0;
-        var memoire = FicheCourante;
+        var memoire = FicheForcee;
         for (var i = 0; i < fiches.Count; i++)
         {
-            FicheCourante = i;
+            FicheForcee = i;
             foreach (var c in e.Champs)
             {
                 if (RequisManquant(e, c)) manquants++;
                 else if (RefusDe(e, c) is not null) refuses++;
             }
         }
-        FicheCourante = memoire;
+        FicheForcee = memoire;
         return (manquants, refuses);
     }
 
@@ -1160,8 +1723,7 @@
     private List<Defaut> TousLesDefauts()
     {
         var liste = new List<Defaut>();
-        var memoireEtape = EtapeCourante;
-        var memoireFiche = FicheCourante;
+        var memoireFiche = FicheForcee;
 
         for (var e = 0; e < Etapes.Length; e++)
         {
@@ -1169,7 +1731,7 @@
             var fiches = Fiches(etape.Code);
             for (var f = 0; f < fiches.Count; f++)
             {
-                FicheCourante = f;
+                FicheForcee = f;
                 foreach (var c in etape.Champs)
                 {
                     if (RequisManquant(etape, c))
@@ -1186,15 +1748,14 @@
             }
         }
 
-        EtapeCourante = memoireEtape;
-        FicheCourante = memoireFiche;
+        FicheForcee = memoireFiche;
         return liste;
     }
 
-    private void AllerAuDefaut(Defaut d)
+    private async Task AllerAuDefaut(Defaut d)
     {
-        EtapeCourante = d.IndexEtape;
-        FicheCourante = d.Fiche;
+        FicheParEtape[Etapes[d.IndexEtape].Code] = d.Fiche;
+        await AllerEtape(d.IndexEtape);
     }
 
     /// <summary>
@@ -1222,14 +1783,6 @@
         Etat.Enregistrer();
         Etat.Journaliser(CleAffaire, "Saisie ROUVERTE apres validation");
     }
-
-    /// <summary>Panneau « Historique VGED » ouvert ou non.</summary>
-    private bool HistoriqueOuvert;
-
-    private List<string> HistoriqueAffaire
-        => Etat.Journal.TryGetValue(CleAffaire, out var l)
-            ? Enumerable.Reverse(l).ToList()
-            : new List<string>();
 
     private record Champ(string Libelle, string Colonne, string Type = "text",
                          string Exemple = "", bool Obligatoire = false,
@@ -1329,8 +1882,8 @@
 
     // ================= Corps des tuiles =================
 
-    // --- Performance : mesures RELEVEES en direct sur le processus (MesuresPerf.cs).
-    //     Rien n'est ecrit en dur : le releve est refait toutes les secondes.
+    // --- Performance : activite des DOSSIERS, calculee dans MesuresPerf.cs
+    //     (traites, en cours, hors delai, rejets, pieces, delai moyen).
     private readonly MesuresPerf Sonde = new();
     private MesurePerf[] Mesures = [];
     private Timer? MinuteurPerf;
@@ -1486,6 +2039,65 @@
             <button class="rig-bouton">Reprendre</button>
         }
     </div>;
+
+    /// <summary>
+    /// Tuile « Mes affaires recentes » : les affaires REELLEMENT ouvertes,
+    /// la plus recente en tete. Un clic rouvre la vue de recherche avec le
+    /// n° d'affaire deja pose — « comme si on recherchait l'affaire ».
+    /// </summary>
+    private RenderFragment CorpsRecents => @<div>
+        @if (Etat.Consultations.Count == 0)
+        {
+            <div class="rig-table__vide" style="padding:var(--rig-esp-3)">
+                Aucune affaire consultee pour l'instant. Les affaires que vous
+                ouvrez apparaitront ici, la plus recente en tete.
+            </div>
+        }
+        else
+        {
+            @foreach (var c in Etat.Consultations.Take(8))
+            {
+                var vue = c;
+                <div class="rig-ligne @(EstValide(vue.Numero) ? "rig-ligne--valide" : "")"
+                     @onclick="() => RechercherAffaire(vue.Numero)"
+                     style="cursor:pointer">
+                    <span class="rig-filet-v rig-filet-v--@vue.Statut"></span>
+                    <span>
+                        <span class="rig-ligne__id">@vue.Numero</span><br />
+                        <span class="rig-ligne__objet">@vue.Objet</span>
+                    </span>
+                    <span class="rig-ligne__droite">
+                        <span style="font-size:12px;color:var(--rig-texte-2)">@vue.Depuis</span><br />
+                        <span style="font-size:11px;color:var(--rig-texte-3)">@vue.Type</span>
+                    </span>
+                </div>
+            }
+        }
+    </div>;
+
+    /// <summary>N° d'affaire pose dans la vue de recherche a son ouverture.</summary>
+    private string? NoAffaireDemande;
+
+    /// <summary>
+    /// Change quand le n° demande change : l'ecran est alors RECONSTRUIT,
+    /// sinon Blazor reutiliserait l'instance et le critere ne serait pas
+    /// repose (OnInitialized ne rejoue pas).
+    /// </summary>
+    private object CleRechAffaire => NoAffaireDemande ?? "toutes-les-affaires";
+
+    /// <summary>Le bouton d'entete : la vue de recherche, SANS aucun critere.</summary>
+    private void VoirToutesLesAffaires()
+    {
+        NoAffaireDemande = null;
+        OuvrirProc(new Proc("PROC_RECHAFF", "Recherche d'affaires"));
+    }
+
+    /// <summary>Une ligne de la tuile : la meme vue, mais sur cette affaire.</summary>
+    private void RechercherAffaire(string numero)
+    {
+        NoAffaireDemande = numero;
+        OuvrirProc(new Proc("PROC_RECHAFF", "Recherche d'affaires"));
+    }
 
     private RenderFragment CorpsFile => @<div>
         @foreach (var d in File)

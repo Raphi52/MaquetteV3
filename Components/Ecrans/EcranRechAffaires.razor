@@ -1,0 +1,149 @@
+@* Ecran de la procedure PROC_RECHAFF — recherche d'affaires.
+
+   Reference RIG v2 (D:/RigApplication/Source/RIG/DLL/Processus/PROC_RECHAFF) :
+     - Operations/OPE_CRITERES.cs : n° affaire, n° demande, n° facture, dates
+     - Ults/ULT_GRIDVIEW_RECHAFF.cs : colonnes N° Affaire, Libelle,
+       Date creation, Solde, Demandes, Factures.
+
+   Deux differences ASSUMEES avec v2, parce que ce n'est pas un portage :
+     - aucun rattachement de demande a l'affaire (dans v2, DoValider deplace
+       DMND_ID_AFFRE quand un n° de demande est passe en entree). Ici l'ecran
+       ne fait que LIRE.
+     - le parametre NoAffaire pre-remplit le critere et lance la recherche,
+       ce qui permet a la tuile « Mes affaires recentes » d'ouvrir la vue
+       comme si on venait de rechercher l'affaire. *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Criteres de recherche</div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">N&deg; Affaire</span>
+            <input class="rig-saisie-champ__saisie" @bind="CritNumero" @bind:event="oninput" />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Libelle, SIREN</span>
+            <input class="rig-saisie-champ__saisie" @bind="CritLibelle" @bind:event="oninput" />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Type</span>
+            <select class="rig-saisie-champ__saisie" @bind="CritType">
+                <option value="">Tous</option>
+                <option value="RCS">RCS</option>
+                <option value="JUD">Judiciaire</option>
+            </select>
+        </label>
+
+        <button class="rig-bouton" @onclick="Vider">Effacer les criteres</button>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Affaires</div>
+            <span class="rig-resultats-proc__compte">@Trouvees.Length affaire(s)</span>
+        </div>
+
+        <div class="rig-table-cadre">
+            <table class="rig-table">
+                <thead>
+                    <tr>
+                        <th>N&deg; Affaire</th>
+                        <th>Libelle</th>
+                        <th>SIREN</th>
+                        <th>Type</th>
+                        <th>Date creation</th>
+                        <th>Solde</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var a in Trouvees)
+                    {
+                        var affaire = a;
+                        <tr class="@(affaire.Numero == NoAffaire ? "rig-ligne--valide" : "")"
+                            @ondblclick="() => Ouvrir.InvokeAsync(affaire.Numero)">
+                            <td class="rig-table__mono">@affaire.Numero</td>
+                            <td>@affaire.Libelle</td>
+                            <td class="rig-table__mono">@affaire.Siren</td>
+                            <td>@affaire.Type</td>
+                            <td class="rig-table__mono">@affaire.Creation.ToString("dd/MM/yyyy")</td>
+                            <td class="rig-table__mono">@affaire.Solde.ToString("N2") &euro;</td>
+                        </tr>
+                    }
+                    @if (Trouvees.Length == 0)
+                    {
+                        <tr><td colspan="6" class="rig-table__vide">Aucune affaire pour ces criteres.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="rig-resultats-proc__entete">
+            <span class="rig-resultats-proc__compte">
+                Double-clic sur une ligne pour ouvrir l'affaire dans la visionneuse.
+            </span>
+        </div>
+    </section>
+</div>
+
+@code {
+    /// <summary>Numero d'affaire pre-rempli a l'ouverture (tuile de l'accueil).</summary>
+    [Parameter] public string? NoAffaire { get; set; }
+
+    /// <summary>Remonte le numero choisi ; la page ouvre la visionneuse.</summary>
+    [Parameter] public EventCallback<string> Ouvrir { get; set; }
+
+    private sealed record Affaire(string Numero, string Libelle, string Siren, string Type,
+                                  DateTime Creation, decimal Solde);
+
+    private static readonly Affaire[] Affaires =
+    [
+        new("0000",    "Affaire de demonstration - AMITEL SAS", "903 118 776", "RCS", new(2026, 9, 1),  0m),
+        new("004176",  "Modification - SCI DU PARC",            "812 445 901", "RCS", new(2026, 8, 24), 142.50m),
+        new("004182",  "Immatriculation - AMITEL SAS",          "903 118 776", "RCS", new(2026, 8, 28), 0m),
+        new("004179",  "Radiation - MARTIN EURL",               "521 004 332", "RCS", new(2026, 8, 12), 68.30m),
+        new("004168",  "Immatriculation - BATIPRO SARL",        "440 927 115", "RCS", new(2026, 7, 30), 0m),
+        new("J-00931", "Depot de bilan - TRANSNORD SA",         "318 552 004", "JUD", new(2026, 6, 18), 415.00m)
+    ];
+
+    private string CritNumero = string.Empty;
+    private string CritLibelle = string.Empty;
+    private string CritType = string.Empty;
+
+    /// <summary>
+    /// Le critere n'est pose qu'a l'OUVERTURE : ensuite l'utilisateur est
+    /// maitre de ses criteres, un nouveau rendu ne doit pas les ecraser.
+    /// </summary>
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrWhiteSpace(NoAffaire)) CritNumero = NoAffaire!.Trim();
+    }
+
+    private void Vider()
+    {
+        CritNumero = string.Empty;
+        CritLibelle = string.Empty;
+        CritType = string.Empty;
+    }
+
+    private Affaire[] Trouvees
+    {
+        get
+        {
+            IEnumerable<Affaire> q = Affaires;
+            if (!string.IsNullOrWhiteSpace(CritNumero))
+                q = q.Where(a => a.Numero.Contains(CritNumero.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(CritLibelle))
+            {
+                var t = CritLibelle.Trim();
+                q = q.Where(a => a.Libelle.Contains(t, StringComparison.OrdinalIgnoreCase)
+                              || a.Siren.Replace(" ", "").Contains(t.Replace(" ", ""),
+                                    StringComparison.OrdinalIgnoreCase));
+            }
+            if (!string.IsNullOrEmpty(CritType)) q = q.Where(a => a.Type == CritType);
+            return q.OrderByDescending(a => a.Creation).ToArray();
+        }
+    }
+}

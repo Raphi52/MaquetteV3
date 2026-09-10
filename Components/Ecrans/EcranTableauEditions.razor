@@ -1,0 +1,132 @@
+@* ============ ECRAN : TABLEAU DES EDITIONS ============
+   Ecran a part entiere, ouvert par un bouton depuis l'affaire : la
+   colonne de droite de l'affaire est desormais la saisie guidee.
+   Colonnes de PROC_TABLEAU_LOT3/Processus/TreeviewEditions.cs,
+   champs de detail d'OPE_DESTINATAIRE.Designer.cs (v2). *@
+<div class="rig-editions-ecran">
+    <div class="rig-editions-ecran__entete">
+        <b>Tableau des editions</b>
+        <span style="color:var(--rig-texte-3);font-size:12px">
+            @Affaire &middot; @Editions.Count(e => !e.EstGroupe) editions
+        </span>
+        <span style="margin-left:auto"></span>
+        <button class="rig-bouton" @onclick="Fermer">Retour a l'affaire</button>
+    </div>
+    <div class="rig-editions-ecran__corps">
+            <div class="rig-editions__cadre">
+                <table class="rig-editions">
+                    <thead>
+                        <tr>
+                            <th class="rig-editions__dest">Destinataire</th>
+                            <th class="rig-editions__drapeau" title="Agrafage">Ag</th>
+                            <th class="rig-editions__doc">Nom du document</th>
+                            <th class="rig-editions__drapeau" title="Envoi au coffre">Cf</th>
+                            <th class="rig-editions__drapeau" title="Envoi tribunal digital">Td</th>
+                            <th class="rig-editions__drapeau" title="Envoi par courriel">@@</th>
+                            <th class="rig-editions__ex" title="Nombre d'exemplaires">Ex.</th>
+                            <th class="rig-editions__drapeau" title="Imprimer">Imp</th>
+                            <th class="rig-editions__imprimante">Imprimante</th>
+                            <th class="rig-editions__file">File ou imprimante</th>
+                            <th class="rig-editions__drapeau" title="Afficher avant impression">Av</th>
+                            <th class="rig-editions__drapeau" title="Recto/Verso">R/V</th>
+                            <th class="rig-editions__file">File differee</th>
+                            <th class="rig-editions__drapeau" title="Impression supplementaire au greffe">+</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var e in Editions)
+                        {
+                            @if (e.EstGroupe)
+                            {
+                                <tr class="rig-editions__groupe">
+                                    <td colspan="14" style="padding-left:@(6 + e.Niveau * 14)px">
+                                        <span class="rig-arbre__chevron rig-arbre__chevron--ouvert"></span>@e.Destinataire
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                <tr class="@(EditionSelectionnee == e ? "rig-editions__ligne--actif" : "")"
+                                    @onclick="() => EditionSelectionnee = e">
+                                    <td class="rig-editions__dest" style="padding-left:@(6 + e.Niveau * 14)px">@e.Destinataire</td>
+                                    <td class="rig-editions__drapeau">@(e.Agrafage ? "x" : "")</td>
+                                    <td class="rig-editions__doc">@e.NomDocument</td>
+                                    <td class="rig-editions__drapeau">@(e.CoffreFort ? "x" : "")</td>
+                                    <td class="rig-editions__drapeau">@(e.TribunalDigital ? "x" : "")</td>
+                                    <td class="rig-editions__drapeau">@(e.EnvoiParMail ? "x" : "")</td>
+                                    <td class="rig-editions__ex">@e.Exemplaires</td>
+                                    <td class="rig-editions__drapeau">@(e.Imprimer ? "x" : "")</td>
+                                    <td class="rig-editions__imprimante">@e.Imprimante</td>
+                                    <td class="rig-editions__file">@e.FileImprimante</td>
+                                    <td class="rig-editions__drapeau">@(e.AffAvantImpression ? "x" : "")</td>
+                                    <td class="rig-editions__drapeau">@(e.RectoVerso ? "x" : "")</td>
+                                    <td class="rig-editions__file">@e.FileDifferee</td>
+                                    <td class="rig-editions__drapeau">@(e.ImpressionSupplementaire ? "x" : "")</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="rig-editions__titre">Detail de l'edition selectionnee</div>
+            <div class="rig-editions__detail">
+                @if (EditionSelectionnee?.Detail is { } d)
+                {
+                    <label class="rig-champ-ed"><span>Designation</span>
+                        <input class="rig-saisie" value="@d.Designation" readonly /></label>
+                    <label class="rig-champ-ed"><span>A l'attention de</span>
+                        <input class="rig-saisie" value="@d.AttentionDe" readonly /></label>
+                    <label class="rig-champ-ed rig-champ-ed--large"><span>Adresse postale</span>
+                        <textarea class="rig-saisie" rows="3" readonly>@d.AdressePostale</textarea></label>
+                    <label class="rig-champ-ed"><span>Type de papier</span>
+                        <select class="rig-saisie" disabled>
+                            @foreach (var tp in ArbreDemo.TypesPapier)
+                            {
+                                <option selected="@(tp == d.TypePapier)">@tp</option>
+                            }
+                        </select></label>
+                    <label class="rig-champ-ed"><span>Telephone</span>
+                        <input class="rig-saisie" value="@d.Telephone" readonly /></label>
+                    <label class="rig-champ-ed"><span>Siren</span>
+                        <input class="rig-saisie" value="@d.Siren" readonly /></label>
+                    <label class="rig-champ-ed"><span>Coffre-fort : nature du document</span>
+                        <input class="rig-saisie" value="@d.NatureCoffreFort" readonly /></label>
+                    <label class="rig-champ-ed"><span>Coffre-fort</span>
+                        <input class="rig-saisie" value="@d.CoffreFort" readonly /></label>
+                    <label class="rig-champ-ed"><span>Tribunal digital : nature du document</span>
+                        <input class="rig-saisie" value="@d.NatureTribunalDigital" readonly /></label>
+                    <label class="rig-champ-ed"><span>Tribunal digital</span>
+                        <input class="rig-saisie" value="@d.TribunalDigital" readonly /></label>
+                    <label class="rig-champ-ed rig-champ-ed--large"><span>Tribunal digital : Erreur</span>
+                        <input class="rig-saisie" value="@d.ErreurTribunalDigital" readonly /></label>
+                    <label class="rig-champ-ed"><span>Courriel</span>
+                        <input class="rig-saisie" value="@d.Courriel" readonly /></label>
+                    <label class="rig-champ-ed rig-champ-ed--case">
+                        <input type="checkbox" checked="@d.ConserverPjOrigine" disabled />
+                        <span>Conserver les PJ au format d'origine (ne pas convertir en PDF)</span></label>
+                    <label class="rig-champ-ed rig-champ-ed--large"><span>Observation</span>
+                        <textarea class="rig-saisie" rows="2" readonly>@d.Observation</textarea></label>
+                }
+                else
+                {
+                    <div style="font-size:11px;color:var(--rig-texte-3)">
+                        Choisissez un destinataire dans le tableau des editions.
+                    </div>
+                }
+            </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>Les lignes d'edition de l'affaire ouverte.</summary>
+    [Parameter] public LigneEdition[] Editions { get; set; } = [];
+
+    /// <summary>Numero et denomination de l'affaire, pour l'entete.</summary>
+    [Parameter] public string Affaire { get; set; } = "";
+
+    /// <summary>Referme l'ecran et revient a l'affaire.</summary>
+    [Parameter] public EventCallback Fermer { get; set; }
+
+    private LigneEdition? EditionSelectionnee;
+}

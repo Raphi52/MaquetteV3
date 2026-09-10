@@ -11,6 +11,8 @@
 
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="../../Metier/ArbreGed.cs" Link="ArbreGed.cs" />
+    <Compile Include="../../Metier/JeuDemo.cs" Link="JeuDemo.cs" />
   </ItemGroup>
 
 </Project>

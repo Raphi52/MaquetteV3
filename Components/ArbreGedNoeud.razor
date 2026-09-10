@@ -12,7 +12,7 @@
      style="--rig-arbre-niveau:@Niveau"
      @onclick="Activer">
     <span class="rig-arbre__libelle">
-        @if (Noeud.Enfants.Length > 0)
+        @if (EnfantsVisibles.Count > 0)
         {
             <span class="rig-arbre__chevron @(Ouvert ? "rig-arbre__chevron--ouvert" : "")">&#9656;</span>
         }
@@ -22,23 +22,23 @@
         }
         <span class="rig-arbre__icone rig-arbre__icone--@Noeud.Icone"></span>
         <span class="rig-arbre__texte">@Noeud.Libelle</span>
-        @if (Noeud.Enfants.Length > 0 && Noeud.NbPieces > 0)
+        @if (EnfantsVisibles.Count > 0 && Noeud.NbPieces > 0)
         {
             <span class="rig-arbre__compte">(@Noeud.NbPieces)</span>
         }
     </span>
     <span class="rig-arbre__date">@Noeud.Date</span>
-    <span class="rig-arbre__pages">@(Noeud.EstPiece ? Noeud.Pages.ToString() : (Noeud.PagesCumulees > 0 ? Noeud.PagesCumulees.ToString() : ""))</span>
 </div>
 
 @if (Ouvert)
 {
-    @foreach (var enfant in Noeud.Enfants)
+    @foreach (var enfant in EnfantsVisibles)
     {
         <ArbreGedNoeud Noeud="enfant" Niveau="Niveau + 1" Ouverts="Ouverts"
-                       Selection="Selection" Selectionner="Selectionner" />
+                       Selection="Selection" Selectionner="Selectionner"
+                       NiveauAcces="NiveauAcces" Ajouts="Ajouts" />
     }
-    @if (Noeud.Enfants.Length == 0 && !Noeud.EstPiece)
+    @if (EnfantsVisibles.Count == 0 && !Noeud.EstPiece)
     {
         <div class="rig-arbre__vide" style="--rig-arbre-niveau:@(Niveau + 1)">aucune piece</div>
     }
@@ -51,6 +51,15 @@
     [Parameter] public NoeudGed? Selection { get; set; }
     [Parameter] public EventCallback<NoeudGed> Selectionner { get; set; }
 
+    /// <summary>Niveau d'acces du login courant : les dossiers reserves au-dessus ne se rendent pas.</summary>
+    [Parameter] public int NiveauAcces { get; set; }
+
+    /// <summary>Elements ajoutes a la main sous un dossier, par le bouton « Nouveau ».</summary>
+    [Parameter] public IReadOnlyDictionary<NoeudGed, List<NoeudGed>>? Ajouts { get; set; }
+
+    private IReadOnlyList<NoeudGed> EnfantsVisibles
+        => AccesGed.EnfantsVisibles(Noeud, NiveauAcces, Ajouts);
+
     private bool Ouvert => Ouverts.Contains(Noeud);
 
     private async Task Activer()
@@ -58,7 +67,7 @@
         // Un dossier se replie/se deplie ; une piece se selectionne. Un
         // dossier vide reste depliable : c'est ainsi que v2 montre
         // « aucune piece » plutot que de cacher le dossier.
-        if (Noeud.Enfants.Length > 0 || !Noeud.EstPiece)
+        if (EnfantsVisibles.Count > 0 || !Noeud.EstPiece)
         {
             if (!Ouverts.Add(Noeud)) Ouverts.Remove(Noeud);
         }

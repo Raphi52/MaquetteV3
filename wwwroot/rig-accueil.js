@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // RIG V3 - pose des tuiles de l'accueil.
 // Le glisser-deposer est fait ici parce que seul le navigateur
 // connait la geometrie reelle de la grille ; la position finale
@@ -12,6 +12,12 @@ const LARGEUR_MIN = 3;     // en colonnes
 const HAUTEUR_MIN = 1;     // en lignes
 
 let detacher = null;
+
+// Le theme est pose sur <html> et pas seulement sur le composant : sans cela
+// le fond de la page hote reste sombre et cerne le mode clair.
+export function appliquerTheme(nom) {
+  document.documentElement.setAttribute("data-rig-theme", nom);
+}
 
 export function activerPose(zone, dotnet) {
   arreterPose();
@@ -56,10 +62,12 @@ export function activerPose(zone, dotnet) {
     if (ev.button !== 0) return;
     if (ev.target.closest(".rig-widget__taille")) return;
     const tete = ev.target.closest(".rig-widget__tete");
-    // Les commandes de l'entete (reglages) doivent recevoir leur clic :
-    // demarrer un deplacement ici appellerait preventDefault et le clic
-    // n'arriverait jamais jusqu'a Blazor.
-    if (!tete || ev.target.closest(".rig-widget__reglages")) return;
+    // TOUT bouton de l'entete doit recevoir son clic : demarrer un
+    // deplacement ici appellerait preventDefault et le clic n'arriverait
+    // jamais jusqu'a Blazor. La garde porte sur "button" et non sur une
+    // classe precise, sinon chaque nouveau bouton d'entete (reglages,
+    // « Voir toutes les affaires »...) redevient muet en silence.
+    if (!tete || ev.target.closest("button")) return;
     const tuile = tete.closest("[data-tuile]");
     if (!tuile) return;
 
@@ -144,4 +152,49 @@ export function activerPose(zone, dotnet) {
 
 export function arreterPose() {
   if (detacher) { detacher(); detacher = null; }
+}
+
+// ============================================================
+// SAISIE GUIDEE - une page geante, mais paginee.
+// Les 7 etapes sont toutes dans le DOM et s'enchainent au scroll ;
+// chacune se cale comme une page (scroll-snap, cote CSS). Le
+// navigateur est le seul a savoir laquelle est reellement visible :
+// c'est lui qui le dit a Blazor, pour que la frise suive.
+// ============================================================
+
+let observateur = null;
+
+export function suivrePagination(zone, dotnet) {
+  arreterPagination();
+  if (!zone) return;
+  const pages = zone.querySelectorAll("[data-etape]");
+  if (!pages.length) return;
+
+  let dernier = -1;
+  observateur = new IntersectionObserver((entrees) => {
+    // La page « courante » est la plus visible, pas la premiere croisee :
+    // sinon la frise sauterait d'un pas des qu'un bord effleure l'ecran.
+    let meilleure = null;
+    for (const e of entrees) {
+      if (!e.isIntersecting) continue;
+      if (!meilleure || e.intersectionRatio > meilleure.intersectionRatio) meilleure = e;
+    }
+    if (!meilleure) return;
+    const index = parseInt(meilleure.target.getAttribute("data-etape"), 10);
+    if (Number.isNaN(index) || index === dernier) return;
+    dernier = index;
+    dotnet.invokeMethodAsync("EtapeVisible", index);
+  }, { root: zone, threshold: [0.15, 0.35, 0.55, 0.75] });
+
+  pages.forEach((p) => observateur.observe(p));
+}
+
+export function arreterPagination() {
+  if (observateur) { observateur.disconnect(); observateur = null; }
+}
+
+export function allerEtape(zone, index) {
+  if (!zone) return;
+  const page = zone.querySelector('[data-etape="' + index + '"]');
+  if (page) page.scrollIntoView({ behavior: "smooth", block: "start" });
 }

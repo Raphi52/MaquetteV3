@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    RIG V3 - ACCUEIL A TUILES POSABLES
    Complement de rig-charte.css. Meme regle fondatrice :
    aucun aplat de couleur, la couleur ne vit que dans les filets.
@@ -8,7 +8,12 @@
 .rig-accueil {
   display: grid;
   grid-template-columns: 232px 1fr;
-  min-height: 100vh;
+  /* La page ne defile plus en entier : c'est le plan de travail qui defile.
+     Sans cela, la barre de defilement court sur toute la fenetre, en dehors
+     du contenu, et le fond de page apparait en bandes autour du cadre. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* ---------- Menu de gauche, groupes depliables ---------- */
@@ -16,7 +21,7 @@
   border-right: 1px solid var(--rig-bord);
   padding: var(--rig-esp-4) var(--rig-esp-2);
   overflow-y: auto;
-  max-height: 100vh;
+  min-height: 0;
 }
 .rig-menu__groupe { margin-bottom: var(--rig-esp-1); }
 .rig-menu__tete {
@@ -56,12 +61,17 @@
 }
 
 /* ---------- Plan de travail ---------- */
-.rig-plan { padding: var(--rig-esp-4) var(--rig-esp-5) var(--rig-esp-6); min-width: 0; }
+.rig-plan {
+  padding: var(--rig-esp-4) var(--rig-esp-5) var(--rig-esp-6);
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
 
-/* ---------- Barre de recherche : fixe, centree, hors des tuiles ---------- */
+/* ---------- Barre de recherche : centree, hors des tuiles ----------
+   Elle defile avec le contenu (choix du 2026-09-10) : plus de sticky. */
 .rig-recherche--fixe {
-  position: sticky;
-  top: var(--rig-esp-3);
+  position: relative;   /* ancre .rig-resultats, sans coller au bord haut */
   z-index: 40;
   max-width: 720px;
   margin: 0 auto var(--rig-esp-5);
@@ -143,6 +153,17 @@
 }
 .rig-widget__fermer:hover { color: var(--rig-texte); }
 .rig-widget__corps { min-height: 0; overflow: auto; flex: 1 1 auto; }
+
+/* Bouton d'action dans l'entete d'une tuile (« Voir toutes les affaires »).
+   Pose a droite du titre, l'engrenage de reglages restant en bout de ligne. */
+.rig-bouton--tuile {
+  margin-left: auto;
+  padding: 2px 8px;
+  font-size: 11px;
+  letter-spacing: var(--rig-ls-kicker);
+  text-transform: uppercase;
+  cursor: pointer;
+}
 
 /* ---------- Panneau des tuiles (allumer / eteindre) ---------- */
 .rig-tuiles-panneau {
@@ -260,18 +281,35 @@
 /* Arbre a gauche, tableau des editions en colonne de droite : la mise
    en page de PROC_VDOSSIER + PROC_TABLEAU_LOT3 dans RIG v2. */
 .rig-vged__corps {
-  display: grid; grid-template-columns: minmax(360px, 1fr) minmax(520px, 1fr);
-  min-height: 0;
+  display: grid; grid-template-columns: 520px 6px minmax(0, 1fr);
+  min-height: 0; position: relative;
 }
+/* Separateur deplacable entre la colonne du milieu et le panneau de droite. */
+.rig-vged__poignee {
+  cursor: col-resize; background: var(--rig-bord);
+  border: 0; padding: 0; touch-action: none;
+}
+.rig-vged__poignee:hover { background: var(--rig-accent, var(--rig-texte-3)); }
+/* Voile actif pendant le glissement : capte le pointeur sur toute la zone. */
+.rig-vged__voile { position: absolute; inset: 0; cursor: col-resize; z-index: 30; }
+.rig-guide__fermer {
+  background: transparent; border: 1px solid var(--rig-bord);
+  border-radius: var(--rig-radius-sm); color: var(--rig-texte-3);
+  cursor: pointer; line-height: 1; font-size: 15px; padding: 1px 6px 3px;
+  margin-left: var(--rig-esp-2);
+}
+.rig-guide__fermer:hover { color: var(--rig-texte); border-color: var(--rig-texte-3); }
 .rig-vged__arbre {
   border-right: 1px solid var(--rig-bord);
   padding: var(--rig-esp-3);
   overflow-y: auto;
 }
 
-/* ---------- Arbre GED : trois colonnes Documents / Date / Nb pages ---------- */
+/* ---------- Arbre GED : deux colonnes Documents / Date ----------
+   La colonne « Nb pages » de v2 est retiree : le nombre de pages reste
+   lisible dans l'apercu de la piece, a droite de l'arbre. */
 .rig-arbre__entete, .rig-arbre__ligne, .rig-arbre__vide {
-  display: grid; grid-template-columns: minmax(0, 1fr) 82px 62px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 82px;
   gap: var(--rig-esp-2); align-items: center;
 }
 .rig-arbre__entete {
@@ -296,10 +334,9 @@
 }
 .rig-arbre__texte { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rig-arbre__compte { color: var(--rig-texte-3); font-size: 11px; }
-.rig-arbre__date, .rig-arbre__pages {
+.rig-arbre__date {
   font-size: 11px; color: var(--rig-texte-3); font-variant-numeric: tabular-nums;
 }
-.rig-arbre__pages { text-align: right; }
 .rig-arbre__chevron {
   display: inline-block; width: 10px; flex: 0 0 10px;
   color: var(--rig-texte-3); transition: transform .12s ease;
@@ -456,7 +493,8 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   .rig-entete { flex-wrap: wrap; gap: var(--rig-esp-2); }
   .rig-titre { font-size: var(--rig-fs-corps); }
 
-  .rig-vged__corps { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+  .rig-vged__corps { grid-template-columns: 1fr !important; grid-template-rows: auto 1fr auto; }
+  .rig-vged__poignee { display: none; }
   .rig-vged__editions { border-left: 0; border-top: 1px solid var(--rig-bord); }
   .rig-vged__arbre { max-height: 30vh; border-right: 0; border-bottom: 1px solid var(--rig-bord); }
 }
@@ -531,7 +569,10 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
      Fond opaque obligatoire, sinon le contenu se lit au travers. */
   position: sticky;
   top: 4px;                /* sous le filet de marque, lui aussi colle */
-  z-index: 60;
+  /* AU-DESSUS des ecrans pleins (`.rig-proc`, z-index 88) : la barre cree un
+     contexte d'empilement, donc son panneau de reglages descendrait DERRIERE
+     l'ecran ouvert avec une valeur plus basse. */
+  z-index: 90;
   background: var(--rig-fond);
 }
 .rig-barre__marque {
@@ -557,16 +598,15 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 
 /* Le panneau des reglages generaux s'ancre sous la barre. */
 .rig-barre .rig-tuiles-panneau { top: calc(100% + 10px); }
+/* Ancre du panneau : sans parent positionne, il se placerait sur la fenetre entiere. */
+.rig-barre__reglages { position: relative; display: inline-flex; align-items: center; }
 
 /* L'entete du plan ne porte plus les commandes : elle ne fait plus
    que presenter la journee. */
 .rig-entete { user-select: text; }
 
 /* Le filet de marque colle au bord haut, la barre juste dessous. */
-.rig-filet-marque { position: sticky; top: 0; z-index: 61; }
-
-/* La recherche se cale SOUS la barre de titre, pas dessous elle. */
-.rig-recherche--fixe { top: 54px; }
+.rig-filet-marque { position: sticky; top: 0; z-index: 91; }
 
 /* ---------- Outils de l'entete du plan (dont le rouage de reglages) ---------- */
 .rig-entete { display: flex; align-items: center; justify-content: space-between; }
@@ -674,12 +714,33 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   border-color: var(--rig-focus); color: var(--rig-focus);
 }
 
-/* --- Le formulaire --- */
-.rig-saisie__corps { padding: var(--rig-esp-5) var(--rig-esp-6); overflow-y: auto; min-width: 0; }
+/* --- Le formulaire : une page geante, paginee ---
+   Les 7 etapes sont toutes dans le flux et defilent a la suite ;
+   scroll-snap les cale une par une pour qu'on ne s'arrete jamais
+   a cheval entre deux etapes. */
+.rig-saisie__pages {
+  overflow-y: auto; min-width: 0; min-height: 0;
+  scroll-snap-type: y proximity;
+  scroll-behavior: smooth;
+  scroll-padding-top: 0;
+  overscroll-behavior-y: contain;
+}
+.rig-saisie__page {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  min-height: 100%;
+  display: flex; flex-direction: column;
+}
+.rig-saisie__page + .rig-saisie__page { border-top: 1px solid var(--rig-bord); }
+.rig-saisie__corps { padding: var(--rig-esp-5) var(--rig-esp-6); min-width: 0; flex: 1 1 auto; }
+/* L'entete reste visible pendant qu'on remplit une etape longue :
+   sans elle on ne sait plus dans quelle page on ecrit. */
 .rig-saisie__entete {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--rig-fond);
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: var(--rig-esp-4); margin-bottom: var(--rig-esp-5);
-  padding-bottom: var(--rig-esp-3);
+  padding-bottom: var(--rig-esp-3); padding-top: var(--rig-esp-2);
   border-bottom: 1px solid var(--rig-bord);
 }
 .rig-saisie__titre { margin: 4px 0 2px; font: 300 var(--rig-fs-titre)/1.2 var(--rig-font); color: var(--rig-texte); }
@@ -723,14 +784,19 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   .rig-frise { border-right: 0; border-bottom: 1px solid var(--rig-bord); max-height: 28vh; }
   .rig-champs { grid-template-columns: 1fr; }
   .rig-saisie__corps { padding: var(--rig-esp-4) var(--rig-esp-3); }
+  .rig-saisie__page { min-height: auto; }
 }
 
 /* ============================================================
    ECRAN DE PROCEDURE : criteres a gauche, resultats a droite.
    Motif repris de RIG v2 (PROC_DEMANDE : RECHERCHE + RESULTATS).
    ============================================================ */
+/* Le bandeau du haut = filet de marque (4 px) + barre (34 px) + sa bordure (1 px).
+   Un ecran de procedure qui part de `inset: 0` passe PAR-DESSUS (z-index 88 contre 60)
+   et fait disparaitre la barre : plus de marque, plus de reduire/agrandir/fermer, et
+   plus de zone de deplacement de la fenetre. Il commence donc SOUS le bandeau. */
 .rig-proc {
-  position: fixed; inset: 0; z-index: 88;
+  position: fixed; inset: var(--rig-bandeau-h, 39px) 0 0 0; z-index: 88;
   background: var(--rig-fond);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -1066,4 +1132,139 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   border: 1px solid var(--rig-bord);
   border-radius: var(--rig-radius-sm);
   padding: 1px 5px;
+}
+
+/* ---------- Colonne de droite de l'affaire : saisie guidee contextuelle ----------
+   Remplace l'ancien tableau des editions, qui a desormais son propre ecran. */
+.rig-vged__guide {
+  border-left: 1px solid var(--rig-bord);
+  padding: var(--rig-esp-3);
+  display: flex; flex-direction: column;
+  gap: var(--rig-esp-2); min-height: 0;
+}
+.rig-guide__entete {
+  display: flex; align-items: flex-start; gap: var(--rig-esp-3);
+  padding-bottom: var(--rig-esp-2);
+  border-bottom: 1px solid var(--rig-bord);
+}
+.rig-guide__titre { margin: 2px 0 0; font: 500 15px/1.3 var(--rig-font); color: var(--rig-texte); }
+.rig-guide__source { font-size: 11px; color: var(--rig-texte-3); }
+.rig-guide__compte {
+  margin-left: auto; font: 12px var(--rig-font-mono); color: var(--rig-texte-3);
+  font-variant-numeric: tabular-nums;
+}
+.rig-guide__champs { flex: 1 1 auto; overflow: auto; min-height: 0; align-content: start; }
+.rig-guide__pied { display: flex; gap: var(--rig-esp-2); align-items: flex-start; }
+.rig-guide__pied .rig-bouton { flex: 0 0 auto; align-self: start; }
+
+/* --- La frise en pied du panneau de droite : horizontale, compacte --- */
+.rig-frise--h {
+  flex: 0 0 auto; margin-top: auto;
+  display: flex; flex-wrap: nowrap; gap: var(--rig-esp-2);
+  padding: var(--rig-esp-2) 0 0;
+  border-right: 0; border-top: 1px solid var(--rig-bord);
+  overflow-x: auto; overflow-y: hidden;
+}
+.rig-frise--h .rig-frise__pas { flex: 1 1 0; min-width: 0; }
+/* Le trait de liaison devient horizontal. */
+.rig-frise--h .rig-frise__pas + .rig-frise__pas::before {
+  left: -6px; top: 13px; width: 6px; height: 1px;
+}
+.rig-frise--h .rig-frise__bouton {
+  flex-direction: column; align-items: center; gap: 2px;
+  margin-bottom: 0; padding: var(--rig-esp-2) 2px; text-align: center;
+}
+.rig-frise--h .rig-frise__pastille { width: 22px; height: 22px; font-size: 10px; }
+.rig-frise--h .rig-frise__libelle {
+  flex: none; align-items: center;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 10px; line-height: 1.25;
+}
+
+/* ---------- Ecran plein du tableau des editions ---------- */
+.rig-editions-ecran { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
+.rig-editions-ecran__entete {
+  display: flex; align-items: center; gap: var(--rig-esp-3);
+  padding: var(--rig-esp-3) var(--rig-esp-4);
+  border-bottom: 1px solid var(--rig-bord);
+}
+.rig-editions-ecran__corps {
+  padding: var(--rig-esp-3);
+  display: grid; grid-template-rows: minmax(0, 3fr) auto minmax(0, 2fr);
+  gap: var(--rig-esp-2); min-height: 0;
+}
+@media (max-width: 1200px) {
+  .rig-vged__guide { border-left: 0; border-top: 1px solid var(--rig-bord); }
+}
+
+/* ---------- Apercu d'une piece (visionneuse) et boite d'impression ---------- */
+.rig-voile {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(0, 0, 0, .55);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--rig-esp-4);
+}
+.rig-voile--haut { z-index: 50; background: rgba(0, 0, 0, .35); }
+.rig-apercu {
+  display: flex; flex-direction: column; min-height: 0;
+  width: min(900px, 92vw); height: min(88vh, 100%);
+  background: var(--rig-fond-2, #1b1f27);
+  border: 1px solid var(--rig-bord); border-radius: var(--rig-radius-sm);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .5);
+}
+.rig-apercu__entete {
+  display: flex; align-items: center; gap: var(--rig-esp-3);
+  padding: var(--rig-esp-3); border-bottom: 1px solid var(--rig-bord);
+}
+.rig-apercu__titre { font: 500 15px/1.3 var(--rig-font); color: var(--rig-texte); }
+.rig-apercu__actions { margin-left: auto; display: flex; gap: var(--rig-esp-2); }
+.rig-apercu__message {
+  padding: var(--rig-esp-2) var(--rig-esp-3);
+  border-bottom: 1px solid var(--rig-bord);
+  font-size: var(--rig-fs-dense); color: var(--rig-texte-2);
+}
+.rig-apercu__pages {
+  flex: 1 1 auto; overflow: auto; min-height: 0;
+  padding: var(--rig-esp-4); display: grid; gap: var(--rig-esp-4);
+  justify-items: center; background: rgba(0, 0, 0, .25);
+}
+.rig-apercu__feuille {
+  position: relative; width: min(640px, 100%); aspect-ratio: 1 / 1.414;
+  background: #fdfdfb; color: #16181d;
+  padding: 44px 48px; box-shadow: 0 4px 14px rgba(0, 0, 0, .4);
+}
+.rig-apercu__feuille-texte {
+  white-space: pre-wrap; font: 12px/1.7 var(--rig-font); overflow: hidden; height: 100%;
+}
+.rig-apercu__folio {
+  position: absolute; right: 20px; bottom: 16px;
+  font: 10px var(--rig-font-mono); color: #6b7280;
+}
+.rig-impression {
+  width: min(420px, 92vw); display: grid; gap: var(--rig-esp-3);
+  padding: var(--rig-esp-4);
+  background: var(--rig-fond-2, #1b1f27);
+  border: 1px solid var(--rig-bord); border-radius: var(--rig-radius-sm);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
+}
+.rig-impression__pied { display: flex; gap: var(--rig-esp-2); }
+
+/* ---------- Bouton « Nouveau » de l'arbre GED ----------
+   L'entete de l'arbre porte une troisieme cellule : le bouton de
+   creation. Les lignes de l'arbre gardent leurs deux colonnes. */
+.rig-arbre__entete { grid-template-columns: minmax(0, 1fr) 82px auto; }
+.rig-arbre__nouveau {
+  border: 1px solid var(--rig-bord); background: var(--rig-fond-2);
+  color: var(--rig-texte-2); border-radius: var(--rig-radius-sm);
+  padding: 1px 8px; font: inherit; cursor: pointer; white-space: nowrap;
+}
+.rig-arbre__nouveau:hover { color: var(--rig-texte); border-color: var(--rig-accent); }
+
+/* ---------- Login connecte, dans l'entete de l'accueil ----------
+   Le niveau d'acces du login choisi filtre les dossiers de l'arbre. */
+.rig-login {
+  margin-left: var(--rig-esp-2);
+  border: 1px solid var(--rig-bord); background: var(--rig-fond-2);
+  color: var(--rig-texte-2); border-radius: var(--rig-radius-sm);
+  padding: 1px 6px; font-size: 12px; cursor: pointer;
 }
