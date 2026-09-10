@@ -1,8 +1,12 @@
-@* Ecran de la procedure PROC_GCLIENT (RIG v2 : « Liste des clients »,
-   blocs OPE_CRITERES, OPE_MOTCLE, OPE_STATUTCLIENT, OPE_TYPECLIENT,
-   OPE_RESULTAT). Colonnes lues dans la grille v2 : Id Client, N Compte,
-   Abrege, Nom, Groupe, Statut, Type. Le type affiche suit la regle de
-   DgvRow.GetTypeClient() : En compte, Greffe, Prevention, PC, Web. *@
+@* Ecran de la procedure PROC_GCLIENT.
+
+   Sources RIG v2 (D:/RigApplication/Source/RIG/DLL/Processus/PROC_GCLIENT) :
+     - OPE_MOTCLE        : ult_TxtMotCle
+     - OPE_STATUTCLIENT  : ult_ChckBxActif, ult_ChckBxBloque, ult_ChckBxSommeil
+     - OPE_TYPECLIENT    : ult_ChckBxCompte, ult_ChckBxGreffe, ult_ChckBxPC,
+                           ult_ChckBxPreventions, ult_ChckBxWeb
+     - OPE_RESULTAT      : grille ult_DGVResultat, colonnes Id Client,
+                           N Compte, Abrege, Nom, Groupe, Statut, Type *@
 
 <div class="rig-proc__corps">
 
@@ -96,17 +100,18 @@
     private sealed record ClientRcs(int Id, string Compte, string Abrege, string Nom,
                                     string Groupe, string Statut, string Type);
 
-    private static readonly string[] Statuts = ["Actif", "Suspendu", "Clos"];
+    // v2 : ult_ChckBxActif, ult_ChckBxBloque, ult_ChckBxSommeil.
+    private static readonly string[] Statuts = ["Actif", "Bloque", "En sommeil"];
     private static readonly string[] Types = ["En compte", "Greffe", "Prevention", "PC", "Web"];
 
     private static readonly ClientRcs[] Clients =
     [
         new(1042, "C-000142", "LEROY",  "SELARL LEROY & ASSOCIES", "Mandataires", "Actif",    "En compte"),
         new(1088, "C-000188", "BLANC",  "CABINET BLANC",           "Mandataires", "Actif",    "En compte"),
-        new(1130, "C-000231", "DUPONT", "SCP DUPONT-MARTIN",       "Avocats",     "Suspendu", "En compte"),
+        new(1130, "C-000231", "DUPONT", "SCP DUPONT-MARTIN",       "Avocats",     "Bloque", "En compte"),
         new(1204, "W-004412", "WEBPRO", "Deposant en ligne",       "",            "Actif",    "Web"),
         new(1250, "G-000012", "GRFCPY", "Greffe de Compiegne",     "Greffes",     "Actif",    "Greffe"),
-        new(1305, "P-000031", "PREV51", "Cellule prevention 51",   "Prevention",  "Clos",     "Prevention")
+        new(1305, "P-000031", "PREV51", "Cellule prevention 51",   "Prevention",  "En sommeil",     "Prevention")
     ];
 
     private string MotCle = string.Empty;

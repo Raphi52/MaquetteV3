@@ -1,7 +1,23 @@
-@* Ecran de la procedure PROC_FCLIENT (RIG v2 : « Fiche Client », blocs
-   OPE_ENTREPRISE et OPE_CONTACT). La grille de compte v2 porte les colonnes
-   Date et Solde ; la maquette les garde et ajoute le libelle du mouvement,
-   qui est ce que la ligne v2 affiche a cote du solde. *@
+@* Ecran de la procedure PROC_FCLIENT.
+
+   Sources RIG v2 (D:/RigApplication/Source/RIG/DLL/Processus/PROC_FCLIENT) :
+     - OPE_IDENTIFICATION : _ultAbrege, _ultNomClient, _ultNumeroCompte,
+       _ultNumeroSiren, _ultDateNaissance, _ultEmailClient, _ultPassword,
+       _ultComboBoxEtatDuCompte, _ultComboBoxGroupeClient,
+       _ultComboBoxTypeDeCompte, _ultTextNumPCouPrevention, et les boutons
+       _ultButtonCompleterNumeroCompte, _ultButtonUpdateFromSiren,
+       _ultButtonGeneratePassword
+     - OPE_ENTREPRISE     : _ultTextTelephonePrincipal, _ultTextTelephonePortable
+     - OPE_PARAMETRAGE    : _ultComboModePaiement, _ultMontantProvision,
+       _ultCheckBoxReleveFacture
+     - OPE_INFORMATIONS   : _ultDateDerniereModif, _ultDateFactuFirst /
+       _ultDateFactuLast, _ultDateEncaissFirst / _ultDateEncaissLast,
+       _ultTextNbFactures, _ultTextNbEncaissements, _ultTextSynchroInfogreffe,
+       _ultTextMultiLineNotesClient, et la grille _ultDataGridViewLatestBalance
+       (colonnes Date et Solde)
+
+   NOTE : les colonnes Mouvement, Debit et Credit de la grille ci-dessous
+   sont un ajout de la maquette ; la grille v2 n a que Date et Solde. *@
 
 <div class="rig-proc__corps">
 
@@ -36,9 +52,121 @@
                 <span class="rig-saisie-champ__libelle">Adresse</span>
                 <textarea class="rig-saisie-champ__saisie" rows="2" readonly>@Fiche.Adresse</textarea>
             </label>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Abrege</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.Abrege" readonly />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Type de compte</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.Type" readonly />
+                </label>
+            </div>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Etat du compte</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.EtatCompte" readonly />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Groupe client</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.Groupe" readonly />
+                </label>
+            </div>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Date de naissance</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.Naissance" readonly />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">N PC ou prevention</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.NumPc" readonly />
+                </label>
+            </div>
             <label class="rig-saisie-champ">
-                <span class="rig-saisie-champ__libelle">Type de client</span>
-                <input class="rig-saisie-champ__saisie" value="@Fiche.Type" readonly />
+                <span class="rig-saisie-champ__libelle">E-mail du client</span>
+                <input class="rig-saisie-champ__saisie" value="@Fiche.Mail" readonly />
+            </label>
+        </div>
+
+        @* v2 : OPE_ENTREPRISE. *@
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Telephones</div>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Principal</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.TelPrincipal" readonly />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Portable</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.TelPortable" readonly />
+                </label>
+            </div>
+        </div>
+
+        @* v2 : OPE_PARAMETRAGE. *@
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Parametrage</div>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Mode de paiement</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.ModePaiement" readonly />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Montant de provision</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.Provision.ToString("N2")" readonly />
+                </label>
+            </div>
+            <span class="rig-etat rig-etat--@(Fiche.ReleveFacture ? "ok" : "attente")">
+                @(Fiche.ReleveFacture ? "Releve de facture actif" : "Pas de releve de facture")
+            </span>
+        </div>
+
+        @* v2 : OPE_INFORMATIONS. *@
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Informations</div>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Premiere facture</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.FactuPremiere" readonly />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Derniere facture</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.FactuDerniere" readonly />
+                </label>
+            </div>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Premier encaissement</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.EncaissPremier" readonly />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Dernier encaissement</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.EncaissDernier" readonly />
+                </label>
+            </div>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Nb factures</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.NbFactures" readonly />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Nb encaissements</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.NbEncaissements" readonly />
+                </label>
+            </div>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Derniere modification</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.DerniereModif" readonly />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Synchro Infogreffe</span>
+                    <input class="rig-saisie-champ__saisie" value="@Fiche.SynchroInfogreffe" readonly />
+                </label>
+            </div>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Notes client</span>
+                <textarea class="rig-saisie-champ__saisie" rows="2" readonly>@Fiche.Notes</textarea>
             </label>
         </div>
     </aside>
@@ -123,7 +251,14 @@
 
 @code {
     private sealed record FicheCli(string Abrege, string Nom, string Compte, string Siren,
-                                   string Adresse, string Type);
+                                   string Adresse, string Type, string EtatCompte, string Groupe,
+                                   string Naissance, string NumPc, string Mail,
+                                   string TelPrincipal, string TelPortable,
+                                   string ModePaiement, decimal Provision, bool ReleveFacture,
+                                   string FactuPremiere, string FactuDerniere,
+                                   string EncaissPremier, string EncaissDernier,
+                                   int NbFactures, int NbEncaissements,
+                                   string DerniereModif, string SynchroInfogreffe, string Notes);
     private sealed record Mouvement(string Abrege, DateTime Date, string Libelle,
                                     decimal Debit, decimal Credit, decimal Solde);
     private sealed record Contact(string Abrege, string Nom, string Fonction, string Tel,
@@ -131,9 +266,9 @@
 
     private static readonly FicheCli[] Fiches =
     [
-        new("LEROY",  "SELARL LEROY & ASSOCIES", "C-000142", "412 875 330", "12 rue du Palais\n51100 Reims",  "En compte"),
-        new("BLANC",  "CABINET BLANC",           "C-000188", "509 221 004", "3 place Drouet\n51100 Reims",    "En compte"),
-        new("DUPONT", "SCP DUPONT-MARTIN",       "C-000231", "788 410 226", "22 rue Chanzy\n51100 Reims",     "En compte")
+        new("LEROY",  "SELARL LEROY & ASSOCIES", "C-000142", "412 875 330", "12 rue du Palais\n51100 Reims", "En compte", "Ouvert",  "Mandataires", "",           "",            "contact@leroy-associes.fr", "03 26 40 11 22", "06 12 45 78 90", "Prelevement", 1500m, true,  "04/01/2019", "02/09/2026", "11/01/2019", "28/08/2026", 412, 388, "02/09/2026", "08/09/2026", "Releve mensuel, envoi par courriel."),
+        new("BLANC",  "CABINET BLANC",           "C-000188", "509 221 004", "3 place Drouet\n51100 Reims",   "En compte", "Ouvert",  "Mandataires", "",           "PC2026-042",  "s.blanc@cabinet-blanc.fr",  "03 26 40 55 01", "",               "Virement",     800m, false, "12/03/2020", "19/08/2026", "20/03/2020", "19/08/2026", 226, 210, "19/08/2026", "08/09/2026", ""),
+        new("DUPONT", "SCP DUPONT-MARTIN",       "C-000231", "788 410 226", "22 rue Chanzy\n51100 Reims",    "En compte", "Bloque",  "Avocats",     "14/05/1971", "",            "greffe@dupont-martin.fr",   "03 26 77 43 09", "06 88 21 04 55", "Cheque",         0m, false, "08/06/2021", "14/07/2026", "15/06/2021", "14/07/2026",  97,  95, "14/07/2026", "07/09/2026", "Compte bloque : relance impayes en cours.")
     ];
 
     private static readonly Mouvement[] Mouvements =
