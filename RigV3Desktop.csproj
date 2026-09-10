@@ -20,6 +20,17 @@
     <Resource Include="rig.ico" />
   </ItemGroup>
 
+  <!-- « dotnet watch » ne doit PAS reconstruire sur un changement de wwwroot :
+       la fenetre surveille elle-meme ces fichiers et recharge sa vue (voir
+       MainWindow.xaml.cs). Sans cette exclusion, watch relance une compilation
+       qui echoue, l'application etant en cours d'execution et verrouillant
+       RigV3Desktop.exe. Les journaux sont exclus pour la meme raison. -->
+  <ItemGroup>
+    <Watch Remove="wwwroot/**" />
+    <Watch Remove="**/*.log" />
+    <Watch Remove="tests/**" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="9.*" />
   </ItemGroup>
