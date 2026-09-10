@@ -1,7 +1,14 @@
-@* Ecran de la procedure PROC_ARCHIRAD (RIG v2 : « Archivage des anciennes
-   formalites »). Les champs viennent des controles de FORM_ARCHIRAD :
-   ult_DateMin / ult_DateMax (bloc OPE_ARCHRSEL - Dates de radiation),
-   ult_TypeRcs, ult_TypeBrd, ult_CBListe, ult_NbDossiers, ult_cboImprimante. *@
+@* Ecran de la procedure PROC_ARCHIRAD.
+
+   Sources RIG v2 (D:/RigApplication/Source/RIG/DLL/Processus/PROC_ARCHIRAD) :
+     - Operations/OPE_ARCHRSEL : ult_DateMin, ult_DateMax (bornes de date de
+       radiation), ult_TypeRcs, ult_CBListe et ult_TextListe
+     - Operations/OPE_ARCHRTOT : ult_NbDossiers, ult_TypeBrd, ult_cboImprimante
+
+   NOTE : v2 n a PAS de grille de resultat sur cet ecran, seulement ces
+   criteres et une impression. Le tableau ci-dessous est un ajout de la
+   maquette, pour que l ecran montre quelque chose en demonstration ; il ne
+   correspond a aucune grille v2. *@
 
 <div class="rig-proc__corps">
 
@@ -47,7 +54,12 @@
 
         <div class="rig-criteres__bloc">
             <label class="rig-saisie-champ">
-                <span class="rig-saisie-champ__libelle">Nombre de dossiers</span>
+                <span class="rig-saisie-champ__libelle">Libelle de la liste</span>
+            <input class="rig-saisie-champ__saisie" @bind="LibelleListe" />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Nombre de dossiers</span>
                 <input class="rig-saisie-champ__saisie" type="number" min="1" max="999" @bind="NbDossiers" />
             </label>
             <label class="rig-saisie-champ">
@@ -127,6 +139,9 @@
 
     private DateTime? DateMin = new DateTime(2012, 1, 1);
     private DateTime? DateMax = new DateTime(2016, 12, 31);
+    // v2 : ult_TextListe, le libelle associe a la case ult_CBListe.
+    private string LibelleListe = string.Empty;
+
     private string TypeRcs = string.Empty;
     private string TypeBrd = "ARCH";
     private string Liste = "COMPLETE";
