@@ -1,9 +1,14 @@
-@* Ecran de la procedure PROC_GEDJUD (RIG v2 : « Edition des documents de
-   la GED », etapes ETP_GED_MODIF, ETP_GED_HISTO, ETP_ENVOI_MAIL...).
-   Colonnes lues dans les grilles v2 : Decision judiciaire, Date Decision,
-   Date prevue de la decision, Instance, Nb docs lies, Numero minute.
-   Actions v2 reprises : Imprimer, Envoyer par e-mail, Envoyer par courrier,
-   Inserer un document, Lier a une decision judiciaire, Historique. *@
+@* Ecran de la procedure PROC_GEDJUD.
+
+   Sources RIG v2 (D:/RigApplication/Source/RIG/DLL/Processus/PROC_GEDJUD) :
+     - ETP_RECHERCHE_DOC/OPE_RECHERCHE_DOC : ulT_txt_numero_metier,
+       ult_cbb_type, ult_date_reception_debut, ult_date_reception_fin,
+       ult_txt_audience_cabinet, ult_txt_commentaire,
+       ult_chb_afficher_minute_non_num, ult_chb_afficher_tout,
+       ult_chb_expandAll, ult_chb_selectAll
+     - ETP_RECHERCHE_DJ/OPE_RECHERCHE_DJ : ult_txt_numero, ult_cbb_type
+     - PROC_GED_LIER_DJ, PROC_GED_HISTORIQUE, PROC_GEDJUD_EDITION :
+       les actions Lier a une decision, Historique, Imprimer, Envoyer. *@
 
 <div class="rig-proc__corps">
 
@@ -35,6 +40,43 @@
                 <option value="Notifie">Notifie</option>
             </select>
         </label>
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Date de reception</div>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Du</span>
+                    <input class="rig-saisie-champ__saisie" type="date" @bind="ReceptionDebut" />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Au</span>
+                    <input class="rig-saisie-champ__saisie" type="date" @bind="ReceptionFin" />
+                </label>
+            </div>
+        </div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Audience / cabinet</span>
+            <input class="rig-saisie-champ__saisie" @bind="AudienceCabinet" />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Commentaire</span>
+            <input class="rig-saisie-champ__saisie" @bind="CritCommentaire" />
+        </label>
+
+        @* v2 : ult_chb_afficher_minute_non_num et ult_chb_afficher_tout. *@
+        <button class="rig-bascule @(MinutesNonNumerisees ? "rig-bascule--actif" : "")"
+                @onclick="() => MinutesNonNumerisees = !MinutesNonNumerisees">
+            <span class="rig-bascule__temoin"></span>
+            <span>Afficher les minutes non numerisees</span>
+        </button>
+
+        <button class="rig-bascule @(AfficherTout ? "rig-bascule--actif" : "")"
+                @onclick="() => AfficherTout = !AfficherTout">
+            <span class="rig-bascule__temoin"></span>
+            <span>Afficher tout</span>
+        </button>
 
         <button class="rig-bascule @(SansDecision ? "rig-bascule--actif" : "")"
                 @onclick="() => SansDecision = !SansDecision">
@@ -130,6 +172,14 @@
         new("Jugement de cloture",        "",          "2025J00088", "Jugement",   null,             new(2026, 9, 20), 0, "Brouillon", "attente", "2023B01120", ["01/09/2026 — projet cree"]),
         new("Copie conforme",             "2024/1188", "2024J00507", "Copie",      new(2024, 11, 8), new(2024, 11, 8), 1, "Notifie",   "ok",      "2025B00044", ["08/11/2024 — copie delivree"])
     ];
+
+    // Criteres de OPE_RECHERCHE_DOC (RIG v2).
+    private DateTime? ReceptionDebut;
+    private DateTime? ReceptionFin;
+    private string AudienceCabinet = string.Empty;
+    private string CritCommentaire = string.Empty;
+    private bool MinutesNonNumerisees;
+    private bool AfficherTout;
 
     private string Recherche = string.Empty;
     private string CritNature = string.Empty;

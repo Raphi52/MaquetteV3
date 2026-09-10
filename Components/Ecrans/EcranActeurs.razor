@@ -1,11 +1,27 @@
-@* Ecran de la procedure PROC_ACTEUR_JUD (RIG v2 : « Gestion des acteurs »).
-   v2 a deux etapes : ETP_RECHERCHE_ACTEUR et ETP_EDITION_ACTEUR.
-   Les champs de la fiche sont les controles de FORM_ACTEUR :
-   ComboBoxCivilite, TextNom, TextPrenom, TextAbrege, TextCompNom,
-   TextDateNaissance, TextAdresse, TextTel, TextFax, TextMail, TextBureau,
-   ComboBoxChambre, ComboBoxSection, ComboBoxStatut, ComboBoxQualifProfession,
-   ComboBoxUtilisateurs, CheckBoxActif, DateDebutFonction, DateFinFonction,
-   TextNomCoffre, DateDemarrageCoffre. *@
+@* Ecran de la procedure PROC_ACTEUR_JUD.
+
+   Sources RIG v2 (D:/RigApplication/Source/RIG/DLL/Processus/PROC_ACTEUR_JUD) :
+     - Recherche/OPE_RECHERCHE_ACTEUR : textRecherche, comboBoxChambre,
+       comboBoxStatut, _ultActiveOnly, dataListviewActeurs
+     - Edition/ : v2 n a PAS une fiche unique mais SIX formulaires, un par
+       type d acteur, chacun avec ses champs propres :
+         OPE_EDITION_GJUGE     juge      -> chambre, section, signature
+                                            dematerialisee et ONZE roles
+                                            (juge-commissaire et suppleant,
+                                            expertise, injonction, ordonnance,
+                                            prevention, rapporteur, RCS civil,
+                                            RCS commercial, president d audience,
+                                            de juridiction, de refere)
+         OPE_EDITION_GMANDPC   mandataire-> SIREN, coffre-fort, et cinq roles
+                                            (administrateur judiciaire,
+                                            commissaire a l execution du plan,
+                                            commissaire priseur, mandataire
+                                            conciliation, RDC liquidation MDJ)
+         OPE_EDITION_GGREFFIER greffier  -> statut et compte utilisateur lie
+         OPE_EDITION_GPARQU    parquet   -> identite seule
+         OPE_EDITION_GINTERV   intervenant -> coffre-fort et date de demarrage
+         OPE_EDITION_EXPERT    expert    -> qualification professionnelle
+   La maquette rend ce choix visible : le type commande les champs affiches. *@
 
 <div class="rig-proc__corps">
 
@@ -17,16 +33,27 @@
             <input class="rig-saisie-champ__saisie" @bind="Recherche" @bind:event="oninput" />
         </label>
 
-        <label class="rig-saisie-champ">
-            <span class="rig-saisie-champ__libelle">Qualite / profession</span>
-            <select class="rig-saisie-champ__saisie" @bind="CritQualif">
-                <option value="">Toutes</option>
-                @foreach (var q in Acteurs.Select(a => a.Qualif).Distinct().Order())
-                {
-                    <option value="@q">@q</option>
-                }
-            </select>
-        </label>
+        <div class="rig-criteres__paire">
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Chambre</span>
+                <select class="rig-saisie-champ__saisie" @bind="CritChambre">
+                    <option value="">Toutes</option>
+                    <option>1re</option>
+                    <option>2e</option>
+                    <option>3e</option>
+                </select>
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Statut</span>
+                <select class="rig-saisie-champ__saisie" @bind="CritStatut">
+                    <option value="">Tous</option>
+                    @foreach (var st in Acteurs.Select(a => a.Statut).Distinct().Order())
+                    {
+                        <option value="@st">@st</option>
+                    }
+                </select>
+            </label>
+        </div>
 
         <button class="rig-bascule @(ActifsSeuls ? "rig-bascule--actif" : "")"
                 @onclick="() => ActifsSeuls = !ActifsSeuls">
@@ -144,6 +171,48 @@
                         <input class="rig-saisie-champ__saisie" value="@a.NomCoffre" readonly />
                     </label>
                 </div>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Type d'acteur</span>
+                    <input class="rig-saisie-champ__saisie" value="@a.Type" readonly />
+                </label>
+
+                @* v2 : OPE_EDITION_GJUGE, onze roles propres au juge. *@
+                @if (a.Type == "Juge")
+                {
+                    <div class="rig-criteres__bloc">
+                        <div class="rig-kicker">Roles du juge</div>
+                        @foreach (var role in RolesJuge)
+                        {
+                            <span class="rig-chip">@role</span>
+                        }
+                    </div>
+                }
+
+                @* v2 : OPE_EDITION_GMANDPC, SIREN et cinq roles. *@
+                @if (a.Type == "Mandataire")
+                {
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">SIREN</span>
+                        <input class="rig-saisie-champ__saisie" value="@a.Siren" readonly />
+                    </label>
+                    <div class="rig-criteres__bloc">
+                        <div class="rig-kicker">Roles du mandataire</div>
+                        @foreach (var role in RolesMandataire)
+                        {
+                            <span class="rig-chip">@role</span>
+                        }
+                    </div>
+                }
+
+                @* v2 : OPE_EDITION_GGREFFIER, compte utilisateur lie. *@
+                @if (a.Type == "Greffier")
+                {
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Compte utilisateur lie</span>
+                        <input class="rig-saisie-champ__saisie" value="@a.Utilisateur" readonly />
+                    </label>
+                }
+
                 <span class="rig-etat rig-etat--@(a.Actif ? "ok" : "attente")">@(a.Actif ? "Actif" : "Inactif")</span>
             </div>
         }
@@ -161,18 +230,37 @@
                                  string ComplementNom, string Adresse, string Tel, string Fax,
                                  string Mail, string Qualif, string Statut, string Chambre,
                                  string Section, DateTime Debut, DateTime? Fin, string Bureau,
-                                 string NomCoffre, bool Actif);
+                                 string NomCoffre, bool Actif,
+                                 string Type, string Siren, string Utilisateur);
+
+    // Roles declares dans OPE_EDITION_GJUGE.Designer.cs (RIG v2).
+    private static readonly string[] RolesJuge =
+    [
+        "Juge-commissaire", "Juge-commissaire suppleant", "Juge expertise",
+        "Juge injonction", "Juge ordonnance", "Juge prevention", "Juge rapporteur",
+        "Juge RCS civil", "Juge RCS commercial", "President d'audience",
+        "President de juridiction", "President de refere"
+    ];
+
+    // Roles declares dans OPE_EDITION_GMANDPC.Designer.cs (RIG v2).
+    private static readonly string[] RolesMandataire =
+    [
+        "Administrateur judiciaire", "Commissaire a l'execution du plan",
+        "Commissaire priseur", "Mandataire conciliation", "RDC liquidation MDJ"
+    ];
 
     private static readonly Acteur[] Acteurs =
     [
-        new("LEROY",  "Maitre", "LEROY",  "Antoine", "Selarl LEROY & associes", "12 rue du Palais, 51100 Reims", "03 26 40 11 22", "03 26 40 11 23", "a.leroy@exemple.fr",  "Mandataire judiciaire", "En fonction", "1re", "A", new(2018, 1, 8),  null,             "B-104", "COFFRE_LEROY",  true),
-        new("BLANC",  "Maitre", "BLANC",  "Sophie",  "",                        "3 place Drouet, 51100 Reims",   "03 26 40 55 01", "",               "s.blanc@exemple.fr",  "Administrateur judiciaire", "En fonction", "2e", "B", new(2020, 9, 1),  null,             "B-210", "COFFRE_BLANC",  true),
-        new("PETIT",  "M.",     "PETIT",  "Jean",    "",                        "8 av. de Laon, 51100 Reims",    "03 26 88 90 12", "",               "j.petit@exemple.fr",  "Juge consulaire",           "En fonction", "3e", "A", new(2022, 4, 15), null,             "A-011", "",              true),
-        new("MOREAU", "Mme",    "MOREAU", "Claire",  "",                        "22 rue Chanzy, 51100 Reims",    "03 26 77 43 09", "",               "c.moreau@exemple.fr", "Expert-comptable",          "Retiree",     "",   "",  new(2012, 2, 1),  new(2024, 12, 31), "",             "",              false)
+        new("LEROY",  "Maitre", "LEROY",  "Antoine", "Selarl LEROY & associes", "12 rue du Palais, 51100 Reims", "03 26 40 11 22", "03 26 40 11 23", "a.leroy@exemple.fr",  "Mandataire judiciaire",     "En fonction", "1re", "A", new(2018, 1, 8),  null,              "B-104", "COFFRE_LEROY", true,  "Mandataire",  "402 118 553", ""),
+        new("BLANC",  "Maitre", "BLANC",  "Sophie",  "",                        "3 place Drouet, 51100 Reims",   "03 26 40 55 01", "",               "s.blanc@exemple.fr",  "Administrateur judiciaire", "En fonction", "2e", "B", new(2020, 9, 1),  null,              "B-210", "COFFRE_BLANC", true,  "Mandataire",  "517 904 220", ""),
+        new("PETIT",  "M.",     "PETIT",  "Jean",    "",                        "8 av. de Laon, 51100 Reims",    "03 26 88 90 12", "",               "j.petit@exemple.fr",  "Juge consulaire",           "En fonction", "3e", "A", new(2022, 4, 15), null,              "A-011", "",             true,  "Juge",        "",            ""),
+        new("DUVAL",  "Mme",    "DUVAL",  "Helene",  "",                        "1 rue du Greffe, 51100 Reims",  "03 26 12 00 40", "",               "h.duval@exemple.fr",  "Greffier",                  "En fonction", "1re", "A", new(2019, 3, 4),  null,              "A-002", "",             true,  "Greffier",    "",            "hduval"),
+        new("MOREAU", "Mme",    "MOREAU", "Claire",  "",                        "22 rue Chanzy, 51100 Reims",    "03 26 77 43 09", "",               "c.moreau@exemple.fr", "Expert-comptable",          "Retiree",     "",    "",  new(2012, 2, 1),  new(2024, 12, 31), "",      "",             false, "Expert",      "",            "")
     ];
 
     private string Recherche = string.Empty;
-    private string CritQualif = string.Empty;
+    private string CritChambre = string.Empty;
+    private string CritStatut = string.Empty;
     private bool ActifsSeuls = true;
     private Acteur? Selection = Acteurs[0];
 
@@ -187,7 +275,8 @@
                 q = q.Where(a => a.Nom.Contains(t, StringComparison.OrdinalIgnoreCase)
                               || a.Abrege.Contains(t, StringComparison.OrdinalIgnoreCase));
             }
-            if (!string.IsNullOrEmpty(CritQualif)) q = q.Where(a => a.Qualif == CritQualif);
+            if (!string.IsNullOrEmpty(CritChambre)) q = q.Where(a => a.Chambre == CritChambre);
+            if (!string.IsNullOrEmpty(CritStatut)) q = q.Where(a => a.Statut == CritStatut);
             if (ActifsSeuls) q = q.Where(a => a.Actif);
             return q.ToArray();
         }
