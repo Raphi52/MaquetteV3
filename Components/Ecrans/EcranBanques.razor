@@ -100,25 +100,44 @@
                         <input class="rig-saisie-champ__saisie" value="@s.MaquetteCheque" readonly />
                     </label>
                     <label class="rig-saisie-champ">
-                        <span class="rig-saisie-champ__libelle">Modes de paiement</span>
-                        <input class="rig-saisie-champ__saisie" value="@string.Join(", ", s.Modes)" readonly />
+                        <span class="rig-saisie-champ__libelle">Num lettre cheque</span>
+                        <input class="rig-saisie-champ__saisie" value="@s.NumLettreCheque" readonly />
                     </label>
                 </div>
+
+                @* v2 (OPE_BANQCHEQUE) : ult_ChFournisseur, ult_ChNotification,
+                   ult_ChTropPercu. *@
+                <div class="rig-criteres__bloc">
+                    <div class="rig-kicker">Emissions autorisees</div>
+                    <span class="rig-chip">@(s.ChequeFournisseur ? "Fournisseur : oui" : "Fournisseur : non")</span>
+                    <span class="rig-chip">@(s.ChequeNotification ? "Notification : oui" : "Notification : non")</span>
+                    <span class="rig-chip">@(s.ChequeTropPercu ? "Trop-percu : oui" : "Trop-percu : non")</span>
+                </div>
+
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Modes de paiement</span>
+                    <input class="rig-saisie-champ__saisie" value="@string.Join(", ", s.Modes)" readonly />
+                </label>
             </div>
         }
     </section>
 </div>
 
 @code {
+    // v2 : OPE_BANQIDENTITE (ult_BanqCode, ult_BanqNom), OPE_BANQADRESSE,
+    // OPE_PARAMCOMPTABLE, et OPE_BANQCHEQUE (ult_CBModel, ult_NumLettreCheque,
+    // ult_ChFournisseur, ult_ChNotification, ult_ChTropPercu).
     private sealed record Banque(string Code, string Designation, string Compte, string Journal,
-                                 string Adresse, string MaquetteCheque, string[] Modes);
+                                 string Adresse, string MaquetteCheque, string[] Modes,
+                                 string NumLettreCheque, bool ChequeFournisseur,
+                                 bool ChequeNotification, bool ChequeTropPercu);
 
     private static readonly Banque[] Banques =
     [
-        new("CA",  "CREDIT AGRICOLE",   "512100", "BQ1", "25 rue de Vesle\n51100 Reims",      "LC_STANDARD", ["Cheque", "Virement"]),
-        new("BP",  "BANQUE POPULAIRE",  "512200", "BQ2", "8 place d'Erlon\n51100 Reims",      "LC_STANDARD", ["Cheque"]),
-        new("LBP", "LA BANQUE POSTALE", "512300", "BQ3", "1 rue Cerf-Volant\n51100 Reims",    "LC_POSTALE",  ["Cheque", "Virement", "Carte bancaire"]),
-        new("CAI", "CAISSE (especes)",  "531000", "CA1", "",                                   "",            ["Especes"])
+        new("CA",  "CREDIT AGRICOLE",   "512100", "BQ1", "25 rue de Vesle\n51100 Reims",      "LC_STANDARD", ["Cheque", "Virement"], "LC-2026-0450", true,  true,  true),
+        new("BP",  "BANQUE POPULAIRE",  "512200", "BQ2", "8 place d'Erlon\n51100 Reims",      "LC_STANDARD", ["Cheque"], "LC-2026-0120", true,  false, false),
+        new("LBP", "LA BANQUE POSTALE", "512300", "BQ3", "1 rue Cerf-Volant\n51100 Reims",    "LC_POSTALE",  ["Cheque", "Virement", "Carte bancaire"], "LC-2026-0088", false, true,  true),
+        new("CAI", "CAISSE (especes)",  "531000", "CA1", "",                                   "",            ["Especes"], "", false, false, false)
     ];
 
     private string Recherche = string.Empty;

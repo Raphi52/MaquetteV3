@@ -88,6 +88,33 @@
                     <span class="rig-saisie-champ__libelle">Corps du message</span>
                     <textarea class="rig-saisie-champ__saisie" rows="8" readonly>@s.Corps</textarea>
                 </label>
+
+                @* v2 (OPE_EDIT_EMAILMODEL) : CheckBoxRCS, CheckBoxJudiciaire,
+                   CheckBoxINS, CheckBoxCPT, CheckBoxAmitel. *@
+                <div class="rig-criteres__bloc">
+                    <div class="rig-kicker">Domaines du modele</div>
+                    @foreach (var d in s.DomainesModele)
+                    {
+                        <span class="rig-chip">@d</span>
+                    }
+                </div>
+
+                @* v2 : ope_edit_emailmodel_many_choices_CC et _RA. *@
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Copie (CC)</span>
+                        <input class="rig-saisie-champ__saisie" value="@s.Copie" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Accuse de reception</span>
+                        <input class="rig-saisie-champ__saisie" value="@s.AccuseReception" readonly />
+                    </label>
+                </div>
+
+                @* v2 : ult_chkIsEnvoiAuto. *@
+                <span class="rig-etat rig-etat--@(s.EnvoiAuto ? "ok" : "attente")">
+                    @(s.EnvoiAuto ? "Envoi automatique actif" : "Envoi manuel")
+                </span>
                 <div>
                     @foreach (var d in s.DomainesModele)
                     {
@@ -136,29 +163,32 @@
 @code {
     private sealed record ModeleMail(string Code, string Libelle, string LibelleEcran, string Type,
                                      string Sujet, string Corps, string ExpediteurLib,
-                                     string ExpediteurAdr, string[] DomainesModele);
+                                     string ExpediteurAdr, string[] DomainesModele,
+                                     string Copie, string AccuseReception, bool EnvoiAuto);
     private sealed record ListeDistribution(string Code, string Libelle, string Domaine, string[] Adresses);
 
-    private static readonly string[] Domaines = ["RCS", "Judiciaire", "Comptabilite", "Inscriptions"];
+    // v2 (OPE_EDIT_EMAILMODEL) : CheckBoxRCS, CheckBoxJudiciaire, CheckBoxINS,
+    // CheckBoxCPT, CheckBoxAmitel.
+    private static readonly string[] Domaines = ["RCS", "Judiciaire", "INS", "CPT", "Amitel"];
 
     private static readonly ModeleMail[] Modeles =
     [
         new("ACC_DEM", "Accuse de reception de demande", "Accuse de reception", "Transactionnel",
             "Votre demande {NUM_DEMANDE} a bien ete recue",
             "Bonjour {CIVILITE} {NOM},\n\nNous avons bien recu votre demande {NUM_DEMANDE} du {DATE_DEMANDE}.\nElle est en cours de traitement par le greffe.\n\nCordialement,\nLe greffe du tribunal de commerce",
-            "Greffe du tribunal de commerce", "greffe@exemple.fr", ["RCS"]),
+            "Greffe du tribunal de commerce", "greffe@exemple.fr", ["RCS"], "", "", true),
         new("REJ_DEM", "Rejet de demande", "Rejet", "Transactionnel",
             "Votre demande {NUM_DEMANDE} a ete rejetee",
             "Bonjour {CIVILITE} {NOM},\n\nVotre demande {NUM_DEMANDE} ne peut etre traitee : {MOTIF_REJET}.\nVous pouvez la deposer a nouveau apres correction.\n\nCordialement,\nLe greffe",
-            "Greffe du tribunal de commerce", "greffe@exemple.fr", ["RCS"]),
+            "Greffe du tribunal de commerce", "greffe@exemple.fr", ["RCS"], "", "", true),
         new("CONV_AUD", "Convocation a une audience", "Convocation", "Judiciaire",
             "Convocation a l'audience du {DATE_AUDIENCE}",
             "Maitre,\n\nVous etes convoque a l'audience du {DATE_AUDIENCE} a {HEURE_AUDIENCE}, chambre {CHAMBRE}.\n\nLe greffe judiciaire",
-            "Greffe judiciaire", "judiciaire@exemple.fr", ["Judiciaire"]),
+            "Greffe judiciaire", "judiciaire@exemple.fr", ["Judiciaire"], "greffe@exemple.fr", "", false),
         new("REL_FAC", "Relance de facture", "Relance", "Comptabilite",
             "Relance : facture {NUM_FACTURE}",
             "Bonjour,\n\nSauf erreur, la facture {NUM_FACTURE} du {DATE_FACTURE} reste impayee ({MONTANT} EUR).\n\nLe service comptable",
-            "Service comptable", "compta@exemple.fr", ["Comptabilite"])
+            "Service comptable", "compta@exemple.fr", ["CPT"], "", "compta@exemple.fr", true)
     ];
 
     private static readonly ListeDistribution[] Distributions =
