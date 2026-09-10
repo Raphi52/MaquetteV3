@@ -52,14 +52,51 @@
                     <option>Enveloppe plieuse</option>
                 </select>
             </label>
+            @* v2 (OPE_PARAM_EDT_MAJ) a QUATRE listes de lot distinctes, pas une
+               seule liste a quatre options : ComboBoxLot, ComboBoxLotLRAR,
+               ComboBoxLotILRAR et ComboBoxLotSubstitution. Chacune choisit le
+               lot a utiliser pour un canal d'envoi different. *@
             <label class="rig-saisie-champ">
-                <span class="rig-saisie-champ__libelle">Lot</span>
+                <span class="rig-saisie-champ__libelle">Lot standard</span>
                 <select class="rig-saisie-champ__saisie" @bind="Lot">
-                    <option>Lot standard</option>
-                    <option>Lot LRAR</option>
-                    <option>Lot iLRAR</option>
-                    <option>Lot de substitution</option>
+                    @foreach (var l in LotsDisponibles)
+                    {
+                        <option value="@l">@l</option>
+                    }
                 </select>
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Lot LRAR</span>
+                <select class="rig-saisie-champ__saisie" @bind="LotLrar">
+                    @foreach (var l in LotsDisponibles)
+                    {
+                        <option value="@l">@l</option>
+                    }
+                </select>
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Lot iLRAR</span>
+                <select class="rig-saisie-champ__saisie" @bind="LotIlrar">
+                    @foreach (var l in LotsDisponibles)
+                    {
+                        <option value="@l">@l</option>
+                    }
+                </select>
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Lot de substitution</span>
+                <select class="rig-saisie-champ__saisie" @bind="LotSubstitution">
+                    @foreach (var l in LotsDisponibles)
+                    {
+                        <option value="@l">@l</option>
+                    }
+                </select>
+            </label>
+
+            @* v2 : TxtNbExemplaires. *@
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Nombre d'exemplaires</span>
+                <input class="rig-saisie-champ__saisie" type="number" min="1" @bind="NbExemplaires" />
             </label>
 
             <button class="rig-bascule @(RectoVerso ? "rig-bascule--actif" : "")"
@@ -82,6 +119,46 @@
                     @onclick="() => EntetePlieuse = !EntetePlieuse">
                 <span class="rig-bascule__temoin"></span><span>Entete au format plieuse</span>
             </button>
+
+            @* v2 : CheckBoxImpression et ult_chkGarderEditionLot1. *@
+            <button class="rig-bascule @(Impression ? "rig-bascule--actif" : "")"
+                    @onclick="() => Impression = !Impression">
+                <span class="rig-bascule__temoin"></span><span>Impression</span>
+            </button>
+            <button class="rig-bascule @(GarderEditionLot1 ? "rig-bascule--actif" : "")"
+                    @onclick="() => GarderEditionLot1 = !GarderEditionLot1">
+                <span class="rig-bascule__temoin"></span><span>Garder l'edition en lot 1</span>
+            </button>
+
+            @* v2 : TxtBoxCodeParamEdt, TxtBoxLibParamEdt, ultComboNatureEdition,
+               ult_txtRequeteSql, TextMultiLineAutresParam. *@
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Code parametre d'edition</span>
+                    <input class="rig-saisie-champ__saisie" @bind="CodeParamEdt" />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Nature d'edition</span>
+                    <select class="rig-saisie-champ__saisie" @bind="NatureEdition">
+                        <option>Courrier</option>
+                        <option>Acte</option>
+                        <option>Bordereau</option>
+                        <option>Etat</option>
+                    </select>
+                </label>
+            </div>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Libelle du parametre</span>
+                <input class="rig-saisie-champ__saisie" @bind="LibParamEdt" />
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Requete SQL</span>
+                <textarea class="rig-saisie-champ__saisie" rows="2" @bind="RequeteSql"></textarea>
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Autres parametres</span>
+                <textarea class="rig-saisie-champ__saisie" rows="2" @bind="AutresParam"></textarea>
+            </label>
         </div>
     </aside>
 
@@ -162,12 +239,31 @@
     private string TypeDoc = string.Empty;
     private string Imprimante = "Greffe - Accueil";
     private string TypePapier = "A4 en-tete";
-    private string Lot = "Lot standard";
+    // v2 (OPE_PARAM_EDT_MAJ) : les lots proposes sont les memes pour les quatre
+    // listes ; c'est le canal d'envoi qui change, pas le catalogue.
+    private static readonly string[] LotsDisponibles =
+        ["(aucun)", "Lot 1 - courrier simple", "Lot 2 - courrier suivi",
+         "Lot 3 - recommande", "Lot 4 - depot guichet"];
+
+    private string Lot = "Lot 1 - courrier simple";
+    private string LotLrar = "Lot 3 - recommande";
+    private string LotIlrar = "Lot 2 - courrier suivi";
+    private string LotSubstitution = "(aucun)";
+    private int NbExemplaires = 1;
+
     private bool RectoVerso = true;
     private bool Agrafage;
     private bool ApercuAvantImpression = true;
     private bool DocNonModifiable;
     private bool EntetePlieuse;
+    private bool Impression = true;
+    private bool GarderEditionLot1;
+
+    private string CodeParamEdt = "PE-RCS-IMM";
+    private string LibParamEdt = "Immatriculation - courrier d'accuse";
+    private string NatureEdition = "Courrier";
+    private string RequeteSql = "SELECT * FROM DEMANDE WHERE DEMAN_ID = @id";
+    private string AutresParam = string.Empty;
     private Maquette? Selection = Maquettes[0];
 
     private Maquette[] Trouvees
