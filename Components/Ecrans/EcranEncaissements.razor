@@ -1,8 +1,12 @@
-@* Ecran de la procedure PROC_ENCAISS (RIG v2 : « Saisie d'encaissement »
-   et bloc OPE_VENTILATIONS). Champs lus dans le formulaire v2 : txtPayeur,
-   txtBanque, txtNumTitre, txtCommentaire, txtAdresseRecu. Colonnes des
-   ventilations lues dans la grille v2 : N identifiant, Affaire, Client,
-   Abrege client, Montant, Solde (affaire / client). *@
+@* Ecran de la procedure PROC_ENCAISS.
+
+   Sources RIG v2 (D:\RigApplication\Source\RIG\DLL\Processus\PROC_ENCAISS) :
+     - Saisie/OPE_FORM_SAISIE : txtPayeur, rcbModePaiement, txtBanque,
+       txtNumTitre, rigMontant, _ultDateVirement, rigchkRecu, txtAdresseRecu,
+       txtCommentaire, lblEncaissRepris
+     - Saisie/OPE_VENTILATIONS + GridViewEncaissementVentilations : colonnes
+       « N° identifiant », « Affaire », « Client », « Abrégé client »,
+       « Montant », « Solde (affaire / client) » *@
 
 <div class="rig-proc__corps">
 
@@ -25,6 +29,11 @@
         </label>
 
         <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Date de virement</span>
+            <input class="rig-saisie-champ__saisie" type="date" @bind="DateVirement" />
+        </label>
+
+        <label class="rig-saisie-champ">
             <span class="rig-saisie-champ__libelle">Banque</span>
             <input class="rig-saisie-champ__saisie" @bind="Banque" />
         </label>
@@ -39,15 +48,31 @@
             <input class="rig-saisie-champ__saisie" type="number" step="0.01" @bind="Montant" />
         </label>
 
-        <label class="rig-saisie-champ">
-            <span class="rig-saisie-champ__libelle">Adresse du recu</span>
-            <textarea class="rig-saisie-champ__saisie" rows="2" @bind="AdresseRecu"></textarea>
-        </label>
+        <button class="rig-bascule @(RecuDemande ? "rig-bascule--actif" : "")"
+                @onclick="() => RecuDemande = !RecuDemande">
+            <span class="rig-bascule__temoin"></span>
+            <span>Emettre un recu</span>
+        </button>
+
+        @if (RecuDemande)
+        {
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Adresse du recu</span>
+                <textarea class="rig-saisie-champ__saisie" rows="2" @bind="AdresseRecu"></textarea>
+            </label>
+        }
 
         <label class="rig-saisie-champ">
             <span class="rig-saisie-champ__libelle">Commentaire</span>
             <textarea class="rig-saisie-champ__saisie" rows="2" @bind="Commentaire"></textarea>
         </label>
+
+        @* v2 : lblEncaissRepris, affiche quand la saisie reprend un
+           encaissement deja enregistre. *@
+        @if (EncaissementRepris is { } repris)
+        {
+            <span class="rig-etat rig-etat--attente">Encaissement repris : @repris</span>
+        }
     </aside>
 
     <section class="rig-resultats-proc">
@@ -118,6 +143,9 @@
 
     private string Payeur = "SELARL LEROY & ASSOCIES";
     private string ModePaiement = "Cheque";
+    private DateTime? DateVirement = JeuDemo.Aujourdhui;
+    private bool RecuDemande = true;
+    private string? EncaissementRepris = "E-2026-0447 du 02/09/2026";
     private string Banque = "CREDIT AGRICOLE";
     private string NumTitre = "CH-4471902";
     private string Commentaire = string.Empty;
