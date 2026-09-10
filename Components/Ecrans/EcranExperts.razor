@@ -1,9 +1,14 @@
-@* Ecran de la procedure PROC_EXPERT (RIG v2 : « Gestion des experts »,
-   etapes ETP_RECHERCHE_EXPERT et ETP_EDITION_EXPERT). Champs lus dans
-   FORM_EXPERT : TextRecherche, ComboBoxCivilite, TextNom, TextAbrege,
-   TextCompNom, TextDateNaissance, TextAdresse, TextTel, TextFax, TextMail,
-   ComboBoxQualifProfession, CheckBoxActif, et les listes de mesures
-   (ListViewMesureExpertActif / ListViewMesureExpertInactif). *@
+@* Ecran de la procedure PROC_EXPERT.
+
+   Sources RIG v2 (D:/RigApplication/Source/RIG/DLL/Processus/PROC_EXPERT) :
+     - Recherche/OPE_RECHERCHE_EXPERT : TextRecherche, DataListviewExpert
+     - Edition/OPE_EDITION_EXPERT     : ComboBoxCivilite, TextNom, TextAbrege,
+       TextCompNom, TextDateNaissance, TextAdresse, TextTel, TextFax, TextMail,
+       ComboBoxQualifProfession, CheckBoxActif, OpeMesureActif / OpeMesureInactif
+     - Edition/OPE_MESURE_EXPERT -> Rig_Ult_Metier/LISTVIEW/
+       ULT_LISTVIEW_MESURES_EXPERT.cs, dont InitColumns() donne les SIX colonnes
+       reprises ici : Num mesure, Civilite, Nom participant, Complement nom,
+       Qualif prof, Adresse. *@
 
 <div class="rig-proc__corps">
 
@@ -72,10 +77,14 @@
                         <input class="rig-saisie-champ__saisie" value="@e.Nom" readonly />
                     </label>
                     <label class="rig-saisie-champ">
-                        <span class="rig-saisie-champ__libelle">Date de naissance</span>
-                        <input class="rig-saisie-champ__saisie" value="@e.Naissance" readonly />
+                        <span class="rig-saisie-champ__libelle">Complement de nom</span>
+                        <input class="rig-saisie-champ__saisie" value="@e.ComplementNom" readonly />
                     </label>
                 </div>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Date de naissance</span>
+                    <input class="rig-saisie-champ__saisie" value="@e.Naissance" readonly />
+                </label>
                 <label class="rig-saisie-champ">
                     <span class="rig-saisie-champ__libelle">Adresse</span>
                     <input class="rig-saisie-champ__saisie" value="@e.Adresse" readonly />
@@ -110,24 +119,24 @@
                 <table class="rig-table">
                     <thead>
                         <tr>
-                            <th>N Instance</th>
-                            <th>Affaire</th>
-                            <th>Mesure</th>
-                            <th>Designation</th>
-                            <th>Echeance</th>
-                            <th>Etat</th>
+                            <th>Num mesure</th>
+                            <th>Civilite</th>
+                            <th>Nom participant</th>
+                            <th>Complement nom</th>
+                            <th>Qualif prof</th>
+                            <th>Adresse</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var m in Mesures.Where(m => m.Expert == e.Abrege && m.EnCours == MesuresActives))
                         {
                             <tr>
-                                <td class="rig-table__mono">@m.Instance</td>
-                                <td>@m.Affaire</td>
-                                <td>@m.Libelle</td>
-                                <td class="rig-table__mono">@m.Designation.ToString("dd/MM/yyyy")</td>
-                                <td class="rig-table__mono">@(m.Echeance?.ToString("dd/MM/yyyy") ?? "")</td>
-                                <td><span class="rig-etat rig-etat--@(m.EnCours ? "action" : "ok")">@(m.EnCours ? "En cours" : "Terminee")</span></td>
+                                <td class="rig-table__mono">@m.NumMesure</td>
+                                <td>@m.Civilite</td>
+                                <td>@m.NomParticipant</td>
+                                <td>@m.ComplementNom</td>
+                                <td>@m.QualifProf</td>
+                                <td>@m.Adresse</td>
                             </tr>
                         }
                         @if (!Mesures.Any(m => m.Expert == e.Abrege && m.EnCours == MesuresActives))
@@ -148,26 +157,30 @@
 </div>
 
 @code {
-    private sealed record Expert(string Abrege, string Civilite, string Nom, string Naissance,
-                                 string Adresse, string Tel, string Fax, string Mail,
-                                 string Qualif, bool Actif);
+    private sealed record Expert(string Abrege, string Civilite, string Nom, string ComplementNom,
+                                 string Naissance, string Adresse, string Tel, string Fax,
+                                 string Mail, string Qualif, bool Actif);
 
-    private sealed record MesureExpert(string Expert, string Instance, string Affaire, string Libelle,
-                                       DateTime Designation, DateTime? Echeance, bool EnCours);
+    // Colonnes de ULT_LISTVIEW_MESURES_EXPERT.InitColumns() (RIG v2) :
+    // MSINS_NUM_MESURE, PRTCP_CIVILITE, PRTCP_NOM, PRTCP_COMPLEMENT_NOM,
+    // PRTCP_QUALIF_PROFESSION, Adresse.AdresseComplete.
+    private sealed record MesureExpert(string Expert, string NumMesure, string Civilite,
+                                       string NomParticipant, string ComplementNom,
+                                       string QualifProf, string Adresse, bool EnCours);
 
     private static readonly Expert[] Experts =
     [
-        new("GIRARD", "M.",  "GIRARD Paul",   "14/05/1971", "9 rue Gambetta, 51100 Reims",   "03 26 12 30 44", "",               "p.girard@exemple.fr",  "Expert-comptable",       true),
-        new("NOEL",   "Mme", "NOEL Julie",    "02/11/1980", "5 bd Foch, 51100 Reims",        "03 26 44 12 87", "03 26 44 12 88", "j.noel@exemple.fr",    "Expert en evaluation",   true),
-        new("ROUX",   "M.",  "ROUX Bernard",  "27/03/1958", "18 rue Talleyrand, 51100 Reims", "03 26 05 76 21", "",              "b.roux@exemple.fr",    "Expert immobilier",      false)
+        new("GIRARD", "M.",  "GIRARD Paul",  "Cabinet Girard & Fils", "14/05/1971", "9 rue Gambetta, 51100 Reims",    "03 26 12 30 44", "",               "p.girard@exemple.fr", "Expert-comptable",     true),
+        new("NOEL",   "Mme", "NOEL Julie",   "",                      "02/11/1980", "5 bd Foch, 51100 Reims",         "03 26 44 12 87", "03 26 44 12 88", "j.noel@exemple.fr",   "Expert en evaluation", true),
+        new("ROUX",   "M.",  "ROUX Bernard", "SELARL Roux Expertise", "27/03/1958", "18 rue Talleyrand, 51100 Reims", "03 26 05 76 21", "",               "b.roux@exemple.fr",   "Expert immobilier",    false)
     ];
 
     private static readonly MesureExpert[] Mesures =
     [
-        new("GIRARD", "2026J00121", "SARL BOULANGERIE DUVAL", "Evaluation des actifs",     new(2026, 4, 2),  new(2026, 10, 2), true),
-        new("GIRARD", "2024J00507", "SCI DU MOULIN",          "Rapport de gestion",        new(2024, 7, 5),  new(2024, 12, 5), false),
-        new("NOEL",   "2026J00134", "SAS TRANSPORTS MARNE",   "Expertise du fonds",        new(2026, 6, 1),  new(2026, 11, 1), true),
-        new("ROUX",   "2025J00088", "EURL COIFFURE MARIE",    "Estimation du bail",        new(2025, 12, 3), new(2026, 3, 3),  false)
+        new("GIRARD", "M-2026-0114", "M.",  "GIRARD Paul",  "Cabinet Girard & Fils", "Expert-comptable",     "9 rue Gambetta, 51100 Reims",    true),
+        new("GIRARD", "M-2024-0503", "M.",  "GIRARD Paul",  "Cabinet Girard & Fils", "Expert-comptable",     "9 rue Gambetta, 51100 Reims",    false),
+        new("NOEL",   "M-2026-0128", "Mme", "NOEL Julie",   "",                      "Expert en evaluation", "5 bd Foch, 51100 Reims",         true),
+        new("ROUX",   "M-2025-0087", "M.",  "ROUX Bernard", "SELARL Roux Expertise", "Expert immobilier",    "18 rue Talleyrand, 51100 Reims", false)
     ];
 
     private string Recherche = string.Empty;
