@@ -1,56 +1,98 @@
-@* Ecran de la procedure PROC_FACTURE (RIG v2 : FORM_ETP_FACTURE, blocs
-   « Informations client », « Articles », « Mode », « Encaissement »,
-   « Infos complementaires »). Colonnes des articles lues dans les grilles
-   v2 (ARTUT_*) : Article, Libelle, Quantite, Prix UHT, Taux TVA, BODACC,
-   INPI, Autre, Montant TTC, Commentaire. *@
+@* Ecran de la procedure PROC_FACTURE.
+
+   Sources RIG v2 (D:\RigApplication\Source\RIG\DLL\Processus\PROC_FACTURE) :
+     - FormFacture/OPE_FACTURE_CLIENT   : ult_client_abrege, ult_client_nom,
+                                          ult_client_adresse, btn_Changer_client,
+                                          ult_lblSolde
+     - FormFacture/OPE_FACTURE_MODE     : ult_Facturer_Tarifer (valeur "F" ou "T")
+     - FormFacture/OPE_FACTURE_INFOS    : ult_combo_payeur, ult_References,
+                                          ult_Attention
+     - FormFacture/OPE_FACTURE_ARTICLES : grille ult_DataGridViewArticles,
+                                          colonnes colCodeArtut, colTypeArticle,
+                                          colQte, colPUHT, colTauxTVA, colBODACC,
+                                          colINPI, colAutre, colTTC
+     - FormEncaissement/OPE_FACTU_ENCAISS : cboModePaiement, cboPayeurs, txtBanque,
+                                          txtNumTitre, ultMontant, ultDateEncaissement,
+                                          txtCommentaire, TxtVentilationId *@
 
 <div class="rig-proc__corps">
 
     <aside class="rig-criteres">
         <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Informations client</div>
 
+        <div class="rig-criteres__paire">
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Abrege</span>
+                <input class="rig-saisie-champ__saisie" value="@Fiche.Abrege" readonly />
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Type de client</span>
+                <input class="rig-saisie-champ__saisie" value="@Fiche.TypeClient" readonly />
+            </label>
+        </div>
+
         <label class="rig-saisie-champ">
-            <span class="rig-saisie-champ__libelle">Client</span>
+            <span class="rig-saisie-champ__libelle">Nom du client</span>
             <select class="rig-saisie-champ__saisie" @bind="Client">
-                @foreach (var c in Clients)
+                @foreach (var c in Fiches)
                 {
-                    <option value="@c">@c</option>
+                    <option value="@c.Nom">@c.Nom</option>
                 }
             </select>
         </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Adresse</span>
+            <input class="rig-saisie-champ__saisie" value="@Fiche.Adresse" readonly />
+        </label>
+
+        <div class="rig-criteres__actions">
+            <button class="rig-bouton" @onclick="ChangerClient">Changer de client</button>
+            <span class="rig-etat rig-etat--@(Fiche.Solde > 0 ? "attente" : "ok")">
+                Solde client @Fiche.Solde.ToString("N2") EUR
+            </span>
+        </div>
 
         <label class="rig-saisie-champ">
             <span class="rig-saisie-champ__libelle">N de demande</span>
             <input class="rig-saisie-champ__saisie" @bind="NumDemande" />
         </label>
 
+        @* v2 : ult_Facturer_Tarifer, un choix exclusif dont la valeur vaut
+           « F » (facturer) ou « T » (tarifer). *@
         <div class="rig-criteres__bloc">
             <div class="rig-kicker">Mode</div>
-            <label class="rig-saisie-champ">
-                <span class="rig-saisie-champ__libelle">Mode de reglement</span>
-                <select class="rig-saisie-champ__saisie" @bind="Mode">
-                    <option>Compte</option>
-                    <option>Cheque</option>
-                    <option>Carte bancaire</option>
-                    <option>Virement</option>
-                    <option>Especes</option>
-                </select>
-            </label>
-            <label class="rig-saisie-champ">
-                <span class="rig-saisie-champ__libelle">Banque</span>
-                <input class="rig-saisie-champ__saisie" @bind="Banque" />
-            </label>
-            <label class="rig-saisie-champ">
-                <span class="rig-saisie-champ__libelle">N de titre</span>
-                <input class="rig-saisie-champ__saisie" @bind="NumTitre" />
-            </label>
+            <div class="rig-onglets">
+                <button class="rig-onglet @(Tarifer ? "" : "rig-onglet--actif")"
+                        @onclick="() => Tarifer = false">Facturer</button>
+                <button class="rig-onglet @(Tarifer ? "rig-onglet--actif" : "")"
+                        @onclick="() => Tarifer = true">Tarifer</button>
+            </div>
+            <p class="rig-nonmaq__texte rig-nonmaq__texte--sourd">
+                @(Tarifer
+                    ? "Tarifer : le montant est calcule sans emettre de facture."
+                    : "Facturer : une facture numerotee sera emise.")
+            </p>
         </div>
 
         <div class="rig-criteres__bloc">
             <div class="rig-kicker">Infos complementaires</div>
             <label class="rig-saisie-champ">
-                <span class="rig-saisie-champ__libelle">Commentaire</span>
-                <textarea class="rig-saisie-champ__saisie" rows="2" @bind="Commentaire"></textarea>
+                <span class="rig-saisie-champ__libelle">Tiers payeur</span>
+                <select class="rig-saisie-champ__saisie" @bind="Payeur">
+                    @foreach (var p in Payeurs)
+                    {
+                        <option value="@p">@p</option>
+                    }
+                </select>
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">References client</span>
+                <input class="rig-saisie-champ__saisie" @bind="References" />
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">A l'attention de</span>
+                <input class="rig-saisie-champ__saisie" @bind="Attention" />
             </label>
         </div>
     </aside>
@@ -113,6 +155,36 @@
                     <input class="rig-saisie-champ__saisie" type="date" @bind="DateEncaissement" />
                 </label>
             </div>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Mode de paiement</span>
+                    <select class="rig-saisie-champ__saisie" @bind="Mode">
+                        <option>Compte</option>
+                        <option>Cheque</option>
+                        <option>Carte bancaire</option>
+                        <option>Virement</option>
+                        <option>Especes</option>
+                    </select>
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Banque</span>
+                    <input class="rig-saisie-champ__saisie" @bind="Banque" />
+                </label>
+            </div>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">N de titre</span>
+                    <input class="rig-saisie-champ__saisie" @bind="NumTitre" />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Identifiant de ventilation</span>
+                    <input class="rig-saisie-champ__saisie" value="@VentilationId" readonly />
+                </label>
+            </div>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Commentaire</span>
+                <textarea class="rig-saisie-champ__saisie" rows="2" @bind="Commentaire"></textarea>
+            </label>
             <span class="rig-etat rig-etat--@(Reste <= 0 ? "ok" : "attente")">
                 @(Reste <= 0 ? "Facture soldee" : "Solde restant " + Reste.ToString("N2") + " EUR")
             </span>
@@ -125,8 +197,18 @@
                                          decimal TauxTva, decimal Bodacc, decimal Inpi, decimal Autre,
                                          decimal Ttc, string Commentaire);
 
-    private static readonly string[] Clients =
-        ["SELARL LEROY & ASSOCIES", "CABINET BLANC", "SCP DUPONT-MARTIN", "Client de passage"];
+    // v2 : ult_client_abrege (dont le titre indique le type de client),
+    // ult_client_nom, ult_client_adresse, ult_lblSolde.
+    private sealed record FicheClient(string Nom, string Abrege, string TypeClient,
+                                      string Adresse, decimal Solde);
+
+    private static readonly FicheClient[] Fiches =
+    [
+        new("SELARL LEROY & ASSOCIES", "LEROY",  "Client en compte", "12 rue de la Paix, 51100 Reims",     812.40m),
+        new("CABINET BLANC",           "BLANC",  "Client WEB",       "4 avenue Jean Jaures, 51000 Chalons", 326.15m),
+        new("SCP DUPONT-MARTIN",       "DUPONT", "Compte PC",        "9 place d Erlon, 51100 Reims",        149.00m),
+        new("Client de passage",       "DIVERS", "Client divers",    "",                                      0m)
+    ];
 
     private static readonly ArticleFacture[] Articles =
     [
@@ -137,8 +219,19 @@
         new("DIV05", "Frais divers",                  1,  8.00m, 20m, 0m,      0m,     4.20m,  14.64m, "")
     ];
 
-    private string Client = Clients[0];
+    private static readonly string[] Payeurs =
+        ["", "Debiteur", "Tiers payeur principal", "Avocat mandataire"];
+
+    private string Client = Fiches[0].Nom;
     private string NumDemande = "D2026-04118";
+
+    // v2 : ult_Facturer_Tarifer, "F" par defaut.
+    private bool Tarifer;
+
+    private string Payeur = string.Empty;
+    private string References = string.Empty;
+    private string Attention = string.Empty;
+    private string VentilationId = "V-2026-8801";
     private string Mode = "Compte";
     private string Banque = string.Empty;
     private string NumTitre = string.Empty;
@@ -146,6 +239,16 @@
     private decimal Encaisse = 200m;
     private DateTime? DateEncaissement = JeuDemo.Aujourdhui;
     private readonly HashSet<string> Retires = new();
+
+    private FicheClient Fiche =>
+        Fiches.FirstOrDefault(f => f.Nom == Client) ?? Fiches[0];
+
+    // v2 : btn_Changer_client fait defiler les clients rattachables a la facture.
+    private void ChangerClient()
+    {
+        var i = Array.FindIndex(Fiches, f => f.Nom == Client);
+        Client = Fiches[(i + 1) % Fiches.Length].Nom;
+    }
 
     private void Basculer(string code) { if (!Retires.Add(code)) Retires.Remove(code); }
 
