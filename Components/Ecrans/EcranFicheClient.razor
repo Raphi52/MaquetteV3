@@ -1,0 +1,163 @@
+@* Ecran de la procedure PROC_FCLIENT (RIG v2 : « Fiche Client », blocs
+   OPE_ENTREPRISE et OPE_CONTACT). La grille de compte v2 porte les colonnes
+   Date et Solde ; la maquette les garde et ajoute le libelle du mouvement,
+   qui est ce que la ligne v2 affiche a cote du solde. *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Client</div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Choisir un client</span>
+            <select class="rig-saisie-champ__saisie" @bind="Abrege">
+                @foreach (var f in Fiches)
+                {
+                    <option value="@f.Abrege">@f.Abrege — @f.Nom</option>
+                }
+            </select>
+        </label>
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Entreprise</div>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Raison sociale</span>
+                <input class="rig-saisie-champ__saisie" value="@Fiche.Nom" readonly />
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">N de compte</span>
+                <input class="rig-saisie-champ__saisie" value="@Fiche.Compte" readonly />
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Siren</span>
+                <input class="rig-saisie-champ__saisie" value="@Fiche.Siren" readonly />
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Adresse</span>
+                <textarea class="rig-saisie-champ__saisie" rows="2" readonly>@Fiche.Adresse</textarea>
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Type de client</span>
+                <input class="rig-saisie-champ__saisie" value="@Fiche.Type" readonly />
+            </label>
+        </div>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-onglets">
+                <button class="rig-onglet @(OngletCompte ? "rig-onglet--actif" : "")"
+                        @onclick="() => OngletCompte = true">Compte</button>
+                <button class="rig-onglet @(!OngletCompte ? "rig-onglet--actif" : "")"
+                        @onclick="() => OngletCompte = false">Contacts</button>
+            </div>
+            <span class="rig-resultats-proc__compte">Solde actuel @Solde.ToString("N2") EUR</span>
+        </div>
+
+        @if (OngletCompte)
+        {
+            <div class="rig-table-cadre">
+                <table class="rig-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Mouvement</th>
+                            <th>Debit</th>
+                            <th>Credit</th>
+                            <th>Solde</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in MouvementsClient)
+                        {
+                            <tr>
+                                <td class="rig-table__mono">@m.Date.ToString("dd/MM/yyyy")</td>
+                                <td>@m.Libelle</td>
+                                <td class="rig-table__mono">@(m.Debit == 0 ? "" : m.Debit.ToString("N2"))</td>
+                                <td class="rig-table__mono">@(m.Credit == 0 ? "" : m.Credit.ToString("N2"))</td>
+                                <td class="rig-table__mono">@m.Solde.ToString("N2")</td>
+                            </tr>
+                        }
+                        @if (MouvementsClient.Length == 0)
+                        {
+                            <tr><td colspan="5" class="rig-table__vide">Aucun mouvement sur ce compte.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="rig-table-cadre">
+                <table class="rig-table">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Fonction</th>
+                            <th>Telephone</th>
+                            <th>E-mail</th>
+                            <th class="rig-table__centre">Principal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in ContactsClient)
+                        {
+                            <tr>
+                                <td>@c.Nom</td>
+                                <td>@c.Fonction</td>
+                                <td class="rig-table__mono">@c.Tel</td>
+                                <td class="rig-table__mono">@c.Mail</td>
+                                <td class="rig-table__centre">@(c.Principal ? "oui" : "")</td>
+                            </tr>
+                        }
+                        @if (ContactsClient.Length == 0)
+                        {
+                            <tr><td colspan="5" class="rig-table__vide">Aucun contact enregistre.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    private sealed record FicheCli(string Abrege, string Nom, string Compte, string Siren,
+                                   string Adresse, string Type);
+    private sealed record Mouvement(string Abrege, DateTime Date, string Libelle,
+                                    decimal Debit, decimal Credit, decimal Solde);
+    private sealed record Contact(string Abrege, string Nom, string Fonction, string Tel,
+                                  string Mail, bool Principal);
+
+    private static readonly FicheCli[] Fiches =
+    [
+        new("LEROY",  "SELARL LEROY & ASSOCIES", "C-000142", "412 875 330", "12 rue du Palais\n51100 Reims",  "En compte"),
+        new("BLANC",  "CABINET BLANC",           "C-000188", "509 221 004", "3 place Drouet\n51100 Reims",    "En compte"),
+        new("DUPONT", "SCP DUPONT-MARTIN",       "C-000231", "788 410 226", "22 rue Chanzy\n51100 Reims",     "En compte")
+    ];
+
+    private static readonly Mouvement[] Mouvements =
+    [
+        new("LEROY", new(2026, 7, 4),  "Facture FA-44120",     194.85m, 0m,      194.85m),
+        new("LEROY", new(2026, 7, 28), "Encaissement CH-4471", 0m,      194.85m, 0m),
+        new("LEROY", new(2026, 8, 19), "Facture FA-45120",     812.40m, 0m,      812.40m),
+        new("BLANC", new(2026, 8, 14), "Facture FA-45121",     320.10m, 0m,      320.10m),
+        new("DUPONT", new(2026, 6, 2), "Facture FA-43980",     145.00m, 0m,      145.00m)
+    ];
+
+    private static readonly Contact[] Contacts =
+    [
+        new("LEROY",  "Antoine LEROY",  "Mandataire",   "03 26 40 11 22", "a.leroy@exemple.fr",   true),
+        new("LEROY",  "Sarah HUET",     "Assistante",   "03 26 40 11 25", "s.huet@exemple.fr",    false),
+        new("BLANC",  "Sophie BLANC",   "Administratrice", "03 26 40 55 01", "s.blanc@exemple.fr", true),
+        new("DUPONT", "Marc DUPONT",    "Avocat",       "03 26 77 43 09", "m.dupont@exemple.fr",  true)
+    ];
+
+    private string Abrege = "LEROY";
+    private bool OngletCompte = true;
+
+    private FicheCli Fiche => Fiches.First(f => f.Abrege == Abrege);
+    private Mouvement[] MouvementsClient => Mouvements.Where(m => m.Abrege == Abrege).ToArray();
+    private Contact[] ContactsClient => Contacts.Where(c => c.Abrege == Abrege).ToArray();
+    private decimal Solde => MouvementsClient.LastOrDefault()?.Solde ?? 0m;
+}

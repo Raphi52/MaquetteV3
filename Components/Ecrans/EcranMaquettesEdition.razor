@@ -1,0 +1,183 @@
+@* Ecran de la procedure PROC_EDIT_MAQUETTE (RIG v2 : « Edition des
+   maquettes », etapes etP_MAQUETTE et etP_PARAM_EDT, plus le bloc
+   « Tables liees »). Champs lus dans les formulaires v2 :
+   ComboBoxCodeProcess, ComboBoxTypeDoc, ComboBoxMaquette, ComboBoxTypeMaquette,
+   ComboBoxImprimante, ComboBoxLot / LotLRAR / LotILRAR / LotSubstitution,
+   ComboBoxTypePapier, CheckBoxRectoVerso, CheckBoxAgrafage,
+   CheckBoxAffAvtImp, CheckBoxImpression, CheckBoxDocNonModifiable,
+   CheckBoxEnteteFormatPlieuse, DataListviewTableLiee. *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Maquette</div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Code processus</span>
+            <select class="rig-saisie-champ__saisie" @bind="CodeProcess">
+                <option value="">Tous</option>
+                @foreach (var p in Maquettes.Select(m => m.Process).Distinct().Order())
+                {
+                    <option value="@p">@p</option>
+                }
+            </select>
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Type de document</span>
+            <select class="rig-saisie-champ__saisie" @bind="TypeDoc">
+                <option value="">Tous</option>
+                @foreach (var t in Maquettes.Select(m => m.TypeDoc).Distinct().Order())
+                {
+                    <option value="@t">@t</option>
+                }
+            </select>
+        </label>
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Parametres d'edition</div>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Imprimante</span>
+                <select class="rig-saisie-champ__saisie" @bind="Imprimante">
+                    <option>Greffe - Accueil</option>
+                    <option>Greffe - Etage 1</option>
+                    <option>PDF (fichier)</option>
+                </select>
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Type de papier</span>
+                <select class="rig-saisie-champ__saisie" @bind="TypePapier">
+                    <option>A4 blanc</option>
+                    <option>A4 en-tete</option>
+                    <option>Enveloppe plieuse</option>
+                </select>
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Lot</span>
+                <select class="rig-saisie-champ__saisie" @bind="Lot">
+                    <option>Lot standard</option>
+                    <option>Lot LRAR</option>
+                    <option>Lot iLRAR</option>
+                    <option>Lot de substitution</option>
+                </select>
+            </label>
+
+            <button class="rig-bascule @(RectoVerso ? "rig-bascule--actif" : "")"
+                    @onclick="() => RectoVerso = !RectoVerso">
+                <span class="rig-bascule__temoin"></span><span>Recto-verso</span>
+            </button>
+            <button class="rig-bascule @(Agrafage ? "rig-bascule--actif" : "")"
+                    @onclick="() => Agrafage = !Agrafage">
+                <span class="rig-bascule__temoin"></span><span>Agrafage</span>
+            </button>
+            <button class="rig-bascule @(ApercuAvantImpression ? "rig-bascule--actif" : "")"
+                    @onclick="() => ApercuAvantImpression = !ApercuAvantImpression">
+                <span class="rig-bascule__temoin"></span><span>Afficher avant impression</span>
+            </button>
+            <button class="rig-bascule @(DocNonModifiable ? "rig-bascule--actif" : "")"
+                    @onclick="() => DocNonModifiable = !DocNonModifiable">
+                <span class="rig-bascule__temoin"></span><span>Document non modifiable</span>
+            </button>
+            <button class="rig-bascule @(EntetePlieuse ? "rig-bascule--actif" : "")"
+                    @onclick="() => EntetePlieuse = !EntetePlieuse">
+                <span class="rig-bascule__temoin"></span><span>Entete au format plieuse</span>
+            </button>
+        </div>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Maquettes</div>
+            <span class="rig-resultats-proc__compte">@Trouvees.Length maquette(s)</span>
+        </div>
+
+        <div class="rig-table-cadre">
+            <table class="rig-table">
+                <thead>
+                    <tr>
+                        <th>Maquette</th>
+                        <th>Libelle</th>
+                        <th>Processus</th>
+                        <th>Type de document</th>
+                        <th>Type de maquette</th>
+                        <th>Derniere mise a jour</th>
+                        <th class="rig-table__centre">Tables liees</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var m in Trouvees)
+                    {
+                        var maq = m;
+                        <tr @onclick="() => Selection = maq">
+                            <td class="rig-table__mono">@maq.Code</td>
+                            <td>@maq.Libelle</td>
+                            <td class="rig-table__mono">@maq.Process</td>
+                            <td>@maq.TypeDoc</td>
+                            <td>@maq.TypeMaquette</td>
+                            <td class="rig-table__mono">@maq.MaJ.ToString("dd/MM/yyyy")</td>
+                            <td class="rig-table__centre">@maq.Tables.Length</td>
+                        </tr>
+                    }
+                    @if (Trouvees.Length == 0)
+                    {
+                        <tr><td colspan="7" class="rig-table__vide">Aucune maquette pour ces criteres.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (Selection is { } s)
+        {
+            <div class="rig-criteres__bloc" style="padding:var(--rig-esp-3)">
+                <div class="rig-kicker">Tables liees a @s.Code</div>
+                <div>
+                    @foreach (var t in s.Tables)
+                    {
+                        <span class="rig-chip">@t</span>
+                    }
+                </div>
+                <p class="rig-nonmaq__texte rig-nonmaq__texte--sourd">
+                    Edition : @Imprimante — @TypePapier — @Lot
+                    @(RectoVerso ? " — recto-verso" : "")@(Agrafage ? " — agrafe" : "")
+                </p>
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    private sealed record Maquette(string Code, string Libelle, string Process, string TypeDoc,
+                                   string TypeMaquette, DateTime MaJ, string[] Tables);
+
+    private static readonly Maquette[] Maquettes =
+    [
+        new("MQ_KBIS",   "Extrait Kbis",              "PROC_DEMANDE",  "Extrait",     "Word",  new(2026, 6, 12), ["DOSSIER", "DEPOT", "CLIENT"]),
+        new("MQ_ARCOU",  "Accuse de reception",       "PROC_ARRIVEE",  "Courrier",    "Word",  new(2026, 4, 3),  ["ARRIVEE", "CLIENT"]),
+        new("MQ_CONVOC", "Convocation d'audience",    "PROC_AUDIENCE", "Courrier",    "Word",  new(2026, 7, 22), ["AUDIENCE", "ACTEUR", "INSTANCE"]),
+        new("MQ_FACT",   "Facture client",            "PROC_FACTURE",  "Facture",     "Excel", new(2026, 8, 30), ["FACTURE", "ARTICLE", "CLIENT"]),
+        new("MQ_BORD",   "Bordereau d'archivage",     "PROC_ARCHIRAD", "Bordereau",   "Word",  new(2025, 12, 5), ["DOSSIER"])
+    ];
+
+    private string CodeProcess = string.Empty;
+    private string TypeDoc = string.Empty;
+    private string Imprimante = "Greffe - Accueil";
+    private string TypePapier = "A4 en-tete";
+    private string Lot = "Lot standard";
+    private bool RectoVerso = true;
+    private bool Agrafage;
+    private bool ApercuAvantImpression = true;
+    private bool DocNonModifiable;
+    private bool EntetePlieuse;
+    private Maquette? Selection = Maquettes[0];
+
+    private Maquette[] Trouvees
+    {
+        get
+        {
+            IEnumerable<Maquette> q = Maquettes;
+            if (!string.IsNullOrEmpty(CodeProcess)) q = q.Where(m => m.Process == CodeProcess);
+            if (!string.IsNullOrEmpty(TypeDoc)) q = q.Where(m => m.TypeDoc == TypeDoc);
+            return q.ToArray();
+        }
+    }
+}

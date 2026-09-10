@@ -186,6 +186,47 @@ Exiger(vue2.Contains("<EcranNonMaquette"),
 Exiger(!Regex.IsMatch(vue2, @"default:\s*<EcranDemandes"),
     "aucune procedure ne retombe en silence sur l ecran des demandes");
 
+// --- 11. TOUTE procedure du menu a son ecran, ou dit pourquoi elle n en a pas.
+//
+// Defaut d origine (10/09/2026) : le menu annoncait 24 procedures et seules
+// 3 avaient un ecran ; les 21 autres tombaient sur l ecran « non maquettee ».
+// Ce controle relit le menu et exige un case pour CHAQUE code.
+var blocMenu = Regex.Match(vue2, @"private readonly Groupe\[\] Groupes =[\s\S]*?
+    \];").Value;
+Exiger(blocMenu.Length > 0, "le menu de gauche est lisible dans Home.razor");
+var codesMenu = Regex.Matches(blocMenu, @"new\(""(?<code>[A-Z][A-Z_]{3,})"",\s*""")
+    .Select(m => m.Groups["code"].Value).Distinct().ToArray();
+Exiger(codesMenu.Length >= 20, $"le menu expose bien ses procedures ({codesMenu.Length} lues)");
+
+// Codes SANS ecran assume : la raison doit etre ecrite dans le code.
+var sansEcran = new[] { "PROC_CREANCE" };
+foreach (var code in codesMenu)
+{
+    var porte = vue2.Contains($"case \"{code}\":");
+    if (sansEcran.Contains(code))
+    {
+        Exiger(!porte, $"{code} n a pas d ecran (v2 est une coquille vide)");
+        Exiger(Regex.IsMatch(vue2, "\"" + code + "\"" + @"\s*=>"),
+            $"{code} explique POURQUOI il n a pas d ecran");
+    }
+    else
+    {
+        Exiger(porte, $"la procedure {code} du menu ouvre son propre ecran");
+    }
+}
+
+// Chaque ecran cite la procedure v2 dont il vient : pas de formulaire generique.
+foreach (var fichier in Directory.GetFiles(
+             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Components/Ecrans")),
+             "Ecran*.razor"))
+{
+    var nom = Path.GetFileName(fichier);
+    if (nom == "EcranNonMaquette.razor") continue;
+    var texte = File.ReadAllText(fichier);
+    Exiger(Regex.IsMatch(texte, @"(PROC_[A-Z_]+|BODACC)"),
+        $"{nom} nomme la procedure RIG v2 dont il est porte");
+}
+
 Console.WriteLine();
 if (echecs.Count == 0)
 {

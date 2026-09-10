@@ -202,11 +202,94 @@
                 <EcranDemandes EstValide="EstValide" Ouvrir="OuvrirParNumero" />
                 break;
 
-            // Les autres procedures du menu ne sont pas portees : elles le
-            // DISENT, au lieu d'afficher l'ecran des demandes sous un autre
-            // nom.
+            case "PROC_CLOT":
+                <EcranCloture OuvrirDossier="OuvrirParNumero" />
+                break;
+
+            case "PROC_ARCHIRAD":
+                <EcranArchivage OuvrirDossier="OuvrirParNumero" />
+                break;
+
+            case "BODACC":
+                <EcranBodacc OuvrirDossier="OuvrirParNumero" />
+                break;
+
+            case "PROC_DEPOTJUD":
+                <EcranDepotsJud OuvrirDossier="OuvrirParNumero" />
+                break;
+
+            case "PROC_ACTEUR_JUD":
+                <EcranActeurs />
+                break;
+
+            case "PROC_CJUD":
+                <EcranConsultationJud OuvrirDossier="OuvrirParNumero" />
+                break;
+
+            case "PROC_AUDIENCE":
+                <EcranAudiences />
+                break;
+
+            case "PROC_EXPERT":
+                <EcranExperts />
+                break;
+
+            case "PROC_GEDJUD":
+                <EcranGedJud OuvrirDossier="OuvrirParNumero" />
+                break;
+
+            case "PROC_DOC_DEMAT":
+                <EcranDocDemat OuvrirDossier="OuvrirParNumero" />
+                break;
+
+            case "PROC_CONTROLE_VIDIGED":
+                <EcranControleVidiged />
+                break;
+
+            case "PROC_COFFRE_FORT":
+                <EcranCoffreFort />
+                break;
+
+            case "PROC_FACTURE":
+                <EcranFactures />
+                break;
+
+            case "PROC_ENCAISS":
+                <EcranEncaissements />
+                break;
+
+            case "PROC_FCLIENT":
+                <EcranFicheClient />
+                break;
+
+            case "PROC_GCLIENT":
+                <EcranClients />
+                break;
+
+            case "PROC_ACCUEIL_PARAM":
+                <EcranParametresAccueil />
+                break;
+
+            case "PROC_GESTEMAIL":
+                <EcranMessagerie />
+                break;
+
+            case "PROC_GESTBANQ":
+                <EcranBanques />
+                break;
+
+            case "PROC_EDIT_MAQUETTE":
+                <EcranMaquettesEdition />
+                break;
+
+            // PROC_CREANCE n'a PAS d'ecran porte, et ce n'est pas un oubli :
+            // dans RIG v2, PROC_CREANCE.cs ne contient qu'un constructeur et
+            // FORM_CREANCE.Designer.cs aucun controle (32 lignes, un simple
+            // conteneur). Il n'y a donc rien a porter ; inventer un ecran de
+            // creances serait inventer RIG v2.
             default:
-                <EcranNonMaquette Code="@ProcOuverte.Code" Libelle="@ProcOuverte.Libelle" />
+                <EcranNonMaquette Code="@ProcOuverte.Code" Libelle="@ProcOuverte.Libelle"
+                                  Motif="@MotifNonMaquette(ProcOuverte.Code)" />
                 break;
         }
     </div>
@@ -839,6 +922,21 @@
     ];
 
     // ================= Ecran de procedure =================
+
+    /// <summary>
+    /// Dit POURQUOI une procedure du menu n'a pas d'ecran, quand la raison
+    /// est etablie dans les sources de RIG v2. Vide sinon.
+    /// </summary>
+    private static string? MotifNonMaquette(string code) => code switch
+    {
+        "PROC_CREANCE" =>
+            "Dans RIG v2, cette procedure est une coquille vide : PROC_CREANCE.cs "
+            + "ne contient qu'un constructeur et FORM_CREANCE.Designer.cs aucun "
+            + "controle. Il n'y a aucun critere ni aucune colonne a porter, et en "
+            + "inventer donnerait un faux ecran.",
+        _ => null
+    };
+
     // Le cadre et l aiguillage vivent ici ; les criteres, les grilles et
     // les jeux de donnees sont dans Components/Ecrans/ et Metier/JeuDemo.cs.
 

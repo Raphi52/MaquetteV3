@@ -1,0 +1,138 @@
+@* Ecran de la procedure PROC_DOC_DEMAT (RIG v2 : arbre de documents
+   dematerialises, rigTreeViewAdv1). Colonnes v2 : DisplayLibelle,
+   AbrPieceLibelle, DatePiece. Actions du menu contextuel v2 : Voir,
+   Modifier..., Requalifier..., Enregistrer sous..., Imprimer...,
+   Proprietes..., Supprimer, Restaurer, Remettre en vigueur,
+   Demander le controle de la piece..., Verifier le justificatif...,
+   Verifier la conformite de la carte d'identite. *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Dossiers dematerialises</div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Rechercher</span>
+            <input class="rig-saisie-champ__saisie" @bind="Recherche" @bind:event="oninput" />
+        </label>
+
+        @foreach (var g in Pieces.GroupBy(p => p.Dossier))
+        {
+            var groupe = g.Key;
+            var ouvert = Ouverts.Contains(groupe);
+            <div class="rig-menu__groupe @(ouvert ? "rig-menu__groupe--ouvert" : "")">
+                <button class="rig-menu__tete" @onclick="() => BasculerGroupe(groupe)">
+                    <span class="rig-menu__chevron">&#9656;</span>
+                    <span>@groupe</span>
+                    <span class="rig-menu__compte">@g.Count()</span>
+                </button>
+                @if (ouvert)
+                {
+                    <ul class="rig-menu__liste">
+                        @foreach (var p in g.Where(Correspond))
+                        {
+                            var piece = p;
+                            <li>
+                                <button class="rig-menu__lien @(Selection == piece ? "rig-menu__lien--actif" : "")"
+                                        @onclick="() => Selection = piece">
+                                    <span class="rig-menu__code">@piece.Abrege</span>@piece.Libelle
+                                </button>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Piece dematerialisee</div>
+            <span class="rig-resultats-proc__compte">@(Selection?.Libelle ?? "aucune piece selectionnee")</span>
+        </div>
+
+        @if (Selection is { } s)
+        {
+            <div class="rig-criteres__bloc" style="padding:var(--rig-esp-3)">
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Abrege de la piece</span>
+                        <input class="rig-saisie-champ__saisie" value="@s.Abrege" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Date de la piece</span>
+                        <input class="rig-saisie-champ__saisie" value="@s.Date.ToString("dd/MM/yyyy")" readonly />
+                    </label>
+                </div>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Libelle affiche</span>
+                    <input class="rig-saisie-champ__saisie" value="@s.Libelle" readonly />
+                </label>
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Etat</span>
+                        <input class="rig-saisie-champ__saisie" value="@s.Etat" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Controle de la piece</span>
+                        <input class="rig-saisie-champ__saisie" value="@s.Controle" readonly />
+                    </label>
+                </div>
+
+                <div class="rig-criteres__actions">
+                    <button class="rig-bouton" @onclick="() => OuvrirDossier.InvokeAsync(s.Dossier)">Voir</button>
+                    <button class="rig-bouton rig-bouton--plat" @onclick='() => Action = "Modifier"'>Modifier</button>
+                    <button class="rig-bouton rig-bouton--plat" @onclick='() => Action = "Requalifier"'>Requalifier</button>
+                    <button class="rig-bouton rig-bouton--plat" @onclick='() => Action = "Enregistrer sous"'>Enregistrer sous</button>
+                    <button class="rig-bouton rig-bouton--plat" @onclick='() => Action = "Imprimer"'>Imprimer</button>
+                </div>
+                <div class="rig-criteres__actions">
+                    <button class="rig-bouton rig-bouton--plat" @onclick='() => Action = "Demande de controle de la piece envoyee"'>Demander le controle</button>
+                    <button class="rig-bouton rig-bouton--plat" @onclick='() => Action = "Verification du justificatif demandee"'>Verifier le justificatif</button>
+                    <button class="rig-bouton rig-bouton--plat" @onclick='() => Action = "Conformite de la carte d identite verifiee"'>Verifier la carte d'identite</button>
+                    <button class="rig-bouton rig-bouton--plat" @onclick='() => Action = "Piece supprimee (restaurable)"'>Supprimer</button>
+                </div>
+
+                @if (Action is { } a)
+                {
+                    <p class="rig-nonmaq__texte">@a</p>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="rig-table__vide" style="padding:var(--rig-esp-4)">
+                Choisissez une piece dans l'arbre de gauche.
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    [Parameter] public EventCallback<string> OuvrirDossier { get; set; }
+
+    private sealed record Piece(string Dossier, string Abrege, string Libelle, DateTime Date,
+                                string Etat, string Controle);
+
+    private static readonly Piece[] Pieces =
+    [
+        new("2026B00811", "STAT", "Statuts constitutifs",            new(2026, 8, 28), "En vigueur", "Conforme"),
+        new("2026B00811", "CNI",  "Carte d'identite du gerant",      new(2026, 8, 28), "En vigueur", "A verifier"),
+        new("2026B00811", "DOM",  "Justificatif de domiciliation",   new(2026, 8, 29), "En vigueur", "Conforme"),
+        new("2019B00233", "PVAG", "PV d'assemblee generale",         new(2026, 9, 1),  "En vigueur", "Conforme"),
+        new("2019B00233", "STAT", "Statuts mis a jour",              new(2026, 9, 1),  "Remplace",   "Conforme"),
+        new("2011B00512", "CPT",  "Comptes annuels 2025",            new(2026, 8, 14), "En vigueur", "Non controle")
+    ];
+
+    private readonly HashSet<string> Ouverts = new() { "2026B00811" };
+    private string Recherche = string.Empty;
+    private string? Action;
+    private Piece? Selection;
+
+    private void BasculerGroupe(string d) { if (!Ouverts.Add(d)) Ouverts.Remove(d); }
+
+    private bool Correspond(Piece p) =>
+        string.IsNullOrWhiteSpace(Recherche)
+        || p.Libelle.Contains(Recherche.Trim(), StringComparison.OrdinalIgnoreCase)
+        || p.Abrege.Contains(Recherche.Trim(), StringComparison.OrdinalIgnoreCase);
+}

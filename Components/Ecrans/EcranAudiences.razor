@@ -1,0 +1,158 @@
+@* Ecran de la procedure PROC_AUDIENCE (RIG v2 : « Creer une Audience »,
+   etape ETP_CREATION_AUDIENCE). Les champs sont ceux d'OPE_CREATION_AUDIENCE :
+   ULTDateAudience, UltHeureAudience, ULTCBTypeAudience, ULTCBChambre,
+   ULTCBSection, ULTCheckBPublique, ULTCheckBChoixWeb, plus le bloc
+   OPE_TYPE_CLASSEMENT_ADMIS et le temoin ult_LabelMailActive. *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Creation d'une audience</div>
+
+        <div class="rig-criteres__paire">
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Date d'audience</span>
+                <input class="rig-saisie-champ__saisie" type="date" @bind="DateAudience" />
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Heure de debut</span>
+                <input class="rig-saisie-champ__saisie" type="time" @bind="Heure" />
+            </label>
+        </div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Type d'audience</span>
+            <select class="rig-saisie-champ__saisie" @bind="TypeAudience">
+                @foreach (var t in TypesAudience)
+                {
+                    <option value="@t">@t</option>
+                }
+            </select>
+        </label>
+
+        <div class="rig-criteres__paire">
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Chambre</span>
+                <select class="rig-saisie-champ__saisie" @bind="Chambre">
+                    <option>1re</option><option>2e</option><option>3e</option>
+                </select>
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Section</span>
+                <select class="rig-saisie-champ__saisie" @bind="Section">
+                    <option>A</option><option>B</option><option>C</option>
+                </select>
+            </label>
+        </div>
+
+        <div class="rig-criteres__bloc">
+            <button class="rig-bascule @(Publique ? "rig-bascule--actif" : "")"
+                    @onclick="() => Publique = !Publique">
+                <span class="rig-bascule__temoin"></span>
+                <span>Audience publique</span>
+            </button>
+            <button class="rig-bascule @(ChoixWeb ? "rig-bascule--actif" : "")"
+                    @onclick="() => ChoixWeb = !ChoixWeb">
+                <span class="rig-bascule__temoin"></span>
+                <span>Publiee sur le web</span>
+            </button>
+        </div>
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Types de classement admis</div>
+            @foreach (var c in Classements)
+            {
+                var v = c;
+                <button class="rig-bascule @(Admis.Contains(v) ? "rig-bascule--actif" : "")"
+                        @onclick="() => BasculerAdmis(v)">
+                    <span class="rig-bascule__temoin"></span>
+                    <span>@v</span>
+                </button>
+            }
+        </div>
+
+        <div class="rig-criteres__actions">
+            <button class="rig-bouton rig-bouton--fort" @onclick="Creer">Creer l'audience</button>
+        </div>
+        <span class="rig-etat rig-etat--@(MailActif ? "ok" : "attente")">
+            @(MailActif ? "Envoi de mail actif" : "Envoi de mail inactif")
+        </span>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Audiences programmees</div>
+            <span class="rig-resultats-proc__compte">@Programmees.Count audience(s)</span>
+        </div>
+
+        <div class="rig-table-cadre">
+            <table class="rig-table">
+                <thead>
+                    <tr>
+                        <th>Date d'audience</th>
+                        <th>Heure de debut</th>
+                        <th>Type d'audience</th>
+                        <th>Chambre</th>
+                        <th>Section</th>
+                        <th class="rig-table__centre">Publique</th>
+                        <th class="rig-table__centre">Web</th>
+                        <th class="rig-table__centre">Affaires</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var a in Programmees)
+                    {
+                        <tr>
+                            <td class="rig-table__mono">@a.Date.ToString("dd/MM/yyyy")</td>
+                            <td class="rig-table__mono">@a.Heure</td>
+                            <td>@a.Type</td>
+                            <td class="rig-table__mono">@a.Chambre</td>
+                            <td class="rig-table__mono">@a.Section</td>
+                            <td class="rig-table__centre">@(a.Publique ? "oui" : "")</td>
+                            <td class="rig-table__centre">@(a.Web ? "oui" : "")</td>
+                            <td class="rig-table__centre">@a.NbAffaires</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+@code {
+    private sealed record AudienceLigne(DateTime Date, string Heure, string Type, string Chambre,
+                                        string Section, bool Publique, bool Web, int NbAffaires);
+
+    private static readonly string[] TypesAudience =
+        ["Audience de procedure collective", "Audience de reference", "Audience de plaidoirie",
+         "Audience de conciliation", "Audience du juge-commissaire"];
+
+    private static readonly string[] Classements =
+        ["Insuffisance d'actif", "Extinction du passif", "Conversion en liquidation", "Report"];
+
+    private readonly List<AudienceLigne> Programmees =
+    [
+        new(new(2026, 9, 15), "09:00", "Audience de procedure collective", "1re", "A", true,  true,  14),
+        new(new(2026, 9, 22), "10:15", "Audience du juge-commissaire",     "1re", "A", false, false,  6),
+        new(new(2026, 9, 29), "14:00", "Audience de plaidoirie",           "2e",  "B", true,  true,   9)
+    ];
+
+    private DateTime? DateAudience = JeuDemo.Aujourdhui.AddDays(7);
+    private TimeOnly Heure = new(9, 0);
+    private string TypeAudience = TypesAudience[0];
+    private string Chambre = "1re";
+    private string Section = "A";
+    private bool Publique = true;
+    private bool ChoixWeb;
+    private bool MailActif = true;
+    private readonly HashSet<string> Admis = new() { "Insuffisance d'actif" };
+
+    private void BasculerAdmis(string c) { if (!Admis.Add(c)) Admis.Remove(c); }
+
+    private void Creer()
+    {
+        if (DateAudience is not { } d) return;
+        Programmees.Add(new(d, $"{Heure.Hour:00}:{Heure.Minute:00}", TypeAudience, Chambre, Section, Publique, ChoixWeb, 0));
+        Programmees.Sort((x, y) => x.Date.CompareTo(y.Date));
+    }
+}

@@ -1,0 +1,172 @@
+@* Ecran de la procedure PROC_CJUD (RIG v2 : consultation judiciaire,
+   « Enrolement de toute affaire » + bloc CJUDINFOG). Les champs sont les
+   controles v2 : ULT_COMBO_ETAT_DEMAT, ult_ComboBoxEtatTraitement,
+   ult_ComboBoxTypeRejet, ult_DateCreation, ult_DateTraitement,
+   ult_LabelNbPiece, ult_TextMultiLineAnomalies, ult_TextMultiLineMotifRejet,
+   et les boutons ult_ButtonVisuPiece / ult_ButtonvisuXML. *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Criteres de consultation</div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Affaire / dossier</span>
+            <input class="rig-saisie-champ__saisie" @bind="CritTexte" @bind:event="oninput" />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Etat de dematerialisation</span>
+            <select class="rig-saisie-champ__saisie" @bind="CritDemat">
+                <option value="">Tous</option>
+                @foreach (var e in Dossiers.Select(d => d.EtatDemat).Distinct().Order())
+                {
+                    <option value="@e">@e</option>
+                }
+            </select>
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Etat de traitement</span>
+            <select class="rig-saisie-champ__saisie" @bind="CritTraitement">
+                <option value="">Tous</option>
+                @foreach (var e in Dossiers.Select(d => d.EtatTraitement).Distinct().Order())
+                {
+                    <option value="@e">@e</option>
+                }
+            </select>
+        </label>
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Dates</div>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Creation a partir du</span>
+                <input class="rig-saisie-champ__saisie" type="date" @bind="CritCreationDu" />
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Traitement jusqu'au</span>
+                <input class="rig-saisie-champ__saisie" type="date" @bind="CritTraitementAu" />
+            </label>
+        </div>
+
+        <button class="rig-bascule @(RejetsSeuls ? "rig-bascule--actif" : "")"
+                @onclick="() => RejetsSeuls = !RejetsSeuls">
+            <span class="rig-bascule__temoin"></span>
+            <span>Rejets uniquement</span>
+        </button>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Enrolements</div>
+            <span class="rig-resultats-proc__compte">@Trouves.Length affaire(s)</span>
+        </div>
+
+        <div class="rig-table-cadre">
+            <table class="rig-table">
+                <thead>
+                    <tr>
+                        <th>N Affaire</th>
+                        <th>Denomination</th>
+                        <th>Etat demat.</th>
+                        <th>Etat traitement</th>
+                        <th>Type de rejet</th>
+                        <th>Date creation</th>
+                        <th>Date traitement</th>
+                        <th class="rig-table__centre">Nb pieces</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in Trouves)
+                    {
+                        var dos = d;
+                        <tr class="@(dos.EtatTraitement == "Rejete" ? "rig-table__ligne--alerte" : "")"
+                            @onclick="() => Selection = dos">
+                            <td class="rig-table__mono">@dos.Affaire</td>
+                            <td>@dos.Denomination</td>
+                            <td>@dos.EtatDemat</td>
+                            <td>@dos.EtatTraitement</td>
+                            <td>@dos.TypeRejet</td>
+                            <td class="rig-table__mono">@dos.Creation.ToString("dd/MM/yyyy")</td>
+                            <td class="rig-table__mono">@(dos.Traitement?.ToString("dd/MM/yyyy") ?? "")</td>
+                            <td class="rig-table__centre">@dos.NbPieces</td>
+                        </tr>
+                    }
+                    @if (Trouves.Length == 0)
+                    {
+                        <tr><td colspan="8" class="rig-table__vide">Aucune affaire ne repond a ces criteres.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (Selection is { } s)
+        {
+            <div class="rig-criteres__bloc" style="padding:var(--rig-esp-3)">
+                <div class="rig-kicker">Detail de @s.Affaire</div>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Anomalies</span>
+                    <textarea class="rig-saisie-champ__saisie" rows="3" readonly>@s.Anomalies</textarea>
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Motif de rejet</span>
+                    <textarea class="rig-saisie-champ__saisie" rows="2" readonly>@s.MotifRejet</textarea>
+                </label>
+                <div class="rig-criteres__actions">
+                    <button class="rig-bouton" @onclick="() => OuvrirDossier.InvokeAsync(s.Dossier)">Visualiser la piece</button>
+                    <button class="rig-bouton rig-bouton--plat" @onclick="() => XmlOuvert = !XmlOuvert">Visualiser le XML</button>
+                </div>
+                @if (XmlOuvert)
+                {
+                    <pre class="rig-code">@s.Xml</pre>
+                }
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    [Parameter] public EventCallback<string> OuvrirDossier { get; set; }
+
+    private sealed record DossierJud(string Affaire, string Denomination, string EtatDemat,
+                                     string EtatTraitement, string TypeRejet, DateTime Creation,
+                                     DateTime? Traitement, int NbPieces, string Anomalies,
+                                     string MotifRejet, string Xml, string Dossier);
+
+    private static readonly DossierJud[] Dossiers =
+    [
+        new("2026J00121", "SARL BOULANGERIE DUVAL", "Dematerialise", "Traite",     "",              new(2026, 3, 4),  new(2026, 3, 6),  12, "",                                  "",                       "<enrolement num=\"2026J00121\" />", "2024B00318"),
+        new("2026J00134", "SAS TRANSPORTS MARNE",   "Partiel",       "En attente", "",              new(2026, 5, 19), null,             5,  "Piece 3 illisible",                 "",                       "<enrolement num=\"2026J00134\" />", "2024B00407"),
+        new("2026J00140", "EURL COIFFURE MARIE",    "Dematerialise", "Rejete",     "Piece manquante", new(2026, 6, 2), new(2026, 6, 3),  3,  "Acte de saisine absent du depot",   "Dossier incomplet",      "<enrolement num=\"2026J00140\" />", "2023B01120"),
+        new("2026J00155", "SCI DU MOULIN",          "Non demat.",    "En attente", "",              new(2026, 7, 21), null,             0,  "Aucun flux recu",                   "",                       "",                                  "2025B00044")
+    ];
+
+    private string CritTexte = string.Empty;
+    private string CritDemat = string.Empty;
+    private string CritTraitement = string.Empty;
+    private DateTime? CritCreationDu;
+    private DateTime? CritTraitementAu;
+    private bool RejetsSeuls;
+    private bool XmlOuvert;
+    private DossierJud? Selection;
+
+    private DossierJud[] Trouves
+    {
+        get
+        {
+            IEnumerable<DossierJud> q = Dossiers;
+            if (!string.IsNullOrWhiteSpace(CritTexte))
+            {
+                var t = CritTexte.Trim();
+                q = q.Where(d => d.Affaire.Contains(t, StringComparison.OrdinalIgnoreCase)
+                              || d.Denomination.Contains(t, StringComparison.OrdinalIgnoreCase));
+            }
+            if (!string.IsNullOrEmpty(CritDemat)) q = q.Where(d => d.EtatDemat == CritDemat);
+            if (!string.IsNullOrEmpty(CritTraitement)) q = q.Where(d => d.EtatTraitement == CritTraitement);
+            if (CritCreationDu is { } du) q = q.Where(d => d.Creation.Date >= du.Date);
+            if (CritTraitementAu is { } au) q = q.Where(d => d.Traitement is { } t && t.Date <= au.Date);
+            if (RejetsSeuls) q = q.Where(d => d.EtatTraitement == "Rejete");
+            return q.ToArray();
+        }
+    }
+}

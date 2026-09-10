@@ -1,0 +1,144 @@
+@* Ecran de la procedure PROC_DEPOTJUD (RIG v2 : depot judiciaire).
+   v2 enchaine des etapes, lues dans PROC_DEPOTJUD.Designer.cs :
+   ETP_INFO_DEMANDE, ETP_INSTANCE_RECHERCHE, ETP_INSTANCE_SUMMARY,
+   ETP_EVENEMENT_SURVENU (« Ajout d'evenement »), ETP_FACTU_GESTCOM,
+   ETP_POST_VAL_INSTANCE. La maquette garde cet enchainement. *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Etapes du depot</div>
+
+        @foreach (var e in Etapes)
+        {
+            var etape = e;
+            <button class="rig-bascule @(EtapeCourante == etape.Code ? "rig-bascule--actif" : "")"
+                    @onclick="() => EtapeCourante = etape.Code">
+                <span class="rig-bascule__temoin"></span>
+                <span>@etape.Libelle</span>
+            </button>
+        }
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Instance</div>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">N d'instance</span>
+                <input class="rig-saisie-champ__saisie" @bind="NumInstance" @bind:event="oninput" />
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Denomination</span>
+                <input class="rig-saisie-champ__saisie" @bind="Denomination" @bind:event="oninput" />
+            </label>
+        </div>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">@Etapes.First(e => e.Code == EtapeCourante).Libelle</div>
+            <span class="rig-resultats-proc__compte">@Trouvees.Length instance(s)</span>
+        </div>
+
+        @if (EtapeCourante == "ETP_EVENEMENT_SURVENU")
+        {
+            <div class="rig-criteres__bloc" style="padding:var(--rig-esp-3)">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Evenement survenu</span>
+                    <select class="rig-saisie-champ__saisie" @bind="Evenement">
+                        <option value="JUG">Jugement</option>
+                        <option value="ORD">Ordonnance</option>
+                        <option value="EXP">Designation d'expert</option>
+                        <option value="CLO">Cloture</option>
+                    </select>
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Date de l'evenement</span>
+                    <input class="rig-saisie-champ__saisie" type="date" @bind="DateEvenement" />
+                </label>
+            </div>
+        }
+
+        <div class="rig-table-cadre">
+            <table class="rig-table">
+                <thead>
+                    <tr>
+                        <th>N Instance</th>
+                        <th>Denomination</th>
+                        <th>Nature</th>
+                        <th>Chambre</th>
+                        <th>Date d'ouverture</th>
+                        <th>Dernier evenement</th>
+                        <th>Etat</th>
+                        <th class="rig-table__centre">A facturer</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var i in Trouvees)
+                    {
+                        var inst = i;
+                        <tr @onclick="() => OuvrirDossier.InvokeAsync(inst.Dossier)">
+                            <td class="rig-table__mono">@inst.Numero</td>
+                            <td>@inst.Denomination</td>
+                            <td>@inst.Nature</td>
+                            <td class="rig-table__mono">@inst.Chambre</td>
+                            <td class="rig-table__mono">@inst.Ouverture.ToString("dd/MM/yyyy")</td>
+                            <td>@inst.DernierEvenement</td>
+                            <td><span class="rig-etat rig-etat--@inst.Statut">@inst.Etat</span></td>
+                            <td class="rig-table__centre">@(inst.AFacturer ? "oui" : "")</td>
+                        </tr>
+                    }
+                    @if (Trouvees.Length == 0)
+                    {
+                        <tr><td colspan="8" class="rig-table__vide">Aucune instance ne repond a cette recherche.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+@code {
+    [Parameter] public EventCallback<string> OuvrirDossier { get; set; }
+
+    private sealed record Etape(string Code, string Libelle);
+    private sealed record Instance(string Numero, string Denomination, string Nature, string Chambre,
+                                   DateTime Ouverture, string DernierEvenement, string Etat,
+                                   string Statut, bool AFacturer, string Dossier);
+
+    private static readonly Etape[] Etapes =
+    [
+        new("ETP_INFO_DEMANDE",       "Informations de la demande"),
+        new("ETP_INSTANCE_RECHERCHE", "Recherche de l'instance"),
+        new("ETP_INSTANCE_SUMMARY",   "Resume de l'instance"),
+        new("ETP_EVENEMENT_SURVENU",  "Ajout d'evenement"),
+        new("ETP_FACTU_GESTCOM",      "Facturation"),
+        new("ETP_POST_VAL_INSTANCE",  "Apres validation")
+    ];
+
+    private static readonly Instance[] Lignes =
+    [
+        new("2026J00121", "SARL BOULANGERIE DUVAL", "Redressement judiciaire", "1re", new(2026, 3, 4),  "Jugement d'ouverture",   "En cours",  "action",  true,  "2024B00318"),
+        new("2026J00134", "SAS TRANSPORTS MARNE",   "Liquidation judiciaire",  "2e",  new(2026, 5, 19), "Designation d'expert",   "En cours",  "attente", false, "2024B00407"),
+        new("2025J00088", "EURL COIFFURE MARIE",    "Sauvegarde",              "1re", new(2025, 11, 2), "Ordonnance",             "Suspendue", "alerte",  true,  "2023B01120"),
+        new("2024J00507", "SCI DU MOULIN",          "Redressement judiciaire", "3e",  new(2024, 6, 12), "Cloture",                "Close",     "ok",      false, "2025B00044")
+    ];
+
+    private string EtapeCourante = "ETP_INSTANCE_RECHERCHE";
+    private string NumInstance = string.Empty;
+    private string Denomination = string.Empty;
+    private string Evenement = "JUG";
+    private DateTime? DateEvenement = JeuDemo.Aujourdhui;
+
+    private Instance[] Trouvees
+    {
+        get
+        {
+            IEnumerable<Instance> q = Lignes;
+            if (!string.IsNullOrWhiteSpace(NumInstance))
+                q = q.Where(l => l.Numero.Contains(NumInstance.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(Denomination))
+                q = q.Where(l => l.Denomination.Contains(Denomination.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (EtapeCourante == "ETP_FACTU_GESTCOM") q = q.Where(l => l.AFacturer);
+            return q.ToArray();
+        }
+    }
+}

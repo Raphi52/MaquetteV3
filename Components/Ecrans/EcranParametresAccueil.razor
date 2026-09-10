@@ -1,0 +1,152 @@
+@* Ecran de la procedure PROC_ACCUEIL_PARAM (RIG v2 : parametres d'accueil).
+   Les reglages sont ceux du formulaire v2 : chkAnimations, chkPleinEcran,
+   chkColorier1LigneSur2, chkAutofocusOnClickIconEtpOpe, chkDateSaisieLibreCpp,
+   chkInterdireMoletteComboCpp, txtIntervalSlideshowAlertes, txtMaxWidth,
+   txtMaxHeight, plus « Colonne triee par defaut » / sens Ascendant-Descendant
+   et la liste des imprimantes a cocher. *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">General</div>
+
+        <button class="rig-bascule @(Animations ? "rig-bascule--actif" : "")"
+                @onclick="() => Animations = !Animations">
+            <span class="rig-bascule__temoin"></span><span>Animations</span>
+        </button>
+        <button class="rig-bascule @(PleinEcran ? "rig-bascule--actif" : "")"
+                @onclick="() => PleinEcran = !PleinEcran">
+            <span class="rig-bascule__temoin"></span><span>Ouvrir en plein ecran</span>
+        </button>
+        <button class="rig-bascule @(AutofocusBouton ? "rig-bascule--actif" : "")"
+                @onclick="() => AutofocusBouton = !AutofocusBouton">
+            <span class="rig-bascule__temoin"></span><span>Focus automatique au clic sur un bouton</span>
+        </button>
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Alertes</div>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Interval de defilement (secondes)</span>
+                <input class="rig-saisie-champ__saisie" type="number" min="1" max="120" @bind="IntervalAlertes" />
+            </label>
+        </div>
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Ajuster la taille des controles</div>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Largeur max.</span>
+                    <input class="rig-saisie-champ__saisie" type="number" min="100" max="4000" @bind="LargeurMax" />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Hauteur max.</span>
+                    <input class="rig-saisie-champ__saisie" type="number" min="100" max="4000" @bind="HauteurMax" />
+                </label>
+            </div>
+        </div>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Grilles et tableaux</div>
+            <span class="rig-resultats-proc__compte">@Imprimantes.Count(i => i.Cochee) imprimante(s) cochee(s)</span>
+        </div>
+
+        <div class="rig-criteres__bloc" style="padding:var(--rig-esp-3)">
+            <button class="rig-bascule @(UneLigneSurDeux ? "rig-bascule--actif" : "")"
+                    @onclick="() => UneLigneSurDeux = !UneLigneSurDeux">
+                <span class="rig-bascule__temoin"></span><span>Colorier une ligne sur deux</span>
+            </button>
+            <button class="rig-bascule @(DateSaisieLibre ? "rig-bascule--actif" : "")"
+                    @onclick="() => DateSaisieLibre = !DateSaisieLibre">
+                <span class="rig-bascule__temoin"></span><span>Date en saisie libre</span>
+            </button>
+            <button class="rig-bascule @(MoletteInterdite ? "rig-bascule--actif" : "")"
+                    @onclick="() => MoletteInterdite = !MoletteInterdite">
+                <span class="rig-bascule__temoin"></span><span>Interdire la molette dans les listes deroulantes</span>
+            </button>
+
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Colonne triee par defaut</span>
+                    <select class="rig-saisie-champ__saisie" @bind="ColonneTri">
+                        <option>Date de creation</option>
+                        <option>N Demande</option>
+                        <option>Client</option>
+                        <option>Etat</option>
+                    </select>
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Sens du tri</span>
+                    <select class="rig-saisie-champ__saisie" @bind="SensTri">
+                        <option>Ascendant</option>
+                        <option>Descendant</option>
+                    </select>
+                </label>
+            </div>
+        </div>
+
+        <div class="rig-criteres__bloc" style="padding:var(--rig-esp-3)">
+            <div class="rig-kicker">Imprimantes autorisees</div>
+            @foreach (var i in Imprimantes)
+            {
+                var imp = i;
+                <button class="rig-bascule @(imp.Cochee ? "rig-bascule--actif" : "")"
+                        @onclick="() => imp.Cochee = !imp.Cochee">
+                    <span class="rig-bascule__temoin"></span>
+                    <span>@imp.Nom @(imp.Recommandee ? "(recommande)" : "")</span>
+                </button>
+            }
+        </div>
+
+        <div class="rig-criteres__bloc" style="padding:var(--rig-esp-3)">
+            <div class="rig-kicker">Apercu</div>
+            <div class="rig-table-cadre">
+                <table class="rig-table">
+                    <thead>
+                        <tr><th>@ColonneTri (@SensTri)</th><th>Client</th><th>Etat</th></tr>
+                    </thead>
+                    <tbody>
+                        @for (var n = 0; n < 4; n++)
+                        {
+                            <tr style="@(UneLigneSurDeux && n % 2 == 1 ? "background:rgba(255,255,255,.04)" : "")">
+                                <td class="rig-table__mono">Ligne @(n + 1)</td>
+                                <td>Client @(n + 1)</td>
+                                <td><span class="rig-etat rig-etat--ok">Validee</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</div>
+
+@code {
+    private sealed class Imprimante
+    {
+        public string Nom { get; init; } = string.Empty;
+        public bool Recommandee { get; init; }
+        public bool Cochee { get; set; }
+    }
+
+    private readonly Imprimante[] Imprimantes =
+    [
+        new() { Nom = "Greffe - Accueil",  Recommandee = true,  Cochee = true },
+        new() { Nom = "Greffe - Etage 1",  Recommandee = false, Cochee = true },
+        new() { Nom = "Greffe - Archives", Recommandee = false, Cochee = false },
+        new() { Nom = "PDF (fichier)",     Recommandee = false, Cochee = true }
+    ];
+
+    private bool Animations = true;
+    private bool PleinEcran;
+    private bool AutofocusBouton = true;
+    private bool UneLigneSurDeux = true;
+    private bool DateSaisieLibre;
+    private bool MoletteInterdite = true;
+    private int IntervalAlertes = 8;
+    private int LargeurMax = 1600;
+    private int HauteurMax = 900;
+    private string ColonneTri = "Date de creation";
+    private string SensTri = "Descendant";
+}

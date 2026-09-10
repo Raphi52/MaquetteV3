@@ -1,0 +1,195 @@
+@* Ecran de la procedure PROC_ACTEUR_JUD (RIG v2 : « Gestion des acteurs »).
+   v2 a deux etapes : ETP_RECHERCHE_ACTEUR et ETP_EDITION_ACTEUR.
+   Les champs de la fiche sont les controles de FORM_ACTEUR :
+   ComboBoxCivilite, TextNom, TextPrenom, TextAbrege, TextCompNom,
+   TextDateNaissance, TextAdresse, TextTel, TextFax, TextMail, TextBureau,
+   ComboBoxChambre, ComboBoxSection, ComboBoxStatut, ComboBoxQualifProfession,
+   ComboBoxUtilisateurs, CheckBoxActif, DateDebutFonction, DateFinFonction,
+   TextNomCoffre, DateDemarrageCoffre. *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Recherche d'un acteur</div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Nom ou abrege</span>
+            <input class="rig-saisie-champ__saisie" @bind="Recherche" @bind:event="oninput" />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Qualite / profession</span>
+            <select class="rig-saisie-champ__saisie" @bind="CritQualif">
+                <option value="">Toutes</option>
+                @foreach (var q in Acteurs.Select(a => a.Qualif).Distinct().Order())
+                {
+                    <option value="@q">@q</option>
+                }
+            </select>
+        </label>
+
+        <button class="rig-bascule @(ActifsSeuls ? "rig-bascule--actif" : "")"
+                @onclick="() => ActifsSeuls = !ActifsSeuls">
+            <span class="rig-bascule__temoin"></span>
+            <span>Acteurs actifs uniquement</span>
+        </button>
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Resultats (@Trouves.Length)</div>
+            @foreach (var item in Trouves)
+            {
+                var acteur = item;
+                <button class="rig-bascule @(Selection?.Abrege == acteur.Abrege ? "rig-bascule--actif" : "")"
+                        @onclick="() => Selection = acteur">
+                    <span class="rig-bascule__temoin"></span>
+                    <span>@acteur.Abrege — @acteur.Nom</span>
+                </button>
+            }
+        </div>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Edition d'un acteur</div>
+            <span class="rig-resultats-proc__compte">@(Selection is null ? "aucun acteur selectionne" : Selection.Abrege)</span>
+        </div>
+
+        @if (Selection is { } a)
+        {
+            <div class="rig-criteres__bloc" style="padding:var(--rig-esp-3)">
+                <div class="rig-kicker">Identite</div>
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Civilite</span>
+                        <input class="rig-saisie-champ__saisie" value="@a.Civilite" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Abrege</span>
+                        <input class="rig-saisie-champ__saisie" value="@a.Abrege" readonly />
+                    </label>
+                </div>
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Nom</span>
+                        <input class="rig-saisie-champ__saisie" value="@a.Nom" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Prenom</span>
+                        <input class="rig-saisie-champ__saisie" value="@a.Prenom" readonly />
+                    </label>
+                </div>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Complement de nom</span>
+                    <input class="rig-saisie-champ__saisie" value="@a.ComplementNom" readonly />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Adresse</span>
+                    <input class="rig-saisie-champ__saisie" value="@a.Adresse" readonly />
+                </label>
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Telephone</span>
+                        <input class="rig-saisie-champ__saisie" value="@a.Tel" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Fax</span>
+                        <input class="rig-saisie-champ__saisie" value="@a.Fax" readonly />
+                    </label>
+                </div>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">E-mail</span>
+                    <input class="rig-saisie-champ__saisie" value="@a.Mail" readonly />
+                </label>
+            </div>
+
+            <div class="rig-criteres__bloc" style="padding:var(--rig-esp-3)">
+                <div class="rig-kicker">Fonction</div>
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Qualite / profession</span>
+                        <input class="rig-saisie-champ__saisie" value="@a.Qualif" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Statut</span>
+                        <input class="rig-saisie-champ__saisie" value="@a.Statut" readonly />
+                    </label>
+                </div>
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Chambre</span>
+                        <input class="rig-saisie-champ__saisie" value="@a.Chambre" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Section</span>
+                        <input class="rig-saisie-champ__saisie" value="@a.Section" readonly />
+                    </label>
+                </div>
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Debut de fonction</span>
+                        <input class="rig-saisie-champ__saisie" value="@a.Debut.ToString("dd/MM/yyyy")" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Fin de fonction</span>
+                        <input class="rig-saisie-champ__saisie" value="@(a.Fin?.ToString("dd/MM/yyyy") ?? "")" readonly />
+                    </label>
+                </div>
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Bureau</span>
+                        <input class="rig-saisie-champ__saisie" value="@a.Bureau" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Nom du coffre</span>
+                        <input class="rig-saisie-champ__saisie" value="@a.NomCoffre" readonly />
+                    </label>
+                </div>
+                <span class="rig-etat rig-etat--@(a.Actif ? "ok" : "attente")">@(a.Actif ? "Actif" : "Inactif")</span>
+            </div>
+        }
+        else
+        {
+            <div class="rig-table__vide" style="padding:var(--rig-esp-4)">
+                Choisissez un acteur dans la liste de gauche.
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    private sealed record Acteur(string Abrege, string Civilite, string Nom, string Prenom,
+                                 string ComplementNom, string Adresse, string Tel, string Fax,
+                                 string Mail, string Qualif, string Statut, string Chambre,
+                                 string Section, DateTime Debut, DateTime? Fin, string Bureau,
+                                 string NomCoffre, bool Actif);
+
+    private static readonly Acteur[] Acteurs =
+    [
+        new("LEROY",  "Maitre", "LEROY",  "Antoine", "Selarl LEROY & associes", "12 rue du Palais, 51100 Reims", "03 26 40 11 22", "03 26 40 11 23", "a.leroy@exemple.fr",  "Mandataire judiciaire", "En fonction", "1re", "A", new(2018, 1, 8),  null,             "B-104", "COFFRE_LEROY",  true),
+        new("BLANC",  "Maitre", "BLANC",  "Sophie",  "",                        "3 place Drouet, 51100 Reims",   "03 26 40 55 01", "",               "s.blanc@exemple.fr",  "Administrateur judiciaire", "En fonction", "2e", "B", new(2020, 9, 1),  null,             "B-210", "COFFRE_BLANC",  true),
+        new("PETIT",  "M.",     "PETIT",  "Jean",    "",                        "8 av. de Laon, 51100 Reims",    "03 26 88 90 12", "",               "j.petit@exemple.fr",  "Juge consulaire",           "En fonction", "3e", "A", new(2022, 4, 15), null,             "A-011", "",              true),
+        new("MOREAU", "Mme",    "MOREAU", "Claire",  "",                        "22 rue Chanzy, 51100 Reims",    "03 26 77 43 09", "",               "c.moreau@exemple.fr", "Expert-comptable",          "Retiree",     "",   "",  new(2012, 2, 1),  new(2024, 12, 31), "",             "",              false)
+    ];
+
+    private string Recherche = string.Empty;
+    private string CritQualif = string.Empty;
+    private bool ActifsSeuls = true;
+    private Acteur? Selection = Acteurs[0];
+
+    private Acteur[] Trouves
+    {
+        get
+        {
+            IEnumerable<Acteur> q = Acteurs;
+            if (!string.IsNullOrWhiteSpace(Recherche))
+            {
+                var t = Recherche.Trim();
+                q = q.Where(a => a.Nom.Contains(t, StringComparison.OrdinalIgnoreCase)
+                              || a.Abrege.Contains(t, StringComparison.OrdinalIgnoreCase));
+            }
+            if (!string.IsNullOrEmpty(CritQualif)) q = q.Where(a => a.Qualif == CritQualif);
+            if (ActifsSeuls) q = q.Where(a => a.Actif);
+            return q.ToArray();
+        }
+    }
+}

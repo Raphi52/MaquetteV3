@@ -1,0 +1,132 @@
+@* Ecran de la procedure PROC_ENCAISS (RIG v2 : « Saisie d'encaissement »
+   et bloc OPE_VENTILATIONS). Champs lus dans le formulaire v2 : txtPayeur,
+   txtBanque, txtNumTitre, txtCommentaire, txtAdresseRecu. Colonnes des
+   ventilations lues dans la grille v2 : N identifiant, Affaire, Client,
+   Abrege client, Montant, Solde (affaire / client). *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Saisie d'encaissement</div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Payeur</span>
+            <input class="rig-saisie-champ__saisie" @bind="Payeur" @bind:event="oninput" />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Mode</span>
+            <select class="rig-saisie-champ__saisie" @bind="ModePaiement">
+                <option>Cheque</option>
+                <option>Virement</option>
+                <option>Carte bancaire</option>
+                <option>Especes</option>
+            </select>
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Banque</span>
+            <input class="rig-saisie-champ__saisie" @bind="Banque" />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">N de titre</span>
+            <input class="rig-saisie-champ__saisie" @bind="NumTitre" />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Montant encaisse</span>
+            <input class="rig-saisie-champ__saisie" type="number" step="0.01" @bind="Montant" />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Adresse du recu</span>
+            <textarea class="rig-saisie-champ__saisie" rows="2" @bind="AdresseRecu"></textarea>
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Commentaire</span>
+            <textarea class="rig-saisie-champ__saisie" rows="2" @bind="Commentaire"></textarea>
+        </label>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Ventilations</div>
+            <span class="rig-resultats-proc__compte">
+                @Ventile.ToString("N2") EUR ventile(s) sur @Montant.ToString("N2") EUR
+                — @(NonVentile == 0 ? "solde nul" : NonVentile.ToString("N2") + " EUR a ventiler")
+            </span>
+        </div>
+
+        <div class="rig-table-cadre">
+            <table class="rig-table">
+                <thead>
+                    <tr>
+                        <th>N identifiant</th>
+                        <th>Affaire</th>
+                        <th>Client</th>
+                        <th>Abrege client</th>
+                        <th>Montant</th>
+                        <th>Solde (affaire / client)</th>
+                        <th class="rig-table__centre">Ventile</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var v in Lignes)
+                    {
+                        var ligne = v;
+                        var choisi = Choisies.Contains(ligne.Identifiant);
+                        <tr class="@(choisi ? "rig-ligne--valide" : "")"
+                            @onclick="() => Basculer(ligne.Identifiant)">
+                            <td class="rig-table__mono">@ligne.Identifiant</td>
+                            <td>@ligne.Affaire</td>
+                            <td>@ligne.Client</td>
+                            <td class="rig-table__mono">@ligne.Abrege</td>
+                            <td class="rig-table__mono">@ligne.Montant.ToString("N2")</td>
+                            <td class="rig-table__mono">@ligne.SoldeAffaire.ToString("N2") / @ligne.SoldeClient.ToString("N2")</td>
+                            <td class="rig-table__centre">@(choisi ? "oui" : "")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="rig-criteres__bloc" style="padding:var(--rig-esp-3)">
+            <span class="rig-etat rig-etat--@(NonVentile == 0 && Choisies.Count > 0 ? "ok" : "attente")">
+                @(Choisies.Count == 0
+                    ? "Choisissez les affaires a solder"
+                    : NonVentile == 0
+                        ? "Encaissement entierement ventile"
+                        : "Ventilation incomplete")
+            </span>
+        </div>
+    </section>
+</div>
+
+@code {
+    private sealed record Ventilation(string Identifiant, string Affaire, string Client, string Abrege,
+                                      decimal Montant, decimal SoldeAffaire, decimal SoldeClient);
+
+    private static readonly Ventilation[] Lignes =
+    [
+        new("V-2026-8801", "2026B00811 — Immatriculation", "SELARL LEROY & ASSOCIES", "LEROY",  194.85m, 194.85m, 812.40m),
+        new("V-2026-8802", "2019B00233 — Modification",    "SELARL LEROY & ASSOCIES", "LEROY",  162.72m, 162.72m, 812.40m),
+        new("V-2026-8803", "2011B00512 — Depot comptes",   "CABINET BLANC",           "BLANC",   53.52m,  53.52m, 320.10m),
+        new("V-2026-8804", "2026B00790 — Procedure",       "SCP DUPONT-MARTIN",       "DUPONT",  88.91m,  88.91m, 145.00m)
+    ];
+
+    private string Payeur = "SELARL LEROY & ASSOCIES";
+    private string ModePaiement = "Cheque";
+    private string Banque = "CREDIT AGRICOLE";
+    private string NumTitre = "CH-4471902";
+    private string Commentaire = string.Empty;
+    private string AdresseRecu = "12 rue du Palais, 51100 Reims";
+    private decimal Montant = 357.57m;
+    private readonly HashSet<string> Choisies = new() { "V-2026-8801", "V-2026-8802" };
+
+    private void Basculer(string id) { if (!Choisies.Add(id)) Choisies.Remove(id); }
+
+    private decimal Ventile => Lignes.Where(l => Choisies.Contains(l.Identifiant)).Sum(l => l.Montant);
+    private decimal NonVentile => Math.Round(Montant - Ventile, 2);
+}

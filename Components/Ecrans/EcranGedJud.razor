@@ -1,0 +1,159 @@
+@* Ecran de la procedure PROC_GEDJUD (RIG v2 : « Edition des documents de
+   la GED », etapes ETP_GED_MODIF, ETP_GED_HISTO, ETP_ENVOI_MAIL...).
+   Colonnes lues dans les grilles v2 : Decision judiciaire, Date Decision,
+   Date prevue de la decision, Instance, Nb docs lies, Numero minute.
+   Actions v2 reprises : Imprimer, Envoyer par e-mail, Envoyer par courrier,
+   Inserer un document, Lier a une decision judiciaire, Historique. *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Documents de la GED</div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Instance / decision</span>
+            <input class="rig-saisie-champ__saisie" @bind="Recherche" @bind:event="oninput" />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Nature du document</span>
+            <select class="rig-saisie-champ__saisie" @bind="CritNature">
+                <option value="">Toutes</option>
+                @foreach (var n in Docs.Select(d => d.Nature).Distinct().Order())
+                {
+                    <option value="@n">@n</option>
+                }
+            </select>
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Etat</span>
+            <select class="rig-saisie-champ__saisie" @bind="CritEtat">
+                <option value="">Tous</option>
+                <option value="Brouillon">Brouillon</option>
+                <option value="Signe">Signe</option>
+                <option value="Notifie">Notifie</option>
+            </select>
+        </label>
+
+        <button class="rig-bascule @(SansDecision ? "rig-bascule--actif" : "")"
+                @onclick="() => SansDecision = !SansDecision">
+            <span class="rig-bascule__temoin"></span>
+            <span>Non lies a une decision</span>
+        </button>
+
+        <div class="rig-criteres__actions">
+            <button class="rig-bouton" @onclick='() => Action = "Inserer un document"'>Inserer un document</button>
+            <button class="rig-bouton rig-bouton--plat" @onclick='() => Action = "Lier a une decision judiciaire"'>Lier a une decision</button>
+        </div>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Decisions judiciaires et documents lies</div>
+            <span class="rig-resultats-proc__compte">@Trouves.Length document(s)@(Action is null ? "" : " — " + Action)</span>
+        </div>
+
+        <div class="rig-table-cadre">
+            <table class="rig-table">
+                <thead>
+                    <tr>
+                        <th>Decision judiciaire</th>
+                        <th>Numero minute</th>
+                        <th>Instance</th>
+                        <th>Nature du document</th>
+                        <th>Date Decision</th>
+                        <th>Date prevue de la decision</th>
+                        <th class="rig-table__centre">Nb docs lies</th>
+                        <th>Etat</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in Trouves)
+                    {
+                        var doc = d;
+                        <tr @onclick="() => Selection = doc">
+                            <td>@doc.Decision</td>
+                            <td class="rig-table__mono">@doc.Minute</td>
+                            <td class="rig-table__mono">@doc.Instance</td>
+                            <td>@doc.Nature</td>
+                            <td class="rig-table__mono">@(doc.DateDecision?.ToString("dd/MM/yyyy") ?? "")</td>
+                            <td class="rig-table__mono">@doc.DatePrevue.ToString("dd/MM/yyyy")</td>
+                            <td class="rig-table__centre">@doc.NbLies</td>
+                            <td><span class="rig-etat rig-etat--@doc.Statut">@doc.Etat</span></td>
+                        </tr>
+                    }
+                    @if (Trouves.Length == 0)
+                    {
+                        <tr><td colspan="8" class="rig-table__vide">Aucun document ne repond a ces criteres.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (Selection is { } s)
+        {
+            <div class="rig-criteres__bloc" style="padding:var(--rig-esp-3)">
+                <div class="rig-kicker">@s.Decision — minute @s.Minute</div>
+                <div class="rig-criteres__actions">
+                    <button class="rig-bouton" @onclick="() => OuvrirDossier.InvokeAsync(s.Dossier)">Afficher le document</button>
+                    <button class="rig-bouton rig-bouton--plat" @onclick='() => Action = "Imprimer"'>Imprimer</button>
+                    <button class="rig-bouton rig-bouton--plat" @onclick='() => Action = "Envoyer par e-mail"'>Envoyer par e-mail</button>
+                    <button class="rig-bouton rig-bouton--plat" @onclick='() => Action = "Envoyer par courrier"'>Envoyer par courrier</button>
+                    <button class="rig-bouton rig-bouton--plat" @onclick="() => Historique = !Historique">Historique</button>
+                </div>
+                @if (Historique)
+                {
+                    <ul class="rig-historique__liste">
+                        @foreach (var h in s.Historiques)
+                        {
+                            <li>@h</li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    [Parameter] public EventCallback<string> OuvrirDossier { get; set; }
+
+    private sealed record DocGed(string Decision, string Minute, string Instance, string Nature,
+                                 DateTime? DateDecision, DateTime DatePrevue, int NbLies,
+                                 string Etat, string Statut, string Dossier, string[] Historiques);
+
+    private static readonly DocGed[] Docs =
+    [
+        new("Jugement d'ouverture",       "2026/0412", "2026J00121", "Jugement",   new(2026, 3, 6),  new(2026, 3, 5),  4, "Notifie",   "ok",      "2024B00318", ["06/03/2026 — signe par le president", "07/03/2026 — notifie au mandataire"]),
+        new("Ordonnance de designation",  "2026/0518", "2026J00134", "Ordonnance", new(2026, 6, 2),  new(2026, 6, 1),  2, "Signe",     "action",  "2024B00407", ["02/06/2026 — signe par le juge-commissaire"]),
+        new("Jugement de cloture",        "",          "2025J00088", "Jugement",   null,             new(2026, 9, 20), 0, "Brouillon", "attente", "2023B01120", ["01/09/2026 — projet cree"]),
+        new("Copie conforme",             "2024/1188", "2024J00507", "Copie",      new(2024, 11, 8), new(2024, 11, 8), 1, "Notifie",   "ok",      "2025B00044", ["08/11/2024 — copie delivree"])
+    ];
+
+    private string Recherche = string.Empty;
+    private string CritNature = string.Empty;
+    private string CritEtat = string.Empty;
+    private bool SansDecision;
+    private bool Historique;
+    private string? Action;
+    private DocGed? Selection;
+
+    private DocGed[] Trouves
+    {
+        get
+        {
+            IEnumerable<DocGed> q = Docs;
+            if (!string.IsNullOrWhiteSpace(Recherche))
+            {
+                var t = Recherche.Trim();
+                q = q.Where(d => d.Instance.Contains(t, StringComparison.OrdinalIgnoreCase)
+                              || d.Decision.Contains(t, StringComparison.OrdinalIgnoreCase));
+            }
+            if (!string.IsNullOrEmpty(CritNature)) q = q.Where(d => d.Nature == CritNature);
+            if (!string.IsNullOrEmpty(CritEtat)) q = q.Where(d => d.Etat == CritEtat);
+            if (SansDecision) q = q.Where(d => d.DateDecision is null);
+            return q.ToArray();
+        }
+    }
+}

@@ -1,0 +1,137 @@
+@* Ecran de la procedure PROC_GESTBANQ (RIG v2 : « Gestion des banques »,
+   blocs OPE_BANQIDENTITE, OPE_BANQADRESSE, OPE_BANQCHEQUE (parametres des
+   lettres cheques) et OPE_PARAMCOMPTABLE). Colonnes lues dans la grille v2 :
+   Code (BANQU_CODE), Designation (BANQU_NOM), Compte (BANQU_COMPTE),
+   Modes associes (GetListeModePaiementBanque). *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Banques</div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Code ou designation</span>
+            <input class="rig-saisie-champ__saisie" @bind="Recherche" @bind:event="oninput" />
+        </label>
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Liste (@Trouvees.Length)</div>
+            @foreach (var item in Trouvees)
+            {
+                var b = item;
+                <button class="rig-bascule @(Selection?.Code == b.Code ? "rig-bascule--actif" : "")"
+                        @onclick="() => Selection = b">
+                    <span class="rig-bascule__temoin"></span>
+                    <span>@b.Code — @b.Designation</span>
+                </button>
+            }
+        </div>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Banques declarees</div>
+            <span class="rig-resultats-proc__compte">@Trouvees.Length banque(s)</span>
+        </div>
+
+        <div class="rig-table-cadre">
+            <table class="rig-table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Designation</th>
+                        <th>Compte</th>
+                        <th>Modes associes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var b in Trouvees)
+                    {
+                        var banque = b;
+                        <tr @onclick="() => Selection = banque">
+                            <td class="rig-table__mono">@banque.Code</td>
+                            <td>@banque.Designation</td>
+                            <td class="rig-table__mono">@banque.Compte</td>
+                            <td>@string.Join(", ", banque.Modes)</td>
+                        </tr>
+                    }
+                    @if (Trouvees.Length == 0)
+                    {
+                        <tr><td colspan="4" class="rig-table__vide">Aucune banque ne repond a cette recherche.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (Selection is { } s)
+        {
+            <div class="rig-criteres__bloc" style="padding:var(--rig-esp-3)">
+                <div class="rig-kicker">Identite</div>
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Code</span>
+                        <input class="rig-saisie-champ__saisie" value="@s.Code" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Designation</span>
+                        <input class="rig-saisie-champ__saisie" value="@s.Designation" readonly />
+                    </label>
+                </div>
+                <div class="rig-kicker">Adresse</div>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Adresse de l'agence</span>
+                    <textarea class="rig-saisie-champ__saisie" rows="2" readonly>@s.Adresse</textarea>
+                </label>
+                <div class="rig-kicker">Parametre comptable</div>
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Compte comptable</span>
+                        <input class="rig-saisie-champ__saisie" value="@s.Compte" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Journal</span>
+                        <input class="rig-saisie-champ__saisie" value="@s.Journal" readonly />
+                    </label>
+                </div>
+                <div class="rig-kicker">Parametres des lettres cheques</div>
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Maquette de lettre cheque</span>
+                        <input class="rig-saisie-champ__saisie" value="@s.MaquetteCheque" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Modes de paiement</span>
+                        <input class="rig-saisie-champ__saisie" value="@string.Join(", ", s.Modes)" readonly />
+                    </label>
+                </div>
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    private sealed record Banque(string Code, string Designation, string Compte, string Journal,
+                                 string Adresse, string MaquetteCheque, string[] Modes);
+
+    private static readonly Banque[] Banques =
+    [
+        new("CA",  "CREDIT AGRICOLE",   "512100", "BQ1", "25 rue de Vesle\n51100 Reims",      "LC_STANDARD", ["Cheque", "Virement"]),
+        new("BP",  "BANQUE POPULAIRE",  "512200", "BQ2", "8 place d'Erlon\n51100 Reims",      "LC_STANDARD", ["Cheque"]),
+        new("LBP", "LA BANQUE POSTALE", "512300", "BQ3", "1 rue Cerf-Volant\n51100 Reims",    "LC_POSTALE",  ["Cheque", "Virement", "Carte bancaire"]),
+        new("CAI", "CAISSE (especes)",  "531000", "CA1", "",                                   "",            ["Especes"])
+    ];
+
+    private string Recherche = string.Empty;
+    private Banque? Selection = Banques[0];
+
+    private Banque[] Trouvees
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Recherche)) return Banques;
+            var t = Recherche.Trim();
+            return Banques.Where(b => b.Code.Contains(t, StringComparison.OrdinalIgnoreCase)
+                                   || b.Designation.Contains(t, StringComparison.OrdinalIgnoreCase)).ToArray();
+        }
+    }
+}
