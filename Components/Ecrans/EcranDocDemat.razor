@@ -127,7 +127,11 @@
     private readonly HashSet<string> Ouverts = new() { "2026B00811" };
     private string Recherche = string.Empty;
     private string? Action;
-    private Piece? Selection;
+
+    // Au demarrage, la premiere piece du dossier deja deplie est selectionnee :
+    // sans cela, la moitie basse de l'ecran restait vide tant qu'on n'avait
+    // rien clique dans l'arbre.
+    private Piece? Selection = Pieces.FirstOrDefault();
 
     private void BasculerGroupe(string d) { if (!Ouverts.Add(d)) Ouverts.Remove(d); }
 
