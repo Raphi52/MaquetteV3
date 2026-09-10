@@ -1,0 +1,67 @@
+@* ============================================================
+   Une ligne de l'arbre GED, et ses enfants par recursion.
+
+   L'arbre de RIG v2 (PROC_VDOSSIER/Control/TreeviewGed) est un vrai
+   arbre : dossier > sous-dossier > piece, sur autant de niveaux que le
+   dossier en compte (Judiciaire > Ordonnances > Demandeur > piece). Un
+   composant qui s'appelle lui-meme rend cette profondeur sans la
+   plafonner ; l'ancienne liste plate de categories ne le pouvait pas.
+   ============================================================ *@
+
+<div class="rig-arbre__ligne @(Selection == Noeud ? "rig-arbre__ligne--actif" : "")"
+     style="--rig-arbre-niveau:@Niveau"
+     @onclick="Activer">
+    <span class="rig-arbre__libelle">
+        @if (Noeud.Enfants.Length > 0)
+        {
+            <span class="rig-arbre__chevron @(Ouvert ? "rig-arbre__chevron--ouvert" : "")">&#9656;</span>
+        }
+        else
+        {
+            <span class="rig-arbre__chevron rig-arbre__chevron--vide"></span>
+        }
+        <span class="rig-arbre__icone rig-arbre__icone--@Noeud.Icone"></span>
+        <span class="rig-arbre__texte">@Noeud.Libelle</span>
+        @if (Noeud.Enfants.Length > 0 && Noeud.NbPieces > 0)
+        {
+            <span class="rig-arbre__compte">(@Noeud.NbPieces)</span>
+        }
+    </span>
+    <span class="rig-arbre__date">@Noeud.Date</span>
+    <span class="rig-arbre__pages">@(Noeud.EstPiece ? Noeud.Pages.ToString() : (Noeud.PagesCumulees > 0 ? Noeud.PagesCumulees.ToString() : ""))</span>
+</div>
+
+@if (Ouvert)
+{
+    @foreach (var enfant in Noeud.Enfants)
+    {
+        <ArbreGedNoeud Noeud="enfant" Niveau="Niveau + 1" Ouverts="Ouverts"
+                       Selection="Selection" Selectionner="Selectionner" />
+    }
+    @if (Noeud.Enfants.Length == 0 && !Noeud.EstPiece)
+    {
+        <div class="rig-arbre__vide" style="--rig-arbre-niveau:@(Niveau + 1)">aucune piece</div>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public NoeudGed Noeud { get; set; } = default!;
+    [Parameter] public int Niveau { get; set; }
+    [Parameter, EditorRequired] public HashSet<NoeudGed> Ouverts { get; set; } = default!;
+    [Parameter] public NoeudGed? Selection { get; set; }
+    [Parameter] public EventCallback<NoeudGed> Selectionner { get; set; }
+
+    private bool Ouvert => Ouverts.Contains(Noeud);
+
+    private async Task Activer()
+    {
+        // Un dossier se replie/se deplie ; une piece se selectionne. Un
+        // dossier vide reste depliable : c'est ainsi que v2 montre
+        // « aucune piece » plutot que de cacher le dossier.
+        if (Noeud.Enfants.Length > 0 || !Noeud.EstPiece)
+        {
+            if (!Ouverts.Add(Noeud)) Ouverts.Remove(Noeud);
+        }
+        await Selectionner.InvokeAsync(Noeud);
+    }
+}

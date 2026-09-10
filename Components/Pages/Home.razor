@@ -328,8 +328,9 @@
                 Historique VGED@(HistoriqueAffaire.Count > 0 ? $" ({HistoriqueAffaire.Count})" : "")
             </button>
             <span class="rig-vged__compte">
-                @Categories.Sum(c => c.Documents.Length) pieces &middot;
-                @Categories.Count(c => c.Documents.Length > 0) / @Categories.Length dossiers servis
+                @Arbre.NbPieces pieces &middot;
+                @Arbre.Enfants.Count(n => n.NbPieces > 0) / @Arbre.Enfants.Length dossiers servis &middot;
+                @Editions.Count(e => !e.EstGroupe) editions
             </span>
         </div>
 
@@ -579,66 +580,135 @@
         {
         <div class="rig-vged__corps">
 
+            @* ---- Arbre documentaire, colonnes de TreeviewGed (v2) ---- *@
             <div class="rig-vged__arbre">
-                <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">Documents numerises</div>
-                @foreach (var cat in Categories)
+                <div class="rig-arbre__entete">
+                    <span class="rig-arbre__libelle">Liste des pieces</span>
+                    <span class="rig-arbre__date">Date</span>
+                    <span class="rig-arbre__pages">Nb pages</span>
+                </div>
+                <div class="rig-arbre">
+                    <ArbreGedNoeud Noeud="Arbre" Niveau="0" Ouverts="NoeudsOuverts"
+                                   Selection="NoeudSelectionne"
+                                   Selectionner="ChoisirNoeud" />
+                </div>
+                @if (NoeudSelectionne is not null && NoeudSelectionne.EstPiece)
                 {
-                    var ouvert = CategoriesOuvertes.Contains(cat.Nom);
-                    <div class="rig-menu__groupe @(ouvert ? "rig-menu__groupe--ouvert" : "")">
-                        <button class="rig-menu__tete" @onclick="() => BasculerCategorie(cat.Nom)">
-                            <span class="rig-menu__chevron">&#9656;</span>
-                            <span>@cat.Libelle</span>
-                            <span class="rig-menu__compte">@cat.Documents.Length</span>
-                        </button>
-                        @if (ouvert && cat.Documents.Length == 0)
-                        {
-                            <div class="rig-vged__vide">aucune piece</div>
-                        }
-                        @if (ouvert)
-                        {
-                            @foreach (var doc in cat.Documents)
-                            {
-                                <button class="rig-vged__doc @(DocumentOuvert == doc ? "rig-vged__doc--actif" : "")"
-                                        @onclick="() => DocumentOuvert = doc">
-                                    <span class="rig-menu__code">@doc.Extension</span>@doc.Libelle
-                                </button>
-                            }
-                        }
-                    </div>
-                }
-            </div>
-
-            <div class="rig-vged__apercu">
-                @if (DocumentOuvert is null)
-                {
-                    <div style="color:var(--rig-texte-3);font-size:var(--rig-fs-dense);align-self:center">
-                        Choisissez une piece a gauche.
-                    </div>
-                }
-                else
-                {
-                    <div class="rig-vged__page">
-                        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-4)">
-                            @DocumentOuvert.Libelle
+                    <div class="rig-arbre__apercu">
+                        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">
+                            @NoeudSelectionne.Libelle
                         </div>
-                        <div style="white-space:pre-wrap">@DocumentOuvert.Apercu</div>
+                        <div class="rig-vged__ligne-meta"><span>Type</span><span>@NoeudSelectionne.Extension</span></div>
+                        <div class="rig-vged__ligne-meta"><span>Depose le</span><span>@NoeudSelectionne.Date</span></div>
+                        <div class="rig-vged__ligne-meta"><span>Pages</span><span>@NoeudSelectionne.Pages</span></div>
+                        <div class="rig-vged__ligne-meta"><span>Origine</span><span>@NoeudSelectionne.Origine</span></div>
+                        @if (NoeudSelectionne.Apercu.Length > 0)
+                        {
+                            <div class="rig-arbre__apercu-texte">@NoeudSelectionne.Apercu</div>
+                        }
                     </div>
                 }
             </div>
 
-            <div class="rig-vged__meta">
-                <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">Piece</div>
-                @if (DocumentOuvert is not null)
-                {
-                    <div class="rig-vged__ligne-meta"><span>Type</span><span>@DocumentOuvert.Extension</span></div>
-                    <div class="rig-vged__ligne-meta"><span>Depose le</span><span>@DocumentOuvert.Date</span></div>
-                    <div class="rig-vged__ligne-meta"><span>Pages</span><span>@DocumentOuvert.Pages</span></div>
-                    <div class="rig-vged__ligne-meta"><span>Origine</span><span>@DocumentOuvert.Origine</span></div>
-                }
-                else
-                {
-                    <div style="font-size:11px;color:var(--rig-texte-3)">Aucune piece selectionnee.</div>
-                }
+            @* ---- Sidebar : tableau des editions + detail du destinataire ----
+                 Colonnes de PROC_TABLEAU_LOT3/Processus/TreeviewEditions.cs,
+                 champs de detail d'OPE_DESTINATAIRE.Designer.cs (v2). *@
+            <div class="rig-vged__editions">
+                <div class="rig-editions__titre">Tableau des editions</div>
+                <div class="rig-editions__cadre">
+                    <table class="rig-editions">
+                        <thead>
+                            <tr>
+                                <th class="rig-editions__dest">Destinataire</th>
+                                <th class="rig-editions__doc">Nom du document</th>
+                                <th class="rig-editions__drapeau" title="Envoi au coffre">Cf</th>
+                                <th class="rig-editions__drapeau" title="Envoi tribunal digital">Td</th>
+                                <th class="rig-editions__drapeau" title="Envoi par courriel">@@</th>
+                                <th class="rig-editions__ex" title="Nombre d'exemplaires">Ex.</th>
+                                <th class="rig-editions__drapeau" title="Imprimer">Imp</th>
+                                <th class="rig-editions__imprimante">Imprimante</th>
+                                <th class="rig-editions__file">File ou imprimante</th>
+                                <th class="rig-editions__file">File differee</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var e in Editions)
+                            {
+                                @if (e.EstGroupe)
+                                {
+                                    <tr class="rig-editions__groupe">
+                                        <td colspan="10" style="padding-left:@(6 + e.Niveau * 14)px">
+                                            <span class="rig-arbre__chevron rig-arbre__chevron--ouvert"></span>@e.Destinataire
+                                        </td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    <tr class="@(EditionSelectionnee == e ? "rig-editions__ligne--actif" : "")"
+                                        @onclick="() => EditionSelectionnee = e">
+                                        <td class="rig-editions__dest" style="padding-left:@(6 + e.Niveau * 14)px">@e.Destinataire</td>
+                                        <td class="rig-editions__doc">@e.NomDocument</td>
+                                        <td class="rig-editions__drapeau">@(e.CoffreFort ? "x" : "")</td>
+                                        <td class="rig-editions__drapeau">@(e.TribunalDigital ? "x" : "")</td>
+                                        <td class="rig-editions__drapeau">@(e.EnvoiParMail ? "x" : "")</td>
+                                        <td class="rig-editions__ex">@e.Exemplaires</td>
+                                        <td class="rig-editions__drapeau">@(e.Imprimer ? "x" : "")</td>
+                                        <td class="rig-editions__imprimante">@e.Imprimante</td>
+                                        <td class="rig-editions__file">@e.FileImprimante</td>
+                                        <td class="rig-editions__file">@e.FileDifferee</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="rig-editions__titre">Detail de l'edition selectionnee</div>
+                <div class="rig-editions__detail">
+                    @if (EditionSelectionnee?.Detail is { } d)
+                    {
+                        <label class="rig-champ-ed"><span>Designation</span>
+                            <input class="rig-saisie" value="@d.Designation" readonly /></label>
+                        <label class="rig-champ-ed"><span>A l'attention de</span>
+                            <input class="rig-saisie" value="@d.AttentionDe" readonly /></label>
+                        <label class="rig-champ-ed rig-champ-ed--large"><span>Adresse postale</span>
+                            <textarea class="rig-saisie" rows="3" readonly>@d.AdressePostale</textarea></label>
+                        <label class="rig-champ-ed"><span>Type de papier</span>
+                            <select class="rig-saisie" disabled>
+                                @foreach (var tp in ArbreDemo.TypesPapier)
+                                {
+                                    <option selected="@(tp == d.TypePapier)">@tp</option>
+                                }
+                            </select></label>
+                        <label class="rig-champ-ed"><span>Telephone</span>
+                            <input class="rig-saisie" value="@d.Telephone" readonly /></label>
+                        <label class="rig-champ-ed"><span>Siren</span>
+                            <input class="rig-saisie" value="@d.Siren" readonly /></label>
+                        <label class="rig-champ-ed"><span>Coffre-fort : nature du document</span>
+                            <input class="rig-saisie" value="@d.NatureCoffreFort" readonly /></label>
+                        <label class="rig-champ-ed"><span>Coffre-fort</span>
+                            <input class="rig-saisie" value="@d.CoffreFort" readonly /></label>
+                        <label class="rig-champ-ed"><span>Tribunal digital : nature du document</span>
+                            <input class="rig-saisie" value="@d.NatureTribunalDigital" readonly /></label>
+                        <label class="rig-champ-ed"><span>Tribunal digital</span>
+                            <input class="rig-saisie" value="@d.TribunalDigital" readonly /></label>
+                        <label class="rig-champ-ed rig-champ-ed--large"><span>Tribunal digital : Erreur</span>
+                            <input class="rig-saisie" value="@d.ErreurTribunalDigital" readonly /></label>
+                        <label class="rig-champ-ed"><span>Courriel</span>
+                            <input class="rig-saisie" value="@d.Courriel" readonly /></label>
+                        <label class="rig-champ-ed rig-champ-ed--case">
+                            <input type="checkbox" checked="@d.ConserverPjOrigine" disabled />
+                            <span>Conserver les PJ au format d'origine (ne pas convertir en PDF)</span></label>
+                        <label class="rig-champ-ed rig-champ-ed--large"><span>Observation</span>
+                            <textarea class="rig-saisie" rows="2" readonly>@d.Observation</textarea></label>
+                    }
+                    else
+                    {
+                        <div style="font-size:11px;color:var(--rig-texte-3)">
+                            Choisissez un destinataire dans le tableau des editions.
+                        </div>
+                    }
+                </div>
             </div>
         </div>
         }
@@ -843,83 +913,48 @@
                .Take(6).ToArray();
 
     // ================= Visionneuse =================
-    private record Document(string Libelle, string Extension, string Date, int Pages,
-                            string Origine, string Apercu);
-    private record Categorie(string Nom, string Libelle, Document[] Documents);
-
     private Dossier? DossierOuvert;
-    private Document? DocumentOuvert;
-    private readonly HashSet<string> CategoriesOuvertes = new() { "DOSSIER", "FORMALITES" };
+
+    // L'arbre de l'affaire ouverte, sa selection, et les dossiers deplies.
+    private NoeudGed Arbre = ArbreDemo.Racine("0000", "AMITEL SAS", "903 118 776");
+    private NoeudGed? NoeudSelectionne;
+    private readonly HashSet<NoeudGed> NoeudsOuverts = new();
+
+    // Le tableau des editions de l'affaire et la ligne selectionnee.
+    private LigneEdition[] Editions = [];
+    private LigneEdition? EditionSelectionnee;
+
+    private void ChoisirNoeud(NoeudGed n) => NoeudSelectionne = n;
 
     private void OuvrirDossier(Dossier d)
     {
         DossierOuvert = d;
-        DocumentOuvert = Categories.First(c => c.Documents.Length > 0).Documents[0];
+
+        // Ouvrir une affaire tombe sur l'arbre, jamais sur la saisie : c'est
+        // l'ecran d'entree de VGED dans RIG v2.
+        ModeSaisie = false;
+
+        Arbre = ArbreDemo.Racine(d.Numero, d.Objet, d.Siren);
+        Editions = ArbreDemo.Editions(d.Numero, d.Objet);
+        EditionSelectionnee = Editions.FirstOrDefault(e => !e.EstGroupe);
+
+        // La racine et tous les dossiers servis sont deplies d'entree :
+        // l'arbre s'ouvre sur du contenu, pas sur une ligne fermee.
+        NoeudsOuverts.Clear();
+        NoeudsOuverts.Add(Arbre);
+        foreach (var n in Arbre.Descendants().Where(n => !n.EstPiece && n.NbPieces > 0))
+            NoeudsOuverts.Add(n);
+
+        NoeudSelectionne = Arbre.Descendants().FirstOrDefault(n => n.EstPiece);
         _recherche = string.Empty;
     }
 
     private void FermerDossier()
     {
         DossierOuvert = null;
-        DocumentOuvert = null;
+        NoeudSelectionne = null;
+        EditionSelectionnee = null;
     }
-
-    private void BasculerCategorie(string nom)
-    {
-        if (!CategoriesOuvertes.Add(nom)) CategoriesOuvertes.Remove(nom);
-    }
-
-    // Arborescence calquee sur les dossiers REELS de l'arbre VGED de RIG v2 :
-    // D:\RigApplication\Source\RIG\DLL\Processus\PROC_VDOSSIER\Nodes\
-    // (Dossier RCS, Formalites, Actes, Bilans, Inscriptions, Judiciaire,
-    //  Ordonnances de prorogation, Bordereaux de requisition, Bordereau
-    //  mandataire, Divergences BE, Non inscrits, Pieces jointes).
-    // Les libelles de commandes viennent de ETP_VGED/OPE_VGED.cs.
-    private readonly Categorie[] Categories =
-    [
-        new("DOSSIER", "Dossier RCS",
-        [
-            new("Statuts signes", "PDF", "12/03/2024", 14, "Depot guichet",
-                "STATUTS DE LA SOCIETE\n\nArticle 1 - Forme\nLa societe est une societe par actions simplifiee regie par les dispositions du Code de commerce.\n\nArticle 2 - Objet\nPrestation de services informatiques.\n\nArticle 3 - Denomination\nAMITEL SAS."),
-            new("Liste des souscripteurs", "PDF", "12/03/2024", 2, "Depot guichet",
-                "LISTE DES SOUSCRIPTEURS\n\nNom / Actions / Montant\nDUPONT Jean   600   6 000 EUR\nMARTIN Claire 400   4 000 EUR")
-        ]),
-        new("FORMALITES", "Formalites",
-        [
-            new("Demande d'immatriculation M0", "PDF", "12/03/2024", 4, "Teletransmission",
-                "DEMANDE D'IMMATRICULATION - CERFA M0\n\nDenomination : AMITEL SAS\nForme : Societe par actions simplifiee\nCapital : 10 000 EUR\nSiege : 12 rue des Lilas"),
-            new("Declaration de non-condamnation", "PDF", "12/03/2024", 1, "Teletransmission",
-                "DECLARATION SUR L'HONNEUR DE NON-CONDAMNATION\n\nJe soussigne DUPONT Jean, ne le 4 avril 1978 a Lyon, declare n'avoir fait l'objet d'aucune condamnation penale ni sanction civile ou administrative de nature a m'interdire de gerer.")
-        ]),
-        new("ACTES", "Actes",
-        [
-            new("Depot d'acte n 2024/0141", "PDF", "12/03/2024", 9, "Depot guichet",
-                "DEPOT D'ACTE N 2024/0141\n\nNature : bail commercial\nEntre SCI DU PARC, bailleur, et AMITEL SAS, preneur.\nLocaux a usage de bureaux sis 12 rue des Lilas.")
-        ]),
-        new("BILANS", "Bilans - comptes annuels", []),
-        new("INSCRIPTIONS", "Inscriptions - privileges",
-        [
-            new("Etat des inscriptions", "PDF", "14/03/2024", 1, "Edition greffe",
-                "ETAT DES INSCRIPTIONS\n\nAucun privilege, nantissement ni protet inscrit a ce jour.")
-        ]),
-        new("JUDICIAIRE", "Judiciaire", []),
-        new("ORDONNANCES", "Ordonnances de prorogation", []),
-        new("BORDEREAUX", "Bordereaux de requisition",
-        [
-            new("Bordereau de numerisation", "PDF", "12/03/2024", 1, "Numerisation",
-                "BORDEREAU DE NUMERISATION D'UN DOSSIER\n\nSite de numerisation : greffe 9999\nNombre de pages : 31\nDate : 12/03/2024")
-        ]),
-        new("MANDATAIRE", "Bordereau mandataire", []),
-        new("DIVERGENCES", "Divergences BE", []),
-        new("NONINSCRITS", "Non inscrits", []),
-        new("PJ", "Pieces jointes",
-        [
-            new("Piece d'identite du president", "JPG", "12/03/2024", 1, "Numerisation",
-                "[Numerisation d'une carte nationale d'identite]"),
-            new("Extrait Kbis", "PDF", "14/03/2024", 2, "Edition greffe",
-                "EXTRAIT KBIS\n\nGreffe du tribunal de commerce 9999\nIdentifiant : 903 118 776 RCS\nDenomination : AMITEL SAS\nForme juridique : Societe par actions simplifiee\nCapital : 10 000 EUR")
-        ])
-    ];
 
     // ================= Ecran de procedure =================
 
