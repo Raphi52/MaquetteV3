@@ -63,7 +63,7 @@
                     {
                         var affaire = a;
                         <tr class="@(affaire.Numero == NoAffaire ? "rig-ligne--valide" : "")"
-                            @ondblclick="() => Ouvrir.InvokeAsync(affaire.Numero)">
+                            @onclick="() => Ouvrir.InvokeAsync(affaire.Numero)" style="cursor:pointer">
                             <td class="rig-table__mono">@affaire.Numero</td>
                             <td>@affaire.Libelle</td>
                             <td class="rig-table__mono">@affaire.Siren</td>

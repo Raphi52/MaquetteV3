@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using RigV3Desktop;
 
 // Garde-fou des CONTROLES DE SAISIE.
@@ -72,9 +72,7 @@ Exiger(vue.Contains("private List<Defaut> TousLesDefauts()"),
 Exiger(Regex.IsMatch(vue, @"disabled=""@\(defauts\.Count > 0\)"""),
     "le bouton Valider est eteint tant qu il reste un defaut");
 // Le bouton desactive ne suffit pas : la methode doit refuser d elle-meme.
-Exiger(Regex.IsMatch(vue, @"ValiderDossier\(\)\s*\{\s*(//[^
-]*
-\s*)*if \(TousLesDefauts\(\)\.Count > 0\) return;"),
+Exiger(Regex.IsMatch(vue, @"ValiderDossier\(\)\s*\{\s*(//[^\r\n]*\r?\n\s*)*if \(TousLesDefauts\(\)\.Count > 0\) return;"),
     "ValiderDossier refuse aussi de lui-meme, sans dependre du bouton");
 Exiger(vue.Contains("Etat.Valides.Add(CleAffaire)") && vue.Contains("Etat.Enregistrer();"),
     "une validation est conservee, pas seulement affichee");

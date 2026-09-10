@@ -1,4 +1,4 @@
-namespace RigV3Desktop;
+﻿namespace RigV3Desktop;
 
 // ============================================================
 // Jeu de demonstration des ecrans de procedure.
@@ -45,27 +45,53 @@ public sealed record ActeNum(int Rang, string Dossier, string Depot, string Deno
         JeuDemo.CategoriesDepot.FirstOrDefault(c => c.Code == Categorie).Libelle ?? Categorie;
 }
 
-/// <summary>Un login de la maquette et son niveau d'acces (0 = le plus bas).</summary>
-public sealed record CompteRig(string Login, string Nom, int NiveauAcces, string Profil);
+/// <summary>
+/// Les deux domaines de la VGED de RIG v2 : ce sont les seules branches
+/// que PROC_VGED\ETP_VGED\OPE_VGED.cs (_InitTreeview) ajoute a l'arbre
+/// d'une affaire. Ils servent ici de droits portes par le login.
+/// </summary>
+public static class DomaineGed
+{
+    public const string Rcs = "RCS";
+    public const string Judiciaire = "JUD";
+}
+
+/// <summary>
+/// Un login de la maquette et les DOMAINES auxquels il donne acces. Les
+/// domaines sont ceux des deux branches de la VGED de v2 : « RCS » et
+/// « JUD » (judiciaire). Ce sont eux qui decident des dossiers visibles
+/// dans l'arbre de l'affaire (voir AccesGed).
+/// </summary>
+public sealed record CompteRig(string Login, string Nom, string[] Domaines, string Profil)
+{
+    /// <summary>Les domaines, tels qu'ils s'ecrivent dans le selecteur de login.</summary>
+    public string DomainesLisibles =>
+        Domaines.Length == 0 ? "aucun domaine" : string.Join(" + ", Domaines);
+}
 
 public static class JeuDemo
 {
     public static readonly DateTime Aujourdhui = new(2026, 9, 9);
 
     /// <summary>
-    /// Les comptes de demonstration. Le niveau d'acces se parametre par
-    /// login : c'est lui qui decide des dossiers visibles dans l'arbre de
-    /// l'affaire (voir AccesGed). Aucun annuaire n'est branche.
+    /// Les comptes de demonstration. Les domaines se parametrent par
+    /// login : ce sont eux qui decident des branches visibles dans l'arbre
+    /// de l'affaire (voir AccesGed). Aucun annuaire n'est branche.
     /// </summary>
     public static readonly CompteRig[] Comptes =
     [
-        new("rvilain", "Raphael", 2, "Greffier"),
-        new("cmartin", "Claire", 1, "Redacteur"),
-        new("pinvite", "Pauline", 0, "Accueil"),
+        new("rvilain", "Raphael", [DomaineGed.Rcs, DomaineGed.Judiciaire], "Greffier"),
+        new("cmartin", "Claire", [DomaineGed.Rcs], "Redacteur RCS"),
+        new("pjudic", "Pauline", [DomaineGed.Judiciaire], "Redacteur judiciaire"),
     ];
 
+    /// <summary>
+    /// Le compte d'un login. Un login inconnu retombe sur le compte le
+    /// MOINS dote : un droit ne s'obtient jamais par defaut.
+    /// </summary>
     public static CompteRig Compte(string login)
-        => Comptes.FirstOrDefault(c => c.Login == login) ?? Comptes[^1];
+        => Comptes.FirstOrDefault(c => c.Login == login)
+           ?? Comptes.OrderBy(c => c.Domaines.Length).First();
 
     public static readonly string[] EtatsDemande =
         ["En saisie", "En controle", "Validee", "Rejetee"];

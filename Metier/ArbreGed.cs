@@ -1,4 +1,4 @@
-namespace RigV3Desktop;
+﻿namespace RigV3Desktop;
 
 // ============================================================
 // Arbre documentaire de l'affaire (esprit VGED de RIG v2).
@@ -11,8 +11,14 @@ namespace RigV3Desktop;
 //     Inscriptions\FolderInscriptions.cs ("Inscriptions privileges"),
 //     Judiciaire\FolderJudiciaire.cs > Ordonnances du President\
 //     FolderOrdonnances.cs > FolderDemandeur.cs / FolderDefendeur.cs,
-//     Ordonnances de prorogation\, Bordereaux de requisition\,
-//     Bordereau mandataire\, Non inscrits\, Pieces jointes\.
+//     Pieces jointes\FolderPiecesJointes.cs.
+//   L'arbre REEL n'a que DEUX branches : OPE_VGED.cs,
+//     _InitTreeview() n'ajoute que « Dossier RCS » (si l'affaire a un
+//     dossier RCS) et « Judiciaire » (si elle a une instance). Les
+//     Nodes\ « Non inscrits », « Bordereaux de requisition » et
+//     « Bordereau mandataire » servent a des ouvertures SEPAREES de la
+//     VGED (_model.Nodes.Clear()), pas a cet arbre, et « Ordonnances
+//     de prorogation » n'y est jamais ajoute.
 //   Colonnes de l'arbre : PROC_VDOSSIER\Control\TreeviewGed.Designer.cs
 //     colDocuments / colDateCreation ("Date de depot...") / colNbPages.
 //
@@ -26,7 +32,7 @@ namespace RigV3Desktop;
 /// </summary>
 public sealed record NoeudGed(string Libelle, string Icone, string Date, int Pages,
                               string Extension, string Origine, string Apercu,
-                              NoeudGed[] Enfants, int NiveauRequis = 0)
+                              NoeudGed[] Enfants, string DomaineRequis = "")
 {
     public bool EstPiece => Enfants.Length == 0 && Extension.Length > 0;
 
@@ -84,13 +90,18 @@ public static class ArbreDemo
         => new(libelle, icone, "", 0, "", "", "", enfants);
 
     /// <summary>
-    /// Un dossier reserve : il ne s'affiche qu'a partir du niveau d'acces
-    /// indique. v2 filtre les dossiers de la VGED sur les droits du login
-    /// (UTILISATEUR / profil) ; ici le niveau est une donnee de demo.
+    /// Une racine de domaine. v2 ne construit l'arbre de la VGED qu'en deux
+    /// branches (PROC_VGED\ETP_VGED\OPE_VGED.cs, _InitTreeview) :
+    /// « Dossier RCS » si l'affaire a un dossier RCS, « Judiciaire » si elle
+    /// a une instance. Le domaine porte ici le droit du login.
     /// </summary>
-    private static NoeudGed DossReserve(string libelle, string icone, int niveauRequis,
-                                        params NoeudGed[] enfants)
-        => new(libelle, icone, "", 0, "", "", "", enfants, niveauRequis);
+    private static NoeudGed Domaine(string libelle, string icone, string domaine,
+                                    params NoeudGed[] enfants)
+        => new(libelle, icone, "", 0, "", "", "", enfants, domaine);
+
+    /// <summary>Les deux domaines de la VGED de v2 (voir DomaineGed).</summary>
+    public const string DomaineRcs = DomaineGed.Rcs;
+    public const string DomaineJudiciaire = DomaineGed.Judiciaire;
 
     /// <summary>Types de papier controles dans OPE_DESTINATAIRE.cs (v2).</summary>
     public static readonly string[] TypesPapier = ["NORMAL", "ENTETE", "PREIMPRIME", "RECYCLE"];
@@ -102,46 +113,45 @@ public static class ArbreDemo
         ["Production (PS)", "Nuit (differe)", "Sans file"];
 
     /// <summary>
-    /// L'arbre de l'affaire. Racine = le dossier RCS, comme dans v2 ou la
-    /// racine porte numero + denomination + Siren.
+    /// L'arbre de l'affaire, dans la forme REELLE de v2. Lu dans
+    /// PROC_VGED\ETP_VGED\OPE_VGED.cs (_InitTreeview) : deux branches et
+    /// pas plus — « Dossier RCS » (Pieces jointes, Depots d'actes, Depots
+    /// des comptes annuels, Formalites, Inscriptions privileges) et
+    /// « Judiciaire » (Ordonnances > Demandeur / Defendeur). « Non
+    /// inscrits » et « Bordereau de requisition » n'en font pas partie :
+    /// v2 les ouvre dans un arbre SEPARE (_model.Nodes.Clear()), et
+    /// « Ordonnances de prorogation » n'est jamais ajoute a l'arbre.
+    /// Libelles pris un a un dans Nodes\*\Folder*.cs.
     /// </summary>
     public static NoeudGed Racine(string numero, string denomination, string siren)
         => Doss($"{numero} {denomination}" + (siren.Length > 0 ? $"   (Siren : {siren})" : ""),
                 "dossier",
-            Doss("Dossier RCS", "dossier",
+            Domaine("Dossier RCS", "dossier", DomaineRcs,
                 Piece("Statuts signes", "PDF", "12/03/2024", 14, "Depot guichet",
                     "STATUTS DE LA SOCIETE\n\nArticle 1 - Forme\nLa societe est une societe par actions simplifiee regie par les dispositions du Code de commerce.\n\nArticle 2 - Objet\nPrestation de services informatiques.\n\nArticle 3 - Denomination\nAMITEL SAS."),
                 Piece("Liste des souscripteurs", "PDF", "12/03/2024", 2, "Depot guichet",
-                    "LISTE DES SOUSCRIPTEURS\n\nNom / Actions / Montant\nDUPONT Jean   600   6 000 EUR\nMARTIN Claire 400   4 000 EUR")),
-            Doss("Depots d'actes", "actes",
-                Doss("Depot n 2024/0141", "sous-dossier",
-                    Piece("Bail commercial", "PDF", "12/03/2024", 9, "Depot guichet",
-                        "DEPOT D'ACTE N 2024/0141\n\nNature : bail commercial\nEntre SCI DU PARC, bailleur, et AMITEL SAS, preneur.\nLocaux a usage de bureaux sis 12 rue des Lilas."))),
-            Doss("Depots des comptes annuels", "bilans"),
-            Doss("Formalites", "formalites",
-                Doss("Formalite n 2024/00218", "sous-dossier",
-                    Piece("Demande d'immatriculation M0", "PDF", "12/03/2024", 4, "Teletransmission",
-                        "DEMANDE D'IMMATRICULATION - CERFA M0\n\nDenomination : AMITEL SAS\nForme : Societe par actions simplifiee\nCapital : 10 000 EUR\nSiege : 12 rue des Lilas"),
-                    Piece("Declaration de non-condamnation", "PDF", "12/03/2024", 1, "Teletransmission",
-                        "DECLARATION SUR L'HONNEUR DE NON-CONDAMNATION\n\nJe soussigne DUPONT Jean, ne le 4 avril 1978 a Lyon, declare n'avoir fait l'objet d'aucune condamnation penale ni sanction civile ou administrative de nature a m'interdire de gerer."))),
-            DossReserve("Signalements de divergences BE", "divergences", 1),
-            DossReserve("Inscriptions privileges", "inscriptions", 1,
-                Doss("Inscription n 2024/0007", "sous-dossier",
-                    Piece("Etat des inscriptions", "PDF", "14/03/2024", 1, "Edition greffe",
-                        "ETAT DES INSCRIPTIONS\n\nAucun privilege, nantissement ni protet inscrit a ce jour."))),
-            DossReserve("Ordonnances de prorogation", "dossier", 2),
-            Doss("Bordereaux de requisition", "dossier",
-                Piece("Bordereau de numerisation", "PDF", "12/03/2024", 1, "Numerisation",
-                    "BORDEREAU DE NUMERISATION D'UN DOSSIER\n\nSite de numerisation : greffe 9999\nNombre de pages : 31\nDate : 12/03/2024")),
-            DossReserve("Bordereau mandataire", "dossier", 2),
-            Doss("Non inscrits", "dossier"),
-            Doss("Pieces jointes", "pj",
-                Piece("Piece d'identite du president", "JPG", "12/03/2024", 1, "Numerisation",
-                    "[Numerisation d'une carte nationale d'identite]"),
-                Piece("Extrait Kbis", "PDF", "14/03/2024", 2, "Edition greffe",
-                    "EXTRAIT KBIS\n\nGreffe du tribunal de commerce 9999\nIdentifiant : 903 118 776 RCS\nDenomination : AMITEL SAS\nForme juridique : Societe par actions simplifiee\nCapital : 10 000 EUR")),
-            Doss("Divers", "dossier"),
-            DossReserve("Judiciaire", "judiciaire", 2,
+                    "LISTE DES SOUSCRIPTEURS\n\nNom / Actions / Montant\nDUPONT Jean   600   6 000 EUR\nMARTIN Claire 400   4 000 EUR"),
+                Doss("Pieces jointes", "pj",
+                    Piece("Piece d'identite du president", "JPG", "12/03/2024", 1, "Numerisation",
+                        "[Numerisation d'une carte nationale d'identite]"),
+                    Piece("Extrait Kbis", "PDF", "14/03/2024", 2, "Edition greffe",
+                        "EXTRAIT KBIS\n\nGreffe du tribunal de commerce 9999\nIdentifiant : 903 118 776 RCS\nDenomination : AMITEL SAS\nForme juridique : Societe par actions simplifiee\nCapital : 10 000 EUR")),
+                Doss("Depots d'actes", "actes",
+                    Doss("Depot n 2024/0141", "sous-dossier",
+                        Piece("Bail commercial", "PDF", "12/03/2024", 9, "Depot guichet",
+                            "DEPOT D'ACTE N 2024/0141\n\nNature : bail commercial\nEntre SCI DU PARC, bailleur, et AMITEL SAS, preneur.\nLocaux a usage de bureaux sis 12 rue des Lilas."))),
+                Doss("Depots des comptes annuels", "bilans"),
+                Doss("Formalites", "formalites",
+                    Doss("Formalite n 2024/00218", "sous-dossier",
+                        Piece("Demande d'immatriculation M0", "PDF", "12/03/2024", 4, "Teletransmission",
+                            "DEMANDE D'IMMATRICULATION - CERFA M0\n\nDenomination : AMITEL SAS\nForme : Societe par actions simplifiee\nCapital : 10 000 EUR\nSiege : 12 rue des Lilas"),
+                        Piece("Declaration de non-condamnation", "PDF", "12/03/2024", 1, "Teletransmission",
+                            "DECLARATION SUR L'HONNEUR DE NON-CONDAMNATION\n\nJe soussigne DUPONT Jean, ne le 4 avril 1978 a Lyon, declare n'avoir fait l'objet d'aucune condamnation penale ni sanction civile ou administrative de nature a m'interdire de gerer."))),
+                Doss("Inscriptions privileges", "inscriptions",
+                    Doss("Inscription n 2024/0007", "sous-dossier",
+                        Piece("Etat des inscriptions", "PDF", "14/03/2024", 1, "Edition greffe",
+                            "ETAT DES INSCRIPTIONS\n\nAucun privilege, nantissement ni protet inscrit a ce jour.")))),
+            Domaine("Judiciaire", "judiciaire", DomaineJudiciaire,
                 Doss("Ordonnances", "sous-dossier",
                     Doss("Demandeur", "partie",
                         Piece("2021IP00530-IP-PRESIDENT-23/09/2021 11:39:13", "PDF",
@@ -153,7 +163,7 @@ public static class ArbreDemo
                         Piece("2023OP02936-OPHP-PDT-13/09/2023 11:25:00", "PDF", "13/09/2023", 1, "Edition greffe", ""),
                         Piece("2022J00114-JUG-GONON-11/07/2023 17:50:58", "PDF", "11/07/2023", 2, "Edition greffe", ""),
                         Piece("2022J00114-conclusions-BEYLE-20/04/2023", "PDF", "20/04/2023", 58, "Depot guichet", ""),
-                        Piece("2022J00114-COUR-BEYLE-20/04/2023", "PDF", "20/04/2023", 2, "Depot guichet", ""),
+                        Piece("2022J00114-COUR-BEYLE-20/04/2023", "PDF", "20/04/2023", 2, "Edition greffe", ""),
                         Piece("2021OP01112-OPHP-PDT-28/07/2021 11:55:45", "PDF", "28/07/2021", 6, "Edition greffe", "")))));
 
     /// <summary>
@@ -232,21 +242,24 @@ public static class ArbreDemo
 
 /// <summary>
 /// Qui voit quoi dans l'arbre de l'affaire. Un dossier marque d'un
-/// NiveauRequis ne se montre qu'aux logins dont le niveau d'acces est au
-/// moins egal. Les elements ajoutes a la main (bouton « Nouveau ») se
+/// DomaineRequis (« RCS » ou « JUD ») ne se montre qu'aux logins qui ont
+/// ce domaine dans leurs droits : c'est ainsi que v2 decide des branches
+/// de la VGED. Les elements ajoutes a la main (bouton « Nouveau ») se
 /// rendent a la suite des enfants du dossier, sans toucher au jeu de
 /// demonstration.
 /// </summary>
 public static class AccesGed
 {
     public static IReadOnlyList<NoeudGed> EnfantsVisibles(
-        NoeudGed parent, int niveauAcces,
+        NoeudGed parent, IReadOnlyCollection<string> domaines,
         IReadOnlyDictionary<NoeudGed, List<NoeudGed>>? ajouts = null)
     {
         var enfants = parent.Enfants.AsEnumerable();
         if (ajouts is not null && ajouts.TryGetValue(parent, out var ajoutes))
             enfants = enfants.Concat(ajoutes);
-        return enfants.Where(e => e.NiveauRequis <= niveauAcces).ToArray();
+        return enfants
+            .Where(e => e.DomaineRequis.Length == 0 || domaines.Contains(e.DomaineRequis))
+            .ToArray();
     }
 
     /// <summary>Un dictionnaire d'ajouts qui distingue deux noeuds par leur identite.</summary>
@@ -255,9 +268,9 @@ public static class AccesGed
 
     /// <summary>Un dossier cree depuis l'arbre (bouton « Nouveau »).</summary>
     public static NoeudGed NouveauDossier(string libelle)
-        => new(libelle, "dossier", "", 0, "", "", "", [], 0);
+        => new(libelle, "dossier", "", 0, "", "", "", []);
 
     /// <summary>Une piece creee depuis l'arbre (bouton « Nouveau »).</summary>
     public static NoeudGed NouvellePiece(string libelle, string extension, string date)
-        => new(libelle, "piece", date, 1, extension, "Ajout manuel", "", [], 0);
+        => new(libelle, "piece", date, 1, extension, "Ajout manuel", "", []);
 }

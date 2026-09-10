@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 // Garde-fou de l'arbre GED et du tableau des editions.
 //
@@ -49,7 +49,7 @@ Exiger(Regex.IsMatch(modele, @"Judiciaire.*Ordonnances.*Demandeur", RegexOptions
 Exiger(File.Exists(noeud), "Components/ArbreGedNoeud.razor existe");
 var rendu = File.Exists(noeud) ? File.ReadAllText(noeud) : string.Empty;
 Exiger(rendu.Contains("<ArbreGedNoeud"), "ArbreGedNoeud.razor s'appelle lui-meme (recursion)");
-foreach (var colonne in new[] { "Liste des pieces", "Date" })
+foreach (var colonne in new[] { "Liste des pieces" })
 {
     Exiger(vue.Contains(colonne), $"l'entete de l'arbre porte la colonne « {colonne} »");
 }
@@ -57,6 +57,10 @@ foreach (var colonne in new[] { "Liste des pieces", "Date" })
 // l'arbre (le nombre de pages reste dans l'apercu de la piece).
 Exiger(!vue.Contains("Nb pages") && !rendu.Contains("rig-arbre__pages"),
     "la colonne « Nb pages » n'est plus dans l'arbre");
+// Demande du 10/09/2026 : la colonne « Date » saute aussi ; la date de
+// depot reste dans l'apercu de la piece, a droite de l'arbre.
+Exiger(!rendu.Contains("rig-arbre__date"),
+    "la colonne « Date » n'est plus dans l'arbre");
 
 // --- 4. Le tableau des editions, colonnes de TreeviewEditions.cs (v2).
 Exiger(vue.Contains("Tableau des editions"), "la sidebar porte le « Tableau des editions »");
@@ -108,32 +112,61 @@ Exiger(vue.Contains("OuvrirImpression"), "le bouton Imprimer ouvre la boite (Ouv
 Exiger(Regex.IsMatch(css, @"\.rig-apercu\s*\{") && Regex.IsMatch(css, @"\.rig-impression\s*\{"),
     "rig-accueil.css style l'apercu et la boite d'impression");
 
-// --- 8. Visibilite des dossiers selon le niveau d'acces du login.
-//        Demande du 10/09/2026 : « les dossiers doivent pas tous etre
-//        visibles, en fonction du niveau d'acces parametrable au niveau du
-//        login ». Sans ce test, un dossier reserve redevient visible pour
-//        tout le monde sans que rien ne le signale.
+// --- 8. Visibilite des branches selon les DOMAINES du login.
+//        Demande du 10/09/2026 : « dans les niveaux il y a RCS et
+//        Judiciaire et ca affecte les elements qu'on voit dans la
+//        treeview ». v2 ne construit l'arbre qu'en deux branches
+//        (PROC_VGED/ETP_VGED/OPE_VGED.cs, _InitTreeview) : Dossier RCS et
+//        Judiciaire. Sans ce test, une branche redevient visible pour tout
+//        le monde, ou l'arbre se remet a porter des dossiers inventes.
 Exiger(RigV3Desktop.JeuDemo.Comptes.Length >= 2, "plusieurs logins de demo existent");
-Exiger(RigV3Desktop.JeuDemo.Comptes.Select(c => c.NiveauAcces).Distinct().Count() >= 2,
-    "les logins n'ont pas tous le meme niveau d'acces");
-Exiger(RigV3Desktop.JeuDemo.Compte("inconnu").NiveauAcces
-       == RigV3Desktop.JeuDemo.Comptes.Min(c => c.NiveauAcces),
-    "un login inconnu retombe sur le niveau d'acces le plus bas");
+Exiger(RigV3Desktop.JeuDemo.Comptes.Select(c => c.DomainesLisibles).Distinct().Count() >= 2,
+    "les logins n'ont pas tous les memes domaines");
+Exiger(RigV3Desktop.JeuDemo.Compte("inconnu").Domaines.Length
+       == RigV3Desktop.JeuDemo.Comptes.Min(c => c.Domaines.Length),
+    "un login inconnu retombe sur le compte le moins dote");
 
 var racineGed = RigV3Desktop.ArbreDemo.Racine("0000", "AMITEL SAS", "903 118 776");
-var niveauMax = RigV3Desktop.JeuDemo.Comptes.Max(c => c.NiveauAcces);
-var vuBas = RigV3Desktop.AccesGed.EnfantsVisibles(racineGed, 0);
-var vuHaut = RigV3Desktop.AccesGed.EnfantsVisibles(racineGed, niveauMax);
-Exiger(vuHaut.Count == racineGed.Enfants.Length,
-    "le niveau le plus eleve voit tous les dossiers de l'affaire");
-Exiger(vuBas.Count < vuHaut.Count,
-    "le niveau le plus bas voit MOINS de dossiers que le niveau le plus eleve");
-Exiger(racineGed.Enfants.Any(d => d.NiveauRequis > 0),
-    "au moins un dossier de l'arbre est reserve (NiveauRequis > 0)");
-Exiger(!vuBas.Any(d => d.Libelle == "Judiciaire") && vuHaut.Any(d => d.Libelle == "Judiciaire"),
-    "le dossier « Judiciaire » est reserve au niveau le plus eleve");
-Exiger(rendu.Contains("NiveauAcces") && vue.Contains("NiveauAcces=\"NiveauAcces\""),
-    "l'arbre rendu recoit le niveau d'acces du login courant");
+string[] tous = [RigV3Desktop.ArbreDemo.DomaineRcs, RigV3Desktop.ArbreDemo.DomaineJudiciaire];
+var vuTout = RigV3Desktop.AccesGed.EnfantsVisibles(racineGed, tous);
+var vuRcs = RigV3Desktop.AccesGed.EnfantsVisibles(racineGed, [RigV3Desktop.ArbreDemo.DomaineRcs]);
+var vuJud = RigV3Desktop.AccesGed.EnfantsVisibles(racineGed, [RigV3Desktop.ArbreDemo.DomaineJudiciaire]);
+var vuRien = RigV3Desktop.AccesGed.EnfantsVisibles(racineGed, System.Array.Empty<string>());
+
+// La structure de v2 : DEUX branches a la racine, pas une liste plate.
+Exiger(vuTout.Count == 2, "l'arbre n'a que deux branches : Dossier RCS et Judiciaire");
+Exiger(vuTout.Any(d => d.Libelle == "Dossier RCS") && vuTout.Any(d => d.Libelle == "Judiciaire"),
+    "les deux branches sont bien « Dossier RCS » et « Judiciaire »");
+Exiger(vuRcs.Count == 1 && vuRcs[0].Libelle == "Dossier RCS",
+    "un login RCS seul ne voit que la branche Dossier RCS");
+Exiger(vuJud.Count == 1 && vuJud[0].Libelle == "Judiciaire",
+    "un login judiciaire seul ne voit que la branche Judiciaire");
+Exiger(vuRien.Count == 0, "un login sans domaine ne voit aucune branche");
+
+// Les sous-dossiers de la branche RCS sont ceux de v2, et rien de plus.
+var rcs = vuTout.First(d => d.Libelle == "Dossier RCS");
+foreach (var attendu in new[] { "Pieces jointes", "Depots d'actes",
+                                "Depots des comptes annuels", "Formalites",
+                                "Inscriptions privileges" })
+{
+    Exiger(rcs.Enfants.Any(e => e.Libelle == attendu),
+        $"la branche RCS porte le sous-dossier v2 « {attendu} »");
+}
+// Ces dossiers n'existent PAS dans l'arbre de v2 : « Non inscrits » et
+// « Bordereau de requisition » s'ouvrent dans un arbre separe, les autres
+// sont des inventions de la maquette.
+var libelles = racineGed.Descendants().Select(n => n.Libelle).ToArray();
+foreach (var interdit in new[] { "Signalements de divergences BE", "Divers",
+                                 "Non inscrits", "Bordereau mandataire",
+                                 "Bordereaux de requisition",
+                                 "Ordonnances de prorogation" })
+{
+    Exiger(!libelles.Contains(interdit),
+        $"l'arbre ne porte plus le dossier inexistant en v2 « {interdit} »");
+}
+
+Exiger(rendu.Contains("Domaines") && vue.Contains("Domaines=\"Domaines\""),
+    "l'arbre rendu recoit les domaines du login courant");
 Exiger(vue.Contains("JeuDemo.Comptes") && vue.Contains("ChangerLogin"),
     "l'entete permet de changer de login");
 
@@ -146,14 +179,14 @@ Exiger(Regex.IsMatch(css, @"\.rig-arbre__nouveau\b"), "rig-accueil.css style le 
 
 var ajouts = RigV3Desktop.AccesGed.NouveauxAjouts();
 var cible = racineGed.Enfants.First(d => d.Libelle == "Dossier RCS");
-var avant = RigV3Desktop.AccesGed.EnfantsVisibles(cible, niveauMax, ajouts).Count;
+var avant = RigV3Desktop.AccesGed.EnfantsVisibles(cible, tous, ajouts).Count;
 ajouts[cible] = [RigV3Desktop.AccesGed.NouveauDossier("Depot n 2026/0042")];
-var apres = RigV3Desktop.AccesGed.EnfantsVisibles(cible, niveauMax, ajouts);
+var apres = RigV3Desktop.AccesGed.EnfantsVisibles(cible, tous, ajouts);
 Exiger(apres.Count == avant + 1 && apres.Any(n => n.Libelle == "Depot n 2026/0042"),
     "un element cree apparait dans la liste du dossier cible");
-Exiger(RigV3Desktop.AccesGed.EnfantsVisibles(
-           racineGed.Enfants.First(d => d.Libelle == "Formalites"), niveauMax, ajouts).Count
-       == racineGed.Enfants.First(d => d.Libelle == "Formalites").Enfants.Length,
+var voisin = cible.Enfants.First(d => d.Libelle == "Formalites");
+Exiger(RigV3Desktop.AccesGed.EnfantsVisibles(voisin, tous, ajouts).Count
+       == voisin.Enfants.Length,
     "l'ajout ne touche que le dossier cible");
 Exiger(RigV3Desktop.AccesGed.NouvellePiece("Kbis", "PDF", "10/09/2026").EstPiece,
     "une piece creee est bien une piece (elle s'ouvre dans l'apercu)");

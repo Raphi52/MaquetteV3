@@ -175,8 +175,8 @@ Exiger(etatSrc.Contains("lignes[^1].EndsWith(evenement"),
     "une frappe repetee ne produit pas un evenement par caractere");
 Exiger(vue2.Contains("Etat.Journaliser(CleAffaire, \"Dossier VALIDE au controle final\")"),
     "la validation laisse une trace dans l historique");
-Exiger(Regex.IsMatch(vue2, @"HistoriqueOuvert = !HistoriqueOuvert"),
-    "la commande Historique VGED n est plus decorative : elle ouvre le panneau");
+Exiger(!vue2.Contains("Historique VGED"),
+    "le bouton Historique VGED est retire de la barre de commandes");
 
 // --- 10. Une procedure non portee le DIT, elle n emprunte pas l ecran des demandes
 Exiger(vue2.Contains("case \"PROC_DEMANDE\":"),

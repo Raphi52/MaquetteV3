@@ -53,6 +53,13 @@
   --rig-filet-fin: 3px;  /* filet en liste */
 }
 
+/* Les listes deroulantes des <select> sont peintes par le SYSTEME, hors CSS.
+   Elles suivent le `color-scheme` du DOCUMENT -- le poser sur l'element lui-meme
+   ne les atteint pas (constate le 2026-09-10 : popup blanche sur texte clair,
+   donc illisible). C'est donc ICI, a la racine, que le schema se declare. */
+html { color-scheme: dark; }
+html:has([data-rig-theme="clair"]) { color-scheme: light; }
+
 /* --- MODE SOMBRE (defaut) --- */
 :root,
 [data-rig-theme="sombre"] {

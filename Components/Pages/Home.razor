@@ -15,6 +15,19 @@
     <span class="rig-barre__version">@Version</span>
 
     <div class="rig-barre__droite">
+        @* Les domaines se parametrent par login : changer de login change les branches
+           visibles dans l'arbre de l'affaire. Le selecteur vit dans la BARRE (demande
+           utilisateur du 2026-09-10) : il reste atteignable depuis n'importe quel ecran. *@
+        <select class="rig-login" title="Login connecte et domaines autorises"
+                value="@LoginCourant"
+                @onchange="ChangerLogin" @onmousedown:stopPropagation="true">
+            @foreach (var compte in JeuDemo.Comptes)
+            {
+                <option value="@compte.Login">
+                    @compte.Login &middot; @compte.Profil (@compte.DomainesLisibles)
+                </option>
+            }
+        </select>
         @* Reglages de la BARRE : toujours atteignables, y compris quand un ecran de
            procedure occupe le plan de travail. Ne contient que le theme pour l'instant. *@
         <div class="rig-barre__reglages" @onmousedown:stopPropagation="true">
@@ -22,6 +35,9 @@
                     title="Reglages" @onclick="BasculerPanneauBarre">&#9881;</button>
             @if (PanneauBarreOuvert)
             {
+                @* Voile transparent plein ecran : un clic AILLEURS ferme le panneau. *@
+                <div class="rig-voile-clic" @onclick="() => PanneauBarreOuvert = false"
+                     @onmousedown:stopPropagation="true"></div>
                 <div class="rig-tuiles-panneau">
                     <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">Affichage</div>
                     <button class="rig-bascule @(ThemeSombre ? "rig-bascule--actif" : "")"
@@ -88,18 +104,6 @@
                 <span style="color:var(--rig-texte-3);font-size:12px">
                     &middot; greffe @Greffe &middot; @DateDuJour
                 </span>
-                @* Le niveau d'acces se parametre par login : changer de login
-                   change les dossiers visibles dans l'arbre de l'affaire. *@
-                <select class="rig-login" title="Login connecte et niveau d'acces"
-                        value="@LoginCourant"
-                        @onchange="ChangerLogin">
-                    @foreach (var compte in JeuDemo.Comptes)
-                    {
-                        <option value="@compte.Login">
-                            @compte.Login &middot; @compte.Profil (niveau @compte.NiveauAcces)
-                        </option>
-                    }
-                </select>
             </div>
             <div class="rig-entete__outils">
                 <button class="rig-entete__action @(PanneauTuilesOuvert ? "rig-entete__action--ouvert" : "")"
@@ -107,9 +111,16 @@
                                 @onclick="BasculerPanneauTuiles" @onmousedown:stopPropagation="true">&#9881;</button>
                 @if (PanneauTuilesOuvert)
                 {
+                    @* Voile transparent plein ecran : un clic AILLEURS ferme le panneau. *@
+                    <div class="rig-voile-clic" @onclick="() => PanneauTuilesOuvert = false"
+                         @onmousedown:stopPropagation="true"></div>
                     <div class="rig-tuiles-panneau" @onmousedown:stopPropagation="true">
-                                <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">
-                                    Tuiles affichees sur l'accueil
+                                <div class="rig-tuiles-panneau__tete">
+                                    <span class="rig-kicker">Tuiles affichees sur l'accueil</span>
+                                    <button class="rig-tuiles-panneau__reset"
+                                            title="Reinitialiser la disposition : replace et redimensionne les tuiles selon la disposition d'origine"
+                                            aria-label="Reinitialiser la disposition"
+                                            @onclick="ReinitialiserDisposition">&#8635;</button>
                                 </div>
                                 @foreach (var def in Definitions)
                                 {
@@ -120,18 +131,6 @@
                                                 <span>@def.Titre</span>
                                     </button>
                                 }
-                                <div class="rig-reglages__filet"></div>
-                                <button class="rig-bascule" title="Replace et redimensionne les tuiles selon la disposition d'origine"
-                                                @onclick="ReinitialiserDisposition">
-                                    <span class="rig-bascule__temoin"></span>
-                                    <span>Reinitialiser la disposition</span>
-                                </button>
-                                <div class="rig-reglages__filet"></div>
-                                <button class="rig-bascule @(ThemeSombre ? "" : "rig-bascule--actif")"
-                                                @onclick="BasculerTheme">
-                                    <span class="rig-bascule__temoin"></span>
-                                    <span>Mode clair</span>
-                                </button>
                     </div>
                 }
             </div>
@@ -378,7 +377,7 @@
             }
             <span class="rig-vged__compte">
                 @Arbre.NbPieces pieces &middot;
-                @Arbre.Enfants.Count(n => n.NbPieces > 0) / @Arbre.Enfants.Length dossiers servis &middot;
+                @DossiersVisibles.Count(n => n.NbPieces > 0) / @DossiersVisibles.Count dossiers servis &middot;
                 @Editions.Count(e => !e.EstGroupe) editions
             </span>
         </div>
@@ -622,7 +621,6 @@
             <div class="rig-vged__arbre">
                 <div class="rig-arbre__entete">
                     <span class="rig-arbre__libelle">Liste des pieces</span>
-                    <span class="rig-arbre__date">Date</span>
                     <button class="rig-arbre__nouveau" title="Ajouter un dossier ou une piece dans l'arbre"
                             @onclick="OuvrirNouveau">+ Nouveau</button>
                 </div>
@@ -630,7 +628,7 @@
                     <ArbreGedNoeud Noeud="Arbre" Niveau="0" Ouverts="NoeudsOuverts"
                                    Selection="NoeudSelectionne"
                                    Selectionner="OuvrirApercu"
-                                   NiveauAcces="NiveauAcces" Ajouts="AjoutsArbre" />
+                                   Domaines="Domaines" Ajouts="AjoutsArbre" />
                 </div>
                 @if (NoeudSelectionne is not null && NoeudSelectionne.EstPiece)
                 {
@@ -943,7 +941,12 @@
     private string LoginCourant = JeuDemo.Comptes[0].Login;
     private CompteRig CompteCourant => JeuDemo.Compte(LoginCourant);
     private string Utilisateur => CompteCourant.Nom;
-    private int NiveauAcces => CompteCourant.NiveauAcces;
+    private string[] Domaines => CompteCourant.Domaines;
+
+    // Le compte affiche en haut de l'ecran ne porte que sur les branches
+    // que le login courant a le droit de voir.
+    private IReadOnlyList<NoeudGed> DossiersVisibles
+        => AccesGed.EnfantsVisibles(Arbre, Domaines, AjoutsArbre);
 
     private void ChangerLogin(ChangeEventArgs ev)
     {
@@ -966,7 +969,7 @@
         {
             var n = pile.Pop();
             yield return n;
-            foreach (var e in AccesGed.EnfantsVisibles(n, NiveauAcces, AjoutsArbre)) pile.Push(e);
+            foreach (var e in AccesGed.EnfantsVisibles(n, Domaines, AjoutsArbre)) pile.Push(e);
         }
     }
 
@@ -2042,8 +2045,7 @@
 
     /// <summary>
     /// Tuile « Mes affaires recentes » : les affaires REELLEMENT ouvertes,
-    /// la plus recente en tete. Un clic rouvre la vue de recherche avec le
-    /// n° d'affaire deja pose — « comme si on recherchait l'affaire ».
+    /// la plus recente en tete. Un clic SIMPLE ouvre directement l'affaire.
     /// </summary>
     private RenderFragment CorpsRecents => @<div>
         @if (Etat.Consultations.Count == 0)
@@ -2059,7 +2061,7 @@
             {
                 var vue = c;
                 <div class="rig-ligne @(EstValide(vue.Numero) ? "rig-ligne--valide" : "")"
-                     @onclick="() => RechercherAffaire(vue.Numero)"
+                     @onclick="() => OuvrirParNumero(vue.Numero)"
                      style="cursor:pointer">
                     <span class="rig-filet-v rig-filet-v--@vue.Statut"></span>
                     <span>
@@ -2092,18 +2094,13 @@
         OuvrirProc(new Proc("PROC_RECHAFF", "Recherche d'affaires"));
     }
 
-    /// <summary>Une ligne de la tuile : la meme vue, mais sur cette affaire.</summary>
-    private void RechercherAffaire(string numero)
-    {
-        NoAffaireDemande = numero;
-        OuvrirProc(new Proc("PROC_RECHAFF", "Recherche d'affaires"));
-    }
-
     private RenderFragment CorpsFile => @<div>
         @foreach (var d in File)
         {
             var valide = EstValide(d.Numero);
-            <div class="rig-ligne @(d.VerrouillePar is not null ? "rig-ligne--verrouille" : "") @(valide ? "rig-ligne--valide" : "")">
+            <div class="rig-ligne @(d.VerrouillePar is not null ? "rig-ligne--verrouille" : "") @(valide ? "rig-ligne--valide" : "")"
+                 @onclick="() => OuvrirParNumero(d.Numero)"
+                 style="cursor:pointer">
                 <span class="rig-filet-v rig-filet-v--@(valide ? "ok" : d.Statut)"></span>
                 <span>
                     <span class="rig-ligne__id">@d.Numero</span><br />

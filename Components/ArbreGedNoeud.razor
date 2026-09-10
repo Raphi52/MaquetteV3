@@ -1,4 +1,4 @@
-@* ============================================================
+﻿@* ============================================================
    Une ligne de l'arbre GED, et ses enfants par recursion.
 
    L'arbre de RIG v2 (PROC_VDOSSIER/Control/TreeviewGed) est un vrai
@@ -27,7 +27,6 @@
             <span class="rig-arbre__compte">(@Noeud.NbPieces)</span>
         }
     </span>
-    <span class="rig-arbre__date">@Noeud.Date</span>
 </div>
 
 @if (Ouvert)
@@ -36,7 +35,7 @@
     {
         <ArbreGedNoeud Noeud="enfant" Niveau="Niveau + 1" Ouverts="Ouverts"
                        Selection="Selection" Selectionner="Selectionner"
-                       NiveauAcces="NiveauAcces" Ajouts="Ajouts" />
+                       Domaines="Domaines" Ajouts="Ajouts" />
     }
     @if (EnfantsVisibles.Count == 0 && !Noeud.EstPiece)
     {
@@ -52,13 +51,13 @@
     [Parameter] public EventCallback<NoeudGed> Selectionner { get; set; }
 
     /// <summary>Niveau d'acces du login courant : les dossiers reserves au-dessus ne se rendent pas.</summary>
-    [Parameter] public int NiveauAcces { get; set; }
+    [Parameter] public string[] Domaines { get; set; } = [];
 
     /// <summary>Elements ajoutes a la main sous un dossier, par le bouton « Nouveau ».</summary>
     [Parameter] public IReadOnlyDictionary<NoeudGed, List<NoeudGed>>? Ajouts { get; set; }
 
     private IReadOnlyList<NoeudGed> EnfantsVisibles
-        => AccesGed.EnfantsVisibles(Noeud, NiveauAcces, Ajouts);
+        => AccesGed.EnfantsVisibles(Noeud, Domaines, Ajouts);
 
     private bool Ouvert => Ouverts.Contains(Noeud);
 
