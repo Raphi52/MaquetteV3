@@ -49,7 +49,9 @@ Exiger(Regex.IsMatch(modele, @"Judiciaire.*Ordonnances.*Demandeur", RegexOptions
 Exiger(File.Exists(noeud), "Components/ArbreGedNoeud.razor existe");
 var rendu = File.Exists(noeud) ? File.ReadAllText(noeud) : string.Empty;
 Exiger(rendu.Contains("<ArbreGedNoeud"), "ArbreGedNoeud.razor s'appelle lui-meme (recursion)");
-foreach (var colonne in new[] { "Liste des pieces" })
+// Renomme le 2026-09-14 (demande Leslie) : l entete de l arbre annonce
+// desormais la vue entiere, pas seulement sa colonne.
+foreach (var colonne in new[] { "Visualisation du dossier" })
 {
     Exiger(vue.Contains(colonne), $"l'entete de l'arbre porte la colonne « {colonne} »");
 }
@@ -63,7 +65,14 @@ Exiger(!rendu.Contains("rig-arbre__date"),
     "la colonne « Date » n'est plus dans l'arbre");
 
 // --- 4. Le tableau des editions, colonnes de TreeviewEditions.cs (v2).
-Exiger(vue.Contains("Tableau des editions"), "la sidebar porte le « Tableau des editions »");
+// Le bouton d acces a quitte la visionneuse (barre du haut retiree le 15/09/2026) ;
+// l ecran lui-meme est conserve.
+Exiger(editions.Contains("Tableau des editions"), "l ecran « Tableau des editions » est conserve");
+// --- Les etapes du dossier : horizontales, paginees, chargees a la demande.
+Exiger(vue.Contains("rig-saisie__pages--h") && !vue.Contains("Controle du dossier</button>"),
+    "les etapes vivent dans la colonne du milieu, a l horizontale, sans onglet a part");
+Exiger(Regex.IsMatch(vue, @"Math\.Abs\(indexEtape - EtapeCourante\) <= 1"),
+    "seules l etape visible et ses voisines sont rendues (chargement a la demande)");
 foreach (var colonne in new[] { "Destinataire", "Nom du document", "Ex.", "Imprimante",
                                 "File ou imprimante", "File differee" })
 {
@@ -92,12 +101,101 @@ Exiger(Regex.IsMatch(css, @"\.rig-vged__editions\b"), "rig-accueil.css style la 
 //        Defaut a l'origine (10/09/2026) : le clic n'affichait que quatre
 //        metadonnees, aucun apercu, aucune action.
 Exiger(Regex.IsMatch(vue, @"class=""rig-apercu"""), "un apercu du document existe (rig-apercu)");
-foreach (var action in new[] { "Imprimer", "Sauvegarder", "Transferer" })
+foreach (var action in new[] { "Imprimer", "Sauvegarder", "Envoyer par mail" })
 {
-    Exiger(Regex.IsMatch(vue, @"rig-apercu__actions.*?>\s*" + action, RegexOptions.Singleline),
+    Exiger(Regex.IsMatch(vue, @"rig-apercu__actions[\s\S]{0,3000}?aria-label=""" + action + @"""", RegexOptions.Singleline),
         $"l'apercu porte le bouton « {action} »");
 }
+Exiger(vue.Contains("EnvoiMailOuvert") && vue.Contains("MailMessagesDemo"), "« Envoyer par mail » ouvre une popup destinataire + message");
 Exiger(vue.Contains("OuvrirApercu"), "le clic sur une piece appelle OuvrirApercu");
+// Demande du 15/09/2026 : un noeud sans formulaire ferme la colonne des
+// donnees, un noeud sans apercu ferme la colonne du document.
+Exiger(Regex.IsMatch(vue, @"if \(PlacerSurInformations\(n\)\) \{ GuideVisible = false; return; \}"),
+    "clic sur une fiche (pas d'apercu) : la colonne du document se ferme");
+Exiger(Regex.IsMatch(vue, @"if \(!n\.EstPiece\) \{ DonneesVisible = false; GuideVisible = false; return; \}"),
+    "clic sur un dossier (ni formulaire ni apercu) : les deux colonnes se ferment");
+
+// --- 7 bis. TROIS zones cote a cote (demande du 14/09/2026) : arbre,
+// donnees, document -- et le document sort dans SA fenetre.
+Exiger(Regex.IsMatch(vue, @"rig-vged__donnees"), "la colonne des DONNEES existe (zone 2)");
+Exiger(Regex.IsMatch(css, @"\.rig-vged__donnees\s*\{"), "rig-accueil.css style la colonne des donnees");
+Exiger(Regex.IsMatch(vue, @"DebutRedim2"),
+    "une SECONDE poignee regle la largeur des donnees (3 colonnes reglables)");
+Exiger(Regex.IsMatch(vue, @"if \(DonneesVisible\) \{ morceaux\.Add"),
+    "les colonnes se recalculent quand une zone se ferme");
+// Borne courte : sans elle, le motif traversait tout le fichier et trouvait
+// la METHODE DetacherDocument, bouton supprime ou non (mesure du 14/09).
+Exiger(Regex.IsMatch(vue, @"rig-apercu__actions[\s\S]{0,3000}?aria-label=""Detacher"" @onclick=""DetacherDocument"""),
+    "le document porte le bouton « Detacher »");
+// Demande du 15/09/2026 : detacher ferme la colonne de droite, fermer la
+// fenetre y renvoie le document.
+var corpsDetacher = Regex.Match(vue, @"private void DetacherDocument\(\)[\s\S]*?\n    \}").Value;
+Exiger(Regex.IsMatch(corpsDetacher, @"fenetre\.Show\(\);[\s\S]*GuideVisible = false;"),
+    "detacher ferme la colonne de droite (pas de doublon)");
+Exiger(Regex.IsMatch(corpsDetacher, @"Closed \+=[\s\S]*ApercuNoeud = piece;[\s\S]*GuideVisible = true;"),
+    "fermer la fenetre detachee renvoie le document dans la colonne de droite");
+Exiger(File.Exists(Path.Combine(racine, "FenetreDocument.xaml")) &&
+       File.Exists(Path.Combine(racine, "FenetreDocument.xaml.cs")),
+    "la fenetre detachee du document existe");
+var fenDoc = File.Exists(Path.Combine(racine, "FenetreDocument.xaml.cs"))
+    ? File.ReadAllText(Path.Combine(racine, "FenetreDocument.xaml.cs")) : string.Empty;
+// Le CHOIX du moniteur ne se lit plus ici : il a ete sorti dans
+// Metier/PlacementDocument.cs pour etre rejoue avec deux ecrans simules
+// (FenetresCheck), ce qu'un poste a un seul moniteur ne permettait pas.
+// Ce controle verifie donc le CABLAGE ; la regle elle-meme est prouvee a
+// l'execution par FenetresCheck.
+Exiger(Regex.IsMatch(fenDoc, @"EnumDisplayMonitors") && Regex.IsMatch(fenDoc, @"PlacementDocument\.Calculer"),
+    "la fenetre detachee demande sa place PAR DEFAUT a PlacementDocument (choix du moniteur)");
+Exiger(File.Exists(Path.Combine(racine, "Metier", "PlacementDocument.cs")),
+    "la regle de placement vit dans un fichier verifiable, pas dans la fenetre WPF");
+// 14/09/2026 : la position PRIME sur le placement par defaut -- elle doit etre
+// la meme d'une fois sur l'autre (travail sur plusieurs ecrans).
+Exiger(Regex.IsMatch(fenDoc, @"if \(!RestaurerPose\(\)\) PoserSurAutreEcran\(\)"),
+    "la position memorisee passe AVANT le placement par defaut");
+Exiger(Regex.IsMatch(fenDoc, @"AccueilEtat\.MemoriserDocument\(Rang, pose\)"),
+    "la place laissee est memorisee, par rang de fenetre");
+var etatAccueil = File.ReadAllText(Path.Combine(racine, "AccueilEtat.cs"));
+Exiger(Regex.IsMatch(etatAccueil, @"Dictionary<string, PoseFenetre> FenetresDocument"),
+    "la position des fenetres detachees est rangee dans accueil.json (pas de nouveau format)");
+// Le verdict lui-meme est verifie A L'EXECUTION par tests/FenetresCheck
+// (AccueilEtat.PoseUtilisable) ; ici on exige seulement que la fenetre s'en
+// serve au lieu de refaire le calcul dans son coin.
+Exiger(Regex.IsMatch(fenDoc, @"ZonesDeTravail\(\)") && Regex.IsMatch(fenDoc, @"AccueilEtat\.PoseUtilisable\(pose, zones\)"),
+    "une position hors des ecrans presents est refusee (fenetre jamais invisible)");
+// PLUSIEURS documents externalisables : un emplacement par rang, pas une piece
+// unique partagee (sinon N fenetres montrent N fois le meme document).
+var partage = File.ReadAllText(Path.Combine(racine, "Metier/DocumentPartage.cs"));
+Exiger(Regex.IsMatch(partage, @"Dictionary<int, DocumentDetache> _emplacements")
+       && Regex.IsMatch(partage, @"public DocumentDetache Emplacement\(int rang\)"),
+    "le passe-plat porte UN emplacement PAR fenetre detachee");
+Exiger(Regex.IsMatch(vue, @"List<FenetreDocument> FenetresDetachees")
+       && !Regex.IsMatch(vue, @"private bool DocumentDetache;"),
+    "VDossier garde une LISTE de fenetres detachees (plusieurs documents a la fois)");
+Exiger(Regex.IsMatch(vue, @"RangLibre\(FenetresDetachees"),
+    "chaque detachement prend le plus petit rang libre");
+
+Exiger(!Regex.IsMatch(fenDoc, @"Application\.Current\.MainWindow\s*\.\s*(Width|Height|Left|Top)"),
+    "la fenetre detachee ne redimensionne pas la fenetre principale");
+var vueDetachee = Path.Combine(racine, "Components/DocumentDetacheVue.razor");
+Exiger(File.Exists(vueDetachee), "Components/DocumentDetacheVue.razor existe");
+// L'objectif (zoom) du document detache doit etre MODULABLE et INDIVIDUEL :
+// boutons +/- dans la vue detachee, applique au document, et etat garde DANS la
+// vue (jamais dans DocumentPartage, sinon les fenetres zoomeraient ensemble).
+var texteDetachee = File.Exists(vueDetachee) ? File.ReadAllText(vueDetachee) : string.Empty;
+Exiger(Regex.IsMatch(texteDetachee, @"@onclick=""ZoomPlus""")
+       && Regex.IsMatch(texteDetachee, @"@onclick=""ZoomMoins"""),
+    "la fenetre detachee porte les boutons d'objectif (zoom + et -)");
+Exiger(Regex.IsMatch(texteDetachee, @"rig-apercu__pages""[^>]{0,120}?zoom:@Zoom"),
+    "l'objectif s'applique aux pages du document detache");
+Exiger(Regex.IsMatch(texteDetachee, @"\[Parameter\] public int Rang"),
+    "la vue detachee sait QUEL document elle affiche (son rang)");
+Exiger(Regex.IsMatch(texteDetachee, @"private double Zoom")
+       && !Regex.IsMatch(File.ReadAllText(Path.Combine(racine, "Metier/DocumentPartage.cs")), @"Zoom"),
+    "l'objectif est propre a CHAQUE fenetre detachee (etat local, pas partage)");
+Exiger(Regex.Matches(File.ReadAllText(Path.Combine(racine, "Metier/DocumentPartage.cs")),
+        @"public static string TextePage").Count == 1 &&
+       !Regex.IsMatch(File.ReadAllText(vueDetachee), @"const int parPage"),
+    "la decoupe en pages n existe qu UNE fois (pas de copie dans la fenetre detachee)");
 Exiger(Regex.IsMatch(vue, @"Selectionner=""OuvrirApercu""|Selectionner=""@?OuvrirApercu"""),
     "l'arbre branche le clic d'une piece sur OuvrirApercu");
 Exiger(vue.Contains("rig-impression"), "la boite de choix de l'imprimante existe (rig-impression)");
@@ -152,6 +250,108 @@ foreach (var attendu in new[] { "Pieces jointes", "Depots d'actes",
     Exiger(rcs.Enfants.Any(e => e.Libelle == attendu),
         $"la branche RCS porte le sous-dossier v2 « {attendu} »");
 }
+// « Informations des Formalites » (demande du 15/09/2026) : premiere entree de
+// la categorie Formalites, formulaire des champs du processus v2 XACTION, et
+// deplier Formalites place le bloc du milieu dessus.
+var formalites = rcs.Enfants.First(e => e.Libelle == "Formalites");
+var ficheFormalites = formalites.Enfants.FirstOrDefault();
+Exiger(ficheFormalites is { EstFiche: true, Libelle: RigV3Desktop.InformationsFormalite.LibelleNoeud },
+    "la categorie Formalites commence par la fiche « Informations des Formalites »");
+Exiger(RigV3Desktop.InformationsFormalite.ProcessusSources.SequenceEqual(new[] { "XACTION" })
+       && RigV3Desktop.InformationsFormalite.NombreChamps == 63
+       && RigV3Desktop.InformationsFormalite.Sections.Select(s => s.Table).SequenceEqual(
+              new[] { "ACTION_RCS", "BODACC", "BODACC_RCS_XML", "BODACC_RCS_XML_DET" }),
+    "la fiche des formalites porte les 63 champs XACTION lus en base");
+Exiger(ReferenceEquals(RigV3Desktop.ArbreDemo.FicheADeplier(formalites), ficheFormalites)
+       && RigV3Desktop.ArbreDemo.FicheADeplier(rcs) is { Libelle: RigV3Desktop.InformationsDossier.LibelleNoeud }
+       && RigV3Desktop.ArbreDemo.FicheADeplier(formalites.Enfants[1]) is null,
+    "deplier Formalites (ou Dossier RCS) designe sa fiche d'informations");
+// « Documents generes lors de la formalite » (demande du 15/09/2026) : pendant
+// v3 des EDITIONS de v2 (OPE_VGED.cs _RechercherFormalites, lignes d'edition
+// R_CODEMODELE_VDAS rangees dans chaque « Formalite n° »).
+var editionsFormalite = formalites.Enfants[1].Enfants
+    .FirstOrDefault(e => e.Libelle == RigV3Desktop.ArbreDemo.LibelleDocumentsGeneres);
+Exiger(editionsFormalite is { EstPiece: false, EstFiche: false } && editionsFormalite.NbPieces > 0
+       && editionsFormalite.Enfants.All(e => e.Origine == "Edition greffe"),
+    "chaque formalite porte la categorie « Documents generes lors de la formalite » (EDITIONS v2)");
+Exiger(Regex.IsMatch(vue, @"ArbreDemo.FicheADeplier\(") && vue.Contains("InformationsFormalite.Sections"),
+    "la vue utilise la regle de depliage et affiche la fiche des formalites");
+// « Informations des depots » (demande du 15/09/2026) : premiere entree de
+// la categorie Depots d'actes, formulaire des champs du processus v2 XDAS, et
+// deplier Depots d'actes place le bloc du milieu dessus.
+var depots = rcs.Enfants.First(e => e.Libelle == "Depots d'actes");
+var ficheDepots = depots.Enfants.FirstOrDefault();
+Exiger(ficheDepots is { EstFiche: true, Libelle: RigV3Desktop.InformationsDepots.LibelleNoeud },
+    "la categorie Depots d'actes commence par la fiche « Informations des depots »");
+Exiger(RigV3Desktop.InformationsDepots.ProcessusSources.SequenceEqual(new[] { "XDAS" })
+       && RigV3Desktop.InformationsDepots.NombreChamps == 77
+       && RigV3Desktop.InformationsDepots.Sections.Select(s => s.Table).SequenceEqual(
+              new[] { "DEPOT_RCS", "EVENEMENT_RCS", "ACTE_DEPOSE", "OBJET_ACTE",
+                      "INPI_TRANS_DEPOT_IMR", "DOSSIER_RCS", "BODACC", "BODACC_RCS_XML" }),
+    "la fiche des depots porte les 77 champs XDAS lus en base");
+Exiger(ReferenceEquals(RigV3Desktop.ArbreDemo.FicheADeplier(depots), ficheDepots)
+       && RigV3Desktop.ArbreDemo.FicheADeplier(depots.Enfants[1]) is null,
+    "deplier Depots d'actes designe sa fiche d'informations, pas un depot");
+Exiger(vue.Contains("InformationsDepots.Sections"),
+    "la vue affiche la fiche des depots");
+
+// --- 8 bis. La branche Judiciaire porte les objets des processus v2 de
+//     CREATION et de MODIFICATION du judiciaire (demande du 16/09/2026).
+//     Libelles des processus lus en base (RIG_AMIENS@SQL-PROD\PROD,
+//     PROCESSUS_ET_FONCTIONALITE) : CJUD/MJUD -> Instances, JOIN ->
+//     Jonctions et disjonctions, MESIN -> Mesures d'instruction,
+//     SIGNJUD/ORDOSIGN -> Decisions judiciaires, NPC/NF/REPRIPCH/MPC/EF ->
+//     Procedures collectives, DEPPC -> Depots sur la procedure, EJC ->
+//     Instances juge-commissaire, CLOT -> Cloture, IPE/IPSUIVI ->
+//     Injonctions de payer, OPE -> Ordonnances. Sans ce test, la branche
+//     Judiciaire retombe a la seule categorie « Ordonnances ».
+var jud = vuTout.First(d => d.Libelle == "Judiciaire");
+foreach (var attendu in new[] { "Instances", "Procedures collectives",
+                                "Injonctions de payer", "Ordonnances" })
+{
+    Exiger(jud.Enfants.Any(e => e.Libelle == attendu),
+        $"la branche Judiciaire porte la categorie « {attendu} »");
+}
+var sousJud = jud.Descendants().Select(n => n.Libelle).ToArray();
+foreach (var attendu in new[] { "Jonctions et disjonctions", "Mesures d instruction",
+                                "Decisions judiciaires", "Depots sur la procedure",
+                                "Instances juge-commissaire", "Cloture" })
+{
+    Exiger(sousJud.Contains(attendu),
+        $"la branche Judiciaire porte le sous-dossier « {attendu} »");
+}
+Exiger(jud.NbPieces >= 15, "la branche Judiciaire porte au moins 15 pieces");
+
+// --- 8 ter. Affaires PUREMENT judiciaires (demande du 16/09/2026) : une
+//     affaire sans dossier RCS (partie non immatriculee, personne physique,
+//     societe d un autre greffe) n ouvre QUE la branche « Judiciaire ».
+//     v2 fait exactement cela : OPE_VGED.cs, _InitTreeview() n ajoute
+//     « Dossier RCS » que si l affaire A un dossier RCS. Sans ce test,
+//     toute affaire ouvre un dossier RCS vide qui n existe pas.
+var jud2 = RigV3Desktop.ArbreDemo.RacineJudiciaire("2026J00087", "DUPONT Jean");
+var brJud = RigV3Desktop.AccesGed.EnfantsVisibles(jud2, tous);
+Exiger(brJud.Count == 1 && brJud[0].Libelle == "Judiciaire",
+    "une affaire purement judiciaire n'ouvre que la branche Judiciaire");
+Exiger(!jud2.Descendants().Any(n => n.Libelle == "Dossier RCS"),
+    "une affaire purement judiciaire ne porte aucun dossier RCS");
+Exiger(brJud[0].NbPieces == jud.NbPieces,
+    "la branche Judiciaire est la meme, avec ou sans dossier RCS");
+Exiger(RigV3Desktop.AccesGed.EnfantsVisibles(
+           RigV3Desktop.ArbreDemo.Racine("0000", "AMITEL SAS", "903 118 776",
+                                         avecJudiciaire: false), tous)
+       .Count == 1,
+    "une affaire sans volet judiciaire n'ouvre que la branche Dossier RCS");
+// La liste des affaires et le fonds de la page portent ces affaires sans Siren.
+var rechAffaires = File.ReadAllText(Path.Combine(racine, "Components/Ecrans/EcranRechAffaires.razor"));
+foreach (var numero in new[] { "2026J00087", "2026P00031", "2026IP00214",
+                               "2026M00045", "2026C00059" })
+{
+    Exiger(rechAffaires.Contains(numero) && vue.Contains(numero),
+        $"l'affaire purement judiciaire « {numero} » est cherchable et ouvrable");
+}
+Exiger(vue.Contains("SansDossierRcs") && vue.Contains("avecDossierRcs: !d.SansDossierRcs"),
+    "ouvrir une affaire purement judiciaire coupe la branche Dossier RCS");
+
 // Ces dossiers n'existent PAS dans l'arbre de v2 : « Non inscrits » et
 // « Bordereau de requisition » s'ouvrent dans un arbre separe, les autres
 // sont des inventions de la maquette.
@@ -177,6 +377,17 @@ Exiger(vue.Contains("NouveauOuvert") && vue.Contains("AjouterElement"),
     "la popup de creation existe et ajoute l'element");
 Exiger(Regex.IsMatch(css, @"\.rig-arbre__nouveau\b"), "rig-accueil.css style le bouton « Nouveau »");
 
+// Les fenetres modales s'ouvrent DEPUIS un ecran plein (`.rig-proc`, z-index 88) :
+// sous ce niveau elles se rendent derriere lui, invisibles (constate le 10/09/2026).
+var zVoile = Regex.Match(css, @"\.rig-voile \{[^}]*z-index:\s*(\d+)");
+var zHaut = Regex.Match(css, @"\.rig-voile--haut \{[^}]*z-index:\s*(\d+)");
+Exiger(zVoile.Success && int.Parse(zVoile.Groups[1].Value) > 88,
+    "le voile des fenetres passe au-dessus des ecrans pleins");
+Exiger(zHaut.Success && int.Parse(zHaut.Groups[1].Value) > 88,
+    "le voile haut (creation) passe au-dessus des ecrans pleins");
+Exiger(!Regex.IsMatch(css, @"\.rig-(impression|apercu) \{[^}]*background:\s*var\(--rig-fond-2"),
+    "les fenetres ont un fond OPAQUE (--rig-fond-2 est translucide)");
+
 var ajouts = RigV3Desktop.AccesGed.NouveauxAjouts();
 var cible = racineGed.Enfants.First(d => d.Libelle == "Dossier RCS");
 var avant = RigV3Desktop.AccesGed.EnfantsVisibles(cible, tous, ajouts).Count;
@@ -190,6 +401,606 @@ Exiger(RigV3Desktop.AccesGed.EnfantsVisibles(voisin, tous, ajouts).Count
     "l'ajout ne touche que le dossier cible");
 Exiger(RigV3Desktop.AccesGed.NouvellePiece("Kbis", "PDF", "10/09/2026").EstPiece,
     "une piece creee est bien une piece (elle s'ouvre dans l'apercu)");
+
+
+// --- 10. Creation par ICONES, nommage SUR PLACE, menu du clic droit.
+Exiger(vue.Contains("rig-natures") && vue.Contains("AccesGed.Natures")
+       && !vue.Contains("NouveauLibelle"),
+    "la fenetre « Nouveau » propose des icones de nature, sans champ Libelle");
+Exiger(RigV3Desktop.AccesGed.Natures.Length >= 10,
+    "la liste des natures proposees est enrichie");
+Exiger(Regex.IsMatch(css, @"\.rig-tuile-nature \{[^}]*border:[^;]*dashed")
+       && Regex.IsMatch(css, @"\.rig-tuile-nature \{[^}]*aspect-ratio:\s*1\s*/\s*1")
+       && Regex.IsMatch(css, @"\.rig-tuile-nature \{[^}]*border-radius")
+       // La grille GED ne doit JAMAIS reutiliser `.rig-nature` : cette classe est
+       // le badge de la colonne Nature du tableau des affaires (rig-charte.css).
+       // Collision constatee le 11/09/2026 : les lignes du tableau prenaient
+       // aspect-ratio 1/1 et devenaient de gros carres.
+       && !Regex.IsMatch(css, @"\.rig-nature \{"),
+    "les tuiles de nature sont carrees, arrondies et en pointilles");
+var arbreVue = File.ReadAllText(Path.Combine(racine, "Components", "ArbreGedNoeud.razor"));
+Exiger(arbreVue.Contains("oncontextmenu") && vue.Contains("rig-ctx__item")
+       && vue.Contains("SupprimerNoeud") && vue.Contains("DemarrerRenommage"),
+    "le clic droit dans l'arbre ouvre un menu avec renommer et supprimer");
+Exiger(arbreVue.Contains("rig-arbre__saisie") && vue.Contains("ValiderRenommage")
+       && vue.Contains("NoeudRenomme = element"),
+    "un element cree se nomme SUR PLACE dans l'arbre");
+// Le menu de GAUCHE de l'accueil s'appelle deja `.rig-menu` : une seconde
+// declaration de ce nom (menu contextuel) l'avait sorti du flux en
+// `position: fixed` et tassait tout l'accueil a gauche (10/09/2026).
+Exiger(!Regex.IsMatch(css, @"\.rig-menu \{[^}]*position:\s*fixed"),
+    "le menu de gauche de l'accueil n'est pas mis en position fixe");
+Exiger(Regex.IsMatch(css, @"\.rig-ctx \{[^}]*position:\s*fixed"),
+    "le menu du clic droit a son propre nom de classe (.rig-ctx)");
+
+// Chaque nature doit avoir SON dessin : sans cela les tuiles se
+// ressemblent toutes et le choix ne se fait plus a l'oeil.
+var icones = File.ReadAllText(Path.Combine(racine, "Components", "IconeGed.razor"));
+Exiger(vue.Contains("<IconeGed Nature=") && !vue.Contains("rig-nature__icone rig-arbre__icone"),
+    "les tuiles de nature portent une vraie icone dessinee, pas une pastille");
+foreach (var n in RigV3Desktop.AccesGed.Natures)
+{
+    if (n.Code == "pdf") continue; // la feuille est le dessin par defaut
+    Exiger(icones.Contains($"\"{n.Code}\" =>"), $"la nature « {n.Titre} » a son propre dessin");
+}
+Exiger(icones.Contains("stroke=\"currentColor\"") && !icones.Contains("http"),
+    "les icones sont tracees au trait, sans image ni ressource externe");
+
+// L'arbre pose la MEME icone que la fenetre de creation, plus de pastille.
+var arbreIcone = File.ReadAllText(Path.Combine(racine, "Components", "ArbreGedNoeud.razor"));
+Exiger(arbreIcone.Contains("<IconeGed Nature=") && !arbreIcone.Contains("rig-arbre__icone--"),
+    "les lignes de l'arbre portent une icone dessinee, plus une pastille carree");
+Exiger(!Regex.IsMatch(css, @"\.rig-arbre__icone \{[^}]*background"),
+    "l'icone de l'arbre est un trait, pas un aplat de couleur");
+Exiger(RigV3Desktop.AccesGed.CodeIcone(RigV3Desktop.AccesGed.NouveauDossier("X")) == "dossier",
+    "un dossier prend le dessin de la chemise");
+Exiger(RigV3Desktop.AccesGed.CodeIcone(
+        RigV3Desktop.AccesGed.NouvellePiece("X", "JPG", "10/09/2026")) == "jpg",
+    "une piece JPG prend le dessin de l'image");
+Exiger(RigV3Desktop.AccesGed.CodeIcone(
+        RigV3Desktop.AccesGed.NouveauSelonNature("ordonnance", "10/09/2026")) == "ordonnance",
+    "une ordonnance creee garde SON dessin dans l'arbre");
+Exiger(RigV3Desktop.AccesGed.CodeIcone(
+        racineGed.Descendants().First(n => n.EstPiece)).Length > 0,
+    "une piece du jeu de demonstration retombe sur un dessin connu");
+
+// La barre du haut (marque, login, reglages, reduire/fermer, deplacement de
+// la fenetre) doit rester visible DANS la vue d'une affaire : la visionneuse
+// commence sous le bandeau et passe sous la barre.
+var vged = Regex.Match(css, @"\.rig-vged \{(?:[^{}]|/\*.*?\*/)*?\}", RegexOptions.Singleline);
+Exiger(vged.Success && vged.Value.Contains("--rig-bandeau-h")
+       && !Regex.IsMatch(vged.Value, @"inset:\s*0\s*;"),
+    "la vue d'une affaire commence SOUS la barre du haut");
+var zVged = Regex.Match(vged.Value, @"z-index:\s*(\d+)");
+var zBarre = Regex.Match(css, @"\.rig-barre \{(?:[^{}]|/\*.*?\*/)*?z-index:\s*(\d+)",
+                         RegexOptions.Singleline);
+Exiger(zVged.Success && zBarre.Success
+       && int.Parse(zVged.Groups[1].Value) < int.Parse(zBarre.Groups[1].Value),
+    "la vue d'une affaire passe SOUS la barre du haut, jamais par-dessus");
+
+var masques = RigV3Desktop.AccesGed.NouveauxMasques();
+masques.Add(cible.Enfants[0]);
+Exiger(RigV3Desktop.AccesGed.EnfantsVisibles(cible, tous, null, masques).Count
+       == cible.Enfants.Length - 1,
+    "un noeud supprime disparait de la liste du dossier");
+
+// La fenetre detachee porte la barre de titre native de Windows : elle ne doit
+// PAS piloter FenetreInterop, dont les commandes visent Application.Current.MainWindow
+// -- reduire/fermer depuis le document frapperaient alors la fenetre principale.
+Exiger(!Regex.IsMatch(File.ReadAllText(vueDetachee), @"FenetreInterop"),
+    "la vue detachee ne pilote pas les commandes de la fenetre principale");
+
+// --- MODE TACHE (task driven) : une recette replie l'arbre sur ce qu'elle
+// nomme, sans rien supprimer, et le bouton « Afficher tout le dossier »
+// remet la vue entiere. Sans ce test, la vue focalisee peut se transformer
+// en suppression silencieuse de branches.
+var deno = RigV3Desktop.RecettesTaches.Deno;
+Exiger(deno.Champs.Length == 2
+       && deno.Champs.Any(c => c.Table == "INSCRIT_PM" && c.Colonne == "DENOMINATION_USAGE")
+       && deno.Champs.Any(c => c.Table == "ETABLISSEMENT" && c.Colonne == "NOM_DOMAINE"),
+    "la recette DENO declare la denomination d'usage ET le nom de domaine");
+Exiger(deno.Champs.Any(c => !c.Declare),
+    "la recette distingue un champ NON declare en base (le nom de domaine)");
+
+var infos = RigV3Desktop.InformationsDossier.Sections;
+Exiger(infos.Any(s => s.Table == "INSCRIT_PM" && s.Champs.Any(c => c.Colonne == "DENOMINATION_USAGE"))
+       && infos.Any(s => s.Table == "ETABLISSEMENT" && s.Champs.Any(c => c.Colonne == "NOM_DOMAINE")),
+    "les deux champs de la recette existent bien dans la fiche du dossier");
+Exiger(infos.Sum(s => s.Champs.Length) > 400
+       && infos.Count(s => deno.GardeTable(s.Table)) == 2,
+    "la recette ne retient que 2 sections de la fiche sur les 31");
+
+var dossierRcs = cible;
+{
+    var complet = RigV3Desktop.AccesGed.EnfantsVisibles(dossierRcs, tous);
+    var focalise = RigV3Desktop.AccesGed.EnfantsVisibles(dossierRcs, tous, null, null, deno);
+    Exiger(focalise.Count < complet.Count, "la tache DENO replie une partie du dossier RCS");
+    Exiger(focalise.Any(n => n.EstFiche),
+        "la tache DENO garde la fiche « Informations du dossier »");
+    Exiger(focalise.Any(n => n.Libelle == "Pieces jointes") && focalise.Any(n => n.Libelle == "Formalites"),
+        "la tache DENO garde les branches ou deposer la preuve");
+    Exiger(!focalise.Any(n => n.Libelle == "Depots des comptes annuels"),
+        "la tache DENO replie les branches qu'elle ne nomme pas");
+    // Le REPLI n'est pas une suppression : sans recette, tout revient.
+    Exiger(RigV3Desktop.AccesGed.EnfantsVisibles(dossierRcs, tous, null, null, null).Count == complet.Count,
+        "« Afficher tout le dossier » remet toutes les branches (repli, pas suppression)");
+}
+Exiger(!RigV3Desktop.AccesGed.EnfantsVisibles(racineGed, tous, null, null, deno)
+        .Any(n => n.Libelle == "Judiciaire"),
+    "la tache DENO ne montre pas la branche Judiciaire");
+
+var vueTache = vue;
+Exiger(vueTache.Contains("Afficher tout le dossier"),
+    "la vue porte le bouton « Afficher tout le dossier »");
+Exiger(vueTache.Contains("BranchesMasquees") && vueTache.Contains("PiecesMasquees"),
+    "le bouton annonce COMBIEN il revele (branches et pieces masquees)");
+var ficheTache = File.ReadAllText(Path.Combine(racine, "Components/FicheInformationsDossier.razor"));
+Exiger(ficheTache.Contains("Afficher tous les champs") && ficheTache.Contains("ToutAffiche"),
+    "la fiche porte le meme bouton et COMPTE les clics");
+
+var alertesTache = new RigV3Desktop.AlertesGreffe().Relever();
+var taches = alertesTache.Where(a => a.Tache is not null).ToArray();
+// Depuis le regroupement (16/09) les denominations arrivent en LOT, plus
+// une par dossier : la file mene toujours a la tache, par le tableau.
+Exiger(alertesTache.Any(a => a.Lot == RigV3Desktop.RecettesTaches.CodeDeno),
+    "l'accueil mene a la tache DENO, desormais par son entree groupee");
+Exiger(taches.Any(a => a.Tache!.Value.Code == "DPER")
+       && taches.Any(a => a.Tache!.Value.Code == "DSTE"),
+    "les alertes de changement de dirigeant arrivent sous leurs DEUX codes");
+Exiger(taches.All(a => RigV3Desktop.RecettesTaches.ParCode(a.Tache!.Value.Code) is not null),
+    "aucune alerte n'ouvre une tache sans recette");
+
+// --- CLOTURE de la tache : elle ne se ferme que si SES champs sont ecrits,
+// la trace dit QUI a ecrit quoi, et l'alerte ne revient plus ensuite.
+var ecrit = new Dictionary<string, string>();
+Exiger(!deno.EstComplete(c => ecrit.TryGetValue(c, out var v) ? v : null),
+    "une tache sans aucun champ ecrit n'est PAS complete");
+ecrit["INSCRIT_PM.DENOMINATION_USAGE"] = "AMIENS BILLARDS 2";
+string? Ecrit(string c) => ecrit.TryGetValue(c, out var v) ? v : null;
+
+// NOM DE DOMAINE : exige UNIQUEMENT si le dossier en porte deja un
+// (decide le 16/09/2026 -- 1 072 etablissements sur 239 564 en ont un).
+// Dossier SANS domaine d'origine : la denomination suffit a clore.
+Exiger(deno.EstComplete(Ecrit),
+    "sans domaine d'origine, renommer suffit a clore (99,5 % des dossiers)");
+// Dossier AVEC un domaine d'origine : il DOIT etre repris.
+string? Origine(string c) => c == "ETABLISSEMENT.NOM_DOMAINE" ? "ancien-nom.fr" : null;
+Exiger(!deno.EstComplete(Ecrit, 1, Origine),
+    "un dossier qui A deja un domaine ne se clot pas sans l'avoir repris");
+Exiger(deno.Manquants(Ecrit, 1, Origine).Single().Colonne == "NOM_DOMAINE",
+    "le champ manquant est NOMME, pas un refus muet");
+ecrit["ETABLISSEMENT.NOM_DOMAINE"] = "amiens-billards.fr";
+Exiger(deno.EstComplete(Ecrit, 1, Origine),
+    "le domaine repris, la tache se clot");
+ecrit["ETABLISSEMENT.NOM_DOMAINE"] = "   ";
+Exiger(!deno.EstComplete(Ecrit, 1, Origine),
+    "une valeur effacee redevient manquante (pas de faux vert)");
+Exiger(deno.Champs.Single(c => c.Colonne == "NOM_DOMAINE").ObligatoireSiRenseigne
+       && !deno.Champs.Single(c => c.Colonne == "NOM_DOMAINE").Obligatoire,
+    "le nom de domaine est conditionnel : ni exige partout, ni abandonne");
+Exiger(deno.ChampsExiges(null).Length == 1 && deno.ChampsExiges(Origine).Length == 2,
+    "1 champ exige sans domaine d'origine, 2 avec");
+
+// La PREUVE de completude est la trace du dossier, avec son auteur.
+var etatTest = new RigV3Desktop.AccueilEtat();
+Exiger(etatTest.DerniereValeur("2026B01067", "INSCRIT_PM.DENOMINATION_USAGE") is null,
+    "aucune valeur n'est prouvee tant que rien n'a ete ecrit");
+etatTest.Modifications["2026B01067"] =
+[
+    new(DateTime.Now, "R. VILAIN", "Informations du dossier > Identite de la personne morale",
+        "Denomination d'usage", "INSCRIT_PM.DENOMINATION_USAGE", "AMIENS BILLARDS", "AMIENS BILLARDS 2"),
+];
+Exiger(etatTest.DerniereValeur("2026B01067", "INSCRIT_PM.DENOMINATION_USAGE") == "AMIENS BILLARDS 2",
+    "la trace du dossier dit la derniere valeur ecrite (preuve de completude)");
+Exiger(etatTest.Modifications["2026B01067"][0].Auteur.Length > 0,
+    "la trace dit QUI a modifie le champ");
+
+Exiger(!etatTest.TacheFaite(RigV3Desktop.RecettesTaches.CodeDeno, "2026B01067"),
+    "une tache non close n'est pas marquee faite");
+etatTest.CloreTache(RigV3Desktop.RecettesTaches.CodeDeno, "2026B01067", "R. VILAIN");
+Exiger(etatTest.TacheFaite(RigV3Desktop.RecettesTaches.CodeDeno, "2026B01067"),
+    "une tache close est retenue (code + affaire + auteur + date)");
+Exiger(!etatTest.TacheFaite(RigV3Desktop.RecettesTaches.CodeDeno, "0000"),
+    "la cloture ne vaut que pour l'affaire nommee, pas pour les autres");
+
+// --- PROPAGATION : ce que l'evenement entraine AILLEURS que dans les champs.
+// Les canaux et leurs codes viennent du referentiel CODE_EVENEMENT_RCS : si
+// quelqu'un les reecrit a la main, ce test le voit.
+Exiger(deno.Effets.Length == 5 && deno.EffetsObligatoires.Length == 4,
+    "DENO declare 5 effets, dont 4 exiges avant cloture");
+foreach (var (canal, code) in new[]
+         { ("bodacc", "B0111 / B0112 / B0113"), ("inpi", "0F"), ("infogreffe", "4028") })
+{
+    var eff = deno.Effets.FirstOrDefault(x => x.Canal == canal);
+    Exiger(eff is not null && eff.Code == code,
+        $"l'effet « {canal} » porte le code lu en base ({code})");
+}
+Exiger(deno.Effets.All(x => x.Source.StartsWith("CODE_EVENEMENT_RCS.")),
+    "chaque effet nomme la colonne de base qui le declare");
+Exiger(deno.Effets.Single(x => x.Canal == "notif-principal").Obligatoire == false
+       && deno.Effets.Single(x => x.Canal == "notif-secondaire").Obligatoire,
+    "la base dit non pour le principal et oui pour le secondaire : le test le fige");
+
+var coches = new HashSet<string>();
+Exiger(deno.EffetsRestants(coches.Contains).Length == 4,
+    "aucun effet coche : les 4 obligatoires restent a traiter");
+coches.Add("bodacc"); coches.Add("inpi"); coches.Add("infogreffe");
+Exiger(deno.EffetsRestants(coches.Contains).Single().Canal == "notif-secondaire",
+    "il reste la notification aux etablissements secondaires, nommee");
+coches.Add("notif-secondaire");
+Exiger(deno.EffetsRestants(coches.Contains).Length == 0,
+    "les 4 effets obligatoires coches, plus rien ne bloque la cloture");
+Exiger(!coches.Contains("notif-principal"),
+    "un effet NON exige ne doit pas etre coche pour pouvoir clore");
+
+var etatEffets = new RigV3Desktop.AccueilEtat();
+Exiger(!etatEffets.EffetTraite("DENO", "2026B01067", "bodacc"),
+    "aucun effet n'est traite au depart");
+etatEffets.BasculerEffet("DENO", "2026B01067", "bodacc");
+Exiger(etatEffets.EffetTraite("DENO", "2026B01067", "bodacc"),
+    "cocher un effet le retient (une tache interrompue se retrouve a l'identique)");
+etatEffets.BasculerEffet("DENO", "2026B01067", "bodacc");
+Exiger(!etatEffets.EffetTraite("DENO", "2026B01067", "bodacc"),
+    "decocher un effet est possible : le geste est reversible");
+Exiger(!etatEffets.EffetTraite("DENO", "0000", "bodacc"),
+    "les effets coches valent pour UNE affaire, pas pour toutes");
+
+// --- 2e RECETTE : changement de dirigeant. C'est elle qui dit si le modele
+// tient sans etre reecrit -- et ce qu'il a fallu lui ajouter.
+var dir = RigV3Desktop.RecettesTaches.Dirigeant;
+Exiger(dir.Evenements.Length == 2 && dir.Evenements.Contains("DSTE")
+       && dir.Evenements.Contains("DPER"),
+    "UNE tache « changer un dirigeant » couvre DEUX codes RCS (DSTE et DPER)");
+Exiger(RigV3Desktop.RecettesTaches.ParCode("DPER") is { } rd && rd.Code == dir.Code,
+    "une alerte DPER trouve la meme recette qu'une alerte DSTE");
+Exiger(RigV3Desktop.RecettesTaches.ParCode("NGER") is null,
+    "NGER n'a PAS de recette : la base dit qu'il ne sert qu'aux depots d'actes");
+Exiger(deno.Evenements.Single() == "DENO",
+    "une recette a un seul code garde le sien (rien n'a casse pour DENO)");
+
+Exiger(dir.Champs.Length == 5 && dir.ChampsObligatoires.Length == 4,
+    "5 champs dont 4 exiges : la date de fin du sortant reste facultative");
+Exiger(dir.Champs.Single(c => c.Colonne == "SUPPRIM_DATE_FIN").Obligatoire == false,
+    "une nomination SANS depart reste un changement de dirigeant valide");
+Exiger(dir.Champs.All(c => !c.Declare),
+    "aucun champ dirigeant n'est declare en base : la recette le dit au lieu de faire semblant");
+Exiger(dir.Champs.All(c => c.Repetable) && deno.Champs.All(c => !c.Repetable),
+    "un dirigeant est une LIGNE repetable, une denomination non");
+Exiger(deno.Champs.Length == 2,
+    "la 1re recette porte toujours ses 2 champs : le domaine n'a pas ete retire");
+
+var ecritDir = new Dictionary<string, string>
+{
+    ["DIRIGEANT_PP[1].PATRONYME"] = "MARTIN",
+    ["DIRIGEANT_PP[1].PRENOMS_ETAT_CIVIL"] = "Claire",
+    ["DIRIGEANT[1].FONCTION_DIRIGEANT"] = "Gerant",
+    ["DIRIGEANT[1].DATE_ENTREE"] = "01/09/2026",
+};
+Exiger(dir.EstComplete(c => ecritDir.TryGetValue(c, out var v) ? v : null),
+    "les 4 champs exiges suffisent : le champ facultatif ne bloque pas la cloture");
+
+Exiger(dir.Effets.Single(x => x.Canal == "infogreffe").Code == "4206"
+       && deno.Effets.Single(x => x.Canal == "infogreffe").Code == "4028",
+    "chaque evenement a SON code Infogreffe (4206 dirigeant, 4028 denomination)");
+Exiger(dir.EffetsObligatoires.Length == 3
+       && dir.Effets.Single(x => x.Canal == "notif").Obligatoire == false,
+    "le dirigeant ne notifie personne : 3 effets exiges, pas 4");
+Exiger(dir.Branches.Contains("Depots d'actes") && !deno.Branches.Contains("Depots d'actes"),
+    "la tache dirigeant ouvre en plus les depots d'actes (l'acte de nomination)");
+
+// --- PLUSIEURS LIGNES : trois dirigeants changes le meme jour font UNE
+// tache, pas trois. Chaque ligne a sa propre cle de trace.
+Exiger(dir.ARepetition && !deno.ARepetition,
+    "la tache dirigeant se saisit en plusieurs lignes, pas la denomination");
+var champFonction = dir.Champs.Single(c => c.Colonne == "FONCTION_DIRIGEANT");
+Exiger(RigV3Desktop.RecetteTache.Cle(champFonction, 2) == "DIRIGEANT[2].FONCTION_DIRIGEANT",
+    "un champ repetable porte son rang de ligne dans la trace");
+Exiger(RigV3Desktop.RecetteTache.Cle(champFonction, 1)
+       != RigV3Desktop.RecetteTache.Cle(champFonction, 2),
+    "le 2e dirigeant n'ECRASE pas le 1er dans la trace");
+Exiger(RigV3Desktop.RecetteTache.Cle(deno.Champs[0], 2) == "INSCRIT_PM.DENOMINATION_USAGE",
+    "un champ NON repetable garde sa cle, quel que soit le rang");
+
+var l1 = new Dictionary<string, string>
+{
+    ["DIRIGEANT_PP[1].PATRONYME"] = "MARTIN",
+    ["DIRIGEANT_PP[1].PRENOMS_ETAT_CIVIL"] = "Claire",
+    ["DIRIGEANT[1].FONCTION_DIRIGEANT"] = "Gerant",
+    ["DIRIGEANT[1].DATE_ENTREE"] = "01/09/2026",
+};
+string? Lire(string c) => l1.TryGetValue(c, out var v) ? v : null;
+Exiger(dir.EstComplete(Lire, 1), "une seule ligne renseignee : la tache est complete");
+Exiger(!dir.EstComplete(Lire, 2),
+    "ouvrir un 2e dirigeant ROUVRE la tache (une ligne vide ne se clot pas en silence)");
+Exiger(dir.ManquantsParLigne(Lire, 2).All(x => x.Ligne == 2)
+       && dir.ManquantsParLigne(Lire, 2).Length == 4,
+    "les 4 champs manquants sont nommes SUR LA LIGNE 2, pas en vrac");
+l1["DIRIGEANT_PP[2].PATRONYME"] = "DUPONT";
+l1["DIRIGEANT_PP[2].PRENOMS_ETAT_CIVIL"] = "Jean";
+l1["DIRIGEANT[2].FONCTION_DIRIGEANT"] = "President";
+l1["DIRIGEANT[2].DATE_ENTREE"] = "02/09/2026";
+Exiger(dir.EstComplete(Lire, 2), "les deux dirigeants renseignes, la tache se clot");
+Exiger(dir.Manquants(Lire, 3).Length == 4,
+    "un 3e dirigeant ajoute redemande ses champs");
+
+var etatLignes = new RigV3Desktop.AccueilEtat();
+Exiger(etatLignes.NbLignesTache("DSTE", "004182") == 1,
+    "une tache commence avec une seule ligne");
+Exiger(etatLignes.AjouterLigneTache("DSTE", "004182") == 2
+       && etatLignes.NbLignesTache("DSTE", "004182") == 2,
+    "ajouter une ligne est retenu (une tache interrompue garde ses lignes)");
+Exiger(etatLignes.NbLignesTache("DSTE", "0000") == 1,
+    "les lignes valent pour UNE affaire, pas pour toutes");
+Exiger(etatLignes.RetirerLigneTache("DSTE", "004182") == 1
+       && etatLignes.RetirerLigneTache("DSTE", "004182") == 1,
+    "retirer une ligne est possible, et ne descend jamais sous une ligne");
+
+Exiger(vueTache.Contains("AjouterLigneTache") && vueTache.Contains("TrousDeLaLigne("),
+    "la vue sait ajouter une ligne et dire laquelle est incomplete");
+var ficheLignes = File.ReadAllText(Path.Combine(racine, "Components/FicheInformationsDossier.razor"));
+Exiger(ficheLignes.Contains("LigneCourante") && ficheLignes.Contains("CleDuChamp("),
+    "la fiche ecrit sous la cle de la ligne saisie");
+Exiger(ficheLignes.Contains("Recette.LibelleLigne"),
+    "la trace nomme la ligne : trois nominations donnent trois lignes distinctes");
+
+// --- TRAITEMENT EN LOT : la meme recette sur plusieurs affaires.
+var ecranLot = Path.Combine(racine, "Components/Ecrans/EcranTachesLot.razor");
+Exiger(File.Exists(ecranLot), "l'ecran de traitement en lot existe");
+var lot = File.Exists(ecranLot) ? File.ReadAllText(ecranLot) : string.Empty;
+Exiger(vueTache.Contains("case \"PROC_TACHES_LOT\":") && vueTache.Contains("<EcranTachesLot"),
+    "l'ecran en lot est aiguille dans la vue");
+Exiger(Regex.IsMatch(vueTache, @"new\(""PROC_TACHES_LOT"",\s*"""),
+    "l'ecran en lot figure au catalogue des traitements");
+Exiger(lot.Contains("ChampsObligatoires") && lot.Contains("<th"),
+    "le lot montre les champs de la recette EN COLONNES");
+Exiger(lot.Contains("ARepetition"),
+    "une tache qui se saisit en plusieurs lignes est ECARTEE du lot, avec son motif");
+Exiger(lot.Contains("private void Terminer(DossierDuLot d)")
+       && !Regex.IsMatch(lot, @"Tout\s*terminer|TerminerTout"),
+    "la cloture est PAR DOSSIER : aucun bouton ne clot le lot entier");
+Exiger(lot.Contains("Restants(d.Dossier) > 0 || EffetsRestants(d.Dossier) > 0"),
+    "un dossier incomplet ne se clot pas, meme au milieu d'un lot");
+Exiger(lot.Contains("Etat.NoterModification(d.Dossier"),
+    "la saisie en lot ecrit dans la trace DU DOSSIER concerne, pas dans un ailleurs");
+Exiger(lot.Contains("Etat.TacheFaite("),
+    "un dossier deja termine sort du lot");
+
+// Le lot n'est pas qu'un ecran : il faut qu'il y ait REELLEMENT plusieurs
+// affaires a traiter ensemble, sinon la vue tableau ne sert a rien.
+var parRecette = RigV3Desktop.JeuDemo.EvenementsAttendus
+    .Select(e => (e, r: RigV3Desktop.RecettesTaches.ParCode(e.Code)))
+    .Where(x => x.r is not null)
+    .GroupBy(x => x.r!.Code)
+    .ToDictionary(g => g.Key, g => g.Count());
+Exiger(parRecette.TryGetValue("DENO", out var nDeno) && nDeno >= 2,
+    "au moins deux affaires attendent la meme recette (le lot a un sens)");
+
+// La file d'alertes MENE au lot : plusieurs dossiers pour une meme recette
+// font UNE entree, pas une par dossier.
+var alertesLot = new RigV3Desktop.AlertesGreffe().Relever();
+var entreeLot = alertesLot.FirstOrDefault(x => x.Lot is not null);
+Exiger(entreeLot is not null && entreeLot.Lot == "DENO",
+    "la file propose UNE entree groupee pour les denominations");
+Exiger(entreeLot is not null && entreeLot.Titre.StartsWith("2 dossiers"),
+    "l'entree groupee annonce COMBIEN de dossiers elle porte");
+// L ARRIERE part en lot, mais ce qui est signale AUJOURD HUI reste une alerte
+// NOMMEE : AlertesGreffe.Relever() le dit explicitement (« ce qui arrive
+// aujourd hui ne part pas en lot »), sinon le flux EDI entre ce matin serait
+// noye dans un compteur et le greffe perdrait le seul cas ou il peut repondre
+// le jour meme. Le controle porte donc sur l ARRIERE, pas sur le jour.
+var denoIndividuelles = alertesLot
+    .Where(x => x.Tache is { } t2 && t2.Code == "DENO")
+    .ToArray();
+Exiger(denoIndividuelles.All(x => x.Detail.Contains("signale aujourd hui")),
+    "aucune denomination de l ARRIERE ne reste en alerte individuelle : le lot les absorbe");
+Exiger(alertesLot.Any(x => x.Tache is { } t3 && (t3.Code == "DPER" || t3.Code == "DSTE")),
+    "le changement de dirigeant reste dossier par dossier (saisie ligne par ligne)");
+Exiger(lot.Contains("CodeRecette"),
+    "l'ecran s'ouvre sur la recette que l'alerte nomme");
+
+// --- RELECTURE EN BASE des recettes sigle / forme juridique / nom d'usage
+// (ULT_OP_ET_EVENEMENT_RCS et CODE_EVENEMENT_RCS, RIG_AMIENS, 16/09/2026).
+// Ces valeurs viennent d'une lecture, pas d'une deduction : si quelqu'un les
+// reecrit de memoire, ce test le voit.
+var sigl = RigV3Desktop.RecettesTaches.ParCode("SIGL")!;
+var form = RigV3Desktop.RecettesTaches.ParCode("FORM")!;
+var nusa = RigV3Desktop.RecettesTaches.ParCode("NUSA")!;
+
+Exiger(sigl.Champs.Length == 1 && sigl.Champs[0].Colonne == "SIGLE"
+       && sigl.Champs[0].Obligatoire,
+    "SIGL : un seul champ declare en base (INSCRIT_PM.SIGLE), obligatoire");
+
+foreach (var col in new[] { "FORME_JURIDIQUE_UTI", "TEXTE_FORME", "ASSOCIE_UNIQUE", "BODACC_OUI" })
+{
+    Exiger(form.Champs.Any(c => c.Table == "INSCRIT_PM" && c.Colonne == col),
+        $"FORM porte le champ declare en base « {col} »");
+}
+Exiger(form.Champs.Length == 4,
+    "FORM : les QUATRE champs declares en base, pas seulement la forme juridique");
+Exiger(form.ChampsObligatoires.Length == 1
+       && form.ChampsObligatoires[0].Colonne == "FORME_JURIDIQUE_UTI",
+    "FORM : seule la forme juridique est exigee (choix produit assume, la base n'exige rien)");
+
+Exiger(nusa.Champs.Length == 2
+       && nusa.Champs.Any(c => c.Colonne == "NOM_USAGE" && c.Obligatoire)
+       && nusa.Champs.Any(c => c.Colonne == "CIVILITE" && !c.Obligatoire),
+    "NUSA : nom d'usage exige, civilite proposee -- comme la base le declare");
+
+// Les codes Infogreffe sont DIFFERENTS par evenement : c'est la valeur la
+// plus facile a recopier de travers.
+foreach (var (code, infog) in new[] { ("SIGL", "4011"), ("FORM", "4012"), ("NUSA", "4035"),
+                                      ("DENO", "4028"), ("DSTE", "4206") })
+{
+    var r = RigV3Desktop.RecettesTaches.ParCode(code)!;
+    Exiger(r.Effets.Single(e => e.Canal == "infogreffe").Code == infog,
+        $"{code} : code Infogreffe {infog}, tel que la base le declare");
+}
+Exiger(!nusa.Effets.Any(e => e.Canal == "bodacc"),
+    "NUSA n'a AUCUNE publication BODACC : la base laisse les trois colonnes vides");
+Exiger(form.Effets.Any(e => e.Canal == "bodacc") && sigl.Effets.Any(e => e.Canal == "bodacc"),
+    "SIGL et FORM publient au BODACC (B0111/B0112/B0113)");
+Exiger(RigV3Desktop.RecettesTaches.Liste.All(
+        r => r.Effets.All(e => e.Source.StartsWith("CODE_EVENEMENT_RCS."))),
+    "CHAQUE effet de CHAQUE recette nomme la colonne de base qui le declare");
+
+// --- REFERENTIEL -> COLONNE REELLE. C'est cette regle qui decidera si le
+// branchement sur la base trouve les champs ou echoue EN SILENCE : une
+// colonne introuvable ne leve rien, elle rend du vide.
+var R = (Func<string, string, RigV3Desktop.CibleColonne>)RigV3Desktop.ColonnesRig.Resoudre;
+
+// Les prefixes sont LUS en base, pas deduits du nom : DIRIGEANT donne
+// DRGNT, DOSSIER_RCS donne DSSRC. Une regle mecanique se tromperait.
+foreach (var (tbl, attr, attendu) in new[]
+{
+    ("INSCRIT_PP",   "PATRONYME",          "INSPP_PATRONYME"),
+    ("INSCRIT_PM",   "DENOMINATION_USAGE", "INSPM_DENOMINATION_USAGE"),
+    ("ETABLISSEMENT","NOM_DOMAINE",        "ETBLS_NOM_DOMAINE"),
+    ("DOSSIER_RCS",  "DATE_CESSATION",     "DSSRC_DATE_CESSATION"),
+    ("DIRIGEANT",    "FONCTION_DIRIGEANT", "DRGNT_FONCTION_DIRIGEANT"),
+    ("DIRIGEANT_PP", "PATRONYME",          "DRGPP_PATRONYME"),
+    ("ADRESSE_BASE", "ID_ADRBS",           "ADRBS_ID_ADRBS"),
+})
+{
+    var cibleCol = R(tbl, attr);
+    Exiger(cibleCol.Resolue && cibleCol.Colonne == attendu,
+        $"{tbl}.{attr} se lit « {attendu} » en base");
+}
+
+// Le « X » de tete est un prefixe de PROCESSUS : la table est reelle.
+Exiger(RigV3Desktop.ColonnesRig.TableReelle("XINSCRIT_PP") == "INSCRIT_PP",
+    "XINSCRIT_PP designe la vraie table INSCRIT_PP (X = prefixe de processus)");
+Exiger(R("XINSCRIT_PP", "INSAI_AUTRES_BIENS_LIEU").Colonne == "INSPP_INSAI_AUTRES_BIENS_LIEU",
+    "un champ vu sous XINSCRIT_PP se resout dans INSCRIT_PP");
+Exiger(RigV3Desktop.ColonnesRig.TableReelle("XMACHIN") == "XMACHIN",
+    "une table inconnue commencant par X n'est PAS amputee de son X");
+
+// Le « # » est un titre de bloc : il ne doit JAMAIS produire une colonne.
+Exiger(!R("#TITRE", "#PRESENCE_SALARIES").Resolue
+       && !R("INSCRIT_PP", "#INSAISISSABILITE").Resolue,
+    "un nom prefixe « # » ne produit aucune colonne : c'est un bloc d'ecran");
+
+// ECHEC BRUYANT : une table dont le prefixe n'a pas ete lu est REFUSEE,
+// jamais devinee -- sinon le branchement chercherait une colonne inventee.
+var inconnue = R("TABLE_JAMAIS_LUE", "CHAMP");
+Exiger(!inconnue.Resolue && inconnue.Motif.Contains("inconnue"),
+    "une table au prefixe non lu est refusee avec son motif, pas devinee");
+Exiger(inconnue.Colonne.Length == 0,
+    "un echec ne rend AUCUN nom de colonne plausible");
+Exiger(R("INSCRIT_PP", "INSPP_PATRONYME").Colonne == "INSPP_PATRONYME",
+    "un attribut deja prefixe n'est pas prefixe deux fois");
+
+// LE GARDE-FOU : tous les champs de toutes les recettes doivent se
+// resoudre. Si quelqu'un ajoute demain une recette sur une table dont le
+// prefixe n'a pas ete lu, ce test devient rouge AVANT le branchement.
+var orphelins = RigV3Desktop.ColonnesRig.NonResolus(RigV3Desktop.RecettesTaches.Liste);
+Exiger(orphelins.Length == 0,
+    orphelins.Length == 0
+        ? "les champs des 12 recettes se resolvent tous en colonne reelle"
+        : $"champs non resolus : {string.Join(" | ", orphelins.Select(o => $"{o.Recette.Code} {o.Champ.Colonne} -> {o.Motif}"))}");
+
+// L'EPREUVE en base doit rester tracee : sans elle, ces noms ne sont que
+// plausibles. Le fichier porte les chiffres mesures, avec leur date.
+var colonnesRig = File.ReadAllText(Path.Combine(racine, "Metier/ColonnesRig.cs"));
+Exiger(colonnesRig.Contains("EPREUVE EN CONDITIONS REELLES")
+       && colonnesRig.Contains("RIG_AMIENS@SQL-PROD"),
+    "la regle porte la trace de son epreuve sur la base de production");
+foreach (var col in new[] { "ETBLS_NOM_DOMAINE", "INSPP_PATRONYME", "DRGNT_FONCTION_DIRIGEANT",
+                            "DRGPP_PATRONYME", "ADRBS_ID_ADRBS", "DSSRC_DATE_CESSATION",
+                            "INSPM_DENOMINATION_USAGE" })
+{
+    Exiger(colonnesRig.Contains(col),
+        $"l'epreuve nomme la colonne reellement lue « {col} »");
+}
+// Chaque table declaree doit avoir ete eprouvee : un prefixe ajoute sans
+// epreuve rendrait des noms plausibles mais non verifies.
+foreach (var t in RigV3Desktop.ColonnesRig.Prefixes)
+{
+    Exiger(colonnesRig.Contains(t.Value + "_"),
+        $"le prefixe « {t.Value} » ({t.Key}) apparait dans l'epreuve");
+}
+
+// La regle ne doit pas rester du code mort : la vue montre la colonne
+// REELLE, et seulement quand elle est resolue (sinon 500 champs hors
+// recette afficheraient un motif d'echec inutile).
+var ficheCol = File.ReadAllText(Path.Combine(racine, "Components/FicheInformationsDossier.razor"));
+Exiger(ficheCol.Contains("ColonnesRig.Resoudre(") && ficheCol.Contains("reelle.Resolue"),
+    "la fiche montre la colonne reelle, et seulement si elle est resolue");
+Exiger(lot.Contains("ColonnesRig.Resoudre("),
+    "le tableau du lot montre aussi la colonne reelle en infobulle");
+
+// --- RELECTURE EN BASE des SEPT dernieres recettes (16/09/2026, memes
+// tables). Les canaux etaient tous exacts ; les CHAMPS manquaient.
+foreach (var (code, cols) in new (string, string[])[]
+{
+    ("NOPA",  ["PATRONYME"]),
+    ("PRENO", ["PRENOMS_ETAT_CIVIL", "PRENOM_USAGE"]),
+    ("PSEU",  ["PSEUDONYME", "PRENOM_PSEUDO", "SURNOM"]),
+    ("COLL",  ["CONJOINT_COLLABO", "CONJOINT_SALARIE", "CODE_SITUATION"]),
+    ("CESM",  ["DATE_CESSATION"]),
+    ("RADI",  ["DATE_CESSATION", "CESS_DECES", "DATE_CES_EMPLOI_SALARIE"]),
+})
+{
+    var r = RigV3Desktop.RecettesTaches.ParCode(code)!;
+    foreach (var col in cols)
+        Exiger(r.Champs.Any(c => c.Colonne == col),
+            $"{code} porte le champ declare en base « {col} »");
+    Exiger(r.Champs.Length == cols.Length,
+        $"{code} porte EXACTEMENT les {cols.Length} champ(s) que la base declare");
+}
+var diss = RigV3Desktop.RecettesTaches.ParCode("DISS")!;
+foreach (var col in new[] { "DATE_DISSOLUTION", "JOURNAL_ANNONCES", "DISSO_JAL_DATE",
+                            "LIEU_LIQUIDATION_CFE", "ID_ADRBS" })
+{
+    Exiger(diss.Champs.Any(c => c.Colonne == col),
+        $"DISS porte le champ declare en base « {col} »");
+}
+Exiger(diss.ChampsObligatoires.Length == 1
+       && diss.ChampsObligatoires[0].Colonne == "DATE_DISSOLUTION",
+    "DISS : seule la date est exigee -- une parution au JAL pas encore connue ne bloque pas");
+
+// Les codes INPI ne sont PAS tous « 0F » : c'est l'autre valeur facile a
+// recopier de travers d'une recette a l'autre.
+foreach (var (code, inpi) in new[] { ("NOPA", "10P"), ("PSEU", "15P"), ("COLL", "30P"),
+                                     ("RADI", "41P"), ("PRENO", "0F"), ("DISS", "0F") })
+{
+    var r = RigV3Desktop.RecettesTaches.ParCode(code)!;
+    Exiger(r.Effets.Single(e => e.Canal == "inpi").Code == inpi,
+        $"{code} : code INPI {inpi}, tel que la base le declare");
+}
+// BODACC : seuls DISS et CESM publient parmi ces sept.
+foreach (var code in new[] { "NOPA", "PRENO", "PSEU", "COLL", "RADI" })
+{
+    Exiger(!RigV3Desktop.RecettesTaches.ParCode(code)!.Effets.Any(e => e.Canal == "bodacc"),
+        $"{code} ne publie PAS au BODACC (les trois colonnes sont vides en base)");
+}
+foreach (var code in new[] { "DISS", "CESM" })
+{
+    Exiger(RigV3Desktop.RecettesTaches.ParCode(code)!.Effets.Any(e => e.Canal == "bodacc"),
+        $"{code} publie au BODACC (B0111 / B0112 / B0113)");
+}
+// La notification aux secondaires n'est PAS uniforme : non pour CESM et COLL.
+foreach (var code in new[] { "CESM", "COLL" })
+{
+    Exiger(RigV3Desktop.RecettesTaches.ParCode(code)!
+            .Effets.All(e => !e.Canal.StartsWith("notif") || !e.Obligatoire),
+        $"{code} ne notifie aucun etablissement : la base dit non aux deux");
+}
+
+Exiger(vueTache.Contains("TacheDejaFaite("),
+    "l'alerte DPER s'eteint quand la tache a ete close sous le code DSTE");
+
+Exiger(vueTache.Contains("TachePeutSeClore()") && vueTache.Contains("EffetsRestants()"),
+    "la cloture exige AUSSI que la propagation soit traitee");
+Exiger(vueTache.Contains("Ce que ce changement entraine"),
+    "la tache montre les endroits impactes");
+Exiger(vueTache.Contains("RaisonBlocage()"),
+    "le bouton dit CE QUI manque, il ne se contente pas d'etre grise");
+
+Exiger(vueTache.Contains("Terminer la tache") && vueTache.Contains("ChampsManquants()"),
+    "la vue porte le bouton « Terminer la tache » et son controle de completude");
+Exiger(vueTache.Contains("AlertesOuvertes()")
+       && !Regex.IsMatch(vueTache, @"Alertes\s*=\s*SondeAlertes\.Relever\(\)"),
+    "la file d'alertes EXCLUT les taches deja terminees");
 
 Console.WriteLine();
 if (echecs.Count == 0)

@@ -323,6 +323,7 @@
                                 case "performance": @CorpsPerformance; break;
                                 case "alertes":     @CorpsAlertes;     break;
                                 case "file":        @CorpsFile;        break;
+                                case "reprise":     @CorpsReprise;     break;
                                 case "services":    @CorpsServices;    break;
                                 case "brouillons":  @CorpsBrouillons;  break;
                                 case "nouveautes":  @CorpsNouveautes;  break;
@@ -1354,8 +1355,33 @@
     /// <summary>La recette appliquee A L'ARBRE : nulle quand tout est affiche.</summary>
     private RecetteTache? RecetteArbre => ToutLeDossier ? null : RecetteActive;
 
+    /// <summary>Recopie dans la trace les valeurs que le flux EDI porte pour
+    /// les champs de cette recette. Sans effet si le flux n en propose aucune.</summary>
+    private void ProposerLesValeursDuFlux(RecetteTache recette, string affaire)
+    {
+        foreach (var champ in recette.Champs)
+        {
+            if (SimulationEdi.ValeurProposee(champ.Table, champ.Colonne) is not { } propose) continue;
+            var cle = RecetteTache.Cle(champ);
+            Etat.NoterModification(affaire, new ModificationChamp(
+                DateTime.Now, SimulationEdi.Message.Fichier,
+                $"Flux EDI > {SimulationEdi.Message.Emetteur}", champ.Libelle, cle,
+                Etat.DerniereValeur(affaire, cle) ?? string.Empty, propose));
+        }
+    }
+
     private void OuvrirTache(RecetteTache recette, string numeroDossier)
     {
+        // CE QUE LE FLUX A DEJA DIT N EST PAS A RETAPER. Quand l affaire vient
+        // d un flux EDI qui porte les valeurs, elles sont ecrites avant meme
+        // que la fiche s ouvre -- par le MEME geste que la saisie a la main
+        // (la trace des modifications), donc visibles dans l historique avec
+        // le fichier pour auteur, et modifiables comme n importe quelle
+        // valeur. Un champ dont le flux ne dit rien reste vide : on ne
+        // remplit jamais a la place du greffier ce que personne n a declare.
+        if (numeroDossier == SimulationEdi.Dossier)
+            ProposerLesValeursDuFlux(recette, numeroDossier);
+
         RecetteActive = recette;
         ToutLeDossier = false;
         LigneCourante = 1;
@@ -2497,13 +2523,20 @@
 
     private readonly DefinitionTuile[] Definitions =
     [
-        new("performance", "Performance",  new() { Colonne = 1, Ligne = 1, Largeur = 4,  Hauteur = 2 }, "ok"),
-        new("alertes",     "Alertes",      new() { Colonne = 5, Ligne = 1, Largeur = 4,  Hauteur = 2 }, "alerte"),
-        new("services",    "Services",     new() { Colonne = 9, Ligne = 1, Largeur = 4,  Hauteur = 2 }, "ok"),
-        new("file",        "Ma file",      new() { Colonne = 1, Ligne = 3, Largeur = 8,  Hauteur = 3 }, "action", true),
-        new("brouillons",  "Brouillons",   new() { Colonne = 9, Ligne = 3, Largeur = 4,  Hauteur = 2 }, "action"),
-        new("nouveautes",  "Nouveautes",   new() { Colonne = 9, Ligne = 5, Largeur = 4,  Hauteur = 1 }, "attente"),
-        new("recents",     "Mes affaires recentes", new() { Colonne = 1, Ligne = 6, Largeur = 8, Hauteur = 2 }, "action")
+        // La hierarchie est celle de la journee du greffe : ce qui est HORS DELAI se voit
+        // en premier, donc « Alertes » est la tuile principale, large et en haut a gauche ;
+        // « Mes affaires recentes » et « Ma file » viennent dessous, aussi larges. La
+        // colonne de droite porte le contexte : Performance, Services, Brouillons et
+        // Nouveautes, etroites. « Reprendre » garde le bandeau de tete : c'est le premier
+        // geste de la journee, reprendre le dossier laisse en plan la veille.
+        new("reprise",     "Reprendre",    new() { Colonne = 1, Ligne = 1, Largeur = 12, Hauteur = 1 }, "action"),
+        new("alertes",     "Alertes",      new() { Colonne = 1, Ligne = 2, Largeur = 8,  Hauteur = 3 }, "alerte", true),
+        new("performance", "Performance",  new() { Colonne = 9, Ligne = 2, Largeur = 4,  Hauteur = 3 }, "ok"),
+        new("recents",     "Mes affaires recentes", new() { Colonne = 1, Ligne = 5, Largeur = 8, Hauteur = 3 }, "action"),
+        new("services",    "Services",     new() { Colonne = 9, Ligne = 5, Largeur = 4,  Hauteur = 2 }, "ok"),
+        new("file",        "Ma file",      new() { Colonne = 1, Ligne = 8, Largeur = 8,  Hauteur = 3 }, "action"),
+        new("brouillons",  "Brouillons",   new() { Colonne = 9, Ligne = 7, Largeur = 4,  Hauteur = 2 }, "neutre"),
+        new("nouveautes",  "Nouveautes",   new() { Colonne = 9, Ligne = 9, Largeur = 4,  Hauteur = 1 }, "attente")
     ];
 
     // ================= Bandeau de mission =================
@@ -2523,7 +2556,6 @@
     /// tuiles qui portent un etat vivant (la file, les alertes) le recalculent.</summary>
     private string StatutTuile(DefinitionTuile def) => def.Id switch
     {
-        "file"    => HorsDelai > 0 ? "alerte" : "action",
         "alertes" => AlertesVues.Any(a => a.Statut == "alerte") ? "alerte" : "attente",
         _         => def.Statut
     };
@@ -3804,6 +3836,7 @@
         OuvrirCode(a.Cible);
     }
 
+
     // Le corps ne montre QUE les alertes surveillees : les interrupteurs
     // vivent dans les reglages de la tuile (bouton engrenage de son entete),
     // pas dans la lecture courante.
@@ -3919,6 +3952,11 @@
     private record Demande(string Numero, string Objet, string Delai, string Etat,
                            string Statut, string? VerrouillePar = null);
     private record Service(string Nom, string Statut, string? Commentaire = null);
+    private record Contexte(string Numero, string Objet, string Etape, string Depuis);
+
+    private readonly Contexte? Reprise =
+        new("004182", "Immatriculation - AMIENS BILLARDS", "3/7 - Dirigeants", "il y a 18 h");
+
     private readonly Demande[] File =
     [
         new("004176", "Modification - SCI DU PARC",     "J+9", "hors delai",     "alerte"),
@@ -3933,6 +3971,74 @@
         new("Teletransmission",    "ok"),
         new("Fusion documentaire", "alerte", "lente")
     ];
+
+    private RenderFragment CorpsReprise => @<div style="display:flex;align-items:center;gap:var(--rig-esp-4)">
+        @if (Reprise is not null)
+        {
+            <span style="flex:1">
+                <span style="font-size:15px"><b>@Reprise.Numero</b> &middot; @Reprise.Objet</span><br />
+                <span style="font-size:12px;color:var(--rig-texte-3)">
+                    arrete a l'etape <b style="color:var(--rig-texte-2)">@Reprise.Etape</b> &mdash; @Reprise.Depuis
+                </span>
+            </span>
+            <button class="rig-bouton" @onclick="() => OuvrirParNumero(Reprise.Numero)">Reprendre</button>
+        }
+    </div>;
+
+    private RenderFragment CorpsFile => @<div>
+        @foreach (var d in File)
+        {
+            var valide = EstValide(d.Numero);
+            <div class="rig-ligne @(d.VerrouillePar is not null ? "rig-ligne--verrouille" : "") @(valide ? "rig-ligne--valide" : "")"
+                 @onclick="() => OuvrirParNumero(d.Numero)"
+                 style="cursor:pointer">
+                <span class="rig-filet-v rig-filet-v--@(valide ? "ok" : d.Statut)"></span>
+                <span>
+                    <span class="rig-ligne__id">@d.Numero</span><br />
+                    <span class="rig-ligne__objet">@d.Objet</span>
+                </span>
+                <span class="rig-ligne__droite">
+                    @if (valide)
+                    {
+                        <span class="rig-ligne__valide">valide</span>
+                    }
+                    else if (d.VerrouillePar is not null)
+                    {
+                        <span style="font-size:11px;color:var(--rig-texte-3)">
+                            ouvert par<br /><b>@d.VerrouillePar</b>
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="@(d.Statut == "alerte" ? "rig-ligne__delai--alerte" : "")">@d.Delai</span>
+                        <br />
+                        <span style="font-size:11px;color:var(--rig-texte-3)">@d.Etat</span>
+                    }
+                </span>
+            </div>
+        }
+    </div>;
+
+    private RenderFragment CorpsServices => @<div>
+        @foreach (var s in Services)
+        {
+            <div class="rig-service">
+                <span class="rig-service__jauge" style="background:var(--rig-grad-@s.Statut)"></span>
+                @s.Nom
+                @if (s.Commentaire is not null)
+                {
+                    <span style="color:var(--rig-texte-3)">&middot; @s.Commentaire</span>
+                }
+            </div>
+        }
+    </div>;
+
+    private RenderFragment CorpsBrouillons => @<div style="font-size:var(--rig-fs-dense);color:var(--rig-texte-2)">
+        <div><b style="color:var(--rig-texte)">2</b> demandes commencees, jamais validees
+            <span style="color:var(--rig-texte-3)">&middot; 5 j et 12 j</span></div>
+        <div><b style="color:var(--rig-texte)">4</b> dossiers epingles</div>
+        <div style="color:var(--rig-texte-3)">10 dernieres demandes touchees</div>
+    </div>;
 
     /// <summary>
     /// Tuile « Mes affaires recentes » : les affaires REELLEMENT ouvertes,
@@ -4000,61 +4106,6 @@
         NoAffaireDemande = null;
         OuvrirProc(new Proc("PROC_RECHAFF", "Recherche d'affaires"));
     }
-
-    private RenderFragment CorpsFile => @<div>
-        @foreach (var d in File)
-        {
-            var valide = EstValide(d.Numero);
-            <div class="rig-ligne @(d.VerrouillePar is not null ? "rig-ligne--verrouille" : "") @(valide ? "rig-ligne--valide" : "")"
-                 @onclick="() => OuvrirParNumero(d.Numero)"
-                 style="cursor:pointer">
-                <span class="rig-filet-v rig-filet-v--@(valide ? "ok" : d.Statut)"></span>
-                <span>
-                    <span class="rig-ligne__id">@d.Numero</span><br />
-                    <span class="rig-ligne__objet">@d.Objet</span>
-                </span>
-                <span class="rig-ligne__droite">
-                    @if (valide)
-                    {
-                        <span class="rig-ligne__valide">valide</span>
-                    }
-                    else if (d.VerrouillePar is not null)
-                    {
-                        <span style="font-size:11px;color:var(--rig-texte-3)">
-                            ouvert par<br /><b>@d.VerrouillePar</b>
-                        </span>
-                    }
-                    else
-                    {
-                        <span class="@(d.Statut == "alerte" ? "rig-ligne__delai--alerte" : "")">@d.Delai</span>
-                        <br />
-                        <span style="font-size:11px;color:var(--rig-texte-3)">@d.Etat</span>
-                    }
-                </span>
-            </div>
-        }
-    </div>;
-
-    private RenderFragment CorpsServices => @<div>
-        @foreach (var s in Services)
-        {
-            <div class="rig-service">
-                <span class="rig-service__jauge" style="background:var(--rig-grad-@s.Statut)"></span>
-                @s.Nom
-                @if (s.Commentaire is not null)
-                {
-                    <span style="color:var(--rig-texte-3)">&middot; @s.Commentaire</span>
-                }
-            </div>
-        }
-    </div>;
-
-    private RenderFragment CorpsBrouillons => @<div style="font-size:var(--rig-fs-dense);color:var(--rig-texte-2)">
-        <div><b style="color:var(--rig-texte)">2</b> demandes commencees, jamais validees
-            <span style="color:var(--rig-texte-3)">&middot; 5 j et 12 j</span></div>
-        <div><b style="color:var(--rig-texte)">4</b> dossiers epingles</div>
-        <div style="color:var(--rig-texte-3)">10 dernieres demandes touchees</div>
-    </div>;
 
     private RenderFragment CorpsNouveautes => @<div style="font-size:var(--rig-fs-dense);color:var(--rig-texte-2)">
         La saisie en masse accepte desormais <b style="color:var(--rig-texte)">les fichiers .csv</b>.
