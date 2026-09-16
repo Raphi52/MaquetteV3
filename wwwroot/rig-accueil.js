@@ -31,6 +31,21 @@ export function activerPose(zone, dotnet) {
     return (rect.width - ECART * (COLONNES - 1)) / COLONNES + ECART;
   };
 
+  // Le z-index de chaque tuile est pose EN STYLE INLINE par Blazor
+  // (`z-index:@p.Ordre`) : un style inline bat toujours une classe CSS, donc
+  // une regle `.rig-widget--saisi { z-index }` reste sans effet. La tuile
+  // saisie doit donc recevoir son z-index INLINE, et le rendre a Blazor au
+  // relachement (c'est lui qui remet l'ordre definitif de la pose).
+  const Z_SAISIE = "60";
+  const monterAuDessus = (tuile) => {
+    tuile.dataset.zAvant = tuile.style.zIndex || "";
+    tuile.style.zIndex = Z_SAISIE;
+  };
+  const rendreZ = (tuile) => {
+    tuile.style.zIndex = tuile.dataset.zAvant || "";
+    delete tuile.dataset.zAvant;
+  };
+
   // Redimensionnement : poignee du coin bas-droit de la tuile.
   const surAppuiTaille = (ev) => {
     if (ev.button !== 0) return;
@@ -52,6 +67,7 @@ export function activerPose(zone, dotnet) {
       pas: pasColonne()
     };
     tuile.classList.add("rig-widget--saisi");
+    monterAuDessus(tuile);
     zone.classList.add("rig-grille--pose");
     prise.setPointerCapture?.(ev.pointerId);
     ev.preventDefault();
@@ -86,6 +102,7 @@ export function activerPose(zone, dotnet) {
       ligne: parseInt(tuile.getAttribute("data-ligne"), 10) || 1
     };
     tuile.classList.add("rig-widget--saisi");
+    monterAuDessus(tuile);
     zone.classList.add("rig-grille--pose");
     tete.setPointerCapture?.(ev.pointerId);
     ev.preventDefault();
@@ -122,6 +139,7 @@ export function activerPose(zone, dotnet) {
     if (taille) {
       const { tuile, id, larg, haut } = taille;
       tuile.classList.remove("rig-widget--saisi");
+      rendreZ(tuile);
       zone.classList.remove("rig-grille--pose");
       taille = null;
       dotnet.invokeMethodAsync("DimensionnerTuile", id, larg, haut);
@@ -130,6 +148,7 @@ export function activerPose(zone, dotnet) {
     if (!saisie) return;
     const { tuile, id, col, ligne } = saisie;
     tuile.classList.remove("rig-widget--saisi");
+    rendreZ(tuile);
     zone.classList.remove("rig-grille--pose");
     saisie = null;
     dotnet.invokeMethodAsync("PoserTuile", id, col, ligne);
@@ -155,46 +174,105 @@ export function arreterPose() {
 }
 
 // ============================================================
-// SAISIE GUIDEE - une page geante, mais paginee.
-// Les 7 etapes sont toutes dans le DOM et s'enchainent au scroll ;
-// chacune se cale comme une page (scroll-snap, cote CSS). Le
+// SAISIE GUIDEE - les etapes a l'horizontale, une page par etape.
+// Chacune se cale comme une page (scroll-snap, cote CSS). Le
 // navigateur est le seul a savoir laquelle est reellement visible :
 // c'est lui qui le dit a Blazor, pour que la frise suive.
 // ============================================================
 
-let observateur = null;
+let detacherPagination = null;
 
 export function suivrePagination(zone, dotnet) {
   arreterPagination();
   if (!zone) return;
-  const pages = zone.querySelectorAll("[data-etape]");
-  if (!pages.length) return;
 
+  // Les etapes sont COTE A COTE : chaque page fait la largeur de la zone et
+  // se cale d'elle-meme (scroll-snap). L'etape visible se deduit donc de la
+  // position horizontale, arrondie a la page la plus proche.
   let dernier = -1;
-  observateur = new IntersectionObserver((entrees) => {
-    // La page « courante » est la plus visible, pas la premiere croisee :
-    // sinon la frise sauterait d'un pas des qu'un bord effleure l'ecran.
-    let meilleure = null;
-    for (const e of entrees) {
-      if (!e.isIntersecting) continue;
-      if (!meilleure || e.intersectionRatio > meilleure.intersectionRatio) meilleure = e;
-    }
-    if (!meilleure) return;
-    const index = parseInt(meilleure.target.getAttribute("data-etape"), 10);
-    if (Number.isNaN(index) || index === dernier) return;
+  let enAttente = false;
+  const indexVisible = () =>
+    Math.round(zone.scrollLeft / Math.max(1, zone.clientWidth));
+
+  const mesurer = () => {
+    enAttente = false;
+    const index = indexVisible();
+    if (index === dernier) return;
     dernier = index;
     dotnet.invokeMethodAsync("EtapeVisible", index);
-  }, { root: zone, threshold: [0.15, 0.35, 0.55, 0.75] });
+  };
+  const auDefilement = () => {
+    if (enAttente) return;
+    enAttente = true;
+    requestAnimationFrame(mesurer);
+  };
 
-  pages.forEach((p) => observateur.observe(p));
+  // La molette verticale : elle fait d'abord defiler l'etape elle-meme
+  // (formulaire plus haut que la vue), et seulement arrivee au bout elle
+  // TOURNE la page vers l'etape suivante ou precedente. Un geste = une page :
+  // un verrou court absorbe l'inertie des pave tactiles.
+  let verrouJusqu = 0;
+  const aLaMolette = (ev) => {
+    // Ctrl+molette = ZOOM de la fenetre, prioritaire : on ne touche a rien,
+    // sinon le preventDefault plus bas annule le zoom natif (defaut du 15/09).
+    if (ev.ctrlKey) return;
+    if (Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) return; // geste deja horizontal
+    const page = ev.target.closest && ev.target.closest("[data-etape]");
+    const sens = ev.deltaY > 0 ? 1 : -1;
+    if (page && page.scrollHeight > page.clientHeight + 1) {
+      const auBout = sens > 0
+        ? page.scrollTop + page.clientHeight >= page.scrollHeight - 1
+        : page.scrollTop <= 0;
+      if (!auBout) return;
+    }
+    ev.preventDefault();
+    const maintenant = performance.now();
+    if (maintenant < verrouJusqu) return;
+    verrouJusqu = maintenant + 450;
+    const total = zone.querySelectorAll("[data-etape]").length;
+    const cible = Math.min(total - 1, Math.max(0, indexVisible() + sens));
+    allerEtape(zone, cible, true);
+  };
+
+  zone.addEventListener("scroll", auDefilement, { passive: true });
+  zone.addEventListener("wheel", aLaMolette, { passive: false });
+  detacherPagination = () => {
+    zone.removeEventListener("scroll", auDefilement);
+    zone.removeEventListener("wheel", aLaMolette);
+  };
+  mesurer();
 }
 
 export function arreterPagination() {
-  if (observateur) { observateur.disconnect(); observateur = null; }
+  if (detacherPagination) { detacherPagination(); detacherPagination = null; }
 }
 
-export function allerEtape(zone, index) {
+export function allerEtape(zone, index, doux = true) {
   if (!zone) return;
-  const page = zone.querySelector('[data-etape="' + index + '"]');
-  if (page) page.scrollIntoView({ behavior: "smooth", block: "start" });
+  zone.scrollTo({ left: index * zone.clientWidth, behavior: doux ? "smooth" : "auto" });
+}
+
+
+// ============ CLAVIER ============
+// RIG v2 se conduit au clavier. Premier pas ici : Echap ferme ce qui est
+// ouvert. L'ecoute est posee sur le DOCUMENT (et non sur un element focusable)
+// parce que le focus peut etre n'importe ou -- dans une grille, un champ, ou
+// nulle part apres un clic sur le fond.
+let detacherClavier = null;
+
+export function activerClavier(dotnet) {
+  arreterClavier();
+  const surTouche = (e) => {
+    if (e.key !== "Escape") return;
+    // Un champ en cours d'edition garde Echap pour lui (annuler la saisie)
+    // seulement s'il est dans une liste deroulante ouverte ; sinon, fermer
+    // l'ecran est le geste attendu.
+    dotnet.invokeMethodAsync("ToucheEchap");
+  };
+  document.addEventListener("keydown", surTouche);
+  detacherClavier = () => document.removeEventListener("keydown", surTouche);
+}
+
+export function arreterClavier() {
+  if (detacherClavier) { detacherClavier(); detacherClavier = null; }
 }

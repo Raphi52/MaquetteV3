@@ -1,0 +1,29 @@
+@* En-tete de colonne qui TRIE au clic. Composant partage : une seule facon de
+   ranger une grille dans toute la maquette, et un seul endroit a corriger.
+
+   Le sens courant est porte par aria-sort, l'attribut que lisent les lecteurs
+   d'ecran ET les tests : la fleche seule ne se mesure pas. *@
+
+<th class="@Classe rig-th--triable"
+    aria-sort="@(Actif ? (Ascendant ? "ascending" : "descending") : "none")"
+    title="Trier par @Libelle"
+    @onclick="() => Trier.InvokeAsync(Cle)">@((MarkupString)Libelle)<span class="rig-th__fleche">@(Actif ? (Ascendant ? "▲" : "▼") : "")</span></th>
+
+@code {
+    /// <summary>Le titre affiche (il peut contenir une entite HTML, ex. N&deg;).</summary>
+    [Parameter] public string Libelle { get; set; } = string.Empty;
+
+    /// <summary>Le nom de la colonne, tel que l'ecran le comprend.</summary>
+    [Parameter] public string Cle { get; set; } = string.Empty;
+
+    /// <summary>La colonne sur laquelle la grille est rangee en ce moment.</summary>
+    [Parameter] public string? CleActive { get; set; }
+
+    [Parameter] public bool Ascendant { get; set; }
+
+    [Parameter] public string? Classe { get; set; }
+
+    [Parameter] public EventCallback<string> Trier { get; set; }
+
+    private bool Actif => CleActive == Cle;
+}

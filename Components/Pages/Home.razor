@@ -1,6 +1,7 @@
 ﻿@page "/"
 @implements IAsyncDisposable
 @inject FenetreInterop Fenetre
+@inject DocumentPartage Partage
 @inject IJSRuntime JS
 
 <PageTitle>RIG V3 - Accueil</PageTitle>
@@ -28,6 +29,59 @@
                 </option>
             }
         </select>
+        @* Bouton VALIDATIONS : debloque par le role. Un login sans ecriture
+           directe y suit ses demandes (« en attente de validation ») ; un
+           superieur habilite y valide ou rejette. Il n'apparait pour personne
+           d'autre. *@
+        @if (CompteCourant.SoumetAValidation || CompteCourant.PeutValider)
+        {
+            <div class="rig-barre__reglages" @onmousedown:stopPropagation="true">
+                <button class="rig-barre__action rig-validations-bouton @(PanneauValidationsOuvert ? "rig-barre__action--ouvert" : "")"
+                        title="@(CompteCourant.PeutValider ? "Modifications a valider" : "Mes modifications en attente de validation")"
+                        @onclick="() => PanneauValidationsOuvert = !PanneauValidationsOuvert">
+                    &#9202; Validations
+                    @if (ValidationsEnAttente > 0)
+                    {
+                        <span class="rig-pastille">@ValidationsEnAttente</span>
+                    }
+                </button>
+                @if (PanneauValidationsOuvert)
+                {
+                    <div class="rig-voile-clic" @onclick="() => PanneauValidationsOuvert = false"
+                         @onmousedown:stopPropagation="true"></div>
+                    <div class="rig-tuiles-panneau rig-validations">
+                        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">
+                            @(CompteCourant.PeutValider ? "Modifications a valider" : "Mes modifications soumises")
+                        </div>
+                        @if (Validations.Count == 0)
+                        {
+                            <div class="rig-validation__vide">Aucune modification soumise.</div>
+                        }
+                        @foreach (var d in Validations.AsEnumerable().Reverse())
+                        {
+                            <div class="rig-validation">
+                                <div class="rig-validation__quoi">@d.Info.Resume</div>
+                                <div class="rig-validation__meta">
+                                    @d.Info.Auteur &middot; @d.Info.DepotLisible
+                                </div>
+                                <div class="rig-validation__etat rig-validation__etat--@(d.Info.EstEnAttente ? "attente" : (d.Info.Etat == EtatModification.Validee ? "ok" : "refus"))">
+                                    @d.Info.Etat@(d.Info.Decideur.Length > 0 ? $" par {d.Info.Decideur}" : "")
+                                </div>
+                                @if (d.Info.EstEnAttente && CompteCourant.PeutValider)
+                                {
+                                    <div class="rig-validation__actions">
+                                        <button class="rig-bouton rig-bouton--fort"
+                                                @onclick="() => ValiderModification(d)">Valider</button>
+                                        <button class="rig-bouton"
+                                                @onclick="() => RejeterModification(d)">Rejeter</button>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
         @* Reglages de la BARRE : toujours atteignables, y compris quand un ecran de
            procedure occupe le plan de travail. Ne contient que le theme pour l'instant. *@
         <div class="rig-barre__reglages" @onmousedown:stopPropagation="true">
@@ -59,37 +113,68 @@
     </div>
 </header>
 
-<div class="rig-accueil">
+<div class="rig-accueil @(MenuReduit ? "rig-accueil--menu-reduit" : "")">
 
-    @* ============ MENU DE GAUCHE : les procs, ranges par domaine ============ *@
+    @* ============ MENU DE GAUCHE : les METIERS du greffe ============ *@
     <nav class="rig-menu">
-        <div class="rig-kicker" style="padding:var(--rig-esp-2);margin-bottom:var(--rig-esp-2)">
-            Traitements
+        @* Le panneau suit l'ORGANISATION du greffe : le RCS et le JUDICIAIRE sont
+           deux mondes qu'un agent pratique rarement en meme temps. Chaque monde
+           porte SA couleur : on reconnait ou on est avant meme d'avoir lu. *@
+        @* Le menu reste TOUJOURS visible : reduit, il laisse un rail ou les
+           pastilles de couleur restent cliquables ; il ne disparait jamais. *@
+        <div class="rig-menu__entete">
+            <button class="rig-menu__replier" @onclick="BasculerMenu"
+                    title="@(MenuReduit ? "Deployer le menu" : "Reduire le menu")">
+                @(MenuReduit ? "»" : "«")
+            </button>
         </div>
-        @foreach (var groupe in Groupes)
+
+        @foreach (var moment in Moments)
         {
-            var ouvert = GroupesOuverts.Contains(groupe.Code);
-            <div class="rig-menu__groupe @(ouvert ? "rig-menu__groupe--ouvert" : "")">
-                <button class="rig-menu__tete" @onclick="() => BasculerGroupe(groupe.Code)">
+            var ouvert = MomentsOuverts.Contains(moment.Titre);
+            <div class="rig-menu__groupe rig-menu__groupe--@moment.Teinte @(ouvert ? "rig-menu__groupe--ouvert" : "")">
+                <button class="rig-menu__tete" title="@moment.Titre"
+                        @onclick="() => OuvrirMoment(moment.Titre)">
                     <span class="rig-menu__chevron">&#9656;</span>
-                    <span class="rig-menu__filet" style="background:var(--rig-grad-@groupe.Statut)"></span>
-                    <span>@groupe.Libelle</span>
-                    <span class="rig-menu__compte">@groupe.Procs.Length</span>
+                    <span class="rig-menu__pastille">@moment.Signe</span>
+                    <span class="rig-menu__titre">@moment.Titre</span>
+                    <span class="rig-menu__compte">@moment.NombreEcrans</span>
                 </button>
                 @if (ouvert)
                 {
-                    <ul class="rig-menu__liste">
-                        @foreach (var proc in groupe.Procs)
+                    @* Troisieme niveau : le metier se lit par VERBES. Un verbe ouvert
+                       montre ses ecrans ; les autres restent des titres d'une ligne. *@
+                    foreach (var sous in moment.Sous)
+                    {
+                        var sousOuvert = SousEstOuvert(moment, sous);
+                        if (sous.Titre.Length > 0)
                         {
-                            <li>
-                                <button class="rig-menu__lien @(ProcOuverte == proc ? "rig-menu__lien--actif" : "")"
-                                        title="@proc.Code"
-                                        @onclick="() => OuvrirProc(proc)">
-                                    <span class="rig-menu__code">@proc.Code.Replace("PROC_", "")</span>@proc.Libelle
-                                </button>
-                            </li>
+                            <button class="rig-menu__sous @(sousOuvert ? "rig-menu__sous--ouvert" : "")"
+                                    title="@sous.Titre"
+                                    @onclick="() => BasculerSous(moment, sous)">
+                                <span class="rig-menu__chevron">&#9656;</span>
+                                <span class="rig-menu__sous-titre">@sous.Titre</span>
+                                <span class="rig-menu__compte">@sous.Entrees.Length</span>
+                            </button>
                         }
-                    </ul>
+                        @if (sousOuvert)
+                        {
+                            <ul class="rig-menu__liste">
+                                @foreach (var e in sous.Entrees)
+                                {
+                                    <li>
+                                        @* Le code technique (PROC_xxx) n'est JAMAIS affiche :
+                                           il reste l'identifiant interne, l'utilisateur lit le besoin. *@
+                                        <button class="rig-menu__lien rig-menu__lien--metier @(ProcOuverte?.Code == e.Code ? "rig-menu__lien--actif" : "")"
+                                                title="@e.Detail"
+                                                @onclick="() => OuvrirCode(e.Code)">
+                                            <span class="rig-menu__quoi">@e.Libelle</span>
+                                        </button>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    }
                 }
             </div>
         }
@@ -101,9 +186,6 @@
         <div class="rig-entete">
             <div class="rig-titre">
                 Bonjour <b>@Utilisateur</b>
-                <span style="color:var(--rig-texte-3);font-size:12px">
-                    &middot; greffe @Greffe &middot; @DateDuJour
-                </span>
             </div>
             <div class="rig-entete__outils">
                 <button class="rig-entete__action @(PanneauTuilesOuvert ? "rig-entete__action--ouvert" : "")"
@@ -136,6 +218,34 @@
             </div>
         </div>
 
+        @* --- Bandeau de mission : les trois chiffres qui decident de la journee.
+               Calcules sur la file reelle, jamais saisis en dur. Chaque chiffre est
+               une PORTE : il ouvre le travail qu'il compte. --- *@
+        <div class="rig-mission">
+            <div class="rig-mission__filet"></div>
+            <div class="rig-mission__chiffres">
+                <button class="rig-mission__bloc" title="Ouvrir la recherche d'affaires"
+                        @onclick="VoirToutesLesAffaires">
+                    <span class="rig-mission__valeur">@ATraiter</span>
+                    <span class="rig-mission__libelle">a traiter</span>
+                </button>
+                <button class="rig-mission__bloc rig-mission__bloc--alerte"
+                        title="Ouvrir la demande hors delai la plus ancienne"
+                        disabled="@(HorsDelai == 0)"
+                        @onclick="OuvrirPlusAncienHorsDelai">
+                    <span class="rig-mission__valeur">@HorsDelai</span>
+                    <span class="rig-mission__libelle">hors delai</span>
+                </button>
+                <div class="rig-mission__bloc rig-mission__bloc--ok">
+                    <span class="rig-mission__valeur">@Validees</span>
+                    <span class="rig-mission__libelle">validees</span>
+                </div>
+                <div class="rig-mission__contexte">
+                    greffe @Greffe<br />@DateDuJour
+                </div>
+            </div>
+        </div>
+
         @* --- Recherche : centree, toujours a la meme place, jamais deplacable --- *@
         <div class="rig-recherche rig-recherche--fixe">
             <span style="font:13px var(--rig-font-mono);color:var(--rig-focus)">&#8981;</span>
@@ -143,9 +253,20 @@
                    placeholder="Rechercher un SIREN, une societe, un dirigeant, un n° de demande…"
                    @bind="Recherche" @bind:event="oninput" />
             <span class="rig-touche">Ctrl K</span>
-            @if (Resultats.Length > 0)
+            @if (Resultats.Length > 0 || Traitements.Length > 0)
             {
                 <div class="rig-resultats">
+                    @foreach (var t in Traitements)
+                    {
+                        <button class="rig-resultat" @onclick="() => OuvrirProc(t)">
+                            <span class="rig-filet-v rig-filet-v--action"></span>
+                            <span class="rig-resultat__id">&#8594;</span>
+                            <span>@t.Libelle<br />
+                                <span style="font-size:11px;color:var(--rig-texte-3)">Ouvrir le traitement</span>
+                            </span>
+                            <span class="rig-resultat__type">Action</span>
+                        </button>
+                    }
                     @foreach (var r in Resultats)
                     {
                         <button class="rig-resultat" @onclick="() => OuvrirDossier(r)">
@@ -167,18 +288,21 @@
             {
                 var p = Pose(def.Id);
                 if (!p.Visible) { continue; }
-                <section class="rig-widget"
+                <section class="rig-widget @(def.Maitresse ? "rig-widget--maitresse" : "")"
                          data-tuile="@def.Id"
                          data-col="@p.Colonne" data-ligne="@p.Ligne"
                          data-larg="@p.Largeur" data-haut="@p.Hauteur"
                          style="grid-column:@p.Colonne / span @p.Largeur;grid-row:@p.Ligne / span @p.Hauteur;z-index:@p.Ordre">
+                    @* Filet de statut en tete de tuile : c'est LUI qui porte la couleur
+                       et la hierarchie de lecture (charte : aucun aplat). *@
+                    <div class="rig-widget__filet rig-filet--@StatutTuile(def)"></div>
                     <header class="rig-widget__tete">
                         <span class="rig-widget__poignee">&#8942;&#8942;</span>
                         <span class="rig-widget__titre">@def.Titre</span>
                         @if (def.Id == "recents")
                         {
                             <button class="rig-bouton rig-bouton--tuile"
-                                    title="Ouvrir la recherche d'affaires (PROC_RECHAFF)"
+                                    title="Ouvrir la recherche d'affaires"
                                     @onclick="VoirToutesLesAffaires"
                                     @onmousedown:stopPropagation="true">Voir toutes les affaires</button>
                         }
@@ -199,7 +323,6 @@
                                 case "performance": @CorpsPerformance; break;
                                 case "alertes":     @CorpsAlertes;     break;
                                 case "file":        @CorpsFile;        break;
-                                case "reprise":     @CorpsReprise;     break;
                                 case "services":    @CorpsServices;    break;
                                 case "brouillons":  @CorpsBrouillons;  break;
                                 case "nouveautes":  @CorpsNouveautes;  break;
@@ -224,11 +347,55 @@
 
         <div class="rig-vged__entete">
             <span class="rig-filet-v rig-filet-v--action"></span>
-            <b style="font:13px var(--rig-font-mono)">@ProcOuverte.Code</b>
-            <span>@ProcOuverte.Libelle</span>
+            @* Le code technique (PROC_xxx) n'est JAMAIS affiche : l'agent lit
+               son BESOIN, pas le nom interne de la procedure. Meme regle que
+               dans le menu de gauche. *@
+            <b>@ProcOuverte.Libelle</b>
             <span style="margin-left:auto"></span>
             <button class="rig-bouton" @onclick="FermerProc">Fermer</button>
         </div>
+
+        @* Bandeau du SUJET : tous les ecrans qui manipulent le meme objet
+           metier (les personnes, les affaires, l'argent...) sont ici, dans
+           une seule vue. On entre par l'objet, on choisit l'ecran ensuite ;
+           plus besoin de savoir d'avance quelle procedure porte le geste. *@
+        @{ var sujet = SujetDe(ProcOuverte.Code); }
+        @if (sujet is not null)
+        {
+            <div class="rig-sujet">
+                <span class="rig-kicker">@sujet.Titre</span>
+                <div class="rig-onglets">
+                    @foreach (var item in ProcsDuSujet(sujet))
+                    {
+                        var p = item;
+                        <button class="rig-onglet @(p.Code == ProcOuverte.Code ? "rig-onglet--actif" : "")"
+                                @onclick="() => OuvrirProc(p)">@p.Libelle</button>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            @* Repli : la procedure n'appartient a aucun sujet d'OBJET, on
+               montre alors ses voisines de GESTE — les ecrans du meme
+               sous-menu. Aucune procedure ouverte ne reste donc isolee. *@
+            var tache = TacheDe(ProcOuverte.Code);
+            if (tache is not null)
+            {
+                <div class="rig-sujet">
+                    <span class="rig-kicker">@TitreTache(tache)</span>
+                    <div class="rig-onglets">
+                        @foreach (var item in tache.Entrees)
+                        {
+                            var e = item;
+                            <button class="rig-onglet @(e.Code == ProcOuverte.Code ? "rig-onglet--actif" : "")"
+                                    title="@e.Detail"
+                                    @onclick="() => OuvrirCode(e.Code)">@e.Libelle</button>
+                        }
+                    </div>
+                </div>
+            }
+        }
 
         @switch (ProcOuverte.Code)
         {
@@ -240,12 +407,21 @@
                 <EcranArrivee OuvrirDossier="OuvrirParNumero" />
                 break;
 
+            case "OUVERTURE_DOSSIER":
+                <EcranOuvertureDossier @key="CleOuverture" SirenDemande="@SirenAImmatriculer" />
+                break;
+
             case "PROC_RECHAFF":
-                <EcranRechAffaires @key="CleRechAffaire" NoAffaire="@NoAffaireDemande" Ouvrir="OuvrirParNumero" />
+                <EcranRechAffaires @key="CleRechAffaire" NoAffaire="@NoAffaireDemande" Ouvrir="OuvrirParNumero"
+                                   OuvrirUnDossier="OuvrirUnDossierPour" />
                 break;
 
             case "PROC_DEMANDE":
                 <EcranDemandes EstValide="EstValide" Ouvrir="OuvrirParNumero" />
+                break;
+
+            case "PROC_REQUI":
+                <EcranRequisitions />
                 break;
 
             case "PROC_CLOT":
@@ -276,12 +452,20 @@
                 <EcranAudiences />
                 break;
 
+            case "PROC_GESTAUDS":
+                <EcranGestionAudiences />
+                break;
+
             case "PROC_EXPERT":
                 <EcranExperts />
                 break;
 
             case "PROC_GEDJUD":
                 <EcranGedJud OuvrirDossier="OuvrirParNumero" />
+                break;
+
+            case "PROC_REDA":
+                <EcranRedaction />
                 break;
 
             case "PROC_DOC_DEMAT":
@@ -312,6 +496,10 @@
                 <EcranClients />
                 break;
 
+            case "PROC_STAT":
+                <EcranStatistiques />
+                break;
+
             case "PROC_ACCUEIL_PARAM":
                 <EcranParametresAccueil />
                 break;
@@ -326,6 +514,28 @@
 
             case "PROC_EDIT_MAQUETTE":
                 <EcranMaquettesEdition />
+                break;
+
+            case "PROC_COMPTABILISATION":
+                <EcranComptabilisation />
+                break;
+
+            case "PROC_COURRIER_DIVERS":
+                <EcranCourriersDivers />
+                break;
+
+            case "PROC_TACHES_LOT":
+                @* Traitement EN LOT : la meme recette sur plusieurs affaires. *@
+                <EcranTachesLot Etat="Etat" Utilisateur="@Utilisateur"
+                                CodeRecette="@LotDemande" />
+                break;
+
+            case "PROC_VERROUS":
+                <EcranVerrous OuvrirDossier="OuvrirParNumero" />
+                break;
+
+            case "PROC_TELETRANS":
+                <EcranTeletransmission OuvrirDossier="OuvrirParNumero" />
                 break;
 
             // PROC_CREANCE n'a PAS d'ecran porte, et ce n'est pas un oubli :
@@ -346,6 +556,9 @@
 {
     <div class="rig-vged">
         <div class="rig-vged__entete">
+            <button class="rig-bouton rig-bouton--icone rig-bouton--plat" title="Retour a l'accueil" aria-label="Retour a l'accueil" @onclick="FermerDossier">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5" /><path d="M12 19l-7-7 7-7" /></svg>
+            </button>
             <span class="rig-filet-v rig-filet-v--@DossierOuvert.Statut"></span>
             <b style="font:13px var(--rig-font-mono)">@DossierOuvert.Numero</b>
             <span>@DossierOuvert.Objet</span>
@@ -353,47 +566,268 @@
                 &middot; SIREN @DossierOuvert.Siren &middot; @DossierOuvert.Type
             </span>
             <span style="margin-left:auto"></span>
-            <button class="rig-bouton" @onclick="FermerDossier">Fermer</button>
-        </div>
-
-        @* Commandes reprises de ETP_VGED/OPE_VGED.cs (RIG v2). *@
-        <div class="rig-vged__outils">
-            <div class="rig-onglets">
-                <button class="rig-onglet @(ModeSaisie ? "" : "rig-onglet--actif")"
-                        @onclick="() => ModeSaisie = false">Documents</button>
-                <button class="rig-onglet @(ModeSaisie ? "rig-onglet--actif" : "")"
-                        @onclick="() => ModeSaisie = true">Saisie guidee</button>
-            </div>
-            <button class="rig-bouton rig-bouton--plat @(EditionsOuvertes ? "rig-bouton--enfonce" : "")"
-                    title="Le tableau des editions s'ouvre en plein ecran"
-                    @onclick="() => EditionsOuvertes = !EditionsOuvertes">
-                Tableau des editions@(Editions.Length > 0 ? $" ({Editions.Count(e => !e.EstGroupe)})" : "")
-            </button>
-            @if (!GuideVisible)
+            @if (!GuideVisible && ApercuNoeud is not null)
             {
-                <button class="rig-bouton rig-bouton--plat"
-                        title="Reafficher la saisie guidee a droite"
-                        @onclick="() => GuideVisible = true">Saisie guidee</button>
+                <button class="rig-bouton rig-bouton--plat" title="Reafficher le document a droite"
+                        @onclick="() => GuideVisible = true">Document</button>
             }
-            <span class="rig-vged__compte">
-                @Arbre.NbPieces pieces &middot;
-                @DossiersVisibles.Count(n => n.NbPieces > 0) / @DossiersVisibles.Count dossiers servis &middot;
-                @Editions.Count(e => !e.EstGroupe) editions
-            </span>
+            <button class="rig-bouton rig-bouton--icone rig-bouton--plat" title="Fermer l'affaire" aria-label="Fermer l'affaire" @onclick="FermerDossier">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12" /><path d="M18 6L6 18" /></svg>
+            </button>
         </div>
 
-        @if (EditionsOuvertes)
+        @* ---- Bandeau des defauts : visible des qu'un requis manque ou qu'une
+             valeur est refusee. Chaque lien ouvre l'etape (et la fiche) ou
+             corriger (demande du 2026-09-15). *@
+        @if (!DossierValide && TousLesDefauts() is { Count: > 0 } defautsBandeau)
         {
-            <EcranTableauEditions Editions="Editions"
-                                  Affaire="@($"{DossierOuvert.Numero} {DossierOuvert.Objet}")"
-                                  Fermer="() => EditionsOuvertes = false" />
+            <div class="rig-bandeau-defauts @(defautsBandeau.Any(d => !d.EstManquant) ? "rig-bandeau-defauts--erreur" : "")" role="alert">
+                @* Piste C du draft (2026-09-15) : compteur + liste repliable, sections triees par urgence. *@
+                <details class="rig-bandeau-defauts__replis">
+                    <summary class="rig-bandeau-defauts__resume">
+                        <span class="rig-bandeau-defauts__titre">
+                            <b>@defautsBandeau.Count</b> @(defautsBandeau.Count == 1 ? "point a corriger" : "points a corriger")
+                        </span>
+                        <span class="rig-bandeau-defauts__voir">voir les sections</span>
+                    </summary>
+                    <div class="rig-bandeau-defauts__liste">
+                    @foreach (var groupe in defautsBandeau.GroupBy(d => (d.IndexEtape, d.Etape, d.Fiche, d.Unite))
+                                                         .OrderByDescending(x => x.Count(d => !d.EstManquant))
+                                                         .ThenByDescending(x => x.Count())
+                                                         .ThenBy(x => x.Key.IndexEtape))
+                    {
+                        var g = groupe;
+                        var refuses = g.Count(d => !d.EstManquant);
+                        var multi = Fiches(Etapes[g.Key.IndexEtape].Code).Count > 1;
+                        <button class="rig-bandeau-defauts__lien @(refuses > 0 ? "rig-bandeau-defauts__lien--refuse" : "rig-bandeau-defauts__lien--manquant")"
+                                title="@string.Join(" · ", g.Select(d => $"{d.Champ} : {d.Motif}"))"
+                                @onclick="() => AllerAuDefautDepuisBandeau(g.First())">
+                            @g.Key.Etape@(multi ? $" ({g.Key.Unite} {g.Key.Fiche + 1})" : "")
+                            <span class="rig-bandeau-defauts__nb">@g.Count()</span>
+                        </button>
+                    }
+                    </div>
+                </details>
+            </div>
         }
-        else if (ModeSaisie)
-        {
-            <div class="rig-saisie">
 
-                @* --- La frise : une pastille par etape, l'etat se lit d'un coup --- *@
-                <ol class="rig-frise">
+        <div class="rig-vged__corps" style="@StyleCorps">
+
+            @* ---- Arbre documentaire, colonnes de TreeviewGed (v2) ---- *@
+            <div class="rig-vged__arbre">
+                <div class="rig-arbre__entete">
+                    <span class="rig-arbre__libelle">Visualisation du dossier</span>
+                    <button class="rig-arbre__nouveau" title="Ajouter un dossier ou une piece dans l'arbre"
+                            @onclick="OuvrirNouveau">+ Nouveau</button>
+                </div>
+                @* MODE TACHE : l'arbre est replie sur ce que la recette nomme.
+                   Le bouton rouvre le dossier entier SANS fermer la tache. *@
+                @if (RecetteActive is not null)
+                {
+                    <div class="rig-tache__bandeau">
+                        <span class="rig-tache__code">@RecetteActive.Code</span>
+                        <span class="rig-tache__titre">@RecetteActive.Titre</span>
+                        <button class="rig-bouton rig-bouton--plat rig-tache__tout"
+                                aria-pressed="@ToutLeDossier"
+                                title="Afficher tout le dossier sans quitter la tache"
+                                @onclick="BasculerToutLeDossier">
+                            @(ToutLeDossier
+                                ? "Revenir a la tache"
+                                : $"Afficher tout le dossier ({BranchesMasquees} branches, {PiecesMasquees} pieces masquees)")
+                        </button>
+                        @* CONTROLE DE COMPLETUDE : la tache ne se termine que
+                           lorsque TOUS ses champs sont renseignes, et la preuve
+                           est la trace du dossier, pas l'ecran. *@
+                        @{
+                            var manquants = ChampsManquants();
+                            // Le compte porte sur les champs EXIGES, pas sur
+                            // tous : compter un champ facultatif comme fait
+                            // affichait « 3 / 5 » quand 2 seulement etaient
+                            // ecrits (defaut vu a l'ecran le 16/09/2026).
+                            // Le compte porte sur les CASES a remplir : un
+                            // champ repetable compte une fois PAR LIGNE. Sans
+                            // cela, 3 dirigeants ouverts affichaient « 0 / 4 »
+                            // alors que 5 cases etaient ecrites (vu le 16/09).
+                            var trous = TrousDeLaTache();
+                            var exiges = CasesExigees();
+                            var faits = exiges - trous.Length;
+                            var facultatifs = RecetteActive.Champs.Length
+                                              - RecetteActive.ChampsObligatoires.Length;
+                        }
+                        <span class="rig-tache__etat @(trous.Length == 0 ? "rig-tache__etat--ok" : "")">
+                            @faits / @exiges champs renseignes
+                            @if (facultatifs > 0)
+                            {
+                                <span class="rig-tache__reste">+ @facultatifs facultatif(s)</span>
+                            }
+                            @if (trous.Length > 0)
+                            {
+                                <span class="rig-tache__reste">reste : @NommerTrous(trous)</span>
+                            }
+                        </span>
+                        <button class="rig-bouton rig-tache__terminer" disabled="@(!TachePeutSeClore())"
+                                title="@RaisonBlocage()"
+                                @onclick="TerminerTache">Terminer la tache</button>
+                        <button class="rig-bouton rig-bouton--plat" title="Fermer la tache sans la terminer"
+                                @onclick="FermerTache">Fermer la tache</button>
+                    </div>
+                    @* PLUSIEURS LIGNES : trois dirigeants changes le meme jour
+                       font UNE tache, pas trois. Chaque ligne a ses propres
+                       champs, sa propre trace, et compte dans la completude. *@
+                    @if (RecetteActive.ARepetition)
+                    {
+                        <div class="rig-tache__lignes">
+                            @for (var i = 1; i <= NbLignesTache; i++)
+                            {
+                                var rang = i;
+                                var trousLigne = TrousDeLaLigne(rang);
+                                <button class="rig-tache__ligne @(rang == LigneCourante ? "rig-tache__ligne--courante" : "") @(trousLigne == 0 ? "rig-tache__ligne--ok" : "")"
+                                        title="@(trousLigne == 0 ? "Ligne complete" : $"{trousLigne} champ(s) a renseigner")"
+                                        @onclick="() => LigneCourante = rang">
+                                    @RecetteActive.LibelleLigne @rang
+                                </button>
+                            }
+                            <button class="rig-tache__ligne rig-tache__ligne--ajout"
+                                    title="@($"Ajouter un {RecetteActive.LibelleLigne.ToLowerInvariant()} a cette tache")"
+                                    @onclick="AjouterLigneTache">+</button>
+                            @if (NbLignesTache > 1)
+                            {
+                                <button class="rig-tache__ligne rig-tache__ligne--ajout"
+                                        title="Retirer la derniere ligne (ce qui y a ete ecrit reste dans la trace)"
+                                        @onclick="RetirerLigneTache">&minus;</button>
+                            }
+                        </div>
+                    }
+                    @* PROPAGATION : ce que l'evenement touche AILLEURS que dans
+                       les champs. Les canaux et leurs codes sont declares en
+                       base pour cet evenement -- chaque ligne dit sa source. *@
+                    <div class="rig-tache__effets">
+                        <div class="rig-tache__effets-titre">
+                            Ce que ce changement entraine
+                            <span class="rig-tache__effets-compte">
+                                @(RecetteActive.EffetsObligatoires.Length - EffetsRestants().Length)
+                                / @RecetteActive.EffetsObligatoires.Length traites
+                            </span>
+                        </div>
+                        @foreach (var effet in RecetteActive.Effets)
+                        {
+                            var e = effet;
+                            var coche = EffetCoche(e.Canal);
+                            <label class="rig-tache__effet @(e.Obligatoire ? "" : "rig-tache__effet--facultatif")"
+                                   title="@($"Declare en base : {e.Source}")">
+                                <input type="checkbox" checked="@coche"
+                                       @onchange="() => BasculerEffet(e)" />
+                                <span class="rig-tache__effet-libelle">@e.Libelle</span>
+                                <span class="rig-tache__effet-code">@e.Code</span>
+                                @if (!e.Obligatoire)
+                                {
+                                    <span class="rig-tache__effet-note">non exige</span>
+                                }
+                            </label>
+                        }
+                    </div>
+                }
+                <div class="rig-arbre">
+                    <ArbreGedNoeud Noeud="Arbre" Niveau="0" Ouverts="NoeudsOuverts"
+                                   Selection="NoeudSelectionne"
+                                   Selectionner="OuvrirApercu"
+                                   Domaines="Domaines" Ajouts="AjoutsArbre"
+                                   Masques="MasquesArbre" Libelles="LibellesArbre"
+                                   Recette="RecetteArbre"
+                                   Renomme="NoeudRenomme" Renommer="ValiderRenommage"
+                                   MenuContextuel="OuvrirMenuNoeud" />
+                </div>
+            </div>
+
+            @* ---- Separateur deplacable : regle la largeur de l'arbre ---- *@
+            @if (DonneesVisible || GuideVisible)
+            {
+            @* preventDefault : sans lui, le navigateur demarre une SELECTION de
+               texte des l'appui et toute la vue se couvre de surlignage bleu. *@
+            <div class="rig-vged__poignee" title="Glisser pour ajuster l'arbre"
+                 @onpointerdown="DebutRedim" @onpointerdown:preventDefault="true"></div>
+            }
+
+            @* ---- ZONE 2 : LES DONNEES ----
+                 Le formulaire de l'etape liee a la piece a desormais SA colonne :
+                 il ne prend plus la place du document (demande du 2026-09-14). *@
+            @* ---- ZONE 2 : LES ETAPES DU DOSSIER ----
+                 Les 7 etapes cote a cote, a l'horizontale : la molette passe a
+                 l'etape suivante (scroll-snap). Seules l'etape visible et ses deux
+                 voisines sont rendues (demande du 2026-09-15). *@
+            @if (DonneesVisible && NoeudSelectionne is { EstFiche: true })
+            {
+            @* « Informations du dossier » : le formulaire complet des donnees v2. *@
+            <div class="rig-vged__guide rig-vged__donnees">
+                @* fix-ok: ajout demande — GedCheck rouge « la vue affiche la fiche des formalites » avant branchement, vert apres *@
+                @if (NoeudSelectionne.Libelle == InformationsFormalite.LibelleNoeud)
+                {
+                @* « Informations des Formalites » : les champs du processus v2 XACTION. *@
+                <FicheInformationsDossier Numero="@DossierOuvert.Numero" Etat="Etat"
+                                          Domaine="Formalites"
+                                          Titre="@InformationsFormalite.LibelleNoeud"
+                                          Sections="InformationsFormalite.Sections"
+                                          Sources="InformationsFormalite.ProcessusSources"
+                                          Fermer="() => DonneesVisible = false" />
+                }
+                else if (NoeudSelectionne.Libelle == InformationsDepots.LibelleNoeud)
+                {
+                @* « Informations des depots » : les champs du processus v2 XDAS. *@
+                <FicheInformationsDossier Numero="@DossierOuvert.Numero" Etat="Etat"
+                                          Domaine="Depots d'actes"
+                                          Titre="@InformationsDepots.LibelleNoeud"
+                                          Sections="InformationsDepots.Sections"
+                                          Sources="InformationsDepots.ProcessusSources"
+                                          Fermer="() => DonneesVisible = false" />
+                }
+                else
+                {
+                <FicheInformationsDossier Numero="@DossierOuvert.Numero" Etat="Etat"
+                                          Recette="RecetteActive"
+                                          ToutAffiche="CompterToutAffiche"
+                                          ChampModifie="StateHasChanged"
+                                          LigneCourante="LigneCourante"
+                                          Fermer="() => DonneesVisible = false" />
+                }
+            </div>
+            @* Seconde poignee aussi pour les fiches : sans elle la grille (qui
+               reserve 6px + colonne donnees) decalait le document et rien ne
+               permettait d'ajuster la separation fiche / document. *@
+            @if (GuideVisible)
+            {
+            <div class="rig-vged__poignee" title="Glisser pour ajuster les donnees"
+                 @onpointerdown="DebutRedim2" @onpointerdown:preventDefault="true"></div>
+            }
+            }
+            else if (DonneesVisible)
+            {
+            <div class="rig-vged__guide rig-vged__donnees">
+                <div class="rig-guide__entete">
+                    <div>
+                        <div class="rig-kicker">Controle du dossier &middot; etape @(EtapeCourante + 1) / @Etapes.Length</div>
+                        <h3 class="rig-guide__titre">@(ApercuNoeud?.Libelle ?? DossierOuvert.Numero)</h3>
+                    </div>
+                    @* Oeil : rouvre le panneau de droite (document) depuis
+                       l'en-tete des etapes (demande du 2026-09-15). *@
+                    @if (!GuideVisible)
+                    {
+                    <button class="rig-bouton rig-bouton--icone rig-bouton--plat" style="margin-left:auto"
+                            title="Afficher le panneau de droite" aria-label="Afficher le panneau de droite"
+                            @onclick="() => GuideVisible = true">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
+                    </button>
+                    }
+                    <button class="rig-guide__fermer" title="Fermer les etapes"
+                            @onclick="() => DonneesVisible = false">&times;</button>
+                </div>
+                <ol class="rig-frise rig-frise--h rig-frise--haut">
+                    @* Fleches de part et d'autre des etapes : elles remplacent les
+                       boutons Precedent / Suivant (demande du 2026-09-15). *@
+                    <li class="rig-frise__fleche">
+                        <button class="rig-frise__fleche-bouton" title="Etape precedente"
+                                disabled="@(EtapeCourante == 0)"
+                                @onclick="() => AllerEtape(EtapeCourante - 1)">&#8249;</button>
+                    </li>
                     @for (var i = 0; i < Etapes.Length; i++)
                     {
                         var index = i;
@@ -429,13 +863,13 @@
                             </button>
                         </li>
                     }
+                    <li class="rig-frise__fleche">
+                        <button class="rig-frise__fleche-bouton" title="Etape suivante"
+                                disabled="@(EtapeCourante == Etapes.Length - 1)"
+                                @onclick="() => AllerEtape(EtapeCourante + 1)">&#8250;</button>
+                    </li>
                 </ol>
-
-                @* --- Une page geante, mais paginee : les etapes s'enchainent
-                     au scroll et chacune se cale comme une page (scroll-snap).
-                     La frise suit la page visible, elle ne la commande plus
-                     seule. --- *@
-                <div class="rig-saisie__pages" @ref="ZonePages">
+                <div class="rig-saisie__pages rig-saisie__pages--h" @ref="ZonePages">
                 @for (var iEtape = 0; iEtape < Etapes.Length; iEtape++)
                 {
                     var indexEtape = iEtape;
@@ -444,18 +878,14 @@
                     var iFiche = IndexFiche(courante);
                     <section class="rig-saisie__page @(indexEtape == EtapeCourante ? "rig-saisie__page--courante" : "")"
                              id="rig-etape-@indexEtape" data-etape="@indexEtape">
+                    @if (Math.Abs(indexEtape - EtapeCourante) <= 1)
+                    {
                     <div class="rig-saisie__corps">
                             <div class="rig-saisie__entete">
                                 <div>
                                     <div class="rig-kicker">Etape @(indexEtape + 1) sur @Etapes.Length</div>
                                     <h2 class="rig-saisie__titre">@courante.Titre</h2>
                                     <div class="rig-saisie__source">@courante.Source</div>
-                                </div>
-                                <div class="rig-saisie__navigation">
-                                    <button class="rig-bouton" disabled="@(indexEtape == 0)"
-                                            @onclick="() => AllerEtape(indexEtape - 1)">Precedent</button>
-                                    <button class="rig-bouton" disabled="@(indexEtape == Etapes.Length - 1)"
-                                            @onclick="() => AllerEtape(indexEtape + 1)">Suivant</button>
                                 </div>
                             </div>
 
@@ -562,226 +992,103 @@
                                 </div>
                             }
 
-                            <div class="rig-champs">
-                                @foreach (var champ in courante.Champs)
-                                {
-                                    var c = champ;
-                                    var e = courante;
-                                    var refus = RefusDe(e, c);
-                                    var manque = RequisManquant(e, c);
-                                    var etatChamp = refus is not null ? "rig-saisie-champ--refuse"
-                                                  : manque ? "rig-saisie-champ--manque" : "";
-                                    <label class="rig-saisie-champ rig-saisie-champ--@c.Largeur @etatChamp">
-                                        <span class="rig-saisie-champ__libelle">
-                                            @c.Libelle
-                                            @if (c.Obligatoire) { <span class="rig-saisie-champ__requis">requis</span> }
-                                        </span>
-                                        @if (c.Choix.Length > 0)
-                                        {
-                                            <select class="rig-saisie-champ__saisie"
-                                                    value="@Valeur(e, c)"
-                                                    @onchange="ev => Ecrire(e, c, ev.Value?.ToString())">
-                                                <option value=""></option>
-                                                @foreach (var choix in c.Choix)
-                                                {
-                                                    <option value="@choix">@choix</option>
-                                                }
-                                            </select>
-                                        }
-                                        else
-                                        {
-                                            <input class="rig-saisie-champ__saisie" type="@c.Type"
-                                                   placeholder="@c.Exemple"
-                                                   value="@Valeur(e, c)"
-                                                   @onchange="ev => Ecrire(e, c, ev.Value?.ToString())" />
-                                        }
-                                        @if (refus is not null)
-                                        {
-                                            <span class="rig-saisie-champ__refus">@refus</span>
-                                        }
-                                        else if (manque)
-                                        {
-                                            <span class="rig-saisie-champ__manque">a renseigner</span>
-                                        }
-                                        <span class="rig-saisie-champ__colonne">@c.Colonne</span>
-                                    </label>
-                                }
-                            </div>
+                            @ChampsSaisie(courante)
                     </div>
+                    }
+                    else
+                    {
+                        <div class="rig-saisie__attente">@courante.Titre</div>
+                    }
                     </section>
                 }
                 </div>
             </div>
-        }
-        else
-        {
-        <div class="rig-vged__corps" style="@StyleCorps">
-
-            @* ---- Arbre documentaire, colonnes de TreeviewGed (v2) ---- *@
-            <div class="rig-vged__arbre">
-                <div class="rig-arbre__entete">
-                    <span class="rig-arbre__libelle">Liste des pieces</span>
-                    <button class="rig-arbre__nouveau" title="Ajouter un dossier ou une piece dans l'arbre"
-                            @onclick="OuvrirNouveau">+ Nouveau</button>
-                </div>
-                <div class="rig-arbre">
-                    <ArbreGedNoeud Noeud="Arbre" Niveau="0" Ouverts="NoeudsOuverts"
-                                   Selection="NoeudSelectionne"
-                                   Selectionner="OuvrirApercu"
-                                   Domaines="Domaines" Ajouts="AjoutsArbre" />
-                </div>
-                @if (NoeudSelectionne is not null && NoeudSelectionne.EstPiece)
-                {
-                    <div class="rig-arbre__apercu">
-                        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">
-                            @NoeudSelectionne.Libelle
-                        </div>
-                        <div class="rig-vged__ligne-meta"><span>Type</span><span>@NoeudSelectionne.Extension</span></div>
-                        <div class="rig-vged__ligne-meta"><span>Depose le</span><span>@NoeudSelectionne.Date</span></div>
-                        <div class="rig-vged__ligne-meta"><span>Pages</span><span>@NoeudSelectionne.Pages</span></div>
-                        <div class="rig-vged__ligne-meta"><span>Origine</span><span>@NoeudSelectionne.Origine</span></div>
-                        @if (NoeudSelectionne.Apercu.Length > 0)
-                        {
-                            <div class="rig-arbre__apercu-texte">@NoeudSelectionne.Apercu</div>
-                        }
-                    </div>
-                }
-            </div>
-
-            @* ---- Colonne de droite : SAISIE GUIDEE contextuelle ----
-                 Ce qui est clique dans l'arbre choisit l'etape a saisir :
-                 le tableau des editions a son propre ecran (bouton dans la
-                 barre d'outils ci-dessus). *@
-            @* ---- Separateur deplacable : regle la largeur de la colonne du milieu ---- *@
             @if (GuideVisible)
             {
-            @* preventDefault : sans lui, le navigateur demarre une SELECTION de
-               texte des l'appui et toute la vue se couvre de surlignage bleu. *@
-            <div class="rig-vged__poignee" title="Glisser pour ajuster la colonne"
-                 @onpointerdown="DebutRedim" @onpointerdown:preventDefault="true"></div>
+            <div class="rig-vged__poignee" title="Glisser pour ajuster les donnees"
+                 @onpointerdown="DebutRedim2" @onpointerdown:preventDefault="true"></div>
             }
+            }
+
+            @* ---- ZONE 3 : LE DOCUMENT (visionneuse VGED) ----
+                 « Detacher » sort cette zone dans une fenetre a part, posable
+                 sur un autre ecran et dimensionnable independamment. *@
             @if (GuideVisible)
             {
-            <div class="rig-vged__guide">
-                @{
-                    var eGuide = EtapeGuide();
-                    var fichesGuide = Fiches(eGuide.Code);
-                    var iFicheGuide = IndexFiche(eGuide);
-                    var (remplisG, totalG) = Avancement(eGuide);
-                }
-                <div class="rig-guide__entete">
-                    <div>
-                        <div class="rig-kicker">Saisie guidee</div>
-                        <h3 class="rig-guide__titre">@eGuide.Titre</h3>
-                        <div class="rig-guide__source">
-                            @(NoeudSelectionne is null
-                                ? "Cliquez dans l'arbre pour cibler la saisie"
-                                : $"d'apres : {NoeudSelectionne.Libelle}")
-                            &middot; @eGuide.Source
-                        </div>
-                    </div>
-                    <div class="rig-guide__compte">@remplisG / @totalG</div>
-                    <button class="rig-guide__fermer" title="Fermer le panneau"
-                            @onclick="() => GuideVisible = false">&times;</button>
-                </div>
-
-                @if (eGuide.Multiple)
+            <div class="rig-vged__guide rig-vged__apercu">
+                @* PLUSIEURS documents peuvent etre sortis en meme temps : la zone
+                   reste donc utilisable pour ouvrir la piece suivante et la
+                   detacher a son tour. Un rappel liste les fenetres ouvertes. *@
+                @if (FenetresDetachees.Count > 0)
                 {
-                    <div class="rig-fiches">
-                        @for (var f = 0; f < fichesGuide.Count; f++)
-                        {
-                            var indexFiche = f;
-                            <button class="rig-fiches__onglet @(indexFiche == iFicheGuide ? "rig-fiches__onglet--actif" : "")"
-                                    @onclick="() => ChoisirFiche(eGuide, indexFiche)">
-                                @eGuide.Unite @(indexFiche + 1)
-                            </button>
-                        }
-                        <button class="rig-fiches__ajout" @onclick="() => AjouterFiche(eGuide)">+ Ajouter</button>
-                        @if (fichesGuide.Count > 1)
-                        {
-                            <button class="rig-fiches__retrait" @onclick="() => SupprimerFiche(eGuide)">Retirer</button>
-                        }
+                    <div class="rig-guide__entete rig-vged__detachees">
+                        <div>
+                            <div class="rig-kicker">Documents sortis</div>
+                            <div class="rig-guide__source">@FenetresDetachees.Count fenetre(s) ouverte(s) — chacune revient toujours a la meme place.</div>
+                        </div>
+                        <button class="rig-bouton" @onclick="RattacherDocument">Tout rattacher</button>
                     </div>
                 }
-
-                <div class="rig-guide__champs rig-champs">
-                    @foreach (var champ in eGuide.Champs)
-                    {
-                        var c = champ;
-                        var e = eGuide;
-                        var refus = RefusDe(e, c);
-                        var manque = RequisManquant(e, c);
-                        var etatChamp = refus is not null ? "rig-saisie-champ--refuse"
-                                      : manque ? "rig-saisie-champ--manque" : "";
-                        <label class="rig-saisie-champ rig-saisie-champ--@c.Largeur @etatChamp">
-                            <span class="rig-saisie-champ__libelle">
-                                @c.Libelle
-                                @if (c.Obligatoire) { <span class="rig-saisie-champ__requis">requis</span> }
-                            </span>
-                            @if (c.Choix.Length > 0)
+                @if (ApercuNoeud is not null)
+                {
+                    <div class="rig-apercu">
+                        <div class="rig-apercu__entete">
+                            <div>
+                                <div class="rig-kicker">@ApercuNoeud.Extension &middot; @ApercuNoeud.Pages page(s) &middot; @ApercuNoeud.Date</div>
+                                <div class="rig-apercu__titre">@ApercuNoeud.Libelle</div>
+                            </div>
+                            <div class="rig-apercu__actions">
+                                @* Icones + info-bulle (demande du 15/09/2026 : les
+                                   libelles en toutes lettres etaient juges laids). *@
+                                <button class="rig-bouton rig-bouton--icone rig-bouton--fort" title="Imprimer" aria-label="Imprimer" @onclick="OuvrirImpression">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6" /><rect x="3" y="9" width="18" height="8" rx="2" /><rect x="7" y="14" width="10" height="7" /></svg>
+                                </button>
+                                <button class="rig-bouton rig-bouton--icone" title="Editer" aria-label="Editer" @onclick="EditerPiece">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M13.5 6.5l4 4" /></svg>
+                                </button>
+                                <button class="rig-bouton rig-bouton--icone" title="Detacher dans une fenetre" aria-label="Detacher" @onclick="DetacherDocument">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6" /><path d="M20 4l-9 9" /><path d="M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5" /></svg>
+                                </button>
+                                <button class="rig-bouton rig-bouton--icone" title="Sauvegarder" aria-label="Sauvegarder" @onclick="Sauvegarder">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h11l4 4v13a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z" /><path d="M8 3v5h7V3" /><rect x="7" y="13" width="10" height="8" /></svg>
+                                </button>
+                                <button class="rig-bouton rig-bouton--icone" title="Envoyer par mail" aria-label="Envoyer par mail" @onclick="OuvrirEnvoiMail">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3L10 14" /><path d="M21 3l-7 18-4-7-7-4z" /></svg>
+                                </button>
+                                <button class="rig-bouton rig-bouton--icone rig-bouton--plat" title="Fermer l'apercu" aria-label="Fermer" @onclick="FermerApercu">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12" /><path d="M18 6L6 18" /></svg>
+                                </button>
+                            </div>
+                        </div>
+                        @if (ApercuMessage.Length > 0)
+                        {
+                            <div class="rig-apercu__message">@ApercuMessage</div>
+                        }
+                        <div class="rig-apercu__pages @(ApercuNoeud.APdf ? "rig-apercu__pages--pdf" : "")">
+                            @if (ApercuNoeud.APdf)
                             {
-                                <select class="rig-saisie-champ__saisie"
-                                        value="@Valeur(e, c)"
-                                        @onchange="ev => Ecrire(e, c, ev.Value?.ToString())">
-                                    <option value=""></option>
-                                    @foreach (var choix in c.Choix)
-                                    {
-                                        <option value="@choix">@choix</option>
-                                    }
-                                </select>
+                                <iframe class="rig-apercu__pdf" src="@(ApercuNoeud.Fichier)#view=FitH" title="@ApercuNoeud.Libelle"></iframe>
+                            }
+                            else if (EstKbis(ApercuNoeud))
+                            {
+                                <div class="rig-apercu__feuille rig-apercu__feuille--kbis">
+                                    <ApercuKbis Numero="@DossierOuvert.Numero" Siren="@DossierOuvert.Siren"
+                                                Denomination="@DenominationAffaire()" Lire="LireSaisie" />
+                                </div>
                             }
                             else
                             {
-                                <input class="rig-saisie-champ__saisie" type="@c.Type"
-                                       placeholder="@c.Exemple"
-                                       value="@Valeur(e, c)"
-                                       @onchange="ev => Ecrire(e, c, ev.Value?.ToString())" />
-                            }
-                            @if (refus is not null)
+                            @for (var feuille = 1; feuille <= Math.Max(1, ApercuNoeud.Pages); feuille++)
                             {
-                                <span class="rig-saisie-champ__refus">@refus</span>
+                                <div class="rig-apercu__feuille">
+                                    <div class="rig-apercu__feuille-texte">@TextePage(ApercuNoeud, feuille)</div>
+                                    <div class="rig-apercu__folio">@feuille / @Math.Max(1, ApercuNoeud.Pages)</div>
+                                </div>
                             }
-                            else if (manque)
-                            {
-                                <span class="rig-saisie-champ__manque">a renseigner</span>
                             }
-                            <span class="rig-saisie-champ__colonne">@c.Colonne</span>
-                        </label>
-                    }
-                </div>
-
-                @* --- La frise, horizontale, en pied du panneau de droite :
-                     les 7 etapes se lisent d'un coup et se choisissent ici. --- *@
-                <ol class="rig-frise rig-frise--h">
-                    @for (var i = 0; i < Etapes.Length; i++)
-                    {
-                        var etapeH = Etapes[i];
-                        var (remplisH, totalH) = Avancement(etapeH);
-                        var (manquantsH, refusesH) = Defauts(etapeH);
-                        var courantH = etapeH.Code == eGuide.Code;
-                        var detailH = refusesH > 0 ? $"{refusesH} valeur(s) refusee(s)"
-                                   : manquantsH > 0 ? $"{manquantsH} requis manquant(s)" : "";
-                        var titreH = $"{etapeH.Titre} - {remplisH} / {totalH}"
-                                   + (detailH.Length > 0 ? " - " + detailH : "");
-                        var etatH = refusesH > 0 ? "refuse"
-                                  : totalH > 0 && remplisH == totalH ? "complet"
-                                  : courantH ? "encours"
-                                  : remplisH > 0 ? "partiel" : "vide";
-                        <li class="rig-frise__pas rig-frise__pas--@etatH @(courantH ? "rig-frise__pas--courant" : "")">
-                            <button class="rig-frise__bouton"
-                                    title="@titreH"
-                                    @onclick="() => ChoisirEtapeGuide(etapeH)">
-                                <span class="rig-frise__pastille">
-                                    @(refusesH > 0 ? "!" : totalH > 0 && remplisH == totalH ? "OK" : (i + 1).ToString())
-                                </span>
-                                <span class="rig-frise__libelle">
-                                    @etapeH.Titre
-                                    <span class="rig-frise__compte">@remplisH / @totalH</span>
-                                </span>
-                            </button>
-                        </li>
-                    }
-                </ol>
+                        </div>
+                    </div>
+                }
             </div>
             }
             @if (Redimensionne)
@@ -791,47 +1098,9 @@
                      @onpointerleave="() => Redimensionne = false"></div>
             }
         </div>
-        }
     </div>
 }
 
-@* ---- Apercu du document clique, et choix de l'imprimante ----
-     v2 : PROC_VDOSSIER ouvre la piece dans une visionneuse avec les
-     actions Imprimer / Enregistrer / Transferer ; « Imprimer » passe par
-     la boite de parametres d'edition (OPE_DESTINATAIRE : file ou
-     imprimante, type de papier, recto-verso, exemplaires). *@
-@if (ApercuNoeud is not null)
-{
-    <div class="rig-voile" @onclick="FermerApercu">
-        <div class="rig-apercu" @onclick:stopPropagation="true">
-            <div class="rig-apercu__entete">
-                <div>
-                    <div class="rig-kicker">@ApercuNoeud.Extension &middot; @ApercuNoeud.Pages page(s) &middot; @ApercuNoeud.Date</div>
-                    <div class="rig-apercu__titre">@ApercuNoeud.Libelle</div>
-                </div>
-                <div class="rig-apercu__actions">
-                    <button class="rig-bouton rig-bouton--fort" @onclick="OuvrirImpression">Imprimer</button>
-                    <button class="rig-bouton" @onclick="Sauvegarder">Sauvegarder</button>
-                    <button class="rig-bouton" @onclick="Transferer">Transferer</button>
-                    <button class="rig-bouton rig-bouton--plat" @onclick="FermerApercu">Fermer</button>
-                </div>
-            </div>
-            @if (ApercuMessage.Length > 0)
-            {
-                <div class="rig-apercu__message">@ApercuMessage</div>
-            }
-            <div class="rig-apercu__pages">
-                @for (var feuille = 1; feuille <= Math.Max(1, ApercuNoeud.Pages); feuille++)
-                {
-                    <div class="rig-apercu__feuille">
-                        <div class="rig-apercu__feuille-texte">@TextePage(ApercuNoeud, feuille)</div>
-                        <div class="rig-apercu__folio">@feuille / @Math.Max(1, ApercuNoeud.Pages)</div>
-                    </div>
-                }
-            </div>
-        </div>
-    </div>
-}
 
 @if (ImpressionOuverte && ApercuNoeud is not null)
 {
@@ -889,45 +1158,92 @@
     </div>
 }
 
-@* ---- Bouton « Nouveau » de l'arbre : creation d'un dossier ou d'une piece ---- *@
-@if (NouveauOuvert)
+@* ---- « Envoyer par mail » : destinataire + message type ---- *@
+@if (EnvoiMailOuvert && ApercuNoeud is not null)
 {
-    <div class="rig-voile rig-voile--haut" @onclick="() => NouveauOuvert = false">
+    <div class="rig-voile rig-voile--haut" @onclick="() => EnvoiMailOuvert = false">
         <div class="rig-impression" @onclick:stopPropagation="true">
-            <div class="rig-kicker">Nouvel element dans &laquo; @DossierCible.Libelle &raquo;</div>
+            <div class="rig-kicker">Envoyer par mail &laquo; @ApercuNoeud.Libelle &raquo;</div>
 
             <label class="rig-saisie-champ">
-                <span class="rig-saisie-champ__libelle">Nature</span>
-                <select class="rig-saisie-champ__saisie" @bind="NouveauType">
-                    <option value="dossier">Dossier</option>
-                    <option value="piece">Piece</option>
+                <span class="rig-saisie-champ__libelle">Destinataire</span>
+                <input class="rig-saisie-champ__saisie" type="email" list="rig-mail-destinataires"
+                       placeholder="nom@exemple.fr" @bind="MailDestinataire" @bind:event="oninput" />
+                <datalist id="rig-mail-destinataires">
+                    @foreach (var d in MailDestinatairesDemo)
+                    {
+                        <option value="@d"></option>
+                    }
+                </datalist>
+            </label>
+
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Message</span>
+                <select class="rig-saisie-champ__saisie" @bind="MailMessageIndex">
+                    @for (var i = 0; i < MailMessagesDemo.Length; i++)
+                    {
+                        <option value="@i">@MailMessagesDemo[i].Titre</option>
+                    }
                 </select>
             </label>
 
-            <label class="rig-saisie-champ">
-                <span class="rig-saisie-champ__libelle">Libelle</span>
-                <input class="rig-saisie-champ__saisie" type="text"
-                       placeholder="Ex. : Depot n 2026/0042" @bind="NouveauLibelle" />
-            </label>
-
-            @if (NouveauType == "piece")
-            {
-                <label class="rig-saisie-champ">
-                    <span class="rig-saisie-champ__libelle">Type de fichier</span>
-                    <select class="rig-saisie-champ__saisie" @bind="NouveauExtension">
-                        <option value="PDF">PDF</option>
-                        <option value="JPG">JPG</option>
-                        <option value="TIF">TIF</option>
-                    </select>
-                </label>
-            }
+            <div class="rig-apercu__message">@MailMessagesDemo[MailMessageIndex].Corps</div>
 
             <div class="rig-impression__pied">
-                <button class="rig-bouton rig-bouton--fort" @onclick="AjouterElement"
-                        disabled="@(NouveauLibelle.Trim().Length == 0)">Ajouter</button>
+                <button class="rig-bouton rig-bouton--fort" disabled="@(MailDestinataire.Trim().Length == 0)"
+                        @onclick="EnvoyerMail">Envoyer</button>
+                <button class="rig-bouton" @onclick="() => EnvoiMailOuvert = false">Annuler</button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ---- Bouton « Nouveau » de l'arbre : on choisit une NATURE, l'element
+       est cree aussitot et se nomme SUR PLACE dans l'arbre ---- *@
+@if (NouveauOuvert)
+{
+    <div class="rig-voile rig-voile--haut" @onclick="() => NouveauOuvert = false">
+        <div class="rig-impression rig-impression--large" @onclick:stopPropagation="true">
+            <div class="rig-kicker">Nouvel element dans &laquo; @Libelle(DossierCible) &raquo;</div>
+            <div class="rig-natures">
+                @foreach (var n in AccesGed.Natures)
+                {
+                    <button type="button" class="rig-tuile-nature" title="@n.Titre"
+                            @onclick="() => AjouterElement(n.Code)">
+                        <IconeGed Nature="@n.Code" Classe="rig-nature__icone" />
+                        <span class="rig-nature__titre">@n.Titre</span>
+                        @if (n.Extension.Length > 0)
+                        {
+                            <span class="rig-nature__ext">@n.Extension</span>
+                        }
+                    </button>
+                }
+            </div>
+            <div class="rig-impression__pied">
                 <button class="rig-bouton" @onclick="() => NouveauOuvert = false">Annuler</button>
             </div>
         </div>
+    </div>
+}
+
+@* ---- Clic droit dans l'arbre : toutes les operations sur le noeud ---- *@
+@if (MenuNoeud is not null)
+{
+    <div class="rig-voile rig-voile--transparent" @onclick="FermerMenu"
+         @oncontextmenu="FermerMenu" @oncontextmenu:preventDefault="true"></div>
+    <div class="rig-ctx" style="left:@(MenuX)px; top:@(MenuY)px" @onclick:stopPropagation="true">
+        <div class="rig-ctx__titre">@Libelle(MenuNoeud)</div>
+        <button class="rig-ctx__item" @onclick="() => DemarrerRenommage(MenuNoeud)">Renommer</button>
+        @if (!MenuNoeud.EstPiece)
+        {
+            <button class="rig-ctx__item" @onclick="() => NouveauSous(MenuNoeud)">Nouvel element ici&hellip;</button>
+            <button class="rig-ctx__item" @onclick="() => ToutDeplier(MenuNoeud)">Tout deplier</button>
+            <button class="rig-ctx__item" @onclick="() => ToutReplier(MenuNoeud)">Tout replier</button>
+        }
+        <button class="rig-ctx__item" @onclick="() => Dupliquer(MenuNoeud)">Dupliquer</button>
+        <div class="rig-ctx__filet"></div>
+        <button class="rig-ctx__item rig-ctx__item--danger"
+                @onclick="() => SupprimerNoeud(MenuNoeud)">Supprimer</button>
     </div>
 }
 
@@ -946,7 +1262,7 @@
     // Le compte affiche en haut de l'ecran ne porte que sur les branches
     // que le login courant a le droit de voir.
     private IReadOnlyList<NoeudGed> DossiersVisibles
-        => AccesGed.EnfantsVisibles(Arbre, Domaines, AjoutsArbre);
+        => AccesGed.EnfantsVisibles(Arbre, Domaines, AjoutsArbre, MasquesArbre);
 
     private void ChangerLogin(ChangeEventArgs ev)
     {
@@ -957,7 +1273,55 @@
         {
             NoeudSelectionne = null;
             ApercuNoeud = null;
+            GuideVisible = false;
         }
+    }
+
+    // ---------------------------------------------------------------
+    // Validation hierarchique : un login sans ecriture directe SOUMET ses
+    // modifications, un superieur les valide. Voir Metier/ValidationModifications.cs.
+    // ---------------------------------------------------------------
+    private sealed class DemandeModification
+    {
+        public required ModificationProposee Info { get; set; }
+        public required Action Appliquer { get; init; }
+    }
+
+    private readonly List<DemandeModification> Validations = new();
+    private int NumeroValidation;
+    private bool PanneauValidationsOuvert;
+
+    private int ValidationsEnAttente => Validations.Count(d => d.Info.EstEnAttente);
+
+    /// <summary>
+    /// Passe le geste par la file de validation quand le login n'a pas le
+    /// droit d'ecrire en direct. Rend true si le geste a ete SOUMIS (donc
+    /// PAS applique) : l'appelant s'arrete alors la.
+    /// </summary>
+    private bool Soumettre(string geste, string cible, string detail, Action appliquer)
+    {
+        if (CompteCourant.PeutModifierDirect) return false;
+        Validations.Add(new DemandeModification
+        {
+            Info = new ModificationProposee(++NumeroValidation, geste, cible, detail,
+                                            CompteCourant.Nom, DateTime.Now),
+            Appliquer = appliquer,
+        });
+        PanneauValidationsOuvert = true;
+        return true;
+    }
+
+    private void ValiderModification(DemandeModification d)
+    {
+        if (!CompteCourant.PeutValider || !d.Info.EstEnAttente) return;
+        d.Appliquer();
+        d.Info = d.Info with { Etat = EtatModification.Validee, Decideur = CompteCourant.Nom };
+    }
+
+    private void RejeterModification(DemandeModification d)
+    {
+        if (!CompteCourant.PeutValider || !d.Info.EstEnAttente) return;
+        d.Info = d.Info with { Etat = EtatModification.Rejetee, Decideur = CompteCourant.Nom };
     }
 
     /// <summary>Les noeuds que le login courant peut voir, ajouts compris.</summary>
@@ -969,36 +1333,401 @@
         {
             var n = pile.Pop();
             yield return n;
-            foreach (var e in AccesGed.EnfantsVisibles(n, Domaines, AjoutsArbre)) pile.Push(e);
+            foreach (var e in AccesGed.EnfantsVisibles(n, Domaines, AjoutsArbre, MasquesArbre)) pile.Push(e);
         }
     }
 
+    // ================= MODE TACHE (task driven) =================
+    // Une alerte n'est pas une ligne a lire : c'est l'INSTANCE d'une recette
+    // (Metier/RecetteTache.cs). Tant qu'une tache est ouverte, l'arbre et la
+    // fiche se replient sur ce que la recette declare. Rien n'est supprime :
+    // « Afficher tout le dossier » remet la vue entiere, et le nombre de
+    // clics dit si la recette est incomplete.
+    private RecetteTache? RecetteActive;
+    private bool ToutLeDossier;
+
+    /// <summary>Combien de fois l'utilisateur a du rouvrir la vue entiere.
+    /// Mesure de qualite de la recette : beaucoup de clics = recette trop
+    /// etroite. Journalise pour que le comptage sorte de l'ecran.</summary>
+    private int ClicsToutAfficher;
+
+    /// <summary>La recette appliquee A L'ARBRE : nulle quand tout est affiche.</summary>
+    private RecetteTache? RecetteArbre => ToutLeDossier ? null : RecetteActive;
+
+    private void OuvrirTache(RecetteTache recette, string numeroDossier)
+    {
+        RecetteActive = recette;
+        ToutLeDossier = false;
+        LigneCourante = 1;
+        OuvrirParNumero(numeroDossier);
+        // La tache mene DIRECTEMENT au seul endroit qui porte ses champs.
+        var fiche = ArbreVisible().FirstOrDefault(n => n.EstFiche
+                                                       && n.Libelle == InformationsDossier.LibelleNoeud);
+        if (fiche is not null)
+        {
+            foreach (var n in ArbreVisible())
+            {
+                if (!n.EstPiece && !n.EstFiche && n.Descendants().Any(d => ReferenceEquals(d, fiche)))
+                    NoeudsOuverts.Add(n);
+            }
+            OuvrirApercu(fiche);
+            DonneesVisible = true;
+        }
+    }
+
+    private void FermerTache()
+    {
+        RecetteActive = null;
+        ToutLeDossier = false;
+    }
+
+    /// <summary>
+    /// Les champs de la tache encore vides. Ils sont lus dans la TRACE des
+    /// modifications de l'affaire (qui a ecrit quoi, quand) : c'est cette
+    /// trace qui prouve la fin de la tache, pas l'etat de l'ecran.
+    /// </summary>
+    private ChampRecette[] ChampsManquants()
+        => RecetteActive is null || DossierOuvert is null
+            ? []
+            : RecetteActive.Manquants(
+                cle => Etat.DerniereValeur(DossierOuvert.Numero, cle), NbLignesTache);
+
+    /// <summary>Les cases exigees encore vides, avec leur rang de ligne.</summary>
+    private (ChampRecette Champ, int Ligne)[] TrousDeLaTache()
+        => RecetteActive is null || DossierOuvert is null
+            ? []
+            : RecetteActive.ManquantsParLigne(
+                cle => Etat.DerniereValeur(DossierOuvert.Numero, cle), NbLignesTache);
+
+    /// <summary>
+    /// Le nombre de CASES a remplir : un champ repetable en vaut une par
+    /// ligne ouverte. C'est ce total qui rend le compte honnete quand la
+    /// tache porte trois dirigeants.
+    /// </summary>
+    private int CasesExigees()
+        => RecetteActive is null
+            ? 0
+            : RecetteActive.ChampsObligatoires.Sum(c => c.Repetable ? NbLignesTache : 1);
+
+    /// <summary>Nomme les cases manquantes, avec leur ligne quand il y en a plusieurs.</summary>
+    private string NommerTrous((ChampRecette Champ, int Ligne)[] trous)
+        => string.Join(", ", trous.Take(4).Select(t =>
+               t.Champ.Repetable && NbLignesTache > 1
+                   ? $"{t.Champ.Libelle} ({RecetteActive!.LibelleLigne} {t.Ligne})"
+                   : t.Champ.Libelle))
+           + (trous.Length > 4 ? $" et {trous.Length - 4} autre(s)" : "");
+
+    /// <summary>La recette que l'alerte de lot demande d'ouvrir, s'il y en a une.</summary>
+    private string LotDemande = "";
+
+    /// <summary>La ligne en cours de saisie (dirigeant 1, 2, 3...).</summary>
+    private int LigneCourante = 1;
+
+    /// <summary>Combien de lignes cette tache a ouvertes sur cette affaire.</summary>
+    private int NbLignesTache
+        => RecetteActive is null || DossierOuvert is null
+            ? 1
+            : Etat.NbLignesTache(RecetteActive.Code, DossierOuvert.Numero);
+
+    /// <summary>Combien de champs exiges manquent SUR CETTE LIGNE.</summary>
+    private int TrousDeLaLigne(int rang)
+        => RecetteActive is null || DossierOuvert is null
+            ? 0
+            : RecetteActive
+                .ManquantsParLigne(cle => Etat.DerniereValeur(DossierOuvert.Numero, cle), NbLignesTache)
+                .Count(x => x.Ligne == rang || !x.Champ.Repetable && rang == 1);
+
+    private void AjouterLigneTache()
+    {
+        if (RecetteActive is null || DossierOuvert is null) return;
+        LigneCourante = Etat.AjouterLigneTache(RecetteActive.Code, DossierOuvert.Numero);
+        Etat.Journaliser(DossierOuvert.Numero,
+            $"Tache {RecetteActive.Code} : {RecetteActive.LibelleLigne} {LigneCourante} ajoute par {Utilisateur}");
+    }
+
+    private void RetirerLigneTache()
+    {
+        if (RecetteActive is null || DossierOuvert is null) return;
+        var n = Etat.RetirerLigneTache(RecetteActive.Code, DossierOuvert.Numero);
+        LigneCourante = Math.Min(LigneCourante, n);
+    }
+
+    /// <summary>Vrai si cet effet de la tache courante est deja coche.</summary>
+    private bool EffetCoche(string canal)
+        => RecetteActive is not null && DossierOuvert is not null
+           && Etat.EffetTraite(RecetteActive.Code, DossierOuvert.Numero, canal);
+
+    /// <summary>Les publications et notifications encore a traiter.</summary>
+    private EffetRecette[] EffetsRestants()
+        => RecetteActive is null || DossierOuvert is null
+            ? []
+            : RecetteActive.EffetsRestants(EffetCoche);
+
+    /// <summary>Coche ou decoche un effet, et le note au journal du dossier.</summary>
+    private void BasculerEffet(EffetRecette e)
+    {
+        if (RecetteActive is null || DossierOuvert is null) return;
+        Etat.BasculerEffet(RecetteActive.Code, DossierOuvert.Numero, e.Canal);
+        Etat.Journaliser(DossierOuvert.Numero,
+            $"Tache {RecetteActive.Code} - {e.Libelle} : "
+            + (EffetCoche(e.Canal) ? "traite" : "remis a faire") + $" par {Utilisateur}");
+    }
+
+    /// <summary>
+    /// La tache ne se clot que si SES champs sont ecrits ET si tout ce
+    /// qu'elle entraine ailleurs a ete traite.
+    /// </summary>
+    private bool TachePeutSeClore()
+        => RecetteActive is not null
+           && ChampsManquants().Length == 0
+           && EffetsRestants().Length == 0;
+
+    /// <summary>Ce qui empeche de terminer, dit en clair sur le bouton.</summary>
+    private string RaisonBlocage()
+    {
+        if (RecetteActive is null) return "";
+        var champs = TrousDeLaTache();
+        if (champs.Length > 0) return "Renseigner d'abord : " + NommerTrous(champs);
+        var effets = EffetsRestants();
+        if (effets.Length > 0)
+            return "Reste a traiter : " + string.Join(", ", effets.Select(e => e.Libelle));
+        return "Terminer la tache et retirer son alerte";
+    }
+
+    /// <summary>
+    /// Termine la tache : elle est inscrite comme faite (qui, quand), le
+    /// journal du dossier en garde la ligne, et son ALERTE ne se releve plus.
+    /// </summary>
+    private void TerminerTache()
+    {
+        if (RecetteActive is null || DossierOuvert is null) return;
+        if (!TachePeutSeClore()) return;
+
+        var code = RecetteActive.Code;
+        var valeurs = string.Join(", ", RecetteActive.Champs
+            .Select(c => $"{c.Libelle} = {Etat.DerniereValeur(DossierOuvert.Numero, RecetteTache.Cle(c))}"));
+        Etat.CloreTache(code, DossierOuvert.Numero, Utilisateur);
+        var propage = string.Join(", ", RecetteActive.EffetsObligatoires.Select(e => e.Libelle));
+        Etat.Journaliser(DossierOuvert.Numero,
+            $"Tache {code} terminee par {Utilisateur} : {valeurs} - propage : {propage}");
+
+        RecetteActive = null;
+        ToutLeDossier = false;
+        // L'alerte correspondante disparait de la file : une tache faite ne
+        // doit pas revenir. Le releve est refait sur l'etat a jour.
+        RelevePerf();
+        Alertes = AlertesOuvertes();
+    }
+
+    /// <summary>
+    /// Les alertes relevees, MOINS celles dont la tache est deja terminee.
+    /// Sans ce filtre, la file redonnerait une tache faite au redemarrage.
+    /// </summary>
+    private AlerteGreffe[] AlertesOuvertes()
+        => SondeAlertes.Relever()
+            .Where(a => a.Tache is not { } t || !TacheDejaFaite(t.Code, t.Dossier))
+            .ToArray();
+
+    /// <summary>
+    /// Vrai si la tache portee par ce code a deja ete terminee sur cette
+    /// affaire. Le test passe par la RECETTE, jamais par le code brut :
+    /// depuis la 2e recette, DPER et DSTE menent a la meme tache, et la
+    /// cloture est retenue sous le code de la recette. Comparer les codes
+    /// bruts laisserait revenir l'alerte DPER apres une tache close en DSTE.
+    /// </summary>
+    private bool TacheDejaFaite(string code, string affaire)
+        => RecettesTaches.ParCode(code) is { } r
+           && Etat.TacheFaite(r.Code, affaire);
+
+    private void BasculerToutLeDossier()
+    {
+        ToutLeDossier = !ToutLeDossier;
+        if (ToutLeDossier) CompterToutAffiche();
+    }
+
+    /// <summary>Un clic sur « Afficher tout » : compte et trace.</summary>
+    private void CompterToutAffiche()
+    {
+        ClicsToutAfficher++;
+        if (DossierOuvert is not null && RecetteActive is not null)
+            Etat.Journaliser(DossierOuvert.Numero,
+                $"Tache {RecetteActive.Code} : vue entiere rouverte ({ClicsToutAfficher} fois)");
+    }
+
+    /// <summary>Les dossiers que la tache replie, et les pieces qu'ils portent.</summary>
+    private (int Branches, int Pieces) Replies()
+    {
+        if (RecetteActive is null) return (0, 0);
+        var branches = 0;
+        var pieces = 0;
+        var pile = new Stack<NoeudGed>();
+        pile.Push(Arbre);
+        while (pile.Count > 0)
+        {
+            var n = pile.Pop();
+            var tous = AccesGed.EnfantsVisibles(n, Domaines, AjoutsArbre, MasquesArbre);
+            var gardes = AccesGed.EnfantsVisibles(n, Domaines, AjoutsArbre, MasquesArbre, RecetteActive);
+            foreach (var e in tous)
+            {
+                if (gardes.Any(g => ReferenceEquals(g, e))) { pile.Push(e); continue; }
+                branches++;
+                pieces += e.NbPieces;
+            }
+        }
+        return (branches, pieces);
+    }
+
+    private int BranchesMasquees => Replies().Branches;
+    private int PiecesMasquees => Replies().Pieces;
+
     // ---- Bouton « Nouveau » de l'arbre : cree un dossier ou une piece ----
     private readonly Dictionary<NoeudGed, List<NoeudGed>> AjoutsArbre = AccesGed.NouveauxAjouts();
+    private readonly HashSet<NoeudGed> MasquesArbre = AccesGed.NouveauxMasques();
+    private readonly Dictionary<NoeudGed, string> LibellesArbre = AccesGed.NouveauxLibelles();
     private bool NouveauOuvert;
-    private string NouveauLibelle = "";
-    private string NouveauType = "dossier";
-    private string NouveauExtension = "PDF";
+
+    // Renommage sur place et menu du clic droit.
+    private NoeudGed? NoeudRenomme;
+    private NoeudGed? MenuNoeud;
+    private double MenuX, MenuY;
+
+    /// <summary>Le libelle affiche d'un noeud : celui d'un renommage sinon le sien.</summary>
+    private string Libelle(NoeudGed n)
+        => LibellesArbre.TryGetValue(n, out var l) ? l : n.Libelle;
+
+    /// <summary>Pose un libelle reecrit ET le retient dans accueil.json.</summary>
+    private void PoserLibelle(NoeudGed n, string texte)
+    {
+        LibellesArbre[n] = texte;
+        MemoriserArbre();
+    }
+
+    /// <summary>
+    /// Retient l'arbre de l'affaire ouverte apres CHAQUE geste (creation,
+    /// suppression, renommage). Les trois collections ci-dessus sont
+    /// indexees par reference d'objet : sans cette ecriture, tout ce que
+    /// l'utilisateur ajoute dans l'arbre part a la fermeture.
+    /// </summary>
+    private void MemoriserArbre()
+    {
+        if (DossierOuvert is null) return;
+        Etat.EnregistrerArbreGed(CleAffaire,
+            PersistanceGed.Capturer(Arbre, AjoutsArbre, MasquesArbre, LibellesArbre));
+    }
 
     private void OuvrirNouveau()
     {
-        NouveauLibelle = "";
-        NouveauType = "dossier";
         NouveauOuvert = true;
     }
 
-    /// <summary>Ou l'element va : le dossier clique, sinon la racine de l'affaire.</summary>
-    private NoeudGed DossierCible
-        => NoeudSelectionne is not null && !NoeudSelectionne.EstPiece ? NoeudSelectionne : Arbre;
-
-    private void AjouterElement()
+    private void NouveauSous(NoeudGed dossier)
     {
-        var libelle = NouveauLibelle.Trim();
-        if (libelle.Length == 0) return;
-        var cible = DossierCible;
-        var element = NouveauType == "piece"
-            ? AccesGed.NouvellePiece(libelle, NouveauExtension, DateDepot)
-            : AccesGed.NouveauDossier(libelle);
+        NoeudSelectionne = dossier;
+        MenuNoeud = null;
+        NouveauOuvert = true;
+    }
+
+    private void OuvrirMenuNoeud((NoeudGed Noeud, MouseEventArgs Souris) e)
+    {
+        MenuNoeud = e.Noeud;
+        MenuX = e.Souris.ClientX;
+        MenuY = e.Souris.ClientY;
+        NoeudRenomme = null;
+    }
+
+    private void FermerMenu() => MenuNoeud = null;
+
+    private void DemarrerRenommage(NoeudGed n)
+    {
+        MenuNoeud = null;
+        NoeudRenomme = n;
+    }
+
+    /// <summary>Renommage valide dans l'arbre. Texte vide = on abandonne.</summary>
+    private void ValiderRenommage((NoeudGed Noeud, string Texte) e)
+    {
+        var texte = e.Texte.Trim();
+        var noeud = e.Noeud;
+        if (texte.Length > 0
+            && !Soumettre("Renommer", Libelle(noeud), $"nouveau nom : {texte}",
+                          () => PoserLibelle(noeud, texte)))
+        {
+            PoserLibelle(noeud, texte);
+        }
+        NoeudRenomme = null;
+    }
+
+    /// <summary>
+    /// Suppression : le jeu de demonstration fige les enfants d'un dossier,
+    /// on MASQUE donc le noeud. Un element ajoute a la main part vraiment.
+    /// </summary>
+    private void SupprimerNoeud(NoeudGed n)
+    {
+        MenuNoeud = null;
+        if (ReferenceEquals(n, Arbre)) return;
+        if (Soumettre("Supprimer", Libelle(n), "", () => AppliquerSuppression(n))) return;
+        AppliquerSuppression(n);
+    }
+
+    private void AppliquerSuppression(NoeudGed n)
+    {
+        var retire = false;
+        foreach (var liste in AjoutsArbre.Values)
+            retire |= liste.RemoveAll(x => ReferenceEquals(x, n)) > 0;
+        if (!retire) MasquesArbre.Add(n);
+        foreach (var d in n.Descendants()) NoeudsOuverts.Remove(d);
+        NoeudsOuverts.Remove(n);
+        if (ReferenceEquals(NoeudSelectionne, n)) { NoeudSelectionne = null; ApercuNoeud = null; GuideVisible = false; }
+        if (ReferenceEquals(NoeudRenomme, n)) NoeudRenomme = null;
+        MemoriserArbre();
+    }
+
+    private void Dupliquer(NoeudGed n)
+    {
+        MenuNoeud = null;
+        if (Soumettre("Dupliquer", Libelle(n), "", () => AppliquerDuplication(n))) return;
+        AppliquerDuplication(n);
+    }
+
+    private void AppliquerDuplication(NoeudGed n)
+    {
+        var parent = ParentDe(n) ?? Arbre;
+        var copie = n.EstPiece
+            ? AccesGed.NouvellePiece($"{Libelle(n)} (copie)", n.Extension, DateDepot)
+            : AccesGed.NouveauDossier($"{Libelle(n)} (copie)");
+        Inserer(parent, copie);
+        NoeudSelectionne = copie;
+        NoeudRenomme = copie;
+    }
+
+    private void ToutDeplier(NoeudGed n)
+    {
+        MenuNoeud = null;
+        NoeudsOuverts.Add(n);
+        foreach (var d in n.Descendants()) if (!d.EstPiece) NoeudsOuverts.Add(d);
+    }
+
+    private void ToutReplier(NoeudGed n)
+    {
+        MenuNoeud = null;
+        foreach (var d in n.Descendants()) NoeudsOuverts.Remove(d);
+        NoeudsOuverts.Remove(n);
+    }
+
+    /// <summary>Le dossier qui porte ce noeud, ajouts manuels compris.</summary>
+    private NoeudGed? ParentDe(NoeudGed n)
+    {
+        foreach (var candidat in ArbreVisible())
+        {
+            if (candidat.Enfants.Any(e => ReferenceEquals(e, n))) return candidat;
+            if (AjoutsArbre.TryGetValue(candidat, out var l) && l.Any(e => ReferenceEquals(e, n)))
+                return candidat;
+        }
+        return null;
+    }
+
+    private void Inserer(NoeudGed cible, NoeudGed element)
+    {
         if (!AjoutsArbre.TryGetValue(cible, out var liste))
         {
             liste = new List<NoeudGed>();
@@ -1006,8 +1735,27 @@
         }
         liste.Add(element);
         NoeudsOuverts.Add(cible);
+        MemoriserArbre();
+    }
+
+    /// <summary>Ou l'element va : le dossier clique, sinon la racine de l'affaire.</summary>
+    private NoeudGed DossierCible
+        => NoeudSelectionne is not null && !NoeudSelectionne.EstPiece ? NoeudSelectionne : Arbre;
+
+    /// <summary>
+    /// Une nature cliquee dans la grille : l'element est cree tout de suite
+    /// avec un libelle par defaut, puis se nomme SUR PLACE dans l'arbre.
+    /// </summary>
+    private void AjouterElement(string nature)
+    {
+        var cible = DossierCible;
+        var element = AccesGed.NouveauSelonNature(nature, DateDepot);
         NouveauOuvert = false;
-        NouveauLibelle = "";
+        if (Soumettre("Creer", Libelle(cible), $"nouvel element : {element.Libelle}",
+                      () => Inserer(cible, element))) return;
+        Inserer(cible, element);
+        NoeudSelectionne = element;
+        NoeudRenomme = element;
     }
 
     private const string DateDepot = "10/09/2026";
@@ -1050,23 +1798,146 @@
     /// <summary>
     /// Clic dans l'arbre : un dossier se replie, une PIECE s'ouvre en apercu.
     /// La selection reste posee pour le panneau de saisie guidee.
+    /// Demande du 15/09/2026 : sans formulaire (dossier) la colonne des
+    /// donnees se ferme ; sans apercu (fiche, dossier) celle du document aussi.
     /// </summary>
     private void OuvrirApercu(NoeudGed n)
     {
         ChoisirNoeud(n);
-        if (!n.EstPiece) return;
+        if (PlacerSurInformations(n)) { GuideVisible = false; return; }
+        if (!n.EstPiece) { DonneesVisible = false; GuideVisible = false; return; }
         ApercuNoeud = n;
         ApercuMessage = "";
         ImpressionOuverte = false;
+        GuideVisible = true;
+        // Les donnees affichees a cote suivent la piece ouverte.
+        CodeEtapeGuide = EtapeDuNoeud(n).Code;
+        SuivreEtape(EtapeDuNoeud(n));
+        PublierDocument();
+    }
+
+    /// <summary>
+    /// « Informations du dossier » dans le bloc du milieu : au clic sur la fiche,
+    /// ou des que « Dossier RCS » est DEPLIE (demande du 15/09/2026).
+    /// </summary>
+    private bool PlacerSurInformations(NoeudGed n)
+    {
+        var fiche = n.EstFiche ? n
+            : NoeudsOuverts.Contains(n) ? ArbreDemo.FicheADeplier(n) : null;
+        if (fiche is null) return false;
+        NoeudSelectionne = fiche;
+        DonneesVisible = true;
+        return true;
+    }
+
+    /// <summary>
+    /// Recopie la piece courante vers les fenetres detachees QUI L'AFFICHENT
+    /// deja : editer le formulaire met a jour la bonne fenetre, sans ecraser
+    /// les autres documents sortis.
+    /// </summary>
+    private void PublierDocument()
+    {
+        if (FenetresDetachees.Count == 0 || ApercuNoeud is null) return;
+        var valeurs = ValeursDocument(ApercuNoeud).Select(v => (v.Libelle, v.Valeur)).ToList();
+        foreach (var f in FenetresDetachees)
+        {
+            if (ReferenceEquals(Partage.Emplacement(f.Rang).Piece, ApercuNoeud))
+                Partage.Publier(f.Rang, ApercuNoeud, valeurs);
+        }
     }
 
     private void FermerApercu()
     {
         ApercuNoeud = null;
         ImpressionOuverte = false;
+        // Demande du 15/09/2026 : la croix ferme directement la colonne de
+        // droite -- il n'existe plus de vue « Aucune piece ouverte ».
+        GuideVisible = false;
     }
 
     private void OuvrirImpression() => ImpressionOuverte = true;
+
+    /// <summary>
+    /// « Editer » depuis la visionneuse : la piece reste affichee a droite,
+    /// l'edition se fait sur place (la colonne de droite EST le document).
+    /// </summary>
+    private void EditerPiece()
+    {
+        if (ApercuNoeud is null) return;
+        NoeudSelectionne = ApercuNoeud;
+        // L'etape deduite de la piece : « Editer » ouvre le formulaire QUI
+        // correspond au document, pas une page de saisie au hasard.
+        CodeEtapeGuide = EtapeDuNoeud(ApercuNoeud).Code;
+        SuivreEtape(EtapeDuNoeud(ApercuNoeud));
+        DonneesVisible = true;
+        ImpressionOuverte = false;
+        ApercuMessage = "";
+    }
+
+    /// <summary>
+    /// Sort la piece courante dans UNE NOUVELLE fenetre. On peut en sortir
+    /// PLUSIEURS : chaque appel prend le plus petit rang libre. La fenetre
+    /// revient a la position memorisee pour ce rang (demande du 14/09/2026 :
+    /// place stable pour qui travaille sur plusieurs ecrans), sinon elle se
+    /// pose sur l'autre ecran quand il y en a un.
+    /// </summary>
+    private void DetacherDocument()
+    {
+        if (ApercuNoeud is null) return;
+        var rang = Partage.RangLibre(FenetresDetachees.Select(f => f.Rang));
+        Partage.Publier(rang, ApercuNoeud,
+            ValeursDocument(ApercuNoeud).Select(v => (v.Libelle, v.Valeur)).ToList());
+        var piece = ApercuNoeud;
+        var fenetre = new FenetreDocument(rang);
+        fenetre.Closed += (_, _) =>
+        {
+            FenetresDetachees.Remove(fenetre);
+            Partage.Liberer(fenetre.Rang);
+            if (VueFermee) return;
+            // Demande du 15/09/2026 : fermer la fenetre RENVOIE le document
+            // dans la colonne de droite, comme avant « Detacher ».
+            _ = InvokeAsync(() =>
+            {
+                ApercuNoeud = piece;
+                ApercuMessage = "";
+                ImpressionOuverte = false;
+                GuideVisible = true;
+                StateHasChanged();
+            });
+        };
+        FenetresDetachees.Add(fenetre);
+        fenetre.Show();
+        // Demande du 15/09/2026 : le document sorti ne reste pas AUSSI a
+        // droite -- la colonne se ferme pour ne pas faire doublon.
+        GuideVisible = false;
+        ImpressionOuverte = false;
+    }
+
+    /// <summary>Vrai des que la vue est liberee (fermeture de l'application) :
+    /// les fenetres qui se ferment alors ne rattachent plus rien.</summary>
+    private bool VueFermee;
+
+    /// <summary>Ramene tous les documents dans la 3e colonne (ferme leurs fenetres).</summary>
+    private void RattacherDocument()
+    {
+        foreach (var f in FenetresDetachees.ToList()) f.Close();
+        FenetresDetachees.Clear();
+    }
+
+    /// <summary>
+    /// Ce que la saisie a porte SUR ce document : les champs renseignes de
+    /// l'etape liee a la piece. C'est le lien « le formulaire affecte le
+    /// document » -- l'apercu les affiche sous son entete.
+    /// </summary>
+    private List<(string Libelle, string Valeur)> ValeursDocument(NoeudGed n)
+    {
+        var etape = EtapeDuNoeud(n);
+        var fiche = FicheVue(etape);
+        return etape.Champs
+                    .Where(c => fiche.TryGetValue(c.Colonne, out var v) && v.Length > 0)
+                    .Select(c => (c.Libelle, fiche[c.Colonne]))
+                    .ToList();
+    }
 
     private void LancerImpression()
     {
@@ -1079,41 +1950,498 @@
     private void Sauvegarder()
         => ApercuMessage = $"Enregistre sous {ApercuNoeud?.Libelle}.{ApercuNoeud?.Extension.ToLowerInvariant()}.";
 
-    private void Transferer()
-        => ApercuMessage = "Transfert prepare : choix du destinataire dans le tableau des editions.";
-
-    /// <summary>
-    /// Le contenu d'une page de l'apercu. La maquette n'a pas de fichier PDF :
-    /// le texte de demonstration de la piece est decoupe en pages.
-    /// </summary>
-    private static string TextePage(NoeudGed n, int feuille)
+    // ---- Envoi par mail (demande du 15/09/2026, remplace « Transferer »).
+    // MAQUETTE : les messages types viennent d'une table en base dans RIG ;
+    // ici trois messages fictifs en dur.
+    private bool EnvoiMailOuvert;
+    private string MailDestinataire = "";
+    private int MailMessageIndex;
+    private static readonly string[] MailDestinatairesDemo =
+        { "avocat.dupont@barreau-exemple.fr", "greffe.civil@exemple.fr", "contact@huissier-exemple.fr" };
+    private static readonly (string Titre, string Corps)[] MailMessagesDemo =
     {
-        if (n.Apercu.Length == 0)
-            return n.Libelle + "\n\n(page " + feuille + " - document numerise, " + n.Origine + ")";
-        var lignes = n.Apercu.Replace("\r\n", "\n").Split('\n');
-        const int parPage = 18;
-        var debut = (feuille - 1) * parPage;
-        if (debut >= lignes.Length)
-            return "(page " + feuille + " - suite du document)";
-        return string.Join("\n", lignes.Skip(debut).Take(parPage));
+        ("Transmission de piece", "Madame, Monsieur, Veuillez trouver ci-joint la piece relative au dossier cite en objet. Cordialement, Le greffe"),
+        ("Convocation a l'audience", "Madame, Monsieur, Vous trouverez ci-joint votre convocation. Merci de vous presenter a la date indiquee. Le greffe"),
+        ("Demande de pieces complementaires", "Madame, Monsieur, Afin de completer le dossier, merci de nous retourner les pieces mentionnees dans le document joint. Le greffe"),
+    };
+
+    private void OuvrirEnvoiMail()
+    {
+        MailDestinataire = "";
+        MailMessageIndex = 0;
+        EnvoiMailOuvert = true;
     }
+
+    private void EnvoyerMail()
+    {
+        EnvoiMailOuvert = false;
+        ApercuMessage = $"Mail « {MailMessagesDemo[MailMessageIndex].Titre} » envoye a {MailDestinataire.Trim()} (maquette : aucun envoi reel).";
+    }
+
+    /// <summary>Une page de l'apercu. La decoupe vit dans DocumentPartage :
+    /// la fenetre detachee affiche exactement les memes pages.</summary>
+    private static string TextePage(NoeudGed n, int feuille)
+        => DocumentPartage.TextePage(n, feuille);
 
     // ================= Menu de gauche =================
     private record Proc(string Code, string Libelle);
     private record Groupe(string Code, string Libelle, string Statut, Proc[] Procs);
 
-    private readonly HashSet<string> GroupesOuverts = new() { "RCS" };
-    private void BasculerGroupe(string code)
+    // ================= Navigation metier =================
+    /// <summary>Une entree du panneau de gauche, nommee par le BESOIN et non par
+    /// l'outil. « Procedure » est un mot de l'architecture de RIG v2 : l'agent ne
+    /// cherche pas « PROC_ARRIVEE », il cherche le courrier arrive ce matin.
+    /// <paramref name="Detail"/> dit ce qu'on y trouve, pour qu'on n'ait pas a
+    /// ouvrir pour savoir.</summary>
+    private record Entree(string Libelle, string Detail, string Code);
+
+    /// <summary><paramref name="Teinte"/> nomme la couleur du groupe (le CSS
+    /// porte les valeurs), <paramref name="Signe"/> le symbole de sa pastille.
+    /// La couleur n'est pas decorative : elle dit dans quel monde on est.</summary>
+    private record Moment(string Titre, string Teinte, string Signe, SousMenu[] Sous)
     {
-        if (!GroupesOuverts.Add(code)) GroupesOuverts.Remove(code);
+        /// <summary>Le compte affiche a droite du metier : le nombre d'ECRANS,
+        /// pas de sous-menus — c'est ce que l'utilisateur va chercher.</summary>
+        public int NombreEcrans => Sous.Sum(s => s.Entrees.Length);
     }
 
+    /// <summary>Un sous-menu : un VERBE, et les ecrans qui le servent. Il coupe
+    /// un metier long (le judiciaire en compte neuf) en paquets de deux a
+    /// quatre lignes, la taille qu'un oeil lit sans balayer.</summary>
+    private record SousMenu(string Titre, Entree[] Entrees);
+
+    /// <summary>Le panneau suit l'ORGANISATION du greffe : le RCS et le
+    /// JUDICIAIRE sont deux metiers distincts, qu'un meme agent pratique
+    /// rarement ensemble. Les ecrans transverses (documents, comptabilite)
+    /// sortent des deux. Quelques ecrans apparaissent dans deux groupes :
+    /// c'est VOULU, on les cherche des deux cotes. Chaque metier se coupe
+    /// ensuite en VERBES : ce qu'on vient y FAIRE.</summary>
+    private readonly Moment[] Moments =
+    [
+        new("Ouvrir", "rcs", "+",
+        [
+            new("Creer une affaire",
+            [
+                new("Nouvelle instance",      "saisir une affaire judiciaire",      "PROC_XAFF"),
+                new("Nouvelle formalite",     "ouvrir une procedure collective",    "PROC_NF"),
+                new("Nouvelle proc. collective", "PC ou prevention",                "PROC_NPC"),
+                new("Injonction de payer",    "creer une IP",                       "PROC_IPE"),
+                new("Enrolement judiciaire",  "mettre l'affaire au role",           "PROC_CJUD"),
+                new("Mesure provisoire",      "inscrire une mesure en instance",    "PROC_MESIN"),
+                new("Jonction d'instances",   "joindre deux affaires",              "PROC_JOIN")
+            ]),
+            new("Recevoir",
+            [
+                new("Courrier du jour",       "le papier entre ce matin",           "PROC_ARRIVEE"),
+                new("Demandes recues",        "ce qu'on attend de moi",             "PROC_DEMANDE"),
+                new("Creation via Infogreffe","enrolement recu par RPJC",           "PROC_CJUDINFOG"),
+                new("Ordonnance d'enrolement","ordonnance RCS",                     "PROC_CORDJRCS"),
+                new("Requisitions",           "commander des documents",            "PROC_REQUI")
+            ]),
+            new("Enregistrer un depot",
+            [
+                new("Depots au tribunal",     "les depots judiciaires",             "PROC_DEPOTJUD"),
+                new("Depots d'actes RCS",     "actes deposes au registre",          "PROC_DAS"),
+                new("Depots d'evenement PC",  "evenement de PC ou prevention",      "PROC_DEP"),
+                new("Depots PC en masse",     "traiter un lot de depots",           "PROC_DEPPCM"),
+                new("Depots beneficiaires",   "actes BEN",                          "PROC_DASBEN")
+            ])
+        ]),
+        new("Trouver", "jud", "?",
+        [
+            new("Une affaire",
+            [
+                new("Ouvrir un dossier",      "une societe arrive au registre",     "OUVERTURE_DOSSIER"),
+                new("Mes affaires",           "tout ce qui m'est confie",           "PROC_RECHAFF"),
+                new("Dossier RCS",            "voir un dossier du registre",        "PROC_VDOSSIER"),
+                new("Dossier judiciaire",     "instance, PC ou prevention",         "PROC_VJUD"),
+                new("Registres judiciaires",  "les registres du greffe",            "PROC_REGJUD"),
+                new("Navires",                "recherche de bateaux",               "PROC_RECHERCHE_BATEAU")
+            ]),
+            new("Une piece, un chiffre",
+            [
+                new("Documents",              "chercher dans la GED",               "PROC_RECHERCHE_GED"),
+                new("Actes numerises",        "ce que le scanner a produit",        "PROC_ACTES_NUM"),
+                new("Chiffres d'un dossier",  "donnees financieres RCS",            "PROC_VCHIFFRES"),
+                new("Encaissements",          "retrouver un reglement",             "PROC_RECHENC"),
+                new("Tarifs",                 "articles tarifaires RCS",            "PROC_TARIFS"),
+                new("Bilans en rejet",        "comptes annuels refuses",            "PROC_REJETS_BILANS")
+            ]),
+            new("Hors du greffe",
+            [
+                new("Interdits de gerer",     "consultation FNIG",                  "PROC_VFNIG"),
+                new("FIBEN",                  "fichier bancaire des entreprises",   "PROC_FIBEN"),
+                new("Notifications",          "echanges entre greffes",             "PROC_VNOTIF"),
+                new("Tribunal digital",       "ce qui vient du portail",            "PROC_VTRID")
+            ])
+        ]),
+        new("Les personnes", "pers", "P",
+        [
+            new("Judiciaire",
+            [
+                new("Acteurs judiciaires",    "juges, parquet, intervenants",       "PROC_ACTEUR_JUD"),
+                new("Experts",                "qui designer, qui a deja siege",     "PROC_EXPERT"),
+                new("Mandataires",            "mandataires et praticiens",          "PROC_MANDATAIRE"),
+                new("Parties d'une instance", "qui s'oppose a qui",                 "PROC_PARTIES"),
+                new("Rapprocher des acteurs", "fusionner deux fiches",              "PROC_RAPPACTEUR"),
+                new("Remplacer un acteur",    "substituer dans les instances",      "PROC_SUPP_ACTEUR_JUD")
+            ]),
+            new("Clients",
+            [
+                new("Clients",                "comptes et fiches",                  "PROC_GCLIENT"),
+                new("Fiche client",           "le detail d'un client",              "PROC_FCLIENT"),
+                new("Tiers payeurs",          "qui regle a la place du client",     "PROC_GESTTIERSPAYEURS"),
+                new("Non-inscrits",           "creer une personne hors registre",   "PROC_CNI")
+            ]),
+            new("Beneficiaires effectifs",
+            [
+                new("Beneficiaires d'un dossier", "les BE d'une societe",           "PROC_BE"),
+                new("Rechercher un beneficiaire", "consultation BEN",               "PROC_BEN"),
+                new("Divergences BEN",        "alertes de coherence",               "PROC_DBEN_ALERT")
+            ])
+        ]),
+        new("Modifier", "mod", "~",
+        [
+            new("L'affaire",
+            [
+                new("Instance judiciaire",    "corriger une instance",              "PROC_MJUD"),
+                new("Procedure collective",   "corriger une PC ou prevention",      "PROC_MPC"),
+                new("Mentions en marge",      "MMA du registre",                    "PROC_MMA"),
+                new("Diligences RCS",         "les diligences d'un dossier",        "PROC_MDIL"),
+                new("Mots directeurs",        "qualification judiciaire",           "PROC_MDJUD"),
+                new("Repertoire",             "corriger le repertoire",             "PROC_MODIF_REPER"),
+                new("Liberer une affaire",    "rendre la main sur un dossier",      "PROC_LIBAFFAIRE")
+            ]),
+            new("Defaire",
+            [
+                new("Liens entre PC",         "rattacher ou detacher",              "PROC_XLIEN"),
+                new("Extinction d'un dossier","cloturer ou radier au RCS",          "PROC_XEX"),
+                new("Supprimer une instance", "et rendre les numeros",              "PROC_XXAFF")
+            ]),
+            new("En masse",
+            [
+                new("Changer le juge-commissaire", "sur plusieurs PC",              "PROC_CHM"),
+                new("Changer les organes",    "mandataires sur un lot de PC",       "PROC_CHORGANESENMASSE"),
+                new("Debiteurs multiples",    "plusieurs debiteurs sur une PC",     "PROC_DEBITEURS_MULTIPLES")
+            ])
+        ]),
+        new("Audiencer", "aud", "A",
+        [
+            new("Preparer",
+            [
+                new("Roles et cabinets",      "organiser les audiences a venir",    "PROC_GESTAUDS"),
+                new("Cabinets",               "les salles d'audience",              "PROC_CABINET"),
+                new("Composition",            "qui siege ce jour-la",               "PROC_COMPO"),
+                new("Preparation d'audience", "plumitif avant l'audience",          "PROC_PREAUD"),
+                new("Convocations",           "convoquer les parties",              "PROC_GCONV"),
+                new("Mise au point chambres", "audiences de cabinet",               "PROC_MPCS")
+            ]),
+            new("Tenir",
+            [
+                new("Audiences",              "les dates qui approchent",           "PROC_AUDIENCE"),
+                new("Retour d'audience",      "saisir ce qui a ete dit",            "PROC_RETAUD"),
+                new("Deliberes",              "ce qui reste a rendre",              "PROC_LISTE_DELIBERES"),
+                new("Taxes et tours de role", "editions PC d'audience",             "PROC_TAXESETTOURS")
+            ]),
+            new("Decider et signer",
+            [
+                new("Redaction",              "ecrire une decision",                "PROC_REDA"),
+                new("Redaction en masse",     "rediger un lot de decisions",        "PROC_REDA_MASSE"),
+                new("Modeles de redaction",   "maquettes des decisions",            "PROC_REDAA"),
+                new("Destinataires",          "a qui part la decision",             "PROC_DEST_REDA"),
+                new("Signature electronique", "signer les decisions",               "PROC_SIGNJUD"),
+                new("Ordonnances a signer",   "la pile a signer",                   "PROC_ORDOSIGN"),
+                new("Occultations",           "masquer avant diffusion",            "PROC_DJ_OCCULTATIONS"),
+                new("Impression legale",      "jugements en masse",                 "PROC_IMPLEG")
+            ])
+        ]),
+        new("Documents", "doc", "D",
+        [
+            new("Numeriser",
+            [
+                new("Pieces numerisees",      "ce que le scanner a produit",        "PROC_ACTES_NUM"),
+                new("Controle des scans",     "verifier avant de valider",          "PROC_CONTROLE_VIDIGED"),
+                new("Documents ocerises",     "numerotation des pages",             "PROC_NUM")
+            ]),
+            new("Classer",
+            [
+                new("Documents",              "la GED de l'affaire",                "PROC_DOC_DEMAT"),
+                new("Documents judiciaires",  "la GED du judiciaire",               "PROC_GEDJUD"),
+                new("Coffre-fort",            "les pieces mises a l'abri",          "PROC_COFFRE_FORT"),
+                new("Transmission",           "envoyer un document dematerialise",  "PROC_TRANSDOC"),
+                new("Suivi dematerialisation","ce qui est parti au JAL/BODACC",     "PROC_SDEMATJUD")
+            ]),
+            new("Voir",
+            [
+                new("Voir un PDF",            "lire une piece",                     "PROC_PDF"),
+                new("Pivoter des pages",      "redresser un scan",                  "PROC_PDF_WRITER"),
+                new("Voir une image",         "image ou PDF multi-pages",           "PROC_IMAGE")
+            ])
+        ]),
+        new("Editer et envoyer", "edit", "E",
+        [
+            new("Courriers",
+            [
+                new("Courriers divers",       "les lettres types du greffe",        "PROC_COURRIER_DIVERS"),
+                new("Courriers en masse",     "un courrier pour un lot",            "PROC_COURRIERM"),
+                new("Modeles d'edition",      "la forme des courriers",             "PROC_EDIT_MAQUETTE"),
+                new("Sceaux",                 "elements de fusion",                 "PROC_SCEAU"),
+                new("Editions differees",     "ce qui partira plus tard",           "PROC_EDT_DIFF")
+            ]),
+            new("Imprimer",
+            [
+                new("File d'impression",      "ce qui attend l'imprimante",         "PROC_PAPERCUT"),
+                new("Relancer un fichier",    "edition bloquee",                    "PROC_RELANCEFILE"),
+                new("Relancer un lot",        "lot d'impression bloque",            "PROC_RELANCELOT"),
+                new("Suivi d'impression",     "ce qui est sorti",                   "PROC_SUIVI_IMPRESSION"),
+                new("Export Excel",           "sortir une liste",                   "PROC_LISTEEXCEL")
+            ]),
+            new("Envoyer",
+            [
+                new("Bordereaux LR",          "recommandes du jour",                "PROC_BORDLR"),
+                new("Retours LRAR",           "accuses de reception",               "PROC_RETOURLRAR"),
+                new("Envoi JAL / BODACC",     "ce qui part en publication",         "PROC_ENV_JAL"),
+                new("Publications BODACC",    "gerer les annonces",                 "PROC_GESTBOD"),
+                new("Surveillance BODACC",    "rejets et annonces en attente",      "PROC_SURVBOD")
+            ])
+        ]),
+        new("Argent", "compta", "$",
+        [
+            new("Facturer",
+            [
+                new("Factures",               "ce qui est du",                      "PROC_FACTURE"),
+                new("Refacturation",          "reediter une facture",               "PROC_FACTREEDIT"),
+                new("Releve de compte",       "le compte d'un client",              "PROC_RELCLI"),
+                new("Articles tarifaires",    "ce qu'on facture",                   "PROC_ARTICLE"),
+                new("Reversements INPI",      "ce qui part a l'INPI",               "PROC_INPIPAY"),
+                new("Formalites INPI",        "paiements en attente",               "PROC_GINPI")
+            ]),
+            new("Encaisser",
+            [
+                new("Encaissements",          "ce qui est rentre",                  "PROC_ENCAISS"),
+                new("Rejets d'encaissement",  "un reglement revenu",                "PROC_REJET"),
+                new("Remise en banque",       "porter les reglements en banque",    "PROC_REMBANQ"),
+                new("Cheques emis",           "ce que le greffe a paye",            "PROC_EDCHQEMIS"),
+                new("Modes de paiement",      "les moyens acceptes",                "PROC_GESTMODEPAIEMENT")
+            ]),
+            new("Tenir les comptes",
+            [
+                new("Journal de caisse",      "la caisse du jour",                  "PROC_JCAISSE"),
+                new("Journal de vente",       "les ventes du greffe",               "PROC_JVENTE"),
+                new("Livre de repertoire",    "le journal du repertoire",           "PROC_JLR"),
+                new("Lettrage",               "solder les mouvements",              "PROC_VLETTRAGE"),
+                new("Figer les ecritures",    "comptabiliser la journee",           "PROC_COMPTABILISATION")
+            ]),
+            new("Creances",
+            [
+                new("Creances",               "les creances d'une PC",              "PROC_CREANCE"),
+                new("Ajouter une creance",    "declarer une creance",               "PROC_ADDCREANCE"),
+                new("Modifier une creance",   "corriger une declaration",           "PROC_MODCREANCE"),
+                new("Integrer des creances",  "reprise en lot",                     "PROC_INTEGCREANCE"),
+                new("Representation",         "qui represente le creancier",        "PROC_CREANREP")
+            ])
+        ]),
+        new("Surveiller", "surv", "!",
+        [
+            new("Relancer",
+            [
+                new("Relances comptes annuels", "DCA en retard",                    "PROC_DCA_RELANCE"),
+                new("Injonctions comptes annuels", "passer a l'injonction",         "PROC_DCA_INJ"),
+                new("Relances beneficiaires", "DBE en retard",                      "PROC_DBE_RELANCE"),
+                new("Injonctions beneficiaires", "injonction DBE",                  "PROC_DBE_INJ"),
+                new("Rappels RBE",            "registre des beneficiaires",         "PROC_SRBE_RAPPEL"),
+                new("Retention d'actes",      "actes retenus au depot",             "PROC_ACTRET"),
+                new("Actes rejetes",          "rejets Infogreffe",                  "PROC_ACTREJ")
+            ]),
+            new("Suivre les instances",
+            [
+                new("Injonctions de payer",   "les IP en attente",                  "PROC_SURVIP"),
+                new("Suivi des preventions",  "les IP de prevention",               "PROC_IPSUIVI"),
+                new("Mesures",                "surveillance des mesures",           "PROC_SURVMES"),
+                new("Lots",                   "les lots en cours",                  "PROC_GESTLOT")
+            ]),
+            new("Chiffres",
+            [
+                new("Statistiques",           "les chiffres du greffe",             "PROC_STAT"),
+                new("Statistiques cour d'appel", "ce qui remonte a la CA",          "PROC_STATCA"),
+                new("Pilotage",               "tableaux de bord",                   "PROC_XPILOTAGE")
+            ])
+        ]),
+        new("Terminer", "fin", "#",
+        [
+            new("",
+            [
+                new("Cloture",                "fermer une affaire terminee",        "PROC_CLOT"),
+                new("Archivage",              "archiver ou radier",                 "PROC_ARCHIRAD"),
+                new("Extinction RCS",         "eteindre un dossier du registre",    "PROC_XEX")
+            ])
+        ]),
+        new("Reglages", "reg", "@",
+        [
+            new("Mon poste",
+            [
+                new("Mon accueil",            "tuiles et alertes",                  "PROC_ACCUEIL_PARAM"),
+                new("Dates de travail",       "la date du greffe",                  "PROC_GESTDATE"),
+                new("Aide du greffe",         "le wiki interne",                    "PROC_WIKI"),
+                new("Page web interne",       "ouvrir un site dans RIG",            "PROC_WEB_BROWSER")
+            ]),
+            new("Referentiels",
+            [
+                new("Tables de reference",    "les codes du greffe",                "PROC_GTABREF"),
+                new("Natures de document",    "typologie de la GED",                "PROC_GED_NATURE_DOC"),
+                new("Messagerie",             "les envois automatiques",            "PROC_GESTEMAIL"),
+                new("Banques",                "les comptes du greffe",              "PROC_GESTBANQ"),
+                new("Bornes d'accueil",       "les kiosques KBIS",                  "PROC_BORNE"),
+                new("Codes chefs IP",         "parametrage des injonctions",        "PROC_PARAM_IP"),
+                new("Listes Excel",           "parametrage des exports",            "PROC_PARAM_LISTEEXCEL"),
+                new("Facturation Expresso",   "parametrage de la facturation",      "PROC_PARAMEXPRESSO")
+            ]),
+            new("Outils",
+            [
+                new("Requetes metier",        "executer une requete preparee",      "PROC_REQUETES"),
+                new("Analyse IA",             "controle des formalites INPI",       "PROC_IA"),
+                new("Retours CFE-NET",        "traitement des retours XML",         "PROC_CFENET_RET"),
+                new("EDI RPVA",               "inscriptions mandataires",           "PROC_EDI_RPVAINS"),
+                new("EDI RPJC",               "traitement / conciliation",          "PROC_EDI_RPJC_TRCNC")
+            ])
+        ])
+    ];
+
+    /// <summary>Sous-menus deplies, reperes par « Metier/Verbe ». A l'ouverture
+    /// d'un metier, son PREMIER verbe s'ouvre seul : on voit tout de suite des
+    /// ecrans, pas une liste de titres vides.</summary>
+    private readonly HashSet<string> SousOuverts = new() { "Ouvrir/Creer une affaire" };
+    private static string CleSous(Moment m, SousMenu s) => $"{m.Titre}/{s.Titre}";
+    private bool SousEstOuvert(Moment m, SousMenu s)
+        => s.Titre.Length == 0 || SousOuverts.Contains(CleSous(m, s));
+    private void BasculerSous(Moment m, SousMenu s)
+    {
+        var cle = CleSous(m, s);
+        if (!SousOuverts.Add(cle)) SousOuverts.Remove(cle);
+    }
+
+    private readonly HashSet<string> MomentsOuverts = new() { "Ouvrir" };
+    private void BasculerMoment(string titre)
+    {
+        if (!MomentsOuverts.Add(titre)) { MomentsOuverts.Remove(titre); return; }
+
+        // A l'ouverture d'un metier, son premier verbe s'ouvre avec lui : sans
+        // cela on ne verrait qu'une liste de titres, et il faudrait deux clics
+        // de plus pour atteindre le moindre ecran.
+        var m = Moments.FirstOrDefault(x => x.Titre == titre);
+        if (m is not null && m.Sous.Length > 0 && m.Sous[0].Titre.Length > 0)
+            SousOuverts.Add(CleSous(m, m.Sous[0]));
+    }
+
+    /// <summary>Menu de gauche replie sur un rail etroit. Le menu reste
+    /// visible dans les deux etats : seule la largeur de sa colonne change.</summary>
+    private bool MenuReduit;
+    private void BasculerMenu() => MenuReduit = !MenuReduit;
+
+    /// <summary>Clic sur un moment. Si le menu est replie, le clic le deploie
+    /// d'abord : sur le rail, les libelles ne sont pas lisibles.</summary>
+    private void OuvrirMoment(string titre)
+    {
+        if (MenuReduit)
+        {
+            MenuReduit = false;
+            MomentsOuverts.Add(titre);
+            return;
+        }
+        BasculerMoment(titre);
+    }
+
+    /// <summary>Ouvre l'ecran d'un code sans que l'appelant ait a connaitre son
+    /// libelle : le catalogue <see cref="Groupes"/> reste la seule source.</summary>
+    private void OuvrirCode(string code)
+    {
+        var p = Groupes.SelectMany(g => g.Procs).FirstOrDefault(x => x.Code == code);
+        if (p is not null) { OuvrirProc(p); return; }
+
+        // Le menu couvre desormais TOUT le catalogue de RIG v2, pas seulement
+        // les ecrans deja portes. Pour une procedure sans ecran, le libelle du
+        // menu sert de titre : on ouvre un ecran « a venir » qui se nomme,
+        // plutot que de ne rien faire au clic.
+        var e = EntreeDeCode(code);
+        if (e is not null) OuvrirProc(new Proc(code, e.Libelle));
+    }
+
+    /// <summary>L'entree de menu qui porte un code, ou null.</summary>
+    private Entree? EntreeDeCode(string code)
+        => Moments.SelectMany(m => m.Sous).SelectMany(s => s.Entrees)
+                  .FirstOrDefault(x => x.Code == code);
+
+    /// <summary>La TACHE (le sous-menu) a laquelle appartient une procedure :
+    /// le meme geste metier, quels que soient les ecrans qui le servent. Elle
+    /// sert de repli au bandeau quand la procedure n'appartient a aucun sujet
+    /// d'objet — ainsi TOUTE procedure ouverte montre ses voisines de geste.</summary>
+    private SousMenu? TacheDe(string code)
+        => Moments.SelectMany(m => m.Sous)
+                  .FirstOrDefault(s => s.Entrees.Any(e => e.Code == code));
+
+    /// <summary>Le titre affichable d'une tache : son verbe, prefixe du metier
+    /// quand le sous-menu n'a pas de titre propre (« Terminer »).</summary>
+    private string TitreTache(SousMenu s)
+    {
+        var m = Moments.First(x => x.Sous.Contains(s));
+        return s.Titre.Length > 0 ? $"{m.Titre} : {s.Titre}" : m.Titre;
+    }
+
+    // ================= Sujets (regroupement par OBJET metier) =================
+    /// <summary>Un SUJET regroupe les procedures qui manipulent le MEME objet
+    /// metier. RIG v2 avait un ecran par procedure : pour ajouter une personne
+    /// en base, il fallait savoir d'avance s'il s'agissait d'un acteur
+    /// judiciaire (PROC_ACTEUR_JUD), d'un expert (PROC_EXPERT) ou d'un client
+    /// (PROC_GCLIENT / PROC_FCLIENT) — quatre ecrans pour un seul geste, et
+    /// l'expert existant DEUX fois. Le sujet remet ces ecrans dans une seule
+    /// vue : on entre par l'objet, on choisit le type ensuite.
+    /// La meme logique est appliquee a TOUS les objets, pas seulement aux
+    /// personnes ; chaque procedure du catalogue appartient a un sujet.</summary>
+    private record Sujet(string Code, string Titre, string[] Procs);
+
+    private readonly Sujet[] Sujets =
+    [
+        new("SUJ_PERSONNES", "Personnes",
+            ["PROC_ACTEUR_JUD", "PROC_EXPERT", "PROC_GCLIENT", "PROC_FCLIENT"]),
+        new("SUJ_AFFAIRES", "Affaires",
+            ["PROC_RECHAFF", "PROC_DEMANDE", "PROC_ARRIVEE", "PROC_DEPOTJUD", "PROC_REQUI", "PROC_CJUD"]),
+        new("SUJ_AUDIENCES", "Audiences",
+            ["PROC_AUDIENCE", "PROC_GESTAUDS"]),
+        new("SUJ_DOCUMENTS", "Documents",
+            ["PROC_DOC_DEMAT", "PROC_ACTES_NUM", "PROC_CONTROLE_VIDIGED", "PROC_COFFRE_FORT", "PROC_GEDJUD"]),
+        new("SUJ_EDITIONS", "Editions",
+            ["PROC_COURRIER_DIVERS", "PROC_EDIT_MAQUETTE", "PROC_REDA", "BODACC"]),
+        new("SUJ_ARGENT", "Argent",
+            ["PROC_FACTURE", "PROC_ENCAISS", "PROC_CREANCE", "PROC_COMPTABILISATION"]),
+        new("SUJ_FIN", "Fin d'affaire",
+            ["PROC_CLOT", "PROC_ARCHIRAD"]),
+        new("SUJ_REGLAGES", "Reglages",
+            ["PROC_ACCUEIL_PARAM", "PROC_STAT", "PROC_GESTEMAIL", "PROC_GESTBANQ"])
+    ];
+
+    /// <summary>Le sujet auquel appartient une procedure, ou null si elle n'en
+    /// a pas (aucune aujourd'hui : le tableau ci-dessus couvre le catalogue).</summary>
+    private Sujet? SujetDe(string code) => Sujets.FirstOrDefault(s => s.Procs.Contains(code));
+
+    /// <summary>Les procedures d'un sujet, avec leur libelle du catalogue. Les
+    /// codes inconnus sont ignores : le catalogue reste la seule source.</summary>
+    private Proc[] ProcsDuSujet(Sujet s)
+    {
+        var connus = Groupes.SelectMany(g => g.Procs).ToDictionary(p => p.Code);
+        return s.Procs.Where(connus.ContainsKey).Select(c => connus[c]).ToArray();
+    }
+
+    /// <summary>Catalogue des ecrans portes depuis RIG v2. Il n'est PLUS affiche
+    /// tel quel : il sert d'aiguillage, de source de libelles pour la recherche
+    /// et d'inventaire de ce qui existe.</summary>
     private readonly Groupe[] Groupes =
     [
         new("RCS", "RCS", "action",
         [
+            new("OUVERTURE_DOSSIER", "Ouverture d'un dossier RCS"),
             new("PROC_RECHAFF",   "Recherche d'affaires"),
             new("PROC_DEMANDE",   "Demandes"),
+            new("PROC_REQUI",     "Requisitions - commande de documents"),
             new("PROC_ARRIVEE",   "Arrivee du courrier"),
             new("PROC_ACTES_NUM", "Actes numerises"),
             new("PROC_CLOT",      "Cloture"),
@@ -1126,14 +2454,17 @@
             new("PROC_ACTEUR_JUD", "Acteurs"),
             new("PROC_CJUD",       "Consultation judiciaire"),
             new("PROC_AUDIENCE",   "Audiences"),
+            new("PROC_GESTAUDS",   "Gestion des audiences"),
             new("PROC_EXPERT",     "Experts"),
-            new("PROC_GEDJUD",     "GED judiciaire")
+            new("PROC_GEDJUD",     "GED judiciaire"),
+            new("PROC_REDA",       "Redaction d'une decision")
         ]),
         new("GED", "Documents", "ok",
         [
             new("PROC_DOC_DEMAT",        "Documents demateralises"),
             new("PROC_CONTROLE_VIDIGED", "Controle VidiGED"),
-            new("PROC_COFFRE_FORT",      "Coffre-fort")
+            new("PROC_COFFRE_FORT",      "Coffre-fort"),
+            new("PROC_TELETRANS",        "Teletransmissions (EDI)")
         ]),
         new("FAC", "Facturation", "ok",
         [
@@ -1141,31 +2472,61 @@
             new("PROC_ENCAISS", "Encaissements"),
             new("PROC_CREANCE", "Creances"),
             new("PROC_FCLIENT", "Fiches clients"),
-            new("PROC_GCLIENT", "Gestion clients")
+            new("PROC_GCLIENT", "Gestion clients"),
+            new("PROC_COMPTABILISATION", "Comptabilisation")
         ]),
         new("ADM", "Administration", "attente",
         [
             new("PROC_ACCUEIL_PARAM", "Parametres d'accueil"),
+            new("PROC_TACHES_LOT",    "Taches en lot"),
+            new("PROC_VERROUS",       "Dossiers verrouilles"),
+            new("PROC_STAT",       "Statistiques"),
             new("PROC_GESTEMAIL",     "Messagerie"),
             new("PROC_GESTBANQ",      "Banques"),
-            new("PROC_EDIT_MAQUETTE", "Maquettes d'edition")
+            new("PROC_EDIT_MAQUETTE", "Maquettes d'edition"),
+            new("PROC_COURRIER_DIVERS", "Courriers divers")
         ])
     ];
 
     // ================= Tuiles =================
-    private record DefinitionTuile(string Id, string Titre, PoseTuile Defaut);
+    /// <summary>Une tuile de l'accueil. <paramref name="Statut"/> choisit le filet de
+    /// couleur pose en tete de la tuile (charte : la couleur ne vit que dans les filets)
+    /// et <paramref name="Maitresse"/> designe la tuile prioritaire, mise en avant.</summary>
+    private record DefinitionTuile(string Id, string Titre, PoseTuile Defaut,
+        string Statut = "neutre", bool Maitresse = false);
 
     private readonly DefinitionTuile[] Definitions =
     [
-        new("reprise",     "Reprendre",    new() { Colonne = 1, Ligne = 1, Largeur = 12, Hauteur = 1 }),
-        new("performance", "Performance",  new() { Colonne = 1, Ligne = 2, Largeur = 4,  Hauteur = 2 }),
-        new("alertes",     "Alertes",      new() { Colonne = 5, Ligne = 2, Largeur = 4,  Hauteur = 2 }),
-        new("services",    "Services",     new() { Colonne = 9, Ligne = 2, Largeur = 4,  Hauteur = 2 }),
-        new("file",        "Ma file",      new() { Colonne = 1, Ligne = 4, Largeur = 8,  Hauteur = 3 }),
-        new("brouillons",  "Brouillons",   new() { Colonne = 9, Ligne = 4, Largeur = 4,  Hauteur = 2 }),
-        new("nouveautes",  "Nouveautes",   new() { Colonne = 9, Ligne = 6, Largeur = 4,  Hauteur = 1 }),
-        new("recents",     "Mes affaires recentes", new() { Colonne = 1, Ligne = 7, Largeur = 8, Hauteur = 2 })
+        new("performance", "Performance",  new() { Colonne = 1, Ligne = 1, Largeur = 4,  Hauteur = 2 }, "ok"),
+        new("alertes",     "Alertes",      new() { Colonne = 5, Ligne = 1, Largeur = 4,  Hauteur = 2 }, "alerte"),
+        new("services",    "Services",     new() { Colonne = 9, Ligne = 1, Largeur = 4,  Hauteur = 2 }, "ok"),
+        new("file",        "Ma file",      new() { Colonne = 1, Ligne = 3, Largeur = 8,  Hauteur = 3 }, "action", true),
+        new("brouillons",  "Brouillons",   new() { Colonne = 9, Ligne = 3, Largeur = 4,  Hauteur = 2 }, "action"),
+        new("nouveautes",  "Nouveautes",   new() { Colonne = 9, Ligne = 5, Largeur = 4,  Hauteur = 1 }, "attente"),
+        new("recents",     "Mes affaires recentes", new() { Colonne = 1, Ligne = 6, Largeur = 8, Hauteur = 2 }, "action")
     ];
+
+    // ================= Bandeau de mission =================
+    // Les trois chiffres de tete sont DERIVES de la file : aucun compteur en dur,
+    // sinon le bandeau mentirait des que la file bouge.
+    private int ATraiter => File.Count(d => d.VerrouillePar is null && !EstValide(d.Numero));
+    private int HorsDelai => File.Count(d => d.Statut == "alerte" && !EstValide(d.Numero));
+    private int Validees => File.Count(d => EstValide(d.Numero));
+
+    private void OuvrirPlusAncienHorsDelai()
+    {
+        var d = File.FirstOrDefault(x => x.Statut == "alerte" && !EstValide(x.Numero));
+        if (d is not null) { OuvrirParNumero(d.Numero); }
+    }
+
+    /// <summary>Statut affiche par le filet d'une tuile : fixe par defaut, mais les
+    /// tuiles qui portent un etat vivant (la file, les alertes) le recalculent.</summary>
+    private string StatutTuile(DefinitionTuile def) => def.Id switch
+    {
+        "file"    => HorsDelai > 0 ? "alerte" : "action",
+        "alertes" => AlertesVues.Any(a => a.Statut == "alerte") ? "alerte" : "attente",
+        _         => def.Statut
+    };
 
     private AccueilEtat Etat = new();
     private bool PanneauTuilesOuvert;
@@ -1238,6 +2599,18 @@
         StateHasChanged();
     }
 
+    /// <summary>Echap : ferme ce qui est ouvert, du plus interieur au plus
+    /// exterieur -- l'affaire d'abord, l'ecran de procedure ensuite. Un seul
+    /// appui ne referme donc jamais deux choses a la fois.</summary>
+    [JSInvokable]
+    public void ToucheEchap()
+    {
+        if (DossierOuvert is not null) FermerDossier();
+        else if (ProcOuverte is not null) FermerProc();
+        else return;
+        StateHasChanged();
+    }
+
     [JSInvokable]
     public void DimensionnerTuile(string id, int largeur, int hauteur)
     {
@@ -1253,6 +2626,7 @@
     {
         Etat = AccueilEtat.Charger();
         RelevePerf();
+        Alertes = AlertesOuvertes();
 
         foreach (var def in Definitions) { Pose(def.Id); }
         foreach (var a in Alertes)
@@ -1270,16 +2644,23 @@
         if (!premierRendu)
         {
             if (Module is null) return;
-            if (ModeSaisie && !PaginationSuivie && Lien is not null)
+            if (EtapesAffichees && !PaginationSuivie && Lien is not null)
             {
                 PaginationSuivie = true;
                 try { await Module.InvokeVoidAsync("suivrePagination", ZonePages, Lien); }
                 catch (JSException) { PaginationSuivie = false; }
             }
-            else if (!ModeSaisie && PaginationSuivie)
+            else if (!EtapesAffichees && PaginationSuivie)
             {
                 PaginationSuivie = false;
                 try { await Module.InvokeVoidAsync("arreterPagination"); }
+                catch (JSException) { }
+            }
+            // Ouvrir une piece amene la frise sur SON etape.
+            if (EtapeADefiler && EtapesAffichees)
+            {
+                EtapeADefiler = false;
+                try { await Module.InvokeVoidAsync("allerEtape", ZonePages, EtapeCourante, false); }
                 catch (JSException) { }
             }
             return;
@@ -1287,6 +2668,7 @@
         Module = await JS.InvokeAsync<IJSObjectReference>("import", "./rig-accueil.js");
         Lien = DotNetObjectReference.Create(this);
         await Module.InvokeVoidAsync("activerPose", Grille, Lien);
+        await Module.InvokeVoidAsync("activerClavier", Lien);
         await AppliquerTheme();
         MinuteurPerf = new Timer(_ =>
         {
@@ -1301,11 +2683,13 @@
     // l'application -- exactement ce que la reprise a chaud doit eviter.
     public async ValueTask DisposeAsync()
     {
+        VueFermee = true;
         if (MinuteurPerf is not null) await MinuteurPerf.DisposeAsync();
         if (Module is not null)
         {
             try { await Module.InvokeVoidAsync("arreterPose"); } catch (JSException) { }
             try { await Module.InvokeVoidAsync("arreterPagination"); } catch (JSException) { }
+            try { await Module.InvokeVoidAsync("arreterClavier"); } catch (JSException) { }
             try { await Module.DisposeAsync(); } catch (JSException) { }
         }
         Lien?.Dispose();
@@ -1319,16 +2703,43 @@
         set { _recherche = value; }
     }
 
-    private record Dossier(string Numero, string Objet, string Siren, string Type, string Statut);
+    /// <summary>
+    /// Une affaire ouverte dans la visionneuse. <c>SansDossierRcs</c> marque
+    /// les affaires PUREMENT judiciaires : elles n ont aucun dossier au RCS,
+    /// donc leur arbre n ouvre que la branche « Judiciaire » (v2 :
+    /// PROC_VGED\ETP_VGED\OPE_VGED.cs, _InitTreeview).
+    /// </summary>
+    private record Dossier(string Numero, string Objet, string Siren, string Type, string Statut,
+                           bool SansDossierRcs = false);
 
-    private readonly Dossier[] Fonds =
+    private static readonly Dossier[] FondsDemo =
     [
-        new("0000",   "Affaire de demonstration - AMITEL SAS", "903 118 776", "RCS", "action"),
+        new("2026B01067",   "Affaire de demonstration - AMIENS BILLARDS", "109 678 235", "RCS", "action"),
         new("004176", "Modification - SCI DU PARC",     "812 445 901", "RCS", "alerte"),
-        new("004182", "Immatriculation - AMITEL SAS",   "903 118 776", "RCS", "action"),
+        new("004182", "Immatriculation - AMIENS BILLARDS",   "109 678 235", "RCS", "action"),
         new("004179", "Radiation - MARTIN EURL",        "521 004 332", "RCS", "attente"),
         new("004168", "Immatriculation - BATIPRO SARL", "440 927 115", "RCS", "neutre"),
-        new("J-00931", "Depot de bilan - TRANSNORD SA", "318 552 004", "JUD", "alerte")
+        new("J-00931", "Depot de bilan - TRANSNORD SA", "318 552 004", "JUD", "alerte"),
+        // Affaires PUREMENT judiciaires (demande du 16/09/2026) : pas de
+        // dossier RCS, donc pas de Siren et une seule branche dans l arbre.
+        new("2026J00087",  "Assignation en paiement - DUPONT Jean",   "", "JUD", "action",  true),
+        new("2026P00031",  "Liquidation judiciaire - MOREAU EI",      "", "JUD", "alerte",  true),
+        new("2026IP00214", "Injonction de payer - LEROY Michel",      "", "JUD", "attente", true),
+        new("2026M00045",  "Expertise avant proces - GARAGE CENTRAL", "", "JUD", "action",  true),
+        new("2026C00059",  "Conciliation - ATELIER DU MEUBLE",        "", "JUD", "neutre",  true)
+    ];
+
+    /// <summary>
+    /// Le fonds d'affaires REELLEMENT interrogeable : le jeu de demonstration
+    /// PLUS les dossiers ouverts pendant la session par l'ecran « Ouvrir un
+    /// dossier ». Un dossier qu'on vient d'ouvrir doit se retrouver ici,
+    /// sinon l'ouverture n'aurait aucune suite.
+    /// </summary>
+    private Dossier[] Fonds =>
+    [
+        .. AffairesOuvertes.Toutes.Select(a =>
+               new Dossier(a.Numero, a.Objet, a.Siren, a.Type, a.Statut)),
+        .. FondsDemo
     ];
 
     private Dossier[] Resultats =>
@@ -1341,13 +2752,25 @@
                         StringComparison.OrdinalIgnoreCase))
                .Take(6).ToArray();
 
+    /// <summary>Les TRAITEMENTS trouves par la meme recherche. Le menu de gauche
+    /// suppose qu'on sait deja quel outil repond au besoin ; la recherche, elle,
+    /// part des mots de l'utilisateur. Taper « facture » doit donc proposer
+    /// l'ecran des factures, exactement comme taper un SIREN propose l'affaire.</summary>
+    private Proc[] Traitements =>
+        string.IsNullOrWhiteSpace(_recherche) || _recherche.Trim().Length < 2
+            ? []
+            : Groupes.SelectMany(g => g.Procs)
+                     .Where(p => p.Libelle.Contains(_recherche.Trim(),
+                                    StringComparison.OrdinalIgnoreCase))
+                     .Take(4).ToArray();
+
     // ================= Visionneuse =================
     private Dossier? DossierOuvert;
 
     // L'arbre de l'affaire ouverte, sa selection, et les dossiers deplies.
-    private NoeudGed Arbre = ArbreDemo.Racine("0000", "AMITEL SAS", "903 118 776");
+    private NoeudGed Arbre = ArbreDemo.Racine("2026B01067", "AMIENS BILLARDS", "109 678 235");
     private NoeudGed? NoeudSelectionne;
-    private readonly HashSet<NoeudGed> NoeudsOuverts = new();
+    private readonly HashSet<NoeudGed> NoeudsOuverts = AccesGed.NouveauxMasques();
 
     // Le tableau des editions de l'affaire et la ligne selectionnee.
     private LigneEdition[] Editions = [];
@@ -1356,24 +2779,54 @@
     /// Le tableau des editions n'est plus la colonne de droite de
     /// l'affaire : c'est un ecran a part, ouvert par un bouton.
     /// </summary>
-    private bool EditionsOuvertes;
 
     // ================= Colonnes de la vue affaire =================
     // Le panneau de droite se ferme (croix) et la colonne du milieu
     // s'ajuste en glissant le separateur. Largeur en pixels, bornee.
-    private bool GuideVisible = true;
+    // Ferme au depart : la colonne n'existe que pour montrer une piece.
+    private bool GuideVisible;
+    // Second locataire de la colonne de droite : le formulaire de l'etape liee
+    // a la piece ouverte. Exclusif avec l'apercu -- « Editer » bascule dessus,
+    // « Voir le document » revient.
+    private bool DonneesVisible = true;
     private bool Redimensionne;
-    private double LargeurArbre = 520;
-    private const double LargeurArbreMin = 280;
+    // Quelle poignee est saisie : 1 = entre l'arbre et les donnees,
+    // 2 = entre les donnees et le document.
+    private int ColonneRedim = 1;
+    private double LargeurArbre = 400;
+    private double LargeurDonnees = 420;
+    private const double LargeurArbreMin = 240;
     private const double LargeurArbreMax = 1100;
+    private const double LargeurDonneesMin = 280;
+    private const double LargeurDonneesMax = 1100;
+    /// <summary>Les fenetres de document actuellement sorties. PLUSIEURS
+    /// documents peuvent l'etre en meme temps ; chacune porte son rang, qui
+    /// est aussi la clef de sa position memorisee.</summary>
+    private readonly List<FenetreDocument> FenetresDetachees = new();
 
     private string StyleCorps
     {
         get
         {
-            var colonnes = GuideVisible
-                ? $"grid-template-columns: {LargeurArbre.ToString("0", System.Globalization.CultureInfo.InvariantCulture)}px 6px minmax(0, 1fr)"
-                : "grid-template-columns: minmax(0, 1fr)";
+            // TROIS zones cote a cote : l'arbre, les donnees, le document.
+            // Chacune peut se fermer ; les colonnes se recalculent alors.
+            static string Px(double v) =>
+                v.ToString("0", System.Globalization.CultureInfo.InvariantCulture) + "px";
+
+            string colonnes;
+            if (!DonneesVisible && !GuideVisible)
+            {
+                colonnes = "grid-template-columns: minmax(0, 1fr)";
+            }
+            else
+            {
+                var morceaux = new List<string> { Px(LargeurArbre) };
+                // Sans document a droite, les donnees prennent toute la largeur
+                // restante : une largeur fixe laissait un grand vide (demande du 2026-09-15).
+                if (DonneesVisible) { morceaux.Add("6px"); morceaux.Add(GuideVisible ? Px(LargeurDonnees) : "minmax(0, 1fr)"); }
+                if (GuideVisible) { morceaux.Add("6px"); morceaux.Add("minmax(0, 1fr)"); }
+                colonnes = "grid-template-columns: " + string.Join(" ", morceaux);
+            }
             // Pendant le glissement, le navigateur selectionnerait le texte
             // survole : la vue se couvrait de surlignage bleu.
             return Redimensionne ? colonnes + "; user-select: none" : colonnes;
@@ -1391,6 +2844,16 @@
     {
         XDepart = e.ClientX;
         LargeurDepart = LargeurArbre;
+        ColonneRedim = 1;
+        Redimensionne = true;
+    }
+
+    /// <summary>Seconde poignee : entre la colonne des donnees et le document.</summary>
+    private void DebutRedim2(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
+    {
+        XDepart = e.ClientX;
+        LargeurDepart = LargeurDonnees;
+        ColonneRedim = 2;
         Redimensionne = true;
     }
 
@@ -1398,7 +2861,10 @@
     {
         if (!Redimensionne) return;
         var largeur = LargeurDepart + (e.ClientX - XDepart);
-        LargeurArbre = Math.Clamp(largeur, LargeurArbreMin, LargeurArbreMax);
+        if (ColonneRedim == 2)
+            LargeurDonnees = Math.Clamp(largeur, LargeurDonneesMin, LargeurDonneesMax);
+        else
+            LargeurArbre = Math.Clamp(largeur, LargeurArbreMin, LargeurArbreMax);
     }
 
     /// <summary>
@@ -1448,6 +2914,14 @@
 
     private void ChoisirEtapeGuide(Etape etape) => CodeEtapeGuide = etape.Code;
 
+    private void SuivreEtape(Etape etape)
+    {
+        var i = Array.IndexOf(Etapes, etape);
+        if (i < 0 || i == EtapeCourante) return;
+        EtapeCourante = i;
+        EtapeADefiler = true;
+    }
+
     private void ChoisirNoeud(NoeudGed n)
     {
         NoeudSelectionne = n;
@@ -1466,11 +2940,19 @@
 
         // Ouvrir une affaire tombe sur l'arbre, jamais sur la saisie : c'est
         // l'ecran d'entree de VGED dans RIG v2.
-        ModeSaisie = false;
+        EtapeCourante = 0;
+        PaginationSuivie = false;
 
-        Arbre = ArbreDemo.Racine(d.Numero, d.Objet, d.Siren);
+        // Une affaire purement judiciaire n ouvre QUE la branche Judiciaire :
+        // v2 n ajoute « Dossier RCS » que si l affaire a un dossier RCS.
+        Arbre = ArbreDemo.Racine(d.Numero, d.Objet, d.Siren,
+                                 avecDossierRcs: !d.SansDossierRcs);
         Editions = ArbreDemo.Editions(d.Numero, d.Objet);
-        EditionsOuvertes = false;
+
+        // L'arbre est reconstruit a neuf : on y repose ce que l'utilisateur
+        // avait ajoute, masque ou renomme lors d'une session precedente.
+        PersistanceGed.Appliquer(Arbre, Etat.ArbreGedDe(d.Numero),
+                                 AjoutsArbre, MasquesArbre, LibellesArbre);
 
         // La racine et tous les dossiers servis sont deplies d'entree :
         // l'arbre s'ouvre sur du contenu, pas sur une ligne fermee.
@@ -1487,7 +2969,6 @@
     {
         DossierOuvert = null;
         NoeudSelectionne = null;
-        EditionsOuvertes = false;
     }
 
     // ================= Ecran de procedure =================
@@ -1496,15 +2977,43 @@
     /// Dit POURQUOI une procedure du menu n'a pas d'ecran, quand la raison
     /// est etablie dans les sources de RIG v2. Vide sinon.
     /// </summary>
-    private static string? MotifNonMaquette(string code) => code switch
+    private string? MotifNonMaquette(string code)
     {
-        "PROC_CREANCE" =>
-            "Dans RIG v2, cette procedure est une coquille vide : PROC_CREANCE.cs "
-            + "ne contient qu'un constructeur et FORM_CREANCE.Designer.cs aucun "
-            + "controle. Il n'y a aucun critere ni aucune colonne a porter, et en "
-            + "inventer donnerait un faux ecran.",
-        _ => null
-    };
+        // Les motifs ETABLIS dans les sources de RIG v2 restent ecrits ici, un
+        // par un : ils disent un constat, pas une place dans le menu.
+        var etabli = code switch
+        {
+            "PROC_CREANCE" =>
+                "L'ancienne application ne contenait aucun ecran pour les creances : "
+                + "ni champ de recherche, ni colonne, ni action. Il n'y a donc rien a "
+                + "reprendre, et en inventer donnerait un ecran trompeur. Cet ecran "
+                + "reste a definir avec le greffe.",
+            _ => null
+        };
+        if (etabli is not null) return etabli;
+
+        // Le motif se LIT dans le menu, il ne s'invente pas : le besoin servi
+        // par l'entree (« Detail ») et sa place dans le metier y sont deja
+        // ecrits. Dire cela vaut mieux que le texte generique « Cet ecran n'est
+        // pas encore disponible », qui ne distingue pas 125 entrees.
+        foreach (var moment in Moments)
+        {
+            foreach (var sous in moment.Sous)
+            {
+                foreach (var entree in sous.Entrees)
+                {
+                    if (entree.Code != code) continue;
+                    return $"Ce que cette entree doit servir : {entree.Detail}. "
+                         + $"Elle se range dans « {moment.Titre} › {sous.Titre} » "
+                         + $"(code {entree.Code}). L'ecran n'est pas encore porte depuis "
+                         + "RIG v2 ; aucun ecran voisin n'est affiche a sa place, cela "
+                         + "donnerait une fausse idee de ce que fait la maquette.";
+                }
+            }
+        }
+
+        return null;
+    }
 
     // Le cadre et l aiguillage vivent ici ; les criteres, les grilles et
     // les jeux de donnees sont dans Components/Ecrans/ et Metier/JeuDemo.cs.
@@ -1517,7 +3026,45 @@
         DossierOuvert = null;
     }
 
-    private void FermerProc() => ProcOuverte = null;
+    /// <summary>L'affaire depuis laquelle un traitement a ete lance. Sans elle,
+    /// cliquer une action du contexte FERMAIT l'affaire : on repartait de zero,
+    /// exactement ce que la navigation par objet cherche a supprimer.</summary>
+    private Dossier? RetourAffaire;
+
+    /// <summary>Ouvre un traitement SANS perdre l'affaire : elle se rouvre d'elle-meme
+    /// quand on referme l'ecran.</summary>
+    private void OuvrirProcDepuisAffaire(Proc proc)
+    {
+        var depuis = DossierOuvert;
+        OuvrirProc(proc);
+        RetourAffaire = depuis;
+    }
+
+    private void FermerProc()
+    {
+        ProcOuverte = null;
+        if (RetourAffaire is not null)
+        {
+            DossierOuvert = RetourAffaire;
+            RetourAffaire = null;
+        }
+    }
+
+    /// <summary>Les traitements proposes DANS l'affaire ouverte. L'utilisateur n'a
+    /// plus a savoir quel outil repond a son besoin : l'objet ouvert porte ses
+    /// propres actions. Le tri suit le domaine de l'affaire (RCS ou judiciaire),
+    /// car proposer « Depots judiciaires » sur une immatriculation RCS serait du
+    /// bruit. Les libelles viennent du menu : une seule source, jamais deux noms
+    /// pour la meme chose.</summary>
+    private Proc[] ActionsDe(Dossier d)
+    {
+        var codes = d.Type == "JUD"
+            ? new[] { "PROC_DEPOTJUD", "PROC_ACTEUR_JUD", "PROC_AUDIENCE", "PROC_GEDJUD", "PROC_FACTURE" }
+            : new[] { "PROC_DEMANDE", "PROC_ACTES_NUM", "PROC_DOC_DEMAT", "PROC_CLOT", "PROC_FACTURE" };
+
+        var connus = Groupes.SelectMany(g => g.Procs).ToDictionary(p => p.Code);
+        return codes.Where(connus.ContainsKey).Select(c => connus[c]).ToArray();
+    }
 
     /// <summary>
     /// Point d entree commun aux trois ecrans : ils remontent un NUMERO de
@@ -1551,9 +3098,16 @@
     // La colonne d'origine est rappelee sous chaque champ : c'est ce qui
     // permet de brancher la saisie sur la base sans deviner.
 
-    private bool ModeSaisie;
+    // Ecran plein de la saisie guidee : il n'est plus un onglet, il s'ouvre
+    // par le bouton « Controle du dossier » (la colonne de droite affiche
+    // desormais le document, pas le formulaire).
+    // Les etapes vivent dans la colonne du milieu : elles existent des qu'une
+    // affaire est ouverte et que la colonne n'est pas fermee.
+    private bool EtapesAffichees => DossierOuvert is not null && DonneesVisible;
+    private bool EtapeADefiler;
     private int EtapeCourante;
     private ElementReference ZonePages;
+
     // Chaque etape garde SA fiche affichee : les 7 etapes sont a l'ecran en
     // meme temps, un index unique les ferait basculer ensemble.
     private readonly Dictionary<string, int> FicheParEtape = new();
@@ -1576,10 +3130,28 @@
         }
         if (!parEtape.TryGetValue(etape, out var fiches) || fiches.Count == 0)
         {
-            fiches = [new Dictionary<string, string>()];
+            fiches = [NouvelleFiche(etape)];
             parEtape[etape] = fiches;
         }
         return fiches;
+    }
+
+    /// <summary>
+    /// Une fiche neuve part PREREMPLIE : chaque champ qui a une valeur de
+    /// depart l'a deja ecrite. Le redacteur corrige ce qui differe au lieu de
+    /// tout taper — et la valeur existe vraiment dans la fiche, donc elle part
+    /// au document et a l'enregistrement.
+    /// </summary>
+    private Dictionary<string, string> NouvelleFiche(string etape)
+    {
+        var fiche = new Dictionary<string, string>();
+        var e = Etapes.FirstOrDefault(x => x.Code == etape);
+        if (e is null) return fiche;
+        foreach (var c in e.Champs)
+        {
+            if (c.Defaut.Length > 0) fiche[c.Colonne] = c.Defaut;
+        }
+        return fiche;
     }
 
     private int IndexFiche(Etape etape)
@@ -1593,15 +3165,96 @@
     private void ChoisirFiche(Etape etape, int index)
         => FicheParEtape[etape.Code] = index;
 
+    /// <summary>
+    /// Les champs d'une etape, source UNIQUE : le meme balisage sert a l'ecran
+    /// plein « Controle du dossier » ET au formulaire ouvert dans la colonne de
+    /// droite par « Editer ». Deux copies auraient divergé au premier ajout de champ.
+    /// </summary>
+    private RenderFragment<Etape> ChampsSaisie => courante => @<div class="rig-champs">
+                                @foreach (var champ in courante.Champs)
+                                {
+                                    var c = champ;
+                                    var e = courante;
+                                    if (!Visible(e, c)) { continue; }
+                                    var refus = RefusDe(e, c);
+                                    var manque = RequisManquant(e, c);
+                                    var etatChamp = refus is not null ? "rig-saisie-champ--refuse"
+                                                  : manque ? "rig-saisie-champ--manque" : "";
+                                    <label class="rig-saisie-champ rig-saisie-champ--@c.Largeur @etatChamp">
+                                        <span class="rig-saisie-champ__libelle">
+                                            @c.Libelle
+                                            @if (c.Obligatoire) { <span class="rig-saisie-champ__requis">requis</span> }
+                                        </span>
+                                        @if (c.Choix.Length > 0)
+                                        {
+                                            <select class="rig-saisie-champ__saisie"
+                                                    value="@Valeur(e, c)"
+                                                    @onchange="ev => Ecrire(e, c, ev.Value?.ToString())">
+                                                <option value=""></option>
+                                                @foreach (var choix in c.Choix)
+                                                {
+                                                    <option value="@choix">@choix</option>
+                                                }
+                                            </select>
+                                        }
+                                        else
+                                        {
+                                            <input class="rig-saisie-champ__saisie" type="@c.Type"
+                                                   placeholder="@c.Exemple"
+                                                   value="@Valeur(e, c)"
+                                                   @oninput="ev => EcrireEnDirect(e, c, ev.Value?.ToString())"
+                                                   @onchange="ev => Ecrire(e, c, ev.Value?.ToString())" />
+                                        }
+                                        @if (refus is not null)
+                                        {
+                                            <span class="rig-saisie-champ__refus">@refus</span>
+                                        }
+                                        else if (manque)
+                                        {
+                                            <span class="rig-saisie-champ__manque">a renseigner</span>
+                                        }
+                                        <span class="rig-saisie-champ__colonne">@c.Colonne</span>
+                                    </label>
+                                }
+    </div>;
+
     private Dictionary<string, string> FicheVue(Etape etape)
         => Fiches(etape.Code)[IndexFiche(etape)];
 
     private string Valeur(Etape e, Champ c)
         => FicheVue(e).TryGetValue(c.Colonne, out var v) ? v : string.Empty;
 
+    /// <summary>
+    /// Chaque frappe porte la valeur sur la previsualisation (et les fenetres
+    /// detachees) sans attendre la sortie du champ. L'enregistrement et le
+    /// journal restent sur « change » : un evenement par frappe serait illisible.
+    /// </summary>
+    private void EcrireEnDirect(Etape e, Champ c, string? v)
+    {
+        FicheVue(e)[c.Colonne] = v ?? string.Empty;
+        PublierDocument();
+    }
+
+    private static bool EstKbis(NoeudGed n)
+        => n.Libelle.Contains("kbis", StringComparison.OrdinalIgnoreCase);
+
+    private string LireSaisie(string codeEtape, string colonne)
+    {
+        var etape = Etapes.FirstOrDefault(x => x.Code == codeEtape);
+        return etape is not null && FicheVue(etape).TryGetValue(colonne, out var v) ? v : string.Empty;
+    }
+
+    private string DenominationAffaire()
+    {
+        var objet = DossierOuvert?.Objet ?? "";
+        var tiret = objet.LastIndexOf(" - ", StringComparison.Ordinal);
+        return tiret >= 0 ? objet[(tiret + 3)..] : objet;
+    }
+
     private void Ecrire(Etape e, Champ c, string? v)
     {
         FicheVue(e)[c.Colonne] = v ?? string.Empty;
+        PublierDocument();
         Etat.Enregistrer();
         // Journal au grain de l ETAPE, pas du champ : un evenement par frappe
         // rendrait l historique illisible.
@@ -1621,7 +3274,7 @@
     private void AjouterFiche(Etape e)
     {
         var fiches = Fiches(e.Code);
-        fiches.Add(new Dictionary<string, string>());
+        fiches.Add(NouvelleFiche(e.Code));
         FicheParEtape[e.Code] = fiches.Count - 1;
         Etat.Enregistrer();
     }
@@ -1671,6 +3324,7 @@
 
     private string? RefusDe(Etape e, Champ c)
     {
+        if (!Visible(e, c)) return null;
         var motif = ValiditeSaisie.Refus(c.Controle, Valeur(e, c), Ajd);
         if (motif is not null) return motif;
 
@@ -1691,8 +3345,19 @@
         return null;
     }
 
+    /// <summary>
+    /// La condition « COLONNE=Valeur|Valeur2 » (ou « COLONNE=* » : renseigne)
+    /// lue sur la fiche COURANTE. Pas de condition = toujours visible.
+    /// </summary>
+    private static bool ConditionRemplie(Dictionary<string, string> fiche, string visibleSi)
+        => ConditionChamp.Remplie(fiche, visibleSi);
+
+    private bool Visible(Etape e, Champ c) => ConditionRemplie(FicheVue(e), c.VisibleSi);
+
+    // Un champ CACHE ne compte ni comme requis manquant ni comme refus :
+    // sinon le controle final bloquerait sur un champ que personne ne voit.
     private bool RequisManquant(Etape e, Champ c)
-        => c.Obligatoire && string.IsNullOrWhiteSpace(Valeur(e, c));
+        => c.Obligatoire && Visible(e, c) && string.IsNullOrWhiteSpace(Valeur(e, c));
 
     /// <summary>Ce qui bloque une etape, toutes ses fiches confondues.</summary>
     private (int Manquants, int Refuses) Defauts(Etape e)
@@ -1762,6 +3427,26 @@
     }
 
     /// <summary>
+    /// Lien du bandeau : la colonne des etapes peut etre fermee, ou occupee
+    /// par une fiche d'informations. On l'affiche d'abord, on laisse le rendu
+    /// creer la zone des pages, puis on fait defiler jusqu'au defaut.
+    /// </summary>
+    private async Task AllerAuDefautDepuisBandeau(Defaut d)
+    {
+        var aRendre = !DonneesVisible || NoeudSelectionne is { EstFiche: true };
+        if (NoeudSelectionne is { EstFiche: true }) NoeudSelectionne = null;
+        DonneesVisible = true;
+        FicheParEtape[Etapes[d.IndexEtape].Code] = d.Fiche;
+        EtapeCourante = d.IndexEtape;
+        if (aRendre)
+        {
+            StateHasChanged();
+            await Task.Delay(1);
+        }
+        await AllerEtape(d.IndexEtape);
+    }
+
+    /// <summary>
     /// Un dossier valide au controle final l est PARTOUT : grille de
     /// resultats, tuile Ma file, visionneuse. Une seule source de verite,
     /// sinon les trois ecrans se contrediraient.
@@ -1787,10 +3472,22 @@
         Etat.Journaliser(CleAffaire, "Saisie ROUVERTE apres validation");
     }
 
+    /// <summary>
+    /// Un champ du formulaire guide.
+    ///
+    /// Defaut   : la valeur de DEPART, ECRITE dans la fiche a sa creation (pas
+    ///            seulement affichee) — c'est elle qui part au document et dans
+    ///            accueil.json. Elle vient des listes de Metier/ (JeuDemo,
+    ///            Greffes), jamais d'une valeur inventee ici.
+    /// VisibleSi: condition d'affichage, « COLONNE=Valeur » (plusieurs valeurs
+    ///            separees par « | », « * » = champ renseigne, quel qu'il soit).
+    ///            La colonne testee est celle de la MEME fiche : un dirigeant
+    ///            personne morale ne cache pas un champ de l'etablissement.
+    /// </summary>
     private record Champ(string Libelle, string Colonne, string Type = "text",
                          string Exemple = "", bool Obligatoire = false,
                          string Largeur = "moitie", string[]? ChoixPossibles = null,
-                         string Controle = "")
+                         string Controle = "", string Defaut = "", string VisibleSi = "")
     {
         public string[] Choix => ChoixPossibles ?? [];
     }
@@ -1798,88 +3495,212 @@
     private record Etape(string Code, string Titre, string Source, Champ[] Champs,
                          bool Multiple = false, string Unite = "Fiche");
 
+    /// <summary>
+    /// La date du jeu de demonstration (Metier/JeuDemo.cs), au format que
+    /// rend un champ « date ». Les valeurs de depart s'y accrochent : aucune
+    /// date n'est ecrite en dur dans le formulaire.
+    /// </summary>
+    private static readonly string DateDemo = JeuDemo.Aujourdhui.ToString("yyyy-MM-dd");
+    private static readonly string GreffeDefaut = $"{Greffes.Defaut.Code} - {Greffes.Defaut.Ville}";
+
+    /// <summary>
+    /// La societe de reference du jeu de demonstration (Metier/JeuDemo.cs) :
+    /// AMIENS BILLARDS, siege. Les valeurs de depart des champs libres s'y
+    /// accrochent, exactement comme DateDemo et GreffeDefaut, pour qu'aucune
+    /// donnee ne soit ecrite en dur dans le formulaire.
+    /// </summary>
+    private static readonly EntrepriseRequi SocieteDemo = JeuDemo.EntreprisesRequi[0];
+    private static readonly DemandeRcs DemandeDemo = JeuDemo.Demandes[0];
+
+    /// <summary>
+    /// Les adresses connues du jeu de demonstration. La colonne v2 s'appelle
+    /// ETABLISSEMENT.ID_ADRBS : c'est un RENVOI vers une adresse deja
+    /// enregistree, pas du texte saisi. Le champ est donc une liste.
+    /// </summary>
+    private static readonly string[] AdressesDemo =
+        JeuDemo.EntreprisesRequi.Select(e => e.Adresse).Distinct().ToArray();
+
     private readonly Etape[] Etapes =
     [
         new("DEMANDE", "Demande", "table DEMANDE",
         [
-            new("Numero de demande", "DMND_NUM_DEMANDE", Exemple: "0000", Obligatoire: true),
-            new("Numero indicatif", "DMND_NUM_INDICATIF", Exemple: "2024/0141"),
-            new("Libelle a l'ecran", "DMND_LIBELLE_ECRAN", Exemple: "Immatriculation - AMITEL SAS", Largeur: "pleine"),
+            new("Numero de demande", "DMND_NUM_DEMANDE", Exemple: "2026B01067", Obligatoire: true,
+                Defaut: DemandeDemo.Numero),
+            new("Numero indicatif", "DMND_NUM_INDICATIF", Exemple: "2024/0141",
+                Defaut: SocieteDemo.Gestion),
+            new("Libelle a l'ecran", "DMND_LIBELLE_ECRAN", Exemple: "Immatriculation - AMIENS BILLARDS", Largeur: "pleine",
+                Defaut: DemandeDemo.Nom),
             new("Etat de la demande", "DMND_ETAT_DEMANDE", Obligatoire: true,
-                ChoixPossibles: ["En saisie", "En controle", "Validee", "Rejetee"]),
-            new("Nom du deposant", "DMND_NOM", Exemple: "DUPONT Jean")
+                ChoixPossibles: JeuDemo.EtatsDemande, Defaut: "En saisie"),
+            new("Nom du deposant", "DMND_NOM", Exemple: "DUPONT Jean",
+                Defaut: SocieteDemo.Dirigeant)
         ]),
 
-        new("IDENTITE", "Identite", "table DOSSIER_RCS",
+        new("IDENTITE", "Identite", "tables DOSSIER_RCS et INSCRIT_PM",
         [
-            new("SIREN", "DSSRC_SIREN", Exemple: "903 118 776", Obligatoire: true, Controle: "siren"),
-            new("Numero de gestion", "DSSRC_NUM_GESTION", Exemple: "2024 B 00141", Obligatoire: true),
+            new("SIREN", "DSSRC_SIREN", Exemple: "109 678 235", Obligatoire: true, Controle: "siren",
+                Defaut: SocieteDemo.Siren),
+            // Kbis « Denomination ou raison sociale » : colonne v2
+            // INSCRIT_PM.DENOMINATION_STATUT. L'apercu prenait jusqu'ici le
+            // libelle de l'affaire, qui n'est pas la denomination statutaire.
+            // INSCRIT_PM : une personne PHYSIQUE n'a pas de denomination statutaire,
+            // elle a un patronyme. Le champ disparait comme le font deja, en
+            // miroir, les champs INSCRIT_PP pour une personne morale.
+            new("Denomination statutaire", "INSPM_DENOMINATION_STATUT", Largeur: "pleine",
+                Obligatoire: true, Exemple: "AMIENS BILLARDS",
+                Defaut: SocieteDemo.Designation,
+                VisibleSi: "DSSRC_TYPE_RCS=Personne morale|Etablissement principal"),
+            new("Numero de gestion", "DSSRC_NUM_GESTION", Exemple: "2024 B 00141", Obligatoire: true,
+                Defaut: SocieteDemo.Gestion),
             new("Type de dossier", "DSSRC_TYPE_RCS", Obligatoire: true,
-                ChoixPossibles: ["Personne morale", "Personne physique", "Etablissement principal"]),
-            new("Date d'immatriculation", "DSSRC_DATE_IMMAT", Type: "date", Obligatoire: true, Controle: "date-passee"),
+                ChoixPossibles: ["Personne morale", "Personne physique", "Etablissement principal"],
+                Defaut: "Personne morale"),
+            new("Date d'immatriculation", "DSSRC_DATE_IMMAT", Type: "date", Obligatoire: true,
+                Controle: "date-passee", Defaut: DateDemo),
+            // DOSSIER_RCS.DATE_PREMIERE_IMMATRICULATION (Metier/InformationsDossier.cs) :
+            // le Kbis la distingue de la date d'immatriculation au greffe courant.
+            new("Date de 1re immatriculation", "DSSRC_DATE_PREMIERE_IMMATRICULATION", Type: "date",
+                Controle: "date-passee", Defaut: DateDemo),
             new("Motif d'immatriculation", "DSSRC_MOTIF_IMMAT",
-                ChoixPossibles: ["Creation", "Transfert de siege", "Reprise", "Reactivation"]),
-            new("Date d'effet", "DSSRC_DATE_EFFET", Type: "date")
+                ChoixPossibles: ["Creation", "Transfert de siege", "Reprise", "Reactivation"],
+                Defaut: "Creation"),
+            // Un transfert vient d'un autre greffe : son numero de gestion
+            // anterieur (DOSSIER_RCS.NUM_ANTERIEUR) n'a de sens que la.
+            new("N° de gestion anterieur", "DSSRC_NUM_ANTERIEUR", Exemple: "2019 B 00712",
+                VisibleSi: "DSSRC_MOTIF_IMMAT=Transfert de siege"),
+            new("Date d'effet", "DSSRC_DATE_EFFET", Type: "date", Defaut: DateDemo),
+            new("Provisoirement sans activite", "DSSRC_PROVISOIREMENT_SANS",
+                ChoixPossibles: ["Non", "Oui"], Defaut: "Non"),
+            // DOSSIER_RCS.AUTO_ENTREPRENEUR : n'existe que pour une personne physique.
+            new("Micro-Entrepreneur", "DSSRC_AUTO_ENTREPRENEUR", ChoixPossibles: ["Non", "Oui"],
+                Defaut: "Non", VisibleSi: "DSSRC_TYPE_RCS=Personne physique"),
+            // Identite de la personne physique (table INSCRIT_PP) : masquee
+            // pour une personne morale, ou ces champs n'ont aucun sens.
+            new("Civilite", "INSPP_CIVILITE", ChoixPossibles: ["M.", "Mme"], Defaut: "M.",
+                VisibleSi: "DSSRC_TYPE_RCS=Personne physique"),
+            new("Patronyme", "INSPP_PATRONYME", Exemple: "DUPONT",
+                VisibleSi: "DSSRC_TYPE_RCS=Personne physique"),
+            new("Date de naissance", "INSPP_DATE_NAISSANCE", Type: "date", Controle: "date-passee",
+                VisibleSi: "DSSRC_TYPE_RCS=Personne physique")
         ]),
 
         new("CAPITAL", "Capital", "table CAPITAL",
         [
-            new("Montant du capital", "CPTL_MONTANT", Type: "number", Exemple: "10000", Obligatoire: true, Controle: "montant"),
-            new("Monnaie", "CPTL_MONNAIE", ChoixPossibles: ["EUR", "USD", "CHF"], Obligatoire: true),
-            new("Capital variable", "CPTL_VARIABLE", ChoixPossibles: ["Non", "Oui"]),
-            new("Minimum statutaire", "CPTL_MINIMUM_STATUTAIRE", Type: "number", Controle: "montant"),
-            new("Taux de liberation", "CPTL_TAUX_LIBERATION", Type: "number", Exemple: "100", Controle: "taux"),
-            new("Apports en nature", "CPTL_APPORTS_NATURE", ChoixPossibles: ["Non", "Oui"]),
+            new("Montant du capital", "CPTL_MONTANT", Type: "number", Exemple: "10000", Obligatoire: true, Controle: "montant",
+                Defaut: "10000"),
+            new("Monnaie", "CPTL_MONNAIE", ChoixPossibles: ["EUR", "USD", "CHF"], Obligatoire: true, Defaut: "EUR"),
+            new("Capital variable", "CPTL_VARIABLE", ChoixPossibles: ["Non", "Oui"], Defaut: "Non"),
+            // Le minimum statutaire ne se declare QUE pour un capital variable.
+            new("Minimum statutaire", "CPTL_MINIMUM_STATUTAIRE", Type: "number", Controle: "montant",
+                VisibleSi: "CPTL_VARIABLE=Oui"),
+            new("Taux de liberation", "CPTL_TAUX_LIBERATION", Type: "number", Exemple: "100",
+                Controle: "taux", Defaut: "100"),
+            new("Apports en nature", "CPTL_APPORTS_NATURE", ChoixPossibles: ["Non", "Oui"], Defaut: "Non"),
             new("Texte du capital", "CPTL_TEXTE_CAPITAL", Largeur: "pleine",
-                Exemple: "Capital de 10 000 EUR divise en 1 000 actions de 10 EUR")
+                Exemple: "Capital de 10 000 EUR divise en 1 000 actions de 10 EUR",
+                Defaut: "Capital de 10 000 EUR divise en 1 000 actions de 10 EUR")
         ]),
 
         new("SIEGE", "Siege et etablissements", "tables SIEGER et ETABLISSEMENT",
         [
             new("Type d'adresse", "ETBLS_TYPE_ADRESSE", Obligatoire: true,
-                ChoixPossibles: ["Siege social", "Etablissement principal", "Etablissement secondaire"]),
-            new("Date de debut", "ETBLS_DATE_DEBUT", Type: "date", Obligatoire: true, Controle: "date-passee"),
+                ChoixPossibles: ["Siege social", "Etablissement principal", "Etablissement secondaire"],
+                Defaut: "Siege social"),
+            // Kbis « Adresse du siege » : colonne v2 ETABLISSEMENT.ID_ADRBS.
+            // L'apercu imprimait le TYPE d'adresse faute de ce champ.
+            new("Adresse", "ETBLS_ID_ADRBS", Largeur: "pleine", Obligatoire: true,
+                Exemple: "12 rue des Lilas 80000 AMIENS",
+                ChoixPossibles: AdressesDemo, Defaut: SocieteDemo.Adresse),
+            // Entete du Kbis : colonne v2 ETABLISSEMENT.CODE_GREFFE, jusqu'ici
+            // ecrite en dur (« Amiens ») dans l'apercu.
+            new("Code greffe", "ETBLS_CODE_GREFFE", Obligatoire: true,
+                ChoixPossibles: Greffes.Choix, Defaut: GreffeDefaut),
+            new("Date de debut", "ETBLS_DATE_DEBUT", Type: "date", Obligatoire: true,
+                Controle: "date-passee", Defaut: DateDemo),
             new("Statut du local", "ETBLS_STATUT_LOCAL",
-                ChoixPossibles: ["Proprietaire", "Locataire", "Domiciliataire", "Mise a disposition"]),
+                ChoixPossibles: ["Proprietaire", "Locataire", "Domiciliataire", "Mise a disposition"],
+                Defaut: "Locataire"),
             new("Mode d'exploitation", "ETBLS_MODE_EXPLOITATION",
-                ChoixPossibles: ["Exploitation directe", "Location-gerance", "Gerance mandat"]),
+                ChoixPossibles: ["Exploitation directe", "Location-gerance", "Gerance mandat"],
+                Defaut: "Exploitation directe"),
             new("Origine du fonds", "ETBLS_ORIGINE_FONDS",
-                ChoixPossibles: ["Creation", "Achat", "Apport", "Succession"]),
-            new("Date de domiciliation", "ETBLS_DATE_DOMICILIATION", Type: "date")
+                ChoixPossibles: ["Creation", "Achat", "Apport", "Succession"], Defaut: "Creation"),
+            // Une date de domiciliation ne concerne qu'un local domicilie.
+            new("Date de domiciliation", "ETBLS_DATE_DOMICILIATION", Type: "date", Defaut: DateDemo,
+                VisibleSi: "ETBLS_STATUT_LOCAL=Domiciliataire"),
+            // AJOUT - section LOI_1956 « Loi de 1956 (location-gerance) » de
+            // Metier/InformationsDossier.cs : un fonds donne en location-gerance
+            // porte un acte date, une expiration et une regle de reconduction.
+            // Rien de tout cela n'existait dans la maquette.
+            new("Date de l'acte de location-gerance", "LOI56_DATE_ACTE", Type: "date",
+                Controle: "date-passee", Defaut: DateDemo,
+                VisibleSi: "ETBLS_MODE_EXPLOITATION=Location-gerance"),
+            new("Expiration de la location-gerance", "LOI56_DATE_EXPIRATION", Type: "date",
+                VisibleSi: "ETBLS_MODE_EXPLOITATION=Location-gerance"),
+            new("Avec tacite reconduction", "LOI56_TACITE_RECONDUC", ChoixPossibles: ["Oui", "Non"],
+                Defaut: "Oui", VisibleSi: "ETBLS_MODE_EXPLOITATION=Location-gerance")
         ], Multiple: true, Unite: "Etablissement"),
 
         new("ACTIVITE", "Activite", "table ACTIVITE",
         [
             new("Activite declaree", "ACTVT_ACTIVITE_DECLAREE", Largeur: "pleine", Obligatoire: true,
-                Exemple: "Prestation de services informatiques, conseil en systemes"),
+                Exemple: "Prestation de services informatiques, conseil en systemes",
+                Defaut: SocieteDemo.Activite),
             new("Code NAF", "ACTVT_CODE_NAF", Exemple: "6202A", Controle: "naf"),
             new("Code APE", "ACTVT_CODE_APE", Exemple: "6202A", Controle: "naf"),
             new("Nature des activites", "ACTVT_NATURE_ACTIVITES",
-                ChoixPossibles: ["Commerciale", "Artisanale", "Liberale", "Agricole"]),
-            new("Date de debut", "ACTVT_DATE_DEBUT", Type: "date", Obligatoire: true, Controle: "date-passee"),
-            new("Activite reglementee", "ACTVT_ACTIVITE_REGLEMENTEE", ChoixPossibles: ["Non", "Oui"]),
-            new("Activite ambulante", "ACTVT_ACTIVITE_AMBULANTE", ChoixPossibles: ["Non", "Oui"]),
-            new("Activite permanente", "ACTVT_PERMANENTE", ChoixPossibles: ["Oui", "Non"])
+                ChoixPossibles: ["Commerciale", "Artisanale", "Liberale", "Agricole"],
+                Defaut: "Commerciale"),
+            new("Date de debut", "ACTVT_DATE_DEBUT", Type: "date", Obligatoire: true,
+                Controle: "date-passee", Defaut: DateDemo),
+            new("Activite reglementee", "ACTVT_ACTIVITE_REGLEMENTEE", ChoixPossibles: ["Non", "Oui"], Defaut: "Non"),
+            new("Activite ambulante", "ACTVT_ACTIVITE_AMBULANTE", ChoixPossibles: ["Non", "Oui"], Defaut: "Non"),
+            new("Activite permanente", "ACTVT_PERMANENTE", ChoixPossibles: ["Oui", "Non"], Defaut: "Oui"),
+            // AJOUT - ACTIVITE.SAISONNIERE (Metier/InformationsDossier.cs, section
+            // ACTIVITE) : v2 le demande, la maquette ne l'avait pas. Une activite
+            // non permanente est saisonniere ou occasionnelle : la question ne se
+            // pose que dans ce cas.
+            new("Activite saisonniere", "ACTVT_SAISONNIERE", ChoixPossibles: ["Oui", "Non"],
+                Defaut: "Oui", VisibleSi: "ACTVT_PERMANENTE=Non")
         ]),
 
         new("DIRIGEANTS", "Dirigeants", "table DIRIGEANT",
         [
             new("Fonction", "DRGNT_FONCTION_DIRIGEANT", Obligatoire: true,
-                ChoixPossibles: ["President", "Directeur general", "Gerant", "Commissaire aux comptes", "Administrateur"]),
-            new("Personne physique", "DRGNT_PERSONNE_PHYSIQUE", ChoixPossibles: ["Oui", "Non"], Obligatoire: true),
-            new("Numero d'ordre", "DRGNT_NUM_ORDRE", Type: "number", Exemple: "1"),
-            new("Date d'entree", "DRGNT_DATE_ENTREE", Type: "date", Obligatoire: true, Controle: "date-passee"),
-            new("SIREN du dirigeant", "DRGNT_NUM_SIREN", Exemple: "si personne morale", Controle: "siren"),
-            new("Organe collegial", "DRGNT_ORGANE_COLLEGIAL", ChoixPossibles: ["Non", "Oui"]),
-            new("Associe indefiniment responsable", "DRGNT_ASSOCIE_ISR", ChoixPossibles: ["Non", "Oui"])
+                ChoixPossibles: ["President", "Directeur general", "Gerant", "Commissaire aux comptes", "Administrateur"],
+                Defaut: "Gerant"),
+            new("Personne physique", "DRGNT_PERSONNE_PHYSIQUE", ChoixPossibles: ["Oui", "Non"],
+                Obligatoire: true, Defaut: "Oui"),
+            new("Numero d'ordre", "DRGNT_NUM_ORDRE", Type: "number", Exemple: "1", Defaut: "1"),
+            new("Date d'entree", "DRGNT_DATE_ENTREE", Type: "date", Obligatoire: true,
+                Controle: "date-passee", Defaut: DateDemo),
+            // Un dirigeant personne PHYSIQUE n'a pas de SIREN : le champ dispraait
+            // de l'ecran au lieu de rester vide et incomprehensible.
+            new("SIREN du dirigeant", "DRGNT_NUM_SIREN", Exemple: "si personne morale", Controle: "siren",
+                VisibleSi: "DRGNT_PERSONNE_PHYSIQUE=Non"),
+            // AJOUT - section DIRIGEANT_PM de Metier/InformationsDossier.cs
+            // (DENOMINATION_STATUT) : un dirigeant personne morale se nomme, la
+            // maquette ne demandait que son SIREN.
+            new("Denomination du dirigeant", "DRGPM_DENOMINATION_STATUT", Largeur: "pleine",
+                Exemple: "HOLDING DUPONT SAS",
+                VisibleSi: "DRGNT_PERSONNE_PHYSIQUE=Non"),
+            new("Organe collegial", "DRGNT_ORGANE_COLLEGIAL", ChoixPossibles: ["Non", "Oui"], Defaut: "Non"),
+            new("Associe indefiniment responsable", "DRGNT_ASSOCIE_ISR", ChoixPossibles: ["Non", "Oui"], Defaut: "Non")
         ], Multiple: true, Unite: "Dirigeant"),
 
         new("CONTROLE", "Controle", "table OBSERVATION_RCS",
         [
             new("Texte de la mention", "OBSRC_TEXTE_MENTION", Largeur: "pleine",
                 Exemple: "Observation portee au registre"),
+            // MENTION_OBSERVATION.DATE_MENTION et .DIFFUSABLE (Metier/InformationsDossier.cs) :
+            // une mention sans date ni regle de diffusion n'est pas publiable.
+            // Ils n'apparaissent que si une mention est effectivement redigee.
+            new("Date de la mention", "MNTOB_DATE_MENTION", Type: "date", Controle: "date-passee",
+                Defaut: DateDemo, VisibleSi: "OBSRC_TEXTE_MENTION=*"),
+            new("Diffusable Kbis", "MNTOB_DIFFUSABLE", ChoixPossibles: ["Oui", "Non"], Defaut: "Oui",
+                VisibleSi: "OBSRC_TEXTE_MENTION=*"),
             new("Etat du dossier", "DSSRC_ETAT_DOSSIER", Obligatoire: true,
-                ChoixPossibles: ["A controler", "Conforme", "En anomalie"])
+                ChoixPossibles: ["A controler", "Conforme", "En anomalie"], Defaut: "A controler")
         ])
     ];
 
@@ -1918,16 +3739,16 @@
         }
     </div>;
 
-    // --- Alertes : chacune s'allume ou s'eteint independamment
-    private record Alerte(string Id, string Titre, string Detail, string Statut);
+    // --- Alertes : relevees sur les dossiers connus (AlertesGreffe), jamais
+    // ecrites en dur, et chacune s'allume ou s'eteint independamment.
+    private readonly AlertesGreffe SondeAlertes = new();
+    private AlerteGreffe[] Alertes = [];
 
-    private readonly Alerte[] Alertes =
-    [
-        new("delai",   "3 demandes hors delai legal", "la plus ancienne : J+9", "alerte"),
-        new("verrou",  "1 dossier ouvert par un tiers", "004168 - M. DURAND", "attente"),
-        new("fusion",  "Fusion documentaire lente",   "file de 3 documents",  "attente"),
-        new("teletr",  "Teletransmission au vert",    "dernier envoi il y a 4 min", "ok")
-    ];
+    /// <summary>Reglages d'affichage de la tuile, conserves dans accueil.json.</summary>
+    private ReglagesAlertes ReglagesAlertes => Etat.ReglagesAlertes;
+
+    /// <summary>Ce que la tuile montre reellement : ecoute, gravite, ordre, plafond.</summary>
+    private AlerteGreffe[] AlertesVues => ReglagesAlertes.Appliquer(Alertes, AlerteActive);
 
     private void BasculerAlerte(string id)
     {
@@ -1937,23 +3758,77 @@
 
     private bool AlerteActive(string id) => !Etat.Alertes.TryGetValue(id, out var v) || v;
 
+    private void ReglerAlertes(Action<ReglagesAlertes> geste)
+    {
+        geste(Etat.ReglagesAlertes);
+        Etat.Enregistrer();
+    }
+
+    // Les trois reglages passent par des methodes nommees : une expression
+    // avec des guillemets ne tient pas dans un attribut Razor.
+    private void ChoisirNiveauAlertes(ChangeEventArgs e)
+        => ReglerAlertes(r => r.NiveauMini = int.TryParse(e.Value?.ToString(), out var n)
+                                             ? Math.Clamp(n, 0, 3) : 0);
+
+    private void ChoisirTriAlertes(ChangeEventArgs e)
+        => ReglerAlertes(r => r.Tri = e.Value?.ToString() is { Length: > 0 } t ? t : "gravite");
+
+    private void ChoisirLimiteAlertes(ChangeEventArgs e)
+        => ReglerAlertes(r => r.Limite = int.TryParse(e.Value?.ToString(), out var n)
+                                         ? Math.Clamp(n, 0, 20) : 0);
+
+    /// <summary>
+    /// Le clic sur une alerte EMMENE : soit sur l'affaire nommee par l'alerte,
+    /// soit sur l'ecran du traitement concerne. Sans cela la tuile disait un
+    /// probleme sans donner le moyen de le traiter.
+    /// </summary>
+    private void OuvrirAlerte(AlerteGreffe a)
+    {
+        // Une alerte de LOT ouvre le TABLEAU des dossiers de cette recette,
+        // deja selectionnee : l'alerte dit « ces dossiers-la », l'ecran doit
+        // s'ouvrir dessus, pas sur un choix a refaire.
+        if (a.Lot is { Length: > 0 } codeLot)
+        {
+            LotDemande = codeLot;
+            OuvrirCode("PROC_TACHES_LOT");
+            return;
+        }
+
+        // Une alerte task driven ouvre la TACHE, pas seulement l'affaire.
+        if (a.Tache is { } t && RecettesTaches.ParCode(t.Code) is { } recette)
+        {
+            OuvrirTache(recette, t.Dossier);
+            return;
+        }
+        if (a.Affaire is { Length: > 0 } numero) { OuvrirParNumero(numero); return; }
+        OuvrirCode(a.Cible);
+    }
+
     // Le corps ne montre QUE les alertes surveillees : les interrupteurs
     // vivent dans les reglages de la tuile (bouton engrenage de son entete),
     // pas dans la lecture courante.
     private RenderFragment CorpsAlertes => @<div>
-        @if (!Alertes.Any(a => AlerteActive(a.Id)))
+        @if (AlertesVues.Length == 0)
         {
-            <div class="rig-vide">Aucune alerte surveillee. Ouvrir les reglages de la tuile pour en reactiver.</div>
+            <div class="rig-vide">Aucune alerte a afficher. Ouvrir les reglages de la tuile pour elargir.</div>
         }
-        @foreach (var a in Alertes.Where(a => AlerteActive(a.Id)))
+        @foreach (var item in AlertesVues)
         {
-            <div class="rig-alerte">
+            var a = item;
+            <button class="rig-alerte rig-alerte--lien" type="button"
+                    title="Aller vers @a.LibelleCible"
+                    @onclick="() => OuvrirAlerte(a)">
                 <span class="rig-filet-v rig-filet-v--@a.Statut"></span>
                 <span class="rig-alerte__corps">
-                    <span class="rig-alerte__titre">@a.Titre</span><br />
-                    <span class="rig-alerte__detail">@a.Detail</span>
+                    <span class="rig-alerte__titre">@a.Titre</span>
+                    @if (ReglagesAlertes.AfficherDetail)
+                    {
+                        <br />
+                        <span class="rig-alerte__detail">@a.Detail</span>
+                    }
                 </span>
-            </div>
+                <span class="rig-alerte__vers">@a.LibelleCible &rsaquo;</span>
+            </button>
         }
     </div>;
 
@@ -1977,11 +3852,45 @@
                 {
                     var active = AlerteActive(a.Id);
                     <button class="rig-bascule @(active ? "rig-bascule--actif" : "")"
+                            title="Mene vers @a.LibelleCible"
                             @onclick="() => BasculerAlerte(a.Id)">
                         <span class="rig-bascule__temoin"></span>
                         <span>@a.Titre</span>
                     </button>
                 }
+
+                <div class="rig-kicker" style="margin:var(--rig-esp-3) 0 var(--rig-esp-2)">Ce que la tuile affiche</div>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">A partir de</span>
+                    <select class="rig-saisie-champ__saisie"
+                            value="@ReglagesAlertes.NiveauMini"
+                            @onchange="ChoisirNiveauAlertes">
+                        <option value="0">Tout, meme ce qui va bien</option>
+                        <option value="1">A surveiller et au-dela</option>
+                        <option value="2">A traiter et au-dela</option>
+                        <option value="3">Hors delai seulement</option>
+                    </select>
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Ordre</span>
+                    <select class="rig-saisie-champ__saisie"
+                            value="@ReglagesAlertes.Tri"
+                            @onchange="ChoisirTriAlertes">
+                        <option value="gravite">Le plus grave en tete</option>
+                        <option value="titre">Par libelle</option>
+                    </select>
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Lignes au plus (0 = toutes)</span>
+                    <input class="rig-saisie-champ__saisie" type="number" min="0" max="20"
+                           value="@ReglagesAlertes.Limite"
+                           @onchange="ChoisirLimiteAlertes" />
+                </label>
+                <button class="rig-bascule @(ReglagesAlertes.AfficherDetail ? "rig-bascule--actif" : "")"
+                        @onclick="() => ReglerAlertes(r => r.AfficherDetail = !r.AfficherDetail)">
+                    <span class="rig-bascule__temoin"></span>
+                    <span>Afficher le detail sous chaque alerte</span>
+                </button>
                 break;
 
             case "performance":
@@ -2010,15 +3919,10 @@
     private record Demande(string Numero, string Objet, string Delai, string Etat,
                            string Statut, string? VerrouillePar = null);
     private record Service(string Nom, string Statut, string? Commentaire = null);
-    private record Contexte(string Numero, string Objet, string Etape, string Depuis);
-
-    private readonly Contexte? Reprise =
-        new("004182", "Immatriculation - AMITEL SAS", "3/7 - Dirigeants", "il y a 18 h");
-
     private readonly Demande[] File =
     [
         new("004176", "Modification - SCI DU PARC",     "J+9", "hors delai",     "alerte"),
-        new("004182", "Immatriculation - AMITEL SAS",   "J+4", "en cours",       "action"),
+        new("004182", "Immatriculation - AMIENS BILLARDS",   "J+4", "en cours",       "action"),
         new("004179", "Radiation - MARTIN EURL",        "J+1", "attente pieces", "attente"),
         new("004168", "Immatriculation - BATIPRO SARL", "",    "",               "neutre", "M. DURAND")
     ];
@@ -2029,19 +3933,6 @@
         new("Teletransmission",    "ok"),
         new("Fusion documentaire", "alerte", "lente")
     ];
-
-    private RenderFragment CorpsReprise => @<div style="display:flex;align-items:center;gap:var(--rig-esp-4)">
-        @if (Reprise is not null)
-        {
-            <span style="flex:1">
-                <span style="font-size:15px"><b>@Reprise.Numero</b> &middot; @Reprise.Objet</span><br />
-                <span style="font-size:12px;color:var(--rig-texte-3)">
-                    arrete a l'etape <b style="color:var(--rig-texte-2)">@Reprise.Etape</b> &mdash; @Reprise.Depuis
-                </span>
-            </span>
-            <button class="rig-bouton">Reprendre</button>
-        }
-    </div>;
 
     /// <summary>
     /// Tuile « Mes affaires recentes » : les affaires REELLEMENT ouvertes,
@@ -2086,6 +3977,22 @@
     /// repose (OnInitialized ne rejoue pas).
     /// </summary>
     private object CleRechAffaire => NoAffaireDemande ?? "toutes-les-affaires";
+
+    /// <summary>SIREN pose dans l'ecran d'ouverture quand on y arrive depuis une
+    /// recherche restee vide.</summary>
+    private string? SirenAImmatriculer;
+
+    /// <summary>Change avec le SIREN : l'ecran est RECONSTRUIT, sinon Blazor
+    /// reutiliserait l'instance et le numero ne serait pas repose.</summary>
+    private object CleOuverture => SirenAImmatriculer ?? "ouverture-vierge";
+
+    /// <summary>La recherche n'a rien trouve : on bascule sur l'ouverture d'un
+    /// dossier, en emportant le SIREN deja saisi.</summary>
+    private void OuvrirUnDossierPour(string siren)
+    {
+        SirenAImmatriculer = string.IsNullOrWhiteSpace(siren) ? null : siren.Trim();
+        OuvrirProc(new Proc("OUVERTURE_DOSSIER", "Ouverture d'un dossier RCS"));
+    }
 
     /// <summary>Le bouton d'entete : la vue de recherche, SANS aucun critere.</summary>
     private void VoirToutesLesAffaires()

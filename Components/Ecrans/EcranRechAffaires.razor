@@ -1,9 +1,14 @@
-@* Ecran de la procedure PROC_RECHAFF — recherche d'affaires.
+﻿@* Ecran de la procedure PROC_RECHAFF — recherche d'affaires.
 
    Reference RIG v2 (D:/RigApplication/Source/RIG/DLL/Processus/PROC_RECHAFF) :
      - Operations/OPE_CRITERES.cs : n° affaire, n° demande, n° facture, dates
      - Ults/ULT_GRIDVIEW_RECHAFF.cs : colonnes N° Affaire, Libelle,
        Date creation, Solde, Demandes, Factures.
+
+   Les criteres d'INSTANCE (id instance, n° de role, code affaire, nom
+   instance ou partie, etat, fenetre de saisine) et le panneau de suppression
+   XXAFF viennent de l'ecran « Instances judiciaires » : la recherche
+   d'affaire doit couvrir ces champs sans obliger a changer d'ecran.
 
    Deux differences ASSUMEES avec v2, parce que ce n'est pas un portage :
      - aucun rattachement de demande a l'affaire (dans v2, DoValider deplace
@@ -15,7 +20,7 @@
 
 <div class="rig-proc__corps">
 
-    <aside class="rig-criteres">
+    <aside class="rig-criteres" @onkeydown="SurToucheCritere">
         <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Criteres de recherche</div>
 
         <label class="rig-saisie-champ">
@@ -29,7 +34,18 @@
         </label>
 
         <label class="rig-saisie-champ">
-            <span class="rig-saisie-champ__libelle">Type</span>
+            <span class="rig-saisie-champ__libelle">Nature</span>
+            <select class="rig-saisie-champ__saisie" @bind="CritNature">
+                <option value="">Toutes</option>
+                @foreach (var n in Natures)
+                {
+                    <option value="@n.Code">@n.Nom</option>
+                }
+            </select>
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Domaine</span>
             <select class="rig-saisie-champ__saisie" @bind="CritType">
                 <option value="">Tous</option>
                 <option value="RCS">RCS</option>
@@ -37,47 +53,179 @@
             </select>
         </label>
 
-        <button class="rig-bouton" @onclick="Vider">Effacer les criteres</button>
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Instance judiciaire</div>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Id instance</span>
+                    <input class="rig-saisie-champ__saisie" placeholder="ex. 55339"
+                           @bind="CritIdInstance" @bind:event="oninput" />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Numero de role</span>
+                    <input class="rig-saisie-champ__saisie" placeholder="ex. 2024F00123"
+                           @bind="CritRole" @bind:event="oninput" />
+                </label>
+            </div>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Code affaire</span>
+                    <input class="rig-saisie-champ__saisie" placeholder="ex. 010"
+                           @bind="CritCodeAffaire" @bind:event="oninput" />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Etat</span>
+                    <select class="rig-saisie-champ__saisie" @bind="CritEtat">
+                        <option value="">Tous</option>
+                        @foreach (var e in Etats)
+                        {
+                            <option value="@e">@e</option>
+                        }
+                    </select>
+                </label>
+            </div>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Nom (instance ou partie)</span>
+                <input class="rig-saisie-champ__saisie" placeholder="ex. DUPONT"
+                       @bind="CritNom" @bind:event="oninput" />
+            </label>
+        </div>
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Saisine</div>
+            <div class="rig-criteres__paire">
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Du</span>
+                    <input class="rig-saisie-champ__saisie" type="date" @bind="CritSaisineDu" />
+                </label>
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Au</span>
+                    <input class="rig-saisie-champ__saisie" type="date" @bind="CritSaisineAu" />
+                </label>
+            </div>
+        </div>
+
+        <div class="rig-criteres__actions">
+            <div class="rig-criteres__paire">
+                <button class="rig-bouton rig-bouton--fort" @onclick="Rechercher">Rechercher</button>
+                <button class="rig-bouton" @onclick="Vider">Reinitialiser</button>
+            </div>
+        </div>
     </aside>
 
     <section class="rig-resultats-proc">
         <div class="rig-resultats-proc__entete">
             <div class="rig-kicker">Affaires</div>
-            <span class="rig-resultats-proc__compte">@Trouvees.Length affaire(s)</span>
+            <span class="rig-resultats-proc__compte">
+                Resultats (@Trouvees.Length) &mdash;
+                @string.Join(", ", Natures
+                    .Select(n => new { n.Nom, Nb = Trouvees.Count(a => a.Nature == n.Code) })
+                    .Where(x => x.Nb > 0)
+                    .Select(x => $"{x.Nb} {x.Nom.ToLowerInvariant()}"))
+            </span>
         </div>
 
         <div class="rig-table-cadre">
             <table class="rig-table">
                 <thead>
                     <tr>
-                        <th>N&deg; Affaire</th>
-                        <th>Libelle</th>
-                        <th>SIREN</th>
-                        <th>Type</th>
-                        <th>Date creation</th>
-                        <th>Solde</th>
+                        <EnteteTriable Libelle="N&deg; Affaire" Cle="Numero" CleActive="@CleTri" Ascendant="TriAscendant" Trier="BasculerTri" />
+                        <EnteteTriable Libelle="Id instance" Cle="IdInstance" CleActive="@CleTri" Ascendant="TriAscendant" Trier="BasculerTri" />
+                        <EnteteTriable Libelle="N&deg; de role" Cle="Role" CleActive="@CleTri" Ascendant="TriAscendant" Trier="BasculerTri" />
+                        <EnteteTriable Libelle="Code affaire" Cle="CodeAffaire" CleActive="@CleTri" Ascendant="TriAscendant" Trier="BasculerTri" />
+                        <EnteteTriable Libelle="Nature" Cle="Nature" CleActive="@CleTri" Ascendant="TriAscendant" Trier="BasculerTri" />
+                        <EnteteTriable Libelle="Libelle" Cle="Libelle" CleActive="@CleTri" Ascendant="TriAscendant" Trier="BasculerTri" />
+                        <EnteteTriable Libelle="Nom" Cle="Nom" CleActive="@CleTri" Ascendant="TriAscendant" Trier="BasculerTri" />
+                        <EnteteTriable Libelle="Etat" Cle="Etat" CleActive="@CleTri" Ascendant="TriAscendant" Trier="BasculerTri" />
+                        <EnteteTriable Libelle="SIREN" Cle="Siren" CleActive="@CleTri" Ascendant="TriAscendant" Trier="BasculerTri" />
+                        <EnteteTriable Libelle="Domaine" Cle="Type" CleActive="@CleTri" Ascendant="TriAscendant" Trier="BasculerTri" />
+                        <EnteteTriable Libelle="Saisine" Cle="Saisine" CleActive="@CleTri" Ascendant="TriAscendant" Trier="BasculerTri" />
+                        <EnteteTriable Libelle="Date creation" Cle="Creation" CleActive="@CleTri" Ascendant="TriAscendant" Trier="BasculerTri" />
+                        <EnteteTriable Libelle="Solde" Cle="Solde" CleActive="@CleTri" Ascendant="TriAscendant" Trier="BasculerTri" />
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var a in Trouvees)
                     {
                         var affaire = a;
-                        <tr class="@(affaire.Numero == NoAffaire ? "rig-ligne--valide" : "")"
-                            @onclick="() => Ouvrir.InvokeAsync(affaire.Numero)" style="cursor:pointer">
+                        <tr class="@(affaire.Numero == Selection ? "rig-ligne--valide" : "")"
+                            @onclick="() => Selection = affaire.Numero"
+                            @ondblclick="() => Ouvrir.InvokeAsync(affaire.Numero)" style="cursor:pointer">
                             <td class="rig-table__mono">@affaire.Numero</td>
+                            <td class="rig-table__mono">@affaire.IdInstance</td>
+                            <td class="rig-table__mono">@affaire.Role</td>
+                            <td class="rig-table__mono">@affaire.CodeAffaire</td>
+                            <td>
+                                <span class="rig-nature rig-nature--@affaire.Nature">
+                                    <span class="rig-nature__filet"></span>
+                                    <span class="rig-nature__nom">@NomNature(affaire.Nature)</span>
+                                </span>
+                            </td>
                             <td>@affaire.Libelle</td>
+                            <td>@affaire.Nom</td>
+                            <td>@affaire.Etat</td>
                             <td class="rig-table__mono">@affaire.Siren</td>
                             <td>@affaire.Type</td>
+                            <td class="rig-table__mono">@affaire.Saisine.ToString("dd/MM/yyyy")</td>
                             <td class="rig-table__mono">@affaire.Creation.ToString("dd/MM/yyyy")</td>
                             <td class="rig-table__mono">@affaire.Solde.ToString("N2") &euro;</td>
                         </tr>
                     }
                     @if (Trouvees.Length == 0)
                     {
-                        <tr><td colspan="6" class="rig-table__vide">Aucune affaire pour ces criteres.</td></tr>
+                        <tr><td colspan="13" class="rig-table__vide">
+                            @if (AucunCritere)
+                            {
+                                <text>Saisissez au moins un critere, puis lancez la recherche.</text>
+                            }
+                            else
+                            {
+                                <div>Aucune affaire ne repond a ces criteres.</div>
+                                <div style="margin-top:var(--rig-esp-3)">
+                                    <button class="rig-bouton rig-bouton--fort"
+                                            @onclick="() => OuvrirUnDossier.InvokeAsync(SirenCherche)">
+                                        Ouvrir un dossier
+                                    </button>
+                                    @if (SirenCherche.Length > 0)
+                                    {
+                                        <span class="rig-resultats-proc__compte"
+                                              style="margin-left:var(--rig-esp-3)">
+                                            pour le SIREN @SirenCherche
+                                        </span>
+                                    }
+                                </div>
+                            }
+                        </td></tr>
                     }
                 </tbody>
             </table>
+        </div>
+
+        <div class="rig-criteres__bloc" style="padding:var(--rig-esp-3) var(--rig-esp-4)">
+            <div class="rig-kicker">Suppression (XXAFF)</div>
+            @if (Choisie is null)
+            {
+                <span class="rig-resultats-proc__compte">
+                    Selectionnez une instance dans les resultats.
+                </span>
+            }
+            else
+            {
+                <span class="rig-resultats-proc__compte">
+                    @Choisie.Numero &middot; instance @Choisie.IdInstance &middot; role @Choisie.Role
+                </span>
+            }
+            <button class="rig-bascule @(LibererNumeros ? "rig-bascule--actif" : "")"
+                    @onclick="() => LibererNumeros = !LibererNumeros">
+                <span class="rig-bascule__temoin"></span>
+                <span>Liberer les numeros metiers</span>
+            </button>
+            <button class="rig-bouton rig-bouton--fort" disabled="@(Choisie is null)"
+                    @onclick="Supprimer">Supprimer l'instance</button>
+            @if (!string.IsNullOrEmpty(Message))
+            {
+                <span class="rig-resultats-proc__compte">@Message</span>
+            }
         </div>
 
         <div class="rig-resultats-proc__entete">
@@ -95,22 +243,125 @@
     /// <summary>Remonte le numero choisi ; la page ouvre la visionneuse.</summary>
     [Parameter] public EventCallback<string> Ouvrir { get; set; }
 
-    private sealed record Affaire(string Numero, string Libelle, string Siren, string Type,
-                                  DateTime Creation, decimal Solde);
+    /// <summary>Remonte un SIREN a immatriculer : la recherche n'a rien trouve,
+    /// c'est donc ICI que l'agent constate qu'il faut ouvrir le dossier. Le
+    /// renvoyer au menu lui ferait retaper le numero.</summary>
+    [Parameter] public EventCallback<string> OuvrirUnDossier { get; set; }
 
-    private static readonly Affaire[] Affaires =
+    private sealed record Affaire(string Numero, string Libelle, string Siren, string Type,
+                                  string Nature, DateTime Creation, decimal Solde,
+                                  string IdInstance, string Role, string CodeAffaire,
+                                  string Nom, string Etat, DateTime Saisine);
+
+    /// <summary>
+    /// Les QUATRE natures d'affaire du greffe. Une affaire est l'une d'elles et
+    /// une seule : elles n'ont ni les memes etapes, ni les memes delais, ni les
+    /// memes interlocuteurs. Le code sert de suffixe de classe CSS (couleur).
+    /// </summary>
+    private sealed record Nature(string Code, string Nom);
+
+    private static readonly Nature[] Natures =
     [
-        new("0000",    "Affaire de demonstration - AMITEL SAS", "903 118 776", "RCS", new(2026, 9, 1),  0m),
-        new("004176",  "Modification - SCI DU PARC",            "812 445 901", "RCS", new(2026, 8, 24), 142.50m),
-        new("004182",  "Immatriculation - AMITEL SAS",          "903 118 776", "RCS", new(2026, 8, 28), 0m),
-        new("004179",  "Radiation - MARTIN EURL",               "521 004 332", "RCS", new(2026, 8, 12), 68.30m),
-        new("004168",  "Immatriculation - BATIPRO SARL",        "440 927 115", "RCS", new(2026, 7, 30), 0m),
-        new("J-00931", "Depot de bilan - TRANSNORD SA",         "318 552 004", "JUD", new(2026, 6, 18), 415.00m)
+        new("instance",   "Instance"),
+        new("collective", "Procedure collective"),
+        new("prevention", "Prevention"),
+        new("mesure",     "Mesure")
+    ];
+
+    private static readonly string[] Etats = ["En cours", "Radiee", "Cloturee"];
+
+    private static string NomNature(string code)
+        => Natures.FirstOrDefault(n => n.Code == code)?.Nom ?? code;
+
+    private static readonly Affaire[] AffairesDemo =
+    [
+        new("2026B01067", "Affaire de demonstration - AMIENS BILLARDS", "109 678 235", "RCS", "instance",   new(2026, 9, 1),  0m,      "55339", "2026F00301", "010", "AMIENS BILLARDS",     "En cours",  new(2026, 8, 30)),
+        new("004176",  "Modification - SCI DU PARC",            "812 445 901", "RCS", "instance",   new(2026, 8, 24), 142.50m, "55210", "2026F00244", "010", "SCI DU PARC",           "En cours",  new(2026, 8, 20)),
+        new("004182",  "Immatriculation - AMIENS BILLARDS",     "109 678 235", "RCS", "instance",   new(2026, 8, 28), 0m,      "55288", "2026F00262", "011", "AMIENS BILLARDS",       "En cours",  new(2026, 8, 26)),
+        new("004179",  "Radiation - MARTIN EURL",               "521 004 332", "RCS", "instance",   new(2026, 8, 12), 68.30m,  "55102", "2026F00198", "012", "MARTIN EURL",           "Radiee",    new(2026, 8, 5)),
+        new("004168",  "Immatriculation - BATIPRO SARL",        "440 927 115", "RCS", "instance",   new(2026, 7, 30), 0m,      "54990", "2026F00151", "011", "BATIPRO SARL",          "Cloturee",  new(2026, 7, 25)),
+        new("J-00931", "Depot de bilan - TRANSNORD SA",         "318 552 004", "JUD", "collective", new(2026, 6, 18), 415.00m, "54771", "2026F00087", "300", "TRANSNORD SA",          "En cours",  new(2026, 6, 10)),
+        new("J-00944", "Liquidation judiciaire - COMPTOIR DU NORD", "402 118 776", "JUD", "collective", new(2026, 8, 5), 230.00m, "55044", "2026F00173", "310", "COMPTOIR DU NORD",   "En cours",  new(2026, 7, 29)),
+        new("P-00218", "Mandat ad hoc - MENUISERIE PICARDE",    "789 220 431", "JUD", "prevention", new(2026, 8, 19), 0m,      "55177", "2026F00221", "400", "MENUISERIE PICARDE",    "En cours",  new(2026, 8, 14)),
+        new("P-00221", "Conciliation - SOMME LOGISTIQUE",       "654 901 228", "JUD", "prevention", new(2026, 7, 22), 90.00m,  "54931", "2026F00139", "410", "SOMME LOGISTIQUE",      "Cloturee",  new(2026, 7, 18)),
+        new("M-00102", "Mesure d'instruction - BATIPRO SARL",   "440 927 115", "JUD", "mesure",     new(2026, 8, 30), 0m,      "55301", "2026F00277", "500", "BATIPRO SARL",          "En cours",  new(2026, 8, 27)),
+        // Affaires PUREMENT judiciaires (demande du 16/09/2026) : aucune n a
+        // de dossier RCS au greffe — partie non immatriculee, personne
+        // physique, ou societe immatriculee dans un AUTRE greffe. Leur
+        // colonne Siren est donc vide, et la visionneuse n ouvre que la
+        // branche « Judiciaire » (v2 : OPE_VGED.cs, _InitTreeview n ajoute
+        // « Dossier RCS » que si l affaire A un dossier RCS).
+        // Enrolement d une affaire contentieuse : processus CJUD.
+        new("2026J00087",  "Assignation en paiement - DUPONT Jean",          "", "JUD", "instance",   new(2026, 3, 12), 88.00m,  "55402", "2026F00312", "010", "DUPONT Jean",           "En cours",  new(2026, 3, 5)),
+        // Liquidation judiciaire d une entreprise individuelle : NPC puis CLOT.
+        new("2026P00031",  "Liquidation judiciaire - MOREAU Entreprise individuelle", "", "JUD", "collective", new(2026, 2, 4),  310.00m, "55388", "2026F00305", "310", "MOREAU EI",   "En cours",  new(2026, 1, 28)),
+        // Injonction de payer contre un particulier : IPE puis IPSUIVI.
+        new("2026IP00214", "Injonction de payer - SOMME ELECTRICITE / LEROY", "", "JUD", "instance",   new(2026, 5, 20), 35.50m,  "55421", "2026F00330", "020", "LEROY Michel",          "En cours",  new(2026, 5, 18)),
+        // Mesure d instruction avant tout proces : MESIN.
+        new("2026M00045",  "Expertise avant proces - GARAGE CENTRAL",        "", "JUD", "mesure",     new(2026, 4, 8),  0m,      "55410", "2026F00321", "500", "GARAGE CENTRAL",        "En cours",  new(2026, 4, 2)),
+        // Conciliation confidentielle, hors RCS : prevention.
+        new("2026C00059",  "Conciliation - ATELIER DU MEUBLE",               "", "JUD", "prevention", new(2026, 6, 15), 0m,      "55433", "2026F00341", "410", "ATELIER DU MEUBLE",     "En cours",  new(2026, 6, 10))
+    ];
+
+    /// <summary>
+    /// Les affaires interrogeables : le jeu de demonstration PLUS les dossiers
+    /// ouverts pendant la session par l'ecran « Ouvrir un dossier ». Les
+    /// colonnes que l'ouverture ne connait pas (solde, instance, saisine) sont
+    /// laissees a vide plutot qu'inventees.
+    /// </summary>
+    private static Affaire[] Affaires =>
+    [
+        .. AffairesOuvertes.Toutes.Select(d =>
+               new Affaire(d.Numero, d.Objet, d.Siren, d.Type, "instance",
+                           JeuDemo.Aujourdhui, 0m, "", "", "011",
+                           d.Objet.Replace("Immatriculation - ", ""),
+                           "En cours", JeuDemo.Aujourdhui)),
+        .. AffairesDemo
     ];
 
     private string CritNumero = string.Empty;
     private string CritLibelle = string.Empty;
     private string CritType = string.Empty;
+    private string CritNature = string.Empty;
+    private string CritIdInstance = string.Empty;
+    private string CritRole = string.Empty;
+    private string CritCodeAffaire = string.Empty;
+    private string CritNom = string.Empty;
+    private string CritEtat = string.Empty;
+    private DateTime? CritSaisineDu;
+    private DateTime? CritSaisineAu;
+
+    private string? Selection;
+    private bool LibererNumeros = true;
+    private string? Message;
+
+    private Affaire? Choisie => Affaires.FirstOrDefault(a => a.Numero == Selection);
+
+    /// <summary>Vrai tant qu'aucun critere n'est pose : le tableau vide ne veut
+    /// alors RIEN dire, et proposer d'ouvrir un dossier serait du bruit.</summary>
+    private bool AucunCritere
+        => string.IsNullOrWhiteSpace(CritNumero) && string.IsNullOrWhiteSpace(CritLibelle)
+        && string.IsNullOrEmpty(CritType) && string.IsNullOrEmpty(CritNature)
+        && string.IsNullOrWhiteSpace(CritIdInstance) && string.IsNullOrWhiteSpace(CritRole)
+        && string.IsNullOrWhiteSpace(CritCodeAffaire) && string.IsNullOrWhiteSpace(CritNom)
+        && string.IsNullOrEmpty(CritEtat) && CritSaisineDu is null && CritSaisineAu is null;
+
+    /// <summary>Le SIREN reellement cherche : il se saisit dans « Libelle ou
+    /// SIREN » (le meme champ sert aux deux), donc on ne le reprend que s'il
+    /// ressemble a un SIREN — neuf chiffres.</summary>
+    private string SirenCherche
+    {
+        get
+        {
+            foreach (var brut in new[] { CritLibelle, CritNom, CritNumero })
+            {
+                var chiffres = new string((brut ?? string.Empty).Where(char.IsDigit).ToArray());
+                if (chiffres.Length == 9 && (brut ?? "").All(c => char.IsDigit(c) || c == ' '))
+                    return chiffres;
+            }
+            return string.Empty;
+        }
+    }
 
     /// <summary>
     /// Le critere n'est pose qu'a l'OUVERTURE : ensuite l'utilisateur est
@@ -121,11 +372,56 @@
         if (!string.IsNullOrWhiteSpace(NoAffaire)) CritNumero = NoAffaire!.Trim();
     }
 
+    /// <summary>Le filtrage est continu ; le bouton force juste un rendu.</summary>
+    /// <summary>Entree dans le bloc des criteres = clic sur Rechercher.
+    /// C'est le geste de RIG v2 : on tape, on valide, sans lacher le clavier.</summary>
+    private void SurToucheCritere(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") Rechercher();
+    }
+
+    // ---- Tri de la grille (en-tetes cliquables) ----
+    /// <summary>La colonne sur laquelle la grille est rangee ; null = ordre
+    /// d'origine (du plus recent au plus ancien).</summary>
+    private string? CleTri;
+    private bool TriAscendant = true;
+
+    /// <summary>Premier clic : ordre croissant. Second clic sur la MEME
+    /// colonne : ordre inverse. C'est le geste de RIG v2.</summary>
+    private void BasculerTri(string cle)
+    {
+        if (CleTri == cle) TriAscendant = !TriAscendant;
+        else { CleTri = cle; TriAscendant = true; }
+    }
+
+    private void Rechercher() => Message = null;
+
     private void Vider()
     {
         CritNumero = string.Empty;
         CritLibelle = string.Empty;
         CritType = string.Empty;
+        CritNature = string.Empty;
+        CritIdInstance = string.Empty;
+        CritRole = string.Empty;
+        CritCodeAffaire = string.Empty;
+        CritNom = string.Empty;
+        CritEtat = string.Empty;
+        CritSaisineDu = null;
+        CritSaisineAu = null;
+        Selection = null;
+        Message = null;
+    }
+
+    /// <summary>
+    /// Ecran de demonstration : la suppression XXAFF n'ecrit rien, elle
+    /// rend compte de ce qui serait supprime et du sort des numeros metiers.
+    /// </summary>
+    private void Supprimer()
+    {
+        if (Choisie is null) return;
+        Message = $"Instance {Choisie.IdInstance} ({Choisie.Numero}) : suppression simulee"
+                + (LibererNumeros ? " — numeros metiers liberes." : " — numeros metiers conserves.");
     }
 
     private Affaire[] Trouvees
@@ -143,7 +439,43 @@
                                     StringComparison.OrdinalIgnoreCase));
             }
             if (!string.IsNullOrEmpty(CritType)) q = q.Where(a => a.Type == CritType);
-            return q.OrderByDescending(a => a.Creation).ToArray();
+            if (!string.IsNullOrEmpty(CritNature)) q = q.Where(a => a.Nature == CritNature);
+            if (!string.IsNullOrWhiteSpace(CritIdInstance))
+                q = q.Where(a => a.IdInstance.Contains(CritIdInstance.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(CritRole))
+                q = q.Where(a => a.Role.Contains(CritRole.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(CritCodeAffaire))
+                q = q.Where(a => a.CodeAffaire.Contains(CritCodeAffaire.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(CritNom))
+            {
+                var t = CritNom.Trim();
+                q = q.Where(a => a.Nom.Contains(t, StringComparison.OrdinalIgnoreCase)
+                              || a.Libelle.Contains(t, StringComparison.OrdinalIgnoreCase));
+            }
+            if (!string.IsNullOrEmpty(CritEtat)) q = q.Where(a => a.Etat == CritEtat);
+            if (CritSaisineDu is { } du) q = q.Where(a => a.Saisine.Date >= du.Date);
+            if (CritSaisineAu is { } au) q = q.Where(a => a.Saisine.Date <= au.Date);
+            // Sans clic sur un en-tete, la grille reste rangee du plus recent au
+            // plus ancien : c'est l'ordre attendu a l'ouverture.
+            if (CleTri is null) return q.OrderByDescending(a => a.Creation).ToArray();
+
+            Func<Affaire, object> clef = CleTri switch
+            {
+                "Numero" => a => a.Numero,
+                "IdInstance" => a => a.IdInstance,
+                "Role" => a => a.Role,
+                "CodeAffaire" => a => a.CodeAffaire,
+                "Nature" => a => a.Nature,
+                "Libelle" => a => a.Libelle,
+                "Nom" => a => a.Nom,
+                "Etat" => a => a.Etat,
+                "Siren" => a => a.Siren,
+                "Type" => a => a.Type,
+                "Saisine" => a => a.Saisine,
+                "Solde" => a => a.Solde,
+                _ => a => a.Creation
+            };
+            return (TriAscendant ? q.OrderBy(clef) : q.OrderByDescending(clef)).ToArray();
         }
     }
 }

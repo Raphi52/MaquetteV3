@@ -16,6 +16,10 @@
   overflow: hidden;
 }
 
+/* Menu replie : la colonne se resserre sur un rail. Le menu n'est jamais
+   masque, seule sa largeur change — le plan de travail gagne la place. */
+.rig-accueil--menu-reduit { grid-template-columns: 44px 1fr; }
+
 /* ---------- Menu de gauche, groupes depliables ---------- */
 .rig-menu {
   border-right: 1px solid var(--rig-bord);
@@ -42,7 +46,6 @@
   display: inline-block;
 }
 .rig-menu__groupe--ouvert .rig-menu__chevron { transform: rotate(90deg); }
-.rig-menu__filet { width: 3px; height: 14px; border-radius: 2px; flex: none; }
 .rig-menu__compte { margin-left: auto; color: var(--rig-texte-3); font-size: 10px; }
 .rig-menu__liste { list-style: none; margin: 0; padding: 0 0 var(--rig-esp-2) 0; }
 .rig-menu__lien {
@@ -50,15 +53,129 @@
   background: none; border: 0; cursor: pointer;
   color: var(--rig-texte-2);
   font: var(--rig-fs-dense)/1.6 var(--rig-font);
-  padding: 3px var(--rig-esp-2) 3px 26px;
+  /* Plus de code technique devant : le libelle prend toute la largeur,
+     l'indentation seule rattache la ligne a son groupe. */
+  padding: 5px var(--rig-esp-2) 5px 26px;
   border-radius: var(--rig-radius-sm);
+  border-left: 2px solid transparent;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .rig-menu__lien:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
-.rig-menu__code {
-  font: 10px var(--rig-font-mono);
-  color: var(--rig-texte-3);
-  margin-right: var(--rig-esp-2);
+
+/* Entree de navigation METIER : le besoin seul. Ce qu'on y trouve est en
+   infobulle (title) plutot qu'en seconde ligne, pour un menu plus dense. */
+.rig-menu__lien--metier { padding-top: 6px; padding-bottom: 6px; }
+.rig-menu__quoi { display: block; }
+
+/* ---------- Couleur des metiers ----------
+   Chaque groupe porte SA teinte : la pastille la montre en plein, le titre
+   la reprend quand le groupe est ouvert, et la ligne survolee ou active s'y
+   rattache par un liseré. C'est le seul aplat de couleur du menu — il tient
+   dans un carre de 18 px, il ne peint jamais le fond du panneau. */
+.rig-menu__groupe--rcs    { --teinte: #d4a94f; --teinte-faible: rgba(212,169,79,.14); }
+.rig-menu__groupe--jud    { --teinte: #7aa2f7; --teinte-faible: rgba(122,162,247,.14); }
+.rig-menu__groupe--doc    { --teinte: #6fc2a0; --teinte-faible: rgba(111,194,160,.14); }
+.rig-menu__groupe--compta { --teinte: #e0956b; --teinte-faible: rgba(224,149,107,.14); }
+.rig-menu__groupe--reg    { --teinte: #a99ad6; --teinte-faible: rgba(169,154,214,.14); }
+/* Le menu suit les GESTES du metier : chaque geste porte sa couleur, pour
+   reconnaitre ou l'on est avant d'avoir lu le titre. */
+.rig-menu__groupe--pers   { --teinte: #d98fb0; --teinte-faible: rgba(217,143,176,.14); }
+.rig-menu__groupe--mod    { --teinte: #c9b26b; --teinte-faible: rgba(201,178,107,.14); }
+.rig-menu__groupe--aud    { --teinte: #8fb8d9; --teinte-faible: rgba(143,184,217,.14); }
+.rig-menu__groupe--edit   { --teinte: #9bc47a; --teinte-faible: rgba(155,196,122,.14); }
+.rig-menu__groupe--surv   { --teinte: #e07b7b; --teinte-faible: rgba(224,123,123,.14); }
+.rig-menu__groupe--fin    { --teinte: #8a94a6; --teinte-faible: rgba(138,148,166,.14); }
+
+.rig-menu__pastille {
+  flex: none;
+  width: 18px; height: 18px; border-radius: 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font: 700 10px/1 var(--rig-font-mono);
+  color: var(--rig-fond);
+  background: var(--teinte, var(--rig-texte-3));
+  opacity: .78;
+  transition: opacity .15s ease, box-shadow .15s ease;
 }
+.rig-menu__tete:hover .rig-menu__pastille,
+.rig-menu__groupe--ouvert .rig-menu__pastille {
+  opacity: 1;
+  box-shadow: 0 0 0 3px var(--teinte-faible);
+}
+.rig-menu__groupe--ouvert .rig-menu__titre { color: var(--teinte); }
+
+/* ---------- Troisieme niveau : les VERBES du metier ----------
+   Un titre court, en petites capitales, sans aplat : il doit se distinguer du
+   metier au-dessus (plus gros, colore) ET des ecrans en dessous (texte plein). */
+.rig-menu__sous {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%;
+  margin-left: 16px; width: calc(100% - 16px);
+  background: none; border: 0; cursor: pointer;
+  color: var(--rig-texte-3);
+  font: 600 10px/1.4 var(--rig-font);
+  letter-spacing: var(--rig-ls-kicker); text-transform: uppercase;
+  padding: 5px var(--rig-esp-2) 5px 6px;
+  border-radius: var(--rig-radius-sm);
+}
+.rig-menu__sous:hover { background: var(--teinte-faible); color: var(--teinte); }
+.rig-menu__sous--ouvert { color: var(--teinte); }
+.rig-menu__sous--ouvert .rig-menu__chevron { transform: rotate(90deg); color: var(--teinte); }
+.rig-menu__sous-titre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Les entrees d'un groupe ouvert se rattachent a sa couleur : un rail discret
+   a gauche de la liste, qui s'allume sous le pointeur et sur l'ecran actif. */
+.rig-menu__groupe--ouvert .rig-menu__liste {
+  border-left: 1px solid var(--teinte-faible);
+  margin-left: 26px;
+  padding-bottom: 4px;
+}
+.rig-menu__groupe--ouvert .rig-menu__lien { padding-left: 12px; }
+.rig-menu__groupe--ouvert .rig-menu__lien:hover {
+  background: var(--teinte-faible);
+  border-left-color: var(--teinte);
+  color: var(--rig-texte);
+}
+.rig-menu__lien--actif {
+  background: var(--teinte-faible);
+  border-left-color: var(--teinte);
+  color: var(--rig-texte);
+  font-weight: 600;
+}
+
+/* Sur le rail, la pastille reste : c'est elle qui identifie le metier. */
+.rig-accueil--menu-reduit .rig-menu__pastille { opacity: 1; }
+
+/* ---------- Repli du menu : le bouton et l'etat de rail ---------- */
+.rig-menu__entete {
+  display: flex; align-items: center; gap: var(--rig-esp-2);
+  padding: var(--rig-esp-2);
+  margin-bottom: var(--rig-esp-2);
+}
+.rig-menu__kicker { min-width: 0; overflow: hidden; white-space: nowrap; }
+.rig-menu__replier {
+  margin-left: auto; flex: none;
+  width: 24px; height: 24px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: 0; cursor: pointer;
+  color: var(--rig-texte-3);
+  font: 12px var(--rig-font-mono);
+  border-radius: var(--rig-radius-sm);
+}
+.rig-menu__replier:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
+
+/* Sur le rail, il ne reste que le bouton et les pastilles des metiers :
+   le texte n'aurait pas la place d'etre lu, mais rien ne disparait du
+   modele — un clic sur une pastille redeploie le menu sur ce metier. */
+.rig-accueil--menu-reduit .rig-menu { padding-left: 0; padding-right: 0; }
+.rig-accueil--menu-reduit .rig-menu__entete { padding: var(--rig-esp-2) 0; }
+.rig-accueil--menu-reduit .rig-menu__titre,
+.rig-accueil--menu-reduit .rig-menu__chevron,
+.rig-accueil--menu-reduit .rig-menu__compte,
+.rig-accueil--menu-reduit .rig-menu__liste,
+.rig-accueil--menu-reduit .rig-menu__sous { display: none; }
+.rig-accueil--menu-reduit .rig-menu__replier { margin: 0 auto; }
+.rig-accueil--menu-reduit .rig-menu__tete { justify-content: center; padding: var(--rig-esp-2) 0; }
+/* La pastille est le seul repere du rail : on la laisse a sa taille pleine. */
 
 /* ---------- Plan de travail ---------- */
 .rig-plan {
@@ -122,7 +239,7 @@
   display: flex; flex-direction: column;
   /* Le fond reprend celui de la page : la tuile n'est pas un aplat de
      couleur, elle est juste OPAQUE pour que l'ombre la detache. */
-  background: var(--rig-fond);
+  background: var(--rig-surface, var(--rig-fond));
   box-shadow: var(--rig-ombre);
   transition: box-shadow .14s ease, transform .14s ease;
 }
@@ -133,7 +250,9 @@
   transform: scale(1.01);
   opacity: .95;
   cursor: grabbing;
-  z-index: 30;
+  /* Pas de z-index ICI : Blazor pose celui de chaque tuile en style inline
+     (`z-index:@p.Ordre`), qui bat toujours une classe. C'est rig-accueil.js
+     qui monte la tuile saisie a 60 en inline, puis rend la main a Blazor. */
 }
 .rig-widget__tete {
   display: flex; align-items: center; gap: var(--rig-esp-2);
@@ -152,7 +271,11 @@
   color: var(--rig-texte-3); font: 12px var(--rig-font-mono); padding: 0 4px;
 }
 .rig-widget__fermer:hover { color: var(--rig-texte); }
-.rig-widget__corps { min-height: 0; overflow: auto; flex: 1 1 auto; }
+.rig-widget__corps {
+  min-height: 0; overflow: auto; flex: 1 1 auto;
+  /* Air entre le contenu et la barre de defilement. */
+  padding-right: var(--rig-esp-3);
+}
 
 /* Bouton d'action dans l'entete d'une tuile (« Voir toutes les affaires »).
    Pose a droite du titre, l'engrenage de reglages restant en bout de ligne. */
@@ -282,9 +405,33 @@
 .rig-alerte__titre { font-size: var(--rig-fs-dense); color: var(--rig-texte); }
 .rig-alerte__detail { font-size: 11px; color: var(--rig-texte-3); }
 
+/* Une alerte MENE quelque part : c'est un bouton pleine largeur, pas une
+   ligne morte. Il garde l'allure d'une ligne (fond et bordure hérités du
+   conteneur) et n'annonce le clic que par le survol et la fleche de droite. */
+.rig-alerte--lien {
+  width: 100%; text-align: left; background: none; color: inherit;
+  border: 0; border-bottom: 1px solid var(--rig-bord-faible);
+  font: inherit; cursor: pointer;
+}
+.rig-alerte--lien:last-child { border-bottom: 0; }
+.rig-alerte--lien:hover,
+.rig-alerte--lien:focus-visible { background: rgba(255, 255, 255, .05); }
+.rig-alerte__vers {
+  margin-left: auto; align-self: center; white-space: nowrap;
+  font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--rig-texte-3); opacity: 0; transition: opacity .12s linear;
+}
+.rig-alerte--lien:hover .rig-alerte__vers,
+.rig-alerte--lien:focus-visible .rig-alerte__vers { opacity: 1; }
+
 /* ---------- Visionneuse documentaire (esprit VGED) ---------- */
 .rig-vged {
-  position: fixed; inset: 0; z-index: 90;
+  /* Elle commence SOUS le bandeau, comme les ecrans de procedure : partir de
+     `inset: 0` la faisait passer par-dessus la barre du haut, et on perdait la
+     marque, le login, les reglages, reduire/agrandir/fermer et la seule zone de
+     deplacement de la fenetre (demande utilisateur du 2026-09-10).
+     z-index 89 : au-dessus d'un ecran de procedure (88), sous la barre (90). */
+  position: fixed; inset: var(--rig-bandeau-h, 39px) 0 0 0; z-index: 89;
   background: var(--rig-fond);
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
@@ -337,7 +484,8 @@
   letter-spacing: .04em;
 }
 .rig-arbre__ligne {
-  padding: 2px var(--rig-esp-2);
+  /* 2026-09-15 : 2px -> 5px, lignes plus hautes pour cliquer plus facilement. */
+  padding: 5px var(--rig-esp-2);
   border-radius: var(--rig-radius-sm);
   font: var(--rig-fs-dense)/1.6 var(--rig-font);
   color: var(--rig-texte-2); cursor: pointer;
@@ -357,11 +505,13 @@
 .rig-arbre__chevron--ouvert { transform: rotate(90deg); }
 .rig-arbre__chevron--vide { visibility: hidden; }
 .rig-arbre__icone {
-  width: 10px; height: 10px; flex: 0 0 10px; border-radius: 2px;
-  background: var(--rig-texte-3);
+  /* Icone au trait (SVG inline), pas un aplat : elle prend la couleur du
+     texte de la ligne, donc elle s'eclaire avec elle au survol. */
+  width: 15px; height: 15px; flex: 0 0 15px;
+  color: var(--rig-texte-3);
 }
-.rig-arbre__icone--piece { background: var(--rig-accent, #4a90d9); opacity: .7; }
-.rig-arbre__icone--judiciaire, .rig-arbre__icone--partie { background: #b08a3e; }
+.rig-arbre__ligne:hover .rig-arbre__icone,
+.rig-arbre__ligne--actif .rig-arbre__icone { color: var(--rig-accent); }
 .rig-arbre__vide {
   font-size: 11px; color: var(--rig-texte-3);
   padding: 2px var(--rig-esp-2);
@@ -371,6 +521,14 @@
   margin-top: var(--rig-esp-3); padding-top: var(--rig-esp-3);
   border-top: 1px solid var(--rig-bord);
 }
+/* Code de la piece devant son libelle (GED demateralisee). La classe etait
+   utilisee dans EcranDocDemat.razor SANS aucune regle : le code et le libelle
+   s'affichaient colles (« STATStatuts constitutifs », mesure 2026-09-15). */
+.rig-menu__code {
+  font-family: var(--rig-font); font-size: 11px;
+  color: var(--rig-texte-3); margin-right: var(--rig-esp-2);
+}
+
 .rig-arbre__apercu-texte {
   margin-top: var(--rig-esp-2); white-space: pre-wrap;
   font: 11px/1.6 var(--rig-font); color: var(--rig-texte-3);
@@ -476,14 +634,12 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    seulement neutralisees tant que la fenetre est etroite.
    ============================================================ */
 @media (max-width: 1100px) {
-  .rig-accueil { grid-template-columns: 1fr; min-height: 0; }
-
-  .rig-menu {
-    border-right: 0;
-    border-bottom: 1px solid var(--rig-bord);
-    max-height: 30vh;
-    padding: var(--rig-esp-3) var(--rig-esp-3);
-  }
+  /* Le menu reste une COLONNE jusqu'a 720 px. Empile des 1100 px (mesure
+     2026-09-15, fenetre 1100x700 en bureau cache), il devenait un bandeau
+     de 30vh a moitie vide avec son propre defilement, et repoussait les
+     cartes sous la ligne de flottaison. */
+  .rig-accueil { grid-template-columns: 196px 1fr; }
+  .rig-accueil--menu-reduit { grid-template-columns: 44px 1fr; }
 
   .rig-plan { padding: var(--rig-esp-3) var(--rig-esp-3) var(--rig-esp-5); }
 
@@ -506,16 +662,32 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   .rig-entete { flex-wrap: wrap; gap: var(--rig-esp-2); }
   .rig-titre { font-size: var(--rig-fs-corps); }
 
-  .rig-vged__corps { grid-template-columns: 1fr !important; grid-template-rows: auto 1fr auto; }
+  /* La zone du milieu (saisie par etapes) garde une hauteur UTILISABLE : en
+     `1fr` elle tombait a une ligne a 900x650 et a ZERO a 640x480 (mesure
+     2026-09-15, bureau cache), ecrasee par l'arbre, la frise et le panneau
+     document. Le corps defile en entier plutot que d'effacer le formulaire. */
+  .rig-vged__corps {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto minmax(340px, 1fr) auto;
+    overflow-y: auto;
+  }
   .rig-vged__poignee { display: none; }
   .rig-vged__editions { border-left: 0; border-top: 1px solid var(--rig-bord); }
-  .rig-vged__arbre { max-height: 30vh; border-right: 0; border-bottom: 1px solid var(--rig-bord); }
+  .rig-vged__arbre { max-height: 30vh; min-height: 96px; flex-shrink: 0; border-right: 0; border-bottom: 1px solid var(--rig-bord); }
 }
 
 @media (max-width: 720px) {
   .rig-perf { grid-template-columns: 1fr 1fr; gap: var(--rig-esp-2); }
   .rig-perf__valeur { font-size: 17px; }
-  .rig-menu { max-height: 26vh; }
+  .rig-accueil,
+  .rig-accueil--menu-reduit { grid-template-columns: 1fr; min-height: 0; }
+  .rig-menu {
+    border-right: 0;
+    border-bottom: 1px solid var(--rig-bord);
+    max-height: 26vh;
+    padding: var(--rig-esp-3) var(--rig-esp-3);
+  }
+  .rig-vged__arbre { max-height: 22vh; }
   .rig-badge { display: none; }
   .rig-touche { display: none; }
 }
@@ -609,6 +781,34 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-barre__action:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
 .rig-barre__action--ouvert { color: var(--rig-focus); background: var(--rig-fond-2); }
 
+/* ---------- Validation hierarchique des modifications ---------- */
+/* Bouton texte de la barre : contrairement aux boutons d'icone, il doit
+   respirer et porter sa pastille de compte. */
+.rig-validations-bouton {
+  width: auto; padding: 0 10px; gap: 6px;
+  font-size: 12px; letter-spacing: .02em;
+}
+.rig-pastille {
+  min-width: 16px; height: 16px; padding: 0 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; font-size: 11px; font-weight: 600;
+  background: var(--rig-focus); color: var(--rig-fond);
+}
+.rig-validations { min-width: 320px; max-width: 420px; max-height: 60vh; overflow: auto; }
+.rig-validation {
+  padding: var(--rig-esp-2) 0;
+  border-top: 1px solid var(--rig-bord);
+}
+.rig-validation:first-of-type { border-top: 0; }
+.rig-validation__quoi { font-size: 13px; color: var(--rig-texte); }
+.rig-validation__meta { font-size: 11px; color: var(--rig-texte-3); margin-top: 2px; }
+.rig-validation__etat { font-size: 11px; margin-top: 4px; text-transform: uppercase; letter-spacing: .04em; }
+.rig-validation__etat--attente { color: var(--rig-focus); }
+.rig-validation__etat--ok { color: #4caf7d; }
+.rig-validation__etat--refus { color: #d4726a; }
+.rig-validation__actions { display: flex; gap: var(--rig-esp-2); margin-top: var(--rig-esp-2); }
+.rig-validation__vide { font-size: 12px; color: var(--rig-texte-3); }
+
 /* Le panneau des reglages generaux s'ancre sous la barre. */
 .rig-barre .rig-tuiles-panneau { top: calc(100% + 10px); }
 /* Ancre du panneau : sans parent positionne, il se placerait sur la fenetre entiere. */
@@ -652,6 +852,20 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   font-size: 11px;
   padding: 4px var(--rig-esp-3);
 }
+/* Les ACTIONS de l'affaire (les traitements du contexte) ne sont pas des outils
+   d'affichage comme « Documents » ou « Tableau des editions » : elles emmenent
+   AILLEURS. Sans separation, l'oeil les confond avec les onglets voisins.
+   Le groupe est donc annonce par un libelle et ouvert par un filet vertical or,
+   la seule couleur que la charte autorise. */
+.rig-vged__actions {
+  display: flex; align-items: center; gap: var(--rig-esp-2);
+  padding-left: var(--rig-esp-3);
+  border-left: 1px solid var(--rig-bord);
+  margin-left: var(--rig-esp-2);
+}
+.rig-vged__actions .rig-kicker { white-space: nowrap; }
+.rig-vged__actions .rig-bouton--plat { border-style: dashed; }
+
 .rig-vged__compte {
   margin-left: auto;
   font: 10px var(--rig-font-mono);
@@ -663,6 +877,17 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    SAISIE GUIDEE : la frise + le formulaire de l'etape
    ============================================================ */
 .rig-onglets { display: flex; gap: 2px; margin-right: var(--rig-esp-3); }
+
+/* Bandeau du SUJET, en tete d'un ecran de procedure : les ecrans qui
+   portent le meme objet metier, cote a cote. */
+.rig-sujet {
+  display: flex; align-items: center; gap: var(--rig-esp-3);
+  flex-wrap: wrap;
+  padding: var(--rig-esp-2) var(--rig-esp-4);
+  border-bottom: 1px solid var(--rig-bord-faible);
+}
+.rig-sujet .rig-onglets { flex-wrap: wrap; }
+
 .rig-onglet {
   background: none; border: 1px solid transparent; border-radius: var(--rig-radius-sm);
   color: var(--rig-texte-3); font: var(--rig-fs-dense)/1 var(--rig-font);
@@ -740,7 +965,10 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 }
 .rig-saisie__page {
   scroll-snap-align: start;
-  scroll-snap-stop: always;
+  /* Pas de scroll-snap-stop: always. Combine a un calage "proximity", il
+     FORCE l'arret sur chaque etape traversee : un geste de defilement large
+     se hachait en autant de blocages qu'il y a d'etapes. Sans lui, le
+     defilement reste continu et ne se cale qu'a l'arrivee. */
   min-height: 100%;
   display: flex; flex-direction: column;
 }
@@ -818,6 +1046,23 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
   min-height: 0;
+}
+
+/* Ecran PROC_REQUI : une bande pleine largeur au-dessus des deux colonnes,
+   pour les commandes web arrivees par EDI (fiche 275). */
+.rig-proc__corps--cmdweb {
+  grid-template-rows: minmax(0, auto) minmax(0, 1fr);
+}
+.rig-cmdweb {
+  grid-column: 1 / -1;
+  display: flex; flex-direction: column; min-height: 0;
+  max-height: 32vh;
+  border-bottom: 1px solid var(--rig-bord);
+}
+.rig-cmdweb__entete {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--rig-esp-3);
+  padding: var(--rig-esp-3) var(--rig-esp-4) var(--rig-esp-2);
 }
 
 .rig-criteres {
@@ -910,14 +1155,35 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-etat--attente { border-color: transparent; box-shadow: inset 0 0 0 1px rgba(154, 165, 180, .5); }
 
 .rig-menu__lien--actif {
-  background: var(--rig-fond-2);
+  background: color-mix(in srgb, var(--rig-focus) 10%, transparent);
   color: var(--rig-texte);
-  box-shadow: inset 2px 0 0 0 var(--rig-focus);
+  border-left-color: var(--rig-focus);
+  font-weight: 600;
 }
 
 @media (max-width: 1100px) {
-  .rig-proc__corps { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
-  .rig-criteres { border-right: 0; border-bottom: 1px solid var(--rig-bord); max-height: 40vh; }
+  /* Resultats : une hauteur plancher, sinon les criteres empiles ne laissaient
+     qu'UNE ligne visible sur 10 a 1100x700 (mesure 2026-09-15). */
+  /* Empile SANS COMPRESSER : en grille, les rangees `auto` se tassaient sous
+     leur contenu et les blocs se CHEVAUCHAIENT (Requisitions 640x480 : criteres
+     par-dessus les commandes web, mesure 2026-09-15). En colonne flex, chaque
+     bloc garde sa hauteur et le corps defile. */
+  .rig-proc__corps { display: flex; flex-direction: column; overflow-y: auto; }
+  .rig-proc__corps > * { flex: none; }
+  .rig-proc__corps > .rig-resultats-proc { flex: 1 0 300px; }
+  .rig-cmdweb { max-height: none; }
+  .rig-cmdweb .rig-table-cadre { min-height: 150px; }
+  /* Criteres : le plafond CEDE a la place libre. A 40vh fixe, le bloc etait
+     coupe en plein milieu d'un champ alors que ~250px restaient VIDES sous un
+     tableau court (Depots judiciaires, BODACC, GED judiciaire, mesure
+     2026-09-15). On garde 40vh comme plancher, et on laisse les criteres
+     prendre la hauteur restante des que la fenetre est assez haute, en
+     reservant ~420px aux resultats (plancher 300px + entete). */
+  .rig-criteres {
+    border-right: 0; border-bottom: 1px solid var(--rig-bord);
+    max-height: max(40vh, calc(100vh - 420px));
+  }
+  .rig-resultats-proc .rig-table-cadre { min-height: 240px; }
 }
 
 /* ---------- Fiches d une etape multiple (dirigeants, etablissements) ---------- */
@@ -1155,6 +1421,31 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   display: flex; flex-direction: column;
   gap: var(--rig-esp-2); min-height: 0;
 }
+/* La colonne de droite EST desormais la visionneuse : le document remplit le
+   volet, il n'est plus une fenetre posee par-dessus la vue (choix du 11/09). */
+/* ZONE 2 : les DONNEES, colonne propre entre l'arbre et le document
+   (3 zones cote a cote, demande du 2026-09-14). Elle defile seule. */
+.rig-vged__donnees { padding: 0; overflow: hidden; gap: 0; }
+.rig-vged__donnees .rig-champs { grid-template-columns: 1fr; max-width: none; }
+
+.rig-vged__apercu { padding: 0; }
+.rig-vged__apercu .rig-apercu {
+  width: 100%; height: 100%;
+  border: 0; border-radius: 0; box-shadow: none;
+  background: transparent;
+}
+.rig-saisie--colonne {
+  display: flex; flex-direction: column; gap: var(--rig-esp-3);
+  padding: var(--rig-esp-3); min-width: 0;
+}
+.rig-saisie--colonne .rig-champs { grid-template-columns: 1fr; max-width: none; }
+
+.rig-guide__entete { padding: var(--rig-esp-3); }
+/* Dans le volet, la feuille prend toute la largeur disponible : centree dans
+   une fenetre large elle laissait une bande vide a gauche. */
+.rig-vged__apercu .rig-apercu__pages { padding: var(--rig-esp-3); }
+.rig-vged__apercu .rig-apercu__feuille { width: 100%; }
+
 .rig-guide__entete {
   display: flex; align-items: flex-start; gap: var(--rig-esp-3);
   padding-bottom: var(--rig-esp-2);
@@ -1184,15 +1475,41 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   left: -6px; top: 13px; width: 6px; height: 1px;
 }
 .rig-frise--h .rig-frise__bouton {
-  flex-direction: column; align-items: center; gap: 2px;
-  margin-bottom: 0; padding: var(--rig-esp-2) 2px; text-align: center;
+  flex-direction: column; align-items: stretch; gap: 5px;
+  margin-bottom: 0; padding: 2px 0 0; text-align: left;
+  border-color: transparent;
 }
-.rig-frise--h .rig-frise__pastille { width: 22px; height: 22px; font-size: 10px; }
+.rig-frise--h .rig-frise__bouton:hover { background: none; }
+.rig-frise--h .rig-frise__bouton:hover .rig-frise__jauge { background: var(--rig-fond-2); }
+/* Plus de trait de liaison ni de cadre : c'est la jauge qui porte l'etat. */
+.rig-frise--h .rig-frise__pas + .rig-frise__pas::before { content: none; }
+.rig-frise--h .rig-frise__pas--courant .rig-frise__bouton {
+  background: none; border-color: transparent;
+}
+/* La jauge : un filet de 3px dont la part remplie dit l'avancement. */
+.rig-frise__jauge {
+  display: block; height: 3px; border-radius: 2px;
+  background: var(--rig-bord); overflow: hidden;
+}
+.rig-frise__jauge-part {
+  display: block; height: 100%; width: 0; border-radius: 2px;
+  background: var(--rig-texte-3);
+  transition: width .18s ease;
+}
+.rig-frise__pas--complet .rig-frise__jauge-part { background: var(--rig-grad-ok); }
+.rig-frise__pas--courant .rig-frise__jauge { background: rgba(176, 141, 63, .25); }
+.rig-frise__pas--courant .rig-frise__jauge-part { background: var(--rig-focus); }
+.rig-frise__pas--refuse .rig-frise__jauge-part { background: var(--rig-alerte); }
 .rig-frise--h .rig-frise__libelle {
-  flex: none; align-items: center;
-  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: 10px; line-height: 1.25;
+  flex: none; align-items: flex-start;
+  max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: 10px; line-height: 1.3;
 }
+.rig-frise--h .rig-frise__libelle { color: var(--rig-texte-3); }
+.rig-frise--h .rig-frise__pas--partiel .rig-frise__libelle,
+.rig-frise--h .rig-frise__pas--complet .rig-frise__libelle { color: var(--rig-texte); }
+.rig-frise--h .rig-frise__pas--courant .rig-frise__libelle { color: var(--rig-focus); font-weight: 600; }
+.rig-frise--h .rig-frise__pas--courant .rig-frise__compte { color: var(--rig-focus); }
 
 /* ---------- Ecran plein du tableau des editions ---------- */
 .rig-editions-ecran { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
@@ -1212,25 +1529,62 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 
 /* ---------- Apercu d'une piece (visionneuse) et boite d'impression ---------- */
 .rig-voile {
-  position: fixed; inset: 0; z-index: 40;
+  /* AU-DESSUS des ecrans pleins (`.rig-proc`, z-index 88) et de la barre de
+     marque (90/91) : une fenetre ouverte DEPUIS un ecran plein doit se voir. */
+  position: fixed; inset: 0; z-index: 92;
   background: rgba(0, 0, 0, .55);
   display: flex; align-items: center; justify-content: center;
   padding: var(--rig-esp-4);
 }
-.rig-voile--haut { z-index: 50; background: rgba(0, 0, 0, .35); }
+.rig-voile--haut { z-index: 93; background: rgba(0, 0, 0, .35); }
+/* Visionneuse ANCREE AU BORD DROIT (choix du 10/09) : le document n'est plus
+   une boite centree, il occupe un volet plein-hauteur cale a droite. */
+.rig-voile--droite {
+  justify-content: flex-end; align-items: stretch; padding: 0;
+  background: rgba(0, 0, 0, .28);
+}
+.rig-voile--droite .rig-apercu {
+  width: min(760px, 96vw); height: 100%;
+  border-radius: 0; border-width: 0 0 0 1px;
+  box-shadow: -18px 0 48px rgba(0, 0, 0, .5);
+}
 .rig-apercu {
   display: flex; flex-direction: column; min-height: 0;
   width: min(900px, 92vw); height: min(88vh, 100%);
-  background: var(--rig-fond-2, #1b1f27);
+  background: var(--rig-fond);
   border: 1px solid var(--rig-bord); border-radius: var(--rig-radius-sm);
   box-shadow: 0 18px 48px rgba(0, 0, 0, .5);
 }
+/* Dans SA fenetre, le document EST la fenetre : les dimensions ci-dessus
+   viennent de l'ancienne visionneuse flottante et laissaient l'entete
+   rogne et la feuille decalee (constate a l'ecran le 2026-09-14). */
+.rig-apercu--detache {
+  width: 100%; height: 100%;
+  border: 0; border-radius: 0; box-shadow: none;
+}
+/* flex-wrap + min-width:0 : la zone du document est etroite et
+   redimensionnable ; sans cela la barre d'actions depassait la colonne et
+   « Fermer » etait coupe (constate a l'ecran le 2026-09-14). */
 .rig-apercu__entete {
-  display: flex; align-items: center; gap: var(--rig-esp-3);
+  display: flex; align-items: center; gap: var(--rig-esp-3); flex-wrap: wrap;
   padding: var(--rig-esp-3); border-bottom: 1px solid var(--rig-bord);
 }
-.rig-apercu__titre { font: 500 15px/1.3 var(--rig-font); color: var(--rig-texte); }
-.rig-apercu__actions { margin-left: auto; display: flex; gap: var(--rig-esp-2); }
+.rig-apercu__titre {
+  font: 500 15px/1.3 var(--rig-font); color: var(--rig-texte);
+  min-width: 0; overflow-wrap: anywhere;
+}
+.rig-apercu__actions {
+  margin-left: auto; display: flex; flex-wrap: wrap; gap: var(--rig-esp-2);
+}
+/* Bouton icone carre : le libelle vit dans title (info-bulle) et aria-label. */
+.rig-bouton--icone {
+  width: 34px; height: 34px; padding: 0;
+  display: inline-grid; place-items: center;
+}
+.rig-bouton--icone svg {
+  width: 18px; height: 18px; fill: none; stroke: currentColor;
+  stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+}
 .rig-apercu__message {
   padding: var(--rig-esp-2) var(--rig-esp-3);
   border-bottom: 1px solid var(--rig-bord);
@@ -1241,6 +1595,10 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   padding: var(--rig-esp-4); display: grid; gap: var(--rig-esp-4);
   justify-items: center; background: rgba(0, 0, 0, .25);
 }
+/* Piece adossee a un VRAI PDF (wwwroot/documents) : la visionneuse PDF
+   integree de WebView2 occupe toute la zone, sans marge ni feuilles. */
+.rig-apercu__pages--pdf { padding: 0; display: flex; overflow: hidden; }
+.rig-apercu__pdf { flex: 1 1 auto; width: 100%; height: 100%; border: 0; background: #525659; }
 .rig-apercu__feuille {
   position: relative; width: min(640px, 100%); aspect-ratio: 1 / 1.414;
   background: #fdfdfb; color: #16181d;
@@ -1253,10 +1611,18 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   position: absolute; right: 20px; bottom: 16px;
   font: 10px var(--rig-font-mono); color: #6b7280;
 }
+/* Objectif (zoom) de la fenetre detachee : taux lisible entre les deux boutons. */
+.rig-zoom { align-items: center; }
+.rig-zoom__taux {
+  min-width: 52px; text-align: center;
+  font: 500 12px/1 var(--rig-font-mono); color: var(--rig-texte-2);
+}
 .rig-impression {
   width: min(420px, 92vw); display: grid; gap: var(--rig-esp-3);
   padding: var(--rig-esp-4);
-  background: var(--rig-fond-2, #1b1f27);
+  /* Fond OPAQUE obligatoire : `--rig-fond-2` vaut rgba(255,255,255,.035),
+     translucide, l'ecran de dessous restait lisible a travers la fenetre. */
+  background: var(--rig-fond);
   border: 1px solid var(--rig-bord); border-radius: var(--rig-radius-sm);
   box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
 }
@@ -1272,6 +1638,68 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   padding: 1px 8px; font: inherit; cursor: pointer; white-space: nowrap;
 }
 .rig-arbre__nouveau:hover { color: var(--rig-texte); border-color: var(--rig-accent); }
+
+/* ---------- Grille des natures (fenetre « Nouveau ») ----------
+   On ne saisit plus de libelle ici : on clique une NATURE, l'element est
+   cree et se nomme SUR PLACE dans l'arbre. */
+.rig-impression--large { width: min(560px, 94vw); }
+.rig-natures {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: var(--rig-esp-2); max-height: 56vh; overflow: auto;
+}
+.rig-tuile-nature {
+  aspect-ratio: 1 / 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; padding: 6px;
+  border: 1px dashed var(--rig-bord); border-radius: 10px;
+  background: transparent; color: var(--rig-texte-2);
+  font: var(--rig-fs-dense)/1.3 var(--rig-font); text-align: center; cursor: pointer;
+  transition: border-color .12s ease, color .12s ease, background .12s ease;
+}
+.rig-tuile-nature:hover {
+  border-color: var(--rig-accent); color: var(--rig-texte);
+  background: var(--rig-fond-2); border-style: solid;
+}
+.rig-nature__icone {
+  /* Trait seul, sans aplat : l'icone suit la couleur du texte de la tuile,
+     donc elle s'eclaire au survol comme le libelle. */
+  width: 26px; height: 26px; flex: 0 0 26px;
+  color: var(--rig-texte-3);
+}
+.rig-tuile-nature:hover .rig-nature__icone { color: var(--rig-accent); }
+.rig-nature__titre { overflow: hidden; text-overflow: ellipsis; }
+.rig-nature__ext { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); }
+
+/* ---------- Renommage sur place dans l'arbre ---------- */
+.rig-arbre__saisie {
+  flex: 1 1 auto; min-width: 0;
+  border: 1px solid var(--rig-accent); border-radius: var(--rig-radius-sm);
+  background: var(--rig-fond); color: var(--rig-texte);
+  font: var(--rig-fs-dense)/1.4 var(--rig-font); padding: 0 4px;
+}
+
+/* ---------- Menu du clic droit sur une ligne de l'arbre ----------
+   Il doit passer au-dessus des ecrans pleins, comme les fenetres. */
+.rig-voile--transparent { position: fixed; inset: 0; z-index: 94; background: transparent; }
+.rig-ctx {
+  position: fixed; z-index: 95; min-width: 180px;
+  display: grid; gap: 1px; padding: 4px;
+  background: var(--rig-fond);
+  border: 1px solid var(--rig-bord); border-radius: var(--rig-radius-sm);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .55);
+}
+.rig-ctx__titre {
+  padding: 2px 8px 4px; font-size: 11px; color: var(--rig-texte-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rig-ctx__item {
+  text-align: left; border: 0; background: transparent;
+  color: var(--rig-texte-2); font: var(--rig-fs-dense)/1.7 var(--rig-font);
+  padding: 1px 8px; border-radius: var(--rig-radius-sm); cursor: pointer;
+}
+.rig-ctx__item:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
+.rig-ctx__item--danger:hover { color: #e06c6c; }
+.rig-ctx__filet { height: 1px; background: var(--rig-bord); margin: 3px 0; }
 
 /* ---------- Login connecte, dans l'entete de l'accueil ----------
    Le niveau d'acces du login choisi filtre les dossiers de l'arbre. */
@@ -1289,7 +1717,9 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    par-dessus le blanc de la fenetre systeme, et le texte clair restait donc
    blanc sur blanc (constate a l'ecran le 2026-09-10). */
 .rig-login option { background-color: #131826; color: #E8ECF4; }
-[data-rig-theme="clair"] .rig-login option { background-color: #FFFFFF; color: #1A1F2B; }
+/* Pas de blanc pur ici non plus (2026-09-10) : la popup eblouissait au milieu
+   d'un mode clair descendu a ~72 % de luminance. Texte en quasi-noir. */
+[data-rig-theme="clair"] .rig-login option { background-color: #DDE2EA; color: #0B0E14; }
 
 /* ---------- Voile de fermeture des panneaux deroulants ----------
    Transparent et plein ecran : capte le clic AILLEURS pour refermer le
@@ -1299,3 +1729,326 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   position: fixed; inset: 0; z-index: 41;
   background: transparent; border: 0; padding: 0;
 }
+
+/* ============================================================
+   BANDEAU DE MISSION + HIERARCHIE PAR LE FILET (2026-09-10)
+   Direction visuelle A+B validee par l'utilisateur : un choc de
+   lecture en tete (trois chiffres), puis une hierarchie portee par
+   les filets de statut. Toujours aucun aplat de couleur.
+   ============================================================ */
+.rig-mission { margin-bottom: var(--rig-esp-5); }
+.rig-mission__filet {
+  height: var(--rig-filet);
+  border-radius: calc(var(--rig-filet) / 2);
+  background: var(--rig-grad-marque);
+  margin-bottom: var(--rig-esp-4);
+}
+.rig-mission__chiffres {
+  display: flex; align-items: flex-end; gap: var(--rig-esp-6);
+  flex-wrap: wrap;
+}
+.rig-mission__bloc {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  background: none; border: 0; padding: 0; text-align: left;
+  color: inherit; cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.rig-mission__bloc:not(:disabled):hover { border-bottom-color: var(--rig-focus); }
+.rig-mission__bloc:disabled { cursor: default; opacity: .45; }
+.rig-mission__valeur {
+  font: 600 46px/1 var(--rig-font);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+  color: var(--rig-texte);
+}
+.rig-mission__bloc--alerte .rig-mission__valeur { color: var(--rig-alerte); }
+.rig-mission__bloc--ok .rig-mission__valeur { color: var(--rig-texte-2); }
+.rig-mission__libelle {
+  font: var(--rig-fs-kicker) var(--rig-font-mono);
+  letter-spacing: var(--rig-ls-kicker); text-transform: uppercase;
+  color: var(--rig-texte-3);
+}
+.rig-mission__contexte {
+  margin-left: auto; text-align: right;
+  font-size: var(--rig-fs-dense); line-height: 1.4;
+  color: var(--rig-texte-3);
+}
+
+/* --- Le filet de statut pose en tete de chaque tuile --- */
+.rig-widget__filet {
+  height: var(--rig-filet-fin);
+  border-radius: calc(var(--rig-filet-fin) / 2);
+  margin: 0 0 var(--rig-esp-3);
+  flex: none;
+}
+
+/* --- Tuile maitresse : c'est la file qui commande la journee ---
+   Les autres tuiles s'effacent (bordure faible, ombre plus discrete)
+   pour que la priorite se voie sans lire un mot. */
+.rig-widget--maitresse {
+  border-color: rgba(176, 141, 63, .55);
+}
+.rig-widget--maitresse .rig-widget__filet { height: var(--rig-filet); border-radius: calc(var(--rig-filet) / 2); }
+.rig-widget--maitresse .rig-widget__titre {
+  font: 600 var(--rig-fs-corps)/1.2 var(--rig-font);
+  letter-spacing: normal; text-transform: none;
+  color: var(--rig-texte);
+}
+.rig-widget:not(.rig-widget--maitresse) { border-color: var(--rig-bord-faible); }
+
+@media (max-width: 1100px) {
+  .rig-mission__chiffres { gap: var(--rig-esp-5); }
+  .rig-mission__valeur { font-size: 34px; }
+  .rig-mission__contexte { display: none; }
+}
+
+/* Rappel des documents sortis dans leurs propres fenetres (VDossier, zone 3). */
+.rig-vged__detachees{
+  border-bottom:1px solid var(--rig-bordure);
+  padding-bottom:8px;
+  margin-bottom:8px;
+}
+
+/* ---------- Etapes du dossier dans la colonne du milieu (2026-09-15) ----------
+   Frise horizontale EN HAUT, puis une piste horizontale : une page par etape,
+   calee par scroll-snap. La molette tourne les pages (rig-accueil.js). */
+.rig-frise--haut {
+  margin-top: 0; padding: var(--rig-esp-2) var(--rig-esp-3);
+  border-top: 0; border-bottom: 1px solid var(--rig-bord);
+}
+.rig-saisie__pages--h {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: row;
+  overflow-x: auto; overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.rig-saisie__pages--h::-webkit-scrollbar { display: none; }
+.rig-saisie__pages--h .rig-saisie__page {
+  flex: 0 0 100%; width: 100%; min-height: 0; height: 100%;
+  overflow-y: auto; overflow-x: hidden;
+  scroll-snap-align: start; scroll-snap-stop: always;
+}
+.rig-saisie__pages--h .rig-saisie__page + .rig-saisie__page { border-top: 0; }
+.rig-saisie__pages--h .rig-saisie__corps { padding: var(--rig-esp-3); }
+.rig-saisie__pages--h .rig-champs { grid-template-columns: 1fr; max-width: none; }
+/* Fleches precedente / suivante aux deux bouts de la frise. */
+.rig-frise--h .rig-frise__fleche { flex: 0 0 auto; display: flex; align-items: center; }
+.rig-frise__fleche-bouton {
+  width: 24px; height: 24px; padding: 0;
+  border: 1px solid var(--rig-bord); border-radius: var(--rig-radius-sm);
+  background: none; color: var(--rig-texte-2);
+  font: 16px/1 var(--rig-font); cursor: pointer;
+}
+.rig-frise__fleche-bouton:hover:not(:disabled) { color: var(--rig-focus); border-color: var(--rig-focus); }
+.rig-frise__fleche-bouton:disabled { opacity: .35; cursor: default; }
+/* Etape hors fenetre de chargement : un simple repere, rendu a l'approche. */
+.rig-saisie__attente {
+  margin: auto; font-size: 11px; color: var(--rig-texte-3);
+}
+
+
+/* Grille des 37 cases d inscription (fiche 275). Sans cette regle, chaque case
+   occupe toute la largeur (.rig-bascule est en width:100%) : la liste s empile
+   sur 37 lignes et repousse les quantites hors de l ecran. */
+.rig-inscriptions {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 2px 10px; margin: var(--rig-esp-2) 0;
+}
+.rig-inscriptions .rig-bascule { width: auto; }
+
+/* ---- « Informations du dossier » : formulaire des donnees v2 ---- */
+/* Marge laterale : sans elle les cases collaient a la poignee de colonne et
+   leur bord gauche (et le contour de focus) etait rogne par overflow-x (2026-09-15).
+   Meme retrait que l'entete (.rig-guide__entete). */
+.rig-infos { display: flex; flex-direction: column; gap: var(--rig-esp-2); overflow-x: hidden; overflow-y: auto; min-height: 0; flex: 1;
+  padding: 0 var(--rig-esp-3); }
+/* Pas de scroll lateral : les noms de colonne (DOSSIER_RCS.DATE_PREMIERE_IMMATRICULATION)
+   n'ont aucun espace, ils debordaient de leur case et elargissaient le panneau. */
+.rig-infos .rig-saisie-champ__colonne { overflow-wrap: anywhere; }
+.rig-infos .rig-saisie-champ__libelle { overflow-wrap: anywhere; min-width: 0; }
+/* Colonne etroite (etapes cote a cote) : le texte d'aide est plus long que la
+   case. Il se coupe en « … » DANS la case au lieu de toucher/deborder le bord. */
+.rig-infos__filtre { width: 100%; min-width: 0; flex: none;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rig-infos__filtre::placeholder { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rig-infos__section { border-bottom: 1px solid var(--rig-bord, rgba(255,255,255,.12)); padding: var(--rig-esp-2) 0; }
+.rig-infos__titre { display: flex; align-items: center; gap: var(--rig-esp-2); cursor: pointer; color: var(--rig-texte); font-size: var(--rig-fs-dense); }
+.rig-infos__table { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); }
+.rig-infos__compte { margin-left: auto; font: 10px var(--rig-font-mono); color: var(--rig-texte-2); }
+.rig-infos__section .rig-champs { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); max-width: none; padding-top: var(--rig-esp-2); }
+
+/* Bandeau des defauts du dossier ouvert (2026-09-15) : liens vers l'etape a corriger. */
+.rig-bandeau-defauts {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--rig-esp-2);
+  padding: var(--rig-esp-2) var(--rig-esp-4);
+  border-bottom: 1px solid var(--rig-bord);
+  border-left: 3px solid var(--rig-alerte);
+  background: var(--rig-fond-2);
+  font: var(--rig-fs-dense)/1.4 var(--rig-font);
+}
+.rig-bandeau-defauts__replis { flex: 1; min-width: 0; }
+.rig-bandeau-defauts__resume { display: inline-flex; align-items: baseline; gap: var(--rig-esp-3, 12px); cursor: pointer; list-style: none; }
+.rig-bandeau-defauts__resume::-webkit-details-marker { display: none; }
+.rig-bandeau-defauts__titre { font-weight: 600; color: var(--rig-alerte); }
+.rig-bandeau-defauts__titre b { font-size: 1.35em; }
+.rig-bandeau-defauts__voir { color: var(--rig-alerte); text-decoration: underline; text-underline-offset: 2px; }
+.rig-bandeau-defauts__voir::after { content: " \25BE"; }
+.rig-bandeau-defauts__replis[open] .rig-bandeau-defauts__voir::after { content: " \25B4"; }
+.rig-bandeau-defauts__liste { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--rig-esp-2); }
+.rig-bandeau-defauts__lien {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--rig-fond); border: none; border-radius: 999px;
+  color: var(--rig-texte-2); cursor: pointer; padding: 2px 4px 2px 10px;
+  font: inherit;
+}
+.rig-bandeau-defauts__lien:hover { color: var(--rig-texte); text-decoration: underline; }
+/* Code couleur (2026-09-15) : orange = requis manquant, rouge = valeur en erreur. */
+.rig-bandeau-defauts__nb {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center;
+  font: 600 11px var(--rig-font); color: #fff; background: var(--rig-alerte);
+}
+.rig-bandeau-defauts__lien--refuse { color: var(--rig-texte); }
+.rig-bandeau-defauts__lien--refuse .rig-bandeau-defauts__nb { background: var(--rig-erreur); }
+.rig-bandeau-defauts--erreur { border-left-color: var(--rig-erreur); }
+.rig-bandeau-defauts--erreur .rig-bandeau-defauts__titre { color: var(--rig-erreur); }
+
+/* Formulaire du milieu : boutons Actions (XACTION) et Historique (15/09/2026). */
+.rig-fiche__outils { display: flex; align-items: center; gap: var(--rig-esp-2); }
+.rig-fiche__menu { position: relative; }
+.rig-fiche__actions { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; margin: 0; padding: 4px 0; list-style: none;
+  min-width: 300px; max-height: 60vh; overflow: auto; background: var(--rig-surface, #1d2230);
+  border: 1px solid var(--rig-bord, rgba(255,255,255,.12)); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+.rig-fiche__actions button { display: flex; justify-content: space-between; gap: var(--rig-esp-2); width: 100%; padding: 6px 12px;
+  background: none; border: 0; color: var(--rig-texte); text-align: left; cursor: pointer; font-size: var(--rig-fs-dense); }
+.rig-fiche__actions button:hover { background: rgba(127,127,127,.15); }
+.rig-fiche__note { margin: 0 var(--rig-esp-3); padding: 6px 10px; border-radius: 6px; font-size: var(--rig-fs-dense); color: var(--rig-texte-2); background: rgba(127,127,127,.1); }
+.rig-histo { display: flex; flex-direction: column; gap: 10px; padding: var(--rig-esp-3); overflow: auto; }
+.rig-histo__vide { color: var(--rig-texte-3); font-style: italic; }
+.rig-histo__entree { display: flex; gap: 12px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--rig-bord, rgba(127,127,127,.25)); }
+.rig-histo__pastille { flex: 0 0 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font: 600 12px var(--rig-font-mono); background: rgba(90,140,255,.25); color: var(--rig-texte); }
+.rig-histo__corps { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rig-histo__phrase { color: var(--rig-texte); font-size: var(--rig-fs-dense); }
+.rig-histo__valeurs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: var(--rig-fs-dense); }
+.rig-histo__avant { padding: 1px 6px; border-radius: 4px; background: rgba(255,90,90,.15); text-decoration: line-through; color: var(--rig-texte-2); }
+.rig-histo__apres { padding: 1px 6px; border-radius: 4px; background: rgba(80,200,120,.18); color: var(--rig-texte); }
+.rig-histo__fleche { color: var(--rig-texte-3); }
+.rig-histo__meta { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); }
+
+/* ===== Extrait Kbis — mise en page nationale RIG v2 =====
+   Source : KbisFromXMLPreformatPDF - xsd 0.35 - xsl 1.24.xsl (wwwroot/kbis/).
+   La feuille fait 21 cm de large : 1 cm = 100cqw / 21 = 4.762cqw ;
+   1 pt = 0.03528 cm = 0.168cqw. */
+.rig-apercu__feuille--kbis { container-type: inline-size; padding: 0; }
+.rig-kbis {
+  position: absolute; inset: 0; overflow: hidden;
+  padding: 1.43cqw 9.52cqw 2.38cqw 4.76cqw;   /* 12pt / 2cm / 0.5cm / 1cm */
+  font-family: "Times New Roman", Times, serif; color: #000; line-height: 1.1;
+  font-size: 1.68cqw;                          /* 10pt */
+  display: flex; flex-direction: column;
+}
+.rig-kbis__entete { font-size: 1.344cqw; min-height: 13.3cqw; }            /* 8pt, zone 2.8cm */
+.rig-kbis__greffe-libelle { font-size: 1.68cqw; font-weight: bold; }
+.rig-kbis__gestion { font-size: 1.68cqw; padding-top: 1.344cqw; }
+.rig-kbis__kbis { font-size: 1.848cqw; font-weight: bold; font-style: italic; text-align: center; }
+.rig-kbis__titre { font-weight: bold; text-align: center; margin-top: 2.52cqw; }   /* 15pt */
+.rig-kbis__fraicheur { text-align: center; margin-bottom: 1.85cqw; }               /* 11pt */
+.rig-kbis__corps { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: inherit; line-height: inherit; }
+.rig-kbis__col-titre { width: 34.4cqw; }                                           /* 205px FO */
+.rig-kbis__section {
+  font-size: 1.512cqw; font-weight: bold; text-align: justify;                     /* 9pt */
+  padding-top: 1.68cqw; padding-bottom: .84cqw; border-bottom: 1px solid #000;
+}
+.rig-kbis__ligne td { vertical-align: top; padding: .84cqw 0 .67cqw; line-height: .95; }
+.rig-kbis__ligne-titre { font-style: italic; padding-right: 1cqw !important; }
+.rig-kbis__bas { margin-top: auto; text-align: right; font-size: 1.43cqw; }
+.rig-kbis__signature { font-size: 1.68cqw; margin: 1.68cqw 0 12cqw; }
+.rig-kbis__pied {
+  display: flex; justify-content: space-between; font-size: 1.344cqw; padding-top: 2cqw;
+}
+
+/* --- Pagination NUMEROTEE des sections d'une fiche « Informations de ... »
+   Meme logique que la frise des etapes du panneau du milieu : une section a
+   la fois, chaque numero mene a la sienne. */
+.rig-infos__pages { display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  list-style: none; margin: var(--rig-esp-2) 0; padding: 0; }
+.rig-infos__page { min-width: 22px; height: 22px; padding: 0 5px; cursor: pointer;
+  border: 1px solid var(--rig-bord, rgba(255,255,255,.14)); border-radius: 4px;
+  background: transparent; color: var(--rig-texte-2); font: 11px var(--rig-font-mono); }
+.rig-infos__page:hover:not(:disabled) { color: var(--rig-texte); border-color: var(--rig-accent, #d4a94f); }
+.rig-infos__page:disabled { opacity: .35; cursor: default; }
+.rig-infos__page--courante { color: #1b1b1b; background: var(--rig-accent, #d4a94f);
+  border-color: var(--rig-accent, #d4a94f); font-weight: 600; }
+.rig-infos__pages-etat { margin-left: auto; font: 10px var(--rig-font-mono); color: var(--rig-texte-3); }
+
+/* ===== MODE TACHE (task driven) =====
+   Le bandeau d'une tache en cours, au-dessus de l'arbre et au-dessus de la
+   fiche. Il dit CE QUI EST DEMANDE et porte le bouton qui rouvre la vue
+   entiere : l'utilisateur n'est jamais enferme dans la vue focalisee. */
+.rig-tache__bandeau {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--rig-esp-2);
+  padding: 5px var(--rig-esp-2);
+  border-bottom: 1px solid var(--rig-bord);
+  background: var(--rig-fond-2, transparent);
+  font: var(--rig-fs-dense)/1.5 var(--rig-font);
+}
+.rig-tache__code {
+  font: 11px var(--rig-font-mono); letter-spacing: .06em;
+  border: 1px solid var(--rig-bord); border-radius: var(--rig-radius-sm);
+  padding: 0 5px; color: var(--rig-texte-2);
+}
+.rig-tache__titre { flex: 1 1 auto; min-width: 0; color: var(--rig-texte-1); }
+.rig-tache__tout { white-space: nowrap; }
+/* Etat de completude d'une tache : combien de ses champs sont ecrits. */
+.rig-tache__etat {
+  font: 11px var(--rig-font-mono); color: var(--rig-texte-3);
+  display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: baseline;
+}
+.rig-tache__etat--ok { color: var(--rig-or, #d4a94f); }
+.rig-tache__reste { color: var(--rig-texte-3); font-style: italic; }
+.rig-tache__terminer:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Propagation d'une tache : ce que l'evenement entraine ailleurs. */
+.rig-tache__effets {
+  padding: 6px var(--rig-esp-2) 8px;
+  border-bottom: 1px solid var(--rig-bord);
+  display: grid; gap: 3px;
+}
+.rig-tache__effets-titre {
+  display: flex; justify-content: space-between; gap: var(--rig-esp-2);
+  font: 11px var(--rig-font-mono); letter-spacing: .04em;
+  color: var(--rig-texte-3); text-transform: uppercase; margin-bottom: 2px;
+}
+.rig-tache__effets-compte { color: var(--rig-texte-2); text-transform: none; }
+.rig-tache__effet {
+  display: flex; align-items: baseline; gap: 6px;
+  font: var(--rig-fs-dense)/1.5 var(--rig-font); color: var(--rig-texte-1);
+  cursor: pointer;
+}
+.rig-tache__effet--facultatif { color: var(--rig-texte-3); }
+.rig-tache__effet-libelle { flex: 1 1 auto; min-width: 0; }
+.rig-tache__effet-code { font: 11px var(--rig-font-mono); color: var(--rig-texte-3); }
+.rig-tache__effet-note { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); font-style: italic; }
+
+/* Les LIGNES d'une tache repetable (dirigeant 1, 2, 3...). */
+.rig-tache__lignes {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  padding: 5px var(--rig-esp-2);
+  border-bottom: 1px solid var(--rig-bord);
+}
+.rig-tache__ligne {
+  font: 11px var(--rig-font-mono); color: var(--rig-texte-2);
+  background: transparent; border: 1px solid var(--rig-bord);
+  border-radius: var(--rig-radius-sm); padding: 1px 7px; cursor: pointer;
+}
+.rig-tache__ligne--courante { color: var(--rig-texte-1); border-color: var(--rig-or, #d4a94f); }
+.rig-tache__ligne--ok { color: var(--rig-or, #d4a94f); }
+.rig-tache__ligne--ajout { font-weight: 700; }
+
+/* ---- En-tete de colonne triable (composant EnteteTriable) ---- */
+.rig-th--triable { cursor: pointer; user-select: none; white-space: nowrap; }
+.rig-th--triable:hover { background: var(--rig-survol, rgba(0, 0, 0, .05)); }
+.rig-th__fleche { margin-left: .35em; font-size: .8em; opacity: .75; }
