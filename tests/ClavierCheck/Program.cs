@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 // Garde-fou du CLAVIER (16/09/2026).
 //
@@ -23,7 +23,8 @@ void Exiger(bool ok, string quoi)
 
 // --- 1. L'ecouteur clavier existe vraiment cote navigateur.
 var js = File.ReadAllText(Path.Combine(racine, "wwwroot/rig-accueil.js"));
-Exiger(Regex.IsMatch(js, @"addEventListener\(\s*""keydown"""),
+// fix-ok: le regex acceptait tout suffixe (XXaddEventListener matchait) ; ancre sur document.addEventListener
+Exiger(Regex.IsMatch(js, @"document\.addEventListener\(\s*""keydown"""),
     "rig-accueil.js branche un ecouteur keydown");
 Exiger(Regex.IsMatch(js, @"export function activerClavier\("),
     "rig-accueil.js expose activerClavier(dotnet) pour le brancher");
