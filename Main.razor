@@ -1,4 +1,6 @@
 @using Microsoft.AspNetCore.Components.Routing
+@implements IDisposable
+@inject FenetreInterop Fenetre
 
 <Router AppAssembly="@typeof(Main).Assembly">
     <Found Context="routeData">
@@ -9,3 +11,38 @@
         <p role="alert">Page introuvable.</p>
     </NotFound>
 </Router>
+
+@* BANDES DE BORD de la fenetre principale (18/11/2026) : le WebView couvre
+   toute la fenetre, sans marge (MainWindow.xaml), et avale donc le pointeur
+   sur les bords. Ces bandes invisibles de 5 px rendent le redimensionnement
+   a Windows. Ici et pas dans Home : FenetreVue monte Home directement et ne
+   doit pas redimensionner la fenetre principale. Fenetre agrandie : pas de
+   bandes, ses bords ne se tirent pas. *@
+@if (Fenetre.Redimensionnable)
+{
+    @foreach (var (bord, classe) in Bords)
+    {
+        <div class="rig-bord rig-bord--@classe" aria-hidden="true"
+             @onmousedown="() => Fenetre.Redimensionner(bord)"></div>
+    }
+}
+
+@code {
+    private static readonly (BordFenetre Bord, string Classe)[] Bords =
+    [
+        (BordFenetre.Haut, "h"), (BordFenetre.Bas, "b"),
+        (BordFenetre.Gauche, "g"), (BordFenetre.Droite, "d"),
+        (BordFenetre.HautGauche, "hg"), (BordFenetre.HautDroite, "hd"),
+        (BordFenetre.BasGauche, "bg"), (BordFenetre.BasDroite, "bd")
+    ];
+
+    protected override void OnInitialized()
+    {
+        Fenetre.SuivreEtat();
+        Fenetre.EtatChange += Rafraichir;
+    }
+
+    private void Rafraichir() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Fenetre.EtatChange -= Rafraichir;
+}

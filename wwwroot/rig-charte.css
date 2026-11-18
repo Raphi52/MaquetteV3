@@ -670,3 +670,17 @@ body {
 .rig-nature--collective .rig-nature__filet { background: var(--rig-grad-alerte); }
 .rig-nature--prevention .rig-nature__filet { background: var(--rig-grad-attente); }
 .rig-nature--mesure     .rig-nature__filet { background: var(--rig-grad-ok); }
+
+/* ---- Bandes de bord de la fenetre principale (Main.razor, 18/11/2026) ----
+   Invisibles, 5 px : le WebView couvre toute la fenetre sans marge, ce sont
+   elles qui rendent le redimensionnement a Windows. Au-dessus de tout (le
+   plus haut z-index des feuilles est 1000). */
+.rig-bord { position: fixed; z-index: 2000; background: transparent; }
+.rig-bord--h  { top: 0;    left: 10px; right: 10px; height: 5px; cursor: ns-resize; }
+.rig-bord--b  { bottom: 0; left: 10px; right: 10px; height: 5px; cursor: ns-resize; }
+.rig-bord--g  { left: 0;   top: 10px; bottom: 10px; width: 5px;  cursor: ew-resize; }
+.rig-bord--d  { right: 0;  top: 10px; bottom: 10px; width: 5px;  cursor: ew-resize; }
+.rig-bord--hg { top: 0;    left: 0;  width: 10px; height: 10px; cursor: nwse-resize; }
+.rig-bord--hd { top: 0;    right: 0; width: 10px; height: 10px; cursor: nesw-resize; }
+.rig-bord--bg { bottom: 0; left: 0;  width: 10px; height: 10px; cursor: nesw-resize; }
+.rig-bord--bd { bottom: 0; right: 0; width: 10px; height: 10px; cursor: nwse-resize; }

@@ -79,6 +79,51 @@ foreach (var (nom, texte) in feuilles)
         "Home.razor expose un bouton de repli/deploiement du menu");
 }
 
+// --- 5. Pas de cadre autour de la page (18/11/2026). Une marge de 6 px autour
+// du WebView, peinte avec des teintes ecrites en dur dans FenetreInterop et
+// restees sur l'ancienne charte (#D8DDE6 / #0C0F16), dessinait un gros cadre
+// gris autour de la page ivoire. La marge est retiree, le redimensionnement
+// passe par des bandes de bord, et le fond de fenetre suit --rig-fond.
+{
+    var fenetreXaml = File.ReadAllText(Path.Combine(racine, "MainWindow.xaml"));
+    var interop = File.ReadAllText(Path.Combine(racine, "FenetreInterop.cs"));
+    var main = File.ReadAllText(Path.Combine(racine, "Main.razor"));
+
+    var vue = Regex.Match(fenetreXaml, @"<blazor:BlazorWebView\b[^>]*>");
+    Exiger(vue.Success && !Regex.IsMatch(vue.Value, @"\bMargin="),
+        "MainWindow.xaml : le WebView n'a pas de marge (aucun cadre autour de la page)");
+
+    string? FondDuTheme(string theme)
+    {
+        var bloc = Regex.Match(charte,
+            @"\[data-rig-theme=""" + theme + @"""\]\s*\{([^{}]*)\}");
+        var fond = Regex.Match(bloc.Groups[1].Value, @"--rig-fond:\s*(#[0-9A-Fa-f]{6})");
+        return fond.Success ? fond.Groups[1].Value.ToUpperInvariant() : null;
+    }
+    string? Constante(string nom)
+    {
+        var m = Regex.Match(interop, nom + @"\s*=\s*""(#[0-9A-Fa-f]{6})""");
+        return m.Success ? m.Groups[1].Value.ToUpperInvariant() : null;
+    }
+    var clair = FondDuTheme("clair");
+    var sombre = FondDuTheme("sombre");
+    Exiger(clair is not null && Constante("FondClair") == clair,
+        $"FenetreInterop.FondClair suit --rig-fond du theme clair ({clair})");
+    Exiger(sombre is not null && Constante("FondSombre") == sombre,
+        $"FenetreInterop.FondSombre suit --rig-fond du theme sombre ({sombre})");
+    Exiger(!Regex.IsMatch(interop, @"Color\.FromRgb\("),
+        "FenetreInterop ne peint aucune teinte en dur hors des deux constantes");
+
+    var bords = new[] { "Haut", "Bas", "Gauche", "Droite", "HautGauche", "HautDroite", "BasGauche", "BasDroite" };
+    Exiger(bords.All(b => main.Contains("BordFenetre." + b + ",")),
+        "Main.razor pose une bande de redimensionnement sur les 8 bords et coins");
+    Exiger(main.Contains("Fenetre.Redimensionner(bord)"),
+        "les bandes de bord rendent le redimensionnement a Windows (Redimensionner)");
+    Exiger(new[] { "h", "b", "g", "d", "hg", "hd", "bg", "bd" }
+            .All(c => Regex.IsMatch(charte, @"\.rig-bord--" + c + @"\s*\{[^{}]*cursor:\s*[a-z]+-resize")),
+        "rig-charte.css donne un curseur de redimensionnement a chaque bande");
+}
+
 Console.WriteLine();
 if (echecs.Count == 0)
 {

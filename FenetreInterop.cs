@@ -51,19 +51,77 @@ public sealed class FenetreInterop
     }
 
     /// <summary>
-    /// Aligne le fond de la fenetre WPF sur le theme de la page : la marge de
-    /// 6 px autour du WebView est peinte par WPF, un fond fige sombre
-    /// dessinerait un bord noir en mode clair.
+    /// Fond de page de la charte (--rig-fond de rig-charte.css), par theme.
+    /// CharteCheck verifie que ces deux valeurs suivent la feuille : elles
+    /// avaient derive (#D8DDE6 / #0C0F16, ancienne charte) et peignaient un
+    /// cadre gris autour de la page ivoire.
+    /// </summary>
+    public const string FondClair = "#F2EDE3";
+    public const string FondSombre = "#12141C";
+
+    /// <summary>
+    /// Aligne le fond de la fenetre WPF sur celui de la page. Il ne se voit
+    /// plus en temps normal (le WebView occupe toute la fenetre), mais il
+    /// apparait au chargement et sur la bande qui s'ouvre pendant un
+    /// redimensionnement, avant que le WebView ne repeigne.
     /// </summary>
     public void AppliquerFond(bool sombre)
     {
         if (Fenetre is not { } f) return;
-        var teinte = sombre
-            ? Color.FromRgb(0x0C, 0x0F, 0x16)
-            : Color.FromRgb(0xD8, 0xDD, 0xE6);
+        var teinte = (Color)ColorConverter.ConvertFromString(sombre ? FondSombre : FondClair);
         f.Background = new SolidColorBrush(teinte);
+    }
+
+    /// <summary>
+    /// Redimensionne la fenetre depuis un bord de la page. Le WebView couvre
+    /// toute la fenetre (plus de marge de 6 px, qui dessinait un cadre) : il
+    /// avale donc le pointeur sur les bords de WindowChrome. Les bandes de
+    /// bord de Main.razor appellent ceci, et Windows mene le redimensionnement
+    /// lui-meme, comme pour Deplacer -- aimantation comprise.
+    /// </summary>
+    /// <summary>Faux une fois la fenetre agrandie : ses bords ne se tirent plus,
+    /// et Main.razor retire ses bandes (sinon le curseur de redimensionnement
+    /// s'afficherait sur les bords d'une fenetre qui ne bouge pas).</summary>
+    public bool Redimensionnable => Fenetre?.WindowState == WindowState.Normal;
+
+    /// <summary>Signale un changement normal / agrandie / reduite.</summary>
+    public event Action? EtatChange;
+
+    private Window? suivie;
+
+    /// <summary>Branche <see cref="EtatChange"/> sur la fenetre principale,
+    /// une seule fois.</summary>
+    public void SuivreEtat()
+    {
+        if (suivie is not null || Fenetre is not { } f) return;
+        suivie = f;
+        f.StateChanged += (_, _) => EtatChange?.Invoke();
+    }
+
+    [JSInvokable]
+    public void Redimensionner(BordFenetre bord)
+    {
+        var fenetre = Fenetre;
+        if (fenetre is null || fenetre.WindowState != WindowState.Normal) return;
+        var handle = new WindowInteropHelper(fenetre).Handle;
+        if (handle == IntPtr.Zero) return;
+        ReleaseCapture();
+        SendMessage(handle, WM_NCLBUTTONDOWN, (int)bord, 0);
     }
 
     [JSInvokable]
     public void Fermer() => Fenetre?.Close();
+}
+
+/// <summary>Bords de la fenetre, valeurs HT* de WM_NCHITTEST (winuser.h).</summary>
+public enum BordFenetre
+{
+    Gauche = 10,
+    Droite = 11,
+    Haut = 12,
+    HautGauche = 13,
+    HautDroite = 14,
+    Bas = 15,
+    BasGauche = 16,
+    BasDroite = 17
 }

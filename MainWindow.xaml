@@ -9,7 +9,7 @@
         Height="900" Width="1500"
         WindowStyle="None"
         WindowStartupLocation="Manual"
-        Background="#0C0F16">
+        Background="#F2EDE3">
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="0"
                             ResizeBorderThickness="6"
@@ -18,11 +18,13 @@
                             UseAeroCaptionButtons="False" />
     </shell:WindowChrome.WindowChrome>
     <Grid>
-        <!-- La marge laisse les 6 px de bord de WindowChrome en zone WPF.
-             Sans elle, le WebView2 (fenetre native enfant) recouvre les bords
-             et avale le pointeur : le redimensionnement devient impossible.
-             La couleur du fond etant la meme, la marge ne se voit pas. -->
-        <blazor:BlazorWebView x:Name="Vue" Margin="6" HostPage="wwwroot/index.html" Services="{DynamicResource services}">
+        <!-- PAS DE MARGE (18/11/2026). Une marge de 6 px laissait les bords de
+             WindowChrome en zone WPF pour le redimensionnement, mais elle se
+             voyait : un cadre gris autour de la page ivoire, et un liseré a
+             cote du menu bleu nuit, quelle que soit la teinte choisie. Le
+             WebView2 couvre donc toute la fenetre ; le redimensionnement passe
+             par les bandes de bord de Main.razor (FenetreInterop.Redimensionner). -->
+        <blazor:BlazorWebView x:Name="Vue" HostPage="wwwroot/index.html" Services="{DynamicResource services}">
             <blazor:BlazorWebView.RootComponents>
                 <blazor:RootComponent Selector="#app" ComponentType="{x:Type local:Main}" />
             </blazor:BlazorWebView.RootComponents>
