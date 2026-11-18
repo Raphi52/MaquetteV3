@@ -161,8 +161,11 @@ foreach (var (libelle, code) in toutesEntrees)
 // PROC_ACTUALITES est NEUVE : les actualites n'existent pas dans
 // RIG v2 (verifie : aucun fichier proc_bulletin*.md dans les fiches), donc
 // aucune fiche ne peut l'attester.
+// PROC_COMMANDES_WEB est NEUVE aussi : c'est l'ecran « Traitement des
+// commandes » de NeoRIG (D:\RIG-V3, CommandesWebViewModel) ; la V2 traitait
+// les commandes web depuis PROC_REQUI, sans procedure a elles.
 var sansFiche = new[] { "PROC_LISTE_DELIBERES", "PROC_SUIVI_IMPRESSION", "PROC_REQUI",
-                        "PROC_ACTUALITES" };
+                        "PROC_ACTUALITES", "PROC_COMMANDES_WEB" };
 
 var fiches = @"D:\RigApplication\Documentation\reference\proc";
 

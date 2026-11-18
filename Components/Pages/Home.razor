@@ -526,6 +526,12 @@
                 <EcranRequisitions />
                 break;
 
+            case "PROC_COMMANDES_WEB":
+                @* Ecran NEUF de NeoRIG (« Traitement des commandes ») : la V2
+                   traitait les commandes web depuis PROC_REQUI. *@
+                <EcranCommandesWeb />
+                break;
+
             case "PROC_CLOT":
                 <EcranCloture OuvrirDossier="OuvrirParNumero" />
                 break;
@@ -2486,7 +2492,8 @@
                 new("Demandes recues",        "ce qu'on attend de moi",             "PROC_DEMANDE"),
                 new("Creation via Infogreffe","enrolement recu par RPJC",           "PROC_CJUDINFOG"),
                 new("Ordonnance d'enrolement","ordonnance RCS",                     "PROC_CORDJRCS"),
-                new("Requisitions",           "commander des documents",            "PROC_REQUI")
+                new("Requisitions",           "commander des documents",            "PROC_REQUI"),
+                new("Commandes web",          "traiter les commandes recues",       "PROC_COMMANDES_WEB")
             ]),
             new("Enregistrer un depot",
             [
@@ -2837,7 +2844,7 @@
         new("SUJ_PERSONNES", "Personnes",
             ["PROC_ACTEUR_JUD", "PROC_EXPERT", "PROC_GCLIENT", "PROC_FCLIENT"]),
         new("SUJ_AFFAIRES", "Affaires",
-            ["PROC_RECHAFF", "PROC_DEMANDE", "PROC_ARRIVEE", "PROC_DEPOTJUD", "PROC_REQUI", "PROC_CJUD"]),
+            ["PROC_RECHAFF", "PROC_DEMANDE", "PROC_ARRIVEE", "PROC_DEPOTJUD", "PROC_REQUI", "PROC_COMMANDES_WEB", "PROC_CJUD"]),
         new("SUJ_AUDIENCES", "Audiences",
             ["PROC_AUDIENCE", "PROC_GESTAUDS"]),
         new("SUJ_DOCUMENTS", "Documents",
@@ -2877,6 +2884,7 @@
             new("PROC_RECHAFF",   "Recherche d'affaires"),
             new("PROC_DEMANDE",   "Demandes"),
             new("PROC_REQUI",     "Requisitions - commande de documents"),
+            new("PROC_COMMANDES_WEB", "Commandes web"),
             new("PROC_ARRIVEE",   "Arrivee du courrier"),
             new("PROC_ACTES_NUM", "Actes numerises"),
             new("PROC_CLOT",      "Cloture"),

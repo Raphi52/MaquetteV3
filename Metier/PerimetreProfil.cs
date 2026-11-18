@@ -43,6 +43,9 @@ public static class PerimetreProfil
         // (demande utilisateur du 2026-09-17).
         ["PROC_ACTRET"] = RcsEnd, ["PROC_ACTREJ"] = RcsEnd, ["PROC_INPIPAY"] = Rcs, ["PROC_GINPI"] = Rcs,
         ["PROC_CFENET_RET"] = Rcs,
+        // Commandes web (NeoRIG) : etats d'endettement ET certificats du
+        // registre ; l'endettement les traite avec le RCS, comme les relances.
+        ["PROC_COMMANDES_WEB"] = RcsEnd,
 
         // ---- Judiciaire ----
         ["PROC_XAFF"] = Jud, ["PROC_NPC"] = Jud, ["PROC_CJUD"] = Jud,
