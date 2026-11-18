@@ -95,16 +95,27 @@
   --rig-or-halo: #B08D3F;
 }
 
-/* Les listes deroulantes des <select> sont peintes par le SYSTEME, hors CSS.
-   Elles suivent le `color-scheme` du DOCUMENT -- le poser sur l'element lui-meme
-   ne les atteint pas (constate le 2026-09-10 : popup blanche sur texte clair,
-   donc illisible). C'est donc ICI, a la racine, que le schema se declare.
-   Tout theme a fond de page CLAIR doit figurer ici (CharteCheck le verifie). */
+/* Schema des controles natifs (barres de defilement, champs) : sombre par
+   defaut, clair pour tout theme a fond de page CLAIR (CharteCheck le verifie).
+   Il ne suffit PAS a rendre lisible la liste d'un <select> : voir juste dessous. */
 html { color-scheme: dark; }
 html:has([data-rig-theme="clair"]),
 html:has([data-rig-theme="violet"]),
 html:has([data-rig-theme="orange"]),
 html:has([data-rig-theme="argile"]) { color-scheme: light; }
+
+/* La liste ouverte d'un <select> est une fenetre a part, qui ne sait pas
+   rendre la transparence : sans fond propre, chaque ligne reprend celui du
+   champ (`--rig-fond-2`, un voile translucide en sombre) et le pose sur du
+   BLANC, sous le texte clair du theme -- lignes invisibles sauf celle
+   survolee. Constate le 10/09/2026 sur la liste des logins (corrige pour elle
+   seule, correctif parti avec elle), puis le 18/11/2026 sur la liste des
+   themes : la regle vaut donc pour TOUTES les listes. `--rig-champ` est
+   opaque dans chaque theme (CharteCheck le verifie). */
+select option {
+  background-color: var(--rig-champ);
+  color: var(--rig-texte);
+}
 
 /* --- MODE SOMBRE (defaut) --- */
 /* 2026-11-18 : l'encre de la « Nuit japonaise » remplace le bleu nuit

@@ -186,8 +186,9 @@ foreach (var (nom, texte) in feuilles)
 // liste de cinq themes. Trois pieges, chacun silencieux a la compilation :
 // - un jeton oublie dans un bloc retombe sur la valeur du SOMBRE (:root) :
 //   texte creme sur carte blanche, illisible ;
-// - un theme a fond clair absent de la regle color-scheme garde des listes
-//   deroulantes systeme sombres (constat du 10/09/2026, en sens inverse) ;
+// - un theme a fond clair absent de la regle color-scheme garde des controles
+//   natifs sombres (barres de defilement) ; les LISTES ouvertes, elles, sont
+//   tenues par la section 8 ;
 // - un code de ThemesRig sans bloc CSS donne une page sans couleurs.
 {
     var home = File.ReadAllText(Path.Combine(racine, "Components", "Pages", "Home.razor"));
@@ -237,6 +238,42 @@ foreach (var (nom, texte) in feuilles)
         "Reglages > Affichage propose une liste deroulante des themes de ThemesRig");
     Exiger(home.Contains(@"data-rig-theme=""@Theme"""),
         "la page porte le code du theme choisi");
+}
+
+// --- 8. Listes deroulantes lisibles dans TOUS les themes. La liste ouverte
+// d'un <select> est une fenetre a part qui ne rend pas la transparence : une
+// ligne sans fond OPAQUE pose le voile translucide du champ sur du blanc, sous
+// le texte clair du theme. Vu le 10/09/2026 (liste des logins, corrigee pour
+// elle seule) puis le 18/11/2026 (liste des themes) : la regle doit etre
+// GLOBALE, et son jeton opaque dans chaque theme, y compris un theme ajoute.
+{
+    var regle = Regex.Match(charte, @"(?m)^select\s+option\s*\{([^{}]*)\}");
+    Exiger(regle.Success
+           && regle.Groups[1].Value.Contains("background-color: var(--rig-champ)")
+           && regle.Groups[1].Value.Contains("color: var(--rig-texte)"),
+        "rig-charte.css donne un fond et un texte de theme a TOUTES les lignes de liste (select option)");
+
+    foreach (var code in themes.Keys)
+    {
+        var champ = Regex.Match(BlocDuTheme(code), @"--rig-champ:\s*([^;]+);");
+        Exiger(champ.Success && Regex.IsMatch(champ.Groups[1].Value.Trim(), @"^#[0-9A-Fa-f]{6}$"),
+            $"« {code} » : --rig-champ est opaque ({(champ.Success ? champ.Groups[1].Value.Trim() : "absent")}), fond des listes ouvertes");
+    }
+
+    // Une regle plus precise qui redonnerait aux lignes un fond translucide
+    // ou transparent defait la regle globale.
+    foreach (var (nom, texte) in feuilles)
+    {
+        var sansCommentaires = Regex.Replace(texte, @"/\*.*?\*/", "", RegexOptions.Singleline);
+        foreach (Match bloc in Regex.Matches(sansCommentaires, @"([^{}]*\boption\b[^{}]*)\{([^{}]*)\}"))
+        {
+            var fond = Regex.Match(bloc.Groups[2].Value, @"background(?:-color)?:\s*([^;]+);");
+            if (!fond.Success) continue;
+            var valeur = fond.Groups[1].Value.Trim();
+            Exiger(!Regex.IsMatch(valeur, @"rgba|transparent|--rig-fond-2|--rig-zebre|--rig-survol"),
+                $"{nom} : « {bloc.Groups[1].Value.Trim()} » garde un fond opaque aux lignes de liste ({valeur})");
+        }
+    }
 }
 
 Console.WriteLine();

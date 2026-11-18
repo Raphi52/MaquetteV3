@@ -20,6 +20,8 @@ public partial class MainWindow : Window
         // le mode clair. D'ou la popup blanche sur texte clair, illisible,
         // constatee le 2026-09-10 : `color-scheme` dans la feuille de style ne
         // pouvait pas y arriver. On fixe donc la preference du WebView lui-meme.
+        // Cela ne suffit PAS pour les lignes : sans fond OPAQUE, elles restent
+        // blanches sous un texte clair (regle `select option`, rig-charte.css).
         Vue.BlazorWebViewInitialized += (_, args) =>
         {
             args.WebView.CoreWebView2.Profile.PreferredColorScheme =
