@@ -1,12 +1,17 @@
 @* Ecran PROC_COMMANDES_WEB — « Traitement des commandes » de NeoRIG, porte dans
    la maquette pour le voir avec ses themes.
 
-   Mise en page reprise de D:\RIG-V3 (lu sans y toucher) :
-     CommandesWebViewModel.cs   carte de recherche + date de travail, puis
-                                liste a gauche, en-tete et detail a droite ;
-                                une commande choisie replie la recherche (loupe)
-                                et reduit la liste a un rail.
-     ListeCommandesWebNode.cs   « Nouvelle commande », groupes par type,
+   MISE EN PAGE « BOITE DE TRI » : direction n° 2 choisie par l'utilisateur au
+   /draft du 18/11/2026 (conv-1984). Des ONGLETS D'ETAT avec leur compte en
+   tete, la recherche repliee derriere la pastille « Rechercher », une liste A
+   PLAT de lignes larges (filet a la couleur du type), et la commande choisie
+   qui s'ouvre en PANNEAU par-dessus la liste, decisions en pied du panneau.
+   Avant ce choix, l'ecran reprenait la mise en page de NeoRIG
+   (CommandesWebViewModel.cs : carte de recherche, liste groupee par type a
+   gauche, reduite a un rail une fois une commande choisie).
+
+   Contenu repris de D:\RIG-V3 (lu sans y toucher) :
+     ListeCommandesWebNode.cs   « Nouvelle commande », ordre par type,
                                 pastille « Rapprochement direct ».
      DetailCommandeWebNode.cs   zones selon le type (ZonesCommandeWebRegle),
                                 edition repliee et decisions en pied.
@@ -15,7 +20,26 @@
    Aucune base n'est branchee : un jeu neuf a chaque ouverture. *@
 
 <div class="rig-tcw">
-    @if (!RechercheRepliee)
+    <nav class="rig-tcw__barre" aria-label="États des commandes">
+        @foreach (var (etat, nombre) in Onglets)
+        {
+            var e = etat;
+            var actif = OngletActif == e;
+            <button class="rig-tcw__onglet @(actif ? "rig-tcw__onglet--actif" : "")"
+                    aria-pressed="@(actif ? "true" : "false")" @onclick="() => ChoisirOnglet(e)">
+                @TraitementCommandes.Libelle(e)<b class="rig-tcw__onglet-compte">@nombre</b>
+            </button>
+        }
+        <span class="rig-tcw__espace"></span>
+        <button class="rig-tcw__chercher @(RechercheOuverte ? "rig-tcw__chercher--ouvert" : "") @(TraitementCommandes.RechercheAffinee(Appliques) ? "rig-tcw__chercher--affinee" : "")"
+                title="@TraitementCommandes.Resumer(Appliques)" aria-expanded="@(RechercheOuverte ? "true" : "false")"
+                @onclick="() => RechercheOuverte = !RechercheOuverte">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="M20 20l-4.5-4.5" /></svg>
+            <span>Rechercher</span>
+        </button>
+    </nav>
+
+    @if (RechercheOuverte)
     {
         <section class="rig-tcw__recherche" @onkeydown="SurToucheRecherche">
             <div class="rig-tcw__criteres">
@@ -29,22 +53,6 @@
                         }
                     </select>
                 </label>
-
-                <div class="rig-saisie-champ rig-tcw__champ">
-                    <span class="rig-saisie-champ__libelle">État</span>
-                    <div class="rig-tcw__puces" role="group" aria-label="État">
-                        @foreach (var e in Enum.GetValues<EtatCommande>())
-                        {
-                            var etat = e;
-                            var pris = EtatsChoisis.Contains(etat);
-                            <button class="rig-tcw__puce @(pris ? "rig-tcw__puce--prise" : "")"
-                                    aria-pressed="@(pris ? "true" : "false")"
-                                    @onclick="() => BasculerEtat(etat)">
-                                <span class="rig-tcw__icone rig-tcw__icone--@TraitementCommandes.IconeEtat(etat)"></span>@TraitementCommandes.Libelle(etat)
-                            </button>
-                        }
-                    </div>
-                </div>
 
                 <div class="rig-saisie-champ rig-tcw__champ">
                     <span class="rig-saisie-champ__libelle">Période du</span>
@@ -88,138 +96,101 @@
         </div>
     }
 
-    <div class="rig-tcw__corps @(ListeRepliee ? "rig-tcw__corps--rail" : "")">
-        @if (ListeRepliee)
-        {
-            @* Le rail : le chevron, puis le compte de chaque groupe sous sa couleur. *@
-            <nav class="rig-tcw__rail" aria-label="Liste des commandes repliée">
-                <button class="rig-tcw__chevron" title="Déplier la liste" aria-label="Déplier la liste"
-                        @onclick="() => ListeRepliee = false">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-                </button>
-                @foreach (var g in Groupes)
-                {
-                    <span class="rig-tcw__rail-compte rig-tcw__rang-@g.Rang" title="@g.Titre">@g.Commandes.Count</span>
-                }
-            </nav>
-        }
-        else
-        {
-            <aside class="rig-tcw__liste">
-                <div class="rig-tcw__liste-entete">
-                    <span class="rig-tcw__compteur">@TraitementCommandes.Compteur(Groupes)</span>
-                    @if (Groupes.Count > 1)
-                    {
-                        <button class="rig-tcw__lien" title="Replier tous les groupes de la liste" @onclick="ToutReplier">Tout replier</button>
-                    }
-                    <button class="rig-tcw__chevron" title="Replier la liste" aria-label="Replier la liste"
-                            @onclick="() => ListeRepliee = true">
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
-                    </button>
-                </div>
-
-                <button class="rig-bouton rig-tcw__nouvelle" @onclick="NouvelleCommande">+&nbsp;&nbsp;Nouvelle commande saisie au guichet</button>
-
+    @* La liste et le panneau occupent la MEME case de grille : le panneau se pose
+       par-dessus la partie droite de la liste, qui reste cliquable a gauche. *@
+    <div class="rig-tcw__scene">
+        <section class="rig-tcw__liste" aria-label="Commandes">
+            <div class="rig-tcw__liste-entete">
+                <span class="rig-tcw__compteur">@TraitementCommandes.Compteur(Groupes)</span>
                 <button class="rig-bascule @(DirectsEnTete ? "rig-bascule--actif" : "")"
                         title="Place en tête de chaque groupe les commandes qui se rapprochent d'un seul dossier."
                         @onclick="BasculerDirects">
                     <span class="rig-bascule__temoin"></span><span>Rapprochements directs en tête</span>
                 </button>
+                <span class="rig-tcw__espace"></span>
+                <button class="rig-bouton rig-tcw__bouton rig-tcw__nouvelle" @onclick="NouvelleCommande">+&nbsp;&nbsp;Nouvelle commande saisie au guichet</button>
+            </div>
 
-                @if (Groupes.Count == 0)
-                {
-                    <div class="rig-tcw__vide">Aucune commande ne correspond aux critères.</div>
-                }
-
-                <div class="rig-tcw__groupes">
-                    @foreach (var g in Groupes)
-                    {
-                        var groupe = g;
-                        var replie = GroupesReplies.Contains(groupe.Famille);
-                        <div class="rig-tcw__groupe rig-tcw__rang-@groupe.Rang">
-                            <button class="rig-tcw__groupe-titre" aria-expanded="@(replie ? "false" : "true")"
-                                    @onclick="() => BasculerGroupe(groupe.Famille)">
-                                <span class="rig-tcw__groupe-chevron @(replie ? "" : "rig-tcw__groupe-chevron--ouvert")">›</span>
-                                <span class="rig-tcw__groupe-nom">@groupe.Titre</span>
-                                <span class="rig-tcw__groupe-compte">@groupe.Commandes.Count</span>
-                            </button>
-                            @if (!replie)
-                            {
-                                @foreach (var c in groupe.Commandes)
-                                {
-                                    var cmd = c;
-                                    <button class="rig-tcw__cmd @(cmd.Id == Selection?.Id ? "rig-tcw__cmd--active" : "")"
-                                            @onclick="() => Choisir(cmd)">
-                                        <span class="rig-tcw__cmd-ligne">
-                                            <span class="rig-tcw__icone rig-tcw__icone--@TraitementCommandes.IconeEtat(cmd.Etat)"></span>
-                                            <span class="rig-tcw__cmd-nom">@(string.IsNullOrWhiteSpace(cmd.Denomination) ? "—" : cmd.Denomination)</span>
-                                            <span class="rig-tcw__cmd-etat">(@TraitementCommandes.Libelle(cmd.Etat))</span>
-                                            @if (TraitementCommandes.EstRapprochementDirect(cmd))
-                                            {
-                                                <span class="rig-tcw__direct" title="Un seul dossier correspond à la commande : à traiter en premier.">Rapprochement direct</span>
-                                            }
-                                        </span>
-                                        <span class="rig-tcw__cmd-precisions">@TraitementCommandes.Precisions(cmd)</span>
-                                    </button>
-                                }
-                            }
-                        </div>
-                    }
-                </div>
-            </aside>
-        }
-
-        <section class="rig-tcw__droite">
-            @if (Selection is null)
+            @if (Ordre.Count == 0)
+            {
+                <div class="rig-tcw__vide">Aucune commande ne correspond aux critères.</div>
+            }
+            else if (Selection is null)
             {
                 <div class="rig-tcw__invite">Sélectionnez une commande dans la liste pour la traiter.</div>
             }
-            else
-            {
-                var c = Selection;
-                var enveloppe = TraitementCommandes.Enveloppe(Toutes, c);
 
-                <header class="rig-tcw__entete">
-                    <div class="rig-tcw__entete-texte">
-                        <b class="rig-tcw__titre">@TraitementCommandes.Titre(c)</b>
-                        <div class="rig-tcw__sous-titre">
-                            <span>@TraitementCommandes.SousTitre(c)</span>
-                            @if (enveloppe.Count > 1)
-                            {
-                                <span class="rig-tcw__enveloppe" title="@TraitementCommandes.EtatEnveloppe(enveloppe)">Enveloppe · @c.Reference</span>
-                                @foreach (var membre in enveloppe)
+            <div class="rig-tcw__lignes">
+                @foreach (var commande in Ordre)
+                {
+                    var cmd = commande;
+                    var active = cmd.Id == Selection?.Id;
+                    <button class="rig-tcw__cmd rig-tcw__rang-@Rang(cmd) @(active ? "rig-tcw__cmd--active" : "")"
+                            aria-current="@(active ? "true" : null)" @onclick="() => Choisir(cmd)">
+                        <span class="rig-tcw__cmd-filet"></span>
+                        <span class="rig-tcw__cmd-qui">
+                            <span class="rig-tcw__cmd-nom">@(string.IsNullOrWhiteSpace(cmd.Denomination) ? "—" : cmd.Denomination)</span>
+                            <span class="rig-tcw__cmd-precisions">@TraitementCommandes.Precisions(cmd)</span>
+                        </span>
+                        <span class="rig-tcw__cmd-type">@TraitementCommandes.Libelle(cmd.Famille)</span>
+                        @if (TraitementCommandes.EstRapprochementDirect(cmd))
+                        {
+                            <span class="rig-tcw__direct" title="Un seul dossier correspond à la commande : à traiter en premier.">Rapprochement direct</span>
+                        }
+                    </button>
+                }
+            </div>
+        </section>
+
+        @if (Selection is { } c)
+        {
+            var enveloppe = TraitementCommandes.Enveloppe(Toutes, c);
+            @* @key : chaque commande ouverte est un panneau NEUF, qui glisse a
+               nouveau et repart en haut de son defilement. *@
+            <section class="rig-tcw__panneau" aria-label="@TraitementCommandes.Titre(c)" @key="c.Id">
+                <div class="rig-tcw__panneau-haut">
+                    <div class="rig-tcw__panneau-tete">
+                        <span class="rig-tcw__type rig-tcw__rang-@Rang(c)">@TraitementCommandes.Libelle(c.Famille)</span>
+                        @if (c.Etat != EtatCommande.ATraiter)
+                        {
+                            <span class="rig-tcw__etat"><span class="rig-tcw__icone rig-tcw__icone--@TraitementCommandes.IconeEtat(c.Etat)"></span>@TraitementCommandes.Libelle(c.Etat)</span>
+                        }
+                        <span class="rig-tcw__espace"></span>
+                        <button class="rig-tcw__fermer rig-tcw__fermer--rond" title="Fermer" aria-label="Fermer" @onclick="FermerPanneau">×</button>
+                    </div>
+                    <div class="rig-tcw__titre">@(string.IsNullOrWhiteSpace(c.Denomination) ? "—" : c.Denomination)</div>
+                    <div class="rig-tcw__reference">@TraitementCommandes.LigneReference(c)</div>
+                    <div class="rig-tcw__documents">
+                        <button class="rig-tcw__doc" title="Consulter ou corriger l'adresse d'envoi de cette commande"
+                                @onclick="OuvrirCoordonnees">Coordonnées du destinataire</button>
+                        <button class="rig-tcw__doc" @onclick="() => Consulter(DocumentConsulte.Kbis)">Kbis</button>
+                        <button class="rig-tcw__doc" @onclick="() => Consulter(DocumentConsulte.EtatSynthese)">État de synthèse</button>
+                        <button class="rig-tcw__doc" @onclick="() => Consulter(DocumentConsulte.KbisHorsRessort)">Kbis hors ressort</button>
+                        <button class="rig-tcw__doc" @onclick="() => Consulter(DocumentConsulte.SyntheseRne)">Synthèse RNE</button>
+                    </div>
+                    @if (enveloppe.Count > 1)
+                    {
+                        <div class="rig-tcw__enveloppe">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2" /><path d="M3.5 7l8.5 6 8.5-6" /></svg>
+                            <span class="rig-tcw__enveloppe-texte">
+                                <b>Enveloppe · @c.Reference</b> — avec
+                                @foreach (var membre in enveloppe.Where(x => x.Id != c.Id))
                                 {
                                     var mb = membre;
-                                    <button class="rig-tcw__membre @(mb.Id == c.Id ? "rig-tcw__membre--courant" : "")"
-                                            title="@TraitementCommandes.Libelle(mb.Famille) : @TraitementCommandes.Libelle(mb.Etat)"
+                                    <button class="rig-tcw__membre" title="@TraitementCommandes.Libelle(mb.Famille) : @TraitementCommandes.Libelle(mb.Etat)"
                                             @onclick="() => Choisir(mb)">
                                         <span class="rig-tcw__icone rig-tcw__icone--@TraitementCommandes.IconeEtat(mb.Etat)"></span>@TraitementCommandes.Libelle(mb.Famille)
                                     </button>
                                 }
-                                <span class="rig-tcw__discret">@TraitementCommandes.EtatEnveloppe(enveloppe)</span>
-                                @if (enveloppe.Any(x => x.EnvoiGroupeEnAttente))
-                                {
-                                    <button class="rig-tcw__lien" @onclick="EnvoyerSansAttendre">Envoyer sans attendre</button>
-                                }
+                                · <span class="rig-tcw__discret">@TraitementCommandes.EtatEnveloppe(enveloppe)</span>
+                            </span>
+                            @if (enveloppe.Any(x => x.EnvoiGroupeEnAttente))
+                            {
+                                <button class="rig-tcw__lien" @onclick="EnvoyerSansAttendre">Envoyer sans attendre</button>
                             }
                         </div>
-                    </div>
-                    <div class="rig-tcw__entete-actions">
-                        <button class="rig-bouton rig-tcw__bouton" title="Consulter ou corriger l'adresse d'envoi de cette commande"
-                                @onclick="OuvrirCoordonnees">Coordonnées du destinataire</button>
-                        <button class="rig-bouton rig-tcw__bouton" @onclick="() => Consulter(DocumentConsulte.Kbis)">Kbis</button>
-                        <button class="rig-bouton rig-tcw__bouton" @onclick="() => Consulter(DocumentConsulte.EtatSynthese)">État de synthèse</button>
-                        <button class="rig-bouton rig-tcw__bouton" @onclick="() => Consulter(DocumentConsulte.KbisHorsRessort)">Kbis hors ressort</button>
-                        <button class="rig-bouton rig-tcw__bouton" @onclick="() => Consulter(DocumentConsulte.SyntheseRne)">Synthèse RNE</button>
-                        @if (RechercheRepliee)
-                        {
-                            <button class="rig-bouton rig-tcw__bouton rig-tcw__loupe" title="@TraitementCommandes.Resumer(Appliques)"
-                                    aria-label="Modifier la recherche" @onclick="RouvrirRecherche">
-                                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="M20 20l-4.5-4.5" /></svg>
-                            </button>
-                        }
-                    </div>
-                </header>
+                    }
+                </div>
 
                 <div class="rig-tcw__detail">
                     @if (c.Etat == EtatCommande.SaisieManuelle)
@@ -310,10 +281,8 @@
                         @switch (TraitementCommandes.Groupe(c.Famille))
                         {
                             case FamilleCommande.EtatEndettement:
-                                <div class="rig-tcw__deux-colonnes">
-                                    @ZoneRapprochement(c, debiteur: true)
-                                    @ZoneTypes(c)
-                                </div>
+                                @ZoneRapprochement(c, debiteur: true)
+                                @ZoneTypes(c)
                                 break;
 
                             case FamilleCommande.NonOpposition:
@@ -350,39 +319,41 @@
                                 <button class="rig-bouton rig-tcw__bouton" @onclick="FermerBande">Annuler</button>
                             </div>
                         }
+                        <details class="rig-tcw__edition">
+                            <summary title="@("Édition & impression")">@TraitementCommandes.BarreEdition(docs)</summary>
+                            <table class="rig-table rig-tcw__table">
+                                <thead><tr><th>Document</th><th>Bac</th><th>Ex.</th><th>Origine de la règle</th></tr></thead>
+                                <tbody>
+                                    @foreach (var d in docs)
+                                    {
+                                        <tr title="Voir le document tel que la validation l'éditera (rien n'est imprimé). Double-clic sur la ligne : même effet.">
+                                            <td>@d.Document</td><td>@d.Bac</td><td>@(d.Exemplaires?.ToString() ?? "—")</td><td>@d.Origine</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                            <div class="rig-tcw__discret">Aucun paramètre d'impression ici : agrafage, coffre, envoi par mail et choix de l'imprimante restent dans le Tableau des éditions.</div>
+                        </details>
                         <div class="rig-tcw__pied-ligne">
-                            <details class="rig-tcw__edition">
-                                <summary title="@("Édition & impression")">@TraitementCommandes.BarreEdition(docs)</summary>
-                                <table class="rig-table rig-tcw__table">
-                                    <thead><tr><th>Document</th><th>Bac</th><th>Ex.</th><th>Origine de la règle</th></tr></thead>
-                                    <tbody>
-                                        @foreach (var d in docs)
-                                        {
-                                            <tr title="Voir le document tel que la validation l'éditera (rien n'est imprimé). Double-clic sur la ligne : même effet.">
-                                                <td>@d.Document</td><td>@d.Bac</td><td>@(d.Exemplaires?.ToString() ?? "—")</td><td>@d.Origine</td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                                <div class="rig-tcw__discret">Aucun paramètre d'impression ici : agrafage, coffre, envoi par mail et choix de l'imprimante restent dans le Tableau des éditions.</div>
-                            </details>
-
                             <div class="rig-tcw__mail">
                                 <button class="rig-bascule @(EnvoiMail ? "rig-bascule--actif" : "")"
                                         title="Les documents sont imprimés comme d'habitude, et envoyés en plus par mail une fois générés, avec le modèle de mail du greffe. Plusieurs adresses se séparent par « ; »."
                                         @onclick="() => EnvoiMail = !EnvoiMail">
                                     <span class="rig-bascule__temoin"></span><span>Envoyer aussi par mail</span>
                                 </button>
-                                <input class="rig-saisie-champ__saisie rig-tcw__mail-adresse" title="Adresse du destinataire"
-                                       aria-label="Adresse du destinataire" disabled="@(!EnvoiMail)" @bind="AdresseMail" @bind:event="oninput" />
+                                @if (EnvoiMail)
+                                {
+                                    <input class="rig-saisie-champ__saisie rig-tcw__mail-adresse" title="Adresse du destinataire"
+                                           aria-label="Adresse du destinataire" @bind="AdresseMail" @bind:event="oninput" />
+                                }
                             </div>
 
                             <div class="rig-tcw__decisions">
+                                <button class="rig-bouton rig-tcw__bouton rig-tcw__rejeter"
+                                        @onclick="() => OuvrirBande(ActionCommande.Rejeter)">Rejeter…</button>
                                 <button class="rig-bouton rig-tcw__bouton"
                                         disabled="@(TraitementCommandes.Refus(c, ActionCommande.MettreEnAttente, "") is not null)"
                                         @onclick="() => OuvrirBande(ActionCommande.MettreEnAttente)">Mettre en attente…</button>
-                                <button class="rig-bouton rig-tcw__bouton rig-tcw__bouton--danger"
-                                        @onclick="() => OuvrirBande(ActionCommande.Rejeter)">Rejeter…</button>
                                 <button class="rig-bouton rig-bouton--fort rig-tcw__valider" disabled="@(blocage is not null)"
                                         title="@blocage" @onclick="() => Decider(ActionCommande.Valider)">Valider</button>
                             </div>
@@ -393,8 +364,8 @@
                         }
                     </footer>
                 }
-            }
-        </section>
+            </section>
+        }
     </div>
 
     @if (CoordonneesOuvertes && Selection is not null)
@@ -458,22 +429,24 @@
     private readonly List<CommandeRecue> Toutes = TraitementCommandes.JeuDemoCommandes();
 
     // ------------------------------------------------------------ recherche
+    // L'etat ne fait plus partie de la carte de recherche : c'est l'onglet.
     private string FamilleChoisie = string.Empty;
-    private readonly HashSet<EtatCommande> EtatsChoisis = [EtatCommande.ATraiter];
     private DateTime? Du;
     private DateTime? Au;
     private string SirenCherche = string.Empty;
     private string ReferenceCherchee = string.Empty;
     private bool EnAttenteEnvoi;
     private CriteresCommandes Appliques = TraitementCommandes.CriteresParDefaut();
+    private bool RechercheOuverte;
 
-    // ------------------------------------------------------------ liste
+    // ------------------------------------------------------------ onglets et liste
+    private EtatCommande OngletActif = EtatCommande.ATraiter;
+    private List<(EtatCommande Etat, int Nombre)> Onglets = [];
     private List<GroupeCommandes> Groupes = [];
+    private List<CommandeRecue> Ordre = [];
     private bool DirectsEnTete;
-    private readonly HashSet<FamilleCommande> GroupesReplies = [];
-    private bool RechercheRepliee;
-    private bool ListeRepliee;
     private CommandeRecue? Selection;
+    private bool RapprochementDeplie;
 
     private (string Texte, string Severite)? Message;
 
@@ -517,11 +490,6 @@
 
     // ================================================================ recherche
 
-    private void BasculerEtat(EtatCommande etat)
-    {
-        if (!EtatsChoisis.Remove(etat)) EtatsChoisis.Add(etat);
-    }
-
     private void SurToucheRecherche(KeyboardEventArgs e)
     {
         if (e.Key == "Enter") Rechercher();
@@ -530,27 +498,41 @@
     private void Rechercher()
     {
         FamilleCommande? famille = Enum.TryParse<FamilleCommande>(FamilleChoisie, out var f) ? f : null;
-        Appliques = new CriteresCommandes(famille, new HashSet<EtatCommande>(EtatsChoisis), Du, Au,
+        Appliques = new CriteresCommandes(famille, new HashSet<EtatCommande> { OngletActif }, Du, Au,
                                           SirenCherche, ReferenceCherchee, EnAttenteEnvoi);
         Selection = null;
         Message = null;
         Rafraichir();
     }
 
-    /// <summary>Relit la liste selon les criteres appliques ; une liste sans selection se deplie.</summary>
+    private void ChoisirOnglet(EtatCommande etat)
+    {
+        if (etat == OngletActif) return;
+        PoserOnglet(etat);
+        Selection = null;
+        Message = null;
+        Rafraichir();
+    }
+
+    private void PoserOnglet(EtatCommande etat)
+    {
+        OngletActif = etat;
+        Appliques = TraitementCommandes.SurOnglet(Appliques, etat);
+    }
+
+    /// <summary>
+    /// Relit les onglets et la liste selon les criteres appliques. Un onglet
+    /// « Saisie manuelle » vide disparait : on revient alors sur « À traiter ».
+    /// </summary>
     private void Rafraichir()
     {
+        Onglets = TraitementCommandes.Onglets(Toutes, Appliques);
+        if (Onglets.All(o => o.Etat != OngletActif)) PoserOnglet(EtatCommande.ATraiter);
         Groupes = TraitementCommandes.Regrouper(TraitementCommandes.Filtrer(Toutes, Appliques), DirectsEnTete);
-        if (Selection is null && Groupes.Count > 0) { RechercheRepliee = false; ListeRepliee = false; }
+        Ordre = Groupes.SelectMany(g => g.Commandes).ToList();
     }
 
-    private IReadOnlyList<CommandeRecue> Ordre => Groupes.SelectMany(g => g.Commandes).ToList();
-
-    private void RouvrirRecherche()
-    {
-        RechercheRepliee = false;
-        ListeRepliee = false;
-    }
+    private static int Rang(CommandeRecue c) => TraitementCommandes.RangGroupe(TraitementCommandes.Groupe(c.Famille));
 
     private void BasculerDirects()
     {
@@ -558,24 +540,23 @@
         Rafraichir();
     }
 
-    private void BasculerGroupe(FamilleCommande famille)
-    {
-        if (!GroupesReplies.Remove(famille)) GroupesReplies.Add(famille);
-    }
-
-    private void ToutReplier()
-    {
-        foreach (var g in Groupes) GroupesReplies.Add(g.Famille);
-    }
-
     // ================================================================ selection
+
+    private void FermerPanneau()
+    {
+        Selection = null;
+        BandeOuverte = null;
+        MotifSaisi = string.Empty;
+        CoordonneesOuvertes = false;
+    }
 
     private void Choisir(CommandeRecue c)
     {
         Selection = c;
-        // Une commande choisie : la recherche se reduit a une loupe et la liste a un rail.
-        RechercheRepliee = true;
-        ListeRepliee = true;
+        // Comme NeoRIG, une commande choisie replie la recherche : le panneau
+        // garde toute la hauteur (capture en theme clair du 18/11/2026).
+        RechercheOuverte = false;
+        RapprochementDeplie = false;
         BandeOuverte = null;
         MotifSaisi = string.Empty;
         CoordonneesOuvertes = false;
@@ -647,16 +628,44 @@
         var affichees = entites.Select(e => (Entite: e, Lignes: debiteur
                 ? TraitementCommandes.LignesVisibles(e, TousDebiteurs, TousEtablissements)
                 : e.Lignes.ToList())).ToList();
+        var resume = retenue is not null && !RapprochementDeplie;
         <section class="rig-tcw__zone">
             <div class="rig-tcw__zone-tete">
                 <span class="rig-tcw__section">@(debiteur ? "Débiteur — rapprochement" : "Dossier concerné")</span>
-                @if (!debiteur)
+                @if (!debiteur && !resume)
                 {
                     <span class="rig-tcw__discret">@(c.Famille == FamilleCommande.Faillite
                         ? "Résolution directe par le n° de gestion reçu : aucune recherche à faire dans le cas nominal."
                         : "Un seul dossier attendu. Si la recherche ne ramène rien, la création du non-inscrit se fait dans RIG V2.")</span>
                 }
+                @if (retenue is not null && !c.EstTraitee)
+                {
+                    <span class="rig-tcw__espace"></span>
+                    <button class="rig-tcw__lien" @onclick="() => RapprochementDeplie = !RapprochementDeplie">@(resume ? "Changer de dossier" : "Replier")</button>
+                }
             </div>
+            @if (resume)
+            {
+                @* Le dossier retenu en UNE ligne (maquette « Boite de tri ») : son
+                   n° de gestion, son nom, la pastille, et l'adresse du siege. *@
+                var siege = TraitementCommandes.LignesVisibles(retenue!, false, false).FirstOrDefault();
+                <div class="rig-tcw__retenue">
+                    <span class="rig-tcw__retenue-code">@(retenue!.Gestion.Length > 0 ? retenue.Gestion : "NI")</span>
+                    <b>@retenue.Designation</b>
+                    <span class="rig-tcw__pastille rig-tcw__pastille--retenue">RETENUE</span>
+                    @if (retenue.Radie)
+                    {
+                        <span class="rig-tcw__pastille rig-tcw__pastille--radie">RADIÉ</span>
+                    }
+                    <span class="rig-tcw__retenue-detail">@(siege is null ? "" : $"{siege.Nature} · {siege.Adresse} · ")@TraitementCommandes.ResumeEntite(retenue)</span>
+                </div>
+                @foreach (var ecart in TraitementCommandes.Ecarts(c, retenue))
+                {
+                    <div class="rig-tcw__ligne-statut rig-tcw__ligne-statut--attente">≠ @ecart</div>
+                }
+            }
+            else
+            {
             <div class="rig-tcw__rech-debiteur">
                 <input class="rig-saisie-champ__saisie" aria-label="SIREN" placeholder="SIREN" @bind="RechSiren" @bind:event="oninput" />
                 <input class="rig-saisie-champ__saisie" aria-label="Raison sociale" placeholder="Raison sociale" @bind="RechRaison" @bind:event="oninput" />
@@ -739,6 +748,7 @@
                     </table>
                 </div>
                 <div class="rig-tcw__resume">@TraitementCommandes.ResumeRapprochement(entites, affichees.Sum(a => a.Lignes.Count))</div>
+            }
             }
         </section>
     };
@@ -915,6 +925,8 @@
     {
         if (Selection is null) return;
         Selection.CibleRetenue = e.Cle;
+        // Le dossier retenu se resume en une ligne ; « Changer de dossier » rouvre la recherche.
+        RapprochementDeplie = false;
         // Changer de cible change les certificats : les motifs de la cible quittee n'ont plus cours.
         CertificatDeFaillite = false;
     }
@@ -1043,9 +1055,8 @@
     private void NouvelleCommande()
     {
         var c = TraitementCommandes.NouvelleSaisie(Toutes);
-        // La saisie n'est visible que si la liste montre les saisies en cours.
-        EtatsChoisis.Add(EtatCommande.SaisieManuelle);
-        Appliques = Appliques with { Etats = new HashSet<EtatCommande>(Appliques.Etats) { EtatCommande.SaisieManuelle } };
+        // La saisie en cours a son propre onglet : on s'y place pour la voir.
+        PoserOnglet(EtatCommande.SaisieManuelle);
         Rafraichir();
         Choisir(c);
         Message = ($"Commande {c.Reference} créée : complétez les informations saisies, puis enregistrez.", "info");
@@ -1064,8 +1075,8 @@
             Message = (refus, "avertissement");
             return;
         }
-        if (!Appliques.Etats.Contains(EtatCommande.ATraiter) && Appliques.Etats.Count > 0)
-            Appliques = Appliques with { Etats = new HashSet<EtatCommande>(Appliques.Etats) { EtatCommande.ATraiter } };
+        // Enregistree, elle passe « À traiter » : on la suit dans son onglet.
+        PoserOnglet(EtatCommande.ATraiter);
         Rafraichir();
         Choisir(c);
         Message = ($"Commande {c.Reference} enregistrée.", "succes");

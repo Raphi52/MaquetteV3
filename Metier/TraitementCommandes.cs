@@ -233,6 +233,18 @@ public static class TraitementCommandes
         return string.Join(" · ", morceaux);
     }
 
+    /// <summary>
+    /// « N° IG-90812 · 07/09/2026 · Infogreffe · CABINET FIDAL AMIENS » : la ligne
+    /// sous le nom, dans le panneau de la Boite de tri (direction choisie au /draft
+    /// du 18/11/2026). Le titre et le sous-titre de NeoRIG, plus le requerant.
+    /// </summary>
+    public static string LigneReference(CommandeRecue c)
+    {
+        var morceaux = new List<string> { $"N° {c.Reference}", SousTitre(c) };
+        if (!string.IsNullOrWhiteSpace(c.Requerant)) morceaux.Add(c.Requerant.Trim());
+        return string.Join(" · ", morceaux);
+    }
+
     // ------------------------------------------------------------ liste et filtre
 
     /// <summary>Les criteres a l'ouverture : seules les commandes « À traiter ».</summary>
@@ -304,6 +316,45 @@ public static class TraitementCommandes
     /// <summary>« 8 commande(s) · 3 groupe(s) » (Liste_Compteur).</summary>
     public static string Compteur(IReadOnlyCollection<GroupeCommandes> groupes) =>
         $"{groupes.Sum(g => g.Commandes.Count)} commande(s) · {groupes.Count} groupe(s)";
+
+    // ------------------------------------------------------------ onglets d'etat (Boite de tri)
+    //
+    // Direction « Boite de tri » choisie au /draft du 18/11/2026 : l'etat ne se
+    // choisit plus par des puces dans la carte de recherche mais par des ONGLETS
+    // au-dessus de la liste, chacun avec son compte. Un onglet = un etat : NeoRIG
+    // permet d'en cocher plusieurs a la fois, la Boite de tri non.
+
+    /// <summary>Les etats qui ont toujours leur onglet, dans l'ordre d'affichage.</summary>
+    public static readonly EtatCommande[] OngletsFixes =
+        [EtatCommande.ATraiter, EtatCommande.EnAttente, EtatCommande.Validee, EtatCommande.Rejetee];
+
+    /// <summary>
+    /// Les onglets et leur compte : les commandes qui repondent aux autres criteres
+    /// de la recherche, TOUS ETATS confondus, comptees par etat. « Saisie manuelle »
+    /// n'a d'onglet que pendant qu'une saisie au guichet est en cours.
+    /// </summary>
+    public static List<(EtatCommande Etat, int Nombre)> Onglets(IEnumerable<CommandeRecue> commandes, CriteresCommandes c)
+    {
+        var parEtat = Filtrer(commandes, c with { Etats = new HashSet<EtatCommande>() })
+            .GroupBy(x => x.Etat)
+            .ToDictionary(g => g.Key, g => g.Count());
+        var onglets = OngletsFixes.Select(e => (e, parEtat.GetValueOrDefault(e))).ToList();
+        if (parEtat.GetValueOrDefault(EtatCommande.SaisieManuelle) is var saisies and > 0)
+            onglets.Add((EtatCommande.SaisieManuelle, saisies));
+        return onglets;
+    }
+
+    /// <summary>Les criteres sur l'onglet choisi : les autres criteres restent, l'etat devient celui-la.</summary>
+    public static CriteresCommandes SurOnglet(CriteresCommandes c, EtatCommande etat) =>
+        c with { Etats = new HashSet<EtatCommande> { etat } };
+
+    /// <summary>
+    /// Vrai quand la recherche restreint plus que l'onglet (type, periode, SIREN,
+    /// n°, validees en attente d'envoi) : la pastille « Rechercher » le montre.
+    /// </summary>
+    public static bool RechercheAffinee(CriteresCommandes c) =>
+        c.Famille is not null || c.Du is not null || c.Au is not null
+        || !string.IsNullOrWhiteSpace(c.Siren) || !string.IsNullOrWhiteSpace(c.Reference) || c.EnAttenteEnvoi;
 
     /// <summary>
     /// La commande a ouvrir apres un traitement : la suivante non traitee dans

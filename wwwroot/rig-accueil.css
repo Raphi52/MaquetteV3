@@ -3111,13 +3111,59 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 /* La bascule commune prend toute la largeur (pensee pour les panneaux) ; ici
    elle se pose EN LIGNE, a cote des criteres et des champs. */
 .rig-tcw .rig-bascule { width: auto; }
-.rig-tcw__rang-1 { --tcw-teinte: var(--rig-verbe-trouver); }
-.rig-tcw__rang-4 { --tcw-teinte: var(--rig-verbe-facturer); }
-.rig-tcw__rang-5 { --tcw-teinte: var(--rig-verbe-configurer); }
+/* Couleur du TYPE (filet de ligne, pastille du panneau) : or pour
+   l'endettement, bleu pour la non-faillite, brique pour la non-opposition,
+   comme la maquette « Boite de tri » choisie le 18/11/2026. En argile, le
+   corail d'« ouvrir » et la brique de « surveiller » sont voisins : le sable
+   de « modifier » prend la place de l'or. */
+.rig-tcw__rang-1 { --tcw-teinte: var(--rig-verbe-ouvrir); }
+.rig-tcw__rang-4 { --tcw-teinte: var(--rig-verbe-trouver); }
+.rig-tcw__rang-5 { --tcw-teinte: var(--rig-verbe-surveiller); }
+[data-rig-theme="argile"] .rig-tcw__rang-1 { --tcw-teinte: var(--rig-verbe-modifier); }
+.rig-tcw__espace { flex: 1 1 auto; }
 .rig-tcw__discret { color: var(--rig-texte-3); }
 .rig-tcw__libelle-fiche {
   font: var(--rig-fs-kicker)/1.3 var(--rig-font-mono); letter-spacing: var(--rig-ls-kicker);
   text-transform: uppercase; color: var(--rig-texte-3);
+}
+
+/* --- Barre des onglets d'etat (Boite de tri) : un onglet par etat, son
+   compte en pastille ; l'onglet actif en aplat or ; a droite, la pastille
+   « Rechercher » qui ouvre la carte de recherche. --- */
+.rig-tcw__barre {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  padding: 2px 2px var(--rig-esp-2); border-bottom: 1px solid var(--rig-bord);
+}
+.rig-tcw__onglet {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 0; border-radius: 999px; background: transparent; cursor: pointer;
+  color: var(--rig-texte-2); font: var(--rig-fs-corps) var(--rig-font);
+  padding: 5px 12px; white-space: nowrap;
+}
+.rig-tcw__onglet:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
+.rig-tcw__onglet:focus-visible { outline: 2px solid var(--rig-focus); outline-offset: 1px; }
+.rig-tcw__onglet-compte {
+  min-width: 20px; padding: 0 6px; border-radius: 999px; text-align: center;
+  font: 600 11px/18px var(--rig-font-mono); background: var(--rig-fond-2); color: var(--rig-texte-2);
+}
+.rig-tcw__onglet--actif,
+.rig-tcw__onglet--actif:hover {
+  background: linear-gradient(135deg, var(--rig-or), var(--rig-or-clair));
+  color: var(--rig-or-texte); font-weight: 600;
+}
+.rig-tcw__onglet--actif .rig-tcw__onglet-compte {
+  background: color-mix(in srgb, var(--rig-or-texte) 16%, transparent); color: var(--rig-or-texte);
+}
+.rig-tcw__chercher {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--rig-bord); border-radius: 999px; background: transparent; cursor: pointer;
+  color: var(--rig-texte-3); font: var(--rig-fs-dense) var(--rig-font); padding: 4px 12px;
+}
+.rig-tcw__chercher:hover, .rig-tcw__chercher--ouvert { border-color: var(--rig-focus); color: var(--rig-texte); }
+/* Des criteres restreignent plus que l'onglet : la pastille le dit (accent + point). */
+.rig-tcw__chercher--affinee { border-color: var(--rig-focus); color: var(--rig-focus); font-weight: 600; }
+.rig-tcw__chercher--affinee::after {
+  content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--rig-focus);
 }
 
 /* --- Carte de recherche : criteres a gauche, date de travail a droite --- */
@@ -3132,18 +3178,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 }
 .rig-tcw__champ { min-width: 170px; }
 .rig-tcw__champ--court { width: 140px; min-width: 120px; }
-.rig-tcw__puces { display: flex; flex-wrap: wrap; gap: 4px; }
-.rig-tcw__puce {
-  display: inline-flex; align-items: center; gap: 6px;
-  border: 1px solid var(--rig-bord); border-radius: 999px; background: transparent;
-  color: var(--rig-texte-2); font: var(--rig-fs-dense) var(--rig-font);
-  padding: 3px 10px; cursor: pointer;
-}
-.rig-tcw__puce:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
-.rig-tcw__puce--prise {
-  border-color: var(--rig-focus); color: var(--rig-texte);
-  background: color-mix(in srgb, var(--rig-focus) 12%, transparent);
-}
 .rig-tcw__periode { display: flex; align-items: center; gap: var(--rig-esp-2); }
 .rig-tcw__periode .rig-saisie-champ__saisie { width: 140px; }
 .rig-tcw__bascule-recherche { align-self: center; }
@@ -3169,29 +3203,22 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 }
 .rig-tcw__fermer:hover { color: var(--rig-texte); }
 
-/* --- Corps : la liste (400 px, ou rail de 48 px) et le traitement --- */
-.rig-tcw__corps {
-  flex: 1 1 auto; min-height: 0;
-  display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: var(--rig-esp-2);
-}
-.rig-tcw__corps--rail { grid-template-columns: 48px minmax(0, 1fr); }
+/* --- Scene : la liste et le panneau dans la MEME case de grille ; le
+   panneau se pose par-dessus la partie droite de la liste (Boite de tri). --- */
+.rig-tcw__scene { flex: 1 1 auto; min-height: 0; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
+.rig-tcw__scene > * { grid-area: 1 / 1; }
 
 .rig-tcw__liste {
-  display: flex; flex-direction: column; gap: var(--rig-esp-2); min-height: 0;
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
   background: var(--rig-surface); border: 1px solid var(--rig-bord); border-radius: var(--rig-radius);
-  padding: var(--rig-esp-3);
 }
-.rig-tcw__liste-entete { display: flex; align-items: center; gap: var(--rig-esp-2); }
-.rig-tcw__compteur { flex: 1 1 auto; color: var(--rig-texte-3); font: 11px var(--rig-font-mono); }
-.rig-tcw__chevron {
-  width: 28px; height: 28px; padding: 0;
-  display: inline-flex; align-items: center; justify-content: center;
-  border: 1px solid var(--rig-bord); border-radius: var(--rig-radius-sm);
-  background: var(--rig-surface); color: var(--rig-texte-2); cursor: pointer;
+.rig-tcw__liste-entete {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--rig-esp-2) var(--rig-esp-3);
+  padding: var(--rig-esp-2) var(--rig-esp-3); border-bottom: 1px solid var(--rig-bord-faible);
 }
-.rig-tcw__chevron:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
-.rig-tcw__chevron svg, .rig-tcw__loupe svg {
-  width: 16px; height: 16px; fill: none; stroke: currentColor;
+.rig-tcw__compteur { color: var(--rig-texte-3); font: 11px var(--rig-font-mono); }
+.rig-tcw__chercher svg, .rig-tcw__enveloppe svg {
+  width: 14px; height: 14px; flex: 0 0 auto; fill: none; stroke: currentColor;
   stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
 }
 .rig-tcw__lien {
@@ -3200,44 +3227,41 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   padding: 2px 4px; border-radius: var(--rig-radius-sm);
 }
 .rig-tcw__lien:hover { background: var(--rig-fond-2); text-decoration: underline; }
-.rig-tcw__nouvelle { width: 100%; text-align: left; font-size: var(--rig-fs-dense); }
-.rig-tcw__vide { color: var(--rig-texte-3); padding: var(--rig-esp-3) 0; }
-.rig-tcw__groupes {
-  flex: 1 1 auto; min-height: 0; overflow-y: auto;
-  display: flex; flex-direction: column; gap: var(--rig-esp-2);
-}
-.rig-tcw__groupe { display: flex; flex-direction: column; }
-.rig-tcw__groupe-titre {
-  width: 100%; display: flex; align-items: center; gap: var(--rig-esp-2); text-align: left;
-  border: 0; border-left: 3px solid var(--tcw-teinte);
-  border-radius: 0 var(--rig-radius-sm) var(--rig-radius-sm) 0;
-  background: color-mix(in srgb, var(--tcw-teinte) 12%, transparent);
-  color: var(--rig-texte); font: 600 var(--rig-fs-dense) var(--rig-font);
-  padding: 5px var(--rig-esp-2); cursor: pointer;
-}
-.rig-tcw__groupe-chevron { display: inline-block; color: var(--rig-texte-3); transition: transform .12s ease; }
-.rig-tcw__groupe-chevron--ouvert { transform: rotate(90deg); }
-.rig-tcw__groupe-nom { flex: 1 1 auto; }
-.rig-tcw__groupe-compte { font: 11px var(--rig-font-mono); color: var(--rig-texte-2); }
+.rig-tcw__nouvelle { white-space: nowrap; }
+.rig-tcw__vide, .rig-tcw__invite { color: var(--rig-texte-3); padding: var(--rig-esp-2) var(--rig-esp-4); }
+.rig-tcw__lignes { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+
+/* Une ligne LARGE par commande : filet a la couleur du type, nom en grand,
+   reference en monospace, type en couleur, pastille du rapprochement direct. */
 .rig-tcw__cmd {
-  width: 100%; display: flex; flex-direction: column; gap: 1px; text-align: left;
-  border: 0; border-left: 3px solid transparent; border-bottom: 1px solid var(--rig-bord-faible);
-  background: transparent; color: var(--rig-texte-2);
+  width: 100%; display: flex; align-items: center; gap: var(--rig-esp-3); text-align: left;
+  border: 0; border-bottom: 1px solid var(--rig-bord-faible);
+  background: transparent; color: var(--rig-texte); cursor: pointer;
   font: var(--rig-fs-dense)/1.4 var(--rig-font);
-  padding: 5px var(--rig-esp-2) 5px var(--rig-esp-3); cursor: pointer;
+  padding: 9px var(--rig-esp-4) 9px var(--rig-esp-3);
 }
-.rig-tcw__cmd:hover { background: var(--rig-survol-ligne); color: var(--rig-texte); }
-.rig-tcw__cmd--active {
-  border-left-color: var(--rig-focus); color: var(--rig-texte);
-  background: color-mix(in srgb, var(--rig-focus) 12%, transparent);
+.rig-tcw__cmd:nth-child(even) { background: var(--rig-zebre); }
+.rig-tcw__cmd:hover { background: var(--rig-survol-ligne); }
+.rig-tcw__cmd--active,
+.rig-tcw__cmd--active:nth-child(even) { background: color-mix(in srgb, var(--rig-or) 15%, transparent); }
+.rig-tcw__cmd-filet { flex: 0 0 4px; align-self: stretch; border-radius: 4px; background: var(--tcw-teinte); }
+/* Largeur bornee : sur un grand ecran, le type reste colle au nom au lieu de
+   flotter au milieu de la ligne (capture du 18/11/2026 a 1516 px). */
+.rig-tcw__cmd-qui { flex: 0 1 320px; min-width: 0; display: flex; flex-direction: column; }
+.rig-tcw__cmd-nom {
+  font: 600 var(--rig-fs-corps) var(--rig-font); letter-spacing: .01em; color: var(--rig-texte);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.rig-tcw__cmd-ligne { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.rig-tcw__cmd-nom { font-weight: 600; color: var(--rig-texte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rig-tcw__cmd-etat { color: var(--rig-texte-3); white-space: nowrap; }
-.rig-tcw__cmd-precisions { font: 11px var(--rig-font-mono); color: var(--rig-texte-3); padding-left: 14px; }
+.rig-tcw__cmd-precisions { font: 11px var(--rig-font-mono); color: var(--rig-texte-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Le type est ecrit dans sa couleur, melangee au texte pour rester lisible
+   (l'or pur ne fait que 2,4:1 sur une carte blanche). */
+.rig-tcw__cmd-type {
+  font: 600 11px var(--rig-font); white-space: nowrap;
+  color: color-mix(in srgb, var(--tcw-teinte) 72%, var(--rig-texte));
+}
 .rig-tcw__direct {
-  margin-left: auto; white-space: nowrap; font-size: 10px; padding: 0 6px; border-radius: 999px;
-  border: 1px solid var(--rig-palier-vide); color: var(--rig-texte);
+  margin-left: auto; white-space: nowrap; font-size: 10px; padding: 0 8px; border-radius: 999px;
+  border: 1px solid var(--rig-palier-vide); color: var(--rig-texte); line-height: 18px;
   background: color-mix(in srgb, var(--rig-palier-vide) 16%, transparent);
 }
 .rig-tcw__icone {
@@ -3253,48 +3277,81 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-tcw__icone--rejetee { --tcw-etat: var(--rig-erreur); }
 .rig-tcw__icone--saisie-manuelle { --tcw-etat: var(--rig-verbe-trouver); }
 
-.rig-tcw__rail { display: flex; flex-direction: column; align-items: center; gap: var(--rig-esp-2); padding-top: 2px; }
-.rig-tcw__rail-compte {
-  min-width: 30px; text-align: center; padding: 3px 0;
-  font: 600 11px var(--rig-font-mono); color: var(--rig-texte);
-  border-left: 3px solid var(--tcw-teinte); border-radius: var(--rig-radius-sm);
-  background: color-mix(in srgb, var(--tcw-teinte) 16%, transparent);
-}
-
-/* --- Partie droite : en-tete de commande, detail, pied --- */
-.rig-tcw__droite { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--rig-esp-2); }
-.rig-tcw__invite { margin: auto; color: var(--rig-texte-3); font-size: var(--rig-fs-corps); }
-.rig-tcw__entete {
-  display: flex; align-items: center; flex-wrap: wrap; gap: var(--rig-esp-3);
+/* --- Panneau de la commande : il glisse depuis la droite par-dessus la liste
+   (62 % de la largeur), en-tete fixe, detail qui defile, decisions en pied.
+   Pas de garde « prefers-reduced-motion » : le poste de l'utilisateur a ce
+   reglage actif et ne verrait jamais le glissement (meme choix que les anneaux). --- */
+.rig-tcw__panneau {
+  justify-self: end; width: 62%; min-width: min(100%, 560px); min-height: 0;
+  display: flex; flex-direction: column; overflow: hidden;
   background: var(--rig-surface); border: 1px solid var(--rig-bord); border-radius: var(--rig-radius);
-  padding: var(--rig-esp-2) var(--rig-esp-3);
+  box-shadow: var(--rig-ombre-saisie);
+  animation: rig-tcw-glisser .2s cubic-bezier(.2, .8, .3, 1);
 }
-.rig-tcw__entete-texte { flex: 1 1 300px; min-width: 0; }
-.rig-tcw__titre { font-size: 15px; color: var(--rig-texte); }
-.rig-tcw__sous-titre { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--rig-texte-3); margin-top: 2px; }
-.rig-tcw__enveloppe { margin-left: var(--rig-esp-2); font: 600 11px var(--rig-font-mono); color: var(--rig-texte-2); }
+@keyframes rig-tcw-glisser { from { opacity: 0; transform: translateX(32px); } }
+.rig-tcw__panneau-haut {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: var(--rig-esp-3) var(--rig-esp-4) var(--rig-esp-3);
+  border-bottom: 1px solid var(--rig-bord-faible);
+}
+.rig-tcw__panneau-tete { display: flex; align-items: center; gap: var(--rig-esp-2); }
+.rig-tcw__type {
+  padding: 0 10px; border-radius: 999px; font: 600 11px/20px var(--rig-font);
+  border: 1px solid var(--tcw-teinte); color: color-mix(in srgb, var(--tcw-teinte) 72%, var(--rig-texte));
+  background: color-mix(in srgb, var(--tcw-teinte) 10%, transparent);
+}
+.rig-tcw__etat { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--rig-texte-2); }
+.rig-tcw__fermer--rond {
+  width: 26px; height: 26px; padding: 0; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; background: var(--rig-fond-2);
+}
+.rig-tcw__titre { font: 600 24px/1.15 var(--rig-font); letter-spacing: -.01em; color: var(--rig-texte); }
+.rig-tcw__reference { font: 11px var(--rig-font-mono); color: var(--rig-texte-3); }
+.rig-tcw__documents { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.rig-tcw__doc {
+  border: 1px solid var(--rig-bord); border-radius: 999px; background: transparent; cursor: pointer;
+  color: var(--rig-texte-2); font: 11px var(--rig-font); padding: 2px 10px;
+}
+.rig-tcw__doc:hover { border-color: var(--rig-focus); color: var(--rig-texte); }
+/* L'enveloppe : les commandes du meme numero partent ensemble. */
+.rig-tcw__enveloppe {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--rig-esp-2) var(--rig-esp-3);
+  padding: 7px var(--rig-esp-3); border-radius: var(--rig-radius-sm); color: var(--rig-focus);
+  border: 1px solid color-mix(in srgb, var(--rig-or) 40%, transparent);
+  background: color-mix(in srgb, var(--rig-or) 9%, transparent);
+}
+.rig-tcw__enveloppe-texte { flex: 1 1 260px; min-width: 0; color: var(--rig-texte-2); }
+.rig-tcw__enveloppe-texte b { color: var(--rig-focus); }
 .rig-tcw__membre {
-  display: inline-flex; align-items: center; gap: 5px;
+  display: inline-flex; align-items: center; gap: 5px; vertical-align: middle;
   border: 1px solid var(--rig-bord); border-radius: 999px; background: transparent;
-  color: var(--rig-texte-2); font: 11px var(--rig-font); padding: 1px 8px; cursor: pointer;
+  color: var(--rig-texte); font: 11px var(--rig-font); padding: 1px 8px; cursor: pointer;
 }
-.rig-tcw__membre:hover { background: var(--rig-fond-2); }
-.rig-tcw__membre--courant { border-color: var(--rig-focus); color: var(--rig-texte); }
-.rig-tcw__entete-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--rig-esp-2); }
+.rig-tcw__membre:hover { border-color: var(--rig-focus); }
 .rig-tcw__bouton { padding: 4px 10px; font-size: var(--rig-fs-dense); }
-.rig-tcw__loupe { width: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; align-self: stretch; }
 .rig-tcw__bouton--danger { border-color: var(--rig-erreur); color: var(--rig-erreur); }
 
 .rig-tcw__detail {
   flex: 1 1 auto; min-height: 0; overflow-y: auto;
   display: flex; flex-direction: column; gap: var(--rig-esp-2);
+  padding: var(--rig-esp-3) var(--rig-esp-4);
 }
+/* Les zones sont des CARTES posees sur le panneau : filet, sans aplat. */
 .rig-tcw__zone {
-  display: flex; flex-direction: column; gap: var(--rig-esp-2); min-width: 0;
-  background: var(--rig-surface); border: 1px solid var(--rig-bord); border-radius: var(--rig-radius);
+  display: flex; flex-direction: column; gap: var(--rig-esp-2); min-width: 0; flex: 0 0 auto;
+  background: transparent; border: 1px solid var(--rig-bord); border-radius: var(--rig-radius);
   padding: var(--rig-esp-3);
 }
 .rig-tcw__zone-tete { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--rig-esp-3); }
+/* Le dossier retenu en une ligne, filet vert a gauche. */
+.rig-tcw__retenue {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px var(--rig-esp-3);
+  padding: 7px var(--rig-esp-3); border-radius: var(--rig-radius-sm);
+  background: var(--rig-fond-2); box-shadow: inset 3px 0 0 0 var(--rig-palier-vide);
+}
+.rig-tcw__retenue .rig-tcw__pastille { margin-left: 0; }
+.rig-tcw__retenue-code { font: 600 11px var(--rig-font-mono); color: var(--rig-texte-2); }
+.rig-tcw__retenue-detail { flex: 1 1 100%; font-size: 11px; color: var(--rig-texte-3); }
 .rig-tcw__section { font: 600 var(--rig-fs-corps) var(--rig-font); color: var(--rig-texte); }
 .rig-tcw__recues { display: block; }
 .rig-tcw__recues > summary { cursor: pointer; list-style: none; }
@@ -3304,7 +3361,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-tcw__champs { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px var(--rig-esp-4); margin: var(--rig-esp-2) 0 0; }
 .rig-tcw__champs dt { color: var(--rig-texte-3); }
 .rig-tcw__champs dd { margin: 0; color: var(--rig-texte); }
-.rig-tcw__deux-colonnes { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--rig-esp-2); align-items: start; }
 
 .rig-tcw__rech-debiteur { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rig-esp-2); }
 .rig-tcw__rech-debiteur .rig-saisie-champ__saisie { width: 170px; }
@@ -3379,21 +3435,28 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-tcw__actions-saisie { display: flex; justify-content: flex-end; gap: var(--rig-esp-2); }
 .rig-tcw__table { margin-top: var(--rig-esp-1); }
 
-/* --- Pied : edition repliee a gauche, decisions a droite, bandes de motif au-dessus --- */
+/* --- Pied du panneau (Boite de tri) : la bande du motif au-dessus, l'edition
+   repliee, puis l'envoi par mail a gauche et les decisions a droite :
+   Rejeter… (neutre), Mettre en attente… (filet), Valider (aplat or). --- */
 .rig-tcw__pied {
   display: flex; flex-direction: column; gap: var(--rig-esp-2);
-  background: var(--rig-surface); border: 1px solid var(--rig-bord); border-radius: var(--rig-radius);
-  padding: var(--rig-esp-2) var(--rig-esp-3);
+  border-top: 1px solid var(--rig-bord-faible);
+  padding: var(--rig-esp-3) var(--rig-esp-4);
 }
 .rig-tcw__pied-ligne { display: flex; align-items: center; flex-wrap: wrap; gap: var(--rig-esp-3); }
-.rig-tcw__edition { flex: 1 1 240px; min-width: 0; }
-.rig-tcw__edition[open] { flex-basis: 100%; }
+.rig-tcw__edition { min-width: 0; }
 .rig-tcw__edition > summary { cursor: pointer; color: var(--rig-texte-2); font-weight: 600; }
 .rig-tcw__mail { display: flex; align-items: center; gap: var(--rig-esp-2); }
 .rig-tcw__mail-adresse { width: 220px; }
-.rig-tcw__mail-adresse:disabled { opacity: .5; }
 .rig-tcw__decisions { display: flex; gap: var(--rig-esp-2); margin-left: auto; }
-.rig-tcw__valider { min-width: 110px; padding: 5px 14px; font-size: var(--rig-fs-dense); }
+.rig-tcw__rejeter { border-color: var(--rig-bord); color: var(--rig-texte-2); }
+.rig-tcw__rejeter:hover { border-color: var(--rig-erreur); color: var(--rig-erreur); }
+.rig-tcw__valider { min-width: 110px; padding: 5px 16px; font-size: var(--rig-fs-dense); }
+.rig-tcw__valider:not(:disabled) {
+  border-color: transparent; font-weight: 600; color: var(--rig-or-texte);
+  background: linear-gradient(135deg, var(--rig-or), var(--rig-or-clair));
+}
+.rig-tcw__valider:not(:disabled):hover { filter: brightness(1.06); }
 .rig-tcw__blocage { color: var(--rig-texte-3); font-size: 11px; text-align: right; }
 .rig-tcw__bande {
   display: flex; align-items: center; gap: var(--rig-esp-2); padding: var(--rig-esp-2);
@@ -3427,6 +3490,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-tcw__dialogue-pied { display: flex; justify-content: flex-end; gap: var(--rig-esp-2); }
 
 @media (max-width: 1200px) {
-  .rig-tcw__corps { grid-template-columns: 320px minmax(0, 1fr); }
-  .rig-tcw__deux-colonnes, .rig-tcw__dialogue-corps { grid-template-columns: minmax(0, 1fr); }
+  .rig-tcw__panneau { width: 74%; }
+  .rig-tcw__dialogue-corps { grid-template-columns: minmax(0, 1fr); }
 }

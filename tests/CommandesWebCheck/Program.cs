@@ -55,7 +55,29 @@ Exiger(TraitementCommandes.Filtrer(jeu, tous with { Du = new DateTime(2026, 9, 7
 Exiger(TraitementCommandes.Resumer(TraitementCommandes.CriteresParDefaut()) == "Toutes · À traiter",
     "la loupe resume les criteres : « Toutes · À traiter »");
 
+// --- Onglets d'etat de la Boite de tri (direction choisie au /draft du 18/11/2026)
+var onglets = TraitementCommandes.Onglets(jeu, TraitementCommandes.CriteresParDefaut());
+var lusOnglets = string.Join(", ", onglets.Select(o => $"{TraitementCommandes.Libelle(o.Etat)} {o.Nombre}"));
+Exiger(lusOnglets == "À traiter 8, Mise en attente 1, Validée 1, Rejetée 1",
+    $"onglets a l'ouverture : quatre etats et leur compte, tous etats confondus (lu : {lusOnglets})");
+var ongletsFiltres = TraitementCommandes.Onglets(jeu, TraitementCommandes.CriteresParDefaut() with { Famille = FamilleCommande.NonOpposition });
+Exiger(ongletsFiltres.Select(o => o.Nombre).SequenceEqual(new[] { 1, 1, 0, 1 }),
+    "les comptes des onglets suivent les autres criteres (type non-opposition : 1, 1, 0, 1)");
+var avecSaisie = TraitementCommandes.JeuDemoCommandes();
+TraitementCommandes.NouvelleSaisie(avecSaisie);
+Exiger(TraitementCommandes.Onglets(avecSaisie, TraitementCommandes.CriteresParDefaut()).LastOrDefault() == (EtatCommande.SaisieManuelle, 1),
+    "« Saisie manuelle » n'a son onglet que pendant une saisie au guichet");
+var surRejetees = TraitementCommandes.SurOnglet(TraitementCommandes.CriteresParDefaut() with { Siren = "999" }, EtatCommande.Rejetee);
+Exiger(surRejetees.Etats.SetEquals(new[] { EtatCommande.Rejetee }) && surRejetees.Siren == "999"
+        && TraitementCommandes.Filtrer(jeu, surRejetees).Single().Reference == "IG-90601",
+    "un onglet remplace l'etat et garde les autres criteres");
+Exiger(!TraitementCommandes.RechercheAffinee(TraitementCommandes.CriteresParDefaut())
+        && TraitementCommandes.RechercheAffinee(TraitementCommandes.CriteresParDefaut() with { Reference = "IG" }),
+    "la pastille « Rechercher » ne s'allume que pour un critere au-dela de l'onglet");
+
 var c5 = jeu.Single(c => c.Id == 5);
+Exiger(TraitementCommandes.LigneReference(c5) == "N° IG-90812 · 07/09/2026 · Infogreffe · CABINET FIDAL AMIENS",
+    $"ligne sous le nom dans le panneau (lu : {TraitementCommandes.LigneReference(c5)})");
 Exiger(TraitementCommandes.Precisions(c5) == "IG-90812 · 07/09 · 512 004 331", $"seconde ligne de la liste (lu : {TraitementCommandes.Precisions(c5)})");
 Exiger(TraitementCommandes.Titre(c5) == "État d'endettement · N° IG-90812", "titre de l'en-tete : type · N°");
 Exiger(TraitementCommandes.SousTitre(c5) == "07/09/2026 · Infogreffe", "sous-titre : date · origine");
@@ -229,6 +251,15 @@ Exiger(Regex.IsMatch(home, @"new\(""SUJ_AFFAIRES""[^\]]*""PROC_REQUI"",\s*""PROC
 Exiger(ecran.Contains("TraitementCommandes.JeuDemoCommandes()") && ecran.Contains("TraitementCommandes.Appliquer(")
         && ecran.Contains("TraitementCommandes.ControlerNonOpposition("),
     "l'ecran joue les regles de Metier/TraitementCommandes.cs, il n'en a pas de copie");
+// La mise en page choisie au /draft du 18/11/2026 (« Boite de tri ») : onglets
+// d'etat, pastille de recherche, liste et panneau dans la meme case, decisions
+// dans l'ordre de la maquette.
+Exiger(ecran.Contains("rig-tcw__barre") && ecran.Contains("TraitementCommandes.Onglets(") && ecran.Contains("rig-tcw__chercher")
+        && Regex.IsMatch(ecran, @"rig-tcw__scene[\s\S]*rig-tcw__liste[\s\S]*rig-tcw__panneau"),
+    "mise en page « Boite de tri » : onglets d'etat, pastille Rechercher, panneau par-dessus la liste");
+var decisions = new[] { ">Rejeter…<", ">Mettre en attente…<", ">Valider<" }.Select(l => ecran.IndexOf(l, StringComparison.Ordinal)).ToList();
+Exiger(decisions.All(i => i > 0) && decisions.SequenceEqual(decisions.Order()),
+    "decisions dans l'ordre de la maquette : Rejeter…, Mettre en attente…, Valider");
 
 // ============================================================ 3. THEMES
 
@@ -273,7 +304,8 @@ if (File.Exists(resx))
         "Contrôle de délivrance", "Type de certificat de non-opposition", "Envoyer aussi par mail", "Données reçues",
         "Ce qui a été envoyé", "Sélectionnez une commande dans la liste pour la traiter.", "Aucune commande ne correspond aux critères.",
         "Délivrer le certificat de faillite", "Délivrer le certificat d'opposition", "Enregistrer la saisie", "Annuler la commande",
-        "Tout replier", "Envoyer sans attendre", "Aperçu de l'enveloppe", "Enregistrer l'adresse", "Revenir à l'adresse reçue",
+        // « Tout replier » n'y est plus : la Boite de tri montre une liste a plat, sans groupes a replier.
+        "Envoyer sans attendre", "Aperçu de l'enveloppe", "Enregistrer l'adresse", "Revenir à l'adresse reçue",
         "Informations saisies", "Certificats", "Dossier concerné", "Retenir", "Tout cocher",
     };
     var absentsResx = libelles.Where(l => !valeurs.Contains(l)).ToList();
