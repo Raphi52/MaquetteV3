@@ -19,18 +19,14 @@
 
     <div class="rig-barre__droite">
         @* Les domaines se parametrent par login : changer de login change les branches
-           visibles dans l'arbre de l'affaire. Le selecteur vit dans la BARRE (demande
-           utilisateur du 2026-09-10) : il reste atteignable depuis n'importe quel ecran. *@
-        <select class="rig-login" title="Login connecte et domaines autorises"
-                value="@LoginCourant"
-                @onchange="ChangerLogin" @onmousedown:stopPropagation="true">
-            @foreach (var compte in JeuDemo.Comptes)
-            {
-                <option value="@compte.Login">
-                    @compte.Login &middot; @compte.Profil (@compte.DomainesLisibles)
-                </option>
-            }
-        </select>
+           visibles dans l'arbre de l'affaire. Il doit rester atteignable depuis n'importe
+           quel ecran (demande utilisateur du 2026-09-10). Depuis « Commandes rondes »
+           (18/11/2026), le login se change par le rond de profil a droite du titre de
+           l'accueil ; un ecran ouvert recouvre ce titre, le rond passe alors ICI. *@
+        @if (AccueilRecouvert)
+        {
+            @RondProfil(dansLaBarre: true)
+        }
         @* Reglages de la BARRE : toujours atteignables, y compris quand un ecran de
            procedure occupe le plan de travail. Ne contient que le theme pour l'instant. *@
         <div class="rig-barre__reglages" @onmousedown:stopPropagation="true">
@@ -218,10 +214,11 @@
             <div class="rig-titre">
                 Bonjour <b>@Utilisateur</b>
             </div>
+            @* « Commandes rondes » (18/11/2026) : le reglage puis le profil, en ronds. *@
             <div class="rig-entete__outils">
                 <button class="rig-entete__action @(PanneauTuilesOuvert ? "rig-entete__action--ouvert" : "")"
-                                title="Reglages de l'accueil"
-                                @onclick="BasculerPanneauTuiles" @onmousedown:stopPropagation="true">&#9881;</button>
+                                title="Reglages de l'accueil" aria-label="Reglages de l'accueil"
+                                @onclick="BasculerPanneauTuiles" @onmousedown:stopPropagation="true"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M3.6 12.4 5 11M11 5l1.4-1.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
                 @if (PanneauTuilesOuvert)
                 {
                     @* Voile transparent plein ecran : un clic AILLEURS ferme le panneau. *@
@@ -253,6 +250,10 @@
                                     </button>
                                 }
                     </div>
+                }
+                @if (!AccueilRecouvert)
+                {
+                    @RondProfil(dansLaBarre: false)
                 }
             </div>
         </div>
@@ -307,11 +308,13 @@
             }
         </div>
 
-        @* --- Chiffres du jour (« Ivoire chaud », 2026-11-18) : trois compteurs
-           DEJA calcules ailleurs, montres en tuiles pleines entre la recherche
-           et la grille. « Arrivees » = le total de cette categorie dans « A
-           traiter », les deux autres = les mesures de la tuile Performance :
-           un chiffre ne peut donc jamais differer de sa tuile d'origine. --- *@
+        @* --- Chiffres du jour (2026-11-18) : trois compteurs DEJA calcules
+           ailleurs, montres en tuiles pleines entre la recherche et la grille.
+           « Arrivees » = le total de cette categorie dans « A traiter », les deux
+           autres = les mesures de la tuile Performance : un chiffre ne peut donc
+           jamais differer de sa tuile d'origine. Chaque tuile porte un grand
+           rond a GAUCHE de son chiffre, qui dit son sujet (« Commandes rondes »,
+           comme les tuiles de la maquette 05) : courrier, coche, horloge. --- *@
         @{
             var chiffreArrivees = ArriveesVues;
             var chiffreEnTete = chiffreArrivees.OrderByDescending(a => a.Nombre).FirstOrDefault();
@@ -321,18 +324,33 @@
         <div class="rig-chiffres">
             <div class="rig-chiffre rig-chiffre--1">
                 <span class="rig-chiffre__libelle">Arrivees</span>
-                <b class="rig-chiffre__valeur">@chiffreArrivees.Sum(a => a.Nombre)</b>
-                <span class="rig-chiffre__detail" title="@chiffreEnTete?.Titre">@(chiffreEnTete is null ? "rien a traiter" : $"{chiffreEnTete.Nombre} : {chiffreEnTete.Titre}")</span>
+                <span class="rig-chiffre__rang">
+                    <span class="rig-chiffre__rond" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M2.5 9.5h3l1 2h3l1-2h3M3.5 4h9l1 5.5V13h-11V9.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span>
+                    <span class="rig-chiffre__texte">
+                        <b class="rig-chiffre__valeur">@chiffreArrivees.Sum(a => a.Nombre)</b>
+                        <span class="rig-chiffre__detail" title="@chiffreEnTete?.Titre">@(chiffreEnTete is null ? "rien a traiter" : $"{chiffreEnTete.Nombre} : {chiffreEnTete.Titre}")</span>
+                    </span>
+                </span>
             </div>
             <div class="rig-chiffre rig-chiffre--2">
                 <span class="rig-chiffre__libelle">Dossiers traites</span>
-                <b class="rig-chiffre__valeur">@(chiffreTraites?.Valeur ?? "-")</b>
-                <span class="rig-chiffre__detail">@chiffreTraites?.ObjectifTexte</span>
+                <span class="rig-chiffre__rang">
+                    <span class="rig-chiffre__rond" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="m3.5 8.5 3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    <span class="rig-chiffre__texte">
+                        <b class="rig-chiffre__valeur">@(chiffreTraites?.Valeur ?? "-")</b>
+                        <span class="rig-chiffre__detail">@chiffreTraites?.ObjectifTexte</span>
+                    </span>
+                </span>
             </div>
             <div class="rig-chiffre rig-chiffre--3">
                 <span class="rig-chiffre__libelle">Hors delai legal</span>
-                <b class="rig-chiffre__valeur">@(chiffreHorsDelai?.Valeur ?? "-")</b>
-                <span class="rig-chiffre__detail">@chiffreHorsDelai?.ObjectifTexte</span>
+                <span class="rig-chiffre__rang">
+                    <span class="rig-chiffre__rond" aria-hidden="true"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.8V8l2.2 1.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+                    <span class="rig-chiffre__texte">
+                        <b class="rig-chiffre__valeur">@(chiffreHorsDelai?.Valeur ?? "-")</b>
+                        <span class="rig-chiffre__detail">@chiffreHorsDelai?.ObjectifTexte</span>
+                    </span>
+                </span>
             </div>
         </div>
 
@@ -1523,9 +1541,57 @@
     private IReadOnlyList<NoeudGed> DossiersVisibles
         => AccesGed.EnfantsVisibles(Arbre, Domaines, AjoutsArbre, MasquesArbre);
 
-    private void ChangerLogin(ChangeEventArgs ev)
+    /// <summary>Panneau du rond de profil : la liste des logins.</summary>
+    private bool PanneauProfilOuvert;
+
+    /// <summary>Un ecran plein recouvre l'accueil et le titre : un ecran de
+    /// procedure (.rig-proc) ou une affaire ouverte (.rig-vged). Le rond de
+    /// profil passe alors dans le bandeau, seul reste visible au-dessus.</summary>
+    private bool AccueilRecouvert => ProcOuverte is not null || DossierOuvert is not null;
+
+    /// <summary>
+    /// Le rond de profil (« Commandes rondes », 18/11/2026) : les initiales du
+    /// login, cercle d'or ; un clic deroule les comptes, un compte choisi change
+    /// de login. Il remplace la liste deroulante du bandeau. Sur l'accueil il est
+    /// a droite du titre ; un ecran ouvert recouvre ce titre (AccueilRecouvert), il
+    /// est alors rendu dans le bandeau (<paramref name="dansLaBarre"/>) : un seul des
+    /// deux existe a la fois, donc un seul etat d'ouverture suffit.
+    /// </summary>
+    private RenderFragment RondProfil(bool dansLaBarre) => @<div class="rig-profil-ancre @(dansLaBarre ? "rig-profil-ancre--barre" : "")"
+                                                               @onmousedown:stopPropagation="true">
+        <button class="rig-profil @(PanneauProfilOuvert ? "rig-profil--ouvert" : "")"
+                title="@($"{CompteCourant.Login} · {CompteCourant.Profil} ({CompteCourant.DomainesLisibles}) : changer de login")"
+                aria-label="Profil @CompteCourant.Login : changer de login"
+                aria-expanded="@(PanneauProfilOuvert ? "true" : "false")"
+                @onclick="() => PanneauProfilOuvert = !PanneauProfilOuvert">@CompteCourant.Initiales</button>
+        @if (PanneauProfilOuvert)
+        {
+            @* Voile transparent plein ecran : un clic AILLEURS ferme le panneau. *@
+            <div class="rig-voile-clic" @onclick="() => PanneauProfilOuvert = false"></div>
+            <div class="rig-tuiles-panneau rig-profil-panneau">
+                <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">Login connecte</div>
+                @foreach (var c in JeuDemo.Comptes)
+                {
+                    var compte = c;
+                    var actif = compte.Login == LoginCourant;
+                    <button class="rig-compte @(actif ? "rig-compte--actif" : "")"
+                            aria-pressed="@(actif ? "true" : "false")"
+                            @onclick="() => ChangerLogin(compte.Login)">
+                        <span class="rig-compte__rond">@compte.Initiales</span>
+                        <span class="rig-compte__texte">
+                            <span class="rig-compte__nom">@compte.Login &middot; @compte.Profil</span>
+                            <span class="rig-compte__domaines">@compte.DomainesLisibles</span>
+                        </span>
+                    </button>
+                }
+            </div>
+        }
+    </div>;
+
+    private void ChangerLogin(string login)
     {
-        LoginCourant = ev.Value?.ToString() ?? LoginCourant;
+        LoginCourant = login;
+        PanneauProfilOuvert = false;
         // Un noeud devenu invisible ne doit pas rester selectionne ni ouvert.
         if (NoeudSelectionne is not null
             && !ArbreVisible().Any(n => ReferenceEquals(n, NoeudSelectionne)))

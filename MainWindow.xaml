@@ -9,7 +9,7 @@
         Height="900" Width="1500"
         WindowStyle="None"
         WindowStartupLocation="Manual"
-        Background="#F2EDE3">
+        Background="#EEF0F4">
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="0"
                             ResizeBorderThickness="6"

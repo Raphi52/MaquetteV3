@@ -56,7 +56,7 @@ public sealed class FenetreInterop
     /// avaient derive (#D8DDE6 / #0C0F16, ancienne charte) et peignaient un
     /// cadre gris autour de la page ivoire.
     /// </summary>
-    public const string FondClair = "#F2EDE3";
+    public const string FondClair = "#EEF0F4";
     public const string FondSombre = "#12141C";
 
     /// <summary>

@@ -189,6 +189,12 @@ public sealed record CompteRig(string Login, string Nom, string[] Domaines, stri
     /// <summary>Les domaines, tels qu'ils s'ecrivent dans le selecteur de login.</summary>
     public string DomainesLisibles =>
         Domaines.Length == 0 ? "aucun domaine" : string.Join(" + ", Domaines);
+
+    /// <summary>Les initiales du rond de profil (« RV » pour rvilain). Un login
+    /// s'ecrit initiale du prenom + nom : ses deux premieres lettres les donnent,
+    /// le compte n'a pas d'autre champ pour le nom de famille.</summary>
+    public string Initiales =>
+        (Login.Length >= 2 ? Login[..2] : Login).ToUpperInvariant();
 }
 
 /// <summary>

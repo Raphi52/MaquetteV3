@@ -2,8 +2,9 @@
    RIG V3 - ACCUEIL A TUILES POSABLES
    Complement de rig-charte.css. Meme regle fondatrice :
    aucun aplat de couleur, la couleur ne vit que dans les filets.
-   Deux exceptions depuis le 2026-11-18 (« Ivoire chaud », voir l'entete
-   de rig-charte.css) : les tuiles chiffrees et le verbe actif du menu.
+   Exceptions depuis le 2026-11-18 (« Commandes rondes », voir l'entete
+   de rig-charte.css) : les tuiles chiffrees et leurs ronds, le rond de
+   profil et le verbe actif du menu.
    ============================================================ */
 
 /* ---------- Ossature : menu a gauche, plan de travail a droite ---------- */
@@ -28,8 +29,8 @@
   padding: var(--rig-esp-4) var(--rig-esp-2);
   overflow-y: auto;
   min-height: 0;
-  /* RAIL ENCRE dans les deux modes (« Ivoire chaud », 2026-11-18) : le menu
-     est un ilot sombre, meme sur l'ivoire du mode clair. Ses jetons de texte,
+  /* RAIL ENCRE dans les deux modes (charte du 2026-11-18) : le menu est un
+     ilot sombre, meme sur le gris bleute du mode clair. Ses jetons de texte,
      de voile et de bord sont donc REDEFINIS ici, pour un fond sombre : tout
      ce qui est dessous lit les memes noms de variables sans changer. */
   background: var(--rig-rail);
@@ -266,18 +267,20 @@
      --fixe (l'accueil) : les champs .rig-recherche des autres ecrans gardent
      le voile de la charte. Cause du rendu fantome corrigee ici : ce voile vaut
      --rig-fond-2, soit du blanc a 3,5 %, donc la barre etait invisible.
-     2026-11-18 (« Ivoire chaud ») : le blanc fixe devient --rig-champ, creme le
-     jour et encre la nuit, comme la maquette choisie ; la barre reste OPAQUE
-     et detachee par le liseré or et l'ombre. */
+     2026-11-18 : le blanc fixe devient --rig-champ, blanc le jour et encre la
+     nuit ; la barre reste OPAQUE et detachee par le liseré or et l'ombre.
+     « Commandes rondes » : elle est une PILULE, comme la recherche de la
+     maquette 05 (la liste de resultats qui pend dessous garde ses angles). */
   background: var(--rig-champ);
   border-color: var(--rig-bord);
-  padding: 12px var(--rig-esp-4);
+  border-radius: 999px;
+  padding: 12px 22px;
   /* C'est le liseré or et l'ombre qui detachent la barre du fond de page, pas
      sa couleur. Ne pas les retirer. */
   box-shadow: 0 0 0 1px rgba(176, 141, 63, .30), var(--rig-ombre);
 }
 /* La loupe : le !important vise le style INLINE pose sur elle dans Home.razor
-   (or du focus), trop pale sur le champ creme du mode clair. */
+   (or du focus), trop pale sur le champ blanc du mode clair. */
 .rig-recherche--fixe > span:first-child { color: var(--rig-texte-3) !important; }
 .rig-recherche--fixe .rig-recherche__saisie { color: var(--rig-texte); }
 .rig-recherche--fixe .rig-recherche__saisie::placeholder { color: var(--rig-texte-3); }
@@ -285,6 +288,8 @@
   color: var(--rig-texte-3);
   border-color: var(--rig-bord);
   background: var(--rig-fond-2);
+  border-radius: 999px;
+  padding: 2px 9px;
 }
 .rig-recherche--fixe:focus-within {
   border-color: var(--rig-focus);
@@ -1080,7 +1085,7 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    que presenter la journee. */
 .rig-entete { user-select: text; }
 
-/* « BONJOUR RAPHAEL » (« Ivoire chaud », 2026-11-18) : le titre de l'accueil
+/* « BONJOUR RAPHAEL » (charte du 2026-11-18) : le titre de l'accueil
    passe en capitales grasses, comme le titre de la voie « Bleu nuit et aplats
    vifs ». Le texte de Home.razor ne change pas, seule sa casse affichee. */
 .rig-plan > .rig-entete .rig-titre {
@@ -1090,12 +1095,15 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 }
 .rig-plan > .rig-entete .rig-titre b { font-weight: 800; }
 
-/* ---------- Tuiles chiffrees (« Ivoire chaud », 2026-11-18) ----------
+/* ---------- Tuiles chiffrees (charte du 2026-11-18) ----------
    Trois chiffres du jour entre la recherche et la grille : Arrivees (le
    compte de « A traiter »), Dossiers traites et Hors delai legal (la tuile
-   Performance). Aplats MATS le jour, verre teinte la nuit : couleurs dans les
+   Performance). Aplats VIFS le jour, verre teinte la nuit : couleurs dans les
    jetons --rig-chiffre-* de rig-charte.css. Fixe comme la recherche : elle ne
-   se pose pas dans la grille et ne se masque pas. */
+   se pose pas dans la grille et ne se masque pas.
+   « Commandes rondes » : sous le libelle, un GRAND ROND a gauche du chiffre
+   dit le sujet de la tuile (blanc le jour, verre la nuit), comme les tuiles
+   de la maquette 05 ; le chiffre et son detail se lisent juste apres. */
 .rig-chiffres {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1103,7 +1111,7 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   margin: 0 0 var(--rig-esp-5);
 }
 .rig-chiffre {
-  display: flex; flex-direction: column; gap: 2px;
+  display: flex; flex-direction: column; gap: 8px;
   min-width: 0;
   padding: var(--rig-esp-3) var(--rig-esp-4);
   border-radius: var(--rig-radius);
@@ -1117,6 +1125,19 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   font: 700 var(--rig-fs-kicker)/1.3 var(--rig-font);
   letter-spacing: var(--rig-ls-kicker); text-transform: uppercase;
 }
+.rig-chiffre__rang { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.rig-chiffre__texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rig-chiffre__rond {
+  width: 48px; height: 48px; border-radius: 50%;
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--rig-chiffre-rond);
+  box-shadow: inset 0 0 0 1px var(--rig-chiffre-rond-bord);
+}
+.rig-chiffre__rond svg { width: 25px; height: 25px; }
+.rig-chiffre--1 .rig-chiffre__rond { color: var(--rig-chiffre-1-icone); }
+.rig-chiffre--2 .rig-chiffre__rond { color: var(--rig-chiffre-2-icone); }
+.rig-chiffre--3 .rig-chiffre__rond { color: var(--rig-chiffre-3-icone); }
 .rig-chiffre__valeur {
   font: 700 30px/1.1 var(--rig-font);
   font-variant-numeric: tabular-nums;
@@ -1133,22 +1154,70 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 /* ---------- Outils de l'entete du plan (dont le rouage de reglages) ---------- */
 .rig-entete { display: flex; align-items: center; justify-content: space-between; }
 .rig-entete__outils { display: flex; align-items: center; gap: var(--rig-esp-2); position: relative; }
+/* « Commandes rondes » (18/11/2026) : le reglage est un ROND plein a droite du
+   titre, sur le fond des champs, comme le reglage de la maquette 05. */
 .rig-entete__action {
-  width: 32px; height: 32px;
+  width: 36px; height: 36px;
   display: inline-flex; align-items: center; justify-content: center;
-  background: transparent; border: 1px solid transparent; border-radius: var(--rig-radius-sm);
-  color: var(--rig-texte-3); font-size: 16px; cursor: pointer;
+  background: var(--rig-champ); border: 1px solid var(--rig-bord); border-radius: 50%;
+  color: var(--rig-texte-2); cursor: pointer;
   transition: background .14s ease, color .14s ease, border-color .14s ease;
 }
+.rig-entete__action svg { width: 18px; height: 18px; }
 .rig-entete__action:hover {
   background: var(--rig-fond-2); color: var(--rig-texte);
-  border-color: var(--rig-bord);
+  border-color: var(--rig-texte-3);
 }
 .rig-entete__action--ouvert {
   color: var(--rig-focus); background: var(--rig-fond-2);
   border-color: var(--rig-bord);
 }
 .rig-entete__outils .rig-tuiles-panneau { top: calc(100% + 8px); }
+
+/* ---------- Rond de profil (« Commandes rondes », 18/11/2026) ----------
+   Les initiales du login dans un rond bleu cercle d'or, a droite du reglage
+   (le rond « Claire Martin » de la maquette 05). Il remplace la liste
+   deroulante du bandeau : un clic deroule les comptes. Un ecran ouvert
+   recouvre le titre : le meme rond est alors rendu, plus petit, dans le
+   bandeau (--barre), pour que le login reste atteignable partout. */
+.rig-profil-ancre { position: relative; display: inline-flex; align-items: center; }
+.rig-profil-ancre--barre { margin-right: var(--rig-esp-2); }
+.rig-profil {
+  width: 36px; height: 36px; border-radius: 50%;
+  flex: 0 0 auto; padding: 0; border: 0; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--rig-profil); color: var(--rig-profil-texte);
+  font: 700 12px/1 var(--rig-font); letter-spacing: .04em;
+  box-shadow: 0 0 0 2px var(--rig-or);
+  transition: box-shadow .14s ease;
+}
+.rig-profil:hover,
+.rig-profil--ouvert { box-shadow: 0 0 0 2px var(--rig-or), 0 0 0 5px color-mix(in srgb, var(--rig-or) 30%, transparent); }
+.rig-profil:focus-visible { outline: 2px solid var(--rig-focus); outline-offset: 4px; }
+.rig-profil-ancre--barre .rig-profil { width: 24px; height: 24px; font-size: 9px; }
+
+/* Le panneau des comptes : une ligne par login, le login connecte marque d'or. */
+.rig-profil-panneau { min-width: 300px; display: flex; flex-direction: column; gap: 2px; }
+.rig-compte {
+  display: flex; align-items: center; gap: var(--rig-esp-3);
+  width: 100%; text-align: left; cursor: pointer;
+  background: transparent; border: 1px solid transparent;
+  border-radius: var(--rig-radius-sm);
+  padding: 6px var(--rig-esp-2);
+  color: var(--rig-texte-2); font: var(--rig-fs-dense)/1.35 var(--rig-font);
+}
+.rig-compte:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
+.rig-compte--actif { border-color: var(--rig-or); color: var(--rig-texte); }
+.rig-compte__rond {
+  width: 26px; height: 26px; border-radius: 50%; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--rig-fond-2); color: var(--rig-texte-2);
+  font: 700 10px/1 var(--rig-font); letter-spacing: .04em;
+}
+.rig-compte--actif .rig-compte__rond { background: var(--rig-profil); color: var(--rig-profil-texte); }
+.rig-compte__texte { display: flex; flex-direction: column; min-width: 0; }
+.rig-compte__nom { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rig-compte__domaines { font-size: 11px; color: var(--rig-texte-3); }
 
 /* ---------- Barre de commandes de la visionneuse ---------- */
 .rig-vged__outils {
@@ -1927,9 +1996,12 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    integree de WebView2 occupe toute la zone, sans marge ni feuilles. */
 .rig-apercu__pages--pdf { padding: 0; display: flex; overflow: hidden; }
 .rig-apercu__pdf { flex: 1 1 auto; width: 100%; height: 100%; border: 0; background: #525659; }
+/* La feuille est du PAPIER : blanc pur, dans les deux modes et quelle que soit
+   la charte (demande du 18/11/2026). L'ancien #fdfdfb, un blanc chaud, passait
+   pour du creme a cote du gris bleute de la page. */
 .rig-apercu__feuille {
   position: relative; width: min(640px, 100%); aspect-ratio: 1 / 1.414;
-  background: #fdfdfb; color: #16181d;
+  background: #FFFFFF; color: #16181d;
   padding: 44px 48px; box-shadow: 0 4px 14px rgba(0, 0, 0, .4);
 }
 .rig-apercu__feuille-texte {
@@ -2035,26 +2107,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-ctx__item:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
 .rig-ctx__item--danger:hover { color: #F04438; }
 .rig-ctx__filet { height: 1px; background: var(--rig-bord); margin: 3px 0; }
-
-/* ---------- Login connecte, dans l'entete de l'accueil ----------
-   Le niveau d'acces du login choisi filtre les dossiers de l'arbre. */
-.rig-login {
-  margin-left: var(--rig-esp-2);
-  border: 1px solid var(--rig-bord); background: var(--rig-fond-2);
-  color: var(--rig-texte-2); border-radius: var(--rig-radius-sm);
-  padding: 1px 6px; font-size: 12px; cursor: pointer;
-  /* Le schema de couleurs qui commande la liste deroulante native est declare
-     sur `html` (rig-charte.css) : pose ici, sur l'element, il n'atteignait pas
-     la popup -- c'est ce qui laissait le blanc sur blanc du 2026-09-10. */
-}
-/* Les lignes de la liste deroulante DOIVENT porter des couleurs OPAQUES.
-   `--rig-fond-2` vaut rgba(255,255,255,.035) : translucide, il ne teinte rien
-   par-dessus le blanc de la fenetre systeme, et le texte clair restait donc
-   blanc sur blanc (constate a l'ecran le 2026-09-10). */
-.rig-login option { background-color: #131826; color: #E8ECF4; }
-/* Pas de blanc pur ici non plus (2026-09-10) : la popup eblouissait au milieu
-   d'un mode clair descendu a ~72 % de luminance. Texte en quasi-noir. */
-[data-rig-theme="clair"] .rig-login option { background-color: #DDE2EA; color: #0B0E14; }
 
 /* ---------- Voile de fermeture des panneaux deroulants ----------
    Transparent et plein ecran : capte le clic AILLEURS pour refermer le

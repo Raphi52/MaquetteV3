@@ -13,16 +13,21 @@
    PDF / Word - voir
    Documentation/reference/90-transverse/documents-charte-amitel.md
 
-   2026-11-18, direction « Ivoire chaud » (choix utilisateur, /draft
-   conv-1979) : le clair suit la voie « Bleu nuit et aplats vifs », le
-   sombre la voie « Nuit japonaise », et l'OR les relie :
-   - l'or marque l'element actif dans les deux modes (verbe ouvert du menu) ;
+   2026-11-18, direction « Commandes rondes » (choix utilisateur, /draft
+   conv-1979, tour 3 proposition 5). Elle remplace « Ivoire chaud », pose et
+   abandonnee le meme jour, dont elle garde la nuit et l'or :
+   - le clair est un GRIS BLEUTE (#EEF0F4) a cartes blanches, la voie « Bleu
+     nuit et aplats vifs » ; le sombre reste l'encre de la « Nuit japonaise » ;
+   - l'or marque l'element actif dans les deux modes (verbe ouvert du menu,
+     anneau du rond de profil) ;
    - le menu de gauche est un rail ENCRE dans les deux modes ;
-   - le clair passe a l'ivoire : meme temperature chaude que la nuit, l'or
-     n'y jure plus ;
-   - la regle « aucun aplat » est levee pour DEUX elements seulement : les
-     tuiles chiffrees de l'accueil (aplats mats le jour, verre teinte la
-     nuit) et la pastille du verbe actif. Partout ailleurs elle tient.
+   - le ROND de la maquette 05 sert de repere : grand rond a gauche du
+     chiffre des tuiles, reglage et profil en ronds a droite du titre,
+     recherche en pilule ;
+   - la regle « aucun aplat » est levee pour ces elements seulement : les
+     tuiles chiffrees de l'accueil (aplats vifs le jour, verre teinte la
+     nuit), leurs ronds, le rond de profil et la pastille du verbe actif.
+     Partout ailleurs elle tient.
    ============================================================ */
 
 :root {
@@ -68,6 +73,11 @@
   --rig-radius-sm: 6px;
   --rig-filet: 6px;      /* epaisseur du filet de statut : signature V1 */
   --rig-filet-fin: 3px;  /* filet en liste */
+
+  /* Rond de profil (« Commandes rondes ») : le meme bleu dans les deux modes,
+     comme sur la maquette ; c'est son anneau d'or qui suit le mode. */
+  --rig-profil: linear-gradient(135deg, #2C3F8F, #4560C2);
+  --rig-profil-texte: #FFFFFF;
 }
 
 /* Les listes deroulantes des <select> sont peintes par le SYSTEME, hors CSS.
@@ -78,9 +88,10 @@ html { color-scheme: dark; }
 html:has([data-rig-theme="clair"]) { color-scheme: light; }
 
 /* --- MODE SOMBRE (defaut) --- */
-/* 2026-11-18 (« Ivoire chaud ») : l'encre de la « Nuit japonaise » remplace le
-   bleu nuit (#0C0F16) ; texte creme au lieu de bleute, voiles et bords tires
-   vers le creme, or #D9B26A. */
+/* 2026-11-18 : l'encre de la « Nuit japonaise » remplace le bleu nuit
+   (#0C0F16) ; texte creme au lieu de bleute, voiles et bords tires vers le
+   creme, or #D9B26A. Posee avec « Ivoire chaud », gardee par « Commandes
+   rondes ». */
 :root,
 [data-rig-theme="sombre"] {
   --rig-fond: #12141C;
@@ -113,7 +124,7 @@ html:has([data-rig-theme="clair"]) { color-scheme: light; }
   --rig-accent: #D9B26A;
   --rig-grad-marque: linear-gradient(90deg, #0D0F16, #D9B26A 55%, #F0D59A);
 
-  /* --- « Ivoire chaud » : ce qui RELIE les deux modes --- */
+  /* --- Ce qui RELIE les deux modes (charte du 2026-11-18) --- */
   /* L'or de l'element actif : un aplat en degrade, texte encre dessus. */
   --rig-or: #C8963E;
   --rig-or-clair: #E4BE76;
@@ -143,6 +154,12 @@ html:has([data-rig-theme="clair"]) { color-scheme: light; }
   --rig-chiffre-3-bord: #6E3A2F;
   --rig-chiffre-texte: #E4E0D6;
   --rig-chiffre-valeur: #F1EDE4;
+  /* Grand rond a gauche du chiffre : verre, icone a la teinte de la tuile. */
+  --rig-chiffre-rond: rgba(255, 255, 255, .10);
+  --rig-chiffre-rond-bord: rgba(255, 255, 255, .16);
+  --rig-chiffre-1-icone: #8FA2E6;
+  --rig-chiffre-2-icone: #B3C878;
+  --rig-chiffre-3-icone: #E8937B;
 }
 
 /* --- MODE CLAIR --- */
@@ -162,36 +179,38 @@ html:has([data-rig-theme="clair"]) { color-scheme: light; }
      Fond bleute moyen, tuiles plus claires (sans blanc pur) detachees par une
      ombre franche, statuts plus satures. */
   /* 2026-09-15 : fond "trop gris" -> blanc casse neutre #F5F6F4 (choix n°1 de l'utilisateur). */
-  /* 2026-11-18 (« Ivoire chaud ») : blanc casse neutre -> IVOIRE #F2EDE3, cartes
-     creme, texte encre brune ; bords et ombres tires vers le brun. Le texte
-     tertiaire est #6B6253, un cran plus fonce que la maquette (#857C6C, 3,6:1
-     sur l'ivoire) : la regle « rien ne reste pale » du 2026-09-10 tient. */
-  --rig-fond: #F2EDE3;
-  --rig-fond-2: #EAE3D6;
-  --rig-zebre: rgba(90, 70, 40, .05);
-  --rig-survol-ligne: rgba(90, 70, 40, .12);
-  --rig-surface: #FFFCF6;
-  --rig-champ: #FFFCF6;
-  --rig-bord: rgba(110, 85, 45, .22);
-  --rig-bord-faible: rgba(110, 85, 45, .13);
-  --rig-texte: #1F1B16;
-  --rig-texte-2: #4A443A;
-  --rig-texte-3: #6B6253;
-  --rig-ombre: 0 1px 3px rgba(60, 45, 20, .16), 0 12px 30px rgba(60, 45, 20, .18);
-  --rig-ombre-saisie: 0 3px 8px rgba(60, 45, 20, .22), 0 26px 56px rgba(60, 45, 20, .28);
+  /* 2026-11-18 (« Commandes rondes ») : GRIS BLEUTE #EEF0F4 et cartes BLANCHES,
+     comme la maquette choisie (l'ivoire du matin est abandonne). Le blanc pur
+     ne couvre que les cartes et les champs, jamais la page : la regle « pas de
+     blanc pur » plus haut vise le fond. Le texte tertiaire est #5F6577, un cran
+     plus fonce que la maquette (#6B7183, 4,3:1 sur le fond) : la regle « rien ne
+     reste pale » du 2026-09-10 demande 4,5:1. */
+  --rig-fond: #EEF0F4;
+  --rig-fond-2: #E3E6EC;
+  --rig-zebre: rgba(25, 40, 80, .04);
+  --rig-survol-ligne: rgba(25, 40, 80, .10);
+  --rig-surface: #FFFFFF;
+  --rig-champ: #FFFFFF;
+  --rig-bord: rgba(25, 40, 80, .14);
+  --rig-bord-faible: rgba(25, 40, 80, .08);
+  --rig-texte: #15171F;
+  --rig-texte-2: #3A3F4E;
+  --rig-texte-3: #5F6577;
+  --rig-ombre: 0 1px 3px rgba(28, 44, 80, .14), 0 10px 26px rgba(28, 44, 80, .14);
+  --rig-ombre-saisie: 0 3px 8px rgba(28, 44, 80, .20), 0 26px 56px rgba(28, 44, 80, .26);
   --rig-alerte: #C2410C;
   --rig-erreur: #D92D20;
   /* Or fonce pour le TEXTE et le contour de focus : l'or de l'aplat (#C8963E)
-     ne fait que 2,4:1 sur l'ivoire. */
-  --rig-focus: #9A6B1F;
-  --rig-accent: #9A6B1F;
+     ne fait que 2,4:1 sur le gris bleute ; #8A5E14 y fait 5:1. */
+  --rig-focus: #8A5E14;
+  --rig-accent: #8A5E14;
   --rig-grad-action:  linear-gradient(90deg, #1D4ED8, #3B82F6);
   --rig-grad-attente: linear-gradient(90deg, #475569, #8494A8);
   --rig-grad-alerte:  linear-gradient(90deg, #C2410C, #F5A609);
   --rig-grad-ok:      linear-gradient(90deg, #047857, #10B981);
   --rig-grad-marque:  linear-gradient(90deg, #15182A, #C8963E 55%, #E4BE76);
 
-  /* --- « Ivoire chaud » : memes roles qu'en sombre, voir plus haut --- */
+  /* --- Memes roles qu'en sombre, voir plus haut --- */
   --rig-or: #C8963E;
   --rig-or-clair: #E4BE76;
   --rig-or-texte: #1E1608;
@@ -204,19 +223,26 @@ html:has([data-rig-theme="clair"]) { color-scheme: light; }
   --rig-verbe-terminer: #6B7183;
   --rig-verbe-facturer: #D9773A;
   --rig-verbe-configurer: #7A5BB5;
-  --rig-palier-vide: #5C7638;
+  --rig-palier-vide: #557A2C;
   --rig-palier-bas: #4560C2;
   --rig-palier-moyen: #D4A044;
   --rig-palier-haut: #C0502F;
-  /* Tuiles chiffrees : aplats MATS bleu ardoise / olive / brique. */
-  --rig-chiffre-1: linear-gradient(135deg, #34457E, #4C5F9C);
-  --rig-chiffre-2: linear-gradient(135deg, #5C7638, #7A9452);
-  --rig-chiffre-3: linear-gradient(135deg, #A4513A, #C26E56);
+  /* Tuiles chiffrees : aplats VIFS bleu / olive / brique (la maquette ; les
+     aplats mats etaient ceux d'« Ivoire chaud »). */
+  --rig-chiffre-1: linear-gradient(135deg, #2C3F8F, #4560C2);
+  --rig-chiffre-2: linear-gradient(135deg, #557A2C, #7FA84A);
+  --rig-chiffre-3: linear-gradient(135deg, #B2492A, #DB7650);
   --rig-chiffre-1-bord: transparent;
   --rig-chiffre-2-bord: transparent;
   --rig-chiffre-3-bord: transparent;
   --rig-chiffre-texte: #FFFFFF;
   --rig-chiffre-valeur: #FFFFFF;
+  /* Grand rond BLANC a gauche du chiffre, icone a la teinte foncee de la tuile. */
+  --rig-chiffre-rond: #FFFFFF;
+  --rig-chiffre-rond-bord: transparent;
+  --rig-chiffre-1-icone: #2C3F8F;
+  --rig-chiffre-2-icone: #557A2C;
+  --rig-chiffre-3-icone: #B2492A;
 }
 
 /* ============================================================

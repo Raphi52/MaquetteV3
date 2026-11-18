@@ -124,6 +124,54 @@ foreach (var (nom, texte) in feuilles)
         "rig-charte.css donne un curseur de redimensionnement a chaque bande");
 }
 
+// --- 6. « Commandes rondes » (18/11/2026, /draft conv-1979, proposition 5).
+// La recherche de l'accueil est une pilule, le reglage et le profil sont des
+// ronds a droite du titre, chaque tuile chiffree porte un grand rond a gauche
+// de son chiffre. Le profil quitte la liste deroulante du bandeau pour le rond
+// « RV » ; mais un ecran ouvert (.rig-proc) recouvre le titre, et le login doit
+// rester atteignable depuis n'importe quel ecran (demande du 10/09/2026) : le
+// meme rond passe alors dans le bandeau.
+{
+    var accueil = feuilles["rig-accueil.css"];
+    var home = File.ReadAllText(Path.Combine(racine, "Components", "Pages", "Home.razor"));
+
+    bool Rond(string selecteur, string rayon) =>
+        Regex.IsMatch(accueil, Regex.Escape(selecteur) + @"\s*\{[^{}]*border-radius:\s*" + Regex.Escape(rayon));
+
+    Exiger(Rond(".rig-recherche--fixe", "999px"), "la recherche de l'accueil est une pilule");
+    Exiger(Rond(".rig-entete__action", "50%"), "le reglage a droite du titre est un rond");
+    Exiger(Rond(".rig-profil", "50%"), "le profil est un rond");
+    Exiger(Rond(".rig-chiffre__rond", "50%"), "le rond des tuiles chiffrees est un cercle");
+    Exiger(Regex.Matches(home, @"class=""rig-chiffre__rond""").Count == 3,
+        "chacune des 3 tuiles chiffrees porte son rond");
+
+    Exiger(!home.Contains("<select class=\"rig-login\""),
+        "le bandeau ne porte plus la liste deroulante du login");
+    Exiger(Regex.IsMatch(home, @"rig-entete__outils[\s\S]*?@if \(!AccueilRecouvert\)\s*\{\s*@RondProfil\(dansLaBarre: false\)"),
+        "sur l'accueil, le rond de profil est a droite du titre");
+    Exiger(Regex.IsMatch(home, @"rig-barre__droite[\s\S]*?@if \(AccueilRecouvert\)\s*\{\s*@RondProfil\(dansLaBarre: true\)"),
+        "un ecran ouvert garde le rond de profil, dans le bandeau");
+    // Les DEUX ecrans pleins recouvrent le titre : l'ecran de procedure
+    // (.rig-proc) ET l'affaire (.rig-vged). Oublier l'affaire perdait le login
+    // la ou il sert le plus : il decide des branches visibles de son arbre.
+    var recouvert = Regex.Match(home, @"bool AccueilRecouvert\s*=>([^;]*);");
+    Exiger(recouvert.Success && recouvert.Groups[1].Value.Contains("ProcOuverte is not null")
+                             && recouvert.Groups[1].Value.Contains("DossierOuvert is not null"),
+        "l'accueil est recouvert par un ecran de procedure comme par une affaire ouverte");
+    Exiger(Regex.IsMatch(home, @"@onclick=""\(\) => ChangerLogin\(compte\.Login\)"""),
+        "le panneau du rond change bien de login");
+
+    // Le fond de la fenetre (section 5) suit deja --rig-fond ; ici, la teinte
+    // choisie : le clair gris bleute de la maquette, plus l'ivoire.
+    Exiger(Regex.IsMatch(charte, @"\[data-rig-theme=""clair""\]\s*\{[^{}]*--rig-fond:\s*#EEF0F4", RegexOptions.IgnoreCase),
+        "le mode clair est le gris bleute #EEF0F4 de la maquette");
+
+    // Les documents sont du papier : BLANC PUR, hors charte (demande du
+    // 18/11/2026 : le #fdfdfb chaud passait pour du creme sur le gris bleute).
+    Exiger(Regex.IsMatch(accueil, @"\.rig-apercu__feuille\s*\{[^{}]*background:\s*#FFFFFF\s*;", RegexOptions.IgnoreCase),
+        "la feuille des documents est blanc pur");
+}
+
 Console.WriteLine();
 if (echecs.Count == 0)
 {

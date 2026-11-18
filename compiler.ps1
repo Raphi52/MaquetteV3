@@ -29,7 +29,17 @@ $ErrorActionPreference = 'Stop'
 # les voit pas, meme quand ces .g.cs existent deja sur le disque. Les enchainer
 # dans UN SEUL appel msbuild traite la cause. L'exe n'est toujours PAS produit
 # ni copie (ni Link ni CopyFilesToOutputDirectory) : l'application reste ouverte.
-& dotnet msbuild "$PSScriptRoot\RigV3Desktop.csproj" "-t:ResolveReferences;MarkupCompilePass1;Compile" -v:m -nologo
+#
+# POURQUOI PrepareResources ET NON MarkupCompilePass1 SEUL (18/11/2026).
+# `Compile` ecrit obj\...\RigV3Desktop.dll, la DLL que toute compilation suivante
+# recopie dans bin. Sans PrepareResources, elle sortait SANS RigV3Desktop.g.resources
+# (les .baml des fenetres WPF) : plus recente que ses sources, elle etait ensuite
+# jugee a jour et recopiee telle quelle par `dotnet build`, les bancs et le
+# redemarrage de dotnet watch -- d'ou « Impossible de trouver la ressource
+# 'fenetredocument.xaml' » (FenetreVueCheck, OngletsCheck rouges sans aucun
+# changement de code). PrepareResources enchaine MarkupCompilePass1, Pass2 et la
+# generation de g.resources : la DLL de obj est complete, et bin n'est pas touche.
+& dotnet msbuild "$PSScriptRoot\RigV3Desktop.csproj" "-t:ResolveReferences;PrepareResources;Compile" -v:m -nologo
 $code = $LASTEXITCODE
 
 if ($code -eq 0) {
