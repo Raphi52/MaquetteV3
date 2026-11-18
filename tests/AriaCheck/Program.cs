@@ -50,6 +50,51 @@ foreach (var f in fichiers)
     }
 }
 
+// --- Les ecrans PORTES EN REACT (web/src, 18/11/2026) : meme regle sur le .tsx.
+// Le balisage change de syntaxe, pas de sens : un attribut s'ecrit aussi
+// entre accolades (onClick={() => ...}, dont le « => » n'est pas une fin de
+// balise), et un commentaire s'ecrit {/* */} au lieu de @* *@.
+var racineWeb = Path.Combine(racine, "web/src");
+var fichiersTsx = Directory.Exists(racineWeb)
+    ? Directory.GetFiles(racineWeb, "*.tsx", SearchOption.AllDirectories)
+               .Where(f => !f.EndsWith(".test.tsx", StringComparison.OrdinalIgnoreCase))
+               .OrderBy(f => f).ToList()
+    : [];
+Exiger(fichiersTsx.Count >= 3, $"les ecrans React sont trouves ({fichiersTsx.Count})");
+var examinesTsx = 0;
+foreach (var f in fichiersTsx)
+{
+    var texte = File.ReadAllText(f);
+    var nom = Path.GetFileName(f);
+    // Attribut = chaine "..." ou '...', expression {...} (une imbrication
+    // d'accolades : style={{ ... }}), ou tout autre caractere hors > " ' {.
+    foreach (Match b in Regex.Matches(texte,
+                 @"<button\b(?<attrs>(?:""[^""]*""|'[^']*'|\{(?:[^{}]|\{[^{}]*\})*\}|[^>""'{])*)>(?<corps>.*?)</button>",
+                 RegexOptions.Singleline))
+    {
+        examinesTsx++;
+        var attrs = b.Groups["attrs"].Value;
+        var corps = b.Groups["corps"].Value;
+
+        var nu = Regex.Replace(corps, @"\{/\*.*?\*/\}", " ", RegexOptions.Singleline);
+        // Une expression qui n'est qu'un texte litteral ({'☆'}) compte pour son texte.
+        nu = Regex.Replace(nu, @"\{\s*(['""`])(?<t>[^'""`]*)\1\s*\}", "${t}");
+        nu = Regex.Replace(nu, @"<[^>]*>", " ");
+        nu = Regex.Replace(nu, @"&[a-zA-Z]+;|&#\d+;", " ");
+        nu = Regex.Replace(nu, @"[\p{Cs}\p{So}]", " ");
+        nu = nu.Trim();
+
+        var nomme = Regex.IsMatch(attrs, @"aria-label\s*=") || Regex.IsMatch(attrs, @"\btitle\s*=");
+        if (nu.Length < 2 && !nomme)
+        {
+            var ligne = texte.Take(b.Index).Count(c => c == '\n') + 1;
+            muets.Add($"{nom}:{ligne}");
+        }
+    }
+}
+Exiger(fichiersTsx.Count == 0 || examinesTsx > 0, $"des boutons sont bien lus dans les ecrans React ({examinesTsx})");
+examines += examinesTsx;
+
 Exiger(examines > 50, $"des boutons sont bien lus dans les ecrans ({examines})");
 Exiger(muets.Count == 0,
     "aucun bouton-icone sans nom dans les ecrans"

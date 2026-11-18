@@ -7,6 +7,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>rig.ico</ApplicationIcon>
+    <!-- web/ (sources React et leur node_modules, des milliers de fichiers) n'est
+         PAS un dossier de fichiers du projet : ni compile, ni copie, ni surveille
+         par « dotnet watch ». L'exclure ICI, et pas par un Remove apres coup,
+         evite aussi que chaque evaluation du projet parcoure node_modules. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);web\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +20,53 @@
     <Content Remove="tests/**" />
     <None Remove="tests/**" />
   </ItemGroup>
+
+  <!-- ECRANS REACT (web/, migration Blazor -> React, lot 1 du 18/11/2026).
+       Un « dotnet build » (donc dev.ps1 et lancer.ps1) produit l'appli
+       complete sans geste de plus : les paquets npm sont installes si besoin,
+       puis Vite construit web/src dans wwwroot/app/rig-iles.js (ignore par git).
+       Les deux etapes sont INCREMENTALES : rien ne tourne si leurs entrees n'ont
+       pas change. Mode d'emploi : web/README.md. -->
+  <ItemGroup>
+    <_EntreesInstallWeb Include="web/package.json;web/package-lock.json" />
+    <_EntreesConstructionWeb Include="web/src/**/*;web/package.json;web/package-lock.json;web/vite.config.ts;web/tsconfig.json" />
+  </ItemGroup>
+
+  <Target Name="VerifierNodeWeb" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command="npm --version" StandardOutputImportance="low" IgnoreExitCode="true" EchoOff="true">
+      <Output TaskParameter="ExitCode" PropertyName="_CodeNpm" />
+    </Exec>
+    <Error Condition="'$(_CodeNpm)' != '0'"
+           Text="Node.js (npm) est requis pour construire les ecrans React de web/ : installer Node 22 ou plus recent (https://nodejs.org), puis relancer." />
+  </Target>
+
+  <Target Name="InstallerWeb" DependsOnTargets="VerifierNodeWeb"
+          Condition="'$(DesignTimeBuild)' != 'true'"
+          Inputs="@(_EntreesInstallWeb)" Outputs="web/node_modules/.rig-install-ok">
+    <Exec Command="npm ci --no-audit --no-fund" WorkingDirectory="$(MSBuildProjectDirectory)\web" />
+    <Touch Files="web/node_modules/.rig-install-ok" AlwaysCreate="true" />
+  </Target>
+
+  <Target Name="ConstruireWeb" DependsOnTargets="InstallerWeb"
+          Condition="'$(DesignTimeBuild)' != 'true'"
+          Inputs="@(_EntreesConstructionWeb)" Outputs="wwwroot/app/rig-iles.js">
+    <Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)\web" />
+  </Target>
+
+  <!-- Les fichiers de wwwroot/app/ peuvent NAITRE pendant ce build (copie neuve,
+       dossier efface) : le glob wwwroot/** du SDK, evalue avant, ne les a pas vus.
+       On les redeclare donc AVANT que le SDK dresse la liste des fichiers servis
+       par la fenetre (ResolveProjectStaticWebAssets), sinon le premier build
+       sortirait une appli sans ses ecrans React (404 sur rig-iles.js). Memes
+       metadonnees que le glob du SDK (Sdk.StaticWebAssets.StaticAssets.ProjectSystem.props). -->
+  <Target Name="DeclarerSortieWeb" DependsOnTargets="ConstruireWeb"
+          BeforeTargets="ResolveProjectStaticWebAssets"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <Content Remove="wwwroot\app\**" />
+      <Content Include="wwwroot\app\**" ExcludeFromSingleFile="true" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <Resource Include="rig.ico" />

@@ -23,11 +23,9 @@ $ErrorActionPreference = 'Continue'
 $bancs = Get-ChildItem -Path (Join-Path $PSScriptRoot 'tests') -Filter '*.csproj' -Recurse |
          Sort-Object Name
 if ($Filtre) { $bancs = $bancs | Where-Object { $_.BaseName -like "*$Filtre*" } }
-
-if (-not $bancs) {
-    Write-Host "Aucun banc trouve dans tests/." -ForegroundColor Yellow
-    exit 1
-}
+# Aucun banc .NET retenu n'est plus un arret ici : le filtre peut viser le seul
+# banc web (« .\tests.ps1 Vitest »). Le controle « rien n'a tourne » est fait
+# apres la serie, sur les resultats reels.
 
 $resultats = @()
 $debutTotal = Get-Date
@@ -75,6 +73,55 @@ foreach ($banc in $bancs) {
         Duree  = $duree
         Echecs = @($sortie | Where-Object { "$_" -like 'ECHEC*' }).Count
     }
+}
+
+# --- Banc des ecrans React (web/, migration Blazor -> React du 18/11/2026).
+# Ce n'est pas un projet .NET : c'est `npm test` (vitest) dans web/. Il entre
+# dans le MEME bilan et le MEME code de sortie que les bancs C#, sous le nom
+# « WebVitest » (filtrable : .\tests.ps1 Vitest).
+$web = Join-Path $PSScriptRoot 'web'
+$nomWeb = 'WebVitest'
+if ((Test-Path (Join-Path $web 'package.json')) -and (-not $Filtre -or $nomWeb -like "*$Filtre*")) {
+    Write-Host ""
+    Write-Host "=== $nomWeb" -ForegroundColor Cyan
+    $debut = Get-Date
+    Push-Location $web
+    try {
+        $sortie = @()
+        $code = 0
+        if (-not (Test-Path 'node_modules\.bin\vitest.cmd')) {
+            $sortie += & npm ci --no-audit --no-fund 2>&1
+            $code = $LASTEXITCODE
+        }
+        if ($code -eq 0) {
+            $sortie += & npm test --silent 2>&1
+            $code = $LASTEXITCODE
+        }
+    } finally { Pop-Location }
+    $duree = [int]((Get-Date) - $debut).TotalSeconds
+
+    if ($Detail -or $code -ne 0) {
+        $sortie | ForEach-Object { Write-Host "    $_" }
+    }
+    else {
+        $sortie | Where-Object { "$_" -match '^\s*Tests\s' } | Select-Object -Last 1 |
+            ForEach-Object { Write-Host "    $_" }
+    }
+
+    $resultats += [pscustomobject]@{
+        Banc   = $nomWeb
+        Code   = $code
+        Vert   = ($code -eq 0)
+        Duree  = $duree
+        # vitest liste chaque test rouge sur une ligne « FAIL  fichier > test ».
+        # Motif en ASCII : ce fichier n'a pas de BOM, PowerShell 5 le lit en ANSI.
+        Echecs = @($sortie | Where-Object { "$_" -match '^\s*FAIL\s' }).Count
+    }
+}
+
+if (-not $resultats) {
+    Write-Host "Aucun banc ne correspond au filtre '$Filtre'." -ForegroundColor Yellow
+    exit 1
 }
 
 $dureeTotale = [int]((Get-Date) - $debutTotal).TotalSeconds

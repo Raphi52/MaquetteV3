@@ -1,0 +1,121 @@
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@* ILE REACT : monte un ecran React (web/src/ecrans/<Composant>.tsx) dans un
+   div que Blazor ne touche plus ensuite.
+
+   Pourquoi : la migration Blazor -> React se fait ecran par ecran. Un ecran
+   porte garde son fichier .razor, reduit a une coquille qui monte l'ile avec
+   les MEMES parametres : Home.razor ne change pas avant les lots 7-8.
+
+   - Proprietes : les valeurs passees au composant (serialisees en JSON) ; un
+     changement de valeur re-rend le composant, son etat React est garde.
+   - Rappels : les gestes que l'ecran remonte a Blazor (ex. ouvrirDossier).
+     Cote React ce sont des fonctions ; elles reviennent ici par Rappeler().
+
+   display:contents : le div ne cree aucune boite. L'ecran React reste, pour
+   la mise en page, l'enfant direct du cadre .rig-proc (colonne souple) :
+   meme rendu qu'avant, sans toucher rig-charte.css ni rig-accueil.css.
+
+   Blazor ne touche jamais l'interieur du div : il n'y rend rien, son diff n'y
+   a donc rien a corriger. React y est seul maitre. *@
+<div @ref="Hote" data-ile="@Composant" style="display:contents"></div>
+
+@code {
+    /// <summary>Chemin du module construit par web/ (vite build), relatif a wwwroot.</summary>
+    public const string CheminModule = "./app/rig-iles.js";
+
+    /// <summary>Le nom du composant React : le nom de son fichier .tsx.</summary>
+    [Parameter, EditorRequired] public string Composant { get; set; } = string.Empty;
+
+    [Parameter] public IReadOnlyDictionary<string, object?>? Proprietes { get; set; }
+
+    [Parameter] public IReadOnlyDictionary<string, RappelIle>? Rappels { get; set; }
+
+    /// <summary>Un geste remonte par React, avec sa valeur en JSON.</summary>
+    public sealed class RappelIle(Func<JsonElement, Task> traiter)
+    {
+        internal Task Traiter(JsonElement valeur) => traiter(valeur);
+    }
+
+    /// <summary>Branche un EventCallback typé : la valeur JSON est relue en T.</summary>
+    public static RappelIle Rappel<T>(EventCallback<T> rappel)
+        => new(v => rappel.InvokeAsync(v.Deserialize<T>(Json)!));
+
+    /// <summary>Branche un EventCallback sans valeur.</summary>
+    public static RappelIle Rappel(EventCallback rappel) => new(_ => rappel.InvokeAsync());
+
+    // Memes regles que l'interop Blazor (proprietes en camelCase).
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+    private static readonly IReadOnlyDictionary<string, object?> Aucune = new Dictionary<string, object?>();
+
+    private ElementReference Hote;
+    private IJSObjectReference? Module;
+    private DotNetObjectReference<IleReact>? Reference;
+    private string? ProprietesEnvoyees;
+    private bool Detruite;
+
+    protected override async Task OnAfterRenderAsync(bool premierRendu)
+    {
+        var proprietes = Proprietes ?? Aucune;
+        var json = JsonSerializer.Serialize(proprietes, Json);
+
+        if (premierRendu)
+        {
+            Reference = DotNetObjectReference.Create(this);
+            Module = await JS.InvokeAsync<IJSObjectReference>("import", CheminModule);
+            // L'ecran a pu etre ferme pendant le chargement du module :
+            // DisposeAsync n'avait alors encore rien a demonter.
+            if (Detruite) { await LibererAsync(); return; }
+            await Module.InvokeVoidAsync("monter", Hote, Composant, proprietes,
+                                         (Rappels?.Keys ?? []).ToArray(), Reference);
+            ProprietesEnvoyees = json;
+            return;
+        }
+
+        if (Module is not null && json != ProprietesEnvoyees)
+        {
+            await Module.InvokeVoidAsync("mettreAJour", Hote, proprietes);
+            ProprietesEnvoyees = json;
+        }
+    }
+
+    /// <summary>Appele par web/src/pont.ts (rappelBlazor) quand l'ecran remonte un geste.</summary>
+    [JSInvokable]
+    public Task Rappeler(string nom, JsonElement valeur)
+    {
+        if (Rappels is null || !Rappels.TryGetValue(nom, out var rappel))
+            throw new InvalidOperationException($"L'ile « {Composant} » n'a pas de rappel « {nom} ».");
+        return rappel.Traiter(valeur);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Detruite = true;
+        await LibererAsync();
+    }
+
+    // Le rechargement de la vue (reprise a chaud de wwwroot, F5) detruit ce
+    // composant APRES que la page JS a disparu, avec son React et son module :
+    // l'appel de nettoyage leve alors JSException (« JS object instance with
+    // ID 3 does not exist »). Non attrapee, elle remonte au dispatcher WPF et
+    // FERME l'application -- mesure le 18/11/2026 (journal .NET Runtime), meme
+    // cause et meme regle que Home.razor.DisposeAsync. Il n'y a alors plus rien
+    // a demonter : l'ignorer est la bonne fin, pas un defaut cache.
+    private async Task LibererAsync()
+    {
+        if (Module is not null)
+        {
+            try { await Module.InvokeVoidAsync("demonter", Hote); }
+            catch (JSException) { }
+            catch (JSDisconnectedException) { }
+            try { await Module.DisposeAsync(); }
+            catch (JSException) { }
+            catch (JSDisconnectedException) { }
+        }
+        Module = null;
+        Reference?.Dispose();
+        Reference = null;
+    }
+}

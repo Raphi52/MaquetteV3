@@ -2,7 +2,12 @@
    ranger une grille dans toute la maquette, et un seul endroit a corriger.
 
    Le sens courant est porte par aria-sort, l'attribut que lisent les lecteurs
-   d'ecran ET les tests : la fleche seule ne se mesure pas. *@
+   d'ecran ET les tests : la fleche seule ne se mesure pas.
+
+   Jumeau React (18/11/2026) : web/src/composants/EnteteTriable.tsx, pour les
+   ecrans portes. Ce .razor reste tant qu'un ecran BLAZOR s'en sert
+   (EcranRechAffaires, EcranRequisitions : lots 2 et 3) ; un <th> ne peut pas
+   etre une ile React (un div n'a pas sa place dans un <tr>). *@
 
 <th class="@Classe rig-th--triable"
     aria-sort="@(Actif ? (Ascendant ? "ascending" : "descending") : "none")"

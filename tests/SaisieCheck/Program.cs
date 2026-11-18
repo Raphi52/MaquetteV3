@@ -128,8 +128,17 @@ finally
 // --- 5. L etat valide remonte dans TOUS les ecrans, depuis une seule source
 var racineVues = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Components"));
 var fichiersVues = Directory.GetFiles(racineVues, "*.razor", SearchOption.AllDirectories);
-var vue2 = string.Join(Environment.NewLine, fichiersVues.Select(File.ReadAllText));
+// Les ecrans PORTES EN REACT (web/src, 18/11/2026) font partie des vues : une
+// regle tenue par un ecran porte se lit dans son .tsx, plus dans son .razor
+// devenu coquille. Les tests (*.test.tsx) n'en sont pas.
+var racineWeb = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../web/src"));
+var fichiersTsx = Directory.Exists(racineWeb)
+    ? Directory.GetFiles(racineWeb, "*.tsx", SearchOption.AllDirectories)
+               .Where(f => !f.EndsWith(".test.tsx", StringComparison.OrdinalIgnoreCase)).ToArray()
+    : [];
+var vue2 = string.Join(Environment.NewLine, fichiersVues.Concat(fichiersTsx).Select(File.ReadAllText));
 Exiger(fichiersVues.Length >= 4, $"les ecrans sont bien decoupes en composants ({fichiersVues.Length} vues)");
+Exiger(fichiersTsx.Length >= 3, $"les ecrans React sont lus avec les vues ({fichiersTsx.Length} .tsx)");
 
 // Les listes de reference (modes d arrivee, categories de depot) ont quitte
 // les vues pour Metier/JeuDemo.cs : on les cherche donc dans les DEUX, sinon
@@ -254,6 +263,13 @@ foreach (var fichier in Directory.GetFiles(
     // Un ecran NEUF (geste que v2 ne portait pas) n a pas de procedure a citer :
     // il doit alors le DIRE, faute de quoi la regle exigerait un code invente.
     Exiger(Regex.IsMatch(texte, @"(PROC_[A-Z_]+|BODACC|Sans origine RIG v2)"),
+        $"{nom} nomme la procedure RIG v2 dont il est porte, ou dit qu il n en a pas");
+}
+// Meme exigence pour l ecran PORTE en React : le .tsx garde la trace de sa source v2.
+foreach (var fichier in fichiersTsx.Where(f => Regex.IsMatch(Path.GetFileName(f), @"^Ecran\w*\.tsx$")))
+{
+    var nom = Path.GetFileName(fichier);
+    Exiger(Regex.IsMatch(File.ReadAllText(fichier), @"(PROC_[A-Z_]+|BODACC|Sans origine RIG v2)"),
         $"{nom} nomme la procedure RIG v2 dont il est porte, ou dit qu il n en a pas");
 }
 

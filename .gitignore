@@ -23,3 +23,9 @@ objverif*/
 
 # Ancienne sortie de build et captures du 17/09 (copie de bin pour apercu) : jamais versionnees
 .preview/
+
+# Ecrans React (web/, migration Blazor -> React) : paquets npm et sortie de
+# Vite. wwwroot/app/ est RECONSTRUIT par chaque dotnet build (RigV3Desktop.csproj,
+# cible ConstruireWeb) : jamais versionne.
+web/node_modules/
+wwwroot/app/

@@ -47,12 +47,35 @@ $ErrorActionPreference = 'Stop'
 # TargetFramework) et la compilation echoue avant le premier `error CS`.
 # La restauration n'ecrit que dans obj\ : l'exe de bin reste intact.
 & dotnet msbuild "$PSScriptRoot\RigV3Desktop.csproj" -restore "-t:ResolveReferences;PrepareResources;Compile" -v:m -nologo
-$code = $LASTEXITCODE
+$codeCs = $LASTEXITCODE
 
-if ($code -eq 0) {
-    Write-Host 'Compilation OK - le binaire n a pas ete touche, l application n a pas ete fermee.' -ForegroundColor Green
-} else {
-    Write-Host "Compilation en ECHEC (code $code) - voir les 'error CS' ci-dessus." -ForegroundColor Red
+# POURQUOI tsc ICI (18/11/2026, ecrans React de web/).
+# Vite construit le JavaScript SANS verifier les types : une erreur TypeScript
+# partirait dans l'appli sans bruit. tsc --noEmit (mode strict, web/tsconfig.json)
+# est donc la verification « est-ce que ca compile » du cote React, comme
+# -t:Compile l'est du cote C#. Il n'ecrit rien : ni wwwroot/app, ni l'exe.
+# Les DEUX passent toujours, pour voir d'un coup les error CS ET les error TS.
+$web = Join-Path $PSScriptRoot 'web'
+$codeTs = 0
+if (Test-Path (Join-Path $web 'package.json')) {
+    Push-Location $web
+    try {
+        # Copie neuve : la cible InstallerWeb du msbuild ci-dessus a normalement
+        # installe les paquets ; s'il s'est arrete avant, on les installe ici.
+        if (-not (Test-Path 'node_modules\.bin\tsc.cmd')) { & npm ci --no-audit --no-fund }
+        & npm run --silent typecheck
+        $codeTs = $LASTEXITCODE
+    } finally { Pop-Location }
 }
 
-exit $code
+if ($codeCs -eq 0 -and $codeTs -eq 0) {
+    Write-Host 'Compilation OK (C# et TypeScript) - le binaire n a pas ete touche, l application n a pas ete fermee.' -ForegroundColor Green
+    exit 0
+}
+if ($codeCs -ne 0) {
+    Write-Host "Compilation C# en ECHEC (code $codeCs) - voir les 'error CS' ci-dessus." -ForegroundColor Red
+}
+if ($codeTs -ne 0) {
+    Write-Host "Verification TypeScript en ECHEC (code $codeTs) - voir les 'error TS' ci-dessus." -ForegroundColor Red
+}
+exit 1

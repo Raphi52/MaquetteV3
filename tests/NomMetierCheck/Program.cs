@@ -80,6 +80,58 @@ foreach (var chemin in fichiers)
     }
 }
 
+// --- Les ecrans PORTES EN REACT (web/src, 18/11/2026) : memes trois regles.
+// Aucun fichier de web/src n'aiguille par code (l'aiguilleur reste Home.razor) :
+// la regle 3 y vaut donc partout. Commentaires exclus comme cote Razor
+// (/* */, {/* */} et //) : la tracabilite vers PROC_xxx de RIG v2 y reste utile.
+static string SansCommentairesTs(string texte)
+{
+    var t = Regex.Replace(texte, @"/\*.*?\*/", " ", RegexOptions.Singleline);
+    t = Regex.Replace(t, @"(?m)^\s*//.*$", " ");
+    return t;
+}
+
+var racineWeb = Path.Combine(racine, "web/src");
+var fichiersWeb = Directory.Exists(racineWeb)
+    ? Directory.GetFiles(racineWeb, "*.ts*", SearchOption.AllDirectories)
+               .Where(f => f.EndsWith(".ts") || f.EndsWith(".tsx"))
+               .Where(f => !Regex.IsMatch(f, @"\.test\.tsx?$"))
+               .ToArray()
+    : [];
+Exiger(fichiersWeb.Any(f => f.EndsWith(".tsx")), $"des ecrans React .tsx sont trouves ({fichiersWeb.Length} fichiers lus)");
+
+foreach (var chemin in fichiersWeb)
+{
+    var nom = Path.GetFileName(chemin);
+    var texte = SansCommentairesTs(File.ReadAllText(chemin));
+
+    // 1. Attributs de texte lus par l'utilisateur : "..." ou {'...'} / {`...`}.
+    foreach (Match m in Regex.Matches(texte,
+                 @"(title|placeholder|alt|aria-label)\s*=\s*(?:""(?<v>[^""]*)""|\{\s*(?<q>['`])(?<v>[^'`]*)\k<q>\s*\})",
+                 RegexOptions.IgnoreCase))
+    {
+        Exiger(!m.Groups["v"].Value.Contains("PROC_"),
+            $"{nom} : l'attribut {m.Groups[1].Value} « {m.Groups["v"].Value} » ne montre pas de code interne");
+    }
+
+    // 2. Texte rendu entre deux balises (meme filtre que cote Razor).
+    foreach (Match m in Regex.Matches(texte, @">([^<>{}]*)<"))
+    {
+        var rendu = m.Groups[1].Value;
+        if (!rendu.Contains("PROC_")) continue;
+        if (rendu.Contains("\n") || rendu.Contains(";")) continue;
+        Exiger(false, $"{nom} : le texte affiche « {rendu.Trim()} » ne montre pas de code interne");
+    }
+
+    // 3. Aucune chaine litterale ("...", '...' ou `...`) ne porte de code interne.
+    foreach (Match m in Regex.Matches(texte, @"([""'`])(?<v>[^""'`\r\n]*PROC_[^""'`\r\n]*)\1"))
+    {
+        Exiger(false,
+            $"{nom} : la chaine « {m.Groups["v"].Value} » porte un code interne ; " +
+            "seul Home.razor aiguille par code");
+    }
+}
+
 Console.WriteLine();
 Console.WriteLine(echecs.Count == 0
     ? "TOUT VERT : aucun code interne de procedure n'atteint l'ecran."

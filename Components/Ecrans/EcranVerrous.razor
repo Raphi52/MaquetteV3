@@ -2,91 +2,22 @@
    Destination de l'alerte « dossier(s) ouvert(s) par un tiers » de
    l'accueil : jusqu'ici l'alerte n'emmenait nulle part. Les lignes sont
    CALCULEES sur les demandes connues (JeuDemo), jamais ecrites en dur :
-   une demande encore en cours portee par un autre login est un verrou. *@
+   une demande encore en cours portee par un autre login est un verrou.
 
-<div class="rig-proc__corps">
+   PORTE EN REACT (lot 1 de la migration, 18/11/2026) : l'ecran est rendu par
+   web/src/ecrans/EcranVerrous.tsx, ses lignes viennent de Pont/EcranVerrous.cs.
+   Ce fichier n'est plus qu'une COQUILLE : il garde le parametre d'origine
+   (OuvrirDossier) pour que Home.razor ne change pas. Mode d'emploi :
+   web/README.md. *@
 
-    <aside class="rig-criteres">
-        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Verrous</div>
-
-        <label class="rig-saisie-champ">
-            <span class="rig-saisie-champ__libelle">Mon login</span>
-            <input class="rig-saisie-champ__saisie" @bind="Utilisateur" @bind:event="oninput" />
-        </label>
-
-        <button class="rig-bascule @(MoiCompris ? "rig-bascule--actif" : "")"
-                @onclick="() => MoiCompris = !MoiCompris">
-            <span class="rig-bascule__temoin"></span>
-            <span>Inclure mes propres dossiers</span>
-        </button>
-
-        <div class="rig-criteres__bloc">
-            <div class="rig-kicker">Detenteurs</div>
-            @foreach (var d in Verrouilles.GroupBy(v => v.Utilisateur).OrderBy(g => g.Key))
-            {
-                <div class="rig-alerte">
-                    <span class="rig-filet-v rig-filet-v--attente"></span>
-                    <span class="rig-alerte__corps">
-                        <span class="rig-alerte__titre">@d.Key</span><br />
-                        <span class="rig-alerte__detail">@d.Count() dossier(s)</span>
-                    </span>
-                </div>
-            }
-        </div>
-    </aside>
-
-    <section class="rig-resultats-proc">
-        <div class="rig-resultats-proc__entete">
-            <div class="rig-kicker">Dossiers verrouilles</div>
-            <span class="rig-resultats-proc__compte">@Verrouilles.Length dossier(s)</span>
-        </div>
-
-        <div class="rig-table-cadre">
-            <table class="rig-table">
-                <thead>
-                    <tr>
-                        <th>Dossier</th>
-                        <th>Objet</th>
-                        <th>Etat</th>
-                        <th>Detenu par</th>
-                        <th>Depuis</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var item in Verrouilles)
-                    {
-                        var v = item;
-                        <tr @onclick="() => OuvrirDossier.InvokeAsync(v.Dossier)"
-                            title="Ouvrir l'affaire @v.Dossier">
-                            <td class="rig-table__mono">@v.Dossier</td>
-                            <td>@v.Nom</td>
-                            <td><span class="rig-etat rig-etat--@v.Statut">@v.Etat</span></td>
-                            <td>@v.Utilisateur</td>
-                            <td class="rig-table__mono">@Age(v) j</td>
-                        </tr>
-                    }
-                    @if (Verrouilles.Length == 0)
-                    {
-                        <tr><td colspan="5" class="rig-table__vide">Aucun dossier n'est retenu par un autre poste.</td></tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    </section>
-</div>
+<IleReact Composant="EcranVerrous" Rappels="Rappels" />
 
 @code {
     /// <summary>Remonte le NUMERO clique : l'ecran ne connait pas la visionneuse.</summary>
     [Parameter] public EventCallback<string> OuvrirDossier { get; set; }
 
-    private string Utilisateur = "R. VILAIN";
-    private bool MoiCompris;
-
-    private DemandeRcs[] Verrouilles => JeuDemo.Demandes
-        .Where(d => d.EnCours && !string.IsNullOrWhiteSpace(d.Utilisateur))
-        .Where(d => MoiCompris || d.Utilisateur != Utilisateur)
-        .OrderBy(d => d.Creation2)
-        .ToArray();
-
-    private static int Age(DemandeRcs d) => (int)(JeuDemo.Aujourdhui - d.Creation2).TotalDays;
+    private Dictionary<string, IleReact.RappelIle> Rappels => new()
+    {
+        ["ouvrirDossier"] = IleReact.Rappel(OuvrirDossier)
+    };
 }

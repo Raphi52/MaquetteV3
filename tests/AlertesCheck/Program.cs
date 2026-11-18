@@ -338,6 +338,47 @@ Exiger(File.Exists(Path.Combine(racine, "Components/Ecrans/EcranVerrous.razor"))
 Exiger(File.Exists(Path.Combine(racine, "Components/Ecrans/EcranTeletransmission.razor")),
     "l'ecran des teletransmissions existe");
 
+// --- 2 ter. L'ecran des verrous, PORTE EN REACT (lot 1, 18/11/2026).
+// Ce que ce banc tenait sur EcranVerrous.razor -- l'ecran existe, ses lignes
+// sont CALCULEES sur les demandes connues, jamais ecrites en dur -- il le tient
+// maintenant sur la chaine reelle : coquille .razor -> ile React -> pont C#.
+// Le calcul vit dans Pont/EcranVerrous.cs : il est EXECUTE ici, pas relu.
+var coquilleVerrous = File.ReadAllText(Path.Combine(racine, "Components/Ecrans/EcranVerrous.razor"));
+var cheminTsxVerrous = Path.Combine(racine, "web/src/ecrans/EcranVerrous.tsx");
+Exiger(File.Exists(cheminTsxVerrous), "l'ecran React des dossiers verrouilles existe (web/src/ecrans/EcranVerrous.tsx)");
+var tsxVerrous = File.Exists(cheminTsxVerrous) ? File.ReadAllText(cheminTsxVerrous) : string.Empty;
+var pontVerrous = File.ReadAllText(Path.Combine(racine, "Pont/EcranVerrous.cs"));
+Exiger(coquilleVerrous.Contains("<IleReact Composant=\"EcranVerrous\""),
+    "la coquille EcranVerrous.razor monte l'ecran React du meme nom");
+Exiger(Regex.IsMatch(coquilleVerrous, @"\[Parameter\] public EventCallback<string> OuvrirDossier")
+       && coquilleVerrous.Contains("[\"ouvrirDossier\"] = IleReact.Rappel(OuvrirDossier)"),
+    "la coquille garde le parametre OuvrirDossier et le remonte depuis React");
+Exiger(vue.Contains("<EcranVerrous OuvrirDossier=\"OuvrirParNumero\" />"),
+    "Home.razor ouvre toujours l'affaire cliquee dans l'ecran des verrous");
+Exiger(tsxVerrous.Contains("appeler<VueVerrous>('EcranVerrous.Verrouilles', utilisateur, moiCompris)"),
+    "l'ecran React demande ses lignes au pont, avec le login et la bascule saisis");
+Exiger(pontVerrous.Contains("[JSInvokable(\"EcranVerrous.Verrouilles\")]"),
+    "le pont expose ce calcul au React sous le meme identifiant");
+Exiger(!Regex.IsMatch(tsxVerrous, @"['""`]\d{6}['""`]"),
+    "l'ecran React n'ecrit aucun numero de dossier en dur : il affiche ce que le pont calcule");
+
+var vueVerrous = RigV3Desktop.Pont.EcranVerrous.Verrouilles("R. VILAIN", moiCompris: false);
+Exiger(vueVerrous.Lignes.Length == attenduVerrous,
+    $"l'ecran montre autant de verrous que les demandes en cours d'un autre poste ({vueVerrous.Lignes.Length} / {attenduVerrous})");
+Exiger(verrou is null || verrou.Titre.StartsWith(vueVerrous.Lignes.Length + " "),
+    "l'alerte « ouvert(s) par un tiers » et l'ecran ou elle mene annoncent le meme nombre");
+Exiger(vueVerrous.Lignes.All(l => l.Utilisateur != "R. VILAIN"
+                                  && JeuDemo.Demandes.Any(d => d.Dossier == l.Dossier && d.EnCours && d.Utilisateur == l.Utilisateur)),
+    "chaque ligne est une demande connue, en cours, portee par un autre login");
+Exiger(vueVerrous.Lignes.Zip(vueVerrous.Lignes.Skip(1)).All(p => p.First.Age >= p.Second.Age),
+    "les verrous les plus anciens viennent en tete");
+var avecMoi = RigV3Desktop.Pont.EcranVerrous.Verrouilles("R. VILAIN", moiCompris: true);
+Exiger(avecMoi.Lignes.Length == JeuDemo.Demandes.Count(d => d.EnCours && !string.IsNullOrWhiteSpace(d.Utilisateur)),
+    "« Inclure mes propres dossiers » ajoute mes demandes en cours, et elles seules");
+Exiger(avecMoi.Detenteurs.Sum(d => d.Nombre) == avecMoi.Lignes.Length
+       && avecMoi.Detenteurs.Select(d => d.Utilisateur).SequenceEqual(avecMoi.Detenteurs.Select(d => d.Utilisateur).Order()),
+    "les detenteurs, ranges par nom, comptent toutes les lignes");
+
 // La vue branche le clic, et ne garde plus de liste d'alertes en dur.
 Exiger(vue.Contains("OuvrirAlerte("), "Home.razor branche le clic d'une alerte");
 Exiger(vue.Contains("SondeAlertes.Relever()"), "Home.razor releve les alertes par la sonde");

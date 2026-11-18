@@ -15,6 +15,13 @@
     <Compile Include="../../Metier/RecetteTache.cs" Link="RecetteTache.cs" />
     <Compile Include="../../Metier/JeuDemo.cs" Link="JeuDemo.cs" />
     <Compile Include="../../Metier/SimulationEdi.cs" Link="SimulationEdi.cs" />
+    <!-- Le calcul de l'ecran des verrous, porte en React le 18/11/2026 : execute ici. -->
+    <Compile Include="../../Pont/EcranVerrous.cs" Link="Pont/EcranVerrous.cs" />
+  </ItemGroup>
+
+  <!-- Pont/*.cs porte [JSInvokable] (Microsoft.JSInterop), livre avec ASP.NET Core. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
 </Project>

@@ -58,6 +58,28 @@ foreach (var f in recherches)
         $"{nom} lance la recherche sur Entree");
 }
 
+// --- 3 bis. Meme regle sur les ecrans PORTES EN REACT (web/src, 18/11/2026) :
+// un ecran dont un bouton lance rechercher() ecoute le clavier (onKeyDown) et
+// lance la recherche sur Entree. Un ecran de recherche porte reste donc compte
+// ici, et le seuil ci-dessus se lit sur les DEUX familles.
+var racineWeb = Path.Combine(racine, "web/src/ecrans");
+var ecransTsx = Directory.Exists(racineWeb)
+    ? Directory.GetFiles(racineWeb, "*.tsx").Where(f => !f.EndsWith(".test.tsx", StringComparison.OrdinalIgnoreCase)).ToList()
+    : [];
+var recherchesTsx = ecransTsx
+    .Where(f => Regex.IsMatch(File.ReadAllText(f), @"onClick=\{\s*(?:\(\)\s*=>\s*)?rechercher(?:\(\))?\s*\}"))
+    .ToList();
+foreach (var f in recherchesTsx)
+{
+    var t = File.ReadAllText(f);
+    var nom = Path.GetFileName(f);
+    Exiger(t.Contains("onKeyDown"), $"{nom} ecoute le clavier");
+    Exiger(Regex.IsMatch(t, @"\.key\s*===?\s*['""]Enter['""][\s\S]{0,80}?rechercher\(\)"),
+        $"{nom} lance la recherche sur Entree");
+}
+Exiger(recherches.Count + recherchesTsx.Count >= 2,
+    $"les ecrans de recherche restent trouves, Blazor et React confondus ({recherches.Count} + {recherchesTsx.Count})");
+
 Console.WriteLine();
 Console.WriteLine(echecs.Count == 0 ? "ClavierCheck : vert." : $"ClavierCheck : {echecs.Count} echec(s).");
 return echecs.Count;
