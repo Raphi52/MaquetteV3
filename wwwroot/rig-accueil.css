@@ -2,6 +2,8 @@
    RIG V3 - ACCUEIL A TUILES POSABLES
    Complement de rig-charte.css. Meme regle fondatrice :
    aucun aplat de couleur, la couleur ne vit que dans les filets.
+   Deux exceptions depuis le 2026-11-18 (« Ivoire chaud », voir l'entete
+   de rig-charte.css) : les tuiles chiffrees et le verbe actif du menu.
    ============================================================ */
 
 /* ---------- Ossature : menu a gauche, plan de travail a droite ---------- */
@@ -22,10 +24,22 @@
 
 /* ---------- Menu de gauche, groupes depliables ---------- */
 .rig-menu {
-  border-right: 1px solid var(--rig-bord);
+  border-right: 1px solid var(--rig-rail-bord);
   padding: var(--rig-esp-4) var(--rig-esp-2);
   overflow-y: auto;
   min-height: 0;
+  /* RAIL ENCRE dans les deux modes (« Ivoire chaud », 2026-11-18) : le menu
+     est un ilot sombre, meme sur l'ivoire du mode clair. Ses jetons de texte,
+     de voile et de bord sont donc REDEFINIS ici, pour un fond sombre : tout
+     ce qui est dessous lit les memes noms de variables sans changer. */
+  background: var(--rig-rail);
+  --rig-texte: #F1EDE4;
+  --rig-texte-2: #E8E2D2;
+  --rig-texte-3: #9C9583;
+  --rig-fond-2: rgba(255, 240, 215, .07);
+  --rig-bord: rgba(255, 240, 215, .14);
+  --rig-bord-faible: rgba(255, 240, 215, .08);
+  color: var(--rig-texte-2);
 }
 .rig-menu__groupe { margin-bottom: var(--rig-esp-1); }
 .rig-menu__tete {
@@ -72,19 +86,26 @@
    la reprend quand le groupe est ouvert, et la ligne survolee ou active s'y
    rattache par un liseré. C'est le seul aplat de couleur du menu — il tient
    dans un carre de 18 px, il ne peint jamais le fond du panneau. */
-.rig-menu__groupe--rcs    { --teinte: #E8A317; --teinte-faible: rgba(232,163,23,.14); }
-.rig-menu__groupe--jud    { --teinte: #3B82F6; --teinte-faible: rgba(59,130,246,.14); }
+/* 2026-11-18 (« Ivoire chaud ») : les SEPT verbes du menu prennent la famille
+   de l'or, une teinte par mode (jetons --rig-verbe-* de rig-charte.css) ; le
+   voile se calcule depuis la teinte. Les autres teintes ne sont pas montrees
+   par le menu des verbes et restent telles quelles. */
+.rig-menu__groupe--rcs    { --teinte: var(--rig-verbe-ouvrir);     --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
+.rig-menu__groupe--jud    { --teinte: var(--rig-verbe-trouver);    --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
 .rig-menu__groupe--doc    { --teinte: #10B981; --teinte-faible: rgba(16,185,129,.14); }
-.rig-menu__groupe--compta { --teinte: #F97316; --teinte-faible: rgba(249,115,22,.14); }
-.rig-menu__groupe--reg    { --teinte: #8B5CF6; --teinte-faible: rgba(139,92,246,.14); }
+.rig-menu__groupe--compta { --teinte: var(--rig-verbe-facturer);   --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
+.rig-menu__groupe--reg    { --teinte: var(--rig-verbe-configurer); --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
 /* Le menu suit les GESTES du metier : chaque geste porte sa couleur, pour
    reconnaitre ou l'on est avant d'avoir lu le titre. */
 .rig-menu__groupe--pers   { --teinte: #EC4899; --teinte-faible: rgba(236,72,153,.14); }
-.rig-menu__groupe--mod    { --teinte: #D4B106; --teinte-faible: rgba(212,177,6,.14); }
+.rig-menu__groupe--mod    { --teinte: var(--rig-verbe-modifier);   --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
 .rig-menu__groupe--aud    { --teinte: #0EA5E9; --teinte-faible: rgba(14,165,233,.14); }
 .rig-menu__groupe--edit   { --teinte: #84CC16; --teinte-faible: rgba(132,204,22,.14); }
-.rig-menu__groupe--surv   { --teinte: #F2544B; --teinte-faible: rgba(242,84,75,.14); }
-.rig-menu__groupe--fin    { --teinte: #64748B; --teinte-faible: rgba(100,116,139,.14); }
+.rig-menu__groupe--surv   { --teinte: var(--rig-verbe-surveiller); --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
+.rig-menu__groupe--fin    { --teinte: var(--rig-verbe-terminer);   --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
+/* Sur le rail encre, une teinte ecrite en TEXTE (sous-titre ouvert, survol)
+   s'eclaircit : le bleu #4560C2 tombe a 2,9:1 sur l'encre. */
+.rig-menu .rig-menu__groupe { --teinte-texte: color-mix(in srgb, var(--teinte, #9C9583) 70%, #FFFFFF); }
 
 /* Favoris : l'or de l'etoile. Le groupe est en tete du menu, au-dessus
    d'« Ouvrir » ; il n'apparait que si au moins une etoile est allumee. */
@@ -115,7 +136,9 @@
   width: 18px; height: 18px; border-radius: 5px;
   display: inline-flex; align-items: center; justify-content: center;
   font: 700 10px/1 var(--rig-font-mono);
-  color: var(--rig-fond);
+  /* Signe blanc dans les deux modes, comme la maquette « Ivoire chaud » (avant :
+     la couleur du fond de page, donc un signe sombre en mode sombre). */
+  color: #FFFFFF;
   background: var(--teinte, var(--rig-texte-3));
   opacity: .78;
   transition: opacity .15s ease, box-shadow .15s ease;
@@ -126,6 +149,23 @@
   box-shadow: 0 0 0 3px var(--teinte-faible);
 }
 .rig-menu__groupe--ouvert .rig-menu__titre { color: var(--teinte); }
+
+/* VERBE ACTIF (« Ivoire chaud », 2026-11-18) : le verbe OUVERT porte la
+   pastille d'or, dans les deux modes. C'est l'un des deux seuls aplats de la
+   charte. Borne a la NAV : EcranDocDemat reprend .rig-menu__groupe pour ses
+   dossiers de pieces, hors du rail, et garde son rendu. */
+.rig-menu .rig-menu__groupe--ouvert > .rig-menu__tete,
+.rig-menu .rig-menu__groupe--ouvert > .rig-menu__tete:hover {
+  background: linear-gradient(90deg, var(--rig-or-clair), var(--rig-or));
+  color: var(--rig-or-texte);
+}
+.rig-menu .rig-menu__groupe--ouvert > .rig-menu__tete .rig-menu__titre,
+.rig-menu .rig-menu__groupe--ouvert > .rig-menu__tete .rig-menu__chevron,
+.rig-menu .rig-menu__groupe--ouvert > .rig-menu__tete .rig-menu__compte { color: var(--rig-or-texte); }
+.rig-menu .rig-menu__groupe--ouvert > .rig-menu__tete .rig-menu__pastille {
+  opacity: 1;
+  box-shadow: 0 0 0 1px rgba(30, 22, 8, .35);
+}
 
 /* ---------- Troisieme niveau : les VERBES du metier ----------
    Un titre court, en petites capitales, sans aplat : il doit se distinguer du
@@ -141,9 +181,9 @@
   padding: 5px var(--rig-esp-2) 5px 6px;
   border-radius: var(--rig-radius-sm);
 }
-.rig-menu__sous:hover { background: var(--teinte-faible); color: var(--teinte); }
-.rig-menu__sous--ouvert { color: var(--teinte); }
-.rig-menu__sous--ouvert .rig-menu__chevron { transform: rotate(90deg); color: var(--teinte); }
+.rig-menu__sous:hover { background: var(--teinte-faible); color: var(--teinte-texte, var(--teinte)); }
+.rig-menu__sous--ouvert { color: var(--teinte-texte, var(--teinte)); }
+.rig-menu__sous--ouvert .rig-menu__chevron { transform: rotate(90deg); color: var(--teinte-texte, var(--teinte)); }
 .rig-menu__sous-titre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Les entrees d'un groupe ouvert se rattachent a sa couleur : un rail discret
@@ -225,34 +265,36 @@
      interdit les aplats de COULEUR ; celui-ci est neutre et ne porte que sur
      --fixe (l'accueil) : les champs .rig-recherche des autres ecrans gardent
      le voile de la charte. Cause du rendu fantome corrigee ici : ce voile vaut
-     --rig-fond-2, soit du blanc a 3,5 %, donc la barre etait invisible. */
-  background: #FFFFFF;
-  border-color: rgba(30, 50, 90, .22);
+     --rig-fond-2, soit du blanc a 3,5 %, donc la barre etait invisible.
+     2026-11-18 (« Ivoire chaud ») : le blanc fixe devient --rig-champ, creme le
+     jour et encre la nuit, comme la maquette choisie ; la barre reste OPAQUE
+     et detachee par le liseré or et l'ombre. */
+  background: var(--rig-champ);
+  border-color: var(--rig-bord);
   padding: 12px var(--rig-esp-4);
-  /* En mode CLAIR le fond de page est deja #F5F6F4 : c'est le liseré or et
-     l'ombre qui detachent la barre, pas le blanc. Ne pas les retirer. */
+  /* C'est le liseré or et l'ombre qui detachent la barre du fond de page, pas
+     sa couleur. Ne pas les retirer. */
   box-shadow: 0 0 0 1px rgba(176, 141, 63, .30), var(--rig-ombre);
 }
-/* Sur blanc, tout le contenu repasse en ENCRE : la loupe or et le texte clair
-   de la charte sombre y seraient illisibles. Le !important vise le style
-   INLINE pose sur la loupe dans Home.razor. */
-.rig-recherche--fixe > span:first-child { color: #4F5A6E !important; }
-.rig-recherche--fixe .rig-recherche__saisie { color: #0B0E14; }
-.rig-recherche--fixe .rig-recherche__saisie::placeholder { color: #69748A; }
+/* La loupe : le !important vise le style INLINE pose sur elle dans Home.razor
+   (or du focus), trop pale sur le champ creme du mode clair. */
+.rig-recherche--fixe > span:first-child { color: var(--rig-texte-3) !important; }
+.rig-recherche--fixe .rig-recherche__saisie { color: var(--rig-texte); }
+.rig-recherche--fixe .rig-recherche__saisie::placeholder { color: var(--rig-texte-3); }
 .rig-recherche--fixe .rig-touche {
-  color: #4F5A6E;
-  border-color: rgba(30, 50, 90, .20);
-  background: #EEF0F3;
+  color: var(--rig-texte-3);
+  border-color: var(--rig-bord);
+  background: var(--rig-fond-2);
 }
 .rig-recherche--fixe:focus-within {
   border-color: var(--rig-focus);
   box-shadow: 0 0 0 3px rgba(176, 141, 63, .35), var(--rig-ombre-saisie);
 }
-/* La liste de resultats pend SOUS la barre : elle suit le blanc, sinon un
-   panneau sombre s'accroche a un champ clair. */
-.rig-recherche--fixe .rig-resultats { background: #FFFFFF; }
-.rig-recherche--fixe .rig-resultat { color: #0B0E14; }
-.rig-recherche--fixe .rig-resultat:hover { background: #F0F2F5; }
+/* La liste de resultats pend SOUS la barre : elle prend le meme fond qu'elle,
+   sinon un panneau d'une autre teinte s'accroche au champ. */
+.rig-recherche--fixe .rig-resultats { background: var(--rig-champ); }
+.rig-recherche--fixe .rig-resultat { color: var(--rig-texte); }
+.rig-recherche--fixe .rig-resultat:hover { background: var(--rig-fond-2); }
 .rig-resultats {
   position: absolute; left: 0; right: 0; top: calc(100% + 4px);
   border: 1px solid var(--rig-bord);
@@ -320,10 +362,12 @@
   user-select: none;
 }
 .rig-widget__poignee { font: 12px var(--rig-font-mono); color: var(--rig-texte-3); }
+/* 2026-11-18 (« Ivoire chaud ») : titre en gras plein, couleur du texte, comme
+   « A TRAITER » sur la maquette choisie (avant : 600 et texte secondaire). */
 .rig-widget__titre {
-  font: 600 var(--rig-fs-kicker)/1 var(--rig-font);
+  font: 700 var(--rig-fs-kicker)/1 var(--rig-font);
   letter-spacing: var(--rig-ls-kicker); text-transform: uppercase;
-  color: var(--rig-texte-2);
+  color: var(--rig-texte);
 }
 .rig-widget__fermer {
   margin-left: auto; background: none; border: 0; cursor: pointer;
@@ -550,11 +594,13 @@
 }
 /* La couleur du rond suit le PALIER de charge de la ligne, comme la pastille
    de l'en-tete (demande du 17/09/2026) : une seule grammaire de couleur dans
-   tout l'accueil, lisible sans apprendre un code de gravite. */
-.rig-alerte__compte--vide  { background: #16C47F; }
-.rig-alerte__compte--bas   { background: #2E6FD8; }
-.rig-alerte__compte--moyen { background: #FF8A00; }
-.rig-alerte__compte--haut  { background: #F04438; }
+   tout l'accueil, lisible sans apprendre un code de gravite.
+   2026-11-18 (« Ivoire chaud ») : les paliers prennent les teintes des tuiles
+   chiffrees (olive, bleu encre, or, brique), une par mode : jetons --rig-palier-*. */
+.rig-alerte__compte--vide  { background: var(--rig-palier-vide); }
+.rig-alerte__compte--bas   { background: var(--rig-palier-bas); }
+.rig-alerte__compte--moyen { background: var(--rig-palier-moyen); }
+.rig-alerte__compte--haut  { background: var(--rig-palier-haut); }
 
 .rig-alerte__titre { font-size: var(--rig-fs-dense); color: var(--rig-texte); }
 .rig-alerte__detail { font-size: 11px; color: var(--rig-texte-3); }
@@ -1033,6 +1079,53 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 /* L'entete du plan ne porte plus les commandes : elle ne fait plus
    que presenter la journee. */
 .rig-entete { user-select: text; }
+
+/* « BONJOUR RAPHAEL » (« Ivoire chaud », 2026-11-18) : le titre de l'accueil
+   passe en capitales grasses, comme le titre de la voie « Bleu nuit et aplats
+   vifs ». Le texte de Home.razor ne change pas, seule sa casse affichee. */
+.rig-plan > .rig-entete .rig-titre {
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+.rig-plan > .rig-entete .rig-titre b { font-weight: 800; }
+
+/* ---------- Tuiles chiffrees (« Ivoire chaud », 2026-11-18) ----------
+   Trois chiffres du jour entre la recherche et la grille : Arrivees (le
+   compte de « A traiter »), Dossiers traites et Hors delai legal (la tuile
+   Performance). Aplats MATS le jour, verre teinte la nuit : couleurs dans les
+   jetons --rig-chiffre-* de rig-charte.css. Fixe comme la recherche : elle ne
+   se pose pas dans la grille et ne se masque pas. */
+.rig-chiffres {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 var(--rig-esp-5);
+}
+.rig-chiffre {
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 0;
+  padding: var(--rig-esp-3) var(--rig-esp-4);
+  border-radius: var(--rig-radius);
+  color: var(--rig-chiffre-texte);
+  box-shadow: var(--rig-ombre);
+}
+.rig-chiffre--1 { background: var(--rig-chiffre-1); border: 1px solid var(--rig-chiffre-1-bord); }
+.rig-chiffre--2 { background: var(--rig-chiffre-2); border: 1px solid var(--rig-chiffre-2-bord); }
+.rig-chiffre--3 { background: var(--rig-chiffre-3); border: 1px solid var(--rig-chiffre-3-bord); }
+.rig-chiffre__libelle {
+  font: 700 var(--rig-fs-kicker)/1.3 var(--rig-font);
+  letter-spacing: var(--rig-ls-kicker); text-transform: uppercase;
+}
+.rig-chiffre__valeur {
+  font: 700 30px/1.1 var(--rig-font);
+  font-variant-numeric: tabular-nums;
+  color: var(--rig-chiffre-valeur);
+}
+.rig-chiffre__detail {
+  font-size: 11px; opacity: .85;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* Le filet de marque colle au bord haut, la barre juste dessous. */
 .rig-filet-marque { position: sticky; top: 0; z-index: 91; }
@@ -2614,10 +2707,11 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   border-radius: 10px; font: 600 11px/1 var(--rig-font-mono);
   color: #fff; background: var(--rig-texte-3);
 }
-.rig-metier__charge--vide  { background: #16C47F; }
-.rig-metier__charge--bas   { background: #2E6FD8; }
-.rig-metier__charge--moyen { background: #FF8A00; }
-.rig-metier__charge--haut  { background: #F04438; }
+/* Memes paliers que les ronds de « A traiter » (jetons --rig-palier-*). */
+.rig-metier__charge--vide  { background: var(--rig-palier-vide); }
+.rig-metier__charge--bas   { background: var(--rig-palier-bas); }
+.rig-metier__charge--moyen { background: var(--rig-palier-moyen); }
+.rig-metier__charge--haut  { background: var(--rig-palier-haut); }
 .rig-metier__deployer {
   font: 12px/1 inherit; color: var(--rig-texte-3);
   background: var(--rig-fond-2); border: 1px solid var(--rig-bord);

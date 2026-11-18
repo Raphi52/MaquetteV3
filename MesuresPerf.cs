@@ -25,6 +25,12 @@ public sealed record MesurePerf(string Libelle, string Valeur, int Part, string 
 /// </summary>
 public sealed class MesuresPerf
 {
+    /// <summary>Libelles des deux mesures que l'accueil reprend aussi en tuiles
+    /// chiffrees (Home.razor, MesureNommee) : nommes UNE fois, pour qu'un
+    /// renommage ne laisse pas la tuile sur « - » sans que rien ne casse.</summary>
+    public const string LibelleTraites = "Dossiers traites";
+    public const string LibelleHorsDelai = "Hors delai legal";
+
     /// <summary>Delai legal de traitement d'une demande, en jours.</summary>
     private const int DelaiLegalJours = 7;
 
@@ -110,11 +116,11 @@ public sealed class MesuresPerf
 
         return
         [
-            Ligne("Dossiers traites",     $"{traites} / {total}",            traites,    total,
+            Ligne(LibelleTraites,         $"{traites} / {total}",            traites,    total,
                   cibleTraites,   $"obj. {cibleTraites:0}",   plusCestMieux: true),
             Ligne("Dossiers en cours",    enCours.ToString("N0"),            enCours,    total,
                   cibleEnCours,   $"obj. <= {cibleEnCours:0}"),
-            Ligne("Hors delai legal",     horsDelai.ToString("N0"),          horsDelai,  Math.Max(enCours, 1),
+            Ligne(LibelleHorsDelai,       horsDelai.ToString("N0"),          horsDelai,  Math.Max(enCours, 1),
                   CibleHorsDelai, "obj. 0"),
             Ligne("Rejets",               rejetes.ToString("N0"),            rejetes,    total,
                   CibleRejets,    $"obj. <= {CibleRejets:0}"),

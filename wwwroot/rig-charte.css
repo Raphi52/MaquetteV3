@@ -12,6 +12,17 @@
    Le rouge #C00000 de la charte Amitel reste reserve aux documents
    PDF / Word - voir
    Documentation/reference/90-transverse/documents-charte-amitel.md
+
+   2026-11-18, direction « Ivoire chaud » (choix utilisateur, /draft
+   conv-1979) : le clair suit la voie « Bleu nuit et aplats vifs », le
+   sombre la voie « Nuit japonaise », et l'OR les relie :
+   - l'or marque l'element actif dans les deux modes (verbe ouvert du menu) ;
+   - le menu de gauche est un rail ENCRE dans les deux modes ;
+   - le clair passe a l'ivoire : meme temperature chaude que la nuit, l'or
+     n'y jure plus ;
+   - la regle « aucun aplat » est levee pour DEUX elements seulement : les
+     tuiles chiffrees de l'accueil (aplats mats le jour, verre teinte la
+     nuit) et la pastille du verbe actif. Partout ailleurs elle tient.
    ============================================================ */
 
 :root {
@@ -67,34 +78,71 @@ html { color-scheme: dark; }
 html:has([data-rig-theme="clair"]) { color-scheme: light; }
 
 /* --- MODE SOMBRE (defaut) --- */
+/* 2026-11-18 (« Ivoire chaud ») : l'encre de la « Nuit japonaise » remplace le
+   bleu nuit (#0C0F16) ; texte creme au lieu de bleute, voiles et bords tires
+   vers le creme, or #D9B26A. */
 :root,
 [data-rig-theme="sombre"] {
-  --rig-fond: #0C0F16;
-  --rig-fond-2: rgba(255, 255, 255, .035);
+  --rig-fond: #12141C;
+  --rig-fond-2: rgba(255, 240, 215, .04);
   /* Lignes alternees des grilles (demande utilisateur 2026-09-17) : un cran
      plus CLAIR que le fond en sombre, un cran plus FONCE en clair. */
-  --rig-zebre: rgba(255, 255, 255, .028);
+  --rig-zebre: rgba(255, 240, 215, .03);
   /* Survol nettement au-dessus de la zebrure, sinon il disparait dessus. */
-  --rig-survol-ligne: rgba(255, 255, 255, .09);
+  --rig-survol-ligne: rgba(255, 240, 215, .09);
   /* 2026-09-15 : tuiles de l'accueil un cran plus claires que le fond
      (avant : pas de surface en sombre, donc tuile = fond). */
-  --rig-surface: #171C27;
-  --rig-bord: rgba(255, 255, 255, .11);
-  --rig-bord-faible: rgba(255, 255, 255, .06);
-  --rig-texte: #F2F5FA;
-  --rig-texte-2: #C3CCDA;
-  --rig-texte-3: #69748A;
+  --rig-surface: #191C26;
+  /* Champ de saisie principal (recherche de l'accueil). */
+  --rig-champ: #1B1E29;
+  --rig-bord: rgba(255, 240, 215, .12);
+  --rig-bord-faible: rgba(255, 240, 215, .065);
+  --rig-texte: #F1EDE4;
+  --rig-texte-2: #CFC8B8;
+  --rig-texte-3: #8A8576;
   --rig-ombre: 0 1px 2px rgba(0, 0, 0, .55), 0 10px 26px rgba(0, 0, 0, .40);
   --rig-ombre-saisie: 0 2px 6px rgba(0, 0, 0, .60), 0 22px 48px rgba(0, 0, 0, .52);
   --rig-alerte: #F5B912;
   /* Valeur REFUSEE (erreur), distincte de l'alerte "manquant" (2026-09-15). */
   --rig-erreur: #F04438;
-  --rig-focus: #D9A429;
+  --rig-focus: #D9B26A;
   /* Accent d'interaction (survol, element actif). Declaree le 2026-09-11 :
      rig-accueil.css l'utilisait a 6 endroits sans qu'elle existe, donc 5 de
      ces accents ne s'affichaient pas du tout (seul .rig-vged__poignee avait
      une couleur de repli). Meme or que --rig-focus : meme role d'interaction. */
-  --rig-accent: #D9A429;
+  --rig-accent: #D9B26A;
+  --rig-grad-marque: linear-gradient(90deg, #0D0F16, #D9B26A 55%, #F0D59A);
+
+  /* --- « Ivoire chaud » : ce qui RELIE les deux modes --- */
+  /* L'or de l'element actif : un aplat en degrade, texte encre dessus. */
+  --rig-or: #C8963E;
+  --rig-or-clair: #E4BE76;
+  --rig-or-texte: #1E1608;
+  /* Le rail du menu de gauche : encre dans les deux modes. */
+  --rig-rail: #0D0F16;
+  --rig-rail-bord: #22252F;
+  /* Pastilles des verbes du menu : famille de l'or, eclaircie la nuit. */
+  --rig-verbe-ouvrir: #D9B26A;
+  --rig-verbe-trouver: #7083C2;
+  --rig-verbe-modifier: #C9A646;
+  --rig-verbe-surveiller: #CC6A55;
+  --rig-verbe-terminer: #7A7668;
+  --rig-verbe-facturer: #D98A55;
+  --rig-verbe-configurer: #9C86CC;
+  /* Paliers de charge des pastilles de compte (« A traiter », metiers). */
+  --rig-palier-vide: #9DB866;
+  --rig-palier-bas: #7083C2;
+  --rig-palier-moyen: #D9B26A;
+  --rig-palier-haut: #CC6A55;
+  /* Tuiles chiffrees : verre teinte bleu encre / olive / brique. */
+  --rig-chiffre-1: linear-gradient(160deg, #222B48, #181D2F);
+  --rig-chiffre-2: linear-gradient(160deg, #272C1B, #1C1F15);
+  --rig-chiffre-3: linear-gradient(160deg, #3B211C, #291917);
+  --rig-chiffre-1-bord: #3A4672;
+  --rig-chiffre-2-bord: #4E5A30;
+  --rig-chiffre-3-bord: #6E3A2F;
+  --rig-chiffre-texte: #E4E0D6;
+  --rig-chiffre-valeur: #F1EDE4;
 }
 
 /* --- MODE CLAIR --- */
@@ -114,27 +162,61 @@ html:has([data-rig-theme="clair"]) { color-scheme: light; }
      Fond bleute moyen, tuiles plus claires (sans blanc pur) detachees par une
      ombre franche, statuts plus satures. */
   /* 2026-09-15 : fond "trop gris" -> blanc casse neutre #F5F6F4 (choix n°1 de l'utilisateur). */
-  --rig-fond: #F5F6F4;
-  --rig-fond-2: #E8EAE6;
-  --rig-zebre: rgba(30, 50, 90, .045);
-  --rig-survol-ligne: rgba(30, 50, 90, .13);
-  --rig-surface: #FCFCFB;
-  --rig-bord: rgba(30, 50, 90, .20);
-  --rig-bord-faible: rgba(30, 50, 90, .12);
-  --rig-texte: #0B0E14;
-  --rig-texte-2: #2B3341;
-  --rig-texte-3: #4F5A6E;
-  --rig-ombre: 0 1px 3px rgba(28, 44, 80, .18), 0 12px 30px rgba(28, 44, 80, .22);
-  --rig-ombre-saisie: 0 3px 8px rgba(28, 44, 80, .24), 0 26px 56px rgba(28, 44, 80, .32);
+  /* 2026-11-18 (« Ivoire chaud ») : blanc casse neutre -> IVOIRE #F2EDE3, cartes
+     creme, texte encre brune ; bords et ombres tires vers le brun. Le texte
+     tertiaire est #6B6253, un cran plus fonce que la maquette (#857C6C, 3,6:1
+     sur l'ivoire) : la regle « rien ne reste pale » du 2026-09-10 tient. */
+  --rig-fond: #F2EDE3;
+  --rig-fond-2: #EAE3D6;
+  --rig-zebre: rgba(90, 70, 40, .05);
+  --rig-survol-ligne: rgba(90, 70, 40, .12);
+  --rig-surface: #FFFCF6;
+  --rig-champ: #FFFCF6;
+  --rig-bord: rgba(110, 85, 45, .22);
+  --rig-bord-faible: rgba(110, 85, 45, .13);
+  --rig-texte: #1F1B16;
+  --rig-texte-2: #4A443A;
+  --rig-texte-3: #6B6253;
+  --rig-ombre: 0 1px 3px rgba(60, 45, 20, .16), 0 12px 30px rgba(60, 45, 20, .18);
+  --rig-ombre-saisie: 0 3px 8px rgba(60, 45, 20, .22), 0 26px 56px rgba(60, 45, 20, .28);
   --rig-alerte: #C2410C;
   --rig-erreur: #D92D20;
-  --rig-focus: #A16207;
-  --rig-accent: #A16207;
+  /* Or fonce pour le TEXTE et le contour de focus : l'or de l'aplat (#C8963E)
+     ne fait que 2,4:1 sur l'ivoire. */
+  --rig-focus: #9A6B1F;
+  --rig-accent: #9A6B1F;
   --rig-grad-action:  linear-gradient(90deg, #1D4ED8, #3B82F6);
   --rig-grad-attente: linear-gradient(90deg, #475569, #8494A8);
   --rig-grad-alerte:  linear-gradient(90deg, #C2410C, #F5A609);
   --rig-grad-ok:      linear-gradient(90deg, #047857, #10B981);
-  --rig-grad-marque:  linear-gradient(90deg, #14294A, #2563EB 55%, #EAB308);
+  --rig-grad-marque:  linear-gradient(90deg, #15182A, #C8963E 55%, #E4BE76);
+
+  /* --- « Ivoire chaud » : memes roles qu'en sombre, voir plus haut --- */
+  --rig-or: #C8963E;
+  --rig-or-clair: #E4BE76;
+  --rig-or-texte: #1E1608;
+  --rig-rail: #15182A;
+  --rig-rail-bord: transparent;
+  --rig-verbe-ouvrir: #C8963E;
+  --rig-verbe-trouver: #4560C2;
+  --rig-verbe-modifier: #B8962A;
+  --rig-verbe-surveiller: #C0502F;
+  --rig-verbe-terminer: #6B7183;
+  --rig-verbe-facturer: #D9773A;
+  --rig-verbe-configurer: #7A5BB5;
+  --rig-palier-vide: #5C7638;
+  --rig-palier-bas: #4560C2;
+  --rig-palier-moyen: #D4A044;
+  --rig-palier-haut: #C0502F;
+  /* Tuiles chiffrees : aplats MATS bleu ardoise / olive / brique. */
+  --rig-chiffre-1: linear-gradient(135deg, #34457E, #4C5F9C);
+  --rig-chiffre-2: linear-gradient(135deg, #5C7638, #7A9452);
+  --rig-chiffre-3: linear-gradient(135deg, #A4513A, #C26E56);
+  --rig-chiffre-1-bord: transparent;
+  --rig-chiffre-2-bord: transparent;
+  --rig-chiffre-3-bord: transparent;
+  --rig-chiffre-texte: #FFFFFF;
+  --rig-chiffre-valeur: #FFFFFF;
 }
 
 /* ============================================================

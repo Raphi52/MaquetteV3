@@ -1,0 +1,3 @@
+{
+  "lancement": "powershell -NoProfile -ExecutionPolicy Bypass -File dev.ps1"
+}

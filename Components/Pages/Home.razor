@@ -307,6 +307,35 @@
             }
         </div>
 
+        @* --- Chiffres du jour (« Ivoire chaud », 2026-11-18) : trois compteurs
+           DEJA calcules ailleurs, montres en tuiles pleines entre la recherche
+           et la grille. « Arrivees » = le total de cette categorie dans « A
+           traiter », les deux autres = les mesures de la tuile Performance :
+           un chiffre ne peut donc jamais differer de sa tuile d'origine. --- *@
+        @{
+            var chiffreArrivees = ArriveesVues;
+            var chiffreEnTete = chiffreArrivees.OrderByDescending(a => a.Nombre).FirstOrDefault();
+            var chiffreTraites = MesureNommee(MesuresPerf.LibelleTraites);
+            var chiffreHorsDelai = MesureNommee(MesuresPerf.LibelleHorsDelai);
+        }
+        <div class="rig-chiffres">
+            <div class="rig-chiffre rig-chiffre--1">
+                <span class="rig-chiffre__libelle">Arrivees</span>
+                <b class="rig-chiffre__valeur">@chiffreArrivees.Sum(a => a.Nombre)</b>
+                <span class="rig-chiffre__detail" title="@chiffreEnTete?.Titre">@(chiffreEnTete is null ? "rien a traiter" : $"{chiffreEnTete.Nombre} : {chiffreEnTete.Titre}")</span>
+            </div>
+            <div class="rig-chiffre rig-chiffre--2">
+                <span class="rig-chiffre__libelle">Dossiers traites</span>
+                <b class="rig-chiffre__valeur">@(chiffreTraites?.Valeur ?? "-")</b>
+                <span class="rig-chiffre__detail">@chiffreTraites?.ObjectifTexte</span>
+            </div>
+            <div class="rig-chiffre rig-chiffre--3">
+                <span class="rig-chiffre__libelle">Hors delai legal</span>
+                <b class="rig-chiffre__valeur">@(chiffreHorsDelai?.Valeur ?? "-")</b>
+                <span class="rig-chiffre__detail">@chiffreHorsDelai?.ObjectifTexte</span>
+            </div>
+        </div>
+
         @* --- Grille : chaque tuile reste ou on l'a posee --- *@
         <div class="rig-grille" @ref="Grille">
             @foreach (var def in Definitions)
@@ -4656,6 +4685,17 @@
             .Select(c => (Categorie: c, Lignes: AlertesVues.Where(a => a.Categorie == c).ToArray()))
             .Where(g => g.Lignes.Length > 0)
             .ToArray();
+
+    /// <summary>Les lignes « Arrivees » telles que la tuile « A traiter » les
+    /// montre (memes reglages d'ecoute) : la tuile chiffree « Arrivees » affiche
+    /// LEUR total, donc le meme nombre que le titre du groupe.</summary>
+    private AlerteGreffe[] ArriveesVues
+        => AlertesVues.Where(a => a.Categorie == CatalogueAlertes.Arrivees).ToArray();
+
+    /// <summary>Une mesure de la tuile Performance, par son libelle
+    /// (MesuresPerf.Relever) ; null tant que la premiere releve n'est pas faite.</summary>
+    private MesurePerf? MesureNommee(string libelle)
+        => Mesures.FirstOrDefault(m => m.Libelle == libelle);
 
     /// <summary>Une categorie eteinte masque TOUTES ses alertes. Absente des
     /// reglages = surveillee : une nouvelle categorie livree plus tard se voit
