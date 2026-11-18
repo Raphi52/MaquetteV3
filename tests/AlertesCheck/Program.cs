@@ -436,8 +436,15 @@ Exiger(cssAccueil.Contains(".rig-metier--deploye") && cssAccueil.Contains("posit
 // Le panneau de droite : borne, stable, et muet sur une alerte « a creer ».
 var grosse = a.OrderByDescending(x => x.Nombre).First();
 var vide = a.FirstOrDefault(x => x.Nombre == 0);
-Exiger(PanneauMetier.Lignes(grosse).Length == Math.Min(grosse.Nombre, PanneauMetier.LignesMax),
+// Plafonne DEUX fois : par LignesMax, et par le nombre de dossiers de demo --
+// au-dela, le modulo de PanneauMetier.Lignes reboucle et un dossier ressort en
+// double (regle ajoutee dans AlertesGreffe.cs apres le 21/09, banc aligne le 18/11).
+Exiger(PanneauMetier.Lignes(grosse).Length
+        == Math.Min(Math.Min(grosse.Nombre, PanneauMetier.LignesMax), JeuDemo.Demandes.Length),
     "le panneau de droite montre autant de demandes que l'alerte en annonce, plafonne");
+Exiger(PanneauMetier.Lignes(grosse).Select(l => l.Chrono).Distinct().Count()
+        == PanneauMetier.Lignes(grosse).Length,
+    "le panneau de droite ne montre jamais deux fois le meme dossier");
 Exiger(PanneauMetier.Lignes(grosse).Select(l => l.Chrono)
         .SequenceEqual(PanneauMetier.Lignes(grosse).Select(l => l.Chrono)),
     "deux affichages de suite donnent les MEMES dossiers");
