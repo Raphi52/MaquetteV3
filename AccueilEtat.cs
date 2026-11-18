@@ -1,8 +1,39 @@
 ﻿using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace RigV3Desktop;
+
+/// <summary>Un theme d'affichage : son code (valeur de <c>data-rig-theme</c>,
+/// un bloc de rig-charte.css), son libelle dans la liste des reglages, et son
+/// fond de page (<c>--rig-fond</c>), que la fenetre WPF reprend autour du
+/// WebView. CharteCheck verifie que chaque fond suit la feuille.</summary>
+public sealed record ThemeRig(string Code, string Libelle, string Fond);
+
+/// <summary>
+/// Les themes proposes dans Reglages &gt; Affichage. Une seule liste fait foi :
+/// la liste deroulante, le fond de la fenetre et le banc CharteCheck la lisent,
+/// et chaque entree a son bloc <c>[data-rig-theme="code"]</c> dans rig-charte.css.
+/// Les trois derniers viennent des maquettes jointes le 18/11/2026.
+/// </summary>
+public static class ThemesRig
+{
+    public const string Defaut = "clair";
+
+    public static readonly IReadOnlyList<ThemeRig> Tous =
+    [
+        new("clair",  "Clair",            "#EEF0F4"),
+        new("sombre", "Sombre",           "#12141C"),
+        new("violet", "Violet pilules",   "#F3F4F8"),
+        new("orange", "Noir et orange",   "#EFEFF0"),
+        new("argile", "Argile et corail", "#E6E1DB"),
+    ];
+
+    /// <summary>Le theme d'un code ; un code inconnu ou vide rend le clair.</summary>
+    public static ThemeRig De(string? code)
+        => Tous.FirstOrDefault(t => t.Code == code) ?? Tous[0];
+}
 
 /// <summary>Pose d'une tuile sur la grille de l'accueil (12 colonnes).</summary>
 public sealed class PoseTuile
@@ -87,12 +118,28 @@ public sealed class AccueilEtat
     public List<DossierOuvert> DossiersOuverts { get; set; } = new();
 
     /// <summary>
-    /// Le mode d'affichage choisi, conserve d'une session a l'autre : le
-    /// greffier qui travaille en clair ne doit pas rebasculer a chaque
-    /// ouverture. Demande du 17/09/2026 : le CLAIR est le mode par defaut,
-    /// donc false est bien la valeur d'un profil neuf.
+    /// Le theme d'affichage choisi (code de <see cref="ThemesRig"/>), conserve
+    /// d'une session a l'autre : le greffier qui travaille en clair ne doit pas
+    /// rebasculer a chaque ouverture. Demande du 17/09/2026 : le CLAIR est le
+    /// theme par defaut. Depuis le 18/11/2026 le choix porte sur plus de deux
+    /// themes : un code inconnu (fichier abime, theme retire) retombe sur le
+    /// clair au lieu de laisser la page sans couleurs.
     /// </summary>
-    public bool ThemeSombre { get; set; }
+    public string Theme
+    {
+        get => theme;
+        set => theme = ThemesRig.De(value).Code;
+    }
+    private string theme = ThemesRig.Defaut;
+
+    /// <summary>
+    /// Ancien reglage oui/non (avant le 18/11/2026). Relu une seule fois par
+    /// <see cref="Charger"/> pour qu'un poste reste en sombre apres la mise a
+    /// jour, puis efface : il n'est plus jamais ecrit.
+    /// </summary>
+    [JsonPropertyName("ThemeSombre")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? AncienThemeSombre { get; set; }
 
     public Dictionary<string, PoseTuile> Tuiles { get; set; } = new();
 
@@ -494,7 +541,15 @@ public sealed class AccueilEtat
             if (File.Exists(Chemin))
             {
                 var lu = JsonSerializer.Deserialize<AccueilEtat>(File.ReadAllText(Chemin));
-                if (lu is not null) return lu;
+                if (lu is not null)
+                {
+                    // Un fichier d'avant les themes nommes n'a que « ThemeSombre » :
+                    // Theme y garde sa valeur par defaut, le clair.
+                    if (lu.AncienThemeSombre == true && lu.Theme == ThemesRig.Defaut)
+                        lu.Theme = "sombre";
+                    lu.AncienThemeSombre = null;
+                    return lu;
+                }
             }
         }
         catch (Exception)

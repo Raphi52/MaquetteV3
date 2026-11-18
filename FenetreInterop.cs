@@ -51,24 +51,18 @@ public sealed class FenetreInterop
     }
 
     /// <summary>
-    /// Fond de page de la charte (--rig-fond de rig-charte.css), par theme.
-    /// CharteCheck verifie que ces deux valeurs suivent la feuille : elles
-    /// avaient derive (#D8DDE6 / #0C0F16, ancienne charte) et peignaient un
-    /// cadre gris autour de la page ivoire.
-    /// </summary>
-    public const string FondClair = "#EEF0F4";
-    public const string FondSombre = "#12141C";
-
-    /// <summary>
     /// Aligne le fond de la fenetre WPF sur celui de la page. Il ne se voit
     /// plus en temps normal (le WebView occupe toute la fenetre), mais il
     /// apparait au chargement et sur la bande qui s'ouvre pendant un
-    /// redimensionnement, avant que le WebView ne repeigne.
+    /// redimensionnement, avant que le WebView ne repeigne. La teinte est le
+    /// fond du theme dans <see cref="ThemesRig"/> ; CharteCheck verifie qu'il
+    /// suit --rig-fond de rig-charte.css (les anciennes constantes avaient
+    /// derive et peignaient un cadre gris autour de la page ivoire).
     /// </summary>
-    public void AppliquerFond(bool sombre)
+    public void AppliquerFond(string theme)
     {
         if (Fenetre is not { } f) return;
-        var teinte = (Color)ColorConverter.ConvertFromString(sombre ? FondSombre : FondClair);
+        var teinte = (Color)ColorConverter.ConvertFromString(ThemesRig.De(theme).Fond);
         f.Background = new SolidColorBrush(teinte);
     }
 

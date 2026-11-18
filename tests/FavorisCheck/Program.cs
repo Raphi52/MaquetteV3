@@ -50,7 +50,7 @@ Exiger(AccueilEtat.Charger().VuesFavorites.Count(c => c == "PROC_NF") == 1,
 // --- 7. Un accueil.json d'AVANT les favoris se lit encore
 File.WriteAllText(etatBanc, "{ \"ThemeSombre\": true }");
 var ancien = AccueilEtat.Charger();
-Exiger(ancien.ThemeSombre, "un ancien fichier de reglages se lit toujours");
+Exiger(ancien.Theme == "sombre", "un ancien fichier de reglages se lit toujours (et garde son mode sombre)");
 Exiger(ancien.VuesFavorites is { Count: 0 }, "sans le champ, la liste part vide (jamais nulle)");
 
 // --- 8. Un code vide n'entre pas dans la liste

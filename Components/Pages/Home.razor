@@ -6,7 +6,7 @@
 
 <PageTitle>RIG V3 - Accueil</PageTitle>
 
-<div data-rig-theme="@(ThemeSombre ? "sombre" : "clair")"
+<div data-rig-theme="@Theme"
      style="background:var(--rig-fond);color:var(--rig-texte);height:100vh;overflow:hidden;display:flex;flex-direction:column">
 
 <div class="rig-filet-marque"></div>
@@ -39,11 +39,18 @@
                      @onmousedown:stopPropagation="true"></div>
                 <div class="rig-tuiles-panneau">
                     <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">Affichage</div>
-                    <button class="rig-bascule @(ThemeSombre ? "rig-bascule--actif" : "")"
-                            @onclick="BasculerTheme">
-                        <span class="rig-bascule__temoin"></span>
-                        <span>Mode sombre</span>
-                    </button>
+                    @* Une liste et non plus la bascule « Mode sombre » : depuis le
+                       18/11/2026 il y a plus de deux themes (ThemesRig.Tous). *@
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Theme</span>
+                        <select class="rig-saisie-champ__saisie" id="rig-choix-theme"
+                                value="@Theme" @onchange="ChoisirTheme">
+                            @foreach (var t in ThemesRig.Tous)
+                            {
+                                <option value="@t.Code">@t.Libelle</option>
+                            }
+                        </select>
+                    </label>
                 </div>
             }
         </div>
@@ -2199,9 +2206,9 @@
     private const string Greffe = "9999";
     private const string Version = "3.0.14";
 
-    /// <summary>Mode d'affichage courant. Clair par defaut ; la valeur
-    /// retenue du profil est reposee dans OnInitialized.</summary>
-    private bool ThemeSombre;
+    /// <summary>Theme d'affichage courant (code de ThemesRig). Clair par
+    /// defaut ; la valeur retenue du profil est reposee dans OnInitialized.</summary>
+    private string Theme = ThemesRig.Defaut;
 
     /// <summary>
     /// Le theme ne peut pas rester porte par ce seul composant : le fond de la
@@ -2209,19 +2216,21 @@
     /// WebView de 6 px, resteraient sombres et cerneraient le mode clair d'un
     /// cadre noir. On propage donc la teinte aux deux hors-Blazor.
     /// </summary>
-    private async Task BasculerTheme()
+    private async Task ChoisirTheme(ChangeEventArgs e)
     {
-        ThemeSombre = !ThemeSombre;
-        Etat.ThemeSombre = ThemeSombre;
+        // Le setter de l'etat ramene un code inconnu au clair : on relit SA
+        // valeur plutot que de recopier telle quelle celle de la liste.
+        Etat.Theme = e.Value?.ToString() ?? ThemesRig.Defaut;
+        Theme = Etat.Theme;
         Etat.Enregistrer();
         await AppliquerTheme();
     }
 
     private async Task AppliquerTheme()
     {
-        Fenetre.AppliquerFond(ThemeSombre);
+        Fenetre.AppliquerFond(Theme);
         if (Module is null) return;
-        try { await Module.InvokeVoidAsync("appliquerTheme", ThemeSombre ? "sombre" : "clair"); }
+        try { await Module.InvokeVoidAsync("appliquerTheme", Theme); }
         catch (JSException) { }
     }
 
@@ -3170,7 +3179,7 @@
     {
         Etat = AccueilEtat.Charger();
         AccueilEtat.FavorisChanges += SurFavorisChanges;
-        ThemeSombre = Etat.ThemeSombre;
+        Theme = Etat.Theme;
         // L AGENCEMENT d abord : les onglets ouverts la derniere fois, dans leur
         // ordre, et les vues qui etaient sorties en fenetre.
         RestaurerAgencement();
@@ -5506,9 +5515,10 @@
             "Le widget Actualites permet d'ecrire une annonce visible par tout le greffe sur "
             + "son accueil. Utile pour une consigne du jour ou une indisponibilite : elle "
             + "s'affiche jusqu'a sa date de fin."),
-        new("AFFICHAGE","clair-sombre", "violet", "Clair ou sombre",    "choix retenu",
-            "Le theme clair et le theme sombre se basculent depuis l'entete. Le choix est "
-            + "retenu poste par poste et reapplique au prochain demarrage.")
+        new("AFFICHAGE","clair-sombre", "violet", "Cinq themes",        "choix retenu",
+            "Clair, sombre, violet pilules, noir et orange ou argile et corail : le theme se "
+            + "choisit dans la liste des reglages de l'entete. Le choix est retenu poste par "
+            + "poste et reapplique au prochain demarrage.")
     ];
 
     // --- Activite des utilisateurs : le journal des gestes de l'equipe, lu

@@ -78,14 +78,33 @@
      comme sur la maquette ; c'est son anneau d'or qui suit le mode. */
   --rig-profil: linear-gradient(135deg, #2C3F8F, #4560C2);
   --rig-profil-texte: #FFFFFF;
+
+  /* Texte et voiles DU RAIL de gauche (lus par .rig-menu, rig-accueil.css).
+     Valeurs d'un rail sombre, celles du clair et du sombre ; un theme a rail
+     clair (« Violet pilules ») les redefinit. --rig-rail-melange est la teinte
+     vers laquelle une couleur de metier ecrite en texte est tiree. */
+  --rig-rail-texte: #F1EDE4;
+  --rig-rail-texte-2: #E8E2D2;
+  --rig-rail-texte-3: #9C9583;
+  --rig-rail-voile: rgba(255, 240, 215, .07);
+  --rig-rail-trait: rgba(255, 240, 215, .14);
+  --rig-rail-trait-faible: rgba(255, 240, 215, .08);
+  --rig-rail-melange: #FFFFFF;
+  /* Liseré et halo de la recherche de l'accueil (et de la frise des etapes) :
+     l'or dans le clair et le sombre, l'accent du theme ailleurs. */
+  --rig-or-halo: #B08D3F;
 }
 
 /* Les listes deroulantes des <select> sont peintes par le SYSTEME, hors CSS.
    Elles suivent le `color-scheme` du DOCUMENT -- le poser sur l'element lui-meme
    ne les atteint pas (constate le 2026-09-10 : popup blanche sur texte clair,
-   donc illisible). C'est donc ICI, a la racine, que le schema se declare. */
+   donc illisible). C'est donc ICI, a la racine, que le schema se declare.
+   Tout theme a fond de page CLAIR doit figurer ici (CharteCheck le verifie). */
 html { color-scheme: dark; }
-html:has([data-rig-theme="clair"]) { color-scheme: light; }
+html:has([data-rig-theme="clair"]),
+html:has([data-rig-theme="violet"]),
+html:has([data-rig-theme="orange"]),
+html:has([data-rig-theme="argile"]) { color-scheme: light; }
 
 /* --- MODE SOMBRE (defaut) --- */
 /* 2026-11-18 : l'encre de la « Nuit japonaise » remplace le bleu nuit
@@ -243,6 +262,233 @@ html:has([data-rig-theme="clair"]) { color-scheme: light; }
   --rig-chiffre-1-icone: #2C3F8F;
   --rig-chiffre-2-icone: #557A2C;
   --rig-chiffre-3-icone: #B2492A;
+}
+
+/* ============================================================
+   THEMES AU CHOIX (18/11/2026)
+   Reglages > Affichage propose une LISTE de themes (ThemesRig dans
+   AccueilEtat.cs) au lieu de la bascule clair / sombre. Les trois suivants
+   viennent de maquettes jointes par l'utilisateur ; leurs teintes y ont ete
+   relevees au pixel.
+   Chaque bloc redefinit TOUS les jetons du mode clair, plus ceux du rail :
+   un jeton oublie retomberait sur la valeur du sombre (:root), donc un texte
+   creme sur une carte blanche. Les degrades de STATUT gardent leur sens
+   (bleu = a moi, vert = fait, ambre = hors delai, gris = un tiers) ; seuls
+   l'accent, les surfaces et le rail changent.
+   ============================================================ */
+
+/* --- VIOLET PILULES : page lavande, cartes et rail BLANCS, accent violet
+   #5F4BEA, tuiles en degrades violets (maquette « 01 - Violet pilules »). */
+[data-rig-theme="violet"] {
+  --rig-fond: #F3F4F8;
+  --rig-fond-2: #E9EAF3;
+  --rig-zebre: rgba(60, 50, 140, .04);
+  --rig-survol-ligne: rgba(95, 75, 234, .09);
+  --rig-surface: #FFFFFF;
+  --rig-champ: #FFFFFF;
+  --rig-bord: rgba(40, 35, 90, .12);
+  --rig-bord-faible: rgba(40, 35, 90, .07);
+  --rig-texte: #17182B;
+  --rig-texte-2: #3B3D55;
+  --rig-texte-3: #5E6178;
+  --rig-ombre: 0 1px 3px rgba(40, 30, 120, .08), 0 12px 30px rgba(40, 30, 120, .10);
+  --rig-ombre-saisie: 0 3px 8px rgba(40, 30, 120, .16), 0 26px 56px rgba(40, 30, 120, .22);
+  --rig-alerte: #C2410C;
+  --rig-erreur: #D92D20;
+  --rig-focus: #5F4BEA;
+  --rig-accent: #5F4BEA;
+  --rig-grad-action:  linear-gradient(90deg, #1D4ED8, #3B82F6);
+  --rig-grad-attente: linear-gradient(90deg, #475569, #8494A8);
+  --rig-grad-alerte:  linear-gradient(90deg, #C2410C, #F5A609);
+  --rig-grad-ok:      linear-gradient(90deg, #047857, #10B981);
+  --rig-grad-marque:  linear-gradient(90deg, #523EDB, #7563EF 55%, #AF47E0);
+
+  --rig-or: #5F4BEA;
+  --rig-or-clair: #7563EF;
+  --rig-or-texte: #FFFFFF;
+  --rig-or-halo: #5F4BEA;
+  --rig-rail: #FFFFFF;
+  --rig-rail-bord: rgba(40, 35, 90, .08);
+  --rig-rail-texte: #17182B;
+  --rig-rail-texte-2: #3B3D55;
+  --rig-rail-texte-3: #6A6D85;
+  --rig-rail-voile: rgba(95, 75, 234, .07);
+  --rig-rail-trait: rgba(40, 35, 90, .12);
+  --rig-rail-trait-faible: rgba(40, 35, 90, .07);
+  --rig-rail-melange: #17182B;
+  --rig-verbe-ouvrir: #5F4BEA;
+  --rig-verbe-trouver: #3D7BF0;
+  --rig-verbe-modifier: #8B5CF6;
+  --rig-verbe-surveiller: #E0457B;
+  --rig-verbe-terminer: #6E7088;
+  --rig-verbe-facturer: #E08A3C;
+  --rig-verbe-configurer: #AF47E0;
+  --rig-palier-vide: #2E9E6A;
+  --rig-palier-bas: #5F4BEA;
+  --rig-palier-moyen: #D4A044;
+  --rig-palier-haut: #E0457B;
+  /* Les trois violets de la maquette : la tuile « Dossiers ouverts », la
+     carte nuit « Avant l'audience », les barres lavande du graphique. */
+  --rig-chiffre-1: linear-gradient(160deg, #7563EF, #523EDB);
+  --rig-chiffre-2: linear-gradient(160deg, #392A91, #0D0A22);
+  --rig-chiffre-3: linear-gradient(160deg, #9B8BF6, #6E5BEB);
+  --rig-chiffre-1-bord: transparent;
+  --rig-chiffre-2-bord: transparent;
+  --rig-chiffre-3-bord: transparent;
+  --rig-chiffre-texte: #FFFFFF;
+  --rig-chiffre-valeur: #FFFFFF;
+  /* Rond cerne de blanc, comme la fleche des tuiles de la maquette. */
+  --rig-chiffre-rond: rgba(255, 255, 255, .14);
+  --rig-chiffre-rond-bord: rgba(255, 255, 255, .60);
+  --rig-chiffre-1-icone: #FFFFFF;
+  --rig-chiffre-2-icone: #FFFFFF;
+  --rig-chiffre-3-icone: #FFFFFF;
+  --rig-profil: linear-gradient(135deg, #523EDB, #7563EF);
+  --rig-profil-texte: #FFFFFF;
+}
+
+/* --- NOIR ET ORANGE : rail noir #0E0E10, page gris perle a cartes
+   blanches, accent orange #F59E0B a texte noir, tuiles noires a icones
+   orange / jaune / gris (maquette « 02 - Noir et orange »). */
+[data-rig-theme="orange"] {
+  --rig-fond: #EFEFF0;
+  --rig-fond-2: #E4E4E7;
+  --rig-zebre: rgba(20, 20, 22, .035);
+  --rig-survol-ligne: rgba(245, 158, 11, .14);
+  --rig-surface: #FFFFFF;
+  --rig-champ: #FFFFFF;
+  --rig-bord: rgba(20, 20, 22, .12);
+  --rig-bord-faible: rgba(20, 20, 22, .07);
+  --rig-texte: #141416;
+  --rig-texte-2: #3F3F46;
+  --rig-texte-3: #5F5F67;
+  --rig-ombre: 0 1px 2px rgba(0, 0, 0, .08), 0 10px 24px rgba(0, 0, 0, .08);
+  --rig-ombre-saisie: 0 3px 8px rgba(0, 0, 0, .16), 0 26px 56px rgba(0, 0, 0, .22);
+  --rig-alerte: #C2410C;
+  --rig-erreur: #D92D20;
+  /* L'orange de l'aplat (#F59E0B) ne fait que 2:1 sur le gris perle :
+     le TEXTE et le contour de focus prennent un orange brule a 5:1. */
+  --rig-focus: #A34E08;
+  --rig-accent: #A34E08;
+  --rig-grad-action:  linear-gradient(90deg, #1D4ED8, #3B82F6);
+  --rig-grad-attente: linear-gradient(90deg, #475569, #8494A8);
+  --rig-grad-alerte:  linear-gradient(90deg, #C2410C, #F5A609);
+  --rig-grad-ok:      linear-gradient(90deg, #047857, #10B981);
+  --rig-grad-marque:  linear-gradient(90deg, #0E0E10, #F59E0B 55%, #FCD34D);
+
+  --rig-or: #F59E0B;
+  --rig-or-clair: #FBBF24;
+  --rig-or-texte: #141416;
+  --rig-or-halo: #F59E0B;
+  --rig-rail: #0E0E10;
+  --rig-rail-bord: transparent;
+  --rig-rail-texte: #F4F4F5;
+  --rig-rail-texte-2: #D4D4D8;
+  --rig-rail-texte-3: #8B8B94;
+  --rig-rail-voile: rgba(255, 255, 255, .06);
+  --rig-rail-trait: rgba(255, 255, 255, .12);
+  --rig-rail-trait-faible: rgba(255, 255, 255, .07);
+  --rig-rail-melange: #FFFFFF;
+  --rig-verbe-ouvrir: #F59E0B;
+  --rig-verbe-trouver: #71717A;
+  --rig-verbe-modifier: #E8A50C;
+  --rig-verbe-surveiller: #EA580C;
+  --rig-verbe-terminer: #52525B;
+  --rig-verbe-facturer: #D97706;
+  --rig-verbe-configurer: #A1A1AA;
+  --rig-palier-vide: #65A30D;
+  --rig-palier-bas: #71717A;
+  --rig-palier-moyen: #F59E0B;
+  --rig-palier-haut: #EA580C;
+  /* La tuile noire « Dossiers ouverts » declinee en trois noirs ; la couleur
+     vit dans le rond, aux teintes du graphique en anneau. */
+  --rig-chiffre-1: linear-gradient(160deg, #26262A, #141416);
+  --rig-chiffre-2: linear-gradient(160deg, #2C2C31, #1C1C1F);
+  --rig-chiffre-3: linear-gradient(160deg, #34343A, #232327);
+  --rig-chiffre-1-bord: transparent;
+  --rig-chiffre-2-bord: transparent;
+  --rig-chiffre-3-bord: transparent;
+  --rig-chiffre-texte: #D4D4D8;
+  --rig-chiffre-valeur: #FFFFFF;
+  --rig-chiffre-rond: rgba(245, 158, 11, .14);
+  --rig-chiffre-rond-bord: rgba(245, 158, 11, .30);
+  --rig-chiffre-1-icone: #F59E0B;
+  --rig-chiffre-2-icone: #FCD34D;
+  --rig-chiffre-3-icone: #D4D4D8;
+  --rig-profil: linear-gradient(135deg, #F59E0B, #FBBF24);
+  --rig-profil-texte: #141416;
+}
+
+/* --- ARGILE ET CORAIL : gris chaud d'argile, cartes creme en relief doux
+   (ombre claire en haut a gauche, sombre en bas a droite), rail petrole
+   #2E393F, accent corail #E8825A et vert d'eau #4CA7A0 (image jointe le
+   18/11/2026 en cours de demande). */
+[data-rig-theme="argile"] {
+  --rig-fond: #E6E1DB;
+  --rig-fond-2: #DBD5CE;
+  --rig-zebre: rgba(60, 45, 30, .04);
+  --rig-survol-ligne: rgba(232, 130, 90, .14);
+  --rig-surface: #F4F0EB;
+  --rig-champ: #F7F4F0;
+  --rig-bord: rgba(60, 45, 30, .13);
+  --rig-bord-faible: rgba(60, 45, 30, .07);
+  --rig-texte: #2A2622;
+  --rig-texte-2: #4A433C;
+  --rig-texte-3: #635A51;
+  --rig-ombre: -3px -3px 10px rgba(255, 255, 255, .60), 4px 6px 16px rgba(110, 85, 60, .18);
+  --rig-ombre-saisie: -4px -4px 14px rgba(255, 255, 255, .55), 8px 14px 32px rgba(110, 85, 60, .28);
+  --rig-alerte: #B4501E;
+  --rig-erreur: #C2412D;
+  /* Corail fonce pour le TEXTE et le focus : le corail de l'aplat fait 2,3:1
+     sur l'argile, #9C4220 y fait 5:1. */
+  --rig-focus: #9C4220;
+  --rig-accent: #9C4220;
+  --rig-grad-action:  linear-gradient(90deg, #1D4ED8, #3B82F6);
+  --rig-grad-attente: linear-gradient(90deg, #475569, #8494A8);
+  --rig-grad-alerte:  linear-gradient(90deg, #C2410C, #F5A609);
+  --rig-grad-ok:      linear-gradient(90deg, #047857, #10B981);
+  --rig-grad-marque:  linear-gradient(90deg, #2E393F, #E8825A 55%, #F8C17B);
+
+  --rig-or: #E8825A;
+  --rig-or-clair: #F2A27E;
+  --rig-or-texte: #2A1A12;
+  --rig-or-halo: #E8825A;
+  --rig-rail: #2E393F;
+  --rig-rail-bord: transparent;
+  --rig-rail-texte: #EEF2F1;
+  --rig-rail-texte-2: #D2DBD9;
+  --rig-rail-texte-3: #93A3A2;
+  --rig-rail-voile: rgba(230, 245, 240, .07);
+  --rig-rail-trait: rgba(230, 245, 240, .14);
+  --rig-rail-trait-faible: rgba(230, 245, 240, .08);
+  --rig-rail-melange: #FFFFFF;
+  --rig-verbe-ouvrir: #E8825A;
+  --rig-verbe-trouver: #4CA7A0;
+  --rig-verbe-modifier: #E3A663;
+  --rig-verbe-surveiller: #C8553D;
+  --rig-verbe-terminer: #8A8178;
+  --rig-verbe-facturer: #D9773A;
+  --rig-verbe-configurer: #609B94;
+  --rig-palier-vide: #4CA7A0;
+  --rig-palier-bas: #609B94;
+  --rig-palier-moyen: #E3A663;
+  --rig-palier-haut: #C8553D;
+  /* Corail, vert d'eau et petrole : les trois pilules de l'image. */
+  --rig-chiffre-1: linear-gradient(145deg, #F0906A, #D9714A);
+  --rig-chiffre-2: linear-gradient(145deg, #5BA9A1, #3F8C85);
+  --rig-chiffre-3: linear-gradient(145deg, #3A474D, #2A3439);
+  --rig-chiffre-1-bord: transparent;
+  --rig-chiffre-2-bord: transparent;
+  --rig-chiffre-3-bord: transparent;
+  --rig-chiffre-texte: #FFFFFF;
+  --rig-chiffre-valeur: #FFFFFF;
+  --rig-chiffre-rond: #F4F0EB;
+  --rig-chiffre-rond-bord: transparent;
+  --rig-chiffre-1-icone: #C9603A;
+  --rig-chiffre-2-icone: #3F8C85;
+  --rig-chiffre-3-icone: #2E393F;
+  --rig-profil: linear-gradient(135deg, #2E393F, #4A5A60);
+  --rig-profil-texte: #FFFFFF;
 }
 
 /* ============================================================

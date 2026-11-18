@@ -34,12 +34,14 @@
      de voile et de bord sont donc REDEFINIS ici, pour un fond sombre : tout
      ce qui est dessous lit les memes noms de variables sans changer. */
   background: var(--rig-rail);
-  --rig-texte: #F1EDE4;
-  --rig-texte-2: #E8E2D2;
-  --rig-texte-3: #9C9583;
-  --rig-fond-2: rgba(255, 240, 215, .07);
-  --rig-bord: rgba(255, 240, 215, .14);
-  --rig-bord-faible: rgba(255, 240, 215, .08);
+  /* 2026-11-18 : les valeurs viennent des jetons --rig-rail-* du theme
+     (rig-charte.css) et non plus d'ici : « Violet pilules » a un rail BLANC. */
+  --rig-texte: var(--rig-rail-texte);
+  --rig-texte-2: var(--rig-rail-texte-2);
+  --rig-texte-3: var(--rig-rail-texte-3);
+  --rig-fond-2: var(--rig-rail-voile);
+  --rig-bord: var(--rig-rail-trait);
+  --rig-bord-faible: var(--rig-rail-trait-faible);
   color: var(--rig-texte-2);
 }
 .rig-menu__groupe { margin-bottom: var(--rig-esp-1); }
@@ -105,8 +107,9 @@
 .rig-menu__groupe--surv   { --teinte: var(--rig-verbe-surveiller); --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
 .rig-menu__groupe--fin    { --teinte: var(--rig-verbe-terminer);   --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
 /* Sur le rail encre, une teinte ecrite en TEXTE (sous-titre ouvert, survol)
-   s'eclaircit : le bleu #4560C2 tombe a 2,9:1 sur l'encre. */
-.rig-menu .rig-menu__groupe { --teinte-texte: color-mix(in srgb, var(--teinte, #9C9583) 70%, #FFFFFF); }
+   s'eclaircit : le bleu #4560C2 tombe a 2,9:1 sur l'encre. Sur un rail clair
+   (« Violet pilules »), --rig-rail-melange la fonce au lieu de l'eclaircir. */
+.rig-menu .rig-menu__groupe { --teinte-texte: color-mix(in srgb, var(--teinte, #9C9583) 70%, var(--rig-rail-melange)); }
 
 /* Favoris : l'or de l'etoile. Le groupe est en tete du menu, au-dessus
    d'« Ouvrir » ; il n'apparait que si au moins une etoile est allumee. */
@@ -277,7 +280,7 @@
   padding: 12px 22px;
   /* C'est le liseré or et l'ombre qui detachent la barre du fond de page, pas
      sa couleur. Ne pas les retirer. */
-  box-shadow: 0 0 0 1px rgba(176, 141, 63, .30), var(--rig-ombre);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--rig-or-halo) 30%, transparent), var(--rig-ombre);
 }
 /* La loupe : le !important vise le style INLINE pose sur elle dans Home.razor
    (or du focus), trop pale sur le champ blanc du mode clair. */
@@ -293,7 +296,7 @@
 }
 .rig-recherche--fixe:focus-within {
   border-color: var(--rig-focus);
-  box-shadow: 0 0 0 3px rgba(176, 141, 63, .35), var(--rig-ombre-saisie);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rig-or-halo) 35%, transparent), var(--rig-ombre-saisie);
 }
 /* La liste de resultats pend SOUS la barre : elle prend le meme fond qu'elle,
    sinon un panneau d'une autre teinte s'accroche au champ. */
@@ -1894,7 +1897,7 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   transition: width .18s ease;
 }
 .rig-frise__pas--complet .rig-frise__jauge-part { background: var(--rig-grad-ok); }
-.rig-frise__pas--courant .rig-frise__jauge { background: rgba(176, 141, 63, .25); }
+.rig-frise__pas--courant .rig-frise__jauge { background: color-mix(in srgb, var(--rig-or-halo) 25%, transparent); }
 .rig-frise__pas--courant .rig-frise__jauge-part { background: var(--rig-focus); }
 .rig-frise__pas--refuse .rig-frise__jauge-part { background: var(--rig-alerte); }
 .rig-frise--h .rig-frise__libelle {
@@ -2130,7 +2133,7 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    Les autres tuiles s'effacent (bordure faible, ombre plus discrete)
    pour que la priorite se voie sans lire un mot. */
 .rig-widget--maitresse {
-  border-color: rgba(176, 141, 63, .55);
+  border-color: color-mix(in srgb, var(--rig-or-halo) 55%, transparent);
 }
 .rig-widget--maitresse .rig-widget__titre {
   font: 600 var(--rig-fs-corps)/1.2 var(--rig-font);

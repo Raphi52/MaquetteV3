@@ -22,6 +22,23 @@ var charte = File.ReadAllText(Path.Combine(wwwroot, "rig-charte.css"));
 var feuilles = Directory.GetFiles(wwwroot, "*.css")
     .ToDictionary(f => Path.GetFileName(f)!, File.ReadAllText);
 
+// Les themes de la liste des reglages, tels que les declare ThemesRig
+// (AccueilEtat.cs) : code -> fond de fenetre.
+var themes = Regex.Matches(File.ReadAllText(Path.Combine(racine, "AccueilEtat.cs")),
+        @"new\(""([a-z]+)"",\s*""[^""]+"",\s*""(#[0-9A-Fa-f]{6})""\)")
+    .ToDictionary(m => m.Groups[1].Value, m => m.Groups[2].Value.ToUpperInvariant());
+
+// Corps du bloc [data-rig-theme="code"] de la charte (vide s'il manque).
+string BlocDuTheme(string code)
+    => Regex.Match(charte, @"\[data-rig-theme=""" + code + @"""\]\s*\{([^{}]*)\}").Groups[1].Value;
+string? FondDuTheme(string code)
+{
+    var fond = Regex.Match(BlocDuTheme(code), @"--rig-fond:\s*(#[0-9A-Fa-f]{6})");
+    return fond.Success ? fond.Groups[1].Value.ToUpperInvariant() : null;
+}
+HashSet<string> Jetons(string corps)
+    => Regex.Matches(corps, @"(--rig-[a-z0-9-]+)\s*:").Select(m => m.Groups[1].Value).ToHashSet();
+
 // --- 1. Le reset existe et porte sur TOUS les elements.
 Exiger(
     Regex.IsMatch(charte, @"\*[^{}]*\{[^{}]*box-sizing:\s*border-box", RegexOptions.Singleline),
@@ -93,26 +110,19 @@ foreach (var (nom, texte) in feuilles)
     Exiger(vue.Success && !Regex.IsMatch(vue.Value, @"\bMargin="),
         "MainWindow.xaml : le WebView n'a pas de marge (aucun cadre autour de la page)");
 
-    string? FondDuTheme(string theme)
+    // Depuis le 18/11/2026 les fonds vivent dans ThemesRig (AccueilEtat.cs),
+    // une entree par theme de la liste des reglages : chacun doit suivre le
+    // --rig-fond de SON bloc de rig-charte.css.
+    foreach (var (code, fondDeclare) in themes)
     {
-        var bloc = Regex.Match(charte,
-            @"\[data-rig-theme=""" + theme + @"""\]\s*\{([^{}]*)\}");
-        var fond = Regex.Match(bloc.Groups[1].Value, @"--rig-fond:\s*(#[0-9A-Fa-f]{6})");
-        return fond.Success ? fond.Groups[1].Value.ToUpperInvariant() : null;
+        var fond = FondDuTheme(code);
+        Exiger(fond is not null && fond == fondDeclare,
+            $"ThemesRig « {code} » : le fond de fenetre {fondDeclare} suit --rig-fond de la feuille ({fond})");
     }
-    string? Constante(string nom)
-    {
-        var m = Regex.Match(interop, nom + @"\s*=\s*""(#[0-9A-Fa-f]{6})""");
-        return m.Success ? m.Groups[1].Value.ToUpperInvariant() : null;
-    }
-    var clair = FondDuTheme("clair");
-    var sombre = FondDuTheme("sombre");
-    Exiger(clair is not null && Constante("FondClair") == clair,
-        $"FenetreInterop.FondClair suit --rig-fond du theme clair ({clair})");
-    Exiger(sombre is not null && Constante("FondSombre") == sombre,
-        $"FenetreInterop.FondSombre suit --rig-fond du theme sombre ({sombre})");
-    Exiger(!Regex.IsMatch(interop, @"Color\.FromRgb\("),
-        "FenetreInterop ne peint aucune teinte en dur hors des deux constantes");
+    Exiger(Regex.IsMatch(interop, @"ThemesRig\.De\(theme\)\.Fond"),
+        "FenetreInterop.AppliquerFond peint le fond du theme lu dans ThemesRig");
+    Exiger(!Regex.IsMatch(interop, @"Color\.FromRgb\(|""#[0-9A-Fa-f]{6}"""),
+        "FenetreInterop ne peint aucune teinte en dur");
 
     var bords = new[] { "Haut", "Bas", "Gauche", "Droite", "HautGauche", "HautDroite", "BasGauche", "BasDroite" };
     Exiger(bords.All(b => main.Contains("BordFenetre." + b + ",")),
@@ -170,6 +180,63 @@ foreach (var (nom, texte) in feuilles)
     // 18/11/2026 : le #fdfdfb chaud passait pour du creme sur le gris bleute).
     Exiger(Regex.IsMatch(accueil, @"\.rig-apercu__feuille\s*\{[^{}]*background:\s*#FFFFFF\s*;", RegexOptions.IgnoreCase),
         "la feuille des documents est blanc pur");
+}
+
+// --- 7. Themes au choix (18/11/2026). La bascule « Mode sombre » devient une
+// liste de cinq themes. Trois pieges, chacun silencieux a la compilation :
+// - un jeton oublie dans un bloc retombe sur la valeur du SOMBRE (:root) :
+//   texte creme sur carte blanche, illisible ;
+// - un theme a fond clair absent de la regle color-scheme garde des listes
+//   deroulantes systeme sombres (constat du 10/09/2026, en sens inverse) ;
+// - un code de ThemesRig sans bloc CSS donne une page sans couleurs.
+{
+    var home = File.ReadAllText(Path.Combine(racine, "Components", "Pages", "Home.razor"));
+    var accueil = feuilles["rig-accueil.css"];
+
+    Exiger(themes.Count >= 5 && new[] { "clair", "sombre", "violet", "orange", "argile" }.All(themes.ContainsKey),
+        $"ThemesRig declare les cinq themes ({string.Join(", ", themes.Keys)})");
+
+    // Le contrat : tout ce que le clair redefinit, plus les jetons du rail.
+    var contrat = Jetons(BlocDuTheme("clair"));
+    contrat.UnionWith(new[] { "--rig-or-halo", "--rig-rail-texte", "--rig-rail-texte-2", "--rig-rail-texte-3",
+        "--rig-rail-voile", "--rig-rail-trait", "--rig-rail-trait-faible", "--rig-rail-melange" });
+    var parDefaut = Jetons(Regex.Match(charte, @":root\s*\{([^{}]*)\}").Groups[1].Value);
+    parDefaut.UnionWith(Jetons(BlocDuTheme("sombre")));
+    var sansDefaut = contrat.Except(parDefaut).ToList();
+    Exiger(sansDefaut.Count == 0,
+        "chaque jeton du contrat a une valeur par defaut (:root ou bloc sombre)"
+        + (sansDefaut.Count > 0 ? " — manque : " + string.Join(", ", sansDefaut) : ""));
+
+    foreach (var code in themes.Keys.Where(c => c is not ("clair" or "sombre")))
+    {
+        var manquants = contrat.Except(Jetons(BlocDuTheme(code))).ToList();
+        Exiger(manquants.Count == 0,
+            $"le theme « {code} » redefinit tous les jetons du clair et du rail"
+            + (manquants.Count > 0 ? " — manque : " + string.Join(", ", manquants) : ""));
+    }
+
+    foreach (var (code, fond) in themes)
+    {
+        var rvb = Convert.FromHexString(fond.TrimStart('#'));
+        var clairOuSombre = (0.2126 * rvb[0] + 0.7152 * rvb[1] + 0.0722 * rvb[2]) / 255 > 0.5;
+        var declareClair = charte.Contains(@"html:has([data-rig-theme=""" + code + @"""])");
+        Exiger(clairOuSombre == declareClair,
+            $"« {code} » : color-scheme {(clairOuSombre ? "light" : "dark")} pour un fond {fond}");
+    }
+
+    // Le rail lit ses couleurs dans les jetons du theme, plus en dur.
+    var menu = Regex.Match(accueil, @"\n\.rig-menu\s*\{([^{}]*)\}").Groups[1].Value;
+    Exiger(menu.Contains("--rig-texte: var(--rig-rail-texte)") && !Regex.IsMatch(menu, @"--rig-texte[^:]*:\s*#"),
+        "le rail de gauche prend ses couleurs de texte dans les jetons --rig-rail-* du theme");
+
+    // La bascule a disparu au profit d'une liste nourrie par ThemesRig.
+    Exiger(!home.Contains("BasculerTheme") && !home.Contains("<span>Mode sombre</span>"),
+        "la bascule « Mode sombre » a disparu des reglages");
+    Exiger(Regex.IsMatch(home, @"<select[^>]*id=""rig-choix-theme""[^>]*@onchange=""ChoisirTheme""")
+           && home.Contains("@foreach (var t in ThemesRig.Tous)"),
+        "Reglages > Affichage propose une liste deroulante des themes de ThemesRig");
+    Exiger(home.Contains(@"data-rig-theme=""@Theme"""),
+        "la page porte le code du theme choisi");
 }
 
 Console.WriteLine();
