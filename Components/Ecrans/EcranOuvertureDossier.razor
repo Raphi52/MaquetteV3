@@ -1,0 +1,272 @@
+@* Ouverture d'un dossier RCS pour une societe.
+
+   Ecran MANQUANT jusqu'ici : la maquette savait chercher une affaire, creer
+   un dossier GED sous une affaire existante, mais jamais faire NAITRE
+   l'affaire elle-meme. Une immatriculation arrivee du guichet unique n'avait
+   donc aucun point d'entree. Sans origine RIG v2 : aucun ecran de l'ancienne
+   application ne portait ce geste, il n'y a donc pas de procedure a citer.
+
+   Les champs ne sont pas inventes : ce sont ceux des sections generees dans
+   Metier/InformationsDossier.cs (lecture du 15/09/2026 de RIG_DEV@SQL-DEV) --
+   DOSSIER_RCS (SIREN, N de gestion en cours, Date d'immatriculation),
+   INSCRIT_PM (Denomination, Forme juridique utilisee), CAPITAL (Montant,
+   Monnaie), ACTIVITE (Code NAF, Activites declarees), ETABLISSEMENT (adresse
+   du siege), DIRIGEANT (nom, qualite).
+
+   Maquette : rien n'est ecrit en base, mais les dossiers ouverts sont
+   conserves dans accueil.json (comme la saisie guidee) : ils sont donc
+   toujours la apres une fermeture de l'application. *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Ouverture d'un dossier</div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">D'ou vient la demande</span>
+            <select class="rig-saisie-champ__saisie" @bind="Origine">
+                @foreach (var o in Origines)
+                {
+                    <option value="@o">@o</option>
+                }
+            </select>
+        </label>
+
+        <div class="rig-criteres__paire">
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">N&deg; SIREN</span>
+                <input class="rig-saisie-champ__saisie" @bind="Siren" placeholder="9 chiffres" />
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Date d'immatriculation</span>
+                <input class="rig-saisie-champ__saisie" type="date" @bind="DateImmat" />
+            </label>
+        </div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Denomination</span>
+            <input class="rig-saisie-champ__saisie" @bind="Denomination" placeholder="raison sociale" />
+        </label>
+
+        <div class="rig-criteres__paire">
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Forme juridique utilisee</span>
+                <select class="rig-saisie-champ__saisie" @bind="FormeJuridique">
+                    @foreach (var f in Formes)
+                    {
+                        <option value="@f">@f</option>
+                    }
+                </select>
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Montant du capital</span>
+                <input class="rig-saisie-champ__saisie" type="number" @bind="Capital" />
+            </label>
+        </div>
+
+        <div class="rig-criteres__paire">
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Code NAF</span>
+                <input class="rig-saisie-champ__saisie" @bind="CodeNaf" placeholder="ex. 6201Z" />
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Monnaie</span>
+                <select class="rig-saisie-champ__saisie" @bind="Monnaie">
+                    <option>EUR</option><option>CHF</option><option>USD</option>
+                </select>
+            </label>
+        </div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Activites (indiquees sur le Kbis)</span>
+            <input class="rig-saisie-champ__saisie" @bind="Activite" />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Adresse du siege</span>
+            <input class="rig-saisie-champ__saisie" @bind="AdresseSiege" />
+        </label>
+
+        <div class="rig-criteres__paire">
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Dirigeant</span>
+                <input class="rig-saisie-champ__saisie" @bind="Dirigeant" />
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Qualite</span>
+                <select class="rig-saisie-champ__saisie" @bind="QualiteDirigeant">
+                    @foreach (var q in Qualites)
+                    {
+                        <option value="@q">@q</option>
+                    }
+                </select>
+            </label>
+        </div>
+
+        <div class="rig-criteres__actions">
+            <button class="rig-bouton rig-bouton--fort" @onclick="Ouvrir">Ouvrir le dossier</button>
+            <button class="rig-bouton" @onclick="ViderLaFiche">Vider</button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Message))
+        {
+            @* Une PHRASE, pas une pastille : « rig-etat » interdit le retour a
+               la ligne (voulu pour les etats de tableau), ce qui faisait
+               deborder ce message hors de la colonne. *@
+            <div class="rig-etat rig-etat--@(Bloquant ? "attente" : "ok")"
+                 style="display:block;white-space:normal;line-height:1.5;padding:6px 10px">
+                @Message
+            </div>
+        }
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Dossiers ouverts</div>
+            <span class="rig-resultats-proc__compte">@Ouverts.Count dossier(s)</span>
+        </div>
+
+        <div class="rig-table-cadre">
+            <table class="rig-table">
+                <thead>
+                    <tr>
+                        <th>N&deg; de gestion</th>
+                        <th>N&deg; SIREN</th>
+                        <th>Denomination</th>
+                        <th>Forme</th>
+                        <th>Immatriculation</th>
+                        <th>Capital</th>
+                        <th>Origine</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in Ouverts)
+                    {
+                        <tr>
+                            <td class="rig-table__mono">@d.Numero</td>
+                            <td class="rig-table__mono">@d.Siren</td>
+                            <td>@d.Denomination</td>
+                            <td>@d.Forme</td>
+                            <td class="rig-table__mono">@d.Immatriculation.ToString("dd/MM/yyyy")</td>
+                            <td class="rig-table__mono">@d.Capital.ToString("N0") @d.Monnaie</td>
+                            <td>@d.Origine</td>
+                        </tr>
+                    }
+                    @if (Ouverts.Count == 0)
+                    {
+                        <tr><td colspan="7" class="rig-table__vide">
+                            Aucun dossier ouvert pour l'instant : remplissez la fiche a gauche.
+                        </td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+@code {
+    /// <summary>Les trois portes reelles d'une immatriculation au greffe.</summary>
+    private static readonly string[] Origines =
+        ["Guichet unique (INPI)", "Demande recue au greffe", "Depot au guichet"];
+
+    private static readonly string[] Formes =
+        ["SAS", "SASU", "SARL", "EURL", "SA", "SNC", "SCI", "Societe civile"];
+
+    private static readonly string[] Qualites =
+        ["President", "Directeur general", "Gerant", "Administrateur", "Associe unique"];
+
+    /// <summary>Les dossiers deja ouverts : ils viennent du registre partage,
+    /// donc du disque — le tableau n'est pas vide au demarrage suivant.</summary>
+    private static IReadOnlyList<DossierOuvert> Ouverts => AffairesOuvertes.Details;
+
+    /// <summary>SIREN pose a l'ouverture de l'ecran : l'agent arrive ici depuis
+    /// une recherche d'affaires restee vide, il ne doit pas retaper le numero
+    /// qu'il vient de saisir.</summary>
+    [Parameter] public string? SirenDemande { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrWhiteSpace(SirenDemande)) Siren = SirenDemande!.Trim();
+    }
+
+    private string Origine = Origines[0];
+    private string Siren = string.Empty;
+    private DateTime? DateImmat = JeuDemo.Aujourdhui;
+    private string Denomination = string.Empty;
+    private string FormeJuridique = Formes[0];
+    private decimal Capital = 1000;
+    private string Monnaie = "EUR";
+    private string CodeNaf = string.Empty;
+    private string Activite = string.Empty;
+    private string AdresseSiege = string.Empty;
+    private string Dirigeant = string.Empty;
+    private string QualiteDirigeant = Qualites[0];
+
+    private string Message = string.Empty;
+    private bool Bloquant;
+
+    /// <summary>Un SIREN est fait de neuf chiffres ; les espaces de saisie sont admis.</summary>
+    private string SirenNormalise => new(Siren.Where(char.IsDigit).ToArray());
+
+    private void Ouvrir()
+    {
+        if (SirenNormalise.Length != 9)
+        {
+            Message = "Le SIREN doit compter neuf chiffres.";
+            Bloquant = true;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(Denomination))
+        {
+            Message = "La denomination est obligatoire pour ouvrir un dossier.";
+            Bloquant = true;
+            return;
+        }
+
+        var deja = AffairesOuvertes.ParSiren(SirenNormalise);
+        if (deja is not null)
+        {
+            Message = "Ce SIREN a deja un dossier ouvert : " + deja.Numero;
+            Bloquant = true;
+            return;
+        }
+
+        var immat = DateImmat ?? JeuDemo.Aujourdhui;
+
+        // Le dossier rejoint le registre PARTAGE : c'est lui que la recherche
+        // d'affaires et la visionneuse interrogent. Sans cela, l'ouverture ne
+        // serait visible que dans le tableau de droite.
+        var ne = AffairesOuvertes.Ouvrir(SirenNormalise, Denomination, immat, null,
+                                         FormeJuridique, Capital, Monnaie, Origine);
+        if (ne is null)
+        {
+            Message = "L'ouverture a ete refusee : verifiez le SIREN et la denomination.";
+            Bloquant = true;
+            return;
+        }
+
+        Message = "Dossier " + ne.Numero + " ouvert pour " + Denomination.Trim()
+                + " : il est desormais retrouvable dans « Mes affaires » par son SIREN.";
+        Bloquant = false;
+        ReinitialiserChamps();
+    }
+
+    private void ViderLaFiche()
+    {
+        ReinitialiserChamps();
+        Message = string.Empty;
+        Bloquant = false;
+    }
+
+    private void ReinitialiserChamps()
+    {
+        Siren = string.Empty;
+        Denomination = string.Empty;
+        CodeNaf = string.Empty;
+        Activite = string.Empty;
+        AdresseSiege = string.Empty;
+        Dirigeant = string.Empty;
+        Capital = 1000;
+    }
+}

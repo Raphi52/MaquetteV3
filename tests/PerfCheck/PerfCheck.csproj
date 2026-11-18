@@ -13,6 +13,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="../../MesuresPerf.cs" Link="MesuresPerf.cs" />
     <Compile Include="../../Metier/JeuDemo.cs" Link="JeuDemo.cs" />
+    <Compile Include="../../Metier/SimulationEdi.cs" Link="SimulationEdi.cs" />
   </ItemGroup>
 
 </Project>

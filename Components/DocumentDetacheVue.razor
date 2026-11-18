@@ -1,0 +1,101 @@
+@implements IDisposable
+@inject DocumentPartage Partage
+
+@* Contenu de la FENETRE DETACHEE du document : le meme apercu que la 3e zone
+   de l'ecran VDossier, seul dans sa fenetre. Il suit la piece ouverte dans la
+   fenetre principale (voir DocumentPartage). *@
+<div data-rig-theme="sombre"
+     style="background:var(--rig-fond);color:var(--rig-texte);height:100vh;overflow:auto">
+    @if (Emplacement.Piece is null)
+    {
+        <div class="rig-guide__entete">
+            <div>
+                <div class="rig-kicker">Document</div>
+                <h3 class="rig-guide__titre">Aucune piece ouverte</h3>
+                <div class="rig-guide__source">Cliquez une piece dans l'arbre de la fenetre principale.</div>
+            </div>
+        </div>
+    }
+    else
+    {
+        var piece = Emplacement.Piece;
+        <div class="rig-apercu rig-apercu--detache">
+            <div class="rig-apercu__entete">
+                <div>
+                    <div class="rig-kicker">@piece.Extension &middot; @piece.Pages page(s) &middot; @piece.Date</div>
+                    <div class="rig-apercu__titre">@piece.Libelle</div>
+                </div>
+                @* Objectif (zoom) PROPRE a cette fenetre : le champ Zoom est local
+                   a la vue, il n'est PAS dans DocumentPartage, donc chaque fenetre
+                   detachee grossit le document independamment de la principale. *@
+                <div class="rig-apercu__actions rig-zoom">
+                    <button class="rig-bouton" @onclick="ZoomMoins">&minus;</button>
+                    <span class="rig-zoom__taux">@((int)Math.Round(Zoom * 100)) %</span>
+                    <button class="rig-bouton" @onclick="ZoomPlus">+</button>
+                    <button class="rig-bouton rig-bouton--plat" @onclick="ZoomRaz">100 %</button>
+                </div>
+            </div>
+            @if (piece.APdf)
+            {
+                <div class="rig-apercu__pages rig-apercu__pages--pdf">
+                    <iframe class="rig-apercu__pdf" src="@(piece.Fichier)#view=FitH" title="@piece.Libelle"></iframe>
+                </div>
+            }
+            else
+            {
+            <div class="rig-apercu__pages" style="zoom:@Zoom.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+                @for (var feuille = 1; feuille <= Math.Max(1, piece.Pages); feuille++)
+                {
+                    <div class="rig-apercu__feuille">
+                        @if (feuille == 1)
+                        {
+                            @* Valeurs du formulaire, relues a chaque frappe (EcrireEnDirect). *@
+                            <dl class="rig-apercu__saisie">
+                                @foreach (var (libelle, valeur) in Emplacement.Valeurs ?? [])
+                                {
+                                    <dt>@libelle</dt><dd>@valeur</dd>
+                                }
+                            </dl>
+                        }
+                        <div class="rig-apercu__feuille-texte">@TextePage(piece, feuille)</div>
+                        <div class="rig-apercu__folio">@feuille / @Math.Max(1, piece.Pages)</div>
+                    </div>
+                }
+            </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>Rang de CETTE fenetre (1re detachee, 2e...). Sert de clef a son
+    /// emplacement : c'est ce qui permet d'externaliser PLUSIEURS documents a
+    /// la fois, chacun dans sa fenetre, sans qu'ils se recopient l'un l'autre.</summary>
+    [Parameter] public int Rang { get; set; } = 1;
+
+    private DocumentDetache Emplacement = default!;
+
+    protected override void OnInitialized()
+    {
+        Emplacement = Partage.Emplacement(Rang);
+        Emplacement.Change += Rafraichir;
+    }
+
+    private void Rafraichir() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        if (Emplacement is not null) Emplacement.Change -= Rafraichir;
+    }
+
+    // Objectif de CETTE fenetre uniquement (0,5 a 4,0).
+    private double Zoom = 1.0;
+
+    private void ZoomPlus() => Zoom = Math.Min(4.0, Math.Round(Zoom + 0.25, 2));
+
+    private void ZoomMoins() => Zoom = Math.Max(0.5, Math.Round(Zoom - 0.25, 2));
+
+    private void ZoomRaz() => Zoom = 1.0;
+
+    private static string TextePage(NoeudGed n, int feuille) => DocumentPartage.TextePage(n, feuille);
+}

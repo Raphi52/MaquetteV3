@@ -37,21 +37,58 @@
             <span>Experts actifs uniquement</span>
         </button>
 
-        <div class="rig-criteres__bloc">
-            <div class="rig-kicker">Resultats (@Trouves.Length)</div>
-            @foreach (var item in Trouves)
-            {
-                var ex = item;
-                <button class="rig-bascule @(Selection?.Abrege == ex.Abrege ? "rig-bascule--actif" : "")"
-                        @onclick="() => Selection = ex">
-                    <span class="rig-bascule__temoin"></span>
-                    <span>@ex.Abrege — @ex.Nom</span>
-                </button>
-            }
-        </div>
     </aside>
 
     <section class="rig-resultats-proc">
+        @* Liste de recherche : les CINQ colonnes de DataListviewExpert en RIG v2
+           (Recherche/OPE_RECHERCHE_EXPERT.cs, appels AddColumns) --
+             Abrege   EXPRT_ABREGE
+             Civilite EXPRT_CIVILITE
+             Nom      EXPRT_NOM
+             Mail     EXPRT_ADRESSE_MAIL
+             Actif    EXPRT_EST_ACTIF
+           Elles ne tenaient pas dans la colonne de criteres (320px) : la liste
+           occupe donc le haut du plan de travail, comme en v2 ou la recherche
+           precede l'edition. *@
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Liste des experts</div>
+            <span class="rig-resultats-proc__compte">@Trouves.Length expert(s)</span>
+        </div>
+
+        <div class="rig-table-cadre">
+            <table class="rig-table">
+                <thead>
+                    <tr>
+                        <th>Abrege</th>
+                        <th>Civilite</th>
+                        <th>Nom</th>
+                        <th>Mail</th>
+                        <th>Actif</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Trouves)
+                    {
+                        var ex = item;
+                        <tr @onclick="() => Selection = ex"
+                            style="@(Selection?.Abrege == ex.Abrege ? "box-shadow:inset 3px 0 0 0 var(--rig-focus)" : "")">
+                            <td class="rig-table__mono">@ex.Abrege</td>
+                            <td>@ex.Civilite</td>
+                            <td>@ex.Nom</td>
+                            <td>@ex.Mail</td>
+                            <td class="rig-table__centre">
+                                <span class="rig-etat rig-etat--@(ex.Actif ? "ok" : "attente")">@(ex.Actif ? "Actif" : "Inactif")</span>
+                            </td>
+                        </tr>
+                    }
+                    @if (Trouves.Length == 0)
+                    {
+                        <tr class="rig-table__ligne--inerte"><td colspan="5" class="rig-table__vide">Aucun expert ne repond a ces criteres.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
         <div class="rig-resultats-proc__entete">
             <div class="rig-kicker">Edition d'un expert</div>
             <span class="rig-resultats-proc__compte">@(Selection?.Abrege ?? "aucun expert selectionne")</span>

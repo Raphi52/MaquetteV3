@@ -8,11 +8,14 @@
    plafonner ; l'ancienne liste plate de categories ne le pouvait pas.
    ============================================================ *@
 
-<div class="rig-arbre__ligne @(Selection == Noeud ? "rig-arbre__ligne--actif" : "")"
+@* CHEMIN : la ligne ou l'on se trouve, et TOUS ses parents, portent un
+   filet a gauche -- on lit d'un coup d'oeil ou l'on est dans le dossier,
+   sans deplier ni compter les retraits. *@
+<div class="rig-arbre__ligne @(ReferenceEquals(Selection, Noeud) ? "rig-arbre__ligne--actif" : "") @(SurLeChemin ? "rig-arbre__ligne--chemin" : "")"
      style="--rig-arbre-niveau:@Niveau"
      @onclick="Activer">
     <span class="rig-arbre__libelle">
-        @if (EnfantsVisibles.Count > 0)
+        @if (EnfantsAffiches.Count > 0)
         {
             <span class="rig-arbre__chevron @(Ouvert ? "rig-arbre__chevron--ouvert" : "")">&#9656;</span>
         }
@@ -20,24 +23,47 @@
         {
             <span class="rig-arbre__chevron rig-arbre__chevron--vide"></span>
         }
-        <span class="rig-arbre__icone rig-arbre__icone--@Noeud.Icone"></span>
-        <span class="rig-arbre__texte">@Noeud.Libelle</span>
+        <IconeGed Nature="@AccesGed.CodeIcone(Noeud)" Classe="rig-arbre__icone" />
+        @if (ReferenceEquals(Renomme, Noeud))
+        {
+            @* Renommage SUR PLACE : c'est ici qu'on nomme un element cree,
+               plutot que dans un champ de la fenetre de creation. *@
+            <input class="rig-arbre__saisie" value="@Texte" autofocus
+                   @onclick:stopPropagation="true"
+                   @onchange="ev => Valider(ev.Value?.ToString())"
+                   @onkeydown="Touche" />
+        }
+        else
+        {
+            <span class="rig-arbre__texte">@Texte</span>
+        }
         @if (EnfantsVisibles.Count > 0 && Noeud.NbPieces > 0)
         {
             <span class="rig-arbre__compte">(@Noeud.NbPieces)</span>
         }
     </span>
+    @* ACTIONS : trois points a DROITE de la ligne, comme la liste des
+       conversations d'Autowin OS. Le clic droit etait invisible -- rien
+       a l'ecran ne disait qu'un menu existait. Le bouton reste discret
+       (revele au survol ou quand son menu est ouvert). *@
+    <button type="button" class="rig-arbre__actions" title="Actions"
+            aria-label="Actions sur @Texte"
+            @onclick="ev => MenuContextuel.InvokeAsync((Noeud, ev))"
+            @onclick:stopPropagation="true">&#8942;</button>
 </div>
 
 @if (Ouvert)
 {
-    @foreach (var enfant in EnfantsVisibles)
+    @foreach (var enfant in EnfantsAffiches)
     {
         <ArbreGedNoeud Noeud="enfant" Niveau="Niveau + 1" Ouverts="Ouverts"
                        Selection="Selection" Selectionner="Selectionner"
-                       Domaines="Domaines" Ajouts="Ajouts" />
+                       Domaines="Domaines" Ajouts="Ajouts" Masques="Masques"
+                       Recette="Recette" Filtre="@Filtre"
+                       Libelles="Libelles" Renomme="Renomme"
+                       Renommer="Renommer" MenuContextuel="MenuContextuel" />
     }
-    @if (EnfantsVisibles.Count == 0 && !Noeud.EstPiece)
+    @if (EnfantsVisibles.Count == 0 && string.IsNullOrWhiteSpace(Filtre) && !Noeud.EstPiece && !Noeud.EstFiche)
     {
         <div class="rig-arbre__vide" style="--rig-arbre-niveau:@(Niveau + 1)">aucune piece</div>
     }
@@ -56,17 +82,76 @@
     /// <summary>Elements ajoutes a la main sous un dossier, par le bouton « Nouveau ».</summary>
     [Parameter] public IReadOnlyDictionary<NoeudGed, List<NoeudGed>>? Ajouts { get; set; }
 
-    private IReadOnlyList<NoeudGed> EnfantsVisibles
-        => AccesGed.EnfantsVisibles(Noeud, Domaines, Ajouts);
+    /// <summary>Noeuds supprimes depuis l'arbre : ils ne se rendent plus.</summary>
+    [Parameter] public IReadOnlyCollection<NoeudGed>? Masques { get; set; }
 
-    private bool Ouvert => Ouverts.Contains(Noeud);
+    /// <summary>Libelles reecrits par un renommage, par identite de noeud.</summary>
+    [Parameter] public IReadOnlyDictionary<NoeudGed, string>? Libelles { get; set; }
+
+    /// <summary>La tache en cours : elle replie les branches qu'elle ne nomme pas.</summary>
+    [Parameter] public RecetteTache? Recette { get; set; }
+
+    /// <summary>Le noeud en cours de renommage sur place, s'il y en a un.</summary>
+    [Parameter] public NoeudGed? Renomme { get; set; }
+
+    /// <summary>Renommage valide (texte vide = renommage abandonne).</summary>
+    [Parameter] public EventCallback<(NoeudGed Noeud, string Texte)> Renommer { get; set; }
+
+    /// <summary>Bouton « trois points » d'une ligne : ouvre le menu des operations.</summary>
+    [Parameter] public EventCallback<(NoeudGed Noeud, MouseEventArgs Souris)> MenuContextuel { get; set; }
+
+    private string Texte
+        => Libelles is not null && Libelles.TryGetValue(Noeud, out var l) ? l : Noeud.Libelle;
+
+    private Task Valider(string? texte) => Renommer.InvokeAsync((Noeud, texte ?? ""));
+
+    private async Task Touche(KeyboardEventArgs ev)
+    {
+        if (ev.Key == "Escape") await Renommer.InvokeAsync((Noeud, ""));
+    }
+
+    private IReadOnlyList<NoeudGed> EnfantsVisibles
+        => AccesGed.EnfantsVisibles(Noeud, Domaines, Ajouts, Masques, Recette);
+
+    /// <summary>Texte de la barre de recherche au-dessus de l'arbre : seules les
+    /// branches dont un element porte ce texte restent affichees.</summary>
+    [Parameter] public string? Filtre { get; set; }
+
+    /// <summary>Les enfants rendus : les visibles, restreints par le filtre.</summary>
+    private IReadOnlyList<NoeudGed> EnfantsAffiches
+        => string.IsNullOrWhiteSpace(Filtre)
+            ? EnfantsVisibles
+            : EnfantsVisibles.Where(n => Correspond(n, FiltreArbre.Normaliser(Filtre))).ToList();
+
+    /// <summary>Le noeud porte le texte cherche, ou l'un de ses descendants visibles.</summary>
+    private bool Correspond(NoeudGed n, string cle)
+    {
+        var texte = Libelles is not null && Libelles.TryGetValue(n, out var l) ? l : n.Libelle;
+        if (FiltreArbre.Normaliser(texte).Contains(cle)) return true;
+        return AccesGed.EnfantsVisibles(n, Domaines, Ajouts, Masques, Recette).Any(e => Correspond(e, cle));
+    }
+
+    // Pendant une recherche, les branches qui menent a un resultat s'ouvrent
+    // seules : un resultat cache sous un dossier replie n'est pas trouve.
+    private bool Ouvert => Ouverts.Contains(Noeud)
+                           || (!string.IsNullOrWhiteSpace(Filtre) && EnfantsAffiches.Count > 0);
+
+    /// <summary>
+    /// Ce noeud est-il un PARENT du noeud selectionne ? La comparaison porte
+    /// sur l'identite du noeud, pas sur son libelle : deux dossiers peuvent
+    /// porter le meme nom a deux endroits de l'arbre.
+    /// </summary>
+    private bool SurLeChemin
+        => Selection is not null
+           && !ReferenceEquals(Selection, Noeud)
+           && Noeud.Descendants().Any(d => ReferenceEquals(d, Selection));
 
     private async Task Activer()
     {
         // Un dossier se replie/se deplie ; une piece se selectionne. Un
         // dossier vide reste depliable : c'est ainsi que v2 montre
         // « aucune piece » plutot que de cacher le dossier.
-        if (EnfantsVisibles.Count > 0 || !Noeud.EstPiece)
+        if (!Noeud.EstFiche && (EnfantsVisibles.Count > 0 || !Noeud.EstPiece))
         {
             if (!Ouverts.Add(Noeud)) Ouverts.Remove(Noeud);
         }

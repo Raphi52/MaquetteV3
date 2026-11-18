@@ -419,9 +419,16 @@ Exiger(Regex.IsMatch(css, @"\.rig-tuile-nature \{[^}]*border:[^;]*dashed")
        && !Regex.IsMatch(css, @"\.rig-nature \{"),
     "les tuiles de nature sont carrees, arrondies et en pointilles");
 var arbreVue = File.ReadAllText(Path.Combine(racine, "Components", "ArbreGedNoeud.razor"));
-Exiger(arbreVue.Contains("oncontextmenu") && vue.Contains("rig-ctx__item")
+// Le clic droit n'annoncait RIEN a l'ecran : remplace le 17/09/2026 par un
+// bouton « trois points » a droite de la ligne (meme geste que la liste des
+// conversations d'Autowin OS). Le clic droit ne doit plus etre le seul acces.
+Exiger(arbreVue.Contains("rig-arbre__actions") && !arbreVue.Contains("oncontextmenu")
+       && vue.Contains("rig-ctx__item")
        && vue.Contains("SupprimerNoeud") && vue.Contains("DemarrerRenommage"),
-    "le clic droit dans l'arbre ouvre un menu avec renommer et supprimer");
+    "les trois points a droite d'une ligne ouvrent le menu renommer/supprimer");
+Exiger(Regex.IsMatch(css, @"\.rig-arbre__actions \{[^}]*opacity:\s*0")
+       && css.Contains(".rig-arbre__ligne:hover .rig-arbre__actions"),
+    "les trois points restent discrets et se revelent au survol de la ligne");
 Exiger(arbreVue.Contains("rig-arbre__saisie") && vue.Contains("ValiderRenommage")
        && vue.Contains("NoeudRenomme = element"),
     "un element cree se nomme SUR PLACE dans l'arbre");
@@ -538,7 +545,8 @@ var ficheTache = File.ReadAllText(Path.Combine(racine, "Components/FicheInformat
 Exiger(ficheTache.Contains("Afficher tous les champs") && ficheTache.Contains("ToutAffiche"),
     "la fiche porte le meme bouton et COMPTE les clics");
 
-var alertesTache = new RigV3Desktop.AlertesGreffe().Relever();
+// fix-ok: depuis le 17/09 Relever() ne rend QUE le catalogue metier de la feuille 2 ; les constats calcules (lots, taches) sont dans ReleverCalculees().
+var alertesTache = new RigV3Desktop.AlertesGreffe().ReleverCalculees();
 var taches = alertesTache.Where(a => a.Tache is not null).ToArray();
 // Depuis le regroupement (16/09) les denominations arrivent en LOT, plus
 // une par dossier : la file mene toujours a la tache, par le tableau.
@@ -777,7 +785,7 @@ Exiger(parRecette.TryGetValue("DENO", out var nDeno) && nDeno >= 2,
 
 // La file d'alertes MENE au lot : plusieurs dossiers pour une meme recette
 // font UNE entree, pas une par dossier.
-var alertesLot = new RigV3Desktop.AlertesGreffe().Relever();
+var alertesLot = new RigV3Desktop.AlertesGreffe().ReleverCalculees();
 var entreeLot = alertesLot.FirstOrDefault(x => x.Lot is not null);
 Exiger(entreeLot is not null && entreeLot.Lot == "DENO",
     "la file propose UNE entree groupee pour les denominations");

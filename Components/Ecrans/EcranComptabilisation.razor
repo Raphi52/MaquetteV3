@@ -1,0 +1,120 @@
+@* Ecran de la procedure PROC_COMPTABILISATION (RIG v2 : « Comptabilisation »,
+   OPE_COMPTABILISATION + TreeView/TreeViewJoursCompta). Le v2 affiche un arbre
+   des JOURNEES non comptabilisees ; sous chaque journee, l'agregat des factures
+   (Classes/FactureJour : NbFactures, MontantTotalTTC, NbAffairesEnCours,
+   NbSansDemande) et les encaissements groupes par remis
+   (Classes/EncaissementRemis : Remis, ModePaiement, NbEncaissement,
+   SommeEncaissement, DateEncaissement ; un remis absent = « non remis »).
+   Traitements lus dans OPE_COMPTABILISATION.cs : « Comptabilisation des
+   factures », « Comptabilisation des encaissements », « Remettre en banque »,
+   « Lettrage des PV et REG du ... ». *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Journees a comptabiliser</div>
+
+        @foreach (var j in Journees)
+        {
+            var jour = j;
+            <button class="rig-bascule @(Selection.Date == jour.Date ? "rig-bascule--actif" : "")"
+                    @onclick="() => Selection = jour">
+                <span class="rig-bascule__temoin"></span>
+                <span>@jour.Date.ToString("dd/MM/yyyy") — @jour.NbFactures facture(s), @jour.Remis.Sum(r => r.NbEncaissement) encaissement(s)</span>
+            </button>
+        }
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Ce qui reste</div>
+            <span class="rig-chip">@Journees.Length jour(s) a comptabiliser</span>
+            <span class="rig-chip">@Journees.Sum(j => j.NbFactures) facture(s)</span>
+            <span class="rig-chip">@Journees.Sum(j => j.Remis.Sum(r => r.SommeEncaissement)).ToString("N2") € encaisses</span>
+        </div>
+
+        @* v2 : ult_LblParam, affiche quand EXPRESSO_FIGERFACTAUTO est actif. *@
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Parametre du greffe</div>
+            <span>Votre greffe est parametre pour ne cocher que les encaissements lorsque vous cochez une journee.</span>
+        </div>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Journee du @Selection.Date.ToString("dd/MM/yyyy")</div>
+            <span class="rig-resultats-proc__compte">@Selection.NbFactures facture(s) — @Selection.MontantTotalTTC.ToString("N2") € TTC</span>
+        </div>
+
+        <div class="rig-criteres__actions">
+            <button class="rig-bouton">Comptabiliser les factures</button>
+            <button class="rig-bouton">Comptabiliser les encaissements</button>
+            <button class="rig-bouton rig-bouton--plat">Remettre en banque</button>
+            <button class="rig-bouton rig-bouton--plat">Lettrage des PV et REG</button>
+        </div>
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Factures de la journee</div>
+            <span class="rig-chip">@Selection.NbFactures facture(s)</span>
+            <span class="rig-chip">@Selection.MontantTotalTTC.ToString("N2") € TTC</span>
+            <span class="rig-chip">@Selection.NbAffairesEnCours affaire(s) en cours</span>
+            <span class="rig-chip">@Selection.NbSansDemande sans demande</span>
+        </div>
+
+        <div class="rig-table-cadre">
+            <table class="rig-table">
+                <thead>
+                    <tr>
+                        <th>Remis</th>
+                        <th>Mode de paiement</th>
+                        <th class="rig-table__centre">Nb</th>
+                        <th>Montant</th>
+                        <th>Date d'encaissement</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in Selection.Remis)
+                    {
+                        <tr>
+                            <td class="rig-table__mono">@(r.NumeroRemis == 0 ? "non remis" : r.NumeroRemis.ToString())</td>
+                            <td>@r.ModePaiement</td>
+                            <td class="rig-table__centre">@r.NbEncaissement</td>
+                            <td class="rig-table__mono">@r.SommeEncaissement.ToString("N2") €</td>
+                            <td class="rig-table__mono">@r.DateEncaissement.ToString("dd/MM/yyyy")</td>
+                        </tr>
+                    }
+                    @if (Selection.Remis.Length == 0)
+                    {
+                        <tr><td colspan="5" class="rig-table__vide">Aucun encaissement pour cette journee.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+@code {
+    // v2 : Classes/EncaissementRemis.cs
+    private sealed record Remis(int NumeroRemis, string ModePaiement, int NbEncaissement,
+                                decimal SommeEncaissement, DateTime DateEncaissement);
+
+    // v2 : Classes/FactureJour.cs + Classes/DateCompta.cs
+    private sealed record Journee(DateTime Date, int NbFactures, decimal MontantTotalTTC,
+                                  int NbAffairesEnCours, int NbSansDemande, Remis[] Remis);
+
+    private static readonly Journee[] Journees =
+    [
+        new(new DateTime(2026, 9, 9),  14, 3_812.40m, 11, 1,
+        [
+            new(4821, "Cheque",          9, 2_140.00m, new DateTime(2026, 9, 9)),
+            new(4822, "Virement",        4, 1_450.40m, new DateTime(2026, 9, 9)),
+            new(0,    "Carte bancaire",  2,   222.00m, new DateTime(2026, 9, 9))
+        ]),
+        new(new DateTime(2026, 9, 8),   6, 1_204.80m,  6, 0,
+        [
+            new(4818, "Cheque",   5, 980.80m, new DateTime(2026, 9, 8)),
+            new(4819, "Especes",  1, 224.00m, new DateTime(2026, 9, 8))
+        ]),
+        new(new DateTime(2026, 9, 7),   3,   456.00m,  2, 1, [])
+    ];
+
+    private Journee Selection = Journees[0];
+}

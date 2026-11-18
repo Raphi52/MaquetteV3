@@ -276,3 +276,70 @@ export function activerClavier(dotnet) {
 export function arreterClavier() {
   if (detacherClavier) { detacherClavier(); detacherClavier = null; }
 }
+
+
+// ============ BARRE D ONGLETS ============
+// Le glisser d un onglet doit continuer a etre suivi QUAND LE POINTEUR SORT
+// de la fenetre : c est justement le geste qui sort l onglet sur un autre
+// ecran. Sans capture du pointeur, le navigateur cesse d envoyer les
+// mouvements des qu on quitte l element, et l arrachage serait impossible.
+document.addEventListener("pointerdown", (e) => {
+  const onglet = e.target instanceof Element ? e.target.closest("[data-rig-onglet]") : null;
+  if (!onglet) return;
+  // La croix n est PAS un debut de glisser : capturer le pointeur sur
+  // l onglet redirigerait le clic vers l onglet, et la croix ne fermerait rien.
+  if (e.target.closest(".rig-vonglet__fermer")) return;
+  try { onglet.setPointerCapture(e.pointerId); } catch { /* pointeur deja relache */ }
+  const r = onglet.getBoundingClientRect();
+  glisseVisuel = { code: onglet.dataset.rigOnglet, prise: e.clientX - r.left, departX: e.clientX, departY: e.clientY, actif: false };
+}, true);
+
+// RETOUR VISUEL du glisser, comme un navigateur : l onglet SUIT le pointeur.
+// Fait ici, en JS, a chaque mouvement : un aller-retour Blazor par pixel
+// donnerait un onglet saccade. Le calcul repart de la place NATURELLE de
+// l onglet a chaque mouvement, donc il reste juste meme quand Blazor le
+// deplace dans la barre (reordonnancement).
+let glisseVisuel = null;
+function ongletGlisse() {
+  return glisseVisuel
+    ? document.querySelector(`[data-rig-onglet="${CSS.escape(glisseVisuel.code)}"]`)
+    : null;
+}
+document.addEventListener("pointermove", (e) => {
+  if (!glisseVisuel) return;
+  if (!glisseVisuel.actif
+      && Math.abs(e.clientX - glisseVisuel.departX) + Math.abs(e.clientY - glisseVisuel.departY) < 6) return;
+  glisseVisuel.actif = true;
+  const onglet = ongletGlisse();
+  if (!onglet) return;
+  onglet.style.transform = "";
+  const naturel = onglet.getBoundingClientRect().left;
+  onglet.style.transform = `translateX(${e.clientX - glisseVisuel.prise - naturel}px)`;
+  onglet.classList.add("rig-vonglet--suit");
+}, true);
+function finVisuel() {
+  const onglet = ongletGlisse();
+  if (onglet) { onglet.style.transform = ""; onglet.classList.remove("rig-vonglet--suit"); }
+  glisseVisuel = null;
+}
+document.addEventListener("pointerup", finVisuel, true);
+document.addEventListener("pointercancel", finVisuel, true);
+/** Appele par le C# quand l onglet vient de partir dans sa fenetre. */
+export function finirGlisseOnglet() { finVisuel(); }
+
+// Mesure, au debut du geste : la taille de la zone visible (pour savoir quand
+// le pointeur en sort) et la place de chaque onglet (pour savoir ou l inserer).
+// Le calcul, lui, reste en C# : c est la qu il est verifiable.
+export function mesurerOnglets() {
+  const cases = [];
+  document.querySelectorAll("[data-rig-onglet]").forEach((el) => {
+    const r = el.getBoundingClientRect();
+    cases.push([r.left, r.right]);
+  });
+  return {
+    // 3e valeur : le bas de la barre d onglets -- au-dela, l onglet s arrache.
+    page: [document.documentElement.clientWidth, document.documentElement.clientHeight,
+           document.getElementById("rig-vonglets")?.getBoundingClientRect().bottom ?? 1e9],
+    cases: cases,
+  };
+}

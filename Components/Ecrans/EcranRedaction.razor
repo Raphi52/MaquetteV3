@@ -1,0 +1,198 @@
+@* Ecran de la procedure PROC_REDA — redaction d'une decision judiciaire.
+
+   Sources RIG v2 (D:/RigApplication/Source/RIG/DLL/Processus/PROC_REDA) :
+     - ETP_REDA/OPE_DECISION_JUDICIAIRE.Designer.cs : tout le formulaire.
+       Listes deroulantes : Type de decision (ultCBTypeDecision), Sens
+       general (ultCBSensGeneral), Ressort (ultCBRessort).
+       Dates : Date (ultDJDate), Date prevue (ultDJDatePrevue), « Mise en
+       delibere le » et « Prononce le ».
+       Cases a cocher : Avant dire droit (ultCBAvantDireDroit),
+       Contradictoire (ultCBContradictoire), Execution provisoire
+       (ultCBExecutionProvisoire), Debats publics, Decision publique,
+       Mesure d'instruction.
+       Boutons de la barre : « Rechercher Delibere » (ultBtnDelibere),
+       « Rechercher Prononce » (ultBtnPrononce), « Gestion Document GED »
+       (OperationGestionDoc).
+       Les deux messages d'absence de resultat sont repris tels quels :
+       « Aucun appel d'affaire delibere » / « Aucun appel d'affaire
+       prononce ».
+     - Le compteur « Decision judiciaire liee a N documents » vient du meme
+       fichier : c'est la GED rattachee, pas un decompte d'affaires. *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Appels d'affaires</div>
+
+        <div class="rig-onglets">
+            <button class="rig-onglet @(SurDelibere ? "rig-onglet--actif" : "")"
+                    @onclick="() => SurDelibere = true">Delibere</button>
+            <button class="rig-onglet @(!SurDelibere ? "rig-onglet--actif" : "")"
+                    @onclick="() => SurDelibere = false">Prononce</button>
+        </div>
+
+        <div class="rig-criteres__bloc">
+            @foreach (var item in Appels.Where(a => a.Delibere == SurDelibere))
+            {
+                var ap = item;
+                <button class="rig-bascule @(Selection?.Numero == ap.Numero ? "rig-bascule--actif" : "")"
+                        @onclick="() => Selection = ap">
+                    <span class="rig-bascule__temoin"></span>
+                    <span>@ap.Numero — @ap.Affaire</span>
+                </button>
+            }
+            @if (!Appels.Any(a => a.Delibere == SurDelibere))
+            {
+                @* Messages repris mot pour mot de la v2. *@
+                <div class="rig-table__vide" style="padding:var(--rig-esp-3)">
+                    @(SurDelibere ? "Aucun appel d'affaire delibere" : "Aucun appel d'affaire prononce")
+                </div>
+            }
+        </div>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Decision judiciaire</div>
+            <span class="rig-resultats-proc__compte">
+                @if (Selection is { } s)
+                {
+                    @($"Decision judiciaire liee a {s.Documents} documents")
+                }
+                else
+                {
+                    @("aucune decision selectionnee")
+                }
+            </span>
+        </div>
+
+        @if (Selection is { } d)
+        {
+            <div class="rig-criteres__bloc" style="padding:var(--rig-esp-3)">
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Type de decision</span>
+                        <input class="rig-saisie-champ__saisie" value="@d.TypeDecision" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Sens general</span>
+                        <input class="rig-saisie-champ__saisie" value="@d.SensGeneral" readonly />
+                    </label>
+                </div>
+
+                <label class="rig-saisie-champ">
+                    <span class="rig-saisie-champ__libelle">Ressort</span>
+                    <input class="rig-saisie-champ__saisie" value="@d.Ressort" readonly />
+                </label>
+
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Date</span>
+                        <input class="rig-saisie-champ__saisie" value="@d.Date" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Date prevue</span>
+                        <input class="rig-saisie-champ__saisie" value="@d.DatePrevue" readonly />
+                    </label>
+                </div>
+
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Mise en delibere le</span>
+                        <input class="rig-saisie-champ__saisie" value="@Ou(d.MiseEnDelibere)" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Prononce le</span>
+                        <input class="rig-saisie-champ__saisie" value="@Ou(d.Prononce)" readonly />
+                    </label>
+                </div>
+            </div>
+
+            <div class="rig-criteres__bloc" style="padding:var(--rig-esp-3)">
+                <div class="rig-kicker">Caracteres de la decision</div>
+                @* Le bloc parent est une colonne flexible : sans ce conteneur,
+                   chaque pastille serait etiree sur toute la largeur. *@
+                <div style="display:flex;flex-wrap:wrap;gap:var(--rig-esp-2)">
+                    @foreach (var c in Caracteres(d))
+                    {
+                        <span class="rig-etat rig-etat--@(c.Value ? "ok" : "attente")">@c.Key</span>
+                    }
+                </div>
+            </div>
+
+            <div class="rig-criteres__bloc" style="padding:var(--rig-esp-3)">
+                <div class="rig-kicker">Mesures d'instruction liees</div>
+                @if (d.Mesures.Length == 0)
+                {
+                    <div class="rig-table__vide" style="padding:var(--rig-esp-3)">Aucune mesure liee a cette decision.</div>
+                }
+                else
+                {
+                    @foreach (var m in d.Mesures)
+                    {
+                        <div class="rig-table__mono">@m</div>
+                    }
+                }
+            </div>
+        }
+        else
+        {
+            <div class="rig-table__vide" style="padding:var(--rig-esp-4)">
+                Choisissez un appel d'affaire dans la liste de gauche.
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    private sealed record Decision(string Numero, string Affaire, bool Delibere,
+                                   string TypeDecision, string SensGeneral, string Ressort,
+                                   string Date, string DatePrevue,
+                                   string MiseEnDelibere, string Prononce,
+                                   bool AvantDireDroit, bool Contradictoire,
+                                   bool ExecutionProvisoire, bool DebatsPublics,
+                                   bool DecisionPublique, bool MesureInstruction,
+                                   int Documents, string[] Mesures);
+
+    private static readonly Decision[] Appels =
+    [
+        new("2026J00121", "AMITEL SAS - ouverture",        true,
+            "Jugement d'ouverture", "Favorable", "Premier ressort",
+            "06/03/2026", "05/03/2026", "20/02/2026", "",
+            false, true,  true,  true,  true,  true,  4,
+            ["MES-2026-0114 — expertise comptable", "MES-2026-0121 — inventaire"]),
+
+        new("2026J00134", "SCI DU PARC - designation",     true,
+            "Ordonnance de designation", "Favorable", "Premier ressort",
+            "02/06/2026", "01/06/2026", "18/05/2026", "",
+            true,  true,  false, false, true,  true,  2,
+            ["MES-2026-0128 — evaluation immobiliere"]),
+
+        new("2025J00088", "MARTIN EURL - cloture",         false,
+            "Jugement de cloture", "Defavorable", "Dernier ressort",
+            "20/09/2026", "20/09/2026", "04/09/2026", "20/09/2026",
+            false, true,  false, true,  true,  false, 0,
+            []),
+
+        new("2024J00507", "DUPONT SARL - copie conforme",  false,
+            "Copie conforme", "Sans objet", "Premier ressort",
+            "08/11/2024", "08/11/2024", "", "08/11/2024",
+            false, false, false, false, false, false, 1,
+            [])
+    ];
+
+    private bool SurDelibere = true;
+    private Decision? Selection = Appels[0];
+
+    private static string Ou(string valeur) => string.IsNullOrEmpty(valeur) ? "—" : valeur;
+
+    private static Dictionary<string, bool> Caracteres(Decision d) => new()
+    {
+        ["Avant dire droit"]     = d.AvantDireDroit,
+        ["Contradictoire"]       = d.Contradictoire,
+        ["Execution provisoire"] = d.ExecutionProvisoire,
+        ["Debats publics"]       = d.DebatsPublics,
+        ["Decision publique"]    = d.DecisionPublique,
+        ["Mesure d'instruction"] = d.MesureInstruction
+    };
+}

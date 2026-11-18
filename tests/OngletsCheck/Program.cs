@@ -1,0 +1,179 @@
+using System.IO;
+using System.Reflection;
+using System.Windows;
+using Microsoft.AspNetCore.Components;
+using RigV3Desktop;
+
+// Garde-fou de la BARRE D'ONGLETS (demande du 17/09/2026 : « un systeme
+// d'onglet comme un navigateur web, ou je peux sortir l'onglet sur un 2e
+// ecran, et qui se rappelle de mon agencement »).
+//
+// Les trois choses que la compilation ne verrait PAS :
+//   1. ouvrir une 2e vue ne doit plus EFFACER la premiere (c'etait le defaut) ;
+//   2. lache hors de la fenetre = onglet sorti ; lache dedans = simple ordre ;
+//   3. l'agencement doit revenir a l'identique apres redemarrage.
+
+internal static class Programme
+{
+    [STAThread]
+    private static int Main()
+    {
+        var echecs = new List<string>();
+        void Exiger(bool ok, string quoi)
+        {
+            Console.WriteLine((ok ? "OK   " : "ECHEC") + " : " + quoi);
+            if (!ok) echecs.Add(quoi);
+        }
+
+        // ---------- 1. La barre se comporte comme celle d'un navigateur.
+        var barre = new EtatOnglets();
+        barre.Ouvrir("PROC_XAFF", "Affaires");
+        barre.Ouvrir("PROC_RECHAFF", "Recherche d'affaires");
+        Exiger(barre.Onglets.Count == 2,
+            "ouvrir une 2e vue AJOUTE un onglet au lieu de remplacer la 1re");
+        Exiger(barre.Actuel?.Code == "PROC_RECHAFF",
+            "la vue qu'on vient d'ouvrir est celle qui est montree");
+
+        barre.Ouvrir("PROC_XAFF", "Affaires");
+        Exiger(barre.Onglets.Count == 2,
+            "rouvrir une vue deja ouverte y revient, sans creer de doublon");
+        Exiger(barre.Actuel?.Code == "PROC_XAFF", "... et elle redevient la vue montree");
+
+        barre.Masquer();
+        Exiger(barre.Actuel is null && barre.Onglets.Count == 2,
+            "revenir a l'accueil garde les onglets ouverts");
+
+        // Fermer celui du milieu : on tombe sur un VOISIN, pas sur l'accueil.
+        var trois = new EtatOnglets();
+        trois.Ouvrir("A", "A"); trois.Ouvrir("B", "B"); trois.Ouvrir("C", "C");
+        trois.Activer("B");
+        trois.Fermer("B");
+        Exiger(trois.Onglets.Count == 2 && trois.Actuel?.Code == "C",
+            "fermer l'onglet courant bascule sur son voisin, l'ecran ne se vide pas");
+        trois.Fermer("A");
+        trois.Fermer("C");
+        Exiger(trois.Onglets.Count == 0 && trois.Actuel is null,
+            "le dernier onglet ferme ramene a l'accueil");
+
+        // ---------- 2. Reordonner par glisser.
+        var ordre = new EtatOnglets();
+        ordre.Ouvrir("A", "A"); ordre.Ouvrir("B", "B"); ordre.Ouvrir("C", "C");
+        ordre.Activer("A");
+        ordre.Deplacer(0, 2);
+        Exiger(string.Join(",", ordre.Codes()) == "B,C,A",
+            "glisser un onglet a la fin le range bien a la fin");
+        Exiger(ordre.Actuel?.Code == "A",
+            "l'onglet deplace reste celui qui est montre (on suit l'onglet, pas la place)");
+
+        var cases = new List<(double, double)> { (0, 100), (100, 220), (220, 300) };
+        Exiger(EtatOnglets.IndexCible(cases, 10) == 0, "lache a gauche : place 1");
+        Exiger(EtatOnglets.IndexCible(cases, 170) == 1, "lache au milieu du 2e : place 2");
+        Exiger(EtatOnglets.IndexCible(cases, 290) == 2, "lache a droite : derniere place");
+        // Les vrais onglets sont separes par un espace (gap de 2 px) : le
+        // survoler ne doit PAS envoyer l'onglet au bout de la barre.
+        var espaces = new List<(double, double)> { (0, 100), (102, 220), (222, 300) };
+        Exiger(EtatOnglets.IndexCible(espaces, 100.5) == 0, "espace entre le 1er et le 2e, cote 1er : place 1, pas la derniere");
+        Exiger(EtatOnglets.IndexCible(espaces, 101.5) == 1, "espace entre le 1er et le 2e, cote 2e : place 2");
+
+        // ---------- 3. Sortir l'onglet de la fenetre.
+        // La fenetre visible mesure 1200 x 800 ; la marge evite qu'un geste
+        // rasant le bord n'arrache l'onglet par accident.
+        Exiger(!ArrachageOnglet.EstSorti(600, 400, 0, 0, 1200, 800),
+            "lache DANS la fenetre : l'onglet ne sort pas");
+        Exiger(!ArrachageOnglet.EstSorti(1210, 400, 0, 0, 1200, 800),
+            "lache a 10 px du bord : encore dedans, l'onglet ne sort pas");
+        Exiger(ArrachageOnglet.EstSorti(1400, 400, 0, 0, 1200, 800),
+            "lache a DROITE hors de la fenetre : l'onglet sort dans sa fenetre");
+        Exiger(ArrachageOnglet.EstSorti(600, -60, 0, 0, 1200, 800),
+            "lache AU-DESSUS de la fenetre : l'onglet sort aussi");
+        Exiger(!ArrachageOnglet.EstSorti(9999, 9999, 0, 0, 0, 0),
+            "fenetre de taille inconnue : on n'arrache pas au hasard");
+
+        var sortie = new EtatOnglets();
+        sortie.Ouvrir("A", "A"); sortie.Ouvrir("B", "B");
+        Exiger(sortie.Detacher("B"), "l'onglet B part dans sa propre fenetre");
+        Exiger(sortie.Onglets.Count == 2 && sortie.Onglets[1].Detache,
+            "l'onglet sorti RESTE dans la barre (on voit ou la vue est partie)");
+        Exiger(sortie.Montre is null,
+            "la vue sortie n'est plus dessinee dans la fenetre principale");
+        Exiger(!sortie.Detacher("B"), "on ne sort pas deux fois la meme vue");
+        sortie.Rattacher("B");
+        Exiger(sortie.Montre?.Code == "B",
+            "fermer la fenetre ramene la vue dans son onglet");
+
+        // ---------- 4. L'agencement survit au redemarrage.
+        var temporaire = Path.Combine(Path.GetTempPath(),
+            "rigv3-onglets-" + Guid.NewGuid().ToString("N") + ".json");
+        Environment.SetEnvironmentVariable("RIGV3_ETAT", temporaire);
+        try
+        {
+            AccueilEtat.MemoriserOnglets(
+                new[] { "PROC_XAFF", "PROC_RECHAFF", "PROC_FACTURE" },
+                "PROC_RECHAFF",
+                new[] { "PROC_FACTURE" });
+
+            var relu = AccueilEtat.Charger();
+            Exiger(string.Join(",", relu.OngletsVue) == "PROC_XAFF,PROC_RECHAFF,PROC_FACTURE",
+                "au redemarrage, les memes onglets reviennent DANS LE MEME ORDRE");
+            Exiger(relu.OngletActif == "PROC_RECHAFF",
+                "l'onglet qui etait devant revient devant");
+            Exiger(relu.VuesDetachees.SequenceEqual(new[] { "PROC_FACTURE" }),
+                "la vue sortie sur l'autre ecran se rouvre en fenetre");
+
+            var pose = new PoseFenetre { Gauche = 1930, Haut = 40, Largeur = 900, Hauteur = 700 };
+            AccueilEtat.MemoriserFenetreVue("PROC_FACTURE", pose);
+            var revenue = AccueilEtat.PoseVue("PROC_FACTURE");
+            Exiger(revenue is not null
+                   && Math.Abs(revenue.Gauche - 1930) < 0.5
+                   && Math.Abs(revenue.Largeur - 900) < 0.5,
+                "la fenetre d'une vue sortie retrouve SA place (clef = la vue, pas le rang)");
+            Exiger(AccueilEtat.PoseVue("PROC_XAFF") is null,
+                "une vue jamais sortie n'a pas de place memorisee");
+
+            // Un accueil.json ecrit AVANT cette version n'a aucun de ces champs :
+            // il doit se charger quand meme, listes vides.
+            File.WriteAllText(temporaire, "{\"ThemeSombre\":true}");
+            var ancien = AccueilEtat.Charger();
+            Exiger(ancien.OngletsVue.Count == 0 && ancien.VuesDetachees.Count == 0
+                   && ancien.FenetresVue.Count == 0 && ancien.OngletActif == string.Empty,
+                "un fichier de reglages ecrit avant cette version se charge sans erreur");
+
+            // ---------- 5. La fenetre d'onglet porte bien SA vue.
+            // Sans ce passage de parametre, toutes les fenetres sorties
+            // montreraient l'accueil -- defaut invisible a la compilation.
+            if (Application.Current is null) new Application();
+            var fenetre = new FenetreVue("PROC_RECHAFF", "Recherche d'affaires", 2);
+            var champ = typeof(FenetreVue)
+                .GetField("Vue", BindingFlags.NonPublic | BindingFlags.Instance)
+                ?.GetValue(fenetre);
+            var racines = (champ as Microsoft.AspNetCore.Components.WebView.Wpf.BlazorWebView)?.RootComponents;
+            Exiger(racines is { Count: > 0 }, "la fenetre sortie declare bien une vue racine");
+            var parametres = racines![0].Parameters;
+            Exiger(parametres is not null
+                   && parametres.TryGetValue("VueInitiale", out var v) && (v as string) == "PROC_RECHAFF",
+                "la fenetre sortie recoit le CODE de l'ecran arrache");
+            Exiger(parametres!.TryGetValue("ModeFenetreVue", out var m) && m is true,
+                "la fenetre sortie s'ouvre sans le menu ni la barre de la fenetre principale");
+            Exiger(racines[0].ComponentType == typeof(RigV3Desktop.Components.Pages.Home),
+                "la fenetre sortie porte bien la page des ecrans");
+            var page = racines[0].ComponentType;
+            var declares = page.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Where(x => x.GetCustomAttribute<ParameterAttribute>() is not null)
+                .Select(x => x.Name).ToList();
+            Exiger(declares.Contains("VueInitiale") && declares.Contains("ModeFenetreVue"),
+                "la page accepte ces deux reglages (sinon Blazor les refuserait a l'ouverture)");
+            fenetre.Close();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("RIGV3_ETAT", null);
+            try { File.Delete(temporaire); } catch (IOException) { }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(echecs.Count == 0
+            ? "Onglets de vues : tout est vert."
+            : $"Onglets de vues : {echecs.Count} ECHEC(S).");
+        return echecs.Count == 0 ? 0 : 1;
+    }
+}

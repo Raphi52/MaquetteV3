@@ -16,6 +16,8 @@ public partial class App : Application
         var services = new ServiceCollection();
         services.AddWpfBlazorWebView();
         services.AddSingleton<FenetreInterop>();
+        // Passe-plat vers la fenetre detachee du document (VDossier, zone 3).
+        services.AddSingleton<DocumentPartage>();
 #if DEBUG
         services.AddBlazorWebViewDeveloperTools();
 #endif

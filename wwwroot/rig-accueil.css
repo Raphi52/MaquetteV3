@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    RIG V3 - ACCUEIL A TUILES POSABLES
    Complement de rig-charte.css. Meme regle fondatrice :
    aucun aplat de couleur, la couleur ne vit que dans les filets.
@@ -72,19 +72,43 @@
    la reprend quand le groupe est ouvert, et la ligne survolee ou active s'y
    rattache par un liseré. C'est le seul aplat de couleur du menu — il tient
    dans un carre de 18 px, il ne peint jamais le fond du panneau. */
-.rig-menu__groupe--rcs    { --teinte: #d4a94f; --teinte-faible: rgba(212,169,79,.14); }
-.rig-menu__groupe--jud    { --teinte: #7aa2f7; --teinte-faible: rgba(122,162,247,.14); }
-.rig-menu__groupe--doc    { --teinte: #6fc2a0; --teinte-faible: rgba(111,194,160,.14); }
-.rig-menu__groupe--compta { --teinte: #e0956b; --teinte-faible: rgba(224,149,107,.14); }
-.rig-menu__groupe--reg    { --teinte: #a99ad6; --teinte-faible: rgba(169,154,214,.14); }
+.rig-menu__groupe--rcs    { --teinte: #E8A317; --teinte-faible: rgba(232,163,23,.14); }
+.rig-menu__groupe--jud    { --teinte: #3B82F6; --teinte-faible: rgba(59,130,246,.14); }
+.rig-menu__groupe--doc    { --teinte: #10B981; --teinte-faible: rgba(16,185,129,.14); }
+.rig-menu__groupe--compta { --teinte: #F97316; --teinte-faible: rgba(249,115,22,.14); }
+.rig-menu__groupe--reg    { --teinte: #8B5CF6; --teinte-faible: rgba(139,92,246,.14); }
 /* Le menu suit les GESTES du metier : chaque geste porte sa couleur, pour
    reconnaitre ou l'on est avant d'avoir lu le titre. */
-.rig-menu__groupe--pers   { --teinte: #d98fb0; --teinte-faible: rgba(217,143,176,.14); }
-.rig-menu__groupe--mod    { --teinte: #c9b26b; --teinte-faible: rgba(201,178,107,.14); }
-.rig-menu__groupe--aud    { --teinte: #8fb8d9; --teinte-faible: rgba(143,184,217,.14); }
-.rig-menu__groupe--edit   { --teinte: #9bc47a; --teinte-faible: rgba(155,196,122,.14); }
-.rig-menu__groupe--surv   { --teinte: #e07b7b; --teinte-faible: rgba(224,123,123,.14); }
-.rig-menu__groupe--fin    { --teinte: #8a94a6; --teinte-faible: rgba(138,148,166,.14); }
+.rig-menu__groupe--pers   { --teinte: #EC4899; --teinte-faible: rgba(236,72,153,.14); }
+.rig-menu__groupe--mod    { --teinte: #D4B106; --teinte-faible: rgba(212,177,6,.14); }
+.rig-menu__groupe--aud    { --teinte: #0EA5E9; --teinte-faible: rgba(14,165,233,.14); }
+.rig-menu__groupe--edit   { --teinte: #84CC16; --teinte-faible: rgba(132,204,22,.14); }
+.rig-menu__groupe--surv   { --teinte: #F2544B; --teinte-faible: rgba(242,84,75,.14); }
+.rig-menu__groupe--fin    { --teinte: #64748B; --teinte-faible: rgba(100,116,139,.14); }
+
+/* Favoris : l'or de l'etoile. Le groupe est en tete du menu, au-dessus
+   d'« Ouvrir » ; il n'apparait que si au moins une etoile est allumee. */
+.rig-menu__groupe--fav    { --teinte: #FACC15; --teinte-faible: rgba(250,204,21,.16); }
+
+/* Une ligne d'ecran = le lien, et l'etoile a sa droite. L'etoile est un
+   bouton FRERE du lien : imbriquee, elle declencherait l'ouverture. */
+.rig-menu__ligne { display: flex; align-items: center; }
+.rig-menu__ligne .rig-menu__lien { flex: 1 1 auto; min-width: 0; }
+.rig-menu__etoile {
+  flex: none;
+  background: none; border: 0; cursor: pointer;
+  color: var(--rig-texte-3);
+  font-size: 12px; line-height: 1;
+  padding: 4px 6px;
+  border-radius: var(--rig-radius-sm);
+  opacity: 0;
+  transition: opacity .12s ease, color .12s ease;
+}
+.rig-menu__ligne:hover .rig-menu__etoile,
+.rig-menu__etoile:focus-visible { opacity: 1; }
+.rig-menu__etoile:hover { color: #FACC15; }
+/* Allumee, elle reste visible sans survol : c'est l'etat qu'on doit voir. */
+.rig-menu__etoile--allumee { opacity: 1; color: #FACC15; }
 
 .rig-menu__pastille {
   flex: none;
@@ -190,10 +214,45 @@
 .rig-recherche--fixe {
   position: relative;   /* ancre .rig-resultats, sans coller au bord haut */
   z-index: 40;
-  max-width: 720px;
-  margin: 0 auto var(--rig-esp-5);
-  background: var(--rig-fond);
+  /* TOUTE LA LARGEUR du plan de travail (demande utilisateur du 2026-09-17).
+     Elle etait bornee a 720px et centree : sur un grand ecran, la barre
+     flottait au milieu d'un vide. Plus de `max-width`, plus de centrage
+     automatique — elle s'aligne desormais sur les tuiles en dessous. */
+  width: 100%;
+  margin: 0 0 var(--rig-esp-5);
+  /* FOND BLANC, aplat NEUTRE assume (demande utilisateur du 2026-09-17) : la
+     barre est le point d'entree du logiciel, elle doit se voir. La charte
+     interdit les aplats de COULEUR ; celui-ci est neutre et ne porte que sur
+     --fixe (l'accueil) : les champs .rig-recherche des autres ecrans gardent
+     le voile de la charte. Cause du rendu fantome corrigee ici : ce voile vaut
+     --rig-fond-2, soit du blanc a 3,5 %, donc la barre etait invisible. */
+  background: #FFFFFF;
+  border-color: rgba(30, 50, 90, .22);
+  padding: 12px var(--rig-esp-4);
+  /* En mode CLAIR le fond de page est deja #F5F6F4 : c'est le liseré or et
+     l'ombre qui detachent la barre, pas le blanc. Ne pas les retirer. */
+  box-shadow: 0 0 0 1px rgba(176, 141, 63, .30), var(--rig-ombre);
 }
+/* Sur blanc, tout le contenu repasse en ENCRE : la loupe or et le texte clair
+   de la charte sombre y seraient illisibles. Le !important vise le style
+   INLINE pose sur la loupe dans Home.razor. */
+.rig-recherche--fixe > span:first-child { color: #4F5A6E !important; }
+.rig-recherche--fixe .rig-recherche__saisie { color: #0B0E14; }
+.rig-recherche--fixe .rig-recherche__saisie::placeholder { color: #69748A; }
+.rig-recherche--fixe .rig-touche {
+  color: #4F5A6E;
+  border-color: rgba(30, 50, 90, .20);
+  background: #EEF0F3;
+}
+.rig-recherche--fixe:focus-within {
+  border-color: var(--rig-focus);
+  box-shadow: 0 0 0 3px rgba(176, 141, 63, .35), var(--rig-ombre-saisie);
+}
+/* La liste de resultats pend SOUS la barre : elle suit le blanc, sinon un
+   panneau sombre s'accroche a un champ clair. */
+.rig-recherche--fixe .rig-resultats { background: #FFFFFF; }
+.rig-recherche--fixe .rig-resultat { color: #0B0E14; }
+.rig-recherche--fixe .rig-resultat:hover { background: #F0F2F5; }
 .rig-resultats {
   position: absolute; left: 0; right: 0; top: calc(100% + 4px);
   border: 1px solid var(--rig-bord);
@@ -311,6 +370,18 @@
   transition: background .14s ease, color .14s ease;
 }
 .rig-tuiles-panneau__reset:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
+.rig-dispositions {
+  display: flex; gap: var(--rig-esp-2); margin: var(--rig-esp-2) 0 var(--rig-esp-3);
+}
+.rig-disposition {
+  flex: 1; padding: var(--rig-esp-2); cursor: pointer;
+  background: none; border: 1px solid var(--rig-bord-faible);
+  border-radius: var(--rig-radius-sm);
+  color: var(--rig-texte-2); font: var(--rig-fs-dense)/1.4 var(--rig-font);
+}
+.rig-disposition:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
+.rig-disposition--actif { border-color: var(--rig-focus); color: var(--rig-texte); }
+.rig-disposition:focus-visible { outline: 2px solid var(--rig-focus); outline-offset: 2px; }
 .rig-tuiles-panneau__reset:focus-visible { outline: 2px solid var(--rig-focus); outline-offset: 2px; }
 
 .rig-bascule {
@@ -380,28 +451,111 @@
 }
 
 /* ---------- Widget performance ---------- */
-.rig-perf { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--rig-esp-3); }
+/* auto-fit et non repeat(2,1fr) : la tuile performance peut etre posee sur
+   2 colonnes comme sur 6 ; a 2 colonnes, une grille figee ecrasait le libelle
+   jusqu'a l'ellipse (« D.. »). La grille retombe donc a une colonne seule des
+   que la place manque. */
+.rig-perf { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--rig-esp-3); }
 .rig-perf__mesure { min-width: 0; }
-.rig-perf__valeur { font: 600 20px/1.1 var(--rig-font-mono); color: var(--rig-texte); }
+/* 2026-09-17 : structure FIGEE sur deux lignes (libelle puis chiffres). En
+   flex-wrap, les chiffres passaient dessous pour certaines mesures seulement
+   selon la largeur : les en-tetes n'avaient plus la meme hauteur et les barres
+   voisines se DECALAIENT verticalement. Deux rangees constantes = alignement
+   garanti a toute largeur, sans rogner le libelle. */
+.rig-perf__entete {
+  display: grid; grid-template-columns: minmax(0, 1fr);
+  row-gap: 2px; min-width: 0;
+}
+.rig-perf__libelle { min-width: 0; }
+.rig-perf__valeur { font: 600 15px/1.2 var(--rig-font-mono); color: var(--rig-texte); }
+/* La cible reste lisible mais s'efface devant la valeur : c'est un repere,
+   pas une deuxieme mesure a comparer. */
+.rig-perf__objectif-texte {
+  font: 11px/1.2 var(--rig-font-mono); color: var(--rig-texte-3); opacity: .75;
+  margin-left: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rig-perf__chiffres { white-space: nowrap; display: flex; align-items: baseline; min-width: 0; }
 .rig-perf__libelle {
   font-size: 11px; color: var(--rig-texte-3);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .rig-perf__barre {
-  height: 3px; border-radius: 2px; margin-top: 4px;
-  background: var(--rig-bord-faible); overflow: hidden;
+  position: relative;
+  height: 8px; border-radius: 4px; margin-top: 4px;
+  background: var(--rig-bord-faible);
 }
-.rig-perf__barre > span { display: block; height: 100%; }
+.rig-perf__barre > span { display: block; height: 100%; border-radius: 4px; }
+/* Le repere d'objectif deborde la barre en haut et en bas pour rester visible
+   meme quand le remplissage le recouvre. */
+.rig-perf__repere {
+  position: absolute; top: -3px; bottom: -3px; width: 2px;
+  background: var(--rig-texte); border-radius: 1px;
+  transform: translateX(-1px);
+}
+
+/* 2026-09-18 (draft B3, conv-701) : la valeur prend la couleur de son statut
+   et la piste de la barre une version pale de cette couleur. La teinte vient
+   du debut du degrade --rig-grad-<statut> de rig-charte.css. */
+.rig-perf__mesure--action  { --perf-teinte: #1D4ED8; }
+.rig-perf__mesure--alerte  { --perf-teinte: #C2410C; }
+.rig-perf__mesure--ok      { --perf-teinte: #047857; }
+.rig-perf__mesure--attente { --perf-teinte: #475569; }
+.rig-perf__valeur { font-weight: 700; font-size: 17px; } /* le petit ecran (plus bas) garde 13px */
+.rig-perf__mesure .rig-perf__valeur { color: var(--perf-teinte, var(--rig-texte)); }
+.rig-perf__mesure .rig-perf__barre {
+  height: 5px; border-radius: 3px;
+  background: color-mix(in srgb, var(--perf-teinte, #94A3B8) 16%, transparent);
+}
+.rig-perf__mesure .rig-perf__barre > span { border-radius: 3px; }
 
 /* ---------- Widget alertes ---------- */
 .rig-alerte {
-  display: flex; align-items: flex-start; gap: var(--rig-esp-3);
-  padding: var(--rig-esp-2) 0;
+  /* 2026-09-17 : lignes DENSIFIEES. A 8px de marge haute et basse, la tuile
+     « A traiter » ne montrait que 5 a 6 lignes sans derouler. Marge ramenee
+     a 4px et interligne serre : ~40 % de lignes visibles en plus, sans
+     rapprocher les textes au point de les coller. */
+  display: flex; align-items: stretch; gap: var(--rig-esp-2);
+  padding: var(--rig-esp-1) 0;
+  line-height: 1.3;
   border-bottom: 1px solid var(--rig-bord-faible);
 }
 .rig-alerte:last-child { border-bottom: 0; }
 .rig-alerte--eteinte { opacity: .38; }
 .rig-alerte__corps { min-width: 0; }
+/* Les alertes de la tuile « A traiter » sont groupees par CATEGORIE :
+   un intertitre discret, puis ses lignes. Le groupe ne pose aucun fond,
+   seule la respiration verticale le separe du precedent. */
+.rig-alerte-groupe + .rig-alerte-groupe { margin-top: var(--rig-esp-2); }
+.rig-alerte-groupe > .rig-kicker { margin-bottom: var(--rig-esp-1); }
+
+/* LE COMBIEN, a la place de la barre de couleur (17/09/2026) : un chiffre
+   aligne a droite dans une gouttiere de largeur fixe, pour que tous les
+   titres commencent a la meme abscisse quel que soit le nombre de chiffres.
+   La couleur porte encore le niveau d'importance, la barre ne le fait plus. */
+/* Le COMBIEN d'une alerte, dans un ROND PLEIN de la couleur de son importance
+   (demande du 17/09/2026, retour a la maquette metier). La couleur est ainsi
+   lisible d'un coup d'oeil a travers tout l'accueil, la ou un chiffre colore
+   se perdait dans la ligne. Meme classe pour TOUS les widgets : « A traiter »,
+   « Mes taches du jour » et les widgets metier. */
+.rig-alerte__compte {
+  flex: 0 0 auto;
+  width: 22px; height: 22px; box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  font: 600 11px/1 var(--rig-font-mono);
+  font-variant-numeric: tabular-nums;
+  /* Un compte a trois chiffres ne doit pas casser le rond : il se resserre. */
+  letter-spacing: -.02em;
+  color: #fff; background: var(--rig-texte-3);
+}
+/* La couleur du rond suit le PALIER de charge de la ligne, comme la pastille
+   de l'en-tete (demande du 17/09/2026) : une seule grammaire de couleur dans
+   tout l'accueil, lisible sans apprendre un code de gravite. */
+.rig-alerte__compte--vide  { background: #16C47F; }
+.rig-alerte__compte--bas   { background: #2E6FD8; }
+.rig-alerte__compte--moyen { background: #FF8A00; }
+.rig-alerte__compte--haut  { background: #F04438; }
+
 .rig-alerte__titre { font-size: var(--rig-fs-dense); color: var(--rig-texte); }
 .rig-alerte__detail { font-size: 11px; color: var(--rig-texte-3); }
 
@@ -434,8 +588,43 @@
   position: fixed; inset: var(--rig-bandeau-h, 39px) 0 0 0; z-index: 89;
   background: var(--rig-fond);
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
 }
+/* ---------- Fiche sommaire : bandeau d'identite au-dessus de l'arbre ----
+   Reprise du panneau « Fiche sommaire » de PROC_VDOSSIER (v2), mais COMPACTE :
+   tout sur une seule ligne qui se replie, et un champ vide ne s'affiche pas du
+   tout -- son libelle non plus (demande du 17/09/2026). */
+.rig-sommaire {
+  border-bottom: 1px solid var(--rig-bord);
+  padding: 2px var(--rig-esp-4) 4px;
+}
+.rig-sommaire__titre {
+  display: flex; align-items: baseline; gap: var(--rig-esp-2);
+  cursor: pointer; list-style: none; padding: 2px 0;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--rig-texte-3); user-select: none;
+}
+.rig-sommaire__titre::-webkit-details-marker { display: none; }
+.rig-sommaire__titre::before {
+  content: "▾"; font-size: 10px; transition: transform .12s ease;
+}
+.rig-sommaire:not([open]) .rig-sommaire__titre::before { transform: rotate(-90deg); }
+/* Rappel du dossier quand le bloc est replie : on ne perd pas l'identite. */
+.rig-sommaire__resume {
+  text-transform: none; letter-spacing: 0; font-size: 12px;
+  color: var(--rig-texte-2, var(--rig-texte-3));
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rig-sommaire[open] .rig-sommaire__resume { display: none; }
+.rig-sommaire__ligne {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: 2px var(--rig-esp-3); font-size: 12px; line-height: 1.4;
+}
+.rig-sommaire__champ { display: inline-flex; align-items: baseline; gap: 4px; }
+.rig-sommaire__libelle { font-size: 11px; color: var(--rig-texte-3); }
+.rig-sommaire__valeur { color: var(--rig-texte); font-weight: 600; }
+.rig-sommaire__valeur--mono { font-family: var(--rig-font-mono); font-weight: 400; }
+.rig-sommaire__mention { color: var(--rig-danger, #D92D20); font-weight: 600; }
 .rig-vged__entete {
   display: flex; align-items: center; gap: var(--rig-esp-3);
   padding: var(--rig-esp-3) var(--rig-esp-4);
@@ -444,6 +633,9 @@
 /* Arbre a gauche, tableau des editions en colonne de droite : la mise
    en page de PROC_VDOSSIER + PROC_TABLEAU_LOT3 dans RIG v2. */
 .rig-vged__corps {
+  /* Toujours la DERNIERE rangee : le bandeau des defauts est conditionnel,
+     sans cette ancre la zone de travail perdait sa hauteur souple. */
+  grid-row: -2;
   display: grid; grid-template-columns: 520px 6px minmax(0, 1fr);
   min-height: 0; position: relative;
 }
@@ -484,6 +676,8 @@
   letter-spacing: .04em;
 }
 .rig-arbre__ligne {
+  /* Deuxieme colonne : le bouton « trois points » des actions, a droite. */
+  grid-template-columns: minmax(0, 1fr) auto;
   /* 2026-09-15 : 2px -> 5px, lignes plus hautes pour cliquer plus facilement. */
   padding: 5px var(--rig-esp-2);
   border-radius: var(--rig-radius-sm);
@@ -492,12 +686,33 @@
 }
 .rig-arbre__ligne:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
 .rig-arbre__ligne--actif { background: var(--rig-fond-2); color: var(--rig-texte); }
+/* CHEMIN : filet or a gauche du noeud courant ET de tous ses parents. Le
+   parent le porte en plus pale -- on lit sa position sans deplier. */
+.rig-arbre__ligne--actif { box-shadow: inset 2px 0 0 var(--rig-or, #E8A317); }
+.rig-arbre__ligne--chemin { box-shadow: inset 2px 0 0 rgba(212, 169, 79, .38); }
+.rig-arbre__ligne--chemin .rig-arbre__texte { color: var(--rig-texte-1); }
 .rig-arbre__libelle {
   display: flex; align-items: center; gap: 4px; min-width: 0;
   padding-left: calc(var(--rig-arbre-niveau, 0) * 14px);
 }
 .rig-arbre__texte { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rig-arbre__compte { color: var(--rig-texte-3); font-size: 11px; }
+/* TROIS POINTS a droite de la ligne (meme geste que la liste des
+   conversations d'Autowin OS) : discret, revele au survol de la ligne,
+   et toujours visible au clavier. Il remplace le clic droit, qui
+   n'annoncait rien a l'ecran. */
+.rig-arbre__actions {
+  display: grid; place-items: center;
+  width: 20px; height: 20px; padding: 0; margin: 0;
+  border: 0; border-radius: var(--rig-radius-sm);
+  background: transparent; color: var(--rig-texte-3);
+  font: 15px/1 var(--rig-font); cursor: pointer;
+  opacity: 0; transition: opacity .12s ease;
+}
+.rig-arbre__ligne:hover .rig-arbre__actions,
+.rig-arbre__ligne--actif .rig-arbre__actions,
+.rig-arbre__actions:focus-visible { opacity: 1; }
+.rig-arbre__actions:hover { background: var(--rig-fond-3, var(--rig-fond-2)); color: var(--rig-texte); }
 .rig-arbre__chevron {
   display: inline-block; width: 10px; flex: 0 0 10px;
   color: var(--rig-texte-3); transition: transform .12s ease;
@@ -598,7 +813,7 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
     bottom: 0;
     z-index: 1000;
     padding: 10px 16px;
-    background: var(--rig-alerte, #7f1d1d);
+    background: var(--rig-alerte, #B45309);
     color: #fff;
     font-size: 13px;
 }
@@ -677,8 +892,9 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 }
 
 @media (max-width: 720px) {
-  .rig-perf { grid-template-columns: 1fr 1fr; gap: var(--rig-esp-2); }
-  .rig-perf__valeur { font-size: 17px; }
+  .rig-perf { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--rig-esp-2); }
+  .rig-perf__valeur { font-size: 13px; }
+  .rig-perf__objectif-texte { display: none; }
   .rig-accueil,
   .rig-accueil--menu-reduit { grid-template-columns: 1fr; min-height: 0; }
   .rig-menu {
@@ -804,8 +1020,8 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-validation__meta { font-size: 11px; color: var(--rig-texte-3); margin-top: 2px; }
 .rig-validation__etat { font-size: 11px; margin-top: 4px; text-transform: uppercase; letter-spacing: .04em; }
 .rig-validation__etat--attente { color: var(--rig-focus); }
-.rig-validation__etat--ok { color: #4caf7d; }
-.rig-validation__etat--refus { color: #d4726a; }
+.rig-validation__etat--ok { color: #16C47F; }
+.rig-validation__etat--refus { color: #F04438; }
 .rig-validation__actions { display: flex; gap: var(--rig-esp-2); margin-top: var(--rig-esp-2); }
 .rig-validation__vide { font-size: 12px; color: var(--rig-texte-3); }
 
@@ -1036,15 +1252,25 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    Un ecran de procedure qui part de `inset: 0` passe PAR-DESSUS (z-index 88 contre 60)
    et fait disparaitre la barre : plus de marque, plus de reduire/agrandir/fermer, et
    plus de zone de deplacement de la fenetre. Il commence donc SOUS le bandeau. */
+/* Les rangees etaient declarees en dur : « auto » pour l'entete, « 1fr » pour
+   le reste. Or l'ecran a TROIS bandes des qu'un bandeau de sujet ou de geste
+   s'affiche (entete + onglets + corps) : le 1fr tombait alors sur les ONGLETS,
+   qui s'etiraient sur toute la hauteur libre, et le corps, relegue en rangee
+   implicite, se retrouvait plaque EN BAS de l'ecran. Invisible sur un ecran
+   dont le contenu remplit la page, flagrant sur un ecran court (chaine EDI,
+   16/09/2026 : ~450 px de vide au-dessus du contenu). En colonne souple, la
+   place restante va a celui qui la demande -- le corps -- quel que soit le
+   nombre de bandes au-dessus de lui. */
 .rig-proc {
   position: fixed; inset: var(--rig-bandeau-h, 39px) 0 0 0; z-index: 88;
   background: var(--rig-fond);
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
 }
 .rig-proc__corps {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
+  flex: 1 1 auto;
   min-height: 0;
 }
 
@@ -1118,15 +1344,22 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 }
 .rig-table { table-layout: auto; }
 .rig-table tbody td {
-  padding: 7px var(--rig-esp-2);
+  padding: 3px var(--rig-esp-2);
   border-bottom: 1px solid var(--rig-bord-faible);
   color: var(--rig-texte-2);
+  /* 2026-09-17, demande utilisateur : UNE seule ligne par ligne de grille.
+     Avant, une cellule longue (Utilisateur, Libelle) repliait sur deux lignes
+     et la hauteur des lignes devenait irreguliere. Le trop-plein se coupe,
+     le cadre (.rig-table-cadre, overflow:auto) permet de defiler. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
 }
-/* Seules les colonnes techniques restent insecables : sinon la derniere
-   colonne (Utilisateur) sortait du cadre et il fallait defiler pour la lire. */
-.rig-table__mono, .rig-table__centre { white-space: nowrap; }
 .rig-table tbody tr { cursor: pointer; }
-.rig-table tbody tr:hover td { background: var(--rig-fond-2); color: var(--rig-texte); }
+/* Une ligne sur deux est teintee pour suivre une ligne longue a l'oeil. */
+.rig-table tbody tr:nth-child(even) td { background: var(--rig-zebre); }
+.rig-table tbody tr:hover td { background: var(--rig-survol-ligne); color: var(--rig-texte); }
 .rig-table__mono { font-family: var(--rig-font-mono); font-size: 11px; }
 .rig-table__centre { text-align: center; }
 .rig-table__vide {
@@ -1344,6 +1577,8 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    pas faire croire au contraire. */
 .rig-table__ligne--inerte { cursor: default; }
 .rig-table__ligne--inerte:hover td { background: transparent; color: var(--rig-texte-2); }
+/* Une ligne non cliquable garde quand meme sa zebrure au survol. */
+.rig-table tbody tr.rig-table__ligne--inerte:nth-child(even):hover td { background: var(--rig-zebre); }
 .rig-table__sans { color: var(--rig-texte-3); font-style: italic; font-family: var(--rig-font); }
 
 /* ============================================================
@@ -1607,9 +1842,16 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-apercu__feuille-texte {
   white-space: pre-wrap; font: 12px/1.7 var(--rig-font); overflow: hidden; height: 100%;
 }
+.rig-apercu__saisie {
+  display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px;
+  margin: 0 0 10px; padding: 0 0 8px; border-bottom: 1px solid #CBD5E1; font: 12px/1.5 var(--rig-font);
+}
+.rig-apercu__saisie:empty { display: none; }
+.rig-apercu__saisie dt { color: #64748B; }
+.rig-apercu__saisie dd { margin: 0; font-weight: 600; }
 .rig-apercu__folio {
   position: absolute; right: 20px; bottom: 16px;
-  font: 10px var(--rig-font-mono); color: #6b7280;
+  font: 10px var(--rig-font-mono); color: #64748B;
 }
 /* Objectif (zoom) de la fenetre detachee : taux lisible entre les deux boutons. */
 .rig-zoom { align-items: center; }
@@ -1698,7 +1940,7 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   padding: 1px 8px; border-radius: var(--rig-radius-sm); cursor: pointer;
 }
 .rig-ctx__item:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
-.rig-ctx__item--danger:hover { color: #e06c6c; }
+.rig-ctx__item--danger:hover { color: #F04438; }
 .rig-ctx__filet { height: 1px; background: var(--rig-bord); margin: 3px 0; }
 
 /* ---------- Login connecte, dans l'entete de l'accueil ----------
@@ -1736,51 +1978,8 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    lecture en tete (trois chiffres), puis une hierarchie portee par
    les filets de statut. Toujours aucun aplat de couleur.
    ============================================================ */
-.rig-mission { margin-bottom: var(--rig-esp-5); }
-.rig-mission__filet {
-  height: var(--rig-filet);
-  border-radius: calc(var(--rig-filet) / 2);
-  background: var(--rig-grad-marque);
-  margin-bottom: var(--rig-esp-4);
-}
-.rig-mission__chiffres {
-  display: flex; align-items: flex-end; gap: var(--rig-esp-6);
-  flex-wrap: wrap;
-}
-.rig-mission__bloc {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
-  background: none; border: 0; padding: 0; text-align: left;
-  color: inherit; cursor: pointer;
-  border-bottom: 2px solid transparent;
-}
-.rig-mission__bloc:not(:disabled):hover { border-bottom-color: var(--rig-focus); }
-.rig-mission__bloc:disabled { cursor: default; opacity: .45; }
-.rig-mission__valeur {
-  font: 600 46px/1 var(--rig-font);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -.02em;
-  color: var(--rig-texte);
-}
-.rig-mission__bloc--alerte .rig-mission__valeur { color: var(--rig-alerte); }
-.rig-mission__bloc--ok .rig-mission__valeur { color: var(--rig-texte-2); }
-.rig-mission__libelle {
-  font: var(--rig-fs-kicker) var(--rig-font-mono);
-  letter-spacing: var(--rig-ls-kicker); text-transform: uppercase;
-  color: var(--rig-texte-3);
-}
-.rig-mission__contexte {
-  margin-left: auto; text-align: right;
-  font-size: var(--rig-fs-dense); line-height: 1.4;
-  color: var(--rig-texte-3);
-}
-
-/* --- Le filet de statut pose en tete de chaque tuile --- */
-.rig-widget__filet {
-  height: var(--rig-filet-fin);
-  border-radius: calc(var(--rig-filet-fin) / 2);
-  margin: 0 0 var(--rig-esp-3);
-  flex: none;
-}
+/* Le filet de statut en tete de tuile a ete RETIRE le 2026-09-17 :
+   la couleur ne sert plus qu a coder l importance des alertes. */
 
 /* --- Tuile maitresse : c'est la file qui commande la journee ---
    Les autres tuiles s'effacent (bordure faible, ombre plus discrete)
@@ -1788,19 +1987,12 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-widget--maitresse {
   border-color: rgba(176, 141, 63, .55);
 }
-.rig-widget--maitresse .rig-widget__filet { height: var(--rig-filet); border-radius: calc(var(--rig-filet) / 2); }
 .rig-widget--maitresse .rig-widget__titre {
   font: 600 var(--rig-fs-corps)/1.2 var(--rig-font);
   letter-spacing: normal; text-transform: none;
   color: var(--rig-texte);
 }
 .rig-widget:not(.rig-widget--maitresse) { border-color: var(--rig-bord-faible); }
-
-@media (max-width: 1100px) {
-  .rig-mission__chiffres { gap: var(--rig-esp-5); }
-  .rig-mission__valeur { font-size: 34px; }
-  .rig-mission__contexte { display: none; }
-}
 
 /* Rappel des documents sortis dans leurs propres fenetres (VDossier, zone 3). */
 .rig-vged__detachees{
@@ -1849,6 +2041,48 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   margin: auto; font-size: 11px; color: var(--rig-texte-3);
 }
 
+/* ---------- Pastille integree a la frise horizontale (2026-09-16) ----------
+   Avant : la pastille flottait seule au-dessus du libelle, en vert sature plein.
+   Maintenant : une grille de 2 colonnes cale la pastille et le compte sur la
+   MEME ligne, le libelle occupe la ligne dessous. L'etat complet devient un
+   anneau fin vert desature au lieu d'un disque plein. */
+.rig-frise--h .rig-frise__bouton {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 8px; row-gap: 3px;
+}
+.rig-frise--h .rig-frise__pastille {
+  grid-column: 1; grid-row: 1;
+  width: 20px; height: 20px;
+  font-size: 10px;
+}
+.rig-frise--h .rig-frise__compte {
+  grid-column: 2; grid-row: 1;
+  justify-self: start;
+  /* Sans nowrap, « 5 / 5 » se casse en deux lignes des que la colonne se
+     resserre (7 etapes dans une fenetre etroite) et repousse le libelle
+     hors du pas. Il se tronque plutot que de se replier. */
+  min-width: 0; white-space: nowrap;
+  overflow: hidden; text-overflow: clip;
+}
+.rig-frise--h .rig-frise__libelle {
+  grid-column: 1 / -1; grid-row: 2;
+}
+/* Largeur plancher d'un pas : anneau (20) + gouttiere (8) + « 5 / 5 ».
+   En dessous, les 7 pas se chevauchaient ; desormais la frise defile
+   horizontalement (elle est deja en overflow-x: auto). */
+.rig-frise--h .rig-frise__pas { min-width: 94px; }
+/* Etape complete : anneau, pas de pastille pleine. */
+.rig-frise--h .rig-frise__pas--complet .rig-frise__pastille {
+  background: none;
+  border: 1.5px solid #34D399;
+  color: #34D399;
+}
+.rig-frise--h .rig-frise__pas--courant .rig-frise__pastille {
+  border-width: 1.5px;
+}
+
 
 /* Grille des 37 cases d inscription (fiche 275). Sans cette regle, chaque case
    occupe toute la largeur (.rig-bascule est en width:100%) : la liste s empile
@@ -1874,11 +2108,86 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-infos__filtre { width: 100%; min-width: 0; flex: none;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .rig-infos__filtre::placeholder { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.rig-infos__section { border-bottom: 1px solid var(--rig-bord, rgba(255,255,255,.12)); padding: var(--rig-esp-2) 0; }
-.rig-infos__titre { display: flex; align-items: center; gap: var(--rig-esp-2); cursor: pointer; color: var(--rig-texte); font-size: var(--rig-fs-dense); }
-.rig-infos__table { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); }
-.rig-infos__compte { margin-left: auto; font: 10px var(--rig-font-mono); color: var(--rig-texte-2); }
-.rig-infos__section .rig-champs { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); max-width: none; padding-top: var(--rig-esp-2); }
+/* Defilement fluide d'un bloc au suivant : le bloc suivant vient se caler en
+   haut de la zone au lieu de s'arreter a mi-hauteur (demande du 17/09/2026). */
+.rig-infos { scroll-snap-type: y proximity; scroll-behavior: smooth; scroll-padding-top: 4px; }
+.rig-infos__section { scroll-snap-align: start; scroll-margin-top: 4px; }
+/* Les etapes NOMMEES remplacent la pagination numerotee 1..31. */
+/* La frise de « Informations du dossier » : c'est .rig-frise--h (celle de
+   l'ecran de saisie d'une formalite), remontee EN TETE du panneau au lieu du
+   pied, et collee quand on defile. */
+.rig-infos__frise { margin-top: 0; padding: 0 0 var(--rig-esp-2);
+    border-top: 0; border-bottom: 1px solid var(--rig-bord, rgba(255,255,255,.12));
+    position: sticky; top: 0; z-index: 3; background: var(--rig-fond); }
+/* Les trois vues de remplissage : renseignes / a saisir / tous. */
+.rig-infos__vue { display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
+    flex: none; padding: var(--rig-esp-2) 0 0;
+    position: sticky; top: 46px; z-index: 2; background: var(--rig-fond); }
+.rig-infos__vue-choix { cursor: pointer; padding: 1px 9px; border-radius: 11px;
+    background: transparent; border: 1px solid var(--rig-bord, rgba(255,255,255,.12));
+    color: var(--rig-texte-2); font: var(--rig-fs-dense)/1.6 var(--rig-font); }
+.rig-infos__vue-choix:hover { color: var(--rig-texte); border-color: var(--rig-accent, #E8A317); }
+.rig-infos__vue-choix--actif { color: var(--rig-fond); background: var(--rig-accent, #E8A317);
+    border-color: var(--rig-accent, #E8A317); font-weight: 600; }
+.rig-infos__vue-etat { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); }
+.rig-infos__vue-guide { margin-left: auto; cursor: pointer; padding: 1px 10px; border-radius: 11px;
+    background: transparent; border: 1px solid var(--rig-accent, #E8A317);
+    color: var(--rig-accent, #E8A317); font: 600 var(--rig-fs-dense)/1.6 var(--rig-font); }
+.rig-infos__vue-guide--actif { color: var(--rig-fond); background: var(--rig-accent, #E8A317); }
+
+/* ---------- SAISIE GUIDEE : un champ a la fois, au clavier ----------
+   Le contraire de la grille : une seule question a l'ecran, en grand, et le
+   clavier suffit (Entree = valider et suivant). Pensee pour enchainer les
+   centaines de champs d'une etape sans jamais lacher le clavier. */
+.rig-guidee { display: flex; flex-direction: column; gap: var(--rig-esp-2);
+    padding: var(--rig-esp-5) 0 var(--rig-esp-4); max-width: 640px; }
+.rig-guidee__jauge { display: block; height: 3px; border-radius: 2px;
+    background: var(--rig-bord); overflow: hidden; }
+.rig-guidee__jauge-part { display: block; height: 100%; border-radius: 2px;
+    background: var(--rig-accent, #E8A317); transition: width .18s ease; }
+.rig-guidee__libelle { margin: 0; font: 500 22px/1.25 var(--rig-font); color: var(--rig-texte); }
+.rig-guidee__saisie { background: transparent; color: var(--rig-texte);
+    border: 0; border-bottom: 2px solid var(--rig-bord);
+    font: var(--rig-fs-titre, 20px)/1.4 var(--rig-font); padding: 4px 0; width: 100%; }
+.rig-guidee__saisie:focus { outline: 0; border-bottom-color: var(--rig-accent, #E8A317); }
+.rig-guidee__aide { display: flex; flex-wrap: wrap; gap: var(--rig-esp-3);
+    font-size: 11px; color: var(--rig-texte-3); }
+.rig-guidee__aide b { color: var(--rig-texte-2); font-weight: 600; }
+.rig-guidee__suivant { margin-left: auto; color: var(--rig-texte-2); }
+.rig-guidee__pied { display: flex; align-items: center; gap: var(--rig-esp-2); }
+.rig-guidee__colonne { margin-left: auto; font: 9px var(--rig-font-mono); color: var(--rig-texte-3); }
+.rig-guidee__vide { padding: var(--rig-esp-4) 0; color: var(--rig-texte-3); font-size: var(--rig-fs-dense); }
+.rig-infos__section { border-bottom: 0; padding: var(--rig-esp-3) 0 var(--rig-esp-2); }
+/* Le nom du bloc devient un KICKER or en petites capitales : il annonce le
+   groupe de champs sans peser comme un titre, et l'oeil descend d'un bloc a
+   l'autre en suivant les kickers. */
+.rig-infos__titre { display: flex; align-items: baseline; gap: var(--rig-esp-2); cursor: pointer;
+    color: var(--rig-accent, #E8A317);
+    font: 600 10px/1.4 var(--rig-font-mono); letter-spacing: var(--rig-ls-kicker, .12em);
+    text-transform: uppercase; }
+.rig-infos__table { font: 9px var(--rig-font-mono); letter-spacing: .04em; color: var(--rig-texte-3); text-transform: none; }
+.rig-infos__compte { margin-left: auto; font: 9px var(--rig-font-mono); letter-spacing: 0; color: var(--rig-texte-3); }
+/* Trois colonnes serrees : la fiche tient plus de champs a l'ecran sans
+   scroller, et les libelles courts (« Eirl », « Date maj ») cessent d'occuper
+   une demi-largeur. */
+.rig-infos__section .rig-champs { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    max-width: none; gap: var(--rig-esp-3) var(--rig-esp-3); padding-top: 6px; }
+/* Saisie EDITORIALE : plus de case pleine, un simple trait sous la valeur.
+   Le fond et la bordure reviennent au focus pour qu'on voie ou on tape. */
+.rig-infos__section .rig-saisie-champ { gap: 2px; }
+.rig-infos__section .rig-saisie-champ__libelle { font-size: 10px; color: var(--rig-texte-3); }
+.rig-infos__section .rig-saisie-champ__saisie {
+    background: transparent; border: 0; border-bottom: 1px solid var(--rig-bord, rgba(255,255,255,.14));
+    border-radius: 0; padding: 3px 0; font-size: var(--rig-fs-dense); }
+.rig-infos__section .rig-saisie-champ__saisie:hover { border-bottom-color: var(--rig-texte-3); }
+.rig-infos__section .rig-saisie-champ__saisie:focus {
+    background: var(--rig-fond-2); border-bottom-color: var(--rig-accent, #E8A317);
+    box-shadow: none; padding-left: 4px; }
+/* Le nom de colonne ne s'affiche qu'au survol du champ : il servait au
+   diagnostic et mangeait une ligne sous CHACUN des 250 champs. */
+.rig-infos__section .rig-saisie-champ__colonne { opacity: 0; transition: opacity .12s ease; }
+.rig-infos__section .rig-saisie-champ:hover .rig-saisie-champ__colonne,
+.rig-infos__section .rig-saisie-champ__saisie:focus ~ .rig-saisie-champ__colonne { opacity: 1; }
 
 /* Bandeau des defauts du dossier ouvert (2026-09-15) : liens vers l'etape a corriger. */
 .rig-bandeau-defauts {
@@ -1970,19 +2279,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   display: flex; justify-content: space-between; font-size: 1.344cqw; padding-top: 2cqw;
 }
 
-/* --- Pagination NUMEROTEE des sections d'une fiche « Informations de ... »
-   Meme logique que la frise des etapes du panneau du milieu : une section a
-   la fois, chaque numero mene a la sienne. */
-.rig-infos__pages { display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
-  list-style: none; margin: var(--rig-esp-2) 0; padding: 0; }
-.rig-infos__page { min-width: 22px; height: 22px; padding: 0 5px; cursor: pointer;
-  border: 1px solid var(--rig-bord, rgba(255,255,255,.14)); border-radius: 4px;
-  background: transparent; color: var(--rig-texte-2); font: 11px var(--rig-font-mono); }
-.rig-infos__page:hover:not(:disabled) { color: var(--rig-texte); border-color: var(--rig-accent, #d4a94f); }
-.rig-infos__page:disabled { opacity: .35; cursor: default; }
-.rig-infos__page--courante { color: #1b1b1b; background: var(--rig-accent, #d4a94f);
-  border-color: var(--rig-accent, #d4a94f); font-weight: 600; }
-.rig-infos__pages-etat { margin-left: auto; font: 10px var(--rig-font-mono); color: var(--rig-texte-3); }
 
 /* ===== MODE TACHE (task driven) =====
    Le bandeau d'une tache en cours, au-dessus de l'arbre et au-dessus de la
@@ -2007,7 +2303,7 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   font: 11px var(--rig-font-mono); color: var(--rig-texte-3);
   display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: baseline;
 }
-.rig-tache__etat--ok { color: var(--rig-or, #d4a94f); }
+.rig-tache__etat--ok { color: var(--rig-or, #E8A317); }
 .rig-tache__reste { color: var(--rig-texte-3); font-style: italic; }
 .rig-tache__terminer:disabled { opacity: .45; cursor: not-allowed; }
 
@@ -2033,6 +2329,31 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-tache__effet-code { font: 11px var(--rig-font-mono); color: var(--rig-texte-3); }
 .rig-tache__effet-note { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); font-style: italic; }
 
+/* LES EFFETS EN PIED DE COLONNE (17/09/2026). Avant, ce bloc etait au-dessus
+   de l'arbre : ouvrir une tache faisait descendre tous les noeuds et on
+   perdait sa place. Ancre en bas, l'arbre ne bouge plus d'un pixel. */
+.rig-vged__arbre { display: flex; flex-direction: column; overflow: hidden; }
+.rig-vged__arbre > .rig-arbre { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.rig-tache__effets--pied {
+  flex: 0 0 auto; margin-top: auto;
+  border-bottom: 0; border-top: 1px solid var(--rig-bord);
+  background: var(--rig-fond-1, transparent);
+}
+/* Une case PROUVEE par une piece deposee : elle ne se clique plus. */
+.rig-tache__effet--prouve { color: var(--rig-texte); }
+.rig-tache__effet--prouve input { cursor: default; }
+.rig-tache__effet-preuve {
+  font: 10px var(--rig-font-mono); color: var(--rig-or, #E8A317);
+}
+/* La ligne d'effet sur laquelle l'arbre est vise. */
+.rig-tache__effet--cible { box-shadow: inset 2px 0 0 var(--rig-or, #E8A317); }
+.rig-tache__effet-libelle {
+  flex: 1 1 auto; min-width: 0; text-align: left;
+  background: transparent; border: 0; padding: 0; color: inherit;
+  font: inherit; cursor: pointer;
+}
+.rig-tache__effet-libelle:disabled { cursor: default; }
+
 /* Les LIGNES d'une tache repetable (dirigeant 1, 2, 3...). */
 .rig-tache__lignes {
   display: flex; flex-wrap: wrap; gap: 4px;
@@ -2044,11 +2365,427 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   background: transparent; border: 1px solid var(--rig-bord);
   border-radius: var(--rig-radius-sm); padding: 1px 7px; cursor: pointer;
 }
-.rig-tache__ligne--courante { color: var(--rig-texte-1); border-color: var(--rig-or, #d4a94f); }
-.rig-tache__ligne--ok { color: var(--rig-or, #d4a94f); }
+.rig-tache__ligne--courante { color: var(--rig-texte-1); border-color: var(--rig-or, #E8A317); }
+.rig-tache__ligne--ok { color: var(--rig-or, #E8A317); }
 .rig-tache__ligne--ajout { font-weight: 700; }
 
 /* ---- En-tete de colonne triable (composant EnteteTriable) ---- */
 .rig-th--triable { cursor: pointer; user-select: none; white-space: nowrap; }
 .rig-th--triable:hover { background: var(--rig-survol, rgba(0, 0, 0, .05)); }
 .rig-th__fleche { margin-left: .35em; font-size: .8em; opacity: .75; }
+
+/* ---------- Widget nouveautes (variante V5 : etiquette a pictogramme) ----------
+   Chaque ligne = un module repere par une etiquette COLOREE A CONTOUR (jamais
+   un aplat : la charte veut la couleur dans le trait), suivie d'une phrase a
+   l'imperatif qui dit ce que l'utilisateur PEUT FAIRE. Le pictogramme est lu
+   avant le mot : c'est lui qui rend le coup d'oeil instantane. */
+.rig-nouv { display: flex; flex-direction: column; gap: 2px; }
+/* Chaque nouveaute est un BOUTON pleine largeur : tout le rang est cliquable,
+   pas seulement le chevron. Il garde l'allure d'une ligne de texte -- aucun
+   fond ni bordure au repos, seul le survol revele qu'il se deplie. */
+.rig-nouv__ligne {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 9px; align-items: center;
+  width: 100%; text-align: left; background: none; border: 0;
+  padding: 3px 4px; border-radius: var(--rig-radius-sm); cursor: pointer; color: inherit;
+}
+.rig-nouv__ligne:hover { background: var(--rig-survol, rgba(0, 0, 0, .05)); }
+.rig-nouv__ligne:focus-visible { outline: 1px solid var(--rig-accent, #3B82F6); outline-offset: 1px; }
+.rig-nouv__chevron { font-size: 9px; color: var(--rig-texte-3, var(--rig-texte-2)); }
+/* Le detail deplie : un filet a gauche, de la TEINTE du module, pour rattacher
+   visuellement le texte a la ligne dont il vient. */
+.rig-nouv__detail {
+  margin: 1px 4px 6px 4px; padding: 4px 0 4px 9px;
+  border-left: 2px solid currentColor;
+  font-size: var(--rig-fs-dense); line-height: 1.5;
+}
+.rig-nouv__detail--vert   { color: #16C47F; }
+.rig-nouv__detail--bleu   { color: #3B82F6; }
+.rig-nouv__detail--or     { color: #F5B912; }
+.rig-nouv__detail--violet { color: #8B5CF6; }
+.rig-nouv__detail::first-line { color: inherit; }
+.rig-nouv__module {
+  display: inline-flex; align-items: center; gap: 4px;
+  font: 600 9px var(--rig-font-mono); letter-spacing: .06em;
+  border: 1px solid currentColor; border-radius: var(--rig-radius-sm);
+  padding: 2px 6px; white-space: nowrap;
+}
+/* L'icone est tracee en `currentColor` : elle prend donc la teinte de son
+   etiquette, sans seconde regle a maintenir par couleur. */
+.rig-nouv__icone { width: 12px; height: 12px; flex: none; }
+.rig-nouv__texte { font-size: var(--rig-fs-dense); color: var(--rig-texte-2); }
+/* Le texte du detail reprend la couleur de lecture : seule la barre laterale
+   garde la teinte du module (heritee par `currentColor` sur la bordure). */
+.rig-nouv__detail { color: var(--rig-texte-2); border-left-color: currentColor; }
+.rig-nouv__detail--vert   { border-left-color: #16C47F; color: var(--rig-texte-2); }
+.rig-nouv__detail--bleu   { border-left-color: #3B82F6; color: var(--rig-texte-2); }
+.rig-nouv__detail--or     { border-left-color: #F5B912; color: var(--rig-texte-2); }
+.rig-nouv__detail--violet { border-left-color: #8B5CF6; color: var(--rig-texte-2); }
+.rig-nouv__texte b { color: var(--rig-texte); }
+
+/* Une teinte par famille de module. La couleur ne sert qu'a REGROUPER d'un
+   coup d'oeil ; elle ne porte aucun jugement (pas de rouge = erreur ici). */
+.rig-nouv__module--vert   { color: #16C47F; }
+.rig-nouv__module--bleu   { color: #3B82F6; }
+.rig-nouv__module--or     { color: #F5B912; }
+.rig-nouv__module--violet { color: #8B5CF6; }
+
+/* Tete de categorie REPLIABLE dans « A traiter » : le titre devient un bouton
+   pleine largeur. Il garde l'allure d'un kicker (petites capitales) -- seuls le
+   chevron et le compte a droite annoncent le clic. Sans cela, une tuile longue
+   obligeait a derouler toutes les categories pour atteindre la derniere. */
+.rig-groupe-tete {
+  display: flex; align-items: center; gap: var(--rig-esp-2);
+  width: 100%; background: none; border: 0; padding: 0;
+  cursor: pointer; text-align: left;
+  /* Demande du 17/09/2026 : les titres de categorie etaient trop discrets
+     pour servir de reperes dans une tuile longue. Ils gardent les petites
+     capitales du kicker mais passent au-dessus de la taille des lignes
+     (13px contre 12px) et en demi-gras -- l'oeil trouve la categorie avant
+     de lire les alertes. */
+  font-size: 13px; font-weight: 600; color: var(--rig-texte-2);
+}
+.rig-groupe-tete:hover { color: var(--rig-texte); }
+.rig-groupe-tete__chevron {
+  display: inline-block; transform: rotate(90deg);
+  transition: transform .12s ease; line-height: 1;
+}
+.rig-groupe-tete__chevron--replie { transform: rotate(0deg); }
+/* La CHARGE de la categorie (somme des lignes) : c'est le chiffre qu'on lit en
+   premier quand la categorie est repliee, donc il domine les comptes de ligne
+   (18px contre 14px) au lieu de s'effacer dans le gris du kicker. */
+.rig-groupe-tete__compte {
+  margin-left: auto;
+  font: 600 18px/1.1 var(--rig-font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  color: var(--rig-texte);
+}
+
+/* ---------- Widget « Activite des utilisateurs » (chef de greffe) ----------
+   Le chef lit trois choses, dans cet ordre : COMBIEN chacun a fait aujourd'hui,
+   puis la suite des gestes, puis QUAND. La couleur reste dans le filet vertical
+   de chaque ligne (charte : aucun aplat), le reste est de la typographie. */
+.rig-activite { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.rig-activite__barre { display: flex; align-items: center; gap: 8px; }
+.rig-activite__filtre {
+  flex: 1 1 auto; min-width: 0;
+  font: 11px var(--rig-font-mono); color: var(--rig-texte-2);
+  background: transparent; border: 1px solid var(--rig-bord);
+  border-radius: var(--rig-radius-sm); padding: 2px 4px;
+}
+.rig-activite__total { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); white-space: nowrap; }
+.rig-activite__comptes { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.rig-activite__compte { font-size: 11px; color: var(--rig-texte-3); white-space: nowrap; }
+.rig-activite__compte b { color: var(--rig-texte); font: 700 12px var(--rig-font-mono); }
+/* La liste est la seule zone qui defile : la barre de filtre et les comptes
+   du jour restent visibles quand le journal s'allonge. */
+.rig-activite__liste {
+  list-style: none; margin: 0; padding: 0; overflow: auto; min-height: 0;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.rig-activite__ligne { display: grid; grid-template-columns: auto 1fr auto; gap: 6px; align-items: baseline; }
+.rig-activite__texte { font-size: var(--rig-fs-dense); color: var(--rig-texte-2); }
+.rig-activite__texte b { color: var(--rig-texte); }
+.rig-activite__quand { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); white-space: nowrap; }
+
+/* ============ BARRE D ONGLETS DE VUES ============
+   Un onglet par vue ouverte, comme dans un navigateur. Distincte de
+   .rig-onglet, qui sert aux onglets INTERNES d une procedure. */
+.rig-vonglets {
+  display: flex; align-items: stretch; gap: 2px;
+  padding: 4px 8px 0 8px;
+  background: var(--rig-fond-2);
+  border-bottom: 1px solid var(--rig-bord);
+  overflow-x: auto; overflow-y: hidden;
+  box-sizing: border-box; height: var(--rig-vonglets-h); flex: 0 0 auto;
+}
+/* Les ecrans plein cadre (.rig-proc, vue dossier) sont en position fixe,
+   calés sous --rig-bandeau-h : ils RECOUVRAIENT la barre d onglets. Quand
+   elle existe, ils commencent donc sous elle. */
+:root { --rig-vonglets-h: 34px; }
+:root:has(#rig-vonglets) { --rig-bandeau-h: calc(39px + var(--rig-vonglets-h)); }
+.rig-vonglet {
+  display: flex; align-items: center; gap: 6px;
+  max-width: 240px; padding: 4px 6px 4px 10px;
+  border: 1px solid var(--rig-bord); border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: var(--rig-fond); color: var(--rig-texte-2);
+  font-size: var(--rig-fs-dense); cursor: pointer;
+  user-select: none; touch-action: none; white-space: nowrap;
+}
+.rig-vonglet:hover { color: var(--rig-texte); }
+.rig-vonglet--actif {
+  background: var(--rig-fond-3, var(--rig-fond-2));
+  color: var(--rig-texte);
+  box-shadow: inset 0 2px 0 0 var(--rig-accent, #D9A429);
+}
+.rig-vonglet--sorti { color: var(--rig-texte-3); opacity: .7; font-style: italic; }
+.rig-vonglet--glisse { opacity: .95; }
+/* Pendant le glisser l onglet suit le pointeur (transform pose par le JS) :
+   il passe au-dessus des autres et ne s anime pas, sinon il trainerait. */
+.rig-vonglet--suit { position: relative; z-index: 2; transition: none; box-shadow: 0 2px 6px rgba(0,0,0,.35); cursor: grabbing; }
+.rig-vonglet__titre { overflow: hidden; text-overflow: ellipsis; }
+.rig-vonglet__sorti { font-size: 10px; color: var(--rig-texte-3); }
+.rig-vonglet__fermer {
+  border: none; background: transparent; color: var(--rig-texte-3);
+  cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 4px; border-radius: 4px;
+}
+.rig-vonglet__fermer:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
+
+/* Etoile de favori dans le coin haut-droit de chaque vue. Toujours visible
+   (pas d'apparition au survol comme dans le menu) : dans une vue, c'est une
+   action offerte, pas un detail de ligne. */
+.rig-vue__etoile {
+  flex: none;
+  background: none; border: 0; cursor: pointer;
+  color: var(--rig-texte-3);
+  font-size: 16px; line-height: 1;
+  padding: 4px 6px;
+  border-radius: var(--rig-radius-sm);
+  transition: color .12s ease;
+}
+.rig-vue__etoile:hover { color: #FACC15; }
+.rig-vue__etoile--allumee { color: #FACC15; }
+
+/* ---------- Parcours guide « requis d'abord » ----------------------
+   Les champs obligatoires (colonnes NOT NULL, Metier/ChampsRequisDossier.cs)
+   passent en tete du parcours. On le SIGNALE sans peindre l'ecran en rouge :
+   la part de jauge change de couleur, le champ porte un liseré, et la frise
+   remplace « remplis / total » par le nombre de requis qui bloquent. */
+.rig-guidee__jauge-part--requis { background: var(--rig-alerte); }
+.rig-guidee__requis {
+  font: 9px var(--rig-font-mono); letter-spacing: var(--rig-ls-kicker);
+  text-transform: uppercase; color: var(--rig-alerte);
+}
+.rig-guidee__saisie--requis { border-bottom-color: var(--rig-alerte); }
+.rig-frise__requis-restants { font: 10px var(--rig-font-mono); color: var(--rig-alerte); }
+
+/* ---------- Widgets METIER : un par categorie de la feuille metier ----------
+   Maquette du 17/09/2026 : deux panneaux cote a cote dans la tuile. A gauche
+   la recherche, les gestes, trois compteurs et les alertes de la categorie ;
+   a droite les demandes de l alerte selectionnee. La colonne de gauche est
+   fixe en largeur pour que le tableau de droite garde ses sept colonnes. */
+.rig-metier {
+  /* Repere du menu flottant de l'en-tete. */
+  position: relative;
+  display: grid;
+  /* Replie, le widget n'a QU'UNE colonne : la liste des demandes n'existe
+     qu'une fois deploye (demande du 17/09/2026), et une colonne vide a droite
+     aurait laisse la moitie du widget blanche. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--rig-esp-3);
+  height: 100%; min-height: 0;
+}
+.rig-metier__gauche,
+.rig-metier__droite { min-width: 0; min-height: 0; overflow: auto; }
+.rig-metier__droite { border-left: 1px solid var(--rig-bord-faible); padding-left: var(--rig-esp-3); }
+
+/* « A traiter BIS » (21/09/2026) : bande pleine largeur, l arbre des
+   categories a gauche, le tableau des demandes a droite -- toujours ouverts. */
+.rig-metier--bis { grid-template-columns: minmax(0, 36fr) minmax(0, 64fr); }
+
+/* Bouton de deploiement (maquette du 17/09/2026, en-tete du panneau gauche).
+   La tuile fait 6 colonnes sur 2 lignes : le tableau de droite n y montre que
+   quelques demandes. Deploye, le widget sort de la grille et occupe l ecran,
+   la liste se lit en entier. z-index sous les fenetres (95 < 88 ecrans pleins
+   non : au-dessus des tuiles, en-dessous de la barre de marque a 90/91). */
+/* En-tete du widget metier : registre + titre + charge a gauche, le bouton
+   de deploiement pousse a droite (maquette metier du 17/09/2026). */
+.rig-metier__tete {
+  display: flex; align-items: center; gap: var(--rig-esp-1);
+  margin-bottom: var(--rig-esp-1);
+}
+.rig-metier__registre {
+  flex: 0 0 auto; font: 10px/1.6 var(--rig-font-mono); letter-spacing: .06em;
+  color: var(--rig-texte-2, var(--rig-texte));
+  background: var(--rig-fond-2); border: 1px solid var(--rig-bord);
+  border-radius: 4px; padding: 0 4px;
+}
+.rig-metier__titre {
+  flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-weight: 600;
+}
+/* La pastille de CHARGE de l'en-tete change de couleur par PALIER (demande du
+   17/09/2026) : le greffier voit de loin si la categorie deborde, sans lire le
+   chiffre. Le doré d'origine ne disait rien -- il etait le meme a 4 et a 73. */
+.rig-metier__charge {
+  flex: 0 0 auto; min-width: 20px; height: 20px; padding: 0 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 10px; font: 600 11px/1 var(--rig-font-mono);
+  color: #fff; background: var(--rig-texte-3);
+}
+.rig-metier__charge--vide  { background: #16C47F; }
+.rig-metier__charge--bas   { background: #2E6FD8; }
+.rig-metier__charge--moyen { background: #FF8A00; }
+.rig-metier__charge--haut  { background: #F04438; }
+.rig-metier__deployer {
+  font: 12px/1 inherit; color: var(--rig-texte-3);
+  background: var(--rig-fond-2); border: 1px solid var(--rig-bord);
+  border-radius: 5px; padding: 2px 7px; cursor: pointer;
+}
+.rig-metier__deployer:hover,
+.rig-metier__deployer:focus-visible { color: var(--rig-texte); border-color: var(--rig-accent, #D9A429); }
+/* La TUILE d'un widget deploye passe au PREMIER PLAN : son z-index inline
+   (rang d'empilement) est remplace par un rang qui bat les autres tuiles, et
+   son overflow est libere -- sinon le panneau deploye, pourtant en position
+   fixe, restait rogne et recouvert par la tuile voisine. */
+.rig-widget--devant { overflow: visible; }
+
+/* Deploye : le widget sort de la grille, et la liste des demandes apparait a
+   sa droite -- d'ou le retour a DEUX colonnes ici. */
+.rig-metier--deploye {
+  grid-template-columns: minmax(190px, 34%) minmax(0, 1fr);
+  position: fixed; inset: 56px 3% 3% 3%; z-index: 97;
+  background: var(--rig-surface, var(--rig-fond));
+  border: 1px solid var(--rig-bord); border-radius: 10px;
+  padding: var(--rig-esp-3); box-shadow: 0 18px 48px rgba(0, 0, 0, .45);
+}
+
+.rig-metier__recherche {
+  display: flex; align-items: center; gap: var(--rig-esp-2);
+  border: 1px solid var(--rig-bord); border-radius: 6px;
+  padding: 3px var(--rig-esp-2); margin-bottom: var(--rig-esp-2);
+}
+.rig-metier__recherche:focus-within { border-color: var(--rig-accent, #D9A429); }
+.rig-metier__loupe { font-size: 11px; color: var(--rig-texte-3); }
+.rig-metier__saisie {
+  flex: 1 1 auto; min-width: 0;
+  background: none; border: 0; outline: none;
+  color: var(--rig-texte); font: var(--rig-fs-dense)/1.3 inherit;
+}
+.rig-metier__puce {
+  flex: 0 0 auto; font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--rig-texte-2, var(--rig-texte)); white-space: nowrap;
+}
+/* La recherche est renseignee : l'etiquette passe au vert, elle dit alors que
+   la liste de droite est REELLEMENT restreinte. */
+.rig-metier__puce--active { color: #16C47F; }
+
+/* Le menu « trois points » de l'en-tete : meme grammaire que les autres
+   panneaux de l'accueil (fond de carte, filet fin, pas d'ombre decorative).
+   Il se pose SOUS l'en-tete, ancre a droite. */
+.rig-metier__menu-bouton {
+  flex: 0 0 auto; width: 22px; height: 22px; line-height: 1;
+  background: var(--rig-fond-2); border: 1px solid var(--rig-bord);
+  border-radius: 4px; color: var(--rig-texte-2, var(--rig-texte)); cursor: pointer;
+}
+.rig-metier__menu-bouton:hover,
+.rig-metier__menu-bouton:focus-visible,
+.rig-metier__menu-bouton--ouvert { color: var(--rig-texte); border-color: var(--rig-accent, #D9A429); }
+.rig-metier__menu {
+  position: absolute; right: 0; top: 26px;
+  z-index: 40; min-width: 210px; padding: var(--rig-esp-1) 0;
+  background: var(--rig-fond); border: 1px solid var(--rig-bord); border-radius: 6px;
+}
+.rig-metier__menu-ligne {
+  display: flex; align-items: center; gap: var(--rig-esp-2);
+  width: 100%; padding: 5px var(--rig-esp-2); text-align: left;
+  background: none; border: 0; cursor: pointer;
+  color: var(--rig-texte); font: var(--rig-fs-dense)/1.4 inherit;
+}
+.rig-metier__menu-ligne:hover:not([disabled]) { background: var(--rig-fond-2); }
+.rig-metier__menu-ligne[disabled] { color: var(--rig-texte-2, var(--rig-texte)); cursor: default; }
+.rig-metier__menu-ligne--phare { font-weight: 600; }
+.rig-metier__menu-glyphe {
+  flex: 0 0 14px; text-align: center; font-family: var(--rig-font-mono);
+  color: var(--rig-texte-2, var(--rig-texte));
+}
+.rig-metier__menu-filet { height: 1px; margin: var(--rig-esp-1) 0; background: var(--rig-bord); }
+
+.rig-metier__gestes { display: flex; flex-wrap: wrap; gap: var(--rig-esp-1); margin-bottom: var(--rig-esp-2); }
+.rig-metier__geste {
+  font: 11px/1.2 inherit; color: var(--rig-texte-2, var(--rig-texte));
+  background: var(--rig-fond-2); border: 1px solid var(--rig-bord);
+  border-radius: 5px; padding: 3px 8px; cursor: not-allowed; opacity: .75;
+}
+
+.rig-metier__compteurs { display: flex; gap: var(--rig-esp-2); margin-bottom: var(--rig-esp-2); }
+.rig-metier__compteur {
+  flex: 1 1 0; min-width: 0; text-align: center;
+  border: 1px solid var(--rig-bord); border-radius: 6px; padding: 4px 2px;
+}
+.rig-metier__chiffre {
+  display: block; font: 600 16px/1.1 var(--rig-font-mono); font-variant-numeric: tabular-nums;
+  color: var(--rig-texte);
+}
+.rig-metier__legende {
+  display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--rig-texte-3);
+}
+
+.rig-metier__ligne {
+  display: flex; align-items: center; gap: var(--rig-esp-2);
+  width: 100%; text-align: left; background: none; color: inherit;
+  border: 0; border-bottom: 1px solid var(--rig-bord-faible);
+  border-left: 3px solid transparent;
+  font: inherit; cursor: pointer; padding: var(--rig-esp-1) var(--rig-esp-1);
+}
+.rig-metier__ligne:hover,
+.rig-metier__ligne:focus-visible { background: rgba(255, 255, 255, .05); }
+.rig-metier__ligne--active {
+  background: rgba(76, 125, 240, .12);
+  border-left-color: var(--rig-accent, #D9A429);
+}
+.rig-metier__ligne-titre { font-size: var(--rig-fs-dense); min-width: 0; }
+
+.rig-metier__droite-tete {
+  display: flex; align-items: center; gap: var(--rig-esp-2);
+  padding-bottom: var(--rig-esp-2); border-bottom: 1px solid var(--rig-bord-faible);
+}
+.rig-metier__droite-titre { font-size: var(--rig-fs-dense); font-weight: 600; }
+.rig-metier__droite-compte { font-size: 11px; color: var(--rig-texte-3); }
+.rig-metier__ouvrir, .rig-metier__fermer {
+  background: none; border: 0; color: var(--rig-texte-3); font: inherit; cursor: pointer;
+}
+.rig-metier__ouvrir { margin-left: auto; font-size: 11px; }
+.rig-metier__ouvrir:hover, .rig-metier__fermer:hover { color: var(--rig-texte); }
+
+.rig-metier__table { width: 100%; border-collapse: collapse; font-size: var(--rig-fs-dense); }
+.rig-metier__table th {
+  text-align: left; font: 10px/1.6 inherit; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--rig-texte-3);
+  border-bottom: 1px solid var(--rig-bord-faible); white-space: nowrap;
+}
+.rig-metier__table td {
+  padding: 3px 8px 3px 0; border-bottom: 1px solid var(--rig-bord-faible);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;
+}
+.rig-metier__chrono {
+  font-family: var(--rig-font-mono); color: var(--rig-accent, #D9A429);
+  background: none; border: 0; padding: 0; cursor: pointer; font-size: inherit;
+}
+.rig-metier__chrono:hover,
+.rig-metier__chrono:focus-visible { text-decoration: underline; }
+.rig-metier__siren { font-family: var(--rig-font-mono); color: var(--rig-texte-3); }
+
+
+/* Tuile ETROITE : le detail passe SOUS le maitre plutot que de se tasser
+   a 120px de large (ajout du 17/09/2026). */
+@media (max-width: 860px) {
+  .rig-metier { grid-template-columns: 1fr; }
+  .rig-metier__droite { border-left: 0; padding-left: 0; border-top: 1px solid var(--rig-bord-faible); padding-top: var(--rig-esp-2); }
+}
+
+/* Verrou KBIS (maquette du 18/09/2026) */
+.rig-verrou { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 6px 10px; margin: 0 0 8px; border: 1px solid rgba(127,127,127,.35); border-radius: 6px; }
+.rig-verrou__texte { flex: 1; font-size: 13px; }
+.rig-verrou--edition { border-color: #3b82f6; }
+.rig-verrou--attente { border-color: #d97706; }
+.rig-verrou__badge { background: #d97706; color: #fff; font-size: 12px; font-weight: 600;
+  padding: 2px 8px; border-radius: 10px; }
+.rig-saisie-champ__saisie[readonly] { opacity: .75; cursor: default; }
+
+/* Recherche au-dessus de l'arbre du dossier : filtre les elements visibles. */
+.rig-arbre__recherche { position: relative; padding: 4px 6px; }
+.rig-arbre__filtre {
+    width: 100%; box-sizing: border-box; height: 24px; padding: 2px 22px 2px 6px;
+    font: inherit; font-size: 12px; color: inherit; background: var(--rig-fond);
+    border: 1px solid var(--rig-bord); border-radius: 3px;
+}
+.rig-arbre__filtre::-webkit-search-cancel-button { display: none; }
+.rig-arbre__filtre-effacer {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    border: 0; background: none; cursor: pointer; font-size: 14px; line-height: 1; color: var(--rig-texte-3); opacity: .7;
+}
+.rig-arbre__filtre-effacer:hover { opacity: 1; }

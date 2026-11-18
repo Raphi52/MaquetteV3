@@ -8,9 +8,8 @@
    est alors affiche tel quel, avec le constat fait dans les sources v2. *@
 
 <div class="rig-nonmaq">
-    <div class="rig-nonmaq__kicker">Procedure non maquettee</div>
+    <div class="rig-nonmaq__kicker">Ecran a venir</div>
     <div class="rig-nonmaq__titre">@Libelle</div>
-    <div class="rig-nonmaq__code">@Code</div>
 
     @if (!string.IsNullOrWhiteSpace(Motif))
     {
@@ -19,18 +18,9 @@
     else
     {
         <p class="rig-nonmaq__texte">
-            Cette procedure existe dans le menu parce qu'elle existe dans RIG v2,
-            mais son ecran n'est pas encore porte dans la maquette.
+            Cet ecran n'est pas encore disponible.
         </p>
     }
-
-    <p class="rig-nonmaq__texte rig-nonmaq__texte--sourd">
-        Le portage suit toujours le meme chemin : lire les blocs
-        <span class="rig-chip">RECHERCHE</span> et
-        <span class="rig-chip">RESULTATS</span> du projet
-        <span class="rig-chip">@Code</span> dans RIG v2, puis reprendre
-        ses criteres et ses colonnes sans en inventer.
-    </p>
 </div>
 
 @code {

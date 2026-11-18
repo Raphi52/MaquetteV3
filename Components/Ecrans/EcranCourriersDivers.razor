@@ -1,0 +1,157 @@
+@* Ecran de la procedure PROC_COURRIER_DIVERS (RIG v2 : « Courrier divers »,
+   OPE_RECHERCHE_COURRIER_DIVERS + OPE_EDITION_COURRIER_DIVERS). C'est le
+   CATALOGUE des courriers divers, pas un courrier a envoyer. Colonnes lues
+   dans OPE_RECHERCHE_COURRIER_DIVERS.cs : Code (COUJU_CODE), Libelle
+   (COUJU_LIBELLE), Type entite (COUJU_TYPE_ENTITE), Parametre edition
+   (COUJU_CODE_PRMED), Avec destinataire (COUJU_WITH_DEST), Actif
+   (COUJU_ACTIF). Valeurs de type entite : eTypeEntiteJudiciaire
+   (INSTANCE, INSTANCE_PREVENTION, PROCEDURE_COLLECTIVE, PREVENTION, MESURE). *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Courriers divers</div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Code ou libelle</span>
+            <input class="rig-saisie-champ__saisie" @bind="Recherche" @bind:event="oninput" />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Type d'entite</span>
+            <select class="rig-saisie-champ__saisie" @bind="TypeFiltre">
+                <option value="">Tous</option>
+                @foreach (var t in Types)
+                {
+                    <option value="@t">@t</option>
+                }
+            </select>
+        </label>
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Affichage</div>
+            <button class="rig-bascule @(ActifsSeuls ? "rig-bascule--actif" : "")" @onclick="() => ActifsSeuls = !ActifsSeuls">
+                <span class="rig-bascule__temoin"></span>
+                <span>Actifs seulement</span>
+            </button>
+        </div>
+
+        <div class="rig-criteres__actions">
+            <button class="rig-bouton">Ajouter un courrier divers</button>
+        </div>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Catalogue</div>
+            <span class="rig-resultats-proc__compte">@Trouves.Length courrier(s)</span>
+        </div>
+
+        <div class="rig-table-cadre">
+            <table class="rig-table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Libelle</th>
+                        <th>Type entite</th>
+                        <th>Parametre edition</th>
+                        <th class="rig-table__centre">Avec destinataire</th>
+                        <th class="rig-table__centre">Actif</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in Trouves)
+                    {
+                        var courrier = c;
+                        <tr @onclick="() => Selection = courrier">
+                            <td class="rig-table__mono">@courrier.Code</td>
+                            <td>@courrier.Libelle</td>
+                            <td class="rig-table__mono">@courrier.TypeEntite</td>
+                            <td class="rig-table__mono">@courrier.ParamEdition</td>
+                            <td class="rig-table__centre">@(courrier.AvecDestinataire ? "oui" : "non")</td>
+                            <td class="rig-table__centre">@(courrier.Actif ? "oui" : "non")</td>
+                        </tr>
+                    }
+                    @if (Trouves.Length == 0)
+                    {
+                        <tr><td colspan="6" class="rig-table__vide">Aucun courrier divers ne repond a cette recherche.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (Selection is { } s)
+        {
+            <div class="rig-criteres__bloc" style="padding:var(--rig-esp-3)">
+                <div class="rig-kicker">Modification du courrier divers @s.Code</div>
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Code du courrier divers</span>
+                        <input class="rig-saisie-champ__saisie" value="@s.Code" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Libelle</span>
+                        <input class="rig-saisie-champ__saisie" value="@s.Libelle" readonly />
+                    </label>
+                </div>
+                <div class="rig-criteres__paire">
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Type entite judiciaire</span>
+                        <input class="rig-saisie-champ__saisie" value="@s.TypeEntite" readonly />
+                    </label>
+                    <label class="rig-saisie-champ">
+                        <span class="rig-saisie-champ__libelle">Parametre edition (maquette)</span>
+                        <input class="rig-saisie-champ__saisie" value="@s.ParamEdition" readonly />
+                    </label>
+                </div>
+                <div class="rig-criteres__bloc">
+                    <span class="rig-chip">@(s.AvecDestinataire ? "Avec destinataire" : "Sans destinataire")</span>
+                    <span class="rig-chip">@(s.Actif ? "Actif" : "Inactif")</span>
+                </div>
+                <div class="rig-criteres__actions">
+                    <button class="rig-bouton rig-bouton--plat">Acceder au parametre edition</button>
+                </div>
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    // v2 : table COURRIER_JUDICIAIRE (colonnes COUJU_*).
+    private sealed record Courrier(string Code, string Libelle, string TypeEntite,
+                                   string ParamEdition, bool AvecDestinataire, bool Actif);
+
+    private static readonly string[] Types =
+        ["INSTANCE", "INSTANCE_PREVENTION", "PROCEDURE_COLLECTIVE", "PREVENTION", "MESURE"];
+
+    private static readonly Courrier[] Courriers =
+    [
+        new("CD_CONV",   "Convocation simple",              "INSTANCE",             "MAQ_CONV_SIMPLE", true,  true),
+        new("CD_RELAN",  "Relance de piece manquante",      "INSTANCE",             "MAQ_RELANCE",     true,  true),
+        new("CD_NOTIF",  "Notification au mandataire",      "PROCEDURE_COLLECTIVE", "MAQ_NOTIF_MAND",  true,  true),
+        new("CD_INFO",   "Information sans destinataire",   "PREVENTION",           "MAQ_INFO",        false, true),
+        new("CD_MESURE", "Courrier de suivi de mesure",     "MESURE",               "MAQ_SUIVI_MES",   true,  false)
+    ];
+
+    private string Recherche = string.Empty;
+    private string TypeFiltre = string.Empty;
+    private bool ActifsSeuls = true;
+    private Courrier? Selection = Courriers[0];
+
+    private Courrier[] Trouves
+    {
+        get
+        {
+            var q = Courriers.AsEnumerable();
+            if (ActifsSeuls) q = q.Where(c => c.Actif);
+            if (!string.IsNullOrEmpty(TypeFiltre)) q = q.Where(c => c.TypeEntite == TypeFiltre);
+            if (!string.IsNullOrWhiteSpace(Recherche))
+            {
+                var t = Recherche.Trim();
+                q = q.Where(c => c.Code.Contains(t, StringComparison.OrdinalIgnoreCase)
+                              || c.Libelle.Contains(t, StringComparison.OrdinalIgnoreCase));
+            }
+            return q.ToArray();
+        }
+    }
+}

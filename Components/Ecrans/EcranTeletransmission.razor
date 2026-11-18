@@ -1,0 +1,93 @@
+@* Ecran PROC_TELETRANS : le suivi des flux TELETRANSMIS (EDI) recus au
+   greffe. Destination de l'alerte « Teletransmission » de l'accueil, qui
+   n'emmenait nulle part. Les lignes viennent du courrier arrive (JeuDemo,
+   table ARRIVEE) : un flux EDI est une arrivee de mode « EDI ». *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Flux recus</div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Mode</span>
+            <select class="rig-saisie-champ__saisie" @bind="Mode">
+                <option value="EDI">EDI (teletransmission)</option>
+                <option value="TOUS">Tous les modes</option>
+            </select>
+        </label>
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Etat du canal</div>
+            <div class="rig-alerte">
+                <span class="rig-filet-v rig-filet-v--@(Flux.Length > 0 ? "ok" : "action")"></span>
+                <span class="rig-alerte__corps">
+                    <span class="rig-alerte__titre">@(Flux.Length > 0 ? "Canal au vert" : "Aucun flux recu")</span><br />
+                    <span class="rig-alerte__detail">@Dernier</span>
+                </span>
+            </div>
+        </div>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Teletransmissions</div>
+            <span class="rig-resultats-proc__compte">@Flux.Length flux</span>
+        </div>
+
+        <div class="rig-table-cadre">
+            <table class="rig-table">
+                <thead>
+                    <tr>
+                        <th>Arrivee</th>
+                        <th>Recu le</th>
+                        <th>Mode</th>
+                        <th>Emetteur</th>
+                        <th>Reference</th>
+                        <th>Demande</th>
+                        <th>Numerise</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Flux)
+                    {
+                        var f = item;
+                        <tr @onclick="() => Aller(f)"
+                            title="@(f.NumDemande.Length > 0 ? $"Ouvrir l'affaire {f.NumDemande}" : "Aucune affaire rattachee")">
+                            <td class="rig-table__mono">@f.Numero</td>
+                            <td class="rig-table__mono">@f.Horodatage</td>
+                            <td>@f.ModeLisible</td>
+                            <td>@f.Nom</td>
+                            <td class="rig-table__mono">@f.References</td>
+                            <td class="rig-table__mono">@f.NumDemande</td>
+                            <td><span class="rig-etat rig-etat--@(f.Numerise ? "ok" : "attente")">@(f.Numerise ? "oui" : "non")</span></td>
+                        </tr>
+                    }
+                    @if (Flux.Length == 0)
+                    {
+                        <tr><td colspan="7" class="rig-table__vide">Aucun flux pour ce mode.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+@code {
+    [Parameter] public EventCallback<string> OuvrirDossier { get; set; }
+
+    private string Mode = "EDI";
+
+    private Arrivee[] Flux => JeuDemo.Arrivees
+        .Where(a => Mode == "TOUS" || a.Mode == Mode)
+        .OrderByDescending(a => a.Instant)
+        .ToArray();
+
+    private string Dernier => Flux.Length > 0
+        ? $"dernier flux : {Flux[0].Horodatage}"
+        : "verifier le connecteur du greffe";
+
+    private Task Aller(Arrivee f)
+        => string.IsNullOrWhiteSpace(f.NumDemande)
+            ? Task.CompletedTask
+            : OuvrirDossier.InvokeAsync(f.NumDemande);
+}

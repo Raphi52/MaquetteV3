@@ -13,6 +13,15 @@
     <Compile Include="Program.cs" />
     <Compile Include="../../Metier/ArbreGed.cs" Link="ArbreGed.cs" />
     <Compile Include="../../Metier/JeuDemo.cs" Link="JeuDemo.cs" />
+    <Compile Include="../../Metier/SimulationEdi.cs" Link="SimulationEdi.cs" />
+    <Compile Include="../../Metier/InformationsDossier.cs" Link="InformationsDossier.cs" />
+    <Compile Include="../../Metier/InformationsFormalite.cs" Link="InformationsFormalite.cs" />
+    <Compile Include="../../Metier/InformationsDepots.cs" Link="InformationsDepots.cs" />
+    <Compile Include="../../Metier/RecetteTache.cs" Link="RecetteTache.cs" />
+    <Compile Include="../../Metier/ColonnesRig.cs" Link="ColonnesRig.cs" />
+    <Compile Include="../../Metier/AlertesGreffe.cs" Link="AlertesGreffe.cs" />
+    <Compile Include="../../Metier/ActionsXaction.cs" Link="ActionsXaction.cs" />
+    <Compile Include="../../AccueilEtat.cs" Link="AccueilEtat.cs" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,51 @@
+﻿@* ============================================================
+   L'icone d'une nouveaute du widget « Nouveautes ».
+
+   Meme parti que IconeGed : un SVG INLINE trace en `currentColor`,
+   donc l'icone prend la teinte de son etiquette (vert, bleu, or,
+   violet) et suit le theme clair comme le theme sombre sans seconde
+   image. Un emoji, lui, arrive avec ses propres couleurs et jure avec
+   la charte des qu'on change de theme.
+
+   Les attributs des traces sont en apostrophes simples : Razor ne
+   connait pas les chaines brutes et une chaine verbatim ne supporte
+   pas le guillemet double sans le doubler.
+   ============================================================ *@
+
+<svg class="@Classe" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+     stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+     aria-hidden="true" focusable="false">
+    @Dessin
+</svg>
+
+@code {
+    /// <summary>Le code de l'icone (voir la liste Nouveautes de l'accueil).</summary>
+    [Parameter, EditorRequired] public string Nom { get; set; } = "";
+
+    [Parameter] public string Classe { get; set; } = "rig-nouv__icone";
+
+    private MarkupString Dessin => new(Nom switch
+    {
+        // Geste : la boussole — on ne cherche plus un module, on cherche une direction.
+        "boussole" => @"
+            <circle cx='12' cy='12' r='9' />
+            <path d='M15.5 8.5l-2 5-5 2 2-5z' />",
+        // Profil : la silhouette, tete et epaules.
+        "profil" => @"
+            <circle cx='12' cy='8' r='3.2' />
+            <path d='M5.5 20a6.5 6.5 0 0 1 13 0' />",
+        // Actualites : le megaphone qui annonce a tout le greffe.
+        "megaphone" => @"
+            <path d='M4 10v4a1 1 0 0 0 1 1h3l7 4V5l-7 4H5a1 1 0 0 0-1 1z' />
+            <path d='M18 9.5a3.5 3.5 0 0 1 0 5' />",
+        // Affichage : la moitie soleil, moitie nuit — le clair et le sombre.
+        "clair-sombre" => @"
+            <circle cx='12' cy='12' r='5' />
+            <path d='M12 7a5 5 0 0 0 0 10z' fill='currentColor' stroke='none' />
+            <path d='M12 1.5v2' /><path d='M12 20.5v2' />
+            <path d='M1.5 12h2' /><path d='M20.5 12h2' />
+            <path d='M4.6 4.6l1.4 1.4' /><path d='M18 18l1.4 1.4' />
+            <path d='M19.4 4.6L18 6' /><path d='M6 18l-1.4 1.4' />",
+        _ => ""
+    });
+}

@@ -1,0 +1,187 @@
+@* Ecran de la procedure PROC_STAT — statistiques du greffe.
+
+   Sources RIG v2 (D:/RigApplication/Source/RIG/DLL/Processus/PROC_STAT) :
+     - STATS_INTERNES/OPE_STATS_INTERNES.Designer.cs : la procedure n'a pas
+       UNE liste mais CINQ volets, montes cote a cote et nommes par leur
+       .Text — « Statistiques internes », « Statistiques web »,
+       « Repartitions des JC et OP », « Ouverture par activites : par
+       chiffre d'affaire », « Ouverture par activites : par nombre de
+       salaries ». D'ou les onglets ci-dessous : ce sont les volets de v2,
+       pas un decoupage invente.
+     - STATS_INTERNES/Commun/OPE_DATES.Designer.cs   : ultDateDebut, ultDateFin.
+     - STATS_INTERNES/Commun/OPE_NIVEAU.Designer.cs  : « Niveau » (ult_Cbx_Niveau),
+       filtre commun a tous les volets internes.
+     - STATS_SEMESTRIELLES/OPE_STATS_SEMESTRIELLES.Designer.cs : deuxieme
+       famille, avec ses propres dates et le champ « Nombre de PC ».
+
+   Les valeurs sont des donnees de demonstration : en v2 elles viennent de
+   la base du greffe, la maquette ne s'y connecte pas. *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Periode</div>
+
+        <div class="rig-criteres__paire">
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Date de debut</span>
+                <input class="rig-saisie-champ__saisie" type="date" @bind="DateDebut" />
+            </label>
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Date de fin</span>
+                <input class="rig-saisie-champ__saisie" type="date" @bind="DateFin" />
+            </label>
+        </div>
+
+        @if (Volet != VoletStat.Semestrielles)
+        {
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Niveau</span>
+                <select class="rig-saisie-champ__saisie" @bind="Niveau">
+                    <option value="Greffe">Greffe</option>
+                    <option value="Chambre">Chambre</option>
+                    <option value="Section">Section</option>
+                </select>
+            </label>
+        }
+        else
+        {
+            @* « Nombre de PC » n'existe QUE dans les statistiques
+               semestrielles (ult_LblNbPc). *@
+            <label class="rig-saisie-champ">
+                <span class="rig-saisie-champ__libelle">Nombre de PC</span>
+                <input class="rig-saisie-champ__saisie" type="number" min="0" @bind="NombrePc" />
+            </label>
+        }
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Volets</div>
+            @foreach (var v in Volets)
+            {
+                var volet = v.Key;
+                <button class="rig-bascule @(Volet == volet ? "rig-bascule--actif" : "")"
+                        @onclick="() => Volet = volet">
+                    <span class="rig-bascule__temoin"></span>
+                    <span>@v.Value</span>
+                </button>
+            }
+        </div>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">@Volets[Volet]</div>
+            <span class="rig-resultats-proc__compte">@Lignes.Length ligne(s)</span>
+        </div>
+
+        <div class="rig-table-cadre">
+            <table class="rig-table">
+                <thead>
+                    <tr>
+                        <th>@EnteteLibelle</th>
+                        <th class="rig-table__centre">Periode en cours</th>
+                        <th class="rig-table__centre">Periode precedente</th>
+                        <th class="rig-table__centre">Ecart</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var l in Lignes)
+                    {
+                        <tr>
+                            <td>@l.Libelle</td>
+                            <td class="rig-table__mono rig-table__centre">@l.Courant</td>
+                            <td class="rig-table__mono rig-table__centre">@l.Precedent</td>
+                            <td class="rig-table__mono rig-table__centre">@Ecart(l)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+@code {
+    private enum VoletStat { Internes, Web, RepartitionsJcOp, ActivitesCa, ActivitesSalaries, Semestrielles }
+
+    private static readonly Dictionary<VoletStat, string> Volets = new()
+    {
+        [VoletStat.Internes]          = "Statistiques internes",
+        [VoletStat.Web]               = "Statistiques web",
+        [VoletStat.RepartitionsJcOp]  = "Repartitions des JC et OP",
+        [VoletStat.ActivitesCa]       = "Ouverture par activites : par chiffre d'affaire",
+        [VoletStat.ActivitesSalaries] = "Ouverture par activites : par nombre de salaries",
+        [VoletStat.Semestrielles]     = "Statistiques semestrielles"
+    };
+
+    private sealed record LigneStat(string Libelle, int Courant, int Precedent);
+
+    private static readonly Dictionary<VoletStat, LigneStat[]> Donnees = new()
+    {
+        [VoletStat.Internes] =
+        [
+            new("Immatriculations", 184, 171),
+            new("Modifications",    412, 438),
+            new("Radiations",        96, 102),
+            new("Depots d'actes",   533, 489),
+            new("Comptes annuels",  267, 254)
+        ],
+        [VoletStat.Web] =
+        [
+            new("Demandes deposees en ligne", 621, 547),
+            new("Comptes crees",               88,  74),
+            new("Documents telecharges",      1450, 1312),
+            new("Paiements aboutis",           598, 521)
+        ],
+        [VoletStat.RepartitionsJcOp] =
+        [
+            new("Jugements de cloture",        58,  61),
+            new("Ordonnances du president",   143, 128),
+            new("Jugements d'ouverture",       41,  37),
+            new("Ordonnances de designation",  77,  69)
+        ],
+        [VoletStat.ActivitesCa] =
+        [
+            new("Moins de 100 k EUR",      92, 85),
+            new("100 a 500 k EUR",         64, 71),
+            new("500 k a 2 M EUR",         28, 24),
+            new("Plus de 2 M EUR",         11,  9),
+            new("Chiffre d'affaire inconnu", 17, 22)
+        ],
+        [VoletStat.ActivitesSalaries] =
+        [
+            new("Aucun salarie",     118, 104),
+            new("1 a 5 salaries",     63,  68),
+            new("6 a 20 salaries",    24,  21),
+            new("Plus de 20 salaries", 8,   7)
+        ],
+        [VoletStat.Semestrielles] =
+        [
+            new("Dossiers traites au semestre", 1264, 1187),
+            new("Delai moyen en jours",            3,    4),
+            new("Procedures collectives",        102,   94),
+            new("Postes de travail declares",     46,   44)
+        ]
+    };
+
+    private VoletStat Volet = VoletStat.Internes;
+    private DateOnly? DateDebut = new DateOnly(DateTime.Today.Year, 1, 1);
+    private DateOnly? DateFin = DateOnly.FromDateTime(DateTime.Today);
+    private string Niveau = "Greffe";
+    private int NombrePc = 46;
+
+    private LigneStat[] Lignes => Donnees[Volet];
+
+    private string EnteteLibelle => Volet switch
+    {
+        VoletStat.ActivitesCa       => "Tranche de chiffre d'affaire",
+        VoletStat.ActivitesSalaries => "Tranche d'effectif",
+        VoletStat.RepartitionsJcOp  => "Nature de la decision",
+        _                           => "Indicateur"
+    };
+
+    private static string Ecart(LigneStat l)
+    {
+        var d = l.Courant - l.Precedent;
+        return d > 0 ? $"+{d}" : d.ToString();
+    }
+}

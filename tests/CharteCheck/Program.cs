@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 // Garde-fou de mise en page.
 //
@@ -48,6 +48,35 @@ foreach (var (nom, texte) in feuilles)
         Exiger(Regex.IsMatch(charte, @"\*[^{}]*\{[^{}]*box-sizing:\s*border-box", RegexOptions.Singleline),
             $"{nom} : « {selecteur} » melange width:100% et padding, le reset est indispensable");
     }
+}
+
+// --- 4. Le menu de gauche se reduit et se redeploie (11/09/2026).
+// Defaut a l'origine : le menu occupait une colonne fixe de 232px, sans
+// aucun moyen de la replier. Le repli responsive (<1100px) n'est pas un
+// repli choisi par l'utilisateur : il faut un etat commande, et il doit
+// rester visible sous forme de rail (jamais display:none).
+{
+    var accueil = feuilles["rig-accueil.css"];
+    var home = File.ReadAllText(Path.Combine(racine, "Components", "Pages", "Home.razor"));
+
+    Exiger(Regex.IsMatch(accueil, @"\.rig-accueil--menu-reduit[^{}]*\{[^{}]*grid-template-columns:\s*(\d+)px"),
+        "rig-accueil.css reduit la colonne du menu via .rig-accueil--menu-reduit");
+
+    var m = Regex.Match(accueil, @"\.rig-accueil--menu-reduit[^{}]*\{[^{}]*grid-template-columns:\s*(\d+)px");
+    Exiger(m.Success && int.Parse(m.Groups[1].Value) is > 0 and < 232,
+        "la colonne reduite est plus etroite que 232px mais reste visible (> 0)");
+
+    Exiger(!Regex.IsMatch(accueil, @"\.rig-accueil--menu-reduit\s+\.rig-menu\s*\{[^{}]*display:\s*none"),
+        "le menu reduit n'est jamais masque (pas de display:none sur .rig-menu)");
+
+    Exiger(home.Contains("MenuReduit") && home.Contains("BasculerMenu"),
+        "Home.razor porte l'etat MenuReduit et sa bascule BasculerMenu");
+
+    Exiger(Regex.IsMatch(home, @"rig-accueil\s+@\(MenuReduit\s*\?\s*""rig-accueil--menu-reduit"""),
+        "Home.razor applique la classe de reduction sur .rig-accueil");
+
+    Exiger(Regex.IsMatch(home, @"rig-menu__replier[^>]*@onclick=""BasculerMenu"""),
+        "Home.razor expose un bouton de repli/deploiement du menu");
 }
 
 Console.WriteLine();

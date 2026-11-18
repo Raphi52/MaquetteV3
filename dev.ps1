@@ -1,4 +1,4 @@
-# Lance RIG V3 en mode developpement, avec reprise a chaud.
+﻿# Lance RIG V3 en mode developpement, avec reprise a chaud.
 #
 #   .\dev.ps1
 #
@@ -31,4 +31,30 @@ $env:DOTNET_ENVIRONMENT = 'Development'
 Write-Host 'RIG V3 - mode developpement (reprise a chaud).' -ForegroundColor Cyan
 Write-Host 'C#, .razor, CSS, JS : repris automatiquement, sans redemarrage.' -ForegroundColor DarkGray
 
-dotnet watch run --project "$PSScriptRoot\RigV3Desktop.csproj" --non-interactive
+# dotnet watch ne relance JAMAIS une application qui s'est fermee : il
+# affiche « Exited / Waiting for a file to change » et Ctrl+R est inactif
+# dans cet etat (dotnet/sdk#34029). La reprise a chaud est alors morte.
+# On surveille donc l'application : si elle disparait alors que watch
+# tourne encore, on arrete CE watch (pid lance ici, et lui seul) et on le
+# relance. Ctrl+C dans cette console arrete tout.
+function Get-AppRig { Get-Process -Name 'RigV3Desktop' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe } }
+
+while ($true) {
+    $watch = Start-Process dotnet -NoNewWindow -PassThru -ArgumentList @(
+        'watch', 'run', '--project', "`"$PSScriptRoot\RigV3Desktop.csproj`"", '--non-interactive')
+    $vue = $false; $absente = 0
+    while (-not $watch.HasExited) {
+        Start-Sleep -Seconds 2
+        if (Get-AppRig) { $vue = $true; $absente = 0 }
+        elseif ($vue) { $absente++ }
+        # 3 sondes (~6 s) : laisse passer un redemarrage sur « rude edit ».
+        if ($vue -and $absente -ge 3) {
+            Write-Host 'Application fermee : relance de dotnet watch...' -ForegroundColor Yellow
+            & taskkill /PID $watch.Id /T /F | Out-Null
+            $watch.WaitForExit(10000) | Out-Null
+            break
+        }
+    }
+    if ($watch.HasExited -and -not $vue) { break }  # watch mort sans jamais lancer l'app : erreur de build, on s'arrete
+}
+

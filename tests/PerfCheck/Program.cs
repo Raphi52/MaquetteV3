@@ -21,6 +21,22 @@ Exiger(a.All(m => m.Part >= 0 && m.Part <= 100), "chaque jauge reste entre 0 et 
 Exiger(a.All(m => m.Statut is "ok" or "attente" or "action" or "alerte"),
     "chaque statut correspond a un degrade existant");
 
+// --- 1 bis. Chaque mesure porte son OBJECTIF, et la couleur suit l ECART a
+// cet objectif -- pas la hauteur de la jauge.
+Exiger(a.All(m => m.Objectif >= 0 && m.Objectif <= 100),
+    "le repere d objectif reste sur l echelle de la jauge");
+Exiger(a.All(m => !string.IsNullOrWhiteSpace(m.ObjectifTexte) && m.ObjectifTexte.Contains("obj.")),
+    "chaque mesure annonce sa cible en clair");
+Exiger(a.All(m => m.Atteinte >= 0), "l atteinte de l objectif est un pourcentage positif");
+Exiger(a.All(m => (m.Atteinte >= 100) == (m.Statut == "ok")),
+    "le vert est donne quand l objectif est tenu, et seulement alors");
+// Le hors-delai a pour cible zero : une jauge haute y est MAUVAISE, une jauge
+// a zero y est verte. C est ce renversement que le statut doit porter.
+var hd = a.First(m => m.Libelle == "Hors delai legal");
+Exiger(hd.Objectif == 0, "l objectif du hors-delai est zero");
+Exiger((hd.Valeur == "0") == (hd.Statut == "ok"),
+    "le hors-delai n est vert que s il est nul");
+
 // --- 2. Les mesures portent bien sur les DOSSIERS, pas sur le process
 var libelles = a.Select(m => m.Libelle).ToArray();
 Exiger(libelles.Contains("Dossiers traites"), "la premiere mesure est le nombre de dossiers traites");
@@ -51,6 +67,10 @@ Exiger(Regex.IsMatch(vue, @"MinuteurPerf\s*=\s*new Timer"), "Home.razor relance 
 Exiger(vue.Contains("RelevePerf();"), "Home.razor appelle le releve");
 Exiger(!Regex.IsMatch(vue, @"new\(""Threads actifs"""), "plus de mesures ecrites en dur dans la vue");
 Exiger(Regex.IsMatch(vue, @"MinuteurPerf.*DisposeAsync", RegexOptions.Singleline), "le minuteur est arrete a la fermeture");
+Exiger(vue.Contains("rig-perf__repere"), "la vue dessine le repere d objectif sur la jauge");
+Exiger(vue.Contains("m.ObjectifTexte"), "la vue affiche la cible chiffree a cote de la valeur");
+var styles = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "../../../../../wwwroot/rig-accueil.css"));
+Exiger(styles.Contains(".rig-perf__repere"), "le repere d objectif a bien un style");
 
 Console.WriteLine();
 if (echecs.Count > 0)

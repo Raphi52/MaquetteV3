@@ -1,0 +1,215 @@
+﻿@* Ecran PROC_ACTUALITES : la REDACTION des actualites affichees sur
+   l'accueil de tout le monde. Rien n'est calcule ici : quelqu'un ecrit
+   (« L'INPI est HS »), et le texte part dans le fichier PARTAGE lu par les
+   autres postes. C'est la destination du clic sur la tuile « Actualites ». *@
+
+<div class="rig-proc__corps">
+
+    <aside class="rig-criteres">
+        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Nouvelle actualite</div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Titre</span>
+            <input class="rig-saisie-champ__saisie" @bind="Titre" @bind:event="oninput"
+                   placeholder="Alerte CNG fraude : ..." />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Message</span>
+            <textarea class="rig-saisie-champ__saisie" rows="4" @bind="Message" @bind:event="oninput"
+                      placeholder="Ce que les utilisateurs doivent savoir."></textarea>
+        </label>
+
+        @* Le TYPE se choisit en premier : il fixe la couleur du filet ET la
+           duree de vie proposee. Une liste deroulante cacherait le code
+           couleur ; des boutons colores le montrent au moment du choix. *@
+        <div class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Type</span>
+            <div class="rig-actualite__types">
+                @foreach (var item in TypeActualite.Tous)
+                {
+                    var t = item;
+                    <button type="button"
+                            class="@("rig-actualite__choix" + (t.Code == Type ? " rig-actualite__choix--pris" : ""))"
+                            title="@Aide(t)"
+                            @onclick="() => ChoisirType(t)">
+                        <span class="rig-filet-v rig-filet-v--@t.Filet"></span>
+                        <span class="rig-actualite__type rig-actualite__type--@t.Filet">@t.Libelle</span>
+                    </button>
+                }
+            </div>
+        </div>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">Signature</span>
+            <input class="rig-saisie-champ__saisie" @bind="Auteur" @bind:event="oninput" />
+        </label>
+
+        <label class="rig-saisie-champ">
+            <span class="rig-saisie-champ__libelle">
+                Retirer apres (jours) — 0 = epingle
+            </span>
+            <input class="rig-saisie-champ__saisie" type="number" min="0" max="365" @bind="Jours" />
+        </label>
+
+        <button class="rig-bouton rig-bouton--fort" @onclick="Publier"
+                disabled="@(string.IsNullOrWhiteSpace(Titre))">Publier l'actualite</button>
+
+        @if (Compte_rendu is { Length: > 0 })
+        {
+            <div class="rig-alerte">
+                <span class="rig-filet-v rig-filet-v--@StatutRendu"></span>
+                <span class="rig-alerte__corps">
+                    <span class="rig-alerte__detail">@Compte_rendu</span>
+                </span>
+            </div>
+        }
+
+        <div class="rig-criteres__bloc">
+            <div class="rig-kicker">Source partagee</div>
+            <div class="rig-alerte__detail">@Depot.CheminPartage</div>
+        </div>
+    </aside>
+
+    <section class="rig-resultats-proc">
+        <div class="rig-resultats-proc__entete">
+            <div class="rig-kicker">Actualites publiees</div>
+            <span class="rig-resultats-proc__compte">@Liste.Count actualite(s)</span>
+        </div>
+
+        <div class="rig-table-cadre">
+            <table class="rig-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Titre</th>
+                        <th>Message</th>
+                        <th>Signature</th>
+                        <th>Publie</th>
+                        <th>Retire</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Liste)
+                    {
+                        var b = item;
+                        <tr>
+                            <td>
+                                <span class="rig-actualite__type rig-actualite__type--@b.Fiche.Filet">@b.Fiche.Libelle</span>
+                            </td>
+                            <td>@b.Titre</td>
+                            <td>@b.Message</td>
+                            <td>@b.Auteur</td>
+                            <td class="rig-table__mono">@b.Horodatage</td>
+                            <td class="rig-table__mono">@(b.Expire is null ? "—" : b.Expire.Value.ToString("dd/MM"))</td>
+                            <td>
+                                <button class="rig-bouton" title="Retirer cette actualite de l'accueil"
+                                        @onclick="() => Retirer(b)">Retirer</button>
+                            </td>
+                        </tr>
+                    }
+                    @if (Liste.Count == 0)
+                    {
+                        <tr><td colspan="7" class="rig-table__vide">Aucune actualite. La premiere publiee s'affichera sur l'accueil de tous les postes.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+@code {
+    private readonly DepotActualites Depot = new();
+
+    private List<Actualite> Liste = new();
+
+    private string Titre = string.Empty;
+    private string Message = string.Empty;
+    private string Statut = "attente";
+    private string Type = TypeActualite.Info;
+    private string Auteur = "Greffe";
+    private int Jours = 7;
+    private string Compte_rendu = string.Empty;
+    private string StatutRendu = "ok";
+
+    protected override void OnInitialized() => Recharger();
+
+    /// <summary>Choisir un type REPOSITIONNE la duree : c'est le sens du type.
+    /// Le redacteur garde la main dessus juste apres, le champ reste libre.</summary>
+    private void ChoisirType(TypeActualite t)
+    {
+        Type = t.Code;
+        Jours = t.JoursDeVie;
+        Statut = t.Code switch
+        {
+            TypeActualite.Fraude => "alerte",
+            TypeActualite.Panne => "alerte",
+            TypeActualite.Procedure => "action",
+            TypeActualite.Retabli => "ok",
+            _ => "attente"
+        };
+    }
+
+    /// <summary>L'infobulle d'un type : ce qu'il veut dire ET combien de temps
+    /// il tient. Sans elle, le code couleur reste a deviner.</summary>
+    private static string Aide(TypeActualite t) => t.Code switch
+    {
+        TypeActualite.Fraude => "Vigilance nominative — reste affichee jusqu'a retrait",
+        TypeActualite.Panne => "Un service tiers est hors service — 30 jours",
+        TypeActualite.Procedure => "Consigne de travail temporaire — 14 jours",
+        TypeActualite.Retabli => "Fin d'une panne — 1 jour",
+        _ => "Simple information — 7 jours"
+    };
+
+    private void Recharger()
+    {
+        var tous = Depot.Tous();
+        // Depot vierge : on part des deux actualites dictees par le metier
+        // (CNG, INPI) plutot que d'un ecran vide -- le redacteur voit tout de
+        // suite la forme attendue, et peut les retirer d'un clic.
+        Liste = (tous.Length > 0 ? tous : DepotActualites.Exemples(DateTime.Now))
+                .OrderByDescending(b => b.Publie).ToList();
+    }
+
+    private void Publier()
+    {
+        if (string.IsNullOrWhiteSpace(Titre)) return;
+        var maintenant = DateTime.Now;
+        Liste.Insert(0, new Actualite(
+            Id: Guid.NewGuid().ToString("N")[..8],
+            Titre: Titre.Trim(),
+            Message: Message.Trim(),
+            Statut: Actualite.Statuts.Contains(Statut) ? Statut : "attente",
+            Auteur: string.IsNullOrWhiteSpace(Auteur) ? "Greffe" : Auteur.Trim(),
+            Publie: maintenant,
+            Expire: Jours > 0 ? maintenant.AddDays(Jours) : null,
+            Type: Type));
+        Ecrire("Actualite publiee : elle s'affichera sur l'accueil des postes.");
+        Titre = string.Empty;
+        Message = string.Empty;
+    }
+
+    private void Retirer(Actualite b)
+    {
+        Liste.Remove(b);
+        Ecrire("Actualite retiree de l'accueil.");
+    }
+
+    // L'echec d'ecriture ne se tait pas : sans ce retour, le redacteur croit
+    // avoir preveni tout le greffe alors que rien n'est parti.
+    private void Ecrire(string reussite)
+    {
+        if (Depot.Ecrire(Liste))
+        {
+            Compte_rendu = reussite;
+            StatutRendu = "ok";
+        }
+        else
+        {
+            Compte_rendu = "ECHEC : la source partagee n'a pas pu etre ecrite. "
+                         + "Rien n'est parti vers les autres postes.";
+            StatutRendu = "alerte";
+        }
+    }
+}

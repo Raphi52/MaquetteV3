@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    RIG V3 - CHARTE GRAPHIQUE FIGEE
    Direction V1 "filet large" - validee le 2026-09-09.
 
@@ -20,12 +20,18 @@
      Les teintes precedentes (indigo #4F46E5, cyan #22D3EE, jaune #FBBF24)
      etaient tres saturees : lisibles, mais d'un registre "produit web"
      qui jure avec un logiciel de greffe. On garde exactement les memes
-     QUATRE statuts, en tons rabattus : encre, acier, laiton, sauge. */
-  --rig-grad-action:  linear-gradient(90deg, #2C4363, #7E9AC0); /* depend de moi */
-  --rig-grad-attente: linear-gradient(90deg, #55606E, #9AA5B4); /* bloque par un tiers */
-  --rig-grad-alerte:  linear-gradient(90deg, #8A5A20, #C9A227); /* hors delai legal */
-  --rig-grad-ok:      linear-gradient(90deg, #3B6656, #8DBBA1); /* fait / conforme */
-  --rig-grad-marque:  linear-gradient(90deg, #22344B, #3E566F 55%, #B08D3F);
+     QUATRE statuts.
+     2026-09-17, demande utilisateur « moins pastel, plus percutant » : les
+     tons rabattus (encre, acier, laiton, sauge) etaient devenus ternes en
+     mode sombre. Chaque teinte est RESATUREE dans sa propre famille — le
+     bleu reste bleu, le laiton reste or — sans changer aucun statut ni
+     aucun role. Seul « attente » reste volontairement neutre : c'est un
+     etat qui ne depend pas de moi, il ne doit pas attirer l'oeil. */
+  --rig-grad-action:  linear-gradient(90deg, #1D4ED8, #60A5FA); /* depend de moi */
+  --rig-grad-attente: linear-gradient(90deg, #475569, #94A3B8); /* bloque par un tiers */
+  --rig-grad-alerte:  linear-gradient(90deg, #B45309, #FBBF24); /* hors delai legal */
+  --rig-grad-ok:      linear-gradient(90deg, #047857, #34D399); /* fait / conforme */
+  --rig-grad-marque:  linear-gradient(90deg, #14294A, #2563EB 55%, #F5B912);
 
   /* --- Typographie --- */
   --rig-font: "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -65,6 +71,14 @@ html:has([data-rig-theme="clair"]) { color-scheme: light; }
 [data-rig-theme="sombre"] {
   --rig-fond: #0C0F16;
   --rig-fond-2: rgba(255, 255, 255, .035);
+  /* Lignes alternees des grilles (demande utilisateur 2026-09-17) : un cran
+     plus CLAIR que le fond en sombre, un cran plus FONCE en clair. */
+  --rig-zebre: rgba(255, 255, 255, .028);
+  /* Survol nettement au-dessus de la zebrure, sinon il disparait dessus. */
+  --rig-survol-ligne: rgba(255, 255, 255, .09);
+  /* 2026-09-15 : tuiles de l'accueil un cran plus claires que le fond
+     (avant : pas de surface en sombre, donc tuile = fond). */
+  --rig-surface: #171C27;
   --rig-bord: rgba(255, 255, 255, .11);
   --rig-bord-faible: rgba(255, 255, 255, .06);
   --rig-texte: #F2F5FA;
@@ -72,26 +86,55 @@ html:has([data-rig-theme="clair"]) { color-scheme: light; }
   --rig-texte-3: #69748A;
   --rig-ombre: 0 1px 2px rgba(0, 0, 0, .55), 0 10px 26px rgba(0, 0, 0, .40);
   --rig-ombre-saisie: 0 2px 6px rgba(0, 0, 0, .60), 0 22px 48px rgba(0, 0, 0, .52);
-  --rig-alerte: #C9A227;
-  --rig-focus: #B08D3F;
+  --rig-alerte: #F5B912;
+  /* Valeur REFUSEE (erreur), distincte de l'alerte "manquant" (2026-09-15). */
+  --rig-erreur: #F04438;
+  --rig-focus: #D9A429;
+  /* Accent d'interaction (survol, element actif). Declaree le 2026-09-11 :
+     rig-accueil.css l'utilisait a 6 endroits sans qu'elle existe, donc 5 de
+     ces accents ne s'affichaient pas du tout (seul .rig-vged__poignee avait
+     une couleur de repli). Meme or que --rig-focus : meme role d'interaction. */
+  --rig-accent: #D9A429;
 }
 
 /* --- MODE CLAIR --- */
 /* Pas de blanc pur : sur un grand ecran de travail il eblouit et fatigue.
    Le fond garde la teinte bleutee du mode sombre (#0C0F16), en clair.
-   Contraste texte principal / fond : ~13:1, tres au-dela du seuil AA. */
+   Assombri le 2026-09-10 (#D8DDE6 -> #C4CBD6) : a 86 % de luminance le
+   fond piquait encore les yeux en plein ecran ; on redescend vers 78 %.
+   Assombri DE NOUVEAU le 2026-09-10 (#C4CBD6 -> #B2BAC7, ~72 % de
+   luminance) : l'utilisateur signale que le mode clair pique encore.
+   Les trois niveaux de texte descendent en meme temps vers le NOIR, pour
+   que rien ne reste pale sur ce fond plus dense.
+   Contraste texte principal / fond : ~11:1, tres au-dela du seuil AA. */
 [data-rig-theme="clair"] {
-  --rig-fond: #D8DDE6;
-  --rig-fond-2: #CBD2DD;
-  --rig-bord: rgba(18, 24, 38, .22);
-  --rig-bord-faible: #BFC7D4;
-  --rig-texte: #171B24;
-  --rig-texte-2: #414A5C;
-  --rig-texte-3: #6E7889;
-  --rig-ombre: 0 1px 2px rgba(18, 24, 38, .12), 0 10px 24px rgba(18, 24, 38, .14);
-  --rig-ombre-saisie: 0 2px 6px rgba(18, 24, 38, .18), 0 22px 44px rgba(18, 24, 38, .22);
-  --rig-alerte: #8A5A20;
-  --rig-focus: #7A6224;
+  /* Refait le 2026-09-15 : les assombrissements successifs avaient donne un
+     "gris sur gris" (tuiles de la meme couleur que la page, ombres a 12 %).
+     Demande utilisateur : effet "wow" avec ombres et couleurs, comme l'accueil.
+     Fond bleute moyen, tuiles plus claires (sans blanc pur) detachees par une
+     ombre franche, statuts plus satures. */
+  /* 2026-09-15 : fond "trop gris" -> blanc casse neutre #F5F6F4 (choix n°1 de l'utilisateur). */
+  --rig-fond: #F5F6F4;
+  --rig-fond-2: #E8EAE6;
+  --rig-zebre: rgba(30, 50, 90, .045);
+  --rig-survol-ligne: rgba(30, 50, 90, .13);
+  --rig-surface: #FCFCFB;
+  --rig-bord: rgba(30, 50, 90, .20);
+  --rig-bord-faible: rgba(30, 50, 90, .12);
+  --rig-texte: #0B0E14;
+  --rig-texte-2: #2B3341;
+  --rig-texte-3: #4F5A6E;
+  --rig-ombre: 0 1px 3px rgba(28, 44, 80, .18), 0 12px 30px rgba(28, 44, 80, .22);
+  --rig-ombre-saisie: 0 3px 8px rgba(28, 44, 80, .24), 0 26px 56px rgba(28, 44, 80, .32);
+  --rig-alerte: #C2410C;
+  --rig-erreur: #D92D20;
+  --rig-focus: #A16207;
+  --rig-accent: #A16207;
+  --rig-grad-action:  linear-gradient(90deg, #1D4ED8, #3B82F6);
+  --rig-grad-attente: linear-gradient(90deg, #475569, #8494A8);
+  --rig-grad-alerte:  linear-gradient(90deg, #C2410C, #F5A609);
+  --rig-grad-ok:      linear-gradient(90deg, #047857, #10B981);
+  --rig-grad-marque:  linear-gradient(90deg, #14294A, #2563EB 55%, #EAB308);
 }
 
 /* ============================================================
@@ -115,6 +158,19 @@ body {
   font-family: var(--rig-font);
   font-size: var(--rig-fs-corps);
   line-height: var(--rig-lh);
+  /* Hauteur BORNEE a la fenetre : sans elle, la page s'etire avec son
+     contenu et les zones en overflow-y:auto (le menu de gauche) ne
+     defilent jamais -- leurs dernieres entrees sortent du cadre. */
+  height: 100%;
+}
+
+/* Racine Blazor : relais de hauteur entre body et la mise en page.
+   Sans ce maillon, la chaine de hauteur est coupee des le premier etage. */
+#app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .rig-page {
@@ -173,14 +229,21 @@ body {
   margin-bottom: var(--rig-esp-2);
 }
 
-.rig-filet--action  { background: var(--rig-grad-action); }
-.rig-filet--attente { background: var(--rig-grad-attente); }
+/* La couleur VIVE est reservee a ce qui demande une action : seul le filet
+   d'alerte reste colore. Action, attente et conforme passent en gris neutre,
+   sinon toute la page crie et plus rien ne ressort. */
+.rig-filet--action  { background: var(--rig-bord); }
+.rig-filet--attente { background: var(--rig-bord); }
 .rig-filet--alerte  { background: var(--rig-grad-alerte); }
-.rig-filet--ok      { background: var(--rig-grad-ok); }
+.rig-filet--ok      { background: var(--rig-bord); }
 
 .rig-filet-v {
-  width: var(--rig-filet-fin);
-  height: 26px;
+  /* 2026-09-17 : 4px au lieu de 3, et la barre prend TOUTE la hauteur de la
+     ligne (align-self) -- a 3px et 26px la couleur d importance passait
+     inapercue dans la tuile « A traiter ». */
+  width: 4px;
+  min-height: 18px;
+  align-self: stretch;
   border-radius: 2px;
   flex: 0 0 auto;
 }
@@ -189,11 +252,61 @@ body {
    que les filets horizontaux avaient ete rabattus : memes teintes pour les
    deux, sinon une meme information change de couleur selon l orientation.
    Le variant --ok manquait : une ligne validee n avait plus de filet. */
-.rig-filet-v--action  { background: linear-gradient(180deg, #2C4363, #7E9AC0); }
-.rig-filet-v--attente { background: linear-gradient(180deg, #55606E, #9AA5B4); }
-.rig-filet-v--alerte  { background: linear-gradient(180deg, #8A5A20, #C9A227); }
-.rig-filet-v--ok      { background: linear-gradient(180deg, #3B6656, #8DBBA1); }
+/* CODE COULEUR D IMPORTANCE (2026-09-17) : les filets HORIZONTAUX de tete de
+   tuile ayant disparu, la couleur ne survit qu ICI. Une barre verticale = un
+   NIVEAU, du plus urgent au plus calme :
+     alerte  (3) rouge   -- a traiter tout de suite
+     action  (2) orange  -- demande un geste
+     attente (1) or      -- en cours, rien a faire dans l immediat
+     ok      (0) vert    -- conforme
+     neutre      gris    -- sans niveau */
+.rig-filet-v--alerte  { background: #D93B3B; }
+.rig-filet-v--action  { background: #E08A3C; }
+.rig-filet-v--attente { background: #D4A94F; }
+.rig-filet-v--ok      { background: #3FA776; }
 .rig-filet-v--neutre  { background: var(--rig-bord); }
+
+/* Les cinq TYPES d'actualite. Ils ont leur propre palette parce
+   qu'ils ne disent pas la meme chose que les statuts de dossier : « fraude »
+   et « panne » doivent se distinguer au premier coup d'oeil, alors que les
+   deux tomberaient sur le meme filet « alerte ». Meme regle que partout :
+   la couleur ne vit que dans le filet, jamais en aplat. */
+.rig-filet-v--act-fraude    { background: linear-gradient(180deg, #8C2F2F, #E05A5A); }
+.rig-filet-v--act-panne     { background: linear-gradient(180deg, #8A5A20, #E08A3C); }
+.rig-filet-v--act-procedure { background: linear-gradient(180deg, #7A6220, #D4A94F); }
+.rig-filet-v--act-info      { background: linear-gradient(180deg, #2C4363, #5B9BD5); }
+.rig-filet-v--act-retabli   { background: linear-gradient(180deg, #3B6656, #5CBA8A); }
+
+/* Le kicker qui NOMME le type, en petites capitales. Il porte la meme
+   couleur que le filet : le lecteur relie la teinte a un mot, sinon le
+   code couleur reste a deviner. Pas de fond : seul le texte est colore. */
+.rig-actualite__type {
+  font: 600 10px/1.4 var(--rig-font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-right: 6px;
+}
+.rig-actualite__type--act-fraude    { color: #C0392B; }
+.rig-actualite__type--act-panne     { color: #A4651F; }
+.rig-actualite__type--act-procedure { color: #8A6D1F; }
+.rig-actualite__type--act-info      { color: #2C5C8A; }
+.rig-actualite__type--act-retabli   { color: #3B7A5C; }
+
+/* Les cinq types offerts a la redaction : des boutons qui montrent leur
+   filet, et non une liste deroulante qui cacherait le code couleur au
+   moment meme ou le redacteur choisit. Le bouton PRIS se marque par sa
+   bordure, pas par un aplat. */
+.rig-actualite__types { display: flex; flex-wrap: wrap; gap: 6px; }
+.rig-actualite__choix {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: none; cursor: pointer;
+  border: 1px solid var(--rig-bord);
+  border-radius: var(--rig-radius-sm);
+  padding: 3px 8px 3px 4px;
+}
+.rig-actualite__choix:hover { border-color: var(--rig-texte-3); }
+.rig-actualite__choix--pris { border-color: currentColor; box-shadow: inset 0 -2px 0 currentColor; }
+.rig-actualite__choix .rig-filet-v { height: 14px; }
 
 /* ============================================================
    CHIFFRE CLE
@@ -448,3 +561,30 @@ body {
   background: #C0392B;
   color: #FFFFFF;
 }
+
+/* ============================================================
+   NATURE D'AFFAIRE : une affaire RIG est soit une INSTANCE, soit une
+   PROCEDURE COLLECTIVE, soit une PREVENTION, soit une MESURE. Les quatre
+   ne se traitent pas pareil : la liste doit les distinguer AU COUP D'OEIL,
+   pas obliger a lire le libelle. Filet vertical colore + libelle court.
+   ============================================================ */
+.rig-nature {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rig-esp-2);
+  white-space: nowrap;
+}
+
+.rig-nature__filet {
+  width: var(--rig-filet-fin);
+  height: 15px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+
+.rig-nature__nom { font-size: var(--rig-fs-dense); color: var(--rig-texte-2); }
+
+.rig-nature--instance   .rig-nature__filet { background: var(--rig-grad-action); }
+.rig-nature--collective .rig-nature__filet { background: var(--rig-grad-alerte); }
+.rig-nature--prevention .rig-nature__filet { background: var(--rig-grad-attente); }
+.rig-nature--mesure     .rig-nature__filet { background: var(--rig-grad-ok); }

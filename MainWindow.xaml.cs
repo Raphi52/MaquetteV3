@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -24,6 +24,13 @@ public partial class MainWindow : Window
         {
             args.WebView.CoreWebView2.Profile.PreferredColorScheme =
                 Microsoft.Web.WebView2.Core.CoreWebView2PreferredColorScheme.Dark;
+#if DEBUG
+            // En developpement, on repart d'un cache VIDE : sinon une feuille
+            // de style modifiee reste invisible apres un redemarrage complet
+            // (index.html reference les CSS sans numero de version).
+            _ = args.WebView.CoreWebView2.Profile.ClearBrowsingDataAsync(
+                Microsoft.Web.WebView2.Core.CoreWebView2BrowsingDataKinds.DiskCache);
+#endif
         };
     }
 
@@ -53,6 +60,14 @@ public partial class MainWindow : Window
                             ?? System.Windows.Media.Matrix.Identity;
 
         var handle = new WindowInteropHelper(this).Handle;
+
+        // Sans barre de titre native (WindowStyle=None), Windows agrandit la
+        // fenetre a la taille TOTALE de l'ecran (rcMonitor) et non a sa zone
+        // de travail : le bas de l'application passe alors SOUS la barre des
+        // taches. On repond donc nous-memes a WM_GETMINMAXINFO en bornant la
+        // taille maximale a rcWork du moniteur concerne.
+        (source as HwndSource)?.AddHook(BornerAgrandissement);
+
         var moniteur = MonitorFromWindow(handle, MONITOR_DEFAULTTONEAREST);
 
         var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
@@ -108,10 +123,11 @@ public partial class MainWindow : Window
         {
             Interval = TimeSpan.FromMilliseconds(250)
         };
-        Attente.Tick += (_, _) =>
+        Attente.Tick += async (_, _) =>
         {
             Attente!.Stop();
             RecopierWwwroot(source, sortie);
+            await ViderCacheAsync();
             Vue.WebView?.Reload();
         };
 
@@ -126,6 +142,30 @@ public partial class MainWindow : Window
         Guetteur.Changed += Change;
         Guetteur.Created += Change;
         Guetteur.Renamed += (o, e) => Change(o, e);
+    }
+
+    /// <summary>
+    /// Vide le cache disque du WebView2 AVANT de recharger.
+    ///
+    /// Cause racine mesuree le 2026-09-17 : « Reload() » recharge le HTML mais
+    /// ressert les sous-ressources (rig-charte.css, rig-accueil.css, le JS)
+    /// depuis le cache, car index.html les reference sans numero de version.
+    /// Une couleur modifiee dans la charte restait donc invisible, meme apres
+    /// avoir ferme et rouvert l'application -- le cache vit dans le profil.
+    /// </summary>
+    private async Task ViderCacheAsync()
+    {
+        var coeur = Vue.WebView?.CoreWebView2;
+        if (coeur is null) return;
+        try
+        {
+            await coeur.Profile.ClearBrowsingDataAsync(
+                Microsoft.Web.WebView2.Core.CoreWebView2BrowsingDataKinds.DiskCache);
+        }
+        catch (Exception)
+        {
+            // Profil indisponible : le rechargement simple reste tente.
+        }
     }
 
     /// <summary>
@@ -167,6 +207,46 @@ public partial class MainWindow : Window
         }
     }
 #endif
+
+    private const int WM_GETMINMAXINFO = 0x0024;
+
+    /// <summary>
+    /// Borne l'agrandissement a la zone de travail (hors barre des taches) du
+    /// moniteur qui porte la fenetre. Tout est en pixels physiques ici.
+    /// </summary>
+    private IntPtr BornerAgrandissement(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg != WM_GETMINMAXINFO) return IntPtr.Zero;
+
+        var moniteur = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        if (moniteur == IntPtr.Zero) return IntPtr.Zero;
+
+        var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+        if (!GetMonitorInfo(moniteur, ref info)) return IntPtr.Zero;
+
+        var mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
+        mmi.ptMaxPosition.x = info.rcWork.left - info.rcMonitor.left;
+        mmi.ptMaxPosition.y = info.rcWork.top - info.rcMonitor.top;
+        mmi.ptMaxSize.x = info.rcWork.right - info.rcWork.left;
+        mmi.ptMaxSize.y = info.rcWork.bottom - info.rcWork.top;
+        Marshal.StructureToPtr(mmi, lParam, true);
+
+        handled = true;
+        return IntPtr.Zero;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT { public int x, y; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MINMAXINFO
+    {
+        public POINT ptReserved;
+        public POINT ptMaxSize;
+        public POINT ptMaxPosition;
+        public POINT ptMinTrackSize;
+        public POINT ptMaxTrackSize;
+    }
 
     private const int MONITOR_DEFAULTTONEAREST = 2;
 

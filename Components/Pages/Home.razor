@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @implements IAsyncDisposable
 @inject FenetreInterop Fenetre
 @inject DocumentPartage Partage
@@ -11,6 +11,8 @@
 
 <div class="rig-filet-marque"></div>
 
+@if (!ModeFenetreVue)
+{
 <header class="rig-barre" @onmousedown="Fenetre.Deplacer">
     <span class="rig-barre__marque">RIG <b>V3</b></span>
     <span class="rig-barre__version">@Version</span>
@@ -29,59 +31,6 @@
                 </option>
             }
         </select>
-        @* Bouton VALIDATIONS : debloque par le role. Un login sans ecriture
-           directe y suit ses demandes (« en attente de validation ») ; un
-           superieur habilite y valide ou rejette. Il n'apparait pour personne
-           d'autre. *@
-        @if (CompteCourant.SoumetAValidation || CompteCourant.PeutValider)
-        {
-            <div class="rig-barre__reglages" @onmousedown:stopPropagation="true">
-                <button class="rig-barre__action rig-validations-bouton @(PanneauValidationsOuvert ? "rig-barre__action--ouvert" : "")"
-                        title="@(CompteCourant.PeutValider ? "Modifications a valider" : "Mes modifications en attente de validation")"
-                        @onclick="() => PanneauValidationsOuvert = !PanneauValidationsOuvert">
-                    &#9202; Validations
-                    @if (ValidationsEnAttente > 0)
-                    {
-                        <span class="rig-pastille">@ValidationsEnAttente</span>
-                    }
-                </button>
-                @if (PanneauValidationsOuvert)
-                {
-                    <div class="rig-voile-clic" @onclick="() => PanneauValidationsOuvert = false"
-                         @onmousedown:stopPropagation="true"></div>
-                    <div class="rig-tuiles-panneau rig-validations">
-                        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">
-                            @(CompteCourant.PeutValider ? "Modifications a valider" : "Mes modifications soumises")
-                        </div>
-                        @if (Validations.Count == 0)
-                        {
-                            <div class="rig-validation__vide">Aucune modification soumise.</div>
-                        }
-                        @foreach (var d in Validations.AsEnumerable().Reverse())
-                        {
-                            <div class="rig-validation">
-                                <div class="rig-validation__quoi">@d.Info.Resume</div>
-                                <div class="rig-validation__meta">
-                                    @d.Info.Auteur &middot; @d.Info.DepotLisible
-                                </div>
-                                <div class="rig-validation__etat rig-validation__etat--@(d.Info.EstEnAttente ? "attente" : (d.Info.Etat == EtatModification.Validee ? "ok" : "refus"))">
-                                    @d.Info.Etat@(d.Info.Decideur.Length > 0 ? $" par {d.Info.Decideur}" : "")
-                                </div>
-                                @if (d.Info.EstEnAttente && CompteCourant.PeutValider)
-                                {
-                                    <div class="rig-validation__actions">
-                                        <button class="rig-bouton rig-bouton--fort"
-                                                @onclick="() => ValiderModification(d)">Valider</button>
-                                        <button class="rig-bouton"
-                                                @onclick="() => RejeterModification(d)">Rejeter</button>
-                                    </div>
-                                }
-                            </div>
-                        }
-                    </div>
-                }
-            </div>
-        }
         @* Reglages de la BARRE : toujours atteignables, y compris quand un ecran de
            procedure occupe le plan de travail. Ne contient que le theme pour l'instant. *@
         <div class="rig-barre__reglages" @onmousedown:stopPropagation="true">
@@ -112,7 +61,43 @@
         </div>
     </div>
 </header>
+}
 
+@* ============ BARRE D ONGLETS (esprit navigateur) ============
+   Chaque vue ouverte prend un onglet. On les reordonne en les glissant ;
+   glisse HORS de la fenetre, un onglet part dans sa PROPRE fenetre, qu on
+   peut poser sur un second ecran (demande du 17/09/2026). L agencement est
+   retenu d une session a l autre. *@
+@if (!ModeFenetreVue && Onglets.Onglets.Count > 0)
+{
+    <div class="rig-vonglets" id="rig-vonglets">
+        @foreach (var item in Onglets.Onglets)
+        {
+            var onglet = item;
+            <div class="rig-vonglet @(Onglets.Actuel == onglet ? "rig-vonglet--actif" : "") @(onglet.Detache ? "rig-vonglet--sorti" : "") @(GlisseEnCours && GlisseCode == onglet.Code ? "rig-vonglet--glisse" : "")"
+                 @key="onglet.Code"
+                 data-rig-onglet="@onglet.Code"
+                 title="@(onglet.Detache ? "Ouvert dans sa propre fenetre" : "Glissez l onglet hors de la fenetre pour le sortir sur un autre ecran")"
+                 @onpointerdown="e => DebutGlisse(onglet, e)"
+                 @onpointermove="GlisseOnglet"
+                 @onpointerup="FinGlisse"
+                 @onclick="() => ActiverOnglet(onglet)">
+                <span class="rig-vonglet__titre">@onglet.Libelle</span>
+                @if (onglet.Detache)
+                {
+                    <span class="rig-vonglet__sorti" aria-label="sorti dans sa fenetre">&#x2197;</span>
+                }
+                <button class="rig-vonglet__fermer" aria-label="Fermer @onglet.Libelle"
+                        @onclick="() => FermerOnglet(onglet.Code)"
+                        @onclick:stopPropagation="true"
+                        @onpointerdown:stopPropagation="true">&times;</button>
+            </div>
+        }
+    </div>
+}
+
+@if (!ModeFenetreVue)
+{
 <div class="rig-accueil @(MenuReduit ? "rig-accueil--menu-reduit" : "")">
 
     @* ============ MENU DE GAUCHE : les METIERS du greffe ============ *@
@@ -129,7 +114,48 @@
             </button>
         </div>
 
-        @foreach (var moment in Moments)
+        @* ============ FAVORIS : les ecrans etoiles, en haut du menu ============
+           Ce groupe ne vient PAS du catalogue Moments : son contenu est choisi
+           par l'utilisateur et vit dans accueil.json. Tant qu'aucune etoile
+           n'est allumee, il ne prend pas de place. *@
+@*  fix-ok: cause mesuree — un groupe Favoris ajoute au tableau Moments serait masque
+    par MomentsVisibles, qui cache tout groupe sans sous-menu visible (et son contenu
+    est dynamique, pas un readonly Moment[]). Il est donc rendu en bloc separe, avant
+    la boucle des moments. L'etoile est un bouton FRERE du lien, pas imbrique :
+    un bouton dans un bouton declencherait aussi l'ouverture de l'ecran. *@
+        @{ var favoris = EntreesFavorites(); }
+        @if (favoris.Length > 0)
+        {
+            <div class="rig-menu__groupe rig-menu__groupe--fav @(FavorisOuverts ? "rig-menu__groupe--ouvert" : "")">
+                <button class="rig-menu__tete" title="Favoris"
+                        @onclick="() => FavorisOuverts = !FavorisOuverts">
+                    <span class="rig-menu__chevron">&#9656;</span>
+                    <span class="rig-menu__pastille">&#9733;</span>
+                    <span class="rig-menu__titre">Favoris</span>
+                    <span class="rig-menu__compte">@favoris.Length</span>
+                </button>
+                @if (FavorisOuverts)
+                {
+                    <ul class="rig-menu__liste">
+                        @foreach (var e in favoris)
+                        {
+                            <li class="rig-menu__ligne">
+                                <button class="rig-menu__lien rig-menu__lien--metier @(ProcOuverte?.Code == e.Code ? "rig-menu__lien--actif" : "")"
+                                        title="@e.Detail"
+                                        @onclick="() => OuvrirCode(e.Code)">
+                                    <span class="rig-menu__quoi">@e.Libelle</span>
+                                </button>
+                                <button class="rig-menu__etoile rig-menu__etoile--allumee"
+                                        title="Retirer des favoris"
+                                        @onclick="() => BasculerFavori(e.Code)">★</button>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+
+        @foreach (var moment in MomentsVisibles)
         {
             var ouvert = MomentsOuverts.Contains(moment.Titre);
             <div class="rig-menu__groupe rig-menu__groupe--@moment.Teinte @(ouvert ? "rig-menu__groupe--ouvert" : "")">
@@ -138,13 +164,13 @@
                     <span class="rig-menu__chevron">&#9656;</span>
                     <span class="rig-menu__pastille">@moment.Signe</span>
                     <span class="rig-menu__titre">@moment.Titre</span>
-                    <span class="rig-menu__compte">@moment.NombreEcrans</span>
+                    <span class="rig-menu__compte">@NombreEcransVisibles(moment)</span>
                 </button>
                 @if (ouvert)
                 {
                     @* Troisieme niveau : le metier se lit par VERBES. Un verbe ouvert
                        montre ses ecrans ; les autres restent des titres d'une ligne. *@
-                    foreach (var sous in moment.Sous)
+                    foreach (var sous in SousVisibles(moment))
                     {
                         var sousOuvert = SousEstOuvert(moment, sous);
                         if (sous.Titre.Length > 0)
@@ -154,15 +180,15 @@
                                     @onclick="() => BasculerSous(moment, sous)">
                                 <span class="rig-menu__chevron">&#9656;</span>
                                 <span class="rig-menu__sous-titre">@sous.Titre</span>
-                                <span class="rig-menu__compte">@sous.Entrees.Length</span>
+                                <span class="rig-menu__compte">@EntreesVisibles(sous).Length</span>
                             </button>
                         }
                         @if (sousOuvert)
                         {
                             <ul class="rig-menu__liste">
-                                @foreach (var e in sous.Entrees)
+                                @foreach (var e in EntreesVisibles(sous))
                                 {
-                                    <li>
+                                    <li class="rig-menu__ligne">
                                         @* Le code technique (PROC_xxx) n'est JAMAIS affiche :
                                            il reste l'identifiant interne, l'utilisateur lit le besoin. *@
                                         <button class="rig-menu__lien rig-menu__lien--metier @(ProcOuverte?.Code == e.Code ? "rig-menu__lien--actif" : "")"
@@ -170,6 +196,11 @@
                                                 @onclick="() => OuvrirCode(e.Code)">
                                             <span class="rig-menu__quoi">@e.Libelle</span>
                                         </button>
+                                        @* L'etoile est un bouton FRERE du lien, jamais imbrique :
+                                           un bouton dans un bouton declencherait les deux gestes. *@
+                                        <button class="rig-menu__etoile @(Etat.EstFavori(e.Code) ? "rig-menu__etoile--allumee" : "")"
+                                                title="@(Etat.EstFavori(e.Code) ? "Retirer des favoris" : "Mettre en favori")"
+                                                @onclick="() => BasculerFavori(e.Code)">@(Etat.EstFavori(e.Code) ? "★" : "☆")</button>
                                     </li>
                                 }
                             </ul>
@@ -204,7 +235,15 @@
                                             aria-label="Reinitialiser la disposition"
                                             @onclick="ReinitialiserDisposition">&#8635;</button>
                                 </div>
-                                @foreach (var def in Definitions)
+                                <span class="rig-kicker">Disposition</span>
+                                <div class="rig-dispositions">
+                                    @foreach (var d in Dispositions)
+                                    {
+                                        <button class="rig-disposition @(Etat.Disposition == d.Id ? "rig-disposition--actif" : "")"
+                                                title="@d.Aide" @onclick="() => AppliquerDisposition(d.Id)">@d.Titre</button>
+                                    }
+                                </div>
+                                @foreach (var def in Definitions.Where(TuileAutorisee))
                                 {
                                     var visible = Pose(def.Id).Visible;
                                     <button class="rig-bascule @(visible ? "rig-bascule--actif" : "")"
@@ -218,34 +257,6 @@
             </div>
         </div>
 
-        @* --- Bandeau de mission : les trois chiffres qui decident de la journee.
-               Calcules sur la file reelle, jamais saisis en dur. Chaque chiffre est
-               une PORTE : il ouvre le travail qu'il compte. --- *@
-        <div class="rig-mission">
-            <div class="rig-mission__filet"></div>
-            <div class="rig-mission__chiffres">
-                <button class="rig-mission__bloc" title="Ouvrir la recherche d'affaires"
-                        @onclick="VoirToutesLesAffaires">
-                    <span class="rig-mission__valeur">@ATraiter</span>
-                    <span class="rig-mission__libelle">a traiter</span>
-                </button>
-                <button class="rig-mission__bloc rig-mission__bloc--alerte"
-                        title="Ouvrir la demande hors delai la plus ancienne"
-                        disabled="@(HorsDelai == 0)"
-                        @onclick="OuvrirPlusAncienHorsDelai">
-                    <span class="rig-mission__valeur">@HorsDelai</span>
-                    <span class="rig-mission__libelle">hors delai</span>
-                </button>
-                <div class="rig-mission__bloc rig-mission__bloc--ok">
-                    <span class="rig-mission__valeur">@Validees</span>
-                    <span class="rig-mission__libelle">validees</span>
-                </div>
-                <div class="rig-mission__contexte">
-                    greffe @Greffe<br />@DateDuJour
-                </div>
-            </div>
-        </div>
-
         @* --- Recherche : centree, toujours a la meme place, jamais deplacable --- *@
         <div class="rig-recherche rig-recherche--fixe">
             <span style="font:13px var(--rig-font-mono);color:var(--rig-focus)">&#8981;</span>
@@ -253,7 +264,7 @@
                    placeholder="Rechercher un SIREN, une societe, un dirigeant, un n° de demande…"
                    @bind="Recherche" @bind:event="oninput" />
             <span class="rig-touche">Ctrl K</span>
-            @if (Resultats.Length > 0 || Traitements.Length > 0)
+            @if (Resultats.Length > 0 || Traitements.Length > 0 || ElementsTrouves.Length > 0)
             {
                 <div class="rig-resultats">
                     @foreach (var t in Traitements)
@@ -278,6 +289,20 @@
                             <span class="rig-resultat__type">@r.Type</span>
                         </button>
                     }
+                    @* Un numero de DEPOT, de FORMALITE ou de LIASSE ne designe pas
+                       une affaire mais un ELEMENT dans son arbre : on ouvre
+                       l'affaire deja depliee sur cet element. *@
+                    @foreach (var e in ElementsTrouves)
+                    {
+                        <button class="rig-resultat" @onclick="() => OuvrirElementTrouve(e)">
+                            <span class="rig-filet-v rig-filet-v--@e.Affaire.Statut"></span>
+                            <span class="rig-resultat__id">&#128193;</span>
+                            <span>@e.Chemin[^1]<br />
+                                <span style="font-size:11px;color:var(--rig-texte-3)">@e.Affaire.Numero &middot; @string.Join(" > ", e.Chemin[..^1])</span>
+                            </span>
+                            <span class="rig-resultat__type">Element</span>
+                        </button>
+                    }
                 </div>
             }
         </div>
@@ -287,24 +312,30 @@
             @foreach (var def in Definitions)
             {
                 var p = Pose(def.Id);
-                if (!p.Visible) { continue; }
-                <section class="rig-widget @(def.Maitresse ? "rig-widget--maitresse" : "")"
+                if (!p.Visible || !TuileAutorisee(def)) { continue; }
+                @* Le z-index inline de la tuile (son rang d'empilement) cree un
+                   CONTEXTE : un widget metier deploye, meme en position fixe et
+                   z-index 89, restait donc enferme dans le rang de SA tuile et
+                   passait derriere une tuile de rang superieur. Une tuile
+                   deployee prend un rang qui bat toutes les autres. *@
+                var devant = MetierEstDeploye(def.Id);
+                <section class="rig-widget @(def.Maitresse ? "rig-widget--maitresse" : "") @(devant ? "rig-widget--devant" : "")"
                          data-tuile="@def.Id"
                          data-col="@p.Colonne" data-ligne="@p.Ligne"
                          data-larg="@p.Largeur" data-haut="@p.Hauteur"
-                         style="grid-column:@p.Colonne / span @p.Largeur;grid-row:@p.Ligne / span @p.Hauteur;z-index:@p.Ordre">
-                    @* Filet de statut en tete de tuile : c'est LUI qui porte la couleur
-                       et la hierarchie de lecture (charte : aucun aplat). *@
-                    <div class="rig-widget__filet rig-filet--@StatutTuile(def)"></div>
+                         style="grid-column:@p.Colonne / span @p.Largeur;grid-row:@p.Ligne / span @p.Hauteur;z-index:@(devant ? 96 : p.Ordre)">
+                    @* Plus de filet colore en tete de tuile (choix du 2026-09-17) :
+                       la couleur ne vit plus que dans les barres verticales des
+                       alertes, ou elle code l'IMPORTANCE. *@
                     <header class="rig-widget__tete">
                         <span class="rig-widget__poignee">&#8942;&#8942;</span>
-                        <span class="rig-widget__titre">@def.Titre</span>
-                        @if (def.Id == "recents")
+                        @* Un widget metier porte DEJA son titre complet dans son
+                           propre en-tete (puce de registre, intitule metier,
+                           pastille de charge). Le redire ici l'ecrivait DEUX FOIS
+                           dans chaque widget. *@
+                        @if (!def.Id.StartsWith("metier-"))
                         {
-                            <button class="rig-bouton rig-bouton--tuile"
-                                    title="Ouvrir la recherche d'affaires"
-                                    @onclick="VoirToutesLesAffaires"
-                                    @onmousedown:stopPropagation="true">Voir toutes les affaires</button>
+                            <span class="rig-widget__titre">@def.Titre</span>
                         }
                         <button class="rig-widget__reglages @(ReglagesTuile == def.Id ? "rig-widget__reglages--ouvert" : "")"
                                 title="Reglages de la tuile"
@@ -322,12 +353,14 @@
                             {
                                 case "performance": @CorpsPerformance; break;
                                 case "alertes":     @CorpsAlertes;     break;
-                                case "file":        @CorpsFile;        break;
-                                case "reprise":     @CorpsReprise;     break;
-                                case "services":    @CorpsServices;    break;
-                                case "brouillons":  @CorpsBrouillons;  break;
+                                case "alertes-bis": @CorpsAlertesBis;  break;
+                                case "taches":      @CorpsTaches;      break;
                                 case "nouveautes":  @CorpsNouveautes;  break;
-                                case "recents":     @CorpsRecents;     break;
+                                case "actualites":  @CorpsActualites;   break;
+                                case "activite":    @CorpsActivite;    break;
+                                // Les huit widgets metier partagent UN corps,
+                                // parametre par leur categorie.
+                                case var m when m.StartsWith("metier-"): @CorpsMetier(def); break;
                             }
                         }
                     </div>
@@ -337,6 +370,7 @@
         </div>
     </div>
 </div>
+}
 
 @* ============ ECRAN DE PROCEDURE ============ *@
 @* Le cadre est commun ; chaque procedure a son composant dans
@@ -353,7 +387,20 @@
                dans le menu de gauche. *@
             <b>@ProcOuverte.Libelle</b>
             <span style="margin-left:auto"></span>
-            <button class="rig-bouton" @onclick="FermerProc">Fermer</button>
+            @* Etoile de la vue : meme geste et meme etat que l'etoile du menu
+               de gauche (BasculerFavori sur le CODE), pour que la vue ouverte
+               puisse etre mise en favori sans retourner dans le menu. *@
+            <button class="rig-vue__etoile @(Etat.EstFavori(ProcOuverte.Code) ? "rig-vue__etoile--allumee" : "")"
+                    title="@(Etat.EstFavori(ProcOuverte.Code) ? "Retirer des favoris" : "Mettre en favori")"
+                    aria-label="@(Etat.EstFavori(ProcOuverte.Code) ? "Retirer des favoris" : "Mettre en favori")"
+                    aria-pressed="@(Etat.EstFavori(ProcOuverte.Code) ? "true" : "false")"
+                    @onclick="() => BasculerFavori(ProcOuverte.Code)">@(Etat.EstFavori(ProcOuverte.Code) ? "★" : "☆")</button>
+            @* Dans une fenetre d onglet sorti, la croix de la fenetre ferme deja
+               la vue : un second bouton « Fermer » faisait doublon (18/09/2026). *@
+            @if (!ModeFenetreVue)
+            {
+                <button class="rig-bouton" @onclick="FermerProc">Fermer</button>
+            }
         </div>
 
         @* Bandeau du SUJET : tous les ecrans qui manipulent le meme objet
@@ -413,7 +460,7 @@
                 break;
 
             case "PROC_RECHAFF":
-                <EcranRechAffaires @key="CleRechAffaire" NoAffaire="@NoAffaireDemande" Ouvrir="OuvrirParNumero"
+                <EcranRechAffaires Ouvrir="OuvrirParNumero"
                                    OuvrirUnDossier="OuvrirUnDossierPour" />
                 break;
 
@@ -505,6 +552,10 @@
                 <EcranParametresAccueil />
                 break;
 
+            case "PROC_ACTUALITES":
+                <EcranActualites />
+                break;
+
             case "PROC_GESTEMAIL":
                 <EcranMessagerie />
                 break;
@@ -576,6 +627,54 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12" /><path d="M18 6L6 18" /></svg>
             </button>
         </div>
+
+        @* ---- FICHE SOMMAIRE (bandeau du haut de la vue arbre) ----
+             Les champs d'identite que RIG v2 affiche au-dessus du treeview
+             (PROC_VDOSSIER, panneau « Fiche sommaire ») : identite du dossier,
+             denomination, adresse, dates, et la mention de procedure.
+             Lecture seule : la saisie reste dans les fiches de droite. *@
+        @{
+            var fs = SommaireDu(DossierOuvert);
+            // UN SEUL FLUX, pas de grille : chaque champ VIDE disparait --
+            // libelle compris (demande du 17/09/2026). Un libelle sans valeur
+            // n'apprend rien et mangeait trois lignes de haut d'ecran.
+            var champs = new (string Libelle, string Valeur, bool Mono)[]
+            {
+                ("N° de gestion", DossierOuvert.Numero, true),
+                ("SIREN", DossierOuvert.Siren, true),
+                ("Type", DossierOuvert.Type, false),
+                ("Type de dossier", DossierOuvert.TypeDossier, true),
+                ("Forme juridique", fs.FormeJuridique, false),
+                ("Sigle", fs.Sigle, false),
+                ("Nom commercial", fs.NomCommercial, false),
+                ("Civilite", fs.Civilite, false),
+                ("Designation", fs.Designation, false),
+                ("Adresse", fs.Adresse.Replace("\n", " - "), false),
+                ("Immat.", fs.Immatriculation, true),
+                ("Cessation", fs.Cessation, true),
+                ("Date MAJ", fs.DateMaj, true)
+            };
+            var sommaireRemplis = champs.Where(c => c.Valeur is { Length: > 0 }).ToArray();
+        }
+        <details class="rig-sommaire" open>
+            <summary class="rig-sommaire__titre">
+                Fiche sommaire
+                <span class="rig-sommaire__resume">@DossierOuvert.Numero &middot; @fs.Designation</span>
+            </summary>
+            <div class="rig-sommaire__ligne">
+                @foreach (var c in sommaireRemplis)
+                {
+                    <span class="rig-sommaire__champ">
+                        <span class="rig-sommaire__libelle">@c.Libelle</span>
+                        <span class="rig-sommaire__valeur @(c.Mono ? "rig-sommaire__valeur--mono" : "")">@c.Valeur</span>
+                    </span>
+                }
+                @if (fs.Mention.Length > 0)
+                {
+                    <span class="rig-sommaire__mention">@fs.Mention</span>
+                }
+            </div>
+        </details>
 
         @* ---- Bandeau des defauts : visible des qu'un requis manque ou qu'une
              valeur est refusee. Chaque lien ouvre l'etape (et la fiche) ou
@@ -699,10 +798,74 @@
                             }
                         </div>
                     }
-                    @* PROPAGATION : ce que l'evenement touche AILLEURS que dans
-                       les champs. Les canaux et leurs codes sont declares en
-                       base pour cet evenement -- chaque ligne dit sa source. *@
-                    <div class="rig-tache__effets">
+                }
+                @* RECHERCHE : filtre les elements visibles de l'arbre. *@
+                <div class="rig-arbre__recherche">
+                    <input type="search" class="rig-arbre__filtre" placeholder="Filtrer l'arbre..."
+                           aria-label="Filtrer les elements de l'arbre"
+                           @bind="FiltreDeLArbre" @bind:event="oninput" />
+                    @if (!string.IsNullOrEmpty(FiltreDeLArbre))
+                    {
+                        <button type="button" class="rig-arbre__filtre-effacer" title="Effacer le filtre"
+                                @onclick="() => FiltreDeLArbre = string.Empty">&times;</button>
+                    }
+                </div>
+                <div class="rig-arbre">
+                    <ArbreGedNoeud Noeud="Arbre" Niveau="0" Ouverts="NoeudsOuverts" Filtre="@FiltreDeLArbre"
+                                   Selection="NoeudSelectionne"
+                                   Selectionner="OuvrirApercu"
+                                   Domaines="Domaines" Ajouts="AjoutsArbre"
+                                   Masques="MasquesArbre" Libelles="LibellesArbre"
+                                   Recette="RecetteArbre"
+                                   Renomme="NoeudRenomme" Renommer="ValiderRenommage"
+                                   MenuContextuel="OuvrirMenuNoeud" />
+                </div>
+                @* PROPAGATION -- EN PIED DE COLONNE (17/09/2026). Ce bloc
+                   etait AU-DESSUS de l'arbre : ouvrir la tache poussait tous
+                   les noeuds vers le bas et on perdait sa place. Ici, l'arbre
+                   ne bouge plus.
+                   Chaque ligne se coche par PREUVE : la piece deposee dans
+                   l'arbre (avis BODACC, accuse INPI). Cliquer la ligne filtre
+                   l'arbre sur cette piece -- la checklist pilote la vue. *@
+                @if (RecetteActive is not null)
+                {
+                    @* CHECKLIST DE SAISIE (17/09/2026). Les sous-taches de
+                       SAISIE n'etaient visibles que dans le message du bouton
+                       « Renseigner d'abord : ... » : elles se remplissaient
+                       toutes seules mais ne se VOYAIENT pas comme des lignes
+                       cochees. Elles sont ici, au-dessus des effets, dans la
+                       MEME liste. Aucune n'est cliquable : la preuve est la
+                       valeur ecrite dans la trace du dossier, jamais un clic. *@
+                    <div class="rig-tache__effets rig-tache__effets--pied">
+                        <div class="rig-tache__effets-titre">
+                            A saisir
+                            <span class="rig-tache__effets-compte">
+                                @(CasesExigees() - TrousDeLaTache().Length)
+                                / @CasesExigees() renseignes
+                            </span>
+                        </div>
+                        @foreach (var item in CasesDeSaisie())
+                        {
+                            var c = item;
+                            <div class="rig-tache__effet @(c.Exige ? "" : "rig-tache__effet--facultatif") @(c.Rempli ? "rig-tache__effet--prouve" : "")"
+                                 title="@($"{c.Champ.Table}.{c.Champ.Colonne}"
+                                          + (c.Rempli
+                                             ? $" -- coche par la valeur ecrite : {c.Valeur}"
+                                             : " -- se cochera des que la valeur sera saisie dans la fiche"))">
+                                <input type="checkbox" checked="@c.Rempli" disabled="true" />
+                                <span class="rig-tache__effet-libelle">@c.Libelle</span>
+                                @if (c.Rempli)
+                                {
+                                    <span class="rig-tache__effet-preuve">saisi : @c.Valeur</span>
+                                }
+                                @if (!c.Exige)
+                                {
+                                    <span class="rig-tache__effet-note">non exige</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <div class="rig-tache__effets rig-tache__effets--pied">
                         <div class="rig-tache__effets-titre">
                             Ce que ce changement entraine
                             <span class="rig-tache__effets-compte">
@@ -713,31 +876,40 @@
                         @foreach (var effet in RecetteActive.Effets)
                         {
                             var e = effet;
+                            var atteste = EffetAtteste(e);
                             var coche = EffetCoche(e.Canal);
-                            <label class="rig-tache__effet @(e.Obligatoire ? "" : "rig-tache__effet--facultatif")"
-                                   title="@($"Declare en base : {e.Source}")">
-                                <input type="checkbox" checked="@coche"
+                            var cible = EffetCible == e.Canal;
+                            <div class="rig-tache__effet @(e.Obligatoire ? "" : "rig-tache__effet--facultatif") @(atteste ? "rig-tache__effet--prouve" : "") @(cible ? "rig-tache__effet--cible" : "")"
+                                 title="@($"Declare en base : {e.Source}"
+                                          + (e.Piece.Length > 0
+                                             ? atteste
+                                                 ? $" -- coche par la piece deposee : {e.Piece}"
+                                                 : $" -- se cochera des que la piece « {e.Piece} » sera deposee"
+                                             : " -- aucun document ne l'atteste : a cocher a la main"))">
+                                <input type="checkbox" checked="@coche" disabled="@atteste"
                                        @onchange="() => BasculerEffet(e)" />
-                                <span class="rig-tache__effet-libelle">@e.Libelle</span>
+                                @* Le libelle est un BOUTON : il filtre l'arbre
+                                   sur la piece attendue par cet effet. *@
+                                <button class="rig-tache__effet-libelle"
+                                        disabled="@(e.Piece.Length == 0)"
+                                        title="@(e.Piece.Length == 0
+                                                 ? "Aucune piece a montrer pour cet effet"
+                                                 : cible ? "Revenir a la tache entiere"
+                                                         : $"Montrer dans l'arbre : {e.Piece}")"
+                                        @onclick="() => ViserEffet(e)">@e.Libelle</button>
                                 <span class="rig-tache__effet-code">@e.Code</span>
+                                @if (atteste)
+                                {
+                                    <span class="rig-tache__effet-preuve">prouve : @e.Piece</span>
+                                }
                                 @if (!e.Obligatoire)
                                 {
                                     <span class="rig-tache__effet-note">non exige</span>
                                 }
-                            </label>
+                            </div>
                         }
                     </div>
                 }
-                <div class="rig-arbre">
-                    <ArbreGedNoeud Noeud="Arbre" Niveau="0" Ouverts="NoeudsOuverts"
-                                   Selection="NoeudSelectionne"
-                                   Selectionner="OuvrirApercu"
-                                   Domaines="Domaines" Ajouts="AjoutsArbre"
-                                   Masques="MasquesArbre" Libelles="LibellesArbre"
-                                   Recette="RecetteArbre"
-                                   Renomme="NoeudRenomme" Renommer="ValiderRenommage"
-                                   MenuContextuel="OuvrirMenuNoeud" />
-                </div>
             </div>
 
             @* ---- Separateur deplacable : regle la largeur de l'arbre ---- *@
@@ -785,6 +957,7 @@
                 {
                 <FicheInformationsDossier Numero="@DossierOuvert.Numero" Etat="Etat"
                                           Recette="RecetteActive"
+                                          Verrou="@(RecetteActive is null)"
                                           ToutAffiche="CompterToutAffiche"
                                           ChampModifie="StateHasChanged"
                                           LigneCourante="LigneCourante"
@@ -1082,6 +1255,16 @@
                             @for (var feuille = 1; feuille <= Math.Max(1, ApercuNoeud.Pages); feuille++)
                             {
                                 <div class="rig-apercu__feuille">
+                                    @if (feuille == 1)
+                                    {
+                                        @* Valeurs du formulaire, relues a chaque frappe (EcrireEnDirect). *@
+                                        <dl class="rig-apercu__saisie">
+                                            @foreach (var (libelle, valeur) in ValeursDocument(ApercuNoeud))
+                                            {
+                                                <dt>@libelle</dt><dd>@valeur</dd>
+                                            }
+                                        </dl>
+                                    }
                                     <div class="rig-apercu__feuille-texte">@TextePage(ApercuNoeud, feuille)</div>
                                     <div class="rig-apercu__folio">@feuille / @Math.Max(1, ApercuNoeud.Pages)</div>
                                 </div>
@@ -1260,6 +1443,52 @@
     private string Utilisateur => CompteCourant.Nom;
     private string[] Domaines => CompteCourant.Domaines;
 
+    // ---- LE MENU SE REDUIT AU METIER DU LOGIN ----
+    // Le catalogue porte le greffe ENTIER. Un redacteur RCS n'a rien a faire
+    // dans les audiences, un redacteur endettement rien a faire au registre :
+    // les ecrans reserves a un autre domaine ne sont pas grises, ils
+    // DISPARAISSENT. Les ecrans transverses (courrier, GED, comptabilite,
+    // reglages) restent visibles pour tous -- voir PerimetreProfil.
+
+    /// <summary>Les ecrans d'un verbe que le login courant a le droit de voir.</summary>
+    /// <summary>Texte de la barre de recherche au-dessus de l'arbre du dossier.</summary>
+    private string FiltreDeLArbre { get; set; } = string.Empty;
+
+    private Entree[] EntreesVisibles(SousMenu s)
+        => s.Entrees.Where(e => PerimetreProfil.Visible(e.Code, Domaines)).ToArray();
+
+    /// <summary>Les verbes d'un metier qui gardent au moins un ecran.</summary>
+    /// <summary>Le groupe Favoris est ouvert d'entree, comme « Ouvrir » : on
+    /// l'a mis la pour y aller directement.</summary>
+    private bool FavorisOuverts = true;
+
+    /// <summary>Les ecrans etoiles, dans l'ordre ou ils l'ont ete. Un favori
+    /// pointant vers un ecran que le profil courant ne voit plus est FILTRE
+    /// ici, pas efface du fichier : le droit peut revenir.</summary>
+    private Entree[] EntreesFavorites()
+        => Etat.VuesFavorites
+               .Select(c => Moments.SelectMany(m => m.Sous)
+                                   .SelectMany(s => s.Entrees)
+                                   .FirstOrDefault(e => e.Code == c))
+               .Where(e => e is not null && PerimetreProfil.Visible(e.Code, Domaines))
+               .Select(e => e!)
+               .ToArray();
+
+    /// <summary>Allume ou eteint l'etoile d'un ecran. Le choix est ecrit dans
+    /// accueil.json a l'instant du clic.</summary>
+    private void BasculerFavori(string code) => Etat.BasculerFavori(code);
+
+    private SousMenu[] SousVisibles(Moment m)
+        => m.Sous.Where(s => EntreesVisibles(s).Length > 0).ToArray();
+
+    /// <summary>Les metiers qui gardent au moins un ecran : un metier vide
+    /// n'est pas affiche du tout.</summary>
+    private Moment[] MomentsVisibles
+        => Moments.Where(m => SousVisibles(m).Length > 0).ToArray();
+
+    private int NombreEcransVisibles(Moment m)
+        => SousVisibles(m).Sum(s => EntreesVisibles(s).Length);
+
     // Le compte affiche en haut de l'ecran ne porte que sur les branches
     // que le login courant a le droit de voir.
     private IReadOnlyList<NoeudGed> DossiersVisibles
@@ -1290,9 +1519,6 @@
 
     private readonly List<DemandeModification> Validations = new();
     private int NumeroValidation;
-    private bool PanneauValidationsOuvert;
-
-    private int ValidationsEnAttente => Validations.Count(d => d.Info.EstEnAttente);
 
     /// <summary>
     /// Passe le geste par la file de validation quand le login n'a pas le
@@ -1308,7 +1534,6 @@
                                             CompteCourant.Nom, DateTime.Now),
             Appliquer = appliquer,
         });
-        PanneauValidationsOuvert = true;
         return true;
     }
 
@@ -1345,6 +1570,9 @@
     // « Afficher tout le dossier » remet la vue entiere, et le nombre de
     // clics dit si la recette est incomplete.
     private RecetteTache? RecetteActive;
+
+    /// <summary>L affaire sur laquelle la tache repliee est ouverte.</summary>
+    private string? AffaireDeLaTache;
     private bool ToutLeDossier;
 
     /// <summary>Combien de fois l'utilisateur a du rouvrir la vue entiere.
@@ -1352,8 +1580,29 @@
     /// etroite. Journalise pour que le comptage sorte de l'ecran.</summary>
     private int ClicsToutAfficher;
 
-    /// <summary>La recette appliquee A L'ARBRE : nulle quand tout est affiche.</summary>
-    private RecetteTache? RecetteArbre => ToutLeDossier ? null : RecetteActive;
+    /// <summary>L'effet de la checklist sur lequel l'arbre est vise, s'il y en a un.</summary>
+    private string EffetCible = "";
+
+    /// <summary>
+    /// La recette appliquee A L'ARBRE : nulle quand tout est affiche. Quand
+    /// une ligne de la checklist est visee, la recette est restreinte aux
+    /// pieces de CET effet -- la checklist pilote l'arbre.
+    /// </summary>
+    private RecetteTache? RecetteArbre
+        => ToutLeDossier ? null
+           : EffetCible.Length > 0 ? RecetteActive?.PourEffet(EffetCible)
+           : RecetteActive;
+
+    /// <summary>
+    /// Clic sur une ligne d'effet : l'arbre se filtre sur la piece attendue.
+    /// Un 2e clic sur la meme ligne revient a la tache entiere -- rien ne
+    /// reste coince sur un filtre qu'on ne saurait pas defaire.
+    /// </summary>
+    private void ViserEffet(EffetRecette e)
+    {
+        if (e.Piece.Length == 0) return;
+        EffetCible = EffetCible == e.Canal ? "" : e.Canal;
+    }
 
     /// <summary>Recopie dans la trace les valeurs que le flux EDI porte pour
     /// les champs de cette recette. Sans effet si le flux n en propose aucune.</summary>
@@ -1383,7 +1632,9 @@
             ProposerLesValeursDuFlux(recette, numeroDossier);
 
         RecetteActive = recette;
+        AffaireDeLaTache = numeroDossier;
         ToutLeDossier = false;
+        EffetCible = "";
         LigneCourante = 1;
         OuvrirParNumero(numeroDossier);
         // La tache mene DIRECTEMENT au seul endroit qui porte ses champs.
@@ -1404,7 +1655,9 @@
     private void FermerTache()
     {
         RecetteActive = null;
+        AffaireDeLaTache = null;
         ToutLeDossier = false;
+        EffetCible = "";
     }
 
     /// <summary>
@@ -1478,16 +1731,67 @@
         LigneCourante = Math.Min(LigneCourante, n);
     }
 
-    /// <summary>Vrai si cet effet de la tache courante est deja coche.</summary>
+    /// <summary>
+    /// Vrai si la PIECE qui atteste cet effet est deposee dans l'arbre du
+    /// dossier. C'est la preuve visible a l'ecran, et c'est elle qui coche la
+    /// case : une coche posee a la main ne prouvait rien.
+    /// </summary>
+    private bool EffetAtteste(EffetRecette e)
+        => RecetteActive is not null
+           && RecetteActive.EffetAtteste(e.Canal, PieceDansLArbre);
+
+    /// <summary>Une piece de ce libelle est-elle deposee quelque part dans l'arbre ?</summary>
+    private bool PieceDansLArbre(string motif)
+        => ArbreVisible().Any(n => n.EstPiece
+                                   && n.Libelle.Contains(motif, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Vrai si cet effet est traite : soit sa piece est deposee (preuve), soit
+    /// il a ete force a la main -- ce qui reste possible pour les canaux
+    /// qu'aucun document n'atteste (une notification, par exemple).
+    /// </summary>
     private bool EffetCoche(string canal)
         => RecetteActive is not null && DossierOuvert is not null
-           && Etat.EffetTraite(RecetteActive.Code, DossierOuvert.Numero, canal);
+           && (RecetteActive.EffetAtteste(canal, PieceDansLArbre)
+               || Etat.EffetTraite(RecetteActive.Code, DossierOuvert.Numero, canal));
 
     /// <summary>Les publications et notifications encore a traiter.</summary>
     private EffetRecette[] EffetsRestants()
         => RecetteActive is null || DossierOuvert is null
             ? []
             : RecetteActive.EffetsRestants(EffetCoche);
+
+    /// <summary>Une ligne de la checklist de SAISIE : un champ exige (ou
+    /// propose) de la recette, pour UNE ligne, avec ce qui la coche.</summary>
+    private sealed record CaseSaisie(ChampRecette Champ, int Ligne, string Libelle,
+                                     bool Exige, bool Rempli, string Valeur);
+
+    /// <summary>
+    /// La checklist de saisie : un champ repetable donne UNE ligne par rang
+    /// ouvert (« Patronyme du dirigeant - Dirigeant 2 »). La coche vient de
+    /// la TRACE du dossier, jamais d'un clic : une valeur effacee decoche.
+    /// </summary>
+    private CaseSaisie[] CasesDeSaisie()
+    {
+        if (RecetteActive is null || DossierOuvert is null) return [];
+        var cases = new List<CaseSaisie>();
+        foreach (var champ in RecetteActive.Champs)
+        {
+            var rangs = champ.Repetable
+                ? Enumerable.Range(1, Math.Max(1, NbLignesTache))
+                : Enumerable.Range(1, 1);
+            foreach (var rang in rangs)
+            {
+                var cle = RecetteTache.Cle(champ, rang);
+                var valeur = Etat.DerniereValeur(DossierOuvert.Numero, cle) ?? string.Empty;
+                cases.Add(new CaseSaisie(champ, rang,
+                    champ.Repetable ? $"{champ.Libelle} - {RecetteActive.LibelleLigne} {rang}" : champ.Libelle,
+                    RecetteActive.EstExige(champ, null),
+                    !string.IsNullOrWhiteSpace(valeur), valeur));
+            }
+        }
+        return cases.ToArray();
+    }
 
     /// <summary>Coche ou decoche un effet, et le note au journal du dossier.</summary>
     private void BasculerEffet(EffetRecette e)
@@ -1543,12 +1847,24 @@
         // doit pas revenir. Le releve est refait sur l'etat a jour.
         RelevePerf();
         Alertes = AlertesOuvertes();
+        Taches = TachesOuvertes();
     }
 
     /// <summary>
     /// Les alertes relevees, MOINS celles dont la tache est deja terminee.
     /// Sans ce filtre, la file redonnerait une tache faite au redemarrage.
     /// </summary>
+    /// <summary>
+    /// Les constats CALCULES sur les dossiers (hors delai, verrous, taches en
+    /// attente, lots), MOINS les taches deja terminees. C'est ce que montre la
+    /// tuile « Mes taches du jour » : le meme filtre que la file d'alertes,
+    /// pour qu'une tache close ne revienne pas au redemarrage.
+    /// </summary>
+    private AlerteGreffe[] TachesOuvertes()
+        => SondeAlertes.ReleverCalculees()
+            .Where(a => a.Tache is not { } t || !TacheDejaFaite(t.Code, t.Dossier))
+            .ToArray();
+
     private AlerteGreffe[] AlertesOuvertes()
         => SondeAlertes.Relever()
             .Where(a => a.Tache is not { } t || !TacheDejaFaite(t.Code, t.Dossier))
@@ -1787,9 +2103,10 @@
     private const string DateDepot = "10/09/2026";
     private const string Greffe = "9999";
     private const string Version = "3.0.14";
-    private static readonly string DateDuJour = "mardi 9 septembre";
 
-    private bool ThemeSombre = true;
+    /// <summary>Mode d'affichage courant. Clair par defaut ; la valeur
+    /// retenue du profil est reposee dans OnInitialized.</summary>
+    private bool ThemeSombre;
 
     /// <summary>
     /// Le theme ne peut pas rester porte par ce seul composant : le fond de la
@@ -1800,6 +2117,8 @@
     private async Task BasculerTheme()
     {
         ThemeSombre = !ThemeSombre;
+        Etat.ThemeSombre = ThemeSombre;
+        Etat.Enregistrer();
         await AppliquerTheme();
     }
 
@@ -2054,7 +2373,8 @@
                 new("Injonction de payer",    "creer une IP",                       "PROC_IPE"),
                 new("Enrolement judiciaire",  "mettre l'affaire au role",           "PROC_CJUD"),
                 new("Mesure provisoire",      "inscrire une mesure en instance",    "PROC_MESIN"),
-                new("Jonction d'instances",   "joindre deux affaires",              "PROC_JOIN")
+                new("Jonction d'instances",   "joindre deux affaires",              "PROC_JOIN"),
+                new("Ouvrir un dossier",      "une societe arrive au registre",     "OUVERTURE_DOSSIER")
             ]),
             new("Recevoir",
             [
@@ -2077,17 +2397,25 @@
         [
             new("Une affaire",
             [
-                new("Ouvrir un dossier",      "une societe arrive au registre",     "OUVERTURE_DOSSIER"),
                 new("Mes affaires",           "tout ce qui m'est confie",           "PROC_RECHAFF"),
                 new("Dossier RCS",            "voir un dossier du registre",        "PROC_VDOSSIER"),
                 new("Dossier judiciaire",     "instance, PC ou prevention",         "PROC_VJUD"),
                 new("Registres judiciaires",  "les registres du greffe",            "PROC_REGJUD"),
                 new("Navires",                "recherche de bateaux",               "PROC_RECHERCHE_BATEAU")
             ]),
-            new("Une piece, un chiffre",
+            new("Les documents",
             [
                 new("Documents",              "chercher dans la GED",               "PROC_RECHERCHE_GED"),
+                new("Documents de l'affaire", "la GED de l'affaire",                "PROC_DOC_DEMAT"),
+                new("Documents judiciaires",  "la GED du judiciaire",               "PROC_GEDJUD"),
                 new("Actes numerises",        "ce que le scanner a produit",        "PROC_ACTES_NUM"),
+                new("Controle des scans",     "verifier avant de valider",          "PROC_CONTROLE_VIDIGED"),
+                new("Coffre-fort",            "les pieces mises a l'abri",          "PROC_COFFRE_FORT"),
+                new("Voir un PDF",            "lire une piece",                     "PROC_PDF"),
+                new("Voir une image",         "image ou PDF multi-pages",           "PROC_IMAGE")
+            ]),
+            new("Un chiffre, un reglement",
+            [
                 new("Chiffres d'un dossier",  "donnees financieres RCS",            "PROC_VCHIFFRES"),
                 new("Encaissements",          "retrouver un reglement",             "PROC_RECHENC"),
                 new("Tarifs",                 "articles tarifaires RCS",            "PROC_TARIFS"),
@@ -2098,32 +2426,8 @@
                 new("Interdits de gerer",     "consultation FNIG",                  "PROC_VFNIG"),
                 new("FIBEN",                  "fichier bancaire des entreprises",   "PROC_FIBEN"),
                 new("Notifications",          "echanges entre greffes",             "PROC_VNOTIF"),
-                new("Tribunal digital",       "ce qui vient du portail",            "PROC_VTRID")
-            ])
-        ]),
-        new("Les personnes", "pers", "P",
-        [
-            new("Judiciaire",
-            [
-                new("Acteurs judiciaires",    "juges, parquet, intervenants",       "PROC_ACTEUR_JUD"),
-                new("Experts",                "qui designer, qui a deja siege",     "PROC_EXPERT"),
-                new("Mandataires",            "mandataires et praticiens",          "PROC_MANDATAIRE"),
-                new("Parties d'une instance", "qui s'oppose a qui",                 "PROC_PARTIES"),
-                new("Rapprocher des acteurs", "fusionner deux fiches",              "PROC_RAPPACTEUR"),
-                new("Remplacer un acteur",    "substituer dans les instances",      "PROC_SUPP_ACTEUR_JUD")
-            ]),
-            new("Clients",
-            [
-                new("Clients",                "comptes et fiches",                  "PROC_GCLIENT"),
-                new("Fiche client",           "le detail d'un client",              "PROC_FCLIENT"),
-                new("Tiers payeurs",          "qui regle a la place du client",     "PROC_GESTTIERSPAYEURS"),
-                new("Non-inscrits",           "creer une personne hors registre",   "PROC_CNI")
-            ]),
-            new("Beneficiaires effectifs",
-            [
-                new("Beneficiaires d'un dossier", "les BE d'une societe",           "PROC_BE"),
-                new("Rechercher un beneficiaire", "consultation BEN",               "PROC_BEN"),
-                new("Divergences BEN",        "alertes de coherence",               "PROC_DBEN_ALERT")
+                new("Tribunal digital",       "ce qui vient du portail",            "PROC_VTRID"),
+                new("Rechercher un beneficiaire", "consultation BEN",               "PROC_BEN")
             ])
         ]),
         new("Modifier", "mod", "~",
@@ -2136,102 +2440,110 @@
                 new("Diligences RCS",         "les diligences d'un dossier",        "PROC_MDIL"),
                 new("Mots directeurs",        "qualification judiciaire",           "PROC_MDJUD"),
                 new("Repertoire",             "corriger le repertoire",             "PROC_MODIF_REPER"),
-                new("Liberer une affaire",    "rendre la main sur un dossier",      "PROC_LIBAFFAIRE")
+                new("Parties d'une instance", "qui s'oppose a qui",                 "PROC_PARTIES"),
+                new("Beneficiaires d'un dossier", "les BE d'une societe",           "PROC_BE")
             ]),
             new("Defaire",
             [
                 new("Liens entre PC",         "rattacher ou detacher",              "PROC_XLIEN"),
-                new("Extinction d'un dossier","cloturer ou radier au RCS",          "PROC_XEX"),
-                new("Supprimer une instance", "et rendre les numeros",              "PROC_XXAFF")
+                new("Supprimer une instance", "et rendre les numeros",              "PROC_XXAFF"),
+                new("Liberer une affaire",    "rendre la main sur un dossier",      "PROC_LIBAFFAIRE")
             ]),
             new("En masse",
             [
                 new("Changer le juge-commissaire", "sur plusieurs PC",              "PROC_CHM"),
                 new("Changer les organes",    "mandataires sur un lot de PC",       "PROC_CHORGANESENMASSE"),
                 new("Debiteurs multiples",    "plusieurs debiteurs sur une PC",     "PROC_DEBITEURS_MULTIPLES")
+            ]),
+            new("Rediger et signer",
+            [
+                new("Redaction",              "ecrire une decision",                "PROC_REDA"),
+                new("Redaction en masse",     "rediger un lot de decisions",        "PROC_REDA_MASSE"),
+                new("Destinataires",          "a qui part la decision",             "PROC_DEST_REDA"),
+                new("Signature electronique", "signer les decisions",               "PROC_SIGNJUD"),
+                new("Ordonnances a signer",   "la pile a signer",                   "PROC_ORDOSIGN"),
+                new("Occultations",           "masquer avant diffusion",            "PROC_DJ_OCCULTATIONS"),
+                new("Impression legale",      "jugements en masse",                 "PROC_IMPLEG")
+            ]),
+            new("Editer un courrier",
+            [
+                new("Courriers divers",       "les lettres types du greffe",        "PROC_COURRIER_DIVERS"),
+                new("Courriers en masse",     "un courrier pour un lot",            "PROC_COURRIERM"),
+                new("Editions differees",     "ce qui partira plus tard",           "PROC_EDT_DIFF"),
+                new("Pivoter des pages",      "redresser un scan",                  "PROC_PDF_WRITER"),
+                new("Documents ocerises",     "numerotation des pages",             "PROC_NUM")
+            ]),
+            new("Envoyer",
+            [
+                new("Transmission",           "envoyer un document dematerialise",  "PROC_TRANSDOC"),
+                new("Bordereaux LR",          "recommandes du jour",                "PROC_BORDLR"),
+                new("Retours LRAR",           "accuses de reception",               "PROC_RETOURLRAR"),
+                new("Envoi JAL / BODACC",     "ce qui part en publication",         "PROC_ENV_JAL"),
+                new("Publications BODACC",    "gerer les annonces",                 "PROC_GESTBOD"),
+                new("File d'impression",      "ce qui attend l'imprimante",         "PROC_PAPERCUT"),
+                new("Export Excel",           "sortir une liste",                   "PROC_LISTEEXCEL")
             ])
         ]),
-        new("Audiencer", "aud", "A",
+        new("Surveiller", "surv", "!",
         [
-            new("Preparer",
+            new("Preparer les audiences",
             [
                 new("Roles et cabinets",      "organiser les audiences a venir",    "PROC_GESTAUDS"),
-                new("Cabinets",               "les salles d'audience",              "PROC_CABINET"),
                 new("Composition",            "qui siege ce jour-la",               "PROC_COMPO"),
                 new("Preparation d'audience", "plumitif avant l'audience",          "PROC_PREAUD"),
                 new("Convocations",           "convoquer les parties",              "PROC_GCONV"),
                 new("Mise au point chambres", "audiences de cabinet",               "PROC_MPCS")
             ]),
-            new("Tenir",
+            new("Suivre les audiences",
             [
                 new("Audiences",              "les dates qui approchent",           "PROC_AUDIENCE"),
                 new("Retour d'audience",      "saisir ce qui a ete dit",            "PROC_RETAUD"),
                 new("Deliberes",              "ce qui reste a rendre",              "PROC_LISTE_DELIBERES"),
                 new("Taxes et tours de role", "editions PC d'audience",             "PROC_TAXESETTOURS")
             ]),
-            new("Decider et signer",
+            new("Relancer",
             [
-                new("Redaction",              "ecrire une decision",                "PROC_REDA"),
-                new("Redaction en masse",     "rediger un lot de decisions",        "PROC_REDA_MASSE"),
-                new("Modeles de redaction",   "maquettes des decisions",            "PROC_REDAA"),
-                new("Destinataires",          "a qui part la decision",             "PROC_DEST_REDA"),
-                new("Signature electronique", "signer les decisions",               "PROC_SIGNJUD"),
-                new("Ordonnances a signer",   "la pile a signer",                   "PROC_ORDOSIGN"),
-                new("Occultations",           "masquer avant diffusion",            "PROC_DJ_OCCULTATIONS"),
-                new("Impression legale",      "jugements en masse",                 "PROC_IMPLEG")
-            ])
-        ]),
-        new("Documents", "doc", "D",
-        [
-            new("Numeriser",
-            [
-                new("Pieces numerisees",      "ce que le scanner a produit",        "PROC_ACTES_NUM"),
-                new("Controle des scans",     "verifier avant de valider",          "PROC_CONTROLE_VIDIGED"),
-                new("Documents ocerises",     "numerotation des pages",             "PROC_NUM")
+                new("Relances comptes annuels", "DCA en retard",                    "PROC_DCA_RELANCE"),
+                new("Injonctions comptes annuels", "passer a l'injonction",         "PROC_DCA_INJ"),
+                new("Relances beneficiaires", "DBE en retard",                      "PROC_DBE_RELANCE"),
+                new("Injonctions beneficiaires", "injonction DBE",                  "PROC_DBE_INJ"),
+                new("Rappels RBE",            "registre des beneficiaires",         "PROC_SRBE_RAPPEL"),
+                new("Retention d'actes",      "actes retenus au depot",             "PROC_ACTRET"),
+                new("Actes rejetes",          "rejets Infogreffe",                  "PROC_ACTREJ"),
+                new("Divergences BEN",        "alertes de coherence",               "PROC_DBEN_ALERT")
             ]),
-            new("Classer",
+            new("Les instances",
             [
-                new("Documents",              "la GED de l'affaire",                "PROC_DOC_DEMAT"),
-                new("Documents judiciaires",  "la GED du judiciaire",               "PROC_GEDJUD"),
-                new("Coffre-fort",            "les pieces mises a l'abri",          "PROC_COFFRE_FORT"),
-                new("Transmission",           "envoyer un document dematerialise",  "PROC_TRANSDOC"),
-                new("Suivi dematerialisation","ce qui est parti au JAL/BODACC",     "PROC_SDEMATJUD")
+                new("Injonctions de payer",   "les IP en attente",                  "PROC_SURVIP"),
+                new("Suivi des preventions",  "les IP de prevention",               "PROC_IPSUIVI"),
+                new("Mesures",                "surveillance des mesures",           "PROC_SURVMES"),
+                new("Lots",                   "les lots en cours",                  "PROC_GESTLOT")
             ]),
-            new("Voir",
+            new("Les envois et les editions",
             [
-                new("Voir un PDF",            "lire une piece",                     "PROC_PDF"),
-                new("Pivoter des pages",      "redresser un scan",                  "PROC_PDF_WRITER"),
-                new("Voir une image",         "image ou PDF multi-pages",           "PROC_IMAGE")
-            ])
-        ]),
-        new("Editer et envoyer", "edit", "E",
-        [
-            new("Courriers",
-            [
-                new("Courriers divers",       "les lettres types du greffe",        "PROC_COURRIER_DIVERS"),
-                new("Courriers en masse",     "un courrier pour un lot",            "PROC_COURRIERM"),
-                new("Modeles d'edition",      "la forme des courriers",             "PROC_EDIT_MAQUETTE"),
-                new("Sceaux",                 "elements de fusion",                 "PROC_SCEAU"),
-                new("Editions differees",     "ce qui partira plus tard",           "PROC_EDT_DIFF")
-            ]),
-            new("Imprimer",
-            [
-                new("File d'impression",      "ce qui attend l'imprimante",         "PROC_PAPERCUT"),
-                new("Relancer un fichier",    "edition bloquee",                    "PROC_RELANCEFILE"),
-                new("Relancer un lot",        "lot d'impression bloque",            "PROC_RELANCELOT"),
+                new("Surveillance BODACC",    "rejets et annonces en attente",      "PROC_SURVBOD"),
+                new("Suivi dematerialisation","ce qui est parti au JAL/BODACC",     "PROC_SDEMATJUD"),
                 new("Suivi d'impression",     "ce qui est sorti",                   "PROC_SUIVI_IMPRESSION"),
-                new("Export Excel",           "sortir une liste",                   "PROC_LISTEEXCEL")
+                new("Relancer un fichier",    "edition bloquee",                    "PROC_RELANCEFILE"),
+                new("Relancer un lot",        "lot d'impression bloque",            "PROC_RELANCELOT")
             ]),
-            new("Envoyer",
+            new("Chiffres",
             [
-                new("Bordereaux LR",          "recommandes du jour",                "PROC_BORDLR"),
-                new("Retours LRAR",           "accuses de reception",               "PROC_RETOURLRAR"),
-                new("Envoi JAL / BODACC",     "ce qui part en publication",         "PROC_ENV_JAL"),
-                new("Publications BODACC",    "gerer les annonces",                 "PROC_GESTBOD"),
-                new("Surveillance BODACC",    "rejets et annonces en attente",      "PROC_SURVBOD")
+                new("Statistiques",           "les chiffres du greffe",             "PROC_STAT"),
+                new("Statistiques cour d'appel", "ce qui remonte a la CA",          "PROC_STATCA"),
+                new("Pilotage",               "tableaux de bord",                   "PROC_XPILOTAGE")
             ])
         ]),
-        new("Argent", "compta", "$",
+        new("Terminer", "fin", "#",
+        [
+            new("",
+            [
+                new("Cloture",                "fermer une affaire terminee",        "PROC_CLOT"),
+                new("Archivage",              "archiver ou radier",                 "PROC_ARCHIRAD"),
+                new("Extinction RCS",         "eteindre un dossier du registre",    "PROC_XEX")
+            ])
+        ]),
+        new("Facturer", "compta", "$",
         [
             new("Facturer",
             [
@@ -2247,8 +2559,7 @@
                 new("Encaissements",          "ce qui est rentre",                  "PROC_ENCAISS"),
                 new("Rejets d'encaissement",  "un reglement revenu",                "PROC_REJET"),
                 new("Remise en banque",       "porter les reglements en banque",    "PROC_REMBANQ"),
-                new("Cheques emis",           "ce que le greffe a paye",            "PROC_EDCHQEMIS"),
-                new("Modes de paiement",      "les moyens acceptes",                "PROC_GESTMODEPAIEMENT")
+                new("Cheques emis",           "ce que le greffe a paye",            "PROC_EDCHQEMIS")
             ]),
             new("Tenir les comptes",
             [
@@ -2267,46 +2578,27 @@
                 new("Representation",         "qui represente le creancier",        "PROC_CREANREP")
             ])
         ]),
-        new("Surveiller", "surv", "!",
+        new("Configurer", "reg", "@",
         [
-            new("Relancer",
+            new("Les acteurs",
             [
-                new("Relances comptes annuels", "DCA en retard",                    "PROC_DCA_RELANCE"),
-                new("Injonctions comptes annuels", "passer a l'injonction",         "PROC_DCA_INJ"),
-                new("Relances beneficiaires", "DBE en retard",                      "PROC_DBE_RELANCE"),
-                new("Injonctions beneficiaires", "injonction DBE",                  "PROC_DBE_INJ"),
-                new("Rappels RBE",            "registre des beneficiaires",         "PROC_SRBE_RAPPEL"),
-                new("Retention d'actes",      "actes retenus au depot",             "PROC_ACTRET"),
-                new("Actes rejetes",          "rejets Infogreffe",                  "PROC_ACTREJ")
+                new("Acteurs judiciaires",    "juges, parquet, intervenants",       "PROC_ACTEUR_JUD"),
+                new("Experts",                "qui designer, qui a deja siege",     "PROC_EXPERT"),
+                new("Mandataires",            "mandataires et praticiens",          "PROC_MANDATAIRE"),
+                new("Rapprocher des acteurs", "fusionner deux fiches",              "PROC_RAPPACTEUR"),
+                new("Remplacer un acteur",    "substituer dans les instances",      "PROC_SUPP_ACTEUR_JUD")
             ]),
-            new("Suivre les instances",
+            new("Les clients",
             [
-                new("Injonctions de payer",   "les IP en attente",                  "PROC_SURVIP"),
-                new("Suivi des preventions",  "les IP de prevention",               "PROC_IPSUIVI"),
-                new("Mesures",                "surveillance des mesures",           "PROC_SURVMES"),
-                new("Lots",                   "les lots en cours",                  "PROC_GESTLOT")
+                new("Clients",                "comptes et fiches",                  "PROC_GCLIENT"),
+                new("Fiche client",           "le detail d'un client",              "PROC_FCLIENT"),
+                new("Tiers payeurs",          "qui regle a la place du client",     "PROC_GESTTIERSPAYEURS"),
+                new("Non-inscrits",           "creer une personne hors registre",   "PROC_CNI")
             ]),
-            new("Chiffres",
-            [
-                new("Statistiques",           "les chiffres du greffe",             "PROC_STAT"),
-                new("Statistiques cour d'appel", "ce qui remonte a la CA",          "PROC_STATCA"),
-                new("Pilotage",               "tableaux de bord",                   "PROC_XPILOTAGE")
-            ])
-        ]),
-        new("Terminer", "fin", "#",
-        [
-            new("",
-            [
-                new("Cloture",                "fermer une affaire terminee",        "PROC_CLOT"),
-                new("Archivage",              "archiver ou radier",                 "PROC_ARCHIRAD"),
-                new("Extinction RCS",         "eteindre un dossier du registre",    "PROC_XEX")
-            ])
-        ]),
-        new("Reglages", "reg", "@",
-        [
             new("Mon poste",
             [
                 new("Mon accueil",            "tuiles et alertes",                  "PROC_ACCUEIL_PARAM"),
+                new("Actualites",             "les messages de l'accueil",          "PROC_ACTUALITES"),
                 new("Dates de travail",       "la date du greffe",                  "PROC_GESTDATE"),
                 new("Aide du greffe",         "le wiki interne",                    "PROC_WIKI"),
                 new("Page web interne",       "ouvrir un site dans RIG",            "PROC_WEB_BROWSER")
@@ -2315,12 +2607,23 @@
             [
                 new("Tables de reference",    "les codes du greffe",                "PROC_GTABREF"),
                 new("Natures de document",    "typologie de la GED",                "PROC_GED_NATURE_DOC"),
-                new("Messagerie",             "les envois automatiques",            "PROC_GESTEMAIL"),
-                new("Banques",                "les comptes du greffe",              "PROC_GESTBANQ"),
-                new("Bornes d'accueil",       "les kiosques KBIS",                  "PROC_BORNE"),
+                new("Cabinets",               "les salles d'audience",              "PROC_CABINET"),
                 new("Codes chefs IP",         "parametrage des injonctions",        "PROC_PARAM_IP"),
-                new("Listes Excel",           "parametrage des exports",            "PROC_PARAM_LISTEEXCEL"),
-                new("Facturation Expresso",   "parametrage de la facturation",      "PROC_PARAMEXPRESSO")
+                new("Bornes d'accueil",       "les kiosques KBIS",                  "PROC_BORNE")
+            ]),
+            new("Modeles et envois",
+            [
+                new("Modeles d'edition",      "la forme des courriers",             "PROC_EDIT_MAQUETTE"),
+                new("Modeles de redaction",   "maquettes des decisions",            "PROC_REDAA"),
+                new("Sceaux",                 "elements de fusion",                 "PROC_SCEAU"),
+                new("Messagerie",             "les envois automatiques",            "PROC_GESTEMAIL")
+            ]),
+            new("Argent et exports",
+            [
+                new("Banques",                "les comptes du greffe",              "PROC_GESTBANQ"),
+                new("Modes de paiement",      "les moyens acceptes",                "PROC_GESTMODEPAIEMENT"),
+                new("Facturation Expresso",   "parametrage de la facturation",      "PROC_PARAMEXPRESSO"),
+                new("Listes Excel",           "parametrage des exports",            "PROC_PARAM_LISTEEXCEL")
             ]),
             new("Outils",
             [
@@ -2454,7 +2757,9 @@
     private Proc[] ProcsDuSujet(Sujet s)
     {
         var connus = Groupes.SelectMany(g => g.Procs).ToDictionary(p => p.Code);
-        return s.Procs.Where(connus.ContainsKey).Select(c => connus[c]).ToArray();
+        return s.Procs.Where(connus.ContainsKey)
+                      .Where(c => PerimetreProfil.Visible(c, Domaines))
+                      .Select(c => connus[c]).ToArray();
     }
 
     /// <summary>Catalogue des ecrans portes depuis RIG v2. Il n'est PLUS affiche
@@ -2504,6 +2809,7 @@
         new("ADM", "Administration", "attente",
         [
             new("PROC_ACCUEIL_PARAM", "Parametres d'accueil"),
+            new("PROC_ACTUALITES", "Actualites"),
             new("PROC_TACHES_LOT",    "Taches en lot"),
             new("PROC_VERROUS",       "Dossiers verrouilles"),
             new("PROC_STAT",       "Statistiques"),
@@ -2521,42 +2827,75 @@
     private record DefinitionTuile(string Id, string Titre, PoseTuile Defaut,
         string Statut = "neutre", bool Maitresse = false);
 
+    /// <summary>Numero de la disposition d'origine ecrite dans ce fichier. A
+    /// monter d'un cran a chaque fois qu'on change la grille par defaut.</summary>
+    private const int DispositionCourante = 9;
+
     private readonly DefinitionTuile[] Definitions =
     [
-        // La hierarchie est celle de la journee du greffe : ce qui est HORS DELAI se voit
-        // en premier, donc « Alertes » est la tuile principale, large et en haut a gauche ;
-        // « Mes affaires recentes » et « Ma file » viennent dessous, aussi larges. La
-        // colonne de droite porte le contexte : Performance, Services, Brouillons et
-        // Nouveautes, etroites. « Reprendre » garde le bandeau de tete : c'est le premier
-        // geste de la journee, reprendre le dossier laisse en plan la veille.
-        new("reprise",     "Reprendre",    new() { Colonne = 1, Ligne = 1, Largeur = 12, Hauteur = 1 }, "action"),
-        new("alertes",     "Alertes",      new() { Colonne = 1, Ligne = 2, Largeur = 8,  Hauteur = 3 }, "alerte", true),
-        new("performance", "Performance",  new() { Colonne = 9, Ligne = 2, Largeur = 4,  Hauteur = 3 }, "ok"),
-        new("recents",     "Mes affaires recentes", new() { Colonne = 1, Ligne = 5, Largeur = 8, Hauteur = 3 }, "action"),
-        new("services",    "Services",     new() { Colonne = 9, Ligne = 5, Largeur = 4,  Hauteur = 2 }, "ok"),
-        new("file",        "Ma file",      new() { Colonne = 1, Ligne = 8, Largeur = 8,  Hauteur = 3 }, "action"),
-        new("brouillons",  "Brouillons",   new() { Colonne = 9, Ligne = 7, Largeur = 4,  Hauteur = 2 }, "neutre"),
-        new("nouveautes",  "Nouveautes",   new() { Colonne = 9, Ligne = 9, Largeur = 4,  Hauteur = 1 }, "attente")
+        // Disposition calee pour que TOUTES les tuiles tiennent dans l'ecran
+        // visible, SANS defilement (demande du 17/09/2026) : 5 lignes de grille
+        // au total, la ou l'ancienne disposition en occupait 10.
+        // « A traiter » tient toute la MOITIE DROITE sur les 5 lignes : c'est la
+        // tuile la plus utilisee de la journee, elle ne doit jamais demander de scroll.
+        new("alertes",     "A traiter",    new() { Colonne = 7, Ligne = 1, Largeur = 6,  Hauteur = 3 }, "alerte", true),
+        // « Mes taches du jour » : les constats CALCULES sur les dossiers
+        // (AlertesGreffe.ReleverCalculees) que « A traiter » ne montre plus
+        // depuis le 17/09/2026. Ils portent le mecanisme TASK DRIVEN : le clic
+        // ouvre la tache, l'arbre et la fiche se replient alors sur les seuls
+        // champs que la recette declare. Sans cette tuile, ce code vivait
+        // encore mais n'avait plus aucune porte d'entree dans l'accueil.
+        // « A traiter BIS » (demande du 21/09/2026) : la version ENRICHIE de
+        // « A traiter », en bande sur TOUT le haut de l'ecran. A gauche l'arbre
+        // des categories, a droite les demandes de l'alerte choisie -- le meme
+        // tableau que les widgets metier (PanneauDemandes).
+        // Hors disposition « Bandeau » elle est eteinte : sa pose par defaut est
+        // rangee SOUS les widgets metier, ou elle ne recouvre rien.
+        new("alertes-bis", "A traiter BIS", new() { Colonne = 1, Ligne = 12, Largeur = 12, Hauteur = 3 }, "alerte"),
+        new("taches",      "Mes taches du jour", new() { Colonne = 7, Ligne = 4, Largeur = 6, Hauteur = 2 }, "alerte"),
+        // Moitie gauche, apres le retrait de « Mes affaires recentes »
+        // (17/09/2026) : plus aucun trou dans la grille, les 5 lignes x 6
+        // colonnes sont entierement occupees.
+        // Le journal des gestes de l'equipe : reserve au chef de greffe (le
+        // compte qui VALIDE). C'est une LISTE : il prend la hauteur (3 lignes)
+        // laissee libre en haut a gauche.
+        new("activite",    "Activite des utilisateurs", new() { Colonne = 1, Ligne = 1, Largeur = 3, Hauteur = 3 }, "action"),
+        // Les actualites sont REDIGEES (pannes INPI, alertes fraude CNG), la ou
+        // « A traiter » est CALCULEE sur les dossiers : deux tuiles distinctes,
+        // sinon un message ecrit se perdrait au milieu de lignes calculees.
+        new("actualites",  "Actualites", new() { Colonne = 4, Ligne = 1, Largeur = 3, Hauteur = 1 }, "attente"),
+        new("nouveautes",  "Nouveautes",   new() { Colonne = 4, Ligne = 2, Largeur = 3, Hauteur = 2 }, "attente"),
+        // La performance est une bande de chiffres : elle gagne a etre LARGE,
+        // elle occupe donc toute la largeur du bas de la moitie gauche.
+        new("performance", "Performance",  new() { Colonne = 1, Ligne = 4, Largeur = 6, Hauteur = 2 }, "ok"),
+        // ---- Les widgets METIER : UN PAR CATEGORIE de la feuille « Alertes
+        // accueil v2 Rig » (Feuil2), demande du 17/09/2026. Chacun est un
+        // panneau double : a gauche la recherche, les gestes et les alertes de
+        // SA categorie, a droite les demandes de l'alerte selectionnee.
+        // POSE (demande du 17/09/2026) : QUATRE par ligne, sur 3 colonnes de
+        // grille chacun, et 3 lignes de haut -- la vue par defaut n'affiche que
+        // la colonne de gauche, il lui faut donc de la HAUTEUR pour montrer
+        // toutes les alertes de la categorie sans defiler dans la tuile. Les
+        // huit tiennent ainsi en deux bandes (lignes 6-8 et 9-11), sous les six
+        // tuiles d'origine dont la disposition n'est pas touchee.
+        new("metier-arrivees",      "Arrivées",              new() { Colonne = 1,  Ligne = 6, Largeur = 3, Hauteur = 3 }, "attente"),
+        new("metier-formalites",    "Formalités",            new() { Colonne = 4,  Ligne = 6, Largeur = 3, Hauteur = 3 }, "attente"),
+        new("metier-notifications", "Notifications",         new() { Colonne = 7,  Ligne = 6, Largeur = 3, Hauteur = 3 }, "attente"),
+        new("metier-das",           "DAS",                   new() { Colonne = 10, Ligne = 6, Largeur = 3, Hauteur = 3 }, "attente"),
+        new("metier-dca",           "DCA",                   new() { Colonne = 1,  Ligne = 9, Largeur = 3, Hauteur = 3 }, "attente"),
+        new("metier-corrections",   "Corrections diverses",  new() { Colonne = 4,  Ligne = 9, Largeur = 3, Hauteur = 3 }, "attente"),
+        new("metier-surveillances", "Surveillances Greffe",  new() { Colonne = 7,  Ligne = 9, Largeur = 3, Hauteur = 3 }, "attente"),
+        new("metier-divers",        "Divers",                new() { Colonne = 10, Ligne = 9, Largeur = 3, Hauteur = 3 }, "attente")
     ];
-
-    // ================= Bandeau de mission =================
-    // Les trois chiffres de tete sont DERIVES de la file : aucun compteur en dur,
-    // sinon le bandeau mentirait des que la file bouge.
-    private int ATraiter => File.Count(d => d.VerrouillePar is null && !EstValide(d.Numero));
-    private int HorsDelai => File.Count(d => d.Statut == "alerte" && !EstValide(d.Numero));
-    private int Validees => File.Count(d => EstValide(d.Numero));
-
-    private void OuvrirPlusAncienHorsDelai()
-    {
-        var d = File.FirstOrDefault(x => x.Statut == "alerte" && !EstValide(x.Numero));
-        if (d is not null) { OuvrirParNumero(d.Numero); }
-    }
 
     /// <summary>Statut affiche par le filet d'une tuile : fixe par defaut, mais les
     /// tuiles qui portent un etat vivant (la file, les alertes) le recalculent.</summary>
     private string StatutTuile(DefinitionTuile def) => def.Id switch
     {
-        "alertes" => AlertesVues.Any(a => a.Statut == "alerte") ? "alerte" : "attente",
+        "alertes" or "alertes-bis" => AlertesVues.Any(a => a.Statut == "alerte") ? "alerte" : "attente",
+        "taches" => TachesVues.Any(a => a.Statut == "alerte") ? "alerte"
+                    : TachesVues.Length > 0 ? "action" : "ok",
+        "actualites" => ActualitesVues.Actifs.Any(b => b.Statut == "alerte") ? "alerte" : def.Statut,
         _         => def.Statut
     };
 
@@ -2570,6 +2909,71 @@
     private IJSObjectReference? Module;
     private DotNetObjectReference<Home>? Lien;
 
+    // ================= Dispositions preparees =================
+    /// <summary>Une disposition prete a l'emploi (demande du 21/09/2026) : les
+    /// tuiles ETEINTES et, pour celles qui s'ecartent de la pose par defaut de
+    /// <see cref="Definitions"/>, leur pose propre. Une tuile absente de
+    /// <paramref name="Poses"/> garde sa pose par defaut.</summary>
+    private sealed record Disposition(string Id, string Titre, string Aide,
+        string[] Eteintes, (string Id, int C, int L, int W, int H)[] Poses);
+
+    private static readonly string[] TuilesMetier =
+    [
+        "metier-arrivees", "metier-formalites", "metier-notifications", "metier-das",
+        "metier-dca", "metier-corrections", "metier-surveillances", "metier-divers"
+    ];
+
+    private static readonly Disposition[] Dispositions =
+    [
+        // 1. Le gros widget « A traiter BIS » sur tout le haut de l'ecran.
+        new("bandeau", "Bandeau", "« A traiter BIS » en bande sur tout le haut",
+            ["alertes", .. TuilesMetier],
+            [
+                P("alertes-bis", 1, 1, 12, 3),
+                P("activite",    1, 4, 3, 2),
+                P("actualites",  4, 4, 3, 1),
+                P("nouveautes",  4, 5, 3, 1),
+                P("taches",      7, 4, 6, 2),
+                P("performance", 1, 6, 12, 2)
+            ]),
+        // 2. Le « A traiter » habituel sur la moitie droite (poses par defaut).
+        new("lateral", "Latéral", "« A traiter » sur la moitie droite",
+            ["alertes-bis", .. TuilesMetier], []),
+        // 3. Les huit petits widgets metier, un par categorie, en tete.
+        new("metiers", "Par métier", "Un petit widget par categorie metier",
+            ["alertes", "alertes-bis"],
+            [
+                P("metier-arrivees",      1,  1, 3, 3),
+                P("metier-formalites",    4,  1, 3, 3),
+                P("metier-notifications", 7,  1, 3, 3),
+                P("metier-das",           10, 1, 3, 3),
+                P("metier-dca",           1,  4, 3, 3),
+                P("metier-corrections",   4,  4, 3, 3),
+                P("metier-surveillances", 7,  4, 3, 3),
+                P("metier-divers",        10, 4, 3, 3),
+                P("activite",    1, 7, 3, 3),
+                P("actualites",  4, 7, 3, 1),
+                P("nouveautes",  4, 8, 3, 2),
+                P("taches",      7, 7, 6, 2),
+                P("performance", 7, 9, 6, 1)
+            ])
+    ];
+
+    private static (string Id, int C, int L, int W, int H) P(string id, int c, int l, int w, int h)
+        => (id, c, l, w, h);
+
+    private Disposition DispositionActive
+        => Dispositions.FirstOrDefault(d => d.Id == Etat.Disposition) ?? Dispositions[1];
+
+    /// <summary>Choisit une disposition : pose ET allumage de chaque tuile.</summary>
+    private void AppliquerDisposition(string id)
+    {
+        Etat.Disposition = id;
+        var d = DispositionActive;
+        foreach (var def in Definitions) { Pose(def.Id).Visible = !d.Eteintes.Contains(def.Id); }
+        ReinitialiserDisposition();
+    }
+
     private PoseTuile Pose(string id)
     {
         if (Etat.Tuiles.TryGetValue(id, out var pose)) return pose;
@@ -2578,32 +2982,45 @@
         {
             Colonne = defaut.Colonne, Ligne = defaut.Ligne,
             Largeur = defaut.Largeur, Hauteur = defaut.Hauteur,
-            Visible = true
+            Visible = !DispositionActive.Eteintes.Contains(id)
         };
         Etat.Tuiles[id] = copie;
         return copie;
     }
+
+    /// <summary>Cette tuile est-elle dans le perimetre du compte connecte ?
+    /// « Activite des utilisateurs » montre le travail des collegues : elle
+    /// n'appartient qu'au chef de greffe. Une tuile non autorisee ne s'affiche
+    /// pas ET ne figure pas dans le panneau de choix : sinon on saurait
+    /// qu'elle existe sans pouvoir l'ouvrir.</summary>
+    private bool TuileAutorisee(DefinitionTuile def)
+        => def.Id != "activite" || JournalActions.VisiblePour(CompteCourant);
 
     private void BasculerPanneauTuiles() => PanneauTuilesOuvert = !PanneauTuilesOuvert;
 
     private void BasculerPanneauBarre() => PanneauBarreOuvert = !PanneauBarreOuvert;
 
     /// <summary>
-    /// Remet CHAQUE tuile a sa pose d'origine (colonne, ligne, largeur,
-    /// hauteur) : la disposition par defaut est calee sur la grille 12
-    /// colonnes et ne comporte aucun chevauchement. Ce que l'utilisateur a
-    /// allume ou eteint est conserve : seule la geometrie est reprise.
+    /// Remet CHAQUE tuile a sa pose dans la disposition choisie (colonne,
+    /// ligne, largeur, hauteur) : chaque disposition est calee sur la grille
+    /// 12 colonnes sans chevauchement. Ce que l'utilisateur a allume ou
+    /// eteint est conserve : seule la geometrie est reprise.
     /// </summary>
     private void ReinitialiserDisposition()
     {
         var rang = 1;
+        var poses = DispositionActive.Poses;
         foreach (var def in Definitions)
         {
             var pose = Pose(def.Id);
-            pose.Colonne = def.Defaut.Colonne;
-            pose.Ligne   = def.Defaut.Ligne;
-            pose.Largeur = def.Defaut.Largeur;
-            pose.Hauteur = def.Defaut.Hauteur;
+            var propre = poses.FirstOrDefault(x => x.Id == def.Id);
+            var (c, l, w, h) = propre.Id is null
+                ? (def.Defaut.Colonne, def.Defaut.Ligne, def.Defaut.Largeur, def.Defaut.Hauteur)
+                : (propre.C, propre.L, propre.W, propre.H);
+            pose.Colonne = c;
+            pose.Ligne   = l;
+            pose.Largeur = w;
+            pose.Hauteur = h;
             pose.Ordre   = rang++;
         }
         Etat.Enregistrer();
@@ -2657,8 +3074,33 @@
     protected override void OnInitialized()
     {
         Etat = AccueilEtat.Charger();
+        AccueilEtat.FavorisChanges += SurFavorisChanges;
+        ThemeSombre = Etat.ThemeSombre;
+        // L AGENCEMENT d abord : les onglets ouverts la derniere fois, dans leur
+        // ordre, et les vues qui etaient sorties en fenetre.
+        RestaurerAgencement();
         RelevePerf();
+        ReleveActualites();
         Alertes = AlertesOuvertes();
+        Taches = TachesOuvertes();
+
+        // La disposition d'origine a change (tuiles « Reprendre » et « Ma file »
+        // retirees, grille retassee sur 5 lignes) : un accueil.json ecrit avant
+        // ce changement garderait l'ancienne grille, donc on la repose une fois.
+        if (Etat.VersionDisposition < DispositionCourante)
+        {
+            foreach (var disparue in Etat.Tuiles.Keys
+                         .Where(id => !Definitions.Any(d => d.Id == id)).ToList())
+            {
+                Etat.Tuiles.Remove(disparue);
+            }
+            // v9 : les dispositions preparees. La disposition active est
+            // appliquee EN ENTIER, allumage compris : sinon « A traiter BIS »,
+            // allumee par defaut en v8, recouvrirait le haut de l'accueil.
+            AppliquerDisposition(DispositionActive.Id);
+            Etat.VersionDisposition = DispositionCourante;
+            Etat.Enregistrer();
+        }
 
         foreach (var def in Definitions) { Pose(def.Id); }
         foreach (var a in Alertes)
@@ -2699,7 +3141,10 @@
         }
         Module = await JS.InvokeAsync<IJSObjectReference>("import", "./rig-accueil.js");
         Lien = DotNetObjectReference.Create(this);
-        await Module.InvokeVoidAsync("activerPose", Grille, Lien);
+        // Une fenetre d onglet arrache n affiche PAS l accueil : sa grille de
+        // tuiles n est jamais rendue, et la brancher faisait planter l app
+        // entiere (« zone.addEventListener is not a function », 18/09/2026).
+        if (!ModeFenetreVue) await Module.InvokeVoidAsync("activerPose", Grille, Lien);
         await Module.InvokeVoidAsync("activerClavier", Lien);
         await AppliquerTheme();
         MinuteurPerf = new Timer(_ =>
@@ -2707,16 +3152,33 @@
             RelevePerf();
             _ = InvokeAsync(StateHasChanged);
         }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        // Les actualites vivent sur le reseau : une minute de retard est sans
+        // consequence, une lecture par seconde martyriserait le partage.
+        MinuteurActualites = new Timer(_ =>
+        {
+            ReleveActualites();
+            _ = InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
     }
 
     // Le rechargement de la vue (reprise a chaud du CSS) demonte ce composant
     // APRES que la page JS a disparu : les appels de nettoyage levent alors
     // JSException. Non attrapee, elle remonte au dispatcher WPF et FERME
     // l'application -- exactement ce que la reprise a chaud doit eviter.
+    /// <summary>Une autre fenetre a allume/eteint une etoile : on reprend sa
+    /// liste, sinon notre copie perimee l'ecraserait au prochain enregistrement.</summary>
+    private void SurFavorisChanges(AccueilEtat source, List<string> liste)
+    {
+        if (ReferenceEquals(source, Etat)) return;
+        _ = InvokeAsync(() => { Etat.VuesFavorites = liste; StateHasChanged(); });
+    }
+
     public async ValueTask DisposeAsync()
     {
+        AccueilEtat.FavorisChanges -= SurFavorisChanges;
         VueFermee = true;
         if (MinuteurPerf is not null) await MinuteurPerf.DisposeAsync();
+        if (MinuteurActualites is not null) await MinuteurActualites.DisposeAsync();
         if (Module is not null)
         {
             try { await Module.InvokeVoidAsync("arreterPose"); } catch (JSException) { }
@@ -2742,7 +3204,68 @@
     /// PROC_VGED\ETP_VGED\OPE_VGED.cs, _InitTreeview).
     /// </summary>
     private record Dossier(string Numero, string Objet, string Siren, string Type, string Statut,
-                           bool SansDossierRcs = false);
+                           bool SansDossierRcs = false, string TypeDossier = "");
+
+    /// <summary>
+    /// Les champs d identite affiches dans le bandeau « Fiche sommaire », au
+    /// dessus de l arbre — repris un a un de PROC_VDOSSIER (v2).
+    /// </summary>
+    private sealed record Sommaire(string FormeJuridique, string Sigle, string NomCommercial,
+                                   string Civilite, string Designation, string Adresse,
+                                   string GestionAnterieure, string Immatriculation,
+                                   string Cessation, string DateMaj, string Mention);
+
+    // Fiche sommaire du jeu de demonstration, par numero d affaire.
+    private static readonly Dictionary<string, Sommaire> SommairesDemo = new()
+    {
+        ["2026B01067"] = new("Societe a responsabilite limitee", "AMB", "AMIENS BILLARDS",
+            "PM", "AMIENS BILLARDS", "14 Rue des Jacobins\n80000 AMIENS",
+            "", "01/09/2026", "", "01/09/2026", ""),
+        ["004176"] = new("Societe civile immobiliere", "", "SCI DU PARC",
+            "PM", "SCI DU PARC", "8 Avenue du Parc\n80000 AMIENS",
+            "2014B00412", "12/03/2014", "", "24/08/2026", ""),
+        ["004182"] = new("Societe a responsabilite limitee", "AMB", "AMIENS BILLARDS",
+            "PM", "AMIENS BILLARDS", "14 Rue des Jacobins\n80000 AMIENS",
+            "", "28/08/2026", "", "28/08/2026", ""),
+        ["004179"] = new("Entreprise unipersonnelle a responsabilite limitee", "", "MARTIN EURL",
+            "PM", "MARTIN EURL", "3 Rue Gambetta\n80100 ABBEVILLE",
+            "2011B00187", "04/05/2011", "12/08/2026", "12/08/2026", "radiation du registre"),
+        ["004168"] = new("Societe par actions simplifiee", "BTP", "BATIPRO SARL",
+            "PM", "BATIPRO SARL", "27 Rue Maurice Flandrin\n69003 LYON",
+            "", "30/07/2026", "", "30/07/2026", ""),
+        ["J-00931"] = new("Societe anonyme", "TND", "TRANSNORD SA",
+            "PM", "TRANSNORD SA", "41 Route de Paris\n80000 AMIENS",
+            "2008B00951", "18/02/2008", "", "18/06/2026", "redressement judiciaire"),
+        ["2026P00031"] = new("Entrepreneur individuel", "", "MOREAU EI",
+            "PP", "MOREAU Julien", "6 Rue des Lilas\n80080 AMIENS",
+            "", "", "", "05/09/2026", "liquidation judiciaire")
+    };
+
+    /// <summary>
+    /// La fiche sommaire d une affaire : le jeu de demonstration, ECRASE par
+    /// ce qui a reellement ete saisi dans les taches (la trace des
+    /// modifications fait foi, comme pour la completude).
+    /// </summary>
+    private Sommaire SommaireDu(Dossier d)
+    {
+        var deduite = d.Objet.Contains(" - ")
+            ? d.Objet[(d.Objet.IndexOf(" - ", StringComparison.Ordinal) + 3)..]
+            : d.Objet;
+        var s = SommairesDemo.TryGetValue(d.Numero, out var connue)
+            ? connue
+            : new Sommaire("", "", "", d.SansDossierRcs ? "PP" : "PM", deduite, "", "", "", "", "", "");
+
+        string Ecrit(string cle, string defaut)
+            => Etat.DerniereValeur(d.Numero, cle) is { Length: > 0 } v ? v : defaut;
+
+        return s with
+        {
+            FormeJuridique = Ecrit("INSCRIT_PM.FORME_JURIDIQUE_UTI", s.FormeJuridique),
+            Sigle = Ecrit("INSCRIT_PM.SIGLE", s.Sigle),
+            Designation = Ecrit("INSCRIT_PM.DENOMINATION_USAGE", s.Designation),
+            Cessation = Ecrit("DOSSIER_RCS.DATE_CESSATION", s.Cessation)
+        };
+    }
 
     private static readonly Dossier[] FondsDemo =
     [
@@ -2758,7 +3281,13 @@
         new("2026P00031",  "Liquidation judiciaire - MOREAU EI",      "", "JUD", "alerte",  true),
         new("2026IP00214", "Injonction de payer - LEROY Michel",      "", "JUD", "attente", true),
         new("2026M00045",  "Expertise avant proces - GARAGE CENTRAL", "", "JUD", "action",  true),
-        new("2026C00059",  "Conciliation - ATELIER DU MEUBLE",        "", "JUD", "neutre",  true)
+        new("2026C00059",  "Conciliation - ATELIER DU MEUBLE",        "", "JUD", "neutre",  true),
+        // Dossiers de test, un par TYPE_DOSSIER (demande du 18/09/2026) :
+        // 01 = A, 02 = B, 03 = C, 04 = D.
+        new("01", "Dossier test type A - personne physique",   "", "RCS", "neutre", TypeDossier: "A"),
+        new("02", "Dossier test type B - societe commerciale", "", "RCS", "neutre", TypeDossier: "B"),
+        new("03", "Dossier test type C - GIE",                 "", "RCS", "neutre", TypeDossier: "C"),
+        new("04", "Dossier test type D - societe civile",      "", "RCS", "neutre", TypeDossier: "D")
     ];
 
     /// <summary>
@@ -2792,9 +3321,51 @@
         string.IsNullOrWhiteSpace(_recherche) || _recherche.Trim().Length < 2
             ? []
             : Groupes.SelectMany(g => g.Procs)
+                     .Where(p => PerimetreProfil.Visible(p.Code, Domaines))
                      .Where(p => p.Libelle.Contains(_recherche.Trim(),
                                     StringComparison.OrdinalIgnoreCase))
                      .Take(4).ToArray();
+
+    /// <summary>Un ELEMENT de l'arbre trouve par la recherche : l'affaire qui
+    /// le porte et son chemin de libelles depuis la racine.</summary>
+    private record ElementTrouve(Dossier Affaire, string[] Chemin);
+
+    /// <summary>L'affaire dans l'arbre de laquelle on cherche un numero de
+    /// depot / formalite / liasse : celle deja ouverte, sinon la premiere
+    /// affaire ayant un dossier RCS.</summary>
+    private Dossier AffaireCherchee
+        => DossierOuvert ?? Fonds.FirstOrDefault(d => !d.SansDossierRcs) ?? Fonds[0];
+
+    /// <summary>Les elements de l'arbre (depot, formalite, liasse, piece) dont
+    /// le libelle porte ce qui est tape. « 2024/0141 », « 2024 0141 » et
+    /// « 20240141 » designent le meme depot : la comparaison ignore les
+    /// separateurs (RechercheArbre.Normaliser).</summary>
+    private ElementTrouve[] ElementsTrouves
+    {
+        get
+        {
+            var terme = _recherche.Trim();
+            if (RechercheArbre.Normaliser(terme).Length < 2) return [];
+            var affaire = AffaireCherchee;
+            var racine = ReferenceEquals(affaire, DossierOuvert)
+                ? Arbre
+                : ArbreDemo.Racine(affaire.Numero, affaire.Objet, affaire.Siren,
+                                   avecDossierRcs: !affaire.SansDossierRcs);
+            return [.. RechercheArbre.Chemins(racine, terme)
+                        .Select(c => new ElementTrouve(affaire, c))];
+        }
+    }
+
+    /// <summary>Ouvre l'affaire et deplie l'arbre JUSQU'A l'element tape.</summary>
+    private void OuvrirElementTrouve(ElementTrouve e)
+    {
+        OuvrirDossier(e.Affaire);
+        var suite = RechercheArbre.Suivre(Arbre, e.Chemin);
+        if (suite is null) return;
+        NoeudsOuverts.Add(Arbre);
+        foreach (var n in suite) NoeudsOuverts.Add(n);
+        OuvrirApercu(suite[^1]);
+    }
 
     // ================= Visionneuse =================
     private Dossier? DossierOuvert;
@@ -2995,6 +3566,20 @@
 
         NoeudSelectionne = Arbre.Descendants().FirstOrDefault(n => n.EstPiece);
         _recherche = string.Empty;
+
+        // KBIS A JOUR (demande du 18/09/2026) : le dossier s'ouvre sur
+        // « Informations du dossier » au milieu et le KBIS en vigueur a droite.
+        var kbis = Arbre.Descendants().FirstOrDefault(n => n.Libelle == ArbreDemo.LibelleKbisAJour);
+        var fiche = Arbre.Descendants().FirstOrDefault(n => n.EstFiche
+                                                          && n.Libelle == InformationsDossier.LibelleNoeud);
+        if (kbis is not null && fiche is not null)
+        {
+            NoeudSelectionne = fiche;
+            DonneesVisible = true;
+            ApercuNoeud = kbis;
+            ApercuMessage = "";
+            GuideVisible = true;
+        }
     }
 
     private void FermerDossier()
@@ -3050,12 +3635,234 @@
     // Le cadre et l aiguillage vivent ici ; les criteres, les grilles et
     // les jeux de donnees sont dans Components/Ecrans/ et Metier/JeuDemo.cs.
 
-    private Proc? ProcOuverte;
+    /// <summary>
+    /// LA BARRE D ONGLETS (demande du 17/09/2026 : « un systeme d onglet comme
+    /// un navigateur web »). Avant, une seule vue pouvait etre ouverte a la
+    /// fois : en ouvrir une autre effacait la premiere. Desormais chaque vue
+    /// ouverte prend un onglet ; la logique (ouvrir, activer, fermer,
+    /// reordonner, arracher) vit dans EtatOnglets, verifiable hors interface.
+    /// </summary>
+    private readonly EtatOnglets Onglets = new();
+
+    /// <summary>Le Proc derriere chaque code d onglet : l onglet ne retient que
+    /// le code, c est lui la clef stable (le libelle, lui, peut changer).</summary>
+    private readonly Dictionary<string, Proc> ProcsConnues = new();
+
+    /// <summary>La vue MONTREE dans cette fenetre. Null quand on est sur
+    /// l accueil ou quand l onglet actif a ete sorti dans sa propre fenetre --
+    /// les onglets, eux, restent ouverts.</summary>
+    private Proc? ProcOuverte
+        => Onglets.Montre is { } o && ProcsConnues.TryGetValue(o.Code, out var p) ? p : null;
 
     private void OuvrirProc(Proc proc)
     {
-        ProcOuverte = proc;
+        ProcsConnues[proc.Code] = proc;
+        // Deja ouverte ? On revient dessus au lieu d en creer un doublon.
+        Onglets.Ouvrir(proc.Code, proc.Libelle);
         DossierOuvert = null;
+        RetenirAgencement();
+    }
+
+
+    // ============ ONGLETS : GLISSER, REORDONNER, ARRACHER ============
+
+    /// <summary>Le code de l ecran a ouvrir d emblee. Rempli par FenetreVue
+    /// quand la page est celle d un onglet SORTI dans sa propre fenetre.</summary>
+    [Parameter] public string? VueInitiale { get; set; }
+
+    /// <summary>Vrai dans une fenetre d onglet arrache : plus de barre de titre
+    /// maison ni de menu, la fenetre ne montre QUE l ecran arrache -- et elle
+    /// ne reecrit pas l agencement global, sinon la derniere fenetre fermee
+    /// ecraserait la disposition de la fenetre principale.</summary>
+    [Parameter] public bool ModeFenetreVue { get; set; }
+
+    /// <summary>Les fenetres d onglets actuellement sorties.</summary>
+    private readonly List<FenetreVue> FenetresVues = new();
+
+    private string? GlisseCode;
+    private double GlisseDepartX, GlisseDepartY;
+    private bool GlisseEnCours;
+    private double LargeurBarre, HauteurPage;
+    /// <summary>Bas de la barre d onglets dans la page (mesure au debut du geste).</summary>
+    private double BasBarreOnglets = double.MaxValue;
+    private List<(double Gauche, double Droite)> CasesOnglets = new();
+
+    /// <summary>Ce que la page mesure pour nous : la taille de la zone visible
+    /// et la place de chaque onglet.</summary>
+    private sealed record MesureBarre(double[] Page, double[][] Cases);
+
+    private async Task DebutGlisse(OngletVue onglet, PointerEventArgs e)
+    {
+        GlisseCode = onglet.Code;
+        GlisseDepartX = e.ClientX;
+        GlisseDepartY = e.ClientY;
+        GlisseEnCours = false;
+        CasesOnglets = new();
+        if (Module is null) return;
+        try
+        {
+            var mesure = await Module.InvokeAsync<MesureBarre>("mesurerOnglets");
+            if (mesure is null) return;
+            LargeurBarre = mesure.Page.Length > 0 ? mesure.Page[0] : 0;
+            HauteurPage = mesure.Page.Length > 1 ? mesure.Page[1] : 0;
+            BasBarreOnglets = mesure.Page.Length > 2 ? mesure.Page[2] : double.MaxValue;
+            CasesOnglets = mesure.Cases.Where(c => c.Length >= 2)
+                                       .Select(c => (c[0], c[1])).ToList();
+        }
+        catch (JSException) { }
+    }
+
+    private void GlisseOnglet(PointerEventArgs e)
+    {
+        if (GlisseCode is null) return;
+        // Un simple clic ne doit pas reordonner : on n entre en glissement
+        // qu au-dela de quelques pixels.
+        if (!GlisseEnCours
+            && Math.Abs(e.ClientX - GlisseDepartX) + Math.Abs(e.ClientY - GlisseDepartY) < 6) return;
+        GlisseEnCours = true;
+
+        // Tire HORS de la barre d onglets (vers le bas, ou hors de la fenetre) :
+        // l onglet part TOUT DE SUITE dans sa fenetre, qui nait sous le pointeur
+        // et le suit jusqu au lacher -- comme un navigateur. Attendre le lacher
+        // laissait l utilisateur glisser dans le vide, sans rien voir bouger.
+        if (e.ClientY > BasBarreOnglets + ArrachageOnglet.MargeDefaut
+            || ArrachageOnglet.EstSorti(e.ClientX, e.ClientY, 0, 0, LargeurBarre, HauteurPage))
+        {
+            var code = GlisseCode;
+            GlisseCode = null;
+            GlisseEnCours = false;
+            _ = Module?.InvokeVoidAsync("finirGlisseOnglet").AsTask();
+            DetacherOnglet(code, suivreCurseur: true);
+            RetenirAgencement();
+            return;
+        }
+
+        var de = Onglets.IndexDe(GlisseCode);
+        // Les places mesurees au debut du geste servent de reperes : elles ne
+        // sont pas remesurees a chaque pixel, la barre bougerait sous le doigt.
+        var vers = EtatOnglets.IndexCible(CasesOnglets, e.ClientX);
+        if (de >= 0 && vers != de) Onglets.Deplacer(de, vers);
+    }
+
+    private void FinGlisse(PointerEventArgs e)
+    {
+        var code = GlisseCode;
+        GlisseCode = null;
+        if (code is null) return;
+
+        if (!GlisseEnCours)
+        {
+            Onglets.Activer(code);
+        }
+        else if (ArrachageOnglet.EstSorti(e.ClientX, e.ClientY, 0, 0, LargeurBarre, HauteurPage))
+        {
+            // LACHE HORS DE LA FENETRE : l onglet part dans sa propre fenetre,
+            // qu on peut poser sur le second ecran.
+            DetacherOnglet(code);
+        }
+        GlisseEnCours = false;
+        RetenirAgencement();
+    }
+
+    private void FermerOnglet(string code)
+    {
+        var fenetre = FenetresVues.FirstOrDefault(f => f.Code == code);
+        Onglets.Fermer(code);
+        // Fermer l onglet ferme AUSSI sa fenetre : sinon la fenetre resterait
+        // orpheline, sans onglet pour la retrouver.
+        fenetre?.Close();
+        RetenirAgencement();
+    }
+
+    /// <summary>Sort l onglet dans sa propre fenetre. L onglet reste dans la
+    /// barre, grise : c est ce qui dit ou la vue est partie, et le clic dessus
+    /// ramene la fenetre au premier plan.</summary>
+    private void DetacherOnglet(string code, bool suivreCurseur = false)
+    {
+        if (!ProcsConnues.TryGetValue(code, out var proc)) return;
+        if (!Onglets.Detacher(code)) return;
+        OuvrirFenetreVue(proc, suivreCurseur);
+    }
+
+    private void OuvrirFenetreVue(Proc proc, bool suivreCurseur = false)
+    {
+        var fenetre = new FenetreVue(proc.Code, proc.Libelle, FenetresVues.Count + 1, suivreCurseur);
+        fenetre.Closed += (_, _) =>
+        {
+            FenetresVues.Remove(fenetre);
+            if (VueFermee) return;
+            // Fermer la fenetre RAMENE la vue dans son onglet, comme un
+            // navigateur : rien n est perdu.
+            _ = InvokeAsync(() =>
+            {
+                Onglets.Rattacher(proc.Code);
+                RetenirAgencement();
+                StateHasChanged();
+            });
+        };
+        FenetresVues.Add(fenetre);
+        fenetre.Show();
+    }
+
+    /// <summary>Clic sur un onglet : on l active, ou on ramene sa fenetre
+    /// devant s il a ete sorti.</summary>
+    private void ActiverOnglet(OngletVue onglet)
+    {
+        if (onglet.Detache)
+        {
+            var fenetre = FenetresVues.FirstOrDefault(f => f.Code == onglet.Code);
+            if (fenetre is not null) { fenetre.Activate(); return; }
+            Onglets.Rattacher(onglet.Code);
+        }
+        else Onglets.Activer(onglet.Code);
+        RetenirAgencement();
+    }
+
+    /// <summary>Retient l AGENCEMENT : les onglets, leur ordre, celui qui est
+    /// actif, et ceux qui sont sortis en fenetre. C est ce qui se rejoue au
+    /// demarrage suivant.</summary>
+    private bool EnRestauration;
+
+    private void RetenirAgencement()
+    {
+        // Pendant la restauration on REJOUE l agencement : le reecrire a chaque
+        // onglet repose ecraserait le fichier avant meme de l avoir fini de lire.
+        if (ModeFenetreVue || EnRestauration) return;
+        try
+        {
+            AccueilEtat.MemoriserOnglets(
+                Onglets.Codes(),
+                Onglets.Actuel?.Code ?? string.Empty,
+                Onglets.Onglets.Where(o => o.Detache).Select(o => o.Code).ToList());
+        }
+        catch (System.IO.IOException) { }
+    }
+
+    /// <summary>Rejoue l agencement retenu : memes onglets, meme ordre, meme
+    /// onglet actif, et les vues sorties retrouvent leur fenetre.</summary>
+    private void RestaurerAgencement()
+    {
+        if (ModeFenetreVue)
+        {
+            // Une fenetre d onglet arrache ne montre QUE son ecran.
+            if (!string.IsNullOrWhiteSpace(VueInitiale)) OuvrirCode(VueInitiale!);
+            return;
+        }
+
+        EnRestauration = true;
+        try { RejouerOnglets(); } finally { EnRestauration = false; }
+    }
+
+    private void RejouerOnglets()
+    {
+        foreach (var code in Etat.OngletsVue.ToList()) OuvrirCode(code);
+        foreach (var code in Etat.VuesDetachees.ToList()) DetacherOnglet(code);
+
+        if (!string.IsNullOrWhiteSpace(Etat.OngletActif)
+            && Onglets.IndexDe(Etat.OngletActif) >= 0
+            && !Etat.VuesDetachees.Contains(Etat.OngletActif))
+            Onglets.Activer(Etat.OngletActif);
+        else Onglets.Masquer();
     }
 
     /// <summary>L'affaire depuis laquelle un traitement a ete lance. Sans elle,
@@ -3074,8 +3881,9 @@
 
     private void FermerProc()
     {
-        ProcOuverte = null;
-        if (RetourAffaire is not null)
+        if (Onglets.Actuel is { } courant) Onglets.Fermer(courant.Code);
+        RetenirAgencement();
+        if (Onglets.Montre is null && RetourAffaire is not null)
         {
             DossierOuvert = RetourAffaire;
             RetourAffaire = null;
@@ -3095,7 +3903,9 @@
             : new[] { "PROC_DEMANDE", "PROC_ACTES_NUM", "PROC_DOC_DEMAT", "PROC_CLOT", "PROC_FACTURE" };
 
         var connus = Groupes.SelectMany(g => g.Procs).ToDictionary(p => p.Code);
-        return codes.Where(connus.ContainsKey).Select(c => connus[c]).ToArray();
+        return codes.Where(connus.ContainsKey)
+                    .Where(c => PerimetreProfil.Visible(c, Domaines))
+                    .Select(c => connus[c]).ToArray();
     }
 
     /// <summary>
@@ -3118,8 +3928,47 @@
                                 demande?.Statut ?? "action");
         }
 
-        ProcOuverte = null;
+        // On QUITTE la vue courante sans fermer les onglets : comme un
+        // navigateur, ils restent la et on y revient d un clic.
+        Onglets.Masquer();
+
+        // UNE TACHE NE SUIT PAS SUR UNE AUTRE AFFAIRE. Quitter le dossier de
+        // la tache pour un autre referme le mode replie : sans cela l arbre
+        // du nouveau dossier restait filtre par la recette d un autre.
+        if (RecetteActive is not null && AffaireDeLaTache != numeroDossier)
+        {
+            RecetteActive = null;
+            AffaireDeLaTache = null;
+            ToutLeDossier = false;
+        }
+
+        // OUVRIR UN DOSSIER QUI A UNE TACHE EN ATTENTE, C EST OUVRIR SA TACHE.
+        // Le greffier qui entre par le courrier ou par la file tombait sur le
+        // dossier ENTIER : 521 champs pour une demande qui n en porte que
+        // deux. Le mode replie n existait que par l alerte de l accueil. Il
+        // est desormais pose ICI, au point d entree commun a tous les ecrans,
+        // donc le chemin est le meme d ou qu on vienne. Le dossier reste
+        // entier : le bandeau de tache porte « Afficher tout le dossier ».
+        if (RecetteActive is null && TacheEnAttente(numeroDossier) is { } attendue)
+        {
+            OuvrirTache(attendue.Recette, numeroDossier);
+            return;
+        }
+
         OuvrirDossier(connu);
+    }
+
+    /// <summary>La tache encore a faire sur cette affaire, s il y en a une.
+    /// Lue dans le MEME releve que les alertes de l accueil : une tache close
+    /// n en ressort pas, et l ecran d ou l on vient n a rien a declarer.</summary>
+    private (RecetteTache Recette, string Code)? TacheEnAttente(string numeroDossier)
+    {
+        foreach (var a in AlertesOuvertes())
+        {
+            if (a.Tache is not { } t || t.Dossier != numeroDossier) continue;
+            if (RecettesTaches.ParCode(t.Code) is { } r) return (r, t.Code);
+        }
+        return null;
     }
 
     // ================= Saisie guidee (la frise) =================
@@ -3761,11 +4610,18 @@
     private RenderFragment CorpsPerformance => @<div class="rig-perf">
         @foreach (var m in Mesures.Where(m => MesureActive(m.Libelle)))
         {
-            <div class="rig-perf__mesure">
-                <div class="rig-perf__valeur">@m.Valeur</div>
-                <div class="rig-perf__libelle" title="@m.Libelle">@m.Libelle</div>
-                <div class="rig-perf__barre">
+            <div class="rig-perf__mesure rig-perf__mesure--@m.Statut">
+                <div class="rig-perf__entete">
+                    <span class="rig-perf__libelle" title="@m.Libelle">@m.Libelle</span>
+                    <span class="rig-perf__chiffres">
+                        <b class="rig-perf__valeur">@m.Valeur</b>
+                        <span class="rig-perf__objectif-texte">@m.ObjectifTexte</span>
+                    </span>
+                </div>
+                <div class="rig-perf__barre" role="img"
+                     aria-label="@m.Libelle : @m.Valeur, @m.ObjectifTexte, objectif atteint a @(m.Atteinte) %">
                     <span style="width:@(m.Part)%;background:var(--rig-grad-@m.Statut)"></span>
+                    <i class="rig-perf__repere" style="left:@(m.Objectif)%"></i>
                 </div>
             </div>
         }
@@ -3776,11 +4632,56 @@
     private readonly AlertesGreffe SondeAlertes = new();
     private AlerteGreffe[] Alertes = [];
 
+    /// <summary>Les constats calcules, montres par la tuile « Mes taches du jour ».</summary>
+    private AlerteGreffe[] Taches = [];
+
+    /// <summary>Ce que la tuile des taches montre : le plus grave en tete.</summary>
+    private AlerteGreffe[] TachesVues
+        => Taches.OrderByDescending(a => a.Gravite)
+                 .ThenBy(a => a.Titre, StringComparer.OrdinalIgnoreCase)
+                 .ToArray();
+
     /// <summary>Reglages d'affichage de la tuile, conserves dans accueil.json.</summary>
     private ReglagesAlertes ReglagesAlertes => Etat.ReglagesAlertes;
 
     /// <summary>Ce que la tuile montre reellement : ecoute, gravite, ordre, plafond.</summary>
-    private AlerteGreffe[] AlertesVues => ReglagesAlertes.Appliquer(Alertes, AlerteActive);
+    private AlerteGreffe[] AlertesVues
+        => ReglagesAlertes.Appliquer(Alertes, AlerteActive, CategorieActive);
+
+    /// <summary>Les alertes vues, GROUPEES par categorie, dans l'ordre du
+    /// catalogue metier. Une categorie sans alerte visible ne fait pas de
+    /// titre vide : elle disparait.</summary>
+    private (string Categorie, AlerteGreffe[] Lignes)[] AlertesParCategorie
+        => CatalogueAlertes.Categories
+            .Select(c => (Categorie: c, Lignes: AlertesVues.Where(a => a.Categorie == c).ToArray()))
+            .Where(g => g.Lignes.Length > 0)
+            .ToArray();
+
+    /// <summary>Une categorie eteinte masque TOUTES ses alertes. Absente des
+    /// reglages = surveillee : une nouvelle categorie livree plus tard se voit
+    /// sans que personne ait a l'allumer.</summary>
+    private bool CategorieActive(string categorie)
+        => !Etat.CategoriesAlertes.TryGetValue(CatalogueAlertes.IdentifiantCategorie(categorie), out var v) || v;
+
+    /// <summary>Une categorie REPLIEE garde son titre et son compte, mais cache
+    /// ses lignes. C'est un rangement de lecture, pas un filtre : les alertes
+    /// restent comptees dans le statut de la tuile.</summary>
+    private bool CategorieRepliee(string categorie)
+        => Etat.CategoriesRepliees.TryGetValue(CatalogueAlertes.IdentifiantCategorie(categorie), out var v) && v;
+
+    private void BasculerRepliCategorie(string categorie)
+    {
+        var id = CatalogueAlertes.IdentifiantCategorie(categorie);
+        Etat.CategoriesRepliees[id] = !CategorieRepliee(categorie);
+        Etat.Enregistrer();
+    }
+
+    private void BasculerCategorie(string categorie)
+    {
+        var id = CatalogueAlertes.IdentifiantCategorie(categorie);
+        Etat.CategoriesAlertes[id] = !(Etat.CategoriesAlertes.TryGetValue(id, out var v) && v);
+        Etat.Enregistrer();
+    }
 
     private void BasculerAlerte(string id)
     {
@@ -3845,13 +4746,32 @@
         {
             <div class="rig-vide">Aucune alerte a afficher. Ouvrir les reglages de la tuile pour elargir.</div>
         }
-        @foreach (var item in AlertesVues)
+        @foreach (var groupe in AlertesParCategorie)
+        {
+        var cat = groupe.Categorie;
+        var repliee = CategorieRepliee(cat);
+        <div class="rig-alerte-groupe">
+            <button class="rig-kicker rig-groupe-tete" type="button"
+                    title="@(repliee ? "Deplier" : "Replier") la categorie @cat"
+                    aria-expanded="@((!repliee).ToString().ToLowerInvariant())"
+                    @onclick="() => BasculerRepliCategorie(cat)">
+                <span class="rig-groupe-tete__chevron @(repliee ? "rig-groupe-tete__chevron--replie" : "")">&rsaquo;</span>
+                <span>@cat</span>
+                @* 17/09/2026 : le compte de la categorie n'est plus le nombre de
+                   LIGNES mais la CHARGE -- la somme des elements a traiter de
+                   ses lignes. Une categorie de 3 lignes qui cache 60 dossiers
+                   ne doit pas s'annoncer « 3 ». *@
+                <span class="rig-groupe-tete__compte">@groupe.Lignes.Sum(x => x.Nombre)</span>
+            </button>
+        @foreach (var item in repliee ? [] : groupe.Lignes)
         {
             var a = item;
             <button class="rig-alerte rig-alerte--lien" type="button"
                     title="Aller vers @a.LibelleCible"
                     @onclick="() => OuvrirAlerte(a)">
-                <span class="rig-filet-v rig-filet-v--@a.Statut"></span>
+                @* 17/09/2026 : le COMBIEN remplace la barre de couleur. Le
+                   niveau d'importance n'est pas perdu : il colore le chiffre. *@
+                <span class="rig-alerte__compte rig-alerte__compte--@PanneauMetier.Palier(a.Nombre)">@a.Nombre</span>
                 <span class="rig-alerte__corps">
                     <span class="rig-alerte__titre">@a.Titre</span>
                     @if (ReglagesAlertes.AfficherDetail)
@@ -3863,6 +4783,89 @@
                 <span class="rig-alerte__vers">@a.LibelleCible &rsaquo;</span>
             </button>
         }
+        </div>
+        }
+    </div>;
+
+    // La tuile des taches : les constats calcules sur les dossiers. Le clic
+    // passe par le MEME chemin que les alertes (OuvrirAlerte) : une ligne
+    // task driven ouvre la tache et replie la vue sur ce qu'il faut editer.
+    private RenderFragment CorpsTaches => @<div>
+        @if (TachesVues.Length == 0)
+        {
+            <div class="rig-vide">Aucune tache en attente sur les dossiers connus.</div>
+        }
+        @foreach (var item in TachesVues)
+        {
+            var a = item;
+            <button class="rig-alerte rig-alerte--lien" type="button"
+                    title="Aller vers @a.LibelleCible"
+                    @onclick="() => OuvrirAlerte(a)">
+                <span class="rig-alerte__compte rig-alerte__compte--@PanneauMetier.Palier(a.Nombre)">@a.Nombre</span>
+                <span class="rig-alerte__corps">
+                    <span class="rig-alerte__titre">@a.Titre</span><br />
+                    <span class="rig-alerte__detail">@a.Detail</span>
+                </span>
+                <span class="rig-alerte__vers">@a.LibelleCible &rsaquo;</span>
+            </button>
+        }
+    </div>;
+
+    // ================= Actualites ==================
+    // Des messages REDIGES, lus dans un fichier PARTAGE. Le reseau peut etre
+    // coupe : on affiche alors le dernier bon contenu ET on l'ECRIT sous la
+    // tuile -- sans cette ligne, l'utilisateur croirait lire l'actualite du
+    // jour alors qu'il lit celle d'avant-hier.
+    private readonly DepotActualites Actualites = new();
+    private LectureActualites ActualitesVues = new([], SourceActualites.Aucune, null, string.Empty);
+    private Timer? MinuteurActualites;
+
+    private string EtatActualites => ActualitesVues.Etat;
+
+    /// <summary>
+    /// Releve les actualites. Au TOUT PREMIER demarrage, aucun fichier partage
+    /// n'existe encore : on y SEME les deux actualites dictees par le metier
+    /// (fraude CNG, INPI HS) plutot que d'afficher une tuile vide. Sans cela,
+    /// le widget ne montre rien tant que personne n'a redige, et personne ne
+    /// redige tant que le widget ne montre rien.
+    /// </summary>
+    private void ReleveActualites()
+    {
+        var maintenant = DateTime.Now;
+        var lu = Actualites.Lire(maintenant);
+        if (lu.Source == SourceActualites.Aucune
+            && Actualites.Ecrire(DepotActualites.Exemples(maintenant)))
+        {
+            lu = Actualites.Lire(maintenant);
+        }
+        ActualitesVues = lu;
+    }
+
+    private RenderFragment CorpsActualites => @<div>
+        @if (ActualitesVues.Actifs.Length == 0)
+        {
+            <div class="rig-vide">Aucune actualite en cours.</div>
+        }
+        @foreach (var item in ActualitesVues.Actifs)
+        {
+            var b = item;
+            <div class="rig-alerte">
+                <span class="rig-filet-v rig-filet-v--@b.Fiche.Filet"></span>
+                <span class="rig-alerte__corps">
+                    <span class="rig-actualite__type rig-actualite__type--@b.Fiche.Filet">@b.Fiche.Libelle</span><span class="rig-alerte__titre">@b.Titre</span><br />
+                    <span class="rig-alerte__detail">@b.Message</span><br />
+                    <span class="rig-alerte__detail">@b.Auteur — @b.Horodatage</span>
+                </span>
+            </div>
+        }
+        <button class="rig-alerte rig-alerte--lien" type="button"
+                title="Ouvrir la redaction des actualites"
+                @onclick="@(() => OuvrirCode("PROC_ACTUALITES"))">
+            <span class="rig-alerte__corps">
+                <span class="rig-alerte__detail">@EtatActualites</span>
+            </span>
+            <span class="rig-alerte__vers">Rediger &rsaquo;</span>
+        </button>
     </div>;
 
     // ================= Reglages d'une tuile =================
@@ -3876,12 +4879,405 @@
     // quelles mesures). Retirer la tuile de l'accueil n'est pas un reglage
     // de tuile : cela se fait dans les reglages generaux, dans la barre du
     // haut, seul endroit d'ou l'on peut aussi la faire revenir.
+    // ============ LES WIDGETS METIER (un par categorie de la Feuil2) ============
+
+    /// <summary>La categorie du catalogue portee par une tuile « metier-... ».
+    /// L'identifiant de tuile est stable et sans accent ; la categorie, elle,
+    /// vient du catalogue metier.</summary>
+    private static string MetierCategorie(string idTuile) => idTuile switch
+    {
+        "metier-arrivees"      => CatalogueAlertes.Arrivees,
+        "metier-formalites"    => CatalogueAlertes.Formalites,
+        "metier-notifications" => CatalogueAlertes.Notifications,
+        "metier-das"           => CatalogueAlertes.Das,
+        "metier-dca"           => CatalogueAlertes.Dca,
+        "metier-corrections"   => CatalogueAlertes.Corrections,
+        "metier-surveillances" => CatalogueAlertes.Surveillances,
+        _                      => CatalogueAlertes.Divers
+    };
+
+    /// <summary>Les alertes de la categorie, dans l'ordre du catalogue metier.
+    /// Volontairement NON filtrees par les reglages de la tuile « A traiter » :
+    /// un widget de categorie montre SA categorie en entier.</summary>
+    private AlerteGreffe[] MetierLignes(string categorie)
+        => Alertes.Where(a => a.Categorie == categorie).ToArray();
+
+    /// <summary>Ce que chaque widget metier a d'ouvert a droite, et ce qu'on a
+    /// tape dans sa recherche. Une entree vide = panneau de droite ferme.</summary>
+    private readonly Dictionary<string, string> MetierChoix = new();
+    private readonly Dictionary<string, string> MetierFiltre = new();
+
+    /// <summary>Les widgets metier DEPLOYES. La maquette du 17/09/2026 porte un
+    /// bouton de deploiement dans l'en-tete du panneau de gauche : la tuile fait
+    /// 6 colonnes sur 2 lignes, donc le tableau de droite n'y montre que quelques
+    /// demandes. Deployer sort le widget de la grille pour lire la liste en grand.</summary>
+    private readonly HashSet<string> MetierDeploye = new();
+
+    private bool MetierEstDeploye(string idTuile) => MetierDeploye.Contains(idTuile);
+
+    private void BasculerDeploiementMetier(string idTuile)
+    {
+        if (!MetierDeploye.Remove(idTuile)) MetierDeploye.Add(idTuile);
+    }
+
+    private AlerteGreffe? MetierAlerte(string idTuile, AlerteGreffe[] lignes)
+    {
+        if (lignes.Length == 0) return null;
+        return MetierChoix.TryGetValue(idTuile, out var id)
+            ? lignes.FirstOrDefault(a => a.Id == id) ?? lignes[0]
+            : lignes[0];
+    }
+
+    /// <summary>
+    /// Le clic sur une alerte du panneau de gauche. REPLIE, le widget n'a pas
+    /// de place pour la liste : il se DEPLOIE (demande du 17/09/2026), et la
+    /// liste montree est celle de l'alerte qu'on vient de choisir. Sans cela le
+    /// clic ne produisait rien de visible -- il ne faisait que preparer un
+    /// panneau qui n'existait pas encore.
+    /// </summary>
+    private void ChoisirMetier(string idTuile, string idAlerte)
+    {
+        MetierChoix[idTuile] = idAlerte;
+        MetierMenu = null;
+        if (!MetierEstDeploye(idTuile)) MetierDeploye.Add(idTuile);
+    }
+
+    private void FermerMetier(string idTuile)
+    {
+        MetierChoix[idTuile] = "";
+    }
+
+    /// <summary>
+    /// La croix du panneau de droite. DEPLOYE, elle REDUIT le widget -- elle le
+    /// remet dans la grille (demande du 17/09/2026) : retirer le tableau sans
+    /// replier aurait laisse un widget plein ecran a moitie vide. Replie, il n'y
+    /// a rien a reduire : elle ferme le panneau.
+    /// </summary>
+    private void ReduireMetier(string idTuile)
+    {
+        MetierMenu = null;
+        if (MetierEstDeploye(idTuile)) { BasculerDeploiementMetier(idTuile); return; }
+        FermerMetier(idTuile);
+    }
+
+    /// <summary>Le widget dont le menu « trois points » est ouvert. UN SEUL a la
+    /// fois : deux menus ouverts sur deux widgets voisins se recouvriraient.</summary>
+    private string? MetierMenu;
+
+    private bool MetierMenuOuvert(string idTuile) => MetierMenu == idTuile;
+
+    private void BasculerMenuMetier(string idTuile)
+        => MetierMenu = MetierMenu == idTuile ? null : idTuile;
+
+    /// <summary>« Ouvrir le dossier » du menu : le MEME chemin que le clic sur
+    /// une alerte, et le menu se referme -- sinon il resterait ouvert par-dessus
+    /// l'ecran qui vient de s'ouvrir.</summary>
+    private void OuvrirDepuisMenuMetier(string idTuile, AlerteGreffe? alerte)
+    {
+        MetierMenu = null;
+        if (alerte is not null) OuvrirAlerte(alerte);
+    }
+
+    /// <summary>« Rafraichir les compteurs » : relit les alertes et les mesures
+    /// a la source, comme au demarrage. Le menu se referme pour que le nouveau
+    /// compte soit visible.</summary>
+    private void RafraichirMetier(string idTuile)
+    {
+        MetierMenu = null;
+        Alertes = AlertesOuvertes();
+        Taches = TachesOuvertes();
+        RelevePerf();
+    }
+
+    /// <summary>« Parametrer le widget » : ouvre le panneau de reglages de la
+    /// tuile, celui de l'engrenage de son en-tete.</summary>
+    private void ParametrerMetier(string idTuile)
+    {
+        MetierMenu = null;
+        BasculerReglages(idTuile);
+    }
+
+    private void FiltrerMetier(string idTuile, ChangeEventArgs e)
+    {
+        MetierFiltre[idTuile] = e.Value?.ToString() ?? "";
+    }
+
+    private string MetierFiltreDe(string idTuile)
+        => MetierFiltre.TryGetValue(idTuile, out var f) ? f : "";
+
+    /// <summary>Les lignes du panneau de droite, filtrees par la recherche du
+    /// widget (numero de chrono ou societe).</summary>
+    private DemandeAlerte[] MetierDemandes(string idTuile, AlerteGreffe alerte)
+    {
+        var filtre = MetierFiltreDe(idTuile).Trim();
+        var lignes = PanneauMetier.Lignes(alerte);
+        return filtre.Length == 0
+            ? lignes
+            : lignes.Where(l => l.Chrono.Contains(filtre, StringComparison.OrdinalIgnoreCase)
+                             || l.Societe.Contains(filtre, StringComparison.OrdinalIgnoreCase)).ToArray();
+    }
+
+    /// <summary>
+    /// Le corps d'un widget metier : deux panneaux, comme la maquette metier du
+    /// 17/09/2026. A GAUCHE la recherche, les gestes de la categorie, trois
+    /// compteurs et la liste des alertes ; A DROITE les demandes de l'alerte
+    /// selectionnee. Les BOUTONS DE GESTE sont de la maquette : ils nomment le
+    /// geste, ils ne l'executent pas -- ils sont desactives, pas trompeurs.
+    /// </summary>
+    private RenderFragment CorpsMetier(DefinitionTuile def) => @<div class="rig-metier @(MetierEstDeploye(def.Id) ? "rig-metier--deploye" : "")">
+        @{
+            var cat = MetierCategorie(def.Id);
+            var lignes = MetierLignes(cat);
+            var choisie = MetierAlerte(def.Id, lignes);
+            var ferme = MetierChoix.TryGetValue(def.Id, out var choix) && choix.Length == 0;
+            // Demande du 17/09/2026 : replie, le widget ne montre QUE sa colonne
+            // de gauche -- c'est la lecture courante. La liste des demandes est
+            // une consultation, elle n'apparait qu'une fois le widget DEPLOYE.
+            var ouverte = (ferme || !MetierEstDeploye(def.Id)) ? null : choisie;
+            var filtre = MetierFiltreDe(def.Id);
+        }
+        <div class="rig-metier__gauche">
+            <div class="rig-metier__tete">
+                <span class="rig-metier__registre">@PanneauMetier.Registre(cat)</span>
+                <span class="rig-metier__titre">@PanneauMetier.Titre(cat)</span>
+                @{ var charge = lignes.Sum(a => a.Nombre); }
+                <span class="rig-metier__charge rig-metier__charge--@PanneauMetier.Palier(charge)"
+                      title="@charge element(s) a traiter dans cette categorie">@charge</span>
+                <button class="rig-metier__deployer" type="button"
+                        title="@(MetierEstDeploye(def.Id) ? "Replier le widget" : "Deployer pour voir la liste en grand")"
+                        aria-pressed="@(MetierEstDeploye(def.Id) ? "true" : "false")"
+                        @onclick="() => BasculerDeploiementMetier(def.Id)"
+                        @onmousedown:stopPropagation="true">@(MetierEstDeploye(def.Id) ? "⤡" : "⛶")</button>
+                @* Le menu des GESTES de la categorie (maquette du 17/09/2026) :
+                   l'en-tete ne peut pas porter six boutons, et les gestes rares
+                   (radier, parametrer) n'ont pas a occuper la place des trois
+                   gestes courants. *@
+                <button class="rig-metier__menu-bouton @(MetierMenuOuvert(def.Id) ? "rig-metier__menu-bouton--ouvert" : "")"
+                        type="button" title="Autres gestes de ce widget"
+                        aria-expanded="@(MetierMenuOuvert(def.Id) ? "true" : "false")"
+                        @onclick="() => BasculerMenuMetier(def.Id)"
+                        @onmousedown:stopPropagation="true">&#8942;</button>
+            </div>
+            @if (MetierMenuOuvert(def.Id))
+            {
+                <div class="rig-metier__menu" @onmousedown:stopPropagation="true">
+                    @{ var gestes = PanneauMetier.ActionsDe(cat); }
+                    @if (gestes.Length > 0)
+                    {
+                        <button class="rig-metier__menu-ligne rig-metier__menu-ligne--phare"
+                                type="button" disabled
+                                title="Maquette : ce geste n'est pas encore branché">
+                            <span class="rig-metier__menu-glyphe">+</span>@gestes[0]
+                        </button>
+                    }
+                    <div class="rig-metier__menu-filet"></div>
+                    <button class="rig-metier__menu-ligne" type="button"
+                            disabled="@(ouverte is null)"
+                            title="@(ouverte is null ? "Choisir une alerte d'abord" : "Aller vers " + ouverte.LibelleCible)"
+                            @onclick="() => OuvrirDepuisMenuMetier(def.Id, ouverte)">
+                        <span class="rig-metier__menu-glyphe">&#8599;</span>Ouvrir le dossier
+                    </button>
+                    @foreach (var geste in gestes.Skip(1))
+                    {
+                        <button class="rig-metier__menu-ligne" type="button" disabled
+                                title="Maquette : ce geste n'est pas encore branché">
+                            <span class="rig-metier__menu-glyphe">&#9633;</span>@geste
+                        </button>
+                    }
+                    <div class="rig-metier__menu-filet"></div>
+                    <button class="rig-metier__menu-ligne" type="button"
+                            title="Relire les alertes et les compteurs"
+                            @onclick="() => RafraichirMetier(def.Id)">
+                        <span class="rig-metier__menu-glyphe">&#8635;</span>Rafraichir les compteurs
+                    </button>
+                    <button class="rig-metier__menu-ligne" type="button"
+                            title="Ouvrir les reglages de cette tuile"
+                            @onclick="() => ParametrerMetier(def.Id)">
+                        <span class="rig-metier__menu-glyphe">&#9881;</span>Parametrer le widget
+                    </button>
+                </div>
+            }
+            <div class="rig-metier__recherche">
+                <span class="rig-metier__loupe">&#128269;</span>
+                <input class="rig-metier__saisie" placeholder="N° de dossier ou société"
+                       value="@filtre"
+                       @oninput="e => FiltrerMetier(def.Id, e)"
+                       @onmousedown:stopPropagation="true" />
+                @* Etiquette de la maquette : elle dit ce que la recherche
+                   CIBLE, elle est donc toujours lisible -- pas seulement une
+                   fois qu'on a tape. *@
+                <span class="rig-metier__puce @(filtre.Trim().Length > 0 ? "rig-metier__puce--active" : "")">dossier ciblé</span>
+            </div>
+            <div class="rig-metier__gestes">
+                @foreach (var geste in PanneauMetier.ActionsDe(cat))
+                {
+                    <button class="rig-metier__geste" type="button" disabled
+                            title="Maquette : ce geste n'est pas encore branché">@geste</button>
+                }
+            </div>
+            <div class="rig-metier__compteurs">
+                <div class="rig-metier__compteur">
+                    <span class="rig-metier__chiffre">@lignes.Sum(a => a.Nombre)</span>
+                    <span class="rig-metier__legende">à traiter</span>
+                </div>
+                <div class="rig-metier__compteur">
+                    <span class="rig-metier__chiffre">@PanneauMetier.Urgents(lignes)</span>
+                    <span class="rig-metier__legende">urgents</span>
+                </div>
+                <div class="rig-metier__compteur">
+                    <span class="rig-metier__chiffre">@PanneauMetier.Demat(lignes)</span>
+                    <span class="rig-metier__legende">démat.</span>
+                </div>
+            </div>
+            <div class="rig-kicker">Alertes</div>
+            @if (lignes.Length == 0)
+            {
+                <div class="rig-vide">Aucune alerte declaree dans cette categorie.</div>
+            }
+            @foreach (var item in lignes)
+            {
+                var a = item;
+                <button class="rig-metier__ligne @(ouverte is not null && ouverte.Id == a.Id ? "rig-metier__ligne--active" : "")"
+                        type="button"
+                        title="@(MetierEstDeploye(def.Id) ? "Voir les demandes de : " + a.Titre : "Agrandir le widget sur les demandes de : " + a.Titre)"
+                        @onclick="() => ChoisirMetier(def.Id, a.Id)"
+                        @onmousedown:stopPropagation="true">
+                    <span class="rig-alerte__compte rig-alerte__compte--@PanneauMetier.Palier(a.Nombre)">@a.Nombre</span>
+                    <span class="rig-metier__ligne-titre">@a.Titre</span>
+                </button>
+            }
+        </div>
+        @if (MetierEstDeploye(def.Id))
+        {
+        @PanneauDemandes(def.Id, ouverte)
+        }
+    </div>;
+
+    /// <summary>Le panneau de droite : les demandes de l'alerte ouverte. PARTAGE
+    /// par les widgets metier et « A traiter BIS » -- un seul tableau.</summary>
+    private RenderFragment PanneauDemandes(string idTuile, AlerteGreffe? ouverte) => @<text>
+        <div class="rig-metier__droite">
+            @if (ouverte is null)
+            {
+                <div class="rig-vide">Choisir une alerte à gauche pour voir ses demandes.</div>
+            }
+            else
+            {
+                var demandes = MetierDemandes(idTuile, ouverte);
+                <div class="rig-metier__droite-tete">
+                    <span class="rig-alerte__compte rig-alerte__compte--@PanneauMetier.Palier(ouverte.Nombre)">@ouverte.Nombre</span>
+                    <span class="rig-metier__droite-titre">@ouverte.Titre</span>
+                    <span class="rig-metier__droite-compte">@demandes.Length demande(s)</span>
+                    <button class="rig-metier__ouvrir" type="button"
+                            title="Aller vers @ouverte.LibelleCible"
+                            @onclick="() => OuvrirAlerte(ouverte)"
+                            @onmousedown:stopPropagation="true">Ouvrir &rsaquo;</button>
+                    <button class="rig-metier__fermer" type="button"
+                            title="@(MetierEstDeploye(idTuile) ? "Reduire le widget" : "Fermer le panneau")"
+                            @onclick="() => ReduireMetier(idTuile)"
+                            @onmousedown:stopPropagation="true">&times;</button>
+                </div>
+                @if (demandes.Length == 0)
+                {
+                    <div class="rig-vide">Aucune demande ne correspond à la recherche.</div>
+                }
+                else
+                {
+                    <table class="rig-metier__table">
+                        <thead>
+                            <tr>
+                                <th>N° chrono</th><th>Société</th><th>SIREN</th><th>Type</th>
+                                <th>Reçu le</th><th>Anc.</th><th>État</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var d in demandes)
+                            {
+                                <tr>
+                                    <td><button class="rig-metier__chrono" type="button"
+                                                title="Ouvrir le dossier @d.Chrono"
+                                                @onclick="() => OuvrirParNumero(d.Chrono)"
+                                                @onmousedown:stopPropagation="true">@d.Chrono</button></td>
+                                    <td>@d.Societe</td>
+                                    <td class="rig-metier__siren">@d.Siren</td>
+                                    <td>@d.Type</td>
+                                    <td>@d.RecuLe</td>
+                                    <td>@d.Anciennete j</td>
+                                    <td>@d.Etat</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            }
+        </div>
+    </text>;
+
+    /// <summary>« A traiter BIS » : l'arbre de toutes les categories (comme
+    /// « A traiter ») a gauche ; le clic sur une alerte la SELECTIONNE et montre
+    /// ses demandes a droite, au lieu d'ouvrir l'ecran cible.</summary>
+    private RenderFragment CorpsAlertesBis => @<div class="rig-metier rig-metier--bis">
+        @{
+            const string id = "alertes-bis";
+            var vues = AlertesVues;
+            var choisie = MetierAlerte(id, vues);
+            var ouverte = MetierChoix.TryGetValue(id, out var choix) && choix.Length == 0 ? null : choisie;
+        }
+        <div class="rig-metier__gauche">
+            @if (vues.Length == 0)
+            {
+                <div class="rig-vide">Aucune alerte a afficher. Ouvrir les reglages de « A traiter » pour elargir.</div>
+            }
+            @foreach (var groupe in AlertesParCategorie)
+            {
+                var cat = groupe.Categorie;
+                var repliee = CategorieRepliee(cat);
+                <div class="rig-alerte-groupe">
+                    <button class="rig-kicker rig-groupe-tete" type="button"
+                            title="@(repliee ? "Deplier" : "Replier") la categorie @cat"
+                            aria-expanded="@((!repliee).ToString().ToLowerInvariant())"
+                            @onclick="() => BasculerRepliCategorie(cat)"
+                            @onmousedown:stopPropagation="true">
+                        <span class="rig-groupe-tete__chevron @(repliee ? "rig-groupe-tete__chevron--replie" : "")">&rsaquo;</span>
+                        <span>@cat</span>
+                        <span class="rig-groupe-tete__compte">@groupe.Lignes.Sum(x => x.Nombre)</span>
+                    </button>
+                    @foreach (var item in repliee ? [] : groupe.Lignes)
+                    {
+                        var a = item;
+                        <button class="rig-metier__ligne @(ouverte is not null && ouverte.Id == a.Id ? "rig-metier__ligne--active" : "")"
+                                type="button" title="Voir les demandes de : @a.Titre"
+                                @onclick="() => MetierChoix[id] = a.Id"
+                                @onmousedown:stopPropagation="true">
+                            <span class="rig-alerte__compte rig-alerte__compte--@PanneauMetier.Palier(a.Nombre)">@a.Nombre</span>
+                            <span class="rig-metier__ligne-titre">@a.Titre</span>
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+        @PanneauDemandes(id, ouverte)
+    </div>;
+
     private RenderFragment ReglagesDe(DefinitionTuile def) => @<div class="rig-reglages">
         @switch (def.Id)
         {
             case "alertes":
-                <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">Alertes surveillees</div>
-                @foreach (var a in Alertes)
+                <div class="rig-kicker" style="margin-bottom:var(--rig-esp-2)">Categories surveillees</div>
+                @foreach (var c in CatalogueAlertes.Categories)
+                {
+                    var cat = c;
+                    var vivante = CategorieActive(cat);
+                    <button class="rig-bascule @(vivante ? "rig-bascule--actif" : "")"
+                            title="Afficher ou masquer toutes les alertes de @cat"
+                            @onclick="() => BasculerCategorie(cat)">
+                        <span class="rig-bascule__temoin"></span>
+                        <span>@cat</span>
+                    </button>
+                }
+
+                <div class="rig-kicker" style="margin:var(--rig-esp-3) 0 var(--rig-esp-2)">Alertes surveillees</div>
+                @foreach (var a in Alertes.Where(x => CategorieActive(x.Categorie)))
                 {
                     var active = AlerteActive(a.Id);
                     <button class="rig-bascule @(active ? "rig-bascule--actif" : "")"
@@ -3951,12 +5347,6 @@
     // --- Le reste de l'accueil, inchange, simplement mis en tuiles
     private record Demande(string Numero, string Objet, string Delai, string Etat,
                            string Statut, string? VerrouillePar = null);
-    private record Service(string Nom, string Statut, string? Commentaire = null);
-    private record Contexte(string Numero, string Objet, string Etape, string Depuis);
-
-    private readonly Contexte? Reprise =
-        new("004182", "Immatriculation - AMIENS BILLARDS", "3/7 - Dirigeants", "il y a 18 h");
-
     private readonly Demande[] File =
     [
         new("004176", "Modification - SCI DU PARC",     "J+9", "hors delai",     "alerte"),
@@ -3964,125 +5354,6 @@
         new("004179", "Radiation - MARTIN EURL",        "J+1", "attente pieces", "attente"),
         new("004168", "Immatriculation - BATIPRO SARL", "",    "",               "neutre", "M. DURAND")
     ];
-
-    private readonly Service[] Services =
-    [
-        new("Base & editions",     "ok"),
-        new("Teletransmission",    "ok"),
-        new("Fusion documentaire", "alerte", "lente")
-    ];
-
-    private RenderFragment CorpsReprise => @<div style="display:flex;align-items:center;gap:var(--rig-esp-4)">
-        @if (Reprise is not null)
-        {
-            <span style="flex:1">
-                <span style="font-size:15px"><b>@Reprise.Numero</b> &middot; @Reprise.Objet</span><br />
-                <span style="font-size:12px;color:var(--rig-texte-3)">
-                    arrete a l'etape <b style="color:var(--rig-texte-2)">@Reprise.Etape</b> &mdash; @Reprise.Depuis
-                </span>
-            </span>
-            <button class="rig-bouton" @onclick="() => OuvrirParNumero(Reprise.Numero)">Reprendre</button>
-        }
-    </div>;
-
-    private RenderFragment CorpsFile => @<div>
-        @foreach (var d in File)
-        {
-            var valide = EstValide(d.Numero);
-            <div class="rig-ligne @(d.VerrouillePar is not null ? "rig-ligne--verrouille" : "") @(valide ? "rig-ligne--valide" : "")"
-                 @onclick="() => OuvrirParNumero(d.Numero)"
-                 style="cursor:pointer">
-                <span class="rig-filet-v rig-filet-v--@(valide ? "ok" : d.Statut)"></span>
-                <span>
-                    <span class="rig-ligne__id">@d.Numero</span><br />
-                    <span class="rig-ligne__objet">@d.Objet</span>
-                </span>
-                <span class="rig-ligne__droite">
-                    @if (valide)
-                    {
-                        <span class="rig-ligne__valide">valide</span>
-                    }
-                    else if (d.VerrouillePar is not null)
-                    {
-                        <span style="font-size:11px;color:var(--rig-texte-3)">
-                            ouvert par<br /><b>@d.VerrouillePar</b>
-                        </span>
-                    }
-                    else
-                    {
-                        <span class="@(d.Statut == "alerte" ? "rig-ligne__delai--alerte" : "")">@d.Delai</span>
-                        <br />
-                        <span style="font-size:11px;color:var(--rig-texte-3)">@d.Etat</span>
-                    }
-                </span>
-            </div>
-        }
-    </div>;
-
-    private RenderFragment CorpsServices => @<div>
-        @foreach (var s in Services)
-        {
-            <div class="rig-service">
-                <span class="rig-service__jauge" style="background:var(--rig-grad-@s.Statut)"></span>
-                @s.Nom
-                @if (s.Commentaire is not null)
-                {
-                    <span style="color:var(--rig-texte-3)">&middot; @s.Commentaire</span>
-                }
-            </div>
-        }
-    </div>;
-
-    private RenderFragment CorpsBrouillons => @<div style="font-size:var(--rig-fs-dense);color:var(--rig-texte-2)">
-        <div><b style="color:var(--rig-texte)">2</b> demandes commencees, jamais validees
-            <span style="color:var(--rig-texte-3)">&middot; 5 j et 12 j</span></div>
-        <div><b style="color:var(--rig-texte)">4</b> dossiers epingles</div>
-        <div style="color:var(--rig-texte-3)">10 dernieres demandes touchees</div>
-    </div>;
-
-    /// <summary>
-    /// Tuile « Mes affaires recentes » : les affaires REELLEMENT ouvertes,
-    /// la plus recente en tete. Un clic SIMPLE ouvre directement l'affaire.
-    /// </summary>
-    private RenderFragment CorpsRecents => @<div>
-        @if (Etat.Consultations.Count == 0)
-        {
-            <div class="rig-table__vide" style="padding:var(--rig-esp-3)">
-                Aucune affaire consultee pour l'instant. Les affaires que vous
-                ouvrez apparaitront ici, la plus recente en tete.
-            </div>
-        }
-        else
-        {
-            @foreach (var c in Etat.Consultations.Take(8))
-            {
-                var vue = c;
-                <div class="rig-ligne @(EstValide(vue.Numero) ? "rig-ligne--valide" : "")"
-                     @onclick="() => OuvrirParNumero(vue.Numero)"
-                     style="cursor:pointer">
-                    <span class="rig-filet-v rig-filet-v--@vue.Statut"></span>
-                    <span>
-                        <span class="rig-ligne__id">@vue.Numero</span><br />
-                        <span class="rig-ligne__objet">@vue.Objet</span>
-                    </span>
-                    <span class="rig-ligne__droite">
-                        <span style="font-size:12px;color:var(--rig-texte-2)">@vue.Depuis</span><br />
-                        <span style="font-size:11px;color:var(--rig-texte-3)">@vue.Type</span>
-                    </span>
-                </div>
-            }
-        }
-    </div>;
-
-    /// <summary>N° d'affaire pose dans la vue de recherche a son ouverture.</summary>
-    private string? NoAffaireDemande;
-
-    /// <summary>
-    /// Change quand le n° demande change : l'ecran est alors RECONSTRUIT,
-    /// sinon Blazor reutiliserait l'instance et le critere ne serait pas
-    /// repose (OnInitialized ne rejoue pas).
-    /// </summary>
-    private object CleRechAffaire => NoAffaireDemande ?? "toutes-les-affaires";
 
     /// <summary>SIREN pose dans l'ecran d'ouverture quand on y arrive depuis une
     /// recherche restee vide.</summary>
@@ -4100,14 +5371,108 @@
         OuvrirProc(new Proc("OUVERTURE_DOSSIER", "Ouverture d'un dossier RCS"));
     }
 
-    /// <summary>Le bouton d'entete : la vue de recherche, SANS aucun critere.</summary>
-    private void VoirToutesLesAffaires()
-    {
-        NoAffaireDemande = null;
-        OuvrirProc(new Proc("PROC_RECHAFF", "Recherche d'affaires"));
-    }
+    /// <summary>
+    /// Une nouveaute LIVREE. <paramref name="Module"/> est l'ecran ou elle vit,
+    /// <paramref name="Pictogramme"/> le code de l'icone (voir IconeNouveaute),
+    /// reconnue avant meme d'etre lue, et
+    /// <paramref name="Action"/> le debut de phrase A L'IMPERATIF : on annonce ce
+    /// que l'utilisateur PEUT FAIRE, pas ce qui a ete code.
+    /// </summary>
+    private record Nouveaute(string Module, string Pictogramme, string Teinte,
+        string Action, string Suite, string Detail);
 
-    private RenderFragment CorpsNouveautes => @<div style="font-size:var(--rig-fs-dense);color:var(--rig-texte-2)">
-        La saisie en masse accepte desormais <b style="color:var(--rig-texte)">les fichiers .csv</b>.
+    /// <summary>
+    /// Les nouveautes de la version en cours, la plus utile en tete. Liste
+    /// ECRITE A LA MAIN a chaque livraison : il n'y a pas de source a interroger,
+    /// et une nouveaute se redige, elle ne se deduit pas d'un journal de commits.
+    /// </summary>
+    private readonly Nouveaute[] Nouveautes =
+    [
+        new("MENU",     "boussole",     "vert",   "Cherchez par geste", "154 procedures",
+            "Le menu ne liste plus des modules mais des GESTES : tapez « immatriculer », "
+            + "« radier », « nantir » et la procedure remonte directement, sans passer par "
+            + "l'arborescence. Les 154 procedures du greffe sont couvertes."),
+        new("PROFIL",   "profil",       "bleu",   "Votre metier seul",  "le reste s'efface",
+            "Votre profil metier (greffier, formaliste, comptable) masque les ecrans qui ne "
+            + "vous concernent pas. Rien n'est supprime : le profil se change a tout moment "
+            + "depuis votre nom, en haut a droite."),
+        new("ACCUEIL",  "megaphone",    "or",     "Publiez une actualite", "vu par le greffe",
+            "Le widget Actualites permet d'ecrire une annonce visible par tout le greffe sur "
+            + "son accueil. Utile pour une consigne du jour ou une indisponibilite : elle "
+            + "s'affiche jusqu'a sa date de fin."),
+        new("AFFICHAGE","clair-sombre", "violet", "Clair ou sombre",    "choix retenu",
+            "Le theme clair et le theme sombre se basculent depuis l'entete. Le choix est "
+            + "retenu poste par poste et reapplique au prochain demarrage.")
+    ];
+
+    // --- Activite des utilisateurs : le journal des gestes de l'equipe, lu
+    // dans JournalActions. Le filtre vit ICI et non dans accueil.json : c'est
+    // une question du moment (« qu'a fait Claire ce matin ? »), pas un reglage
+    // qu'on veut retrouver demain matin.
+    private string FiltreActivite = string.Empty;
+
+    private ActionAgent[] ActivitesVues => JournalActions.De(FiltreActivite);
+
+    private RenderFragment CorpsActivite => @<div class="rig-activite">
+        <div class="rig-activite__barre">
+            <select class="rig-activite__filtre" aria-label="Filtrer par utilisateur"
+                    @bind="FiltreActivite" @onmousedown:stopPropagation="true">
+                <option value="">Tous les utilisateurs</option>
+                @foreach (var login in JournalActions.Agents)
+                {
+                    <option value="@login">@JeuDemo.Compte(login).Nom (@login)</option>
+                }
+            </select>
+            <span class="rig-activite__total">@ActivitesVues.Length geste(s)</span>
+        </div>
+        <div class="rig-activite__comptes">
+            @foreach (var c in JournalActions.ParAgentAujourdhui())
+            {
+                <span class="rig-activite__compte" title="@c.Agent : @c.Nombre geste(s) aujourd'hui">
+                    <b>@c.Nombre</b> @c.Agent
+                </span>
+            }
+        </div>
+        <ul class="rig-activite__liste">
+            @foreach (var a in ActivitesVues)
+            {
+                <li class="rig-activite__ligne">
+                    <span class="rig-filet-v rig-filet-v--action"></span>
+                    <span class="rig-activite__texte"><b>@a.Agent</b> @a.Verbe @a.Objet</span>
+                    <span class="rig-activite__quand">@a.Depuis</span>
+                </li>
+            }
+        </ul>
+    </div>;
+
+    // Le module de la nouveaute DEPLIEE, ou null quand tout est replie. Un seul
+    // panneau ouvert a la fois : la tuile est basse, deux details ouverts la
+    // feraient defiler au lieu de se lire d'un coup d'oeil.
+    private string? NouveauteOuverte;
+
+    private void BasculerNouveaute(string module)
+        => NouveauteOuverte = NouveauteOuverte == module ? null : module;
+
+    private RenderFragment CorpsNouveautes => @<div class="rig-nouv">
+        @foreach (var n in Nouveautes)
+        {
+            var ouverte = NouveauteOuverte == n.Module;
+            <button type="button"
+                    class="rig-nouv__ligne @(ouverte ? "rig-nouv__ligne--ouverte" : "")"
+                    aria-expanded="@(ouverte ? "true" : "false")"
+                    title="@(ouverte ? "Replier" : "Voir le detail")"
+                    @onclick="() => BasculerNouveaute(n.Module)"
+                    @onmousedown:stopPropagation="true">
+                <span class="rig-nouv__module rig-nouv__module--@n.Teinte">
+                    <IconeNouveaute Nom="@n.Pictogramme" />@n.Module
+                </span>
+                <span class="rig-nouv__texte"><b>@n.Action</b> @n.Suite</span>
+                <span class="rig-nouv__chevron">@(ouverte ? "▾" : "▸")</span>
+            </button>
+            @if (ouverte)
+            {
+                <p class="rig-nouv__detail rig-nouv__detail--@n.Teinte">@n.Detail</p>
+            }
+        }
     </div>;
 }

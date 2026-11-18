@@ -1,0 +1,114 @@
+﻿@* Apercu d'un extrait Kbis avec la mise en page NATIONALE de RIG v2.
+   Source : \\ged2\Schema_RIG_XSD$\KBisXml\v35 xsl 1.24\KbisFromXMLPreformatPDF - xsd 0.35 - xsl 1.24.xsl
+   (copie : wwwroot/kbis/). Valeurs reprises de la feuille XSL-FO :
+   A4 21 x 29.7 cm, marges gauche 1 cm / droite 2 cm, police Times,
+   entete greffe 8pt (libelles 10pt gras), « Extrait Kbis » 11pt gras italique,
+   titre 10pt gras centre, sections 9pt gras + filet 0.9px, lignes 10pt,
+   colonne des titres 205px en italique, pied « FIN DE L'EXTRAIT » a droite.
+   Les VALEURS viennent du formulaire : chaque frappe re-rend l'extrait. *@
+
+<div class="rig-kbis">
+    <div class="rig-kbis__entete">
+        <div class="rig-kbis__greffe-libelle">@GreffeDuDossier.Libelle</div>
+        <div class="rig-kbis__greffe-libelle">@("Registre du Commerce et des Societes")</div>
+        @if (GreffeDuDossier.Adresse.Length > 0)
+        {
+            <div>@GreffeDuDossier.Adresse</div>
+        }
+        <div class="rig-kbis__gestion">Numero de gestion @Val("IDENTITE", "DSSRC_NUM_GESTION", "—")</div>
+    </div>
+
+    <div class="rig-kbis__kbis">Extrait Kbis</div>
+    <div class="rig-kbis__titre">EXTRAIT D'IMMATRICULATION PRINCIPALE AU REGISTRE DU COMMERCE ET DES SOCIETES</div>
+    <div class="rig-kbis__fraicheur">a jour au @DateTime.Today.ToString("dd/MM/yyyy")</div>
+
+    <table class="rig-kbis__corps">
+        <colgroup><col class="rig-kbis__col-titre" /><col /></colgroup>
+        @Section("IDENTIFICATION DE LA PERSONNE MORALE",
+        [
+            ("Immatriculation au RCS, numero", Siren + " R.C.S. " + VilleRcs),
+            ("Date d'immatriculation", Date(Val("IDENTITE", "DSSRC_DATE_IMMAT"))),
+            ("Denomination ou raison sociale", Val("IDENTITE", "INSPM_DENOMINATION_STATUT", Denomination)),
+            ("Forme juridique", Val("IDENTITE", "DSSRC_TYPE_RCS")),
+            ("Capital social", Capital()),
+            ("Adresse du siege", Val("SIEGE", "ETBLS_ID_ADRBS")),
+            ("Date de debut", Date(Val("SIEGE", "ETBLS_DATE_DEBUT"))),
+        ])
+        @Section("GESTION, DIRECTION, ADMINISTRATION, CONTROLE, ASSOCIES OU MEMBRES",
+        [
+            ("Qualite", Val("DIRIGEANTS", "DRGNT_FONCTION_DIRIGEANT")),
+            ("Date d'entree en fonction", Date(Val("DIRIGEANTS", "DRGNT_DATE_ENTREE"))),
+            ("SIREN", Val("DIRIGEANTS", "DRGNT_NUM_SIREN")),
+        ])
+        @Section("RENSEIGNEMENTS RELATIFS A L'ACTIVITE ET A L'ETABLISSEMENT PRINCIPAL",
+        [
+            ("Activite(s) exercee(s)", Val("ACTIVITE", "ACTVT_ACTIVITE_DECLAREE")),
+            ("Date de commencement d'activite", Date(Val("ACTIVITE", "ACTVT_DATE_DEBUT"))),
+            ("Code NAF", Val("ACTIVITE", "ACTVT_CODE_NAF")),
+            ("Origine du fonds ou de l'activite", Val("SIEGE", "ETBLS_ORIGINE_FONDS")),
+            ("Mode d'exploitation", Val("SIEGE", "ETBLS_MODE_EXPLOITATION")),
+        ])
+    </table>
+
+    <div class="rig-kbis__bas">
+        <div class="rig-kbis__signature">Le Greffier</div>
+        <div>FIN DE L'EXTRAIT</div>
+    </div>
+
+    <div class="rig-kbis__pied">
+        <span>R.C.S. @VilleRcs - @DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss")&nbsp;&nbsp;&nbsp;&nbsp;@Numero</span>
+        <span>page 1/1</span>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Numero { get; set; } = "";
+    [Parameter, EditorRequired] public string Siren { get; set; } = "";
+    [Parameter, EditorRequired] public string Denomination { get; set; } = "";
+    /// <summary>Lit une valeur du formulaire : (code etape, colonne) -> valeur.</summary>
+    [Parameter, EditorRequired] public Func<string, string, string> Lire { get; set; } = (_, _) => "";
+    // L'entete vient du champ « Code greffe » du formulaire (colonne v2
+    // ETABLISSEMENT.CODE_GREFFE). Tant qu'il n'est pas saisi, le greffe par
+    // defaut (Amiens) tient lieu de repli : l'entete ne se vide jamais.
+    private Greffe GreffeDuDossier => Greffes.Trouver(Val("SIEGE", "ETBLS_CODE_GREFFE"));
+    private string VilleRcs => GreffeDuDossier.Ville;
+
+    private string Val(string etape, string colonne, string defaut = "")
+    {
+        var v = Lire(etape, colonne);
+        return string.IsNullOrWhiteSpace(v) ? defaut : v;
+    }
+
+    private static string Date(string v)
+        => DateTime.TryParse(v, System.Globalization.CultureInfo.InvariantCulture,
+                             System.Globalization.DateTimeStyles.None, out var d)
+            ? d.ToString("dd/MM/yyyy") : v;
+
+    private string Capital()
+    {
+        var montant = Val("CAPITAL", "CPTL_MONTANT");
+        if (montant.Length == 0) return "";
+        var fr = System.Globalization.CultureInfo.GetCultureInfo("fr-FR");
+        var texte = decimal.TryParse(montant, System.Globalization.NumberStyles.Number,
+                                     System.Globalization.CultureInfo.InvariantCulture, out var m)
+            ? m.ToString("N2", fr) : montant;
+        var variable = Val("CAPITAL", "CPTL_VARIABLE") == "Oui" ? " (variable)" : "";
+        return $"{texte} {Val("CAPITAL", "CPTL_MONNAIE", "EUR")}{variable}";
+    }
+
+    // Comme la XSL : une section sans aucune ligne renseignee n'est pas affichee,
+    // et une ligne sans libelle non plus.
+    private RenderFragment Section(string titre, (string Titre, string Libelle)[] lignes) => __builder =>
+    {
+        var pleines = lignes.Where(l => !string.IsNullOrWhiteSpace(l.Libelle)).ToArray();
+        if (pleines.Length == 0) return;
+        <tr><td colspan="2" class="rig-kbis__section">@titre</td></tr>
+        @foreach (var l in pleines)
+        {
+            <tr class="rig-kbis__ligne">
+                <td class="rig-kbis__ligne-titre">@l.Titre</td>
+                <td>@l.Libelle</td>
+            </tr>
+        }
+    };
+}

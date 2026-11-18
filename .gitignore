@@ -14,3 +14,12 @@ obj/
 *.rej
 
 # rig.ico est VERSIONNE : l'app en a besoin au build.
+
+# Sorties de build temporaires des bancs (verification app ouverte)
+binverif*/
+objverif*/
+**/obj_sc_tmp/
+*_wpftmp.csproj
+
+# Ancienne sortie de build et captures du 17/09 (copie de bin pour apercu) : jamais versionnees
+.preview/
