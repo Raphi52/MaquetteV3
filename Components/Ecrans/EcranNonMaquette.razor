@@ -5,23 +5,15 @@
 
    Depuis le portage de septembre 2026, toutes les procedures du menu ont
    leur ecran SAUF celles dont RIG v2 ne contient rien a porter : le motif
-   est alors affiche tel quel, avec le constat fait dans les sources v2. *@
+   est alors affiche tel quel, avec le constat fait dans les sources v2.
 
-<div class="rig-nonmaq">
-    <div class="rig-nonmaq__kicker">Ecran a venir</div>
-    <div class="rig-nonmaq__titre">@Libelle</div>
+   PORTE EN REACT (lot 5 de la migration, 18/11/2026) : l'ecran est rendu par
+   web/src/ecrans/EcranNonMaquette.tsx. Ce fichier n'est plus qu'une COQUILLE :
+   il garde ses trois parametres pour que Home.razor ne change pas, et les
+   passe tels quels a l'ile (le motif reste calcule par Home.razor).
+   Mode d'emploi : web/README.md. *@
 
-    @if (!string.IsNullOrWhiteSpace(Motif))
-    {
-        <p class="rig-nonmaq__texte">@Motif</p>
-    }
-    else
-    {
-        <p class="rig-nonmaq__texte">
-            Cet ecran n'est pas encore disponible.
-        </p>
-    }
-</div>
+<IleReact Composant="EcranNonMaquette" Proprietes="Proprietes" />
 
 @code {
     [Parameter] public string Code { get; set; } = string.Empty;
@@ -29,4 +21,12 @@
 
     /// <summary>Raison precise, quand elle est connue, de l'absence d'ecran.</summary>
     [Parameter] public string? Motif { get; set; }
+
+    // Cles en camelCase : ce sont les noms des proprietes du composant React.
+    private Dictionary<string, object?> Proprietes => new()
+    {
+        ["code"] = Code,
+        ["libelle"] = Libelle,
+        ["motif"] = Motif
+    };
 }

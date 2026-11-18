@@ -107,6 +107,26 @@ Home.razor ──> Components/Ecrans/EcranX.razor (COQUILLE, mêmes paramètres)
 - **Voir la console JS** sur le bureau caché : F12 dans la fenêtre RIG
   (outils de développement activés en Debug).
 
+## Ajouts du lot 5 (écrans juridiction et éditions)
+
+- **`src/criteres.ts`** : les gestes des écrans de recherche, à reprendre
+  plutôt qu'à réécrire — `dateCourte` (`ToString("dd/MM/yyyy")` d'une date
+  tenue en `aaaa-mm-jj`), `contientSansCasse` (`Contains(…, OrdinalIgnoreCase)`),
+  `estBlanc` (`IsNullOrWhiteSpace`), `distinctsTries` (`Distinct().Order()`,
+  ordre fr-FR) et `entierLisible` (le `@bind` d'un `int`).
+- **Les boutons de `.rig-criteres__actions`** : ce bloc n'est PAS en colonne
+  souple ; les boutons y sont en ligne et Razor gardait un blanc entre eux.
+  Mets `{' '}` entre deux boutons écrits sur deux lignes dans le `.razor`
+  (sinon ils se collent). Pas de blanc à recopier autour d'un `@foreach` /
+  `@if` : Razor les supprimait déjà.
+- **`iles.test.tsx`** lit la liste des écrans montables sur le disque : un
+  écran ajouté n'y demande aucune ligne.
+- **Captures du bureau entier** (`hdesk-observe.ps1`, 1920×1080) : la fenêtre
+  commence à y = 66, sa barre d'onglets finit vers y = 137 — compare avec
+  `--haut 140`, pas 80. L'appli met quelques secondes à accepter un geste
+  après son lancement : capture d'abord l'accueil, sinon la première capture
+  montre l'accueil au lieu de l'écran voulu.
+
 ## Commandes
 
 | Commande (dans `web/`) | Effet |

@@ -11,14 +11,24 @@ function hote(): HTMLDivElement {
   return div
 }
 
+// Les noms ATTENDUS se lisent sur le disque (les fichiers que le registre doit
+// rendre montables), pas dans une liste ecrite ici : chaque lot qui porte un
+// ecran n'a rien a ajouter a ce test, et deux lots en parallele ne se disputent
+// plus cette ligne (lot 5, 18/11/2026 : la liste figee du lot 1 cassait des
+// le premier ecran ajoute).
+const fichiersPortes = Object.keys(import.meta.glob(['./ecrans/*.tsx', './composants/*.tsx', '!./**/*.test.tsx']))
+  .map((chemin) => chemin.slice(chemin.lastIndexOf('/') + 1).replace(/\.tsx$/, ''))
+  .sort()
+
 describe('iles (montage depuis Components/IleReact.razor)', () => {
   it('chaque ecran et composant porte est montable sous le nom de son fichier', () => {
-    expect(composantsMontables()).toEqual(['EcranFactures', 'EcranVerrous', 'EnteteTriable'])
+    expect(fichiersPortes).toEqual(expect.arrayContaining(['EcranFactures', 'EcranVerrous', 'EnteteTriable']))
+    expect(composantsMontables()).toEqual(fichiersPortes)
   })
 
   it('un nom inconnu echoue en listant les noms montables', () => {
     const reference = { invokeMethodAsync: vi.fn() }
-    expect(() => monter(hote(), 'EcranInconnu', {}, [], reference)).toThrow(/EcranInconnu.*EcranFactures, EcranVerrous/)
+    expect(() => monter(hote(), 'EcranInconnu', {}, [], reference)).toThrow(/EcranInconnu.*EcranFactures.*EcranVerrous/)
   })
 
   it('monte, remonte un rappel a Blazor, puis demonte proprement', async () => {

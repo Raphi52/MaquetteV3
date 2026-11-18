@@ -266,12 +266,33 @@ foreach (var fichier in Directory.GetFiles(
         $"{nom} nomme la procedure RIG v2 dont il est porte, ou dit qu il n en a pas");
 }
 // Meme exigence pour l ecran PORTE en React : le .tsx garde la trace de sa source v2.
+// EcranNonMaquette.tsx en est exempt, comme son .razor ci-dessus : il ne vient
+// d aucune procedure, il NOMME celle qui n a pas d ecran (porte au lot 5, 18/11/2026).
 foreach (var fichier in fichiersTsx.Where(f => Regex.IsMatch(Path.GetFileName(f), @"^Ecran\w*\.tsx$")))
 {
     var nom = Path.GetFileName(fichier);
+    if (nom == "EcranNonMaquette.tsx") continue;
     Exiger(Regex.IsMatch(File.ReadAllText(fichier), @"(PROC_[A-Z_]+|BODACC|Sans origine RIG v2)"),
         $"{nom} nomme la procedure RIG v2 dont il est porte, ou dit qu il n en a pas");
 }
+
+// L ecran « non maquettee » est rendu par React depuis le lot 5 : la regle de la
+// section 10 (une procedure non portee le DIT) se lit dans son .tsx, et sa
+// coquille .razor doit lui transmettre les trois parametres de Home.razor.
+var nonMaqTsx = fichiersTsx.FirstOrDefault(f => Path.GetFileName(f) == "EcranNonMaquette.tsx");
+Exiger(nonMaqTsx is not null, "l ecran des procedures non portees existe en React (EcranNonMaquette.tsx)");
+var nonMaq = nonMaqTsx is null ? "" : File.ReadAllText(nonMaqTsx);
+Exiger(Regex.IsMatch(nonMaq, @"className=""rig-nonmaq__titre"">\{libelle\}"),
+    "l ecran non maquette affiche le libelle de la procedure ouverte");
+Exiger(Regex.IsMatch(nonMaq, @"motif[\s\S]{0,120}?<p className=""rig-nonmaq__texte"">\{motif\}</p>"),
+    "le motif etabli de l absence d ecran est affiche tel quel quand il est connu");
+Exiger(nonMaq.Contains("Cet ecran n'est pas encore disponible."),
+    "sans motif connu, l ecran dit qu il n est pas encore disponible");
+var nonMaqCoquille = File.ReadAllText(Path.GetFullPath(Path.Combine(
+    AppContext.BaseDirectory, "../../../../../Components/Ecrans/EcranNonMaquette.razor")));
+Exiger(Regex.IsMatch(nonMaqCoquille, @"<IleReact Composant=""EcranNonMaquette"" Proprietes=""Proprietes"" />")
+       && nonMaqCoquille.Contains("[\"libelle\"] = Libelle") && nonMaqCoquille.Contains("[\"motif\"] = Motif"),
+    "la coquille EcranNonMaquette.razor transmet le libelle et le motif calcules par Home.razor");
 
 // --- 12. Le menu de procedures n est plus le SEUL chemin vers un traitement.
 //

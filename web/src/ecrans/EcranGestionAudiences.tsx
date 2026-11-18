@@ -1,0 +1,247 @@
+// Ecran de la procedure PROC_GESTAUDS — gestion des audiences et cabinets.
+//
+// Sources RIG v2 (D:/RigApplication/Source/RIG/DLL/Processus/PROC_GESTAUDS) :
+//   - Operations/OPE_RECHERCHE_GESTAUDS.Designer.cs : les criteres de
+//     recherche — Date (OPE_DATE_AUDIENCE, puis OPE_DATE_AUDCAB1 et
+//     OPE_DATE_AUDCAB2 pour l'encadrement), Type d'audience, Chambre,
+//     Section, Juge, Type de cabinet, Code de cabinet, Type de Classement,
+//     Nombre de resultats maximum.
+//   - Operations/OPE_RESULTAT_GESTAUDS.cs : la liste de resultats. Ses
+//     colonnes sont montees dans Columns.AddRange() et leurs libelles poses
+//     plus bas (_jour.Text, _date.Text, ...) — d'ou les TREIZE colonnes
+//     reprises ici. La colonne « Greffier » n'existe QUE lorsque la
+//     recherche porte sur les cabinets (test ParamTypeRecherche ==
+//     EnumTypeRecherche.Cabinet) : la bascule « Cabinets » ci-dessous
+//     reproduit cette condition, elle n'est pas un confort d'affichage.
+//     De meme, « jugeOuSection » est une seule colonne qui change de titre
+//     selon le mode — d'ou l'en-tete calcule.
+//
+// Porte depuis Components/Ecrans/EcranGestionAudiences.razor (lot 5) : meme
+// balisage, memes classes CSS. L'ecran ne lisait rien dans Metier/ : ses
+// audiences de demonstration et ses filtres sont ici, sans pont.
+
+import { useState } from 'react'
+import { distinctsTries, entierLisible } from '../criteres'
+
+interface Audience {
+  jour: string
+  /** jj/mm/aaaa, tel que la grille v2 l'affiche */
+  date: string
+  heure: string
+  type: string
+  codeCabinet: string
+  typeCabinet: string
+  juge: string
+  section: string
+  chambre: string
+  greffier: string
+  typeClassement: string
+  public: boolean
+  auteurSuppression: string
+  dateSuppression: string
+  envoiSuppression: string
+}
+
+const a = (jour: string, date: string, heure: string, type: string, codeCabinet: string, typeCabinet: string,
+           juge: string, section: string, chambre: string, greffier: string, typeClassement: string,
+           pub: boolean, auteurSuppression: string, dateSuppression: string, envoiSuppression: string): Audience =>
+  ({ jour, date, heure, type, codeCabinet, typeCabinet, juge, section, chambre, greffier, typeClassement,
+     public: pub, auteurSuppression, dateSuppression, envoiSuppression })
+
+const Audiences: Audience[] = [
+  a('Lundi',    '14/09/2026', '09h00', 'Audience de procedure', 'CAB-01', 'Cabinet du president',  'Mme LEROY', '1re section', '1re chambre', 'M. PETIT',  'Renvoi',           true,  '',        '',           ''),
+  a('Lundi',    '14/09/2026', '10h30', 'Audience publique',     'CAB-01', 'Cabinet du president',  'Mme LEROY', '1re section', '1re chambre', 'M. PETIT',  'Mise en delibere', true,  '',        '',           ''),
+  a('Mardi',    '15/09/2026', '14h00', 'Cabinet du juge',       'CAB-03', 'Cabinet du rapporteur', 'M. DUVAL',  '2e section',  '2e chambre',  'Mme FAURE', 'Renvoi',           false, '',        '',           ''),
+  a('Jeudi',    '17/09/2026', '09h30', 'Audience publique',     '',       '',                      'M. DUVAL',  '2e section',  '2e chambre',  '',          'Radiation',        true,  'rvilain', '02/09/2026', 'Envoye'),
+  a('Vendredi', '18/09/2026', '11h00', 'Audience de procedure', 'CAB-02', 'Cabinet du president',  'Mme LEROY', '3e section',  '1re chambre', 'M. PETIT',  'Clos',             true,  '',        '',           ''),
+]
+
+const vide = (valeur: string): string => (valeur === '' ? '—' : valeur)
+
+/** « jj/mm/aaaa » -> « aaaa-mm-jj », comparable a la valeur d'un <input type="date">. */
+const jourIso = (texte: string): string => {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(texte)
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : '0001-01-01'
+}
+
+export function EcranGestionAudiences() {
+  const [modeCabinet, setModeCabinet] = useState(true)
+  const [dateDebut, setDateDebut] = useState('')
+  const [dateFin, setDateFin] = useState('')
+  const [critType, setCritType] = useState('')
+  const [critChambre, setCritChambre] = useState('')
+  const [critSection, setCritSection] = useState('')
+  const [critJuge, setCritJuge] = useState('')
+  const [critTypeCabinet, setCritTypeCabinet] = useState('')
+  const [critCodeCabinet, setCritCodeCabinet] = useState('')
+  const [critClassement, setCritClassement] = useState('')
+  // Le texte saisi et la derniere valeur LISIBLE (le @bind d'un int).
+  const [maxTexte, setMaxTexte] = useState('100')
+  const [maxResultats, setMaxResultats] = useState(100)
+
+  function saisirMax(texte: string) {
+    setMaxTexte(texte)
+    const n = entierLisible(texte)
+    if (n !== null) setMaxResultats(n)
+  }
+
+  let q = Audiences
+  if (critType !== '') q = q.filter((x) => x.type === critType)
+  if (critChambre !== '') q = q.filter((x) => x.chambre === critChambre)
+  if (critSection !== '') q = q.filter((x) => x.section === critSection)
+  if (critJuge !== '') q = q.filter((x) => x.juge === critJuge)
+  if (critTypeCabinet !== '') q = q.filter((x) => x.typeCabinet === critTypeCabinet)
+  if (critCodeCabinet !== '') q = q.filter((x) => x.codeCabinet === critCodeCabinet)
+  if (critClassement !== '') q = q.filter((x) => x.typeClassement === critClassement)
+  if (dateDebut !== '') q = q.filter((x) => jourIso(x.date) >= dateDebut)
+  if (dateFin !== '') q = q.filter((x) => jourIso(x.date) <= dateFin)
+  const trouvees = q.slice(0, Math.max(1, maxResultats))
+
+  return (
+    <div className="rig-proc__corps">
+
+      <aside className="rig-criteres">
+        <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Recherche d'une audience</div>
+
+        <button className={`rig-bascule${modeCabinet ? ' rig-bascule--actif' : ''}`}
+                onClick={() => setModeCabinet(!modeCabinet)}>
+          <span className="rig-bascule__temoin"></span>
+          <span>Recherche par cabinets</span>
+        </button>
+
+        <div className="rig-criteres__paire">
+          <label className="rig-saisie-champ">
+            <span className="rig-saisie-champ__libelle">Du</span>
+            <input className="rig-saisie-champ__saisie" type="date" value={dateDebut}
+                   onChange={(e) => setDateDebut(e.target.value)} />
+          </label>
+          <label className="rig-saisie-champ">
+            <span className="rig-saisie-champ__libelle">Au</span>
+            <input className="rig-saisie-champ__saisie" type="date" value={dateFin}
+                   onChange={(e) => setDateFin(e.target.value)} />
+          </label>
+        </div>
+
+        <label className="rig-saisie-champ">
+          <span className="rig-saisie-champ__libelle">Type d'audience</span>
+          <select className="rig-saisie-champ__saisie" value={critType} onChange={(e) => setCritType(e.target.value)}>
+            <option value="">Tous</option>
+            {distinctsTries(Audiences.map((x) => x.type)).map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </label>
+
+        <div className="rig-criteres__paire">
+          <label className="rig-saisie-champ">
+            <span className="rig-saisie-champ__libelle">Chambre</span>
+            <select className="rig-saisie-champ__saisie" value={critChambre} onChange={(e) => setCritChambre(e.target.value)}>
+              <option value="">Toutes</option>
+              {distinctsTries(Audiences.map((x) => x.chambre)).map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </label>
+          <label className="rig-saisie-champ">
+            <span className="rig-saisie-champ__libelle">Section</span>
+            <select className="rig-saisie-champ__saisie" value={critSection} onChange={(e) => setCritSection(e.target.value)}>
+              <option value="">Toutes</option>
+              {distinctsTries(Audiences.map((x) => x.section)).map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
+        </div>
+
+        <label className="rig-saisie-champ">
+          <span className="rig-saisie-champ__libelle">Juge</span>
+          <select className="rig-saisie-champ__saisie" value={critJuge} onChange={(e) => setCritJuge(e.target.value)}>
+            <option value="">Tous</option>
+            {distinctsTries(Audiences.map((x) => x.juge)).map((j) => <option key={j} value={j}>{j}</option>)}
+          </select>
+        </label>
+
+        <div className="rig-criteres__paire">
+          <label className="rig-saisie-champ">
+            <span className="rig-saisie-champ__libelle">Type de cabinet</span>
+            <select className="rig-saisie-champ__saisie" value={critTypeCabinet} onChange={(e) => setCritTypeCabinet(e.target.value)}>
+              <option value="">Tous</option>
+              {distinctsTries(Audiences.map((x) => x.typeCabinet).filter((t) => t.length > 0))
+                .map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </label>
+          <label className="rig-saisie-champ">
+            <span className="rig-saisie-champ__libelle">Code de cabinet</span>
+            <select className="rig-saisie-champ__saisie" value={critCodeCabinet} onChange={(e) => setCritCodeCabinet(e.target.value)}>
+              <option value="">Tous</option>
+              {distinctsTries(Audiences.map((x) => x.codeCabinet).filter((c) => c.length > 0))
+                .map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </label>
+        </div>
+
+        <label className="rig-saisie-champ">
+          <span className="rig-saisie-champ__libelle">Type de classement</span>
+          <select className="rig-saisie-champ__saisie" value={critClassement} onChange={(e) => setCritClassement(e.target.value)}>
+            <option value="">Tous</option>
+            {distinctsTries(Audiences.map((x) => x.typeClassement)).map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </label>
+
+        <label className="rig-saisie-champ">
+          <span className="rig-saisie-champ__libelle">Nombre de resultats maximum</span>
+          <input className="rig-saisie-champ__saisie" type="number" min="1" max="999" value={maxTexte}
+                 onChange={(e) => saisirMax(e.target.value)} />
+        </label>
+      </aside>
+
+      <section className="rig-resultats-proc">
+        <div className="rig-resultats-proc__entete">
+          <div className="rig-kicker">Audiences trouvees</div>
+          <span className="rig-resultats-proc__compte">{trouvees.length} sur {maxResultats} maximum</span>
+        </div>
+
+        <div className="rig-table-cadre">
+          <table className="rig-table">
+            <thead>
+              <tr>
+                <th>Jour</th>
+                <th>Date</th>
+                <th>Heure</th>
+                <th>Type</th>
+                <th>Code de cabinet</th>
+                {/* Une seule colonne en v2, dont le titre change avec le mode. */}
+                <th>{modeCabinet ? 'Juge' : 'Section'}</th>
+                {modeCabinet && <th>Greffier</th>}
+                <th>Type de classement</th>
+                <th>Public</th>
+                <th>Auteur suppression</th>
+                <th>Date suppression</th>
+                <th>Envoi suppression Infogreffe</th>
+                <th>Web (non dispo.)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trouvees.map((x, i) => (
+                <tr key={i}>
+                  <td>{x.jour}</td>
+                  <td className="rig-table__mono">{x.date}</td>
+                  <td className="rig-table__mono">{x.heure}</td>
+                  <td>{x.type}</td>
+                  <td className="rig-table__mono">{vide(x.codeCabinet)}</td>
+                  <td>{modeCabinet ? x.juge : x.section}</td>
+                  {modeCabinet && <td>{vide(x.greffier)}</td>}
+                  <td>{x.typeClassement}</td>
+                  <td className="rig-table__centre">{x.public ? 'Oui' : 'Non'}</td>
+                  <td>{vide(x.auteurSuppression)}</td>
+                  <td className="rig-table__mono">{vide(x.dateSuppression)}</td>
+                  <td className="rig-table__centre">{vide(x.envoiSuppression)}</td>
+                  <td className="rig-table__centre rig-table__sans">non dispo.</td>
+                </tr>
+              ))}
+              {trouvees.length === 0 && (
+                <tr className="rig-table__ligne--inerte">
+                  <td colSpan={13} className="rig-table__vide">Aucune audience ne repond a ces criteres.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  )
+}

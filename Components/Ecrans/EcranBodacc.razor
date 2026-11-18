@@ -13,195 +13,22 @@
        Num ann., Type annonce, Texte Bodacc
 
    Criteres : Operations/OPE_RECH_BOD.Designer.cs -> TextRechByNum,
-   TextNumBordereau, TextNumFacture, DateDu, DateAu. *@
+   TextNumBordereau, TextNumFacture, DateDu, DateAu.
 
-<div class="rig-proc__corps">
+   PORTE EN REACT (lot 5 de la migration, 18/11/2026) : l'ecran est rendu par
+   web/src/ecrans/EcranBodacc.tsx, sa date du jour vient de
+   Pont/EcranBodacc.cs. Ce fichier n'est plus qu'une COQUILLE : il garde le
+   parametre d'origine (OuvrirDossier) pour que Home.razor ne change pas.
+   Mode d'emploi : web/README.md. *@
 
-    <aside class="rig-criteres">
-        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Recherche BODACC</div>
-
-        <label class="rig-saisie-champ">
-            <span class="rig-saisie-champ__libelle">Num annonce / dossier</span>
-            <input class="rig-saisie-champ__saisie" placeholder="num ann. ou dossier"
-                   @bind="CritTexte" @bind:event="oninput" />
-        </label>
-
-        <label class="rig-saisie-champ">
-            <span class="rig-saisie-champ__libelle">Type d'annonce</span>
-            <select class="rig-saisie-champ__saisie" @bind="CritType">
-                <option value="">Tous</option>
-                @foreach (var t in Lignes.Select(l => l.TypeAnnonce).Distinct().Order())
-                {
-                    <option value="@t">@t</option>
-                }
-            </select>
-        </label>
-
-        <div class="rig-criteres__bloc">
-            <div class="rig-kicker">Date prevue d'envoi</div>
-            <div class="rig-criteres__paire">
-                <label class="rig-saisie-champ">
-                    <span class="rig-saisie-champ__libelle">Du</span>
-                    <input class="rig-saisie-champ__saisie" type="date" @bind="CritDu" />
-                </label>
-                <label class="rig-saisie-champ">
-                    <span class="rig-saisie-champ__libelle">Au</span>
-                    <input class="rig-saisie-champ__saisie" type="date" @bind="CritAu" />
-                </label>
-            </div>
-        </div>
-
-        @* v2 : TextNumBordereau et TextNumFacture (OPE_RECH_BOD). *@
-        <label class="rig-saisie-champ">
-            <span class="rig-saisie-champ__libelle">Num bordereau</span>
-            <input class="rig-saisie-champ__saisie" @bind="CritNumBord" @bind:event="oninput" />
-        </label>
-
-        <label class="rig-saisie-champ">
-            <span class="rig-saisie-champ__libelle">Num facture</span>
-            <input class="rig-saisie-champ__saisie" @bind="CritNumFact" @bind:event="oninput" />
-        </label>
-
-        <div class="rig-criteres__actions">
-            <button class="rig-bouton" @onclick="Effacer">Effacer</button>
-        </div>
-    </aside>
-
-    <section class="rig-resultats-proc">
-        <div class="rig-resultats-proc__entete">
-            <div class="rig-onglets">
-                <button class="rig-onglet @(AEnvoyer ? "rig-onglet--actif" : "")"
-                        @onclick="() => AEnvoyer = true">BODACC a envoyer</button>
-                <button class="rig-onglet @(!AEnvoyer ? "rig-onglet--actif" : "")"
-                        @onclick="() => AEnvoyer = false">BODACC deja envoye</button>
-            </div>
-            <span class="rig-resultats-proc__compte">@Trouvees.Length annonce(s)</span>
-        </div>
-
-        <div class="rig-table-cadre">
-            <table class="rig-table">
-                <thead>
-                    @if (AEnvoyer)
-                    {
-                        @* Colonnes de BodaccToSendRigDataGridView.cs (RIG v2). *@
-                        <tr>
-                            <th>Num PC ou prevention</th>
-                            <th>Code eve pro</th>
-                            <th>Date eve pro</th>
-                            <th>Texte Bodacc</th>
-                            <th>Date prevue d'envoi</th>
-                            <th>Type annonce</th>
-                        </tr>
-                    }
-                    else
-                    {
-                        @* Colonnes de BodaccAlreadySentRigDataGridView.cs (RIG v2). *@
-                        <tr>
-                            <th>Num PC ou prevention</th>
-                            <th>Code eve pro</th>
-                            <th>Date eve pro</th>
-                            <th>Date envoi</th>
-                            <th>Date trans.</th>
-                            <th>Num bord.</th>
-                            <th>Num fact.</th>
-                            <th>Date parution</th>
-                            <th>Num parution</th>
-                            <th>Num ann.</th>
-                            <th>Type annonce</th>
-                            <th>Texte Bodacc</th>
-                        </tr>
-                    }
-                </thead>
-                <tbody>
-                    @foreach (var l in Trouvees)
-                    {
-                        var ligne = l;
-                        var retard = AEnvoyer && ligne.PrevueEnvoi.Date < JeuDemo.Aujourdhui.Date;
-                        <tr class="@(retard ? "rig-table__ligne--alerte" : "")"
-                            @onclick="() => OuvrirDossier.InvokeAsync(ligne.Dossier)">
-                            @if (AEnvoyer)
-                            {
-                                <td class="rig-table__mono">@ligne.NumPc</td>
-                                <td class="rig-table__mono">@ligne.CodeEvePro</td>
-                                <td class="rig-table__mono">@ligne.DateEvePro.ToString("dd/MM/yyyy")</td>
-                                <td>@ligne.Texte</td>
-                                <td class="rig-table__mono">@ligne.PrevueEnvoi.ToString("dd/MM/yyyy")</td>
-                                <td>@ligne.TypeAnnonce</td>
-                            }
-                            else
-                            {
-                                <td class="rig-table__mono">@ligne.NumPc</td>
-                                <td class="rig-table__mono">@ligne.CodeEvePro</td>
-                                <td class="rig-table__mono">@ligne.DateEvePro.ToString("dd/MM/yyyy")</td>
-                                <td class="rig-table__mono">@(ligne.Envoi?.ToString("dd/MM/yyyy") ?? "")</td>
-                                <td class="rig-table__mono">@(ligne.Transmission?.ToString("dd/MM/yyyy") ?? "")</td>
-                                <td class="rig-table__mono">@ligne.NumBord</td>
-                                <td class="rig-table__mono">@ligne.NumFact</td>
-                                <td class="rig-table__mono">@(ligne.Parution?.ToString("dd/MM/yyyy") ?? "")</td>
-                                <td class="rig-table__mono">@ligne.NumParution</td>
-                                <td class="rig-table__mono">@ligne.NumAnnonce</td>
-                                <td>@ligne.TypeAnnonce</td>
-                                <td>@ligne.Texte</td>
-                            }
-                        </tr>
-                    }
-                    @if (Trouvees.Length == 0)
-                    {
-                        <tr><td colspan="@(AEnvoyer ? 6 : 12)" class="rig-table__vide">Aucune annonce ne repond a ces criteres.</td></tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    </section>
-</div>
+<IleReact Composant="EcranBodacc" Rappels="Rappels" />
 
 @code {
+    /// <summary>Remonte le NUMERO de dossier : l'ecran ne connait pas la visionneuse.</summary>
     [Parameter] public EventCallback<string> OuvrirDossier { get; set; }
 
-    private sealed record Annonce(string NumAnnonce, string NumPc, string TypeAnnonce, string CodeEvePro,
-                                  DateTime DateEvePro, DateTime PrevueEnvoi, DateTime? Envoi,
-                                  string NumParution, DateTime? Parution, string NumBord, string NumFact,
-                                  string Texte, string Dossier, DateTime? Transmission);
-
-    private static readonly Annonce[] Lignes =
-    [
-        new("A2026-1188", "PC2026-041", "Immatriculation",  "IMM", new(2026, 9, 2), new(2026, 9, 8),  null,             "",       null,             "",        "",        "Immatriculation SARL LES TILLEULS", "2026B00811", null),
-        new("A2026-1189", "",           "Modification",     "MOD", new(2026, 9, 3), new(2026, 9, 9),  null,             "",       null,             "",        "",        "Changement de gerant",              "2019B00233", null),
-        new("A2026-1190", "PC2026-042", "Procedure collective", "PCO", new(2026, 9, 1), new(2026, 9, 4), null,          "",       null,             "",        "",        "Ouverture de redressement",         "2026B00790", null),
-        new("A2026-1150", "",           "Radiation",        "RAD", new(2026, 8, 12), new(2026, 8, 18), new(2026, 8, 18), "2026-171", new(2026, 8, 24), "BD-2610", "FA-45120", "Radiation EURL LE PETIT CAFE",   "2004B01344", new DateTime(2026, 8, 19)),
-        new("A2026-1151", "",           "Depot des comptes","DCA", new(2026, 8, 14), new(2026, 8, 20), new(2026, 8, 20), "2026-172", new(2026, 8, 26), "BD-2610", "FA-45121", "Depot des comptes 2025",          "2011B00512", new DateTime(2026, 8, 21))
-    ];
-
-    private bool AEnvoyer = true;
-    private string CritNumBord = string.Empty;
-    private string CritNumFact = string.Empty;
-
-    private string CritTexte = string.Empty;
-    private string CritType = string.Empty;
-    private DateTime? CritDu;
-    private DateTime? CritAu;
-
-    private void Effacer()
+    private Dictionary<string, IleReact.RappelIle> Rappels => new()
     {
-        CritTexte = string.Empty; CritType = string.Empty;
-        CritDu = null; CritAu = null;
-    }
-
-    private Annonce[] Trouvees
-    {
-        get
-        {
-            IEnumerable<Annonce> q = Lignes.Where(l => (l.Envoi is null) == AEnvoyer);
-            if (!string.IsNullOrWhiteSpace(CritTexte))
-            {
-                var t = CritTexte.Trim();
-                q = q.Where(l => l.NumAnnonce.Contains(t, StringComparison.OrdinalIgnoreCase)
-                              || l.Dossier.Contains(t, StringComparison.OrdinalIgnoreCase));
-            }
-            if (!string.IsNullOrEmpty(CritType)) q = q.Where(l => l.TypeAnnonce == CritType);
-            if (CritDu is { } du) q = q.Where(l => l.PrevueEnvoi.Date >= du.Date);
-            if (CritAu is { } au) q = q.Where(l => l.PrevueEnvoi.Date <= au.Date);
-            return q.ToArray();
-        }
-    }
+        ["ouvrirDossier"] = IleReact.Rappel(OuvrirDossier)
+    };
 }

@@ -8,158 +8,22 @@
    NOTE : v2 n a PAS de grille de resultat sur cet ecran, seulement ces
    criteres et une impression. Le tableau ci-dessous est un ajout de la
    maquette, pour que l ecran montre quelque chose en demonstration ; il ne
-   correspond a aucune grille v2. *@
+   correspond a aucune grille v2.
 
-<div class="rig-proc__corps">
+   PORTE EN REACT (lot 5 de la migration, 18/11/2026) : l'ecran est rendu par
+   web/src/ecrans/EcranArchivage.tsx. Il ne lisait rien dans Metier/ : il n'a
+   pas de pont. Ce fichier n'est plus qu'une COQUILLE : il garde le parametre
+   d'origine (OuvrirDossier) pour que Home.razor ne change pas.
+   Mode d'emploi : web/README.md. *@
 
-    <aside class="rig-criteres">
-        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Dates de radiation</div>
-
-        <div class="rig-criteres__paire">
-            <label class="rig-saisie-champ">
-                <span class="rig-saisie-champ__libelle">Date mini.</span>
-                <input class="rig-saisie-champ__saisie" type="date" @bind="DateMin" />
-            </label>
-            <label class="rig-saisie-champ">
-                <span class="rig-saisie-champ__libelle">Date maxi.</span>
-                <input class="rig-saisie-champ__saisie" type="date" @bind="DateMax" />
-            </label>
-        </div>
-
-        <div class="rig-criteres__bloc">
-            <div class="rig-kicker">Selection</div>
-            <label class="rig-saisie-champ">
-                <span class="rig-saisie-champ__libelle">Type RCS</span>
-                <select class="rig-saisie-champ__saisie" @bind="TypeRcs">
-                    <option value="">Tous</option>
-                    <option value="PM">Personne morale</option>
-                    <option value="PP">Personne physique</option>
-                </select>
-            </label>
-            <label class="rig-saisie-champ">
-                <span class="rig-saisie-champ__libelle">Type de bordereau</span>
-                <select class="rig-saisie-champ__saisie" @bind="TypeBrd">
-                    <option value="ARCH">Archivage</option>
-                    <option value="RAD">Radiation</option>
-                </select>
-            </label>
-            <label class="rig-saisie-champ">
-                <span class="rig-saisie-champ__libelle">Liste</span>
-                <select class="rig-saisie-champ__saisie" @bind="Liste">
-                    <option value="COMPLETE">Liste complete</option>
-                    <option value="CONTROLE">Liste de controle</option>
-                </select>
-            </label>
-        </div>
-
-        <div class="rig-criteres__bloc">
-            <label class="rig-saisie-champ">
-                <span class="rig-saisie-champ__libelle">Libelle de la liste</span>
-            <input class="rig-saisie-champ__saisie" @bind="LibelleListe" />
-        </label>
-
-        <label class="rig-saisie-champ">
-            <span class="rig-saisie-champ__libelle">Nombre de dossiers</span>
-                <input class="rig-saisie-champ__saisie" type="number" min="1" max="999" @bind="NbDossiers" />
-            </label>
-            <label class="rig-saisie-champ">
-                <span class="rig-saisie-champ__libelle">Imprimante</span>
-                <select class="rig-saisie-champ__saisie" @bind="Imprimante">
-                    <option>Greffe - Etage 1</option>
-                    <option>Greffe - Accueil</option>
-                    <option>PDF (fichier)</option>
-                </select>
-            </label>
-        </div>
-
-        <div class="rig-criteres__actions">
-            <button class="rig-bouton rig-bouton--fort" @onclick="Preparer">Preparer le bordereau</button>
-        </div>
-    </aside>
-
-    <section class="rig-resultats-proc">
-        <div class="rig-resultats-proc__entete">
-            <div class="rig-kicker">Formalites retenues</div>
-            <span class="rig-resultats-proc__compte">
-                @Retenues.Length retenue(s) sur @Lignes.Length — bordereau @(Prepare ? "prepare" : "non prepare")
-            </span>
-        </div>
-
-        <div class="rig-table-cadre">
-            <table class="rig-table">
-                <thead>
-                    <tr>
-                        <th>N Dossier</th>
-                        <th>Denomination</th>
-                        <th>Type RCS</th>
-                        <th>Date de radiation</th>
-                        <th>Dernier depot</th>
-                        <th class="rig-table__centre">Pieces</th>
-                        <th>Etat</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var l in Retenues)
-                    {
-                        var ligne = l;
-                        <tr @onclick="() => OuvrirDossier.InvokeAsync(ligne.Dossier)">
-                            <td class="rig-table__mono">@ligne.Dossier</td>
-                            <td>@ligne.Denomination</td>
-                            <td class="rig-table__mono">@ligne.Type</td>
-                            <td class="rig-table__mono">@ligne.Radiation.ToString("dd/MM/yyyy")</td>
-                            <td class="rig-table__mono">@ligne.DernierDepot.ToString("dd/MM/yyyy")</td>
-                            <td class="rig-table__centre">@ligne.Pieces</td>
-                            <td><span class="rig-etat rig-etat--@(Prepare ? "ok" : "attente")">@(Prepare ? "Sur bordereau" : "A archiver")</span></td>
-                        </tr>
-                    }
-                    @if (Retenues.Length == 0)
-                    {
-                        <tr><td colspan="7" class="rig-table__vide">Aucune formalite dans cette plage de radiation.</td></tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    </section>
-</div>
+<IleReact Composant="EcranArchivage" Rappels="Rappels" />
 
 @code {
+    /// <summary>Remonte le NUMERO de dossier : l'ecran ne connait pas la visionneuse.</summary>
     [Parameter] public EventCallback<string> OuvrirDossier { get; set; }
 
-    private sealed record LigneArchi(string Dossier, string Denomination, string Type,
-                                     DateTime Radiation, DateTime DernierDepot, int Pieces);
-
-    private static readonly LigneArchi[] Lignes =
-    [
-        new("1998B00214", "SARL MENUISERIE COLLIN", "PM", new(2014, 3, 12), new(2013, 11, 4),  18),
-        new("2001B00877", "SAS ELEC DU NORD",       "PM", new(2016, 7, 1),  new(2016, 2, 20),  24),
-        new("1995A00120", "DUPONT Jean",            "PP", new(2012, 10, 9), new(2012, 5, 30),   7),
-        new("2004B01344", "EURL LE PETIT CAFE",     "PM", new(2018, 1, 25), new(2017, 9, 12),  11),
-        new("1999A00456", "MARTIN Claire",          "PP", new(2015, 6, 3),  new(2015, 1, 15),   9)
-    ];
-
-    private DateTime? DateMin = new DateTime(2012, 1, 1);
-    private DateTime? DateMax = new DateTime(2016, 12, 31);
-    // v2 : ult_TextListe, le libelle associe a la case ult_CBListe.
-    private string LibelleListe = string.Empty;
-
-    private string TypeRcs = string.Empty;
-    private string TypeBrd = "ARCH";
-    private string Liste = "COMPLETE";
-    private int NbDossiers = 50;
-    private string Imprimante = "Greffe - Etage 1";
-    private bool Prepare;
-
-    private void Preparer() => Prepare = true;
-
-    private LigneArchi[] Retenues
+    private Dictionary<string, IleReact.RappelIle> Rappels => new()
     {
-        get
-        {
-            IEnumerable<LigneArchi> q = Lignes;
-            if (DateMin is { } min) q = q.Where(l => l.Radiation.Date >= min.Date);
-            if (DateMax is { } max) q = q.Where(l => l.Radiation.Date <= max.Date);
-            if (!string.IsNullOrEmpty(TypeRcs)) q = q.Where(l => l.Type == TypeRcs);
-            return q.Take(Math.Clamp(NbDossiers, 1, 999)).ToArray();
-        }
-    }
+        ["ouvrirDossier"] = IleReact.Rappel(OuvrirDossier)
+    };
 }
