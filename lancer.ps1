@@ -17,7 +17,7 @@
 
 $ErrorActionPreference = 'Stop'
 $racine = $PSScriptRoot
-$exe = Join-Path $racine 'bin\Debug\net9.0-windows\RigV3Desktop.exe'
+$exe = Join-Path $racine 'bin\Debug\net10.0-windows\RigV3Desktop.exe'
 
 # 1. Fermer l'instance en cours -- et ELLE SEULE : on filtre sur le chemin exact
 #    de l'executable, jamais sur le seul nom de processus.

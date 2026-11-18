@@ -45,12 +45,12 @@ foreach ($banc in $bancs) {
     # quand l'application tourne (MSB3021/MSB3027). OutputPath global envoie le
     # banc ET le projet reference dans un dossier a part : bin\ n'est jamais touche.
     # Ce dossier est a CINQ niveaux sous la racine du depot, comme le bin\Debug\
-    # net9.0-windows\ d'un banc : 20 bancs relisent leurs sources par
+    # net10.0-windows\ d'un banc : 20 bancs relisent leurs sources par
     # AppContext.BaseDirectory + « ../../../../../ ». Sous %TEMP% (avant le
     # 2026-11-18), ces cinq crans tombaient sur C:\Users\<nom>\ : 20 bancs sur
     # 28 sortaient rouges sur DirectoryNotFoundException, quel que soit le code.
     # « binverif* » est deja ignore par git.
-    $sortieDir = Join-Path $PSScriptRoot "tests\$nom\binverif\Debug\net9.0-windows\"
+    $sortieDir = Join-Path $PSScriptRoot "tests\$nom\binverif\Debug\net10.0-windows\"
     $sortie = & dotnet build $banc.FullName --nologo -v:q "-p:OutputPath=$sortieDir" 2>&1
     $code = $LASTEXITCODE
     if ($code -eq 0) {

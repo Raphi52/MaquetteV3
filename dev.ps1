@@ -16,7 +16,7 @@
 # compilation de watch echouerait (MSB3027). On ferme donc l'instance
 # lancee depuis CE dossier -- et elle seule, jamais tous les processus
 # portant ce nom.
-$exe = Join-Path $PSScriptRoot 'bin\Debug\net9.0-windows\RigV3Desktop.exe'
+$exe = Join-Path $PSScriptRoot 'bin\Debug\net10.0-windows\RigV3Desktop.exe'
 Get-Process -Name 'RigV3Desktop' -ErrorAction SilentlyContinue |
     Where-Object { $_.Path -eq $exe } |
     ForEach-Object {

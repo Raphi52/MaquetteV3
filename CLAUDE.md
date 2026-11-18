@@ -6,7 +6,7 @@ Pour savoir si le code compile, lance **`.\compiler.ps1`** (c'est-à-dire
 `dotnet msbuild RigV3Desktop.csproj -t:Compile`). Exit 0 = ça compile, exit 1 =
 les `error CS` sont dans la sortie.
 
-`dotnet build` et `dotnet run` recopient `bin\Debug\net9.0-windows\RigV3Desktop.exe`.
+`dotnet build` et `dotnet run` recopient `bin\Debug\net10.0-windows\RigV3Desktop.exe`.
 Quand l'application de l'utilisateur tourne, ce fichier est **verrouillé par Windows** :
 la compilation échoue sur **MSB3021 / MSB3027**, et le réflexe qui suit — fermer
 l'application pour débloquer — fait **disparaître sa fenêtre en plein travail**.
@@ -36,7 +36,7 @@ t'ont donné (`chat-<id du fil>` ou `run-<id du run>`, jamais un nom inventé) :
 
 ```
 powershell -NoProfile -File D:\AutoWinOS\scripts\hdesk-lancer.ps1 `
-  -Id <ton-id> -Executable "D:\RigV3Desktop\bin\Debug\net9.0-windows\RigV3Desktop.exe" `
+  -Id <ton-id> -Executable "D:\RigV3Desktop\bin\Debug\net10.0-windows\RigV3Desktop.exe" `
   -Travail "<ce que tu vérifies>"
 
 powershell -NoProfile -File D:\AutoWinOS\scripts\hdesk-observe.ps1 `
@@ -60,7 +60,7 @@ Deux raisons mesurées :
 2. **Le bureau caché n'a pas besoin d'un build neuf.** Aucun verrou d'instance
    mono n'existe dans ce projet (vérifié le 2026-09-17 : aucun `Mutex` dans le
    code). Tu peux donc lancer **l'exe déjà présent** dans
-   `bin\Debug\net9.0-windows\` sur ton bureau caché pendant que la fenêtre de
+   `bin\Debug\net10.0-windows\` sur ton bureau caché pendant que la fenêtre de
    l'utilisateur tourne, et capturer là.
 
 Donc l'ordre est : `compiler.ps1` (vert) → bureau caché sur l'exe existant →

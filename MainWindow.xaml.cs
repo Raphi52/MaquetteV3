@@ -172,7 +172,7 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Retrouve le wwwroot des SOURCES en remontant depuis le dossier
-    /// d'execution (bin/Debug/net9.0-windows). Rend null hors developpement.
+    /// d'execution (bin/Debug/net10.0-windows). Rend null hors developpement.
     /// </summary>
     private static string? TrouverWwwrootSource()
     {

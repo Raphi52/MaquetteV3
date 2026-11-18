@@ -39,7 +39,14 @@ $ErrorActionPreference = 'Stop'
 # 'fenetredocument.xaml' » (FenetreVueCheck, OngletsCheck rouges sans aucun
 # changement de code). PrepareResources enchaine MarkupCompilePass1, Pass2 et la
 # generation de g.resources : la DLL de obj est complete, et bin n'est pas touche.
-& dotnet msbuild "$PSScriptRoot\RigV3Desktop.csproj" "-t:ResolveReferences;PrepareResources;Compile" -v:m -nologo
+#
+# POURQUOI -restore (18/11/2026, passage en .NET 10).
+# `dotnet msbuild` ne restaure PAS les paquets NuGet, contrairement a `dotnet build`.
+# Sans restauration, obj\project.assets.json manque (copie neuve : NETSDK1004) ou
+# decrit encore l'ancienne version de .NET (NETSDK1005 apres un changement de
+# TargetFramework) et la compilation echoue avant le premier `error CS`.
+# La restauration n'ecrit que dans obj\ : l'exe de bin reste intact.
+& dotnet msbuild "$PSScriptRoot\RigV3Desktop.csproj" -restore "-t:ResolveReferences;PrepareResources;Compile" -v:m -nologo
 $code = $LASTEXITCODE
 
 if ($code -eq 0) {
