@@ -930,6 +930,8 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
      de pousser les commandes de fenetre hors du cadre. */
   .rig-entete { flex-wrap: wrap; gap: var(--rig-esp-2); }
   .rig-titre { font-size: var(--rig-fs-corps); }
+  /* Le salut de « Proue » garde sa place de titre, un cran plus petit. */
+  .rig-plan > .rig-entete .rig-proue .rig-titre { font-size: 20px; }
 
   /* La zone du milieu (saisie par etapes) garde une hauteur UTILISABLE : en
      `1fr` elle tombait a une ligne a 900x650 et a ZERO a 640x480 (mesure
@@ -1098,6 +1100,23 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 }
 .rig-plan > .rig-entete .rig-titre b { font-weight: 800; }
 
+/* ---------- « Proue » (/draft conv-1983, 18/11/2026) ----------
+   L'entete devient la proue de l'accueil : la date en petites capitales d'or,
+   le salut en grand, puis UNE phrase qui dit la journee avec les trois memes
+   chiffres que les tuiles chiffrees. Plus d'air au-dessus des chiffres. */
+.rig-plan > .rig-entete { align-items: flex-start; margin-bottom: var(--rig-esp-4); }
+.rig-proue { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.rig-proue__date {
+  font: 700 var(--rig-fs-kicker)/1.3 var(--rig-font-mono);
+  letter-spacing: .16em; text-transform: uppercase;
+  color: var(--rig-accent);
+}
+.rig-plan > .rig-entete .rig-proue .rig-titre { font-size: 26px; line-height: 1.1; }
+.rig-proue__phrase { margin-top: 4px; font-size: 13px; color: var(--rig-texte-2); }
+.rig-proue__phrase b { font-weight: 700; color: var(--rig-texte); }
+.rig-proue__phrase .rig-proue__alerte { color: var(--rig-alerte); }
+.rig-proue__point { margin: 0 6px; color: var(--rig-texte-3); }
+
 /* ---------- Tuiles chiffrees (charte du 2026-11-18) ----------
    Trois chiffres du jour entre la recherche et la grille : Arrivees (le
    compte de « A traiter »), Dossiers traites et Hors delai legal (la tuile
@@ -1113,14 +1132,28 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   gap: 12px;
   margin: 0 0 var(--rig-esp-5);
 }
+/* « Proue » : chaque tuile chiffree est un BOUTON qui deplie sa liste ; elle
+   se souleve au survol et, depliee, porte l'anneau d'or de l'element actif
+   (la regle de la charte « Commandes rondes »). */
 .rig-chiffre {
-  display: flex; flex-direction: column; gap: 8px;
+  display: flex; flex-direction: column; gap: 10px;
   min-width: 0;
-  padding: var(--rig-esp-3) var(--rig-esp-4);
+  padding: 14px var(--rig-esp-4);
   border-radius: var(--rig-radius);
   color: var(--rig-chiffre-texte);
   box-shadow: var(--rig-ombre);
+  font: inherit; text-align: left; cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease;
+  /* Piste de l'anneau, posee SUR la tuile : declaree dans :root, elle lirait
+     --rig-chiffre-texte du sombre, quel que soit le theme choisi plus bas. */
+  --rig-anneau-piste: color-mix(in srgb, var(--rig-chiffre-texte) 22%, transparent);
 }
+.rig-chiffre:hover { transform: translateY(-2px); box-shadow: var(--rig-ombre-saisie); }
+.rig-chiffre:focus-visible { outline: 2px solid var(--rig-focus); outline-offset: 3px; }
+/* Ombre COURTE une fois depliee : la grande ombre du survol tombait sur le
+   haut de la liste posee juste dessous et la grisait (capture du 18/11). */
+.rig-chiffre--deplie,
+.rig-chiffre--deplie:hover { transform: none; box-shadow: 0 0 0 2px var(--rig-or), var(--rig-ombre); }
 .rig-chiffre--1 { background: var(--rig-chiffre-1); border: 1px solid var(--rig-chiffre-1-bord); }
 .rig-chiffre--2 { background: var(--rig-chiffre-2); border: 1px solid var(--rig-chiffre-2-bord); }
 .rig-chiffre--3 { background: var(--rig-chiffre-3); border: 1px solid var(--rig-chiffre-3-bord); }
@@ -1142,7 +1175,7 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-chiffre--2 .rig-chiffre__rond { color: var(--rig-chiffre-2-icone); }
 .rig-chiffre--3 .rig-chiffre__rond { color: var(--rig-chiffre-3-icone); }
 .rig-chiffre__valeur {
-  font: 700 30px/1.1 var(--rig-font);
+  font: 700 40px/1.05 var(--rig-font);
   font-variant-numeric: tabular-nums;
   color: var(--rig-chiffre-valeur);
 }
@@ -1150,6 +1183,125 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   font-size: 11px; opacity: .85;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+/* ---------- Anneaux des tuiles chiffrees (« Proue ») ----------
+   Un anneau de 4 px cerne le grand rond. Il est un CALQUE a part, masque en
+   couronne : la nuit le rond est du verre translucide, et un disque peint
+   dessous se verrait au travers (constate sur la maquette sombre).
+   Teinte = le texte de la tuile (blanc sur les aplats vifs, creme sur le
+   verre) : l'anneau suit tous les themes sans jeton par theme.
+   - parts (Arrivees) : une part par categorie, degrade ecrit par Home.razor ;
+   - jauge (Traites, Hors delai) : --rig-anneau-cible (0-100) pose en ligne.
+   Pas de garde « prefers-reduced-motion » : le remplissage FAIT partie du
+   choix (« anneaux qui se remplissent ») et le poste de l'utilisateur a ce
+   reglage actif, il ne le verrait jamais (lecon Brain du 2026-10). */
+@property --rig-anneau-part { syntax: '<number>'; inherits: false; initial-value: 0; }
+.rig-chiffre__anneau {
+  flex: 0 0 auto;
+  width: 58px; height: 58px; border-radius: 50%;
+  display: grid; place-items: center;
+}
+.rig-chiffre__anneau > * { grid-area: 1 / 1; }
+.rig-chiffre__cercle {
+  width: 58px; height: 58px; border-radius: 50%;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4.5px), black calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4.5px), black calc(100% - 4px));
+}
+.rig-chiffre__cercle--parts { animation: rig-anneau-tourner 1.2s cubic-bezier(.2, .7, .2, 1) backwards; }
+.rig-chiffre__cercle--jauge {
+  --rig-anneau-part: var(--rig-anneau-cible, 0);
+  background: conic-gradient(var(--rig-chiffre-texte) calc(var(--rig-anneau-part) * 1%), var(--rig-anneau-piste) 0);
+  /* `backwards` seul : une fois rempli, l'anneau suit sa valeur VIVANTE
+     (une releve qui change la cible le fait glisser, sans rejouer le depart). */
+  animation: rig-anneau-remplir 1.4s cubic-bezier(.2, .7, .2, 1) .15s backwards;
+  transition: --rig-anneau-part .6s ease;
+}
+.rig-chiffre__anneau--alerte .rig-chiffre__cercle--jauge {
+  background: conic-gradient(var(--rig-anneau-alerte) calc(var(--rig-anneau-part) * 1%), var(--rig-anneau-piste) 0);
+}
+.rig-chiffre__anneau--alerte { animation: rig-anneau-pouls 2s ease-in-out infinite; }
+@keyframes rig-anneau-remplir { from { --rig-anneau-part: 0; } }
+@keyframes rig-anneau-tourner { from { transform: rotate(-120deg); opacity: 0; } }
+@keyframes rig-anneau-pouls {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--rig-anneau-alerte) 30%, transparent); }
+}
+
+/* ---------- Liste depliee sous un chiffre (« Proue ») ----------
+   Une pointe sous la tuile depliee, puis la liste dans une carte ; la grille
+   se replie pendant ce temps en resumes d'une ligne (.rig-proue-resumes). */
+.rig-proue-pointe {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;
+  height: 9px; margin: calc(9px - var(--rig-esp-5)) 0 0;
+}
+.rig-proue-pointe::before {
+  content: ""; width: 0; height: 0; margin-left: 36px;
+  border-left: 9px solid transparent; border-right: 9px solid transparent;
+  border-bottom: 9px solid var(--rig-surface);
+}
+.rig-proue-pointe--2::before { grid-column: 2; }
+.rig-proue-pointe--3::before { grid-column: 3; }
+.rig-proue-liste {
+  margin: 0 0 var(--rig-esp-4);
+  padding: var(--rig-esp-3) var(--rig-esp-4);
+  background: var(--rig-surface);
+  border: 1px solid var(--rig-bord);
+  border-radius: var(--rig-radius);
+  box-shadow: var(--rig-ombre);
+  animation: rig-proue-ouvrir .22s ease-out;
+}
+.rig-proue-liste__tete {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--rig-esp-2);
+  margin-bottom: var(--rig-esp-2);
+}
+.rig-proue-liste__titre {
+  font: 700 var(--rig-fs-kicker)/1.3 var(--rig-font);
+  letter-spacing: var(--rig-ls-kicker); text-transform: uppercase;
+  color: var(--rig-texte);
+}
+.rig-proue-liste__titre b { font-size: 18px; letter-spacing: normal; }
+.rig-proue-liste__lien {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: 600 12px/1.3 var(--rig-font); color: var(--rig-accent);
+  white-space: nowrap;
+}
+.rig-proue-liste__lien:hover { text-decoration: underline; }
+.rig-proue-liste .rig-alerte:last-child { border-bottom: 0; }
+@keyframes rig-proue-ouvrir { from { opacity: 0; transform: translateY(-6px); } }
+
+/* Les tuiles de la grille en RESUME d'une ligne, pendant qu'un chiffre est
+   deplie. La grille reste dans la page, masquee : rig-accueil.js y garde son
+   glisser-deposer branche. */
+.rig-grille--repliee { display: none; }
+/* Grille a cases EGALES : en flex, le dernier resume seul sur sa ligne
+   s'etirait sur toute la largeur (capture du 18/11). */
+.rig-proue-resumes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.rig-proue-resume {
+  min-width: 0;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 12px;
+  font: inherit; text-align: left; color: var(--rig-texte); cursor: pointer;
+  background: var(--rig-surface);
+  border: 1px solid var(--rig-bord);
+  border-radius: var(--rig-radius);
+  box-shadow: var(--rig-ombre);
+  transition: box-shadow .14s ease, transform .14s ease;
+  animation: rig-proue-ouvrir .22s ease-out;
+}
+.rig-proue-resume:hover { transform: translateY(-1px); box-shadow: var(--rig-ombre-saisie); }
+.rig-proue-resume:focus-visible { outline: 2px solid var(--rig-focus); outline-offset: 2px; }
+.rig-proue-resume__tete { display: flex; align-items: center; gap: var(--rig-esp-2); }
+.rig-proue-resume__ligne {
+  display: block; min-width: 0;
+  font-size: 12px; color: var(--rig-texte-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rig-proue-resume__ligne b { color: var(--rig-texte); }
+.rig-proue-resume__ligne > span + span::before { content: "\00B7"; margin: 0 6px; color: var(--rig-texte-3); }
+
+/* La tuile ou ramene un resume ou un lien « Tout voir » s'entoure d'or un
+   instant (classe posee et retiree par montrerTuile, rig-accueil.js). */
+.rig-widget--signale { box-shadow: 0 0 0 2px var(--rig-or), var(--rig-ombre-saisie); }
 
 /* Le filet de marque colle au bord haut, la barre juste dessous. */
 .rig-filet-marque { position: sticky; top: 0; z-index: 91; }

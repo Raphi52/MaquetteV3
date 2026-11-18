@@ -28,6 +28,12 @@
      tuiles chiffrees de l'accueil (aplats vifs le jour, verre teinte la
      nuit), leurs ronds, le rond de profil et la pastille du verbe actif.
      Partout ailleurs elle tient.
+
+   2026-11-18, accueil « Proue » (choix utilisateur, /draft conv-1983,
+   proposition 1), DANS cette charte : date en capitales d'or au-dessus du
+   salut, phrase du jour, anneaux autour des ronds des tuiles chiffrees
+   (--rig-anneau-alerte), tuiles chiffrees cliquables qui deplient leur liste.
+   Aucun nouvel aplat : la liste et les resumes sont des cartes de surface.
    ============================================================ */
 
 :root {
@@ -78,6 +84,12 @@
      comme sur la maquette ; c'est son anneau d'or qui suit le mode. */
   --rig-profil: linear-gradient(135deg, #2C3F8F, #4560C2);
   --rig-profil-texte: #FFFFFF;
+
+  /* Anneau « Hors delai legal » des tuiles chiffrees (« Proue », 18/11/2026) :
+     un or PALE, lisible sur la brique vive du jour comme sur le verre de la
+     nuit et sur les tuiles de chaque theme. Invariant : l'alerte du texte
+     (--rig-alerte, brique en clair) disparaitrait sur la tuile brique. */
+  --rig-anneau-alerte: #FFD27A;
 
   /* Texte et voiles DU RAIL de gauche (lus par .rig-menu, rig-accueil.css).
      Valeurs d'un rail sombre, celles du clair et du sombre ; un theme a rail

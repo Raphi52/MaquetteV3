@@ -19,6 +19,17 @@ export function appliquerTheme(nom) {
   document.documentElement.setAttribute("data-rig-theme", nom);
 }
 
+// « Proue » (18/11/2026) : un resume d'une ligne ou un lien « Tout voir » a
+// rendu la grille ; la tuile visee defile dans la vue et s'entoure d'or un
+// instant, pour que l'oeil la retrouve parmi les autres.
+export function montrerTuile(id) {
+  const tuile = document.querySelector(`.rig-grille [data-tuile="${CSS.escape(id)}"]`);
+  if (!tuile) return;
+  tuile.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  tuile.classList.add("rig-widget--signale");
+  setTimeout(() => tuile.classList.remove("rig-widget--signale"), 1400);
+}
+
 export function activerPose(zone, dotnet) {
   arreterPose();
   if (!zone) return;

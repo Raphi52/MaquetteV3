@@ -31,8 +31,9 @@ public sealed class MesuresPerf
     public const string LibelleTraites = "Dossiers traites";
     public const string LibelleHorsDelai = "Hors delai legal";
 
-    /// <summary>Delai legal de traitement d'une demande, en jours.</summary>
-    private const int DelaiLegalJours = 7;
+    /// <summary>Delai legal de traitement d'une demande, en jours : le meme que
+    /// les alertes, pour que la mesure et la tache « hors delai » comptent pareil.</summary>
+    private const int DelaiLegalJours = JeuDemo.DelaiLegalJours;
 
     /// <summary>
     /// OBJECTIFS de service, figes ici et nulle part ailleurs. Ils ne sont
@@ -94,8 +95,8 @@ public sealed class MesuresPerf
         var enCours = demandes.Count(d => d.EnCours);
         var rejetes = demandes.Count(d => d.Etat == "Rejetee");
 
-        var horsDelai = demandes.Count(d => d.EnCours
-            && (JeuDemo.Aujourdhui - d.Creation2).TotalDays > DelaiLegalJours);
+        // La meme liste que celle depliee sous la tuile chiffree de l'accueil.
+        var horsDelai = JeuDemo.DemandesHorsDelai().Length;
 
         var actes = JeuDemo.Actes;
         var numerises = actes.Count(a => a.Demat);

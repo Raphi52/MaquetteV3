@@ -217,9 +217,46 @@
     @* ============ PLAN DE TRAVAIL ============ *@
     <div class="rig-plan">
 
+        @* Les trois chiffres du jour, lus UNE fois : la phrase de l'entete et les
+           tuiles chiffrees disent donc toujours les memes nombres. *@
+        @{
+            var chiffreArrivees = ArriveesVues;
+            var chiffreArriveesTotal = chiffreArrivees.Sum(a => a.Nombre);
+            var chiffreEnTete = chiffreArrivees.OrderByDescending(a => a.Nombre).FirstOrDefault();
+            var chiffreTraites = MesureNommee(MesuresPerf.LibelleTraites);
+            var chiffreHorsDelai = MesureNommee(MesuresPerf.LibelleHorsDelai);
+            var horsDelaiNombre = chiffreHorsDelai is null ? 0 : JeuDemo.DemandesHorsDelai().Length;
+        }
+
         <div class="rig-entete">
-            <div class="rig-titre">
-                Bonjour <b>@Utilisateur</b>
+            @* « Proue » (/draft conv-1983, 18/11/2026) : la date du jour, le salut,
+               puis UNE phrase qui dit la journee avec les chiffres des tuiles. *@
+            <div class="rig-proue">
+                <div class="rig-proue__date">@DateDuJour</div>
+                <div class="rig-titre">
+                    Bonjour <b>@Utilisateur</b>
+                </div>
+                <div class="rig-proue__phrase">
+                    @if (chiffreHorsDelai is not null)
+                    {
+                        @if (horsDelaiNombre > 0)
+                        {
+                            <b class="rig-proue__alerte">@horsDelaiNombre @(horsDelaiNombre > 1 ? "dossiers" : "dossier")</b>
+                            @(horsDelaiNombre > 1 ? " depassent le delai legal" : " depasse le delai legal")
+                        }
+                        else
+                        {
+                            <span>Aucun dossier hors delai legal</span>
+                        }
+                        <span class="rig-proue__point">&middot;</span>
+                    }
+                    <b>@chiffreArriveesTotal @(chiffreArriveesTotal > 1 ? "arrivees" : "arrivee")</b> a traiter
+                    @if (chiffreTraites is not null)
+                    {
+                        <span class="rig-proue__point">&middot;</span>
+                        <b>@chiffreTraites.Valeur</b> <span>traites</span>
+                    }
+                </div>
             </div>
             @* « Commandes rondes » (18/11/2026) : le reglage puis le profil, en ronds. *@
             <div class="rig-entete__outils">
@@ -321,48 +358,160 @@
            autres = les mesures de la tuile Performance : un chiffre ne peut donc
            jamais differer de sa tuile d'origine. Chaque tuile porte un grand
            rond a GAUCHE de son chiffre, qui dit son sujet (« Commandes rondes »,
-           comme les tuiles de la maquette 05) : courrier, coche, horloge. --- *@
-        @{
-            var chiffreArrivees = ArriveesVues;
-            var chiffreEnTete = chiffreArrivees.OrderByDescending(a => a.Nombre).FirstOrDefault();
-            var chiffreTraites = MesureNommee(MesuresPerf.LibelleTraites);
-            var chiffreHorsDelai = MesureNommee(MesuresPerf.LibelleHorsDelai);
-        }
+           comme les tuiles de la maquette 05) : courrier, coche, horloge.
+           « Proue » (18/11/2026) : le rond est cerne d'un ANNEAU qui se remplit
+           (parts des arrivees, atteinte de l'objectif, part des dossiers en cours
+           hors delai) et chaque tuile est un BOUTON qui deplie sa liste dessous. --- *@
         <div class="rig-chiffres">
-            <div class="rig-chiffre rig-chiffre--1">
+            <button type="button" class="rig-chiffre rig-chiffre--1 @(ChiffreDeplie == 1 ? "rig-chiffre--deplie" : "")"
+                    aria-expanded="@(ChiffreDeplie == 1 ? "true" : "false")"
+                    title="@(ChiffreDeplie == 1 ? "Replier" : "Deplier") la liste des arrivees"
+                    @onclick="() => BasculerChiffre(1)">
                 <span class="rig-chiffre__libelle">Arrivees</span>
                 <span class="rig-chiffre__rang">
-                    <span class="rig-chiffre__rond" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M2.5 9.5h3l1 2h3l1-2h3M3.5 4h9l1 5.5V13h-11V9.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span>
+                    <span class="rig-chiffre__anneau" aria-hidden="true">
+                        <span class="rig-chiffre__cercle rig-chiffre__cercle--parts" style="background:@AnneauArrivees(chiffreArrivees)"></span>
+                        <span class="rig-chiffre__rond" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M2.5 9.5h3l1 2h3l1-2h3M3.5 4h9l1 5.5V13h-11V9.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span>
+                    </span>
                     <span class="rig-chiffre__texte">
-                        <b class="rig-chiffre__valeur">@chiffreArrivees.Sum(a => a.Nombre)</b>
+                        <b class="rig-chiffre__valeur">@chiffreArriveesTotal</b>
                         <span class="rig-chiffre__detail" title="@chiffreEnTete?.Titre">@(chiffreEnTete is null ? "rien a traiter" : $"{chiffreEnTete.Nombre} : {chiffreEnTete.Titre}")</span>
                     </span>
                 </span>
-            </div>
-            <div class="rig-chiffre rig-chiffre--2">
+            </button>
+            <button type="button" class="rig-chiffre rig-chiffre--2 @(ChiffreDeplie == 2 ? "rig-chiffre--deplie" : "")"
+                    aria-expanded="@(ChiffreDeplie == 2 ? "true" : "false")"
+                    title="@(ChiffreDeplie == 2 ? "Replier" : "Deplier") les mesures de performance"
+                    @onclick="() => BasculerChiffre(2)">
                 <span class="rig-chiffre__libelle">Dossiers traites</span>
                 <span class="rig-chiffre__rang">
-                    <span class="rig-chiffre__rond" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="m3.5 8.5 3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    @* L'anneau dit l'ATTEINTE de l'objectif (4 traites pour 9 vises = 44 %),
+                       la meme grandeur qui colore la barre de la tuile Performance. *@
+                    <span class="rig-chiffre__anneau" aria-hidden="true">
+                        <span class="rig-chiffre__cercle rig-chiffre__cercle--jauge" style="--rig-anneau-cible:@(Math.Clamp(chiffreTraites?.Atteinte ?? 0, 0, 100))"></span>
+                        <span class="rig-chiffre__rond" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="m3.5 8.5 3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    </span>
                     <span class="rig-chiffre__texte">
                         <b class="rig-chiffre__valeur">@(chiffreTraites?.Valeur ?? "-")</b>
                         <span class="rig-chiffre__detail">@chiffreTraites?.ObjectifTexte</span>
                     </span>
                 </span>
-            </div>
-            <div class="rig-chiffre rig-chiffre--3">
+            </button>
+            <button type="button" class="rig-chiffre rig-chiffre--3 @(ChiffreDeplie == 3 ? "rig-chiffre--deplie" : "")"
+                    aria-expanded="@(ChiffreDeplie == 3 ? "true" : "false")"
+                    title="@(ChiffreDeplie == 3 ? "Replier" : "Deplier") la liste des dossiers hors delai legal"
+                    @onclick="() => BasculerChiffre(3)">
                 <span class="rig-chiffre__libelle">Hors delai legal</span>
                 <span class="rig-chiffre__rang">
-                    <span class="rig-chiffre__rond" aria-hidden="true"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.8V8l2.2 1.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+                    @* L'anneau dit la PART des dossiers en cours qui ont passe le delai ;
+                       des qu'il y en a un, il prend la teinte d'alerte et bat doucement. *@
+                    <span class="rig-chiffre__anneau @(horsDelaiNombre > 0 ? "rig-chiffre__anneau--alerte" : "")" aria-hidden="true">
+                        <span class="rig-chiffre__cercle rig-chiffre__cercle--jauge" style="--rig-anneau-cible:@(chiffreHorsDelai?.Part ?? 0)"></span>
+                        <span class="rig-chiffre__rond" aria-hidden="true"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.8V8l2.2 1.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+                    </span>
                     <span class="rig-chiffre__texte">
                         <b class="rig-chiffre__valeur">@(chiffreHorsDelai?.Valeur ?? "-")</b>
                         <span class="rig-chiffre__detail">@chiffreHorsDelai?.ObjectifTexte</span>
                     </span>
                 </span>
-            </div>
+            </button>
         </div>
 
+        @* --- « Proue » : la liste du chiffre deplie, juste sous lui, puis les
+           tuiles de la grille en RESUME d'une ligne. La grille reste dans la page
+           (masquee) : le glisser-deposer de rig-accueil.js y reste branche. --- *@
+        @if (ChiffreDeplie is int deplie)
+        {
+            <div class="rig-proue-pointe rig-proue-pointe--@deplie" aria-hidden="true"></div>
+            <section class="rig-proue-liste" aria-label="@(deplie switch { 1 => "Arrivees", 2 => "Performance", _ => "Hors delai legal" })">
+                @switch (deplie)
+                {
+                    case 1:
+                        <header class="rig-proue-liste__tete">
+                            <span class="rig-proue-liste__titre">Arrivees &middot; <b>@chiffreArriveesTotal</b></span>
+                            @if (TuileVisible("alertes"))
+                            {
+                                <button type="button" class="rig-proue-liste__lien" @onclick="@(() => VoirTuile("alertes"))">Tout voir dans A traiter &rarr;</button>
+                            }
+                        </header>
+                        @if (chiffreArrivees.Length == 0)
+                        {
+                            <div class="rig-vide">Aucune arrivee a traiter.</div>
+                        }
+                        @foreach (var item in chiffreArrivees)
+                        {
+                            var a = item;
+                            <button class="rig-alerte rig-alerte--lien" type="button"
+                                    title="Aller vers @a.LibelleCible"
+                                    @onclick="() => OuvrirAlerte(a)">
+                                <span class="rig-alerte__compte rig-alerte__compte--@PanneauMetier.Palier(a.Nombre)">@a.Nombre</span>
+                                <span class="rig-alerte__corps">
+                                    <span class="rig-alerte__titre">@a.Titre</span>
+                                </span>
+                                <span class="rig-alerte__vers">@a.LibelleCible &rsaquo;</span>
+                            </button>
+                        }
+                        break;
+                    case 2:
+                        <header class="rig-proue-liste__tete">
+                            <span class="rig-proue-liste__titre">Dossiers traites &middot; <b>@(chiffreTraites?.Valeur ?? "-")</b></span>
+                            @if (TuileVisible("performance"))
+                            {
+                                <button type="button" class="rig-proue-liste__lien" @onclick="@(() => VoirTuile("performance"))">Tout voir dans Performance &rarr;</button>
+                            }
+                        </header>
+                        @CorpsPerformance
+                        break;
+                    default:
+                        var horsDelai = JeuDemo.DemandesHorsDelai();
+                        <header class="rig-proue-liste__tete">
+                            <span class="rig-proue-liste__titre">Hors delai legal &middot; <b>@horsDelai.Length</b></span>
+                            @if (TuileVisible("taches"))
+                            {
+                                <button type="button" class="rig-proue-liste__lien" @onclick="@(() => VoirTuile("taches"))">Tout voir dans Mes taches du jour &rarr;</button>
+                            }
+                        </header>
+                        @if (horsDelai.Length == 0)
+                        {
+                            <div class="rig-vide">Aucun dossier hors delai legal.</div>
+                        }
+                        @foreach (var item in horsDelai)
+                        {
+                            var d = item;
+                            <button class="rig-alerte rig-alerte--lien" type="button"
+                                    title="Ouvrir l'affaire @d.Dossier"
+                                    @onclick="() => OuvrirParNumero(d.Dossier)">
+                                <span class="rig-filet-v rig-filet-v--alerte"></span>
+                                <span class="rig-alerte__corps">
+                                    <span class="rig-alerte__titre">@d.Nom</span><br />
+                                    @* Jamais d.Traitement : c'est le code PROC_xxx, que l'accueil n'affiche pas. *@
+                                    <span class="rig-alerte__detail">J+@JeuDemo.JoursDepuis(d) &middot; demande @d.Numero &middot; creee le @d.Creation</span>
+                                </span>
+                                <span class="rig-alerte__vers">affaire @d.Dossier &rsaquo;</span>
+                            </button>
+                        }
+                        break;
+                }
+            </section>
+            <div class="rig-proue-resumes">
+                @foreach (var item in TuilesEnResume)
+                {
+                    var def = item;
+                    <button type="button" class="rig-proue-resume"
+                            title="Revenir a la grille sur la tuile @def.Titre"
+                            @onclick="() => VoirTuile(def.Id)">
+                        <span class="rig-proue-resume__tete">
+                            <span class="rig-widget__poignee" aria-hidden="true">&#8942;&#8942;</span>
+                            <span class="rig-widget__titre">@def.Titre</span>
+                        </span>
+                        @ResumeTuile(def)
+                    </button>
+                }
+            </div>
+        }
+
         @* --- Grille : chaque tuile reste ou on l'a posee --- *@
-        <div class="rig-grille" @ref="Grille">
+        <div class="rig-grille @(ChiffreDeplie is null ? "" : "rig-grille--repliee")" @ref="Grille">
             @foreach (var def in Definitions)
             {
                 var p = Pose(def.Id);
@@ -3249,6 +3398,14 @@
                 try { await Module.InvokeVoidAsync("allerEtape", ZonePages, EtapeCourante, false); }
                 catch (JSException) { }
             }
+            // « Proue » : un resume ou un lien « Tout voir » vient de rendre la
+            // grille ; la tuile visee defile dans la vue et s'entoure d'or.
+            if (TuileASignaler is { } tuile)
+            {
+                TuileASignaler = null;
+                try { await Module.InvokeVoidAsync("montrerTuile", tuile); }
+                catch (JSException) { }
+            }
             return;
         }
         Module = await JS.InvokeAsync<IJSObjectReference>("import", "./rig-accueil.js");
@@ -4779,6 +4936,158 @@
     /// (MesuresPerf.Relever) ; null tant que la premiere releve n'est pas faite.</summary>
     private MesurePerf? MesureNommee(string libelle)
         => Mesures.FirstOrDefault(m => m.Libelle == libelle);
+
+    // ================= « Proue » (/draft conv-1983, 18/11/2026) =================
+    // Un clic sur une tuile chiffree deplie SA liste juste dessous ; pendant ce
+    // temps la grille se replie en resumes d'une ligne, pour que la liste se lise
+    // sans defiler. Un second clic sur le chiffre, un resume ou le lien « Tout
+    // voir » rendent la grille. Rien n'est enregistre : l'accueil s'ouvre
+    // toujours sur la grille, comme avant.
+
+    /// <summary>La tuile chiffree depliee (1 arrivees, 2 traites, 3 hors delai), ou null.</summary>
+    private int? ChiffreDeplie;
+
+    /// <summary>La tuile a amener dans la vue au rendu qui fait reapparaitre la grille.</summary>
+    private string? TuileASignaler;
+
+    private void BasculerChiffre(int rang) => ChiffreDeplie = ChiffreDeplie == rang ? null : rang;
+
+    private void VoirTuile(string id)
+    {
+        ChiffreDeplie = null;
+        TuileASignaler = id;
+    }
+
+    /// <summary>« mercredi 18 novembre » ; les capitales viennent du CSS.</summary>
+    private static string DateDuJour
+        => DateTime.Today.ToString("dddd d MMMM", System.Globalization.CultureInfo.GetCultureInfo("fr-FR"));
+
+    /// <summary>Vrai si la tuile est posee sur l'accueil et permise a ce compte :
+    /// un lien « Tout voir » vers une tuile masquee ne menerait nulle part.</summary>
+    private bool TuileVisible(string id)
+        => Definitions.FirstOrDefault(d => d.Id == id) is { } def && Pose(id).Visible && TuileAutorisee(def);
+
+    /// <summary>Les tuiles de la grille, dans l'ordre de lecture (ligne puis colonne).</summary>
+    private DefinitionTuile[] TuilesEnResume
+        => Definitions.Where(d => Pose(d.Id).Visible && TuileAutorisee(d))
+                      .OrderBy(d => Pose(d.Id).Ligne).ThenBy(d => Pose(d.Id).Colonne)
+                      .ToArray();
+
+    /// <summary>
+    /// L'anneau des arrivees : une part par categorie, de la plus chargee a la
+    /// moins chargee, chacune un cran plus pale, un fin vide entre deux parts.
+    /// Les pourcentages sont ecrits en culture INVARIANTE : « 33,3% » casserait
+    /// le degrade.
+    /// </summary>
+    private static string AnneauArrivees(AlerteGreffe[] lignes)
+    {
+        var parts = lignes.Where(a => a.Nombre > 0).OrderByDescending(a => a.Nombre).ToArray();
+        var total = parts.Sum(a => a.Nombre);
+        if (total == 0) return "var(--rig-anneau-piste)"; // piste posee sur .rig-chiffre
+
+        static string Pc(double v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%";
+        var vide = parts.Length > 1 ? 1.6 : 0;
+        var segments = new List<string>();
+        double debut = 0;
+        for (var i = 0; i < parts.Length; i++)
+        {
+            var fin = debut + parts[i].Nombre * 100.0 / total;
+            var plein = Math.Max(debut, fin - vide);
+            var opacite = Math.Max(32, 100 - 22 * i);
+            segments.Add($"color-mix(in srgb, var(--rig-chiffre-texte) {opacite}%, transparent) {Pc(debut)} {Pc(plein)}");
+            if (plein < fin) segments.Add($"transparent {Pc(plein)} {Pc(fin)}");
+            debut = fin;
+        }
+        return "conic-gradient(" + string.Join(", ", segments) + ")";
+    }
+
+    /// <summary>
+    /// Le resume d'UNE ligne d'une tuile, quand la grille est repliee : ce que
+    /// la tuile montre en premier (le plus grave, le plus recent, le plus
+    /// charge), lu aux memes sources que son corps.
+    /// </summary>
+    private RenderFragment ResumeTuile(DefinitionTuile def) => @<span class="rig-proue-resume__ligne">
+        @switch (def.Id)
+        {
+            case "alertes" or "alertes-bis":
+                var groupes = AlertesParCategorie;
+                if (groupes.Length == 0)
+                {
+                    <span>Aucune alerte a afficher</span>
+                }
+                foreach (var g in groupes.Take(3))
+                {
+                    <span><b>@g.Lignes.Sum(x => x.Nombre)</b> @g.Categorie</span>
+                }
+                break;
+            case "taches":
+                var tache = TachesVues.FirstOrDefault();
+                if (tache is null)
+                {
+                    <span>Aucune tache en attente</span>
+                }
+                else
+                {
+                    <span>@tache.Titre</span>
+                    if (TachesVues.Length > 1)
+                    {
+                        <span>+@(TachesVues.Length - 1) autre(s)</span>
+                    }
+                }
+                break;
+            case "activite":
+                var geste = ActivitesVues.FirstOrDefault();
+                if (geste is null)
+                {
+                    <span>Aucun geste aujourd'hui</span>
+                }
+                else
+                {
+                    <span><b>@geste.Agent</b> @geste.Verbe @geste.Objet</span>
+                }
+                break;
+            case "actualites":
+                var actu = ActualitesVues.Actifs.FirstOrDefault();
+                if (actu is null)
+                {
+                    <span>Aucune actualite en cours</span>
+                }
+                else
+                {
+                    <span><b>@actu.Fiche.Libelle</b> @actu.Titre</span>
+                }
+                break;
+            case "nouveautes":
+                var nouv = Nouveautes.FirstOrDefault();
+                if (nouv is not null)
+                {
+                    <span><b>@nouv.Action</b> @nouv.Suite</span>
+                }
+                break;
+            case "performance":
+                // La mesure la plus loin de son objectif, hors les deux deja en tuiles chiffrees.
+                var mesure = Mesures.Where(x => MesureActive(x.Libelle)
+                                             && x.Libelle != MesuresPerf.LibelleTraites
+                                             && x.Libelle != MesuresPerf.LibelleHorsDelai)
+                                    .OrderBy(x => x.Atteinte)
+                                    .FirstOrDefault();
+                if (mesure is not null)
+                {
+                    <span>@mesure.Libelle <b>@mesure.Valeur</b></span>
+                    <span>@mesure.ObjectifTexte</span>
+                }
+                break;
+            case var id when id.StartsWith("metier-"):
+                var lignesMetier = MetierLignes(MetierCategorie(id));
+                var plusChargee = lignesMetier.OrderByDescending(x => x.Nombre).FirstOrDefault();
+                <span><b>@lignesMetier.Sum(x => x.Nombre)</b> a traiter</span>
+                if (plusChargee is not null)
+                {
+                    <span>@plusChargee.Titre</span>
+                }
+                break;
+        }
+    </span>;
 
     /// <summary>Une categorie eteinte masque TOUTES ses alertes. Absente des
     /// reglages = surveillee : une nouvelle categorie livree plus tard se voit

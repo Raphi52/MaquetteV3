@@ -213,6 +213,27 @@ public static class JeuDemo
 {
     public static readonly DateTime Aujourdhui = new(2026, 9, 9);
 
+    /// <summary>Delai legal de traitement d'une demande, en jours.</summary>
+    public const int DelaiLegalJours = 7;
+
+    /// <summary>
+    /// Les demandes encore en cours au-dela du delai legal, la plus ancienne en
+    /// tete. Source UNIQUE (18/11/2026) : la tache « hors delai » (AlertesGreffe),
+    /// la mesure de la tuile Performance (MesuresPerf) et la liste que l'accueil
+    /// deplie sous la tuile chiffree « Hors delai legal » la lisent toutes trois.
+    /// Avant, chacun refaisait le filtre avec sa propre copie du delai : un
+    /// chiffre pouvait differer de la liste posee juste dessous. Elle vit ICI
+    /// parce que chaque banc qui compile l'un de ces fichiers compile aussi
+    /// celui-ci (PerfCheck n'embarque pas AlertesGreffe.cs).
+    /// </summary>
+    public static DemandeRcs[] DemandesHorsDelai()
+        => Demandes.Where(d => d.EnCours && (Aujourdhui - d.Creation2).TotalDays > DelaiLegalJours)
+                   .OrderBy(d => d.Creation2)
+                   .ToArray();
+
+    /// <summary>Jours entiers ecoules depuis la creation de la demande (le « J+n »).</summary>
+    public static int JoursDepuis(DemandeRcs d) => (int)(Aujourdhui - d.Creation2).TotalDays;
+
     /// <summary>
     /// Les evenements recurrents qui attendent d etre traites. Le code doit
     /// correspondre a une recette connue (RecettesTaches) : sans recette,

@@ -198,8 +198,8 @@ public static class CatalogueAlertes
 /// </summary>
 public sealed class AlertesGreffe
 {
-    /// <summary>Delai legal de traitement d'une demande, en jours.</summary>
-    public const int DelaiLegalJours = 7;
+    /// <summary>Delai legal de traitement d'une demande, en jours (JeuDemo le porte).</summary>
+    public const int DelaiLegalJours = JeuDemo.DelaiLegalJours;
 
     /// <summary>Le greffier a son poste : tout dossier porte par QUELQU'UN
     /// D'AUTRE et encore en cours est un dossier verrouille pour lui.</summary>
@@ -231,14 +231,11 @@ public sealed class AlertesGreffe
         var demandes = JeuDemo.Demandes;
         var liste = new List<AlerteGreffe>();
 
-        var horsDelai = demandes
-            .Where(d => d.EnCours && (JeuDemo.Aujourdhui - d.Creation2).TotalDays > DelaiLegalJours)
-            .OrderBy(d => d.Creation2)
-            .ToArray();
+        var horsDelai = JeuDemo.DemandesHorsDelai();
         if (horsDelai.Length > 0)
         {
             var plusVieille = horsDelai[0];
-            var jours = (int)(JeuDemo.Aujourdhui - plusVieille.Creation2).TotalDays;
+            var jours = JeuDemo.JoursDepuis(plusVieille);
             liste.Add(new("delai",
                 $"{horsDelai.Length} demande(s) hors delai legal",
                 $"la plus ancienne : J+{jours} - {plusVieille.Nom}",
