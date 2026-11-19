@@ -55,7 +55,6 @@ export function vuePlan(partiel: Partial<VuePlanAccueil> = {}): VuePlanAccueil {
         login: 'rvilain', comptes: [],
       },
     },
-    recherche: { texte: '', traitements: [], affaires: [], elements: [] },
     chiffres: {
       deplie: null, arrivees: 66, detail1: '22 : DAS', titreDetail1: 'DAS', anneau1: 'var(--rig-anneau-piste)',
       cible2: 44, valeur2: '4 / 11', objectif2: 'obj. 9', alerte3: true, cible3: 30, valeur3: '2', objectif3: 'obj. 0',

@@ -202,6 +202,39 @@ internal static class Programme
         Agir("paletteAller", new { nature = "ecran", cle = "BODACC" });
         Exiger(plan.Vue().Proc is { Code: "BODACC" }, "une annonce ouvre l'ecran BODACC");
 
+        // --- 11. La BARRE de l'accueil est la porte de la palette (19/11/2026) :
+        // la lettre tapee y part, et la palette trouve ce que l'ancienne liste
+        // trouvait -- les ecrans du menu, les elements de l'arbre.
+        plan.SurGesteAccueil(new GesteIle("palette", Valeur("trans")));
+        p = P();
+        Exiger(p.Texte == "trans" && p.Ecrans.Any(e => e is { Code: "PROC_TELETRANS", Libelle: "Teletransmissions (EDI)" })
+               && p.Travail.Any(t => t.Numero == "004151"),
+            "une frappe dans la barre de l'accueil ouvre la palette avec ce texte : ecrans du menu et travail");
+        Agir("paletteTexte", "2024 0141");
+        p = P();
+        var depot = p.Elements.FirstOrDefault(e => e.Libelle == "Depot n 2024/0141");
+        Exiger(depot is { Piece: false, Lieu: "Depots d'actes" } && depot.Chemin[0] == "Dossier RCS",
+            $"un n° de depot trouve son dossier dans l'arbre, separateurs ignores ({string.Join(", ", p.Elements.Select(e => e.Libelle))})");
+        Agir("paletteTexte", "bail commercial");
+        p = P();
+        Exiger(p.Pieces.Any(x => x.Libelle == "Bail commercial") && p.Elements.All(e => e.Libelle != "Bail commercial"),
+            "une piece trouvee par son libelle ET son texte ne s'affiche qu'une fois, avec son passage");
+        plan.SurGesteAccueil(new GesteIle("login", Valeur("pjudic")));
+        Agir("paletteTexte", "2024 0141");
+        Exiger(P().Elements.Length == 0, "un login sans le domaine RCS ne trouve pas les elements de la branche RCS");
+        plan.SurGesteAccueil(new GesteIle("login", Valeur("rvilain")));
+        Agir("paletteTexte", "2024 0141");
+        Agir("palettePiece", P().Elements.First(e => e.Libelle == "Depot n 2024/0141").Chemin);
+        vue = plan.Vue();
+        Exiger(vue.Palette is null && vue.Dossier is { Numero: "2026B01067" },
+            "Entree sur un element de l'arbre ouvre son affaire");
+        Agir("echap");
+        Agir("paletteOuvrir");
+        Agir("paletteTexte", "facture");
+        Agir("paletteAller", new { nature = "ecran", cle = P().Ecrans.First().Code });
+        Exiger(plan.Vue().Proc is { Libelle: var lib } && lib.Contains("Facture", StringComparison.OrdinalIgnoreCase),
+            "Entree sur un ecran du menu l'ouvre");
+
         plan.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 }

@@ -47,16 +47,6 @@ export interface EnteteVue {
   profil: ProfilVue | null
 }
 
-export interface TraitementTrouveVue { libelle: string }
-export interface AffaireTrouveeVue { numero: string, objet: string, siren: string, type: string, statut: string }
-export interface ElementTrouveVue { statut: string, nom: string, numero: string, chemin: string }
-export interface RechercheVue {
-  texte: string
-  traitements: TraitementTrouveVue[]
-  affaires: AffaireTrouveeVue[]
-  elements: ElementTrouveVue[]
-}
-
 export interface ChiffresVue {
   deplie: number | null
   arrivees: number
@@ -187,7 +177,6 @@ export interface VuePlanAccueil {
   menuReduit: boolean
   menu: MenuVue
   entete: EnteteVue
-  recherche: RechercheVue
   chiffres: ChiffresVue
   proue: ProueVue | null
   tuiles: TuileVue[]

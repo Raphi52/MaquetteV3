@@ -21,7 +21,7 @@ import type { KeyboardEvent as ToucheReact, ReactNode } from 'react'
 import { AnnoncesBodacc } from '../ecrans/EcranBodacc'
 import type { AnnonceBodacc } from '../ecrans/EcranBodacc'
 import type {
-  GestePlan, HorsGreffePaletteVue, PaletteVue, PiecePaletteVue, TravailPaletteVue,
+  ElementPaletteVue, EcranPaletteVue, GestePlan, HorsGreffePaletteVue, PaletteVue, PiecePaletteVue, TravailPaletteVue,
 } from '../plan/types'
 
 // ---------------------------------------------------------------- texte
@@ -86,6 +86,7 @@ const TRACES: Record<string, ReactNode> = {
   hors: <><circle cx="8" cy="8" r="6" /><path d="M2 8h12M8 2c2 2 2 10 0 12M8 2c-2 2-2 10 0 12" /></>,
   siren: <><path d="M3 3h10v10H3z" /><path d="M8 5.5v5M5.5 8h5" /></>,
   loupe: <><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></>,
+  ecran: <><path d="M2 3h12v8H2z" /><path d="M6 14h4M8 11v3" /></>,
   horloge: <><circle cx="8" cy="8" r="6" /><path d="M8 4.5V8l2.5 1.5" /></>,
 }
 
@@ -107,6 +108,8 @@ function Touche({ children }: { children: ReactNode }) {
 
 type Element =
   | { sorte: 'travail', t: TravailPaletteVue }
+  | { sorte: 'ecran', e: EcranPaletteVue }
+  | { sorte: 'element', el: ElementPaletteVue }
   | { sorte: 'piece', p: PiecePaletteVue }
   | { sorte: 'annonce', a: AnnonceBodacc }
   | { sorte: 'hors', h: HorsGreffePaletteVue }
@@ -152,6 +155,10 @@ export function Palette({ vue, plan }: ProprietesPalette) {
     if (vue.travail.length > 0) {
       groupes.push({ titre: 'Le plus urgent d abord', compte: vue.travailTrouve, elements: vue.travail.map((t) => ({ sorte: 'travail', t })) })
     }
+    if (vue.ecrans.length > 0) groupes.push({ titre: 'Ecrans', compte: vue.ecrans.length, elements: vue.ecrans.map((e) => ({ sorte: 'ecran', e })) })
+    if (vue.elements.length > 0) {
+      groupes.push({ titre: 'Dans l arbre du dossier', compte: vue.elements.length, elements: vue.elements.map((el) => ({ sorte: 'element', el })) })
+    }
     const pieces = vue.pieces.filter((p) => !p.annonce)
     if (pieces.length > 0) groupes.push({ titre: 'Dans le texte des pieces', compte: pieces.length, elements: pieces.map((p) => ({ sorte: 'piece', p })) })
     const avis = vue.pieces.filter((p) => p.annonce)
@@ -166,6 +173,7 @@ export function Palette({ vue, plan }: ProprietesPalette) {
   }
   const elements = groupes.flatMap((g) => g.elements)
   const rien = texte.length > 0 && vue.travail.length === 0 && vue.pieces.length === 0 && annonces.length === 0
+    && vue.ecrans.length === 0 && vue.elements.length === 0
   const index = Math.min(choisi, Math.max(elements.length - 1, 0))
   const courant: Element | undefined = elements[index]
 
@@ -196,6 +204,15 @@ export function Palette({ vue, plan }: ProprietesPalette) {
         g.push({ groupe: 'Copier', libelle: 'Copier le numero', detail: t.numero, touche: 'Ctrl C', faire: () => copierAvecAvis(t.numero, 'numero copie') })
         if (t.siren) g.push({ groupe: 'Copier', libelle: 'Copier le SIREN', detail: t.siren, faire: () => copierAvecAvis(t.siren, 'SIREN copie') })
         return g
+      }
+      case 'ecran':
+        return [{ groupe: 'Ouvrir', libelle: 'Ouvrir l ecran ' + e.e.libelle, touche: 'Entree', faire: () => aller('ecran', e.e.code) }]
+      case 'element': {
+        const el = e.el
+        return [
+          { groupe: 'Ouvrir', libelle: el.piece ? 'Ouvrir la piece' : 'Ouvrir dans l arbre', detail: el.lieu, touche: 'Entree', faire: () => plan('palettePiece', el.chemin) },
+          { groupe: 'Copier', libelle: 'Copier le libelle', detail: el.libelle, touche: 'Ctrl C', faire: () => copierAvecAvis(el.libelle, 'libelle copie') },
+        ]
       }
       case 'piece': {
         const p = e.p
@@ -381,6 +398,8 @@ export function Palette({ vue, plan }: ProprietesPalette) {
 function libelleCourt(e: Element): string {
   switch (e.sorte) {
     case 'travail': return `${e.t.numero} · ${e.t.titre.split(' - ')[0]}`
+    case 'ecran': return e.e.libelle
+    case 'element': return e.el.libelle
     case 'piece': return e.p.libelle
     case 'annonce': return `${e.a.numAnnonce} · ${e.a.typeAnnonce}`
     case 'hors': return e.h.source
@@ -414,6 +433,24 @@ function Ligne({ element: e, saisie, choisie, survoler, ouvrir, gestes }: Propri
         <span className={'rig-palette__etat' + (e.t.ton ? ' rig-palette__etat--' + e.t.ton : '')}>{e.t.etat}</span>
         {e.t.qui ? <span title={e.t.qui.signature}><Avatar initiales={e.t.qui.initiales} moi={e.t.aMoi} /></span>
                  : <span className="rig-palette__avatar rig-palette__avatar--vide"></span>}
+      </>
+      break
+    case 'ecran':
+      corps = <>
+        <Picto nom="ecran" />
+        <span className="rig-palette__texte">
+          <span className="rig-palette__t1"><Surligne texte={e.e.libelle} saisie={saisie} /></span>
+          <span className="rig-palette__t2">Ouvrir l ecran</span>
+        </span>
+      </>
+      break
+    case 'element':
+      corps = <>
+        <Picto nom={e.el.piece ? 'doc' : 'aff'} />
+        <span className="rig-palette__texte">
+          <span className="rig-palette__t1"><Surligne texte={e.el.libelle} saisie={saisie} /></span>
+          <span className="rig-palette__t2">{e.el.lieu}</span>
+        </span>
       </>
       break
     case 'piece':
@@ -534,6 +571,19 @@ function Apercu({ element: e, vue, saisie }: { element: Element, vue: PaletteVue
         </>}
       </>
     }
+    case 'ecran':
+      return <>
+        <div className="rig-palette__titre">Apercu · ecran</div>
+        <div className="rig-palette__nom">{e.e.libelle}</div>
+        <div className="rig-palette__para">Entree ouvre cet ecran dans un onglet.</div>
+      </>
+    case 'element':
+      return <>
+        <div className="rig-palette__titre">Apercu · {e.el.piece ? 'piece' : 'dossier de l arbre'}</div>
+        <div className="rig-palette__nom"><Surligne texte={e.el.libelle} saisie={saisie} /></div>
+        <div className="rig-palette__para">{e.el.lieu ? `${e.el.lieu} · ` : ''}{vue.dossierDesPieces}</div>
+        <div className="rig-palette__para">Entree ouvre l affaire, l arbre deplie jusqu ici.</div>
+      </>
     case 'piece': {
       const p = e.p
       return <>

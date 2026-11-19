@@ -30,31 +30,19 @@ namespace RigV3Desktop.Pont;
 /// <param name="Recouvert">Un ecran de procedure ou une affaire recouvre l'accueil :
 /// son titre, et le rond de profil avec lui, ne se voient plus.</param>
 /// <param name="CodeOuvert">Le code de l'ecran de procedure ouvert (lien actif du menu).</param>
-/// <param name="Trouve">Les resultats de la recherche, calcules sur le fonds d'affaires
-/// et le catalogue des traitements du plan de travail.</param>
-public sealed record ContexteAccueil(bool Recouvert, string? CodeOuvert, RechercheTrouvee Trouve);
-
-/// <summary>Les resultats de la recherche, dans l'ordre d'affichage.</summary>
-public sealed record RechercheTrouvee(TraitementTrouveVue[] Traitements, AffaireTrouveeVue[] Affaires,
-                                      ElementTrouveVue[] Elements)
-{
-    public static readonly RechercheTrouvee Rien = new([], [], []);
-}
+public sealed record ContexteAccueil(bool Recouvert, string? CodeOuvert);
 
 /// <summary>Ce que l'accueil demande au plan de travail apres un geste.</summary>
 /// <param name="Quoi">Une des constantes de <see cref="DemandeAccueil"/>.</param>
-/// <param name="Valeur">Le code d'ecran ou le numero d'affaire, selon <paramref name="Quoi"/>.</param>
+/// <param name="Valeur">Le code d'ecran, le numero d'affaire ou le texte deja tape, selon <paramref name="Quoi"/>.</param>
 /// <param name="Alerte">L'alerte cliquee (<see cref="OuvrirAlerte"/>).</param>
-/// <param name="Rang">Le rang du resultat de recherche clique.</param>
-public sealed record DemandeAccueil(string Quoi, string Valeur = "", AlerteGreffe? Alerte = null, int Rang = -1)
+public sealed record DemandeAccueil(string Quoi, string Valeur = "", AlerteGreffe? Alerte = null)
 {
     public const string OuvrirCode = "ouvrirCode";
     public const string OuvrirAlerte = "ouvrirAlerte";
     public const string OuvrirNumero = "ouvrirNumero";
-    public const string OuvrirTraitement = "ouvrirTraitement";
-    public const string OuvrirAffaire = "ouvrirAffaire";
-    public const string OuvrirElement = "ouvrirElement";
-    /// <summary>La pastille « Ctrl K » de la recherche : ouvrir la palette (Pont/PlanTravailPalette.cs).</summary>
+    /// <summary>La barre de recherche ou sa pastille « Ctrl K » : ouvrir la palette
+    /// (Pont/PlanTravailPalette.cs), avec ce qui y a deja ete tape.</summary>
     public const string OuvrirPalette = "ouvrirPalette";
     public const string LoginChange = "loginChange";
     public const string ThemeChange = "themeChange";
@@ -79,7 +67,7 @@ public sealed record ProfilVue(bool Ouvert, string Initiales, string Titre, stri
                                CompteVue[] Comptes);
 public sealed record CompteVue(string Login, string Initiales, string Profil, string Domaines, bool Actif);
 
-public sealed record VuePlanAccueil(bool MenuReduit, MenuVue Menu, EnteteVue Entete, RechercheVue Recherche,
+public sealed record VuePlanAccueil(bool MenuReduit, MenuVue Menu, EnteteVue Entete,
                                     ChiffresVue Chiffres, ProueVue? Proue, TuileVue[] Tuiles, SignalVue? Signal);
 
 public sealed record MenuVue(bool FavorisOuverts, FavoriVue[] Favoris, MomentVue[] Moments);
@@ -102,13 +90,6 @@ public sealed record PhraseVue(bool HorsDelaiConnu, int HorsDelai, int Arrivees,
 public sealed record PanneauTuilesVue(string Theme, ThemeVue[] Themes, DispositionVue[] Dispositions, BasculeVue[] Tuiles);
 public sealed record DispositionVue(string Id, string Titre, string Aide, bool Actif);
 
-public sealed record RechercheVue(string Texte, TraitementTrouveVue[] Traitements, AffaireTrouveeVue[] Affaires,
-                                  ElementTrouveVue[] Elements);
-public sealed record TraitementTrouveVue(string Libelle);
-public sealed record AffaireTrouveeVue(string Numero, string Objet, string Siren, string Type, string Statut);
-/// <param name="Nom">Le dernier libelle du chemin (l'element trouve).</param>
-/// <param name="Chemin">Les libelles du chemin qui y mene, joints par « &gt; ».</param>
-public sealed record ElementTrouveVue(string Statut, string Nom, string Numero, string Chemin);
 
 /// <summary>Les trois tuiles chiffrees. Les styles des anneaux sont ecrits ici, en
 /// culture invariante (un « 33,3% » casserait le degrade).</summary>
@@ -391,14 +372,6 @@ public sealed class SessionAccueil : IAsyncDisposable
         BasculerMoment(titre);
     }
 
-    // ================= Recherche =================
-    /// <summary>Le texte tape dans la recherche de l'accueil (« Ctrl K »). Les
-    /// resultats se calculent sur le fonds d'affaires du plan de travail : Home
-    /// les passe dans le ContexteAccueil.</summary>
-    public string Recherche { get; private set; } = string.Empty;
-
-    /// <summary>Une affaire vient de s'ouvrir depuis la recherche : le champ se vide.</summary>
-    public void ViderRecherche() => Recherche = string.Empty;
 
     // ================= Tuiles =================
     /// <summary>Une tuile de l'accueil. <paramref name="Maitresse"/> designe la tuile
@@ -1186,12 +1159,8 @@ public sealed class SessionAccueil : IAsyncDisposable
             case "reinitialiser": ReinitialiserDisposition(); return null;
             case "disposition": AppliquerDisposition(Exiger(valeur)); return null;
             case "tuile": BasculerTuile(Exiger(valeur)); return null;
-            // --- Recherche
-            case "recherche": Recherche = Texte(valeur) ?? string.Empty; return null;
-            case "traitement": return new(DemandeAccueil.OuvrirTraitement, Rang: Entier(valeur));
-            case "affaire": return new(DemandeAccueil.OuvrirAffaire, Rang: Entier(valeur));
-            case "element": return new(DemandeAccueil.OuvrirElement, Rang: Entier(valeur));
-            case "palette": return new(DemandeAccueil.OuvrirPalette);
+            // --- Recherche : la barre ouvre la palette, avec ce qui y est tape
+            case "palette": return new(DemandeAccueil.OuvrirPalette, Texte(valeur) ?? string.Empty);
             // --- Chiffres du jour et « Proue »
             case "chiffre": BasculerChiffre(Entier(valeur)); return null;
             case "voirTuile": VoirTuile(Exiger(valeur)); return null;
@@ -1361,9 +1330,7 @@ public sealed class SessionAccueil : IAsyncDisposable
                 corps is not null && corps.StartsWith("metier-") ? Metier(def) : null));
         }
 
-        var trouve = ctx.Trouve;
         return new VuePlanAccueil(MenuReduit, Menu(ctx), entete,
-            new RechercheVue(Recherche, trouve.Traitements, trouve.Affaires, trouve.Elements),
             chiffres, proue, [.. tuiles],
             TuileASignaler is { } signal ? new SignalVue(signal, NumeroSignal) : null);
     }

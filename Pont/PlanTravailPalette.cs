@@ -18,11 +18,19 @@ namespace RigV3Desktop.Pont;
 /// <param name="TravailTrouve">Combien de lignes repondent au filtre, montrees ou non.</param>
 /// <param name="DossierDesPieces">L'affaire dont l'arbre est cherche (« 2026B01067 AMIENS BILLARDS »).</param>
 /// <param name="SirenInconnu">Le SIREN tape quand rien ne lui repond : la palette propose d'ouvrir un dossier.</param>
+/// <param name="Ecrans">Les ecrans du menu dont le nom porte ce qui est tape (« facture », « trans »).</param>
+/// <param name="Elements">Les elements de l'arbre dont le LIBELLE porte ce qui est tape (n° de depot, de formalite).</param>
 public sealed record PaletteVue(string Texte, string Filtre, FiltrePaletteVue[] Filtres, AgentPaletteVue Moi,
                                 AgentPaletteVue[] Agents, TravailPaletteVue[] Travail, int TravailTrouve,
                                 PiecePaletteVue[] Pieces, string DossierDesPieces, string NumeroDesPieces,
                                 HorsGreffePaletteVue[] HorsGreffe,
-                                BilanPaletteVue Bilan, string? SirenInconnu);
+                                BilanPaletteVue Bilan, string? SirenInconnu,
+                                EcranPaletteVue[] Ecrans, ElementPaletteVue[] Elements);
+/// <summary>Un ecran du menu ; le geste « paletteAller » (nature « ecran ») l'ouvre par son code.</summary>
+public sealed record EcranPaletteVue(string Code, string Libelle);
+/// <param name="Chemin">Libelles depuis la racine : « palettePiece » deplie l'arbre jusqu'a l'element.</param>
+/// <param name="Piece">Une piece (sinon un dossier de l'arbre : un depot, une formalite).</param>
+public sealed record ElementPaletteVue(string Libelle, string[] Chemin, string Lieu, bool Piece);
 public sealed record FiltrePaletteVue(string Code, string Libelle, int Nombre);
 /// <param name="Signature">Ce qu'inscrit la colonne « Utilisateur » (« C. BENIER »).</param>
 /// <param name="Nom">Le prenom du compte quand il existe, sinon la signature.</param>
@@ -53,11 +61,12 @@ public sealed partial class SessionPlanTravail
     private sealed record GestePaletteAller(string Nature, string Cle);
     private sealed record GestePaletteAttribuer(string Numero, string? Signature);
 
-    /// <summary>Ctrl K, ou la pastille « Ctrl K » de la recherche de l'accueil.</summary>
-    private void OuvrirPalette()
+    /// <summary>Ctrl K, ou la barre de recherche de l'accueil : elle passe ce qui y
+    /// a deja ete tape (la premiere lettre), la palette continue la saisie.</summary>
+    private void OuvrirPalette(string texte = "")
     {
         PaletteOuverte = !ModeFenetreVue;
-        PaletteTexte = string.Empty;
+        PaletteTexte = texte;
     }
 
     /// <summary>Echap ferme d'abord la palette, la couche la plus haute.</summary>
@@ -135,16 +144,25 @@ public sealed partial class SessionPlanTravail
             .ToArray();
         var gardees = RecherchePalette.Filtrer(trouve, PaletteFiltre, moi).ToArray();
 
-        // Les pieces se cherchent dans l'arbre que l'on OUVRIRAIT : celui de
-        // l'affaire ouverte (avec ce que l'agent y a ajoute ou masque), sinon
-        // celui de la premiere affaire du registre -- le meme que la recherche
-        // d'elements de l'accueil (ElementsTrouves).
+        // L'arbre se cherche tel qu'on l'OUVRIRAIT : celui de l'affaire ouverte
+        // (avec ce que l'agent y a ajoute ou masque), sinon celui de la premiere
+        // affaire du registre. Ce que le login ne voit pas ne se cherche pas.
         var affaire = AffaireCherchee;
-        var racine = ReferenceEquals(affaire, DossierOuvert)
-            ? Arbre
-            : ArbreDemo.Racine(affaire.Numero, affaire.Objet, affaire.Siren, avecDossierRcs: !affaire.SansDossierRcs);
-        var pieces = RecherchePalette.Passages(racine,
-            n => AccesGed.EnfantsVisibles(n, Domaines, AjoutsArbre, MasquesArbre), texte);
+        var racine = ArbreCherche();
+        IEnumerable<NoeudGed> Visibles(NoeudGed n) => AccesGed.EnfantsVisibles(n, Domaines, AjoutsArbre, MasquesArbre);
+        // Par le LIBELLE (un n° de depot, de formalite, une liasse) : « 2024/0141 »,
+        // « 2024 0141 » et « 20240141 » sont le meme depot (RechercheArbre).
+        // Par le TEXTE de la piece, avec le passage trouve.
+        var pieces = RecherchePalette.Passages(racine, Visibles, texte);
+        // Une piece trouvee des deux facons ne s'affiche qu'une fois, avec son
+        // passage, qui en dit plus que son libelle (et range un avis BODACC
+        // parmi les annonces).
+        var elements = RechercheArbre.Chemins(racine, texte)
+            .Where(c => !pieces.Any(p => p.Chemin.SequenceEqual(c)))
+            .Select(c => (Chemin: c, Suite: SuiteVisible(racine, c, Visibles)))
+            .Where(e => e.Suite is not null)
+            .ToArray();
+        var ecrans = texte.Length == 0 ? [] : TraitementsPour(texte);
 
         var siren = RecherchePalette.SirenTape(texte);
         // Hors du greffe : pour un SIREN tape, ou pour la societe que designe
@@ -189,7 +207,26 @@ public sealed partial class SessionPlanTravail
             affaire.Numero,
             horsGreffe,
             bilan,
-            siren is not null && trouve.Length == 0 ? siren : null);
+            siren is not null && trouve.Length == 0 ? siren : null,
+            [.. ecrans.Select(p => new EcranPaletteVue(p.Code, p.Libelle))],
+            [.. elements.Select(e => new ElementPaletteVue(e.Chemin[^1], e.Chemin, RecherchePalette.Lieu(e.Chemin),
+                                                           e.Suite![^1].EstPiece))]);
+    }
+
+    /// <summary>Les noeuds d'un chemin, s'il passe tout entier par des noeuds
+    /// VISIBLES pour ce login ; null sinon (branche d'un autre domaine, masquee).</summary>
+    private static NoeudGed[]? SuiteVisible(NoeudGed racine, string[] chemin, Func<NoeudGed, IEnumerable<NoeudGed>> visibles)
+    {
+        var suite = new List<NoeudGed>();
+        var courant = racine;
+        foreach (var libelle in chemin)
+        {
+            var enfant = visibles(courant).FirstOrDefault(e => e.Libelle == libelle);
+            if (enfant is null) return null;
+            suite.Add(enfant);
+            courant = enfant;
+        }
+        return suite.Count > 0 ? [.. suite] : null;
     }
 
     /// <summary>Le libelle d'un ecran dans le catalogue du menu ; vide s'il n'y est pas.</summary>

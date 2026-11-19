@@ -46,7 +46,13 @@ export interface PaletteVue {
   horsGreffe: HorsGreffePaletteVue[]
   bilan: BilanPaletteVue
   sirenInconnu: string | null
+  /** Les ecrans du menu dont le nom porte ce qui est tape. */
+  ecrans: EcranPaletteVue[]
+  /** Les elements de l'arbre dont le libelle porte ce qui est tape (n° de depot, de formalite). */
+  elements: ElementPaletteVue[]
 }
+export interface EcranPaletteVue { code: string, libelle: string }
+export interface ElementPaletteVue { libelle: string, chemin: string[], lieu: string, piece: boolean }
 export interface FiltrePaletteVue { code: string, libelle: string, nombre: number }
 export interface AgentPaletteVue { signature: string, initiales: string, nom: string }
 export interface TravailPaletteVue {

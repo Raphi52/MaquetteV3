@@ -205,7 +205,7 @@ foreach (var (nom, texte) in feuilles)
     // Depuis le « + » (conv-2009, meme jour) : au bout des onglets, avant la fenetre.
     Exiger(Regex.IsMatch(barreTsx, @"<header className=""rig-barre""[^\n]*\n[\s\S]*?<button className=\{'rig-vonglet rig-vonglet--maison'[\s\S]*?</button>\s*\{onglets && <Onglets[^\n]*\n(\s*\{/\*[\s\S]*?\*/\})?\s*<button className=""rig-vonglet rig-vonglet--plus""[\s\S]*?</button>\s*<div className=""rig-fenetre"">"),
         "la barre du haut : la maison, les onglets, le « + », puis les boutons de la fenetre");
-    Exiger(home.Contains("return new(AccueilRecouvert, ProcOuverte?.Code,"),
+    Exiger(home.Contains("return new(AccueilRecouvert, ProcOuverte?.Code"),
         "le plan de travail passe a l'accueil s'il est recouvert");
     // Les DEUX ecrans pleins recouvrent le titre : l'ecran de procedure
     // (.rig-proc) ET l'affaire (.rig-vged). Oublier l'affaire perdait le login

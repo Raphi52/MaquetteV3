@@ -92,7 +92,7 @@ Exiger(AccueilEtat.Charger().Theme == "clair",
 // AccueilEtat. On joue ce geste comme React, puis on rouvre une fenetre comme
 // au redemarrage.
 static JsonElement Valeur(string json) => JsonDocument.Parse(json).RootElement.Clone();
-var contexte = new ContexteAccueil(false, null, RechercheTrouvee.Rien);
+var contexte = new ContexteAccueil(false, null);
 File.Delete(fichier);
 var session = new SessionAccueil(AccueilEtat.Charger());
 Exiger(session.Vue(contexte).Accueil.Entete.Panneau is null,

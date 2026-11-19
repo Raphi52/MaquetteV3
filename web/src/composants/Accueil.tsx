@@ -32,7 +32,7 @@ export function Accueil({ vue, geste }: ProprietesAccueil) {
         <div className="rig-plan__tete">
           <Entete entete={vue.entete} geste={agir} />
           {' '}
-          <Recherche recherche={vue.recherche} geste={agir} />
+          <Recherche geste={agir} />
         </div>
         {' '}
         <Chiffres vue={vue.chiffres} geste={agir} />

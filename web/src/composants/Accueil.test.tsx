@@ -206,39 +206,17 @@ describe('Accueil : la recherche', () => {
     expect(gestes()).toEqual([['palette', null]])
   })
 
-  it('le texte remonte a chaque frappe et ne s\'ecrase pas tant que la session n\'a pas change', () => {
-    const { container, gestes, rerender, geste } = rendre()
+  it('la barre est la porte de la palette : un clic l\'ouvre, une frappe l\'ouvre avec la lettre tapee', () => {
+    const { container, gestes } = rendre()
     const saisie = container.querySelector<HTMLInputElement>('.rig-recherche__saisie')!
     expect(saisie.placeholder).toBe('Rechercher un SIREN, une societe, un dirigeant, un n° de demande…')
-    fireEvent.input(saisie, { target: { value: 'fact' } })
-    expect(gestes()).toEqual([['recherche', 'fact']])
-    expect(container.querySelector('.rig-resultats')).toBeNull()
-    // Une affaire ouverte vide la recherche cote C# : le champ suit.
-    const vue = vuePlan()
-    vue.recherche.texte = 'fact'
-    rerender(<Accueil vue={vue} geste={geste} />)
-    rerender(<Accueil vue={vuePlan()} geste={geste} />)
+    // Le clic ne pose pas le curseur dans la barre : la saisie de la palette le prend.
+    expect(fireEvent.mouseDown(saisie)).toBe(false)
+    fireEvent.change(saisie, { target: { value: 't' } })
+    expect(gestes()).toEqual([['palette', ''], ['palette', 't']])
+    // La barre reste vide et n'a plus de liste a elle : la palette l'a remplacee.
     expect(saisie.value).toBe('')
-  })
-
-  it('les resultats : traitements, affaires, elements, en morceaux ; un clic remonte le RANG', () => {
-    const vue = vuePlan()
-    vue.recherche = {
-      texte: 'ami',
-      traitements: [{ libelle: 'Factures' }],
-      affaires: [{ numero: '004182', objet: 'Immatriculation - AMIENS', siren: '109 678 235', type: 'RCS', statut: 'action' }],
-      elements: [{ statut: 'alerte', nom: 'Depot 2024/0141', numero: '2026B01067', chemin: 'Dossier RCS > Depots' }],
-    }
-    const { container, gestes } = rendre(vue)
-    const [t, a, e] = [...container.querySelectorAll('.rig-resultat')]
-    expect(morceaux(t!)).toEqual(['<span>', ' ', '<span>', ' ', '<span>', ' ', '<span>'])
-    expect(morceaux(t!.children[2]!)).toEqual(['Factures', '<br>', ' ', '<span>'])
-    expect(a!.querySelector('.rig-filet-v')!.className).toBe('rig-filet-v rig-filet-v--action')
-    expect(morceaux(a!.children[2]!.querySelector('span'))).toEqual(['SIREN ', '109 678 235'])
-    expect(morceaux(e!.children[2]!.querySelector('span'))).toEqual(['2026B01067', ' · ', 'Dossier RCS > Depots'])
-    expect(e!.querySelector('.rig-resultat__type')!.textContent).toBe('Element')
-    fireEvent.click(t!); fireEvent.click(a!); fireEvent.click(e!)
-    expect(gestes()).toEqual([['traitement', 0], ['affaire', 0], ['element', 0]])
+    expect(container.querySelector('.rig-recherche')!.querySelectorAll('div')).toHaveLength(0)
   })
 })
 

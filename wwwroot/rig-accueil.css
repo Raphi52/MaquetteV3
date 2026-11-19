@@ -285,7 +285,7 @@
 /* ---------- Barre de recherche : centree, hors des tuiles ----------
    Elle defile avec le contenu (choix du 2026-09-10) : plus de sticky. */
 .rig-recherche--fixe {
-  position: relative;   /* ancre .rig-resultats, sans coller au bord haut */
+  position: relative;   /* porte son z-index, sans coller au bord haut */
   z-index: 40;
   /* TOUTE LA LARGEUR du plan de travail (demande utilisateur du 2026-09-17).
      Elle etait bornee a 720px et centree : sur un grand ecran, la barre
@@ -327,31 +327,9 @@
   border-color: var(--rig-focus);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--rig-or-halo) 35%, transparent), var(--rig-ombre-saisie);
 }
-/* La liste de resultats pend SOUS la barre : elle prend le meme fond qu'elle,
-   sinon un panneau d'une autre teinte s'accroche au champ. */
-.rig-recherche--fixe .rig-resultats { background: var(--rig-champ); }
-.rig-recherche--fixe .rig-resultat { color: var(--rig-texte); }
-.rig-recherche--fixe .rig-resultat:hover { background: var(--rig-fond-2); }
-.rig-resultats {
-  position: absolute; left: 0; right: 0; top: calc(100% + 4px);
-  border: 1px solid var(--rig-bord);
-  border-radius: var(--rig-radius);
-  background: var(--rig-fond);
-  overflow: hidden;
-  z-index: 41;
-}
-.rig-resultat {
-  display: flex; align-items: center; gap: var(--rig-esp-3);
-  width: 100%; text-align: left;
-  background: none; border: 0; border-bottom: 1px solid var(--rig-bord-faible);
-  cursor: pointer; color: var(--rig-texte);
-  font: var(--rig-fs-corps)/1.4 var(--rig-font);
-  padding: var(--rig-esp-3) var(--rig-esp-4);
-}
-.rig-resultat:last-child { border-bottom: 0; }
-.rig-resultat:hover { background: var(--rig-fond-2); }
-.rig-resultat__id { font: 12px var(--rig-font-mono); color: var(--rig-texte-3); }
-.rig-resultat__type { margin-left: auto; font-size: 11px; color: var(--rig-texte-3); }
+/* Plus de liste qui pend sous la barre (19/11/2026, conv-2018) : la barre
+   ouvre la palette Ctrl K (rig-palette.css), qui montre les resultats. */
+.rig-recherche--fixe .rig-recherche__saisie { cursor: text; }
 
 /* ---------- Grille de pose ---------- */
 .rig-grille {

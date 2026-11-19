@@ -391,9 +391,13 @@ Exiger(aiguillage.Contains("<EcranNonMaquette code={proc.code} libelle={proc.lib
 // Direction du 11/09/2026 : le systeme de procedures doit disparaitre de
 // l interface. Deux chemins le remplacent, et ce controle les verrouille
 // pour qu ils ne repartent pas en silence.
-Exiger(Regex.IsMatch(vue2, @"private Proc\[\] Traitements"),
-    "la recherche de l accueil trouve aussi les traitements, pas que les affaires");
-Exiger(Regex.IsMatch(vue2, @"Traitements\s*=>[\s\S]{0,400}?p\.Libelle\.Contains"),
+// Depuis le 19/11/2026 (conv-2018), la recherche est la palette Ctrl K, que la
+// barre de l accueil ouvre : TraitementsPour(terme) lui fournit les ecrans.
+Exiger(Regex.IsMatch(vue2, @"private Proc\[\] TraitementsPour\(string terme\)"),
+    "la recherche (palette, ouverte par la barre de l accueil) trouve aussi les traitements, pas que les affaires");
+var traitements = Regex.Match(vue2, @"TraitementsPour\(string terme\)\s*=>[\s\S]{0,400}?;");
+Exiger(traitements.Success && traitements.Value.Contains("Correspond(terme, p.Libelle)")
+       && !Regex.IsMatch(traitements.Value, @"Correspond\([^)]*p\.Code|p\.Code\.Contains"),
     "la recherche des traitements porte sur le LIBELLE, jamais sur le code interne");
 Exiger(Regex.IsMatch(vue2, @"private Proc\[\] ActionsDe\(Dossier"),
     "l affaire ouverte propose ses propres traitements");

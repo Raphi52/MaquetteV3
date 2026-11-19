@@ -1048,8 +1048,10 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     }
 
     // ================= Recherche =================
-    // Le texte tape vit dans la session de l'accueil (Accueil.Recherche) ; les
-    // resultats se calculent ici, sur le fonds d'affaires du plan de travail.
+    // La recherche est la PALETTE Ctrl K (PlanTravailPalette.cs), que la barre
+    // de l'accueil ouvre (19/11/2026, conv-2018). Ce qui suit lui fournit le
+    // fonds d'affaires et l'arbre dans lequel elle cherche, et ouvre ce qu'elle
+    // a trouve.
 
     /// <summary>
     /// Une affaire ouverte dans la visionneuse. <c>SansDossierRcs</c> marque
@@ -1157,28 +1159,16 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         .. FondsDemo
     ];
 
-    private Dossier[] Resultats =>
-        string.IsNullOrWhiteSpace(Accueil.Recherche) || Accueil.Recherche.Trim().Length < 2
-            ? []
-            : Fonds.Where(d =>
-                    d.Numero.Contains(Accueil.Recherche.Trim(), StringComparison.OrdinalIgnoreCase)
-                 || d.Objet.Contains(Accueil.Recherche.Trim(), StringComparison.OrdinalIgnoreCase)
-                 || d.Siren.Replace(" ", "").Contains(Accueil.Recherche.Trim().Replace(" ", ""),
-                        StringComparison.OrdinalIgnoreCase))
-               .Take(6).ToArray();
-
-    /// <summary>Les TRAITEMENTS trouves par la meme recherche. Le menu de gauche
-    /// suppose qu'on sait deja quel outil repond au besoin ; la recherche, elle,
-    /// part des mots de l'utilisateur. Taper « facture » doit donc proposer
+    /// <summary>Les TRAITEMENTS dont le libelle porte ce qui est tape. Le menu de
+    /// gauche suppose qu'on sait deja quel outil repond au besoin ; la recherche,
+    /// elle, part des mots de l'utilisateur. Taper « facture » doit donc proposer
     /// l'ecran des factures, exactement comme taper un SIREN propose l'affaire.</summary>
-    private Proc[] Traitements =>
-        string.IsNullOrWhiteSpace(Accueil.Recherche) || Accueil.Recherche.Trim().Length < 2
-            ? []
-            : Groupes.SelectMany(g => g.Procs)
-                     .Where(p => PerimetreProfil.Visible(p.Code, Domaines))
-                     .Where(p => p.Libelle.Contains(Accueil.Recherche.Trim(),
-                                    StringComparison.OrdinalIgnoreCase))
-                     .Take(4).ToArray();
+    private Proc[] TraitementsPour(string terme)
+        => [.. Groupes.SelectMany(g => g.Procs)
+                      .Where(p => PerimetreProfil.Visible(p.Code, Domaines))
+                      .Where(p => RecherchePalette.Correspond(terme, p.Libelle))
+                      .DistinctBy(p => p.Code)
+                      .Take(4)];
 
     /// <summary>Un ELEMENT de l'arbre trouve par la recherche : l'affaire qui
     /// le porte et son chemin de libelles depuis la racine.</summary>
@@ -1190,24 +1180,15 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private Dossier AffaireCherchee
         => DossierOuvert ?? Fonds.FirstOrDefault(d => !d.SansDossierRcs) ?? Fonds[0];
 
-    /// <summary>Les elements de l'arbre (depot, formalite, liasse, piece) dont
-    /// le libelle porte ce qui est tape. « 2024/0141 », « 2024 0141 » et
-    /// « 20240141 » designent le meme depot : la comparaison ignore les
-    /// separateurs (RechercheArbre.Normaliser).</summary>
-    private ElementTrouve[] ElementsTrouves
+    /// <summary>L'arbre que la recherche fouille : celui de l'affaire ouverte (avec
+    /// ce que l'agent y a ajoute ou masque), sinon celui de l'affaire cherchee.</summary>
+    private NoeudGed ArbreCherche()
     {
-        get
-        {
-            var terme = Accueil.Recherche.Trim();
-            if (RechercheArbre.Normaliser(terme).Length < 2) return [];
-            var affaire = AffaireCherchee;
-            var racine = ReferenceEquals(affaire, DossierOuvert)
-                ? Arbre
-                : ArbreDemo.Racine(affaire.Numero, affaire.Objet, affaire.Siren,
-                                   avecDossierRcs: !affaire.SansDossierRcs);
-            return [.. RechercheArbre.Chemins(racine, terme)
-                        .Select(c => new ElementTrouve(affaire, c))];
-        }
+        var affaire = AffaireCherchee;
+        return ReferenceEquals(affaire, DossierOuvert)
+            ? Arbre
+            : ArbreDemo.Racine(affaire.Numero, affaire.Objet, affaire.Siren,
+                               avecDossierRcs: !affaire.SansDossierRcs);
     }
 
     /// <summary>Ouvre l'affaire et deplie l'arbre JUSQU'A l'element tape.</summary>
@@ -1441,7 +1422,6 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             NoeudsOuverts.Add(n);
 
         NoeudSelectionne = Arbre.Descendants().FirstOrDefault(n => n.EstPiece);
-        Accueil.ViderRecherche();
 
         // KBIS A JOUR (demande du 18/09/2026) : le dossier s'ouvre sur
         // « Informations du dossier » au milieu et le KBIS en vigueur a droite.
@@ -2414,23 +2394,10 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
 
     // ================= Les gestes de l'accueil =================
 
-    // Les resultats de la recherche montres au dernier rendu : un clic designe
-    // son resultat par son RANG dans ces listes (Pont/Accueil.cs, ContexteAccueil).
-    private Proc[] TraitementsMontres = [];
-    private Dossier[] AffairesMontrees = [];
-    private ElementTrouve[] ElementsMontres = [];
-
     /// <summary>Ce que seul le plan de travail sait, passe a la vue de l'accueil.</summary>
     private Pont.ContexteAccueil ContexteDeLAccueil()
     {
-        TraitementsMontres = Traitements;
-        AffairesMontrees = Resultats;
-        ElementsMontres = ElementsTrouves;
-        return new(AccueilRecouvert, ProcOuverte?.Code, new(
-            TraitementsMontres.Select(t => new Pont.TraitementTrouveVue(t.Libelle)).ToArray(),
-            AffairesMontrees.Select(r => new Pont.AffaireTrouveeVue(r.Numero, r.Objet, r.Siren, r.Type, r.Statut)).ToArray(),
-            ElementsMontres.Select(e => new Pont.ElementTrouveVue(e.Affaire.Statut, e.Chemin[^1], e.Affaire.Numero,
-                                                                   string.Join(" > ", e.Chemin[..^1]))).ToArray()));
+        return new(AccueilRecouvert, ProcOuverte?.Code);
     }
 
     /// <summary>Un geste de la barre ou de l'accueil : la session l'applique ; ce
@@ -2443,10 +2410,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             case Pont.DemandeAccueil.OuvrirCode: OuvrirCode(demande.Valeur); break;
             case Pont.DemandeAccueil.OuvrirAlerte: OuvrirAlerte(demande.Alerte!); break;
             case Pont.DemandeAccueil.OuvrirNumero: OuvrirParNumero(demande.Valeur); break;
-            case Pont.DemandeAccueil.OuvrirTraitement: OuvrirProc(TraitementsMontres[demande.Rang]); break;
-            case Pont.DemandeAccueil.OuvrirAffaire: OuvrirDossier(AffairesMontrees[demande.Rang]); break;
-            case Pont.DemandeAccueil.OuvrirElement: OuvrirElementTrouve(ElementsMontres[demande.Rang]); break;
-            case Pont.DemandeAccueil.OuvrirPalette: OuvrirPalette(); break;
+            case Pont.DemandeAccueil.OuvrirPalette: OuvrirPalette(demande.Valeur); break;
             case Pont.DemandeAccueil.LoginChange: ApresChangementLogin(); break;
             case Pont.DemandeAccueil.ThemeChange: Fenetre?.AppliquerFond(Theme); break;
             case Pont.DemandeAccueil.Deplacer: Fenetre?.Deplacer(); break;

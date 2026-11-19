@@ -41,6 +41,8 @@ function vue(partiel: Partial<PaletteVue> = {}): PaletteVue {
     horsGreffe: [{ code: 'FIBEN', source: 'FIBEN', objet: 'cotation et incidents de paiement, Banque de France', sujet: 'TRANSNORD SA · 318 552 004' }],
     bilan: { jour: 'mercredi 9 septembre', horsDelai: 2, arriveesDuJour: 3, mAttendent: 4, plusAncienne: 4 },
     sirenInconnu: null,
+    ecrans: [],
+    elements: [],
     ...partiel,
   }
 }
@@ -178,6 +180,27 @@ describe('Palette Ctrl K (/draft « Page Recherche », propositions 3 et 6)', ()
     expect(p.apercu()).toContain('SIREN552 100 554')
     p.touche('Enter')
     expect(p.appels()).toEqual([['paletteAller', { nature: 'siren', cle: '552 100 554' }]])
+  })
+
+  it('les ecrans du menu et les elements de l arbre : ce que la barre de l accueil trouvait', () => {
+    const p = rendre(vue({
+      texte: 'trans', pieces: [], horsGreffe: [],
+      ecrans: [{ code: 'CODE_TELETRANS', libelle: 'Teletransmissions (EDI)' }],
+      elements: [{ libelle: 'Depot n 2024/0141', chemin: ['Dossier RCS', 'Depots d\'actes', 'Depot n 2024/0141'], lieu: 'Depots d\'actes', piece: false }],
+    }))
+    expect(p.titres()).toEqual(['Le plus urgent d abord2', 'Ecrans1', 'Dans l arbre du dossier1'])
+    p.touche('ArrowDown'); p.touche('ArrowDown')
+    expect(p.choisie()).toContain('Teletransmissions (EDI)')
+    expect([...p.container.querySelector('.rig-palette__ligne--choisie')!.querySelectorAll('mark')].map((m) => m.textContent)).toEqual(['trans'])
+    p.touche('Enter')
+    p.touche('ArrowDown')
+    expect(p.choisie()).toContain('Depot n 2024/0141')
+    expect(p.apercu()).toContain('Depots d\'actes · 2026B01067 AMIENS BILLARDS')
+    p.touche('Enter')
+    expect(p.appels()).toEqual([
+      ['paletteAller', { nature: 'ecran', cle: 'CODE_TELETRANS' }],
+      ['palettePiece', ['Dossier RCS', 'Depots d\'actes', 'Depot n 2024/0141']],
+    ])
   })
 
   it('un clic sur le voile ferme la palette ; un clic dedans, non', () => {
