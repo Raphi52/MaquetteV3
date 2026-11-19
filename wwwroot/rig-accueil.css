@@ -480,7 +480,8 @@
 
 /* --- L'interrupteur lui-meme ---------------------------------------
    La piste reste creuse et neutre a l'arret ; allumee, elle prend le
-   degrade de marque. Le pouce est un vrai palet : il glisse avec un
+   degrade vif de son theme (--rig-bascule-allumee, rig-charte.css : sans
+   noir, du clair au soutenu). Le pouce est un vrai palet : il glisse avec un
    leger depassement, s'ecrase pendant le trajet, et porte une ombre
    pour se detacher de la piste. */
 .rig-bascule__temoin {
@@ -498,7 +499,7 @@
   /* Le degrade allume, revele par l'opacite : evite un saut de couleur. */
   content: ""; position: absolute; inset: 0;
   border-radius: inherit;
-  background: var(--rig-grad-marque);
+  background: var(--rig-bascule-allumee);
   opacity: 0;
   transition: opacity .2s ease;
 }
@@ -3171,10 +3172,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 /* La bascule commune prend toute la largeur (pensee pour les panneaux) ; ici
    elle se pose EN LIGNE, a cote des criteres et des champs. */
 .rig-tcw .rig-bascule { width: auto; }
-/* Allumee, la piste prend la couleur que chaque theme donne a
-   --rig-bascule-allumee (rig-charte.css) : aplat orange brule en Clair et en
-   Noir et orange, degrade de marque ailleurs. Eteinte, rien ne change. */
-.rig-tcw .rig-bascule__temoin::before { background: var(--rig-bascule-allumee); }
 /* Couleur du TYPE (filet de ligne, pastille du panneau) : or pour
    l'endettement, bleu pour la non-faillite, brique pour la non-opposition,
    comme la maquette « Boite de tri » choisie le 18/11/2026. En argile, le
