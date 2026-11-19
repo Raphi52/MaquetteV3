@@ -513,6 +513,9 @@ public static class TraitementCommandes
             ecarts.Add($"Raison sociale reçu : {c.Denomination} ≠ {e.Designation}");
         if (SirenConcorde(c, e) == false)
             ecarts.Add($"SIREN reçu : {FormaterSiren(c.Siren)} ≠ {FormaterSiren(e.Siren)}");
+        // Champ_NumeroGestion de NeoRIG, au format de Alerte_Ecart.
+        if (GestionConcorde(c, e) == false)
+            ecarts.Add($"N° de gestion reçu : {c.NumeroGestion.Trim()} ≠ {e.Gestion}");
         return ecarts;
     }
 
@@ -527,6 +530,14 @@ public static class TraitementCommandes
     /// <summary>Le SIREN reçu est-il celui de l'entite ? null quand l'un des deux manque.</summary>
     public static bool? SirenConcorde(CommandeRecue c, EntiteRapprochee e) =>
         Chiffres(c.Siren) is { Length: > 0 } recu && Chiffres(e.Siren) is { Length: > 0 } connu ? recu == connu : null;
+
+    /// <summary>
+    /// Le n° de gestion reçu (seul le certificat de non-faillite en porte un) est-il
+    /// celui du dossier ? Casse et blancs ignorés ; null quand l'un des deux manque.
+    /// </summary>
+    public static bool? GestionConcorde(CommandeRecue c, EntiteRapprochee e) =>
+        SansBlancs(c.NumeroGestion) is { Length: > 0 } recu && SansBlancs(e.Gestion) is { Length: > 0 } connu
+            ? string.Equals(recu, connu, StringComparison.OrdinalIgnoreCase) : null;
 
     // ---------------------------------------------------- controles de delivrance
 
@@ -911,6 +922,8 @@ public static class TraitementCommandes
     // ----------------------------------------------------------------- outils
 
     public static string Chiffres(string? s) => new((s ?? string.Empty).Where(char.IsAsciiDigit).ToArray());
+
+    private static string SansBlancs(string s) => string.Concat(s.Where(ch => !char.IsWhiteSpace(ch)));
 
     /// <summary>Majuscules sans accents ni ponctuation, espaces simples : pour comparer deux noms.</summary>
     public static string Normaliser(string? s)

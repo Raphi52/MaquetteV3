@@ -414,13 +414,13 @@ describe('EcranCommandesWeb', () => {
     const entite = (cle: string, designation: string, siren: string, ecarts: string[]) => ({
       cle, nonInscrit: false, gestion: cle, designation, siren, type: 'PM', radie: false, retenue: false,
       lignes: [{ nature: 'SIÈGE', adresse: '12 rue des Trois Cailloux, 80000 AMIENS', nbInscriptions: 14 }], ecarts,
-      nbAdresses: 2, nbInscriptions: 17, sirenConcorde: ecarts.length === 0, raisonConcorde: true,
+      nbAdresses: 2, nbInscriptions: 17, sirenConcorde: ecarts.length === 0, raisonConcorde: true, gestionConcorde: null,
     })
     const rapprochement = {
       debiteur: true, faillite: false, aRetenue: false, deplie: false, traitee: false, retenue: null,
       rechSiren: '402118447', rechRaison: 'AMIENS BILLARDS', tousDebiteurs: false, tousEtablissements: false,
       message: null, resumeRapprochement: '2 ligne(s) · 2 PM · 0 NI',
-      commandeSiren: '402 118 447', commandeRaison: 'AMIENS BILLARDS', rechercheOuverte: false,
+      commandeSiren: '402 118 447', commandeRaison: 'AMIENS BILLARDS', commandeGestion: '—', rechercheOuverte: false,
       entites: [entite('2026B01067', 'AMIENS BILLARDS', '402 118 447', []),
                 entite('004151', 'AMIENS BILLARDS', '334 771 018', ['SIREN reçu : 402 118 447 ≠ 334 771 018'])],
     }
@@ -440,6 +440,8 @@ describe('EcranCommandesWeb', () => {
     expect(conforme.textContent).toContain('Aucun écart avec la commande')
     expect(conforme.querySelectorAll('.rig-tcw__comparaison .rig-tcw__coche')).toHaveLength(2)
     expect(conforme.textContent).toContain('17· PM · 2 adresse(s)')
+    // Le n° de gestion ne se compare que pour le certificat de non-faillite.
+    expect(conforme.textContent).not.toContain('N° de gestion')
     expect(ecart.querySelector('.rig-tcw__verdict')!.className).toContain('rig-tcw__ligne-statut--attente')
     expect(ecart.textContent).toContain('≠ SIREN reçu : 402 118 447 ≠ 334 771 018')
     expect(ecart.querySelector('.rig-tcw__difference')).not.toBeNull()
@@ -464,12 +466,12 @@ describe('EcranCommandesWeb', () => {
       debiteur: false, faillite: true, aRetenue: false, deplie: false, traitee: false, retenue: null,
       rechSiren: '512004331', rechRaison: 'SCI DU PARC', tousDebiteurs: false, tousEtablissements: false,
       message: null, resumeRapprochement: '1 ligne(s) · 1 PM · 0 NI',
-      commandeSiren: '512 004 331', commandeRaison: 'SCI DU PARC', rechercheOuverte: false,
+      commandeSiren: '512 004 331', commandeRaison: 'SCI DU PARC', commandeGestion: '004176', rechercheOuverte: false,
       entites: [{
         cle: '004176', nonInscrit: false, gestion: '004176', designation: 'SCI DU PARC', siren: '512 004 331', type: 'PM',
         radie: false, retenue: false,
         lignes: [{ nature: 'SIÈGE', adresse: '18 rue du Parc, 80480 DURY', nbInscriptions: 6 }], ecarts: [],
-        nbAdresses: 1, nbInscriptions: 6, sirenConcorde: true, raisonConcorde: true,
+        nbAdresses: 1, nbInscriptions: 6, sirenConcorde: true, raisonConcorde: true, gestionConcorde: true,
       }],
     }
     const { gestes } = session({ ...vueDeBase(), panneau: { ...panneau(), rapprochement } }, (v, geste) => {
@@ -482,7 +484,14 @@ describe('EcranCommandesWeb', () => {
     expect(zone.querySelector('table')).toBeNull()
     const cartes = [...zone.querySelectorAll('.rig-tcw__corresp')]
     expect(cartes).toHaveLength(1)
-    expect(cartes[0]!.querySelectorAll('.rig-tcw__comparaison .rig-tcw__coche')).toHaveLength(2)
+    // Certificat de non-faillite : le n° de gestion reçu face a celui du dossier, en
+    // premiere ligne (c'est lui qui resout le dossier), puis SIREN et raison sociale.
+    const champs = [...cartes[0]!.querySelectorAll('.rig-tcw__comparaison > .rig-tcw__comp-champ:not(.rig-tcw__comp-tete)')]
+    expect(champs.map((c) => c.textContent)).toEqual(['N° de gestion', 'SIREN', 'Raison sociale', 'SIÈGE', 'Inscriptions'])
+    const gestion = champs[0]!
+    expect(gestion.nextElementSibling!.textContent).toBe('004176')
+    expect(gestion.nextElementSibling!.nextElementSibling!.querySelector('.rig-tcw__coche')).not.toBeNull()
+    expect(cartes[0]!.querySelectorAll('.rig-tcw__comparaison .rig-tcw__coche')).toHaveLength(3)
     expect(cartes[0]!.querySelector('.rig-tcw__verdict')!.textContent).toBe('Aucun écart avec la commandeRetenir')
     // Les textes de NeoRIG propres au dossier concerne restent : sa consigne en tete, l'invite au-dessus des cartes.
     expect(zone.textContent).toContain('Résolution directe par le n° de gestion reçu')
@@ -496,6 +505,30 @@ describe('EcranCommandesWeb', () => {
 
     fireEvent.click(zone.querySelector('.rig-tcw__corresp .rig-tcw__verdict button')!)
     expect(gestes).toEqual([['Basculer', 'RechercheRapprochementOuverte'], ['Retenir', '004176']])
+  })
+
+  it('certificat de non-faillite : un n° de gestion different porte « ≠ » et son ecart au verdict', async () => {
+    const ecart = 'N° de gestion reçu : 004176 ≠ 2026B01067'
+    const rapprochement = {
+      debiteur: false, faillite: true, aRetenue: false, deplie: false, traitee: false, retenue: null,
+      rechSiren: '', rechRaison: 'AMIENS BILLARDS', tousDebiteurs: false, tousEtablissements: false,
+      message: null, resumeRapprochement: '1 ligne(s) · 1 PM · 0 NI',
+      commandeSiren: '512 004 331', commandeRaison: 'SCI DU PARC', commandeGestion: '004176', rechercheOuverte: true,
+      entites: [{
+        cle: '2026B01067', nonInscrit: false, gestion: '2026B01067', designation: 'AMIENS BILLARDS', siren: '402 118 447',
+        type: 'PM', radie: false, retenue: false,
+        lignes: [{ nature: 'SIÈGE', adresse: '12 rue des Trois Cailloux, 80000 AMIENS', nbInscriptions: 14 }], ecarts: [ecart],
+        nbAdresses: 2, nbInscriptions: 17, sirenConcorde: false, raisonConcorde: false, gestionConcorde: false,
+      }],
+    }
+    session({ ...vueDeBase(), panneau: { ...panneau(), rapprochement } })
+    const { container } = render(<EcranCommandesWeb />)
+    await screen.findByText('2026B01067', { selector: '.rig-tcw__comp-mono' })
+    const gestion = [...container.querySelectorAll('.rig-tcw__comp-champ')].find((c) => c.textContent === 'N° de gestion')!
+    const dossier = gestion.nextElementSibling!.nextElementSibling!
+    expect(dossier.querySelector('.rig-tcw__difference')!.textContent).toBe('≠')
+    expect(dossier.querySelector('.rig-tcw__coche')).toBeNull()
+    expect(container.querySelector('.rig-tcw__verdict-ecarts')!.textContent).toBe(`≠ ${ecart}`)
   })
 
   it('un message se ferme par sa croix ; sa severite donne sa classe', async () => {

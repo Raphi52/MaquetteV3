@@ -48,26 +48,30 @@ public sealed record TraiteeCw(bool Rejetee, string Motif, string Reference, Doc
 public sealed record LigneEntiteCw(string Nature, string Adresse, int NbInscriptions);
 /// <summary>
 /// Une entite trouvee. NbAdresses et NbInscriptions comptent TOUTES ses adresses
-/// (Lignes n'a que celles que les filtres laissent voir) ; SirenConcorde et
-/// RaisonConcorde disent si la commande et le dossier concordent (null : rien a comparer).
+/// (Lignes n'a que celles que les filtres laissent voir) ; SirenConcorde,
+/// RaisonConcorde et GestionConcorde disent si la commande et le dossier
+/// concordent (null : rien a comparer).
 /// </summary>
 public sealed record EntiteCw(string Cle, bool NonInscrit, string Gestion, string Designation, string Siren,
                               string Type, bool Radie, bool Retenue, LigneEntiteCw[] Lignes,
                               string[] Ecarts, int NbAdresses, int NbInscriptions, bool? SirenConcorde,
-                              bool? RaisonConcorde);
+                              bool? RaisonConcorde, bool? GestionConcorde);
 public sealed record RetenueCw(string Code, string Designation, bool Radie, string Detail, string[] Ecarts);
 
 /// <summary>
-/// La zone de rapprochement (debiteur ou dossier concerne). CommandeSiren et
-/// CommandeRaison : ce que la commande a reçu, la colonne « Commande » de la vue
-/// « Correspondance » (/draft du 19/11/2026), commune aux deux. RechercheOuverte : ses
-/// champs de recherche sont montres (replies tant qu'un dossier est trouve).
+/// La zone de rapprochement (debiteur ou dossier concerne). CommandeSiren,
+/// CommandeRaison et CommandeGestion : ce que la commande a reçu, la colonne
+/// « Commande » de la vue « Correspondance » (/draft du 19/11/2026), commune aux
+/// deux ; le n° de gestion n'y figure que pour le certificat de non-faillite
+/// (Faillite). RechercheOuverte : ses champs de recherche sont montres (replies
+/// tant qu'un dossier est trouve).
 /// </summary>
 public sealed record RapprochementCw(bool Debiteur, bool Faillite, bool ARetenue, bool Deplie, bool Traitee,
                                      RetenueCw? Retenue, string RechSiren, string RechRaison,
                                      bool TousDebiteurs, bool TousEtablissements, string? Message,
                                      EntiteCw[] Entites, string ResumeRapprochement,
-                                     string CommandeSiren, string CommandeRaison, bool RechercheOuverte);
+                                     string CommandeSiren, string CommandeRaison, string CommandeGestion,
+                                     bool RechercheOuverte);
 
 public sealed record ItemTypeCw(bool Regroupement, string Code, string Libelle, bool Enfant, bool Coche);
 public sealed record TypesCw(string DateTravail, bool ToutCoche, ItemTypeCw[] Items, int Quantite);
@@ -1020,17 +1024,19 @@ public sealed class SessionCommandesWeb
                 e.Type, e.Radie, e.Cle == c.CibleRetenue,
                 a.Lignes.Select(l => new LigneEntiteCw(l.Nature, l.Adresse, l.NbInscriptions)).ToArray(),
                 TraitementCommandes.Ecarts(c, e).ToArray(), e.Lignes.Count, e.NbInscriptions,
-                TraitementCommandes.SirenConcorde(c, e), TraitementCommandes.RaisonConcorde(c, e));
+                TraitementCommandes.SirenConcorde(c, e), TraitementCommandes.RaisonConcorde(c, e),
+                TraitementCommandes.GestionConcorde(c, e));
         }).ToArray();
 
-        // Recherche du debiteur repliee tant qu'il y a des dossiers a comparer et
-        // aucun message de la recherche a lire ; sinon ses champs restent la.
+        // Recherche repliee tant qu'il y a des dossiers a comparer et aucun
+        // message de la recherche a lire ; sinon ses champs restent la.
         var rechercheOuverte = RechercheRapprochementOuverte || entites.Count == 0 || Resultat.Message is not null;
         return new RapprochementCw(debiteur, c.Famille == FamilleCommande.Faillite, retenue is not null,
             RapprochementDeplie, c.EstTraitee, vueRetenue, RechSiren, RechRaison, TousDebiteurs, TousEtablissements,
             Resultat.Message, vueEntites,
             entites.Count > 0 ? TraitementCommandes.ResumeRapprochement(entites, affichees.Sum(a => a.Lignes.Count)) : "",
-            Tiret(TraitementCommandes.FormaterSiren(c.Siren)), Tiret(c.Denomination), rechercheOuverte);
+            Tiret(TraitementCommandes.FormaterSiren(c.Siren)), Tiret(c.Denomination), Tiret(c.NumeroGestion.Trim()),
+            rechercheOuverte);
     }
 
     /// <summary>Ce que lisait le RenderFragment ZoneTypes (et CaseCochable) du .razor.</summary>

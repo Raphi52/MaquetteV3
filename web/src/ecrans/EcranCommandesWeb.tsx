@@ -107,6 +107,7 @@ export interface EntiteCw {
   /** La commande et le dossier concordent-ils ? null : rien a comparer. */
   sirenConcorde: boolean | null
   raisonConcorde: boolean | null
+  gestionConcorde: boolean | null
 }
 export interface RetenueCw { code: string; designation: string; radie: boolean; detail: string; ecarts: string[] }
 export interface RapprochementCw {
@@ -126,6 +127,8 @@ export interface RapprochementCw {
   /** Ce que la commande a reçu : la colonne « Commande » de la Correspondance. */
   commandeSiren: string
   commandeRaison: string
+  /** Seul le certificat de non-faillite (faillite) montre et compare le n° de gestion. */
+  commandeGestion: string
   /** Les champs de recherche du debiteur sont montres. */
   rechercheOuverte: boolean
 }
@@ -263,6 +266,15 @@ function Correspondance({ r, e, geste }: { r: RapprochementCw; e: EntiteCw; gest
           {e.radie && <span className="rig-tcw__pastille rig-tcw__pastille--radie">RADIÉ</span>}
           {e.retenue && <span className="rig-tcw__pastille rig-tcw__pastille--retenue">RETENUE</span>}
         </span>
+        {/* Le certificat de non-faillite resout son dossier par le n° de gestion
+            reçu : il ouvre la comparaison. */}
+        {r.faillite && (
+          <>
+            <span className="rig-tcw__comp-champ">N° de gestion</span>
+            <span className="rig-tcw__comp-mono">{r.commandeGestion}</span>
+            <span className="rig-tcw__comp-mono"><Concorde ok={e.gestionConcorde} />{e.gestion.length > 0 ? e.gestion : '—'}</span>
+          </>
+        )}
         <span className="rig-tcw__comp-champ">SIREN</span>
         <span className="rig-tcw__comp-mono">{r.commandeSiren}</span>
         <span className="rig-tcw__comp-mono"><Concorde ok={e.sirenConcorde} />{e.siren.length > 0 ? e.siren : '—'}</span>

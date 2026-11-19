@@ -128,6 +128,15 @@ Exiger(TraitementCommandes.RaisonConcorde(jeu.Single(c => c.Id == 9), martin) ==
        && TraitementCommandes.SirenConcorde(jeu.Single(c => c.Id == 1), entiteBillards) == true
        && TraitementCommandes.RaisonConcorde(jeu.Single(c => c.Id == 1), entiteBillards) == true,
     "concordances : raison sociale differente (MARTIN), rien a comparer sans SIREN connu, tout concorde (AMIENS BILLARDS)");
+// Le n° de gestion reçu (certificat de non-faillite SCI DU PARC, n° 6) face a celui du dossier.
+var failliteParc = jeu.Single(c => c.Id == 6);
+var dossierParc = TraitementCommandes.Entites.Single(e => e.Gestion == "004176");
+Exiger(TraitementCommandes.GestionConcorde(failliteParc, dossierParc) == true
+       && TraitementCommandes.GestionConcorde(failliteParc, entiteBillards) == false
+       && TraitementCommandes.GestionConcorde(jeu.Single(c => c.Id == 1), entiteBillards) is null
+       && TraitementCommandes.Ecarts(failliteParc, dossierParc).Count == 0
+       && TraitementCommandes.Ecarts(failliteParc, entiteBillards).Last() == "N° de gestion reçu : 004176 ≠ 2026B01067",
+    "n° de gestion : 004176 concorde avec son dossier, ecart « N° de gestion reçu : 004176 ≠ 2026B01067 » sinon, rien a comparer sans n° reçu");
 
 // --- Controle de delivrance (DelivranceNonOpposition.Evaluer)
 var batipro = TraitementCommandes.ControlerNonOpposition(jeu.Single(c => c.Id == 3));
@@ -484,8 +493,10 @@ var c6t = temoin.Single(c => c.Id == 6);
 Geste("Choisir", 6);
 Exiger(vue.Panneau!.Rapprochement is { Debiteur: false, Faillite: true, RechercheOuverte: false, Message: null } r6
        && r6.CommandeSiren == TraitementCommandes.FormaterSiren(c6t.Siren) && r6.CommandeRaison == c6t.Denomination
-       && r6.Entites.Single() is { Gestion: "004176", SirenConcorde: true, RaisonConcorde: true, Ecarts.Length: 0, Retenue: false },
-    "correspondance : la faillite SCI DU PARC face au dossier 004176 (SIREN et raison sociale concordent), recherche repliee");
+       && r6.CommandeGestion == "004176"
+       && r6.Entites.Single() is { Gestion: "004176", SirenConcorde: true, RaisonConcorde: true, GestionConcorde: true,
+                                    Ecarts.Length: 0, Retenue: false },
+    "correspondance : la faillite SCI DU PARC face au dossier 004176 (n° de gestion, SIREN et raison sociale concordent), recherche repliee");
 Geste("Basculer", "RechercheRapprochementOuverte");
 Exiger(vue.Panneau!.Rapprochement!.RechercheOuverte, "correspondance : le dossier concerne deplie aussi sa recherche");
 Geste("Texte", new { champ = "RechSiren", valeur = "" });
@@ -493,8 +504,10 @@ Geste("Texte", new { champ = "RechRaison", valeur = "AMIENS BILLARDS" });
 Geste("RelancerRapprochement");
 var autres = vue.Panneau!.Rapprochement!.Entites;
 Exiger(autres.Length == 1 && autres.All(e => !e.Retenue && e.RaisonConcorde == false && e.SirenConcorde == false
+                                            && e.GestionConcorde == false
                                             && e.Ecarts.SequenceEqual(TraitementCommandes.Ecarts(c6t, TraitementCommandes.Entite(e.Cle)!))
-                                            && e.Ecarts.Contains("Raison sociale reçu : SCI DU PARC ≠ AMIENS BILLARDS")),
+                                            && e.Ecarts.Contains("Raison sociale reçu : SCI DU PARC ≠ AMIENS BILLARDS")
+                                            && e.Ecarts.Contains("N° de gestion reçu : 004176 ≠ 2026B01067")),
     "correspondance : le dossier AMIENS BILLARDS trouve pour la faillite SCI DU PARC porte ses ecarts sans etre retenu (lu : "
     + string.Join(" ; ", autres.Select(e => $"{e.Cle}={string.Join("|", e.Ecarts)}")) + ")");
 Geste("Choisir", 1);
