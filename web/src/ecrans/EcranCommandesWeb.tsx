@@ -18,6 +18,11 @@
 // ouverte, et Valider est le bout du trait (« Valider 2 / 3 »). Les marches sont
 // calculees par le pont, sur la regle meme qui ferme Valider.
 //
+// OUVERTURE EN « FONDU SUR PLACE » : direction choisie au /draft du 19/11/2026
+// (conv-2021). Ouvrir une commande resserre la liste en colonne pendant que sa
+// couleur passe en fondu a celle du panneau gauche de l'accueil, et le detail
+// glisse en meme temps ; la fermeture rejoue le chemin a l'envers (useBascule).
+//
 // Contenu repris de D:\RIG-V3 (lu sans y toucher) :
 //   ListeCommandesWebNode.cs   « Nouvelle commande », ordre par type,
 //                              pastille « Rapprochement direct ».
@@ -445,12 +450,15 @@ function Marche({ e, children }: { e: EtapeCw; children: ReactNode }) {
   )
 }
 
-function Panneau({ p, geste }: { p: PanneauCw; geste: Geste }) {
+/** `sortant` : la commande vient d'etre fermee ; le panneau reste le temps de la
+ *  bascule, INERTE (ni clic ni focus : la session ne la connait plus) et cache aux
+ *  lecteurs d'ecran, pendant que la CSS le fait ressortir. */
+function Panneau({ p, geste, sortant = false }: { p: PanneauCw; geste: Geste; sortant?: boolean }) {
   const texte = (champ: string) => (valeur: string) => geste('Texte', { champ, valeur })
   const pied = p.pied
   const [dossier, choix, edition] = p.etapes
   return (
-    <section className="rig-tcw__panneau" aria-label={p.titre}>
+    <section className="rig-tcw__panneau" aria-label={p.titre} inert={sortant}>
       <div className="rig-tcw__panneau-haut">
         <div className="rig-tcw__panneau-tete">
           <span className={`rig-tcw__type rig-tcw__rang-${p.rang}`}>{p.type}</span>
@@ -721,8 +729,40 @@ function Tuile({ t, geste }: { t: TuileCw; geste: Geste }) {
   )
 }
 
+/** Duree de la BASCULE liste <-> colonne, en ms : le « fondu sur place » choisi au
+ *  /draft du 19/11/2026 (conv-2021). L'ecran la pose dans --tcw-duree, que lit
+ *  toute l'animation (rig-accueil.css), et garde ce temps-la le panneau ferme. */
+export const DureeBascule = 450
+
+/** La bascule en cours quand une commande s'ouvre ou se ferme, et le panneau qui
+ *  sort. Les deux changent PENDANT le rendu (« garder l'etat du rendu precedent »,
+ *  doc React) : la classe de bascule et le panneau sortant arrivent dans la meme
+ *  image que le changement de mise en page. Poses apres coup, dans un effet, la
+ *  transition n'aurait pas de depart et le panneau, demonte puis remonte,
+ *  repartirait en haut de son defilement. */
+function useBascule(panneau: PanneauCw | null) {
+  const [ouvert, poserOuvert] = useState(false)
+  const [bascule, poserBascule] = useState<'ouverture' | 'fermeture' | null>(null)
+  const [sortant, poserSortant] = useState<PanneauCw | null>(null)
+  // Le dernier panneau MONTRE (rendu valide) : c'est lui qui ressort a la fermeture.
+  const dernier = useRef<PanneauCw | null>(null)
+  if ((panneau !== null) !== ouvert) {
+    poserOuvert(panneau !== null)
+    poserBascule(panneau !== null ? 'ouverture' : 'fermeture')
+    poserSortant(panneau !== null ? null : dernier.current)
+  }
+  useEffect(() => { if (panneau) dernier.current = panneau }, [panneau])
+  useEffect(() => {
+    if (bascule === null) return
+    const fin = window.setTimeout(() => { poserBascule(null); poserSortant(null) }, DureeBascule)
+    return () => window.clearTimeout(fin)
+  }, [bascule])
+  return { bascule: bascule !== null, sortant }
+}
+
 export function EcranCommandesWeb() {
   const [vue, geste] = useSession(pont)
+  const { bascule, sortant } = useBascule(vue?.panneau ?? null)
   const pilule = useRef<HTMLDivElement>(null)
   // Largeur de la liste choisie a la poignee (px), null = celle d'origine (26 %).
   // Reglage d'affichage : il tient tant que l'ecran est ouvert, d'une commande a
@@ -841,9 +881,12 @@ export function EcranCommandesWeb() {
 
       {/* Escalier : une commande ouverte se pose A COTE de la liste, qui se resserre
           en colonne (nom et marches faites) au lieu d'etre recouverte. La poignee
-          entre les deux regle la largeur de la liste (--tcw-liste). */}
-      <div className={`rig-tcw__scene ${vue.panneau ? 'rig-tcw__scene--ouverte' : ''}`}
-           style={largeurListe === null ? undefined : { '--tcw-liste': `${largeurListe}px` } as CSSProperties}>
+          entre les deux regle la largeur de la liste (--tcw-liste). L'ouverture et
+          la fermeture sont une BASCULE animee (--bascule, --tcw-duree). */}
+      <div className={['rig-tcw__scene', vue.panneau && 'rig-tcw__scene--ouverte', bascule && 'rig-tcw__scene--bascule']
+                        .filter(Boolean).join(' ')}
+           style={{ '--tcw-duree': `${DureeBascule}ms`,
+                    ...(largeurListe === null ? {} : { '--tcw-liste': `${largeurListe}px` }) } as CSSProperties}>
         <section className="rig-tcw__liste" aria-label="Commandes" ref={liste}>
           <div className="rig-tcw__liste-entete">
             <span className="rig-tcw__compteur">{vue.compteur}</span>
@@ -894,8 +937,11 @@ export function EcranCommandesWeb() {
         )}
 
         {/* key : chaque commande ouverte est un panneau NEUF, qui glisse a
-            nouveau et repart en haut de son defilement. */}
-        {vue.panneau && <Panneau key={vue.panneau.id} p={vue.panneau} geste={geste} />}
+            nouveau et repart en haut de son defilement. Une commande qui vient
+            d'etre fermee garde le sien (meme key : rien ne se remonte) le temps
+            de ressortir. */}
+        {vue.panneau ? <Panneau key={vue.panneau.id} p={vue.panneau} geste={geste} />
+          : sortant && <Panneau key={sortant.id} p={sortant} geste={geste} sortant />}
       </div>
 
       {vue.coordonnees && <Coordonnees d={vue.coordonnees} geste={geste} />}

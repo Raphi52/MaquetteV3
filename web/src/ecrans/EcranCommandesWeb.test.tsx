@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { EcranCommandesWeb, type PanneauCw, type VueCommandesWeb } from './EcranCommandesWeb'
+import { DureeBascule, EcranCommandesWeb, type PanneauCw, type VueCommandesWeb } from './EcranCommandesWeb'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
@@ -114,7 +114,7 @@ describe('EcranCommandesWeb', () => {
     expect(transnord!.querySelector('.rig-tcw__avancement')!.textContent).toBe('2/3')
     expect(parc!.querySelector('.rig-tcw__avancement')!.className).toBe('rig-tcw__avancement rig-tcw__avancement--prete')
     // Sans commande ouverte : la liste seule, et l'invite.
-    expect(container.querySelector('.rig-tcw__scene')!.className).toBe('rig-tcw__scene ')
+    expect(container.querySelector('.rig-tcw__scene')!.className).toBe('rig-tcw__scene')
     expect(container.querySelector('.rig-tcw__liste > .rig-tcw__invite')!.textContent)
       .toBe('Sélectionnez une commande dans la liste pour la traiter.')
   })
@@ -129,10 +129,40 @@ describe('EcranCommandesWeb', () => {
     fireEvent.click(screen.getByText('SCI DU PARC'))
     await waitFor(() => expect(container.querySelector('.rig-tcw__scene > .rig-tcw__panneau')).not.toBeNull())
     expect(gestes).toEqual([['ChoisirOnglet', 'EnAttente'], ['Choisir', 7]])
-    expect(container.querySelector('.rig-tcw__scene')!.className).toBe('rig-tcw__scene rig-tcw__scene--ouverte')
+    // L'ouverture est une bascule animee (fondu sur place, conv-2021), qui retombe d'elle-meme.
+    expect(container.querySelector('.rig-tcw__scene')!.className).toBe('rig-tcw__scene rig-tcw__scene--ouverte rig-tcw__scene--bascule')
+    await waitFor(() => expect(container.querySelector('.rig-tcw__scene')!.className).toBe('rig-tcw__scene rig-tcw__scene--ouverte'))
     expect(container.querySelector('.rig-tcw__panneau')!.getAttribute('aria-label')).toBe('Faillite — SCI DU PARC')
     expect(container.querySelector('.rig-tcw__cmd--active')!.getAttribute('aria-current')).toBe('true')
     expect(container.querySelector('.rig-tcw__invite')).toBeNull()
+  })
+
+  it('fermer une commande la fait RESSORTIR : le meme panneau reste, inerte, le temps de la bascule, puis s\'en va', async () => {
+    const { gestes } = session({ ...vueDeBase(), panneau: panneau() }, (v, geste) => {
+      if (geste === 'FermerPanneau') v.panneau = null
+      return v
+    })
+    const { container } = render(<EcranCommandesWeb />)
+    const scene = () => container.querySelector('.rig-tcw__scene') as HTMLElement
+    await screen.findByText('1 document à éditer')
+    // La duree de la bascule est posee par l'ecran : la CSS la lit dans --tcw-duree.
+    expect(scene().style.getPropertyValue('--tcw-duree')).toBe(`${DureeBascule}ms`)
+    await waitFor(() => expect(scene().className).toBe('rig-tcw__scene rig-tcw__scene--ouverte'))
+    const ouvert = container.querySelector('.rig-tcw__scene > .rig-tcw__panneau')!
+    expect(ouvert.hasAttribute('inert')).toBe(false)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fermer' }))
+    await waitFor(() => expect(scene().className).toBe('rig-tcw__scene rig-tcw__scene--bascule'))
+    expect(gestes.map(([g]) => g)).toEqual(['FermerPanneau'])
+    // Le MEME element (rien n'est remonte), inerte : ni clic ni focus, la session ne le connait plus.
+    expect(container.querySelector('.rig-tcw__scene > .rig-tcw__panneau')).toBe(ouvert)
+    expect(ouvert.hasAttribute('inert')).toBe(true)
+    // La liste, elle, est deja celle d'une commande fermee : plus de poignee, l'invite revient.
+    expect(container.querySelector('.rig-tcw__poignee')).toBeNull()
+    expect(container.querySelector('.rig-tcw__invite')).not.toBeNull()
+
+    await waitFor(() => expect(container.querySelector('.rig-tcw__panneau')).toBeNull())
+    expect(scene().className).toBe('rig-tcw__scene')
   })
 
   it('commande ouverte : une poignee ENTRE la liste et le panneau regle la largeur de la liste, sans rien remonter a la session', async () => {

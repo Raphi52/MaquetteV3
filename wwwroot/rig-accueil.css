@@ -3314,13 +3314,39 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    tiers de la liste sous le panneau). Entre les deux, la POIGNEE (colonne du
    milieu, large comme l'ancien espacement) regle la largeur de la liste :
    --tcw-liste, posee par l'ecran ; sans elle, 26 % comme avant. clamp() la
-   garde entre 210 px et ce qui laisse 420 px au panneau quand la fenetre
-   se resserre apres coup. --- */
-.rig-tcw__scene { flex: 1 1 auto; min-height: 0; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
-.rig-tcw__scene--ouverte {
-  grid-template-columns: clamp(210px, var(--tcw-liste, 26%), calc(100% - 420px - var(--rig-esp-2))) var(--rig-esp-2) minmax(0, 1fr);
+   garde entre 210 px et ce qui laisse --tcw-panneau-min au panneau quand la
+   fenetre se resserre apres coup.
+
+   FONDU SUR PLACE (/draft du 19/11/2026, conv-2021, proposition 1 choisie) :
+   ouvrir ou fermer une commande ne saute plus. Pendant la BASCULE
+   (.rig-tcw__scene--bascule, que l'ecran pose pour --tcw-duree, qu'il pose
+   aussi), tout bouge ensemble : la liste se resserre, sa couleur passe d'un seul
+   fondu a celle du panneau gauche, le detail glisse ; la fermeture rejoue le
+   meme chemin a l'envers, l'ecran gardant le panneau (inerte) le temps qu'il
+   ressorte. Une grille ne s'anime pas d'une a trois colonnes : les trois
+   colonnes existent donc toujours, menees par --tcw-ouverture (0 = la liste
+   seule, poignee et panneau a 0 px ; 1 = liste | poignee | panneau). Hors
+   bascule, aucune transition : la poignee et le changement de theme restent
+   instantanes. Pas de garde « prefers-reduced-motion » : le poste de
+   l'utilisateur a ce reglage actif (meme choix que le glissement du panneau). --- */
+@property --tcw-ouverture { syntax: "<number>"; inherits: false; initial-value: 0; }
+.rig-tcw__scene {
+  --tcw-panneau-min: 420px;
+  --tcw-colonne: clamp(210px, var(--tcw-liste, 26%), calc(100% - var(--tcw-panneau-min) - var(--rig-esp-2)));
+  flex: 1 1 auto; min-height: 0; display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns:
+    calc(100% - var(--tcw-ouverture) * (100% - var(--tcw-colonne)))
+    calc(var(--tcw-ouverture) * var(--rig-esp-2))
+    minmax(0, 1fr);
 }
+.rig-tcw__scene--ouverte { --tcw-ouverture: 1; }
+/* Le resserrement part vite et se pose en douceur ; l'elargissement accelere
+   puis freine (les courbes de la maquette). */
+.rig-tcw__scene--bascule { transition: --tcw-ouverture var(--tcw-duree) cubic-bezier(.4, 0, .2, 1); }
+.rig-tcw__scene--bascule.rig-tcw__scene--ouverte { transition-timing-function: cubic-bezier(.2, .8, .3, 1); }
 .rig-tcw__poignee {
+  grid-column: 2; grid-row: 1;
   position: relative; cursor: col-resize; touch-action: none; outline: none;
 }
 /* Le trait n'apparait qu'au survol, au clavier et pendant le geste : au repos,
@@ -3333,16 +3359,68 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-tcw__poignee:hover::after,
 .rig-tcw__poignee:focus-visible::after,
 .rig-tcw__poignee:active::after { opacity: 1; }
-.rig-tcw__scene--ouverte .rig-tcw__cmd { gap: var(--rig-esp-2); padding: 8px var(--rig-esp-3) 8px var(--rig-esp-2); }
-.rig-tcw__scene--ouverte .rig-tcw__cmd-qui { flex: 1 1 auto; }
-.rig-tcw__scene--ouverte .rig-tcw__cmd-precisions,
-.rig-tcw__scene--ouverte .rig-tcw__cmd-type,
-.rig-tcw__scene--ouverte .rig-tcw__direct { display: none; }
+/* Ligne resserree (commande ouverte) : filet, nom, marches faites. La reference,
+   le type et la pastille ne sont pas retires (display: none) mais REPLIES a 0 px
+   et caches : ils fondent pendant la bascule au lieu de disparaitre d'un coup.
+   Les ecarts sont des marges (pas un gap, qui laisserait une place a chaque
+   element replie). */
+.rig-tcw__scene--ouverte .rig-tcw__cmd { --tcw-ecart: var(--rig-esp-2); padding: 8px var(--rig-esp-3) 8px var(--rig-esp-2); }
+.rig-tcw__scene--ouverte .rig-tcw__cmd-qui { flex-grow: 1; margin-right: var(--tcw-ecart); }
+.rig-tcw__scene--ouverte .rig-tcw__cmd-precisions { max-height: 0; opacity: 0; visibility: hidden; }
+.rig-tcw__scene--ouverte .rig-tcw__cmd-type { max-width: 0; margin-left: 0; margin-right: 0; opacity: 0; visibility: hidden; }
+.rig-tcw__scene--ouverte .rig-tcw__direct { max-width: 0; padding-left: 0; padding-right: 0; border-width: 0; opacity: 0; visibility: hidden; }
+.rig-tcw__scene--ouverte .rig-tcw__direct + .rig-tcw__avancement { margin-left: 0; }
 .rig-tcw__scene--ouverte .rig-tcw__nouvelle { white-space: normal; text-align: left; }
 
+/* La bascule, transition par transition. Le texte et les aplats de la liste
+   changent de couleur d'un coup, a 45 % : la ou le fond franchit le gris moyen.
+   Fondus avec lui, ils passaient par un gris sur gris illisible (planche du
+   /draft en theme clair). Ce qui se replie le fait sur les premiers 45 % de
+   l'ouverture et se deplie sur les derniers 45 % de la fermeture, puis devient
+   invisible ou visible d'un coup (visibility). */
+.rig-tcw__scene--bascule {
+  --tcw-mi: calc(var(--tcw-duree) * .45);
+  --tcw-net: calc(var(--tcw-duree) * .05);
+  --tcw-couleurs: color var(--tcw-net) linear var(--tcw-mi), background-color var(--tcw-net) linear var(--tcw-mi),
+    border-color var(--tcw-net) linear var(--tcw-mi), box-shadow var(--tcw-net) linear var(--tcw-mi),
+    fill var(--tcw-net) linear var(--tcw-mi), stroke var(--tcw-net) linear var(--tcw-mi);
+  --tcw-courbe: cubic-bezier(.4, 0, .2, 1);
+  --tcw-repli: var(--tcw-mi) var(--tcw-courbe) calc(var(--tcw-duree) * .55);
+  --tcw-fin-repli: 0s linear 0s;
+}
+.rig-tcw__scene--bascule.rig-tcw__scene--ouverte {
+  --tcw-courbe: cubic-bezier(.2, .8, .3, 1);
+  --tcw-repli: var(--tcw-mi) var(--tcw-courbe) 0s;
+  --tcw-fin-repli: 0s linear var(--tcw-mi);
+}
+.rig-tcw__scene--bascule .rig-tcw__liste {
+  transition: --tcw-voile var(--tcw-duree) ease-in-out, border-color var(--tcw-duree) ease-in-out,
+    border-radius var(--tcw-duree) ease-in-out, box-shadow var(--tcw-duree) ease-in-out;
+}
+.rig-tcw__scene--bascule .rig-tcw__liste * { transition: var(--tcw-couleurs); }
+.rig-tcw__scene--bascule .rig-tcw__cmd { transition: var(--tcw-couleurs), padding var(--tcw-duree) var(--tcw-courbe); }
+.rig-tcw__scene--bascule .rig-tcw__cmd-qui {
+  transition: var(--tcw-couleurs), margin var(--tcw-duree) var(--tcw-courbe), flex-grow var(--tcw-fin-repli);
+}
+.rig-tcw__scene--bascule .rig-tcw__cmd-precisions,
+.rig-tcw__scene--bascule .rig-tcw__cmd-type,
+.rig-tcw__scene--bascule .rig-tcw__direct {
+  transition: var(--tcw-couleurs), opacity var(--tcw-repli), max-height var(--tcw-repli), max-width var(--tcw-repli),
+    margin var(--tcw-repli), padding var(--tcw-repli), border-width var(--tcw-repli), visibility var(--tcw-fin-repli);
+}
+.rig-tcw__scene--bascule .rig-tcw__direct + .rig-tcw__avancement { transition: var(--tcw-couleurs), margin-left var(--tcw-repli); }
+
+/* Le degrade du panneau gauche est TOUJOURS sous la liste, couvert d'un voile de
+   la couleur de la carte : plein ici (la carte de toujours), transparent une
+   commande ouverte. C'est ce voile qui fond pendant la bascule : un degrade ne
+   se fond pas en une couleur unie. */
+@property --tcw-voile { syntax: "<color>"; inherits: false; initial-value: transparent; }
 .rig-tcw__liste {
+  grid-column: 1; grid-row: 1;
   display: flex; flex-direction: column; min-height: 0; overflow: hidden;
-  background: var(--rig-surface); border: 1px solid var(--rig-bord); border-radius: var(--rig-radius);
+  --tcw-voile: var(--rig-surface);
+  background: linear-gradient(var(--tcw-voile), var(--tcw-voile)), var(--rig-rail);
+  border: 1px solid var(--rig-bord); border-radius: var(--rig-radius);
 }
 /* Commande ouverte : la liste devient la colonne de GAUCHE et prend l'habit du
    menu de gauche de l'accueil, theme par theme (19/11/2026, Raphael Vilain :
@@ -3352,9 +3430,10 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    est dessous lit les memes noms sans changer. Les teintes ecrites en texte se
    melangent a --rig-rail-melange, comme les groupes du menu : sans cela,
    l'orange brule du Noir et orange ne fait que 3:1 sur son panneau noir et
-   l'alerte du Clair 1,8:1 sur son gris fonce (tests/CharteCheck). */
+   l'alerte du Clair 1,8:1 sur son gris fonce (tests/CharteCheck). Le fond :
+   le voile s'efface et laisse voir --rig-rail, deja peint dessous. */
 .rig-tcw__scene--ouverte .rig-tcw__liste {
-  background: var(--rig-rail);
+  --tcw-voile: transparent;
   border-color: var(--rig-rail-bord);
   border-radius: var(--rig-rail-rayon);
   box-shadow: var(--rig-rail-ombre);
@@ -3395,7 +3474,8 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 /* Une ligne LARGE par commande : filet a la couleur du type, nom en grand,
    reference en monospace, type en couleur, pastille du rapprochement direct. */
 .rig-tcw__cmd {
-  width: 100%; display: flex; align-items: center; gap: var(--rig-esp-3); text-align: left;
+  --tcw-ecart: var(--rig-esp-3);
+  width: 100%; display: flex; align-items: center; text-align: left;
   border: 0; border-bottom: 1px solid var(--rig-bord-faible);
   background: transparent; color: var(--rig-texte); cursor: pointer;
   font: var(--rig-fs-dense)/1.4 var(--rig-font);
@@ -3412,20 +3492,30 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-tcw__cmd-filet { flex: 0 0 4px; align-self: stretch; border-radius: 4px; background: var(--tcw-teinte); }
 /* Largeur bornee : sur un grand ecran, le type reste colle au nom au lieu de
    flotter au milieu de la ligne (capture du 18/11/2026 a 1516 px). */
-.rig-tcw__cmd-qui { flex: 0 1 320px; min-width: 0; display: flex; flex-direction: column; }
+.rig-tcw__cmd-qui { flex: 0 1 320px; min-width: 0; display: flex; flex-direction: column; margin-left: var(--tcw-ecart); }
 .rig-tcw__cmd-nom {
   font: 600 var(--rig-fs-corps) var(--rig-font); letter-spacing: .01em; color: var(--rig-texte);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.rig-tcw__cmd-precisions { font: 11px var(--rig-font-mono); color: var(--rig-texte-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rig-tcw__cmd-precisions {
+  font: 11px var(--rig-font-mono); color: var(--rig-texte-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-height: 2em;
+}
 /* Le type est ecrit dans sa couleur, melangee au texte pour rester lisible
-   (l'or pur ne fait que 2,4:1 sur une carte blanche). */
+   (l'or pur ne fait que 2,4:1 sur une carte blanche). Son ecart a droite garde
+   la pastille (ou les marches) a distance. overflow: clip et non hidden, pour le
+   type comme pour la pastille : rogner le texte qui se replie sans changer leur
+   largeur minimale (hidden la ramenerait a 0, et le type se tronquerait).
+   max-width CHIFFREE, plus large que le plus long libelle (« État d'endettement
+   — non-inscrit », ~17em) : de « none » a 0, le repli ne s'anime pas, il saute
+   a la fin des le premier instant (vu au banc fige, 19/11/2026). */
 .rig-tcw__cmd-type {
-  font: 600 11px var(--rig-font); white-space: nowrap;
+  font: 600 11px var(--rig-font); white-space: nowrap; overflow: clip; max-width: 30em;
+  margin-left: var(--tcw-ecart); margin-right: var(--tcw-ecart);
   color: color-mix(in srgb, var(--tcw-teinte) 72%, var(--rig-texte));
 }
 .rig-tcw__direct {
-  margin-left: auto; white-space: nowrap; font-size: 10px; padding: 0 8px; border-radius: 999px;
+  margin-left: auto; white-space: nowrap; overflow: clip; max-width: 16em; font-size: 10px; padding: 0 8px; border-radius: 999px;
   border: 1px solid var(--rig-palier-vide); color: var(--rig-texte); line-height: 18px;
   background: color-mix(in srgb, var(--rig-palier-vide) 16%, transparent);
 }
@@ -3435,8 +3525,7 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   flex: 0 0 auto; margin-left: auto; white-space: nowrap;
   font: 600 11px var(--rig-font-mono); color: var(--rig-alerte);
 }
-.rig-tcw__direct + .rig-tcw__avancement { margin-left: var(--rig-esp-2); }
-.rig-tcw__scene--ouverte .rig-tcw__avancement { margin-left: auto; }
+.rig-tcw__direct + .rig-tcw__avancement { margin-left: calc(var(--tcw-ecart) + var(--rig-esp-2)); }
 .rig-tcw__avancement--prete { color: var(--rig-palier-vide); }
 .rig-tcw__icone {
   flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%;
@@ -3456,6 +3545,7 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    Pas de garde « prefers-reduced-motion » : le poste de l'utilisateur a ce
    reglage actif et ne verrait jamais le glissement (meme choix que les anneaux). --- */
 .rig-tcw__panneau {
+  grid-column: 3; grid-row: 1;
   min-width: 0; min-height: 0;
   display: flex; flex-direction: column; overflow: hidden;
   background: var(--rig-surface); border: 1px solid var(--rig-bord); border-radius: var(--rig-radius);
@@ -3463,6 +3553,22 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   animation: rig-tcw-glisser .2s cubic-bezier(.2, .8, .3, 1);
 }
 @keyframes rig-tcw-glisser { from { opacity: 0; transform: translateX(32px); } }
+/* Bascule (fondu sur place) : a l'ouverture, le detail part un peu apres la
+   liste (15 % de la bascule) et finit avec elle ; d'une commande a l'autre, il
+   garde son glissement court. Pendant toute la bascule, son contenu garde la
+   largeur minimale du panneau : la colonne s'ouvre (ou se referme) devant lui
+   au lieu de le faire passer a la ligne a chaque image. A la fermeture, l'ecran
+   le garde, INERTE, le temps qu'il ressorte par ou il est entre. */
+.rig-tcw__scene--bascule .rig-tcw__panneau {
+  animation-duration: calc(var(--tcw-duree) * .85);
+  animation-delay: calc(var(--tcw-duree) * .15);
+  animation-fill-mode: backwards;
+}
+.rig-tcw__scene--bascule .rig-tcw__panneau > * { min-width: var(--tcw-panneau-min); }
+.rig-tcw__scene--bascule .rig-tcw__panneau[inert] {
+  animation: rig-tcw-sortir calc(var(--tcw-duree) * .85) cubic-bezier(.4, 0, .2, 1) forwards;
+}
+@keyframes rig-tcw-sortir { to { opacity: 0; transform: translateX(32px); } }
 .rig-tcw__panneau-haut {
   display: flex; flex-direction: column; gap: 6px;
   padding: var(--rig-esp-3) var(--rig-esp-4) var(--rig-esp-3);

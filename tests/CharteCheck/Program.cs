@@ -460,13 +460,22 @@ foreach (var (nom, texte) in feuilles)
         // 4,5:1 sur chaque arret du degrade. Sans melange, l'orange brule du
         // theme Noir et orange ne fait que 3,0:1 sur son panneau noir, l'alerte
         // du clair 1,8:1 sur son gris fonce.
+        // Le FOND passe en fondu (conv-2021) : un degrade ne se fond pas en une
+        // couleur unie, donc --rig-rail est peint EN PERMANENCE sous la liste,
+        // couvert d'un voile de la couleur de la carte ; commande ouverte, le
+        // voile devient transparent et laisse voir le panneau gauche.
         {
             var liste = Regex.Match(accueil, @"\n\.rig-tcw__scene--ouverte \.rig-tcw__liste\s*\{([^{}]*)\}").Groups[1].Value;
-            Exiger(liste.Contains("background: var(--rig-rail)") && liste.Contains("box-shadow: var(--rig-rail-ombre)")
+            var listeFermee = Regex.Match(accueil, @"\n\.rig-tcw__liste\s*\{([^{}]*)\}").Groups[1].Value;
+            Exiger(listeFermee.Contains("--tcw-voile: var(--rig-surface)")
+                   && listeFermee.Contains("background: linear-gradient(var(--tcw-voile), var(--tcw-voile)), var(--rig-rail)")
+                   && liste.Contains("--tcw-voile: transparent"),
+                "Commandes web : sous la liste, le fond du menu de l'accueil, couvert du voile de la carte qui s'efface une commande ouverte");
+            Exiger(liste.Contains("box-shadow: var(--rig-rail-ombre)")
                    && liste.Contains("border-radius: var(--rig-rail-rayon)")
                    && liste.Contains("--rig-texte: var(--rig-rail-texte)") && liste.Contains("--rig-texte-2: var(--rig-rail-texte-2)")
                    && liste.Contains("--rig-texte-3: var(--rig-rail-texte-3)") && liste.Contains("--rig-bord-faible: var(--rig-rail-trait-faible)"),
-                "Commandes web : la liste de gauche (commande ouverte) prend le fond, l'ombre et les textes du menu de l'accueil");
+                "Commandes web : la liste de gauche (commande ouverte) prend l'ombre, le rayon et les textes du menu de l'accueil");
 
             var regles = string.Concat(Regex.Matches(accueil, @"\n\.rig-tcw__scene--ouverte \.rig-tcw__liste[^{}]*\{([^{}]*)\}")
                 .Select(m => m.Groups[1].Value));
