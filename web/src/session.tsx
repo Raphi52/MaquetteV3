@@ -17,7 +17,7 @@
 // Ce module ne parle pas au C# lui-meme : chaque ecran lui passe ses propres
 // appels a pont.ts (regles.test.ts verifie qu'un ecran n'appelle que SON pont).
 
-import { useCallback, useEffect, useRef, useState, type InputHTMLAttributes } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type InputHTMLAttributes } from 'react'
 
 /** Toute vue rendue par un pont a session porte l'identifiant de sa session. */
 export interface VueDeSession {
@@ -112,8 +112,14 @@ export function Saisie({ valeur, quand = 'input', changer, finir, ...attributs }
   const changerCourant = useRef(changer)
   const finirCourant = useRef(finir)
 
-  useEffect(() => { changerCourant.current = changer }, [changer])
-  useEffect(() => { finirCourant.current = finir }, [finir])
+  // useLayoutEffect, pas useEffect, pour TOUT ce qui branche le « change »
+  // (19/11/2026) : il tourne pendant que React ecrit le champ dans la page. Un
+  // useEffect peut etre repousse a une tache suivante (rendu hors act de plus
+  // de 5 ms, machine chargee) : le champ etait alors a l'ecran sans ecoute, et
+  // un « change » tire entre les deux etait perdu (test instable « volet
+  // Articles » ; session.test.tsx le rejoue avec un rendu lent).
+  useLayoutEffect(() => { changerCourant.current = changer }, [changer])
+  useLayoutEffect(() => { finirCourant.current = finir }, [finir])
 
   useEffect(() => {
     const el = champ.current
@@ -122,7 +128,7 @@ export function Saisie({ valeur, quand = 'input', changer, finir, ...attributs }
 
   // L'evenement « change » du navigateur : React n'en donne pas (son onChange
   // suit chaque frappe). C'est celui que le `@bind` de Blazor ecoutait.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = champ.current
     if (!el || quand !== 'change') return
     const surChange = () => changerCourant.current(el.value)
@@ -131,7 +137,7 @@ export function Saisie({ valeur, quand = 'input', changer, finir, ...attributs }
   }, [quand])
 
   const aFinir = finir !== undefined
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = champ.current
     if (!el || !aFinir) return
     const surFin = () => finirCourant.current?.(el.value)

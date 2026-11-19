@@ -5,6 +5,7 @@
 // valeur (la regle du @bind de Blazor).
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { Saisie, useSession, type PontDeSession, type VueDeSession } from './session'
 
@@ -104,6 +105,47 @@ describe('Saisie', () => {
     expect(changer).not.toHaveBeenCalled()
     fireEvent.change(champ, { target: { value: '120' } })
     expect(changer).toHaveBeenCalledWith('120')
+  })
+
+  it('« change » : ecoute des que le champ est a l\'ecran, avant les effets differes de React', async () => {
+    // Cause du test instable « volet Articles » (EcranRequisitions.test.tsx,
+    // 19/11/2026). La vue d'une session arrive HORS act (reponse du pont) :
+    // React la rend dans une tache de son ordonnanceur et, si cette tache a
+    // depasse ses 5 ms (machine chargee), repousse les useEffect a une tache
+    // suivante. Entre les deux, le champ est deja dans la page : un « change »
+    // tire la (le test, ou une saisie) etait perdu si l'ecoute s'accrochait dans
+    // un useEffect. Le rendu lent ci-dessous rend ce cas certain, sans charge.
+    const changer = vi.fn()
+    let montrer: () => void = () => {}
+    function RenduLent() {
+      const debut = performance.now()
+      while (performance.now() - debut < 20) { /* depasse la tranche de 5 ms */ }
+      return null
+    }
+    function Differe() {
+      const [visible, setVisible] = useState(false)
+      montrer = () => setVisible(true)
+      return visible ? <><RenduLent /><Saisie aria-label="champ" quand="change" valeur="" changer={changer} /></> : null
+    }
+    const { container } = render(<Differe />)
+    const changeTireAuRendu = new Promise<void>((fini) => {
+      // Rappel d'un MutationObserver : juste apres l'ecriture du champ dans la
+      // page, avant toute autre tache -- le moment ou findByText rend la main.
+      const observateur = new MutationObserver(() => {
+        const champ = container.querySelector('input')
+        if (!champ) return
+        observateur.disconnect()
+        fireEvent.change(champ, { target: { value: '5' } })
+        fini()
+      })
+      observateur.observe(container, { childList: true, subtree: true })
+    })
+    const avertir = vi.spyOn(console, 'error').mockImplementation(() => {}) // « not wrapped in act » : voulu
+    try {
+      montrer() // hors act, comme la reponse du pont dans useSession
+      await changeTireAuRendu
+    } finally { avertir.mockRestore() }
+    expect(changer).toHaveBeenCalledWith('5')
   })
 
   it('ne reecrit le champ que quand la valeur de la session CHANGE', () => {

@@ -15,7 +15,7 @@
 // a la session ; les rappels qu'il leve (champModifie, toutAffiche) reviennent
 // dans la vue et sont remontes a la coquille.
 
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from 'react'
 import { appeler } from '../pont'
 import { Saisie } from '../session'
 
@@ -405,12 +405,18 @@ function Guidee({ guide, geste, focusRendu }: ProprietesGuidee) {
   const champ = useRef<HTMLInputElement>(null)
   const saisie = useRef('')
 
+  // useLayoutEffect pour les deux (19/11/2026) : ils tournent pendant que
+  // React ecrit le nouveau champ dans la page. Un useEffect peut etre repousse
+  // a une tache suivante (rendu de plus de 5 ms, machine chargee) : le champ
+  // etait alors a l'ecran sans focus, et une frappe tombee entre les deux etait
+  // effacee par la remise a zero (meme cause que Saisie, session.tsx).
+
   // Un nouveau champ guide : rien n'y est encore tape.
-  useEffect(() => { saisie.current = '' }, [guide.cle])
+  useLayoutEffect(() => { saisie.current = '' }, [guide.cle])
 
   // Le champ guide prend le focus : sans cela, il faudrait cliquer dans la case
   // apres chaque Entree -- la saisie au clavier perdrait tout son interet.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (guide.focus === focusRendu.current) return
     focusRendu.current = guide.focus
     champ.current?.focus()
