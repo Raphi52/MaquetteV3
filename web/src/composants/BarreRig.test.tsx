@@ -54,8 +54,11 @@ describe('BarreRig (la barre du haut, « comme Brave »)', () => {
 
   it('le « + » au bout des onglets, comme dans Brave : il ouvre l\'accueil sans deplacer la fenetre', () => {
     const { container, gestes, plans } = rendre()
-    const plus = container.querySelector('.rig-barre__plus')!
+    const plus = container.querySelector('.rig-vonglet--plus')!
     expect(plus.previousElementSibling!.id).toBe('rig-vonglets')
+    // La forme d'un onglet (comme la maison), pas un rond ; mais il ne se glisse pas.
+    expect(plus.className).toBe('rig-vonglet rig-vonglet--plus')
+    expect(plus.hasAttribute('data-rig-onglet')).toBe(false)
     expect(plus.getAttribute('aria-label')).toBe('Nouvel onglet')
     expect(plus.querySelector('svg')).not.toBeNull()
     fireEvent.mouseDown(plus)

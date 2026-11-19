@@ -2933,6 +2933,22 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   content: ''; position: absolute; left: 0; top: 7px; bottom: 7px; width: 1px;
   background: var(--rig-bord);
 }
+/* LE « + », dernier onglet (19/11/2026) : la forme d'un onglet inactif, comme
+   la maison -- colle au bas de la barre, coins hauts arrondis, fond d'onglet
+   au survol -- et non plus un rond centre dans la barre (« doit ressembler a
+   un onglet »). Le filet qui le separe du dernier onglet s'efface quand cet
+   onglet est l'onglet ouvert. Sans onglet, la regle des voisins
+   (.rig-vonglet + .rig-vonglet) pose le filet entre la maison et lui. */
+.rig-vonglet--plus {
+  width: 40px; flex: none; align-self: flex-end;
+  padding: 0; justify-content: center; font: inherit;
+}
+.rig-vonglet--plus svg { width: 15px; height: 15px; display: block; }
+.rig-vonglets:has(> .rig-vonglet:last-child:not(.rig-vonglet--actif)) + .rig-vonglet--plus::before {
+  content: ''; position: absolute; left: 0; top: 7px; bottom: 7px; width: 1px;
+  background: var(--rig-bord);
+}
+.rig-vonglet--plus:focus-visible { outline: 2px solid var(--rig-focus, var(--rig-or)); outline-offset: -2px; }
 
 /* ---------- Parcours guide « requis d'abord » ----------------------
    Les champs obligatoires (colonnes NOT NULL, Metier/ChampsRequisDossier.cs)
@@ -3831,18 +3847,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   .rig-vged__suivi, .rig-vged__chemin { grid-column: auto; grid-row: auto; }
   .rig-vged__suivi { border-left: 0; border-top: 1px solid var(--rig-bord); max-height: 60vh; }
 }
-
-/* LE « + » au bout des onglets, comme dans Brave (19/11/2026) : un rond
-   discret, centre dans la barre, colle au dernier onglet. Il ouvre l'accueil. */
-.rig-barre__plus {
-  flex: none; align-self: center; margin-left: 6px;
-  display: grid; place-items: center; width: 26px; height: 26px; padding: 0;
-  border: 0; border-radius: 50%; background: transparent; cursor: pointer;
-  color: var(--rig-texte-2);
-}
-.rig-barre__plus:hover { background: color-mix(in srgb, var(--rig-texte) 10%, transparent); color: var(--rig-texte); }
-.rig-barre__plus:focus-visible { outline: 2px solid var(--rig-focus, var(--rig-or)); outline-offset: 1px; }
-.rig-barre__plus svg { width: 15px; height: 15px; display: block; }
 
 /* ============================================================
    L'HABILLAGE DU DRAFT (proposition 3, conv-2009, 19/11/2026) : la vue

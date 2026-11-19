@@ -41,8 +41,10 @@ export function BarreRig({ onglets, finsDeGlisse, accueil, geste, plan }: Propri
       {onglets && <Onglets onglets={onglets} finsDeGlisse={finsDeGlisse} plan={plan} />}
       {/* LE « + » au bout des onglets, comme dans Brave (demande de conv-2007,
           rappelee le 19/11/2026) : il ouvre l'accueil, d'ou l'on choisit quoi
-          ouvrir, sans fermer les onglets. Toujours la, meme sans onglet. */}
-      <button className="rig-barre__plus" title="Nouvel onglet : choisir quoi ouvrir depuis l'accueil"
+          ouvrir, sans fermer les onglets. Toujours la, meme sans onglet. Il a
+          la FORME d'un onglet, comme la maison (« pas un bouton rond »,
+          19/11/2026) ; sans data-rig-onglet, il ne se glisse pas. */}
+      <button className="rig-vonglet rig-vonglet--plus" title="Nouvel onglet : choisir quoi ouvrir depuis l'accueil"
               aria-label="Nouvel onglet" onClick={() => plan('accueil')} onMouseDown={arreter}>
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v9.5M3.25 8h9.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"></path></svg>
       </button>
