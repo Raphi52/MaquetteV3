@@ -2334,8 +2334,11 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 
 /* LE PIED : l'en-tete descendu en bas. Colonne etroite : titre et outils sur
    une rangee, le bilan dessous ; colonne large : les trois sur une seule. Le
-   filet haut dit l'etat : brique tant qu'un point bloque, accent quand plus rien
-   ne bloque, vert quand le dossier est valide. */
+   filet haut prend la couleur de la pastille du bilan : alerte tant qu'un point
+   bloque (brique en clair, jaune en sombre, comme la maquette choisie), vert des
+   que plus rien ne bloque. L'etat « pret » etait a l'accent : en sombre, or
+   #D9B26A contre jaune #F5B912, les deux filets se confondaient (capture du
+   19/11/2026). */
 .rig-guide__controle {
   flex: none;
   display: grid; grid-template-columns: minmax(0, 1fr) auto;
@@ -2345,7 +2348,7 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   border-top: 1px solid var(--rig-bord-faible);
   background: linear-gradient(var(--rig-alerte), var(--rig-alerte)) top / 100% 2px no-repeat;
 }
-.rig-guide__controle--pret { background-image: linear-gradient(var(--rig-focus), var(--rig-focus)); }
+.rig-guide__controle--pret,
 .rig-guide__controle--valide { background-image: var(--rig-grad-ok); }
 .rig-guide__titres { grid-area: titres; min-width: 0; }
 .rig-guide__controle .rig-guide__titre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -2372,6 +2375,7 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 /* Le detail passe a la ligne plutot que de perdre « valeur(s) refusee(s) »
    derriere le bouton Valider, en colonne etroite. */
 .rig-bilan__detail { font: 10px/1.3 var(--rig-font-mono); color: var(--rig-texte-3); }
+.rig-bilan__detail > span { white-space: nowrap; }
 .rig-bilan .rig-bouton { flex: none; white-space: nowrap; }
 .rig-bilan .rig-bouton--fort { padding: 6px var(--rig-esp-4); }
 

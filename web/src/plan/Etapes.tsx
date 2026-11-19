@@ -125,8 +125,8 @@ function Corps({ page, plan }: { page: PageEtapeVue, plan: GestePlan }) {
  * LE PIED : l'en-tete descendu en bas. Titre de la piece, bilan du controle
  * (ce qui bloque, puis « Valider le dossier » ; « Rouvrir la saisie » quand le
  * dossier est valide), oeil et croix. Son filet haut dit l'etat d'un coup
- * d'oeil : brique tant qu'un point bloque, accent quand plus rien ne bloque,
- * vert quand le dossier est valide.
+ * d'oeil, de la couleur de la pastille du bilan : alerte (brique en clair,
+ * jaune en sombre) tant qu'un point bloque, vert des que plus rien ne bloque.
  */
 function Pied({ etapes, plan }: { etapes: EtapesVue, plan: GestePlan }) {
   const { recap, courante, total } = etapes
@@ -172,8 +172,10 @@ function Bilan({ recap, plan, controle }: { recap: RecapVue, plan: GestePlan, co
   const texte = (
     <>
       <span className="rig-bilan__titre">{recap.titre}</span>{' '}
+      {/* Deux morceaux insecables : en colonne etroite, la ligne se coupe au
+          « · », jamais au milieu de « 1 valeur(s) refusee(s) ». */}
       <span className="rig-bilan__detail">
-        {recap.aManquer}{' a renseigner · '}{recap.refusees}{' valeur(s) refusee(s) '}
+        <span>{recap.aManquer}{' a renseigner'}</span>{' · '}<span>{recap.refusees}{' valeur(s) refusee(s)'}</span>
       </span>
     </>
   )

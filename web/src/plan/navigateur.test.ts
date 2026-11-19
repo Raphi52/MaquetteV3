@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ecouterEchap } from './clavier'
 import { ecouterGlisse, finirSuivi, mesurerOnglets } from './glisse'
-import { allerEtape, etapeEnHaut, suivreEtapeVisible } from './pagination'
+import { allerEtape, etapeEnHaut, etapeSuivie, suivreEtapeVisible } from './pagination'
 
 // Ce que seul le navigateur sait faire (ex-wwwroot/rig-accueil.js, retire au
 // lot 2) : le clavier, le glisser d'un onglet, le defilement des etapes.
@@ -127,5 +127,58 @@ describe('accordeon des etapes : defilement vertical', () => {
     allerEtape(z, 9)
     allerEtape(null, 1)
     expect(z.scrollTo).toHaveBeenCalledTimes(2)
+  })
+
+  it('colonne large : l\'etape demandee reste la courante quand le defilement bute en bas, jusqu\'a ce que l\'utilisateur fasse defiler', () => {
+    // Vu en capture le 19/11/2026 : un clic sur le bilan du pied ouvrait l'etape
+    // Controle (la derniere), la zone ne pouvait pas la monter en haut, et le
+    // pied disait « etape 3 / 7 ». Ici, 3 etapes de 100 px, zone de 150 px,
+    // scrollTop plafonne a 150 : la ligne de l'etape 2 (y = 200) ne passe jamais le bord.
+    const z = zone(0)
+    const vue = vi.fn()
+    const rafs: FrameRequestCallback[] = []
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((f) => { rafs.push(f); return rafs.length })
+    try {
+      const arreter = suivreEtapeVisible(z, vue)
+      allerEtape(z, 2)
+      z.scrollTop = 150
+      z.dispatchEvent(new Event('scroll'))
+      rafs.shift()!(0)
+      expect(etapeEnHaut(z)).toBe(1)
+      expect(etapeSuivie(z)).toBe(2)
+      expect(vue.mock.calls).toEqual([[0], [2]])
+
+      // Un clic dans un champ de l'etape ne la lache pas ; la molette, si.
+      z.querySelector('section')!.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+      expect(etapeSuivie(z)).toBe(2)
+      z.dispatchEvent(new Event('wheel'))
+      z.scrollTop = 120
+      z.dispatchEvent(new Event('scroll'))
+      rafs.shift()!(0)
+      expect(vue.mock.calls).toEqual([[0], [2], [1]])
+      arreter()
+    } finally {
+      raf.mockRestore()
+    }
+  })
+
+  it('la barre de defilement et les touches de defilement lachent l\'etape demandee ; une frappe dans un champ, non', () => {
+    const z = zone(0)
+    const champ = document.createElement('input')
+    champ.id = 'champ'
+    z.appendChild(champ)
+    const arreter = suivreEtapeVisible(z, vi.fn())
+    try {
+      allerEtape(z, 2)
+      document.getElementById('champ')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+      expect(etapeSuivie(z)).toBe(2)
+      z.querySelector('section')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageDown', bubbles: true }))
+      expect(etapeSuivie(z)).toBe(0)
+      allerEtape(z, 2)
+      z.dispatchEvent(new Event('pointerdown'))
+      expect(etapeSuivie(z)).toBe(0)
+    } finally {
+      arreter()
+    }
   })
 })

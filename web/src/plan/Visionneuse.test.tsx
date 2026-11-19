@@ -235,7 +235,7 @@ describe('Visionneuse : la saisie guidee en accordeon, l\'en-tete en bas', () =>
     return () => Object.defineProperty(HTMLElement.prototype, 'offsetTop', original)
   }
 
-  it('la zone des etapes dit au C# quelle etape est en haut des qu\'elle apparait, puis joue le defilement demande', () => {
+  it('la zone des etapes dit au C# son etape des qu\'elle apparait (celle du haut, ou celle demandee), puis joue le defilement demande', () => {
     const plan = vi.fn<GestePlan>()
     const joue = { current: 0 }
     const scrollTo = vi.fn()
@@ -243,9 +243,16 @@ describe('Visionneuse : la saisie guidee en accordeon, l\'en-tete en bas', () =>
     HTMLElement.prototype.scrollTo = scrollTo as unknown as typeof original
     const retirer = poserLesEtapes()
     try {
+      // Sans defilement demande : l'etape du haut.
+      const sans = render(<Visionneuse dossier={dossier()} pagination={0} defilement={null} defilementJoue={{ current: 0 }} plan={plan} />)
+      expect(plan.mock.calls).toEqual([['etapeVisible', 0]])
+      sans.unmount()
+      plan.mockClear()
+      // Une piece ouverte sur l'etape 3 : c'est elle que le pied annonce, meme
+      // si la zone ne peut pas la monter jusqu'en haut (src/plan/pagination.ts).
       const { rerender } = render(<Visionneuse dossier={dossier()} pagination={0} defilement={{ numero: 4, index: 2, doux: false }}
                                                defilementJoue={joue} plan={plan} />)
-      expect(plan).toHaveBeenCalledWith('etapeVisible', 0)
+      expect(plan.mock.calls).toEqual([['etapeVisible', 2]])
       expect(scrollTo).toHaveBeenCalledWith({ top: 80, behavior: 'auto' })
       expect(joue.current).toBe(4)
       // Le meme numero n'est pas rejoue ; un numero neuf l'est, en douceur.
@@ -377,7 +384,10 @@ describe('Visionneuse : la saisie guidee en accordeon, l\'en-tete en bas', () =>
     expect(morceaux(bilan)).toEqual(['<span>', ' ', '<button>', ' ', '<button>'])
     expect(bilan.querySelector('.rig-recap__pastille')!.className).toBe('rig-recap__pastille rig-recap__pastille--bloque')
     expect(bilan.querySelector('.rig-bilan__titre')!.textContent).toBe('2 points bloquent la validation')
-    expect(morceaux(bilan.querySelector('.rig-bilan__detail')!)).toEqual(['1', ' a renseigner · ', '1', ' valeur(s) refusee(s) '])
+    // Deux morceaux insecables, separes par « · » : la ligne ne se coupe qu'entre eux.
+    const detail = bilan.querySelector('.rig-bilan__detail')!
+    expect(morceaux(detail)).toEqual(['<span>', ' · ', '<span>'])
+    expect([...detail.children].map((s) => morceaux(s))).toEqual([['1', ' a renseigner'], ['1', ' valeur(s) refusee(s)']])
     const valider = [...bilan.querySelectorAll('button')].find((b) => b.textContent === 'Valider le dossier') as HTMLButtonElement
     expect(valider.disabled).toBe(true)
     // Le texte du bilan deplie l'etape Controle ; elle donne le detail, point par point.
@@ -387,7 +397,7 @@ describe('Visionneuse : la saisie guidee en accordeon, l\'en-tete en bas', () =>
     expect(morceaux(aller)).toEqual(['<span>', ' ', '<span>', ' ', '<span>'])
     expect(controle.querySelectorAll('.rig-recap__point')[0]!.className).toBe('rig-recap__point rig-recap__point--refuse')
     fireEvent.click(aller)
-    // Plus rien ne bloque : Valider s'allume, le filet passe a l'accent, plus de detail.
+    // Plus rien ne bloque : Valider s'allume, le filet passe au vert (classe --pret), plus de detail.
     const pret: RecapVue = { valide: false, nombre: 0, titre: 'Rien ne bloque la validation', aManquer: 0, refusees: 0, groupes: [] }
     rerender(<Visionneuse dossier={dossier({ etapes: avecControle(pret) })} pagination={0} defilement={null} defilementJoue={{ current: 0 }} plan={plan} />)
     expect(container.querySelector('.rig-guide__controle')!.className).toBe('rig-guide__controle rig-guide__controle--pret')
