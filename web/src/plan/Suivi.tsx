@@ -24,18 +24,25 @@ export interface ProprietesSuivi {
 export function SuiviDossier({ bandeau, historique, fil, plan }: ProprietesSuivi) {
   const [onglet, setOnglet] = useState<OngletSuivi>('suivi')
   const reste = bandeau?.liens ?? []
-  const bouton = (code: OngletSuivi, libelle: string, nombre: number) => (
+  // Le NOMBRE d'un onglet dit ce qui attend : les points a corriger sur « Suivi »
+  // (en couleur d'alerte), les messages sur « Fil ». Zero : rien d'affiche.
+  // (« Suivi 45 » additionnait les points a corriger et les pieces de
+  // l'historique : un nombre qui ne disait rien.)
+  const bouton = (code: OngletSuivi, libelle: string, nombre: number, titre: string, alerte = false) => (
     <button type="button" role="tab" aria-selected={onglet === code}
             className={'rig-suivi__onglet' + (onglet === code ? ' rig-suivi__onglet--actif' : '')}
+            title={nombre > 0 ? titre : undefined}
             onClick={() => setOnglet(code)}>
-      {libelle}{' '}<b>{nombre}</b>
+      {libelle}
+      {nombre > 0 && <>{' '}<b className={'rig-suivi__nombre' + (alerte ? ' rig-suivi__nombre--alerte' : '')}>{nombre}</b></>}
     </button>
   )
   return (
     <aside className="rig-vged__suivi" aria-label="Suivi du dossier">
       <div className="rig-suivi__onglets" role="tablist">
-        {bouton('suivi', 'Suivi', reste.length + historique.length)}
-        {bouton('fil', 'Fil', fil.length)}
+        {bouton('suivi', 'Suivi', reste.length,
+                reste.length + (reste.length === 1 ? ' etape a corriger' : ' etapes a corriger'), true)}
+        {bouton('fil', 'Fil', fil.length, fil.length + (fil.length === 1 ? ' message' : ' messages'))}
       </div>
       {onglet === 'suivi'
         ? (

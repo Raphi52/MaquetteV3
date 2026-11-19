@@ -1255,6 +1255,10 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private const double LargeurArbreMax = 1100;
     private const double LargeurDonneesMin = 280;
     private const double LargeurDonneesMax = 1100;
+    /// <summary>La colonne d'une poignee : le VIDE entre deux cartes de la vue du dossier,
+    /// le meme que celui qui separe la colonne de suivi (.rig-vged__suivi, margin-left).
+    /// Avec 6 px ici contre 10 px a cote du suivi, les ecarts etaient inegaux (passe de finition du 19/11/2026).</summary>
+    private const string Gouttiere = "10px";
     /// <summary>Les fenetres de document actuellement sorties. PLUSIEURS
     /// documents peuvent l'etre en meme temps ; chacune porte son rang, qui
     /// est aussi la clef de sa position memorisee.</summary>
@@ -1284,12 +1288,12 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
                 // Arbre replie, la premiere poignee part avec lui.
                 if (DonneesVisible)
                 {
-                    if (!ArbreReplie) morceaux.Add("6px");
+                    if (!ArbreReplie) morceaux.Add(Gouttiere);
                     morceaux.Add(GuideVisible ? Px(LargeurDonnees) : "minmax(0, 1fr)");
                 }
                 if (GuideVisible)
                 {
-                    if (!ArbreReplie || DonneesVisible) morceaux.Add("6px");
+                    if (!ArbreReplie || DonneesVisible) morceaux.Add(Gouttiere);
                     morceaux.Add("minmax(0, 1fr)");
                 }
             }

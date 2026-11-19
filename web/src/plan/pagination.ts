@@ -5,6 +5,22 @@
 // reellement visible : c'est lui qui le dit au C# (geste « etapeVisible »),
 // pour que la frise suive.
 
+/**
+ * Amene le pas COURANT de la frise dans sa partie visible (19/11/2026). Sept pas
+ * de 94 px au moins debordent d'une colonne de 400 px : quand l'etape avancait
+ * (fleche, molette, piece ouverte dans l'arbre), le pas allume sortait du
+ * champ, a droite. `marge` laisse libres les fleches, collees aux deux bouts
+ * (rig-accueil.css, .rig-vged .rig-frise--haut).
+ */
+export function montrerPasCourant(frise: HTMLElement | null, marge = 32): void {
+  const pas = frise?.querySelector<HTMLElement>('.rig-frise__pas--courant')
+  if (!frise || !pas) return
+  const f = frise.getBoundingClientRect()
+  const p = pas.getBoundingClientRect()
+  if (p.left < f.left + marge) frise.scrollLeft -= f.left + marge - p.left
+  else if (p.right > f.right - marge) frise.scrollLeft += p.right - (f.right - marge)
+}
+
 /** Fait defiler la zone jusqu'a l'etape `index` (la page se cale d'elle-meme). */
 export function allerEtape(zone: HTMLElement | null, index: number, doux = true): void {
   if (!zone) return

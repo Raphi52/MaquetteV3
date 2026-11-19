@@ -48,12 +48,24 @@ describe('Vue du dossier : l\'arbre se replie', () => {
 })
 
 describe('Vue du dossier : la colonne de suivi, onglets Suivi / Fil', () => {
-  it('deux onglets, Suivi choisi au depart ; leurs nombres', () => {
+  it('deux onglets, Suivi choisi au depart ; leurs nombres : etapes a corriger (alerte), messages', () => {
     const { container } = rendre(dossier({ fil: [note, modif] }))
     const onglets = [...container.querySelectorAll('.rig-suivi__onglet')]
-    expect(onglets.map((o) => o.textContent)).toEqual(['Suivi 10', 'Fil 2'])
+    // Plus « Suivi 10 » (1 etape a corriger + 9 pieces additionnees) : le nombre dit ce qui attend.
+    expect(onglets.map((o) => o.textContent)).toEqual(['Suivi 1', 'Fil 2'])
+    expect(onglets.map((o) => o.querySelector('.rig-suivi__nombre')!.className))
+      .toEqual(['rig-suivi__nombre rig-suivi__nombre--alerte', 'rig-suivi__nombre'])
+    expect(onglets.map((o) => o.getAttribute('title'))).toEqual(['1 etape a corriger', '2 messages'])
     expect(onglets.map((o) => o.getAttribute('aria-selected'))).toEqual(['true', 'false'])
     expect(container.querySelector('.rig-fil')).toBeNull()
+  })
+
+  it('zero : l\'onglet n\'affiche ni nombre ni infobulle', () => {
+    const { container } = rendre(dossier({ bandeau: null, fil: [] }))
+    const onglets = [...container.querySelectorAll('.rig-suivi__onglet')]
+    expect(onglets.map((o) => o.textContent)).toEqual(['Suivi', 'Fil'])
+    expect(container.querySelector('.rig-suivi__nombre')).toBeNull()
+    expect(onglets.map((o) => o.getAttribute('title'))).toEqual([null, null])
   })
 
   it('Suivi : le reste a faire, une ligne par etape ; un clic ouvre l\'etape', () => {

@@ -195,7 +195,8 @@ export function FicheInformationsDossier({ session, version, fermer, toutAffiche
         <div>
           <div className="rig-kicker">{vue.domaine} &middot; {vue.champs} champs &middot; {vue.etapes} &eacute;tapes &middot; {vue.blocs} blocs</div>
           <h3 className="rig-guide__titre">{vue.titre}</h3>
-          <div className="rig-guide__source">{vue.numero} &middot; source RIG v2 : {vue.sources}</div>
+          {/* Une ligne, coupee en « … » dans une colonne etroite : le texte entier en infobulle. */}
+          <div className="rig-guide__source" title={'source RIG v2 : ' + vue.sources}>{vue.numero} &middot; source RIG v2 : {vue.sources}</div>
         </div>
         <div className="rig-fiche__outils">
           {/* Bouton ACTIONS : les actions du processus v2 XACTION (Metier/ActionsXaction.cs). */}
@@ -312,9 +313,6 @@ export function FicheInformationsDossier({ session, version, fermer, toutAffiche
                       onClick={() => geste('remplissage', 1)}>A saisir {vue.remplissage.aSaisir}</button>
               <button className={`rig-infos__vue-choix ${vue.remplissage.choix === 2 ? 'rig-infos__vue-choix--actif' : ''}`}
                       onClick={() => geste('remplissage', 2)}>Tous {vue.remplissage.total}</button>
-              {vue.remplissage.aucunChamp && (
-                <span className="rig-infos__vue-etat">aucun champ dans cette vue</span>
-              )}
               {/* SAISIE GUIDEE : un champ a la fois, au clavier. Elle prend TOUS
                   les champs de l'etape (pas seulement ceux de la vue courante). */}
               <button className={`rig-infos__vue-guide ${vue.remplissage.guide ? 'rig-infos__vue-guide--actif' : ''}`}
@@ -323,6 +321,26 @@ export function FicheInformationsDossier({ session, version, fermer, toutAffiche
             </div>
           )}
 
+          {/* VUE VIDE : la carte ne reste pas blanche sous « aucun champ » (un
+              dossier sans aucun champ renseigne s'ouvrait ainsi) ; elle dit
+              pourquoi et propose la vue qui en montre. */}
+          {vue.guide === null && vue.remplissage?.aucunChamp && (
+            <div className="rig-infos__vide">
+              <b>{vue.remplissage.choix === 0 && vue.remplissage.remplis === 0
+                ? 'Aucun champ renseigne pour ce dossier.'
+                : 'Aucun champ dans cette vue.'}</b>
+              {vue.remplissage.choix !== 1 && vue.remplissage.aSaisir > 0 && (
+                <button className="rig-bouton rig-bouton--plat" onClick={() => geste('remplissage', 1)}>
+                  Voir les champs a saisir ({vue.remplissage.aSaisir})
+                </button>
+              )}
+              {vue.remplissage.choix !== 0 && vue.remplissage.remplis > 0 && (
+                <button className="rig-bouton rig-bouton--plat" onClick={() => geste('remplissage', 0)}>
+                  Voir les champs renseignes ({vue.remplissage.remplis})
+                </button>
+              )}
+            </div>
+          )}
           {vue.guide !== null ? (
             vue.guide.vide
               ? <div className="rig-guidee__vide">Cette etape n'a aucun champ a saisir.</div>

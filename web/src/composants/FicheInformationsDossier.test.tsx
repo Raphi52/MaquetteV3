@@ -116,6 +116,35 @@ describe('FicheInformationsDossier', () => {
     expect(agir.mock.calls.map((c) => [c[1], c[2]])).toEqual([['filtre', 'siren'], ['etape', 1], ['remplissage', 1], ['page', 1]])
   })
 
+  it('la VUE VIDE dit pourquoi et propose la vue qui montre des champs', async () => {
+    // Un dossier sans aucun champ renseigne s'ouvre sur « Renseignes 0 » : la carte restait blanche.
+    const rien = vue({ remplissage: { choix: 0, remplis: 0, aSaisir: 523, total: 523, aucunChamp: true, guide: false }, sections: [] })
+    const agir = vi.fn((_s: unknown, _geste: unknown, _valeur: unknown) => rien)
+    const { container } = monter({ 'FicheInformationsDossier.Vue': () => rien, 'FicheInformationsDossier.Agir': agir })
+    const vide = await waitFor(() => { const v = container.querySelector('.rig-infos__vide'); expect(v).not.toBeNull(); return v! })
+    expect(vide.querySelector('b')!.textContent).toBe('Aucun champ renseigne pour ce dossier.')
+    const boutons = [...vide.querySelectorAll('button')]
+    expect(boutons.map((b) => b.textContent)).toEqual(['Voir les champs a saisir (523)'])
+    fireEvent.click(boutons[0]!)
+    await waitFor(() => expect(agir).toHaveBeenCalledWith('s1', 'remplissage', 1))
+    // L'ancienne mention en petites capitales a disparu de la rangee des vues.
+    expect(container.querySelector('.rig-infos__vue')!.textContent).not.toContain('aucun champ')
+  })
+
+  it('vue vide alors que d\'autres champs existent : elle propose les deux autres vues utiles', async () => {
+    const tout = vue({ remplissage: { choix: 1, remplis: 4, aSaisir: 0, total: 4, aucunChamp: true, guide: false }, sections: [] })
+    const { container } = monter({ 'FicheInformationsDossier.Vue': () => tout })
+    const vide = await waitFor(() => { const v = container.querySelector('.rig-infos__vide'); expect(v).not.toBeNull(); return v! })
+    expect(vide.querySelector('b')!.textContent).toBe('Aucun champ dans cette vue.')
+    expect([...vide.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Voir les champs renseignes (4)'])
+  })
+
+  it('des champs a l\'ecran : pas de vue vide', async () => {
+    const { container } = monter({ 'FicheInformationsDossier.Vue': () => vue() })
+    await screen.findByText('Etat Dossier')
+    expect(container.querySelector('.rig-infos__vide')).toBeNull()
+  })
+
   it('le menu Actions XACTION et la note de l\'action demandee', async () => {
     const actions = [{ code: '1GDMNX', libelle: 'Demande du XACTION' }, { code: 'XRBODAC', libelle: 'Corriger le BODACC' }]
     const agir = vi.fn((_s: unknown, geste: unknown, _valeur: unknown) => geste === 'menuActions'

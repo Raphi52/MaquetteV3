@@ -9,7 +9,7 @@
 import { Fragment, useEffect, useRef, type MutableRefObject } from 'react'
 import { Liste } from '../accueil/Liste'
 import { Saisie } from '../session'
-import { allerEtape, suivrePagination } from './pagination'
+import { allerEtape, montrerPasCourant, suivrePagination } from './pagination'
 import type { ChampSaisieVue, DefilementVue, EtapesVue, GestePlan, PageEtapeVue, RecapVue } from './types'
 
 export interface ProprietesEtapes {
@@ -46,6 +46,9 @@ export function Etapes({ etapes, pagination, defilement, defilementJoue, plan }:
   }, [pagination])
 
   const { courante, total } = etapes
+  // La frise suit l'etape : son pas allume reste dans le champ.
+  const frise = useRef<HTMLOListElement>(null)
+  useEffect(() => { montrerPasCourant(frise.current) }, [courante])
   return (
     <div className="rig-vged__guide rig-vged__donnees">
       <div className="rig-guide__entete">
@@ -64,7 +67,7 @@ export function Etapes({ etapes, pagination, defilement, defilementJoue, plan }:
         <button className="rig-guide__fermer" title="Fermer les etapes"
                 onClick={() => plan('fermerEtapes')}>{'×'}</button>
       </div>{' '}
-      <ol className="rig-frise rig-frise--h rig-frise--haut">
+      <ol className="rig-frise rig-frise--h rig-frise--haut" ref={frise}>
         {/* Fleches de part et d'autre des etapes : elles remplacent les boutons
             Precedent / Suivant (demande du 2026-09-15). */}
         <li className="rig-frise__fleche">
@@ -74,10 +77,12 @@ export function Etapes({ etapes, pagination, defilement, defilementJoue, plan }:
         </li>
         {etapes.pas.map((p, index) => (
           <li key={index} className={'rig-frise__pas rig-frise__pas--' + p.etat + ' ' + (p.courant ? 'rig-frise__pas--courant' : '')}>
-            <button className="rig-frise__bouton" onClick={() => plan('allerEtape', index)}>
+            <button className="rig-frise__bouton" title={p.titre} onClick={() => plan('allerEtape', index)}>
               <span className="rig-frise__pastille">{p.pastille}</span>{' '}
               <span className="rig-frise__libelle">
-                {p.titre}
+                {/* Le nom dans son element : texte nu dans le libelle (flex en
+                    colonne), il etait coupe net, sans « … » (19/11/2026). */}
+                <span className="rig-frise__titre">{p.titre}</span>
                 {p.fiches > 0 && <span className="rig-frise__fiches">{p.fiches}{' '}{p.unite}{'s'}</span>}
                 {p.refuses > 0
                   ? <span className="rig-frise__defaut">{p.refuses}{' valeur(s) refusee(s)'}</span>

@@ -26,7 +26,7 @@ export function Apercu({ colonne, plan }: { colonne: ApercuColonneVue, plan: Ges
           <div className="rig-apercu__entete">
             <div>
               <div className="rig-kicker">{a.extension}{' · '}{a.pages}{' page(s) · '}{a.date}</div>{' '}
-              <div className="rig-apercu__titre">{a.libelle}</div>
+              <div className="rig-apercu__titre" title={a.libelle}>{a.libelle}</div>
             </div>{' '}
             <div className="rig-apercu__actions">
               {/* Icones + info-bulle (demande du 15/09/2026 : les libelles en

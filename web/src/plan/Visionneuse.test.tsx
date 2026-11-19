@@ -84,23 +84,28 @@ describe('Visionneuse : entete, fiche sommaire en puces, points a corriger', () 
 })
 
 describe('Visionneuse : l\'historique des pieces, dans l\'onglet Suivi', () => {
-  it('les 7 plus recentes : date, point, libelle, origine ; la piece ouverte marquee', () => {
+  it('TOUTES les pieces : date, point, puis libelle et origine sur deux lignes ; la piece ouverte marquee', () => {
     const { container } = rendre()
     const milieu = container.querySelector('.rig-vged__corps > .rig-vged__milieu')!
     expect([...milieu.children].map((e) => e.className)).toEqual(['rig-vged__guide rig-vged__donnees'])
     const suivi = container.querySelector('.rig-vged__corps > .rig-vged__suivi')!
     expect(suivi.querySelector('.rig-chrono__titre')!.textContent).toBe('Historique des pieces · 9')
     const pieces = suivi.querySelectorAll('.rig-chrono__piece')
-    expect(pieces).toHaveLength(7)
-    expect(morceaux(pieces[0]!)).toEqual(['<span>', '<span>', '<span>', '<span>'])
-    expect(pieces[0]!.textContent).toBe('19/11Kbis a jourEdition greffe')
+    expect(pieces).toHaveLength(9)
+    // Plus de « tout voir » : la liste defile dans sa carte.
+    expect(suivi.querySelector('.rig-chrono__tout')).toBeNull()
+    expect(morceaux(pieces[0]!)).toEqual(['<span>', '<span>', '<span>'])
+    expect(morceaux(pieces[0]!.querySelector('.rig-chrono__texte'))).toEqual(['<span>', '<span>'])
+    expect(pieces[0]!.querySelector('.rig-chrono__libelle')!.textContent).toBe('Kbis a jour')
+    expect(pieces[0]!.querySelector('.rig-chrono__origine')!.textContent).toBe('Edition greffe')
     expect(pieces[0]!.className).toBe('rig-chrono__piece rig-chrono__piece--actif')
     expect(pieces[0]!.getAttribute('aria-current')).toBe('true')
     expect(pieces[0]!.getAttribute('title')).toBe('19/11/2026 · Dossier RCS · Edition greffe · 1 p.')
-    // L'annee en tete de ses pieces, comme dans le draft : 2026 (2 pieces), puis 2024.
+    // L'annee en tete de ses pieces, comme dans le draft : 2026 (2 pieces), 2024 (6), puis 2023.
     expect([...suivi.querySelectorAll('.rig-chrono__liste > li')].map((l) => l.className || l.querySelector('.rig-chrono__date')!.textContent))
-      .toEqual(['rig-chrono__annee', '19/11', '15/09', 'rig-chrono__annee', '12/12', '15/11', '12/11', '15/10', '08/10'])
-    expect([...suivi.querySelectorAll('.rig-chrono__annee')].map((a) => a.textContent)).toEqual(['2026', '2024'])
+      .toEqual(['rig-chrono__annee', '19/11', '15/09', 'rig-chrono__annee', '12/12', '15/11', '12/11', '15/10', '08/10', '18/06',
+                'rig-chrono__annee', '03/03'])
+    expect([...suivi.querySelectorAll('.rig-chrono__annee')].map((a) => a.textContent)).toEqual(['2026', '2024', '2023'])
     expect(pieces[0]!.querySelector('.rig-chrono__point')!.className).toBe('rig-chrono__point rig-chrono__point--rcs')
     expect(pieces[1]!.className).toBe('rig-chrono__piece')
   })
@@ -116,27 +121,15 @@ describe('Visionneuse : l\'historique des pieces, dans l\'onglet Suivi', () => {
     expect((pieces[0]!.querySelector('.rig-chrono__point') as HTMLElement).style.getPropertyValue('--rig-chrono-teinte')).toBe('')
   })
 
-  it('« tout voir » deroule les 9 pieces, puis revient aux 7 dernieres', () => {
-    const { container } = rendre()
-    const tout = container.querySelector('.rig-chrono__tout')!
-    expect(tout.textContent).toBe('tout voir')
-    expect(tout.getAttribute('aria-expanded')).toBe('false')
-    fireEvent.click(tout)
-    expect(container.querySelectorAll('.rig-chrono__piece')).toHaveLength(9)
-    expect(tout.textContent).toBe('les 7 dernieres')
-    fireEvent.click(tout)
-    expect(container.querySelectorAll('.rig-chrono__piece')).toHaveLength(7)
-  })
-
   it('un clic sur une piece remonte « historiqueOuvrir » avec son identifiant', () => {
     const { container, gestes } = rendre()
     fireEvent.click(container.querySelectorAll('.rig-chrono__piece')[3]!)
     expect(gestes()).toEqual([['historiqueOuvrir', 'n13']])
   })
 
-  it('7 pieces ou moins : pas de « tout voir » ; aucune piece datee : pas d\'historique', () => {
-    const { container, rerender, plan } = rendre(dossier({ historique: dossier().historique.slice(0, 7) }))
-    expect(container.querySelector('.rig-chrono__tout')).toBeNull()
+  it('aucune piece datee : pas d\'historique', () => {
+    const { container, rerender, plan } = rendre(dossier({ historique: dossier().historique.slice(0, 2) }))
+    expect(container.querySelectorAll('.rig-chrono__piece')).toHaveLength(2)
     rerender(<Visionneuse dossier={dossier({ historique: [] })} pagination={0} defilement={null} defilementJoue={{ current: 0 }} plan={plan} />)
     expect(container.querySelector('.rig-chrono')).toBeNull()
   })
@@ -264,7 +257,11 @@ describe('Visionneuse : la saisie guidee', () => {
     expect(pas[0]!.className).toBe('rig-frise__pas rig-frise__pas--complet ')
     const bouton = pas[1]!.querySelector('.rig-frise__bouton')!
     expect(morceaux(bouton)).toEqual(['<span>', ' ', '<span>', ' ', '<span>'])
-    expect(morceaux(bouton.querySelector('.rig-frise__libelle')!)).toEqual(['Identite', '<span>'])
+    // Le nom dans SON element : texte nu dans le libelle (flex en colonne), il se
+    // coupait net contre la fleche au lieu de finir en « … » ; entier en infobulle.
+    expect(morceaux(bouton.querySelector('.rig-frise__libelle')!)).toEqual(['<span>', '<span>'])
+    expect(bouton.querySelector('.rig-frise__titre')!.textContent).toBe('Identite')
+    expect(bouton.getAttribute('title')).toBe('Identite')
     expect(morceaux(bouton.querySelector('.rig-frise__defaut')!)).toEqual(['1', ' valeur(s) refusee(s)'])
     expect(morceaux(bouton.querySelector('.rig-frise__compte')!)).toEqual(['11', ' / ', '14'])
     const siege = pas[3]!.querySelector('.rig-frise__libelle')!

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ecouterEchap } from './clavier'
 import { ecouterGlisse, finirSuivi, mesurerOnglets } from './glisse'
-import { allerEtape, suivrePagination } from './pagination'
+import { allerEtape, montrerPasCourant, suivrePagination } from './pagination'
 
 // Ce que seul le navigateur sait faire (ex-wwwroot/rig-accueil.js, retire au
 // lot 2) : le clavier, le glisser d'un onglet, la pagination des etapes.
@@ -110,5 +110,37 @@ describe('pagination des etapes', () => {
     expect(z.scrollTo).toHaveBeenCalledTimes(1)
     expect(z.scrollTo).toHaveBeenCalledWith({ left: 1000, behavior: 'smooth' })
     arreter()
+  })
+})
+
+describe('frise des etapes : le pas courant reste dans le champ', () => {
+  // Une frise de 400 px (x 100 a 500) ; les fleches occupent 32 px a chaque bout.
+  function frise(pasGauche: number, pasDroite: number) {
+    document.body.innerHTML = '<ol><li class="rig-frise__pas"></li><li class="rig-frise__pas rig-frise__pas--courant"></li></ol>'
+    const ol = document.querySelector('ol')!
+    const pas = document.querySelector('.rig-frise__pas--courant')!
+    ol.getBoundingClientRect = () => rect(100, 500)
+    pas.getBoundingClientRect = () => rect(pasGauche, pasDroite)
+    ol.scrollLeft = 200
+    return ol
+  }
+
+  it('sorti a droite : la frise avance juste assez pour le montrer avant la fleche', () => {
+    const ol = frise(520, 620)
+    montrerPasCourant(ol)
+    expect(ol.scrollLeft).toBe(200 + (620 - 468))
+  })
+
+  it('sorti a gauche (sous la fleche) : la frise recule', () => {
+    const ol = frise(110, 210)
+    montrerPasCourant(ol)
+    expect(ol.scrollLeft).toBe(200 - (132 - 110))
+  })
+
+  it('deja visible, ou aucune frise : rien ne bouge', () => {
+    const ol = frise(200, 300)
+    montrerPasCourant(ol)
+    expect(ol.scrollLeft).toBe(200)
+    expect(() => montrerPasCourant(null)).not.toThrow()
   })
 })

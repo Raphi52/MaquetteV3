@@ -765,7 +765,9 @@
    parent le porte en plus pale -- on lit sa position sans deplier. */
 .rig-arbre__ligne--actif { box-shadow: inset 2px 0 0 var(--rig-or, #E8A317); }
 .rig-arbre__ligne--chemin { box-shadow: inset 2px 0 0 rgba(212, 169, 79, .38); }
-.rig-arbre__ligne--chemin .rig-arbre__texte { color: var(--rig-texte-1); }
+/* --rig-texte (et non --rig-texte-1, qui n'existe dans aucun theme : la regle
+   restait sans effet, le parent gardait le gris des autres lignes). */
+.rig-arbre__ligne--chemin .rig-arbre__texte { color: var(--rig-texte); }
 .rig-arbre__libelle {
   display: flex; align-items: center; gap: 4px; min-width: 0;
   padding-left: calc(var(--rig-arbre-niveau, 0) * 14px);
@@ -883,8 +885,13 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    Les barres natives de Windows (17 px, gris opaque) cassent la
    charte : on les remplace par un filet fin qui n'apparait qu'au
    survol de la zone concernee.
+   PLUS de `* { scrollbar-width: thin; scrollbar-color: ... }` (retire le
+   19/11/2026) : depuis Chromium 121, ces deux proprietes standard PRIMENT sur
+   ::-webkit-scrollbar. WebView2 dessinait donc la barre classique de Windows,
+   amincie mais grise, toujours visible et a fleches (vue en capture sous la
+   frise des etapes et dans l'arbre) : le filet ci-dessous ne s'appliquait plus.
+   Ne pas les remettre, ni globalement ni sur une zone.
    ============================================================ */
-* { scrollbar-width: thin; scrollbar-color: var(--rig-bord) transparent; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
@@ -1963,8 +1970,8 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 
 /* La colonne du milieu : les donnees, puis l'HISTORIQUE DES PIECES dessous
    (proposition 5 du /draft du 19/11/2026). Les donnees prennent la hauteur
-   restante et defilent seules ; l'historique garde la sienne (45 % au plus,
-   « tout voir » defile dans ce cadre). */
+   restante et defilent seules ; l'historique garde la sienne (45 % au plus).
+   Depuis la proposition 3, il vit dans la colonne de suivi (plus bas). */
 .rig-vged__milieu { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .rig-vged__milieu > .rig-vged__donnees { flex: 1 1 0; min-height: 0; }
 .rig-chrono {
@@ -1983,12 +1990,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   font: 600 10px/1.3 var(--rig-font-mono); letter-spacing: .1em;
   text-transform: uppercase; color: var(--rig-texte-3);
 }
-.rig-chrono__tout {
-  background: none; border: 0; padding: 0; cursor: pointer; white-space: nowrap;
-  font: 600 11px var(--rig-font); color: var(--rig-accent);
-}
-.rig-chrono__tout:hover { text-decoration: underline; }
-.rig-chrono__tout[aria-expanded="false"]::after { content: " \203A"; }
 .rig-chrono__liste { list-style: none; margin: 0; padding: 0; overflow-y: auto; min-height: 0; }
 .rig-chrono__piece {
   display: flex; align-items: center; gap: 8px; width: 100%; height: 24px; padding: 0 6px;
@@ -2462,7 +2463,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-infos__vue-choix:hover { color: var(--rig-texte); border-color: var(--rig-accent, #E8A317); }
 .rig-infos__vue-choix--actif { color: var(--rig-fond); background: var(--rig-accent, #E8A317);
     border-color: var(--rig-accent, #E8A317); font-weight: 600; }
-.rig-infos__vue-etat { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); }
 .rig-infos__vue-guide { margin-left: auto; cursor: pointer; padding: 1px 10px; border-radius: 11px;
     background: transparent; border: 1px solid var(--rig-accent, #E8A317);
     color: var(--rig-accent, #E8A317); font: 600 var(--rig-fs-dense)/1.6 var(--rig-font); }
@@ -3728,9 +3728,13 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 }
 
 /* LISERE : un filet de la couleur de la rubrique, pose au retrait de sa tete,
-   court le long de la tete et de tout ce qu'elle range. */
-.rig-arbre__ligne--groupe { position: relative; }
-.rig-arbre__ligne--groupe::before {
+   court le long de la tete et de tout ce qu'elle range (« aucune piece »
+   comprise : le filet ne s'interrompt pas sous un dossier vide). */
+.rig-arbre__ligne--groupe, .rig-arbre__vide--groupe {
+  position: relative;
+  --rig-arbre-teinte-sous: color-mix(in srgb, var(--rig-arbre-teinte) 45%, transparent);
+}
+.rig-arbre__ligne--groupe::before, .rig-arbre__vide--groupe::before {
   content: ""; position: absolute; top: 0; bottom: 0; width: 3px; pointer-events: none;
   left: calc(var(--rig-esp-2) + var(--rig-arbre-niveau-groupe, 0) * 14px - 5px);
   background: var(--rig-arbre-teinte);
@@ -3738,6 +3742,76 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-arbre__ligne--tete::before { top: 4px; border-radius: 2px 2px 0 0; }
 /* La tete de la rubrique : son icone prend la couleur du lisere. */
 .rig-arbre__ligne--tete .rig-arbre__icone { color: var(--rig-arbre-teinte); }
+
+/* SOUS-LISERES (19/11/2026) : dans la rubrique, chaque sous-dossier OUVERT
+   porte un filet fin de la meme teinte, adoucie, a SON retrait (5 px avant son
+   chevron, comme le lisere de la tete) -- du haut de sa ligne a sa derniere
+   piece. Une ligne les dessine tous dans un seul ::after, en trois couches :
+     1. le sous-lisere du dossier qui contient la ligne choisie, teinte pleine
+        (--rig-arbre-sous-actif = son rang ; absent = hors de la boite) ;
+     2. le sien, si elle est un sous-dossier ouvert (--sous-tete), a 4 px du
+        haut comme la tete : deux dossiers voisins ne se confondent pas ;
+     3. ceux des sous-dossiers qui la contiennent (--rig-arbre-sous), un filet
+        de 2 px tous les 14 px -- le pas du retrait.
+   Calcul : ArbreGedNoeud.tsx, styleLigne. */
+.rig-arbre__ligne--groupe::after, .rig-arbre__vide--groupe::after {
+  content: ""; position: absolute; top: 0; bottom: 0; pointer-events: none;
+  left: calc(var(--rig-esp-2) + (var(--rig-arbre-niveau-groupe, 0) + 1) * 14px - 5px);
+  width: calc((var(--rig-arbre-sous, 0) + 1) * 14px);
+  background-repeat: no-repeat;
+  background-image:
+    linear-gradient(var(--rig-arbre-teinte), var(--rig-arbre-teinte)),
+    linear-gradient(var(--rig-arbre-teinte-sous), var(--rig-arbre-teinte-sous)),
+    repeating-linear-gradient(to right, var(--rig-arbre-teinte-sous) 0 2px, transparent 2px 14px);
+  background-position:
+    calc(var(--rig-arbre-sous-actif, -1) * 14px) var(--rig-arbre-sous-actif-haut, 0px),
+    calc(var(--rig-arbre-sous, 0) * 14px) 4px,
+    0 0;
+  background-size:
+    2px calc(100% - var(--rig-arbre-sous-actif-haut, 0px)),
+    0 0,
+    calc(var(--rig-arbre-sous, 0) * 14px) 100%;
+}
+.rig-arbre__ligne--sous-tete::after {
+  background-size:
+    2px calc(100% - var(--rig-arbre-sous-actif-haut, 0px)),
+    2px calc(100% - 4px),
+    calc(var(--rig-arbre-sous, 0) * 14px) 100%;
+}
+/* En SOMBRE, la teinte adoucie a 45 % se fondait dans le fond gris : les
+   sous-liseres sortaient olive et ternes (vu en capture, 19/11/2026). 65 %
+   les garde plus pales que le lisere, mais lisibles. */
+[data-rig-theme="sombre"] .rig-arbre__ligne--groupe,
+[data-rig-theme="sombre"] .rig-arbre__vide--groupe {
+  --rig-arbre-teinte-sous: color-mix(in srgb, var(--rig-arbre-teinte) 65%, transparent);
+}
+/* Le sous-dossier ouvert : son icone prend la teinte adoucie de son filet. */
+.rig-arbre__ligne--sous-tete .rig-arbre__icone { color: var(--rig-arbre-teinte); opacity: .8; }
+
+/* TRAITS DE NIVEAU neutres (19/11/2026) : hors rubrique, chaque dossier ouvert
+   (« Dossier RCS ») porte un trait fin et gris a son retrait, du haut de sa
+   ligne a sa derniere piece -- la meme geometrie que le lisere, sans couleur.
+   Trois epaisseurs, trois rangs : lisere 3 px en couleur > sous-lisere 2 px en
+   couleur adoucie > trait neutre 1 px gris. Un element par ligne, en deux
+   couches : le sien (--propre, a 4 px du haut), puis un trait tous les 14 px
+   pour les dossiers qui la contiennent (--rig-arbre-neutres, a partir du
+   niveau 1). Calcul : ArbreGedNoeud.tsx, traitsNeutres. */
+.rig-arbre__ligne, .rig-arbre__vide { position: relative; }
+.rig-arbre__niveaux {
+  position: absolute; top: 0; bottom: 0; pointer-events: none;
+  left: calc(var(--rig-esp-2) + 14px - 5px);
+  width: calc((var(--rig-arbre-neutres, 0) + 1) * 14px);
+  --rig-arbre-trait: color-mix(in srgb, var(--rig-texte-3) 38%, transparent);
+  background-repeat: no-repeat;
+  background-image:
+    linear-gradient(var(--rig-arbre-trait), var(--rig-arbre-trait)),
+    repeating-linear-gradient(to right, var(--rig-arbre-trait) 0 1px, transparent 1px 14px);
+  background-position: calc(var(--rig-arbre-neutres, 0) * 14px) 4px, 0 0;
+  background-size: 0 0, calc(var(--rig-arbre-neutres, 0) * 14px) 100%;
+}
+.rig-arbre__niveaux--propre {
+  background-size: 1px calc(100% - 4px), calc(var(--rig-arbre-neutres, 0) * 14px) 100%;
+}
 
 /* L'entete de l'arbre : libelle et nombre de pieces, « + Nouveau », replier. */
 .rig-vged__arbre .rig-arbre__entete { grid-template-columns: minmax(0, 1fr) auto auto; }
@@ -3790,7 +3864,20 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   padding: 4px 8px; border: 0; border-radius: 999px; background: transparent; cursor: pointer;
   font: 12px var(--rig-font); color: var(--rig-texte-3); white-space: nowrap;
 }
-.rig-suivi__onglet b { font-weight: 600; font-family: var(--rig-font-mono); font-size: 11px; }
+/* Le nombre d'un onglet, en pastille : les etapes a corriger sur « Suivi »
+   (teinte d'alerte), les messages sur « Fil ». Absent quand il vaut zero. */
+.rig-suivi__onglet .rig-suivi__nombre {
+  display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
+  border-radius: 999px; background: var(--rig-fond-2); color: var(--rig-texte-2);
+  font: 600 10.5px/1 var(--rig-font-mono);
+}
+.rig-suivi__onglet .rig-suivi__nombre--alerte {
+  background: color-mix(in srgb, var(--rig-alerte) 16%, transparent); color: var(--rig-alerte);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rig-alerte) 45%, transparent);
+}
+/* Sur l'onglet choisi (fond or) : la pastille prend l'encre de l'or. */
+.rig-suivi__onglet--actif .rig-suivi__nombre,
+.rig-suivi__onglet--actif .rig-suivi__nombre--alerte { background: var(--rig-or-texte); color: var(--rig-or-clair); box-shadow: none; }
 .rig-suivi__onglet:hover { color: var(--rig-texte); }
 .rig-suivi__onglet--actif, .rig-suivi__onglet--actif:hover { background: var(--rig-or); color: var(--rig-or-texte); font-weight: 600; }
 .rig-suivi__panneau { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--rig-esp-3); }
@@ -3821,10 +3908,13 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-vged__suivi .rig-chrono { flex: 1 1 auto; max-height: none; border-left: 0; padding: 0; background: none; }
 .rig-vged__suivi .rig-chrono__entete { padding: 0 6px 4px; }
 .rig-vged__suivi .rig-chrono__date { width: auto; }
-.rig-chrono__libelle { flex: 1 1 auto; }
+/* Chaque piece sur DEUX lignes : le libelle, puis son origine -- cote a cote,
+   ils se coupaient tous deux (« Certificat en matiere de di… Editio… »). */
+.rig-chrono__texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.rig-chrono__libelle { max-width: 100%; }
 .rig-chrono__origine {
-  flex: 0 1 auto; max-width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: 10.5px; color: var(--rig-texte-3);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 10.5px; font-weight: 400; color: var(--rig-texte-3);
 }
 /* Le point d'une piece rangee dans une rubrique : la couleur de son lisere. */
 .rig-chrono__point--groupe { border-color: var(--rig-chrono-teinte); }
@@ -3937,14 +4027,165 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   background: var(--rig-surface); border-bottom: 0; padding: 2px 4px 6px 8px;
   font: 700 10px/1.3 var(--rig-font-mono); letter-spacing: .14em; color: var(--rig-accent);
 }
-.rig-vged__arbre .rig-arbre__pieces { font-weight: 600; }
-.rig-vged__arbre .rig-arbre__filtre { border-radius: 999px; }
-/* La ligne choisie : teinte or et filet or, comme dans le draft. */
-.rig-vged__arbre .rig-arbre__ligne--actif { background: color-mix(in srgb, var(--rig-or) 16%, transparent); }
+/* « · 44 PIECES » dans le surtitre, en petites capitales or comme « HISTORIQUE
+   DES PIECES · 44 » et « RESTE A FAIRE · 1 » : la regle de base le passait en
+   minuscules grises, le seul surtitre de la vue a deux styles. */
+.rig-vged__arbre .rig-arbre__pieces { font-weight: inherit; text-transform: inherit; letter-spacing: inherit; color: inherit; }
+/* Les deux outils de l'entete, « + Nouveau » et replier : meme hauteur, meme
+   bord, meme survol (le premier etait une puce grise, le second un carre). */
+.rig-vged__arbre .rig-arbre__nouveau,
+.rig-vged__arbre .rig-arbre__replier {
+  height: 24px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--rig-bord-faible); border-radius: 999px;
+  background: var(--rig-surface); color: var(--rig-texte-2);
+  font: 600 11px var(--rig-font); letter-spacing: 0; text-transform: none;
+}
+.rig-vged__arbre .rig-arbre__nouveau { padding: 0 10px; }
+.rig-vged__arbre .rig-arbre__replier { width: 24px; padding: 0; }
+.rig-vged__arbre .rig-arbre__nouveau:hover,
+.rig-vged__arbre .rig-arbre__replier:hover { color: var(--rig-texte); border-color: var(--rig-accent); background: var(--rig-fond-2); }
+/* Les deux FILTRES de la vue (l'arbre, les champs des donnees) : la meme
+   pilule. Celui des donnees etait une case grise carree de 36 px. */
+.rig-vged__arbre .rig-arbre__filtre,
+.rig-vged__donnees .rig-infos__filtre {
+  height: 28px; box-sizing: border-box; border-radius: 999px;
+  border: 1px solid var(--rig-bord-faible); background: var(--rig-fond);
+  font: 12px var(--rig-font); color: var(--rig-texte);
+}
+.rig-vged__arbre .rig-arbre__filtre { padding: 0 24px 0 12px; }
+.rig-vged__donnees .rig-infos__filtre { padding: 0 14px; margin-top: 2px; }
+.rig-vged__arbre .rig-arbre__filtre:focus,
+.rig-vged__donnees .rig-infos__filtre:focus { outline: 0; border-color: var(--rig-accent); background: var(--rig-surface); }
+/* CHEMIN : les parents de la ligne choisie. Le filet pale de la regle de base
+   tombait au bord gauche de la carte, loin de leur retrait : des traits isoles,
+   sans lien avec les liseres (vus en capture, 19/11/2026). Dans la vue, un
+   parent se lit a son texte plein et, hors rubrique, a son ICONE or -- l'or dit
+   « ou je suis » ; dans une rubrique, c'est le sous-lisere allume qui montre le
+   chemin, et l'icone garde la teinte de la rubrique. */
+.rig-vged__arbre .rig-arbre__ligne--chemin { box-shadow: none; }
+.rig-vged__arbre .rig-arbre__ligne--chemin .rig-arbre__texte { font-weight: 600; }
+.rig-vged__arbre .rig-arbre__ligne--chemin:not(.rig-arbre__ligne--groupe) .rig-arbre__icone { color: var(--rig-accent); }
+/* LA LIGNE CHOISIE : teinte or et filet or DROIT a gauche, comme dans le
+   draft. L'ombre interieure de la regle de base suivait l'arrondi de la ligne
+   et dessinait une parenthese « ( » (vu en capture agrandie, 19/11/2026) ; le
+   fond la suit aussi, d'ou le coin gauche carre. */
+.rig-vged__arbre .rig-arbre__ligne--actif {
+  box-shadow: none; border-radius: 0 var(--rig-radius-sm) var(--rig-radius-sm) 0;
+  background-image: linear-gradient(var(--rig-or), var(--rig-or));
+  background-repeat: no-repeat; background-size: 2px 100%;
+  background-color: color-mix(in srgb, var(--rig-or) 16%, transparent);
+}
 .rig-vged__arbre .rig-arbre__ligne--actif .rig-arbre__texte { font-weight: 700; }
 
+/* ---- Les entetes de cartes : un seul langage ----
+   Chaque carte (donnees, etapes, document) ouvre sur le meme surtitre que
+   l'arbre et le suivi : petites capitales or, sur UNE ligne (« … » si la
+   colonne est etroite) ; puis un titre de 15 px. Les donnees et le document
+   avaient un surtitre gris qui passait sur deux lignes. */
+.rig-vged .rig-guide__entete .rig-kicker,
+.rig-vged .rig-apercu__entete .rig-kicker {
+  font: 700 10px/1.3 var(--rig-font-mono); letter-spacing: .14em; color: var(--rig-accent);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rig-vged .rig-guide__titre,
+.rig-vged .rig-apercu__titre { margin: 3px 0 0; font: 600 15px/1.3 var(--rig-font); color: var(--rig-texte); }
+.rig-vged .rig-guide__entete { border-bottom-color: var(--rig-bord-faible); }
+.rig-vged .rig-guide__entete > div:first-child { flex: 1 1 140px; min-width: 0; }
+/* L'entete du DOCUMENT : le surtitre sur toute la largeur, puis le titre et
+   ses six outils sur la MEME rangee. En flex-wrap, les outils passaient seuls
+   sur une deuxieme rangee, sous un titre court : 36 px de hauteur perdue, et
+   une carte d'une autre forme que ses voisines. Le titre long passe sur deux
+   lignes au plus (texte entier en infobulle) ; une colonne tres etroite
+   replie les outils plutot que de les couper. */
+.rig-vged .rig-apercu__entete {
+  display: grid; grid-template-columns: minmax(80px, 1fr) minmax(0, max-content);
+  align-items: center; gap: 3px 10px;
+}
+.rig-vged .rig-apercu__entete > div:first-child { display: contents; }
+.rig-vged .rig-apercu__entete .rig-kicker { grid-column: 1 / -1; }
+.rig-vged .rig-apercu__entete .rig-apercu__titre {
+  grid-column: 1; margin: 0;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: normal;
+}
+.rig-vged .rig-apercu__entete .rig-apercu__actions { grid-column: 2; margin-left: 0; justify-content: flex-end; }
+.rig-vged__donnees .rig-guide__source {
+  margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Les OUTILS des cartes : 28 px, discrets, le meme survol partout. Les six
+   icones du document etaient des carres cercles de 34 px, « Actions ▾ »
+   passait sur deux lignes et la croix avait un troisieme dessin. */
+.rig-vged .rig-fiche__outils .rig-bouton,
+.rig-vged .rig-apercu__actions .rig-bouton,
+.rig-vged .rig-guide__entete .rig-guide__fermer {
+  height: 28px; min-width: 28px; box-sizing: border-box; margin: 0; padding: 0 10px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap;
+  border: 1px solid var(--rig-bord-faible); border-radius: 8px; box-shadow: none;
+  background: transparent; color: var(--rig-texte-2); font: 500 12px/1 var(--rig-font);
+}
+.rig-vged .rig-apercu__actions .rig-bouton--icone,
+.rig-vged .rig-guide__entete .rig-guide__fermer { width: 28px; padding: 0; font-size: 16px; }
+.rig-vged .rig-apercu__actions .rig-bouton--icone svg { width: 16px; height: 16px; }
+.rig-vged .rig-fiche__outils .rig-bouton:hover,
+.rig-vged .rig-apercu__actions .rig-bouton:hover,
+.rig-vged .rig-guide__entete .rig-guide__fermer:hover { background: var(--rig-fond-2); color: var(--rig-texte); border-color: var(--rig-bord); }
+/* Imprimer reste l'action premiere du document ; un outil enfonce (menu
+   Actions ouvert, Historique affiche) prend l'accent. */
+.rig-vged .rig-apercu__actions .rig-bouton--fort,
+.rig-vged .rig-fiche__outils .rig-bouton[aria-expanded="true"],
+.rig-vged .rig-fiche__outils .rig-bouton[aria-pressed="true"] {
+  color: var(--rig-accent); border-color: color-mix(in srgb, var(--rig-accent) 55%, transparent);
+}
+.rig-vged .rig-apercu__actions { gap: 4px; }
+.rig-vged .rig-fiche__outils { gap: 4px; flex: none; }
+
+/* LE DOCUMENT tient dans la largeur de sa carte : la feuille (100 %) se
+   mesurait sur une piste de grille a la taille de son contenu -- le Kbis
+   debordait a droite, coupe, sous une barre de defilement horizontale. */
+.rig-vged__apercu .rig-apercu__pages:not(.rig-apercu__pages--pdf) { grid-template-columns: minmax(0, 1fr); }
+
+/* LECTURE SEULE (verrou KBIS) : un encart doux ; le texte garde sa largeur et
+   le bouton passe dessous quand la colonne est etroite (il ecrasait le texte
+   sur cinq lignes). */
+.rig-vged__donnees .rig-verrou {
+  margin: 0; padding: 10px 12px; gap: 8px 10px;
+  border-radius: var(--rig-radius); background: var(--rig-fond-2);
+}
+.rig-vged__donnees .rig-verrou:not(.rig-verrou--edition):not(.rig-verrou--attente) { border-color: var(--rig-bord-faible); }
+.rig-vged__donnees .rig-verrou__texte { flex: 1 1 200px; font-size: 12.5px; line-height: 1.45; color: var(--rig-texte-2); }
+.rig-vged__donnees .rig-verrou .rig-bouton { height: 28px; padding: 0 12px; font-size: 12px; }
+
+/* LA FRISE DES ETAPES dans la vue : ses sept pas debordent d'une colonne
+   etroite. Les fleches restent collees aux deux bouts (elles defilaient avec
+   les pas : « › » sortait du champ), et le pas courant revient dans le champ
+   quand l'etape change (Etapes.tsx, montrerPasCourant). L'ombre pleine des
+   fleches masque les pas qui passent dessous jusque dans la marge de la frise.
+   (La barre grise a boutons sous la frise venait de la regle globale des
+   barres de defilement : voir « BARRES DE DEFILEMENT ».) */
+.rig-vged .rig-frise--haut > .rig-frise__fleche { position: sticky; z-index: 1; background: var(--rig-surface); }
+.rig-vged .rig-frise--haut > .rig-frise__fleche:first-child { left: 0; padding-right: 4px; box-shadow: -12px 0 0 var(--rig-surface); }
+.rig-vged .rig-frise--haut > .rig-frise__fleche:last-child { right: 0; padding-left: 4px; box-shadow: 12px 0 0 var(--rig-surface); }
+/* Le nom d'un pas (« Siege et etablissements ») et ses mentions (« 1 valeur(s)
+   refusee(s) ») : coupes net au bord du pas, ils finissent en « … » ; le nom
+   entier est en infobulle sur le pas (Etapes.tsx). */
+.rig-vged .rig-frise--h .rig-frise__libelle > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* L'ENTETE D'UNE ETAPE (« ETAPE 1 SUR 7 · Demande ») : sur le fond de sa carte
+   et dans le langage des titres de la vue. Le fond de page l'enfermait dans une
+   boite grise (noire en sombre), et son titre maigre (300) etait le seul de la vue. */
+.rig-vged .rig-saisie__entete { background: var(--rig-surface); border-bottom-color: var(--rig-bord-faible); }
+.rig-vged .rig-saisie__titre { font: 600 17px/1.3 var(--rig-font); }
+
+/* VUE VIDE des donnees : elle dit pourquoi, et propose la vue qui montre des champs. */
+.rig-infos__vide {
+  display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
+  margin: 18px 0 8px; padding: 22px 16px;
+  border: 1px dashed var(--rig-bord); border-radius: var(--rig-radius);
+  font-size: 12.5px; color: var(--rig-texte-3);
+}
+.rig-infos__vide b { color: var(--rig-texte-2); font-weight: 600; }
+
 /* ---- Arbre replie : le chemin en pilule sur le fond ---- */
-.rig-vged__chemin { border-bottom: 0; padding: 0 0 8px; }
+.rig-vged__chemin { border-bottom: 0; padding: 0 0 10px; }
 .rig-vged__chemin-etapes {
   padding: 3px 12px; border-radius: 999px;
   background: var(--rig-surface); border: 1px solid var(--rig-bord-faible);
@@ -3974,8 +4215,10 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-vged__suivi .rig-chrono__titre {
   font: 700 10px/1.3 var(--rig-font-mono); letter-spacing: .14em; color: var(--rig-accent);
 }
-/* La carte de l'historique s'arrete a ses lignes ; « tout voir » la fait defiler. */
-.rig-vged__suivi .rig-chrono { padding: 10px 8px; flex: 0 1 auto; }
+/* La carte de l'historique prend la hauteur restante de la colonne : toutes
+   les pieces, qui defilent dans la carte (le vide sous « tout voir » est parti). */
+.rig-vged__suivi .rig-chrono { padding: 10px 6px 6px; flex: 1 1 auto; min-height: 0; }
+.rig-vged__suivi .rig-chrono__liste { flex: 1 1 auto; }
 
 /* L'historique groupe par annee : l'annee en or, puis jour et mois. */
 .rig-chrono__annee {
@@ -3983,8 +4226,14 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 }
 .rig-chrono__annee:first-child { padding-top: 2px; }
 .rig-vged__suivi .rig-chrono__date { width: 40px; flex: none; }
-.rig-vged__suivi .rig-chrono__piece { height: 26px; }
-.rig-vged__suivi .rig-chrono__piece--actif { box-shadow: inset 3px 0 0 var(--rig-or); }
+.rig-vged__suivi .rig-chrono__piece { height: auto; min-height: 36px; padding: 4px 6px; }
+/* La piece ouverte : filet or DROIT. Le fond aussi suit l'arrondi de la ligne :
+   son coin gauche est donc carre, sinon le filet se courbe en « ( ». */
+.rig-vged__suivi .rig-chrono__piece--actif {
+  box-shadow: none; border-radius: 0 5px 5px 0;
+  background-image: linear-gradient(var(--rig-or), var(--rig-or));
+  background-repeat: no-repeat; background-size: 3px 100%;
+}
 
 /* Le champ du fil : une carte, comme le reste de la colonne. */
 .rig-fil__saisie { background: var(--rig-surface); border-color: var(--rig-bord-faible); border-radius: var(--rig-radius); }
