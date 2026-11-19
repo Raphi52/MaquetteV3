@@ -22,7 +22,8 @@
      anneau du rond de profil) ;
    - le menu de gauche est un rail ENCRE en sombre, « FER DEGRADE » en clair
      (degrade de gris fonces, ombre vers la page ; /draft conv-2000 du
-     2026-11-19 — il etait encre dans les deux modes) ;
+     2026-11-19 — il etait encre dans les deux modes), et en clair un PANNEAU
+     flottant aux coins arrondis plutot qu'une barre collee au bord ;
    - le ROND de la maquette 05 sert de repere : grand rond a gauche du
      chiffre des tuiles, reglage et profil en ronds a droite du titre,
      recherche en pilule ;
@@ -98,7 +99,10 @@
      redefinit (« Violet pilules » a un rail BLANC). --rig-rail-melange est la
      teinte vers laquelle une couleur de metier ecrite en texte est tiree.
      --rig-rail-ombre detache le rail de la page (le clair, 2026-11-19) ;
-     aucune ailleurs, ou le bord --rig-rail-bord suffit. */
+     aucune ailleurs, ou le bord --rig-rail-bord suffit. --rig-rail-marge et
+     --rig-rail-rayon font du rail un PANNEAU flottant aux coins arrondis (le
+     clair, meme jour) ; 0px ailleurs, ou il reste colle au bord. 0px et non 0 :
+     la marge entre dans un calc() de largeur de colonne. */
   --rig-rail-texte: #F1EDE4;
   --rig-rail-texte-2: #E8E2D2;
   --rig-rail-texte-3: #9C9583;
@@ -107,6 +111,8 @@
   --rig-rail-trait-faible: rgba(255, 240, 215, .08);
   --rig-rail-melange: #FFFFFF;
   --rig-rail-ombre: none;
+  --rig-rail-marge: 0px;
+  --rig-rail-rayon: 0px;
   /* Liseré et halo de la recherche de l'accueil (et de la frise des etapes) :
      l'or dans le clair et le sombre, l'accent du theme ailleurs. */
   --rig-or-halo: #B08D3F;
@@ -269,10 +275,15 @@ select option {
      avant : gris clair #D7DAE0 le matin meme, encre #15182A la veille) :
      degrade VERTICAL de gris neutres fonces, texte clair, et une OMBRE douce
      vers la page a la place du bord. Le tertiaire tient 4,6:1 sur l'arret le
-     plus clair (#43464E). La pastille or du verbe ouvert ne change pas. */
+     plus clair (#43464E). La pastille or du verbe ouvert ne change pas.
+     Le meme jour, un PANNEAU et non plus une barre rigide : decolle du haut,
+     du bas et de la gauche de la fenetre, coins arrondis, ombre portee tout
+     autour au lieu d'une ombre laterale. */
   --rig-rail: linear-gradient(180deg, #43464E, #26282D);
   --rig-rail-bord: transparent;
-  --rig-rail-ombre: 6px 0 16px rgba(20, 24, 35, .30);
+  --rig-rail-ombre: 0 6px 18px rgba(20, 24, 35, .24), 0 1px 3px rgba(20, 24, 35, .18);
+  --rig-rail-marge: 12px;
+  --rig-rail-rayon: 14px;
   --rig-rail-texte: #F2F3F5;
   --rig-rail-texte-2: #D9DCE2;
   --rig-rail-texte-3: #B0B5BF;
@@ -366,6 +377,8 @@ select option {
   --rig-rail-trait-faible: rgba(40, 35, 90, .07);
   --rig-rail-melange: #17182B;
   --rig-rail-ombre: none;
+  --rig-rail-marge: 0px;
+  --rig-rail-rayon: 0px;
   --rig-verbe-ouvrir: #5F4BEA;
   --rig-verbe-trouver: #3D7BF0;
   --rig-verbe-modifier: #8B5CF6;
@@ -444,6 +457,8 @@ select option {
   --rig-rail-trait-faible: rgba(255, 255, 255, .07);
   --rig-rail-melange: #FFFFFF;
   --rig-rail-ombre: none;
+  --rig-rail-marge: 0px;
+  --rig-rail-rayon: 0px;
   --rig-verbe-ouvrir: #F59E0B;
   --rig-verbe-trouver: #71717A;
   --rig-verbe-modifier: #E8A50C;
@@ -522,6 +537,8 @@ select option {
   --rig-rail-trait-faible: rgba(230, 245, 240, .08);
   --rig-rail-melange: #FFFFFF;
   --rig-rail-ombre: none;
+  --rig-rail-marge: 0px;
+  --rig-rail-rayon: 0px;
   --rig-verbe-ouvrir: #E8825A;
   --rig-verbe-trouver: #4CA7A0;
   --rig-verbe-modifier: #E3A663;

@@ -10,7 +10,9 @@
 /* ---------- Ossature : menu a gauche, plan de travail a droite ---------- */
 .rig-accueil {
   display: grid;
-  grid-template-columns: 232px 1fr;
+  /* La colonne s'elargit de la marge du panneau (--rig-rail-marge, 0px hors
+     du clair) : le menu garde ses 232 px, ses libelles ne se replient pas. */
+  grid-template-columns: calc(232px + var(--rig-rail-marge)) 1fr;
   /* La page ne defile plus en entier : c'est le plan de travail qui defile.
      Sans cela, la barre de defilement court sur toute la fenetre, en dehors
      du contenu, et le fond de page apparait en bandes autour du cadre. */
@@ -21,7 +23,7 @@
 
 /* Menu replie : la colonne se resserre sur un rail. Le menu n'est jamais
    masque, seule sa largeur change — le plan de travail gagne la place. */
-.rig-accueil--menu-reduit { grid-template-columns: 44px 1fr; }
+.rig-accueil--menu-reduit { grid-template-columns: calc(44px + var(--rig-rail-marge)) 1fr; }
 
 /* ---------- Menu de gauche, groupes depliables ---------- */
 .rig-menu {
@@ -39,6 +41,11 @@
      `none` dans les autres themes. Le plan de travail n'a pas de fond : rien
      ne la recouvre dans sa marge gauche. */
   box-shadow: var(--rig-rail-ombre);
+  /* En clair, un PANNEAU flottant et non une barre rigide (2026-11-19) :
+     decolle du haut, du bas et de la gauche de la fenetre, coins arrondis.
+     A droite, la marge du plan de travail fait deja l'ecart. 0px ailleurs. */
+  margin: var(--rig-rail-marge) 0 var(--rig-rail-marge) var(--rig-rail-marge);
+  border-radius: var(--rig-rail-rayon);
   /* 2026-11-18 : les valeurs viennent des jetons --rig-rail-* du theme
      (rig-charte.css) et non plus d'ici. */
   --rig-texte: var(--rig-rail-texte);
@@ -912,8 +919,8 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
      2026-09-15, fenetre 1100x700 en bureau cache), il devenait un bandeau
      de 30vh a moitie vide avec son propre defilement, et repoussait les
      cartes sous la ligne de flottaison. */
-  .rig-accueil { grid-template-columns: 196px 1fr; }
-  .rig-accueil--menu-reduit { grid-template-columns: 44px 1fr; }
+  .rig-accueil { grid-template-columns: calc(196px + var(--rig-rail-marge)) 1fr; }
+  .rig-accueil--menu-reduit { grid-template-columns: calc(44px + var(--rig-rail-marge)) 1fr; }
 
   .rig-plan { padding: var(--rig-esp-3) var(--rig-esp-3) var(--rig-esp-5); }
 
@@ -961,6 +968,8 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   .rig-menu {
     border-right: 0;
     border-bottom: 1px solid var(--rig-bord);
+    /* Bandeau au-dessus du plan : le panneau du clair se decolle aussi a droite. */
+    margin: var(--rig-rail-marge);
     max-height: 26vh;
     padding: var(--rig-esp-3) var(--rig-esp-3);
   }

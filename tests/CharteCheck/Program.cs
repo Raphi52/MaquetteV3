@@ -78,10 +78,13 @@ foreach (var (nom, texte) in feuilles)
     // de Home.razor, deplace tel quel) et son balisage web/src/plan/.
     var home = File.ReadAllText(Path.Combine(racine, "Pont", "PlanTravail.cs")) + "\n" + string.Join("\n", Directory.GetFiles(Path.Combine(racine, "web/src/plan"), "*.tsx").Append(Path.Combine(racine, "web/src/composants/Application.tsx")).Where(f => !f.EndsWith(".test.tsx")).Select(File.ReadAllText));
 
-    Exiger(Regex.IsMatch(accueil, @"\.rig-accueil--menu-reduit[^{}]*\{[^{}]*grid-template-columns:\s*(\d+)px"),
+    // Depuis le panneau flottant du clair (19/11/2026), la colonne s'ecrit
+    // calc(<largeur du menu> + var(--rig-rail-marge)) : la largeur lue est celle du menu.
+    const string colonneReduite = @"\.rig-accueil--menu-reduit[^{}]*\{[^{}]*grid-template-columns:\s*(?:calc\()?(\d+)px";
+    Exiger(Regex.IsMatch(accueil, colonneReduite),
         "rig-accueil.css reduit la colonne du menu via .rig-accueil--menu-reduit");
 
-    var m = Regex.Match(accueil, @"\.rig-accueil--menu-reduit[^{}]*\{[^{}]*grid-template-columns:\s*(\d+)px");
+    var m = Regex.Match(accueil, colonneReduite);
     Exiger(m.Success && int.Parse(m.Groups[1].Value) is > 0 and < 232,
         "la colonne reduite est plus etroite que 232px mais reste visible (> 0)");
 
@@ -325,6 +328,27 @@ foreach (var (nom, texte) in feuilles)
             $"« clair » : le rail se detache par une ombre, sans bord ({ombre ?? "ombre absente"})");
         Exiger(menu.Contains("box-shadow: var(--rig-rail-ombre)"),
             ".rig-menu porte l'ombre du theme (--rig-rail-ombre)");
+
+        // Un PANNEAU flottant, pas une barre collee au bord (demande du 19/11/2026,
+        // conv-2000) : decolle de la fenetre par --rig-rail-marge, coins arrondis
+        // par --rig-rail-rayon. Les colonnes s'elargissent de la marge, pour que le
+        // menu garde sa largeur (232 px deploye, 44 px reduit) et que ses libelles
+        // ne se replient pas. Les autres themes posent 0px : rien n'y bouge.
+        int Pixels(string? valeur) => valeur is not null && Regex.Match(valeur, @"^(\d+)px$") is { Success: true } p
+            ? int.Parse(p.Groups[1].Value) : 0;
+        var marge = Pixels(Valeur("--rig-rail-marge"));
+        var rayon = Pixels(Valeur("--rig-rail-rayon"));
+        Exiger(marge is >= 6 and <= 24 && rayon is >= 8 and <= 24,
+            $"« clair » : le menu est un panneau decolle ({marge}px) aux coins arrondis ({rayon}px)");
+        Exiger(menu.Contains("border-radius: var(--rig-rail-rayon)")
+               && Regex.IsMatch(menu, @"margin:\s*var\(--rig-rail-marge\)\s+0\s+var\(--rig-rail-marge\)\s+var\(--rig-rail-marge\)"),
+            ".rig-menu lit la marge et l'arrondi du theme (haut, bas et gauche decolles)");
+        foreach (var colonne in new[] { "232px", "44px", "196px" })
+            Exiger(accueil.Contains($"grid-template-columns: calc({colonne} + var(--rig-rail-marge)) 1fr"),
+                $"la colonne du menu ({colonne}) s'elargit de la marge du panneau");
+        foreach (var code in themes.Keys.Where(c => c is not ("clair" or "sombre")))
+            Exiger(Regex.IsMatch(BlocDuTheme(code), @"--rig-rail-marge:\s*0px;") && Regex.IsMatch(BlocDuTheme(code), @"--rig-rail-rayon:\s*0px;"),
+                $"le theme « {code} » garde son menu colle au bord (marge et arrondi a 0px)");
     }
 
     // La bascule a disparu au profit d'une liste nourrie par ThemesRig.
