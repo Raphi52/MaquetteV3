@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { Accueil } from './Accueil'
 import { morceaux } from '../test/morceaux'
-import { ligne, tuile, vuePlan } from '../test/accueil'
+import { ligne, panneauTuiles, tuile, vuePlan } from '../test/accueil'
 import type { GesteIle, VuePlanAccueil } from '../accueil/types'
 
 afterEach(cleanup)
@@ -111,17 +111,14 @@ describe('Accueil : l\'entete', () => {
     expect(phrase.textContent).toBe('Aucun dossier hors delai legal·1 arrivee a traiter\n')
   })
 
-  it('le panneau des tuiles : dispositions, bascules, reinitialisation ; le voile le ferme', () => {
+  it('le panneau des tuiles : theme, dispositions, bascules, reinitialisation ; le voile le ferme', () => {
     const vue = vuePlan()
     vue.entete.panneauOuvert = true
-    vue.entete.panneau = {
-      dispositions: [{ id: 'lateral', titre: 'Latéral', aide: 'A traiter a droite', actif: true }, { id: 'metiers', titre: 'Par métier', aide: 'un widget', actif: false }],
-      tuiles: [{ id: 'alertes', libelle: 'A traiter', titre: null, actif: true }, { id: 'activite', libelle: 'Activite', titre: null, actif: false }],
-    }
+    vue.entete.panneau = panneauTuiles()
     const { container, gestes } = rendre(vue)
     expect(container.querySelector('.rig-entete__action')!.className).toBe('rig-entete__action rig-entete__action--ouvert')
     const panneau = container.querySelector('.rig-tuiles-panneau')!
-    expect(morceaux(panneau)).toEqual(['<div>', ' ', '<span>', ' ', '<div>', '<button>', '<button>'])
+    expect(morceaux(panneau)).toEqual(['<label>', '<div>', ' ', '<span>', ' ', '<div>', '<button>', '<button>'])
     expect([...panneau.querySelectorAll('.rig-disposition')].map((b) => b.className)).toEqual(['rig-disposition rig-disposition--actif', 'rig-disposition '])
     expect([...panneau.querySelectorAll('.rig-bascule')].map((b) => b.className)).toEqual(['rig-bascule rig-bascule--actif', 'rig-bascule '])
     fireEvent.click(panneau.querySelector('.rig-tuiles-panneau__reset')!)
@@ -131,10 +128,46 @@ describe('Accueil : l\'entete', () => {
     expect(gestes()).toEqual([['reinitialiser', null], ['disposition', 'metiers'], ['tuile', 'activite'], ['fermerPanneauTuiles', null]])
   })
 
+  // Le theme etait dans un panneau de la barre du haut : depuis le 19/11/2026
+  // (la barre ne porte plus que les onglets), il est en tete de ces reglages.
+  it('reglages de l\'accueil : la liste des themes ; le choix part a la session', () => {
+    const vue = vuePlan()
+    vue.entete.panneauOuvert = true
+    vue.entete.panneau = panneauTuiles({ theme: 'clair' })
+    const { container, gestes } = rendre(vue)
+    const champ = container.querySelector('.rig-tuiles-panneau')!.firstElementChild!
+    expect(champ.className).toBe('rig-saisie-champ rig-tuiles-panneau__theme')
+    expect(champ.querySelector('.rig-saisie-champ__libelle')!.textContent).toBe('Theme')
+    const liste = champ.querySelector<HTMLSelectElement>('select#rig-choix-theme')!
+    expect(liste.className).toBe('rig-saisie-champ__saisie')
+    expect([...liste.options].map((o) => [o.value, o.textContent])).toEqual([['clair', 'Clair'], ['sombre', 'Sombre']])
+    expect(liste.value).toBe('clair')
+    expect(container.textContent).not.toContain('Mode sombre')
+    fireEvent.change(liste, { target: { value: 'sombre' } })
+    expect(gestes()).toEqual([['theme', 'sombre']])
+  })
+
+  it('la liste des themes garde le choix de l\'utilisateur jusqu\'a la reponse, puis suit la session', () => {
+    const avec = (theme: string) => {
+      const vue = vuePlan()
+      vue.entete.panneauOuvert = true
+      vue.entete.panneau = panneauTuiles({ theme })
+      return vue
+    }
+    const { container, rerender, geste } = rendre(avec('clair'))
+    const liste = container.querySelector<HTMLSelectElement>('#rig-choix-theme')!
+    fireEvent.change(liste, { target: { value: 'sombre' } })
+    rerender(<Accueil vue={avec('clair')} geste={geste} />)
+    expect(liste.value).toBe('sombre')
+    rerender(<Accueil vue={avec('sombre')} geste={geste} />)
+    rerender(<Accueil vue={avec('clair')} geste={geste} />)
+    expect(liste.value).toBe('clair')
+  })
+
   it('le rond de profil est A DROITE DU TITRE quand l\'accueil est visible ; il change le login', () => {
     const vue = vuePlan()
     vue.entete.profil = {
-      dansLaBarre: false, ouvert: true, initiales: 'RV', titre: 'rvilain · Greffier (RCS + JUD) : changer de login', login: 'rvilain',
+      ouvert: true, initiales: 'RV', titre: 'rvilain · Greffier (RCS + JUD) : changer de login', login: 'rvilain',
       comptes: [
         { login: 'rvilain', initiales: 'RV', profil: 'Greffier', domaines: 'RCS + JUD', actif: true },
         { login: 'pjudic', initiales: 'PJ', profil: 'Redacteur judiciaire', domaines: 'JUD', actif: false },
@@ -142,7 +175,7 @@ describe('Accueil : l\'entete', () => {
     }
     const { container, gestes } = rendre(vue)
     const outils = container.querySelector('.rig-entete__outils')!
-    expect(outils.lastElementChild!.className).toBe('rig-profil-ancre ')
+    expect(outils.lastElementChild!.className).toBe('rig-profil-ancre')
     const rond = outils.querySelector('.rig-profil')!
     expect(rond.className).toBe('rig-profil rig-profil--ouvert')
     expect(rond.getAttribute('aria-label')).toBe('Profil rvilain : changer de login')

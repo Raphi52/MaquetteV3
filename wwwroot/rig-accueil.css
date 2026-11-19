@@ -1012,14 +1012,15 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 }
 
 /* ============================================================
-   BARRE DE TITRE
-   Pleine largeur : toute la bande deplace la fenetre. L'ancienne
-   entete ne couvrait que la colonne de droite, donc le deplacement
-   ne repondait que sur une petite zone.
+   BARRE DE TITRE, « comme Brave » (19/11/2026)
+   Les onglets des vues ouvertes, puis les boutons de la fenetre : rien
+   d'autre. Pleine largeur : tout appui HORS d'un onglet ou d'un bouton
+   deplace la fenetre. Son fond est le « cadre » (teinte du texte a 7 %) ;
+   l'onglet actif prend le fond de la page et se fond dans l'ecran ouvert.
    ============================================================ */
 .rig-barre {
-  display: flex; align-items: center; gap: var(--rig-esp-3);
-  padding: 0 0 0 var(--rig-esp-3);
+  display: flex; align-items: center; gap: 0;
+  padding: 0 0 0 8px;
   height: 34px;
   border-bottom: 1px solid var(--rig-bord);
   user-select: none;
@@ -1033,28 +1034,11 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
      contexte d'empilement, donc son panneau de reglages descendrait DERRIERE
      l'ecran ouvert avec une valeur plus basse. */
   z-index: 90;
-  background: var(--rig-fond);
+  background: color-mix(in srgb, var(--rig-fond) 93%, var(--rig-texte));
 }
-.rig-barre__marque {
-  font: 600 var(--rig-fs-dense)/1 var(--rig-font);
-  letter-spacing: var(--rig-ls-kicker); text-transform: uppercase;
-  color: var(--rig-texte-2);
-}
-.rig-barre__marque b { color: var(--rig-texte); }
-.rig-barre__version { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); }
-.rig-barre__droite {
-  display: flex; align-items: center; gap: 0;
-  margin-left: auto; align-self: stretch;
-}
-.rig-barre__action {
-  width: 30px; height: 26px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: transparent; border: 0; border-radius: 6px;
-  color: var(--rig-texte-3); font-size: 14px; cursor: pointer;
-  transition: background .12s ease, color .12s ease;
-}
-.rig-barre__action:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
-.rig-barre__action--ouvert { color: var(--rig-focus); background: var(--rig-fond-2); }
+/* Les boutons de la fenetre poussent a droite ; leur marge gauche reste une
+   zone de deplacement meme quand les onglets remplissent la barre. */
+.rig-barre .rig-fenetre { margin-left: auto; padding-left: 40px; align-self: stretch; }
 
 /* ---------- Validation hierarchique des modifications ---------- */
 /* Bouton texte de la barre : contrairement aux boutons d'icone, il doit
@@ -1083,11 +1067,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-validation__etat--refus { color: #F04438; }
 .rig-validation__actions { display: flex; gap: var(--rig-esp-2); margin-top: var(--rig-esp-2); }
 .rig-validation__vide { font-size: 12px; color: var(--rig-texte-3); }
-
-/* Le panneau des reglages generaux s'ancre sous la barre. */
-.rig-barre .rig-tuiles-panneau { top: calc(100% + 10px); }
-/* Ancre du panneau : sans parent positionne, il se placerait sur la fenetre entiere. */
-.rig-barre__reglages { position: relative; display: inline-flex; align-items: center; }
 
 /* L'entete du plan ne porte plus les commandes : elle ne fait plus
    que presenter la journee. */
@@ -1334,15 +1313,15 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   border-color: var(--rig-bord);
 }
 .rig-entete__outils .rig-tuiles-panneau { top: calc(100% + 8px); }
+/* Le theme, en tete des reglages de l'accueil (il etait dans la barre du haut). */
+.rig-tuiles-panneau__theme { margin-bottom: var(--rig-esp-3); }
 
 /* ---------- Rond de profil (« Commandes rondes », 18/11/2026) ----------
    Les initiales du login dans un rond bleu cercle d'or, a droite du reglage
    (le rond « Claire Martin » de la maquette 05). Il remplace la liste
-   deroulante du bandeau : un clic deroule les comptes. Un ecran ouvert
-   recouvre le titre : le meme rond est alors rendu, plus petit, dans le
-   bandeau (--barre), pour que le login reste atteignable partout. */
+   deroulante du bandeau : un clic deroule les comptes. Il n'est que la : la
+   barre du haut ne porte plus que les onglets (19/11/2026). */
 .rig-profil-ancre { position: relative; display: inline-flex; align-items: center; }
-.rig-profil-ancre--barre { margin-right: var(--rig-esp-2); }
 .rig-profil {
   width: 36px; height: 36px; border-radius: 50%;
   flex: 0 0 auto; padding: 0; border: 0; cursor: pointer;
@@ -1355,7 +1334,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-profil:hover,
 .rig-profil--ouvert { box-shadow: 0 0 0 2px var(--rig-or), 0 0 0 5px color-mix(in srgb, var(--rig-or) 30%, transparent); }
 .rig-profil:focus-visible { outline: 2px solid var(--rig-focus); outline-offset: 4px; }
-.rig-profil-ancre--barre .rig-profil { width: 24px; height: 24px; font-size: 9px; }
 
 /* Le panneau des comptes : une ligne par login, le login connecte marque d'or. */
 .rig-profil-panneau { min-width: 300px; display: flex; flex-direction: column; gap: 2px; }
@@ -2854,49 +2832,65 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-activite__texte b { color: var(--rig-texte); }
 .rig-activite__quand { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); white-space: nowrap; }
 
-/* ============ BARRE D ONGLETS DE VUES ============
-   Un onglet par vue ouverte, comme dans un navigateur. Distincte de
-   .rig-onglet, qui sert aux onglets INTERNES d une procedure. */
+/* ============ ONGLETS DE VUES (dans la barre du haut) ============
+   Un onglet par vue ouverte, comme dans Brave : ils vivent DANS la barre
+   de titre (19/11/2026), qui garde donc sa hauteur -- --rig-bandeau-h ne
+   bouge plus quand un onglet s'ouvre. Distincts de .rig-onglet, qui sert
+   aux onglets INTERNES d une procedure. */
 .rig-vonglets {
-  display: flex; align-items: stretch; gap: 2px;
-  padding: 4px 8px 0 8px;
-  background: var(--rig-fond-2);
-  border-bottom: 1px solid var(--rig-bord);
-  overflow-x: auto; overflow-y: hidden;
-  box-sizing: border-box; height: var(--rig-vonglets-h); flex: 0 0 auto;
+  display: flex; align-items: flex-end; gap: 0;
+  align-self: stretch; flex: 0 1 auto; min-width: 0;
 }
-/* Les ecrans plein cadre (.rig-proc, vue dossier) sont en position fixe,
-   calés sous --rig-bandeau-h : ils RECOUVRAIENT la barre d onglets. Quand
-   elle existe, ils commencent donc sous elle. */
-:root { --rig-vonglets-h: 34px; }
-:root:has(#rig-vonglets) { --rig-bandeau-h: calc(39px + var(--rig-vonglets-h)); }
+/* Comme un navigateur, les onglets RETRECISSENT quand la barre se remplit
+   au lieu de defiler. Largeur en `width` et non en flex-basis : la barre
+   d'onglets se dimensionne sur la largeur de ses onglets, qui ignore la
+   flex-basis -- avec `flex: 0 1 220px`, chaque onglet tombait a la largeur
+   de son titre et le coupait (capture du 19/11/2026). */
 .rig-vonglet {
+  position: relative;
   display: flex; align-items: center; gap: 6px;
-  max-width: 240px; padding: 4px 6px 4px 10px;
-  border: 1px solid var(--rig-bord); border-bottom: none;
-  border-radius: 6px 6px 0 0;
-  background: var(--rig-fond); color: var(--rig-texte-2);
+  width: 220px; flex: 0 1 auto; min-width: 0; height: 28px;
+  padding: 0 4px 0 12px; box-sizing: border-box; overflow: hidden;
+  border: 1px solid transparent; border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: transparent; color: var(--rig-texte-2);
   font-size: var(--rig-fs-dense); cursor: pointer;
   user-select: none; touch-action: none; white-space: nowrap;
 }
-.rig-vonglet:hover { color: var(--rig-texte); }
-.rig-vonglet--actif {
-  background: var(--rig-fond-3, var(--rig-fond-2));
+.rig-vonglet:hover { color: var(--rig-texte); background: color-mix(in srgb, var(--rig-fond) 55%, transparent); }
+/* Filet entre deux onglets inactifs, efface autour de l'onglet actif. */
+.rig-vonglet:not(.rig-vonglet--actif) + .rig-vonglet:not(.rig-vonglet--actif)::before {
+  content: ''; position: absolute; left: 0; top: 7px; bottom: 7px; width: 1px;
+  background: var(--rig-bord);
+}
+/* L'onglet actif a le fond de la page et descend d'1 px sur la bordure de
+   la barre : il ne fait qu'un avec l'ecran ouvert dessous. */
+.rig-vonglet--actif,
+.rig-vonglet--actif:hover {
+  background: var(--rig-fond);
+  border-color: var(--rig-bord);
   color: var(--rig-texte);
-  box-shadow: inset 0 2px 0 0 var(--rig-accent, #D9A429);
+  margin-bottom: -1px; height: 29px;
 }
 .rig-vonglet--sorti { color: var(--rig-texte-3); opacity: .7; font-style: italic; }
 .rig-vonglet--glisse { opacity: .95; }
 /* Pendant le glisser l onglet suit le pointeur (transform pose par le JS) :
    il passe au-dessus des autres et ne s anime pas, sinon il trainerait. */
 .rig-vonglet--suit { position: relative; z-index: 2; transition: none; box-shadow: 0 2px 6px rgba(0,0,0,.35); cursor: grabbing; }
-.rig-vonglet__titre { overflow: hidden; text-overflow: ellipsis; }
-.rig-vonglet__sorti { font-size: 10px; color: var(--rig-texte-3); }
+.rig-vonglet__titre { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rig-vonglet__sorti { flex: none; font-size: 10px; color: var(--rig-texte-3); }
+/* La croix : toujours sur l'onglet actif, au survol sur les autres. */
 .rig-vonglet__fermer {
+  flex: none; width: 20px; height: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
   border: none; background: transparent; color: var(--rig-texte-3);
-  cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 4px; border-radius: 4px;
+  cursor: pointer; font-size: 14px; line-height: 1; padding: 0; border-radius: 50%;
+  opacity: 0; transition: opacity .12s ease, background .12s ease;
 }
-.rig-vonglet__fermer:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
+.rig-vonglet:hover .rig-vonglet__fermer,
+.rig-vonglet--actif .rig-vonglet__fermer,
+.rig-vonglet__fermer:focus-visible { opacity: 1; }
+.rig-vonglet__fermer:hover { background: color-mix(in srgb, var(--rig-texte) 12%, transparent); color: var(--rig-texte); }
 
 /* Etoile de favori dans le coin haut-droit de chaque vue. Toujours visible
    (pas d'apparition au survol comme dans le menu) : dans une vue, c'est une

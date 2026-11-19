@@ -84,26 +84,31 @@ File.WriteAllText(fichier, "{ ceci n'est pas du json");
 Exiger(AccueilEtat.Charger().Theme == "clair",
     "un etat illisible retombe sur le theme CLAIR par defaut");
 
-// ---------- Le choix fait dans la BARRE (React) : l'aller-retour complet ----------
-// 19/11/2026, lot 1 du passage a React : la liste des themes est rendue par
-// web/src/composants/BarreRig.tsx ; son choix remonte a la session de l'accueil
-// (Pont/Accueil.cs, geste « theme ») qui l'ecrit par AccueilEtat. On joue ce
-// geste comme React, puis on rouvre une fenetre comme au redemarrage.
+// ---------- Le choix fait dans les REGLAGES DE L'ACCUEIL (React) : l'aller-retour complet ----------
+// La liste des themes est rendue par web/src/accueil/Entete.tsx, en tete du
+// panneau des reglages de l'accueil (elle etait dans la barre du haut, qui ne
+// porte plus que les onglets depuis le 19/11/2026) ; son choix remonte a la
+// session de l'accueil (Pont/Accueil.cs, geste « theme ») qui l'ecrit par
+// AccueilEtat. On joue ce geste comme React, puis on rouvre une fenetre comme
+// au redemarrage.
 static JsonElement Valeur(string json) => JsonDocument.Parse(json).RootElement.Clone();
 var contexte = new ContexteAccueil(false, null, RechercheTrouvee.Rien);
 File.Delete(fichier);
 var session = new SessionAccueil(AccueilEtat.Charger());
-Exiger(session.Vue(contexte).Barre.Themes.Select(t => t.Code).SequenceEqual(ThemesRig.Tous.Select(t => t.Code)),
-    "la liste de la barre propose les themes de ThemesRig, dans leur ordre");
+Exiger(session.Vue(contexte).Accueil.Entete.Panneau is null,
+    "panneau des reglages ferme : la vue ne porte pas la liste des themes");
+session.Agir("panneauTuiles", Valeur("null"));
+Exiger(session.Vue(contexte).Accueil.Entete.Panneau?.Themes.Select(t => t.Code).SequenceEqual(ThemesRig.Tous.Select(t => t.Code)) == true,
+    "la liste des reglages de l'accueil propose les themes de ThemesRig, dans leur ordre");
 Exiger(session.Theme == "clair" && session.Vue(contexte).Theme == "clair",
     "une premiere fenetre s'ouvre en CLAIR, et sa vue le dit");
 var demande = session.Agir("theme", Valeur("\"violet\""));
 Exiger(demande is { Quoi: DemandeAccueil.ThemeChange, Valeur: "violet" },
     "choisir un theme demande a la fenetre de repeindre son fond (FenetreInterop.AppliquerFond)");
 var vueTheme = session.Vue(contexte);
-Exiger(vueTheme.Theme == "violet" && vueTheme.Barre.Theme == "violet",
-    "la vue rendue a React porte le theme choisi (liste de la barre et data-rig-theme)");
-Exiger(AccueilEtat.Charger().Theme == "violet", "le theme choisi dans la barre est ecrit dans accueil.json");
+Exiger(vueTheme.Theme == "violet" && vueTheme.Accueil.Entete.Panneau?.Theme == "violet",
+    "la vue rendue a React porte le theme choisi (liste des reglages et data-rig-theme)");
+Exiger(AccueilEtat.Charger().Theme == "violet", "le theme choisi dans les reglages est ecrit dans accueil.json");
 Exiger(new SessionAccueil(AccueilEtat.Charger()).Theme == "violet",
     "une nouvelle fenetre (redemarrage) rouvre dans le theme choisi");
 session.Agir("theme", Valeur("\"fuchsia\""));

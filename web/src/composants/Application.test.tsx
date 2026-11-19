@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { Application, type GestePlanIle } from './Application'
 import { morceaux } from '../test/morceaux'
-import { vueBarre, vuePlan } from '../test/accueil'
+import { vuePlan } from '../test/accueil'
 import { dossier, proc as procPlan, vueApplication } from '../test/plan'
 import type { GesteIle } from '../accueil/types'
 import type { VueApplication } from '../plan/types'
@@ -34,15 +34,16 @@ describe('Application : la racine de la page', () => {
     expect(document.documentElement.getAttribute('data-rig-theme')).toBe('sombre')
   })
 
-  it('l\'accueil (barre et plan d\'accueil), puis les onglets, l\'ecran et l\'affaire, dans l\'ordre de Home.razor', () => {
+  it('la barre (ses onglets DEDANS, « comme Brave »), puis l\'accueil, l\'ecran et l\'affaire', () => {
     const vue = vueApplication({
-      barre: vueBarre(), accueil: vuePlan(),
+      barre: true, accueil: vuePlan(),
       onglets: [{ code: 'PROC_FACTURE', libelle: 'Factures', actif: true, detache: false, glisse: false }],
       proc: proc(), dossier: dossier(),
     })
     const { container } = rendre(vue)
     const enfants = [...container.firstElementChild!.children].map((e) => e.tagName.toLowerCase() + '.' + e.className.split(' ')[0])
-    expect(enfants).toEqual(['div.rig-filet-marque', 'header.rig-barre', 'div.rig-vonglets', 'div.rig-accueil', 'div.rig-proc', 'div.rig-vged'])
+    expect(enfants).toEqual(['div.rig-filet-marque', 'header.rig-barre', 'div.rig-accueil', 'div.rig-proc', 'div.rig-vged'])
+    expect(container.querySelector('header.rig-barre > #rig-vonglets')).not.toBeNull()
   })
 
   it('dans la fenetre d\'un onglet sorti : ni barre ni accueil, l\'ecran seul et sans bouton Fermer', () => {
@@ -83,7 +84,7 @@ describe('Application : les gestes du plan de travail', () => {
   })
 
   it('les gestes de l\'accueil passent par le rappel « geste », sans numero', () => {
-    const { container, geste, plan } = rendre(vueApplication({ barre: vueBarre(), accueil: vuePlan() }))
+    const { container, geste, plan } = rendre(vueApplication({ barre: true, accueil: vuePlan() }))
     fireEvent.click(container.querySelector('.rig-menu__replier')!)
     expect(geste).toHaveBeenCalledWith({ nom: 'menu', valeur: null })
     expect(plan).not.toHaveBeenCalled()
@@ -97,7 +98,7 @@ describe('Application : la barre d\'onglets', () => {
   ]
 
   it('un onglet : titre, marque « sorti », croix ; memes classes et titres que Razor', () => {
-    const { container } = rendre(vueApplication({ onglets }))
+    const { container } = rendre(vueApplication({ barre: true, onglets }))
     const barre = container.querySelector('#rig-vonglets')!
     expect(barre.className).toBe('rig-vonglets')
     const [a, b] = barre.querySelectorAll('.rig-vonglet')
@@ -113,7 +114,7 @@ describe('Application : la barre d\'onglets', () => {
   })
 
   it('appui, glisser et lacher partent au C# avec la mesure de la barre ; la croix ne declenche pas l\'onglet', () => {
-    const { container, gestes } = rendre(vueApplication({ onglets }))
+    const { container, gestes } = rendre(vueApplication({ barre: true, onglets }))
     const a = container.querySelector('[data-rig-onglet="PROC_FACTURE"]')!
     fireEvent.pointerDown(a, { clientX: 30, clientY: 12 })
     fireEvent.pointerMove(a, { clientX: 31, clientY: 12, buttons: 0 })

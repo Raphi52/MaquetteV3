@@ -1,8 +1,7 @@
 // Le rond de profil (« Commandes rondes », 18/11/2026) : les initiales du
 // login, cercle d'or ; un clic deroule les comptes, un compte choisi change de
-// login. Sur l'accueil il est a droite du titre (Entete.tsx) ; un ecran ouvert
-// recouvre ce titre, il est alors rendu dans la barre du haut (BarreRig.tsx) :
-// un seul des deux existe a la fois, la vue ne remplit que l'un des deux.
+// login. Il est a droite du titre de l'accueil (Entete.tsx), et seulement la :
+// la barre du haut ne porte plus que les onglets (19/11/2026, « comme Brave »).
 //
 // Porte en React (lot 1 du plan « finir le passage a React ») depuis le
 // RenderFragment RondProfil de Home.razor : meme balisage, memes morceaux de
@@ -12,8 +11,7 @@ import { arreter, type GesteAccueil, type ProfilVue } from './types'
 
 export function RondProfil({ profil, geste }: { profil: ProfilVue, geste: GesteAccueil }) {
   return (
-    <div className={'rig-profil-ancre ' + (profil.dansLaBarre ? 'rig-profil-ancre--barre' : '')}
-         onMouseDown={arreter}>
+    <div className="rig-profil-ancre" onMouseDown={arreter}>
       <button className={'rig-profil ' + (profil.ouvert ? 'rig-profil--ouvert' : '')}
               title={profil.titre}
               aria-label={'Profil ' + profil.login + ' : changer de login'}

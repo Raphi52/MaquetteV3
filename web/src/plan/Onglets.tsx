@@ -1,11 +1,14 @@
-// LA BARRE D'ONGLETS (esprit navigateur), portee de Components/Pages/Home.razor
-// (lot 2 du plan « finir le passage a React », 19/11/2026).
+// LES ONGLETS (esprit navigateur), portes de Components/Pages/Home.razor
+// (lot 2 du plan « finir le passage a React », 19/11/2026). Depuis le
+// 19/11/2026 (« comme Brave ») ils vivent DANS la barre du haut (BarreRig.tsx) :
+// un appui sur un onglet ne doit donc pas deplacer la fenetre.
 // Chaque vue ouverte prend un onglet. On les reordonne en les glissant ;
 // glisse HORS de la fenetre, un onglet part dans sa PROPRE fenetre (FenetreVue),
 // qu'on peut poser sur un second ecran (demande du 17/09/2026). L'agencement
 // est retenu d'une session a l'autre (SessionPlanTravail.RetenirAgencement).
 
 import { useEffect } from 'react'
+import { arreter } from '../accueil/types'
 import { ecouterGlisse, finirSuivi, mesurerOnglets } from './glisse'
 import type { GestePlan, OngletBarreVue } from './types'
 
@@ -33,6 +36,9 @@ export function Onglets({ onglets, finsDeGlisse, plan }: ProprietesOnglets) {
              // nul) : on ne lui envoie que ceux d'un geste en cours.
              onPointerMove={(e) => { if (e.buttons !== 0) plan('ongletGlisse', { x: e.clientX, y: e.clientY }) }}
              onPointerUp={(e) => plan('ongletFin', { x: e.clientX, y: e.clientY })}
+             // La barre deplace la fenetre au mousedown : sur un onglet, ce serait
+             // la fenetre qui partirait au lieu de l'onglet.
+             onMouseDown={arreter}
              onClick={() => plan('ongletActiver', onglet.code)}>
           <span className="rig-vonglet__titre">{onglet.libelle}</span>
           {onglet.detache && <span className="rig-vonglet__sorti" aria-label="sorti dans sa fenetre">{'↗'}</span>}

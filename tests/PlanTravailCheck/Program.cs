@@ -184,7 +184,7 @@ internal static class Programme
 
         // --- 1. La page s'ouvre sur l'accueil, sans ecran ni affaire.
         var vue = plan.Vue();
-        Exiger(vue.Accueil is not null && vue.Barre is not null && vue.Proc is null && vue.Dossier is null,
+        Exiger(vue.Accueil is not null && vue.Barre && vue.Proc is null && vue.Dossier is null,
             "la page s'ouvre sur l'accueil (barre et accueil), sans ecran ni affaire");
 
         // --- 2. Ouvrir un dossier : l'arbre, « Informations du dossier » et le KBIS a jour.

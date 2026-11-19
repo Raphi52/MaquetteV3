@@ -1,12 +1,13 @@
 // L'ENTETE DE L'ACCUEIL : « Proue » (/draft conv-1983, 18/11/2026) -- la date
 // du jour, le salut, puis UNE phrase qui dit la journee avec les chiffres des
-// tuiles ; a droite, « Commandes rondes » : le reglage de l'accueil (le panneau
-// des tuiles et des dispositions) puis le rond de profil.
+// tuiles ; a droite, « Commandes rondes » : le reglage de l'accueil (le theme,
+// le panneau des tuiles et des dispositions) puis le rond de profil.
 //
 // Porte en React (lot 1 du plan « finir le passage a React ») depuis le
 // <div class="rig-entete"> de Home.razor. Les morceaux de texte suivent ceux
 // que Razor creait (un noeud par @expression) : voir web/README.md, lot 3.
 
+import { Liste } from './Liste'
 import { RondProfil } from './RondProfil'
 import { arreter, type EnteteVue, type GesteAccueil, type PhraseVue } from './types'
 
@@ -67,6 +68,15 @@ export function Entete({ entete, geste }: { entete: EnteteVue, geste: GesteAccue
             <div className="rig-voile-clic" onClick={() => geste('fermerPanneauTuiles')} onMouseDown={arreter}></div>
             {' '}
             <div className="rig-tuiles-panneau" onMouseDown={arreter}>
+              {/* Le theme etait dans un panneau de la barre du haut ; elle ne porte
+                  plus que les onglets depuis le 19/11/2026 (« comme Brave »). */}
+              <label className="rig-saisie-champ rig-tuiles-panneau__theme">
+                <span className="rig-saisie-champ__libelle">Theme</span>
+                <Liste className="rig-saisie-champ__saisie" id="rig-choix-theme"
+                       valeur={panneau.theme} changer={(code) => geste('theme', code)}>
+                  {panneau.themes.map((t) => <option key={t.code} value={t.code}>{t.libelle}</option>)}
+                </Liste>
+              </label>
               <div className="rig-tuiles-panneau__tete">
                 <span className="rig-kicker">Tuiles affichees sur l'accueil</span>
                 {' '}

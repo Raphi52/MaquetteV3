@@ -180,9 +180,9 @@ foreach (var (nom, texte) in feuilles)
     Exiger(Rond(".rig-profil", "50%"), "le profil est un rond");
     Exiger(Rond(".rig-chiffre__rond", "50%"), "le rond des tuiles chiffrees est un cercle");
     // Depuis le lot 1 du passage a React (19/11/2026) : la barre, l'entete, les
-    // chiffres et le rond de profil sont rendus par web/src/ ; ou le rond se pose
-    // (titre ou barre) est decide par la session de l'accueil (Pont/Accueil.cs)
-    // sur ce que Home.razor sait seul (AccueilRecouvert, passe dans le contexte).
+    // chiffres et le rond de profil sont rendus par web/src/. Le rond n'est plus
+    // qu'a droite du titre de l'accueil : la barre du haut ne porte que les
+    // onglets et les boutons de la fenetre (19/11/2026, « comme Brave »).
     string Web(params string[] chemin) => File.ReadAllText(Path.Combine(new[] { racine, "web", "src" }.Concat(chemin).ToArray()));
     var pont = File.ReadAllText(Path.Combine(racine, "Pont", "Accueil.cs"));
     var chiffresTsx = Web("accueil", "Chiffres.tsx");
@@ -196,11 +196,13 @@ foreach (var (nom, texte) in feuilles)
     Exiger(!home.Contains("<select class=\"rig-login\"") && !balisagePlan.Contains("rig-login") && !barreTsx.Contains("rig-login"),
         "le bandeau ne porte plus la liste deroulante du login");
     Exiger(Regex.IsMatch(enteteTsx, @"rig-entete__outils[\s\S]*?\{entete\.profil && <RondProfil profil=\{entete\.profil\}")
-           && pont.Contains("ctx.Recouvert ? null : Profil(dansLaBarre: false)"),
+           && pont.Contains("ctx.Recouvert ? null : Profil());"),
         "sur l'accueil, le rond de profil est a droite du titre");
-    Exiger(Regex.IsMatch(barreTsx, @"rig-barre__droite[\s\S]*?\{vue\.profil && <RondProfil profil=\{vue\.profil\}")
-           && pont.Contains("ctx.Recouvert ? Profil(dansLaBarre: true) : null"),
-        "un ecran ouvert garde le rond de profil, dans le bandeau");
+    Exiger(!barreTsx.Contains("RondProfil") && !barreTsx.Contains("rig-barre__marque")
+           && !barreTsx.Contains("<Liste") && !pont.Contains("PanneauBarre"),
+        "la barre du haut ne porte ni profil, ni marque, ni reglages : seulement les onglets et la fenetre");
+    Exiger(Regex.IsMatch(barreTsx, @"<header className=""rig-barre""[^\n]*\n\s*\{onglets && <Onglets [^\n]*\n\s*<div className=""rig-fenetre"">"),
+        "la barre du haut : les onglets, puis les boutons de la fenetre");
     Exiger(home.Contains("return new(AccueilRecouvert, ProcOuverte?.Code,"),
         "le plan de travail passe a l'accueil s'il est recouvert");
     // Les DEUX ecrans pleins recouvrent le titre : l'ecran de procedure
@@ -361,20 +363,21 @@ foreach (var (nom, texte) in feuilles)
     }
 
     // La bascule a disparu au profit d'une liste nourrie par ThemesRig.
-    // Depuis le lot 1 du passage a React (19/11/2026) : la barre et sa liste sont
-    // dans web/src/composants/BarreRig.tsx, le choix passe par la session de
-    // l'accueil (Pont/Accueil.cs), <html> recoit le theme par ThemeRig.tsx.
-    var barreTsx = File.ReadAllText(Path.Combine(racine, "web", "src", "composants", "BarreRig.tsx"));
+    // Depuis le 19/11/2026 la liste est en tete des reglages de l'accueil
+    // (web/src/accueil/Entete.tsx) : la barre du haut ne porte plus que les
+    // onglets. Le choix passe par la session de l'accueil (Pont/Accueil.cs),
+    // <html> recoit le theme par ThemeRig.tsx.
+    var reglagesTsx = File.ReadAllText(Path.Combine(racine, "web", "src", "accueil", "Entete.tsx"));
     var themeTsx = File.ReadAllText(Path.Combine(racine, "web", "src", "composants", "ThemeRig.tsx"));
     var pont = File.ReadAllText(Path.Combine(racine, "Pont", "Accueil.cs"));
     Exiger(!home.Contains("BasculerTheme") && !balisagePlan.Contains("Mode sombre")
-           && !Regex.IsMatch(barreTsx, @">\s*Mode sombre\s*<") && !pont.Contains("BasculerTheme"),
+           && !Regex.IsMatch(reglagesTsx, @">\s*Mode sombre\s*<") && !pont.Contains("BasculerTheme"),
         "la bascule « Mode sombre » a disparu des reglages");
-    Exiger(Regex.IsMatch(barreTsx, @"<Liste[^>]*id=""rig-choix-theme""[^>]*changer=\{\(code\) => agir\('theme', code\)\}")
-           && barreTsx.Contains("vue.themes.map((t) => <option key={t.code} value={t.code}>{t.libelle}</option>)")
+    Exiger(Regex.IsMatch(reglagesTsx, @"<Liste[^>]*id=""rig-choix-theme""[^>]*changer=\{\(code\) => geste\('theme', code\)\}")
+           && reglagesTsx.Contains("panneau.themes.map((t) => <option key={t.code} value={t.code}>{t.libelle}</option>)")
            && pont.Contains("ThemesRig.Tous.Select(t => new ThemeVue(t.Code, t.Libelle))")
            && pont.Contains("case \"theme\": ChoisirTheme(Texte(valeur));"),
-        "Reglages > Affichage propose une liste deroulante des themes de ThemesRig");
+        "les reglages de l'accueil proposent une liste deroulante des themes de ThemesRig");
     Exiger(application.Contains("<div data-rig-theme={v.theme}") && home.Contains("private string Theme => Accueil.Theme;")
            && File.ReadAllText(Path.Combine(racine, "Pont", "PlanTravailVue.cs")).Contains("return new VueApplication(\r\n            Theme,".Replace("\r\n", Environment.NewLine)),
         "la page porte le code du theme choisi");

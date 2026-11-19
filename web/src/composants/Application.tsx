@@ -16,7 +16,6 @@ import { ThemeRig } from './ThemeRig'
 import type { GesteIle } from '../accueil/types'
 import { ecouterEchap } from '../plan/clavier'
 import { EnvoiMail, Impression, MenuNoeud, Nouveau } from '../plan/Modales'
-import { Onglets } from '../plan/Onglets'
 import { Procedure } from '../plan/Procedure'
 import type { GestePlan, VueApplication } from '../plan/types'
 import { Visionneuse } from '../plan/Visionneuse'
@@ -70,10 +69,10 @@ export function Application({ vue, geste, plan }: ProprietesApplication) {
          style={{ background: 'var(--rig-fond)', color: 'var(--rig-texte)', height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <div className="rig-filet-marque"></div>
       <ThemeRig theme={v.theme} />
-      {v.barre && <BarreRig vue={v.barre} geste={geste} />}
-      {/* BARRE D'ONGLETS (esprit navigateur) : glisser pour reordonner, hors
-          de la fenetre pour sortir l'onglet sur un autre ecran. */}
-      {v.onglets && <Onglets onglets={v.onglets} finsDeGlisse={v.finsDeGlisse} plan={gestePlan} />}
+      {/* LA BARRE DU HAUT, « comme Brave » : les onglets (glisser pour
+          reordonner, hors de la fenetre pour sortir l'onglet sur un autre
+          ecran), puis les boutons de la fenetre. */}
+      {v.barre && <BarreRig onglets={v.onglets} finsDeGlisse={v.finsDeGlisse} geste={geste} plan={gestePlan} />}
       {v.accueil && <Accueil vue={v.accueil} geste={geste} />}
       {/* ECRAN DE PROCEDURE : le cadre est commun, l'ecran vient de l'aiguillage. */}
       {v.proc && <Procedure proc={v.proc} plan={gestePlan} />}

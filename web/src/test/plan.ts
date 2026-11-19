@@ -131,7 +131,7 @@ export function historique(): PieceHistoriqueVue[] {
 
 export function vueApplication(partiel: Partial<VueApplication> = {}): VueApplication {
   return {
-    theme: 'clair', geste: 0, barre: null, accueil: null, onglets: null, finsDeGlisse: 0,
+    theme: 'clair', geste: 0, barre: false, accueil: null, onglets: null, finsDeGlisse: 0,
     proc: null, dossier: null, impression: null, envoiMail: null, nouveau: null, menuNoeud: null,
     pagination: 0, defilement: null,
     ...partiel,

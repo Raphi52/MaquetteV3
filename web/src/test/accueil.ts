@@ -1,7 +1,7 @@
 // Une VUE D'ACCUEIL d'exemple pour les tests (forme de Pont/Accueil.cs, VueAccueil) :
 // petite, mais chaque bloc y est present, pour que chaque test n'ecrive que ce qu'il change.
 
-import type { AlerteLigneVue, TuileVue, VueBarre, VuePlanAccueil } from '../accueil/types'
+import type { AlerteLigneVue, PanneauTuilesVue, TuileVue, VuePlanAccueil } from '../accueil/types'
 
 export function ligne(id: string, nombre: number, titre: string): AlerteLigneVue {
   return { id, nombre, palier: nombre > 10 ? 'fort' : 'faible', titre, detail: 'detail ' + id, libelleCible: 'Ecran ' + id }
@@ -18,11 +18,13 @@ export function tuile(id: string, partiel: Partial<TuileVue> = {}): TuileVue {
   }
 }
 
-export function vueBarre(partiel: Partial<VueBarre> = {}): VueBarre {
+/** Le panneau des reglages de l'accueil, ouvert : le theme, les dispositions, les tuiles. */
+export function panneauTuiles(partiel: Partial<PanneauTuilesVue> = {}): PanneauTuilesVue {
   return {
-    version: '3.0.14', reglages: false, theme: 'clair',
+    theme: 'clair',
     themes: [{ code: 'clair', libelle: 'Clair' }, { code: 'sombre', libelle: 'Sombre' }],
-    profil: null,
+    dispositions: [{ id: 'lateral', titre: 'Latéral', aide: 'A traiter a droite', actif: true }, { id: 'metiers', titre: 'Par métier', aide: 'un widget', actif: false }],
+    tuiles: [{ id: 'alertes', libelle: 'A traiter', titre: null, actif: true }, { id: 'activite', libelle: 'Activite', titre: null, actif: false }],
     ...partiel,
   }
 }
@@ -49,7 +51,7 @@ export function vuePlan(partiel: Partial<VuePlanAccueil> = {}): VuePlanAccueil {
       phrase: { horsDelaiConnu: true, horsDelai: 2, arrivees: 66, traites: '4 / 11' },
       panneauOuvert: false, panneau: null,
       profil: {
-        dansLaBarre: false, ouvert: false, initiales: 'RV', titre: 'rvilain · Greffier (RCS) : changer de login',
+        ouvert: false, initiales: 'RV', titre: 'rvilain · Greffier (RCS) : changer de login',
         login: 'rvilain', comptes: [],
       },
     },

@@ -568,9 +568,9 @@ Exiger(RigV3Desktop.AccesGed.CodeIcone(
         racineGed.Descendants().First(n => n.EstPiece)).Length > 0,
     "une piece du jeu de demonstration retombe sur un dessin connu");
 
-// La barre du haut (marque, login, reglages, reduire/fermer, deplacement de
-// la fenetre) doit rester visible DANS la vue d'une affaire : la visionneuse
-// commence sous le bandeau et passe sous la barre.
+// La barre du haut (onglets, reduire/fermer, deplacement de la fenetre) doit
+// rester visible DANS la vue d'une affaire : la visionneuse commence sous le
+// bandeau et passe sous la barre.
 var vged = Regex.Match(css, @"\.rig-vged \{(?:[^{}]|/\*.*?\*/)*?\}", RegexOptions.Singleline);
 Exiger(vged.Success && vged.Value.Contains("--rig-bandeau-h")
        && !Regex.IsMatch(vged.Value, @"inset:\s*0\s*;"),

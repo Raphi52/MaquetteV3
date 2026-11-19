@@ -2,7 +2,7 @@
 // (records C#, proprietes en camelCase). Un type par record, memes noms de
 // champs : un champ renomme d'un cote casse le typecheck de l'autre a la relecture.
 
-import type { VueBarre, VuePlanAccueil } from '../accueil/types'
+import type { VuePlanAccueil } from '../accueil/types'
 import type { LigneArbreVue } from '../composants/ArbreGedNoeud'
 import type { VueKbis } from '../composants/ApercuKbis'
 
@@ -13,7 +13,8 @@ export interface VueApplication {
   theme: string
   /** Le numero du dernier geste du plan de travail joue par le C# (voir Application.tsx). */
   geste: number
-  barre: VueBarre | null
+  /** Faux dans la fenetre d'un onglet sorti : ni barre, ni accueil. */
+  barre: boolean
   accueil: VuePlanAccueil | null
   onglets: OngletBarreVue[] | null
   finsDeGlisse: number

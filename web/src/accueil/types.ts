@@ -13,24 +13,14 @@ export interface GesteIle {
 
 export interface VueAccueil {
   theme: string
-  barre: VueBarre
   accueil: VuePlanAccueil
 }
 
 export interface ThemeVue { code: string, libelle: string }
 
-export interface VueBarre {
-  version: string
-  reglages: boolean
-  theme: string
-  themes: ThemeVue[]
-  profil: ProfilVue | null
-}
-
 export interface CompteVue { login: string, initiales: string, profil: string, domaines: string, actif: boolean }
 
 export interface ProfilVue {
-  dansLaBarre: boolean
   ouvert: boolean
   initiales: string
   titre: string
@@ -47,7 +37,7 @@ export interface MenuVue { favorisOuverts: boolean, favoris: FavoriVue[], moment
 export interface PhraseVue { horsDelaiConnu: boolean, horsDelai: number, arrivees: number, traites: string | null }
 export interface DispositionVue { id: string, titre: string, aide: string, actif: boolean }
 export interface BasculeVue { id: string, libelle: string, titre: string | null, actif: boolean }
-export interface PanneauTuilesVue { dispositions: DispositionVue[], tuiles: BasculeVue[] }
+export interface PanneauTuilesVue { theme: string, themes: ThemeVue[], dispositions: DispositionVue[], tuiles: BasculeVue[] }
 export interface EnteteVue {
   date: string
   utilisateur: string

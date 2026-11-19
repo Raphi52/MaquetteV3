@@ -3,81 +3,62 @@ import { cleanup, fireEvent, render } from '@testing-library/react'
 import { BarreRig } from './BarreRig'
 import { ThemeRig } from './ThemeRig'
 import { morceaux } from '../test/morceaux'
-import { vueBarre } from '../test/accueil'
-import type { GesteIle, VueBarre } from '../accueil/types'
+import type { GesteIle } from '../accueil/types'
+import type { OngletBarreVue } from '../plan/types'
 
 afterEach(cleanup)
 
-function rendre(vue: VueBarre = vueBarre()) {
+const onglets: OngletBarreVue[] = [
+  { code: 'PROC_FACTURE', libelle: 'Factures', actif: false, detache: false, glisse: false },
+  { code: 'PROC_ENCAISS', libelle: 'Encaissements', actif: true, detache: false, glisse: false },
+]
+
+function rendre(ouverts: OngletBarreVue[] | null = onglets) {
   const geste = vi.fn<(g: GesteIle) => void>()
-  const r = render(<BarreRig vue={vue} geste={geste} />)
-  return { ...r, geste, gestes: () => geste.mock.calls.map(([g]) => [g.nom, g.valeur]) }
+  const plan = vi.fn()
+  const r = render(<BarreRig onglets={ouverts} finsDeGlisse={0} geste={geste} plan={plan} />)
+  return {
+    ...r, geste, plan,
+    gestes: () => geste.mock.calls.map(([g]) => [g.nom, g.valeur]),
+    plans: () => plan.mock.calls.map(([nom, valeur]) => [nom, valeur]),
+  }
 }
 
-describe('BarreRig (la barre du haut de la fenetre)', () => {
-  it('marque, version, reglages et boutons de fenetre, avec les blancs de Razor', () => {
+describe('BarreRig (la barre du haut, « comme Brave »)', () => {
+  it('les onglets puis les boutons de la fenetre : rien d\'autre', () => {
     const { container } = rendre()
     const barre = container.querySelector('header.rig-barre')!
-    expect(morceaux(barre)).toEqual(['<span>', ' ', '<span>', ' ', '<div>'])
-    expect(morceaux(barre.querySelector('.rig-barre__marque'))).toEqual(['RIG ', '<b>'])
-    expect(barre.querySelector('.rig-barre__version')!.textContent).toBe('3.0.14')
-    const droite = barre.querySelector('.rig-barre__droite')!
-    expect(morceaux(droite)).toEqual(['<div>', ' ', '<div>'])
-    expect(morceaux(droite.querySelector('.rig-fenetre'))).toEqual(['<button>', ' ', '<button>', ' ', '<button>'])
-    expect([...droite.querySelectorAll('.rig-fenetre__bouton')].map((b) => [b.getAttribute('title'), b.textContent]))
+    expect(morceaux(barre)).toEqual(['<div>', '<div>'])
+    expect(barre.firstElementChild!.id).toBe('rig-vonglets')
+    expect([...barre.querySelectorAll('.rig-vonglet__titre')].map((t) => t.textContent)).toEqual(['Factures', 'Encaissements'])
+    const fenetre = barre.querySelector('.rig-fenetre')!
+    expect(barre.lastElementChild).toBe(fenetre)
+    expect([...fenetre.querySelectorAll('.rig-fenetre__bouton')].map((b) => [b.getAttribute('title'), b.textContent]))
       .toEqual([['Reduire', '–'], ['Agrandir', '□'], ['Fermer', '✕']])
-    expect(droite.querySelector('.rig-barre__action')!.className).toBe('rig-barre__action ')
-    expect(droite.querySelector('.rig-barre__action')!.textContent).toBe('⚙')
+    // Ce que la barre portait avant le 19/11/2026 n'y est plus.
+    expect(barre.textContent).not.toContain('RIG')
+    expect(barre.querySelector('select, .rig-profil, .rig-tuiles-panneau')).toBeNull()
   })
 
-  it('un appui sur la barre DEPLACE la fenetre ; les boutons, eux, ne la deplacent pas', () => {
-    const { container, gestes } = rendre()
-    fireEvent.mouseDown(container.querySelector('.rig-barre__marque')!)
+  it('sans vue ouverte : la barre ne garde que les boutons de la fenetre', () => {
+    const { container } = rendre(null)
+    const barre = container.querySelector('header.rig-barre')!
+    expect(morceaux(barre)).toEqual(['<div>'])
+    expect(barre.querySelector('#rig-vonglets')).toBeNull()
+  })
+
+  it('un appui HORS d\'un onglet ou d\'un bouton deplace la fenetre ; onglets et boutons, non', () => {
+    const { container, gestes, plans } = rendre()
+    fireEvent.mouseDown(container.querySelector('header.rig-barre')!)
+    fireEvent.mouseDown(container.querySelector('#rig-vonglets')!)
+    fireEvent.mouseDown(container.querySelector('.rig-fenetre')!)
+    const onglet = container.querySelector('[data-rig-onglet="PROC_FACTURE"]')!
+    fireEvent.mouseDown(onglet)
+    fireEvent.click(onglet)
     for (const b of container.querySelectorAll('.rig-fenetre__bouton')) { fireEvent.mouseDown(b); fireEvent.click(b) }
-    fireEvent.mouseDown(container.querySelector('.rig-barre__action')!)
-    expect(gestes()).toEqual([['deplacer', null], ['reduire', null], ['agrandir', null], ['fermer', null]])
-  })
-
-  it('Reglages > Affichage : la liste des themes ; le choix part a la session', () => {
-    const { container, gestes } = rendre(vueBarre({ reglages: true, theme: 'clair' }))
-    expect(container.querySelector('.rig-barre__action')!.className).toBe('rig-barre__action rig-barre__action--ouvert')
-    const panneau = container.querySelector('.rig-tuiles-panneau')!
-    expect(morceaux(panneau)).toEqual(['<div>', ' ', '<label>'])
-    const liste = panneau.querySelector<HTMLSelectElement>('select#rig-choix-theme')!
-    expect(liste.className).toBe('rig-saisie-champ__saisie')
-    expect([...liste.options].map((o) => [o.value, o.textContent])).toEqual([['clair', 'Clair'], ['sombre', 'Sombre']])
-    expect(liste.value).toBe('clair')
-    expect(container.textContent).not.toContain('Mode sombre')
-    fireEvent.change(liste, { target: { value: 'sombre' } })
-    fireEvent.click(container.querySelector('.rig-voile-clic')!)
-    expect(gestes()).toEqual([['theme', 'sombre'], ['fermerPanneauBarre', null]])
-  })
-
-  it('la liste garde le choix de l\'utilisateur jusqu\'a la reponse, puis suit la session', () => {
-    const geste = vi.fn()
-    const { container, rerender } = render(<BarreRig vue={vueBarre({ reglages: true })} geste={geste} />)
-    const liste = container.querySelector<HTMLSelectElement>('#rig-choix-theme')!
-    fireEvent.change(liste, { target: { value: 'sombre' } })
-    rerender(<BarreRig vue={vueBarre({ reglages: true })} geste={geste} />)
-    expect(liste.value).toBe('sombre')
-    rerender(<BarreRig vue={vueBarre({ reglages: true, theme: 'sombre' })} geste={geste} />)
-    rerender(<BarreRig vue={vueBarre({ reglages: true, theme: 'clair' })} geste={geste} />)
-    expect(liste.value).toBe('clair')
-  })
-
-  it('un ecran ouvert recouvre l\'accueil : le rond de profil passe DANS la barre', () => {
-    const { container, gestes } = rendre(vueBarre({
-      profil: { dansLaBarre: true, ouvert: false, initiales: 'RV', titre: 'rvilain · Greffier (RCS) : changer de login', login: 'rvilain', comptes: [] },
-    }))
-    const droite = container.querySelector('.rig-barre__droite')!
-    expect(droite.firstElementChild!.className).toBe('rig-profil-ancre rig-profil-ancre--barre')
-    expect(morceaux(droite)).toEqual(['<div>', '<div>', ' ', '<div>'])
-    const rond = droite.querySelector('.rig-profil')!
-    expect(rond.textContent).toBe('RV')
-    expect(rond.getAttribute('aria-expanded')).toBe('false')
-    fireEvent.mouseDown(rond)
-    fireEvent.click(rond)
-    expect(gestes()).toEqual([['profil', null]])
+    expect(gestes()).toEqual([['deplacer', null], ['deplacer', null], ['deplacer', null],
+                              ['reduire', null], ['agrandir', null], ['fermer', null]])
+    expect(plans()).toEqual([['ongletActiver', 'PROC_FACTURE']])
   })
 })
 
