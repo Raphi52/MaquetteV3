@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { Aiguillage } from './Aiguillage'
-import { proc } from '../test/plan'
+import { paletteVue, proc } from '../test/plan'
 import type { GestePlan } from './types'
 import { EcranActes } from '../ecrans/EcranActes'
 import { EcranArrivee } from '../ecrans/EcranArrivee'
@@ -12,6 +12,7 @@ import { EcranDemandes } from '../ecrans/EcranDemandes'
 import { EcranNonMaquette } from '../ecrans/EcranNonMaquette'
 import { EcranOuvertureDossier } from '../ecrans/EcranOuvertureDossier'
 import { EcranRechAffaires } from '../ecrans/EcranRechAffaires'
+import { EcranRecherche } from '../ecrans/EcranRecherche'
 import { EcranRequisitions } from '../ecrans/EcranRequisitions'
 import { EcranTachesLot } from '../ecrans/EcranTachesLot'
 import { EcranVerrous } from '../ecrans/EcranVerrous'
@@ -68,6 +69,13 @@ describe('Aiguillage des ecrans de procedure', () => {
     expect(lot.key).toBe('s1')
     expect(lot.props).toEqual({ session: 's1', version: 3 })
     expect(aiguiller('PROC_TACHES_LOT').el).toBeNull()
+  })
+
+  it('la page « Recherche » : la palette etalee en page, avec la vue calculee par le plan de travail', () => {
+    const recherche = paletteVue({ texte: 'dupont' })
+    const { el, plan } = aiguiller('RECHERCHE', { ...proc().ecran, recherche })
+    expect(el!.type).toBe(EcranRecherche)
+    expect(el!.props).toEqual({ vue: recherche, plan })
   })
 
   it('une procedure sans ecran tombe sur l\'ecran qui se nomme, avec son motif', () => {

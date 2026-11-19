@@ -48,8 +48,12 @@ public sealed record TravailPaletteVue(string Nature, string Numero, string Cle,
 public sealed record ActivitePaletteVue(string Agent, string Verbe, string Objet, string Depuis);
 /// <param name="Chemin">Libelles depuis la racine : le geste « palettePiece » deplie l'arbre jusqu'a la piece.</param>
 /// <param name="Annonce">Une annonce (BODACC) : rangee a part dans la palette.</param>
+/// <param name="Texte">Le texte entier de la piece : la liseuse de la page « Recherche » l'affiche.</param>
+/// <param name="Positions">Le debut de chaque passage trouve dans <paramref name="Texte"/>.</param>
+/// <param name="Longueur">La longueur de chaque passage (celle de ce qui est tape).</param>
 public sealed record PiecePaletteVue(string Libelle, string[] Chemin, string Lieu, string Avant, string Trouve,
-                                     string Apres, int Passages, int Pages, string Date, string Origine, bool Annonce);
+                                     string Apres, int Passages, int Pages, string Date, string Origine, bool Annonce,
+                                     string Texte, int[] Positions, int Longueur);
 /// <param name="Sujet">Ce qui serait consulte (« TRANSNORD SA · 318 552 004 »).</param>
 public sealed record HorsGreffePaletteVue(string Code, string Source, string Objet, string Sujet);
 /// <param name="PlusAncienne">Jours depuis la plus ancienne demande en cours confiee au login.</param>
@@ -58,6 +62,14 @@ public sealed record BilanPaletteVue(string Jour, int HorsDelai, int ArriveesDuJ
 public sealed partial class SessionPlanTravail
 {
     private bool PaletteOuverte;
+
+    /// <summary>Le code de la page « Recherche » (proposition 4 « Lecteur » du /draft,
+    /// conv-2018) : la palette etalee dans un onglet. Seul l'aiguillage le lit
+    /// (web/src/plan/Aiguillage.tsx).</summary>
+    private const string CodePageRecherche = "RECHERCHE";
+
+    /// <summary>Ce qui est cherche dans la page « Recherche » (sa propre barre).</summary>
+    private string PageRechercheTexte = string.Empty;
     private bool PaletteAncree;
     private string PaletteTexte = string.Empty;
     private string PaletteFiltre = "tout";
@@ -95,6 +107,13 @@ public sealed partial class SessionPlanTravail
             case "paletteOuvrir": OuvrirPalette(ancree: !AccueilRecouvert); break;
             case "paletteFermer": PaletteOuverte = false; break;
             case "paletteTexte": PaletteTexte = Texte(valeur); break;
+            // « Ouvrir en page » : la meme recherche, dans un onglet, avec la liseuse.
+            case "paletteEnPage":
+                PageRechercheTexte = PaletteTexte;
+                PaletteOuverte = false;
+                OuvrirPageRecherche();
+                break;
+            case "rechercheTexte": PageRechercheTexte = Texte(valeur); break;
             case "paletteFiltre":
             {
                 var code = Texte(valeur);
@@ -138,19 +157,28 @@ public sealed partial class SessionPlanTravail
 
     /// <summary>La palette, si elle est ouverte (jamais dans la fenetre d'un onglet sorti).</summary>
     private PaletteVue? VuePalette()
-    {
-        if (!PaletteOuverte || ModeFenetreVue) return null;
+        => !PaletteOuverte || ModeFenetreVue ? null : Recherche(PaletteTexte, PaletteFiltre, PaletteAncree);
 
+    /// <summary>La page « Recherche » : le MEME calcul que la palette, sur le texte de sa barre.</summary>
+    private PaletteVue VuePageRecherche() => Recherche(PageRechercheTexte, "tout", ancree: false);
+
+    /// <summary>Ouvre (ou ramene) l'onglet de la page « Recherche ».</summary>
+    private void OuvrirPageRecherche() => OuvrirProc(new Proc(CodePageRecherche, "Recherche"));
+
+    /// <summary>La recherche de la palette et de la page : le travail, les ecrans, l'arbre,
+    /// le texte des pieces, hors du greffe.</summary>
+    private PaletteVue Recherche(string texteTape, string filtre, bool ancree)
+    {
         var compte = Accueil.CompteCourant;
         var moi = compte.Signature;
-        var texte = PaletteTexte.Trim();
+        var texte = texteTape.Trim();
 
         var trouve = RecherchePalette.Travail(texte,
             Fonds.Select(d => new AffairePalette(d.Numero, d.Objet, d.Siren, d.Type, d.Statut)), EstValide);
         var filtres = RecherchePalette.Filtres
             .Select(f => new FiltrePaletteVue(f.Code, f.Libelle, RecherchePalette.Filtrer(trouve, f.Code, moi).Count()))
             .ToArray();
-        var gardees = RecherchePalette.Filtrer(trouve, PaletteFiltre, moi).ToArray();
+        var gardees = RecherchePalette.Filtrer(trouve, filtre, moi).ToArray();
 
         // L'arbre se cherche tel qu'on l'OUVRIRAIT : celui de l'affaire ouverte
         // (avec ce que l'agent y a ajoute ou masque), sinon celui de la premiere
@@ -196,7 +224,7 @@ public sealed partial class SessionPlanTravail
             enCoursAMoi.Length == 0 ? 0 : enCoursAMoi.Max(JeuDemo.JoursDepuis));
 
         return new PaletteVue(
-            PaletteTexte, PaletteFiltre, filtres, Agent(moi),
+            texteTape, filtre, filtres, Agent(moi),
             [.. JeuDemo.Comptes.Select(c => Agent(c.Signature))],
             [.. gardees.Take(RecherchePalette.MaxTravail).Select(t => new TravailPaletteVue(
                 t.Nature, t.Numero, t.Cle, t.Ecran, LibelleEcran(t.Ecran), t.Titre, t.Detail, t.Etat, t.Ton, t.Filet,
@@ -210,7 +238,7 @@ public sealed partial class SessionPlanTravail
             gardees.Length,
             [.. pieces.Select(p => new PiecePaletteVue(p.Piece.Libelle, p.Chemin, RecherchePalette.Lieu(p.Chemin),
                 p.Avant, p.Trouve, p.Apres, p.Passages, p.Piece.Pages, p.Piece.Date, p.Piece.Origine,
-                RecherchePalette.EstAnnonce(p.Piece)))],
+                RecherchePalette.EstAnnonce(p.Piece), p.Piece.Apercu, p.Positions, p.Longueur))],
             $"{affaire.Numero} {Denomination(affaire.Objet)}",
             affaire.Numero,
             horsGreffe,
@@ -219,7 +247,7 @@ public sealed partial class SessionPlanTravail
             [.. ecrans.Select(p => new EcranPaletteVue(p.Code, p.Libelle))],
             [.. elements.Select(e => new ElementPaletteVue(e.Chemin[^1], e.Chemin, RecherchePalette.Lieu(e.Chemin),
                                                            e.Suite![^1].EstPiece))],
-            PaletteAncree);
+            ancree);
     }
 
     /// <summary>Les noeuds d'un chemin, s'il passe tout entier par des noeuds

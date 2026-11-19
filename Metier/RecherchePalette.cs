@@ -48,8 +48,10 @@ public sealed record AffairePalette(string Numero, string Objet, string Siren, s
 /// <param name="Avant">Le texte qui precede le premier passage trouve.</param>
 /// <param name="Trouve">Le passage lui-meme, tel qu'il est ecrit dans la piece.</param>
 /// <param name="Passages">Combien de fois la piece porte ce qui est tape.</param>
+/// <param name="Positions">Ou commence chaque passage dans le texte de la piece (Apercu), dans
+/// l'ordre ; tous font <paramref name="Longueur"/> caracteres.</param>
 public sealed record PassagePiece(string[] Chemin, NoeudGed Piece, string Avant, string Trouve,
-                                  string Apres, int Passages);
+                                  string Apres, int Passages, int[] Positions, int Longueur);
 
 /// <summary>Un fichier consulte HORS du greffe. Aucun n'est branche dans la maquette.</summary>
 public sealed record SourceExterne(string Code, string Nom, string Objet);
@@ -277,7 +279,8 @@ public static class RecherchePalette
                 if (trouves.Count >= max) return;
                 string[] ici = [.. chemin, e.Libelle];
                 if (e.EstPiece && e.Apercu.Length > 0 && Passage(e.Apercu, plie) is { } p)
-                    trouves.Add(new PassagePiece(ici, e, p.Avant, p.Trouve, p.Apres, p.Nombre));
+                    trouves.Add(new PassagePiece(ici, e, p.Avant, p.Trouve, p.Apres, p.Positions.Length,
+                                                 p.Positions, plie.Length));
                 Descendre(e, ici);
             }
         }
@@ -285,15 +288,15 @@ public static class RecherchePalette
         return [.. trouves];
     }
 
-    private static (string Avant, string Trouve, string Apres, int Nombre)? Passage(string texte, string cherchePlie)
+    private static (string Avant, string Trouve, string Apres, int[] Positions)? Passage(string texte, string cherchePlie)
     {
         var plie = PlierAPlat(texte);
         var i = plie.IndexOf(cherchePlie, StringComparison.Ordinal);
         if (i < 0) return null;
 
-        var nombre = 0;
+        var positions = new List<int>();
         for (var j = i; j >= 0; j = plie.IndexOf(cherchePlie, j + cherchePlie.Length, StringComparison.Ordinal))
-            nombre++;
+            positions.Add(j);
 
         var debut = Math.Max(0, i - 48);
         var fin = Math.Min(texte.Length, i + cherchePlie.Length + 72);
@@ -303,7 +306,7 @@ public static class RecherchePalette
 
         return ((debut > 0 ? "…" : "") + Lisible(texte[debut..i]),
                 texte.Substring(i, cherchePlie.Length),
-                Lisible(texte[(i + cherchePlie.Length)..fin]) + (fin < texte.Length ? "…" : ""), nombre);
+                Lisible(texte[(i + cherchePlie.Length)..fin]) + (fin < texte.Length ? "…" : ""), [.. positions]);
     }
 
     /// <summary>Sans accents, sans casse, MEME LONGUEUR que le texte : une position

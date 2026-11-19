@@ -254,6 +254,36 @@ internal static class Programme
             "Ctrl K sur un ecran ouvre la palette au milieu");
         Agir("paletteFermer");
 
+        // --- 13. « Ouvrir en page » : la meme recherche dans un onglet, avec la liseuse
+        // (/draft tour 4, proposition 4 « Lecteur »).
+        Agir("accueil");
+        Agir("paletteOuvrir");
+        Agir("paletteTexte", "dupont");
+        Agir("paletteEnPage");
+        vue = plan.Vue();
+        var page = vue.Proc?.Ecran.Recherche;
+        Exiger(vue.Palette is null && vue.Proc is { Code: "RECHERCHE", Libelle: "Recherche" } && page is { Texte: "dupont" },
+            "« Ouvrir en page » ferme la palette et ouvre l'onglet Recherche sur le meme texte");
+        Exiger(page!.Pieces.Length >= 2 && page.Pieces.All(x => x.Positions.Length == x.Passages && x.Longueur == 6
+               && x.Positions.All(i => x.Texte.Substring(i, x.Longueur).Equals("DUPONT", StringComparison.OrdinalIgnoreCase))),
+            "chaque piece porte son texte entier et la place exacte de CHAQUE passage, pour la liseuse");
+        var decl = page.Pieces.First(x => x.Libelle == "Declaration de non-condamnation");
+        Agir("rechercheTexte", "soussigné dupont");
+        page = plan.Vue().Proc!.Ecran.Recherche!;
+        var d2 = page.Pieces.Single(x => x.Libelle == decl.Libelle);
+        Exiger(page.Texte == "soussigné dupont" && d2.Texte.Substring(d2.Positions[0], d2.Longueur) == "soussigne DUPONT",
+            "la barre de la page cherche a son tour, accents ignores, passage exact");
+        Agir("palettePiece", d2.Chemin);
+        vue = plan.Vue();
+        Exiger(vue.Dossier is { Numero: "2026B01067" } && vue.Dossier.Apercu?.Apercu?.Libelle == decl.Libelle,
+            "« Ouvrir la piece » ouvre son affaire avec la piece a l'apercu");
+        Exiger(plan.Vue().Proc is null || plan.Vue().Proc!.Code != "RECHERCHE" || plan.Vue().Dossier is not null,
+            "l'affaire passe devant la page");
+        Agir("echap");
+        Agir("ongletActiver", "RECHERCHE");
+        Exiger(plan.Vue().Proc?.Ecran.Recherche is { Texte: "soussigné dupont" },
+            "revenu sur l'onglet, la page a garde sa recherche");
+
         plan.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 }

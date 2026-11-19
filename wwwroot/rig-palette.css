@@ -426,3 +426,120 @@ button.rig-touche--palette:hover { color: var(--rig-focus); border-color: var(--
   box-shadow: 0 18px 44px rgba(0, 0, 0, .18), 0 2px 6px rgba(0, 0, 0, .12);
 }
 [data-rig-theme="sombre"] .rig-palette--ancree { box-shadow: 0 18px 44px rgba(0, 0, 0, .55), 0 2px 6px rgba(0, 0, 0, .40); }
+
+/* « Ouvrir en page » : le lien dans la saisie de la palette. */
+.rig-palette__enpage {
+  border: none;
+  background: transparent;
+  color: var(--rig-focus);
+  font: 12px var(--rig-font);
+  padding: 2px 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex: none;
+}
+.rig-palette__enpage:hover { text-decoration: underline; }
+
+/* ---- LA PAGE « RECHERCHE » (web/src/ecrans/EcranRecherche.tsx) ----
+   /draft tour 4, proposition 4 « Lecteur » : la barre en grand, les resultats
+   a gauche (lignes de la palette), la piece en grand a droite, sur fond gris,
+   chaque passage surligne, le courant en or plein avec un filet dans la marge. */
+.rig-rp {
+  --rig-palette-choisi: color-mix(in srgb, var(--rig-or) 16%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+  padding: 14px 18px;
+  font: 13px/1.45 var(--rig-font);
+  color: var(--rig-texte);
+}
+.rig-rp mark { background: color-mix(in srgb, var(--rig-or) 32%, transparent); color: inherit; border-radius: 2px; padding: 0 1px; }
+.rig-rp__tete { display: flex; flex-direction: column; gap: 6px; flex: none; }
+.rig-rp__barre { margin: 0; }
+.rig-rp__som { font-size: 12.5px; color: var(--rig-texte-3); padding-left: 10px; }
+.rig-rp__som b { color: var(--rig-texte); }
+.rig-rp__corps { flex: 1; min-height: 0; display: flex; gap: 12px; }
+.rig-rp__liste {
+  width: 42%;
+  min-width: 300px;
+  flex: none;
+  overflow-y: auto;
+  background: var(--rig-surface);
+  border: 1px solid var(--rig-bord);
+  border-radius: 12px;
+  padding: 4px 8px 10px;
+}
+.rig-rp__voir {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--rig-focus);
+  font: 12px var(--rig-font);
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+.rig-rp__inerte { cursor: default; }
+.rig-rp__lecteur {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--rig-fond-2);
+  border: 1px solid var(--rig-bord);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+.rig-rp__barre-lecteur { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 13px; flex: none; }
+.rig-rp__pale { color: var(--rig-texte-3); font-size: 12px; }
+.rig-rp__nav { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--rig-texte-2); }
+.rig-rp__fleche {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: var(--rig-surface);
+  box-shadow: inset 0 0 0 1px var(--rig-bord);
+  color: var(--rig-texte);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.rig-rp__fleche:hover { color: var(--rig-focus); }
+.rig-rp__ouvrir {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 7px;
+  padding: 5px 12px;
+  background: var(--rig-or);
+  color: var(--rig-or-texte);
+  font: 600 12.5px var(--rig-font);
+  cursor: pointer;
+}
+.rig-rp__ouvrir .rig-palette__touche { background: rgba(255, 255, 255, .5); box-shadow: none; color: var(--rig-or-texte); }
+/* La feuille reste BLANCHE en sombre : c'est le papier de la piece. */
+.rig-rp__feuille {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  align-self: center;
+  width: 100%;
+  max-width: 720px;
+  padding: 28px 36px;
+  background: #FFFFFF;
+  color: #15171F;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(25, 40, 80, .14), 0 6px 20px rgba(28, 44, 80, .14);
+  font: 14px/1.7 var(--rig-font);
+  white-space: pre-wrap;
+}
+.rig-rp__m { background: rgba(200, 150, 62, .30); color: #15171F; border-radius: 2px; padding: 0 1px; }
+.rig-rp__m--courant { background: #E4BE76; box-shadow: 0 0 0 2px #C8963E; }
+.rig-rp__vide { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--rig-texte-3); font-size: 13.5px; }
+.rig-rp__vide .rig-palette__picto { width: 28px; height: 28px; }
+@media (max-width: 860px) { .rig-rp__liste { width: 46%; min-width: 0; } .rig-rp__pale { display: none; } }

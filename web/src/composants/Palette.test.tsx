@@ -36,6 +36,7 @@ function vue(partiel: Partial<PaletteVue> = {}): PaletteVue {
       libelle: 'Liste des souscripteurs', chemin: ['Dossier RCS', 'Liste des souscripteurs'], lieu: 'Dossier RCS',
       avant: 'Nom / Actions / Montant · ', trouve: 'TRANSNORD', apres: ' Jean 600', passages: 2, pages: 2,
       date: '12/03/2024', origine: 'Depot guichet', annonce: false,
+      texte: 'LISTE · Nom / Actions / Montant · TRANSNORD Jean 600', positions: [34], longueur: 9,
     }],
     dossierDesPieces: '2026B01067 AMIENS BILLARDS', numeroDesPieces: '2026B01067',
     horsGreffe: [{ code: 'FIBEN', source: 'FIBEN', objet: 'cotation et incidents de paiement, Banque de France', sujet: 'TRANSNORD SA · 318 552 004' }],
@@ -228,6 +229,12 @@ describe('Palette Ctrl K (/draft « Page Recherche », propositions 3 et 6)', ()
     fireEvent.keyDown(champ, { key: 'Escape' })
     expect(plan.mock.calls.slice(1)).toEqual([['paletteTexte', 'transnord sa'], ['paletteFermer']])
     dehors.remove()
+  })
+
+  it('« Ouvrir en page » etale la meme recherche dans un onglet', () => {
+    const p = rendre()
+    fireEvent.click(p.getByText('Ouvrir en page'))
+    expect(p.appels()).toEqual([['paletteEnPage', undefined]])
   })
 
   it('un clic sur le voile ferme la palette ; un clic dedans, non', () => {

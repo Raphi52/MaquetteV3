@@ -18,6 +18,7 @@ import { EcranArrivee } from '../ecrans/EcranArrivee'
 import { EcranAudiences } from '../ecrans/EcranAudiences'
 import { EcranBanques } from '../ecrans/EcranBanques'
 import { EcranBodacc } from '../ecrans/EcranBodacc'
+import { EcranRecherche } from '../ecrans/EcranRecherche'
 import { EcranClients } from '../ecrans/EcranClients'
 import { EcranCloture } from '../ecrans/EcranCloture'
 import { EcranCoffreFort } from '../ecrans/EcranCoffreFort'
@@ -94,6 +95,10 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
 
     case 'BODACC':
       return <EcranBodacc ouvrirDossier={ouvrirParNumero} />
+
+    case 'RECHERCHE':
+      // La palette Ctrl K etalee en page, avec la liseuse des pieces (« Ouvrir en page »).
+      return <EcranRecherche vue={ecran.recherche} plan={plan} />
 
     case 'PROC_DEPOTJUD':
       return <EcranDepotsJud ouvrirDossier={ouvrirParNumero} />

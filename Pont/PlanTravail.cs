@@ -890,6 +890,9 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     /// libelle : le catalogue <see cref="Groupes"/> reste la seule source.</summary>
     private void OuvrirCode(string code)
     {
+        // La page « Recherche » n'est pas au menu : son onglet se rouvre quand meme
+        // au redemarrage (RejouerOnglets).
+        if (code == CodePageRecherche) { OuvrirPageRecherche(); return; }
         var p = Groupes.SelectMany(g => g.Procs).FirstOrDefault(x => x.Code == code);
         if (p is not null) { OuvrirProc(p); return; }
 

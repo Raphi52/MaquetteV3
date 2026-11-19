@@ -84,6 +84,8 @@ export interface ActivitePaletteVue { agent: string, verbe: string, objet: strin
 export interface PiecePaletteVue {
   libelle: string, chemin: string[], lieu: string, avant: string, trouve: string, apres: string
   passages: number, pages: number, date: string, origine: string, annonce: boolean
+  /** Le texte entier de la piece, et ou commence chaque passage trouve (meme longueur pour tous). */
+  texte: string, positions: number[], longueur: number
 }
 export interface HorsGreffePaletteVue { code: string, source: string, objet: string, sujet: string }
 export interface BilanPaletteVue { jour: string, horsDelai: number, arriveesDuJour: number, mAttendent: number, plusAncienne: number }
@@ -110,6 +112,8 @@ export interface EcranProcVue {
   cleOuverture: string
   lot: SessionEcranVue | null
   motif: string | null
+  /** La page « Recherche » (la palette etalee en page, ecran EcranRecherche) ; null ailleurs. */
+  recherche: PaletteVue | null
 }
 
 // ---- La visionneuse d'affaire ----

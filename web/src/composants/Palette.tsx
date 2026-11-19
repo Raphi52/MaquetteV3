@@ -63,7 +63,7 @@ export function Surligne({ texte, saisie }: { texte: string, saisie: string }) {
 }
 
 /** Une annonce BODACC repond-elle a la saisie ? Chaque mot doit s'y retrouver. */
-function annonceRepond(a: AnnonceBodacc, saisie: string): boolean {
+export function annonceRepond(a: AnnonceBodacc, saisie: string): boolean {
   const mots = motsDe(saisie)
   if (mots.length === 0 || plier(saisie).replace(/\s/g, '').length < 3) return false
   const tout = plier([a.numAnnonce, a.typeAnnonce, a.texte, a.dossier, a.numPc].join(' '))
@@ -90,17 +90,17 @@ const TRACES: Record<string, ReactNode> = {
   horloge: <><circle cx="8" cy="8" r="6" /><path d="M8 4.5V8l2.5 1.5" /></>,
 }
 
-function Picto({ nom }: { nom: string }) {
+export function Picto({ nom }: { nom: string }) {
   return (
     <svg className="rig-palette__picto" viewBox="0 0 16 16" aria-hidden="true">{TRACES[nom] ?? TRACES.doc}</svg>
   )
 }
 
-function Avatar({ initiales, moi }: { initiales: string, moi?: boolean }) {
+export function Avatar({ initiales, moi }: { initiales: string, moi?: boolean }) {
   return <span className={'rig-palette__avatar' + (moi ? ' rig-palette__avatar--moi' : '')}>{initiales}</span>
 }
 
-function Touche({ children }: { children: ReactNode }) {
+export function Touche({ children }: { children: ReactNode }) {
   return <span className="rig-palette__touche">{children}</span>
 }
 
@@ -339,6 +339,11 @@ export function Palette({ vue, plan, ancree = false }: ProprietesPalette) {
            placeholder={enGestes ? 'Filtrer les gestes…' : ancree ? ATTENTE_BARRE : 'Rechercher un SIREN, une societe, un n° de demande, un mot dans les pieces…'} />
   )
   const avisCopie = copie && <span className="rig-palette__copie">{copie}</span>
+  // La meme recherche dans un onglet, avec la liseuse des pieces (ecrans/EcranRecherche.tsx).
+  const enPage = (
+    <button type="button" tabIndex={-1} className="rig-palette__enpage" title="La meme recherche dans un onglet, avec la liseuse des pieces"
+            onClick={() => plan('paletteEnPage')}>Ouvrir en page</button>
+  )
 
   if (ancree) {
     return (
@@ -349,6 +354,7 @@ export function Palette({ vue, plan, ancree = false }: ProprietesPalette) {
         {saisieChamp}
         {avisCopie}
         {' '}
+        {enPage}
         <Touche>Echap</Touche>
         <div className="rig-palette rig-palette--ancree" role="dialog" aria-label="Rechercher partout">
           {panneau()}
@@ -367,6 +373,7 @@ export function Palette({ vue, plan, ancree = false }: ProprietesPalette) {
           {fil}
           {saisieChamp}
           {avisCopie}
+          {enPage}
           <Touche>Echap</Touche>
         </div>
         {panneau()}

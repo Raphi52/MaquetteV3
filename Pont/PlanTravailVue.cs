@@ -56,8 +56,9 @@ public sealed record ProcVue(string Code, string Libelle, EcranProcVue Ecran);
 /// <param name="CleOuverture">Change avec le SIREN : l'ecran d'ouverture est reconstruit (@key).</param>
 /// <param name="Lot">La session de l'ecran des taches en lot, ouverte ici avec l'etat vivant.</param>
 /// <param name="Motif">Pourquoi la procedure n'a pas d'ecran (EcranNonMaquette).</param>
+/// <param name="Recherche">La page « Recherche » (la palette etalee en page) ; null pour les autres ecrans.</param>
 public sealed record EcranProcVue(string[] Valides, string? SirenDemande, string CleOuverture,
-                                  SessionEcranVue? Lot, string? Motif);
+                                  SessionEcranVue? Lot, string? Motif, PaletteVue? Recherche);
 
 public sealed record SessionEcranVue(string Session, int Version);
 
@@ -245,7 +246,8 @@ public sealed partial class SessionPlanTravail
                 JeuDemo.Demandes.Select(d => d.Dossier).Distinct().Where(EstValide).ToArray(),
                 SirenAImmatriculer, CleOuverture.ToString() ?? "",
                 p.Code == "PROC_TACHES_LOT" ? VueSessionLot() : null,
-                MotifNonMaquette(p.Code)));
+                MotifNonMaquette(p.Code),
+                p.Code == CodePageRecherche ? VuePageRecherche() : null));
     }
 
     // ---- Taches en lot : la session que Components/Ecrans/EcranTachesLot.razor ouvrait ----
@@ -703,7 +705,9 @@ public sealed partial class SessionPlanTravail
             case "paletteFiltre":
             case "paletteAller":
             case "palettePiece":
-            case "paletteAttribuer": AgirPalette(geste, valeur); break;
+            case "paletteAttribuer":
+            case "paletteEnPage":
+            case "rechercheTexte": AgirPalette(geste, valeur); break;
 
             // ---- Visionneuse : entete, bandeau des defauts, colonnes ----
             case "fermerDossier": FermerAffaire(); break;
