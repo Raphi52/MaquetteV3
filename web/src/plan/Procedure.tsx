@@ -9,19 +9,28 @@
 // du titre (etoile, Fermer), ni le bandeau des ecrans voisins du meme sujet.
 // L'onglet porte le titre et sa croix ferme l'ecran ; l'etoile reste dans le
 // menu de gauche.
+//
+// `cachee` : l'onglet de cet ecran est ouvert mais ne se montre pas. L'ecran
+// reste monte (son etat survit au changement d'onglet, Application.tsx) ; seul
+// son cadre sort de la page.
 
 import { Aiguillage } from './Aiguillage'
 import type { GestePlan, ProcVue } from './types'
+import { EcranVisible } from './visibilite'
 
 export interface ProprietesProcedure {
   proc: ProcVue
   plan: GestePlan
+  cachee?: boolean
 }
 
-export function Procedure({ proc, plan }: ProprietesProcedure) {
+export function Procedure({ proc, plan, cachee = false }: ProprietesProcedure) {
   return (
-    <div className="rig-proc">
-      <Aiguillage proc={proc} plan={plan} />
+    // display:none en ligne : .rig-proc pose display:flex, qui l'emporterait sur l'attribut hidden.
+    <div className="rig-proc" {...(cachee ? { style: { display: 'none' }, 'aria-hidden': true } : {})}>
+      <EcranVisible.Provider value={!cachee}>
+        <Aiguillage proc={proc} plan={plan} />
+      </EcranVisible.Provider>
     </div>
   )
 }

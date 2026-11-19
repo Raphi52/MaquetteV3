@@ -32,9 +32,10 @@
 // et les regles de l'ancien @code vivent dans Pont/EcranCommandesWeb.cs
 // (SessionCommandesWeb) ; cet ecran affiche la vue et remonte chaque geste.
 
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
+import { useContext, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import { PoigneeColonne } from '../composants/PoigneeColonne'
 import { appeler } from '../pont'
+import { EcranVisible } from '../plan/visibilite'
 import { Saisie, useSession, type Geste, type PontDeSession } from '../session'
 
 export interface OptionCw { valeur: string; libelle: string }
@@ -728,9 +729,13 @@ export function EcranCommandesWeb() {
   // l'autre, sans passer par la session.
   const liste = useRef<HTMLElement>(null)
   const [largeurListe, poserLargeurListe] = useState<number | null>(null)
+  const visible = useContext(EcranVisible)
 
-  // Ctrl K pose le curseur dans la pilule, comme sa touche l'annonce.
+  // Ctrl K pose le curseur dans la pilule, comme sa touche l'annonce. Pas
+  // quand l'onglet est cache (src/plan/visibilite.ts) : la touche irait au
+  // champ invisible au lieu de l'ecran montre.
   useEffect(() => {
+    if (!visible) return
     const surTouche = (e: globalThis.KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'k') return
       const champ = pilule.current?.querySelector('input')
@@ -741,7 +746,7 @@ export function EcranCommandesWeb() {
     }
     window.addEventListener('keydown', surTouche)
     return () => window.removeEventListener('keydown', surTouche)
-  }, [])
+  }, [visible])
 
   // Avant la premiere reponse du pont : le cadre seul, sans aucune valeur fausse.
   if (!vue) return <div className="rig-tcw"></div>

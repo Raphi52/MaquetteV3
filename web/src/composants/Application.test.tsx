@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Application, type GestePlanIle } from './Application'
 import { morceaux } from '../test/morceaux'
 import { vuePlan } from '../test/accueil'
 import { dossier, proc as procPlan, vueApplication } from '../test/plan'
 import type { GesteIle } from '../accueil/types'
-import type { VueApplication } from '../plan/types'
+import type { OngletBarreVue, VueApplication } from '../plan/types'
+import type { VueCommandesWeb } from '../ecrans/EcranCommandesWeb'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
 afterEach(cleanup)
 
@@ -137,5 +139,92 @@ describe('Application : la barre d\'onglets', () => {
     expect((g[0]![1] as { mesure: { page: number[] } }).mesure.page).toHaveLength(3)
     expect(g[1]![1]).toEqual({ x: 80, y: 12 })
     expect(g[4]![1]).toBe('PROC_FACTURE')
+  })
+})
+
+// Le geste de l'utilisateur (conv-2017) : une commande ouverte a droite dans
+// « Commandes web », un autre onglet, puis retour. L'ecran est le VRAI
+// EcranCommandesWeb, sa session C# simulee par le faux pont.
+describe('Application : un onglet quitte garde son ecran', () => {
+  const onglet = (code: string, libelle: string, partiel: Partial<OngletBarreVue> = {}): OngletBarreVue =>
+    ({ code, libelle, actif: false, detache: false, glisse: false, verbe: null, ...partiel })
+  const commandes = procPlan({ code: 'PROC_COMMANDES_WEB', libelle: 'Commandes web' })
+  const creances = proc({ libelle: 'Creances' })
+  const deux = [onglet('PROC_COMMANDES_WEB', 'Commandes web'), onglet('PROC_CREANCE', 'Creances')]
+
+  function sessionCommandes() {
+    const ligne = { id: 7, rang: 5, nom: 'SCI DU PARC', precisions: 'IG-12399', type: 'Faillite', direct: false, avancement: null, prete: false }
+    const fermee: VueCommandesWeb = {
+      session: 'S', tuiles: [], rapide: '', rechercheOuverte: false, rechercheAffinee: false, resumeCriteres: '',
+      recherche: { famille: '', familles: [], du: '', au: '', siren: '', reference: '', enAttenteEnvoi: false, dateTravail: '19/11/2026' },
+      message: null, compteur: '1 commande(s)', directsEnTete: false, lignes: [{ ...ligne, active: false }],
+      panneau: null, coordonnees: null,
+    }
+    const ouverte: VueCommandesWeb = {
+      ...fermee, lignes: [{ ...ligne, active: true }],
+      panneau: {
+        id: 7, titre: 'Faillite — SCI DU PARC', rang: 5, type: 'Faillite', etat: null, nom: 'SCI DU PARC', reference: 'IG-12399',
+        enveloppe: null, saisie: null, donneesRecues: [], traitee: null, motifAttente: null, rapprochement: null, types: null,
+        nonOpposition: null, certificats: null, pied: null, etapes: [], choixDeplie: false,
+      },
+    }
+    let vue = fermee
+    return installerFauxPont({
+      'EcranCommandesWeb.Ouvrir': () => fermee,
+      'EcranCommandesWeb.Agir': (_s, g) => { if (g === 'Choisir') vue = ouverte; return vue },
+      'EcranCommandesWeb.Fermer': () => undefined,
+    })
+  }
+
+  afterEach(retirerFauxPont)
+
+  it('la commande ouverte a droite est toujours la au retour sur l\'onglet ; la session n\'est fermee qu\'avec l\'onglet', async () => {
+    const pont = sessionCommandes()
+    const { container, rerender, geste, plan } = rendre(vueApplication({ barre: true, onglets: deux, proc: commandes }))
+    const montrer = (v: VueApplication) => rerender(<Application vue={v} geste={geste} plan={plan} />)
+    fireEvent.click((await screen.findByText('SCI DU PARC')).closest('button')!)
+    const panneau = await screen.findByRole('region', { name: 'Faillite — SCI DU PARC' })
+
+    // Un autre onglet : l'ecran des commandes est cache, pas detruit.
+    montrer(vueApplication({ barre: true, onglets: deux, proc: creances }))
+    const ecrans = [...container.querySelectorAll<HTMLElement>('.rig-proc')]
+    expect(ecrans.map((e) => e.style.display)).toEqual(['none', ''])
+    expect(ecrans[1]!.querySelector('.rig-nonmaq__titre')!.textContent).toBe('Creances')
+
+    // Retour : le meme panneau (meme noeud, rien n'a ete reconstruit), visible.
+    montrer(vueApplication({ barre: true, onglets: deux, proc: commandes }))
+    expect(screen.getByRole('region', { name: 'Faillite — SCI DU PARC' })).toBe(panneau)
+    expect(container.querySelector<HTMLElement>('.rig-proc')!.style.display).toBe('')
+    const noms = () => pont.appels.mock.calls.map(([nom]) => nom)
+    expect(noms().filter((n) => n === 'EcranCommandesWeb.Ouvrir')).toHaveLength(1)
+    expect(noms()).not.toContain('EcranCommandesWeb.Fermer')
+
+    // L'onglet se ferme : l'ecran part, et sa session avec lui.
+    montrer(vueApplication({ barre: true, onglets: [deux[1]!], proc: creances }))
+    expect(container.querySelectorAll('.rig-proc')).toHaveLength(1)
+    await waitFor(() => expect(noms()).toContain('EcranCommandesWeb.Fermer'))
+  })
+
+  it('un onglet sorti dans sa propre fenetre quitte la page principale (sa fenetre monte le sien)', async () => {
+    sessionCommandes()
+    const { container, rerender, geste, plan } = rendre(vueApplication({ barre: true, onglets: deux, proc: commandes }))
+    await screen.findByText('SCI DU PARC')
+    const sorti = [onglet('PROC_COMMANDES_WEB', 'Commandes web', { detache: true }), deux[1]!]
+    rerender(<Application vue={vueApplication({ barre: true, onglets: sorti, proc: null })} geste={geste} plan={plan} />)
+    expect(container.querySelector('.rig-proc')).toBeNull()
+  })
+
+  it('cache, l\'ecran des commandes ne prend plus Ctrl K a l\'ecran montre', async () => {
+    sessionCommandes()
+    const { rerender, geste, plan } = rendre(vueApplication({ barre: true, onglets: deux, proc: commandes }))
+    const champ = await screen.findByPlaceholderText('Rechercher une commande, un SIREN, un n° IG-…')
+    rerender(<Application vue={vueApplication({ barre: true, onglets: deux, proc: creances })} geste={geste} plan={plan} />)
+    // fireEvent rend faux quand un ecouteur a appele preventDefault.
+    expect(fireEvent.keyDown(window, { key: 'k', ctrlKey: true })).toBe(true)
+    expect(document.activeElement).not.toBe(champ)
+    // De retour sur son onglet, Ctrl K y pose de nouveau le curseur.
+    rerender(<Application vue={vueApplication({ barre: true, onglets: deux, proc: commandes })} geste={geste} plan={plan} />)
+    expect(fireEvent.keyDown(window, { key: 'k', ctrlKey: true })).toBe(false)
+    expect(document.activeElement).toBe(champ)
   })
 })

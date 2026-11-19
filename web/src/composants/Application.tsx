@@ -17,8 +17,29 @@ import type { GesteIle } from '../accueil/types'
 import { ecouterEchap } from '../plan/clavier'
 import { EnvoiMail, Impression, MenuNoeud, Nouveau } from '../plan/Modales'
 import { Procedure } from '../plan/Procedure'
-import type { GestePlan, VueApplication } from '../plan/types'
+import type { GestePlan, ProcVue, VueApplication } from '../plan/types'
 import { Visionneuse } from '../plan/Visionneuse'
+
+/**
+ * LES ECRANS DES ONGLETS OUVERTS RESTENT MONTES (19/11/2026, conv-2017) :
+ * changer d'onglet ne fait que les cacher, comme un onglet de navigateur.
+ * Avant, seul l'ecran montre etait rendu : revenir sur un onglet reconstruisait
+ * son ecran a neuf (sa session C# fermee puis rouverte) et perdait ce qu'on y
+ * avait ouvert, comme la commande choisie dans « Commandes web ».
+ *
+ * `gardes` tient, par code d'onglet, la derniere vue recue quand l'ecran etait
+ * montre. Un ecran sort de `gardes`, donc est demonte (session fermee), quand
+ * son onglet se ferme ou part dans une autre fenetre (qui monte alors le sien).
+ * Idempotente pour une meme vue : elle peut tourner pendant le rendu.
+ */
+function garderEcrans(gardes: Map<string, ProcVue>, v: VueApplication): void {
+  const ouverts = new Set((v.onglets ?? []).filter((o) => !o.detache).map((o) => o.code))
+  if (v.proc) {
+    ouverts.add(v.proc.code)
+    gardes.set(v.proc.code, v.proc)
+  }
+  for (const code of [...gardes.keys()]) if (!ouverts.has(code)) gardes.delete(code)
+}
 
 /** Ce que React passe au rappel « plan » (GestePlan cote C#). */
 export interface GestePlanIle {
@@ -64,6 +85,10 @@ export function Application({ vue, geste, plan }: ProprietesApplication) {
   // survit a la fermeture et a la reouverture des etapes.
   const defilementJoue = useRef(vue.defilement?.numero ?? 0)
 
+  // Les ecrans des onglets ouverts (voir garderEcrans).
+  const ecrans = useRef(new Map<string, ProcVue>())
+  garderEcrans(ecrans.current, v)
+
   return (
     <div data-rig-theme={v.theme}
          style={{ background: 'var(--rig-fond)', color: 'var(--rig-texte)', height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -75,8 +100,11 @@ export function Application({ vue, geste, plan }: ProprietesApplication) {
       {v.barre && <BarreRig onglets={v.onglets} finsDeGlisse={v.finsDeGlisse} accueil={!v.proc && !v.dossier}
                             geste={geste} plan={gestePlan} />}
       {v.accueil && <Accueil vue={v.accueil} geste={geste} />}
-      {/* ECRAN DE PROCEDURE : le cadre est commun, l'ecran vient de l'aiguillage. */}
-      {v.proc && <Procedure proc={v.proc} plan={gestePlan} />}
+      {/* ECRANS DE PROCEDURE : le cadre est commun, l'ecran vient de l'aiguillage.
+          Ceux des onglets ouverts restent montes, caches hors de leur onglet. */}
+      {[...ecrans.current.values()].map((p) => (
+        <Procedure key={p.code} proc={p} plan={gestePlan} cachee={p.code !== v.proc?.code} />
+      ))}
       {/* VISIONNEUSE DOCUMENTAIRE (esprit VGED) */}
       {v.dossier && (
         <Visionneuse dossier={v.dossier} pagination={v.pagination} defilement={v.defilement}
