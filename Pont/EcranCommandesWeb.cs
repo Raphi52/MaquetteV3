@@ -9,21 +9,40 @@ namespace RigV3Desktop.Pont;
 // le .tsx renvoie avec un geste. Les textes « — » des valeurs vides sont poses ici,
 // avec le string.IsNullOrWhiteSpace du .razor.
 
-public sealed record OngletCw(string Etat, string Libelle, int Nombre, bool Actif);
+/// <summary>
+/// Une colonne de statut (direction « Colonnes de statut », /draft du 19/11/2026,
+/// conv-1998) : l'ancien onglet d'etat, coiffe d'une tuile de l'accueil, avec SES
+/// commandes. <c>Part</c> (0-100) remplit l'anneau de la tuile : sa part des
+/// commandes de toutes les colonnes. <c>Depot</c> : la decision (ActionCommande)
+/// que joue une carte deposee dans la colonne, nulle quand elle n'en accepte pas.
+/// <c>Actif</c> : la colonne de la commande ouverte, celle ou « suivante » se prend.
+/// </summary>
+public sealed record ColonneCw(string Etat, string Libelle, int Nombre, bool Actif, int Part, string Detail,
+                               string? Depot, LigneCw[] Lignes);
 public sealed record OptionCw(string Valeur, string Libelle);
 public sealed record MessageCw(string Texte, string Severite);
+
+/// <summary>Un chiffre de la proue et ce qu'il compte (« 3 » · « groupes ») ; <c>Alerte</c> l'ecrit en teinte d'alerte.</summary>
+public sealed record ChiffreCw(int Nombre, string Texte, bool Alerte);
+
+/// <summary>
+/// L'en-tete de l'ecran, a la maniere de la proue de l'accueil : la date du jour,
+/// le titre (les commandes a traiter) et la phrase des autres colonnes.
+/// </summary>
+public sealed record ProueCw(string Date, ChiffreCw Titre, ChiffreCw[] Phrase);
 
 /// <summary>Les criteres tels que saisis dans la carte de recherche (dates : aaaa-mm-jj ou vide).</summary>
 public sealed record RechercheCw(string Famille, OptionCw[] Familles, string Du, string Au, string Siren,
                                  string Reference, bool EnAttenteEnvoi, string DateTravail);
 
 /// <summary>
-/// Une ligne de la liste a plat ; <c>Id</c> revient avec le clic. <c>Avancement</c> :
+/// Une carte de colonne ; <c>Id</c> revient avec le clic. <c>Avancement</c> :
 /// les marches faites de son escalier (« 2/3 »), nul pour une commande traitee ou
-/// en saisie ; <c>Prete</c> quand les trois le sont.
+/// en saisie ; <c>Prete</c> quand les trois le sont. <c>Deplacable</c> : la carte
+/// se glisse vers une autre colonne (commande a traiter ou en attente).
 /// </summary>
 public sealed record LigneCw(int Id, int Rang, bool Active, string Nom, string Precisions, string Type, bool Direct,
-                             string? Avancement, bool Prete);
+                             string? Avancement, bool Prete, bool Deplacable);
 
 public sealed record EtatCw(string Icone, string Libelle);
 public sealed record MembreCw(int Id, string Titre, string Icone, string Libelle);
@@ -84,13 +103,13 @@ public sealed record CoordonneesCw(bool LectureSeule, ChampAdresseCw[] Champs, s
                                    bool AdresseCorrigee);
 
 /// <summary>Tout ce que web/src/ecrans/EcranCommandesWeb.tsx affiche.</summary>
-public sealed record VueCommandesWeb(string Session, OngletCw[] Onglets, bool RechercheOuverte, bool RechercheAffinee,
-                                     string ResumeCriteres, RechercheCw Recherche, MessageCw? Message, string Compteur,
-                                     bool DirectsEnTete, LigneCw[] Lignes, PanneauCw? Panneau, CoordonneesCw? Coordonnees);
+public sealed record VueCommandesWeb(string Session, ProueCw Proue, ColonneCw[] Colonnes, bool RechercheOuverte,
+                                     bool RechercheAffinee, string ResumeCriteres, RechercheCw Recherche, MessageCw? Message,
+                                     bool DirectsEnTete, PanneauCw? Panneau, CoordonneesCw? Coordonnees);
 
 /// <summary>
 /// Pont de l'ecran PROC_COMMANDES_WEB (web/src/ecrans/EcranCommandesWeb.tsx) :
-/// « Traitement des commandes » de NeoRIG, mise en page « Boite de tri » (conv-1984),
+/// « Traitement des commandes » de NeoRIG, en « Colonnes de statut » (conv-1998),
 /// commande en « Escalier » (conv-1993) : <see cref="SessionCommandesWeb"/> calcule ses marches.
 ///
 /// ECRAN A SESSION (web/src/session.tsx) : les commandes de l'ecran sont des
@@ -143,10 +162,13 @@ public sealed class SessionCommandesWeb
     private CriteresCommandes Appliques = TraitementCommandes.CriteresParDefaut();
     private bool RechercheOuverte;
 
-    // ------------------------------------------------------------ onglets et liste
+    // ------------------------------------------------------------ colonnes de statut
+    // Un onglet d'etat = une colonne. Toutes sont visibles a la fois, chacune avec
+    // ses groupes ; l'onglet ACTIF est la colonne de la commande ouverte : c'est
+    // dans son Ordre que Decider prend la suivante.
     private EtatCommande OngletActif = EtatCommande.ATraiter;
     private List<(EtatCommande Etat, int Nombre)> Onglets = [];
-    private List<GroupeCommandes> Groupes = [];
+    private Dictionary<EtatCommande, List<GroupeCommandes>> GroupesParEtat = [];
     private List<CommandeRecue> Ordre = [];
     private bool DirectsEnTete;
     private CommandeRecue? Selection;
@@ -259,15 +281,64 @@ public sealed class SessionCommandesWeb
     }
 
     /// <summary>
-    /// Relit les onglets et la liste selon les criteres appliques. Un onglet
-    /// « Saisie manuelle » vide disparait : on revient alors sur « À traiter ».
+    /// Relit les colonnes selon les criteres appliques : chacune filtre sur SON
+    /// etat (SurOnglet), les autres criteres restent ceux de la recherche. Une
+    /// colonne « Saisie manuelle » vide disparait : on revient alors sur « À traiter ».
     /// </summary>
     private void Rafraichir()
     {
         Onglets = TraitementCommandes.Onglets(Toutes, Appliques);
         if (Onglets.All(o => o.Etat != OngletActif)) PoserOnglet(EtatCommande.ATraiter);
-        Groupes = TraitementCommandes.Regrouper(TraitementCommandes.Filtrer(Toutes, Appliques), DirectsEnTete);
-        Ordre = Groupes.SelectMany(g => g.Commandes).ToList();
+        GroupesParEtat = Onglets.ToDictionary(o => o.Etat, o => TraitementCommandes.Regrouper(
+            TraitementCommandes.Filtrer(Toutes, TraitementCommandes.SurOnglet(Appliques, o.Etat)), DirectsEnTete));
+        Ordre = GroupesParEtat[OngletActif].SelectMany(g => g.Commandes).ToList();
+    }
+
+    /// <summary>
+    /// Une carte choisie dans une AUTRE colonne fait de sa colonne la colonne
+    /// active : la suivante, apres une decision, se prend alors dans son ordre.
+    /// </summary>
+    private void ChoisirDansSaColonne(CommandeRecue c)
+    {
+        if (c.Etat != OngletActif && Onglets.Any(o => o.Etat == c.Etat))
+        {
+            PoserOnglet(c.Etat);
+            Rafraichir();
+        }
+        Choisir(c);
+    }
+
+    /// <summary>La decision que joue une carte deposee dans la colonne d'un etat ; nulle si elle n'en accepte pas.</summary>
+    private static ActionCommande? DecisionDeLaColonne(EtatCommande etat) => etat switch
+    {
+        EtatCommande.EnAttente => ActionCommande.MettreEnAttente,
+        EtatCommande.Validee => ActionCommande.Valider,
+        EtatCommande.Rejetee => ActionCommande.Rejeter,
+        _ => null,
+    };
+
+    /// <summary>
+    /// Une carte glissee dans une colonne : la commande s'ouvre, puis la decision
+    /// part comme au clic sur le bouton du pied. Valider decide tout de suite (et
+    /// dit ce qui manque s'il est ferme) ; Rejeter et Mettre en attente ouvrent la
+    /// bande du motif. Les refus qui ne tiennent pas au motif (commande traitee, en
+    /// saisie, deja en attente) s'affichent sans rien ouvrir.
+    /// </summary>
+    private void Deposer(CommandeRecue c, ActionCommande action)
+    {
+        // La carte de la commande DEJA ouverte garde ce que l'agent y a choisi
+        // (types, quantites, mail) : la rechoisir le remettrait aux valeurs d'ouverture.
+        if (Selection?.Id != c.Id) ChoisirDansSaColonne(c);
+        // Sans motif, Refus ne peut refuser Rejeter que pour son motif (la bande le
+        // demandera) : on ne garde que les refus d'etat, qui valent pour les trois.
+        if ((!EnCours(c) || action == ActionCommande.MettreEnAttente)
+            && TraitementCommandes.Refus(c, action, null) is { } refus)
+        {
+            Message = (refus, "avertissement");
+            return;
+        }
+        if (action == ActionCommande.Valider) Decider(action);
+        else OuvrirBande(action);
     }
 
     private static int Rang(CommandeRecue c) => TraitementCommandes.RangGroupe(TraitementCommandes.Groupe(c.Famille));
@@ -690,7 +761,10 @@ public sealed class SessionCommandesWeb
             case "FermerMessage": Message = null; break;
             case "BasculerDirects": BasculerDirects(); break;
             case "NouvelleCommande": NouvelleCommande(); break;
-            case "Choisir": Choisir(Commande(valeur.GetInt32())); break;
+            case "Choisir": ChoisirDansSaColonne(Commande(valeur.GetInt32())); break;
+            case "Deposer":
+                Deposer(Commande(valeur.GetProperty("id").GetInt32()), Enum.Parse<ActionCommande>(Texte(valeur, "action")));
+                break;
             case "FermerPanneau": FermerPanneau(); break;
 
             // ---- en-tete du panneau
@@ -814,35 +888,72 @@ public sealed class SessionCommandesWeb
     private static DocumentCw[] Documents(IEnumerable<DocumentEdite> docs) =>
         docs.Select(d => new DocumentCw(d.Document, d.Bac, d.Exemplaires?.ToString() ?? "—", d.Origine)).ToArray();
 
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+
     internal VueCommandesWeb Vue(string session)
     {
-        var onglets = Onglets.Select(o => new OngletCw(o.Etat.ToString(), TraitementCommandes.Libelle(o.Etat),
-                                                       o.Nombre, OngletActif == o.Etat)).ToArray();
+        var total = Onglets.Sum(o => o.Nombre);
+        var colonnes = Onglets.Select(o =>
+        {
+            var groupes = GroupesParEtat[o.Etat];
+            return new ColonneCw(o.Etat.ToString(), TraitementCommandes.Libelle(o.Etat), o.Nombre, OngletActif == o.Etat,
+                total == 0 ? 0 : (int)Math.Round(o.Nombre * 100.0 / total), $"{groupes.Count} groupe(s)",
+                DecisionDeLaColonne(o.Etat)?.ToString(),
+                groupes.SelectMany(g => g.Commandes).Select(VueLigne).ToArray());
+        }).ToArray();
         var recherche = new RechercheCw(FamilleChoisie, Familles(),
             Du?.ToString(FormatDate, CultureInfo.InvariantCulture) ?? string.Empty,
             Au?.ToString(FormatDate, CultureInfo.InvariantCulture) ?? string.Empty,
             SirenCherche, ReferenceCherchee, EnAttenteEnvoi,
             TraitementCommandes.DateTravail.ToString("dd/MM/yyyy"));
-        var lignes = Ordre.Select(cmd =>
-        {
-            // La commande ouverte compte sur ce que l'agent a choisi, les autres sur ce
-            // qu'elles montreront a l'ouverture.
-            var marches = EnCours(cmd) ? MarchesDe(cmd, cmd.Id == Selection?.Id ? ChoixEnCours : ChoixCommande.ParDefaut(cmd)) : [];
-            var faites = marches.Count(m => m.Faite);
-            return new LigneCw(cmd.Id, Rang(cmd), cmd.Id == Selection?.Id, Tiret(cmd.Denomination),
-                               TraitementCommandes.Precisions(cmd),
-                               TraitementCommandes.Libelle(cmd.Famille),
-                               TraitementCommandes.EstRapprochementDirect(cmd),
-                               marches.Length > 0 ? $"{faites}/{marches.Length}" : null,
-                               marches.Length > 0 && faites == marches.Length);
-        }).ToArray();
 
-        return new VueCommandesWeb(session, onglets, RechercheOuverte, TraitementCommandes.RechercheAffinee(Appliques),
+        return new VueCommandesWeb(session, VueProue(), colonnes, RechercheOuverte, TraitementCommandes.RechercheAffinee(Appliques),
             TraitementCommandes.Resumer(Appliques), recherche,
             Message is { } m ? new MessageCw(m.Texte, m.Severite) : null,
-            TraitementCommandes.Compteur(Groupes), DirectsEnTete, lignes,
+            DirectsEnTete,
             Selection is { } c ? VuePanneau(c) : null,
             CoordonneesOuvertes && Selection is not null ? VueCoordonnees(Selection) : null);
+    }
+
+    private LigneCw VueLigne(CommandeRecue cmd)
+    {
+        // La commande ouverte compte sur ce que l'agent a choisi, les autres sur ce
+        // qu'elles montreront a l'ouverture.
+        var marches = EnCours(cmd) ? MarchesDe(cmd, cmd.Id == Selection?.Id ? ChoixEnCours : ChoixCommande.ParDefaut(cmd)) : [];
+        var faites = marches.Count(m => m.Faite);
+        return new LigneCw(cmd.Id, Rang(cmd), cmd.Id == Selection?.Id, Tiret(cmd.Denomination),
+                           TraitementCommandes.Precisions(cmd),
+                           TraitementCommandes.Libelle(cmd.Famille),
+                           TraitementCommandes.EstRapprochementDirect(cmd),
+                           marches.Length > 0 ? $"{faites}/{marches.Length}" : null,
+                           marches.Length > 0 && faites == marches.Length,
+                           EnCours(cmd));
+    }
+
+    /// <summary>
+    /// La proue : la date du jour (celle de l'accueil, Home.DateDuJour), le compte
+    /// « À traiter » en titre, puis une phrase pour ses groupes et les autres
+    /// colonnes. Les rejets s'ecrivent en teinte d'alerte des qu'il y en a.
+    /// </summary>
+    private ProueCw VueProue()
+    {
+        static string Accord(int n, string un, string plusieurs) => n > 1 ? plusieurs : un;
+        int Nombre(EtatCommande e) => Onglets.FirstOrDefault(o => o.Etat == e).Nombre;
+        var aTraiter = Nombre(EtatCommande.ATraiter);
+        var groupes = GroupesParEtat[EtatCommande.ATraiter].Count;
+        var phrase = new List<ChiffreCw> { new(groupes, Accord(groupes, "groupe", "groupes"), false) };
+        foreach (var (etat, n) in Onglets.Where(o => o.Etat != EtatCommande.ATraiter))
+        {
+            phrase.Add(etat switch
+            {
+                EtatCommande.EnAttente => new ChiffreCw(n, "en attente", false),
+                EtatCommande.Validee => new ChiffreCw(n, Accord(n, "validée", "validées"), false),
+                EtatCommande.Rejetee => new ChiffreCw(n, Accord(n, "rejetée", "rejetées"), n > 0),
+                _ => new ChiffreCw(n, "en saisie au guichet", false),
+            });
+        }
+        return new ProueCw(DateTime.Today.ToString("dddd d MMMM", Fr),
+            new ChiffreCw(aTraiter, Accord(aTraiter, "commande à traiter", "commandes à traiter"), false), phrase.ToArray());
     }
 
     private PanneauCw VuePanneau(CommandeRecue c)

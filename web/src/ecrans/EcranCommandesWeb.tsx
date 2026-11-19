@@ -1,15 +1,19 @@
 // Ecran PROC_COMMANDES_WEB — « Traitement des commandes » de NeoRIG, porte dans
 // la maquette pour le voir avec ses themes.
 //
-// MISE EN PAGE « BOITE DE TRI » : direction n° 2 choisie par l'utilisateur au
-// /draft du 18/11/2026 (conv-1984). Des ONGLETS D'ETAT avec leur compte en
-// tete, la recherche repliee derriere la pastille « Rechercher », une liste A
-// PLAT de lignes larges (filet a la couleur du type), et la commande choisie
-// qui s'ouvre en PANNEAU, decisions en pied du panneau.
+// MISE EN PAGE « COLONNES DE STATUT » : direction n° 4 choisie par l'utilisateur
+// au /draft du 19/11/2026 (conv-1998), avec l'effet de l'accueil. L'en-tete est
+// une PROUE (date en petites capitales, le compte « à traiter » en grand, une
+// phrase pour les autres colonnes) ; chaque etat est une COLONNE coiffee d'une
+// tuile chiffree de l'accueil (grand rond, anneau qui se remplit de sa part des
+// commandes) et porte SES cartes ; la commande choisie s'ouvre en panneau a
+// droite. GLISSER une carte vers « Mise en attente », « Validée » ou « Rejetée »
+// joue la decision du pied (geste « Deposer », regle dans le pont).
+// Remplace la « Boite de tri » (conv-1984), dont onglets et liste a plat
+// deviennent les colonnes.
 //
 // COMMANDE EN « ESCALIER » : direction choisie au /draft du 19/11/2026 (conv-1993).
-// La commande ouverte se pose A COTE de la liste, devenue une colonne ; chaque
-// ligne dit ses marches faites (« 2/3 »). Le detail descend en trois MARCHES
+// Chaque carte dit ses marches faites (« 2/3 »). Le detail descend en trois MARCHES
 // reliees par un trait — dossier, choix (types ou certificats), edition — avec
 // leur voyant ; une marche faite se replie en une ligne, celle qui manque reste
 // ouverte, et Valider est le bout du trait (« Valider 2 / 3 »). Les marches sont
@@ -29,11 +33,10 @@
 // et les regles de l'ancien @code vivent dans Pont/EcranCommandesWeb.cs
 // (SessionCommandesWeb) ; cet ecran affiche la vue et remonte chaque geste.
 
-import type { KeyboardEvent, ReactNode } from 'react'
+import { Fragment, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { appeler } from '../pont'
 import { Saisie, useSession, type Geste, type PontDeSession } from '../session'
 
-export interface OngletCw { etat: string; libelle: string; nombre: number; actif: boolean }
 export interface OptionCw { valeur: string; libelle: string }
 export interface MessageCw { texte: string; severite: string }
 export interface RechercheCw {
@@ -56,7 +59,20 @@ export interface LigneCw {
   direct: boolean
   avancement: string | null
   prete: boolean
+  deplacable: boolean
 }
+export interface ColonneCw {
+  etat: string
+  libelle: string
+  nombre: number
+  actif: boolean
+  part: number
+  detail: string
+  depot: string | null
+  lignes: LigneCw[]
+}
+export interface ChiffreCw { nombre: number; texte: string; alerte: boolean }
+export interface ProueCw { date: string; titre: ChiffreCw; phrase: ChiffreCw[] }
 export interface EtatCw { icone: string; libelle: string }
 export interface MembreCw { id: number; titre: string; icone: string; libelle: string }
 export interface EnveloppeCw { reference: string; membres: MembreCw[]; etat: string; envoiEnAttente: boolean }
@@ -144,15 +160,14 @@ export interface ChampAdresseCw { cle: string; libelle: string; large: boolean; 
 export interface CoordonneesCw { lectureSeule: boolean; champs: ChampAdresseCw[]; lignes: string[]; alertes: string[]; adresseCorrigee: boolean }
 export interface VueCommandesWeb {
   session: string
-  onglets: OngletCw[]
+  proue: ProueCw
+  colonnes: ColonneCw[]
   rechercheOuverte: boolean
   rechercheAffinee: boolean
   resumeCriteres: string
   recherche: RechercheCw
   message: MessageCw | null
-  compteur: string
   directsEnTete: boolean
-  lignes: LigneCw[]
   panneau: PanneauCw | null
   coordonnees: CoordonneesCw | null
 }
@@ -673,13 +688,124 @@ function Coordonnees({ d, geste }: { d: CoordonneesCw; geste: Geste }) {
   )
 }
 
+// ------------------------------------------------------------ colonnes de statut
+
+/** La teinte de tuile de chaque colonne (jetons --rig-chiffre-N de la charte, comme les tuiles de l'accueil). */
+const TeinteColonne: Record<string, number> = { ATraiter: 1, EnAttente: 4, Validee: 2, Rejetee: 3, SaisieManuelle: 4 }
+
+const trait = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round', strokeLinejoin: 'round' } as const
+
+/** Le sujet de chaque colonne, dans le grand rond de sa tuile (dessins de l'accueil pour la corbeille, la coche et l'horloge). */
+const IconeColonne: Record<string, ReactNode> = {
+  ATraiter: <svg viewBox="0 0 16 16"><path d="M2.5 9.5h3l1 2h3l1-2h3M3.5 4h9l1 5.5V13h-11V9.5z" {...trait} /></svg>,
+  EnAttente: <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6" {...trait} /><path d="M8 4.8V8l2.2 1.6" {...trait} /></svg>,
+  Validee: <svg viewBox="0 0 16 16"><path d="m3.5 8.5 3 3 6-6.5" {...trait} strokeWidth={1.8} /></svg>,
+  Rejetee: <svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" {...trait} strokeWidth={1.8} /></svg>,
+  SaisieManuelle: <svg viewBox="0 0 16 16"><path d="M10.5 2.8l2.7 2.7-7.4 7.4H3.1v-2.7z" {...trait} /></svg>,
+}
+
+/** La zone ou poser une carte, selon la decision de la colonne (ColonneCw.Depot). */
+const Depots: Record<string, { classe: string; libelle: string }> = {
+  Valider: { classe: 'valider', libelle: 'Déposer ici pour valider' },
+  MettreEnAttente: { classe: 'attente', libelle: 'Déposer ici pour mettre en attente' },
+  Rejeter: { classe: 'rejeter', libelle: 'Déposer ici pour rejeter' },
+}
+
+/** La carte en cours de glisser : son identifiant et sa colonne de depart. */
+interface Traine { id: number; etat: string }
+
+function Carte({ cmd, rang, etat, traine, setTraine, geste }: {
+  cmd: LigneCw; rang: number; etat: string; traine: Traine | null; setTraine: (t: Traine | null) => void; geste: Geste
+}) {
+  const commencer = (e: DragEvent) => {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(cmd.id))
+    setTraine({ id: cmd.id, etat })
+  }
+  return (
+    <button type="button"
+            className={`rig-tcw__carte rig-tcw__rang-${cmd.rang} ${cmd.active ? 'rig-tcw__carte--active' : ''} ${traine?.id === cmd.id ? 'rig-tcw__carte--traine' : ''}`}
+            style={{ '--tcw-ordre': rang } as CSSProperties}
+            aria-current={cmd.active ? 'true' : undefined} draggable={cmd.deplacable}
+            {...(cmd.deplacable ? { title: 'Glisser vers une autre colonne pour décider' } : {})}
+            onClick={() => geste('Choisir', cmd.id)}
+            onDragStart={cmd.deplacable ? commencer : undefined} onDragEnd={() => setTraine(null)}>
+      <span className="rig-tcw__carte-tete">
+        <span className="rig-tcw__carte-nom">{cmd.nom}</span>
+        {cmd.avancement !== null && (
+          <span className={`rig-tcw__avancement ${cmd.prete ? 'rig-tcw__avancement--prete' : ''}`}
+                title="Marches faites : dossier, choix, édition">{cmd.avancement}</span>
+        )}
+      </span>
+      <span className="rig-tcw__carte-type">{cmd.type}</span>
+      <span className="rig-tcw__carte-pied">
+        <span className="rig-tcw__carte-precisions">{cmd.precisions}</span>
+        {cmd.direct && (
+          <span className="rig-tcw__direct" title="Un seul dossier correspond à la commande : à traiter en premier.">Rapprochement direct</span>
+        )}
+      </span>
+    </button>
+  )
+}
+
+function Colonne({ c, traine, setTraine, geste }: {
+  c: ColonneCw; traine: Traine | null; setTraine: (t: Traine | null) => void; geste: Geste
+}) {
+  const [survol, setSurvol] = useState(false)
+  // Une colonne accepte la carte glissee si elle porte une decision et n'est pas sa colonne de depart.
+  const depot = c.depot !== null && traine !== null && traine.etat !== c.etat ? Depots[c.depot] : undefined
+  const glisser = depot && traine
+    ? {
+        onDragOver: (e: DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setSurvol(true) },
+        onDragLeave: (e: DragEvent) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setSurvol(false)
+        },
+        onDrop: (e: DragEvent) => {
+          e.preventDefault()
+          setSurvol(false)
+          setTraine(null)
+          geste('Deposer', { id: traine.id, action: c.depot })
+        },
+      }
+    : {}
+  return (
+    <section className={`rig-tcw__colonne ${depot ? 'rig-tcw__colonne--cible' : ''} ${depot && survol ? 'rig-tcw__colonne--survol' : ''}`}
+             aria-label={c.libelle} {...glisser}>
+      <button type="button" aria-pressed={c.actif ? 'true' : 'false'}
+              className={`rig-chiffre rig-chiffre--${TeinteColonne[c.etat] ?? 4} rig-tcw__tete ${c.actif ? 'rig-chiffre--deplie' : ''}`}
+              onClick={() => geste('ChoisirOnglet', c.etat)}>
+        <span className="rig-chiffre__libelle">{c.libelle}</span>
+        <span className="rig-chiffre__rang">
+          <span className="rig-chiffre__anneau" aria-hidden="true">
+            <span className="rig-chiffre__cercle rig-chiffre__cercle--jauge" style={{ '--rig-anneau-cible': c.part } as CSSProperties}></span>
+            <span className="rig-chiffre__rond">{IconeColonne[c.etat]}</span>
+          </span>
+          <span className="rig-chiffre__texte">
+            <b className="rig-chiffre__valeur">{c.nombre}</b>
+            <span className="rig-chiffre__detail">{c.detail}</span>
+          </span>
+        </span>
+      </button>
+      <div className="rig-tcw__cartes">
+        {c.lignes.length === 0 && !depot && <div className="rig-tcw__vide">Aucune commande ne correspond aux critères.</div>}
+        {c.lignes.map((cmd, i) => (
+          <Carte key={cmd.id} cmd={cmd} rang={i} etat={c.etat} traine={traine} setTraine={setTraine} geste={geste} />
+        ))}
+        {depot && <div className={`rig-tcw__depot rig-tcw__depot--${depot.classe}`}>{depot.libelle}</div>}
+      </div>
+    </section>
+  )
+}
+
 export function EcranCommandesWeb() {
   const [vue, geste] = useSession(pont)
+  const [traine, setTraine] = useState<Traine | null>(null)
 
   // Avant la premiere reponse du pont : le cadre seul, sans aucune valeur fausse.
   if (!vue) return <div className="rig-tcw"></div>
 
   const r = vue.recherche
+  const proue = vue.proue
   const texte = (champ: string) => (valeur: string) => geste('Texte', { champ, valeur })
   const rechercher = () => geste('Rechercher')
   const surToucheRecherche = (e: KeyboardEvent) => {
@@ -688,21 +814,35 @@ export function EcranCommandesWeb() {
 
   return (
     <div className="rig-tcw">
-      <nav className="rig-tcw__barre" aria-label="États des commandes">
-        {vue.onglets.map((o) => (
-          <button key={o.etat} className={`rig-tcw__onglet ${o.actif ? 'rig-tcw__onglet--actif' : ''}`}
-                  aria-pressed={o.actif ? 'true' : 'false'} onClick={() => geste('ChoisirOnglet', o.etat)}>
-            {o.libelle}<b className="rig-tcw__onglet-compte">{o.nombre}</b>
+      {/* La proue de l'accueil : date, compte « à traiter » en grand, phrase des autres colonnes. */}
+      <header className="rig-tcw__barre">
+        <div className="rig-proue rig-tcw__proue">
+          <div className="rig-proue__date">{proue.date}<span className="rig-proue__point">·</span>Affaires</div>
+          <h2 className="rig-tcw__proue-titre"><b>{proue.titre.nombre}</b> {proue.titre.texte}</h2>
+          <div className="rig-proue__phrase">
+            {proue.phrase.map((c, i) => (
+              <Fragment key={i}>
+                {i > 0 && <span className="rig-proue__point">·</span>}
+                <b className={c.alerte ? 'rig-proue__alerte' : undefined}>{c.nombre}</b> {c.texte}
+              </Fragment>
+            ))}
+          </div>
+        </div>
+        <div className="rig-tcw__outils">
+          <button className={`rig-bascule ${vue.directsEnTete ? 'rig-bascule--actif' : ''}`}
+                  title="Place en tête de chaque groupe les commandes qui se rapprochent d'un seul dossier."
+                  onClick={() => geste('BasculerDirects')}>
+            <span className="rig-bascule__temoin"></span><span>Rapprochements directs en tête</span>
           </button>
-        ))}
-        <span className="rig-tcw__espace"></span>
-        <button className={`rig-tcw__chercher ${vue.rechercheOuverte ? 'rig-tcw__chercher--ouvert' : ''} ${vue.rechercheAffinee ? 'rig-tcw__chercher--affinee' : ''}`}
-                title={vue.resumeCriteres} aria-expanded={vue.rechercheOuverte ? 'true' : 'false'}
-                onClick={() => geste('Basculer', 'RechercheOuverte')}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="M20 20l-4.5-4.5" /></svg>
-          <span>Rechercher</span>
-        </button>
-      </nav>
+          <button className="rig-bouton rig-tcw__bouton rig-tcw__nouvelle" onClick={() => geste('NouvelleCommande')}>+&nbsp;&nbsp;Nouvelle commande saisie au guichet</button>
+          <button className={`rig-tcw__chercher ${vue.rechercheOuverte ? 'rig-tcw__chercher--ouvert' : ''} ${vue.rechercheAffinee ? 'rig-tcw__chercher--affinee' : ''}`}
+                  title={vue.resumeCriteres} aria-expanded={vue.rechercheOuverte ? 'true' : 'false'}
+                  onClick={() => geste('Basculer', 'RechercheOuverte')}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="M20 20l-4.5-4.5" /></svg>
+            <span>Rechercher</span>
+          </button>
+        </div>
+      </header>
 
       {vue.rechercheOuverte && (
         <section className="rig-tcw__recherche" onKeyDown={surToucheRecherche}>
@@ -758,52 +898,22 @@ export function EcranCommandesWeb() {
         </div>
       )}
 
-      {/* Escalier : une commande ouverte se pose A COTE de la liste, qui se resserre
-          en colonne (nom et marches faites) au lieu d'etre recouverte. */}
-      <div className={`rig-tcw__scene ${vue.panneau ? 'rig-tcw__scene--ouverte' : ''}`}>
-        <section className="rig-tcw__liste" aria-label="Commandes">
-          <div className="rig-tcw__liste-entete">
-            <span className="rig-tcw__compteur">{vue.compteur}</span>
-            <button className={`rig-bascule ${vue.directsEnTete ? 'rig-bascule--actif' : ''}`}
-                    title="Place en tête de chaque groupe les commandes qui se rapprochent d'un seul dossier."
-                    onClick={() => geste('BasculerDirects')}>
-              <span className="rig-bascule__temoin"></span><span>Rapprochements directs en tête</span>
-            </button>
-            <span className="rig-tcw__espace"></span>
-            <button className="rig-bouton rig-tcw__bouton rig-tcw__nouvelle" onClick={() => geste('NouvelleCommande')}>+&nbsp;&nbsp;Nouvelle commande saisie au guichet</button>
-          </div>
-
-          {vue.lignes.length === 0 ? (
-            <div className="rig-tcw__vide">Aucune commande ne correspond aux critères.</div>
-          ) : vue.panneau === null ? (
-            <div className="rig-tcw__invite">Sélectionnez une commande dans la liste pour la traiter.</div>
-          ) : null}
-
-          <div className="rig-tcw__lignes">
-            {vue.lignes.map((cmd) => (
-              <button key={cmd.id} className={`rig-tcw__cmd rig-tcw__rang-${cmd.rang} ${cmd.active ? 'rig-tcw__cmd--active' : ''}`}
-                      aria-current={cmd.active ? 'true' : undefined} onClick={() => geste('Choisir', cmd.id)}>
-                <span className="rig-tcw__cmd-filet"></span>
-                <span className="rig-tcw__cmd-qui">
-                  <span className="rig-tcw__cmd-nom">{cmd.nom}</span>
-                  <span className="rig-tcw__cmd-precisions">{cmd.precisions}</span>
-                </span>
-                <span className="rig-tcw__cmd-type">{cmd.type}</span>
-                {cmd.direct && (
-                  <span className="rig-tcw__direct" title="Un seul dossier correspond à la commande : à traiter en premier.">Rapprochement direct</span>
-                )}
-                {cmd.avancement !== null && (
-                  <span className={`rig-tcw__avancement ${cmd.prete ? 'rig-tcw__avancement--prete' : ''}`}
-                        title="Marches faites : dossier, choix, édition">{cmd.avancement}</span>
-                )}
-              </button>
-            ))}
-          </div>
-        </section>
+      {/* Les colonnes a gauche, la commande ouverte a droite. La place du panneau
+          reste prise sans commande (l'invite) : choisir une carte n'elargit ni ne
+          resserre les colonnes. */}
+      <div className="rig-tcw__scene">
+        <div className="rig-tcw__colonnes" aria-label="Commandes par statut">
+          {vue.colonnes.map((c) => <Colonne key={c.etat} c={c} traine={traine} setTraine={setTraine} geste={geste} />)}
+        </div>
 
         {/* key : chaque commande ouverte est un panneau NEUF, qui glisse a
             nouveau et repart en haut de son defilement. */}
-        {vue.panneau && <Panneau key={vue.panneau.id} p={vue.panneau} geste={geste} />}
+        {vue.panneau ? <Panneau key={vue.panneau.id} p={vue.panneau} geste={geste} /> : (
+          <div className="rig-tcw__invite">
+            <span>Sélectionnez une commande dans la liste pour la traiter.</span>
+            <span className="rig-tcw__discret">Ou glissez sa carte vers « Mise en attente », « Validée » ou « Rejetée ».</span>
+          </div>
+        )}
       </div>
 
       {vue.coordonnees && <Coordonnees d={vue.coordonnees} geste={geste} />}

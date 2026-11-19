@@ -202,6 +202,10 @@ select option {
   --rig-chiffre-1-icone: #8FA2E6;
   --rig-chiffre-2-icone: #B3C878;
   --rig-chiffre-3-icone: #E8937B;
+  /* 4e teinte : la colonne « Mise en attente » des commandes web (neutre). */
+  --rig-chiffre-4: linear-gradient(160deg, #262A33, #1B1E26);
+  --rig-chiffre-4-bord: #454B58;
+  --rig-chiffre-4-icone: #A9B1C2;
 }
 
 /* --- MODE CLAIR --- */
@@ -285,6 +289,10 @@ select option {
   --rig-chiffre-1-icone: #2C3F8F;
   --rig-chiffre-2-icone: #557A2C;
   --rig-chiffre-3-icone: #B2492A;
+  /* 4e teinte : la colonne « Mise en attente » des commandes web (neutre). */
+  --rig-chiffre-4: linear-gradient(135deg, #475569, #8494A8);
+  --rig-chiffre-4-bord: transparent;
+  --rig-chiffre-4-icone: #475569;
 }
 
 /* ============================================================
@@ -366,6 +374,10 @@ select option {
   --rig-chiffre-1-icone: #FFFFFF;
   --rig-chiffre-2-icone: #FFFFFF;
   --rig-chiffre-3-icone: #FFFFFF;
+  /* 4e teinte : la colonne « Mise en attente » des commandes web (neutre). */
+  --rig-chiffre-4: linear-gradient(160deg, #6E7088, #4B4D66);
+  --rig-chiffre-4-bord: transparent;
+  --rig-chiffre-4-icone: #FFFFFF;
   --rig-profil: linear-gradient(135deg, #523EDB, #7563EF);
   --rig-profil-texte: #FFFFFF;
 }
@@ -438,6 +450,10 @@ select option {
   --rig-chiffre-1-icone: #F59E0B;
   --rig-chiffre-2-icone: #FCD34D;
   --rig-chiffre-3-icone: #D4D4D8;
+  /* 4e teinte : la colonne « Mise en attente » des commandes web (neutre). */
+  --rig-chiffre-4: linear-gradient(160deg, #3C3C42, #2A2A2F);
+  --rig-chiffre-4-bord: transparent;
+  --rig-chiffre-4-icone: #A1A1AA;
   --rig-profil: linear-gradient(135deg, #F59E0B, #FBBF24);
   --rig-profil-texte: #141416;
 }
@@ -510,6 +526,10 @@ select option {
   --rig-chiffre-1-icone: #C9603A;
   --rig-chiffre-2-icone: #3F8C85;
   --rig-chiffre-3-icone: #2E393F;
+  /* 4e teinte : la colonne « Mise en attente » des commandes web (neutre). */
+  --rig-chiffre-4: linear-gradient(145deg, #A39A90, #857B71);
+  --rig-chiffre-4-bord: transparent;
+  --rig-chiffre-4-icone: #6B6158;
   --rig-profil: linear-gradient(135deg, #2E393F, #4A5A60);
   --rig-profil-texte: #FFFFFF;
 }
