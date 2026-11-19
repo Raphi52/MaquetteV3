@@ -6,143 +6,21 @@
      - OPE_TYPECLIENT    : ult_ChckBxCompte, ult_ChckBxGreffe, ult_ChckBxPC,
                            ult_ChckBxPreventions, ult_ChckBxWeb
      - OPE_RESULTAT      : grille ult_DGVResultat, colonnes Id Client,
-                           N Compte, Abrege, Nom, Groupe, Statut, Type *@
+                           N Compte, Abrege, Nom, Groupe, Statut, Type
 
-<div class="rig-proc__corps">
+   PORTE EN REACT (lot 4 de la migration, 19/11/2026) : l'ecran est rendu par
+   web/src/ecrans/EcranClients.tsx, sans pont : l'ecran ne lisait rien dans Metier/. Ce fichier n'est plus qu'une COQUILLE :
+   l'ecran garde son parametre Selectionner,
+   remonte par le rappel « selectionner ». Mode d'emploi : web/README.md. *@
 
-    <aside class="rig-criteres">
-        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Criteres de recherche</div>
-
-        <label class="rig-saisie-champ">
-            <span class="rig-saisie-champ__libelle">Mot cle</span>
-            <input class="rig-saisie-champ__saisie" placeholder="nom, abrege ou compte"
-                   @bind="MotCle" @bind:event="oninput" />
-        </label>
-
-        <div class="rig-criteres__bloc">
-            <div class="rig-kicker">Statut du client</div>
-            @foreach (var s in Statuts)
-            {
-                var v = s;
-                <button class="rig-bascule @(CritStatuts.Contains(v) ? "rig-bascule--actif" : "")"
-                        @onclick="() => BasculerStatut(v)">
-                    <span class="rig-bascule__temoin"></span>
-                    <span>@v</span>
-                </button>
-            }
-        </div>
-
-        <div class="rig-criteres__bloc">
-            <div class="rig-kicker">Type de client</div>
-            @foreach (var t in Types)
-            {
-                var v = t;
-                <button class="rig-bascule @(CritTypes.Contains(v) ? "rig-bascule--actif" : "")"
-                        @onclick="() => BasculerType(v)">
-                    <span class="rig-bascule__temoin"></span>
-                    <span>@v</span>
-                </button>
-            }
-        </div>
-
-        <div class="rig-criteres__actions">
-            <button class="rig-bouton" @onclick="Effacer">Effacer</button>
-        </div>
-    </aside>
-
-    <section class="rig-resultats-proc">
-        <div class="rig-resultats-proc__entete">
-            <div class="rig-kicker">Resultat</div>
-            <span class="rig-resultats-proc__compte">@Trouves.Length client(s) sur @Clients.Length</span>
-        </div>
-
-        <div class="rig-table-cadre">
-            <table class="rig-table">
-                <thead>
-                    <tr>
-                        <th>Id Client</th>
-                        <th>N Compte</th>
-                        <th>Abrege</th>
-                        <th>Nom</th>
-                        <th>Groupe</th>
-                        <th>Statut</th>
-                        <th>Type</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var c in Trouves)
-                    {
-                        var cli = c;
-                        <tr @onclick="() => Selectionner.InvokeAsync(cli.Abrege)">
-                            <td class="rig-table__mono">@cli.Id</td>
-                            <td class="rig-table__mono">@cli.Compte</td>
-                            <td class="rig-table__mono">@cli.Abrege</td>
-                            <td>@cli.Nom</td>
-                            <td>@cli.Groupe</td>
-                            <td><span class="rig-etat rig-etat--@(cli.Statut == "Actif" ? "ok" : "attente")">@cli.Statut</span></td>
-                            <td>@cli.Type</td>
-                        </tr>
-                    }
-                    @if (Trouves.Length == 0)
-                    {
-                        <tr><td colspan="7" class="rig-table__vide">Aucun client ne repond a ces criteres.</td></tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    </section>
-</div>
+<IleReact Composant="EcranClients" Rappels="Rappels" />
 
 @code {
     /// <summary>Remonte l'abrege du client choisi (v2 : bouton « Selectionner »).</summary>
     [Parameter] public EventCallback<string> Selectionner { get; set; }
 
-    private sealed record ClientRcs(int Id, string Compte, string Abrege, string Nom,
-                                    string Groupe, string Statut, string Type);
-
-    // v2 : ult_ChckBxActif, ult_ChckBxBloque, ult_ChckBxSommeil.
-    private static readonly string[] Statuts = ["Actif", "Bloque", "En sommeil"];
-    private static readonly string[] Types = ["En compte", "Greffe", "Prevention", "PC", "Web"];
-
-    private static readonly ClientRcs[] Clients =
-    [
-        new(1042, "C-000142", "LEROY",  "SELARL LEROY & ASSOCIES", "Mandataires", "Actif",    "En compte"),
-        new(1088, "C-000188", "BLANC",  "CABINET BLANC",           "Mandataires", "Actif",    "En compte"),
-        new(1130, "C-000231", "DUPONT", "SCP DUPONT-MARTIN",       "Avocats",     "Bloque", "En compte"),
-        new(1204, "W-004412", "WEBPRO", "Deposant en ligne",       "",            "Actif",    "Web"),
-        new(1250, "G-000012", "GRFCPY", "Greffe de Compiegne",     "Greffes",     "Actif",    "Greffe"),
-        new(1305, "P-000031", "PREV51", "Cellule prevention 51",   "Prevention",  "En sommeil",     "Prevention")
-    ];
-
-    private string MotCle = string.Empty;
-    private readonly HashSet<string> CritStatuts = new();
-    private readonly HashSet<string> CritTypes = new();
-
-    private void BasculerStatut(string s) { if (!CritStatuts.Add(s)) CritStatuts.Remove(s); }
-    private void BasculerType(string t) { if (!CritTypes.Add(t)) CritTypes.Remove(t); }
-
-    private void Effacer()
+    private Dictionary<string, IleReact.RappelIle> Rappels => new()
     {
-        MotCle = string.Empty;
-        CritStatuts.Clear();
-        CritTypes.Clear();
-    }
-
-    private ClientRcs[] Trouves
-    {
-        get
-        {
-            IEnumerable<ClientRcs> q = Clients;
-            if (!string.IsNullOrWhiteSpace(MotCle))
-            {
-                var t = MotCle.Trim();
-                q = q.Where(c => c.Nom.Contains(t, StringComparison.OrdinalIgnoreCase)
-                              || c.Abrege.Contains(t, StringComparison.OrdinalIgnoreCase)
-                              || c.Compte.Contains(t, StringComparison.OrdinalIgnoreCase));
-            }
-            if (CritStatuts.Count > 0) q = q.Where(c => CritStatuts.Contains(c.Statut));
-            if (CritTypes.Count > 0) q = q.Where(c => CritTypes.Contains(c.Type));
-            return q.ToArray();
-        }
-    }
+        ["selectionner"] = IleReact.Rappel(Selectionner)
+    };
 }

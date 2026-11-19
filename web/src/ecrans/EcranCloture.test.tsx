@@ -1,0 +1,51 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { EcranCloture } from './EcranCloture'
+import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+
+afterEach(() => { cleanup(); retirerFauxDotNet() })
+
+// Valeurs attendues : celles de l'ecran Blazor (EcranCloture.razor), JeuDemo.Aujourdhui = 09/09/2026 :
+// seule la limite d'examen du 05/09/2026 (SAS TRANSPORTS MARNE) est depassee.
+function ouvrir(ouvrirDossier = vi.fn()) {
+  const dotnet = installerFauxDotNet({ 'EcranCloture.DateDuJour': () => '2026-09-09' })
+  return { dotnet, ouvrirDossier, ...render(<EcranCloture ouvrirDossier={ouvrirDossier} />) }
+}
+const lignes = (c: HTMLElement) =>
+  [...c.querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent))
+const alertes = (c: HTMLElement) => c.querySelectorAll('tbody tr.rig-table__ligne--alerte')
+
+describe('EcranCloture', () => {
+  it('affiche les cinq affaires de « Selection PC » et marque la limite depassee', async () => {
+    const { container, dotnet } = ouvrir()
+    expect(container.querySelector('.rig-resultats-proc__compte')!.textContent!.trim()).toBe('5 affichee(s) sur 5')
+    expect(container.querySelectorAll('thead th')).toHaveLength(15)
+    expect(lignes(container)[0]!.slice(0, 4)).toEqual(['PC-2024-0118', 'SARL BOULANGERIE DUVAL', '1re', '15/09/2026'])
+    await vi.waitFor(() => expect(alertes(container)).toHaveLength(1))
+    expect(dotnet.invokeMethodAsync).toHaveBeenCalledWith('RigV3Desktop', 'EcranCloture.DateDuJour')
+    expect(alertes(container)[0]!.textContent).toContain('SAS TRANSPORTS MARNE')
+  })
+
+  it('un clic sur une ligne remonte le dossier a Blazor', () => {
+    const { container, ouvrirDossier } = ouvrir()
+    fireEvent.click(container.querySelectorAll('tbody tr')[0]!)
+    expect(ouvrirDossier).toHaveBeenCalledWith('2024B00318')
+  })
+
+  it('les criteres filtrent ; l\'onglet « Enrolement / requete » a ses propres colonnes', async () => {
+    const { container } = ouvrir()
+    await vi.waitFor(() => expect(alertes(container)).toHaveLength(1))
+    fireEvent.click(screen.getByRole('button', { name: 'Limite d\'examen depassee' }))
+    expect(lignes(container).map((l) => l[0])).toEqual(['PC-2024-0207'])
+    fireEvent.click(screen.getByRole('button', { name: 'Effacer' }))
+    fireEvent.change(screen.getByLabelText('Chambre'), { target: { value: '1re' } })
+    expect(container.querySelector('.rig-resultats-proc__compte')!.textContent!.trim()).toBe('2 affichee(s) sur 5')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enrolement / requete' }))
+    expect(screen.getByText('Enrolement et requete')).toBeTruthy()
+    expect(container.querySelectorAll('thead th')).toHaveLength(8)
+    expect(lignes(container)[0]).toEqual(['2024/00318', 'PC-2024-0118', 'Me LEROY', 'SARL BOULANGERIE DUVAL', 'Assignation', '15/09/2026', '04/03/2026', 'Facturee'])
+    fireEvent.change(screen.getByLabelText('Affaire'), { target: { value: 'zzz' } })
+    expect(container.querySelector('.rig-table__vide')!.getAttribute('colspan')).toBe('8')
+  })
+})
