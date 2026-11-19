@@ -185,6 +185,52 @@ public sealed partial class SessionPlanTravail
         if (SousDossiersReplies.RemoveWhere(d => Range(d, element)) > 0) MemoriserArbre();
     }
 
+    /// <summary>
+    /// Les CARTES ouvertes de l'affaire telles que son arbre enregistre les connait
+    /// (ArbreGedEnregistre.Cartes) : comparees au classeur apres chaque geste (RetenirLesCartes).
+    /// </summary>
+    private readonly HashSet<NoeudGed> CartesRetenues = AccesGed.NouveauxMasques();
+
+    /// <summary>Les cartes ouvertes du classeur : les tetes de rubrique depliees.</summary>
+    private HashSet<NoeudGed> CartesOuvertes()
+    {
+        var cartes = AccesGed.NouveauxMasques();
+        foreach (var rubrique in GroupesArbre().Keys)
+            if (NoeudsOuverts.Contains(rubrique)) cartes.Add(rubrique);
+        return cartes;
+    }
+
+    /// <summary>
+    /// Apres CHAQUE geste (Agir, SurGesteAccueil) : si les cartes ouvertes ont change, quoi
+    /// qui les ait ouvertes (clic sur la carte, historique, palette, mode tache), l'arbre de
+    /// l'affaire est reecrit -- elles se rouvriront avec elle, meme apres un redemarrage
+    /// (demande du 19/11/2026). Un seul point plutot qu'un appel par geste : aucun chemin
+    /// qui ouvre une carte ne peut l'oublier.
+    /// </summary>
+    private void RetenirLesCartes()
+    {
+        if (DossierOuvert is null || CartesRetenues.SetEquals(CartesOuvertes())) return;
+        MemoriserArbre();
+    }
+
+    /// <summary>
+    /// A l'ouverture de l'affaire : ses cartes retenues se rouvrent, sauf dans le classeur
+    /// ou l'element choisi a deja ouvert la sienne (une carte par domaine, et l'element
+    /// ouvert reste visible).
+    /// </summary>
+    private void RouvrirLesCartes(IReadOnlyCollection<NoeudGed> cartes)
+    {
+        foreach (var domaine in AccesGed.EnfantsVisibles(Arbre, Domaines, AjoutsArbre, MasquesArbre, RecetteArbre))
+        {
+            var rubriques = AccesGed.EnfantsVisibles(domaine, Domaines, AjoutsArbre, MasquesArbre, RecetteArbre)
+                                    .Where(r => !r.EstPiece && !r.EstFiche).ToList();
+            if (rubriques.Any(NoeudsOuverts.Contains)) continue;
+            if (rubriques.FirstOrDefault(cartes.Contains) is { } carte) NoeudsOuverts.Add(carte);
+        }
+        CartesRetenues.Clear();
+        CartesRetenues.UnionWith(cartes);
+    }
+
     /// <summary>Le dossier range cet element, a toute profondeur (elements crees compris).</summary>
     private bool Range(NoeudGed dossier, NoeudGed element)
         => dossier.Enfants.Concat(AjoutsArbre.TryGetValue(dossier, out var a) ? a : [])

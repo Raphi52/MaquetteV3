@@ -223,8 +223,16 @@ internal static class Programme
                && Ligne(vue.Dossier.Arbre, "Instances") is { Ouvert: true }
                && vue.Dossier.Historique.Single(p => p.Actif).Libelle == "Rapport d expertise",
             "un clic dans l'historique ouvre la piece a droite et la montre choisie, sa carte ouverte");
-        // L'affaire rouverte repart de son etat d'entree (et d'un arbre neuf).
+        // L'affaire rouverte (un arbre neuf) retrouve la CARTE qu'on y a laissee ouverte, quoi
+        // qui l'ait ouverte -- ici l'historique (demande du 19/11/2026, ArbreGedEnregistre.Cartes).
         Agir("ouvrirNumero", "004176");
+        Exiger(Ligne(plan.Vue().Dossier!.Arbre, "Instances") is { Ouvert: true }
+               && Ligne(plan.Vue().Dossier!.Arbre, "Rapport d expertise") is { Actif: false },
+            "rouverte, l'affaire retrouve la carte laissee ouverte (Instances) ; l'element choisi est celui d'entree");
+        Agir("arbreRubrique", Ligne(plan.Vue().Dossier!.Arbre, "Instances")!.Id);
+        Agir("ouvrirNumero", "004176");
+        Exiger(Lignes(plan.Vue().Dossier!.Arbre).Where(l => l.Groupe > 0 && l.Niveau == l.NiveauGroupe).All(l => !l.Ouvert),
+            "une carte refermee le reste a la reouverture : l'affaire repart cartes fermees");
         d = plan.Vue().Dossier;
 
         // --- 2 ter. La vue du dossier, proposition 3 « Onglets Suivi / Fil » du /draft du
@@ -292,8 +300,13 @@ internal static class Programme
         const string depotA = "Depot n A2024/038654";
         LigneArbreVue Arbre() => plan.Vue().Dossier!.Arbre;
         List<string>? Retenus() => AccueilEtat.Charger().ArbreGedDe("004176")?.Replies;
+        // Ouvre la carte si elle est fermee (elle a pu rester ouverte : l'affaire s'en souvient).
+        void OuvrirCarte(SessionPlanTravail s, string carte)
+        {
+            if (Ligne(s.Vue().Dossier!.Arbre, carte) is { Ouvert: false } l) s.Agir("arbreRubrique", Valeur(l.Id));
+        }
         Agir("ouvrirNumero", "004176");
-        Agir("arbreRubrique", Ligne(Arbre(), "Depots d'actes")!.Id);
+        OuvrirCarte(plan, "Depots d'actes");
         Exiger(Ligne(Arbre(), depotA) is { Replie: false }, "un sous-dossier est deplie tant qu'on ne l'a pas replie");
         Agir("arbreReplierDossier", Ligne(Arbre(), depotA)!.Id);
         Exiger(Ligne(Arbre(), depotA) is { Replie: true, Enfants.Length: 2 } && Retenus() is { Count: 1 },
@@ -310,11 +323,15 @@ internal static class Programme
         var relance = new SessionPlanTravail(null, null);
         relance.Initialiser();
         relance.Agir("ouvrirNumero", Valeur("004151"));
-        relance.Agir("arbreRubrique", Valeur(Ligne(relance.Vue().Dossier!.Arbre, "Depots d'actes")!.Id));
+        // 004151 peut avoir une tache en attente (selon la date) : l'ouvrir ouvre sa tache, et
+        // l'arbre se replie sur ce qu'elle nomme. « Afficher tout le dossier » le rend entier.
+        if (relance.Vue().Dossier!.Tache is not null) relance.Agir("basculerTout", Valeur(null));
+        OuvrirCarte(relance, "Depots d'actes");
         Exiger(Ligne(relance.Vue().Dossier!.Arbre, depotA) is { Replie: false },
             "le repli vaut pour SON affaire : la meme branche d'une autre affaire reste depliee");
         relance.Agir("ouvrirNumero", Valeur("004176"));
-        relance.Agir("arbreRubrique", Valeur(Ligne(relance.Vue().Dossier!.Arbre, "Depots d'actes")!.Id));
+        Exiger(Ligne(relance.Vue().Dossier!.Arbre, "Depots d'actes") is { Ouvert: true },
+            "la carte laissee ouverte survit au redemarrage : l'affaire rouverte par une session neuve la rouvre");
         Exiger(Ligne(relance.Vue().Dossier!.Arbre, depotA) is { Replie: true },
             "le repli survit au redemarrage : une session neuve le relit pour l'affaire rouverte");
         var certificat = relance.Vue().Dossier!.Historique.First(p => p.Libelle == "Certificat de depot d'actes");

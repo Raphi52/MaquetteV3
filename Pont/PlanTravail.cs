@@ -517,15 +517,18 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
 
     /// <summary>
     /// Retient l'arbre de l'affaire ouverte apres CHAQUE geste (creation,
-    /// suppression, renommage). Les trois collections ci-dessus sont
-    /// indexees par reference d'objet : sans cette ecriture, tout ce que
-    /// l'utilisateur ajoute dans l'arbre part a la fermeture.
+    /// suppression, renommage, repli d'un sous-dossier, carte ouverte). Les
+    /// collections ci-dessus sont indexees par reference d'objet : sans cette
+    /// ecriture, tout ce que l'utilisateur ajoute dans l'arbre part a la fermeture.
     /// </summary>
     private void MemoriserArbre()
     {
         if (DossierOuvert is null) return;
+        var cartes = CartesOuvertes();
         Etat.EnregistrerArbreGed(CleAffaire,
-            PersistanceGed.Capturer(Arbre, AjoutsArbre, MasquesArbre, LibellesArbre, SousDossiersReplies));
+            PersistanceGed.Capturer(Arbre, AjoutsArbre, MasquesArbre, LibellesArbre, SousDossiersReplies, cartes));
+        CartesRetenues.Clear();
+        CartesRetenues.UnionWith(cartes);
     }
 
     private void OuvrirNouveau()
@@ -1203,7 +1206,9 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         NoeudsOuverts.Add(Arbre);
         foreach (var n in suite) NoeudsOuverts.Add(n);
         OuvrirApercu(suite[^1]);
-        UneRubriqueParDomaine();
+        // La carte de l'element s'ouvre seule dans SON classeur ; celle de l'autre, rouverte
+        // avec l'affaire, reste (comme l'ouverture depuis l'historique).
+        if (suite.FirstOrDefault(GroupesArbre().ContainsKey) is { } rubrique) FermerLesAutresRubriques(rubrique);
     }
 
     // ================= Visionneuse =================
@@ -1438,9 +1443,10 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         Editions = ArbreDemo.Editions(d.Numero, d.Objet);
 
         // L'arbre est reconstruit a neuf : on y repose ce que l'utilisateur
-        // avait ajoute, masque, renomme ou replie lors d'une session precedente.
+        // avait ajoute, masque, renomme, replie ou laisse ouvert lors d'une session precedente.
+        var cartes = AccesGed.NouveauxMasques();
         PersistanceGed.Appliquer(Arbre, Etat.ArbreGedDe(d.Numero),
-                                 AjoutsArbre, MasquesArbre, LibellesArbre, SousDossiersReplies);
+                                 AjoutsArbre, MasquesArbre, LibellesArbre, SousDossiersReplies, cartes);
 
         // La racine et tous les dossiers servis sont deplies d'entree :
         // l'arbre s'ouvre sur du contenu, pas sur une ligne fermee.
@@ -1464,8 +1470,10 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             ApercuMessage = "";
             GuideVisible = true;
         }
-        // Le classeur s'ouvre sur UNE carte au plus par domaine : celle de l'element choisi.
+        // Le classeur s'ouvre sur UNE carte au plus par domaine : celle de l'element choisi,
+        // sinon celle qu'on y avait laissee ouverte.
         UneRubriqueParDomaine();
+        RouvrirLesCartes(cartes);
     }
 
     /// <summary>QUITTE la vue de l'affaire (la maison) : son onglet, lui, reste -- c'est
@@ -2494,6 +2502,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             case Pont.DemandeAccueil.Fermer: Fenetre?.Fermer(); break;
             default: throw new InvalidOperationException($"Demande inconnue de l'accueil : {demande.Quoi}.");
         }
+        // Une affaire ouverte d'ici (palette, alerte) a pu ouvrir une carte : comme apres Agir.
+        RetenirLesCartes();
     }
 
     /// <summary>Un minuteur de l'accueil a releve (performance, actualites) : la vue suit.</summary>

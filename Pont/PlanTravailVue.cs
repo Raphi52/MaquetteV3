@@ -863,5 +863,7 @@ public sealed partial class SessionPlanTravail
 
             default: throw new InvalidOperationException($"Geste inconnu du plan de travail : {geste}.");
         }
+        // Les cartes ouvertes du classeur, retenues avec l'affaire si le geste les a changees.
+        RetenirLesCartes();
     }
 }

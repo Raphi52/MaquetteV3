@@ -657,7 +657,12 @@ public sealed class ArbreGedEnregistre
     /// web/src/composants/ClasseurArbre.tsx ; demande du 19/11/2026).</summary>
     public List<string> Replies { get; set; } = new();
 
-    public bool Vide() => Ajouts.Count == 0 && Masques.Count == 0 && Libelles.Count == 0 && Replies.Count == 0;
+    /// <summary>Chemins des CARTES de rubrique ouvertes dans le classeur (une au plus par
+    /// domaine), rouvertes avec l'affaire (demande du 19/11/2026).</summary>
+    public List<string> Cartes { get; set; } = new();
+
+    public bool Vide() => Ajouts.Count == 0 && Masques.Count == 0 && Libelles.Count == 0
+                          && Replies.Count == 0 && Cartes.Count == 0;
 }
 
 public static class PersistanceGed
@@ -701,13 +706,15 @@ public static class PersistanceGed
     }
 
     /// <summary>L'etat de l'arbre a ecrire dans accueil.json (<paramref name="replies"/> : les
-    /// sous-dossiers replies du classeur, aucun s'il est absent).</summary>
+    /// sous-dossiers replies du classeur, <paramref name="cartes"/> : ses cartes ouvertes ;
+    /// aucun s'ils sont absents).</summary>
     public static ArbreGedEnregistre Capturer(
         NoeudGed racine,
         IReadOnlyDictionary<NoeudGed, List<NoeudGed>> ajouts,
         IReadOnlyCollection<NoeudGed> masques,
         IReadOnlyDictionary<NoeudGed, string> libelles,
-        IReadOnlyCollection<NoeudGed>? replies = null)
+        IReadOnlyCollection<NoeudGed>? replies = null,
+        IReadOnlyCollection<NoeudGed>? cartes = null)
     {
         var chemins = Chemins(racine, ajouts);
         var etat = new ArbreGedEnregistre();
@@ -727,8 +734,11 @@ public static class PersistanceGed
             if (chemins.TryGetValue(couple.Key, out var chemin)) etat.Libelles[chemin] = couple.Value;
         foreach (var n in replies ?? [])
             if (chemins.TryGetValue(n, out var chemin)) etat.Replies.Add(chemin);
+        foreach (var n in cartes ?? [])
+            if (chemins.TryGetValue(n, out var chemin)) etat.Cartes.Add(chemin);
         // Ordre stable : le fichier ne change pas quand l'etat ne change pas.
         etat.Replies.Sort(StringComparer.Ordinal);
+        etat.Cartes.Sort(StringComparer.Ordinal);
         return etat;
     }
 
@@ -742,12 +752,14 @@ public static class PersistanceGed
         Dictionary<NoeudGed, List<NoeudGed>> ajouts,
         HashSet<NoeudGed> masques,
         Dictionary<NoeudGed, string> libelles,
-        HashSet<NoeudGed>? replies = null)
+        HashSet<NoeudGed>? replies = null,
+        HashSet<NoeudGed>? cartes = null)
     {
         ajouts.Clear();
         masques.Clear();
         libelles.Clear();
         replies?.Clear();
+        cartes?.Clear();
         if (etat is null) return;
 
         // Du moins profond au plus profond : un element pose SOUS un dossier
@@ -773,5 +785,8 @@ public static class PersistanceGed
         if (replies is not null)
             foreach (var chemin in etat.Replies)
                 if (parChemin.TryGetValue(chemin, out var n)) replies.Add(n);
+        if (cartes is not null)
+            foreach (var chemin in etat.Cartes)
+                if (parChemin.TryGetValue(chemin, out var n)) cartes.Add(n);
     }
 }
