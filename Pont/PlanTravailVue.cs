@@ -28,7 +28,7 @@ public sealed record VueApplication(string Theme, int Geste, bool Barre, VuePlan
                                     OngletBarreVue[]? Onglets, int FinsDeGlisse, ProcVue? Proc,
                                     DossierVue? Dossier, ImpressionVue? Impression, EnvoiMailVue? EnvoiMail,
                                     NouveauVue? Nouveau, MenuNoeudVue? MenuNoeud,
-                                    int Pagination, DefilementVue? Defilement);
+                                    int Pagination, DefilementVue? Defilement, PaletteVue? Palette);
 
 /// <summary>Un geste de la page pour le plan de travail, numerote par la page.</summary>
 public sealed record GestePlan(string Nom, JsonElement Valeur, int Numero);
@@ -221,7 +221,8 @@ public sealed partial class SessionPlanTravail
                 ? new MenuNoeudVue(Libelle(MenuNoeud), MenuX, MenuY, MenuNoeud.EstPiece)
                 : null,
             Pagination,
-            Defilement);
+            Defilement,
+            VuePalette());
     }
 
     private ProcVue? VueProc()
@@ -673,6 +674,15 @@ public sealed partial class SessionPlanTravail
             case "ouvrirCode": OuvrirCode(Texte(valeur)); break;
             case "ouvrirNumero": OuvrirParNumero(Texte(valeur)); break;
             case "ouvrirUnDossier": OuvrirUnDossierPour(Texte(valeur)); break;
+
+            // ---- La palette Ctrl K (PlanTravailPalette.cs) ----
+            case "paletteOuvrir":
+            case "paletteFermer":
+            case "paletteTexte":
+            case "paletteFiltre":
+            case "paletteAller":
+            case "palettePiece":
+            case "paletteAttribuer": AgirPalette(geste, valeur); break;
 
             // ---- Visionneuse : entete, bandeau des defauts, colonnes ----
             case "fermerDossier": FermerDossier(); break;

@@ -774,6 +774,9 @@ export function EcranCommandesWeb() {
   // Ctrl K pose le curseur dans la pilule, comme sa touche l'annonce. Pas
   // quand l'onglet est cache (src/plan/visibilite.ts) : la touche irait au
   // champ invisible au lieu de l'ecran montre.
+  // A la CAPTURE (19/11/2026) : la palette Ctrl K de l'application ecoute la
+  // meme touche ; l'ecran passe ainsi avant elle, et elle lui cede la touche
+  // (preventDefault) -- sur cet ecran, Ctrl K reste sa propre recherche.
   useEffect(() => {
     if (!visible) return
     const surTouche = (e: globalThis.KeyboardEvent) => {
@@ -784,8 +787,8 @@ export function EcranCommandesWeb() {
       champ.focus()
       champ.select()
     }
-    window.addEventListener('keydown', surTouche)
-    return () => window.removeEventListener('keydown', surTouche)
+    window.addEventListener('keydown', surTouche, true)
+    return () => window.removeEventListener('keydown', surTouche, true)
   }, [visible])
 
   // Avant la premiere reponse du pont : le cadre seul, sans aucune valeur fausse.

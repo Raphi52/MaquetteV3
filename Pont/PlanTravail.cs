@@ -979,6 +979,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     /// par la page (web/src/plan/clavier.ts) et remontee par le geste « echap ».</summary>
     private void ToucheEchap()
     {
+        if (FermerPalette()) return;
         if (DossierOuvert is not null) FermerDossier();
         else if (ProcOuverte is not null) FermerProc();
     }
@@ -2429,6 +2430,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             case Pont.DemandeAccueil.OuvrirTraitement: OuvrirProc(TraitementsMontres[demande.Rang]); break;
             case Pont.DemandeAccueil.OuvrirAffaire: OuvrirDossier(AffairesMontrees[demande.Rang]); break;
             case Pont.DemandeAccueil.OuvrirElement: OuvrirElementTrouve(ElementsMontres[demande.Rang]); break;
+            case Pont.DemandeAccueil.OuvrirPalette: OuvrirPalette(); break;
             case Pont.DemandeAccueil.LoginChange: ApresChangementLogin(); break;
             case Pont.DemandeAccueil.ThemeChange: Fenetre?.AppliquerFond(Theme); break;
             case Pont.DemandeAccueil.Deplacer: Fenetre?.Deplacer(); break;

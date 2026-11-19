@@ -50,6 +50,9 @@ const Lignes: Annonce[] = [
   { numAnnonce: 'A2026-1151', numPc: '', typeAnnonce: 'Depot des comptes', codeEvePro: 'DCA', dateEvePro: '2026-08-14', prevueEnvoi: '2026-08-20', envoi: '2026-08-20', numParution: '2026-172', parution: '2026-08-26', numBord: 'BD-2610', numFact: 'FA-45121', texte: 'Depot des comptes 2025', dossier: '2011B00512', transmission: '2026-08-21' },
 ]
 
+/** Les annonces de l'ecran, que la palette Ctrl K cherche aussi (composants/Palette.tsx). */
+export { Lignes as AnnoncesBodacc, type Annonce as AnnonceBodacc }
+
 const date = (d: string | null): string => (d === null ? '' : dateCourte(d))
 
 export interface ProprietesEcranBodacc {

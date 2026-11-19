@@ -16,6 +16,7 @@ import { ThemeRig } from './ThemeRig'
 import type { GesteIle } from '../accueil/types'
 import { ecouterEchap } from '../plan/clavier'
 import { EnvoiMail, Impression, MenuNoeud, Nouveau } from '../plan/Modales'
+import { Palette } from './Palette'
 import { Procedure } from '../plan/Procedure'
 import type { GestePlan, ProcVue, VueApplication } from '../plan/types'
 import { Visionneuse } from '../plan/Visionneuse'
@@ -81,6 +82,24 @@ export function Application({ vue, geste, plan }: ProprietesApplication) {
   // Echap ferme ce qui est ouvert, du plus interieur au plus exterieur.
   useEffect(() => ecouterEchap(() => gestePlan('echap')), [gestePlan])
 
+  // Ctrl K ouvre la PALETTE depuis n'importe quel ecran (Palette.tsx), dans la
+  // fenetre principale. Un ecran qui garde Ctrl K pour sa propre recherche
+  // (Commandes web) l'a deja prise : il ecoute a la capture et appelle
+  // preventDefault. Palette ouverte, c'est elle qui repond a la touche.
+  const paletteOuverte = useRef(false)
+  paletteOuverte.current = v.palette !== null
+  const barre = v.barre
+  useEffect(() => {
+    if (!barre) return
+    const surTouche = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'k' || e.defaultPrevented || paletteOuverte.current) return
+      e.preventDefault()
+      gestePlan('paletteOuvrir')
+    }
+    window.addEventListener('keydown', surTouche)
+    return () => window.removeEventListener('keydown', surTouche)
+  }, [barre, gestePlan])
+
   // Le dernier defilement de la zone des etapes deja joue : tenu ici, il
   // survit a la fermeture et a la reouverture des etapes.
   const defilementJoue = useRef(vue.defilement?.numero ?? 0)
@@ -114,6 +133,8 @@ export function Application({ vue, geste, plan }: ProprietesApplication) {
       {v.envoiMail && <EnvoiMail vue={v.envoiMail} plan={gestePlan} />}
       {v.nouveau && <Nouveau vue={v.nouveau} plan={gestePlan} />}
       {v.menuNoeud && <MenuNoeud vue={v.menuNoeud} plan={gestePlan} />}
+      {/* LA PALETTE Ctrl K, par-dessus tout le reste. */}
+      {v.palette && <Palette vue={v.palette} plan={gestePlan} />}
     </div>
   )
 }

@@ -134,7 +134,7 @@ export function vueApplication(partiel: Partial<VueApplication> = {}): VueApplic
   return {
     theme: 'clair', geste: 0, barre: false, accueil: null, onglets: null, finsDeGlisse: 0,
     proc: null, dossier: null, impression: null, envoiMail: null, nouveau: null, menuNoeud: null,
-    pagination: 0, defilement: null,
+    pagination: 0, defilement: null, palette: null,
     ...partiel,
   }
 }

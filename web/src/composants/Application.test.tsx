@@ -216,17 +216,23 @@ describe('Application : un onglet quitte garde son ecran', () => {
     expect(container.querySelector('.rig-proc')).toBeNull()
   })
 
-  it('cache, l\'ecran des commandes ne prend plus Ctrl K a l\'ecran montre', async () => {
+  it('cache, l\'ecran des commandes ne prend plus Ctrl K : la touche va a la palette de l\'ecran montre', async () => {
     sessionCommandes()
     const { rerender, geste, plan } = rendre(vueApplication({ barre: true, onglets: deux, proc: commandes }))
     const champ = await screen.findByPlaceholderText('Rechercher une commande, un SIREN, un n° IG-…')
     rerender(<Application vue={vueApplication({ barre: true, onglets: deux, proc: creances })} geste={geste} plan={plan} />)
-    // fireEvent rend faux quand un ecouteur a appele preventDefault.
-    expect(fireEvent.keyDown(window, { key: 'k', ctrlKey: true })).toBe(true)
+    const palettes = () => plan.mock.calls.filter(([g]) => g.nom === 'paletteOuvrir').length
+    // fireEvent rend faux quand un ecouteur a appele preventDefault : ici la
+    // palette Ctrl K (19/11/2026), pas le champ cache des commandes.
+    expect(fireEvent.keyDown(window, { key: 'k', ctrlKey: true })).toBe(false)
     expect(document.activeElement).not.toBe(champ)
-    // De retour sur son onglet, Ctrl K y pose de nouveau le curseur.
-    rerender(<Application vue={vueApplication({ barre: true, onglets: deux, proc: commandes })} geste={geste} plan={plan} />)
+    expect(palettes()).toBe(1)
+    // De retour sur son onglet (vue du C# APRES ce geste numero 1 : une vue
+    // plus ancienne serait ignoree), Ctrl K y pose de nouveau le curseur, et
+    // la palette lui cede la touche.
+    rerender(<Application vue={vueApplication({ barre: true, onglets: deux, proc: commandes, geste: 1 })} geste={geste} plan={plan} />)
     expect(fireEvent.keyDown(window, { key: 'k', ctrlKey: true })).toBe(false)
     expect(document.activeElement).toBe(champ)
+    expect(palettes()).toBe(1)
   })
 })

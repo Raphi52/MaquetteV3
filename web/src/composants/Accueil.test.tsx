@@ -198,6 +198,14 @@ describe('Accueil : l\'entete', () => {
 })
 
 describe('Accueil : la recherche', () => {
+  it('la pastille « Ctrl K » est un bouton qui ouvre la palette', () => {
+    const { container, gestes } = rendre()
+    const pastille = container.querySelector<HTMLButtonElement>('.rig-recherche button.rig-touche')!
+    expect(pastille.textContent).toBe('Ctrl K')
+    fireEvent.click(pastille)
+    expect(gestes()).toEqual([['palette', null]])
+  })
+
   it('le texte remonte a chaque frappe et ne s\'ecrase pas tant que la session n\'a pas change', () => {
     const { container, gestes, rerender, geste } = rendre()
     const saisie = container.querySelector<HTMLInputElement>('.rig-recherche__saisie')!

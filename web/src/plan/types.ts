@@ -26,7 +26,59 @@ export interface VueApplication {
   menuNoeud: MenuNoeudVue | null
   pagination: number
   defilement: DefilementVue | null
+  /** La palette Ctrl K, quand elle est ouverte (Pont/PlanTravailPalette.cs). */
+  palette: PaletteVue | null
 }
+
+// ---- La palette Ctrl K (Metier/RecherchePalette.cs, Pont/PlanTravailPalette.cs) ----
+export interface PaletteVue {
+  texte: string
+  filtre: string
+  filtres: FiltrePaletteVue[]
+  moi: AgentPaletteVue
+  agents: AgentPaletteVue[]
+  travail: TravailPaletteVue[]
+  /** Combien de lignes repondent au filtre, montrees ou non. */
+  travailTrouve: number
+  pieces: PiecePaletteVue[]
+  dossierDesPieces: string
+  numeroDesPieces: string
+  horsGreffe: HorsGreffePaletteVue[]
+  bilan: BilanPaletteVue
+  sirenInconnu: string | null
+}
+export interface FiltrePaletteVue { code: string, libelle: string, nombre: number }
+export interface AgentPaletteVue { signature: string, initiales: string, nom: string }
+export interface TravailPaletteVue {
+  /** dem | aff | cou | doc */
+  nature: string
+  numero: string
+  /** Le dossier qu'ouvre la ligne ; vide = l'ecran nomme par ecran. */
+  cle: string
+  ecran: string
+  /** Le nom de cet ecran dans le menu ; vide = pas d'ecran a proposer. */
+  ecranLibelle: string
+  titre: string
+  detail: string
+  etat: string
+  /** al | ok | vide */
+  ton: string
+  filet: string
+  qui: AgentPaletteVue | null
+  aMoi: boolean
+  enCours: boolean
+  attribuable: boolean
+  delai: string | null
+  siren: string
+  activite: ActivitePaletteVue[]
+}
+export interface ActivitePaletteVue { agent: string, verbe: string, objet: string, depuis: string }
+export interface PiecePaletteVue {
+  libelle: string, chemin: string[], lieu: string, avant: string, trouve: string, apres: string
+  passages: number, pages: number, date: string, origine: string, annonce: boolean
+}
+export interface HorsGreffePaletteVue { code: string, source: string, objet: string, sujet: string }
+export interface BilanPaletteVue { jour: string, horsDelai: number, arriveesDuJour: number, mAttendent: number, plusAncienne: number }
 
 export interface OngletBarreVue {
   code: string, libelle: string, actif: boolean, detache: boolean, glisse: boolean

@@ -54,6 +54,8 @@ public sealed record DemandeAccueil(string Quoi, string Valeur = "", AlerteGreff
     public const string OuvrirTraitement = "ouvrirTraitement";
     public const string OuvrirAffaire = "ouvrirAffaire";
     public const string OuvrirElement = "ouvrirElement";
+    /// <summary>La pastille « Ctrl K » de la recherche : ouvrir la palette (Pont/PlanTravailPalette.cs).</summary>
+    public const string OuvrirPalette = "ouvrirPalette";
     public const string LoginChange = "loginChange";
     public const string ThemeChange = "themeChange";
     public const string Deplacer = "deplacer";
@@ -1189,6 +1191,7 @@ public sealed class SessionAccueil : IAsyncDisposable
             case "traitement": return new(DemandeAccueil.OuvrirTraitement, Rang: Entier(valeur));
             case "affaire": return new(DemandeAccueil.OuvrirAffaire, Rang: Entier(valeur));
             case "element": return new(DemandeAccueil.OuvrirElement, Rang: Entier(valeur));
+            case "palette": return new(DemandeAccueil.OuvrirPalette);
             // --- Chiffres du jour et « Proue »
             case "chiffre": BasculerChiffre(Entier(valeur)); return null;
             case "voirTuile": VoirTuile(Exiger(valeur)); return null;

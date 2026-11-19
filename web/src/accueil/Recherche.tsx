@@ -25,7 +25,9 @@ export function Recherche({ recherche, geste }: { recherche: RechercheVue, geste
               placeholder="Rechercher un SIREN, une societe, un dirigeant, un n° de demande…"
               valeur={r.texte} quand="input" changer={(texte) => geste('recherche', texte)} />
       {' '}
-      <span className="rig-touche">Ctrl K</span>
+      {/* La pastille ouvre la PALETTE (composants/Palette.tsx), comme la touche. */}
+      <button type="button" className="rig-touche rig-touche--palette" title="Chercher partout, depuis n importe quel ecran"
+              onClick={() => geste('palette')}>Ctrl K</button>
       {(r.affaires.length > 0 || r.traitements.length > 0 || r.elements.length > 0) && (
         <div className="rig-resultats">
           {r.traitements.map((t, rang) => (

@@ -195,6 +195,13 @@ public sealed record CompteRig(string Login, string Nom, string[] Domaines, stri
     /// le compte n'a pas d'autre champ pour le nom de famille.</summary>
     public string Initiales =>
         (Login.Length >= 2 ? Login[..2] : Login).ToUpperInvariant();
+
+    /// <summary>Le compte tel que les demandes l'inscrivent dans leur colonne
+    /// « Utilisateur » : « R. VILAIN » pour rvilain. Meme regle que
+    /// <see cref="Initiales"/> (initiale du prenom, puis le nom).</summary>
+    public string Signature =>
+        Login.Length < 2 ? Login.ToUpperInvariant()
+                         : $"{char.ToUpperInvariant(Login[0])}. {Login[1..].ToUpperInvariant()}";
 }
 
 /// <summary>
@@ -316,9 +323,23 @@ public static class JeuDemo
     public static EvenementAttendu[] EvenementsAttendus
         => [.. EvenementsAttendusBase, SimulationEdi.Evenement];
 
-    /// <summary>Les demandes de la file, cas du jour en tete (la plus recente).</summary>
+    /// <summary>Les demandes de la file, cas du jour en tete (la plus recente).
+    /// Une demande attribuee pendant la session (<see cref="Attribuer"/>) porte
+    /// son nouvel agent : tous les ecrans lisent la meme liste.</summary>
     public static DemandeRcs[] Demandes
-        => [SimulationEdi.Demande, .. DemandesBase];
+        => [.. new[] { SimulationEdi.Demande }.Concat(DemandesBase).Select(Attribuee)];
+
+    // Qui s'occupe de quelle demande, change pendant la session par « Me
+    // l'attribuer » (palette Ctrl K, 19/11/2026). Aucune base n'est branchee :
+    // l'attribution vit le temps de l'application, comme le reste du jeu.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> Attributions = new();
+
+    /// <summary>Confie une demande a un agent (sa <see cref="CompteRig.Signature"/>).</summary>
+    public static void Attribuer(string numeroDemande, string utilisateur)
+        => Attributions[numeroDemande] = utilisateur;
+
+    private static DemandeRcs Attribuee(DemandeRcs d)
+        => Attributions.TryGetValue(d.Numero, out var u) ? d with { Utilisateur = u } : d;
 
     /// <summary>Le courrier arrive, cas du jour en tete.</summary>
     public static Arrivee[] Arrivees
