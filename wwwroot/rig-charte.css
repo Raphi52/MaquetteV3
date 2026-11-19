@@ -20,8 +20,9 @@
      nuit et aplats vifs » ; le sombre reste l'encre de la « Nuit japonaise » ;
    - l'or marque l'element actif dans les deux modes (verbe ouvert du menu,
      anneau du rond de profil) ;
-   - le menu de gauche est un rail ENCRE en sombre, GRIS CLAIR en clair
-     (demande du 2026-11-19 ; il etait encre dans les deux modes) ;
+   - le menu de gauche est un rail ENCRE en sombre, « FER DEGRADE » en clair
+     (degrade de gris fonces, ombre vers la page ; /draft conv-2000 du
+     2026-11-19 — il etait encre dans les deux modes) ;
    - le ROND de la maquette 05 sert de repere : grand rond a gauche du
      chiffre des tuiles, reglage et profil en ronds a droite du titre,
      recherche en pilule ;
@@ -93,9 +94,11 @@
   --rig-anneau-alerte: #FFD27A;
 
   /* Texte et voiles DU RAIL de gauche (lus par .rig-menu, rig-accueil.css).
-     Valeurs d'un rail sombre, celles du sombre ; un theme a rail clair
-     (« clair », « Violet pilules ») les redefinit. --rig-rail-melange est la teinte
-     vers laquelle une couleur de metier ecrite en texte est tiree. */
+     Valeurs d'un rail sombre, celles du sombre ; chaque autre theme les
+     redefinit (« Violet pilules » a un rail BLANC). --rig-rail-melange est la
+     teinte vers laquelle une couleur de metier ecrite en texte est tiree.
+     --rig-rail-ombre detache le rail de la page (le clair, 2026-11-19) ;
+     aucune ailleurs, ou le bord --rig-rail-bord suffit. */
   --rig-rail-texte: #F1EDE4;
   --rig-rail-texte-2: #E8E2D2;
   --rig-rail-texte-3: #9C9583;
@@ -103,6 +106,7 @@
   --rig-rail-trait: rgba(255, 240, 215, .14);
   --rig-rail-trait-faible: rgba(255, 240, 215, .08);
   --rig-rail-melange: #FFFFFF;
+  --rig-rail-ombre: none;
   /* Liseré et halo de la recherche de l'accueil (et de la frise des etapes) :
      l'or dans le clair et le sombre, l'accent du theme ailleurs. */
   --rig-or-halo: #B08D3F;
@@ -172,7 +176,7 @@ select option {
   --rig-or: #C8963E;
   --rig-or-clair: #E4BE76;
   --rig-or-texte: #1E1608;
-  /* Le rail du menu de gauche : encre la nuit (gris clair le jour). */
+  /* Le rail du menu de gauche : encre la nuit (degrade de gris fonces le jour). */
   --rig-rail: #0D0F16;
   --rig-rail-bord: #22252F;
   /* Pastilles des verbes du menu : famille de l'or, eclaircie la nuit. */
@@ -261,19 +265,21 @@ select option {
   --rig-or: #C8963E;
   --rig-or-clair: #E4BE76;
   --rig-or-texte: #1E1608;
-  /* Rail GRIS CLAIR (demande utilisateur du 2026-11-19 ; avant : encre
-     #15182A). Un cran sous le fond de page, la meme teinte bleutee : le texte
-     y passe au fonce, le tertiaire a 5:1 (#5F6577 de la page n'y ferait que
-     4,1:1). --rig-rail-melange fonce les teintes ecrites en texte. */
-  --rig-rail: #D7DAE0;
-  --rig-rail-bord: rgba(25, 40, 80, .10);
-  --rig-rail-texte: #15171F;
-  --rig-rail-texte-2: #3A3F4E;
-  --rig-rail-texte-3: #4F5568;
-  --rig-rail-voile: rgba(25, 40, 80, .07);
-  --rig-rail-trait: rgba(25, 40, 80, .14);
-  --rig-rail-trait-faible: rgba(25, 40, 80, .08);
-  --rig-rail-melange: #15171F;
+  /* Rail « FER DEGRADE » (/draft conv-2000, 2026-11-19, proposition 6 ;
+     avant : gris clair #D7DAE0 le matin meme, encre #15182A la veille) :
+     degrade VERTICAL de gris neutres fonces, texte clair, et une OMBRE douce
+     vers la page a la place du bord. Le tertiaire tient 4,6:1 sur l'arret le
+     plus clair (#43464E). La pastille or du verbe ouvert ne change pas. */
+  --rig-rail: linear-gradient(180deg, #43464E, #26282D);
+  --rig-rail-bord: transparent;
+  --rig-rail-ombre: 6px 0 16px rgba(20, 24, 35, .30);
+  --rig-rail-texte: #F2F3F5;
+  --rig-rail-texte-2: #D9DCE2;
+  --rig-rail-texte-3: #B0B5BF;
+  --rig-rail-voile: rgba(255, 255, 255, .07);
+  --rig-rail-trait: rgba(255, 255, 255, .13);
+  --rig-rail-trait-faible: rgba(255, 255, 255, .08);
+  --rig-rail-melange: #FFFFFF;
   --rig-verbe-ouvrir: #C8963E;
   --rig-verbe-trouver: #4560C2;
   --rig-verbe-modifier: #B8962A;
@@ -359,6 +365,7 @@ select option {
   --rig-rail-trait: rgba(40, 35, 90, .12);
   --rig-rail-trait-faible: rgba(40, 35, 90, .07);
   --rig-rail-melange: #17182B;
+  --rig-rail-ombre: none;
   --rig-verbe-ouvrir: #5F4BEA;
   --rig-verbe-trouver: #3D7BF0;
   --rig-verbe-modifier: #8B5CF6;
@@ -436,6 +443,7 @@ select option {
   --rig-rail-trait: rgba(255, 255, 255, .12);
   --rig-rail-trait-faible: rgba(255, 255, 255, .07);
   --rig-rail-melange: #FFFFFF;
+  --rig-rail-ombre: none;
   --rig-verbe-ouvrir: #F59E0B;
   --rig-verbe-trouver: #71717A;
   --rig-verbe-modifier: #E8A50C;
@@ -513,6 +521,7 @@ select option {
   --rig-rail-trait: rgba(230, 245, 240, .14);
   --rig-rail-trait-faible: rgba(230, 245, 240, .08);
   --rig-rail-melange: #FFFFFF;
+  --rig-rail-ombre: none;
   --rig-verbe-ouvrir: #E8825A;
   --rig-verbe-trouver: #4CA7A0;
   --rig-verbe-modifier: #E3A663;

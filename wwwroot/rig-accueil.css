@@ -30,10 +30,15 @@
   overflow-y: auto;
   min-height: 0;
   /* Le RAIL a son propre fond, qui n'est pas celui de la page : encre en
-     sombre, gris clair en clair (2026-11-19), blanc en « Violet pilules ».
-     Ses jetons de texte, de voile et de bord sont donc REDEFINIS ici : tout
-     ce qui est dessous lit les memes noms de variables sans changer. */
+     sombre, degrade de gris fonces en clair (« Fer degrade », 2026-11-19),
+     blanc en « Violet pilules ». Ses jetons de texte, de voile et de bord sont
+     donc REDEFINIS ici : tout ce qui est dessous lit les memes noms de
+     variables sans changer. */
   background: var(--rig-rail);
+  /* Le clair detache le rail par une ombre douce plutot que par le bord ;
+     `none` dans les autres themes. Le plan de travail n'a pas de fond : rien
+     ne la recouvre dans sa marge gauche. */
+  box-shadow: var(--rig-rail-ombre);
   /* 2026-11-18 : les valeurs viennent des jetons --rig-rail-* du theme
      (rig-charte.css) et non plus d'ici. */
   --rig-texte: var(--rig-rail-texte);
