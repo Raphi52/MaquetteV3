@@ -420,8 +420,12 @@ select option {
   --rig-or-texte: #FFFFFF;
   --rig-or-halo: #5F4BEA;
   /* Panneau BLANC flottant (2026-11-19, conv-2012), comme les cartes du
-     theme : degrade du blanc a un lavande a peine teinte, ombre violette douce
-     a la place du bord. Le tertiaire tient 4,6:1 sur l'arret bas. */
+     theme : degrade du blanc a un lavande a peine teinte. Le tertiaire tient
+     4,6:1 sur l'arret bas. Blanc sur lavande, la COULEUR ne detache pas le
+     panneau (mesure sur capture : #F5F3FE en bas contre #EBEBF3 autour,
+     1,08:1) et l'ombre portee vers le bas ne trace rien a gauche : un filet
+     INTERIEUR a l'opacite du bord des cartes (.12) dessine le contour, et
+     l'ombre, renforcee, deborde un peu de chaque cote. */
   --rig-rail: linear-gradient(180deg, #FFFFFF, #F5F3FE);
   --rig-rail-bord: transparent;
   --rig-rail-texte: #17182B;
@@ -431,7 +435,7 @@ select option {
   --rig-rail-trait: rgba(40, 35, 90, .12);
   --rig-rail-trait-faible: rgba(40, 35, 90, .07);
   --rig-rail-melange: #17182B;
-  --rig-rail-ombre: 0 6px 18px rgba(40, 30, 120, .14), 0 1px 3px rgba(40, 30, 120, .10);
+  --rig-rail-ombre: inset 0 0 0 1px rgba(40, 35, 90, .12), 0 8px 24px rgba(40, 30, 120, .20), 0 1px 4px rgba(40, 30, 120, .12);
   --rig-rail-marge: 12px;
   --rig-rail-rayon: 14px;
   --rig-verbe-ouvrir: #5F4BEA;

@@ -396,6 +396,20 @@ foreach (var (nom, texte) in feuilles)
                 Exiger(ecart >= 1.2,
                     $"« {code} » : sur la page sombre {page}, chaque arret du panneau se distingue de la page ({ecart:0.00}:1 au pire, 1,2 exige)");
             }
+            // Sur TOUTE page, le bord du panneau doit etre net : soit sa couleur
+            // tranche sur la page (1,2:1 sur chaque arret), soit un FILET INTERIEUR
+            // (inset 0 0 0 1px, opacite >= .10) le dessine. Defaut a l'origine
+            // (19/11/2026, conv-2012) : le panneau blanc du violet finissait en
+            // #F5F3FE contre #EBEBF3 autour (1,08:1 mesure sur capture), et son
+            // ombre portee vers le bas ne tracait rien a gauche.
+            if (page is not null && arretsTheme.Count > 0)
+            {
+                var tranche = arretsTheme.Min(a => Contraste(a, page)) >= 1.2;
+                var filet = Regex.Match(ombreTheme ?? "", @"inset\s+0\s+0\s+0\s+1px\s+rgba\(\s*\d+,\s*\d+,\s*\d+,\s*(0?\.\d+)\s*\)");
+                var filetNet = filet.Success && double.Parse(filet.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) >= 0.10;
+                Exiger(tranche || filetNet,
+                    $"« {code} » : le bord du panneau est net sur la page {page} (couleur qui tranche, ou filet interieur d'au moins .10)");
+            }
             foreach (var jeton in new[] { "--rig-rail-texte", "--rig-rail-texte-2", "--rig-rail-texte-3" })
             {
                 var texte = ValeurDuTheme(code, jeton);
