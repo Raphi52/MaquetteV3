@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { EcranRequisitions, type ArticlesRequi, type LigneCommandeWebRequi, type VueRequisitions } from './EcranRequisitions'
-import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
-afterEach(() => { cleanup(); retirerFauxDotNet() })
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 // Les regles (filtre, tri, panier, quantites d'inscription) sont dans
 // Pont/EcranRequisitions.cs et EXECUTEES par tests/RequiCheck. Ici : l'ecran
@@ -31,7 +31,7 @@ function vueDeBase(): VueRequisitions {
 function session(reagir: (vue: VueRequisitions, geste: string, valeur: unknown) => VueRequisitions = (v) => v) {
   const gestes: Array<[string, unknown]> = []
   let vue = vueDeBase()
-  const dotnet = installerFauxDotNet({
+  const pont = installerFauxPont({
     'EcranRequisitions.Ouvrir': () => vue,
     'EcranRequisitions.Agir': (_s, geste, valeur) => {
       gestes.push([geste as string, valeur])
@@ -40,13 +40,13 @@ function session(reagir: (vue: VueRequisitions, geste: string, valeur: unknown) 
     },
     'EcranRequisitions.Fermer': () => undefined,
   })
-  return { gestes, dotnet }
+  return { gestes, pont }
 }
 
 describe('EcranRequisitions', () => {
   it('rien de faux avant la reponse du pont, puis la zone haute et le compteur', async () => {
     let repondre: (v: VueRequisitions) => void = () => {}
-    installerFauxDotNet({ 'EcranRequisitions.Ouvrir': () => new Promise<VueRequisitions>((r) => { repondre = r }) })
+    installerFauxPont({ 'EcranRequisitions.Ouvrir': () => new Promise<VueRequisitions>((r) => { repondre = r }) })
     const { container } = render(<EcranRequisitions />)
     expect(container.querySelector('.rig-proc__corps.rig-proc__corps--cmdweb')).not.toBeNull()
     expect(screen.queryByText('Saisissez un critere puis lancez la recherche.')).toBeNull()
@@ -116,7 +116,7 @@ describe('EcranRequisitions', () => {
 
   it('le resultat double-clique part au panier par son rang', async () => {
     const gestes: Array<[string, unknown]> = []
-    installerFauxDotNet({
+    installerFauxPont({
       'EcranRequisitions.Ouvrir': () => ({
         ...vueDeBase(), aRecherche: true, compteur: '1 ligne(s) / 1 dossier',
         trouvees: [{ rang: 0, radie: true, infobulle: 'TRANSNORD SA\nDossier radie', id: '7', siren: '412 345 678',
@@ -144,7 +144,7 @@ describe('EcranRequisitions', () => {
       nbInscr: 2,
     }
     const gestes: Array<[string, unknown]> = []
-    installerFauxDotNet({
+    installerFauxPont({
       'EcranRequisitions.Ouvrir': () => ({ ...vueDeBase(), volet: 'articles', compteur: 'commande 1', articles }),
       'EcranRequisitions.Agir': (_s, geste, valeur) => { gestes.push([geste as string, valeur]); return { ...vueDeBase(), volet: 'articles', articles } },
     })
@@ -168,12 +168,12 @@ describe('EcranRequisitions', () => {
   })
 
   it('appelle SON pont, et lui seul, et ferme la session au demontage', async () => {
-    const { dotnet } = session()
+    const { pont } = session()
     const { unmount } = render(<EcranRequisitions />)
     await screen.findByText('IG-1')
     unmount()
-    const appels = dotnet.invokeMethodAsync.mock.calls.map((c) => c[1])
+    const appels = pont.appels.mock.calls.map((c) => c[0])
     expect(appels).toEqual(['EcranRequisitions.Ouvrir', 'EcranRequisitions.Fermer'])
-    expect(dotnet.invokeMethodAsync).toHaveBeenLastCalledWith('RigV3Desktop', 'EcranRequisitions.Fermer', 'S')
+    expect(pont.appels).toHaveBeenLastCalledWith('EcranRequisitions.Fermer', 'S')
   })
 })

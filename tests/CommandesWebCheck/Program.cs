@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using RigV3Desktop;
@@ -246,8 +246,8 @@ Exiger(PerimetreProfil.Reserve(TraitementCommandes.CodeEcran).OrderBy(x => x).Se
 // ============================================================ 2. ATTEIGNABLE
 
 // PORTAGE EN REACT (lot 2, 19/11/2026). L'ecran tenait en UN fichier .razor
-// (balisage + @code). Il est maintenant en trois : la coquille .razor qui monte
-// l'ile React, web/src/ecrans/EcranCommandesWeb.tsx (le BALISAGE) et
+// (balisage + @code). Il a ete coupe en trois : la coquille .razor qui montait
+// l'ile React (retiree avec Blazor le 19/11/2026), web/src/ecrans/EcranCommandesWeb.tsx (le BALISAGE) et
 // Pont/EcranCommandesWeb.cs (l'ETAT et les appels aux regles, l'ancien @code
 // deplace tel quel dans SessionCommandesWeb). « ecran » designe donc desormais
 // le .tsx ET le pont : ce que le .razor contenait a lui seul. Une regle de mise
@@ -260,16 +260,16 @@ var aiguillage = File.ReadAllText(Path.Combine(racine, "web/src/plan/Aiguillage.
 var ecranChemin = Path.Combine(racine, "Components/Ecrans/EcranCommandesWeb.razor");
 var tsxChemin = Path.Combine(racine, "web/src/ecrans/EcranCommandesWeb.tsx");
 var pontChemin = Path.Combine(racine, "Pont/EcranCommandesWeb.cs");
-Exiger(File.Exists(ecranChemin), "l'ecran EcranCommandesWeb.razor existe");
+// Blazor est retire depuis le 19/11/2026 : plus de coquille .razor, l'ecran est React.
+Exiger(!File.Exists(ecranChemin), "plus de coquille EcranCommandesWeb.razor : l'ecran est le .tsx");
 Exiger(File.Exists(tsxChemin) && File.Exists(pontChemin), "l'ecran React EcranCommandesWeb.tsx et son pont Pont/EcranCommandesWeb.cs existent");
-var coquille = File.Exists(ecranChemin) ? File.ReadAllText(ecranChemin) : string.Empty;
 var tsx = File.Exists(tsxChemin) ? File.ReadAllText(tsxChemin) : string.Empty;
 var pont = File.Exists(pontChemin) ? File.ReadAllText(pontChemin) : string.Empty;
 var ecran = tsx + "\n" + pont;
 // Le CODE du .tsx, sans ses commentaires (son en-tete cite Metier/TraitementCommandes.cs).
 var codeTsx = Regex.Replace(tsx, @"/\*[\s\S]*?\*/|//[^\n]*", "");
-Exiger(Regex.IsMatch(coquille, @"<IleReact\s+Composant=""EcranCommandesWeb""\s*/>"),
-    "la coquille monte l'ecran React (<IleReact Composant=\"EcranCommandesWeb\" />)");
+Exiger(Regex.IsMatch(tsx, @"export function EcranCommandesWeb\(\)"),
+    "l'ecran React se monte sans parametre, comme sa coquille le faisait (export function EcranCommandesWeb())");
 Exiger(Regex.IsMatch(aiguillage, @"case\s+'PROC_COMMANDES_WEB'\s*:(?:\s*//[^\n]*)*\s*return <EcranCommandesWeb\s*/>"),
     "le plan de travail aiguille PROC_COMMANDES_WEB vers <EcranCommandesWeb />");
 // Le catalogue du menu de gauche vit dans Pont/MenuAccueil.cs depuis le lot 1 du

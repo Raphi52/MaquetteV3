@@ -16,6 +16,21 @@ tourne, toutes les erreurs remontent, l'exe n'est jamais touché. Mesuré le 202
 application ouverte : `-t:Compile` rend 0 sans que la date de l'exe bouge ; une erreur
 de type introduite rend 1 avec son `error CS`.
 
+`compiler.ps1` vérifie aussi les écrans React (`web/`) : `npm run typecheck` (TypeScript
+strict), `error TS` dans la sortie. Il ne construit pas `wwwroot/app/` : la construction
+Vite est accrochée à la copie vers `bin\` (cibles `ConstruireWeb` / `CopierWeb` du
+`.csproj`), que seul un vrai build fait.
+
+## L'interface : WPF + WebView2 + React (Blazor retiré le 2026-11-19)
+
+Chaque fenêtre (`MainWindow`, `FenetreVue`, `FenetreDocument`) porte un contrôle
+**WebView2 direct** (paquet `Microsoft.Web.WebView2`) branché par `Pont/PageWeb.cs` :
+`wwwroot/` servi sous `https://rigv3.example/`, page React montée par
+`web/src/racine.tsx` sur la racine de la fenêtre (`Pont/Racines.cs`). Tout appel au
+C# passe par `web/src/pont.ts` (messagerie WebView2) et `Pont/Repartiteur.cs`
+(méthodes `[JSInvokable("<NomEcran>.<Methode>")]` de `Pont/`). Il n'y a plus aucun
+`.razor` ni paquet `Components.WebView`. Mode d'emploi des écrans : `web/README.md`.
+
 ## Ne ferme jamais l'application de l'utilisateur
 
 Pas de `taskkill /IM RigV3Desktop.exe`, pas de `Stop-Process -Name RigV3Desktop`.
@@ -53,10 +68,14 @@ Puis **lis l'image**. Un code de sortie non nul du lanceur (4 = l'app est morte,
 tu lui fais payer une interruption pour une preuve que tu peux obtenir sans lui.
 Deux raisons mesurées :
 
-1. **Le hot reload tourne déjà.** L'utilisateur lance `dev.ps1` (`dotnet watch`) :
-   un `.razor`, un `.cs` et les CSS/JS de `wwwroot` sont **repris à chaud dans
-   l'application ouverte**, sans build de ta part et sans redémarrage. Ton édition
-   est donc **déjà à l'écran** — dis-le, ne demande rien.
+1. **Le hot reload tourne déjà.** L'utilisateur lance `dev.ps1` : il démarre le
+   **serveur Vite** (port libre, `RIGV3_VITE`) puis `dotnet watch`, et la fenêtre
+   charge sa page depuis Vite. Un `.tsx`/`.ts` de `web/src` est repris à chaud par
+   Vite, un `.cs` par `dotnet watch`, les CSS/images de `wwwroot` par la fenêtre
+   elle-même : **dans l'application ouverte**, sans build de ta part et sans
+   redémarrage. Ton édition est donc **déjà à l'écran** — dis-le, ne demande rien.
+   (Prouvé le 2026-11-19 : `dev.ps1` lancé sur un bureau caché, une retouche de
+   `web/src/accueil/Entete.tsx` est apparue dans la fenêtre, même pid.)
 2. **Le bureau caché n'a pas besoin d'un build neuf.** Aucun verrou d'instance
    mono n'existe dans ce projet (vérifié le 2026-09-17 : aucun `Mutex` dans le
    code). Tu peux donc lancer **l'exe déjà présent** dans

@@ -1,17 +1,17 @@
-using System.IO;
+﻿using System.IO;
 using System.Reflection;
 using System.Windows;
-using Microsoft.AspNetCore.Components;
 using RigV3Desktop;
-using RigV3Desktop.Components;
+using RigV3Desktop.Pont;
 
 // Garde-fou du PASSAGE DU RANG a la vue du document (demande du 14/09/2026).
 //
-// Le juge a note que « Vue.RootComponents[0].Parameters = ... » n'etait prouve
-// que par la compilation : si l'index ou le nom du parametre ne correspondait
-// pas, TOUTES les fenetres detachees afficheraient le meme document -- le
-// defaut meme qu'on corrige. Ici on CONSTRUIT vraiment deux fenetres et on
-// relit ce qui a ete pose.
+// Le juge a note que le passage du rang a la vue n'etait prouve que par la
+// compilation : s'il se perdait, TOUTES les fenetres detachees afficheraient le
+// meme document -- le defaut meme qu'on corrige. Ici on CONSTRUIT vraiment les
+// fenetres et on relit ce qui a ete pose. Depuis le retrait de Blazor
+// (19/11/2026), le rang va a la RACINE de la fenetre (Pont/Racines.cs,
+// RacineDocumentDetache), qui fait monter web/src/composants/DocumentDetacheVue.tsx.
 
 internal static class Programme
 {
@@ -39,12 +39,10 @@ internal static class Programme
 
         if (Application.Current is null) new Application();
 
-        var vue = typeof(DocumentDetacheVue);
-        var parametres = vue.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.GetCustomAttribute<ParameterAttribute>() is not null)
-            .Select(p => p.Name).ToList();
-        Exiger(parametres.Contains("Rang"),
-            "la vue du document expose bien un parametre nomme Rang");
+        var racineDoc = typeof(RacineDocumentDetache);
+        Exiger(racineDoc.GetProperty("Rang", BindingFlags.Public | BindingFlags.Instance)?.PropertyType == typeof(int)
+               && File.Exists(Path.Combine(AppContext.BaseDirectory, "../../../../../web/src/composants/DocumentDetacheVue.tsx")),
+            "la racine du document expose bien un rang (Rang), et sa vue React existe");
 
         foreach (var rang in new[] { 1, 2, 3 })
         {
@@ -52,15 +50,13 @@ internal static class Programme
             var champ = typeof(FenetreDocument)
                 .GetField("Vue", BindingFlags.NonPublic | BindingFlags.Instance)
                 ?.GetValue(fenetre);
-            var racines = (champ as Microsoft.AspNetCore.Components.WebView.Wpf.BlazorWebView)?.RootComponents;
-            Exiger(racines is { Count: > 0 },
-                $"fenetre {rang} : la vue racine declaree en XAML est presente");
-            var racine = racines![0];
-            Exiger(racine.ComponentType == vue,
-                $"fenetre {rang} : la vue racine est bien celle du document");
-            var pose = racine.Parameters;
-            Exiger(pose is not null && pose.TryGetValue("Rang", out var v) && v is int i && i == rang,
-                $"fenetre {rang} : le rang {rang} est bien transmis a la vue");
+            Exiger(champ is Microsoft.Web.WebView2.Wpf.WebView2,
+                $"fenetre {rang} : la vue WebView2 declaree en XAML est presente");
+            var racine = fenetre.Racine;
+            Exiger(racine.Composant == "DocumentDetacheVue" && racine.Rappels.Length == 0 && !racine.Bords,
+                $"fenetre {rang} : la racine monte bien la vue du document");
+            Exiger(racine.Rang == rang,
+                $"fenetre {rang} : le rang {rang} est bien transmis a la racine");
             fenetre.Close();
         }
 

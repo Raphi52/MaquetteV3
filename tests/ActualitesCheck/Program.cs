@@ -134,11 +134,12 @@ Exiger(pontAccueil.Contains("Actualites.Lire(maintenant)") && pontAccueil.Contai
 // partage vivent dans Pont/EcranActualites.cs (ecran a session). Ce que ce banc
 // lisait dans le .razor -- l'ecran ecrit dans le depot partage, il porte un
 // geste de publication -- il le tient sur la chaine reelle, et l'EXECUTE.
-var ecran = Path.Combine(racine, "Components/Ecrans/EcranActualites.razor");
-Exiger(File.Exists(ecran), "l'ecran de saisie EcranActualites.razor existe");
-var coquille = File.Exists(ecran) ? File.ReadAllText(ecran) : string.Empty;
-Exiger(coquille.Contains("<IleReact Composant=\"EcranActualites\" />"),
-    "la coquille monte l'ecran React du meme nom, sans parametre comme avant");
+// RETRAIT DE BLAZOR (lot 3 du plan « finir le passage a React », 19/11/2026) :
+// la coquille .razor n'existe plus, l'aiguillage React monte l'ecran directement.
+Exiger(!File.Exists(Path.Combine(racine, "Components/Ecrans/EcranActualites.razor")) && aiguillage.Contains("<EcranActualites"),
+    "l'ecran de saisie est atteignable : l'aiguillage React le monte (plus de coquille .razor)");
+Exiger(aiguillage.Contains("<EcranActualites />"),
+    "l'aiguillage monte l'ecran React du meme nom, sans parametre comme avant");
 var cheminTsx = Path.Combine(racine, "web/src/ecrans/EcranActualites.tsx");
 Exiger(File.Exists(cheminTsx), "l'ecran React de saisie existe (web/src/ecrans/EcranActualites.tsx)");
 var tsx = File.Exists(cheminTsx) ? File.ReadAllText(cheminTsx) : string.Empty;

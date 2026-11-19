@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EcranBodacc } from './EcranBodacc'
-import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
-afterEach(() => { cleanup(); retirerFauxDotNet() })
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 // JeuDemo.Aujourdhui = 09/09/2026 : les annonces prevues le 08/09 et le 04/09
 // sont en retard, celle du 09/09 ne l'est pas (capture Blazor du 18/11/2026).
 function ouvrir(ouvrirDossier = vi.fn()) {
-  installerFauxDotNet({ 'EcranBodacc.DateDuJour': () => '2026-09-09' })
+  installerFauxPont({ 'EcranBodacc.DateDuJour': () => '2026-09-09' })
   return { ouvrirDossier, ...render(<EcranBodacc ouvrirDossier={ouvrirDossier} />) }
 }
 
@@ -28,7 +28,7 @@ describe('EcranBodacc', () => {
   })
 
   it('n\'affiche aucune ligne tant que la date du jour n\'est pas connue', () => {
-    installerFauxDotNet({ 'EcranBodacc.DateDuJour': () => new Promise<string>(() => {}) })
+    installerFauxPont({ 'EcranBodacc.DateDuJour': () => new Promise<string>(() => {}) })
     const { container } = render(<EcranBodacc ouvrirDossier={vi.fn()} />)
     expect(container.querySelectorAll('tbody tr')).toHaveLength(0)
     expect(screen.queryByText('Aucune annonce ne repond a ces criteres.')).toBeNull()

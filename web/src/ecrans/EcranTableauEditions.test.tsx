@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EcranTableauEditions, type LigneEdition } from './EcranTableauEditions'
-import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 import { morceaux } from '../test/morceaux'
 
-afterEach(() => { cleanup(); retirerFauxDotNet() })
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 const detail = {
   designation: 'GREFFE DU TRIBUNAL', attentionDe: 'M. DUPONT', adressePostale: '1 rue X\n80000 AMIENS', typePapier: 'ENTETE',
@@ -25,7 +25,7 @@ const editions: LigneEdition[] = [
 
 describe('EcranTableauEditions', () => {
   it('rend les colonnes v2, les groupes et le compte des editions', async () => {
-    installerFauxDotNet({ 'EcranTableauEditions.TypesPapier': () => ['NORMAL', 'ENTETE'] })
+    installerFauxPont({ 'EcranTableauEditions.TypesPapier': () => ['NORMAL', 'ENTETE'] })
     const { container } = render(<EcranTableauEditions editions={editions} affaire="0000 AMITEL" fermer={vi.fn()} />)
 
     expect(screen.getByText('Tableau des editions')).toBeTruthy()
@@ -41,7 +41,7 @@ describe('EcranTableauEditions', () => {
   })
 
   it('choisir une ligne montre le detail du destinataire, en lecture seule', async () => {
-    installerFauxDotNet({ 'EcranTableauEditions.TypesPapier': () => ['NORMAL', 'ENTETE'] })
+    installerFauxPont({ 'EcranTableauEditions.TypesPapier': () => ['NORMAL', 'ENTETE'] })
     const { container } = render(<EcranTableauEditions editions={editions} affaire="0000" fermer={vi.fn()} />)
 
     fireEvent.click(screen.getByText('Requerant'))
@@ -59,7 +59,7 @@ describe('EcranTableauEditions', () => {
   })
 
   it('« Retour a l\'affaire » remonte la fermeture a la coquille', () => {
-    installerFauxDotNet({ 'EcranTableauEditions.TypesPapier': () => [] })
+    installerFauxPont({ 'EcranTableauEditions.TypesPapier': () => [] })
     const fermer = vi.fn()
     render(<EcranTableauEditions editions={[]} affaire="0000" fermer={fermer} />)
     fireEvent.click(screen.getByRole('button', { name: 'Retour a l\'affaire' }))

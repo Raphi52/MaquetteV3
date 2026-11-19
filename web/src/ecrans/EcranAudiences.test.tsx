@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EcranAudiences } from './EcranAudiences'
-import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
-afterEach(() => { cleanup(); retirerFauxDotNet() })
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 // Valeurs attendues : celles de la capture de l'ecran Blazor (18/11/2026) :
 // date proposee 16/09/2026 (JeuDemo.Aujourdhui + 7), 3 audiences programmees.
 function ouvrir() {
-  const dotnet = installerFauxDotNet({ 'EcranAudiences.DateProposee': () => '2026-09-16' })
-  return { dotnet, ...render(<EcranAudiences />) }
+  const pont = installerFauxPont({ 'EcranAudiences.DateProposee': () => '2026-09-16' })
+  return { pont, ...render(<EcranAudiences />) }
 }
 
 const lignes = (c: HTMLElement) =>
@@ -17,9 +17,9 @@ const lignes = (c: HTMLElement) =>
 
 describe('EcranAudiences', () => {
   it('affiche les audiences programmees et la date proposee par le pont', async () => {
-    const { container, dotnet } = ouvrir()
+    const { container, pont } = ouvrir()
     expect(await screen.findByDisplayValue('2026-09-16')).toBeTruthy()
-    expect(dotnet.invokeMethodAsync).toHaveBeenCalledWith('RigV3Desktop', 'EcranAudiences.DateProposee')
+    expect(pont.appels).toHaveBeenCalledWith('EcranAudiences.DateProposee')
     expect(container.querySelector('.rig-resultats-proc__compte')!.textContent).toBe('3 audience(s)')
     expect(lignes(container)[0]).toEqual(['15/09/2026', '09:00', 'Audience de procedure collective', '1re', 'A', 'oui', 'oui', '14'])
     expect(lignes(container)[1]).toEqual(['22/09/2026', '10:15', 'Audience du juge-commissaire', '1re', 'A', '', '', '6'])

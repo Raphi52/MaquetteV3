@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using RigV3Desktop;
@@ -42,22 +42,27 @@ internal static class Programme
     {
         var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
 
-        // --- 0. Home.razor n'est plus qu'une coquille qui monte l'application.
-        var home = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
-        // Commentaires retires D'ABORD : l'en-tete cite « le @code de cette page ».
-        var sansCommentaires = Regex.Replace(home, @"@\*[\s\S]*?\*@", "");
-        var balisageHome = sansCommentaires[..sansCommentaires.IndexOf("@code", StringComparison.Ordinal)];
-        Exiger(Regex.Matches(balisageHome, @"<IleReact\b").Count == 1
-               && balisageHome.Contains("<IleReact Composant=\"Application\" Proprietes=\"@(new Dictionary<string, object?> { [\"vue\"] = Plan.Vue() })\" Rappels=\"Rappels\" />"),
-            "Home.razor monte UNE ile : l'application React entiere, avec la vue du plan de travail");
-        Exiger(!Regex.IsMatch(balisageHome, @"class=""rig-|@if|@foreach|@switch|<Ecran"),
-            "Home.razor ne rend plus aucun balisage ni aucun ecran lui-meme");
-        Exiger(home.Contains("[\"geste\"] = IleReact.Rappel(EventCallback.Factory.Create<Pont.GesteIle>(this, g => Plan.SurGesteAccueil(g)))")
-               && home.Contains("[\"plan\"] = IleReact.Rappel(EventCallback.Factory.Create<Pont.GestePlan>(this, g => Plan.Jouer(g)))"),
-            "Home.razor renvoie les gestes de l'accueil et du plan de travail a la session");
-        Exiger(home.Contains("Plan.Planifier = action => _ = InvokeAsync(() => { action(); StateHasChanged(); });")
-               && home.Contains("if (premierRendu) Plan.Demarrer();") && home.Contains("await Plan.DisposeAsync();"),
-            "Home.razor rejoue les changements venus d'ailleurs, demarre et libere la session");
+        // --- 0. Plus de Home.razor (Blazor retire, lot 3 du plan « finir le passage
+        // a React », 19/11/2026) : la fenetre monte l'application React par SA racine,
+        // Pont/Racines.cs (RacinePlanTravail), qui tient la session comme Home le faisait.
+        var racines = File.ReadAllText(Path.Combine(racine, "Pont/Racines.cs"));
+        Exiger(!File.Exists(Path.Combine(racine, "Components/Pages/Home.razor"))
+               && racines.Contains("public override string Composant => \"Application\";")
+               && racines.Contains("new Dictionary<string, object?> { [\"vue\"] = Plan.Vue() }"),
+            "la racine de la fenetre monte UNE composante : l'application React entiere, avec la vue du plan de travail");
+        var razor = Directory.EnumerateFiles(racine, "*.razor", SearchOption.AllDirectories)
+            .Where(f => !Regex.IsMatch(f, @"[\\/](bin|obj|node_modules|binverif)[\\/]")).ToList();
+        var projet = File.ReadAllText(Path.Combine(racine, "RigV3Desktop.csproj"));
+        Exiger(razor.Count == 0 && projet.Contains("<Project Sdk=\"Microsoft.NET.Sdk\">")
+               && !projet.Contains("Components.WebView") && !projet.Contains("Sdk.Razor"),
+            $"plus aucun .razor ni paquet Blazor dans l'application ({razor.Count} .razor)");
+        Exiger(racines.Contains("case \"geste\": Plan.SurGesteAccueil(valeur.Deserialize<GesteIle>(Repartiteur.Json)!); break;")
+               && racines.Contains("case \"plan\": Plan.Jouer(valeur.Deserialize<GestePlan>(Repartiteur.Json)!); break;"),
+            "la racine renvoie les gestes de l'accueil et du plan de travail a la session");
+        Exiger(racines.Contains("Plan.Planifier = action => Planifier(action);")
+               && racines.Contains("protected override void SurDemarrage() => Plan.Demarrer();")
+               && racines.Contains("await Plan.DisposeAsync();"),
+            "la racine rejoue les changements venus d'ailleurs, demarre et libere la session");
         var aiguillage = File.ReadAllText(Path.Combine(racine, "web/src/plan/Aiguillage.tsx"));
         var ecrans = Directory.GetFiles(Path.Combine(racine, "web/src/ecrans"), "Ecran*.tsx")
                               .Where(f => !f.EndsWith(".test.tsx")).Select(Path.GetFileNameWithoutExtension)
@@ -77,6 +82,7 @@ internal static class Programme
         Environment.SetEnvironmentVariable("RIGV3_ETAT", etatBanc);
         try
         {
+            JouerPont(racine);
             Jouer();
         }
         finally
@@ -90,6 +96,83 @@ internal static class Programme
             ? "PlanTravailCheck : vert."
             : $"PlanTravailCheck : {Echecs.Count} echec(s).");
         return Echecs.Count == 0 ? 0 : 1;
+    }
+
+    /// <summary>
+    /// 0 bis. LE PONT JOUE de bout en bout (Pont/Repartiteur.cs), comme la page le
+    /// fait par la messagerie de WebView2 : ouvrir la racine, remonter un geste,
+    /// appeler une methode d'ecran, recevoir les erreurs. Les messages sont ceux
+    /// que web/src/pont.ts poste et lit.
+    /// </summary>
+    private static void JouerPont(string racineDepot)
+    {
+        var postes = new List<JsonElement>();
+        var verrou = new object();
+        var racinePage = new RacinePlanTravail(null, null);
+        var pont = new Repartiteur(racinePage,
+            json => { lock (verrou) postes.Add(JsonDocument.Parse(json).RootElement.Clone()); },
+            action => { lock (verrou) action(); });
+        JsonElement Reponse(int numero)
+        {
+            lock (verrou) return postes.Last(m => m.TryGetProperty("reponse", out var r) && r.GetInt32() == numero);
+        }
+        JsonElement[] Racines()
+        {
+            lock (verrou) return postes.Where(m => m.TryGetProperty("evenement", out var e) && e.GetString() == "racine").ToArray();
+        }
+        void Envoyer(int numero, string nom, params object?[] args)
+            => pont.Recevoir(JsonSerializer.Serialize(new { appel = numero, nom, args }, Repartiteur.Json)).GetAwaiter().GetResult();
+
+        Envoyer(1, "Racine.Ouvrir");
+        var ouverte = Reponse(1).GetProperty("valeur");
+        Exiger(ouverte.GetProperty("composant").GetString() == "Application"
+               && ouverte.GetProperty("rappels").EnumerateArray().Select(r => r.GetString()).SequenceEqual(new[] { "geste", "plan" })
+               && !ouverte.GetProperty("bords").GetBoolean()
+               && ouverte.GetProperty("proprietes").GetProperty("vue").GetProperty("accueil").ValueKind == JsonValueKind.Object,
+            "pont : Racine.Ouvrir rend l'application, ses deux gestes et la vue de l'accueil (sans bandes de bord hors fenetre)");
+        Exiger(racinePage.Demarree,
+            "pont : la session demarre apres l'ouverture (minuteurs de l'accueil), comme apres le premier rendu");
+
+        var envoisAvant = Racines().Length;
+        Envoyer(2, "Racine.Rappeler", "plan", new { nom = "ouvrirNumero", valeur = "004176", numero = 1 });
+        var apres = Racines().Skip(envoisAvant).LastOrDefault();
+        Exiger(Reponse(2).TryGetProperty("valeur", out _) && !Reponse(2).TryGetProperty("erreur", out _)
+               && apres.ValueKind == JsonValueKind.Object
+               && apres.GetProperty("valeur").GetProperty("proprietes").GetProperty("vue").GetProperty("dossier").GetProperty("numero").GetString() == "004176"
+               && apres.GetProperty("valeur").GetProperty("proprietes").GetProperty("vue").GetProperty("geste").GetInt32() == 1,
+            "pont : un geste du plan remonte a la session, et la racine redessinee (affaire 004176, geste 1) part a la page");
+
+        Envoyer(3, "EcranVerrous.Verrouilles", "R. VILAIN", false);
+        Exiger(Reponse(3).GetProperty("valeur").GetProperty("lignes").GetArrayLength()
+               == EcranVerrous.Verrouilles("R. VILAIN", false).Lignes.Length,
+            "pont : une methode [JSInvokable] d'ecran est jointe par son identifiant, arguments convertis du JSON");
+
+        Envoyer(4, "Ecran.Inconnu");
+        Envoyer(5, "EcranVerrous.Verrouilles", "R. VILAIN");
+        Exiger(Reponse(4).GetProperty("erreur").GetString()!.Contains("Aucune methode [JSInvokable(\"Ecran.Inconnu\")]")
+               && Reponse(5).GetProperty("erreur").GetString()!.Contains("attend 2 argument(s), 1 recu(s)"),
+            "pont : un identifiant inconnu ou un mauvais compte d'arguments est une erreur rendue a la page, jamais avalee");
+
+        // Chaque identifiant appele par la page existe cote C# : sous Blazor, une
+        // faute de frappe ne se voyait qu'a l'execution ; ici elle se voit au banc.
+        var appels = Directory.GetFiles(Path.Combine(racineDepot, "web/src"), "*.ts*", SearchOption.AllDirectories)
+            .Where(f => !Regex.IsMatch(f, @"\.test\.tsx?$|[\\/]test[\\/]"))
+            .SelectMany(f => Regex.Matches(File.ReadAllText(f), @"appeler<[^>]*>\(\s*'([^']+)'").Select(m => m.Groups[1].Value))
+            .Distinct().ToList();
+        // « Racine.Ouvrir » et « Racine.Rappeler » sont les deux appels que le repartiteur
+        // traite lui-meme (la racine de la fenetre), sans methode [JSInvokable].
+        var absents = appels.Where(id => id is not ("Racine.Ouvrir" or "Racine.Rappeler")
+                                         && !Repartiteur.Methodes.ContainsKey(id)).ToList();
+        Exiger(appels.Count >= 20 && absents.Count == 0,
+            $"pont : les {appels.Count} identifiants appeles par web/src existent tous en [JSInvokable] ({string.Join(", ", absents)})");
+
+        racinePage.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        int envoisFin;
+        lock (verrou) envoisFin = postes.Count;
+        pont.Pousser();
+        Envoyer(6, "Racine.Ouvrir");
+        lock (verrou) Exiger(racinePage.Fermee && postes.Count == envoisFin,
+            "pont : une fois la fenetre fermee, plus rien n'est poste a sa page");
     }
 
     private static void Jouer()

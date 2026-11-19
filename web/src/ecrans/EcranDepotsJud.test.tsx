@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EcranDepotsJud } from './EcranDepotsJud'
-import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
-afterEach(() => { cleanup(); retirerFauxDotNet() })
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 function ouvrir(ouvrirDossier = vi.fn()) {
-  const dotnet = installerFauxDotNet({ 'EcranDepotsJud.DateDuJour': () => '2026-09-09' })
-  return { dotnet, ouvrirDossier, ...render(<EcranDepotsJud ouvrirDossier={ouvrirDossier} />) }
+  const pont = installerFauxPont({ 'EcranDepotsJud.DateDuJour': () => '2026-09-09' })
+  return { pont, ouvrirDossier, ...render(<EcranDepotsJud ouvrirDossier={ouvrirDossier} />) }
 }
 
 const compte = (c: HTMLElement) => c.querySelector('.rig-resultats-proc__compte')!.textContent
@@ -33,12 +33,12 @@ describe('EcranDepotsJud', () => {
   })
 
   it('l\'etape « Nouvel evenement survenu » montre l\'evenement, date du jour venue du pont', async () => {
-    const { dotnet } = ouvrir()
+    const { pont } = ouvrir()
     expect(screen.queryByLabelText('Evenement survenu')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Nouvel evenement survenu' }))
     expect((screen.getByLabelText('Evenement survenu') as HTMLSelectElement).value).toBe('JUG')
     expect(await screen.findByDisplayValue('2026-09-09')).toBe(screen.getByLabelText('Date de l\'evenement'))
-    expect(dotnet.invokeMethodAsync).toHaveBeenCalledWith('RigV3Desktop', 'EcranDepotsJud.DateDuJour')
+    expect(pont.appels).toHaveBeenCalledWith('EcranDepotsJud.DateDuJour')
   })
 
   it('cherche par numero et par denomination, sans casse', () => {

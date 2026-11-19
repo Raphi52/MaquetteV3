@@ -1,5 +1,3 @@
-using Microsoft.JSInterop;
-
 namespace RigV3Desktop.Pont;
 
 /// <summary>Une ligne de la grille des flux teletransmis.</summary>

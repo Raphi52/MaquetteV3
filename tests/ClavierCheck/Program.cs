@@ -55,19 +55,13 @@ Exiger(Regex.IsMatch(corps.Groups["c"].Value, @"if \(DossierOuvert is not null\)
     "Echap ferme l'affaire d'abord, l'ecran ensuite : jamais deux choses a la fois");
 
 // --- 3. Entree lance la recherche partout ou une recherche existe.
-var ecrans = Directory.GetFiles(Path.Combine(racine, "Components/Ecrans"), "*.razor");
-var recherches = ecrans.Where(f => File.ReadAllText(f).Contains(@"@onclick=""Rechercher""")).ToList();
-// Le seuil « au moins deux ecrans de recherche » se lit apres la section 3 bis,
-// sur les DEUX familles : depuis le 19/11/2026 (lots 2 et 3), les trois ecrans
-// de recherche sont en React et plus aucun .razor n'en porte.
-foreach (var f in recherches)
-{
-    var t = File.ReadAllText(f);
-    var nom = Path.GetFileName(f);
-    Exiger(t.Contains("@onkeydown"), $"{nom} ecoute le clavier");
-    Exiger(Regex.IsMatch(t, @"Enter""\s*\)\s*Rechercher\(\)|e\.Key == ""Enter"""),
-        $"{nom} lance la recherche sur Entree");
-}
+// Depuis le retrait de Blazor (lot 3 du plan « finir le passage a React »,
+// 19/11/2026), il n'y a plus d'ecran .razor : la regle se tient sur la seule
+// famille React (section 3 bis), et on s'assure qu'aucun .razor n'est revenu
+// en douce (il echapperait alors a ce controle).
+Exiger(!Directory.EnumerateFiles(racine, "*.razor", SearchOption.AllDirectories)
+            .Any(f => !Regex.IsMatch(f, @"[\\/](bin|obj|node_modules|binverif)[\\/]")),
+    "plus aucun ecran .razor : les ecrans de recherche se lisent en React");
 
 // --- 3 bis. Meme regle sur les ecrans PORTES EN REACT (web/src, 18/11/2026) :
 // un ecran dont un bouton lance rechercher() ecoute le clavier (onKeyDown) et
@@ -88,13 +82,13 @@ foreach (var f in recherchesTsx)
     Exiger(Regex.IsMatch(t, @"\.key\s*===?\s*['""]Enter['""][\s\S]{0,80}?rechercher\(\)"),
         $"{nom} lance la recherche sur Entree");
 }
-Exiger(recherches.Count + recherchesTsx.Count >= 2,
-    $"les ecrans de recherche restent trouves, Blazor et React confondus ({recherches.Count} + {recherchesTsx.Count})");
+Exiger(recherchesTsx.Count >= 2,
+    $"les ecrans de recherche restent trouves ({recherchesTsx.Count})");
 // Plus strict que l'ancien seuil (>= 2 sur les seuls .razor) : les TROIS ecrans
 // de recherche connus le 19/11/2026 sont nommes, et chacun doit etre trouve
-// dans l'une ou l'autre famille -- un ecran qui perdrait son bouton Rechercher
+// parmi les ecrans React -- un ecran qui perdrait son bouton Rechercher
 // en passant en React ne sortirait plus du controle sans bruit.
-var nomsRecherche = recherches.Concat(recherchesTsx).Select(Path.GetFileNameWithoutExtension).ToHashSet();
+var nomsRecherche = recherchesTsx.Select(Path.GetFileNameWithoutExtension).ToHashSet();
 Exiger(new[] { "EcranRechAffaires", "EcranRequisitions", "EcranCommandesWeb" }.All(nomsRecherche.Contains),
     $"les ecrans de recherche sont trouves ({string.Join(", ", nomsRecherche.Order())})");
 

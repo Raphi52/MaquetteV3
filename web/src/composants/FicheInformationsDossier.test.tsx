@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { FicheInformationsDossier, type VueFiche } from './FicheInformationsDossier'
-import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 import { morceaux } from '../test/morceaux'
 
-afterEach(() => { cleanup(); retirerFauxDotNet() })
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 // Etat et regles de la fiche (etapes, vues, saisie guidee, verrou, tache,
 // historique) vivent dans la session de Pont/FicheInformationsDossier.cs,
@@ -37,17 +37,17 @@ function vue(plus: Partial<VueFiche> = {}): VueFiche {
 }
 
 function monter(reponses: Record<string, (...a: unknown[]) => unknown>, version = 0) {
-  const dotnet = installerFauxDotNet(reponses)
+  const pont = installerFauxPont(reponses)
   const rappels = { fermer: vi.fn(), toutAffiche: vi.fn(), champModifie: vi.fn() }
   const r = render(<FicheInformationsDossier session="s1" version={version} {...rappels} />)
-  return { ...r, dotnet, ...rappels }
+  return { ...r, pont, ...rappels }
 }
 
 describe('FicheInformationsDossier', () => {
   it('lit la vue de la session ouverte par la coquille ; l\'entete en morceaux Razor', async () => {
-    const { container, dotnet } = monter({ 'FicheInformationsDossier.Vue': () => vue() })
+    const { container, pont } = monter({ 'FicheInformationsDossier.Vue': () => vue() })
     await screen.findByText('Informations du dossier')
-    expect(dotnet.invokeMethodAsync).toHaveBeenCalledWith('RigV3Desktop', 'FicheInformationsDossier.Vue', 's1')
+    expect(pont.appels).toHaveBeenCalledWith('FicheInformationsDossier.Vue', 's1')
     expect(morceaux(container.querySelector('.rig-guide__entete .rig-kicker')))
       .toEqual(['Dossier RCS', ' · ', '523', ' champs · ', '6', ' étapes · ', '31', ' blocs'])
     expect(morceaux(container.querySelector('.rig-guide__source')))
@@ -165,7 +165,7 @@ describe('FicheInformationsDossier', () => {
     await screen.findByText('Demander une modification')
     expect(r1.container.querySelector('.rig-verrou')!.className).toBe('rig-verrou ')
     expect((r1.container.querySelector('.rig-champs input') as HTMLInputElement).readOnly).toBe(true)
-    cleanup(); retirerFauxDotNet()
+    cleanup(); retirerFauxPont()
 
     const edition = vue({ verrou: { enAttente: false, attente: 0, enEdition: true, brouillon: 0 } })
     const r2 = monter({ 'FicheInformationsDossier.Vue': () => edition })
@@ -174,7 +174,7 @@ describe('FicheInformationsDossier', () => {
     expect((screen.getByText('Envoyer la demande') as HTMLButtonElement).disabled).toBe(true)
     expect(morceaux(r2.container.querySelector('.rig-verrou__texte')))
       .toEqual(['Modification en cours — ', '0', ' champ(s) modifie(s).'])
-    cleanup(); retirerFauxDotNet()
+    cleanup(); retirerFauxPont()
 
     const attente = vue({ verrou: { enAttente: true, attente: 1, enEdition: false, brouillon: 0 } })
     const r3 = monter({ 'FicheInformationsDossier.Vue': () => attente })

@@ -1,5 +1,3 @@
-using Microsoft.JSInterop;
-
 namespace RigV3Desktop.Pont;
 
 /// <summary>Les criteres saisis a gauche de l'ecran (memes noms que l'ancien @code).</summary>

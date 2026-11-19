@@ -9,11 +9,12 @@
     <link rel="stylesheet" href="rig-accueil.css" />
 </head>
 <body>
+    <!-- La page de TOUTES les fenetres RIG (principale, onglet sorti, document
+         detache) : le module monte dans #app la racine que la fenetre lui donne
+         (web/src/racine.tsx, Pont/Racines.cs). Servie par la fenetre sous
+         https://rigv3.example/ (Pont/PageWeb.cs) ; sous dev.ps1, par le serveur
+         Vite, qui remplace le module construit par web/src/main.ts. -->
     <div id="app">Chargement...</div>
-    <div id="blazor-error-ui">
-        Une erreur est survenue.
-        <a href="" class="reload">Recharger</a>
-    </div>
-    <script src="_framework/blazor.webview.js"></script>
+    <script type="module" src="app/rig-iles.js"></script>
 </body>
 </html>

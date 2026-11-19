@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { EcranTachesLot, type VueTachesLot } from './EcranTachesLot'
-import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 import { morceaux } from '../test/morceaux'
 
-afterEach(() => { cleanup(); retirerFauxDotNet() })
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 // Les regles (lots, saisie dans la trace DU dossier, cloture par dossier) vivent
 // dans Pont/EcranTachesLot.cs, executees par tests/GedCheck. Ici : l'ecran lit la
@@ -40,11 +40,11 @@ function vueDirigeant(): VueTachesLot {
 
 describe('EcranTachesLot', () => {
   it('lit la vue de la session ouverte par la coquille : lots, en-tete, colonnes de la recette', async () => {
-    const dotnet = installerFauxDotNet({ 'EcranTachesLot.Vue': () => vueDeno() })
+    const pont = installerFauxPont({ 'EcranTachesLot.Vue': () => vueDeno() })
     const { container } = render(<EcranTachesLot session="s1" version={0} />)
 
     await screen.findByText('TRANSNORD SA')
-    expect(dotnet.invokeMethodAsync).toHaveBeenCalledWith('RigV3Desktop', 'EcranTachesLot.Vue', 's1')
+    expect(pont.appels).toHaveBeenCalledWith('EcranTachesLot.Vue', 's1')
     const lots = container.querySelectorAll('aside button.rig-alerte')
     expect(lots[0]!.className).toBe('rig-alerte rig-alerte--lien rig-alerte--actif')
     expect(lots[0]!.getAttribute('title')).toBe('Traiter les 2 dossiers en lot')
@@ -67,7 +67,7 @@ describe('EcranTachesLot', () => {
   })
 
   it('remonte la saisie (a la sortie du champ), la propagation et la cloture du dossier', async () => {
-    const dotnet = installerFauxDotNet({
+    const pont = installerFauxPont({
       'EcranTachesLot.Vue': () => vueDeno(),
       'EcranTachesLot.Agir': (_s: unknown, geste: unknown) =>
         geste === 'Terminer' ? { ...vueDeno('X'), dernierMessage: '004176 termine. Son alerte ne reviendra plus.' } : vueDeno('X'),
@@ -77,19 +77,19 @@ describe('EcranTachesLot', () => {
 
     const champ = container.querySelector('tbody tr input') as HTMLInputElement
     fireEvent.change(champ, { target: { value: 'X' } })
-    await waitFor(() => expect(dotnet.invokeMethodAsync).toHaveBeenCalledWith(
-      'RigV3Desktop', 'EcranTachesLot.Agir', 's1', 'Ecrire', { dossier: '004151', champ: 0, valeur: 'X' }))
+    await waitFor(() => expect(pont.appels).toHaveBeenCalledWith(
+      'EcranTachesLot.Agir', 's1', 'Ecrire', { dossier: '004151', champ: 0, valeur: 'X' }))
 
     fireEvent.click(screen.getAllByRole('button', { name: 'tout' })[0]!)
-    await waitFor(() => expect(dotnet.invokeMethodAsync).toHaveBeenLastCalledWith('RigV3Desktop', 'EcranTachesLot.Agir', 's1', 'ToutPropager', '004151'))
+    await waitFor(() => expect(pont.appels).toHaveBeenLastCalledWith('EcranTachesLot.Agir', 's1', 'ToutPropager', '004151'))
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Terminer' })[1]!)
     await screen.findByText('004176 termine. Son alerte ne reviendra plus.')
-    expect(dotnet.invokeMethodAsync).toHaveBeenLastCalledWith('RigV3Desktop', 'EcranTachesLot.Agir', 's1', 'Terminer', '004176')
+    expect(pont.appels).toHaveBeenLastCalledWith('EcranTachesLot.Agir', 's1', 'Terminer', '004176')
   })
 
   it('une tache a repetition est REFUSEE en lot, avec son motif', async () => {
-    installerFauxDotNet({ 'EcranTachesLot.Vue': () => vueDeno(), 'EcranTachesLot.Agir': () => vueDirigeant() })
+    installerFauxPont({ 'EcranTachesLot.Vue': () => vueDeno(), 'EcranTachesLot.Agir': () => vueDirigeant() })
     const { container } = render(<EcranTachesLot session="s1" version={0} />)
     fireEvent.click(await screen.findByText('Changer un dirigeant'))
     await waitFor(() => expect(container.querySelector('table')).toBeNull())
@@ -102,11 +102,11 @@ describe('EcranTachesLot', () => {
 
   it('une nouvelle version (la coquille a change de recette) relit la vue', async () => {
     const vues = [vueDeno(), vueDirigeant()]
-    const dotnet = installerFauxDotNet({ 'EcranTachesLot.Vue': () => vues.shift() })
+    const pont = installerFauxPont({ 'EcranTachesLot.Vue': () => vues.shift() })
     const { rerender } = render(<EcranTachesLot session="s1" version={0} />)
     await screen.findByText('TRANSNORD SA')
     rerender(<EcranTachesLot session="s1" version={1} />)
     await screen.findByText(/se saisit/)
-    expect(dotnet.invokeMethodAsync).toHaveBeenCalledTimes(2)
+    expect(pont.appels).toHaveBeenCalledTimes(2)
   })
 })

@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EcranCloture } from './EcranCloture'
-import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
-afterEach(() => { cleanup(); retirerFauxDotNet() })
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 // Valeurs attendues : celles de l'ecran Blazor (EcranCloture.razor), JeuDemo.Aujourdhui = 09/09/2026 :
 // seule la limite d'examen du 05/09/2026 (SAS TRANSPORTS MARNE) est depassee.
 function ouvrir(ouvrirDossier = vi.fn()) {
-  const dotnet = installerFauxDotNet({ 'EcranCloture.DateDuJour': () => '2026-09-09' })
-  return { dotnet, ouvrirDossier, ...render(<EcranCloture ouvrirDossier={ouvrirDossier} />) }
+  const pont = installerFauxPont({ 'EcranCloture.DateDuJour': () => '2026-09-09' })
+  return { pont, ouvrirDossier, ...render(<EcranCloture ouvrirDossier={ouvrirDossier} />) }
 }
 const lignes = (c: HTMLElement) =>
   [...c.querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent))
@@ -17,12 +17,12 @@ const alertes = (c: HTMLElement) => c.querySelectorAll('tbody tr.rig-table__lign
 
 describe('EcranCloture', () => {
   it('affiche les cinq affaires de « Selection PC » et marque la limite depassee', async () => {
-    const { container, dotnet } = ouvrir()
+    const { container, pont } = ouvrir()
     expect(container.querySelector('.rig-resultats-proc__compte')!.textContent!.trim()).toBe('5 affichee(s) sur 5')
     expect(container.querySelectorAll('thead th')).toHaveLength(15)
     expect(lignes(container)[0]!.slice(0, 4)).toEqual(['PC-2024-0118', 'SARL BOULANGERIE DUVAL', '1re', '15/09/2026'])
     await vi.waitFor(() => expect(alertes(container)).toHaveLength(1))
-    expect(dotnet.invokeMethodAsync).toHaveBeenCalledWith('RigV3Desktop', 'EcranCloture.DateDuJour')
+    expect(pont.appels).toHaveBeenCalledWith('EcranCloture.DateDuJour')
     expect(alertes(container)[0]!.textContent).toContain('SAS TRANSPORTS MARNE')
   })
 

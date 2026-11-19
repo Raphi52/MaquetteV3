@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.IO;
 using System.Reflection;
 
@@ -28,9 +28,17 @@ internal static class Programme
         var assemblage = typeof(RigV3Desktop.App).Assembly;
 
         // L'en-tete triable est un composant PARTAGE : une seule facon de trier
-        // dans toute la maquette.
-        var entete = assemblage.GetType("RigV3Desktop.Components.EnteteTriable");
-        Exiger(entete is not null, "le composant d'en-tete triable partage existe");
+        // dans toute la maquette. Il est en React depuis le lot 6 (19/11/2026),
+        // et seul depuis le retrait de Blazor : web/src/composants/EnteteTriable.tsx,
+        // importe par les ecrans qui trient.
+        var racineDepot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
+        var cheminEntete = Path.Combine(racineDepot, "web/src/composants/EnteteTriable.tsx");
+        var importeurs = Directory.GetFiles(Path.Combine(racineDepot, "web/src/ecrans"), "*.tsx")
+            .Where(f => !f.EndsWith(".test.tsx") && File.ReadAllText(f).Contains("from '../composants/EnteteTriable'"))
+            .ToList();
+        Exiger(File.Exists(cheminEntete) && File.ReadAllText(cheminEntete).Contains("export function EnteteTriable(")
+               && importeurs.Count >= 2,
+            $"le composant d'en-tete triable partage existe, et les ecrans qui trient s'en servent ({importeurs.Count})");
 
         // Les objets de grille exposent tantot des proprietes, tantot des champs
         // publics : lire l'un ou l'autre, sinon le banc mesurerait sa propre
@@ -47,12 +55,12 @@ internal static class Programme
             // Ecran PORTE EN REACT A SESSION (web/src/session.tsx, 19/11/2026) :
             // son etat et son tri ont quitte le .razor (devenu une coquille) pour
             // la classe Session<Nom> de Pont/<Ecran>.cs, avec les MEMES membres
-            // (BasculerTri, la liste). C'est elle qu'on construit ; sinon le
-            // composant Blazor, comme avant.
+            // (BasculerTri, la liste). C'est elle qu'on construit (Blazor, et ses
+            // composants d'ecran, sont retires depuis le 19/11/2026).
             var session = nomEcran.StartsWith("Ecran", StringComparison.Ordinal)
                 ? assemblage.GetType("RigV3Desktop.Pont.Session" + nomEcran["Ecran".Length..])
                 : null;
-            var type = session ?? assemblage.GetType("RigV3Desktop.Components.Ecrans." + nomEcran);
+            var type = session;
             if (type is null) { Exiger(false, $"{nomEcran} : ecran introuvable"); return; }
             var instance = Activator.CreateInstance(type, nonPublic: true)!;
 

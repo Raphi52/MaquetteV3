@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { EcranTeletransmission, type VueTeletransmission } from './EcranTeletransmission'
-import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 import { morceaux } from '../test/morceaux'
 
-afterEach(() => { cleanup(); retirerFauxDotNet() })
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 // Les flux sont calcules par Pont/EcranTeletransmission.cs (execute par
 // tests/AlertesCheck). Ici : l'etat du canal suit les flux rendus, le mode part
@@ -17,7 +17,7 @@ const vue = (mode: unknown): VueTeletransmission => mode === 'EDI'
 
 describe('EcranTeletransmission', () => {
   it('« Canal au vert » quand des flux EDI sont arrives, et le flux rattache ouvre son affaire', async () => {
-    installerFauxDotNet({ 'EcranTeletransmission.Flux': vue })
+    installerFauxPont({ 'EcranTeletransmission.Flux': vue })
     const ouvrirDossier = vi.fn()
     render(<EcranTeletransmission ouvrirDossier={ouvrirDossier} />)
 
@@ -30,12 +30,12 @@ describe('EcranTeletransmission', () => {
   })
 
   it('un autre mode redemande au pont ; sans flux, le canal le dit', async () => {
-    const dotnet = installerFauxDotNet({ 'EcranTeletransmission.Flux': vue })
+    const pont = installerFauxPont({ 'EcranTeletransmission.Flux': vue })
     render(<EcranTeletransmission ouvrirDossier={vi.fn()} />)
     await screen.findByText('Canal au vert')
     fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'TOUS' } })
     await screen.findByText('Aucun flux recu')
-    await waitFor(() => expect(dotnet.invokeMethodAsync).toHaveBeenLastCalledWith('RigV3Desktop', 'EcranTeletransmission.Flux', 'TOUS'))
+    await waitFor(() => expect(pont.appels).toHaveBeenLastCalledWith('EcranTeletransmission.Flux', 'TOUS'))
     expect(screen.getByText('Aucun flux pour ce mode.')).toBeTruthy()
   })
 })

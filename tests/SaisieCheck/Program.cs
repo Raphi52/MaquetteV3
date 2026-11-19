@@ -190,27 +190,22 @@ finally
 }
 
 // --- 5. L etat valide remonte dans TOUS les ecrans, depuis une seule source
-var racineVues = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Components"));
-// Home.razor n'est plus qu'une COQUILLE (lot 2, 19/11/2026) : ce qu'il tenait se
-// lit dans Pont/PlanTravail*.cs et web/src/plan/ (ajoutes plus bas).
-var fichiersVues = Directory.GetFiles(racineVues, "*.razor", SearchOption.AllDirectories)
-                            .Where(f => !Path.GetFileName(f).Equals("Home.razor", StringComparison.OrdinalIgnoreCase))
-                            .ToArray();
-// Les ecrans PORTES EN REACT (web/src, 18/11/2026) font partie des vues : une
-// regle tenue par un ecran porte se lit dans son .tsx, plus dans son .razor
-// devenu coquille. Les tests (*.test.tsx) n'en sont pas.
+// Les VUES sont les ecrans et composants React (web/src, ports du 18/11/2026 au
+// 19/11/2026) : Blazor et ses .razor sont retires (lot 3 du plan « finir le
+// passage a React », 19/11/2026). Les tests (*.test.tsx) n'en sont pas.
 var racineWeb = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../web/src"));
 var fichiersTsx = Directory.Exists(racineWeb)
     ? Directory.GetFiles(racineWeb, "*.tsx", SearchOption.AllDirectories)
                .Where(f => !f.EndsWith(".test.tsx", StringComparison.OrdinalIgnoreCase)).ToArray()
     : [];
+var fichiersVues = fichiersTsx.Where(f => Regex.IsMatch(f, @"[\\/](ecrans|composants)[\\/]")).ToArray();
 // Le plan de travail (lot 2) : le @code de Home.razor est dans Pont/PlanTravail.cs,
 // sa vue et ses gestes dans Pont/PlanTravailVue.cs ; l'aiguillage des ecrans est
 // web/src/plan/Aiguillage.tsx (lu ci-dessus avec les .tsx, et seul ci-dessous).
 var racinePont = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Pont"));
 var fichiersPlan = new[] { Path.Combine(racinePont, "PlanTravail.cs"), Path.Combine(racinePont, "PlanTravailVue.cs") };
 var aiguillage = File.ReadAllText(Path.Combine(racineWeb, "plan", "Aiguillage.tsx"));
-var vue2 = string.Join(Environment.NewLine, fichiersVues.Concat(fichiersTsx).Concat(fichiersPlan).Select(File.ReadAllText));
+var vue2 = string.Join(Environment.NewLine, fichiersTsx.Concat(fichiersPlan).Select(File.ReadAllText));
 Exiger(fichiersVues.Length >= 4, $"les ecrans sont bien decoupes en composants ({fichiersVues.Length} vues)");
 Exiger(fichiersTsx.Length >= 3, $"les ecrans React sont lus avec les vues ({fichiersTsx.Length} .tsx)");
 
@@ -271,7 +266,7 @@ foreach (var mode in new[] { "Accueil", "e-Mail", "Edi", "Fax", "Poste", "Recomm
 var courrierSaisie = RigV3Desktop.Pont.EcranArrivee.Trouver(
     new("", "", "", "", "", null, null, false, false, 500)).Lignes;
 Exiger(tsxArrivee.Contains("ouvrirDossier(a.numDemande)")
-       && LireDepot("Components/Ecrans/EcranArrivee.razor").Contains("[\"ouvrirDossier\"] = IleReact.Rappel(OuvrirDossier)")
+       && aiguillage.Contains("<EcranArrivee ouvrirDossier={ouvrirParNumero} />")
        && courrierSaisie.Any(a => a.NumDemande.Length > 0),
     "la ligne d arrivee ouvre la demande liee");
 Exiger(Regex.IsMatch(tsxArrivee, @"function ouvrir\(a: LigneArrivee\) \{\s*if \(a\.numDemande\.trim\(\) === ''\) return\s+ouvrirDossier")
@@ -359,22 +354,14 @@ foreach (var code in codesMenu)
 }
 
 // Chaque ecran cite la procedure v2 dont il vient : pas de formulaire generique.
-foreach (var fichier in Directory.GetFiles(
-             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Components/Ecrans")),
-             "Ecran*.razor"))
-{
-    var nom = Path.GetFileName(fichier);
-    if (nom == "EcranNonMaquette.razor") continue;
-    var texte = File.ReadAllText(fichier);
-    // Un ecran NEUF (geste que v2 ne portait pas) n a pas de procedure a citer :
-    // il doit alors le DIRE, faute de quoi la regle exigerait un code invente.
-    Exiger(Regex.IsMatch(texte, @"(PROC_[A-Z_]+|BODACC|Sans origine RIG v2)"),
-        $"{nom} nomme la procedure RIG v2 dont il est porte, ou dit qu il n en a pas");
-}
-// Meme exigence pour l ecran PORTE en React : le .tsx garde la trace de sa source v2.
-// EcranNonMaquette.tsx en est exempt, comme son .razor ci-dessus : il ne vient
+// Les ecrans sont tous en React depuis le retrait de Blazor (19/11/2026) : le .tsx
+// garde la trace de sa source v2. Un ecran NEUF (geste que v2 ne portait pas) n a
+// pas de procedure a citer : il doit alors le DIRE, faute de quoi la regle
+// exigerait un code invente. EcranNonMaquette.tsx en est exempt : il ne vient
 // d aucune procedure, il NOMME celle qui n a pas d ecran (porte au lot 5, 18/11/2026).
-foreach (var fichier in fichiersTsx.Where(f => Regex.IsMatch(Path.GetFileName(f), @"^Ecran\w*\.tsx$")))
+var ecransPortes = fichiersTsx.Where(f => Regex.IsMatch(Path.GetFileName(f), @"^Ecran\w*\.tsx$")).ToArray();
+Exiger(ecransPortes.Length >= 37, $"les ecrans React sont tous lus ({ecransPortes.Length})");
+foreach (var fichier in ecransPortes)
 {
     var nom = Path.GetFileName(fichier);
     if (nom == "EcranNonMaquette.tsx") continue;
@@ -383,8 +370,9 @@ foreach (var fichier in fichiersTsx.Where(f => Regex.IsMatch(Path.GetFileName(f)
 }
 
 // L ecran « non maquettee » est rendu par React depuis le lot 5 : la regle de la
-// section 10 (une procedure non portee le DIT) se lit dans son .tsx, et sa
-// coquille .razor doit lui transmettre les trois parametres de Home.razor.
+// section 10 (une procedure non portee le DIT) se lit dans son .tsx, et
+// l'aiguillage du plan de travail lui transmet le libelle et le motif (sa coquille
+// .razor le faisait jusqu'au retrait de Blazor, 19/11/2026).
 var nonMaqTsx = fichiersTsx.FirstOrDefault(f => Path.GetFileName(f) == "EcranNonMaquette.tsx");
 Exiger(nonMaqTsx is not null, "l ecran des procedures non portees existe en React (EcranNonMaquette.tsx)");
 var nonMaq = nonMaqTsx is null ? "" : File.ReadAllText(nonMaqTsx);
@@ -394,11 +382,9 @@ Exiger(Regex.IsMatch(nonMaq, @"motif[\s\S]{0,120}?<p className=""rig-nonmaq__tex
     "le motif etabli de l absence d ecran est affiche tel quel quand il est connu");
 Exiger(nonMaq.Contains("Cet ecran n'est pas encore disponible."),
     "sans motif connu, l ecran dit qu il n est pas encore disponible");
-var nonMaqCoquille = File.ReadAllText(Path.GetFullPath(Path.Combine(
-    AppContext.BaseDirectory, "../../../../../Components/Ecrans/EcranNonMaquette.razor")));
-Exiger(Regex.IsMatch(nonMaqCoquille, @"<IleReact Composant=""EcranNonMaquette"" Proprietes=""Proprietes"" />")
-       && nonMaqCoquille.Contains("[\"libelle\"] = Libelle") && nonMaqCoquille.Contains("[\"motif\"] = Motif"),
-    "la coquille EcranNonMaquette.razor transmet le libelle et le motif calcules par Home.razor");
+Exiger(aiguillage.Contains("<EcranNonMaquette code={proc.code} libelle={proc.libelle} motif={ecran.motif} />")
+       && Regex.IsMatch(File.ReadAllText(fichiersPlan[1]), @"\bMotif\b"),
+    "l'aiguillage transmet a EcranNonMaquette le libelle et le motif calcules par le plan de travail");
 
 // --- 12. Le menu de procedures n est plus le SEUL chemin vers un traitement.
 //

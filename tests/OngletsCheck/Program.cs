@@ -1,7 +1,6 @@
-using System.IO;
+﻿using System.IO;
 using System.Reflection;
 using System.Windows;
-using Microsoft.AspNetCore.Components;
 using RigV3Desktop;
 
 // Garde-fou de la BARRE D'ONGLETS (demande du 17/09/2026 : « un systeme
@@ -146,22 +145,19 @@ internal static class Programme
             var champ = typeof(FenetreVue)
                 .GetField("Vue", BindingFlags.NonPublic | BindingFlags.Instance)
                 ?.GetValue(fenetre);
-            var racines = (champ as Microsoft.AspNetCore.Components.WebView.Wpf.BlazorWebView)?.RootComponents;
-            Exiger(racines is { Count: > 0 }, "la fenetre sortie declare bien une vue racine");
-            var parametres = racines![0].Parameters;
-            Exiger(parametres is not null
-                   && parametres.TryGetValue("VueInitiale", out var v) && (v as string) == "PROC_RECHAFF",
+            // Depuis le retrait de Blazor (19/11/2026), ces reglages vont a la RACINE
+            // de la fenetre (Pont/Racines.cs, RacinePlanTravail), qui les donne a la
+            // session du plan de travail.
+            Exiger(champ is Microsoft.Web.WebView2.Wpf.WebView2, "la fenetre sortie declare bien sa vue WebView2");
+            var racine = fenetre.Racine;
+            Exiger(racine.VueInitiale == "PROC_RECHAFF",
                 "la fenetre sortie recoit le CODE de l'ecran arrache");
-            Exiger(parametres!.TryGetValue("ModeFenetreVue", out var m) && m is true,
-                "la fenetre sortie s'ouvre sans le menu ni la barre de la fenetre principale");
-            Exiger(racines[0].ComponentType == typeof(RigV3Desktop.Components.Pages.Home),
+            Exiger(racine.ModeFenetreVue && !racine.Bords,
+                "la fenetre sortie s'ouvre sans le menu ni la barre (ni les bandes de bord) de la fenetre principale");
+            Exiger(racine.Composant == "Application" && racine.Rappels.SequenceEqual(new[] { "geste", "plan" }),
                 "la fenetre sortie porte bien la page des ecrans");
-            var page = racines[0].ComponentType;
-            var declares = page.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(x => x.GetCustomAttribute<ParameterAttribute>() is not null)
-                .Select(x => x.Name).ToList();
-            Exiger(declares.Contains("VueInitiale") && declares.Contains("ModeFenetreVue"),
-                "la page accepte ces deux reglages (sinon Blazor les refuserait a l'ouverture)");
+            Exiger(racine.Plan.VueInitiale == "PROC_RECHAFF" && racine.Plan.ModeFenetreVue,
+                "la session du plan de travail recoit ces deux reglages");
             fenetre.Close();
         }
         finally

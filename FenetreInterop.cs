@@ -2,12 +2,11 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
-using Microsoft.JSInterop;
 
 namespace RigV3Desktop;
 
 /// <summary>
-/// Commandes de fenetre exposees a la page Blazor : la barre de titre native
+/// Commandes de la fenetre principale, menees pour la page : la barre de titre native
 /// est supprimee (WindowStyle=None), l'interface porte donc elle-meme
 /// deplacement, reduction, agrandissement et fermeture.
 /// </summary>
@@ -24,7 +23,6 @@ public sealed class FenetreInterop
 
     private static Window? Fenetre => Application.Current?.MainWindow;
 
-    [JSInvokable]
     public void Deplacer()
     {
         var fenetre = Fenetre;
@@ -35,13 +33,11 @@ public sealed class FenetreInterop
         SendMessage(handle, WM_NCLBUTTONDOWN, HTCAPTION, 0);
     }
 
-    [JSInvokable]
     public void Reduire()
     {
         if (Fenetre is { } f) f.WindowState = WindowState.Minimized;
     }
 
-    [JSInvokable]
     public void BasculerAgrandissement()
     {
         if (Fenetre is not { } f) return;
@@ -70,11 +66,11 @@ public sealed class FenetreInterop
     /// Redimensionne la fenetre depuis un bord de la page. Le WebView couvre
     /// toute la fenetre (plus de marge de 6 px, qui dessinait un cadre) : il
     /// avale donc le pointeur sur les bords de WindowChrome. Les bandes de
-    /// bord de Main.razor appellent ceci, et Windows mene le redimensionnement
+    /// bord de la page (web/src/fenetre/Bords.tsx) appellent ceci, et Windows mene le redimensionnement
     /// lui-meme, comme pour Deplacer -- aimantation comprise.
     /// </summary>
     /// <summary>Faux une fois la fenetre agrandie : ses bords ne se tirent plus,
-    /// et Main.razor retire ses bandes (sinon le curseur de redimensionnement
+    /// et la page retire ses bandes (sinon le curseur de redimensionnement
     /// s'afficherait sur les bords d'une fenetre qui ne bouge pas).</summary>
     public bool Redimensionnable => Fenetre?.WindowState == WindowState.Normal;
 
@@ -92,7 +88,6 @@ public sealed class FenetreInterop
         f.StateChanged += (_, _) => EtatChange?.Invoke();
     }
 
-    [JSInvokable]
     public void Redimensionner(BordFenetre bord)
     {
         var fenetre = Fenetre;
@@ -103,7 +98,6 @@ public sealed class FenetreInterop
         SendMessage(handle, WM_NCLBUTTONDOWN, (int)bord, 0);
     }
 
-    [JSInvokable]
     public void Fermer() => Fenetre?.Close();
 }
 

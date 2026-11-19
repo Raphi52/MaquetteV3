@@ -39,9 +39,10 @@
     <Compile Include="../../Pont/DocumentDetacheVue.cs" Link="Pont/DocumentDetacheVue.cs" />
   </ItemGroup>
 
-  <!-- Pont/*.cs porte [JSInvokable] (Microsoft.JSInterop), livre avec ASP.NET Core. -->
+  <!-- Pont/*.cs porte [JSInvokable] : l'attribut du projet (Pont/JSInvokable.cs),
+       depuis le retrait de Blazor (19/11/2026) ; plus besoin d'ASP.NET Core. -->
   <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Compile Include="../../Pont/JSInvokable.cs" Link="Pont/JSInvokable.cs" />
   </ItemGroup>
 
 </Project>

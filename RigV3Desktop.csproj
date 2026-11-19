@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -21,12 +21,16 @@
     <None Remove="tests/**" />
   </ItemGroup>
 
-  <!-- ECRANS REACT (web/, migration Blazor -> React, lot 1 du 18/11/2026).
-       Un « dotnet build » (donc dev.ps1 et lancer.ps1) produit l'appli
-       complete sans geste de plus : les paquets npm sont installes si besoin,
-       puis Vite construit web/src dans wwwroot/app/rig-iles.js (ignore par git).
-       Les deux etapes sont INCREMENTALES : rien ne tourne si leurs entrees n'ont
-       pas change. Mode d'emploi : web/README.md. -->
+  <!-- ECRANS REACT (web/, migration Blazor -> React du 18/11/2026 ; Blazor
+       retire le 19/11/2026). Un « dotnet build » (donc dev.ps1 et lancer.ps1)
+       produit l'appli complete sans geste de plus : les paquets npm sont
+       installes si besoin, puis Vite construit web/src dans
+       wwwroot/app/rig-iles.js (ignore par git), copie avec le reste de wwwroot
+       dans le dossier de sortie, que la fenetre sert par un nom d'hote
+       virtuel (Pont/PageWeb.cs). Les deux etapes sont INCREMENTALES : rien ne
+       tourne si leurs entrees n'ont pas change. Elles sont accrochees a la
+       COPIE vers la sortie, pas a la compilation : compiler.ps1 (qui s'arrete
+       avant) n'ecrit donc jamais dans wwwroot/app. Mode d'emploi : web/README.md. -->
   <ItemGroup>
     <_EntreesInstallWeb Include="web/package.json;web/package-lock.json" />
     <_EntreesConstructionWeb Include="web/src/**/*;web/package.json;web/package-lock.json;web/vite.config.ts;web/tsconfig.json" />
@@ -43,29 +47,35 @@
   <Target Name="InstallerWeb" DependsOnTargets="VerifierNodeWeb"
           Condition="'$(DesignTimeBuild)' != 'true'"
           Inputs="@(_EntreesInstallWeb)" Outputs="web/node_modules/.rig-install-ok">
-    <Exec Command="npm ci --no-audit --no-fund" WorkingDirectory="$(MSBuildProjectDirectory)\web" />
+    <Exec Command="npm ci --no-audit --no-fund" WorkingDirectory="$(MSBuildProjectDirectory)/web" />
     <Touch Files="web/node_modules/.rig-install-ok" AlwaysCreate="true" />
   </Target>
 
   <Target Name="ConstruireWeb" DependsOnTargets="InstallerWeb"
+          BeforeTargets="CopyFilesToOutputDirectory"
           Condition="'$(DesignTimeBuild)' != 'true'"
           Inputs="@(_EntreesConstructionWeb)" Outputs="wwwroot/app/rig-iles.js">
-    <Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)\web" />
+    <Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)/web" />
   </Target>
 
-  <!-- Les fichiers de wwwroot/app/ peuvent NAITRE pendant ce build (copie neuve,
-       dossier efface) : le glob wwwroot/** du SDK, evalue avant, ne les a pas vus.
-       On les redeclare donc AVANT que le SDK dresse la liste des fichiers servis
-       par la fenetre (ResolveProjectStaticWebAssets), sinon le premier build
-       sortirait une appli sans ses ecrans React (404 sur rig-iles.js). Memes
-       metadonnees que le glob du SDK (Sdk.StaticWebAssets.StaticAssets.ProjectSystem.props). -->
-  <Target Name="DeclarerSortieWeb" DependsOnTargets="ConstruireWeb"
-          BeforeTargets="ResolveProjectStaticWebAssets"
+  <!-- wwwroot/ est copie tel quel dans la sortie. Ses fichiers fixes (charte,
+       documents, Kbis) le sont par le None ci-dessous ; wwwroot/app/ peut NAITRE
+       pendant ce build (copie neuve, dossier vide par Vite), apres que la liste
+       des None a ete dressee : il est donc copie par CopierWeb, qui le liste
+       une fois la construction faite. -->
+  <ItemGroup>
+    <None Update="wwwroot/**" CopyToOutputDirectory="PreserveNewest" />
+    <None Remove="wwwroot/app/**" />
+  </ItemGroup>
+
+  <Target Name="CopierWeb" AfterTargets="CopyFilesToOutputDirectory" DependsOnTargets="ConstruireWeb"
           Condition="'$(DesignTimeBuild)' != 'true'">
     <ItemGroup>
-      <Content Remove="wwwroot\app\**" />
-      <Content Include="wwwroot\app\**" ExcludeFromSingleFile="true" CopyToPublishDirectory="PreserveNewest" />
+      <_SortieWeb Include="wwwroot/app/**" />
     </ItemGroup>
+    <Copy SourceFiles="@(_SortieWeb)"
+          DestinationFiles="@(_SortieWeb->'$(OutDir)wwwroot/app/%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
   </Target>
 
   <ItemGroup>
@@ -73,9 +83,10 @@
   </ItemGroup>
 
   <!-- « dotnet watch » ne doit PAS reconstruire sur un changement de wwwroot :
-       la fenetre surveille elle-meme ces fichiers et recharge sa vue (voir
-       MainWindow.xaml.cs). Sans cette exclusion, watch relance une compilation
-       qui echoue, l'application etant en cours d'execution et verrouillant
+       la fenetre surveille elle-meme ces fichiers et recharge sa page (voir
+       MainWindow.xaml.cs), et les .tsx sont repris par le serveur Vite
+       (dev.ps1). Sans cette exclusion, watch relance une compilation qui
+       echoue, l'application etant en cours d'execution et verrouillant
        RigV3Desktop.exe. Les journaux sont exclus pour la meme raison. -->
   <ItemGroup>
     <Watch Remove="wwwroot/**" />
@@ -83,22 +94,14 @@
     <Watch Remove="tests/**" />
   </ItemGroup>
 
-  <!-- POURQUOI 9.0.120 SUR .NET 10 (18/11/2026, passage en .NET 10).
-       La version 10 de ce paquet remplace le WebView2 classique par
-       WebView2CompositionControl. Mesure dans ce depot avec 10.0.130 :
-       - en « net10.0-windows », l'application plante a l'ouverture de sa fenetre
-         (FileNotFoundException 'Microsoft.Windows.SDK.NET, Version=10.0.17763.10') ;
-       - en « net10.0-windows10.0.17763.0 » (valeur de la doc Microsoft), la fenetre
-         s'ouvre mais reste BLANCHE sur le bureau cache : aucun processus WebView2
-         n'est lance, la page ne se charge jamais. Le bureau cache est notre seul
-         moyen de verifier un rendu sans toucher l'ecran de l'utilisateur.
-       Bug amont ouvert, sans correctif : github.com/dotnet/wpf/issues/11291 (contenu
-       blanc ou clignotant ; contournement confirme : revenir a 9.0.120).
-       SORTIE : .NET 11 ajoute UseCompositionControl="False" sur BlazorWebView, ou un
-       retour de cette option en 10 (github.com/dotnet/maui/issues/40015). Version
-       FIGEE (pas « 9.* ») : 9.0.120 est la version prouvee ici. -->
+  <!-- Le controle WebView2 DIRECT (19/11/2026, retrait de Blazor). Version
+       1.0.3179.45 : celle que le BlazorWebView 9.0.120 tirait deja, donc le
+       moteur d'affichage prouve sur le bureau cache. Le controle classique
+       (Microsoft.Web.WebView2.Wpf.WebView2), PAS WebView2CompositionControl :
+       c'est ce dernier qui laissait la page blanche avec le BlazorWebView 10
+       (github.com/dotnet/wpf/issues/11291). -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="9.0.120" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3179.45" />
   </ItemGroup>
 
 </Project>

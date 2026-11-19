@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using RigV3Desktop;
 
 // Garde-fou de la JONCTION entre l'ecran « Ouvrir un dossier » et la
@@ -108,21 +108,20 @@ Exiger(AffairesOuvertes.Toutes.Count == 0, "la remise a zero est elle aussi ecri
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
 string Lire(string relatif) => File.ReadAllText(Path.Combine(racine, relatif));
 
-// PORTES EN REACT (lot 3, 19/11/2026) : les deux .razor ne sont plus que des
-// coquilles. Le maillon « recherche » se lit donc sur la chaine reelle :
-// coquille (parametre + rappel) -> ecran React (bouton) -> pont C# (SIREN
-// cherche, recherche restee vide), et le pont est EXECUTE plus bas.
-var rech = Lire("Components/Ecrans/EcranRechAffaires.razor");
+// PORTES EN REACT (lot 3, 19/11/2026), coquilles .razor retirees avec Blazor
+// (lot 3 du plan « finir le passage a React », meme jour). Le maillon
+// « recherche » se lit donc sur la chaine reelle : propriete React (le geste
+// remonte) -> ecran React (bouton) -> pont C# (SIREN cherche, recherche restee
+// vide), et le pont est EXECUTE plus bas.
 var rechTsx = Lire("web/src/ecrans/EcranRechAffaires.tsx");
 // Lot 2 du passage a React (19/11/2026) : l'aiguillage des ecrans est
 // web/src/plan/Aiguillage.tsx, les gestes du plan de travail Pont/PlanTravailVue.cs.
 var accueil = Lire("web/src/plan/Aiguillage.tsx");
 var gestesPlan = Lire("Pont/PlanTravailVue.cs");
-var ouverture = Lire("Components/Ecrans/EcranOuvertureDossier.razor");
 var ouvertureTsx = Lire("web/src/ecrans/EcranOuvertureDossier.tsx");
 
-Exiger(rech.Contains("EventCallback<string> OuvrirUnDossier")
-       && rech.Contains("[\"ouvrirUnDossier\"] = IleReact.Rappel(OuvrirUnDossier)"),
+Exiger(rechTsx.Contains("ouvrirUnDossier: (siren: string) => void")
+       && rechTsx.Contains("export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }"),
     "« Mes affaires » sait remonter une demande d'ouverture");
 Exiger(rechTsx.Contains("onClick={() => ouvrirUnDossier(vue.sirenCherche)}"),
     "le bouton « Ouvrir un dossier » emporte le SIREN cherche");
@@ -134,8 +133,8 @@ Exiger(accueil.Contains("ouvrirUnDossier={(siren) => plan('ouvrirUnDossier', sir
 Exiger(accueil.Contains("<EcranOuvertureDossier key={ecran.cleOuverture} sirenDemande={ecran.sirenDemande} />")
        && gestesPlan.Contains("SirenAImmatriculer, CleOuverture.ToString()"),
     "l'accueil transmet le SIREN a l'ecran d'ouverture");
-Exiger(ouverture.Contains("[Parameter] public string? SirenDemande")
-       && ouverture.Contains("[\"sirenDemande\"] = SirenDemande"),
+Exiger(ouvertureTsx.Contains("sirenDemande?: string | null")
+       && ouvertureTsx.Contains("export function EcranOuvertureDossier({ sirenDemande }"),
     "l'ecran d'ouverture accepte un SIREN pre-rempli");
 Exiger(ouvertureTsx.Contains("useState(() => (sirenDemande ?? '').trim())"),
     "l'ecran React d'ouverture pose ce SIREN dans la fiche");

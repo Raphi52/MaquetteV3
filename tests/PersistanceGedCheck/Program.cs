@@ -1,4 +1,4 @@
-using RigV3Desktop;
+﻿using RigV3Desktop;
 
 // Banc de l'arbre GED CONSERVE d'une session a l'autre.
 //
@@ -116,13 +116,18 @@ foreach (var appel in new[] { "MemoriserArbre();", "PoserLibelle(" })
 // PORTE EN REACT (lot 6, 19/11/2026) : Components/ApercuKbis.razor n'est plus
 // qu'une coquille. Les valeurs de l'extrait se calculent dans Pont/ApercuKbis.cs
 // (lu ET execute ci-dessous), la mise en page dans web/src/composants/ApercuKbis.tsx.
-var coquilleKbis = File.ReadAllText(Path.Combine(racine, "Components/ApercuKbis.razor"));
+// Blazor retire (19/11/2026) : plus de coquille, c'est le plan de travail qui passe
+// la lecture du formulaire au pont (Pont/PlanTravailVue.cs, depuis le lot 2) et
+// l'apercu de la piece qui monte l'extrait (web/src/plan/Apercu.tsx).
+var planVue = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravailVue.cs"));
+var apercu = File.ReadAllText(Path.Combine(racine, "web/src/plan/Apercu.tsx"));
 var tsxKbis = File.ReadAllText(Path.Combine(racine, "web/src/composants/ApercuKbis.tsx"));
 var kbis = File.ReadAllText(Path.Combine(racine, "Pont/ApercuKbis.cs"));
-Exiger(coquilleKbis.Contains("<IleReact Composant=\"ApercuKbis\"")
-       && coquilleKbis.Contains("ApercuKbis.Vue(Numero, Siren, Denomination, Lire)")
-       && tsxKbis.Contains("className=\"rig-kbis\""),
-    "la coquille du Kbis passe la lecture du formulaire au pont et monte l'extrait React");
+Exiger(apercu.Contains("<ApercuKbis vue={a.kbis} />")
+       && planVue.Contains("kbis = ApercuKbis.Vue(d.Numero, d.Siren, DenominationAffaire(), LireSaisie);")
+       && tsxKbis.Contains("className=\"rig-kbis\"")
+       && !File.Exists(Path.Combine(racine, "Components/ApercuKbis.razor")),
+    "le plan de travail passe la lecture du formulaire au pont du Kbis et monte l'extrait React");
 Exiger(vue.Contains("\"INSPM_DENOMINATION_STATUT\""),
     "le formulaire porte la denomination statutaire (INSCRIT_PM.DENOMINATION_STATUT)");
 Exiger(vue.Contains("\"ETBLS_ID_ADRBS\""),
@@ -133,7 +138,7 @@ Exiger(kbis.Contains("Val(\"IDENTITE\", \"INSPM_DENOMINATION_STATUT\""),
     "le Kbis imprime la denomination SAISIE");
 Exiger(kbis.Contains("(\"Adresse du siege\", Val(\"SIEGE\", \"ETBLS_ID_ADRBS\"))"),
     "le Kbis imprime l'adresse du siege, et non le TYPE d'adresse");
-Exiger(!(kbis + tsxKbis + coquilleKbis).Contains("Greffe du Tribunal de Commerce d'Amiens"),
+Exiger(!(kbis + tsxKbis + apercu).Contains("Greffe du Tribunal de Commerce d'Amiens"),
     "le greffe n'est plus ecrit en dur dans l'apercu Kbis");
 
 // L'extrait calcule par le pont, sur un formulaire saisi.

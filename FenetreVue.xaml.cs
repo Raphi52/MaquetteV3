@@ -31,21 +31,19 @@ public partial class FenetreVue : Window
         SuivreCurseur = suivreCurseur;
         InitializeComponent();
 
-        // Le code de l'ecran est passe a la page : sans lui, la fenetre sortie
-        // afficherait l'accueil au lieu de l'onglet qu'on vient d'arracher.
-        Vue.RootComponents[0].Parameters = new Dictionary<string, object?>
-        {
-            ["VueInitiale"] = Code,
-            ["ModeFenetreVue"] = true,
-        };
+        // Le code de l'ecran est passe a la racine de la page : sans lui, la
+        // fenetre sortie afficherait l'accueil au lieu de l'onglet qu'on vient
+        // d'arracher.
+        Racine = new Pont.RacinePlanTravail(App.Fenetre, App.Partage, modeFenetreVue: true, vueInitiale: Code);
         Title = string.IsNullOrWhiteSpace(libelle) ? "RIG V3" : "RIG V3 - " + libelle;
 
-        Vue.BlazorWebViewInitialized += (_, args) =>
-        {
-            args.WebView.CoreWebView2.Profile.PreferredColorScheme =
-                Microsoft.Web.WebView2.Core.CoreWebView2PreferredColorScheme.Dark;
-        };
+        Loaded += async (_, _) => await Pont.PageWeb.Brancher(Vue, Racine);
+        Closed += async (_, _) => await Racine.DisposeAsync();
     }
+
+    /// <summary>Ce que la page de cette fenetre monte : l'application en mode
+    /// « onglet sorti », ouverte sur l'ecran <see cref="Code"/>.</summary>
+    public Pont.RacinePlanTravail Racine { get; }
 
     protected override void OnSourceInitialized(EventArgs e)
     {

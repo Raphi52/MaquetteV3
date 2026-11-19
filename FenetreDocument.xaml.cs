@@ -24,19 +24,20 @@ public partial class FenetreDocument : Window
         Rang = rang;
         InitializeComponent();
 
-        // Le rang est passe a la vue Blazor : sans lui, toutes les fenetres
-        // liraient le meme emplacement et montreraient le meme document.
-        Vue.RootComponents[0].Parameters = new Dictionary<string, object?> { ["Rang"] = rang };
+        // Le rang est passe a la racine de la page : sans lui, toutes les
+        // fenetres liraient le meme emplacement et montreraient le meme document.
+        Racine = new Pont.RacineDocumentDetache(App.Partage, rang);
         Title = rang > 1 ? $"RIG V3 - Document {rang}" : "RIG V3 - Document";
 
-        // Meme correctif que la fenetre principale : la liste deroulante d'un
-        // <select> suit la preference de couleur du navigateur hote.
-        Vue.BlazorWebViewInitialized += (_, args) =>
-        {
-            args.WebView.CoreWebView2.Profile.PreferredColorScheme =
-                Microsoft.Web.WebView2.Core.CoreWebView2PreferredColorScheme.Dark;
-        };
+        // Meme reglages que la fenetre principale (PageWeb) : la liste
+        // deroulante d'un <select> suit la preference de couleur du navigateur hote.
+        Loaded += async (_, _) => await Pont.PageWeb.Brancher(Vue, Racine);
+        Closed += async (_, _) => await Racine.DisposeAsync();
     }
+
+    /// <summary>Ce que la page de cette fenetre monte : l'apercu du document de
+    /// l'emplacement <see cref="Rang"/>.</summary>
+    public Pont.RacineDocumentDetache Racine { get; }
 
     protected override void OnSourceInitialized(EventArgs e)
     {

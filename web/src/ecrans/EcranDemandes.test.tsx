@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { EcranDemandes, type LigneDemande, type VueDemandes } from './EcranDemandes'
-import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 import { morceaux } from '../test/morceaux'
 
-afterEach(() => { cleanup(); retirerFauxDotNet() })
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 // Le filtre et l'etat AFFICHE (la validation au controle final prime) sont
 // calcules par Pont/EcranDemandes.cs, execute par tests/SaisieCheck. Ici : la
@@ -22,11 +22,11 @@ const vue = (_c: unknown, valides: unknown): VueDemandes => ({
 
 describe('EcranDemandes', () => {
   it('montre l\'etat rendu par le pont pour les dossiers valides', async () => {
-    const dotnet = installerFauxDotNet({ 'EcranDemandes.Trouver': vue })
+    const pont = installerFauxPont({ 'EcranDemandes.Trouver': vue })
     const { container } = render(<EcranDemandes valides={['004151']} ouvrir={vi.fn()} />)
 
     expect(morceaux(await screen.findByText('2 affichee(s) sur 12'))).toEqual(['2', ' affichee(s) sur ', '12'])
-    expect(dotnet.invokeMethodAsync.mock.calls[0]![3]).toEqual(['004151'])
+    expect(pont.appels.mock.calls[0]![2]).toEqual(['004151'])
     const rangees = container.querySelectorAll('tbody tr')
     expect(rangees[0]!.querySelector('.rig-etat')!.className).toBe('rig-etat rig-etat--ok')
     expect(rangees[0]!.querySelector('.rig-etat')!.textContent).toBe('Validee')
@@ -36,20 +36,20 @@ describe('EcranDemandes', () => {
   })
 
   it('une bascule d\'etat part au pont, « Effacer » remet les criteres', async () => {
-    const dotnet = installerFauxDotNet({ 'EcranDemandes.Trouver': vue })
+    const pont = installerFauxPont({ 'EcranDemandes.Trouver': vue })
     render(<EcranDemandes valides={[]} ouvrir={vi.fn()} />)
     const bascule = await screen.findByRole('button', { name: 'Validee' })
     fireEvent.click(bascule)
-    await waitFor(() => expect((dotnet.invokeMethodAsync.mock.lastCall![2] as { critEtats: string[] }).critEtats).toEqual(['Validee']))
+    await waitFor(() => expect((pont.appels.mock.lastCall![1] as { critEtats: string[] }).critEtats).toEqual(['Validee']))
     expect(bascule.className).toBe('rig-bascule rig-bascule--actif')
 
     fireEvent.change(screen.getByLabelText('Nombre maxi. de demandes affichees'), { target: { value: '12a' } })
     fireEvent.click(screen.getByRole('button', { name: 'Effacer' }))
-    await waitFor(() => expect(dotnet.invokeMethodAsync.mock.lastCall![2]).toMatchObject({ critEtats: [], critTopMax: 50 }))
+    await waitFor(() => expect(pont.appels.mock.lastCall![1]).toMatchObject({ critEtats: [], critTopMax: 50 }))
   })
 
   it('un clic sur une demande remonte son dossier', async () => {
-    installerFauxDotNet({ 'EcranDemandes.Trouver': vue })
+    installerFauxPont({ 'EcranDemandes.Trouver': vue })
     const ouvrir = vi.fn()
     render(<EcranDemandes valides={[]} ouvrir={ouvrir} />)
     fireEvent.click(await screen.findByText('Demande D2'))

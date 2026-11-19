@@ -6,30 +6,37 @@ les écrans réécrits en React 19 + TypeScript strict, construits par Vite dans
 `wwwroot/app/rig-iles.js` (ignoré par git, reconstruit à chaque `dotnet build`).
 
 Ce fichier est le **mode d'emploi d'un portage d'écran** : les lots 2 à 6 le suivent.
+**Blazor est retiré depuis le 19/11/2026** (plan `plan-2a906eb0`, lot 3) : les
+sections plus bas qui parlent de coquilles `.razor` et d'`IleReact` racontent
+l'historique du portage ; l'état actuel est ci-dessous et dans « Ajouts du plan
+« finir le passage à React », lot 3 ».
 
 ## Comment ça tient ensemble
 
 ```
-Home.razor ──> Components/Ecrans/EcranX.razor (COQUILLE, mêmes paramètres)
-                     │  <IleReact Composant="EcranX" Proprietes=… Rappels=… />
+MainWindow / FenetreVue / FenetreDocument (WPF, controle WebView2 direct)
+                     │  Pont/PageWeb.cs : https://rigv3.example/ = wwwroot/
+                     │  (sous dev.ps1 : la page vient du serveur Vite)
                      ▼
-               Components/IleReact.razor ──import──> wwwroot/app/rig-iles.js
-                     │  monter / mettreAJour / demonter      (web/src/iles.ts)
+               wwwroot/index.html ──> app/rig-iles.js   (web/src/main.ts)
+                     │  demarrer(#app) : appeler('Racine.Ouvrir')   (web/src/racine.tsx)
                      ▼
-               web/src/ecrans/EcranX.tsx  (le rendu, mêmes classes CSS)
+               Pont/Racines.cs  RacinePlanTravail / RacineDocumentDetache
+                     │  { composant, proprietes, rappels, bords }
+                     ▼
+               web/src/composants/Application.tsx (ou DocumentDetacheVue.tsx)
+                     │  -> src/plan/Aiguillage.tsx -> web/src/ecrans/EcranX.tsx
                      │  appeler<T>('EcranX.Methode', …)       (web/src/pont.ts)
                      ▼
-               Pont/EcranX.cs  [JSInvokable("EcranX.Methode")] ──> Metier/
+               Pont/Repartiteur.cs ──> Pont/EcranX.cs [JSInvokable("EcranX.Methode")] ──> Metier/
 ```
 
-- **Coquille** : le `.razor` d'origine garde son nom et ses `[Parameter]` ;
-  `Home.razor` ne change pas (jusqu'aux lots 7-8).
-- **Île** : `IleReact` monte le composant React dans un `div` en
-  `display:contents` (aucune boîte : la mise en page CSS est inchangée).
-  Une propriété qui change re-rend le composant sans perdre son état.
+- **Racine** : chaque fenêtre WPF a sa racine C# (`Pont/Racines.cs`) ; la page la
+  demande au chargement (`Racine.Ouvrir`) et monte le composant nommé dans un
+  `div[data-ile]` en `display:contents` (aucune boîte). Le C# renvoie la racine de
+  lui-même quand elle change (évènement `racine`) : React re-rend sans perdre son état.
 - **Pont** : `web/src/pont.ts` est le **seul** fichier de `web/src` qui parle
   au C# (`src/regles.test.ts` le vérifie). Il reste générique : aucun nom d'écran.
-  Au lot 9 (retrait de Blazor), c'est le seul fichier à changer côté React.
 - **Registre** : `iles.ts` rend montable tout `src/ecrans/<Nom>.tsx` et
   `src/composants/<Nom>.tsx` qui exporte `export function <Nom>`. Aucune
   liste à tenir : deux lots en parallèle ne se marchent pas dessus.
@@ -53,7 +60,7 @@ Home.razor ──> Components/Ecrans/EcranX.razor (COQUILLE, mêmes paramètres)
    `<IleReact Composant="EcranX" Proprietes="…" Rappels="…" />`. Exemple
    complet avec rappel : `Components/Ecrans/EcranVerrous.razor`.
 5. **Les tests** : `web/src/ecrans/EcranX.test.tsx` (vitest), avec le faux
-   DotNet de `src/test/faux-dotnet.ts`. Un banc C# de `tests/` qui relisait
+   pont de `src/test/faux-pont.ts` (ex-`faux-dotnet.ts`). Un banc C# de `tests/` qui relisait
    le `.razor` tient la **même règle** sur le `.tsx` ou l'exécute par le pont
    (exemple : `tests/AlertesCheck`, section « 2 ter »). Jamais supprimé, jamais
    desserré : autant de vérifications ou plus.
@@ -359,15 +366,66 @@ Home.razor ──> Components/Ecrans/EcranX.razor (COQUILLE, mêmes paramètres)
   fixe avant la capture, et la ferme par `WM_CLOSE` (sa croix), un clic tombant
   sur la fenêtre principale passée devant.
 
+## Ajouts du plan « finir le passage à React », lot 3 : Blazor retiré
+
+- **Plus de Blazor.** Plus aucun `.razor` (`Main.razor`, `_Imports.razor`,
+  `Components/` : les coquilles et `IleReact` sont supprimées) ; le projet est en
+  `Microsoft.NET.Sdk` et le paquet `Microsoft.AspNetCore.Components.WebView.Wpf`
+  (figé sur 9.0.120) est remplacé par `Microsoft.Web.WebView2` 1.0.3179.45, la
+  version que ce paquet tirait déjà. Contrôle **classique** `WebView2`, pas
+  `WebView2CompositionControl` (la cause de la page blanche du BlazorWebView 10).
+- **Les fenêtres** (`MainWindow`, `FenetreVue`, `FenetreDocument`) portent un
+  `<wv2:WebView2 x:Name="Vue" />` et appellent `Pont.PageWeb.Brancher(Vue, Racine)`
+  au chargement : un environnement WebView2 partagé (même dossier de données que
+  BlazorWebView, `%LOCALAPPDATA%\RigV3Desktop.WebView2`), thème sombre des listes
+  déroulantes, `wwwroot` sous `https://rigv3.example/`, aucune autre origine
+  chargée ni écoutée. Leur racine (`Racine`) est fermée avec elles.
+- **Racines** (`Pont/Racines.cs`) : `RacinePlanTravail` (ex-`Main.razor` + `Home.razor` :
+  session du plan de travail, rappels `geste` et `plan`, bandes de bord dans la
+  fenêtre principale non agrandie) et `RacineDocumentDetache` (ex-`DocumentDetacheVue.razor`).
+  Même cycle de vie : ouverte à la première demande de la page (un rechargement
+  la retrouve telle quelle), démarrée après le premier rendu, fermée avec la fenêtre.
+- **Répartiteur** (`Pont/Repartiteur.cs`) : reçoit `{ appel, nom, args }`, joint la
+  méthode statique `[JSInvokable("<NomEcran>.<Methode>")]` trouvée par réflexion
+  (attribut du projet, même nom que celui de Blazor : les ponts n'ont pas changé),
+  convertit les arguments en JSON (mêmes règles que Blazor, compte exact), répond
+  `{ reponse, valeur | erreur }`. Après un rappel et à chaque changement venu
+  d'ailleurs, il renvoie la racine **si son JSON a changé**.
+- **Côté React** : `src/main.ts` (entrée, `wwwroot/app/rig-iles.js`),
+  `src/racine.tsx` (`demarrer` : monte la racine, la re-rend à chaque envoi, écrit
+  toute erreur dans la page au lieu de la laisser blanche), `src/fenetre/Bords.tsx`
+  (les 8 bandes de `Main.razor`, `onMouseDown` → rappel `bord` →
+  `FenetreInterop.Redimensionner`), `src/pont.ts` (`appeler`, `ecouter`, `rappel`).
+  Tests : `src/test/faux-pont.ts` joue le vrai transport (aller-retour JSON,
+  numéros d'appel) ; `racine.test.tsx`, `pont.test.ts`, `iles.test.tsx`.
+- **Développement** : `dev.ps1` lance `npm run dev` (Vite) sur un port libre, attend
+  sa réponse, pose `RIGV3_VITE` et lance `dotnet watch` : la fenêtre (Debug,
+  localhost seulement) charge la page depuis Vite, qui reprend un `.tsx` à chaud.
+  `vite.config.ts` sert alors **le même** `wwwroot/index.html`, module construit
+  remplacé par `src/main.ts`, et `wwwroot` en dossier public. Fermer l'appli arrête
+  `dotnet watch` et Vite.
+- **Construction** : `ConstruireWeb` / `CopierWeb` sont accrochées à la copie vers
+  `bin\` (plus aux fichiers statiques de Razor) ; `wwwroot` est copié dans la
+  sortie et servi de là.
+- **Preuves** (bureau caché, `%TEMP%\lot3-blazor-outils\`) : le parcours du lot 2
+  (30 états, onglet arraché compris) et un parcours de redimensionnement des trois
+  fenêtres, rejoués sur l'exe Blazor (main `099d280`) et sur celui-ci : identiques
+  au pixel, sauf l'anneau animé « Hors délai légal » et un survol en transition —
+  écarts qu'on retrouve, aux mêmes endroits, entre deux lancements du même exe
+  Blazor. Le glisser d'une bande de bord n'est pas pilotable sur un bureau caché
+  (boucle native de Windows) : même résultat avant/après ; la taille est donc
+  changée par `SetWindowPos` pour la preuve.
+
 ## Commandes
 
 | Commande (dans `web/`) | Effet |
 |---|---|
+| `npm run dev -- --port <n>` | serveur Vite à chaud (lancé par `dev.ps1`, qui choisit le port et le passe à la fenêtre) |
 | `npm run build` | construit `wwwroot/app/rig-iles.js` (fait aussi par `dotnet build`) |
-| `npm run watch` | reconstruit à chaque enregistrement ; l'appli ouverte se recharge seule (elle surveille `wwwroot`) |
+| `npm run watch` | reconstruit à chaque enregistrement ; une appli lancée HORS `dev.ps1` se recharge seule (elle surveille `wwwroot`) |
 | `npm run typecheck` | `tsc --noEmit`, mode strict (fait aussi par `compiler.ps1`) |
 | `npm test` | vitest (fait aussi par `tests.ps1`, banc `WebVitest`) |
 | `npm run comparer -- a.png b.png [--haut px]` | compare deux captures pixel par pixel |
 
-Avec `dev.ps1`, un `.tsx` modifié n'est repris qu'au prochain build : lance
-`npm run watch` à côté pour le voir tout de suite.
+Avec `dev.ps1`, un `.tsx` modifié est repris **à chaud** par le serveur Vite dans
+la fenêtre ouverte : rien à lancer à côté.

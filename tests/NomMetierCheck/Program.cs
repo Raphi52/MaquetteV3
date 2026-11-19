@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 // Garde-fou du NOM METIER.
 //
@@ -18,11 +18,10 @@ using System.Text.RegularExpressions;
 //     navigation -- aucune chaine litterale ne contient PROC_. Depuis le lot 2
 //     du passage a React (19/11/2026), l'aiguilleur est web/src/plan/Aiguillage.tsx
 //     (le @switch de Home.razor) ; Home.razor, devenu coquille, perd son exemption.
-// Les commentaires (@* *@ et //) sont exclus : la tracabilite vers les
+// Les commentaires (/* */ et //) sont exclus : la tracabilite vers les
 // sources v2 est utile et invisible a l'utilisateur.
 
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
-var composants = Path.Combine(racine, "Components");
 
 var echecs = new List<string>();
 void Exiger(bool ok, string quoi)
@@ -31,59 +30,16 @@ void Exiger(bool ok, string quoi)
     if (!ok) echecs.Add(quoi);
 }
 
-// Retire les commentaires Razor @* ... *@ et les commentaires C# de ligne.
-static string SansCommentaires(string texte)
-{
-    var t = Regex.Replace(texte, @"@\*.*?\*@", " ", RegexOptions.Singleline);
-    t = Regex.Replace(t, @"(?m)^\s*//.*$", " ");
-    t = Regex.Replace(t, @"(?m)^\s*///.*$", " ");
-    return t;
-}
-
-var fichiers = Directory.GetFiles(composants, "*.razor", SearchOption.AllDirectories);
-Exiger(fichiers.Length > 0, "des ecrans .razor sont trouves");
-
-foreach (var chemin in fichiers)
-{
-    var nom = Path.GetFileName(chemin);
-    var texte = SansCommentaires(File.ReadAllText(chemin));
-
-    // Le balisage (ce qui devient de l'ecran) s'arrete au bloc @code.
-    var debutCode = Regex.Match(texte, @"(?m)^\s*@code");
-    var balisage = debutCode.Success ? texte[..debutCode.Index] : texte;
-    var codeCs = debutCode.Success ? texte[debutCode.Index..] : string.Empty;
-
-    // 1. Attributs de texte lus par l'utilisateur.
-    foreach (Match m in Regex.Matches(balisage, @"(title|placeholder|alt)\s*=\s*""([^""]*)""",
-                                      RegexOptions.IgnoreCase))
-    {
-        Exiger(!m.Groups[2].Value.Contains("PROC_"),
-            $"{nom} : l'attribut {m.Groups[1].Value} « {m.Groups[2].Value} » ne montre pas de code interne");
-    }
-
-    // 2. Texte rendu entre deux balises.
-    foreach (Match m in Regex.Matches(balisage, @">([^<>]*)<"))
-    {
-        var rendu = m.Groups[1].Value;
-        if (!rendu.Contains("PROC_")) continue;
-        // Un texte affiche tient sur une ligne et n'est pas du C# : ce filtre
-        // ecarte les blocs @switch d'aiguillage, qui vivent dans le balisage.
-        if (rendu.Contains("\n") || rendu.Contains(";")) continue;
-        Exiger(false, $"{nom} : le texte affiche « {rendu.Trim()} » ne montre pas de code interne");
-    }
-
-    // 3. Hors aiguilleur : aucun code interne, meme en donnee (Home.razor compris).
-    foreach (Match m in Regex.Matches(texte, @"""([^""\r\n]*PROC_[^""\r\n]*)"""))
-    {
-        Exiger(false,
-            $"{nom} : la chaine « {m.Groups[1].Value} » porte un code interne ; " +
-            "seul l'aiguillage (web/src/plan/Aiguillage.tsx) aiguille par code");
-    }
-}
+// RETRAIT DE BLAZOR (lot 3 du plan « finir le passage a React », 19/11/2026) :
+// plus aucun ecran .razor. Les trois regles se tiennent sur les ecrans React
+// ci-dessous ; on s'assure qu'aucun .razor n'est revenu, qui y echapperait.
+Exiger(!Directory.EnumerateFiles(racine, "*.razor", SearchOption.AllDirectories)
+            .Any(f => !Regex.IsMatch(f, @"[\\/](bin|obj|node_modules|binverif)[\\/]")),
+    "plus aucun ecran .razor : les regles se lisent sur les ecrans React");
 
 // --- Les ecrans PORTES EN REACT (web/src, 18/11/2026) : memes trois regles.
 // Un seul fichier de web/src aiguille par code : web/src/plan/Aiguillage.tsx
-// (lot 2) ; la regle 3 vaut partout ailleurs. Commentaires exclus comme cote Razor
+// (lot 2) ; la regle 3 vaut partout ailleurs. Commentaires exclus
 // (/* */, {/* */} et //) : la tracabilite vers PROC_xxx de RIG v2 y reste utile.
 static string SansCommentairesTs(string texte)
 {
@@ -119,7 +75,7 @@ foreach (var chemin in fichiersWeb)
             $"{nom} : l'attribut {m.Groups[1].Value} « {m.Groups["v"].Value} » ne montre pas de code interne");
     }
 
-    // 2. Texte rendu entre deux balises (meme filtre que cote Razor).
+    // 2. Texte rendu entre deux balises (un texte sur plusieurs lignes ou avec « ; » est du code).
     foreach (Match m in Regex.Matches(texte, @">([^<>{}]*)<"))
     {
         var rendu = m.Groups[1].Value;

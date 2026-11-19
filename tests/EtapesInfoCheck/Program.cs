@@ -1,4 +1,4 @@
-using RigV3Desktop;
+﻿using RigV3Desktop;
 
 // Garde-fou du regroupement en ETAPES NOMMEES de « Informations du dossier ».
 //
@@ -15,10 +15,14 @@ var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../.
 // saisie guidee) dans la session de Pont/FicheInformationsDossier.cs : chaque
 // regle ci-dessous se lit a son nouvel endroit. Ces regles sont aussi
 // EXECUTEES par tests/SaisieCheck et tests/GedCheck.
-var coquille = File.ReadAllText(Path.Combine(racine, "Components/FicheInformationsDossier.razor"));
+// Blazor retire (19/11/2026) : plus de coquille. Ce qu'elle faisait -- ouvrir et
+// fermer la session sur l'etat de l'accueil, monter la fiche -- est dans le plan de
+// travail (Pont/PlanTravailVue.cs, depuis le lot 2) et dans sa visionneuse React.
+var planVue = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravailVue.cs"));
+var visionneuse = File.ReadAllText(Path.Combine(racine, "web/src/plan/Visionneuse.tsx"));
 var tsx = File.ReadAllText(Path.Combine(racine, "web/src/composants/FicheInformationsDossier.tsx"));
 var pont = File.ReadAllText(Path.Combine(racine, "Pont/FicheInformationsDossier.cs"));
-var fiche = coquille + Environment.NewLine + tsx + Environment.NewLine + pont;
+var fiche = tsx + Environment.NewLine + pont;
 var css = File.ReadAllText(Path.Combine(racine, "wwwroot/rig-accueil.css"));
 
 var echecs = new List<string>();
@@ -46,10 +50,12 @@ Exiger(EtapesInfoDossier.Etapes.Length < InformationsDossier.Sections.Length,
 Exiger(EtapesInfoDossier.Rang("DIRIGEANT") == EtapesInfoDossier.Rang("DIRIGEANT_PP"),
     "les dirigeants personnes physiques sont dans la meme etape que les dirigeants");
 
-Exiger(coquille.Contains("<IleReact Composant=\"FicheInformationsDossier\"")
-       && coquille.Contains("FicheInformationsDossier.Ouvrir(Parametres)")
-       && coquille.Contains("FicheInformationsDossier.Fermer(Session)"),
-    "la coquille monte la fiche React et ouvre/ferme sa session sur l'etat de l'accueil");
+Exiger(visionneuse.Contains("<FicheInformationsDossier key={d.fiche.session} session={d.fiche.session}")
+       && planVue.Contains("SessionFiche = FicheInformationsDossier.Ouvrir(parametres);")
+       && planVue.Contains("FicheInformationsDossier.Parametrer(SessionFiche, parametres)")
+       && planVue.Contains("FicheInformationsDossier.Fermer(SessionFiche);")
+       && !File.Exists(Path.Combine(racine, "Components/FicheInformationsDossier.razor")),
+    "le plan de travail monte la fiche React et ouvre/ferme sa session sur l'etat de l'accueil (plus de coquille)");
 
 Exiger(tsx.Contains("rig-frise--h") && pont.Contains("EtapesInfoDossier.Rang(v.Section.Table)")
        && pont.Contains("EtapesInfoDossier.Etapes[g.Key]"),

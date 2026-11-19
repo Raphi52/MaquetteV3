@@ -60,8 +60,9 @@ $codeTs = 0
 if (Test-Path (Join-Path $web 'package.json')) {
     Push-Location $web
     try {
-        # Copie neuve : la cible InstallerWeb du msbuild ci-dessus a normalement
-        # installe les paquets ; s'il s'est arrete avant, on les installe ici.
+        # Copie neuve : les paquets ne sont installes que par un vrai build
+        # (cible InstallerWeb, accrochee a la copie vers bin depuis le
+        # 19/11/2026, que -t:Compile n'atteint pas) : on les installe ici.
         if (-not (Test-Path 'node_modules\.bin\tsc.cmd')) { & npm ci --no-audit --no-fund }
         & npm run --silent typecheck
         $codeTs = $LASTEXITCODE

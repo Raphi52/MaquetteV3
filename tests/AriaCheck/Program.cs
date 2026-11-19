@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 // Garde-fou du BOUTON MUET (16/09/2026).
 //
@@ -18,37 +18,17 @@ void Exiger(bool ok, string quoi)
     if (!ok) echecs.Add(quoi);
 }
 
-var fichiers = Directory.GetFiles(Path.Combine(racine, "Components/Ecrans"), "*.razor").OrderBy(f => f).ToList();
-Exiger(fichiers.Count >= 30, $"les ecrans sont trouves ({fichiers.Count})");
+// RETRAIT DE BLAZOR (19/11/2026) : plus aucun ecran .razor. La regle se tient
+// sur les .tsx ci-dessous, et le seuil « au moins 30 ecrans » sur web/src/ecrans.
+Exiger(!Directory.EnumerateFiles(racine, "*.razor", SearchOption.AllDirectories)
+            .Any(f => !Regex.IsMatch(f, @"[\\/](bin|obj|node_modules|binverif)[\\/]")),
+    "plus aucun ecran .razor : la regle se lit sur les ecrans React");
+var ecransTsx = Directory.GetFiles(Path.Combine(racine, "web/src/ecrans"), "Ecran*.tsx")
+                         .Count(f => !f.EndsWith(".test.tsx", StringComparison.OrdinalIgnoreCase));
+Exiger(ecransTsx >= 30, $"les ecrans sont trouves ({ecransTsx})");
 
 var muets = new List<string>();
 var examines = 0;
-foreach (var f in fichiers)
-{
-    var texte = File.ReadAllText(f);
-    var nom = Path.GetFileName(f);
-    foreach (Match b in Regex.Matches(texte, @"<button\b(?<attrs>(?:""[^""]*""|[^>""])*)>(?<corps>.*?)</button>", RegexOptions.Singleline))
-    {
-        examines++;
-        var attrs = b.Groups["attrs"].Value;
-        var corps = b.Groups["corps"].Value;
-
-        // Texte lisible = ce qui reste une fois les balises, les commentaires
-        // Razor et les expressions d'icone retires.
-        var nu = Regex.Replace(corps, @"<[^>]*>", " ");
-        nu = Regex.Replace(nu, @"@\*.*?\*@", " ", RegexOptions.Singleline);
-        nu = Regex.Replace(nu, @"&[a-zA-Z]+;|&#\d+;", " ");
-        nu = Regex.Replace(nu, @"[\p{Cs}\p{So}]", " ");   // emojis et symboles
-        nu = nu.Trim();
-
-        var nomme = Regex.IsMatch(attrs, @"aria-label\s*=") || Regex.IsMatch(attrs, @"\btitle\s*=");
-        if (nu.Length < 2 && !nomme)
-        {
-            var ligne = texte.Take(b.Index).Count(c => c == '\n') + 1;
-            muets.Add($"{nom}:{ligne}");
-        }
-    }
-}
 
 // --- Les ecrans PORTES EN REACT (web/src, 18/11/2026) : meme regle sur le .tsx.
 // Le balisage change de syntaxe, pas de sens : un attribut s'ecrit aussi

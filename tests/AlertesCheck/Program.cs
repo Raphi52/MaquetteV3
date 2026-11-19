@@ -355,27 +355,30 @@ Exiger(!source.Contains("var aRenommer = demandes.FirstOrDefault(d => d.EnCours)
 Exiger(source.Contains("JeuDemo.EvenementsAttendus"),
     "le releve part des evenements en attente");
 
-// Les deux ecrans crees pour les alertes existent bien sur le disque.
-Exiger(File.Exists(Path.Combine(racine, "Components/Ecrans/EcranVerrous.razor")),
-    "l'ecran des dossiers verrouilles existe");
-Exiger(File.Exists(Path.Combine(racine, "Components/Ecrans/EcranTeletransmission.razor")),
-    "l'ecran des teletransmissions existe");
+// Les deux ecrans crees pour les alertes existent bien sur le disque, en React
+// (Blazor et ses coquilles .razor sont retires depuis le 19/11/2026).
+Exiger(File.Exists(Path.Combine(racine, "web/src/ecrans/EcranVerrous.tsx"))
+       && !File.Exists(Path.Combine(racine, "Components/Ecrans/EcranVerrous.razor")),
+    "l'ecran des dossiers verrouilles existe (en React, plus de coquille .razor)");
+Exiger(File.Exists(Path.Combine(racine, "web/src/ecrans/EcranTeletransmission.tsx"))
+       && !File.Exists(Path.Combine(racine, "Components/Ecrans/EcranTeletransmission.razor")),
+    "l'ecran des teletransmissions existe (en React, plus de coquille .razor)");
 
 // --- 2 ter. L'ecran des verrous, PORTE EN REACT (lot 1, 18/11/2026).
 // Ce que ce banc tenait sur EcranVerrous.razor -- l'ecran existe, ses lignes
 // sont CALCULEES sur les demandes connues, jamais ecrites en dur -- il le tient
-// maintenant sur la chaine reelle : coquille .razor -> ile React -> pont C#.
+// maintenant sur la chaine reelle : aiguillage React -> ecran React -> pont C#
+// (la coquille .razor intermediaire est retiree avec Blazor, 19/11/2026).
 // Le calcul vit dans Pont/EcranVerrous.cs : il est EXECUTE ici, pas relu.
-var coquilleVerrous = File.ReadAllText(Path.Combine(racine, "Components/Ecrans/EcranVerrous.razor"));
 var cheminTsxVerrous = Path.Combine(racine, "web/src/ecrans/EcranVerrous.tsx");
 Exiger(File.Exists(cheminTsxVerrous), "l'ecran React des dossiers verrouilles existe (web/src/ecrans/EcranVerrous.tsx)");
 var tsxVerrous = File.Exists(cheminTsxVerrous) ? File.ReadAllText(cheminTsxVerrous) : string.Empty;
 var pontVerrous = File.ReadAllText(Path.Combine(racine, "Pont/EcranVerrous.cs"));
-Exiger(coquilleVerrous.Contains("<IleReact Composant=\"EcranVerrous\""),
-    "la coquille EcranVerrous.razor monte l'ecran React du meme nom");
-Exiger(Regex.IsMatch(coquilleVerrous, @"\[Parameter\] public EventCallback<string> OuvrirDossier")
-       && coquilleVerrous.Contains("[\"ouvrirDossier\"] = IleReact.Rappel(OuvrirDossier)"),
-    "la coquille garde le parametre OuvrirDossier et le remonte depuis React");
+Exiger(Regex.IsMatch(aiguillage, @"<EcranVerrous\b"),
+    "l'aiguillage du plan de travail monte l'ecran React EcranVerrous");
+Exiger(tsxVerrous.Contains("ouvrirDossier: (numero: string) => void")
+       && tsxVerrous.Contains("onClick={() => ouvrirDossier(v.dossier)}"),
+    "l'ecran garde le geste OuvrirDossier et le remonte au clic d'une ligne");
 Exiger(aiguillage.Contains("<EcranVerrous ouvrirDossier={ouvrirParNumero} />")
        && aiguillage.Contains("const ouvrirParNumero = (numero: string) => plan('ouvrirNumero', numero)")
        && gestesPlan.Contains("case \"ouvrirNumero\": OuvrirParNumero(Texte(valeur)); break;"),
@@ -405,18 +408,17 @@ Exiger(avecMoi.Detenteurs.Sum(d => d.Nombre) == avecMoi.Lignes.Length
     "les detenteurs, ranges par nom, comptent toutes les lignes");
 
 // --- 2 quater. L'ecran des teletransmissions, PORTE EN REACT (lot 3, 19/11/2026).
-// Meme principe que les verrous : la chaine coquille -> ile React -> pont C#,
+// Meme principe que les verrous : la chaine aiguillage -> ecran React -> pont C#,
 // et le calcul des flux (Pont/EcranTeletransmission.cs) EXECUTE ici.
-var coquilleTeletrans = File.ReadAllText(Path.Combine(racine, "Components/Ecrans/EcranTeletransmission.razor"));
 var cheminTsxTeletrans = Path.Combine(racine, "web/src/ecrans/EcranTeletransmission.tsx");
 Exiger(File.Exists(cheminTsxTeletrans), "l'ecran React des teletransmissions existe (web/src/ecrans/EcranTeletransmission.tsx)");
 var tsxTeletrans = File.Exists(cheminTsxTeletrans) ? File.ReadAllText(cheminTsxTeletrans) : string.Empty;
 var pontTeletrans = File.ReadAllText(Path.Combine(racine, "Pont/EcranTeletransmission.cs"));
-Exiger(coquilleTeletrans.Contains("<IleReact Composant=\"EcranTeletransmission\""),
-    "la coquille EcranTeletransmission.razor monte l'ecran React du meme nom");
-Exiger(Regex.IsMatch(coquilleTeletrans, @"\[Parameter\] public EventCallback<string> OuvrirDossier")
-       && coquilleTeletrans.Contains("[\"ouvrirDossier\"] = IleReact.Rappel(OuvrirDossier)"),
-    "la coquille des teletransmissions garde OuvrirDossier et le remonte depuis React");
+Exiger(Regex.IsMatch(aiguillage, @"<EcranTeletransmission\b"),
+    "l'aiguillage du plan de travail monte l'ecran React EcranTeletransmission");
+Exiger(tsxTeletrans.Contains("ouvrirDossier: (numero: string) => void")
+       && tsxTeletrans.Contains("ouvrirDossier(f.numDemande)"),
+    "l'ecran des teletransmissions garde le geste OuvrirDossier et le remonte depuis React");
 Exiger(aiguillage.Contains("<EcranTeletransmission ouvrirDossier={ouvrirParNumero} />"),
     "le plan de travail ouvre toujours l'affaire du flux clique");
 Exiger(tsxTeletrans.Contains("appeler<VueTeletransmission>('EcranTeletransmission.Flux', mode)")

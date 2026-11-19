@@ -1,5 +1,3 @@
-using Microsoft.JSInterop;
-
 namespace RigV3Desktop.Pont;
 
 /// <summary>

@@ -6,35 +6,46 @@ using System.Windows.Interop;
 namespace RigV3Desktop;
 
 /// <summary>
-/// Fenetre hote. Son contenu est rendu par une vue Blazor (voir MainWindow.xaml).
+/// Fenetre hote. Son contenu est une page React servie par un controle WebView2
+/// (voir MainWindow.xaml) ; sa racine est l'application entiere, accueil et plan
+/// de travail (Pont/Racines.cs, RacinePlanTravail).
 /// </summary>
 public partial class MainWindow : Window
 {
+    /// <summary>Ce que la page de cette fenetre monte. Les commandes de fenetre
+    /// et le passe-plat des documents sont ceux de l'application (App).</summary>
+    public Pont.RacinePlanTravail Racine { get; } = new(App.Fenetre, App.Partage);
+
     public MainWindow()
     {
         InitializeComponent();
-
-        // La liste deroulante d'un <select> n'est PAS peinte par la page : c'est
-        // une fenetre du systeme. Elle suit la preference de couleur du
-        // navigateur hote, dont le defaut (Auto) copie celle de Windows -- ici
-        // le mode clair. D'ou la popup blanche sur texte clair, illisible,
-        // constatee le 2026-09-10 : `color-scheme` dans la feuille de style ne
-        // pouvait pas y arriver. On fixe donc la preference du WebView lui-meme.
-        // Cela ne suffit PAS pour les lignes : sans fond OPAQUE, elles restent
-        // blanches sous un texte clair (regle `select option`, rig-charte.css).
-        Vue.BlazorWebViewInitialized += (_, args) =>
+        Loaded += async (_, _) =>
         {
-            args.WebView.CoreWebView2.Profile.PreferredColorScheme =
-                Microsoft.Web.WebView2.Core.CoreWebView2PreferredColorScheme.Dark;
+            // Le selecteur de couleur des listes deroulantes (theme sombre) est
+            // fixe par PageWeb. Cela ne suffit PAS pour les lignes : sans fond
+            // OPAQUE, elles restent blanches sous un texte clair (regle
+            // `select option`, rig-charte.css).
 #if DEBUG
-            // En developpement, on repart d'un cache VIDE : sinon une feuille
-            // de style modifiee reste invisible apres un redemarrage complet
-            // (index.html reference les CSS sans numero de version).
-            _ = args.WebView.CoreWebView2.Profile.ClearBrowsingDataAsync(
-                Microsoft.Web.WebView2.Core.CoreWebView2BrowsingDataKinds.DiskCache);
+            await ViderCacheAuDemarrage();
 #endif
+            await Pont.PageWeb.Brancher(Vue, Racine);
         };
+        Closed += async (_, _) => await Racine.DisposeAsync();
     }
+
+#if DEBUG
+    /// <summary>
+    /// En developpement, on repart d'un cache VIDE : sinon une feuille de style
+    /// modifiee reste invisible apres un redemarrage complet (index.html
+    /// reference les CSS sans numero de version). Fait AVANT le premier
+    /// chargement, pour qu'aucune feuille perimee ne soit servie.
+    /// </summary>
+    private async Task ViderCacheAuDemarrage()
+    {
+        await Vue.EnsureCoreWebView2Async(await Pont.PageWeb.EnvironnementPartage());
+        await ViderCacheAsync();
+    }
+#endif
 
     /// <summary>
     /// Place la fenetre a la main, sur le moniteur ou se trouve le pointeur.
@@ -101,14 +112,15 @@ public partial class MainWindow : Window
 
 #if DEBUG
     // ---------------------------------------------------------------
-    // Reprise a chaud des fichiers statiques (CSS, JS, images).
+    // Reprise a chaud des fichiers statiques (CSS, images, JS construit).
     //
-    // BlazorWebView ne reprend pas wwwroot a chaud (dotnet/aspnetcore#37496)
-    // et il sert les fichiers COPIES dans le dossier de sortie, pas les
-    // sources. On surveille donc les sources : au moindre changement, le
-    // fichier est recopie dans la sortie et la page est rechargee. Aucun
-    // redemarrage de l'application. Le code C# et les .razor, eux, sont
-    // repris par « dotnet watch run » (dev.ps1).
+    // La page est servie depuis le wwwroot COPIE dans le dossier de sortie
+    // (hote virtuel, Pont/PageWeb.cs), pas depuis les sources. On surveille
+    // donc les sources : au moindre changement, le fichier est recopie dans
+    // la sortie et la page est rechargee. Aucun redemarrage de l'application.
+    // Le code C# est repris par « dotnet watch run », les .tsx par le serveur
+    // Vite (dev.ps1) : sous Vite, wwwroot/app (le JS construit) n'est pas lu
+    // et ses changements ne rechargent rien.
     // ---------------------------------------------------------------
     private FileSystemWatcher? Guetteur;
     private System.Windows.Threading.DispatcherTimer? Attente;
@@ -130,8 +142,10 @@ public partial class MainWindow : Window
             Attente!.Stop();
             RecopierWwwroot(source, sortie);
             await ViderCacheAsync();
-            Vue.WebView?.Reload();
+            Vue.CoreWebView2?.Reload();
         };
+        var sousVite = Pont.PageWeb.AdresseVite() is not null;
+        var dossierApp = Path.Combine(source, "app") + Path.DirectorySeparatorChar;
 
         Guetteur = new FileSystemWatcher(source)
         {
@@ -139,8 +153,14 @@ public partial class MainWindow : Window
             NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,
             EnableRaisingEvents = true
         };
-        void Change(object _, FileSystemEventArgs __) =>
+        void Change(object _, FileSystemEventArgs e)
+        {
+            // Sous Vite, le JS construit (wwwroot/app) n'est pas celui que la
+            // page charge : une construction (dotnet build, npm run build) ne
+            // doit pas recharger la page et lui faire perdre son etat.
+            if (sousVite && e.FullPath.StartsWith(dossierApp, StringComparison.OrdinalIgnoreCase)) return;
             Dispatcher.Invoke(() => { Attente!.Stop(); Attente.Start(); });
+        }
         Guetteur.Changed += Change;
         Guetteur.Created += Change;
         Guetteur.Renamed += (o, e) => Change(o, e);
@@ -157,7 +177,7 @@ public partial class MainWindow : Window
     /// </summary>
     private async Task ViderCacheAsync()
     {
-        var coeur = Vue.WebView?.CoreWebView2;
+        var coeur = Vue.CoreWebView2;
         if (coeur is null) return;
         try
         {

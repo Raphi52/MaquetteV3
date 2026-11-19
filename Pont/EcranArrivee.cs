@@ -1,5 +1,3 @@
-using Microsoft.JSInterop;
-
 namespace RigV3Desktop.Pont;
 
 /// <summary>Une entree de liste deroulante : le code envoye, le libelle lu.</summary>

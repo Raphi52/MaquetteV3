@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { EcranVerrous, type LigneVerrou, type VueVerrous } from './EcranVerrous'
-import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
-afterEach(() => { cleanup(); retirerFauxDotNet() })
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 // Le calcul (filtre, tri, age, detenteurs) est fait par Pont/EcranVerrous.cs
 // et execute par tests/AlertesCheck. Ici : l'ecran AFFICHE ce que le pont rend,
@@ -22,11 +22,11 @@ function vue(utilisateur: unknown, moiCompris: unknown): VueVerrous {
 
 describe('EcranVerrous', () => {
   it('affiche les dossiers retenus par un autre poste, avec leur compte et leurs detenteurs', async () => {
-    const dotnet = installerFauxDotNet({ 'EcranVerrous.Verrouilles': vue })
+    const pont = installerFauxPont({ 'EcranVerrous.Verrouilles': vue })
     const { container } = render(<EcranVerrous ouvrirDossier={vi.fn()} />)
 
     await screen.findByText('2 dossier(s)')
-    expect(dotnet.invokeMethodAsync).toHaveBeenCalledWith('RigV3Desktop', 'EcranVerrous.Verrouilles', 'R. VILAIN', false)
+    expect(pont.appels).toHaveBeenCalledWith('EcranVerrous.Verrouilles', 'R. VILAIN', false)
     const rangees = container.querySelectorAll('tbody tr')
     expect(rangees).toHaveLength(2)
     expect([...rangees[0]!.querySelectorAll('td')].map((td) => td.textContent))
@@ -37,7 +37,7 @@ describe('EcranVerrous', () => {
   })
 
   it('« Inclure mes propres dossiers » redemande au pont avec la bascule allumee', async () => {
-    const dotnet = installerFauxDotNet({ 'EcranVerrous.Verrouilles': vue })
+    const pont = installerFauxPont({ 'EcranVerrous.Verrouilles': vue })
     render(<EcranVerrous ouvrirDossier={vi.fn()} />)
     await screen.findByText('2 dossier(s)')
 
@@ -47,23 +47,23 @@ describe('EcranVerrous', () => {
 
     await screen.findByText('3 dossier(s)')
     expect(bascule.className).toBe('rig-bascule rig-bascule--actif')
-    expect(dotnet.invokeMethodAsync).toHaveBeenLastCalledWith('RigV3Desktop', 'EcranVerrous.Verrouilles', 'R. VILAIN', true)
+    expect(pont.appels).toHaveBeenLastCalledWith('EcranVerrous.Verrouilles', 'R. VILAIN', true)
   })
 
   it('« Mon login » change le poste de reference', async () => {
-    const dotnet = installerFauxDotNet({ 'EcranVerrous.Verrouilles': vue })
+    const pont = installerFauxPont({ 'EcranVerrous.Verrouilles': vue })
     render(<EcranVerrous ouvrirDossier={vi.fn()} />)
     await screen.findByText('2 dossier(s)')
 
     fireEvent.change(screen.getByLabelText('Mon login'), { target: { value: 'C. BENIER' } })
-    await waitFor(() => expect(dotnet.invokeMethodAsync)
-      .toHaveBeenLastCalledWith('RigV3Desktop', 'EcranVerrous.Verrouilles', 'C. BENIER', false))
+    await waitFor(() => expect(pont.appels)
+      .toHaveBeenLastCalledWith('EcranVerrous.Verrouilles', 'C. BENIER', false))
     await screen.findByText('2 dossier(s)')
     expect(screen.queryByText('Depot de bilan - TRANSNORD SA')).toBeNull()
   })
 
   it('remonte le NUMERO clique a la coquille Blazor', async () => {
-    installerFauxDotNet({ 'EcranVerrous.Verrouilles': vue })
+    installerFauxPont({ 'EcranVerrous.Verrouilles': vue })
     const ouvrirDossier = vi.fn()
     render(<EcranVerrous ouvrirDossier={ouvrirDossier} />)
 
@@ -73,7 +73,7 @@ describe('EcranVerrous', () => {
 
   it('dit qu\'aucun dossier n\'est retenu, mais seulement une fois la reponse arrivee', async () => {
     let repondre: (v: VueVerrous) => void = () => {}
-    installerFauxDotNet({ 'EcranVerrous.Verrouilles': () => new Promise<VueVerrous>((r) => { repondre = r }) })
+    installerFauxPont({ 'EcranVerrous.Verrouilles': () => new Promise<VueVerrous>((r) => { repondre = r }) })
     const { container } = render(<EcranVerrous ouvrirDossier={vi.fn()} />)
 
     expect(screen.queryByText('Aucun dossier n\'est retenu par un autre poste.')).toBeNull()
@@ -86,7 +86,7 @@ describe('EcranVerrous', () => {
 
   it('ignore une reponse perimee arrivee apres une plus recente', async () => {
     const enAttente: Array<{ args: unknown[]; repondre: (v: VueVerrous) => void }> = []
-    installerFauxDotNet({
+    installerFauxPont({
       'EcranVerrous.Verrouilles': (...args) => new Promise<VueVerrous>((r) => { enAttente.push({ args, repondre: r }) }),
     })
     render(<EcranVerrous ouvrirDossier={vi.fn()} />)

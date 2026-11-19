@@ -1,17 +1,17 @@
-// Point d'entree du module wwwroot/app/rig-iles.js : ce que
-// Components/IleReact.razor appelle pour monter, mettre a jour et demonter
-// un ecran React dans le div qu'il lui donne.
+// Le REGISTRE des composants montables a la racine d'une fenetre (racine.tsx) :
+// le C# nomme le composant (RacineWeb.Composant, Pont/Racines.cs), la page le
+// trouve ici.
 //
-// Le REGISTRE est automatique : chaque fichier src/ecrans/<Nom>.tsx et
+// Le registre est automatique : chaque fichier src/ecrans/<Nom>.tsx et
 // src/composants/<Nom>.tsx exporte un composant nomme comme lui, et devient
 // montable sous ce nom. Aucune liste a tenir a la main : deux lots qui portent
 // deux ecrans en meme temps ne se marchent pas dessus dans ce fichier.
+// (Jusqu'au 19/11/2026, ce module montait aussi les « iles » React dans les
+// coquilles Blazor -- d'ou son nom ; Blazor est retire.)
 
-import { createElement, type ComponentType } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { rappelBlazor, type ReferenceBlazor } from './pont'
+import type { ComponentType } from 'react'
 
-type Proprietes = Record<string, unknown>
+export type Proprietes = Record<string, unknown>
 
 const modules = import.meta.glob<Record<string, unknown>>(
   ['./ecrans/*.tsx', './composants/*.tsx', '!./**/*.test.tsx'],
@@ -35,51 +35,11 @@ export function composantsMontables(): string[] {
   return [...composants.keys()].sort()
 }
 
-interface Ile {
-  racine: Root
-  composant: ComponentType<Proprietes>
-  rappels: Proprietes
-}
-
-const iles = new WeakMap<Element, Ile>()
-
-function rendre(ile: Ile, proprietes: Proprietes): void {
-  ile.racine.render(createElement(ile.composant, { ...proprietes, ...ile.rappels }))
-}
-
-/**
- * Monte le composant `nom` dans `hote`. `nomsRappels` liste les proprietes
- * qui sont des gestes remontes a Blazor : chacune devient une fonction.
- */
-export function monter(
-  hote: Element,
-  nom: string,
-  proprietes: Proprietes,
-  nomsRappels: string[],
-  reference: ReferenceBlazor,
-): void {
+/** Le composant `nom` ; un nom inconnu echoue en listant les noms montables. */
+export function composantMontable(nom: string): ComponentType<Proprietes> {
   const composant = composants.get(nom)
   if (!composant) {
-    throw new Error(`Ile React inconnue : « ${nom} ». Montables : ${composantsMontables().join(', ')}.`)
+    throw new Error(`Composant inconnu : « ${nom} ». Montables : ${composantsMontables().join(', ')}.`)
   }
-  demonter(hote)
-  const rappels: Proprietes = {}
-  for (const r of nomsRappels) rappels[r] = rappelBlazor(reference, r)
-  const ile: Ile = { racine: createRoot(hote), composant, rappels }
-  iles.set(hote, ile)
-  rendre(ile, proprietes)
-}
-
-/** Les parametres de la coquille ont change : on rend a nouveau, l'etat React est garde. */
-export function mettreAJour(hote: Element, proprietes: Proprietes): void {
-  const ile = iles.get(hote)
-  if (ile) rendre(ile, proprietes)
-}
-
-/** La coquille quitte l'ecran : React rend le div vide, propre, avant que Blazor le retire. */
-export function demonter(hote: Element): void {
-  const ile = iles.get(hote)
-  if (!ile) return
-  iles.delete(hote)
-  ile.racine.unmount()
+  return composant
 }

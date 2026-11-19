@@ -36,12 +36,16 @@ var balisage = string.Join(Environment.NewLine,
              .Where(f => !f.EndsWith(".test.tsx")).OrderBy(f => f).Select(File.ReadAllText));
 var vue = codePlan + Environment.NewLine + balisage;
 var arbreModele = Path.Combine(racine, "Metier/ArbreGed.cs");
-var noeud = Path.Combine(racine, "Components/ArbreGedNoeud.razor");
+var noeud = Path.Combine(racine, "web/src/composants/ArbreGedNoeud.tsx");
 // PORTE EN REACT (lot 6, 19/11/2026) : ArbreGedNoeud, IconeGed, DocumentDetacheVue
 // et FicheInformationsDossier ne sont plus que des COQUILLES. Leur balisage se lit
 // dans web/src/composants/<Nom>.tsx, leurs regles dans Pont/<Nom>.cs ; chaque regle
 // ci-dessous se lit a son nouvel endroit ET les ponts sont EXECUTES (section
-// « Ponts du lot 6 », en fin de fichier).
+// « Ponts du lot 6 », en fin de fichier). Depuis le retrait de Blazor (lot 3 du
+// plan « finir le passage a React », 19/11/2026), il n'y a plus de coquilles :
+// ce qu'elles faisaient (monter le composant, lui passer l'etat vivant, ouvrir et
+// fermer une session) se lit la ou le plan de travail le fait desormais --
+// web/src/plan/*.tsx (« balisage ») et Pont/PlanTravail*.cs (« codePlan »).
 string LireSource(string relatif)
 {
     var chemin = Path.Combine(racine, relatif);
@@ -49,17 +53,13 @@ string LireSource(string relatif)
 }
 var tsxArbre = LireSource("web/src/composants/ArbreGedNoeud.tsx");
 var pontArbre = LireSource("Pont/ArbreGedNoeud.cs");
-var coquilleArbre = LireSource("Components/ArbreGedNoeud.razor");
 var tsxFiche = LireSource("web/src/composants/FicheInformationsDossier.tsx");
 var pontFiche = LireSource("Pont/FicheInformationsDossier.cs");
-var coquilleFiche = LireSource("Components/FicheInformationsDossier.razor");
 var css = File.ReadAllText(Path.Combine(racine, "wwwroot/rig-accueil.css"));
 // Le tableau des editions a son propre ecran depuis 09/2026 : les colonnes et
 // le detail du destinataire s'y trouvent, plus dans Home.razor.
 // PORTE EN REACT (lot 3, 19/11/2026) : le .razor n'est plus qu'une coquille ;
 // colonnes et detail se lisent dans web/src/ecrans/EcranTableauEditions.tsx.
-var ecranEditions = Path.Combine(racine, "Components/Ecrans/EcranTableauEditions.razor");
-var coquilleEditions = File.Exists(ecranEditions) ? File.ReadAllText(ecranEditions) : string.Empty;
 var tsxEditions = Path.Combine(racine, "web/src/ecrans/EcranTableauEditions.tsx");
 var editions = File.Exists(tsxEditions) ? File.ReadAllText(tsxEditions) : string.Empty;
 
@@ -88,10 +88,11 @@ Exiger(Regex.IsMatch(modele, @"Judiciaire.*Ordonnances.*Demandeur", RegexOptions
     "Judiciaire contient Ordonnances qui contient Demandeur (profondeur >= 3)");
 
 // --- 3. L'arbre se rend par un composant RECURSIF, avec ses colonnes v2.
-Exiger(File.Exists(noeud), "Components/ArbreGedNoeud.razor existe");
-Exiger(coquilleArbre.Contains("<IleReact Composant=\"ArbreGedNoeud\""),
-    "la coquille ArbreGedNoeud.razor monte l'arbre React");
-var rendu = coquilleArbre + Environment.NewLine + tsxArbre + Environment.NewLine + pontArbre;
+Exiger(File.Exists(noeud) && !File.Exists(Path.Combine(racine, "Components/ArbreGedNoeud.razor")),
+    "web/src/composants/ArbreGedNoeud.tsx existe (plus de coquille .razor)");
+Exiger(balisage.Contains("<ArbreGedNoeud ligne={d.arbre}"),
+    "la visionneuse du plan de travail monte l'arbre React, depuis sa racine");
+var rendu = tsxArbre + Environment.NewLine + pontArbre;
 Exiger(Regex.IsMatch(tsxArbre, @"export function ArbreGedNoeud[\s\S]*?<ArbreGedNoeud key=\{enfant\.id\}"),
     "ArbreGedNoeud.tsx s'appelle lui-meme (recursion)");
 // Renomme le 2026-09-14 (demande Leslie) : l entete de l arbre annonce
@@ -113,11 +114,11 @@ Exiger(!rendu.Contains("rig-arbre__date"),
 // Le bouton d acces a quitte la visionneuse (barre du haut retiree le 15/09/2026) ;
 // l ecran lui-meme est conserve.
 Exiger(editions.Contains("Tableau des editions"), "l ecran « Tableau des editions » est conserve");
-Exiger(coquilleEditions.Contains("<IleReact Composant=\"EcranTableauEditions\"")
-       && coquilleEditions.Contains("[Parameter] public LigneEdition[] Editions")
-       && coquilleEditions.Contains("[\"editions\"] = Editions")
-       && coquilleEditions.Contains("[\"fermer\"] = IleReact.Rappel(Fermer)"),
-    "la coquille du tableau des editions garde Editions, Affaire et Fermer, et monte l'ecran React");
+Exiger(editions.Contains("editions?: LigneEdition[] | null") && editions.Contains("affaire?: string | null")
+       && editions.Contains("fermer: () => void")
+       && editions.Contains("export function EcranTableauEditions({ editions, affaire, fermer }")
+       && !File.Exists(Path.Combine(racine, "Components/Ecrans/EcranTableauEditions.razor")),
+    "l'ecran React du tableau des editions garde Editions, Affaire et Fermer (plus de coquille .razor)");
 Exiger(editions.Contains("appeler<string[]>('EcranTableauEditions.TypesPapier')")
        && RigV3Desktop.Pont.EcranTableauEditions.TypesPapier().SequenceEqual(RigV3Desktop.ArbreDemo.TypesPapier),
     "les types de papier du detail viennent d'ArbreDemo par le pont, dans leur ordre");
@@ -231,32 +232,35 @@ Exiger(Regex.IsMatch(vue, @"RangLibre\(FenetresDetachees"),
 
 Exiger(!Regex.IsMatch(fenDoc, @"Application\.Current\.MainWindow\s*\.\s*(Width|Height|Left|Top)"),
     "la fenetre detachee ne redimensionne pas la fenetre principale");
-var vueDetachee = Path.Combine(racine, "Components/DocumentDetacheVue.razor");
-Exiger(File.Exists(vueDetachee), "Components/DocumentDetacheVue.razor existe");
+// Depuis le retrait de Blazor (19/11/2026), la racine de FenetreDocument est
+// RacineDocumentDetache (Pont/Racines.cs), plus la coquille .razor.
+var racinesFenetres = LireSource("Pont/Racines.cs");
+var racineDetachee = Regex.Match(racinesFenetres, @"public sealed class RacineDocumentDetache[\s\S]*$").Value;
+Exiger(racineDetachee.Contains("public override string Composant => \"DocumentDetacheVue\";")
+       && fenDoc.Contains("Racine = new Pont.RacineDocumentDetache(App.Partage, rang);"),
+    "la fenetre detachee monte la vue React du document (RacineDocumentDetache)");
 // L'objectif (zoom) du document detache doit etre MODULABLE et INDIVIDUEL :
 // boutons +/- dans la vue detachee, applique au document, et etat garde DANS la
 // vue (jamais dans DocumentPartage, sinon les fenetres zoomeraient ensemble).
 // PORTE EN REACT (lot 6) : la coquille reste la racine de FenetreDocument ; la
 // vue est web/src/composants/DocumentDetacheVue.tsx, la piece vient de
 // Pont/DocumentDetacheVue.cs. L'objectif est un etat React de CETTE fenetre.
-var coquilleDetachee = File.Exists(vueDetachee) ? File.ReadAllText(vueDetachee) : string.Empty;
 var tsxDetachee = LireSource("web/src/composants/DocumentDetacheVue.tsx");
 var pontDetachee = LireSource("Pont/DocumentDetacheVue.cs");
-var texteDetachee = coquilleDetachee + Environment.NewLine + tsxDetachee + Environment.NewLine + pontDetachee;
-Exiger(coquilleDetachee.Contains("<IleReact Composant=\"DocumentDetacheVue\"")
-       && coquilleDetachee.Contains("Emplacement.Change += Rafraichir")
-       && coquilleDetachee.Contains("DocumentDetacheVue.Vue(Emplacement)"),
-    "la coquille de la fenetre detachee suit SON emplacement et re-rend la vue React");
+var texteDetachee = racineDetachee + Environment.NewLine + tsxDetachee + Environment.NewLine + pontDetachee;
+Exiger(racineDetachee.Contains("Emplacement.Change += Changer")
+       && racineDetachee.Contains("DocumentDetacheVue.Vue(Emplacement)"),
+    "la racine de la fenetre detachee suit SON emplacement et re-rend la vue React");
 Exiger(Regex.IsMatch(tsxDetachee, @"onClick=\{\(\) => setZoom\(zoomPlus\)\}")
        && Regex.IsMatch(tsxDetachee, @"onClick=\{\(\) => setZoom\(zoomMoins\)\}"),
     "la fenetre detachee porte les boutons d'objectif (zoom + et -)");
 Exiger(Regex.IsMatch(tsxDetachee, @"rig-apercu__pages""[^>]{0,120}?zoom"),
     "l'objectif s'applique aux pages du document detache");
-Exiger(Regex.IsMatch(coquilleDetachee, @"\[Parameter\] public int Rang")
-       && coquilleDetachee.Contains("Partage.Emplacement(Rang)"),
+Exiger(racineDetachee.Contains("public int Rang => rang;")
+       && racineDetachee.Contains("Emplacement = partage.Emplacement(rang);"),
     "la vue detachee sait QUEL document elle affiche (son rang)");
 Exiger(Regex.IsMatch(tsxDetachee, @"const \[zoom, setZoom\] = useState\(1\.0\)")
-       && !Regex.IsMatch(pontDetachee + coquilleDetachee, @"Zoom")
+       && !Regex.IsMatch(pontDetachee + racineDetachee, @"Zoom")
        && !Regex.IsMatch(File.ReadAllText(Path.Combine(racine, "Metier/DocumentPartage.cs")), @"Zoom"),
     "l'objectif est propre a CHAQUE fenetre detachee (etat local, pas partage)");
 Exiger(Regex.Matches(File.ReadAllText(Path.Combine(racine, "Metier/DocumentPartage.cs")),
@@ -438,7 +442,7 @@ foreach (var interdit in new[] { "Signalements de divergences BE", "Divers",
         $"l'arbre ne porte plus le dossier inexistant en v2 « {interdit} »");
 }
 
-Exiger(coquilleArbre.Contains("[Parameter] public string[] Domaines")
+Exiger(codePlan.Contains("private string[] Domaines => Accueil.Domaines;")
        && pontArbre.Contains("AccesGed.EnfantsVisibles(n, domaines, ajouts, masques, recette)")
        && codePlan.Contains("ArbreGedNoeud.Vue(Arbre, 0, NoeudsOuverts, NoeudSelectionne, Domaines,"),
     "l'arbre rendu recoit les domaines du login courant");
@@ -508,7 +512,7 @@ var arbreVue = tsxArbre;
 // bouton « trois points » a droite de la ligne (meme geste que la liste des
 // conversations d'Autowin OS). Le clic droit ne doit plus etre le seul acces.
 Exiger(arbreVue.Contains("rig-arbre__actions")
-       && !(arbreVue + coquilleArbre).Contains("oncontextmenu", StringComparison.OrdinalIgnoreCase)
+       && !(arbreVue + Regex.Match(balisage, @"<ArbreGedNoeud ligne=\{d\.arbre\}[\s\S]*?/>").Value).Contains("oncontextmenu", StringComparison.OrdinalIgnoreCase)
        && arbreVue.Contains("e.stopPropagation(); menuContextuel(")
        && vue.Contains("rig-ctx__item")
        && vue.Contains("SupprimerNoeud") && vue.Contains("DemarrerRenommage"),
@@ -530,12 +534,12 @@ Exiger(Regex.IsMatch(css, @"\.rig-ctx \{[^}]*position:\s*fixed"),
 // Chaque nature doit avoir SON dessin : sans cela les tuiles se
 // ressemblent toutes et le choix ne se fait plus a l'oeil.
 // PORTE EN REACT (lot 6) : les dessins vivent dans web/src/composants/IconeGed.tsx ;
-// IconeGed.razor est la coquille que Home.razor pose dans la fenetre de creation.
+// la fenetre de creation (web/src/plan/Modales.tsx) le pose directement depuis le
+// lot 2 ; sa coquille IconeGed.razor est retiree avec Blazor (19/11/2026).
 var icones = LireSource("web/src/composants/IconeGed.tsx");
-var coquilleIcone = LireSource("Components/IconeGed.razor");
 Exiger(balisage.Contains("<IconeGed nature={n.code} classe=\"rig-nature__icone\" />") && !vue.Contains("rig-nature__icone rig-arbre__icone")
-       && coquilleIcone.Contains("<IleReact Composant=\"IconeGed\"")
-       && coquilleIcone.Contains("[\"nature\"] = Nature") && coquilleIcone.Contains("[\"classe\"] = Classe"),
+       && Regex.IsMatch(icones, @"export function IconeGed\(\{ nature, classe\b")
+       && !File.Exists(Path.Combine(racine, "Components/IconeGed.razor")),
     "les tuiles de nature portent une vraie icone dessinee, pas une pastille");
 foreach (var n in RigV3Desktop.AccesGed.Natures)
 {
@@ -634,7 +638,8 @@ Exiger(vueTache.Contains("Afficher tout le dossier"),
     "la vue porte le bouton « Afficher tout le dossier »");
 Exiger(vueTache.Contains("BranchesMasquees") && vueTache.Contains("PiecesMasquees"),
     "le bouton annonce COMBIEN il revele (branches et pieces masquees)");
-Exiger(tsxFiche.Contains("Afficher tous les champs") && coquilleFiche.Contains("[\"toutAffiche\"] = IleReact.Rappel(ToutAffiche)")
+Exiger(tsxFiche.Contains("Afficher tous les champs") && balisage.Contains("toutAffiche={() => plan('toutAffiche')}")
+       && codePlan.Contains("case \"toutAffiche\": CompterToutAffiche(); break;")
        && pontFiche.Contains("if (TousChamps) Rappels.Add(\"toutAffiche\")"),
     "la fiche porte le meme bouton et COMPTE les clics");
 
@@ -850,16 +855,18 @@ Exiger(ficheLignes.Contains("Recette.LibelleLigne"),
 // Pont/EcranTachesLot.cs et le balisage dans web/src/ecrans/EcranTachesLot.tsx.
 // Les regles lues ci-dessous se lisent donc dans ces deux fichiers, et la
 // session est EXECUTEE plus bas sur un etat jetable.
-var ecranLot = Path.Combine(racine, "Components/Ecrans/EcranTachesLot.razor");
-Exiger(File.Exists(ecranLot), "l'ecran de traitement en lot existe");
-var coquilleLot = File.Exists(ecranLot) ? File.ReadAllText(ecranLot) : string.Empty;
+// Blazor retire (19/11/2026) : plus de coquille, le plan de travail ouvre et
+// ferme la session du lot (Pont/PlanTravailVue.cs, depuis le lot 2).
+Exiger(File.Exists(Path.Combine(racine, "web/src/ecrans/EcranTachesLot.tsx"))
+       && !File.Exists(Path.Combine(racine, "Components/Ecrans/EcranTachesLot.razor")),
+    "l'ecran de traitement en lot existe (en React)");
 var lot = File.ReadAllText(Path.Combine(racine, "Pont/EcranTachesLot.cs")) + Environment.NewLine
         + File.ReadAllText(Path.Combine(racine, "web/src/ecrans/EcranTachesLot.tsx"));
-Exiger(coquilleLot.Contains("<IleReact Composant=\"EcranTachesLot\"")
-       && coquilleLot.Contains("[Parameter, EditorRequired] public AccueilEtat Etat")
-       && coquilleLot.Contains("EcranTachesLot.Ouvrir(Etat, Utilisateur, CodeRecette)")
-       && coquilleLot.Contains("EcranTachesLot.Fermer(Session)"),
-    "la coquille du lot garde ses parametres, ouvre la session sur l'etat VIVANT de l'accueil et la ferme");
+Exiger(balisage.Contains("<EcranTachesLot key={ecran.lot.session} session={ecran.lot.session} version={ecran.lot.version} />")
+       && codePlan.Contains("SessionLot = EcranTachesLot.Ouvrir(Etat, Utilisateur, LotDemande);")
+       && codePlan.Contains("EcranTachesLot.Parametrer(SessionLot, Etat, Utilisateur, LotDemande)")
+       && codePlan.Contains("EcranTachesLot.Fermer(SessionLot);"),
+    "le plan de travail monte le lot, ouvre sa session sur l'etat VIVANT de l'accueil et la ferme");
 Exiger(vueTache.Contains("case 'PROC_TACHES_LOT':") && vueTache.Contains("<EcranTachesLot"),
     "l'ecran en lot est aiguille dans la vue");
 Exiger(Regex.IsMatch(vueTache, @"new\(""PROC_TACHES_LOT"",\s*"""),

@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EcranFactures } from './EcranFactures'
-import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
-afterEach(() => { cleanup(); retirerFauxDotNet() })
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 // Les montants attendus sont ceux de la capture de l'ecran Blazor (18/11/2026) :
 // Total TTC 458,63 EUR, reste a encaisser 258,63 EUR pour 200 encaisses.
 function ouvrir() {
-  installerFauxDotNet({ 'EcranFactures.DateDuJour': () => '2026-09-09' })
+  installerFauxPont({ 'EcranFactures.DateDuJour': () => '2026-09-09' })
   return render(<EcranFactures />)
 }
 

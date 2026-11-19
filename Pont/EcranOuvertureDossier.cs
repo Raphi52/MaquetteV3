@@ -1,5 +1,3 @@
-using Microsoft.JSInterop;
-
 namespace RigV3Desktop.Pont;
 
 /// <summary>Un dossier deja ouvert, date et capital mis en forme comme Blazor les affichait.</summary>

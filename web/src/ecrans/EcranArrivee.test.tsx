@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { EcranArrivee, type LigneArrivee, type VueArrivee } from './EcranArrivee'
-import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
-afterEach(() => { cleanup(); retirerFauxDotNet() })
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 // Le filtre vit dans Pont/EcranArrivee.cs (execute par tests/SaisieCheck et
 // SimuEdiCheck). Ici : une arrivee mene a SA demande, une arrivee sans demande
@@ -20,7 +20,7 @@ const vue = (): VueArrivee => ({
 
 describe('EcranArrivee', () => {
   it('une arrivee rattachee ouvre sa demande, une arrivee sans demande reste inerte', async () => {
-    installerFauxDotNet({ 'EcranArrivee.Trouver': vue })
+    installerFauxPont({ 'EcranArrivee.Trouver': vue })
     const ouvrirDossier = vi.fn()
     const { container } = render(<EcranArrivee ouvrirDossier={ouvrirDossier} />)
 
@@ -36,10 +36,10 @@ describe('EcranArrivee', () => {
   })
 
   it('les modes viennent du pont, et le mode choisi lui est renvoye', async () => {
-    const dotnet = installerFauxDotNet({ 'EcranArrivee.Trouver': vue })
+    const pont = installerFauxPont({ 'EcranArrivee.Trouver': vue })
     render(<EcranArrivee ouvrirDossier={vi.fn()} />)
     await screen.findByText('A1')
     fireEvent.change(screen.getByLabelText(/Mode d/), { target: { value: 'EDI' } })
-    await waitFor(() => expect((dotnet.invokeMethodAsync.mock.lastCall![2] as { critMode: string }).critMode).toBe('EDI'))
+    await waitFor(() => expect((pont.appels.mock.lastCall![1] as { critMode: string }).critMode).toBe('EDI'))
   })
 })

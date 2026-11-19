@@ -120,9 +120,13 @@ foreach (var (nom, texte) in feuilles)
 {
     var fenetreXaml = File.ReadAllText(Path.Combine(racine, "MainWindow.xaml"));
     var interop = File.ReadAllText(Path.Combine(racine, "FenetreInterop.cs"));
-    var main = File.ReadAllText(Path.Combine(racine, "Main.razor"));
+    // Les bandes de bord de Main.razor sont en React depuis le retrait de Blazor
+    // (19/11/2026) : web/src/fenetre/Bords.tsx les dessine, la racine C# de la
+    // fenetre principale (Pont/Racines.cs) les pose et mene le geste.
+    var bordsTsx = File.ReadAllText(Path.Combine(racine, "web", "src", "fenetre", "Bords.tsx"));
+    var racines = File.ReadAllText(Path.Combine(racine, "Pont", "Racines.cs"));
 
-    var vue = Regex.Match(fenetreXaml, @"<blazor:BlazorWebView\b[^>]*>");
+    var vue = Regex.Match(fenetreXaml, @"<wv2:WebView2\b[^>]*>");
     Exiger(vue.Success && !Regex.IsMatch(vue.Value, @"\bMargin="),
         "MainWindow.xaml : le WebView n'a pas de marge (aucun cadre autour de la page)");
 
@@ -140,11 +144,16 @@ foreach (var (nom, texte) in feuilles)
     Exiger(!Regex.IsMatch(interop, @"Color\.FromRgb\(|""#[0-9A-Fa-f]{6}"""),
         "FenetreInterop ne peint aucune teinte en dur");
 
-    var bords = new[] { "Haut", "Bas", "Gauche", "Droite", "HautGauche", "HautDroite", "BasGauche", "BasDroite" };
-    Exiger(bords.All(b => main.Contains("BordFenetre." + b + ",")),
-        "Main.razor pose une bande de redimensionnement sur les 8 bords et coins");
-    Exiger(main.Contains("Fenetre.Redimensionner(bord)"),
-        "les bandes de bord rendent le redimensionnement a Windows (Redimensionner)");
+    // Chaque bande porte le NOM de BordFenetre (FenetreInterop.cs) et sa classe :
+    // un nom qui ne serait plus celui de l'enum ferait echouer Enum.Parse cote C#.
+    var bords = new[] { ("Haut", "h"), ("Bas", "b"), ("Gauche", "g"), ("Droite", "d"),
+                        ("HautGauche", "hg"), ("HautDroite", "hd"), ("BasGauche", "bg"), ("BasDroite", "bd") };
+    Exiger(bords.All(b => bordsTsx.Contains($"['{b.Item1}', '{b.Item2}']")
+                          && Regex.IsMatch(interop, @"\b" + b.Item1 + @"\s*=\s*1\d\b")),
+        "la page pose une bande de redimensionnement sur les 8 bords et coins (Bords.tsx, noms de BordFenetre)");
+    Exiger(bordsTsx.Contains("onMouseDown={() => { void redimensionner(bord) }}")
+           && racines.Contains("fenetre!.Redimensionner(Enum.Parse<BordFenetre>(valeur.GetString() ?? string.Empty));"),
+        "les bandes de bord rendent le redimensionnement a Windows (rappel « bord » -> Redimensionner)");
     Exiger(new[] { "h", "b", "g", "d", "hg", "hd", "bg", "bd" }
             .All(c => Regex.IsMatch(charte, @"\.rig-bord--" + c + @"\s*\{[^{}]*cursor:\s*[a-z]+-resize")),
         "rig-charte.css donne un curseur de redimensionnement a chaque bande");

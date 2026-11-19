@@ -40,10 +40,11 @@ void Exiger(bool ok, string quoi)
     if (!ok) echecs.Add(quoi);
 }
 
-Exiger(File.Exists(coquille), "l'ecran EcranRequisitions.razor existe");
+// Blazor retire (19/11/2026) : la coquille .razor n'existe plus, l'ecran est le .tsx.
+Exiger(!File.Exists(coquille), "plus de coquille EcranRequisitions.razor : l'ecran est React");
 Exiger(File.Exists(cheminTsx), "l'ecran React EcranRequisitions.tsx existe");
 Exiger(File.Exists(cheminPont), "le pont Pont/EcranRequisitions.cs existe");
-if (!File.Exists(coquille) || !File.Exists(cheminTsx) || !File.Exists(cheminPont))
+if (!File.Exists(cheminTsx) || !File.Exists(cheminPont))
 {
     Console.WriteLine(echecs.Count + " echec(s).");
     return 1;
@@ -65,8 +66,10 @@ Exiger(menuAccueil.Contains("\"PROC_REQUI\")") || Regex.IsMatch(menuAccueil, @"n
     "le menu propose bien l'entree Requisitions (PROC_REQUI)");
 Exiger(maison.Contains("Moments = Pont.MenuAccueil.Moments;"),
     "le plan de travail aiguille sur ce meme catalogue");
-Exiger(Regex.IsMatch(File.ReadAllText(coquille), @"<IleReact\s+Composant=""EcranRequisitions""\s*/>"),
-    "la coquille monte l'ecran React (<IleReact Composant=\"EcranRequisitions\" />)");
+// Blazor retire (19/11/2026) : plus de coquille, l'ecran React se monte seul,
+// sans parametre, comme sa coquille le faisait.
+Exiger(!File.Exists(coquille) && Regex.IsMatch(tsx, @"export function EcranRequisitions\(\)"),
+    "l'ecran React se monte sans parametre, sans coquille .razor (export function EcranRequisitions())");
 Exiger(tsx.Contains("'EcranRequisitions.Ouvrir'") && tsx.Contains("'EcranRequisitions.Agir'")
        && tsx.Contains("'EcranRequisitions.Fermer'")
        && texte.Contains("[JSInvokable(\"EcranRequisitions.Ouvrir\")]")

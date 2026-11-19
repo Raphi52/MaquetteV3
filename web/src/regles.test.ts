@@ -15,10 +15,10 @@ describe('regles de web/src', () => {
     expect(Object.keys(sources).length).toBeGreaterThanOrEqual(6)
   })
 
-  it('pont.ts est le SEUL fichier qui parle au C# (DotNet / invokeMethodAsync)', () => {
+  it('pont.ts est le SEUL fichier qui parle au C# (chrome.webview ; ni DotNet ni invokeMethodAsync, retires avec Blazor)', () => {
     const fautifs = Object.entries(sources)
       .filter(([chemin]) => chemin !== './pont.ts')
-      .filter(([, texte]) => /\bDotNet\b|invokeMethodAsync/.test(texte))
+      .filter(([, texte]) => /\bchrome\??\.webview\b|\bpostMessage\b|\bDotNet\b|invokeMethodAsync/.test(texte))
       .map(([chemin]) => chemin)
     expect(fautifs).toEqual([])
   })

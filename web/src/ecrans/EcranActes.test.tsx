@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { EcranActes, type LigneActe, type VueActes } from './EcranActes'
-import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 import { morceaux } from '../test/morceaux'
 
-afterEach(() => { cleanup(); retirerFauxDotNet() })
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 // Le filtre (non numerisables masques tant que la case n'est pas cochee) vit
 // dans Pont/EcranActes.cs, execute par tests/SaisieCheck. Ici : la case part au
@@ -24,7 +24,7 @@ const vue = (c: unknown): VueActes => ({
 
 describe('EcranActes', () => {
   it('la case « Lister actes non numerisables » redemande au pont', async () => {
-    const dotnet = installerFauxDotNet({ 'EcranActes.Trouver': vue })
+    const pont = installerFauxPont({ 'EcranActes.Trouver': vue })
     const { container } = render(<EcranActes ouvrirDossier={vi.fn()} />)
     await screen.findByText('D1')
     expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
@@ -33,14 +33,14 @@ describe('EcranActes', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Lister actes non numerisables' }))
     await screen.findByText('D2')
-    expect((dotnet.invokeMethodAsync.mock.lastCall![2] as { critNonNumerisables: boolean }).critNonNumerisables).toBe(true)
+    expect((pont.appels.mock.lastCall![1] as { critNonNumerisables: boolean }).critNonNumerisables).toBe(true)
     const inerte = container.querySelectorAll('tbody tr')[1]!
     expect(inerte.className).toBe('rig-table__ligne--alerte rig-table__ligne--inerte')
     expect(inerte.getAttribute('title')).toBe('Acte non numerisable : Illisible')
   })
 
   it('un acte numerise ouvre son dossier, un acte non numerisable n\'ouvre rien', async () => {
-    installerFauxDotNet({ 'EcranActes.Trouver': vue })
+    installerFauxPont({ 'EcranActes.Trouver': vue })
     const ouvrirDossier = vi.fn()
     render(<EcranActes ouvrirDossier={ouvrirDossier} />)
     fireEvent.click(await screen.findByText('D1'))

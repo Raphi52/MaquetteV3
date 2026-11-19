@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { EcranCommandesWeb, type PanneauCw, type VueCommandesWeb } from './EcranCommandesWeb'
-import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
-afterEach(() => { cleanup(); retirerFauxDotNet() })
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 // Les regles (tuiles, filtre, groupes, rapprochement, delivrance, transitions)
 // sont dans Metier/TraitementCommandes.cs, jouees par Pont/EcranCommandesWeb.cs
@@ -62,7 +62,7 @@ function panneau(): PanneauCw {
 function session(depart: VueCommandesWeb, reagir: (vue: VueCommandesWeb, geste: string, valeur: unknown) => VueCommandesWeb = (v) => v) {
   const gestes: Array<[string, unknown]> = []
   let vue = depart
-  const dotnet = installerFauxDotNet({
+  const pont = installerFauxPont({
     'EcranCommandesWeb.Ouvrir': () => vue,
     'EcranCommandesWeb.Agir': (_s, geste, valeur) => {
       gestes.push([geste as string, valeur])
@@ -71,7 +71,7 @@ function session(depart: VueCommandesWeb, reagir: (vue: VueCommandesWeb, geste: 
     },
     'EcranCommandesWeb.Fermer': () => undefined,
   })
-  return { gestes, dotnet }
+  return { gestes, pont }
 }
 
 describe('EcranCommandesWeb', () => {
@@ -320,11 +320,11 @@ describe('EcranCommandesWeb', () => {
   })
 
   it('appelle SON pont, et lui seul, et ferme la session au demontage', async () => {
-    const { dotnet } = session(vueDeBase())
+    const { pont } = session(vueDeBase())
     const { unmount } = render(<EcranCommandesWeb />)
     await screen.findByText('TRANSNORD SA')
     unmount()
-    expect(dotnet.invokeMethodAsync.mock.calls.map((c) => c[1])).toEqual(['EcranCommandesWeb.Ouvrir', 'EcranCommandesWeb.Fermer'])
+    expect(pont.appels.mock.calls.map((c) => c[0])).toEqual(['EcranCommandesWeb.Ouvrir', 'EcranCommandesWeb.Fermer'])
   })
 
   it('enveloppe : un blanc avant et apres les membres, comme le .razor (« avec » texte, puis @foreach, puis « · »)', async () => {

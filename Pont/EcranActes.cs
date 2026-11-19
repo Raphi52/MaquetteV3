@@ -1,5 +1,3 @@
-using Microsoft.JSInterop;
-
 namespace RigV3Desktop.Pont;
 
 /// <summary>Une categorie de depot (dbo.CATEGORIE_DEPOT) : code envoye, libelle lu.</summary>
