@@ -64,7 +64,7 @@ describe('Application : la racine de la page', () => {
 
 describe('Application : les gestes du plan de travail', () => {
   it('chaque geste part numerote, avec sa valeur (null si absente)', () => {
-    const onglets = [{ code: 'PROC_CREANCE', libelle: 'Creances', actif: true, detache: false, glisse: false }]
+    const onglets = [{ code: 'PROC_CREANCE', libelle: 'Creances', actif: true, detache: false, glisse: false, verbe: null }]
     const { container, gestes } = rendre(vueApplication({ barre: true, onglets, proc: proc() }))
     fireEvent.keyDown(document, { key: 'Escape' })
     fireEvent.click(container.querySelector('.rig-vonglet__fermer')!)

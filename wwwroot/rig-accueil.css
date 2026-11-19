@@ -2872,10 +2872,12 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   color: var(--rig-texte);
   margin-bottom: -1px; height: 29px;
   /* Les conges debordent de 8 px de chaque cote : l'onglet ouvert ne coupe
-     donc plus ce qui depasse, et garde la place de sa pastille et de sa
-     croix ; z-index pour passer au-dessus de ses voisins. */
-  overflow: visible; min-width: 72px; z-index: 1;
+     donc plus ce qui depasse ; z-index pour passer au-dessus de ses voisins. */
+  overflow: visible; z-index: 1;
 }
+/* Un onglet de vue ouvert garde la place de sa pastille et de sa croix. Pas
+   la maison (40 px, une icone seule), qui est aussi un .rig-vonglet--actif. */
+.rig-vonglets > .rig-vonglet--actif { min-width: 72px; }
 /* Un conge = un carre de 9 px a cote du pied de l'onglet, rempli du fond de
    la page HORS d'un quart de cercle centre sur son coin haut exterieur. Le
    carre recouvre la colonne du bord de l'onglet : la bordure verticale
