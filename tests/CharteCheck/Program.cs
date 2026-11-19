@@ -310,6 +310,14 @@ foreach (var (nom, texte) in feuilles)
             var (x, y) = (Luminance(a), Luminance(b));
             return (Math.Max(x, y) + .05) / (Math.Min(x, y) + .05);
         }
+        // Clarte percue L* (CIELAB, 0 = noir, 100 = blanc) : des pas egaux a
+        // l'oeil, dans les noirs comme dans les blancs. Pour comparer deux
+        // SURFACES ; Contraste reste la mesure des textes.
+        double Clarte(string hexa)
+        {
+            var y = Luminance(hexa);
+            return y > 216.0 / 24389 ? 116 * Math.Cbrt(y) - 16 : y * 24389.0 / 27;
+        }
 
         var valeurRail = Valeur("--rig-rail") ?? "";
         var arrets = Regex.Matches(valeurRail, @"#[0-9A-Fa-f]{6}").Select(m => m.Value).ToList();
@@ -386,25 +394,48 @@ foreach (var (nom, texte) in feuilles)
             // Sur une page SOMBRE, l'ombre ne se voit pas : le panneau doit se
             // detacher par sa COULEUR, sur toute sa hauteur. Defaut a l'origine
             // (19/11/2026, conv-2012) : le degrade du sombre allait de #2A2A2A a
-            // #111111 et croisait la page #1E1E1E — mesure sur capture, #1C1C1C a
+            // #111111 et CROISAIT la page #1E1E1E — mesure sur capture, #1C1C1C a
             // mi-hauteur contre #1A1A1A autour : le panneau disparaissait.
-            // 1,2:1 au moins, au-dessus des cartes de la page (1,13:1).
+            // Donc : tous les arrets du MEME cote de la page (tous plus clairs ou
+            // tous plus fonces), et un ecart de CLARTE PERCUE (L* CIELAB) d'au
+            // moins 5 sur le pire arret, plus que les cartes (#282828 sur #1E1E1E :
+            // 4,9). Pas le rapport de contraste du texte (WCAG) : sa marge de 0,05
+            // ecrase les noirs — meme le noir pur n'y fait que 1,26:1 sur #1E1E1E —
+            // et il interdisait tout panneau plus fonce que la page.
             var page = FondDuTheme(code);
+            bool SeDetache(string fond, out string mesure)
+            {
+                var clartePage = Clarte(fond);
+                var ecarts = arretsTheme.Select(a => Clarte(a) - clartePage).ToList();
+                var pire = ecarts.Min(e => Math.Abs(e));
+                var unSeulCote = ecarts.All(e => e > 0) || ecarts.All(e => e < 0);
+                mesure = unSeulCote ? $"ecart de clarte {pire:0.0} au pire, 5 exige" : "le degrade CROISE la page";
+                return unSeulCote && pire >= 5;
+            }
             if (page is not null && Luminance(page) < 0.2 && arretsTheme.Count > 0)
             {
-                var ecart = arretsTheme.Min(a => Contraste(a, page));
-                Exiger(ecart >= 1.2,
-                    $"« {code} » : sur la page sombre {page}, chaque arret du panneau se distingue de la page ({ecart:0.00}:1 au pire, 1,2 exige)");
+                Exiger(SeDetache(page, out var mesure),
+                    $"« {code} » : sur la page sombre {page}, le panneau reste d'un seul cote de la page et s'en distingue sur toute sa hauteur ({mesure})");
+            }
+            // Le sombre a un panneau NOIR, de la famille du bandeau d'en-tete
+            // (#080808), donc plus FONCE que la page sur toute sa hauteur. Demande
+            // du 19/11/2026 (conv-2012) : le panneau acier #3A3C42 -> #2E2F34, plus
+            // clair que les cartes, etait « trop clair ».
+            if (code == "sombre" && page is not null && arretsTheme.Count > 0)
+            {
+                var plusClair = arretsTheme.MaxBy(Clarte)!;
+                Exiger(Clarte(plusClair) < Clarte(page),
+                    $"« sombre » : le panneau est plus fonce que la page {page} sur toute sa hauteur (arret le plus clair : {plusClair})");
             }
             // Sur TOUTE page, le bord du panneau doit etre net : soit sa couleur
-            // tranche sur la page (1,2:1 sur chaque arret), soit un FILET INTERIEUR
+            // se detache de la page (regle ci-dessus), soit un FILET INTERIEUR
             // (inset 0 0 0 1px, opacite >= .10) le dessine. Defaut a l'origine
             // (19/11/2026, conv-2012) : le panneau blanc du violet finissait en
             // #F5F3FE contre #EBEBF3 autour (1,08:1 mesure sur capture), et son
             // ombre portee vers le bas ne tracait rien a gauche.
             if (page is not null && arretsTheme.Count > 0)
             {
-                var tranche = arretsTheme.Min(a => Contraste(a, page)) >= 1.2;
+                var tranche = SeDetache(page, out _);
                 var filet = Regex.Match(ombreTheme ?? "", @"inset\s+0\s+0\s+0\s+1px\s+rgba\(\s*\d+,\s*\d+,\s*\d+,\s*(0?\.\d+)\s*\)");
                 var filetNet = filet.Success && double.Parse(filet.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) >= 0.10;
                 Exiger(tranche || filetNet,
