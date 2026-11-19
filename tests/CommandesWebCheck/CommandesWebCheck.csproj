@@ -1,8 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- net10.0-windows + reference au projet (19/11/2026, lot 2 du portage React) :
+       la section 5 du banc JOUE les gestes de l'ecran par son pont
+       (Pont/EcranCommandesWeb.cs), qui vit dans l'application WPF. Les regles de
+       Metier/ viennent donc du projet, et non plus de fichiers lies ici : une
+       seule copie de TraitementCommandes, celle que l'ecran appelle. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>CommandesWebCheck</RootNamespace>
@@ -11,12 +17,7 @@
 
   <ItemGroup>
     <Compile Include="Program.cs" />
-    <Compile Include="../../Metier/TraitementCommandes.cs" Link="TraitementCommandes.cs" />
-    <Compile Include="../../Metier/PerimetreProfil.cs" Link="PerimetreProfil.cs" />
-    <Compile Include="../../Metier/JeuDemo.cs" Link="JeuDemo.cs" />
-    <Compile Include="../../Metier/SimulationEdi.cs" Link="SimulationEdi.cs" />
-    <Compile Include="../../Metier/AlertesGreffe.cs" Link="AlertesGreffe.cs" />
-    <Compile Include="../../Metier/RecetteTache.cs" Link="RecetteTache.cs" />
+    <ProjectReference Include="../../RigV3Desktop.csproj" />
   </ItemGroup>
 
 </Project>

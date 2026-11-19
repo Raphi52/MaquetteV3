@@ -1,5 +1,8 @@
+using System.IO;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using RigV3Desktop;
+using RigV3Desktop.Pont;
 
 // Banc de l'ecran « Traitement des commandes » (PROC_COMMANDES_WEB), porte de
 // NeoRIG (D:\RIG-V3) dans la maquette le 18/11/2026.
@@ -11,7 +14,11 @@ using RigV3Desktop;
 //   2. l'ecran est ATTEIGNABLE (aiguillage, menu, sujet, catalogue, perimetre) ;
 //   3. il SUIT LES THEMES : aucune couleur en dur dans ses styles, et chaque
 //      classe qu'il pose a sa regle ;
-//   4. ses libelles sont ceux de NeoRIG (si D:\RIG-V3 est lisible d'ici).
+//   4. ses libelles sont ceux de NeoRIG (si D:\RIG-V3 est lisible d'ici) ;
+//   5. depuis le portage React (19/11/2026), ses GESTES joues par le pont
+//      (Pont/EcranCommandesWeb.cs, comme React les envoie) rendent ce que
+//      TraitementCommandes calcule sur un jeu temoin : le pont delegue, il ne
+//      recopie pas.
 
 var echecs = new List<string>();
 void Exiger(bool ok, string quoi)
@@ -238,26 +245,51 @@ Exiger(PerimetreProfil.Reserve(TraitementCommandes.CodeEcran).OrderBy(x => x).Se
 
 // ============================================================ 2. ATTEIGNABLE
 
+// PORTAGE EN REACT (lot 2, 19/11/2026). L'ecran tenait en UN fichier .razor
+// (balisage + @code). Il est maintenant en trois : la coquille .razor qui monte
+// l'ile React, web/src/ecrans/EcranCommandesWeb.tsx (le BALISAGE) et
+// Pont/EcranCommandesWeb.cs (l'ETAT et les appels aux regles, l'ancien @code
+// deplace tel quel dans SessionCommandesWeb). « ecran » designe donc desormais
+// le .tsx ET le pont : ce que le .razor contenait a lui seul. Une regle de mise
+// en page se lit dans le .tsx, un appel de regle dans le pont. La section 5 est
+// neuve : elle JOUE les gestes par le pont et compare a TraitementCommandes.
 var home = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
 var ecranChemin = Path.Combine(racine, "Components/Ecrans/EcranCommandesWeb.razor");
+var tsxChemin = Path.Combine(racine, "web/src/ecrans/EcranCommandesWeb.tsx");
+var pontChemin = Path.Combine(racine, "Pont/EcranCommandesWeb.cs");
 Exiger(File.Exists(ecranChemin), "l'ecran EcranCommandesWeb.razor existe");
-var ecran = File.Exists(ecranChemin) ? File.ReadAllText(ecranChemin) : string.Empty;
+Exiger(File.Exists(tsxChemin) && File.Exists(pontChemin), "l'ecran React EcranCommandesWeb.tsx et son pont Pont/EcranCommandesWeb.cs existent");
+var coquille = File.Exists(ecranChemin) ? File.ReadAllText(ecranChemin) : string.Empty;
+var tsx = File.Exists(tsxChemin) ? File.ReadAllText(tsxChemin) : string.Empty;
+var pont = File.Exists(pontChemin) ? File.ReadAllText(pontChemin) : string.Empty;
+var ecran = tsx + "\n" + pont;
+// Le CODE du .tsx, sans ses commentaires (son en-tete cite Metier/TraitementCommandes.cs).
+var codeTsx = Regex.Replace(tsx, @"/\*[\s\S]*?\*/|//[^\n]*", "");
+Exiger(Regex.IsMatch(coquille, @"<IleReact\s+Composant=""EcranCommandesWeb""\s*/>"),
+    "la coquille monte l'ecran React (<IleReact Composant=\"EcranCommandesWeb\" />)");
 Exiger(Regex.IsMatch(home, @"case\s+""PROC_COMMANDES_WEB""\s*:(?:\s*@\*[\s\S]*?\*@)?\s*<EcranCommandesWeb\s*/>"),
     "Home.razor aiguille PROC_COMMANDES_WEB vers <EcranCommandesWeb />");
 Exiger(Regex.IsMatch(home, @"new\(""Commandes web"",\s*""[^""]+"",\s*""PROC_COMMANDES_WEB""\)"), "le menu « Recevoir » porte l'entree « Commandes web »");
 Exiger(Regex.IsMatch(home, @"new\(""PROC_COMMANDES_WEB"",\s*""Commandes web""\)"), "le catalogue connait l'ecran");
 Exiger(Regex.IsMatch(home, @"new\(""SUJ_AFFAIRES""[^\]]*""PROC_REQUI"",\s*""PROC_COMMANDES_WEB"""),
     "le sujet « Affaires » le range a cote des requisitions");
-Exiger(ecran.Contains("TraitementCommandes.JeuDemoCommandes()") && ecran.Contains("TraitementCommandes.Appliquer(")
-        && ecran.Contains("TraitementCommandes.ControlerNonOpposition("),
+Exiger(pont.Contains("TraitementCommandes.JeuDemoCommandes()") && pont.Contains("TraitementCommandes.Appliquer(")
+        && pont.Contains("TraitementCommandes.ControlerNonOpposition(")
+        && !codeTsx.Contains("TraitementCommandes") && !Regex.IsMatch(codeTsx, @"\bMath\.|new Date\(|\.sort\("),
     "l'ecran joue les regles de Metier/TraitementCommandes.cs, il n'en a pas de copie");
+Exiger(tsx.Contains("'EcranCommandesWeb.Ouvrir'") && tsx.Contains("'EcranCommandesWeb.Agir'") && tsx.Contains("'EcranCommandesWeb.Fermer'")
+        && pont.Contains("[JSInvokable(\"EcranCommandesWeb.Ouvrir\")]") && pont.Contains("[JSInvokable(\"EcranCommandesWeb.Agir\")]")
+        && pont.Contains("[JSInvokable(\"EcranCommandesWeb.Fermer\")]"),
+    "l'ecran React appelle les trois methodes de SON pont, et le pont les expose");
 // La mise en page choisie au /draft du 18/11/2026 (« Boite de tri ») : onglets
 // d'etat, pastille de recherche, liste et panneau dans la meme case, decisions
-// dans l'ordre de la maquette.
-Exiger(ecran.Contains("rig-tcw__barre") && ecran.Contains("TraitementCommandes.Onglets(") && ecran.Contains("rig-tcw__chercher")
-        && Regex.IsMatch(ecran, @"rig-tcw__scene[\s\S]*rig-tcw__liste[\s\S]*rig-tcw__panneau"),
+// dans l'ordre de la maquette. En React, le panneau est le composant <Panneau>,
+// pose dans la scene APRES la liste ; c'est lui qui porte rig-tcw__panneau.
+Exiger(tsx.Contains("rig-tcw__barre") && pont.Contains("TraitementCommandes.Onglets(") && tsx.Contains("rig-tcw__chercher")
+        && Regex.IsMatch(tsx, @"rig-tcw__scene[\s\S]*rig-tcw__liste[\s\S]*<Panneau\b")
+        && Regex.IsMatch(tsx, @"function\s+Panneau\b[\s\S]*?className=""rig-tcw__panneau"""),
     "mise en page « Boite de tri » : onglets d'etat, pastille Rechercher, panneau par-dessus la liste");
-var decisions = new[] { ">Rejeter…<", ">Mettre en attente…<", ">Valider<" }.Select(l => ecran.IndexOf(l, StringComparison.Ordinal)).ToList();
+var decisions = new[] { ">Rejeter…<", ">Mettre en attente…<", ">Valider<" }.Select(l => tsx.IndexOf(l, StringComparison.Ordinal)).ToList();
 Exiger(decisions.All(i => i > 0) && decisions.SequenceEqual(decisions.Order()),
     "decisions dans l'ordre de la maquette : Rejeter…, Mettre en attente…, Valider");
 
@@ -326,6 +358,121 @@ else
 {
     Note("D:\\RIG-V3 n'est pas lisible depuis ce poste : la fidelite des libelles a NeoRIG n'est pas jouee.");
 }
+
+// ============================================================ 5. GESTES JOUES PAR LE PONT
+// EcranCommandesWeb.Agir(session, geste, valeur) est l'appel que fait React a
+// chaque clic ou frappe. Chaque vue rendue est comparee a ce que
+// TraitementCommandes calcule lui-meme sur un jeu TEMOIN, traite en parallele.
+
+var temoin = TraitementCommandes.JeuDemoCommandes();
+var defaut = TraitementCommandes.CriteresParDefaut();
+List<CommandeRecue> OrdreTemoin(CriteresCommandes cr, bool directs) =>
+    TraitementCommandes.Regrouper(TraitementCommandes.Filtrer(temoin, cr), directs).SelectMany(g => g.Commandes).ToList();
+List<int> Ids(CriteresCommandes cr, bool directs) => OrdreTemoin(cr, directs).Select(c => c.Id).ToList();
+string OngletsTemoin(EtatCommande actif) => string.Join(", ", TraitementCommandes.Onglets(temoin, defaut)
+    .Select(o => $"{TraitementCommandes.Libelle(o.Etat)} {o.Nombre}{(o.Etat == actif ? "*" : "")}"));
+
+var vue = EcranCommandesWeb.Ouvrir();
+VueCommandesWeb Geste(string geste, object? valeur = null) =>
+    vue = EcranCommandesWeb.Agir(vue.Session, geste, JsonSerializer.SerializeToElement(valeur));
+string OngletsLus() => string.Join(", ", vue.Onglets.Select(o => $"{o.Libelle} {o.Nombre}{(o.Actif ? "*" : "")}"));
+IEnumerable<int> IdsLus() => vue.Lignes.Select(l => l.Id);
+string? OngletActif() => vue.Onglets.SingleOrDefault(o => o.Actif)?.Etat;
+
+Exiger(vue.Compteur == "8 commande(s) · 3 groupe(s)" && OngletsLus() == OngletsTemoin(EtatCommande.ATraiter),
+    $"joue : a l'ouverture, 8 commandes en 3 groupes, onglet « À traiter » (lu : {vue.Compteur} | {OngletsLus()})");
+Exiger(IdsLus().SequenceEqual(Ids(defaut, false))
+       && vue.Lignes.All(l => l.Precisions == TraitementCommandes.Precisions(temoin.Single(c => c.Id == l.Id))
+                           && l.Direct == TraitementCommandes.EstRapprochementDirect(temoin.Single(c => c.Id == l.Id))),
+    "joue : la liste suit l'ordre de Regrouper, ses precisions et pastilles sont celles de TraitementCommandes");
+
+Geste("ChoisirOnglet", "Rejetee");
+Exiger(OngletActif() == "Rejetee" && IdsLus().SequenceEqual(new[] { 11 }), "joue : l'onglet « Rejetée » ne montre que IG-90601");
+Geste("ChoisirOnglet", "ATraiter");
+
+Geste("Basculer", "RechercheOuverte");
+Geste("Texte", new { champ = "SirenCherche", valeur = "512 004" });
+Geste("Rechercher");
+var critSiren = defaut with { Siren = "512 004" };
+Exiger(vue.RechercheOuverte && vue.RechercheAffinee && vue.ResumeCriteres == TraitementCommandes.Resumer(critSiren)
+       && IdsLus().SequenceEqual(Ids(critSiren, false)) && vue.Lignes.Length > 0,
+    $"joue : la saisie d'un SIREN puis « Rechercher » filtre comme Filtrer (lu : {vue.Lignes.Length} ligne(s), « {vue.ResumeCriteres} »)");
+Geste("Texte", new { champ = "SirenCherche", valeur = "" });
+Geste("Rechercher");
+Exiger(!vue.RechercheAffinee && IdsLus().SequenceEqual(Ids(defaut, false)), "joue : SIREN efface, la liste revient entiere");
+
+var c1t = temoin.Single(c => c.Id == 1);
+Geste("Choisir", 1);
+Exiger(vue.Panneau is { } p1 && p1.Titre == TraitementCommandes.Titre(c1t) && p1.Reference == TraitementCommandes.LigneReference(c1t)
+       && p1.Rapprochement is { Entites.Length: 1 } && !vue.RechercheOuverte,
+    "joue : choisir une commande ouvre son panneau (titre, reference, rapprochement de TraitementCommandes) et replie la recherche");
+Geste("OuvrirBande", "Rejeter");
+Exiger(vue.Panneau?.Pied?.Bande is { Rejet: true, ConfirmerRefuse: true }, "joue : la bande de rejet s'ouvre, confirmation fermee sans motif");
+Geste("Decider", "Rejeter");
+Exiger(vue.Message is { Texte: "Motif obligatoire pour un rejet.", Severite: "avertissement" } && vue.Panneau?.Id == 1,
+    "joue : rejeter sans motif est refuse, la commande reste ouverte");
+Geste("Texte", new { champ = "MotifSaisi", valeur = " Doublon " });
+Exiger(vue.Panneau?.Pied?.Bande is { ConfirmerRefuse: false, MotifSaisi: " Doublon " }, "joue : le motif saisi ouvre la confirmation");
+var suivante = TraitementCommandes.Suivante(OrdreTemoin(defaut, false), c1t);
+var attenduRejet = TraitementCommandes.Appliquer(temoin, c1t, ActionCommande.Rejeter, " Doublon ", []);
+Geste("Decider", "Rejeter");
+Exiger(vue.Message is { Severite: "succes" } m1 && m1.Texte == attenduRejet && suivante is not null && vue.Panneau?.Id == suivante.Id,
+    $"joue : avec un motif, le rejet passe (« {attenduRejet} ») et la suivante s'ouvre");
+Exiger(OngletsLus() == OngletsTemoin(EtatCommande.ATraiter) && IdsLus().SequenceEqual(Ids(defaut, false)),
+    $"joue : onglets et liste suivent l'etat rejete (lu : {OngletsLus()})");
+
+Geste("NouvelleCommande");
+Exiger(vue.Panneau?.Saisie is not null && OngletActif() == "SaisieManuelle"
+       && vue.Message?.Texte.StartsWith("Commande MAN-0001 créée") == true,
+    "joue : « Nouvelle commande saisie au guichet » ouvre la saisie MAN-0001 dans son onglet");
+Geste("EnregistrerSaisie");
+Exiger(vue.Message is { Texte: "Saisissez une raison sociale ou un SIREN.", Severite: "avertissement" },
+    "joue : enregistrer une saisie vide est refuse");
+Geste("ChoisirTypeSaisi", "Faillite");
+Geste("Texte", new { champ = "Denomination", valeur = "BATIPRO SARL" });
+Geste("Texte", new { champ = "Requerant", valeur = "M. DURAND" });
+Exiger(vue.Panneau?.Saisie is { Famille: "Faillite", Denomination: "BATIPRO SARL", Requerant: "M. DURAND" },
+    "joue : la saisie au guichet (type choisi, raison sociale, requerant) est retenue");
+Geste("EnregistrerSaisie");
+Exiger(vue.Message is { Texte: "Commande MAN-0001 enregistrée.", Severite: "succes" } && OngletActif() == "ATraiter"
+       && vue.Panneau is { Saisie: null, Nom: "BATIPRO SARL" },
+    "joue : la saisie complete est enregistree et passe « À traiter »");
+// Le temoin suit la meme saisie, par Metier directement.
+var saisieTemoin = TraitementCommandes.NouvelleSaisie(temoin);
+saisieTemoin.Famille = FamilleCommande.Faillite;
+saisieTemoin.Denomination = "BATIPRO SARL";
+saisieTemoin.Requerant = "M. DURAND";
+Exiger(TraitementCommandes.EnregistrerSaisie(saisieTemoin) is null && IdsLus().SequenceEqual(Ids(defaut, false)),
+    $"joue : la commande du guichet prend sa place dans la liste, comme dans Regrouper (lu : {string.Join(",", IdsLus())})");
+
+// Le tri de cet ecran : « Rapprochements directs en tête ». Sur le jeu d'exemple
+// a l'ouverture, les directs sont DEJA en tete de leur groupe : la bascule n'y
+// change rien a voir. La commande du guichet (type non-faillite, BATIPRO SARL,
+// un seul dossier) est plus recente que TRANSNORD (deux dossiers) : elle doit
+// remonter devant lui.
+Geste("BasculerDirects");
+Exiger(vue.DirectsEnTete && IdsLus().SequenceEqual(Ids(defaut, true)) && !Ids(defaut, true).SequenceEqual(Ids(defaut, false)),
+    $"joue : « Rapprochements directs en tête » reordonne la liste comme Regrouper(…, true) (lu : {string.Join(",", IdsLus())} ; sans : {string.Join(",", Ids(defaut, false))})");
+Geste("BasculerDirects");
+Exiger(!vue.DirectsEnTete && IdsLus().SequenceEqual(Ids(defaut, false)), "joue : … et la rebascule rend l'ordre d'origine");
+
+Geste("OuvrirCoordonnees");
+Geste("Adresse", new { cle = "Voie", valeur = new string('X', 40) });
+Exiger(vue.Coordonnees is { } co1 && co1.Alertes.Any(a => a.StartsWith("Ligne de plus de 34 caractères")),
+    "joue : une ligne d'adresse trop longue est signalee dans « Coordonnées du destinataire »");
+Geste("FermerCoordonnees");
+Exiger(vue.Coordonnees is null, "joue : « Fermer » referme les coordonnees");
+
+var gesteInconnu = false;
+try { Geste("GesteQuiNExistePas"); }
+catch (ArgumentException) { gesteInconnu = true; }
+Exiger(gesteInconnu, "un geste inconnu est une erreur franche, jamais ignore en silence");
+var sessionCw = vue.Session;
+EcranCommandesWeb.Fermer(sessionCw);
+var fermee = false;
+try { EcranCommandesWeb.Agir(sessionCw, "Rechercher", JsonSerializer.SerializeToElement<object?>(null)); }
+catch (InvalidOperationException) { fermee = true; }
+Exiger(fermee, "une session fermee ne repond plus");
 
 Console.WriteLine();
 if (echecs.Count == 0)

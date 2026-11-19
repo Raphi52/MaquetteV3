@@ -182,4 +182,20 @@ describe('EcranCommandesWeb', () => {
     unmount()
     expect(dotnet.invokeMethodAsync.mock.calls.map((c) => c[1])).toEqual(['EcranCommandesWeb.Ouvrir', 'EcranCommandesWeb.Fermer'])
   })
+
+  it('enveloppe : un blanc avant et apres les membres, comme le .razor (« avec » texte, puis @foreach, puis « · »)', async () => {
+    // Capture du 19/11/2026 (IG-90812) : le .razor rendait « — avec [membre] · 2 a
+    // traiter… ». Razor ne retire que les blancs SEULS autour d'un @foreach ; ici
+    // ils terminent « — avec » et ouvrent « · », il les gardait.
+    const vue = vueDeBase()
+    vue.panneau = { ...panneau(), enveloppe: {
+      reference: 'IG-90812', etat: '2 à traiter avant l\'envoi.', envoiEnAttente: false,
+      membres: [{ id: 6, titre: 'Certificat de non-faillite : À traiter', icone: 'a-traiter', libelle: 'Certificat de non-faillite' }],
+    } }
+    session(vue)
+    const { container } = render(<EcranCommandesWeb />)
+    await screen.findByText('Enveloppe · IG-90812')
+    expect(container.querySelector('.rig-tcw__enveloppe-texte')!.textContent)
+      .toBe('Enveloppe · IG-90812 — avec Certificat de non-faillite · 2 à traiter avant l\'envoi.')
+  })
 })

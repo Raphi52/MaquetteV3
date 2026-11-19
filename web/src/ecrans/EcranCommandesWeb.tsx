@@ -423,14 +423,16 @@ function Panneau({ p, geste }: { p: PanneauCw; geste: Geste }) {
         {p.enveloppe && (
           <div className="rig-tcw__enveloppe">
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2" /><path d="M3.5 7l8.5 6 8.5-6" /></svg>
-            {/* Texte courant : « — avec » colle au premier membre et « · » au dernier,
-                comme le rendait le .razor (blancs retires autour du @foreach). */}
+            {/* Un blanc apres « — avec » et un avant « · » : dans le .razor, ils
+                finissaient et ouvraient un texte NON vide, que Razor garde (il ne
+                retire que les blancs SEULS autour du @foreach, donc rien entre deux
+                membres). Vu a la comparaison des captures du 19/11/2026 (IG-90812). */}
             <span className="rig-tcw__enveloppe-texte">
-              <b>Enveloppe · {p.enveloppe.reference}</b> — avec{p.enveloppe.membres.map((mb) => (
+              <b>Enveloppe · {p.enveloppe.reference}</b> — avec{' '}{p.enveloppe.membres.map((mb) => (
                 <button key={mb.id} className="rig-tcw__membre" title={mb.titre} onClick={() => geste('Choisir', mb.id)}>
                   <span className={`rig-tcw__icone rig-tcw__icone--${mb.icone}`}></span>{mb.libelle}
                 </button>
-              ))}· <span className="rig-tcw__discret">{p.enveloppe.etat}</span>
+              ))}{' '}· <span className="rig-tcw__discret">{p.enveloppe.etat}</span>
             </span>
             {p.enveloppe.envoiEnAttente && (
               <button className="rig-tcw__lien" onClick={() => geste('EnvoyerSansAttendre')}>Envoyer sans attendre</button>

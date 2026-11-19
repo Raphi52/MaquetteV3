@@ -44,7 +44,15 @@ internal static class Programme
 
         void Verifier(string nomEcran, string proprieteListe, string cle, Func<object, IComparable> lecture)
         {
-            var type = assemblage.GetType("RigV3Desktop.Components.Ecrans." + nomEcran);
+            // Ecran PORTE EN REACT A SESSION (web/src/session.tsx, 19/11/2026) :
+            // son etat et son tri ont quitte le .razor (devenu une coquille) pour
+            // la classe Session<Nom> de Pont/<Ecran>.cs, avec les MEMES membres
+            // (BasculerTri, la liste). C'est elle qu'on construit ; sinon le
+            // composant Blazor, comme avant.
+            var session = nomEcran.StartsWith("Ecran", StringComparison.Ordinal)
+                ? assemblage.GetType("RigV3Desktop.Pont.Session" + nomEcran["Ecran".Length..])
+                : null;
+            var type = session ?? assemblage.GetType("RigV3Desktop.Components.Ecrans." + nomEcran);
             if (type is null) { Exiger(false, $"{nomEcran} : ecran introuvable"); return; }
             var instance = Activator.CreateInstance(type, nonPublic: true)!;
 
@@ -67,6 +75,25 @@ internal static class Programme
                 $"{nomEcran} : un clic sur « {cle} » range la grille dans l'ordre");
             Exiger(decroissant.SequenceEqual(croissant.AsEnumerable().Reverse()),
                 $"{nomEcran} : un second clic inverse l'ordre");
+
+            // Ecran a session : le meme tri par le GESTE que le .tsx envoie au
+            // clic sur l'en-tete, Agir(« BasculerTri », cle) — la colonne cliquee
+            // arrive bien jusqu'a BasculerTri.
+            if (session is not null)
+            {
+                var agir = type.GetMethod("Agir", Prive);
+                Exiger(agir is not null, $"{nomEcran} : la session recoit les gestes de React (Agir)");
+                if (agir is null) return;
+                var parGeste = Activator.CreateInstance(type, nonPublic: true)!;
+                var valeur = System.Text.Json.JsonSerializer.SerializeToElement(cle);
+                List<IComparable> LireGeste()
+                    => ((IEnumerable)liste.GetValue(parGeste)!).Cast<object>().Select(lecture).ToList();
+                agir.Invoke(parGeste, new object?[] { "BasculerTri", valeur });
+                var croissantGeste = LireGeste();
+                agir.Invoke(parGeste, new object?[] { "BasculerTri", valeur });
+                Exiger(croissantGeste.SequenceEqual(croissant) && LireGeste().SequenceEqual(decroissant),
+                    $"{nomEcran} : le geste « BasculerTri » envoye par React trie de meme, puis inverse");
+            }
         }
 
         Verifier("EcranRechAffaires", "Trouvees", "Nom", o => Membre(o, "Nom"));

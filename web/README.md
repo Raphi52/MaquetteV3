@@ -107,6 +107,48 @@ Home.razor ──> Components/Ecrans/EcranX.razor (COQUILLE, mêmes paramètres)
 - **Voir la console JS** sur le bureau caché : F12 dans la fenêtre RIG
   (outils de développement activés en Debug).
 
+## Ajouts du lot 2 (Réquisitions, Commandes web) : l'écran à session
+
+- **Quand** : l'état de l'écran est fait d'objets de `Metier/` que `Metier/`
+  modifie lui-même (`TraitementCommandes.Appliquer`, `CommandeRequi.TravailFrais`…)
+  et presque chaque valeur affichée sort d'une de ses règles. Recopier cet état
+  dans React recopierait les règles. Le `@code` est alors **déplacé tel quel**
+  dans `Session<Nom>` de `Pont/Ecran<Nom>.cs` (mêmes membres, mêmes noms) ; le
+  `.tsx` ne tient que la vue rendue et remonte chaque geste (`src/session.tsx` :
+  `useSession`, `Saisie`).
+- **Contrat** : `Ecran<Nom>.Ouvrir()` → vue ; `Ecran<Nom>.Agir(session, geste,
+  valeur)` → vue après le geste ; `Ecran<Nom>.Fermer(session)`. Un geste inconnu
+  lève une exception (jamais ignoré). Sessions rangées par `Pont/SessionsEcran.cs`.
+- **Bancs** : un banc qui relisait le `.razor` relit les règles dans le pont et
+  le balisage dans le `.tsx`, puis **joue les gestes** en appelant
+  `Ecran<Nom>.Agir` comme React (`tests/RequiCheck` section 9,
+  `tests/CommandesWebCheck` section 5 : chaque vue comparée à ce que `Metier/`
+  calcule sur un jeu témoin). Le `.csproj` du banc passe alors en
+  `net10.0-windows` + `UseWPF` + `ProjectReference` vers `RigV3Desktop.csproj`,
+  et le code ajoute `using System.IO;` (les usings implicites de WPF l'omettent).
+  `tests/TriCheck` trouve seul la classe `Session<Nom>` d'un écran à session.
+- **Blancs autour d'un `@foreach`** (précision à la note du lot 5 ci-dessous) :
+  Razor ne retire que les blancs **seuls**. Un texte qui *finit* par un blanc
+  juste avant le `@foreach` (« — avec ») ou qui *commence* par un blanc juste
+  après (« · 2 à traiter ») le garde : écris `{' '}` des deux côtés du `.map`
+  (Commandes web, ligne « Enveloppe », vu à la comparaison des captures :
+  998 pixels décalés, puis 0 après correction).
+- **Pièges** : une regex de banc qui contenait un vrai saut de ligne doit
+  écrire `\r?\n` (un `.cs` neuf peut être en LF, l'ancien `.razor` était en
+  CRLF) ; un contrôle « le `.tsx` ne recopie aucune règle » se fait sur son code
+  **sans les commentaires** (l'en-tête cite le fichier de règles). Avant d'exiger
+  qu'un geste « change l'ordre », vérifie que le jeu d'exemple le permet : sur
+  l'onglet « À traiter », les rapprochements directs sont déjà en tête.
+- **Copie « avant » exportée** (`git archive <commit>` dans `%TEMP%`) : ne relie
+  **jamais** son `web/node_modules` à celui de ta copie par une jonction. Sa
+  première compilation lance `npm ci` (cible `InstallerWeb`), qui vide
+  `node_modules` à travers le lien, donc le tien aussi (vu au lot 2, réparé par
+  le `npm ci` suivant). Laisse la compilation l'installer.
+- **État de l'appli lancée pour une capture** : pose `RIGV3_ETAT=<fichier jetable>`
+  avant `hdesk-lancer.ps1` (le lanceur transmet son environnement), sinon l'appli
+  écrit dans `%APPDATA%\RigV3\accueil.json`, les réglages de l'utilisateur.
+  Partir du même fichier pour « avant » et « après » rend aussi les captures comparables.
+
 ## Ajouts du lot 5 (écrans juridiction et éditions)
 
 - **`src/criteres.ts`** : les gestes des écrans de recherche, à reprendre
