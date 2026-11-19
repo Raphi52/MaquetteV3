@@ -38,13 +38,13 @@ public sealed record OngletBarreVue(string Code, string Libelle, bool Actif, boo
 public sealed record DefilementVue(int Numero, int Index, bool Doux);
 
 // ---- L'ecran de procedure (div.rig-proc) ----
-/// <param name="BoutonFermer">Faux dans la fenetre d'un onglet sorti : sa croix ferme deja la vue.</param>
-public sealed record ProcVue(string Code, string Libelle, bool Favori, bool BoutonFermer,
-                             SujetVue? Sujet, EcranProcVue Ecran);
-
-/// <summary>Le bandeau du sujet (ou, a defaut, de la tache) : les ecrans voisins.</summary>
-public sealed record SujetVue(string Titre, OngletSujetVue[] Onglets);
-public sealed record OngletSujetVue(string Code, string Libelle, bool Actif, string? Detail);
+/// <summary>
+/// L'ecran ouvert. Rien n'est affiche au-dessus de lui (19/11/2026, conv-2010) : la
+/// ligne du titre (etoile, Fermer) et le bandeau des ecrans voisins ont ete retires
+/// de tous les ecrans — l'onglet porte le titre, sa croix ferme, l'etoile est au menu.
+/// <c>Libelle</c> sert encore a l'ecran « a venir » (EcranNonMaquette), qui se nomme.
+/// </summary>
+public sealed record ProcVue(string Code, string Libelle, EcranProcVue Ecran);
 
 /// <summary>Ce que les ecrans recevaient de Home.razor en parametres.</summary>
 /// <param name="Valides">Les dossiers des demandes qui ont passe le controle final (EcranDemandes).</param>
@@ -204,20 +204,7 @@ public sealed partial class SessionPlanTravail
     {
         if (ProcOuverte is not { } p) return null;
 
-        SujetVue? bandeau = null;
-        var sujet = SujetDe(p.Code);
-        if (sujet is not null)
-        {
-            bandeau = new SujetVue(sujet.Titre,
-                ProcsDuSujet(sujet).Select(x => new OngletSujetVue(x.Code, x.Libelle, x.Code == p.Code, null)).ToArray());
-        }
-        else if (TacheDe(p.Code) is { } tache)
-        {
-            bandeau = new SujetVue(TitreTache(tache),
-                tache.Entrees.Select(e => new OngletSujetVue(e.Code, e.Libelle, e.Code == p.Code, e.Detail)).ToArray());
-        }
-
-        return new ProcVue(p.Code, p.Libelle, Etat.EstFavori(p.Code), !ModeFenetreVue, bandeau,
+        return new ProcVue(p.Code, p.Libelle,
             new EcranProcVue(
                 JeuDemo.Demandes.Select(d => d.Dossier).Distinct().Where(EstValide).ToArray(),
                 SirenAImmatriculer, CleOuverture.ToString() ?? "",
@@ -654,8 +641,6 @@ public sealed partial class SessionPlanTravail
             case "ongletFermer": FermerOnglet(Texte(valeur)); break;
 
             // ---- Ecran de procedure et ouvertures demandees par les ecrans ----
-            case "favori": BasculerFavori(Texte(valeur)); break;
-            case "fermerProc": FermerProc(); break;
             case "ouvrirCode": OuvrirCode(Texte(valeur)); break;
             case "ouvrirNumero": OuvrirParNumero(Texte(valeur)); break;
             case "ouvrirUnDossier": OuvrirUnDossierPour(Texte(valeur)); break;

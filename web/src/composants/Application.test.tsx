@@ -46,34 +46,42 @@ describe('Application : la racine de la page', () => {
     expect(container.querySelector('header.rig-barre > #rig-vonglets')).not.toBeNull()
   })
 
-  it('dans la fenetre d\'un onglet sorti : ni barre ni accueil, l\'ecran seul et sans bouton Fermer', () => {
-    const { container } = rendre(vueApplication({ proc: proc({ boutonFermer: false }) }))
+  it('dans la fenetre d\'un onglet sorti : ni barre ni accueil, l\'ecran seul', () => {
+    const { container } = rendre(vueApplication({ proc: proc() }))
     expect(container.querySelector('.rig-barre')).toBeNull()
     expect(container.querySelector('.rig-accueil')).toBeNull()
     expect(container.querySelector('.rig-proc')).not.toBeNull()
-    expect([...container.querySelectorAll('.rig-proc button')].some((b) => b.textContent === 'Fermer')).toBe(false)
+  })
+
+  it('l\'ecran commence par son contenu : ni ligne du titre (etoile, Fermer), ni bandeau des ecrans voisins', () => {
+    const { container } = rendre(vueApplication({ proc: proc() }))
+    const ecran = container.querySelector('.rig-proc')!
+    expect([...ecran.children].map((e) => e.className)).toEqual(['rig-nonmaq'])
+    expect(ecran.querySelector('.rig-vged__entete, .rig-sujet, .rig-vue__etoile')).toBeNull()
+    expect([...ecran.querySelectorAll('button')].some((b) => b.textContent === 'Fermer')).toBe(false)
   })
 })
 
 describe('Application : les gestes du plan de travail', () => {
   it('chaque geste part numerote, avec sa valeur (null si absente)', () => {
-    const { container, gestes } = rendre(vueApplication({ proc: proc() }))
-    const fermer = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Fermer')!
-    fireEvent.click(fermer)
-    fireEvent.click(container.querySelector('.rig-vue__etoile')!)
-    expect(gestes()).toEqual([['fermerProc', null, 1], ['favori', 'PROC_CREANCE', 2]])
+    const onglets = [{ code: 'PROC_CREANCE', libelle: 'Creances', actif: true, detache: false, glisse: false }]
+    const { container, gestes } = rendre(vueApplication({ barre: true, onglets, proc: proc() }))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.click(container.querySelector('.rig-vonglet__fermer')!)
+    expect(gestes()).toEqual([['echap', null, 1], ['ongletFermer', 'PROC_CREANCE', 2]])
   })
 
   it('une vue plus ancienne que le dernier geste n\'est pas montree ; celle qui le porte l\'est', () => {
     const { container, rerender, geste, plan } = rendre(vueApplication({ proc: proc({ libelle: 'Factures' }) }))
-    fireEvent.click(container.querySelector('.rig-vue__etoile')!)
-    fireEvent.click(container.querySelector('.rig-vue__etoile')!)
+    const titre = () => container.querySelector('.rig-proc .rig-nonmaq__titre')!.textContent
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.keyDown(document, { key: 'Escape' })
     // La reponse au 1er geste arrive : le 2e est encore en route, rien ne bouge.
-    rerender(<Application vue={vueApplication({ geste: 1, proc: proc({ libelle: 'Intermediaire', favori: true }) })} geste={geste} plan={plan} />)
-    expect(container.querySelector('.rig-proc b')!.textContent).toBe('Factures')
+    rerender(<Application vue={vueApplication({ geste: 1, proc: proc({ libelle: 'Intermediaire' }) })} geste={geste} plan={plan} />)
+    expect(titre()).toBe('Factures')
     // La reponse au dernier geste : elle est montree.
     rerender(<Application vue={vueApplication({ geste: 2, proc: proc({ libelle: 'Encaissements' }) })} geste={geste} plan={plan} />)
-    expect(container.querySelector('.rig-proc b')!.textContent).toBe('Encaissements')
+    expect(titre()).toBe('Encaissements')
   })
 
   it('Echap, ou que soit le focus, remonte « echap » ; les autres touches rien', () => {

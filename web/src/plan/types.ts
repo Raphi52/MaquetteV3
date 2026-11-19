@@ -35,13 +35,8 @@ export interface DefilementVue { numero: number, index: number, doux: boolean }
 export interface ProcVue {
   code: string
   libelle: string
-  favori: boolean
-  boutonFermer: boolean
-  sujet: SujetVue | null
   ecran: EcranProcVue
 }
-export interface SujetVue { titre: string, onglets: OngletSujetVue[] }
-export interface OngletSujetVue { code: string, libelle: string, actif: boolean, detail: string | null }
 export interface SessionEcranVue { session: string, version: number }
 export interface EcranProcVue {
   valides: string[]

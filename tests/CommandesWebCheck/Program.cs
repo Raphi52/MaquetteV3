@@ -11,7 +11,7 @@ using RigV3Desktop.Pont;
 //   1. les REGLES portees (filtre, groupes, rapprochement, delivrance,
 //      transitions, enveloppe, saisie au guichet, adresse) rendent ce que
 //      NeoRIG rend sur le jeu d'exemple ;
-//   2. l'ecran est ATTEIGNABLE (aiguillage, menu, sujet, catalogue, perimetre) ;
+//   2. l'ecran est ATTEIGNABLE (aiguillage, menu, catalogue, perimetre) ;
 //   3. il SUIT LES THEMES : aucune couleur en dur dans ses styles, et chaque
 //      classe qu'il pose a sa regle ;
 //   4. ses libelles sont ceux de NeoRIG (si D:\RIG-V3 est lisible d'ici) ;
@@ -254,7 +254,7 @@ Exiger(PerimetreProfil.Reserve(TraitementCommandes.CodeEcran).OrderBy(x => x).Se
 // en page se lit dans le .tsx, un appel de regle dans le pont. La section 5 est
 // neuve : elle JOUE les gestes par le pont et compare a TraitementCommandes.
 // Lot 2 du passage a React (19/11/2026) : l'aiguillage est web/src/plan/Aiguillage.tsx,
-// le catalogue et les sujets vivent dans Pont/PlanTravail.cs (le @code de Home.razor).
+// le catalogue vit dans Pont/PlanTravail.cs (le @code de Home.razor).
 var home = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs"));
 var aiguillage = File.ReadAllText(Path.Combine(racine, "web/src/plan/Aiguillage.tsx"));
 var ecranChemin = Path.Combine(racine, "Components/Ecrans/EcranCommandesWeb.razor");
@@ -278,8 +278,8 @@ var menuAccueil = File.ReadAllText(Path.Combine(racine, "Pont/MenuAccueil.cs"));
 Exiger(Regex.IsMatch(menuAccueil, @"new\(""Commandes web"",\s*""[^""]+"",\s*""PROC_COMMANDES_WEB""\)"), "le menu « Recevoir » porte l'entree « Commandes web »");
 Exiger(!Regex.IsMatch(home, @"new\(""Commandes web"",\s*""[^""]+"",\s*""PROC_COMMANDES_WEB""\)"), "le plan de travail ne tient pas de copie de l'entree de menu");
 Exiger(Regex.IsMatch(home, @"new\(""PROC_COMMANDES_WEB"",\s*""Commandes web""\)"), "le catalogue connait l'ecran");
-Exiger(Regex.IsMatch(home, @"new\(""SUJ_AFFAIRES""[^\]]*""PROC_REQUI"",\s*""PROC_COMMANDES_WEB"""),
-    "le sujet « Affaires » le range a cote des requisitions");
+// (Le « sujet Affaires » qui le rangeait dans le bandeau des ecrans voisins a ete
+// retire avec ce bandeau, de tous les ecrans, le 19/11/2026 — conv-2010.)
 Exiger(pont.Contains("TraitementCommandes.JeuDemoCommandes()") && pont.Contains("TraitementCommandes.Appliquer(")
         && pont.Contains("TraitementCommandes.ControlerNonOpposition(")
         && !codeTsx.Contains("TraitementCommandes") && !Regex.IsMatch(codeTsx, @"\bMath\.|new Date\(|\.sort\("),

@@ -883,13 +883,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     // ================= Navigation metier =================
     /// <summary>Le catalogue du menu de gauche, deplace dans Pont/MenuAccueil.cs
     /// (lot 1 du passage a React). Le plan de travail le relit pour ses
-    /// aiguillages : motif d'un ecran a venir, tache voisine d'une procedure.</summary>
+    /// aiguillages : motif et libelle d'un ecran a venir.</summary>
     private readonly Pont.MomentMenu[] Moments = Pont.MenuAccueil.Moments;
-
-    /// <summary>L'etoile de la vue ouverte : meme geste que l'etoile du menu de
-    /// gauche, ecrit dans accueil.json a l'instant du clic.</summary>
-    private void BasculerFavori(string code) => Etat.BasculerFavori(code);
-
 
     /// <summary>Ouvre l'ecran d'un code sans que l'appelant ait a connaitre son
     /// libelle : le catalogue <see cref="Groupes"/> reste la seule source.</summary>
@@ -910,68 +905,6 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private Pont.EntreeMenu? EntreeDeCode(string code)
         => Moments.SelectMany(m => m.Sous).SelectMany(s => s.Entrees)
                   .FirstOrDefault(x => x.Code == code);
-
-    /// <summary>La TACHE (le sous-menu) a laquelle appartient une procedure :
-    /// le meme geste metier, quels que soient les ecrans qui le servent. Elle
-    /// sert de repli au bandeau quand la procedure n'appartient a aucun sujet
-    /// d'objet — ainsi TOUTE procedure ouverte montre ses voisines de geste.</summary>
-    private Pont.SousMenu? TacheDe(string code)
-        => Moments.SelectMany(m => m.Sous)
-                  .FirstOrDefault(s => s.Entrees.Any(e => e.Code == code));
-
-    /// <summary>Le titre affichable d'une tache : son verbe, prefixe du metier
-    /// quand le sous-menu n'a pas de titre propre (« Terminer »).</summary>
-    private string TitreTache(Pont.SousMenu s)
-    {
-        var m = Moments.First(x => x.Sous.Contains(s));
-        return s.Titre.Length > 0 ? $"{m.Titre} : {s.Titre}" : m.Titre;
-    }
-
-    // ================= Sujets (regroupement par OBJET metier) =================
-    /// <summary>Un SUJET regroupe les procedures qui manipulent le MEME objet
-    /// metier. RIG v2 avait un ecran par procedure : pour ajouter une personne
-    /// en base, il fallait savoir d'avance s'il s'agissait d'un acteur
-    /// judiciaire (PROC_ACTEUR_JUD), d'un expert (PROC_EXPERT) ou d'un client
-    /// (PROC_GCLIENT / PROC_FCLIENT) — quatre ecrans pour un seul geste, et
-    /// l'expert existant DEUX fois. Le sujet remet ces ecrans dans une seule
-    /// vue : on entre par l'objet, on choisit le type ensuite.
-    /// La meme logique est appliquee a TOUS les objets, pas seulement aux
-    /// personnes ; chaque procedure du catalogue appartient a un sujet.</summary>
-    private record Sujet(string Code, string Titre, string[] Procs);
-
-    private readonly Sujet[] Sujets =
-    [
-        new("SUJ_PERSONNES", "Personnes",
-            ["PROC_ACTEUR_JUD", "PROC_EXPERT", "PROC_GCLIENT", "PROC_FCLIENT"]),
-        new("SUJ_AFFAIRES", "Affaires",
-            ["PROC_RECHAFF", "PROC_DEMANDE", "PROC_ARRIVEE", "PROC_DEPOTJUD", "PROC_REQUI", "PROC_COMMANDES_WEB", "PROC_CJUD"]),
-        new("SUJ_AUDIENCES", "Audiences",
-            ["PROC_AUDIENCE", "PROC_GESTAUDS"]),
-        new("SUJ_DOCUMENTS", "Documents",
-            ["PROC_DOC_DEMAT", "PROC_ACTES_NUM", "PROC_CONTROLE_VIDIGED", "PROC_COFFRE_FORT", "PROC_GEDJUD"]),
-        new("SUJ_EDITIONS", "Editions",
-            ["PROC_COURRIER_DIVERS", "PROC_EDIT_MAQUETTE", "PROC_REDA", "BODACC"]),
-        new("SUJ_ARGENT", "Argent",
-            ["PROC_FACTURE", "PROC_ENCAISS", "PROC_CREANCE", "PROC_COMPTABILISATION"]),
-        new("SUJ_FIN", "Fin d'affaire",
-            ["PROC_CLOT", "PROC_ARCHIRAD"]),
-        new("SUJ_REGLAGES", "Reglages",
-            ["PROC_ACCUEIL_PARAM", "PROC_STAT", "PROC_GESTEMAIL", "PROC_GESTBANQ"])
-    ];
-
-    /// <summary>Le sujet auquel appartient une procedure, ou null si elle n'en
-    /// a pas (aucune aujourd'hui : le tableau ci-dessus couvre le catalogue).</summary>
-    private Sujet? SujetDe(string code) => Sujets.FirstOrDefault(s => s.Procs.Contains(code));
-
-    /// <summary>Les procedures d'un sujet, avec leur libelle du catalogue. Les
-    /// codes inconnus sont ignores : le catalogue reste la seule source.</summary>
-    private Proc[] ProcsDuSujet(Sujet s)
-    {
-        var connus = Groupes.SelectMany(g => g.Procs).ToDictionary(p => p.Code);
-        return s.Procs.Where(connus.ContainsKey)
-                      .Where(c => PerimetreProfil.Visible(c, Domaines))
-                      .Select(c => connus[c]).ToArray();
-    }
 
     /// <summary>Catalogue des ecrans portes depuis RIG v2. Il n'est PLUS affiche
     /// tel quel : il sert d'aiguillage, de source de libelles pour la recherche

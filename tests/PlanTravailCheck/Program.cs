@@ -290,7 +290,9 @@ internal static class Programme
         Exiger(plan.Vue().Proc is { Code: "PROC_DEMANDE" } pd && attendus.All(pd.Ecran.Valides.Contains)
                && pd.Ecran.Valides.All(v => v == "004176"),
             "l'ecran des demandes recoit la liste des dossiers valides");
-        Agir("fermerProc");
+        // L'ecran n'a plus de bouton « Fermer » (conv-2010) : c'est la croix de son onglet.
+        Agir("ongletFermer", "PROC_DEMANDE");
+        Exiger(plan.Vue().Proc is null && plan.Vue().Onglets is null, "la croix de l'onglet ferme l'ecran");
 
         // --- 7. Fiches multiples : ajouter un etablissement.
         Agir("ouvrirNumero", "004176");
@@ -352,10 +354,8 @@ internal static class Programme
         Agir("ouvrirCode", "PROC_ENCAISS");
         vue = plan.Vue();
         Exiger(vue.Onglets is { Length: 2 } o && o[0].Code == "PROC_FACTURE" && o[1] is { Code: "PROC_ENCAISS", Actif: true }
-               && vue.Proc is { Code: "PROC_ENCAISS", BoutonFermer: true },
+               && vue.Proc is { Code: "PROC_ENCAISS" },
             "deux ecrans ouverts prennent deux onglets, le dernier est montre");
-        Exiger(vue.Proc!.Sujet is { Titre: "Argent" } s && s.Onglets.Any(x => x.Code == "PROC_FACTURE"),
-            "le bandeau du sujet montre les ecrans voisins");
         Agir("ongletDebut", new { code = "PROC_ENCAISS", x = 150.0, y = 20.0,
                                   mesure = new { page = new[] { 1500.0, 900.0, 40.0 }, cases = new[] { new[] { 10.0, 100.0 }, new[] { 110.0, 200.0 } } } });
         Agir("ongletGlisse", new { x = 40.0, y = 20.0 });
@@ -364,9 +364,6 @@ internal static class Programme
             "glisser un onglet le reordonne");
         Agir("ongletActiver", "PROC_FACTURE");
         Exiger(plan.Vue().Proc?.Code == "PROC_FACTURE", "un clic sur un onglet montre son ecran");
-        Agir("favori", "PROC_FACTURE");
-        Exiger(plan.Vue().Proc?.Favori == true, "l'etoile de l'ecran le met en favori");
-        Agir("favori", "PROC_FACTURE");
         Agir("echap");
         Exiger(plan.Vue().Onglets is { Length: 1 } && plan.Vue().Proc?.Code == "PROC_ENCAISS",
             "Echap ferme l'ecran montre (son onglet) ; l'onglet voisin prend la place");
