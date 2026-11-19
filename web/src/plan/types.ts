@@ -50,6 +50,8 @@ export interface PaletteVue {
   ecrans: EcranPaletteVue[]
   /** Les elements de l'arbre dont le libelle porte ce qui est tape (n° de depot, de formalite). */
   elements: ElementPaletteVue[]
+  /** Ouverte depuis la barre de l'accueil : elle pend sous la barre, en liste deroulante. */
+  ancree: boolean
 }
 export interface EcranPaletteVue { code: string, libelle: string }
 export interface ElementPaletteVue { libelle: string, chemin: string[], lieu: string, piece: boolean }

@@ -20,12 +20,14 @@ namespace RigV3Desktop.Pont;
 /// <param name="SirenInconnu">Le SIREN tape quand rien ne lui repond : la palette propose d'ouvrir un dossier.</param>
 /// <param name="Ecrans">Les ecrans du menu dont le nom porte ce qui est tape (« facture », « trans »).</param>
 /// <param name="Elements">Les elements de l'arbre dont le LIBELLE porte ce qui est tape (n° de depot, de formalite).</param>
+/// <param name="Ancree">Ouverte depuis la barre de recherche de l'accueil : elle pend SOUS la barre,
+/// en liste deroulante. Sinon (Ctrl K depuis un ecran), elle flotte au milieu.</param>
 public sealed record PaletteVue(string Texte, string Filtre, FiltrePaletteVue[] Filtres, AgentPaletteVue Moi,
                                 AgentPaletteVue[] Agents, TravailPaletteVue[] Travail, int TravailTrouve,
                                 PiecePaletteVue[] Pieces, string DossierDesPieces, string NumeroDesPieces,
                                 HorsGreffePaletteVue[] HorsGreffe,
                                 BilanPaletteVue Bilan, string? SirenInconnu,
-                                EcranPaletteVue[] Ecrans, ElementPaletteVue[] Elements);
+                                EcranPaletteVue[] Ecrans, ElementPaletteVue[] Elements, bool Ancree);
 /// <summary>Un ecran du menu ; le geste « paletteAller » (nature « ecran ») l'ouvre par son code.</summary>
 public sealed record EcranPaletteVue(string Code, string Libelle);
 /// <param name="Chemin">Libelles depuis la racine : « palettePiece » deplie l'arbre jusqu'a l'element.</param>
@@ -55,6 +57,7 @@ public sealed record BilanPaletteVue(string Jour, int HorsDelai, int ArriveesDuJ
 public sealed partial class SessionPlanTravail
 {
     private bool PaletteOuverte;
+    private bool PaletteAncree;
     private string PaletteTexte = string.Empty;
     private string PaletteFiltre = "tout";
 
@@ -63,10 +66,12 @@ public sealed partial class SessionPlanTravail
 
     /// <summary>Ctrl K, ou la barre de recherche de l'accueil : elle passe ce qui y
     /// a deja ete tape (la premiere lettre), la palette continue la saisie.</summary>
-    private void OuvrirPalette(string texte = "")
+    /// <param name="ancree">Depuis la barre de l'accueil : la palette pend sous elle.</param>
+    private void OuvrirPalette(string texte = "", bool ancree = false)
     {
         PaletteOuverte = !ModeFenetreVue;
         PaletteTexte = texte;
+        PaletteAncree = ancree;
     }
 
     /// <summary>Echap ferme d'abord la palette, la couche la plus haute.</summary>
@@ -210,7 +215,8 @@ public sealed partial class SessionPlanTravail
             siren is not null && trouve.Length == 0 ? siren : null,
             [.. ecrans.Select(p => new EcranPaletteVue(p.Code, p.Libelle))],
             [.. elements.Select(e => new ElementPaletteVue(e.Chemin[^1], e.Chemin, RecherchePalette.Lieu(e.Chemin),
-                                                           e.Suite![^1].EstPiece))]);
+                                                           e.Suite![^1].EstPiece))],
+            PaletteAncree);
     }
 
     /// <summary>Les noeuds d'un chemin, s'il passe tout entier par des noeuds

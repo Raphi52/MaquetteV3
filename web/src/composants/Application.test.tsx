@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { Application, type GestePlanIle } from './Application'
 import { morceaux } from '../test/morceaux'
 import { vuePlan } from '../test/accueil'
-import { dossier, proc as procPlan, vueApplication } from '../test/plan'
+import { dossier, paletteVue, proc as procPlan, vueApplication } from '../test/plan'
 import type { GesteIle } from '../accueil/types'
 import type { OngletBarreVue, VueApplication } from '../plan/types'
 import type { VueCommandesWeb } from '../ecrans/EcranCommandesWeb'
@@ -214,6 +214,17 @@ describe('Application : un onglet quitte garde son ecran', () => {
     const sorti = [onglet('PROC_COMMANDES_WEB', 'Commandes web', { detache: true }), deux[1]!]
     rerender(<Application vue={vueApplication({ barre: true, onglets: sorti, proc: null })} geste={geste} plan={plan} />)
     expect(container.querySelector('.rig-proc')).toBeNull()
+  })
+
+  it('ouverte depuis la barre de l\'accueil, la palette pend sous la barre ; par Ctrl K, elle flotte au milieu', () => {
+    const { container, rerender, geste, plan } = rendre(vueApplication({ barre: true, accueil: vuePlan(), palette: paletteVue({ ancree: true }) }))
+    expect(container.querySelector('.rig-plan__tete .rig-recherche--palette .rig-palette--ancree')).not.toBeNull()
+    expect(container.querySelector('.rig-palette__voile')).toBeNull()
+    expect(container.querySelectorAll('.rig-palette')).toHaveLength(1)
+    rerender(<Application vue={vueApplication({ barre: true, accueil: vuePlan(), palette: paletteVue({ ancree: false }) })} geste={geste} plan={plan} />)
+    expect(container.querySelector('.rig-palette__voile > .rig-palette')).not.toBeNull()
+    expect(container.querySelector('.rig-recherche--palette')).toBeNull()
+    expect(container.querySelectorAll('.rig-palette')).toHaveLength(1)
   })
 
   it('cache, l\'ecran des commandes ne prend plus Ctrl K : la touche va a la palette de l\'ecran montre', async () => {

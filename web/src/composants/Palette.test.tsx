@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { Palette } from './Palette'
+import { ATTENTE_BARRE, Palette } from './Palette'
 import type { PaletteVue, TravailPaletteVue } from '../plan/types'
 
 afterEach(cleanup)
@@ -43,6 +43,7 @@ function vue(partiel: Partial<PaletteVue> = {}): PaletteVue {
     sirenInconnu: null,
     ecrans: [],
     elements: [],
+    ancree: false,
     ...partiel,
   }
 }
@@ -201,6 +202,32 @@ describe('Palette Ctrl K (/draft « Page Recherche », propositions 3 et 6)', ()
       ['paletteAller', { nature: 'ecran', cle: 'CODE_TELETRANS' }],
       ['palettePiece', ['Dossier RCS', 'Depots d\'actes', 'Depot n 2024/0141']],
     ])
+  })
+
+  it('accrochee a la barre de l accueil : la saisie dans la pilule, la liste pendue dessous, sans voile', () => {
+    const plan = vi.fn<(nom: string, valeur?: unknown) => void>()
+    const dehors = document.createElement('div')
+    document.body.appendChild(dehors)
+    const { container } = render(<Palette vue={vue({ ancree: true })} plan={plan} ancree />)
+    const barre = container.firstElementChild!
+    expect(barre.className).toBe('rig-recherche rig-recherche--fixe rig-recherche--palette')
+    const champ = barre.querySelector<HTMLInputElement>('input.rig-recherche__saisie')!
+    expect(champ.placeholder).toBe(ATTENTE_BARRE)
+    expect(document.activeElement).toBe(champ)
+    // La liste est DANS la barre (elle pend dessous en CSS), et rien ne voile l'accueil.
+    expect(barre.querySelector('.rig-palette.rig-palette--ancree .rig-palette__liste')).not.toBeNull()
+    expect(container.querySelector('.rig-palette__voile')).toBeNull()
+    expect(container.querySelector('.rig-palette__saisie')).toBeNull()
+    // Un clic dans la liste la garde ouverte ; un clic ailleurs dans la page la ferme.
+    fireEvent.mouseDown(barre.querySelector('.rig-palette__liste')!)
+    expect(plan).not.toHaveBeenCalled()
+    fireEvent.mouseDown(dehors)
+    expect(plan.mock.calls).toEqual([['paletteFermer']])
+    // Le clavier est le meme : Echap ferme, la frappe cherche.
+    fireEvent.change(champ, { target: { value: 'transnord sa' } })
+    fireEvent.keyDown(champ, { key: 'Escape' })
+    expect(plan.mock.calls.slice(1)).toEqual([['paletteTexte', 'transnord sa'], ['paletteFermer']])
+    dehors.remove()
   })
 
   it('un clic sur le voile ferme la palette ; un clic dedans, non', () => {

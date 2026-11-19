@@ -118,7 +118,9 @@ export function Application({ vue, geste, plan }: ProprietesApplication) {
           ecran), puis les boutons de la fenetre. */}
       {v.barre && <BarreRig onglets={v.onglets} finsDeGlisse={v.finsDeGlisse} accueil={!v.proc && !v.dossier}
                             geste={geste} plan={gestePlan} />}
-      {v.accueil && <Accueil vue={v.accueil} geste={geste} />}
+      {/* Ouverte depuis la barre de l'accueil, la palette est la liste deroulante
+          de cette barre : c'est l'accueil qui la dessine. */}
+      {v.accueil && <Accueil vue={v.accueil} geste={geste} palette={v.palette?.ancree ? v.palette : null} plan={gestePlan} />}
       {/* ECRANS DE PROCEDURE : le cadre est commun, l'ecran vient de l'aiguillage.
           Ceux des onglets ouverts restent montes, caches hors de leur onglet. */}
       {[...ecrans.current.values()].map((p) => (
@@ -133,8 +135,8 @@ export function Application({ vue, geste, plan }: ProprietesApplication) {
       {v.envoiMail && <EnvoiMail vue={v.envoiMail} plan={gestePlan} />}
       {v.nouveau && <Nouveau vue={v.nouveau} plan={gestePlan} />}
       {v.menuNoeud && <MenuNoeud vue={v.menuNoeud} plan={gestePlan} />}
-      {/* LA PALETTE Ctrl K, par-dessus tout le reste. */}
-      {v.palette && <Palette vue={v.palette} plan={gestePlan} />}
+      {/* LA PALETTE Ctrl K, par-dessus tout le reste (sauf accrochee a la barre de l'accueil). */}
+      {v.palette && !(v.palette.ancree && v.accueil) && <Palette vue={v.palette} plan={gestePlan} />}
     </div>
   )
 }

@@ -14,13 +14,17 @@ import { Grille } from '../accueil/Grille'
 import { Menu } from '../accueil/Menu'
 import { Recherche } from '../accueil/Recherche'
 import type { GesteAccueil, GesteIle, VuePlanAccueil } from '../accueil/types'
+import type { GestePlan, PaletteVue } from '../plan/types'
 
 export interface ProprietesAccueil {
   vue: VuePlanAccueil
   geste: (g: GesteIle) => void
+  /** La palette ouverte depuis la barre de recherche : elle pend sous la barre. */
+  palette?: PaletteVue | null
+  plan?: GestePlan
 }
 
-export function Accueil({ vue, geste }: ProprietesAccueil) {
+export function Accueil({ vue, geste, palette = null, plan }: ProprietesAccueil) {
   const agir: GesteAccueil = (nom, valeur) => { geste({ nom, valeur: valeur ?? null }) }
   return (
     <div className={'rig-accueil ' + (vue.menuReduit ? 'rig-accueil--menu-reduit' : '')}>
@@ -32,7 +36,7 @@ export function Accueil({ vue, geste }: ProprietesAccueil) {
         <div className="rig-plan__tete">
           <Entete entete={vue.entete} geste={agir} />
           {' '}
-          <Recherche geste={agir} />
+          <Recherche geste={agir} palette={palette} {...(plan ? { plan } : {})} />
         </div>
         {' '}
         <Chiffres vue={vue.chiffres} geste={agir} />

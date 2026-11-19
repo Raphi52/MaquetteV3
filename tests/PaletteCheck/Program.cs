@@ -181,9 +181,13 @@ internal static class Programme
 
         // --- 8 bis. La pastille « Ctrl K » de la recherche de l'accueil ouvre la palette.
         plan.SurGesteAccueil(new GesteIle("palette", Valeur(null)));
-        Exiger(plan.Vue().Palette is { Texte: "" }, "la pastille « Ctrl K » de l'accueil ouvre la palette");
+        Exiger(plan.Vue().Palette is { Texte: "", Ancree: true },
+            "la barre de l'accueil ouvre la palette ACCROCHEE : sa liste deroulante");
         Agir("paletteFermer");
         Exiger(plan.Vue().Palette is null, "la palette se ferme");
+        Agir("paletteOuvrir");
+        Exiger(plan.Vue().Palette is { Ancree: false }, "Ctrl K ouvre la palette flottante, au milieu");
+        Agir("paletteFermer");
 
         // --- 9. Echap ferme la palette d'abord, l'affaire ensuite.
         Agir("paletteOuvrir");

@@ -9,10 +9,24 @@
 // a elle (traitements, affaires, elements) : la palette l'a remplacee, avec les
 // memes resultats et davantage -- deux recherches qui ne trouvent pas la meme
 // chose, c'est une de trop.
+//
+// Ouverte d'ici, la palette est la LISTE DEROULANTE de cette barre (19/11/2026) :
+// elle se dessine a sa place (`ancree`), sa saisie dans la pilule, ses resultats
+// pendus dessous. Seul Ctrl K depuis un autre ecran la fait flotter au milieu.
 
+import { ATTENTE_BARRE, Palette } from '../composants/Palette'
+import type { GestePlan, PaletteVue } from '../plan/types'
 import type { GesteAccueil } from './types'
 
-export function Recherche({ geste }: { geste: GesteAccueil }) {
+export interface ProprietesRecherche {
+  geste: GesteAccueil
+  /** La palette ouverte depuis cette barre (vue.palette.ancree), sinon null. */
+  palette?: PaletteVue | null
+  plan?: GestePlan
+}
+
+export function Recherche({ geste, palette = null, plan }: ProprietesRecherche) {
+  if (palette && plan) return <Palette vue={palette} plan={plan} ancree />
   return (
     <div className="rig-recherche rig-recherche--fixe">
       <span style={{ font: '13px var(--rig-font-mono)', color: 'var(--rig-focus)' }}>{'⌕'}</span>
@@ -21,7 +35,7 @@ export function Recherche({ geste }: { geste: GesteAccueil }) {
           par-dessus et garde la suite de la frappe. Le clic n'y pose pas le
           curseur (preventDefault) : c'est la saisie de la palette qui le prend. */}
       <input className="rig-recherche__saisie" value="" aria-label="Rechercher partout"
-             placeholder="Rechercher un SIREN, une societe, un dirigeant, un n° de demande…"
+             placeholder={ATTENTE_BARRE}
              onMouseDown={(e) => { e.preventDefault(); geste('palette', '') }}
              onChange={(e) => geste('palette', e.target.value)} />
       {' '}

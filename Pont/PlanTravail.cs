@@ -2410,7 +2410,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             case Pont.DemandeAccueil.OuvrirCode: OuvrirCode(demande.Valeur); break;
             case Pont.DemandeAccueil.OuvrirAlerte: OuvrirAlerte(demande.Alerte!); break;
             case Pont.DemandeAccueil.OuvrirNumero: OuvrirParNumero(demande.Valeur); break;
-            case Pont.DemandeAccueil.OuvrirPalette: OuvrirPalette(demande.Valeur); break;
+            case Pont.DemandeAccueil.OuvrirPalette: OuvrirPalette(demande.Valeur, ancree: true); break;
             case Pont.DemandeAccueil.LoginChange: ApresChangementLogin(); break;
             case Pont.DemandeAccueil.ThemeChange: Fenetre?.AppliquerFond(Theme); break;
             case Pont.DemandeAccueil.Deplacer: Fenetre?.Deplacer(); break;

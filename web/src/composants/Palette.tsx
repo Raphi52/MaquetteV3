@@ -124,9 +124,15 @@ const NATURES: Record<string, string> = { dem: 'la demande', aff: 'l affaire', c
 export interface ProprietesPalette {
   vue: PaletteVue
   plan: GestePlan
+  /** Dessinee DANS la barre de recherche de l'accueil (composants/accueil/Recherche.tsx) :
+   *  sa saisie prend la place de celle de la barre, le reste pend dessous. */
+  ancree?: boolean
 }
 
-export function Palette({ vue, plan }: ProprietesPalette) {
+/** Le texte d'attente de la barre de l'accueil, ouverte ou fermee : la meme barre. */
+export const ATTENTE_BARRE = 'Rechercher un SIREN, une societe, un dirigeant, un n° de demande…'
+
+export function Palette({ vue, plan, ancree = false }: ProprietesPalette) {
   // La frappe vit ICI : le champ suit le clavier sans attendre la vue du C#,
   // qui ne fait que repondre a ce qui est tape.
   const [saisie, poserSaisie] = useState(vue.texte)
@@ -137,8 +143,19 @@ export function Palette({ vue, plan }: ProprietesPalette) {
   const [copie, poserCopie] = useState<string | null>(null)
   const champ = useRef<HTMLInputElement>(null)
   const liste = useRef<HTMLDivElement>(null)
+  const barre = useRef<HTMLDivElement>(null)
 
   useEffect(() => { champ.current?.focus() }, [enGestes])
+  // Accrochee a la barre, elle n'a pas de voile : un clic hors de la barre et
+  // de sa liste la ferme, comme une liste deroulante.
+  useEffect(() => {
+    if (!ancree) return
+    const surClic = (e: MouseEvent) => {
+      if (barre.current && !barre.current.contains(e.target as Node)) plan('paletteFermer')
+    }
+    document.addEventListener('mousedown', surClic)
+    return () => document.removeEventListener('mousedown', surClic)
+  }, [ancree, plan])
   useEffect(() => {
     if (copie === null) return
     const minuteur = window.setTimeout(() => poserCopie(null), 1400)
@@ -304,6 +321,34 @@ export function Palette({ vue, plan }: ProprietesPalette) {
 
   const choisiTravail = courant?.sorte === 'travail' ? courant.t : null
 
+  // La saisie : dans sa propre ligne (palette flottante) ou dans la barre de
+  // l'accueil (palette accrochee), avec la meme classe que le champ de la barre.
+  const fil = enGestes && courant && <span className="rig-palette__fil">{libelleCourt(courant)}<i>›</i></span>
+  const saisieChamp = (
+    <input ref={champ} className={ancree ? 'rig-recherche__saisie' : 'rig-palette__champ'} value={enGestes ? filtreGestes : saisie}
+           onChange={(e) => changerSaisie(e.target.value)} spellCheck={false} autoComplete="off"
+           aria-label={enGestes ? 'Filtrer les gestes' : 'Rechercher'}
+           placeholder={enGestes ? 'Filtrer les gestes…' : ancree ? ATTENTE_BARRE : 'Rechercher un SIREN, une societe, un n° de demande, un mot dans les pieces…'} />
+  )
+  const avisCopie = copie && <span className="rig-palette__copie">{copie}</span>
+
+  if (ancree) {
+    return (
+      <div ref={barre} className="rig-recherche rig-recherche--fixe rig-recherche--palette" onKeyDown={surTouche}>
+        <span style={{ font: '13px var(--rig-font-mono)', color: 'var(--rig-focus)' }}>{'⌕'}</span>
+        {' '}
+        {fil}
+        {saisieChamp}
+        {avisCopie}
+        {' '}
+        <Touche>Echap</Touche>
+        <div className="rig-palette rig-palette--ancree" role="dialog" aria-label="Rechercher partout">
+          {panneau()}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="rig-palette__voile" onMouseDown={() => plan('paletteFermer')}>
       <div className="rig-palette" role="dialog" aria-label="Rechercher partout" onKeyDown={surTouche}
@@ -311,17 +356,19 @@ export function Palette({ vue, plan }: ProprietesPalette) {
         {/* ---- La saisie ---- */}
         <div className="rig-palette__saisie">
           <Picto nom="loupe" />
-          {enGestes && courant && (
-            <span className="rig-palette__fil">{libelleCourt(courant)}<i>›</i></span>
-          )}
-          <input ref={champ} className="rig-palette__champ" value={enGestes ? filtreGestes : saisie}
-                 onChange={(e) => changerSaisie(e.target.value)} spellCheck={false} autoComplete="off"
-                 aria-label={enGestes ? 'Filtrer les gestes' : 'Rechercher'}
-                 placeholder={enGestes ? 'Filtrer les gestes…' : 'Rechercher un SIREN, une societe, un n° de demande, un mot dans les pieces…'} />
-          {copie && <span className="rig-palette__copie">{copie}</span>}
+          {fil}
+          {saisieChamp}
+          {avisCopie}
           <Touche>Echap</Touche>
         </div>
+        {panneau()}
+      </div>
+    </div>
+  )
 
+  /** Ce qui est sous la saisie : les filtres, la liste et l'apercu, le pied. */
+  function panneau() {
+    return <>
         {/* ---- Les filtres de « Mon travail » ---- */}
         <div className="rig-palette__filtres">
           {vue.filtres.map((f) => (
@@ -390,9 +437,8 @@ export function Palette({ vue, plan }: ProprietesPalette) {
             : <><Touche>↑ ↓</Touche>choisir <Touche>Entree</Touche>ouvrir <Touche>→</Touche>gestes <Touche>Tab</Touche>filtre suivant
                 {choisiTravail?.attribuable && <><Touche>Ctrl M</Touche>me l attribuer</>} <Touche>Echap</Touche>fermer</>}
         </div>
-      </div>
-    </div>
-  )
+    </>
+  }
 }
 
 function libelleCourt(e: Element): string {

@@ -5,8 +5,20 @@
 
 import type { LigneArbreVue } from '../composants/ArbreGedNoeud'
 import type {
-  ApercuVue, DossierVue, EtapesVue, PageEtapeVue, PieceHistoriqueVue, ProcVue, TacheVue, VueApplication,
+  ApercuVue, DossierVue, EtapesVue, PageEtapeVue, PaletteVue, PieceHistoriqueVue, ProcVue, TacheVue, VueApplication,
 } from '../plan/types'
+
+/** Une palette Ctrl K vide (Pont/PlanTravailPalette.cs), avant de taper. */
+export function paletteVue(partiel: Partial<PaletteVue> = {}): PaletteVue {
+  return {
+    texte: '', filtre: 'tout', filtres: [{ code: 'tout', libelle: 'Tout', nombre: 0 }],
+    moi: { signature: 'R. VILAIN', initiales: 'RV', nom: 'Raphael' }, agents: [],
+    travail: [], travailTrouve: 0, pieces: [], dossierDesPieces: '2026B01067 AMIENS BILLARDS', numeroDesPieces: '2026B01067',
+    horsGreffe: [], bilan: { jour: 'mercredi 9 septembre', horsDelai: 0, arriveesDuJour: 0, mAttendent: 0, plusAncienne: 0 },
+    sirenInconnu: null, ecrans: [], elements: [], ancree: false,
+    ...partiel,
+  }
+}
 
 export function ligneArbre(id: string, texte: string, enfants: LigneArbreVue[] = [], niveau = 0): LigneArbreVue {
   return {
