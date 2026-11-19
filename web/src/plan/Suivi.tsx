@@ -5,7 +5,8 @@
 //     etape ; un clic ouvre l'etape) puis l'HISTORIQUE des pieces ;
 //   - Fil : les notes ecrites sur le dossier et les valeurs changees dans le
 //     formulaire, du plus ancien au plus recent, et le champ pour ecrire.
-// L'onglet choisi est un etat de l'ecran seulement : rien ne part au C#.
+// L'onglet choisi est un etat de l'ecran seulement : rien ne part au C#. Le REPLI
+// a droite, lui, est tenu par le C# (SuiviReplie) : la colonne du corps change.
 
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
@@ -18,12 +19,31 @@ export interface ProprietesSuivi {
   bandeau: BandeauDefautsVue | null
   historique: PieceHistoriqueVue[]
   fil: MessageFilVue[]
+  /** Repliee a droite (geste « suiviReplier ») : il n'en reste qu'un rail pour la rouvrir. */
+  replie?: boolean
   plan: GestePlan
 }
 
-export function SuiviDossier({ bandeau, historique, fil, plan }: ProprietesSuivi) {
+export function SuiviDossier({ bandeau, historique, fil, replie = false, plan }: ProprietesSuivi) {
   const [onglet, setOnglet] = useState<OngletSuivi>('suivi')
   const reste = bandeau?.liens ?? []
+  // REPLIEE A DROITE (demande du 19/11/2026) : un rail, tout entier bouton pour la
+  // rouvrir, qui garde le nombre d'etapes a corriger -- replier ne cache pas l'alerte.
+  if (replie) {
+    return (
+      <aside className="rig-vged__suivi rig-vged__suivi--replie" aria-label="Suivi du dossier">
+        <button type="button" className="rig-suivi__rouvrir" title="Rouvrir le suivi" aria-label="Rouvrir le suivi"
+                onClick={() => plan('suiviDeplier')}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+          <span className="rig-suivi__rouvrir-libelle">Suivi</span>
+          {reste.length > 0 && (
+            <b className="rig-suivi__nombre rig-suivi__nombre--alerte"
+               title={reste.length + (reste.length === 1 ? ' etape a corriger' : ' etapes a corriger')}>{reste.length}</b>
+          )}
+        </button>
+      </aside>
+    )
+  }
   // Le NOMBRE d'un onglet dit ce qui attend : les points a corriger sur « Suivi »
   // (en couleur d'alerte), les messages sur « Fil ». Zero : rien d'affiche.
   // (« Suivi 45 » additionnait les points a corriger et les pieces de
@@ -39,10 +59,17 @@ export function SuiviDossier({ bandeau, historique, fil, plan }: ProprietesSuivi
   )
   return (
     <aside className="rig-vged__suivi" aria-label="Suivi du dossier">
-      <div className="rig-suivi__onglets" role="tablist">
-        {bouton('suivi', 'Suivi', reste.length,
-                reste.length + (reste.length === 1 ? ' etape a corriger' : ' etapes a corriger'), true)}
-        {bouton('fil', 'Fil', fil.length, fil.length + (fil.length === 1 ? ' message' : ' messages'))}
+      {/* Le bouton de repli au bord INTERIEUR, comme celui de l'arbre : en miroir. */}
+      <div className="rig-suivi__tete">
+        <button type="button" className="rig-suivi__replier" title="Replier le suivi a droite"
+                aria-label="Replier le suivi" onClick={() => plan('suiviReplier')}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+        </button>
+        <div className="rig-suivi__onglets" role="tablist">
+          {bouton('suivi', 'Suivi', reste.length,
+                  reste.length + (reste.length === 1 ? ' etape a corriger' : ' etapes a corriger'), true)}
+          {bouton('fil', 'Fil', fil.length, fil.length + (fil.length === 1 ? ' message' : ' messages'))}
+        </div>
       </div>
       {onglet === 'suivi'
         ? (

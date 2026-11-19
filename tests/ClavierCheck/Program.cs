@@ -49,9 +49,10 @@ Exiger(gestes.Contains("case \"echap\": ToucheEchap(); break;"),
 var corps = Regex.Match(plan, @"private void ToucheEchap\(\)(?<c>.*?)\n    \}", RegexOptions.Singleline);
 Exiger(corps.Success && corps.Groups["c"].Value.Contains("FermerProc"),
     "Echap ferme l'ecran de procedure ouvert");
-Exiger(corps.Success && corps.Groups["c"].Value.Contains("FermerDossier"),
+// Depuis le 19/11/2026 l'affaire a son onglet : Echap la ferme AVEC lui (FermerAffaire).
+Exiger(corps.Success && corps.Groups["c"].Value.Contains("FermerAffaire"),
     "Echap ferme l'affaire ouverte");
-Exiger(Regex.IsMatch(corps.Groups["c"].Value, @"if \(DossierOuvert is not null\) FermerDossier\(\);\s*else if \(ProcOuverte is not null\) FermerProc\(\);"),
+Exiger(Regex.IsMatch(corps.Groups["c"].Value, @"if \(DossierOuvert is not null\) FermerAffaire\(\);\s*else if \(ProcOuverte is not null\) FermerProc\(\);"),
     "Echap ferme l'affaire d'abord, l'ecran ensuite : jamais deux choses a la fois");
 
 // --- 3. Entree lance la recherche partout ou une recherche existe.

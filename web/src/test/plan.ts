@@ -119,7 +119,7 @@ export function dossier(partiel: Partial<DossierVue> = {}): DossierVue {
     apercu: { detachees: 0, apercu: apercu() }, voile: false,
     historique: historique(),
     arbreReplie: false, chemin: ['004176', 'Dossier RCS', 'Statuts signes'], pieces: 42,
-    fil: [],
+    fil: [], suiviReplie: false,
     ...partiel,
   }
 }

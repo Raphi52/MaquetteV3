@@ -21,9 +21,36 @@ public sealed partial class SessionPlanTravail
     /// comme la largeur de sa colonne.</summary>
     private bool ArbreReplie;
 
-    /// <summary>La colonne de suivi, derniere colonne du corps : un cinquieme de la largeur,
-    /// jamais moins de 240 px (ses onglets et ses dates tiennent).</summary>
-    private const string LargeurSuivi = "minmax(240px, 20%)";
+    /// <summary>La colonne de suivi, derniere colonne du corps, tant qu'on ne l'a pas glissee :
+    /// un cinquieme de la largeur, jamais moins de 240 px (ses onglets et ses dates tiennent).</summary>
+    private const string LargeurSuiviSouple = "minmax(240px, 20%)";
+
+    /// <summary>La colonne de suivi est repliee a droite (geste « suiviReplier ») : il n'en reste
+    /// qu'un rail, son bouton pour la rouvrir et le nombre d'etapes a corriger. Elle le reste
+    /// d'une affaire a l'autre, comme l'arbre (demande du 19/11/2026).</summary>
+    private bool SuiviReplie;
+
+    /// <summary>La largeur du rail de la colonne de suivi repliee.</summary>
+    private const string LargeurSuiviReplie = "38px";
+
+    /// <summary>La largeur glissee a la troisieme poignee (entre le document et le suivi), en
+    /// pixels ; null tant que personne ne l'a glissee : la colonne garde sa largeur souple.</summary>
+    private double? LargeurSuiviReglee;
+    private const double LargeurSuiviMin = 240;
+    private const double LargeurSuiviMax = 900;
+
+    /// <summary>
+    /// Troisieme poignee : la largeur de la colonne de suivi. Le C# ne connait pas la largeur
+    /// rendue de la colonne souple (un cinquieme de la fenetre) : l'ecran la mesure et l'envoie
+    /// avec la saisie. Glisser a GAUCHE elargit la colonne (elle est collee au bord droit).
+    /// </summary>
+    private void DebutRedimSuivi(double clientX, double largeurRendue)
+    {
+        XDepart = clientX;
+        LargeurDepart = largeurRendue > 0 ? largeurRendue : LargeurSuiviReglee ?? LargeurSuiviMin;
+        ColonneRedim = 3;
+        Redimensionne = true;
+    }
 
     /// <summary>La longueur maximale d'un message du fil.</summary>
     private const int LongueurMessageMax = 2000;

@@ -980,7 +980,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private void ToucheEchap()
     {
         if (FermerPalette()) return;
-        if (DossierOuvert is not null) FermerDossier();
+        if (DossierOuvert is not null) FermerAffaire();
         else if (ProcOuverte is not null) FermerProc();
     }
 
@@ -1230,7 +1230,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private bool DonneesVisible = true;
     private bool Redimensionne;
     // Quelle poignee est saisie : 1 = entre l'arbre et les donnees,
-    // 2 = entre les donnees et le document.
+    // 2 = entre les donnees et le document, 3 = devant la colonne de suivi.
     private int ColonneRedim = 1;
     private double LargeurArbre = 400;
     private double LargeurDonnees = 420;
@@ -1238,8 +1238,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private const double LargeurArbreMax = 1100;
     private const double LargeurDonneesMin = 280;
     private const double LargeurDonneesMax = 1100;
-    /// <summary>La colonne d'une poignee : le VIDE entre deux cartes de la vue du dossier,
-    /// le meme que celui qui separe la colonne de suivi (.rig-vged__suivi, margin-left).
+    /// <summary>La colonne d'une poignee : le VIDE entre deux cartes de la vue du dossier, devant
+    /// la colonne de suivi comme entre les autres (sa poignee y glisse depuis le 19/11/2026).
     /// Avec 6 px ici contre 10 px a cote du suivi, les ecarts etaient inegaux (passe de finition du 19/11/2026).</summary>
     private const string Gouttiere = "10px";
     /// <summary>Les fenetres de document actuellement sorties. PLUSIEURS
@@ -1280,7 +1280,11 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
                     morceaux.Add("minmax(0, 1fr)");
                 }
             }
-            morceaux.Add(LargeurSuivi);
+            // La colonne de suivi, derriere sa gouttiere (la troisieme poignee y
+            // glisse) : repliee en rail, glissee en pixels, sinon souple.
+            morceaux.Add(Gouttiere);
+            morceaux.Add(SuiviReplie ? LargeurSuiviReplie
+                         : LargeurSuiviReglee is { } suivi ? Px(suivi) : LargeurSuiviSouple);
             // Arbre replie : une premiere rangee porte le chemin de l'element choisi,
             // au-dessus des donnees et du document ; la colonne de suivi prend les deux.
             var colonnes = "grid-template-columns: " + string.Join(" ", morceaux)
@@ -1319,7 +1323,9 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     {
         if (!Redimensionne) return;
         var largeur = LargeurDepart + (clientX - XDepart);
-        if (ColonneRedim == 2)
+        if (ColonneRedim == 3)
+            LargeurSuiviReglee = Math.Clamp(LargeurDepart - (clientX - XDepart), LargeurSuiviMin, LargeurSuiviMax);
+        else if (ColonneRedim == 2)
             LargeurDonnees = Math.Clamp(largeur, LargeurDonneesMin, LargeurDonneesMax);
         else
             LargeurArbre = Math.Clamp(largeur, LargeurArbreMin, LargeurArbreMax);
@@ -1391,6 +1397,10 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private void OuvrirDossier(Dossier d)
     {
         DossierOuvert = d;
+        AffaireChargee = d;
+        // L'affaire prend SON onglet dans la barre du haut, au nom du dossier
+        // (Pont/PlanTravailOngletAffaire.cs, demande du 19/11/2026).
+        PoserOngletAffaire(d);
 
         // Historique de consultation : horodate a l'instant du clic, jamais
         // reconstitue a l'affichage. C'est ce que la tuile « Mes affaires
@@ -1441,9 +1451,12 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         UneRubriqueParDomaine();
     }
 
+    /// <summary>QUITTE la vue de l'affaire (la maison) : son onglet, lui, reste -- c'est
+    /// FermerAffaire qui le ferme. Revenir sur l'onglet rouvre l'affaire par son numero.</summary>
     private void FermerDossier()
     {
         DossierOuvert = null;
+        AffaireChargee = null;
         NoeudSelectionne = null;
     }
 
@@ -1598,6 +1611,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         if (!GlisseEnCours)
         {
             Onglets.Activer(code);
+            SuivreOngletActif();
         }
         else if (ArrachageOnglet.EstSorti(clientX, clientY, 0, 0, LargeurBarre, HauteurPage))
         {
@@ -1613,6 +1627,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     {
         var fenetre = FenetresVues.FirstOrDefault(f => f.Code == code);
         Onglets.Fermer(code);
+        // L'onglet voisin prend la place : une affaire s'y montre, un ecran la quitte.
+        SuivreOngletActif();
         // Fermer l onglet ferme AUSSI sa fenetre : sinon la fenetre resterait
         // orpheline, sans onglet pour la retrouver.
         fenetre?.Close();
@@ -1659,6 +1675,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             Onglets.Rattacher(onglet.Code);
         }
         else Onglets.Activer(onglet.Code);
+        SuivreOngletActif();
         RetenirAgencement();
     }
 
@@ -1699,7 +1716,11 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
 
     private void RejouerOnglets()
     {
-        foreach (var code in Etat.OngletsVue.ToList()) OuvrirCode(code);
+        foreach (var code in Etat.OngletsVue.ToList())
+        {
+            if (NumeroDOngletAffaire(code) is { } numero) ReposerOngletAffaire(numero);
+            else OuvrirCode(code);
+        }
         foreach (var code in Etat.VuesDetachees.ToList()) DetacherOnglet(code);
 
         if (!string.IsNullOrWhiteSpace(Etat.OngletActif)
@@ -1707,6 +1728,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             && !Etat.VuesDetachees.Contains(Etat.OngletActif))
             Onglets.Activer(Etat.OngletActif);
         else Onglets.Masquer();
+        // L'onglet actif est celui d'une affaire : elle se rouvre.
+        SuivreOngletActif();
     }
 
     /// <summary>L'affaire depuis laquelle un traitement a ete lance. Sans elle,
@@ -1726,8 +1749,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     /// <summary>
     /// La MAISON, premier onglet de la barre du haut (19/11/2026) : ramene a
     /// l'accueil SANS fermer les onglets -- comme un navigateur, on y revient
-    /// d'un clic. L'affaire ouverte, elle, n'a pas d'onglet : elle se ferme,
-    /// comme par sa croix.
+    /// d'un clic. L'affaire ouverte garde le sien, comme un ecran (depuis le
+    /// 19/11/2026 : elle n'en avait pas, et la maison la fermait).
     /// </summary>
     private void AllerALAccueil()
     {
@@ -1739,6 +1762,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private void FermerProc()
     {
         if (Onglets.Actuel is { } courant) Onglets.Fermer(courant.Code);
+        // L'onglet voisin prend la place : celui d'une affaire la montre.
+        SuivreOngletActif();
         RetenirAgencement();
         if (Onglets.Montre is null && RetourAffaire is not null)
         {
@@ -1765,6 +1790,19 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
                     .Select(c => connus[c]).ToArray();
     }
 
+    /// <summary>L'affaire d'un numero : celle du fonds, sinon celle d'une demande du jeu de
+    /// demonstration (son nom, son SIREN), sinon le numero seul.</summary>
+    private Dossier DossierDeNumero(string numeroDossier)
+    {
+        if (Fonds.FirstOrDefault(f => f.Numero == numeroDossier) is { } connu) return connu;
+        var demande = JeuDemo.Demandes.FirstOrDefault(d => d.Dossier == numeroDossier);
+        return new Dossier(numeroDossier,
+                           demande?.Nom ?? numeroDossier,
+                           demande?.Siren ?? string.Empty,
+                           "RCS",
+                           demande?.Statut ?? "action");
+    }
+
     /// <summary>
     /// Point d entree commun aux trois ecrans : ils remontent un NUMERO de
     /// dossier, la page se charge de retrouver l affaire et d ouvrir la
@@ -1774,16 +1812,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     {
         if (string.IsNullOrWhiteSpace(numeroDossier)) return;
 
-        var connu = Fonds.FirstOrDefault(f => f.Numero == numeroDossier);
-        if (connu is null)
-        {
-            var demande = JeuDemo.Demandes.FirstOrDefault(d => d.Dossier == numeroDossier);
-            connu = new Dossier(numeroDossier,
-                                demande?.Nom ?? numeroDossier,
-                                demande?.Siren ?? string.Empty,
-                                "RCS",
-                                demande?.Statut ?? "action");
-        }
+        var connu = DossierDeNumero(numeroDossier);
 
         // On QUITTE la vue courante sans fermer les onglets : comme un
         // navigateur, ils restent la et on y revient d un clic.

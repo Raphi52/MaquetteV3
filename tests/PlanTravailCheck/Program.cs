@@ -294,6 +294,36 @@ internal static class Programme
         d = plan.Vue().Dossier!;
         Exiger(!d.ArbreReplie && d.Poignee && d.StyleCorps.Split(';')[0].Split(' ').Length == colonnesDeplie,
             "l'arbre se rouvre a sa place");
+
+        // LA COLONNE DE SUIVI se replie a droite et se glisse comme les autres (demande du 19/11/2026).
+        Exiger(!d.SuiviReplie && d.StyleCorps.Contains(" 10px minmax(240px, 20%); "),
+            "la colonne de suivi a sa gouttiere, ou glisse sa poignee, et garde sa largeur souple tant qu'on ne la glisse pas");
+        Agir("suiviReplier");
+        var suiviReplie = plan.Vue().Dossier!;
+        Exiger(suiviReplie.SuiviReplie && suiviReplie.StyleCorps.Contains(" 10px 38px; ")
+               // « minmax(240px, 20%) » compte deux morceaux, « 38px » un seul.
+               && suiviReplie.StyleCorps.Split(';')[0].Split(' ').Length == colonnesDeplie - 1,
+            $"repliee, la colonne de suivi n'est plus qu'un rail de 38 px ({suiviReplie.StyleCorps})");
+        Agir("ouvrirNumero", "004176");
+        Exiger(plan.Vue().Dossier!.SuiviReplie, "la colonne de suivi reste repliee d'une affaire a l'autre, comme l'arbre");
+        Agir("suiviDeplier");
+        Exiger(!plan.Vue().Dossier!.SuiviReplie && plan.Vue().Dossier!.StyleCorps.Contains(" 10px minmax(240px, 20%); "),
+            "la colonne de suivi se rouvre a sa largeur");
+        // Glisser a GAUCHE elargit le suivi, depuis la largeur rendue que l'ecran envoie.
+        Agir("redimDebut", new { colonne = 3, x = 1500.0, largeur = 300.0 });
+        Agir("redim", new { x = 1400.0, y = 10.0 });
+        Exiger(plan.Vue().Dossier!.StyleCorps.Contains(" 10px 400px; "),
+            $"glisse de 100 px vers la gauche, le suivi passe de 300 a 400 px ({plan.Vue().Dossier!.StyleCorps})");
+        Agir("redim", new { x = 2400.0, y = 10.0 });
+        Exiger(plan.Vue().Dossier!.StyleCorps.Contains(" 10px 240px; "), "le suivi ne descend pas sous 240 px");
+        Agir("redim", new { x = -2000.0, y = 10.0 });
+        Exiger(plan.Vue().Dossier!.StyleCorps.Contains(" 10px 900px; "), "le suivi ne depasse pas 900 px");
+        Agir("redim", new { x = 1450.0, y = 10.0 });
+        Agir("redimFin");
+        Agir("ouvrirNumero", "004176");
+        d = plan.Vue().Dossier!;
+        Exiger(!d.Voile && d.StyleCorps.Contains(" 10px 350px; ") && !d.StyleCorps.Contains("user-select"),
+            "la largeur glissee du suivi tient, d'une affaire a l'autre");
         // Ce login voit les deux domaines, sans ajout ni masque : toutes les pieces de l'arbre.
         Exiger(d.Pieces > 0 && d.Pieces == d.Arbre.Compte,
             $"l'entete de l'arbre compte les pieces visibles ({d.Pieces})");
@@ -407,8 +437,18 @@ internal static class Programme
                && pd.Ecran.Valides.All(v => v == "004176"),
             "l'ecran des demandes recoit la liste des dossiers valides");
         // L'ecran n'a plus de bouton « Fermer » (conv-2010) : c'est la croix de son onglet.
+        // L'affaire a SON onglet (demande du 19/11/2026), au nom du dossier : ouvrir l'ecran
+        // l'a quittee sans la fermer ; fermer l'ecran rend la place a l'onglet voisin, le sien.
+        Exiger(plan.Vue().Dossier is null && plan.Vue().Onglets is { Length: 2 } oa
+               && oa[0] is { Code: "AFFAIRE:004176", Libelle: "Modification - SCI DU PARC", Actif: false }
+               && oa[1] is { Code: "PROC_DEMANDE", Actif: true },
+            "l'affaire ouverte a son onglet, au nom du dossier, et un ecran ouvert la quitte sans le fermer");
         Agir("ongletFermer", "PROC_DEMANDE");
-        Exiger(plan.Vue().Proc is null && plan.Vue().Onglets is null, "la croix de l'onglet ferme l'ecran");
+        Exiger(plan.Vue().Proc is null && plan.Vue().Dossier?.Numero == "004176"
+               && plan.Vue().Onglets is { Length: 1 } ob && ob[0] is { Code: "AFFAIRE:004176", Actif: true },
+            "la croix de l'onglet ferme l'ecran ; l'onglet voisin, celui de l'affaire, la remontre");
+        Exiger(plan.Vue().Dossier!.Etapes!.Pages[6].Recap is { Valide: true },
+            "revenir sur l'onglet de l'affaire la retrouve telle qu'on l'a laissee (sa saisie validee)");
 
         // --- 7. Fiches multiples : ajouter un etablissement.
         Agir("ouvrirNumero", "004176");
@@ -492,11 +532,30 @@ internal static class Programme
         Agir("ongletActiver", "PROC_ENCAISS");
         Exiger(plan.Vue().Proc?.Code == "PROC_ENCAISS", "un clic sur l'onglet y revient");
         Agir("ouvrirNumero", "004176");
-        Exiger(plan.Vue().Dossier is not null, "une affaire ouverte recouvre l'accueil");
+        vue = plan.Vue();
+        Exiger(vue.Dossier is not null && vue.Proc is null
+               && vue.Onglets is { Length: 2 } oc && oc[1] is { Code: "AFFAIRE:004176", Actif: true } && !oc[0].Actif,
+            "une affaire ouverte recouvre l'accueil et prend l'onglet actif");
+        Agir("ongletActiver", "PROC_ENCAISS");
+        Exiger(plan.Vue().Proc?.Code == "PROC_ENCAISS" && plan.Vue().Dossier is null,
+            "un clic sur l'onglet d'un ecran quitte l'affaire sans la fermer (l'ecran seul est montre)");
+        Agir("ongletDebut", new { code = "AFFAIRE:004176", x = 150.0, y = 20.0,
+                                  mesure = new { page = new[] { 1500.0, 900.0, 40.0 }, cases = new[] { new[] { 10.0, 100.0 }, new[] { 110.0, 200.0 } } } });
+        Agir("ongletFin", new { x = 150.0, y = 20.0 });
+        Exiger(plan.Vue().Dossier?.Numero == "004176" && plan.Vue().Proc is null,
+            "un clic sur l'onglet de l'affaire la remontre");
+        Agir("ouvrirNumero", "004176");
+        Exiger(plan.Vue().Onglets is { Length: 2 }, "rouvrir l'affaire reprend son onglet, sans doublon");
         Agir("accueil");
         vue = plan.Vue();
-        Exiger(vue.Proc is null && vue.Dossier is null && vue.Onglets is { Length: 1 },
-            "depuis une affaire, la maison la ferme et ramene a l'accueil, l'onglet reste");
+        Exiger(vue.Proc is null && vue.Dossier is null && vue.Onglets is { Length: 2 } od && od.All(x => !x.Actif),
+            "depuis une affaire, la maison ramene a l'accueil ; les onglets restent, le sien compris");
+        Agir("ongletActiver", "AFFAIRE:004176");
+        Exiger(plan.Vue().Dossier?.Numero == "004176", "l'onglet de l'affaire la rouvre depuis l'accueil");
+        Agir("fermerDossier");
+        vue = plan.Vue();
+        Exiger(vue.Dossier is null && vue.Proc?.Code == "PROC_ENCAISS" && vue.Onglets is { Length: 1 },
+            "la croix de l'affaire ferme son onglet ; l'onglet voisin prend la place");
         Agir("ongletFermer", "PROC_ENCAISS");
         Exiger(plan.Vue().Onglets is null, "fermer le dernier onglet retire la barre d'onglets");
         Agir("ouvrirNumero", "004176");

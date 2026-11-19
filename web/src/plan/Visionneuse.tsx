@@ -4,9 +4,9 @@
 // Suivi / Fil » du /draft du 19/11/2026, conv-2009) : l'ARBRE documentaire, qui
 // se replie en un chemin au-dessus des donnees ; les DONNEES (fiche
 // d'informations ou saisie guidee) ; le DOCUMENT ; et la colonne de SUIVI, a
-// deux onglets (reste a faire et historique des pieces / fil du dossier). Les
-// donnees et le document se ferment, et les separateurs se glissent pour regler
-// les largeurs.
+// deux onglets (reste a faire et historique des pieces / fil du dossier), qui se
+// replie a droite. Les donnees et le document se ferment, et les separateurs se
+// glissent pour regler les largeurs -- celle du suivi comprise.
 
 import { useEffect, useRef } from 'react'
 import type { CSSProperties, MutableRefObject } from 'react'
@@ -67,7 +67,9 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
   return (
     <div className="rig-vged">
       <div className="rig-vged__entete">
-        <button className="rig-bouton rig-bouton--icone rig-bouton--plat" title="Retour a l'accueil" aria-label="Retour a l'accueil" onClick={() => plan('fermerDossier')}>
+        {/* La fleche ramene a l'accueil comme la maison : l'onglet de l'affaire
+            reste dans la barre (19/11/2026). La croix, a droite, la ferme. */}
+        <button className="rig-bouton rig-bouton--icone rig-bouton--plat" title="Retour a l'accueil" aria-label="Retour a l'accueil" onClick={() => plan('accueil')}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"></path><path d="M12 19l-7-7 7-7"></path></svg>
         </button>{' '}
         <span className={'rig-filet-v rig-filet-v--' + d.statut}></span>{' '}
@@ -219,8 +221,20 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
         {/* ---- ZONE 3 : LE DOCUMENT ---- */}
         {d.apercu && <Apercu colonne={d.apercu} plan={plan} />}
 
+        {/* Troisieme poignee : devant la colonne de suivi, qu'elle elargit vers la
+            gauche. Le C# ne connait pas la largeur rendue de la colonne souple : elle
+            part avec la saisie. Repliee, la colonne n'a plus de poignee. */}
+        {!d.suiviReplie && (
+          <div className="rig-vged__poignee rig-vged__poignee--suivi" title="Glisser pour ajuster le suivi"
+               onPointerDown={(e) => {
+                 e.preventDefault()
+                 const suivi = e.currentTarget.parentElement?.querySelector('.rig-vged__suivi')
+                 plan('redimDebut', { colonne: 3, x: e.clientX, largeur: suivi?.getBoundingClientRect().width ?? 0 })
+               }}></div>
+        )}
+
         {/* ---- ZONE 4 : LE SUIVI ---- toujours a droite, onglets Suivi / Fil. */}
-        <SuiviDossier bandeau={d.bandeau} historique={d.historique} fil={d.fil} plan={plan} />
+        <SuiviDossier bandeau={d.bandeau} historique={d.historique} fil={d.fil} replie={d.suiviReplie} plan={plan} />
 
         {d.voile && (
           <div className="rig-vged__voile"

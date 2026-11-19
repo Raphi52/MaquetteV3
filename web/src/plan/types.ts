@@ -142,6 +142,8 @@ export interface DossierVue {
   pieces: number
   /** Le fil de l'affaire, du plus ancien au plus recent (onglet Fil). */
   fil: MessageFilVue[]
+  /** La colonne de suivi est repliee a droite : un rail la remplace, sa poignee disparait. */
+  suiviReplie: boolean
 }
 export interface PieceHistoriqueVue {
   id: string

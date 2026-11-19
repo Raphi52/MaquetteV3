@@ -37,7 +37,8 @@ describe('Vue du dossier : l\'arbre se replie', () => {
     const { container, gestes } = rendre(dossier({ arbreReplie: true, poignee: false }))
     expect(container.querySelector('.rig-vged__arbre')).toBeNull()
     expect([...container.querySelector('.rig-vged__corps')!.children].map((e) => e.className)).toEqual([
-      'rig-vged__chemin', 'rig-vged__milieu', 'rig-vged__poignee', 'rig-vged__guide rig-vged__apercu', 'rig-vged__suivi',
+      'rig-vged__chemin', 'rig-vged__milieu', 'rig-vged__poignee', 'rig-vged__guide rig-vged__apercu',
+      'rig-vged__poignee rig-vged__poignee--suivi', 'rig-vged__suivi',
     ])
     const etapes = [...container.querySelectorAll('.rig-vged__chemin-etapes > li')]
     expect(etapes.map((e) => e.textContent)).toEqual(['004176', 'Dossier RCS', 'Statuts signes'])
@@ -117,5 +118,36 @@ describe('Vue du dossier : la colonne de suivi, onglets Suivi / Fil', () => {
     fireEvent.change(champ, { target: { value: 'Relance faite' } })
     fireEvent.click(envoyer)
     expect(gestes()[1]).toEqual(['filEcrire', 'Relance faite'])
+  })
+})
+
+// Demande du 19/11/2026 : la colonne de suivi se retracte a droite, et sa largeur
+// se glisse comme celle des autres colonnes.
+describe('Vue du dossier : la colonne de suivi se replie a droite', () => {
+  it('le bouton devant les onglets remonte « suiviReplier »', () => {
+    const { container, gestes } = rendre()
+    const tete = container.querySelector('.rig-suivi__tete')!
+    expect([...tete.children].map((e) => e.className)).toEqual(['rig-suivi__replier', 'rig-suivi__onglets'])
+    fireEvent.click(tete.querySelector('.rig-suivi__replier')!)
+    expect(gestes()).toEqual([['suiviReplier', null]])
+  })
+
+  it('repliee : un rail sans onglets ni poignee, qui garde le nombre d\'etapes a corriger et rouvre la colonne', () => {
+    const { container, gestes } = rendre(dossier({ suiviReplie: true }))
+    const suivi = container.querySelector('.rig-vged__corps > .rig-vged__suivi')!
+    expect(suivi.className).toBe('rig-vged__suivi rig-vged__suivi--replie')
+    expect(suivi.querySelector('.rig-suivi__onglets')).toBeNull()
+    expect(suivi.querySelector('.rig-chrono')).toBeNull()
+    expect(container.querySelector('.rig-vged__poignee--suivi')).toBeNull()
+    const rouvrir = suivi.querySelector('.rig-suivi__rouvrir')!
+    expect(rouvrir.textContent).toBe('Suivi1')
+    expect(rouvrir.querySelector('.rig-suivi__nombre')!.getAttribute('title')).toBe('1 etape a corriger')
+    fireEvent.click(rouvrir)
+    expect(gestes()).toEqual([['suiviDeplier', null]])
+  })
+
+  it('repliee sans defaut : le rail n\'affiche pas de nombre', () => {
+    const { container } = rendre(dossier({ suiviReplie: true, bandeau: null }))
+    expect(container.querySelector('.rig-suivi__rouvrir')!.textContent).toBe('Suivi')
   })
 })

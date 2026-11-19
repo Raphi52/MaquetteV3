@@ -67,12 +67,15 @@ public sealed record SessionEcranVue(string Session, int Version);
 /// <param name="Chemin">Les libelles du numero de l'affaire jusqu'a l'element choisi dans l'arbre.</param>
 /// <param name="Pieces">Le nombre de pieces que l'arbre montre a ce login.</param>
 /// <param name="Fil">Le fil de l'affaire, du plus ancien au plus recent (onglet « Fil » de la colonne de suivi).</param>
+/// <param name="SuiviReplie">La colonne de suivi est repliee a droite : un rail la remplace, et sa
+/// poignee (la troisieme, qui regle sa largeur) disparait avec elle (demande du 19/11/2026).</param>
 public sealed record DossierVue(string Numero, string Objet, string Siren, string Type, string Statut,
                                 bool BoutonDocument, SommaireVue Sommaire, BandeauDefautsVue? Bandeau,
                                 string StyleCorps, TacheVue? Tache, string Filtre, LigneArbreVue Arbre,
                                 bool Poignee, FicheColonneVue? Fiche, EtapesVue? Etapes, bool Poignee2,
                                 ApercuColonneVue? Apercu, bool Voile, PieceHistoriqueVue[] Historique,
-                                bool ArbreReplie, string[] Chemin, int Pieces, MessageFilVue[] Fil);
+                                bool ArbreReplie, string[] Chemin, int Pieces, MessageFilVue[] Fil,
+                                bool SuiviReplie);
 
 /// <summary>
 /// Un message du FIL de l'affaire : une note ecrite dans l'onglet « Fil », ou une valeur
@@ -379,7 +382,8 @@ public sealed partial class SessionPlanTravail
             DonneesVisible && GuideVisible,
             GuideVisible ? new ApercuColonneVue(FenetresDetachees.Count, VueApercu(d)) : null,
             Redimensionne, historique,
-            ArbreReplie, CheminSelection(d.Numero), NbPiecesVisibles(), VueFil(d.Numero));
+            ArbreReplie, CheminSelection(d.Numero), NbPiecesVisibles(), VueFil(d.Numero),
+            SuiviReplie);
     }
 
     /// <summary>
@@ -610,7 +614,8 @@ public sealed partial class SessionPlanTravail
     private sealed record GestePoint(double X, double Y);
     private sealed record GesteDebutGlisse(string Code, double X, double Y, MesureBarre? Mesure);
     private sealed record GesteNoeud(string Id, string? Texte, double ClientX, double ClientY);
-    private sealed record GesteRedim(int Colonne, double X);
+    /// <param name="Largeur">La largeur rendue de la colonne saisie, mesuree par l'ecran (poignee 3).</param>
+    private sealed record GesteRedim(int Colonne, double X, double Largeur = 0);
     private sealed record GesteFiche(string Etape, int Index);
     private sealed record GesteDefaut(int Etape, int Fiche);
     private sealed record GesteSaisie(string Etape, string Colonne, string? Valeur);
@@ -695,7 +700,7 @@ public sealed partial class SessionPlanTravail
             case "paletteAttribuer": AgirPalette(geste, valeur); break;
 
             // ---- Visionneuse : entete, bandeau des defauts, colonnes ----
-            case "fermerDossier": FermerDossier(); break;
+            case "fermerDossier": FermerAffaire(); break;
             case "afficherDocument": GuideVisible = true; break;
             case "allerAuDefautBandeau":
             {
@@ -706,7 +711,9 @@ public sealed partial class SessionPlanTravail
             case "redimDebut":
             {
                 var g = Lire<GesteRedim>(valeur);
-                if (g.Colonne == 2) DebutRedim2(g.X); else DebutRedim(g.X);
+                if (g.Colonne == 3) DebutRedimSuivi(g.X, g.Largeur);
+                else if (g.Colonne == 2) DebutRedim2(g.X);
+                else DebutRedim(g.X);
                 break;
             }
             case "redim": PendantRedim(Lire<GestePoint>(valeur).X); break;
@@ -715,6 +722,8 @@ public sealed partial class SessionPlanTravail
             // ---- Arbre ----
             case "arbreReplier": ArbreReplie = true; break;
             case "arbreDeplier": ArbreReplie = false; break;
+            case "suiviReplier": SuiviReplie = true; break;
+            case "suiviDeplier": SuiviReplie = false; break;
             case "ouvrirNouveau": OuvrirNouveau(); break;
             case "filtre": FiltreDeLArbre = Texte(valeur); break;
             case "effacerFiltre": FiltreDeLArbre = string.Empty; break;

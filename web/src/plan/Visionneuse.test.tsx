@@ -173,24 +173,30 @@ describe('Visionneuse : les colonnes', () => {
       .toBe('400px 6px 420px 6px minmax(0px, 1fr)')
   })
 
-  it('arbre, poignee, donnees, poignee, document, suivi : dans cet ordre', () => {
+  it('arbre, poignee, donnees, poignee, document, poignee, suivi : dans cet ordre', () => {
     const { container } = rendre()
     expect([...container.querySelector('.rig-vged__corps')!.children].map((e) => e.className)).toEqual([
       'rig-vged__arbre', 'rig-vged__poignee', 'rig-vged__milieu', 'rig-vged__poignee',
-      'rig-vged__guide rig-vged__apercu', 'rig-vged__suivi',
+      'rig-vged__guide rig-vged__apercu', 'rig-vged__poignee rig-vged__poignee--suivi', 'rig-vged__suivi',
     ])
   })
 
   it('les poignees remontent leur colonne et l\'abscisse ; le voile suit le pointeur puis lache', () => {
     const { container, gestes } = rendre(dossier({ voile: true }))
-    const [p1, p2] = container.querySelectorAll('.rig-vged__poignee')
+    const [p1, p2, p3] = container.querySelectorAll('.rig-vged__poignee')
+    // La troisieme envoie aussi la largeur RENDUE du suivi : sa largeur souple
+    // (un cinquieme de la fenetre) n'est pas connue du C#.
+    const suivi = container.querySelector('.rig-vged__suivi')!
+    suivi.getBoundingClientRect = () => ({ width: 312 }) as DOMRect
     fireEvent.pointerDown(p1!, { clientX: 400 })
     fireEvent.pointerDown(p2!, { clientX: 820 })
+    fireEvent.pointerDown(p3!, { clientX: 1500 })
     const voile = container.querySelector('.rig-vged__voile')!
     fireEvent.pointerMove(voile, { clientX: 450, clientY: 10 })
     fireEvent.pointerUp(voile)
     expect(gestes()).toEqual([
       ['redimDebut', { colonne: 1, x: 400 }], ['redimDebut', { colonne: 2, x: 820 }],
+      ['redimDebut', { colonne: 3, x: 1500, largeur: 312 }],
       ['redim', { x: 450, y: 10 }], ['redimFin', null],
     ])
   })
