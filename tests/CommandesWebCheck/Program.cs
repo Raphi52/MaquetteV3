@@ -289,17 +289,20 @@ Exiger(tsx.Contains("'EcranCommandesWeb.Ouvrir'") && tsx.Contains("'EcranCommand
         && pont.Contains("[JSInvokable(\"EcranCommandesWeb.Fermer\")]"),
     "l'ecran React appelle les trois methodes de SON pont, et le pont les expose");
 // La mise en page choisie au /draft du 19/11/2026 (« Proue », qui remplace la
-// « Boite de tri » du 18/11) : la proue de l'accueil, la recherche en pilule, une
-// tuile chiffree (.rig-chiffre, grand rond et anneau) par onglet d'etat, puis la
-// liste et le panneau A COTE ; decisions dans l'ordre de la maquette. En React, le
-// panneau est le composant <Panneau>, pose dans la scene APRES la liste ; c'est
-// lui qui porte rig-tcw__panneau.
-Exiger(tsx.Contains("rig-tcw__barre") && tsx.Contains("className=\"rig-proue\"")
+// « Boite de tri » du 18/11) : la recherche en pilule EN HAUT, une tuile chiffree
+// (.rig-chiffre, grand rond et anneau) par onglet d'etat, puis la liste et le
+// panneau A COTE ; decisions dans l'ordre de la maquette. En React, le panneau est
+// le composant <Panneau>, pose dans la scene APRES la liste ; c'est lui qui porte
+// rig-tcw__panneau. L'en-tete date + compte « à traiter » (.rig-proue) qui
+// surmontait la pilule a ete retire (conv-2010) : il prenait de la place.
+Exiger(!codeTsx.Contains("rig-proue") && !codeTsx.Contains("rig-tcw__barre") && !pont.Contains("Proue(")
         && pont.Contains("TraitementCommandes.Onglets(") && tsx.Contains("rig-tcw__chercher")
-        && Regex.IsMatch(tsx, @"rig-proue\b[\s\S]*rig-tcw__pilule[\s\S]*rig-tcw__tuiles[\s\S]*rig-tcw__scene[\s\S]*rig-tcw__liste[\s\S]*<Panneau\b")
+        // ({} : ce qui reste d'un commentaire JSX une fois les commentaires otes)
+        && Regex.IsMatch(codeTsx, @"<div className=""rig-tcw"">\s*(\{\}\s*)?<div className=""rig-tcw__cherche"">")
+        && Regex.IsMatch(tsx, @"rig-tcw__pilule[\s\S]*rig-tcw__tuiles[\s\S]*rig-tcw__scene[\s\S]*rig-tcw__liste[\s\S]*<Panneau\b")
         && Regex.IsMatch(tsx, @"function\s+Tuile\b[\s\S]*?rig-chiffre rig-chiffre--[\s\S]*?rig-chiffre__anneau")
         && Regex.IsMatch(tsx, @"function\s+Panneau\b[\s\S]*?className=""rig-tcw__panneau"""),
-    "mise en page « Proue » : proue, recherche en pilule, une tuile par etat, liste et panneau a cote");
+    "mise en page « Proue » : recherche en pilule en haut (sans en-tete au-dessus), une tuile par etat, liste et panneau a cote");
 // Une tuile est un FILTRE : son clic remonte « ChoisirOnglet » avec son etat ; la
 // pilule remonte chaque frappe (« FiltrerRapide »). Le filtre est dans le pont.
 Exiger(codeTsx.Contains("geste('ChoisirOnglet', t.etat)") && codeTsx.Contains("geste('FiltrerRapide', texte)")
@@ -422,13 +425,6 @@ Geste("ChoisirOnglet", "ATraiter");
 Exiger(tuilesFausses.Count == 0 && vue.Tuiles.Sum(o => o.Part) is >= 99 and <= 101,
     $"joue : chaque tuile filtre la liste sur son etat (Regrouper), compte ses groupes, et les anneaux font 100 % (fausses : "
     + string.Join(", ", tuilesFausses) + ")");
-// La proue : la date de l'accueil, le compte « à traiter » en titre, et la phrase.
-Exiger(vue.Proue.Date == DateTime.Today.ToString("dddd d MMMM", System.Globalization.CultureInfo.GetCultureInfo("fr-FR"))
-       && vue.Proue.Titre == new ChiffreCw(8, "commandes à traiter", false)
-       && string.Join(" · ", vue.Proue.Phrase.Select(c => $"{c.Nombre} {c.Texte}{(c.Alerte ? "!" : "")}"))
-          == "3 groupes · 1 en attente · 1 validée · 1 rejetée!",
-    $"joue : la proue dit « 8 commandes à traiter » et « 3 groupes · 1 en attente · 1 validée · 1 rejetée » (rejet en alerte) — lu : "
-    + string.Join(" · ", vue.Proue.Phrase.Select(c => $"{c.Nombre} {c.Texte}{(c.Alerte ? "!" : "")}")));
 
 Geste("ChoisirOnglet", "Rejetee");
 Exiger(OngletActif() == "Rejetee" && IdsLus().SequenceEqual(new[] { 11 }), "joue : l'onglet « Rejetée » ne montre que IG-90601");

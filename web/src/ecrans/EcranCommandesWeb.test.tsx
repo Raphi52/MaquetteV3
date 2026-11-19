@@ -13,12 +13,6 @@ afterEach(() => { cleanup(); retirerFauxPont() })
 function vueDeBase(): VueCommandesWeb {
   return {
     session: 'S',
-    proue: {
-      date: 'jeudi 19 novembre',
-      titre: { nombre: 6, texte: 'commandes à traiter', alerte: false },
-      phrase: [{ nombre: 2, texte: 'groupes', alerte: false }, { nombre: 2, texte: 'en attente', alerte: false },
-               { nombre: 1, texte: 'rejetée', alerte: true }],
-    },
     tuiles: [
       { etat: 'ATraiter', libelle: 'À traiter', nombre: 6, actif: true, part: 67, detail: '2 groupe(s)' },
       { etat: 'EnAttente', libelle: 'Mise en attente', nombre: 2, actif: false, part: 22, detail: '1 groupe(s)' },
@@ -75,19 +69,16 @@ function session(depart: VueCommandesWeb, reagir: (vue: VueCommandesWeb, geste: 
 }
 
 describe('EcranCommandesWeb', () => {
-  it('proue de l\'accueil : date, compte « à traiter » en grand, phrase des autres etats (rejets en alerte)', async () => {
+  it('la recherche en pilule ouvre l\'ecran, sans en-tete au-dessus (ni date, ni compte « à traiter »)', async () => {
     session(vueDeBase())
     const { container } = render(<EcranCommandesWeb />)
     await screen.findByText('TRANSNORD SA')
-    const proue = container.querySelector('.rig-tcw__barre > .rig-proue')!
-    expect(proue.querySelector('.rig-proue__date')!.textContent).toBe('jeudi 19 novembre·Affaires')
-    expect(proue.querySelector('.rig-tcw__proue-titre')!.textContent).toBe('6 commandes à traiter')
-    expect(proue.querySelector('.rig-proue__phrase')!.textContent).toBe('2 groupes·2 en attente·1 rejetée')
-    const chiffres = [...proue.querySelectorAll('.rig-proue__phrase b')]
-    expect(chiffres.map((b) => b.className)).toEqual(['', '', 'rig-proue__alerte'])
-    // L'ordre de la maquette : proue, pilule, tuiles, puis liste et detail.
+    // L'ordre : pilule, tuiles, puis liste et detail. L'en-tete date + compte a ete
+    // retire (conv-2010) : il prenait de la place, les tuiles donnent ces chiffres.
     expect([...container.querySelector('.rig-tcw')!.children].map((e) => e.className.trim()))
-      .toEqual(['rig-tcw__barre', 'rig-tcw__cherche', 'rig-tcw__tuiles', 'rig-tcw__scene'])
+      .toEqual(['rig-tcw__cherche', 'rig-tcw__tuiles', 'rig-tcw__scene'])
+    expect(container.querySelector('.rig-proue')).toBeNull()
+    expect(container.textContent).not.toContain('commandes à traiter')
   })
 
   it('une tuile de l\'accueil par statut (anneau rempli de sa part), puis la liste de la tuile active', async () => {

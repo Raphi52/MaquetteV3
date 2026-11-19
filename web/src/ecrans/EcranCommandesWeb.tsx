@@ -2,10 +2,10 @@
 // la maquette pour le voir avec ses themes.
 //
 // MISE EN PAGE « PROUE » : direction n° 1 choisie par l'utilisateur au /draft du
-// 19/11/2026, l'accueil applique tel quel. L'en-tete est la PROUE de l'accueil
-// (date en petites capitales, le compte « à traiter » en grand, une phrase pour
-// les autres etats) ; dessous, la RECHERCHE EN PILULE de l'accueil, qui filtre a
-// chaque frappe ; puis une TUILE CHIFFREE par etat (grand rond, anneau qui se
+// 19/11/2026, l'accueil applique tel quel. En haut, la RECHERCHE EN PILULE de
+// l'accueil, qui filtre a chaque frappe (l'en-tete date + compte « à traiter »
+// a ete retire le meme jour, conv-2010 : il prenait de la place, les tuiles
+// donnent deja ces chiffres) ; puis une TUILE CHIFFREE par etat (grand rond, anneau qui se
 // remplit de sa part des commandes), qui filtre la liste sur son etat. La liste
 // est a gauche, la commande choisie s'ouvre a droite. Elle remplace les
 // « Colonnes de statut » essayees le meme jour, et reprend la liste a plat de
@@ -32,7 +32,7 @@
 // et les regles de l'ancien @code vivent dans Pont/EcranCommandesWeb.cs
 // (SessionCommandesWeb) ; cet ecran affiche la vue et remonte chaque geste.
 
-import { Fragment, useEffect, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import { appeler } from '../pont'
 import { Saisie, useSession, type Geste, type PontDeSession } from '../session'
 
@@ -67,8 +67,6 @@ export interface TuileCw {
   part: number
   detail: string
 }
-export interface ChiffreCw { nombre: number; texte: string; alerte: boolean }
-export interface ProueCw { date: string; titre: ChiffreCw; phrase: ChiffreCw[] }
 export interface EtatCw { icone: string; libelle: string }
 export interface MembreCw { id: number; titre: string; icone: string; libelle: string }
 export interface EnveloppeCw { reference: string; membres: MembreCw[]; etat: string; envoiEnAttente: boolean }
@@ -156,7 +154,6 @@ export interface ChampAdresseCw { cle: string; libelle: string; large: boolean; 
 export interface CoordonneesCw { lectureSeule: boolean; champs: ChampAdresseCw[]; lignes: string[]; alertes: string[]; adresseCorrigee: boolean }
 export interface VueCommandesWeb {
   session: string
-  proue: ProueCw
   tuiles: TuileCw[]
   rapide: string
   rechercheOuverte: boolean
@@ -744,7 +741,6 @@ export function EcranCommandesWeb() {
   if (!vue) return <div className="rig-tcw"></div>
 
   const r = vue.recherche
-  const proue = vue.proue
   const texte = (champ: string) => (valeur: string) => geste('Texte', { champ, valeur })
   const rechercher = () => geste('Rechercher')
   const surToucheRecherche = (e: KeyboardEvent) => {
@@ -753,22 +749,6 @@ export function EcranCommandesWeb() {
 
   return (
     <div className="rig-tcw">
-      {/* La proue de l'accueil : date, compte « à traiter » en grand, phrase des autres etats. */}
-      <header className="rig-tcw__barre">
-        <div className="rig-proue">
-          <div className="rig-proue__date">{proue.date}<span className="rig-proue__point">·</span>Affaires</div>
-          <h2 className="rig-tcw__proue-titre"><b>{proue.titre.nombre}</b> {proue.titre.texte}</h2>
-          <div className="rig-proue__phrase">
-            {proue.phrase.map((c, i) => (
-              <Fragment key={i}>
-                {i > 0 && <span className="rig-proue__point">·</span>}
-                <b className={c.alerte ? 'rig-proue__alerte' : undefined}>{c.nombre}</b> {c.texte}
-              </Fragment>
-            ))}
-          </div>
-        </div>
-      </header>
-
       {/* La recherche en pilule de l'accueil : chaque frappe filtre tuiles et
           liste. « Critères » ouvre la recherche detaillee (type, periode…). */}
       <div className="rig-tcw__cherche">

@@ -18,15 +18,6 @@ public sealed record TuileCw(string Etat, string Libelle, int Nombre, bool Actif
 public sealed record OptionCw(string Valeur, string Libelle);
 public sealed record MessageCw(string Texte, string Severite);
 
-/// <summary>Un chiffre de la proue et ce qu'il compte (« 3 » · « groupes ») ; <c>Alerte</c> l'ecrit en teinte d'alerte.</summary>
-public sealed record ChiffreCw(int Nombre, string Texte, bool Alerte);
-
-/// <summary>
-/// L'en-tete de l'ecran, a la maniere de la proue de l'accueil : la date du jour,
-/// le titre (les commandes a traiter) et la phrase des autres etats.
-/// </summary>
-public sealed record ProueCw(string Date, ChiffreCw Titre, ChiffreCw[] Phrase);
-
 /// <summary>Les criteres tels que saisis dans la carte de recherche (dates : aaaa-mm-jj ou vide).</summary>
 public sealed record RechercheCw(string Famille, OptionCw[] Familles, string Du, string Au, string Siren,
                                  string Reference, bool EnAttenteEnvoi, string DateTravail);
@@ -101,7 +92,7 @@ public sealed record CoordonneesCw(bool LectureSeule, ChampAdresseCw[] Champs, s
 /// Tout ce que web/src/ecrans/EcranCommandesWeb.tsx affiche. <c>Rapide</c> : le
 /// texte de la recherche en pilule, applique a chaque frappe.
 /// </summary>
-public sealed record VueCommandesWeb(string Session, ProueCw Proue, TuileCw[] Tuiles, string Rapide, bool RechercheOuverte,
+public sealed record VueCommandesWeb(string Session, TuileCw[] Tuiles, string Rapide, bool RechercheOuverte,
                                      bool RechercheAffinee, string ResumeCriteres, RechercheCw Recherche, MessageCw? Message,
                                      string Compteur, bool DirectsEnTete, LigneCw[] Lignes, PanneauCw? Panneau,
                                      CoordonneesCw? Coordonnees);
@@ -163,7 +154,7 @@ public sealed class SessionCommandesWeb
 
     // ------------------------------------------------------------ tuiles et liste
     // Un onglet d'etat = une tuile, qui filtre la liste sur son etat. Chaque tuile
-    // compte aussi ses groupes (son detail, et la phrase de la proue) : les groupes
+    // compte aussi ses groupes (son detail) : les groupes
     // sont donc calcules pour chaque etat. Decider prend la suivante dans l'Ordre
     // de la tuile ACTIVE, celui de la liste affichee.
     private EtatCommande OngletActif = EtatCommande.ATraiter;
@@ -865,8 +856,6 @@ public sealed class SessionCommandesWeb
     private static DocumentCw[] Documents(IEnumerable<DocumentEdite> docs) =>
         docs.Select(d => new DocumentCw(d.Document, d.Bac, d.Exemplaires?.ToString() ?? "—", d.Origine)).ToArray();
 
-    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
-
     internal VueCommandesWeb Vue(string session)
     {
         var total = Onglets.Sum(o => o.Nombre);
@@ -879,7 +868,7 @@ public sealed class SessionCommandesWeb
             SirenCherche, ReferenceCherchee, EnAttenteEnvoi,
             TraitementCommandes.DateTravail.ToString("dd/MM/yyyy"));
 
-        return new VueCommandesWeb(session, VueProue(), tuiles, Appliques.Texte, RechercheOuverte,
+        return new VueCommandesWeb(session, tuiles, Appliques.Texte, RechercheOuverte,
             TraitementCommandes.RechercheAffinee(Appliques), TraitementCommandes.Resumer(Appliques), recherche,
             Message is { } m ? new MessageCw(m.Texte, m.Severite) : null,
             TraitementCommandes.Compteur(GroupesParEtat[OngletActif]), DirectsEnTete, Ordre.Select(VueLigne).ToArray(),
@@ -899,32 +888,6 @@ public sealed class SessionCommandesWeb
                            TraitementCommandes.EstRapprochementDirect(cmd),
                            marches.Length > 0 ? $"{faites}/{marches.Length}" : null,
                            marches.Length > 0 && faites == marches.Length);
-    }
-
-    /// <summary>
-    /// La proue : la date du jour (celle de l'accueil, Home.DateDuJour), le compte
-    /// « À traiter » en titre, puis une phrase pour ses groupes et les autres
-    /// etats. Les rejets s'ecrivent en teinte d'alerte des qu'il y en a.
-    /// </summary>
-    private ProueCw VueProue()
-    {
-        static string Accord(int n, string un, string plusieurs) => n > 1 ? plusieurs : un;
-        int Nombre(EtatCommande e) => Onglets.FirstOrDefault(o => o.Etat == e).Nombre;
-        var aTraiter = Nombre(EtatCommande.ATraiter);
-        var groupes = GroupesParEtat[EtatCommande.ATraiter].Count;
-        var phrase = new List<ChiffreCw> { new(groupes, Accord(groupes, "groupe", "groupes"), false) };
-        foreach (var (etat, n) in Onglets.Where(o => o.Etat != EtatCommande.ATraiter))
-        {
-            phrase.Add(etat switch
-            {
-                EtatCommande.EnAttente => new ChiffreCw(n, "en attente", false),
-                EtatCommande.Validee => new ChiffreCw(n, Accord(n, "validée", "validées"), false),
-                EtatCommande.Rejetee => new ChiffreCw(n, Accord(n, "rejetée", "rejetées"), n > 0),
-                _ => new ChiffreCw(n, "en saisie au guichet", false),
-            });
-        }
-        return new ProueCw(DateTime.Today.ToString("dddd d MMMM", Fr),
-            new ChiffreCw(aTraiter, Accord(aTraiter, "commande à traiter", "commandes à traiter"), false), phrase.ToArray());
     }
 
     private PanneauCw VuePanneau(CommandeRecue c)
