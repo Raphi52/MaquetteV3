@@ -57,19 +57,32 @@ $codeCs = $LASTEXITCODE
 # Les DEUX passent toujours, pour voir d'un coup les error CS ET les error TS.
 $web = Join-Path $PSScriptRoot 'web'
 $codeTs = 0
+$codePaquets = 0
 if (Test-Path (Join-Path $web 'package.json')) {
+    # PAQUETS A JOUR AVANT tsc (19/11/2026). Ils ne sont installes que par un
+    # vrai build (cible InstallerWeb, accrochee a la copie vers bin), que
+    # -t:Compile n'atteint pas : on appelle donc CETTE cible, seule definition
+    # de la regle (marqueur plus ancien que package.json / package-lock.json =>
+    # npm ci). Tester « tsc.cmd existe », comme avant, laissait des paquets
+    # PERIMES : apres l'ajout de @types/node, TS2591 dans vite.config.ts.
+    # Appel SEPARE de la compilation C# : un refus ici (paquets tenus par le
+    # serveur Vite de dev.ps1) ne doit pas masquer les error CS.
+    & dotnet msbuild "$PSScriptRoot\RigV3Desktop.csproj" -t:InstallerWeb -v:m -nologo
+    $codePaquets = $LASTEXITCODE
     Push-Location $web
     try {
-        # Copie neuve : les paquets ne sont installes que par un vrai build
-        # (cible InstallerWeb, accrochee a la copie vers bin depuis le
-        # 19/11/2026, que -t:Compile n'atteint pas) : on les installe ici.
-        if (-not (Test-Path 'node_modules\.bin\tsc.cmd')) { & npm ci --no-audit --no-fund }
         & npm run --silent typecheck
         $codeTs = $LASTEXITCODE
     } finally { Pop-Location }
 }
 
-if ($codeCs -eq 0 -and $codeTs -eq 0) {
+if ($codePaquets -ne 0) {
+    # tsc a tourne quand meme, sur les paquets presents : son verdict reste
+    # affiche, mais il porte sur des paquets qui ne sont peut-etre plus ceux
+    # de package-lock.json. On le dit au lieu de rendre un vert muet.
+    Write-Host "Paquets npm NON mis a jour (code $codePaquets) - voir le message ci-dessus ; la verification TypeScript a porte sur les paquets deja installes." -ForegroundColor Yellow
+}
+if ($codeCs -eq 0 -and $codeTs -eq 0 -and $codePaquets -eq 0) {
     Write-Host 'Compilation OK (C# et TypeScript) - le binaire n a pas ete touche, l application n a pas ete fermee.' -ForegroundColor Green
     exit 0
 }

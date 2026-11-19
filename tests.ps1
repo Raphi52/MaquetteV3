@@ -87,12 +87,11 @@ if ((Test-Path (Join-Path $web 'package.json')) -and (-not $Filtre -or $nomWeb -
     $debut = Get-Date
     Push-Location $web
     try {
-        $sortie = @()
-        $code = 0
-        if (-not (Test-Path 'node_modules\.bin\vitest.cmd')) {
-            $sortie += & npm ci --no-audit --no-fund 2>&1
-            $code = $LASTEXITCODE
-        }
+        # Paquets a jour : la regle est la cible InstallerWeb du .csproj (marqueur
+        # plus ancien que package.json / package-lock.json => npm ci), pas la
+        # presence de vitest.cmd, qui laissait des paquets perimes (19/11/2026).
+        $sortie = @(& dotnet msbuild (Join-Path $PSScriptRoot 'RigV3Desktop.csproj') -t:InstallerWeb -v:m -nologo 2>&1)
+        $code = $LASTEXITCODE
         if ($code -eq 0) {
             $sortie += & npm test --silent 2>&1
             $code = $LASTEXITCODE

@@ -1,4 +1,4 @@
-﻿﻿# Lance RIG V3 en mode developpement, avec reprise a chaud.
+﻿# Lance RIG V3 en mode developpement, avec reprise a chaud.
 #
 #   .\dev.ps1
 #
@@ -37,11 +37,15 @@ $env:DOTNET_ENVIRONMENT = 'Development'
 # port est pris entre-temps, Vite s'arrete au lieu d'en prendre un autre que la
 # fenetre ne connaitrait pas.
 $web = Join-Path $PSScriptRoot 'web'
-if (-not (Test-Path (Join-Path $web 'node_modules\.bin\vite.cmd'))) {
-    Push-Location $web
-    try { & npm ci --no-audit --no-fund } finally { Pop-Location }
-    if ($LASTEXITCODE -ne 0) { Write-Host 'npm ci en echec : le serveur Vite ne peut pas demarrer.' -ForegroundColor Red; exit 1 }
-}
+# PAQUETS A JOUR AVANT VITE (19/11/2026). La regle est la cible InstallerWeb
+# du .csproj (marqueur plus ancien que package.json / package-lock.json =>
+# npm ci). Elle DOIT passer ici, avant Vite : sinon c'est le premier build de
+# dotnet watch qui lance npm ci, alors que Vite tient deja node_modules --
+# Windows refuse d'effacer les fichiers charges, l'installation s'arrete a
+# moitie (14 paquets sur 77) et aucune fenetre ne s'ouvre. Faite ici, la cible
+# est a jour quand watch la rejoue : elle ne tourne plus.
+& dotnet msbuild "$PSScriptRoot\RigV3Desktop.csproj" -t:InstallerWeb -v:m -nologo
+if ($LASTEXITCODE -ne 0) { Write-Host 'Paquets npm non installes : le serveur Vite ne peut pas demarrer.' -ForegroundColor Red; exit 1 }
 $ecoute = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
 $ecoute.Start(); $port = $ecoute.LocalEndpoint.Port; $ecoute.Stop()
 $adresseVite = "http://127.0.0.1:$port/"

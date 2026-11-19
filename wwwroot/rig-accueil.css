@@ -883,23 +883,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 }
 .rig-vged__ligne-meta > span:first-child { color: var(--rig-texte-3); }
 
-/* Bandeau d'erreur Blazor : masque tant que le framework ne le montre pas.
-   Sans cette regle, le template l'affiche en permanence (il n'a pas de
-   display:none par defaut hors des templates Microsoft). */
-#blazor-error-ui {
-    display: none;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1000;
-    padding: 10px 16px;
-    background: var(--rig-alerte, #B45309);
-    color: #fff;
-    font-size: 13px;
-}
-#blazor-error-ui .reload { color: #fff; text-decoration: underline; }
-
 
 /* ============================================================
    BARRES DE DEFILEMENT

@@ -21,6 +21,13 @@ strict), `error TS` dans la sortie. Il ne construit pas `wwwroot/app/` : la cons
 Vite est accrochée à la copie vers `bin\` (cibles `ConstruireWeb` / `CopierWeb` du
 `.csproj`), que seul un vrai build fait.
 
+Paquets npm : une seule règle, la cible `InstallerWeb` du `.csproj` (`npm ci` quand
+`web/package.json` ou `package-lock.json` est plus récent que
+`web/node_modules/.rig-install-ok`). `compiler.ps1`, `tests.ps1` et `dev.ps1` (avant de
+lancer Vite) l'appellent d'abord. Si un serveur Vite ou vitest de ce dossier tient
+`node_modules`, elle **refuse** au lieu d'effacer les paquets sous lui, et nomme le pid :
+ne le tue pas s'il n'est pas à toi — compile dans ta propre copie de travail.
+
 ## L'interface : WPF + WebView2 + React (Blazor retiré le 2026-11-19)
 
 Chaque fenêtre (`MainWindow`, `FenetreVue`, `FenetreDocument`) porte un contrôle

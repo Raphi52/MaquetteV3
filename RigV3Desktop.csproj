@@ -44,9 +44,31 @@
            Text="Node.js (npm) est requis pour construire les ecrans React de web/ : installer Node 22 ou plus recent (https://nodejs.org), puis relancer." />
   </Target>
 
+  <!-- LA REGLE « PAQUETS A JOUR » (19/11/2026) : web/node_modules est installe
+       quand le marqueur .rig-install-ok manque ou qu'il est plus ancien que
+       package.json ou package-lock.json. C'est la SEULE definition de la regle :
+       compiler.ps1, dev.ps1 (AVANT de lancer Vite) et tests.ps1 appellent cette
+       cible (« dotnet msbuild -t:InstallerWeb », ~1 s quand tout est a jour)
+       au lieu de tester la presence d'un binaire. Tester « tsc.cmd existe »
+       laissait des paquets PERIMES en place apres l'ajout de @types/node
+       (TS2591 dans vite.config.ts, compiler.ps1 rouge).
+       GARDE : npm ci EFFACE node_modules avant de reinstaller. Si un processus
+       de CE dossier le tient (serveur Vite de dev.ps1, vitest, esbuild), Windows
+       refuse d'effacer les fichiers charges, l'installation s'arrete a moitie
+       (mesure : 14 paquets sur 77) et le serveur Vite casse sous l'utilisateur.
+       On s'arrete donc AVANT d'effacer, en nommant les processus. Le chemin
+       passe par l'environnement : sur la ligne de commande, le PowerShell de
+       la garde se trouverait lui-meme. -->
   <Target Name="InstallerWeb" DependsOnTargets="VerifierNodeWeb"
           Condition="'$(DesignTimeBuild)' != 'true'"
           Inputs="@(_EntreesInstallWeb)" Outputs="web/node_modules/.rig-install-ok">
+    <Exec Command="powershell -NoProfile -NonInteractive -Command &quot;$d = $env:RIG_WEB_MODULES.ToLower().Replace('/','\'); $p = Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and (('' + $_.CommandLine + ' ' + $_.ExecutablePath).ToLower().Replace('/','\')).Contains($d) }; foreach ($x in $p) { Write-Host ('  pid ' + $x.ProcessId + ' ' + $x.Name) }; if ($p) { exit 3 }&quot;"
+          EnvironmentVariables="RIG_WEB_MODULES=$(MSBuildProjectDirectory)\web\node_modules\"
+          IgnoreExitCode="true" EchoOff="true">
+      <Output TaskParameter="ExitCode" PropertyName="_CodeWebEnUsage" />
+    </Exec>
+    <Error Condition="'$(_CodeWebEnUsage)' == '3'"
+           Text="Paquets npm a mettre a jour (web/package.json ou package-lock.json plus recent que la derniere installation), mais web/node_modules est tenu par les processus ci-dessus (serveur Vite de dev.ps1, vitest...) : npm ci les effacerait sous eux. Une fois ces processus termines, relancer : dev.ps1 met les paquets a jour AVANT de demarrer Vite." />
     <Exec Command="npm ci --no-audit --no-fund" WorkingDirectory="$(MSBuildProjectDirectory)/web" />
     <Touch Files="web/node_modules/.rig-install-ok" AlwaysCreate="true" />
   </Target>
