@@ -98,14 +98,31 @@ Exiger(depot.Tous().Length == exemples.Length + 2,
     "l'ecran de saisie voit AUSSI les actualites expirees ou programmees");
 
 // --- 5. La tuile est bien posee sur l'accueil
-Exiger(vue.Contains("new(\"actualites\""), "la tuile « actualites » est declaree dans l'accueil");
-Exiger(vue.Contains("case \"actualites\":"), "le corps de la tuile est aiguille dans le switch");
-Exiger(vue.Contains("CorpsActualites"), "le corps de la tuile existe");
-Exiger(vue.Contains("rig-filet-v--@b.Fiche.Filet") || vue.Contains("rig-filet-v--@(b.Fiche.Filet)"),
+// PORTE EN REACT (lot 1 du plan « finir le passage a React », 19/11/2026) :
+// la grille de l'accueil est rendue par web/src/accueil/Grille.tsx, le corps de
+// la tuile par Tuiles.tsx (fonction Actualites) ; la releve, la vue et le geste
+// « Rediger » vivent dans la session de l'accueil (Pont/Accueil.cs). Memes
+// regles, lues dans ces fichiers.
+var pontAccueil = File.ReadAllText(Path.Combine(racine, "Pont/Accueil.cs"));
+var grilleTsx = File.ReadAllText(Path.Combine(racine, "web/src/accueil/Grille.tsx"));
+var tuilesTsx = File.ReadAllText(Path.Combine(racine, "web/src/accueil/Tuiles.tsx"));
+Exiger(pontAccueil.Contains("new(\"actualites\""), "la tuile « actualites » est declaree dans l'accueil");
+Exiger(pontAccueil.Contains("corps == \"actualites\" ? ActualitesTuile()")
+       && grilleTsx.Contains("if (t.actualites) return <Actualites vue={t.actualites}"),
+    "le corps de la tuile est aiguille dans le switch");
+Exiger(tuilesTsx.Contains("export function Actualites("), "le corps de la tuile existe");
+Exiger(tuilesTsx.Contains("className={'rig-filet-v rig-filet-v--' + b.filet}")
+       && pontAccueil.Contains("new ActualiteVue(b.Fiche.Filet,"),
     "la couleur passe par le filet, comme la charte l'impose");
-Exiger(vue.Contains("rig-actualite__type"), "le type est NOMME a cote de sa couleur");
-Exiger(vue.Contains("EtatActualites"), "l'etat de la source est affiche dans la tuile");
-Exiger(vue.Contains("PROC_ACTUALITES"), "la tuile mene a l'ecran de saisie");
+Exiger(tuilesTsx.Contains("'rig-actualite__type rig-actualite__type--' + b.filet}>{b.type}"),
+    "le type est NOMME a cote de sa couleur");
+Exiger(pontAccueil.Contains("EtatActualites") && tuilesTsx.Contains("{vue.etat}"),
+    "l'etat de la source est affiche dans la tuile");
+Exiger(pontAccueil.Contains("case \"rediger\": return new(DemandeAccueil.OuvrirCode, \"PROC_ACTUALITES\");")
+       && tuilesTsx.Contains("onClick={() => geste('rediger')}"),
+    "la tuile mene a l'ecran de saisie");
+Exiger(pontAccueil.Contains("Actualites.Lire(maintenant)") && pontAccueil.Contains("DepotActualites.Exemples(maintenant)"),
+    "la tuile lit le depot partage, et l'ensemence au premier demarrage");
 
 // --- 6. L'ecran de saisie existe et est atteignable.
 // PORTE EN REACT (lot 3, 19/11/2026) : EcranActualites.razor n'est plus qu'une

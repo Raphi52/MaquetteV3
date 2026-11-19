@@ -1,4 +1,7 @@
+using System.IO;
+using System.Text.Json;
 using RigV3Desktop;
+using RigV3Desktop.Pont;
 
 // Banc du THEME D'AFFICHAGE retenu d'une session a l'autre.
 //
@@ -80,6 +83,49 @@ Exiger(etat4.Theme == "clair", "un code vide retombe sur le CLAIR");
 File.WriteAllText(fichier, "{ ceci n'est pas du json");
 Exiger(AccueilEtat.Charger().Theme == "clair",
     "un etat illisible retombe sur le theme CLAIR par defaut");
+
+// ---------- Le choix fait dans la BARRE (React) : l'aller-retour complet ----------
+// 19/11/2026, lot 1 du passage a React : la liste des themes est rendue par
+// web/src/composants/BarreRig.tsx ; son choix remonte a la session de l'accueil
+// (Pont/Accueil.cs, geste « theme ») qui l'ecrit par AccueilEtat. On joue ce
+// geste comme React, puis on rouvre une fenetre comme au redemarrage.
+static JsonElement Valeur(string json) => JsonDocument.Parse(json).RootElement.Clone();
+var contexte = new ContexteAccueil(false, null, RechercheTrouvee.Rien);
+File.Delete(fichier);
+var session = new SessionAccueil(AccueilEtat.Charger());
+Exiger(session.Vue(contexte).Barre.Themes.Select(t => t.Code).SequenceEqual(ThemesRig.Tous.Select(t => t.Code)),
+    "la liste de la barre propose les themes de ThemesRig, dans leur ordre");
+Exiger(session.Theme == "clair" && session.Vue(contexte).Theme == "clair",
+    "une premiere fenetre s'ouvre en CLAIR, et sa vue le dit");
+var demande = session.Agir("theme", Valeur("\"violet\""));
+Exiger(demande is { Quoi: DemandeAccueil.ThemeChange, Valeur: "violet" },
+    "choisir un theme demande a la fenetre de repeindre son fond (FenetreInterop.AppliquerFond)");
+var vueTheme = session.Vue(contexte);
+Exiger(vueTheme.Theme == "violet" && vueTheme.Barre.Theme == "violet",
+    "la vue rendue a React porte le theme choisi (liste de la barre et data-rig-theme)");
+Exiger(AccueilEtat.Charger().Theme == "violet", "le theme choisi dans la barre est ecrit dans accueil.json");
+Exiger(new SessionAccueil(AccueilEtat.Charger()).Theme == "violet",
+    "une nouvelle fenetre (redemarrage) rouvre dans le theme choisi");
+session.Agir("theme", Valeur("\"fuchsia\""));
+Exiger(session.Theme == "clair" && AccueilEtat.Charger().Theme == "clair",
+    "un code inconnu venu de la liste retombe sur le CLAIR, et c'est le clair qui est retenu");
+session.Agir("theme", Valeur("null"));
+Exiger(session.Theme == "clair", "un choix vide retombe sur le CLAIR");
+
+// ---------- Ce que React fait du theme ----------
+var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
+var themeTsx = File.ReadAllText(Path.Combine(racine, "web/src/composants/ThemeRig.tsx"));
+var home = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
+Exiger(themeTsx.Contains("document.documentElement.setAttribute('data-rig-theme', theme)"),
+    "<html> recoit le theme (sinon le fond de la page hote cerne le clair d'un cadre sombre)");
+// L'ile du theme n'est sous AUCUNE condition : la ligne qui la precede n'ouvre pas de bloc.
+var lignes = home.Split('\n').Select(l => l.Trim()).ToList();
+var ileTheme = lignes.FindIndex(l => l.StartsWith("<IleReact Composant=\"ThemeRig\""));
+Exiger(ileTheme > 0 && lignes[ileTheme - 1] != "{" && !lignes[ileTheme - 1].StartsWith("@if"),
+    "le theme est pose dans TOUTES les fenetres, y compris celle d'un onglet sorti");
+Exiger(home.Contains("case Pont.DemandeAccueil.ThemeChange: Fenetre.AppliquerFond(Theme);")
+       && System.Text.RegularExpressions.Regex.Matches(home, @"Fenetre\.AppliquerFond\(Theme\);").Count >= 2,
+    "le fond de la fenetre WPF suit le theme au demarrage et a chaque choix");
 
 try { Directory.Delete(dossierTemp, true); } catch (Exception) { }
 

@@ -13,7 +13,16 @@ void Exiger(bool ok, string quoi)
 }
 
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
+// Home.razor garde l'AIGUILLAGE (ouvrir l'ecran, l'affaire ou la tache d'une
+// alerte). Depuis le lot 1 du passage a React (19/11/2026), la tuile elle-meme
+// est rendue par web/src/accueil/Tuiles.tsx, et ses regles (releve, groupes,
+// widgets metier) vivent dans la session de l'accueil, Pont/Accueil.cs.
 var vue = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
+var pont = File.ReadAllText(Path.Combine(racine, "Pont/Accueil.cs"));
+var tuiles = File.ReadAllText(Path.Combine(racine, "web/src/accueil/Tuiles.tsx"));
+var grille = File.ReadAllText(Path.Combine(racine, "web/src/accueil/Grille.tsx"));
+// Le corps de « A traiter » seul (fonction Alertes de Tuiles.tsx).
+var corpsAlertes = Regex.Match(tuiles, @"export function Alertes\([\s\S]*?\r?\n\}\r?\n").Value;
 
 // --- 1. Le releve
 var sonde = new AlertesGreffe { Utilisateur = "R. VILAIN" };
@@ -38,12 +47,14 @@ Exiger(catalogue.Where(x => x.Nombre == 0)
     "seules les alertes « a creer » affichent zero");
 Exiger(catalogue.Zip(sonde.Relever()).All(c => c.First.Nombre == c.Second.Nombre),
     "le compte d'une ligne ne change pas d'un affichage a l'autre");
-Exiger(!vue.Contains("rig-filet-v--@a.Statut"),
+Exiger(!vue.Contains("rig-filet-v--@a.Statut") && corpsAlertes.Length > 0 && !corpsAlertes.Contains("rig-filet-v"),
     "la barre verticale a disparu des lignes de « A traiter »");
 // Depuis le 17/09/2026 la pastille est coloree par le PALIER de charge
 // (PanneauMetier.Palier) et non plus par la gravite : une seule grammaire de
 // couleur pour toutes les pastilles de l'accueil.
-Exiger(vue.Contains("rig-alerte__compte--@PanneauMetier.Palier(a.Nombre)") && vue.Contains("@a.Nombre"),
+Exiger(pont.Contains("new(a.Id, a.Nombre, PanneauMetier.Palier(a.Nombre),")
+       && tuiles.Contains("className={'rig-alerte__compte rig-alerte__compte--' + a.palier}>{a.nombre}</span>")
+       && corpsAlertes.Contains("<Compte a={a} />"),
     "chaque ligne de « A traiter » montre son nombre d'elements a traiter, colore par palier");
 Exiger(PanneauMetier.Palier(0) == "vide" && PanneauMetier.Palier(10) == "bas"
     && PanneauMetier.Palier(11) == "moyen" && PanneauMetier.Palier(20) == "moyen"
@@ -51,9 +62,12 @@ Exiger(PanneauMetier.Palier(0) == "vide" && PanneauMetier.Palier(10) == "bas"
     "les paliers de charge : 0 vide, 1-10 bas, 11-20 moyen, 21+ haut");
 
 // Le compte d'une CATEGORIE est la CHARGE, pas le nombre de lignes.
-Exiger(vue.Contains("groupe.Lignes.Sum(x => x.Nombre)"),
+Exiger(pont.Contains("new GroupeAlertesVue(g.Categorie, repliee, g.Lignes.Sum(x => x.Nombre),")
+       && tuiles.Contains("<span className=\"rig-groupe-tete__compte\">{g.charge}</span>"),
     "le compte d'une categorie somme les nombres de ses lignes");
-Exiger(!vue.Contains("rig-groupe-tete__compte\">@groupe.Lignes.Length"),
+Exiger(!vue.Contains("rig-groupe-tete__compte\">@groupe.Lignes.Length")
+       && !Regex.IsMatch(pont, @"new GroupeAlertesVue\([^;]*g\.Lignes\.Length")
+       && !tuiles.Contains("{g.lignes.length}"),
     "le compte d'une categorie n'est plus son nombre de lignes");
 
 Exiger(a.Length > 0, "la sonde rend au moins une alerte");
@@ -418,9 +432,12 @@ Exiger(RigV3Desktop.Pont.EcranTeletransmission.Flux("MODE-ABSENT") is { Flux.Len
     "sans flux, l'ecran conseille de verifier le connecteur au lieu de rester muet");
 
 // La vue branche le clic, et ne garde plus de liste d'alertes en dur.
-Exiger(vue.Contains("OuvrirAlerte("), "Home.razor branche le clic d'une alerte");
-Exiger(vue.Contains("SondeAlertes.Relever()"), "Home.razor releve les alertes par la sonde");
-Exiger(!Regex.IsMatch(vue, @"new\(""delai"",\s*""3 demandes"),
+Exiger(vue.Contains("OuvrirAlerte(") && vue.Contains("case Pont.DemandeAccueil.OuvrirAlerte: OuvrirAlerte(demande.Alerte!);")
+       && pont.Contains("case \"alerte\": return new(DemandeAccueil.OuvrirAlerte, Alerte: Trouver(Alertes, Exiger(valeur)));")
+       && corpsAlertes.Contains("onClick={() => geste('alerte', a.id)}"),
+    "Home.razor branche le clic d'une alerte");
+Exiger(pont.Contains("SondeAlertes.Relever()"), "la session de l'accueil releve les alertes par la sonde");
+Exiger(!Regex.IsMatch(vue + pont, @"new\(""delai"",\s*""3 demandes"),
     "plus d'alertes ecrites en dur dans la vue");
 
 // --- 3. Les reglages font ce qu'ils annoncent
@@ -478,9 +495,10 @@ Exiger(sansDca.Length == a.Count(x => x.Categorie != CatalogueAlertes.Dca),
     "et n'en retire aucune autre");
 
 // --- 6. Le nom de la tuile
-Exiger(vue.Contains("\"alertes\",     \"A traiter\""),
+Exiger(pont.Contains("\"alertes\",     \"A traiter\""),
     "la tuile des alertes s'appelle « A traiter »");
-Exiger(vue.Contains("AlertesParCategorie") && vue.Contains("BasculerCategorie"),
+Exiger(pont.Contains("AlertesParCategorie") && pont.Contains("BasculerCategorie")
+       && tuiles.Contains("onClick={() => geste('categorie', c.id)}"),
     "la tuile groupe par categorie et sait en eteindre une");
 
 // --- 7. LES WIDGETS METIER : un par categorie de la feuille (17/09/2026)
@@ -492,21 +510,24 @@ foreach (var categorie in CatalogueAlertes.Categories)
 {
     var idTuile = "metier-" + categorie.Split(' ')[0].ToLowerInvariant()
         .Replace("é", "e").Replace("è", "e");
-    Exiger(vue.Contains($"new(\"{idTuile}\","),
+    Exiger(pont.Contains($"new(\"{idTuile}\","),
         $"la categorie « {categorie} » a son widget metier dans la grille ({idTuile})");
     Exiger(PanneauMetier.ActionsDe(categorie).Length > 0,
         $"la categorie « {categorie} » propose au moins un geste metier");
 }
-Exiger(vue.Contains("StartsWith(\"metier-\")") && vue.Contains("CorpsMetier(def)"),
+Exiger(pont.Contains("corps.StartsWith(\"metier-\") ? Metier(def)")
+       && grille.Contains("if (t.metier) return <Metier id={t.id} vue={t.metier}"),
     "l'accueil aiguille les tuiles metier vers leur corps");
-Exiger(vue.Contains("rig-metier__gauche") && vue.Contains("rig-metier__droite"),
+Exiger(tuiles.Contains("className=\"rig-metier__gauche\"") && tuiles.Contains("className=\"rig-metier__droite\""),
     "le widget metier a bien ses DEUX panneaux");
 
 // Le bouton de deploiement de la maquette : sans lui, la liste de droite reste
 // coincee dans une tuile de 2 lignes et on ne peut pas la lire en entier.
-Exiger(vue.Contains("rig-metier__deployer") && vue.Contains("BasculerDeploiementMetier"),
+Exiger(tuiles.Contains("className=\"rig-metier__deployer\"") && tuiles.Contains("geste('metierDeployer', id)")
+       && pont.Contains("case \"metierDeployer\": BasculerDeploiementMetier("),
     "le widget metier porte son bouton de deploiement");
-Exiger(vue.Contains("rig-metier--deploye") && vue.Contains("MetierEstDeploye"),
+Exiger(tuiles.Contains("'rig-metier ' + (vue.deploye ? 'rig-metier--deploye' : '')")
+       && pont.Contains("var deploye = MetierEstDeploye(def.Id);"),
     "le deploiement change la classe du widget (etat lisible a l'ecran)");
 var cssAccueil = File.ReadAllText(Path.Combine(racine, "wwwroot", "rig-accueil.css"));
 Exiger(cssAccueil.Contains(".rig-metier--deploye") && cssAccueil.Contains("position: fixed"),

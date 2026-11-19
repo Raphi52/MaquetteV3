@@ -14,7 +14,15 @@ void Exiger(bool ok, string quoi)
 }
 
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
-var vue = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
+// PORTE EN REACT (lot 1 du plan « finir le passage a React », 19/11/2026) :
+// la grille de l'accueil, ses poses et ses dispositions vivent dans la session
+// de l'accueil (Pont/Accueil.cs, meme ecriture que dans Home.razor) ; la tuile
+// est rendue par web/src/accueil/Grille.tsx et Tuiles.tsx (fonction Activite).
+var vue = File.ReadAllText(Path.Combine(racine, "Pont/Accueil.cs"));
+var home = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
+var grilleTsx = File.ReadAllText(Path.Combine(racine, "web/src/accueil/Grille.tsx"));
+var tuilesTsx = File.ReadAllText(Path.Combine(racine, "web/src/accueil/Tuiles.tsx"));
+Exiger(!home.Contains("new(\"activite\","), "Home.razor ne tient plus de copie de la grille de l'accueil");
 
 // --- 1. Le journal
 var tout = JournalActions.Toutes;
@@ -67,7 +75,13 @@ Exiger(JeuDemo.Comptes.Where(c => !c.PeutValider).All(c => !JournalActions.Visib
 // --- 5. Le branchement dans l'accueil
 Exiger(vue.Contains("\"activite\", \"Activite des utilisateurs\"")
        || vue.Contains("new(\"activite\","), "la tuile est declaree dans la grille de l'accueil");
-Exiger(vue.Contains("case \"activite\":"), "la tuile a un corps rendu dans l'accueil");
+Exiger(vue.Contains("corps == \"activite\" ? ActiviteTuile()")
+       && grilleTsx.Contains("if (t.activite) return <Activite vue={t.activite}")
+       && tuilesTsx.Contains("export function Activite("),
+    "la tuile a un corps rendu dans l'accueil");
+Exiger(vue.Contains("JournalActions.De(FiltreActivite)") && vue.Contains("case \"activite\": FiltreActivite =")
+       && tuilesTsx.Contains("changer={(login) => geste('activite', login)}"),
+    "le filtre par agent de la tuile passe par le journal");
 Exiger(vue.Contains("JournalActions.VisiblePour(CompteCourant)"),
     "l'accueil filtre la tuile sur le compte connecte");
 Exiger(vue.Contains("Definitions.Where(TuileAutorisee)"),

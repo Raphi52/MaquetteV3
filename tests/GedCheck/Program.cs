@@ -426,8 +426,18 @@ Exiger(coquilleArbre.Contains("[Parameter] public string[] Domaines")
        && pontArbre.Contains("AccesGed.EnfantsVisibles(n, domaines, ajouts, masques, recette)")
        && vue.Contains("Domaines=\"Domaines\""),
     "l'arbre rendu recoit les domaines du login courant");
-Exiger(vue.Contains("JeuDemo.Comptes") && vue.Contains("ChangerLogin"),
+// Le rond de profil est rendu par React depuis le lot 1 du passage a React
+// (19/11/2026) : la liste des comptes et le changement de login vivent dans la
+// session de l'accueil (Pont/Accueil.cs), le clic dans web/src/accueil/RondProfil.tsx,
+// et Home.razor replie l'arbre sur ce que le nouveau login voit.
+var pontAccueil = File.ReadAllText(Path.Combine(racine, "Pont/Accueil.cs"));
+var rondProfil = File.ReadAllText(Path.Combine(racine, "web/src/accueil/RondProfil.tsx"));
+Exiger(pontAccueil.Contains("JeuDemo.Comptes") && pontAccueil.Contains("ChangerLogin")
+       && rondProfil.Contains("geste('login', compte.login)"),
     "l'entete permet de changer de login");
+Exiger(vue.Contains("case Pont.DemandeAccueil.LoginChange: ApresChangementLogin();")
+       && vue.Contains("private string[] Domaines => Accueil.Domaines;"),
+    "un changement de login replie l'arbre et change ses domaines visibles");
 
 // --- 9. Bouton « Nouveau » de l'arbre : popup, puis ajout dans la liste.
 Exiger(vue.Contains("rig-arbre__nouveau") && vue.Contains("OuvrirNouveau"),
@@ -1109,7 +1119,9 @@ foreach (var code in new[] { "CESM", "COLL" })
         $"{code} ne notifie aucun etablissement : la base dit non aux deux");
 }
 
-Exiger(vueTache.Contains("TacheDejaFaite("),
+// Les releves d'alertes ont suivi l'accueil dans sa session (Pont/Accueil.cs,
+// lot 1 du passage a React) : le filtre des taches closes s'y lit.
+Exiger(pontAccueil.Contains("TacheDejaFaite(") && pontAccueil.Contains("RecettesTaches.ParCode(code) is { } r"),
     "l'alerte DPER s'eteint quand la tache a ete close sous le code DSTE");
 
 Exiger(vueTache.Contains("TachePeutSeClore()") && vueTache.Contains("EffetsRestants()"),
@@ -1124,6 +1136,10 @@ Exiger(vueTache.Contains("Terminer la tache") && vueTache.Contains("ChampsManqua
 Exiger(vueTache.Contains("AlertesOuvertes()")
        && !Regex.IsMatch(vueTache, @"Alertes\s*=\s*SondeAlertes\.Relever\(\)"),
     "la file d'alertes EXCLUT les taches deja terminees");
+Exiger(Regex.IsMatch(pontAccueil, @"Alertes = AlertesOuvertes\(\);\s*Taches = TachesOuvertes\(\);")
+       && !Regex.IsMatch(pontAccueil, @"Alertes\s*=\s*SondeAlertes\.Relever\(\)")
+       && vue.Contains("Accueil.ReleverAlertes();"),
+    "la session de l'accueil releve sa file sans les taches terminees, et Home la fait relire a la cloture");
 
 // --- PONTS DU LOT 6, EXECUTES (19/11/2026). Les regles de l'arbre, de la fiche
 // et de la fenetre detachee ont quitte les .razor pour Pont/ : on les joue ici

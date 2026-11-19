@@ -269,7 +269,11 @@ Exiger(Regex.IsMatch(coquille, @"<IleReact\s+Composant=""EcranCommandesWeb""\s*/
     "la coquille monte l'ecran React (<IleReact Composant=\"EcranCommandesWeb\" />)");
 Exiger(Regex.IsMatch(home, @"case\s+""PROC_COMMANDES_WEB""\s*:(?:\s*@\*[\s\S]*?\*@)?\s*<EcranCommandesWeb\s*/>"),
     "Home.razor aiguille PROC_COMMANDES_WEB vers <EcranCommandesWeb />");
-Exiger(Regex.IsMatch(home, @"new\(""Commandes web"",\s*""[^""]+"",\s*""PROC_COMMANDES_WEB""\)"), "le menu « Recevoir » porte l'entree « Commandes web »");
+// Le catalogue du menu de gauche vit dans Pont/MenuAccueil.cs depuis le lot 1 du
+// passage a React (19/11/2026) : l'entree s'y lit, au meme format.
+var menuAccueil = File.ReadAllText(Path.Combine(racine, "Pont/MenuAccueil.cs"));
+Exiger(Regex.IsMatch(menuAccueil, @"new\(""Commandes web"",\s*""[^""]+"",\s*""PROC_COMMANDES_WEB""\)"), "le menu « Recevoir » porte l'entree « Commandes web »");
+Exiger(!Regex.IsMatch(home, @"new\(""Commandes web"",\s*""[^""]+"",\s*""PROC_COMMANDES_WEB""\)"), "Home.razor ne tient plus de copie de l'entree de menu");
 Exiger(Regex.IsMatch(home, @"new\(""PROC_COMMANDES_WEB"",\s*""Commandes web""\)"), "le catalogue connait l'ecran");
 Exiger(Regex.IsMatch(home, @"new\(""SUJ_AFFAIRES""[^\]]*""PROC_REQUI"",\s*""PROC_COMMANDES_WEB"""),
     "le sujet « Affaires » le range a cote des requisitions");

@@ -55,8 +55,13 @@ var maison = File.ReadAllText(home);
 // --- 1. L'ecran est ATTEIGNABLE : sans ce branchement il n'existe pour personne.
 Exiger(Regex.IsMatch(maison, @"case\s+""PROC_REQUI""\s*:\s*\r?\n\s*<EcranRequisitions\s*/>"),
     "Home.razor route PROC_REQUI vers <EcranRequisitions />");
-Exiger(maison.Contains("\"PROC_REQUI\")") || Regex.IsMatch(maison, @"new\(""Requisitions"".*""PROC_REQUI""\)"),
+// Le menu de gauche est rendu par React depuis le lot 1 du passage a React
+// (19/11/2026) : son catalogue vit dans Pont/MenuAccueil.cs.
+var menuAccueil = File.ReadAllText(Path.Combine(racine, "Pont", "MenuAccueil.cs"));
+Exiger(menuAccueil.Contains("\"PROC_REQUI\")") || Regex.IsMatch(menuAccueil, @"new\(""Requisitions"".*""PROC_REQUI""\)"),
     "le menu propose bien l'entree Requisitions (PROC_REQUI)");
+Exiger(maison.Contains("Moments = Pont.MenuAccueil.Moments;"),
+    "Home.razor aiguille sur ce meme catalogue");
 Exiger(Regex.IsMatch(File.ReadAllText(coquille), @"<IleReact\s+Composant=""EcranRequisitions""\s*/>"),
     "la coquille monte l'ecran React (<IleReact Composant=\"EcranRequisitions\" />)");
 Exiger(tsx.Contains("'EcranRequisitions.Ouvrir'") && tsx.Contains("'EcranRequisitions.Agir'")

@@ -1,8 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- Le theme se choisit dans la barre du haut, rendue par React depuis le lot 1
+       du passage a React (19/11/2026) ; le choix passe par la session de l'accueil
+       (Pont/Accueil.cs). Le banc l'EXECUTE : il reference donc l'application
+       entiere, comme les bancs des ecrans a session (web/README.md, lot 2). -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>ThemeCheck</RootNamespace>
@@ -11,18 +16,7 @@
 
   <ItemGroup>
     <Compile Include="Program.cs" />
-    <Compile Include="../../AccueilEtat.cs" Link="AccueilEtat.cs" />
-    <Compile Include="../../Metier/ArbreGed.cs" Link="ArbreGed.cs" />
-    <Compile Include="../../Metier/Greffes.cs" Link="Greffes.cs" />
-    <Compile Include="../../Metier/JeuDemo.cs" Link="JeuDemo.cs" />
-    <Compile Include="../../Metier/SimulationEdi.cs" Link="SimulationEdi.cs" />
-    <Compile Include="../../Metier/AlertesGreffe.cs" Link="AlertesGreffe.cs" />
-    <Compile Include="../../Metier/ActionsXaction.cs" Link="ActionsXaction.cs" />
-    <Compile Include="../../Metier/RecetteTache.cs" Link="RecetteTache.cs" />
-    <Compile Include="../../Metier/ValidationModifications.cs" Link="ValidationModifications.cs" />
-    <Compile Include="../../Metier/InformationsDossier.cs" Link="InformationsDossier.cs" />
-    <Compile Include="../../Metier/InformationsFormalite.cs" Link="InformationsFormalite.cs" />
-    <Compile Include="../../Metier/InformationsDepots.cs" Link="InformationsDepots.cs" />
+    <ProjectReference Include="../../RigV3Desktop.csproj" />
   </ItemGroup>
 
 </Project>

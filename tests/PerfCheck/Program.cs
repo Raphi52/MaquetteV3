@@ -60,15 +60,30 @@ var b = sonde.Relever();
 Exiger(a.Zip(b).All(c => c.First.Valeur == c.Second.Valeur),
     "deux releves consecutifs donnent le meme etat des dossiers");
 
-// --- 3. La vue est branchee sur la sonde, sans tableau ecrit en dur
-var vue = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "../../../../../Components/Pages/Home.razor"));
-Exiger(Regex.IsMatch(vue, @"MesuresPerf\s+Sonde\s*=\s*new"), "Home.razor instancie la sonde");
-Exiger(Regex.IsMatch(vue, @"MinuteurPerf\s*=\s*new Timer"), "Home.razor relance le releve par minuteur");
-Exiger(vue.Contains("RelevePerf();"), "Home.razor appelle le releve");
-Exiger(!Regex.IsMatch(vue, @"new\(""Threads actifs"""), "plus de mesures ecrites en dur dans la vue");
-Exiger(Regex.IsMatch(vue, @"MinuteurPerf.*DisposeAsync", RegexOptions.Singleline), "le minuteur est arrete a la fermeture");
-Exiger(vue.Contains("rig-perf__repere"), "la vue dessine le repere d objectif sur la jauge");
-Exiger(vue.Contains("m.ObjectifTexte"), "la vue affiche la cible chiffree a cote de la valeur");
+// --- 3. La vue est branchee sur la sonde, sans tableau ecrit en dur.
+// PORTE EN REACT (lot 1 du plan « finir le passage a React », 19/11/2026) : la
+// sonde et son minuteur vivent dans la session de l'accueil (Pont/Accueil.cs),
+// la tuile est dessinee par web/src/accueil/Tuiles.tsx (fonction Performance) ;
+// Home.razor demarre et arrete la session, et la fait relire apres une tache.
+var racinePerf = Path.Combine(AppContext.BaseDirectory, "../../../../../");
+var vue = File.ReadAllText(Path.Combine(racinePerf, "Components/Pages/Home.razor"));
+var pont = File.ReadAllText(Path.Combine(racinePerf, "Pont/Accueil.cs"));
+var tuiles = File.ReadAllText(Path.Combine(racinePerf, "web/src/accueil/Tuiles.tsx"));
+Exiger(Regex.IsMatch(pont, @"MesuresPerf\s+Sonde\s*=\s*new"), "la session de l'accueil instancie la sonde");
+Exiger(Regex.IsMatch(pont, @"MinuteurPerf\s*\?\?=\s*new Timer"), "la session relance le releve par minuteur");
+Exiger(Regex.IsMatch(pont, @"new Timer\(_ =>\s*\{\s*RelevePerf\(\);\s*Change\?\.Invoke\(\);"),
+    "chaque releve du minuteur fait redessiner l'accueil");
+Exiger(vue.Contains("Accueil.Demarrer();") && vue.Contains("private void SurChangeAccueil() => _ = InvokeAsync(StateHasChanged);"),
+    "Home.razor demarre les minuteurs au premier rendu et redessine a chaque releve");
+Exiger(pont.Contains("RelevePerf();") && vue.Contains("Accueil.RelevePerf();"), "la session et Home.razor appellent le releve");
+Exiger(!Regex.IsMatch(vue + pont + tuiles, @"new\(""Threads actifs""|'Threads actifs'|""Threads actifs"""),
+    "plus de mesures ecrites en dur dans la vue");
+Exiger(Regex.IsMatch(pont, @"MinuteurPerf.*DisposeAsync", RegexOptions.Singleline)
+       && vue.Contains("await Accueil.DisposeAsync();"), "le minuteur est arrete a la fermeture");
+Exiger(tuiles.Contains("className=\"rig-perf__repere\" style={{ left: m.objectif + '%' }}"),
+    "la vue dessine le repere d objectif sur la jauge");
+Exiger(tuiles.Contains("{m.objectifTexte}") && pont.Contains("m.ObjectifTexte"),
+    "la vue affiche la cible chiffree a cote de la valeur");
 var styles = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "../../../../../wwwroot/rig-accueil.css"));
 Exiger(styles.Contains(".rig-perf__repere"), "le repere d objectif a bien un style");
 

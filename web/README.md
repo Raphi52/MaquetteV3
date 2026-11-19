@@ -244,6 +244,60 @@ Home.razor ──> Components/Ecrans/EcranX.razor (COQUILLE, mêmes paramètres)
   bord de l'arbre, et selon le passage un curseur de saisie qui clignote ou
   l'anneau animé d'une tuile de l'accueil (teinte 1/255) — hors de ce lot.
 
+## Ajouts du plan « finir le passage à React », lot 1 : l'accueil
+
+- **La coupe avec le plan de travail (lot 2).** L'accueil = `header.rig-barre` et
+  `div.rig-accueil` entiers (menu, entête, recherche, chiffres du jour, « Proue »,
+  grille et corps des tuiles), rendus par trois îles : `ThemeRig` (pose
+  `data-rig-theme` sur `<html>`, montée dans TOUTES les fenêtres, ne dessine rien),
+  `BarreRig` et `Accueil` (`src/composants/`). Leurs morceaux sont dans
+  `src/accueil/`. Le plan de travail (onglets, `rig-proc`, `rig-vged`, modales,
+  Échap, pagination des étapes) et le ROUTAGE (`OuvrirCode`, `OuvrirAlerte`,
+  `OuvrirParNumero`, `OuvrirDossier`, fonds d'affaires, `Groupes`, `Sujets`)
+  restent dans `Home.razor` pour le lot 2.
+- **Session tenue par Home, pas par React.** L'état de l'accueil est PARTAGÉ avec
+  le plan de travail (`AccueilEtat`, login, thème) : `Home.razor` garde un champ
+  `Accueil` (`Pont.SessionAccueil`, le `@code` déplacé tel quel) et s'en sert
+  (`Etat => Accueil.Etat`, `Domaines => Accueil.Domaines`…). À chaque rendu, Home
+  calcule la vue UNE fois (`Accueil.Vue(ContexteDeLAccueil())`) et la passe en
+  `Proprietes` : les minuteurs (performance chaque seconde, actualités chaque
+  minute) arrivent ainsi sans code de plus ; `IleReact` ne renvoie que si le JSON
+  change. Le contexte porte ce que seul le plan de travail sait (accueil
+  recouvert, écran ouvert, résultats de recherche calculés sur son fonds).
+- **Un seul rappel, `geste`** : `{ nom, valeur }` → `SessionAccueil.Agir`, qui rend
+  une `DemandeAccueil` pour ce qui sort de l'accueil (ouvrir un écran, une
+  alerte, un numéro, un résultat de recherche par son RANG ; login ou thème
+  changé ; déplacer, réduire, agrandir, fermer la fenêtre). Un geste inconnu lève
+  une exception.
+- **Catalogue du menu** : `Pont/MenuAccueil.cs` (même indentation, lue par
+  `tests/MenuGestesCheck`) ; `Home.razor` le relit par
+  `Moments = Pont.MenuAccueil.Moments` (aiguillages, `tests/MotifCheck`).
+- **Glisser-déposer** (ex-`activerPose` de `rig-accueil.js`) : `src/accueil/pose.ts`
+  (géométrie, mêmes bornes que `PoserTuile` / `DimensionnerTuile`) et
+  `Grille.tsx`. Pendant le geste la tuile suit le pointeur par son `style` React
+  (z-index 60, `rig-widget--saisi`, `rig-grille--pose`) ; au lâcher, la pose part
+  au C# et la tuile GARDE la pose lâchée jusqu'à ce que la vue la porte (pas de
+  retour en arrière d'un aller-retour). `rig-accueil.js` ne garde que la
+  pagination, le clavier et la barre d'onglets.
+- **Listes déroulantes à valeur C#** : `src/accueil/Liste.tsx`, le pendant de
+  `Saisie` — un `<select value>` contrôlé reviendrait sur l'ancien thème entre
+  le choix et la réponse.
+- **Les blancs, lus dans le code que Razor génère.** Plutôt que de deviner ce que
+  Razor garde : `dotnet msbuild -t:Compile -p:EmitCompilerGeneratedFiles=true`
+  (créer d'abord les dossiers `obj/Debug/net10.0-windows/generated/…/Components/Pages`,
+  sinon CS0016) écrit `Home_razor.g.cs`, où chaque `AddContent` est un nœud de
+  texte et chaque `AddMarkupContent("\r\n   ")` un blanc. Exemple : le blanc entre
+  `</b>` et `@(…)` est RETIRÉ, celui entre `</b>` et `<span>` sur une même ligne
+  est GARDÉ.
+- **Captures** : parcours rejoué sur l'exe d'avant et d'après (clair : accueil,
+  réglages de la barre, panneau des tuiles, profil, chiffres 1 et 3 dépliés, menu
+  réduit, disposition « Par métier », widget déployé ; sombre : 5 états). Tous à
+  0 pixel, sauf trois écarts qui changent aussi entre deux captures du MÊME exe :
+  l'anneau « Hors délai légal » (animation infinie `rig-anneau-pouls`), une bande
+  de 5 px au bord du panneau de profil, et un survol en transition ; le widget
+  déployé diffère de 1/255 de teinte au plus, dans l'ombre derrière lui.
+  Un glisser se joue sur le bureau caché par `D:\AutoWinOS\scripts\hdesk-glisser.ps1`.
+
 ## Commandes
 
 | Commande (dans `web/`) | Effet |
