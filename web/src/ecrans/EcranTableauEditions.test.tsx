@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EcranTableauEditions, type LigneEdition } from './EcranTableauEditions'
 import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { morceaux } from '../test/morceaux'
 
 afterEach(() => { cleanup(); retirerFauxDotNet() })
 
@@ -28,7 +29,7 @@ describe('EcranTableauEditions', () => {
     const { container } = render(<EcranTableauEditions editions={editions} affaire="0000 AMITEL" fermer={vi.fn()} />)
 
     expect(screen.getByText('Tableau des editions')).toBeTruthy()
-    expect(screen.getByText('0000 AMITEL · 2 editions')).toBeTruthy()
+    expect(morceaux(screen.getByText('0000 AMITEL · 2 editions'))).toEqual(['0000 AMITEL', ' · ', '2', ' editions'])
     expect(container.querySelectorAll('thead th')).toHaveLength(14)
     const groupe = container.querySelector('tr.rig-editions__groupe td') as HTMLTableCellElement
     expect(groupe.colSpan).toBe(14)

@@ -83,7 +83,7 @@ export function EcranTeletransmission({ ouvrirDossier }: ProprietesEcranTeletran
       <section className="rig-resultats-proc">
         <div className="rig-resultats-proc__entete">
           <div className="rig-kicker">Teletransmissions</div>
-          <span className="rig-resultats-proc__compte">{vue ? `${flux.length} flux` : ''}</span>
+          <span className="rig-resultats-proc__compte">{vue && <>{flux.length}{' flux'}</>}</span>
         </div>
 
         <div className="rig-table-cadre">

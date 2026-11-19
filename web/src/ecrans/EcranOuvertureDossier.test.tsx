@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { EcranOuvertureDossier, type ResultatOuverture, type VueOuverture } from './EcranOuvertureDossier'
 import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { morceaux } from '../test/morceaux'
 
 afterEach(() => { cleanup(); retirerFauxDotNet() })
 
@@ -17,6 +18,7 @@ describe('EcranOuvertureDossier', () => {
     render(<EcranOuvertureDossier sirenDemande=" 512345678 " />)
     expect((screen.getByLabelText('N° SIREN') as HTMLInputElement).value).toBe('512345678')
     await waitFor(() => expect((screen.getByLabelText('Date d\'immatriculation') as HTMLInputElement).value).toBe('2026-09-09'))
+    expect(morceaux(screen.getByText('0 dossier(s)'))).toEqual(['0', ' dossier(s)'])
   })
 
   it('ouvre le dossier par le pont, puis vide la fiche ; un refus la garde', async () => {

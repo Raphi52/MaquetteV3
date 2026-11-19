@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { EcranTachesLot, type VueTachesLot } from './EcranTachesLot'
 import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { morceaux } from '../test/morceaux'
 
 afterEach(() => { cleanup(); retirerFauxDotNet() })
 
@@ -48,6 +49,9 @@ describe('EcranTachesLot', () => {
     expect(lots[0]!.className).toBe('rig-alerte rig-alerte--lien rig-alerte--actif')
     expect(lots[0]!.getAttribute('title')).toBe('Traiter les 2 dossiers en lot')
     expect(lots[1]!.querySelector('.rig-alerte__detail')!.textContent).toBe('1 dossier(s) · saisie ligne par ligne')
+    expect(morceaux(lots[0]!.querySelector('.rig-alerte__detail'))).toEqual(['2', ' dossier(s) '])
+    expect(morceaux(lots[1]!.querySelector('.rig-alerte__detail')))
+      .toEqual(['1', ' dossier(s) ', '· saisie ligne par ligne'])
     expect(lots[1]!.getAttribute('title')).toBe('Cette tache se saisit dossier par dossier')
     expect(container.querySelector('.rig-resultats-proc__entete .rig-kicker')!.textContent)
       .toBe('Changer la denomination ·  DENO')
@@ -56,6 +60,7 @@ describe('EcranTachesLot', () => {
     const [incomplet, pret] = [...container.querySelectorAll('tbody tr')]
     expect(incomplet!.getAttribute('title')).toBe('1 champ(s) et 2 publication(s) a traiter')
     expect(incomplet!.querySelectorAll('td')[3]!.textContent).toBe('0 / 2 tout')
+    expect(morceaux(incomplet!.querySelectorAll('td')[3]!)).toEqual(['0', ' / ', '2', ' ', '<button>'])
     expect((incomplet!.querySelector('.rig-tache__terminer') as HTMLButtonElement).disabled).toBe(true)
     expect(pret!.getAttribute('title')).toBe('Pret a terminer')
     expect((pret!.querySelector('.rig-tache__terminer') as HTMLButtonElement).disabled).toBe(false)
@@ -90,6 +95,9 @@ describe('EcranTachesLot', () => {
     await waitFor(() => expect(container.querySelector('table')).toBeNull())
     expect(container.querySelector('.rig-resultats-proc .rig-vide')!.textContent)
       .toBe('« Changer un dirigeant » se saisit ligne par ligne (plusieurs dirigeants par dossier). Ouvrir chaque affaire depuis la file d\'alertes.')
+    expect(morceaux(container.querySelector('.rig-resultats-proc .rig-vide'))).toEqual([
+      '« ', 'Changer un dirigeant', ' » se saisit ', '<b>', ' (plusieurs ', 'dirigeant',
+      's par dossier). Ouvrir chaque affaire depuis la file d\'alertes.'])
   })
 
   it('une nouvelle version (la coquille a change de recette) relit la vue', async () => {

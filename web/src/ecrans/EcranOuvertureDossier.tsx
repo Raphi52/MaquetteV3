@@ -223,7 +223,7 @@ export function EcranOuvertureDossier({ sirenDemande }: ProprietesEcranOuverture
       <section className="rig-resultats-proc">
         <div className="rig-resultats-proc__entete">
           <div className="rig-kicker">Dossiers ouverts</div>
-          <span className="rig-resultats-proc__compte">{ouverts ? `${ouverts.length} dossier(s)` : ''}</span>
+          <span className="rig-resultats-proc__compte">{ouverts && <>{ouverts.length}{' dossier(s)'}</>}</span>
         </div>
 
         <div className="rig-table-cadre">

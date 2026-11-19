@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { EcranRechAffaires, type LigneAffaire, type VueAffaires } from './EcranRechAffaires'
 import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { morceaux } from '../test/morceaux'
 
 afterEach(() => { cleanup(); retirerFauxDotNet() })
 
@@ -77,7 +78,9 @@ describe('EcranRechAffaires', () => {
 
     fireEvent.change(screen.getByLabelText('Libelle, SIREN'), { target: { value: '512 345 678' } })
     await screen.findByText('Aucune affaire ne repond a ces criteres.')
-    expect(await screen.findByText('pour le SIREN 512345678')).toBeTruthy()
+    const pourLeSiren = await screen.findByText('pour le SIREN 512345678')
+    expect(morceaux(pourLeSiren)).toEqual([' pour le SIREN ', '512345678'])
+    expect(morceaux(pourLeSiren.parentElement)).toEqual(['<button>', '<span>'])
     fireEvent.click(screen.getByRole('button', { name: 'Ouvrir un dossier' }))
     expect(ouvrirUnDossier).toHaveBeenCalledWith('512345678')
   })
@@ -86,7 +89,8 @@ describe('EcranRechAffaires', () => {
     installerFauxDotNet({ 'EcranRechAffaires.Trouver': vue })
     render(<EcranRechAffaires ouvrir={vi.fn()} ouvrirUnDossier={vi.fn()} />)
     fireEvent.click(await screen.findByText('2026B01067'))
-    await screen.findByText('2026B01067 · instance 55339 · role 2026F00301')
+    expect(morceaux(await screen.findByText('2026B01067 · instance 55339 · role 2026F00301')))
+      .toEqual(['2026B01067', ' · instance ', '55339', ' · role ', '2026F00301'])
     fireEvent.click(screen.getByRole('button', { name: 'Supprimer l\'instance' }))
     expect(screen.getByText(/suppression simulee — numeros metiers liberes\./)).toBeTruthy()
     fireEvent.keyDown(screen.getByLabelText('N° Affaire'), { key: 'Enter' })

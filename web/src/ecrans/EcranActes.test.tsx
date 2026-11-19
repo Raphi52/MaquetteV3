@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { EcranActes, type LigneActe, type VueActes } from './EcranActes'
 import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { morceaux } from '../test/morceaux'
 
 afterEach(() => { cleanup(); retirerFauxDotNet() })
 
@@ -27,6 +28,8 @@ describe('EcranActes', () => {
     const { container } = render(<EcranActes ouvrirDossier={vi.fn()} />)
     await screen.findByText('D1')
     expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
+    expect(morceaux(container.querySelector('.rig-resultats-proc__entete .rig-resultats-proc__compte')))
+      .toEqual(['1', ' affiche(s) · ', '0', ' sans image · ', '0', ' anomalie(s)'])
 
     fireEvent.click(screen.getByRole('button', { name: 'Lister actes non numerisables' }))
     await screen.findByText('D2')

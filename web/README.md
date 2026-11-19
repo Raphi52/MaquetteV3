@@ -169,6 +169,41 @@ Home.razor ──> Components/Ecrans/EcranX.razor (COQUILLE, mêmes paramètres)
   après son lancement : capture d'abord l'accueil, sinon la première capture
   montre l'accueil au lieu de l'écran voulu.
 
+## Ajouts du lot 3 (recherche d'affaires, dossiers, courrier) : les morceaux de texte
+
+- **Un morceau par `@expression`.** Razor crée un nœud de texte pour chaque
+  `@expression` et un pour chaque texte écrit entre elles :
+  `@n dossier(s)` donne « 3 » puis « dossier(s) ». Chromium mesure chaque nœud
+  à part et arrondit sa largeur : une seule chaîne assemblée (`` {`${n} dossier(s)`} ``,
+  ou une concaténation) se dessine décalée d'une fraction de pixel, et tout ce
+  qui suit glisse avec. Vu au lot 3 : « 0 / 4 » de Tâches en lot élargissait une
+  colonne du tableau (134 pixels différents), « 10 affiche(s) · 4 sans image »
+  d'Actes (25 px), « role 2026F00087 » de la recherche (20 px) ; tous à 0 après
+  correction. **Règle : chaque `@x` du `.razor` = un `{x}` du `.tsx`**, le texte
+  entre deux en morceau séparé : `{n}{' affiche(s) · '}{m}{' sans image'}`
+  (`{n} dossier(s)` écrit sur une ligne convient aussi). Jamais de gabarit
+  `` `${…}` `` pour un texte affiché. Seul le découpage compte : un blanc qui se
+  replie (`"\n      "` contre `" "`) se dessine pareil.
+- **Le blanc garde sa place.** « pour le SIREN » : Razor retirait le blanc entre
+  le bouton et le `@if`, mais gardait celui du DÉBUT du `span`
+  (`<span>\n  pour le SIREN @x`). Ce blanc se dessine dans la police du `span`
+  (6,7 px en chasse fixe), pas dans celle du parent (3,3 px) : écris
+  `<span>{' pour le SIREN '}{x}</span>`, pas `{' '}` avant le `span` (bouton
+  décalé de 2 px sinon). De même « N dossier(s) » suivi d'un `@if` : le blanc
+  reste à la fin du morceau (`{' dossier(s) '}`), la puce suivante n'en a pas.
+- **Le test** : `morceaux(el)` (`src/test/morceaux.ts`) rend les nœuds enfants
+  d'un élément ; les tests d'écran du lot 3 vérifient le découpage exact
+  (`expect(morceaux(compte)).toEqual(['2', ' affichee(s) sur ', '12'])`), rouge
+  sur une chaîne assemblée.
+- **Trouver le morceau qui diffère** quand une capture n'est pas à 0 : relève,
+  avant et après, chaque nœud de texte rendu avec ses boîtes
+  (`Range.getClientRects()`, au 1/100 px) et compare les deux listes ; le premier
+  écart nomme le morceau fautif. Le port `--remote-debugging-port` passé par
+  `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` n'est pas ouvert par ce WebView2
+  (157, constaté le 19/11) : un script ajouté à l'`index.html` d'une copie
+  jetable, qui envoie l'arbre à un petit serveur local, fait l'affaire — à
+  retirer avant tout commit.
+
 ## Commandes
 
 | Commande (dans `web/`) | Effet |

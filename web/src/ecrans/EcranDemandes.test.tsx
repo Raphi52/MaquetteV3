@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { EcranDemandes, type LigneDemande, type VueDemandes } from './EcranDemandes'
 import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { morceaux } from '../test/morceaux'
 
 afterEach(() => { cleanup(); retirerFauxDotNet() })
 
@@ -24,7 +25,7 @@ describe('EcranDemandes', () => {
     const dotnet = installerFauxDotNet({ 'EcranDemandes.Trouver': vue })
     const { container } = render(<EcranDemandes valides={['004151']} ouvrir={vi.fn()} />)
 
-    await screen.findByText('2 affichee(s) sur 12')
+    expect(morceaux(await screen.findByText('2 affichee(s) sur 12'))).toEqual(['2', ' affichee(s) sur ', '12'])
     expect(dotnet.invokeMethodAsync.mock.calls[0]![3]).toEqual(['004151'])
     const rangees = container.querySelectorAll('tbody tr')
     expect(rangees[0]!.querySelector('.rig-etat')!.className).toBe('rig-etat rig-etat--ok')

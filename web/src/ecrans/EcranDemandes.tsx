@@ -170,7 +170,7 @@ export function EcranDemandes({ valides, ouvrir }: ProprietesEcranDemandes) {
         <div className="rig-resultats-proc__entete">
           <div className="rig-kicker">Resultats de la recherche</div>
           <span className="rig-resultats-proc__compte">
-            {vue ? `${trouvees.length} affichee(s) sur ${vue.total}` : ''}
+            {vue && <>{trouvees.length}{' affichee(s) sur '}{vue.total}</>}
           </span>
         </div>
 

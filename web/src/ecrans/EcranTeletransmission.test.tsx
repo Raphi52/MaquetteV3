@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { EcranTeletransmission, type VueTeletransmission } from './EcranTeletransmission'
 import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
+import { morceaux } from '../test/morceaux'
 
 afterEach(() => { cleanup(); retirerFauxDotNet() })
 
@@ -21,7 +22,7 @@ describe('EcranTeletransmission', () => {
     render(<EcranTeletransmission ouvrirDossier={ouvrirDossier} />)
 
     await screen.findByText('Canal au vert')
-    expect(screen.getByText('2 flux')).toBeTruthy()
+    expect(morceaux(screen.getByText('2 flux'))).toEqual(['2', ' flux'])
     fireEvent.click(screen.getByText('A7'))
     expect(ouvrirDossier).toHaveBeenCalledWith('004151')
     fireEvent.click(screen.getByText('A8'))

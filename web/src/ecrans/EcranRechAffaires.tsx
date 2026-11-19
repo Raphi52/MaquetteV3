@@ -330,14 +330,13 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
                                 onClick={() => ouvrirUnDossier(vue.sirenCherche)}>
                           Ouvrir un dossier
                         </button>
+                        {/* Aucun blanc entre le bouton et le span (Razor retire celui qui
+                            precede un @if) ; le blanc est DANS le span, a sa police. */}
                         {vue.sirenCherche.length > 0 && (
-                          <>
-                            {' '}
-                            <span className="rig-resultats-proc__compte"
-                                  style={{ marginLeft: 'var(--rig-esp-3)' }}>
-                              pour le SIREN {vue.sirenCherche}
-                            </span>
-                          </>
+                          <span className="rig-resultats-proc__compte"
+                                style={{ marginLeft: 'var(--rig-esp-3)' }}>
+                            {' pour le SIREN '}{vue.sirenCherche}
+                          </span>
                         )}
                       </div>
                     </>
@@ -356,7 +355,7 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
             </span>
           ) : (
             <span className="rig-resultats-proc__compte">
-              {`${choisie.numero} · instance ${choisie.idInstance} · role ${choisie.role}`}
+              {choisie.numero}{' · instance '}{choisie.idInstance}{' · role '}{choisie.role}
             </span>
           )}
           <button className={`rig-bascule${libererNumeros ? ' rig-bascule--actif' : ''}`}

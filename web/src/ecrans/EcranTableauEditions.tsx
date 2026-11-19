@@ -85,7 +85,7 @@ export function EcranTableauEditions({ editions, affaire, fermer }: ProprietesEc
       <div className="rig-editions-ecran__entete">
         <b>Tableau des editions</b>
         <span style={{ color: 'var(--rig-texte-3)', fontSize: '12px' }}>
-          {`${affaire ?? ''} · ${lignes.filter((e) => !e.estGroupe).length} editions`}
+          {affaire}{' · '}{lignes.filter((e) => !e.estGroupe).length}{' editions'}
         </span>
         <span style={{ marginLeft: 'auto' }}></span>
         <button className="rig-bouton" onClick={() => fermer()}>Retour a l'affaire</button>

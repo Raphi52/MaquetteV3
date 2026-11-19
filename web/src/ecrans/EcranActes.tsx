@@ -159,8 +159,13 @@ export function EcranActes({ ouvrirDossier }: ProprietesEcranActes) {
         <div className="rig-resultats-proc__entete">
           <div className="rig-kicker">Actes numerises</div>
           <span className="rig-resultats-proc__compte">
-            {vue ? `${trouves.length} affiche(s) · ${trouves.filter((a) => !a.demat).length} sans image · `
-                   + `${trouves.filter((a) => a.anomalie !== '').length} anomalie(s)` : ''}
+            {/* Memes morceaux de texte que Razor (chaque nombre, puis son libelle) :
+                une seule chaine decalait le lissage des lettres (web/README.md). */}
+            {vue && <>
+              {trouves.length}{' affiche(s) · '}
+              {trouves.filter((a) => !a.demat).length}{' sans image · '}
+              {trouves.filter((a) => a.anomalie !== '').length}{' anomalie(s)'}
+            </>}
           </span>
         </div>
 

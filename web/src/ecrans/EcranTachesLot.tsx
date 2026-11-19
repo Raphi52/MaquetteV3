@@ -123,8 +123,9 @@ export function EcranTachesLot({ session, version }: ProprietesEcranTachesLot) {
             <span className="rig-alerte__corps">
               <span className="rig-alerte__titre">{lot.titre}</span><br />
               <span className="rig-alerte__detail">
-                {/* Razor gardait le saut de ligne avant le @if : un blanc avant la puce. */}
-                {`${lot.dossiers} dossier(s)`}{lot.aRepetition && ' · saisie ligne par ligne'}
+                {/* Memes morceaux de texte que Razor : le nombre, puis « dossier(s) »
+                    qui garde le blanc d'avant le @if, puis la puce sans blanc. */}
+                {lot.dossiers}{' dossier(s) '}{lot.aRepetition && '· saisie ligne par ligne'}
               </span>
             </span>
           </button>
@@ -156,8 +157,8 @@ export function EcranTachesLot({ session, version }: ProprietesEcranTachesLot) {
           // Refus EXPLIQUE, pas un tableau vide : cette tache porte plusieurs
           // lignes par dossier, elle se traite une par une.
           <div className="rig-vide">
-            {`« ${recette.titre} » se saisit `}<b>ligne par ligne</b>
-            {` (plusieurs ${recette.libelleLigne}s par dossier). Ouvrir chaque affaire depuis la file d'alertes.`}
+            {'« '}{recette.titre}{' » se saisit '}<b>ligne par ligne</b>
+            {' (plusieurs '}{recette.libelleLigne}{"s par dossier). Ouvrir chaque affaire depuis la file d'alertes."}
           </div>
         ) : (
           <>
@@ -188,7 +189,7 @@ export function EcranTachesLot({ session, version }: ProprietesEcranTachesLot) {
                         </td>
                       ))}
                       <td className="rig-table__mono">
-                        {`${recette.effets - d.effetsRestants} / ${recette.effets}`}{' '}
+                        {recette.effets - d.effetsRestants}{' / '}{recette.effets}{' '}
                         <button className="rig-bouton rig-bouton--plat"
                                 title="Marquer toutes les publications de ce dossier comme traitees"
                                 onClick={() => geste('ToutPropager', d.dossier)}>tout</button>
