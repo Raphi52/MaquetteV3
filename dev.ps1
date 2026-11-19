@@ -34,27 +34,53 @@ Write-Host 'C#, .razor, CSS, JS : repris automatiquement, sans redemarrage.' -Fo
 # dotnet watch ne relance JAMAIS une application qui s'est fermee : il
 # affiche « Exited / Waiting for a file to change » et Ctrl+R est inactif
 # dans cet etat (dotnet/sdk#34029). La reprise a chaud est alors morte.
-# On surveille donc l'application : si elle disparait alors que watch
-# tourne encore, on arrete CE watch (pid lance ici, et lui seul) et on le
-# relance. Ctrl+C dans cette console arrete tout.
+# On surveille donc l'application, et la FACON dont elle est partie decide :
+#  - code 0 : l'utilisateur l'a fermee. On arrete CE watch et le script.
+#    La relancer la faisait revenir a chaque fermeture, sans fin (le bouton
+#    « Lancer » d'Autowin, qui joue ce script, semblait lancer en boucle) ;
+#  - autre code : plantage, ou arret force (watch tue l'application sur
+#    « rude edit », taskkill /F rend 1). On relance CE watch (pid lance ici,
+#    et lui seul) pour garder la reprise a chaud ;
+#  - trois arrets de suite moins de 30 s apres le demarrage : elle plante au
+#    lancement, la relancer ne la reparera pas. On s'arrete.
+# Ctrl+C dans cette console arrete tout.
 function Get-AppRig { Get-Process -Name 'RigV3Desktop' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe } }
 
+$plantagesAuDemarrage = 0
 while ($true) {
     $watch = Start-Process dotnet -NoNewWindow -PassThru -ArgumentList @(
         'watch', 'run', '--project', "`"$PSScriptRoot\RigV3Desktop.csproj`"", '--non-interactive')
-    $vue = $false; $absente = 0
+    $app = $null; $absente = 0
     while (-not $watch.HasExited) {
         Start-Sleep -Seconds 2
-        if (Get-AppRig) { $vue = $true; $absente = 0 }
-        elseif ($vue) { $absente++ }
-        # 3 sondes (~6 s) : laisse passer un redemarrage sur « rude edit ».
-        if ($vue -and $absente -ge 3) {
-            Write-Host 'Application fermee : relance de dotnet watch...' -ForegroundColor Yellow
-            & taskkill /PID $watch.Id /T /F | Out-Null
-            $watch.WaitForExit(10000) | Out-Null
-            break
+        $vivante = Get-AppRig | Select-Object -First 1
+        if ($vivante) {
+            if (-not $app -or $app.Id -ne $vivante.Id) {
+                # Le handle ouvert pendant que l'application vit garde son code de
+                # sortie lisible une fois partie : sans lui, ExitCode reste vide.
+                $app = $vivante; $null = $app.Handle
+            }
+            $absente = 0
         }
+        elseif ($app) { $absente++ }
+        # 3 sondes (~6 s) : laisse passer un redemarrage sur « rude edit ».
+        if ($app -and $absente -ge 3) { break }
     }
-    if ($watch.HasExited -and -not $vue) { break }  # watch mort sans jamais lancer l'app : erreur de build, on s'arrete
+    if (-not $app) { break }  # watch mort sans jamais lancer l'app : erreur de build, on s'arrete
+    if (-not $watch.HasExited) {
+        & taskkill /PID $watch.Id /T /F | Out-Null
+        $watch.WaitForExit(10000) | Out-Null
+    }
+    if (-not $app.HasExited) { continue }  # watch tombe, l'application vit : on relance watch, comme avant
+    if ($app.ExitCode -eq 0) {
+        Write-Host 'Application fermee : fin du mode developpement.' -ForegroundColor Yellow
+        break
+    }
+    if (($app.ExitTime - $app.StartTime).TotalSeconds -lt 30) { $plantagesAuDemarrage++ } else { $plantagesAuDemarrage = 0 }
+    if ($plantagesAuDemarrage -ge 3) {
+        Write-Host "L'application retombe des son demarrage (code $($app.ExitCode)) : arret. Corrige l'erreur puis relance." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "Application arretee (code $($app.ExitCode)) : relance de dotnet watch..." -ForegroundColor Yellow
 }
 
