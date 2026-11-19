@@ -3296,9 +3296,28 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    commande ouverte (Escalier, /draft du 19/11/2026, conv-1993) se pose A COTE :
    deux colonnes, la liste resserree a gauche (filet, nom, marches faites), le
    panneau a droite. Plus rien n'est recouvert (la Boite de tri cachait les deux
-   tiers de la liste sous le panneau). --- */
+   tiers de la liste sous le panneau). Entre les deux, la POIGNEE (colonne du
+   milieu, large comme l'ancien espacement) regle la largeur de la liste :
+   --tcw-liste, posee par l'ecran ; sans elle, 26 % comme avant. clamp() la
+   garde entre 210 px et ce qui laisse 420 px au panneau quand la fenetre
+   se resserre apres coup. --- */
 .rig-tcw__scene { flex: 1 1 auto; min-height: 0; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
-.rig-tcw__scene--ouverte { grid-template-columns: minmax(210px, 26%) minmax(0, 1fr); gap: var(--rig-esp-2); }
+.rig-tcw__scene--ouverte {
+  grid-template-columns: clamp(210px, var(--tcw-liste, 26%), calc(100% - 420px - var(--rig-esp-2))) var(--rig-esp-2) minmax(0, 1fr);
+}
+.rig-tcw__poignee {
+  position: relative; cursor: col-resize; touch-action: none; outline: none;
+}
+/* Le trait n'apparait qu'au survol, au clavier et pendant le geste : au repos,
+   l'ecran est celui d'avant (un simple espacement entre liste et panneau). */
+.rig-tcw__poignee::after {
+  content: ""; position: absolute; top: var(--rig-esp-3); bottom: var(--rig-esp-3); left: 50%;
+  width: 2px; margin-left: -1px; border-radius: 1px; background: var(--rig-accent);
+  opacity: 0; transition: opacity .12s;
+}
+.rig-tcw__poignee:hover::after,
+.rig-tcw__poignee:focus-visible::after,
+.rig-tcw__poignee:active::after { opacity: 1; }
 .rig-tcw__scene--ouverte .rig-tcw__cmd { gap: var(--rig-esp-2); padding: 8px var(--rig-esp-3) 8px var(--rig-esp-2); }
 .rig-tcw__scene--ouverte .rig-tcw__cmd-qui { flex: 1 1 auto; }
 .rig-tcw__scene--ouverte .rig-tcw__cmd-precisions,

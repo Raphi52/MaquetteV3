@@ -135,6 +135,44 @@ describe('EcranCommandesWeb', () => {
     expect(container.querySelector('.rig-tcw__invite')).toBeNull()
   })
 
+  it('commande ouverte : une poignee ENTRE la liste et le panneau regle la largeur de la liste, sans rien remonter a la session', async () => {
+    const { gestes } = session({ ...vueDeBase(), panneau: panneau() })
+    const { container } = render(<EcranCommandesWeb />)
+    await screen.findByText('SCI DU PARC', { selector: '.rig-tcw__cmd-nom' })
+    const scene = container.querySelector('.rig-tcw__scene') as HTMLElement
+    expect([...scene.children].map((e) => e.className)).toEqual(['rig-tcw__liste', 'rig-tcw__poignee', 'rig-tcw__panneau'])
+    // jsdom ne mesure rien : la scene fait 1200 px, la liste 300, la poignee 8.
+    const mesure = (el: Element, width: number) => { el.getBoundingClientRect = () => ({ width }) as DOMRect }
+    mesure(scene, 1200)
+    mesure(container.querySelector('.rig-tcw__liste')!, 300)
+    const poignee = screen.getByRole('separator', { name: 'Largeur de la liste des commandes' })
+    mesure(poignee, 8)
+    // Au repos : aucune largeur posee, la CSS garde ses 26 %.
+    expect(scene.style.getPropertyValue('--tcw-liste')).toBe('')
+
+    fireEvent.pointerDown(poignee, { clientX: 310, button: 0, pointerId: 1 })
+    fireEvent.pointerMove(poignee, { clientX: 450 })
+    fireEvent.pointerUp(poignee)
+    expect(scene.style.getPropertyValue('--tcw-liste')).toBe('440px')
+    // Jamais au point d'ecraser le panneau : 1200 - 8 - 420 = 772 px au plus.
+    fireEvent.pointerDown(poignee, { clientX: 450, button: 0, pointerId: 1 })
+    fireEvent.pointerMove(poignee, { clientX: 1500 })
+    fireEvent.pointerUp(poignee)
+    expect(scene.style.getPropertyValue('--tcw-liste')).toBe('772px')
+    // Double-clic : la largeur d'origine revient.
+    fireEvent.doubleClick(poignee)
+    expect(scene.style.getPropertyValue('--tcw-liste')).toBe('')
+    expect(gestes).toEqual([])
+  })
+
+  it('sans commande ouverte, pas de poignee : la liste occupe toute la largeur', async () => {
+    session(vueDeBase())
+    const { container } = render(<EcranCommandesWeb />)
+    await screen.findByText('TRANSNORD SA')
+    expect(container.querySelector('.rig-tcw__poignee')).toBeNull()
+    expect(screen.queryByRole('separator')).toBeNull()
+  })
+
   it('une tuile sans commande : la liste le dit', async () => {
     session({ ...vueDeBase(), lignes: [], compteur: '0 commande(s) · 0 groupe(s)' })
     const { container } = render(<EcranCommandesWeb />)

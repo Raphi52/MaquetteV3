@@ -32,7 +32,8 @@
 // et les regles de l'ancien @code vivent dans Pont/EcranCommandesWeb.cs
 // (SessionCommandesWeb) ; cet ecran affiche la vue et remonte chaque geste.
 
-import { useEffect, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
+import { PoigneeColonne } from '../composants/PoigneeColonne'
 import { appeler } from '../pont'
 import { Saisie, useSession, type Geste, type PontDeSession } from '../session'
 
@@ -722,6 +723,11 @@ function Tuile({ t, geste }: { t: TuileCw; geste: Geste }) {
 export function EcranCommandesWeb() {
   const [vue, geste] = useSession(pont)
   const pilule = useRef<HTMLDivElement>(null)
+  // Largeur de la liste choisie a la poignee (px), null = celle d'origine (26 %).
+  // Reglage d'affichage : il tient tant que l'ecran est ouvert, d'une commande a
+  // l'autre, sans passer par la session.
+  const liste = useRef<HTMLElement>(null)
+  const [largeurListe, poserLargeurListe] = useState<number | null>(null)
 
   // Ctrl K pose le curseur dans la pilule, comme sa touche l'annonce.
   useEffect(() => {
@@ -829,9 +835,11 @@ export function EcranCommandesWeb() {
       )}
 
       {/* Escalier : une commande ouverte se pose A COTE de la liste, qui se resserre
-          en colonne (nom et marches faites) au lieu d'etre recouverte. */}
-      <div className={`rig-tcw__scene ${vue.panneau ? 'rig-tcw__scene--ouverte' : ''}`}>
-        <section className="rig-tcw__liste" aria-label="Commandes">
+          en colonne (nom et marches faites) au lieu d'etre recouverte. La poignee
+          entre les deux regle la largeur de la liste (--tcw-liste). */}
+      <div className={`rig-tcw__scene ${vue.panneau ? 'rig-tcw__scene--ouverte' : ''}`}
+           style={largeurListe === null ? undefined : { '--tcw-liste': `${largeurListe}px` } as CSSProperties}>
+        <section className="rig-tcw__liste" aria-label="Commandes" ref={liste}>
           <div className="rig-tcw__liste-entete">
             <span className="rig-tcw__compteur">{vue.compteur}</span>
             <button className={`rig-bascule ${vue.directsEnTete ? 'rig-bascule--actif' : ''}`}
@@ -871,6 +879,14 @@ export function EcranCommandesWeb() {
             ))}
           </div>
         </section>
+
+        {/* resteMin : a 420 px, les trois decisions du pied (Rejeter…, Mettre en
+            attente…, Valider) tiennent encore sur une ligne ; le reste du panneau
+            passe a la ligne (vu sur capture, bureau cache, 19/11/2026). */}
+        {vue.panneau && (
+          <PoigneeColonne className="rig-tcw__poignee" libelle="Largeur de la liste des commandes"
+                          colonne={liste} min={210} resteMin={420} changer={poserLargeurListe} />
+        )}
 
         {/* key : chaque commande ouverte est un panneau NEUF, qui glisse a
             nouveau et repart en haut de son defilement. */}
