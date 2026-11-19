@@ -543,3 +543,51 @@ button.rig-touche--palette:hover { color: var(--rig-focus); border-color: var(--
 .rig-rp__vide { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--rig-texte-3); font-size: 13.5px; }
 .rig-rp__vide .rig-palette__picto { width: 28px; height: 28px; }
 @media (max-width: 860px) { .rig-rp__liste { width: 46%; min-width: 0; } .rig-rp__pale { display: none; } }
+
+/* La liseuse lit un vrai document PAGE par page : la page du passage courant, en
+   texte surligne ou le PDF lui-meme a cette page ; « Joindre a ce depot » dessous. */
+.rig-rp__page { font-size: 12.5px; color: var(--rig-texte-2); white-space: nowrap; }
+.rig-rp__vues { display: inline-flex; border-radius: 7px; box-shadow: inset 0 0 0 1px var(--rig-bord); overflow: hidden; }
+.rig-rp__vue {
+  border: none;
+  background: transparent;
+  color: var(--rig-texte-2);
+  font: 12px var(--rig-font);
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.rig-rp__vue--on { background: var(--rig-texte); color: var(--rig-surface); font-weight: 700; }
+.rig-rp__pdf {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  border-radius: 4px;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 1px rgba(25, 40, 80, .14), 0 6px 20px rgba(28, 44, 80, .14);
+}
+.rig-rp__joindre { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: none; font-size: 12.5px; }
+.rig-rp__depots {
+  min-width: 0;
+  max-width: 360px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid var(--rig-bord);
+  background: var(--rig-champ);
+  color: var(--rig-texte);
+  font: 12.5px var(--rig-font);
+}
+.rig-rp__bouton {
+  height: 28px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 7px;
+  background: var(--rig-surface);
+  box-shadow: inset 0 0 0 1px var(--rig-focus);
+  color: var(--rig-focus);
+  font: 600 12.5px var(--rig-font);
+  cursor: pointer;
+}
+.rig-rp__bouton:disabled { box-shadow: inset 0 0 0 1px var(--rig-bord); color: var(--rig-texte-3); cursor: default; }
+.rig-rp__avis { color: var(--rig-texte-2); }

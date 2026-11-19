@@ -48,10 +48,14 @@ public sealed record AffairePalette(string Numero, string Objet, string Siren, s
 /// <param name="Avant">Le texte qui precede le premier passage trouve.</param>
 /// <param name="Trouve">Le passage lui-meme, tel qu'il est ecrit dans la piece.</param>
 /// <param name="Passages">Combien de fois la piece porte ce qui est tape.</param>
-/// <param name="Positions">Ou commence chaque passage dans le texte de la piece (Apercu), dans
-/// l'ordre ; tous font <paramref name="Longueur"/> caracteres.</param>
+/// <param name="Texte">Le texte de la piece, ses pages separees par un saut de page (\f).</param>
+/// <param name="Positions">Ou commence chaque passage dans <paramref name="Texte"/>, dans l'ordre.</param>
+/// <param name="Longueurs">La longueur de chaque passage dans le texte : un retour a la ligne entre
+/// deux mots compte pour un blanc, un passage peut donc etre plus long que ce qui est tape.</param>
+/// <param name="PagesDesPassages">La page (a partir de 1) de chaque passage.</param>
 public sealed record PassagePiece(string[] Chemin, NoeudGed Piece, string Avant, string Trouve,
-                                  string Apres, int Passages, int[] Positions, int Longueur);
+                                  string Apres, int Passages, int[] Positions, int[] Longueurs,
+                                  string Texte, int[] PagesDesPassages, int NbPages);
 
 /// <summary>Un fichier consulte HORS du greffe. Aucun n'est branche dans la maquette.</summary>
 public sealed record SourceExterne(string Code, string Nom, string Objet);
@@ -264,8 +268,10 @@ public static class RecherchePalette
     /// </summary>
     /// <param name="enfants">Les enfants VISIBLES d'un noeud pour ce login (domaines,
     /// pieces masquees) : une piece qu'on ne peut pas ouvrir ne se cherche pas.</param>
+    /// <param name="pagesDe">Le texte d'une piece, page par page (Metier/TextePieces.cs) : celui
+    /// de l'arbre pour une piece de demonstration, celui tire du PDF pour un vrai document.</param>
     public static PassagePiece[] Passages(NoeudGed racine, Func<NoeudGed, IEnumerable<NoeudGed>> enfants,
-                                          string texte, int max = 6)
+                                          Func<NoeudGed, string[]> pagesDe, string texte, int max = 6)
     {
         var cherche = Regex.Replace(texte.Trim(), @"\s+", " ");
         if (Plier(cherche).Length < 3) return [];
@@ -278,9 +284,12 @@ public static class RecherchePalette
             {
                 if (trouves.Count >= max) return;
                 string[] ici = [.. chemin, e.Libelle];
-                if (e.EstPiece && e.Apercu.Length > 0 && Passage(e.Apercu, plie) is { } p)
+                if (e.EstPiece && pagesDe(e) is { Length: > 0 } pages
+                    && string.Join('\f', pages) is var tout && Passage(tout, plie) is { } p)
                     trouves.Add(new PassagePiece(ici, e, p.Avant, p.Trouve, p.Apres, p.Positions.Length,
-                                                 p.Positions, plie.Length));
+                                                 p.Positions, p.Longueurs, tout,
+                                                 [.. p.Positions.Select(i => 1 + tout.AsSpan(0, i).Count('\f'))],
+                                                 pages.Length));
                 Descendre(e, ici);
             }
         }
@@ -288,25 +297,46 @@ public static class RecherchePalette
         return [.. trouves];
     }
 
-    private static (string Avant, string Trouve, string Apres, int[] Positions)? Passage(string texte, string cherchePlie)
+    private static (string Avant, string Trouve, string Apres, int[] Positions, int[] Longueurs)? Passage(string texte, string cherchePlie)
     {
-        var plie = PlierAPlat(texte);
-        var i = plie.IndexOf(cherchePlie, StringComparison.Ordinal);
-        if (i < 0) return null;
+        // Le texte plie (sans accents ni casse) et ses blancs successifs reduits a UN : le texte
+        // d'un PDF coupe ses lignes n'importe ou, « Guichet unique » doit trouver « Guichet\nUnique ».
+        // origine[k] : ou se trouve, dans le texte, le k-ieme caractere du pli.
+        var sb = new StringBuilder(texte.Length);
+        var origine = new List<int>(texte.Length);
+        for (var k = 0; k < texte.Length; k++)
+        {
+            if (char.IsWhiteSpace(texte[k]))
+            {
+                if (sb.Length > 0 && sb[^1] == ' ') continue;
+                sb.Append(' ');
+            }
+            else sb.Append(char.ToUpperInvariant(texte[k].ToString().Normalize(NormalizationForm.FormD)[0]));
+            origine.Add(k);
+        }
+        var plie = sb.ToString();
 
         var positions = new List<int>();
-        for (var j = i; j >= 0; j = plie.IndexOf(cherchePlie, j + cherchePlie.Length, StringComparison.Ordinal))
-            positions.Add(j);
+        var longueurs = new List<int>();
+        for (var j = plie.IndexOf(cherchePlie, StringComparison.Ordinal); j >= 0;
+             j = plie.IndexOf(cherchePlie, j + cherchePlie.Length, StringComparison.Ordinal))
+        {
+            positions.Add(origine[j]);
+            longueurs.Add(origine[j + cherchePlie.Length - 1] + 1 - origine[j]);
+        }
+        if (positions.Count == 0) return null;
+        var i = positions[0];
+        var longueur = longueurs[0];
 
         var debut = Math.Max(0, i - 48);
-        var fin = Math.Min(texte.Length, i + cherchePlie.Length + 72);
+        var fin = Math.Min(texte.Length, i + longueur + 72);
         // Couper sur un blanc, pas au milieu d'un mot.
         if (debut > 0 && texte.IndexOf(' ', debut, i - debut) is var b and >= 0) debut = b + 1;
-        if (fin < texte.Length && texte.LastIndexOf(' ', fin - 1, fin - (i + cherchePlie.Length)) is var e and >= 0) fin = e;
+        if (fin < texte.Length && texte.LastIndexOf(' ', fin - 1, fin - (i + longueur)) is var e and >= 0) fin = e;
 
         return ((debut > 0 ? "…" : "") + Lisible(texte[debut..i]),
-                texte.Substring(i, cherchePlie.Length),
-                Lisible(texte[(i + cherchePlie.Length)..fin]) + (fin < texte.Length ? "…" : ""), [.. positions]);
+                Lisible(texte.Substring(i, longueur)),
+                Lisible(texte[(i + longueur)..fin]) + (fin < texte.Length ? "…" : ""), [.. positions], [.. longueurs]);
     }
 
     /// <summary>Sans accents, sans casse, MEME LONGUEUR que le texte : une position
@@ -323,7 +353,7 @@ public static class RecherchePalette
     }
 
     /// <summary>Une piece s'ecrit sur plusieurs lignes ; l'extrait, sur une seule.</summary>
-    private static string Lisible(string morceau) => Regex.Replace(morceau, @"[ \t]*\n[\s]*", " · ");
+    private static string Lisible(string morceau) => Regex.Replace(morceau, @"[ \t]*[\n\f][\s]*", " · ");
 
     /// <summary>Le libelle d'un dossier, en mots (« Depots d'actes > Depot n 2024/0141 »).</summary>
     public static string Lieu(string[] chemin)

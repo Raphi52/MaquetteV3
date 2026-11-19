@@ -710,7 +710,8 @@ public sealed partial class SessionPlanTravail
             case "palettePiece":
             case "paletteAttribuer":
             case "paletteEnPage":
-            case "rechercheTexte": AgirPalette(geste, valeur); break;
+            case "rechercheTexte":
+            case "rechercheJoindre": AgirPalette(geste, valeur); break;
 
             // ---- Visionneuse : entete, bandeau des defauts, colonnes ----
             case "fermerDossier": FermerAffaire(); break;

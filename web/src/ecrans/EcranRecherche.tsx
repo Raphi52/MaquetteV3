@@ -4,7 +4,10 @@
 // la liste des resultats a gauche -- le texte des pieces d'abord, puis le travail le plus
 // urgent, les ecrans, l'arbre, les annonces, hors du greffe -- et la PIECE en grand a
 // droite, chaque passage trouve surligne, le passage courant en or, avec passage suivant
-// et precedent (N et Maj N, ou F3 et Maj F3 depuis la saisie).
+// et precedent (N et Maj N, ou F3 et Maj F3 depuis la saisie). Un vrai document (PDF) se
+// lit PAGE par page : la liseuse montre la page du passage courant (« page 3 sur 13 »), en
+// texte surligne ou, au choix, le PDF lui-meme ouvert a cette page. « Joindre a ce depot »
+// pose une copie de la piece dans un depot de l'affaire (Pont/PlanTravailPalette.cs).
 // Pas d'equivalent dans RIG v2 : PROC_RECHAFF (« Recherche d'affaires ») n'y cherchait que
 // des affaires, jamais dans le texte des pieces.
 //
@@ -17,7 +20,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ToucheReact, ReactNode } from 'react'
 import { annonceRepond, Avatar, Picto, Surligne, Touche } from '../composants/Palette'
 import { AnnoncesBodacc } from './EcranBodacc'
-import type { GestePlan, PaletteVue, PiecePaletteVue } from '../plan/types'
+import type { DepotPaletteVue, GestePlan, PaletteVue, PiecePaletteVue } from '../plan/types'
 
 export interface ProprietesEcranRecherche {
   /** Null tant que la vue n'est pas arrivee. */
@@ -25,35 +28,53 @@ export interface ProprietesEcranRecherche {
   plan: GestePlan
 }
 
-/** Les morceaux du texte d'une piece : hors passage, ou le passage n (0 = le premier). */
-function morceaux(texte: string, positions: number[], longueur: number): Array<{ t: string, n: number | null }> {
-  const r: Array<{ t: string, n: number | null }> = []
+/**
+ * Les morceaux de la PAGE n (a partir de 1) d'une piece : hors passage, ou le passage
+ * numero k de la piece (0 = le premier). Les pages sont separees par \f dans le texte.
+ */
+export function morceauxDeLaPage(piece: PiecePaletteVue, n: number): Array<{ t: string, k: number | null }> {
+  const pages = piece.texte.split('\f')
+  let debut = 0
+  for (let i = 0; i < n - 1 && i < pages.length; i++) debut += (pages[i] ?? '').length + 1
+  const page = pages[n - 1] ?? ''
+  const r: Array<{ t: string, k: number | null }> = []
   let i = 0
-  positions.forEach((p, n) => {
-    if (p > i) r.push({ t: texte.slice(i, p), n: null })
-    r.push({ t: texte.slice(p, p + longueur), n })
-    i = p + longueur
+  piece.positions.forEach((p, k) => {
+    const lg = piece.longueurs[k] ?? 0
+    if (p < debut || p >= debut + page.length) return
+    const local = p - debut
+    if (local > i) r.push({ t: page.slice(i, local), k: null })
+    r.push({ t: page.slice(local, local + lg), k })
+    i = local + lg
   })
-  if (i < texte.length) r.push({ t: texte.slice(i), n: null })
+  if (i < page.length) r.push({ t: page.slice(i), k: null })
   return r
 }
 
+/** Ce qui distingue une piece d'une autre dans la liste : son chemin dans l'arbre. */
+const cleDe = (p: PiecePaletteVue) => p.chemin.join('/')
+
 export function EcranRecherche({ vue, plan }: ProprietesEcranRecherche) {
   const [saisie, poserSaisie] = useState(vue?.texte ?? '')
-  const [lue, lire] = useState(0)
+  // La piece lue, retenue par son CHEMIN (pas son rang) : « Joindre a ce depot » ajoute sa
+  // copie a la liste, qui se reordonne ; la liseuse doit rester sur la meme piece.
+  const [lue, lire] = useState<string | null>(null)
   const [passage, poserPassage] = useState(0)
   const [toutLeTravail, voirToutLeTravail] = useState(false)
+  const [enPdf, voirEnPdf] = useState(false)
+  const [depotVoulu, vouloirDepot] = useState<string | null>(null)
   const feuille = useRef<HTMLDivElement>(null)
 
   const texte = vue?.texte.trim() ?? ''
   const pieces = vue?.pieces ?? []
-  const piece: PiecePaletteVue | undefined = pieces[Math.min(lue, Math.max(pieces.length - 1, 0))]
+  const piece: PiecePaletteVue | undefined = pieces.find((p) => cleDe(p) === lue) ?? pieces[0]
+  const cleLue = piece ? cleDe(piece) : ''
   // Les annonces de l'ecran BODACC, filtrees comme dans la palette.
   const annonces = useMemo(() => AnnoncesBodacc.filter((a) => annonceRepond(a, texte)), [texte])
 
   // Une autre recherche, ou une autre piece : on repart du premier passage.
-  useEffect(() => { lire(0); poserPassage(0) }, [texte])
-  useEffect(() => { poserPassage(0) }, [lue])
+  useEffect(() => { lire(null); poserPassage(0) }, [texte])
+  useEffect(() => { poserPassage(0); voirEnPdf(false) }, [cleLue])
   // Le passage courant reste a l'ecran dans la feuille.
   useEffect(() => {
     feuille.current?.querySelector('[data-courant="oui"]')?.scrollIntoView?.({ block: 'center' })
@@ -62,6 +83,11 @@ export function EcranRecherche({ vue, plan }: ProprietesEcranRecherche) {
   if (!vue) return <div className="rig-rp"></div>
 
   const nb = piece?.positions.length ?? 0
+  const page = piece?.pagesDesPassages[passage] ?? 1
+  // « Ce depot » : celui choisi dans la liste, sinon celui selectionne dans l'affaire, sinon le premier.
+  const depot: DepotPaletteVue | undefined = vue.depots.find((d) => d.chemin.join('/') === depotVoulu)
+    ?? vue.depots.find((d) => d.choisi) ?? vue.depots[0]
+  const dejaDedans = !!piece && !!depot && depot.pieces.includes(piece.libelle)
   const allerPassage = (sens: number) => { if (nb > 0) poserPassage((passage + sens + nb) % nb) }
   const ouvrirPiece = (p: PiecePaletteVue | undefined) => { if (p) plan('palettePiece', p.chemin) }
   const aller = (nature: string, cle: string) => plan('paletteAller', { nature, cle })
@@ -116,10 +142,10 @@ export function EcranRecherche({ vue, plan }: ProprietesEcranRecherche) {
         <div className="rig-rp__liste" role="listbox" aria-label="Resultats">
           {pieces.length > 0 && <>
             {titre('Dans le texte des pieces', pieces.length)}
-            {pieces.map((p, i) => (
-              <div key={p.chemin.join('/')} role="option" aria-selected={p === piece}
+            {pieces.map((p) => (
+              <div key={cleDe(p)} role="option" aria-selected={p === piece}
                    className={'rig-palette__ligne' + (p === piece ? ' rig-palette__ligne--choisie' : '')}
-                   onClick={() => lire(i)} onDoubleClick={() => ouvrirPiece(p)}>
+                   onClick={() => lire(cleDe(p))} onDoubleClick={() => ouvrirPiece(p)}>
                 <Picto nom={p.annonce ? 'annonce' : 'piece'} />
                 <span className="rig-palette__texte">
                   <span className="rig-palette__t1">{p.libelle}</span>
@@ -212,7 +238,14 @@ export function EcranRecherche({ vue, plan }: ProprietesEcranRecherche) {
           {piece ? <>
             <div className="rig-rp__barre-lecteur">
               <b>{piece.libelle}</b>
-              <span className="rig-rp__pale">{piece.lieu} · {piece.pages} {piece.pages > 1 ? 'pages' : 'page'} · {piece.date}</span>
+              <span className="rig-rp__pale">{piece.lieu} · {piece.date}</span>
+              {(piece.nbPages > 1 || piece.fichier) && <span className="rig-rp__page">page <b>{page}</b> sur {piece.nbPages}</span>}
+              {piece.fichier && (
+                <span className="rig-rp__vues" role="group" aria-label="Voir la piece">
+                  <button type="button" className={'rig-rp__vue' + (enPdf ? '' : ' rig-rp__vue--on')} onClick={() => voirEnPdf(false)}>Texte</button>
+                  <button type="button" className={'rig-rp__vue' + (enPdf ? ' rig-rp__vue--on' : '')} onClick={() => voirEnPdf(true)}>PDF</button>
+                </span>
+              )}
               <span className="rig-rp__nav">
                 passage <b>{passage + 1}</b> sur {nb}
                 <button type="button" className="rig-rp__fleche" title="Passage precedent (Maj N)" onClick={() => allerPassage(-1)}>‹</button>
@@ -221,13 +254,34 @@ export function EcranRecherche({ vue, plan }: ProprietesEcranRecherche) {
               </span>
               <button type="button" className="rig-rp__ouvrir" onClick={() => ouvrirPiece(piece)}>Ouvrir la piece <Touche>Entree</Touche></button>
             </div>
-            <div className="rig-rp__feuille" ref={feuille} aria-label={'Texte de la piece ' + piece.libelle}>
-              {morceaux(piece.texte, piece.positions, piece.longueur).map((m, i) =>
-                m.n === null
-                  ? <span key={i}>{m.t}</span>
-                  : <mark key={i} data-courant={m.n === passage ? 'oui' : undefined}
-                          className={'rig-rp__m' + (m.n === passage ? ' rig-rp__m--courant' : '')}>{m.t}</mark>)}
-            </div>
+            {enPdf && piece.fichier
+              ? <iframe key={piece.fichier + '#' + page} className="rig-rp__pdf" title={piece.libelle + ', page ' + page}
+                        src={piece.fichier + '#page=' + page + '&view=FitH'}></iframe>
+              : (
+                <div className="rig-rp__feuille" ref={feuille} aria-label={'Texte de la piece ' + piece.libelle + ', page ' + page}>
+                  {morceauxDeLaPage(piece, page).map((m, i) =>
+                    m.k === null
+                      ? <span key={i}>{m.t}</span>
+                      : <mark key={i} data-courant={m.k === passage ? 'oui' : undefined}
+                              className={'rig-rp__m' + (m.k === passage ? ' rig-rp__m--courant' : '')}>{m.t}</mark>)}
+                </div>
+              )}
+            {depot && (
+              <div className="rig-rp__joindre">
+                <span className="rig-rp__pale">Joindre a</span>
+                <select className="rig-rp__depots" aria-label="Depot ou joindre la piece" value={depot.chemin.join('/')}
+                        onChange={(e) => vouloirDepot(e.target.value)}>
+                  {vue.depots.map((d) => (
+                    <option key={d.chemin.join('/')} value={d.chemin.join('/')}>{d.libelle} · {d.lieu}</option>
+                  ))}
+                </select>
+                <button type="button" className="rig-rp__bouton" disabled={dejaDedans}
+                        onClick={() => plan('rechercheJoindre', { piece: piece.chemin, depot: depot.chemin })}>
+                  {dejaDedans ? 'Deja dans ce depot' : 'Joindre a ce depot'}
+                </button>
+                {vue.avis && <span className="rig-rp__avis" role="status">{vue.avis}</span>}
+              </div>
+            )}
           </> : (
             <div className="rig-rp__vide">
               <Picto nom="piece" />

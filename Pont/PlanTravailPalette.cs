@@ -20,6 +20,8 @@ namespace RigV3Desktop.Pont;
 /// <param name="SirenInconnu">Le SIREN tape quand rien ne lui repond : la palette propose d'ouvrir un dossier.</param>
 /// <param name="Ecrans">Les ecrans du menu dont le nom porte ce qui est tape (« facture », « trans »).</param>
 /// <param name="Elements">Les elements de l'arbre dont le LIBELLE porte ce qui est tape (n° de depot, de formalite).</param>
+/// <param name="Depots">Les depots de l'affaire cherchee, ou la liseuse peut JOINDRE une piece (page seule).</param>
+/// <param name="Avis">Ce que le dernier « Joindre » a fait (page seule) ; null sinon.</param>
 /// <param name="Ancree">Ouverte SUR L'ACCUEIL (sa barre de recherche, ou Ctrl K quand rien ne le
 /// recouvre) : elle pend SOUS la barre, en liste deroulante. Sur un ecran ou une affaire, elle
 /// flotte au milieu.</param>
@@ -28,7 +30,10 @@ public sealed record PaletteVue(string Texte, string Filtre, FiltrePaletteVue[] 
                                 PiecePaletteVue[] Pieces, string DossierDesPieces, string NumeroDesPieces,
                                 HorsGreffePaletteVue[] HorsGreffe,
                                 BilanPaletteVue Bilan, string? SirenInconnu,
-                                EcranPaletteVue[] Ecrans, ElementPaletteVue[] Elements, bool Ancree);
+                                EcranPaletteVue[] Ecrans, ElementPaletteVue[] Elements, bool Ancree,
+                                DepotPaletteVue[] Depots, string? Avis);
+/// <summary>Un depot de l'arbre (« Depot n 2024/0141 ») et les pieces qu'il contient deja.</summary>
+public sealed record DepotPaletteVue(string Libelle, string[] Chemin, string Lieu, string[] Pieces, bool Choisi);
 /// <summary>Un ecran du menu ; le geste « paletteAller » (nature « ecran ») l'ouvre par son code.</summary>
 public sealed record EcranPaletteVue(string Code, string Libelle);
 /// <param name="Chemin">Libelles depuis la racine : « palettePiece » deplie l'arbre jusqu'a l'element.</param>
@@ -48,12 +53,17 @@ public sealed record TravailPaletteVue(string Nature, string Numero, string Cle,
 public sealed record ActivitePaletteVue(string Agent, string Verbe, string Objet, string Depuis);
 /// <param name="Chemin">Libelles depuis la racine : le geste « palettePiece » deplie l'arbre jusqu'a la piece.</param>
 /// <param name="Annonce">Une annonce (BODACC) : rangee a part dans la palette.</param>
-/// <param name="Texte">Le texte entier de la piece : la liseuse de la page « Recherche » l'affiche.</param>
+/// <param name="Texte">Le texte entier de la piece, pages separees par \f (page « Recherche » seule ;
+/// vide dans la palette, qui n'en montre que l'extrait).</param>
 /// <param name="Positions">Le debut de chaque passage trouve dans <paramref name="Texte"/>.</param>
-/// <param name="Longueur">La longueur de chaque passage (celle de ce qui est tape).</param>
+/// <param name="Longueurs">La longueur de chaque passage dans le texte.</param>
+/// <param name="Fichier">Le PDF de la piece (relatif a wwwroot), vide pour une piece de demonstration.</param>
+/// <param name="PagesDesPassages">La page de chaque passage, a partir de 1.</param>
+/// <param name="NbPages">Le nombre de pages du texte (celui du PDF pour un vrai document).</param>
 public sealed record PiecePaletteVue(string Libelle, string[] Chemin, string Lieu, string Avant, string Trouve,
                                      string Apres, int Passages, int Pages, string Date, string Origine, bool Annonce,
-                                     string Texte, int[] Positions, int Longueur);
+                                     string Texte, int[] Positions, int[] Longueurs, string Fichier,
+                                     int[] PagesDesPassages, int NbPages);
 /// <param name="Sujet">Ce qui serait consulte (« TRANSNORD SA · 318 552 004 »).</param>
 public sealed record HorsGreffePaletteVue(string Code, string Source, string Objet, string Sujet);
 /// <param name="PlusAncienne">Jours depuis la plus ancienne demande en cours confiee au login.</param>
@@ -70,6 +80,11 @@ public sealed partial class SessionPlanTravail
 
     /// <summary>Ce qui est cherche dans la page « Recherche » (sa propre barre).</summary>
     private string PageRechercheTexte = string.Empty;
+
+    /// <summary>Ce que le dernier « Joindre a ce depot » a fait, dit dans la liseuse.</summary>
+    private string? AvisPageRecherche;
+
+    private sealed record GesteJoindre(string[] Piece, string[] Depot);
     private bool PaletteAncree;
     private string PaletteTexte = string.Empty;
     private string PaletteFiltre = "tout";
@@ -113,7 +128,13 @@ public sealed partial class SessionPlanTravail
                 PaletteOuverte = false;
                 OuvrirPageRecherche();
                 break;
-            case "rechercheTexte": PageRechercheTexte = Texte(valeur); break;
+            case "rechercheTexte": PageRechercheTexte = Texte(valeur); AvisPageRecherche = null; break;
+            case "rechercheJoindre":
+            {
+                var g = Lire<GesteJoindre>(valeur);
+                JoindreAuDepot(g.Piece, g.Depot);
+                break;
+            }
             case "paletteFiltre":
             {
                 var code = Texte(valeur);
@@ -157,17 +178,18 @@ public sealed partial class SessionPlanTravail
 
     /// <summary>La palette, si elle est ouverte (jamais dans la fenetre d'un onglet sorti).</summary>
     private PaletteVue? VuePalette()
-        => !PaletteOuverte || ModeFenetreVue ? null : Recherche(PaletteTexte, PaletteFiltre, PaletteAncree);
+        => !PaletteOuverte || ModeFenetreVue ? null : Recherche(PaletteTexte, PaletteFiltre, PaletteAncree, page: false);
 
-    /// <summary>La page « Recherche » : le MEME calcul que la palette, sur le texte de sa barre.</summary>
-    private PaletteVue VuePageRecherche() => Recherche(PageRechercheTexte, "tout", ancree: false);
+    /// <summary>La page « Recherche » : le MEME calcul que la palette, sur le texte de sa barre,
+    /// avec en plus le texte entier des pieces trouvees et les depots ou les joindre.</summary>
+    private PaletteVue VuePageRecherche() => Recherche(PageRechercheTexte, "tout", ancree: false, page: true);
 
     /// <summary>Ouvre (ou ramene) l'onglet de la page « Recherche ».</summary>
     private void OuvrirPageRecherche() => OuvrirProc(new Proc(CodePageRecherche, "Recherche"));
 
     /// <summary>La recherche de la palette et de la page : le travail, les ecrans, l'arbre,
     /// le texte des pieces, hors du greffe.</summary>
-    private PaletteVue Recherche(string texteTape, string filtre, bool ancree)
+    private PaletteVue Recherche(string texteTape, string filtre, bool ancree, bool page)
     {
         var compte = Accueil.CompteCourant;
         var moi = compte.Signature;
@@ -180,16 +202,16 @@ public sealed partial class SessionPlanTravail
             .ToArray();
         var gardees = RecherchePalette.Filtrer(trouve, filtre, moi).ToArray();
 
-        // L'arbre se cherche tel qu'on l'OUVRIRAIT : celui de l'affaire ouverte
-        // (avec ce que l'agent y a ajoute ou masque), sinon celui de la premiere
-        // affaire du registre. Ce que le login ne voit pas ne se cherche pas.
-        var affaire = AffaireCherchee;
-        var racine = ArbreCherche();
-        IEnumerable<NoeudGed> Visibles(NoeudGed n) => AccesGed.EnfantsVisibles(n, Domaines, AjoutsArbre, MasquesArbre);
+        // L'arbre se cherche tel qu'on l'OUVRIRAIT (ArbreDeLaRecherche), avec ce que
+        // l'agent y a ajoute ou masque. Ce que le login ne voit pas ne se cherche pas.
+        var arbre = ArbreDeLaRecherche();
+        var affaire = arbre.Affaire;
+        var racine = arbre.Racine;
+        IEnumerable<NoeudGed> Visibles(NoeudGed n) => arbre.Visibles(n, Domaines);
         // Par le LIBELLE (un n° de depot, de formalite, une liasse) : « 2024/0141 »,
         // « 2024 0141 » et « 20240141 » sont le meme depot (RechercheArbre).
         // Par le TEXTE de la piece, avec le passage trouve.
-        var pieces = RecherchePalette.Passages(racine, Visibles, texte);
+        var pieces = RecherchePalette.Passages(racine, Visibles, n => TextePieces.Pages(n, PageWeb.DossierWwwroot), texte);
         // Une piece trouvee des deux facons ne s'affiche qu'une fois, avec son
         // passage, qui en dit plus que son libelle (et range un avis BODACC
         // parmi les annonces).
@@ -238,7 +260,8 @@ public sealed partial class SessionPlanTravail
             gardees.Length,
             [.. pieces.Select(p => new PiecePaletteVue(p.Piece.Libelle, p.Chemin, RecherchePalette.Lieu(p.Chemin),
                 p.Avant, p.Trouve, p.Apres, p.Passages, p.Piece.Pages, p.Piece.Date, p.Piece.Origine,
-                RecherchePalette.EstAnnonce(p.Piece), p.Piece.Apercu, p.Positions, p.Longueur))],
+                RecherchePalette.EstAnnonce(p.Piece), page ? p.Texte : "", p.Positions, p.Longueurs, p.Piece.Fichier,
+                p.PagesDesPassages, p.NbPages))],
             $"{affaire.Numero} {Denomination(affaire.Objet)}",
             affaire.Numero,
             horsGreffe,
@@ -247,7 +270,96 @@ public sealed partial class SessionPlanTravail
             [.. ecrans.Select(p => new EcranPaletteVue(p.Code, p.Libelle))],
             [.. elements.Select(e => new ElementPaletteVue(e.Chemin[^1], e.Chemin, RecherchePalette.Lieu(e.Chemin),
                                                            e.Suite![^1].EstPiece))],
-            ancree);
+            ancree,
+            page ? Depots(racine, Visibles) : [],
+            page ? AvisPageRecherche : null);
+    }
+
+    // ================= Joindre une piece a un depot (liseuse de la page « Recherche ») =================
+
+    /// <summary>L'arbre ou cherche la recherche, avec ce que l'agent y a ajoute,
+    /// masque, renomme ou replie. Celui de l'affaire ouverte (les collections de la
+    /// session), sinon celui de l'affaire cherchee, reconstruit avec son etat
+    /// enregistre : une piece jointe a une affaire fermee s'y retrouve.</summary>
+    private sealed record ArbreDeRecherche(Dossier Affaire, NoeudGed Racine,
+                                           Dictionary<NoeudGed, List<NoeudGed>> Ajouts, HashSet<NoeudGed> Masques,
+                                           Dictionary<NoeudGed, string> Libelles, HashSet<NoeudGed> Replies, bool Ouvert)
+    {
+        public IReadOnlyList<NoeudGed> Visibles(NoeudGed n, string[] domaines)
+            => AccesGed.EnfantsVisibles(n, domaines, Ajouts, Masques);
+    }
+
+    private ArbreDeRecherche ArbreDeLaRecherche()
+    {
+        var affaire = AffaireCherchee;
+        if (ReferenceEquals(affaire, DossierOuvert))
+            return new(affaire, Arbre, AjoutsArbre, MasquesArbre, LibellesArbre, SousDossiersReplies, Ouvert: true);
+        var racine = ArbreDemo.Racine(affaire.Numero, affaire.Objet, affaire.Siren, avecDossierRcs: !affaire.SansDossierRcs);
+        var a = new ArbreDeRecherche(affaire, racine, AccesGed.NouveauxAjouts(), AccesGed.NouveauxMasques(),
+                                     AccesGed.NouveauxLibelles(), AccesGed.NouveauxMasques(), Ouvert: false);
+        PersistanceGed.Appliquer(racine, Etat.ArbreGedDe(affaire.Numero), a.Ajouts, a.Masques, a.Libelles, a.Replies);
+        return a;
+    }
+
+    /// <summary>Les depots de l'arbre (« Depot n ... ») visibles pour ce login, avec leurs pieces.
+    /// Celui selectionne dans l'affaire ouverte est « ce depot ».</summary>
+    private DepotPaletteVue[] Depots(NoeudGed racine, Func<NoeudGed, IEnumerable<NoeudGed>> visibles)
+    {
+        var depots = new List<DepotPaletteVue>();
+        void Descendre(NoeudGed noeud, string[] chemin)
+        {
+            foreach (var e in visibles(noeud))
+            {
+                string[] ici = [.. chemin, e.Libelle];
+                if (!e.EstPiece && e.Libelle.StartsWith("Depot n", StringComparison.Ordinal))
+                    depots.Add(new DepotPaletteVue(e.Libelle, ici, RecherchePalette.Lieu(ici),
+                        [.. visibles(e).Where(p => p.EstPiece).Select(p => p.Libelle)],
+                        ReferenceEquals(e, NoeudSelectionne)));
+                Descendre(e, ici);
+            }
+        }
+        Descendre(racine, []);
+        return [.. depots];
+    }
+
+    /// <summary>
+    /// JOINDRE une piece a un depot : une copie de la piece (son texte, son PDF) est
+    /// posee dans le dossier du depot, comme « Nouveau » y pose un element -- meme
+    /// validation hierarchique pour un login qui ne modifie pas en direct. L'arbre
+    /// de l'affaire est enregistre : la piece jointe s'y retrouve a la reouverture.
+    /// </summary>
+    private void JoindreAuDepot(string[] cheminPiece, string[] cheminDepot)
+    {
+        var a = ArbreDeLaRecherche();
+        IEnumerable<NoeudGed> Visibles(NoeudGed n) => a.Visibles(n, Domaines);
+        var piece = SuiteVisible(a.Racine, cheminPiece, Visibles)?[^1];
+        var depot = SuiteVisible(a.Racine, cheminDepot, Visibles)?[^1];
+        if (piece is not { EstPiece: true } || depot is null || depot.EstPiece)
+        {
+            AvisPageRecherche = "Cette piece ou ce depot n est plus dans l arbre.";
+            return;
+        }
+        if (Visibles(depot).Any(e => e.EstPiece && e.Libelle == piece.Libelle))
+        {
+            AvisPageRecherche = $"« {piece.Libelle} » est deja dans {depot.Libelle}.";
+            return;
+        }
+
+        var copie = piece with { };
+        void Joindre()
+        {
+            if (a.Ouvert) { Inserer(depot, copie); return; }
+            if (!a.Ajouts.TryGetValue(depot, out var liste)) a.Ajouts[depot] = liste = [];
+            liste.Add(copie);
+            Etat.EnregistrerArbreGed(a.Affaire.Numero, PersistanceGed.Capturer(a.Racine, a.Ajouts, a.Masques, a.Libelles, a.Replies));
+        }
+        if (Soumettre("Joindre", depot.Libelle, $"piece jointe : {piece.Libelle}", Joindre))
+        {
+            AvisPageRecherche = $"Envoye en validation : « {piece.Libelle} » dans {depot.Libelle}.";
+            return;
+        }
+        Joindre();
+        AvisPageRecherche = $"« {piece.Libelle} » jointe a {depot.Libelle}.";
     }
 
     /// <summary>Les noeuds d'un chemin, s'il passe tout entier par des noeuds

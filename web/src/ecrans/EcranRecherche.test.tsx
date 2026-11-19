@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
-import { EcranRecherche } from './EcranRecherche'
+import { EcranRecherche, morceauxDeLaPage } from './EcranRecherche'
 import { paletteVue } from '../test/plan'
 import type { PaletteVue, PiecePaletteVue } from '../plan/types'
 
@@ -15,7 +15,7 @@ function piece(partiel: Partial<PiecePaletteVue> = {}): PiecePaletteVue {
     libelle: 'Declaration de non-condamnation', chemin: ['Dossier RCS', 'Formalites', 'Formalite n 2024/00218', 'Declaration de non-condamnation'],
     lieu: 'Formalites > Formalite n 2024/00218', avant: '… Je soussigne ', trouve: 'DUPONT', apres: ' Jean, ne le 4 avril 1978…',
     passages: 2, pages: 1, date: '12/03/2024', origine: 'Teletransmission', annonce: false,
-    texte: TEXTE, positions: [premier, second], longueur: 6,
+    texte: TEXTE, positions: [premier, second], longueurs: [6, 6], fichier: '', pagesDesPassages: [1, 1], nbPages: 1,
     ...partiel,
   }
 }
@@ -25,7 +25,7 @@ function rendre(v: Partial<PaletteVue> = {}) {
   const vue = paletteVue({
     texte: 'dupont', travailTrouve: 0,
     pieces: [piece(), piece({ libelle: 'Liste des souscripteurs', chemin: ['Dossier RCS', 'Liste des souscripteurs'], lieu: 'Dossier RCS',
-      texte: 'LISTE DES SOUSCRIPTEURS\nDUPONT Jean 600', positions: [24], longueur: 6, passages: 1 })],
+      texte: 'LISTE DES SOUSCRIPTEURS\nDUPONT Jean 600', positions: [24], longueurs: [6], pagesDesPassages: [1], passages: 1 })],
     ...v,
   })
   const r = render(<EcranRecherche vue={vue} plan={plan} />)
@@ -107,6 +107,69 @@ describe('EcranRecherche (la palette en page, liseuse des pieces)', () => {
     expect(p.container.querySelector('.rig-rp__vide')!.textContent).toBe('Aucune piece ne contient « 552 100 554 ».')
     fireEvent.click(p.getByText('Ouvrir un dossier pour ce SIREN'))
     expect(p.appels()).toEqual([['paletteAller', { nature: 'siren', cle: '552 100 554' }]])
+  })
+
+  it('un vrai document se lit par page : la page du passage courant, en texte ou en PDF', () => {
+    // Trois pages ; « commandite » en page 1 et en page 3.
+    const texte = 'Synthese de depot\nSociete en commandite par actions\fPage deux sans rien\fGerant de la commandite'
+    const pdf = piece({
+      libelle: 'Synthese de depot au Guichet unique', fichier: 'documents/synthese.pdf', nbPages: 3, pages: 3,
+      texte, positions: [texte.indexOf('commandite'), texte.lastIndexOf('commandite')], longueurs: [10, 10], pagesDesPassages: [1, 3],
+    })
+    const p = rendre({ texte: 'commandite', pieces: [pdf] })
+    expect(p.container.querySelector('.rig-rp__page')!.textContent).toBe('page 1 sur 3')
+    expect(p.container.querySelector('.rig-rp__feuille')!.textContent).toBe('Synthese de depot\nSociete en commandite par actions')
+    fireEvent.keyDown(p.container.querySelector('.rig-rp')!, { key: 'n' })
+    expect(p.container.querySelector('.rig-rp__page')!.textContent).toBe('page 3 sur 3')
+    expect(p.container.querySelector('.rig-rp__feuille')!.textContent).toBe('Gerant de la commandite')
+    expect(p.courant()!.textContent).toBe('commandite')
+    fireEvent.click(p.getByText('PDF'))
+    expect(p.container.querySelector('.rig-rp__feuille')).toBeNull()
+    expect(p.container.querySelector('iframe.rig-rp__pdf')!.getAttribute('src')).toBe('documents/synthese.pdf#page=3&view=FitH')
+    fireEvent.click(p.getByText('Texte'))
+    expect(p.container.querySelector('iframe')).toBeNull()
+  })
+
+  it('les morceaux d une page ne prennent que ses passages, a leur place', () => {
+    const texte = 'aaa X bbb\fccc X\fX'
+    const pc = piece({ texte, positions: [4, 14, 16], longueurs: [1, 1, 1], pagesDesPassages: [1, 2, 3], nbPages: 3 })
+    expect(morceauxDeLaPage(pc, 1)).toEqual([{ t: 'aaa ', k: null }, { t: 'X', k: 0 }, { t: ' bbb', k: null }])
+    expect(morceauxDeLaPage(pc, 2)).toEqual([{ t: 'ccc ', k: null }, { t: 'X', k: 1 }])
+    expect(morceauxDeLaPage(pc, 3)).toEqual([{ t: 'X', k: 2 }])
+  })
+
+  it('« Joindre a ce depot » : le depot choisi, la piece jointe, l avis ; deja dedans, le bouton le dit', () => {
+    const depots = [
+      { libelle: 'Depot n 2024/0141', chemin: ['Dossier RCS', 'Depots d\'actes', 'Depot n 2024/0141'], lieu: 'Depots d\'actes', pieces: ['Bail commercial'], choisi: false },
+      { libelle: 'Depot n B2024/061077', chemin: ['Dossier RCS', 'Depots des comptes annuels', 'Depot n B2024/061077'], lieu: 'Depots des comptes annuels', pieces: ['Declaration de non-condamnation'], choisi: false },
+    ]
+    const p = rendre({ depots, avis: null })
+    const choix = p.container.querySelector<HTMLSelectElement>('.rig-rp__depots')!
+    expect([...choix.options].map((o) => o.textContent)).toEqual(['Depot n 2024/0141 · Depots d\'actes', 'Depot n B2024/061077 · Depots des comptes annuels'])
+    fireEvent.click(p.getByText('Joindre a ce depot'))
+    expect(p.appels()).toEqual([['rechercheJoindre', { piece: piece().chemin, depot: depots[0]!.chemin }]])
+    fireEvent.change(choix, { target: { value: depots[1]!.chemin.join('/') } })
+    expect((p.getByText('Deja dans ce depot') as HTMLButtonElement).disabled).toBe(true)
+    cleanup()
+    const p2 = rendre({ depots, avis: '« Declaration de non-condamnation » jointe a Depot n 2024/0141.' })
+    expect(p2.getByRole('status').textContent).toBe('« Declaration de non-condamnation » jointe a Depot n 2024/0141.')
+  })
+
+  it('la copie jointe arrive en tete de liste : la liseuse reste sur la piece lue, au meme passage', () => {
+    const souscripteurs = piece({ libelle: 'Liste des souscripteurs', chemin: ['Dossier RCS', 'Liste des souscripteurs'], lieu: 'Dossier RCS',
+      texte: 'LISTE DES SOUSCRIPTEURS\nDUPONT Jean 600', positions: [24], longueurs: [6], pagesDesPassages: [1], passages: 1 })
+    const plan = vi.fn<(nom: string, valeur?: unknown) => void>()
+    const avant = paletteVue({ texte: 'dupont', travailTrouve: 0, pieces: [souscripteurs, piece()] })
+    const r = render(<EcranRecherche vue={avant} plan={plan} />)
+    fireEvent.click(r.getAllByRole('option')[1]!)
+    fireEvent.keyDown(r.container.querySelector('.rig-rp')!, { key: 'n' })
+    expect(r.container.querySelector('.rig-rp__nav')!.textContent).toContain('passage 2 sur 2')
+    // Le plan de travail renvoie la liste avec la copie jointe en tete.
+    const copie = piece({ chemin: ['Dossier RCS', 'Depots d\'actes', 'Depot n 2024/0141', 'Declaration de non-condamnation'] })
+    r.rerender(<EcranRecherche vue={{ ...avant, pieces: [copie, souscripteurs, piece()], avis: 'jointe' }} plan={plan} />)
+    expect(r.container.querySelector('.rig-palette__ligne--choisie')!.textContent).toContain('Declaration de non-condamnation')
+    expect(r.getAllByRole('option')[2]!.getAttribute('aria-selected')).toBe('true')
+    expect(r.container.querySelector('.rig-rp__nav')!.textContent).toContain('passage 2 sur 2')
   })
 
   it('avant la reponse du plan de travail, le cadre seul', () => {

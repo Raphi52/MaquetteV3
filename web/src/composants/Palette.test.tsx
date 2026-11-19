@@ -36,7 +36,8 @@ function vue(partiel: Partial<PaletteVue> = {}): PaletteVue {
       libelle: 'Liste des souscripteurs', chemin: ['Dossier RCS', 'Liste des souscripteurs'], lieu: 'Dossier RCS',
       avant: 'Nom / Actions / Montant · ', trouve: 'TRANSNORD', apres: ' Jean 600', passages: 2, pages: 2,
       date: '12/03/2024', origine: 'Depot guichet', annonce: false,
-      texte: 'LISTE · Nom / Actions / Montant · TRANSNORD Jean 600', positions: [34], longueur: 9,
+      texte: 'LISTE · Nom / Actions / Montant · TRANSNORD Jean 600', positions: [34], longueurs: [9], fichier: '',
+      pagesDesPassages: [1], nbPages: 1,
     }],
     dossierDesPieces: '2026B01067 AMIENS BILLARDS', numeroDesPieces: '2026B01067',
     horsGreffe: [{ code: 'FIBEN', source: 'FIBEN', objet: 'cotation et incidents de paiement, Banque de France', sujet: 'TRANSNORD SA · 318 552 004' }],
@@ -45,6 +46,8 @@ function vue(partiel: Partial<PaletteVue> = {}): PaletteVue {
     ecrans: [],
     elements: [],
     ancree: false,
+    depots: [],
+    avis: null,
     ...partiel,
   }
 }

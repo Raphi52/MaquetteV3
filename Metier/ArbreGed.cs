@@ -639,6 +639,12 @@ public sealed class AjoutGedEnregistre
     public int Pages { get; set; }
     public string Extension { get; set; } = "";
     public string Origine { get; set; } = "";
+    /// <summary>Le texte d'une piece de demonstration (vide sinon). Une piece JOINTE
+    /// depuis la page « Recherche » est la copie d'une piece existante : elle garde son
+    /// texte et son PDF, sinon elle se rouvrirait vide.</summary>
+    public string Apercu { get; set; } = "";
+    /// <summary>Le PDF de la piece, relatif a wwwroot (vide sinon).</summary>
+    public string Fichier { get; set; } = "";
 }
 
 /// <summary>Ce qu'un utilisateur a change dans l'arbre d'UNE affaire.</summary>
@@ -725,7 +731,8 @@ public static class PersistanceGed
             etat.Ajouts[chemin] = couple.Value.Select(n => new AjoutGedEnregistre
             {
                 Libelle = n.Libelle, Icone = n.Icone, Date = n.Date,
-                Pages = n.Pages, Extension = n.Extension, Origine = n.Origine
+                Pages = n.Pages, Extension = n.Extension, Origine = n.Origine,
+                Apercu = n.Apercu, Fichier = n.Fichier
             }).ToList();
         }
         foreach (var n in masques)
@@ -772,7 +779,7 @@ public static class PersistanceGed
             if (parent is null) continue;
             ajouts[parent] = etat.Ajouts[chemin]
                 .Select(a => new NoeudGed(a.Libelle, a.Icone, a.Date, a.Pages,
-                                          a.Extension, a.Origine, "", []))
+                                          a.Extension, a.Origine, a.Apercu ?? "", [], "", a.Fichier ?? ""))
                 .ToList();
         }
 

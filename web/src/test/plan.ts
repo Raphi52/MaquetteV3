@@ -15,7 +15,7 @@ export function paletteVue(partiel: Partial<PaletteVue> = {}): PaletteVue {
     moi: { signature: 'R. VILAIN', initiales: 'RV', nom: 'Raphael' }, agents: [],
     travail: [], travailTrouve: 0, pieces: [], dossierDesPieces: '2026B01067 AMIENS BILLARDS', numeroDesPieces: '2026B01067',
     horsGreffe: [], bilan: { jour: 'mercredi 9 septembre', horsDelai: 0, arriveesDuJour: 0, mAttendent: 0, plusAncienne: 0 },
-    sirenInconnu: null, ecrans: [], elements: [], ancree: false,
+    sirenInconnu: null, ecrans: [], elements: [], ancree: false, depots: [], avis: null,
     ...partiel,
   }
 }

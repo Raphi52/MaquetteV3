@@ -1186,16 +1186,6 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private Dossier AffaireCherchee
         => DossierOuvert ?? Fonds.FirstOrDefault(d => !d.SansDossierRcs) ?? Fonds[0];
 
-    /// <summary>L'arbre que la recherche fouille : celui de l'affaire ouverte (avec
-    /// ce que l'agent y a ajoute ou masque), sinon celui de l'affaire cherchee.</summary>
-    private NoeudGed ArbreCherche()
-    {
-        var affaire = AffaireCherchee;
-        return ReferenceEquals(affaire, DossierOuvert)
-            ? Arbre
-            : ArbreDemo.Racine(affaire.Numero, affaire.Objet, affaire.Siren,
-                               avecDossierRcs: !affaire.SansDossierRcs);
-    }
 
     /// <summary>Ouvre l'affaire et deplie l'arbre JUSQU'A l'element tape.</summary>
     private void OuvrirElementTrouve(ElementTrouve e)

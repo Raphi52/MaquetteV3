@@ -52,7 +52,12 @@ export interface PaletteVue {
   elements: ElementPaletteVue[]
   /** Ouverte depuis la barre de l'accueil : elle pend sous la barre, en liste deroulante. */
   ancree: boolean
+  /** Les depots de l'affaire cherchee, ou la liseuse peut joindre une piece (page seule). */
+  depots: DepotPaletteVue[]
+  /** Ce que le dernier « Joindre a ce depot » a fait (page seule). */
+  avis: string | null
 }
+export interface DepotPaletteVue { libelle: string, chemin: string[], lieu: string, pieces: string[], choisi: boolean }
 export interface EcranPaletteVue { code: string, libelle: string }
 export interface ElementPaletteVue { libelle: string, chemin: string[], lieu: string, piece: boolean }
 export interface FiltrePaletteVue { code: string, libelle: string, nombre: number }
@@ -84,8 +89,11 @@ export interface ActivitePaletteVue { agent: string, verbe: string, objet: strin
 export interface PiecePaletteVue {
   libelle: string, chemin: string[], lieu: string, avant: string, trouve: string, apres: string
   passages: number, pages: number, date: string, origine: string, annonce: boolean
-  /** Le texte entier de la piece, et ou commence chaque passage trouve (meme longueur pour tous). */
-  texte: string, positions: number[], longueur: number
+  /** Le texte entier de la piece (pages separees par \f ; vide dans la palette), le debut et la
+   *  longueur de chaque passage trouve, et sa page (a partir de 1). */
+  texte: string, positions: number[], longueurs: number[], pagesDesPassages: number[], nbPages: number
+  /** Le PDF de la piece, relatif a la page (vide pour une piece de demonstration). */
+  fichier: string
 }
 export interface HorsGreffePaletteVue { code: string, source: string, objet: string, sujet: string }
 export interface BilanPaletteVue { jour: string, horsDelai: number, arriveesDuJour: number, mAttendent: number, plusAncienne: number }

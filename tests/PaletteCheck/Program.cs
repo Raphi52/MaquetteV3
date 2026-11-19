@@ -264,14 +264,14 @@ internal static class Programme
         var page = vue.Proc?.Ecran.Recherche;
         Exiger(vue.Palette is null && vue.Proc is { Code: "RECHERCHE", Libelle: "Recherche" } && page is { Texte: "dupont" },
             "« Ouvrir en page » ferme la palette et ouvre l'onglet Recherche sur le meme texte");
-        Exiger(page!.Pieces.Length >= 2 && page.Pieces.All(x => x.Positions.Length == x.Passages && x.Longueur == 6
-               && x.Positions.All(i => x.Texte.Substring(i, x.Longueur).Equals("DUPONT", StringComparison.OrdinalIgnoreCase))),
+        Exiger(page!.Pieces.Length >= 2 && page.Pieces.All(x => x.Positions.Length == x.Passages && x.Longueurs.All(l => l == 6)
+               && x.Positions.Select((i, k) => x.Texte.Substring(i, x.Longueurs[k])).All(t => t.Equals("DUPONT", StringComparison.OrdinalIgnoreCase))),
             "chaque piece porte son texte entier et la place exacte de CHAQUE passage, pour la liseuse");
         var decl = page.Pieces.First(x => x.Libelle == "Declaration de non-condamnation");
         Agir("rechercheTexte", "soussigné dupont");
         page = plan.Vue().Proc!.Ecran.Recherche!;
         var d2 = page.Pieces.Single(x => x.Libelle == decl.Libelle);
-        Exiger(page.Texte == "soussigné dupont" && d2.Texte.Substring(d2.Positions[0], d2.Longueur) == "soussigne DUPONT",
+        Exiger(page.Texte == "soussigné dupont" && d2.Texte.Substring(d2.Positions[0], d2.Longueurs[0]) == "soussigne DUPONT",
             "la barre de la page cherche a son tour, accents ignores, passage exact");
         Agir("palettePiece", d2.Chemin);
         vue = plan.Vue();
@@ -283,6 +283,57 @@ internal static class Programme
         Agir("ongletActiver", "RECHERCHE");
         Exiger(plan.Vue().Proc?.Ecran.Recherche is { Texte: "soussigné dupont" },
             "revenu sur l'onglet, la page a garde sa recherche");
+
+        // --- 14. Les VRAIS documents (PDF) se cherchent par leur texte, page par page
+        // (wwwroot/documents/*.pdf.txt, tires par extraire-texte-pdf.ps1).
+        Agir("rechercheTexte", "commandite");
+        page = plan.Vue().Proc!.Ecran.Recherche!;
+        var synthese = page.Pieces.FirstOrDefault(x => x.Libelle == "Synthese de depot au Guichet unique");
+        Exiger(synthese is { Fichier: "documents/formalite-synthese-guichet-unique.pdf", NbPages: 13 }
+               && synthese.PagesDesPassages.SequenceEqual([1, 2, 4]) && synthese.Texte.Split('\f').Length == 13,
+            $"un vrai PDF se trouve par son texte, chaque passage avec sa page ({string.Join(", ", page.Pieces.Select(x => x.Libelle))})");
+        Exiger(synthese!.Positions.Select((i, k) => synthese.Texte.Substring(i, synthese.Longueurs[k]))
+               .All(t => RecherchePalette.Plier(t) == "COMMANDITE"),
+            "les passages d'un PDF sont a la bonne place dans son texte");
+        Agir("paletteOuvrir");
+        Agir("paletteTexte", "commandite");
+        Exiger(P().Pieces.Any(x => x.Libelle == synthese.Libelle && x.Texte == "" && x.PagesDesPassages.SequenceEqual([1, 2, 4])),
+            "la palette trouve le PDF aussi, sans transporter son texte entier");
+        Agir("paletteFermer");
+        Agir("rechercheTexte", "guichet unique formalité J00092709138");
+        page = plan.Vue().Proc!.Ecran.Recherche!;
+        var aCheval = page.Pieces.FirstOrDefault(x => x.Libelle == synthese.Libelle);
+        Exiger(aCheval is not null && aCheval.Texte.Substring(aCheval.Positions[0], aCheval.Longueurs[0]).Contains('\n'),
+            "un passage a cheval sur deux lignes du PDF est trouve : les retours a la ligne comptent pour un blanc");
+        Agir("rechercheTexte", "ordonnance du president");
+        Exiger(plan.Vue().Proc!.Ecran.Recherche!.Pieces.All(x => x.Fichier != "documents/ordonnance-president.pdf"),
+            "un PDF qui n'est qu'une image numerisee n'a pas de texte : il ne se trouve pas par son contenu");
+
+        // --- 15. « Joindre a ce depot » : une copie de la piece dans un depot de l'affaire.
+        Agir("rechercheTexte", "commandite");
+        page = plan.Vue().Proc!.Ecran.Recherche!;
+        var depotActes = page.Depots.FirstOrDefault(d => d.Libelle == "Depot n 2024/0141");
+        Exiger(page.Depots.Length >= 3 && depotActes is { Lieu: "Depots d'actes" } && !depotActes.Pieces.Contains(synthese.Libelle),
+            $"la liseuse connait les depots de l'affaire ({string.Join(", ", page.Depots.Select(d => d.Libelle))})");
+        plan.SurGesteAccueil(new GesteIle("login", Valeur("astagiaire")));
+        Agir("rechercheJoindre", new { piece = synthese.Chemin, depot = depotActes!.Chemin });
+        page = plan.Vue().Proc!.Ecran.Recherche!;
+        Exiger(page.Avis!.StartsWith("Envoye en validation") && !page.Depots.Single(d => d.Libelle == depotActes.Libelle).Pieces.Contains(synthese.Libelle),
+            "un login soumis a validation : la piece n'est jointe qu'une fois la demande validee");
+        plan.SurGesteAccueil(new GesteIle("login", Valeur("rvilain")));
+        Agir("rechercheJoindre", new { piece = synthese.Chemin, depot = depotActes.Chemin });
+        page = plan.Vue().Proc!.Ecran.Recherche!;
+        Exiger(page.Avis == $"« {synthese.Libelle} » jointe a {depotActes.Libelle}." && page.Depots.Single(d => d.Libelle == depotActes.Libelle).Pieces.Contains(synthese.Libelle),
+            "« Joindre a ce depot » pose la piece dans le depot, et le dit");
+        Agir("rechercheJoindre", new { piece = synthese.Chemin, depot = depotActes.Chemin });
+        Exiger(plan.Vue().Proc!.Ecran.Recherche!.Avis!.Contains("est deja dans"), "une piece deja dans le depot n'y est pas posee deux fois");
+        var copie = plan.Vue().Proc!.Ecran.Recherche!.Pieces.FirstOrDefault(x => x.Chemin.Contains("Depot n 2024/0141"));
+        Exiger(copie is { Fichier: "documents/formalite-synthese-guichet-unique.pdf", NbPages: 13 },
+            "la piece jointe garde son PDF et son texte (enregistres avec l'arbre de l'affaire)");
+        Agir("ouvrirNumero", "2026B01067");
+        Agir("ongletActiver", "RECHERCHE");
+        Exiger(plan.Vue().Proc?.Ecran.Recherche?.Depots.Single(d => d.Libelle == depotActes.Libelle).Pieces.Contains(synthese.Libelle) == true,
+            "rouverte, l'affaire a garde la piece jointe dans son depot");
 
         plan.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
