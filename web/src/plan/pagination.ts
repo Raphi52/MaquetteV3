@@ -1,47 +1,54 @@
-// SAISIE GUIDEE - les etapes a l'horizontale, une page par etape (ex-
-// suivrePagination / allerEtape de wwwroot/rig-accueil.js, portes au lot 2 du
-// plan « finir le passage a React », 19/11/2026). Chacune se cale comme une
-// page (scroll-snap, cote CSS). Le navigateur est le seul a savoir laquelle est
-// reellement visible : c'est lui qui le dit au C# (geste « etapeVisible »),
-// pour que la frise suive.
+// SAISIE GUIDEE - le defilement de l'ACCORDEON des etapes (proposition 6 « En-
+// tete en bas » du /draft du 19/11/2026, conv-2022 ; avant, des pages cote a
+// cote calees par scroll-snap). Les etapes sont l'une sous l'autre, dans UNE
+// colonne qui defile a la verticale. Le navigateur est le seul a savoir
+// laquelle est en haut de la vue : c'est lui qui le dit au C# (geste
+// « etapeVisible »), pour que le pied dise « etape N / 7 ».
 
-/**
- * Amene le pas COURANT de la frise dans sa partie visible (19/11/2026). Sept pas
- * de 94 px au moins debordent d'une colonne de 400 px : quand l'etape avancait
- * (fleche, molette, piece ouverte dans l'arbre), le pas allume sortait du
- * champ, a droite. `marge` laisse libres les fleches, collees aux deux bouts
- * (rig-accueil.css, .rig-vged .rig-frise--haut).
- */
-export function montrerPasCourant(frise: HTMLElement | null, marge = 32): void {
-  const pas = frise?.querySelector<HTMLElement>('.rig-frise__pas--courant')
-  if (!frise || !pas) return
-  const f = frise.getBoundingClientRect()
-  const p = pas.getBoundingClientRect()
-  if (p.left < f.left + marge) frise.scrollLeft -= f.left + marge - p.left
-  else if (p.right > f.right - marge) frise.scrollLeft += p.right - (f.right - marge)
+/** Marge sous le haut de la zone : une ligne d'etape arrivee a 8 px du bord compte deja comme « en haut ». */
+const MARGE_HAUT = 8
+
+function etapesDe(zone: HTMLElement): HTMLElement[] {
+  return [...zone.querySelectorAll<HTMLElement>('[data-etape]')]
 }
 
-/** Fait defiler la zone jusqu'a l'etape `index` (la page se cale d'elle-meme). */
+/**
+ * Amene l'etape `index` en vue : sa ligne en haut de la zone. Une etape DEJA
+ * entierement visible ne bouge pas -- deplier une etape courte au milieu de
+ * l'ecran ne doit pas faire sauter la page.
+ */
 export function allerEtape(zone: HTMLElement | null, index: number, doux = true): void {
   if (!zone) return
-  zone.scrollTo({ left: index * zone.clientWidth, behavior: doux ? 'smooth' : 'auto' })
+  const etape = etapesDe(zone)[index]
+  if (!etape) return
+  const haut = etape.offsetTop
+  const bas = haut + etape.offsetHeight
+  const vue = zone.scrollTop
+  if (haut >= vue && bas <= vue + zone.clientHeight && zone.clientHeight > 0) return
+  zone.scrollTo({ top: haut, behavior: doux ? 'smooth' : 'auto' })
+}
+
+/** L'etape dont la ligne est passee en haut de la zone (la derniere au-dessus du bord). */
+export function etapeEnHaut(zone: HTMLElement): number {
+  const bord = zone.scrollTop + MARGE_HAUT
+  let index = 0
+  for (const etape of etapesDe(zone)) {
+    if (etape.offsetTop > bord) break
+    index = Number(etape.dataset.etape ?? index)
+  }
+  return index
 }
 
 /**
- * Suit l'etape visible de la zone et tourne les pages a la molette. Rend la
- * fonction qui arrete le suivi (arreterPagination).
+ * Suit l'etape en haut de la zone et la remonte a chaque changement. Rend la
+ * fonction qui arrete le suivi.
  */
-export function suivrePagination(zone: HTMLElement, etapeVisible: (index: number) => void): () => void {
-  // Les etapes sont COTE A COTE : chaque page fait la largeur de la zone et se
-  // cale d'elle-meme. L'etape visible se deduit donc de la position
-  // horizontale, arrondie a la page la plus proche.
+export function suivreEtapeVisible(zone: HTMLElement, etapeVisible: (index: number) => void): () => void {
   let dernier = -1
   let enAttente = false
-  const indexVisible = () => Math.round(zone.scrollLeft / Math.max(1, zone.clientWidth))
-
   const mesurer = () => {
     enAttente = false
-    const index = indexVisible()
+    const index = etapeEnHaut(zone)
     if (index === dernier) return
     dernier = index
     etapeVisible(index)
@@ -51,39 +58,7 @@ export function suivrePagination(zone: HTMLElement, etapeVisible: (index: number
     enAttente = true
     requestAnimationFrame(mesurer)
   }
-
-  // La molette verticale : elle fait d'abord defiler l'etape elle-meme
-  // (formulaire plus haut que la vue), et seulement arrivee au bout elle TOURNE
-  // la page vers l'etape suivante ou precedente. Un geste = une page : un
-  // verrou court absorbe l'inertie des pave tactiles.
-  let verrouJusqu = 0
-  const aLaMolette = (ev: WheelEvent) => {
-    // Ctrl+molette = ZOOM de la fenetre, prioritaire : on ne touche a rien,
-    // sinon le preventDefault plus bas annule le zoom natif (defaut du 15/09).
-    if (ev.ctrlKey) return
-    if (Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) return // geste deja horizontal
-    const page = ev.target instanceof Element ? ev.target.closest<HTMLElement>('[data-etape]') : null
-    const sens = ev.deltaY > 0 ? 1 : -1
-    if (page && page.scrollHeight > page.clientHeight + 1) {
-      const auBout = sens > 0
-        ? page.scrollTop + page.clientHeight >= page.scrollHeight - 1
-        : page.scrollTop <= 0
-      if (!auBout) return
-    }
-    ev.preventDefault()
-    const maintenant = performance.now()
-    if (maintenant < verrouJusqu) return
-    verrouJusqu = maintenant + 450
-    const total = zone.querySelectorAll('[data-etape]').length
-    const cible = Math.min(total - 1, Math.max(0, indexVisible() + sens))
-    allerEtape(zone, cible, true)
-  }
-
   zone.addEventListener('scroll', auDefilement, { passive: true })
-  zone.addEventListener('wheel', aLaMolette, { passive: false })
   mesurer()
-  return () => {
-    zone.removeEventListener('scroll', auDefilement)
-    zone.removeEventListener('wheel', aLaMolette)
-  }
+  return () => zone.removeEventListener('scroll', auDefilement)
 }

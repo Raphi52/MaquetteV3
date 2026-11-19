@@ -121,14 +121,18 @@ public sealed record EffetTacheVue(string Code, string Libelle, bool Obligatoire
 /// <param name="Branche">Laquelle des trois fiches du .razor (un composant different par branche).</param>
 public sealed record FicheColonneVue(string Branche, string Session, int Version);
 
-/// <summary>La saisie guidee : frise et pages des 7 etapes.</summary>
+/// <summary>La saisie guidee en ACCORDEON : une ligne par etape, qui se deplie
+/// (proposition 6 « En-tete en bas » du /draft du 19/11/2026, conv-2022).</summary>
+/// <param name="Recap">Le controle du dossier, calcule a chaque rendu : il vit dans
+/// le PIED du panneau, avec le titre, que l'etape Controle soit ouverte ou non.</param>
 public sealed record EtapesVue(int Courante, int Total, string Titre, bool Oeil, PasEtapeVue[] Pas,
-                               PageEtapeVue[] Pages);
+                               PageEtapeVue[] Pages, RecapVue Recap);
 /// <param name="Fiches">« 3 dirigeants » : le nombre, ou 0 quand il ne s'affiche pas.</param>
 public sealed record PasEtapeVue(string Etat, bool Courant, string Pastille, string Titre, int Fiches,
                                  string Unite, int Refuses, int Manquants, int Remplis, int Total);
-/// <param name="Rendue">Seules l'etape visible et ses deux voisines sont rendues.</param>
-public sealed record PageEtapeVue(string Code, bool Courante, bool Rendue, string Titre, string Source,
+/// <param name="Ouverte">L'etape est depliee dans l'accordeon : seules les etapes
+/// ouvertes portent leurs champs (une etape repliee n'est qu'une ligne).</param>
+public sealed record PageEtapeVue(string Code, bool Courante, bool Ouverte, string Titre, string Source,
                                   OngletsFichesVue? Fiches, RecapVue? Recap, ChampSaisieVue[] Champs);
 public sealed record OngletsFichesVue(string Unite, int Nombre, int Actif);
 public sealed record ChampSaisieVue(string Libelle, string Colonne, string Type, string Exemple,
@@ -517,12 +521,15 @@ public sealed partial class SessionPlanTravail
                 refuses, manquants, remplis, total);
         }
 
+        // Un seul calcul des defauts par rendu : le pied et l'etape Controle
+        // ouverte lisent le meme recapitulatif.
+        var recap = VueRecap();
         var pages = new PageEtapeVue[Etapes.Length];
         for (var i = 0; i < Etapes.Length; i++)
         {
             var courante = Etapes[i];
-            var rendue = Math.Abs(i - EtapeCourante) <= 1;
-            if (!rendue)
+            var ouverte = EtapesOuvertes.Contains(i);
+            if (!ouverte)
             {
                 pages[i] = new PageEtapeVue(courante.Code, i == EtapeCourante, false, courante.Titre,
                                             courante.Source, null, null, []);
@@ -531,12 +538,12 @@ public sealed partial class SessionPlanTravail
             var fiches = Fiches(courante.Code);
             pages[i] = new PageEtapeVue(courante.Code, i == EtapeCourante, true, courante.Titre, courante.Source,
                 courante.Multiple ? new OngletsFichesVue(courante.Unite, fiches.Count, IndexFiche(courante)) : null,
-                courante.Code == "CONTROLE" ? VueRecap() : null,
+                courante.Code == "CONTROLE" ? recap : null,
                 ChampsVue(courante));
         }
 
         return new EtapesVue(EtapeCourante, Etapes.Length, ApercuNoeud?.Libelle ?? d.Numero, !GuideVisible,
-                             pas, pages);
+                             pas, pages, recap);
     }
 
     /// <summary>Les champs visibles d'une etape, sur sa fiche affichee
@@ -752,6 +759,7 @@ public sealed partial class SessionPlanTravail
             // ---- Saisie guidee ----
             case "fermerEtapes": DonneesVisible = false; break;
             case "allerEtape": AllerEtape(Entier(valeur)); break;
+            case "basculerEtape": BasculerEtape(Entier(valeur)); break;
             case "etapeVisible": EtapeVisible(Entier(valeur)); break;
             case "choisirFiche": { var g = Lire<GesteFiche>(valeur); ChoisirFiche(EtapeDe(g.Etape), g.Index); break; }
             case "ajouterFiche": AjouterFiche(EtapeDe(Texte(valeur))); break;

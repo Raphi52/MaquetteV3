@@ -1393,8 +1393,9 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private void SuivreEtape(Etape etape)
     {
         var i = Array.IndexOf(Etapes, etape);
-        if (i < 0 || i == EtapeCourante) return;
+        if (i < 0 || (i == EtapeCourante && EtapesOuvertes.Contains(i))) return;
         EtapeCourante = i;
+        EtapesOuvertes.Add(i);
         EtapeADefiler = true;
     }
 
@@ -1417,6 +1418,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         // Ouvrir une affaire tombe sur l'arbre, jamais sur la saisie : c'est
         // l'ecran d'entree de VGED dans RIG v2.
         EtapeCourante = 0;
+        EtapesOuvertes.Clear();
+        EtapesOuvertes.Add(0);
         Pagination++;
 
         // Une affaire purement judiciaire n ouvre QUE la branche Judiciaire :
@@ -1858,6 +1861,9 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private bool EtapesAffichees => DossierOuvert is not null && DonneesVisible;
     private bool EtapeADefiler;
     private int EtapeCourante;
+    // Les etapes DEPLIEES de l'accordeon (plusieurs a la fois). Seules elles
+    // portent leurs champs dans la vue : une etape repliee n'est qu'une ligne.
+    private readonly HashSet<int> EtapesOuvertes = [0];
 
     // Chaque etape garde SA fiche affichee : les 7 etapes sont a l'ecran en
     // meme temps, un index unique les ferait basculer ensemble.
@@ -1992,15 +1998,25 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     }
 
     /// <summary>
-    /// La frise et les boutons Precedent/Suivant ne changent plus de page :
-    /// ils FONT DEFILER la page geante jusqu'a l'etape voulue, qui se cale
-    /// d'elle-meme (scroll-snap).
+    /// Aller a une etape (lien vers un defaut, piece ouverte) : elle se DEPLIE
+    /// dans l'accordeon, sans replier les autres, et la page la fait defiler
+    /// jusqu'a elle.
     /// </summary>
     private void AllerEtape(int index)
     {
         index = Math.Clamp(index, 0, Etapes.Length - 1);
         EtapeCourante = index;
+        EtapesOuvertes.Add(index);
         Defiler(index, doux: true);
+    }
+
+    /// <summary>Un clic sur la ligne d'une etape : la deplie (elle devient la
+    /// courante et la page l'amene en vue) ou la replie.</summary>
+    private void BasculerEtape(int index)
+    {
+        index = Math.Clamp(index, 0, Etapes.Length - 1);
+        if (EtapesOuvertes.Remove(index)) return;
+        AllerEtape(index);
     }
 
     /// <summary>Remontee par la page (web/src/plan/pagination.ts) : l'etape la plus visible a change.</summary>

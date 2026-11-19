@@ -71,9 +71,11 @@ Exiger(Regex.IsMatch(vue, @"""DRGNT_DATE_ENTREE""[^)]*Controle:\s*""date-passee"
 Exiger(calculVue.Contains("var (manquants, refuses) = Defauts(etape);")
        && calculVue.Contains("refuses, manquants, remplis, total);"),
     "la frise interroge bien les defauts de chaque etape");
-Exiger(etapesTsx.Contains("rig-frise__requis") && etapesTsx.Contains("rig-frise__defaut")
-       && Regex.IsMatch(etapesTsx, @"p\.refuses > 0\s*\?\s*<span className=""rig-frise__defaut"">[\s\S]{0,200}?: p\.manquants > 0\s*\?\s*<span className=""rig-frise__requis"">"),
-    "la frise distingue requis manquants et valeurs refusees");
+// Depuis l'accordeon (proposition 6 du /draft du 19/11/2026, conv-2022), c'est
+// la ligne de chaque etape qui porte ces deux defauts.
+Exiger(etapesTsx.Contains("rig-accordeon__requis") && etapesTsx.Contains("rig-accordeon__defaut")
+       && Regex.IsMatch(etapesTsx, @"pas\.refuses > 0\s*\?\s*<span className=""rig-accordeon__defaut"">[\s\S]{0,200}?: pas\.manquants > 0\s*\?\s*<span className=""rig-accordeon__requis"">"),
+    "la ligne de chaque etape distingue requis manquants et valeurs refusees");
 
 // --- 7. Le controle final : recapitulatif ET verrou de validation
 Exiger(vue.Contains("private List<Defaut> TousLesDefauts()")

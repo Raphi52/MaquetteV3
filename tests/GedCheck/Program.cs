@@ -122,12 +122,14 @@ Exiger(editions.Contains("editions?: LigneEdition[] | null") && editions.Contain
 Exiger(editions.Contains("appeler<string[]>('EcranTableauEditions.TypesPapier')")
        && RigV3Desktop.Pont.EcranTableauEditions.TypesPapier().SequenceEqual(RigV3Desktop.ArbreDemo.TypesPapier),
     "les types de papier du detail viennent d'ArbreDemo par le pont, dans leur ordre");
-// --- Les etapes du dossier : horizontales, paginees, chargees a la demande.
-Exiger(vue.Contains("rig-saisie__pages--h") && !vue.Contains("Controle du dossier</button>"),
-    "les etapes vivent dans la colonne du milieu, a l horizontale, sans onglet a part");
-Exiger(Regex.IsMatch(codePlan, @"var rendue = Math\.Abs\(i - EtapeCourante\) <= 1;")
-       && Regex.IsMatch(balisage, @"page\.rendue\s*\?\s*<Page "),
-    "seules l etape visible et ses voisines sont rendues (chargement a la demande)");
+// --- Les etapes du dossier : un accordeon, l'en-tete en bas (proposition 6 du
+// /draft du 19/11/2026, conv-2022), champs charges a la demande.
+Exiger(vue.Contains("rig-accordeon__etapes") && vue.Contains("rig-guide__controle")
+       && !vue.Contains("Controle du dossier</button>"),
+    "les etapes vivent dans la colonne du milieu, en accordeon, le controle du dossier en pied, sans onglet a part");
+Exiger(Regex.IsMatch(codePlan, @"var ouverte = EtapesOuvertes\.Contains\(i\);")
+       && Regex.IsMatch(balisage, @"page\.ouverte && <Corps "),
+    "seules les etapes depliees portent leurs champs (chargement a la demande)");
 foreach (var colonne in new[] { "Destinataire", "Nom du document", "Ex.", "Imprimante",
                                 "File ou imprimante", "File differee" })
 {

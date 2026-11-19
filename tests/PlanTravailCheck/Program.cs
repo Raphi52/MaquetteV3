@@ -304,19 +304,29 @@ internal static class Programme
             "ouvrir les statuts amene la saisie guidee sur SON etape (Capital)");
         Exiger(vue.Defilement is { Index: 2, Doux: false },
             "la page recoit le defilement immediat vers cette etape");
-        Exiger(d.Etapes!.Pages.Count(p => p.Rendue) == 3 && !d.Etapes.Pages[6].Rendue,
-            "seules l'etape visible et ses deux voisines sont rendues");
+        Exiger(d.Etapes!.Pages[2] is { Ouverte: true } && d.Etapes.Pages[2].Champs.Length > 0
+               && d.Etapes.Pages[6] is { Ouverte: false, Champs.Length: 0 },
+            "l'etape de la piece se deplie dans l'accordeon ; une etape repliee ne porte aucun champ");
         Exiger(d.Apercu?.Apercu is { Libelle: "Statuts signes" } && d.Apercu.Apercu.Feuilles.Length > 0,
             "la piece s'affiche a droite, page par page");
 
-        // --- 4. Passer les etapes (frise et pages).
+        // --- 4. Passer les etapes (accordeon, l'en-tete en bas).
         Agir("allerEtape", 1);
         vue = plan.Vue();
         d = vue.Dossier!;
-        Exiger(d.Etapes!.Courante == 1 && vue.Defilement is { Index: 1, Doux: true },
-            "la frise passe a l'etape 2 et fait defiler la page en douceur");
+        Exiger(d.Etapes!.Courante == 1 && d.Etapes.Pages[1].Ouverte && d.Etapes.Pages[2].Ouverte
+               && vue.Defilement is { Index: 1, Doux: true },
+            "aller a l'etape 2 la deplie sans replier les autres, et la page la fait defiler en douceur");
+        Agir("basculerEtape", 4);
+        vue = plan.Vue();
+        Exiger(vue.Dossier!.Etapes! is { Courante: 4 } e4 && e4.Pages[4].Ouverte && e4.Pages[4].Champs.Length > 0
+               && vue.Defilement is { Index: 4, Doux: true },
+            "un clic sur la ligne d'une etape repliee la deplie, en fait la courante et l'amene en vue");
+        Agir("basculerEtape", 4);
+        Exiger(plan.Vue().Dossier!.Etapes!.Pages[4] is { Ouverte: false, Champs.Length: 0 },
+            "un second clic sur la ligne la replie");
         Agir("etapeVisible", 3);
-        Exiger(plan.Vue().Dossier!.Etapes!.Courante == 3, "la page dit quelle etape est visible : la frise suit");
+        Exiger(plan.Vue().Dossier!.Etapes!.Courante == 3, "la page dit quelle etape est en haut : le pied suit (« etape 4 / 7 »)");
         Agir("allerEtape", 99);
         Exiger(plan.Vue().Dossier!.Etapes!.Courante == 6, "aller au-dela de la derniere etape s'arrete au controle final");
         Agir("allerEtape", 1);
@@ -335,6 +345,10 @@ internal static class Programme
         var recap = plan.Vue().Dossier!.Etapes!.Pages[6].Recap;
         Exiger(recap is { Valide: false } && recap.Nombre > 0 && recap.Titre.Contains("bloque"),
             "le controle final dit ce qui bloque la validation");
+        Agir("basculerEtape", 6);
+        Exiger(plan.Vue().Dossier!.Etapes! is { Recap: { Valide: false, Nombre: > 0 } } pied && pied.Pages[6].Recap is null,
+            "le pied porte le controle du dossier meme quand l'etape Controle est repliee");
+        Agir("allerEtape", 6);
         Agir("valider");
         Exiger(plan.Vue().Dossier!.Etapes!.Pages[6].Recap is { Valide: false },
             "un dossier qui a un defaut ne se valide pas, meme si le geste arrive");

@@ -25,7 +25,7 @@ export function proc(partiel: Partial<ProcVue> = {}): ProcVue {
 }
 
 export function page(code: string, titre: string, partiel: Partial<PageEtapeVue> = {}): PageEtapeVue {
-  return { code, courante: false, rendue: false, titre, source: 'table ' + code, fiches: null, recap: null, champs: [], ...partiel }
+  return { code, courante: false, ouverte: false, titre, source: 'table ' + code, fiches: null, recap: null, champs: [], ...partiel }
 }
 
 export function etapes(partiel: Partial<EtapesVue> = {}): EtapesVue {
@@ -38,9 +38,9 @@ export function etapes(partiel: Partial<EtapesVue> = {}): EtapesVue {
       { etat: 'partiel', courant: false, pastille: '4', titre: 'Siege et etablissements', fiches: 2, unite: 'etablissement', refuses: 0, manquants: 2, remplis: 20, total: 22 },
     ],
     pages: [
-      page('DEMANDE', 'Demande', { rendue: true }),
+      page('DEMANDE', 'Demande', { ouverte: true }),
       page('IDENTITE', 'Identite', {
-        rendue: true, courante: true,
+        ouverte: true, courante: true,
         champs: [
           { libelle: 'SIREN', colonne: 'DSSRC_SIREN', type: 'text', exemple: '109 678 235', obligatoire: true, largeur: 'moitie',
             choix: [], valeur: '402 118 447', refus: 'cle de controle du SIREN incorrecte', manque: false },
@@ -50,9 +50,10 @@ export function etapes(partiel: Partial<EtapesVue> = {}): EtapesVue {
             choix: [], valeur: '', refus: null, manque: true },
         ],
       }),
-      page('CAPITAL', 'Capital', { rendue: true }),
+      page('CAPITAL', 'Capital'),
       page('SIEGE', 'Siege et etablissements', { fiches: { unite: 'Etablissement', nombre: 2, actif: 1 } }),
     ],
+    recap: { valide: false, nombre: 1, titre: '1 point bloque la validation', aManquer: 0, refusees: 1, groupes: [] },
     ...partiel,
   }
 }

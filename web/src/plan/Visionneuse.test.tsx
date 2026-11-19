@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { styleDepuisTexte, Visionneuse } from './Visionneuse'
 import { morceaux } from '../test/morceaux'
-import { apercu, dossier, etapes, historique, ligneArbre, tache } from '../test/plan'
-import type { DossierVue, GestePlan } from './types'
+import { apercu, dossier, etapes, historique, ligneArbre, page, tache } from '../test/plan'
+import type { DossierVue, GestePlan, RecapVue } from './types'
 
 afterEach(cleanup)
 
@@ -87,7 +87,7 @@ describe('Visionneuse : l\'historique des pieces, dans l\'onglet Suivi', () => {
   it('TOUTES les pieces : date, point, puis libelle et origine sur deux lignes ; la piece ouverte marquee', () => {
     const { container } = rendre()
     const milieu = container.querySelector('.rig-vged__corps > .rig-vged__milieu')!
-    expect([...milieu.children].map((e) => e.className)).toEqual(['rig-vged__guide rig-vged__donnees'])
+    expect([...milieu.children].map((e) => e.className)).toEqual(['rig-vged__guide rig-vged__donnees rig-accordeon'])
     const suivi = container.querySelector('.rig-vged__corps > .rig-vged__suivi')!
     expect(suivi.querySelector('.rig-chrono__titre')!.textContent).toBe('Historique des pieces · 9')
     const pieces = suivi.querySelectorAll('.rig-chrono__piece')
@@ -217,77 +217,105 @@ describe('Visionneuse : les colonnes', () => {
   })
 })
 
-describe('Visionneuse : la saisie guidee', () => {
-  it('la zone des etapes dit au C# quelle etape est visible des qu\'elle apparait, puis joue le defilement demande', () => {
+describe('Visionneuse : la saisie guidee en accordeon, l\'en-tete en bas', () => {
+  // jsdom ne mesure rien : chaque ligne d'etape est posee a 40 px de la precedente.
+  function poserLesEtapes() {
+    const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetTop')!
+    Object.defineProperty(HTMLElement.prototype, 'offsetTop', {
+      configurable: true,
+      get(this: HTMLElement) { return this.dataset.etape ? Number(this.dataset.etape) * 40 : 0 },
+    })
+    return () => Object.defineProperty(HTMLElement.prototype, 'offsetTop', original)
+  }
+
+  it('la zone des etapes dit au C# quelle etape est en haut des qu\'elle apparait, puis joue le defilement demande', () => {
     const plan = vi.fn<GestePlan>()
     const joue = { current: 0 }
     const scrollTo = vi.fn()
     const original = HTMLElement.prototype.scrollTo
     HTMLElement.prototype.scrollTo = scrollTo as unknown as typeof original
+    const retirer = poserLesEtapes()
     try {
       const { rerender } = render(<Visionneuse dossier={dossier()} pagination={0} defilement={{ numero: 4, index: 2, doux: false }}
                                                defilementJoue={joue} plan={plan} />)
       expect(plan).toHaveBeenCalledWith('etapeVisible', 0)
-      expect(scrollTo).toHaveBeenCalledWith({ left: 0, behavior: 'auto' })
+      expect(scrollTo).toHaveBeenCalledWith({ top: 80, behavior: 'auto' })
       expect(joue.current).toBe(4)
       // Le meme numero n'est pas rejoue ; un numero neuf l'est, en douceur.
       rerender(<Visionneuse dossier={dossier()} pagination={0} defilement={{ numero: 4, index: 2, doux: false }} defilementJoue={joue} plan={plan} />)
       rerender(<Visionneuse dossier={dossier()} pagination={0} defilement={{ numero: 5, index: 1, doux: true }} defilementJoue={joue} plan={plan} />)
       expect(scrollTo).toHaveBeenCalledTimes(2)
-      expect(scrollTo).toHaveBeenLastCalledWith({ left: 0, behavior: 'smooth' })
+      expect(scrollTo).toHaveBeenLastCalledWith({ top: 40, behavior: 'smooth' })
     } finally {
       HTMLElement.prototype.scrollTo = original
+      retirer()
     }
   })
 
-  it('l\'entete des etapes en morceaux, sans oeil quand le document est a droite', () => {
+  it('plus d\'en-tete en haut : les etapes d\'abord, le pied ensuite (titre, bilan, croix), sans oeil quand le document est a droite', () => {
     const { container, gestes } = rendre()
     const donnees = container.querySelector('.rig-vged__donnees')!
-    expect(morceaux(donnees.querySelector('.rig-kicker')!)).toEqual(['Controle du dossier · etape ', '2', ' / ', '7'])
-    expect(donnees.querySelector('.rig-guide__titre')!.textContent).toBe('Statuts signes')
-    expect(donnees.querySelector('[aria-label="Afficher le panneau de droite"]')).toBeNull()
-    fireEvent.click(donnees.querySelector('.rig-guide__fermer')!)
+    expect(donnees.className).toBe('rig-vged__guide rig-vged__donnees rig-accordeon')
+    expect(donnees.querySelector('.rig-guide__entete')).toBeNull()
+    expect(donnees.firstElementChild!.className).toBe('rig-accordeon__etapes')
+    const pied = donnees.lastElementChild!
+    expect(pied.className).toBe('rig-guide__controle rig-guide__controle--bloque')
+    expect(morceaux(pied)).toEqual(['<div>', ' ', '<div>', ' ', '<div>'])
+    expect(morceaux(pied.querySelector('.rig-kicker')!)).toEqual(['Controle du dossier · etape ', '2', ' / ', '7'])
+    expect(pied.querySelector('.rig-guide__titre')!.textContent).toBe('Statuts signes')
+    expect(pied.querySelector('[aria-label="Afficher le panneau de droite"]')).toBeNull()
+    fireEvent.click(pied.querySelector('.rig-guide__fermer')!)
     expect(gestes()).toEqual([['fermerEtapes', null]])
   })
 
-  it('la frise : fleches, etat de chaque etape, pastille, defauts et compte en morceaux', () => {
-    const { container, gestes } = rendre()
-    const pas = container.querySelectorAll('.rig-frise__pas')
-    expect(pas[1]!.className).toBe('rig-frise__pas rig-frise__pas--refuse rig-frise__pas--courant')
-    expect(pas[0]!.className).toBe('rig-frise__pas rig-frise__pas--complet ')
-    const bouton = pas[1]!.querySelector('.rig-frise__bouton')!
-    expect(morceaux(bouton)).toEqual(['<span>', ' ', '<span>', ' ', '<span>'])
-    // Le nom dans SON element : texte nu dans le libelle (flex en colonne), il se
-    // coupait net contre la fleche au lieu de finir en « … » ; entier en infobulle.
-    expect(morceaux(bouton.querySelector('.rig-frise__libelle')!)).toEqual(['<span>', '<span>'])
-    expect(bouton.querySelector('.rig-frise__titre')!.textContent).toBe('Identite')
-    expect(bouton.getAttribute('title')).toBe('Identite')
-    expect(morceaux(bouton.querySelector('.rig-frise__defaut')!)).toEqual(['1', ' valeur(s) refusee(s)'])
-    expect(morceaux(bouton.querySelector('.rig-frise__compte')!)).toEqual(['11', ' / ', '14'])
-    const siege = pas[3]!.querySelector('.rig-frise__libelle')!
-    expect(morceaux(siege.querySelector('.rig-frise__fiches')!)).toEqual(['2', ' ', 'etablissement', 's'])
-    expect(morceaux(siege.querySelector('.rig-frise__requis')!)).toEqual(['2', ' requis manquant(s)'])
-    const [precedente, suivante] = container.querySelectorAll('.rig-frise__fleche-bouton')
-    expect((precedente as HTMLButtonElement).disabled).toBe(false)
-    fireEvent.click(precedente!)
-    fireEvent.click(suivante!)
-    fireEvent.click(bouton)
-    expect(gestes()).toEqual([['allerEtape', 0], ['allerEtape', 2], ['allerEtape', 1]])
+  it('l\'oeil descend dans le pied, a cote de la croix', () => {
+    const { container, gestes } = rendre(dossier({ etapes: etapes({ oeil: true }) }))
+    const outils = container.querySelector('.rig-guide__controle .rig-guide__outils')!
+    expect(morceaux(outils)).toEqual(['<button>', '<button>'])
+    fireEvent.click(outils.querySelector('[aria-label="Afficher le panneau de droite"]')!)
+    expect(gestes()).toEqual([['afficherDocument', null]])
   })
 
-  it('les pages : la courante et ses voisines sont rendues, les autres attendent', () => {
+  it('une ligne par etape : pastille, nom, resume et compte en morceaux ; un clic la deplie ou la replie', () => {
+    const { container, gestes } = rendre()
+    const sections = container.querySelectorAll('.rig-accordeon__etape')
+    expect(sections).toHaveLength(4)
+    expect(sections[1]!.className).toBe('rig-accordeon__etape rig-accordeon__etape--refuse rig-accordeon__etape--ouverte rig-accordeon__etape--courante')
+    expect(sections[1]!.id).toBe('rig-etape-1')
+    expect(sections[1]!.getAttribute('data-etape')).toBe('1')
+    expect(sections[3]!.className).toBe('rig-accordeon__etape rig-accordeon__etape--partiel')
+    const identite = sections[1]!.querySelector('.rig-accordeon__ligne')!
+    expect(morceaux(identite)).toEqual(['<span>', ' ', '<span>', ' ', '<span>', ' ', '<span>', '<svg>'])
+    expect(identite.getAttribute('aria-expanded')).toBe('true')
+    expect(identite.getAttribute('title')).toBe('Identite')
+    expect(identite.querySelector('.rig-accordeon__pastille')!.textContent).toBe('!')
+    expect(identite.querySelector('.rig-accordeon__nom')!.textContent).toBe('Identite')
+    expect(morceaux(identite.querySelector('.rig-accordeon__defaut')!)).toEqual(['1', ' valeur(s) refusee(s)'])
+    expect(morceaux(identite.querySelector('.rig-accordeon__compte')!)).toEqual(['11', ' / ', '14'])
+    // Repliee : les fiches et les requis manquants restent dans le resume.
+    const siege = sections[3]!.querySelector('.rig-accordeon__ligne')!
+    expect(siege.getAttribute('aria-expanded')).toBe('false')
+    expect(morceaux(siege.querySelector('.rig-accordeon__fiches')!)).toEqual(['2', ' ', 'etablissement', 's'])
+    expect(morceaux(siege.querySelector('.rig-accordeon__requis')!)).toEqual(['2', ' requis manquant(s)'])
+    // Depliee et sans defaut : le resume nomme sa table.
+    expect(sections[0]!.querySelector('.rig-accordeon__source')!.textContent).toBe('table DEMANDE')
+    expect(sections[2]!.querySelector('.rig-accordeon__source')).toBeNull()
+    fireEvent.click(identite)
+    fireEvent.click(siege)
+    expect(gestes()).toEqual([['basculerEtape', 1], ['basculerEtape', 3]])
+  })
+
+  it('seules les etapes depliees portent leurs champs', () => {
     const { container } = rendre()
-    const pages = container.querySelectorAll('.rig-saisie__page')
-    expect(pages[1]!.className).toBe('rig-saisie__page rig-saisie__page--courante')
-    expect(pages[1]!.id).toBe('rig-etape-1')
-    expect(pages[1]!.getAttribute('data-etape')).toBe('1')
-    expect(morceaux(pages[1]!.querySelector('.rig-kicker')!)).toEqual(['Etape ', '2', ' sur ', '7'])
-    expect(pages[3]!.querySelector('.rig-saisie__attente')!.textContent).toBe('Siege et etablissements')
+    const sections = container.querySelectorAll('.rig-accordeon__etape')
+    expect(sections[1]!.querySelector('.rig-accordeon__corps')).not.toBeNull()
+    expect(sections[2]!.querySelector('.rig-accordeon__corps')).toBeNull()
+    expect(sections[3]!.querySelector('.rig-accordeon__corps')).toBeNull()
   })
 
   it('un champ : libelle et « requis », saisie, refus ou manque, colonne ; frappe et sortie remontent', () => {
     const { container, gestes } = rendre()
-    const labels = container.querySelectorAll('.rig-saisie__page--courante .rig-saisie-champ')
+    const labels = container.querySelectorAll('.rig-accordeon__etape--courante .rig-saisie-champ')
     expect(labels[0]!.className).toBe('rig-saisie-champ rig-saisie-champ--moitie rig-saisie-champ--refuse')
     expect(labels[2]!.className).toBe('rig-saisie-champ rig-saisie-champ--pleine rig-saisie-champ--manque')
     expect(morceaux(labels[0]!)).toEqual(['<span>', '<input>', '<span>', '<span>'])
@@ -311,7 +339,7 @@ describe('Visionneuse : la saisie guidee', () => {
 
   it('une etape multiple : ses fiches en onglets, ajout et retrait', () => {
     const e = etapes()
-    e.pages[3] = { ...e.pages[3]!, rendue: true }
+    e.pages[3] = { ...e.pages[3]!, ouverte: true }
     const { container, gestes } = rendre(dossier({ etapes: e }))
     const fiches = container.querySelector('.rig-fiches')!
     expect(morceaux(fiches)).toEqual(['<button>', '<button>', '<button>', '<button>'])
@@ -324,31 +352,47 @@ describe('Visionneuse : la saisie guidee', () => {
     expect(gestes()).toEqual([['choisirFiche', { etape: 'SIEGE', index: 0 }], ['ajouterFiche', 'SIEGE'], ['supprimerFiche', 'SIEGE']])
   })
 
-  it('le controle final : ce qui bloque, le bouton Valider eteint, puis le dossier valide', () => {
-    const recapBloque = { valide: false, nombre: 2, titre: '2 points bloquent la validation', aManquer: 1, refusees: 1, groupes: [
+  it('le controle dans le pied : ce qui bloque, Valider eteint, le detail dans l\'etape Controle, puis le dossier valide', () => {
+    const recapBloque: RecapVue = { valide: false, nombre: 2, titre: '2 points bloquent la validation', aManquer: 1, refusees: 1, groupes: [
       { indexEtape: 1, fiche: 0, etape: 'Identite', multi: false, unite: 'Fiche', nombre: 2, points: [
         { champ: 'SIREN', motif: 'cle incorrecte', colonne: 'DSSRC_SIREN', manquant: false },
         { champ: 'Patronyme', motif: 'a renseigner', colonne: 'INSPP_PATRONYME', manquant: true },
       ] }] }
-    const e = etapes()
-    e.pages[1] = { ...e.pages[1]!, recap: recapBloque }
-    const { container, gestes, rerender, plan } = rendre(dossier({ etapes: e }))
-    const entete = container.querySelector('.rig-recap__entete')!
-    expect(morceaux(entete)).toEqual(['<span>', ' ', '<div>', ' ', '<button>'])
-    expect(entete.querySelector('.rig-recap__pastille')!.className).toBe('rig-recap__pastille rig-recap__pastille--bloque')
-    expect(morceaux(entete.querySelector('.rig-recap__detail')!)).toEqual(['1', ' a renseigner · ', '1', ' valeur(s) refusee(s) '])
-    const valider = [...entete.querySelectorAll('button')].find((b) => b.textContent === 'Valider le dossier') as HTMLButtonElement
+    // Une etape Controle (la 5e du jeu d'essai), depliee : elle porte le detail.
+    const avecControle = (recap: RecapVue) => {
+      const e = etapes({ recap })
+      e.pas.push({ etat: 'vide', courant: false, pastille: '5', titre: 'Controle', fiches: 0, unite: 'fiche', refuses: 0, manquants: 0, remplis: 0, total: 2 })
+      e.pages.push(page('CONTROLE', 'Controle', { ouverte: true, recap }))
+      return e
+    }
+    const { container, gestes, rerender, plan } = rendre(dossier({ etapes: avecControle(recapBloque) }))
+    const bilan = container.querySelector('.rig-guide__controle .rig-bilan')!
+    expect(morceaux(bilan)).toEqual(['<span>', ' ', '<button>', ' ', '<button>'])
+    expect(bilan.querySelector('.rig-recap__pastille')!.className).toBe('rig-recap__pastille rig-recap__pastille--bloque')
+    expect(bilan.querySelector('.rig-bilan__titre')!.textContent).toBe('2 points bloquent la validation')
+    expect(morceaux(bilan.querySelector('.rig-bilan__detail')!)).toEqual(['1', ' a renseigner · ', '1', ' valeur(s) refusee(s) '])
+    const valider = [...bilan.querySelectorAll('button')].find((b) => b.textContent === 'Valider le dossier') as HTMLButtonElement
     expect(valider.disabled).toBe(true)
-    const aller = container.querySelector('.rig-recap__aller')!
+    // Le texte du bilan deplie l'etape Controle ; elle donne le detail, point par point.
+    fireEvent.click(bilan.querySelector('.rig-bilan__texte--lien')!)
+    const controle = container.querySelector('#rig-etape-4')!
+    const aller = controle.querySelector('.rig-recap__aller')!
     expect(morceaux(aller)).toEqual(['<span>', ' ', '<span>', ' ', '<span>'])
-    expect(container.querySelectorAll('.rig-recap__point')[0]!.className).toBe('rig-recap__point rig-recap__point--refuse')
+    expect(controle.querySelectorAll('.rig-recap__point')[0]!.className).toBe('rig-recap__point rig-recap__point--refuse')
     fireEvent.click(aller)
-    const ok = etapes()
-    ok.pages[1] = { ...ok.pages[1]!, recap: { valide: true, nombre: 0, titre: '', aManquer: 0, refusees: 0, groupes: [] } }
-    rerender(<Visionneuse dossier={dossier({ etapes: ok })} pagination={0} defilement={null} defilementJoue={{ current: 0 }} plan={plan} />)
-    expect(container.querySelector('.rig-recap__entete')!.className).toBe('rig-recap__entete rig-recap__entete--valide')
+    // Plus rien ne bloque : Valider s'allume, le filet passe a l'accent, plus de detail.
+    const pret: RecapVue = { valide: false, nombre: 0, titre: 'Rien ne bloque la validation', aManquer: 0, refusees: 0, groupes: [] }
+    rerender(<Visionneuse dossier={dossier({ etapes: avecControle(pret) })} pagination={0} defilement={null} defilementJoue={{ current: 0 }} plan={plan} />)
+    expect(container.querySelector('.rig-guide__controle')!.className).toBe('rig-guide__controle rig-guide__controle--pret')
+    expect(container.querySelector('.rig-bilan__texte--lien')).toBeNull()
+    expect(container.querySelector('.rig-recap__liste')).toBeNull()
+    fireEvent.click([...container.querySelectorAll('button')].find((b) => b.textContent === 'Valider le dossier')!)
+    const ok: RecapVue = { valide: true, nombre: 0, titre: '', aManquer: 0, refusees: 0, groupes: [] }
+    rerender(<Visionneuse dossier={dossier({ etapes: avecControle(ok) })} pagination={0} defilement={null} defilementJoue={{ current: 0 }} plan={plan} />)
+    expect(container.querySelector('.rig-guide__controle')!.className).toBe('rig-guide__controle rig-guide__controle--valide')
+    expect(container.querySelector('.rig-bilan')!.className).toBe('rig-bilan rig-bilan--valide')
     fireEvent.click([...container.querySelectorAll('button')].find((b) => b.textContent === 'Rouvrir la saisie')!)
-    expect(gestes()).toEqual([['allerAuDefaut', { etape: 1, fiche: 0 }], ['rouvrir', null]])
+    expect(gestes()).toEqual([['allerEtape', 4], ['allerAuDefaut', { etape: 1, fiche: 0 }], ['valider', null], ['rouvrir', null]])
   })
 })
 

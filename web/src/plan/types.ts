@@ -216,6 +216,8 @@ export interface EtapesVue {
   oeil: boolean
   pas: PasEtapeVue[]
   pages: PageEtapeVue[]
+  /** Le controle du dossier, calcule a chaque rendu : il vit dans le pied du panneau. */
+  recap: RecapVue
 }
 export interface PasEtapeVue {
   etat: string
@@ -232,7 +234,8 @@ export interface PasEtapeVue {
 export interface PageEtapeVue {
   code: string
   courante: boolean
-  rendue: boolean
+  /** Depliee dans l'accordeon : seules les etapes ouvertes portent leurs champs. */
+  ouverte: boolean
   titre: string
   source: string
   fiches: OngletsFichesVue | null

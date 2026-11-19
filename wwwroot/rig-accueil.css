@@ -1473,42 +1473,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   border-color: var(--rig-focus); color: var(--rig-focus);
 }
 
-/* --- Le formulaire : une page geante, paginee ---
-   Les 7 etapes sont toutes dans le flux et defilent a la suite ;
-   scroll-snap les cale une par une pour qu'on ne s'arrete jamais
-   a cheval entre deux etapes. */
-.rig-saisie__pages {
-  overflow-y: auto; min-width: 0; min-height: 0;
-  scroll-snap-type: y proximity;
-  scroll-behavior: smooth;
-  scroll-padding-top: 0;
-  overscroll-behavior-y: contain;
-}
-.rig-saisie__page {
-  scroll-snap-align: start;
-  /* Pas de scroll-snap-stop: always. Combine a un calage "proximity", il
-     FORCE l'arret sur chaque etape traversee : un geste de defilement large
-     se hachait en autant de blocages qu'il y a d'etapes. Sans lui, le
-     defilement reste continu et ne se cale qu'a l'arrivee. */
-  min-height: 100%;
-  display: flex; flex-direction: column;
-}
-.rig-saisie__page + .rig-saisie__page { border-top: 1px solid var(--rig-bord); }
-.rig-saisie__corps { padding: var(--rig-esp-5) var(--rig-esp-6); min-width: 0; flex: 1 1 auto; }
-/* L'entete reste visible pendant qu'on remplit une etape longue :
-   sans elle on ne sait plus dans quelle page on ecrit. */
-.rig-saisie__entete {
-  position: sticky; top: 0; z-index: 2;
-  background: var(--rig-fond);
-  display: flex; align-items: flex-start; justify-content: space-between;
-  gap: var(--rig-esp-4); margin-bottom: var(--rig-esp-5);
-  padding-bottom: var(--rig-esp-3); padding-top: var(--rig-esp-2);
-  border-bottom: 1px solid var(--rig-bord);
-}
-.rig-saisie__titre { margin: 4px 0 2px; font: 300 var(--rig-fs-titre)/1.2 var(--rig-font); color: var(--rig-texte); }
-.rig-saisie__source { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); }
-.rig-saisie__navigation { display: flex; gap: var(--rig-esp-2); flex: none; }
-
 .rig-champs {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--rig-esp-4) var(--rig-esp-5);
@@ -1545,8 +1509,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   .rig-saisie { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .rig-frise { border-right: 0; border-bottom: 1px solid var(--rig-bord); max-height: 28vh; }
   .rig-champs { grid-template-columns: 1fr; }
-  .rig-saisie__corps { padding: var(--rig-esp-4) var(--rig-esp-3); }
-  .rig-saisie__page { min-height: auto; }
 }
 
 /* ============================================================
@@ -1757,7 +1719,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-fiches__retrait:hover { color: var(--rig-alerte); border-color: var(--rig-alerte); }
 
 .rig-frise__libelle { display: flex; flex-direction: column; gap: 1px; }
-.rig-frise__fiches { font: 9px var(--rig-font-mono); color: var(--rig-texte-3); }
 .rig-frise__pas--complet .rig-frise__pastille { font-size: 9px; font-weight: 700; }
 
 /* ---------- Controle de validite ----------------------------------
@@ -1781,8 +1742,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   font-style: italic;
 }
 
-.rig-frise__defaut { font: 9px var(--rig-font-mono); color: var(--rig-alerte); }
-.rig-frise__requis { font: 9px var(--rig-font-mono); color: var(--rig-texte-3); }
 .rig-frise__pas--refuse .rig-frise__pastille {
   border-color: var(--rig-alerte);
   color: var(--rig-alerte);
@@ -1790,17 +1749,9 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 }
 
 /* ============================================================
-   CONTROLE FINAL : le recapitulatif de ce qui bloque
+   CONTROLE FINAL : la pastille du bilan (pied des etapes, .rig-bilan)
+   et le detail de ce qui bloque (etape Controle de l'accordeon)
    ============================================================ */
-.rig-recap {
-  margin: calc(var(--rig-esp-4) * -1) 0 var(--rig-esp-5);
-  padding-bottom: var(--rig-esp-4);
-  border-bottom: 1px solid var(--rig-bord-faible);
-}
-.rig-recap__entete {
-  display: flex; align-items: center; gap: var(--rig-esp-3);
-  padding: var(--rig-esp-3) 0 var(--rig-esp-4);
-}
 .rig-recap__pastille {
   width: 38px; height: 38px; flex: none;
   display: inline-flex; align-items: center; justify-content: center;
@@ -1814,8 +1765,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   border-color: transparent; background: var(--rig-grad-ok);
   color: var(--rig-fond); font-size: 11px;
 }
-.rig-recap__titre { font: 300 var(--rig-fs-titre)/1.2 var(--rig-font); color: var(--rig-texte); }
-.rig-recap__detail { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); margin-top: 3px; }
 
 /* Le bouton de validation : seul bouton "fort" de l'ecran, et il ne
    s'allume que lorsque la liste est vide. */
@@ -2335,31 +2284,129 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   margin-bottom:8px;
 }
 
-/* ---------- Etapes du dossier dans la colonne du milieu (2026-09-15) ----------
-   Frise horizontale EN HAUT, puis une piste horizontale : une page par etape,
-   calee par scroll-snap. La molette tourne les pages (rig-accueil.js). */
-.rig-frise--haut {
-  margin-top: 0; padding: var(--rig-esp-2) var(--rig-esp-3);
-  border-top: 0; border-bottom: 1px solid var(--rig-bord);
-}
-.rig-saisie__pages--h {
+/* ---------- Etapes du dossier en ACCORDEON (proposition 6 « En-tete en bas »,
+   /draft du 19/11/2026, conv-2022) ----------
+   Une ligne par etape, qui se deplie (plusieurs a la fois), dans UNE colonne qui
+   defile a la verticale ; le PIED porte le titre, le controle du dossier et la
+   croix. Remplace la frise du haut et les pages cote a cote (2026-09-15). */
+.rig-accordeon { container-type: inline-size; }
+.rig-accordeon__etapes {
   flex: 1 1 auto; min-height: 0;
-  display: flex; flex-direction: row;
-  overflow-x: auto; overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  scroll-behavior: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
-}
-.rig-saisie__pages--h::-webkit-scrollbar { display: none; }
-.rig-saisie__pages--h .rig-saisie__page {
-  flex: 0 0 100%; width: 100%; min-height: 0; height: 100%;
+  /* Les lignes mesurent leur offsetTop depuis la zone (web/src/plan/pagination.ts). */
+  position: relative;
   overflow-y: auto; overflow-x: hidden;
-  scroll-snap-align: start; scroll-snap-stop: always;
+  overscroll-behavior: contain;
+  padding: 4px var(--rig-esp-3);
 }
-.rig-saisie__pages--h .rig-saisie__page + .rig-saisie__page { border-top: 0; }
-.rig-saisie__pages--h .rig-saisie__corps { padding: var(--rig-esp-3); }
-.rig-saisie__pages--h .rig-champs { grid-template-columns: 1fr; max-width: none; }
+.rig-accordeon__etape { border-bottom: 1px solid var(--rig-bord-faible); }
+.rig-accordeon__ligne {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; min-height: 34px; padding: 4px 4px 4px 0;
+  background: none; border: 0; text-align: left; cursor: pointer;
+  color: var(--rig-texte); font: 12.5px/1.3 var(--rig-font);
+}
+.rig-accordeon__ligne:hover .rig-accordeon__nom { color: var(--rig-focus); }
+.rig-accordeon__ligne:focus-visible { outline: 2px solid var(--rig-focus); outline-offset: -2px; border-radius: var(--rig-radius-sm); }
+.rig-accordeon__pastille {
+  width: 20px; height: 20px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; border: 1px solid var(--rig-bord);
+  font: 10px var(--rig-font-mono); color: var(--rig-texte-3);
+}
+.rig-accordeon__etape--partiel .rig-accordeon__pastille { border-color: var(--rig-texte-3); color: var(--rig-texte-2); }
+.rig-accordeon__etape--complet .rig-accordeon__pastille {
+  border: 1.5px solid #34D399; color: #34D399; font-size: 8.5px; font-weight: 700;
+}
+.rig-accordeon__etape--refuse .rig-accordeon__pastille { border-color: var(--rig-alerte); color: var(--rig-alerte); font-weight: 700; }
+.rig-accordeon__etape--courante .rig-accordeon__pastille { border-width: 1.5px; }
+.rig-accordeon__etape--encours .rig-accordeon__pastille { border-color: var(--rig-or); color: var(--rig-focus); font-weight: 600; }
+.rig-accordeon__nom { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Le resume tient sur la ligne : il se tronque avant le nom et le compte. */
+.rig-accordeon__resume {
+  flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px;
+  white-space: nowrap; overflow: hidden;
+}
+.rig-accordeon__resume > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rig-accordeon__defaut { font: 9.5px var(--rig-font-mono); color: var(--rig-alerte); }
+.rig-accordeon__requis,
+.rig-accordeon__fiches,
+.rig-accordeon__source { font: 9.5px var(--rig-font-mono); color: var(--rig-texte-3); }
+.rig-accordeon__compte {
+  flex: none; font: 10px var(--rig-font-mono); color: var(--rig-texte-3);
+  font-variant-numeric: tabular-nums;
+}
+.rig-accordeon__chevron {
+  width: 12px; height: 12px; flex: none;
+  fill: none; stroke: var(--rig-texte-3); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round;
+  transition: transform .12s ease;
+}
+/* L'etape DEPLIEE : nom en accent, soulignee d'or, chevron vers le bas. */
+.rig-accordeon__etape--ouverte > .rig-accordeon__ligne { box-shadow: inset 0 -1px 0 var(--rig-or); }
+.rig-accordeon__etape--ouverte .rig-accordeon__nom { color: var(--rig-focus); font-weight: 600; font-size: 13px; }
+.rig-accordeon__etape--ouverte > .rig-accordeon__ligne .rig-accordeon__compte { color: var(--rig-focus); }
+.rig-accordeon__etape--ouverte .rig-accordeon__chevron { transform: rotate(90deg); stroke: var(--rig-focus); }
+.rig-accordeon__corps { padding: var(--rig-esp-3) 0 var(--rig-esp-4) 28px; min-width: 0; }
+.rig-accordeon .rig-champs { grid-template-columns: 1fr; gap: var(--rig-esp-3) var(--rig-esp-4); max-width: none; }
+.rig-accordeon .rig-recap__liste { margin-bottom: var(--rig-esp-4); }
+/* Colonne large : les champs « moitie » vont par deux, comme dans le draft. */
+@container (min-width: 520px) {
+  .rig-accordeon .rig-champs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 380px) {
+  .rig-accordeon__corps { padding-left: 0; }
+}
+/* Colonne etroite : le detail d'un point (champ, motif, colonne) passe l'un
+   sous l'autre. La regle d'origine ne le faisait que sous 1100 px de FENETRE :
+   dans une colonne de 400 px d'une grande fenetre, le motif tenait dans une
+   bande de quelques lettres (vu en capture, 19/11/2026). */
+@container (max-width: 560px) {
+  .rig-accordeon .rig-recap__point { flex-direction: column; gap: 0; }
+  .rig-accordeon .rig-recap__champ { min-width: 0; }
+}
+
+/* LE PIED : l'en-tete descendu en bas. Colonne etroite : titre et outils sur
+   une rangee, le bilan dessous ; colonne large : les trois sur une seule. Le
+   filet haut dit l'etat : brique tant qu'un point bloque, accent quand plus rien
+   ne bloque, vert quand le dossier est valide. */
+.rig-guide__controle {
+  flex: none;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "titres outils" "bilan bilan";
+  align-items: center; gap: 8px 12px;
+  padding: 11px var(--rig-esp-3) 10px;
+  border-top: 1px solid var(--rig-bord-faible);
+  background: linear-gradient(var(--rig-alerte), var(--rig-alerte)) top / 100% 2px no-repeat;
+}
+.rig-guide__controle--pret { background-image: linear-gradient(var(--rig-focus), var(--rig-focus)); }
+.rig-guide__controle--valide { background-image: var(--rig-grad-ok); }
+.rig-guide__titres { grid-area: titres; min-width: 0; }
+.rig-guide__controle .rig-guide__titre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rig-guide__outils { grid-area: outils; display: flex; align-items: center; gap: 6px; }
+@container (min-width: 620px) {
+  .rig-guide__controle {
+    grid-template-columns: minmax(140px, 1fr) minmax(0, 1.4fr) auto;
+    grid-template-areas: "titres bilan outils";
+  }
+}
+.rig-bilan { grid-area: bilan; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rig-bilan .rig-recap__pastille { width: 26px; height: 26px; font-size: 11px; }
+.rig-bilan .rig-recap__pastille--ok { font-size: 9px; }
+.rig-bilan__texte {
+  flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;
+  background: none; border: 0; padding: 0; text-align: left; color: inherit; font: inherit;
+}
+.rig-bilan__texte--lien { cursor: pointer; border-radius: var(--rig-radius-sm); }
+.rig-bilan__texte--lien:hover .rig-bilan__titre { color: var(--rig-alerte); }
+.rig-bilan__titre {
+  font: 600 12.5px/1.3 var(--rig-font); color: var(--rig-texte);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Le detail passe a la ligne plutot que de perdre « valeur(s) refusee(s) »
+   derriere le bouton Valider, en colonne etroite. */
+.rig-bilan__detail { font: 10px/1.3 var(--rig-font-mono); color: var(--rig-texte-3); }
+.rig-bilan .rig-bouton { flex: none; white-space: nowrap; }
+.rig-bilan .rig-bouton--fort { padding: 6px var(--rig-esp-4); }
+
 /* Fleches precedente / suivante aux deux bouts de la frise. */
 .rig-frise--h .rig-frise__fleche { flex: 0 0 auto; display: flex; align-items: center; }
 .rig-frise__fleche-bouton {
@@ -2370,11 +2417,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 }
 .rig-frise__fleche-bouton:hover:not(:disabled) { color: var(--rig-focus); border-color: var(--rig-focus); }
 .rig-frise__fleche-bouton:disabled { opacity: .35; cursor: default; }
-/* Etape hors fenetre de chargement : un simple repere, rendu a l'approche. */
-.rig-saisie__attente {
-  margin: auto; font-size: 11px; color: var(--rig-texte-3);
-}
-
 /* ---------- Pastille integree a la frise horizontale (2026-09-16) ----------
    Avant : la pastille flottait seule au-dessus du libelle, en vert sature plein.
    Maintenant : une grille de 2 colonnes cale la pastille et le compte sur la
@@ -4226,6 +4268,7 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    colonne est etroite) ; puis un titre de 15 px. Les donnees et le document
    avaient un surtitre gris qui passait sur deux lignes. */
 .rig-vged .rig-guide__entete .rig-kicker,
+.rig-vged .rig-guide__controle .rig-kicker,
 .rig-vged .rig-apercu__entete .rig-kicker {
   font: 700 10px/1.3 var(--rig-font-mono); letter-spacing: .14em; color: var(--rig-accent);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -4259,18 +4302,21 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    passait sur deux lignes et la croix avait un troisieme dessin. */
 .rig-vged .rig-fiche__outils .rig-bouton,
 .rig-vged .rig-apercu__actions .rig-bouton,
-.rig-vged .rig-guide__entete .rig-guide__fermer {
+.rig-vged .rig-guide__entete .rig-guide__fermer,
+.rig-vged .rig-guide__controle .rig-guide__fermer {
   height: 28px; min-width: 28px; box-sizing: border-box; margin: 0; padding: 0 10px;
   display: inline-flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap;
   border: 1px solid var(--rig-bord-faible); border-radius: 8px; box-shadow: none;
   background: transparent; color: var(--rig-texte-2); font: 500 12px/1 var(--rig-font);
 }
 .rig-vged .rig-apercu__actions .rig-bouton--icone,
-.rig-vged .rig-guide__entete .rig-guide__fermer { width: 28px; padding: 0; font-size: 16px; }
+.rig-vged .rig-guide__entete .rig-guide__fermer,
+.rig-vged .rig-guide__controle .rig-guide__fermer { width: 28px; padding: 0; font-size: 16px; }
 .rig-vged .rig-apercu__actions .rig-bouton--icone svg { width: 16px; height: 16px; }
 .rig-vged .rig-fiche__outils .rig-bouton:hover,
 .rig-vged .rig-apercu__actions .rig-bouton:hover,
-.rig-vged .rig-guide__entete .rig-guide__fermer:hover { background: var(--rig-fond-2); color: var(--rig-texte); border-color: var(--rig-bord); }
+.rig-vged .rig-guide__entete .rig-guide__fermer:hover,
+.rig-vged .rig-guide__controle .rig-guide__fermer:hover { background: var(--rig-fond-2); color: var(--rig-texte); border-color: var(--rig-bord); }
 /* Imprimer reste l'action premiere du document ; un outil enfonce (menu
    Actions ouvert, Historique affiche) prend l'accent. */
 .rig-vged .rig-apercu__actions .rig-bouton--fort,
@@ -4296,27 +4342,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-vged__donnees .rig-verrou:not(.rig-verrou--edition):not(.rig-verrou--attente) { border-color: var(--rig-bord-faible); }
 .rig-vged__donnees .rig-verrou__texte { flex: 1 1 200px; font-size: 12.5px; line-height: 1.45; color: var(--rig-texte-2); }
 .rig-vged__donnees .rig-verrou .rig-bouton { height: 28px; padding: 0 12px; font-size: 12px; }
-
-/* LA FRISE DES ETAPES dans la vue : ses sept pas debordent d'une colonne
-   etroite. Les fleches restent collees aux deux bouts (elles defilaient avec
-   les pas : « › » sortait du champ), et le pas courant revient dans le champ
-   quand l'etape change (Etapes.tsx, montrerPasCourant). L'ombre pleine des
-   fleches masque les pas qui passent dessous jusque dans la marge de la frise.
-   (La barre grise a boutons sous la frise venait de la regle globale des
-   barres de defilement : voir « BARRES DE DEFILEMENT ».) */
-.rig-vged .rig-frise--haut > .rig-frise__fleche { position: sticky; z-index: 1; background: var(--rig-surface); }
-.rig-vged .rig-frise--haut > .rig-frise__fleche:first-child { left: 0; padding-right: 4px; box-shadow: -12px 0 0 var(--rig-surface); }
-.rig-vged .rig-frise--haut > .rig-frise__fleche:last-child { right: 0; padding-left: 4px; box-shadow: 12px 0 0 var(--rig-surface); }
-/* Le nom d'un pas (« Siege et etablissements ») et ses mentions (« 1 valeur(s)
-   refusee(s) ») : coupes net au bord du pas, ils finissent en « … » ; le nom
-   entier est en infobulle sur le pas (Etapes.tsx). */
-.rig-vged .rig-frise--h .rig-frise__libelle > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* L'ENTETE D'UNE ETAPE (« ETAPE 1 SUR 7 · Demande ») : sur le fond de sa carte
-   et dans le langage des titres de la vue. Le fond de page l'enfermait dans une
-   boite grise (noire en sombre), et son titre maigre (300) etait le seul de la vue. */
-.rig-vged .rig-saisie__entete { background: var(--rig-surface); border-bottom-color: var(--rig-bord-faible); }
-.rig-vged .rig-saisie__titre { font: 600 17px/1.3 var(--rig-font); }
 
 /* VUE VIDE des donnees : elle dit pourquoi, et propose la vue qui montre des champs. */
 .rig-infos__vide {

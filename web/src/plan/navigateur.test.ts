@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ecouterEchap } from './clavier'
 import { ecouterGlisse, finirSuivi, mesurerOnglets } from './glisse'
-import { allerEtape, montrerPasCourant, suivrePagination } from './pagination'
+import { allerEtape, etapeEnHaut, suivreEtapeVisible } from './pagination'
 
 // Ce que seul le navigateur sait faire (ex-wwwroot/rig-accueil.js, retire au
-// lot 2) : le clavier, le glisser d'un onglet, la pagination des etapes.
+// lot 2) : le clavier, le glisser d'un onglet, le defilement des etapes.
 
 afterEach(() => { document.body.innerHTML = '' })
 
@@ -71,76 +71,61 @@ describe('glisser d\'un onglet', () => {
   })
 })
 
-describe('pagination des etapes', () => {
-  function zone(scrollLeft: number) {
+describe('accordeon des etapes : defilement vertical', () => {
+  // Trois etapes de 100 px l'une sous l'autre, dans une zone de 150 px de haut.
+  function zone(scrollTop: number) {
     document.body.innerHTML = '<div id="z"><section data-etape="0"></section><section data-etape="1"></section><section data-etape="2"></section></div>'
     const z = document.getElementById('z')!
-    Object.defineProperty(z, 'clientWidth', { value: 500 })
-    z.scrollLeft = scrollLeft
+    Object.defineProperty(z, 'clientHeight', { value: 150 })
+    z.querySelectorAll<HTMLElement>('[data-etape]').forEach((s, i) => {
+      Object.defineProperty(s, 'offsetTop', { value: i * 100 })
+      Object.defineProperty(s, 'offsetHeight', { value: 100 })
+    })
+    z.scrollTop = scrollTop
     z.scrollTo = vi.fn() as unknown as HTMLElement['scrollTo']
     return z
   }
 
-  it('dit l\'etape visible des le branchement (arrondie a la page la plus proche)', () => {
-    const z = zone(760)
-    const vue = vi.fn()
-    const arreter = suivrePagination(z, vue)
-    expect(vue).toHaveBeenCalledWith(2)
-    arreter()
+  it('l\'etape en haut est la derniere dont la ligne a passe le bord (a 8 px pres)', () => {
+    expect(etapeEnHaut(zone(0))).toBe(0)
+    expect(etapeEnHaut(zone(92))).toBe(1)
+    expect(etapeEnHaut(zone(91))).toBe(0)
+    expect(etapeEnHaut(zone(250))).toBe(2)
   })
 
-  it('aller a une etape fait defiler d\'une largeur de page par etape, en douceur ou d\'un coup', () => {
+  it('dit l\'etape en haut des le branchement, puis a chaque changement seulement', () => {
+    const z = zone(120)
+    const vue = vi.fn()
+    const rafs: FrameRequestCallback[] = []
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((f) => { rafs.push(f); return rafs.length })
+    try {
+      const arreter = suivreEtapeVisible(z, vue)
+      expect(vue).toHaveBeenCalledWith(1)
+      z.scrollTop = 150
+      z.dispatchEvent(new Event('scroll'))
+      rafs.shift()!(0)
+      z.scrollTop = 210
+      z.dispatchEvent(new Event('scroll'))
+      rafs.shift()!(0)
+      expect(vue.mock.calls).toEqual([[1], [2]])
+      arreter()
+      z.dispatchEvent(new Event('scroll'))
+      expect(rafs).toHaveLength(0)
+    } finally {
+      raf.mockRestore()
+    }
+  })
+
+  it('aller a une etape amene sa ligne en haut, en douceur ou d\'un coup ; deja entiere a l\'ecran, rien ne bouge', () => {
     const z = zone(0)
     allerEtape(z, 2)
     allerEtape(z, 1, false)
-    expect(z.scrollTo).toHaveBeenNthCalledWith(1, { left: 1000, behavior: 'smooth' })
-    expect(z.scrollTo).toHaveBeenNthCalledWith(2, { left: 500, behavior: 'auto' })
+    expect(z.scrollTo).toHaveBeenNthCalledWith(1, { top: 200, behavior: 'smooth' })
+    expect(z.scrollTo).toHaveBeenNthCalledWith(2, { top: 100, behavior: 'auto' })
+    allerEtape(z, 0)
+    expect(z.scrollTo).toHaveBeenCalledTimes(2)
+    allerEtape(z, 9)
     allerEtape(null, 1)
-  })
-
-  it('la molette tourne UNE page par geste ; Ctrl+molette reste au zoom', () => {
-    const z = zone(500)
-    const arreter = suivrePagination(z, vi.fn())
-    z.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, ctrlKey: true, cancelable: true }))
-    expect(z.scrollTo).not.toHaveBeenCalled()
-    const ev = new WheelEvent('wheel', { deltaY: 100, cancelable: true })
-    z.dispatchEvent(ev)
-    z.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, cancelable: true }))
-    expect(ev.defaultPrevented).toBe(true)
-    expect(z.scrollTo).toHaveBeenCalledTimes(1)
-    expect(z.scrollTo).toHaveBeenCalledWith({ left: 1000, behavior: 'smooth' })
-    arreter()
-  })
-})
-
-describe('frise des etapes : le pas courant reste dans le champ', () => {
-  // Une frise de 400 px (x 100 a 500) ; les fleches occupent 32 px a chaque bout.
-  function frise(pasGauche: number, pasDroite: number) {
-    document.body.innerHTML = '<ol><li class="rig-frise__pas"></li><li class="rig-frise__pas rig-frise__pas--courant"></li></ol>'
-    const ol = document.querySelector('ol')!
-    const pas = document.querySelector('.rig-frise__pas--courant')!
-    ol.getBoundingClientRect = () => rect(100, 500)
-    pas.getBoundingClientRect = () => rect(pasGauche, pasDroite)
-    ol.scrollLeft = 200
-    return ol
-  }
-
-  it('sorti a droite : la frise avance juste assez pour le montrer avant la fleche', () => {
-    const ol = frise(520, 620)
-    montrerPasCourant(ol)
-    expect(ol.scrollLeft).toBe(200 + (620 - 468))
-  })
-
-  it('sorti a gauche (sous la fleche) : la frise recule', () => {
-    const ol = frise(110, 210)
-    montrerPasCourant(ol)
-    expect(ol.scrollLeft).toBe(200 - (132 - 110))
-  })
-
-  it('deja visible, ou aucune frise : rien ne bouge', () => {
-    const ol = frise(200, 300)
-    montrerPasCourant(ol)
-    expect(ol.scrollLeft).toBe(200)
-    expect(() => montrerPasCourant(null)).not.toThrow()
+    expect(z.scrollTo).toHaveBeenCalledTimes(2)
   })
 })
