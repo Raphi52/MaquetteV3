@@ -71,18 +71,32 @@ Write-Host "Ecrans React (.tsx) : Vite sur $adresseVite. C#, CSS : repris automa
 # dotnet watch ne relance JAMAIS une application qui s'est fermee : il
 # affiche « Exited / Waiting for a file to change » et Ctrl+R est inactif
 # dans cet etat (dotnet/sdk#34029). La reprise a chaud est alors morte.
-# On surveille donc l'application, et la FACON dont elle est partie decide :
-#  - code 0 : l'utilisateur l'a fermee. On arrete CE watch et le script.
-#    La relancer la faisait revenir a chaque fermeture, sans fin (le bouton
-#    « Lancer » d'Autowin, qui joue ce script, semblait lancer en boucle) ;
-#  - autre code : plantage, ou arret force (watch tue l'application sur
-#    « rude edit », taskkill /F rend 1). On relance CE watch (pid lance ici,
-#    et lui seul) pour garder la reprise a chaud ;
+# On surveille donc l'application, et la FACON dont elle est partie decide.
+# Son parent est le « dotnet run » de watch ; l'ordre des deux sorties dit
+# qui a ferme (mesure du 19/11/2026, dotnet watch 10.0.402) :
+#  - redemarrage par watch (« rude edit ») : watch tue « dotnet run » D'ABORD
+#    (code -1), l'application suit ~40 ms apres avec le code 0. Watch la
+#    relance lui-meme une fois recompilee : on attend, sans rien tuer ;
+#  - fermeture par l'utilisateur : l'application part d'abord, code 0, et
+#    « dotnet run » la suit. On arrete CE watch et le script. La relancer la
+#    faisait revenir a chaque fermeture, sans fin (le bouton « Lancer »
+#    d'Autowin, qui joue ce script, semblait lancer en boucle). Le code 0 seul
+#    ne suffit pas : un redemarrage par watch rend 0 aussi ;
+#  - autre code, application partie d'abord : plantage ou arret force. On
+#    relance CE watch (pid lance ici, et lui seul) pour garder la reprise a
+#    chaud ;
 #  - trois arrets de suite moins de 30 s apres le demarrage : elle plante au
 #    lancement, la relancer ne la reparera pas. On s'arrete.
 # Ctrl+C dans cette console arrete tout. Dans TOUS les cas, le serveur Vite
 # lance plus haut (pid lance ici, et lui seul) est arrete en sortant.
 function Get-AppRig { Get-Process -Name 'RigV3Desktop' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe } }
+function Get-ParentRig($app) {
+    $idParent = (Get-CimInstance Win32_Process -Filter "ProcessId=$($app.Id)" -ErrorAction SilentlyContinue).ParentProcessId
+    if (-not $idParent) { return $null }
+    $parent = Get-Process -Id $idParent -ErrorAction SilentlyContinue
+    if ($parent) { $null = $parent.Handle }
+    $parent
+}
 
 $codeSortie = 0
 try {
@@ -90,28 +104,37 @@ try {
     while ($true) {
         $watch = Start-Process dotnet -NoNewWindow -PassThru -ArgumentList @(
             'watch', 'run', '--project', "`"$PSScriptRoot\RigV3Desktop.csproj`"", '--non-interactive')
-        $app = $null; $absente = 0
+        $app = $null; $parent = $null; $vue = $false; $absente = 0
         while (-not $watch.HasExited) {
             Start-Sleep -Seconds 2
             $vivante = Get-AppRig | Select-Object -First 1
             if ($vivante) {
                 if (-not $app -or $app.Id -ne $vivante.Id) {
-                    # Le handle ouvert pendant que l'application vit garde son code de
-                    # sortie lisible une fois partie : sans lui, ExitCode reste vide.
+                    # Les handles ouverts pendant que les processus vivent gardent leur
+                    # code et leur heure de sortie lisibles : sans eux, ils restent vides.
                     $app = $vivante; $null = $app.Handle
+                    $parent = Get-ParentRig $app
                 }
-                $absente = 0
+                $vue = $true; $absente = 0
+                continue
             }
-            elseif ($app) { $absente++ }
-            # 3 sondes (~6 s) : laisse passer un redemarrage sur « rude edit ».
-            if ($app -and $absente -ge 3) { break }
+            if (-not $app) { continue }
+            $absente++
+            # « dotnet run » suit l'application de quelques ms : on l'attend ~6 s au plus.
+            if ($parent -and -not $parent.HasExited -and $absente -lt 3) { continue }
+            if ($parent -and $parent.HasExited -and $parent.ExitTime -le $app.ExitTime) {
+                Write-Host 'Redemarrage par dotnet watch : la fenetre revient apres la compilation.' -ForegroundColor DarkGray
+                $app = $null; $parent = $null; $absente = 0
+                continue
+            }
+            break
         }
-        if (-not $app) { break }  # watch mort sans jamais lancer l'app : erreur de build, on s'arrete
+        if (-not $vue) { break }  # watch mort sans jamais lancer l'app : erreur de build, on s'arrete
         if (-not $watch.HasExited) {
             & taskkill /PID $watch.Id /T /F | Out-Null
             $watch.WaitForExit(10000) | Out-Null
         }
-        if (-not $app.HasExited) { continue }  # watch tombe, l'application vit : on relance watch, comme avant
+        if (-not $app -or -not $app.HasExited) { continue }  # watch tombe seul : on le relance, comme avant
         if ($app.ExitCode -eq 0) {
             Write-Host 'Application fermee : fin du mode developpement.' -ForegroundColor Yellow
             break
