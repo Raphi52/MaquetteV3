@@ -45,6 +45,83 @@ public sealed partial class SessionPlanTravail
         return groupes;
     }
 
+    // ------------------------------------------------------------
+    // LE CLASSEUR DE L'ARBRE (/draft du 19/11/2026, proposition 5 « Chronologie »,
+    // web/src/composants/ClasseurArbre.tsx) : une bascule par domaine (Dossier RCS,
+    // Judiciaire), une carte par rubrique, UNE SEULE ouverte par domaine.
+    // ------------------------------------------------------------
+
+    /// <summary>
+    /// Les branches que le classeur RENDS : celles que l'utilisateur a ouvertes, plus
+    /// la racine et ses domaines (la bascule montre l'un ou l'autre, jamais replie), et,
+    /// dans chaque rubrique ouverte, TOUS ses sous-dossiers -- la carte les montre en
+    /// intertitres et sa vue « Par date » a besoin de toutes ses pieces. NoeudsOuverts
+    /// n'est pas touche : la regle du pont (« une branche fermee ne rend rien dessous »)
+    /// reste vraie, c'est le choix des branches qui change.
+    /// </summary>
+    private HashSet<NoeudGed> OuvertsDuClasseur()
+    {
+        var vue = AccesGed.NouveauxMasques();
+        vue.UnionWith(NoeudsOuverts);
+        vue.Add(Arbre);
+        void ToutOuvrir(NoeudGed dossier)
+        {
+            vue.Add(dossier);
+            foreach (var e in AccesGed.EnfantsVisibles(dossier, Domaines, AjoutsArbre, MasquesArbre, RecetteArbre))
+                if (!e.EstPiece && !e.EstFiche) ToutOuvrir(e);
+        }
+        foreach (var domaine in AccesGed.EnfantsVisibles(Arbre, Domaines, AjoutsArbre, MasquesArbre, RecetteArbre))
+        {
+            vue.Add(domaine);
+            foreach (var rubrique in AccesGed.EnfantsVisibles(domaine, Domaines, AjoutsArbre, MasquesArbre, RecetteArbre))
+                if (NoeudsOuverts.Contains(rubrique)) ToutOuvrir(rubrique);
+        }
+        return vue;
+    }
+
+    /// <summary>
+    /// La carte d'une rubrique, cliquee (geste « arbreRubrique ») : fermee, elle s'ouvre
+    /// et referme les autres rubriques de son domaine ; ouverte, elle se ferme. Rien
+    /// n'est choisi ni ferme a cote (document, donnees) : ouvrir une carte, c'est
+    /// parcourir. Une rubrique qui COMMENCE par sa fiche (Formalites) l'ouvre au
+    /// milieu, comme son depliage dans l'arbre (ArbreDemo.FicheADeplier).
+    /// </summary>
+    private void BasculerRubrique(NoeudGed rubrique)
+    {
+        if (NoeudsOuverts.Remove(rubrique)) return;
+        NoeudsOuverts.Add(rubrique);
+        FermerLesAutresRubriques(rubrique);
+        if (ArbreDemo.FicheADeplier(rubrique) is { } fiche) OuvrirApercu(fiche);
+    }
+
+    /// <summary>
+    /// A l'ouverture d'une affaire, toutes les branches servies sont depliees (l'arbre
+    /// s'ouvrait sur du contenu) : le classeur, lui, garde au plus UNE carte ouverte par
+    /// domaine -- celle qui range l'element choisi ; les autres se ferment.
+    /// </summary>
+    private void UneRubriqueParDomaine()
+    {
+        foreach (var domaine in AccesGed.EnfantsVisibles(Arbre, Domaines, AjoutsArbre, MasquesArbre, RecetteArbre))
+            foreach (var rubrique in AccesGed.EnfantsVisibles(domaine, Domaines, AjoutsArbre, MasquesArbre, RecetteArbre))
+                if (!rubrique.EstPiece && !rubrique.EstFiche
+                    && !(NoeudSelectionne is not null
+                         && (ReferenceEquals(rubrique, NoeudSelectionne)
+                             || rubrique.Descendants().Any(d => ReferenceEquals(d, NoeudSelectionne)))))
+                    NoeudsOuverts.Remove(rubrique);
+    }
+
+    /// <summary>Referme les rubriques soeurs de celle-ci, dans son domaine.</summary>
+    private void FermerLesAutresRubriques(NoeudGed rubrique)
+    {
+        foreach (var domaine in AccesGed.EnfantsVisibles(Arbre, Domaines, AjoutsArbre, MasquesArbre, RecetteArbre))
+        {
+            var soeurs = AccesGed.EnfantsVisibles(domaine, Domaines, AjoutsArbre, MasquesArbre, RecetteArbre);
+            if (!soeurs.Any(s => ReferenceEquals(s, rubrique))) continue;
+            foreach (var s in soeurs)
+                if (!ReferenceEquals(s, rubrique) && !s.EstPiece && !s.EstFiche) NoeudsOuverts.Remove(s);
+        }
+    }
+
     /// <summary>
     /// Le chemin de l'element choisi dans l'arbre, montre quand l'arbre est replie :
     /// le numero de l'affaire, puis chaque dossier, puis l'element. Sans choix : le numero seul.

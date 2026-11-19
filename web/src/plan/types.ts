@@ -3,7 +3,7 @@
 // champs : un champ renomme d'un cote casse le typecheck de l'autre a la relecture.
 
 import type { VuePlanAccueil } from '../accueil/types'
-import type { LigneArbreVue } from '../composants/ArbreGedNoeud'
+import type { LigneArbreVue } from '../composants/ClasseurArbre'
 import type { VueKbis } from '../composants/ApercuKbis'
 
 /** Remonte un geste a SessionPlanTravail.Agir (le rappel « plan » de Home.razor). */

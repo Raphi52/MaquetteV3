@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 
 namespace RigV3Desktop.Pont;
@@ -13,10 +14,16 @@ namespace RigV3Desktop.Pont;
 /// <param name="Groupe">La teinte du LISERE (1 a 8) de la rubrique qui range la ligne, 0 hors rubrique :
 /// tout ce qui va ensemble porte le meme filet de couleur (demande du 19/11/2026).</param>
 /// <param name="NiveauGroupe">Le niveau de la tete de la rubrique : le lisere se pose a son retrait.</param>
+/// <param name="Date">Une PIECE : sa date de depot (jj/mm/aaaa), vide sinon. Le classeur de
+/// l'arbre (19/11/2026, /draft « Chronologie ») la montre et range ses pieces par date.</param>
+/// <param name="Pages">Une PIECE : son nombre de pages, 0 sinon.</param>
+/// <param name="Derniere">Un DOSSIER : la date de sa piece la plus recente (jj/mm/aaaa), vide
+/// s'il n'en a aucune de datee -- la carte fermee d'une rubrique l'annonce.</param>
 public sealed record LigneArbreVue(string Id, int Niveau, string Texte, string Icone,
                                    bool Actif, bool Chemin, bool Depliable, bool Ouvert,
                                    bool Renomme, int? Compte, LigneArbreVue[] Enfants, bool Vide,
-                                   int Groupe = 0, int NiveauGroupe = 0);
+                                   int Groupe = 0, int NiveauGroupe = 0,
+                                   string Date = "", int Pages = 0, string Derniere = "");
 
 /// <summary>
 /// Pont du composant RECURSIF de l'arbre GED (web/src/composants/ArbreGedNoeud.tsx).
@@ -91,7 +98,35 @@ public static class ArbreGedNoeud
             Vide: ouvert && visibles.Count == 0 && string.IsNullOrWhiteSpace(filtre)
                   && !noeud.EstPiece && !noeud.EstFiche,
             Groupe: groupe,
-            NiveauGroupe: niveauGroupe);
+            NiveauGroupe: niveauGroupe,
+            Date: noeud.EstPiece ? noeud.Date : "",
+            Pages: noeud.EstPiece ? noeud.Pages : 0,
+            Derniere: noeud.EstPiece || noeud.EstFiche
+                ? ""
+                : DerniereDate(noeud, domaines, ajouts, masques, recette)?.ToString(FormatDate, CultureInfo.InvariantCulture) ?? "");
+    }
+
+    /// <summary>Le format des dates de l'arbre (NoeudGed.Date).</summary>
+    private const string FormatDate = "dd/MM/yyyy";
+
+    /// <summary>
+    /// La date de la piece la plus recente sous ce dossier, parmi les pieces VISIBLES
+    /// (droits du login, ajouts, masques, mode tache) -- y compris sous une branche
+    /// repliee : la carte fermee d'une rubrique l'annonce sans etre ouverte.
+    /// </summary>
+    private static DateTime? DerniereDate(NoeudGed dossier, string[] domaines,
+                                          IReadOnlyDictionary<NoeudGed, List<NoeudGed>>? ajouts,
+                                          IReadOnlyCollection<NoeudGed>? masques, RecetteTache? recette)
+    {
+        DateTime? plusRecente = null;
+        foreach (var e in EnfantsVisibles(dossier, domaines, ajouts, masques, recette))
+        {
+            var date = e.EstPiece
+                ? DateTime.TryParseExact(e.Date, FormatDate, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : (DateTime?)null
+                : e.EstFiche ? null : DerniereDate(e, domaines, ajouts, masques, recette);
+            if (date is { } x && (plusRecente is null || x > plusRecente)) plusRecente = x;
+        }
+        return plusRecente;
     }
 
     /// <summary>

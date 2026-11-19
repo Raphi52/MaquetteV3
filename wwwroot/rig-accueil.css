@@ -713,10 +713,11 @@
   overflow-y: auto;
 }
 
-/* ---------- Arbre GED : une seule colonne, la liste des pieces ----------
-   Les colonnes « Nb pages » et « Date » de v2 sont retirees : les deux
-   valeurs restent lisibles dans l'apercu de la piece, a droite. */
-.rig-arbre__entete, .rig-arbre__ligne, .rig-arbre__vide {
+/* ---------- Arbre GED : l'entete et les lignes ----------
+   Depuis le classeur (19/11/2026, /draft « Chronologie » : plus bas, « LE
+   CLASSEUR DE L'ARBRE »), une piece montre sa date et ses pages ; la demande
+   du 10/09/2026 qui les avait retirees de l'arbre est revue par ce choix. */
+.rig-arbre__entete, .rig-arbre__ligne {
   display: grid; grid-template-columns: minmax(0, 1fr);
   gap: var(--rig-esp-2); align-items: center;
 }
@@ -739,19 +740,13 @@
 }
 .rig-arbre__ligne:hover { background: var(--rig-fond-2); color: var(--rig-texte); }
 .rig-arbre__ligne--actif { background: var(--rig-fond-2); color: var(--rig-texte); }
-/* CHEMIN : filet or a gauche du noeud courant ET de tous ses parents. Le
-   parent le porte en plus pale -- on lit sa position sans deplier. */
+/* La ligne choisie : filet or a gauche. */
 .rig-arbre__ligne--actif { box-shadow: inset 2px 0 0 var(--rig-or, #E8A317); }
-.rig-arbre__ligne--chemin { box-shadow: inset 2px 0 0 rgba(212, 169, 79, .38); }
-/* --rig-texte (et non --rig-texte-1, qui n'existe dans aucun theme : la regle
-   restait sans effet, le parent gardait le gris des autres lignes). */
-.rig-arbre__ligne--chemin .rig-arbre__texte { color: var(--rig-texte); }
 .rig-arbre__libelle {
   display: flex; align-items: center; gap: 4px; min-width: 0;
   padding-left: calc(var(--rig-arbre-niveau, 0) * 14px);
 }
 .rig-arbre__texte { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rig-arbre__compte { color: var(--rig-texte-3); font-size: 11px; }
 /* TROIS POINTS a droite de la ligne (meme geste que la liste des
    conversations d'Autowin OS) : discret, revele au survol de la ligne,
    et toujours visible au clavier. Il remplace le clic droit, qui
@@ -782,11 +777,6 @@
 }
 .rig-arbre__ligne:hover .rig-arbre__icone,
 .rig-arbre__ligne--actif .rig-arbre__icone { color: var(--rig-accent); }
-.rig-arbre__vide {
-  font-size: 11px; color: var(--rig-texte-3);
-  padding: 2px var(--rig-esp-2);
-  padding-left: calc(var(--rig-arbre-niveau, 0) * 14px + 24px);
-}
 .rig-arbre__apercu {
   margin-top: var(--rig-esp-3); padding-top: var(--rig-esp-3);
   border-top: 1px solid var(--rig-bord);
@@ -3967,92 +3957,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   --rig-groupe-5: #D4517E; --rig-groupe-6: #2FA6B8; --rig-groupe-7: #A69A2E; --rig-groupe-8: #8C7A6B;
 }
 
-/* LISERE : un filet de la couleur de la rubrique, pose au retrait de sa tete,
-   court le long de la tete et de tout ce qu'elle range (« aucune piece »
-   comprise : le filet ne s'interrompt pas sous un dossier vide). */
-.rig-arbre__ligne--groupe, .rig-arbre__vide--groupe {
-  position: relative;
-  --rig-arbre-teinte-sous: color-mix(in srgb, var(--rig-arbre-teinte) 45%, transparent);
-}
-.rig-arbre__ligne--groupe::before, .rig-arbre__vide--groupe::before {
-  content: ""; position: absolute; top: 0; bottom: 0; width: 3px; pointer-events: none;
-  left: calc(var(--rig-esp-2) + var(--rig-arbre-niveau-groupe, 0) * 14px - 5px);
-  background: var(--rig-arbre-teinte);
-}
-.rig-arbre__ligne--tete::before { top: 4px; border-radius: 2px 2px 0 0; }
-/* La tete de la rubrique : son icone prend la couleur du lisere. */
-.rig-arbre__ligne--tete .rig-arbre__icone { color: var(--rig-arbre-teinte); }
-
-/* SOUS-LISERES (19/11/2026) : dans la rubrique, chaque sous-dossier OUVERT
-   porte un filet fin de la meme teinte, adoucie, a SON retrait (5 px avant son
-   chevron, comme le lisere de la tete) -- du haut de sa ligne a sa derniere
-   piece. Une ligne les dessine tous dans un seul ::after, en trois couches :
-     1. le sous-lisere du dossier qui contient la ligne choisie, teinte pleine
-        (--rig-arbre-sous-actif = son rang ; absent = hors de la boite) ;
-     2. le sien, si elle est un sous-dossier ouvert (--sous-tete), a 4 px du
-        haut comme la tete : deux dossiers voisins ne se confondent pas ;
-     3. ceux des sous-dossiers qui la contiennent (--rig-arbre-sous), un filet
-        de 2 px tous les 14 px -- le pas du retrait.
-   Calcul : ArbreGedNoeud.tsx, styleLigne. */
-.rig-arbre__ligne--groupe::after, .rig-arbre__vide--groupe::after {
-  content: ""; position: absolute; top: 0; bottom: 0; pointer-events: none;
-  left: calc(var(--rig-esp-2) + (var(--rig-arbre-niveau-groupe, 0) + 1) * 14px - 5px);
-  width: calc((var(--rig-arbre-sous, 0) + 1) * 14px);
-  background-repeat: no-repeat;
-  background-image:
-    linear-gradient(var(--rig-arbre-teinte), var(--rig-arbre-teinte)),
-    linear-gradient(var(--rig-arbre-teinte-sous), var(--rig-arbre-teinte-sous)),
-    repeating-linear-gradient(to right, var(--rig-arbre-teinte-sous) 0 2px, transparent 2px 14px);
-  background-position:
-    calc(var(--rig-arbre-sous-actif, -1) * 14px) var(--rig-arbre-sous-actif-haut, 0px),
-    calc(var(--rig-arbre-sous, 0) * 14px) 4px,
-    0 0;
-  background-size:
-    2px calc(100% - var(--rig-arbre-sous-actif-haut, 0px)),
-    0 0,
-    calc(var(--rig-arbre-sous, 0) * 14px) 100%;
-}
-.rig-arbre__ligne--sous-tete::after {
-  background-size:
-    2px calc(100% - var(--rig-arbre-sous-actif-haut, 0px)),
-    2px calc(100% - 4px),
-    calc(var(--rig-arbre-sous, 0) * 14px) 100%;
-}
-/* En SOMBRE, la teinte adoucie a 45 % se fondait dans le fond gris : les
-   sous-liseres sortaient olive et ternes (vu en capture, 19/11/2026). 65 %
-   les garde plus pales que le lisere, mais lisibles. */
-[data-rig-theme="sombre"] .rig-arbre__ligne--groupe,
-[data-rig-theme="sombre"] .rig-arbre__vide--groupe {
-  --rig-arbre-teinte-sous: color-mix(in srgb, var(--rig-arbre-teinte) 65%, transparent);
-}
-/* Le sous-dossier ouvert : son icone prend la teinte adoucie de son filet. */
-.rig-arbre__ligne--sous-tete .rig-arbre__icone { color: var(--rig-arbre-teinte); opacity: .8; }
-
-/* TRAITS DE NIVEAU neutres (19/11/2026) : hors rubrique, chaque dossier ouvert
-   (« Dossier RCS ») porte un trait fin et gris a son retrait, du haut de sa
-   ligne a sa derniere piece -- la meme geometrie que le lisere, sans couleur.
-   Trois epaisseurs, trois rangs : lisere 3 px en couleur > sous-lisere 2 px en
-   couleur adoucie > trait neutre 1 px gris. Un element par ligne, en deux
-   couches : le sien (--propre, a 4 px du haut), puis un trait tous les 14 px
-   pour les dossiers qui la contiennent (--rig-arbre-neutres, a partir du
-   niveau 1). Calcul : ArbreGedNoeud.tsx, traitsNeutres. */
-.rig-arbre__ligne, .rig-arbre__vide { position: relative; }
-.rig-arbre__niveaux {
-  position: absolute; top: 0; bottom: 0; pointer-events: none;
-  left: calc(var(--rig-esp-2) + 14px - 5px);
-  width: calc((var(--rig-arbre-neutres, 0) + 1) * 14px);
-  --rig-arbre-trait: color-mix(in srgb, var(--rig-texte-3) 38%, transparent);
-  background-repeat: no-repeat;
-  background-image:
-    linear-gradient(var(--rig-arbre-trait), var(--rig-arbre-trait)),
-    repeating-linear-gradient(to right, var(--rig-arbre-trait) 0 1px, transparent 1px 14px);
-  background-position: calc(var(--rig-arbre-neutres, 0) * 14px) 4px, 0 0;
-  background-size: 0 0, calc(var(--rig-arbre-neutres, 0) * 14px) 100%;
-}
-.rig-arbre__niveaux--propre {
-  background-size: 1px calc(100% - 4px), calc(var(--rig-arbre-neutres, 0) * 14px) 100%;
-}
-
 /* L'entete de l'arbre : libelle et nombre de pieces, « + Nouveau », replier. */
 .rig-vged__arbre .rig-arbre__entete { grid-template-columns: minmax(0, 1fr) auto auto; }
 .rig-vged__arbre .rig-arbre__entete > .rig-arbre__libelle { overflow: hidden; white-space: nowrap; }
@@ -4296,15 +4200,6 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-vged__donnees .rig-infos__filtre { padding: 0 14px; margin-top: 2px; }
 .rig-vged__arbre .rig-arbre__filtre:focus,
 .rig-vged__donnees .rig-infos__filtre:focus { outline: 0; border-color: var(--rig-accent); background: var(--rig-surface); }
-/* CHEMIN : les parents de la ligne choisie. Le filet pale de la regle de base
-   tombait au bord gauche de la carte, loin de leur retrait : des traits isoles,
-   sans lien avec les liseres (vus en capture, 19/11/2026). Dans la vue, un
-   parent se lit a son texte plein et, hors rubrique, a son ICONE or -- l'or dit
-   « ou je suis » ; dans une rubrique, c'est le sous-lisere allume qui montre le
-   chemin, et l'icone garde la teinte de la rubrique. */
-.rig-vged__arbre .rig-arbre__ligne--chemin { box-shadow: none; }
-.rig-vged__arbre .rig-arbre__ligne--chemin .rig-arbre__texte { font-weight: 600; }
-.rig-vged__arbre .rig-arbre__ligne--chemin:not(.rig-arbre__ligne--groupe) .rig-arbre__icone { color: var(--rig-accent); }
 /* LA LIGNE CHOISIE : teinte or et filet or DROIT a gauche, comme dans le
    draft. L'ombre interieure de la regle de base suivait l'arrondi de la ligne
    et dessinait une parenthese « ( » (vu en capture agrandie, 19/11/2026) ; le
@@ -4316,6 +4211,148 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   background-color: color-mix(in srgb, var(--rig-or) 16%, transparent);
 }
 .rig-vged__arbre .rig-arbre__ligne--actif .rig-arbre__texte { font-weight: 700; }
+
+/* ---- LE CLASSEUR DE L'ARBRE (/draft du 19/11/2026, proposition 5
+   « Chronologie » ; web/src/composants/ClasseurArbre.tsx) ----
+   Une bascule par domaine (Dossier RCS / Judiciaire), le rappel de la piece
+   ouverte de l'autre cote, une carte « hors rubrique », puis une carte par
+   rubrique : filet de sa couleur en haut (--g = --rig-groupe-N), nombre de
+   pieces et date de la plus recente ; ouverte, « Par dossier » (intertitres)
+   ou « Par date » (frise par annee, decisions en or). */
+.rig-classeur { display: flex; flex-direction: column; gap: 6px; padding: 2px 0 8px; }
+.rig-classeur__bascule { display: flex; padding: 3px; border-radius: 10px; background: var(--rig-fond-2); }
+.rig-classeur__domaine {
+  flex: 1 1 0; min-width: 0; padding: 5px 6px; border: 0; border-radius: 7px; background: transparent;
+  font: 12px var(--rig-font); color: var(--rig-texte-2); cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rig-classeur__domaine b { font: 700 10px var(--rig-font-mono); margin-left: 4px; color: var(--rig-texte-3); }
+.rig-classeur__domaine:hover { color: var(--rig-texte); }
+.rig-classeur__domaine--on {
+  background: var(--rig-surface); color: var(--rig-texte); font-weight: 700;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .12), inset 0 0 0 1px var(--rig-bord-faible);
+}
+.rig-classeur__domaine--on b { color: var(--rig-accent); }
+
+/* Le rappel : la piece ouverte est dans l'autre classeur ; un clic y ramene. */
+.rig-classeur__rappel {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px;
+  border: 0; border-radius: 8px; cursor: pointer; text-align: left;
+  background: color-mix(in srgb, var(--rig-or) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rig-or) 40%, transparent);
+  font: 11.5px/1.35 var(--rig-font); color: var(--rig-texte-2);
+}
+.rig-classeur__rappel:hover { box-shadow: inset 0 0 0 1px var(--rig-or); }
+.rig-classeur__rappel i { width: 7px; height: 7px; border-radius: 50%; background: var(--rig-or); flex: none; }
+.rig-classeur__rappel span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rig-classeur__rappel b { color: var(--rig-texte); }
+.rig-classeur__rappel em { font-style: normal; font-weight: 700; color: var(--rig-accent); white-space: nowrap; }
+
+/* Les pieces posees directement sous le domaine (Kbis a jour, Statuts signes...). */
+.rig-classeur__hors { border-radius: 9px; box-shadow: inset 0 0 0 1px var(--rig-bord-faible); padding: 2px 4px 4px; }
+.rig-classeur__hors-titre {
+  display: flex; align-items: baseline; gap: 8px; padding: 6px 8px 2px;
+  font-weight: 600; font-size: 13px; color: var(--rig-texte);
+}
+.rig-classeur__hors-titre span { font: 400 10px var(--rig-font-mono); color: var(--rig-texte-3); }
+
+/* Une piece : icone, nom (deux lignes au plus), pages, date, trois points.
+   --p : sa profondeur sous la rubrique (12 px par sous-dossier). */
+.rig-classeur .rig-arbre__ligne {
+  display: flex; align-items: center; gap: 7px; min-height: 26px;
+  padding: 3px 6px 3px calc(6px + var(--p, 0) * 12px);
+}
+.rig-classeur .rig-arbre__ligne .rig-arbre__texte {
+  flex: 1 1 auto; min-width: 0; white-space: normal; line-height: 1.3; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+}
+.rig-classeur .rig-arbre__saisie { flex: 1 1 auto; }
+.rig-classeur__pages {
+  font: 9.5px var(--rig-font-mono); padding: 1px 5px; border-radius: 4px;
+  background: var(--rig-fond-2); color: var(--rig-texte-3); flex: none;
+}
+.rig-classeur__date { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); flex: none; }
+
+/* Un sous-dossier, en intertitre dans sa carte. */
+.rig-classeur__it {
+  display: flex; align-items: center; gap: 6px; margin: 6px 0 1px; min-height: 22px;
+  padding: 0 6px 0 calc(6px + var(--p, 0) * 12px);
+  font: 500 12px/1.3 var(--rig-font); color: var(--rig-texte-2);
+}
+.rig-classeur__it .rig-arbre__texte { flex: 0 1 auto; min-width: 0; }
+.rig-classeur__it-icone { width: 13px; height: 13px; flex: none; color: var(--g, var(--rig-texte-3)); }
+.rig-classeur__it-n { font: 700 9.5px var(--rig-font-mono); color: var(--g, var(--rig-texte-3)); }
+.rig-classeur__it--chemin { font-weight: 700; color: var(--rig-texte); }
+.rig-classeur__it .rig-arbre__actions, .rig-classeur__tete .rig-arbre__actions { margin-left: auto; flex: none; }
+.rig-classeur__it:hover .rig-arbre__actions,
+.rig-classeur__tete:hover .rig-arbre__actions { opacity: 1; }
+.rig-classeur__vide {
+  padding: 4px 6px 4px calc(24px + var(--p, 0) * 12px);
+  font-size: 11px; color: var(--rig-texte-3);
+}
+
+/* La carte d'une rubrique. */
+.rig-classeur__carte {
+  border-radius: 9px; overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--rig-bord-faible), inset 0 3px 0 var(--g);
+}
+.rig-classeur__tete {
+  display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 5px 8px 4px 12px;
+  cursor: pointer;
+}
+.rig-classeur__tete:hover { background: var(--rig-fond-2); }
+.rig-classeur__tete .rig-arbre__texte { flex: 1 1 auto; min-width: 0; font-weight: 600; font-size: 13px; color: var(--rig-texte); }
+.rig-classeur__tete--chemin .rig-arbre__texte { font-weight: 700; }
+.rig-classeur__meta { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); flex: none; }
+.rig-classeur__carte--ouverte .rig-classeur__tete {
+  background: color-mix(in srgb, var(--g) 9%, transparent);
+  box-shadow: inset 0 -1px 0 var(--rig-bord-faible);
+}
+.rig-classeur__corps { padding: 4px 8px 8px 10px; }
+.rig-classeur__outils { display: flex; align-items: center; gap: 8px; margin: 4px 0 4px 2px; }
+.rig-classeur__periode {
+  flex: 1; min-width: 0; font: 10px var(--rig-font-mono); color: var(--rig-texte-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rig-classeur__tri { display: flex; gap: 2px; padding: 2px; border-radius: 999px; background: var(--rig-fond-2); flex: none; }
+.rig-classeur__tri button {
+  padding: 1px 8px; border: 0; border-radius: 999px; background: transparent; cursor: pointer;
+  font: 10.5px var(--rig-font); color: var(--rig-texte-3);
+}
+.rig-classeur__tri .rig-classeur__tri--on {
+  background: var(--rig-surface); color: var(--rig-texte); font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .1);
+}
+
+/* « Par date » : la frise, un trait vertical sous les points (jour 40 px +
+   ecart 8 px + demi-point 5 px = 53 px), l'annee en or, les decisions en or. */
+.rig-classeur__frise {
+  background-image: linear-gradient(var(--rig-bord), var(--rig-bord));
+  background-size: 2px 100%; background-position: 53px 0; background-repeat: no-repeat;
+  padding-bottom: 2px;
+}
+.rig-classeur__an { margin: 6px 0 2px; padding-left: 2px; font: 700 10px var(--rig-font-mono); letter-spacing: .12em; color: var(--rig-accent); }
+/* « sans date » est trop long pour la marge des annees : le trait le barrait (vu en
+   capture, 19/11/2026). Il s'aligne sur la colonne des noms, apres le trait. */
+.rig-classeur__an--sans { padding-left: 62px; letter-spacing: .06em; text-transform: uppercase; color: var(--rig-texte-3); }
+.rig-classeur .rig-classeur__ev { align-items: flex-start; gap: 8px; padding: 4px 6px 4px 0; }
+.rig-classeur .rig-classeur__ev:hover:not(.rig-arbre__ligne--actif) { background: transparent; }
+.rig-classeur__ev:hover .rig-arbre__texte { color: var(--rig-texte); }
+.rig-classeur__jour { width: 40px; flex: none; text-align: right; font: 10px/1.7 var(--rig-font-mono); color: var(--rig-texte-3); }
+.rig-classeur__point {
+  width: 10px; height: 10px; border-radius: 50%; flex: none; margin-top: 3px;
+  background: var(--rig-surface); box-shadow: inset 0 0 0 2px var(--g, var(--rig-texte-3));
+}
+.rig-classeur__ev--decision .rig-classeur__point {
+  background: var(--rig-or); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rig-or) 22%, transparent);
+}
+.rig-classeur__ev-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rig-classeur__ev-texte .rig-arbre__texte { font-weight: 500; font-size: 12px; }
+.rig-classeur__ev--decision .rig-arbre__texte { font-weight: 700; color: var(--rig-texte); }
+.rig-classeur__ev-texte em {
+  font-style: normal; font-size: 10px; color: var(--rig-texte-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* ---- Les entetes de cartes : un seul langage ----
    Chaque carte (donnees, etapes, document) ouvre sur le meme surtitre que

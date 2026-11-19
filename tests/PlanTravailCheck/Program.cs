@@ -211,15 +211,18 @@ internal static class Programme
         var rapport = histo.FirstOrDefault(p => p.Libelle == "Rapport d expertise");
         Exiger(rapport is { Judiciaire: true, Rubrique: "Mesures d instruction", Date: "03/03/2023", Pages: 42 },
             "une piece judiciaire porte sa rubrique, sa date et son nombre de pages");
-        Agir("arbreActiver", Ligne(d.Arbre, "Judiciaire")!.Id);
-        Exiger(Ligne(plan.Vue().Dossier!.Arbre, "Rapport d expertise") is null,
-            "la branche Judiciaire repliee cache le rapport dans l'arbre");
+        // CLASSEUR (/draft du 19/11/2026, « Chronologie ») : l'affaire s'ouvre sur ses
+        // cartes FERMEES hors de l'element choisi (« Informations du dossier », cote RCS) ;
+        // la carte Instances l'est donc, et le rapport qu'elle range n'est pas rendu.
+        Exiger(Ligne(d.Arbre, "Instances") is { Ouvert: false } && Ligne(d.Arbre, "Rapport d expertise") is null,
+            "le classeur s'ouvre cartes fermees hors de l'element choisi : le rapport n'est pas rendu");
         Agir("historiqueOuvrir", rapport!.Id);
         vue = plan.Vue();
         Exiger(vue.Dossier!.Apercu?.Apercu is { Libelle: "Rapport d expertise" }
                && Ligne(vue.Dossier.Arbre, "Rapport d expertise") is { Actif: true }
+               && Ligne(vue.Dossier.Arbre, "Instances") is { Ouvert: true }
                && vue.Dossier.Historique.Single(p => p.Actif).Libelle == "Rapport d expertise",
-            "un clic dans l'historique ouvre la piece a droite et la montre choisie dans l'arbre, branche depliee");
+            "un clic dans l'historique ouvre la piece a droite et la montre choisie, sa carte ouverte");
         // L'affaire rouverte repart de son etat d'entree (et d'un arbre neuf).
         Agir("ouvrirNumero", "004176");
         d = plan.Vue().Dossier;
@@ -236,9 +239,38 @@ internal static class Programme
         Exiger(Ligne(d!.Arbre, "Dossier RCS") is { Groupe: 0 } && Ligne(d.Arbre, "Kbis a jour") is { Groupe: 0 }
                && Ligne(d.Arbre, "Judiciaire") is { Groupe: 0 },
             "les domaines et les pieces posees a meme le domaine n'ont pas de lisere");
+        // --- Le CLASSEUR (proposition 5 « Chronologie ») : au plus une carte ouverte par
+        // domaine, qui rend TOUT ce qu'elle range ; la date, les pages, la derniere date.
+        Exiger(Lignes(d.Arbre).Where(l => l.Groupe > 0 && l.Niveau == l.NiveauGroupe).All(l => !l.Ouvert)
+               && Ligne(d.Arbre, "Dossier RCS") is { Ouvert: true } && Ligne(d.Arbre, "Judiciaire") is { Ouvert: true },
+            "a l'ouverture, les deux domaines sont rendus et aucune carte n'est ouverte (l'element choisi est hors rubrique)");
+        Exiger(Ligne(d.Arbre, "Instances") is { Ouvert: false, Compte: 7, Derniere: "11/07/2023", Enfants.Length: 0 }
+               && Ligne(d.Arbre, "Depots d'actes") is { Derniere: "15/10/2024" },
+            "une carte fermee annonce son nombre de pieces et la date de la plus recente, sans rien rendre dessous");
+        Agir("arbreRubrique", Ligne(d.Arbre, "Depots d'actes")!.Id);
+        Agir("arbreRubrique", Ligne(plan.Vue().Dossier!.Arbre, "Instances")!.Id);
+        d = plan.Vue().Dossier;
+        Exiger(Ligne(d!.Arbre, "Depots d'actes") is { Ouvert: true } && Ligne(d.Arbre, "Instances") is { Ouvert: true }
+               && Ligne(d.Arbre, "Bail commercial") is { Date: "12/03/2024", Pages: 9 }
+               && Ligne(d.Arbre, "Rapport d expertise") is { Date: "03/03/2023", Pages: 42 },
+            "une carte ouverte rend tout ce qu'elle range, sous-dossiers compris ; chaque piece porte sa date et ses pages");
         Exiger(Ligne(d.Arbre, "Bail commercial") is { Groupe: 2, NiveauGroupe: 2, Niveau: 4 }
                && Ligne(d.Arbre, "Rapport d expertise") is { Groupe: 6, NiveauGroupe: 2 },
             "tout ce qu'une rubrique range, a toute profondeur, porte sa teinte et le niveau de sa tete");
+        Agir("arbreRubrique", Ligne(d.Arbre, "Pieces jointes")!.Id);
+        d = plan.Vue().Dossier;
+        Exiger(Ligne(d!.Arbre, "Pieces jointes") is { Ouvert: true } && Ligne(d.Arbre, "Depots d'actes") is { Ouvert: false }
+               && Ligne(d.Arbre, "Instances") is { Ouvert: true },
+            "ouvrir une carte referme les autres de SON domaine, pas celles de l'autre classeur");
+        Agir("arbreRubrique", Ligne(d.Arbre, "Pieces jointes")!.Id);
+        Exiger(Ligne(plan.Vue().Dossier!.Arbre, "Pieces jointes") is { Ouvert: false },
+            "un second clic referme la carte");
+        Agir("arbreRubrique", Ligne(plan.Vue().Dossier!.Arbre, "Formalites")!.Id);
+        Exiger(Lignes(plan.Vue().Dossier!.Arbre).Single(l => l.Actif).Texte == "Informations des Formalites",
+            "la carte Formalites, qui commence par sa fiche, l'ouvre au milieu (comme son depliage dans l'arbre)");
+        // La suite part de l'etat d'entree de l'affaire (la fiche Formalites a change la mise en page).
+        Agir("ouvrirNumero", "004176");
+        d = plan.Vue().Dossier;
         Exiger(d.Historique.Single(p => p.Libelle == "Rapport d expertise").Groupe == 6
                && d.Historique.Single(p => p.Libelle == "Kbis a jour").Groupe == 0,
             "dans l'historique, le point d'une piece prend la teinte de sa rubrique dans l'arbre");

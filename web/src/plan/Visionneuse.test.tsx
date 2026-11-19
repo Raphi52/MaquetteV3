@@ -208,11 +208,12 @@ describe('Visionneuse : les colonnes', () => {
     expect(gestes()).toEqual([['filtre', 'Kb'], ['effacerFiltre', null]])
   })
 
-  it('l\'arbre est rendu sous .rig-arbre et ses gestes partent au plan de travail', () => {
+  it('le classeur est rendu sous .rig-arbre et ses gestes partent au plan de travail', () => {
     const { container, gestes } = rendre()
+    // Le classeur ne montre plus la ligne racine (l'affaire, deja dans l'entete) : la piece seule.
     const lignes = container.querySelectorAll('.rig-arbre .rig-arbre__ligne')
-    expect(lignes.length).toBeGreaterThanOrEqual(2)
-    fireEvent.click(lignes[1]!)
+    expect([...lignes].map((l) => l.textContent!.trim())).toEqual(['Statuts signes⋮'])
+    fireEvent.click(lignes[0]!)
     expect(gestes()[0]).toEqual(['arbreActiver', 'n2'])
   })
 })

@@ -1,4 +1,5 @@
-﻿using RigV3Desktop;
+﻿using System.Text.RegularExpressions;
+using RigV3Desktop;
 
 // Banc de controle du MODE TACHE vu depuis l'arbre (demande du 17/09/2026,
 // affinements A/B/D/E/F). La preuve tenue ici est la PRESENCE DE LA PIECE
@@ -19,10 +20,10 @@ var vue = File.ReadAllText(Path.Combine(racineSrc, "Pont/PlanTravail.cs"))
           + File.ReadAllText(Path.Combine(racineSrc, "Pont/PlanTravailVue.cs"));
 var tacheTsx = File.ReadAllText(Path.Combine(racineSrc, "web/src/plan/Tache.tsx"));
 var visionneuseTsx = File.ReadAllText(Path.Combine(racineSrc, "web/src/plan/Visionneuse.tsx"));
-// PORTE EN REACT (lot 6, 19/11/2026) : Components/ArbreGedNoeud.razor n'est plus
-// qu'une coquille ; la ligne se dessine dans web/src/composants/ArbreGedNoeud.tsx
+// PORTE EN REACT (lot 6, 19/11/2026) puis CLASSEUR (/draft « Chronologie », meme jour) :
+// l'arbre se dessine dans web/src/composants/ClasseurArbre.tsx (ArbreGedNoeud.tsx retire)
 // et le chemin se calcule dans Pont/ArbreGedNoeud.cs, EXECUTE ci-dessous.
-var noeudVue = File.ReadAllText(Path.Combine(racineSrc, "web/src/composants/ArbreGedNoeud.tsx"));
+var noeudVue = File.ReadAllText(Path.Combine(racineSrc, "web/src/composants/ClasseurArbre.tsx"));
 var css = File.ReadAllText(Path.Combine(racineSrc, "wwwroot/rig-accueil.css"));
 
 var deno = RecettesTaches.Deno;
@@ -102,7 +103,9 @@ Exiger(posArbre > 0 && posEffets > posArbre && tacheTsx.Contains("className=\"ri
 Exiger(css.Contains("rig-tache__effets"), "D : le bloc des effets a son ancrage en pied de colonne");
 
 // --- B. Chemin or : le noeud courant et ses parents
-Exiger(noeudVue.Contains("ligne.chemin ? 'rig-arbre__ligne--chemin'"),
+// Dans le classeur, un parent est un intertitre (sous-dossier) ou l'en-tete d'une carte (rubrique).
+Exiger(noeudVue.Contains("(l.chemin ? ' rig-classeur__it--chemin' : '')")
+       && noeudVue.Contains("(r.chemin ? ' rig-classeur__tete--chemin' : '')"),
     "B : la ligne d'un parent du noeud courant porte la marque du chemin");
 // Le chemin calcule par le pont, sur l'arbre de la tache DENO : la piece gardee
 // est active, chacun de ses parents porte la marque, et elle seule.
@@ -124,7 +127,12 @@ Exiger(!Lignes(vueTache).Any(l => l.Texte.Contains("Piece d'identite du presiden
                                                     new Dictionary<string, NoeudGed>()))
               .Any(l => l.Texte.Contains("Piece d'identite du president", StringComparison.OrdinalIgnoreCase)),
     "A : l'arbre RENDU par le pont replie la piece non nommee, et la rend sans recette (execute)");
-Exiger(css.Contains("rig-arbre__ligne--chemin"), "B : le filet or du chemin existe dans la charte");
+// Le classeur marque le chemin en GRAS (intertitre, en-tete de carte) ; la piece
+// choisie garde son filet or (.rig-arbre__ligne--actif).
+Exiger(Regex.IsMatch(css, @"\.rig-classeur__it--chemin \{[^}]*font-weight: 700")
+       && Regex.IsMatch(css, @"\.rig-classeur__tete--chemin \.rig-arbre__texte \{[^}]*font-weight: 700")
+       && Regex.IsMatch(css, @"\.rig-arbre__ligne--actif \{[^}]*var\(--rig-or"),
+    "B : la marque du chemin existe dans la charte (parents en gras, piece choisie en or)");
 
 Console.WriteLine();
 Console.WriteLine(echecs.Count == 0

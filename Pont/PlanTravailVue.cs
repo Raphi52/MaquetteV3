@@ -345,7 +345,7 @@ public sealed partial class SessionPlanTravail
 
         var index = new Dictionary<string, NoeudGed>(StringComparer.Ordinal);
         var groupes = GroupesArbre();
-        var arbre = ArbreGedNoeud.Vue(Arbre, 0, NoeudsOuverts, NoeudSelectionne, Domaines, AjoutsArbre,
+        var arbre = ArbreGedNoeud.Vue(Arbre, 0, OuvertsDuClasseur(), NoeudSelectionne, Domaines, AjoutsArbre,
                                       MasquesArbre, LibellesArbre, RecetteArbre, NoeudRenomme,
                                       FiltreDeLArbre, index, groupes: groupes);
         var historique = VueHistorique(index, groupes);
@@ -444,6 +444,9 @@ public sealed partial class SessionPlanTravail
         }
         if (!Chercher(Arbre)) return;
         foreach (var dossier in chemin) NoeudsOuverts.Add(dossier);
+        // Classeur : la rubrique de la piece s'ouvre seule dans son domaine
+        // (chemin = racine, domaine, rubrique, sous-dossiers...).
+        if (chemin.Count >= 3) FermerLesAutresRubriques(chemin[2]);
         OuvrirApercu(piece);
     }
 
@@ -723,6 +726,9 @@ public sealed partial class SessionPlanTravail
                     ArbreGedNoeud.Activer(active, NoeudsOuverts, Domaines, AjoutsArbre, MasquesArbre, RecetteArbre);
                     OuvrirApercu(active);
                 }
+                break;
+            case "arbreRubrique":
+                if (NoeudDe(Texte(valeur)) is { EstPiece: false, EstFiche: false } rubrique) BasculerRubrique(rubrique);
                 break;
             case "historiqueOuvrir":
                 if (NoeudDe(Texte(valeur)) is { EstPiece: true } piece) OuvrirDepuisHistorique(piece);

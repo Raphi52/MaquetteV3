@@ -1200,6 +1200,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         NoeudsOuverts.Add(Arbre);
         foreach (var n in suite) NoeudsOuverts.Add(n);
         OuvrirApercu(suite[^1]);
+        UneRubriqueParDomaine();
     }
 
     // ================= Visionneuse =================
@@ -1436,6 +1437,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             ApercuMessage = "";
             GuideVisible = true;
         }
+        // Le classeur s'ouvre sur UNE carte au plus par domaine : celle de l'element choisi.
+        UneRubriqueParDomaine();
     }
 
     private void FermerDossier()

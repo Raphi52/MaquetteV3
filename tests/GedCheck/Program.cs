@@ -36,7 +36,10 @@ var balisage = string.Join(Environment.NewLine,
              .Where(f => !f.EndsWith(".test.tsx")).OrderBy(f => f).Select(File.ReadAllText));
 var vue = codePlan + Environment.NewLine + balisage;
 var arbreModele = Path.Combine(racine, "Metier/ArbreGed.cs");
-var noeud = Path.Combine(racine, "web/src/composants/ArbreGedNoeud.tsx");
+// Depuis le 19/11/2026, l'arbre se rend en CLASSEUR (/draft « Chronologie », conv-2009) :
+// web/src/composants/ClasseurArbre.tsx remplace ArbreGedNoeud.tsx (retire). Les regles
+// qui suivent se lisent dans le nouveau composant ; leur intention ne change pas.
+var noeud = Path.Combine(racine, "web/src/composants/ClasseurArbre.tsx");
 // PORTE EN REACT (lot 6, 19/11/2026) : ArbreGedNoeud, IconeGed, DocumentDetacheVue
 // et FicheInformationsDossier ne sont plus que des COQUILLES. Leur balisage se lit
 // dans web/src/composants/<Nom>.tsx, leurs regles dans Pont/<Nom>.cs ; chaque regle
@@ -51,7 +54,7 @@ string LireSource(string relatif)
     var chemin = Path.Combine(racine, relatif);
     return File.Exists(chemin) ? File.ReadAllText(chemin) : string.Empty;
 }
-var tsxArbre = LireSource("web/src/composants/ArbreGedNoeud.tsx");
+var tsxArbre = LireSource("web/src/composants/ClasseurArbre.tsx");
 var pontArbre = LireSource("Pont/ArbreGedNoeud.cs");
 var tsxFiche = LireSource("web/src/composants/FicheInformationsDossier.tsx");
 var pontFiche = LireSource("Pont/FicheInformationsDossier.cs");
@@ -88,27 +91,29 @@ Exiger(Regex.IsMatch(modele, @"Judiciaire.*Ordonnances.*Demandeur", RegexOptions
     "Judiciaire contient Ordonnances qui contient Demandeur (profondeur >= 3)");
 
 // --- 3. L'arbre se rend par un composant RECURSIF, avec ses colonnes v2.
-Exiger(File.Exists(noeud) && !File.Exists(Path.Combine(racine, "Components/ArbreGedNoeud.razor")),
-    "web/src/composants/ArbreGedNoeud.tsx existe (plus de coquille .razor)");
-Exiger(balisage.Contains("<ArbreGedNoeud ligne={d.arbre}"),
-    "la visionneuse du plan de travail monte l'arbre React, depuis sa racine");
-var rendu = tsxArbre + Environment.NewLine + pontArbre;
-Exiger(Regex.IsMatch(tsxArbre, @"export function ArbreGedNoeud[\s\S]*?<ArbreGedNoeud key=\{enfant\.id\}"),
-    "ArbreGedNoeud.tsx s'appelle lui-meme (recursion)");
+Exiger(File.Exists(noeud) && !File.Exists(Path.Combine(racine, "Components/ArbreGedNoeud.razor"))
+       && !File.Exists(Path.Combine(racine, "web/src/composants/ArbreGedNoeud.tsx")),
+    "web/src/composants/ClasseurArbre.tsx existe (plus de coquille .razor, plus d'ancien arbre en retrait)");
+Exiger(balisage.Contains("<ClasseurArbre arbre={d.arbre}"),
+    "la visionneuse du plan de travail monte le classeur React, depuis la racine de l'arbre");
+// La profondeur (Judiciaire > Ordonnances > Demandeur > piece) se rend sans plafond :
+// le contenu d'une carte s'appelle lui-meme pour chaque sous-dossier.
+Exiger(Regex.IsMatch(tsxArbre, @"function Contenu\([\s\S]*?<Contenu key=\{l\.id \+ ':c'\}"),
+    "ClasseurArbre.tsx rend les sous-dossiers par un composant qui s'appelle lui-meme (recursion)");
 // Renomme le 2026-09-14 (demande Leslie) : l entete de l arbre annonce
 // desormais la vue entiere, pas seulement sa colonne.
 foreach (var colonne in new[] { "Visualisation du dossier" })
 {
     Exiger(vue.Contains(colonne), $"l'entete de l'arbre porte la colonne « {colonne} »");
 }
-// Demande du 10/09/2026 : la colonne « Nb pages » de v2 est RETIREE de
-// l'arbre (le nombre de pages reste dans l'apercu de la piece).
-Exiger(!vue.Contains("Nb pages") && !rendu.Contains("rig-arbre__pages"),
-    "la colonne « Nb pages » n'est plus dans l'arbre");
-// Demande du 10/09/2026 : la colonne « Date » saute aussi ; la date de
-// depot reste dans l'apercu de la piece, a droite de l'arbre.
-Exiger(!rendu.Contains("rig-arbre__date"),
-    "la colonne « Date » n'est plus dans l'arbre");
+// Demande du 10/09/2026 : les colonnes « Nb pages » et « Date » de v2 avaient ete
+// RETIREES de l'arbre. REVUE le 19/11/2026 : l'utilisateur a choisi le classeur
+// « Chronologie » (/draft, conv-2009), qui range les pieces PAR DATE et montre leurs
+// pages. Ce ne sont plus des colonnes de tableau, et ces valeurs viennent du metier.
+Exiger(!vue.Contains("Nb pages")
+       && pontArbre.Contains("Date: noeud.EstPiece ? noeud.Date") && pontArbre.Contains("Pages: noeud.EstPiece ? noeud.Pages")
+       && tsxArbre.Contains("rig-classeur__date") && tsxArbre.Contains("rig-classeur__pages"),
+    "la date et les pages d'une piece viennent du metier et s'affichent sur sa ligne, pas en colonne « Nb pages »");
 
 // --- 4. Le tableau des editions, colonnes de TreeviewEditions.cs (v2).
 // Le bouton d acces a quitte la visionneuse (barre du haut retiree le 15/09/2026) ;
@@ -448,7 +453,9 @@ foreach (var interdit in new[] { "Signalements de divergences BE", "Divers",
 
 Exiger(codePlan.Contains("private string[] Domaines => Accueil.Domaines;")
        && pontArbre.Contains("AccesGed.EnfantsVisibles(n, domaines, ajouts, masques, recette)")
-       && codePlan.Contains("ArbreGedNoeud.Vue(Arbre, 0, NoeudsOuverts, NoeudSelectionne, Domaines,"),
+       // Les branches rendues sont celles du classeur (OuvertsDuClasseur, 19/11/2026) ;
+       // les domaines du login, eux, passent toujours.
+       && codePlan.Contains("ArbreGedNoeud.Vue(Arbre, 0, OuvertsDuClasseur(), NoeudSelectionne, Domaines,"),
     "l'arbre rendu recoit les domaines du login courant");
 // Le rond de profil est rendu par React depuis le lot 1 du passage a React
 // (19/11/2026) : la liste des comptes et le changement de login vivent dans la
@@ -516,7 +523,7 @@ var arbreVue = tsxArbre;
 // bouton « trois points » a droite de la ligne (meme geste que la liste des
 // conversations d'Autowin OS). Le clic droit ne doit plus etre le seul acces.
 Exiger(arbreVue.Contains("rig-arbre__actions")
-       && !(arbreVue + Regex.Match(balisage, @"<ArbreGedNoeud ligne=\{d\.arbre\}[\s\S]*?/>").Value).Contains("oncontextmenu", StringComparison.OrdinalIgnoreCase)
+       && !(arbreVue + Regex.Match(balisage, @"<ClasseurArbre arbre=\{d\.arbre\}[\s\S]*?/>").Value).Contains("oncontextmenu", StringComparison.OrdinalIgnoreCase)
        && arbreVue.Contains("e.stopPropagation(); menuContextuel(")
        && vue.Contains("rig-ctx__item")
        && vue.Contains("SupprimerNoeud") && vue.Contains("DemarrerRenommage"),

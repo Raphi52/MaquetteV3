@@ -3,7 +3,7 @@
 // Valeurs reprises du parcours joue sur l'appli (affaire 004176, etapes du
 // dossier RCS) : les tests lisent le balisage rendu, pas les regles.
 
-import type { LigneArbreVue } from '../composants/ArbreGedNoeud'
+import type { LigneArbreVue } from '../composants/ClasseurArbre'
 import type {
   ApercuVue, DossierVue, EtapesVue, PageEtapeVue, PaletteVue, PieceHistoriqueVue, ProcVue, TacheVue, VueApplication,
 } from '../plan/types'
@@ -24,7 +24,7 @@ export function ligneArbre(id: string, texte: string, enfants: LigneArbreVue[] =
   return {
     id, niveau, texte, icone: enfants.length ? 'dossier' : 'pdf', actif: false, chemin: false,
     depliable: enfants.length > 0, ouvert: enfants.length > 0, renomme: false, compte: null, enfants, vide: false,
-    groupe: 0, niveauGroupe: 0,
+    groupe: 0, niveauGroupe: 0, date: '', pages: 0, derniere: '',
   }
 }
 

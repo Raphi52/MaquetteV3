@@ -10,7 +10,7 @@
 
 import { useEffect, useRef } from 'react'
 import type { CSSProperties, MutableRefObject } from 'react'
-import { ArbreGedNoeud } from '../composants/ArbreGedNoeud'
+import { ClasseurArbre } from '../composants/ClasseurArbre'
 import { FicheInformationsDossier } from '../composants/FicheInformationsDossier'
 import { Saisie } from '../session'
 import { Apercu } from './Apercu'
@@ -167,9 +167,12 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
                       onClick={() => plan('effacerFiltre')}>{'×'}</button>
             )}
           </div>{' '}
+          {/* LE CLASSEUR (/draft du 19/11/2026, « Chronologie ») : une bascule par
+              domaine, une carte par rubrique, la piece ouverte rappelee. */}
           <div className="rig-arbre">
-            <ArbreGedNoeud ligne={d.arbre}
+            <ClasseurArbre arbre={d.arbre} chemin={d.chemin} filtre={d.filtre}
                            activer={(id) => plan('arbreActiver', id)}
+                           rubrique={(id) => plan('arbreRubrique', id)}
                            renommer={(r) => plan('arbreRenommer', r)}
                            menuContextuel={(souris) => plan('arbreMenu', souris)} />
           </div>
