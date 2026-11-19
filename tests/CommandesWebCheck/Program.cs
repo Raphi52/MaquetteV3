@@ -463,6 +463,67 @@ Exiger(vue.Coordonnees is { } co1 && co1.Alertes.Any(a => a.StartsWith("Ligne de
 Geste("FermerCoordonnees");
 Exiger(vue.Coordonnees is null, "joue : « Fermer » referme les coordonnees");
 
+// ---- L'ESCALIER (/draft du 19/11/2026, conv-1993, direction « Escalier ») : trois
+// marches (dossier, choix, edition) qui sont les morceaux de la regle qui ferme
+// Valider. Une session NEUVE : le jeu d'exemple tel qu'a l'ouverture.
+EcranCommandesWeb.Fermer(vue.Session);
+vue = EcranCommandesWeb.Ouvrir();
+// a) Pour chaque commande de la liste : le compte affiche AVANT de l'ouvrir est celui
+//    de son escalier A L'OUVERTURE, et Valider se ferme sur le manque de la premiere
+//    marche non faite, mot pour mot (une seule regle, pas deux qui divergent).
+foreach (var ligne in vue.Lignes.ToList())
+{
+    var avant = ligne.Avancement;
+    Geste("Choisir", ligne.Id);
+    var pe = vue.Panneau!;
+    var faites = pe.Etapes.Count(e => e.Faite);
+    var manque = pe.Etapes.FirstOrDefault(e => !e.Faite)?.Manque;
+    Exiger(pe.Etapes.Length == 3 && avant == $"{faites}/3" && ligne.Prete == (faites == 3)
+           && pe.Etapes.All(e => e.Faite == (e.Manque is null))
+           && pe.Pied!.Blocage == manque && pe.Pied.Avancement == (manque is null ? "" : $"{faites} / 3"),
+        $"escalier : {ligne.Nom} n° {ligne.Id} — liste « {avant} », marches {faites}/3, Valider fermé sur « {pe.Pied?.Blocage} »");
+}
+// b) SCI DU PARC (etat d'endettement, IG-90812) : le debiteur manque, types et edition sont prets.
+Geste("Choisir", 5);
+Exiger(vue.Panneau!.Etapes.Select(e => $"{e.Nom}|{e.Faite}|{e.Resume}").SequenceEqual(new[]
+       {
+           "Débiteur|False|", "Types d'inscription commandés|True|NP, Z · Qté 1", "Édition|True|Édition : 2 document(s)",
+       })
+       && vue.Panneau.Etapes[0].Manque == "Retenez le débiteur dans le rapprochement pour rattacher la commande."
+       && vue.Lignes.Single(l => l.Id == 5).Avancement == "2/3" && !vue.Panneau.ChoixDeplie,
+    "escalier : SCI DU PARC — Débiteur à faire, Types « NP, Z · Qté 1 » et Édition prêts, liste « 2/3 » (lu : "
+    + string.Join(" ; ", vue.Panneau.Etapes.Select(e => $"{e.Nom}|{e.Faite}|{e.Resume}")) + ")");
+// c) Une marche faite se replie ; « Modifier » la rouvre, et choisir une commande la replie.
+Geste("Basculer", "ChoixDeplie");
+Exiger(vue.Panneau!.ChoixDeplie, "escalier : « Modifier » rouvre la marche des types");
+// d) Decocher tous les types : la marche du choix ET l'edition tombent, avec le motif de toujours.
+Geste("CocherTous", false);
+Exiger(vue.Panneau!.Etapes.Select(e => e.Faite).SequenceEqual(new[] { false, false, false })
+       && vue.Panneau.Pied!.Blocage == "Retenez le débiteur dans le rapprochement pour rattacher la commande."
+       && vue.Panneau.Etapes[1].Manque == "Cochez au moins un type d'inscription, avec une quantité."
+       && vue.Lignes.Single(l => l.Id == 5).Avancement == "0/3",
+    "escalier : sans type coché, Types et Édition passent à faire, et la liste le suit (« 0/3 »)");
+Geste("CocherTous", true);
+// e) Types coches mais quantite a zero : le choix est fait, il n'y a rien a editer.
+Geste("Compteur", new { cible = "QuantiteInscriptions", sens = "valeur" });
+Exiger(vue.Panneau!.Etapes.Select(e => e.Faite).SequenceEqual(new[] { false, true, false })
+       && vue.Panneau.Etapes[2].Manque == "Cochez au moins un type d'inscription, avec une quantité.",
+    "escalier : quantité à zéro — Types reste fait, l'Édition manque");
+Geste("Compteur", new { cible = "QuantiteInscriptions", sens = "valeur" });
+// f) Retenir le seul dossier trouve : les trois marches sont faites, Valider s'ouvre.
+Geste("Retenir", vue.Panneau!.Rapprochement!.Entites.Single().Cle);
+Exiger(vue.Panneau!.Etapes.All(e => e.Faite) && vue.Panneau.Etapes[0].Resume == "SCI DU PARC"
+       && vue.Panneau.Pied!.Blocage is null && vue.Panneau.Pied.Avancement == ""
+       && vue.Lignes.Single(l => l.Id == 5) is { Avancement: "3/3", Prete: true },
+    "escalier : débiteur retenu — 3/3, Valider ouvert, la ligne passe « prête »");
+Geste("Choisir", 6);
+Exiger(!vue.Panneau!.ChoixDeplie && vue.Lignes.Single(l => l.Id == 5).Avancement == "3/3",
+    "escalier : une autre commande s'ouvre repliée ; SCI DU PARC garde son dossier retenu dans la liste");
+// g) Une commande traitee n'a ni marches ni compte.
+Geste("ChoisirOnglet", "Validee");
+Exiger(vue.Lignes.Length > 0 && vue.Lignes.All(l => l.Avancement is null && !l.Prete),
+    "escalier : une commande traitée n'affiche aucun compte");
+
 var gesteInconnu = false;
 try { Geste("GesteQuiNExistePas"); }
 catch (ArgumentException) { gesteInconnu = true; }

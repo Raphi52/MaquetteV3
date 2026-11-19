@@ -17,8 +17,13 @@ public sealed record MessageCw(string Texte, string Severite);
 public sealed record RechercheCw(string Famille, OptionCw[] Familles, string Du, string Au, string Siren,
                                  string Reference, bool EnAttenteEnvoi, string DateTravail);
 
-/// <summary>Une ligne de la liste a plat ; <c>Id</c> revient avec le clic.</summary>
-public sealed record LigneCw(int Id, int Rang, bool Active, string Nom, string Precisions, string Type, bool Direct);
+/// <summary>
+/// Une ligne de la liste a plat ; <c>Id</c> revient avec le clic. <c>Avancement</c> :
+/// les marches faites de son escalier (« 2/3 »), nul pour une commande traitee ou
+/// en saisie ; <c>Prete</c> quand les trois le sont.
+/// </summary>
+public sealed record LigneCw(int Id, int Rang, bool Active, string Nom, string Precisions, string Type, bool Direct,
+                             string? Avancement, bool Prete);
 
 public sealed record EtatCw(string Icone, string Libelle);
 public sealed record MembreCw(int Id, string Titre, string Icone, string Libelle);
@@ -52,14 +57,27 @@ public sealed record CertificatCw(string Valeur, string Libelle, int Quantite, b
 public sealed record CertificatsCw(string DateTravail, CertificatCw[] Lignes, bool BasculeFaillite, bool CertificatDeFaillite);
 
 public sealed record BandeCw(bool Rejet, string MotifSaisi, bool ConfirmerRefuse, int LongueurMax);
+/// <summary>Le pied ; <c>Avancement</c> (« 2 / 3 ») s'ecrit dans Valider tant qu'il est ferme, vide sinon.</summary>
 public sealed record PiedCw(BandeCw? Bande, string Barre, DocumentCw[] Documents, bool EnvoiMail, string AdresseMail,
-                            bool AttenteRefusee, string? Blocage);
+                            bool AttenteRefusee, string? Blocage, string Avancement);
 
-/// <summary>La commande ouverte en panneau.</summary>
+/// <summary>
+/// Une marche de l'escalier (direction « Escalier », /draft du 19/11/2026, conv-1993) :
+/// son nom, faite ou non, son resume d'une ligne quand elle est faite, et sinon ce
+/// qui manque — le motif meme qui ferme Valider.
+/// </summary>
+public sealed record EtapeCw(string Nom, bool Faite, string Resume, string? Manque);
+
+/// <summary>
+/// La commande ouverte en panneau. <c>Etapes</c> : les trois marches (dossier, choix,
+/// edition), vide pour une commande traitee ou en saisie ; <c>ChoixDeplie</c> : la
+/// marche du choix, faite, a ete rouverte par « Modifier ».
+/// </summary>
 public sealed record PanneauCw(int Id, string Titre, int Rang, string Type, EtatCw? Etat, string Nom, string Reference,
                                EnveloppeCw? Enveloppe, SaisieCw? Saisie, ChampCw[] DonneesRecues, TraiteeCw? Traitee,
                                string? MotifAttente, RapprochementCw? Rapprochement, TypesCw? Types,
-                               NonOppositionCw? NonOpposition, CertificatsCw? Certificats, PiedCw? Pied);
+                               NonOppositionCw? NonOpposition, CertificatsCw? Certificats, PiedCw? Pied,
+                               EtapeCw[] Etapes, bool ChoixDeplie);
 
 public sealed record ChampAdresseCw(string Cle, string Libelle, bool Large, string Valeur);
 public sealed record CoordonneesCw(bool LectureSeule, ChampAdresseCw[] Champs, string[] Lignes, string[] Alertes,
@@ -72,7 +90,8 @@ public sealed record VueCommandesWeb(string Session, OngletCw[] Onglets, bool Re
 
 /// <summary>
 /// Pont de l'ecran PROC_COMMANDES_WEB (web/src/ecrans/EcranCommandesWeb.tsx) :
-/// « Traitement des commandes » de NeoRIG, mise en page « Boite de tri » (conv-1984).
+/// « Traitement des commandes » de NeoRIG, mise en page « Boite de tri » (conv-1984),
+/// commande en « Escalier » (conv-1993) : <see cref="SessionCommandesWeb"/> calcule ses marches.
 ///
 /// ECRAN A SESSION (web/src/session.tsx) : les commandes de l'ecran sont des
 /// CommandeRecue que Metier/TraitementCommandes.cs modifie lui-meme (Appliquer,
@@ -148,10 +167,45 @@ public sealed class SessionCommandesWeb
     private bool CertificatDOpposition;
     private readonly Dictionary<CertificatFaillite, int> Certificats = new();
     private bool CertificatDeFaillite;
+    // La marche du choix (types, certificats), faite, se replie en une ligne ;
+    // « Modifier » la rouvre. Chaque commande choisie repart repliee.
+    private bool ChoixDeplie;
     private bool EnvoiMail;
     private string AdresseMail = string.Empty;
     private ActionCommande? BandeOuverte;
     private string MotifSaisi = string.Empty;
+
+    /// <summary>
+    /// Ce que l'agent a choisi pour une commande : les champs ci-dessus, ensemble.
+    /// L'escalier d'une commande de la liste qui n'est PAS ouverte se calcule sur
+    /// <see cref="ParDefaut"/> — ce que <see cref="Choisir"/> poserait en l'ouvrant :
+    /// le compte « 2/3 » de la liste est donc celui de l'escalier a l'ouverture.
+    /// </summary>
+    private sealed record ChoixCommande(IReadOnlySet<string> TypesCoches, int QuantiteInscriptions,
+                                        IReadOnlySet<SousTypeCno> SousTypes, int QuantiteCno, bool CertificatDOpposition,
+                                        IReadOnlyDictionary<CertificatFaillite, int> Certificats, bool CertificatDeFaillite)
+    {
+        /// <summary>Les types recus pre-coches, une de chaque, le sous-type recu, la non-faillite pour une commande de faillite.</summary>
+        public static ChoixCommande ParDefaut(CommandeRecue c)
+        {
+            var types = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var k in TraitementCommandes.CasesCommandees(c))
+                foreach (var code in k.EstRegroupement ? k.Enfants.Select(e => e.Code) : [k.Code])
+                    types.Add(code);
+            var sousTypes = new HashSet<SousTypeCno>();
+            if (c.SousType is { } st && st != SousTypeCno.InjonctionDePayer) sousTypes.Add(st);
+            var certificats = new Dictionary<CertificatFaillite, int>
+            {
+                [CertificatFaillite.NonFaillite] = c.Famille == FamilleCommande.Faillite ? 1 : 0,
+                [CertificatFaillite.NonRcs] = 0,
+                [CertificatFaillite.NonRsac] = 0,
+            };
+            return new(types, 1, sousTypes, 1, false, certificats, false);
+        }
+    }
+
+    private ChoixCommande ChoixEnCours => new(TypesCoches, QuantiteInscriptions, SousTypes, QuantiteCno,
+                                              CertificatDOpposition, Certificats, CertificatDeFaillite);
 
     // ------------------------------------------------------------ coordonnees
     private bool CoordonneesOuvertes;
@@ -251,22 +305,20 @@ public sealed class SessionCommandesWeb
         TousEtablissements = false;
         Resultat = TraitementCommandes.RechercherPour(c);
 
+        var choix = ChoixCommande.ParDefaut(c);
         TypesCoches.Clear();
-        foreach (var k in TraitementCommandes.CasesCommandees(c))
-            foreach (var code in k.EstRegroupement ? k.Enfants.Select(e => e.Code) : [k.Code])
-                TypesCoches.Add(code);
-        QuantiteInscriptions = 1;
+        TypesCoches.UnionWith(choix.TypesCoches);
+        QuantiteInscriptions = choix.QuantiteInscriptions;
 
         SousTypes.Clear();
-        if (c.SousType is { } st && st != SousTypeCno.InjonctionDePayer) SousTypes.Add(st);
-        QuantiteCno = 1;
-        CertificatDOpposition = false;
+        SousTypes.UnionWith(choix.SousTypes);
+        QuantiteCno = choix.QuantiteCno;
+        CertificatDOpposition = choix.CertificatDOpposition;
 
         Certificats.Clear();
-        Certificats[CertificatFaillite.NonFaillite] = c.Famille == FamilleCommande.Faillite ? 1 : 0;
-        Certificats[CertificatFaillite.NonRcs] = 0;
-        Certificats[CertificatFaillite.NonRsac] = 0;
-        CertificatDeFaillite = false;
+        foreach (var (cert, quantite) in choix.Certificats) Certificats[cert] = quantite;
+        CertificatDeFaillite = choix.CertificatDeFaillite;
+        ChoixDeplie = false;
 
         // Une commande web porte deja son adresse mail : la case est cochee par defaut (#2294).
         AdresseMail = c.Email;
@@ -338,45 +390,104 @@ public sealed class SessionCommandesWeb
 
     // ================================================================ edition et decisions
 
-    private List<DocumentEdite> DocumentsEnCours(CommandeRecue c)
+    private List<DocumentEdite> DocumentsEnCours(CommandeRecue c) => DocumentsEnCours(c, ChoixEnCours);
+
+    private static List<DocumentEdite> DocumentsEnCours(CommandeRecue c, ChoixCommande choix)
     {
         var cible = TraitementCommandes.Entite(c.CibleRetenue);
         // Un certificat bloque ne se commande pas : son compteur compte pour zero.
-        var certificats = Certificats.ToDictionary(kv => kv.Key,
+        var certificats = choix.Certificats.ToDictionary(kv => kv.Key,
             kv => cible is not null && TraitementCommandes.MotifBlocage(kv.Key, cible) is not null ? 0 : kv.Value);
-        if (CertificatDeFaillite) certificats[CertificatFaillite.NonFaillite] = Math.Max(1, Certificats[CertificatFaillite.NonFaillite]);
-        var typesCoches = TraitementCommandes.CasesCommandees(c)
-            .SelectMany(k => k.EstRegroupement ? k.Enfants : [k]).Count(k => TypesCoches.Contains(k.Code));
-        return TraitementCommandes.Documents(c, typesCoches, QuantiteInscriptions, certificats, CertificatDeFaillite,
-                                             SousTypes, QuantiteCno, CertificatDOpposition);
+        if (choix.CertificatDeFaillite)
+            certificats[CertificatFaillite.NonFaillite] = Math.Max(1, choix.Certificats[CertificatFaillite.NonFaillite]);
+        return TraitementCommandes.Documents(c, TypesCochesCommandes(c, choix), choix.QuantiteInscriptions, certificats,
+                                             choix.CertificatDeFaillite, choix.SousTypes, choix.QuantiteCno,
+                                             choix.CertificatDOpposition);
     }
 
+    private static IEnumerable<CaseType> TypesCommandes(CommandeRecue c) =>
+        TraitementCommandes.CasesCommandees(c).SelectMany(k => k.EstRegroupement ? k.Enfants : [k]);
+
+    private static int TypesCochesCommandes(CommandeRecue c, ChoixCommande choix) =>
+        TypesCommandes(c).Count(k => choix.TypesCoches.Contains(k.Code));
+
     /// <summary>Pourquoi Valider reste ferme ; nul quand la commande se valide.</summary>
-    private string? BlocageValider(CommandeRecue c, IReadOnlyList<DocumentEdite> docs)
+    private string? BlocageValider(CommandeRecue c, IReadOnlyList<DocumentEdite> docs) =>
+        TraitementCommandes.Refus(c, ActionCommande.Valider, null)
+        ?? Marches(c, ChoixEnCours, docs).Select(m => m.Manque).FirstOrDefault(m => m is not null);
+
+    /// <summary>Une marche de l'escalier ; faite quand rien ne manque.</summary>
+    private sealed record Marche(string Nom, string? Manque, string Resume)
     {
-        if (TraitementCommandes.Refus(c, ActionCommande.Valider, null) is { } refus) return refus;
+        public bool Faite => Manque is null;
+    }
+
+    /// <summary>
+    /// Les trois marches de l'escalier, dans l'ordre ou Valider les exige : le dossier,
+    /// le choix (types, type de certificat ou certificats), l'edition. C'est la regle
+    /// qui fermait Valider, decoupee par zone : chaque controle d'avant est porte par la
+    /// marche ou l'agent le corrige, avec son motif mot pour mot. La premiere marche non
+    /// faite donne donc le motif de <see cref="BlocageValider"/> (tests/CommandesWebCheck).
+    /// </summary>
+    private static Marche[] Marches(CommandeRecue c, ChoixCommande choix, IReadOnlyList<DocumentEdite> docs)
+    {
         var groupe = TraitementCommandes.Groupe(c.Famille);
-        if (TraitementCommandes.Entite(c.CibleRetenue) is null)
-            return groupe == FamilleCommande.EtatEndettement
-                ? "Retenez le débiteur dans le rapprochement pour rattacher la commande."
-                : "Sélectionnez le dossier concerné pour rattacher le certificat.";
+        var retenue = TraitementCommandes.Entite(c.CibleRetenue);
+        var dossier = groupe == FamilleCommande.EtatEndettement
+            ? new Marche("Débiteur", retenue is null ? "Retenez le débiteur dans le rapprochement pour rattacher la commande." : null,
+                         retenue?.Designation ?? "")
+            : new Marche("Dossier concerné", retenue is null ? "Sélectionnez le dossier concerné pour rattacher le certificat." : null,
+                         retenue?.Designation ?? "");
+
         // Seule la lettre d'accompagnement : il ne reste rien a delivrer.
         var produits = docs.Count(d => d.Document != "Lettre d'accompagnement" && d.Document != "Facture");
-        if (groupe == FamilleCommande.NonOpposition && !CertificatDOpposition)
+        var rienADelivrer = produits > 0 ? null : groupe switch
         {
-            if (SousTypes.Count == 0) return "Cochez un type de certificat pour lancer le contrôle de délivrance.";
-            var controle = TraitementCommandes.ControlerNonOpposition(c);
-            if (controle.Issue == IssueDelivrance.Rejet) return controle.Motif;
-        }
-        if (produits == 0)
-            return groupe switch
-            {
-                FamilleCommande.Faillite => "Aucun certificat n'est délivrable : la commande doit être rejetée.",
-                FamilleCommande.EtatEndettement => "Cochez au moins un type d'inscription, avec une quantité.",
-                _ => "Aucun certificat n'est commandé : la quantité est à zéro.",
-            };
-        return null;
+            FamilleCommande.Faillite => "Aucun certificat n'est délivrable : la commande doit être rejetée.",
+            FamilleCommande.EtatEndettement => "Cochez au moins un type d'inscription, avec une quantité.",
+            _ => "Aucun certificat n'est commandé : la quantité est à zéro.",
+        };
+
+        // Le choix est fait quand quelque chose est demande ; s'il ne produit aucun
+        // document (quantite a zero, certificat bloque), c'est l'edition qui manque.
+        var choisi = groupe switch
+        {
+            FamilleCommande.NonOpposition => new Marche("Type de certificat de non-opposition",
+                ManqueNonOpposition(c, choix), ResumeNonOpposition(choix)),
+            FamilleCommande.Faillite => new Marche("Certificats",
+                choix.CertificatDeFaillite || choix.Certificats.Values.Any(q => q > 0) ? null : rienADelivrer,
+                ResumeCertificats(choix)),
+            _ => new Marche("Types d'inscription commandés",
+                TypesCochesCommandes(c, choix) > 0 ? null : rienADelivrer, ResumeTypes(c, choix)),
+        };
+        return [dossier, choisi, new Marche("Édition", rienADelivrer, TraitementCommandes.BarreEdition(docs))];
     }
+
+    private static string? ManqueNonOpposition(CommandeRecue c, ChoixCommande choix)
+    {
+        if (choix.CertificatDOpposition) return null;
+        if (choix.SousTypes.Count == 0) return "Cochez un type de certificat pour lancer le contrôle de délivrance.";
+        var controle = TraitementCommandes.ControlerNonOpposition(c);
+        return controle.Issue == IssueDelivrance.Rejet ? controle.Motif : null;
+    }
+
+    // Les resumes d'une ligne de la marche du choix, repliee quand elle est faite.
+    private static string ResumeTypes(CommandeRecue c, ChoixCommande choix) =>
+        string.Join(", ", TypesCommandes(c).Where(k => choix.TypesCoches.Contains(k.Code)).Select(k => k.Code))
+        + " · Qté " + choix.QuantiteInscriptions;
+
+    private static string ResumeNonOpposition(ChoixCommande choix) => choix.CertificatDOpposition
+        ? "Délivrer le certificat d'opposition"
+        : string.Join(", ", Enum.GetValues<SousTypeCno>().Where(choix.SousTypes.Contains).Select(TraitementCommandes.Libelle))
+          + " · Qté " + choix.QuantiteCno;
+
+    private static string ResumeCertificats(ChoixCommande choix) => string.Join(" · ",
+        Enum.GetValues<CertificatFaillite>().Where(cert => choix.Certificats[cert] > 0)
+            .Select(cert => $"{TraitementCommandes.Libelle(cert)} × {choix.Certificats[cert]}")
+            .Concat(choix.CertificatDeFaillite ? new[] { "Délivrer le certificat de faillite" } : []));
+
+    /// <summary>Les commandes dont on traite les zones : ni traitees, ni en saisie au guichet.</summary>
+    private static bool EnCours(CommandeRecue c) => !c.EstTraitee && c.Etat != EtatCommande.SaisieManuelle;
 
     private void OuvrirBande(ActionCommande action)
     {
@@ -668,6 +779,7 @@ public sealed class SessionCommandesWeb
             case nameof(RechercheOuverte): RechercheOuverte = !RechercheOuverte; break;
             case nameof(EnAttenteEnvoi): EnAttenteEnvoi = !EnAttenteEnvoi; break;
             case nameof(RapprochementDeplie): RapprochementDeplie = !RapprochementDeplie; break;
+            case nameof(ChoixDeplie): ChoixDeplie = !ChoixDeplie; break;
             case nameof(TousDebiteurs): TousDebiteurs = !TousDebiteurs; break;
             case nameof(TousEtablissements): TousEtablissements = !TousEtablissements; break;
             case nameof(EnvoiMail): EnvoiMail = !EnvoiMail; break;
@@ -711,10 +823,19 @@ public sealed class SessionCommandesWeb
             Au?.ToString(FormatDate, CultureInfo.InvariantCulture) ?? string.Empty,
             SirenCherche, ReferenceCherchee, EnAttenteEnvoi,
             TraitementCommandes.DateTravail.ToString("dd/MM/yyyy"));
-        var lignes = Ordre.Select(cmd => new LigneCw(cmd.Id, Rang(cmd), cmd.Id == Selection?.Id, Tiret(cmd.Denomination),
-                                                     TraitementCommandes.Precisions(cmd),
-                                                     TraitementCommandes.Libelle(cmd.Famille),
-                                                     TraitementCommandes.EstRapprochementDirect(cmd))).ToArray();
+        var lignes = Ordre.Select(cmd =>
+        {
+            // La commande ouverte compte sur ce que l'agent a choisi, les autres sur ce
+            // qu'elles montreront a l'ouverture.
+            var marches = EnCours(cmd) ? MarchesDe(cmd, cmd.Id == Selection?.Id ? ChoixEnCours : ChoixCommande.ParDefaut(cmd)) : [];
+            var faites = marches.Count(m => m.Faite);
+            return new LigneCw(cmd.Id, Rang(cmd), cmd.Id == Selection?.Id, Tiret(cmd.Denomination),
+                               TraitementCommandes.Precisions(cmd),
+                               TraitementCommandes.Libelle(cmd.Famille),
+                               TraitementCommandes.EstRapprochementDirect(cmd),
+                               marches.Length > 0 ? $"{faites}/{marches.Length}" : null,
+                               marches.Length > 0 && faites == marches.Length);
+        }).ToArray();
 
         return new VueCommandesWeb(session, onglets, RechercheOuverte, TraitementCommandes.RechercheAffinee(Appliques),
             TraitementCommandes.Resumer(Appliques), recherche,
@@ -747,7 +868,7 @@ public sealed class SessionCommandesWeb
             : null;
 
         // Les zones du detail, selon le groupe du type (le @switch du .razor).
-        var enCours = !c.EstTraitee && c.Etat != EtatCommande.SaisieManuelle;
+        var enCours = EnCours(c);
         RapprochementCw? rapprochement = null;
         TypesCw? types = null;
         NonOppositionCw? nonOpposition = null;
@@ -772,24 +893,30 @@ public sealed class SessionCommandesWeb
         }
 
         PiedCw? pied = null;
+        EtapeCw[] etapes = [];
         if (enCours)
         {
             var docs = DocumentsEnCours(c);
             var blocage = BlocageValider(c, docs);
+            var marches = Marches(c, ChoixEnCours, docs);
+            etapes = marches.Select(m => new EtapeCw(m.Nom, m.Faite, m.Faite ? m.Resume : "", m.Manque)).ToArray();
             var bande = BandeOuverte is { } b
                 ? new BandeCw(b == ActionCommande.Rejeter, MotifSaisi,
                               TraitementCommandes.Refus(c, b, MotifSaisi) is not null, TraitementCommandes.LongueurMaxMotif)
                 : null;
             pied = new PiedCw(bande, TraitementCommandes.BarreEdition(docs), Documents(docs), EnvoiMail, AdresseMail,
-                              TraitementCommandes.Refus(c, ActionCommande.MettreEnAttente, "") is not null, blocage);
+                              TraitementCommandes.Refus(c, ActionCommande.MettreEnAttente, "") is not null, blocage,
+                              blocage is null ? "" : $"{marches.Count(m => m.Faite)} / {marches.Length}");
         }
 
         return new PanneauCw(c.Id, TraitementCommandes.Titre(c), Rang(c), TraitementCommandes.Libelle(c.Famille),
             c.Etat != EtatCommande.ATraiter ? new EtatCw(TraitementCommandes.IconeEtat(c.Etat), TraitementCommandes.Libelle(c.Etat)) : null,
             Tiret(c.Denomination), TraitementCommandes.LigneReference(c), vueEnveloppe, saisie, donnees, traitee,
             enCours && c.Etat == EtatCommande.EnAttente && c.Motif.Length > 0 ? c.Motif : null,
-            rapprochement, types, nonOpposition, certificats, pied);
+            rapprochement, types, nonOpposition, certificats, pied, etapes, ChoixDeplie);
     }
+
+    private static Marche[] MarchesDe(CommandeRecue c, ChoixCommande choix) => Marches(c, choix, DocumentsEnCours(c, choix));
 
     /// <summary>Ce que lisait le RenderFragment ZoneRapprochement du .razor.</summary>
     private RapprochementCw VueRapprochement(CommandeRecue c, bool debiteur)

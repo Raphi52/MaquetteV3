@@ -5,7 +5,15 @@
 // /draft du 18/11/2026 (conv-1984). Des ONGLETS D'ETAT avec leur compte en
 // tete, la recherche repliee derriere la pastille « Rechercher », une liste A
 // PLAT de lignes larges (filet a la couleur du type), et la commande choisie
-// qui s'ouvre en PANNEAU par-dessus la liste, decisions en pied du panneau.
+// qui s'ouvre en PANNEAU, decisions en pied du panneau.
+//
+// COMMANDE EN « ESCALIER » : direction choisie au /draft du 19/11/2026 (conv-1993).
+// La commande ouverte se pose A COTE de la liste, devenue une colonne ; chaque
+// ligne dit ses marches faites (« 2/3 »). Le detail descend en trois MARCHES
+// reliees par un trait — dossier, choix (types ou certificats), edition — avec
+// leur voyant ; une marche faite se replie en une ligne, celle qui manque reste
+// ouverte, et Valider est le bout du trait (« Valider 2 / 3 »). Les marches sont
+// calculees par le pont, sur la regle meme qui ferme Valider.
 //
 // Contenu repris de D:\RIG-V3 (lu sans y toucher) :
 //   ListeCommandesWebNode.cs   « Nouvelle commande », ordre par type,
@@ -21,7 +29,7 @@
 // et les regles de l'ancien @code vivent dans Pont/EcranCommandesWeb.cs
 // (SessionCommandesWeb) ; cet ecran affiche la vue et remonte chaque geste.
 
-import type { KeyboardEvent } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
 import { appeler } from '../pont'
 import { Saisie, useSession, type Geste, type PontDeSession } from '../session'
 
@@ -38,7 +46,17 @@ export interface RechercheCw {
   enAttenteEnvoi: boolean
   dateTravail: string
 }
-export interface LigneCw { id: number; rang: number; active: boolean; nom: string; precisions: string; type: string; direct: boolean }
+export interface LigneCw {
+  id: number
+  rang: number
+  active: boolean
+  nom: string
+  precisions: string
+  type: string
+  direct: boolean
+  avancement: string | null
+  prete: boolean
+}
 export interface EtatCw { icone: string; libelle: string }
 export interface MembreCw { id: number; titre: string; icone: string; libelle: string }
 export interface EnveloppeCw { reference: string; membres: MembreCw[]; etat: string; envoiEnAttente: boolean }
@@ -98,7 +116,9 @@ export interface PiedCw {
   adresseMail: string
   attenteRefusee: boolean
   blocage: string | null
+  avancement: string
 }
+export interface EtapeCw { nom: string; faite: boolean; resume: string; manque: string | null }
 export interface PanneauCw {
   id: number
   titre: string
@@ -117,6 +137,8 @@ export interface PanneauCw {
   nonOpposition: NonOppositionCw | null
   certificats: CertificatsCw | null
   pied: PiedCw | null
+  etapes: EtapeCw[]
+  choixDeplie: boolean
 }
 export interface ChampAdresseCw { cle: string; libelle: string; large: boolean; valeur: string }
 export interface CoordonneesCw { lectureSeule: boolean; champs: ChampAdresseCw[]; lignes: string[]; alertes: string[]; adresseCorrigee: boolean }
@@ -396,9 +418,24 @@ function ZoneCertificats({ c, geste }: { c: CertificatsCw; geste: Geste }) {
   )
 }
 
+/** Une marche de l'escalier : son voyant (coche quand elle est faite, anneau sinon)
+ *  dans la gouttiere ou passe le trait, et son contenu a droite. */
+function Marche({ e, children }: { e: EtapeCw; children: ReactNode }) {
+  return (
+    <div className={`rig-tcw__marche ${e.faite ? 'rig-tcw__marche--faite' : 'rig-tcw__marche--a-faire'}`}>
+      <span className="rig-tcw__voyant" role="img" aria-label={e.faite ? `${e.nom} : fait` : `${e.nom} : à faire`}
+            title={e.manque ?? e.nom}>
+        {e.faite && <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
+      </span>
+      <div className="rig-tcw__marche-corps">{children}</div>
+    </div>
+  )
+}
+
 function Panneau({ p, geste }: { p: PanneauCw; geste: Geste }) {
   const texte = (champ: string) => (valeur: string) => geste('Texte', { champ, valeur })
   const pied = p.pied
+  const [dossier, choix, edition] = p.etapes
   return (
     <section className="rig-tcw__panneau" aria-label={p.titre}>
       <div className="rig-tcw__panneau-haut">
@@ -505,10 +542,39 @@ function Panneau({ p, geste }: { p: PanneauCw; geste: Geste }) {
             {p.motifAttente !== null && (
               <div className="rig-tcw__ligne-statut rig-tcw__ligne-statut--attente">Motif de la mise en attente : {p.motifAttente}</div>
             )}
-            {p.rapprochement && <ZoneRapprochement r={p.rapprochement} geste={geste} />}
-            {p.types && <ZoneTypes t={p.types} geste={geste} />}
-            {p.nonOpposition && <ZoneNonOpposition n={p.nonOpposition} geste={geste} />}
-            {p.certificats && <ZoneCertificats c={p.certificats} geste={geste} />}
+            {pied && dossier && choix && edition && (
+              <div className="rig-tcw__escalier">
+                <Marche e={dossier}>
+                  {p.rapprochement && <ZoneRapprochement r={p.rapprochement} geste={geste} />}
+                </Marche>
+                <Marche e={choix}>
+                  {choix.faite && !p.choixDeplie ? (
+                    <div className="rig-tcw__marche-ligne">
+                      <span className="rig-tcw__section">{choix.nom}</span>
+                      <span className="rig-tcw__marche-resume">{choix.resume}</span>
+                      <button className="rig-tcw__lien" onClick={() => geste('Basculer', 'ChoixDeplie')}>Modifier</button>
+                    </div>
+                  ) : (
+                    <>
+                      {p.types && <ZoneTypes t={p.types} geste={geste} />}
+                      {p.nonOpposition && <ZoneNonOpposition n={p.nonOpposition} geste={geste} />}
+                      {p.certificats && <ZoneCertificats c={p.certificats} geste={geste} />}
+                      {choix.faite && (
+                        <button className="rig-tcw__lien rig-tcw__marche-replier" onClick={() => geste('Basculer', 'ChoixDeplie')}>Replier</button>
+                      )}
+                    </>
+                  )}
+                </Marche>
+                <Marche e={edition}>
+                  <details className="rig-tcw__edition">
+                    <summary title="Édition & impression">{pied.barre}</summary>
+                    <Documents documents={pied.documents}
+                               titreLigne="Voir le document tel que la validation l'éditera (rien n'est imprimé). Double-clic sur la ligne : même effet." />
+                    <div className="rig-tcw__discret">Aucun paramètre d'impression ici : agrafage, coffre, envoi par mail et choix de l'imprimante restent dans le Tableau des éditions.</div>
+                  </details>
+                </Marche>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -529,13 +595,10 @@ function Panneau({ p, geste }: { p: PanneauCw; geste: Geste }) {
               <button className="rig-bouton rig-tcw__bouton" onClick={() => geste('FermerBande')}>Annuler</button>
             </div>
           )}
-          <details className="rig-tcw__edition">
-            <summary title="Édition & impression">{pied.barre}</summary>
-            <Documents documents={pied.documents}
-                       titreLigne="Voir le document tel que la validation l'éditera (rien n'est imprimé). Double-clic sur la ligne : même effet." />
-            <div className="rig-tcw__discret">Aucun paramètre d'impression ici : agrafage, coffre, envoi par mail et choix de l'imprimante restent dans le Tableau des éditions.</div>
-          </details>
           <div className="rig-tcw__pied-ligne">
+            {/* Le bout du trait de l'escalier : anneau tant que Valider est ferme. */}
+            <span className={`rig-tcw__voyant rig-tcw__voyant--fin ${pied.blocage === null ? 'rig-tcw__voyant--pret' : ''}`}
+                  aria-hidden="true"></span>
             <div className="rig-tcw__mail">
               <button className={`rig-bascule ${pied.envoiMail ? 'rig-bascule--actif' : ''}`}
                       title="Les documents sont imprimés comme d'habitude, et envoyés en plus par mail une fois générés, avec le modèle de mail du greffe. Plusieurs adresses se séparent par « ; »."
@@ -555,7 +618,7 @@ function Panneau({ p, geste }: { p: PanneauCw; geste: Geste }) {
                       disabled={pied.attenteRefusee}
                       onClick={() => geste('OuvrirBande', 'MettreEnAttente')}>Mettre en attente…</button>
               <button className="rig-bouton rig-bouton--fort rig-tcw__valider" disabled={pied.blocage !== null}
-                      {...(pied.blocage !== null ? { title: pied.blocage } : {})} onClick={() => geste('Decider', 'Valider')}>Valider</button>
+                      {...(pied.blocage !== null ? { title: pied.blocage } : {})} onClick={() => geste('Decider', 'Valider')}>Valider<b className="rig-tcw__valider-compte">{pied.avancement}</b></button>
             </div>
           </div>
           {pied.blocage !== null && <div className="rig-tcw__blocage">{pied.blocage}</div>}
@@ -695,9 +758,9 @@ export function EcranCommandesWeb() {
         </div>
       )}
 
-      {/* La liste et le panneau occupent la MEME case de grille : le panneau se pose
-          par-dessus la partie droite de la liste, qui reste cliquable a gauche. */}
-      <div className="rig-tcw__scene">
+      {/* Escalier : une commande ouverte se pose A COTE de la liste, qui se resserre
+          en colonne (nom et marches faites) au lieu d'etre recouverte. */}
+      <div className={`rig-tcw__scene ${vue.panneau ? 'rig-tcw__scene--ouverte' : ''}`}>
         <section className="rig-tcw__liste" aria-label="Commandes">
           <div className="rig-tcw__liste-entete">
             <span className="rig-tcw__compteur">{vue.compteur}</span>
@@ -728,6 +791,10 @@ export function EcranCommandesWeb() {
                 <span className="rig-tcw__cmd-type">{cmd.type}</span>
                 {cmd.direct && (
                   <span className="rig-tcw__direct" title="Un seul dossier correspond à la commande : à traiter en premier.">Rapprochement direct</span>
+                )}
+                {cmd.avancement !== null && (
+                  <span className={`rig-tcw__avancement ${cmd.prete ? 'rig-tcw__avancement--prete' : ''}`}
+                        title="Marches faites : dossier, choix, édition">{cmd.avancement}</span>
                 )}
               </button>
             ))}
