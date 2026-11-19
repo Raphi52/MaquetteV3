@@ -1,15 +1,18 @@
 // LA VISIONNEUSE D'AFFAIRE (esprit VGED, div.rig-vged) de
 // Components/Pages/Home.razor, portee au lot 2 du plan « finir le passage a
 // React » (19/11/2026). Trois zones cote a cote : l'ARBRE documentaire, les
-// DONNEES (fiche d'informations ou saisie guidee), le DOCUMENT ; chacune se
-// ferme, et les separateurs se glissent pour regler les largeurs.
+// DONNEES (fiche d'informations ou saisie guidee) avec l'historique des pieces
+// dessous, le DOCUMENT ; chacune se ferme, et les separateurs se glissent pour
+// regler les largeurs.
 
+import { useEffect, useRef } from 'react'
 import type { CSSProperties, MutableRefObject } from 'react'
 import { ArbreGedNoeud } from '../composants/ArbreGedNoeud'
 import { FicheInformationsDossier } from '../composants/FicheInformationsDossier'
 import { Saisie } from '../session'
 import { Apercu } from './Apercu'
 import { Etapes } from './Etapes'
+import { HistoriqueDossier } from './Historique'
 import { BandeauTache, ChecklistsTache } from './Tache'
 import type { DefilementVue, DossierVue, GestePlan } from './types'
 
@@ -38,6 +41,26 @@ export interface ProprietesVisionneuse {
 
 export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue, plan }: ProprietesVisionneuse) {
   const s = d.sommaire
+  // Une piece ouverte DEPUIS L'HISTORIQUE peut etre loin dans l'arbre (branche
+  // Judiciaire, 40 lignes plus bas) : quand la piece ouverte change, l'arbre
+  // defile jusqu'a sa ligne choisie. « nearest » : une ligne deja visible (clic
+  // dans l'arbre lui-meme) ne bouge pas.
+  const colonneArbre = useRef<HTMLDivElement>(null)
+  const pieceOuverte = d.historique.find((p) => p.actif)?.id
+  useEffect(() => {
+    colonneArbre.current?.querySelector('.rig-arbre__ligne--actif')?.scrollIntoView?.({ block: 'nearest' })
+  }, [pieceOuverte])
+  // La liste des points a corriger se deroule PAR-DESSUS les boutons du
+  // document : un clic ailleurs, ou le choix d'un lien, la referme.
+  const defauts = useRef<HTMLDetailsElement>(null)
+  useEffect(() => {
+    const fermer = (e: PointerEvent) => {
+      const liste = defauts.current
+      if (liste?.open && !liste.contains(e.target as Node)) liste.open = false
+    }
+    document.addEventListener('pointerdown', fermer)
+    return () => document.removeEventListener('pointerdown', fermer)
+  }, [])
   return (
     <div className="rig-vged">
       <div className="rig-vged__entete">
@@ -45,67 +68,63 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"></path><path d="M12 19l-7-7 7-7"></path></svg>
         </button>{' '}
         <span className={'rig-filet-v rig-filet-v--' + d.statut}></span>{' '}
-        <b style={{ font: '13px var(--rig-font-mono)' }}>{d.numero}</b>{' '}
-        <span>{d.objet}</span>{' '}
-        <span style={{ color: 'var(--rig-texte-3)', fontSize: '12px' }}>{' · SIREN '}{d.siren}{' · '}{d.type}</span>{' '}
-        <span style={{ marginLeft: 'auto' }}></span>
+        {/* IDENTITE (proposition 5 du /draft du 19/11/2026) : le numero et l'objet
+            en titre, la FICHE SOMMAIRE en puces dessous -- les champs d'identite
+            que RIG v2 affiche au-dessus du treeview (PROC_VDOSSIER). UN SEUL
+            FLUX : chaque champ VIDE disparait, libelle compris. */}
+        <div className="rig-vged__identite">
+          <div className="rig-vged__titre">
+            <b className="rig-vged__numero">{d.numero}</b>{' '}<span>{d.objet}</span>
+          </div>
+          <div className="rig-vged__puces" aria-label="Fiche sommaire">
+            {s.champs.map((c, i) => (
+              <span key={i} className="rig-vged__puce">
+                <span className="rig-vged__puce-libelle">{c.libelle}</span>{' '}
+                <span className={'rig-vged__puce-valeur' + (c.mono ? ' rig-vged__puce-valeur--mono' : '')}>{c.valeur}</span>
+              </span>
+            ))}
+            {s.mention.length > 0 && <span className="rig-vged__mention">{s.mention}</span>}
+          </div>
+        </div>
         {d.boutonDocument && (
           <button className="rig-bouton rig-bouton--plat" title="Reafficher le document a droite"
                   onClick={() => plan('afficherDocument')}>Document</button>
+        )}
+        {/* LES POINTS A CORRIGER, en pastille : visible des qu'un requis manque
+            ou qu'une valeur est refusee. Elle deroule un lien par etape a
+            corriger ; chaque lien ouvre l'etape (et la fiche). */}
+        {d.bandeau && (
+          <div className={'rig-vged__defauts' + (d.bandeau.erreur ? ' rig-vged__defauts--erreur' : '')} role="alert">
+            <details ref={defauts}>
+              <summary className="rig-vged__defauts-pastille" title="Voir les sections a corriger">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2z"></path><path d="M12 10v4"></path><path d="M12 17v.5"></path></svg>
+                <b>{d.bandeau.nombre}</b>{' '}{d.bandeau.nombre === 1 ? 'point a corriger' : 'points a corriger'}
+              </summary>
+              <div className="rig-vged__defauts-liste">
+                {d.bandeau.liens.map((l, i) => (
+                  <button key={i} className={'rig-vged__defauts-lien' + (l.refuse ? ' rig-vged__defauts-lien--refuse' : '')}
+                          title={l.titre}
+                          onClick={() => {
+                            if (defauts.current) defauts.current.open = false
+                            plan('allerAuDefautBandeau', { etape: l.indexEtape, fiche: l.fiche })
+                          }}>
+                    {l.etape}{l.suffixe}{' '}
+                    <span className="rig-vged__defauts-nb">{l.nombre}</span>
+                  </button>
+                ))}
+              </div>
+            </details>
+          </div>
         )}
         <button className="rig-bouton rig-bouton--icone rig-bouton--plat" title="Fermer l'affaire" aria-label="Fermer l'affaire" onClick={() => plan('fermerDossier')}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>
         </button>
       </div>
 
-      {/* FICHE SOMMAIRE (bandeau du haut de la vue arbre) : les champs
-          d'identite que RIG v2 affiche au-dessus du treeview (PROC_VDOSSIER).
-          UN SEUL FLUX : chaque champ VIDE disparait, libelle compris. */}
-      <details className="rig-sommaire" open>
-        <summary className="rig-sommaire__titre">
-          {' Fiche sommaire '}
-          <span className="rig-sommaire__resume">{d.numero}{' · '}{s.designation}</span>
-        </summary>{' '}
-        <div className="rig-sommaire__ligne">
-          {s.champs.map((c, i) => (
-            <span key={i} className="rig-sommaire__champ">
-              <span className="rig-sommaire__libelle">{c.libelle}</span>{' '}
-              <span className={'rig-sommaire__valeur ' + (c.mono ? 'rig-sommaire__valeur--mono' : '')}>{c.valeur}</span>
-            </span>
-          ))}
-          {s.mention.length > 0 && <span className="rig-sommaire__mention">{s.mention}</span>}
-        </div>
-      </details>
-
-      {/* Bandeau des defauts : visible des qu'un requis manque ou qu'une valeur
-          est refusee. Chaque lien ouvre l'etape (et la fiche) ou corriger. */}
-      {d.bandeau && (
-        <div className={'rig-bandeau-defauts ' + (d.bandeau.erreur ? 'rig-bandeau-defauts--erreur' : '')} role="alert">
-          <details className="rig-bandeau-defauts__replis">
-            <summary className="rig-bandeau-defauts__resume">
-              <span className="rig-bandeau-defauts__titre">
-                <b>{d.bandeau.nombre}</b>{' '}{d.bandeau.nombre === 1 ? 'point a corriger' : 'points a corriger'}
-              </span>{' '}
-              <span className="rig-bandeau-defauts__voir">voir les sections</span>
-            </summary>{' '}
-            <div className="rig-bandeau-defauts__liste">
-              {d.bandeau.liens.map((l, i) => (
-                <button key={i} className={'rig-bandeau-defauts__lien ' + (l.refuse ? 'rig-bandeau-defauts__lien--refuse' : 'rig-bandeau-defauts__lien--manquant')}
-                        title={l.titre}
-                        onClick={() => plan('allerAuDefautBandeau', { etape: l.indexEtape, fiche: l.fiche })}>
-                  {l.etape}{l.suffixe}{' '}
-                  <span className="rig-bandeau-defauts__nb">{l.nombre}</span>
-                </button>
-              ))}
-            </div>
-          </details>
-        </div>
-      )}
-
       <div className="rig-vged__corps" style={styleDepuisTexte(d.styleCorps)}>
 
         {/* ---- Arbre documentaire, colonnes de TreeviewGed (v2) ---- */}
-        <div className="rig-vged__arbre">
+        <div className="rig-vged__arbre" ref={colonneArbre}>
           <div className="rig-arbre__entete">
             <span className="rig-arbre__libelle">Visualisation du dossier</span>{' '}
             <button className="rig-arbre__nouveau" title="Ajouter un dossier ou une piece dans l'arbre"
@@ -143,18 +162,26 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
         )}
 
         {/* ---- ZONE 2 : LES DONNEES ---- la fiche d'informations quand une
-            fiche est choisie dans l'arbre, sinon les 7 etapes de la saisie. */}
-        {d.fiche && (
-          <div key="fiche" className="rig-vged__guide rig-vged__donnees">
-            <FicheInformationsDossier key={d.fiche.session} session={d.fiche.session} version={d.fiche.version}
-                                      fermer={() => plan('ficheFermer')}
-                                      toutAffiche={() => plan('toutAffiche')}
-                                      champModifie={() => plan('champModifie')} />
+            fiche est choisie dans l'arbre, sinon les 7 etapes de la saisie ;
+            DESSOUS, l'historique des pieces (proposition 5 du /draft du
+            19/11/2026) : arbre, donnees, historique et document a l'ecran
+            ensemble, sans rien a basculer. */}
+        {(d.fiche || d.etapes) && (
+          <div className="rig-vged__milieu">
+            {d.fiche && (
+              <div key="fiche" className="rig-vged__guide rig-vged__donnees">
+                <FicheInformationsDossier key={d.fiche.session} session={d.fiche.session} version={d.fiche.version}
+                                          fermer={() => plan('ficheFermer')}
+                                          toutAffiche={() => plan('toutAffiche')}
+                                          champModifie={() => plan('champModifie')} />
+              </div>
+            )}
+            {d.etapes && (
+              <Etapes key="etapes" etapes={d.etapes} pagination={pagination} defilement={defilement}
+                      defilementJoue={defilementJoue} plan={plan} />
+            )}
+            <HistoriqueDossier pieces={d.historique} plan={plan} />
           </div>
-        )}
-        {d.etapes && (
-          <Etapes key="etapes" etapes={d.etapes} pagination={pagination} defilement={defilement}
-                  defilementJoue={defilementJoue} plan={plan} />
         )}
         {/* Seconde poignee : entre les donnees et le document. */}
         {d.poignee2 && (

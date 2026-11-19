@@ -70,8 +70,20 @@ export interface DossierVue {
   poignee2: boolean
   apercu: ApercuColonneVue | null
   voile: boolean
+  /** Les pieces datees, la plus recente en tete (l'historique sous les donnees). */
+  historique: PieceHistoriqueVue[]
 }
-export interface SommaireVue { designation: string, champs: ChampSommaireVue[], mention: string }
+export interface PieceHistoriqueVue {
+  id: string
+  date: string
+  libelle: string
+  rubrique: string
+  origine: string
+  pages: number
+  judiciaire: boolean
+  actif: boolean
+}
+export interface SommaireVue { champs: ChampSommaireVue[], mention: string }
 export interface ChampSommaireVue { libelle: string, valeur: string, mono: boolean }
 export interface BandeauDefautsVue { nombre: number, erreur: boolean, liens: LienDefautVue[] }
 export interface LienDefautVue {

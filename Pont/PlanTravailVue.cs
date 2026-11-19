@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 
 namespace RigV3Desktop.Pont;
@@ -59,9 +60,20 @@ public sealed record DossierVue(string Numero, string Objet, string Siren, strin
                                 bool BoutonDocument, SommaireVue Sommaire, BandeauDefautsVue? Bandeau,
                                 string StyleCorps, TacheVue? Tache, string Filtre, LigneArbreVue Arbre,
                                 bool Poignee, FicheColonneVue? Fiche, EtapesVue? Etapes, bool Poignee2,
-                                ApercuColonneVue? Apercu, bool Voile);
+                                ApercuColonneVue? Apercu, bool Voile, PieceHistoriqueVue[] Historique);
 
-public sealed record SommaireVue(string Designation, ChampSommaireVue[] Champs, string Mention);
+/// <summary>
+/// Une piece DATEE de l'affaire, dans l'historique sous les donnees (proposition
+/// « Historique sous les donnees » du /draft du 19/11/2026) : la plus recente en tete.
+/// </summary>
+/// <param name="Id">Le meme identifiant que la ligne de l'arbre : le clic ouvre cette piece.</param>
+/// <param name="Rubrique">Le dossier qui range la piece dans l'arbre (« Depots d'actes »...).</param>
+/// <param name="Judiciaire">La piece est sous la branche « Judiciaire » (point bleu, sinon or).</param>
+/// <param name="Actif">La piece est celle ouverte a droite, ou celle choisie dans l'arbre.</param>
+public sealed record PieceHistoriqueVue(string Id, string Date, string Libelle, string Rubrique,
+                                        string Origine, int Pages, bool Judiciaire, bool Actif);
+
+public sealed record SommaireVue(ChampSommaireVue[] Champs, string Mention);
 public sealed record ChampSommaireVue(string Libelle, string Valeur, bool Mono);
 
 public sealed record BandeauDefautsVue(int Nombre, bool Erreur, LienDefautVue[] Liens);
@@ -273,10 +285,11 @@ public sealed partial class SessionPlanTravail
 
         var fs = SommaireDu(d);
         // UN SEUL FLUX, pas de grille : chaque champ VIDE disparait --
-        // libelle compris (demande du 17/09/2026).
+        // libelle compris (demande du 17/09/2026). Les champs passent en puces
+        // dans l'entete, SOUS le numero de gestion qui en est le titre : il n'y
+        // figure donc plus une seconde fois (proposition 5 du /draft du 19/11/2026).
         var champs = new (string Libelle, string Valeur, bool Mono)[]
         {
-            ("N° de gestion", d.Numero, true),
             ("SIREN", d.Siren, true),
             ("Type", d.Type, false),
             ("Type de dossier", d.TypeDossier, true),
@@ -290,7 +303,7 @@ public sealed partial class SessionPlanTravail
             ("Cessation", fs.Cessation, true),
             ("Date MAJ", fs.DateMaj, true)
         };
-        var sommaire = new SommaireVue(fs.Designation,
+        var sommaire = new SommaireVue(
             champs.Where(c => c.Valeur is { Length: > 0 })
                   .Select(c => new ChampSommaireVue(c.Libelle, c.Valeur, c.Mono)).ToArray(),
             fs.Mention);
@@ -317,6 +330,7 @@ public sealed partial class SessionPlanTravail
         var arbre = ArbreGedNoeud.Vue(Arbre, 0, NoeudsOuverts, NoeudSelectionne, Domaines, AjoutsArbre,
                                       MasquesArbre, LibellesArbre, RecetteArbre, NoeudRenomme,
                                       FiltreDeLArbre, index);
+        var historique = VueHistorique(index);
         IndexArbre = index;
 
         FicheColonneVue? fiche = null;
@@ -346,7 +360,70 @@ public sealed partial class SessionPlanTravail
             FiltreDeLArbre, arbre, DonneesVisible || GuideVisible, fiche, etapes,
             DonneesVisible && GuideVisible,
             GuideVisible ? new ApercuColonneVue(FenetresDetachees.Count, VueApercu(d)) : null,
-            Redimensionne);
+            Redimensionne, historique);
+    }
+
+    /// <summary>
+    /// L'HISTORIQUE sous les donnees : chaque piece DATEE que l'arbre montre a ce
+    /// login, la plus recente en tete (a date egale, l'ordre de l'arbre). Memes
+    /// regles de visibilite que l'arbre (droits du domaine, ajouts, masques, repli
+    /// du mode tache) : l'historique ne revele aucune piece que l'arbre cache. Le
+    /// filtre texte de l'arbre ne s'y applique pas : l'historique reste entier.
+    /// Chaque piece entre dans <paramref name="index"/> : son clic la retrouve meme
+    /// quand sa branche est repliee dans l'arbre.
+    /// </summary>
+    private PieceHistoriqueVue[] VueHistorique(IDictionary<string, NoeudGed> index)
+    {
+        var pieces = new List<(DateTime Quand, NoeudGed Piece, string Rubrique, bool Judiciaire)>();
+        void Parcourir(NoeudGed dossier, bool judiciaire)
+        {
+            foreach (var e in AccesGed.EnfantsVisibles(dossier, Domaines, AjoutsArbre, MasquesArbre, RecetteArbre))
+            {
+                var jud = judiciaire || e.DomaineRequis == ArbreDemo.DomaineJudiciaire;
+                if (!e.EstPiece) { Parcourir(e, jud); continue; }
+                if (DateTime.TryParseExact(e.Date, "dd/MM/yyyy", CultureInfo.InvariantCulture,
+                                           DateTimeStyles.None, out var quand))
+                    pieces.Add((quand, e, LibelleAffiche(dossier), jud));
+            }
+        }
+        Parcourir(Arbre, false);
+
+        return pieces
+            // OrderByDescending est STABLE : a date egale, l'ordre de l'arbre reste.
+            .OrderByDescending(p => p.Quand)
+            .Select(p =>
+            {
+                var id = ArbreGedNoeud.Identifiant(p.Piece);
+                index[id] = p.Piece;
+                return new PieceHistoriqueVue(id, p.Piece.Date, LibelleAffiche(p.Piece), p.Rubrique,
+                    p.Piece.Origine, p.Piece.Pages, p.Judiciaire,
+                    ReferenceEquals(p.Piece, ApercuNoeud) || ReferenceEquals(p.Piece, NoeudSelectionne));
+            })
+            .ToArray();
+    }
+
+    /// <summary>Le libelle que l'arbre affiche : celui donne par un renommage, sinon l'original.</summary>
+    private string LibelleAffiche(NoeudGed n) => LibellesArbre.TryGetValue(n, out var l) ? l : n.Libelle;
+
+    /// <summary>
+    /// Un clic dans l'historique : la piece s'ouvre comme depuis l'arbre, et les
+    /// dossiers qui la contiennent se deplient pour qu'on l'y voie choisie.
+    /// </summary>
+    private void OuvrirDepuisHistorique(NoeudGed piece)
+    {
+        var chemin = new List<NoeudGed>();
+        bool Chercher(NoeudGed n)
+        {
+            if (ReferenceEquals(n, piece)) return true;
+            chemin.Add(n);
+            foreach (var e in AccesGed.EnfantsVisibles(n, Domaines, AjoutsArbre, MasquesArbre, RecetteArbre))
+                if (Chercher(e)) return true;
+            chemin.RemoveAt(chemin.Count - 1);
+            return false;
+        }
+        if (!Chercher(Arbre)) return;
+        foreach (var dossier in chemin) NoeudsOuverts.Add(dossier);
+        OuvrirApercu(piece);
     }
 
     private TacheVue? VueTache()
@@ -612,6 +689,9 @@ public sealed partial class SessionPlanTravail
                     ArbreGedNoeud.Activer(active, NoeudsOuverts, Domaines, AjoutsArbre, MasquesArbre, RecetteArbre);
                     OuvrirApercu(active);
                 }
+                break;
+            case "historiqueOuvrir":
+                if (NoeudDe(Texte(valeur)) is { EstPiece: true } piece) OuvrirDepuisHistorique(piece);
                 break;
             case "arbreRenommer":
             {

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { styleDepuisTexte, Visionneuse } from './Visionneuse'
 import { morceaux } from '../test/morceaux'
-import { apercu, dossier, etapes, tache } from '../test/plan'
+import { apercu, dossier, etapes, historique, ligneArbre, tache } from '../test/plan'
 import type { DossierVue, GestePlan } from './types'
 
 afterEach(cleanup)
@@ -18,14 +18,15 @@ function rendre(d: DossierVue = dossier()) {
   return { ...r, plan, gestes: () => plan.mock.calls.filter(([nom]) => nom !== 'etapeVisible').map(([nom, valeur]) => [nom, valeur ?? null]) }
 }
 
-describe('Visionneuse : entete, fiche sommaire, bandeau des defauts', () => {
-  it('l\'entete : retour, filet du statut, numero, objet, SIREN et type en morceaux, croix', () => {
+describe('Visionneuse : entete, fiche sommaire en puces, points a corriger', () => {
+  it('l\'entete : retour, filet du statut, identite, pastille des defauts, croix', () => {
     const { container } = rendre()
     const entete = container.querySelector('.rig-vged > .rig-vged__entete')!
-    expect(morceaux(entete)).toEqual(['<button>', ' ', '<span>', ' ', '<b>', ' ', '<span>', ' ', '<span>', ' ', '<span>', '<button>'])
+    expect(morceaux(entete)).toEqual(['<button>', ' ', '<span>', ' ', '<div>', '<div>', '<button>'])
     expect(entete.children[1]!.className).toBe('rig-filet-v rig-filet-v--alerte')
-    expect(morceaux(entete.children[4]!)).toEqual([' · SIREN ', '812 445 901', ' · ', 'RCS'])
-    expect(entete.querySelectorAll('button')[1]!.getAttribute('aria-label')).toBe("Fermer l'affaire")
+    expect(morceaux(entete.querySelector('.rig-vged__titre')!)).toEqual(['<b>', ' ', '<span>'])
+    expect(entete.querySelector('.rig-vged__titre')!.textContent).toBe('004176 Modification - SCI DU PARC')
+    expect(entete.lastElementChild!.getAttribute('aria-label')).toBe("Fermer l'affaire")
   })
 
   it('« Document » n\'apparait que si la piece est ouverte et la colonne fermee', () => {
@@ -35,34 +36,123 @@ describe('Visionneuse : entete, fiche sommaire, bandeau des defauts', () => {
     expect(gestes()).toEqual([['afficherDocument', null]])
   })
 
-  it('la fiche sommaire : un seul flux de champs, le resume en morceaux', () => {
-    const { container } = rendre()
-    const resume = container.querySelector('.rig-sommaire__titre')!
-    expect(morceaux(resume)).toEqual([' Fiche sommaire ', '<span>'])
-    expect(morceaux(resume.querySelector('span')!)).toEqual(['004176', ' · ', 'SCI DU PARC'])
-    const champs = container.querySelectorAll('.rig-sommaire__champ')
-    expect(champs).toHaveLength(2)
-    expect(morceaux(champs[0]!)).toEqual(['<span>', ' ', '<span>'])
-    expect(champs[0]!.lastElementChild!.className).toBe('rig-sommaire__valeur rig-sommaire__valeur--mono')
-    expect(champs[1]!.lastElementChild!.className).toBe('rig-sommaire__valeur ')
-    expect(container.querySelector('.rig-sommaire__mention')).toBeNull()
+  it('la fiche sommaire : une puce par champ, sous le titre ; la mention en rouge si elle existe', () => {
+    const { container, rerender, plan } = rendre()
+    const puces = container.querySelectorAll('.rig-vged__entete .rig-vged__puces > .rig-vged__puce')
+    expect(puces).toHaveLength(2)
+    expect(morceaux(puces[0]!)).toEqual(['<span>', ' ', '<span>'])
+    expect(puces[0]!.textContent).toBe('SIREN 812 445 901')
+    expect(puces[0]!.lastElementChild!.className).toBe('rig-vged__puce-valeur rig-vged__puce-valeur--mono')
+    expect(puces[1]!.lastElementChild!.className).toBe('rig-vged__puce-valeur')
+    expect(container.querySelector('.rig-vged__mention')).toBeNull()
+    const radiee = dossier()
+    radiee.sommaire = { ...radiee.sommaire, mention: 'Radiee' }
+    rerender(<Visionneuse dossier={radiee} pagination={0} defilement={null} defilementJoue={{ current: 0 }} plan={plan} />)
+    expect(container.querySelector('.rig-vged__puces > .rig-vged__mention')!.textContent).toBe('Radiee')
   })
 
-  it('le bandeau des defauts : compte, liens vers l\'etape a corriger', () => {
+  it('les points a corriger : une pastille dans l\'entete, qui deroule les liens vers l\'etape a corriger', () => {
     const { container, gestes } = rendre()
-    const bandeau = container.querySelector('.rig-bandeau-defauts')!
-    expect(bandeau.className).toBe('rig-bandeau-defauts rig-bandeau-defauts--erreur')
-    expect(morceaux(container.querySelector('.rig-bandeau-defauts__titre')!)).toEqual(['<b>', ' ', 'point a corriger'])
-    const lien = container.querySelector('.rig-bandeau-defauts__lien')!
-    expect(lien.className).toBe('rig-bandeau-defauts__lien rig-bandeau-defauts__lien--refuse')
+    const defauts = container.querySelector('.rig-vged__entete > .rig-vged__defauts')!
+    expect(defauts.className).toBe('rig-vged__defauts rig-vged__defauts--erreur')
+    expect(defauts.getAttribute('role')).toBe('alert')
+    expect(morceaux(defauts.querySelector('summary')!)).toEqual(['<svg>', '<b>', ' ', 'point a corriger'])
+    const lien = defauts.querySelector('.rig-vged__defauts-lien')!
+    expect(lien.className).toBe('rig-vged__defauts-lien rig-vged__defauts-lien--refuse')
     expect(morceaux(lien)).toEqual(['Identite', ' ', '<span>'])
     fireEvent.click(lien)
     expect(gestes()).toEqual([['allerAuDefautBandeau', { etape: 1, fiche: 0 }]])
   })
 
-  it('sans defaut, pas de bandeau', () => {
+  it('la liste des points a corriger se referme au clic ailleurs et apres le choix d\'un lien', () => {
+    const { container } = rendre()
+    const liste = container.querySelector('.rig-vged__defauts details') as HTMLDetailsElement
+    liste.open = true
+    fireEvent.pointerDown(liste.querySelector('summary')!)
+    expect(liste.open).toBe(true)
+    fireEvent.pointerDown(container.querySelector('.rig-vged__arbre')!)
+    expect(liste.open).toBe(false)
+    liste.open = true
+    fireEvent.click(liste.querySelector('.rig-vged__defauts-lien')!)
+    expect(liste.open).toBe(false)
+  })
+
+  it('sans defaut, pas de pastille', () => {
     const { container } = rendre(dossier({ bandeau: null }))
-    expect(container.querySelector('.rig-bandeau-defauts')).toBeNull()
+    expect(container.querySelector('.rig-vged__defauts')).toBeNull()
+  })
+})
+
+describe('Visionneuse : l\'historique des pieces sous les donnees', () => {
+  it('les 7 plus recentes : date, point or ou bleu, libelle ; la piece ouverte marquee', () => {
+    const { container } = rendre()
+    const milieu = container.querySelector('.rig-vged__corps > .rig-vged__milieu')!
+    expect([...milieu.children].map((e) => e.className)).toEqual(['rig-vged__guide rig-vged__donnees', 'rig-chrono'])
+    expect(milieu.querySelector('.rig-chrono__titre')!.textContent).toBe('Historique des pieces · 9')
+    const pieces = milieu.querySelectorAll('.rig-chrono__piece')
+    expect(pieces).toHaveLength(7)
+    expect(morceaux(pieces[0]!)).toEqual(['<span>', '<span>', '<span>'])
+    expect(pieces[0]!.textContent).toBe('19/11/2026Kbis a jour')
+    expect(pieces[0]!.className).toBe('rig-chrono__piece rig-chrono__piece--actif')
+    expect(pieces[0]!.getAttribute('aria-current')).toBe('true')
+    expect(pieces[0]!.getAttribute('title')).toBe('Dossier RCS · Edition greffe · 1 p.')
+    expect(pieces[0]!.querySelector('.rig-chrono__point')!.className).toBe('rig-chrono__point rig-chrono__point--rcs')
+    expect(pieces[2]!.querySelector('.rig-chrono__point')!.className).toBe('rig-chrono__point rig-chrono__point--jud')
+    expect(pieces[1]!.className).toBe('rig-chrono__piece')
+  })
+
+  it('« tout voir » deroule les 9 pieces, puis revient aux 7 dernieres', () => {
+    const { container } = rendre()
+    const tout = container.querySelector('.rig-chrono__tout')!
+    expect(tout.textContent).toBe('tout voir')
+    expect(tout.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(tout)
+    expect(container.querySelectorAll('.rig-chrono__piece')).toHaveLength(9)
+    expect(tout.textContent).toBe('les 7 dernieres')
+    fireEvent.click(tout)
+    expect(container.querySelectorAll('.rig-chrono__piece')).toHaveLength(7)
+  })
+
+  it('un clic sur une piece remonte « historiqueOuvrir » avec son identifiant', () => {
+    const { container, gestes } = rendre()
+    fireEvent.click(container.querySelectorAll('.rig-chrono__piece')[3]!)
+    expect(gestes()).toEqual([['historiqueOuvrir', 'n13']])
+  })
+
+  it('7 pieces ou moins : pas de « tout voir » ; aucune piece datee : pas d\'historique', () => {
+    const { container, rerender, plan } = rendre(dossier({ historique: dossier().historique.slice(0, 7) }))
+    expect(container.querySelector('.rig-chrono__tout')).toBeNull()
+    rerender(<Visionneuse dossier={dossier({ historique: [] })} pagination={0} defilement={null} defilementJoue={{ current: 0 }} plan={plan} />)
+    expect(container.querySelector('.rig-chrono')).toBeNull()
+  })
+
+  it('colonne des donnees fermee : l\'historique part avec elle', () => {
+    const { container } = rendre(dossier({ etapes: null, fiche: null, poignee2: false }))
+    expect(container.querySelector('.rig-vged__milieu')).toBeNull()
+    expect(container.querySelector('.rig-chrono')).toBeNull()
+  })
+
+  it('la piece ouverte change : l\'arbre defile jusqu\'a sa ligne choisie, une seule fois', () => {
+    const defiler = vi.fn()
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = defiler
+    try {
+      const { container, rerender, plan } = rendre()
+      defiler.mockClear()
+      const rapport = dossier({
+        arbre: ligneArbre('n1', '004176 Modification - SCI DU PARC', [{ ...ligneArbre('n13', 'Depot du rapport du mandataire', [], 1), actif: true }]),
+        historique: historique().map((p) => ({ ...p, actif: p.id === 'n13' })),
+      })
+      const vue = (d: DossierVue) => <Visionneuse dossier={d} pagination={0} defilement={null} defilementJoue={{ current: 0 }} plan={plan} />
+      rerender(vue(rapport))
+      expect(defiler).toHaveBeenCalledTimes(1)
+      expect(defiler.mock.contexts[0]).toBe(container.querySelector('.rig-vged__arbre .rig-arbre__ligne--actif'))
+      expect(defiler).toHaveBeenCalledWith({ block: 'nearest' })
+      rerender(vue({ ...rapport }))
+      expect(defiler).toHaveBeenCalledTimes(1)
+    } finally {
+      Element.prototype.scrollIntoView = original
+    }
   })
 })
 
@@ -75,10 +165,10 @@ describe('Visionneuse : les colonnes', () => {
       .toBe('400px 6px 420px 6px minmax(0px, 1fr)')
   })
 
-  it('arbre, poignee, donnees, poignee, document : dans cet ordre', () => {
+  it('arbre, poignee, donnees (et historique), poignee, document : dans cet ordre', () => {
     const { container } = rendre()
     expect([...container.querySelector('.rig-vged__corps')!.children].map((e) => e.className)).toEqual([
-      'rig-vged__arbre', 'rig-vged__poignee', 'rig-vged__guide rig-vged__donnees', 'rig-vged__poignee',
+      'rig-vged__arbre', 'rig-vged__poignee', 'rig-vged__milieu', 'rig-vged__poignee',
       'rig-vged__guide rig-vged__apercu',
     ])
   })

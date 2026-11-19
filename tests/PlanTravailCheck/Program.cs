@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Globalization;
+using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using RigV3Desktop;
@@ -194,6 +195,34 @@ internal static class Programme
             "un ecran qui remonte le numero 004176 ouvre l'affaire, avec sa fiche sommaire");
         Exiger(d?.Fiche is { Branche: "dossier" } && d.Apercu?.Apercu is { Libelle: "Kbis a jour", Kbis: not null },
             "l'affaire s'ouvre sur « Informations du dossier » au milieu et le KBIS a jour a droite");
+        Exiger(!d!.Sommaire.Champs.Any(c => c.Libelle == "N° de gestion"),
+            "le numero de gestion titre l'entete : il ne se repete pas dans les puces de la fiche sommaire");
+
+        // --- 2 bis. L'historique sous les donnees (proposition 5 du /draft du 19/11/2026) :
+        // les pieces datees de l'arbre, la plus recente en tete ; un clic ouvre la piece et
+        // deplie sa branche, meme repliee dans l'arbre.
+        var histo = d.Historique;
+        var dates = histo.Select(p => DateTime.ParseExact(p.Date, "dd/MM/yyyy", CultureInfo.InvariantCulture)).ToList();
+        Exiger(histo.Length > 7 && dates.Zip(dates.Skip(1)).All(x => x.First >= x.Second),
+            $"l'historique liste les pieces datees de l'arbre, la plus recente en tete ({histo.Length} pieces)");
+        Exiger(histo[0] is { Libelle: "Kbis a jour", Rubrique: "Dossier RCS", Judiciaire: false, Actif: true }
+               && histo.Count(p => p.Actif) == 1,
+            "en tete : le KBIS a jour, seul marque comme la piece ouverte a droite");
+        var rapport = histo.FirstOrDefault(p => p.Libelle == "Rapport d expertise");
+        Exiger(rapport is { Judiciaire: true, Rubrique: "Mesures d instruction", Date: "03/03/2023", Pages: 42 },
+            "une piece judiciaire porte sa rubrique, sa date et son nombre de pages");
+        Agir("arbreActiver", Ligne(d.Arbre, "Judiciaire")!.Id);
+        Exiger(Ligne(plan.Vue().Dossier!.Arbre, "Rapport d expertise") is null,
+            "la branche Judiciaire repliee cache le rapport dans l'arbre");
+        Agir("historiqueOuvrir", rapport!.Id);
+        vue = plan.Vue();
+        Exiger(vue.Dossier!.Apercu?.Apercu is { Libelle: "Rapport d expertise" }
+               && Ligne(vue.Dossier.Arbre, "Rapport d expertise") is { Actif: true }
+               && vue.Dossier.Historique.Single(p => p.Actif).Libelle == "Rapport d expertise",
+            "un clic dans l'historique ouvre la piece a droite et la montre choisie dans l'arbre, branche depliee");
+        // L'affaire rouverte repart de son etat d'entree (et d'un arbre neuf).
+        Agir("ouvrirNumero", "004176");
+        d = plan.Vue().Dossier;
 
         // --- 3. Une piece de l'arbre : la saisie guidee va sur SON etape.
         var statuts = Ligne(d!.Arbre, "Statuts signes");

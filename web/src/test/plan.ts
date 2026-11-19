@@ -5,7 +5,7 @@
 
 import type { LigneArbreVue } from '../composants/ArbreGedNoeud'
 import type {
-  ApercuVue, DossierVue, EtapesVue, PageEtapeVue, ProcVue, TacheVue, VueApplication,
+  ApercuVue, DossierVue, EtapesVue, PageEtapeVue, PieceHistoriqueVue, ProcVue, TacheVue, VueApplication,
 } from '../plan/types'
 
 export function ligneArbre(id: string, texte: string, enfants: LigneArbreVue[] = [], niveau = 0): LigneArbreVue {
@@ -95,8 +95,8 @@ export function dossier(partiel: Partial<DossierVue> = {}): DossierVue {
   return {
     numero: '004176', objet: 'Modification - SCI DU PARC', siren: '812 445 901', type: 'RCS', statut: 'alerte',
     boutonDocument: false,
-    sommaire: { designation: 'SCI DU PARC', champs: [
-      { libelle: 'N° de gestion', valeur: '004176', mono: true },
+    sommaire: { champs: [
+      { libelle: 'SIREN', valeur: '812 445 901', mono: true },
       { libelle: 'Forme juridique', valeur: 'Societe civile immobiliere', mono: false },
     ], mention: '' },
     bandeau: { nombre: 1, erreur: true, liens: [
@@ -107,8 +107,26 @@ export function dossier(partiel: Partial<DossierVue> = {}): DossierVue {
     arbre: ligneArbre('n1', '004176 Modification - SCI DU PARC', [ligneArbre('n2', 'Statuts signes', [], 1)]),
     poignee: true, fiche: null, etapes: etapes(), poignee2: true,
     apercu: { detachees: 0, apercu: apercu() }, voile: false,
+    historique: historique(),
     ...partiel,
   }
+}
+
+/** Neuf pieces datees de l'affaire 004176, la plus recente en tete (Pont : VueHistorique). */
+export function historique(): PieceHistoriqueVue[] {
+  const piece = (id: string, date: string, libelle: string, rubrique: string, judiciaire = false, actif = false): PieceHistoriqueVue =>
+    ({ id, date, libelle, rubrique, origine: 'Edition greffe', pages: 1, judiciaire, actif })
+  return [
+    piece('n10', '19/11/2026', 'Kbis a jour', 'Dossier RCS', false, true),
+    piece('n11', '15/09/2026', 'Certificat en matiere de difficultes des entreprises', 'Pieces jointes'),
+    piece('n12', '12/12/2024', 'Depot de l etat des creances', 'Depots sur la procedure', true),
+    piece('n13', '15/11/2024', 'Depot du rapport du mandataire', 'Depots sur la procedure', true),
+    piece('n14', '12/11/2024', 'Lettre de regularisation du depot', 'Depots des comptes annuels'),
+    piece('n15', '15/10/2024', 'Certificat de depot d\'actes', "Depots d'actes"),
+    piece('n16', '08/10/2024', 'Synthese de depot au Guichet unique', 'Formalites'),
+    piece('n17', '18/06/2024', 'Jugement d ouverture du redressement judiciaire', 'Procedure n 2024P00042 - Redressement judiciaire', true),
+    piece('n18', '03/03/2023', 'Rapport d expertise', 'Mesures d instruction', true),
+  ]
 }
 
 export function vueApplication(partiel: Partial<VueApplication> = {}): VueApplication {

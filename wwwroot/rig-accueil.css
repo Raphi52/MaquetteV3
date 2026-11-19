@@ -669,53 +669,44 @@
   position: fixed; inset: var(--rig-bandeau-h, 39px) 0 0 0; z-index: 89;
   background: var(--rig-fond);
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  /* Deux rangees (19/11/2026) : l'entete -- qui porte desormais la fiche
+     sommaire et les points a corriger -- puis la zone de travail. */
+  grid-template-rows: auto minmax(0, 1fr);
 }
-/* ---------- Fiche sommaire : bandeau d'identite au-dessus de l'arbre ----
-   Reprise du panneau « Fiche sommaire » de PROC_VDOSSIER (v2), mais COMPACTE :
-   tout sur une seule ligne qui se replie, et un champ vide ne s'affiche pas du
-   tout -- son libelle non plus (demande du 17/09/2026). */
-.rig-sommaire {
-  border-bottom: 1px solid var(--rig-bord);
-  padding: 2px var(--rig-esp-4) 4px;
-}
-.rig-sommaire__titre {
-  display: flex; align-items: baseline; gap: var(--rig-esp-2);
-  cursor: pointer; list-style: none; padding: 2px 0;
-  font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
-  color: var(--rig-texte-3); user-select: none;
-}
-.rig-sommaire__titre::-webkit-details-marker { display: none; }
-.rig-sommaire__titre::before {
-  content: "▾"; font-size: 10px; transition: transform .12s ease;
-}
-.rig-sommaire:not([open]) .rig-sommaire__titre::before { transform: rotate(-90deg); }
-/* Rappel du dossier quand le bloc est replie : on ne perd pas l'identite. */
-.rig-sommaire__resume {
-  text-transform: none; letter-spacing: 0; font-size: 12px;
-  color: var(--rig-texte-2, var(--rig-texte-3));
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.rig-sommaire[open] .rig-sommaire__resume { display: none; }
-.rig-sommaire__ligne {
-  display: flex; flex-wrap: wrap; align-items: baseline;
-  gap: 2px var(--rig-esp-3); font-size: 12px; line-height: 1.4;
-}
-.rig-sommaire__champ { display: inline-flex; align-items: baseline; gap: 4px; }
-.rig-sommaire__libelle { font-size: 11px; color: var(--rig-texte-3); }
-.rig-sommaire__valeur { color: var(--rig-texte); font-weight: 600; }
-.rig-sommaire__valeur--mono { font-family: var(--rig-font-mono); font-weight: 400; }
-.rig-sommaire__mention { color: var(--rig-danger, #D92D20); font-weight: 600; }
 .rig-vged__entete {
   display: flex; align-items: center; gap: var(--rig-esp-3);
-  padding: var(--rig-esp-3) var(--rig-esp-4);
+  padding: var(--rig-esp-2) var(--rig-esp-4);
   border-bottom: 1px solid var(--rig-bord);
 }
+/* ---------- Identite de l'affaire et FICHE SOMMAIRE en puces ----------
+   Proposition 5 du /draft du 19/11/2026 : le panneau « Fiche sommaire » de
+   PROC_VDOSSIER (v2) monte dans l'entete. Le numero et l'objet en titre, les
+   champs d'identite en puces dessous, qui passent a la ligne plutot que de
+   pousser les boutons. Un champ vide ne s'affiche pas du tout -- son libelle
+   non plus (demande du 17/09/2026). */
+.rig-vged__identite { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.rig-vged__titre {
+  font-size: 14px; font-weight: 600; color: var(--rig-texte);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rig-vged__numero { font: 600 13px var(--rig-font-mono); }
+.rig-vged__puces { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.rig-vged__puce {
+  display: inline-flex; align-items: baseline; gap: 4px; max-width: 100%;
+  padding: 1px 8px; border-radius: 999px;
+  background: var(--rig-fond-2); border: 1px solid var(--rig-bord-faible);
+  font-size: 11px; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rig-vged__puce-libelle { color: var(--rig-texte-3); }
+.rig-vged__puce-valeur { color: var(--rig-texte); font-weight: 600; }
+.rig-vged__puce-valeur--mono { font-family: var(--rig-font-mono); font-weight: 400; }
+.rig-vged__mention { font-size: 11px; color: var(--rig-erreur); font-weight: 600; }
 /* Arbre a gauche, tableau des editions en colonne de droite : la mise
    en page de PROC_VDOSSIER + PROC_TABLEAU_LOT3 dans RIG v2. */
 .rig-vged__corps {
-  /* Toujours la DERNIERE rangee : le bandeau des defauts est conditionnel,
-     sans cette ancre la zone de travail perdait sa hauteur souple. */
+  /* Toujours la DERNIERE rangee, celle de hauteur souple, quel que soit le
+     nombre de bandeaux au-dessus (le bandeau des defauts y etait conditionnel
+     avant de passer en pastille dans l'entete, le 19/11/2026). */
   grid-row: -2;
   display: grid; grid-template-columns: 520px 6px minmax(0, 1fr);
   min-height: 0; position: relative;
@@ -1995,6 +1986,57 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-vged__donnees { padding: 0; overflow: hidden; gap: 0; }
 .rig-vged__donnees .rig-champs { grid-template-columns: 1fr; max-width: none; }
 
+/* La colonne du milieu : les donnees, puis l'HISTORIQUE DES PIECES dessous
+   (proposition 5 du /draft du 19/11/2026). Les donnees prennent la hauteur
+   restante et defilent seules ; l'historique garde la sienne (45 % au plus,
+   « tout voir » defile dans ce cadre). */
+.rig-vged__milieu { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.rig-vged__milieu > .rig-vged__donnees { flex: 1 1 0; min-height: 0; }
+.rig-chrono {
+  flex: 0 1 auto; max-height: 45%; min-height: 0;
+  display: flex; flex-direction: column;
+  border-left: 1px solid var(--rig-bord);
+  padding: 6px var(--rig-esp-3) var(--rig-esp-2);
+  /* Le filet or qui coupe la colonne : les donnees au-dessus, les pieces dessous. */
+  background: linear-gradient(90deg, var(--rig-or), transparent) top left / 100% 1px no-repeat;
+}
+.rig-chrono__entete {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--rig-esp-2); padding: 4px 6px;
+}
+.rig-chrono__titre {
+  font: 600 10px/1.3 var(--rig-font-mono); letter-spacing: .1em;
+  text-transform: uppercase; color: var(--rig-texte-3);
+}
+.rig-chrono__tout {
+  background: none; border: 0; padding: 0; cursor: pointer; white-space: nowrap;
+  font: 600 11px var(--rig-font); color: var(--rig-accent);
+}
+.rig-chrono__tout:hover { text-decoration: underline; }
+.rig-chrono__tout[aria-expanded="false"]::after { content: " \203A"; }
+.rig-chrono__liste { list-style: none; margin: 0; padding: 0; overflow-y: auto; min-height: 0; }
+.rig-chrono__piece {
+  display: flex; align-items: center; gap: 8px; width: 100%; height: 24px; padding: 0 6px;
+  background: none; border: 0; border-radius: 5px; cursor: pointer; text-align: left;
+  font: 12px/1.2 var(--rig-font); color: var(--rig-texte-2);
+}
+.rig-chrono__piece:hover { background: var(--rig-survol-ligne); color: var(--rig-texte); }
+.rig-chrono__piece--actif {
+  background: color-mix(in srgb, var(--rig-or) 16%, transparent);
+  box-shadow: inset 3px 0 0 var(--rig-or); color: var(--rig-texte); font-weight: 600;
+}
+.rig-chrono__date { flex: none; width: 74px; font: 11px var(--rig-font-mono); color: var(--rig-texte-3); }
+.rig-chrono__point {
+  flex: none; width: 8px; height: 8px; box-sizing: border-box;
+  border-radius: 50%; border: 2px solid var(--rig-or);
+}
+/* Le bleu des pieces judiciaires : celui de la charte (verbe « trouver »),
+   qui existe dans chacun des cinq themes. */
+.rig-chrono__point--jud { border-color: var(--rig-verbe-trouver); }
+.rig-chrono__piece--actif .rig-chrono__point--rcs { background: var(--rig-or); }
+.rig-chrono__piece--actif .rig-chrono__point--jud { background: var(--rig-verbe-trouver); }
+.rig-chrono__libelle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .rig-vged__apercu { padding: 0; }
 .rig-vged__apercu .rig-apercu {
   width: 100%; height: 100%;
@@ -2092,6 +2134,7 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 }
 @media (max-width: 1200px) {
   .rig-vged__guide { border-left: 0; border-top: 1px solid var(--rig-bord); }
+  .rig-chrono { border-left: 0; }
 }
 
 /* ---------- Apercu d'une piece (visionneuse) et boite d'impression ---------- */
@@ -2504,41 +2547,49 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-infos__section .rig-saisie-champ:hover .rig-saisie-champ__colonne,
 .rig-infos__section .rig-saisie-champ__saisie:focus ~ .rig-saisie-champ__colonne { opacity: 1; }
 
-/* Bandeau des defauts du dossier ouvert (2026-09-15) : liens vers l'etape a corriger. */
-.rig-bandeau-defauts {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--rig-esp-2);
-  padding: var(--rig-esp-2) var(--rig-esp-4);
-  border-bottom: 1px solid var(--rig-bord);
-  border-left: 3px solid var(--rig-alerte);
-  background: var(--rig-fond-2);
+/* Les POINTS A CORRIGER du dossier ouvert (2026-09-15) : une pastille dans
+   l'entete depuis le 19/11/2026 (proposition 5 du /draft), qui deroule un lien
+   par etape a corriger. Orange = un requis manque, rouge = une valeur refusee. */
+.rig-vged__defauts { position: relative; flex: none; }
+.rig-vged__defauts-pastille {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 999px; cursor: pointer; list-style: none;
+  font: 600 var(--rig-fs-dense)/1.3 var(--rig-font); white-space: nowrap; user-select: none;
+  color: var(--rig-alerte);
+  background: color-mix(in srgb, var(--rig-alerte) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--rig-alerte) 40%, transparent);
+}
+.rig-vged__defauts-pastille::-webkit-details-marker { display: none; }
+.rig-vged__defauts-pastille svg {
+  width: 14px; height: 14px; fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.rig-vged__defauts-pastille b { font-size: 1.15em; }
+.rig-vged__defauts--erreur .rig-vged__defauts-pastille {
+  color: var(--rig-erreur);
+  background: color-mix(in srgb, var(--rig-erreur) 10%, transparent);
+  border-color: color-mix(in srgb, var(--rig-erreur) 40%, transparent);
+}
+.rig-vged__defauts-liste {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 20;
+  display: flex; flex-direction: column; gap: 2px; min-width: 220px; padding: 6px;
+  border-radius: var(--rig-radius-sm); border: 1px solid var(--rig-bord);
+  background: var(--rig-surface); box-shadow: var(--rig-ombre);
+}
+.rig-vged__defauts-lien {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: none; border: none; border-radius: 6px; text-align: left;
+  color: var(--rig-texte-2); cursor: pointer; padding: 4px 6px 4px 10px;
   font: var(--rig-fs-dense)/1.4 var(--rig-font);
 }
-.rig-bandeau-defauts__replis { flex: 1; min-width: 0; }
-.rig-bandeau-defauts__resume { display: inline-flex; align-items: baseline; gap: var(--rig-esp-3, 12px); cursor: pointer; list-style: none; }
-.rig-bandeau-defauts__resume::-webkit-details-marker { display: none; }
-.rig-bandeau-defauts__titre { font-weight: 600; color: var(--rig-alerte); }
-.rig-bandeau-defauts__titre b { font-size: 1.35em; }
-.rig-bandeau-defauts__voir { color: var(--rig-alerte); text-decoration: underline; text-underline-offset: 2px; }
-.rig-bandeau-defauts__voir::after { content: " \25BE"; }
-.rig-bandeau-defauts__replis[open] .rig-bandeau-defauts__voir::after { content: " \25B4"; }
-.rig-bandeau-defauts__liste { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--rig-esp-2); }
-.rig-bandeau-defauts__lien {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: var(--rig-fond); border: none; border-radius: 999px;
-  color: var(--rig-texte-2); cursor: pointer; padding: 2px 4px 2px 10px;
-  font: inherit;
-}
-.rig-bandeau-defauts__lien:hover { color: var(--rig-texte); text-decoration: underline; }
-/* Code couleur (2026-09-15) : orange = requis manquant, rouge = valeur en erreur. */
-.rig-bandeau-defauts__nb {
+.rig-vged__defauts-lien:hover { color: var(--rig-texte); background: var(--rig-survol-ligne); }
+.rig-vged__defauts-nb {
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; box-sizing: border-box;
   display: inline-flex; align-items: center; justify-content: center;
   font: 600 11px var(--rig-font); color: #fff; background: var(--rig-alerte);
 }
-.rig-bandeau-defauts__lien--refuse { color: var(--rig-texte); }
-.rig-bandeau-defauts__lien--refuse .rig-bandeau-defauts__nb { background: var(--rig-erreur); }
-.rig-bandeau-defauts--erreur { border-left-color: var(--rig-erreur); }
-.rig-bandeau-defauts--erreur .rig-bandeau-defauts__titre { color: var(--rig-erreur); }
+.rig-vged__defauts-lien--refuse { color: var(--rig-texte); }
+.rig-vged__defauts-lien--refuse .rig-vged__defauts-nb { background: var(--rig-erreur); }
 
 /* Formulaire du milieu : boutons Actions (XACTION) et Historique (15/09/2026). */
 .rig-fiche__outils { display: flex; align-items: center; gap: var(--rig-esp-2); }
