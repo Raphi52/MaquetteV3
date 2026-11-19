@@ -22,6 +22,18 @@
     <Compile Include="../../Metier/AlertesGreffe.cs" Link="AlertesGreffe.cs" />
     <Compile Include="../../Metier/ActionsXaction.cs" Link="ActionsXaction.cs" />
     <Compile Include="../../AccueilEtat.cs" Link="AccueilEtat.cs" />
+    <!-- Ecrans portes en React le 19/11/2026 (lot 3) : leurs ponts sont executes ici. -->
+    <Compile Include="../../Metier/DossierRcs.cs" Link="DossierRcs.cs" />
+    <Compile Include="../../Metier/AffairesOuvertes.cs" Link="AffairesOuvertes.cs" />
+    <Compile Include="../../Pont/SessionsEcran.cs" Link="Pont/SessionsEcran.cs" />
+    <Compile Include="../../Pont/EcranRechAffaires.cs" Link="Pont/EcranRechAffaires.cs" />
+    <Compile Include="../../Pont/EcranTableauEditions.cs" Link="Pont/EcranTableauEditions.cs" />
+    <Compile Include="../../Pont/EcranTachesLot.cs" Link="Pont/EcranTachesLot.cs" />
+  </ItemGroup>
+
+  <!-- Pont/*.cs porte [JSInvokable] (Microsoft.JSInterop), livre avec ASP.NET Core. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
 </Project>

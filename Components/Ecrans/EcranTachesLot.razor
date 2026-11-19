@@ -1,3 +1,5 @@
+@implements IDisposable
+
 @* ============================================================
    TRAITEMENT EN LOT : la MEME recette appliquee a PLUSIEURS affaires.
 
@@ -16,140 +18,23 @@
    Origine : Sans origine RIG v2. L'ancienne application traitait les
    taches UNE PAR UNE, dossier par dossier ; aucun ecran v2 ne portait le
    lot. Il n'y a donc pas de procedure PROC_ a citer ici.
+
+   PORTE EN REACT (lot 3 de la migration, 19/11/2026) : l'ecran est rendu
+   par web/src/ecrans/EcranTachesLot.tsx ; ses regles (lots, choix
+   d'ouverture, saisie, cloture par dossier) vivent dans
+   Pont/EcranTachesLot.cs. Ce fichier n'est plus qu'une COQUILLE : il garde
+   les parametres d'origine (Etat, Utilisateur, CodeRecette) pour que
+   Home.razor ne change pas.
+
+   Pourquoi la coquille ouvre ELLE-MEME la session : l'ecran ecrit dans
+   l'etat VIVANT de l'accueil (AccueilEtat), un objet qui ne traverse pas
+   vers React. La session le recoit ici ; React n'en recoit que
+   l'identifiant, et « version » change quand un nouveau parametre change la
+   recette affichee (une alerte de lot qui rouvre l'ecran sur une autre).
+   Mode d'emploi : web/README.md.
    ============================================================ *@
 
-<div class="rig-proc__corps">
-
-    <aside class="rig-criteres">
-        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Taches en attente</div>
-
-        @foreach (var item in Lots)
-        {
-            var lot = item;
-            <button class="rig-alerte rig-alerte--lien @(ReferenceEquals(lot.Recette, RecetteChoisie) ? "rig-alerte--actif" : "")"
-                    type="button"
-                    title="@(lot.Recette.ARepetition
-                              ? "Cette tache se saisit dossier par dossier"
-                              : $"Traiter les {lot.Dossiers.Length} dossiers en lot")"
-                    @onclick="() => Choisir(lot.Recette)">
-                <span class="rig-filet-v rig-filet-v--action"></span>
-                <span class="rig-alerte__corps">
-                    <span class="rig-alerte__titre">@lot.Recette.Titre</span><br />
-                    <span class="rig-alerte__detail">
-                        @lot.Dossiers.Length dossier(s)
-                        @if (lot.Recette.ARepetition)
-                        {
-                            <text>&middot; saisie ligne par ligne</text>
-                        }
-                    </span>
-                </span>
-            </button>
-        }
-        @if (Lots.Length == 0)
-        {
-            <div class="rig-vide">Aucune tache en attente.</div>
-        }
-    </aside>
-
-    <section class="rig-resultats-proc">
-        <div class="rig-resultats-proc__entete">
-            <div class="rig-kicker">
-                <span>@(RecetteChoisie?.Titre ?? "Traitement en lot")</span>
-                @if (RecetteChoisie is not null)
-                {
-                    @* Un espace insecable AVANT la puce : sans lui, le code se
-                       collait au titre (« ...NOM DE DOMAINEDENO », vu le 16/09). *@
-                    <span>&#160;&middot;&#160;</span>
-                    <span class="rig-infos__table">@string.Join(" / ", RecetteChoisie.Evenements)</span>
-                }
-            </div>
-            <span class="rig-resultats-proc__compte">@DossiersDuLot.Length dossier(s)</span>
-        </div>
-
-        @if (RecetteChoisie is null)
-        {
-            <div class="rig-vide">Choisir une tache a gauche pour traiter ses dossiers ensemble.</div>
-        }
-        else if (RecetteChoisie.ARepetition)
-        {
-            @* Refus EXPLIQUE, pas un tableau vide : cette tache porte
-               plusieurs lignes par dossier, elle se traite une par une. *@
-            <div class="rig-vide">
-                « @RecetteChoisie.Titre » se saisit <b>ligne par ligne</b>
-                (plusieurs @RecetteChoisie.LibelleLigne.ToLowerInvariant()s par dossier).
-                Ouvrir chaque affaire depuis la file d'alertes.
-            </div>
-        }
-        else
-        {
-            <div class="rig-table-cadre">
-                <table class="rig-table">
-                    <thead>
-                        <tr>
-                            <th>Dossier</th>
-                            <th>Societe</th>
-                            @foreach (var c in RecetteChoisie.ChampsObligatoires)
-                            {
-                                @* L'infobulle montre la colonne REELLE de la
-                                   base (prefixe compris), pas le nom du
-                                   referentiel : c'est celle-la qu'il faudra
-                                   ecrire au branchement. *@
-                                <th title="@ColonnesRig.Resoudre(c)">@c.Libelle</th>
-                            }
-                            <th>Propagation</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var item in DossiersDuLot)
-                        {
-                            var d = item;
-                            var restants = Restants(d.Dossier);
-                            var effets = EffetsRestants(d.Dossier);
-                            var pret = restants == 0 && effets == 0;
-                            <tr title="@(pret ? "Pret a terminer" : $"{restants} champ(s) et {effets} publication(s) a traiter")">
-                                <td class="rig-table__mono">@d.Dossier</td>
-                                <td>@d.Nom</td>
-                                @foreach (var champ in RecetteChoisie.ChampsObligatoires)
-                                {
-                                    var c = champ;
-                                    var cle = RecetteTache.Cle(c);
-                                    <td>
-                                        <input class="rig-saisie-champ__saisie"
-                                               value="@(Etat.DerniereValeur(d.Dossier, cle) ?? "")"
-                                               @onchange="ev => Ecrire(d, c, cle, ev.Value?.ToString() ?? string.Empty)" />
-                                    </td>
-                                }
-                                <td class="rig-table__mono">
-                                    @(RecetteChoisie.EffetsObligatoires.Length - effets)
-                                    / @RecetteChoisie.EffetsObligatoires.Length
-                                    <button class="rig-bouton rig-bouton--plat"
-                                            title="Marquer toutes les publications de ce dossier comme traitees"
-                                            @onclick="() => ToutPropager(d.Dossier)">tout</button>
-                                </td>
-                                <td>
-                                    <button class="rig-bouton rig-tache__terminer" disabled="@(!pret)"
-                                            title="@(pret
-                                                      ? "Terminer la tache sur ce dossier"
-                                                      : "Renseigner les champs et les publications d'abord")"
-                                            @onclick="() => Terminer(d)">Terminer</button>
-                                </td>
-                            </tr>
-                        }
-                        @if (DossiersDuLot.Length == 0)
-                        {
-                            <tr><td colspan="9" class="rig-table__vide">Plus aucun dossier en attente pour cette tache.</td></tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-            @if (DernierMessage.Length > 0)
-            {
-                <div class="rig-fiche__note">@DernierMessage</div>
-            }
-        }
-    </section>
-</div>
+<IleReact Composant="EcranTachesLot" Proprietes="Proprietes" />
 
 @code {
     [Parameter, EditorRequired] public AccueilEtat Etat { get; set; } = default!;
@@ -157,124 +42,36 @@
     /// <summary>Qui traite : son nom part dans la trace et dans la cloture.</summary>
     [Parameter] public string Utilisateur { get; set; } = "";
 
-    private RecetteTache? RecetteChoisie;
-    private string DernierMessage = "";
-
-    private sealed record DossierDuLot(string Dossier, string Nom, DateTime Signale);
-
-    /// <summary>
-    /// Les taches en attente, groupees par recette. Source : les evenements
-    /// attendus du jeu de demonstration, MOINS ceux dont la tache est deja
-    /// close -- exactement la meme regle que la file d'alertes.
-    /// </summary>
-    private (RecetteTache Recette, DossierDuLot[] Dossiers)[] Lots
-        => JeuDemo.EvenementsAttendus
-            .Select(e => (Evt: e, Recette: RecettesTaches.ParCode(e.Code)))
-            .Where(x => x.Recette is not null)
-            .Where(x => !Etat.TacheFaite(x.Recette!.Code, x.Evt.Dossier))
-            .GroupBy(x => x.Recette!)
-            .Select(g => (g.Key, g.Select(x => Ligne(x.Evt))
-                                  .Where(d => d is not null).Select(d => d!)
-                                  .OrderBy(d => d.Signale).ToArray()))
-            .Where(x => x.Item2.Length > 0)
-            .ToArray();
-
-    private DossierDuLot[] DossiersDuLot
-        => RecetteChoisie is null
-            ? []
-            : Lots.FirstOrDefault(l => ReferenceEquals(l.Recette, RecetteChoisie)).Dossiers ?? [];
-
-    private static DossierDuLot? Ligne(EvenementAttendu e)
-    {
-        var demande = JeuDemo.Demandes.FirstOrDefault(d => d.Dossier == e.Dossier);
-        return demande is null ? null : new DossierDuLot(e.Dossier, demande.Nom, e.Signale);
-    }
-
     /// <summary>
     /// La recette a ouvrir d'office, quand on vient d'une alerte de lot
     /// (« 2 dossiers : renommer la societe »). Vide = choix automatique.
     /// </summary>
     [Parameter] public string CodeRecette { get; set; } = "";
 
-    /// <summary>
-    /// A l'ouverture : la recette DEMANDEE si l'alerte en nomme une, sinon
-    /// le lot le PLUS GROS parmi ceux qui se traitent en tableau. Arriver
-    /// sur un ecran vide obligeait a un clic pour ne rien apprendre.
-    /// </summary>
-    protected override void OnInitialized() => Poser();
-
-    /// <summary>Rouvrir l'ecran sur une AUTRE recette doit changer la vue.</summary>
-    protected override void OnParametersSet() => Poser();
-
-    private void Poser()
-    {
-        if (CodeRecette.Length > 0
-            && Lots.FirstOrDefault(l => l.Recette.Code == CodeRecette) is { Recette: not null } demande)
-        {
-            RecetteChoisie = demande.Recette;
-            return;
-        }
-        RecetteChoisie ??= Lots.Where(l => !l.Recette.ARepetition)
-                               .OrderByDescending(l => l.Dossiers.Length)
-                               .Select(l => l.Recette)
-                               .FirstOrDefault();
-    }
-
-    private void Choisir(RecetteTache r)
-    {
-        RecetteChoisie = r;
-        DernierMessage = "";
-    }
-
-    /// <summary>Champs exiges encore vides sur CE dossier.</summary>
-    private int Restants(string dossier)
-        => RecetteChoisie?.Manquants(cle => Etat.DerniereValeur(dossier, cle)).Length ?? 0;
-
-    /// <summary>Publications encore a traiter sur CE dossier.</summary>
-    private int EffetsRestants(string dossier)
-        => RecetteChoisie?.EffetsRestants(
-               canal => Etat.EffetTraite(RecetteChoisie.Code, dossier, canal)).Length ?? 0;
+    private string? Session;
+    private int Version;
 
     /// <summary>
-    /// Ecrire dans le tableau note la modification DANS LE DOSSIER concerne :
-    /// la trace reste par affaire, le lot n'est qu'une facon de saisir.
+    /// Premier passage : la session s'ouvre et pose la recette (OnInitialized
+    /// du .razor d'origine). Ensuite, a chaque rendu de l'accueil : rouvrir
+    /// l'ecran sur une AUTRE recette doit changer la vue.
     /// </summary>
-    private void Ecrire(DossierDuLot d, ChampRecette c, string cle, string apres)
+    protected override void OnParametersSet()
     {
-        var avant = Etat.DerniereValeur(d.Dossier, cle) ?? string.Empty;
-        if (avant == apres) return;
-        Etat.NoterModification(d.Dossier, new ModificationChamp(
-            DateTime.Now, Utilisateur, $"Traitement en lot > {RecetteChoisie!.Titre}",
-            c.Libelle, cle, avant, apres));
+        if (Session is null)
+            Session = global::RigV3Desktop.Pont.EcranTachesLot.Ouvrir(Etat, Utilisateur, CodeRecette);
+        else if (global::RigV3Desktop.Pont.EcranTachesLot.Parametrer(Session, Etat, Utilisateur, CodeRecette))
+            Version++;
     }
 
-    private void ToutPropager(string dossier)
+    private Dictionary<string, object?> Proprietes => new()
     {
-        if (RecetteChoisie is null) return;
-        foreach (var e in RecetteChoisie.EffetsObligatoires)
-        {
-            if (!Etat.EffetTraite(RecetteChoisie.Code, dossier, e.Canal))
-                Etat.BasculerEffet(RecetteChoisie.Code, dossier, e.Canal);
-        }
-        Etat.Journaliser(dossier,
-            $"Tache {RecetteChoisie.Code} (lot) : publications marquees traitees par {Utilisateur}");
-    }
+        ["session"] = Session,
+        ["version"] = Version
+    };
 
-    /// <summary>
-    /// Cloture PAR DOSSIER. Il n'y a volontairement PAS de « tout terminer » :
-    /// un bouton global fermerait aussi les dossiers incomplets, et c'est
-    /// precisement ce que le controle de completude sert a empecher.
-    /// </summary>
-    private void Terminer(DossierDuLot d)
+    public void Dispose()
     {
-        if (RecetteChoisie is null) return;
-        if (Restants(d.Dossier) > 0 || EffetsRestants(d.Dossier) > 0) return;
-
-        var valeurs = string.Join(", ", RecetteChoisie.ChampsObligatoires
-            .Select(c => $"{c.Libelle} = {Etat.DerniereValeur(d.Dossier, RecetteTache.Cle(c))}"));
-        Etat.CloreTache(RecetteChoisie.Code, d.Dossier, Utilisateur);
-        Etat.Journaliser(d.Dossier,
-            $"Tache {RecetteChoisie.Code} terminee en lot par {Utilisateur} : {valeurs}");
-        DernierMessage = $"{d.Dossier} termine. Son alerte ne reviendra plus.";
+        if (Session is not null) global::RigV3Desktop.Pont.EcranTachesLot.Fermer(Session);
     }
 }

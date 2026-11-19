@@ -55,5 +55,25 @@ writeFileSync(sortie, PNG.sync.write(diff))
 
 const total = width * hauteur
 const part = ((differents / total) * 100).toFixed(3)
-console.log(JSON.stringify({ avant: cheminAvant, apres: cheminApres, zone: `${width}x${hauteur} (bande du haut ignoree : ${haut} px)`, pixelsDifferents: differents, part: `${part} %`, image: sortie }))
+
+// OU sont les differences : le rectangle qui les contient, en pixels de la
+// capture ENTIERE (bande du haut comprise). Sans lui, il fallait relire l'image
+// rouge a l'oeil pour savoir quelle ligne de l'ecran avait bouge (lot 3).
+let boite = null
+for (let y = 0; y < hauteur; y++) {
+  for (let x = 0; x < width; x++) {
+    const i = (y * width + x) * 4
+    let ecart = 0
+    for (let k = 0; k < 3; k++) {
+      ecart = Math.max(ecart, Math.abs(avant.data[(haut * width * 4) + i + k] - apres.data[(haut * width * 4) + i + k]))
+    }
+    if (ecart === 0) continue
+    if (!boite) boite = { x0: x, y0: y + haut, x1: x, y1: y + haut, ecartMax: ecart }
+    boite.x0 = Math.min(boite.x0, x); boite.x1 = Math.max(boite.x1, x)
+    boite.y0 = Math.min(boite.y0, y + haut); boite.y1 = Math.max(boite.y1, y + haut)
+    boite.ecartMax = Math.max(boite.ecartMax, ecart)
+  }
+}
+
+console.log(JSON.stringify({ avant: cheminAvant, apres: cheminApres, zone: `${width}x${hauteur} (bande du haut ignoree : ${haut} px)`, pixelsDifferents: differents, part: `${part} %`, boite, image: sortie }))
 process.exit(differents === 0 ? 0 : 1)

@@ -150,14 +150,35 @@ var sources = vue2 + Environment.NewLine
                            .Select(File.ReadAllText));
 Exiger(Regex.IsMatch(vue2, @"private bool EstValide\(string numeroDossier\) => Etat\.Valides\.Contains"),
     "une seule source de verite pour l etat valide");
-Exiger(Regex.IsMatch(vue2, @"valide \? ""Validee"""),
+// Les ecrans Demandes, Arrivee et Actes sont PORTES EN REACT (lot 3, 19/11/2026) :
+// leur filtre et l etat AFFICHE vivent dans Pont/<Ecran>.cs, leur balisage et
+// leurs clics dans web/src/ecrans/<Ecran>.tsx. Chaque regle ci-dessous se lit a
+// son nouvel endroit, ET s execute par le pont (meme appel que l ecran React).
+var racineDepot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
+string LireDepot(string relatif) => File.ReadAllText(Path.Combine(racineDepot, relatif));
+var pontDemandes = LireDepot("Pont/EcranDemandes.cs");
+var pontActes = LireDepot("Pont/EcranActes.cs");
+var tsxArrivee = LireDepot("web/src/ecrans/EcranArrivee.tsx");
+var tsxActes = LireDepot("web/src/ecrans/EcranActes.tsx");
+RigV3Desktop.Pont.CriteresDemandes CritDemandes(string[] etats, bool enCours = false)
+    => new("", "", "", null, null, etats, false, enCours, 500);
+var demandeEnCours = JeuDemo.Demandes.First(d => d.EnCours);
+var grilleValide = RigV3Desktop.Pont.EcranDemandes.Trouver(CritDemandes([]), [demandeEnCours.Dossier]);
+
+Exiger(Regex.IsMatch(pontDemandes, @"valide \? ""Validee""")
+       && grilleValide.Lignes.Where(l => l.Dossier == demandeEnCours.Dossier).All(l => l.Etat == "Validee" && l.Statut == "ok"),
     "la grille de resultats affiche Validee pour un dossier valide");
-Exiger(Regex.IsMatch(vue2, @"!valide && dem\.EnCours"),
+Exiger(Regex.IsMatch(pontDemandes, @"!valide && dem\.EnCours")
+       && grilleValide.Lignes.Where(l => l.Dossier == demandeEnCours.Dossier).All(l => !l.EnCours)
+       && RigV3Desktop.Pont.EcranDemandes.Trouver(CritDemandes([], enCours: true), [demandeEnCours.Dossier])
+              .Lignes.All(l => l.Dossier != demandeEnCours.Dossier),
     "un dossier valide n est plus compte en cours dans la grille");
 // La tuile « Ma file » a ete RETIREE de l accueil le 17/09/2026 a la demande de
 // l utilisateur : l assertion qui gardait son appel a EstValide n a plus d objet.
 // Le meme invariant reste garde ci-dessus sur la grille de resultats.
-Exiger(vue2.Contains("CritEtats.Contains(EtatReel(d))"),
+Exiger(pontDemandes.Contains("CritEtats.Contains(EtatReel(d))")
+       && RigV3Desktop.Pont.EcranDemandes.Trouver(CritDemandes(["Validee"]), [demandeEnCours.Dossier])
+              .Lignes.Any(l => l.Dossier == demandeEnCours.Dossier),
     "le filtre par etat suit la validation, sinon il raterait les dossiers valides");
 
 // --- 6. L ecran Arrivee du courrier a ses PROPRES criteres et colonnes
@@ -173,9 +194,14 @@ foreach (var mode in new[] { "Accueil", "e-Mail", "Edi", "Fax", "Poste", "Recomm
     Exiger(sources.Contains(mode), $"le mode d arrivee « {mode} » est celui de dbo.MODE_ARRIVEE");
 }
 // --- 7. Une arrivee mene a SA demande, sauf quand il n y en a pas
-Exiger(vue2.Contains("OuvrirDossier.InvokeAsync(a.NumDemande)"),
+var courrierSaisie = RigV3Desktop.Pont.EcranArrivee.Trouver(
+    new("", "", "", "", "", null, null, false, false, 500)).Lignes;
+Exiger(tsxArrivee.Contains("ouvrirDossier(a.numDemande)")
+       && LireDepot("Components/Ecrans/EcranArrivee.razor").Contains("[\"ouvrirDossier\"] = IleReact.Rappel(OuvrirDossier)")
+       && courrierSaisie.Any(a => a.NumDemande.Length > 0),
     "la ligne d arrivee ouvre la demande liee");
-Exiger(Regex.IsMatch(vue2, @"Ouvrir\(Arrivee a\)\s*=>\s*string\.IsNullOrWhiteSpace\(a\.NumDemande\)"),
+Exiger(Regex.IsMatch(tsxArrivee, @"function ouvrir\(a: LigneArrivee\) \{\s*if \(a\.numDemande\.trim\(\) === ''\) return\s+ouvrirDossier")
+       && courrierSaisie.Any(a => a.NumDemande.Trim() == ""),
     "une arrivee sans demande ne mene nulle part");
 Exiger(vue2.Contains("rig-table__ligne--inerte"),
     "une ligne sans demande se distingue visuellement");
@@ -195,9 +221,15 @@ foreach (var cat in new[] { "Depots actes", "Depots des comptes annuels", "Benef
     Exiger(sources.Contains(cat), $"la categorie « {cat} » est celle de dbo.CATEGORIE_DEPOT");
 }
 // Les actes non numerisables sont MASQUES par defaut : la case les ajoute.
-Exiger(vue2.Contains("if (!CritNonNumerisables) q = q.Where(a => a.Numerisable);"),
+RigV3Desktop.Pont.CriteresActes CritActes(bool nonNumerisables)
+    => new("", "", "", null, null, nonNumerisables, false, 500);
+var actesParDefaut = RigV3Desktop.Pont.EcranActes.Trouver(CritActes(false)).Lignes;
+var actesAvecCase = RigV3Desktop.Pont.EcranActes.Trouver(CritActes(true)).Lignes;
+Exiger(pontActes.Contains("if (!c.CritNonNumerisables) q = q.Where(a => a.Numerisable);")
+       && actesParDefaut.All(a => a.Numerisable)
+       && actesAvecCase.Length > actesParDefaut.Length && actesAvecCase.Any(a => !a.Numerisable),
     "les actes non numerisables sont masques tant que la case n est pas cochee");
-Exiger(Regex.IsMatch(vue2, @"Ouvrir\(ActeNum a\)\s*=>\s*!a\.Numerisable"),
+Exiger(Regex.IsMatch(tsxActes, @"function ouvrir\(a: LigneActe\) \{\s*if \(!a\.numerisable\) return\s+ouvrirDossier"),
     "un acte non numerisable n ouvre rien");
 
 // --- 9. Historique VGED : evenements HORODATES a l instant de l action

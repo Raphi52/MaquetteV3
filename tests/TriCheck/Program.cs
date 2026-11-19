@@ -96,7 +96,28 @@ internal static class Programme
             }
         }
 
-        Verifier("EcranRechAffaires", "Trouvees", "Nom", o => Membre(o, "Nom"));
+        // EcranRechAffaires est PORTE EN REACT (lot 3, 19/11/2026) : la grille est
+        // triee par Pont/EcranRechAffaires.cs (ordre des chaines .NET), l'ecran
+        // React ne lui passe que la colonne et le sens. Meme mesure, sur le pont :
+        // un clic range la grille, un second clic sur la meme colonne l'inverse.
+        {
+            var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
+            var tsxRech = File.ReadAllText(Path.Combine(racine, "web/src/ecrans/EcranRechAffaires.tsx"));
+            Exiger(System.Text.RegularExpressions.Regex.IsMatch(tsxRech,
+                       @"function basculerTri\(cle: string\) \{\s*if \(cleTri === cle\) setTriAscendant\(!triAscendant\)\s*else \{ setCleTri\(cle\); setTriAscendant\(true\) \}")
+                   && tsxRech.Contains("<EnteteTriable "),
+                "EcranRechAffaires : les en-tetes partages basculent le tri (basculerTri)");
+            var sansCritere = new RigV3Desktop.Pont.CriteresAffaires("", "", "", "", "", "", "", "", "", null, null);
+            List<IComparable> Noms(bool ascendant) => RigV3Desktop.Pont.EcranRechAffaires
+                .Trouver(sansCritere, "Nom", ascendant, null).Lignes.Select(l => (IComparable)l.Nom).ToList();
+            var croissant = Noms(true);
+            var decroissant = Noms(false);
+            Exiger(croissant.Count > 2, $"EcranRechAffaires : la grille a des lignes ({croissant.Count})");
+            Exiger(croissant.SequenceEqual(croissant.OrderBy(x => x)),
+                "EcranRechAffaires : un clic sur « Nom » range la grille dans l'ordre");
+            Exiger(decroissant.SequenceEqual(croissant.AsEnumerable().Reverse()),
+                "EcranRechAffaires : un second clic inverse l'ordre");
+        }
         Verifier("EcranRequisitions", "CommandesWebVisibles", "Recue", o => Membre(o, "Recue"));
 
         Console.WriteLine();

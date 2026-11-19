@@ -1,4 +1,5 @@
-﻿using RigV3Desktop;
+﻿using System.Text.Json;
+using RigV3Desktop;
 
 // Controle du widget ACTUALITES : des messages REDIGES (et non
 // calcules) lus dans un fichier PARTAGE, avec repli hors ligne VISIBLE,
@@ -106,16 +107,68 @@ Exiger(vue.Contains("rig-actualite__type"), "le type est NOMME a cote de sa coul
 Exiger(vue.Contains("EtatActualites"), "l'etat de la source est affiche dans la tuile");
 Exiger(vue.Contains("PROC_ACTUALITES"), "la tuile mene a l'ecran de saisie");
 
-// --- 6. L'ecran de saisie existe et est atteignable
+// --- 6. L'ecran de saisie existe et est atteignable.
+// PORTE EN REACT (lot 3, 19/11/2026) : EcranActualites.razor n'est plus qu'une
+// coquille qui monte web/src/ecrans/EcranActualites.tsx ; la liste et le depot
+// partage vivent dans Pont/EcranActualites.cs (ecran a session). Ce que ce banc
+// lisait dans le .razor -- l'ecran ecrit dans le depot partage, il porte un
+// geste de publication -- il le tient sur la chaine reelle, et l'EXECUTE.
 var ecran = Path.Combine(racine, "Components/Ecrans/EcranActualites.razor");
 Exiger(File.Exists(ecran), "l'ecran de saisie EcranActualites.razor existe");
-if (File.Exists(ecran))
-{
-    var texte = File.ReadAllText(ecran);
-    Exiger(texte.Contains("DepotActualites"), "l'ecran de saisie ecrit dans le depot partage");
-    Exiger(texte.Contains("Publier") || texte.Contains("Enregistrer"),
-        "l'ecran de saisie porte un geste de publication");
-}
+var coquille = File.Exists(ecran) ? File.ReadAllText(ecran) : string.Empty;
+Exiger(coquille.Contains("<IleReact Composant=\"EcranActualites\" />"),
+    "la coquille monte l'ecran React du meme nom, sans parametre comme avant");
+var cheminTsx = Path.Combine(racine, "web/src/ecrans/EcranActualites.tsx");
+Exiger(File.Exists(cheminTsx), "l'ecran React de saisie existe (web/src/ecrans/EcranActualites.tsx)");
+var tsx = File.Exists(cheminTsx) ? File.ReadAllText(cheminTsx) : string.Empty;
+var pontActu = File.ReadAllText(Path.Combine(racine, "Pont/EcranActualites.cs"));
+Exiger(pontActu.Contains("DepotActualites"), "l'ecran de saisie ecrit dans le depot partage");
+Exiger(tsx.Contains("geste('Publier')") && tsx.Contains("Publier l'actualite"),
+    "l'ecran de saisie porte un geste de publication");
+Exiger(tsx.Contains("'EcranActualites.Ouvrir'") && tsx.Contains("'EcranActualites.Agir'")
+       && tsx.Contains("'EcranActualites.Fermer'"),
+    "l'ecran React ouvre, pilote et ferme sa session par le pont");
+
+// Le geste reel, sur un depot JETABLE : publier ecrit le fichier partage.
+JsonElement Valeur(object? v) => JsonSerializer.SerializeToElement(v);
+var depotEcran = new DepotActualites { CheminPartage = Path.Combine(bac, "ecran-partage.json"),
+                                       CheminCache = Path.Combine(bac, "ecran-cache.json") };
+var v0 = RigV3Desktop.Pont.EcranActualites.Ouvrir(depotEcran);
+Exiger(v0.Liste.Length == 2 && v0.Liste.Any(l => l.Titre.Contains("CHERIFI")),
+    "depot vierge : l'ecran part des deux exemples du metier");
+Exiger(!v0.PeutPublier, "sans titre, « Publier » est grise");
+Exiger(v0.Types.Length == TypeActualite.Tous.Length && v0.Types.All(t => t.Aide.Length > 0),
+    "chaque type a son bouton et son infobulle");
+var s = v0.Session;
+RigV3Desktop.Pont.EcranActualites.Agir(s, "Titre", Valeur("Coupure INPI"));
+var v1 = RigV3Desktop.Pont.EcranActualites.Agir(s, "ChoisirType", Valeur(TypeActualite.Panne));
+Exiger(v1.Type == TypeActualite.Panne && v1.Jours == "30" && v1.PeutPublier,
+    "choisir un type repositionne la duree proposee (Panne : 30 jours)");
+var v2 = RigV3Desktop.Pont.EcranActualites.Agir(s, "Jours", Valeur("12a"));
+Exiger(v2.Jours == "30", "une duree illisible garde la derniere valeur lisible, comme le @bind d'un int");
+var v3 = RigV3Desktop.Pont.EcranActualites.Agir(s, "Publier", Valeur(null));
+var ecrites = depotEcran.Tous();
+Exiger(ecrites.Length == 3 && ecrites[0].Titre == "Coupure INPI" && ecrites[0].Type == TypeActualite.Panne
+       && ecrites[0].Statut == "alerte",
+    "« Publier » ECRIT le fichier partage, en tete, avec le type et le statut choisis");
+Exiger(v3.CompteRendu.StartsWith("Actualite publiee") && v3.StatutRendu == "ok" && v3.Titre == "",
+    "la publication est confirmee et le titre est vide pour la suivante");
+var v4 = RigV3Desktop.Pont.EcranActualites.Agir(s, "Retirer", Valeur(0));
+Exiger(v4.Liste.Length == 2 && depotEcran.Tous().Length == 2 && v4.CompteRendu == "Actualite retiree de l'accueil.",
+    "« Retirer » enleve l'actualite du fichier partage");
+RigV3Desktop.Pont.EcranActualites.Fermer(s);
+
+// Un depot qu'on ne peut pas ecrire ne se tait pas.
+var bloque = Path.Combine(bac, "fichier-bloquant");
+File.WriteAllText(bloque, "pas un dossier");
+var depotBloque = new DepotActualites { CheminPartage = Path.Combine(bloque, "sous", "partage.json"),
+                                        CheminCache = Path.Combine(bloque, "sous", "cache.json") };
+var sb = RigV3Desktop.Pont.EcranActualites.Ouvrir(depotBloque).Session;
+RigV3Desktop.Pont.EcranActualites.Agir(sb, "Titre", Valeur("Rien ne part"));
+var vb = RigV3Desktop.Pont.EcranActualites.Agir(sb, "Publier", Valeur(null));
+Exiger(vb.StatutRendu == "alerte" && vb.CompteRendu.StartsWith("ECHEC"),
+    "un echec d'ecriture est DIT au redacteur : rien n'est parti");
+RigV3Desktop.Pont.EcranActualites.Fermer(sb);
 Exiger(vue.Contains("case \"PROC_ACTUALITES\":"), "l'ecran est branche dans l'aiguillage des procedures");
 Exiger(vue.Contains("<EcranActualites />"), "l'ecran est rendu par l'accueil");
 Exiger(vue.Contains("\"PROC_ACTUALITES\", \"Actualites\"")

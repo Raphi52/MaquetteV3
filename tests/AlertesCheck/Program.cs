@@ -379,6 +379,44 @@ Exiger(avecMoi.Detenteurs.Sum(d => d.Nombre) == avecMoi.Lignes.Length
        && avecMoi.Detenteurs.Select(d => d.Utilisateur).SequenceEqual(avecMoi.Detenteurs.Select(d => d.Utilisateur).Order()),
     "les detenteurs, ranges par nom, comptent toutes les lignes");
 
+// --- 2 quater. L'ecran des teletransmissions, PORTE EN REACT (lot 3, 19/11/2026).
+// Meme principe que les verrous : la chaine coquille -> ile React -> pont C#,
+// et le calcul des flux (Pont/EcranTeletransmission.cs) EXECUTE ici.
+var coquilleTeletrans = File.ReadAllText(Path.Combine(racine, "Components/Ecrans/EcranTeletransmission.razor"));
+var cheminTsxTeletrans = Path.Combine(racine, "web/src/ecrans/EcranTeletransmission.tsx");
+Exiger(File.Exists(cheminTsxTeletrans), "l'ecran React des teletransmissions existe (web/src/ecrans/EcranTeletransmission.tsx)");
+var tsxTeletrans = File.Exists(cheminTsxTeletrans) ? File.ReadAllText(cheminTsxTeletrans) : string.Empty;
+var pontTeletrans = File.ReadAllText(Path.Combine(racine, "Pont/EcranTeletransmission.cs"));
+Exiger(coquilleTeletrans.Contains("<IleReact Composant=\"EcranTeletransmission\""),
+    "la coquille EcranTeletransmission.razor monte l'ecran React du meme nom");
+Exiger(Regex.IsMatch(coquilleTeletrans, @"\[Parameter\] public EventCallback<string> OuvrirDossier")
+       && coquilleTeletrans.Contains("[\"ouvrirDossier\"] = IleReact.Rappel(OuvrirDossier)"),
+    "la coquille des teletransmissions garde OuvrirDossier et le remonte depuis React");
+Exiger(vue.Contains("<EcranTeletransmission OuvrirDossier=\"OuvrirParNumero\" />"),
+    "Home.razor ouvre toujours l'affaire du flux clique");
+Exiger(tsxTeletrans.Contains("appeler<VueTeletransmission>('EcranTeletransmission.Flux', mode)")
+       && pontTeletrans.Contains("[JSInvokable(\"EcranTeletransmission.Flux\")]"),
+    "l'ecran React demande ses flux au pont, pour le mode choisi");
+Exiger(Regex.IsMatch(tsxTeletrans, @"if \(f\.numDemande\.trim\(\) === ''\) return\s+ouvrirDossier\(f\.numDemande\)"),
+    "un flux sans demande rattachee ne mene nulle part");
+Exiger(pontTeletrans.Contains("JeuDemo.Arrivees"),
+    "les flux viennent du courrier arrive, pas d'une liste a part");
+
+var fluxEdi = RigV3Desktop.Pont.EcranTeletransmission.Flux("EDI");
+Exiger(fluxEdi.Flux.Length > 0 && fluxEdi.Flux.Length == JeuDemo.Arrivees.Count(x => x.Mode == "EDI"),
+    $"le mode EDI montre exactement les arrivees EDI ({fluxEdi.Flux.Length})");
+Exiger(fluxEdi.Flux.All(f => f.ModeLisible == "Edi"), "chaque flux EDI est lisible « Edi »");
+Exiger(fluxEdi.Flux.Zip(fluxEdi.Flux.Skip(1)).All(p =>
+           JeuDemo.Arrivees.First(x => x.Numero == p.First.Numero).Instant
+           >= JeuDemo.Arrivees.First(x => x.Numero == p.Second.Numero).Instant),
+    "le flux le plus recent vient en tete");
+Exiger(fluxEdi.Dernier == "dernier flux : " + fluxEdi.Flux[0].Horodatage,
+    "l'etat du canal date le dernier flux recu");
+Exiger(RigV3Desktop.Pont.EcranTeletransmission.Flux("TOUS").Flux.Length == JeuDemo.Arrivees.Length,
+    "« Tous les modes » montre tout le courrier arrive");
+Exiger(RigV3Desktop.Pont.EcranTeletransmission.Flux("MODE-ABSENT") is { Flux.Length: 0, Dernier: "verifier le connecteur du greffe" },
+    "sans flux, l'ecran conseille de verifier le connecteur au lieu de rester muet");
+
 // La vue branche le clic, et ne garde plus de liste d'alertes en dur.
 Exiger(vue.Contains("OuvrirAlerte("), "Home.razor branche le clic d'une alerte");
 Exiger(vue.Contains("SondeAlertes.Relever()"), "Home.razor releve les alertes par la sonde");

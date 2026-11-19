@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Text.Json;
+using System.Text.RegularExpressions;
 
 // Garde-fou de l'arbre GED et du tableau des editions.
 //
@@ -12,14 +13,26 @@
 //  OPE_DESTINATAIRE.Designer.cs). Sans ce test, la liste plate repasse.
 
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
+
+// Bac a sable (19/11/2026) : les AccueilEtat de ce banc ENREGISTRENT a chaque
+// geste (BasculerEffet, NoterModification, CloreTache...). Sans RIGV3_ETAT, ils
+// ecrivaient dans %APPDATA%\RigV3\accueil.json -- l'etat REEL de l'utilisateur,
+// remplace par un etat vierge a chaque passage du banc. Efface a la fin.
+var etatBanc = Path.Combine(Path.GetTempPath(), "rigv3-gedcheck-" + Guid.NewGuid().ToString("N") + ".json");
+Environment.SetEnvironmentVariable("RIGV3_ETAT", etatBanc);
+
 var vue = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
 var arbreModele = Path.Combine(racine, "Metier/ArbreGed.cs");
 var noeud = Path.Combine(racine, "Components/ArbreGedNoeud.razor");
 var css = File.ReadAllText(Path.Combine(racine, "wwwroot/rig-accueil.css"));
 // Le tableau des editions a son propre ecran depuis 09/2026 : les colonnes et
 // le detail du destinataire s'y trouvent, plus dans Home.razor.
+// PORTE EN REACT (lot 3, 19/11/2026) : le .razor n'est plus qu'une coquille ;
+// colonnes et detail se lisent dans web/src/ecrans/EcranTableauEditions.tsx.
 var ecranEditions = Path.Combine(racine, "Components/Ecrans/EcranTableauEditions.razor");
-var editions = File.Exists(ecranEditions) ? File.ReadAllText(ecranEditions) : string.Empty;
+var coquilleEditions = File.Exists(ecranEditions) ? File.ReadAllText(ecranEditions) : string.Empty;
+var tsxEditions = Path.Combine(racine, "web/src/ecrans/EcranTableauEditions.tsx");
+var editions = File.Exists(tsxEditions) ? File.ReadAllText(tsxEditions) : string.Empty;
 
 var echecs = new List<string>();
 void Exiger(bool ok, string quoi)
@@ -68,6 +81,14 @@ Exiger(!rendu.Contains("rig-arbre__date"),
 // Le bouton d acces a quitte la visionneuse (barre du haut retiree le 15/09/2026) ;
 // l ecran lui-meme est conserve.
 Exiger(editions.Contains("Tableau des editions"), "l ecran « Tableau des editions » est conserve");
+Exiger(coquilleEditions.Contains("<IleReact Composant=\"EcranTableauEditions\"")
+       && coquilleEditions.Contains("[Parameter] public LigneEdition[] Editions")
+       && coquilleEditions.Contains("[\"editions\"] = Editions")
+       && coquilleEditions.Contains("[\"fermer\"] = IleReact.Rappel(Fermer)"),
+    "la coquille du tableau des editions garde Editions, Affaire et Fermer, et monte l'ecran React");
+Exiger(editions.Contains("appeler<string[]>('EcranTableauEditions.TypesPapier')")
+       && RigV3Desktop.Pont.EcranTableauEditions.TypesPapier().SequenceEqual(RigV3Desktop.ArbreDemo.TypesPapier),
+    "les types de papier du detail viennent d'ArbreDemo par le pont, dans leur ordre");
 // --- Les etapes du dossier : horizontales, paginees, chargees a la demande.
 Exiger(vue.Contains("rig-saisie__pages--h") && !vue.Contains("Controle du dossier</button>"),
     "les etapes vivent dans la colonne du milieu, a l horizontale, sans onglet a part");
@@ -342,11 +363,16 @@ Exiger(RigV3Desktop.AccesGed.EnfantsVisibles(
        .Count == 1,
     "une affaire sans volet judiciaire n'ouvre que la branche Dossier RCS");
 // La liste des affaires et le fonds de la page portent ces affaires sans Siren.
-var rechAffaires = File.ReadAllText(Path.Combine(racine, "Components/Ecrans/EcranRechAffaires.razor"));
+// La recherche d'affaires est PORTEE EN REACT (lot 3, 19/11/2026) : son fonds
+// vit dans Pont/EcranRechAffaires.cs, et la recherche y est EXECUTEE.
+var rechAffaires = File.ReadAllText(Path.Combine(racine, "Pont/EcranRechAffaires.cs"));
 foreach (var numero in new[] { "2026J00087", "2026P00031", "2026IP00214",
                                "2026M00045", "2026C00059" })
 {
-    Exiger(rechAffaires.Contains(numero) && vue.Contains(numero),
+    var trouvee = RigV3Desktop.Pont.EcranRechAffaires.Trouver(
+        new(numero, "", "", "", "", "", "", "", "", null, null), null, true, null);
+    Exiger(rechAffaires.Contains(numero) && vue.Contains(numero)
+           && trouvee.Lignes.Any(l => l.Numero == numero && l.Siren == "" && l.Type == "JUD"),
         $"l'affaire purement judiciaire « {numero} » est cherchable et ouvrable");
 }
 Exiger(vue.Contains("SansDossierRcs") && vue.Contains("avecDossierRcs: !d.SansDossierRcs"),
@@ -752,9 +778,21 @@ Exiger(ficheLignes.Contains("Recette.LibelleLigne"),
     "la trace nomme la ligne : trois nominations donnent trois lignes distinctes");
 
 // --- TRAITEMENT EN LOT : la meme recette sur plusieurs affaires.
+// PORTE EN REACT (lot 3, 19/11/2026) : le .razor est une coquille qui ouvre la
+// session avec l'etat de l'accueil ; les regles vivent dans
+// Pont/EcranTachesLot.cs et le balisage dans web/src/ecrans/EcranTachesLot.tsx.
+// Les regles lues ci-dessous se lisent donc dans ces deux fichiers, et la
+// session est EXECUTEE plus bas sur un etat jetable.
 var ecranLot = Path.Combine(racine, "Components/Ecrans/EcranTachesLot.razor");
 Exiger(File.Exists(ecranLot), "l'ecran de traitement en lot existe");
-var lot = File.Exists(ecranLot) ? File.ReadAllText(ecranLot) : string.Empty;
+var coquilleLot = File.Exists(ecranLot) ? File.ReadAllText(ecranLot) : string.Empty;
+var lot = File.ReadAllText(Path.Combine(racine, "Pont/EcranTachesLot.cs")) + Environment.NewLine
+        + File.ReadAllText(Path.Combine(racine, "web/src/ecrans/EcranTachesLot.tsx"));
+Exiger(coquilleLot.Contains("<IleReact Composant=\"EcranTachesLot\"")
+       && coquilleLot.Contains("[Parameter, EditorRequired] public AccueilEtat Etat")
+       && coquilleLot.Contains("EcranTachesLot.Ouvrir(Etat, Utilisateur, CodeRecette)")
+       && coquilleLot.Contains("EcranTachesLot.Fermer(Session)"),
+    "la coquille du lot garde ses parametres, ouvre la session sur l'etat VIVANT de l'accueil et la ferme");
 Exiger(vueTache.Contains("case \"PROC_TACHES_LOT\":") && vueTache.Contains("<EcranTachesLot"),
     "l'ecran en lot est aiguille dans la vue");
 Exiger(Regex.IsMatch(vueTache, @"new\(""PROC_TACHES_LOT"",\s*"""),
@@ -805,6 +843,42 @@ Exiger(alertesLot.Any(x => x.Tache is { } t3 && (t3.Code == "DPER" || t3.Code ==
     "le changement de dirigeant reste dossier par dossier (saisie ligne par ligne)");
 Exiger(lot.Contains("CodeRecette"),
     "l'ecran s'ouvre sur la recette que l'alerte nomme");
+
+// Le LOT JOUE par sa session, sur un etat jetable (RIGV3_ETAT ci-dessus).
+JsonElement Geste(object? v) => JsonSerializer.SerializeToElement(v);
+var etatLot = new RigV3Desktop.AccueilEtat();
+var attendusDeno = RigV3Desktop.JeuDemo.EvenementsAttendus
+    .Where(e => e.Code == "DENO" && RigV3Desktop.JeuDemo.Demandes.Any(d => d.Dossier == e.Dossier))
+    .OrderBy(e => e.Signale).Select(e => e.Dossier).ToArray();
+var sLot = RigV3Desktop.Pont.EcranTachesLot.Ouvrir(etatLot, "R. VILAIN", "");
+var vLot = RigV3Desktop.Pont.EcranTachesLot.Vue(sLot);
+Exiger(vLot.Recette?.Code == "DENO" && vLot.Dossiers.Select(d => d.Dossier).SequenceEqual(attendusDeno),
+    "sans recette demandee, l'ecran s'ouvre sur le plus gros lot, ses dossiers du plus ancien au plus recent");
+Exiger(vLot.Lots.Any(l => l.ARepetition) && vLot.Lots.Single(l => l.Actif).Code == "DENO",
+    "les taches a repetition restent listees a gauche, la tache ouverte est marquee");
+var cibleLot = vLot.Dossiers[0];
+Exiger(!cibleLot.Pret && cibleLot.Restants > 0, "un dossier sans saisie n'est pas pret a terminer");
+RigV3Desktop.Pont.EcranTachesLot.Agir(sLot, "Terminer", Geste(cibleLot.Dossier));
+Exiger(!etatLot.TacheFaite("DENO", cibleLot.Dossier),
+    "« Terminer » sur un dossier incomplet ne clot rien");
+for (var j = 0; j < vLot.Recette!.Champs.Length; j++)
+    RigV3Desktop.Pont.EcranTachesLot.Agir(sLot, "Ecrire", Geste(new { dossier = cibleLot.Dossier, champ = j, valeur = "NOUVELLE DENO " + j }));
+Exiger(etatLot.Modifications.TryGetValue(cibleLot.Dossier, out var tracesLot)
+       && tracesLot.Count == vLot.Recette.Champs.Length
+       && tracesLot.All(m => m.Element.StartsWith("Traitement en lot > ") && m.Auteur == "R. VILAIN"),
+    "chaque saisie du tableau est notee dans la trace DU dossier, avec son auteur");
+var vPropage = RigV3Desktop.Pont.EcranTachesLot.Agir(sLot, "ToutPropager", Geste(cibleLot.Dossier));
+Exiger(vPropage.Dossiers.First(d => d.Dossier == cibleLot.Dossier) is { Pret: true, EffetsRestants: 0 },
+    "« tout » coche les publications : le dossier devient pret");
+var vClos = RigV3Desktop.Pont.EcranTachesLot.Agir(sLot, "Terminer", Geste(cibleLot.Dossier));
+Exiger(etatLot.TacheFaite("DENO", cibleLot.Dossier) && vClos.Dossiers.All(d => d.Dossier != cibleLot.Dossier)
+       && vClos.Dossiers.Length == attendusDeno.Length - 1
+       && vClos.DernierMessage == cibleLot.Dossier + " termine. Son alerte ne reviendra plus.",
+    "la cloture vaut pour CE dossier seul, qui sort du lot ; les autres restent");
+Exiger(RigV3Desktop.Pont.EcranTachesLot.Parametrer(sLot, etatLot, "R. VILAIN", "DSTE")
+       && RigV3Desktop.Pont.EcranTachesLot.Vue(sLot).Recette is { ARepetition: true, LibelleLigne: "dirigeant" },
+    "rouvrir l'ecran sur une autre recette change la vue ; une tache a repetition y est refusee, motif nomme");
+RigV3Desktop.Pont.EcranTachesLot.Fermer(sLot);
 
 // --- RELECTURE EN BASE des recettes sigle / forme juridique / nom d'usage
 // (ULT_OP_ET_EVENEMENT_RCS et CODE_EVENEMENT_RCS, RIG_AMIENS, 16/09/2026).
@@ -1009,6 +1083,8 @@ Exiger(vueTache.Contains("Terminer la tache") && vueTache.Contains("ChampsManqua
 Exiger(vueTache.Contains("AlertesOuvertes()")
        && !Regex.IsMatch(vueTache, @"Alertes\s*=\s*SondeAlertes\.Relever\(\)"),
     "la file d'alertes EXCLUT les taches deja terminees");
+
+try { File.Delete(etatBanc); } catch (IOException) { }
 
 Console.WriteLine();
 if (echecs.Count == 0)

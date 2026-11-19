@@ -21,5 +21,13 @@
     <Compile Include="../../Metier/SimulationEdi.cs" Link="SimulationEdi.cs" />
     <Compile Include="../../Metier/ActionsXaction.cs" Link="ActionsXaction.cs" />
     <Compile Include="../../Metier/ConditionChamp.cs" Link="ConditionChamp.cs" />
+    <!-- Demandes, Arrivee et Actes, portes en React le 19/11/2026 (lot 3) : leurs ponts sont executes ici. -->
+    <Compile Include="../../Pont/EcranDemandes.cs" Link="Pont/EcranDemandes.cs" />
+    <Compile Include="../../Pont/EcranArrivee.cs" Link="Pont/EcranArrivee.cs" />
+    <Compile Include="../../Pont/EcranActes.cs" Link="Pont/EcranActes.cs" />
+  </ItemGroup>
+  <!-- Pont/*.cs porte [JSInvokable] (Microsoft.JSInterop), livre avec ASP.NET Core. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 </Project>

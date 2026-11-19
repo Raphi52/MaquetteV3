@@ -40,9 +40,16 @@ Exiger(arrivee?.NumDemande == dossier,
     "le courrier est RAPPROCHE de la demande qu il a ouverte");
 Exiger(JeuDemo.Arrivees[0].References == SimulationEdi.Message.Fichier,
     "il est en tete du courrier : c est l arrivee la plus recente");
-var ecranArrivee = File.ReadAllText(Path.Combine(racine, "Components/Ecrans/EcranArrivee.razor"));
+// L ecran du courrier est PORTE EN REACT (lot 3, 19/11/2026) : son filtre vit
+// dans Pont/EcranArrivee.cs. On lit le pont, et on l EXECUTE comme l ecran.
+var ecranArrivee = File.ReadAllText(Path.Combine(racine, "Pont/EcranArrivee.cs"));
 Exiger(ecranArrivee.Contains("JeuDemo.Arrivees"),
     "l ecran du courrier lit bien cette liste, il n a pas sa copie");
+var courrier = RigV3Desktop.Pont.EcranArrivee.Trouver(
+    new("", "", "", "", "", null, null, false, false, 50));
+Exiger(courrier.Lignes.Length > 0 && courrier.Lignes[0].References == SimulationEdi.Message.Fichier
+       && courrier.Lignes[0].ModeLisible == "Edi" && courrier.Lignes[0].NumDemande == dossier,
+    "a l ouverture de l ecran du courrier, le flux EDI est la premiere ligne, rapprochee de sa demande");
 
 // --- 3. DEMANDES RECUES : la demande existe et elle est en cours.
 var demande = JeuDemo.Demandes.FirstOrDefault(d => d.Dossier == dossier);
@@ -50,9 +57,15 @@ Exiger(demande is not null, "la demande de modification est dans la file");
 Exiger(demande?.EnCours == true, "elle est en cours, donc visible dans la file du jour");
 Exiger(demande?.Siren == SimulationEdi.Message.Siren,
     "elle porte le SIREN annonce par le flux : pas deux verites");
-var ecranDemandes = File.ReadAllText(Path.Combine(racine, "Components/Ecrans/EcranDemandes.razor"));
+// L ecran des demandes est PORTE EN REACT (lot 3) : son filtre vit dans
+// Pont/EcranDemandes.cs. On lit le pont, et on l EXECUTE comme l ecran.
+var ecranDemandes = File.ReadAllText(Path.Combine(racine, "Pont/EcranDemandes.cs"));
 Exiger(ecranDemandes.Contains("JeuDemo.Demandes"),
     "l ecran des demandes lit bien cette liste");
+var fileDuJour = RigV3Desktop.Pont.EcranDemandes.Trouver(
+    new("", "", "", null, null, [], false, true, 50), []);
+Exiger(fileDuJour.Lignes.Any(l => l.Dossier == dossier && l.EnCours && l.Siren == SimulationEdi.Message.Siren),
+    "l ecran des demandes, filtre « en cours », montre la demande ouverte par le flux");
 
 // --- 4. ACCUEIL : l alerte est CALCULEE sur l evenement, et elle mene a la tache.
 var evenement = JeuDemo.EvenementsAttendus.FirstOrDefault(e => e.Dossier == dossier);

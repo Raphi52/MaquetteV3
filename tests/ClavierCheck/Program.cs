@@ -48,7 +48,9 @@ Exiger(home.Contains(@"InvokeVoidAsync(""activerClavier"""),
 // --- 3. Entree lance la recherche partout ou une recherche existe.
 var ecrans = Directory.GetFiles(Path.Combine(racine, "Components/Ecrans"), "*.razor");
 var recherches = ecrans.Where(f => File.ReadAllText(f).Contains(@"@onclick=""Rechercher""")).ToList();
-Exiger(recherches.Count >= 2, $"les ecrans de recherche sont trouves ({recherches.Count})");
+// Le seuil « au moins deux ecrans de recherche » se lit apres la section 3 bis,
+// sur les DEUX familles : depuis le 19/11/2026 (lots 2 et 3), les trois ecrans
+// de recherche sont en React et plus aucun .razor n'en porte.
 foreach (var f in recherches)
 {
     var t = File.ReadAllText(f);
@@ -79,6 +81,13 @@ foreach (var f in recherchesTsx)
 }
 Exiger(recherches.Count + recherchesTsx.Count >= 2,
     $"les ecrans de recherche restent trouves, Blazor et React confondus ({recherches.Count} + {recherchesTsx.Count})");
+// Plus strict que l'ancien seuil (>= 2 sur les seuls .razor) : les TROIS ecrans
+// de recherche connus le 19/11/2026 sont nommes, et chacun doit etre trouve
+// dans l'une ou l'autre famille -- un ecran qui perdrait son bouton Rechercher
+// en passant en React ne sortirait plus du controle sans bruit.
+var nomsRecherche = recherches.Concat(recherchesTsx).Select(Path.GetFileNameWithoutExtension).ToHashSet();
+Exiger(new[] { "EcranRechAffaires", "EcranRequisitions", "EcranCommandesWeb" }.All(nomsRecherche.Contains),
+    $"les ecrans de recherche sont trouves ({string.Join(", ", nomsRecherche.Order())})");
 
 Console.WriteLine();
 Console.WriteLine(echecs.Count == 0 ? "ClavierCheck : vert." : $"ClavierCheck : {echecs.Count} echec(s).");

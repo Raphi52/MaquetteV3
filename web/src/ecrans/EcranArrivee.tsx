@@ -181,7 +181,8 @@ export function EcranArrivee({ ouvrirDossier }: ProprietesEcranArrivee) {
         <div className="rig-resultats-proc__entete">
           <div className="rig-kicker">Courrier arrive</div>
           <span className="rig-resultats-proc__compte">
-            {vue ? `${trouvees.length} affichee(s) sur ${vue.total} · ${vue.aNumeriser} a numeriser` : ''}
+            {/* Memes noeuds de texte que Razor : voir EcranRechAffaires.tsx. */}
+            {vue && <>{trouvees.length}{' affichee(s) sur '}{vue.total}{' ·\n                '}{vue.aNumeriser}{' a numeriser\n            '}</>}
           </span>
         </div>
 

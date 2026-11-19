@@ -17,6 +17,8 @@
     <Compile Include="../../Metier/SimulationEdi.cs" Link="SimulationEdi.cs" />
     <!-- Le calcul de l'ecran des verrous, porte en React le 18/11/2026 : execute ici. -->
     <Compile Include="../../Pont/EcranVerrous.cs" Link="Pont/EcranVerrous.cs" />
+    <!-- Le calcul de l'ecran des teletransmissions, porte en React le 19/11/2026 (lot 3). -->
+    <Compile Include="../../Pont/EcranTeletransmission.cs" Link="Pont/EcranTeletransmission.cs" />
   </ItemGroup>
 
   <!-- Pont/*.cs porte [JSInvokable] (Microsoft.JSInterop), livre avec ASP.NET Core. -->

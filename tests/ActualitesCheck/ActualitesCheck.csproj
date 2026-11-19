@@ -16,6 +16,14 @@
     <Compile Include="../../Metier/RecetteTache.cs" Link="RecetteTache.cs" />
     <Compile Include="../../Metier/JeuDemo.cs" Link="JeuDemo.cs" />
     <Compile Include="../../Metier/SimulationEdi.cs" Link="SimulationEdi.cs" />
+    <!-- L'ecran de saisie, porte en React le 19/11/2026 (lot 3) : sa session est executee ici. -->
+    <Compile Include="../../Pont/EcranActualites.cs" Link="Pont/EcranActualites.cs" />
+    <Compile Include="../../Pont/SessionsEcran.cs" Link="Pont/SessionsEcran.cs" />
+  </ItemGroup>
+
+  <!-- Pont/*.cs porte [JSInvokable] (Microsoft.JSInterop), livre avec ASP.NET Core. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
 </Project>

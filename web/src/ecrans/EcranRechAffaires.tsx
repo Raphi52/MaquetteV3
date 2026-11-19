@@ -275,7 +275,10 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
         <div className="rig-resultats-proc__entete">
           <div className="rig-kicker">Affaires</div>
           <span className="rig-resultats-proc__compte">
-            {vue ? `Resultats (${trouvees.length}) — ${vue.resume}` : ''}
+            {/* Memes noeuds de texte que Razor (« Resultats ( », le nombre, « ) — », le
+                resume) : un seul noeud deplacait le lissage des lettres de quelques
+                pixels a la comparaison des captures. */}
+            {vue && <>{'\n                Resultats ('}{trouvees.length}{') —\n                '}{vue.resume}</>}
           </span>
         </div>
 

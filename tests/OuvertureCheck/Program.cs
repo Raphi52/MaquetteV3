@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using RigV3Desktop;
 
 // Garde-fou de la JONCTION entre l'ecran « Ouvrir un dossier » et la
@@ -107,22 +108,57 @@ Exiger(AffairesOuvertes.Toutes.Count == 0, "la remise a zero est elle aussi ecri
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
 string Lire(string relatif) => File.ReadAllText(Path.Combine(racine, relatif));
 
+// PORTES EN REACT (lot 3, 19/11/2026) : les deux .razor ne sont plus que des
+// coquilles. Le maillon « recherche » se lit donc sur la chaine reelle :
+// coquille (parametre + rappel) -> ecran React (bouton) -> pont C# (SIREN
+// cherche, recherche restee vide), et le pont est EXECUTE plus bas.
 var rech = Lire("Components/Ecrans/EcranRechAffaires.razor");
+var rechTsx = Lire("web/src/ecrans/EcranRechAffaires.tsx");
 var accueil = Lire("Components/Pages/Home.razor");
 var ouverture = Lire("Components/Ecrans/EcranOuvertureDossier.razor");
+var ouvertureTsx = Lire("web/src/ecrans/EcranOuvertureDossier.tsx");
 
-Exiger(rech.Contains("EventCallback<string> OuvrirUnDossier"),
+Exiger(rech.Contains("EventCallback<string> OuvrirUnDossier")
+       && rech.Contains("[\"ouvrirUnDossier\"] = IleReact.Rappel(OuvrirUnDossier)"),
     "« Mes affaires » sait remonter une demande d'ouverture");
-Exiger(rech.Contains("OuvrirUnDossier.InvokeAsync(SirenCherche)"),
+Exiger(rechTsx.Contains("onClick={() => ouvrirUnDossier(vue.sirenCherche)}"),
     "le bouton « Ouvrir un dossier » emporte le SIREN cherche");
-Exiger(rech.Contains("Aucune affaire ne repond a ces criteres"),
+Exiger(Regex.IsMatch(rechTsx, @"vue\.aucunCritere \?[\s\S]{0,200}?Aucune affaire ne repond a ces criteres[\s\S]{0,300}?Ouvrir un dossier"),
     "le bouton n'apparait qu'apres une recherche restee vide");
 Exiger(accueil.Contains("OuvrirUnDossier=\"OuvrirUnDossierPour\""),
     "l'accueil ecoute cette demande");
 Exiger(accueil.Contains("SirenDemande=\"@SirenAImmatriculer\""),
     "l'accueil transmet le SIREN a l'ecran d'ouverture");
-Exiger(ouverture.Contains("[Parameter] public string? SirenDemande"),
+Exiger(ouverture.Contains("[Parameter] public string? SirenDemande")
+       && ouverture.Contains("[\"sirenDemande\"] = SirenDemande"),
     "l'ecran d'ouverture accepte un SIREN pre-rempli");
+Exiger(ouvertureTsx.Contains("useState(() => (sirenDemande ?? '').trim())"),
+    "l'ecran React d'ouverture pose ce SIREN dans la fiche");
+
+// La jonction JOUEE par les ponts des deux ecrans : rechercher un SIREN
+// inconnu, ouvrir le dossier depuis l'ecran d'ouverture, le retrouver.
+static RigV3Desktop.Pont.CriteresAffaires Criteres(string libelle = "")
+    => new("", libelle, "", "", "", "", "", "", "", null, null);
+
+var vide = RigV3Desktop.Pont.EcranRechAffaires.Trouver(Criteres(), null, true, null);
+Exiger(vide.AucunCritere && vide.SirenCherche == "",
+    "sans critere, la grille ne propose pas d'ouvrir un dossier");
+var inconnu = RigV3Desktop.Pont.EcranRechAffaires.Trouver(Criteres("512 345 678"), null, true, null);
+Exiger(inconnu.Lignes.Length == 0 && !inconnu.AucunCritere && inconnu.SirenCherche == "512345678",
+    "un SIREN inconnu laisse la recherche vide et le SIREN cherche est retenu, sans espaces");
+Exiger(RigV3Desktop.Pont.EcranRechAffaires.Trouver(Criteres("SOCIETE 512"), null, true, null).SirenCherche == "",
+    "un libelle qui n'est pas un SIREN n'est pas propose a l'immatriculation");
+var ouvertPont = RigV3Desktop.Pont.EcranOuvertureDossier.Ouvrir(new RigV3Desktop.Pont.FicheOuverture(
+    "Guichet unique (INPI)", inconnu.SirenCherche, new DateOnly(2026, 9, 9), "SOCIETE Z", "SAS", 1000m, "EUR"));
+Exiger(!ouvertPont.Bloquant && ouvertPont.Ouverts.Any(o => o.Siren == "512345678"),
+    "l'ecran d'ouverture ouvre le dossier pour ce SIREN");
+var retrouve = RigV3Desktop.Pont.EcranRechAffaires.Trouver(Criteres("512 345 678"), null, true, null);
+Exiger(retrouve.Lignes.Length == 1 && retrouve.Lignes[0].Nom == "SOCIETE Z",
+    "la recherche d'affaires retrouve aussitot le dossier ouvert");
+Exiger(RigV3Desktop.Pont.EcranOuvertureDossier.Ouvrir(new RigV3Desktop.Pont.FicheOuverture(
+           "Guichet unique (INPI)", "512345678", null, "SOCIETE Z BIS", "SAS", 1000m, "EUR")) is { Bloquant: true } refus
+       && refus.Message.StartsWith("Ce SIREN a deja un dossier ouvert"),
+    "l'ecran d'ouverture refuse un second dossier pour le meme SIREN, et le dit");
 
 if (File.Exists(etatBanc)) File.Delete(etatBanc);
 
