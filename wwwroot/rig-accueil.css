@@ -2882,6 +2882,18 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-vonglet--actif .rig-vonglet__fermer,
 .rig-vonglet__fermer:focus-visible { opacity: 1; }
 .rig-vonglet__fermer:hover { background: color-mix(in srgb, var(--rig-texte) 12%, transparent); color: var(--rig-texte); }
+/* La maison, premier onglet (retour a l'accueil) : une icone seule, etroite.
+   Elle est HORS de .rig-vonglets : collee au bas de la barre comme les
+   onglets, et le filet qui la separe du premier onglet est pose ici. */
+.rig-vonglet--maison {
+  width: 40px; flex: none; align-self: flex-end;
+  padding: 0; justify-content: center; font: inherit;
+}
+.rig-vonglet--maison svg { width: 15px; height: 15px; display: block; }
+.rig-vonglet--maison:not(.rig-vonglet--actif) + .rig-vonglets > .rig-vonglet:first-child:not(.rig-vonglet--actif)::before {
+  content: ''; position: absolute; left: 0; top: 7px; bottom: 7px; width: 1px;
+  background: var(--rig-bord);
+}
 
 /* ---------- Parcours guide « requis d'abord » ----------------------
    Les champs obligatoires (colonnes NOT NULL, Metier/ChampsRequisDossier.cs)

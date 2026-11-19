@@ -1717,6 +1717,19 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         RetourAffaire = depuis;
     }
 
+    /// <summary>
+    /// La MAISON, premier onglet de la barre du haut (19/11/2026) : ramene a
+    /// l'accueil SANS fermer les onglets -- comme un navigateur, on y revient
+    /// d'un clic. L'affaire ouverte, elle, n'a pas d'onglet : elle se ferme,
+    /// comme par sa croix.
+    /// </summary>
+    private void AllerALAccueil()
+    {
+        Onglets.Masquer();
+        FermerDossier();
+        RetenirAgencement();
+    }
+
     private void FermerProc()
     {
         if (Onglets.Actuel is { } courant) Onglets.Fermer(courant.Code);

@@ -367,6 +367,20 @@ internal static class Programme
         Agir("echap");
         Exiger(plan.Vue().Onglets is { Length: 1 } && plan.Vue().Proc?.Code == "PROC_ENCAISS",
             "Echap ferme l'ecran montre (son onglet) ; l'onglet voisin prend la place");
+        // La maison, premier onglet de la barre : retour a l'accueil, onglets gardes.
+        Agir("accueil");
+        vue = plan.Vue();
+        Exiger(vue.Proc is null && vue.Dossier is null && vue.Accueil is not null
+               && vue.Onglets is { Length: 1 } om && !om[0].Actif,
+            "la maison ramene a l'accueil sans fermer les onglets");
+        Agir("ongletActiver", "PROC_ENCAISS");
+        Exiger(plan.Vue().Proc?.Code == "PROC_ENCAISS", "un clic sur l'onglet y revient");
+        Agir("ouvrirNumero", "004176");
+        Exiger(plan.Vue().Dossier is not null, "une affaire ouverte recouvre l'accueil");
+        Agir("accueil");
+        vue = plan.Vue();
+        Exiger(vue.Proc is null && vue.Dossier is null && vue.Onglets is { Length: 1 },
+            "depuis une affaire, la maison la ferme et ramene a l'accueil, l'onglet reste");
         Agir("ongletFermer", "PROC_ENCAISS");
         Exiger(plan.Vue().Onglets is null, "fermer le dernier onglet retire la barre d'onglets");
         Agir("ouvrirNumero", "004176");

@@ -72,7 +72,8 @@ export function Application({ vue, geste, plan }: ProprietesApplication) {
       {/* LA BARRE DU HAUT, « comme Brave » : les onglets (glisser pour
           reordonner, hors de la fenetre pour sortir l'onglet sur un autre
           ecran), puis les boutons de la fenetre. */}
-      {v.barre && <BarreRig onglets={v.onglets} finsDeGlisse={v.finsDeGlisse} geste={geste} plan={gestePlan} />}
+      {v.barre && <BarreRig onglets={v.onglets} finsDeGlisse={v.finsDeGlisse} accueil={!v.proc && !v.dossier}
+                            geste={geste} plan={gestePlan} />}
       {v.accueil && <Accueil vue={v.accueil} geste={geste} />}
       {/* ECRAN DE PROCEDURE : le cadre est commun, l'ecran vient de l'aiguillage. */}
       {v.proc && <Procedure proc={v.proc} plan={gestePlan} />}

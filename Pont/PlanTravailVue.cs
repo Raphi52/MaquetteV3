@@ -639,6 +639,7 @@ public sealed partial class SessionPlanTravail
                 break;
             }
             case "ongletFermer": FermerOnglet(Texte(valeur)); break;
+            case "accueil": AllerALAccueil(); break;
 
             // ---- Ecran de procedure et ouvertures demandees par les ecrans ----
             case "ouvrirCode": OuvrirCode(Texte(valeur)); break;

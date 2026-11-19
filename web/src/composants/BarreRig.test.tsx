@@ -13,10 +13,10 @@ const onglets: OngletBarreVue[] = [
   { code: 'PROC_ENCAISS', libelle: 'Encaissements', actif: true, detache: false, glisse: false },
 ]
 
-function rendre(ouverts: OngletBarreVue[] | null = onglets) {
+function rendre(ouverts: OngletBarreVue[] | null = onglets, accueil = false) {
   const geste = vi.fn<(g: GesteIle) => void>()
   const plan = vi.fn()
-  const r = render(<BarreRig onglets={ouverts} finsDeGlisse={0} geste={geste} plan={plan} />)
+  const r = render(<BarreRig onglets={ouverts} finsDeGlisse={0} accueil={accueil} geste={geste} plan={plan} />)
   return {
     ...r, geste, plan,
     gestes: () => geste.mock.calls.map(([g]) => [g.nom, g.valeur]),
@@ -25,11 +25,16 @@ function rendre(ouverts: OngletBarreVue[] | null = onglets) {
 }
 
 describe('BarreRig (la barre du haut, « comme Brave »)', () => {
-  it('les onglets puis les boutons de la fenetre : rien d\'autre', () => {
+  it('la maison, les onglets puis les boutons de la fenetre : rien d\'autre', () => {
     const { container } = rendre()
     const barre = container.querySelector('header.rig-barre')!
-    expect(morceaux(barre)).toEqual(['<div>', '<div>'])
-    expect(barre.firstElementChild!.id).toBe('rig-vonglets')
+    expect(morceaux(barre)).toEqual(['<button>', '<div>', '<div>'])
+    const maison = barre.firstElementChild!
+    expect(maison.getAttribute('title')).toBe('Accueil')
+    expect(maison.className).toBe('rig-vonglet rig-vonglet--maison')
+    expect(maison.querySelector('svg')).not.toBeNull()
+    expect(maison.hasAttribute('data-rig-onglet')).toBe(false)
+    expect(maison.nextElementSibling!.id).toBe('rig-vonglets')
     expect([...barre.querySelectorAll('.rig-vonglet__titre')].map((t) => t.textContent)).toEqual(['Factures', 'Encaissements'])
     const fenetre = barre.querySelector('.rig-fenetre')!
     expect(barre.lastElementChild).toBe(fenetre)
@@ -40,11 +45,25 @@ describe('BarreRig (la barre du haut, « comme Brave »)', () => {
     expect(barre.querySelector('select, .rig-profil, .rig-tuiles-panneau')).toBeNull()
   })
 
-  it('sans vue ouverte : la barre ne garde que les boutons de la fenetre', () => {
+  it('sans vue ouverte : la barre ne garde que la maison et les boutons de la fenetre', () => {
     const { container } = rendre(null)
     const barre = container.querySelector('header.rig-barre')!
-    expect(morceaux(barre)).toEqual(['<div>'])
+    expect(morceaux(barre)).toEqual(['<button>', '<div>'])
     expect(barre.querySelector('#rig-vonglets')).toBeNull()
+  })
+
+  it('la maison est l\'onglet actif quand l\'accueil se voit ; son clic y ramene sans deplacer la fenetre', () => {
+    const actif = rendre(onglets, true)
+    expect(actif.container.querySelector('.rig-vonglet--maison')!.className).toBe('rig-vonglet rig-vonglet--maison rig-vonglet--actif')
+    expect(actif.container.querySelector('.rig-vonglet--maison')!.getAttribute('aria-current')).toBe('page')
+    cleanup()
+    const { container, gestes, plans } = rendre()
+    const maison = container.querySelector('.rig-vonglet--maison')!
+    expect(maison.hasAttribute('aria-current')).toBe(false)
+    fireEvent.mouseDown(maison)
+    fireEvent.click(maison)
+    expect(gestes()).toEqual([])
+    expect(plans()).toEqual([['accueil', undefined]])
   })
 
   it('un appui HORS d\'un onglet ou d\'un bouton deplace la fenetre ; onglets et boutons, non', () => {
