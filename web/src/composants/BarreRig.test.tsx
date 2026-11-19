@@ -25,10 +25,10 @@ function rendre(ouverts: OngletBarreVue[] | null = onglets, accueil = false) {
 }
 
 describe('BarreRig (la barre du haut, « comme Brave »)', () => {
-  it('la maison, les onglets puis les boutons de la fenetre : rien d\'autre', () => {
+  it('la maison, les onglets, le « + » puis les boutons de la fenetre : rien d\'autre', () => {
     const { container } = rendre()
     const barre = container.querySelector('header.rig-barre')!
-    expect(morceaux(barre)).toEqual(['<button>', '<div>', '<div>'])
+    expect(morceaux(barre)).toEqual(['<button>', '<div>', '<button>', '<div>'])
     const maison = barre.firstElementChild!
     expect(maison.getAttribute('title')).toBe('Accueil')
     expect(maison.className).toBe('rig-vonglet rig-vonglet--maison')
@@ -45,11 +45,23 @@ describe('BarreRig (la barre du haut, « comme Brave »)', () => {
     expect(barre.querySelector('select, .rig-profil, .rig-tuiles-panneau')).toBeNull()
   })
 
-  it('sans vue ouverte : la barre ne garde que la maison et les boutons de la fenetre', () => {
+  it('sans vue ouverte : la barre ne garde que la maison, le « + » et les boutons de la fenetre', () => {
     const { container } = rendre(null)
     const barre = container.querySelector('header.rig-barre')!
-    expect(morceaux(barre)).toEqual(['<button>', '<div>'])
+    expect(morceaux(barre)).toEqual(['<button>', '<button>', '<div>'])
     expect(barre.querySelector('#rig-vonglets')).toBeNull()
+  })
+
+  it('le « + » au bout des onglets, comme dans Brave : il ouvre l\'accueil sans deplacer la fenetre', () => {
+    const { container, gestes, plans } = rendre()
+    const plus = container.querySelector('.rig-barre__plus')!
+    expect(plus.previousElementSibling!.id).toBe('rig-vonglets')
+    expect(plus.getAttribute('aria-label')).toBe('Nouvel onglet')
+    expect(plus.querySelector('svg')).not.toBeNull()
+    fireEvent.mouseDown(plus)
+    fireEvent.click(plus)
+    expect(gestes()).toEqual([])
+    expect(plans()).toEqual([['accueil', undefined]])
   })
 
   it('la maison est l\'onglet actif quand l\'accueil se voit ; son clic y ramene sans deplacer la fenetre', () => {

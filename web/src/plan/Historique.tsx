@@ -22,6 +22,9 @@ export interface ProprietesHistorique {
   plan: GestePlan
 }
 
+/** « 19/11/2026 » : « 2026 ». */
+const annee = (p: PieceHistoriqueVue) => p.date.slice(6)
+
 function point(p: PieceHistoriqueVue): { className: string, style?: CSSProperties } {
   const base = 'rig-chrono__point rig-chrono__point--' + (p.judiciaire ? 'jud' : 'rcs')
   return p.groupe
@@ -43,19 +46,24 @@ export function HistoriqueDossier({ pieces, plan }: ProprietesHistorique) {
         )}
       </div>
       <ol className="rig-chrono__liste">
-        {montrees.map((p) => (
+        {montrees.map((p, i) => [
+          // L'ANNEE en tete de ses pieces (le draft du 19/11/2026) : la date de
+          // chaque ligne se reduit alors au jour et au mois.
+          annee(p) !== (i > 0 ? annee(montrees[i - 1]!) : '') && (
+            <li key={'an-' + annee(p)} className="rig-chrono__annee" aria-hidden="true">{annee(p)}</li>
+          ),
           <li key={p.id}>
             <button type="button" className={'rig-chrono__piece' + (p.actif ? ' rig-chrono__piece--actif' : '')}
                     aria-current={p.actif ? 'true' : undefined}
-                    title={p.rubrique + ' · ' + p.origine + (p.pages > 0 ? ' · ' + p.pages + ' p.' : '')}
+                    title={p.date + ' · ' + p.rubrique + ' · ' + p.origine + (p.pages > 0 ? ' · ' + p.pages + ' p.' : '')}
                     onClick={() => plan('historiqueOuvrir', p.id)}>
-              <span className="rig-chrono__date">{p.date}</span>
+              <span className="rig-chrono__date">{p.date.slice(0, 5)}</span>
               <span {...point(p)} aria-hidden="true"></span>
               <span className="rig-chrono__libelle">{p.libelle}</span>
               <span className="rig-chrono__origine">{p.origine}</span>
             </button>
-          </li>
-        ))}
+          </li>,
+        ])}
       </ol>
     </section>
   )

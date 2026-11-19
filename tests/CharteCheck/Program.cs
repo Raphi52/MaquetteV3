@@ -202,8 +202,9 @@ foreach (var (nom, texte) in feuilles)
            && !barreTsx.Contains("<Liste") && !pont.Contains("PanneauBarre"),
         "la barre du haut ne porte ni profil, ni marque, ni reglages : seulement les onglets et la fenetre");
     // Depuis la maison (conv-2013, 19/11/2026) : elle ouvre la barre, avant les onglets.
-    Exiger(Regex.IsMatch(barreTsx, @"<header className=""rig-barre""[^\n]*\n[\s\S]*?<button className=\{'rig-vonglet rig-vonglet--maison'[\s\S]*?</button>\s*\{onglets && <Onglets[^\n]*\n\s*<div className=""rig-fenetre"">"),
-        "la barre du haut : la maison, les onglets, puis les boutons de la fenetre");
+    // Depuis le « + » (conv-2009, meme jour) : au bout des onglets, avant la fenetre.
+    Exiger(Regex.IsMatch(barreTsx, @"<header className=""rig-barre""[^\n]*\n[\s\S]*?<button className=\{'rig-vonglet rig-vonglet--maison'[\s\S]*?</button>\s*\{onglets && <Onglets[^\n]*\n(\s*\{/\*[\s\S]*?\*/\})?\s*<button className=""rig-barre__plus""[\s\S]*?</button>\s*<div className=""rig-fenetre"">"),
+        "la barre du haut : la maison, les onglets, le « + », puis les boutons de la fenetre");
     Exiger(home.Contains("return new(AccueilRecouvert, ProcOuverte?.Code,"),
         "le plan de travail passe a l'accueil s'il est recouvert");
     // Les DEUX ecrans pleins recouvrent le titre : l'ecran de procedure

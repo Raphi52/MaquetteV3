@@ -3831,3 +3831,128 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   .rig-vged__suivi, .rig-vged__chemin { grid-column: auto; grid-row: auto; }
   .rig-vged__suivi { border-left: 0; border-top: 1px solid var(--rig-bord); max-height: 60vh; }
 }
+
+/* LE « + » au bout des onglets, comme dans Brave (19/11/2026) : un rond
+   discret, centre dans la barre, colle au dernier onglet. Il ouvre l'accueil. */
+.rig-barre__plus {
+  flex: none; align-self: center; margin-left: 6px;
+  display: grid; place-items: center; width: 26px; height: 26px; padding: 0;
+  border: 0; border-radius: 50%; background: transparent; cursor: pointer;
+  color: var(--rig-texte-2);
+}
+.rig-barre__plus:hover { background: color-mix(in srgb, var(--rig-texte) 10%, transparent); color: var(--rig-texte); }
+.rig-barre__plus:focus-visible { outline: 2px solid var(--rig-focus, var(--rig-or)); outline-offset: 1px; }
+.rig-barre__plus svg { width: 15px; height: 15px; display: block; }
+
+/* ============================================================
+   L'HABILLAGE DU DRAFT (proposition 3, conv-2009, 19/11/2026) : la vue
+   rendue en filets plats sur un seul fond ne ressemblait pas au draft
+   (« horrible et pas moderne dans l'app »). Ce que le draft montrait :
+   - une PROUE sombre (le rail de la charte) : numero or, nom en capitales,
+     fiche sommaire en puces claires ;
+   - les zones posees en CARTES blanches, coins ronds, sur le fond gris,
+     separees par un vide et non plus par des traits ;
+   - des titres de section en petites capitales or, l'historique groupe
+     par annee.
+   Tout passe par les jetons de rig-charte.css : chaque theme garde ses couleurs.
+   ============================================================ */
+
+/* ---- La proue ---- */
+.rig-vged__entete {
+  background: var(--rig-rail); color: var(--rig-rail-texte);
+  border-bottom: 0; padding: 10px var(--rig-esp-4);
+}
+.rig-vged__entete .rig-bouton--plat { color: var(--rig-rail-texte-2); background: transparent; border-color: transparent; }
+.rig-vged__entete .rig-bouton--plat:hover { color: var(--rig-rail-texte); background: var(--rig-rail-trait-faible); }
+.rig-vged__titre { display: flex; align-items: baseline; gap: 12px; font-size: 17px; color: var(--rig-rail-texte); }
+.rig-vged__titre > span { font-weight: 800; letter-spacing: .06em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; }
+.rig-vged__numero { font: 700 17px var(--rig-font-mono); color: var(--rig-or-clair); flex: none; }
+.rig-vged__puce { background: var(--rig-rail-trait-faible); border-color: var(--rig-rail-trait); }
+.rig-vged__puce-libelle { color: var(--rig-rail-texte-3); }
+.rig-vged__puce-valeur { color: var(--rig-rail-texte); }
+.rig-vged__mention { color: color-mix(in srgb, var(--rig-erreur) 55%, #fff); }
+.rig-vged__entete .rig-vged__defauts-pastille {
+  color: color-mix(in srgb, var(--rig-alerte) 45%, #fff);
+  background: color-mix(in srgb, var(--rig-alerte) 22%, transparent);
+  border-color: color-mix(in srgb, var(--rig-alerte) 65%, transparent);
+}
+
+/* ---- Le corps : des cartes sur le fond, separees par un vide ---- */
+.rig-vged__corps { padding: 10px 12px 12px; background: var(--rig-fond); }
+.rig-vged__arbre,
+.rig-vged__milieu,
+.rig-vged__corps > .rig-vged__apercu {
+  background: var(--rig-surface);
+  border: 1px solid var(--rig-bord-faible); border-radius: var(--rig-radius);
+  box-shadow: 0 1px 2px rgba(20, 30, 60, .06);
+  overflow: hidden; min-height: 0;
+}
+.rig-vged__arbre { border-right: 1px solid var(--rig-bord-faible); padding: 8px 6px 8px 4px; }
+.rig-vged__milieu > .rig-vged__guide, .rig-vged__corps > .rig-vged__apercu { border-left: 0; }
+/* Les poignees deviennent le vide entre deux cartes : un filet d'accent
+   n'apparait qu'au survol, pour montrer qu'on peut glisser. */
+.rig-vged__poignee {
+  background: linear-gradient(var(--rig-accent), var(--rig-accent)) center / 2px 0 no-repeat;
+  transition: background-size .15s ease;
+}
+.rig-vged__poignee:hover { background: linear-gradient(var(--rig-accent), var(--rig-accent)) center / 2px 40% no-repeat; }
+/* La feuille du document, sur un plateau gris clair dans sa carte. */
+.rig-vged__corps > .rig-vged__apercu .rig-apercu__pages { background: var(--rig-fond-2); }
+.rig-vged__corps > .rig-vged__apercu .rig-apercu__entete { border-bottom-color: var(--rig-bord-faible); }
+
+/* L'entete de l'arbre dans sa carte : titre or en petites capitales. */
+.rig-vged__arbre .rig-arbre__entete {
+  background: var(--rig-surface); border-bottom: 0; padding: 2px 4px 6px 8px;
+  font: 700 10px/1.3 var(--rig-font-mono); letter-spacing: .14em; color: var(--rig-accent);
+}
+.rig-vged__arbre .rig-arbre__pieces { font-weight: 600; }
+.rig-vged__arbre .rig-arbre__filtre { border-radius: 999px; }
+/* La ligne choisie : teinte or et filet or, comme dans le draft. */
+.rig-vged__arbre .rig-arbre__ligne--actif { background: color-mix(in srgb, var(--rig-or) 16%, transparent); }
+.rig-vged__arbre .rig-arbre__ligne--actif .rig-arbre__texte { font-weight: 700; }
+
+/* ---- Arbre replie : le chemin en pilule sur le fond ---- */
+.rig-vged__chemin { border-bottom: 0; padding: 0 0 8px; }
+.rig-vged__chemin-etapes {
+  padding: 3px 12px; border-radius: 999px;
+  background: var(--rig-surface); border: 1px solid var(--rig-bord-faible);
+}
+
+/* ---- La colonne de suivi : les onglets, puis des cartes ---- */
+.rig-vged__suivi { margin-left: 10px; padding: 0; border-left: 0; gap: 10px; }
+.rig-suivi__onglets { background: var(--rig-surface); border-color: var(--rig-bord-faible); padding: 3px; }
+.rig-suivi__onglet { padding: 5px 8px; }
+.rig-suivi__onglet--actif, .rig-suivi__onglet--actif:hover {
+  background: linear-gradient(135deg, var(--rig-or), var(--rig-or-clair)); color: var(--rig-or-texte);
+}
+.rig-suivi__panneau { gap: 10px; }
+.rig-reste,
+.rig-vged__suivi .rig-chrono,
+.rig-fil__liste,
+.rig-fil__vide {
+  background: var(--rig-surface);
+  border: 1px solid var(--rig-bord-faible); border-radius: var(--rig-radius);
+  box-shadow: 0 1px 2px rgba(20, 30, 60, .06);
+  padding: 10px 8px;
+}
+.rig-fil__vide { flex: 1 1 auto; padding: 12px; }
+.rig-fil__liste { padding: 10px; }
+/* Titres de section : petites capitales or, le nombre en gris. */
+.rig-suivi__titre,
+.rig-vged__suivi .rig-chrono__titre {
+  font: 700 10px/1.3 var(--rig-font-mono); letter-spacing: .14em; color: var(--rig-accent);
+}
+/* La carte de l'historique s'arrete a ses lignes ; « tout voir » la fait defiler. */
+.rig-vged__suivi .rig-chrono { padding: 10px 8px; flex: 0 1 auto; }
+
+/* L'historique groupe par annee : l'annee en or, puis jour et mois. */
+.rig-chrono__annee {
+  padding: 8px 6px 2px; font: 800 13px/1 var(--rig-font-mono); color: var(--rig-or);
+}
+.rig-chrono__annee:first-child { padding-top: 2px; }
+.rig-vged__suivi .rig-chrono__date { width: 40px; flex: none; }
+.rig-vged__suivi .rig-chrono__piece { height: 26px; }
+.rig-vged__suivi .rig-chrono__piece--actif { box-shadow: inset 3px 0 0 var(--rig-or); }
+
+/* Le champ du fil : une carte, comme le reste de la colonne. */
+.rig-fil__saisie { background: var(--rig-surface); border-color: var(--rig-bord-faible); border-radius: var(--rig-radius); }
