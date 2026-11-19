@@ -21,7 +21,20 @@ var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../.
 var etatBanc = Path.Combine(Path.GetTempPath(), "rigv3-gedcheck-" + Guid.NewGuid().ToString("N") + ".json");
 Environment.SetEnvironmentVariable("RIGV3_ETAT", etatBanc);
 
-var vue = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
+// PORTE EN REACT (lot 2 du plan « finir le passage a React », 19/11/2026) : le
+// plan de travail de Home.razor (visionneuse, arbre, saisie guidee, modales) est
+// rendu par web/src/plan/*.tsx et web/src/composants/Application.tsx ; son @code
+// est deplace tel quel dans Pont/PlanTravail.cs, sa vue et ses gestes dans
+// Pont/PlanTravailVue.cs. « vue » designe donc ces sources ensemble : ce que
+// Home.razor contenait a lui seul. Une regle de balisage se lit dans le .tsx
+// (« balisage »), une regle de code dans le C# (« codePlan »).
+var codePlan = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs"))
+               + Environment.NewLine + File.ReadAllText(Path.Combine(racine, "Pont/PlanTravailVue.cs"));
+var balisage = string.Join(Environment.NewLine,
+    Directory.GetFiles(Path.Combine(racine, "web/src/plan"), "*.tsx")
+             .Append(Path.Combine(racine, "web/src/composants/Application.tsx"))
+             .Where(f => !f.EndsWith(".test.tsx")).OrderBy(f => f).Select(File.ReadAllText));
+var vue = codePlan + Environment.NewLine + balisage;
 var arbreModele = Path.Combine(racine, "Metier/ArbreGed.cs");
 var noeud = Path.Combine(racine, "Components/ArbreGedNoeud.razor");
 // PORTE EN REACT (lot 6, 19/11/2026) : ArbreGedNoeud, IconeGed, DocumentDetacheVue
@@ -111,7 +124,8 @@ Exiger(editions.Contains("appeler<string[]>('EcranTableauEditions.TypesPapier')"
 // --- Les etapes du dossier : horizontales, paginees, chargees a la demande.
 Exiger(vue.Contains("rig-saisie__pages--h") && !vue.Contains("Controle du dossier</button>"),
     "les etapes vivent dans la colonne du milieu, a l horizontale, sans onglet a part");
-Exiger(Regex.IsMatch(vue, @"Math\.Abs\(indexEtape - EtapeCourante\) <= 1"),
+Exiger(Regex.IsMatch(codePlan, @"var rendue = Math\.Abs\(i - EtapeCourante\) <= 1;")
+       && Regex.IsMatch(balisage, @"page\.rendue\s*\?\s*<Page "),
     "seules l etape visible et ses voisines sont rendues (chargement a la demande)");
 foreach (var colonne in new[] { "Destinataire", "Nom du document", "Ex.", "Imprimante",
                                 "File ou imprimante", "File differee" })
@@ -140,7 +154,7 @@ Exiger(Regex.IsMatch(css, @"\.rig-vged__editions\b"), "rig-accueil.css style la 
 //        actions, et « Imprimer » ouvre le choix de l'imprimante.
 //        Defaut a l'origine (10/09/2026) : le clic n'affichait que quatre
 //        metadonnees, aucun apercu, aucune action.
-Exiger(Regex.IsMatch(vue, @"class=""rig-apercu"""), "un apercu du document existe (rig-apercu)");
+Exiger(Regex.IsMatch(balisage, @"className=""rig-apercu"""), "un apercu du document existe (rig-apercu)");
 foreach (var action in new[] { "Imprimer", "Sauvegarder", "Envoyer par mail" })
 {
     Exiger(Regex.IsMatch(vue, @"rig-apercu__actions[\s\S]{0,3000}?aria-label=""" + action + @"""", RegexOptions.Singleline),
@@ -165,7 +179,8 @@ Exiger(Regex.IsMatch(vue, @"if \(DonneesVisible\) \{ morceaux\.Add"),
     "les colonnes se recalculent quand une zone se ferme");
 // Borne courte : sans elle, le motif traversait tout le fichier et trouvait
 // la METHODE DetacherDocument, bouton supprime ou non (mesure du 14/09).
-Exiger(Regex.IsMatch(vue, @"rig-apercu__actions[\s\S]{0,3000}?aria-label=""Detacher"" @onclick=""DetacherDocument"""),
+Exiger(Regex.IsMatch(balisage, @"rig-apercu__actions[\s\S]{0,3000}?aria-label=""Detacher"" onClick=\{\(\) => plan\('detacher'\)\}")
+       && codePlan.Contains("case \"detacher\": DetacherDocument(); break;"),
     "le document porte le bouton « Detacher »");
 // Demande du 15/09/2026 : detacher ferme la colonne de droite, fermer la
 // fenetre y renvoie le document.
@@ -248,7 +263,8 @@ Exiger(Regex.Matches(File.ReadAllText(Path.Combine(racine, "Metier/DocumentParta
         @"public static string TextePage").Count == 1 &&
        !Regex.IsMatch(texteDetachee, @"parPage") && pontDetachee.Contains("DocumentPartage.TextePage(piece, f)"),
     "la decoupe en pages n existe qu UNE fois (pas de copie dans la fenetre detachee)");
-Exiger(Regex.IsMatch(vue, @"Selectionner=""OuvrirApercu""|Selectionner=""@?OuvrirApercu"""),
+Exiger(Regex.IsMatch(codePlan, @"ArbreGedNoeud\.Activer\(active[\s\S]{0,200}?OuvrirApercu\(active\);")
+       && balisage.Contains("activer={(id) => plan('arbreActiver', id)}"),
     "l'arbre branche le clic d'une piece sur OuvrirApercu");
 Exiger(vue.Contains("rig-impression"), "la boite de choix de l'imprimante existe (rig-impression)");
 Exiger(Regex.IsMatch(vue, @"ArbreDemo\.Imprimantes"),
@@ -424,7 +440,7 @@ foreach (var interdit in new[] { "Signalements de divergences BE", "Divers",
 
 Exiger(coquilleArbre.Contains("[Parameter] public string[] Domaines")
        && pontArbre.Contains("AccesGed.EnfantsVisibles(n, domaines, ajouts, masques, recette)")
-       && vue.Contains("Domaines=\"Domaines\""),
+       && codePlan.Contains("ArbreGedNoeud.Vue(Arbre, 0, NoeudsOuverts, NoeudSelectionne, Domaines,"),
     "l'arbre rendu recoit les domaines du login courant");
 // Le rond de profil est rendu par React depuis le lot 1 du passage a React
 // (19/11/2026) : la liste des comptes et le changement de login vivent dans la
@@ -517,7 +533,7 @@ Exiger(Regex.IsMatch(css, @"\.rig-ctx \{[^}]*position:\s*fixed"),
 // IconeGed.razor est la coquille que Home.razor pose dans la fenetre de creation.
 var icones = LireSource("web/src/composants/IconeGed.tsx");
 var coquilleIcone = LireSource("Components/IconeGed.razor");
-Exiger(vue.Contains("<IconeGed Nature=") && !vue.Contains("rig-nature__icone rig-arbre__icone")
+Exiger(balisage.Contains("<IconeGed nature={n.code} classe=\"rig-nature__icone\" />") && !vue.Contains("rig-nature__icone rig-arbre__icone")
        && coquilleIcone.Contains("<IleReact Composant=\"IconeGed\"")
        && coquilleIcone.Contains("[\"nature\"] = Nature") && coquilleIcone.Contains("[\"classe\"] = Classe"),
     "les tuiles de nature portent une vraie icone dessinee, pas une pastille");
@@ -844,7 +860,7 @@ Exiger(coquilleLot.Contains("<IleReact Composant=\"EcranTachesLot\"")
        && coquilleLot.Contains("EcranTachesLot.Ouvrir(Etat, Utilisateur, CodeRecette)")
        && coquilleLot.Contains("EcranTachesLot.Fermer(Session)"),
     "la coquille du lot garde ses parametres, ouvre la session sur l'etat VIVANT de l'accueil et la ferme");
-Exiger(vueTache.Contains("case \"PROC_TACHES_LOT\":") && vueTache.Contains("<EcranTachesLot"),
+Exiger(vueTache.Contains("case 'PROC_TACHES_LOT':") && vueTache.Contains("<EcranTachesLot"),
     "l'ecran en lot est aiguille dans la vue");
 Exiger(Regex.IsMatch(vueTache, @"new\(""PROC_TACHES_LOT"",\s*"""),
     "l'ecran en lot figure au catalogue des traitements");

@@ -11,11 +11,20 @@ using RigV3Desktop;
 //  1. le METIER : les droits des comptes et les etats d'une demande ;
 //  2. l'ARBRE : rejoue le circuit sur le vrai modele GED (masques, ajouts,
 //     libelles) et verifie qu'aucun effet n'apparait avant la validation ;
-//  3. la VUE : Home.razor fait bien passer les QUATRE gestes par Soumettre,
-//     et n'applique la modification que dans ValiderModification.
+//  3. la VUE : le plan de travail fait bien passer les QUATRE gestes par
+//     Soumettre, et n'applique la modification que dans ValiderModification.
+//     Depuis le lot 2 du passage a React (19/11/2026), ces regles vivent dans
+//     Pont/PlanTravail.cs (le @code de Home.razor, deplace tel quel) ; le
+//     balisage de la page est dans web/src/plan/ et web/src/composants/Application.tsx.
 
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
-var vue = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
+var vue = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs"));
+// Le balisage rendu par React : la barre du haut comprise (lot 1).
+var balisage = string.Join("\n",
+    Directory.GetFiles(Path.Combine(racine, "web/src/plan"), "*.tsx")
+             .Append(Path.Combine(racine, "web/src/composants/Application.tsx"))
+             .Append(Path.Combine(racine, "web/src/composants/BarreRig.tsx"))
+             .Where(f => !f.EndsWith(".test.tsx")).Select(File.ReadAllText));
 
 var echecs = new List<string>();
 void Exiger(bool ok, string quoi)
@@ -106,16 +115,26 @@ Exiger(!applique && masques2.Count == 0 && refuse.EstEnAttente,
 // --- 4. La VUE fait bien passer les gestes par la file.
 foreach (var geste in new[] { "Renommer", "Supprimer", "Dupliquer", "Creer" })
     Exiger(Regex.IsMatch(vue, @"Soumettre\(""" + geste + @"""") ,
-        $"Home.razor soumet le geste « {geste} » a validation");
+        $"le plan de travail soumet le geste « {geste} » a validation");
 Exiger(Regex.IsMatch(vue, @"private bool Soumettre[\s\S]{0,200}if \(CompteCourant\.PeutModifierDirect\) return false;"),
-    "Home.razor n'ecrit en direct que si le login en a le droit");
+    "le plan de travail n'ecrit en direct que si le login en a le droit");
 Exiger(Regex.IsMatch(vue, @"ValiderModification\(DemandeModification d\)[\s\S]{0,260}d\.Appliquer\(\);"),
-    "Home.razor n'applique la modification QUE dans ValiderModification");
+    "le plan de travail n'applique la modification QUE dans ValiderModification");
 Exiger(Regex.IsMatch(vue, @"ValiderModification[\s\S]{0,160}!CompteCourant\.PeutValider")
        || Regex.IsMatch(vue, @"if \(!CompteCourant\.PeutValider"),
     "seul un login habilite peut valider depuis la vue");
-Exiger(!vue.Contains("rig-validations-bouton") && !vue.Contains("ValidationsEnAttente"),
+Exiger(!vue.Contains("rig-validations-bouton") && !vue.Contains("ValidationsEnAttente")
+       && !balisage.Contains("rig-validations-bouton") && !balisage.Contains("ValidationsEnAttente"),
     "la barre du haut ne porte PLUS de bouton Validations (retire le 2026-09-17)");
+// Les gestes de l'arbre qui passent par Soumettre arrivent bien de la page :
+// le menu du clic droit et le renommage sur place sont branches sur eux.
+foreach (var (nom, methode) in new[] { ("menuRenommer", "DemarrerRenommage"), ("menuSupprimer", "SupprimerNoeud"),
+                                         ("menuDupliquer", "Dupliquer"), ("ajouterElement", "AjouterElement"),
+                                         ("arbreRenommer", "ValiderRenommage") })
+    Exiger(Regex.IsMatch(File.ReadAllText(Path.Combine(racine, "Pont/PlanTravailVue.cs")),
+               $@"case ""{nom}"":[\s\S]{{0,200}}?{methode}\(")
+           && balisage.Contains($"'{nom}'"),
+        $"le geste « {nom} » de la page joue {methode} du plan de travail");
 
 Console.WriteLine();
 if (echecs.Count == 0)

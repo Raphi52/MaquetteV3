@@ -253,7 +253,10 @@ Exiger(PerimetreProfil.Reserve(TraitementCommandes.CodeEcran).OrderBy(x => x).Se
 // le .tsx ET le pont : ce que le .razor contenait a lui seul. Une regle de mise
 // en page se lit dans le .tsx, un appel de regle dans le pont. La section 5 est
 // neuve : elle JOUE les gestes par le pont et compare a TraitementCommandes.
-var home = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
+// Lot 2 du passage a React (19/11/2026) : l'aiguillage est web/src/plan/Aiguillage.tsx,
+// le catalogue et les sujets vivent dans Pont/PlanTravail.cs (le @code de Home.razor).
+var home = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs"));
+var aiguillage = File.ReadAllText(Path.Combine(racine, "web/src/plan/Aiguillage.tsx"));
 var ecranChemin = Path.Combine(racine, "Components/Ecrans/EcranCommandesWeb.razor");
 var tsxChemin = Path.Combine(racine, "web/src/ecrans/EcranCommandesWeb.tsx");
 var pontChemin = Path.Combine(racine, "Pont/EcranCommandesWeb.cs");
@@ -267,13 +270,13 @@ var ecran = tsx + "\n" + pont;
 var codeTsx = Regex.Replace(tsx, @"/\*[\s\S]*?\*/|//[^\n]*", "");
 Exiger(Regex.IsMatch(coquille, @"<IleReact\s+Composant=""EcranCommandesWeb""\s*/>"),
     "la coquille monte l'ecran React (<IleReact Composant=\"EcranCommandesWeb\" />)");
-Exiger(Regex.IsMatch(home, @"case\s+""PROC_COMMANDES_WEB""\s*:(?:\s*@\*[\s\S]*?\*@)?\s*<EcranCommandesWeb\s*/>"),
-    "Home.razor aiguille PROC_COMMANDES_WEB vers <EcranCommandesWeb />");
+Exiger(Regex.IsMatch(aiguillage, @"case\s+'PROC_COMMANDES_WEB'\s*:(?:\s*//[^\n]*)*\s*return <EcranCommandesWeb\s*/>"),
+    "le plan de travail aiguille PROC_COMMANDES_WEB vers <EcranCommandesWeb />");
 // Le catalogue du menu de gauche vit dans Pont/MenuAccueil.cs depuis le lot 1 du
 // passage a React (19/11/2026) : l'entree s'y lit, au meme format.
 var menuAccueil = File.ReadAllText(Path.Combine(racine, "Pont/MenuAccueil.cs"));
 Exiger(Regex.IsMatch(menuAccueil, @"new\(""Commandes web"",\s*""[^""]+"",\s*""PROC_COMMANDES_WEB""\)"), "le menu « Recevoir » porte l'entree « Commandes web »");
-Exiger(!Regex.IsMatch(home, @"new\(""Commandes web"",\s*""[^""]+"",\s*""PROC_COMMANDES_WEB""\)"), "Home.razor ne tient plus de copie de l'entree de menu");
+Exiger(!Regex.IsMatch(home, @"new\(""Commandes web"",\s*""[^""]+"",\s*""PROC_COMMANDES_WEB""\)"), "le plan de travail ne tient pas de copie de l'entree de menu");
 Exiger(Regex.IsMatch(home, @"new\(""PROC_COMMANDES_WEB"",\s*""Commandes web""\)"), "le catalogue connait l'ecran");
 Exiger(Regex.IsMatch(home, @"new\(""SUJ_AFFAIRES""[^\]]*""PROC_REQUI"",\s*""PROC_COMMANDES_WEB"""),
     "le sujet « Affaires » le range a cote des requisitions");

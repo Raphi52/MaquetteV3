@@ -13,11 +13,20 @@ void Exiger(bool ok, string quoi)
 }
 
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
-// Home.razor garde l'AIGUILLAGE (ouvrir l'ecran, l'affaire ou la tache d'une
-// alerte). Depuis le lot 1 du passage a React (19/11/2026), la tuile elle-meme
-// est rendue par web/src/accueil/Tuiles.tsx, et ses regles (releve, groupes,
-// widgets metier) vivent dans la session de l'accueil, Pont/Accueil.cs.
-var vue = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
+// Le PLAN DE TRAVAIL garde l'AIGUILLAGE (ouvrir l'ecran, l'affaire ou la tache
+// d'une alerte). Depuis le lot 1 du passage a React (19/11/2026), la tuile
+// elle-meme est rendue par web/src/accueil/Tuiles.tsx, et ses regles (releve,
+// groupes, widgets metier) vivent dans la session de l'accueil, Pont/Accueil.cs.
+// Depuis le lot 2, les regles du plan de travail vivent dans Pont/PlanTravail.cs
+// (le @code de Home.razor, deplace tel quel) et l'aiguillage des ecrans est
+// web/src/plan/Aiguillage.tsx.
+var vue = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs"));
+var gestesPlan = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravailVue.cs"));
+var aiguillage = File.ReadAllText(Path.Combine(racine, "web/src/plan/Aiguillage.tsx"));
+// Tout le balisage de la page rendu par React (plan de travail et application).
+var balisage = string.Join("\n", Directory.GetFiles(Path.Combine(racine, "web/src/plan"), "*.tsx")
+    .Append(Path.Combine(racine, "web/src/composants/Application.tsx"))
+    .Where(f => !f.EndsWith(".test.tsx")).Select(File.ReadAllText));
 var pont = File.ReadAllText(Path.Combine(racine, "Pont/Accueil.cs"));
 var tuiles = File.ReadAllText(Path.Combine(racine, "web/src/accueil/Tuiles.tsx"));
 var grille = File.ReadAllText(Path.Combine(racine, "web/src/accueil/Grille.tsx"));
@@ -47,7 +56,7 @@ Exiger(catalogue.Where(x => x.Nombre == 0)
     "seules les alertes « a creer » affichent zero");
 Exiger(catalogue.Zip(sonde.Relever()).All(c => c.First.Nombre == c.Second.Nombre),
     "le compte d'une ligne ne change pas d'un affichage a l'autre");
-Exiger(!vue.Contains("rig-filet-v--@a.Statut") && corpsAlertes.Length > 0 && !corpsAlertes.Contains("rig-filet-v"),
+Exiger(!vue.Contains("rig-filet-v--@a.Statut") && !balisage.Contains("rig-alerte") && corpsAlertes.Length > 0 && !corpsAlertes.Contains("rig-filet-v"),
     "la barre verticale a disparu des lignes de « A traiter »");
 // Depuis le 17/09/2026 la pastille est coloree par le PALIER de charge
 // (PanneauMetier.Palier) et non plus par la gravite : une seule grammaire de
@@ -65,7 +74,7 @@ Exiger(PanneauMetier.Palier(0) == "vide" && PanneauMetier.Palier(10) == "bas"
 Exiger(pont.Contains("new GroupeAlertesVue(g.Categorie, repliee, g.Lignes.Sum(x => x.Nombre),")
        && tuiles.Contains("<span className=\"rig-groupe-tete__compte\">{g.charge}</span>"),
     "le compte d'une categorie somme les nombres de ses lignes");
-Exiger(!vue.Contains("rig-groupe-tete__compte\">@groupe.Lignes.Length")
+Exiger(!vue.Contains("rig-groupe-tete__compte\">@groupe.Lignes.Length") && !balisage.Contains("rig-groupe-tete__compte")
        && !Regex.IsMatch(pont, @"new GroupeAlertesVue\([^;]*g\.Lignes\.Length")
        && !tuiles.Contains("{g.lignes.length}"),
     "le compte d'une categorie n'est plus son nombre de lignes");
@@ -115,7 +124,7 @@ foreach (var alerte in a)
     {
         Exiger(RecettesTaches.ParCode(codeLot) is not null,
             $"la recette du lot « {alerte.Id} » existe ({codeLot})");
-        Exiger(vue.Contains("case \"PROC_TACHES_LOT\":"),
+        Exiger(aiguillage.Contains("case 'PROC_TACHES_LOT':") && aiguillage.Contains("<EcranTachesLot key={ecran.lot.session} session={ecran.lot.session} version={ecran.lot.version} />"),
             "la vue aiguille l ecran de traitement en lot");
         Exiger(vue.Contains("LotDemande = codeLot;"),
             "l alerte de lot ouvre l ecran SUR SA recette, pas sur un choix a refaire");
@@ -136,9 +145,9 @@ foreach (var alerte in a)
         continue;
     }
 
-    // Une cible d'ecran doit etre aiguillee dans Home.razor ET figurer au
+    // Une cible d'ecran doit etre aiguillee (web/src/plan/Aiguillage.tsx) ET figurer au
     // catalogue, sinon le clic tomberait sur « ecran non maquette ».
-    Exiger(vue.Contains($"case \"{alerte.Cible}\":"),
+    Exiger(aiguillage.Contains($"case '{alerte.Cible}':"),
         $"l'ecran de « {alerte.Id} » est aiguille ({alerte.Cible})");
     Exiger(Regex.IsMatch(vue, $@"new\(""{alerte.Cible}"",\s*"""),
         $"la cible de « {alerte.Id} » est au catalogue des traitements");
@@ -367,8 +376,10 @@ Exiger(coquilleVerrous.Contains("<IleReact Composant=\"EcranVerrous\""),
 Exiger(Regex.IsMatch(coquilleVerrous, @"\[Parameter\] public EventCallback<string> OuvrirDossier")
        && coquilleVerrous.Contains("[\"ouvrirDossier\"] = IleReact.Rappel(OuvrirDossier)"),
     "la coquille garde le parametre OuvrirDossier et le remonte depuis React");
-Exiger(vue.Contains("<EcranVerrous OuvrirDossier=\"OuvrirParNumero\" />"),
-    "Home.razor ouvre toujours l'affaire cliquee dans l'ecran des verrous");
+Exiger(aiguillage.Contains("<EcranVerrous ouvrirDossier={ouvrirParNumero} />")
+       && aiguillage.Contains("const ouvrirParNumero = (numero: string) => plan('ouvrirNumero', numero)")
+       && gestesPlan.Contains("case \"ouvrirNumero\": OuvrirParNumero(Texte(valeur)); break;"),
+    "le plan de travail ouvre toujours l'affaire cliquee dans l'ecran des verrous");
 Exiger(tsxVerrous.Contains("appeler<VueVerrous>('EcranVerrous.Verrouilles', utilisateur, moiCompris)"),
     "l'ecran React demande ses lignes au pont, avec le login et la bascule saisis");
 Exiger(pontVerrous.Contains("[JSInvokable(\"EcranVerrous.Verrouilles\")]"),
@@ -406,8 +417,8 @@ Exiger(coquilleTeletrans.Contains("<IleReact Composant=\"EcranTeletransmission\"
 Exiger(Regex.IsMatch(coquilleTeletrans, @"\[Parameter\] public EventCallback<string> OuvrirDossier")
        && coquilleTeletrans.Contains("[\"ouvrirDossier\"] = IleReact.Rappel(OuvrirDossier)"),
     "la coquille des teletransmissions garde OuvrirDossier et le remonte depuis React");
-Exiger(vue.Contains("<EcranTeletransmission OuvrirDossier=\"OuvrirParNumero\" />"),
-    "Home.razor ouvre toujours l'affaire du flux clique");
+Exiger(aiguillage.Contains("<EcranTeletransmission ouvrirDossier={ouvrirParNumero} />"),
+    "le plan de travail ouvre toujours l'affaire du flux clique");
 Exiger(tsxTeletrans.Contains("appeler<VueTeletransmission>('EcranTeletransmission.Flux', mode)")
        && pontTeletrans.Contains("[JSInvokable(\"EcranTeletransmission.Flux\")]"),
     "l'ecran React demande ses flux au pont, pour le mode choisi");
@@ -435,9 +446,9 @@ Exiger(RigV3Desktop.Pont.EcranTeletransmission.Flux("MODE-ABSENT") is { Flux.Len
 Exiger(vue.Contains("OuvrirAlerte(") && vue.Contains("case Pont.DemandeAccueil.OuvrirAlerte: OuvrirAlerte(demande.Alerte!);")
        && pont.Contains("case \"alerte\": return new(DemandeAccueil.OuvrirAlerte, Alerte: Trouver(Alertes, Exiger(valeur)));")
        && corpsAlertes.Contains("onClick={() => geste('alerte', a.id)}"),
-    "Home.razor branche le clic d'une alerte");
+    "le plan de travail branche le clic d'une alerte");
 Exiger(pont.Contains("SondeAlertes.Relever()"), "la session de l'accueil releve les alertes par la sonde");
-Exiger(!Regex.IsMatch(vue + pont, @"new\(""delai"",\s*""3 demandes"),
+Exiger(!Regex.IsMatch(vue + pont + balisage, @"new\(""delai"",\s*""3 demandes"),
     "plus d'alertes ecrites en dur dans la vue");
 
 // --- 3. Les reglages font ce qu'ils annoncent

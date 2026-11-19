@@ -74,7 +74,9 @@ foreach (var (nom, texte) in feuilles)
 // rester visible sous forme de rail (jamais display:none).
 {
     var accueil = feuilles["rig-accueil.css"];
-    var home = File.ReadAllText(Path.Combine(racine, "Components", "Pages", "Home.razor"));
+    // Le plan de travail (lot 2 du passage a React) : Pont/PlanTravail.cs (le @code
+    // de Home.razor, deplace tel quel) et son balisage web/src/plan/.
+    var home = File.ReadAllText(Path.Combine(racine, "Pont", "PlanTravail.cs")) + "\n" + string.Join("\n", Directory.GetFiles(Path.Combine(racine, "web/src/plan"), "*.tsx").Append(Path.Combine(racine, "web/src/composants/Application.tsx")).Where(f => !f.EndsWith(".test.tsx")).Select(File.ReadAllText));
 
     Exiger(Regex.IsMatch(accueil, @"\.rig-accueil--menu-reduit[^{}]*\{[^{}]*grid-template-columns:\s*(\d+)px"),
         "rig-accueil.css reduit la colonne du menu via .rig-accueil--menu-reduit");
@@ -104,7 +106,7 @@ foreach (var (nom, texte) in feuilles)
     Exiger(Regex.IsMatch(menuTsx, @"className=""rig-menu__replier""\s+onClick=\{\(\) => geste\('menu'\)\}"),
         "l'accueil expose un bouton de repli/deploiement du menu");
     Exiger(!home.Contains("rig-menu__replier") && !home.Contains("bool MenuReduit"),
-        "Home.razor ne tient plus de copie du menu de gauche");
+        "le plan de travail ne tient pas de copie du menu de gauche");
 }
 
 // --- 5. Pas de cadre autour de la page (18/11/2026). Une marge de 6 px autour
@@ -154,7 +156,9 @@ foreach (var (nom, texte) in feuilles)
 // meme rond passe alors dans le bandeau.
 {
     var accueil = feuilles["rig-accueil.css"];
-    var home = File.ReadAllText(Path.Combine(racine, "Components", "Pages", "Home.razor"));
+    // Le plan de travail (lot 2) : son code dans Pont/PlanTravail.cs, son balisage dans web/src/plan/.
+    var home = File.ReadAllText(Path.Combine(racine, "Pont", "PlanTravail.cs"));
+    var balisagePlan = string.Join("\n", Directory.GetFiles(Path.Combine(racine, "web/src/plan"), "*.tsx").Append(Path.Combine(racine, "web/src/composants/Application.tsx")).Where(f => !f.EndsWith(".test.tsx")).Select(File.ReadAllText));
 
     bool Rond(string selecteur, string rayon) =>
         Regex.IsMatch(accueil, Regex.Escape(selecteur) + @"\s*\{[^{}]*border-radius:\s*" + Regex.Escape(rayon));
@@ -177,7 +181,7 @@ foreach (var (nom, texte) in feuilles)
     Exiger(Regex.Matches(chiffresTsx, @"className=""rig-chiffre__rond""").Count == 3,
         "chacune des 3 tuiles chiffrees porte son rond");
 
-    Exiger(!home.Contains("<select class=\"rig-login\"") && !barreTsx.Contains("rig-login"),
+    Exiger(!home.Contains("<select class=\"rig-login\"") && !balisagePlan.Contains("rig-login") && !barreTsx.Contains("rig-login"),
         "le bandeau ne porte plus la liste deroulante du login");
     Exiger(Regex.IsMatch(enteteTsx, @"rig-entete__outils[\s\S]*?\{entete\.profil && <RondProfil profil=\{entete\.profil\}")
            && pont.Contains("ctx.Recouvert ? null : Profil(dansLaBarre: false)"),
@@ -186,7 +190,7 @@ foreach (var (nom, texte) in feuilles)
            && pont.Contains("ctx.Recouvert ? Profil(dansLaBarre: true) : null"),
         "un ecran ouvert garde le rond de profil, dans le bandeau");
     Exiger(home.Contains("return new(AccueilRecouvert, ProcOuverte?.Code,"),
-        "Home.razor passe a l'accueil s'il est recouvert");
+        "le plan de travail passe a l'accueil s'il est recouvert");
     // Les DEUX ecrans pleins recouvrent le titre : l'ecran de procedure
     // (.rig-proc) ET l'affaire (.rig-vged). Oublier l'affaire perdait le login
     // la ou il sert le plus : il decide des branches visibles de son arbre.
@@ -218,7 +222,11 @@ foreach (var (nom, texte) in feuilles)
 //   tenues par la section 8 ;
 // - un code de ThemesRig sans bloc CSS donne une page sans couleurs.
 {
-    var home = File.ReadAllText(Path.Combine(racine, "Components", "Pages", "Home.razor"));
+    // La page entiere est rendue par l'application React (lot 2) : web/src/composants/Application.tsx ;
+    // le theme est lu dans la session du plan de travail (Pont/PlanTravail.cs).
+    var home = File.ReadAllText(Path.Combine(racine, "Pont", "PlanTravail.cs"));
+    var application = File.ReadAllText(Path.Combine(racine, "web", "src", "composants", "Application.tsx"));
+    var balisagePlan = string.Join("\n", Directory.GetFiles(Path.Combine(racine, "web/src/plan"), "*.tsx").Append(Path.Combine(racine, "web/src/composants/Application.tsx")).Where(f => !f.EndsWith(".test.tsx")).Select(File.ReadAllText));
     var accueil = feuilles["rig-accueil.css"];
 
     Exiger(themes.Count >= 5 && new[] { "clair", "sombre", "violet", "orange", "argile" }.All(themes.ContainsKey),
@@ -326,7 +334,7 @@ foreach (var (nom, texte) in feuilles)
     var barreTsx = File.ReadAllText(Path.Combine(racine, "web", "src", "composants", "BarreRig.tsx"));
     var themeTsx = File.ReadAllText(Path.Combine(racine, "web", "src", "composants", "ThemeRig.tsx"));
     var pont = File.ReadAllText(Path.Combine(racine, "Pont", "Accueil.cs"));
-    Exiger(!home.Contains("BasculerTheme") && !home.Contains("<span>Mode sombre</span>")
+    Exiger(!home.Contains("BasculerTheme") && !balisagePlan.Contains("Mode sombre")
            && !Regex.IsMatch(barreTsx, @">\s*Mode sombre\s*<") && !pont.Contains("BasculerTheme"),
         "la bascule « Mode sombre » a disparu des reglages");
     Exiger(Regex.IsMatch(barreTsx, @"<Liste[^>]*id=""rig-choix-theme""[^>]*changer=\{\(code\) => agir\('theme', code\)\}")
@@ -334,10 +342,11 @@ foreach (var (nom, texte) in feuilles)
            && pont.Contains("ThemesRig.Tous.Select(t => new ThemeVue(t.Code, t.Libelle))")
            && pont.Contains("case \"theme\": ChoisirTheme(Texte(valeur));"),
         "Reglages > Affichage propose une liste deroulante des themes de ThemesRig");
-    Exiger(home.Contains(@"data-rig-theme=""@Theme""") && home.Contains("private string Theme => Accueil.Theme;"),
+    Exiger(application.Contains("<div data-rig-theme={v.theme}") && home.Contains("private string Theme => Accueil.Theme;")
+           && File.ReadAllText(Path.Combine(racine, "Pont", "PlanTravailVue.cs")).Contains("return new VueApplication(\r\n            Theme,".Replace("\r\n", Environment.NewLine)),
         "la page porte le code du theme choisi");
     Exiger(themeTsx.Contains("document.documentElement.setAttribute('data-rig-theme', theme)")
-           && home.Contains("<IleReact Composant=\"ThemeRig\" Proprietes=\"@(new Dictionary<string, object?> { [\"theme\"] = Theme })\" />"),
+           && application.Contains("<ThemeRig theme={v.theme} />"),
         "<html> porte aussi le theme, dans toutes les fenetres (ile ThemeRig)");
 }
 

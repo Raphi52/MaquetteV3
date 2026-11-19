@@ -115,16 +115,21 @@ Exiger(session.Theme == "clair", "un choix vide retombe sur le CLAIR");
 // ---------- Ce que React fait du theme ----------
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
 var themeTsx = File.ReadAllText(Path.Combine(racine, "web/src/composants/ThemeRig.tsx"));
-var home = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
+// Lot 2 du passage a React (19/11/2026) : la page entiere est l'application React
+// (web/src/composants/Application.tsx), le fond WPF suit la session du plan de
+// travail (Pont/PlanTravail.cs, le @code de Home.razor deplace tel quel).
+var home = File.ReadAllText(Path.Combine(racine, "web/src/composants/Application.tsx"));
+var plan = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs"));
 Exiger(themeTsx.Contains("document.documentElement.setAttribute('data-rig-theme', theme)"),
     "<html> recoit le theme (sinon le fond de la page hote cerne le clair d'un cadre sombre)");
 // L'ile du theme n'est sous AUCUNE condition : la ligne qui la precede n'ouvre pas de bloc.
 var lignes = home.Split('\n').Select(l => l.Trim()).ToList();
-var ileTheme = lignes.FindIndex(l => l.StartsWith("<IleReact Composant=\"ThemeRig\""));
-Exiger(ileTheme > 0 && lignes[ileTheme - 1] != "{" && !lignes[ileTheme - 1].StartsWith("@if"),
+var ileTheme = lignes.FindIndex(l => l.StartsWith("<ThemeRig theme="));
+Exiger(ileTheme > 0 && lignes[ileTheme] == "<ThemeRig theme={v.theme} />"
+       && !lignes[ileTheme - 1].EndsWith("&&") && !lignes[ileTheme - 1].EndsWith("(") && !lignes[ileTheme - 1].StartsWith("{"),
     "le theme est pose dans TOUTES les fenetres, y compris celle d'un onglet sorti");
-Exiger(home.Contains("case Pont.DemandeAccueil.ThemeChange: Fenetre.AppliquerFond(Theme);")
-       && System.Text.RegularExpressions.Regex.Matches(home, @"Fenetre\.AppliquerFond\(Theme\);").Count >= 2,
+Exiger(plan.Contains("case Pont.DemandeAccueil.ThemeChange: Fenetre?.AppliquerFond(Theme);")
+       && System.Text.RegularExpressions.Regex.Matches(plan, @"Fenetre\?\.AppliquerFond\(Theme\);").Count >= 2,
     "le fond de la fenetre WPF suit le theme au demarrage et a chaque choix");
 
 try { Directory.Delete(dossierTemp, true); } catch (Exception) { }

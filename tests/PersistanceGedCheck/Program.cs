@@ -103,13 +103,14 @@ Exiger(ajouts2.Count == 0 && masques2.Count == 0 && libelles2.Count == 0 && avan
 
 // ---------- L'ecran appelle bien ces deux points ----------
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
-var vue = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
+// Lot 2 du passage a React (19/11/2026) : le @code de Home.razor vit dans Pont/PlanTravail.cs.
+var vue = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs"));
 Exiger(vue.Contains("PersistanceGed.Appliquer("),
-    "Home.razor repose l'arbre conserve a l'ouverture d'une affaire");
+    "le plan de travail repose l'arbre conserve a l'ouverture d'une affaire");
 Exiger(vue.Contains("PersistanceGed.Capturer("),
-    "Home.razor retient l'arbre apres un geste de l'utilisateur");
+    "le plan de travail retient l'arbre apres un geste de l'utilisateur");
 foreach (var appel in new[] { "MemoriserArbre();", "PoserLibelle(" })
-    Exiger(vue.Contains(appel), $"Home.razor appelle {appel}");
+    Exiger(vue.Contains(appel), $"le plan de travail appelle {appel}");
 
 // ---------- Kbis : greffe, denomination et adresse du siege VIENNENT DU FORMULAIRE ----------
 // PORTE EN REACT (lot 6, 19/11/2026) : Components/ApercuKbis.razor n'est plus

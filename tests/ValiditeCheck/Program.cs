@@ -54,22 +54,32 @@ Exiger(R("taux", "100") is null, "un taux de 100 % passe");
 Exiger(R("taux", "140") is not null, "un taux au-dela de 100 % est refuse");
 
 // --- 6. Les controles sont bien BRANCHES sur les champs de la vue
-var vue = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "../../../../../Components/Pages/Home.razor"));
+// Depuis le lot 2 du passage a React (19/11/2026) : les etapes, leurs champs et
+// le controle final vivent dans Pont/PlanTravail.cs (le @code de Home.razor,
+// deplace tel quel) ; la vue en est calculee par Pont/PlanTravailVue.cs et
+// rendue par web/src/plan/Etapes.tsx.
+var racineSrc = Path.Combine(AppContext.BaseDirectory, "../../../../../");
+var vue = File.ReadAllText(Path.Combine(racineSrc, "Pont/PlanTravail.cs"));
+var calculVue = File.ReadAllText(Path.Combine(racineSrc, "Pont/PlanTravailVue.cs"));
+var etapesTsx = File.ReadAllText(Path.Combine(racineSrc, "web/src/plan/Etapes.tsx"));
 Exiger(Regex.IsMatch(vue, @"""DSSRC_SIREN""[^)]*Controle:\s*""siren"""),
     "le SIREN du dossier porte le controle siren");
 Exiger(Regex.IsMatch(vue, @"""ACTVT_CODE_NAF""[^)]*Controle:\s*""naf"""),
     "le code NAF porte son controle");
 Exiger(Regex.IsMatch(vue, @"""DRGNT_DATE_ENTREE""[^)]*Controle:\s*""date-passee"""),
     "la date d'entree d'un dirigeant ne peut pas etre future");
-Exiger(vue.Contains("var (manquants, refuses) = Defauts(etape);"),
+Exiger(calculVue.Contains("var (manquants, refuses) = Defauts(etape);")
+       && calculVue.Contains("refuses, manquants, remplis, total);"),
     "la frise interroge bien les defauts de chaque etape");
-Exiger(vue.Contains("rig-frise__requis") && vue.Contains("rig-frise__defaut"),
+Exiger(etapesTsx.Contains("rig-frise__requis") && etapesTsx.Contains("rig-frise__defaut")
+       && Regex.IsMatch(etapesTsx, @"p\.refuses > 0\s*\?\s*<span className=""rig-frise__defaut"">[\s\S]{0,200}?: p\.manquants > 0\s*\?\s*<span className=""rig-frise__requis"">"),
     "la frise distingue requis manquants et valeurs refusees");
 
 // --- 7. Le controle final : recapitulatif ET verrou de validation
-Exiger(vue.Contains("private List<Defaut> TousLesDefauts()"),
+Exiger(vue.Contains("private List<Defaut> TousLesDefauts()")
+       && Regex.IsMatch(calculVue, @"var defauts = TousLesDefauts\(\);\s*return new RecapVue\(false, defauts\.Count,"),
     "le controle final rassemble les defauts des 7 etapes");
-Exiger(Regex.IsMatch(vue, @"disabled=""@\(defauts\.Count > 0\)"""),
+Exiger(Regex.IsMatch(etapesTsx, @"const n = recap\.nombre[\s\S]{0,1500}?disabled=\{n > 0\}\s*onClick=\{\(\) => plan\('valider'\)\}"),
     "le bouton Valider est eteint tant qu il reste un defaut");
 // Le bouton desactive ne suffit pas : la methode doit refuser d elle-meme.
 Exiger(Regex.IsMatch(vue, @"ValiderDossier\(\)\s*\{\s*(//[^\r\n]*\r?\n\s*)*if \(TousLesDefauts\(\)\.Count > 0\) return;"),

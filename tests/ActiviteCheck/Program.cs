@@ -19,10 +19,12 @@ var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../.
 // de l'accueil (Pont/Accueil.cs, meme ecriture que dans Home.razor) ; la tuile
 // est rendue par web/src/accueil/Grille.tsx et Tuiles.tsx (fonction Activite).
 var vue = File.ReadAllText(Path.Combine(racine, "Pont/Accueil.cs"));
-var home = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
+// Le plan de travail (lot 2 : Pont/PlanTravail.cs, le @code de Home.razor deplace,
+// et son balisage web/src/plan/) ne tient pas non plus de copie de la grille.
+var home = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs")) + "\n" + string.Join("\n", Directory.GetFiles(Path.Combine(racine, "web/src/plan"), "*.tsx").Append(Path.Combine(racine, "web/src/composants/Application.tsx")).Where(f => !f.EndsWith(".test.tsx")).Select(File.ReadAllText));
 var grilleTsx = File.ReadAllText(Path.Combine(racine, "web/src/accueil/Grille.tsx"));
 var tuilesTsx = File.ReadAllText(Path.Combine(racine, "web/src/accueil/Tuiles.tsx"));
-Exiger(!home.Contains("new(\"activite\","), "Home.razor ne tient plus de copie de la grille de l'accueil");
+Exiger(!home.Contains("new(\"activite\","), "le plan de travail ne tient pas de copie de la grille de l'accueil");
 
 // --- 1. Le journal
 var tout = JournalActions.Toutes;

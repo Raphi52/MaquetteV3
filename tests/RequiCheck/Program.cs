@@ -28,7 +28,10 @@ var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../.
 var coquille = Path.Combine(racine, "Components", "Ecrans", "EcranRequisitions.razor");
 var cheminTsx = Path.Combine(racine, "web", "src", "ecrans", "EcranRequisitions.tsx");
 var cheminPont = Path.Combine(racine, "Pont", "EcranRequisitions.cs");
-var home = Path.Combine(racine, "Components", "Pages", "Home.razor");
+// Lot 2 du passage a React (19/11/2026) : l'aiguillage est web/src/plan/Aiguillage.tsx,
+// le catalogue du plan de travail vit dans Pont/PlanTravail.cs.
+var home = Path.Combine(racine, "Pont", "PlanTravail.cs");
+var aiguillage = File.ReadAllText(Path.Combine(racine, "web", "src", "plan", "Aiguillage.tsx"));
 
 var echecs = new List<string>();
 void Exiger(bool ok, string quoi)
@@ -53,15 +56,15 @@ var texte = File.ReadAllText(cheminPont);
 var maison = File.ReadAllText(home);
 
 // --- 1. L'ecran est ATTEIGNABLE : sans ce branchement il n'existe pour personne.
-Exiger(Regex.IsMatch(maison, @"case\s+""PROC_REQUI""\s*:\s*\r?\n\s*<EcranRequisitions\s*/>"),
-    "Home.razor route PROC_REQUI vers <EcranRequisitions />");
+Exiger(Regex.IsMatch(aiguillage, @"case\s+'PROC_REQUI'\s*:\s*\r?\n\s*return <EcranRequisitions\s*/>"),
+    "le plan de travail route PROC_REQUI vers <EcranRequisitions />");
 // Le menu de gauche est rendu par React depuis le lot 1 du passage a React
 // (19/11/2026) : son catalogue vit dans Pont/MenuAccueil.cs.
 var menuAccueil = File.ReadAllText(Path.Combine(racine, "Pont", "MenuAccueil.cs"));
 Exiger(menuAccueil.Contains("\"PROC_REQUI\")") || Regex.IsMatch(menuAccueil, @"new\(""Requisitions"".*""PROC_REQUI""\)"),
     "le menu propose bien l'entree Requisitions (PROC_REQUI)");
 Exiger(maison.Contains("Moments = Pont.MenuAccueil.Moments;"),
-    "Home.razor aiguille sur ce meme catalogue");
+    "le plan de travail aiguille sur ce meme catalogue");
 Exiger(Regex.IsMatch(File.ReadAllText(coquille), @"<IleReact\s+Composant=""EcranRequisitions""\s*/>"),
     "la coquille monte l'ecran React (<IleReact Composant=\"EcranRequisitions\" />)");
 Exiger(tsx.Contains("'EcranRequisitions.Ouvrir'") && tsx.Contains("'EcranRequisitions.Agir'")

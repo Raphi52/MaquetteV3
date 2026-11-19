@@ -22,28 +22,37 @@ void Exiger(bool ok, string quoi)
 }
 
 // --- 1. L'ecouteur clavier existe vraiment cote navigateur.
-var js = File.ReadAllText(Path.Combine(racine, "wwwroot/rig-accueil.js"));
-// fix-ok: le regex acceptait tout suffixe (XXaddEventListener matchait) ; ancre sur document.addEventListener
-Exiger(Regex.IsMatch(js, @"document\.addEventListener\(\s*""keydown"""),
-    "rig-accueil.js branche un ecouteur keydown");
-Exiger(Regex.IsMatch(js, @"export function activerClavier\("),
-    "rig-accueil.js expose activerClavier(dotnet) pour le brancher");
-Exiger(js.Contains("Escape"),
+// Depuis le lot 2 du passage a React (19/11/2026), il est dans
+// web/src/plan/clavier.ts (ex-activerClavier de wwwroot/rig-accueil.js, retire),
+// branche par l'application (web/src/composants/Application.tsx) ; vitest le
+// joue en plus (web/src/plan/clavier.test.ts).
+var js = File.ReadAllText(Path.Combine(racine, "web/src/plan/clavier.ts"));
+var application = File.ReadAllText(Path.Combine(racine, "web/src/composants/Application.tsx"));
+// fix-ok: le regex acceptait tout suffixe (XXaddEventListener matchait) ; ancre sur l'ecoute du DOCUMENT
+Exiger(Regex.IsMatch(js, @"\bdoc\.addEventListener\(\s*'keydown'") && js.Contains("doc: Document = document"),
+    "clavier.ts branche un ecouteur keydown sur le document");
+Exiger(Regex.IsMatch(js, @"export function ecouterEchap\("),
+    "clavier.ts expose ecouterEchap(echap) pour le brancher");
+Exiger(js.Contains("'Escape'"),
     "l'ecouteur reconnait la touche Echap");
-Exiger(Regex.IsMatch(js, @"export function arreterClavier\(") && js.Contains(@"removeEventListener(""keydown"""),
+Exiger(js.Contains("return () => doc.removeEventListener('keydown', surTouche)")
+       && application.Contains("useEffect(() => ecouterEchap(() => gestePlan('echap')), [gestePlan])"),
     "l'ecouteur clavier est debranche quand la page s'en va");
 
 // --- 2. Echap arrive jusqu'a C#, et ferme ce qui est ouvert.
-var home = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
-Exiger(Regex.IsMatch(home, @"\[JSInvokable\][^\}]*ToucheEchap", RegexOptions.Singleline),
-    "Home.razor expose ToucheEchap au navigateur");
-var corps = Regex.Match(home, @"public void ToucheEchap\(\)(?<c>.*?)\n    \}", RegexOptions.Singleline);
+// La regle vit dans la session du plan de travail (Pont/PlanTravail.cs, le @code
+// de Home.razor deplace tel quel) ; le geste « echap » y mene (Pont/PlanTravailVue.cs).
+var plan = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs"));
+var gestes = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravailVue.cs"));
+Exiger(gestes.Contains("case \"echap\": ToucheEchap(); break;"),
+    "le plan de travail recoit Echap de la page (geste « echap »)");
+var corps = Regex.Match(plan, @"private void ToucheEchap\(\)(?<c>.*?)\n    \}", RegexOptions.Singleline);
 Exiger(corps.Success && corps.Groups["c"].Value.Contains("FermerProc"),
     "Echap ferme l'ecran de procedure ouvert");
 Exiger(corps.Success && corps.Groups["c"].Value.Contains("FermerDossier"),
     "Echap ferme l'affaire ouverte");
-Exiger(home.Contains(@"InvokeVoidAsync(""activerClavier"""),
-    "Home branche l'ecouteur clavier au premier rendu");
+Exiger(Regex.IsMatch(corps.Groups["c"].Value, @"if \(DossierOuvert is not null\) FermerDossier\(\);\s*else if \(ProcOuverte is not null\) FermerProc\(\);"),
+    "Echap ferme l'affaire d'abord, l'ecran ensuite : jamais deux choses a la fois");
 
 // --- 3. Entree lance la recherche partout ou une recherche existe.
 var ecrans = Directory.GetFiles(Path.Combine(racine, "Components/Ecrans"), "*.razor");

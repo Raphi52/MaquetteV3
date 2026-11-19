@@ -12,7 +12,13 @@ void Exiger(bool ok, string quoi)
 }
 
 var racineSrc = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
-var vue = File.ReadAllText(Path.Combine(racineSrc, "Components/Pages/Home.razor"));
+// Lot 2 du passage a React (19/11/2026) : le @code de Home.razor vit dans
+// Pont/PlanTravail.cs ; le mode tache se dessine dans web/src/plan/Tache.tsx,
+// l'arbre et sa colonne dans web/src/plan/Visionneuse.tsx.
+var vue = File.ReadAllText(Path.Combine(racineSrc, "Pont/PlanTravail.cs"))
+          + File.ReadAllText(Path.Combine(racineSrc, "Pont/PlanTravailVue.cs"));
+var tacheTsx = File.ReadAllText(Path.Combine(racineSrc, "web/src/plan/Tache.tsx"));
+var visionneuseTsx = File.ReadAllText(Path.Combine(racineSrc, "web/src/plan/Visionneuse.tsx"));
 // PORTE EN REACT (lot 6, 19/11/2026) : Components/ArbreGedNoeud.razor n'est plus
 // qu'une coquille ; la ligne se dessine dans web/src/composants/ArbreGedNoeud.tsx
 // et le chemin se calcule dans Pont/ArbreGedNoeud.cs, EXECUTE ci-dessous.
@@ -77,7 +83,7 @@ Exiger(!deno.EffetAtteste("inpi", PiecePresente),
 Exiger(!deno.EffetAtteste("notif-secondaire", PiecePresente),
     "E : un effet sans piece attestante ne se coche jamais tout seul");
 Exiger(vue.Contains("EffetAtteste"), "E : la vue lit le cochage derive, pas seulement l'etat clique");
-Exiger(vue.Contains("disabled=\"@atteste\"") || vue.Contains("readonly"),
+Exiger(tacheTsx.Contains("checked={e.coche} disabled={e.atteste}") && vue.Contains("var atteste = EffetAtteste(e);"),
     "E : une case prouvee n'est plus cochable a la main");
 
 // --- F. Une etape de la checklist PILOTE le filtre
@@ -89,9 +95,9 @@ Exiger(ReferenceEquals(deno.PourEffet("notif-secondaire"), deno),
 Exiger(vue.Contains("EffetCible"), "F : la vue porte l'effet choisi comme filtre de l'arbre");
 
 // --- D. Les effets passent EN PIED : l'arbre ne descend plus
-var posEffets = vue.IndexOf("rig-tache__effets", StringComparison.Ordinal);
-var posArbre = vue.IndexOf("<div class=\"rig-arbre\">", StringComparison.Ordinal);
-Exiger(posArbre > 0 && posEffets > posArbre,
+var posEffets = visionneuseTsx.IndexOf("<ChecklistsTache", StringComparison.Ordinal);
+var posArbre = visionneuseTsx.IndexOf("<div className=\"rig-arbre\">", StringComparison.Ordinal);
+Exiger(posArbre > 0 && posEffets > posArbre && tacheTsx.Contains("className=\"rig-tache__effets rig-tache__effets--pied\""),
     "D : le bloc des effets est rendu APRES l'arbre (il ne le pousse plus vers le bas)");
 Exiger(css.Contains("rig-tache__effets"), "D : le bloc des effets a son ancrage en pied de colonne");
 

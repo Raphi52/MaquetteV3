@@ -32,7 +32,8 @@ var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../.
 // Le catalogue du menu a quitte Home.razor pour Pont/MenuAccueil.cs (lot 1 du
 // passage a React, 19/11/2026) : le menu est rendu par web/src/accueil/Menu.tsx,
 // son etat vit dans Pont/Accueil.cs. Memes regles, lues a la nouvelle adresse.
-var home = Path.Combine(racine, "Components", "Pages", "Home.razor");
+// Le plan de travail (lot 2) : le @code de Home.razor vit dans Pont/PlanTravail.cs.
+var home = Path.Combine(racine, "Pont", "PlanTravail.cs");
 var catalogue = Path.Combine(racine, "Pont", "MenuAccueil.cs");
 var session = Path.Combine(racine, "Pont", "Accueil.cs");
 var css = Path.Combine(racine, "wwwroot", "rig-accueil.css");
@@ -45,7 +46,7 @@ void Exiger(bool ok, string quoi)
 }
 void Info(string quoi) => Console.WriteLine("NOTE : " + quoi);
 
-Exiger(File.Exists(home), "Home.razor est trouve");
+Exiger(File.Exists(home), "Pont/PlanTravail.cs (le plan de travail) est trouve");
 Exiger(File.Exists(catalogue), "Pont/MenuAccueil.cs (le catalogue du menu) est trouve");
 Exiger(File.Exists(session), "Pont/Accueil.cs (l'etat du menu) est trouve");
 Exiger(File.Exists(css), "rig-accueil.css est trouve");
@@ -56,11 +57,11 @@ var texte = File.ReadAllText(catalogue);
 // Un SEUL catalogue : le menu de l'accueil (la session) et les aiguillages du
 // plan de travail (Home.razor, motif d'un ecran a venir) lisent le meme tableau.
 Exiger(File.ReadAllText(home).Contains("Moments = Pont.MenuAccueil.Moments;"),
-    "Home.razor relit le catalogue du menu, sans en tenir une copie");
+    "le plan de travail relit le catalogue du menu, sans en tenir une copie");
 Exiger(System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(session), @"MenuAccueil\.Moments").Count >= 3,
     "la session de l'accueil construit le menu depuis ce catalogue");
 Exiger(!File.ReadAllText(home).Contains("private readonly Moment[] Moments ="),
-    "Home.razor ne declare plus son propre tableau des gestes");
+    "le plan de travail ne declare pas son propre tableau des gestes");
 
 // ---- Lecture du tableau Moments ----------------------------------------
 var debut = texte.IndexOf("public static readonly MomentMenu[] Moments =", StringComparison.Ordinal);

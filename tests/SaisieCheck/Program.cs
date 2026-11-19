@@ -80,7 +80,10 @@ try
         "chaque affaire garde SA saisie, sans melange");
 
     // --- 4. La vue declare bien les deux etapes multiples
-    var vue = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "../../../../../Components/Pages/Home.razor"));
+    // Lot 2 du passage a React (19/11/2026) : les etapes et leurs regles vivent dans
+    // Pont/PlanTravail.cs (le @code de Home.razor, deplace tel quel).
+    var vue = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "../../../../../Pont/PlanTravail.cs"));
+    var calculVue = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "../../../../../Pont/PlanTravailVue.cs"));
     Exiger(Regex.IsMatch(vue, @"Multiple:\s*true,\s*Unite:\s*""Dirigeant"""),
         "l'etape Dirigeants est declaree multiple dans la vue");
     Exiger(Regex.IsMatch(vue, @"Multiple:\s*true,\s*Unite:\s*""Etablissement"""),
@@ -89,7 +92,7 @@ try
     // le chercher seul laissait passer une methode Ecrire qui n enregistre rien.
     Exiger(Regex.IsMatch(vue,
             @"void Ecrire\([^)]*\)\s*\{[^}]*FicheVue\(e\)\[c\.Colonne\][^}]*Etat\.Enregistrer\(\);"),
-        // fix-ok: Home.razor intercale PublierDocument() entre l ecriture et Etat.Enregistrer() ; on verifie le corps de Ecrire, pas l adjacence
+        // fix-ok: le plan de travail intercale PublierDocument() entre l ecriture et Etat.Enregistrer() ; on verifie le corps de Ecrire, pas l adjacence
         "la methode qui ecrit un champ enregistre dans la foulee");
 
     // --- 4b. Formulaire du milieu (demande du 15/09/2026) : bouton Actions
@@ -175,7 +178,9 @@ try
         Environment.SetEnvironmentVariable("RIGV3_ETAT", etatAvantFiche);
         try { File.Delete(etatFicheBanc); } catch (IOException) { }
     }
-    Exiger(Regex.Matches(vue, @"<FicheInformationsDossier Numero=""@DossierOuvert.Numero"" Etat=""Etat""").Count >= 2,
+    // Les trois fiches (dossier, formalites, depots) recoivent l'etat vivant : la
+    // session du plan de travail les ouvre avec lui (ParametresFiche).
+    Exiger(Regex.Matches(calculVue, @"new ParametresFiche\(d\.Numero,[^;]*?\bEtat\b").Count >= 2,
         "la vue transmet l etat au formulaire");
 }
 finally
@@ -186,7 +191,11 @@ finally
 
 // --- 5. L etat valide remonte dans TOUS les ecrans, depuis une seule source
 var racineVues = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Components"));
-var fichiersVues = Directory.GetFiles(racineVues, "*.razor", SearchOption.AllDirectories);
+// Home.razor n'est plus qu'une COQUILLE (lot 2, 19/11/2026) : ce qu'il tenait se
+// lit dans Pont/PlanTravail*.cs et web/src/plan/ (ajoutes plus bas).
+var fichiersVues = Directory.GetFiles(racineVues, "*.razor", SearchOption.AllDirectories)
+                            .Where(f => !Path.GetFileName(f).Equals("Home.razor", StringComparison.OrdinalIgnoreCase))
+                            .ToArray();
 // Les ecrans PORTES EN REACT (web/src, 18/11/2026) font partie des vues : une
 // regle tenue par un ecran porte se lit dans son .tsx, plus dans son .razor
 // devenu coquille. Les tests (*.test.tsx) n'en sont pas.
@@ -195,7 +204,13 @@ var fichiersTsx = Directory.Exists(racineWeb)
     ? Directory.GetFiles(racineWeb, "*.tsx", SearchOption.AllDirectories)
                .Where(f => !f.EndsWith(".test.tsx", StringComparison.OrdinalIgnoreCase)).ToArray()
     : [];
-var vue2 = string.Join(Environment.NewLine, fichiersVues.Concat(fichiersTsx).Select(File.ReadAllText));
+// Le plan de travail (lot 2) : le @code de Home.razor est dans Pont/PlanTravail.cs,
+// sa vue et ses gestes dans Pont/PlanTravailVue.cs ; l'aiguillage des ecrans est
+// web/src/plan/Aiguillage.tsx (lu ci-dessus avec les .tsx, et seul ci-dessous).
+var racinePont = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Pont"));
+var fichiersPlan = new[] { Path.Combine(racinePont, "PlanTravail.cs"), Path.Combine(racinePont, "PlanTravailVue.cs") };
+var aiguillage = File.ReadAllText(Path.Combine(racineWeb, "plan", "Aiguillage.tsx"));
+var vue2 = string.Join(Environment.NewLine, fichiersVues.Concat(fichiersTsx).Concat(fichiersPlan).Select(File.ReadAllText));
 Exiger(fichiersVues.Length >= 4, $"les ecrans sont bien decoupes en composants ({fichiersVues.Length} vues)");
 Exiger(fichiersTsx.Length >= 3, $"les ecrans React sont lus avec les vues ({fichiersTsx.Length} .tsx)");
 
@@ -241,7 +256,7 @@ Exiger(pontDemandes.Contains("CritEtats.Contains(EtatReel(d))")
     "le filtre par etat suit la validation, sinon il raterait les dossiers valides");
 
 // --- 6. L ecran Arrivee du courrier a ses PROPRES criteres et colonnes
-Exiger(vue2.Contains("case \"PROC_ARRIVEE\":") && vue2.Contains("<EcranArrivee"),
+Exiger(aiguillage.Contains("case 'PROC_ARRIVEE':") && aiguillage.Contains("<EcranArrivee"),
     "la procedure Arrivee ouvre son propre ecran");
 foreach (var colonne in new[] { "ARRV_NUM_ARRIVEE", "ARRV_NOM", "ARRV_REFERENCES",
                                 "ARRV_MODE_ARRIVEE", "ARRV_CASE_COURRIER" })
@@ -268,7 +283,7 @@ Exiger(vue2.Contains("non rattachee"),
     "la colonne N Demande dit clairement qu il n y a pas de demande");
 
 // --- 8. L ecran Actes numerises : criteres et colonnes de RIG v2
-Exiger(vue2.Contains("case \"PROC_ACTES_NUM\":") && vue2.Contains("<EcranActes"),
+Exiger(aiguillage.Contains("case 'PROC_ACTES_NUM':") && aiguillage.Contains("<EcranActes"),
     "la procedure Actes numerises ouvre son propre ecran");
 foreach (var libelle in new[] { "N Dossier / N Depot", "Abrege piece", "Type de depot",
                                 "Lister actes non numerisables", "Date de cloture", "Anomalies" })
@@ -308,11 +323,11 @@ Exiger(!vue2.Contains("Historique VGED"),
     "le bouton Historique VGED est retire de la barre de commandes");
 
 // --- 10. Une procedure non portee le DIT, elle n emprunte pas l ecran des demandes
-Exiger(vue2.Contains("case \"PROC_DEMANDE\":"),
+Exiger(aiguillage.Contains("case 'PROC_DEMANDE':"),
     "l ecran des demandes est reserve a PROC_DEMANDE");
 Exiger(vue2.Contains("<EcranNonMaquette"),
     "les procedures non portees ouvrent l ecran qui les nomme");
-Exiger(!Regex.IsMatch(vue2, @"default:\s*<EcranDemandes"),
+Exiger(!Regex.IsMatch(vue2, @"default:\s*(return\s*)?<EcranDemandes"),
     "aucune procedure ne retombe en silence sur l ecran des demandes");
 
 // --- 11. TOUTE procedure du menu a son ecran, ou dit pourquoi elle n en a pas.
@@ -321,7 +336,7 @@ Exiger(!Regex.IsMatch(vue2, @"default:\s*<EcranDemandes"),
 // 3 avaient un ecran ; les 21 autres tombaient sur l ecran « non maquettee ».
 // Ce controle relit le menu et exige un case pour CHAQUE code.
 var blocMenu = Regex.Match(vue2, @"private readonly Groupe\[\] Groupes =[\s\S]*?\r?\n    \];").Value;
-Exiger(blocMenu.Length > 0, "le menu de gauche est lisible dans Home.razor");
+Exiger(blocMenu.Length > 0, "le catalogue des procedures est lisible dans le plan de travail");
 var codesMenu = Regex.Matches(blocMenu, @"new\(""(?<code>[A-Z][A-Z_]{3,})"",\s*""")
     .Select(m => m.Groups["code"].Value).Distinct().ToArray();
 Exiger(codesMenu.Length >= 20, $"le menu expose bien ses procedures ({codesMenu.Length} lues)");
@@ -330,7 +345,7 @@ Exiger(codesMenu.Length >= 20, $"le menu expose bien ses procedures ({codesMenu.
 var sansEcran = new[] { "PROC_CREANCE" };
 foreach (var code in codesMenu)
 {
-    var porte = vue2.Contains($"case \"{code}\":");
+    var porte = aiguillage.Contains($"case '{code}':");
     if (sansEcran.Contains(code))
     {
         Exiger(!porte, $"{code} n a pas d ecran (v2 est une coquille vide)");
@@ -426,15 +441,21 @@ Exiger(Regex.IsMatch(vue2, @"private void EditerPiece\(\)[\s\S]{0,600}?DonneesVi
     "Editer ouvre la colonne des donnees");
 Exiger(Regex.IsMatch(vue2, @"private void OuvrirApercu[\s\S]{0,400}?CodeEtapeGuide = EtapeDuNoeud\(n\)\.Code;"),
     "les donnees affichees suivent la piece cliquee dans l arbre");
-Exiger(Regex.IsMatch(vue2, @"rig-vged__donnees[\s\S]{0,16000}?@ChampsSaisie\(courante\)"),
+// Lot 2 (19/11/2026) : le fragment ChampsSaisie du .razor est la fonction Champs
+// de web/src/plan/Etapes.tsx ; sa vue est calculee par ChampsVue (Pont/PlanTravailVue.cs).
+var etapesTsx = File.ReadAllText(Path.Combine(racineWeb, "plan", "Etapes.tsx"));
+Exiger(Regex.IsMatch(etapesTsx, @"rig-vged__donnees[\s\S]{0,16000}?<Champs code=\{page\.code\}")
+       && Regex.Matches(etapesTsx, @"<Champs ").Count == 1,
     "la colonne des donnees affiche CELLE de la saisie guidee, pas une copie");
-Exiger(Regex.Matches(vue2, @"foreach \(var champ in courante\.Champs\)").Count == 1,
+Exiger(Regex.Matches(vue2, @"foreach \(var c in courante\.Champs\)").Count == 1
+       && Regex.Matches(etapesTsx, @"className=""rig-champs""").Count == 1,
     "la boucle des champs de la saisie guidee n existe qu UNE fois (pas de copie)");
 // Le document montre ce que le formulaire a renseigne. Depuis le 15/09/2026
 // ce n est plus un encadre colle sous l apercu (« rig-apercu__saisie ») mais
 // l extrait Kbis LUI-MEME, re-rendu a chaque frappe : le controle porte donc
 // sur le branchement reel, pas sur le nom d une classe disparue.
-Exiger(Regex.IsMatch(vue2, @"<ApercuKbis[\s\S]{0,300}?Lire=""LireSaisie"""),
+Exiger(Regex.IsMatch(vue2, @"ApercuKbis\.Vue\(d\.Numero, d\.Siren, DenominationAffaire\(\), LireSaisie\)")
+       && vue2.Contains("<ApercuKbis vue={a.kbis} />"),
     "le document montre ce que le formulaire a renseigne");
 Exiger(Regex.IsMatch(vue2, @"private string LireSaisie\(string codeEtape, string colonne\)[\s\S]{0,400}?FicheVue\(etape\)\.TryGetValue\(colonne"),
     "ce que le document affiche est LU dans la saisie guidee, pas recopie");
@@ -459,7 +480,7 @@ Exiger(!Regex.IsMatch(vue2, @"fiches = \[new Dictionary<string, string>\(\)\]"),
 Exiger(Regex.IsMatch(vue2, @"AjouterFiche\(Etape e\)[\s\S]{0,300}?fiches\.Add\(NouvelleFiche\("),
     "une fiche ajoutee (2e dirigeant, 2e etablissement) est prereemplie aussi");
 // Le conditionnel s ajoute au fragment UNIQUE de rendu, pas dans une copie.
-Exiger(Regex.IsMatch(vue2, @"foreach \(var champ in courante\.Champs\)[\s\S]{0,600}?if \(!Visible\(e, c\)\) \{ continue; \}"),
+Exiger(Regex.IsMatch(vue2, @"foreach \(var c in courante\.Champs\)[\s\S]{0,200}?if \(!Visible\(courante, c\)\) continue;"),
     "un champ dont la condition n est pas remplie n est pas affiche");
 // Un champ cache ne doit jamais bloquer la validation en silence.
 Exiger(Regex.IsMatch(vue2, @"bool RequisManquant\(Etape e, Champ c\)\s*=>\s*c\.Obligatoire && Visible\(e, c\)"),

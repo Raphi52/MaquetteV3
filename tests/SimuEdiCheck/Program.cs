@@ -27,8 +27,12 @@ var alertes = new AlertesGreffe();
 // --- 1. AUCUNE VUE DEDIEE : le cas se rencontre dans les ecrans du greffe.
 Exiger(!File.Exists(Path.Combine(racine, "Components/Ecrans/EcranSimulationEdi.razor")),
     "aucun ecran de demonstration : la mise en situation se joue dans les vrais ecrans");
-var home = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
-Exiger(!home.Contains("DEMO_CHAINE_EDI") && !home.Contains("EcranSimulationEdi"),
+// Lot 2 du passage a React (19/11/2026) : le @code de Home.razor vit dans
+// Pont/PlanTravail.cs (deplace tel quel), sa vue dans Pont/PlanTravailVue.cs.
+var home = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs"));
+var vuePlan = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravailVue.cs"));
+var balisagePlan = string.Join("\n", Directory.GetFiles(Path.Combine(racine, "web/src/plan"), "*.tsx").Append(Path.Combine(racine, "web/src/composants/Application.tsx")).Where(f => !f.EndsWith(".test.tsx")).Select(File.ReadAllText));
+Exiger(!home.Contains("DEMO_CHAINE_EDI") && !home.Contains("EcranSimulationEdi") && !balisagePlan.Contains("EcranSimulationEdi"),
     "le menu n expose aucune entree de demonstration");
 
 // --- 2. COURRIER DU JOUR : le flux y est, par le mode EDI, rapproche.
@@ -126,7 +130,7 @@ Exiger(Regex.IsMatch(fiche, @"ValeurAffichee\(string cle\)[\s\S]{0,300}?Derniere
 // rend la main a Modifier et le champ reste saisissable.
 Exiger(tsxFiche.Contains("quand=\"change\" changer={(texte) => geste('saisir', { s: bloc.s, c: c.c, valeur: texte })}")
        && Regex.IsMatch(fiche, @"void Saisir[\s\S]{0,200}?if \(!Verrou\) \{ Modifier\(bloc, c, cle, apres\)")
-       && File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor")).Contains("Verrou=\"@(RecetteActive is null)\""),
+       && System.Text.RegularExpressions.Regex.IsMatch(vuePlan, @"InformationsDossier\.ProcessusSources, RecetteActive, LigneCourante, Etat,\s*RecetteActive is null\)\)"),
     "le champ reste modifiable a la main, la proposition ne le verrouille pas");
 
 // EXECUTE : la valeur proposee par le flux EDI (ecrite dans la trace par un AUTRE
@@ -176,7 +180,7 @@ Exiger(Regex.IsMatch(home, @"private \(RecetteTache Recette, string Code\)\? Tac
     "la tache en attente est lue dans le MEME releve que les alertes : une tache close ne replie rien");
 Exiger(Regex.IsMatch(home, @"RecetteActive is not null && AffaireDeLaTache != numeroDossier"),
     "changer d affaire referme le mode replie : l arbre d un dossier n est jamais filtre par la recette d un autre");
-Exiger(home.Contains("Afficher tout le dossier"),
+Exiger(vuePlan.Contains("Afficher tout le dossier") && balisagePlan.Contains("Afficher tout le dossier sans quitter la tache"),
     "le dossier reste ENTIER : le bandeau porte le bouton qui rouvre tout sans quitter la tache");
 Exiger(Regex.IsMatch(home, @"BasculerToutLeDossier\(\)[\s\S]{0,200}?ToutLeDossier = !ToutLeDossier"),
     "ce bouton bascule dans les deux sens, sans fermer la tache");

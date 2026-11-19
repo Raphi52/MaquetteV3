@@ -66,16 +66,19 @@ Exiger(a.Zip(b).All(c => c.First.Valeur == c.Second.Valeur),
 // la tuile est dessinee par web/src/accueil/Tuiles.tsx (fonction Performance) ;
 // Home.razor demarre et arrete la session, et la fait relire apres une tache.
 var racinePerf = Path.Combine(AppContext.BaseDirectory, "../../../../../");
-var vue = File.ReadAllText(Path.Combine(racinePerf, "Components/Pages/Home.razor"));
+// Lot 2 du passage a React (19/11/2026) : le @code de Home.razor vit dans
+// Pont/PlanTravail.cs ; sa session demarre et arrete celle de l'accueil.
+var vue = File.ReadAllText(Path.Combine(racinePerf, "Pont/PlanTravail.cs"));
 var pont = File.ReadAllText(Path.Combine(racinePerf, "Pont/Accueil.cs"));
 var tuiles = File.ReadAllText(Path.Combine(racinePerf, "web/src/accueil/Tuiles.tsx"));
 Exiger(Regex.IsMatch(pont, @"MesuresPerf\s+Sonde\s*=\s*new"), "la session de l'accueil instancie la sonde");
 Exiger(Regex.IsMatch(pont, @"MinuteurPerf\s*\?\?=\s*new Timer"), "la session relance le releve par minuteur");
 Exiger(Regex.IsMatch(pont, @"new Timer\(_ =>\s*\{\s*RelevePerf\(\);\s*Change\?\.Invoke\(\);"),
     "chaque releve du minuteur fait redessiner l'accueil");
-Exiger(vue.Contains("Accueil.Demarrer();") && vue.Contains("private void SurChangeAccueil() => _ = InvokeAsync(StateHasChanged);"),
-    "Home.razor demarre les minuteurs au premier rendu et redessine a chaque releve");
-Exiger(pont.Contains("RelevePerf();") && vue.Contains("Accueil.RelevePerf();"), "la session et Home.razor appellent le releve");
+Exiger(Regex.IsMatch(vue, @"public void Demarrer\(\)[\s\S]{0,700}?Accueil\.Demarrer\(\);") && vue.Contains("private void SurChangeAccueil() => Change?.Invoke();")
+       && vue.Contains("Accueil.Change += SurChangeAccueil;"),
+    "le plan de travail demarre les minuteurs au premier rendu et redessine a chaque releve");
+Exiger(pont.Contains("RelevePerf();") && vue.Contains("Accueil.RelevePerf();"), "la session et le plan de travail appellent le releve");
 Exiger(!Regex.IsMatch(vue + pont + tuiles, @"new\(""Threads actifs""|'Threads actifs'|""Threads actifs"""),
     "plus de mesures ecrites en dur dans la vue");
 Exiger(Regex.IsMatch(pont, @"MinuteurPerf.*DisposeAsync", RegexOptions.Singleline)

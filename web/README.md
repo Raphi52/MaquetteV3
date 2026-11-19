@@ -298,6 +298,67 @@ Home.razor ──> Components/Ecrans/EcranX.razor (COQUILLE, mêmes paramètres)
   déployé diffère de 1/255 de teinte au plus, dans l'ombre derrière lui.
   Un glisser se joue sur le bureau caché par `D:\AutoWinOS\scripts\hdesk-glisser.ps1`.
 
+## Ajouts du plan « finir le passage à React », lot 2 : le plan de travail
+
+- **Home.razor n'est plus qu'une coquille.** Il monte UNE île, `Application`
+  (`src/composants/Application.tsx`), avec `Plan.Vue()` en `Proprietes` et deux
+  rappels : `geste` (l'accueil, `SessionAccueil.Agir`, inchangé) et `plan`
+  (`SessionPlanTravail.Jouer`). Les noms des gestes de l'accueil et du plan se
+  recouvrent (`favori`, `fermer`…) : deux rappels, jamais un seul.
+- **Le `@code` de Home.razor est dans `Pont/PlanTravail.cs`** (`SessionPlanTravail`,
+  déplacé TEL QUEL : mêmes membres, mêmes noms ; seules les attaches à Blazor ont
+  changé). `Pont/PlanTravailVue.cs` porte les records de la vue (un par bloc du
+  balisage, mêmes noms que `src/plan/types.ts`), `Vue()` et `Agir(geste, valeur)` :
+  chaque `@onclick`/`@oninput`/`@onpointer…` du `.razor` est un geste nommé qui
+  appelle la MÊME méthode. Un geste inconnu lève une exception.
+- **Le balisage** est dans `src/plan/` : `Onglets.tsx`, `Procedure.tsx`,
+  `Aiguillage.tsx` (le `@switch` : le SEUL fichier qui aiguille par code,
+  `tests/NomMetierCheck`), `Visionneuse.tsx`, `Tache.tsx`, `Etapes.tsx`,
+  `Apercu.tsx`, `Modales.tsx`. Les 37 écrans de `src/ecrans/` y sont montés
+  DIRECTEMENT, avec les paramètres de leur coquille (les coquilles `.razor` ne
+  sont plus montées par personne : le lot 3 les retire avec Blazor).
+- **Écrans à session ouverts par le C#** : la fiche d'informations (trois branches
+  = trois sessions, comme les trois composants du `.razor`) et les tâches en lot
+  reçoivent l'état VIVANT de l'accueil ; `SessionPlanTravail` les ouvre, les
+  `Parametrer` à chaque `Vue()` (version +1 si la vue a pu changer) et les ferme
+  quand ils quittent la page. L'arbre (`ArbreGedNoeud.Vue`, index des nœuds du
+  dernier calcul) et le Kbis (`ApercuKbis.Vue(…, LireSaisie)`) sont calculés dans
+  `Vue()`.
+- **Une vue périmée n'est jamais montrée.** Chaque geste du plan part numéroté
+  (`GestePlan.Numero`), la vue dit le dernier numéro joué (`VueApplication.Geste`) :
+  `Application` garde la vue montrée tant que la réponse au DERNIER geste n'est
+  pas là. Sans ça, deux frappes rapides dans un champ faisaient revenir le texte
+  intermédiaire (même parti que `useSession`).
+- **`rig-accueil.js` est retiré** : clavier → `src/plan/clavier.ts`, glisser
+  d'onglet (capture du pointeur, retour visuel) → `src/plan/glisse.ts`, pagination
+  des étapes → `src/plan/pagination.ts`. Ce qui se faisait APRÈS le rendu en
+  Blazor (amener la frise sur l'étape d'une pièce) part dans la vue
+  (`Defilement { numero, index, doux }`) : la page le joue UNE fois, après avoir
+  rendu la zone ; le numéro joué est tenu par l'application (il survit à la
+  fermeture des étapes). `Pagination` avance quand une affaire s'ouvre (le
+  `PaginationSuivie = false` du `.razor`).
+- **Changements venus d'ailleurs** (minuteurs de l'accueil, fenêtre WPF refermée,
+  étoile allumée dans une autre fenêtre) : `SessionPlanTravail.Planifier`, que la
+  coquille branche sur `InvokeAsync(…; StateHasChanged)`, et l'événement `Change`.
+- **Saisie à deux évènements** : `Saisie` (`src/session.tsx`) accepte `finir` en
+  plus de `changer` (le `@oninput` + `@onchange` de la saisie guidée).
+- **Écart de comportement, voulu** : ouvrir une pièce quand les étapes
+  APPARAISSENT amène la frise sur l'étape de la pièce (« Statuts signés » →
+  Capital), comme le code le demande. L'exe Blazor y arrivait une fois sur deux :
+  `suivrePagination` mesurait l'étape visible (0) pendant que le défilement
+  attendait, et la frise restait sur l'étape 1.
+- **Bancs** : chaque banc qui relisait Home.razor relit la même règle dans
+  `Pont/PlanTravail*.cs` ou `src/plan/*.tsx` ; `tests/PlanTravailCheck` (neuf)
+  JOUE le parcours par `SessionPlanTravail.Agir` (dossier, étapes, saisie refusée
+  puis acceptée, validation, onglets, Échap, tâche, filtre, impression, mail,
+  validation hiérarchique) et tient que Home.razor n'est qu'une coquille.
+- **Parcours avant/après** (bureau caché, 30 états, `%TEMP%\lot2-outils\parcours.sh`) :
+  tous à 0 pixel sauf l'anneau animé « Hors délai légal », 2 pixels de teinte
+  ≤ 7/255 au bord de l'arbre (déjà vus au lot 6) et l'étape ci-dessus. La fenêtre
+  d'un onglet arraché naît sous le curseur RÉEL : le parcours la pose à une place
+  fixe avant la capture, et la ferme par `WM_CLOSE` (sa croix), un clic tombant
+  sur la fenêtre principale passée devant.
+
 ## Commandes
 
 | Commande (dans `web/`) | Effet |

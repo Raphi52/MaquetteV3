@@ -28,18 +28,25 @@ internal static class Programme
         }
 
         var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
-        var source = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
+        // Depuis le lot 2 du passage a React (19/11/2026), l'aiguillage des ecrans
+        // est web/src/plan/Aiguillage.tsx (le @switch de Home.razor) et le motif
+        // d'un ecran a venir est calcule par la session du plan de travail
+        // (Pont/PlanTravail.cs, le @code de Home.razor deplace tel quel).
+        var source = File.ReadAllText(Path.Combine(racine, "web/src/plan/Aiguillage.tsx"));
 
         // Les codes reellement aiguilles vers un ecran porte.
-        var portes = Regex.Matches(source, "case \"(?<c>[A-Z_0-9]+)\"")
+        var portes = Regex.Matches(source, "case '(?<c>[A-Z_0-9]+)'")
             .Select(m => m.Groups["c"].Value).ToHashSet();
         Exiger(portes.Count > 20, $"l'aiguillage expose bien ses branches ({portes.Count} lues)");
+        // Le cas par defaut de l'aiguillage montre bien l'ecran qui se nomme, avec son motif.
+        Exiger(Regex.IsMatch(source, @"default:\s*return <EcranNonMaquette code=\{proc\.code\} libelle=\{proc\.libelle\} motif=\{ecran\.motif\} />"),
+            "une entree sans ecran tombe sur l'ecran qui se nomme, avec son motif");
 
         // Le menu, lu dans l'objet lui-meme et non dans le texte.
-        var home = typeof(RigV3Desktop.Components.Pages.Home);
-        var instance = Activator.CreateInstance(home, nonPublic: true)!;
-        var moments = (IEnumerable)home.GetField("Moments", Prive)!.GetValue(instance)!;
-        var motif = home.GetMethod("MotifNonMaquette", Prive)!;
+        var plan = typeof(RigV3Desktop.Pont.SessionPlanTravail);
+        var instance = new RigV3Desktop.Pont.SessionPlanTravail(null, null);
+        var moments = (IEnumerable)plan.GetField("Moments", Prive)!.GetValue(instance)!;
+        var motif = plan.GetMethod("MotifNonMaquette", Prive)!;
 
         var codes = new List<(string Code, string Libelle)>();
         foreach (var moment in moments)

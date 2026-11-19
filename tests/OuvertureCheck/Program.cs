@@ -114,7 +114,10 @@ string Lire(string relatif) => File.ReadAllText(Path.Combine(racine, relatif));
 // cherche, recherche restee vide), et le pont est EXECUTE plus bas.
 var rech = Lire("Components/Ecrans/EcranRechAffaires.razor");
 var rechTsx = Lire("web/src/ecrans/EcranRechAffaires.tsx");
-var accueil = Lire("Components/Pages/Home.razor");
+// Lot 2 du passage a React (19/11/2026) : l'aiguillage des ecrans est
+// web/src/plan/Aiguillage.tsx, les gestes du plan de travail Pont/PlanTravailVue.cs.
+var accueil = Lire("web/src/plan/Aiguillage.tsx");
+var gestesPlan = Lire("Pont/PlanTravailVue.cs");
 var ouverture = Lire("Components/Ecrans/EcranOuvertureDossier.razor");
 var ouvertureTsx = Lire("web/src/ecrans/EcranOuvertureDossier.tsx");
 
@@ -125,9 +128,11 @@ Exiger(rechTsx.Contains("onClick={() => ouvrirUnDossier(vue.sirenCherche)}"),
     "le bouton « Ouvrir un dossier » emporte le SIREN cherche");
 Exiger(Regex.IsMatch(rechTsx, @"vue\.aucunCritere \?[\s\S]{0,200}?Aucune affaire ne repond a ces criteres[\s\S]{0,300}?Ouvrir un dossier"),
     "le bouton n'apparait qu'apres une recherche restee vide");
-Exiger(accueil.Contains("OuvrirUnDossier=\"OuvrirUnDossierPour\""),
+Exiger(accueil.Contains("ouvrirUnDossier={(siren) => plan('ouvrirUnDossier', siren)}")
+       && gestesPlan.Contains("case \"ouvrirUnDossier\": OuvrirUnDossierPour(Texte(valeur)); break;"),
     "l'accueil ecoute cette demande");
-Exiger(accueil.Contains("SirenDemande=\"@SirenAImmatriculer\""),
+Exiger(accueil.Contains("<EcranOuvertureDossier key={ecran.cleOuverture} sirenDemande={ecran.sirenDemande} />")
+       && gestesPlan.Contains("SirenAImmatriculer, CleOuverture.ToString()"),
     "l'accueil transmet le SIREN a l'ecran d'ouverture");
 Exiger(ouverture.Contains("[Parameter] public string? SirenDemande")
        && ouverture.Contains("[\"sirenDemande\"] = SirenDemande"),

@@ -1,0 +1,80 @@
+import { describe, expect, it, vi } from 'vitest'
+import type { ReactElement } from 'react'
+import { Aiguillage } from './Aiguillage'
+import { proc } from '../test/plan'
+import type { GestePlan } from './types'
+import { EcranActes } from '../ecrans/EcranActes'
+import { EcranArrivee } from '../ecrans/EcranArrivee'
+import { EcranBodacc } from '../ecrans/EcranBodacc'
+import { EcranClients } from '../ecrans/EcranClients'
+import { EcranCommandesWeb } from '../ecrans/EcranCommandesWeb'
+import { EcranDemandes } from '../ecrans/EcranDemandes'
+import { EcranNonMaquette } from '../ecrans/EcranNonMaquette'
+import { EcranOuvertureDossier } from '../ecrans/EcranOuvertureDossier'
+import { EcranRechAffaires } from '../ecrans/EcranRechAffaires'
+import { EcranRequisitions } from '../ecrans/EcranRequisitions'
+import { EcranTachesLot } from '../ecrans/EcranTachesLot'
+import { EcranVerrous } from '../ecrans/EcranVerrous'
+
+// L'AIGUILLAGE (le @switch de Home.razor) : chaque code mene a SON ecran React,
+// monte directement, avec les parametres que sa coquille .razor lui passait.
+// Lu sur l'element rendu par la fonction (sans monter l'ecran, qui appellerait
+// son pont) ; tests/MotifCheck et NomMetierCheck tiennent le reste du catalogue.
+function aiguiller(code: string, ecran = proc().ecran) {
+  const plan = vi.fn<GestePlan>()
+  const el = Aiguillage({ proc: proc({ code, libelle: 'Libelle ' + code, ecran }), plan }) as ReactElement<Record<string, unknown>> | null
+  return { el, plan }
+}
+
+describe('Aiguillage des ecrans de procedure', () => {
+  it.each([
+    ['PROC_ACTES_NUM', EcranActes], ['PROC_ARRIVEE', EcranArrivee], ['BODACC', EcranBodacc],
+    ['PROC_REQUI', EcranRequisitions], ['PROC_COMMANDES_WEB', EcranCommandesWeb], ['PROC_VERROUS', EcranVerrous],
+    ['PROC_GCLIENT', EcranClients],
+  ])('%s monte son ecran', (code, ecran) => {
+    expect(aiguiller(code).el!.type).toBe(ecran)
+  })
+
+  it('un ecran qui ouvre un dossier remonte son NUMERO au plan de travail', () => {
+    for (const code of ['PROC_ACTES_NUM', 'PROC_ARRIVEE', 'PROC_VERROUS', 'BODACC']) {
+      const { el, plan } = aiguiller(code)
+      ;(el!.props.ouvrirDossier as (n: string) => void)('004176')
+      expect(plan).toHaveBeenCalledWith('ouvrirNumero', '004176')
+    }
+  })
+
+  it('la recherche d\'affaires : ouvrir une affaire, ou un dossier pour le SIREN cherche', () => {
+    const { el, plan } = aiguiller('PROC_RECHAFF')
+    expect(el!.type).toBe(EcranRechAffaires)
+    ;(el!.props.ouvrir as (n: string) => void)('2026B01067')
+    ;(el!.props.ouvrirUnDossier as (s: string) => void)('903118776')
+    expect(plan.mock.calls).toEqual([['ouvrirNumero', '2026B01067'], ['ouvrirUnDossier', '903118776']])
+  })
+
+  it('les demandes recoivent les dossiers valides ; l\'ouverture, son SIREN et sa cle', () => {
+    const ecran = { ...proc().ecran, valides: ['004176'], sirenDemande: '903118776', cleOuverture: '903118776' }
+    const demandes = aiguiller('PROC_DEMANDE', ecran).el!
+    expect(demandes.type).toBe(EcranDemandes)
+    expect(demandes.props.valides).toEqual(['004176'])
+    const ouverture = aiguiller('OUVERTURE_DOSSIER', ecran).el!
+    expect(ouverture.type).toBe(EcranOuvertureDossier)
+    expect(ouverture.key).toBe('903118776')
+    expect(ouverture.props.sirenDemande).toBe('903118776')
+  })
+
+  it('les taches en lot : la session ouverte par le C#, recreee quand elle change', () => {
+    const lot = aiguiller('PROC_TACHES_LOT', { ...proc().ecran, lot: { session: 's1', version: 3 } }).el!
+    expect(lot.type).toBe(EcranTachesLot)
+    expect(lot.key).toBe('s1')
+    expect(lot.props).toEqual({ session: 's1', version: 3 })
+    expect(aiguiller('PROC_TACHES_LOT').el).toBeNull()
+  })
+
+  it('une procedure sans ecran tombe sur l\'ecran qui se nomme, avec son motif', () => {
+    for (const code of ['PROC_CREANCE', 'PROC_INCONNUE']) {
+      const el = aiguiller(code).el!
+      expect(el.type).toBe(EcranNonMaquette)
+      expect(el.props).toEqual({ code, libelle: 'Libelle ' + code, motif: 'Motif lu dans le menu.' })
+    }
+  })
+})

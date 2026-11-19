@@ -1,0 +1,121 @@
+// Codes neutres (pas de PROC_) : hors aiguillage, aucun fichier de web/src ne porte de code interne (tests/NomMetierCheck).
+// Des vues du plan de travail pour les tests (records de Pont/PlanTravailVue.cs).
+// Valeurs reprises du parcours joue sur l'appli (affaire 004176, etapes du
+// dossier RCS) : les tests lisent le balisage rendu, pas les regles.
+
+import type { LigneArbreVue } from '../composants/ArbreGedNoeud'
+import type {
+  ApercuVue, DossierVue, EtapesVue, PageEtapeVue, ProcVue, TacheVue, VueApplication,
+} from '../plan/types'
+
+export function ligneArbre(id: string, texte: string, enfants: LigneArbreVue[] = [], niveau = 0): LigneArbreVue {
+  return {
+    id, niveau, texte, icone: enfants.length ? 'dossier' : 'pdf', actif: false, chemin: false,
+    depliable: enfants.length > 0, ouvert: enfants.length > 0, renomme: false, compte: null, enfants, vide: false,
+  }
+}
+
+export function proc(partiel: Partial<ProcVue> = {}): ProcVue {
+  return {
+    code: 'FACTURES', libelle: 'Factures', favori: false, boutonFermer: true,
+    sujet: { titre: 'Argent', onglets: [
+      { code: 'FACTURES', libelle: 'Factures', actif: true, detail: null },
+      { code: 'ENCAISSEMENTS', libelle: 'Encaissements', actif: false, detail: null },
+    ] },
+    ecran: { valides: [], sirenDemande: null, cleOuverture: 'ouverture-vierge', lot: null, motif: 'Motif lu dans le menu.' },
+    ...partiel,
+  }
+}
+
+export function page(code: string, titre: string, partiel: Partial<PageEtapeVue> = {}): PageEtapeVue {
+  return { code, courante: false, rendue: false, titre, source: 'table ' + code, fiches: null, recap: null, champs: [], ...partiel }
+}
+
+export function etapes(partiel: Partial<EtapesVue> = {}): EtapesVue {
+  return {
+    courante: 1, total: 7, titre: 'Statuts signes', oeil: false,
+    pas: [
+      { etat: 'complet', courant: false, pastille: 'OK', titre: 'Demande', fiches: 0, unite: 'fiche', refuses: 0, manquants: 0, remplis: 5, total: 5 },
+      { etat: 'refuse', courant: true, pastille: '!', titre: 'Identite', fiches: 0, unite: 'fiche', refuses: 1, manquants: 0, remplis: 11, total: 14 },
+      { etat: 'partiel', courant: false, pastille: '3', titre: 'Capital', fiches: 0, unite: 'fiche', refuses: 0, manquants: 0, remplis: 6, total: 7 },
+      { etat: 'partiel', courant: false, pastille: '4', titre: 'Siege et etablissements', fiches: 2, unite: 'etablissement', refuses: 0, manquants: 2, remplis: 20, total: 22 },
+    ],
+    pages: [
+      page('DEMANDE', 'Demande', { rendue: true }),
+      page('IDENTITE', 'Identite', {
+        rendue: true, courante: true,
+        champs: [
+          { libelle: 'SIREN', colonne: 'DSSRC_SIREN', type: 'text', exemple: '109 678 235', obligatoire: true, largeur: 'moitie',
+            choix: [], valeur: '402 118 447', refus: 'cle de controle du SIREN incorrecte', manque: false },
+          { libelle: 'Type de dossier', colonne: 'DSSRC_TYPE_RCS', type: 'text', exemple: '', obligatoire: true, largeur: 'moitie',
+            choix: ['Personne morale', 'Personne physique'], valeur: 'Personne morale', refus: null, manque: false },
+          { libelle: 'Patronyme', colonne: 'INSPP_PATRONYME', type: 'text', exemple: 'DUPONT', obligatoire: false, largeur: 'pleine',
+            choix: [], valeur: '', refus: null, manque: true },
+        ],
+      }),
+      page('CAPITAL', 'Capital', { rendue: true }),
+      page('SIEGE', 'Siege et etablissements', { fiches: { unite: 'Etablissement', nombre: 2, actif: 1 } }),
+    ],
+    ...partiel,
+  }
+}
+
+export function tache(partiel: Partial<TacheVue> = {}): TacheVue {
+  return {
+    code: 'DENO', titre: 'Renommer la societe et son nom de domaine', toutLeDossier: false,
+    texteTout: 'Afficher tout le dossier (14 branches, 42 pieces masquees)',
+    faits: 1, exiges: 1, facultatifs: 1, reste: null, complete: true, peutClore: false,
+    raison: 'Reste a traiter : Transmission INPI (registre national)', lignes: null,
+    cases: [{ libelle: "Denomination d'usage", exige: true, rempli: true, valeur: 'NORMARINE ATLANTIQUE', titre: 'INSCRIT_PM.DENOMINATION_USAGE' }],
+    casesFaites: 1, casesExigees: 1,
+    effets: [
+      { code: 'B0111', libelle: 'Publication BODACC', obligatoire: true, atteste: true, coche: true, cible: false,
+        titre: 'Declare en base', sansPiece: false, titreLibelle: "Montrer dans l'arbre : Avis BODACC", piece: 'Avis BODACC' },
+      { code: '0F', libelle: 'Transmission INPI (registre national)', obligatoire: true, atteste: false, coche: false, cible: false,
+        titre: 'Declare en base', sansPiece: false, titreLibelle: "Montrer dans l'arbre : Accuse INPI", piece: 'Accuse INPI' },
+    ],
+    effetsTraites: 1, effetsObligatoires: 4,
+    ...partiel,
+  }
+}
+
+export function apercu(partiel: Partial<ApercuVue> = {}): ApercuVue {
+  return {
+    extension: 'PDF', pages: 2, date: '12/03/2024', libelle: 'Statuts signes', message: '', pdf: false, fichier: '',
+    kbis: null,
+    feuilles: [
+      { numero: 1, total: 2, texte: 'STATUTS DE LA SOCIETE', valeurs: [{ libelle: 'Montant du capital', valeur: '10000' }] },
+      { numero: 2, total: 2, texte: 'Article 2', valeurs: null },
+    ],
+    ...partiel,
+  }
+}
+
+export function dossier(partiel: Partial<DossierVue> = {}): DossierVue {
+  return {
+    numero: '004176', objet: 'Modification - SCI DU PARC', siren: '812 445 901', type: 'RCS', statut: 'alerte',
+    boutonDocument: false,
+    sommaire: { designation: 'SCI DU PARC', champs: [
+      { libelle: 'N° de gestion', valeur: '004176', mono: true },
+      { libelle: 'Forme juridique', valeur: 'Societe civile immobiliere', mono: false },
+    ], mention: '' },
+    bandeau: { nombre: 1, erreur: true, liens: [
+      { indexEtape: 1, fiche: 0, refuse: true, titre: 'SIREN : cle de controle du SIREN incorrecte', etape: 'Identite', suffixe: '', nombre: 1 },
+    ] },
+    styleCorps: 'grid-template-columns: 400px 6px 420px 6px minmax(0, 1fr)',
+    tache: null, filtre: '',
+    arbre: ligneArbre('n1', '004176 Modification - SCI DU PARC', [ligneArbre('n2', 'Statuts signes', [], 1)]),
+    poignee: true, fiche: null, etapes: etapes(), poignee2: true,
+    apercu: { detachees: 0, apercu: apercu() }, voile: false,
+    ...partiel,
+  }
+}
+
+export function vueApplication(partiel: Partial<VueApplication> = {}): VueApplication {
+  return {
+    theme: 'clair', geste: 0, barre: null, accueil: null, onglets: null, finsDeGlisse: 0,
+    proc: null, dossier: null, impression: null, envoiMail: null, nouveau: null, menuNoeud: null,
+    pagination: 0, defilement: null,
+    ...partiel,
+  }
+}

@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using System.Text.RegularExpressions;
 using RigV3Desktop;
 
 // Controle du widget ACTUALITES : des messages REDIGES (et non
@@ -12,7 +13,10 @@ void Exiger(bool ok, string quoi)
 }
 
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
-var vue = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
+// Lot 2 du passage a React (19/11/2026) : l'aiguillage des ecrans est
+// web/src/plan/Aiguillage.tsx, la table des procedures est dans Pont/PlanTravail.cs.
+var aiguillage = File.ReadAllText(Path.Combine(racine, "web/src/plan/Aiguillage.tsx"));
+var vue = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs"));
 
 // Bac a sable : JAMAIS l'etat reel de l'utilisateur.
 var bac = Path.Combine(Path.GetTempPath(), "rigv3-actualites-" + Guid.NewGuid().ToString("N"));
@@ -186,8 +190,8 @@ var vb = RigV3Desktop.Pont.EcranActualites.Agir(sb, "Publier", Valeur(null));
 Exiger(vb.StatutRendu == "alerte" && vb.CompteRendu.StartsWith("ECHEC"),
     "un echec d'ecriture est DIT au redacteur : rien n'est parti");
 RigV3Desktop.Pont.EcranActualites.Fermer(sb);
-Exiger(vue.Contains("case \"PROC_ACTUALITES\":"), "l'ecran est branche dans l'aiguillage des procedures");
-Exiger(vue.Contains("<EcranActualites />"), "l'ecran est rendu par l'accueil");
+Exiger(aiguillage.Contains("case 'PROC_ACTUALITES':"), "l'ecran est branche dans l'aiguillage des procedures");
+Exiger(Regex.IsMatch(aiguillage, @"case 'PROC_ACTUALITES':\s*return <EcranActualites />"), "l'ecran est rendu par le plan de travail");
 Exiger(vue.Contains("\"PROC_ACTUALITES\", \"Actualites\"")
        || vue.Contains("\"PROC_ACTUALITES\""), "l'ecran est nomme dans la table des procedures");
 

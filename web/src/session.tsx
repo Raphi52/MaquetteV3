@@ -92,6 +92,13 @@ export interface ProprietesSaisie extends AttributsSaisie {
    */
   quand?: 'input' | 'change'
   changer: (valeur: string) => void
+  /**
+   * Facultatif, en plus de `changer` a chaque frappe : la sortie du champ ou
+   * Entree (l'evenement « change »). Pour un champ du .razor qui portait a la
+   * fois @oninput et @onchange (saisie guidee : apercu en direct, puis
+   * enregistrement et journal).
+   */
+  finir?: (valeur: string) => void
 }
 
 /**
@@ -100,11 +107,13 @@ export interface ProprietesSaisie extends AttributsSaisie {
  * que la session refuse (un nombre illisible) reste donc affichee telle quelle,
  * et la frappe n'est jamais ecrasee par une reponse en retard.
  */
-export function Saisie({ valeur, quand = 'input', changer, ...attributs }: ProprietesSaisie) {
+export function Saisie({ valeur, quand = 'input', changer, finir, ...attributs }: ProprietesSaisie) {
   const champ = useRef<HTMLInputElement>(null)
   const changerCourant = useRef(changer)
+  const finirCourant = useRef(finir)
 
   useEffect(() => { changerCourant.current = changer }, [changer])
+  useEffect(() => { finirCourant.current = finir }, [finir])
 
   useEffect(() => {
     const el = champ.current
@@ -120,6 +129,15 @@ export function Saisie({ valeur, quand = 'input', changer, ...attributs }: Propr
     el.addEventListener('change', surChange)
     return () => el.removeEventListener('change', surChange)
   }, [quand])
+
+  const aFinir = finir !== undefined
+  useEffect(() => {
+    const el = champ.current
+    if (!el || !aFinir) return
+    const surFin = () => finirCourant.current?.(el.value)
+    el.addEventListener('change', surFin)
+    return () => el.removeEventListener('change', surFin)
+  }, [aFinir])
 
   return (
     <input ref={champ} defaultValue={valeur} {...attributs}
