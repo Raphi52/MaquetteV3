@@ -24,6 +24,22 @@ Environment.SetEnvironmentVariable("RIGV3_ETAT", etatBanc);
 var vue = File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor"));
 var arbreModele = Path.Combine(racine, "Metier/ArbreGed.cs");
 var noeud = Path.Combine(racine, "Components/ArbreGedNoeud.razor");
+// PORTE EN REACT (lot 6, 19/11/2026) : ArbreGedNoeud, IconeGed, DocumentDetacheVue
+// et FicheInformationsDossier ne sont plus que des COQUILLES. Leur balisage se lit
+// dans web/src/composants/<Nom>.tsx, leurs regles dans Pont/<Nom>.cs ; chaque regle
+// ci-dessous se lit a son nouvel endroit ET les ponts sont EXECUTES (section
+// « Ponts du lot 6 », en fin de fichier).
+string LireSource(string relatif)
+{
+    var chemin = Path.Combine(racine, relatif);
+    return File.Exists(chemin) ? File.ReadAllText(chemin) : string.Empty;
+}
+var tsxArbre = LireSource("web/src/composants/ArbreGedNoeud.tsx");
+var pontArbre = LireSource("Pont/ArbreGedNoeud.cs");
+var coquilleArbre = LireSource("Components/ArbreGedNoeud.razor");
+var tsxFiche = LireSource("web/src/composants/FicheInformationsDossier.tsx");
+var pontFiche = LireSource("Pont/FicheInformationsDossier.cs");
+var coquilleFiche = LireSource("Components/FicheInformationsDossier.razor");
 var css = File.ReadAllText(Path.Combine(racine, "wwwroot/rig-accueil.css"));
 // Le tableau des editions a son propre ecran depuis 09/2026 : les colonnes et
 // le detail du destinataire s'y trouvent, plus dans Home.razor.
@@ -60,8 +76,11 @@ Exiger(Regex.IsMatch(modele, @"Judiciaire.*Ordonnances.*Demandeur", RegexOptions
 
 // --- 3. L'arbre se rend par un composant RECURSIF, avec ses colonnes v2.
 Exiger(File.Exists(noeud), "Components/ArbreGedNoeud.razor existe");
-var rendu = File.Exists(noeud) ? File.ReadAllText(noeud) : string.Empty;
-Exiger(rendu.Contains("<ArbreGedNoeud"), "ArbreGedNoeud.razor s'appelle lui-meme (recursion)");
+Exiger(coquilleArbre.Contains("<IleReact Composant=\"ArbreGedNoeud\""),
+    "la coquille ArbreGedNoeud.razor monte l'arbre React");
+var rendu = coquilleArbre + Environment.NewLine + tsxArbre + Environment.NewLine + pontArbre;
+Exiger(Regex.IsMatch(tsxArbre, @"export function ArbreGedNoeud[\s\S]*?<ArbreGedNoeud key=\{enfant\.id\}"),
+    "ArbreGedNoeud.tsx s'appelle lui-meme (recursion)");
 // Renomme le 2026-09-14 (demande Leslie) : l entete de l arbre annonce
 // desormais la vue entiere, pas seulement sa colonne.
 foreach (var colonne in new[] { "Visualisation du dossier" })
@@ -202,20 +221,32 @@ Exiger(File.Exists(vueDetachee), "Components/DocumentDetacheVue.razor existe");
 // L'objectif (zoom) du document detache doit etre MODULABLE et INDIVIDUEL :
 // boutons +/- dans la vue detachee, applique au document, et etat garde DANS la
 // vue (jamais dans DocumentPartage, sinon les fenetres zoomeraient ensemble).
-var texteDetachee = File.Exists(vueDetachee) ? File.ReadAllText(vueDetachee) : string.Empty;
-Exiger(Regex.IsMatch(texteDetachee, @"@onclick=""ZoomPlus""")
-       && Regex.IsMatch(texteDetachee, @"@onclick=""ZoomMoins"""),
+// PORTE EN REACT (lot 6) : la coquille reste la racine de FenetreDocument ; la
+// vue est web/src/composants/DocumentDetacheVue.tsx, la piece vient de
+// Pont/DocumentDetacheVue.cs. L'objectif est un etat React de CETTE fenetre.
+var coquilleDetachee = File.Exists(vueDetachee) ? File.ReadAllText(vueDetachee) : string.Empty;
+var tsxDetachee = LireSource("web/src/composants/DocumentDetacheVue.tsx");
+var pontDetachee = LireSource("Pont/DocumentDetacheVue.cs");
+var texteDetachee = coquilleDetachee + Environment.NewLine + tsxDetachee + Environment.NewLine + pontDetachee;
+Exiger(coquilleDetachee.Contains("<IleReact Composant=\"DocumentDetacheVue\"")
+       && coquilleDetachee.Contains("Emplacement.Change += Rafraichir")
+       && coquilleDetachee.Contains("DocumentDetacheVue.Vue(Emplacement)"),
+    "la coquille de la fenetre detachee suit SON emplacement et re-rend la vue React");
+Exiger(Regex.IsMatch(tsxDetachee, @"onClick=\{\(\) => setZoom\(zoomPlus\)\}")
+       && Regex.IsMatch(tsxDetachee, @"onClick=\{\(\) => setZoom\(zoomMoins\)\}"),
     "la fenetre detachee porte les boutons d'objectif (zoom + et -)");
-Exiger(Regex.IsMatch(texteDetachee, @"rig-apercu__pages""[^>]{0,120}?zoom:@Zoom"),
+Exiger(Regex.IsMatch(tsxDetachee, @"rig-apercu__pages""[^>]{0,120}?zoom"),
     "l'objectif s'applique aux pages du document detache");
-Exiger(Regex.IsMatch(texteDetachee, @"\[Parameter\] public int Rang"),
+Exiger(Regex.IsMatch(coquilleDetachee, @"\[Parameter\] public int Rang")
+       && coquilleDetachee.Contains("Partage.Emplacement(Rang)"),
     "la vue detachee sait QUEL document elle affiche (son rang)");
-Exiger(Regex.IsMatch(texteDetachee, @"private double Zoom")
+Exiger(Regex.IsMatch(tsxDetachee, @"const \[zoom, setZoom\] = useState\(1\.0\)")
+       && !Regex.IsMatch(pontDetachee + coquilleDetachee, @"Zoom")
        && !Regex.IsMatch(File.ReadAllText(Path.Combine(racine, "Metier/DocumentPartage.cs")), @"Zoom"),
     "l'objectif est propre a CHAQUE fenetre detachee (etat local, pas partage)");
 Exiger(Regex.Matches(File.ReadAllText(Path.Combine(racine, "Metier/DocumentPartage.cs")),
         @"public static string TextePage").Count == 1 &&
-       !Regex.IsMatch(File.ReadAllText(vueDetachee), @"const int parPage"),
+       !Regex.IsMatch(texteDetachee, @"parPage") && pontDetachee.Contains("DocumentPartage.TextePage(piece, f)"),
     "la decoupe en pages n existe qu UNE fois (pas de copie dans la fenetre detachee)");
 Exiger(Regex.IsMatch(vue, @"Selectionner=""OuvrirApercu""|Selectionner=""@?OuvrirApercu"""),
     "l'arbre branche le clic d'une piece sur OuvrirApercu");
@@ -391,7 +422,9 @@ foreach (var interdit in new[] { "Signalements de divergences BE", "Divers",
         $"l'arbre ne porte plus le dossier inexistant en v2 « {interdit} »");
 }
 
-Exiger(rendu.Contains("Domaines") && vue.Contains("Domaines=\"Domaines\""),
+Exiger(coquilleArbre.Contains("[Parameter] public string[] Domaines")
+       && pontArbre.Contains("AccesGed.EnfantsVisibles(n, domaines, ajouts, masques, recette)")
+       && vue.Contains("Domaines=\"Domaines\""),
     "l'arbre rendu recoit les domaines du login courant");
 Exiger(vue.Contains("JeuDemo.Comptes") && vue.Contains("ChangerLogin"),
     "l'entete permet de changer de login");
@@ -444,11 +477,13 @@ Exiger(Regex.IsMatch(css, @"\.rig-tuile-nature \{[^}]*border:[^;]*dashed")
        // aspect-ratio 1/1 et devenaient de gros carres.
        && !Regex.IsMatch(css, @"\.rig-nature \{"),
     "les tuiles de nature sont carrees, arrondies et en pointilles");
-var arbreVue = File.ReadAllText(Path.Combine(racine, "Components", "ArbreGedNoeud.razor"));
+var arbreVue = tsxArbre;
 // Le clic droit n'annoncait RIEN a l'ecran : remplace le 17/09/2026 par un
 // bouton « trois points » a droite de la ligne (meme geste que la liste des
 // conversations d'Autowin OS). Le clic droit ne doit plus etre le seul acces.
-Exiger(arbreVue.Contains("rig-arbre__actions") && !arbreVue.Contains("oncontextmenu")
+Exiger(arbreVue.Contains("rig-arbre__actions")
+       && !(arbreVue + coquilleArbre).Contains("oncontextmenu", StringComparison.OrdinalIgnoreCase)
+       && arbreVue.Contains("e.stopPropagation(); menuContextuel(")
        && vue.Contains("rig-ctx__item")
        && vue.Contains("SupprimerNoeud") && vue.Contains("DemarrerRenommage"),
     "les trois points a droite d'une ligne ouvrent le menu renommer/supprimer");
@@ -468,20 +503,26 @@ Exiger(Regex.IsMatch(css, @"\.rig-ctx \{[^}]*position:\s*fixed"),
 
 // Chaque nature doit avoir SON dessin : sans cela les tuiles se
 // ressemblent toutes et le choix ne se fait plus a l'oeil.
-var icones = File.ReadAllText(Path.Combine(racine, "Components", "IconeGed.razor"));
-Exiger(vue.Contains("<IconeGed Nature=") && !vue.Contains("rig-nature__icone rig-arbre__icone"),
+// PORTE EN REACT (lot 6) : les dessins vivent dans web/src/composants/IconeGed.tsx ;
+// IconeGed.razor est la coquille que Home.razor pose dans la fenetre de creation.
+var icones = LireSource("web/src/composants/IconeGed.tsx");
+var coquilleIcone = LireSource("Components/IconeGed.razor");
+Exiger(vue.Contains("<IconeGed Nature=") && !vue.Contains("rig-nature__icone rig-arbre__icone")
+       && coquilleIcone.Contains("<IleReact Composant=\"IconeGed\"")
+       && coquilleIcone.Contains("[\"nature\"] = Nature") && coquilleIcone.Contains("[\"classe\"] = Classe"),
     "les tuiles de nature portent une vraie icone dessinee, pas une pastille");
 foreach (var n in RigV3Desktop.AccesGed.Natures)
 {
     if (n.Code == "pdf") continue; // la feuille est le dessin par defaut
-    Exiger(icones.Contains($"\"{n.Code}\" =>"), $"la nature « {n.Titre} » a son propre dessin");
+    Exiger(icones.Contains($"case '{n.Code}':"), $"la nature « {n.Titre} » a son propre dessin");
 }
 Exiger(icones.Contains("stroke=\"currentColor\"") && !icones.Contains("http"),
     "les icones sont tracees au trait, sans image ni ressource externe");
 
 // L'arbre pose la MEME icone que la fenetre de creation, plus de pastille.
-var arbreIcone = File.ReadAllText(Path.Combine(racine, "Components", "ArbreGedNoeud.razor"));
-Exiger(arbreIcone.Contains("<IconeGed Nature=") && !arbreIcone.Contains("rig-arbre__icone--"),
+var arbreIcone = tsxArbre;
+Exiger(arbreIcone.Contains("<IconeGed nature={ligne.icone} classe=\"rig-arbre__icone\"")
+       && pontArbre.Contains("AccesGed.CodeIcone(noeud)") && !arbreIcone.Contains("rig-arbre__icone--"),
     "les lignes de l'arbre portent une icone dessinee, plus une pastille carree");
 Exiger(!Regex.IsMatch(css, @"\.rig-arbre__icone \{[^}]*background"),
     "l'icone de l'arbre est un trait, pas un aplat de couleur");
@@ -520,7 +561,7 @@ Exiger(RigV3Desktop.AccesGed.EnfantsVisibles(cible, tous, null, masques).Count
 // La fenetre detachee porte la barre de titre native de Windows : elle ne doit
 // PAS piloter FenetreInterop, dont les commandes visent Application.Current.MainWindow
 // -- reduire/fermer depuis le document frapperaient alors la fenetre principale.
-Exiger(!Regex.IsMatch(File.ReadAllText(vueDetachee), @"FenetreInterop"),
+Exiger(!Regex.IsMatch(texteDetachee, @"FenetreInterop"),
     "la vue detachee ne pilote pas les commandes de la fenetre principale");
 
 // --- MODE TACHE (task driven) : une recette replie l'arbre sur ce qu'elle
@@ -567,8 +608,8 @@ Exiger(vueTache.Contains("Afficher tout le dossier"),
     "la vue porte le bouton « Afficher tout le dossier »");
 Exiger(vueTache.Contains("BranchesMasquees") && vueTache.Contains("PiecesMasquees"),
     "le bouton annonce COMBIEN il revele (branches et pieces masquees)");
-var ficheTache = File.ReadAllText(Path.Combine(racine, "Components/FicheInformationsDossier.razor"));
-Exiger(ficheTache.Contains("Afficher tous les champs") && ficheTache.Contains("ToutAffiche"),
+Exiger(tsxFiche.Contains("Afficher tous les champs") && coquilleFiche.Contains("[\"toutAffiche\"] = IleReact.Rappel(ToutAffiche)")
+       && pontFiche.Contains("if (TousChamps) Rappels.Add(\"toutAffiche\")"),
     "la fiche porte le meme bouton et COMPTE les clics");
 
 // fix-ok: depuis le 17/09 Relever() ne rend QUE le catalogue metier de la feuille 2 ; les constats calcules (lots, taches) sont dans ReleverCalculees().
@@ -771,7 +812,7 @@ Exiger(etatLignes.RetirerLigneTache("DSTE", "004182") == 1
 
 Exiger(vueTache.Contains("AjouterLigneTache") && vueTache.Contains("TrousDeLaLigne("),
     "la vue sait ajouter une ligne et dire laquelle est incomplete");
-var ficheLignes = File.ReadAllText(Path.Combine(racine, "Components/FicheInformationsDossier.razor"));
+var ficheLignes = pontFiche;
 Exiger(ficheLignes.Contains("LigneCourante") && ficheLignes.Contains("CleDuChamp("),
     "la fiche ecrit sous la cle de la ligne saisie");
 Exiger(ficheLignes.Contains("Recette.LibelleLigne"),
@@ -1004,7 +1045,7 @@ foreach (var t in RigV3Desktop.ColonnesRig.Prefixes)
 // La regle ne doit pas rester du code mort : la vue montre la colonne
 // REELLE, et seulement quand elle est resolue (sinon 500 champs hors
 // recette afficheraient un motif d'echec inutile).
-var ficheCol = File.ReadAllText(Path.Combine(racine, "Components/FicheInformationsDossier.razor"));
+var ficheCol = pontFiche;
 Exiger(ficheCol.Contains("ColonnesRig.Resoudre(") && ficheCol.Contains("reelle.Resolue"),
     "la fiche montre la colonne reelle, et seulement si elle est resolue");
 Exiger(lot.Contains("ColonnesRig.Resoudre("),
@@ -1083,6 +1124,130 @@ Exiger(vueTache.Contains("Terminer la tache") && vueTache.Contains("ChampsManqua
 Exiger(vueTache.Contains("AlertesOuvertes()")
        && !Regex.IsMatch(vueTache, @"Alertes\s*=\s*SondeAlertes\.Relever\(\)"),
     "la file d'alertes EXCLUT les taches deja terminees");
+
+// --- PONTS DU LOT 6, EXECUTES (19/11/2026). Les regles de l'arbre, de la fiche
+// et de la fenetre detachee ont quitte les .razor pour Pont/ : on les joue ici
+// comme la coquille et React les jouent, sur le jeu de demonstration.
+{
+    var ouverts = RigV3Desktop.AccesGed.NouveauxMasques();
+    ouverts.Add(racineGed);
+    var index = new Dictionary<string, RigV3Desktop.NoeudGed>();
+    RigV3Desktop.Pont.LigneArbreVue VueArbre(RigV3Desktop.NoeudGed? selection = null, string[]? domaines = null,
+                                             string? filtre = null, RigV3Desktop.NoeudGed? racineVue = null)
+    {
+        index.Clear();
+        return RigV3Desktop.Pont.ArbreGedNoeud.Vue(racineVue ?? racineGed, 0, ouverts, selection, domaines ?? tous,
+                                                   null, null, null, null, null, filtre, index);
+    }
+    IEnumerable<RigV3Desktop.Pont.LigneArbreVue> Lignes(RigV3Desktop.Pont.LigneArbreVue l)
+        => new[] { l }.Concat(l.Enfants.SelectMany(Lignes));
+
+    var arbreVu = VueArbre();
+    Exiger(arbreVu.Ouvert && arbreVu.Enfants.Length == RigV3Desktop.AccesGed.EnfantsVisibles(racineGed, tous).Count
+           && arbreVu.Enfants.All(e => !e.Ouvert && e.Enfants.Length == 0),
+        "pont de l'arbre : la racine ouverte rend ses enfants visibles, une branche fermee ne rend rien dessous");
+    Exiger(index.Count == Lignes(arbreVu).Count()
+           && Lignes(arbreVu).All(l => index.ContainsKey(l.Id))
+           && index[arbreVu.Id] is { } r0 && ReferenceEquals(r0, racineGed)
+           && VueArbre().Enfants.Select(e => e.Id).SequenceEqual(arbreVu.Enfants.Select(e => e.Id)),
+        "pont de l'arbre : chaque ligne rendue garde un identifiant STABLE qui retrouve SON noeud");
+    Exiger(!VueArbre(domaines: [RigV3Desktop.ArbreDemo.DomaineRcs]).Enfants.Any(e => e.Texte == "Judiciaire")
+           && arbreVu.Enfants.Any(e => e.Texte == "Judiciaire"),
+        "pont de l'arbre : un dossier reserve a un autre domaine ne se rend pas");
+
+    var brancheRcs = racineGed.Enfants.First(e => e.Libelle == "Dossier RCS");
+    RigV3Desktop.Pont.ArbreGedNoeud.Activer(brancheRcs, ouverts, tous, null, null, null);
+    var deplie = VueArbre().Enfants.First(e => e.Texte == "Dossier RCS");
+    RigV3Desktop.Pont.ArbreGedNoeud.Activer(brancheRcs, ouverts, tous, null, null, null);
+    var replie = VueArbre().Enfants.First(e => e.Texte == "Dossier RCS");
+    Exiger(deplie.Ouvert && deplie.Enfants.Length > 0 && deplie.Depliable && !replie.Ouvert && replie.Enfants.Length == 0,
+        "pont de l'arbre : un clic deplie un dossier, un second le replie");
+    var pieceRcs = brancheRcs.Enfants.First(e => e.EstPiece);
+    var avantClic = ouverts.Count;
+    RigV3Desktop.Pont.ArbreGedNoeud.Activer(pieceRcs, ouverts, tous, null, null, null);
+    Exiger(ouverts.Count == avantClic, "pont de l'arbre : un clic sur une piece ne deplie rien (elle se selectionne)");
+
+    ouverts.Add(brancheRcs);
+    var avecSelection = VueArbre(selection: pieceRcs);
+    var lignePiece = Lignes(avecSelection).First(l => index[l.Id] == pieceRcs);
+    Exiger(avecSelection.Chemin && avecSelection.Enfants.First(e => e.Texte == "Dossier RCS").Chemin
+           && lignePiece.Actif && !lignePiece.Chemin,
+        "pont de l'arbre : la piece choisie est active, TOUS ses parents portent le chemin");
+    ouverts.Remove(brancheRcs);
+
+    var filtreArbre = VueArbre(filtre: "statuts");
+    Exiger(Lignes(filtreArbre).Any(l => l.Texte.Contains("Statuts", StringComparison.OrdinalIgnoreCase))
+           && filtreArbre.Enfants.All(e => e.Ouvert)
+           && !filtreArbre.Enfants.Any(e => e.Texte == "Judiciaire"),
+        "pont de l'arbre : le filtre ouvre les branches qui menent a un resultat et cache les autres");
+
+    var dossierVide = RigV3Desktop.AccesGed.NouveauDossier("Vide");
+    ouverts.Add(dossierVide);
+    var vueVide = VueArbre(racineVue: dossierVide);
+    Exiger(vueVide.Vide && !vueVide.Depliable && vueVide.Compte is null && vueVide.Enfants.Length == 0,
+        "pont de l'arbre : un dossier ouvert sans piece annonce « aucune piece »");
+    Exiger(arbreVu.Compte == racineGed.NbPieces && arbreVu.Icone == RigV3Desktop.AccesGed.CodeIcone(racineGed),
+        "pont de l'arbre : le compte de pieces et l'icone viennent du metier");
+
+    // Fenetre detachee : la piece et sa decoupe en pages, par le passe-plat.
+    var partageDoc = new RigV3Desktop.DocumentPartage();
+    var pieceDoc = racineGed.Descendants().First(n => n.EstPiece && !n.APdf);
+    Exiger(RigV3Desktop.Pont.DocumentDetacheVue.Vue(partageDoc.Emplacement(1)) is null,
+        "pont de la fenetre detachee : sans piece ouverte, la vue le dit (null)");
+    partageDoc.Publier(2, pieceDoc, [("SIREN", "903 118 776")]);
+    var vueDoc = RigV3Desktop.Pont.DocumentDetacheVue.Vue(partageDoc.Emplacement(2))!;
+    Exiger(vueDoc.Libelle == pieceDoc.Libelle && vueDoc.Feuilles.Length == Math.Max(1, pieceDoc.Pages)
+           && vueDoc.Feuilles.Select(f => f.Texte).SequenceEqual(
+                  Enumerable.Range(1, vueDoc.Feuilles.Length).Select(f => RigV3Desktop.DocumentPartage.TextePage(pieceDoc, f)))
+           && vueDoc.Valeurs.Single() is { Libelle: "SIREN", Valeur: "903 118 776" },
+        "pont de la fenetre detachee : la piece de SON rang, decoupee par DocumentPartage.TextePage");
+    Exiger(RigV3Desktop.Pont.DocumentDetacheVue.Vue(partageDoc.Emplacement(1)) is null,
+        "pont de la fenetre detachee : chaque rang garde son document (le rang 1 reste vide)");
+
+    // Fiche : la session de Pont/FicheInformationsDossier.cs, comme la coquille l'ouvre.
+    var etatFiche = new RigV3Desktop.AccueilEtat();
+    var ficheOpts = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+    System.Text.Json.JsonElement J(object? o) => System.Text.Json.JsonSerializer.SerializeToElement(o, ficheOpts);
+    RigV3Desktop.Pont.ParametresFiche P(RigV3Desktop.RecetteTache? r, int ligne = 1)
+        => new("004182", "Dossier RCS", RigV3Desktop.InformationsDossier.LibelleNoeud,
+               RigV3Desktop.InformationsDossier.Sections, RigV3Desktop.InformationsDossier.ProcessusSources,
+               r, ligne, etatFiche, r is null);
+
+    var sDeno = RigV3Desktop.Pont.FicheInformationsDossier.Ouvrir(P(deno));
+    var vDeno = RigV3Desktop.Pont.FicheInformationsDossier.Vue(sDeno);
+    var champsDeno = vDeno.Sections.SelectMany(x => x.Champs).ToArray();
+    Exiger(vDeno.Tache is { Code: "DENO", TousChamps: false } && vDeno.Frise is null && vDeno.Remplissage is null
+           && champsDeno.Length == RigV3Desktop.InformationsDossier.Sections
+                  .Sum(x => x.Champs.Count(c => deno.GardeChamp(x.Table, c.Colonne))),
+        "pont de la fiche : en mode tache, la fiche ne montre QUE les champs de la recette");
+    var ouvreTout = RigV3Desktop.Pont.FicheInformationsDossier.Agir(sDeno, "tousChamps", J(null));
+    var refermeTout = RigV3Desktop.Pont.FicheInformationsDossier.Agir(sDeno, "tousChamps", J(null));
+    Exiger(ouvreTout.Rappels.SequenceEqual(["toutAffiche"]) && ouvreTout.Tache!.TousChamps
+           && ouvreTout.Remplissage is not null && refermeTout.Rappels.Length == 0,
+        "pont de la fiche : « Afficher tous les champs » rouvre la fiche ET leve ToutAffiche (le retour ne compte pas)");
+    Exiger(champsDeno.Any(c => c.TitreColonne.StartsWith("En base : "))
+           && champsDeno.All(c => c.TitreColonne.StartsWith("En base : ") || c.TitreColonne == c.Cle),
+        "pont de la fiche : l'infobulle montre la colonne reelle quand elle est resolue, la cle sinon");
+    RigV3Desktop.Pont.FicheInformationsDossier.Fermer(sDeno);
+
+    var repetable = dir.Champs.FirstOrDefault(c => c.Repetable && RigV3Desktop.InformationsDossier.Sections
+        .Any(x => x.Table == c.Table && x.Champs.Any(ch => ch.Colonne == c.Colonne)));
+    Exiger(repetable is not null, "pont de la fiche : la recette dirigeant a un champ repetable dans la fiche");
+    if (repetable is not null)
+    {
+        var sDir = RigV3Desktop.Pont.FicheInformationsDossier.Ouvrir(P(dir, ligne: 2));
+        var bloc = Array.FindIndex(RigV3Desktop.InformationsDossier.Sections, x => x.Table == repetable.Table
+                                   && x.Champs.Any(ch => ch.Colonne == repetable.Colonne));
+        var rang = Array.FindIndex(RigV3Desktop.InformationsDossier.Sections[bloc].Champs, ch => ch.Colonne == repetable.Colonne);
+        var apresSaisie = RigV3Desktop.Pont.FicheInformationsDossier.Agir(sDir, "saisir", J(new { s = bloc, c = rang, valeur = "MARTIN" }));
+        var ecriture = etatFiche.Modifications["004182"].Last();
+        Exiger(ecriture.Colonne == RigV3Desktop.RecetteTache.Cle(repetable, 2) && ecriture.Colonne.Contains("[2]")
+               && ecriture.Element.EndsWith($"({dir.LibelleLigne} 2)") && ecriture.Apres == "MARTIN"
+               && apresSaisie.Rappels.SequenceEqual(["champModifie"]),
+            "pont de la fiche : un champ repetable s'ecrit sous la cle de SA ligne, la trace nomme la ligne");
+        RigV3Desktop.Pont.FicheInformationsDossier.Fermer(sDir);
+    }
+}
 
 try { File.Delete(etatBanc); } catch (IOException) { }
 

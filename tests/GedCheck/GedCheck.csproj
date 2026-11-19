@@ -29,6 +29,14 @@
     <Compile Include="../../Pont/EcranRechAffaires.cs" Link="Pont/EcranRechAffaires.cs" />
     <Compile Include="../../Pont/EcranTableauEditions.cs" Link="Pont/EcranTableauEditions.cs" />
     <Compile Include="../../Pont/EcranTachesLot.cs" Link="Pont/EcranTachesLot.cs" />
+    <!-- Composants portes en React le 19/11/2026 (lot 6) : arbre, fiche, fenetre detachee. -->
+    <Compile Include="../../Metier/FiltreArbre.cs" Link="FiltreArbre.cs" />
+    <Compile Include="../../Metier/EtapesInfoDossier.cs" Link="EtapesInfoDossier.cs" />
+    <Compile Include="../../Metier/ChampsRequisDossier.cs" Link="ChampsRequisDossier.cs" />
+    <Compile Include="../../Metier/DocumentPartage.cs" Link="DocumentPartage.cs" />
+    <Compile Include="../../Pont/ArbreGedNoeud.cs" Link="Pont/ArbreGedNoeud.cs" />
+    <Compile Include="../../Pont/FicheInformationsDossier.cs" Link="Pont/FicheInformationsDossier.cs" />
+    <Compile Include="../../Pont/DocumentDetacheVue.cs" Link="Pont/DocumentDetacheVue.cs" />
   </ItemGroup>
 
   <!-- Pont/*.cs porte [JSInvokable] (Microsoft.JSInterop), livre avec ASP.NET Core. -->

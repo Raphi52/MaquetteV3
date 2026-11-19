@@ -13,7 +13,10 @@ void Exiger(bool ok, string quoi)
 
 var racineSrc = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
 var vue = File.ReadAllText(Path.Combine(racineSrc, "Components/Pages/Home.razor"));
-var noeudVue = File.ReadAllText(Path.Combine(racineSrc, "Components/ArbreGedNoeud.razor"));
+// PORTE EN REACT (lot 6, 19/11/2026) : Components/ArbreGedNoeud.razor n'est plus
+// qu'une coquille ; la ligne se dessine dans web/src/composants/ArbreGedNoeud.tsx
+// et le chemin se calcule dans Pont/ArbreGedNoeud.cs, EXECUTE ci-dessous.
+var noeudVue = File.ReadAllText(Path.Combine(racineSrc, "web/src/composants/ArbreGedNoeud.tsx"));
 var css = File.ReadAllText(Path.Combine(racineSrc, "wwwroot/rig-accueil.css"));
 
 var deno = RecettesTaches.Deno;
@@ -93,8 +96,28 @@ Exiger(posArbre > 0 && posEffets > posArbre,
 Exiger(css.Contains("rig-tache__effets"), "D : le bloc des effets a son ancrage en pied de colonne");
 
 // --- B. Chemin or : le noeud courant et ses parents
-Exiger(noeudVue.Contains("rig-arbre__ligne--chemin"),
+Exiger(noeudVue.Contains("ligne.chemin ? 'rig-arbre__ligne--chemin'"),
     "B : la ligne d'un parent du noeud courant porte la marque du chemin");
+// Le chemin calcule par le pont, sur l'arbre de la tache DENO : la piece gardee
+// est active, chacun de ses parents porte la marque, et elle seule.
+var ouverts = AccesGed.NouveauxMasques();
+foreach (var n in new[] { arbre }.Concat(arbre.Descendants())) ouverts.Add(n);
+var avis = Visible(deno).First(n => n.Libelle.Contains("Avis BODACC", StringComparison.OrdinalIgnoreCase));
+var vueTache = RigV3Desktop.Pont.ArbreGedNoeud.Vue(arbre, 0, ouverts, avis, domaines, null, null, null, deno, null, null,
+                                                  new Dictionary<string, NoeudGed>());
+IEnumerable<RigV3Desktop.Pont.LigneArbreVue> Lignes(RigV3Desktop.Pont.LigneArbreVue l)
+    => new[] { l }.Concat(l.Enfants.SelectMany(Lignes));
+var parents = new[] { arbre }.Concat(arbre.Descendants()).Where(n => n.Descendants().Any(d => ReferenceEquals(d, avis)))
+                             .Select(n => n.Libelle).ToHashSet();
+Exiger(Lignes(vueTache).Single(l => l.Actif).Texte == avis.Libelle
+       && Lignes(vueTache).Where(l => l.Chemin).Select(l => l.Texte).ToHashSet().SetEquals(parents)
+       && parents.Count >= 2,
+    "B : le pont marque le chemin de la piece choisie, et seulement lui (execute)");
+Exiger(!Lignes(vueTache).Any(l => l.Texte.Contains("Piece d'identite du president", StringComparison.OrdinalIgnoreCase))
+       && Lignes(RigV3Desktop.Pont.ArbreGedNoeud.Vue(arbre, 0, ouverts, avis, domaines, null, null, null, null, null, null,
+                                                    new Dictionary<string, NoeudGed>()))
+              .Any(l => l.Texte.Contains("Piece d'identite du president", StringComparison.OrdinalIgnoreCase)),
+    "A : l'arbre RENDU par le pont replie la piece non nommee, et la rend sans recette (execute)");
 Exiger(css.Contains("rig-arbre__ligne--chemin"), "B : le filet or du chemin existe dans la charte");
 
 Console.WriteLine();

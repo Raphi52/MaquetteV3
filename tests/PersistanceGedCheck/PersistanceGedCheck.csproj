@@ -14,6 +14,8 @@
     <Compile Include="../../AccueilEtat.cs" Link="AccueilEtat.cs" />
     <Compile Include="../../Metier/ArbreGed.cs" Link="ArbreGed.cs" />
     <Compile Include="../../Metier/Greffes.cs" Link="Greffes.cs" />
+    <!-- Apercu Kbis porte en React le 19/11/2026 (lot 6) : son pont est execute ici. -->
+    <Compile Include="../../Pont/ApercuKbis.cs" Link="Pont/ApercuKbis.cs" />
     <Compile Include="../../Metier/JeuDemo.cs" Link="JeuDemo.cs" />
     <Compile Include="../../Metier/SimulationEdi.cs" Link="SimulationEdi.cs" />
     <Compile Include="../../Metier/AlertesGreffe.cs" Link="AlertesGreffe.cs" />

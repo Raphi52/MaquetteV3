@@ -114,15 +114,57 @@ Exiger(Regex.IsMatch(home, @"private void OuvrirTache\([\s\S]{0,700}?ProposerLes
 Exiger(Regex.IsMatch(home, @"ProposerLesValeursDuFlux[\s\S]{0,900}?Etat\.NoterModification\("),
     "elles sont ecrites dans l historique, comme une saisie a la main");
 
-var fiche = File.ReadAllText(Path.Combine(racine, "Components/FicheInformationsDossier.razor"));
+// PORTE EN REACT (lot 6, 19/11/2026) : Components/FicheInformationsDossier.razor
+// n'est plus qu'une coquille ; ValeurAffichee, Saisir et Modifier vivent dans la
+// session de Pont/FicheInformationsDossier.cs (lue ET executee ci-dessous), le
+// champ dans web/src/composants/FicheInformationsDossier.tsx.
+var fiche = File.ReadAllText(Path.Combine(racine, "Pont/FicheInformationsDossier.cs"));
+var tsxFiche = File.ReadAllText(Path.Combine(racine, "web/src/composants/FicheInformationsDossier.tsx"));
 Exiger(Regex.IsMatch(fiche, @"ValeurAffichee\(string cle\)[\s\S]{0,300}?DerniereValeur\("),
     "le formulaire AFFICHE ce que la trace porte deja");
 // Verrou KBIS (18/09/2026) : il ne joue QUE hors tache ; en tache, Saisir
 // rend la main a Modifier et le champ reste saisissable.
-Exiger(fiche.Contains("@onchange=\"ev => Saisir(bloc, c, cle,")
-       && Regex.IsMatch(fiche, @"Task Saisir[\s\S]{0,200}?if \(!Verrou\) \{ await Modifier\(bloc, c, cle, apres\)")
+Exiger(tsxFiche.Contains("quand=\"change\" changer={(texte) => geste('saisir', { s: bloc.s, c: c.c, valeur: texte })}")
+       && Regex.IsMatch(fiche, @"void Saisir[\s\S]{0,200}?if \(!Verrou\) \{ Modifier\(bloc, c, cle, apres\)")
        && File.ReadAllText(Path.Combine(racine, "Components/Pages/Home.razor")).Contains("Verrou=\"@(RecetteActive is null)\""),
     "le champ reste modifiable a la main, la proposition ne le verrouille pas");
+
+// EXECUTE : la valeur proposee par le flux EDI (ecrite dans la trace par un AUTRE
+// chemin que la fiche) s'affiche dans la fiche de la tache, et une nouvelle
+// ecriture de la trace fait relire la vue (la coquille re-signale React).
+var etatAvantFiche = Environment.GetEnvironmentVariable("RIGV3_ETAT");
+var etatFicheBanc = Path.Combine(Path.GetTempPath(), "rigv3-simuedicheck-" + Guid.NewGuid().ToString("N") + ".json");
+Environment.SetEnvironmentVariable("RIGV3_ETAT", etatFicheBanc);
+try
+{
+    var etatFlux = new AccueilEtat();
+    var recetteFlux = RecettesTaches.Deno;
+    var champFlux = recetteFlux.Champs.First(c => InformationsDossier.Sections
+        .Any(x => x.Table == c.Table && x.Champs.Any(ch => ch.Colonne == c.Colonne)));
+    var cleFlux = RecetteTache.Cle(champFlux);
+    void Proposer(string valeur, string avant) => etatFlux.NoterModification(dossier, new ModificationChamp(
+        DateTime.Now, "flux EDI", "Proposition", champFlux.Libelle, cleFlux, avant, valeur));
+    Proposer(SimulationEdi.NouvelleDenomination, "");
+    RigV3Desktop.Pont.ParametresFiche Pf() => new(dossier, "Dossier RCS", InformationsDossier.LibelleNoeud,
+        InformationsDossier.Sections, InformationsDossier.ProcessusSources, recetteFlux, 1, etatFlux, false);
+    var sFlux = RigV3Desktop.Pont.FicheInformationsDossier.Ouvrir(Pf());
+    string? Affiche() => RigV3Desktop.Pont.FicheInformationsDossier.Vue(sFlux).Sections
+        .SelectMany(x => x.Champs).FirstOrDefault(ch => ch.Cle == cleFlux)?.Valeur;
+    var vueFlux = RigV3Desktop.Pont.FicheInformationsDossier.Vue(sFlux);
+    Exiger(Affiche() == SimulationEdi.NouvelleDenomination && !vueFlux.LectureSeule && vueFlux.Verrou is null,
+        "la fiche de la tache AFFICHE la valeur proposee par le flux, et le champ reste saisissable (execute)");
+    var inchange = RigV3Desktop.Pont.FicheInformationsDossier.Parametrer(sFlux, Pf());
+    Proposer("AUTRE NOM", SimulationEdi.NouvelleDenomination);
+    var relu = RigV3Desktop.Pont.FicheInformationsDossier.Parametrer(sFlux, Pf());
+    Exiger(!inchange && relu && Affiche() == "AUTRE NOM",
+        "une ecriture de la trace par un autre ecran fait relire la fiche ouverte, et rien d'autre (execute)");
+    RigV3Desktop.Pont.FicheInformationsDossier.Fermer(sFlux);
+}
+finally
+{
+    Environment.SetEnvironmentVariable("RIGV3_ETAT", etatAvantFiche);
+    try { File.Delete(etatFicheBanc); } catch (IOException) { }
+}
 
 // --- 8. LA MEME PORTE POUR TOUS LES ECRANS. Entrer par le courrier ou par la
 // file des demandes doit poser le dossier REPLIE sur sa tache, pas les 521

@@ -25,6 +25,12 @@
     <Compile Include="../../Pont/EcranDemandes.cs" Link="Pont/EcranDemandes.cs" />
     <Compile Include="../../Pont/EcranArrivee.cs" Link="Pont/EcranArrivee.cs" />
     <Compile Include="../../Pont/EcranActes.cs" Link="Pont/EcranActes.cs" />
+    <!-- Fiche d'informations portee en React le 19/11/2026 (lot 6) : sa session est executee ici. -->
+    <Compile Include="../../Metier/EtapesInfoDossier.cs" Link="EtapesInfoDossier.cs" />
+    <Compile Include="../../Metier/ChampsRequisDossier.cs" Link="ChampsRequisDossier.cs" />
+    <Compile Include="../../Metier/ColonnesRig.cs" Link="ColonnesRig.cs" />
+    <Compile Include="../../Pont/SessionsEcran.cs" Link="Pont/SessionsEcran.cs" />
+    <Compile Include="../../Pont/FicheInformationsDossier.cs" Link="Pont/FicheInformationsDossier.cs" />
   </ItemGroup>
   <!-- Pont/*.cs porte [JSInvokable] (Microsoft.JSInterop), livre avec ASP.NET Core. -->
   <ItemGroup>

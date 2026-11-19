@@ -1,4 +1,6 @@
-﻿@* ============================================================
+﻿@implements IDisposable
+
+@* ============================================================
    « Informations du dossier » (Dossier RCS) : la vue du milieu en
    formulaire. Les sections et les champs viennent de
    Metier/InformationsDossier.cs, liste generee a partir des processus
@@ -7,325 +9,25 @@
    les centaines de la liste.
    Le meme formulaire sert « Informations des Formalites » (XACTION,
    Metier/InformationsFormalite.cs) : titre, sections et sources en parametre.
+
+   PORTE EN REACT (lot 6 de la migration, 19/11/2026) : la fiche est rendue
+   par web/src/composants/FicheInformationsDossier.tsx ; son etat et ses
+   regles (etapes, vues de remplissage, saisie guidee, verrou KBIS, mode
+   tache, historique, actions XACTION) vivent dans la session de
+   Pont/FicheInformationsDossier.cs. Ce fichier n'est plus qu'une COQUILLE :
+   il garde ses parametres d'origine pour que Home.razor ne change pas.
+
+   Pourquoi la coquille ouvre ELLE-MEME la session : la fiche ecrit dans
+   l'etat VIVANT de l'accueil (AccueilEtat), un objet qui ne traverse pas
+   vers React. La session le recoit ici ; React n'en recoit que
+   l'identifiant, et « version » change quand un rendu de l'accueil change
+   ce que la fiche affiche (autre dossier, tache, ligne, trace ecrite
+   ailleurs). Mode d'emploi : web/README.md.
    ============================================================ *@
 
-<div class="rig-guide__entete">
-    <div>
-        <div class="rig-kicker">@Domaine &middot; @Sections.Sum(s => s.Champs.Length) champs &middot; @NombreEtapes &eacute;tapes &middot; @Sections.Length blocs</div>
-        <h3 class="rig-guide__titre">@Titre</h3>
-        <div class="rig-guide__source">@Numero &middot; source RIG v2 : @string.Join(", ", Sources)</div>
-    </div>
-    <div class="rig-fiche__outils">
-        @* Bouton ACTIONS : les actions du processus v2 XACTION (Metier/ActionsXaction.cs). *@
-        <div class="rig-fiche__menu">
-            <button class="rig-bouton rig-bouton--plat" aria-expanded="@MenuActions"
-                    @onclick="() => MenuActions = !MenuActions">Actions &#9662;</button>
-            @if (MenuActions)
-            {
-                <ul class="rig-fiche__actions" role="menu">
-                    @foreach (var a in ActionsXaction.Liste)
-                    {
-                        var action = a;
-                        <li><button role="menuitem" title="@action.Code" @onclick="() => Choisir(action)">
-                            <span>@action.Libelle</span><span class="rig-infos__table">@action.Code</span>
-                        </button></li>
-                    }
-                </ul>
-            }
-        </div>
-        @* Bouton HISTORIQUE : remplace le formulaire par le journal des modifications. *@
-        <button class="rig-bouton rig-bouton--plat" aria-pressed="@Historique"
-                @onclick="BasculerHistorique">@(Historique ? "Formulaire" : "Historique")</button>
-        <button class="rig-guide__fermer" title="Fermer" @onclick="Fermer">&times;</button>
-    </div>
-</div>
-
-@if (DerniereAction is not null)
-{
-    <div class="rig-fiche__note">Action demandée : @DerniereAction.Libelle (@DerniereAction.Code) &mdash; notée au journal du dossier.</div>
-}
-
-@if (Historique)
-{
-    var entrees = Entrees();
-    <div class="rig-histo">
-        @if (entrees.Length == 0)
-        {
-            <p class="rig-histo__vide">Aucune modification enregistrée pour @Numero.</p>
-        }
-        @foreach (var m in entrees)
-        {
-            <article class="rig-histo__entree">
-                <div class="rig-histo__pastille">@Initiales(m.Auteur)</div>
-                <div class="rig-histo__corps">
-                    <div class="rig-histo__phrase">
-                        <strong>@m.Auteur</strong> a modifié <strong>@m.Champ</strong> dans <em>@m.Element</em>
-                    </div>
-                    <div class="rig-histo__valeurs">
-                        <span class="rig-histo__avant">@(m.Avant.Length == 0 ? "(vide)" : m.Avant)</span>
-                        <span class="rig-histo__fleche">&rarr;</span>
-                        <span class="rig-histo__apres">@(m.Apres.Length == 0 ? "(vide)" : m.Apres)</span>
-                    </div>
-                    <div class="rig-histo__meta">@m.Quand.ToString("dd/MM/yyyy HH:mm") &middot; @m.Colonne</div>
-                </div>
-            </article>
-        }
-    </div>
-}
-else
-{
-
-<div class="rig-infos">
-    @* MODE TACHE : la recette declare les champs a modifier ; la fiche ne
-       montre qu'eux. Le bouton rouvre les 523 champs SANS fermer la tache. *@
-    @if (Recette is not null)
-    {
-        var caches = Sections.Sum(x => x.Champs.Length) - Recette.Champs.Length;
-        <div class="rig-tache__bandeau">
-            <span class="rig-tache__code">@Recette.Code</span>
-            <span class="rig-tache__titre">@Recette.Titre</span>
-            <button class="rig-bouton rig-bouton--plat rig-tache__tout"
-                    aria-pressed="@TousChamps"
-                    title="Afficher tous les champs de la fiche sans quitter la tache"
-                    @onclick="BasculerTousChamps">
-                @(TousChamps
-                    ? "Revenir aux champs de la tache"
-                    : $"Afficher tous les champs ({caches} masques)")
-            </button>
-        </div>
-    }
-    @* VERROU KBIS (maquette du 18/09/2026, agent SANS droits) : la fiche
-       s'ouvre en lecture seule ; « Demander une modification » ouvre les
-       champs, « Envoyer la demande » part vers un responsable et le KBIS
-       reste celui en vigueur, marque « Modification en attente ». *@
-    @if (Verrou)
-    {
-        <div class="rig-verrou @(EnAttente ? "rig-verrou--attente" : EnEdition ? "rig-verrou--edition" : "")">
-            @if (EnAttente)
-            {
-                <span class="rig-verrou__badge">Modification en attente</span>
-                <span class="rig-verrou__texte">@Attentes[Numero] champ(s) soumis a la validation d'un responsable &mdash; le KBIS affiche reste celui en vigueur.</span>
-            }
-            else if (EnEdition)
-            {
-                <span class="rig-verrou__texte">Modification en cours &mdash; @Brouillon.Count champ(s) modifie(s).</span>
-                <button class="rig-bouton rig-bouton--plat" @onclick="AnnulerEdition">Annuler</button>
-                <button class="rig-bouton rig-bouton--fort" disabled="@(Brouillon.Count == 0)" @onclick="EnvoyerDemande">Envoyer la demande</button>
-            }
-            else
-            {
-                <span class="rig-verrou__cadenas" aria-hidden="true">&#128274;</span>
-                <span class="rig-verrou__texte">Lecture seule &mdash; vous n'avez pas les droits de modification du KBIS.</span>
-                <button class="rig-bouton rig-bouton--fort" @onclick="() => EnEdition = true">Demander une modification</button>
-            }
-        </div>
-    }
-    <input class="rig-saisie-champ__saisie rig-infos__filtre" type="search"
-           placeholder="Filtrer un champ (libelle ou colonne)..."
-           title="Filtrer un champ (libelle ou colonne)"
-           @bind="Filtre" @bind:event="oninput" />
-
-    @* ETAPES NOMMEES (EtapesInfoDossier) : les 31 tables v2 sont regroupees
-       en six etapes metier. On affiche UNE etape a la fois -- mais TOUS ses
-       blocs empiles, et le defilement colle d'un bloc au suivant
-       (scroll-snap, cf. .rig-infos dans rig-accueil.css). Un filtre actif
-       montre tout ce qui correspond, toutes etapes confondues. *@
-    @{
-        var visibles = SectionsVisibles();
-        var groupes = visibles
-            .GroupBy(v => EtapesInfoDossier.Rang(v.Section.Table))
-            .OrderBy(g => g.Key)
-            .Select(g => (Etape: EtapesInfoDossier.Etapes[g.Key], Blocs: g.ToArray()))
-            .ToArray();
-        var page = Math.Clamp(Page, 0, Math.Max(0, groupes.Length - 1));
-        var etalees = Filtre.Length > 0 || ModeTache;
-        var affichees = etalees || groupes.Length == 0
-            ? visibles
-            : groupes[page].Blocs;
-    }
-    @* En mode tache, les champs demandes tiennent ENSEMBLE a l'ecran : les
-       paginer par etape obligerait a chercher le second champ. *@
-    @* FRISE A JAUGES, la meme que l'ecran de saisie d'une formalite
-       (Home.razor, .rig-frise--h) : pastille OK / numero, libelle, avancement
-       « remplis / total » et filet de progression. Reprise telle quelle pour
-       que les deux ecrans se pilotent du meme geste. *@
-    @if (groupes.Length > 1 && !ModeTache)
-    {
-        <ol class="rig-frise rig-frise--h rig-infos__frise">
-            <li class="rig-frise__fleche">
-                <button class="rig-frise__fleche-bouton" title="Etape precedente"
-                        disabled="@(page == 0 || Filtre.Length > 0)"
-                        @onclick="() => Page = page - 1">&#8249;</button>
-            </li>
-            @for (var i = 0; i < groupes.Length; i++)
-            {
-                var index = i;
-                var g = groupes[i];
-                var (remplis, total) = Avancement(g.Blocs);
-                var etat = total > 0 && remplis == total ? "complet"
-                         : index == page && Filtre.Length == 0 ? "encours"
-                         : remplis > 0 ? "partiel" : "vide";
-                <li class="rig-frise__pas rig-frise__pas--@etat @(index == page && Filtre.Length == 0 ? "rig-frise__pas--courant" : "")">
-                    <button class="rig-frise__bouton"
-                            title="@g.Etape.Titre - @g.Blocs.Length bloc(s), @total champs"
-                            @onclick="() => { Page = index; Filtre = string.Empty; }">
-                        <span class="rig-frise__libelle">@g.Etape.Titre</span>
-                        @{ var bloquants = RequisManquants(g.Blocs); }
-                        @if (bloquants > 0)
-                        {
-                            <span class="rig-frise__requis-restants">@bloquants requis</span>
-                        }
-                        else
-                        {
-                            <span class="rig-frise__compte">@remplis / @total</span>
-                        }
-                        <span class="rig-frise__jauge">
-                            <span class="rig-frise__jauge-part"
-                                  style="width:@(total == 0 ? 0 : remplis * 100 / total)%"></span>
-                        </span>
-                    </button>
-                </li>
-            }
-            <li class="rig-frise__fleche">
-                <button class="rig-frise__fleche-bouton" title="Etape suivante"
-                        disabled="@(page == groupes.Length - 1 || Filtre.Length > 0)"
-                        @onclick="() => Page = page + 1">&#8250;</button>
-            </li>
-        </ol>
-    }
-
-    @* Le VIDE est un choix, plus un mur : par defaut on ne montre que les
-       champs RENSEIGNES (41 sur 523 dans un dossier courant). *@
-    @if (!ModeTache)
-    {
-        <div class="rig-infos__vue">
-            <button class="rig-infos__vue-choix @(Remplissage == VueRemplie ? "rig-infos__vue-choix--actif" : "")"
-                    @onclick="() => Remplissage = VueRemplie">Renseignes @NombreRemplis</button>
-            <button class="rig-infos__vue-choix @(Remplissage == VueVide ? "rig-infos__vue-choix--actif" : "")"
-                    @onclick="() => Remplissage = VueVide">A saisir @(NombreTotal - NombreRemplis)</button>
-            <button class="rig-infos__vue-choix @(Remplissage == VueTout ? "rig-infos__vue-choix--actif" : "")"
-                    @onclick="() => Remplissage = VueTout">Tous @NombreTotal</button>
-            @if (visibles.Length == 0)
-            {
-                <span class="rig-infos__vue-etat">aucun champ dans cette vue</span>
-            }
-            @* SAISIE GUIDEE : un champ a la fois, au clavier. Elle prend TOUS
-               les champs de l'etape (pas seulement ceux de la vue courante) --
-               on vient la pour remplir, donc les vides sont la matiere. *@
-            <button class="rig-infos__vue-guide @(Guide ? "rig-infos__vue-guide--actif" : "")"
-                    title="Saisir les champs de l'etape un par un, au clavier"
-                    @onclick="BasculerGuide">@(Guide ? "Quitter la saisie guidee" : "Saisie guidee")</button>
-        </div>
-    }
-
-    @if (Guide && !ModeTache && groupes.Length > 0)
-    {
-        var pas = ChampsGuide(groupes[page].Etape);
-        var i = Math.Clamp(PasGuide, 0, Math.Max(0, pas.Length - 1));
-        @if (pas.Length == 0)
-        {
-            <div class="rig-guidee__vide">Cette etape n'a aucun champ a saisir.</div>
-        }
-        else
-        {
-            var courant = pas[i];
-            var cleG = CleDuChamp(courant.Section, courant.Champ);
-            var suivant = i + 1 < pas.Length ? pas[i + 1].Champ.Libelle : "fin de l'etape";
-            @* PARCOURS REQUIS D'ABORD : ChampsGuide met en tete les champs
-               obligatoires (colonnes NOT NULL lues en recette). La jauge se
-               coupe donc en deux : segment ROUGE tant qu'on est dans les
-               obligatoires, gris pour les facultatifs qui suivent. *@
-            var nbRequis = pas.Count(x => EstRequisActif(x.Section, x.Champ));
-            var courantRequis = EstRequisActif(courant.Section, courant.Champ);
-            var partRequis = nbRequis * 100 / pas.Length;
-            <div class="rig-guidee">
-                @* Le FOND de la jauge marque la portion obligatoire du parcours ;
-                   la part qui avance passe du rouge (on est dans les requis) a
-                   l'accent (on est dans les facultatifs). *@
-                <div class="rig-guidee__jauge"
-                     style="background:linear-gradient(90deg,var(--rig-alerte-fond,#f6dcd8) 0 @(partRequis)%,var(--rig-bord) @(partRequis)% 100%)">
-                    <span class="rig-guidee__jauge-part @(courantRequis ? "rig-guidee__jauge-part--requis" : "")"
-                          style="width:@((i + 1) * 100 / pas.Length)%"></span>
-                </div>
-                <div class="rig-kicker">
-                    @if (courantRequis)
-                    {
-                        <span class="rig-guidee__requis">Requis @(i + 1) / @nbRequis</span>
-                        <text> &middot; </text>
-                    }
-                    @groupes[page].Etape.Titre &middot; @courant.Section.Titre
-                    &middot; champ @(i + 1) / @pas.Length
-                </div>
-                <h2 class="rig-guidee__libelle">@courant.Champ.Libelle</h2>
-                <input class="rig-guidee__saisie @(courantRequis ? "rig-guidee__saisie--requis" : "")" @ref="ChampGuide"
-                       value="@ValeurAffichee(cleG)"
-                       @oninput="ev => SaisieGuide = ev.Value?.ToString() ?? string.Empty"
-                       @onkeydown="ev => ClavierGuide(ev, courant.Section, courant.Champ, cleG, pas.Length)" />
-                <div class="rig-guidee__aide">
-                    <span><b>Entree</b> valider et suivant</span>
-                    <span><b>Maj+Entree</b> revenir</span>
-                    <span><b>Echap</b> tout voir</span>
-                    <span class="rig-guidee__suivant">suivant : @suivant</span>
-                </div>
-                <div class="rig-guidee__pied">
-                    <button class="rig-bouton rig-bouton--plat" disabled="@(i == 0)"
-                            @onclick="() => PasGuide = i - 1">&#8249; Precedent</button>
-                    <button class="rig-bouton rig-bouton--plat" disabled="@(i == pas.Length - 1)"
-                            @onclick="() => ValiderGuide(courant.Section, courant.Champ, cleG, pas.Length)">Suivant &#8250;</button>
-                    <span class="rig-guidee__colonne">@cleG</span>
-                </div>
-            </div>
-        }
-    }
-    else
-    {
-    @foreach (var vu in affichees)
-    {
-        var bloc = vu.Section;
-        var champs = vu.Champs;
-        <details class="rig-infos__section" open="true">
-            <summary class="rig-infos__titre">
-                @bloc.Titre
-                <span class="rig-infos__table">@bloc.Table</span>
-                <span class="rig-infos__compte">@champs.Length</span>
-            </summary>
-            <div class="rig-champs">
-                @foreach (var champ in champs)
-                {
-                    var c = champ;
-                    @* Un champ REPETABLE de la tache porte le rang de la ligne
-                       saisie : sans lui, le 2e dirigeant ecraserait le 1er. *@
-                    var cle = CleDuChamp(bloc, c);
-                    <label class="rig-saisie-champ rig-saisie-champ--moitie" title="@c.Processus">
-                        <span class="rig-saisie-champ__libelle">@c.Libelle</span>
-                        <input class="rig-saisie-champ__saisie"
-                               value="@(Verrou && Brouillon.TryGetValue(cle, out var prop) ? prop : ValeurAffichee(cle))"
-                               readonly="@(Verrou && !EnEdition)"
-                               @onchange="ev => Saisir(bloc, c, cle, ev.Value?.ToString() ?? string.Empty)" />
-                        @* Sous le champ : la cle de trace. En infobulle, la
-                           COLONNE REELLE de la base -- « INSPP_PATRONYME »
-                           et non « PATRONYME » (ColonnesRig). *@
-                        @{
-                            var reelle = ColonnesRig.Resoudre(bloc.Table, c.Colonne);
-                        }
-                        <span class="rig-saisie-champ__colonne"
-                              title="@(reelle.Resolue ? $"En base : {reelle}" : cle)">@cle</span>
-                    </label>
-                }
-            </div>
-        </details>
-    }
-    }
-</div>
-}
+<IleReact Composant="FicheInformationsDossier" Proprietes="Proprietes" Rappels="Rappels" />
 
 @code {
-    /// <summary>Le nombre d'etapes REELLEMENT couvertes par ces sections : la
-    /// fiche sert aussi les formalites et les depots, dont les tables ne sont
-    /// pas dans le regroupement du dossier (elles tiennent alors en une).</summary>
-    private int NombreEtapes
-        => Sections.Select(s => EtapesInfoDossier.Rang(s.Table)).Distinct().Count();
-
     [Parameter] public string Numero { get; set; } = "";
     [Parameter] public EventCallback Fermer { get; set; }
     [Parameter] public string Domaine { get; set; } = "Dossier RCS";
@@ -346,244 +48,46 @@ else
     /// <summary>La ligne saisie quand la tache en compte plusieurs (dirigeant 1, 2, 3...).</summary>
     [Parameter] public int LigneCourante { get; set; } = 1;
 
-    /// <summary>
-    /// La cle sous laquelle ce champ est ECRIT dans la trace. Un champ
-    /// repetable de la tache courante porte son rang de ligne ; tous les
-    /// autres gardent « TABLE.COLONNE » -- rien ne change hors tache.
-    /// </summary>
-    private string CleDuChamp(SectionInfoDossier bloc, ChampInfoDossier c)
-    {
-        var champ = Recette?.Champs.FirstOrDefault(
-            x => x.Table == bloc.Table && x.Colonne == c.Colonne);
-        return champ is { Repetable: true }
-            ? RecetteTache.Cle(champ, LigneCourante)
-            : $"{bloc.Table}.{c.Colonne}";
-    }
-
     /// <summary>Etat persistant : porte l'historique des modifications et le journal.</summary>
     [Parameter] public AccueilEtat? Etat { get; set; }
 
-    private bool MenuActions;
-    private bool Historique;
-    private ActionXaction? DerniereAction;
-
-    private void BasculerHistorique()
-    {
-        Historique = !Historique;
-        MenuActions = false;
-    }
-
-    private ModificationChamp[] Entrees()
-        => Etat is not null && Etat.Modifications.TryGetValue(Numero, out var l)
-            ? l.AsEnumerable().Reverse().ToArray()
-            : Array.Empty<ModificationChamp>();
-
-    private void Choisir(ActionXaction a)
-    {
-        MenuActions = false;
-        DerniereAction = a;
-        Etat?.Journaliser(Numero, $"Action {ActionsXaction.Processus} demandee : {a.Libelle} ({a.Code})");
-    }
-
-    /// <summary>
-    /// Ce que le champ AFFICHE. Le dictionnaire local ne connait que ce qui a
-    /// ete tape dans CETTE vue : a la reouverture d'une affaire, ou quand une
-    /// valeur a ete ecrite ailleurs (proposition d'un flux EDI), il est vide
-    /// et le champ paraissait vierge alors que la trace portait deja la
-    /// valeur -- la tache se disait complete devant un formulaire blanc. La
-    /// trace fait donc foi des que la vue n'a rien de plus recent.
-    /// </summary>
-    private string ValeurAffichee(string cle)
-        => Valeurs.TryGetValue(cle, out var v) ? v
-           : Etat?.DerniereValeur(Numero, cle) ?? string.Empty;
-
-    // La trace nomme la LIGNE : « ... > Dirigeants (Dirigeant 2) ». Sans
-    // cela, trois nominations le meme jour produisaient trois lignes
-    // d'historique impossibles a distinguer.
-    private async Task Modifier(SectionInfoDossier bloc, ChampInfoDossier c, string cle, string apres)
-    {
-        var avant = ValeurAffichee(cle);
-        Valeurs[cle] = apres;
-        var ou = $"{Titre} > {bloc.Titre}";
-        if (Recette is not null && cle.Contains('[') && Recette.ARepetition)
-            ou += $" ({Recette.LibelleLigne} {LigneCourante})";
-        Etat?.NoterModification(Numero, new ModificationChamp(DateTime.Now, Environment.UserName,
-            ou, c.Libelle, cle, avant, apres));
-        // La vue qui porte la tache doit recompter ses champs renseignes :
-        // sans ce signal, le bouton « Terminer la tache » resterait grise.
-        await ChampModifie.InvokeAsync();
-    }
-
     /// <summary>Verrou KBIS : actif pour « Informations du dossier » seulement.</summary>
     [Parameter] public bool Verrou { get; set; }
-    private bool EnEdition;
-    // Brouillon de la demande : la valeur en vigueur n'est PAS ecrasee tant
-    // qu'un responsable n'a pas valide (hors maquette).
-    private readonly Dictionary<string, string> Brouillon = new();
-    // Demandes en attente par dossier, pour la session : elles survivent au
-    // changement de noeud (la fiche est recreee).
-    private static readonly Dictionary<string, int> Attentes = new();
-    private bool EnAttente => Attentes.ContainsKey(Numero);
 
-    private async Task Saisir(SectionInfoDossier bloc, ChampInfoDossier c, string cle, string apres)
+    private string? Session;
+    private int Version;
+
+    private global::RigV3Desktop.Pont.ParametresFiche Parametres
+        => new(Numero, Domaine, Titre, Sections, Sources, Recette, LigneCourante, Etat, Verrou);
+
+    /// <summary>
+    /// Premier passage : la session s'ouvre (l'etat initial du composant
+    /// d'origine). Ensuite, a chaque rendu de l'accueil, la session recoit les
+    /// nouveaux parametres et dit si la vue affichee a pu changer.
+    /// </summary>
+    protected override void OnParametersSet()
     {
-        if (!Verrou) { await Modifier(bloc, c, cle, apres); return; }
-        if (!EnEdition) return;
-        if (apres == ValeurAffichee(cle)) Brouillon.Remove(cle); else Brouillon[cle] = apres;
+        if (Session is null)
+            Session = global::RigV3Desktop.Pont.FicheInformationsDossier.Ouvrir(Parametres);
+        else if (global::RigV3Desktop.Pont.FicheInformationsDossier.Parametrer(Session, Parametres))
+            Version++;
     }
 
-    private void AnnulerEdition() { Brouillon.Clear(); EnEdition = false; }
-
-    private void EnvoyerDemande()
+    private Dictionary<string, object?> Proprietes => new()
     {
-        Attentes[Numero] = Brouillon.Count;
-        Brouillon.Clear();
-        EnEdition = false;
-    }
+        ["session"] = Session,
+        ["version"] = Version
+    };
 
-    private static string Initiales(string auteur)
-        => new string(auteur.Split('.', ' ', '_').Where(x => x.Length > 0)
-                            .Take(2).Select(x => char.ToUpperInvariant(x[0])).ToArray());
-
-    private string Filtre = "";
-    private readonly Dictionary<string, string> Valeurs = new();
-
-    /// <summary>Les sections qui ont au moins un champ retenu par le filtre.</summary>
-    private (SectionInfoDossier Section, ChampInfoDossier[] Champs)[] SectionsVisibles()
-        => Sections.Select(s => (Section: s, Champs: s.Champs.Where(c => Garde(s, c)).ToArray()))
-                   .Where(x => x.Champs.Length > 0)
-                   .ToArray();
-
-    private int Page;
-
-    /// <summary>La SAISIE GUIDEE : un champ a la fois, au clavier.</summary>
-    private bool Guide;
-    private int PasGuide;
-    private string SaisieGuide = string.Empty;
-    private ElementReference ChampGuide;
-    private bool RendreFocus;
-
-    private void BasculerGuide()
+    private Dictionary<string, IleReact.RappelIle> Rappels => new()
     {
-        Guide = !Guide;
-        PasGuide = 0;
-        SaisieGuide = string.Empty;
-        RendreFocus = Guide;
-    }
+        ["fermer"] = IleReact.Rappel(Fermer),
+        ["toutAffiche"] = IleReact.Rappel(ToutAffiche),
+        ["champModifie"] = IleReact.Rappel(ChampModifie)
+    };
 
-    /// <summary>Tous les champs de l'etape, a plat, dans l'ordre des blocs.</summary>
-    private (SectionInfoDossier Section, ChampInfoDossier Champ)[] ChampsGuide(EtapeInfoDossier etape)
-        => Sections.Where(s => etape.Tables.Contains(s.Table))
-                   .SelectMany(s => s.Champs.Where(c => GardeTache(s, c))
-                                            .Select(c => (Section: s, Champ: c)))
-                   .OrderByDescending(x => EstRequisActif(x.Section, x.Champ))
-                   .ToArray();
-
-    /// <summary>Vrai quand ce bloc porte deja au moins une valeur. Un bloc
-    /// VIERGE ne reclame pas ses obligatoires : sinon un dossier personne
-    /// morale exigerait un patronyme d'inscrit personne physique, et un
-    /// dossier sans dirigeant une fonction de dirigeant.</summary>
-    private bool BlocEntame(SectionInfoDossier s)
-        => s.Champs.Any(c => EstRempli(s, c));
-
-    /// <summary>Un champ obligatoire QUI S'APPLIQUE a ce dossier : la colonne
-    /// est NOT NULL en base (ChampsRequisDossier), elle n'est pas ecrite par
-    /// le systeme, et son bloc est actif.</summary>
-    private bool EstRequisActif(SectionInfoDossier s, ChampInfoDossier c)
-        => ChampsRequisDossier.EstRequis(s.Table, c.Colonne)
-           && (!ChampsRequisDossier.BlocConditionnel(s.Table) || BlocEntame(s));
-
-    /// <summary>Les obligatoires encore VIDES d'une etape : ce qui bloque.</summary>
-    private int RequisManquants((SectionInfoDossier Section, ChampInfoDossier[] Champs)[] blocs)
-        => blocs.Sum(b => b.Section.Champs.Count(
-               c => EstRequisActif(b.Section, c) && !EstRempli(b.Section, c)));
-
-    /// <summary>Entree passe au suivant, Maj+Entree revient, Echap sort.</summary>
-    private async Task ClavierGuide(KeyboardEventArgs ev, SectionInfoDossier s,
-                                    ChampInfoDossier c, string cle, int total)
+    public void Dispose()
     {
-        if (ev.Key == "Escape") { BasculerGuide(); return; }
-        if (ev.Key != "Enter") return;
-        if (ev.ShiftKey) { PasGuide = Math.Max(0, PasGuide - 1); SaisieGuide = string.Empty; RendreFocus = true; return; }
-        await ValiderGuide(s, c, cle, total);
+        if (Session is not null) global::RigV3Desktop.Pont.FicheInformationsDossier.Fermer(Session);
     }
-
-    /// <summary>Ecrit la valeur tapee (si elle a change) puis avance d'un champ.</summary>
-    private async Task ValiderGuide(SectionInfoDossier s, ChampInfoDossier c, string cle, int total)
-    {
-        if (SaisieGuide.Length > 0 && SaisieGuide != ValeurAffichee(cle))
-            await Modifier(s, c, cle, SaisieGuide);
-        SaisieGuide = string.Empty;
-        PasGuide = Math.Min(total - 1, PasGuide + 1);
-        RendreFocus = true;
-    }
-
-    /// <summary>Le champ guide prend le focus : sans cela, il faudrait
-    /// cliquer dans la case apres chaque Entree -- la saisie au clavier
-    /// perdrait tout son interet.</summary>
-    protected override async Task OnAfterRenderAsync(bool premier)
-    {
-        if (!RendreFocus) return;
-        RendreFocus = false;
-        try { await ChampGuide.FocusAsync(); } catch { /* le champ n'est pas rendu */ }
-    }
-
-    /// <summary>Les trois vues de remplissage (voir .rig-infos__vue).</summary>
-    public const int VueRemplie = 0;
-    public const int VueVide = 1;
-    public const int VueTout = 2;
-
-    /// <summary>La vue courante. On ouvre sur les champs RENSEIGNES : afficher
-    /// d'emblee les 523 champs (dont ~480 vides) etait le vrai defaut de cette
-    /// fiche -- un mur de cases avant toute lecture.</summary>
-    private int Remplissage = VueRemplie;
-
-    /// <summary>Vrai quand ce champ porte deja une valeur (vue ou trace).</summary>
-    private bool EstRempli(SectionInfoDossier s, ChampInfoDossier c)
-        => ValeurAffichee(CleDuChamp(s, c)).Length > 0;
-
-    /// <summary>Avancement d'une etape : champs renseignes sur total.</summary>
-    private (int Remplis, int Total) Avancement((SectionInfoDossier Section, ChampInfoDossier[] Champs)[] blocs)
-    {
-        var total = 0; var remplis = 0;
-        foreach (var b in blocs)
-            foreach (var c in b.Section.Champs)
-            {
-                total++;
-                if (EstRempli(b.Section, c)) remplis++;
-            }
-        return (remplis, total);
-    }
-
-    private int NombreTotal => Sections.Sum(s => s.Champs.Length);
-    private int NombreRemplis => Sections.Sum(s => s.Champs.Count(c => EstRempli(s, c)));
-
-    /// <summary>Vrai quand l'utilisateur a rouvert la fiche entiere depuis la tache.</summary>
-    private bool TousChamps;
-
-    private async Task BasculerTousChamps()
-    {
-        TousChamps = !TousChamps;
-        Page = 0;
-        if (TousChamps) await ToutAffiche.InvokeAsync();
-    }
-
-    private bool Garde(SectionInfoDossier s, ChampInfoDossier c)
-        => GardeTache(s, c)
-           && GardeRemplissage(s, c)
-           && (Filtre.Length == 0
-               || c.Libelle.Contains(Filtre, StringComparison.OrdinalIgnoreCase)
-               || c.Colonne.Contains(Filtre, StringComparison.OrdinalIgnoreCase));
-
-    /// <summary>La vue de remplissage retenue. Le mode tache et un filtre texte
-    /// la neutralisent : on cherche alors un champ PRECIS, rempli ou non.</summary>
-    private bool GardeRemplissage(SectionInfoDossier s, ChampInfoDossier c)
-        => ModeTache || Filtre.Length > 0 || Remplissage == VueTout
-           || (Remplissage == VueRemplie) == EstRempli(s, c);
-
-    /// <summary>Vrai quand la fiche est restreinte aux champs de la tache.</summary>
-    private bool ModeTache => Recette is not null && !TousChamps;
-
-    private bool GardeTache(SectionInfoDossier s, ChampInfoDossier c)
-        => Recette is null || TousChamps || Recette.GardeChamp(s.Table, c.Colonne);
 }

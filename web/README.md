@@ -204,6 +204,46 @@ Home.razor ──> Components/Ecrans/EcranX.razor (COQUILLE, mêmes paramètres)
   jetable, qui envoie l'arbre à un petit serveur local, fait l'affaire — à
   retirer avant tout commit.
 
+## Ajouts du lot 6 (composants de l'accueil : arbre, fiche, Kbis, icônes, fenêtre détachée)
+
+- **Composants, pas écrans** : `src/composants/<Nom>.tsx`, montés par leur
+  coquille `Components/<Nom>.razor` (mêmes `[Parameter]`). Home.razor et
+  `FenetreDocument` (racine `DocumentDetacheVue`) n'ont pas changé.
+- **Paramètres vivants** (HashSet des nœuds ouverts, `AccueilEtat`, la fonction
+  `Lire` du Kbis, l'emplacement de `DocumentPartage`) : ils ne traversent pas.
+  La coquille appelle elle-même `Pont/<Nom>.Vue(...)` (C# simple, sans
+  `[JSInvokable]`) et passe la vue calculée en `Proprietes` ; `IleReact` ne
+  renvoie que si le JSON change. C'est le cas d'`ArbreGedNoeud`, `ApercuKbis`,
+  `DocumentDetacheVue` (abonnée à `Emplacement.Change`).
+- **Composant récursif** (`ArbreGedNoeud`) : UNE île à la racine, la récursion
+  est dans le `.tsx`. Chaque ligne porte un identifiant d'IDENTITÉ
+  (`ConditionalWeakTable`, car `NoeudGed` est un record à égalité de valeur) ;
+  la coquille retrouve le nœud d'un geste par l'index rempli au dernier rendu,
+  puis lève l'`EventCallback` d'origine (tuple `(NoeudGed, MouseEventArgs)` refait
+  côté C#).
+- **Session ouverte par la coquille** (`FicheInformationsDossier`, comme
+  `EcranTachesLot`) : `Parametrer` rend vrai seulement si ce que la vue lit HORS
+  session a changé (paramètres par identité + trace du dossier) — la coquille
+  incrémente alors `version`. Sans ça, chaque rendu de l'accueil (minuteries
+  comprises) ferait relire la vue. Les `EventCallback` levés par un geste
+  (`ChampModifie`, `ToutAffiche`) reviennent dans `vue.rappels` ; React les
+  remonte à la coquille, même si la vue de ce geste est dépassée.
+- **`@onchange`** d'un champ : `Saisie` avec `quand="change"` (`src/session.tsx`).
+- **Même `<input>` réutilisé par Razor** : en saisie guidée, le texte tapé
+  restait affiché dans le champ suivant sans y être écrit (capture « avant » du
+  19/11). Le `.tsx` recrée le champ par `key={cle}` : c'est le seul écart voulu
+  avec la capture d'avant.
+- **Icônes SVG** : les mêmes chaînes que la `MarkupString` du `.razor`, posées par
+  `dangerouslySetInnerHTML` (constantes du fichier, jamais une saisie).
+- **Table sans `<tbody>`** dans le `.razor` : le `.tsx` l'écrit (le navigateur
+  crée de toute façon ce groupe de lignes ; React refuse `<tr>` sous `<table>`).
+- **Parcours de captures** rejoué à l'identique avant/après : 24 états (fiche,
+  menu, historique, verrou, saisie guidée, arbre replié/filtré, renommage,
+  menu « ⋮ », fenêtre détachée et zoom). Deux passages : 20 états à 0 pixel à
+  chaque fois ; le reste = l'écart voulu ci-dessus, 3 pixels de teinte ≤ 2/255 au
+  bord de l'arbre, et selon le passage un curseur de saisie qui clignote ou
+  l'anneau animé d'une tuile de l'accueil (teinte 1/255) — hors de ce lot.
+
 ## Commandes
 
 | Commande (dans `web/`) | Effet |

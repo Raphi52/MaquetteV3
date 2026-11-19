@@ -21,6 +21,9 @@
     <Compile Include="../../Metier/ColonnesRig.cs" Link="ColonnesRig.cs" />
     <Compile Include="../../Metier/AlertesGreffe.cs" Link="AlertesGreffe.cs" />
     <Compile Include="../../Metier/ActionsXaction.cs" Link="ActionsXaction.cs" />
+    <!-- Arbre porte en React le 19/11/2026 (lot 6) : son pont est execute ici. -->
+    <Compile Include="../../Metier/FiltreArbre.cs" Link="FiltreArbre.cs" />
+    <Compile Include="../../Pont/ArbreGedNoeud.cs" Link="Pont/ArbreGedNoeud.cs" />
   </ItemGroup>
 
 </Project>

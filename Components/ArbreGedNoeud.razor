@@ -1,4 +1,7 @@
-﻿@* ============================================================
+﻿@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Web
+
+@* ============================================================
    Une ligne de l'arbre GED, et ses enfants par recursion.
 
    L'arbre de RIG v2 (PROC_VDOSSIER/Control/TreeviewGed) est un vrai
@@ -6,68 +9,22 @@
    dossier en compte (Judiciaire > Ordonnances > Demandeur > piece). Un
    composant qui s'appelle lui-meme rend cette profondeur sans la
    plafonner ; l'ancienne liste plate de categories ne le pouvait pas.
+
+   PORTE EN REACT (lot 6 de la migration, 19/11/2026) : l'arbre est rendu
+   par web/src/composants/ArbreGedNoeud.tsx, qui s'appelle lui-meme pour
+   chaque enfant ; ses regles (enfants visibles, filtre, branches ouvertes,
+   chemin, repli au clic) vivent dans Pont/ArbreGedNoeud.cs. Ce fichier
+   n'est plus qu'une COQUILLE : il garde ses parametres d'origine pour que
+   Home.razor ne change pas.
+
+   Pourquoi la coquille calcule la vue : ses parametres sont des objets
+   VIVANTS de l'accueil (HashSet des noeuds ouverts, ajouts, masques,
+   libelles renommes) qui ne traversent pas vers React. Elle les passe au
+   pont, envoie la ligne racine a React, et retrouve le noeud de chaque geste
+   par son identifiant. Mode d'emploi : web/README.md.
    ============================================================ *@
 
-@* CHEMIN : la ligne ou l'on se trouve, et TOUS ses parents, portent un
-   filet a gauche -- on lit d'un coup d'oeil ou l'on est dans le dossier,
-   sans deplier ni compter les retraits. *@
-<div class="rig-arbre__ligne @(ReferenceEquals(Selection, Noeud) ? "rig-arbre__ligne--actif" : "") @(SurLeChemin ? "rig-arbre__ligne--chemin" : "")"
-     style="--rig-arbre-niveau:@Niveau"
-     @onclick="Activer">
-    <span class="rig-arbre__libelle">
-        @if (EnfantsAffiches.Count > 0)
-        {
-            <span class="rig-arbre__chevron @(Ouvert ? "rig-arbre__chevron--ouvert" : "")">&#9656;</span>
-        }
-        else
-        {
-            <span class="rig-arbre__chevron rig-arbre__chevron--vide"></span>
-        }
-        <IconeGed Nature="@AccesGed.CodeIcone(Noeud)" Classe="rig-arbre__icone" />
-        @if (ReferenceEquals(Renomme, Noeud))
-        {
-            @* Renommage SUR PLACE : c'est ici qu'on nomme un element cree,
-               plutot que dans un champ de la fenetre de creation. *@
-            <input class="rig-arbre__saisie" value="@Texte" autofocus
-                   @onclick:stopPropagation="true"
-                   @onchange="ev => Valider(ev.Value?.ToString())"
-                   @onkeydown="Touche" />
-        }
-        else
-        {
-            <span class="rig-arbre__texte">@Texte</span>
-        }
-        @if (EnfantsVisibles.Count > 0 && Noeud.NbPieces > 0)
-        {
-            <span class="rig-arbre__compte">(@Noeud.NbPieces)</span>
-        }
-    </span>
-    @* ACTIONS : trois points a DROITE de la ligne, comme la liste des
-       conversations d'Autowin OS. Le clic droit etait invisible -- rien
-       a l'ecran ne disait qu'un menu existait. Le bouton reste discret
-       (revele au survol ou quand son menu est ouvert). *@
-    <button type="button" class="rig-arbre__actions" title="Actions"
-            aria-label="Actions sur @Texte"
-            @onclick="ev => MenuContextuel.InvokeAsync((Noeud, ev))"
-            @onclick:stopPropagation="true">&#8942;</button>
-</div>
-
-@if (Ouvert)
-{
-    @foreach (var enfant in EnfantsAffiches)
-    {
-        <ArbreGedNoeud Noeud="enfant" Niveau="Niveau + 1" Ouverts="Ouverts"
-                       Selection="Selection" Selectionner="Selectionner"
-                       Domaines="Domaines" Ajouts="Ajouts" Masques="Masques"
-                       Recette="Recette" Filtre="@Filtre"
-                       Libelles="Libelles" Renomme="Renomme"
-                       Renommer="Renommer" MenuContextuel="MenuContextuel" />
-    }
-    @if (EnfantsVisibles.Count == 0 && string.IsNullOrWhiteSpace(Filtre) && !Noeud.EstPiece && !Noeud.EstFiche)
-    {
-        <div class="rig-arbre__vide" style="--rig-arbre-niveau:@(Niveau + 1)">aucune piece</div>
-    }
-}
+<IleReact Composant="ArbreGedNoeud" Proprietes="Proprietes" Rappels="Rappels" />
 
 @code {
     [Parameter, EditorRequired] public NoeudGed Noeud { get; set; } = default!;
@@ -100,61 +57,72 @@
     /// <summary>Bouton « trois points » d'une ligne : ouvre le menu des operations.</summary>
     [Parameter] public EventCallback<(NoeudGed Noeud, MouseEventArgs Souris)> MenuContextuel { get; set; }
 
-    private string Texte
-        => Libelles is not null && Libelles.TryGetValue(Noeud, out var l) ? l : Noeud.Libelle;
-
-    private Task Valider(string? texte) => Renommer.InvokeAsync((Noeud, texte ?? ""));
-
-    private async Task Touche(KeyboardEventArgs ev)
-    {
-        if (ev.Key == "Escape") await Renommer.InvokeAsync((Noeud, ""));
-    }
-
-    private IReadOnlyList<NoeudGed> EnfantsVisibles
-        => AccesGed.EnfantsVisibles(Noeud, Domaines, Ajouts, Masques, Recette);
-
     /// <summary>Texte de la barre de recherche au-dessus de l'arbre : seules les
     /// branches dont un element porte ce texte restent affichees.</summary>
     [Parameter] public string? Filtre { get; set; }
 
-    /// <summary>Les enfants rendus : les visibles, restreints par le filtre.</summary>
-    private IReadOnlyList<NoeudGed> EnfantsAffiches
-        => string.IsNullOrWhiteSpace(Filtre)
-            ? EnfantsVisibles
-            : EnfantsVisibles.Where(n => Correspond(n, FiltreArbre.Normaliser(Filtre))).ToList();
+    /// <summary>Les noeuds rendus au dernier rendu, par identifiant : un geste de React les nomme ainsi.</summary>
+    private Dictionary<string, NoeudGed> Index = new(StringComparer.Ordinal);
 
-    /// <summary>Le noeud porte le texte cherche, ou l'un de ses descendants visibles.</summary>
-    private bool Correspond(NoeudGed n, string cle)
+    private Dictionary<string, object?> Proprietes
     {
-        var texte = Libelles is not null && Libelles.TryGetValue(n, out var l) ? l : n.Libelle;
-        if (FiltreArbre.Normaliser(texte).Contains(cle)) return true;
-        return AccesGed.EnfantsVisibles(n, Domaines, Ajouts, Masques, Recette).Any(e => Correspond(e, cle));
+        get
+        {
+            var index = new Dictionary<string, NoeudGed>(StringComparer.Ordinal);
+            var ligne = global::RigV3Desktop.Pont.ArbreGedNoeud.Vue(
+                Noeud, Niveau, Ouverts, Selection, Domaines, Ajouts, Masques, Libelles,
+                Recette, Renomme, Filtre, index);
+            Index = index;
+            return new() { ["ligne"] = ligne };
+        }
     }
 
-    // Pendant une recherche, les branches qui menent a un resultat s'ouvrent
-    // seules : un resultat cache sous un dossier replie n'est pas trouve.
-    private bool Ouvert => Ouverts.Contains(Noeud)
-                           || (!string.IsNullOrWhiteSpace(Filtre) && EnfantsAffiches.Count > 0);
-
-    /// <summary>
-    /// Ce noeud est-il un PARENT du noeud selectionne ? La comparaison porte
-    /// sur l'identite du noeud, pas sur son libelle : deux dossiers peuvent
-    /// porter le meme nom a deux endroits de l'arbre.
-    /// </summary>
-    private bool SurLeChemin
-        => Selection is not null
-           && !ReferenceEquals(Selection, Noeud)
-           && Noeud.Descendants().Any(d => ReferenceEquals(d, Selection));
-
-    private async Task Activer()
+    private Dictionary<string, IleReact.RappelIle> Rappels => new()
     {
-        // Un dossier se replie/se deplie ; une piece se selectionne. Un
-        // dossier vide reste depliable : c'est ainsi que v2 montre
-        // « aucune piece » plutot que de cacher le dossier.
-        if (!Noeud.EstFiche && (EnfantsVisibles.Count > 0 || !Noeud.EstPiece))
+        ["activer"] = new(v => Activer(v.GetString())),
+        ["renommer"] = new(v => Valider(v.Deserialize<Renommage>(Json))),
+        ["menuContextuel"] = new(v => Menu(v.Deserialize<Souris>(Json)))
+    };
+
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+    private sealed record Renommage(string Id, string Texte);
+
+    private sealed record Souris(string Id, double ClientX, double ClientY, double ScreenX, double ScreenY,
+                                 double OffsetX, double OffsetY, double PageX, double PageY,
+                                 long Button, long Buttons, long Detail,
+                                 bool CtrlKey, bool ShiftKey, bool AltKey, bool MetaKey);
+
+    private NoeudGed? Trouver(string? id) => id is not null && Index.TryGetValue(id, out var n) ? n : null;
+
+    // Un dossier se replie/se deplie ; une piece se selectionne (Pont/ArbreGedNoeud.Activer).
+    private async Task Activer(string? id)
+    {
+        if (Trouver(id) is not { } noeud) return;
+        global::RigV3Desktop.Pont.ArbreGedNoeud.Activer(noeud, Ouverts, Domaines, Ajouts, Masques, Recette);
+        await Selectionner.InvokeAsync(noeud);
+        StateHasChanged();
+    }
+
+    private async Task Valider(Renommage? r)
+    {
+        if (r is null || Trouver(r.Id) is not { } noeud) return;
+        await Renommer.InvokeAsync((noeud, r.Texte ?? ""));
+        StateHasChanged();
+    }
+
+    private async Task Menu(Souris? s)
+    {
+        if (s is null || Trouver(s.Id) is not { } noeud) return;
+        var souris = new MouseEventArgs
         {
-            if (!Ouverts.Add(Noeud)) Ouverts.Remove(Noeud);
-        }
-        await Selectionner.InvokeAsync(Noeud);
+            Type = "click",
+            ClientX = s.ClientX, ClientY = s.ClientY, ScreenX = s.ScreenX, ScreenY = s.ScreenY,
+            OffsetX = s.OffsetX, OffsetY = s.OffsetY, PageX = s.PageX, PageY = s.PageY,
+            Button = s.Button, Buttons = s.Buttons, Detail = s.Detail,
+            CtrlKey = s.CtrlKey, ShiftKey = s.ShiftKey, AltKey = s.AltKey, MetaKey = s.MetaKey
+        };
+        await MenuContextuel.InvokeAsync((noeud, souris));
+        StateHasChanged();
     }
 }

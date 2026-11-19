@@ -112,7 +112,16 @@ foreach (var appel in new[] { "MemoriserArbre();", "PoserLibelle(" })
     Exiger(vue.Contains(appel), $"Home.razor appelle {appel}");
 
 // ---------- Kbis : greffe, denomination et adresse du siege VIENNENT DU FORMULAIRE ----------
-var kbis = File.ReadAllText(Path.Combine(racine, "Components/ApercuKbis.razor"));
+// PORTE EN REACT (lot 6, 19/11/2026) : Components/ApercuKbis.razor n'est plus
+// qu'une coquille. Les valeurs de l'extrait se calculent dans Pont/ApercuKbis.cs
+// (lu ET execute ci-dessous), la mise en page dans web/src/composants/ApercuKbis.tsx.
+var coquilleKbis = File.ReadAllText(Path.Combine(racine, "Components/ApercuKbis.razor"));
+var tsxKbis = File.ReadAllText(Path.Combine(racine, "web/src/composants/ApercuKbis.tsx"));
+var kbis = File.ReadAllText(Path.Combine(racine, "Pont/ApercuKbis.cs"));
+Exiger(coquilleKbis.Contains("<IleReact Composant=\"ApercuKbis\"")
+       && coquilleKbis.Contains("ApercuKbis.Vue(Numero, Siren, Denomination, Lire)")
+       && tsxKbis.Contains("className=\"rig-kbis\""),
+    "la coquille du Kbis passe la lecture du formulaire au pont et monte l'extrait React");
 Exiger(vue.Contains("\"INSPM_DENOMINATION_STATUT\""),
     "le formulaire porte la denomination statutaire (INSCRIT_PM.DENOMINATION_STATUT)");
 Exiger(vue.Contains("\"ETBLS_ID_ADRBS\""),
@@ -123,8 +132,36 @@ Exiger(kbis.Contains("Val(\"IDENTITE\", \"INSPM_DENOMINATION_STATUT\""),
     "le Kbis imprime la denomination SAISIE");
 Exiger(kbis.Contains("(\"Adresse du siege\", Val(\"SIEGE\", \"ETBLS_ID_ADRBS\"))"),
     "le Kbis imprime l'adresse du siege, et non le TYPE d'adresse");
-Exiger(!kbis.Contains("\"Greffe du Tribunal de Commerce d'Amiens\""),
+Exiger(!(kbis + tsxKbis + coquilleKbis).Contains("Greffe du Tribunal de Commerce d'Amiens"),
     "le greffe n'est plus ecrit en dur dans l'apercu Kbis");
+
+// L'extrait calcule par le pont, sur un formulaire saisi.
+var saisieKbis = new Dictionary<(string, string), string>
+{
+    [("SIEGE", "ETBLS_CODE_GREFFE")] = "7501 - PARIS",
+    [("IDENTITE", "INSPM_DENOMINATION_STATUT")] = "NOUVELLE SAS",
+    [("IDENTITE", "DSSRC_DATE_IMMAT")] = "2014-03-12",
+    [("SIEGE", "ETBLS_ID_ADRBS")] = "3 rue de Rivoli 75001 PARIS",
+    [("CAPITAL", "CPTL_MONTANT")] = "10000",
+};
+string LireKbis(string etape, string colonne) => saisieKbis.TryGetValue((etape, colonne), out var v) ? v : "";
+var extrait = RigV3Desktop.Pont.ApercuKbis.Vue("004176", "812 445 901", "SCI DU PARC", LireKbis);
+string? Ligne(string titre) => extrait.Sections.SelectMany(x => x.Lignes).FirstOrDefault(l => l.Titre == titre)?.Libelle;
+Exiger(extrait.GreffeLibelle == Greffes.Trouver("7501 - PARIS").Libelle && extrait.VilleRcs == "PARIS"
+       && Ligne("Immatriculation au RCS, numero") == "812 445 901 R.C.S. PARIS",
+    "le Kbis calcule prend l'entete et la ville du greffe SAISI (execute)");
+Exiger(Ligne("Denomination ou raison sociale") == "NOUVELLE SAS"
+       && Ligne("Adresse du siege") == "3 rue de Rivoli 75001 PARIS"
+       && Ligne("Date d'immatriculation") == "12/03/2014",
+    "le Kbis calcule imprime la denomination, l'adresse et la date saisies (execute)");
+Exiger(Ligne("Capital social") == 10000m.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("fr-FR")) + " EUR"
+       && extrait.Gestion == "—"
+       && extrait.Sections.Length == 1,
+    "le capital en N2 fr-FR, la gestion par defaut, et les sections vides masquees comme la XSL (execute)");
+var sansSaisie = RigV3Desktop.Pont.ApercuKbis.Vue("004176", "812 445 901", "SCI DU PARC", (_, _) => "");
+Exiger(sansSaisie.GreffeLibelle == Greffes.Defaut.Libelle
+       && sansSaisie.Sections.Single().Lignes.Single(l => l.Titre == "Denomination ou raison sociale").Libelle == "SCI DU PARC",
+    "sans saisie, le greffe par defaut et la denomination de l'affaire (execute)");
 Exiger(Greffes.Trouver("8001 - AMIENS").Ville == "AMIENS", "le code greffe saisi retrouve son greffe");
 Exiger(Greffes.Trouver("7501 - PARIS").Libelle.Contains("Paris"), "un autre greffe change l'entete");
 Exiger(Greffes.Trouver("").Code == Greffes.Defaut.Code, "sans saisie, l'entete garde le greffe par defaut");

@@ -105,17 +105,76 @@ try
     Exiger(ActionsXaction.Liste.Length == 20 && ActionsXaction.Liste[0].Code == "1GDMNX"
            && ActionsXaction.Liste[^1].Code == "XVERIF",
         "le menu Actions porte les 20 actions (nature A) du processus XACTION lues en base");
-    var fiche = File.ReadAllText(Path.Combine(AppContext.BaseDirectory,
-        "../../../../../Components/FicheInformationsDossier.razor"));
+    // PORTE EN REACT (lot 6, 19/11/2026) : Components/FicheInformationsDossier.razor
+    // n'est plus qu'une coquille. Le champ se dessine dans
+    // web/src/composants/FicheInformationsDossier.tsx et remonte sa valeur a la
+    // session de Pont/FicheInformationsDossier.cs, ou vivent Saisir et Modifier :
+    // les regles se lisent la, et la session est EXECUTEE juste apres.
+    var racineFiche = Path.Combine(AppContext.BaseDirectory, "../../../../../");
+    var tsxFiche = File.ReadAllText(Path.Combine(racineFiche, "web/src/composants/FicheInformationsDossier.tsx"));
+    var fiche = File.ReadAllText(Path.Combine(racineFiche, "Pont/FicheInformationsDossier.cs"));
     // Verrou KBIS (18/09/2026) : le champ passe par Saisir, qui rend la main
     // a Modifier hors verrou ; une demande en attente n'est PAS une modification.
-    Exiger(fiche.Contains("@onchange=\"ev => Saisir(bloc, c, cle,")
-           && Regex.IsMatch(fiche, @"Task Saisir[\s\S]{0,200}?if \(!Verrou\) \{ await Modifier\(bloc, c, cle, apres\)")
+    Exiger(tsxFiche.Contains("quand=\"change\" changer={(texte) => geste('saisir', { s: bloc.s, c: c.c, valeur: texte })}")
+           && Regex.IsMatch(fiche, @"case ""saisir"":[\s\S]{0,300}?Saisir\(bloc, c, CleDuChamp\(bloc, c\),")
+           && Regex.IsMatch(fiche, @"void Saisir[\s\S]{0,200}?if \(!Verrou\) \{ Modifier\(bloc, c, cle, apres\)")
            && Regex.IsMatch(fiche, @"(void|async Task) Modifier[\s\S]{0,500}?Etat\?\.NoterModification\("),
-        // fix-ok: Modifier est passee en async Task (await ChampModifie.InvokeAsync) ; le banc n acceptait que void
         "chaque saisie du formulaire passe par l historique");
-    Exiger(Regex.IsMatch(fiche, @"@if \(Historique\)[\s\S]{0,2000}?rig-histo__avant[\s\S]{0,1500}?else\s*\{"),
+    Exiger(Regex.IsMatch(tsxFiche, @"\{vue\.historique \? \([\s\S]{0,2000}?rig-histo__avant[\s\S]{0,1500}?\) : \("),
         "le bouton Historique remplace le formulaire par le journal");
+
+    // La session de la fiche, EXECUTEE comme la coquille et React la jouent.
+    // Son etat ecrit dans un fichier jetable (RIGV3_ETAT), jamais dans celui
+    // de l'utilisateur.
+    var etatAvantFiche = Environment.GetEnvironmentVariable("RIGV3_ETAT");
+    var etatFicheBanc = Path.Combine(Path.GetTempPath(), "rigv3-saisiecheck-fiche-" + Guid.NewGuid().ToString("N") + ".json");
+    Environment.SetEnvironmentVariable("RIGV3_ETAT", etatFicheBanc);
+    try
+    {
+        var hf = new AccueilEtat();
+        var jsonFiche = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+        System.Text.Json.JsonElement J(object? o) => System.Text.Json.JsonSerializer.SerializeToElement(o, jsonFiche);
+        RigV3Desktop.Pont.ParametresFiche Pf(bool verrou)
+            => new("0000", "Dossier RCS", InformationsDossier.LibelleNoeud, InformationsDossier.Sections,
+                   InformationsDossier.ProcessusSources, null, 1, hf, verrou);
+        var bloc0 = InformationsDossier.Sections[0];
+        var cle0 = $"{bloc0.Table}.{bloc0.Champs[0].Colonne}";
+        bool Montre(RigV3Desktop.Pont.VueFiche v, string valeur)
+            => v.Sections.SelectMany(x => x.Champs).Any(ch => ch.Cle == cle0 && ch.Valeur == valeur);
+
+        var libre = RigV3Desktop.Pont.FicheInformationsDossier.Ouvrir(Pf(false));
+        var saisie = RigV3Desktop.Pont.FicheInformationsDossier.Agir(libre, "saisir", J(new { s = 0, c = 0, valeur = "Actif" }));
+        Exiger(hf.Modifications["0000"].Last() is { Avant: "", Apres: "Actif" } m0 && m0.Colonne == cle0
+               && m0.Element == $"{InformationsDossier.LibelleNoeud} > {bloc0.Titre}"
+               && saisie.Rappels.SequenceEqual(["champModifie"]) && Montre(saisie, "Actif"),
+            "une saisie hors verrou est ECRITE dans l historique et leve ChampModifie (execute)");
+
+        var ecritures = hf.Modifications["0000"].Count;
+        var verrou = RigV3Desktop.Pont.FicheInformationsDossier.Ouvrir(Pf(true));
+        var lecture = RigV3Desktop.Pont.FicheInformationsDossier.Agir(verrou, "saisir", J(new { s = 0, c = 0, valeur = "Radie" }));
+        Exiger(lecture.LectureSeule && lecture.Verrou is { EnEdition: false, EnAttente: false }
+               && hf.Modifications["0000"].Count == ecritures && lecture.Rappels.Length == 0 && Montre(lecture, "Actif"),
+            "verrou KBIS : la fiche s ouvre en lecture seule, une frappe n ecrit rien (execute)");
+        RigV3Desktop.Pont.FicheInformationsDossier.Agir(verrou, "demanderModification", J(null));
+        var brouillon = RigV3Desktop.Pont.FicheInformationsDossier.Agir(verrou, "saisir", J(new { s = 0, c = 0, valeur = "Radie" }));
+        var envoi = RigV3Desktop.Pont.FicheInformationsDossier.Agir(verrou, "envoyerDemande", J(null));
+        Exiger(brouillon.Verrou is { EnEdition: true, Brouillon: 1 } && !brouillon.LectureSeule && Montre(brouillon, "Radie")
+               && envoi.Verrou is { EnAttente: true, Attente: 1 }
+               && hf.Modifications["0000"].Count == ecritures && Montre(envoi, "Actif"),
+            "une demande en attente n est PAS une modification : la trace et le KBIS restent ceux en vigueur (execute)");
+
+        var histo = RigV3Desktop.Pont.FicheInformationsDossier.Agir(libre, "historique", J(null));
+        Exiger(histo.Historique && histo.Entrees.Length == ecritures && histo.Entrees[0].Apres == "Actif"
+               && histo.Entrees[0].Avant == "(vide)",
+            "le bouton Historique montre le journal, le plus recent en tete (execute)");
+        RigV3Desktop.Pont.FicheInformationsDossier.Fermer(libre);
+        RigV3Desktop.Pont.FicheInformationsDossier.Fermer(verrou);
+    }
+    finally
+    {
+        Environment.SetEnvironmentVariable("RIGV3_ETAT", etatAvantFiche);
+        try { File.Delete(etatFicheBanc); } catch (IOException) { }
+    }
     Exiger(Regex.Matches(vue, @"<FicheInformationsDossier Numero=""@DossierOuvert.Numero"" Etat=""Etat""").Count >= 2,
         "la vue transmet l etat au formulaire");
 }
