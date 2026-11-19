@@ -20,8 +20,9 @@ namespace RigV3Desktop.Pont;
 /// <param name="SirenInconnu">Le SIREN tape quand rien ne lui repond : la palette propose d'ouvrir un dossier.</param>
 /// <param name="Ecrans">Les ecrans du menu dont le nom porte ce qui est tape (« facture », « trans »).</param>
 /// <param name="Elements">Les elements de l'arbre dont le LIBELLE porte ce qui est tape (n° de depot, de formalite).</param>
-/// <param name="Ancree">Ouverte depuis la barre de recherche de l'accueil : elle pend SOUS la barre,
-/// en liste deroulante. Sinon (Ctrl K depuis un ecran), elle flotte au milieu.</param>
+/// <param name="Ancree">Ouverte SUR L'ACCUEIL (sa barre de recherche, ou Ctrl K quand rien ne le
+/// recouvre) : elle pend SOUS la barre, en liste deroulante. Sur un ecran ou une affaire, elle
+/// flotte au milieu.</param>
 public sealed record PaletteVue(string Texte, string Filtre, FiltrePaletteVue[] Filtres, AgentPaletteVue Moi,
                                 AgentPaletteVue[] Agents, TravailPaletteVue[] Travail, int TravailTrouve,
                                 PiecePaletteVue[] Pieces, string DossierDesPieces, string NumeroDesPieces,
@@ -89,7 +90,9 @@ public sealed partial class SessionPlanTravail
         {
             // Chaque ouverture repart d'une saisie vide : Ctrl K est un nouveau
             // « je cherche », pas la reprise de la recherche d'avant.
-            case "paletteOuvrir": OuvrirPalette(); break;
+            // Sur l'accueil, Ctrl K deroule la palette sous SA barre de recherche,
+            // comme un clic dans la barre ; par-dessus un ecran, elle flotte.
+            case "paletteOuvrir": OuvrirPalette(ancree: !AccueilRecouvert); break;
             case "paletteFermer": PaletteOuverte = false; break;
             case "paletteTexte": PaletteTexte = Texte(valeur); break;
             case "paletteFiltre":

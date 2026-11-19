@@ -219,7 +219,7 @@ describe('Application : un onglet quitte garde son ecran', () => {
     expect(container.querySelector('.rig-proc')).toBeNull()
   })
 
-  it('ouverte depuis la barre de l\'accueil, la palette pend sous la barre ; par Ctrl K, elle flotte au milieu', () => {
+  it('ouverte sur l\'accueil (barre ou Ctrl K), la palette pend sous la barre ; sur un ecran, elle flotte au milieu', () => {
     const { container, rerender, geste, plan } = rendre(vueApplication({ barre: true, accueil: vuePlan(), palette: paletteVue({ ancree: true }) }))
     expect(container.querySelector('.rig-plan__tete .rig-recherche--palette .rig-palette--ancree')).not.toBeNull()
     expect(container.querySelector('.rig-palette__voile')).toBeNull()

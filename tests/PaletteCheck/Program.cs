@@ -186,7 +186,8 @@ internal static class Programme
         Agir("paletteFermer");
         Exiger(plan.Vue().Palette is null, "la palette se ferme");
         Agir("paletteOuvrir");
-        Exiger(plan.Vue().Palette is { Ancree: false }, "Ctrl K ouvre la palette flottante, au milieu");
+        Exiger(plan.Vue() is { Palette.Ancree: false, Dossier: not null },
+            "Ctrl K par-dessus une affaire ouverte : la palette flotte au milieu");
         Agir("paletteFermer");
 
         // --- 9. Echap ferme la palette d'abord, l'affaire ensuite.
@@ -238,6 +239,20 @@ internal static class Programme
         Agir("paletteAller", new { nature = "ecran", cle = P().Ecrans.First().Code });
         Exiger(plan.Vue().Proc is { Libelle: var lib } && lib.Contains("Facture", StringComparison.OrdinalIgnoreCase),
             "Entree sur un ecran du menu l'ouvre");
+
+        // --- 12. Ctrl K SUR L'ACCUEIL : la liste deroulante de sa barre ; sur un
+        // ecran, la palette flotte au milieu.
+        Agir("accueil");
+        Exiger(plan.Vue() is { Proc: null, Dossier: null, Accueil: not null }, "la maison ramene a l'accueil");
+        Agir("paletteOuvrir");
+        Exiger(plan.Vue().Palette is { Ancree: true, Texte: "" },
+            "Ctrl K sur l'accueil deroule la palette sous la barre, comme un clic dans la barre");
+        Agir("paletteFermer");
+        Agir("ouvrirCode", "BODACC");
+        Agir("paletteOuvrir");
+        Exiger(plan.Vue() is { Palette.Ancree: false, Proc.Code: "BODACC" },
+            "Ctrl K sur un ecran ouvre la palette au milieu");
+        Agir("paletteFermer");
 
         plan.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }

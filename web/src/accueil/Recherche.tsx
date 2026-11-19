@@ -10,9 +10,10 @@
 // memes resultats et davantage -- deux recherches qui ne trouvent pas la meme
 // chose, c'est une de trop.
 //
-// Ouverte d'ici, la palette est la LISTE DEROULANTE de cette barre (19/11/2026) :
-// elle se dessine a sa place (`ancree`), sa saisie dans la pilule, ses resultats
-// pendus dessous. Seul Ctrl K depuis un autre ecran la fait flotter au milieu.
+// Ouverte sur l'accueil (clic dans la barre, ou Ctrl K), la palette est la LISTE
+// DEROULANTE de cette barre (19/11/2026) : elle se dessine a sa place (`ancree`),
+// sa saisie dans la pilule, ses resultats pendus dessous. Seul Ctrl K depuis un
+// ecran ou une affaire la fait flotter au milieu.
 
 import { ATTENTE_BARRE, Palette } from '../composants/Palette'
 import type { GestePlan, PaletteVue } from '../plan/types'

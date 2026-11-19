@@ -146,6 +146,14 @@ export function Palette({ vue, plan, ancree = false }: ProprietesPalette) {
   const barre = useRef<HTMLDivElement>(null)
 
   useEffect(() => { champ.current?.focus() }, [enGestes])
+  // Ctrl K peut derouler la palette sous une barre que la page a fait defiler
+  // hors de vue, ou tout en bas : on ramene la barre en haut pour que sa liste
+  // se voie.
+  useEffect(() => {
+    if (!ancree) return
+    const r = barre.current?.getBoundingClientRect()
+    if (r && (r.top < 0 || r.top > window.innerHeight * 0.4)) barre.current?.scrollIntoView?.({ block: 'start' })
+  }, [ancree])
   // Accrochee a la barre, elle n'a pas de voile : un clic hors de la barre et
   // de sa liste la ferme, comme une liste deroulante.
   useEffect(() => {
