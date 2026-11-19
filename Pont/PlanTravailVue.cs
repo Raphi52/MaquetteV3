@@ -356,7 +356,7 @@ public sealed partial class SessionPlanTravail
         var groupes = GroupesArbre();
         var arbre = ArbreGedNoeud.Vue(Arbre, 0, OuvertsDuClasseur(), NoeudSelectionne, Domaines, AjoutsArbre,
                                       MasquesArbre, LibellesArbre, RecetteArbre, NoeudRenomme,
-                                      FiltreDeLArbre, index, groupes: groupes);
+                                      FiltreDeLArbre, index, groupes: groupes, replies: SousDossiersReplies);
         var historique = VueHistorique(index, groupes);
         IndexArbre = index;
 
@@ -750,6 +750,9 @@ public sealed partial class SessionPlanTravail
                 if (NoeudDe(Texte(valeur)) is { EstPiece: false, EstFiche: false } rubrique) BasculerRubrique(rubrique);
                 break;
             case "arbreTri": ClasserLeClasseur(Texte(valeur)); break;
+            case "arbreReplierDossier":
+                if (NoeudDe(Texte(valeur)) is { } sousDossier) BasculerSousDossier(sousDossier);
+                break;
             case "historiqueOuvrir":
                 if (NoeudDe(Texte(valeur)) is { EstPiece: true } piece) OuvrirDepuisHistorique(piece);
                 break;

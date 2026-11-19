@@ -10,7 +10,7 @@ function l(id: string, texte: string, o: Partial<LigneArbreVue> = {}): LigneArbr
   return {
     id, niveau: 0, texte, icone: o.icone ?? (enfants.length || o.compte !== undefined ? 'dossier' : 'pdf'),
     actif: false, chemin: false, depliable: enfants.length > 0, ouvert: enfants.length > 0, renomme: false,
-    compte: null, enfants, vide: false, groupe: 0, niveauGroupe: 0, date: '', pages: 0, derniere: '', ...o,
+    compte: null, enfants, vide: false, groupe: 0, niveauGroupe: 0, date: '', pages: 0, derniere: '', replie: false, ...o,
   }
 }
 
@@ -63,6 +63,7 @@ function rendre(donnees = affaire(), tri: TriClasseur = 'date') {
     trier: (t) => gestes.push(['trier', t]),
     activer: (id) => gestes.push(['activer', id]),
     rubrique: (id) => gestes.push(['rubrique', id]),
+    replier: (id) => gestes.push(['replier', id]),
     renommer: (r) => gestes.push(['renommer', r]),
     menuContextuel: vi.fn((s) => gestes.push(['menu', s.id])),
   }
@@ -141,28 +142,30 @@ describe('ClasseurArbre : les cartes', () => {
 })
 
 describe('ClasseurArbre : la carte ouverte, par date et par dossier', () => {
-  it('« Par date » d\'office : la frise par annee, de la plus ancienne a la plus recente, la fiche a la fin', () => {
+  it('« Par date » d\'office : la frise par annee, la plus recente en tete, la fiche a la fin ; la periode reste dans l\'ordre du calendrier', () => {
     const { container } = rendre()
     const carte = container.querySelector('.rig-classeur__carte--ouverte')!
     expect(carte.querySelector('.rig-classeur__periode')!.textContent).toBe('du 12/03/2024 au 15/10/2024')
     expect(carte.querySelector('.rig-classeur__tri--on')!.textContent).toBe('Par date')
     const frise = carte.querySelector('.rig-classeur__frise')!
     expect([...frise.children].map((e) => e.className.includes('rig-classeur__an') ? e.textContent : e.querySelector('.rig-classeur__jour')!.textContent))
-      .toEqual(['2024', '12/03', '15/10', '15/10', 'sans date', ''])
+      .toEqual(['2024', '15/10', '15/10', '12/03', 'sans date', ''])
     const ev = [...frise.querySelectorAll('.rig-classeur__ev')]
+    // A date egale (le 15/10), l'ordre de l'arbre : le PV avant le Certificat.
     expect(ev.map((e) => e.querySelector('em')!.textContent)).toEqual([
-      'Depot n 2024/0141 · 9 p.', 'Depot n A2024/038654 · 3 p.', 'Documents generes lors de la formalite · 1 p.', "Depots d'actes"])
+      'Depot n A2024/038654 · 3 p.', 'Documents generes lors de la formalite · 1 p.', 'Depot n 2024/0141 · 9 p.', "Depots d'actes"])
     // La piece choisie y est marquee, comme dans l'arbre.
-    expect(ev[2]!.className).toContain('rig-arbre__ligne--actif')
+    expect(ev[1]!.className).toContain('rig-arbre__ligne--actif')
   })
 
-  it('les DECISIONS (rangees sous « Decisions judiciaires ») passent en or', () => {
+  it('les DECISIONS (rangees sous « Decisions judiciaires ») passent en or ; les annees vont de la plus recente a la plus ancienne', () => {
     const { container } = rendre(affaire({ choisi: 'rapport' }))
     const ev = [...container.querySelectorAll('.rig-classeur__carte--ouverte .rig-classeur__ev')]
     expect(ev.map((e) => e.querySelector('.rig-arbre__texte')!.textContent))
-      .toEqual(['Assignation en paiement', 'Rapport d expertise', '2022J00114-JUG-GONON-11/07/2023 17:50:58'])
-    expect(ev.map((e) => e.className.includes('rig-classeur__ev--decision'))).toEqual([false, false, true])
-    expect(textes(container, '.rig-classeur__carte--ouverte .rig-classeur__an')).toEqual(['2022', '2023'])
+      .toEqual(['2022J00114-JUG-GONON-11/07/2023 17:50:58', 'Rapport d expertise', 'Assignation en paiement'])
+    expect(ev.map((e) => e.className.includes('rig-classeur__ev--decision'))).toEqual([true, false, false])
+    expect(textes(container, '.rig-classeur__carte--ouverte .rig-classeur__an')).toEqual(['2023', '2022'])
+    expect(container.querySelector('.rig-classeur__carte--ouverte .rig-classeur__periode')!.textContent).toBe('du 14/02/2022 au 11/07/2023')
   })
 
   it('le classement vient du pont : un clic sur l\'autre le lui demande, l\'ecran ne bascule pas seul', () => {
@@ -212,67 +215,43 @@ describe('ClasseurArbre : replier un sous-dossier en « Par dossier »', () => {
   const intertitre = (c: Element, debut: string) =>
     [...corps(c).querySelectorAll('.rig-classeur__it')].find((e) => e.querySelector('.rig-arbre__texte')!.textContent!.startsWith(debut))!
   const pieces = (c: Element) => textes(corps(c), '.rig-arbre__ligne .rig-arbre__texte')
+  // L'affaire telle que le pont la rend avec ces sous-dossiers replies.
+  const avecReplis = (ids: string[]) => {
+    const d = affaire()
+    const marquer = (l: LigneArbreVue): LigneArbreVue => ({ ...l, replie: ids.includes(l.id), enfants: l.enfants.map(marquer) })
+    return { ...d, arbre: marquer(d.arbre) }
+  }
 
-  it('un clic sur l\'intertitre replie ce qu\'il range, sous-dossiers compris ; un second le rouvre ; rien ne part au pont', () => {
+  it('un clic sur l\'intertitre demande au pont de le replier ; l\'ecran suit la vue, il ne replie pas seul', () => {
     const { container, gestes } = rendre(affaire(), 'dossier')
     expect(intertitre(container, 'Depot n A2024').getAttribute('aria-expanded')).toBe('true')
-    // Il range la piece ouverte (le Certificat) : on peut quand meme le replier.
     fireEvent.click(intertitre(container, 'Depot n A2024'))
-    expect(intertitre(container, 'Depot n A2024').getAttribute('aria-expanded')).toBe('false')
-    expect(intertitre(container, 'Depot n A2024').querySelector('.rig-arbre__chevron--ouvert')).toBeNull()
+    expect(gestes).toEqual([['replier', 'd2']])
+    expect(intertitre(container, 'Depot n A2024').getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('un sous-dossier replie par le pont : son intertitre reste (chevron, nombre), ce qu\'il range se cache, sous-dossiers compris', () => {
+    const { container, gestes } = rendre(avecReplis(['d2']), 'dossier')
+    const d2 = intertitre(container, 'Depot n A2024')
+    expect(d2.getAttribute('aria-expanded')).toBe('false')
+    expect(d2.querySelector('.rig-arbre__chevron--ouvert')).toBeNull()
+    expect(d2.querySelector('.rig-classeur__it-n')!.textContent).toBe('2')
     expect(pieces(container)).toEqual(['Informations des depots', 'Bail commercial'])
     expect(textes(corps(container), '.rig-classeur__it .rig-arbre__texte')).toEqual(['Depot n 2024/0141', 'Depot n A2024/038654'])
-    fireEvent.click(intertitre(container, 'Depot n A2024'))
-    expect(pieces(container)).toEqual(['Informations des depots', 'Bail commercial',
-      'Extrait de proces-verbal du conseil de surveillance du 03/10/2024', "Certificat de depot d'actes"])
-    expect(gestes).toEqual([])
+    // Un second clic demande de le rouvrir : le meme geste, le pont bascule.
+    fireEvent.click(d2)
+    expect(gestes).toEqual([['replier', 'd2']])
   })
 
   it('les trois points d\'un intertitre ouvrent le menu sans le replier', () => {
     const { container, gestes } = rendre(affaire(), 'dossier')
     fireEvent.click(intertitre(container, 'Depot n 2024').querySelector('.rig-arbre__actions')!)
     expect(gestes).toEqual([['menu', 'd1']])
-    expect(intertitre(container, 'Depot n 2024').getAttribute('aria-expanded')).toBe('true')
   })
 
-  it('« Par date » ignore les replis (la frise garde toutes les pieces) ; ils reviennent en « Par dossier »', () => {
-    const { container, rerender, p } = rendre(affaire(), 'dossier')
-    fireEvent.click(intertitre(container, 'Depot n A2024'))
-    rerender(<ClasseurArbre {...p} tri="date" />)
+  it('« Par date » ignore les replis : la frise garde toutes les pieces', () => {
+    const { container } = rendre(avecReplis(['d1', 'd2']), 'date')
     expect(container.querySelectorAll('.rig-classeur__ev')).toHaveLength(4)
-    rerender(<ClasseurArbre {...p} tri="dossier" />)
-    expect(intertitre(container, 'Depot n A2024').getAttribute('aria-expanded')).toBe('false')
-  })
-
-  it('une piece choisie AILLEURS (historique, palette) dans un sous-dossier replie le rouvre ; les autres replis restent', () => {
-    const d = affaire()
-    const { container, rerender, p } = rendre(d, 'dossier')
-    fireEvent.click(intertitre(container, 'Depot n 2024'))
-    fireEvent.click(intertitre(container, 'Depot n A2024'))
-    expect(pieces(container)).toEqual(['Informations des depots'])
-    // Le Bail commercial, range sous « Depot n 2024/0141 », est choisi depuis l'historique.
-    const rcs = d.arbre.enfants[0]!
-    const actes = rcs.enfants[2]!
-    const [d1, d2] = [actes.enfants[1]!, actes.enfants[2]!]
-    const gen = d2.enfants[1]!
-    // L'arbre tel que le pont le rend quand le Bail (bail = vrai) ou le Kbis est choisi.
-    const arbre = (bail: boolean): LigneArbreVue => ({ ...d.arbre, enfants: [{ ...rcs, enfants: [
-      { ...rcs.enfants[0]!, actif: !bail }, rcs.enfants[1]!,
-      { ...actes, chemin: bail, enfants: [
-        actes.enfants[0]!,
-        { ...d1, chemin: bail, enfants: [{ ...d1.enfants[0]!, actif: bail }] },
-        { ...d2, chemin: false, enfants: [d2.enfants[0]!, { ...gen, chemin: false, enfants: [{ ...gen.enfants[0]!, actif: false }] }] },
-      ] },
-      rcs.enfants[3]!,
-    ] }, d.arbre.enfants[1]!] })
-    rerender(<ClasseurArbre {...p} arbre={arbre(true)} chemin={['004176', 'Dossier RCS', "Depots d'actes", 'Depot n 2024/0141', 'Bail commercial']} />)
-    expect(intertitre(container, 'Depot n 2024').getAttribute('aria-expanded')).toBe('true')
-    expect(intertitre(container, 'Depot n A2024').getAttribute('aria-expanded')).toBe('false')
-    expect(pieces(container)).toEqual(['Informations des depots', 'Bail commercial'])
-    // Rouvert, il le reste quand la selection repart ailleurs (le Kbis, hors rubrique).
-    rerender(<ClasseurArbre {...p} arbre={arbre(false)} chemin={['004176', 'Dossier RCS', 'Kbis a jour']} />)
-    expect(intertitre(container, 'Depot n 2024').getAttribute('aria-expanded')).toBe('true')
-    expect(intertitre(container, 'Depot n A2024').getAttribute('aria-expanded')).toBe('false')
   })
 })
 
@@ -280,7 +259,7 @@ describe('frise : les pieces d\'une rubrique pour « Par date »', () => {
   it('toutes, sous-dossiers compris, triees par date ; les non datees a part', () => {
     const rubrique = affaire().arbre.enfants[0]!.enfants[2]!
     const { datees, sansDate } = frise(rubrique)
-    expect(datees.map((x) => x.ligne.id)).toEqual(['bail', 'pv', 'cert'])
+    expect(datees.map((x) => x.ligne.id)).toEqual(['pv', 'cert', 'bail'])
     expect(sansDate.map((x) => [x.ligne.id, x.dossier])).toEqual([['info', "Depots d'actes"]])
   })
 })

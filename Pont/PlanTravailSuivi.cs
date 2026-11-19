@@ -151,6 +151,45 @@ public sealed partial class SessionPlanTravail
         AccueilEtat.MemoriserTriClasseur(tri);
     }
 
+    /// <summary>
+    /// Les SOUS-DOSSIERS replies dans le classeur (« Par dossier », clic sur l'intertitre),
+    /// pour l'affaire ouverte. Retenus avec le reste de son arbre (MemoriserArbre, par
+    /// chemin dans accueil.json), reposes a sa reouverture (PersistanceGed.Appliquer) :
+    /// d'une affaire a l'autre et apres redemarrage (demande du 19/11/2026).
+    /// </summary>
+    private readonly HashSet<NoeudGed> SousDossiersReplies = AccesGed.NouveauxMasques();
+
+    /// <summary>Un sous-dossier : un dossier range DANS une rubrique (ni la racine, ni un
+    /// domaine, ni la tete d'une rubrique, qui est sa carte).</summary>
+    private bool EstSousDossier(NoeudGed n)
+        => !n.EstPiece && !n.EstFiche && !ReferenceEquals(n, Arbre)
+           && !AccesGed.EnfantsVisibles(Arbre, Domaines, AjoutsArbre, MasquesArbre).Any(d => ReferenceEquals(d, n))
+           && !GroupesArbre().ContainsKey(n);
+
+    /// <summary>Le geste « arbreReplierDossier » : replie le sous-dossier, ou le rouvre, et le retient.</summary>
+    private void BasculerSousDossier(NoeudGed n)
+    {
+        if (!EstSousDossier(n)) return;
+        if (!SousDossiersReplies.Remove(n)) SousDossiersReplies.Add(n);
+        MemoriserArbre();
+    }
+
+    /// <summary>
+    /// Un element vient d'etre choisi (setter de NoeudSelectionne) : les sous-dossiers
+    /// replies qui le rangent se rouvrent, et le restent. Replier celui qui range l'element
+    /// DEJA ouvert reste possible : la selection ne change pas, rien ne se rouvre.
+    /// </summary>
+    private void RouvrirLesSousDossiersDe(NoeudGed? element)
+    {
+        if (element is null || SousDossiersReplies.Count == 0) return;
+        if (SousDossiersReplies.RemoveWhere(d => Range(d, element)) > 0) MemoriserArbre();
+    }
+
+    /// <summary>Le dossier range cet element, a toute profondeur (elements crees compris).</summary>
+    private bool Range(NoeudGed dossier, NoeudGed element)
+        => dossier.Enfants.Concat(AjoutsArbre.TryGetValue(dossier, out var a) ? a : [])
+                  .Any(e => ReferenceEquals(e, element) || Range(e, element));
+
     /// <summary>Referme les rubriques soeurs de celle-ci, dans son domaine.</summary>
     private void FermerLesAutresRubriques(NoeudGed rubrique)
     {

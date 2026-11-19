@@ -287,6 +287,49 @@ internal static class Programme
         Agir("arbreTri", "date");
         Exiger(plan.Vue().Dossier!.TriClasseur == "date" && AccueilEtat.Charger().TriClasseur == "date",
             "revenir « Par date » s'enregistre aussi");
+        // Les SOUS-DOSSIERS REPLIES du classeur (« Par dossier ») : retenus PAR AFFAIRE, au
+        // redemarrage ; une piece choisie ailleurs rouvre celui qui la range (demande du 19/11/2026).
+        const string depotA = "Depot n A2024/038654";
+        LigneArbreVue Arbre() => plan.Vue().Dossier!.Arbre;
+        List<string>? Retenus() => AccueilEtat.Charger().ArbreGedDe("004176")?.Replies;
+        Agir("ouvrirNumero", "004176");
+        Agir("arbreRubrique", Ligne(Arbre(), "Depots d'actes")!.Id);
+        Exiger(Ligne(Arbre(), depotA) is { Replie: false }, "un sous-dossier est deplie tant qu'on ne l'a pas replie");
+        Agir("arbreReplierDossier", Ligne(Arbre(), depotA)!.Id);
+        Exiger(Ligne(Arbre(), depotA) is { Replie: true, Enfants.Length: 2 } && Retenus() is { Count: 1 },
+            "replie : la vue le dit, ses pieces sont rendues quand meme (« Par date » les montre), et le fichier d'etat le retient");
+        Agir("arbreReplierDossier", Ligne(Arbre(), "Depots d'actes")!.Id);
+        Agir("arbreReplierDossier", Ligne(Arbre(), "Bail commercial")!.Id);
+        Exiger(Ligne(Arbre(), "Depots d'actes") is { Replie: false, Ouvert: true } && Retenus() is { Count: 1 },
+            "ce geste ne replie ni une carte de rubrique ni une piece");
+        Agir("filtre", "certificat");
+        Exiger(Ligne(Arbre(), depotA) is { Replie: false }, "pendant une recherche, rien n'est replie : elle montre ce qu'elle trouve");
+        Agir("effacerFiltre");
+        // Une session NEUVE (le redemarrage) ; l'autre affaire y est ouverte, pas dans celle
+        // du banc : chaque affaire ouverte prend un onglet, et la suite compte les onglets.
+        var relance = new SessionPlanTravail(null, null);
+        relance.Initialiser();
+        relance.Agir("ouvrirNumero", Valeur("004151"));
+        relance.Agir("arbreRubrique", Valeur(Ligne(relance.Vue().Dossier!.Arbre, "Depots d'actes")!.Id));
+        Exiger(Ligne(relance.Vue().Dossier!.Arbre, depotA) is { Replie: false },
+            "le repli vaut pour SON affaire : la meme branche d'une autre affaire reste depliee");
+        relance.Agir("ouvrirNumero", Valeur("004176"));
+        relance.Agir("arbreRubrique", Valeur(Ligne(relance.Vue().Dossier!.Arbre, "Depots d'actes")!.Id));
+        Exiger(Ligne(relance.Vue().Dossier!.Arbre, depotA) is { Replie: true },
+            "le repli survit au redemarrage : une session neuve le relit pour l'affaire rouverte");
+        var certificat = relance.Vue().Dossier!.Historique.First(p => p.Libelle == "Certificat de depot d'actes");
+        relance.Agir("historiqueOuvrir", Valeur(certificat.Id));
+        var apresHistorique = relance.Vue().Dossier!.Arbre;
+        Exiger(Ligne(apresHistorique, depotA) is { Replie: false }
+               && Ligne(apresHistorique, "Certificat de depot d'actes") is { Actif: true } && Retenus() is null or { Count: 0 },
+            "ouvrir depuis l'historique une piece d'un sous-dossier replie le rouvre, et le fichier l'oublie");
+        relance.Agir("arbreReplierDossier", Valeur(Ligne(apresHistorique, depotA)!.Id));
+        Exiger(Ligne(relance.Vue().Dossier!.Arbre, depotA) is { Replie: true },
+            "replier celui qui range la piece DEJA ouverte reste possible : rien ne le rouvre tant que le choix ne change pas");
+        relance.Agir("arbreReplierDossier", Valeur(Ligne(relance.Vue().Dossier!.Arbre, depotA)!.Id));
+        Exiger(Ligne(relance.Vue().Dossier!.Arbre, depotA) is { Replie: false } && Retenus() is null or { Count: 0 },
+            "un second clic le rouvre, et le fichier l'oublie");
+        relance.DisposeAsync().AsTask().GetAwaiter().GetResult();
         // La suite part de l'etat d'entree de l'affaire (la fiche Formalites a change la mise en page).
         Agir("ouvrirNumero", "004176");
         d = plan.Vue().Dossier;

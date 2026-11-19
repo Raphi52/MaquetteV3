@@ -24,7 +24,7 @@ export function ligneArbre(id: string, texte: string, enfants: LigneArbreVue[] =
   return {
     id, niveau, texte, icone: enfants.length ? 'dossier' : 'pdf', actif: false, chemin: false,
     depliable: enfants.length > 0, ouvert: enfants.length > 0, renomme: false, compte: null, enfants, vide: false,
-    groupe: 0, niveauGroupe: 0, date: '', pages: 0, derniere: '',
+    groupe: 0, niveauGroupe: 0, date: '', pages: 0, derniere: '', replie: false,
   }
 }
 

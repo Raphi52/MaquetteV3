@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 namespace RigV3Desktop.Pont;
 
 /// <summary>
-/// Une ligne de l'arbre GED telle que web/src/composants/ArbreGedNoeud.tsx la
+/// Une ligne de l'arbre GED telle que web/src/composants/ClasseurArbre.tsx la
 /// rend, avec ses enfants deja calcules (vides tant que la branche est repliee).
 /// </summary>
 /// <param name="Id">Identifiant STABLE du noeud (son identite, pas son libelle) : il revient avec chaque geste.</param>
@@ -19,14 +19,18 @@ namespace RigV3Desktop.Pont;
 /// <param name="Pages">Une PIECE : son nombre de pages, 0 sinon.</param>
 /// <param name="Derniere">Un DOSSIER : la date de sa piece la plus recente (jj/mm/aaaa), vide
 /// s'il n'en a aucune de datee -- la carte fermee d'une rubrique l'annonce.</param>
+/// <param name="Replie">Un SOUS-DOSSIER replie dans le classeur (« Par dossier ») : son intertitre
+/// reste, ce qu'il range se cache. Ses enfants sont rendus quand meme : « Par date » les montre.
+/// Jamais pendant une recherche, qui montre ce qu'elle trouve.</param>
 public sealed record LigneArbreVue(string Id, int Niveau, string Texte, string Icone,
                                    bool Actif, bool Chemin, bool Depliable, bool Ouvert,
                                    bool Renomme, int? Compte, LigneArbreVue[] Enfants, bool Vide,
                                    int Groupe = 0, int NiveauGroupe = 0,
-                                   string Date = "", int Pages = 0, string Derniere = "");
+                                   string Date = "", int Pages = 0, string Derniere = "",
+                                   bool Replie = false);
 
 /// <summary>
-/// Pont du composant RECURSIF de l'arbre GED (web/src/composants/ArbreGedNoeud.tsx).
+/// Pont du composant RECURSIF de l'arbre GED (web/src/composants/ClasseurArbre.tsx).
 ///
 /// Les regles du @code de Components/ArbreGedNoeud.razor sont DEPLACEES ici telles
 /// quelles (enfants visibles, filtre, branches ouvertes, chemin, repli au clic) :
@@ -63,7 +67,8 @@ public static class ArbreGedNoeud
                                     RecetteTache? recette, NoeudGed? renomme, string? filtre,
                                     IDictionary<string, NoeudGed> index,
                                     IReadOnlyDictionary<NoeudGed, int>? groupes = null,
-                                    int groupe = 0, int niveauGroupe = 0)
+                                    int groupe = 0, int niveauGroupe = 0,
+                                    IReadOnlySet<NoeudGed>? replies = null)
     {
         var id = Identifiant(noeud);
         index[id] = noeud;
@@ -83,7 +88,7 @@ public static class ArbreGedNoeud
         var enfants = ouvert
             ? affiches.Select(e => Vue(e, niveau + 1, ouverts, selection, domaines, ajouts, masques,
                                         libelles, recette, renomme, filtre, index,
-                                        groupes, groupe, niveauGroupe)).ToArray()
+                                        groupes, groupe, niveauGroupe, replies)).ToArray()
             : [];
 
         return new LigneArbreVue(
@@ -103,7 +108,8 @@ public static class ArbreGedNoeud
             Pages: noeud.EstPiece ? noeud.Pages : 0,
             Derniere: noeud.EstPiece || noeud.EstFiche
                 ? ""
-                : DerniereDate(noeud, domaines, ajouts, masques, recette)?.ToString(FormatDate, CultureInfo.InvariantCulture) ?? "");
+                : DerniereDate(noeud, domaines, ajouts, masques, recette)?.ToString(FormatDate, CultureInfo.InvariantCulture) ?? "",
+            Replie: replies is not null && replies.Contains(noeud) && string.IsNullOrWhiteSpace(filtre));
     }
 
     /// <summary>Le format des dates de l'arbre (NoeudGed.Date).</summary>

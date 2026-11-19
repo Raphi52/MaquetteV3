@@ -180,6 +180,7 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
                            trier={(tri) => plan('arbreTri', tri)}
                            activer={(id) => plan('arbreActiver', id)}
                            rubrique={(id) => plan('arbreRubrique', id)}
+                           replier={(id) => plan('arbreReplierDossier', id)}
                            renommer={(r) => plan('arbreRenommer', r)}
                            menuContextuel={(souris) => plan('arbreMenu', souris)} />
           </div>

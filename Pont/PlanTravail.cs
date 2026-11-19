@@ -525,7 +525,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     {
         if (DossierOuvert is null) return;
         Etat.EnregistrerArbreGed(CleAffaire,
-            PersistanceGed.Capturer(Arbre, AjoutsArbre, MasquesArbre, LibellesArbre));
+            PersistanceGed.Capturer(Arbre, AjoutsArbre, MasquesArbre, LibellesArbre, SousDossiersReplies));
     }
 
     private void OuvrirNouveau()
@@ -1211,7 +1211,20 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
 
     // L'arbre de l'affaire ouverte, sa selection, et les dossiers deplies.
     private NoeudGed Arbre = ArbreDemo.Racine("2026B01067", "AMIENS BILLARDS", "109 678 235");
-    private NoeudGed? NoeudSelectionne;
+    private NoeudGed? noeudSelectionne;
+    /// <summary>L'element choisi. Quel que soit le chemin (arbre, historique, palette,
+    /// frise « Par date »), en choisir un AUTRE rouvre les sous-dossiers replies qui le
+    /// rangent : l'element ouvert reste visible dans le classeur (PlanTravailSuivi.cs).</summary>
+    private NoeudGed? NoeudSelectionne
+    {
+        get => noeudSelectionne;
+        set
+        {
+            if (ReferenceEquals(noeudSelectionne, value)) return;
+            noeudSelectionne = value;
+            RouvrirLesSousDossiersDe(value);
+        }
+    }
     private readonly HashSet<NoeudGed> NoeudsOuverts = AccesGed.NouveauxMasques();
 
     // Le tableau des editions de l'affaire et la ligne selectionnee.
@@ -1424,9 +1437,9 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         Editions = ArbreDemo.Editions(d.Numero, d.Objet);
 
         // L'arbre est reconstruit a neuf : on y repose ce que l'utilisateur
-        // avait ajoute, masque ou renomme lors d'une session precedente.
+        // avait ajoute, masque, renomme ou replie lors d'une session precedente.
         PersistanceGed.Appliquer(Arbre, Etat.ArbreGedDe(d.Numero),
-                                 AjoutsArbre, MasquesArbre, LibellesArbre);
+                                 AjoutsArbre, MasquesArbre, LibellesArbre, SousDossiersReplies);
 
         // La racine et tous les dossiers servis sont deplies d'entree :
         // l'arbre s'ouvre sur du contenu, pas sur une ligne fermee.
