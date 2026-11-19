@@ -69,13 +69,15 @@ public sealed record SessionEcranVue(string Session, int Version);
 /// <param name="Fil">Le fil de l'affaire, du plus ancien au plus recent (onglet « Fil » de la colonne de suivi).</param>
 /// <param name="SuiviReplie">La colonne de suivi est repliee a droite : un rail la remplace, et sa
 /// poignee (la troisieme, qui regle sa largeur) disparait avec elle (demande du 19/11/2026).</param>
+/// <param name="TriClasseur">Le classement de la carte ouverte du classeur : « date » ou « dossier »
+/// (AccueilEtat.TriClasseur, retenu d'une affaire a l'autre et au redemarrage).</param>
 public sealed record DossierVue(string Numero, string Objet, string Siren, string Type, string Statut,
                                 bool BoutonDocument, SommaireVue Sommaire, BandeauDefautsVue? Bandeau,
                                 string StyleCorps, TacheVue? Tache, string Filtre, LigneArbreVue Arbre,
                                 bool Poignee, FicheColonneVue? Fiche, EtapesVue? Etapes, bool Poignee2,
                                 ApercuColonneVue? Apercu, bool Voile, PieceHistoriqueVue[] Historique,
                                 bool ArbreReplie, string[] Chemin, int Pieces, MessageFilVue[] Fil,
-                                bool SuiviReplie);
+                                bool SuiviReplie, string TriClasseur);
 
 /// <summary>
 /// Un message du FIL de l'affaire : une note ecrite dans l'onglet « Fil », ou une valeur
@@ -383,7 +385,8 @@ public sealed partial class SessionPlanTravail
             GuideVisible ? new ApercuColonneVue(FenetresDetachees.Count, VueApercu(d)) : null,
             Redimensionne, historique,
             ArbreReplie, CheminSelection(d.Numero), NbPiecesVisibles(), VueFil(d.Numero),
-            SuiviReplie);
+            SuiviReplie, Etat.TriClasseur == AccueilEtat.TriClasseurParDossier
+                ? AccueilEtat.TriClasseurParDossier : AccueilEtat.TriClasseurParDate);
     }
 
     /// <summary>
@@ -739,6 +742,7 @@ public sealed partial class SessionPlanTravail
             case "arbreRubrique":
                 if (NoeudDe(Texte(valeur)) is { EstPiece: false, EstFiche: false } rubrique) BasculerRubrique(rubrique);
                 break;
+            case "arbreTri": ClasserLeClasseur(Texte(valeur)); break;
             case "historiqueOuvrir":
                 if (NoeudDe(Texte(valeur)) is { EstPiece: true } piece) OuvrirDepuisHistorique(piece);
                 break;

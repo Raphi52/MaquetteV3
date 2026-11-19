@@ -9,11 +9,14 @@
 //     de la plus recente) ; une seule ouverte par domaine (geste « arbreRubrique »,
 //     regle dans Pont/PlanTravailSuivi.cs, BasculerRubrique) ;
 //   - dans la carte ouverte, « Par dossier » (les sous-dossiers en intertitres,
-//     recursion de Contenu) ou « Par date » (une frise par annee, les decisions en or).
+//     recursion de Contenu, chacun se replie d'un clic) ou « Par date » (une frise
+//     par annee, les decisions en or). Ce choix est retenu par le pont, d'une
+//     affaire a l'autre et au redemarrage (geste « arbreTri », AccueilEtat.TriClasseur).
 //
 // Les donnees arrivent du pont (Pont/ArbreGedNoeud.cs, LigneArbreVue) : branches
-// ouvertes, filtre, chemin, renommage, droits du login. Ici, seulement la mise en
-// page et deux choix d'affichage tenus par l'ecran : le classeur montre et le tri.
+// ouvertes, filtre, chemin, renommage, droits du login, classement. Ici, seulement
+// la mise en page et deux choix d'affichage tenus par l'ecran : le classeur montre
+// et les sous-dossiers replies.
 
 import { Fragment, useState } from 'react'
 import type { CSSProperties, MouseEvent } from 'react'
@@ -75,6 +78,10 @@ export interface ProprietesClasseurArbre {
   chemin: string[]
   /** Le texte du filtre : pendant une recherche, la bascule compte les pieces trouvees. */
   filtre: string
+  /** Le classement de la carte ouverte (DossierVue.triClasseur, retenu par le pont). */
+  tri: TriClasseur
+  /** « Par dossier » / « Par date » clique : le pont le retient. */
+  trier: (tri: TriClasseur) => void
   /** Clic sur une piece ou une fiche : la coquille la choisit et l'ouvre. */
   activer: (id: string) => void
   /** Clic sur la carte d'une rubrique : elle s'ouvre (et ferme les autres) ou se ferme. */
@@ -169,25 +176,42 @@ function Ligne({ ligne, profondeur, p }: { ligne: LigneArbreVue, profondeur: num
   )
 }
 
-/** « Par dossier » : les pieces, et chaque sous-dossier en intertitre avec ce qu'il range. */
-function Contenu({ lignes, profondeur, p }: { lignes: LigneArbreVue[], profondeur: number, p: ProprietesClasseurArbre }) {
+/** Les sous-dossiers replies en « Par dossier » : l'ecran les tient, le pont rend tout dessous. */
+interface Replis {
+  replie: (id: string) => boolean
+  basculer: (id: string) => void
+}
+
+/** Les dossiers qui menent a l'element choisi (ligne marquee « chemin »). */
+function dossiersDuChemin(l: LigneArbreVue, ids: string[] = []): string[] {
+  if (l.chemin && estDossier(l)) ids.push(l.id)
+  for (const e of l.enfants) dossiersDuChemin(e, ids)
+  return ids
+}
+
+/** « Par dossier » : les pieces, et chaque sous-dossier en intertitre avec ce qu'il range ; un clic sur l'intertitre le replie. */
+function Contenu({ lignes, profondeur, p, replis }: { lignes: LigneArbreVue[], profondeur: number, p: ProprietesClasseurArbre, replis: Replis }) {
   return (
     <>
-      {lignes.map((l) => estDossier(l)
-        ? (
+      {lignes.map((l) => {
+        if (!estDossier(l)) return <Ligne key={l.id} ligne={l} profondeur={profondeur} p={p} />
+        const ouvert = !replis.replie(l.id)
+        return (
           <Fragment key={l.id}>
             <div className={'rig-classeur__it' + (l.chemin ? ' rig-classeur__it--chemin' : '')}
-                 style={{ '--p': profondeur } as CSSProperties}>
+                 style={{ '--p': profondeur } as CSSProperties}
+                 role="button" aria-expanded={ouvert} onClick={() => replis.basculer(l.id)}>
+              <span className={'rig-arbre__chevron' + (ouvert ? ' rig-arbre__chevron--ouvert' : '')} aria-hidden="true">&#9656;</span>
               <IconeGed nature="dossier" classe="rig-classeur__it-icone" />
               <Libelle ligne={l} renommer={p.renommer} />
               {l.compte !== null && <b className="rig-classeur__it-n">{l.compte}</b>}
               <Actions ligne={l} menuContextuel={p.menuContextuel} />
             </div>
-            {l.vide && <div className="rig-classeur__vide" style={{ '--p': profondeur + 1 } as CSSProperties}>aucune piece</div>}
-            <Contenu key={l.id + ':c'} lignes={l.enfants} profondeur={profondeur + 1} p={p} />
+            {ouvert && l.vide && <div className="rig-classeur__vide" style={{ '--p': profondeur + 1 } as CSSProperties}>aucune piece</div>}
+            {ouvert && <Contenu key={l.id + ':c'} lignes={l.enfants} profondeur={profondeur + 1} p={p} replis={replis} />}
           </Fragment>
         )
-        : <Ligne key={l.id} ligne={l} profondeur={profondeur} p={p} />)}
+      })}
     </>
   )
 }
@@ -233,7 +257,8 @@ function periode(rubrique: LigneArbreVue): string {
   return premiere === derniere ? 'le ' + premiere : 'du ' + premiere + ' au ' + derniere
 }
 
-function Rubrique({ r, tri, setTri, p }: { r: LigneArbreVue, tri: TriClasseur, setTri: (t: TriClasseur) => void, p: ProprietesClasseurArbre }) {
+function Rubrique({ r, p, replis }: { r: LigneArbreVue, p: ProprietesClasseurArbre, replis: Replis }) {
+  const { tri, trier } = p
   const meta = r.compte !== null ? pieces(r.compte) + (r.derniere ? ' · ' + r.derniere : '') : 'aucune piece'
   return (
     <section className={'rig-classeur__carte' + (r.ouvert ? ' rig-classeur__carte--ouverte' : '')} style={teinte(r.groupe)}
@@ -251,13 +276,13 @@ function Rubrique({ r, tri, setTri, p }: { r: LigneArbreVue, tri: TriClasseur, s
             <span className="rig-classeur__periode">{periode(r)}</span>
             <span className="rig-classeur__tri" role="group" aria-label="Classer les pieces">
               <button type="button" className={tri === 'dossier' ? 'rig-classeur__tri--on' : undefined}
-                      aria-pressed={tri === 'dossier'} onClick={() => setTri('dossier')}>Par dossier</button>
+                      aria-pressed={tri === 'dossier'} onClick={() => { if (tri !== 'dossier') trier('dossier') }}>Par dossier</button>
               <button type="button" className={tri === 'date' ? 'rig-classeur__tri--on' : undefined}
-                      aria-pressed={tri === 'date'} onClick={() => setTri('date')}>Par date</button>
+                      aria-pressed={tri === 'date'} onClick={() => { if (tri !== 'date') trier('date') }}>Par date</button>
             </span>
           </div>
           {r.vide && <div className="rig-classeur__vide">aucune piece</div>}
-          {tri === 'date' ? <Chronologie rubrique={r} p={p} /> : <Contenu lignes={r.enfants} profondeur={0} p={p} />}
+          {tri === 'date' ? <Chronologie rubrique={r} p={p} /> : <Contenu lignes={r.enfants} profondeur={0} p={p} replis={replis} />}
         </div>
       )}
     </section>
@@ -270,7 +295,26 @@ export function ClasseurArbre(p: ProprietesClasseurArbre) {
   // une autre piece (depuis l'historique, la palette...) montre le sien.
   const cle = chemin.join('␟')
   const [choix, setChoix] = useState<{ id: string, cle: string } | null>(null)
-  const [tri, setTri] = useState<TriClasseur>('date')
+  // Les sous-dossiers REPLIES (clic sur leur intertitre, « Par dossier »). Quand un
+  // element est choisi ailleurs (historique, palette, frise « Par date ») a l'interieur
+  // d'un sous-dossier replie, celui-ci se rouvre : la piece ouverte reste visible.
+  // (Ajustement pendant le rendu quand la selection change : react.dev, « Storing
+  // information from previous renders ».)
+  const [replis, setReplis] = useState<{ ids: ReadonlySet<string>, cle: string }>(() => ({ ids: new Set(), cle }))
+  let replies = replis.ids
+  if (replis.cle !== cle) {
+    const chemin = new Set(dossiersDuChemin(arbre))
+    replies = new Set([...replis.ids].filter((id) => !chemin.has(id)))
+    setReplis({ ids: replies, cle })
+  }
+  const gestesReplis: Replis = {
+    replie: (id) => replies.has(id),
+    basculer: (id) => setReplis((avant) => {
+      const ids = new Set(avant.ids)
+      if (!ids.delete(id)) ids.add(id)
+      return { ids, cle: avant.cle }
+    }),
+  }
   const domaines = arbre.enfants.filter(estDossier)
   const deLaSelection = domaines.find((d) => d.chemin || d.actif)
   const affiche = (choix !== null && choix.cle === cle ? domaines.find((d) => d.id === choix.id) : undefined)
@@ -305,10 +349,10 @@ export function ClasseurArbre(p: ProprietesClasseurArbre) {
       {hors.length > 0 && (
         <section className="rig-classeur__hors" aria-label={affiche.texte + ' hors rubrique'}>
           <div className="rig-classeur__hors-titre">{affiche.texte} <span>{piecesHors > 0 ? pieces(piecesHors) + ' hors rubrique' : 'hors rubrique'}</span></div>
-          <Contenu lignes={hors} profondeur={0} p={p} />
+          <Contenu lignes={hors} profondeur={0} p={p} replis={gestesReplis} />
         </section>
       )}
-      {affiche.enfants.filter(estRubrique).map((r) => <Rubrique key={r.id} r={r} tri={tri} setTri={setTri} p={p} />)}
+      {affiche.enfants.filter(estRubrique).map((r) => <Rubrique key={r.id} r={r} p={p} replis={gestesReplis} />)}
       {affiche.enfants.length === 0 && <div className="rig-classeur__vide">aucune piece</div>}
     </div>
   )

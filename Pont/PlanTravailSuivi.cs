@@ -137,6 +137,20 @@ public sealed partial class SessionPlanTravail
                     NoeudsOuverts.Remove(rubrique);
     }
 
+    /// <summary>
+    /// Le geste « arbreTri » : « Par dossier » ou « Par date » dans la carte ouverte. Le choix
+    /// vaut pour toutes les affaires et survit au redemarrage (AccueilEtat.TriClasseur) ; il
+    /// est pose aussi dans l'etat de cette session, sinon son prochain Enregistrer le defait.
+    /// Une autre valeur est ignoree.
+    /// </summary>
+    private void ClasserLeClasseur(string tri)
+    {
+        if (tri is not (AccueilEtat.TriClasseurParDate or AccueilEtat.TriClasseurParDossier)) return;
+        if (Etat.TriClasseur == tri) return;
+        Etat.TriClasseur = tri;
+        AccueilEtat.MemoriserTriClasseur(tri);
+    }
+
     /// <summary>Referme les rubriques soeurs de celle-ci, dans son domaine.</summary>
     private void FermerLesAutresRubriques(NoeudGed rubrique)
     {

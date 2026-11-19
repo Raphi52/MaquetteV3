@@ -268,6 +268,25 @@ internal static class Programme
         Agir("arbreRubrique", Ligne(plan.Vue().Dossier!.Arbre, "Formalites")!.Id);
         Exiger(Lignes(plan.Vue().Dossier!.Arbre).Single(l => l.Actif).Texte == "Informations des Formalites",
             "la carte Formalites, qui commence par sa fiche, l'ouvre au milieu (comme son depliage dans l'arbre)");
+        // Le CLASSEMENT de la carte ouverte (« Par dossier » / « Par date ») est retenu d'une
+        // affaire a l'autre et au redemarrage (demande du 19/11/2026, AccueilEtat.TriClasseur).
+        Exiger(plan.Vue().Dossier!.TriClasseur == "date", "la carte ouverte se classe « Par date » tant qu'on n'a rien choisi");
+        Agir("arbreTri", "dossier");
+        Exiger(plan.Vue().Dossier!.TriClasseur == "dossier" && AccueilEtat.Charger().TriClasseur == "dossier",
+            "« Par dossier » clique : la vue le rend, et le fichier d'etat l'a deja");
+        Agir("arbreTri", "n'importe quoi");
+        Exiger(plan.Vue().Dossier!.TriClasseur == "dossier", "une valeur inconnue est ignoree");
+        Agir("ouvrirNumero", "004176");
+        Exiger(plan.Vue().Dossier!.TriClasseur == "dossier", "le classement reste d'une affaire a l'autre");
+        var redemarre = new SessionPlanTravail(null, null);
+        redemarre.Initialiser();
+        redemarre.Agir("ouvrirNumero", Valeur("004176"));
+        Exiger(redemarre.Vue().Dossier?.TriClasseur == "dossier" && AccueilEtat.Charger().TriClasseur == "dossier",
+            "le classement survit au redemarrage : une session neuve le relit dans le fichier d'etat");
+        redemarre.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        Agir("arbreTri", "date");
+        Exiger(plan.Vue().Dossier!.TriClasseur == "date" && AccueilEtat.Charger().TriClasseur == "date",
+            "revenir « Par date » s'enregistre aussi");
         // La suite part de l'etat d'entree de l'affaire (la fiche Formalites a change la mise en page).
         Agir("ouvrirNumero", "004176");
         d = plan.Vue().Dossier;

@@ -543,6 +543,26 @@ public sealed class AccueilEtat
         Enregistrer();
     }
 
+    /// <summary>
+    /// Le classement des pieces dans la carte ouverte du classeur de l'arbre
+    /// (web/src/composants/ClasseurArbre.tsx) : « date » (la frise, par defaut) ou
+    /// « dossier ». Il vaut pour toutes les affaires et survit au redemarrage
+    /// (demande du 19/11/2026, conv-2009).
+    /// </summary>
+    public string TriClasseur { get; set; } = TriClasseurParDate;
+
+    public const string TriClasseurParDate = "date";
+    public const string TriClasseurParDossier = "dossier";
+
+    /// <summary>Retient le classement du classeur. Relit le fichier avant d'ecrire, comme
+    /// MemoriserOnglets : une autre fenetre a pu l'enregistrer entre-temps.</summary>
+    public static void MemoriserTriClasseur(string tri)
+    {
+        var etat = Charger();
+        etat.TriClasseur = tri;
+        etat.Enregistrer();
+    }
+
     // RIGV3_ETAT : chemin de secours du fichier de reglages. Sert aux
     // controles internes, qui ne doivent PAS ecrire dans l'etat reel de
     // l'utilisateur. Vide en usage normal.

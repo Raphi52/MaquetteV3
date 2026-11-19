@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ClasseurArbre, frise, type LigneArbreVue, type ProprietesClasseurArbre } from './ClasseurArbre'
+import { ClasseurArbre, frise, type LigneArbreVue, type ProprietesClasseurArbre, type TriClasseur } from './ClasseurArbre'
 
 afterEach(cleanup)
 
@@ -55,10 +55,12 @@ function affaire(o: { choisi?: string, filtre?: boolean } = {}) {
   return { arbre, chemin, filtre: o.filtre ? 'certif' : '' }
 }
 
-function rendre(donnees = affaire()) {
+function rendre(donnees = affaire(), tri: TriClasseur = 'date') {
   const gestes: [string, unknown][] = []
   const p: ProprietesClasseurArbre = {
     ...donnees,
+    tri,
+    trier: (t) => gestes.push(['trier', t]),
     activer: (id) => gestes.push(['activer', id]),
     rubrique: (id) => gestes.push(['rubrique', id]),
     renommer: (r) => gestes.push(['renommer', r]),
@@ -163,11 +165,28 @@ describe('ClasseurArbre : la carte ouverte, par date et par dossier', () => {
     expect(textes(container, '.rig-classeur__carte--ouverte .rig-classeur__an')).toEqual(['2022', '2023'])
   })
 
-  it('« Par dossier » : chaque sous-dossier en intertitre, avec ce qu\'il range un cran plus loin', () => {
+  it('le classement vient du pont : un clic sur l\'autre le lui demande, l\'ecran ne bascule pas seul', () => {
     const { container, gestes } = rendre()
-    fireEvent.click([...container.querySelectorAll('.rig-classeur__tri button')].find((b) => b.textContent === 'Par dossier')!)
+    const bouton = (t: string) => [...container.querySelectorAll('.rig-classeur__tri button')].find((b) => b.textContent === t)!
+    fireEvent.click(bouton('Par date'))
+    expect(gestes).toEqual([])
+    fireEvent.click(bouton('Par dossier'))
+    expect(gestes).toEqual([['trier', 'dossier']])
+    expect(container.querySelector('.rig-classeur__tri--on')!.textContent).toBe('Par date')
+  })
+
+  it('« Par dossier » retenu par le pont : la carte s\'ouvre directement ainsi', () => {
+    const { container } = rendre(affaire(), 'dossier')
+    expect(container.querySelector('.rig-classeur__tri--on')!.textContent).toBe('Par dossier')
+    expect(container.querySelector('.rig-classeur__frise')).toBeNull()
+  })
+
+  it('« Par dossier » : chaque sous-dossier en intertitre, avec ce qu\'il range un cran plus loin', () => {
+    const { container, gestes } = rendre(affaire(), 'dossier')
     const corps = container.querySelector('.rig-classeur__carte--ouverte .rig-classeur__corps')!
-    expect(textes(corps, '.rig-classeur__it')).toEqual(['Depot n 2024/01411', 'Depot n A2024/0386542', 'Documents generes lors de la formalite1'].map((t) => t + '⋮'))
+    expect([...corps.querySelectorAll('.rig-classeur__it')].map((e) =>
+      ['.rig-arbre__chevron', '.rig-arbre__texte', '.rig-classeur__it-n'].map((s) => e.querySelector(s)!.textContent).join(' ')))
+      .toEqual(['▸ Depot n 2024/0141 1', '▸ Depot n A2024/038654 2', '▸ Documents generes lors de la formalite 1'])
     expect([...corps.querySelectorAll('.rig-classeur__it')].map((e) => (e as HTMLElement).style.getPropertyValue('--p'))).toEqual(['0', '0', '1'])
     expect([...corps.querySelectorAll('.rig-classeur__it')].map((e) => e.className.includes('--chemin'))).toEqual([false, true, true])
     const cert = [...corps.querySelectorAll('.rig-arbre__ligne')].find((e) => e.textContent!.trim().startsWith('Certificat'))!
@@ -185,6 +204,75 @@ describe('ClasseurArbre : la carte ouverte, par date et par dossier', () => {
     expect(saisie.value).toBe('Kbis a jour')
     fireEvent.keyDown(saisie, { key: 'Escape' })
     expect(gestes).toEqual([['renommer', { id: 'kbis', texte: '' }]])
+  })
+})
+
+describe('ClasseurArbre : replier un sous-dossier en « Par dossier »', () => {
+  const corps = (c: Element) => c.querySelector('.rig-classeur__carte--ouverte .rig-classeur__corps')!
+  const intertitre = (c: Element, debut: string) =>
+    [...corps(c).querySelectorAll('.rig-classeur__it')].find((e) => e.querySelector('.rig-arbre__texte')!.textContent!.startsWith(debut))!
+  const pieces = (c: Element) => textes(corps(c), '.rig-arbre__ligne .rig-arbre__texte')
+
+  it('un clic sur l\'intertitre replie ce qu\'il range, sous-dossiers compris ; un second le rouvre ; rien ne part au pont', () => {
+    const { container, gestes } = rendre(affaire(), 'dossier')
+    expect(intertitre(container, 'Depot n A2024').getAttribute('aria-expanded')).toBe('true')
+    // Il range la piece ouverte (le Certificat) : on peut quand meme le replier.
+    fireEvent.click(intertitre(container, 'Depot n A2024'))
+    expect(intertitre(container, 'Depot n A2024').getAttribute('aria-expanded')).toBe('false')
+    expect(intertitre(container, 'Depot n A2024').querySelector('.rig-arbre__chevron--ouvert')).toBeNull()
+    expect(pieces(container)).toEqual(['Informations des depots', 'Bail commercial'])
+    expect(textes(corps(container), '.rig-classeur__it .rig-arbre__texte')).toEqual(['Depot n 2024/0141', 'Depot n A2024/038654'])
+    fireEvent.click(intertitre(container, 'Depot n A2024'))
+    expect(pieces(container)).toEqual(['Informations des depots', 'Bail commercial',
+      'Extrait de proces-verbal du conseil de surveillance du 03/10/2024', "Certificat de depot d'actes"])
+    expect(gestes).toEqual([])
+  })
+
+  it('les trois points d\'un intertitre ouvrent le menu sans le replier', () => {
+    const { container, gestes } = rendre(affaire(), 'dossier')
+    fireEvent.click(intertitre(container, 'Depot n 2024').querySelector('.rig-arbre__actions')!)
+    expect(gestes).toEqual([['menu', 'd1']])
+    expect(intertitre(container, 'Depot n 2024').getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('« Par date » ignore les replis (la frise garde toutes les pieces) ; ils reviennent en « Par dossier »', () => {
+    const { container, rerender, p } = rendre(affaire(), 'dossier')
+    fireEvent.click(intertitre(container, 'Depot n A2024'))
+    rerender(<ClasseurArbre {...p} tri="date" />)
+    expect(container.querySelectorAll('.rig-classeur__ev')).toHaveLength(4)
+    rerender(<ClasseurArbre {...p} tri="dossier" />)
+    expect(intertitre(container, 'Depot n A2024').getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('une piece choisie AILLEURS (historique, palette) dans un sous-dossier replie le rouvre ; les autres replis restent', () => {
+    const d = affaire()
+    const { container, rerender, p } = rendre(d, 'dossier')
+    fireEvent.click(intertitre(container, 'Depot n 2024'))
+    fireEvent.click(intertitre(container, 'Depot n A2024'))
+    expect(pieces(container)).toEqual(['Informations des depots'])
+    // Le Bail commercial, range sous « Depot n 2024/0141 », est choisi depuis l'historique.
+    const rcs = d.arbre.enfants[0]!
+    const actes = rcs.enfants[2]!
+    const [d1, d2] = [actes.enfants[1]!, actes.enfants[2]!]
+    const gen = d2.enfants[1]!
+    // L'arbre tel que le pont le rend quand le Bail (bail = vrai) ou le Kbis est choisi.
+    const arbre = (bail: boolean): LigneArbreVue => ({ ...d.arbre, enfants: [{ ...rcs, enfants: [
+      { ...rcs.enfants[0]!, actif: !bail }, rcs.enfants[1]!,
+      { ...actes, chemin: bail, enfants: [
+        actes.enfants[0]!,
+        { ...d1, chemin: bail, enfants: [{ ...d1.enfants[0]!, actif: bail }] },
+        { ...d2, chemin: false, enfants: [d2.enfants[0]!, { ...gen, chemin: false, enfants: [{ ...gen.enfants[0]!, actif: false }] }] },
+      ] },
+      rcs.enfants[3]!,
+    ] }, d.arbre.enfants[1]!] })
+    rerender(<ClasseurArbre {...p} arbre={arbre(true)} chemin={['004176', 'Dossier RCS', "Depots d'actes", 'Depot n 2024/0141', 'Bail commercial']} />)
+    expect(intertitre(container, 'Depot n 2024').getAttribute('aria-expanded')).toBe('true')
+    expect(intertitre(container, 'Depot n A2024').getAttribute('aria-expanded')).toBe('false')
+    expect(pieces(container)).toEqual(['Informations des depots', 'Bail commercial'])
+    // Rouvert, il le reste quand la selection repart ailleurs (le Kbis, hors rubrique).
+    rerender(<ClasseurArbre {...p} arbre={arbre(false)} chemin={['004176', 'Dossier RCS', 'Kbis a jour']} />)
+    expect(intertitre(container, 'Depot n 2024').getAttribute('aria-expanded')).toBe('true')
+    expect(intertitre(container, 'Depot n A2024').getAttribute('aria-expanded')).toBe('false')
   })
 })
 

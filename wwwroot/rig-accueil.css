@@ -4284,12 +4284,14 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 }
 .rig-classeur__date { font: 10px var(--rig-font-mono); color: var(--rig-texte-3); flex: none; }
 
-/* Un sous-dossier, en intertitre dans sa carte. */
+/* Un sous-dossier, en intertitre dans sa carte : un clic le replie, son chevron le dit. */
 .rig-classeur__it {
   display: flex; align-items: center; gap: 6px; margin: 6px 0 1px; min-height: 22px;
-  padding: 0 6px 0 calc(6px + var(--p, 0) * 12px);
+  padding: 0 6px 0 calc(6px + var(--p, 0) * 12px); border-radius: 5px; cursor: pointer;
   font: 500 12px/1.3 var(--rig-font); color: var(--rig-texte-2);
 }
+.rig-classeur__it:hover { background: var(--rig-fond-2); }
+.rig-classeur__it .rig-arbre__chevron { width: 10px; flex: 0 0 10px; font-size: 12px; line-height: 1; text-align: center; color: var(--rig-texte-2); }
 .rig-classeur__it .rig-arbre__texte { flex: 0 1 auto; min-width: 0; }
 .rig-classeur__it-icone { width: 13px; height: 13px; flex: none; color: var(--g, var(--rig-texte-3)); }
 .rig-classeur__it-n { font: 700 9.5px var(--rig-font-mono); color: var(--g, var(--rig-texte-3)); }

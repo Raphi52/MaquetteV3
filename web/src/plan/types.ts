@@ -3,7 +3,7 @@
 // champs : un champ renomme d'un cote casse le typecheck de l'autre a la relecture.
 
 import type { VuePlanAccueil } from '../accueil/types'
-import type { LigneArbreVue } from '../composants/ClasseurArbre'
+import type { LigneArbreVue, TriClasseur } from '../composants/ClasseurArbre'
 import type { VueKbis } from '../composants/ApercuKbis'
 
 /** Remonte un geste a SessionPlanTravail.Agir (le rappel « plan » de Home.razor). */
@@ -144,6 +144,8 @@ export interface DossierVue {
   fil: MessageFilVue[]
   /** La colonne de suivi est repliee a droite : un rail la remplace, sa poignee disparait. */
   suiviReplie: boolean
+  /** Le classement de la carte ouverte du classeur, retenu d'une affaire a l'autre et au redemarrage. */
+  triClasseur: TriClasseur
 }
 export interface PieceHistoriqueVue {
   id: string

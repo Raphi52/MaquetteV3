@@ -172,7 +172,8 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
           {/* LE CLASSEUR (/draft du 19/11/2026, « Chronologie ») : une bascule par
               domaine, une carte par rubrique, la piece ouverte rappelee. */}
           <div className="rig-arbre">
-            <ClasseurArbre arbre={d.arbre} chemin={d.chemin} filtre={d.filtre}
+            <ClasseurArbre arbre={d.arbre} chemin={d.chemin} filtre={d.filtre} tri={d.triClasseur}
+                           trier={(tri) => plan('arbreTri', tri)}
                            activer={(id) => plan('arbreActiver', id)}
                            rubrique={(id) => plan('arbreRubrique', id)}
                            renommer={(r) => plan('arbreRenommer', r)}
