@@ -28,7 +28,7 @@ namespace RigV3Desktop.Pont;
 
 /// <summary>Ce que seul le plan de travail (Home.razor, lot 2) sait, a chaque rendu.</summary>
 /// <param name="Recouvert">Un ecran de procedure ou une affaire recouvre l'accueil :
-/// le rond de profil passe alors dans la barre du haut.</param>
+/// son titre, et le rond de profil avec lui, ne se voient plus.</param>
 /// <param name="CodeOuvert">Le code de l'ecran de procedure ouvert (lien actif du menu).</param>
 /// <param name="Trouve">Les resultats de la recherche, calcules sur le fonds d'affaires
 /// et le catalogue des traitements du plan de travail.</param>
@@ -67,14 +67,13 @@ public sealed record GesteIle(string Nom, JsonElement Valeur);
 
 // ---------------- La vue (ce que React affiche) ----------------
 
-public sealed record VueAccueil(string Theme, VueBarre Barre, VuePlanAccueil Accueil);
+public sealed record VueAccueil(string Theme, VuePlanAccueil Accueil);
 
-public sealed record VueBarre(string Version, bool Reglages, string Theme, ThemeVue[] Themes, ProfilVue? Profil);
 public sealed record ThemeVue(string Code, string Libelle);
 
 /// <summary>Le rond de profil et, ouvert, la liste des logins.</summary>
 /// <param name="Titre">L'infobulle du rond (login, profil, domaines).</param>
-public sealed record ProfilVue(bool DansLaBarre, bool Ouvert, string Initiales, string Titre, string Login,
+public sealed record ProfilVue(bool Ouvert, string Initiales, string Titre, string Login,
                                CompteVue[] Comptes);
 public sealed record CompteVue(string Login, string Initiales, string Profil, string Domaines, bool Actif);
 
@@ -96,7 +95,9 @@ public sealed record EnteteVue(string Date, string Utilisateur, PhraseVue Phrase
 /// <param name="HorsDelaiConnu">La mesure « Hors delai legal » est relevee.</param>
 /// <param name="Traites">La valeur de « Dossiers traites », null tant qu'elle n'est pas relevee.</param>
 public sealed record PhraseVue(bool HorsDelaiConnu, int HorsDelai, int Arrivees, string? Traites);
-public sealed record PanneauTuilesVue(DispositionVue[] Dispositions, BasculeVue[] Tuiles);
+/// <param name="Theme">Le theme choisi ; <paramref name="Themes"/> ceux de ThemesRig. Le choix vit ICI
+/// depuis que la barre du haut ne porte plus que les onglets (19/11/2026).</param>
+public sealed record PanneauTuilesVue(string Theme, ThemeVue[] Themes, DispositionVue[] Dispositions, BasculeVue[] Tuiles);
 public sealed record DispositionVue(string Id, string Titre, string Aide, bool Actif);
 
 public sealed record RechercheVue(string Texte, TraitementTrouveVue[] Traitements, AffaireTrouveeVue[] Affaires,
@@ -184,8 +185,6 @@ public sealed record BasculeVue(string Id, string Libelle, string? Titre, bool A
 /// </summary>
 public sealed class SessionAccueil : IAsyncDisposable
 {
-    public const string Version = "3.0.14";
-
     public SessionAccueil(AccueilEtat etat)
     {
         Etat = etat;
@@ -273,11 +272,10 @@ public sealed class SessionAccueil : IAsyncDisposable
         MinuteurActualites = null;
     }
 
-    // ================= Barre du haut, reglages, theme, profil =================
-
-    /// <summary>Reglages ancres dans la barre du haut (theme). Distincts du panneau
-    /// des tuiles, qui vit dans l'accueil et disparait des qu'un ecran s'ouvre.</summary>
-    public bool PanneauBarreOuvert { get; private set; }
+    // ================= Reglages, theme, profil =================
+    // La barre du haut ne porte plus que les onglets et les boutons de la
+    // fenetre (19/11/2026, « comme Brave ») : le theme se choisit dans les
+    // reglages de l'accueil, le profil a droite de son titre.
 
     /// <summary>Panneau du rond de profil : la liste des logins.</summary>
     public bool PanneauProfilOuvert { get; private set; }
@@ -285,8 +283,6 @@ public sealed class SessionAccueil : IAsyncDisposable
     public bool PanneauTuilesOuvert { get; private set; }
 
     private void BasculerPanneauTuiles() => PanneauTuilesOuvert = !PanneauTuilesOuvert;
-
-    private void BasculerPanneauBarre() => PanneauBarreOuvert = !PanneauBarreOuvert;
 
     /// <summary>
     /// Le theme ne peut pas rester porte par l'accueil : le fond de la page hote
@@ -1165,8 +1161,6 @@ public sealed class SessionAccueil : IAsyncDisposable
             case "reduire": return new(DemandeAccueil.Reduire);
             case "agrandir": return new(DemandeAccueil.Agrandir);
             case "fermer": return new(DemandeAccueil.Fermer);
-            case "panneauBarre": BasculerPanneauBarre(); return null;
-            case "fermerPanneauBarre": PanneauBarreOuvert = false; return null;
             case "theme": ChoisirTheme(Texte(valeur)); return new(DemandeAccueil.ThemeChange, Theme);
             // --- Rond de profil
             case "profil": PanneauProfilOuvert = !PanneauProfilOuvert; return null;
@@ -1278,20 +1272,16 @@ public sealed class SessionAccueil : IAsyncDisposable
 
     public VueAccueil Vue(ContexteAccueil ctx)
     {
-        var themes = ThemesRig.Tous.Select(t => new ThemeVue(t.Code, t.Libelle)).ToArray();
-        var barre = new VueBarre(Version, PanneauBarreOuvert, Theme, themes,
-                                 ctx.Recouvert ? Profil(dansLaBarre: true) : null);
-        return new VueAccueil(Theme, barre, Plan(ctx));
+        return new VueAccueil(Theme, Plan(ctx));
     }
 
     /// <summary>Le rond de profil (« Commandes rondes », 18/11/2026) : les initiales
-    /// du login ; un clic deroule les comptes. Sur l'accueil il est a droite du
-    /// titre ; un ecran ouvert recouvre ce titre, il est alors rendu dans la
-    /// barre : un seul des deux existe a la fois, donc un seul etat d'ouverture.</summary>
-    private ProfilVue Profil(bool dansLaBarre)
+    /// du login ; un clic deroule les comptes. Il est a droite du titre de
+    /// l'accueil, et seulement la : la barre du haut ne porte plus que les onglets.</summary>
+    private ProfilVue Profil()
     {
         var c = CompteCourant;
-        return new ProfilVue(dansLaBarre, PanneauProfilOuvert, c.Initiales,
+        return new ProfilVue(PanneauProfilOuvert, c.Initiales,
             $"{c.Login} · {c.Profil} ({c.DomainesLisibles}) : changer de login", c.Login,
             PanneauProfilOuvert
                 ? JeuDemo.Comptes.Select(x => new CompteVue(x.Login, x.Initiales, x.Profil, x.DomainesLisibles,
@@ -1315,11 +1305,12 @@ public sealed class SessionAccueil : IAsyncDisposable
             PanneauTuilesOuvert,
             PanneauTuilesOuvert
                 ? new PanneauTuilesVue(
+                    Theme, ThemesRig.Tous.Select(t => new ThemeVue(t.Code, t.Libelle)).ToArray(),
                     Dispositions.Select(d => new DispositionVue(d.Id, d.Titre, d.Aide, Etat.Disposition == d.Id)).ToArray(),
                     Definitions.Where(TuileAutorisee)
                                .Select(def => new BasculeVue(def.Id, def.Titre, null, Pose(def.Id).Visible)).ToArray())
                 : null,
-            ctx.Recouvert ? null : Profil(dansLaBarre: false));
+            ctx.Recouvert ? null : Profil());
 
         var chiffres = new ChiffresVue(ChiffreDeplie, chiffreArriveesTotal,
             chiffreEnTete is null ? "rien a traiter" : $"{chiffreEnTete.Nombre} : {chiffreEnTete.Titre}",

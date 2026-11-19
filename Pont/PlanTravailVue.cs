@@ -18,12 +18,13 @@ namespace RigV3Desktop.Pont;
 /// <summary>Toute la page : l'accueil (lot 1) et le plan de travail.</summary>
 /// <param name="Geste">Le numero du dernier geste du plan de travail joue (GestePlan.Numero) : la
 /// page n'affiche jamais une vue plus ancienne que son dernier geste.</param>
-/// <param name="Barre">Nul dans la fenetre d'un onglet sorti (ni barre, ni accueil).</param>
-/// <param name="Onglets">Nul quand la barre d'onglets n'est pas affichee.</param>
+/// <param name="Barre">Faux dans la fenetre d'un onglet sorti (ni barre, ni accueil). La barre
+/// du haut ne porte que les onglets et les boutons de la fenetre (19/11/2026, « comme Brave »).</param>
+/// <param name="Onglets">Nul quand aucun onglet n'est ouvert.</param>
 /// <param name="FinsDeGlisse">Avance quand le C# termine lui-meme un glisser d'onglet (onglet arrache).</param>
 /// <param name="Pagination">Avance quand l'observateur de defilement des etapes doit etre rebranche.</param>
 /// <param name="Defilement">Le dernier defilement de la zone des etapes demande par le C#.</param>
-public sealed record VueApplication(string Theme, int Geste, VueBarre? Barre, VuePlanAccueil? Accueil,
+public sealed record VueApplication(string Theme, int Geste, bool Barre, VuePlanAccueil? Accueil,
                                     OngletBarreVue[]? Onglets, int FinsDeGlisse, ProcVue? Proc,
                                     DossierVue? Dossier, ImpressionVue? Impression, EnvoiMailVue? EnvoiMail,
                                     NouveauVue? Nouveau, MenuNoeudVue? MenuNoeud,
@@ -167,7 +168,7 @@ public sealed partial class SessionPlanTravail
         return new VueApplication(
             Theme,
             DernierGeste,
-            vueAccueil?.Barre,
+            vueAccueil is not null,
             vueAccueil?.Accueil,
             !ModeFenetreVue && Onglets.Onglets.Count > 0
                 ? Onglets.Onglets.Select(o => new OngletBarreVue(
