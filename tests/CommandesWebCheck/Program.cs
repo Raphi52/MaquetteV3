@@ -474,9 +474,30 @@ Exiger(vue.Panneau!.Rapprochement is { Debiteur: true, RechercheOuverte: false, 
        && r1.Entites.Single() is { NbAdresses: 2, NbInscriptions: 17, SirenConcorde: true, RaisonConcorde: true,
                                     Ecarts.Length: 0, Lignes.Length: 1 },
     "correspondance : commande face au dossier (SIREN et raison sociale concordent, 2 adresses, 17 inscriptions), recherche repliee");
-Geste("Basculer", "RechercheDebiteurOuverte");
+Geste("Basculer", "RechercheRapprochementOuverte");
 Exiger(vue.Panneau!.Rapprochement!.RechercheOuverte, "correspondance : « Chercher un autre dossier » deplie la recherche");
-Geste("Basculer", "RechercheDebiteurOuverte");
+Geste("Basculer", "RechercheRapprochementOuverte");
+// La meme Correspondance pour le dossier concerne (non-opposition, faillite) : la
+// faillite SCI DU PARC (n° 6) face a son dossier, recherche repliee ; et CHAQUE
+// dossier trouve porte ses ecarts, meme non retenu (avant : seul le retenu).
+var c6t = temoin.Single(c => c.Id == 6);
+Geste("Choisir", 6);
+Exiger(vue.Panneau!.Rapprochement is { Debiteur: false, Faillite: true, RechercheOuverte: false, Message: null } r6
+       && r6.CommandeSiren == TraitementCommandes.FormaterSiren(c6t.Siren) && r6.CommandeRaison == c6t.Denomination
+       && r6.Entites.Single() is { Gestion: "004176", SirenConcorde: true, RaisonConcorde: true, Ecarts.Length: 0, Retenue: false },
+    "correspondance : la faillite SCI DU PARC face au dossier 004176 (SIREN et raison sociale concordent), recherche repliee");
+Geste("Basculer", "RechercheRapprochementOuverte");
+Exiger(vue.Panneau!.Rapprochement!.RechercheOuverte, "correspondance : le dossier concerne deplie aussi sa recherche");
+Geste("Texte", new { champ = "RechSiren", valeur = "" });
+Geste("Texte", new { champ = "RechRaison", valeur = "AMIENS BILLARDS" });
+Geste("RelancerRapprochement");
+var autres = vue.Panneau!.Rapprochement!.Entites;
+Exiger(autres.Length == 1 && autres.All(e => !e.Retenue && e.RaisonConcorde == false && e.SirenConcorde == false
+                                            && e.Ecarts.SequenceEqual(TraitementCommandes.Ecarts(c6t, TraitementCommandes.Entite(e.Cle)!))
+                                            && e.Ecarts.Contains("Raison sociale reçu : SCI DU PARC ≠ AMIENS BILLARDS")),
+    "correspondance : le dossier AMIENS BILLARDS trouve pour la faillite SCI DU PARC porte ses ecarts sans etre retenu (lu : "
+    + string.Join(" ; ", autres.Select(e => $"{e.Cle}={string.Join("|", e.Ecarts)}")) + ")");
+Geste("Choisir", 1);
 Geste("OuvrirBande", "Rejeter");
 Exiger(vue.Panneau?.Pied?.Bande is { Rejet: true, ConfirmerRefuse: true }, "joue : la bande de rejet s'ouvre, confirmation fermee sans motif");
 Geste("Decider", "Rejeter");

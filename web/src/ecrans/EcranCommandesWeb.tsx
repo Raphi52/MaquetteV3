@@ -97,7 +97,6 @@ export interface EntiteCw {
   designation: string
   siren: string
   type: string
-  resume: string
   radie: boolean
   retenue: boolean
   lignes: LigneEntiteCw[]
@@ -245,7 +244,8 @@ function Concorde({ ok }: { ok: boolean | null }) {
 }
 
 /**
- * La « Correspondance » du debiteur (/draft du 19/11/2026, proposition 5) : la
+ * La « Correspondance » du rapprochement (/draft du 19/11/2026, proposition 5),
+ * pour le debiteur comme pour le dossier concerne (non-opposition, faillite) : la
  * commande et le dossier trouve cote a cote, champ par champ, puis le verdict
  * et « Retenir ». Une carte par dossier trouve ; le double-clic retient, comme
  * dans le tableau d'avant.
@@ -299,9 +299,9 @@ function Correspondance({ r, e, geste }: { r: RapprochementCw; e: EntiteCw; gest
 function ZoneRapprochement({ r, geste }: { r: RapprochementCw; geste: Geste }) {
   const resume = r.aRetenue && !r.deplie
   const texte = (champ: string) => (valeur: string) => geste('Texte', { champ, valeur })
-  // Le debiteur replie sa recherche derriere ce lien tant que des dossiers sont
-  // a comparer ; sans dossier ou avec un message, elle reste ouverte (le C# la force).
-  const lienRecherche = r.debiteur && !resume && r.entites.length > 0 && r.message === null
+  // La recherche se replie derriere ce lien tant que des dossiers sont a
+  // comparer ; sans dossier ou avec un message, elle reste ouverte (le C# la force).
+  const lienRecherche = !resume && r.entites.length > 0 && r.message === null
   const lienDossier = r.aRetenue && !r.traitee
   return (
     <section className="rig-tcw__zone">
@@ -315,7 +315,7 @@ function ZoneRapprochement({ r, geste }: { r: RapprochementCw; geste: Geste }) {
         {(lienRecherche || lienDossier) && <span className="rig-tcw__espace"></span>}
         {lienRecherche && (
           <button className="rig-tcw__lien" aria-expanded={r.rechercheOuverte}
-                  onClick={() => geste('Basculer', 'RechercheDebiteurOuverte')}>
+                  onClick={() => geste('Basculer', 'RechercheRapprochementOuverte')}>
             {r.rechercheOuverte ? 'Masquer la recherche' : 'Chercher un autre dossier'}
           </button>
         )}
@@ -340,7 +340,7 @@ function ZoneRapprochement({ r, geste }: { r: RapprochementCw; geste: Geste }) {
         </>
       ) : (
         <>
-          {(!r.debiteur || r.rechercheOuverte) && <div className="rig-tcw__rech-debiteur">
+          {r.rechercheOuverte && <div className="rig-tcw__rech-debiteur">
             <Saisie className="rig-saisie-champ__saisie" aria-label="SIREN" placeholder="SIREN"
                     valeur={r.rechSiren} changer={texte('RechSiren')} />
             <Saisie className="rig-saisie-champ__saisie" aria-label="Raison sociale" placeholder="Raison sociale"
@@ -364,58 +364,9 @@ function ZoneRapprochement({ r, geste }: { r: RapprochementCw; geste: Geste }) {
               ? 'Sélectionnez le dossier concerné pour rattacher le certificat.'
               : 'Plusieurs entités répondent alors qu\'un seul dossier est attendu : désignez la bonne.'}</div>
           ) : null}
-          {r.debiteur && r.entites.length > 0 && (
+          {r.entites.length > 0 && (
             <>
               {r.entites.map((e) => <Correspondance key={e.cle} r={r} e={e} geste={geste} />)}
-              <div className="rig-tcw__resume">{r.resumeRapprochement}</div>
-            </>
-          )}
-          {/* Le dossier concerne (non-opposition, faillite) garde son tableau. */}
-          {!r.debiteur && r.entites.length > 0 && (
-            <>
-              <div className="rig-table-cadre rig-tcw__cadre">
-                <table className="rig-table rig-tcw__rappro">
-                  <thead>
-                    <tr><th>Dossier</th><th>Nature</th><th>Désignation</th><th>Siren</th><th>Adresse</th><th>Type</th><th>Nb ins</th><th></th></tr>
-                  </thead>
-                  <tbody>
-                    {r.entites.map((e) => [
-                      <tr key={`b:${e.cle}`} className={`rig-tcw__bloc ${e.retenue ? 'rig-tcw__bloc--retenu' : ''}`}
-                          onDoubleClick={() => geste('Retenir', e.cle)}>
-                        {/* Cellule en texte courant : les blancs entre pastille, nom et
-                            resume sont ceux que le .razor gardait (ni avant ni entre
-                            les pastilles conditionnelles). */}
-                        <td colSpan={7}>
-                          <span className="rig-tcw__pastille rig-tcw__pastille--accent">{e.nonInscrit ? 'NON-INSCRIT' : 'DOSSIER RCS'}</span>{' '}
-                          <b>{e.designation}</b>{' '}
-                          <span className="rig-tcw__discret">{e.resume}</span>
-                          {e.radie && <span className="rig-tcw__pastille rig-tcw__pastille--radie">RADIÉ</span>}
-                          {e.retenue && <span className="rig-tcw__pastille rig-tcw__pastille--retenue">RETENUE</span>}
-                        </td>
-                        <td className="rig-tcw__cellule-action">
-                          {!e.retenue && <button className="rig-tcw__lien" onClick={() => geste('Retenir', e.cle)}>Retenir</button>}
-                        </td>
-                      </tr>,
-                      ...e.lignes.map((l, i) => (
-                        <tr key={`l:${e.cle}:${i}`} className={e.retenue ? 'rig-tcw__ligne--retenue' : ''}
-                            onDoubleClick={() => geste('Retenir', e.cle)}>
-                          <td className="rig-table__mono">{e.gestion.length > 0 ? e.gestion : 'NI'}</td>
-                          <td><span className="rig-tcw__nature">{l.nature}</span></td>
-                          <td>{e.designation}</td>
-                          <td className="rig-table__mono">{e.siren}</td>
-                          <td title={l.adresse}>{l.adresse}</td>
-                          <td>{e.type}</td>
-                          <td className="rig-table__centre">{l.nbInscriptions}</td>
-                          <td></td>
-                        </tr>
-                      )),
-                      ...e.ecarts.map((ecart, i) => (
-                        <tr key={`e:${e.cle}:${i}`} className="rig-tcw__ecart"><td colSpan={8} title="Voir ce qui ne correspond pas à la commande">≠ {ecart}</td></tr>
-                      )),
-                    ])}
-                  </tbody>
-                </table>
-              </div>
               <div className="rig-tcw__resume">{r.resumeRapprochement}</div>
             </>
           )}

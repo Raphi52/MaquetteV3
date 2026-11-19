@@ -412,7 +412,7 @@ describe('EcranCommandesWeb', () => {
   // dossier trouve cote a cote, le verdict, « Retenir » ; la recherche repliee.
   it('debiteur : la commande et chaque dossier se comparent, la recherche se replie derriere un lien', async () => {
     const entite = (cle: string, designation: string, siren: string, ecarts: string[]) => ({
-      cle, nonInscrit: false, gestion: cle, designation, siren, type: 'PM', resume: '', radie: false, retenue: false,
+      cle, nonInscrit: false, gestion: cle, designation, siren, type: 'PM', radie: false, retenue: false,
       lignes: [{ nature: 'SIÈGE', adresse: '12 rue des Trois Cailloux, 80000 AMIENS', nbInscriptions: 14 }], ecarts,
       nbAdresses: 2, nbInscriptions: 17, sirenConcorde: ecarts.length === 0, raisonConcorde: true,
     })
@@ -454,7 +454,48 @@ describe('EcranCommandesWeb', () => {
     expect(screen.getByText('Masquer la recherche').getAttribute('aria-expanded')).toBe('true')
 
     fireEvent.click(ecart.querySelector('.rig-tcw__verdict button')!)
-    expect(gestes).toEqual([['Basculer', 'RechercheDebiteurOuverte'], ['Retenir', '004151']])
+    expect(gestes).toEqual([['Basculer', 'RechercheRapprochementOuverte'], ['Retenir', '004151']])
+  })
+
+  // Meme « Correspondance » pour le dossier concerne (non-opposition, faillite) :
+  // son ancien tableau disparait, sa recherche se replie, sans les interrupteurs du debiteur.
+  it('dossier concerne : meme Correspondance que le debiteur, recherche repliee sans interrupteurs', async () => {
+    const rapprochement = {
+      debiteur: false, faillite: true, aRetenue: false, deplie: false, traitee: false, retenue: null,
+      rechSiren: '512004331', rechRaison: 'SCI DU PARC', tousDebiteurs: false, tousEtablissements: false,
+      message: null, resumeRapprochement: '1 ligne(s) · 1 PM · 0 NI',
+      commandeSiren: '512 004 331', commandeRaison: 'SCI DU PARC', rechercheOuverte: false,
+      entites: [{
+        cle: '004176', nonInscrit: false, gestion: '004176', designation: 'SCI DU PARC', siren: '512 004 331', type: 'PM',
+        radie: false, retenue: false,
+        lignes: [{ nature: 'SIÈGE', adresse: '18 rue du Parc, 80480 DURY', nbInscriptions: 6 }], ecarts: [],
+        nbAdresses: 1, nbInscriptions: 6, sirenConcorde: true, raisonConcorde: true,
+      }],
+    }
+    const { gestes } = session({ ...vueDeBase(), panneau: { ...panneau(), rapprochement } }, (v, geste) => {
+      if (geste === 'Basculer') v.panneau!.rapprochement!.rechercheOuverte = !v.panneau!.rapprochement!.rechercheOuverte
+      return v
+    })
+    render(<EcranCommandesWeb />)
+    const zone = (await screen.findByText('Dossier concerné', { selector: '.rig-tcw__section' })).closest('.rig-tcw__zone')!
+
+    expect(zone.querySelector('table')).toBeNull()
+    const cartes = [...zone.querySelectorAll('.rig-tcw__corresp')]
+    expect(cartes).toHaveLength(1)
+    expect(cartes[0]!.querySelectorAll('.rig-tcw__comparaison .rig-tcw__coche')).toHaveLength(2)
+    expect(cartes[0]!.querySelector('.rig-tcw__verdict')!.textContent).toBe('Aucun écart avec la commandeRetenir')
+    // Les textes de NeoRIG propres au dossier concerne restent : sa consigne en tete, l'invite au-dessus des cartes.
+    expect(zone.textContent).toContain('Résolution directe par le n° de gestion reçu')
+    expect(zone.querySelector('.rig-tcw__ligne-statut--info')!.textContent).toBe('Sélectionnez le dossier concerné pour rattacher le certificat.')
+    expect(zone.querySelector('.rig-tcw__resume')!.textContent).toBe('1 ligne(s) · 1 PM · 0 NI')
+
+    expect(screen.queryByPlaceholderText('SIREN')).toBeNull()
+    fireEvent.click(screen.getByText('Chercher un autre dossier'))
+    await screen.findByPlaceholderText('SIREN')
+    expect(screen.queryByText('Tous les débiteurs')).toBeNull()
+
+    fireEvent.click(zone.querySelector('.rig-tcw__corresp .rig-tcw__verdict button')!)
+    expect(gestes).toEqual([['Basculer', 'RechercheRapprochementOuverte'], ['Retenir', '004176']])
   })
 
   it('un message se ferme par sa croix ; sa severite donne sa classe', async () => {

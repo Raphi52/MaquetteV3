@@ -52,7 +52,7 @@ public sealed record LigneEntiteCw(string Nature, string Adresse, int NbInscript
 /// RaisonConcorde disent si la commande et le dossier concordent (null : rien a comparer).
 /// </summary>
 public sealed record EntiteCw(string Cle, bool NonInscrit, string Gestion, string Designation, string Siren,
-                              string Type, string Resume, bool Radie, bool Retenue, LigneEntiteCw[] Lignes,
+                              string Type, bool Radie, bool Retenue, LigneEntiteCw[] Lignes,
                               string[] Ecarts, int NbAdresses, int NbInscriptions, bool? SirenConcorde,
                               bool? RaisonConcorde);
 public sealed record RetenueCw(string Code, string Designation, bool Radie, string Detail, string[] Ecarts);
@@ -60,7 +60,7 @@ public sealed record RetenueCw(string Code, string Designation, bool Radie, stri
 /// <summary>
 /// La zone de rapprochement (debiteur ou dossier concerne). CommandeSiren et
 /// CommandeRaison : ce que la commande a reçu, la colonne « Commande » de la vue
-/// « Correspondance » du debiteur (/draft du 19/11/2026). RechercheOuverte : ses
+/// « Correspondance » (/draft du 19/11/2026), commune aux deux. RechercheOuverte : ses
 /// champs de recherche sont montres (replies tant qu'un dossier est trouve).
 /// </summary>
 public sealed record RapprochementCw(bool Debiteur, bool Faillite, bool ARetenue, bool Deplie, bool Traitee,
@@ -192,9 +192,9 @@ public sealed class SessionCommandesWeb
     private ResultatRapprochement Resultat = new([], null);
     private bool TousDebiteurs;
     private bool TousEtablissements;
-    // « Chercher un autre dossier » : la recherche du debiteur reste repliee tant
-    // qu'un dossier est trouve ; ce lien la deplie.
-    private bool RechercheDebiteurOuverte;
+    // « Chercher un autre dossier » : la recherche du rapprochement (debiteur ou
+    // dossier concerne) reste repliee tant qu'un dossier est trouve ; ce lien la deplie.
+    private bool RechercheRapprochementOuverte;
     private readonly HashSet<string> TypesCoches = new(StringComparer.Ordinal);
     private int QuantiteInscriptions = 1;
     private readonly HashSet<SousTypeCno> SousTypes = [];
@@ -366,7 +366,7 @@ public sealed class SessionCommandesWeb
         RechRaison = c.Denomination;
         TousDebiteurs = false;
         TousEtablissements = false;
-        RechercheDebiteurOuverte = false;
+        RechercheRapprochementOuverte = false;
         Resultat = TraitementCommandes.RechercherPour(c);
 
         var choix = ChoixCommande.ParDefaut(c);
@@ -448,7 +448,7 @@ public sealed class SessionCommandesWeb
         Selection.CibleRetenue = e.Cle;
         // Le dossier retenu se resume en une ligne ; « Changer de dossier » rouvre la recherche.
         RapprochementDeplie = false;
-        RechercheDebiteurOuverte = false;
+        RechercheRapprochementOuverte = false;
         // Changer de cible change les certificats : les motifs de la cible quittee n'ont plus cours.
         CertificatDeFaillite = false;
     }
@@ -848,7 +848,7 @@ public sealed class SessionCommandesWeb
             case nameof(ChoixDeplie): ChoixDeplie = !ChoixDeplie; break;
             case nameof(TousDebiteurs): TousDebiteurs = !TousDebiteurs; break;
             case nameof(TousEtablissements): TousEtablissements = !TousEtablissements; break;
-            case nameof(RechercheDebiteurOuverte): RechercheDebiteurOuverte = !RechercheDebiteurOuverte; break;
+            case nameof(RechercheRapprochementOuverte): RechercheRapprochementOuverte = !RechercheRapprochementOuverte; break;
             case nameof(EnvoiMail): EnvoiMail = !EnvoiMail; break;
             default: throw new ArgumentException($"Bascule inconnue : « {champ} ».", nameof(champ));
         }
@@ -1011,24 +1011,21 @@ public sealed class SessionCommandesWeb
                 TraitementCommandes.Ecarts(c, retenue).ToArray());
         }
 
+        // CHAQUE dossier trouve se compare a la commande (son verdict « Aucun
+        // écart avec la commande » ou ses ≠), debiteur comme dossier concerne.
         var vueEntites = affichees.Select(a =>
         {
             var e = a.Entite;
-            var estRetenue = e.Cle == c.CibleRetenue;
-            // Le debiteur compare CHAQUE dossier trouve a la commande (son verdict
-            // « Aucun écart avec la commande » ou ses ≠) ; le dossier concerne ne
-            // montre que les ecarts du dossier retenu, comme avant.
             return new EntiteCw(e.Cle, e.NonInscrit, e.Gestion, e.Designation, TraitementCommandes.FormaterSiren(e.Siren),
-                e.Type, TraitementCommandes.ResumeEntite(e), e.Radie, estRetenue,
+                e.Type, e.Radie, e.Cle == c.CibleRetenue,
                 a.Lignes.Select(l => new LigneEntiteCw(l.Nature, l.Adresse, l.NbInscriptions)).ToArray(),
-                estRetenue || debiteur ? TraitementCommandes.Ecarts(c, e).ToArray() : [],
-                e.Lignes.Count, e.NbInscriptions,
+                TraitementCommandes.Ecarts(c, e).ToArray(), e.Lignes.Count, e.NbInscriptions,
                 TraitementCommandes.SirenConcorde(c, e), TraitementCommandes.RaisonConcorde(c, e));
         }).ToArray();
 
         // Recherche du debiteur repliee tant qu'il y a des dossiers a comparer et
         // aucun message de la recherche a lire ; sinon ses champs restent la.
-        var rechercheOuverte = RechercheDebiteurOuverte || entites.Count == 0 || Resultat.Message is not null;
+        var rechercheOuverte = RechercheRapprochementOuverte || entites.Count == 0 || Resultat.Message is not null;
         return new RapprochementCw(debiteur, c.Famille == FamilleCommande.Faillite, retenue is not null,
             RapprochementDeplie, c.EstTraitee, vueRetenue, RechSiren, RechRaison, TousDebiteurs, TousEtablissements,
             Resultat.Message, vueEntites,
