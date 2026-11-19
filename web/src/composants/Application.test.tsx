@@ -121,7 +121,7 @@ describe('Application : la barre d\'onglets', () => {
     expect(b!.querySelector('.rig-vonglet__sorti')!.textContent).toBe('↗')
     expect(a!.querySelector('.rig-vonglet__fermer')!.getAttribute('aria-label')).toBe('Fermer Factures')
     // Une croix dessinee, du trait du « + » de la barre, et non plus le caractere « × ».
-    expect(a!.querySelector('.rig-vonglet__fermer svg path')!.getAttribute('stroke-width')).toBe('1.9')
+    expect(a!.querySelector('.rig-vonglet__fermer svg path')!.getAttribute('stroke-width')).toBe('1.5')
     expect(a!.querySelector('.rig-vonglet__fermer')!.textContent).toBe('')
   })
 

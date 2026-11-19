@@ -54,7 +54,7 @@ export function Onglets({ onglets, finsDeGlisse, plan }: ProprietesOnglets) {
           <button className="rig-vonglet__fermer" aria-label={'Fermer ' + onglet.libelle}
                   onClick={(e) => { e.stopPropagation(); plan('ongletFermer', onglet.code) }}
                   onPointerDown={(e) => e.stopPropagation()}>
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"></path></svg>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"></path></svg>
           </button>
         </div>
       ))}
