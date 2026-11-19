@@ -413,8 +413,8 @@ describe('EcranCommandesWeb', () => {
   it('debiteur : la commande et chaque dossier se comparent, la recherche se replie derriere un lien', async () => {
     const entite = (cle: string, designation: string, siren: string, ecarts: string[]) => ({
       cle, nonInscrit: false, gestion: cle, designation, siren, type: 'PM', radie: false, retenue: false,
-      lignes: [{ nature: 'SIÈGE', adresse: '12 rue des Trois Cailloux, 80000 AMIENS', nbInscriptions: 14 }], ecarts,
-      nbAdresses: 2, nbInscriptions: 17, sirenConcorde: ecarts.length === 0, raisonConcorde: true, gestionConcorde: null,
+      lignes: [{ nature: 'SIÈGE', adresse: '12 rue des Trois Cailloux, 80000 AMIENS', nbInscriptions: 14, distingue: false }], ecarts,
+      nbAdresses: 2, nbInscriptions: 17, sirenConcorde: ecarts.length === 0, raisonConcorde: true, gestionConcorde: null, distinctions: [],
     })
     const rapprochement = {
       debiteur: true, faillite: false, aRetenue: false, deplie: false, traitee: false, retenue: null,
@@ -472,8 +472,8 @@ describe('EcranCommandesWeb', () => {
       entites: [{
         cle: '004176', nonInscrit: false, gestion: '004176', designation: 'SCI DU PARC', siren: '512 004 331', type: 'PM',
         radie: false, retenue: false,
-        lignes: [{ nature: 'SIÈGE', adresse: '18 rue du Parc, 80480 DURY', nbInscriptions: 6 }], ecarts: [],
-        nbAdresses: 1, nbInscriptions: 6, sirenConcorde: true, raisonConcorde: true, gestionConcorde: true,
+        lignes: [{ nature: 'SIÈGE', adresse: '18 rue du Parc, 80480 DURY', nbInscriptions: 6, distingue: false }], ecarts: [],
+        nbAdresses: 1, nbInscriptions: 6, sirenConcorde: true, raisonConcorde: true, gestionConcorde: true, distinctions: [],
       }],
     }
     const { gestes } = session({ ...vueDeBase(), panneau: { ...panneau(), rapprochement } }, (v, geste) => {
@@ -523,8 +523,8 @@ describe('EcranCommandesWeb', () => {
       entites: [{
         cle: '2026B01067', nonInscrit: false, gestion: '2026B01067', designation: 'AMIENS BILLARDS', siren: '402 118 447',
         type: 'PM', radie: false, retenue: false,
-        lignes: [{ nature: 'SIÈGE', adresse: '12 rue des Trois Cailloux, 80000 AMIENS', nbInscriptions: 14 }], ecarts: [ecart],
-        nbAdresses: 2, nbInscriptions: 17, sirenConcorde: false, raisonConcorde: false, gestionConcorde: false,
+        lignes: [{ nature: 'SIÈGE', adresse: '12 rue des Trois Cailloux, 80000 AMIENS', nbInscriptions: 14, distingue: false }], ecarts: [ecart],
+        nbAdresses: 2, nbInscriptions: 17, sirenConcorde: false, raisonConcorde: false, gestionConcorde: false, distinctions: [],
       }],
     }
     session({ ...vueDeBase(), panneau: { ...panneau(), rapprochement } })
@@ -535,6 +535,86 @@ describe('EcranCommandesWeb', () => {
     expect(dossier.querySelector('.rig-tcw__difference')!.textContent).toBe('≠')
     expect(dossier.querySelector('.rig-tcw__coche')).toBeNull()
     expect(container.querySelector('.rig-tcw__verdict-ecarts')!.textContent).toBe(`≠ ${ecart}`)
+  })
+
+  it('plusieurs dossiers concordants : chaque carte met en avant ce qui la distingue des autres', async () => {
+    // Certificat de non-faillite TRANSNORD SA : deux dossiers sans ecart avec la
+    // commande, que seuls le n° de gestion et l'adresse departagent.
+    const carte = (cle: string, nature: string, adresse: string, nbInscriptions: number) => ({
+      cle, nonInscrit: false, gestion: cle, designation: 'TRANSNORD SA', siren: '334 771 018', type: 'PM',
+      radie: false, retenue: false, lignes: [{ nature, adresse, nbInscriptions, distingue: true }], ecarts: [],
+      nbAdresses: 1, nbInscriptions, sirenConcorde: true, raisonConcorde: true, gestionConcorde: null,
+      distinctions: ['gestion', 'adresse'],
+    })
+    const rapprochement = {
+      debiteur: false, faillite: true, aRetenue: false, deplie: false, traitee: false, retenue: null,
+      rechSiren: '334771018', rechRaison: 'TRANSNORD SA', tousDebiteurs: false, tousEtablissements: false,
+      message: null, resumeRapprochement: '2 ligne(s) · 2 PM · 0 NI',
+      commandeSiren: '334 771 018', commandeRaison: 'TRANSNORD SA', commandeGestion: '—', rechercheOuverte: false,
+      entites: [carte('004151', 'SIÈGE', 'ZI Nord, 80440 BOVES', 21),
+                carte('004155', 'ÉTABLISSEMENT', 'Quai de Somme, 80100 ABBEVILLE', 2)],
+    }
+    session({ ...vueDeBase(), panneau: { ...panneau(), rapprochement } })
+    const { container } = render(<EcranCommandesWeb />)
+    await screen.findByText('004155', { selector: '.rig-tcw__comp-mono > .rig-tcw__distingue' })
+    const cartes = [...container.querySelectorAll('.rig-tcw__corresp')]
+    expect(cartes).toHaveLength(2)
+
+    for (const [i, c] of cartes.entries()) {
+      // Ce qui departage est surligne (la valeur du dossier et son libelle) ; ce qui
+      // est commun (SIREN, raison sociale) ne l'est pas.
+      const surlignes = [...c.querySelectorAll('.rig-tcw__distingue')].map((s) => s.textContent)
+      expect(surlignes).toEqual(i === 0
+        ? ['N° de gestion', '004151', 'SIÈGE', 'ZI Nord, 80440 BOVES']
+        : ['N° de gestion', '004155', 'ÉTABLISSEMENT', 'Quai de Somme, 80100 ABBEVILLE'])
+      expect(c.querySelector('.rig-tcw__verdict')!.textContent)
+        .toBe('Aucun écart avec la commandeSe distingue par : n° de gestion, adresseRetenir')
+    }
+  })
+
+  it('un seul dossier, ou des dossiers en ecart : rien n\'est surligne', async () => {
+    const rapprochement = {
+      debiteur: true, faillite: false, aRetenue: false, deplie: false, traitee: false, retenue: null,
+      rechSiren: '', rechRaison: '', tousDebiteurs: false, tousEtablissements: false,
+      message: null, resumeRapprochement: '1 ligne(s) · 1 PM · 0 NI',
+      commandeSiren: '402 118 447', commandeRaison: 'AMIENS BILLARDS', commandeGestion: '—', rechercheOuverte: false,
+      entites: [{
+        cle: '2026B01067', nonInscrit: false, gestion: '2026B01067', designation: 'AMIENS BILLARDS', siren: '402 118 447',
+        type: 'PM', radie: false, retenue: false,
+        lignes: [{ nature: 'SIÈGE', adresse: '12 rue des Trois Cailloux, 80000 AMIENS', nbInscriptions: 14, distingue: false }],
+        ecarts: [], nbAdresses: 2, nbInscriptions: 17, sirenConcorde: true, raisonConcorde: true, gestionConcorde: null,
+        distinctions: [],
+      }],
+    }
+    session({ ...vueDeBase(), panneau: { ...panneau(), rapprochement } })
+    const { container } = render(<EcranCommandesWeb />)
+    await screen.findByText('2026B01067', { selector: '.rig-tcw__comp-code' })
+    expect(container.querySelector('.rig-tcw__distingue')).toBeNull()
+    expect(container.querySelector('.rig-tcw__verdict')!.textContent).toBe('Aucun écart avec la commandeRetenir')
+  })
+
+  it('debiteur : le n° de gestion qui departage est surligne dans l\'entete de la carte', async () => {
+    const carte = (cle: string) => ({
+      cle, nonInscrit: false, gestion: cle, designation: 'TRANSNORD SA', siren: '334 771 018', type: 'PM',
+      radie: false, retenue: false, lignes: [{ nature: 'SIÈGE', adresse: 'ZI Nord, 80440 BOVES', nbInscriptions: 21, distingue: false }],
+      ecarts: [], nbAdresses: 1, nbInscriptions: 21, sirenConcorde: true, raisonConcorde: true, gestionConcorde: null,
+      distinctions: ['gestion'],
+    })
+    const rapprochement = {
+      debiteur: true, faillite: false, aRetenue: false, deplie: false, traitee: false, retenue: null,
+      rechSiren: '', rechRaison: '', tousDebiteurs: false, tousEtablissements: false,
+      message: null, resumeRapprochement: '2 ligne(s) · 2 PM · 0 NI',
+      commandeSiren: '334 771 018', commandeRaison: 'TRANSNORD SA', commandeGestion: '—', rechercheOuverte: false,
+      entites: [carte('004151'), carte('004155')],
+    }
+    session({ ...vueDeBase(), panneau: { ...panneau(), rapprochement } })
+    const { container } = render(<EcranCommandesWeb />)
+    await screen.findByText('004155', { selector: '.rig-tcw__comp-code' })
+    const surlignes = [...container.querySelectorAll('.rig-tcw__distingue')].map((s) => s.textContent)
+    expect(surlignes).toEqual(['004151', '004155'])
+    expect(container.querySelector('.rig-tcw__comp-code.rig-tcw__distingue')).not.toBeNull()
+    expect(container.querySelector('.rig-tcw__verdict')!.textContent)
+      .toBe('Aucun écart avec la commandeSe distingue par : n° de gestionRetenir')
   })
 
   it('un message se ferme par sa croix ; sa severite donne sa classe', async () => {

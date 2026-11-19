@@ -89,7 +89,8 @@ export interface ChampCw { libelle: string; valeur: string }
 export interface DocumentCw { document: string; bac: string; exemplaires: string; origine: string }
 export interface SaisieCw { famille: string; familles: OptionCw[]; denomination: string; siren: string; requerant: string }
 export interface TraiteeCw { rejetee: boolean; motif: string; reference: string; envoyes: DocumentCw[] }
-export interface LigneEntiteCw { nature: string; adresse: string; nbInscriptions: number }
+/** distingue : cette adresse departage le dossier des autres dossiers trouves (voir EntiteCw.distinctions). */
+export interface LigneEntiteCw { nature: string; adresse: string; nbInscriptions: number; distingue: boolean }
 export interface EntiteCw {
   cle: string
   nonInscrit: boolean
@@ -108,6 +109,12 @@ export interface EntiteCw {
   sirenConcorde: boolean | null
   raisonConcorde: boolean | null
   gestionConcorde: boolean | null
+  /**
+   * Quand plusieurs dossiers trouves concordent TOUS avec la commande : ce qui
+   * departage celui-ci des autres (« gestion », « siren », « raison », « adresse »),
+   * mis en avant dans sa carte. Vide sinon.
+   */
+  distinctions: string[]
 }
 export interface RetenueCw { code: string; designation: string; radie: boolean; detail: string; ecarts: string[] }
 export interface RapprochementCw {
@@ -246,6 +253,16 @@ function Concorde({ ok }: { ok: boolean | null }) {
   return ok ? <Coche /> : <span className="rig-tcw__difference" title="Ne correspond pas à la commande">≠</span>
 }
 
+/** Surligne une valeur qui departage le dossier des autres dossiers trouves ; sinon le texte nu. */
+function MisEnAvant({ si, children }: { si: boolean; children: string }) {
+  return si ? <span className="rig-tcw__distingue">{children}</span> : <>{children}</>
+}
+
+/** Les cles de EntiteCw.distinctions, nommees dans le verdict. */
+const NomDistinction: Record<string, string> = {
+  gestion: 'n° de gestion', siren: 'SIREN', raison: 'raison sociale', adresse: 'adresse',
+}
+
 /**
  * La « Correspondance » du rapprochement (/draft du 19/11/2026, proposition 5),
  * pour le debiteur comme pour le dossier concerne (non-opposition, faillite) : la
@@ -254,6 +271,10 @@ function Concorde({ ok }: { ok: boolean | null }) {
  * dans le tableau d'avant.
  */
 function Correspondance({ r, e, geste }: { r: RapprochementCw; e: EntiteCw; geste: Geste }) {
+  // Ce qui departage ce dossier des autres dossiers concordants : son libelle et
+  // sa valeur sont surlignes, et le verdict le nomme.
+  const distingue = (cle: string) => e.distinctions.includes(cle) ? 'rig-tcw__distingue' : ''
+  const gestion = e.gestion.length > 0 ? e.gestion : '—'
   return (
     <div className={`rig-tcw__corresp ${e.retenue ? 'rig-tcw__corresp--retenue' : ''}`}
          onDoubleClick={() => geste('Retenir', e.cle)}>
@@ -263,7 +284,7 @@ function Correspondance({ r, e, geste }: { r: RapprochementCw; e: EntiteCw; gest
         <span className="rig-tcw__comp-tete">
           <span className="rig-tcw__pastille rig-tcw__pastille--accent">{e.nonInscrit ? 'NON-INSCRIT' : 'DOSSIER RCS'}</span>
           {/* Le certificat de non-faillite montre le n° dans sa ligne « N° de gestion » : pas deux fois. */}
-          {!r.faillite && <span className="rig-tcw__comp-code">{e.gestion.length > 0 ? e.gestion : 'NI'}</span>}
+          {!r.faillite && <span className={`rig-tcw__comp-code ${distingue('gestion')}`}>{e.gestion.length > 0 ? e.gestion : 'NI'}</span>}
           {e.radie && <span className="rig-tcw__pastille rig-tcw__pastille--radie">RADIÉ</span>}
           {e.retenue && <span className="rig-tcw__pastille rig-tcw__pastille--retenue">RETENUE</span>}
         </span>
@@ -271,22 +292,26 @@ function Correspondance({ r, e, geste }: { r: RapprochementCw; e: EntiteCw; gest
             reçu : il ouvre la comparaison (et quitte l'entete ci-dessus). */}
         {r.faillite && (
           <>
-            <span className="rig-tcw__comp-champ">N° de gestion</span>
+            <span className={`rig-tcw__comp-champ ${distingue('gestion')}`}>N° de gestion</span>
             <span className="rig-tcw__comp-mono">{r.commandeGestion}</span>
-            <span className="rig-tcw__comp-mono"><Concorde ok={e.gestionConcorde} />{e.gestion.length > 0 ? e.gestion : '—'}</span>
+            <span className="rig-tcw__comp-mono">
+              <Concorde ok={e.gestionConcorde} /><MisEnAvant si={distingue('gestion') !== ''}>{gestion}</MisEnAvant>
+            </span>
           </>
         )}
-        <span className="rig-tcw__comp-champ">SIREN</span>
+        <span className={`rig-tcw__comp-champ ${distingue('siren')}`}>SIREN</span>
         <span className="rig-tcw__comp-mono">{r.commandeSiren}</span>
-        <span className="rig-tcw__comp-mono"><Concorde ok={e.sirenConcorde} />{e.siren.length > 0 ? e.siren : '—'}</span>
-        <span className="rig-tcw__comp-champ">Raison sociale</span>
+        <span className="rig-tcw__comp-mono">
+          <Concorde ok={e.sirenConcorde} /><MisEnAvant si={distingue('siren') !== ''}>{e.siren.length > 0 ? e.siren : '—'}</MisEnAvant>
+        </span>
+        <span className={`rig-tcw__comp-champ ${distingue('raison')}`}>Raison sociale</span>
         <span>{r.commandeRaison}</span>
-        <span><Concorde ok={e.raisonConcorde} /><b>{e.designation}</b></span>
+        <span><Concorde ok={e.raisonConcorde} /><b className={distingue('raison') || undefined}>{e.designation}</b></span>
         {e.lignes.map((l, i) => (
           <Fragment key={i}>
-            <span className="rig-tcw__comp-champ">{l.nature}</span>
+            <span className={`rig-tcw__comp-champ ${l.distingue ? 'rig-tcw__distingue' : ''}`}>{l.nature}</span>
             <span className="rig-tcw__discret">—</span>
-            <span>{l.adresse}<span className="rig-tcw__discret">· {l.nbInscriptions} ins.</span></span>
+            <span><MisEnAvant si={l.distingue}>{l.adresse}</MisEnAvant><span className="rig-tcw__discret">· {l.nbInscriptions} ins.</span></span>
           </Fragment>
         ))}
         <span className="rig-tcw__comp-champ">Inscriptions</span>
@@ -295,7 +320,14 @@ function Correspondance({ r, e, geste }: { r: RapprochementCw; e: EntiteCw; gest
       </div>
       <div className={`rig-tcw__ligne-statut rig-tcw__ligne-statut--${e.ecarts.length === 0 ? 'ok' : 'attente'} rig-tcw__verdict`}>
         {e.ecarts.length === 0 ? (
-          <><Coche /><span>Aucun écart avec la commande</span></>
+          <>
+            <Coche /><span>Aucun écart avec la commande</span>
+            {e.distinctions.length > 0 && (
+              <span className="rig-tcw__verdict-distinctions">
+                Se distingue par : {e.distinctions.map((d) => NomDistinction[d] ?? d).join(', ')}
+              </span>
+            )}
+          </>
         ) : (
           <span className="rig-tcw__verdict-ecarts" title="Voir ce qui ne correspond pas à la commande">
             {e.ecarts.map((ecart, i) => <span key={i}>≠ {ecart}</span>)}

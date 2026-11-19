@@ -495,7 +495,7 @@ Exiger(vue.Panneau!.Rapprochement is { Debiteur: false, Faillite: true, Recherch
        && r6.CommandeSiren == TraitementCommandes.FormaterSiren(c6t.Siren) && r6.CommandeRaison == c6t.Denomination
        && r6.CommandeGestion == "004176"
        && r6.Entites.Single() is { Gestion: "004176", SirenConcorde: true, RaisonConcorde: true, GestionConcorde: true,
-                                    Ecarts.Length: 0, Retenue: false },
+                                    Ecarts.Length: 0, Retenue: false, Distinctions.Length: 0 },
     "correspondance : la faillite SCI DU PARC face au dossier 004176 (n° de gestion, SIREN et raison sociale concordent), recherche repliee");
 Geste("Basculer", "RechercheRapprochementOuverte");
 Exiger(vue.Panneau!.Rapprochement!.RechercheOuverte, "correspondance : le dossier concerne deplie aussi sa recherche");
@@ -510,6 +510,26 @@ Exiger(autres.Length == 1 && autres.All(e => !e.Retenue && e.RaisonConcorde == f
                                             && e.Ecarts.Contains("N° de gestion reçu : 004176 ≠ 2026B01067")),
     "correspondance : le dossier AMIENS BILLARDS trouve pour la faillite SCI DU PARC porte ses ecarts sans etre retenu (lu : "
     + string.Join(" ; ", autres.Select(e => $"{e.Cle}={string.Join("|", e.Ecarts)}")) + ")");
+// Ce qui departage des dossiers trouves ne se montre que s'ils concordent TOUS :
+// un dossier seul (SCI DU PARC, AMIENS BILLARDS) ou des dossiers en ecart (les deux
+// TRANSNORD SA cherches pour la faillite SCI DU PARC) n'ont rien a departager.
+Geste("Texte", new { champ = "RechRaison", valeur = "TRANSNORD" });
+Geste("RelancerRapprochement");
+var enEcart = vue.Panneau!.Rapprochement!.Entites;
+Exiger(autres.Single().Distinctions.Length == 0
+       && enEcart.Length == 2 && enEcart.All(e => e.Ecarts.Length > 0 && e.Distinctions.Length == 0 && e.Lignes.All(l => !l.Distingue)),
+    "distinctions : rien a departager pour un dossier seul ni pour des dossiers en ecart (lu : "
+    + string.Join(" ; ", enEcart.Select(e => $"{e.Cle}={string.Join("|", e.Distinctions)}")) + ")");
+// La faillite TRANSNORD SA (n° 2) trouve 004151 (siege, BOVES) et 004155
+// (etablissement, ABBEVILLE), sans ecart : chaque carte met en avant son n° de
+// gestion et son adresse, pas le SIREN ni la raison sociale qu'ils partagent.
+Geste("Choisir", 2);
+var concordants = vue.Panneau!.Rapprochement!.Entites;
+Exiger(concordants.Length == 2
+       && concordants.All(e => e.Ecarts.Length == 0 && e.Distinctions.SequenceEqual(new[] { "gestion", "adresse" })
+                               && e.Lignes.Length == 1 && e.Lignes.All(l => l.Distingue)),
+    "distinctions : les deux dossiers TRANSNORD SA concordants se departagent par n° de gestion et adresse (lu : "
+    + string.Join(" ; ", concordants.Select(e => $"{e.Cle}={string.Join("|", e.Distinctions)}")) + ")");
 Geste("Choisir", 1);
 Geste("OuvrirBande", "Rejeter");
 Exiger(vue.Panneau?.Pied?.Bande is { Rejet: true, ConfirmerRefuse: true }, "joue : la bande de rejet s'ouvre, confirmation fermee sans motif");

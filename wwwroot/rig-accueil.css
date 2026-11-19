@@ -3794,6 +3794,17 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-tcw__verdict { display: flex; align-items: center; flex-wrap: wrap; gap: var(--rig-esp-2); }
 .rig-tcw__verdict > .rig-bouton { margin-left: auto; }
 .rig-tcw__verdict-ecarts { display: flex; flex-direction: column; gap: 2px; }
+/* Plusieurs dossiers concordent tous avec la commande : ce qui departage chacun
+   (n° de gestion, adresse…) est surligne dans sa carte — libelle a l'accent,
+   valeur sur fond d'accent — et nomme au bout du verdict. */
+.rig-tcw__comparaison > .rig-tcw__comp-champ.rig-tcw__distingue { color: var(--rig-focus); }
+.rig-tcw__comparaison span.rig-tcw__distingue:not(.rig-tcw__comp-champ),
+.rig-tcw__comparaison b.rig-tcw__distingue {
+  padding: 1px 6px; border-radius: var(--rig-radius-sm); font-weight: 700; color: var(--rig-texte);
+  background: color-mix(in srgb, var(--rig-focus) 16%, transparent);
+}
+.rig-tcw__verdict-distinctions { color: var(--rig-texte-2); }
+.rig-tcw__verdict-distinctions::before { content: "·"; margin-right: var(--rig-esp-2); }
 
 .rig-tcw__case { display: flex; align-items: center; gap: var(--rig-esp-2); color: var(--rig-texte); cursor: pointer; }
 .rig-tcw__case input { accent-color: var(--rig-focus); margin: 0; }

@@ -45,17 +45,20 @@ public sealed record DocumentCw(string Document, string Bac, string Exemplaires,
 public sealed record SaisieCw(string Famille, OptionCw[] Familles, string Denomination, string Siren, string Requerant);
 public sealed record TraiteeCw(bool Rejetee, string Motif, string Reference, DocumentCw[] Envoyes);
 
-public sealed record LigneEntiteCw(string Nature, string Adresse, int NbInscriptions);
+/// <summary>Distingue : cette adresse departage le dossier des autres (voir EntiteCw.Distinctions).</summary>
+public sealed record LigneEntiteCw(string Nature, string Adresse, int NbInscriptions, bool Distingue);
 /// <summary>
 /// Une entite trouvee. NbAdresses et NbInscriptions comptent TOUTES ses adresses
 /// (Lignes n'a que celles que les filtres laissent voir) ; SirenConcorde,
 /// RaisonConcorde et GestionConcorde disent si la commande et le dossier
-/// concordent (null : rien a comparer).
+/// concordent (null : rien a comparer). Distinctions : quand plusieurs dossiers
+/// trouves concordent TOUS avec la commande, ce qui departage celui-ci des autres
+/// (« gestion », « siren », « raison », « adresse ») ; vide sinon.
 /// </summary>
 public sealed record EntiteCw(string Cle, bool NonInscrit, string Gestion, string Designation, string Siren,
                               string Type, bool Radie, bool Retenue, LigneEntiteCw[] Lignes,
                               string[] Ecarts, int NbAdresses, int NbInscriptions, bool? SirenConcorde,
-                              bool? RaisonConcorde, bool? GestionConcorde);
+                              bool? RaisonConcorde, bool? GestionConcorde, string[] Distinctions);
 public sealed record RetenueCw(string Code, string Designation, bool Radie, string Detail, string[] Ecarts);
 
 /// <summary>
@@ -1017,15 +1020,17 @@ public sealed class SessionCommandesWeb
 
         // CHAQUE dossier trouve se compare a la commande (son verdict « Aucun
         // écart avec la commande » ou ses ≠), debiteur comme dossier concerne.
-        var vueEntites = affichees.Select(a =>
+        var distinctions = Distinctions(c, affichees);
+        var vueEntites = affichees.Select((a, i) =>
         {
             var e = a.Entite;
+            var (champs, adresses) = distinctions[i];
             return new EntiteCw(e.Cle, e.NonInscrit, e.Gestion, e.Designation, TraitementCommandes.FormaterSiren(e.Siren),
                 e.Type, e.Radie, e.Cle == c.CibleRetenue,
-                a.Lignes.Select(l => new LigneEntiteCw(l.Nature, l.Adresse, l.NbInscriptions)).ToArray(),
+                a.Lignes.Select((l, k) => new LigneEntiteCw(l.Nature, l.Adresse, l.NbInscriptions, adresses[k])).ToArray(),
                 TraitementCommandes.Ecarts(c, e).ToArray(), e.Lignes.Count, e.NbInscriptions,
                 TraitementCommandes.SirenConcorde(c, e), TraitementCommandes.RaisonConcorde(c, e),
-                TraitementCommandes.GestionConcorde(c, e));
+                TraitementCommandes.GestionConcorde(c, e), champs);
         }).ToArray();
 
         // Recherche repliee tant qu'il y a des dossiers a comparer et aucun
@@ -1037,6 +1042,42 @@ public sealed class SessionCommandesWeb
             entites.Count > 0 ? TraitementCommandes.ResumeRapprochement(entites, affichees.Sum(a => a.Lignes.Count)) : "",
             Tiret(TraitementCommandes.FormaterSiren(c.Siren)), Tiret(c.Denomination), Tiret(c.NumeroGestion.Trim()),
             rechercheOuverte);
+    }
+
+    /// <summary>Les champs d'identite d'un dossier, sous la forme qui sert a les comparer.</summary>
+    private static readonly (string Cle, Func<EntiteRapprochee, string> Valeur)[] ChampsIdentite =
+    [
+        ("gestion", e => TraitementCommandes.Normaliser(e.Gestion)),
+        ("siren", e => TraitementCommandes.Chiffres(e.Siren)),
+        ("raison", e => TraitementCommandes.Normaliser(e.Designation)),
+    ];
+
+    /// <summary>
+    /// Ce qui departage chaque dossier trouve, quand ils sont plusieurs et
+    /// concordent TOUS avec la commande : leur verdict, « Aucun écart avec la
+    /// commande », ne les distingue plus. Pour chacun : les champs d'identite dont
+    /// un autre dossier n'a pas la meme valeur (plus « adresse » si l'une de ses
+    /// adresses montrees manque a un autre), et, par adresse montree, si elle le
+    /// distingue. Rien a departager sinon (un seul dossier, ou un ecart).
+    /// </summary>
+    private static (string[] Champs, bool[] Adresses)[] Distinctions(CommandeRecue c,
+        List<(EntiteRapprochee Entite, List<LigneEntite> Lignes)> affichees)
+    {
+        if (affichees.Count < 2 || affichees.Any(a => TraitementCommandes.Ecarts(c, a.Entite).Count > 0))
+            return affichees.Select(a => (Array.Empty<string>(), new bool[a.Lignes.Count])).ToArray();
+
+        static string Adresse(LigneEntite l) => TraitementCommandes.Normaliser($"{l.Nature} {l.Adresse}");
+        return affichees.Select((a, i) =>
+        {
+            var autres = affichees.Where((_, j) => j != i).ToList();
+            var adresses = a.Lignes
+                .Select(l => autres.Any(o => o.Lignes.All(ol => Adresse(ol) != Adresse(l))))
+                .ToArray();
+            var champs = ChampsIdentite
+                .Where(f => autres.Any(o => f.Valeur(o.Entite) != f.Valeur(a.Entite)))
+                .Select(f => f.Cle);
+            return ((adresses.Any(x => x) ? champs.Append("adresse") : champs).ToArray(), adresses);
+        }).ToArray();
     }
 
     /// <summary>Ce que lisait le RenderFragment ZoneTypes (et CaseCochable) du .razor.</summary>
