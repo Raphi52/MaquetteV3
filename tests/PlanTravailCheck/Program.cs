@@ -454,8 +454,9 @@ internal static class Programme
                && d.Etapes.Pages.All(p => p.Code != "CONTROLE") && d.Etapes.Pages[^1].Code == "DIRIGEANTS",
             "la liste montre les 6 etapes de saisie, sans le controle");
         Exiger(d.Etapes.Controle.Select(c => c.Colonne).SequenceEqual(new[] { "OBSRC_TEXTE_MENTION", "DSSRC_ETAT_DOSSIER" })
-               && d.Etapes.Controle[1] is { Obligatoire: true, Valeur: "A controler", Manque: false },
-            "le pied porte les champs du controle : la mention et l'etat du dossier");
+               && d.Etapes.Controle[1] is { Obligatoire: true, Valeur: "A controler", Manque: false,
+                                            Refus: "a passer a « Conforme » pour valider le dossier" },
+            "le pied porte les champs du controle : la mention et l'etat du dossier, refuse tant qu'il n'est pas « Conforme »");
         Exiger(d.Apercu?.Apercu is { Libelle: "Statuts signes" } && d.Apercu.Apercu.Feuilles.Length > 0,
             "la piece s'affiche a droite, page par page");
 
@@ -529,7 +530,24 @@ internal static class Programme
         Agir("saisie", new { etape = "IDENTITE", colonne = "DSSRC_SIREN", valeur = "109 678 235" });
         Exiger(Siren() is { Refus: null, Valeur: "109 678 235" }, "la frappe porte la valeur en direct");
         Agir("ecrire", new { etape = "IDENTITE", colonne = "DSSRC_SIREN", valeur = "109 678 235" });
-        Exiger(plan.Vue().Dossier!.Bandeau is null, "la saisie corrigee fait disparaitre le bandeau des defauts");
+        Exiger(plan.Vue().Dossier!.Bandeau is { } bc && bc.Liens.All(l => l.Etape != "Identite"),
+            "la saisie corrigee retire Identite du bandeau des defauts");
+
+        // --- 5 bis. L'etat du dossier : seul « Conforme » se valide (19/11/2026, conv-2022).
+        Exiger(plan.Vue().Dossier!.Etapes!.Recap is { Valide: false, Nombre: 1, Refusees: 1 } rc
+               && rc.Groupes.Single() is { IndexEtape: 6, Etape: "Controle" } gc
+               && gc.Points.Single() is { Colonne: "DSSRC_ETAT_DOSSIER", Manquant: false }
+               && plan.Vue().Dossier!.Bandeau!.Liens.Single().Etape == "Controle",
+            "un dossier « A controler » bloque encore la validation, et le dit (pied, bandeau)");
+        Agir("valider");
+        Exiger(plan.Vue().Dossier!.Etapes!.Recap is { Valide: false },
+            "« Valider » est refuse tant que l'etat n'est pas « Conforme », meme si le geste arrive");
+        Agir("ecrire", new { etape = "CONTROLE", colonne = "DSSRC_ETAT_DOSSIER", valeur = "En anomalie" });
+        Exiger(plan.Vue().Dossier!.Etapes!.Controle[^1] is { Refus: not null },
+            "un dossier « En anomalie » ne se valide pas non plus");
+        Agir("ecrire", new { etape = "CONTROLE", colonne = "DSSRC_ETAT_DOSSIER", valeur = "Conforme" });
+        Exiger(plan.Vue().Dossier!.Etapes!.Controle[^1] is { Refus: null } && plan.Vue().Dossier!.Bandeau is null,
+            "« Conforme » leve le refus et le bandeau des defauts");
 
         // --- 6. Valider le dossier, le rouvrir.
         Exiger(plan.Vue().Dossier!.Etapes!.Recap is { Valide: false, Nombre: 0 },

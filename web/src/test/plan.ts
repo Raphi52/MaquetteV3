@@ -71,7 +71,8 @@ export function etapes(partiel: Partial<EtapesVue> = {}): EtapesVue {
       { libelle: 'Texte de la mention', colonne: 'OBSRC_TEXTE_MENTION', type: 'text', exemple: 'Observation portee au registre',
         obligatoire: false, largeur: 'pleine', choix: [], valeur: '', refus: null, manque: false },
       { libelle: 'Etat du dossier', colonne: 'DSSRC_ETAT_DOSSIER', type: 'text', exemple: '', obligatoire: true, largeur: 'moitie',
-        choix: ['A controler', 'Conforme', 'En anomalie'], valeur: 'A controler', refus: null, manque: false },
+        choix: ['A controler', 'Conforme', 'En anomalie'], valeur: 'A controler',
+        refus: 'a passer a « Conforme » pour valider le dossier', manque: false },
     ],
     ...partiel,
   }

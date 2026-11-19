@@ -53,6 +53,16 @@ Exiger(R("montant", "-5") is not null, "un capital negatif est refuse");
 Exiger(R("taux", "100") is null, "un taux de 100 % passe");
 Exiger(R("taux", "140") is not null, "un taux au-dela de 100 % est refuse");
 
+// --- 5 bis. Etat du dossier : seul « Conforme » laisse valider (19/11/2026, conv-2022).
+// « A controler » et « En anomalie » sont des valeurs legitimes de la liste, mais
+// le dossier ne se valide pas tant qu'il n'est pas declare conforme.
+Exiger(R("conforme", "Conforme") is null, "un dossier « Conforme » se valide");
+Exiger(R("conforme", "A controler") == "a passer a « Conforme » pour valider le dossier",
+    "un dossier « A controler » est refuse, avec le geste a faire");
+Exiger(R("conforme", "En anomalie") == "a passer a « Conforme » pour valider le dossier",
+    "un dossier « En anomalie » est refuse");
+Exiger(R("conforme", "") is null, "un etat vide n'est pas refuse : il est « a renseigner »");
+
 // --- 6. Les controles sont bien BRANCHES sur les champs de la vue
 // Depuis le lot 2 du passage a React (19/11/2026) : les etapes, leurs champs et
 // le controle final vivent dans Pont/PlanTravail.cs (le @code de Home.razor,

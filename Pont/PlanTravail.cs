@@ -2470,8 +2470,11 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
                 Defaut: DateDemo, VisibleSi: "OBSRC_TEXTE_MENTION=*"),
             new("Diffusable Kbis", "MNTOB_DIFFUSABLE", ChoixPossibles: ["Oui", "Non"], Defaut: "Oui",
                 VisibleSi: "OBSRC_TEXTE_MENTION=*"),
+            // Seul un dossier « Conforme » se valide (ValiditeSaisie, controle
+            // « conforme ») : le motif s'affiche sous le champ, dans le pied.
             new("Etat du dossier", "DSSRC_ETAT_DOSSIER", Obligatoire: true,
-                ChoixPossibles: ["A controler", "Conforme", "En anomalie"], Defaut: "A controler")
+                ChoixPossibles: ["A controler", "Conforme", "En anomalie"], Defaut: "A controler",
+                Controle: "conforme")
         ])
     ];
 

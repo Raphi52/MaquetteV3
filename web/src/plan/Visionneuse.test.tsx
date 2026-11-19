@@ -284,8 +284,11 @@ describe('Visionneuse : la saisie guidee en accordeon, l\'en-tete en bas', () =>
     const pied = donnees.lastElementChild!
     expect(pied.className).toBe('rig-guide__controle rig-guide__controle--bloque')
     // Ordre du balisage = ordre de tabulation : titres, bilan, validation, outils.
-    expect([...pied.children].map((e) => e.className)).toEqual(['rig-guide__titres', 'rig-bilan', 'rig-guide__validation', 'rig-guide__outils'])
-    expect(morceaux(pied)).toEqual(['<div>', ' ', '<div>', ' ', '<div>', ' ', '<div>'])
+    // Valider est un voisin direct : la grille du CSS le pose sur la ligne du
+    // bilan en colonne etroite, au bout des champs en colonne large.
+    expect([...pied.children].map((e) => e.className)).toEqual(
+      ['rig-guide__titres', 'rig-bilan', 'rig-guide__validation', 'rig-bouton rig-bouton--fort rig-guide__valider', 'rig-guide__outils'])
+    expect(morceaux(pied)).toEqual(['<div>', ' ', '<div>', ' ', '<div>', ' ', '<button>', ' ', '<div>'])
     // Le controle n'est plus une etape de la liste : 6 etapes.
     expect(morceaux(pied.querySelector('.rig-kicker')!)).toEqual(['Controle du dossier · etape ', '2', ' / ', '6'])
     expect(pied.querySelector('.rig-guide__titre')!.textContent).toBe('Statuts signes')
@@ -396,14 +399,17 @@ describe('Visionneuse : la saisie guidee en accordeon, l\'en-tete en bas', () =>
     expect(morceaux(detail)).toEqual(['<span>', ' · ', '<span>'])
     expect([...detail.children].map((s) => morceaux(s))).toEqual([['1', ' a renseigner'], ['1', ' valeur(s) refusee(s)']])
 
-    // La rangee de validation : les champs de Controle, puis Valider, eteint.
+    // La rangee de validation : les champs de Controle ; l'etat du dossier dit
+    // pourquoi il bloque. Valider, a part, reste eteint.
     const validation = container.querySelector('.rig-guide__controle .rig-guide__validation')!
-    expect(morceaux(validation)).toEqual(['<div>', ' ', '<button>'])
+    expect(morceaux(validation)).toEqual(['<div>'])
     expect([...validation.querySelectorAll('.rig-saisie-champ__libelle')].map((l) => l.firstChild!.textContent))
       .toEqual(['Texte de la mention', 'Etat du dossier'])
-    const valider = validation.lastElementChild as HTMLButtonElement
+    expect(validation.querySelector('.rig-saisie-champ--refuse .rig-saisie-champ__refus')!.textContent)
+      .toBe('a passer a « Conforme » pour valider le dossier')
+    const valider = container.querySelector('.rig-guide__controle > .rig-guide__valider') as HTMLButtonElement
     expect(valider.textContent).toBe('Valider le dossier')
-    expect(valider.className).toBe('rig-bouton rig-bouton--fort')
+    expect(valider.className).toBe('rig-bouton rig-bouton--fort rig-guide__valider')
     expect(valider.disabled).toBe(true)
     // Les champs ecrivent dans l'etape CONTROLE, comme dans la liste.
     fireEvent.input(validation.querySelector('input')!, { target: { value: 'Radiation d\'office' } })
@@ -420,15 +426,17 @@ describe('Visionneuse : la saisie guidee en accordeon, l\'en-tete en bas', () =>
     const pret: RecapVue = { valide: false, nombre: 0, titre: 'Rien ne bloque la validation', aManquer: 0, refusees: 0, groupes: [] }
     rerender(<Visionneuse dossier={dossier({ etapes: etapes({ recap: pret }) })} pagination={0} defilement={null} defilementJoue={{ current: 0 }} plan={plan} />)
     expect(container.querySelector('.rig-guide__controle')!.className).toBe('rig-guide__controle rig-guide__controle--pret')
-    fireEvent.click(container.querySelector('.rig-guide__validation > button')!)
+    expect((container.querySelector('.rig-guide__valider') as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(container.querySelector('.rig-guide__valider')!)
 
     // Dossier valide : « Rouvrir la saisie » prend la place de Valider, a cote des memes champs.
     const ok: RecapVue = { valide: true, nombre: 0, titre: '', aManquer: 0, refusees: 0, groupes: [] }
     rerender(<Visionneuse dossier={dossier({ etapes: etapes({ recap: ok }) })} pagination={0} defilement={null} defilementJoue={{ current: 0 }} plan={plan} />)
     expect(container.querySelector('.rig-guide__controle')!.className).toBe('rig-guide__controle rig-guide__controle--valide')
     expect(container.querySelector('.rig-bilan')!.className).toBe('rig-bilan rig-bilan--valide')
-    expect(morceaux(container.querySelector('.rig-guide__validation')!)).toEqual(['<div>', ' ', '<button>'])
-    fireEvent.click(container.querySelector('.rig-guide__validation > button')!)
+    expect(container.querySelector('.rig-guide__valider')!.textContent).toBe('Rouvrir la saisie')
+    expect(container.querySelector('.rig-guide__validation .rig-champs')).not.toBeNull()
+    fireEvent.click(container.querySelector('.rig-guide__valider')!)
     expect(gestes()).toEqual([
       ['saisie', { etape: 'CONTROLE', colonne: 'OBSRC_TEXTE_MENTION', valeur: 'Radiation d\'office' }],
       ['ecrire', { etape: 'CONTROLE', colonne: 'DSSRC_ETAT_DOSSIER', valeur: 'Conforme' }],

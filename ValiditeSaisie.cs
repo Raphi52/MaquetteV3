@@ -106,6 +106,13 @@ public static class ValiditeSaisie
                 return null;
             }
 
+            // Etat du dossier (DSSRC_ETAT_DOSSIER) : « A controler » et « En
+            // anomalie » sont des valeurs legitimes, mais seul un dossier
+            // « Conforme » passe le controle final (demande du 19/11/2026,
+            // conv-2022). Le motif dit le geste qui debloque.
+            case "conforme":
+                return valeur.Trim() == "Conforme" ? null : "a passer a « Conforme » pour valider le dossier";
+
             default:
                 return null;
         }

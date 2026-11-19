@@ -122,13 +122,14 @@ function Corps({ page, plan }: { page: PageEtapeVue, plan: GestePlan }) {
 
 /**
  * LE PIED : l'en-tete descendu en bas. Titre de la piece, bilan du controle
- * (ce qui bloque), puis les champs de l'etape Controle -- etat du dossier,
- * mention -- a cote de « Valider le dossier » (« Rouvrir la saisie » quand le
- * dossier est valide), oeil et croix. Son filet haut dit l'etat d'un coup
- * d'oeil, de la couleur de la pastille du bilan : alerte (brique en clair,
- * jaune en sombre) tant qu'un point bloque, vert des que plus rien ne bloque.
- * L'ordre du balisage est celui de la tabulation (bilan, champs, Valider,
- * outils) ; la grille du CSS pose les outils en haut a droite.
+ * (ce qui bloque), les champs de l'etape Controle -- mention, etat du dossier
+ * --, « Valider le dossier » (« Rouvrir la saisie » quand le dossier est
+ * valide), oeil et croix. Son filet haut dit l'etat d'un coup d'oeil, de la
+ * couleur de la pastille du bilan : alerte (brique en clair, jaune en sombre)
+ * tant qu'un point bloque, vert des que plus rien ne bloque. L'ordre du
+ * balisage est celui de la tabulation (bilan, champs, Valider, outils) ; la
+ * grille du CSS place le reste : outils en haut a droite, et Valider sur la
+ * ligne du bilan en colonne etroite, au bout des champs en colonne large.
  */
 function Pied({ etapes, plan }: { etapes: EtapesVue, plan: GestePlan }) {
   const { recap, courante, total } = etapes
@@ -142,14 +143,15 @@ function Pied({ etapes, plan }: { etapes: EtapesVue, plan: GestePlan }) {
       </div>{' '}
       <Bilan recap={recap} total={total} plan={plan} />{' '}
       <div className="rig-guide__validation">
-        <Champs code="CONTROLE" fiche={0} champs={etapes.controle} plan={plan} />{' '}
-        {/* Valider n'est possible que sans aucun defaut (et le C# le reverifie). */}
-        {recap.valide
-          ? <button className="rig-bouton" onClick={() => plan('rouvrir')}>Rouvrir la saisie</button>
-          : <button className="rig-bouton rig-bouton--fort"
-                    disabled={n > 0}
-                    onClick={() => plan('valider')}>Valider le dossier</button>}
+        <Champs code="CONTROLE" fiche={0} champs={etapes.controle} plan={plan} />
       </div>{' '}
+      {/* Valider n'est possible que sans aucun defaut -- l'etat du dossier
+          « Conforme » compris -- et le C# le reverifie. */}
+      {recap.valide
+        ? <button className="rig-bouton rig-guide__valider" onClick={() => plan('rouvrir')}>Rouvrir la saisie</button>
+        : <button className="rig-bouton rig-bouton--fort rig-guide__valider"
+                  disabled={n > 0}
+                  onClick={() => plan('valider')}>Valider le dossier</button>}{' '}
       <div className="rig-guide__outils">
         {/* Oeil : rouvre le panneau de droite (document) depuis le pied des etapes. */}
         {etapes.oeil && (
