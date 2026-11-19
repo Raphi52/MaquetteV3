@@ -32,6 +32,12 @@
      nuit), leurs ronds, le rond de profil et la pastille du verbe actif.
      Partout ailleurs elle tient.
 
+   2026-11-19, sombre « En-tete noir » (choix utilisateur, /draft conv-2001,
+   tour 2 proposition 4, affinage de « Carbone et aplats vifs ») : plus de
+   bleu nuit, des NIVEAUX de noir et de gris neutres -- menu #111111, bandeau
+   d'en-tete #080808 sous le salut et la recherche, page #1E1E1E, cartes
+   #282828 -- et les tuiles chiffrees en aplats vifs comme le jour.
+
    2026-11-18, accueil « Proue » (choix utilisateur, /draft conv-1983,
    proposition 1), DANS cette charte : date en capitales d'or au-dessus du
    salut, phrase du jour, anneaux autour des ronds des tuiles chiffrees
@@ -103,16 +109,24 @@
      --rig-rail-rayon font du rail un PANNEAU flottant aux coins arrondis (le
      clair, meme jour) ; 0px ailleurs, ou il reste colle au bord. 0px et non 0 :
      la marge entre dans un calc() de largeur de colonne. */
-  --rig-rail-texte: #F1EDE4;
-  --rig-rail-texte-2: #E8E2D2;
-  --rig-rail-texte-3: #9C9583;
-  --rig-rail-voile: rgba(255, 240, 215, .07);
-  --rig-rail-trait: rgba(255, 240, 215, .14);
-  --rig-rail-trait-faible: rgba(255, 240, 215, .08);
+  /* 2026-11-19 (« En-tete noir ») : gris neutres, plus de creme. */
+  --rig-rail-texte: #ECECEC;
+  --rig-rail-texte-2: #BDBDBD;
+  --rig-rail-texte-3: #8A8A8A;
+  --rig-rail-voile: rgba(255, 255, 255, .07);
+  --rig-rail-trait: rgba(255, 255, 255, .13);
+  --rig-rail-trait-faible: rgba(255, 255, 255, .08);
   --rig-rail-melange: #FFFFFF;
   --rig-rail-ombre: none;
   --rig-rail-marge: 0px;
   --rig-rail-rayon: 0px;
+  /* Bandeau sous la date, le salut et la recherche de l'accueil
+     (.rig-plan__tete, rig-accueil.css). Aucun par defaut : seul le sombre en
+     pose un, dans sa regle a part plus bas. --rig-entete-ecart est l'air entre
+     le bandeau et les tuiles chiffrees (0px sans bandeau : rien ne bouge). */
+  --rig-entete-fond: transparent;
+  --rig-entete-bord: transparent;
+  --rig-entete-ecart: 0px;
   /* Liseré et halo de la recherche de l'accueil (et de la frise des etapes) :
      l'or dans le clair et le sombre, l'accent du theme ailleurs. */
   --rig-or-halo: #B08D3F;
@@ -141,29 +155,33 @@ select option {
 }
 
 /* --- MODE SOMBRE (defaut) --- */
-/* 2026-11-18 : l'encre de la « Nuit japonaise » remplace le bleu nuit
-   (#0C0F16) ; texte creme au lieu de bleute, voiles et bords tires vers le
-   creme, or #D9B26A. Posee avec « Ivoire chaud », gardee par « Commandes
-   rondes ». */
+/* 2026-11-19, « En-tete noir » (/draft conv-2001) : l'encre bleutee de la
+   « Nuit japonaise » (#12141C, cartes #191C26, texte creme) laisse place a des
+   NIVEAUX de gris neutres, du plus sombre au plus clair : bandeau d'en-tete
+   #080808, menu #111111, champ #1A1A1A, page #1E1E1E, cartes #282828. Voiles
+   et bords en blanc pur attenue, plus en creme. L'or #D9B26A ne change pas.
+   Le tertiaire est #959595 et non le #7C7C7C de la maquette : celui-ci ne
+   faisait que 3,5:1 sur les cartes, #959595 y tient 4,9:1. */
 :root,
 [data-rig-theme="sombre"] {
-  --rig-fond: #12141C;
-  --rig-fond-2: rgba(255, 240, 215, .04);
+  --rig-fond: #1E1E1E;
+  --rig-fond-2: rgba(255, 255, 255, .04);
   /* Lignes alternees des grilles (demande utilisateur 2026-09-17) : un cran
      plus CLAIR que le fond en sombre, un cran plus FONCE en clair. */
-  --rig-zebre: rgba(255, 240, 215, .03);
+  --rig-zebre: rgba(255, 255, 255, .03);
   /* Survol nettement au-dessus de la zebrure, sinon il disparait dessus. */
-  --rig-survol-ligne: rgba(255, 240, 215, .09);
+  --rig-survol-ligne: rgba(255, 255, 255, .08);
   /* 2026-09-15 : tuiles de l'accueil un cran plus claires que le fond
      (avant : pas de surface en sombre, donc tuile = fond). */
-  --rig-surface: #191C26;
-  /* Champ de saisie principal (recherche de l'accueil). */
-  --rig-champ: #1B1E29;
-  --rig-bord: rgba(255, 240, 215, .12);
-  --rig-bord-faible: rgba(255, 240, 215, .065);
-  --rig-texte: #F1EDE4;
-  --rig-texte-2: #CFC8B8;
-  --rig-texte-3: #8A8576;
+  --rig-surface: #282828;
+  /* Champ de saisie principal (recherche de l'accueil) : posee sur le bandeau
+     noir, elle est un cran au-dessus de lui et un cran sous la page. */
+  --rig-champ: #1A1A1A;
+  --rig-bord: rgba(255, 255, 255, .10);
+  --rig-bord-faible: rgba(255, 255, 255, .06);
+  --rig-texte: #ECECEC;
+  --rig-texte-2: #B0B0B0;
+  --rig-texte-3: #959595;
   --rig-ombre: 0 1px 2px rgba(0, 0, 0, .55), 0 10px 26px rgba(0, 0, 0, .40);
   --rig-ombre-saisie: 0 2px 6px rgba(0, 0, 0, .60), 0 22px 48px rgba(0, 0, 0, .52);
   --rig-alerte: #F5B912;
@@ -175,16 +193,17 @@ select option {
      ces accents ne s'affichaient pas du tout (seul .rig-vged__poignee avait
      une couleur de repli). Meme or que --rig-focus : meme role d'interaction. */
   --rig-accent: #D9B26A;
-  --rig-grad-marque: linear-gradient(90deg, #0D0F16, #D9B26A 55%, #F0D59A);
+  --rig-grad-marque: linear-gradient(90deg, #111111, #D9B26A 55%, #F0D59A);
 
   /* --- Ce qui RELIE les deux modes (charte du 2026-11-18) --- */
   /* L'or de l'element actif : un aplat en degrade, texte encre dessus. */
   --rig-or: #C8963E;
   --rig-or-clair: #E4BE76;
   --rig-or-texte: #1E1608;
-  /* Le rail du menu de gauche : encre la nuit (degrade de gris fonces le jour). */
-  --rig-rail: #0D0F16;
-  --rig-rail-bord: #22252F;
+  /* Le rail du menu de gauche : noir la nuit (degrade de gris fonces le
+     jour). Pas de bord : c'est l'ecart avec la page #1E1E1E qui le detache. */
+  --rig-rail: #111111;
+  --rig-rail-bord: transparent;
   /* Pastilles des verbes du menu : famille de l'or, eclaircie la nuit. */
   --rig-verbe-ouvrir: #D9B26A;
   --rig-verbe-trouver: #7083C2;
@@ -198,25 +217,36 @@ select option {
   --rig-palier-bas: #7083C2;
   --rig-palier-moyen: #D9B26A;
   --rig-palier-haut: #CC6A55;
-  /* Tuiles chiffrees : verre teinte bleu encre / olive / brique. */
-  --rig-chiffre-1: linear-gradient(160deg, #222B48, #181D2F);
-  --rig-chiffre-2: linear-gradient(160deg, #272C1B, #1C1F15);
-  --rig-chiffre-3: linear-gradient(160deg, #3B211C, #291917);
-  --rig-chiffre-1-bord: #3A4672;
-  --rig-chiffre-2-bord: #4E5A30;
-  --rig-chiffre-3-bord: #6E3A2F;
-  --rig-chiffre-texte: #E4E0D6;
-  --rig-chiffre-valeur: #F1EDE4;
-  /* Grand rond a gauche du chiffre : verre, icone a la teinte de la tuile. */
-  --rig-chiffre-rond: rgba(255, 255, 255, .10);
-  --rig-chiffre-rond-bord: rgba(255, 255, 255, .16);
-  --rig-chiffre-1-icone: #8FA2E6;
-  --rig-chiffre-2-icone: #B3C878;
-  --rig-chiffre-3-icone: #E8937B;
+  /* Tuiles chiffrees : aplats VIFS bleu / vert / brique, comme le jour (la
+     voie « Carbone et aplats vifs ») ; le verre teinte de la nuit a vecu. */
+  --rig-chiffre-1: linear-gradient(135deg, #2E47B5, #4262D6);
+  --rig-chiffre-2: linear-gradient(135deg, #4A7628, #6C9C36);
+  --rig-chiffre-3: linear-gradient(135deg, #B04A2B, #DA6A40);
+  --rig-chiffre-1-bord: transparent;
+  --rig-chiffre-2-bord: transparent;
+  --rig-chiffre-3-bord: transparent;
+  --rig-chiffre-texte: #F2F2F2;
+  --rig-chiffre-valeur: #FFFFFF;
+  /* Grand rond a gauche du chiffre : verre blanc, icone BLANCHE (le jour, le
+     rond est blanc plein et l'icone a la teinte de la tuile). */
+  --rig-chiffre-rond: rgba(255, 255, 255, .16);
+  --rig-chiffre-rond-bord: rgba(255, 255, 255, .24);
+  --rig-chiffre-1-icone: #FFFFFF;
+  --rig-chiffre-2-icone: #FFFFFF;
+  --rig-chiffre-3-icone: #FFFFFF;
   /* 4e teinte : la colonne « Mise en attente » des commandes web (neutre). */
-  --rig-chiffre-4: linear-gradient(160deg, #262A33, #1B1E26);
-  --rig-chiffre-4-bord: #454B58;
-  --rig-chiffre-4-icone: #A9B1C2;
+  --rig-chiffre-4: linear-gradient(135deg, #3A3A3A, #555555);
+  --rig-chiffre-4-bord: transparent;
+  --rig-chiffre-4-icone: #FFFFFF;
+}
+
+/* Le BANDEAU NOIR de l'en-tete de l'accueil (« En-tete noir », 2026-11-19).
+   Regle a part, sans :root : le bloc ci-dessus vaut aussi pour :root, et les
+   autres themes heriteraient du bandeau faute de redefinir ces jetons. */
+[data-rig-theme="sombre"] {
+  --rig-entete-fond: #080808;
+  --rig-entete-bord: rgba(255, 255, 255, .07);
+  --rig-entete-ecart: var(--rig-esp-5);
 }
 
 /* --- MODE CLAIR --- */

@@ -24,7 +24,13 @@ describe('Accueil : la coquille et le menu', () => {
     const racine = container.firstElementChild!
     expect(racine.className).toBe('rig-accueil ')
     expect(morceaux(racine)).toEqual(['<nav>', ' ', '<div>'])
-    expect(morceaux(racine.querySelector('.rig-plan'))).toEqual(['<div>', ' ', '<div>', ' ', '<div>', '<div>'])
+    // La tete du plan (« En-tete noir », 19/11/2026) porte l'entete PUIS la
+    // recherche : le bandeau du sombre passe sous les deux.
+    expect(morceaux(racine.querySelector('.rig-plan'))).toEqual(['<div>', ' ', '<div>', '<div>'])
+    const tete = racine.querySelector('.rig-plan')!.firstElementChild!
+    expect(tete.className).toBe('rig-plan__tete')
+    expect(morceaux(tete)).toEqual(['<div>', ' ', '<div>'])
+    expect(Array.from(tete.children, (e) => e.className)).toEqual(['rig-entete', 'rig-recherche rig-recherche--fixe'])
     rerender(<Accueil vue={vuePlan({ menuReduit: true })} geste={geste} />)
     expect(container.firstElementChild!.className).toBe('rig-accueil rig-accueil--menu-reduit')
     expect(container.querySelector('.rig-menu__replier')!.getAttribute('title')).toBe('Deployer le menu')

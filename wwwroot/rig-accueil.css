@@ -264,6 +264,21 @@
   min-height: 0;
   overflow-y: auto;
 }
+/* Tete du plan : la date, le salut et la recherche (« En-tete noir »,
+   2026-11-19). Les marges negatives rendent le padding du plan : le bloc
+   touche les bords haut, gauche et droit, et sa place reste la meme. Seul le
+   sombre lui donne un fond (bandeau noir) et un filet bas ; ailleurs ses
+   jetons valent transparent et 0px, et rien ne bouge. Le filet est une ombre
+   interieure, pour ne pas ajouter de pixel a la hauteur. flow-root garde
+   DANS le bloc la marge basse de la recherche : sans lui, elle passerait
+   dessous et le bandeau s'arreterait au ras de la pilule. */
+.rig-plan__tete {
+  display: flow-root;
+  margin: calc(-1 * var(--rig-esp-4)) calc(-1 * var(--rig-esp-5)) var(--rig-entete-ecart);
+  padding: var(--rig-esp-4) var(--rig-esp-5) 0;
+  background: var(--rig-entete-fond);
+  box-shadow: inset 0 -1px 0 var(--rig-entete-bord);
+}
 
 /* ---------- Barre de recherche : centree, hors des tuiles ----------
    Elle defile avec le contenu (choix du 2026-09-10) : plus de sticky. */
@@ -943,7 +958,7 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   .rig-entete { flex-wrap: wrap; gap: var(--rig-esp-2); }
   .rig-titre { font-size: var(--rig-fs-corps); }
   /* Le salut de « Proue » garde sa place de titre, un cran plus petit. */
-  .rig-plan > .rig-entete .rig-proue .rig-titre { font-size: 20px; }
+  .rig-plan__tete > .rig-entete .rig-proue .rig-titre { font-size: 20px; }
 
   /* La zone du milieu (saisie par etapes) garde une hauteur UTILISABLE : en
      `1fr` elle tombait a une ligne a 900x650 et a ZERO a 640x480 (mesure
@@ -1107,25 +1122,25 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 /* « BONJOUR RAPHAEL » (charte du 2026-11-18) : le titre de l'accueil
    passe en capitales grasses, comme le titre de la voie « Bleu nuit et aplats
    vifs ». Le texte de Home.razor ne change pas, seule sa casse affichee. */
-.rig-plan > .rig-entete .rig-titre {
+.rig-plan__tete > .rig-entete .rig-titre {
   text-transform: uppercase;
   font-weight: 800;
   letter-spacing: .02em;
 }
-.rig-plan > .rig-entete .rig-titre b { font-weight: 800; }
+.rig-plan__tete > .rig-entete .rig-titre b { font-weight: 800; }
 
 /* ---------- « Proue » (/draft conv-1983, 18/11/2026) ----------
    L'entete devient la proue de l'accueil : la date en petites capitales d'or,
    le salut en grand, puis UNE phrase qui dit la journee avec les trois memes
    chiffres que les tuiles chiffrees. Plus d'air au-dessus des chiffres. */
-.rig-plan > .rig-entete { align-items: flex-start; margin-bottom: var(--rig-esp-4); }
+.rig-plan__tete > .rig-entete { align-items: flex-start; margin-bottom: var(--rig-esp-4); }
 .rig-proue { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .rig-proue__date {
   font: 700 var(--rig-fs-kicker)/1.3 var(--rig-font-mono);
   letter-spacing: .16em; text-transform: uppercase;
   color: var(--rig-accent);
 }
-.rig-plan > .rig-entete .rig-proue .rig-titre { font-size: 26px; line-height: 1.1; }
+.rig-plan__tete > .rig-entete .rig-proue .rig-titre { font-size: 26px; line-height: 1.1; }
 .rig-proue__phrase { margin-top: 4px; font-size: 13px; color: var(--rig-texte-2); }
 .rig-proue__phrase b { font-weight: 700; color: var(--rig-texte); }
 .rig-proue__phrase .rig-proue__alerte { color: var(--rig-alerte); }
