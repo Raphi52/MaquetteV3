@@ -450,6 +450,50 @@ foreach (var (nom, texte) in feuilles)
                 Exiger(ratio >= 4.5, $"« {code} » : {jeton} lisible sur tout le panneau ({ratio:0.0}:1 au pire, 4,5 exige)");
             }
         }
+
+        // Commandes web, commande ouverte : la liste devient la colonne de GAUCHE
+        // et prend l'habit du menu de l'accueil, theme par theme (demande du
+        // 19/11/2026, conv-2019 : « le panel de gauche de la meme couleur que le
+        // menu de gauche de l'accueil en fonction des themes »). Memes jetons que
+        // .rig-menu ; les teintes ecrites en texte (bouton, liens, « 2/3 ») se
+        // melangent a --rig-rail-melange, comme les groupes du menu, et tiennent
+        // 4,5:1 sur chaque arret du degrade. Sans melange, l'orange brule du
+        // theme Noir et orange ne fait que 3,0:1 sur son panneau noir, l'alerte
+        // du clair 1,8:1 sur son gris fonce.
+        {
+            var liste = Regex.Match(accueil, @"\n\.rig-tcw__scene--ouverte \.rig-tcw__liste\s*\{([^{}]*)\}").Groups[1].Value;
+            Exiger(liste.Contains("background: var(--rig-rail)") && liste.Contains("box-shadow: var(--rig-rail-ombre)")
+                   && liste.Contains("border-radius: var(--rig-rail-rayon)")
+                   && liste.Contains("--rig-texte: var(--rig-rail-texte)") && liste.Contains("--rig-texte-2: var(--rig-rail-texte-2)")
+                   && liste.Contains("--rig-texte-3: var(--rig-rail-texte-3)") && liste.Contains("--rig-bord-faible: var(--rig-rail-trait-faible)"),
+                "Commandes web : la liste de gauche (commande ouverte) prend le fond, l'ombre et les textes du menu de l'accueil");
+
+            var regles = string.Concat(Regex.Matches(accueil, @"\n\.rig-tcw__scene--ouverte \.rig-tcw__liste[^{}]*\{([^{}]*)\}")
+                .Select(m => m.Groups[1].Value));
+            var melanges = Regex.Matches(regles, @"color-mix\(in srgb, var\((--rig-[a-z-]+)\) (\d+)%, var\(--rig-rail-melange\)\)")
+                .Select(m => (jeton: m.Groups[1].Value, part: int.Parse(m.Groups[2].Value) / 100.0)).ToList();
+            Exiger(new[] { "--rig-or", "--rig-alerte", "--rig-palier-vide" }.All(j => melanges.Any(x => x.jeton == j)),
+                $"Commandes web : la liste de gauche melange au rail l'accent, l'alerte et le « pret » ({string.Join(", ", melanges.Select(x => x.jeton))})");
+            string Melange(string a, string b, double part)
+            {
+                var (x, y) = (Convert.FromHexString(a.TrimStart('#')), Convert.FromHexString(b.TrimStart('#')));
+                return "#" + string.Concat(Enumerable.Range(0, 3).Select(i => ((int)Math.Round(x[i] * part + y[i] * (1 - part))).ToString("X2")));
+            }
+            foreach (var code in themes.Keys)
+            {
+                var arretsListe = Regex.Matches(ValeurDuTheme(code, "--rig-rail") ?? "", @"#[0-9A-Fa-f]{6}").Select(m => m.Value).ToList();
+                var melangeRail = ValeurDuTheme(code, "--rig-rail-melange");
+                foreach (var (jeton, part) in melanges)
+                {
+                    var teinte = ValeurDuTheme(code, jeton);
+                    var lisible = teinte is not null && melangeRail is not null && arretsListe.Count > 0
+                        && Regex.IsMatch(teinte, @"^#[0-9A-Fa-f]{6}$") && Regex.IsMatch(melangeRail, @"^#[0-9A-Fa-f]{6}$");
+                    var ratio = lisible ? arretsListe.Min(a => Contraste(a, Melange(teinte!, melangeRail!, part))) : 0;
+                    Exiger(ratio >= 4.5,
+                        $"« {code} » : Commandes web, {jeton} melange a {part:P0} lisible sur la liste de gauche ({ratio:0.0}:1 au pire, 4,5 exige)");
+                }
+            }
+        }
     }
 
     // La bascule a disparu au profit d'une liste nourrie par ThemesRig.
