@@ -37,7 +37,7 @@ describe('Application : la racine de la page', () => {
   it('la barre (ses onglets DEDANS, « comme Brave »), puis l\'accueil, l\'ecran et l\'affaire', () => {
     const vue = vueApplication({
       barre: true, accueil: vuePlan(),
-      onglets: [{ code: 'PROC_FACTURE', libelle: 'Factures', actif: true, detache: false, glisse: false }],
+      onglets: [{ code: 'PROC_FACTURE', libelle: 'Factures', actif: true, detache: false, glisse: false, verbe: null }],
       proc: proc(), dossier: dossier(),
     })
     const { container } = rendre(vue)
@@ -101,8 +101,8 @@ describe('Application : les gestes du plan de travail', () => {
 
 describe('Application : la barre d\'onglets', () => {
   const onglets = [
-    { code: 'PROC_FACTURE', libelle: 'Factures', actif: false, detache: false, glisse: false },
-    { code: 'PROC_ENCAISS', libelle: 'Encaissements', actif: true, detache: true, glisse: true },
+    { code: 'PROC_FACTURE', libelle: 'Factures', actif: false, detache: false, glisse: false, verbe: null },
+    { code: 'PROC_ENCAISS', libelle: 'Encaissements', actif: true, detache: true, glisse: true, verbe: null },
   ]
 
   it('un onglet : titre, marque « sorti », croix ; memes classes et titres que Razor', () => {

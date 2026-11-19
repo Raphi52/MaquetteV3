@@ -318,4 +318,11 @@ public static class MenuAccueil
             ])
         ])
     ];
+
+    /// <summary>Le VERBE du menu (Ouvrir, Trouver...) qui range un ecran, ou null
+    /// pour un ecran hors du menu (PROC_TACHES_LOT, ouvert par une alerte de lot).
+    /// L'onglet de la vue en porte la pastille (19/11/2026) : on reconnait d'un
+    /// coup d'oeil ce qu'on est venu y faire, aux couleurs du menu.</summary>
+    public static MomentMenu? VerbeDe(string code)
+        => Moments.FirstOrDefault(m => m.Sous.Any(s => s.Entrees.Any(e => e.Code == code)));
 }

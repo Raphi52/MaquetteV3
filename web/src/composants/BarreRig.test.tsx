@@ -9,8 +9,8 @@ import type { OngletBarreVue } from '../plan/types'
 afterEach(cleanup)
 
 const onglets: OngletBarreVue[] = [
-  { code: 'PROC_FACTURE', libelle: 'Factures', actif: false, detache: false, glisse: false },
-  { code: 'PROC_ENCAISS', libelle: 'Encaissements', actif: true, detache: false, glisse: false },
+  { code: 'PROC_FACTURE', libelle: 'Factures', actif: false, detache: false, glisse: false, verbe: null },
+  { code: 'PROC_ENCAISS', libelle: 'Encaissements', actif: true, detache: false, glisse: false, verbe: null },
 ]
 
 function rendre(ouverts: OngletBarreVue[] | null = onglets, accueil = false) {

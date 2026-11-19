@@ -100,6 +100,23 @@ internal static class Programme
         Exiger(sortie.Montre?.Code == "B",
             "fermer la fenetre ramene la vue dans son onglet");
 
+        // ---------- 3 bis. La pastille du verbe (19/11/2026, « Onglet fondu » n°3).
+        // L'onglet porte la pastille du verbe du menu qui range sa vue. Ce que la
+        // compilation ne verrait pas : une teinte de verbe sans regle CSS donnerait
+        // une pastille grise, sans erreur nulle part.
+        var arrivee = RigV3Desktop.Pont.MenuAccueil.VerbeDe("PROC_ARRIVEE");
+        Exiger(arrivee is { Titre: "Ouvrir", Teinte: "rcs", Signe: "+" },
+            "le courrier du jour porte la pastille « + » d'Ouvrir");
+        Exiger(RigV3Desktop.Pont.MenuAccueil.VerbeDe("PROC_AUDIENCE") is { Titre: "Surveiller", Signe: "!" },
+            "les audiences portent la pastille « ! » de Surveiller");
+        Exiger(RigV3Desktop.Pont.MenuAccueil.VerbeDe("PROC_TACHES_LOT") is null,
+            "une vue hors du menu (taches en lot, ouverte par une alerte) n'a pas de pastille");
+        var css = File.ReadAllText(Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+            "../../../../../wwwroot/rig-accueil.css")));
+        foreach (var verbe in RigV3Desktop.Pont.MenuAccueil.Moments)
+            Exiger(css.Contains(".rig-vonglet__verbe--" + verbe.Teinte),
+                $"la pastille d'onglet de « {verbe.Titre} » a sa couleur (.rig-vonglet__verbe--{verbe.Teinte})");
+
         // ---------- 4. L'agencement survit au redemarrage.
         var temporaire = Path.Combine(Path.GetTempPath(),
             "rigv3-onglets-" + Guid.NewGuid().ToString("N") + ".json");

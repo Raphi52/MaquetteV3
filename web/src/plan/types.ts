@@ -28,7 +28,13 @@ export interface VueApplication {
   defilement: DefilementVue | null
 }
 
-export interface OngletBarreVue { code: string, libelle: string, actif: boolean, detache: boolean, glisse: boolean }
+export interface OngletBarreVue {
+  code: string, libelle: string, actif: boolean, detache: boolean, glisse: boolean
+  /** La pastille du verbe du menu qui range la vue ; nul pour une vue hors du menu. */
+  verbe: VerbeOngletVue | null
+}
+/** Un verbe du menu (MomentMenu) : la teinte nomme sa couleur (.rig-vonglet__verbe--<teinte>). */
+export interface VerbeOngletVue { titre: string, teinte: string, signe: string }
 export interface DefilementVue { numero: number, index: number, doux: boolean }
 
 // ---- L'ecran de procedure ----

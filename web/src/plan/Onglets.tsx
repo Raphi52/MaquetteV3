@@ -40,6 +40,12 @@ export function Onglets({ onglets, finsDeGlisse, plan }: ProprietesOnglets) {
              // la fenetre qui partirait au lieu de l'onglet.
              onMouseDown={arreter}
              onClick={() => plan('ongletActiver', onglet.code)}>
+          {/* La pastille du verbe, la MEME que dans le menu de gauche (19/11/2026) :
+              son survol nomme le verbe, a la place de l'aide de l'onglet. */}
+          {onglet.verbe && (
+            <span className={'rig-menu__pastille rig-vonglet__verbe rig-vonglet__verbe--' + onglet.verbe.teinte}
+                  title={onglet.verbe.titre}>{onglet.verbe.signe}</span>
+          )}
           <span className="rig-vonglet__titre">{onglet.libelle}</span>
           {onglet.detache && <span className="rig-vonglet__sorti" aria-label="sorti dans sa fenetre">{'↗'}</span>}
           <button className="rig-vonglet__fermer" aria-label={'Fermer ' + onglet.libelle}

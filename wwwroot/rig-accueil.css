@@ -104,20 +104,22 @@
 /* 2026-11-18 (« Ivoire chaud ») : les SEPT verbes du menu prennent la famille
    de l'or, une teinte par mode (jetons --rig-verbe-* de rig-charte.css) ; le
    voile se calcule depuis la teinte. Les autres teintes ne sont pas montrees
-   par le menu des verbes et restent telles quelles. */
-.rig-menu__groupe--rcs    { --teinte: var(--rig-verbe-ouvrir);     --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
-.rig-menu__groupe--jud    { --teinte: var(--rig-verbe-trouver);    --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
+   par le menu des verbes et restent telles quelles. La pastille de l'onglet
+   d'une vue (.rig-vonglet__verbe, 19/11/2026) prend la teinte de son verbe
+   ICI : le menu et la barre du haut ne peuvent pas diverger. */
+.rig-menu__groupe--rcs, .rig-vonglet__verbe--rcs { --teinte: var(--rig-verbe-ouvrir);     --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
+.rig-menu__groupe--jud, .rig-vonglet__verbe--jud { --teinte: var(--rig-verbe-trouver);    --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
 .rig-menu__groupe--doc    { --teinte: #10B981; --teinte-faible: rgba(16,185,129,.14); }
-.rig-menu__groupe--compta { --teinte: var(--rig-verbe-facturer);   --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
-.rig-menu__groupe--reg    { --teinte: var(--rig-verbe-configurer); --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
+.rig-menu__groupe--compta, .rig-vonglet__verbe--compta { --teinte: var(--rig-verbe-facturer);   --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
+.rig-menu__groupe--reg, .rig-vonglet__verbe--reg { --teinte: var(--rig-verbe-configurer); --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
 /* Le menu suit les GESTES du metier : chaque geste porte sa couleur, pour
    reconnaitre ou l'on est avant d'avoir lu le titre. */
 .rig-menu__groupe--pers   { --teinte: #EC4899; --teinte-faible: rgba(236,72,153,.14); }
-.rig-menu__groupe--mod    { --teinte: var(--rig-verbe-modifier);   --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
+.rig-menu__groupe--mod, .rig-vonglet__verbe--mod { --teinte: var(--rig-verbe-modifier);   --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
 .rig-menu__groupe--aud    { --teinte: #0EA5E9; --teinte-faible: rgba(14,165,233,.14); }
 .rig-menu__groupe--edit   { --teinte: #84CC16; --teinte-faible: rgba(132,204,22,.14); }
-.rig-menu__groupe--surv   { --teinte: var(--rig-verbe-surveiller); --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
-.rig-menu__groupe--fin    { --teinte: var(--rig-verbe-terminer);   --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
+.rig-menu__groupe--surv, .rig-vonglet__verbe--surv { --teinte: var(--rig-verbe-surveiller); --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
+.rig-menu__groupe--fin, .rig-vonglet__verbe--fin { --teinte: var(--rig-verbe-terminer);   --teinte-faible: color-mix(in srgb, var(--teinte) 20%, transparent); }
 /* Sur le rail encre, une teinte ecrite en TEXTE (sous-titre ouvert, survol)
    s'eclaircit : le bleu #4560C2 tombe a 2,9:1 sur l'encre. Sur un rail clair
    (« Violet pilules »), --rig-rail-melange la fonce au lieu de l'eclaircir. */
@@ -1022,7 +1024,11 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-barre {
   display: flex; align-items: center; gap: 0;
   padding: 0 0 0 8px;
-  height: 34px;
+  /* 34 px + la bordure : la boite compte sa bordure (box-sizing de
+     rig-charte.css), et --rig-bandeau-h (39 px) attend filet 4 + 34 + 1.
+     A 34 px, il restait 1 px vide entre la barre et l'ecran ouvert, ou la
+     page d'accueil transparaissait en un trait sombre sous l'onglet actif. */
+  height: 35px;
   border-bottom: 1px solid var(--rig-bord);
   user-select: none;
   cursor: default;
@@ -2855,14 +2861,34 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   background: var(--rig-bord);
 }
 /* L'onglet actif a le fond de la page et descend d'1 px sur la bordure de
-   la barre : il ne fait qu'un avec l'ecran ouvert dessous. */
+   la barre : il ne fait qu'un avec l'ecran ouvert dessous. « Onglet fondu »
+   (19/11/2026) : un lisere d'accent plat en haut, qui suit l'arrondi, et deux
+   conges inverses a son pied qui le font couler dans l'ecran. */
 .rig-vonglet--actif,
 .rig-vonglet--actif:hover {
   background: var(--rig-fond);
   border-color: var(--rig-bord);
+  border-top: 2px solid var(--rig-or);
   color: var(--rig-texte);
   margin-bottom: -1px; height: 29px;
+  /* Les conges debordent de 8 px de chaque cote : l'onglet ouvert ne coupe
+     donc plus ce qui depasse, et garde la place de sa pastille et de sa
+     croix ; z-index pour passer au-dessus de ses voisins. */
+  overflow: visible; min-width: 72px; z-index: 1;
 }
+/* Un conge = un carre de 9 px a cote du pied de l'onglet, rempli du fond de
+   la page HORS d'un quart de cercle centre sur son coin haut exterieur. Le
+   carre recouvre la colonne du bord de l'onglet : la bordure verticale
+   s'arrete ou l'arc commence, et l'arc (anneau de 8 a 9 px, couleur du bord)
+   rejoint le filet bas de la barre. */
+.rig-vonglet--actif::before,
+.rig-vonglet--actif::after {
+  content: ''; position: absolute; bottom: 0; width: 9px; height: 9px;
+  pointer-events: none;
+  --conge: transparent 7.6px, var(--rig-bord) 8px, var(--rig-bord) 8.6px, var(--rig-fond) 9px;
+}
+.rig-vonglet--actif::before { left: -9px;  background: radial-gradient(circle at 0 0, var(--conge)); }
+.rig-vonglet--actif::after  { right: -9px; background: radial-gradient(circle at 100% 0, var(--conge)); }
 .rig-vonglet--sorti { color: var(--rig-texte-3); opacity: .7; font-style: italic; }
 .rig-vonglet--glisse { opacity: .95; }
 /* Pendant le glisser l onglet suit le pointeur (transform pose par le JS) :
@@ -2870,6 +2896,11 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-vonglet--suit { position: relative; z-index: 2; transition: none; box-shadow: 0 2px 6px rgba(0,0,0,.35); cursor: grabbing; }
 .rig-vonglet__titre { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .rig-vonglet__sorti { flex: none; font-size: 10px; color: var(--rig-texte-3); }
+/* La pastille du verbe (19/11/2026) : celle du menu de gauche
+   (.rig-menu__pastille, 18 px, signe blanc, teinte du verbe posee avec celle
+   des groupes du menu), un peu effacee sauf sur l'onglet ouvert ou survole. */
+.rig-vonglet:hover .rig-vonglet__verbe,
+.rig-vonglet--actif .rig-vonglet__verbe { opacity: 1; }
 /* La croix : toujours sur l'onglet actif, au survol sur les autres. */
 .rig-vonglet__fermer {
   flex: none; width: 20px; height: 20px;

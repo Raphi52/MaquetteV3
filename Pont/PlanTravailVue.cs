@@ -33,7 +33,12 @@ public sealed record VueApplication(string Theme, int Geste, bool Barre, VuePlan
 /// <summary>Un geste de la page pour le plan de travail, numerote par la page.</summary>
 public sealed record GestePlan(string Nom, JsonElement Valeur, int Numero);
 
-public sealed record OngletBarreVue(string Code, string Libelle, bool Actif, bool Detache, bool Glisse);
+/// <param name="Verbe">La pastille du verbe du menu qui range la vue ; nul hors du menu.</param>
+public sealed record OngletBarreVue(string Code, string Libelle, bool Actif, bool Detache, bool Glisse,
+                                    VerbeOngletVue? Verbe);
+/// <summary>Le verbe d'un onglet, tel que le menu de gauche le dessine (MomentMenu) :
+/// <paramref name="Teinte"/> nomme sa couleur, <paramref name="Signe"/> le symbole de sa pastille.</summary>
+public sealed record VerbeOngletVue(string Titre, string Teinte, string Signe);
 
 public sealed record DefilementVue(int Numero, int Index, bool Doux);
 
@@ -173,7 +178,8 @@ public sealed partial class SessionPlanTravail
             !ModeFenetreVue && Onglets.Onglets.Count > 0
                 ? Onglets.Onglets.Select(o => new OngletBarreVue(
                       o.Code, o.Libelle, ReferenceEquals(Onglets.Actuel, o), o.Detache,
-                      GlisseEnCours && GlisseCode == o.Code)).ToArray()
+                      GlisseEnCours && GlisseCode == o.Code,
+                      MenuAccueil.VerbeDe(o.Code) is { } v ? new VerbeOngletVue(v.Titre, v.Teinte, v.Signe) : null)).ToArray()
                 : null,
             FinsDeGlisse,
             proc,
