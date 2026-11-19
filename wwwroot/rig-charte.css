@@ -194,6 +194,9 @@ select option {
      une couleur de repli). Meme or que --rig-focus : meme role d'interaction. */
   --rig-accent: #D9B26A;
   --rig-grad-marque: linear-gradient(90deg, #111111, #D9B26A 55%, #F0D59A);
+  /* Piste allumee de l'interrupteur des commandes web : ici le degrade de
+     marque ; Clair et Noir et orange prennent un aplat orange brule. */
+  --rig-bascule-allumee: var(--rig-grad-marque);
 
   /* --- Ce qui RELIE les deux modes (charte du 2026-11-18) --- */
   /* L'or de l'element actif : un aplat en degrade, texte encre dessus. */
@@ -296,6 +299,10 @@ select option {
   --rig-grad-alerte:  linear-gradient(90deg, #C2410C, #F5A609);
   --rig-grad-ok:      linear-gradient(90deg, #047857, #10B981);
   --rig-grad-marque:  linear-gradient(90deg, #15182A, #C8963E 55%, #E4BE76);
+  /* Interrupteur allume des commandes web : aplat orange brule a 5:1 sur
+     blanc, la ou l'or du degrade de marque tombe a 2,4:1
+     (/draft du 19/11/2026, proposition « Brule », conv-2008). */
+  --rig-bascule-allumee: #B45309;
 
   /* --- Memes roles qu'en sombre, voir plus haut --- */
   --rig-or: #C8963E;
@@ -392,6 +399,7 @@ select option {
   --rig-grad-alerte:  linear-gradient(90deg, #C2410C, #F5A609);
   --rig-grad-ok:      linear-gradient(90deg, #047857, #10B981);
   --rig-grad-marque:  linear-gradient(90deg, #523EDB, #7563EF 55%, #AF47E0);
+  --rig-bascule-allumee: var(--rig-grad-marque);
 
   --rig-or: #5F4BEA;
   --rig-or-clair: #7563EF;
@@ -472,6 +480,10 @@ select option {
   --rig-grad-alerte:  linear-gradient(90deg, #C2410C, #F5A609);
   --rig-grad-ok:      linear-gradient(90deg, #047857, #10B981);
   --rig-grad-marque:  linear-gradient(90deg, #0E0E10, #F59E0B 55%, #FCD34D);
+  /* Interrupteur allume des commandes web : aplat orange brule a 5:1 sur
+     blanc, la ou l'orange vif du degrade de marque tombe a 2:1
+     (/draft du 19/11/2026, proposition « Brule », conv-2008). */
+  --rig-bascule-allumee: #B45309;
 
   --rig-or: #F59E0B;
   --rig-or-clair: #FBBF24;
@@ -552,6 +564,7 @@ select option {
   --rig-grad-alerte:  linear-gradient(90deg, #C2410C, #F5A609);
   --rig-grad-ok:      linear-gradient(90deg, #047857, #10B981);
   --rig-grad-marque:  linear-gradient(90deg, #2E393F, #E8825A 55%, #F8C17B);
+  --rig-bascule-allumee: var(--rig-grad-marque);
 
   --rig-or: #E8825A;
   --rig-or-clair: #F2A27E;

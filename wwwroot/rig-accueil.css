@@ -3171,6 +3171,10 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 /* La bascule commune prend toute la largeur (pensee pour les panneaux) ; ici
    elle se pose EN LIGNE, a cote des criteres et des champs. */
 .rig-tcw .rig-bascule { width: auto; }
+/* Allumee, la piste prend la couleur que chaque theme donne a
+   --rig-bascule-allumee (rig-charte.css) : aplat orange brule en Clair et en
+   Noir et orange, degrade de marque ailleurs. Eteinte, rien ne change. */
+.rig-tcw .rig-bascule__temoin::before { background: var(--rig-bascule-allumee); }
 /* Couleur du TYPE (filet de ligne, pastille du panneau) : or pour
    l'endettement, bleu pour la non-faillite, brique pour la non-opposition,
    comme la maquette « Boite de tri » choisie le 18/11/2026. En argile, le
