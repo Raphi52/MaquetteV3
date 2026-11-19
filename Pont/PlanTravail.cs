@@ -1635,28 +1635,35 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         RetenirAgencement();
     }
 
-    /// <summary>Sort l onglet dans sa propre fenetre. L onglet reste dans la
+    /// <summary>Sort l onglet dans sa propre fenetre -- celui d un ecran, ou celui
+    /// d une affaire (PlanTravailOngletAffaire.cs). L onglet reste dans la
     /// barre, grise : c est ce qui dit ou la vue est partie, et le clic dessus
     /// ramene la fenetre au premier plan.</summary>
     private void DetacherOnglet(string code, bool suivreCurseur = false)
     {
-        if (!ProcsConnues.TryGetValue(code, out var proc)) return;
-        if (!Onglets.Detacher(code)) return;
-        OuvrirFenetreVue(proc, suivreCurseur);
+        var libelle = ProcsConnues.TryGetValue(code, out var proc) ? proc.Libelle : LibelleAffaireASortir(code);
+        if (libelle is null || !Onglets.Detacher(code)) return;
+        QuitterAffaireSortie(code);
+        OuvrirFenetreVue(code, libelle, suivreCurseur);
     }
 
-    private void OuvrirFenetreVue(Proc proc, bool suivreCurseur = false)
+    private void OuvrirFenetreVue(string code, string libelle, bool suivreCurseur = false)
     {
-        var fenetre = new FenetreVue(proc.Code, proc.Libelle, FenetresVues.Count + 1, suivreCurseur);
+        var fenetre = new FenetreVue(code, libelle, FenetresVues.Count + 1, suivreCurseur);
         fenetre.Closed += (_, _) =>
         {
             FenetresVues.Remove(fenetre);
             if (VueFermee) return;
             // Fermer la fenetre RAMENE la vue dans son onglet, comme un
-            // navigateur : rien n est perdu.
+            // navigateur : rien n est perdu. Sauf si l'affaire y a ete FERMEE
+            // (sa croix, Echap) : son onglet s'en va avec elle.
+            var fermee = fenetre.Racine.Plan.AffaireFermee;
             Planifier(() =>
             {
-                Onglets.Rattacher(proc.Code);
+                if (fermee) Onglets.Fermer(code);
+                else Onglets.Rattacher(code);
+                // Une affaire rattachee se remontre ; un ecran rattache la quitte.
+                SuivreOngletActif();
                 RetenirAgencement();
             });
         };
@@ -1705,8 +1712,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     {
         if (ModeFenetreVue)
         {
-            // Une fenetre d onglet arrache ne montre QUE son ecran.
-            if (!string.IsNullOrWhiteSpace(VueInitiale)) OuvrirCode(VueInitiale!);
+            // Une fenetre d onglet arrache ne montre QUE son ecran -- ou son affaire.
+            if (!string.IsNullOrWhiteSpace(VueInitiale)) OuvrirVueInitiale(VueInitiale!);
             return;
         }
 
@@ -1845,11 +1852,15 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     }
 
     /// <summary>La tache encore a faire sur cette affaire, s il y en a une.
-    /// Lue dans le MEME releve que les alertes de l accueil : une tache close
-    /// n en ressort pas, et l ecran d ou l on vient n a rien a declarer.</summary>
+    /// Lue dans le MEME releve que la tuile « Mes taches du jour » : une tache
+    /// close n en ressort pas, et l ecran d ou l on vient n a rien a declarer.
+    /// Pas dans AlertesOuvertes : depuis le 17/09/2026 elle ne rend plus que le
+    /// catalogue des types d'alertes, sans aucune tache -- la regle ne jouait
+    /// alors que pour une tache deja en memoire, jamais dans une fenetre neuve
+    /// (onglet d'affaire sorti, constate le 19/11/2026).</summary>
     private (RecetteTache Recette, string Code)? TacheEnAttente(string numeroDossier)
     {
-        foreach (var a in Accueil.AlertesOuvertes())
+        foreach (var a in Accueil.TachesOuvertes())
         {
             if (a.Tache is not { } t || t.Dossier != numeroDossier) continue;
             if (RecettesTaches.ParCode(t.Code) is { } r) return (r, t.Code);

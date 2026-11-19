@@ -585,6 +585,28 @@ internal static class Programme
         Agir("echap");
         Exiger(plan.Vue().Dossier is null, "... et l'affaire ouverte");
 
+        // --- 10 bis. L'onglet d'une affaire SORTI dans sa propre fenetre (demande du
+        // 19/11/2026). La fenetre WPF elle-meme est prouvee sur le bureau cache ; ici, la
+        // session qu'elle monte : ouverte sur l'affaire de son onglet, sans barre ni accueil
+        // ni fleche « Retour » ; sa croix et Echap demandent la fermeture de la fenetre et
+        // disent a la principale de fermer l'onglet (AffaireFermee).
+        var sortie = new SessionPlanTravail(null, null, modeFenetreVue: true, vueInitiale: "AFFAIRE:004176");
+        sortie.Initialiser();
+        var fermetures = 0;
+        sortie.FermerFenetre += () => fermetures++;
+        vue = sortie.Vue();
+        Exiger(vue.Dossier is { Numero: "004176", Sortie: true } && vue.Onglets is null && vue.Accueil is null && !vue.Barre,
+            "la fenetre d'un onglet d'affaire sorti s'ouvre sur cette affaire, seule, sans fleche « Retour »");
+        Agir("ouvrirNumero", "004176");
+        Exiger(plan.Vue().Dossier is { Sortie: false }, "dans la fenetre principale, l'affaire garde sa fleche « Retour »");
+        Agir("fermerDossier");
+        Exiger(!sortie.AffaireFermee && fermetures == 0, "rien n'est ferme tant qu'on ne touche pas la fenetre sortie");
+        sortie.Agir("echap", Valeur(null));
+        Exiger(sortie.AffaireFermee && fermetures == 1,
+            "Echap, dans la fenetre sortie, ferme l'affaire : la fenetre doit partir, son onglet avec");
+        sortie.Agir("fermerDossier", Valeur(null));
+        Exiger(fermetures == 2, "la croix de l'affaire, dans la fenetre sortie, fait de meme");
+
         // --- 11. Le mode tache : la tuile « Mes taches du jour » ouvre la TACHE, pas
         // seulement l'affaire (OuvrirAlerte -> OuvrirTache), comme sur l'ecran.
         var accueil = new SessionAccueil(AccueilEtat.Charger());
@@ -598,6 +620,12 @@ internal static class Programme
         Agir("ouvrirNumero", deno.Tache!.Value.Dossier);
         Exiger(plan.Vue().Dossier?.Tache is { Code: "DENO" },
             "rouvrir l'affaire d'une tache en attente, depuis n'importe quel ecran, rouvre sa tache");
+        // Sortie dans sa fenetre, elle s'y montre comme dans son onglet : sur sa tache.
+        var sortieTache = new SessionPlanTravail(null, null, modeFenetreVue: true,
+                                                 vueInitiale: "AFFAIRE:" + deno.Tache!.Value.Dossier);
+        sortieTache.Initialiser();
+        Exiger(sortieTache.Vue().Dossier is { Tache.Code: "DENO", Sortie: true },
+            "l'onglet d'une affaire a tache, sorti dans sa fenetre, y rouvre sa tache (pas le dossier entier)");
         t = plan.Vue().Dossier!.Tache!;
         var inpi = Array.FindIndex(t!.Effets, e => e.Code == "0F");
         Exiger(inpi >= 0 && !t.Effets[inpi].Coche, "l'effet INPI est a faire");
@@ -633,6 +661,17 @@ internal static class Programme
         var refuse = false;
         try { Agir("gesteQuiNExistePas"); } catch (InvalidOperationException) { refuse = true; }
         Exiger(refuse, "un geste inconnu est une erreur franche, jamais ignore");
+
+        // --- 14. Une tache CLOSE ne se rouvre plus (TacheEnAttente lit TachesOuvertes,
+        // filtree comme la tuile « Mes taches du jour »). En dernier : la cloture reste
+        // dans l'etat du banc.
+        var etatClos = AccueilEtat.Charger();
+        etatClos.CloreTache("DENO", deno.Tache!.Value.Dossier, "banc");
+        var apresCloture = new SessionPlanTravail(null, null, modeFenetreVue: true,
+                                                  vueInitiale: "AFFAIRE:" + deno.Tache!.Value.Dossier);
+        apresCloture.Initialiser();
+        Exiger(apresCloture.Vue().Dossier is { Tache: null } dc && dc.Numero == deno.Tache!.Value.Dossier,
+            "une tache close ne se rouvre plus : l'affaire s'ouvre entiere");
 
         plan.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }

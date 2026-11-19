@@ -29,6 +29,15 @@ describe('Visionneuse : entete, fiche sommaire en puces, points a corriger', () 
     expect(entete.lastElementChild!.getAttribute('aria-label')).toBe("Fermer l'affaire")
   })
 
+  it('dans la fenetre d\'un onglet sorti, pas de fleche « Retour » (il n\'y a pas d\'accueil) ; la croix reste', () => {
+    const { container, gestes } = rendre(dossier({ sortie: true }))
+    const entete = container.querySelector('.rig-vged > .rig-vged__entete')!
+    expect(morceaux(entete)).toEqual([' ', '<span>', ' ', '<div>', '<div>', '<button>'])
+    expect(container.querySelector('[aria-label="Retour a l\'accueil"]')).toBeNull()
+    fireEvent.click(entete.lastElementChild!)
+    expect(gestes()).toEqual([['fermerDossier', null]])
+  })
+
   it('« Document » n\'apparait que si la piece est ouverte et la colonne fermee', () => {
     const { container, gestes } = rendre(dossier({ boutonDocument: true }))
     const doc = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Document')!

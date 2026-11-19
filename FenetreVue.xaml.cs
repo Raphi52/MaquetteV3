@@ -37,6 +37,9 @@ public partial class FenetreVue : Window
         Racine = new Pont.RacinePlanTravail(App.Fenetre, App.Partage, modeFenetreVue: true, vueInitiale: Code);
         Title = string.IsNullOrWhiteSpace(libelle) ? "RIG V3" : "RIG V3 - " + libelle;
 
+        // L'affaire montree ici vient d'y etre fermee (sa croix, Echap) : la fenetre
+        // s'en va. Apres le geste en cours, pour ne pas fermer la page sous lui.
+        Racine.Plan.FermerFenetre += () => Dispatcher.BeginInvoke(Close);
         Loaded += async (_, _) => await Pont.PageWeb.Brancher(Vue, Racine);
         Closed += async (_, _) => await Racine.DisposeAsync();
     }

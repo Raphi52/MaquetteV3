@@ -146,6 +146,8 @@ export interface DossierVue {
   suiviReplie: boolean
   /** Le classement de la carte ouverte du classeur, retenu d'une affaire a l'autre et au redemarrage. */
   triClasseur: TriClasseur
+  /** Montree dans la fenetre de son onglet sorti : pas d'accueil derriere, pas de fleche « Retour ». */
+  sortie: boolean
 }
 export interface PieceHistoriqueVue {
   id: string

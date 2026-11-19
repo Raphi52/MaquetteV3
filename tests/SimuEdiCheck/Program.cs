@@ -176,8 +176,10 @@ finally
 // donc il vaut pour tout ecran qui ouvre un dossier par son numero.
 Exiger(Regex.IsMatch(home, @"private void OuvrirParNumero\([\s\S]{0,1800}?TacheEnAttente\(numeroDossier\) is \{ \} attendue[\s\S]{0,200}?OuvrirTache\("),
     "ouvrir un dossier par son numero ouvre sa tache en attente, d ou qu on vienne");
-Exiger(Regex.IsMatch(home, @"private \(RecetteTache Recette, string Code\)\? TacheEnAttente\([\s\S]{0,600}?AlertesOuvertes\(\)"),
-    "la tache en attente est lue dans le MEME releve que les alertes : une tache close ne replie rien");
+// Le releve est celui de « Mes taches du jour » (TachesOuvertes) : AlertesOuvertes
+// ne porte plus de tache depuis le 17/09/2026 (constate le 19/11/2026).
+Exiger(Regex.IsMatch(home, @"private \(RecetteTache Recette, string Code\)\? TacheEnAttente\([\s\S]{0,900}?Accueil\.TachesOuvertes\(\)"),
+    "la tache en attente est lue dans le MEME releve que les taches du jour : une tache close ne replie rien");
 Exiger(Regex.IsMatch(home, @"RecetteActive is not null && AffaireDeLaTache != numeroDossier"),
     "changer d affaire referme le mode replie : l arbre d un dossier n est jamais filtre par la recette d un autre");
 Exiger(vuePlan.Contains("Afficher tout le dossier") && balisagePlan.Contains("Afficher tout le dossier sans quitter la tache"),

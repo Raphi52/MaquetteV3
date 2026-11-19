@@ -68,10 +68,14 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
     <div className="rig-vged">
       <div className="rig-vged__entete">
         {/* La fleche ramene a l'accueil comme la maison : l'onglet de l'affaire
-            reste dans la barre (19/11/2026). La croix, a droite, la ferme. */}
-        <button className="rig-bouton rig-bouton--icone rig-bouton--plat" title="Retour a l'accueil" aria-label="Retour a l'accueil" onClick={() => plan('accueil')}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"></path><path d="M12 19l-7-7 7-7"></path></svg>
-        </button>{' '}
+            reste dans la barre (19/11/2026). La croix, a droite, la ferme.
+            Dans la fenetre d'un onglet SORTI, il n'y a pas d'accueil : pas de fleche
+            (fermer la fenetre ramene l'affaire dans son onglet). */}
+        {!d.sortie && (
+          <button className="rig-bouton rig-bouton--icone rig-bouton--plat" title="Retour a l'accueil" aria-label="Retour a l'accueil" onClick={() => plan('accueil')}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"></path><path d="M12 19l-7-7 7-7"></path></svg>
+          </button>
+        )}{' '}
         <span className={'rig-filet-v rig-filet-v--' + d.statut}></span>{' '}
         {/* IDENTITE (proposition 5 du /draft du 19/11/2026) : le numero et l'objet
             en titre, la FICHE SOMMAIRE en puces dessous -- les champs d'identite

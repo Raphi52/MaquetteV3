@@ -1167,8 +1167,11 @@ Exiger(vueTache.Contains("RaisonBlocage()"),
 
 Exiger(vueTache.Contains("Terminer la tache") && vueTache.Contains("ChampsManquants()"),
     "la vue porte le bouton « Terminer la tache » et son controle de completude");
-Exiger(vueTache.Contains("AlertesOuvertes()")
-       && !Regex.IsMatch(vueTache, @"Alertes\s*=\s*SondeAlertes\.Relever\(\)"),
+// Depuis le 19/11/2026 le plan lit les TACHES ouvertes (TachesOuvertes) : la file
+// d'alertes (AlertesOuvertes) ne porte plus aucune tache depuis le 17/09/2026. Les
+// deux appliquent le meme filtre des taches terminees (TacheDejaFaite).
+Exiger(vueTache.Contains("Accueil.TachesOuvertes()")
+       && !Regex.IsMatch(vueTache, @"SondeAlertes\.(Relever|ReleverCalculees)\(\)"),
     "la file d'alertes EXCLUT les taches deja terminees");
 Exiger(Regex.IsMatch(pontAccueil, @"Alertes = AlertesOuvertes\(\);\s*Taches = TachesOuvertes\(\);")
        && !Regex.IsMatch(pontAccueil, @"Alertes\s*=\s*SondeAlertes\.Relever\(\)")
