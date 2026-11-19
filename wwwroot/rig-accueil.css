@@ -3678,6 +3678,40 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-tcw__ligne-statut--attente { --tcw-statut: var(--rig-alerte); }
 .rig-tcw__ligne-statut--rejet { --tcw-statut: var(--rig-erreur); }
 
+/* Correspondance du debiteur (/draft du 19/11/2026, proposition 5) : la commande
+   et le dossier trouve cote a cote, champ par champ (coche verte = pareil, « ≠ »
+   d'alerte = different), puis le verdict, ligne de statut verte ou d'alerte, et
+   « Retenir » au bout. Une carte par dossier ; le retenu a le filet vert. */
+.rig-tcw__corresp { display: flex; flex-direction: column; gap: var(--rig-esp-2); }
+.rig-tcw__corresp + .rig-tcw__corresp { padding-top: var(--rig-esp-2); border-top: 1px dashed var(--rig-bord); }
+.rig-tcw__comparaison {
+  display: grid; grid-template-columns: minmax(96px, max-content) minmax(0, 1fr) minmax(0, 1.4fr);
+  border: 1px solid var(--rig-bord); border-radius: var(--rig-radius-sm); overflow: hidden;
+  font-size: var(--rig-fs-dense);
+}
+.rig-tcw__comparaison > span {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; min-width: 0;
+  padding: 6px 10px; border-bottom: 1px solid var(--rig-bord-faible); color: var(--rig-texte);
+}
+.rig-tcw__comparaison > span:nth-last-child(-n+3) { border-bottom: 0; }
+.rig-tcw__comparaison > .rig-tcw__comp-tete { background: var(--rig-zebre); border-bottom-color: var(--rig-bord); }
+.rig-tcw__corresp--retenue .rig-tcw__comparaison { box-shadow: inset 3px 0 0 0 var(--rig-palier-vide); }
+.rig-tcw__comparaison > .rig-tcw__comp-champ {
+  font: 600 9.5px/1.3 var(--rig-font-mono); letter-spacing: var(--rig-ls-kicker);
+  text-transform: uppercase; color: var(--rig-texte-3);
+}
+.rig-tcw__comp-tete .rig-tcw__pastille { margin-left: 0; }
+.rig-tcw__comp-code { font: 11px var(--rig-font-mono); color: var(--rig-texte-2); }
+.rig-tcw__comp-mono { font-family: var(--rig-font-mono); font-size: 11px; }
+.rig-tcw__coche {
+  width: 13px; height: 13px; flex: 0 0 auto;
+  fill: none; stroke: var(--rig-palier-vide); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round;
+}
+.rig-tcw__difference { color: var(--rig-alerte); font-weight: 700; flex: 0 0 auto; }
+.rig-tcw__verdict { display: flex; align-items: center; flex-wrap: wrap; gap: var(--rig-esp-2); }
+.rig-tcw__verdict > .rig-bouton { margin-left: auto; }
+.rig-tcw__verdict-ecarts { display: flex; flex-direction: column; gap: 2px; }
+
 .rig-tcw__case { display: flex; align-items: center; gap: var(--rig-esp-2); color: var(--rig-texte); cursor: pointer; }
 .rig-tcw__case input { accent-color: var(--rig-focus); margin: 0; }
 .rig-tcw__case--enfant { padding-left: var(--rig-esp-4); }
@@ -3773,11 +3807,14 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-tcw__rejeter { border-color: var(--rig-bord); color: var(--rig-texte-2); }
 .rig-tcw__rejeter:hover { border-color: var(--rig-erreur); color: var(--rig-erreur); }
 .rig-tcw__valider { min-width: 110px; padding: 5px 16px; font-size: var(--rig-fs-dense); }
-.rig-tcw__valider:not(:disabled) {
+/* Plein or : Valider, et « Retenir » de la Correspondance du debiteur (/draft du 19/11/2026). */
+/* « :not(:disabled) » sur les deux : il les met au-dessus de .rig-bouton:hover
+   (rig-charte.css), qui sinon effacerait le fond plein au survol. */
+.rig-tcw__valider:not(:disabled), .rig-tcw__retenir:not(:disabled) {
   border-color: transparent; font-weight: 600; color: var(--rig-or-texte);
   background: linear-gradient(135deg, var(--rig-or), var(--rig-or-clair));
 }
-.rig-tcw__valider:not(:disabled):hover { filter: brightness(1.06); }
+.rig-tcw__valider:not(:disabled):hover, .rig-tcw__retenir:not(:disabled):hover { filter: brightness(1.06); }
 .rig-tcw__valider-compte {
   margin-left: 8px; padding: 0 6px; border-radius: 999px;
   font: 600 10px/16px var(--rig-font-mono);

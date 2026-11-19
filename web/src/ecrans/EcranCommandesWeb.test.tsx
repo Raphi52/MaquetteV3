@@ -353,6 +353,55 @@ describe('EcranCommandesWeb', () => {
     ])
   })
 
+  // « Correspondance » (/draft du 19/11/2026, proposition 5) : la commande et le
+  // dossier trouve cote a cote, le verdict, « Retenir » ; la recherche repliee.
+  it('debiteur : la commande et chaque dossier se comparent, la recherche se replie derriere un lien', async () => {
+    const entite = (cle: string, designation: string, siren: string, ecarts: string[]) => ({
+      cle, nonInscrit: false, gestion: cle, designation, siren, type: 'PM', resume: '', radie: false, retenue: false,
+      lignes: [{ nature: 'SIÈGE', adresse: '12 rue des Trois Cailloux, 80000 AMIENS', nbInscriptions: 14 }], ecarts,
+      nbAdresses: 2, nbInscriptions: 17, sirenConcorde: ecarts.length === 0, raisonConcorde: true,
+    })
+    const rapprochement = {
+      debiteur: true, faillite: false, aRetenue: false, deplie: false, traitee: false, retenue: null,
+      rechSiren: '402118447', rechRaison: 'AMIENS BILLARDS', tousDebiteurs: false, tousEtablissements: false,
+      message: null, resumeRapprochement: '2 ligne(s) · 2 PM · 0 NI',
+      commandeSiren: '402 118 447', commandeRaison: 'AMIENS BILLARDS', rechercheOuverte: false,
+      entites: [entite('2026B01067', 'AMIENS BILLARDS', '402 118 447', []),
+                entite('004151', 'AMIENS BILLARDS', '334 771 018', ['SIREN reçu : 402 118 447 ≠ 334 771 018'])],
+    }
+    const { gestes } = session({ ...vueDeBase(), panneau: { ...panneau(), rapprochement } }, (v, geste) => {
+      if (geste === 'Basculer') v.panneau!.rapprochement!.rechercheOuverte = !v.panneau!.rapprochement!.rechercheOuverte
+      return v
+    })
+    const { container } = render(<EcranCommandesWeb />)
+    await screen.findByText('Débiteur — rapprochement')
+
+    // Une carte par dossier, l'ancien tableau a disparu ; le verdict suit les ecarts.
+    expect(container.querySelector('.rig-tcw__rappro')).toBeNull()
+    const cartes = [...container.querySelectorAll('.rig-tcw__corresp')]
+    expect(cartes).toHaveLength(2)
+    const [conforme, ecart] = cartes as [Element, Element]
+    expect(conforme.querySelector('.rig-tcw__verdict')!.className).toContain('rig-tcw__ligne-statut--ok')
+    expect(conforme.textContent).toContain('Aucun écart avec la commande')
+    expect(conforme.querySelectorAll('.rig-tcw__comparaison .rig-tcw__coche')).toHaveLength(2)
+    expect(conforme.textContent).toContain('17· PM · 2 adresse(s)')
+    expect(ecart.querySelector('.rig-tcw__verdict')!.className).toContain('rig-tcw__ligne-statut--attente')
+    expect(ecart.textContent).toContain('≠ SIREN reçu : 402 118 447 ≠ 334 771 018')
+    expect(ecart.querySelector('.rig-tcw__difference')).not.toBeNull()
+
+    // Recherche repliee : ni champ ni interrupteur tant que le lien n'est pas clique.
+    expect(screen.queryByPlaceholderText('SIREN')).toBeNull()
+    expect(screen.queryByText('Tous les débiteurs')).toBeNull()
+    const lien = screen.getByText('Chercher un autre dossier')
+    expect(lien.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(lien)
+    await screen.findByPlaceholderText('SIREN')
+    expect(screen.getByText('Masquer la recherche').getAttribute('aria-expanded')).toBe('true')
+
+    fireEvent.click(ecart.querySelector('.rig-tcw__verdict button')!)
+    expect(gestes).toEqual([['Basculer', 'RechercheDebiteurOuverte'], ['Retenir', '004151']])
+  })
+
   it('un message se ferme par sa croix ; sa severite donne sa classe', async () => {
     const { gestes } = session({ ...vueDeBase(), message: { texte: 'Commande validée.', severite: 'succes' } },
       (v, geste) => { if (geste === 'FermerMessage') v.message = null; return v })

@@ -509,13 +509,24 @@ public static class TraitementCommandes
     public static List<string> Ecarts(CommandeRecue c, EntiteRapprochee e)
     {
         var ecarts = new List<string>();
-        if (c.Denomination.Length > 0 && Normaliser(c.Denomination) != Normaliser(e.Designation))
+        if (RaisonConcorde(c, e) == false)
             ecarts.Add($"Raison sociale reçu : {c.Denomination} ≠ {e.Designation}");
-        var sirenRecu = Chiffres(c.Siren);
-        if (sirenRecu.Length > 0 && Chiffres(e.Siren).Length > 0 && sirenRecu != Chiffres(e.Siren))
+        if (SirenConcorde(c, e) == false)
             ecarts.Add($"SIREN reçu : {FormaterSiren(c.Siren)} ≠ {FormaterSiren(e.Siren)}");
         return ecarts;
     }
+
+    /// <summary>
+    /// La raison sociale reçue est-elle celle de l'entite ? null quand la commande
+    /// n'en porte aucune : rien a comparer (la vue « Correspondance » du debiteur
+    /// ne coche alors rien).
+    /// </summary>
+    public static bool? RaisonConcorde(CommandeRecue c, EntiteRapprochee e) =>
+        c.Denomination.Length > 0 ? Normaliser(c.Denomination) == Normaliser(e.Designation) : null;
+
+    /// <summary>Le SIREN reçu est-il celui de l'entite ? null quand l'un des deux manque.</summary>
+    public static bool? SirenConcorde(CommandeRecue c, EntiteRapprochee e) =>
+        Chiffres(c.Siren) is { Length: > 0 } recu && Chiffres(e.Siren) is { Length: > 0 } connu ? recu == connu : null;
 
     // ---------------------------------------------------- controles de delivrance
 

@@ -37,7 +37,7 @@
 // et les regles de l'ancien @code vivent dans Pont/EcranCommandesWeb.cs
 // (SessionCommandesWeb) ; cet ecran affiche la vue et remonte chaque geste.
 
-import { useContext, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
+import { Fragment, useContext, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import { PoigneeColonne } from '../composants/PoigneeColonne'
 import { appeler } from '../pont'
 import { EcranVisible } from '../plan/visibilite'
@@ -94,6 +94,12 @@ export interface EntiteCw {
   retenue: boolean
   lignes: LigneEntiteCw[]
   ecarts: string[]
+  /** Toutes ses adresses et inscriptions, filtres ignores (lignes n'a que les visibles). */
+  nbAdresses: number
+  nbInscriptions: number
+  /** La commande et le dossier concordent-ils ? null : rien a comparer. */
+  sirenConcorde: boolean | null
+  raisonConcorde: boolean | null
 }
 export interface RetenueCw { code: string; designation: string; radie: boolean; detail: string; ecarts: string[] }
 export interface RapprochementCw {
@@ -110,6 +116,11 @@ export interface RapprochementCw {
   message: string | null
   entites: EntiteCw[]
   resumeRapprochement: string
+  /** Ce que la commande a reçu : la colonne « Commande » de la Correspondance. */
+  commandeSiren: string
+  commandeRaison: string
+  /** Les champs de recherche du debiteur sont montres. */
+  rechercheOuverte: boolean
 }
 export interface ItemTypeCw { regroupement: boolean; code: string; libelle: string; enfant: boolean; coche: boolean }
 export interface TypesCw { dateTravail: string; toutCoche: boolean; items: ItemTypeCw[]; quantite: number }
@@ -214,9 +225,75 @@ function Documents({ documents, titreLigne }: { documents: DocumentCw[]; titreLi
   )
 }
 
+const Coche = () => (
+  <svg className="rig-tcw__coche" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+)
+
+/** Coche si la commande et le dossier disent la meme chose, « ≠ » sinon, rien sans comparaison. */
+function Concorde({ ok }: { ok: boolean | null }) {
+  if (ok === null) return null
+  return ok ? <Coche /> : <span className="rig-tcw__difference" title="Ne correspond pas à la commande">≠</span>
+}
+
+/**
+ * La « Correspondance » du debiteur (/draft du 19/11/2026, proposition 5) : la
+ * commande et le dossier trouve cote a cote, champ par champ, puis le verdict
+ * et « Retenir ». Une carte par dossier trouve ; le double-clic retient, comme
+ * dans le tableau d'avant.
+ */
+function Correspondance({ r, e, geste }: { r: RapprochementCw; e: EntiteCw; geste: Geste }) {
+  return (
+    <div className={`rig-tcw__corresp ${e.retenue ? 'rig-tcw__corresp--retenue' : ''}`}
+         onDoubleClick={() => geste('Retenir', e.cle)}>
+      <div className="rig-tcw__comparaison">
+        <span className="rig-tcw__comp-tete"></span>
+        <span className="rig-tcw__comp-tete rig-tcw__comp-champ">Commande</span>
+        <span className="rig-tcw__comp-tete">
+          <span className="rig-tcw__pastille rig-tcw__pastille--accent">{e.nonInscrit ? 'NON-INSCRIT' : 'DOSSIER RCS'}</span>
+          <span className="rig-tcw__comp-code">{e.gestion.length > 0 ? e.gestion : 'NI'}</span>
+          {e.radie && <span className="rig-tcw__pastille rig-tcw__pastille--radie">RADIÉ</span>}
+          {e.retenue && <span className="rig-tcw__pastille rig-tcw__pastille--retenue">RETENUE</span>}
+        </span>
+        <span className="rig-tcw__comp-champ">SIREN</span>
+        <span className="rig-tcw__comp-mono">{r.commandeSiren}</span>
+        <span className="rig-tcw__comp-mono"><Concorde ok={e.sirenConcorde} />{e.siren.length > 0 ? e.siren : '—'}</span>
+        <span className="rig-tcw__comp-champ">Raison sociale</span>
+        <span>{r.commandeRaison}</span>
+        <span><Concorde ok={e.raisonConcorde} /><b>{e.designation}</b></span>
+        {e.lignes.map((l, i) => (
+          <Fragment key={i}>
+            <span className="rig-tcw__comp-champ">{l.nature}</span>
+            <span className="rig-tcw__discret">—</span>
+            <span>{l.adresse}<span className="rig-tcw__discret">· {l.nbInscriptions} ins.</span></span>
+          </Fragment>
+        ))}
+        <span className="rig-tcw__comp-champ">Inscriptions</span>
+        <span className="rig-tcw__discret">—</span>
+        <span><b className="rig-tcw__comp-mono">{e.nbInscriptions}</b><span className="rig-tcw__discret">· {e.type} · {e.nbAdresses} adresse(s)</span></span>
+      </div>
+      <div className={`rig-tcw__ligne-statut rig-tcw__ligne-statut--${e.ecarts.length === 0 ? 'ok' : 'attente'} rig-tcw__verdict`}>
+        {e.ecarts.length === 0 ? (
+          <><Coche /><span>Aucun écart avec la commande</span></>
+        ) : (
+          <span className="rig-tcw__verdict-ecarts" title="Voir ce qui ne correspond pas à la commande">
+            {e.ecarts.map((ecart, i) => <span key={i}>≠ {ecart}</span>)}
+          </span>
+        )}
+        {!e.retenue && (
+          <button className="rig-bouton rig-tcw__bouton rig-tcw__retenir" onClick={() => geste('Retenir', e.cle)}>Retenir</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ZoneRapprochement({ r, geste }: { r: RapprochementCw; geste: Geste }) {
   const resume = r.aRetenue && !r.deplie
   const texte = (champ: string) => (valeur: string) => geste('Texte', { champ, valeur })
+  // Le debiteur replie sa recherche derriere ce lien tant que des dossiers sont
+  // a comparer ; sans dossier ou avec un message, elle reste ouverte (le C# la force).
+  const lienRecherche = r.debiteur && !resume && r.entites.length > 0 && r.message === null
+  const lienDossier = r.aRetenue && !r.traitee
   return (
     <section className="rig-tcw__zone">
       <div className="rig-tcw__zone-tete">
@@ -226,11 +303,15 @@ function ZoneRapprochement({ r, geste }: { r: RapprochementCw; geste: Geste }) {
             ? 'Résolution directe par le n° de gestion reçu : aucune recherche à faire dans le cas nominal.'
             : 'Un seul dossier attendu. Si la recherche ne ramène rien, la création du non-inscrit se fait dans RIG V2.'}</span>
         )}
-        {r.aRetenue && !r.traitee && (
-          <>
-            <span className="rig-tcw__espace"></span>
-            <button className="rig-tcw__lien" onClick={() => geste('Basculer', 'RapprochementDeplie')}>{resume ? 'Changer de dossier' : 'Replier'}</button>
-          </>
+        {(lienRecherche || lienDossier) && <span className="rig-tcw__espace"></span>}
+        {lienRecherche && (
+          <button className="rig-tcw__lien" aria-expanded={r.rechercheOuverte}
+                  onClick={() => geste('Basculer', 'RechercheDebiteurOuverte')}>
+            {r.rechercheOuverte ? 'Masquer la recherche' : 'Chercher un autre dossier'}
+          </button>
+        )}
+        {lienDossier && (
+          <button className="rig-tcw__lien" onClick={() => geste('Basculer', 'RapprochementDeplie')}>{resume ? 'Changer de dossier' : 'Replier'}</button>
         )}
       </div>
       {resume && r.retenue ? (
@@ -250,7 +331,7 @@ function ZoneRapprochement({ r, geste }: { r: RapprochementCw; geste: Geste }) {
         </>
       ) : (
         <>
-          <div className="rig-tcw__rech-debiteur">
+          {(!r.debiteur || r.rechercheOuverte) && <div className="rig-tcw__rech-debiteur">
             <Saisie className="rig-saisie-champ__saisie" aria-label="SIREN" placeholder="SIREN"
                     valeur={r.rechSiren} changer={texte('RechSiren')} />
             <Saisie className="rig-saisie-champ__saisie" aria-label="Raison sociale" placeholder="Raison sociale"
@@ -266,7 +347,7 @@ function ZoneRapprochement({ r, geste }: { r: RapprochementCw; geste: Geste }) {
                 </button>
               </>
             )}
-          </div>
+          </div>}
           {r.message !== null ? (
             <div className="rig-tcw__ligne-statut rig-tcw__ligne-statut--info">{r.message}</div>
           ) : !r.debiteur && !r.aRetenue && r.entites.length > 0 ? (
@@ -274,7 +355,14 @@ function ZoneRapprochement({ r, geste }: { r: RapprochementCw; geste: Geste }) {
               ? 'Sélectionnez le dossier concerné pour rattacher le certificat.'
               : 'Plusieurs entités répondent alors qu\'un seul dossier est attendu : désignez la bonne.'}</div>
           ) : null}
-          {r.entites.length > 0 && (
+          {r.debiteur && r.entites.length > 0 && (
+            <>
+              {r.entites.map((e) => <Correspondance key={e.cle} r={r} e={e} geste={geste} />)}
+              <div className="rig-tcw__resume">{r.resumeRapprochement}</div>
+            </>
+          )}
+          {/* Le dossier concerne (non-opposition, faillite) garde son tableau. */}
+          {!r.debiteur && r.entites.length > 0 && (
             <>
               <div className="rig-table-cadre rig-tcw__cadre">
                 <table className="rig-table rig-tcw__rappro">

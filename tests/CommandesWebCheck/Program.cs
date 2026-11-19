@@ -122,6 +122,12 @@ var martin = TraitementCommandes.Entites.Single(e => e.Designation == "MARTIN Er
 Exiger(TraitementCommandes.Ecarts(jeu.Single(c => c.Id == 9), martin).SequenceEqual(new[] { "Raison sociale reçu : MARTIN ERIC ≠ MARTIN Eric (EURL)" }),
     "l'ecart de raison sociale est signale sur la cible retenue");
 Exiger(TraitementCommandes.Ecarts(jeu.Single(c => c.Id == 1), entiteBillards).Count == 0, "aucun ecart quand tout concorde");
+// Les marques de la « Correspondance » du debiteur : les memes comparaisons que les ecarts.
+Exiger(TraitementCommandes.RaisonConcorde(jeu.Single(c => c.Id == 9), martin) == false
+       && TraitementCommandes.SirenConcorde(jeu.Single(c => c.Id == 9), martin) is null
+       && TraitementCommandes.SirenConcorde(jeu.Single(c => c.Id == 1), entiteBillards) == true
+       && TraitementCommandes.RaisonConcorde(jeu.Single(c => c.Id == 1), entiteBillards) == true,
+    "concordances : raison sociale differente (MARTIN), rien a comparer sans SIREN connu, tout concorde (AMIENS BILLARDS)");
 
 // --- Controle de delivrance (DelivranceNonOpposition.Evaluer)
 var batipro = TraitementCommandes.ControlerNonOpposition(jeu.Single(c => c.Id == 3));
@@ -452,6 +458,16 @@ Geste("Choisir", 1);
 Exiger(vue.Panneau is { } p1 && p1.Titre == TraitementCommandes.Titre(c1t) && p1.Reference == TraitementCommandes.LigneReference(c1t)
        && p1.Rapprochement is { Entites.Length: 1 } && !vue.RechercheOuverte,
     "joue : choisir une commande ouvre son panneau (titre, reference, rapprochement de TraitementCommandes) et replie la recherche");
+// « Correspondance » du debiteur (/draft du 19/11/2026) : la commande face a chaque
+// dossier trouve ; la recherche reste repliee tant qu'un dossier est trouve.
+Exiger(vue.Panneau!.Rapprochement is { Debiteur: true, RechercheOuverte: false, Message: null } r1
+       && r1.CommandeSiren == TraitementCommandes.FormaterSiren(c1t.Siren) && r1.CommandeRaison == c1t.Denomination
+       && r1.Entites.Single() is { NbAdresses: 2, NbInscriptions: 17, SirenConcorde: true, RaisonConcorde: true,
+                                    Ecarts.Length: 0, Lignes.Length: 1 },
+    "correspondance : commande face au dossier (SIREN et raison sociale concordent, 2 adresses, 17 inscriptions), recherche repliee");
+Geste("Basculer", "RechercheDebiteurOuverte");
+Exiger(vue.Panneau!.Rapprochement!.RechercheOuverte, "correspondance : « Chercher un autre dossier » deplie la recherche");
+Geste("Basculer", "RechercheDebiteurOuverte");
 Geste("OuvrirBande", "Rejeter");
 Exiger(vue.Panneau?.Pied?.Bande is { Rejet: true, ConfirmerRefuse: true }, "joue : la bande de rejet s'ouvre, confirmation fermee sans motif");
 Geste("Decider", "Rejeter");
