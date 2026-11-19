@@ -104,22 +104,28 @@
      Valeurs d'un rail sombre, celles du sombre ; chaque autre theme les
      redefinit (« Violet pilules » a un rail BLANC). --rig-rail-melange est la
      teinte vers laquelle une couleur de metier ecrite en texte est tiree.
-     --rig-rail-ombre detache le rail de la page (le clair, 2026-11-19) ;
-     aucune ailleurs, ou le bord --rig-rail-bord suffit. --rig-rail-marge et
-     --rig-rail-rayon font du rail un PANNEAU flottant aux coins arrondis (le
-     clair, meme jour) ; 0px ailleurs, ou il reste colle au bord. 0px et non 0 :
-     la marge entre dans un calc() de largeur de colonne. */
-  /* 2026-11-19 (« En-tete noir ») : gris neutres, plus de creme. */
+     Le PANNEAU (« Fer degrade » du clair, conv-2000, etendu a TOUS les themes
+     le 2026-11-19, conv-2012) : --rig-rail-marge et --rig-rail-rayon le
+     decollent de la fenetre, coins arrondis ; --rig-rail-ombre le detache de la
+     page a la place du bord ; --rig-rail est un degrade VERTICAL, plus clair en
+     haut, dans la famille de couleurs du theme. Les textes tiennent 4,5:1 sur
+     chaque arret du degrade. 12px et non 12 : la marge entre dans un calc() de
+     largeur de colonne. */
+  /* 2026-11-19 (« En-tete noir ») : gris neutres, plus de creme. Tertiaire
+     #959595 (celui de la page) et non #8A8A8A : sur l'arret haut du panneau
+     (#2A2A2A), #8A8A8A tombait a 4,2:1, #959595 y tient 4,8:1. */
   --rig-rail-texte: #ECECEC;
   --rig-rail-texte-2: #BDBDBD;
-  --rig-rail-texte-3: #8A8A8A;
+  --rig-rail-texte-3: #959595;
   --rig-rail-voile: rgba(255, 255, 255, .07);
   --rig-rail-trait: rgba(255, 255, 255, .13);
   --rig-rail-trait-faible: rgba(255, 255, 255, .08);
   --rig-rail-melange: #FFFFFF;
-  --rig-rail-ombre: none;
-  --rig-rail-marge: 0px;
-  --rig-rail-rayon: 0px;
+  /* Sur la page #1E1E1E, une ombre seule ne se voit pas : un filet clair
+     INTERIEUR (inset) dessine le bord du panneau, l'ombre noire le souleve. */
+  --rig-rail-ombre: inset 0 0 0 1px rgba(255, 255, 255, .07), 0 8px 22px rgba(0, 0, 0, .45), 0 1px 3px rgba(0, 0, 0, .35);
+  --rig-rail-marge: 12px;
+  --rig-rail-rayon: 14px;
   /* Bandeau sous la date, le salut et la recherche de l'accueil
      (.rig-plan__tete, rig-accueil.css). Aucun par defaut : seul le sombre en
      pose un, dans sa regle a part plus bas. --rig-entete-ecart est l'air entre
@@ -206,9 +212,10 @@ select option {
   --rig-or: #C8963E;
   --rig-or-clair: #E4BE76;
   --rig-or-texte: #1E1608;
-  /* Le rail du menu de gauche : noir la nuit (degrade de gris fonces le
-     jour). Pas de bord : c'est l'ecart avec la page #1E1E1E qui le detache. */
-  --rig-rail: #111111;
+  /* Le rail du menu de gauche, en PANNEAU comme le jour (2026-11-19, conv-2012) :
+     degrade du gris des cartes (#2A2A2A) au noir de l'ancien rail (#111111).
+     Pas de bord : le filet interieur de --rig-rail-ombre le dessine. */
+  --rig-rail: linear-gradient(180deg, #2A2A2A, #111111);
   --rig-rail-bord: transparent;
   /* Pastilles des verbes du menu : famille de l'or, eclaircie la nuit. */
   --rig-verbe-ouvrir: #D9B26A;
@@ -408,8 +415,11 @@ select option {
   --rig-or-clair: #7563EF;
   --rig-or-texte: #FFFFFF;
   --rig-or-halo: #5F4BEA;
-  --rig-rail: #FFFFFF;
-  --rig-rail-bord: rgba(40, 35, 90, .08);
+  /* Panneau BLANC flottant (2026-11-19, conv-2012), comme les cartes du
+     theme : degrade du blanc a un lavande a peine teinte, ombre violette douce
+     a la place du bord. Le tertiaire tient 4,6:1 sur l'arret bas. */
+  --rig-rail: linear-gradient(180deg, #FFFFFF, #F5F3FE);
+  --rig-rail-bord: transparent;
   --rig-rail-texte: #17182B;
   --rig-rail-texte-2: #3B3D55;
   --rig-rail-texte-3: #6A6D85;
@@ -417,9 +427,9 @@ select option {
   --rig-rail-trait: rgba(40, 35, 90, .12);
   --rig-rail-trait-faible: rgba(40, 35, 90, .07);
   --rig-rail-melange: #17182B;
-  --rig-rail-ombre: none;
-  --rig-rail-marge: 0px;
-  --rig-rail-rayon: 0px;
+  --rig-rail-ombre: 0 6px 18px rgba(40, 30, 120, .14), 0 1px 3px rgba(40, 30, 120, .10);
+  --rig-rail-marge: 12px;
+  --rig-rail-rayon: 14px;
   --rig-verbe-ouvrir: #5F4BEA;
   --rig-verbe-trouver: #3D7BF0;
   --rig-verbe-modifier: #8B5CF6;
@@ -490,7 +500,10 @@ select option {
   --rig-or-clair: #FBBF24;
   --rig-or-texte: #141416;
   --rig-or-halo: #F59E0B;
-  --rig-rail: #0E0E10;
+  /* Panneau NOIR flottant (2026-11-19, conv-2012) : degrade du noir des
+     tuiles (#232327) au noir du theme (#0E0E10), ombre a la place du bord.
+     Le tertiaire tient 4,6:1 sur l'arret haut. */
+  --rig-rail: linear-gradient(180deg, #232327, #0E0E10);
   --rig-rail-bord: transparent;
   --rig-rail-texte: #F4F4F5;
   --rig-rail-texte-2: #D4D4D8;
@@ -499,9 +512,9 @@ select option {
   --rig-rail-trait: rgba(255, 255, 255, .12);
   --rig-rail-trait-faible: rgba(255, 255, 255, .07);
   --rig-rail-melange: #FFFFFF;
-  --rig-rail-ombre: none;
-  --rig-rail-marge: 0px;
-  --rig-rail-rayon: 0px;
+  --rig-rail-ombre: 0 6px 18px rgba(0, 0, 0, .22), 0 1px 3px rgba(0, 0, 0, .16);
+  --rig-rail-marge: 12px;
+  --rig-rail-rayon: 14px;
   --rig-verbe-ouvrir: #F59E0B;
   --rig-verbe-trouver: #71717A;
   --rig-verbe-modifier: #E8A50C;
@@ -572,18 +585,22 @@ select option {
   --rig-or-clair: #F2A27E;
   --rig-or-texte: #2A1A12;
   --rig-or-halo: #E8825A;
-  --rig-rail: #2E393F;
+  /* Panneau PETROLE flottant (2026-11-19, conv-2012) : degrade d'un petrole
+     eclairci (#36434A) a un petrole profond (#1F282C), ombre brune douce du
+     theme a la place du bord. Tertiaire eclairci (#93A3A2 -> #A3B2B1) pour
+     tenir 4,6:1 sur l'arret haut, plus clair que l'ancien rail plein. */
+  --rig-rail: linear-gradient(180deg, #36434A, #1F282C);
   --rig-rail-bord: transparent;
   --rig-rail-texte: #EEF2F1;
   --rig-rail-texte-2: #D2DBD9;
-  --rig-rail-texte-3: #93A3A2;
+  --rig-rail-texte-3: #A3B2B1;
   --rig-rail-voile: rgba(230, 245, 240, .07);
   --rig-rail-trait: rgba(230, 245, 240, .14);
   --rig-rail-trait-faible: rgba(230, 245, 240, .08);
   --rig-rail-melange: #FFFFFF;
-  --rig-rail-ombre: none;
-  --rig-rail-marge: 0px;
-  --rig-rail-rayon: 0px;
+  --rig-rail-ombre: 0 6px 18px rgba(60, 45, 30, .26), 0 1px 3px rgba(60, 45, 30, .18);
+  --rig-rail-marge: 12px;
+  --rig-rail-rayon: 14px;
   --rig-verbe-ouvrir: #E8825A;
   --rig-verbe-trouver: #4CA7A0;
   --rig-verbe-modifier: #E3A663;

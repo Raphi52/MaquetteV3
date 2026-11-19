@@ -344,22 +344,52 @@ foreach (var (nom, texte) in feuilles)
         // conv-2000) : decolle de la fenetre par --rig-rail-marge, coins arrondis
         // par --rig-rail-rayon. Les colonnes s'elargissent de la marge, pour que le
         // menu garde sa largeur (232 px deploye, 44 px reduit) et que ses libelles
-        // ne se replient pas. Les autres themes posent 0px : rien n'y bouge.
-        int Pixels(string? valeur) => valeur is not null && Regex.Match(valeur, @"^(\d+)px$") is { Success: true } p
-            ? int.Parse(p.Groups[1].Value) : 0;
-        var marge = Pixels(Valeur("--rig-rail-marge"));
-        var rayon = Pixels(Valeur("--rig-rail-rayon"));
-        Exiger(marge is >= 6 and <= 24 && rayon is >= 8 and <= 24,
-            $"« clair » : le menu est un panneau decolle ({marge}px) aux coins arrondis ({rayon}px)");
+        // ne se replient pas.
         Exiger(menu.Contains("border-radius: var(--rig-rail-rayon)")
                && Regex.IsMatch(menu, @"margin:\s*var\(--rig-rail-marge\)\s+0\s+var\(--rig-rail-marge\)\s+var\(--rig-rail-marge\)"),
             ".rig-menu lit la marge et l'arrondi du theme (haut, bas et gauche decolles)");
         foreach (var colonne in new[] { "232px", "44px", "196px" })
             Exiger(accueil.Contains($"grid-template-columns: calc({colonne} + var(--rig-rail-marge)) 1fr"),
                 $"la colonne du menu ({colonne}) s'elargit de la marge du panneau");
-        foreach (var code in themes.Keys.Where(c => c is not ("clair" or "sombre")))
-            Exiger(Regex.IsMatch(BlocDuTheme(code), @"--rig-rail-marge:\s*0px;") && Regex.IsMatch(BlocDuTheme(code), @"--rig-rail-rayon:\s*0px;"),
-                $"le theme « {code} » garde son menu colle au bord (marge et arrondi a 0px)");
+
+        // Le MEME panneau dans les CINQ themes (demande du 19/11/2026, conv-2012 :
+        // « le meme panel dans tous les themes »), chacun dans ses couleurs :
+        // decolle et arrondi, detache par une ombre et non par un bord, fond en
+        // degrade vertical, textes du rail a 4,5:1 sur CHAQUE arret du degrade
+        // (le plus clair pour un panneau fonce, le plus fonce pour le blanc du violet).
+        var blocRacine = Regex.Match(charte, @":root\s*\{([^{}]*)\}").Groups[1].Value;
+        string? ValeurDuTheme(string code, string jeton)
+        {
+            foreach (var bloc in new[] { BlocDuTheme(code), BlocDuTheme("sombre"), blocRacine })
+            {
+                var m = Regex.Match(bloc, Regex.Escape(jeton) + @":\s*([^;]+);");
+                if (m.Success) return m.Groups[1].Value.Trim();
+            }
+            return null;
+        }
+        int Pixels(string? valeur) => valeur is not null && Regex.Match(valeur, @"^(\d+)px$") is { Success: true } p
+            ? int.Parse(p.Groups[1].Value) : 0;
+        foreach (var code in themes.Keys)
+        {
+            var marge = Pixels(ValeurDuTheme(code, "--rig-rail-marge"));
+            var rayon = Pixels(ValeurDuTheme(code, "--rig-rail-rayon"));
+            Exiger(marge is >= 6 and <= 24 && rayon is >= 8 and <= 24,
+                $"« {code} » : le menu est un panneau decolle ({marge}px) aux coins arrondis ({rayon}px)");
+            var ombreTheme = ValeurDuTheme(code, "--rig-rail-ombre");
+            Exiger(ombreTheme is not null && ombreTheme != "none" && ValeurDuTheme(code, "--rig-rail-bord") == "transparent",
+                $"« {code} » : le panneau se detache par une ombre, sans bord ({ombreTheme ?? "ombre absente"})");
+            var rail = ValeurDuTheme(code, "--rig-rail") ?? "";
+            var arretsTheme = Regex.Matches(rail, @"#[0-9A-Fa-f]{6}").Select(m => m.Value).ToList();
+            Exiger(rail.StartsWith("linear-gradient(180deg") && arretsTheme.Count >= 2,
+                $"« {code} » : le fond du panneau est un degrade vertical ({(rail.Length > 0 ? rail : "absent")})");
+            foreach (var jeton in new[] { "--rig-rail-texte", "--rig-rail-texte-2", "--rig-rail-texte-3" })
+            {
+                var texte = ValeurDuTheme(code, jeton);
+                var ratio = texte is null || !Regex.IsMatch(texte, @"^#[0-9A-Fa-f]{6}$") || arretsTheme.Count == 0
+                    ? 0 : arretsTheme.Min(a => Contraste(a, texte));
+                Exiger(ratio >= 4.5, $"« {code} » : {jeton} lisible sur tout le panneau ({ratio:0.0}:1 au pire, 4,5 exige)");
+            }
+        }
     }
 
     // La bascule a disparu au profit d'une liste nourrie par ThemesRig.
