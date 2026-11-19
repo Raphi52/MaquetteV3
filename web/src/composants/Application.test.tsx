@@ -120,7 +120,9 @@ describe('Application : la barre d\'onglets', () => {
     expect(morceaux(b!)).toEqual(['<span>', '<span>', '<button>'])
     expect(b!.querySelector('.rig-vonglet__sorti')!.textContent).toBe('↗')
     expect(a!.querySelector('.rig-vonglet__fermer')!.getAttribute('aria-label')).toBe('Fermer Factures')
-    expect(a!.querySelector('.rig-vonglet__fermer')!.textContent).toBe('×')
+    // Une croix dessinee, du trait du « + » de la barre, et non plus le caractere « × ».
+    expect(a!.querySelector('.rig-vonglet__fermer svg path')!.getAttribute('stroke-width')).toBe('1.9')
+    expect(a!.querySelector('.rig-vonglet__fermer')!.textContent).toBe('')
   })
 
   it('appui, glisser et lacher partent au C# avec la mesure de la barre ; la croix ne declenche pas l\'onglet', () => {

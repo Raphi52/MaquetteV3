@@ -48,9 +48,14 @@ export function Onglets({ onglets, finsDeGlisse, plan }: ProprietesOnglets) {
           )}
           <span className="rig-vonglet__titre">{onglet.libelle}</span>
           {onglet.detache && <span className="rig-vonglet__sorti" aria-label="sorti dans sa fenetre">{'↗'}</span>}
+          {/* La croix est DESSINEE, du meme trait que le « + » et la maison de
+              la barre (BarreRig.tsx, 19/11/2026) : le caractere « × » d'avant
+              etait trop fin a cote d'eux. */}
           <button className="rig-vonglet__fermer" aria-label={'Fermer ' + onglet.libelle}
                   onClick={(e) => { e.stopPropagation(); plan('ongletFermer', onglet.code) }}
-                  onPointerDown={(e) => e.stopPropagation()}>{'×'}</button>
+                  onPointerDown={(e) => e.stopPropagation()}>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"></path></svg>
+          </button>
         </div>
       ))}
     </div>
