@@ -29,13 +29,13 @@
   padding: var(--rig-esp-4) var(--rig-esp-2);
   overflow-y: auto;
   min-height: 0;
-  /* RAIL ENCRE dans les deux modes (charte du 2026-11-18) : le menu est un
-     ilot sombre, meme sur le gris bleute du mode clair. Ses jetons de texte,
-     de voile et de bord sont donc REDEFINIS ici, pour un fond sombre : tout
+  /* Le RAIL a son propre fond, qui n'est pas celui de la page : encre en
+     sombre, gris clair en clair (2026-11-19), blanc en « Violet pilules ».
+     Ses jetons de texte, de voile et de bord sont donc REDEFINIS ici : tout
      ce qui est dessous lit les memes noms de variables sans changer. */
   background: var(--rig-rail);
   /* 2026-11-18 : les valeurs viennent des jetons --rig-rail-* du theme
-     (rig-charte.css) et non plus d'ici : « Violet pilules » a un rail BLANC. */
+     (rig-charte.css) et non plus d'ici. */
   --rig-texte: var(--rig-rail-texte);
   --rig-texte-2: var(--rig-rail-texte-2);
   --rig-texte-3: var(--rig-rail-texte-3);

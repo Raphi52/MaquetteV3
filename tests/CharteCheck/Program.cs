@@ -230,6 +230,47 @@ foreach (var (nom, texte) in feuilles)
     Exiger(menu.Contains("--rig-texte: var(--rig-rail-texte)") && !Regex.IsMatch(menu, @"--rig-texte[^:]*:\s*#"),
         "le rail de gauche prend ses couleurs de texte dans les jetons --rig-rail-* du theme");
 
+    // En clair, le rail de gauche est GRIS CLAIR (demande du 19/11/2026 : il
+    // etait encre #15182A). Gris = trois canaux proches ; il doit se detacher
+    // de la page ; son texte, alors fonce, tient 4,5:1 jusqu'au tertiaire (regle
+    // « rien ne reste pale » du 10/09/2026) ; et --rig-rail-melange fonce les
+    // teintes ecrites en texte au lieu de les eclaircir.
+    {
+        var blocClair = BlocDuTheme("clair");
+        string? Hexa(string jeton)
+        {
+            var m = Regex.Match(blocClair, Regex.Escape(jeton) + @":\s*(#[0-9A-Fa-f]{6})\s*;");
+            return m.Success ? m.Groups[1].Value : null;
+        }
+        double Luminance(string hexa)
+        {
+            var c = Convert.FromHexString(hexa.TrimStart('#'));
+            double Lin(byte v) { var s = v / 255.0; return s <= 0.04045 ? s / 12.92 : Math.Pow((s + 0.055) / 1.055, 2.4); }
+            return 0.2126 * Lin(c[0]) + 0.7152 * Lin(c[1]) + 0.0722 * Lin(c[2]);
+        }
+        double Contraste(string a, string b)
+        {
+            var (x, y) = (Luminance(a), Luminance(b));
+            return (Math.Max(x, y) + .05) / (Math.Min(x, y) + .05);
+        }
+
+        var rail = Hexa("--rig-rail");
+        var octets = rail is null ? null : Convert.FromHexString(rail.TrimStart('#'));
+        Exiger(octets is not null && octets.Max() - octets.Min() <= 16 && Luminance(rail!) > 0.5,
+            $"« clair » : le rail de gauche est un gris clair ({rail ?? "absent ou non opaque"})");
+        Exiger(rail is not null && Contraste(rail, FondDuTheme("clair") ?? rail) >= 1.15,
+            "« clair » : le rail gris se detache du fond de page");
+        foreach (var jeton in new[] { "--rig-rail-texte", "--rig-rail-texte-2", "--rig-rail-texte-3" })
+        {
+            var texte = Hexa(jeton);
+            var ratio = rail is null || texte is null ? 0 : Contraste(rail, texte);
+            Exiger(ratio >= 4.5, $"« clair » : {jeton} lisible sur le rail gris ({ratio:0.0}:1, 4,5 exige)");
+        }
+        var melange = Hexa("--rig-rail-melange");
+        Exiger(melange is not null && Luminance(melange) < 0.2,
+            "« clair » : --rig-rail-melange fonce les teintes du menu sur le rail gris");
+    }
+
     // La bascule a disparu au profit d'une liste nourrie par ThemesRig.
     Exiger(!home.Contains("BasculerTheme") && !home.Contains("<span>Mode sombre</span>"),
         "la bascule « Mode sombre » a disparu des reglages");
