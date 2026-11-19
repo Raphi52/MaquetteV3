@@ -3233,7 +3233,8 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 /* La bascule commune prend toute la largeur (pensee pour les panneaux) ; ici
    elle se pose EN LIGNE, a cote des criteres et des champs. */
 .rig-tcw .rig-bascule { width: auto; }
-/* Couleur du TYPE (filet de ligne, pastille du panneau) : or pour
+/* Couleur du TYPE (repere et titre du groupe, barre de la commande ouverte,
+   pastille du panneau) : or pour
    l'endettement, bleu pour la non-faillite, brique pour la non-opposition,
    comme la maquette « Boite de tri » choisie le 18/11/2026. En argile, le
    corail d'« ouvrir » et la brique de « surveiller » sont voisins : le sable
@@ -3379,13 +3380,16 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-tcw__poignee:hover::after,
 .rig-tcw__poignee:focus-visible::after,
 .rig-tcw__poignee:active::after { opacity: 1; }
-/* Ligne resserree (commande ouverte) : filet, nom, marches faites. La reference,
-   le type et la pastille ne sont pas retires (display: none) mais REPLIES a 0 px
-   et caches : ils fondent pendant la bascule au lieu de disparaitre d'un coup.
-   Les ecarts sont des marges (pas un gap, qui laisserait une place a chaque
-   element replie). */
-.rig-tcw__scene--ouverte .rig-tcw__cmd { --tcw-ecart: var(--rig-esp-2); padding: 8px var(--rig-esp-3) 8px var(--rig-esp-2); }
+/* Ligne resserree (commande ouverte) : nom et marches faites, sous le titre de
+   son groupe (maquette « Accordeon », conv-2024 : nom en 13 px, texte secondaire ;
+   la commande ouverte en gras). La reference, le type et la pastille ne sont pas
+   retires (display: none) mais REPLIES a 0 px et caches : ils fondent pendant la
+   bascule au lieu de disparaitre d'un coup. Les ecarts sont des marges (pas un
+   gap, qui laisserait une place a chaque element replie). */
+.rig-tcw__scene--ouverte .rig-tcw__cmd { --tcw-ecart: var(--rig-esp-2); padding: 5px var(--rig-esp-3) 5px var(--tcw-retrait); }
 .rig-tcw__scene--ouverte .rig-tcw__cmd-qui { flex-grow: 1; margin-right: var(--tcw-ecart); }
+.rig-tcw__scene--ouverte .rig-tcw__cmd-nom { font-weight: 400; font-size: 13px; color: var(--rig-texte-2); }
+.rig-tcw__scene--ouverte .rig-tcw__cmd--active .rig-tcw__cmd-nom { font-weight: 600; color: var(--rig-texte); }
 .rig-tcw__scene--ouverte .rig-tcw__cmd-precisions { max-height: 0; opacity: 0; visibility: hidden; }
 .rig-tcw__scene--ouverte .rig-tcw__cmd-type { max-width: 0; margin-left: 0; margin-right: 0; opacity: 0; visibility: hidden; }
 .rig-tcw__scene--ouverte .rig-tcw__direct { max-width: 0; padding-left: 0; padding-right: 0; border-width: 0; opacity: 0; visibility: hidden; }
@@ -3429,6 +3433,11 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
     margin var(--tcw-repli), padding var(--tcw-repli), border-width var(--tcw-repli), visibility var(--tcw-fin-repli);
 }
 .rig-tcw__scene--bascule .rig-tcw__direct + .rig-tcw__avancement { transition: var(--tcw-couleurs), margin-left var(--tcw-repli); }
+/* Les groupes qui se replient a l'ouverture (usePliage) le font en meme temps
+   que la liste se resserre ; sans ces regles, celle de tous les descendants (plus
+   haut) ne leur laisserait que les couleurs, et ils sauteraient. */
+.rig-tcw__scene--bascule .rig-tcw__groupe-corps { transition: var(--tcw-couleurs), grid-template-rows var(--tcw-duree) var(--tcw-courbe); }
+.rig-tcw__scene--bascule .rig-tcw__chevron { transition: var(--tcw-couleurs), transform var(--tcw-duree) var(--tcw-courbe); }
 
 /* Le degrade du panneau gauche est TOUJOURS sous la liste, couvert d'un voile de
    la couleur de la carte : plein ici (la carte de toujours), transparent une
@@ -3438,6 +3447,9 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-tcw__liste {
   grid-column: 1; grid-row: 1;
   display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+  /* Retrait des lignes : elles commencent sous le TITRE de leur groupe (marge du
+     titre 10 px + chevron 12 + repere 4 + deux ecarts de 7). */
+  --tcw-retrait: 40px;
   --tcw-voile: var(--rig-surface);
   background: linear-gradient(var(--tcw-voile), var(--tcw-voile)), var(--rig-rail);
   border: 1px solid var(--rig-bord); border-radius: var(--rig-radius);
@@ -3464,19 +3476,33 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   --rig-bord: var(--rig-rail-trait);
   --rig-bord-faible: var(--rig-rail-trait-faible);
   --rig-survol-ligne: var(--rig-rail-voile);
-  --rig-zebre: color-mix(in srgb, var(--rig-rail-melange) 3%, transparent);
   --rig-focus: color-mix(in srgb, var(--rig-or) 70%, var(--rig-rail-melange));
   color: var(--rig-texte);
 }
-/* « 2/3 » en 11 px : 45 % de teinte, le seuil ou l'alerte du Clair (#C2410C)
-   tient 4,5:1 sur le gris fonce de son panneau. */
-.rig-tcw__scene--ouverte .rig-tcw__liste .rig-tcw__avancement { color: color-mix(in srgb, var(--rig-alerte) 45%, var(--rig-rail-melange)); }
+/* « 3/3 » (prete) en 11 px : 45 % de teinte, le seuil ou le vert tient 4,5:1 sur
+   le gris fonce du Clair. */
 .rig-tcw__scene--ouverte .rig-tcw__liste .rig-tcw__avancement--prete { color: color-mix(in srgb, var(--rig-palier-vide) 45%, var(--rig-rail-melange)); }
+/* Les titres de groupe et leur nombre, dans la couleur du type : 40 % de teinte,
+   le plus fort dosage ou le bleu du Clair tient encore 4,5:1 dans sa pastille
+   (fond a 16 % de teinte), sur chaque arret du degrade (tests/CharteCheck). En
+   argile, le rang 1 lit le sable de « modifier », comme --tcw-teinte ; :where()
+   garde la regle au meme poids que les autres, et a portee du controle. */
+.rig-tcw__scene--ouverte .rig-tcw__liste .rig-tcw__rang-1 { --tcw-teinte-lue: color-mix(in srgb, var(--rig-verbe-ouvrir) 40%, var(--rig-rail-melange)); }
+.rig-tcw__scene--ouverte .rig-tcw__liste .rig-tcw__rang-4 { --tcw-teinte-lue: color-mix(in srgb, var(--rig-verbe-trouver) 40%, var(--rig-rail-melange)); }
+.rig-tcw__scene--ouverte .rig-tcw__liste .rig-tcw__rang-5 { --tcw-teinte-lue: color-mix(in srgb, var(--rig-verbe-surveiller) 40%, var(--rig-rail-melange)); }
+.rig-tcw__scene--ouverte .rig-tcw__liste .rig-tcw__rang-1:where([data-rig-theme="argile"] *) { --tcw-teinte-lue: color-mix(in srgb, var(--rig-verbe-modifier) 40%, var(--rig-rail-melange)); }
+/* En-tete : le nombre de commandes en grand, l'interrupteur, puis « Nouvelle
+   commande » en lien. Sur une ligne quand la liste est large ; en colonne, l'un
+   sous l'autre, une commande ouverte (maquette « Accordeon »). */
 .rig-tcw__liste-entete {
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--rig-esp-2) var(--rig-esp-3);
-  padding: var(--rig-esp-2) var(--rig-esp-3); border-bottom: 1px solid var(--rig-bord-faible);
+  padding: var(--rig-esp-3) var(--rig-esp-4) 10px; border-bottom: 1px solid var(--rig-bord-faible);
 }
-.rig-tcw__compteur { color: var(--rig-texte-3); font: 11px var(--rig-font-mono); }
+.rig-tcw__scene--ouverte .rig-tcw__liste-entete { flex-direction: column; align-items: flex-start; }
+.rig-tcw__scene--ouverte .rig-tcw__espace { display: none; }
+.rig-tcw__compteur { display: inline-flex; align-items: center; gap: 10px; }
+.rig-tcw__compteur-nombre { font: 700 30px/1 var(--rig-font); color: var(--rig-focus); }
+.rig-tcw__compteur-detail { font: 11px/1.35 var(--rig-font-mono); color: var(--rig-texte-3); }
 .rig-tcw__chercher svg, .rig-tcw__enveloppe svg {
   width: 14px; height: 14px; flex: 0 0 auto; fill: none; stroke: currentColor;
   stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
@@ -3487,32 +3513,82 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   padding: 2px 4px; border-radius: var(--rig-radius-sm);
 }
 .rig-tcw__lien:hover { background: var(--rig-fond-2); text-decoration: underline; }
-.rig-tcw__nouvelle { white-space: nowrap; }
+/* « Nouvelle commande » en LIEN (maquette « Accordeon ») : le texte dans la
+   couleur du bouton, sans son cadre ; souligne au survol. */
+.rig-tcw__nouvelle { white-space: nowrap; border-color: transparent; padding-left: 0; padding-right: 0; font-weight: 600; }
+.rig-tcw__nouvelle:hover { background: transparent; text-decoration: underline; }
 .rig-tcw__vide, .rig-tcw__invite { color: var(--rig-texte-3); padding: var(--rig-esp-2) var(--rig-esp-4); }
 .rig-tcw__lignes { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 
-/* Une ligne LARGE par commande : filet a la couleur du type, nom en grand,
-   reference en monospace, type en couleur, pastille du rapprochement direct. */
+/* --- Accordeon (/draft du 19/11/2026, conv-2024 : proposition 5, palette
+   « Types ») : un titre par groupe, ses commandes dessous. Le titre : chevron,
+   repere de la couleur du type, titre et nombre ECRITS dans cette couleur, le
+   nombre en pastille teintee. Sur la carte, la teinte se melange au texte comme
+   le type de la ligne (lisible sur une carte blanche) ; une commande ouverte,
+   au rail (regles .rig-tcw__scene--ouverte plus haut). Replie, le titre resume
+   ses noms et le corps se referme (grille de 1fr a 0fr, qui s'anime). --- */
+.rig-tcw__groupe {
+  --tcw-teinte-lue: color-mix(in srgb, var(--tcw-teinte) 72%, var(--rig-texte));
+  border-bottom: 1px solid var(--rig-bord-faible);
+}
+.rig-tcw__groupe-tete {
+  width: 100%; display: grid; grid-template-columns: 12px 4px minmax(0, 1fr) auto; align-items: center; column-gap: 7px;
+  border: 0; background: transparent; color: var(--rig-texte-3); cursor: pointer; text-align: left;
+  font: 600 13px/1.4 var(--rig-font); padding: 9px var(--rig-esp-4) 6px 10px;
+}
+.rig-tcw__groupe-tete:hover { background: var(--rig-survol-ligne); }
+.rig-tcw__groupe-tete:focus-visible { outline: 2px solid var(--rig-focus); outline-offset: -2px; }
+/* Le groupe de la commande ouverte ne se replie pas : ni main, ni survol. */
+.rig-tcw__groupe-tete--fixe { cursor: default; }
+.rig-tcw__groupe-tete--fixe:hover { background: transparent; }
+.rig-tcw__groupe-tete--fixe .rig-tcw__chevron { opacity: .45; }
+.rig-tcw__chevron {
+  width: 12px; height: 12px; fill: none; stroke: currentColor;
+  stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+  transition: transform .22s cubic-bezier(.4, 0, .2, 1);
+}
+.rig-tcw__groupe--plie .rig-tcw__chevron { transform: rotate(-90deg); }
+.rig-tcw__groupe-repere { height: 15px; border-radius: 2px; background: var(--tcw-teinte); }
+.rig-tcw__groupe-titre { color: var(--tcw-teinte-lue); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rig-tcw__groupe-nombre {
+  font: 600 11px/17px var(--rig-font-mono); padding: 0 7px; border-radius: 999px;
+  color: var(--tcw-teinte-lue); background: color-mix(in srgb, var(--tcw-teinte) 16%, transparent);
+}
+/* Le resume n'existe que replie (sinon chaque nom serait ecrit deux fois dans
+   la page) : il arrive comme les lignes, en glissant. */
+.rig-tcw__groupe-resume {
+  grid-column: 3 / -1; padding-top: 2px;
+  font: 400 11px/1.4 var(--rig-font); color: var(--rig-texte-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  animation: rig-proue-ouvrir .22s ease-out backwards;
+}
+.rig-tcw__groupe-corps { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .22s cubic-bezier(.4, 0, .2, 1); }
+.rig-tcw__groupe--plie .rig-tcw__groupe-corps { grid-template-rows: 0fr; }
+.rig-tcw__groupe-lignes { min-height: 0; overflow: hidden; }
+
+/* Une ligne LARGE par commande, sous le titre de son groupe : nom en grand,
+   reference en monospace, type en couleur, pastille du rapprochement direct.
+   Ni filet ni zebrage : la couleur est dans le titre du groupe. */
 .rig-tcw__cmd {
   --tcw-ecart: var(--rig-esp-3);
   width: 100%; display: flex; align-items: center; text-align: left;
-  border: 0; border-bottom: 1px solid var(--rig-bord-faible);
+  border: 0;
   background: transparent; color: var(--rig-texte); cursor: pointer;
   font: var(--rig-fs-dense)/1.4 var(--rig-font);
-  padding: 9px var(--rig-esp-4) 9px var(--rig-esp-3);
+  padding: 9px var(--rig-esp-4) 9px var(--tcw-retrait);
   /* Les lignes arrivent l'une apres l'autre (--tcw-ordre), comme les listes de
      l'accueil ; l'attente est bornee a la 12e ligne. */
   animation: rig-proue-ouvrir .24s ease-out backwards;
   animation-delay: calc(min(var(--tcw-ordre), 12) * 25ms);
 }
-.rig-tcw__cmd:nth-child(even) { background: var(--rig-zebre); }
 .rig-tcw__cmd:hover { background: var(--rig-survol-ligne); }
+/* La commande ouverte : un voile neutre (le texte du theme a 9 %) et une barre
+   de la couleur de son groupe. */
 .rig-tcw__cmd--active,
-.rig-tcw__cmd--active:nth-child(even) { background: color-mix(in srgb, var(--rig-or) 15%, transparent); }
-.rig-tcw__cmd-filet { flex: 0 0 4px; align-self: stretch; border-radius: 4px; background: var(--tcw-teinte); }
+.rig-tcw__cmd--active:hover { background: color-mix(in srgb, var(--rig-texte) 9%, transparent); box-shadow: inset 3px 0 0 var(--tcw-teinte); }
 /* Largeur bornee : sur un grand ecran, le type reste colle au nom au lieu de
    flotter au milieu de la ligne (capture du 18/11/2026 a 1516 px). */
-.rig-tcw__cmd-qui { flex: 0 1 320px; min-width: 0; display: flex; flex-direction: column; margin-left: var(--tcw-ecart); }
+.rig-tcw__cmd-qui { flex: 0 1 320px; min-width: 0; display: flex; flex-direction: column; }
 .rig-tcw__cmd-nom {
   font: 600 var(--rig-fs-corps) var(--rig-font); letter-spacing: .01em; color: var(--rig-texte);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -3539,11 +3615,12 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   border: 1px solid var(--rig-palier-vide); color: var(--rig-texte); line-height: 18px;
   background: color-mix(in srgb, var(--rig-palier-vide) 16%, transparent);
 }
-/* Les marches faites de l'escalier (« 2/3 ») au bout de la ligne : alerte tant
-   qu'il en manque, vert quand la commande est prete a valider. */
+/* Les marches faites de l'escalier (« 2/3 ») au bout de la ligne : texte
+   secondaire tant qu'il en manque (palette « Types », conv-2024 : la couleur va
+   au type, plus a l'alerte), vert quand la commande est prete a valider. */
 .rig-tcw__avancement {
   flex: 0 0 auto; margin-left: auto; white-space: nowrap;
-  font: 600 11px var(--rig-font-mono); color: var(--rig-alerte);
+  font: 600 11px var(--rig-font-mono); color: var(--rig-texte-2);
 }
 .rig-tcw__direct + .rig-tcw__avancement { margin-left: calc(var(--tcw-ecart) + var(--rig-esp-2)); }
 .rig-tcw__avancement--prete { color: var(--rig-palier-vide); }

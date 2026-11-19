@@ -361,7 +361,7 @@ if (File.Exists(resx))
         "Contrôle de délivrance", "Type de certificat de non-opposition", "Envoyer aussi par mail", "Données reçues",
         "Ce qui a été envoyé", "Sélectionnez une commande dans la liste pour la traiter.", "Aucune commande ne correspond aux critères.",
         "Délivrer le certificat de faillite", "Délivrer le certificat d'opposition", "Enregistrer la saisie", "Annuler la commande",
-        // « Tout replier » n'y est plus : la Boite de tri montre une liste a plat, sans groupes a replier.
+        // « Tout replier » n'y est pas : l'accordeon (conv-2024) replie ses groupes un a un.
         "Envoyer sans attendre", "Aperçu de l'enveloppe", "Enregistrer l'adresse", "Revenir à l'adresse reçue",
         "Informations saisies", "Certificats", "Dossier concerné", "Retenir", "Tout cocher",
     };
@@ -414,6 +414,15 @@ Exiger(IdsLus().SequenceEqual(Ids(defaut, false))
        && LignesLues().All(l => l.Precisions == TraitementCommandes.Precisions(temoin.Single(c => c.Id == l.Id))
                            && l.Direct == TraitementCommandes.EstRapprochementDirect(temoin.Single(c => c.Id == l.Id))),
     "joue : la liste suit l'ordre de Regrouper, ses precisions et pastilles sont celles de TraitementCommandes");
+// Accordeon (conv-2024) : l'ecran range les lignes sous un titre par groupe, par
+// le rang. Les groupes de la vue sont ceux de Regrouper, dans son ordre, et
+// chaque ligne trouve le sien.
+var groupesTemoin = TraitementCommandes.Regrouper(TraitementCommandes.Filtrer(temoin, defaut), false);
+Exiger(vue.Groupes.Select(g => (g.Rang, g.Titre, g.Nombre))
+           .SequenceEqual(groupesTemoin.Select(g => (g.Rang, g.Titre, g.Commandes.Count)))
+       && vue.Groupes.Select(g => g.Rang).Distinct().Count() == vue.Groupes.Length
+       && LignesLues().All(l => vue.Groupes.Any(g => g.Rang == l.Rang)),
+    $"joue : les titres de groupe sont ceux de Regrouper, chacun avec son nombre (lu : {string.Join(" | ", vue.Groupes.Select(g => $"{g.Titre} {g.Nombre}"))})");
 // Chaque tuile, CLIQUEE, montre dans la liste les commandes de son etat, dans
 // l'ordre de Regrouper ; son nombre est celui de la liste, ses groupes son detail,
 // et les parts des anneaux font le tout.

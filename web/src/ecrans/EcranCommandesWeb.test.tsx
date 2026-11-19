@@ -24,6 +24,7 @@ function vueDeBase(): VueCommandesWeb {
     recherche: { famille: '', familles: [{ valeur: 'Faillite', libelle: 'Faillite' }], du: '', au: '', siren: '',
                  reference: '', enAttenteEnvoi: false, dateTravail: '18/11/2026' },
     message: null, compteur: '2 commande(s) · 2 groupe(s)', directsEnTete: false,
+    groupes: [{ rang: 1, titre: 'État d\'endettement', nombre: 1 }, { rang: 5, titre: 'Non-opposition', nombre: 1 }],
     lignes: [
       { id: 3, rang: 1, active: false, nom: 'TRANSNORD SA', precisions: 'IG-12345 · 12/11', type: 'État d\'endettement', direct: true,
         avancement: '2/3', prete: false },
@@ -97,8 +98,12 @@ describe('EcranCommandesWeb', () => {
     expect((tuiles[0]!.querySelector('.rig-chiffre__cercle--jauge') as HTMLElement).style.getPropertyValue('--rig-anneau-cible')).toBe('67')
     expect(tuiles.every((t) => t.querySelector('.rig-chiffre__rond svg') !== null)).toBe(true)
 
-    expect(container.querySelector('.rig-tcw__compteur')!.textContent).toBe('2 commande(s) · 2 groupe(s)')
-    const lignes = [...container.querySelectorAll('.rig-tcw__scene > .rig-tcw__liste .rig-tcw__lignes > .rig-tcw__cmd')]
+    // Le compte de NeoRIG sur deux etages, le nombre en grand ; le libelle entier en infobulle.
+    const compteur = container.querySelector('.rig-tcw__compteur')!
+    expect(compteur.querySelector('.rig-tcw__compteur-nombre')!.textContent).toBe('2')
+    expect(compteur.querySelector('.rig-tcw__compteur-detail')!.textContent).toBe('commande(s)2 groupe(s)')
+    expect(compteur.getAttribute('title')).toBe('2 commande(s) · 2 groupe(s)')
+    const lignes = [...container.querySelectorAll('.rig-tcw__scene > .rig-tcw__liste .rig-tcw__lignes .rig-tcw__cmd')]
     expect(lignes.map((b) => b.querySelector('.rig-tcw__cmd-nom')!.textContent)).toEqual(['TRANSNORD SA', 'SCI DU PARC'])
     const [transnord, parc] = lignes
     expect(transnord!.className).toBe('rig-tcw__cmd rig-tcw__rang-1 ')
@@ -195,6 +200,56 @@ describe('EcranCommandesWeb', () => {
     expect(gestes).toEqual([])
   })
 
+  it('accordeon : un titre par groupe, dans l\'ordre de la session ; un clic le replie, et il resume ses noms', async () => {
+    const { gestes } = session(vueDeBase())
+    const { container } = render(<EcranCommandesWeb />)
+    await screen.findByText('TRANSNORD SA')
+    const groupes = () => [...container.querySelectorAll('.rig-tcw__lignes > .rig-tcw__groupe')]
+    expect(groupes().map((g) => g.className.trim())).toEqual(['rig-tcw__groupe rig-tcw__rang-1', 'rig-tcw__groupe rig-tcw__rang-5'])
+    expect(groupes().map((g) => [g.querySelector('.rig-tcw__groupe-titre')!.textContent, g.querySelector('.rig-tcw__groupe-nombre')!.textContent]))
+      .toEqual([['État d\'endettement', '1'], ['Non-opposition', '1']])
+    expect(groupes().map((g) => [...g.querySelectorAll('.rig-tcw__cmd-nom')].map((n) => n.textContent)))
+      .toEqual([['TRANSNORD SA'], ['SCI DU PARC']])
+    // Sans commande ouverte, tout est deplie, sans resume.
+    const tete = screen.getByRole('button', { name: /^Non-opposition/ })
+    expect(tete.getAttribute('aria-expanded')).toBe('true')
+    expect(container.querySelector('.rig-tcw__groupe-resume')).toBeNull()
+
+    fireEvent.click(tete)
+    const parc = groupes()[1]!
+    expect(parc.className).toBe('rig-tcw__groupe rig-tcw__rang-5 rig-tcw__groupe--plie')
+    expect(tete.getAttribute('aria-expanded')).toBe('false')
+    expect(parc.querySelector('.rig-tcw__groupe-resume')!.textContent).toBe('SCI DU PARC')
+    // Les lignes refermees ne prennent ni clic ni Tab.
+    expect(parc.querySelector('.rig-tcw__groupe-corps')!.hasAttribute('inert')).toBe(true)
+    fireEvent.click(tete)
+    expect(tete.getAttribute('aria-expanded')).toBe('true')
+    // Replier est un reglage d'affichage : rien ne remonte a la session.
+    expect(gestes).toEqual([])
+  })
+
+  it('accordeon : une commande qui s\'ouvre replie les AUTRES groupes ; le sien reste deplie, meme au clic', async () => {
+    session(vueDeBase(), (v, geste) => {
+      if (geste === 'Choisir') { v.panneau = panneau(); v.lignes[1]!.active = true }
+      return v
+    })
+    const { container } = render(<EcranCommandesWeb />)
+    fireEvent.click(await screen.findByText('SCI DU PARC'))
+    await waitFor(() => expect(container.querySelector('.rig-tcw__panneau')).not.toBeNull())
+    const endettement = screen.getByRole('button', { name: /^État d'endettement/ })
+    const opposition = screen.getByRole('button', { name: /^Non-opposition/ })
+    expect(endettement.getAttribute('aria-expanded')).toBe('false')
+    expect(container.querySelector('.rig-tcw__rang-1 .rig-tcw__groupe-resume')!.textContent).toBe('TRANSNORD SA')
+    expect(opposition.getAttribute('aria-expanded')).toBe('true')
+    expect(opposition.className).toBe('rig-tcw__groupe-tete rig-tcw__groupe-tete--fixe')
+    expect(opposition.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(opposition)
+    expect(opposition.getAttribute('aria-expanded')).toBe('true')
+    // Un autre groupe se deplie a la demande.
+    fireEvent.click(endettement)
+    expect(endettement.getAttribute('aria-expanded')).toBe('true')
+  })
+
   it('sans commande ouverte, pas de poignee : la liste occupe toute la largeur', async () => {
     session(vueDeBase())
     const { container } = render(<EcranCommandesWeb />)
@@ -204,7 +259,7 @@ describe('EcranCommandesWeb', () => {
   })
 
   it('une tuile sans commande : la liste le dit', async () => {
-    session({ ...vueDeBase(), lignes: [], compteur: '0 commande(s) · 0 groupe(s)' })
+    session({ ...vueDeBase(), groupes: [], lignes: [], compteur: '0 commande(s) · 0 groupe(s)' })
     const { container } = render(<EcranCommandesWeb />)
     expect((await screen.findByText('Aucune commande ne correspond aux critères.')).className).toBe('rig-tcw__vide')
     expect(container.querySelector('.rig-tcw__invite')).toBeNull()

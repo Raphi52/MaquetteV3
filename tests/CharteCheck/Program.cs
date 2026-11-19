@@ -455,11 +455,13 @@ foreach (var (nom, texte) in feuilles)
         // et prend l'habit du menu de l'accueil, theme par theme (demande du
         // 19/11/2026, conv-2019 : « le panel de gauche de la meme couleur que le
         // menu de gauche de l'accueil en fonction des themes »). Memes jetons que
-        // .rig-menu ; les teintes ecrites en texte (bouton, liens, « 2/3 ») se
-        // melangent a --rig-rail-melange, comme les groupes du menu, et tiennent
-        // 4,5:1 sur chaque arret du degrade. Sans melange, l'orange brule du
-        // theme Noir et orange ne fait que 3,0:1 sur son panneau noir, l'alerte
-        // du clair 1,8:1 sur son gris fonce.
+        // .rig-menu ; les teintes ecrites en texte (bouton, liens, « 3/3 », titres
+        // de groupe dans la couleur de leur type) se melangent a --rig-rail-melange,
+        // comme les groupes du menu, et tiennent 4,5:1 sur chaque arret du degrade.
+        // Sans melange, l'orange brule du theme Noir et orange ne fait que 3,0:1
+        // sur son panneau noir, l'alerte du clair 1,8:1 sur son gris fonce.
+        // Accordeon « Types » (conv-2024) : « 2/3 » n'est plus en alerte mais en
+        // texte secondaire ; la couleur passe aux titres des groupes.
         // Le FOND passe en fondu (conv-2021) : un degrade ne se fond pas en une
         // couleur unie, donc --rig-rail est peint EN PERMANENCE sous la liste,
         // couvert d'un voile de la couleur de la carte ; commande ouverte, le
@@ -481,8 +483,9 @@ foreach (var (nom, texte) in feuilles)
                 .Select(m => m.Groups[1].Value));
             var melanges = Regex.Matches(regles, @"color-mix\(in srgb, var\((--rig-[a-z-]+)\) (\d+)%, var\(--rig-rail-melange\)\)")
                 .Select(m => (jeton: m.Groups[1].Value, part: int.Parse(m.Groups[2].Value) / 100.0)).ToList();
-            Exiger(new[] { "--rig-or", "--rig-alerte", "--rig-palier-vide" }.All(j => melanges.Any(x => x.jeton == j)),
-                $"Commandes web : la liste de gauche melange au rail l'accent, l'alerte et le « pret » ({string.Join(", ", melanges.Select(x => x.jeton))})");
+            Exiger(new[] { "--rig-or", "--rig-palier-vide", "--rig-verbe-ouvrir", "--rig-verbe-trouver", "--rig-verbe-surveiller", "--rig-verbe-modifier" }
+                       .All(j => melanges.Any(x => x.jeton == j)),
+                $"Commandes web : la liste de gauche melange au rail l'accent, le « pret » et la couleur de chaque type ({string.Join(", ", melanges.Select(x => x.jeton))})");
             string Melange(string a, string b, double part)
             {
                 var (x, y) = (Convert.FromHexString(a.TrimStart('#')), Convert.FromHexString(b.TrimStart('#')));

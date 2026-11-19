@@ -30,6 +30,13 @@ public sealed record RechercheCw(string Famille, OptionCw[] Familles, string Du,
 public sealed record LigneCw(int Id, int Rang, bool Active, string Nom, string Precisions, string Type, bool Direct,
                              string? Avancement, bool Prete);
 
+/// <summary>
+/// Un groupe de la liste (GroupeCommandes) : son titre et son nombre de
+/// commandes. Les lignes arrivent dans l'ordre des groupes ; l'ecran les range
+/// sous leur titre par le <c>Rang</c>, qui porte aussi la couleur.
+/// </summary>
+public sealed record GroupeCw(int Rang, string Titre, int Nombre);
+
 public sealed record EtatCw(string Icone, string Libelle);
 public sealed record MembreCw(int Id, string Titre, string Icone, string Libelle);
 public sealed record EnveloppeCw(string Reference, MembreCw[] Membres, string Etat, bool EnvoiEnAttente);
@@ -106,7 +113,7 @@ public sealed record CoordonneesCw(bool LectureSeule, ChampAdresseCw[] Champs, s
 /// </summary>
 public sealed record VueCommandesWeb(string Session, TuileCw[] Tuiles, string Rapide, bool RechercheOuverte,
                                      bool RechercheAffinee, string ResumeCriteres, RechercheCw Recherche, MessageCw? Message,
-                                     string Compteur, bool DirectsEnTete, LigneCw[] Lignes, PanneauCw? Panneau,
+                                     string Compteur, bool DirectsEnTete, GroupeCw[] Groupes, LigneCw[] Lignes, PanneauCw? Panneau,
                                      CoordonneesCw? Coordonnees);
 
 /// <summary>
@@ -889,7 +896,9 @@ public sealed class SessionCommandesWeb
         return new VueCommandesWeb(session, tuiles, Appliques.Texte, RechercheOuverte,
             TraitementCommandes.RechercheAffinee(Appliques), TraitementCommandes.Resumer(Appliques), recherche,
             Message is { } m ? new MessageCw(m.Texte, m.Severite) : null,
-            TraitementCommandes.Compteur(GroupesParEtat[OngletActif]), DirectsEnTete, Ordre.Select(VueLigne).ToArray(),
+            TraitementCommandes.Compteur(GroupesParEtat[OngletActif]), DirectsEnTete,
+            GroupesParEtat[OngletActif].Select(g => new GroupeCw(g.Rang, g.Titre, g.Commandes.Count)).ToArray(),
+            Ordre.Select(VueLigne).ToArray(),
             Selection is { } c ? VuePanneau(c) : null,
             CoordonneesOuvertes && Selection is not null ? VueCoordonnees(Selection) : null);
     }

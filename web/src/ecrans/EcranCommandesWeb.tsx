@@ -23,6 +23,13 @@
 // couleur passe en fondu a celle du panneau gauche de l'accueil, et le detail
 // glisse en meme temps ; la fermeture rejoue le chemin a l'envers (useBascule).
 //
+// LISTE EN « ACCORDEON », couleurs « TYPES » : /draft du 19/11/2026 (conv-2024,
+// proposition 5 du premier tour, palette 2 du second). En tete, le nombre de
+// commandes en grand ; la liste se range sous un titre par groupe, ecrit dans la
+// couleur du type, avec son nombre en pastille teintee. Un groupe se replie (il
+// resume alors ses noms sur une ligne) ; celui de la commande ouverte reste
+// deplie (usePliage).
+//
 // Contenu repris de D:\RIG-V3 (lu sans y toucher) :
 //   ListeCommandesWebNode.cs   « Nouvelle commande », ordre par type,
 //                              pastille « Rapprochement direct ».
@@ -66,6 +73,7 @@ export interface LigneCw {
   avancement: string | null
   prete: boolean
 }
+export interface GroupeCw { rang: number; titre: string; nombre: number }
 export interface TuileCw {
   etat: string
   libelle: string
@@ -181,6 +189,7 @@ export interface VueCommandesWeb {
   message: MessageCw | null
   compteur: string
   directsEnTete: boolean
+  groupes: GroupeCw[]
   lignes: LigneCw[]
   panneau: PanneauCw | null
   coordonnees: CoordonneesCw | null
@@ -848,9 +857,63 @@ function useBascule(panneau: PanneauCw | null) {
   return { bascule: bascule !== null, sortant }
 }
 
+/** Les groupes REPLIES de la liste, par rang. Une commande qui s'OUVRE replie les
+ *  autres groupes : la colonne ne garde deplie que le sien, comme la maquette
+ *  « Accordeon » ; la fermeture deplie tout. Entre les deux, seul le clic replie
+ *  ou deplie : passer d'une commande a l'autre ne fait rien sauter, sauf le groupe
+ *  de la commande ouverte, qui se deplie s'il etait replie, et ne se replie pas.
+ *  Calcule PENDANT le rendu, comme useBascule : le repli part dans la meme image
+ *  que la bascule. Reglage d'affichage : il ne passe pas par la session. */
+function usePliage(panneau: PanneauCw | null, groupes: GroupeCw[]) {
+  const [plies, poserPlies] = useState<ReadonlySet<number>>(() => new Set())
+  const [ouvert, poserOuvert] = useState(false)
+  const actif = panneau?.rang ?? null
+  if ((actif !== null) !== ouvert) {
+    poserOuvert(actif !== null)
+    poserPlies(new Set(actif === null ? [] : groupes.map((g) => g.rang).filter((r) => r !== actif)))
+  } else if (actif !== null && plies.has(actif)) {
+    poserPlies(new Set([...plies].filter((r) => r !== actif)))
+  }
+  const basculer = (rang: number) => {
+    if (rang === actif) return
+    poserPlies((avant) => {
+      const apres = new Set(avant)
+      if (!apres.delete(rang)) apres.add(rang)
+      return apres
+    })
+  }
+  return { plies, actif, basculer }
+}
+
+/** Un groupe de la liste : son titre (chevron, repere et titre dans la couleur du
+ *  type, nombre en pastille), puis ses commandes. Replie, le titre resume les noms
+ *  sur une ligne et les lignes, refermees, sont inertes : ni clic ni Tab dans ce
+ *  qui ne se voit pas. */
+function GroupeListe({ g, noms, plie, fixe, basculer, children }: {
+  g: GroupeCw; noms: string; plie: boolean; fixe: boolean; basculer: () => void; children: ReactNode
+}) {
+  return (
+    <div className={`rig-tcw__groupe rig-tcw__rang-${g.rang} ${plie ? 'rig-tcw__groupe--plie' : ''}`}>
+      <button className={`rig-tcw__groupe-tete ${fixe ? 'rig-tcw__groupe-tete--fixe' : ''}`}
+              aria-expanded={!plie} aria-disabled={fixe || undefined}
+              title={fixe ? 'Le groupe de la commande ouverte reste déplié.' : undefined} onClick={basculer}>
+        <svg className="rig-tcw__chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" /></svg>
+        <span className="rig-tcw__groupe-repere"></span>
+        <span className="rig-tcw__groupe-titre">{g.titre}</span>
+        <span className="rig-tcw__groupe-nombre">{g.nombre}</span>
+        {plie && <span className="rig-tcw__groupe-resume">{noms}</span>}
+      </button>
+      <div className="rig-tcw__groupe-corps" inert={plie}>
+        <div className="rig-tcw__groupe-lignes">{children}</div>
+      </div>
+    </div>
+  )
+}
+
 export function EcranCommandesWeb() {
   const [vue, geste] = useSession(pont)
   const { bascule, sortant } = useBascule(vue?.panneau ?? null)
+  const pliage = usePliage(vue?.panneau ?? null, vue?.groupes ?? [])
   const pilule = useRef<HTMLDivElement>(null)
   // Largeur de la liste choisie a la poignee (px), null = celle d'origine (26 %).
   // Reglage d'affichage : il tient tant que l'ecran est ouvert, d'une commande a
@@ -980,7 +1043,12 @@ export function EcranCommandesWeb() {
                     ...(largeurListe === null ? {} : { '--tcw-liste': `${largeurListe}px` }) } as CSSProperties}>
         <section className="rig-tcw__liste" aria-label="Commandes" ref={liste}>
           <div className="rig-tcw__liste-entete">
-            <span className="rig-tcw__compteur">{vue.compteur}</span>
+            {/* Le compte de NeoRIG (Liste_Compteur, « 8 commande(s) · 3 groupe(s) »,
+                en infobulle) sur deux etages : le nombre de commandes en grand. */}
+            <span className="rig-tcw__compteur" title={vue.compteur}>
+              <b className="rig-tcw__compteur-nombre">{vue.groupes.reduce((n, g) => n + g.nombre, 0)}</b>
+              <span className="rig-tcw__compteur-detail">commande(s)<br />{vue.groupes.length} groupe(s)</span>
+            </span>
             <button className={`rig-bascule ${vue.directsEnTete ? 'rig-bascule--actif' : ''}`}
                     title="Place en tête de chaque groupe les commandes qui se rapprochent d'un seul dossier."
                     onClick={() => geste('BasculerDirects')}>
@@ -996,26 +1064,37 @@ export function EcranCommandesWeb() {
             <div className="rig-tcw__invite">Sélectionnez une commande dans la liste pour la traiter.</div>
           ) : null}
 
+          {/* Les lignes arrivent dans l'ordre des groupes : chacune se range sous
+              le titre de son groupe (meme rang). --tcw-ordre garde le rang dans
+              toute la liste, pour l'arrivee des lignes l'une apres l'autre. */}
           <div className="rig-tcw__lignes">
-            {vue.lignes.map((cmd, i) => (
-              <button key={cmd.id} className={`rig-tcw__cmd rig-tcw__rang-${cmd.rang} ${cmd.active ? 'rig-tcw__cmd--active' : ''}`}
-                      style={{ '--tcw-ordre': i } as CSSProperties}
-                      aria-current={cmd.active ? 'true' : undefined} onClick={() => geste('Choisir', cmd.id)}>
-                <span className="rig-tcw__cmd-filet"></span>
-                <span className="rig-tcw__cmd-qui">
-                  <span className="rig-tcw__cmd-nom">{cmd.nom}</span>
-                  <span className="rig-tcw__cmd-precisions">{cmd.precisions}</span>
-                </span>
-                <span className="rig-tcw__cmd-type">{cmd.type}</span>
-                {cmd.direct && (
-                  <span className="rig-tcw__direct" title="Un seul dossier correspond à la commande : à traiter en premier.">Rapprochement direct</span>
-                )}
-                {cmd.avancement !== null && (
-                  <span className={`rig-tcw__avancement ${cmd.prete ? 'rig-tcw__avancement--prete' : ''}`}
-                        title="Marches faites : dossier, choix, édition">{cmd.avancement}</span>
-                )}
-              </button>
-            ))}
+            {vue.groupes.map((g) => {
+              const lignes = vue.lignes.filter((cmd) => cmd.rang === g.rang)
+              return (
+                <GroupeListe key={g.rang} g={g} noms={lignes.map((cmd) => cmd.nom).join(' · ')}
+                             plie={pliage.plies.has(g.rang)} fixe={g.rang === pliage.actif}
+                             basculer={() => pliage.basculer(g.rang)}>
+                  {lignes.map((cmd) => (
+                    <button key={cmd.id} className={`rig-tcw__cmd rig-tcw__rang-${cmd.rang} ${cmd.active ? 'rig-tcw__cmd--active' : ''}`}
+                            style={{ '--tcw-ordre': vue.lignes.indexOf(cmd) } as CSSProperties}
+                            aria-current={cmd.active ? 'true' : undefined} onClick={() => geste('Choisir', cmd.id)}>
+                      <span className="rig-tcw__cmd-qui">
+                        <span className="rig-tcw__cmd-nom">{cmd.nom}</span>
+                        <span className="rig-tcw__cmd-precisions">{cmd.precisions}</span>
+                      </span>
+                      <span className="rig-tcw__cmd-type">{cmd.type}</span>
+                      {cmd.direct && (
+                        <span className="rig-tcw__direct" title="Un seul dossier correspond à la commande : à traiter en premier.">Rapprochement direct</span>
+                      )}
+                      {cmd.avancement !== null && (
+                        <span className={`rig-tcw__avancement ${cmd.prete ? 'rig-tcw__avancement--prete' : ''}`}
+                              title="Marches faites : dossier, choix, édition">{cmd.avancement}</span>
+                      )}
+                    </button>
+                  ))}
+                </GroupeListe>
+              )
+            })}
           </div>
         </section>
 

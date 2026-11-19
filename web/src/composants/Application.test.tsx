@@ -159,7 +159,8 @@ describe('Application : un onglet quitte garde son ecran', () => {
     const fermee: VueCommandesWeb = {
       session: 'S', tuiles: [], rapide: '', rechercheOuverte: false, rechercheAffinee: false, resumeCriteres: '',
       recherche: { famille: '', familles: [], du: '', au: '', siren: '', reference: '', enAttenteEnvoi: false, dateTravail: '19/11/2026' },
-      message: null, compteur: '1 commande(s)', directsEnTete: false, lignes: [{ ...ligne, active: false }],
+      message: null, compteur: '1 commande(s)', directsEnTete: false,
+      groupes: [{ rang: 5, titre: 'Non-opposition', nombre: 1 }], lignes: [{ ...ligne, active: false }],
       panneau: null, coordonnees: null,
     }
     const ouverte: VueCommandesWeb = {
