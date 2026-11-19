@@ -315,6 +315,18 @@ internal static class Programme
         var numerise = plan.Vue().Proc!.Ecran.Recherche!.Pieces.FirstOrDefault(x => x.Fichier == "documents/document-numerise.pdf");
         Exiger(numerise is { NbPages: 5 } && numerise.PagesDesPassages.Contains(2),
             $"un document numerise (bordereau, avoir, courriel) se trouve aussi, a la page de l'avoir ({numerise?.Libelle}, pages {string.Join(",", numerise?.PagesDesPassages ?? [])})");
+        // Le nombre de pages AFFICHE (« 4 p. » dans la liste, l'apercu) est celui que l'arbre de
+        // demonstration declare : il doit etre celui du PDF, sinon la liste dit « 4 p. » a cote
+        // de « page 3 sur 3 » dans la liseuse.
+        static IEnumerable<NoeudGed> Tous(NoeudGed n) => n.Enfants.SelectMany(Tous).Prepend(n);
+        var ecarts = Tous(ArbreDemo.Racine("0000", "DEMO", ""))
+            .Where(n => n.APdf)
+            .Select(n => (n.Libelle, Declare: n.Pages, Reel: TextePieces.Pages(n, PageWeb.DossierWwwroot).Length))
+            .Where(p => p.Reel > 0 && p.Reel != p.Declare)
+            .Select(p => $"{p.Libelle} : {p.Declare} declarees, {p.Reel} dans le PDF")
+            .ToArray();
+        Exiger(ecarts.Length == 0,
+            $"chaque PDF de la demonstration declare son vrai nombre de pages ({(ecarts.Length == 0 ? "aucun ecart" : string.Join(" ; ", ecarts))})");
 
         // --- 15. « Joindre a ce depot » : une copie de la piece dans un depot de l'affaire.
         Agir("rechercheTexte", "commandite");
