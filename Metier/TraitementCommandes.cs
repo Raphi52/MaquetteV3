@@ -112,10 +112,14 @@ public sealed record ControleDelivrance(IssueDelivrance Issue, DateOnly? Dernier
 /// <summary>Un document que la validation editera (aperçu « Edition &amp; impression »).</summary>
 public sealed record DocumentEdite(string Document, string Bac, int? Exemplaires, string Origine);
 
-/// <summary>Les criteres de la carte de recherche ; une valeur vide ne filtre pas.</summary>
+/// <summary>
+/// Les criteres de la carte de recherche ; une valeur vide ne filtre pas.
+/// <c>Texte</c> : la recherche rapide de la pilule (direction « Proue », /draft
+/// du 19/11/2026), un seul champ qui cherche partout (voir <see cref="TraitementCommandes.Correspond"/>).
+/// </summary>
 public sealed record CriteresCommandes(FamilleCommande? Famille, IReadOnlySet<EtatCommande> Etats,
                                        DateTime? Du, DateTime? Au, string Siren, string Reference,
-                                       bool EnAttenteEnvoi);
+                                       bool EnAttenteEnvoi, string Texte = "");
 
 /// <summary>Un groupe de la liste de gauche : une famille, sa couleur (rang), ses commandes.</summary>
 public sealed record GroupeCommandes(FamilleCommande Famille, string Titre, int Rang,
@@ -263,8 +267,26 @@ public static class TraitementCommandes
                 && (c.Au is null || x.Date.Date <= c.Au.Value.Date)
                 && (siren.Length == 0 || Chiffres(x.Siren).Contains(siren, StringComparison.Ordinal))
                 && (reference.Length == 0 || x.Reference.Contains(reference, StringComparison.OrdinalIgnoreCase))
-                && (!c.EnAttenteEnvoi || x.EnvoiGroupeEnAttente))
+                && (!c.EnAttenteEnvoi || x.EnvoiGroupeEnAttente)
+                && Correspond(x, c.Texte))
             .ToList();
+    }
+
+    /// <summary>
+    /// La recherche rapide : le texte se trouve dans la raison sociale (casse et
+    /// accents ignores) ou dans le n° de commande ; un texte FAIT DE CHIFFRES se
+    /// cherche aussi dans le SIREN, espaces ignores. « IG-91004 » ne cherche donc
+    /// pas « 91004 » dans les SIREN : il ne trouverait que des coincidences.
+    /// </summary>
+    public static bool Correspond(CommandeRecue x, string? texte)
+    {
+        var t = (texte ?? string.Empty).Trim();
+        if (t.Length == 0) return true;
+        if (Fr.CompareInfo.IndexOf(x.Denomination, t, CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace) >= 0) return true;
+        if (x.Reference.Contains(t, StringComparison.OrdinalIgnoreCase)) return true;
+        var chiffres = Chiffres(t);
+        return chiffres.Length == t.Replace(" ", string.Empty).Length
+               && Chiffres(x.Siren).Contains(chiffres, StringComparison.Ordinal);
     }
 
     /// <summary>Les criteres en une ligne, separes par « · » : l'infobulle de la loupe (ResumerRecherche).</summary>

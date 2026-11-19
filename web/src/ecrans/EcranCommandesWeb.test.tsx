@@ -5,7 +5,7 @@ import { installerFauxDotNet, retirerFauxDotNet } from '../test/faux-dotnet'
 
 afterEach(() => { cleanup(); retirerFauxDotNet() })
 
-// Les regles (onglets, filtre, groupes, rapprochement, delivrance, transitions)
+// Les regles (tuiles, filtre, groupes, rapprochement, delivrance, transitions)
 // sont dans Metier/TraitementCommandes.cs, jouees par Pont/EcranCommandesWeb.cs
 // et EXECUTEES par tests/CommandesWebCheck. Ici : l'ecran affiche la vue que
 // la session lui rend, et lui remonte le bon geste.
@@ -19,34 +19,25 @@ function vueDeBase(): VueCommandesWeb {
       phrase: [{ nombre: 2, texte: 'groupes', alerte: false }, { nombre: 2, texte: 'en attente', alerte: false },
                { nombre: 1, texte: 'rejetée', alerte: true }],
     },
-    colonnes: [
-      { etat: 'ATraiter', libelle: 'À traiter', nombre: 6, actif: true, part: 67, detail: '2 groupe(s)', depot: null, lignes: [
-        { id: 3, rang: 1, active: false, nom: 'TRANSNORD SA', precisions: 'IG-12345 · 12/11', type: 'État d\'endettement', direct: true,
-          avancement: '2/3', prete: false, deplacable: true },
-        { id: 7, rang: 5, active: false, nom: 'SCI DU PARC', precisions: 'IG-12399 · 13/11', type: 'Faillite', direct: false,
-          avancement: '3/3', prete: true, deplacable: true },
-      ] },
-      { etat: 'EnAttente', libelle: 'Mise en attente', nombre: 2, actif: false, part: 22, detail: '1 groupe(s)', depot: 'MettreEnAttente', lignes: [
-        { id: 9, rang: 4, active: false, nom: 'NORD MARINE SAS', precisions: 'IG-12401 · 14/11', type: 'Certificat de non-faillite',
-          direct: false, avancement: '1/3', prete: false, deplacable: true },
-      ] },
-      { etat: 'Validee', libelle: 'Validée', nombre: 0, actif: false, part: 0, detail: '0 groupe(s)', depot: 'Valider', lignes: [] },
-      { etat: 'Rejetee', libelle: 'Rejetée', nombre: 1, actif: false, part: 11, detail: '1 groupe(s)', depot: 'Rejeter', lignes: [
-        { id: 11, rang: 1, active: false, nom: 'BATIPRO SARL', precisions: 'IG-90601 · 02/09', type: 'État d\'endettement',
-          direct: false, avancement: null, prete: false, deplacable: false },
-      ] },
+    tuiles: [
+      { etat: 'ATraiter', libelle: 'À traiter', nombre: 6, actif: true, part: 67, detail: '2 groupe(s)' },
+      { etat: 'EnAttente', libelle: 'Mise en attente', nombre: 2, actif: false, part: 22, detail: '1 groupe(s)' },
+      { etat: 'Validee', libelle: 'Validée', nombre: 0, actif: false, part: 0, detail: '0 groupe(s)' },
+      { etat: 'Rejetee', libelle: 'Rejetée', nombre: 1, actif: false, part: 11, detail: '1 groupe(s)' },
     ],
+    rapide: '',
     rechercheOuverte: false, rechercheAffinee: false, resumeCriteres: 'Tous les types',
     recherche: { famille: '', familles: [{ valeur: 'Faillite', libelle: 'Faillite' }], du: '', au: '', siren: '',
                  reference: '', enAttenteEnvoi: false, dateTravail: '18/11/2026' },
-    message: null, directsEnTete: false,
+    message: null, compteur: '2 commande(s) · 2 groupe(s)', directsEnTete: false,
+    lignes: [
+      { id: 3, rang: 1, active: false, nom: 'TRANSNORD SA', precisions: 'IG-12345 · 12/11', type: 'État d\'endettement', direct: true,
+        avancement: '2/3', prete: false },
+      { id: 7, rang: 5, active: false, nom: 'SCI DU PARC', precisions: 'IG-12399 · 13/11', type: 'Faillite', direct: false,
+        avancement: '3/3', prete: true },
+    ],
     panneau: null, coordonnees: null,
   }
-}
-
-/** Le transport d'un glisser : jsdom n'en fournit pas, le navigateur si. */
-function transport() {
-  return { dataTransfer: { effectAllowed: '', dropEffect: '', setData: () => undefined } }
 }
 
 function panneau(): PanneauCw {
@@ -84,7 +75,7 @@ function session(depart: VueCommandesWeb, reagir: (vue: VueCommandesWeb, geste: 
 }
 
 describe('EcranCommandesWeb', () => {
-  it('proue de l\'accueil : date, compte « à traiter » en grand, phrase des autres colonnes (rejets en alerte)', async () => {
+  it('proue de l\'accueil : date, compte « à traiter » en grand, phrase des autres etats (rejets en alerte)', async () => {
     session(vueDeBase())
     const { container } = render(<EcranCommandesWeb />)
     await screen.findByText('TRANSNORD SA')
@@ -94,53 +85,52 @@ describe('EcranCommandesWeb', () => {
     expect(proue.querySelector('.rig-proue__phrase')!.textContent).toBe('2 groupes·2 en attente·1 rejetée')
     const chiffres = [...proue.querySelectorAll('.rig-proue__phrase b')]
     expect(chiffres.map((b) => b.className)).toEqual(['', '', 'rig-proue__alerte'])
+    // L'ordre de la maquette : proue, pilule, tuiles, puis liste et detail.
+    expect([...container.querySelector('.rig-tcw')!.children].map((e) => e.className.trim()))
+      .toEqual(['rig-tcw__barre', 'rig-tcw__cherche', 'rig-tcw__tuiles', 'rig-tcw__scene'])
   })
 
-  it('une colonne par statut, coiffee d\'une tuile de l\'accueil (anneau rempli de sa part), avec SES cartes', async () => {
+  it('une tuile de l\'accueil par statut (anneau rempli de sa part), puis la liste de la tuile active', async () => {
     session(vueDeBase())
     const { container } = render(<EcranCommandesWeb />)
     await screen.findByText('TRANSNORD SA')
-    const colonnes = [...container.querySelectorAll('.rig-tcw__scene > .rig-tcw__colonnes > .rig-tcw__colonne')]
-    expect(colonnes.map((c) => c.getAttribute('aria-label'))).toEqual(['À traiter', 'Mise en attente', 'Validée', 'Rejetée'])
-    const tetes = colonnes.map((c) => c.querySelector(':scope > .rig-chiffre')!)
-    expect(tetes.map((t) => t.className)).toEqual([
-      'rig-chiffre rig-chiffre--1 rig-tcw__tete rig-chiffre--deplie', 'rig-chiffre rig-chiffre--4 rig-tcw__tete ',
-      'rig-chiffre rig-chiffre--2 rig-tcw__tete ', 'rig-chiffre rig-chiffre--3 rig-tcw__tete ',
+    const tuiles = [...container.querySelectorAll('.rig-tcw__tuiles > .rig-chiffre')]
+    expect(tuiles.map((t) => t.className)).toEqual([
+      'rig-chiffre rig-chiffre--1 rig-tcw__tuile rig-chiffre--deplie', 'rig-chiffre rig-chiffre--4 rig-tcw__tuile ',
+      'rig-chiffre rig-chiffre--2 rig-tcw__tuile ', 'rig-chiffre rig-chiffre--3 rig-tcw__tuile ',
     ])
-    expect(tetes[0]!.getAttribute('aria-pressed')).toBe('true')
-    expect(tetes[0]!.querySelector('.rig-chiffre__libelle')!.textContent).toBe('À traiter')
-    expect(tetes[0]!.querySelector('.rig-chiffre__valeur')!.textContent).toBe('6')
-    expect(tetes[0]!.querySelector('.rig-chiffre__detail')!.textContent).toBe('2 groupe(s)')
-    expect((tetes[0]!.querySelector('.rig-chiffre__cercle--jauge') as HTMLElement).style.getPropertyValue('--rig-anneau-cible')).toBe('67')
-    expect(tetes.every((t) => t.querySelector('.rig-chiffre__rond svg') !== null)).toBe(true)
+    expect(tuiles.map((t) => t.getAttribute('aria-pressed'))).toEqual(['true', 'false', 'false', 'false'])
+    expect(tuiles.map((t) => t.querySelector('.rig-chiffre__libelle')!.textContent)).toEqual(['À traiter', 'Mise en attente', 'Validée', 'Rejetée'])
+    expect(tuiles[0]!.querySelector('.rig-chiffre__valeur')!.textContent).toBe('6')
+    expect(tuiles[0]!.querySelector('.rig-chiffre__detail')!.textContent).toBe('2 groupe(s)')
+    expect((tuiles[0]!.querySelector('.rig-chiffre__cercle--jauge') as HTMLElement).style.getPropertyValue('--rig-anneau-cible')).toBe('67')
+    expect(tuiles.every((t) => t.querySelector('.rig-chiffre__rond svg') !== null)).toBe(true)
 
-    const cartes = colonnes.map((c) => [...c.querySelectorAll('.rig-tcw__cartes > .rig-tcw__carte')])
-    expect(cartes.map((l) => l.map((b) => b.querySelector('.rig-tcw__carte-nom')!.textContent)))
-      .toEqual([['TRANSNORD SA', 'SCI DU PARC'], ['NORD MARINE SAS'], [], ['BATIPRO SARL']])
-    expect(colonnes[2]!.querySelector('.rig-tcw__vide')!.textContent).toBe('Aucune commande ne correspond aux critères.')
-    const [transnord, parc] = cartes[0]!
-    expect(transnord!.className).toBe('rig-tcw__carte rig-tcw__rang-1  ')
-    expect(transnord!.querySelector('.rig-tcw__carte-type')!.textContent).toBe('État d\'endettement')
-    expect(transnord!.querySelector('.rig-tcw__carte-precisions')!.textContent).toBe('IG-12345 · 12/11')
+    expect(container.querySelector('.rig-tcw__compteur')!.textContent).toBe('2 commande(s) · 2 groupe(s)')
+    const lignes = [...container.querySelectorAll('.rig-tcw__scene > .rig-tcw__liste .rig-tcw__lignes > .rig-tcw__cmd')]
+    expect(lignes.map((b) => b.querySelector('.rig-tcw__cmd-nom')!.textContent)).toEqual(['TRANSNORD SA', 'SCI DU PARC'])
+    const [transnord, parc] = lignes
+    expect(transnord!.className).toBe('rig-tcw__cmd rig-tcw__rang-1 ')
+    expect((transnord as HTMLElement).style.getPropertyValue('--tcw-ordre')).toBe('0')
+    expect((parc as HTMLElement).style.getPropertyValue('--tcw-ordre')).toBe('1')
+    expect(transnord!.querySelector('.rig-tcw__cmd-type')!.textContent).toBe('État d\'endettement')
+    expect(transnord!.querySelector('.rig-tcw__cmd-precisions')!.textContent).toBe('IG-12345 · 12/11')
     expect(transnord!.querySelector('.rig-tcw__direct')!.textContent).toBe('Rapprochement direct')
     expect(parc!.querySelector('.rig-tcw__direct')).toBeNull()
     expect(transnord!.hasAttribute('aria-current')).toBe(false)
-    // Escalier : chaque carte dit ses marches faites ; une commande prete passe au vert.
+    // Escalier : chaque ligne dit ses marches faites ; une commande prete passe au vert.
     expect(transnord!.querySelector('.rig-tcw__avancement')!.className).toBe('rig-tcw__avancement ')
     expect(transnord!.querySelector('.rig-tcw__avancement')!.textContent).toBe('2/3')
     expect(parc!.querySelector('.rig-tcw__avancement')!.className).toBe('rig-tcw__avancement rig-tcw__avancement--prete')
-    // Une commande traitee n'a pas de compte et ne se glisse pas.
-    expect(cartes[3]![0]!.querySelector('.rig-tcw__avancement')).toBeNull()
-    expect(cartes[3]![0]!.getAttribute('draggable')).toBe('false')
-    expect(transnord!.getAttribute('draggable')).toBe('true')
-    // Sans commande ouverte, l'invite garde la place du panneau.
-    expect(container.querySelector('.rig-tcw__scene > .rig-tcw__invite')!.firstChild!.textContent)
+    // Sans commande ouverte : la liste seule, et l'invite.
+    expect(container.querySelector('.rig-tcw__scene')!.className).toBe('rig-tcw__scene ')
+    expect(container.querySelector('.rig-tcw__liste > .rig-tcw__invite')!.textContent)
       .toBe('Sélectionnez une commande dans la liste pour la traiter.')
   })
 
-  it('cliquer une tuile ou une carte remonte l\'etat et l\'IDENTIFIANT ; le panneau prend la place de l\'invite', async () => {
+  it('cliquer une tuile remonte son etat, une ligne son IDENTIFIANT ; la commande s\'ouvre a cote de la liste', async () => {
     const { gestes } = session(vueDeBase(), (v, geste) => {
-      if (geste === 'Choisir') { v.panneau = panneau(); v.colonnes[0]!.lignes[1]!.active = true }
+      if (geste === 'Choisir') { v.panneau = panneau(); v.lignes[1]!.active = true }
       return v
     })
     const { container } = render(<EcranCommandesWeb />)
@@ -148,46 +138,37 @@ describe('EcranCommandesWeb', () => {
     fireEvent.click(screen.getByText('SCI DU PARC'))
     await waitFor(() => expect(container.querySelector('.rig-tcw__scene > .rig-tcw__panneau')).not.toBeNull())
     expect(gestes).toEqual([['ChoisirOnglet', 'EnAttente'], ['Choisir', 7]])
+    expect(container.querySelector('.rig-tcw__scene')!.className).toBe('rig-tcw__scene rig-tcw__scene--ouverte')
     expect(container.querySelector('.rig-tcw__panneau')!.getAttribute('aria-label')).toBe('Faillite — SCI DU PARC')
-    expect(container.querySelector('.rig-tcw__carte--active')!.getAttribute('aria-current')).toBe('true')
+    expect(container.querySelector('.rig-tcw__cmd--active')!.getAttribute('aria-current')).toBe('true')
     expect(container.querySelector('.rig-tcw__invite')).toBeNull()
   })
 
-  it('glisser une carte : les AUTRES colonnes a decision s\'offrent, deposer remonte « Deposer » avec l\'identifiant et la decision', async () => {
-    const { gestes } = session(vueDeBase())
+  it('une tuile sans commande : la liste le dit', async () => {
+    session({ ...vueDeBase(), lignes: [], compteur: '0 commande(s) · 0 groupe(s)' })
     const { container } = render(<EcranCommandesWeb />)
-    const carte = (await screen.findByText('NORD MARINE SAS')).closest('.rig-tcw__carte')!
-    const colonne = (nom: string) => container.querySelector(`.rig-tcw__colonne[aria-label="${nom}"]`)!
-    expect(container.querySelector('.rig-tcw__depot')).toBeNull()
-
-    fireEvent.dragStart(carte, transport())
-    expect(carte.className).toContain('rig-tcw__carte--traine')
-    // La colonne de depart (Mise en attente) et « À traiter » (aucune decision) ne s'offrent pas.
-    expect(colonne('À traiter').querySelector('.rig-tcw__depot')).toBeNull()
-    expect(colonne('Mise en attente').querySelector('.rig-tcw__depot')).toBeNull()
-    expect(colonne('Validée').querySelector('.rig-tcw__depot')!.className).toBe('rig-tcw__depot rig-tcw__depot--valider')
-    expect(colonne('Validée').querySelector('.rig-tcw__depot')!.textContent).toBe('Déposer ici pour valider')
-    expect(colonne('Validée').querySelector('.rig-tcw__vide')).toBeNull()
-    expect(colonne('Rejetée').querySelector('.rig-tcw__depot')!.textContent).toBe('Déposer ici pour rejeter')
-
-    fireEvent.dragOver(colonne('Rejetée'), transport())
-    expect(colonne('Rejetée').className).toBe('rig-tcw__colonne rig-tcw__colonne--cible rig-tcw__colonne--survol')
-    fireEvent.drop(colonne('Rejetée'), transport())
-    expect(gestes).toEqual([['Deposer', { id: 9, action: 'Rejeter' }]])
-    expect(container.querySelector('.rig-tcw__depot')).toBeNull()
-    expect(carte.className).not.toContain('rig-tcw__carte--traine')
+    expect((await screen.findByText('Aucune commande ne correspond aux critères.')).className).toBe('rig-tcw__vide')
+    expect(container.querySelector('.rig-tcw__invite')).toBeNull()
   })
 
-  it('une carte lachee hors d\'une colonne ne remonte rien', async () => {
-    const { gestes } = session(vueDeBase())
+  it('la pilule filtre a chaque frappe et montre le texte de la session ; Ctrl K y pose le curseur', async () => {
+    const { gestes } = session({ ...vueDeBase(), rapide: 'tra' })
     const { container } = render(<EcranCommandesWeb />)
-    const carte = (await screen.findByText('TRANSNORD SA')).closest('.rig-tcw__carte')!
-    fireEvent.dragStart(carte, transport())
-    expect(container.querySelector('.rig-tcw__colonne[aria-label="Mise en attente"] .rig-tcw__depot')!.textContent)
-      .toBe('Déposer ici pour mettre en attente')
-    fireEvent.dragEnd(carte, transport())
-    expect(container.querySelector('.rig-tcw__depot')).toBeNull()
-    expect(gestes).toEqual([])
+    const champ = await screen.findByPlaceholderText('Rechercher une commande, un SIREN, un n° IG-…') as HTMLInputElement
+    expect(champ.closest('.rig-recherche')!.className).toBe('rig-recherche rig-recherche--fixe rig-tcw__pilule')
+    expect(champ.value).toBe('tra')
+    expect(container.querySelector('.rig-tcw__pilule .rig-touche')!.textContent).toBe('Ctrl K')
+
+    fireEvent.input(champ, { target: { value: 'parc' } })
+    expect(gestes).toEqual([['FiltrerRapide', 'parc']])
+
+    expect(document.activeElement).not.toBe(champ)
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+    expect(document.activeElement).toBe(champ)
+    // Une autre touche avec Ctrl ne prend pas le curseur.
+    champ.blur()
+    fireEvent.keyDown(window, { key: 'j', ctrlKey: true })
+    expect(document.activeElement).not.toBe(champ)
   })
 
   it('decisions en pied dans l\'ordre de la maquette ; Valider bloque porte son motif et compte les marches', async () => {

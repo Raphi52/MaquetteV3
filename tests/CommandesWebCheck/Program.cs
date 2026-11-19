@@ -288,23 +288,23 @@ Exiger(tsx.Contains("'EcranCommandesWeb.Ouvrir'") && tsx.Contains("'EcranCommand
         && pont.Contains("[JSInvokable(\"EcranCommandesWeb.Ouvrir\")]") && pont.Contains("[JSInvokable(\"EcranCommandesWeb.Agir\")]")
         && pont.Contains("[JSInvokable(\"EcranCommandesWeb.Fermer\")]"),
     "l'ecran React appelle les trois methodes de SON pont, et le pont les expose");
-// La mise en page choisie au /draft du 19/11/2026 (« Colonnes de statut », qui
-// remplace la « Boite de tri » du 18/11) : la proue de l'accueil, une colonne par
-// onglet d'etat coiffee d'une tuile chiffree (.rig-chiffre) avec ses cartes, la
-// pastille de recherche, et le panneau A COTE des colonnes ; decisions dans l'ordre
-// de la maquette. En React, le panneau est le composant <Panneau>, pose dans la
-// scene APRES les colonnes ; c'est lui qui porte rig-tcw__panneau.
-Exiger(tsx.Contains("rig-tcw__barre") && tsx.Contains("className=\"rig-proue rig-tcw__proue\"")
+// La mise en page choisie au /draft du 19/11/2026 (« Proue », qui remplace la
+// « Boite de tri » du 18/11) : la proue de l'accueil, la recherche en pilule, une
+// tuile chiffree (.rig-chiffre, grand rond et anneau) par onglet d'etat, puis la
+// liste et le panneau A COTE ; decisions dans l'ordre de la maquette. En React, le
+// panneau est le composant <Panneau>, pose dans la scene APRES la liste ; c'est
+// lui qui porte rig-tcw__panneau.
+Exiger(tsx.Contains("rig-tcw__barre") && tsx.Contains("className=\"rig-proue\"")
         && pont.Contains("TraitementCommandes.Onglets(") && tsx.Contains("rig-tcw__chercher")
-        && Regex.IsMatch(tsx, @"rig-tcw__scene[\s\S]*rig-tcw__colonnes[\s\S]*<Panneau\b")
-        && Regex.IsMatch(tsx, @"function\s+Colonne\b[\s\S]*?rig-chiffre rig-chiffre--[\s\S]*?rig-chiffre__anneau[\s\S]*?<Carte\b")
+        && Regex.IsMatch(tsx, @"rig-proue\b[\s\S]*rig-tcw__pilule[\s\S]*rig-tcw__tuiles[\s\S]*rig-tcw__scene[\s\S]*rig-tcw__liste[\s\S]*<Panneau\b")
+        && Regex.IsMatch(tsx, @"function\s+Tuile\b[\s\S]*?rig-chiffre rig-chiffre--[\s\S]*?rig-chiffre__anneau")
         && Regex.IsMatch(tsx, @"function\s+Panneau\b[\s\S]*?className=""rig-tcw__panneau"""),
-    "mise en page « Colonnes de statut » : proue, une colonne par etat coiffee d'une tuile, pastille Rechercher, panneau a cote");
-// Glisser une carte vers une colonne joue SA decision : la correspondance colonne
-// -> decision est dans le pont (ColonneCw.Depot), le .tsx ne fait que la remonter.
-Exiger(Regex.IsMatch(codeTsx, @"draggable=\{cmd\.deplacable\}") && codeTsx.Contains("geste('Deposer', { id: traine.id, action: c.depot })")
-        && pont.Contains("case \"Deposer\":") && !Regex.IsMatch(codeTsx, @"'(?:Valider|Rejeter|MettreEnAttente)'\s*:\s*'(?:Validee|Rejetee|EnAttente)'"),
-    "glisser une carte remonte « Deposer » avec la decision que le pont a donnee a la colonne");
+    "mise en page « Proue » : proue, recherche en pilule, une tuile par etat, liste et panneau a cote");
+// Une tuile est un FILTRE : son clic remonte « ChoisirOnglet » avec son etat ; la
+// pilule remonte chaque frappe (« FiltrerRapide »). Le filtre est dans le pont.
+Exiger(codeTsx.Contains("geste('ChoisirOnglet', t.etat)") && codeTsx.Contains("geste('FiltrerRapide', texte)")
+        && pont.Contains("case \"FiltrerRapide\":") && !codeTsx.Contains("Deposer") && !pont.Contains("Deposer"),
+    "les tuiles filtrent par « ChoisirOnglet », la pilule par « FiltrerRapide » ; plus aucun glisser-deposer");
 var decisions = new[] { ">Rejeter…<", ">Mettre en attente…<", ">Valider<" }.Select(l => tsx.IndexOf(l, StringComparison.Ordinal)).ToList();
 Exiger(decisions.All(i => i > 0) && decisions.SequenceEqual(decisions.Order()),
     "decisions dans l'ordre de la maquette : Rejeter…, Mettre en attente…, Valider");
@@ -391,32 +391,37 @@ string OngletsTemoin(EtatCommande actif) => string.Join(", ", TraitementCommande
 var vue = EcranCommandesWeb.Ouvrir();
 VueCommandesWeb Geste(string geste, object? valeur = null) =>
     vue = EcranCommandesWeb.Agir(vue.Session, geste, JsonSerializer.SerializeToElement(valeur));
-// Colonnes de statut : un onglet d'etat = une colonne, avec SES cartes ; la colonne
-// active est celle de la commande ouverte. « La liste » des controles qui suivent
-// est donc la colonne active.
-string OngletsLus() => string.Join(", ", vue.Colonnes.Select(o => $"{o.Libelle} {o.Nombre}{(o.Actif ? "*" : "")}"));
-LigneCw[] LignesLues() => vue.Colonnes.Single(o => o.Actif).Lignes;
-LigneCw[] Colonne(string etat) => vue.Colonnes.Single(o => o.Etat == etat).Lignes;
+// Proue : un onglet d'etat = une tuile, qui filtre la liste sur son etat.
+string OngletsLus() => string.Join(", ", vue.Tuiles.Select(o => $"{o.Libelle} {o.Nombre}{(o.Actif ? "*" : "")}"));
+LigneCw[] LignesLues() => vue.Lignes;
 IEnumerable<int> IdsLus() => LignesLues().Select(l => l.Id);
-string? OngletActif() => vue.Colonnes.SingleOrDefault(o => o.Actif)?.Etat;
+string? OngletActif() => vue.Tuiles.SingleOrDefault(o => o.Actif)?.Etat;
 
-var aTraiterOuverture = vue.Colonnes.Single(o => o.Etat == "ATraiter");
-Exiger(aTraiterOuverture is { Nombre: 8, Detail: "3 groupe(s)" } && OngletsLus() == OngletsTemoin(EtatCommande.ATraiter),
-    $"joue : a l'ouverture, 8 commandes en 3 groupes, colonne « À traiter » active (lu : {aTraiterOuverture.Detail} | {OngletsLus()})");
+var aTraiterOuverture = vue.Tuiles.Single(o => o.Etat == "ATraiter");
+Exiger(vue.Compteur == "8 commande(s) · 3 groupe(s)" && aTraiterOuverture is { Nombre: 8, Detail: "3 groupe(s)" }
+       && OngletsLus() == OngletsTemoin(EtatCommande.ATraiter),
+    $"joue : a l'ouverture, 8 commandes en 3 groupes, tuile « À traiter » active (lu : {vue.Compteur} | {OngletsLus()})");
 Exiger(IdsLus().SequenceEqual(Ids(defaut, false))
        && LignesLues().All(l => l.Precisions == TraitementCommandes.Precisions(temoin.Single(c => c.Id == l.Id))
                            && l.Direct == TraitementCommandes.EstRapprochementDirect(temoin.Single(c => c.Id == l.Id))),
-    "joue : la colonne suit l'ordre de Regrouper, ses precisions et pastilles sont celles de TraitementCommandes");
-// Chaque colonne montre SES commandes, dans l'ordre de Regrouper sur son etat ;
-// seules les commandes en cours se glissent ; chaque colonne a sa decision.
-var colonnesJustes = vue.Colonnes.Select(o => (o.Etat, Juste:
-        o.Lignes.Select(l => l.Id).SequenceEqual(Ids(TraitementCommandes.SurOnglet(defaut, Enum.Parse<EtatCommande>(o.Etat)), false))
-        && o.Lignes.Length == o.Nombre
-        && o.Lignes.All(l => l.Deplacable == (o.Etat is "ATraiter" or "EnAttente")))).ToList();
-Exiger(colonnesJustes.All(c => c.Juste) && vue.Colonnes.Sum(o => o.Part) is >= 99 and <= 101
-       && string.Join(",", vue.Colonnes.Select(o => o.Depot ?? "-")) == "-,MettreEnAttente,Valider,Rejeter",
-    $"joue : chaque colonne a ses commandes (Regrouper sur son etat), sa part de l'anneau et sa decision (fausses : "
-    + string.Join(", ", colonnesJustes.Where(c => !c.Juste).Select(c => c.Etat)) + ")");
+    "joue : la liste suit l'ordre de Regrouper, ses precisions et pastilles sont celles de TraitementCommandes");
+// Chaque tuile, CLIQUEE, montre dans la liste les commandes de son etat, dans
+// l'ordre de Regrouper ; son nombre est celui de la liste, ses groupes son detail,
+// et les parts des anneaux font le tout.
+var tuilesFausses = new List<string>();
+foreach (var t in vue.Tuiles.ToList())
+{
+    Geste("ChoisirOnglet", t.Etat);
+    var surEtat = TraitementCommandes.SurOnglet(defaut, Enum.Parse<EtatCommande>(t.Etat));
+    var groupesEtat = TraitementCommandes.Regrouper(TraitementCommandes.Filtrer(temoin, surEtat), false).Count;
+    if (OngletActif() != t.Etat || !IdsLus().SequenceEqual(Ids(surEtat, false)) || LignesLues().Length != t.Nombre
+        || t.Detail != $"{groupesEtat} groupe(s)" || vue.Panneau is not null)
+        tuilesFausses.Add(t.Etat);
+}
+Geste("ChoisirOnglet", "ATraiter");
+Exiger(tuilesFausses.Count == 0 && vue.Tuiles.Sum(o => o.Part) is >= 99 and <= 101,
+    $"joue : chaque tuile filtre la liste sur son etat (Regrouper), compte ses groupes, et les anneaux font 100 % (fausses : "
+    + string.Join(", ", tuilesFausses) + ")");
 // La proue : la date de l'accueil, le compte « à traiter » en titre, et la phrase.
 Exiger(vue.Proue.Date == DateTime.Today.ToString("dddd d MMMM", System.Globalization.CultureInfo.GetCultureInfo("fr-FR"))
        && vue.Proue.Titre == new ChiffreCw(8, "commandes à traiter", false)
@@ -428,10 +433,11 @@ Exiger(vue.Proue.Date == DateTime.Today.ToString("dddd d MMMM", System.Globaliza
 Geste("ChoisirOnglet", "Rejetee");
 Exiger(OngletActif() == "Rejetee" && IdsLus().SequenceEqual(new[] { 11 }), "joue : l'onglet « Rejetée » ne montre que IG-90601");
 Geste("ChoisirOnglet", "ATraiter");
-// Choisir une carte d'une AUTRE colonne fait de sa colonne la colonne active.
+// Choisir une commande d'un AUTRE etat (un membre d'enveloppe) active sa tuile.
 Geste("Choisir", 11);
-Exiger(OngletActif() == "Rejetee" && vue.Panneau?.Id == 11 && vue.Panneau.Traitee is { Rejetee: true },
-    "joue : choisir la carte rejetee IG-90601 ouvre son panneau et active la colonne « Rejetée »");
+Exiger(OngletActif() == "Rejetee" && vue.Panneau?.Id == 11 && vue.Panneau.Traitee is { Rejetee: true }
+       && LignesLues().Single(l => l.Active).Id == 11,
+    "joue : choisir la commande rejetee IG-90601 ouvre son panneau et active la tuile « Rejetée », ou elle est en surbrillance");
 Geste("ChoisirOnglet", "ATraiter");
 
 Geste("Basculer", "RechercheOuverte");
@@ -568,62 +574,49 @@ Geste("ChoisirOnglet", "Validee");
 Exiger(LignesLues().Length > 0 && LignesLues().All(l => l.Avancement is null && !l.Prete),
     "escalier : une commande traitée n'affiche aucun compte");
 
-// ---- GLISSER UNE CARTE (Colonnes de statut, /draft du 19/11/2026, conv-1998) :
-// deposer une carte dans une colonne joue la decision du pied. Une session NEUVE.
+// ---- RECHERCHE EN PILULE (« Proue », /draft du 19/11/2026) : un seul champ,
+// applique a chaque frappe, qui cherche dans la raison sociale, le n° de commande
+// et le SIREN. Une session NEUVE, comparee a un jeu NEUF filtre par Metier
+// directement (le temoin du haut a deja rejete IG-90601 et saisi MAN-0001).
 EcranCommandesWeb.Fermer(vue.Session);
 vue = EcranCommandesWeb.Ouvrir();
-// a) SCI DU PARC (IG-90812) devient prete en retenant son seul dossier (escalier f).
-//    Sa carte, commande OUVERTE, garde ce que l'agent y a choisi : sans type coche,
-//    la deposer dans « Validée » est refuse sur le manque des types — elle n'est pas
-//    remise aux valeurs d'ouverture, qui l'auraient validee.
-Geste("Choisir", 5);
-Geste("Retenir", vue.Panneau!.Rapprochement!.Entites.Single().Cle);
-Geste("CocherTous", false);
-Geste("Deposer", new { id = 5, action = "Valider" });
-Exiger(vue.Panneau?.Id == 5 && vue.Message == new MessageCw("Cochez au moins un type d'inscription, avec une quantité.", "avertissement")
-       && Colonne("ATraiter").Any(l => l.Id == 5),
-    $"glisser : la carte de la commande ouverte garde ses choix (types décochés : Valider refusé — lu : « {vue.Message?.Texte} »)");
-Geste("CocherTous", true);
-//    Prete, deposee dans « Validée », elle est validee : elle change de colonne et
-//    la suivante de « À traiter » s'ouvre, comme au clic sur Valider.
-var prete = Colonne("ATraiter").Single(l => l.Id == 5);
-Exiger(prete.Prete, $"glisser : SCI DU PARC est prête avant d'être déposée ({prete.Avancement})");
-var apresPrete = Colonne("ATraiter").SkipWhile(l => l.Id != prete.Id).Skip(1).FirstOrDefault();
-var valideesAvant = Colonne("Validee").Length;
-Geste("Deposer", new { id = prete.Id, action = "Valider" });
-Exiger(vue.Message is { Severite: "succes" } && Colonne("Validee").Any(l => l.Id == prete.Id)
-       && Colonne("Validee").Length == valideesAvant + 1 && Colonne("ATraiter").All(l => l.Id != prete.Id)
-       && OngletActif() == "ATraiter" && vue.Panneau?.Id == apresPrete?.Id,
-    $"glisser : {prete.Nom} (prête) déposée dans « Validée » est validée et la suivante s'ouvre (lu : « {vue.Message?.Texte} »)");
-// b) Une commande a qui il manque une marche : Valider refuse, avec le manque de son escalier.
-var incomplete = Colonne("ATraiter").First(l => !l.Prete);
-Geste("Deposer", new { id = incomplete.Id, action = "Valider" });
-Exiger(vue.Panneau?.Id == incomplete.Id && vue.Panneau.Pied?.Blocage is { } blocage
-       && vue.Message == new MessageCw(blocage, "avertissement") && Colonne("ATraiter").Any(l => l.Id == incomplete.Id),
-    $"glisser : {incomplete.Nom} ({incomplete.Avancement}) déposée dans « Validée » reste à traiter, le manque s'affiche (lu : « {vue.Message?.Texte} »)");
-// c) « Rejetée » : la commande s'ouvre sur la bande du motif, rien n'est encore decide.
-Geste("FermerMessage");
-Geste("Deposer", new { id = incomplete.Id, action = "Rejeter" });
-Exiger(vue.Panneau?.Id == incomplete.Id && vue.Panneau.Pied?.Bande is { Rejet: true, ConfirmerRefuse: true }
-       && vue.Message is null && Colonne("ATraiter").Any(l => l.Id == incomplete.Id),
-    "glisser : déposée dans « Rejetée », la commande s'ouvre sur la bande du motif, sans rien décider");
-// d) « Mise en attente » : la bande du motif (facultatif) ; une commande deja en attente est refusee.
-Geste("Deposer", new { id = incomplete.Id, action = "MettreEnAttente" });
-Exiger(vue.Panneau?.Pied?.Bande is { Rejet: false, ConfirmerRefuse: false }, "glisser : déposée dans « Mise en attente », la bande du motif s'ouvre");
-var enAttente = Colonne("EnAttente").First();
-Geste("Deposer", new { id = enAttente.Id, action = "MettreEnAttente" });
-Exiger(vue.Message == new MessageCw("Cette commande est déjà en attente.", "avertissement") && vue.Panneau?.Id == enAttente.Id
-       && vue.Panneau.Pied?.Bande is null && OngletActif() == "EnAttente",
-    "glisser : une commande déjà en attente, redéposée dans « Mise en attente », est refusée sans ouvrir la bande");
-// e) Une commande traitee ne se decide plus, meme deposee.
-var traitee = Colonne("Rejetee").First();
-Geste("Deposer", new { id = traitee.Id, action = "Valider" });
-var refusTraitee = vue.Message;
-Geste("Deposer", new { id = traitee.Id, action = "Rejeter" });
-Exiger(refusTraitee == new MessageCw("Cette commande est déjà traitée : aucune action possible.", "avertissement")
-       && vue.Message == refusTraitee && vue.Panneau?.Id == traitee.Id && vue.Panneau.Pied is null
-       && Colonne("Rejetee").Any(l => l.Id == traitee.Id),
-    "glisser : une commande traitée ne se décide plus, ni vers « Validée » ni vers « Rejetée »");
+var neuf = TraitementCommandes.JeuDemoCommandes();
+List<int> IdsNeufs(CriteresCommandes cr) =>
+    TraitementCommandes.Regrouper(TraitementCommandes.Filtrer(neuf, cr), false).SelectMany(g => g.Commandes).Select(c => c.Id).ToList();
+string TuilesNeuves(CriteresCommandes cr) => string.Join(", ", TraitementCommandes.Onglets(neuf, cr)
+    .Select(o => $"{TraitementCommandes.Libelle(o.Etat)} {o.Nombre}{(o.Etat == EtatCommande.ATraiter ? "*" : "")}"));
+// a) Une raison sociale, sans la casse : la liste ET les tuiles se recomptent ; la
+//    commande ouverte reste ouverte.
+Geste("Choisir", 1);
+Geste("FiltrerRapide", "parc");
+var surParc = defaut with { Texte = "parc" };
+Exiger(vue.Rapide == "parc" && IdsLus().SequenceEqual(IdsNeufs(surParc)) && LignesLues().Length > 0
+       && LignesLues().All(l => l.Nom.Contains("PARC", StringComparison.Ordinal))
+       && OngletsLus() == TuilesNeuves(surParc) && vue.Panneau?.Id == 1,
+    $"pilule : « parc » ne garde que les PARC, recompte les tuiles et laisse la commande ouverte (lu : {string.Join(",", IdsLus())} | {OngletsLus()})");
+// b) Un n° de commande, en minuscules.
+Geste("FiltrerRapide", "ig-90812");
+Exiger(IdsLus().SequenceEqual(IdsNeufs(defaut with { Texte = "ig-90812" })) && IdsLus().Contains(5),
+    $"pilule : « ig-90812 » trouve la commande IG-90812 (lu : {string.Join(",", IdsLus())})");
+// c) Un SIREN tape avec ses espaces.
+var avecSiren = neuf.First(c => c.Etat == EtatCommande.ATraiter && c.Siren.Length == 9);
+var sirenTape = $"{avecSiren.Siren[..3]} {avecSiren.Siren[3..6]}";
+Geste("FiltrerRapide", sirenTape);
+Exiger(IdsLus().SequenceEqual(IdsNeufs(defaut with { Texte = sirenTape })) && IdsLus().Contains(avecSiren.Id),
+    $"pilule : « {sirenTape} » trouve {avecSiren.Denomination} par son SIREN (lu : {string.Join(",", IdsLus())})");
+// d) La recherche detaillee garde le texte de la pilule ; l'effacer rend tout.
+Geste("Rechercher");
+var garde = vue.Rapide == sirenTape && IdsLus().SequenceEqual(IdsNeufs(defaut with { Texte = sirenTape }));
+Geste("FiltrerRapide", "");
+Exiger(garde && vue.Rapide == "" && IdsLus().SequenceEqual(IdsNeufs(defaut)) && OngletsLus() == TuilesNeuves(defaut),
+    "pilule : « Rechercher » garde le texte de la pilule ; l'effacer rend la liste et les tuiles entieres");
+// e) La regle seule : accents ignores ; un texte qui n'est pas fait de chiffres ne
+//    cherche pas dans le SIREN.
+var accent = new CommandeRecue { Denomination = "SOCIÉTÉ GÉNÉRALE", Reference = "IG-91004", Siren = "552120222" };
+Exiger(TraitementCommandes.Correspond(accent, "societe gen") && TraitementCommandes.Correspond(accent, "552 120")
+       && TraitementCommandes.Correspond(accent, "ig-910") && !TraitementCommandes.Correspond(accent, "X-55212")
+       && TraitementCommandes.Correspond(accent, "  "),
+    "pilule : « societe gen » trouve SOCIÉTÉ GÉNÉRALE, « 552 120 » son SIREN, et « X-55212 » ne le cherche pas dans le SIREN");
 
 var gesteInconnu = false;
 try { Geste("GesteQuiNExistePas"); }
