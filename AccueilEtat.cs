@@ -24,7 +24,7 @@ public static class ThemesRig
     public static readonly IReadOnlyList<ThemeRig> Tous =
     [
         new("clair",  "Clair",            "#EEF0F4"),
-        new("sombre", "Sombre",           "#12141C"),
+        new("sombre", "Sombre",           "#1E1E1E"),
         new("violet", "Violet pilules",   "#F3F4F8"),
         new("orange", "Noir et orange",   "#EFEFF0"),
         new("argile", "Argile et corail", "#E6E1DB"),

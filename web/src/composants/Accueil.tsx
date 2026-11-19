@@ -27,9 +27,13 @@ export function Accueil({ vue, geste }: ProprietesAccueil) {
       <Menu menu={vue.menu} reduit={vue.menuReduit} geste={agir} />
       {' '}
       <div className="rig-plan">
-        <Entete entete={vue.entete} geste={agir} />
-        {' '}
-        <Recherche recherche={vue.recherche} geste={agir} />
+        {/* La tete du plan : le bandeau noir du theme sombre (« En-tete noir »,
+            /draft conv-2001) passe sous la date, le salut ET la recherche. */}
+        <div className="rig-plan__tete">
+          <Entete entete={vue.entete} geste={agir} />
+          {' '}
+          <Recherche recherche={vue.recherche} geste={agir} />
+        </div>
         {' '}
         <Chiffres vue={vue.chiffres} geste={agir} />
         {vue.proue && <Proue proue={vue.proue} geste={agir} />}
