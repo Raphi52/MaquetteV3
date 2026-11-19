@@ -440,8 +440,10 @@ describe('EcranCommandesWeb', () => {
     expect(conforme.textContent).toContain('Aucun écart avec la commande')
     expect(conforme.querySelectorAll('.rig-tcw__comparaison .rig-tcw__coche')).toHaveLength(2)
     expect(conforme.textContent).toContain('17· PM · 2 adresse(s)')
-    // Le n° de gestion ne se compare que pour le certificat de non-faillite.
+    // Le n° de gestion ne se compare que pour le certificat de non-faillite : ici
+    // il reste dans l'entete du dossier.
     expect(conforme.textContent).not.toContain('N° de gestion')
+    expect(conforme.querySelector('.rig-tcw__comp-code')!.textContent).toBe('2026B01067')
     expect(ecart.querySelector('.rig-tcw__verdict')!.className).toContain('rig-tcw__ligne-statut--attente')
     expect(ecart.textContent).toContain('≠ SIREN reçu : 402 118 447 ≠ 334 771 018')
     expect(ecart.querySelector('.rig-tcw__difference')).not.toBeNull()
@@ -488,6 +490,10 @@ describe('EcranCommandesWeb', () => {
     // premiere ligne (c'est lui qui resout le dossier), puis SIREN et raison sociale.
     const champs = [...cartes[0]!.querySelectorAll('.rig-tcw__comparaison > .rig-tcw__comp-champ:not(.rig-tcw__comp-tete)')]
     expect(champs.map((c) => c.textContent)).toEqual(['N° de gestion', 'SIREN', 'Raison sociale', 'SIÈGE', 'Inscriptions'])
+    // Cette ligne le montre deja : l'entete ne garde que la pastille.
+    const tete = cartes[0]!.querySelectorAll('.rig-tcw__comp-tete')[2]!
+    expect(tete.querySelector('.rig-tcw__comp-code')).toBeNull()
+    expect(tete.textContent).toBe('DOSSIER RCS')
     const gestion = champs[0]!
     expect(gestion.nextElementSibling!.textContent).toBe('004176')
     expect(gestion.nextElementSibling!.nextElementSibling!.querySelector('.rig-tcw__coche')).not.toBeNull()

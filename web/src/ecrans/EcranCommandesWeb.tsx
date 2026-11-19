@@ -262,12 +262,13 @@ function Correspondance({ r, e, geste }: { r: RapprochementCw; e: EntiteCw; gest
         <span className="rig-tcw__comp-tete rig-tcw__comp-champ">Commande</span>
         <span className="rig-tcw__comp-tete">
           <span className="rig-tcw__pastille rig-tcw__pastille--accent">{e.nonInscrit ? 'NON-INSCRIT' : 'DOSSIER RCS'}</span>
-          <span className="rig-tcw__comp-code">{e.gestion.length > 0 ? e.gestion : 'NI'}</span>
+          {/* Le certificat de non-faillite montre le n° dans sa ligne « N° de gestion » : pas deux fois. */}
+          {!r.faillite && <span className="rig-tcw__comp-code">{e.gestion.length > 0 ? e.gestion : 'NI'}</span>}
           {e.radie && <span className="rig-tcw__pastille rig-tcw__pastille--radie">RADIÉ</span>}
           {e.retenue && <span className="rig-tcw__pastille rig-tcw__pastille--retenue">RETENUE</span>}
         </span>
         {/* Le certificat de non-faillite resout son dossier par le n° de gestion
-            reçu : il ouvre la comparaison. */}
+            reçu : il ouvre la comparaison (et quitte l'entete ci-dessus). */}
         {r.faillite && (
           <>
             <span className="rig-tcw__comp-champ">N° de gestion</span>
