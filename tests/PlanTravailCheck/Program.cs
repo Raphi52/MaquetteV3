@@ -424,13 +424,21 @@ internal static class Programme
         Agir("arbreActiver", statuts!.Id);
         vue = plan.Vue();
         d = vue.Dossier!;
-        Exiger(d.Fiche is null && d.Etapes is { Courante: 2, Total: 7 } && d.Etapes.Pages[2].Titre == "Capital",
+        Exiger(d.Fiche is null && d.Etapes is { Courante: 2, Total: 6 } && d.Etapes.Pages[2].Titre == "Capital",
             "ouvrir les statuts amene la saisie guidee sur SON etape (Capital)");
         Exiger(vue.Defilement is { Index: 2, Doux: false },
             "la page recoit le defilement immediat vers cette etape");
         Exiger(d.Etapes!.Pages[2] is { Ouverte: true } && d.Etapes.Pages[2].Champs.Length > 0
-               && d.Etapes.Pages[6] is { Ouverte: false, Champs.Length: 0 },
+               && d.Etapes.Pages[5] is { Ouverte: false, Champs.Length: 0 },
             "l'etape de la piece se deplie dans l'accordeon ; une etape repliee ne porte aucun champ");
+        // Controle n'est plus une ligne de la liste (19/11/2026, conv-2022) : ses
+        // champs partent dans le PIED, a cote de « Valider le dossier ».
+        Exiger(d.Etapes.Pages.Length == 6 && d.Etapes.Pas.Length == 6
+               && d.Etapes.Pages.All(p => p.Code != "CONTROLE") && d.Etapes.Pages[^1].Code == "DIRIGEANTS",
+            "la liste montre les 6 etapes de saisie, sans le controle");
+        Exiger(d.Etapes.Controle.Select(c => c.Colonne).SequenceEqual(new[] { "OBSRC_TEXTE_MENTION", "DSSRC_ETAT_DOSSIER" })
+               && d.Etapes.Controle[1] is { Obligatoire: true, Valeur: "A controler", Manque: false },
+            "le pied porte les champs du controle : la mention et l'etat du dossier");
         Exiger(d.Apercu?.Apercu is { Libelle: "Statuts signes" } && d.Apercu.Apercu.Feuilles.Length > 0,
             "la piece s'affiche a droite, page par page");
 
@@ -450,9 +458,37 @@ internal static class Programme
         Exiger(plan.Vue().Dossier!.Etapes!.Pages[4] is { Ouverte: false, Champs.Length: 0 },
             "un second clic sur la ligne la replie");
         Agir("etapeVisible", 3);
-        Exiger(plan.Vue().Dossier!.Etapes!.Courante == 3, "la page dit quelle etape est en haut : le pied suit (« etape 4 / 7 »)");
+        Exiger(plan.Vue().Dossier!.Etapes!.Courante == 3, "la page dit quelle etape est en haut : le pied suit (« etape 4 / 6 »)");
         Agir("allerEtape", 99);
-        Exiger(plan.Vue().Dossier!.Etapes!.Courante == 6, "aller au-dela de la derniere etape s'arrete au controle final");
+        Exiger(plan.Vue().Dossier!.Etapes!.Courante == 5, "aller au-dela de la derniere etape s'arrete a la derniere de la liste");
+        Agir("allerEtape", 1);
+        // Aller au controle (son index du modele, 6) : rien ne se deplie ni ne
+        // defile, ses champs sont deja dans le pied.
+        var numeroDefilement = plan.Vue().Defilement?.Numero;
+        Agir("allerEtape", 6);
+        Agir("basculerEtape", 6);
+        Exiger(plan.Vue().Dossier!.Etapes! is { Courante: 1, Pages.Length: 6 }
+               && plan.Vue().Defilement?.Numero == numeroDefilement,
+            "aller au controle ne change ni l'etape courante ni le defilement");
+        // Une piece rangee au controle (inscription), ouverte depuis l'historique
+        // des pieces : elle s'affiche, la liste ne bouge pas.
+        var inscriptions = plan.Vue().Dossier!.Historique.FirstOrDefault(p => p.Libelle == "Etat des inscriptions");
+        Exiger(inscriptions is not null, "la piece « Etat des inscriptions » est dans l'historique des pieces");
+        Agir("historiqueOuvrir", inscriptions!.Id);
+        Exiger(plan.Vue().Dossier! is { Etapes.Courante: 1, Apercu.Apercu.Libelle: "Etat des inscriptions" },
+            "ouvrir une piece du controle l'affiche sans changer l'etape courante");
+        // Le pied ecrit dans l'etape CONTROLE : vider l'etat du dossier bloque, la
+        // mention fait paraitre sa date et sa diffusion.
+        Agir("ecrire", new { etape = "CONTROLE", colonne = "DSSRC_ETAT_DOSSIER", valeur = "" });
+        Exiger(plan.Vue().Dossier!.Etapes! is { } ec && ec.Controle[^1] is { Colonne: "DSSRC_ETAT_DOSSIER", Manque: true }
+               && ec.Recap.Groupes.Any(g => g.IndexEtape == 6 && g.Points.Any(x => x.Colonne == "DSSRC_ETAT_DOSSIER")),
+            "un etat du dossier vide est a renseigner, dans le pied et dans le controle final");
+        Agir("ecrire", new { etape = "CONTROLE", colonne = "DSSRC_ETAT_DOSSIER", valeur = "A controler" });
+        Agir("ecrire", new { etape = "CONTROLE", colonne = "OBSRC_TEXTE_MENTION", valeur = "Radiation d'office" });
+        Exiger(plan.Vue().Dossier!.Etapes!.Controle.Select(c => c.Colonne)
+                   .SequenceEqual(new[] { "OBSRC_TEXTE_MENTION", "MNTOB_DATE_MENTION", "MNTOB_DIFFUSABLE", "DSSRC_ETAT_DOSSIER" }),
+            "une mention redigee fait paraitre sa date et sa diffusion dans le pied");
+        Agir("ecrire", new { etape = "CONTROLE", colonne = "OBSRC_TEXTE_MENTION", valeur = "" });
         Agir("allerEtape", 1);
 
         // --- 5. Une saisie refusee, puis acceptee.
@@ -465,16 +501,12 @@ internal static class Programme
             "la frise marque l'etape « Identite » comme refusee");
         Exiger(plan.Vue().Dossier!.Bandeau is { Erreur: true } b && b.Liens.Any(l => l.Etape == "Identite" && l.Refuse),
             "le bandeau des defauts nomme l'etape a corriger");
-        Agir("allerEtape", 6);
-        var recap = plan.Vue().Dossier!.Etapes!.Pages[6].Recap;
-        Exiger(recap is { Valide: false } && recap.Nombre > 0 && recap.Titre.Contains("bloque"),
-            "le controle final dit ce qui bloque la validation");
-        Agir("basculerEtape", 6);
-        Exiger(plan.Vue().Dossier!.Etapes! is { Recap: { Valide: false, Nombre: > 0 } } pied && pied.Pages[6].Recap is null,
-            "le pied porte le controle du dossier meme quand l'etape Controle est repliee");
-        Agir("allerEtape", 6);
+        var recap = plan.Vue().Dossier!.Etapes!.Recap;
+        Exiger(recap is { Valide: false } && recap.Nombre > 0 && recap.Titre.Contains("bloque")
+               && recap.Groupes[0] is { IndexEtape: 1, Etape: "Identite" },
+            "le pied dit ce qui bloque la validation, et ou (Identite)");
         Agir("valider");
-        Exiger(plan.Vue().Dossier!.Etapes!.Pages[6].Recap is { Valide: false },
+        Exiger(plan.Vue().Dossier!.Etapes!.Recap is { Valide: false },
             "un dossier qui a un defaut ne se valide pas, meme si le geste arrive");
         Agir("allerEtape", 1);
         Agir("saisie", new { etape = "IDENTITE", colonne = "DSSRC_SIREN", valeur = "109 678 235" });
@@ -483,13 +515,12 @@ internal static class Programme
         Exiger(plan.Vue().Dossier!.Bandeau is null, "la saisie corrigee fait disparaitre le bandeau des defauts");
 
         // --- 6. Valider le dossier, le rouvrir.
-        Agir("allerEtape", 6);
-        Exiger(plan.Vue().Dossier!.Etapes!.Pages[6].Recap is { Valide: false, Nombre: 0 },
+        Exiger(plan.Vue().Dossier!.Etapes!.Recap is { Valide: false, Nombre: 0 },
             "plus rien ne bloque la validation");
         Agir("valider");
-        Exiger(plan.Vue().Dossier!.Etapes!.Pages[6].Recap is { Valide: true }, "le dossier est valide");
+        Exiger(plan.Vue().Dossier!.Etapes!.Recap is { Valide: true }, "le dossier est valide");
         Agir("rouvrir");
-        Exiger(plan.Vue().Dossier!.Etapes!.Pages[6].Recap is { Valide: false, Nombre: 0 },
+        Exiger(plan.Vue().Dossier!.Etapes!.Recap is { Valide: false, Nombre: 0 },
             "« Rouvrir la saisie » retire la validation");
         Agir("valider");
         // Une seule source de verite : l'ecran des demandes recoit les dossiers valides.
@@ -509,7 +540,7 @@ internal static class Programme
         Exiger(plan.Vue().Proc is null && plan.Vue().Dossier?.Numero == "004176"
                && plan.Vue().Onglets is { Length: 1 } ob && ob[0] is { Code: "AFFAIRE:004176", Actif: true },
             "la croix de l'onglet ferme l'ecran ; l'onglet voisin, celui de l'affaire, la remontre");
-        Exiger(plan.Vue().Dossier!.Etapes!.Pages[6].Recap is { Valide: true },
+        Exiger(plan.Vue().Dossier!.Etapes!.Recap is { Valide: true },
             "revenir sur l'onglet de l'affaire la retrouve telle qu'on l'a laissee (sa saisie validee)");
 
         // --- 7. Fiches multiples : ajouter un etablissement.

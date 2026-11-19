@@ -199,7 +199,7 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
         )}
 
         {/* ---- ZONE 2 : LES DONNEES ---- la fiche d'informations quand une
-            fiche est choisie dans l'arbre, sinon les 7 etapes de la saisie.
+            fiche est choisie dans l'arbre, sinon les etapes de la saisie (le controle est dans leur pied).
             L'historique des pieces, autrefois dessous, est passe dans l'onglet
             Suivi de la colonne de droite (proposition 3, 19/11/2026). */}
         {(d.fiche || d.etapes) && (

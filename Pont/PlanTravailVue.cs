@@ -131,22 +131,26 @@ public sealed record FicheColonneVue(string Branche, string Session, int Version
 
 /// <summary>La saisie guidee en ACCORDEON : une ligne par etape, qui se deplie
 /// (proposition 6 « En-tete en bas » du /draft du 19/11/2026, conv-2022).</summary>
+/// <param name="Total">Le nombre d'etapes de la LISTE : le controle n'en fait plus partie.</param>
 /// <param name="Recap">Le controle du dossier, calcule a chaque rendu : il vit dans
-/// le PIED du panneau, avec le titre, que l'etape Controle soit ouverte ou non.</param>
+/// le PIED du panneau, avec le titre.</param>
+/// <param name="Controle">Les champs visibles de l'etape CONTROLE (etat du dossier,
+/// mention), poses dans le pied a cote de « Valider le dossier » : l'etape n'est plus
+/// une ligne de l'accordeon (19/11/2026, conv-2022).</param>
 public sealed record EtapesVue(int Courante, int Total, string Titre, bool Oeil, PasEtapeVue[] Pas,
-                               PageEtapeVue[] Pages, RecapVue Recap);
+                               PageEtapeVue[] Pages, RecapVue Recap, ChampSaisieVue[] Controle);
 /// <param name="Fiches">« 3 dirigeants » : le nombre, ou 0 quand il ne s'affiche pas.</param>
 public sealed record PasEtapeVue(string Etat, bool Courant, string Pastille, string Titre, int Fiches,
                                  string Unite, int Refuses, int Manquants, int Remplis, int Total);
 /// <param name="Ouverte">L'etape est depliee dans l'accordeon : seules les etapes
 /// ouvertes portent leurs champs (une etape repliee n'est qu'une ligne).</param>
 public sealed record PageEtapeVue(string Code, bool Courante, bool Ouverte, string Titre, string Source,
-                                  OngletsFichesVue? Fiches, RecapVue? Recap, ChampSaisieVue[] Champs);
+                                  OngletsFichesVue? Fiches, ChampSaisieVue[] Champs);
 public sealed record OngletsFichesVue(string Unite, int Nombre, int Actif);
 public sealed record ChampSaisieVue(string Libelle, string Colonne, string Type, string Exemple,
                                     bool Obligatoire, string Largeur, string[] Choix, string Valeur,
                                     string? Refus, bool Manque);
-/// <summary>Le controle final (etape CONTROLE).</summary>
+/// <summary>Le controle final, dans le pied des etapes : ce qui bloque, par etape.</summary>
 public sealed record RecapVue(bool Valide, int Nombre, string Titre, int AManquer, int Refusees,
                               GroupeRecapVue[] Groupes);
 public sealed record GroupeRecapVue(int IndexEtape, int Fiche, string Etape, bool Multi, string Unite,
@@ -519,8 +523,11 @@ public sealed partial class SessionPlanTravail
 
     private EtapesVue VueEtapes(Dossier d)
     {
-        var pas = new PasEtapeVue[Etapes.Length];
-        for (var i = 0; i < Etapes.Length; i++)
+        // La LISTE : les etapes avant le controle, sous leurs index du modele ;
+        // le controle part dans le pied (voir IndexControle).
+        var nombre = IndexControle;
+        var pas = new PasEtapeVue[nombre];
+        for (var i = 0; i < nombre; i++)
         {
             var etape = Etapes[i];
             var (remplis, total) = Avancement(etape);
@@ -536,29 +543,25 @@ public sealed partial class SessionPlanTravail
                 refuses, manquants, remplis, total);
         }
 
-        // Un seul calcul des defauts par rendu : le pied et l'etape Controle
-        // ouverte lisent le meme recapitulatif.
-        var recap = VueRecap();
-        var pages = new PageEtapeVue[Etapes.Length];
-        for (var i = 0; i < Etapes.Length; i++)
+        var pages = new PageEtapeVue[nombre];
+        for (var i = 0; i < nombre; i++)
         {
             var courante = Etapes[i];
             var ouverte = EtapesOuvertes.Contains(i);
             if (!ouverte)
             {
                 pages[i] = new PageEtapeVue(courante.Code, i == EtapeCourante, false, courante.Titre,
-                                            courante.Source, null, null, []);
+                                            courante.Source, null, []);
                 continue;
             }
             var fiches = Fiches(courante.Code);
             pages[i] = new PageEtapeVue(courante.Code, i == EtapeCourante, true, courante.Titre, courante.Source,
                 courante.Multiple ? new OngletsFichesVue(courante.Unite, fiches.Count, IndexFiche(courante)) : null,
-                courante.Code == "CONTROLE" ? recap : null,
                 ChampsVue(courante));
         }
 
-        return new EtapesVue(EtapeCourante, Etapes.Length, ApercuNoeud?.Libelle ?? d.Numero, !GuideVisible,
-                             pas, pages, recap);
+        return new EtapesVue(EtapeCourante, nombre, ApercuNoeud?.Libelle ?? d.Numero, !GuideVisible,
+                             pas, pages, VueRecap(), ChampsVue(Etapes[IndexControle]));
     }
 
     /// <summary>Les champs visibles d'une etape, sur sa fiche affichee

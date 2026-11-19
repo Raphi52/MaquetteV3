@@ -3,8 +3,10 @@
 // (pastille, nom, defaut, compte) qui se deplie, plusieurs a la fois, dans une
 // seule colonne qui defile a la verticale : toute la hauteur du haut va aux
 // etapes. Le PIED porte ce que portait l'en-tete -- titre de la piece, oeil,
-// croix -- et le controle du dossier : ce qui bloque et « Valider le dossier »,
-// toujours visibles. Seules les etapes ouvertes portent leurs champs (le C# ne
+// croix -- et le controle du dossier : ce qui bloque, puis les champs de
+// l'etape Controle (etat du dossier, mention) a cote de « Valider le dossier »,
+// toujours visibles ; Controle n'est plus une ligne de la liste (19/11/2026).
+// Seules les etapes ouvertes portent leurs champs (le C# ne
 // calcule pas les autres). Les etapes et leurs champs sont calques sur les
 // tables reelles du dossier RCS de RIG v2 ; leurs regles (visibilite, refus,
 // requis, controle final) sont dans Pont/PlanTravail.cs, la vue de chaque champ
@@ -113,9 +115,6 @@ function Corps({ page, plan }: { page: PageEtapeVue, plan: GestePlan }) {
         </div>
       )}
 
-      {/* --- Controle final : le DETAIL de ce qui bloque (le bilan est dans le pied) --- */}
-      {page.recap && !page.recap.valide && page.recap.nombre > 0 && <PointsBloquants recap={page.recap} plan={plan} />}
-
       <Champs code={page.code} fiche={fiches?.actif ?? 0} champs={page.champs} plan={plan} />
     </div>
   )
@@ -123,22 +122,34 @@ function Corps({ page, plan }: { page: PageEtapeVue, plan: GestePlan }) {
 
 /**
  * LE PIED : l'en-tete descendu en bas. Titre de la piece, bilan du controle
- * (ce qui bloque, puis « Valider le dossier » ; « Rouvrir la saisie » quand le
+ * (ce qui bloque), puis les champs de l'etape Controle -- etat du dossier,
+ * mention -- a cote de « Valider le dossier » (« Rouvrir la saisie » quand le
  * dossier est valide), oeil et croix. Son filet haut dit l'etat d'un coup
  * d'oeil, de la couleur de la pastille du bilan : alerte (brique en clair,
  * jaune en sombre) tant qu'un point bloque, vert des que plus rien ne bloque.
+ * L'ordre du balisage est celui de la tabulation (bilan, champs, Valider,
+ * outils) ; la grille du CSS pose les outils en haut a droite.
  */
 function Pied({ etapes, plan }: { etapes: EtapesVue, plan: GestePlan }) {
   const { recap, courante, total } = etapes
   const etat = recap.valide ? 'valide' : recap.nombre > 0 ? 'bloque' : 'pret'
-  const controle = etapes.pages.findIndex((p) => p.code === 'CONTROLE')
+  const n = recap.nombre
   return (
     <div className={'rig-guide__controle rig-guide__controle--' + etat}>
       <div className="rig-guide__titres">
         <div className="rig-kicker">{'Controle du dossier · etape '}{courante + 1}{' / '}{total}</div>{' '}
         <h3 className="rig-guide__titre">{etapes.titre}</h3>
       </div>{' '}
-      <Bilan recap={recap} plan={plan} controle={controle} />{' '}
+      <Bilan recap={recap} total={total} plan={plan} />{' '}
+      <div className="rig-guide__validation">
+        <Champs code="CONTROLE" fiche={0} champs={etapes.controle} plan={plan} />{' '}
+        {/* Valider n'est possible que sans aucun defaut (et le C# le reverifie). */}
+        {recap.valide
+          ? <button className="rig-bouton" onClick={() => plan('rouvrir')}>Rouvrir la saisie</button>
+          : <button className="rig-bouton rig-bouton--fort"
+                    disabled={n > 0}
+                    onClick={() => plan('valider')}>Valider le dossier</button>}
+      </div>{' '}
       <div className="rig-guide__outils">
         {/* Oeil : rouvre le panneau de droite (document) depuis le pied des etapes. */}
         {etapes.oeil && (
@@ -155,20 +166,21 @@ function Pied({ etapes, plan }: { etapes: EtapesVue, plan: GestePlan }) {
   )
 }
 
-/** Le bilan du controle final, dans le pied. Tant qu'un point bloque, son
- *  texte deplie l'etape Controle, qui en donne le detail point par point. */
-function Bilan({ recap, plan, controle }: { recap: RecapVue, plan: GestePlan, controle: number }) {
+/** Le bilan du controle final, dans le pied. Tant qu'un point bloque dans la
+ *  LISTE, son texte mene au premier : l'etape se deplie, le champ dit son
+ *  motif. Un point du controle lui-meme est deja sous les yeux, dans le pied. */
+function Bilan({ recap, total, plan }: { recap: RecapVue, total: number, plan: GestePlan }) {
   if (recap.valide) {
     return (
       <div className="rig-bilan rig-bilan--valide">
         <span className="rig-recap__pastille rig-recap__pastille--ok">OK</span>{' '}
         <span className="rig-bilan__texte"><span className="rig-bilan__titre">Dossier valide</span>{' '}
-          <span className="rig-bilan__detail">{' Les 7 etapes sont completes et acceptees. '}</span></span>{' '}
-        <button className="rig-bouton" onClick={() => plan('rouvrir')}>Rouvrir la saisie</button>
+          <span className="rig-bilan__detail">{' Les etapes et le controle sont complets et acceptes. '}</span></span>
       </div>
     )
   }
   const n = recap.nombre
+  const premier = recap.groupes.find((g) => g.indexEtape < total)
   const texte = (
     <>
       <span className="rig-bilan__titre">{recap.titre}</span>{' '}
@@ -184,46 +196,11 @@ function Bilan({ recap, plan, controle }: { recap: RecapVue, plan: GestePlan, co
       <span className={'rig-recap__pastille ' + (n === 0 ? 'rig-recap__pastille--ok' : 'rig-recap__pastille--bloque')}>
         {n === 0 ? 'OK' : String(n)}
       </span>{' '}
-      {n > 0 && controle >= 0
-        ? <button className="rig-bilan__texte rig-bilan__texte--lien" title="Voir ce qui bloque"
-                  onClick={() => plan('allerEtape', controle)}>{texte}</button>
-        : <span className="rig-bilan__texte">{texte}</span>}{' '}
-      {/* Valider n'est possible que sans aucun defaut (et le C# le revérifie). */}
-      <button className="rig-bouton rig-bouton--fort"
-              disabled={n > 0}
-              onClick={() => plan('valider')}>Valider le dossier</button>
+      {premier
+        ? <button className="rig-bilan__texte rig-bilan__texte--lien" title={'Aller a ' + premier.etape}
+                  onClick={() => plan('allerAuDefaut', { etape: premier.indexEtape, fiche: premier.fiche })}>{texte}</button>
+        : <span className="rig-bilan__texte">{texte}</span>}
     </div>
-  )
-}
-
-/** Le detail de ce qui bloque, dans l'etape Controle : un lien par etape a
- *  corriger, puis chaque point (champ, motif, colonne). */
-function PointsBloquants({ recap, plan }: { recap: RecapVue, plan: GestePlan }) {
-  return (
-    <ul className="rig-recap__liste">
-      {recap.groupes.map((g, i) => (
-        <li key={i} className="rig-recap__groupe">
-          <button className="rig-recap__aller"
-                  onClick={() => plan('allerAuDefaut', { etape: g.indexEtape, fiche: g.fiche })}>
-            <span className="rig-recap__rang">{g.indexEtape + 1}</span>{' '}
-            <span>
-              {g.etape}
-              {g.multi && <span className="rig-recap__fiche">{g.unite}{' '}{g.fiche + 1}</span>}
-            </span>{' '}
-            <span className="rig-recap__nb">{g.nombre}</span>
-          </button>{' '}
-          <ul className="rig-recap__points">
-            {g.points.map((d, j) => (
-              <li key={j} className={'rig-recap__point ' + (d.manquant ? '' : 'rig-recap__point--refuse')}>
-                <span className="rig-recap__champ">{d.champ}</span>{' '}
-                <span className="rig-recap__motif">{d.motif}</span>{' '}
-                <span className="rig-recap__colonne">{d.colonne}</span>
-              </li>
-            ))}
-          </ul>
-        </li>
-      ))}
-    </ul>
   )
 }
 

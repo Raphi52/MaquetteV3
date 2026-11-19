@@ -229,6 +229,7 @@ export interface FicheColonneVue { branche: string, session: string, version: nu
 
 export interface EtapesVue {
   courante: number
+  /** Le nombre d'etapes de la liste : le controle n'en fait plus partie. */
   total: number
   titre: string
   oeil: boolean
@@ -236,6 +237,8 @@ export interface EtapesVue {
   pages: PageEtapeVue[]
   /** Le controle du dossier, calcule a chaque rendu : il vit dans le pied du panneau. */
   recap: RecapVue
+  /** Les champs de l'etape CONTROLE (etat du dossier, mention), dans le pied a cote de « Valider le dossier ». */
+  controle: ChampSaisieVue[]
 }
 export interface PasEtapeVue {
   etat: string
@@ -257,7 +260,6 @@ export interface PageEtapeVue {
   titre: string
   source: string
   fiches: OngletsFichesVue | null
-  recap: RecapVue | null
   champs: ChampSaisieVue[]
 }
 export interface OngletsFichesVue { unite: string, nombre: number, actif: number }

@@ -37,12 +37,12 @@ export function proc(partiel: Partial<ProcVue> = {}): ProcVue {
 }
 
 export function page(code: string, titre: string, partiel: Partial<PageEtapeVue> = {}): PageEtapeVue {
-  return { code, courante: false, ouverte: false, titre, source: 'table ' + code, fiches: null, recap: null, champs: [], ...partiel }
+  return { code, courante: false, ouverte: false, titre, source: 'table ' + code, fiches: null, champs: [], ...partiel }
 }
 
 export function etapes(partiel: Partial<EtapesVue> = {}): EtapesVue {
   return {
-    courante: 1, total: 7, titre: 'Statuts signes', oeil: false,
+    courante: 1, total: 6, titre: 'Statuts signes', oeil: false,
     pas: [
       { etat: 'complet', courant: false, pastille: 'OK', titre: 'Demande', fiches: 0, unite: 'fiche', refuses: 0, manquants: 0, remplis: 5, total: 5 },
       { etat: 'refuse', courant: true, pastille: '!', titre: 'Identite', fiches: 0, unite: 'fiche', refuses: 1, manquants: 0, remplis: 11, total: 14 },
@@ -66,6 +66,13 @@ export function etapes(partiel: Partial<EtapesVue> = {}): EtapesVue {
       page('SIEGE', 'Siege et etablissements', { fiches: { unite: 'Etablissement', nombre: 2, actif: 1 } }),
     ],
     recap: { valide: false, nombre: 1, titre: '1 point bloque la validation', aManquer: 0, refusees: 1, groupes: [] },
+    // Les champs de l'etape Controle, poses dans le pied a cote de « Valider le dossier ».
+    controle: [
+      { libelle: 'Texte de la mention', colonne: 'OBSRC_TEXTE_MENTION', type: 'text', exemple: 'Observation portee au registre',
+        obligatoire: false, largeur: 'pleine', choix: [], valeur: '', refus: null, manque: false },
+      { libelle: 'Etat du dossier', colonne: 'DSSRC_ETAT_DOSSIER', type: 'text', exemple: '', obligatoire: true, largeur: 'moitie',
+        choix: ['A controler', 'Conforme', 'En anomalie'], valeur: 'A controler', refus: null, manque: false },
+    ],
     ...partiel,
   }
 }

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { styleDepuisTexte, Visionneuse } from './Visionneuse'
 import { morceaux } from '../test/morceaux'
-import { apercu, dossier, etapes, historique, ligneArbre, page, tache } from '../test/plan'
+import { apercu, dossier, etapes, historique, ligneArbre, tache } from '../test/plan'
 import type { DossierVue, GestePlan, RecapVue } from './types'
 
 afterEach(cleanup)
@@ -275,7 +275,7 @@ describe('Visionneuse : la saisie guidee en accordeon, l\'en-tete en bas', () =>
     }
   })
 
-  it('plus d\'en-tete en haut : les etapes d\'abord, le pied ensuite (titre, bilan, croix), sans oeil quand le document est a droite', () => {
+  it('plus d\'en-tete en haut : les etapes d\'abord, le pied ensuite (titre, bilan, champs du controle et Valider, croix), sans oeil quand le document est a droite', () => {
     const { container, gestes } = rendre()
     const donnees = container.querySelector('.rig-vged__donnees')!
     expect(donnees.className).toBe('rig-vged__guide rig-vged__donnees rig-accordeon')
@@ -283,8 +283,11 @@ describe('Visionneuse : la saisie guidee en accordeon, l\'en-tete en bas', () =>
     expect(donnees.firstElementChild!.className).toBe('rig-accordeon__etapes')
     const pied = donnees.lastElementChild!
     expect(pied.className).toBe('rig-guide__controle rig-guide__controle--bloque')
-    expect(morceaux(pied)).toEqual(['<div>', ' ', '<div>', ' ', '<div>'])
-    expect(morceaux(pied.querySelector('.rig-kicker')!)).toEqual(['Controle du dossier · etape ', '2', ' / ', '7'])
+    // Ordre du balisage = ordre de tabulation : titres, bilan, validation, outils.
+    expect([...pied.children].map((e) => e.className)).toEqual(['rig-guide__titres', 'rig-bilan', 'rig-guide__validation', 'rig-guide__outils'])
+    expect(morceaux(pied)).toEqual(['<div>', ' ', '<div>', ' ', '<div>', ' ', '<div>'])
+    // Le controle n'est plus une etape de la liste : 6 etapes.
+    expect(morceaux(pied.querySelector('.rig-kicker')!)).toEqual(['Controle du dossier · etape ', '2', ' / ', '6'])
     expect(pied.querySelector('.rig-guide__titre')!.textContent).toBe('Statuts signes')
     expect(pied.querySelector('[aria-label="Afficher le panneau de droite"]')).toBeNull()
     fireEvent.click(pied.querySelector('.rig-guide__fermer')!)
@@ -375,50 +378,61 @@ describe('Visionneuse : la saisie guidee en accordeon, l\'en-tete en bas', () =>
     expect(gestes()).toEqual([['choisirFiche', { etape: 'SIEGE', index: 0 }], ['ajouterFiche', 'SIEGE'], ['supprimerFiche', 'SIEGE']])
   })
 
-  it('le controle dans le pied : ce qui bloque, Valider eteint, le detail dans l\'etape Controle, puis le dossier valide', () => {
+  it('le controle dans le pied : ce qui bloque, puis les champs de l\'etape Controle a cote de Valider, eteint tant qu\'un point bloque', () => {
     const recapBloque: RecapVue = { valide: false, nombre: 2, titre: '2 points bloquent la validation', aManquer: 1, refusees: 1, groupes: [
-      { indexEtape: 1, fiche: 0, etape: 'Identite', multi: false, unite: 'Fiche', nombre: 2, points: [
-        { champ: 'SIREN', motif: 'cle incorrecte', colonne: 'DSSRC_SIREN', manquant: false },
-        { champ: 'Patronyme', motif: 'a renseigner', colonne: 'INSPP_PATRONYME', manquant: true },
-      ] }] }
-    // Une etape Controle (la 5e du jeu d'essai), depliee : elle porte le detail.
-    const avecControle = (recap: RecapVue) => {
-      const e = etapes({ recap })
-      e.pas.push({ etat: 'vide', courant: false, pastille: '5', titre: 'Controle', fiches: 0, unite: 'fiche', refuses: 0, manquants: 0, remplis: 0, total: 2 })
-      e.pages.push(page('CONTROLE', 'Controle', { ouverte: true, recap }))
-      return e
-    }
-    const { container, gestes, rerender, plan } = rendre(dossier({ etapes: avecControle(recapBloque) }))
+      { indexEtape: 1, fiche: 0, etape: 'Identite', multi: false, unite: 'Fiche', nombre: 1, points: [
+        { champ: 'SIREN', motif: 'cle incorrecte', colonne: 'DSSRC_SIREN', manquant: false }] },
+      { indexEtape: 6, fiche: 0, etape: 'Controle', multi: false, unite: 'Fiche', nombre: 1, points: [
+        { champ: 'Etat du dossier', motif: 'a renseigner', colonne: 'DSSRC_ETAT_DOSSIER', manquant: true }] }] }
+    const { container, gestes, rerender, plan } = rendre(dossier({ etapes: etapes({ recap: recapBloque }) }))
+    // Aucune ligne « Controle » dans la liste : ses champs sont dans le pied.
+    expect([...container.querySelectorAll('.rig-accordeon__nom')].map((n) => n.textContent)).not.toContain('Controle')
     const bilan = container.querySelector('.rig-guide__controle .rig-bilan')!
-    expect(morceaux(bilan)).toEqual(['<span>', ' ', '<button>', ' ', '<button>'])
+    expect(morceaux(bilan)).toEqual(['<span>', ' ', '<button>'])
     expect(bilan.querySelector('.rig-recap__pastille')!.className).toBe('rig-recap__pastille rig-recap__pastille--bloque')
     expect(bilan.querySelector('.rig-bilan__titre')!.textContent).toBe('2 points bloquent la validation')
     // Deux morceaux insecables, separes par « · » : la ligne ne se coupe qu'entre eux.
     const detail = bilan.querySelector('.rig-bilan__detail')!
     expect(morceaux(detail)).toEqual(['<span>', ' · ', '<span>'])
     expect([...detail.children].map((s) => morceaux(s))).toEqual([['1', ' a renseigner'], ['1', ' valeur(s) refusee(s)']])
-    const valider = [...bilan.querySelectorAll('button')].find((b) => b.textContent === 'Valider le dossier') as HTMLButtonElement
+
+    // La rangee de validation : les champs de Controle, puis Valider, eteint.
+    const validation = container.querySelector('.rig-guide__controle .rig-guide__validation')!
+    expect(morceaux(validation)).toEqual(['<div>', ' ', '<button>'])
+    expect([...validation.querySelectorAll('.rig-saisie-champ__libelle')].map((l) => l.firstChild!.textContent))
+      .toEqual(['Texte de la mention', 'Etat du dossier'])
+    const valider = validation.lastElementChild as HTMLButtonElement
+    expect(valider.textContent).toBe('Valider le dossier')
+    expect(valider.className).toBe('rig-bouton rig-bouton--fort')
     expect(valider.disabled).toBe(true)
-    // Le texte du bilan deplie l'etape Controle ; elle donne le detail, point par point.
+    // Les champs ecrivent dans l'etape CONTROLE, comme dans la liste.
+    fireEvent.input(validation.querySelector('input')!, { target: { value: 'Radiation d\'office' } })
+    fireEvent.change(validation.querySelector('select')!, { target: { value: 'Conforme' } })
+    // Le texte du bilan mene au premier point DE LA LISTE (Identite), pas au controle deja a l'ecran.
     fireEvent.click(bilan.querySelector('.rig-bilan__texte--lien')!)
-    const controle = container.querySelector('#rig-etape-4')!
-    const aller = controle.querySelector('.rig-recap__aller')!
-    expect(morceaux(aller)).toEqual(['<span>', ' ', '<span>', ' ', '<span>'])
-    expect(controle.querySelectorAll('.rig-recap__point')[0]!.className).toBe('rig-recap__point rig-recap__point--refuse')
-    fireEvent.click(aller)
-    // Plus rien ne bloque : Valider s'allume, le filet passe au vert (classe --pret), plus de detail.
-    const pret: RecapVue = { valide: false, nombre: 0, titre: 'Rien ne bloque la validation', aManquer: 0, refusees: 0, groupes: [] }
-    rerender(<Visionneuse dossier={dossier({ etapes: avecControle(pret) })} pagination={0} defilement={null} defilementJoue={{ current: 0 }} plan={plan} />)
-    expect(container.querySelector('.rig-guide__controle')!.className).toBe('rig-guide__controle rig-guide__controle--pret')
+
+    // Seul un point du controle bloque : il est sous les yeux, le bilan n'est plus un lien.
+    const seulControle: RecapVue = { ...recapBloque, nombre: 1, refusees: 0, groupes: [recapBloque.groupes[1]!] }
+    rerender(<Visionneuse dossier={dossier({ etapes: etapes({ recap: seulControle }) })} pagination={0} defilement={null} defilementJoue={{ current: 0 }} plan={plan} />)
     expect(container.querySelector('.rig-bilan__texte--lien')).toBeNull()
-    expect(container.querySelector('.rig-recap__liste')).toBeNull()
-    fireEvent.click([...container.querySelectorAll('button')].find((b) => b.textContent === 'Valider le dossier')!)
+
+    // Plus rien ne bloque : Valider s'allume, le filet passe au vert (classe --pret).
+    const pret: RecapVue = { valide: false, nombre: 0, titre: 'Rien ne bloque la validation', aManquer: 0, refusees: 0, groupes: [] }
+    rerender(<Visionneuse dossier={dossier({ etapes: etapes({ recap: pret }) })} pagination={0} defilement={null} defilementJoue={{ current: 0 }} plan={plan} />)
+    expect(container.querySelector('.rig-guide__controle')!.className).toBe('rig-guide__controle rig-guide__controle--pret')
+    fireEvent.click(container.querySelector('.rig-guide__validation > button')!)
+
+    // Dossier valide : « Rouvrir la saisie » prend la place de Valider, a cote des memes champs.
     const ok: RecapVue = { valide: true, nombre: 0, titre: '', aManquer: 0, refusees: 0, groupes: [] }
-    rerender(<Visionneuse dossier={dossier({ etapes: avecControle(ok) })} pagination={0} defilement={null} defilementJoue={{ current: 0 }} plan={plan} />)
+    rerender(<Visionneuse dossier={dossier({ etapes: etapes({ recap: ok }) })} pagination={0} defilement={null} defilementJoue={{ current: 0 }} plan={plan} />)
     expect(container.querySelector('.rig-guide__controle')!.className).toBe('rig-guide__controle rig-guide__controle--valide')
     expect(container.querySelector('.rig-bilan')!.className).toBe('rig-bilan rig-bilan--valide')
-    fireEvent.click([...container.querySelectorAll('button')].find((b) => b.textContent === 'Rouvrir la saisie')!)
-    expect(gestes()).toEqual([['allerEtape', 4], ['allerAuDefaut', { etape: 1, fiche: 0 }], ['valider', null], ['rouvrir', null]])
+    expect(morceaux(container.querySelector('.rig-guide__validation')!)).toEqual(['<div>', ' ', '<button>'])
+    fireEvent.click(container.querySelector('.rig-guide__validation > button')!)
+    expect(gestes()).toEqual([
+      ['saisie', { etape: 'CONTROLE', colonne: 'OBSRC_TEXTE_MENTION', valeur: 'Radiation d\'office' }],
+      ['ecrire', { etape: 'CONTROLE', colonne: 'DSSRC_ETAT_DOSSIER', valeur: 'Conforme' }],
+      ['allerAuDefaut', { etape: 1, fiche: 0 }], ['valider', null], ['rouvrir', null]])
   })
 })
 

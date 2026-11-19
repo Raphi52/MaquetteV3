@@ -434,9 +434,13 @@ Exiger(Regex.IsMatch(vue2, @"private void OuvrirApercu[\s\S]{0,400}?CodeEtapeGui
 // Lot 2 (19/11/2026) : le fragment ChampsSaisie du .razor est la fonction Champs
 // de web/src/plan/Etapes.tsx ; sa vue est calculee par ChampsVue (Pont/PlanTravailVue.cs).
 var etapesTsx = File.ReadAllText(Path.Combine(racineWeb, "plan", "Etapes.tsx"));
+// Le pied des etapes reprend la MEME fonction pour les champs de l'etape Controle,
+// sortie de la liste le 19/11/2026 (conv-2022) : deux appels, une seule fonction.
 Exiger(Regex.IsMatch(etapesTsx, @"rig-vged__donnees[\s\S]{0,16000}?<Champs code=\{page\.code\}")
-       && Regex.Matches(etapesTsx, @"<Champs ").Count == 1,
-    "la colonne des donnees affiche CELLE de la saisie guidee, pas une copie");
+       && Regex.IsMatch(etapesTsx, @"function Pied\([\s\S]{0,1500}?<Champs code=""CONTROLE""")
+       && Regex.Matches(etapesTsx, @"<Champs ").Count == 2
+       && Regex.Matches(etapesTsx, @"function Champs\(").Count == 1,
+    "la colonne des donnees affiche CELLE de la saisie guidee, pas une copie (le pied l'appelle pour le controle)");
 Exiger(Regex.Matches(vue2, @"foreach \(var c in courante\.Champs\)").Count == 1
        && Regex.Matches(etapesTsx, @"className=""rig-champs""").Count == 1,
     "la boucle des champs de la saisie guidee n existe qu UNE fois (pas de copie)");

@@ -1397,7 +1397,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private void SuivreEtape(Etape etape)
     {
         var i = Array.IndexOf(Etapes, etape);
-        if (i < 0 || (i == EtapeCourante && EtapesOuvertes.Contains(i))) return;
+        // Une piece du controle (inscription, ordonnance...) : ses champs sont dans le pied.
+        if (i < 0 || i == IndexControle || (i == EtapeCourante && EtapesOuvertes.Contains(i))) return;
         EtapeCourante = i;
         EtapesOuvertes.Add(i);
         EtapeADefiler = true;
@@ -1904,6 +1905,17 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     // portent leurs champs dans la vue : une etape repliee n'est qu'une ligne.
     private readonly HashSet<int> EtapesOuvertes = [0];
 
+    /// <summary>
+    /// L'etape CONTROLE (etat du dossier, mention) reste une etape du MODELE --
+    /// ses champs, ses regles, le controle final, la regle de l'arbre -- mais
+    /// n'est plus une ligne de l'accordeon : ses champs vivent dans le PIED, a
+    /// cote de « Valider le dossier » (demande du 19/11/2026, conv-2022). Elle
+    /// est la DERNIERE du modele : la liste montre les etapes qui la precedent,
+    /// sous leurs index du modele. Aller vers elle ne deplie ni ne fait defiler
+    /// rien : ses champs sont deja a l'ecran.
+    /// </summary>
+    private int IndexControle => Array.FindIndex(Etapes, e => e.Code == "CONTROLE");
+
     // Chaque etape garde SA fiche affichee : les 7 etapes sont a l'ecran en
     // meme temps, un index unique les ferait basculer ensemble.
     private readonly Dictionary<string, int> FicheParEtape = new();
@@ -2039,11 +2051,14 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     /// <summary>
     /// Aller a une etape (lien vers un defaut, piece ouverte) : elle se DEPLIE
     /// dans l'accordeon, sans replier les autres, et la page la fait defiler
-    /// jusqu'a elle.
+    /// jusqu'a elle. Le controle n'a pas de ligne (voir IndexControle) : rien a
+    /// faire, ses champs sont dans le pied. Au-dela, on s'arrete a la derniere
+    /// etape de la liste.
     /// </summary>
     private void AllerEtape(int index)
     {
-        index = Math.Clamp(index, 0, Etapes.Length - 1);
+        if (index == IndexControle) return;
+        index = Math.Clamp(index, 0, IndexControle - 1);
         EtapeCourante = index;
         EtapesOuvertes.Add(index);
         Defiler(index, doux: true);
@@ -2053,7 +2068,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     /// courante et la page l'amene en vue) ou la replie.</summary>
     private void BasculerEtape(int index)
     {
-        index = Math.Clamp(index, 0, Etapes.Length - 1);
+        if (index == IndexControle) return;
+        index = Math.Clamp(index, 0, IndexControle - 1);
         if (EtapesOuvertes.Remove(index)) return;
         AllerEtape(index);
     }
@@ -2062,7 +2078,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private void EtapeVisible(int index)
     {
         if (index == EtapeCourante) return;
-        EtapeCourante = Math.Clamp(index, 0, Etapes.Length - 1);
+        EtapeCourante = Math.Clamp(index, 0, IndexControle - 1);
     }
 
     // ---- Controle de validite --------------------------------------
@@ -2189,7 +2205,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         if (NoeudSelectionne is { EstFiche: true }) NoeudSelectionne = null;
         DonneesVisible = true;
         FicheParEtape[Etapes[d.IndexEtape].Code] = d.Fiche;
-        EtapeCourante = d.IndexEtape;
+        // AllerEtape en fait la courante ; un defaut du controle reste dans le pied.
         AllerEtape(d.IndexEtape);
     }
 
