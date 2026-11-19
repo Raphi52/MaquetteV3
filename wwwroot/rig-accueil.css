@@ -1143,6 +1143,12 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    haut de la liste posee juste dessous et la grisait (capture du 18/11). */
 .rig-chiffre--deplie,
 .rig-chiffre--deplie:hover { transform: none; box-shadow: 0 0 0 2px var(--rig-or), var(--rig-ombre); }
+/* Noir et orange : ses tuiles sont orangees (19/11/2026) et l'anneau d'or
+   collé à leur bord s'y fondait. Un liseré couleur de page le décolle. */
+[data-rig-theme="orange"] .rig-chiffre--deplie,
+[data-rig-theme="orange"] .rig-chiffre--deplie:hover {
+  box-shadow: 0 0 0 2px var(--rig-fond), 0 0 0 4px var(--rig-or), var(--rig-ombre);
+}
 .rig-chiffre--1 { background: var(--rig-chiffre-1); border: 1px solid var(--rig-chiffre-1-bord); }
 .rig-chiffre--2 { background: var(--rig-chiffre-2); border: 1px solid var(--rig-chiffre-2-bord); }
 .rig-chiffre--3 { background: var(--rig-chiffre-3); border: 1px solid var(--rig-chiffre-3-bord); }

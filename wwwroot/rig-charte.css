@@ -473,9 +473,11 @@ select option {
   --rig-profil-texte: #FFFFFF;
 }
 
-/* --- NOIR ET ORANGE : rail noir #0E0E10, page gris perle a cartes
-   blanches, accent orange #F59E0B a texte noir, tuiles noires a icones
-   orange / jaune / gris (maquette « 02 - Noir et orange »). */
+/* --- NOIR ET ORANGE : page gris perle a cartes blanches, accent orange
+   #F59E0B a texte noir (maquette « 02 - Noir et orange »). Depuis le
+   19/11/2026 (Raphael Vilain : « des degrades partout, pas avec du noir,
+   des trucs qui claquent ») le rail et les tuiles chiffrees ne sont plus
+   noirs : rail orange -> framboise -> violet, tuiles vives a encre noire. */
 [data-rig-theme="orange"] {
   --rig-fond: #EFEFF0;
   --rig-fond-2: #E4E4E7;
@@ -508,17 +510,18 @@ select option {
   --rig-or-clair: #FBBF24;
   --rig-or-texte: #141416;
   --rig-or-halo: #F59E0B;
-  /* Panneau NOIR flottant (2026-11-19, conv-2012) : degrade du noir des
-     tuiles (#232327) au noir du theme (#0E0E10), ombre a la place du bord.
-     Le tertiaire tient 4,6:1 sur l'arret haut. */
-  --rig-rail: linear-gradient(180deg, #232327, #0E0E10);
+  /* Panneau flottant (2026-11-19, conv-2012), ombre a la place du bord.
+     Degrade VIF sans noir (conv-2008) : orange brule -> framboise -> violet.
+     Les textes sont des blancs chauds : sur l'arret le plus clair (#C2410C)
+     le blanc tient 5,2:1, le secondaire 4,8:1, le tertiaire 4,6:1. */
+  --rig-rail: linear-gradient(180deg, #C2410C, #BE185D 55%, #6D28D9);
   --rig-rail-bord: transparent;
-  --rig-rail-texte: #F4F4F5;
-  --rig-rail-texte-2: #D4D4D8;
-  --rig-rail-texte-3: #8B8B94;
-  --rig-rail-voile: rgba(255, 255, 255, .06);
-  --rig-rail-trait: rgba(255, 255, 255, .12);
-  --rig-rail-trait-faible: rgba(255, 255, 255, .07);
+  --rig-rail-texte: #FFFFFF;
+  --rig-rail-texte-2: #FFF4EC;
+  --rig-rail-texte-3: #FFEDE3;
+  --rig-rail-voile: rgba(255, 255, 255, .10);
+  --rig-rail-trait: rgba(255, 255, 255, .20);
+  --rig-rail-trait-faible: rgba(255, 255, 255, .12);
   --rig-rail-melange: #FFFFFF;
   --rig-rail-ombre: 0 6px 18px rgba(0, 0, 0, .22), 0 1px 3px rgba(0, 0, 0, .16);
   --rig-rail-marge: 12px;
@@ -534,25 +537,30 @@ select option {
   --rig-palier-bas: #71717A;
   --rig-palier-moyen: #F59E0B;
   --rig-palier-haut: #EA580C;
-  /* La tuile noire « Dossiers ouverts » declinee en trois noirs ; la couleur
-     vit dans le rond, aux teintes du graphique en anneau. */
-  --rig-chiffre-1: linear-gradient(160deg, #26262A, #141416);
-  --rig-chiffre-2: linear-gradient(160deg, #2C2C31, #1C1C1F);
-  --rig-chiffre-3: linear-gradient(160deg, #34343A, #232327);
+  /* Tuiles chiffrees VIVES (19/11/2026, conv-2008 ; avant : trois noirs).
+     L'encre est le noir du theme, comme sur son orange : sur chaque arret
+     elle tient 5,5:1 au moins, et le detail (11 px a 85 %) 4,6:1. Le rond,
+     l'icone et l'anneau (qui suit --rig-chiffre-texte) passent a l'encre. */
+  --rig-chiffre-1: linear-gradient(160deg, #FCD34D, #F97316);
+  --rig-chiffre-2: linear-gradient(160deg, #FB923C, #F7506A);
+  --rig-chiffre-3: linear-gradient(160deg, #FB7185, #E254F0);
   --rig-chiffre-1-bord: transparent;
   --rig-chiffre-2-bord: transparent;
   --rig-chiffre-3-bord: transparent;
-  --rig-chiffre-texte: #D4D4D8;
-  --rig-chiffre-valeur: #FFFFFF;
-  --rig-chiffre-rond: rgba(245, 158, 11, .14);
-  --rig-chiffre-rond-bord: rgba(245, 158, 11, .30);
-  --rig-chiffre-1-icone: #F59E0B;
-  --rig-chiffre-2-icone: #FCD34D;
-  --rig-chiffre-3-icone: #D4D4D8;
-  /* 4e teinte : la tuile « Mise en attente » des commandes web (neutre). */
-  --rig-chiffre-4: linear-gradient(160deg, #3C3C42, #2A2A2F);
+  --rig-chiffre-texte: #141416;
+  --rig-chiffre-valeur: #141416;
+  --rig-chiffre-rond: rgba(255, 255, 255, .45);
+  --rig-chiffre-rond-bord: rgba(20, 20, 22, .12);
+  --rig-chiffre-1-icone: #141416;
+  --rig-chiffre-2-icone: #141416;
+  --rig-chiffre-3-icone: #141416;
+  /* L'anneau en alerte (Hors delai) : un framboise profond, le jaune pale
+     de :root disparaitrait sur une tuile claire. */
+  --rig-anneau-alerte: #9F1239;
+  /* 4e teinte : la tuile « Mise en attente » des commandes web, jaune. */
+  --rig-chiffre-4: linear-gradient(160deg, #FDE047, #FBBF24);
   --rig-chiffre-4-bord: transparent;
-  --rig-chiffre-4-icone: #A1A1AA;
+  --rig-chiffre-4-icone: #141416;
   --rig-profil: linear-gradient(135deg, #F59E0B, #FBBF24);
   --rig-profil-texte: #141416;
 }
