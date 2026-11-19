@@ -382,6 +382,19 @@ foreach (var (nom, texte) in feuilles)
             var arretsTheme = Regex.Matches(rail, @"#[0-9A-Fa-f]{6}").Select(m => m.Value).ToList();
             Exiger(rail.StartsWith("linear-gradient(180deg") && arretsTheme.Count >= 2,
                 $"« {code} » : le fond du panneau est un degrade vertical ({(rail.Length > 0 ? rail : "absent")})");
+            // Sur une page SOMBRE, l'ombre ne se voit pas : le panneau doit se
+            // detacher par sa COULEUR, sur toute sa hauteur. Defaut a l'origine
+            // (19/11/2026, conv-2012) : le degrade du sombre allait de #2A2A2A a
+            // #111111 et croisait la page #1E1E1E — mesure sur capture, #1C1C1C a
+            // mi-hauteur contre #1A1A1A autour : le panneau disparaissait.
+            // 1,2:1 au moins, au-dessus des cartes de la page (1,13:1).
+            var page = FondDuTheme(code);
+            if (page is not null && Luminance(page) < 0.2 && arretsTheme.Count > 0)
+            {
+                var ecart = arretsTheme.Min(a => Contraste(a, page));
+                Exiger(ecart >= 1.2,
+                    $"« {code} » : sur la page sombre {page}, chaque arret du panneau se distingue de la page ({ecart:0.00}:1 au pire, 1,2 exige)");
+            }
             foreach (var jeton in new[] { "--rig-rail-texte", "--rig-rail-texte-2", "--rig-rail-texte-3" })
             {
                 var texte = ValeurDuTheme(code, jeton);
