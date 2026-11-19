@@ -305,9 +305,16 @@ internal static class Programme
         var aCheval = page.Pieces.FirstOrDefault(x => x.Libelle == synthese.Libelle);
         Exiger(aCheval is not null && aCheval.Texte.Substring(aCheval.Positions[0], aCheval.Longueurs[0]).Contains('\n'),
             "un passage a cheval sur deux lignes du PDF est trouve : les retours a la ligne comptent pour un blanc");
-        Agir("rechercheTexte", "ordonnance du president");
-        Exiger(plan.Vue().Proc!.Ecran.Recherche!.Pieces.All(x => x.Fichier != "documents/ordonnance-president.pdf"),
-            "un PDF qui n'est qu'une image numerisee n'a pas de texte : il ne se trouve pas par son contenu");
+        // Un PDF qui n'est qu'une IMAGE numerisee : son texte, lu a l'image par la
+        // reconnaissance de caracteres de Windows (extraire-texte-pdf.ps1), se cherche aussi.
+        Agir("rechercheTexte", "Guillaume BRUN");
+        var ordonnance = plan.Vue().Proc!.Ecran.Recherche!.Pieces.FirstOrDefault(x => x.Fichier == "documents/ordonnance-president.pdf");
+        Exiger(ordonnance is { NbPages: 3 } && ordonnance.PagesDesPassages.SequenceEqual([3]),
+            $"une ordonnance numerisee se trouve par son texte lu a l'image, a sa page ({ordonnance?.Libelle}, pages {string.Join(",", ordonnance?.PagesDesPassages ?? [])})");
+        Agir("rechercheTexte", "avoir de la facture");
+        var numerise = plan.Vue().Proc!.Ecran.Recherche!.Pieces.FirstOrDefault(x => x.Fichier == "documents/document-numerise.pdf");
+        Exiger(numerise is { NbPages: 5 } && numerise.PagesDesPassages.Contains(2),
+            $"un document numerise (bordereau, avoir, courriel) se trouve aussi, a la page de l'avoir ({numerise?.Libelle}, pages {string.Join(",", numerise?.PagesDesPassages ?? [])})");
 
         // --- 15. « Joindre a ce depot » : une copie de la piece dans un depot de l'affaire.
         Agir("rechercheTexte", "commandite");
@@ -334,6 +341,25 @@ internal static class Programme
         Agir("ongletActiver", "RECHERCHE");
         Exiger(plan.Vue().Proc?.Ecran.Recherche?.Depots.Single(d => d.Libelle == depotActes.Libelle).Pieces.Contains(synthese.Libelle) == true,
             "rouverte, l'affaire a garde la piece jointe dans son depot");
+
+        // --- 16. « Ouvrir la piece » de la liseuse : le PDF a la page du passage lu.
+        Agir("rechercheTexte", "commandite");
+        Agir("rechercheOuvrir", new { chemin = synthese.Chemin, page = 4 });
+        var ouvert = plan.Vue().Dossier?.Apercu?.Apercu;
+        Exiger(ouvert is { Libelle: "Synthese de depot au Guichet unique", Pdf: true, Page: 4 },
+            $"« Ouvrir la piece » ouvre le PDF a la page du passage lu ({ouvert?.Libelle}, page {ouvert?.Page})");
+        Agir("ongletActiver", "RECHERCHE");
+        Agir("rechercheOuvrir", new { chemin = synthese.Chemin, page = 99 });
+        Exiger(plan.Vue().Dossier?.Apercu?.Apercu?.Page == 13, "une page au-dela du document s'arrete a sa derniere (13)");
+        Agir("palettePiece", synthese.Chemin);
+        Exiger(plan.Vue().Dossier?.Apercu?.Apercu?.Page == 1, "ouverte autrement (palette, arbre), la piece repart de sa page 1");
+        // Une piece d'un autre classeur (Judiciaire), lue a l'image : meme chose.
+        Agir("ongletActiver", "RECHERCHE");
+        Agir("rechercheTexte", "Guillaume BRUN");
+        Agir("rechercheOuvrir", new { chemin = ordonnance!.Chemin, page = 3 });
+        var ordo = plan.Vue().Dossier?.Apercu?.Apercu;
+        Exiger(ordo is { Pdf: true, Page: 3, Fichier: "documents/ordonnance-president.pdf" },
+            $"l'ordonnance numerisee s'ouvre a la page du passage lu ({ordo?.Libelle}, page {ordo?.Page})");
 
         plan.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }

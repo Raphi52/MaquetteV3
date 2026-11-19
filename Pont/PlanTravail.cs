@@ -684,6 +684,9 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
 
     // ================= Apercu d'une piece et impression =================
     private NoeudGed? ApercuNoeud;
+    /// <summary>La page ou le PDF de la piece s'ouvre : 1, sauf depuis la page « Recherche »,
+    /// qui l'ouvre a la page du passage lu (geste « rechercheOuvrir », PlanTravailPalette.cs).</summary>
+    private int ApercuPage = 1;
     private string ApercuMessage = "";
     private bool ImpressionOuverte;
     private string ImprImprimante = ArbreDemo.Imprimantes[0];
@@ -710,6 +713,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         // Les donnees affichees a cote suivent la piece ouverte.
         CodeEtapeGuide = EtapeDuNoeud(n).Code;
         SuivreEtape(EtapeDuNoeud(n));
+        // Son PDF s'ouvre en page 1 (la page « Recherche » la change ensuite).
+        ApercuPage = 1;
         PublierDocument();
     }
 

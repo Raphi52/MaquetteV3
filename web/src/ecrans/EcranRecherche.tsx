@@ -89,7 +89,11 @@ export function EcranRecherche({ vue, plan }: ProprietesEcranRecherche) {
     ?? vue.depots.find((d) => d.choisi) ?? vue.depots[0]
   const dejaDedans = !!piece && !!depot && depot.pieces.includes(piece.libelle)
   const allerPassage = (sens: number) => { if (nb > 0) poserPassage((passage + sens + nb) % nb) }
-  const ouvrirPiece = (p: PiecePaletteVue | undefined) => { if (p) plan('palettePiece', p.chemin) }
+  // La piece s'ouvre dans son affaire, son PDF a la page du passage lu (celle de son
+  // premier passage pour une autre ligne de la liste).
+  const ouvrirPiece = (p: PiecePaletteVue | undefined) => {
+    if (p) plan('rechercheOuvrir', { chemin: p.chemin, page: p === piece ? page : (p.pagesDesPassages[0] ?? 1) })
+  }
   const aller = (nature: string, cle: string) => plan('paletteAller', { nature, cle })
 
   function surTouche(e: ToucheReact<HTMLDivElement>) {

@@ -12,7 +12,8 @@ namespace RigV3Desktop;
 // « <document>.pdf.txt », a cote du PDF, les pages separees par un saut de page (\f).
 // Les pages vides restent a leur place : la page N du texte est la page N du PDF, et
 // la liseuse de la page « Recherche » peut ouvrir le PDF a la page du passage.
-// Un PDF sans fichier texte (image numerisee, jamais extrait) n'a pas de texte.
+// Une image numerisee a aussi son fichier : le meme script la lit a l'image (la
+// reconnaissance de caracteres de Windows). Un PDF jamais extrait n'a pas de texte.
 // ============================================================
 public static class TextePieces
 {

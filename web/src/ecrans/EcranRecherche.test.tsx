@@ -73,8 +73,8 @@ describe('EcranRecherche (la palette en page, liseuse des pieces)', () => {
     fireEvent.keyDown(p.container.querySelector('.rig-rp')!, { key: 'Enter' })
     fireEvent.click(p.getByText('Ouvrir la piece'))
     expect(p.appels()).toEqual([
-      ['palettePiece', ['Dossier RCS', 'Liste des souscripteurs']],
-      ['palettePiece', ['Dossier RCS', 'Liste des souscripteurs']],
+      ['rechercheOuvrir', { chemin: ['Dossier RCS', 'Liste des souscripteurs'], page: 1 }],
+      ['rechercheOuvrir', { chemin: ['Dossier RCS', 'Liste des souscripteurs'], page: 1 }],
     ])
   })
 
@@ -128,6 +128,9 @@ describe('EcranRecherche (la palette en page, liseuse des pieces)', () => {
     expect(p.container.querySelector('iframe.rig-rp__pdf')!.getAttribute('src')).toBe('documents/synthese.pdf#page=3&view=FitH')
     fireEvent.click(p.getByText('Texte'))
     expect(p.container.querySelector('iframe')).toBeNull()
+    // « Ouvrir la piece » : la visionneuse a la page du passage lu (3), pas a la premiere.
+    fireEvent.click(p.getByText('Ouvrir la piece'))
+    expect(p.appels()).toEqual([['rechercheOuvrir', { chemin: pdf.chemin, page: 3 }]])
   })
 
   it('les morceaux d une page ne prennent que ses passages, a leur place', () => {

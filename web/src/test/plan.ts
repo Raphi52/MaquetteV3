@@ -99,7 +99,7 @@ export function tache(partiel: Partial<TacheVue> = {}): TacheVue {
 
 export function apercu(partiel: Partial<ApercuVue> = {}): ApercuVue {
   return {
-    extension: 'PDF', pages: 2, date: '12/03/2024', libelle: 'Statuts signes', message: '', pdf: false, fichier: '',
+    extension: 'PDF', pages: 2, date: '12/03/2024', libelle: 'Statuts signes', message: '', pdf: false, fichier: '', page: 1,
     kbis: null,
     feuilles: [
       { numero: 1, total: 2, texte: 'STATUTS DE LA SOCIETE', valeurs: [{ libelle: 'Montant du capital', valeur: '10000' }] },

@@ -160,7 +160,7 @@ public sealed record PointRecapVue(string Champ, string Motif, string Colonne, b
 /// <summary>La colonne de droite : documents sortis et apercu de la piece.</summary>
 public sealed record ApercuColonneVue(int Detachees, ApercuVue? Apercu);
 public sealed record ApercuVue(string Extension, int Pages, string Date, string Libelle, string Message,
-                               bool Pdf, string Fichier, VueKbis? Kbis, FeuilleApercuVue[] Feuilles);
+                               bool Pdf, string Fichier, int Page, VueKbis? Kbis, FeuilleApercuVue[] Feuilles);
 public sealed record FeuilleApercuVue(int Numero, int Total, string Texte, ValeurApercuVue[]? Valeurs);
 public sealed record ValeurApercuVue(string Libelle, string Valeur);
 
@@ -616,7 +616,7 @@ public sealed partial class SessionPlanTravail
                         : null));
             }
         }
-        return new ApercuVue(n.Extension, n.Pages, n.Date, n.Libelle, ApercuMessage, n.APdf, n.Fichier,
+        return new ApercuVue(n.Extension, n.Pages, n.Date, n.Libelle, ApercuMessage, n.APdf, n.Fichier, ApercuPage,
                              kbis, feuilles.ToArray());
     }
 
@@ -711,7 +711,8 @@ public sealed partial class SessionPlanTravail
             case "paletteAttribuer":
             case "paletteEnPage":
             case "rechercheTexte":
-            case "rechercheJoindre": AgirPalette(geste, valeur); break;
+            case "rechercheJoindre":
+            case "rechercheOuvrir": AgirPalette(geste, valeur); break;
 
             // ---- Visionneuse : entete, bandeau des defauts, colonnes ----
             case "fermerDossier": FermerAffaire(); break;

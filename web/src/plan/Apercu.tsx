@@ -54,7 +54,9 @@ export function Apercu({ colonne, plan }: { colonne: ApercuColonneVue, plan: Ges
           {a.message.length > 0 && <div className="rig-apercu__message">{a.message}</div>}
           <div className={'rig-apercu__pages ' + (a.pdf ? 'rig-apercu__pages--pdf' : '')}>
             {a.pdf
-              ? <iframe className="rig-apercu__pdf" src={a.fichier + '#view=FitH'} title={a.libelle}></iframe>
+              // La cle force un nouveau chargement : le lecteur PDF ne suit pas un simple
+              // changement de #page sur un cadre deja ouvert.
+              ? <iframe key={a.fichier + '#' + a.page} className="rig-apercu__pdf" src={a.fichier + '#page=' + a.page + '&view=FitH'} title={a.libelle}></iframe>
               : a.kbis
                 ? (
                   <div className="rig-apercu__feuille rig-apercu__feuille--kbis">

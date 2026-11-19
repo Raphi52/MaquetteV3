@@ -85,6 +85,7 @@ public sealed partial class SessionPlanTravail
     private string? AvisPageRecherche;
 
     private sealed record GesteJoindre(string[] Piece, string[] Depot);
+    private sealed record GesteOuvrirALaPage(string[] Chemin, int Page);
     private bool PaletteAncree;
     private string PaletteTexte = string.Empty;
     private string PaletteFiltre = "tout";
@@ -133,6 +134,16 @@ public sealed partial class SessionPlanTravail
             {
                 var g = Lire<GesteJoindre>(valeur);
                 JoindreAuDepot(g.Piece, g.Depot);
+                break;
+            }
+            // « Ouvrir la piece » de la liseuse : la piece dans son affaire, et son PDF
+            // a la page du passage lu (pas au-dela de ses pages).
+            case "rechercheOuvrir":
+            {
+                var g = Lire<GesteOuvrirALaPage>(valeur);
+                OuvrirElementTrouve(new ElementTrouve(AffaireCherchee, g.Chemin));
+                if (ApercuNoeud is { APdf: true } pdf && pdf.Libelle == g.Chemin.LastOrDefault())
+                    ApercuPage = Math.Clamp(g.Page, 1, Math.Max(1, TextePieces.Pages(pdf, PageWeb.DossierWwwroot).Length));
                 break;
             }
             case "paletteFiltre":

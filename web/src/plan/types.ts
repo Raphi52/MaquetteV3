@@ -311,6 +311,8 @@ export interface ApercuVue {
   message: string
   pdf: boolean
   fichier: string
+  /** La page ou le PDF s'ouvre : 1, ou celle du passage lu quand la page Recherche l'ouvre. */
+  page: number
   kbis: VueKbis | null
   feuilles: FeuilleApercuVue[]
 }

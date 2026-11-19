@@ -460,6 +460,11 @@ describe('Visionneuse : le document et le mode tache', () => {
     expect(morceaux(feuilles[1]!.querySelector('.rig-apercu__folio')!)).toEqual(['2', ' / ', '2'])
   })
 
+  it('un PDF s ouvre a sa page : celle du passage lu quand la page Recherche l a ouvert', () => {
+    const { container } = rendre(dossier({ apercu: { detachees: 0, apercu: apercu({ pdf: true, fichier: 'documents/synthese.pdf', page: 4, feuilles: [] }) } }))
+    expect(container.querySelector('iframe.rig-apercu__pdf')!.getAttribute('src')).toBe('documents/synthese.pdf#page=4&view=FitH')
+  })
+
   it('sans valeur saisie, la liste reste VIDE (rig-apercu__saisie:empty la masque)', () => {
     const { container } = rendre(dossier({ apercu: { detachees: 0, apercu: apercu({ feuilles: [{ numero: 1, total: 1, texte: 'x', valeurs: [] }] }) } }))
     expect(container.querySelector('.rig-apercu__saisie')!.childNodes).toHaveLength(0)
