@@ -120,8 +120,10 @@ describe('Application : la barre d\'onglets', () => {
     expect(morceaux(b!)).toEqual(['<span>', '<span>', '<button>'])
     expect(b!.querySelector('.rig-vonglet__sorti')!.textContent).toBe('↗')
     expect(a!.querySelector('.rig-vonglet__fermer')!.getAttribute('aria-label')).toBe('Fermer Factures')
-    // Une croix dessinee, du trait du « + » de la barre, et non plus le caractere « × ».
-    expect(a!.querySelector('.rig-vonglet__fermer svg path')!.getAttribute('stroke-width')).toBe('1.5')
+    // Une croix dessinee, et non plus le caractere « × » : le dessin « Fine »,
+    // choisi par l'utilisateur parmi cinq le 19/11/2026.
+    expect(a!.querySelector('.rig-vonglet__fermer svg')!.getAttribute('viewBox')).toBe('0 0 24 24')
+    expect(a!.querySelector('.rig-vonglet__fermer svg path')!.getAttribute('stroke-width')).toBe('2')
     expect(a!.querySelector('.rig-vonglet__fermer')!.textContent).toBe('')
   })
 

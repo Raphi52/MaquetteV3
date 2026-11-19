@@ -2925,10 +2925,11 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-vonglet--actif .rig-vonglet__fermer,
 .rig-vonglet__fermer:focus-visible { opacity: 1; }
 .rig-vonglet__fermer:hover { background: color-mix(in srgb, var(--rig-texte) 12%, transparent); color: var(--rig-texte); }
-/* 14 px a un trait de 1,5/16 : 1,3 px a l'ecran, l'epaisseur du « + » (15 px
-   a 1,5/16), et sa couleur (--rig-texte-2) : la croix est raccord avec lui.
-   Branches de 7 px : a 12 px et 1,9/16 (essai du 19/11/2026), elles etaient
-   trop courtes pour leur trait et le centre faisait une tache (« moche »). */
+/* 14 px a un trait de 2/24 : 1,2 px a l'ecran, un peu plus fin que le « + »
+   (15 px a 1,5/16, 1,4 px), de sa couleur (--rig-texte-2). Branches de 7 px.
+   Dessin « Fine », choisi par l'utilisateur parmi cinq le 19/11/2026 ; a 12 px
+   et 1,9/16 (essai du meme jour), les branches etaient trop courtes pour leur
+   trait et le centre faisait une tache (« moche »). */
 .rig-vonglet__fermer svg { width: 14px; height: 14px; display: block; }
 /* La maison, premier onglet (retour a l'accueil) : une icone seule, etroite.
    Elle est HORS de .rig-vonglets : collee au bas de la barre comme les
