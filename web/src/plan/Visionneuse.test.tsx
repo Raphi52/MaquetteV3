@@ -83,22 +83,33 @@ describe('Visionneuse : entete, fiche sommaire en puces, points a corriger', () 
   })
 })
 
-describe('Visionneuse : l\'historique des pieces sous les donnees', () => {
-  it('les 7 plus recentes : date, point or ou bleu, libelle ; la piece ouverte marquee', () => {
+describe('Visionneuse : l\'historique des pieces, dans l\'onglet Suivi', () => {
+  it('les 7 plus recentes : date, point, libelle, origine ; la piece ouverte marquee', () => {
     const { container } = rendre()
     const milieu = container.querySelector('.rig-vged__corps > .rig-vged__milieu')!
-    expect([...milieu.children].map((e) => e.className)).toEqual(['rig-vged__guide rig-vged__donnees', 'rig-chrono'])
-    expect(milieu.querySelector('.rig-chrono__titre')!.textContent).toBe('Historique des pieces · 9')
-    const pieces = milieu.querySelectorAll('.rig-chrono__piece')
+    expect([...milieu.children].map((e) => e.className)).toEqual(['rig-vged__guide rig-vged__donnees'])
+    const suivi = container.querySelector('.rig-vged__corps > .rig-vged__suivi')!
+    expect(suivi.querySelector('.rig-chrono__titre')!.textContent).toBe('Historique des pieces · 9')
+    const pieces = suivi.querySelectorAll('.rig-chrono__piece')
     expect(pieces).toHaveLength(7)
-    expect(morceaux(pieces[0]!)).toEqual(['<span>', '<span>', '<span>'])
-    expect(pieces[0]!.textContent).toBe('19/11/2026Kbis a jour')
+    expect(morceaux(pieces[0]!)).toEqual(['<span>', '<span>', '<span>', '<span>'])
+    expect(pieces[0]!.textContent).toBe('19/11/2026Kbis a jourEdition greffe')
     expect(pieces[0]!.className).toBe('rig-chrono__piece rig-chrono__piece--actif')
     expect(pieces[0]!.getAttribute('aria-current')).toBe('true')
     expect(pieces[0]!.getAttribute('title')).toBe('Dossier RCS · Edition greffe · 1 p.')
     expect(pieces[0]!.querySelector('.rig-chrono__point')!.className).toBe('rig-chrono__point rig-chrono__point--rcs')
-    expect(pieces[2]!.querySelector('.rig-chrono__point')!.className).toBe('rig-chrono__point rig-chrono__point--jud')
     expect(pieces[1]!.className).toBe('rig-chrono__piece')
+  })
+
+  it('le point d\'une piece rangee dans une rubrique prend la couleur du lisere de l\'arbre', () => {
+    const { container } = rendre()
+    const pieces = container.querySelectorAll('.rig-chrono__piece')
+    // n12 : « Depots sur la procedure », sous la rubrique Procedures collectives (teinte 7).
+    const point = pieces[2]!.querySelector('.rig-chrono__point') as HTMLElement
+    expect(point.className).toBe('rig-chrono__point rig-chrono__point--jud rig-chrono__point--groupe')
+    expect(point.style.getPropertyValue('--rig-chrono-teinte')).toBe('var(--rig-groupe-7)')
+    // Le Kbis a jour, hors rubrique, garde l'or du dossier RCS.
+    expect((pieces[0]!.querySelector('.rig-chrono__point') as HTMLElement).style.getPropertyValue('--rig-chrono-teinte')).toBe('')
   })
 
   it('« tout voir » deroule les 9 pieces, puis revient aux 7 dernieres', () => {
@@ -126,10 +137,10 @@ describe('Visionneuse : l\'historique des pieces sous les donnees', () => {
     expect(container.querySelector('.rig-chrono')).toBeNull()
   })
 
-  it('colonne des donnees fermee : l\'historique part avec elle', () => {
+  it('colonne des donnees fermee : l\'historique reste dans la colonne de suivi', () => {
     const { container } = rendre(dossier({ etapes: null, fiche: null, poignee2: false }))
     expect(container.querySelector('.rig-vged__milieu')).toBeNull()
-    expect(container.querySelector('.rig-chrono')).toBeNull()
+    expect(container.querySelector('.rig-vged__suivi .rig-chrono')).not.toBeNull()
   })
 
   it('la piece ouverte change : l\'arbre defile jusqu\'a sa ligne choisie, une seule fois', () => {
@@ -165,11 +176,11 @@ describe('Visionneuse : les colonnes', () => {
       .toBe('400px 6px 420px 6px minmax(0px, 1fr)')
   })
 
-  it('arbre, poignee, donnees (et historique), poignee, document : dans cet ordre', () => {
+  it('arbre, poignee, donnees, poignee, document, suivi : dans cet ordre', () => {
     const { container } = rendre()
     expect([...container.querySelector('.rig-vged__corps')!.children].map((e) => e.className)).toEqual([
       'rig-vged__arbre', 'rig-vged__poignee', 'rig-vged__milieu', 'rig-vged__poignee',
-      'rig-vged__guide rig-vged__apercu',
+      'rig-vged__guide rig-vged__apercu', 'rig-vged__suivi',
     ])
   })
 
@@ -189,7 +200,8 @@ describe('Visionneuse : les colonnes', () => {
 
   it('l\'entete de l\'arbre, le filtre et sa croix', () => {
     const { container, gestes, rerender, plan } = rendre()
-    expect(morceaux(container.querySelector('.rig-arbre__entete')!)).toEqual(['<span>', ' ', '<button>'])
+    expect(morceaux(container.querySelector('.rig-arbre__entete')!)).toEqual(['<span>', ' ', '<button>', ' ', '<button>'])
+    expect(container.querySelector('.rig-arbre__entete .rig-arbre__libelle')!.textContent).toBe('Visualisation du dossier · 42 pieces')
     const filtre = container.querySelector('.rig-arbre__filtre') as HTMLInputElement
     expect(filtre.getAttribute('placeholder')).toBe("Filtrer l'arbre...")
     expect(container.querySelector('.rig-arbre__filtre-effacer')).toBeNull()

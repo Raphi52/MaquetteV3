@@ -3669,3 +3669,165 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 @media (max-width: 1200px) {
   .rig-tcw__dialogue-corps { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ============================================================
+   LA VUE DU DOSSIER, proposition 3 « Onglets Suivi / Fil » du /draft du
+   19/11/2026 (conv-2009) : l'arbre se replie en un chemin, un LISERE de
+   couleur par rubrique de l'arbre, la colonne de SUIVI a droite.
+   ============================================================ */
+/* Les teintes des rubriques : moyennes, lisibles sur les fonds clairs comme
+   sombres des cinq themes, et jamais l'or -- l'or dit deja « ou je suis »
+   (filet du chemin, ligne choisie). Pont/PlanTravailSuivi.cs en compte 8. */
+.rig-vged {
+  --rig-groupe-1: #4C8BD9; --rig-groupe-2: #3EA67A; --rig-groupe-3: #D9793F; --rig-groupe-4: #9B6BD6;
+  --rig-groupe-5: #D4517E; --rig-groupe-6: #2FA6B8; --rig-groupe-7: #A69A2E; --rig-groupe-8: #8C7A6B;
+}
+
+/* LISERE : un filet de la couleur de la rubrique, pose au retrait de sa tete,
+   court le long de la tete et de tout ce qu'elle range. */
+.rig-arbre__ligne--groupe { position: relative; }
+.rig-arbre__ligne--groupe::before {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 3px; pointer-events: none;
+  left: calc(var(--rig-esp-2) + var(--rig-arbre-niveau-groupe, 0) * 14px - 5px);
+  background: var(--rig-arbre-teinte);
+}
+.rig-arbre__ligne--tete::before { top: 4px; border-radius: 2px 2px 0 0; }
+/* La tete de la rubrique : son icone prend la couleur du lisere. */
+.rig-arbre__ligne--tete .rig-arbre__icone { color: var(--rig-arbre-teinte); }
+
+/* L'entete de l'arbre : libelle et nombre de pieces, « + Nouveau », replier. */
+.rig-vged__arbre .rig-arbre__entete { grid-template-columns: minmax(0, 1fr) auto auto; }
+.rig-vged__arbre .rig-arbre__entete > .rig-arbre__libelle { overflow: hidden; white-space: nowrap; }
+.rig-arbre__pieces { text-transform: none; letter-spacing: 0; color: var(--rig-texte-3); }
+.rig-arbre__replier {
+  display: grid; place-items: center; width: 22px; height: 22px; padding: 0;
+  border: 1px solid var(--rig-bord); border-radius: var(--rig-radius-sm);
+  background: var(--rig-fond-2); color: var(--rig-texte-2); cursor: pointer;
+}
+.rig-arbre__replier:hover { color: var(--rig-texte); border-color: var(--rig-texte-3); }
+.rig-arbre__replier svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ARBRE REPLIE : le chemin de l'element choisi, en premiere rangee, au-dessus
+   des donnees et du document (la colonne de suivi prend les deux rangees). */
+.rig-vged__chemin {
+  grid-column: 1 / -2; grid-row: 1;
+  display: flex; align-items: center; gap: var(--rig-esp-2); min-width: 0;
+  padding: 6px var(--rig-esp-3); border-bottom: 1px solid var(--rig-bord);
+}
+.rig-vged__chemin-arbre {
+  flex: none; display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 11px 3px 8px; border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--rig-or); color: var(--rig-or-texte); font: 600 12px var(--rig-font);
+}
+.rig-vged__chemin-arbre:hover { filter: brightness(1.06); }
+.rig-vged__chemin-arbre svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.rig-vged__chemin-etapes {
+  display: flex; align-items: center; min-width: 0; margin: 0; padding: 0; list-style: none;
+  font: 12px var(--rig-font); color: var(--rig-texte-3); white-space: nowrap; overflow: hidden;
+}
+.rig-vged__chemin-etapes > li { overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+.rig-vged__chemin-etapes > li:first-child { font-family: var(--rig-font-mono); flex-shrink: 0; }
+.rig-vged__chemin-etapes > li + li::before { content: "\203A"; margin: 0 7px; color: var(--rig-texte-3); }
+.rig-vged__chemin-courant { color: var(--rig-texte); font-weight: 600; }
+
+/* ZONE 4 : LA COLONNE DE SUIVI, toujours la derniere colonne, sur toute la hauteur. */
+.rig-vged__suivi {
+  grid-column: -2 / -1; grid-row: 1 / -1;
+  display: flex; flex-direction: column; gap: var(--rig-esp-3);
+  min-width: 0; min-height: 0; overflow: hidden;
+  padding: var(--rig-esp-3); border-left: 1px solid var(--rig-bord);
+}
+.rig-suivi__onglets {
+  flex: none; display: flex; gap: 2px; padding: 2px;
+  border: 1px solid var(--rig-bord); border-radius: 999px; background: var(--rig-fond-2);
+}
+.rig-suivi__onglet {
+  flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 4px 8px; border: 0; border-radius: 999px; background: transparent; cursor: pointer;
+  font: 12px var(--rig-font); color: var(--rig-texte-3); white-space: nowrap;
+}
+.rig-suivi__onglet b { font-weight: 600; font-family: var(--rig-font-mono); font-size: 11px; }
+.rig-suivi__onglet:hover { color: var(--rig-texte); }
+.rig-suivi__onglet--actif, .rig-suivi__onglet--actif:hover { background: var(--rig-or); color: var(--rig-or-texte); font-weight: 600; }
+.rig-suivi__panneau { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--rig-esp-3); }
+.rig-suivi__titre {
+  padding: 0 6px 4px; font: 600 10px/1.3 var(--rig-font-mono); letter-spacing: .1em;
+  text-transform: uppercase; color: var(--rig-texte-3);
+}
+.rig-suivi__vide { padding: 2px 6px; font-size: 12px; color: var(--rig-texte-3); }
+
+/* RESTE A FAIRE : une ligne par etape a corriger, sa case, son nombre de points. */
+.rig-reste { flex: none; }
+.rig-reste__liste { list-style: none; margin: 0; padding: 0; }
+.rig-reste__ligne {
+  display: flex; align-items: center; gap: 8px; width: 100%; height: 26px; padding: 0 6px;
+  background: none; border: 0; border-radius: 5px; cursor: pointer; text-align: left;
+  font: 12px/1.2 var(--rig-font); color: var(--rig-texte-2);
+}
+.rig-reste__ligne:hover { background: var(--rig-survol-ligne); color: var(--rig-texte); }
+.rig-reste__case {
+  flex: none; width: 12px; height: 12px; box-sizing: border-box; border-radius: 3px;
+  border: 1.5px solid var(--rig-alerte); background: color-mix(in srgb, var(--rig-alerte) 14%, transparent);
+}
+.rig-reste__ligne--refuse .rig-reste__case { border-color: var(--rig-erreur); background: color-mix(in srgb, var(--rig-erreur) 14%, transparent); }
+.rig-reste__etape { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.rig-reste__nombre { flex: none; font-size: 11px; color: var(--rig-texte-3); }
+
+/* L'HISTORIQUE dans l'onglet Suivi : il prend la hauteur restante et defile seul. */
+.rig-vged__suivi .rig-chrono { flex: 1 1 auto; max-height: none; border-left: 0; padding: 0; background: none; }
+.rig-vged__suivi .rig-chrono__entete { padding: 0 6px 4px; }
+.rig-vged__suivi .rig-chrono__date { width: auto; }
+.rig-chrono__libelle { flex: 1 1 auto; }
+.rig-chrono__origine {
+  flex: 0 1 auto; max-width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 10.5px; color: var(--rig-texte-3);
+}
+/* Le point d'une piece rangee dans une rubrique : la couleur de son lisere. */
+.rig-chrono__point--groupe { border-color: var(--rig-chrono-teinte); }
+.rig-chrono__piece--actif .rig-chrono__point--groupe { background: var(--rig-chrono-teinte); }
+
+/* LE FIL : les messages, du plus ancien au plus recent, puis le champ d'ecriture. */
+.rig-fil { gap: var(--rig-esp-2); }
+.rig-fil__vide { flex: 1 1 auto; }
+.rig-fil__liste {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; list-style: none; margin: 0; padding: 0 2px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.rig-fil__message { display: flex; gap: 8px; align-items: flex-start; min-width: 0; }
+.rig-fil__avatar {
+  flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--rig-profil); color: var(--rig-profil-texte); font: 700 9px/1 var(--rig-font);
+}
+.rig-fil__corps { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.rig-fil__tete {
+  display: flex; align-items: baseline; gap: 6px; min-width: 0;
+  font-size: 12px; color: var(--rig-texte-2);
+}
+.rig-fil__tete > :first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rig-fil__tete b { color: var(--rig-texte); font-weight: 600; }
+.rig-fil__quand { margin-left: auto; flex: none; font: 10.5px var(--rig-font-mono); color: var(--rig-texte-3); }
+.rig-fil__bulle {
+  align-self: flex-start; max-width: 100%; padding: 5px 9px;
+  border-radius: 2px 10px 10px 10px; background: var(--rig-fond-2); border: 1px solid var(--rig-bord-faible);
+  font-size: 12.5px; line-height: 1.45; color: var(--rig-texte); white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.rig-fil__diff { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; font: 12px var(--rig-font-mono); color: var(--rig-accent); }
+.rig-fil__diff s { color: var(--rig-texte-3); }
+.rig-fil__diff b { color: var(--rig-texte); }
+.rig-fil__saisie {
+  flex: none; display: flex; flex-direction: column; gap: 6px; padding: 6px;
+  border: 1px solid var(--rig-bord); border-radius: var(--rig-radius); background: var(--rig-champ);
+}
+.rig-fil__champ {
+  resize: none; width: 100%; box-sizing: border-box; border: 0; outline: 0; background: transparent;
+  font: 12.5px/1.45 var(--rig-font); color: var(--rig-texte);
+}
+.rig-fil__envoyer { align-self: flex-end; }
+
+/* Fenetre etroite : tout s'empile (voir le bloc @media 1100px plus haut). Les
+   rangees calculees par le C# ne s'appliquent plus, le suivi passe dessous. */
+@media (max-width: 1100px) {
+  .rig-vged__corps { grid-template-rows: auto minmax(340px, 1fr) auto !important; }
+  .rig-vged__suivi, .rig-vged__chemin { grid-column: auto; grid-row: auto; }
+  .rig-vged__suivi { border-left: 0; border-top: 1px solid var(--rig-bord); max-height: 60vh; }
+}

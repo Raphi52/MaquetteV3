@@ -11,7 +11,7 @@ afterEach(cleanup)
 function ligne(id: string, texte: string, plus: Partial<LigneArbreVue> = {}): LigneArbreVue {
   return {
     id, niveau: 0, texte, icone: 'dossier', actif: false, chemin: false, depliable: false, ouvert: false,
-    renomme: false, compte: null, enfants: [], vide: false, ...plus,
+    renomme: false, compte: null, enfants: [], vide: false, groupe: 0, niveauGroupe: 0, ...plus,
   }
 }
 
@@ -99,5 +99,22 @@ describe('ArbreGedNoeud', () => {
     fireEvent.keyDown(champ, { key: 'Escape' })
     expect(renommer).toHaveBeenLastCalledWith({ id: 'n3', texte: '' })
     expect(container.querySelector('.rig-arbre__texte')).toBeNull()
+  })
+
+  it('le LISERE : la tete d\'une rubrique et tout ce qu\'elle range portent sa teinte et le niveau de la tete', () => {
+    const fille = ligne('n6', 'Bail commercial', { niveau: 3, icone: 'pdf', groupe: 2, niveauGroupe: 2 })
+    const rubrique = ligne('n5', "Depots d'actes", { niveau: 2, depliable: true, ouvert: true, groupe: 2, niveauGroupe: 2, enfants: [fille] })
+    const { container } = rendre(ligne('n4', 'Dossier RCS', { niveau: 1, depliable: true, ouvert: true, enfants: [rubrique] }))
+    const [domaine, tete, piece] = [...container.querySelectorAll('.rig-arbre__ligne')] as HTMLElement[]
+    expect(domaine!.className).not.toContain('rig-arbre__ligne--groupe')
+    expect(domaine!.style.getPropertyValue('--rig-arbre-teinte')).toBe('')
+    expect(tete!.className).toContain('rig-arbre__ligne--groupe rig-arbre__ligne--tete')
+    expect(piece!.className).toContain('rig-arbre__ligne--groupe')
+    expect(piece!.className).not.toContain('rig-arbre__ligne--tete')
+    for (const l of [tete!, piece!]) {
+      expect(l.style.getPropertyValue('--rig-arbre-teinte')).toBe('var(--rig-groupe-2)')
+      expect(l.style.getPropertyValue('--rig-arbre-niveau-groupe')).toBe('2')
+    }
+    expect(piece!.style.getPropertyValue('--rig-arbre-niveau')).toBe('3')
   })
 })

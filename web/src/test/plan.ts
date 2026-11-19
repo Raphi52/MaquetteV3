@@ -12,6 +12,7 @@ export function ligneArbre(id: string, texte: string, enfants: LigneArbreVue[] =
   return {
     id, niveau, texte, icone: enfants.length ? 'dossier' : 'pdf', actif: false, chemin: false,
     depliable: enfants.length > 0, ouvert: enfants.length > 0, renomme: false, compte: null, enfants, vide: false,
+    groupe: 0, niveauGroupe: 0,
   }
 }
 
@@ -104,24 +105,28 @@ export function dossier(partiel: Partial<DossierVue> = {}): DossierVue {
     poignee: true, fiche: null, etapes: etapes(), poignee2: true,
     apercu: { detachees: 0, apercu: apercu() }, voile: false,
     historique: historique(),
+    arbreReplie: false, chemin: ['004176', 'Dossier RCS', 'Statuts signes'], pieces: 42,
+    fil: [],
     ...partiel,
   }
 }
 
 /** Neuf pieces datees de l'affaire 004176, la plus recente en tete (Pont : VueHistorique). */
 export function historique(): PieceHistoriqueVue[] {
-  const piece = (id: string, date: string, libelle: string, rubrique: string, judiciaire = false, actif = false): PieceHistoriqueVue =>
-    ({ id, date, libelle, rubrique, origine: 'Edition greffe', pages: 1, judiciaire, actif })
+  // groupe : la teinte du lisere de la rubrique dans l'arbre (ordre de l'arbre de demonstration :
+  // Pieces jointes 1, Depots d'actes 2, comptes 3, Formalites 4, Instances 6, Procedures collectives 7).
+  const piece = (id: string, date: string, libelle: string, rubrique: string, judiciaire = false, actif = false, groupe = 0): PieceHistoriqueVue =>
+    ({ id, date, libelle, rubrique, origine: 'Edition greffe', pages: 1, judiciaire, actif, groupe })
   return [
     piece('n10', '19/11/2026', 'Kbis a jour', 'Dossier RCS', false, true),
-    piece('n11', '15/09/2026', 'Certificat en matiere de difficultes des entreprises', 'Pieces jointes'),
-    piece('n12', '12/12/2024', 'Depot de l etat des creances', 'Depots sur la procedure', true),
-    piece('n13', '15/11/2024', 'Depot du rapport du mandataire', 'Depots sur la procedure', true),
-    piece('n14', '12/11/2024', 'Lettre de regularisation du depot', 'Depots des comptes annuels'),
-    piece('n15', '15/10/2024', 'Certificat de depot d\'actes', "Depots d'actes"),
-    piece('n16', '08/10/2024', 'Synthese de depot au Guichet unique', 'Formalites'),
-    piece('n17', '18/06/2024', 'Jugement d ouverture du redressement judiciaire', 'Procedure n 2024P00042 - Redressement judiciaire', true),
-    piece('n18', '03/03/2023', 'Rapport d expertise', 'Mesures d instruction', true),
+    piece('n11', '15/09/2026', 'Certificat en matiere de difficultes des entreprises', 'Pieces jointes', false, false, 1),
+    piece('n12', '12/12/2024', 'Depot de l etat des creances', 'Depots sur la procedure', true, false, 7),
+    piece('n13', '15/11/2024', 'Depot du rapport du mandataire', 'Depots sur la procedure', true, false, 7),
+    piece('n14', '12/11/2024', 'Lettre de regularisation du depot', 'Depots des comptes annuels', false, false, 3),
+    piece('n15', '15/10/2024', 'Certificat de depot d\'actes', "Depots d'actes", false, false, 2),
+    piece('n16', '08/10/2024', 'Synthese de depot au Guichet unique', 'Formalites', false, false, 4),
+    piece('n17', '18/06/2024', 'Jugement d ouverture du redressement judiciaire', 'Procedure n 2024P00042 - Redressement judiciaire', true, false, 7),
+    piece('n18', '03/03/2023', 'Rapport d expertise', 'Mesures d instruction', true, false, 6),
   ]
 }
 

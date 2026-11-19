@@ -176,7 +176,9 @@ Exiger(Regex.IsMatch(vue, @"rig-vged__donnees"), "la colonne des DONNEES existe 
 Exiger(Regex.IsMatch(css, @"\.rig-vged__donnees\s*\{"), "rig-accueil.css style la colonne des donnees");
 Exiger(Regex.IsMatch(vue, @"DebutRedim2"),
     "une SECONDE poignee regle la largeur des donnees (3 colonnes reglables)");
-Exiger(Regex.IsMatch(vue, @"if \(DonneesVisible\) \{ morceaux\.Add"),
+// Depuis le 19/11/2026 (conv-2009), le bloc pose aussi la poignee seulement si
+// l'arbre n'est pas replie ; le calcul colonne par colonne est joue par PlanTravailCheck.
+Exiger(Regex.IsMatch(vue, @"if \(DonneesVisible\)\s*\{\s*(if \(!ArbreReplie\) )?morceaux\.Add"),
     "les colonnes se recalculent quand une zone se ferme");
 // Borne courte : sans elle, le motif traversait tout le fichier et trouvait
 // la METHODE DetacherDocument, bouton supprime ou non (mesure du 14/09).

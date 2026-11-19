@@ -417,6 +417,27 @@ public sealed class AccueilEtat
         Enregistrer();
     }
 
+    /// <summary>
+    /// Le FIL de chaque affaire (onglet « Fil » de la vue du dossier, proposition 3
+    /// du /draft du 19/11/2026) : les messages ecrits sur le dossier, du plus ancien
+    /// au plus recent. Enregistre comme la trace des modifications : le fil survit
+    /// a la fermeture de l'application.
+    /// </summary>
+    public Dictionary<string, List<MessageFil>> Fil { get; set; } = new();
+
+    /// <summary>Ajoute un message au fil de l'affaire. Un message vide n'entre pas.</summary>
+    public void EcrireAuFil(string affaire, MessageFil m)
+    {
+        if (string.IsNullOrWhiteSpace(affaire) || string.IsNullOrWhiteSpace(m.Texte)) return;
+        if (!Fil.TryGetValue(affaire, out var liste))
+        {
+            liste = new List<MessageFil>();
+            Fil[affaire] = liste;
+        }
+        liste.Add(m);
+        Enregistrer();
+    }
+
     /// <summary>Les taches de recette terminees, par « code/affaire ».</summary>
     public Dictionary<string, TacheClose> TachesFaites { get; set; } = new();
 

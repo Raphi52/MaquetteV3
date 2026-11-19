@@ -1,9 +1,12 @@
 // LA VISIONNEUSE D'AFFAIRE (esprit VGED, div.rig-vged) de
 // Components/Pages/Home.razor, portee au lot 2 du plan « finir le passage a
-// React » (19/11/2026). Trois zones cote a cote : l'ARBRE documentaire, les
-// DONNEES (fiche d'informations ou saisie guidee) avec l'historique des pieces
-// dessous, le DOCUMENT ; chacune se ferme, et les separateurs se glissent pour
-// regler les largeurs.
+// React » (19/11/2026). Quatre zones cote a cote (proposition 3 « Onglets
+// Suivi / Fil » du /draft du 19/11/2026, conv-2009) : l'ARBRE documentaire, qui
+// se replie en un chemin au-dessus des donnees ; les DONNEES (fiche
+// d'informations ou saisie guidee) ; le DOCUMENT ; et la colonne de SUIVI, a
+// deux onglets (reste a faire et historique des pieces / fil du dossier). Les
+// donnees et le document se ferment, et les separateurs se glissent pour regler
+// les largeurs.
 
 import { useEffect, useRef } from 'react'
 import type { CSSProperties, MutableRefObject } from 'react'
@@ -12,7 +15,7 @@ import { FicheInformationsDossier } from '../composants/FicheInformationsDossier
 import { Saisie } from '../session'
 import { Apercu } from './Apercu'
 import { Etapes } from './Etapes'
-import { HistoriqueDossier } from './Historique'
+import { SuiviDossier } from './Suivi'
 import { BandeauTache, ChecklistsTache } from './Tache'
 import type { DefilementVue, DossierVue, GestePlan } from './types'
 
@@ -123,12 +126,34 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
 
       <div className="rig-vged__corps" style={styleDepuisTexte(d.styleCorps)}>
 
+        {/* ---- Arbre REPLIE : le chemin de l'element choisi, au-dessus des
+            donnees et du document ; « Arbre » le rouvre. ---- */}
+        {d.arbreReplie && (
+          <nav className="rig-vged__chemin" aria-label="Chemin dans le dossier">
+            <button type="button" className="rig-vged__chemin-arbre" title="Rouvrir l'arbre du dossier"
+                    onClick={() => plan('arbreDeplier')}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4v14a2 2 0 0 0 2 2h3"></path><path d="M5 9h5"></path><rect x="11" y="6.5" width="8" height="5" rx="1"></rect><rect x="11" y="16.5" width="8" height="5" rx="1"></rect></svg>
+              Arbre
+            </button>
+            <ol className="rig-vged__chemin-etapes">
+              {d.chemin.map((c, i) => (
+                <li key={i} className={i === d.chemin.length - 1 ? 'rig-vged__chemin-courant' : undefined}>{c}</li>
+              ))}
+            </ol>
+          </nav>
+        )}
+
         {/* ---- Arbre documentaire, colonnes de TreeviewGed (v2) ---- */}
+        {!d.arbreReplie && (
         <div className="rig-vged__arbre" ref={colonneArbre}>
           <div className="rig-arbre__entete">
-            <span className="rig-arbre__libelle">Visualisation du dossier</span>{' '}
+            <span className="rig-arbre__libelle">Visualisation du dossier <span className="rig-arbre__pieces">{'· ' + d.pieces + (d.pieces === 1 ? ' piece' : ' pieces')}</span></span>{' '}
             <button className="rig-arbre__nouveau" title="Ajouter un dossier ou une piece dans l'arbre"
-                    onClick={() => plan('ouvrirNouveau')}>+ Nouveau</button>
+                    onClick={() => plan('ouvrirNouveau')}>+ Nouveau</button>{' '}
+            <button type="button" className="rig-arbre__replier" title="Replier l'arbre" aria-label="Replier l'arbre"
+                    onClick={() => plan('arbreReplier')}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+            </button>
           </div>
           {/* MODE TACHE : l'arbre est replie sur ce que la recette nomme. */}
           {d.tache && <BandeauTache tache={d.tache} plan={plan} />}
@@ -152,6 +177,7 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
               l'arbre, ouvrir la tache poussait tous les noeuds vers le bas. */}
           {d.tache && <ChecklistsTache tache={d.tache} plan={plan} />}
         </div>
+        )}
 
         {/* ---- Separateur deplacable : regle la largeur de l'arbre ----
             preventDefault : sans lui, le navigateur demarre une SELECTION de
@@ -162,10 +188,9 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
         )}
 
         {/* ---- ZONE 2 : LES DONNEES ---- la fiche d'informations quand une
-            fiche est choisie dans l'arbre, sinon les 7 etapes de la saisie ;
-            DESSOUS, l'historique des pieces (proposition 5 du /draft du
-            19/11/2026) : arbre, donnees, historique et document a l'ecran
-            ensemble, sans rien a basculer. */}
+            fiche est choisie dans l'arbre, sinon les 7 etapes de la saisie.
+            L'historique des pieces, autrefois dessous, est passe dans l'onglet
+            Suivi de la colonne de droite (proposition 3, 19/11/2026). */}
         {(d.fiche || d.etapes) && (
           <div className="rig-vged__milieu">
             {d.fiche && (
@@ -180,7 +205,6 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
               <Etapes key="etapes" etapes={d.etapes} pagination={pagination} defilement={defilement}
                       defilementJoue={defilementJoue} plan={plan} />
             )}
-            <HistoriqueDossier pieces={d.historique} plan={plan} />
           </div>
         )}
         {/* Seconde poignee : entre les donnees et le document. */}
@@ -191,6 +215,9 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
 
         {/* ---- ZONE 3 : LE DOCUMENT ---- */}
         {d.apercu && <Apercu colonne={d.apercu} plan={plan} />}
+
+        {/* ---- ZONE 4 : LE SUIVI ---- toujours a droite, onglets Suivi / Fil. */}
+        <SuiviDossier bandeau={d.bandeau} historique={d.historique} fil={d.fil} plan={plan} />
 
         {d.voile && (
           <div className="rig-vged__voile"

@@ -62,11 +62,26 @@ public sealed record EcranProcVue(string[] Valides, string? SirenDemande, string
 public sealed record SessionEcranVue(string Session, int Version);
 
 // ---- La visionneuse d'affaire (div.rig-vged) ----
+/// <param name="ArbreReplie">L'arbre est replie : sa colonne disparait, le chemin de la piece
+/// choisie le remplace au-dessus des donnees (proposition 3 du /draft du 19/11/2026).</param>
+/// <param name="Chemin">Les libelles du numero de l'affaire jusqu'a l'element choisi dans l'arbre.</param>
+/// <param name="Pieces">Le nombre de pieces que l'arbre montre a ce login.</param>
+/// <param name="Fil">Le fil de l'affaire, du plus ancien au plus recent (onglet « Fil » de la colonne de suivi).</param>
 public sealed record DossierVue(string Numero, string Objet, string Siren, string Type, string Statut,
                                 bool BoutonDocument, SommaireVue Sommaire, BandeauDefautsVue? Bandeau,
                                 string StyleCorps, TacheVue? Tache, string Filtre, LigneArbreVue Arbre,
                                 bool Poignee, FicheColonneVue? Fiche, EtapesVue? Etapes, bool Poignee2,
-                                ApercuColonneVue? Apercu, bool Voile, PieceHistoriqueVue[] Historique);
+                                ApercuColonneVue? Apercu, bool Voile, PieceHistoriqueVue[] Historique,
+                                bool ArbreReplie, string[] Chemin, int Pieces, MessageFilVue[] Fil);
+
+/// <summary>
+/// Un message du FIL de l'affaire : une note ecrite dans l'onglet « Fil », ou une valeur
+/// changee dans le formulaire (la trace des modifications, Modification = vrai).
+/// </summary>
+/// <param name="Quand">« 10:42 » le jour meme, « hier 16:20 », sinon « 12/03/2024 10:42 ».</param>
+/// <param name="Champ">Le champ modifie (vide pour une note).</param>
+public sealed record MessageFilVue(string Initiales, string Auteur, string Quand, string Texte,
+                                   bool Modification, string Champ, string Avant, string Apres);
 
 /// <summary>
 /// Une piece DATEE de l'affaire, dans l'historique sous les donnees (proposition
@@ -76,8 +91,11 @@ public sealed record DossierVue(string Numero, string Objet, string Siren, strin
 /// <param name="Rubrique">Le dossier qui range la piece dans l'arbre (« Depots d'actes »...).</param>
 /// <param name="Judiciaire">La piece est sous la branche « Judiciaire » (point bleu, sinon or).</param>
 /// <param name="Actif">La piece est celle ouverte a droite, ou celle choisie dans l'arbre.</param>
+/// <param name="Groupe">La teinte du lisere de sa rubrique dans l'arbre (0 hors rubrique) : son
+/// point prend la meme couleur, on voit d'un coup d'oeil ce qui va ensemble.</param>
 public sealed record PieceHistoriqueVue(string Id, string Date, string Libelle, string Rubrique,
-                                        string Origine, int Pages, bool Judiciaire, bool Actif);
+                                        string Origine, int Pages, bool Judiciaire, bool Actif,
+                                        int Groupe = 0);
 
 public sealed record SommaireVue(ChampSommaireVue[] Champs, string Mention);
 public sealed record ChampSommaireVue(string Libelle, string Valeur, bool Mono);
@@ -321,10 +339,11 @@ public sealed partial class SessionPlanTravail
         }
 
         var index = new Dictionary<string, NoeudGed>(StringComparer.Ordinal);
+        var groupes = GroupesArbre();
         var arbre = ArbreGedNoeud.Vue(Arbre, 0, NoeudsOuverts, NoeudSelectionne, Domaines, AjoutsArbre,
                                       MasquesArbre, LibellesArbre, RecetteArbre, NoeudRenomme,
-                                      FiltreDeLArbre, index);
-        var historique = VueHistorique(index);
+                                      FiltreDeLArbre, index, groupes: groupes);
+        var historique = VueHistorique(index, groupes);
         IndexArbre = index;
 
         FicheColonneVue? fiche = null;
@@ -351,10 +370,11 @@ public sealed partial class SessionPlanTravail
 
         return new DossierVue(d.Numero, d.Objet, d.Siren, d.Type, d.Statut,
             !GuideVisible && ApercuNoeud is not null, sommaire, bandeau, StyleCorps, VueTache(),
-            FiltreDeLArbre, arbre, DonneesVisible || GuideVisible, fiche, etapes,
+            FiltreDeLArbre, arbre, !ArbreReplie && (DonneesVisible || GuideVisible), fiche, etapes,
             DonneesVisible && GuideVisible,
             GuideVisible ? new ApercuColonneVue(FenetresDetachees.Count, VueApercu(d)) : null,
-            Redimensionne, historique);
+            Redimensionne, historique,
+            ArbreReplie, CheminSelection(d.Numero), NbPiecesVisibles(), VueFil(d.Numero));
     }
 
     /// <summary>
@@ -366,21 +386,22 @@ public sealed partial class SessionPlanTravail
     /// Chaque piece entre dans <paramref name="index"/> : son clic la retrouve meme
     /// quand sa branche est repliee dans l'arbre.
     /// </summary>
-    private PieceHistoriqueVue[] VueHistorique(IDictionary<string, NoeudGed> index)
+    private PieceHistoriqueVue[] VueHistorique(IDictionary<string, NoeudGed> index,
+                                               IReadOnlyDictionary<NoeudGed, int> groupes)
     {
-        var pieces = new List<(DateTime Quand, NoeudGed Piece, string Rubrique, bool Judiciaire)>();
-        void Parcourir(NoeudGed dossier, bool judiciaire)
+        var pieces = new List<(DateTime Quand, NoeudGed Piece, string Rubrique, bool Judiciaire, int Groupe)>();
+        void Parcourir(NoeudGed dossier, bool judiciaire, int groupe)
         {
             foreach (var e in AccesGed.EnfantsVisibles(dossier, Domaines, AjoutsArbre, MasquesArbre, RecetteArbre))
             {
                 var jud = judiciaire || e.DomaineRequis == ArbreDemo.DomaineJudiciaire;
-                if (!e.EstPiece) { Parcourir(e, jud); continue; }
+                if (!e.EstPiece) { Parcourir(e, jud, groupes.TryGetValue(e, out var g) ? g : groupe); continue; }
                 if (DateTime.TryParseExact(e.Date, "dd/MM/yyyy", CultureInfo.InvariantCulture,
                                            DateTimeStyles.None, out var quand))
-                    pieces.Add((quand, e, LibelleAffiche(dossier), jud));
+                    pieces.Add((quand, e, LibelleAffiche(dossier), jud, groupe));
             }
         }
-        Parcourir(Arbre, false);
+        Parcourir(Arbre, false, 0);
 
         return pieces
             // OrderByDescending est STABLE : a date egale, l'ordre de l'arbre reste.
@@ -391,7 +412,8 @@ public sealed partial class SessionPlanTravail
                 index[id] = p.Piece;
                 return new PieceHistoriqueVue(id, p.Piece.Date, LibelleAffiche(p.Piece), p.Rubrique,
                     p.Piece.Origine, p.Piece.Pages, p.Judiciaire,
-                    ReferenceEquals(p.Piece, ApercuNoeud) || ReferenceEquals(p.Piece, NoeudSelectionne));
+                    ReferenceEquals(p.Piece, ApercuNoeud) || ReferenceEquals(p.Piece, NoeudSelectionne),
+                    p.Groupe);
             })
             .ToArray();
     }
@@ -671,6 +693,8 @@ public sealed partial class SessionPlanTravail
             case "redimFin": Redimensionne = false; break;
 
             // ---- Arbre ----
+            case "arbreReplier": ArbreReplie = true; break;
+            case "arbreDeplier": ArbreReplie = false; break;
             case "ouvrirNouveau": OuvrirNouveau(); break;
             case "filtre": FiltreDeLArbre = Texte(valeur); break;
             case "effacerFiltre": FiltreDeLArbre = string.Empty; break;
@@ -686,6 +710,7 @@ public sealed partial class SessionPlanTravail
             case "historiqueOuvrir":
                 if (NoeudDe(Texte(valeur)) is { EstPiece: true } piece) OuvrirDepuisHistorique(piece);
                 break;
+            case "filEcrire": EcrireAuFil(Texte(valeur)); break;
             case "arbreRenommer":
             {
                 var g = Lire<GesteNoeud>(valeur);

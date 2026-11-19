@@ -1264,25 +1264,40 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     {
         get
         {
-            // TROIS zones cote a cote : l'arbre, les donnees, le document.
-            // Chacune peut se fermer ; les colonnes se recalculent alors.
+            // QUATRE zones cote a cote : l'arbre, les donnees, le document et,
+            // toujours a droite, la colonne de SUIVI (onglets Suivi / Fil,
+            // proposition 3 du /draft du 19/11/2026). L'arbre se replie, les
+            // donnees et le document se ferment ; les colonnes se recalculent alors.
             static string Px(double v) =>
                 v.ToString("0", System.Globalization.CultureInfo.InvariantCulture) + "px";
 
-            string colonnes;
+            var morceaux = new List<string>();
             if (!DonneesVisible && !GuideVisible)
             {
-                colonnes = "grid-template-columns: minmax(0, 1fr)";
+                morceaux.Add("minmax(0, 1fr)");
             }
             else
             {
-                var morceaux = new List<string> { Px(LargeurArbre) };
+                if (!ArbreReplie) morceaux.Add(Px(LargeurArbre));
                 // Sans document a droite, les donnees prennent toute la largeur
                 // restante : une largeur fixe laissait un grand vide (demande du 2026-09-15).
-                if (DonneesVisible) { morceaux.Add("6px"); morceaux.Add(GuideVisible ? Px(LargeurDonnees) : "minmax(0, 1fr)"); }
-                if (GuideVisible) { morceaux.Add("6px"); morceaux.Add("minmax(0, 1fr)"); }
-                colonnes = "grid-template-columns: " + string.Join(" ", morceaux);
+                // Arbre replie, la premiere poignee part avec lui.
+                if (DonneesVisible)
+                {
+                    if (!ArbreReplie) morceaux.Add("6px");
+                    morceaux.Add(GuideVisible ? Px(LargeurDonnees) : "minmax(0, 1fr)");
+                }
+                if (GuideVisible)
+                {
+                    if (!ArbreReplie || DonneesVisible) morceaux.Add("6px");
+                    morceaux.Add("minmax(0, 1fr)");
+                }
             }
+            morceaux.Add(LargeurSuivi);
+            // Arbre replie : une premiere rangee porte le chemin de l'element choisi,
+            // au-dessus des donnees et du document ; la colonne de suivi prend les deux.
+            var colonnes = "grid-template-columns: " + string.Join(" ", morceaux)
+                         + "; grid-template-rows: " + (ArbreReplie ? "auto minmax(0, 1fr)" : "minmax(0, 1fr)");
             // Pendant le glissement, le navigateur selectionnerait le texte
             // survole : la vue se couvrait de surlignage bleu.
             return Redimensionne ? colonnes + "; user-select: none" : colonnes;

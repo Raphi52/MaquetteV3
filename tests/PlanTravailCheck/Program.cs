@@ -224,6 +224,76 @@ internal static class Programme
         Agir("ouvrirNumero", "004176");
         d = plan.Vue().Dossier;
 
+        // --- 2 ter. La vue du dossier, proposition 3 « Onglets Suivi / Fil » du /draft du
+        // 19/11/2026 (conv-2009) : le LISERE des rubriques, l'arbre qui se replie, le fil.
+        var rubriques = new[] { "Pieces jointes", "Depots d'actes", "Depots des comptes annuels", "Formalites",
+                                "Inscriptions privileges", "Instances", "Procedures collectives" }
+            .Select(r => Ligne(d!.Arbre, r)).ToArray();
+        Exiger(rubriques.All(r => r is not null)
+               && rubriques.Select(r => r!.Groupe).SequenceEqual(new[] { 1, 2, 3, 4, 5, 6, 7 })
+               && rubriques.All(r => r!.NiveauGroupe == 2 && r.Niveau == 2),
+            "chaque rubrique de l'arbre porte sa teinte de lisere, dans l'ordre de l'arbre ; elle en est la tete");
+        Exiger(Ligne(d!.Arbre, "Dossier RCS") is { Groupe: 0 } && Ligne(d.Arbre, "Kbis a jour") is { Groupe: 0 }
+               && Ligne(d.Arbre, "Judiciaire") is { Groupe: 0 },
+            "les domaines et les pieces posees a meme le domaine n'ont pas de lisere");
+        Exiger(Ligne(d.Arbre, "Bail commercial") is { Groupe: 2, NiveauGroupe: 2, Niveau: 4 }
+               && Ligne(d.Arbre, "Rapport d expertise") is { Groupe: 6, NiveauGroupe: 2 },
+            "tout ce qu'une rubrique range, a toute profondeur, porte sa teinte et le niveau de sa tete");
+        Exiger(d.Historique.Single(p => p.Libelle == "Rapport d expertise").Groupe == 6
+               && d.Historique.Single(p => p.Libelle == "Kbis a jour").Groupe == 0,
+            "dans l'historique, le point d'une piece prend la teinte de sa rubrique dans l'arbre");
+
+        Exiger(!d.ArbreReplie && d.Poignee
+               && d.StyleCorps.StartsWith("grid-template-columns: ") && d.StyleCorps.Contains(" minmax(240px, 20%); grid-template-rows: minmax(0, 1fr)"),
+            "la colonne de suivi est la derniere colonne du corps, sur une seule rangee");
+        var colonnesDeplie = d.StyleCorps.Split(';')[0].Split(' ').Length;
+        var choisie = Lignes(d.Arbre).Single(l => l.Actif).Texte;
+        Agir("arbreReplier");
+        var replie = plan.Vue().Dossier!;
+        Exiger(replie.ArbreReplie && !replie.Poignee
+               && replie.StyleCorps.Split(';')[0].Split(' ').Length == colonnesDeplie - 2
+               && replie.StyleCorps.Contains("grid-template-rows: auto minmax(0, 1fr)"),
+            "arbre replie : sa colonne et sa poignee partent, une rangee s'ouvre pour le chemin");
+        Exiger(replie.Chemin.Length >= 2 && replie.Chemin[0] == "004176" && replie.Chemin[^1] == choisie,
+            $"le chemin va du numero de l'affaire a l'element choisi dans l'arbre ({string.Join(" > ", replie.Chemin)})");
+        Agir("ouvrirNumero", "004176");
+        Exiger(plan.Vue().Dossier!.ArbreReplie, "l'arbre reste replie d'une affaire a l'autre, comme sa largeur");
+        Agir("arbreDeplier");
+        d = plan.Vue().Dossier!;
+        Exiger(!d.ArbreReplie && d.Poignee && d.StyleCorps.Split(';')[0].Split(' ').Length == colonnesDeplie,
+            "l'arbre se rouvre a sa place");
+        // Ce login voit les deux domaines, sans ajout ni masque : toutes les pieces de l'arbre.
+        Exiger(d.Pieces > 0 && d.Pieces == d.Arbre.Compte,
+            $"l'entete de l'arbre compte les pieces visibles ({d.Pieces})");
+
+        var filAvant = d.Fil.Length;
+        Agir("filEcrire", "   ");
+        Exiger(plan.Vue().Dossier!.Fil.Length == filAvant, "une note vide n'entre pas au fil");
+        Agir("filEcrire", "  Date de naissance du gerant a demander  ");
+        var fil = plan.Vue().Dossier!.Fil;
+        Exiger(fil.Length == filAvant + 1
+               && fil[^1] is { Modification: false, Texte: "Date de naissance du gerant a demander" }
+               && fil[^1].Quand == DateTime.Now.ToString("HH:mm") && fil[^1].Initiales.Length > 0,
+            "une note ecrite entre au fil, a la fin, datee de l'heure du jour et signee");
+        Exiger(AccueilEtat.Charger().Fil.TryGetValue("004176", out var enregistre)
+               && enregistre[^1].Texte == "Date de naissance du gerant a demander",
+            "le fil est enregistre avec l'etat de l'application : il survit a sa fermeture");
+
+        var midi = new DateTime(2026, 11, 19, 12, 0, 0);
+        var fondu = SessionPlanTravail.FilDeLAffaire(
+            [new MessageFil(midi.AddHours(-1), "cedric.benier", "PV recu"), new MessageFil(midi, "raphael.vilain", "Merci")],
+            [new ModificationChamp(midi.AddMinutes(-30), "raphael.vilain", "Dossier > Capital", "Montant du capital",
+                                   "CAPITAL", "15000", "40000"),
+             new ModificationChamp(midi.AddDays(-1), "raphael.vilain", "Dossier > Siege", "Enseigne", "ENSEIGNE", "", "Billards")],
+            midi);
+        Exiger(fondu.Select(m => m.Modification ? "M:" + m.Champ : m.Texte)
+                    .SequenceEqual(new[] { "M:Enseigne", "PV recu", "M:Montant du capital", "Merci" }),
+            "le fil fond notes et valeurs changees, du plus ancien au plus recent");
+        Exiger(fondu[0] is { Quand: "hier 12:00", Avant: "(vide)", Apres: "Billards" }
+               && fondu[1] is { Initiales: "CB", Auteur: "C. BENIER", Quand: "11:00" }
+               && fondu[2] is { Auteur: "R. VILAIN", Avant: "15000", Apres: "40000" },
+            "chaque message dit qui (« C. BENIER », « CB »), quand (« 11:00 », « hier 12:00 ») et, pour une valeur, avant et apres");
+
         // --- 3. Une piece de l'arbre : la saisie guidee va sur SON etape.
         var statuts = Ligne(d!.Arbre, "Statuts signes");
         Exiger(statuts is not null, "la piece « Statuts signes » est dans l'arbre rendu");

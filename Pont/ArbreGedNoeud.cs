@@ -10,9 +10,13 @@ namespace RigV3Desktop.Pont;
 /// <param name="Depliable">Le noeud a des enfants affiches : chevron plein, sinon chevron vide.</param>
 /// <param name="Compte">Le nombre de pieces entre parentheses, ou null quand il ne s'affiche pas.</param>
 /// <param name="Vide">« aucune piece » s'affiche sous la ligne (dossier ouvert sans enfant).</param>
+/// <param name="Groupe">La teinte du LISERE (1 a 8) de la rubrique qui range la ligne, 0 hors rubrique :
+/// tout ce qui va ensemble porte le meme filet de couleur (demande du 19/11/2026).</param>
+/// <param name="NiveauGroupe">Le niveau de la tete de la rubrique : le lisere se pose a son retrait.</param>
 public sealed record LigneArbreVue(string Id, int Niveau, string Texte, string Icone,
                                    bool Actif, bool Chemin, bool Depliable, bool Ouvert,
-                                   bool Renomme, int? Compte, LigneArbreVue[] Enfants, bool Vide);
+                                   bool Renomme, int? Compte, LigneArbreVue[] Enfants, bool Vide,
+                                   int Groupe = 0, int NiveauGroupe = 0);
 
 /// <summary>
 /// Pont du composant RECURSIF de l'arbre GED (web/src/composants/ArbreGedNoeud.tsx).
@@ -41,6 +45,8 @@ public static class ArbreGedNoeud
     /// La ligne de ce noeud et, si elle est ouverte, tout ce qui se rend dessous.
     /// <paramref name="index"/> recoit chaque noeud rendu sous son identifiant :
     /// c'est par lui que la coquille retrouve le noeud d'un geste.
+    /// <paramref name="groupes"/> donne la teinte de chaque TETE de rubrique ; ses
+    /// descendants la portent aussi (<paramref name="groupe"/>, <paramref name="niveauGroupe"/>).
     /// </summary>
     public static LigneArbreVue Vue(NoeudGed noeud, int niveau, IReadOnlySet<NoeudGed> ouverts,
                                     NoeudGed? selection, string[] domaines,
@@ -48,10 +54,17 @@ public static class ArbreGedNoeud
                                     IReadOnlyCollection<NoeudGed>? masques,
                                     IReadOnlyDictionary<NoeudGed, string>? libelles,
                                     RecetteTache? recette, NoeudGed? renomme, string? filtre,
-                                    IDictionary<string, NoeudGed> index)
+                                    IDictionary<string, NoeudGed> index,
+                                    IReadOnlyDictionary<NoeudGed, int>? groupes = null,
+                                    int groupe = 0, int niveauGroupe = 0)
     {
         var id = Identifiant(noeud);
         index[id] = noeud;
+        if (groupes is not null && groupes.TryGetValue(noeud, out var teinte))
+        {
+            groupe = teinte;
+            niveauGroupe = niveau;
+        }
 
         var visibles = EnfantsVisibles(noeud, domaines, ajouts, masques, recette);
         var affiches = EnfantsAffiches(visibles, domaines, ajouts, masques, libelles, recette, filtre);
@@ -62,7 +75,8 @@ public static class ArbreGedNoeud
 
         var enfants = ouvert
             ? affiches.Select(e => Vue(e, niveau + 1, ouverts, selection, domaines, ajouts, masques,
-                                        libelles, recette, renomme, filtre, index)).ToArray()
+                                        libelles, recette, renomme, filtre, index,
+                                        groupes, groupe, niveauGroupe)).ToArray()
             : [];
 
         return new LigneArbreVue(
@@ -75,7 +89,9 @@ public static class ArbreGedNoeud
             Compte: visibles.Count > 0 && noeud.NbPieces > 0 ? noeud.NbPieces : null,
             Enfants: enfants,
             Vide: ouvert && visibles.Count == 0 && string.IsNullOrWhiteSpace(filtre)
-                  && !noeud.EstPiece && !noeud.EstFiche);
+                  && !noeud.EstPiece && !noeud.EstFiche,
+            Groupe: groupe,
+            NiveauGroupe: niveauGroupe);
     }
 
     /// <summary>

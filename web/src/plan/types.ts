@@ -72,8 +72,16 @@ export interface DossierVue {
   poignee2: boolean
   apercu: ApercuColonneVue | null
   voile: boolean
-  /** Les pieces datees, la plus recente en tete (l'historique sous les donnees). */
+  /** Les pieces datees, la plus recente en tete (l'historique, onglet Suivi). */
   historique: PieceHistoriqueVue[]
+  /** L'arbre est replie : sa colonne disparait, le chemin de l'element choisi le remplace. */
+  arbreReplie: boolean
+  /** Du numero de l'affaire a l'element choisi dans l'arbre. */
+  chemin: string[]
+  /** Le nombre de pieces que l'arbre montre a ce login. */
+  pieces: number
+  /** Le fil de l'affaire, du plus ancien au plus recent (onglet Fil). */
+  fil: MessageFilVue[]
 }
 export interface PieceHistoriqueVue {
   id: string
@@ -84,6 +92,19 @@ export interface PieceHistoriqueVue {
   pages: number
   judiciaire: boolean
   actif: boolean
+  /** La teinte du lisere de sa rubrique dans l'arbre (1 a 8), 0 hors rubrique. */
+  groupe: number
+}
+/** Une note du fil, ou une valeur changee dans le formulaire (modification = vrai). */
+export interface MessageFilVue {
+  initiales: string
+  auteur: string
+  quand: string
+  texte: string
+  modification: boolean
+  champ: string
+  avant: string
+  apres: string
 }
 export interface SommaireVue { champs: ChampSommaireVue[], mention: string }
 export interface ChampSommaireVue { libelle: string, valeur: string, mono: boolean }

@@ -31,6 +31,10 @@ export interface LigneArbreVue {
   compte: number | null
   enfants: LigneArbreVue[]
   vide: boolean
+  /** La teinte du lisere de sa rubrique (1 a 8), 0 hors rubrique. */
+  groupe: number
+  /** Le niveau de la tete de sa rubrique : le lisere se pose a son retrait. */
+  niveauGroupe: number
 }
 
 /** Le clic sur les trois points : la position de la souris, pour placer le menu. */
@@ -77,14 +81,31 @@ function souris(id: string, e: MouseEvent<HTMLButtonElement>): SourisArbre {
 
 const niveau = (n: number) => ({ '--rig-arbre-niveau': n }) as CSSProperties
 
+/**
+ * Le style d'une ligne : son retrait et, dans une rubrique, la teinte et le
+ * niveau de la tete de son LISERE (rig-accueil.css, .rig-arbre__ligne--groupe).
+ */
+export function styleLigne(ligne: Pick<LigneArbreVue, 'niveau' | 'groupe' | 'niveauGroupe'>): CSSProperties {
+  if (!ligne.groupe) return niveau(ligne.niveau)
+  return {
+    '--rig-arbre-niveau': ligne.niveau,
+    '--rig-arbre-teinte': `var(--rig-groupe-${ligne.groupe})`,
+    '--rig-arbre-niveau-groupe': ligne.niveauGroupe,
+  } as CSSProperties
+}
+
 export function ArbreGedNoeud({ ligne, activer, renommer, menuContextuel }: ProprietesArbreGedNoeud) {
   return (
     <>
       {/* CHEMIN : la ligne ou l'on se trouve, et TOUS ses parents, portent un
           filet a gauche -- on lit d'un coup d'oeil ou l'on est dans le dossier,
-          sans deplier ni compter les retraits. */}
-      <div className={`rig-arbre__ligne ${ligne.actif ? 'rig-arbre__ligne--actif' : ''} ${ligne.chemin ? 'rig-arbre__ligne--chemin' : ''}`}
-           style={niveau(ligne.niveau)}
+          sans deplier ni compter les retraits.
+          LISERE (19/11/2026) : chaque rubrique (Pieces jointes, Depots d'actes...)
+          a sa couleur ; sa tete et tout ce qu'elle range portent un filet de cette
+          couleur, au retrait de la tete -- on voit ce qui va ensemble. */}
+      <div className={`rig-arbre__ligne ${ligne.actif ? 'rig-arbre__ligne--actif' : ''} ${ligne.chemin ? 'rig-arbre__ligne--chemin' : ''}`
+                      + (ligne.groupe ? ' rig-arbre__ligne--groupe' + (ligne.niveau === ligne.niveauGroupe ? ' rig-arbre__ligne--tete' : '') : '')}
+           style={styleLigne(ligne)}
            onClick={() => activer(ligne.id)}>
         <span className="rig-arbre__libelle">
           {ligne.depliable

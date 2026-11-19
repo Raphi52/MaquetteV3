@@ -50,3 +50,6 @@ public static class ActionsXaction
 /// </summary>
 public sealed record ModificationChamp(DateTime Quand, string Auteur, string Element,
                                       string Champ, string Colonne, string Avant, string Apres);
+
+/// <summary>Un message ecrit dans le fil d'une affaire : qui, quand, quoi.</summary>
+public sealed record MessageFil(DateTime Quand, string Auteur, string Texte);
