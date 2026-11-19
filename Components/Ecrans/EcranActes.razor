@@ -2,208 +2,22 @@
    Criteres lus dans RIG v2 : OPE_CRITERES ("N Dossier / N Depot",
    "Abrege piece"), OPE_DATE ("Date de depot" Du/Au), OPE_RECHERCHE
    ("Type de depot", "Lister actes non numerisables").
-   Colonnes : RESULTAT/DataGridviewActes.cs. *@
+   Colonnes : RESULTAT/DataGridviewActes.cs.
 
-<div class="rig-proc__corps">
+   PORTE EN REACT (lot 3 de la migration, 18/11/2026) : l'ecran est rendu par
+   web/src/ecrans/EcranActes.tsx, ses lignes viennent de Pont/EcranActes.cs
+   (filtre sur JeuDemo.Actes). Ce fichier n'est plus qu'une COQUILLE : il
+   garde le parametre d'origine (OuvrirDossier) pour que Home.razor ne change
+   pas. Mode d'emploi : web/README.md. *@
 
-    <aside class="rig-criteres">
-        <div class="rig-kicker" style="margin-bottom:var(--rig-esp-3)">Critere</div>
-
-        <label class="rig-saisie-champ">
-            <span class="rig-saisie-champ__libelle">N Dossier / N Depot</span>
-            <input class="rig-saisie-champ__saisie" placeholder="0000, D-2026-1188, denomination"
-                   @bind="CritActeCritere" @bind:event="oninput" />
-        </label>
-
-        <label class="rig-saisie-champ">
-            <span class="rig-saisie-champ__libelle">Abrege piece</span>
-            <input class="rig-saisie-champ__saisie" placeholder="STAT, BILAN, PVAG"
-                   @bind="CritAbrege" @bind:event="oninput" />
-        </label>
-
-        <label class="rig-saisie-champ">
-            <span class="rig-saisie-champ__libelle">Type de depot</span>
-            <select class="rig-saisie-champ__saisie" @bind="CritTypeDepot">
-                <option value="">Tous</option>
-                @foreach (var c in JeuDemo.CategoriesDepot)
-                {
-                    <option value="@c.Code">@c.Libelle</option>
-                }
-            </select>
-            <span class="rig-saisie-champ__colonne">DPTRC_CATEGORIE_DEPOT &middot; dbo.CATEGORIE_DEPOT</span>
-        </label>
-
-        <div class="rig-criteres__bloc">
-            <div class="rig-kicker">Date de depot</div>
-            <div class="rig-criteres__paire">
-                <label class="rig-saisie-champ">
-                    <span class="rig-saisie-champ__libelle">Du</span>
-                    <input class="rig-saisie-champ__saisie" type="date" @bind="CritDu" />
-                </label>
-                <label class="rig-saisie-champ">
-                    <span class="rig-saisie-champ__libelle">Au</span>
-                    <input class="rig-saisie-champ__saisie" type="date" @bind="CritAu" />
-                </label>
-            </div>
-        </div>
-
-        <div class="rig-criteres__bloc">
-            <button class="rig-bascule @(CritNonNumerisables ? "rig-bascule--actif" : "")"
-                    @onclick="() => CritNonNumerisables = !CritNonNumerisables">
-                <span class="rig-bascule__temoin"></span>
-                <span>Lister actes non numerisables</span>
-            </button>
-            <button class="rig-bascule @(CritAnomalies ? "rig-bascule--actif" : "")"
-                    @onclick="() => CritAnomalies = !CritAnomalies">
-                <span class="rig-bascule__temoin"></span>
-                <span>Avec anomalie seulement</span>
-            </button>
-        </div>
-
-        <label class="rig-saisie-champ">
-            <span class="rig-saisie-champ__libelle">Nombre maxi. d actes affiches</span>
-            <input class="rig-saisie-champ__saisie" type="number" min="1" max="500" @bind="CritTopMax" />
-        </label>
-
-        <div class="rig-criteres__actions">
-            <button class="rig-bouton" @onclick="Effacer">Effacer</button>
-        </div>
-    </aside>
-
-    <section class="rig-resultats-proc">
-        <div class="rig-resultats-proc__entete">
-            <div class="rig-kicker">Actes numerises</div>
-            <span class="rig-resultats-proc__compte">
-                @Trouves.Length affiche(s) &middot;
-                @Trouves.Count(a => !a.Demat) sans image &middot;
-                @Trouves.Count(a => !string.IsNullOrEmpty(a.Anomalie)) anomalie(s)
-            </span>
-        </div>
-
-        <div class="rig-table-cadre">
-            <table class="rig-table">
-                <thead>
-                    <tr>
-                        <th class="rig-table__centre">N</th>
-                        <th>N Dossier</th>
-                        <th>N Depot</th>
-                        <th>Denomination</th>
-                        <th>Categorie de depot</th>
-                        <th>Abrege</th>
-                        <th>Description</th>
-                        <th>Date de depot</th>
-                        <th>Date de l acte</th>
-                        <th>Date de cloture</th>
-                        <th class="rig-table__centre">Confid.</th>
-                        <th class="rig-table__centre">Demat.</th>
-                        <th>Anomalies</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var a in Trouves)
-                    {
-                        var acte = a;
-                        <tr class="@(string.IsNullOrEmpty(acte.Anomalie) ? "" : "rig-table__ligne--alerte") @(acte.Numerisable ? "" : "rig-table__ligne--inerte")"
-                            title="@(acte.Numerisable ? "Ouvrir le dossier " + acte.Dossier : "Acte non numerisable : " + acte.Anomalie)"
-                            @onclick="() => Ouvrir(acte)">
-                            <td class="rig-table__centre rig-table__mono">@acte.Rang</td>
-                            <td class="rig-table__mono">@acte.Dossier</td>
-                            <td class="rig-table__mono">@acte.Depot</td>
-                            <td>@acte.Denomination</td>
-                            <td><span class="rig-etat">@acte.CategorieLisible</span></td>
-                            <td class="rig-table__mono">@acte.Abrege</td>
-                            <td>@acte.Description</td>
-                            <td class="rig-table__mono">@acte.Depose</td>
-                            <td class="rig-table__mono">@acte.Acte</td>
-                            <td class="rig-table__mono">@acte.Cloture</td>
-                            <td class="rig-table__centre">@(acte.Confidentiel ? "oui" : "")</td>
-                            <td class="rig-table__centre">@(acte.Demat ? "oui" : "")</td>
-                            <td>
-                                @if (string.IsNullOrEmpty(acte.Anomalie))
-                                {
-                                    <span class="rig-table__sans">aucune</span>
-                                }
-                                else
-                                {
-                                    @acte.Anomalie
-                                }
-                            </td>
-                        </tr>
-                    }
-                    @if (Trouves.Length == 0)
-                    {
-                        <tr>
-                            <td colspan="13" class="rig-table__vide">
-                                Aucun acte ne repond a ces criteres.
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    </section>
-</div>
+<IleReact Composant="EcranActes" Rappels="Rappels" />
 
 @code {
     /// <summary>Remonte le numero de dossier a ouvrir.</summary>
     [Parameter] public EventCallback<string> OuvrirDossier { get; set; }
 
-    private string CritActeCritere = string.Empty;
-    private string CritAbrege = string.Empty;
-    private string CritTypeDepot = string.Empty;
-    private DateTime? CritDu;
-    private DateTime? CritAu;
-    private bool CritNonNumerisables;
-    private bool CritAnomalies;
-    private int CritTopMax = 50;
-
-    /// <summary>
-    /// Un acte numerise mene au dossier qui le porte. Un acte NON
-    /// numerisable n a pas d image a montrer : la ligne reste inerte.
-    /// </summary>
-    private Task Ouvrir(ActeNum a)
-        => !a.Numerisable ? Task.CompletedTask : OuvrirDossier.InvokeAsync(a.Dossier);
-
-    private void Effacer()
+    private Dictionary<string, IleReact.RappelIle> Rappels => new()
     {
-        CritActeCritere = string.Empty;
-        CritAbrege = string.Empty;
-        CritTypeDepot = string.Empty;
-        CritDu = null;
-        CritAu = null;
-        CritNonNumerisables = false;
-        CritAnomalies = false;
-        CritTopMax = 50;
-    }
-
-    private ActeNum[] Trouves
-    {
-        get
-        {
-            IEnumerable<ActeNum> q = JeuDemo.Actes;
-
-            if (!string.IsNullOrWhiteSpace(CritActeCritere))
-            {
-                var t = CritActeCritere.Trim();
-                q = q.Where(a => a.Dossier.Contains(t, StringComparison.OrdinalIgnoreCase)
-                              || a.Depot.Contains(t, StringComparison.OrdinalIgnoreCase)
-                              || a.Denomination.Contains(t, StringComparison.OrdinalIgnoreCase));
-            }
-            if (!string.IsNullOrWhiteSpace(CritAbrege))
-            {
-                var t = CritAbrege.Trim();
-                q = q.Where(a => a.Abrege.Contains(t, StringComparison.OrdinalIgnoreCase));
-            }
-            if (!string.IsNullOrWhiteSpace(CritTypeDepot)) q = q.Where(a => a.Categorie == CritTypeDepot);
-            if (CritDu is { } du) q = q.Where(a => a.DateDepot.Date >= du.Date);
-            if (CritAu is { } au) q = q.Where(a => a.DateDepot.Date <= au.Date);
-
-            // "Lister actes non numerisables" AJOUTE ces actes a la liste :
-            // dans RIG v2 ils sont masques tant que la case n est pas cochee.
-            if (!CritNonNumerisables) q = q.Where(a => a.Numerisable);
-            if (CritAnomalies) q = q.Where(a => !string.IsNullOrEmpty(a.Anomalie));
-
-            return q.Take(Math.Clamp(CritTopMax, 1, 500)).ToArray();
-        }
-    }
+        ["ouvrirDossier"] = IleReact.Rappel(OuvrirDossier)
+    };
 }
