@@ -27,6 +27,9 @@
 //     DemandeDe). Ce que l'affaire ne dit pas reste vide, rien n'est emprunte a la demo.
 // fix-ok: constate sur 004182 le 20/11 -- l'etat de depart (client, n de demande,
 // articles, encaissement) etait celui de la demo quel que soit le dossier recu.
+// fix-ok: constate sur 004151 le 20/11 (chef, exe bf90a8a) -- une facture SANS article
+// gardait le mode « Facturer » (facture numerotee a 0 EUR), le total 0,00 et l'encaissement
+// « Facture soldee » : l'ecran supposait qu'il y a toujours quelque chose a facturer.
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
@@ -103,6 +106,16 @@ const Tarif: readonly ArticleTarif[] = [
   { code: 'INP04', libelle: 'Transmission INPI',         prixUht: 12.00, tauxTva: 20, bodacc: 0,      inpi: 18.50, autre: 0,    ttc: 32.90,  natures: [] },
   { code: 'DIV05', libelle: 'Frais divers',              prixUht: 8.00,  tauxTva: 20, bodacc: 0,      inpi: 0,     autre: 4.20, ttc: 14.64,  natures: [] },
 ]
+
+// Les natures dont le depot ne se facture pas au greffe : RIEN A FACTURER, ce n'est pas
+// un trou du tarif. « Depot de bilan » : le greffe n'encaisse rien au depot de la
+// declaration de cessation des paiements ; ses emoluments dans la procedure collective
+// sont pris sur les fonds du debiteur, ou avances par le Tresor public (Code de commerce,
+// art. L663-1, lu sur Legifrance le 20/11/2026). La fiche service-public F22352
+// (« Declaration de cessation des paiements (depot de bilan) », verifiee le 01/01/2025)
+// decrit la declaration mais ne dit rien de son cout (lue le 20/11/2026).
+// Une nature seulement ABSENTE du tarif (Radiation, Depot d actes...) n'est pas dite gratuite.
+const NaturesGratuites: readonly string[] = ['Depot de bilan']
 
 // La facture de demonstration, celle de l'ecran ouvert depuis l'accueil (capture
 // de l'ecran Blazor du 18/11/2026 : 458,63 EUR TTC).
@@ -236,6 +249,13 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
   const articles = lignes.map(article)
   const total = articles.filter((a) => !retires.has(a.code)).reduce((s, a) => s + centimes(a.ttc), 0)
   const reste = Math.max(0, total - centimes(encaisse))
+  // Une facture d'affaire SANS article n'est ni a emettre (une facture numerotee a 0 EUR)
+  // ni a encaisser, et n'est pas « soldee » : l'ecran dit pourquoi il n'y a rien.
+  const nature = dossier ? natureDe(dossier) : ''
+  const sansArticle = articles.length === 0
+  const pourquoiRien = NaturesGratuites.includes(nature)
+    ? `Rien a facturer : ${nature}, depot gratuit au greffe.`
+    : `Aucun article du tarif pour cette affaire${nature ? ` (${nature})` : ''}.`
 
   return (
     <div className="rig-proc__corps">
@@ -292,16 +312,20 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
             « F » (facturer) ou « T » (tarifer). */}
         <div className="rig-criteres__bloc">
           <div className="rig-kicker">Mode</div>
-          <div className="rig-onglets">
-            <button className={`rig-onglet${tarifer ? '' : ' rig-onglet--actif'}`}
-                    onClick={() => setTarifer(false)}>Facturer</button>
-            <button className={`rig-onglet${tarifer ? ' rig-onglet--actif' : ''}`}
-                    onClick={() => setTarifer(true)}>Tarifer</button>
-          </div>
+          {!sansArticle && (
+            <div className="rig-onglets">
+              <button className={`rig-onglet${tarifer ? '' : ' rig-onglet--actif'}`}
+                      onClick={() => setTarifer(false)}>Facturer</button>
+              <button className={`rig-onglet${tarifer ? ' rig-onglet--actif' : ''}`}
+                      onClick={() => setTarifer(true)}>Tarifer</button>
+            </div>
+          )}
           <p className="rig-nonmaq__texte rig-nonmaq__texte--sourd">
-            {tarifer
-              ? 'Tarifer : le montant est calcule sans emettre de facture.'
-              : 'Facturer : une facture numerotee sera emise.'}
+            {sansArticle
+              ? 'Aucune facture ne sera emise.'
+              : tarifer
+                ? 'Tarifer : le montant est calcule sans emettre de facture.'
+                : 'Facturer : une facture numerotee sera emise.'}
           </p>
         </div>
 
@@ -330,7 +354,7 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
         <div className="rig-resultats-proc__entete">
           <div className="rig-kicker">Articles de la facture</div>
           <span className="rig-resultats-proc__compte">
-            Total TTC {euros(total)} EUR — reste a encaisser {euros(reste)} EUR
+            {sansArticle ? 'Aucun article' : `Total TTC ${euros(total)} EUR — reste a encaisser ${euros(reste)} EUR`}
           </span>
         </div>
 
@@ -351,11 +375,9 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
               </tr>
             </thead>
             <tbody>
-              {articles.length === 0 && dossier && (
+              {sansArticle && (
                 <tr>
-                  <td colSpan={10} className="rig-table__vide">
-                    Aucun article du tarif pour cette affaire{natureDe(dossier) ? ` (${natureDe(dossier)})` : ''}.
-                  </td>
+                  <td colSpan={10} className="rig-table__vide">{pourquoiRien}</td>
                 </tr>
               )}
               {articles.map((art) => (
@@ -378,7 +400,7 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
           </table>
         </div>
 
-        <div className="rig-criteres__bloc" style={{ padding: 'var(--rig-esp-3)' }}>
+        {!sansArticle && <div className="rig-criteres__bloc" style={{ padding: 'var(--rig-esp-3)' }}>
           <div className="rig-kicker">Encaissement</div>
           <div className="rig-criteres__paire">
             <label className="rig-saisie-champ">
@@ -426,7 +448,7 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
           <span className={`rig-etat rig-etat--${reste <= 0 ? 'ok' : 'attente'}`}>
             {reste <= 0 ? 'Facture soldee' : `Solde restant ${euros(reste)} EUR`}
           </span>
-        </div>
+        </div>}
       </section>
     </div>
   )

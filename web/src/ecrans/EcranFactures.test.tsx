@@ -106,6 +106,7 @@ const DemandesDemo: Record<string, { numero: string; client: string }> = {
   '004182': { numero: '004182', client: 'AMIENS BILL.' },
   '004151': { numero: '004151', client: 'TRANSNORD' },
   '004176': { numero: '004176', client: 'SCI DU PARC' },
+  '004179': { numero: '004179', client: 'MARTIN EURL' },
 }
 
 function ouvrirPour(dossier: ContexteDossierVue | null) {
@@ -131,8 +132,20 @@ function sansRienDeLaDemo(c: HTMLElement) {
   expect(c.textContent).not.toMatch(/Changement de gerant|Refacturation INPI|812,40/)
 }
 
+// Une facture SANS article n'est ni a emettre ni a encaisser : pas de « Facturer »
+// (une facture numerotee a 0 EUR), pas de total, pas de « Facture soldee ».
+function sansFactureNiEncaissement(c: HTMLElement) {
+  expect(compte(c)).toBe('Aucun article')
+  expect(c.textContent).not.toMatch(/Total TTC|Facture soldee|une facture numerotee sera emise/)
+  expect(screen.queryByRole('button', { name: 'Facturer' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Tarifer' })).toBeNull()
+  expect(screen.getByText('Aucune facture ne sera emise.')).toBeTruthy()
+  expect(screen.queryByLabelText('Montant encaisse')).toBeNull()
+}
+
 const AmiensBillards = contexteDossier({ numero: '004182', siren: '109 678 235', objet: 'Immatriculation - AMIENS BILLARDS', nom: 'AMIENS BILLARDS' })
 const Transnord = contexteDossier({ numero: '004151', siren: '318 552 004', objet: 'Depot de bilan - TRANSNORD SA', nom: 'TRANSNORD SA' })
+const MartinEurl = contexteDossier({ numero: '004179', siren: '521 004 332', objet: 'Radiation - MARTIN EURL', nom: 'MARTIN EURL' })
 
 describe('EcranFactures ouvert depuis une affaire', () => {
   it('montre l\'affaire choisie en tete ; sans affaire, l\'ecran d\'avant', async () => {
@@ -167,20 +180,26 @@ describe('EcranFactures ouvert depuis une affaire', () => {
     // Rien n'est encaisse sur cette facture : tout reste a encaisser.
     expect(compte(container)).toBe('Total TTC 194,85 EUR — reste a encaisser 194,85 EUR')
     expect(valeur('Montant encaisse')).toBe('')
+    expect(solde(container).textContent).toBe('Solde restant 194,85 EUR')
+    // Le jumeau de 004151 : une facture qui a un article s'emet, comme depuis l'accueil.
+    expect(screen.getByRole('button', { name: 'Facturer' }).className).toBe('rig-onglet rig-onglet--actif')
+    expect(screen.getByText('Facturer : une facture numerotee sera emise.')).toBeTruthy()
     sansRienDeLaDemo(container)
   })
 
   // Un « depot de bilan » est la declaration de cessation des paiements (procedure
   // collective ; glossaire du Brain, 50-metier-judiciaire), PAS le depot des comptes
-  // annuels : DEP03 ne le facture pas, et le tarif RCS de l'ecran n'a aucun article pour lui.
-  // fix-ok: refuse par le chef le 20/11 -- 004151 etait facture DEP03 « Depot des comptes annuels ».
-  it('004151, un depot de bilan : aucun article du tarif, mais sa demande et son client', async () => {
+  // annuels : DEP03 ne le facture pas. Et son depot ne se facture pas au greffe : rien
+  // a facturer, donc ni facture numerotee a 0 EUR ni « Facture soldee ».
+  // fix-ok: refuse par le chef le 20/11 -- 004151 etait facture DEP03 « Depot des comptes annuels »,
+  // puis montrait une facture vide « soldee », emissible, comme si le tarif avait un trou.
+  it('004151, un depot de bilan : rien a facturer, depot gratuit -- mais sa demande et son client', async () => {
     const { container, pont } = ouvrirPour(Transnord)
     expect(lignes(container)).toEqual([[
-      'Aucun article du tarif pour cette affaire (Depot de bilan).',
+      'Rien a facturer : Depot de bilan, depot gratuit au greffe.',
     ]])
-    expect(container.textContent).not.toMatch(/DEP03|Depot des comptes annuels/)
-    expect(compte(container)).toBe('Total TTC 0,00 EUR — reste a encaisser 0,00 EUR')
+    expect(container.textContent).not.toMatch(/DEP03|Depot des comptes annuels|Aucun article du tarif/)
+    sansFactureNiEncaissement(container)
     await waitFor(() => expect(valeur('N de demande')).toBe('004151'))
     expect(pont.appels).toHaveBeenCalledWith('EcranFactures.DemandeDe', '004151')
     expect(valeur('Abrege')).toBe('TRANSNORD')
@@ -205,12 +224,25 @@ describe('EcranFactures ouvert depuis une affaire', () => {
     }))
     await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranFactures.DemandeDe', 'J-00931'))
     expect(lignes(container)).toEqual([[
-      'Aucun article du tarif pour cette affaire (Depot de bilan).',
+      'Rien a facturer : Depot de bilan, depot gratuit au greffe.',
     ]])
-    expect(compte(container)).toBe('Total TTC 0,00 EUR — reste a encaisser 0,00 EUR')
+    sansFactureNiEncaissement(container)
     expect(valeur('N de demande')).toBe('')
     expect(valeur('Abrege')).toBe('')
     expect(valeur('Nom du client')).toBe('')
+    sansRienDeLaDemo(container)
+  })
+
+  // Le jumeau de la gratuite : une radiation n'a pas d'article dans le tarif de l'ecran,
+  // mais rien ne dit qu'elle est gratuite -- l'ecran le dit tel quel, sans facture a emettre.
+  it('004179, une radiation absente du tarif : aucun article, sans pretendre le depot gratuit', async () => {
+    const { container } = ouvrirPour(MartinEurl)
+    expect(lignes(container)).toEqual([[
+      'Aucun article du tarif pour cette affaire (Radiation).',
+    ]])
+    expect(container.textContent).not.toMatch(/gratuit/)
+    sansFactureNiEncaissement(container)
+    await waitFor(() => expect(valeur('N de demande')).toBe('004179'))
     sansRienDeLaDemo(container)
   })
 
