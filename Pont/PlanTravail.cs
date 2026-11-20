@@ -674,6 +674,89 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         NoeudRenomme = element;
     }
 
+    // ---- Les PIECES du classeur (plan « Vue du dossier = coeur des actions », lot 4, 20/11/2026) ----
+
+    /// <summary>Le geste « arbreJoindre » : le dossier qui recoit le fichier, son nom, son contenu en base64.</summary>
+    private sealed record GesteJoindreFichier(string Id, string Nom, string Contenu);
+
+    /// <summary>
+    /// JOINDRE UN FICHIER (glisse sur une carte ou un dossier du classeur, ou choisi par « Joindre un
+    /// fichier ») : il est range avec les pieces jointes de l'affaire (PiecesJointes.Ranger), pose
+    /// dans le dossier vise comme un element cree -- retenu avec l'arbre, meme validation
+    /// hierarchique -- et s'ouvre dans la colonne du document. La page n'envoie qu'un fichier
+    /// accepte : un refus ici est une erreur franche, comme un geste inconnu.
+    /// </summary>
+    private void JoindreFichier(NoeudGed cible, string nom, byte[] contenu)
+    {
+        if (DossierOuvert is null) return;
+        if (cible.EstPiece || cible.EstFiche)
+            throw new InvalidOperationException($"« {Libelle(cible)} » n'est pas un dossier : on n'y joint pas de fichier.");
+        if (PiecesJointes.Refus(nom, contenu) is { } refus) throw new InvalidOperationException(refus);
+        var dossierPieces = AccueilEtat.DossierPiecesJointes;
+        var affaire = CleAffaire;
+        if (Soumettre("Joindre", Libelle(cible), $"piece jointe : {nom}",
+                      () => Inserer(cible, PiecesJointes.Ranger(dossierPieces, affaire, nom, contenu, DateTime.Today))))
+            return;
+        var piece = PiecesJointes.Ranger(dossierPieces, affaire, nom, contenu, DateTime.Today);
+        Inserer(cible, piece);
+        // Comme « Kbis a jour » (AfficherKbis) : sa carte s'ouvre et la piece s'y montre choisie ; en
+        // mode tache, l'arbre replie peut ne pas la lister, le document s'ouvre quand meme.
+        OuvrirDepuisHistorique(piece);
+        if (!GuideVisible || !ReferenceEquals(ApercuNoeud, piece)) OuvrirApercu(piece);
+    }
+
+    /// <summary>Les pieces qu'un dossier range, sous-dossiers compris, telles que ce login les voit.</summary>
+    private List<NoeudGed> PiecesDe(NoeudGed dossier)
+        => AccesGed.PiecesSous(dossier, Domaines, AjoutsArbre, MasquesArbre).ToList();
+
+    private static string NombreDePieces(int n) => n + (n == 1 ? " piece" : " pieces");
+
+    /// <summary>Ce que la modale annonce pour ce noeud : le libelle d'une piece, ou celui d'un
+    /// dossier suivi du nombre de pieces qu'il range (« Pieces jointes (5 pieces) »).</summary>
+    private string CibleDeLaModale(NoeudGed n)
+        => n.EstPiece ? Libelle(n) : $"{Libelle(n)} ({NombreDePieces(PiecesDe(n).Count)})";
+
+    /// <summary>« Imprimer » du menu : une piece, ou un dossier entier -- toutes ses pieces,
+    /// sous-dossiers compris (_Print recursif de RIG v2). La modale d'impression dit combien.</summary>
+    private void ImprimerNoeud(NoeudGed n)
+    {
+        MenuNoeud = null;
+        var cible = CibleDeLaModale(n);
+        OuvrirImpression();
+        ImpressionDe = cible;
+    }
+
+    /// <summary>« Envoyer par mail » du menu : une piece, ou un dossier entier (_EnvoiDossierParMail).</summary>
+    private void EnvoyerNoeud(NoeudGed n)
+    {
+        MenuNoeud = null;
+        var cible = CibleDeLaModale(n);
+        OuvrirEnvoiMail();
+        EnvoiDe = cible;
+    }
+
+    /// <summary>« Ouvrir dans une fenetre » du menu : la piece s'ouvre, puis sort dans sa fenetre
+    /// (le geste « detacher » de la colonne du document).</summary>
+    private void OuvrirNoeudDansUneFenetre(NoeudGed n)
+    {
+        MenuNoeud = null;
+        if (!n.EstPiece) return;
+        OuvrirDepuisHistorique(n);
+        if (!ReferenceEquals(ApercuNoeud, n)) OuvrirApercu(n);
+        DetacherDocument();
+    }
+
+    /// <summary>Le menu du clic droit, selon la nature du noeud (Modales.tsx, MenuNoeud).</summary>
+    private MenuNoeudVue VueMenuNoeud(NoeudGed n)
+    {
+        var libelle = Libelle(n);
+        // Un dossier numerote se copie par son numero (« Copier le n° »), le reste par son libelle.
+        var numero = n.EstPiece || n.EstFiche ? null : AccesGed.NumeroDe(libelle);
+        return new MenuNoeudVue(libelle, MenuX, MenuY, n.EstPiece,
+                                n.EstPiece || n.EstFiche ? 0 : PiecesDe(n).Count,
+                                numero ?? libelle, numero is not null);
+    }
+
     private const string DateDepot = "10/09/2026";
     private const string Greffe = "9999";
 

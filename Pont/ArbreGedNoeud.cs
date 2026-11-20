@@ -98,7 +98,11 @@ public static class ArbreGedNoeud
             Depliable: affiches.Count > 0,
             Ouvert: ouvert,
             Renomme: ReferenceEquals(renomme, noeud),
-            Compte: visibles.Count > 0 && noeud.NbPieces > 0 ? noeud.NbPieces : null,
+            // Les pieces qu'il range pour ce login, ajouts compris, suppressions exclues (lot 4,
+            // 20/11/2026) : NbPieces, le compte fige du jeu de demonstration, ignorait les pieces
+            // jointes et supprimees (GedCheck, « une piece jointe compte dans sa carte »).
+            Compte: visibles.Count > 0 && AccesGed.PiecesSous(noeud, domaines, ajouts, masques).Count() is > 0 and var n
+                ? n : null,
             Enfants: enfants,
             Vide: ouvert && visibles.Count == 0 && string.IsNullOrWhiteSpace(filtre)
                   && !noeud.EstPiece && !noeud.EstFiche,

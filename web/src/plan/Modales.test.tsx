@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { EnvoiMail, Impression, MenuNoeud, Nouveau } from './Modales'
 import { morceaux } from '../test/morceaux'
 import type { GestePlan } from './types'
@@ -67,19 +67,65 @@ describe('Modales du plan de travail', () => {
     expect(gestes()).toEqual([['ajouterElement', 'pdf'], ['fermerNouveau', null]])
   })
 
-  it('Menu du clic droit : pose sous le pointeur ; un dossier a trois operations de plus qu\'une piece', () => {
+  // Les vues du menu, comme Pont/PlanTravail.cs (VueMenuNoeud) les rend.
+  const dossier = { titre: 'Depot n A2024/038654', x: 300, y: 400.5, estPiece: false, pieces: 2, copie: 'A2024/038654', copieNumero: true }
+  const piece = { titre: 'Kbis a jour', x: 1, y: 1, estPiece: true, pieces: 0, copie: 'Kbis a jour', copieNumero: false }
+  const items = (c: Element) => [...c.querySelectorAll('.rig-ctx button')].map((b) => b.textContent)
+
+  it('Menu du clic droit : pose sous le pointeur ; un dossier s\'imprime et s\'envoie ENTIER, ses pieces annoncees', () => {
     const { plan, gestes } = geste()
-    const { container, rerender } = render(<MenuNoeud plan={plan} vue={{ titre: 'Dossier RCS', x: 300, y: 400.5, estPiece: false }} />)
+    const { container } = render(<MenuNoeud plan={plan} vue={dossier} />)
     const menu = container.querySelector('.rig-ctx') as HTMLElement
     expect(menu.style.left).toBe('300px')
     expect(menu.style.top).toBe('400.5px')
-    expect(morceaux(menu)).toEqual(['<div>', ' ', '<button>', '<button>', ' ', '<button>', ' ', '<button>', '<button>', ' ', '<div>', ' ', '<button>'])
-    expect([...menu.querySelectorAll('button')].map((b) => b.textContent))
-      .toEqual(['Renommer', 'Nouvel element ici…', 'Tout deplier', 'Tout replier', 'Dupliquer', 'Supprimer'])
-    rerender(<MenuNoeud plan={plan} vue={{ titre: 'Kbis a jour', x: 1, y: 1, estPiece: true }} />)
-    expect([...container.querySelectorAll('.rig-ctx button')].map((b) => b.textContent)).toEqual(['Renommer', 'Dupliquer', 'Supprimer'])
+    expect(morceaux(menu)).toEqual(['<div>', ' ', '<button>', '<button>', '<button>', '<div>', ' ', '<button>', '<button>', ' ', '<button>', ' ', '<button>', '<button>', ' ', '<div>', ' ', '<button>'])
+    expect(items(menu)).toEqual(['Imprimer (2 pieces)', 'Envoyer par mail (2 pieces)', 'Copier le n° A2024/038654',
+      'Renommer', 'Nouvel element ici…', 'Tout deplier', 'Tout replier', 'Dupliquer', 'Supprimer'])
+    fireEvent.click(menu.querySelectorAll('button')[0]!)
+    fireEvent.click(menu.querySelectorAll('button')[1]!)
+    expect(gestes()).toEqual([['menuImprimer', null], ['menuEnvoyer', null]])
+  })
+
+  it('une piece s\'ouvre dans une fenetre, s\'imprime, s\'envoie, se copie par son libelle ; pas d\'operation de dossier', () => {
+    const { plan, gestes } = geste()
+    const { container } = render(<MenuNoeud plan={plan} vue={piece} />)
+    expect(items(container)).toEqual(['Ouvrir dans une fenetre', 'Imprimer', 'Envoyer par mail', 'Copier le libelle', 'Renommer', 'Dupliquer', 'Supprimer'])
+    fireEvent.click(container.querySelectorAll('.rig-ctx button')[0]!)
     fireEvent.contextMenu(container.querySelector('.rig-voile')!)
     fireEvent.click(container.querySelector('.rig-ctx__item--danger')!)
-    expect(gestes()).toEqual([['fermerMenu', null], ['menuSupprimer', null]])
+    expect(gestes()).toEqual([['menuFenetre', null], ['fermerMenu', null], ['menuSupprimer', null]])
+  })
+
+  it('ouvert pres du bord (carte du bas), le menu remonte et recule pour rester entier dans la fenetre', () => {
+    // jsdom ne mesure rien : le menu fait ici 180 x 300 px, la fenetre 1024 x 768.
+    const mesure = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({ width: 180, height: 300, x: 0, y: 0, top: 0, left: 0, right: 180, bottom: 300, toJSON: () => ({}) })
+    const { plan } = geste()
+    const { container } = render(<MenuNoeud plan={plan} vue={{ ...dossier, x: 1000, y: 700 }} />)
+    const menu = container.querySelector('.rig-ctx') as HTMLElement
+    expect([menu.style.left, menu.style.top]).toEqual([`${window.innerWidth - 180 - 8}px`, `${window.innerHeight - 300 - 8}px`])
+    mesure.mockRestore()
+  })
+
+  it('une fiche ou un dossier vide : rien a imprimer ni a envoyer ; un dossier d\'une piece le dit au singulier', () => {
+    const { plan } = geste()
+    const { container, rerender } = render(<MenuNoeud plan={plan} vue={{ ...dossier, titre: 'Informations des depots', pieces: 0, copie: 'Informations des depots', copieNumero: false }} />)
+    expect(items(container)).toEqual(['Copier le libelle', 'Renommer', 'Nouvel element ici…', 'Tout deplier', 'Tout replier', 'Dupliquer', 'Supprimer'])
+    rerender(<MenuNoeud plan={plan} vue={{ ...dossier, titre: 'Depot n 2024/0141', pieces: 1, copie: '2024/0141' }} />)
+    expect(items(container).slice(0, 3)).toEqual(['Imprimer (1 piece)', 'Envoyer par mail (1 piece)', 'Copier le n° 2024/0141'])
+  })
+
+  it('Copier : le n° du dossier part au presse-papiers et le menu se ferme ; un presse-papiers refuse se dit', async () => {
+    const ecrire = vi.fn<(t: string) => Promise<void>>().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('refuse'))
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: ecrire }, configurable: true })
+    const { plan, gestes } = geste()
+    const { container } = render(<MenuNoeud plan={plan} vue={dossier} />)
+    const copier = () => [...container.querySelectorAll('.rig-ctx button')].find((b) => b.textContent!.startsWith('Cop'))!
+    fireEvent.click(copier())
+    await waitFor(() => expect(gestes()).toEqual([['fermerMenu', null]]))
+    expect(ecrire).toHaveBeenCalledWith('A2024/038654')
+    fireEvent.click(copier())
+    await waitFor(() => expect(copier().textContent).toBe('Copie impossible'))
+    expect(gestes()).toEqual([['fermerMenu', null]])
   })
 })

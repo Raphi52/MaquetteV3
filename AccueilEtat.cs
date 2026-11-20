@@ -573,6 +573,10 @@ public sealed class AccueilEtat
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "RigV3", "accueil.json");
 
+    /// <summary>Le dossier des fichiers joints aux affaires (Metier/ArbreGed.cs, PiecesJointes), a cote
+    /// du fichier de reglages : avec RIGV3_ETAT, ce sont ceux de la copie, jamais ceux de l'utilisateur.</summary>
+    public static string DossierPiecesJointes => PiecesJointes.DossierPour(Chemin);
+
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
 
     public static AccueilEtat Charger()

@@ -1241,6 +1241,20 @@ Exiger(Regex.IsMatch(pontAccueil, @"Alertes = AlertesOuvertes\(\);\s*Taches = Ta
         "pont de l'arbre : un dossier ouvert sans piece annonce « aucune piece »");
     Exiger(arbreVu.Compte == racineGed.NbPieces && arbreVu.Icone == RigV3Desktop.AccesGed.CodeIcone(racineGed),
         "pont de l'arbre : le compte de pieces et l'icone viennent du metier");
+    // Lot 4 du plan « Vue du dossier » (20/11/2026) : le compte d'une carte suit ce que l'agent
+    // y a JOINT et ce qu'il a SUPPRIME. Il lisait NoeudGed.NbPieces, le compte fige du jeu de
+    // demonstration : « Pieces jointes » annoncait 4 pieces en en montrant 5.
+    var pjCompte = racineGed.Descendants().First(n => n.Libelle == "Pieces jointes");
+    var ajoutsCompte = RigV3Desktop.AccesGed.NouveauxAjouts();
+    ajoutsCompte[pjCompte] = [RigV3Desktop.AccesGed.NouvellePiece("Attestation URSSAF", "PDF", "20/11/2026")];
+    var masquesCompte = RigV3Desktop.AccesGed.NouveauxMasques();
+    int? CompteDe(RigV3Desktop.NoeudGed n) => RigV3Desktop.Pont.ArbreGedNoeud.Vue(
+        n, 2, ouverts, null, tous, ajoutsCompte, masquesCompte, null, null, null, null, index).Compte;
+    Exiger(pjCompte.NbPieces == 4 && CompteDe(pjCompte) == 5,
+        $"pont de l'arbre : une piece jointe compte dans sa carte (4 + 1, lu : {CompteDe(pjCompte)})");
+    masquesCompte.Add(pjCompte.Enfants[0]);
+    masquesCompte.Add(pjCompte.Enfants[1]);
+    Exiger(CompteDe(pjCompte) == 3, $"pont de l'arbre : une piece supprimee ne compte plus (5 - 2, lu : {CompteDe(pjCompte)})");
 
     // Fenetre detachee : la piece et sa decoupe en pages, par le passe-plat.
     var partageDoc = new RigV3Desktop.DocumentPartage();

@@ -19,9 +19,16 @@
 // ouvertes, filtre, chemin, renommage, droits du login, classement, replis. Ici,
 // seulement la mise en page et un choix d'affichage tenu par l'ecran : le classeur
 // montre.
+//
+// JOINDRE UN FICHIER (plan « Vue du dossier », lot 4, 20/11/2026 ; RIG v2 :
+// _ImporterPieceAutreSansBordereau) : un PDF ou une image glisse depuis l'explorateur
+// sur une carte, un intertitre ou la carte « hors rubrique », ou choisi par « Joindre
+// un fichier » dans la carte ouverte. L'ecran le lit, refuse en clair un type non
+// accepte, et remonte au pont son nom et son contenu en base64 (geste « arbreJoindre ») :
+// le pont le range, l'ajoute a l'arbre et l'ouvre dans la colonne du document.
 
-import { Fragment, useState } from 'react'
-import type { CSSProperties, MouseEvent } from 'react'
+import { Fragment, useRef, useState } from 'react'
+import type { ChangeEvent, CSSProperties, DragEvent, MouseEvent } from 'react'
 import { Saisie } from '../session'
 import { IconeGed } from './IconeGed'
 
@@ -96,7 +103,94 @@ export interface ProprietesClasseurArbre {
   renommer: (renommage: { id: string, texte: string }) => void
   /** Bouton « trois points » : ouvre le menu des operations. */
   menuContextuel: (souris: SourisArbre) => void
+  /** Un fichier accepte, depose ou choisi sur un dossier : le pont le joint a l'affaire. */
+  joindre: (fichier: FichierJoint) => void
 }
+
+/** Ce que l'ecran remonte au pont pour un fichier joint (geste « arbreJoindre »). */
+export interface FichierJoint {
+  /** Le dossier qui le recoit (une rubrique, un sous-dossier, le domaine). */
+  id: string
+  nom: string
+  /** Le contenu du fichier, en base64. */
+  contenu: string
+}
+
+/**
+ * Les types qu'on peut joindre, et le debut de leur contenu une fois en base64
+ * (« %PDF » -> « JVBER », FF D8 FF -> « /9j/ », la signature PNG -> « iVBORw0KGgo »).
+ * La MEME regle garde le pont (Metier/ArbreGed.cs, PiecesJointes.Refus) : un message
+ * identique, que le fichier soit refuse ici ou la-bas.
+ */
+const SIGNATURES: Record<string, string> = { pdf: 'JVBER', jpg: '/9j/', jpeg: '/9j/', png: 'iVBORw0KGgo' }
+
+/** Ce que le selecteur de fichier propose. */
+export const TYPES_JOINTS = '.pdf,.jpg,.jpeg,.png'
+
+/**
+ * Pourquoi ce fichier n'est pas joint, ou null. Sans contenu (avant lecture), seul
+ * le type se juge : un .docx est refuse sans etre lu.
+ */
+export function refusFichier(nom: string, contenu: string | null = null): string | null {
+  const point = nom.lastIndexOf('.')
+  const extension = point < 0 ? '' : nom.slice(point + 1).toLowerCase()
+  const signature = SIGNATURES[extension]
+  if (signature === undefined) return `« ${nom} » n'est pas joint : seuls les PDF et les images JPG ou PNG sont acceptes.`
+  if (contenu === null) return null
+  if (contenu.length === 0) return `« ${nom} » est vide : il n'est pas joint.`
+  if (!contenu.startsWith(signature)) {
+    return `« ${nom} » n'est pas un vrai ${extension === 'jpeg' ? 'JPG' : extension.toUpperCase()} : il n'est pas joint.`
+  }
+  return null
+}
+
+/** Le contenu du fichier en base64 (ce qui suit la virgule de son adresse « data: »). */
+function lireEnBase64(fichier: File): Promise<string> {
+  return new Promise((resoudre, rejeter) => {
+    const lecteur = new FileReader()
+    lecteur.onload = () => {
+      const url = String(lecteur.result)
+      resoudre(url.slice(url.indexOf(',') + 1))
+    }
+    lecteur.onerror = () => rejeter(lecteur.error ?? new Error('lecture impossible'))
+    lecteur.readAsDataURL(fichier)
+  })
+}
+
+/**
+ * Joint ces fichiers au dossier, un par un (le dernier joint est celui qui reste ouvert).
+ * Rend les refus, dans l'ordre des fichiers ; un fichier refuse n'est pas envoye.
+ */
+export async function joindreFichiers(id: string, fichiers: readonly File[], joindre: (f: FichierJoint) => void): Promise<string[]> {
+  const refus: string[] = []
+  for (const f of fichiers) {
+    const avant = refusFichier(f.name)
+    if (avant !== null) { refus.push(avant); continue }
+    let contenu: string
+    try { contenu = await lireEnBase64(f) } catch { refus.push(`« ${f.name} » n'a pas pu etre lu : il n'est pas joint.`); continue }
+    const apres = refusFichier(f.name, contenu)
+    if (apres !== null) { refus.push(apres); continue }
+    joindre({ id, nom: f.name, contenu })
+  }
+  return refus
+}
+
+/** Ce que les cartes et les intertitres recoivent pour accepter un fichier glisse. */
+interface Depot {
+  /** Le dossier survole par un fichier en cours de glisse (il s'eclaire). */
+  survol: string | null
+  /** Les evenements de glisse d'une zone qui joint au dossier <id>. */
+  zone: (id: string) => {
+    onDragOver: (e: DragEvent<HTMLElement>) => void
+    onDragLeave: (e: DragEvent<HTMLElement>) => void
+    onDrop: (e: DragEvent<HTMLElement>) => void
+  }
+  /** « Joindre un fichier » : ouvre le selecteur pour ce dossier. */
+  choisir: (id: string) => void
+}
+
+/** Un glisser qui porte des FICHIERS (de l'explorateur), pas un texte ou un onglet. */
+const porteDesFichiers = (e: DragEvent<HTMLElement>) => [...e.dataTransfer.types].includes('Files')
 
 function souris(id: string, e: MouseEvent<HTMLButtonElement>): SourisArbre {
   return {
@@ -188,7 +282,7 @@ function Ligne({ ligne, profondeur, p }: { ligne: LigneArbreVue, profondeur: num
  * un clic sur l'intertitre le replie (le pont le retient, et le rouvre quand une piece
  * qu'il range est choisie ailleurs : historique, palette, frise).
  */
-function Contenu({ lignes, profondeur, p }: { lignes: LigneArbreVue[], profondeur: number, p: ProprietesClasseurArbre }) {
+function Contenu({ lignes, profondeur, p, depot }: { lignes: LigneArbreVue[], profondeur: number, p: ProprietesClasseurArbre, depot: Depot }) {
   return (
     <>
       {lignes.map((l) => {
@@ -196,9 +290,11 @@ function Contenu({ lignes, profondeur, p }: { lignes: LigneArbreVue[], profondeu
         const ouvert = !l.replie
         return (
           <Fragment key={l.id}>
-            <div className={'rig-classeur__it' + (l.chemin ? ' rig-classeur__it--chemin' : '')}
+            {/* Un fichier glisse SUR l'intertitre va dans ce sous-dossier. */}
+            <div className={'rig-classeur__it' + (l.chemin ? ' rig-classeur__it--chemin' : '')
+                            + (depot.survol === l.id ? ' rig-classeur__depot' : '')}
                  style={{ '--p': profondeur } as CSSProperties}
-                 role="button" aria-expanded={ouvert} onClick={() => p.replier(l.id)}>
+                 role="button" aria-expanded={ouvert} onClick={() => p.replier(l.id)} {...depot.zone(l.id)}>
               <span className={'rig-arbre__chevron' + (ouvert ? ' rig-arbre__chevron--ouvert' : '')} aria-hidden="true">&#9656;</span>
               <IconeGed nature="dossier" classe="rig-classeur__it-icone" />
               <Libelle ligne={l} renommer={p.renommer} />
@@ -206,7 +302,7 @@ function Contenu({ lignes, profondeur, p }: { lignes: LigneArbreVue[], profondeu
               <Actions ligne={l} menuContextuel={p.menuContextuel} />
             </div>
             {ouvert && l.vide && <div className="rig-classeur__vide" style={{ '--p': profondeur + 1 } as CSSProperties}>aucune piece</div>}
-            {ouvert && <Contenu key={l.id + ':c'} lignes={l.enfants} profondeur={profondeur + 1} p={p} />}
+            {ouvert && <Contenu key={l.id + ':c'} lignes={l.enfants} profondeur={profondeur + 1} p={p} depot={depot} />}
           </Fragment>
         )
       })}
@@ -255,12 +351,14 @@ function periode(rubrique: LigneArbreVue): string {
   return premiere === derniere ? 'le ' + premiere : 'du ' + premiere + ' au ' + derniere
 }
 
-function Rubrique({ r, p }: { r: LigneArbreVue, p: ProprietesClasseurArbre }) {
+function Rubrique({ r, p, depot }: { r: LigneArbreVue, p: ProprietesClasseurArbre, depot: Depot }) {
   const { tri, trier } = p
   const meta = r.compte !== null ? pieces(r.compte) + (r.derniere ? ' · ' + r.derniere : '') : 'aucune piece'
   return (
-    <section className={'rig-classeur__carte' + (r.ouvert ? ' rig-classeur__carte--ouverte' : '')} style={teinte(r.groupe)}
-             aria-label={r.texte}>
+    /* Un fichier glisse sur la carte, ouverte ou fermee, va dans la rubrique. */
+    <section className={'rig-classeur__carte' + (r.ouvert ? ' rig-classeur__carte--ouverte' : '')
+                        + (depot.survol === r.id ? ' rig-classeur__depot' : '')} style={teinte(r.groupe)}
+             aria-label={r.texte} {...depot.zone(r.id)}>
       <div className={'rig-classeur__tete' + (r.chemin ? ' rig-classeur__tete--chemin' : '')}
            role="button" aria-expanded={r.ouvert} onClick={() => p.rubrique(r.id)}>
         <Libelle ligne={r} renommer={p.renommer} />
@@ -280,7 +378,10 @@ function Rubrique({ r, p }: { r: LigneArbreVue, p: ProprietesClasseurArbre }) {
             </span>
           </div>
           {r.vide && <div className="rig-classeur__vide">aucune piece</div>}
-          {tri === 'date' ? <Chronologie rubrique={r} p={p} /> : <Contenu lignes={r.enfants} profondeur={0} p={p} />}
+          {tri === 'date' ? <Chronologie rubrique={r} p={p} /> : <Contenu lignes={r.enfants} profondeur={0} p={p} depot={depot} />}
+          {/* Au pied de la carte, sur toute sa largeur : dans la barre des outils, il coupait la periode. */}
+          <button type="button" className="rig-classeur__joindre" title={'Joindre un PDF ou une image a « ' + r.texte + ' » (ou le glisser sur la carte)'}
+                  onClick={() => depot.choisir(r.id)}>Joindre un fichier</button>
         </div>
       )}
     </section>
@@ -303,8 +404,59 @@ export function ClasseurArbre(p: ProprietesClasseurArbre) {
   const hors = affiche.enfants.filter((e) => !estRubrique(e))
   const piecesHors = hors.filter((e) => !estDossier(e) && e.icone !== 'note').length
 
+  // JOINDRE : le dossier survole par un fichier, les refus du dernier depot, le selecteur.
+  const [survol, setSurvol] = useState<string | null>(null)
+  const [refus, setRefus] = useState<string[]>([])
+  const selecteur = useRef<HTMLInputElement>(null)
+  const cibleDuSelecteur = useRef<string | null>(null)
+  const recevoir = (id: string, fichiers: readonly File[]) => {
+    if (fichiers.length === 0) return
+    void joindreFichiers(id, fichiers, p.joindre).then(setRefus)
+  }
+  const depot: Depot = {
+    survol,
+    zone: (id) => ({
+      onDragOver: (e) => {
+        if (!porteDesFichiers(e)) return
+        // preventDefault : sans lui, le navigateur refuse le depot (et ouvrirait le fichier).
+        e.preventDefault()
+        e.stopPropagation()
+        e.dataTransfer.dropEffect = 'copy'
+        if (survol !== id) setSurvol(id)
+      },
+      onDragLeave: (e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null) && survol === id) setSurvol(null)
+      },
+      onDrop: (e) => {
+        if (!porteDesFichiers(e)) return
+        e.preventDefault()
+        e.stopPropagation()
+        setSurvol(null)
+        recevoir(id, [...e.dataTransfer.files])
+      },
+    }),
+    choisir: (id) => {
+      cibleDuSelecteur.current = id
+      selecteur.current?.click()
+    },
+  }
+  const choisi = (e: ChangeEvent<HTMLInputElement>) => {
+    const fichiers = [...(e.target.files ?? [])]
+    // Vide, pour que choisir encore le MEME fichier redeclenche le changement.
+    e.target.value = ''
+    if (cibleDuSelecteur.current !== null) recevoir(cibleDuSelecteur.current, fichiers)
+  }
+
   return (
     <div className="rig-classeur">
+      <input ref={selecteur} type="file" accept={TYPES_JOINTS} multiple hidden onChange={choisi}
+             aria-label="Fichier a joindre" />
+      {refus.length > 0 && (
+        <div className="rig-classeur__refus" role="alert">
+          <span>{refus.map((r) => <span key={r}>{r}</span>)}</span>
+          <button type="button" aria-label="Fermer" title="Fermer" onClick={() => setRefus([])}>{'×'}</button>
+        </div>
+      )}
       {domaines.length > 1 && (
         <div className="rig-classeur__bascule" role="tablist" aria-label="Classeurs du dossier">
           {domaines.map((d) => (
@@ -325,12 +477,14 @@ export function ClasseurArbre(p: ProprietesClasseurArbre) {
         </button>
       )}
       {hors.length > 0 && (
-        <section className="rig-classeur__hors" aria-label={affiche.texte + ' hors rubrique'}>
+        /* Un fichier glisse ici va directement sous le domaine. */
+        <section className={'rig-classeur__hors' + (survol === affiche.id ? ' rig-classeur__depot' : '')}
+                 aria-label={affiche.texte + ' hors rubrique'} {...depot.zone(affiche.id)}>
           <div className="rig-classeur__hors-titre">{affiche.texte} <span>{piecesHors > 0 ? pieces(piecesHors) + ' hors rubrique' : 'hors rubrique'}</span></div>
-          <Contenu lignes={hors} profondeur={0} p={p} />
+          <Contenu lignes={hors} profondeur={0} p={p} depot={depot} />
         </section>
       )}
-      {affiche.enfants.filter(estRubrique).map((r) => <Rubrique key={r.id} r={r} p={p} />)}
+      {affiche.enfants.filter(estRubrique).map((r) => <Rubrique key={r.id} r={r} p={p} depot={depot} />)}
       {affiche.enfants.length === 0 && <div className="rig-classeur__vide">aucune piece</div>}
     </div>
   )
