@@ -14,10 +14,11 @@
 // et les regles de l'ancien @code vivent dans Pont/EcranRequisitions.cs
 // (SessionRequisitions) ; cet ecran affiche la vue et remonte chaque geste.
 
-import type { KeyboardEvent } from 'react'
+import { useEffect, useRef, type KeyboardEvent } from 'react'
 import { EnteteTriable } from '../composants/EnteteTriable'
 import { appeler } from '../pont'
 import { Saisie, useSession, type PontDeSession } from '../session'
+import type { ContexteDossierVue } from '../plan/types'
 
 export interface LigneCommandeWebRequi {
   /** Sa place dans le jeu de l'ecran : elle revient avec le clic. */
@@ -160,8 +161,26 @@ const colonnesCommandesWeb: ReadonlyArray<readonly [string, string, string?]> = 
 
 const bascule = (actif: boolean) => `rig-bascule ${actif ? 'rig-bascule--actif' : ''}`
 
-export function EcranRequisitions() {
+export interface ProprietesEcranRequisitions {
+  /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) ; absent ou null depuis l'accueil. */
+  dossier?: ContexteDossierVue | null
+}
+
+export function EcranRequisitions({ dossier = null }: ProprietesEcranRequisitions) {
   const [vue, geste] = useSession(pont)
+
+  // Ouvert depuis une affaire : des que la session repond, son entreprise est
+  // cherchee par son SIREN -- les gestes de l'agent qui le saisit puis clique
+  // « Rechercher ». Une seule fois : ensuite, les criteres sont les siens. Sans
+  // SIREN (affaire de test), rien n'est pose : le critere reste a saisir.
+  const preRempli = useRef(false)
+  const ouverte = vue !== null
+  useEffect(() => {
+    if (!ouverte || dossier === null || dossier.siren.length === 0 || preRempli.current) return
+    preRempli.current = true
+    geste('Critere', { champ: 'CritSiren', valeur: dossier.siren })
+    geste('Rechercher')
+  }, [ouverte, dossier, geste])
 
   // Avant la premiere reponse du pont : le cadre seul, sans aucune valeur fausse.
   if (!vue) return <div className="rig-proc__corps rig-proc__corps--cmdweb"></div>

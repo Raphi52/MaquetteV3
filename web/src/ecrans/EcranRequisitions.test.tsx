@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { EcranRequisitions, type ArticlesRequi, type LigneCommandeWebRequi, type VueRequisitions } from './EcranRequisitions'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
+import { contexteDossier } from '../test/dossier'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
 
@@ -175,5 +176,30 @@ describe('EcranRequisitions', () => {
     const appels = pont.appels.mock.calls.map((c) => c[0])
     expect(appels).toEqual(['EcranRequisitions.Ouvrir', 'EcranRequisitions.Fermer'])
     expect(pont.appels).toHaveBeenLastCalledWith('EcranRequisitions.Fermer', 'S')
+  })
+})
+
+// Ouvert depuis la page d'une affaire : des que la session repond, son
+// entreprise est cherchee par son SIREN -- les gestes de l'agent, une seule fois
+// (plan « Vue du dossier », lot 2).
+describe('EcranRequisitions ouvert depuis une affaire', () => {
+  it('pose son SIREN et lance la recherche, une fois', async () => {
+    const { gestes } = session()
+    const { rerender } = render(<EcranRequisitions dossier={contexteDossier()} />)
+    await waitFor(() => expect(gestes).toEqual([['Critere', { champ: 'CritSiren', valeur: '812 445 901' }], ['Rechercher', null]]))
+    rerender(<EcranRequisitions dossier={contexteDossier()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Reinitialiser' }))
+    await waitFor(() => expect(gestes.map(([g]) => g)).toEqual(['Critere', 'Rechercher', 'Effacer']))
+  })
+
+  it('sans affaire, ou une affaire sans SIREN : aucun geste a l\'ouverture', async () => {
+    const { gestes } = session()
+    const sans = render(<EcranRequisitions dossier={null} />)
+    await screen.findByText('Commandes web a traiter (2)')
+    sans.unmount()
+    render(<EcranRequisitions dossier={contexteDossier({ siren: '' })} />)
+    await screen.findByText('Commandes web a traiter (2)')
+    fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
+    await waitFor(() => expect(gestes).toEqual([['Rechercher', null]]))
   })
 })

@@ -13,6 +13,8 @@
 
 import { useState } from 'react'
 import { contientSansCasse, estBlanc } from '../criteres'
+import { PourLeDossier } from '../composants/PourLeDossier'
+import type { ContexteDossierVue } from '../plan/types'
 
 // v2 : table COURRIER_JUDICIAIRE (colonnes COUJU_*).
 interface Courrier {
@@ -34,7 +36,13 @@ const Courriers: Courrier[] = [
   { code: 'CD_MESURE', libelle: 'Courrier de suivi de mesure', typeEntite: 'MESURE', paramEdition: 'MAQ_SUIVI_MES', avecDestinataire: true, actif: false },
 ]
 
-export function EcranCourriersDivers() {
+export interface ProprietesEcranCourriersDivers {
+  /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) : le courrier est pour elle,
+   *  deja choisie (bloc « Pour le dossier »). Absent ou null depuis l'accueil. */
+  dossier?: ContexteDossierVue | null
+}
+
+export function EcranCourriersDivers({ dossier = null }: ProprietesEcranCourriersDivers) {
   const [recherche, setRecherche] = useState('')
   const [typeFiltre, setTypeFiltre] = useState('')
   const [actifsSeuls, setActifsSeuls] = useState(true)
@@ -55,6 +63,8 @@ export function EcranCourriersDivers() {
     <div className="rig-proc__corps">
 
       <aside className="rig-criteres">
+        {dossier && <PourLeDossier dossier={dossier} />}
+
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Courriers divers</div>
 
         <label className="rig-saisie-champ">

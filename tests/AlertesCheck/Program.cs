@@ -379,7 +379,9 @@ Exiger(Regex.IsMatch(aiguillage, @"<EcranVerrous\b"),
 Exiger(tsxVerrous.Contains("ouvrirDossier: (numero: string) => void")
        && tsxVerrous.Contains("onClick={() => ouvrirDossier(v.dossier)}"),
     "l'ecran garde le geste OuvrirDossier et le remonte au clic d'une ligne");
-Exiger(aiguillage.Contains("<EcranVerrous ouvrirDossier={ouvrirParNumero} />")
+// Le branchement, quels que soient les autres attributs de l'element (depuis le lot 2
+// du plan « Vue du dossier », 20/11/2026 : la cle et le contexte de l'affaire).
+Exiger(Regex.IsMatch(aiguillage, @"<EcranVerrous\b[^>]*\souvrirDossier=\{ouvrirParNumero\}")
        && aiguillage.Contains("const ouvrirParNumero = (numero: string) => plan('ouvrirNumero', numero)")
        && gestesPlan.Contains("case \"ouvrirNumero\": OuvrirParNumero(Texte(valeur)); break;"),
     "le plan de travail ouvre toujours l'affaire cliquee dans l'ecran des verrous");
@@ -419,7 +421,7 @@ Exiger(Regex.IsMatch(aiguillage, @"<EcranTeletransmission\b"),
 Exiger(tsxTeletrans.Contains("ouvrirDossier: (numero: string) => void")
        && tsxTeletrans.Contains("ouvrirDossier(f.numDemande)"),
     "l'ecran des teletransmissions garde le geste OuvrirDossier et le remonte depuis React");
-Exiger(aiguillage.Contains("<EcranTeletransmission ouvrirDossier={ouvrirParNumero} />"),
+Exiger(Regex.IsMatch(aiguillage, @"<EcranTeletransmission\b[^>]*\souvrirDossier=\{ouvrirParNumero\}"),
     "le plan de travail ouvre toujours l'affaire du flux clique");
 Exiger(tsxTeletrans.Contains("appeler<VueTeletransmission>('EcranTeletransmission.Flux', mode)")
        && pontTeletrans.Contains("[JSInvokable(\"EcranTeletransmission.Flux\")]"),

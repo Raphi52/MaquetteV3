@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { EcranTeletransmission, type VueTeletransmission } from './EcranTeletransmission'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 import { morceaux } from '../test/morceaux'
+import { contexteDossier } from '../test/dossier'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
 
@@ -37,5 +38,34 @@ describe('EcranTeletransmission', () => {
     await screen.findByText('Aucun flux recu')
     await waitFor(() => expect(pont.appels).toHaveBeenLastCalledWith('EcranTeletransmission.Flux', 'TOUS'))
     expect(screen.getByText('Aucun flux pour ce mode.')).toBeTruthy()
+  })
+})
+
+// Ouvert depuis la page d'une affaire : seuls les flux rattaches a elle ; l'etat
+// du canal reste celui de TOUS les flux (plan « Vue du dossier », lot 2).
+describe('EcranTeletransmission ouvert depuis une affaire', () => {
+  const nombre = (c: HTMLElement) => c.querySelector('.rig-resultats-proc__compte')!.textContent
+
+  it('ne montre que ses flux ; la bascule rend toute la liste', async () => {
+    installerFauxPont({ 'EcranTeletransmission.Flux': vue })
+    const { container } = render(<EcranTeletransmission ouvrirDossier={vi.fn()} dossier={contexteDossier({ numero: '004151' })} />)
+    await screen.findByText('Canal au vert')
+    expect(nombre(container)).toBe('1 flux')
+    expect(screen.getByText('A7')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Dossier 004151 seulement' }))
+    expect(nombre(container)).toBe('2 flux')
+  })
+
+  it('une affaire sans flux le dit, canal toujours au vert ; sans affaire, ni bascule ni filtre', async () => {
+    installerFauxPont({ 'EcranTeletransmission.Flux': vue })
+    const avec = render(<EcranTeletransmission ouvrirDossier={vi.fn()} dossier={contexteDossier()} />)
+    expect(await screen.findByText('Aucun flux pour le dossier 004176 dans ce mode.')).toBeTruthy()
+    expect(screen.getByText('Canal au vert')).toBeTruthy()
+    avec.unmount()
+
+    const sans = render(<EcranTeletransmission ouvrirDossier={vi.fn()} dossier={null} />)
+    await screen.findByText('Canal au vert')
+    expect(nombre(sans.container)).toBe('2 flux')
+    expect(screen.queryByRole('button', { name: /seulement$/ })).toBeNull()
   })
 })

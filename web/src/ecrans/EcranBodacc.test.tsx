@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EcranBodacc } from './EcranBodacc'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
+import { contexteDossier } from '../test/dossier'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
 
@@ -71,5 +72,34 @@ describe('EcranBodacc', () => {
     const { ouvrirDossier } = ouvrir()
     fireEvent.click(await screen.findByText('Changement de gerant'))
     expect(ouvrirDossier).toHaveBeenCalledWith('2019B00233')
+  })
+})
+
+// Ouvert depuis la page d'une affaire : ses annonces, par son numero dans
+// « Num annonce / dossier » (plan « Vue du dossier », lot 2).
+describe('EcranBodacc ouvert depuis une affaire', () => {
+  const rendre = (dossier: ReturnType<typeof contexteDossier> | null) => {
+    installerFauxPont({ 'EcranBodacc.DateDuJour': () => '2026-09-09' })
+    return render(<EcranBodacc ouvrirDossier={vi.fn()} dossier={dossier} />)
+  }
+
+  it('montre ses seules annonces, le critere deja rempli', async () => {
+    const { container } = rendre(contexteDossier({ numero: '2019B00233' }))
+    expect(await screen.findByText('Changement de gerant')).toBeTruthy()
+    expect(compte(container)).toBe('1 annonce(s)')
+    expect((screen.getByLabelText('Num annonce / dossier') as HTMLInputElement).value).toBe('2019B00233')
+  })
+
+  it('une affaire sans annonce le dit ; sans affaire, toute la liste', async () => {
+    const avec = rendre(contexteDossier())
+    expect(await screen.findByText('Aucune annonce ne repond a ces criteres.')).toBeTruthy()
+    expect(compte(avec.container)).toBe('0 annonce(s)')
+    avec.unmount()
+    retirerFauxPont()
+
+    const sans = rendre(null)
+    expect(await screen.findByText('Immatriculation SARL LES TILLEULS')).toBeTruthy()
+    expect(compte(sans.container)).toBe('3 annonce(s)')
+    expect((screen.getByLabelText('Num annonce / dossier') as HTMLInputElement).value).toBe('')
   })
 })

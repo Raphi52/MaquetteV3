@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EcranGedJud } from './EcranGedJud'
+import { contexteDossier } from '../test/dossier'
 
 afterEach(cleanup)
 
@@ -51,5 +52,21 @@ describe('EcranGedJud', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Afficher le document' }))
     expect(ouvrirDossier).toHaveBeenCalledWith('2024B00318')
+  })
+})
+
+// Ouvert depuis la page d'une affaire judiciaire : ses documents, par son numero
+// dans « Instance / decision » (plan « Vue du dossier », lot 2).
+describe('EcranGedJud ouvert depuis une affaire', () => {
+  it('ne montre que ses documents, le critere deja rempli ; sans affaire, les quatre', () => {
+    const avec = render(<EcranGedJud ouvrirDossier={vi.fn()} dossier={contexteDossier({ numero: '2026J00134', type: 'JUD' })} />)
+    expect(compte(avec.container)).toBe('1 document(s)')
+    expect(screen.getByText('Ordonnance de designation')).toBeTruthy()
+    expect((screen.getByLabelText('Instance / decision') as HTMLInputElement).value).toBe('2026J00134')
+    avec.unmount()
+
+    const sans = render(<EcranGedJud ouvrirDossier={vi.fn()} dossier={null} />)
+    expect(compte(sans.container)).toBe('4 document(s)')
+    expect((screen.getByLabelText('Instance / decision') as HTMLInputElement).value).toBe('')
   })
 })

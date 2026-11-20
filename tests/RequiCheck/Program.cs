@@ -57,8 +57,8 @@ var texte = File.ReadAllText(cheminPont);
 var maison = File.ReadAllText(home);
 
 // --- 1. L'ecran est ATTEIGNABLE : sans ce branchement il n'existe pour personne.
-Exiger(Regex.IsMatch(aiguillage, @"case\s+'PROC_REQUI'\s*:\s*\r?\n\s*return <EcranRequisitions\s*/>"),
-    "le plan de travail route PROC_REQUI vers <EcranRequisitions />");
+Exiger(Regex.IsMatch(aiguillage, @"case\s+'PROC_REQUI'\s*:\s*\r?\n\s*return <EcranRequisitions key=\{cle\} dossier=\{dossier\} />"),
+    "le plan de travail route PROC_REQUI vers <EcranRequisitions />, avec le contexte de l'affaire");
 // Le menu de gauche est rendu par React depuis le lot 1 du passage a React
 // (19/11/2026) : son catalogue vit dans Pont/MenuAccueil.cs.
 var menuAccueil = File.ReadAllText(Path.Combine(racine, "Pont", "MenuAccueil.cs"));
@@ -67,9 +67,13 @@ Exiger(menuAccueil.Contains("\"PROC_REQUI\")") || Regex.IsMatch(menuAccueil, @"n
 Exiger(maison.Contains("Moments = Pont.MenuAccueil.Moments;"),
     "le plan de travail aiguille sur ce meme catalogue");
 // Blazor retire (19/11/2026) : plus de coquille, l'ecran React se monte seul,
-// sans parametre, comme sa coquille le faisait.
-Exiger(!File.Exists(coquille) && Regex.IsMatch(tsx, @"export function EcranRequisitions\(\)"),
-    "l'ecran React se monte sans parametre, sans coquille .razor (export function EcranRequisitions())");
+// sans parametre obligatoire, comme sa coquille le faisait. Depuis le lot 2 du plan
+// « Vue du dossier » (20/11/2026), seul s'y ajoute, FACULTATIF, le contexte de
+// l'affaire d'ou on l'ouvre.
+Exiger(!File.Exists(coquille)
+       && Regex.IsMatch(tsx, @"export function EcranRequisitions\(\{ dossier = null \}: ProprietesEcranRequisitions\)")
+       && Regex.IsMatch(tsx, @"export interface ProprietesEcranRequisitions \{\s*(?:/\*\*[^\n]*\*/\s*)?dossier\?: ContexteDossierVue \| null\s*\}"),
+    "l'ecran React se monte sans parametre obligatoire, sans coquille .razor (seul dossier?, l'affaire d'ou on l'ouvre)");
 Exiger(tsx.Contains("'EcranRequisitions.Ouvrir'") && tsx.Contains("'EcranRequisitions.Agir'")
        && tsx.Contains("'EcranRequisitions.Fermer'")
        && texte.Contains("[JSInvokable(\"EcranRequisitions.Ouvrir\")]")

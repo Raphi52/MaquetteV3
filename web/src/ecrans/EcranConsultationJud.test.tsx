@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EcranConsultationJud } from './EcranConsultationJud'
+import { contexteDossier } from '../test/dossier'
 
 afterEach(cleanup)
 
@@ -55,5 +56,21 @@ describe('EcranConsultationJud', () => {
     expect(container.querySelector('pre.rig-code')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Visualiser le XML' }))
     expect(container.querySelector('pre.rig-code')!.textContent).toBe('<enrolement num="2026J00140" />')
+  })
+})
+
+// Ouvert depuis la page d'une affaire judiciaire : cherchee par son numero dans
+// « Affaire / dossier » (plan « Vue du dossier », lot 2).
+describe('EcranConsultationJud ouvert depuis une affaire', () => {
+  it('ne montre qu\'elle, le critere deja rempli ; sans affaire, les quatre', () => {
+    const avec = render(<EcranConsultationJud ouvrirDossier={vi.fn()} dossier={contexteDossier({ numero: '2026J00134', type: 'JUD' })} />)
+    expect(compte(avec.container)).toBe('1 affaire(s)')
+    expect(screen.getByText('SAS TRANSPORTS MARNE')).toBeTruthy()
+    expect((screen.getByLabelText('Affaire / dossier') as HTMLInputElement).value).toBe('2026J00134')
+    avec.unmount()
+
+    const sans = render(<EcranConsultationJud ouvrirDossier={vi.fn()} dossier={null} />)
+    expect(compte(sans.container)).toBe('4 affaire(s)')
+    expect((screen.getByLabelText('Affaire / dossier') as HTMLInputElement).value).toBe('')
   })
 })

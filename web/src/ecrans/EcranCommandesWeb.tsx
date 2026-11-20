@@ -49,6 +49,7 @@ import { PoigneeColonne } from '../composants/PoigneeColonne'
 import { appeler } from '../pont'
 import { EcranVisible } from '../plan/visibilite'
 import { Saisie, useSession, type Geste, type PontDeSession } from '../session'
+import type { ContexteDossierVue } from '../plan/types'
 
 export interface OptionCw { valeur: string; libelle: string }
 export interface MessageCw { texte: string; severite: string }
@@ -906,7 +907,12 @@ function GroupeListe({ g, noms, plie, fixe, basculer, children }: {
   )
 }
 
-export function EcranCommandesWeb() {
+export interface ProprietesEcranCommandesWeb {
+  /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) ; absent ou null depuis l'accueil. */
+  dossier?: ContexteDossierVue | null
+}
+
+export function EcranCommandesWeb({ dossier = null }: ProprietesEcranCommandesWeb) {
   const [vue, geste] = useSession(pont)
   const { bascule, sortant } = useBascule(vue?.panneau ?? null)
   const pliage = usePliage(vue?.panneau ?? null, vue?.groupes ?? [])
@@ -917,6 +923,19 @@ export function EcranCommandesWeb() {
   const liste = useRef<HTMLElement>(null)
   const [largeurListe, poserLargeurListe] = useState<number | null>(null)
   const visible = useContext(EcranVisible)
+
+  // Ouvert depuis une affaire : des que la session repond, ses commandes sont
+  // cherchees par son SIREN (critere « SIREN » puis « Rechercher », les gestes de
+  // l'agent). Une seule fois : ensuite, les criteres sont les siens. Sans SIREN
+  // (affaire de test), la liste reste celle de l'accueil.
+  const preRempli = useRef(false)
+  const ouverte = vue !== null
+  useEffect(() => {
+    if (!ouverte || dossier === null || dossier.siren.length === 0 || preRempli.current) return
+    preRempli.current = true
+    geste('Texte', { champ: 'SirenCherche', valeur: dossier.siren })
+    geste('Rechercher')
+  }, [ouverte, dossier, geste])
 
   // Ctrl K pose le curseur dans la pilule, comme sa touche l'annonce. Pas
   // quand l'onglet est cache (src/plan/visibilite.ts) : la touche irait au

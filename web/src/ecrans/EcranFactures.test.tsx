@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EcranFactures } from './EcranFactures'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
+import { contexteDossier } from '../test/dossier'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
 
@@ -89,5 +90,25 @@ describe('EcranFactures', () => {
     const { container } = ouvrir()
     const actions = container.querySelector('.rig-criteres__actions')!
     expect(actions.childNodes[1]?.textContent).toBe(' ')
+  })
+})
+
+// Ouvert depuis la page d'une affaire : la facture est pour elle, deja choisie
+// (bloc « Pour le dossier » ; plan « Vue du dossier », lot 2).
+describe('EcranFactures ouvert depuis une affaire', () => {
+  it('montre l\'affaire choisie en tete ; sans affaire, l\'ecran d\'avant', () => {
+    installerFauxPont({ 'EcranFactures.DateDuJour': () => '2026-09-09' })
+    const avec = render(<EcranFactures dossier={contexteDossier()} />)
+    expect(screen.getByText('Pour le dossier')).toBeTruthy()
+    expect((screen.getByLabelText('N de dossier') as HTMLInputElement).value).toBe('004176')
+    expect((screen.getByLabelText('Siren') as HTMLInputElement).value).toBe('812 445 901')
+    expect((screen.getByLabelText('Denomination') as HTMLInputElement).value).toBe('SCI DU PARC')
+    expect(compte(avec.container)).toBe('Total TTC 458,63 EUR — reste a encaisser 258,63 EUR')
+    avec.unmount()
+
+    const sans = render(<EcranFactures dossier={null} />)
+    expect(screen.queryByText('Pour le dossier')).toBeNull()
+    expect(screen.queryByLabelText('N de dossier')).toBeNull()
+    expect(sans.container.querySelector('.rig-criteres > .rig-kicker')!.textContent).toBe('Informations client')
   })
 })

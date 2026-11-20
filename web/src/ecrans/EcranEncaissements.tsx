@@ -17,6 +17,8 @@
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { centimes, euros } from '../format'
+import { PourLeDossier } from '../composants/PourLeDossier'
+import type { ContexteDossierVue } from '../plan/types'
 
 interface Ventilation {
   identifiant: string
@@ -42,7 +44,16 @@ const Lignes: Ventilation[] = [
 // enregistre.
 const EncaissementRepris: string | null = 'E-2026-0447 du 02/09/2026'
 
-export function EcranEncaissements() {
+/** Le numero de l'affaire d'une ventilation (« 2026B00811 — Immatriculation » -> « 2026B00811 »). */
+const numeroAffaire = (l: Ventilation): string => l.affaire.split(' — ')[0] ?? ''
+
+export interface ProprietesEcranEncaissements {
+  /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) : le reglement est pour elle
+   *  (bloc « Pour le dossier », ses ventilations cochees). Absent ou null depuis l'accueil. */
+  dossier?: ContexteDossierVue | null
+}
+
+export function EcranEncaissements({ dossier = null }: ProprietesEcranEncaissements) {
   const [payeur, setPayeur] = useState('SELARL LEROY & ASSOCIES')
   const [modePaiement, setModePaiement] = useState('Cheque')
   // null tant que le pont n'a pas repondu (ou une fois la date effacee).
@@ -56,7 +67,11 @@ export function EcranEncaissements() {
   // decimal, une saisie illisible ne remet pas le montant a zero.
   const [montantTexte, setMontantTexte] = useState('357.57')
   const [montant, setMontant] = useState(centimes(357.57))
-  const [choisies, setChoisies] = useState<ReadonlySet<string>>(new Set(['V-2026-8801', 'V-2026-8802']))
+  // Ouvert depuis une affaire : les ventilations cochees au depart sont les SIENNES
+  // (aucune si elle n'en a pas), jamais celles d'autres affaires.
+  const [choisies, setChoisies] = useState<ReadonlySet<string>>(() => new Set(dossier
+    ? Lignes.filter((l) => numeroAffaire(l) === dossier.numero).map((l) => l.identifiant)
+    : ['V-2026-8801', 'V-2026-8802']))
 
   useEffect(() => {
     let perime = false
@@ -86,6 +101,8 @@ export function EcranEncaissements() {
     <div className="rig-proc__corps">
 
       <aside className="rig-criteres">
+        {dossier && <PourLeDossier dossier={dossier} />}
+
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Saisie d'encaissement</div>
 
         <label className="rig-saisie-champ">

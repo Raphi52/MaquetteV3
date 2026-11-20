@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
+import type { ContexteDossierVue } from '../plan/types'
 
 export interface LigneVerrou {
   dossier: string
@@ -32,11 +33,17 @@ export interface VueVerrous {
 export interface ProprietesEcranVerrous {
   /** Remonte le NUMERO clique : l'ecran ne connait pas la visionneuse. */
   ouvrirDossier: (numero: string) => void
+  /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) ; absent ou null depuis l'accueil. */
+  dossier?: ContexteDossierVue | null
 }
 
-export function EcranVerrous({ ouvrirDossier }: ProprietesEcranVerrous) {
+export function EcranVerrous({ ouvrirDossier, dossier = null }: ProprietesEcranVerrous) {
   const [utilisateur, setUtilisateur] = useState('R. VILAIN')
   const [moiCompris, setMoiCompris] = useState(false)
+  // Ouvert depuis une affaire : la liste se limite a elle (« qui la tient ? ») ;
+  // la bascule, montree seulement alors, rend la liste entiere.
+  const [surLeDossier, setSurLeDossier] = useState(dossier !== null)
+  const filtre = surLeDossier ? dossier : null
   // null tant que le pont n'a pas repondu : on n'affiche alors ni ligne ni
   // « aucun dossier », qui serait faux pendant ce court instant.
   const [vue, setVue] = useState<VueVerrous | null>(null)
@@ -50,7 +57,8 @@ export function EcranVerrous({ ouvrirDossier }: ProprietesEcranVerrous) {
     return () => { perime = true }
   }, [utilisateur, moiCompris])
 
-  const verrouilles = vue?.lignes ?? []
+  const tous = vue?.lignes ?? []
+  const verrouilles = filtre ? tous.filter((v) => v.dossier === filtre.numero) : tous
 
   return (
     <div className="rig-proc__corps">
@@ -69,6 +77,14 @@ export function EcranVerrous({ ouvrirDossier }: ProprietesEcranVerrous) {
           <span className="rig-bascule__temoin"></span>
           <span>Inclure mes propres dossiers</span>
         </button>
+
+        {dossier && (
+          <button className={`rig-bascule${surLeDossier ? ' rig-bascule--actif' : ''}`}
+                  onClick={() => setSurLeDossier(!surLeDossier)}>
+            <span className="rig-bascule__temoin"></span>
+            <span>Dossier {dossier.numero} seulement</span>
+          </button>
+        )}
 
         <div className="rig-criteres__bloc">
           <div className="rig-kicker">Detenteurs</div>
@@ -114,7 +130,9 @@ export function EcranVerrous({ ouvrirDossier }: ProprietesEcranVerrous) {
                 </tr>
               ))}
               {vue && verrouilles.length === 0 && (
-                <tr><td colSpan={5} className="rig-table__vide">Aucun dossier n'est retenu par un autre poste.</td></tr>
+                <tr><td colSpan={5} className="rig-table__vide">
+                  {filtre ? `Le dossier ${filtre.numero} n'est retenu par aucun autre poste.` : "Aucun dossier n'est retenu par un autre poste."}
+                </td></tr>
               )}
             </tbody>
           </table>

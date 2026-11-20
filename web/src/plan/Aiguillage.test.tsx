@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { Aiguillage } from './Aiguillage'
 import { paletteVue, proc } from '../test/plan'
+import { contexteDossier } from '../test/dossier'
 import type { GestePlan } from './types'
 import { EcranActes } from '../ecrans/EcranActes'
 import { EcranArrivee } from '../ecrans/EcranArrivee'
@@ -76,6 +77,28 @@ describe('Aiguillage des ecrans de procedure', () => {
     const { el, plan } = aiguiller('RECHERCHE', { ...proc().ecran, recherche })
     expect(el!.type).toBe(EcranRecherche)
     expect(el!.props).toEqual({ vue: recherche, plan })
+  })
+
+  it('un ecran ouvert depuis une affaire en recoit le contexte, monte a sa cle ; sans affaire, ni l\'un ni l\'autre', () => {
+    const dossier = contexteDossier()
+    const pourLAffaire = { ...proc().ecran, dossier }
+    for (const code of ['PROC_DEMANDE', 'PROC_REQUI', 'PROC_COMMANDES_WEB', 'PROC_CLOT', 'BODACC', 'PROC_DEPOTJUD',
+                        'PROC_CJUD', 'PROC_GEDJUD', 'PROC_FACTURE', 'PROC_ENCAISS', 'PROC_COURRIER_DIVERS',
+                        'PROC_VERROUS', 'PROC_TELETRANS']) {
+      const avec = aiguiller(code, pourLAffaire).el!
+      expect(avec.props.dossier, code).toBe(dossier)
+      // La cle : rouvert pour une autre affaire, l'ecran repart de ses valeurs de depart.
+      expect(avec.key, code).toBe('004176')
+      const sans = aiguiller(code).el!
+      expect(sans.props.dossier, code).toBeNull()
+      expect(sans.key, code).toBeNull()
+    }
+    // Ceux-ci ne peuvent rien faire d'une affaire (aucun critere ni liste a son nom) : rien ne leur est passe.
+    for (const code of ['PROC_ARCHIRAD', 'PROC_REDA', 'PROC_AUDIENCE']) {
+      const el = aiguiller(code, pourLAffaire).el!
+      expect(el.props.dossier, code).toBeUndefined()
+      expect(el.key, code).toBeNull()
+    }
   })
 
   it('une procedure sans ecran tombe sur l\'ecran qui se nomme, avec son motif', () => {

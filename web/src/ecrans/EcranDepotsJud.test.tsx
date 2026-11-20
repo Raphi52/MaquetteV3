@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EcranDepotsJud } from './EcranDepotsJud'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
+import { contexteDossier } from '../test/dossier'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
 
@@ -55,5 +56,27 @@ describe('EcranDepotsJud', () => {
     const { ouvrirDossier } = ouvrir()
     fireEvent.click(screen.getByText('2025J00088'))
     expect(ouvrirDossier).toHaveBeenCalledWith('2023B01120')
+  })
+})
+
+// Ouvert depuis la page d'une affaire judiciaire : son instance, cherchee par
+// son numero dans « N d'instance » (plan « Vue du dossier », lot 2).
+describe('EcranDepotsJud ouvert depuis une affaire', () => {
+  const rendre = (dossier: ReturnType<typeof contexteDossier> | null) => {
+    installerFauxPont({ 'EcranDepotsJud.DateDuJour': () => '2026-09-09' })
+    return render(<EcranDepotsJud ouvrirDossier={vi.fn()} dossier={dossier} />)
+  }
+
+  it('ne montre que son instance, le critere deja rempli ; sans affaire, les quatre', () => {
+    const avec = rendre(contexteDossier({ numero: '2026J00134', type: 'JUD' }))
+    expect(compte(avec.container)).toBe('1 instance(s)')
+    expect(screen.getByText('SAS TRANSPORTS MARNE')).toBeTruthy()
+    expect((screen.getByLabelText('N d\'instance') as HTMLInputElement).value).toBe('2026J00134')
+    avec.unmount()
+    retirerFauxPont()
+
+    const sans = rendre(null)
+    expect(compte(sans.container)).toBe('4 instance(s)')
+    expect((screen.getByLabelText('N d\'instance') as HTMLInputElement).value).toBe('')
   })
 })

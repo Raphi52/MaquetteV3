@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { DureeBascule, EcranCommandesWeb, type PanneauCw, type VueCommandesWeb } from './EcranCommandesWeb'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
+import { contexteDossier } from '../test/dossier'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
 
@@ -664,5 +665,30 @@ describe('EcranCommandesWeb', () => {
     await screen.findByText('Enveloppe · IG-90812')
     expect(container.querySelector('.rig-tcw__enveloppe-texte')!.textContent)
       .toBe('Enveloppe · IG-90812 — avec Certificat de non-faillite · 2 à traiter avant l\'envoi.')
+  })
+})
+
+// Ouvert depuis la page d'une affaire : des que la session repond, ses commandes
+// sont cherchees par son SIREN (critere « SIREN » puis « Rechercher »), une
+// seule fois (plan « Vue du dossier », lot 2).
+describe('EcranCommandesWeb ouvert depuis une affaire', () => {
+  it('pose son SIREN et lance la recherche, une fois', async () => {
+    const { gestes } = session(vueDeBase())
+    const { rerender } = render(<EcranCommandesWeb dossier={contexteDossier()} />)
+    await waitFor(() => expect(gestes).toEqual([['Texte', { champ: 'SirenCherche', valeur: '812 445 901' }], ['Rechercher', null]]))
+    rerender(<EcranCommandesWeb dossier={contexteDossier()} />)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(gestes).toHaveLength(2)
+  })
+
+  it('sans affaire, ou une affaire sans SIREN : aucun geste a l\'ouverture', async () => {
+    const { gestes } = session(vueDeBase())
+    const sans = render(<EcranCommandesWeb dossier={null} />)
+    await waitFor(() => expect(sans.container.querySelector('.rig-tcw__cherche')).not.toBeNull())
+    sans.unmount()
+    const vide = render(<EcranCommandesWeb dossier={contexteDossier({ siren: '' })} />)
+    await waitFor(() => expect(vide.container.querySelector('.rig-tcw__cherche')).not.toBeNull())
+    await new Promise((r) => setTimeout(r, 20))
+    expect(gestes).toEqual([])
   })
 })

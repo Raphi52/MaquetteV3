@@ -23,6 +23,8 @@
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { centimes, euros, nombre } from '../format'
+import { PourLeDossier } from '../composants/PourLeDossier'
+import type { ContexteDossierVue } from '../plan/types'
 
 interface ArticleFacture {
   code: string
@@ -66,7 +68,13 @@ const Payeurs: readonly string[] = ['', 'Debiteur', 'Tiers payeur principal', 'A
 
 const premiereFiche: FicheClient = Fiches[0] ?? { nom: '', abrege: '', typeClient: '', adresse: '', solde: 0 }
 
-export function EcranFactures() {
+export interface ProprietesEcranFactures {
+  /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) : la facture est pour elle,
+   *  deja choisie (bloc « Pour le dossier »). Absent ou null depuis l'accueil. */
+  dossier?: ContexteDossierVue | null
+}
+
+export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
   const [client, setClient] = useState(premiereFiche.nom)
   const [numDemande, setNumDemande] = useState('D2026-04118')
 
@@ -124,6 +132,8 @@ export function EcranFactures() {
     <div className="rig-proc__corps">
 
       <aside className="rig-criteres">
+        {dossier && <PourLeDossier dossier={dossier} />}
+
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Informations client</div>
 
         <div className="rig-criteres__paire">
