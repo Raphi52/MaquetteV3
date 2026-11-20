@@ -1215,9 +1215,16 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         var deduite = d.Objet.Contains(" - ")
             ? d.Objet[(d.Objet.IndexOf(" - ", StringComparison.Ordinal) + 3)..]
             : d.Objet;
+        // Sans fiche a elle, l'affaire prend de celle de SA societe (meme SIREN) la forme juridique et
+        // la date d'immatriculation, l'identite de la societe. Ni l'adresse (le jeu range le siege de
+        // 004151 sous son numero, Metier/JeuDemo.cs) ni la mention ou les dates d'une autre procedure.
+        // fix-ok: 004151 n'a pas d'entree dans SommairesDemo, sa societe en a une (J-00931, meme SIREN)
+        // -- mesure : PlanTravailCheck rouge, Kbis de 004151 lu forme « » et date d'immatriculation « ».
+        var societe = SommaireDeLaSociete(d);
         var s = SommairesDemo.TryGetValue(d.Numero, out var connue)
             ? connue
-            : new Sommaire("", "", "", d.SansDossierRcs ? "PP" : "PM", deduite, "", "", "", "", "", "");
+            : new Sommaire(societe?.FormeJuridique ?? "", "", "", d.SansDossierRcs ? "PP" : "PM", deduite, "", "",
+                           societe?.Immatriculation ?? "", "", "", "");
 
         string Ecrit(string cle, string defaut)
             => Etat.DerniereValeur(d.Numero, cle) is { Length: > 0 } v ? v : defaut;
@@ -1230,6 +1237,19 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             Cessation = Ecrit("DOSSIER_RCS.DATE_CESSATION", s.Cessation)
         };
     }
+
+    /// <summary>
+    /// La fiche sommaire de la SOCIETE de l'affaire : la sienne, sinon celle d'une autre
+    /// affaire du jeu au MEME SIREN (004151, depot de bilan de TRANSNORD SA, n'en a pas ;
+    /// J-00931, la meme societe, en a une). Null sans SIREN (affaire purement judiciaire)
+    /// ou si aucune affaire de cette societe n'en a : jamais celle d'une autre societe.
+    /// </summary>
+    private static Sommaire? SommaireDeLaSociete(Dossier d)
+        => SommairesDemo.GetValueOrDefault(d.Numero)
+           ?? (d.Siren.Length == 0 ? null
+               : FondsDemo.Where(f => f.Siren == d.Siren && f.Numero != d.Numero)
+                          .Select(f => SommairesDemo.GetValueOrDefault(f.Numero))
+                          .FirstOrDefault(x => x is not null));
 
     private static readonly Dossier[] FondsDemo =
     [
@@ -2090,7 +2110,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     /// <summary>
     /// Ce que le jeu de demonstration sait de l'affaire, par colonne de la fiche :
     /// le SIREN de son bandeau, le dossier cree par « Ouvrir un dossier »
-    /// (AffairesOuvertes), sa fiche sommaire (<see cref="SommairesDemo"/>), sa societe
+    /// (AffairesOuvertes), sa fiche sommaire (<see cref="SommairesDemo"/> ; pour la date
+    /// d'immatriculation, celle de sa societe, <see cref="SommaireDeLaSociete"/>), sa societe
     /// (JeuDemo.EntreprisesRequi, par numero d'affaire, le siege d'abord) et sa demande
     /// (JeuDemo.Demandes). Une donnee que l'affaire n'a pas reste VIDE : jusqu'au
     /// 20/11/2026 ces champs prenaient AMIENS BILLARDS pour toute affaire (Kbis de 004151
@@ -2105,7 +2126,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
                                               .OrderBy(x => x.TypeAdresse == "Siege" ? 0 : 1).FirstOrDefault();
         var demande = JeuDemo.Demandes.FirstOrDefault(x => x.Dossier == d.Numero);
         var immatriculation = ouvert is { Immatriculation: var date } && date != default ? date.ToString("yyyy-MM-dd")
-            : DateTime.TryParseExact(sommaire?.Immatriculation, "dd/MM/yyyy",
+            : DateTime.TryParseExact(SommaireDeLaSociete(d)?.Immatriculation, "dd/MM/yyyy",
                                      CultureInfo.InvariantCulture, DateTimeStyles.None, out var immat)
             ? immat.ToString("yyyy-MM-dd") : "";
         var gestion = ouvert?.Numero ?? societe?.Gestion ?? "";

@@ -914,13 +914,32 @@ internal static class Programme
             // connait pas celui de TRANSNORD SA : la ligne reste vide.
             Exiger(k is not null && LigneKbis(k, "Capital social") == "",
                 $"004151 : capital inconnu de l'affaire, pas celui d'AMIENS BILLARDS (lu : « {(k is null ? "aucun Kbis" : LigneKbis(k, "Capital social"))} »)");
-            Exiger(k is not null && LigneKbis(k, "Forme juridique") == FormeBandeau(d) && LigneKbis(k, "Forme juridique") != "Personne morale",
-                $"004151 : la forme juridique du Kbis est celle du bandeau, jamais le type de dossier (lu : Kbis « {(k is null ? "aucun Kbis" : LigneKbis(k, "Forme juridique"))} », bandeau « {FormeBandeau(d)} »)");
-            // Le jeu ne connait pas la date d'immatriculation de 004151 : la ligne reste vide, elle
-            // ne prend pas la date du jour (TRANSNORD, en depot de bilan, « immatricule » le jour meme).
-            // Jumeau : 004176, qui a la sienne au bandeau (12/03/2014), l'affiche (controle suivant).
-            Exiger(k is not null && LigneKbis(k, "Date d'immatriculation") == "",
-                $"004151 : date d'immatriculation inconnue de l'affaire, la ligne reste vide (lu : « {(k is null ? "aucun Kbis" : LigneKbis(k, "Date d'immatriculation"))} »)");
+            // 004151 n'a pas de fiche sommaire a elle, mais sa SOCIETE en a une : J-00931, l'autre
+            // affaire de TRANSNORD SA, meme SIREN 318 552 007 (Societe anonyme, immatriculee le
+            // 18/02/2008). Ce n'est pas « emprunter a une autre societe » : c'est la meme. Le Kbis
+            // les imprimait vides, et la puce du bandeau ne montrait pas la forme.
+            // fix-ok: SommaireDu/ValeursDeLAffaire ne lisaient que SommairesDemo[numero], absent pour 004151 --
+            // mesure : PlanTravailCheck rouge sur 4db0ca7, Kbis de 004151 lu forme « » et date d'immatriculation « ».
+            Exiger(k is not null && LigneKbis(k, "Forme juridique") == "Societe anonyme" && FormeBandeau(d) == "Societe anonyme",
+                $"004151 : la forme juridique est celle de TRANSNORD SA (fiche sommaire de J-00931, meme SIREN), au Kbis comme au bandeau, jamais le type de dossier (lu : Kbis « {(k is null ? "aucun Kbis" : LigneKbis(k, "Forme juridique"))} », bandeau « {FormeBandeau(d)} »)");
+            Exiger(k is not null && LigneKbis(k, "Date d'immatriculation") == "18/02/2008",
+                $"004151 : la date d'immatriculation est celle de TRANSNORD SA (J-00931, meme SIREN), pas la date du jour (lu : « {(k is null ? "aucun Kbis" : LigneKbis(k, "Date d'immatriculation"))} »)");
+            // Seule l'identite de la societe passe d'une affaire a l'autre : le siege de 004151 reste
+            // celui que le jeu range sous 004151 (BOVES, controle plus haut), pas « 41 Route de Paris »
+            // de J-00931, et la mention de la procedure de J-00931 (redressement judiciaire) n'est pas la sienne.
+            Exiger(d.Sommaire.Mention == "" && !d.Sommaire.Champs.Any(c => c.Libelle == "Adresse" && c.Valeur.Contains("Route de Paris")),
+                $"004151 : ni l'adresse ni la mention de J-00931 ne passent a 004151 (lu : mention « {d.Sommaire.Mention} »)");
+
+            // --- Jumeau : 004144 (LES TROIS CHENES) n'a de fiche sommaire ni a elle ni a sa societe.
+            // Forme et date restent VIDES : ni la date du jour, ni la forme d'une autre societe.
+            Faire("ouvrirNumero", "004144");
+            Faire("actionDossier", "kbis");
+            var d44 = s.Vue().Dossier!;
+            var k44 = d44.Apercu?.Apercu?.Kbis;
+            Exiger(k44 is not null && LigneKbis(k44, "Denomination ou raison sociale").Contains("TROIS CHENES")
+                   && LigneKbis(k44, "Forme juridique") == "" && FormeBandeau(d44) == ""
+                   && LigneKbis(k44, "Date d'immatriculation") == "",
+                $"jumeau : 004144, dont le jeu ne connait ni la forme ni la date, les laisse vides (lu : {(k44 is null ? "aucun Kbis" : TexteKbis(k44))} ; bandeau « {FormeBandeau(d44)} »)");
 
             // --- 004176, SCI DU PARC : des anciens defauts d'AMIENS BILLARDS deja enregistres.
             Faire("ouvrirNumero", "004176");
