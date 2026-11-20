@@ -1,0 +1,50 @@
+# SQL Server de DEVELOPPEMENT de la V3 de RIG (lot 1 du plan de reconstruction,
+# 2026-11-20). Mode d'emploi et raisons : docs/reconstruction/architecture.md.
+#
+#   docker compose up -d        # demarre (ou reprend) le serveur
+#   docker compose down         # l'arrete, les bases restent (volume)
+#   docker compose down -v      # l'arrete ET efface toutes ses bases
+#
+# Ce serveur n'est qu'un poste de travail : il n'ecoute que sur la machine
+# (127.0.0.1), jamais sur le reseau. Les bancs (tests/*Check) y creent chacun
+# LEUR base jetable puis la suppriment (Base/BaseJetable.cs) ; ils refusent
+# tout autre serveur que la machine locale -- jamais SQL-DEV ni SQL-PROD.
+#
+# Le port et le mot de passe ont une valeur par defaut, reprise dans
+# Base/BaseJetable.cs (ServeurDeveloppement). Pour les changer, poser AVANT
+# « docker compose up » RIGV3_SQL_PORT et RIGV3_SQL_MDP, et donner aux bancs la
+# chaine complete par RIGV3_SQL. Le mot de passe ne protege qu'un serveur
+# local sans donnee reelle : ce n'est pas un secret de production.
+name: rigv3
+
+services:
+  sql:
+    # SQL Server 2022, edition Developer (gratuite, complete, interdite en
+    # production) : la version que la V3 vise chez les greffes (decision Q4).
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: rigv3-sql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+      MSSQL_SA_PASSWORD: "${RIGV3_SQL_MDP:-RigV3_dev_2026!}"
+      # Collation du SERVEUR = celle de SQL-DEV\DEV (French_CI_AS, lue le
+      # 2026-11-20) : tempdb, donc les tables temporaires, la prennent. Celle
+      # des BASES (SQL_Latin1_General_CP1_CI_AS, comme RIG_DEV) est posee a leur
+      # creation (Base/BaseJetable.cs) : la recopie compare les textes comme la V2.
+      MSSQL_COLLATION: "French_CI_AS"
+      MSSQL_MEMORY_LIMIT_MB: "2048"
+    ports:
+      # 14330 et pas 1433 : un SQL Server installe sur le poste tient souvent 1433.
+      - "127.0.0.1:${RIGV3_SQL_PORT:-14330}:1433"
+    volumes:
+      - donnees:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -b -Q \"SELECT 1\" > /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  donnees:

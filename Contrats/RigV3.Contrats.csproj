@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- LES CONTRATS : les types echanges entre l'ecran (RigV3Desktop, son
+       Pont/ClientServeur.cs) et le serveur (Serveur/). Un seul endroit, reference
+       des deux cotes : un champ renomme d'un cote casse la compilation de
+       l'autre, au lieu d'arriver vide a l'ecran.
+       Rangement : un dossier par theme du carnet (Sante/, Socle/, Numerotation/...),
+       un fichier par echange. Aucun fichier commun a modifier pour en ajouter un.
+       Pas de dependance : ce projet ne contient que des types de donnees
+       (records) et les adresses de leurs routes. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>RigV3.Contrats</RootNamespace>
+  </PropertyGroup>
+
+</Project>

@@ -19,6 +19,20 @@
     <Compile Remove="tests/**" />
     <Content Remove="tests/**" />
     <None Remove="tests/**" />
+    <!-- La V3 (lot 1 du plan de reconstruction, 20/11/2026) : le serveur, l'outil
+         des migrations et les contrats ont chacun leur projet, la documentation
+         n'est pas du code. Comme tests/** : rien de ces dossiers (ni leurs obj/,
+         dont les .cs generes) n'entre dans l'application. -->
+    <Compile Remove="Serveur/**;Base/**;Contrats/**;docs/**" />
+    <Content Remove="Serveur/**;Base/**;Contrats/**;docs/**" />
+    <None Remove="Serveur/**;Base/**;Contrats/**;docs/**" />
+  </ItemGroup>
+
+  <!-- Les types echanges avec le serveur V3 (Pont/ClientServeur.cs) : le meme
+       projet que celui du serveur, pour qu'un champ renomme d'un cote casse la
+       compilation de l'autre. -->
+  <ItemGroup>
+    <ProjectReference Include="Contrats/RigV3.Contrats.csproj" />
   </ItemGroup>
 
   <!-- ECRANS REACT (web/, migration Blazor -> React du 18/11/2026 ; Blazor
@@ -114,6 +128,9 @@
     <Watch Remove="wwwroot/**" />
     <Watch Remove="**/*.log" />
     <Watch Remove="tests/**" />
+    <!-- Ni le serveur V3, ni ses migrations, ni la documentation : l'app n'en
+         depend pas (Contrats/, si : l'app le reference, une retouche la reconstruit). -->
+    <Watch Remove="Serveur/**;Base/**;docs/**" />
   </ItemGroup>
 
   <!-- Le controle WebView2 DIRECT (19/11/2026, retrait de Blazor). Version

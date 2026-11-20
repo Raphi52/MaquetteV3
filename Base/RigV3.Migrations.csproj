@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- L'OUTIL DES MIGRATIONS de la base V3 (une base par greffe, decision Q4).
+       Il joue les scripts de migrations/ qui ne l'ont pas encore ete, dans l'ordre,
+       et les inscrit au journal de la base (table rigv3.Migration).
+       Ligne de commande : en tete de Program.cs.
+       Il porte aussi l'utilitaire des bancs (BaseJetable) : chaque banc cree SA
+       base sur le SQL Server local (docker-compose.yml), y joue les migrations,
+       puis la supprime.
+       Mode d'emploi : docs/reconstruction/architecture.md. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>RigV3.Base</RootNamespace>
+  </PropertyGroup>
+
+  <!-- 7.1.2 et pas 6.1.6 : la 6.1.6 tire System.Security.Cryptography.Pkcs 9.0.11,
+       signale vulnerable par la restauration (NU1902 / NU1903, 2026-11-20). -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.2" />
+  </ItemGroup>
+
+  <!-- Les scripts voyagent avec l'outil : sa sortie (et celle d'un projet qui le
+       reference) contient migrations/, son dossier par defaut. Tout le dossier,
+       LISEZMOI.md compris, et pas seulement *.sql.
+       fix-ok: mesure le 2026-11-20, sans aucun .sql le dossier manquait dans la
+       sortie et l'outil sortait en echec au lieu de dire « a jour ».
+       Les autres editions de ce fichier : SqlClient 6.1.6 signale vulnerable
+       (NU1902/NU1903), et un commentaire XML qui contenait deux tirets (MSB4025). -->
+  <ItemGroup>
+    <None Update="migrations/**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

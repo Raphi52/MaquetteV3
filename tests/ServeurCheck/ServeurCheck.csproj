@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Banc de l'architecture V3 (lot 1 du plan de reconstruction) : base jetable,
+       migrations, serveur en memoire, /sante, client de l'ecran. Il lui faut le
+       SQL Server de developpement : docker compose up -d (racine du depot). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ServeurCheck</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <!-- Le client de l'ecran, compile seul (il ne depend que de Contrats/) :
+         il est essaye contre le vrai serveur, sans monter l'application WPF. -->
+    <Compile Include="../../Pont/ClientServeur.cs" Link="Pont/ClientServeur.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+    <ProjectReference Include="../../Contrats/RigV3.Contrats.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
+  </ItemGroup>
+</Project>

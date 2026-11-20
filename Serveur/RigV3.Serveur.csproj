@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- LA PARTIE SERVEUR de la V3 de RIG (decision Q4 : .NET 10, hebergee chez
+       Amitel ; l'ecran RigV3Desktop l'appelle depuis les serveurs RDS).
+       Un module par fichier (IModuleServeur), trouve tout seul au demarrage :
+       ajouter une route n'oblige a toucher aucun fichier commun.
+       Mode d'emploi : docs/reconstruction/architecture.md. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>RigV3.Serveur</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Contrats/RigV3.Contrats.csproj" />
+    <ProjectReference Include="../Base/RigV3.Migrations.csproj" />
+  </ItemGroup>
+
+</Project>
