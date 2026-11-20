@@ -221,7 +221,13 @@ export interface TravailDossierVue {
   ecranLibelle: string
 }
 /** Un verbe de la barre d'actions du dossier et ses actions disponibles. */
-export interface VerbeActionsVue { verbe: string, actions: ActionDossierVue[] }
+export interface VerbeActionsVue {
+  verbe: string
+  actions: ActionDossierVue[]
+  /** Le code de l'action que le verbe garde en BOUTON quand la barre le replie (le Kbis, les
+   *  factures, le courrier ; un verbe d'une seule action, elle) ; null : le verbe entier en menu. */
+  principale: string | null
+}
 export interface ActionDossierVue {
   /** Ce que remonte le geste « actionDossier ». */
   code: string

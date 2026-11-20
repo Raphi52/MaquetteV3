@@ -700,8 +700,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             return;
         var piece = PiecesJointes.Ranger(dossierPieces, affaire, nom, contenu, DateTime.Today);
         Inserer(cible, piece);
-        // Comme « Kbis a jour » (AfficherKbis) : sa carte s'ouvre et la piece s'y montre choisie ; en
-        // mode tache, l'arbre replie peut ne pas la lister, le document s'ouvre quand meme.
+        // Comme « Kbis a jour » (AfficherKbis) : sa carte s'ouvre et la piece s'y montre choisie, mode
+        // tache compris (un ajout n'est jamais replie, AccesGed.EnfantsVisibles).
         OuvrirDepuisHistorique(piece);
         if (!GuideVisible || !ReferenceEquals(ApercuNoeud, piece)) OuvrirApercu(piece);
     }
@@ -936,9 +936,12 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private void LancerImpression()
     {
         ImpressionOuverte = false;
-        ApercuMessage = $"Envoye a {ImprImprimante} — {ImprExemplaires} ex., papier {ImprTypePapier}"
-                      + (ImprRectoVerso ? ", recto-verso" : "")
-                      + $", file {ImprFileDifferee}.";
+        // La confirmation s'affiche sous la piece OUVERTE : un dossier entier ou l'arborescence
+        // s'y nomme, sinon on croyait n'avoir imprime qu'elle (parcours du lot 6, 20/11/2026).
+        var ou = $"{ImprImprimante} — {ImprExemplaires} ex., papier {ImprTypePapier}"
+               + (ImprRectoVerso ? ", recto-verso" : "")
+               + $", file {ImprFileDifferee}.";
+        ApercuMessage = ImpressionDe is { } quoi ? $"« {quoi} » envoye a {ou}" : $"Envoye a {ou}";
     }
 
     private void Sauvegarder()
@@ -971,7 +974,9 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private void EnvoyerMail()
     {
         EnvoiMailOuvert = false;
-        ApercuMessage = $"Mail « {MailMessagesDemo[MailMessageIndex].Titre} » envoye a {MailDestinataire.Trim()} (maquette : aucun envoi reel).";
+        // Comme l'impression : le dossier entier se nomme sous la piece ouverte.
+        var mail = $"« {MailMessagesDemo[MailMessageIndex].Titre} » envoye a {MailDestinataire.Trim()} (maquette : aucun envoi reel).";
+        ApercuMessage = EnvoiDe is { } quoi ? $"« {quoi} » : mail {mail}" : $"Mail {mail}";
     }
 
     /// <summary>Une page de l'apercu. La decoupe vit dans DocumentPartage :
@@ -1012,64 +1017,12 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         => Moments.SelectMany(m => m.Sous).SelectMany(s => s.Entrees)
                   .FirstOrDefault(x => x.Code == code);
 
-    /// <summary>Catalogue des ecrans portes depuis RIG v2. Il n'est PLUS affiche
-    /// tel quel : il sert d'aiguillage, de source de libelles pour la recherche
-    /// et d'inventaire de ce qui existe.</summary>
-    private readonly Groupe[] Groupes =
-    [
-        new("RCS", "RCS", "action",
-        [
-            new("OUVERTURE_DOSSIER", "Ouverture d'un dossier RCS"),
-            new("PROC_RECHAFF",   "Recherche d'affaires"),
-            new("PROC_DEMANDE",   "Demandes"),
-            new("PROC_REQUI",     "Requisitions - commande de documents"),
-            new("PROC_COMMANDES_WEB", "Commandes web"),
-            new("PROC_ARRIVEE",   "Arrivee du courrier"),
-            new("PROC_ACTES_NUM", "Actes numerises"),
-            new("PROC_CLOT",      "Cloture"),
-            new("PROC_ARCHIRAD",  "Archivage / radiation"),
-            new("BODACC",         "BODACC")
-        ]),
-        new("JUD", "Judiciaire", "attente",
-        [
-            new("PROC_DEPOTJUD",   "Depots judiciaires"),
-            new("PROC_ACTEUR_JUD", "Acteurs"),
-            new("PROC_CJUD",       "Consultation judiciaire"),
-            new("PROC_AUDIENCE",   "Audiences"),
-            new("PROC_GESTAUDS",   "Gestion des audiences"),
-            new("PROC_EXPERT",     "Experts"),
-            new("PROC_GEDJUD",     "GED judiciaire"),
-            new("PROC_REDA",       "Redaction d'une decision")
-        ]),
-        new("GED", "Documents", "ok",
-        [
-            new("PROC_DOC_DEMAT",        "Documents demateralises"),
-            new("PROC_CONTROLE_VIDIGED", "Controle VidiGED"),
-            new("PROC_COFFRE_FORT",      "Coffre-fort"),
-            new("PROC_TELETRANS",        "Teletransmissions (EDI)")
-        ]),
-        new("FAC", "Facturation", "ok",
-        [
-            new("PROC_FACTURE", "Factures"),
-            new("PROC_ENCAISS", "Encaissements"),
-            new("PROC_CREANCE", "Creances"),
-            new("PROC_FCLIENT", "Fiches clients"),
-            new("PROC_GCLIENT", "Gestion clients"),
-            new("PROC_COMPTABILISATION", "Comptabilisation")
-        ]),
-        new("ADM", "Administration", "attente",
-        [
-            new("PROC_ACCUEIL_PARAM", "Parametres d'accueil"),
-            new("PROC_ACTUALITES", "Actualites"),
-            new("PROC_TACHES_LOT",    "Taches en lot"),
-            new("PROC_VERROUS",       "Dossiers verrouilles"),
-            new("PROC_STAT",       "Statistiques"),
-            new("PROC_GESTEMAIL",     "Messagerie"),
-            new("PROC_GESTBANQ",      "Banques"),
-            new("PROC_EDIT_MAQUETTE", "Maquettes d'edition"),
-            new("PROC_COURRIER_DIVERS", "Courriers divers")
-        ])
-    ];
+    /// <summary>Le catalogue des ecrans portes depuis RIG v2 (Pont/CatalogueEcrans.cs, la seule
+    /// source de leurs noms), sous la forme que la session aiguille : il sert d'aiguillage, de
+    /// source de libelles pour la recherche et d'inventaire de ce qui existe.</summary>
+    private static readonly Groupe[] Groupes =
+        [.. CatalogueEcrans.Familles.Select(f => new Groupe(f.Code, f.Libelle, f.Statut,
+                                                            [.. f.Ecrans.Select(e => new Proc(e.Code, e.Libelle))]))];
 
     /// <summary>L'etat retenu d'une session a l'autre (accueil.json), tenu par la
     /// session de l'accueil et partage avec le plan de travail.</summary>
@@ -1676,6 +1629,10 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         ProcsConnues[proc.Code] = proc;
         // Deja ouverte ? On revient dessus au lieu d en creer un doublon.
         Onglets.Ouvrir(proc.Code, proc.Libelle);
+        // Ouvert d'ailleurs que de son affaire (le menu de l'accueil, la palette) : l'ecran
+        // GENERAL. Le menu reprenait l'onglet ouvert pour 004151, sa facture et son bloc
+        // « Pour le dossier » (parcours du lot 6) ; OuvrirProcDepuisAffaire le rend a l'affaire.
+        AffaireDesEcrans.Remove(proc.Code);
         DossierOuvert = null;
         RetenirAgencement();
     }
@@ -1850,7 +1807,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             AccueilEtat.MemoriserOnglets(
                 Onglets.Codes(),
                 Onglets.Actuel?.Code ?? string.Empty,
-                Onglets.Onglets.Where(o => o.Detache).Select(o => o.Code).ToList());
+                Onglets.Onglets.Where(o => o.Detache).Select(o => o.Code).ToList(),
+                AffaireDesEcrans.ToDictionary(a => a.Key, a => a.Value.Numero));
         }
         catch (System.IO.IOException) { }
     }
@@ -1875,7 +1833,13 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         foreach (var code in Etat.OngletsVue.ToList())
         {
             if (NumeroDOngletAffaire(code) is { } numero) ReposerOngletAffaire(numero);
-            else OuvrirCode(code);
+            else
+            {
+                OuvrirCode(code);
+                // L'ecran ouvert POUR une affaire la retrouve : son contexte, sa puce, son retour.
+                if (Etat.AffairesDesOnglets.TryGetValue(code, out var affaire))
+                    AffaireDesEcrans[code] = DossierDeNumero(affaire);
+            }
         }
         foreach (var code in Etat.VuesDetachees.ToList()) DetacherOnglet(code);
 
@@ -1904,7 +1868,10 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     {
         var depuis = DossierOuvert;
         OuvrirProc(proc);
-        if (depuis is not null) AffaireDesEcrans[proc.Code] = depuis;
+        if (depuis is null) return;
+        AffaireDesEcrans[proc.Code] = depuis;
+        // Retenu avec l'agencement : l'onglet retrouve son affaire au demarrage suivant.
+        RetenirAgencement();
     }
 
     /// <summary>

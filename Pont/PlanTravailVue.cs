@@ -93,7 +93,7 @@ public sealed record DossierVue(string Numero, string Objet, string Siren, strin
                                 VerbeActionsVue[] Actions, EnCoursDossierVue EnCours);
 
 /// <summary>Un verbe de la barre d'actions et ses actions disponibles.</summary>
-public sealed record VerbeActionsVue(string Verbe, ActionDossierVue[] Actions);
+public sealed record VerbeActionsVue(string Verbe, ActionDossierVue[] Actions, string? Principale);
 
 /// <summary>Une action de la barre du dossier.</summary>
 /// <param name="Code">Ce que la page remonte par le geste « actionDossier ».</param>

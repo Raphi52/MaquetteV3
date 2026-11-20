@@ -154,6 +154,9 @@ describe('ActionsDossier : des boutons groupes par verbe, un menu seulement si l
   // deplie (boutons) puis replie (menu). Ici, ces largeurs sont posees a la main.
   const DEPLIE: Record<string, number> = { Delivrer: 700, Enregistrer: 420, Facturer: 230, Ecrire: 330, Suivre: 520 }
   const REPLIE = 80
+  // La forme « action principale » (lot 6) : le bouton de l'action frequente, et le chevron du
+  // reste du verbe. Enregistrer et Suivre n'en ont pas (actionsRcs : principale null).
+  const PRINCIPALE: Record<string, number> = { Delivrer: 120, Facturer: 110, Ecrire: 100 }
   let largeurEntete = 0
   // Chaque enfant de la rangee des puces de l'identite (puces, mention, avis de copie).
   let largeurPuce = 0
@@ -172,10 +175,10 @@ describe('ActionsDossier : des boutons groupes par verbe, un menu seulement si l
       let largeur = 0
       if (this.matches('[data-entete], .rig-vged__entete')) largeur = largeurEntete
       else if (this.parentElement?.matches('.rig-vged__puces')) largeur = largeurPuce
-      else if (this.closest('.rig-vged__agir-mesure')) {
-        largeur = this.matches('.rig-vged__agir-groupe')
-          ? DEPLIE[this.querySelector('.rig-vged__agir-legende')!.textContent!]!
-          : REPLIE
+      else if (this.parentElement?.parentElement?.matches('.rig-vged__agir-mesure')) {
+        // Chaque forme mesuree porte son verbe et sa forme (data-verbe, data-forme).
+        const { verbe = '', forme } = (this as HTMLElement).dataset
+        largeur = forme === 'boutons' ? DEPLIE[verbe]! : forme === 'principale' ? PRINCIPALE[verbe]! : REPLIE
       }
       return { width: largeur, height: 20, x: 0, y: 0, top: 0, left: 0, right: largeur, bottom: 20, toJSON: () => ({}) } as DOMRect
     })
@@ -185,11 +188,12 @@ describe('ActionsDossier : des boutons groupes par verbe, un menu seulement si l
     vi.restoreAllMocks()
   })
 
-  /** La forme de chaque verbe dans la barre : « B » = boutons, « M » = menu. */
+  /** La forme de chaque verbe dans la barre : « B » = boutons, « P » = son action principale
+   *  en bouton et le reste sous un chevron, « M » = menu. */
   function formes(container: HTMLElement): string {
     return [...container.querySelector('.rig-vged__agir')!.children]
       .filter((e) => !e.classList.contains('rig-vged__agir-mesure'))
-      .map((e) => (e.tagName === 'DETAILS' ? 'M' : 'B')).join('')
+      .map((e) => (e.tagName === 'DETAILS' ? 'M' : e.classList.contains('rig-vged__agir-principale') ? 'P' : 'B')).join('')
   }
   function rendreDansEntete(largeur: number) {
     largeurEntete = largeur
@@ -204,28 +208,43 @@ describe('ActionsDossier : des boutons groupes par verbe, un menu seulement si l
 
   it('formeDesVerbes : les verbes se deplient du moins couteux au plus couteux, tant que la barre tient', () => {
     const v = (deplie: number) => ({ deplie, replie: 80 })
-    expect(formeDesVerbes([v(700), v(420), v(230)], 2000, 0, 0)).toEqual([true, true, true])
+    expect(formeDesVerbes([v(700), v(420), v(230)], 2000, 0, 0)).toEqual(['boutons', 'boutons', 'boutons'])
     // 240 en menus ; couts 620, 340, 150 : le 3e (390), le 2e (730), pas le 1er (1350 > 800).
-    expect(formeDesVerbes([v(700), v(420), v(230)], 800, 0, 0)).toEqual([false, true, true])
+    expect(formeDesVerbes([v(700), v(420), v(230)], 800, 0, 0)).toEqual(['menu', 'boutons', 'boutons'])
     // Les ecarts et le cadre comptent : 2 x 2 + 10 de plus, le 2e ne tient plus (744 > 730).
-    expect(formeDesVerbes([v(700), v(420), v(230)], 730, 2, 10)).toEqual([false, false, true])
+    expect(formeDesVerbes([v(700), v(420), v(230)], 730, 2, 10)).toEqual(['menu', 'menu', 'boutons'])
     // Meme tout en menus, la barre deborde : rien ne se deplie.
-    expect(formeDesVerbes([v(700), v(420), v(230)], 200, 0, 0)).toEqual([false, false, false])
+    expect(formeDesVerbes([v(700), v(420), v(230)], 200, 0, 0)).toEqual(['menu', 'menu', 'menu'])
     // A cout egal, l'ordre de la barre departage.
-    expect(formeDesVerbes([v(300), v(300)], 460, 0, 0)).toEqual([true, false])
+    expect(formeDesVerbes([v(300), v(300)], 460, 0, 0)).toEqual(['boutons', 'menu'])
+  })
+
+  it('formeDesVerbes : la forme « principale » passe avant les boutons du meme verbe, a son cout', () => {
+    // 160 en menus. Le 1er : principale +40, puis boutons +580 ; le 2e n'en a pas (+340).
+    const verbes = [{ deplie: 700, replie: 80, principale: 120 }, { deplie: 420, replie: 80 }]
+    expect(formeDesVerbes(verbes, 199, 0, 0)).toEqual(['menu', 'menu'])
+    expect(formeDesVerbes(verbes, 200, 0, 0)).toEqual(['principale', 'menu'])
+    expect(formeDesVerbes(verbes, 539, 0, 0)).toEqual(['principale', 'menu'])
+    expect(formeDesVerbes(verbes, 540, 0, 0)).toEqual(['principale', 'boutons'])
+    expect(formeDesVerbes(verbes, 1120, 0, 0)).toEqual(['boutons', 'boutons'])
+    // Plus etroite que son menu (« Factures » contre « Facturer ») : toujours prise, meme
+    // quand la barre deborde -- elle la raccourcit.
+    expect(formeDesVerbes([{ deplie: 230, replie: 90, principale: 85 }], 50, 0, 0)).toEqual(['principale'])
   })
 
   it('formeDesVerbes : en elargissant, un verbe deplie ne se replie jamais', () => {
     // Le premier tri (ordre de la barre, en sautant un verbe trop large) repliait
     // Facturer pour deplier Delivrer en passant de 1500 a 1920 px.
-    const verbes = Object.values(DEPLIE).map((deplie) => ({ deplie, replie: REPLIE }))
+    const verbes = Object.entries(DEPLIE).map(([verbe, deplie]) =>
+      ({ deplie, replie: REPLIE, ...(PRINCIPALE[verbe] !== undefined ? { principale: PRINCIPALE[verbe] } : {}) }))
+    const rang = { menu: 0, principale: 1, boutons: 2 }
     let avant = formeDesVerbes(verbes, 0, 2, 6)
     for (let largeur = 10; largeur <= 3000; largeur += 10) {
       const apres = formeDesVerbes(verbes, largeur, 2, 6)
-      avant.forEach((deplie, i) => { if (deplie) expect(apres[i], `verbe ${i} a ${largeur} px`).toBe(true) })
+      avant.forEach((forme, i) => expect(rang[apres[i]!], `verbe ${i} a ${largeur} px`).toBeGreaterThanOrEqual(rang[forme]))
       avant = apres
     }
-    expect(avant).toEqual([true, true, true, true, true])
+    expect(avant).toEqual(['boutons', 'boutons', 'boutons', 'boutons', 'boutons'])
   })
 
   it('assez de largeur : chaque verbe est un groupe de boutons, et un bouton remonte son geste', () => {
@@ -257,13 +276,14 @@ describe('ActionsDossier : des boutons groupes par verbe, un menu seulement si l
   it('la largeur manque : les verbes qui ne tiennent plus se replient en menu, et se redeplient quand elle revient', () => {
     const { container } = rendreDansEntete(3000)
     expect(formes(container)).toBe('BBBBB')
-    // 800 : en menus 400 ; Facturer (+150) puis Ecrire (+250) tiennent (800), Enregistrer (+340) non.
+    // 800 : en menus 400 ; les formes principales d'Ecrire (+20), Facturer (+30), Delivrer (+40),
+    // puis les boutons de Facturer (+120) tiennent (610) ; ceux d'Ecrire (+230) non.
     redimensionner(800)
-    expect(formes(container)).toBe('MMBBM')
+    expect(formes(container)).toBe('PMBPM')
     // Un verbe replie garde toutes ses actions, avec leur lettre.
-    const delivrer = container.querySelector<HTMLDetailsElement>('.rig-vged__agir > details')!
-    expect(delivrer.querySelector('summary')!.textContent).toBe('Delivrer')
-    expect(delivrer.querySelectorAll('[role="menuitem"] kbd')).toHaveLength(5)
+    const enregistrer = container.querySelector<HTMLDetailsElement>('.rig-vged__agir > details')!
+    expect(enregistrer.querySelector('summary')!.textContent).toBe('Enregistrer')
+    expect(enregistrer.querySelectorAll('[role="menuitem"] kbd')).toHaveLength(4)
     redimensionner(300)
     expect(formes(container)).toBe('MMMMM')
     // Les deux derniers menus deroulent vers la gauche.
@@ -278,9 +298,9 @@ describe('ActionsDossier : des boutons groupes par verbe, un menu seulement si l
     largeurEntete = IDENTITE_MIN + 1000
     const { container } = render(<Visionneuse dossier={dossier({ actions: actionsRcs() })} pagination={0} defilement={null}
                                                defilementJoue={{ current: 0 }} plan={vi.fn<GestePlan>()} />)
-    // 1000 : en menus 400 ; Facturer (550) et Ecrire (800) tiennent, Enregistrer (1140) non.
-    // Sans la reserve de l'identite (1480), Enregistrer se serait deplie.
-    expect(formes(container)).toBe('MMBBM')
+    // 1000 : en menus 400 ; les trois formes principales (490), Facturer (610) et Ecrire (840)
+    // tiennent, Enregistrer (1180) non. Sans la reserve de l'identite (1480), il se serait deplie.
+    expect(formes(container)).toBe('PMBBM')
   })
 
   it('lignesDesPuces / largeurDesPuces : le retour a la ligne des puces, et la largeur la plus etroite pour N lignes', () => {
@@ -302,14 +322,17 @@ describe('ActionsDossier : des boutons groupes par verbe, un menu seulement si l
   /** La visionneuse d'une affaire a `n` puces de 300 px (la 1re, le SIREN). */
   function rendreAffaire(n: number) {
     largeurPuce = 300
+    const plan = vi.fn<GestePlan>()
     const champs = Array.from({ length: n }, (_, i) => ({ libelle: i === 0 ? 'SIREN' : 'Champ ' + i, valeur: 'v' + i, mono: false }))
-    return render(<Visionneuse dossier={dossier({ actions: actionsRcs(), sommaire: { champs, mention: '' } })} pagination={0}
-                               defilement={null} defilementJoue={{ current: 0 }} plan={vi.fn<GestePlan>()} />)
+    const r = render(<Visionneuse dossier={dossier({ actions: actionsRcs(), sommaire: { champs, mention: '' } })} pagination={0}
+                                  defilement={null} defilementJoue={{ current: 0 }} plan={plan} />)
+    return { ...r, plan }
   }
-  /** La largeur de la barre telle qu'elle s'affiche (verbes en boutons ou en menus). */
+  /** La largeur de la barre telle qu'elle s'affiche (verbes en boutons, principale ou menus). */
   function largeurBarre(container: HTMLElement): number {
-    const d = Object.values(DEPLIE)
-    return [...formes(container)].reduce((s, f, i) => s + (f === 'B' ? d[i]! : REPLIE), 0)
+    const verbes = Object.keys(DEPLIE)
+    return [...formes(container)].reduce((s, f, i) =>
+      s + (f === 'B' ? DEPLIE[verbes[i]!]! : f === 'P' ? PRINCIPALE[verbes[i]!]! : REPLIE), 0)
   }
 
   it("deplier un verbe ne fait jamais passer les puces de l'identite sur une ligne de plus (004176 a 1500 px)", () => {
@@ -318,12 +341,13 @@ describe('ActionsDossier : des boutons groupes par verbe, un menu seulement si l
     const puces = [300, 300, 300, 300, 300]
     largeurEntete = 1400
     const { container } = rendreAffaire(5)
-    // Barre repliee (400), l'identite a 1000 px : 2 lignes de puces. Deplier Facturer
-    // (+150) la ramenerait a 850 : 3 lignes. Tout reste en menus (480 fixes : 'MMBBM').
-    expect(formes(container)).toBe('MMMMM')
-    // 1600 : l'identite a 1200 en menus (2 lignes) ; Facturer deplie, elle garde 1050 : 2 lignes.
+    // Barre repliee (400), l'identite a 1000 px : 2 lignes de puces, qui tiennent jusqu'a 900.
+    // Les trois formes principales (+90) tiennent ; deplier Facturer (+120 de plus) la
+    // ramenerait a 790 : 3 lignes. (480 fixes : 'PMBBM'.)
+    expect(formes(container)).toBe('PMPPM')
+    // 1600 : l'identite a 1200 en menus (2 lignes) ; Facturer deplie, elle garde 990 : 2 lignes.
     redimensionner(1600)
-    expect(formes(container)).toBe('MMBMM')
+    expect(formes(container)).toBe('PMBPM')
     // A toute largeur, jamais une ligne de plus que barre toute repliee ; et assez
     // large, tout est en boutons.
     for (let largeur = 600; largeur <= 4000; largeur += 25) {
@@ -339,13 +363,41 @@ describe('ActionsDossier : des boutons groupes par verbe, un menu seulement si l
     // 4 puces, 1500 px : l'identite a 1100 en menus, 2 lignes ; elle peut descendre a 600.
     largeurEntete = 1500
     const { container } = rendreAffaire(4)
-    expect(formes(container)).toBe('MMBBM')
+    expect(formes(container)).toBe('PMBBM')
     fireEvent.click(container.querySelector('.rig-vged__puces > .rig-vged__puce--copie')!)
     expect((await screen.findByRole('status')).textContent).toBe('SIREN copie')
     // L'entete change de hauteur avec l'avis : la mesure repart. Compte comme une
     // puce, il porterait la reserve a 900 et replierait Ecrire le temps de l'avis.
     redimensionner(1500)
-    expect(formes(container)).toBe('MMBBM')
+    expect(formes(container)).toBe('PMBBM')
+  })
+
+  it("004176 a 1516 px : les verbes replies gardent « Kbis a jour » et « Factures » en boutons, sans ligne de puces en plus", () => {
+    // Refus du chef (lot 6, 20/11/2026) : a 1516 px, les cinq verbes de 004176 etaient des
+    // menus, deux clics pour le Kbis ou les factures. Faux si : la forme principale prenait
+    // la place des puces (une ligne de plus), si Enregistrer ou Suivre, sans action frequente,
+    // gagnaient un bouton, ou si Ecrire (le seul mail) restait un menu d'un item.
+    largeurEntete = 1400
+    const { container, plan } = rendreAffaire(5)
+    expect(formes(container)).toBe('PMPPM')
+    expect(lignesDesPuces([300, 300, 300, 300, 300], 0, 1400 - largeurBarre(container))).toBe(2)
+    fireEvent.click(screen.getByRole('button', { name: 'Kbis a jour' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Factures' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Envoyer le dossier par mail' }))
+    // (La zone des etapes de la visionneuse remonte aussi « etapeVisible » : seules les actions comptent.)
+    const actions = () => plan.mock.calls.filter(([geste]) => geste === 'actionDossier')
+    expect(actions()).toEqual([['actionDossier', 'kbis'], ['actionDossier', 'factures'], ['actionDossier', 'envoyerDossier']])
+    expect(screen.getByRole('group', { name: 'Ecrire' }).querySelector('details')).toBeNull()
+    // Le reste du verbe sous son chevron, nomme par le verbe, chaque action avec sa lettre.
+    const suite = screen.getByRole('group', { name: 'Delivrer' }).querySelector('details')!
+    expect(suite.querySelector('summary')!.getAttribute('aria-label')).toBe('Delivrer : toutes les actions')
+    expect(suite.querySelector('[role="menu"]')!.getAttribute('aria-label')).toBe('Delivrer')
+    expect([...suite.querySelectorAll('[role="menuitem"] kbd')].map((k) => k.textContent).join('')).toBe('KIPRW')
+    // Menu ouvert, sa lettre joue l'action, comme dans un verbe replie.
+    suite.open = true
+    fireEvent.keyDown(suite, { key: 'i' })
+    expect(actions().at(-1)).toEqual(['actionDossier', 'imprimerKbis'])
+    expect(suite.open).toBe(false)
   })
 })
 

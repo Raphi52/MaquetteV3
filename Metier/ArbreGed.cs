@@ -476,15 +476,24 @@ public static class AccesGed
         RecetteTache? recette = null)
     {
         var enfants = parent.Enfants.AsEnumerable();
+        IReadOnlyCollection<NoeudGed> poses = [];
         if (ajouts is not null && ajouts.TryGetValue(parent, out var ajoutes))
+        {
             enfants = enfants.Concat(ajoutes);
+            poses = ajoutes;
+        }
+        // CE QUE L'AGENT A POSE (piece jointe, element cree par « Nouveau ») N'EST JAMAIS
+        // REPLIE par la tache, ni le dossier qui le range : un PDF joint en mode tache
+        // partait dans les pieces masquees, invisible dans la carte ou on venait de le
+        // deposer (004151, parcours du lot 6, 20/11/2026).
+        bool Pose(NoeudGed e) => poses.Contains(e) || RangeUnAjout(e, domaines, ajouts, masques);
         return enfants
             .Where(e => e.DomaineRequis.Length == 0 || domaines.Contains(e.DomaineRequis))
             // MODE TACHE : une recette active replie les branches qu'elle ne
             // nomme pas. C'est un REPLI, pas une suppression -- le bouton
             // « Afficher tout le dossier » passe recette = null et tout
             // revient, sans qu'aucun noeud ait ete touche.
-            .Where(e => recette is null
+            .Where(e => recette is null || Pose(e)
                         || recette.GardeBranche(parent.Libelle, e.Libelle,
                                                e.EstPiece || e.EstFiche || e.Enfants.Length == 0)
                         // LE CHEMIN VERS UNE PIECE NOMMEE RESTE OUVERT. Sans
@@ -503,12 +512,12 @@ public static class AccesGed
             // pieces, donc le dossier entier restait a l'ecran. Une FICHE
             // n'est jamais repliee -- c'est elle qui porte les champs de la
             // tache. Repli, pas suppression : recette = null rend tout.
-            .Where(e => recette is null || !e.EstPiece || recette.GardePiece(e.Libelle))
+            .Where(e => recette is null || !e.EstPiece || recette.GardePiece(e.Libelle) || Pose(e))
             // Un sous-dossier dont PLUS AUCUNE piece n'est gardee se replie a
             // son tour : sinon le filtre a la piece laissait a l'ecran une
             // rangee de dossiers vides, aussi encombrante que le dossier
             // entier. Un dossier qui porte une FICHE reste, toujours.
-            .Where(e => recette is null || e.EstPiece || e.EstFiche
+            .Where(e => recette is null || e.EstPiece || e.EstFiche || Pose(e)
                         || PorteQuelqueChose(e, domaines, ajouts, masques, recette))
             // Un noeud supprime depuis l'arbre n'est pas retire du jeu de
             // demonstration (les enfants sont un tableau fige) : il est
@@ -517,6 +526,15 @@ public static class AccesGed
             .Where(e => masques is null || !masques.Contains(e))
             .ToArray();
     }
+
+    /// <summary>Ce dossier range-t-il, a n'importe quelle profondeur, un element que l'agent a
+    /// pose (<paramref name="ajouts"/>) et qui n'a pas ete supprime ? Sans ajout, non, d'emblee.</summary>
+    private static bool RangeUnAjout(NoeudGed dossier, IReadOnlyCollection<string> domaines,
+        IReadOnlyDictionary<NoeudGed, List<NoeudGed>>? ajouts, IReadOnlyCollection<NoeudGed>? masques)
+        => ajouts is { Count: > 0 } && !dossier.EstPiece
+           && EnfantsVisibles(dossier, domaines, ajouts, masques)
+                  .Any(e => (ajouts.TryGetValue(dossier, out var l) && l.Contains(e))
+                            || RangeUnAjout(e, domaines, ajouts, masques));
 
     /// <summary>
     /// Ce dossier porte-t-il, a n'importe quelle profondeur, une PIECE que la

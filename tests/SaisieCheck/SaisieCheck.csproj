@@ -23,6 +23,9 @@
     <Compile Include="../../Metier/ConditionChamp.cs" Link="ConditionChamp.cs" />
     <!-- Demandes, Arrivee et Actes, portes en React le 19/11/2026 (lot 3) : leurs ponts sont executes ici. -->
     <Compile Include="../../Pont/EcranDemandes.cs" Link="Pont/EcranDemandes.cs" />
+    <!-- Le nom de chaque traitement vient du catalogue des ecrans (20/11/2026). -->
+    <Compile Include="../../Pont/CatalogueEcrans.cs" Link="Pont/CatalogueEcrans.cs" />
+    <Compile Include="../../Pont/MenuAccueil.cs" Link="Pont/MenuAccueil.cs" />
     <Compile Include="../../Pont/EcranArrivee.cs" Link="Pont/EcranArrivee.cs" />
     <Compile Include="../../Pont/EcranActes.cs" Link="Pont/EcranActes.cs" />
     <!-- Fiche d'informations portee en React le 19/11/2026 (lot 6) : sa session est executee ici. -->

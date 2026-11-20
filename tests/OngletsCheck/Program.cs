@@ -146,6 +146,32 @@ internal static class Programme
             Exiger(AccueilEtat.PoseVue("PROC_XAFF") is null,
                 "une vue jamais sortie n'a pas de place memorisee");
 
+            // Une SESSION garde l'etat lu a son demarrage (SessionAccueil.Etat) et le reecrit
+            // EN ENTIER a chaque geste (Consulter, l'arbre GED...). Ouvrir une affaire retient
+            // son onglet (MemoriserOnglets) PUIS la consulte : l'etat de la session, lu avant,
+            // remettait la barre du demarrage, et les onglets ne revenaient plus (parcours du
+            // lot 6, 20/11/2026 : 004176 et 004151 ouverts, app fermee, accueil seul au retour).
+            var session = AccueilEtat.Charger();
+            AccueilEtat.MemoriserOnglets(new[] { "AFFAIRE:004176", "AFFAIRE:004151", "PROC_FACTURE" },
+                "AFFAIRE:004151", Array.Empty<string>(),
+                new Dictionary<string, string> { ["PROC_FACTURE"] = "004151" });
+            AccueilEtat.MemoriserFenetreVue("AFFAIRE:004151", pose);
+            AccueilEtat.MemoriserTriClasseur(AccueilEtat.TriClasseurParDossier);
+            session.Consulter("004151", "Depot de bilan - TRANSNORD SA", "318552007", "RCS", "retard");
+            var apresSession = AccueilEtat.Charger();
+            Exiger(string.Join(",", apresSession.OngletsVue) == "AFFAIRE:004176,AFFAIRE:004151,PROC_FACTURE"
+                   && apresSession.OngletActif == "AFFAIRE:004151",
+                "une session qui ecrit apres l'ouverture d'une affaire garde les onglets retenus (et l'actif)");
+            Exiger(apresSession.AffairesDesOnglets.TryGetValue("PROC_FACTURE", out var affaireFacture) && affaireFacture == "004151",
+                "... et l'affaire de l'onglet d'ecran ouvert depuis elle");
+            Exiger(AccueilEtat.PoseVue("AFFAIRE:004151") is not null,
+                "... et la place retenue entre-temps pour une fenetre sortie");
+            Exiger(apresSession.TriClasseur == AccueilEtat.TriClasseurParDossier,
+                "... et le classement du classeur choisi entre-temps (une autre fenetre)");
+            // Le jumeau : ce que la session ecrit, ELLE, est bien ecrit.
+            Exiger(apresSession.Consultations.FirstOrDefault()?.Numero == "004151",
+                "ce que la session ecrit (la consultation de l'affaire) est bien ecrit");
+
             // Un accueil.json ecrit AVANT cette version n'a aucun de ces champs :
             // il doit se charger quand meme, listes vides.
             File.WriteAllText(temporaire, "{\"ThemeSombre\":true}");

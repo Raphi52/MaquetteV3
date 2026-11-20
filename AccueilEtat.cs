@@ -202,6 +202,12 @@ public sealed class AccueilEtat
     /// elles se rouvrent en fenetre au demarrage suivant, chacune a sa place.</summary>
     public List<string> VuesDetachees { get; set; } = new();
 
+    /// <summary>L'affaire de chaque onglet d'ECRAN ouvert depuis elle (barre d'actions du
+    /// dossier) : code de l'ecran -> numero de l'affaire. Sans elle, l'onglet revenait au
+    /// demarrage sans son affaire -- la facture generale, ni bloc « Pour le dossier » ni
+    /// puce de retour (parcours du lot 6, 20/11/2026).</summary>
+    public Dictionary<string, string> AffairesDesOnglets { get; set; } = new();
+
     /// <summary>Ou se pose la fenetre de CHAQUE vue sortie, par CODE d ecran
     /// (« PROC_XAFF ») et non par rang : l agencement doit revenir vue par vue,
     /// pas selon l ordre dans lequel on a arrache les onglets.</summary>
@@ -213,7 +219,7 @@ public sealed class AccueilEtat
 
     /// <summary>Retient la barre d onglets telle qu elle est a l ecran.</summary>
     public static void MemoriserOnglets(IEnumerable<string> codes, string actif,
-        IEnumerable<string> detachees)
+        IEnumerable<string> detachees, IReadOnlyDictionary<string, string>? affaires = null)
     {
         var etat = Charger();
         etat.OngletsVue = codes.Where(c => !string.IsNullOrWhiteSpace(c))
@@ -221,7 +227,11 @@ public sealed class AccueilEtat
         etat.OngletActif = actif ?? string.Empty;
         etat.VuesDetachees = detachees.Where(c => !string.IsNullOrWhiteSpace(c))
                                       .Take(PlafondOnglets).ToList();
-        etat.Enregistrer();
+        // Seulement pour les onglets retenus : un onglet ferme emporte son affaire.
+        etat.AffairesDesOnglets = (affaires ?? etat.AffairesDesOnglets)
+            .Where(a => etat.OngletsVue.Contains(a.Key) && !string.IsNullOrWhiteSpace(a.Value))
+            .ToDictionary(a => a.Key, a => a.Value);
+        etat.Ecrire();
     }
 
     /// <summary>La place memorisee pour la fenetre de cette vue, ou null.</summary>
@@ -235,7 +245,7 @@ public sealed class AccueilEtat
         var etat = Charger();
         if (etat.FenetresVue.Count >= PlafondOnglets && !etat.FenetresVue.ContainsKey(code)) return;
         etat.FenetresVue[code] = pose;
-        etat.Enregistrer();
+        etat.Ecrire();
     }
 
     /// <summary>La pose memorisee pour ce rang, ou null la premiere fois.</summary>
@@ -253,7 +263,7 @@ public sealed class AccueilEtat
         if (rang < 1 || rang > PlafondFenetresDocument) return;
         var etat = Charger();
         etat.FenetresDocument[rang.ToString()] = pose;
-        etat.Enregistrer();
+        etat.Ecrire();
     }
 
     /// <summary>
@@ -568,7 +578,7 @@ public sealed class AccueilEtat
     {
         var etat = Charger();
         etat.TriClasseur = tri;
-        etat.Enregistrer();
+        etat.Ecrire();
     }
 
     // RIGV3_ETAT : chemin de secours du fichier de reglages. Sert aux
@@ -587,7 +597,10 @@ public sealed class AccueilEtat
 
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
 
-    public static AccueilEtat Charger()
+    public static AccueilEtat Charger() => LireFichier() ?? new AccueilEtat();
+
+    /// <summary>Le fichier de reglages lu, ou null s'il manque ou ne se lit pas.</summary>
+    private static AccueilEtat? LireFichier()
     {
         try
         {
@@ -610,10 +623,38 @@ public sealed class AccueilEtat
             // Un etat illisible ne doit jamais empecher l'accueil de s'ouvrir :
             // on repart de la disposition par defaut.
         }
-        return new AccueilEtat();
+        return null;
     }
 
+    /// <summary>
+    /// Ecrit les reglages de cette session. L'AGENCEMENT -- onglets, onglet actif, vues
+    /// sorties, affaire de chaque onglet, places des fenetres, classement du classeur --
+    /// n'appartient qu'au FICHIER : seuls les Memoriser* l'ecrivent, en le relisant. Une
+    /// session, elle, garde l'etat lu a son demarrage (SessionAccueil.Etat) ; elle reprend
+    /// donc l'agencement du fichier avant d'ecrire le reste.
+    /// fix-ok: OuvrirDossier retient l'onglet de l'affaire (MemoriserOnglets) puis la consulte
+    /// (Etat.Consulter -> Enregistrer, sur l'etat lu au demarrage) : la barre du demarrage
+    /// revenait dans le fichier (mesure du 20/11/2026, parcours du lot 6 : 004176 et 004151
+    /// ouverts, accueil.json ecrit a l'ouverture avec « OngletsVue »: [], accueil seul au
+    /// redemarrage). Banc : tests/OngletsCheck, section 4.
+    /// </summary>
     public void Enregistrer()
+    {
+        if (LireFichier() is { } fichier)
+        {
+            OngletsVue = fichier.OngletsVue;
+            OngletActif = fichier.OngletActif;
+            VuesDetachees = fichier.VuesDetachees;
+            AffairesDesOnglets = fichier.AffairesDesOnglets;
+            FenetresVue = fichier.FenetresVue;
+            FenetresDocument = fichier.FenetresDocument;
+            TriClasseur = fichier.TriClasseur;
+        }
+        Ecrire();
+    }
+
+    /// <summary>Ecrit cet etat tel quel : celui qu'un Memoriser* vient de relire et de modifier.</summary>
+    private void Ecrire()
     {
         try
         {

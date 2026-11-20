@@ -16,7 +16,9 @@ var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../.
 // Lot 2 du passage a React (19/11/2026) : l'aiguillage des ecrans est
 // web/src/plan/Aiguillage.tsx, la table des procedures est dans Pont/PlanTravail.cs.
 var aiguillage = File.ReadAllText(Path.Combine(racine, "web/src/plan/Aiguillage.tsx"));
-var vue = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs"));
+// Le catalogue des ecrans vit dans Pont/CatalogueEcrans.cs depuis le 20/11/2026 (sorti de
+// PlanTravail.cs, lot 6 du plan « Vue du dossier ») : il est lu avec lui.
+var vue = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs")) + Environment.NewLine + File.ReadAllText(Path.Combine(racine, "Pont/CatalogueEcrans.cs"));
 
 // Bac a sable : JAMAIS l'etat reel de l'utilisateur.
 var bac = Path.Combine(Path.GetTempPath(), "rigv3-actualites-" + Guid.NewGuid().ToString("N"));

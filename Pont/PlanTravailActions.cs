@@ -73,17 +73,18 @@ public sealed partial class SessionPlanTravail
         => ArbreVisible().FirstOrDefault(n => n.EstPiece && n.Libelle == ArbreDemo.LibelleKbisAJour);
 
     /// <summary>La barre : un groupe par verbe, dans l'ordre du catalogue ; un verbe sans
-    /// action disponible n'apparait pas.</summary>
+    /// action disponible n'apparait pas. Chaque verbe nomme l'action qu'il garde en bouton
+    /// quand la barre le replie (ActionsDossier.Principale).</summary>
     private VerbeActionsVue[] VueActions(Dossier d)
     {
         var disponibles = ActionsDisponibles(d).ToList();
         return ActionsDossier.Verbes
-            .Select(verbe => new VerbeActionsVue(verbe, disponibles
-                .Where(a => a.Verbe == verbe)
+            .Select(verbe => disponibles.Where(a => a.Verbe == verbe).ToList())
+            .Where(actions => actions.Count > 0)
+            .Select(actions => new VerbeActionsVue(actions[0].Verbe, actions
                 .Select(a => new ActionDossierVue(a.Code, a.Libelle, a.Touche.ToString(), a.Detail,
                                                   !a.EstLocale, TexteACopier(a, d)))
-                .ToArray()))
-            .Where(g => g.Actions.Length > 0)
+                .ToArray(), ActionsDossier.Principale(actions)?.Code))
             .ToArray();
     }
 
@@ -120,8 +121,10 @@ public sealed partial class SessionPlanTravail
                 break;
             case ActionsDossier.EnvoyerDossier:
                 OuvrirEnvoiMail();
-                var pieces = NbPiecesVisibles();
-                EnvoiDe = $"Dossier entier {d.Numero} ({pieces} {(pieces == 1 ? "piece" : "pieces")})";
+                // Le dossier ENTIER, comme « Envoyer par mail » d'un dossier du classeur (PiecesDe) :
+                // toutes les pieces que ce login peut voir, pas celles que le mode tache montre
+                // (004151 annoncait « 2 pieces », parcours du lot 6).
+                EnvoiDe = $"Dossier entier {d.Numero} ({NombreDePieces(PiecesDe(Arbre).Count)})";
                 break;
             case ActionsDossier.CopierNumero or ActionsDossier.CopierSiren:
                 // Le presse-papiers est celui de la page : elle copie sans remonter le geste.

@@ -12,10 +12,13 @@ public sealed record CriteresDemandes(string CritDemande, string CritClient, str
 /// </summary>
 public sealed record LigneDemande(string Numero, string Nom, string Dossier, string Siren, string Client,
                                   string Traitement, string Etat, string Statut, bool EnCours,
-                                  string Creation, string Validation, string Utilisateur, bool Alerte);
+                                  string Creation, string Validation, string Utilisateur, bool Alerte,
+                                  string TraitementLibelle);
 
-/// <summary>Ce que l'ecran affiche : les listes de choix, la grille et le total connu.</summary>
-public sealed record VueDemandes(string[] Traitements, string[] Etats, LigneDemande[] Lignes, int Total);
+/// <summary>Ce que l'ecran affiche : les listes de choix, la grille et le total connu.
+/// <paramref name="LibellesTraitements"/> nomme chaque traitement, dans l'ordre des codes.</summary>
+public sealed record VueDemandes(string[] Traitements, string[] Etats, LigneDemande[] Lignes, int Total,
+                                 string[] LibellesTraitements);
 
 /// <summary>
 /// Pont de l'ecran PROC_DEMANDE (web/src/ecrans/EcranDemandes.tsx) : les demandes
@@ -51,16 +54,31 @@ public static class EcranDemandes
                         ? JeuDemo.Aujourdhui.ToString("dd/MM/yyyy")
                         : dem.Validation,
                     dem.Utilisateur,
-                    Alerte: dem.Alerte && !valide);
+                    Alerte: dem.Alerte && !valide,
+                    TraitementLibelle: LibelleTraitement(dem.Traitement));
             })
             .ToArray();
 
+        var traitements = JeuDemo.Demandes.Select(d => d.Traitement).Distinct().Order().ToArray();
         return new VueDemandes(
-            JeuDemo.Demandes.Select(d => d.Traitement).Distinct().Order().ToArray(),
+            traitements,
             JeuDemo.EtatsDemande,
             lignes,
-            JeuDemo.Demandes.Length);
+            JeuDemo.Demandes.Length,
+            [.. traitements.Select(LibelleTraitement)]);
     }
+
+    /// <summary>
+    /// Le traitement d'une demande, nomme par son ecran comme son onglet (« Depots judiciaires ») :
+    /// la colonne et la liste « Processus » montraient le code interne (PROC_DEPOTJUD, parcours du
+    /// lot 6, 20/11/2026). Un code absent du catalogue se lit sans son prefixe technique
+    /// (PROC_BODACC : « BODACC »). Le filtre, lui, garde le code pour valeur. Le nom vient du
+    /// catalogue des ecrans (Pont/CatalogueEcrans.cs), pas de la session de la page : ce fichier
+    /// se compile seul dans SaisieCheck et SimuEdiCheck.
+    /// </summary>
+    internal static string LibelleTraitement(string code)
+        => CatalogueEcrans.Nom(code) is { Length: > 0 } nom ? nom
+         : code.StartsWith("PROC_", StringComparison.Ordinal) ? code["PROC_".Length..].Replace('_', ' ') : code;
 
     private static DemandeRcs[] Trouvees(CriteresDemandes c, Func<string, bool> EstValide)
     {

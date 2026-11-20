@@ -29,13 +29,19 @@ export interface LigneDemande {
   validation: string
   utilisateur: string
   alerte: boolean
+  /** Le traitement nomme par son ecran (« Depots judiciaires ») : c'est lui qui s'affiche,
+   *  jamais le code (Pont/EcranDemandes.cs : LibelleTraitement). */
+  traitementLibelle: string
 }
 
 export interface VueDemandes {
+  /** Les codes des traitements : la valeur du filtre « Processus ». */
   traitements: string[]
   etats: string[]
   lignes: LigneDemande[]
   total: number
+  /** Le nom de chaque traitement, dans l'ordre des codes : ce que la liste montre. */
+  libellesTraitements: string[]
 }
 
 export interface ProprietesEcranDemandes {
@@ -117,8 +123,8 @@ export function EcranDemandes({ valides, ouvrir, dossier = null }: ProprietesEcr
           <span className="rig-saisie-champ__libelle">Processus</span>
           <select className="rig-saisie-champ__saisie" value={critProcessus} onChange={(e) => setCritProcessus(e.target.value)}>
             <option value="">Tous</option>
-            {(vue?.traitements ?? []).map((trait) => (
-              <option key={trait} value={trait}>{trait}</option>
+            {(vue?.traitements ?? []).map((trait, i) => (
+              <option key={trait} value={trait}>{vue?.libellesTraitements[i] ?? trait}</option>
             ))}
           </select>
         </label>
@@ -206,7 +212,7 @@ export function EcranDemandes({ valides, ouvrir, dossier = null }: ProprietesEcr
                   <td className="rig-table__mono">{dem.dossier}</td>
                   <td className="rig-table__mono">{dem.siren}</td>
                   <td>{dem.client}</td>
-                  <td className="rig-table__mono">{dem.traitement}</td>
+                  <td>{dem.traitementLibelle}</td>
                   <td>
                     <span className={`rig-etat rig-etat--${dem.statut}`}>
                       {dem.etat}

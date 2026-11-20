@@ -405,10 +405,7 @@ public sealed partial class SessionPlanTravail
     }
 
     /// <summary>Le libelle d'un ecran dans le catalogue du menu ; vide s'il n'y est pas.</summary>
-    private string LibelleEcran(string code)
-        => code.Length == 0 ? ""
-         : Groupes.SelectMany(g => g.Procs).FirstOrDefault(p => p.Code == code)?.Libelle
-           ?? EntreeDeCode(code)?.Libelle ?? "";
+    private static string LibelleEcran(string code) => CatalogueEcrans.Nom(code);
 
     /// <summary>« Depot de bilan - TRANSNORD SA » nomme la societe apres le tiret.</summary>
     private static string Denomination(string objet)

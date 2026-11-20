@@ -38,6 +38,47 @@ internal static class Programme
     private static IEnumerable<LigneArbreVue> Lignes(LigneArbreVue l)
         => new[] { l }.Concat(l.Enfants.SelectMany(Lignes));
 
+    /// <summary>
+    /// La valeur que la feuille donne a cette <paramref name="propriete"/> de ce selecteur pour
+    /// une fenetre de <paramref name="largeur"/> pixels : celle de la DERNIERE regle, dans l'ordre
+    /// du fichier, qui le nomme tel quel et la pose, hors des @media qui ne s'appliquent pas
+    /// (seuls « (max-width: N) » avec N >= largeur comptent). Une cascade reduite aux regles
+    /// d'egale force et aux proprietes ecrites telles quelles (« overflow » n'est pas lu dans
+    /// « overflow-y »), ce qui suffit pour les cartes du corps du dossier.
+    /// fix-ok: a 1100 px, la regle des cartes (« min-height: 0 », rig-accueil.css ~4398) venait
+    /// apres la mise en page etroite (~930) et l'annulait -- mesure sur capture, arbre ~110 px.
+    /// </summary>
+    private static string? ProprieteA(string css, string selecteur, string propriete, int largeur)
+    {
+        css = Regex.Replace(css, @"/\*.*?\*/", "", RegexOptions.Singleline);
+        string? valeur = null;
+        void Lire(string bloc, bool applique)
+        {
+            var i = 0;
+            while (i < bloc.Length)
+            {
+                var ouvre = bloc.IndexOf('{', i);
+                if (ouvre < 0) return;
+                var tete = Regex.Replace(bloc[i..ouvre].Trim(), @"\s+", " ");
+                var (fin, profondeur) = (ouvre + 1, 1);
+                while (fin < bloc.Length && profondeur > 0)
+                    profondeur += bloc[fin++] switch { '{' => 1, '}' => -1, _ => 0 };
+                var corps = bloc[(ouvre + 1)..(fin - 1)];
+                if (tete.StartsWith("@media", StringComparison.Ordinal))
+                {
+                    var m = Regex.Match(tete, @"^@media \(max-width: (\d+)px\)$");
+                    Lire(corps, applique && m.Success && int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture) >= largeur);
+                }
+                else if (applique && !tete.StartsWith('@') && tete.Split(',').Select(s => s.Trim()).Contains(selecteur)
+                         && Regex.Match(corps, @"(?:^|[;\s])" + Regex.Escape(propriete) + @":\s*([^;]+);") is { Success: true } lu)
+                    valeur = lu.Groups[1].Value.Trim();
+                i = fin;
+            }
+        }
+        Lire(css, applique: true);
+        return valeur;
+    }
+
     [STAThread]
     private static int Main()
     {
@@ -122,16 +163,30 @@ internal static class Programme
 
         // Bac a sable : JAMAIS l'etat reel de l'utilisateur.
         var etatAvant = Environment.GetEnvironmentVariable("RIGV3_ETAT");
+        var etatPont = Path.Combine(Path.GetTempPath(), "rigv3-pont-" + Guid.NewGuid().ToString("N") + ".json");
         var etatBanc = Path.Combine(Path.GetTempPath(), "rigv3-plantravail-" + Guid.NewGuid().ToString("N") + ".json");
-        Environment.SetEnvironmentVariable("RIGV3_ETAT", etatBanc);
         try
         {
+            // Le pont ouvre 004176 : son onglet est RETENU et revient au demarrage suivant. Chaque
+            // partie a donc son etat -- Jouer part d'une page neuve.
+            Environment.SetEnvironmentVariable("RIGV3_ETAT", etatPont);
             JouerPont(racine);
+            // REDEMARRAGE : l'onglet de l'affaire ouverte revient. La session l'ecrit en ouvrant
+            // l'affaire (MemoriserOnglets) PUIS consulte l'affaire sur l'etat lu a son demarrage :
+            // cet etat reecrivait la barre vide, et l'app redemarrait sur l'accueil seul (parcours
+            // du lot 6, 20/11/2026 : 004176 et 004151 ouverts, aucun onglet au retour).
+            var redemarree = new SessionPlanTravail(null, null);
+            redemarree.Initialiser();
+            Exiger(redemarree.Vue().Onglets?.Any(o => o.Code == "AFFAIRE:004176") == true,
+                $"redemarrage : l'onglet de l'affaire ouverte (004176) revient dans la barre (onglets : {string.Join(", ", redemarree.Vue().Onglets?.Select(o => o.Code) ?? [])})");
+            redemarree.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            Environment.SetEnvironmentVariable("RIGV3_ETAT", etatBanc);
             Jouer();
         }
         finally
         {
             Environment.SetEnvironmentVariable("RIGV3_ETAT", etatAvant);
+            try { File.Delete(etatPont); } catch (IOException) { }
             try { File.Delete(etatBanc); } catch (IOException) { }
         }
 
@@ -834,6 +889,7 @@ internal static class Programme
         JouerActionsDossier();
         JouerEnCoursDossier();
         JouerIdentiteDeLAffaire();
+        JouerParcoursDuDossier();
     }
 
     /// <summary>
@@ -1102,8 +1158,8 @@ internal static class Programme
         Exiger(s.Vue().Impression?.Libelle == "Arborescence du dossier 004176",
             "« Imprimer l'arborescence » ouvre la modale d'impression sur l'arborescence du dossier");
         Faire("lancerImpression");
-        Exiger(s.Vue().Impression is null && s.Vue().Dossier!.Apercu!.Apercu!.Message.StartsWith("Envoye a "),
-            "l'impression de l'arborescence part et le dit");
+        Exiger(s.Vue().Impression is null && s.Vue().Dossier!.Apercu!.Apercu!.Message.StartsWith("« Arborescence du dossier 004176 » envoye a "),
+            "l'impression de l'arborescence part et le dit, en la nommant (la confirmation s'affiche sous la piece ouverte)");
         Faire("imprimer");
         Exiger(s.Vue().Impression?.Libelle == "Kbis a jour",
             "jumeau : le bouton Imprimer du document reprend la piece ouverte, pas l'arborescence");
@@ -1402,5 +1458,225 @@ internal static class Programme
         JeuDemo.Attribuer("004151", "C. BENIER");
         foreach (var o in s.Vue().Onglets ?? []) Faire("ongletFermer", o.Code);
         s.DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// 18. LE PARCOURS D'UN AGENT SUR LA PAGE DU DOSSIER (plan « Vue du dossier = coeur des
+    /// actions », lot 6, 20/11/2026), joue sur l'app au bureau cache : 004176 puis 004151, le
+    /// Kbis, facturer et revenir, une demande en cours, joindre un PDF, imprimer, envoyer le
+    /// dossier, sortir l'onglet, redemarrer. Chaque defaut releve a son controle ici, avec
+    /// l'entree qui le ferait echouer si la correction etait fausse. Etat a part : le
+    /// redemarrage relit ce que la premiere session a retenu.
+    /// </summary>
+    private static void JouerParcoursDuDossier()
+    {
+        var etatAvant = Environment.GetEnvironmentVariable("RIGV3_ETAT");
+        var etatIci = Path.Combine(Path.GetTempPath(), "rigv3-parcours-" + Guid.NewGuid().ToString("N") + ".json");
+        Environment.SetEnvironmentVariable("RIGV3_ETAT", etatIci);
+        try
+        {
+            var s = new SessionPlanTravail(null, null);
+            s.Initialiser();
+            void Faire(string geste, object? valeur = null) => s.Agir(geste, Valeur(valeur));
+
+            // --- LA BARRE, 004176 a 1516 px : ses cinq verbes replies en menus, il fallait deux
+            // clics pour le Kbis ou les factures. Chaque verbe nomme son action FREQUENTE, qui
+            // reste un bouton quand il se replie ; un verbe d'une seule action est cette action.
+            // Faux si : Enregistrer ou Suivre en nommaient une (la barre s'allongerait sans
+            // raison), ou si Ecrire (le seul mail, sur un dossier RCS) restait un menu d'un item.
+            Faire("ouvrirNumero", "004176");
+            string? Principale(SessionPlanTravail x, string verbe)
+                => x.Vue().Dossier!.Actions.Single(g => g.Verbe == verbe).Principale;
+            Exiger(Principale(s, ActionsDossier.Delivrer) == "kbis" && Principale(s, ActionsDossier.Facturer) == "factures"
+                   && Principale(s, ActionsDossier.Ecrire) == "envoyerDossier"
+                   && Principale(s, ActionsDossier.Enregistrer) is null && Principale(s, ActionsDossier.Suivre) is null,
+                "004176 : Delivrer nomme « Kbis a jour », Facturer « Factures », Ecrire son seul mail ; Enregistrer et Suivre, rien");
+
+            // --- FACTURER ET REVENIR : l'affaire revient sur SON etape. La page remonte la zone
+            // des etapes a neuf, en haut : sans defilement demande, elle rapportait l'etape du
+            // haut (« etape 1 / 6 ») et le C# la prenait pour la courante. Faux si : le retour
+            // par l'onglet de l'affaire (et pas seulement par la puce) repartait encore en haut.
+            Faire("actionDossier", "kbis");
+            Faire("allerEtape", 2);
+            var avant = s.Vue();
+            Exiger(avant.Dossier!.Etapes is { Courante: 2 }, "precondition : 004176 montre ses etapes, sur la 3 / 6");
+            var defileAvant = avant.Defilement?.Numero ?? 0;
+            Faire("actionDossier", "factures");
+            Exiger(s.Vue().Proc?.Code == "PROC_FACTURE", "precondition : Factures ouvert pour 004176");
+            Faire("retourDossier");
+            var retour = s.Vue();
+            Exiger(retour.Dossier?.Etapes is { Courante: 2 } && retour.Defilement is { Index: 2, Doux: false } d1 && d1.Numero > defileAvant,
+                $"revenue par la puce « ← Dossier », l'affaire ramene la frise sur son etape 3 / 6 (defilement : {retour.Defilement?.ToString() ?? "aucun"})");
+            Faire("ongletActiver", "PROC_FACTURE");
+            var defileEcran = s.Vue().Defilement?.Numero ?? 0;
+            Faire("ongletActiver", "AFFAIRE:004176");
+            Exiger(s.Vue().Defilement is { Index: 2 } d2 && d2.Numero > defileEcran,
+                "jumeau : revenue par son onglet, meme retour sur l'etape 3 / 6");
+
+            // --- 004151 S'OUVRE EN MODE TACHE (« Dissolution ») : l'arbre replie ce que la tache
+            // ne nomme pas. Le DOSSIER ENTIER part par mail : toutes ses pieces, pas les 2 que la
+            // tache montre (la modale disait « Dossier entier 004151 (2 pieces) »). Faux si : on
+            // comptait les pieces montrees -- egal hors mode tache, d'ou 004151 ici et pas 004176.
+            Faire("ouvrirNumero", "004151");
+            var v = s.Vue();
+            Exiger(v.Dossier!.Tache is not null, "precondition : 004151 s'ouvre en mode tache");
+            static int Masquees(DossierVue x)
+                => int.Parse(Regex.Match(x.Tache!.TexteTout, @"(\d+) pieces? masquee").Groups[1].Value, CultureInfo.InvariantCulture);
+            var montrees = v.Dossier.Pieces;
+            var masquees = Masquees(v.Dossier);
+            Faire("actionDossier", "envoyerDossier");
+            Exiger(s.Vue().EnvoiMail?.Libelle == $"Dossier entier 004151 ({montrees + masquees} pieces)",
+                $"« Envoyer le dossier par mail » compte le dossier entier : {montrees} montrees + {masquees} masquees (lu : {s.Vue().EnvoiMail?.Libelle})");
+            Faire("fermerMail");
+
+            // --- JOINDRE UN PDF EN MODE TACHE : la piece reste dans sa carte. Elle passait le
+            // compteur de la carte a 5 et partait dans les pieces masquees (42 -> 43). Faux si :
+            // la tache ne repliait plus rien (le compte des masquees doit rester le meme).
+            var carte = Lignes(v.Dossier.Arbre).First(l => l.Texte == "Pieces jointes");
+            var pdf = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes("%PDF-1.4\n1 0 obj<<>>endobj\n%%EOF\n"));
+            Faire("arbreJoindre", new { id = carte.Id, nom = "attestation-parcours.pdf", contenu = pdf });
+            v = s.Vue();
+            var jointe = Lignes(v.Dossier!.Arbre).FirstOrDefault(l => l.Texte.StartsWith("attestation-parcours", StringComparison.Ordinal));
+            Exiger(jointe is not null && v.Dossier.Pieces == montrees + 1 && Masquees(v.Dossier) == masquees,
+                $"le PDF joint en mode tache se montre dans sa carte ({v.Dossier.Pieces} pieces montrees au lieu de {montrees + 1}, {Masquees(v.Dossier)} masquees au lieu de {masquees})");
+
+            // --- IMPRIMER UN DOSSIER ENTIER : la confirmation s'affiche sous la piece ouverte (le PDF
+            // joint) ; elle disait « Envoye a \\srv-print... » sans dire QUOI -- on croyait n'avoir
+            // imprime que la piece. Elle nomme le dossier imprime. Faux si : la piece ouverte,
+            // imprimee par son propre bouton, etait renommee (jumeau : sa confirmation reste courte).
+            Faire("arbreMenu", new { id = carte.Id, clientX = 10, clientY = 10 });
+            Faire("menuImprimer");
+            Exiger(s.Vue().Impression?.Libelle == "Pieces jointes (5 pieces)", $"precondition : la modale imprime les 5 pieces jointes (lu : {s.Vue().Impression?.Libelle})");
+            Faire("lancerImpression");
+            var message = s.Vue().Dossier!.Apercu!.Apercu!.Message;
+            Exiger(message.StartsWith("« Pieces jointes (5 pieces) » envoye a ", StringComparison.Ordinal),
+                $"la confirmation d'impression d'un dossier entier dit ce qui est parti (lu : {message})");
+            Faire("imprimer");
+            Faire("lancerImpression");
+            message = s.Vue().Dossier!.Apercu!.Apercu!.Message;
+            Exiger(message.StartsWith("Envoye a ", StringComparison.Ordinal), $"jumeau : la piece ouverte, imprimee par son bouton, garde sa confirmation (lu : {message})");
+            Faire("actionDossier", "envoyerDossier");
+            Faire("destinataire", "greffe.civil@exemple.fr");
+            Faire("envoyerMail");
+            message = s.Vue().Dossier!.Apercu!.Apercu!.Message;
+            Exiger(message.StartsWith($"« Dossier entier 004151 ({montrees + 1 + masquees} pieces) » : mail ", StringComparison.Ordinal),
+                $"la confirmation de l'envoi du dossier entier dit ce qui est parti (lu : {message})");
+
+            // --- FACTURER DEPUIS 004151, PUIS REDEMARRER : l'onglet Factures garde son affaire.
+            // Il revenait au demarrage sans elle : la facture generale (SELARL LEROY, comptes
+            // annuels), ni bloc « Pour le dossier » ni puce de retour.
+            Faire("actionDossier", "factures");
+            Exiger(s.Vue().Proc is { Code: "PROC_FACTURE", Ecran.Dossier.Numero: "004151" }, "precondition : Factures pour 004151");
+            s.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            var r = new SessionPlanTravail(null, null);
+            r.Initialiser();
+            void FaireR(string geste, object? valeur = null) => r.Agir(geste, Valeur(valeur));
+            FaireR("ongletActiver", "PROC_FACTURE");
+            Exiger(r.Vue().Proc is { Code: "PROC_FACTURE", Ecran.Dossier.Numero: "004151" },
+                $"apres un redemarrage, l'onglet Factures ouvert depuis 004151 est toujours le sien (lu : {r.Vue().Proc?.Ecran.Dossier?.Numero ?? "aucune affaire"})");
+            FaireR("retourDossier");
+            Exiger(r.Vue().Dossier?.Numero == "004151", "apres un redemarrage, sa puce « ← Dossier » ramene a 004151");
+
+            // --- L'ACCUEIL OUVRE L'ECRAN GENERAL : « Facturer › Factures » du menu reprenait
+            // l'onglet de 004151, sa facture et son bloc « Pour le dossier ». Faux si : l'action
+            // de l'affaire, rejouee ensuite, ne le rendait pas a l'affaire.
+            FaireR("accueil");
+            FaireR("ouvrirCode", "PROC_FACTURE");
+            Exiger(r.Vue().Proc is { Code: "PROC_FACTURE", Ecran.Dossier: null },
+                "depuis l'accueil, « Factures » ouvre l'ecran general, pas la facture de 004151");
+            FaireR("ongletActiver", "AFFAIRE:004151");
+            FaireR("actionDossier", "factures");
+            Exiger(r.Vue().Proc is { Code: "PROC_FACTURE", Ecran.Dossier.Numero: "004151" },
+                "jumeau : depuis l'affaire, le meme onglet repart pour elle");
+            FaireR("accueil");
+            FaireR("ouvrirCode", "PROC_FACTURE");
+            r.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            var r2 = new SessionPlanTravail(null, null);
+            r2.Initialiser();
+            r2.Agir("ongletActiver", Valeur("PROC_FACTURE"));
+            Exiger(r2.Vue().Proc is { Code: "PROC_FACTURE", Ecran.Dossier: null },
+                "jumeau : l'ecran ouvert depuis l'accueil reste general au redemarrage");
+            r2.DisposeAsync().AsTask().GetAwaiter().GetResult();
+
+            // --- L'ECRAN DEMANDES (ouvert depuis le dossier) nommait le traitement par son code
+            // interne (PROC_DEPOTJUD). Il le nomme par l'ecran, comme son onglet. Faux si : le
+            // filtre « Processus », qui garde le code pour valeur, ne trouvait plus 004151.
+            var tout = new CriteresDemandes("", "", "", null, null, [], false, false, 50);
+            var demandes = EcranDemandes.Trouver(tout, []);
+            Exiger(demandes.Lignes.Length > 5
+                   && demandes.Lignes.All(l => l.TraitementLibelle.Length > 0 && !l.TraitementLibelle.Contains("PROC_"))
+                   && demandes.LibellesTraitements.Length == demandes.Traitements.Length
+                   && demandes.LibellesTraitements.All(t => t.Length > 0 && !t.Contains("PROC_"))
+                   && demandes.Lignes.First(l => l.Numero == "004151").TraitementLibelle == "Depots judiciaires"
+                   && demandes.Lignes.First(l => l.Numero == "004176").TraitementLibelle == "Demandes",
+                $"Demandes : la colonne Traitement et la liste Processus nomment l'ecran, jamais son code ({string.Join(", ", demandes.Lignes.Select(l => l.TraitementLibelle).Distinct())})");
+            var parCode = EcranDemandes.Trouver(tout with { CritProcessus = "PROC_DEPOTJUD" }, []);
+            Exiger(parCode.Lignes.Select(l => l.Numero).SequenceEqual(new[] { "004151" }),
+                "jumeau : le filtre « Processus » garde le code pour valeur et trouve 004151");
+
+            // --- L'ENTETE A 1100 PX : sur 004151 (mode tache, bouton « Document »), la page sortait
+            // de la fenetre -- « 2 points a cor... » coupe, la croix de l'affaire hors champ, le corps
+            // empile coupe a droite. La colonne de la page (grille .rig-vged, colonne implicite
+            // « auto ») et celle du corps empile (« 1fr ») grandissaient jusqu'a la largeur minimale
+            // de leur contenu. Plafonnees a la fenetre (minmax(0, 1fr)), l'identite cede la place et
+            // son titre s'abrege. Faux si : une seule des deux colonnes restait libre de grandir.
+            var css = File.ReadAllText(Path.Combine(Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../")),
+                                                    "wwwroot/rig-accueil.css"));
+            var page = Regex.Match(css, @"\n\.rig-vged \{[^}]*grid-template-rows: auto minmax\(0, 1fr\);[^}]*\}").Value;
+            var etroit = Regex.Matches(css, @"@media \(max-width: 1100px\) \{(?:[^{}]|\{[^{}]*\})*\}")
+                              .Select(m => Regex.Match(m.Value, @"\.rig-vged__corps \{[^}]*\}").Value).FirstOrDefault(c => c.Length > 0) ?? "";
+            Exiger(page.Contains("grid-template-columns: minmax(0, 1fr);") && etroit.Contains("grid-template-columns: minmax(0, 1fr) !important;"),
+                $"a 1100 px, ni la page du dossier ni son corps empile ne depassent la fenetre (colonnes plafonnees : page « {Regex.Match(page, @"grid-template-columns:[^;]*").Value} », corps « {Regex.Match(etroit, @"grid-template-columns:[^;]*").Value} »)");
+
+            // --- LE CORPS EMPILE A 1100 PX : l'arbre ne montrait que son filtre et ses onglets, le
+            // document une bande de quelques pixels, le suivi ses seuls onglets. La regle des cartes
+            // (« min-height: 0 », plus bas dans la feuille, meme force) effacait les hauteurs minimales
+            // de la mise en page etroite, ecrite plus haut : la grille partageait la hauteur de la
+            // fenetre a parts egales (~100 px chacune) au lieu de faire defiler le corps. La cascade est
+            // rejouee ici telle qu'elle s'applique a 1100 px. Une hauteur minimale compte si c'est une
+            // longueur non nulle, ou « auto » sur une carte qui ne coupe pas son contenu (overflow
+            // visible : minimum fonde sur le contenu) ; « max-content » ne compte pas, Chrome l'ignore
+            // en dimensionnant les rangees (mesure : rangee de l'arbre a 20 px, carte posee sur la
+            // fiche). Faux si : une regle d'egale force placee apres la mise en page etroite remettait
+            // « min-height: 0 », ou l'arbre repassait en « overflow: hidden ».
+            foreach (var zone in new[] { ".rig-vged__arbre", ".rig-vged__corps > .rig-vged__apercu", ".rig-vged__suivi" })
+            {
+                var mini = ProprieteA(css, zone, "min-height", 1100);
+                var coupe = ProprieteA(css, zone, "overflow", 1100);
+                var tient = mini switch
+                {
+                    null or "0" or "0px" or "max-content" or "min-content" or "fit-content" => false,
+                    "auto" => coupe == "visible",
+                    _ => true,
+                };
+                Exiger(tient, $"a 1100 px, « {zone} » garde une hauteur minimale dans le corps empile, qui defile (lu en fin de cascade : min-height {mini ?? "aucune"}, overflow {coupe ?? "aucun"})");
+                // Jumeau : en large, les colonnes cote a cote remplissent la hauteur et defilent
+                // chacune ; une hauteur minimale y ferait deborder la page.
+                Exiger(ProprieteA(css, zone, "min-height", 1500) == "0",
+                    $"jumeau : a 1500 px, « {zone} » reste a « min-height: 0 » (lu : {ProprieteA(css, zone, "min-height", 1500) ?? "aucune"})");
+            }
+
+            // --- L'ENTETE DE L'AFFAIRE : la barre d'actions mesure ses VOISINS (retour, filet,
+            // Document, points a corriger, fermer) en les supposant fixes, seule l'identite cedant la
+            // place (ActionsDossier.tsx, mesurer). Les boutons retour et fermer se tassaient de ~8 px
+            // chacun quand la barre se depliait : mesures barre depliee, les voisins laissaient 17 px de
+            // plus a l'identite, ses puces « tenaient sur une ligne », la barre se repliait ; mesures
+            // barre repliee, elle se redepliait. A 1516 px, 004151 restait tout en menus, puces sur deux
+            // lignes (releve dans la page du 20/11/2026 : voisins 292,0 px barre repliee, 274,9 depliee).
+            // Faux si : un voisin de la barre peut retrecir.
+            var voisins = ProprieteA(css, ".rig-vged__entete > :not(.rig-vged__identite)", "flex-shrink", 1516);
+            Exiger(voisins == "0",
+                $"a 1516 px, les voisins de la barre d'actions ne retrecissent pas : sa mesure ne depend plus de sa forme (lu : flex-shrink {voisins ?? "aucun"})");
+            // Jumeau : l'identite, elle, cede la place (sans quoi l'entete deborderait de la fenetre).
+            Exiger(ProprieteA(css, ".rig-vged__identite", "flex", 1516) == "1 1 auto"
+                   && ProprieteA(css, ".rig-vged__identite", "min-width", 1516) == "0",
+                "jumeau : l'identite de l'affaire reste la seule a ceder la place (flex 1 1 auto, min-width 0)");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("RIGV3_ETAT", etatAvant);
+            try { File.Delete(etatIci); } catch (IOException) { }
+            try { Directory.Delete(PiecesJointes.DossierPour(etatIci), recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
     }
 }

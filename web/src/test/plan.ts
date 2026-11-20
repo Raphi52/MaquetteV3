@@ -142,20 +142,21 @@ function action(code: string, libelle: string, touche: string, ecran: boolean, c
 
 /** La barre de l'affaire RCS 004176, telle que la session la rend (Metier/ActionsDossier.cs). */
 export function actionsRcs(): VerbeActionsVue[] {
+  // principale : l'action que le verbe garde en bouton replie (Metier/ActionsDossier.cs : Principale).
   return [
-    { verbe: 'Delivrer', actions: [
+    { verbe: 'Delivrer', principale: 'kbis', actions: [
       action('kbis', 'Kbis a jour', 'K', false), action('imprimerKbis', 'Imprimer le Kbis', 'I', false),
       action('imprimerArborescence', "Imprimer l'arborescence", 'P', false),
       action('requisitions', 'Requisitions - commande de documents', 'R', true), action('commandesWeb', 'Commandes web', 'W', true),
     ] },
-    { verbe: 'Enregistrer', actions: [
+    { verbe: 'Enregistrer', principale: null, actions: [
       action('demandes', 'Demandes', 'D', true), action('bodacc', 'BODACC', 'B', true),
       action('cloture', 'Cloture', 'O', true), action('archivage', 'Archivage / radiation', 'A', true),
     ] },
-    { verbe: 'Facturer', actions: [action('factures', 'Factures', 'F', true), action('encaissements', 'Encaissements', 'E', true)] },
+    { verbe: 'Facturer', principale: 'factures', actions: [action('factures', 'Factures', 'F', true), action('encaissements', 'Encaissements', 'E', true)] },
     // Aucun courrier divers : ils sont judiciaires, et aucune lettre type RCS n'existe (Metier/CourriersDivers.cs).
-    { verbe: 'Ecrire', actions: [action('envoyerDossier', 'Envoyer le dossier par mail', 'M', false)] },
-    { verbe: 'Suivre', actions: [
+    { verbe: 'Ecrire', principale: 'envoyerDossier', actions: [action('envoyerDossier', 'Envoyer le dossier par mail', 'M', false)] },
+    { verbe: 'Suivre', principale: null, actions: [
       action('copierNumero', 'Copier le n°', 'N', false, '004176'), action('copierSiren', 'Copier le SIREN', 'S', false, '812 445 901'),
       action('verrous', 'Dossiers verrouilles', 'V', true), action('teletransmissions', 'Teletransmissions (EDI)', 'T', true),
     ] },
@@ -166,14 +167,14 @@ export function actionsRcs(): VerbeActionsVue[] {
  *  « Ecrire » propose le courrier divers de sa nature, joue dans la page (Metier/CourriersDivers.cs). */
 export function actionsJud(): VerbeActionsVue[] {
   return [
-    { verbe: 'Delivrer', actions: [action('imprimerArborescence', "Imprimer l'arborescence", 'P', false)] },
-    { verbe: 'Enregistrer', actions: [action('depotsJudiciaires', 'Depots judiciaires', 'D', true), action('bodacc', 'BODACC', 'B', true)] },
-    { verbe: 'Facturer', actions: [action('factures', 'Factures', 'F', true), action('encaissements', 'Encaissements', 'E', true)] },
-    { verbe: 'Ecrire', actions: [
+    { verbe: 'Delivrer', principale: 'imprimerArborescence', actions: [action('imprimerArborescence', "Imprimer l'arborescence", 'P', false)] },
+    { verbe: 'Enregistrer', principale: null, actions: [action('depotsJudiciaires', 'Depots judiciaires', 'D', true), action('bodacc', 'BODACC', 'B', true)] },
+    { verbe: 'Facturer', principale: 'factures', actions: [action('factures', 'Factures', 'F', true), action('encaissements', 'Encaissements', 'E', true)] },
+    { verbe: 'Ecrire', principale: 'courrier:CD_NOTIF', actions: [
       action('courrier:CD_NOTIF', 'Notification au mandataire', 'C', false), action('redaction', "Redaction d'une decision", 'R', true),
       action('envoyerDossier', 'Envoyer le dossier par mail', 'M', false),
     ] },
-    { verbe: 'Suivre', actions: [
+    { verbe: 'Suivre', principale: null, actions: [
       action('copierNumero', 'Copier le n°', 'N', false, '2026P00031'),
       action('consultationJudiciaire', 'Consultation judiciaire', 'J', true), action('audiences', 'Audiences', 'U', true),
       action('gedJudiciaire', 'GED judiciaire', 'G', true), action('verrous', 'Dossiers verrouilles', 'V', true),

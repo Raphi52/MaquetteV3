@@ -21,6 +21,12 @@
 // passaient de 2 a 3 lignes (refus du controle final, 20/11/2026). La reserve se
 // mesure desormais sur les puces : pas une ligne de plus que barre toute repliee.
 //
+// fix-ok: a 1516 px, 004176 avait ses cinq verbes en menus, deux clics pour le Kbis ou les
+// factures (refus du chef, lot 6, 20/11/2026). Entre le menu et les boutons, une forme de
+// plus : l'action PRINCIPALE du verbe (le Kbis, les factures, le courrier ; un verbe d'une
+// seule action, elle) en bouton, le reste sous un chevron. Le C# la nomme
+// (Metier/ActionsDossier.cs : Principale), formeDesVerbes la choisit a son cout.
+//
 // Le catalogue et ce qui est disponible sur l'affaire sont decides par le C#
 // (Metier/ActionsDossier.cs, Pont/PlanTravailActions.cs) ; la page remonte le
 // code de l'action (geste « actionDossier »), sauf pour une COPIE, qu'elle joue
@@ -111,26 +117,43 @@ export function largeurDesPuces(puces: number[], ecart: number, lignes: number, 
   return haut
 }
 
-/** Un verbe mesure : sa largeur en boutons, et repliee en menu. */
-export interface LargeursVerbe { deplie: number, replie: number }
+/** La forme d'un verbe dans la barre, de la plus compacte a la plus large : un menu, son
+ *  action principale en bouton et le reste sous un chevron, ou tous ses boutons. */
+export type FormeVerbe = 'menu' | 'principale' | 'boutons'
 
-/** Quels verbes s'affichent en BOUTONS (vrai) plutot qu'en menu, pour une barre de
- *  `disponible` pixels au plus (`ecart` entre deux verbes, `cadre` = bords et marges
- *  de la barre). Les verbes se deplient du moins couteux au plus couteux (ce que le
- *  deplier ajoute a la barre ; a egalite, dans l'ordre de la barre), tant qu'elle
- *  tient : le plus de boutons possible, et en elargissant la fenetre un verbe
- *  deplie ne se replie jamais. Aucun verbe ne change de place, seulement de forme. */
-export function formeDesVerbes(verbes: LargeursVerbe[], disponible: number, ecart: number, cadre: number): boolean[] {
-  const deplie = verbes.map(() => false)
+/** Un verbe mesure : sa largeur en boutons, repliee en menu, et dans sa forme principale
+ *  s'il en a une. */
+export interface LargeursVerbe { deplie: number, replie: number, principale?: number }
+
+/** La forme de chaque verbe pour une barre de `disponible` pixels au plus (`ecart` entre
+ *  deux verbes, `cadre` = bords et marges de la barre). Tout part en menus ; puis, marche
+ *  par marche, le verbe dont la forme suivante coute le moins a la barre (a egalite, dans
+ *  l'ordre de la barre) prend cette forme -- sa principale avant ses boutons --, tant qu'elle
+ *  tient. Une marche qui raccourcit la barre est toujours prise. L'ordre des marches ne
+ *  depend pas de la largeur : en elargissant la fenetre, un verbe ne revient jamais a une
+ *  forme plus compacte. Aucun verbe ne change de place, seulement de forme. */
+export function formeDesVerbes(verbes: LargeursVerbe[], disponible: number, ecart: number, cadre: number): FormeVerbe[] {
+  const marches = verbes.map((v): [FormeVerbe, number][] => [
+    ['menu', v.replie],
+    ...(v.principale === undefined ? [] : [['principale', v.principale] as [FormeVerbe, number]]),
+    ['boutons', v.deplie],
+  ])
+  const rang = verbes.map(() => 0)
   let total = cadre + ecart * Math.max(0, verbes.length - 1) + verbes.reduce((s, v) => s + v.replie, 0)
-  const ordre = verbes.map((v, i) => ({ i, cout: v.deplie - v.replie })).sort((a, b) => a.cout - b.cout || a.i - b.i)
-  for (const { i, cout } of ordre) {
-    // Trie par cout : si celui-ci ne tient pas, aucun des suivants ne tiendra.
-    if (total + cout > disponible) break
-    deplie[i] = true
+  for (;;) {
+    let choix = -1
+    let cout = Infinity
+    marches.forEach((m, i) => {
+      const ici = m[rang[i]!]!
+      const suivante = m[rang[i]! + 1]
+      if (suivante && suivante[1] - ici[1] < cout) { choix = i; cout = suivante[1] - ici[1] }
+    })
+    // La moins chere ne tient pas : aucune autre ne tiendrait.
+    if (choix < 0 || (cout > 0 && total + cout > disponible)) break
+    rang[choix]!++
     total += cout
   }
-  return deplie
+  return rang.map((r, i) => marches[i]![r]![0])
 }
 
 const px = (v: string) => parseFloat(v) || 0
@@ -157,7 +180,7 @@ export function reserveIdentite(identite: Element, repliee: number): number {
 
 /** Mesure la place de la barre dans son entete et rend la forme de chaque verbe ;
  *  null quand rien n'est mesurable (vue cachee, pas de mise en page). */
-function mesurer(barre: HTMLElement, mesure: HTMLElement, nombre: number): boolean[] | null {
+function mesurer(barre: HTMLElement, mesure: HTMLElement, verbes: VerbeActionsVue[]): FormeVerbe[] | null {
   const entete = barre.parentElement
   if (!entete) return null
   const se = getComputedStyle(entete)
@@ -165,7 +188,10 @@ function mesurer(barre: HTMLElement, mesure: HTMLElement, nombre: number): boole
   if (contenu <= 0) return null
   // Les voisins dans le flux : leur largeur est fixe, sauf l'identite, qui cede la
   // place a la barre jusqu'a sa reserve. Aucun ne depend de la forme de la barre, ni
-  // les puces de l'identite : pas de boucle.
+  // les puces de l'identite : pas de boucle. C'est la feuille qui le garantit
+  // (rig-accueil.css : « .rig-vged__entete > :not(.rig-vged__identite) », flex-shrink 0) ;
+  // sans elle, les boutons retour et fermer se tassaient sous une barre depliee et la
+  // barre basculait d'une forme a l'autre (004151 a 1516 px, 20/11/2026).
   let pris = 0
   let enFlux = 0
   let identite: Element | null = null
@@ -180,16 +206,23 @@ function mesurer(barre: HTMLElement, mesure: HTMLElement, nombre: number): boole
   }
   // Ce que se partagent l'identite et la barre.
   const libre = contenu - pris - px(se.columnGap) * Math.max(0, enFlux - 1)
-  // La couche de mesure porte, dans l'ordre des verbes, la forme depliee puis la repliee.
-  const mesures = [...mesure.children].map(largeur)
-  if (mesures.length !== 2 * nombre || mesures.some((l) => l <= 0)) return null
+  // La couche de mesure porte chaque forme de chaque verbe, nommee (data-verbe, data-forme).
+  const formes = [...mesure.children] as HTMLElement[]
+  const largeurDe = (verbe: string, forme: FormeVerbe) => {
+    const e = formes.find((x) => x.dataset.verbe === verbe && x.dataset.forme === forme)
+    return e ? largeur(e) : 0
+  }
+  const mesures: LargeursVerbe[] = verbes.map((v) => ({
+    deplie: largeurDe(v.verbe, 'boutons'), replie: largeurDe(v.verbe, 'menu'),
+    ...(v.principale !== null ? { principale: largeurDe(v.verbe, 'principale') } : {}),
+  }))
+  if (mesures.some((m) => m.deplie <= 0 || m.replie <= 0 || (m.principale !== undefined && m.principale <= 0))) return null
   const sb = getComputedStyle(barre)
   const cadre = cadreDe(barre)
   const ecart = px(sb.columnGap)
-  const verbes = Array.from({ length: nombre }, (_, i) => ({ deplie: mesures[2 * i]!, replie: mesures[2 * i + 1]! }))
-  const toutReplie = cadre + ecart * Math.max(0, nombre - 1) + verbes.reduce((s, v) => s + v.replie, 0)
+  const toutReplie = cadre + ecart * Math.max(0, verbes.length - 1) + mesures.reduce((s, v) => s + v.replie, 0)
   const reserve = identite ? reserveIdentite(identite, libre - toutReplie) : 0
-  return formeDesVerbes(verbes, libre - reserve, ecart, cadre)
+  return formeDesVerbes(mesures, libre - reserve, ecart, cadre)
 }
 
 const Chevron = () => <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
@@ -205,8 +238,8 @@ export interface ProprietesActionsDossier {
 export function ActionsDossier({ verbes, plan, copier }: ProprietesActionsDossier) {
   const barre = useRef<HTMLDivElement>(null)
   const mesure = useRef<HTMLDivElement>(null)
-  // La forme de chaque verbe (vrai = boutons) ; d'entree, tout en menus.
-  const [deplies, poserDeplies] = useState<boolean[]>([])
+  // La forme de chaque verbe ; d'entree, tout en menus.
+  const [formes, poserFormes] = useState<FormeVerbe[]>([])
 
   // Mesure avant l'affichage (pas de saut visible), puis a chaque changement de
   // largeur de l'entete ou des textes mesures (police chargee, autre affaire).
@@ -215,8 +248,8 @@ export function ActionsDossier({ verbes, plan, copier }: ProprietesActionsDossie
     const m = mesure.current
     if (!b || !m) return
     const ajuster = () => {
-      const forme = mesurer(b, m, verbes.length) ?? verbes.map(() => false)
-      poserDeplies((avant) => (avant.length === forme.length && avant.every((x, i) => x === forme[i]) ? avant : forme))
+      const forme = mesurer(b, m, verbes) ?? verbes.map((): FormeVerbe => 'menu')
+      poserFormes((avant) => (avant.length === forme.length && avant.every((x, i) => x === forme[i]) ? avant : forme))
     }
     ajuster()
     if (typeof ResizeObserver === 'undefined') return
@@ -265,51 +298,78 @@ export function ActionsDossier({ verbes, plan, copier }: ProprietesActionsDossie
     jouer(a, menu)
   }
 
-  // Le groupe de BOUTONS d'un verbe ; `mesure` = son double inerte de la couche de mesure.
+  // `mesure` : le double inerte d'une forme, dans la couche de mesure, qui la nomme.
+  const nommer = (v: VerbeActionsVue, forme: FormeVerbe, mesure: boolean) =>
+    mesure ? { 'data-verbe': v.verbe, 'data-forme': forme } : { role: 'group', 'aria-label': v.verbe }
+  const bouton = (a: ActionDossierVue, mesure: boolean) => (
+    <button key={a.code} type="button" title={infobulle(a)} tabIndex={mesure ? -1 : undefined}
+            className={'rig-vged__agir-bouton' + (a.ecran ? ' rig-vged__agir-bouton--ecran' : '')}
+            onClick={mesure ? undefined : () => jouer(a, null)}>
+      {a.libelle}
+      {a.ecran && <VersEcran />}
+    </button>
+  )
+  // Le groupe de BOUTONS d'un verbe.
   const groupe = (v: VerbeActionsVue, mesure = false) => (
-    <div key={v.verbe} className="rig-vged__agir-groupe" role={mesure ? undefined : 'group'} aria-label={mesure ? undefined : v.verbe}>
+    <div key={v.verbe + (mesure ? ' boutons' : '')} className="rig-vged__agir-groupe" {...nommer(v, 'boutons', mesure)}>
       <span className="rig-vged__agir-legende">{v.verbe}</span>
-      {v.actions.map((a) => (
-        <button key={a.code} type="button" title={infobulle(a)} tabIndex={mesure ? -1 : undefined}
-                className={'rig-vged__agir-bouton' + (a.ecran ? ' rig-vged__agir-bouton--ecran' : '')}
-                onClick={mesure ? undefined : () => jouer(a, null)}>
-          {a.libelle}
-          {a.ecran && <VersEcran />}
-        </button>
-      ))}
+      {v.actions.map((a) => bouton(a, mesure))}
     </div>
   )
+  // Le MENU d'un verbe : son titre (le verbe, ou le seul chevron a cote de l'action
+  // principale), et toutes ses actions avec leur lettre.
+  const menu = (v: VerbeActionsVue, i: number, titre: 'verbe' | 'chevron') => (
+    <details key={v.verbe} onToggle={(e) => ouvert(e.currentTarget)} onKeyDown={(e) => touche(e, v)}
+             className={'rig-vged__agir-verbe' + (i >= verbes.length - 2 ? ' rig-vged__agir-verbe--droite' : '')}>
+      <summary className={'rig-vged__agir-titre' + (titre === 'chevron' ? ' rig-vged__agir-titre--chevron' : '')}
+               aria-label={titre === 'chevron' ? v.verbe + ' : toutes les actions' : undefined}
+               title={(titre === 'chevron' ? v.verbe + ' : ' : '') + v.actions.map((a) => `${a.libelle} (${a.touche})`).join(' · ')}>
+        {titre === 'verbe' && v.verbe}<Chevron />
+      </summary>
+      <div className="rig-vged__agir-menu" role="menu" aria-label={v.verbe}>
+        {titre === 'chevron' && <div className="rig-vged__agir-entete" aria-hidden="true">{v.verbe}</div>}
+        {v.actions.map((a) => (
+          <button key={a.code} type="button" role="menuitem" title={infobulle(a)}
+                  className={'rig-vged__agir-action' + (a.ecran ? ' rig-vged__agir-action--ecran' : '')}
+                  onClick={(e) => jouer(a, e.currentTarget.closest('details'))}>
+            <span className="rig-vged__agir-libelle">{a.libelle}</span>
+            {a.ecran && <VersEcran />}
+            {/* L'espace separe la lettre du libelle pour un lecteur d'ecran (« Factures F ») ;
+                dans la ligne flex, il ne se dessine pas. */}
+            {' '}<kbd className="rig-vged__agir-touche">{a.touche}</kbd>
+          </button>
+        ))}
+      </div>
+    </details>
+  )
+  // L'action PRINCIPALE en bouton, et le reste du verbe sous un chevron (aucun chevron pour un
+  // verbe d'une seule action : un menu d'un item coute un clic pour rien).
+  const principale = (v: VerbeActionsVue, i: number, mesure = false) => {
+    const a = v.actions.find((x) => x.code === v.principale)
+    if (!a) return mesure ? null : menu(v, i, 'verbe')
+    return (
+      <div key={v.verbe + (mesure ? ' principale' : '')} className="rig-vged__agir-principale" {...nommer(v, 'principale', mesure)}>
+        {bouton(a, mesure)}
+        {v.actions.length > 1 && (mesure
+          ? <span className="rig-vged__agir-titre rig-vged__agir-titre--chevron"><Chevron /></span>
+          : menu(v, i, 'chevron'))}
+      </div>
+    )
+  }
 
   return (
     <div className="rig-vged__agir" role="toolbar" aria-label="Actions sur le dossier" ref={barre}>
-      {verbes.map((v, i) => deplies[i] ? groupe(v) : (
-        <details key={v.verbe} onToggle={(e) => ouvert(e.currentTarget)} onKeyDown={(e) => touche(e, v)}
-                 className={'rig-vged__agir-verbe' + (i >= verbes.length - 2 ? ' rig-vged__agir-verbe--droite' : '')}>
-          <summary className="rig-vged__agir-titre" title={v.actions.map((a) => `${a.libelle} (${a.touche})`).join(' · ')}>
-            {v.verbe}<Chevron />
-          </summary>
-          <div className="rig-vged__agir-menu" role="menu" aria-label={v.verbe}>
-            {v.actions.map((a) => (
-              <button key={a.code} type="button" role="menuitem" title={infobulle(a)}
-                      className={'rig-vged__agir-action' + (a.ecran ? ' rig-vged__agir-action--ecran' : '')}
-                      onClick={(e) => jouer(a, e.currentTarget.closest('details'))}>
-                <span className="rig-vged__agir-libelle">{a.libelle}</span>
-                {a.ecran && <VersEcran />}
-                {/* L'espace separe la lettre du libelle pour un lecteur d'ecran (« Factures F ») ;
-                    dans la ligne flex, il ne se dessine pas. */}
-                {' '}<kbd className="rig-vged__agir-touche">{a.touche}</kbd>
-              </button>
-            ))}
-          </div>
-        </details>
-      ))}
-      {/* La couche de MESURE : chaque verbe deplie puis replie, invisible, hors du flux
-          et hors de l'arbre d'accessibilite ; elle dit ce que chaque forme demande. */}
+      {verbes.map((v, i) => formes[i] === 'boutons' ? groupe(v)
+        : formes[i] === 'principale' ? principale(v, i)
+        : menu(v, i, 'verbe'))}
+      {/* La couche de MESURE : chaque forme de chaque verbe, invisible, hors du flux et hors
+          de l'arbre d'accessibilite ; elle dit ce que chaque forme demande. */}
       <div className="rig-vged__agir-mesure" aria-hidden="true" inert>
         <div ref={mesure}>
-          {verbes.flatMap((v) => [
+          {verbes.flatMap((v, i) => [
             groupe(v, true),
-            <span key={v.verbe + ' replie'} className="rig-vged__agir-titre">{v.verbe}<Chevron /></span>,
+            principale(v, i, true),
+            <span key={v.verbe + ' menu'} className="rig-vged__agir-titre" data-verbe={v.verbe} data-forme="menu">{v.verbe}<Chevron /></span>,
           ])}
         </div>
       </div>

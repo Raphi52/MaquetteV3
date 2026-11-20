@@ -27,6 +27,10 @@ namespace RigV3Desktop;
 // La TOUCHE est une lettre, unique parmi les actions qu'un meme type d'affaire
 // montre (verifie par le meme banc). Les libelles des ecrans sont ceux de leur
 // onglet : ce qu'on clique est ce que l'onglet affichera.
+//
+// L'action FREQUENTE d'un verbe (le Kbis, les factures, le courrier) reste un bouton
+// quand la barre replie ce verbe en menu (lot 6, 20/11/2026) : a 1516 px, les cinq
+// verbes de 004176 etaient des menus, deux clics pour le Kbis.
 // ============================================================
 
 /// <summary>Une action de la barre du dossier.</summary>
@@ -36,8 +40,9 @@ namespace RigV3Desktop;
 /// <param name="Ecran">Le code de l'ecran ouvert pour ce dossier ; nul pour un geste local.</param>
 /// <param name="Types">Les types d'affaire qui la montrent (Dossier.Type : RCS, JUD).</param>
 /// <param name="Detail">L'infobulle : ce que fait l'action.</param>
+/// <param name="Frequente">L'action que son verbe garde en bouton quand il se replie en menu.</param>
 public sealed record ActionDossier(string Code, string Verbe, string Libelle, char Touche,
-                                   string? Ecran, string[] Types, string Detail)
+                                   string? Ecran, string[] Types, string Detail, bool Frequente = false)
 {
     public bool EstLocale => Ecran is null;
 }
@@ -76,7 +81,7 @@ public static class ActionsDossier
     [
         // ---- Delivrer : ce qui sort du greffe vers le demandeur ----
         new(Kbis, Delivrer, "Kbis a jour", 'K', null, Tous,
-            "Affiche le Kbis en vigueur dans la colonne du document"),
+            "Affiche le Kbis en vigueur dans la colonne du document", Frequente: true),
         new(ImprimerKbis, Delivrer, "Imprimer le Kbis", 'I', null, Tous,
             "Affiche le Kbis a jour et ouvre le choix de l'imprimante"),
         new(ImprimerArborescence, Delivrer, "Imprimer l'arborescence", 'P', null, Tous,
@@ -100,13 +105,13 @@ public static class ActionsDossier
 
         // ---- Facturer ----
         new("factures", Facturer, "Factures", 'F', "PROC_FACTURE", Tous,
-            "Les factures de ce dossier (nouvel onglet)"),
+            "Les factures de ce dossier (nouvel onglet)", Frequente: true),
         new("encaissements", Facturer, "Encaissements", 'E', "PROC_ENCAISS", Tous,
             "Les reglements de ce dossier (nouvel onglet)"),
 
         // ---- Ecrire ----
         new(Courriers, Ecrire, "Courriers divers", 'C', null, Jud,
-            "Les courriers types qui valent pour la nature de l'affaire"),
+            "Les courriers types qui valent pour la nature de l'affaire", Frequente: true),
         new("redaction", Ecrire, "Redaction d'une decision", 'R', "PROC_REDA", Jud,
             "Rediger une decision pour cette affaire (nouvel onglet)"),
         new(EnvoyerDossier, Ecrire, "Envoyer le dossier par mail", 'M', null, Tous,
@@ -133,13 +138,20 @@ public static class ActionsDossier
     public static IEnumerable<ActionDossier> Pour(string type)
         => Catalogue.Where(a => a.Types.Contains(type));
 
+    /// <summary>L'action qu'un verbe garde en BOUTON quand il se replie en menu : sa premiere
+    /// action frequente ; un verbe d'une seule action, celle-la (un menu d'un item coute un clic
+    /// pour rien) ; sinon aucune.</summary>
+    public static ActionDossier? Principale(IReadOnlyList<ActionDossier> actionsDuVerbe)
+        => actionsDuVerbe.FirstOrDefault(a => a.Frequente) ?? (actionsDuVerbe.Count == 1 ? actionsDuVerbe[0] : null);
+
     /// <summary>L'action de ce code, ou null.</summary>
     public static ActionDossier? DeCode(string code)
         => Catalogue.FirstOrDefault(a => a.Code == code);
 
     /// <summary>
     /// Les actions courrier d'une affaire, une par modele, a la place de la famille
-    /// <see cref="Courriers"/>. Le premier modele prend la lettre de la famille (C) ; les
+    /// <see cref="Courriers"/>. Le premier modele prend la lettre de la famille (C), et sa
+    /// place d'action frequente (<see cref="ActionDossier.Frequente"/>) ; les
     /// suivants, la premiere lettre de leur libelle qu'aucune autre action de l'affaire
     /// (<paramref name="prises"/>) ni un modele precedent ne porte, a defaut la premiere libre
     /// de l'alphabet (une affaire montre bien moins de 26 actions).
@@ -148,13 +160,13 @@ public static class ActionsDossier
     {
         var famille = DeCode(Courriers)!;
         var lettres = new HashSet<char>(prises);
-        return modeles.Select(m =>
+        return modeles.Select((m, i) =>
         {
             var touche = (famille.Touche + m.Libelle.ToUpperInvariant() + "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
                 .First(c => char.IsAsciiLetterUpper(c) && !lettres.Contains(c));
             lettres.Add(touche);
             return new ActionDossier(PrefixeCourrier + m.Code, Ecrire, m.Libelle, touche, null, famille.Types,
-                "Ecrit ce courrier pour l'affaire et l'affiche dans la colonne du document");
+                "Ecrit ce courrier pour l'affaire et l'affiche dans la colonne du document", Frequente: i == 0 && famille.Frequente);
         }).ToArray();
     }
 }

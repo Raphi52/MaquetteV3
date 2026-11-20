@@ -4,7 +4,7 @@
 // « Empilee » (tour 3), avec deux familles d'elements retenues :
 //   3 · MON TRAVAIL -- le plus urgent d'abord, filet d'etat, qui s'en occupe,
 //       delai legal, activite du dossier, filtres « A moi », « Hors delai »,
-//       « Cette semaine », « Me l'attribuer » (Ctrl M) et « Attribuer a… » ;
+//       « Cette semaine », « M'attribuer » (Ctrl M) et « Attribuer a… » ;
 //   6 · PIECES -- le passage trouve dans le TEXTE des pieces de l'arbre,
 //       les annonces BODACC, les fichiers hors du greffe.
 // Socle commun : la saisie, la liste a gauche et l'apercu a droite, → pour
@@ -236,14 +236,16 @@ export function Palette({ vue, plan, ancree = false }: ProprietesPalette) {
         if (t.ecran && t.ecranLibelle) g.push({ groupe: 'Ouvrir', libelle: 'Ouvrir l ecran ' + t.ecranLibelle, ...(t.cle ? {} : { touche: 'Entree' }), faire: () => aller('ecran', t.ecran) })
         if (t.nature === 'dem' && t.enCours) {
           if (t.attribuable) {
-            g.push({ groupe: 'Mon travail', libelle: 'Me l attribuer', detail: t.qui ? 'aujourd hui ' + t.qui.signature : 'personne ne s en occupe', touche: 'Ctrl M', faire: () => plan('paletteAttribuer', { numero: t.numero, signature: null }) })
+            // Les memes mots que la colonne de suivi (« M'attribuer », Suivi.tsx) et, plus bas,
+            // que la barre du dossier (« Copier le n° ») : parcours du lot 6, 20/11/2026.
+            g.push({ groupe: 'Mon travail', libelle: "M'attribuer", detail: t.qui ? 'aujourd hui ' + t.qui.signature : 'personne ne s en occupe', touche: 'Ctrl M', faire: () => plan('paletteAttribuer', { numero: t.numero, signature: null }) })
           }
           for (const a of vue.agents) {
             if (a.signature === vue.moi.signature || a.signature === t.qui?.signature) continue
             g.push({ groupe: 'Mon travail', libelle: 'Attribuer a ' + a.nom, detail: a.signature, faire: () => plan('paletteAttribuer', { numero: t.numero, signature: a.signature }) })
           }
         }
-        g.push({ groupe: 'Copier', libelle: 'Copier le numero', detail: t.numero, touche: 'Ctrl C', faire: () => copierAvecAvis(t.numero, 'numero copie') })
+        g.push({ groupe: 'Copier', libelle: 'Copier le n°', detail: t.numero, touche: 'Ctrl C', faire: () => copierAvecAvis(t.numero, 'n° copie') })
         if (t.siren) g.push({ groupe: 'Copier', libelle: 'Copier le SIREN', detail: t.siren, faire: () => copierAvecAvis(t.siren, 'SIREN copie') })
         return g
       }
@@ -467,7 +469,7 @@ export function Palette({ vue, plan, ancree = false }: ProprietesPalette) {
           {enGestes
             ? <><Touche>↑ ↓</Touche>choisir <Touche>Entree</Touche>lancer <Touche>←</Touche>ou <Touche>Echap</Touche>revenir aux resultats</>
             : <><Touche>↑ ↓</Touche>choisir <Touche>Entree</Touche>ouvrir <Touche>→</Touche>gestes <Touche>Tab</Touche>filtre suivant
-                {choisiTravail?.attribuable && <><Touche>Ctrl M</Touche>me l attribuer</>} <Touche>Echap</Touche>fermer</>}
+                {choisiTravail?.attribuable && <><Touche>Ctrl M</Touche>m'attribuer</>} <Touche>Echap</Touche>fermer</>}
         </div>
     </>
   }

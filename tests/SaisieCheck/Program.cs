@@ -16,12 +16,16 @@ void Exiger(bool ok, string quoi)
     if (!ok) echecs.Add(quoi);
 }
 
-var chemin = Path.Combine(
-    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-    "RigV3", "accueil.json");
-
-// On ne detruit pas la saisie de l'utilisateur : on met son fichier de cote.
-var sauvegarde = File.Exists(chemin) ? File.ReadAllText(chemin) : null;
+// Bac a sable : un fichier jetable (RIGV3_ETAT), JAMAIS l'etat reel de l'utilisateur. Jusqu'au
+// 20/11/2026, ce banc ecrivait ses fiches dans %APPDATA%\RigV3\accueil.json et remettait une
+// sauvegarde a la fin : entre-temps, une application ouverte qui enregistrait ses reglages
+// perdait son ecriture, et un arret du banc laissait la saisie de test chez l'utilisateur
+// (le fichier changeait de date a chaque .\tests.ps1 -- mesure du parcours du lot 6).
+// fix-ok: mesure du 20/11/2026 -- date de %APPDATA%\RigV3\accueil.json changee a 21:29:29,83, pendant
+// SaisieCheck seul ; lance seul, ce banc la change (21:29:29 -> 21:30:25), aucun autre ne la touche.
+var etatAvant = Environment.GetEnvironmentVariable("RIGV3_ETAT");
+var chemin = Path.Combine(Path.GetTempPath(), "rigv3-saisiecheck-" + Guid.NewGuid().ToString("N") + ".json");
+Environment.SetEnvironmentVariable("RIGV3_ETAT", chemin);
 
 try
 {
@@ -185,8 +189,8 @@ try
 }
 finally
 {
-    if (sauvegarde is null) File.Delete(chemin);
-    else File.WriteAllText(chemin, sauvegarde);
+    Environment.SetEnvironmentVariable("RIGV3_ETAT", etatAvant);
+    try { File.Delete(chemin); } catch (IOException) { }
 }
 
 // --- 5. L etat valide remonte dans TOUS les ecrans, depuis une seule source
@@ -329,9 +333,13 @@ Exiger(!Regex.IsMatch(vue2, @"default:\s*(return\s*)?<EcranDemandes"),
 //
 // Defaut d origine (10/09/2026) : le menu annoncait 24 procedures et seules
 // 3 avaient un ecran ; les 21 autres tombaient sur l ecran « non maquettee ».
-// Ce controle relit le menu et exige un case pour CHAQUE code.
-var blocMenu = Regex.Match(vue2, @"private readonly Groupe\[\] Groupes =[\s\S]*?\r?\n    \];").Value;
-Exiger(blocMenu.Length > 0, "le catalogue des procedures est lisible dans le plan de travail");
+// Ce controle relit le menu et exige un case pour CHAQUE code. Le catalogue vit dans
+// Pont/CatalogueEcrans.cs depuis le 20/11/2026 (sorti de PlanTravail.cs : l'ecran
+// Demandes y lit le nom de ses traitements) ; la session en derive son aiguillage.
+var catalogue = File.ReadAllText(Path.Combine(racinePont, "CatalogueEcrans.cs"));
+var blocMenu = Regex.Match(catalogue, @"public static readonly FamilleEcrans\[\] Familles =[\s\S]*?\r?\n    \];").Value;
+Exiger(blocMenu.Length > 0, "le catalogue des procedures est lisible (Pont/CatalogueEcrans.cs)");
+Exiger(vue2.Contains("CatalogueEcrans.Familles"), "le plan de travail aiguille sur ce catalogue, pas sur une copie");
 var codesMenu = Regex.Matches(blocMenu, @"new\(""(?<code>[A-Z][A-Z_]{3,})"",\s*""")
     .Select(m => m.Groups["code"].Value).Distinct().ToArray();
 Exiger(codesMenu.Length >= 20, $"le menu expose bien ses procedures ({codesMenu.Length} lues)");

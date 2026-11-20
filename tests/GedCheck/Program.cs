@@ -28,8 +28,11 @@ Environment.SetEnvironmentVariable("RIGV3_ETAT", etatBanc);
 // Pont/PlanTravailVue.cs. « vue » designe donc ces sources ensemble : ce que
 // Home.razor contenait a lui seul. Une regle de balisage se lit dans le .tsx
 // (« balisage »), une regle de code dans le C# (« codePlan »).
+// Le catalogue des ecrans vit dans Pont/CatalogueEcrans.cs depuis le 20/11/2026 (sorti de
+// PlanTravail.cs, lot 6 du plan « Vue du dossier ») : il est lu avec lui.
 var codePlan = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs"))
-               + Environment.NewLine + File.ReadAllText(Path.Combine(racine, "Pont/PlanTravailVue.cs"));
+               + Environment.NewLine + File.ReadAllText(Path.Combine(racine, "Pont/PlanTravailVue.cs"))
+               + Environment.NewLine + File.ReadAllText(Path.Combine(racine, "Pont/CatalogueEcrans.cs"));
 var balisage = string.Join(Environment.NewLine,
     Directory.GetFiles(Path.Combine(racine, "web/src/plan"), "*.tsx")
              .Append(Path.Combine(racine, "web/src/composants/Application.tsx"))

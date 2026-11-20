@@ -112,13 +112,16 @@ describe('Palette Ctrl K (/draft « Page Recherche », propositions 3 et 6)', ()
     expect(p.appels().at(-1)).toEqual(['paletteAller', { nature: 'aff', cle: 'J-00931' }])
   })
 
-  it('→ ouvre les gestes du resultat ; Me l attribuer ; Echap revient aux resultats sans fermer', () => {
+  it("→ ouvre les gestes du resultat ; M'attribuer ; Echap revient aux resultats sans fermer", () => {
     const p = rendre()
     p.touche('ArrowRight')
     expect(p.container.querySelector('.rig-palette__fil')!.textContent).toBe('004151 · Depot de bilan›')
     const libelles = [...p.container.querySelectorAll('.rig-palette__liste .rig-palette__t1')].map((t) => t.textContent)
-    expect(libelles).toEqual(['Ouvrir la demande', 'Ouvrir l ecran Demandes', 'Me l attribuer', 'Attribuer a Claire',
-                              'Copier le numero', 'Copier le SIREN'])
+    // Les memes mots que la barre du dossier (« Copier le n° », Metier/ActionsDossier.cs) et que
+    // la colonne de suivi (« M'attribuer », Suivi.tsx) : la palette disait « Copier le numero »
+    // et « Me l attribuer » pour les memes gestes (parcours du lot 6, 20/11/2026).
+    expect(libelles).toEqual(['Ouvrir la demande', 'Ouvrir l ecran Demandes', "M'attribuer", 'Attribuer a Claire',
+                              'Copier le n°', 'Copier le SIREN'])
     p.touche('ArrowDown'); p.touche('ArrowDown')
     p.touche('Enter')
     expect(p.appels()).toEqual([['paletteAttribuer', { numero: '004151', signature: null }]])
@@ -155,7 +158,7 @@ describe('Palette Ctrl K (/draft « Page Recherche », propositions 3 et 6)', ()
       ['paletteFiltre', 'moi'],
       ['paletteFiltre', 'semaine'],
     ])
-    expect(p.container.querySelector('.rig-palette__pied')!.textContent).toContain('Ctrl Mme l attribuer')
+    expect(p.container.querySelector('.rig-palette__pied')!.textContent).toContain("Ctrl Mm'attribuer")
   })
 
   it('une piece montre son passage et s ouvre depliee dans son affaire', () => {

@@ -270,7 +270,9 @@ Exiger(PerimetreProfil.Reserve(TraitementCommandes.CodeEcran).OrderBy(x => x).Se
 // neuve : elle JOUE les gestes par le pont et compare a TraitementCommandes.
 // Lot 2 du passage a React (19/11/2026) : l'aiguillage est web/src/plan/Aiguillage.tsx,
 // le catalogue vit dans Pont/PlanTravail.cs (le @code de Home.razor).
-var home = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs"));
+// Le catalogue des ecrans vit dans Pont/CatalogueEcrans.cs depuis le 20/11/2026 (sorti de
+// PlanTravail.cs, lot 6 du plan « Vue du dossier ») : il est lu avec lui.
+var home = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs")) + Environment.NewLine + File.ReadAllText(Path.Combine(racine, "Pont/CatalogueEcrans.cs"));
 var aiguillage = File.ReadAllText(Path.Combine(racine, "web/src/plan/Aiguillage.tsx"));
 var ecranChemin = Path.Combine(racine, "Components/Ecrans/EcranCommandesWeb.razor");
 var tsxChemin = Path.Combine(racine, "web/src/ecrans/EcranCommandesWeb.tsx");

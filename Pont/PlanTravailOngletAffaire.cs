@@ -74,7 +74,14 @@ public sealed partial class SessionPlanTravail
         if (Onglets.Montre is { } onglet && NumeroDOngletAffaire(onglet.Code) is { } numero)
         {
             if (DossierOuvert?.Numero == numero) return;
-            if (AffaireChargee?.Numero == numero) DossierOuvert = AffaireChargee;
+            if (AffaireChargee?.Numero == numero)
+            {
+                DossierOuvert = AffaireChargee;
+                // La page remonte la zone des etapes a neuf, en haut : sans defilement demande,
+                // elle rapportait l'etape du haut (etapeVisible) et l'affaire repartait a 1 / 6
+                // (parcours du lot 6, 20/11/2026). Elle revient sur SON etape.
+                EtapeADefiler = true;
+            }
             else OuvrirParNumero(numero);
         }
         else DossierOuvert = null;

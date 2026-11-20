@@ -20,7 +20,9 @@ var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../.
 // Depuis le lot 2, les regles du plan de travail vivent dans Pont/PlanTravail.cs
 // (le @code de Home.razor, deplace tel quel) et l'aiguillage des ecrans est
 // web/src/plan/Aiguillage.tsx.
-var vue = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs"));
+// Le catalogue des ecrans vit dans Pont/CatalogueEcrans.cs depuis le 20/11/2026 (sorti de
+// PlanTravail.cs, lot 6 du plan « Vue du dossier ») : il est lu avec lui.
+var vue = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs")) + Environment.NewLine + File.ReadAllText(Path.Combine(racine, "Pont/CatalogueEcrans.cs"));
 var gestesPlan = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravailVue.cs"));
 var aiguillage = File.ReadAllText(Path.Combine(racine, "web/src/plan/Aiguillage.tsx"));
 // Tout le balisage de la page rendu par React (plan de travail et application).
