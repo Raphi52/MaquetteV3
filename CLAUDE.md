@@ -57,6 +57,12 @@ Utilise le bureau caché d'Autowin, avec l'identifiant `-Id` que tes consignes
 t'ont donné (`chat-<id du fil>` ou `run-<id du run>`, jamais un nom inventé) :
 
 ```
+# 1. Une COPIE des réglages de l'utilisateur, pour ne jamais écrire dans les siens
+#    (onglets ouverts, cartes du classeur, notes du fil, thème) :
+Copy-Item "$env:APPDATA\RigV3\accueil.json" "<dossier temporaire du fil>\accueil.json"
+$env:RIGV3_ETAT = "<dossier temporaire du fil>\accueil.json"
+
+# 2. Le lanceur transmet cet environnement à l'app :
 powershell -NoProfile -File D:\AutoWinOS\scripts\hdesk-lancer.ps1 `
   -Id <ton-id> -Executable "D:\RigV3Desktop\bin\Debug\net10.0-windows\RigV3Desktop.exe" `
   -Travail "<ce que tu vérifies>"
@@ -64,6 +70,12 @@ powershell -NoProfile -File D:\AutoWinOS\scripts\hdesk-lancer.ps1 `
 powershell -NoProfile -File D:\AutoWinOS\scripts\hdesk-observe.ps1 `
   -InstanceId <ton-id> -Output <chemin.png>
 ```
+
+**Sans `RIGV3_ETAT`, l'app de ton bureau caché écrit dans les réglages de
+l'utilisateur** (`%APPDATA%\RigV3\accueil.json`, choisi par `AccueilEtat.Chemin`) :
+un onglet que tu ouvres pour vérifier réapparaît chez lui au prochain démarrage.
+Mesuré le 2026-11-20 (conv-2041) : avec la variable, l'affaire 004151 ouverte sur
+le bureau caché est écrite dans la copie, et le fichier de l'utilisateur ne bouge pas.
 
 Puis **lis l'image**. Un code de sortie non nul du lanceur (4 = l'app est morte,
 3 = aucune fenêtre, 1 = échec) est une erreur de ton tour : lis `erreur` et
