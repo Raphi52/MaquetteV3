@@ -108,6 +108,11 @@ public static class EcranRechAffaires
         .. AffairesDemo
     ];
 
+    /// <summary>La nature d'une affaire du fonds (code de <see cref="Natures"/> : instance, collective,
+    /// prevention, mesure), ou null si elle n'y est pas. La barre du dossier y choisit les courriers
+    /// divers qu'elle propose (Pont/PlanTravailActions.cs, lot 9 du plan « Vue du dossier »).</summary>
+    public static string? NatureDe(string numero) => Affaires.FirstOrDefault(a => a.Numero == numero)?.Nature;
+
     /// <param name="cleTri">La colonne cliquee ; null = ordre d'origine (du plus recent au plus ancien).</param>
     /// <param name="selection">Le numero de la ligne selectionnee, ou null.</param>
     [JSInvokable("EcranRechAffaires.Trouver")]

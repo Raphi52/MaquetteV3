@@ -1555,6 +1555,14 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             ApercuMessage = "";
             GuideVisible = true;
         }
+        else
+        {
+            // Sans Kbis (affaire purement judiciaire), rien a montrer : le document de l'affaire
+            // d'avant -- un courrier ecrit pour elle (lot 9) -- ne reste pas a cote de celle-ci.
+            ApercuNoeud = null;
+            ApercuMessage = "";
+            GuideVisible = false;
+        }
         // Le classeur s'ouvre sur UNE carte au plus par domaine : celle de l'element choisi,
         // sinon celle qu'on y avait laissee ouverte.
         UneRubriqueParDomaine();

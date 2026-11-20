@@ -152,7 +152,8 @@ export function actionsRcs(): VerbeActionsVue[] {
       action('cloture', 'Cloture', 'O', true), action('archivage', 'Archivage / radiation', 'A', true),
     ] },
     { verbe: 'Facturer', actions: [action('factures', 'Factures', 'F', true), action('encaissements', 'Encaissements', 'E', true)] },
-    { verbe: 'Ecrire', actions: [action('courriers', 'Courriers divers', 'C', true), action('envoyerDossier', 'Envoyer le dossier par mail', 'M', false)] },
+    // Aucun courrier divers : ils sont judiciaires, et aucune lettre type RCS n'existe (Metier/CourriersDivers.cs).
+    { verbe: 'Ecrire', actions: [action('envoyerDossier', 'Envoyer le dossier par mail', 'M', false)] },
     { verbe: 'Suivre', actions: [
       action('copierNumero', 'Copier le n°', 'N', false, '004176'), action('copierSiren', 'Copier le SIREN', 'S', false, '812 445 901'),
       action('verrous', 'Dossiers verrouilles', 'V', true), action('teletransmissions', 'Teletransmissions (EDI)', 'T', true),
@@ -160,14 +161,15 @@ export function actionsRcs(): VerbeActionsVue[] {
   ]
 }
 
-/** La barre d'une affaire purement judiciaire (2026P00031) : ni Kbis, ni SIREN. */
+/** La barre d'une affaire purement judiciaire (2026P00031, procedure collective) : ni Kbis, ni SIREN ;
+ *  « Ecrire » propose le courrier divers de sa nature, joue dans la page (Metier/CourriersDivers.cs). */
 export function actionsJud(): VerbeActionsVue[] {
   return [
     { verbe: 'Delivrer', actions: [action('imprimerArborescence', "Imprimer l'arborescence", 'P', false)] },
     { verbe: 'Enregistrer', actions: [action('depotsJudiciaires', 'Depots judiciaires', 'D', true), action('bodacc', 'BODACC', 'B', true)] },
     { verbe: 'Facturer', actions: [action('factures', 'Factures', 'F', true), action('encaissements', 'Encaissements', 'E', true)] },
     { verbe: 'Ecrire', actions: [
-      action('courriers', 'Courriers divers', 'C', true), action('redaction', "Redaction d'une decision", 'R', true),
+      action('courrier:CD_NOTIF', 'Notification au mandataire', 'C', false), action('redaction', "Redaction d'une decision", 'R', true),
       action('envoyerDossier', 'Envoyer le dossier par mail', 'M', false),
     ] },
     { verbe: 'Suivre', actions: [

@@ -2080,8 +2080,12 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   background: #FFFFFF; color: #16181d;
   padding: 44px 48px; box-shadow: 0 4px 14px rgba(0, 0, 0, .4);
 }
+/* Le texte d'une feuille n'est jamais coupe : s'il depasse la hauteur A4 (colonne etroite,
+   longue ligne repliee), la feuille s'allonge (hauteur minimale automatique d'une boite a
+   aspect-ratio). Le rognage d'avant (overflow hidden, height 100 %) cachait la fin et la
+   signature d'un courrier ecrit depuis le dossier (capture du 20/11/2026, lot 9). */
 .rig-apercu__feuille-texte {
-  white-space: pre-wrap; font: 12px/1.7 var(--rig-font); overflow: hidden; height: 100%;
+  white-space: pre-wrap; font: 12px/1.7 var(--rig-font);
 }
 .rig-apercu__saisie {
   display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px;

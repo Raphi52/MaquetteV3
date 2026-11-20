@@ -12,7 +12,12 @@ namespace RigV3Desktop;
 //     Kbis, l'imprimer, imprimer l'arborescence, envoyer le dossier par mail,
 //     copier le numero ou le SIREN) ;
 //   - soit un ECRAN, ouvert dans un onglet « pour ce dossier »
-//     (Pont/PlanTravailActions.cs) : l'onglet retient l'affaire et y ramene.
+//     (Pont/PlanTravailActions.cs) : l'onglet retient l'affaire et y ramene ;
+//   - soit la FAMILLE des courriers (lot 9) : la barre la remplace par un bouton par
+//     modele de courrier divers qui vaut pour l'affaire (Metier/CourriersDivers.cs), qui
+//     produit le courrier rempli dans la colonne du document ; aucun modele, rien.
+//     Elle ouvrait l'ecran PROC_COURRIER_DIVERS, le CATALOGUE des modeles : un ecran
+//     de parametrage, qui reste au menu de l'accueil.
 //
 // Un ecran n'entre ici que s'il est REELLEMENT monte par l'aiguillage
 // (web/src/plan/Aiguillage.tsx) : un code qui tomberait sur « ecran a venir »
@@ -57,6 +62,12 @@ public static class ActionsDossier
     public const string CopierNumero = "copierNumero";
     public const string CopierSiren = "copierSiren";
 
+    /// <summary>La famille des courriers : jamais montree telle quelle, la barre la remplace par
+    /// <see cref="DesCourriers"/>. Sa lettre lui est reservee : elle revient au premier modele.</summary>
+    public const string Courriers = "courriers";
+    /// <summary>Le code d'une action courrier : ce prefixe, puis le code du modele (« courrier:CD_NOTIF »).</summary>
+    public const string PrefixeCourrier = "courrier:";
+
     private static readonly string[] Rcs = [DomaineGed.Rcs];
     private static readonly string[] Jud = [DomaineGed.Judiciaire];
     private static readonly string[] Tous = [DomaineGed.Rcs, DomaineGed.Judiciaire];
@@ -94,8 +105,8 @@ public static class ActionsDossier
             "Les reglements de ce dossier (nouvel onglet)"),
 
         // ---- Ecrire ----
-        new("courriers", Ecrire, "Courriers divers", 'C', "PROC_COURRIER_DIVERS", Tous,
-            "Une lettre type du greffe pour ce dossier (nouvel onglet)"),
+        new(Courriers, Ecrire, "Courriers divers", 'C', null, Jud,
+            "Les courriers types qui valent pour la nature de l'affaire"),
         new("redaction", Ecrire, "Redaction d'une decision", 'R', "PROC_REDA", Jud,
             "Rediger une decision pour cette affaire (nouvel onglet)"),
         new(EnvoyerDossier, Ecrire, "Envoyer le dossier par mail", 'M', null, Tous,
@@ -125,4 +136,25 @@ public static class ActionsDossier
     /// <summary>L'action de ce code, ou null.</summary>
     public static ActionDossier? DeCode(string code)
         => Catalogue.FirstOrDefault(a => a.Code == code);
+
+    /// <summary>
+    /// Les actions courrier d'une affaire, une par modele, a la place de la famille
+    /// <see cref="Courriers"/>. Le premier modele prend la lettre de la famille (C) ; les
+    /// suivants, la premiere lettre de leur libelle qu'aucune autre action de l'affaire
+    /// (<paramref name="prises"/>) ni un modele precedent ne porte, a defaut la premiere libre
+    /// de l'alphabet (une affaire montre bien moins de 26 actions).
+    /// </summary>
+    public static ActionDossier[] DesCourriers(IEnumerable<ModeleCourrier> modeles, IEnumerable<char> prises)
+    {
+        var famille = DeCode(Courriers)!;
+        var lettres = new HashSet<char>(prises);
+        return modeles.Select(m =>
+        {
+            var touche = (famille.Touche + m.Libelle.ToUpperInvariant() + "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+                .First(c => char.IsAsciiLetterUpper(c) && !lettres.Contains(c));
+            lettres.Add(touche);
+            return new ActionDossier(PrefixeCourrier + m.Code, Ecrire, m.Libelle, touche, null, famille.Types,
+                "Ecrit ce courrier pour l'affaire et l'affiche dans la colonne du document");
+        }).ToArray();
+    }
 }
