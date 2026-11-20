@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EcranEncaissements } from './EcranEncaissements'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
+import { contexteDossier } from '../test/dossier'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
 
@@ -44,5 +45,36 @@ describe('EcranEncaissements', () => {
     expect(screen.getByLabelText('Adresse du recu')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Emettre un recu' }))
     expect(screen.queryByLabelText('Adresse du recu')).toBeNull()
+  })
+})
+
+// Ouvert depuis la page d'une affaire : le reglement est pour elle (bloc « Pour
+// le dossier »), et seules SES ventilations sont cochees au depart -- jamais
+// celles d'autres affaires (plan « Vue du dossier », lot 2).
+describe('EcranEncaissements ouvert depuis une affaire', () => {
+  const rendre = (dossier: ReturnType<typeof contexteDossier> | null) => {
+    installerFauxPont({ 'EcranEncaissements.DateDuJour': () => '2026-09-09' })
+    return render(<EcranEncaissements dossier={dossier} />)
+  }
+
+  it('coche ses ventilations, et elles seules', () => {
+    const { container } = rendre(contexteDossier({ numero: '2019B00233', nom: 'SCI DU MOULIN' }))
+    expect((screen.getByLabelText('N de dossier') as HTMLInputElement).value).toBe('2019B00233')
+    const cochees = container.querySelectorAll('tbody tr.rig-ligne--valide')
+    expect([...cochees].map((tr) => tr.querySelector('td')!.textContent)).toEqual(['V-2026-8802'])
+  })
+
+  it('une affaire sans ventilation n\'en coche aucune ; sans affaire, les deux d\'avant', () => {
+    const avec = rendre(contexteDossier())
+    expect(screen.getByText('Pour le dossier')).toBeTruthy()
+    expect(avec.container.querySelectorAll('tbody tr.rig-ligne--valide')).toHaveLength(0)
+    expect(screen.getByText('Choisissez les affaires a solder')).toBeTruthy()
+    avec.unmount()
+    retirerFauxPont()
+
+    const sans = rendre(null)
+    expect(screen.queryByText('Pour le dossier')).toBeNull()
+    expect(sans.container.querySelectorAll('tbody tr.rig-ligne--valide')).toHaveLength(2)
+    expect(compte(sans.container)).toBe('357,57 EUR ventile(s) sur 357,57 EUR — solde nul')
   })
 })

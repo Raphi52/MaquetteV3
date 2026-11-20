@@ -9,6 +9,15 @@
 // Un ecran qui « ouvre un dossier » remonte le NUMERO : la page
 // (SessionPlanTravail.OuvrirParNumero) retrouve l'affaire et ouvre la
 // visionneuse ; les ecrans n'ont rien a savoir de la visionneuse.
+//
+// Dans l'autre sens, un ecran ouvert DEPUIS une affaire (barre d'actions de sa
+// page, Pont/PlanTravailActions.cs) en recoit le contexte (ecran.dossier) et
+// arrive pre-rempli sur elle (plan « Vue du dossier = coeur des actions »,
+// lot 2) : critere de recherche rempli, liste filtree, ou affaire pre-choisie
+// pour une creation. Il est monte avec la CLE de cette affaire : rouvert pour
+// une autre (ou depuis l'accueil, sans contexte), il repart de ses valeurs de
+// depart au lieu de garder les criteres de la precedente. Sans contexte, la
+// propriete vaut null et l'ecran est celui d'avant.
 
 import { EcranActes } from '../ecrans/EcranActes'
 import { EcranActeurs } from '../ecrans/EcranActeurs'
@@ -61,6 +70,9 @@ export interface ProprietesAiguillage {
 export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
   const ouvrirParNumero = (numero: string) => plan('ouvrirNumero', numero)
   const ecran = proc.ecran
+  // L'affaire d'ou l'ecran a ete ouvert, et sa cle de montage (voir l'en-tete).
+  const dossier = ecran.dossier
+  const cle = dossier?.numero
   switch (proc.code) {
     case 'PROC_ACTES_NUM':
       return <EcranActes ouvrirDossier={ouvrirParNumero} />
@@ -77,39 +89,43 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
                                 ouvrirUnDossier={(siren) => plan('ouvrirUnDossier', siren)} />
 
     case 'PROC_DEMANDE':
-      return <EcranDemandes valides={ecran.valides} ouvrir={ouvrirParNumero} />
+      return <EcranDemandes key={cle} valides={ecran.valides} ouvrir={ouvrirParNumero} dossier={dossier} />
 
     case 'PROC_REQUI':
-      return <EcranRequisitions />
+      return <EcranRequisitions key={cle} dossier={dossier} />
 
     case 'PROC_COMMANDES_WEB':
       // Ecran NEUF de NeoRIG (« Traitement des commandes ») : la V2 traitait
       // les commandes web depuis PROC_REQUI.
-      return <EcranCommandesWeb />
+      return <EcranCommandesWeb key={cle} dossier={dossier} />
 
     case 'PROC_CLOT':
-      return <EcranCloture ouvrirDossier={ouvrirParNumero} />
+      return <EcranCloture key={cle} ouvrirDossier={ouvrirParNumero} dossier={dossier} />
 
     case 'PROC_ARCHIRAD':
+      // Sans l'affaire : la v2 (OPE_ARCHRSEL) choisit les dossiers par PLAGE de dates de
+      // radiation, aucun critere ne vise un dossier -- rien a pre-remplir sans l'inventer.
       return <EcranArchivage ouvrirDossier={ouvrirParNumero} />
 
     case 'BODACC':
-      return <EcranBodacc ouvrirDossier={ouvrirParNumero} />
+      return <EcranBodacc key={cle} ouvrirDossier={ouvrirParNumero} dossier={dossier} />
 
     case 'RECHERCHE':
       // La palette Ctrl K etalee en page, avec la liseuse des pieces (« Ouvrir en page »).
       return <EcranRecherche vue={ecran.recherche} plan={plan} />
 
     case 'PROC_DEPOTJUD':
-      return <EcranDepotsJud ouvrirDossier={ouvrirParNumero} />
+      return <EcranDepotsJud key={cle} ouvrirDossier={ouvrirParNumero} dossier={dossier} />
 
     case 'PROC_ACTEUR_JUD':
       return <EcranActeurs />
 
     case 'PROC_CJUD':
-      return <EcranConsultationJud ouvrirDossier={ouvrirParNumero} />
+      return <EcranConsultationJud key={cle} ouvrirDossier={ouvrirParNumero} dossier={dossier} />
 
     case 'PROC_AUDIENCE':
+      // Sans l'affaire : l'ecran cree une AUDIENCE (date, chambre, types admis), pas une
+      // ligne d'affaire ; ses audiences programmees ne portent aucun numero d'affaire.
       return <EcranAudiences />
 
     case 'PROC_GESTAUDS':
@@ -119,9 +135,11 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
       return <EcranExperts />
 
     case 'PROC_GEDJUD':
-      return <EcranGedJud ouvrirDossier={ouvrirParNumero} />
+      return <EcranGedJud key={cle} ouvrirDossier={ouvrirParNumero} dossier={dossier} />
 
     case 'PROC_REDA':
+      // Sans l'affaire : l'ecran n'a ni critere ni liste a son numero (decisions « sur
+      // delibere » du jeu de l'ecran) ; rien a pre-remplir sans l'inventer.
       return <EcranRedaction />
 
     case 'PROC_DOC_DEMAT':
@@ -134,10 +152,10 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
       return <EcranCoffreFort />
 
     case 'PROC_FACTURE':
-      return <EcranFactures />
+      return <EcranFactures key={cle} dossier={dossier} />
 
     case 'PROC_ENCAISS':
-      return <EcranEncaissements />
+      return <EcranEncaissements key={cle} dossier={dossier} />
 
     case 'PROC_FCLIENT':
       return <EcranFicheClient />
@@ -167,7 +185,7 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
       return <EcranComptabilisation />
 
     case 'PROC_COURRIER_DIVERS':
-      return <EcranCourriersDivers />
+      return <EcranCourriersDivers key={cle} dossier={dossier} />
 
     case 'PROC_TACHES_LOT':
       // Traitement EN LOT : la meme recette sur plusieurs affaires. La session
@@ -177,10 +195,10 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
         : null
 
     case 'PROC_VERROUS':
-      return <EcranVerrous ouvrirDossier={ouvrirParNumero} />
+      return <EcranVerrous key={cle} ouvrirDossier={ouvrirParNumero} dossier={dossier} />
 
     case 'PROC_TELETRANS':
-      return <EcranTeletransmission ouvrirDossier={ouvrirParNumero} />
+      return <EcranTeletransmission key={cle} ouvrirDossier={ouvrirParNumero} dossier={dossier} />
 
     // PROC_CREANCE n'a PAS d'ecran porte, et ce n'est pas un oubli : dans
     // RIG v2, PROC_CREANCE.cs ne contient qu'un constructeur et

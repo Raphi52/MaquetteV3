@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { dateSaisie, useNombreSaisi } from '../saisie'
+import type { ContexteDossierVue } from '../plan/types'
 
 export interface LigneDemande {
   numero: string
@@ -42,10 +43,15 @@ export interface ProprietesEcranDemandes {
   valides: string[]
   /** Remonte le numero du dossier a ouvrir dans la visionneuse. */
   ouvrir: (numero: string) => void
+  /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) ; absent ou null depuis l'accueil. */
+  dossier?: ContexteDossierVue | null
 }
 
-export function EcranDemandes({ valides, ouvrir }: ProprietesEcranDemandes) {
-  const [critDemande, setCritDemande] = useState('')
+export function EcranDemandes({ valides, ouvrir, dossier = null }: ProprietesEcranDemandes) {
+  // Ouvert depuis une affaire : ses demandes, cherchees par son numero dans le
+  // critere « Demande » (une demande RCS porte le numero de son dossier,
+  // JeuDemo.Demandes), sans saisie. « Effacer » le vide, comme tout critere.
+  const [critDemande, setCritDemande] = useState(dossier?.numero ?? '')
   const [critClient, setCritClient] = useState('')
   const [critProcessus, setCritProcessus] = useState('')
   const [critDu, setCritDu] = useState('')

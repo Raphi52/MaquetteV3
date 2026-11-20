@@ -23,6 +23,7 @@
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, dateCourte, distinctsTries, estBlanc } from '../criteres'
+import type { ContexteDossierVue } from '../plan/types'
 
 interface Annonce {
   numAnnonce: string
@@ -58,14 +59,17 @@ const date = (d: string | null): string => (d === null ? '' : dateCourte(d))
 export interface ProprietesEcranBodacc {
   /** Remonte le NUMERO de dossier de l'annonce cliquee : l'ecran ne connait pas la visionneuse. */
   ouvrirDossier: (numero: string) => void
+  /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) ; absent ou null depuis l'accueil. */
+  dossier?: ContexteDossierVue | null
 }
 
-export function EcranBodacc({ ouvrirDossier }: ProprietesEcranBodacc) {
+export function EcranBodacc({ ouvrirDossier, dossier = null }: ProprietesEcranBodacc) {
   const [aEnvoyer, setAEnvoyer] = useState(true)
   const [critNumBord, setCritNumBord] = useState('')
   const [critNumFact, setCritNumFact] = useState('')
 
-  const [critTexte, setCritTexte] = useState('')
+  // Ouvert depuis une affaire : ses annonces, par son numero dans « Num annonce / dossier ».
+  const [critTexte, setCritTexte] = useState(dossier?.numero ?? '')
   const [critType, setCritType] = useState('')
   const [critDu, setCritDu] = useState('')
   const [critAu, setCritAu] = useState('')

@@ -23,6 +23,7 @@
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, dateCourte, distinctsTries, estBlanc } from '../criteres'
+import type { ContexteDossierVue } from '../plan/types'
 
 interface LigneClot {
   role: string
@@ -67,13 +68,17 @@ const Chambres = distinctsTries(Lignes.map((l) => l.chambre))
 export interface ProprietesEcranCloture {
   /** Remonte le dossier a ouvrir dans la visionneuse. */
   ouvrirDossier: (dossier: string) => void
+  /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) ; absent ou null depuis l'accueil. */
+  dossier?: ContexteDossierVue | null
 }
 
-export function EcranCloture({ ouvrirDossier }: ProprietesEcranCloture) {
+export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranCloture) {
   // v2 presente ces affaires a deux etapes distinctes, avec des colonnes
   // differentes : « Selection PC » puis « Enrolement / requete ».
   const [etapeSelection, setEtapeSelection] = useState(true)
-  const [critAffaire, setCritAffaire] = useState('')
+  // Ouvert depuis une affaire : cherchee par son NOM, ce que prend le critere
+  // « Affaire » (nom ou n de role) -- son numero de dossier n'est pas un n de role.
+  const [critAffaire, setCritAffaire] = useState(dossier?.nom ?? '')
   const [critChambre, setCritChambre] = useState('')
   const [critDu, setCritDu] = useState('')
   const [critAu, setCritAu] = useState('')

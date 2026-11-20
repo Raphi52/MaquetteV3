@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
+import type { ContexteDossierVue } from '../plan/types'
 
 export interface LigneFlux {
   numero: string
@@ -29,10 +30,16 @@ export interface VueTeletransmission {
 export interface ProprietesEcranTeletransmission {
   /** Remonte le numero de l'affaire rattachee au flux clique. */
   ouvrirDossier: (numero: string) => void
+  /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) ; absent ou null depuis l'accueil. */
+  dossier?: ContexteDossierVue | null
 }
 
-export function EcranTeletransmission({ ouvrirDossier }: ProprietesEcranTeletransmission) {
+export function EcranTeletransmission({ ouvrirDossier, dossier = null }: ProprietesEcranTeletransmission) {
   const [mode, setMode] = useState('EDI')
+  // Ouvert depuis une affaire : seuls les flux rattaches a elle ; la bascule,
+  // montree seulement alors, rend la liste entiere.
+  const [surLeDossier, setSurLeDossier] = useState(dossier !== null)
+  const filtre = surLeDossier ? dossier : null
   // null tant que le pont n'a pas repondu : ni « Canal au vert » ni « Aucun
   // flux recu », qui seraient faux pendant cet instant.
   const [vue, setVue] = useState<VueTeletransmission | null>(null)
@@ -44,7 +51,9 @@ export function EcranTeletransmission({ ouvrirDossier }: ProprietesEcranTeletran
     return () => { perime = true }
   }, [mode])
 
-  const flux = vue?.flux ?? []
+  // L'etat du canal se lit sur TOUS les flux recus, la liste sur ceux de l'affaire.
+  const recus = vue?.flux ?? []
+  const flux = filtre ? recus.filter((f) => f.numDemande === filtre.numero) : recus
 
   /** Un flux sans demande rattachee ne mene nulle part. */
   function aller(f: LigneFlux) {
@@ -66,13 +75,21 @@ export function EcranTeletransmission({ ouvrirDossier }: ProprietesEcranTeletran
           </select>
         </label>
 
+        {dossier && (
+          <button className={`rig-bascule${surLeDossier ? ' rig-bascule--actif' : ''}`}
+                  onClick={() => setSurLeDossier(!surLeDossier)}>
+            <span className="rig-bascule__temoin"></span>
+            <span>Dossier {dossier.numero} seulement</span>
+          </button>
+        )}
+
         <div className="rig-criteres__bloc">
           <div className="rig-kicker">Etat du canal</div>
           {vue && (
             <div className="rig-alerte">
-              <span className={`rig-filet-v rig-filet-v--${flux.length > 0 ? 'ok' : 'action'}`}></span>
+              <span className={`rig-filet-v rig-filet-v--${recus.length > 0 ? 'ok' : 'action'}`}></span>
               <span className="rig-alerte__corps">
-                <span className="rig-alerte__titre">{flux.length > 0 ? 'Canal au vert' : 'Aucun flux recu'}</span><br />
+                <span className="rig-alerte__titre">{recus.length > 0 ? 'Canal au vert' : 'Aucun flux recu'}</span><br />
                 <span className="rig-alerte__detail">{vue.dernier}</span>
               </span>
             </div>
@@ -113,7 +130,9 @@ export function EcranTeletransmission({ ouvrirDossier }: ProprietesEcranTeletran
                 </tr>
               ))}
               {vue && flux.length === 0 && (
-                <tr><td colSpan={7} className="rig-table__vide">Aucun flux pour ce mode.</td></tr>
+                <tr><td colSpan={7} className="rig-table__vide">
+                  {filtre ? `Aucun flux pour le dossier ${filtre.numero} dans ce mode.` : 'Aucun flux pour ce mode.'}
+                </td></tr>
               )}
             </tbody>
           </table>

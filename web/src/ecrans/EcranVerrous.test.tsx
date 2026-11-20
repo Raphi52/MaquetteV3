@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { EcranVerrous, type LigneVerrou, type VueVerrous } from './EcranVerrous'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
+import { contexteDossier } from '../test/dossier'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
 
@@ -98,5 +99,35 @@ describe('EcranVerrous', () => {
     enAttente[0]!.repondre(vue('R. VILAIN', false))
     await new Promise((r) => setTimeout(r, 0))
     expect(screen.getByText('3 dossier(s)')).toBeTruthy()
+  })
+})
+
+// Ouvert depuis la page d'une affaire : « qui tient ce dossier ? » -- la liste se
+// limite a elle, une bascule rend la liste entiere (plan « Vue du dossier », lot 2).
+describe('EcranVerrous ouvert depuis une affaire', () => {
+  it('ne montre que son verrou ; la bascule rend toute la liste', async () => {
+    installerFauxPont({ 'EcranVerrous.Verrouilles': vue })
+    const { container } = render(<EcranVerrous ouvrirDossier={vi.fn()} dossier={contexteDossier()} />)
+    // Le compteur de la liste : « 1 dossier(s) » est aussi le detail d'un detenteur.
+    await waitFor(() => expect(container.querySelector('.rig-resultats-proc__compte')!.textContent).toBe('1 dossier(s)'))
+    expect([...container.querySelectorAll('tbody tr td')].map((td) => td.textContent).slice(0, 4))
+      .toEqual(['004176', 'Modification - SCI DU PARC', 'En controle', 'M. DURAND'])
+
+    const bascule = screen.getByRole('button', { name: 'Dossier 004176 seulement' })
+    expect(bascule.className).toBe('rig-bascule rig-bascule--actif')
+    fireEvent.click(bascule)
+    await screen.findByText('2 dossier(s)')
+    expect(bascule.className).toBe('rig-bascule')
+  })
+
+  it('une affaire que personne d\'autre ne tient le dit ; sans affaire, ni bascule ni filtre', async () => {
+    installerFauxPont({ 'EcranVerrous.Verrouilles': vue })
+    const avec = render(<EcranVerrous ouvrirDossier={vi.fn()} dossier={contexteDossier({ numero: '004179' })} />)
+    expect(await screen.findByText('Le dossier 004179 n\'est retenu par aucun autre poste.')).toBeTruthy()
+    avec.unmount()
+
+    render(<EcranVerrous ouvrirDossier={vi.fn()} dossier={null} />)
+    await screen.findByText('2 dossier(s)')
+    expect(screen.queryByRole('button', { name: /seulement$/ })).toBeNull()
   })
 })

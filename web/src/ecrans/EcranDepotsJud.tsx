@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, dateCourte, estBlanc } from '../criteres'
+import type { ContexteDossierVue } from '../plan/types'
 
 interface Etape {
   code: string
@@ -59,11 +60,14 @@ const Lignes: Instance[] = [
 export interface ProprietesEcranDepotsJud {
   /** Remonte le NUMERO de dossier de l'instance cliquee : l'ecran ne connait pas la visionneuse. */
   ouvrirDossier: (numero: string) => void
+  /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) ; absent ou null depuis l'accueil. */
+  dossier?: ContexteDossierVue | null
 }
 
-export function EcranDepotsJud({ ouvrirDossier }: ProprietesEcranDepotsJud) {
+export function EcranDepotsJud({ ouvrirDossier, dossier = null }: ProprietesEcranDepotsJud) {
   const [etapeCourante, setEtapeCourante] = useState('ETP_INSTANCE_RECHERCHE')
-  const [numInstance, setNumInstance] = useState('')
+  // Ouvert depuis une affaire : son instance, cherchee par son numero (« N d'instance »).
+  const [numInstance, setNumInstance] = useState(dossier?.numero ?? '')
   const [denomination, setDenomination] = useState('')
   const [evenement, setEvenement] = useState('JUG')
   // null tant que le pont n'a pas repondu (ou une fois la date effacee).

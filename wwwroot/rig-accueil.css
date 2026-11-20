@@ -1541,6 +1541,14 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-criteres__paire {
   display: grid; grid-template-columns: 1fr 1fr; gap: var(--rig-esp-2);
 }
+/* « Pour le dossier » (web/src/composants/PourLeDossier.tsx) : l'affaire deja choisie
+   d'un ecran ouvert depuis sa page, en tete, separee par un filet des criteres propres
+   a l'ecran -- sans lui, le titre qui suit collait au dernier champ (capture du 20/11/2026). */
+.rig-criteres__dossier {
+  display: flex; flex-direction: column; gap: var(--rig-esp-3);
+  padding-bottom: var(--rig-esp-3);
+  border-bottom: 1px solid var(--rig-bord-faible);
+}
 .rig-criteres__actions {
   margin-top: auto; padding-top: var(--rig-esp-3);
   border-top: 1px solid var(--rig-bord-faible);

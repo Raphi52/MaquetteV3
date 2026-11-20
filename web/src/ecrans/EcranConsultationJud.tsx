@@ -12,6 +12,7 @@
 
 import { useState } from 'react'
 import { contientSansCasse, dateCourte, distinctsTries, estBlanc } from '../criteres'
+import type { ContexteDossierVue } from '../plan/types'
 
 interface DossierJud {
   affaire: string
@@ -40,10 +41,13 @@ const Dossiers: DossierJud[] = [
 export interface ProprietesEcranConsultationJud {
   /** Remonte le NUMERO de dossier de la piece : l'ecran ne connait pas la visionneuse. */
   ouvrirDossier: (numero: string) => void
+  /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) ; absent ou null depuis l'accueil. */
+  dossier?: ContexteDossierVue | null
 }
 
-export function EcranConsultationJud({ ouvrirDossier }: ProprietesEcranConsultationJud) {
-  const [critTexte, setCritTexte] = useState('')
+export function EcranConsultationJud({ ouvrirDossier, dossier = null }: ProprietesEcranConsultationJud) {
+  // Ouvert depuis une affaire : cherchee par son numero dans « Affaire / dossier ».
+  const [critTexte, setCritTexte] = useState(dossier?.numero ?? '')
   const [critDemat, setCritDemat] = useState('')
   const [critTraitement, setCritTraitement] = useState('')
   const [critCreationDu, setCritCreationDu] = useState('')

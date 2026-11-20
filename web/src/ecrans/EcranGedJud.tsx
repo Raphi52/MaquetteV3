@@ -17,6 +17,7 @@
 
 import { useState } from 'react'
 import { contientSansCasse, dateCourte, distinctsTries, estBlanc } from '../criteres'
+import type { ContexteDossierVue } from '../plan/types'
 
 interface DocGed {
   decision: string
@@ -44,9 +45,11 @@ const Docs: DocGed[] = [
 export interface ProprietesEcranGedJud {
   /** Remonte le NUMERO de dossier du document : l'ecran ne connait pas la visionneuse. */
   ouvrirDossier: (numero: string) => void
+  /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) ; absent ou null depuis l'accueil. */
+  dossier?: ContexteDossierVue | null
 }
 
-export function EcranGedJud({ ouvrirDossier }: ProprietesEcranGedJud) {
+export function EcranGedJud({ ouvrirDossier, dossier = null }: ProprietesEcranGedJud) {
   // Criteres de OPE_RECHERCHE_DOC (RIG v2).
   const [receptionDebut, setReceptionDebut] = useState('')
   const [receptionFin, setReceptionFin] = useState('')
@@ -55,7 +58,8 @@ export function EcranGedJud({ ouvrirDossier }: ProprietesEcranGedJud) {
   const [minutesNonNumerisees, setMinutesNonNumerisees] = useState(false)
   const [afficherTout, setAfficherTout] = useState(false)
 
-  const [recherche, setRecherche] = useState('')
+  // Ouvert depuis une affaire : ses documents, par son numero dans « Instance / decision ».
+  const [recherche, setRecherche] = useState(dossier?.numero ?? '')
   const [critNature, setCritNature] = useState('')
   const [critEtat, setCritEtat] = useState('')
   const [sansDecision, setSansDecision] = useState(false)

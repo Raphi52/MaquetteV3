@@ -283,10 +283,14 @@ var pont = File.Exists(pontChemin) ? File.ReadAllText(pontChemin) : string.Empty
 var ecran = tsx + "\n" + pont;
 // Le CODE du .tsx, sans ses commentaires (son en-tete cite Metier/TraitementCommandes.cs).
 var codeTsx = Regex.Replace(tsx, @"/\*[\s\S]*?\*/|//[^\n]*", "");
-Exiger(Regex.IsMatch(tsx, @"export function EcranCommandesWeb\(\)"),
-    "l'ecran React se monte sans parametre, comme sa coquille le faisait (export function EcranCommandesWeb())");
-Exiger(Regex.IsMatch(aiguillage, @"case\s+'PROC_COMMANDES_WEB'\s*:(?:\s*//[^\n]*)*\s*return <EcranCommandesWeb\s*/>"),
-    "le plan de travail aiguille PROC_COMMANDES_WEB vers <EcranCommandesWeb />");
+// Depuis le lot 2 du plan « Vue du dossier » (20/11/2026), l'ecran recoit en plus,
+// FACULTATIF, le contexte de l'affaire d'ou on l'ouvre : il se monte toujours sans
+// parametre obligatoire, et l'aiguillage le monte a la cle de cette affaire.
+Exiger(Regex.IsMatch(tsx, @"export function EcranCommandesWeb\(\{ dossier = null \}: ProprietesEcranCommandesWeb\)")
+       && Regex.IsMatch(tsx, @"export interface ProprietesEcranCommandesWeb \{\s*(?:/\*\*[^\n]*\*/\s*)?dossier\?: ContexteDossierVue \| null\s*\}"),
+    "l'ecran React se monte sans parametre obligatoire, comme sa coquille le faisait (seul dossier?, l'affaire d'ou on l'ouvre)");
+Exiger(Regex.IsMatch(aiguillage, @"case\s+'PROC_COMMANDES_WEB'\s*:(?:\s*//[^\n]*)*\s*return <EcranCommandesWeb key=\{cle\} dossier=\{dossier\} />"),
+    "le plan de travail aiguille PROC_COMMANDES_WEB vers <EcranCommandesWeb />, avec le contexte de l'affaire");
 // Le catalogue du menu de gauche vit dans Pont/MenuAccueil.cs depuis le lot 1 du
 // passage a React (19/11/2026) : l'entree s'y lit, au meme format.
 var menuAccueil = File.ReadAllText(Path.Combine(racine, "Pont/MenuAccueil.cs"));

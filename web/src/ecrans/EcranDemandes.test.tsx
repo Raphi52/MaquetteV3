@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { EcranDemandes, type LigneDemande, type VueDemandes } from './EcranDemandes'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 import { morceaux } from '../test/morceaux'
+import { contexteDossier } from '../test/dossier'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
 
@@ -54,5 +55,34 @@ describe('EcranDemandes', () => {
     render(<EcranDemandes valides={[]} ouvrir={ouvrir} />)
     fireEvent.click(await screen.findByText('Demande D2'))
     expect(ouvrir).toHaveBeenCalledWith('004176')
+  })
+})
+
+// Ouvert depuis la page d'une affaire (barre d'actions, plan « Vue du dossier »,
+// lot 2) : ses demandes, sans saisie. Le faux pont filtre sur « Demande » comme
+// Pont/EcranDemandes.cs (le numero ou le nom contient le texte).
+describe('EcranDemandes ouvert depuis une affaire', () => {
+  const filtrer = (c: unknown): VueDemandes => {
+    const t = (c as { critDemande: string }).critDemande
+    const toutes = [{ ...ligne('004176', '004176', false), nom: 'Modification - SCI DU PARC' }, ligne('004151', '004151', false)]
+    return { traitements: [], etats: [], total: toutes.length, lignes: toutes.filter((l) => l.numero.includes(t) || l.nom.includes(t)) }
+  }
+
+  it('cherche ses demandes par son numero des le premier appel, sans saisie', async () => {
+    const pont = installerFauxPont({ 'EcranDemandes.Trouver': filtrer })
+    const { container } = render(<EcranDemandes valides={[]} ouvrir={vi.fn()} dossier={contexteDossier()} />)
+    expect(await screen.findByText('Modification - SCI DU PARC')).toBeTruthy()
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
+    expect(pont.appels.mock.calls[0]![1]).toMatchObject({ critDemande: '004176' })
+    expect((screen.getByLabelText('Demande') as HTMLInputElement).value).toBe('004176')
+  })
+
+  it('sans affaire (ouvert depuis l\'accueil) : aucun critere, toutes les demandes', async () => {
+    const pont = installerFauxPont({ 'EcranDemandes.Trouver': filtrer })
+    const { container } = render(<EcranDemandes valides={[]} ouvrir={vi.fn()} dossier={null} />)
+    await screen.findByText('Modification - SCI DU PARC')
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(2)
+    expect(pont.appels.mock.calls[0]![1]).toMatchObject({ critDemande: '' })
+    expect((screen.getByLabelText('Demande') as HTMLInputElement).value).toBe('')
   })
 })
