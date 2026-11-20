@@ -71,10 +71,16 @@ public sealed class DocumentPartage
         if (n.Apercu.Length == 0)
             return n.Libelle + "\n\n(page " + feuille + " - document numerise, " + n.Origine + ")";
         var lignes = n.Apercu.Replace("\r\n", "\n").Split('\n');
-        const int parPage = 18;
-        var debut = (feuille - 1) * parPage;
+        var debut = (feuille - 1) * LignesParPage;
         if (debut >= lignes.Length)
             return "(page " + feuille + " - suite du document)";
-        return string.Join("\n", lignes.Skip(debut).Take(parPage));
+        return string.Join("\n", lignes.Skip(debut).Take(LignesParPage));
     }
+
+    /// <summary>Les lignes d'une page de l'apercu texte.</summary>
+    public const int LignesParPage = 18;
+
+    /// <summary>Les pages qu'un texte d'apercu occupe : celles que <see cref="TextePage"/> remplit.</summary>
+    public static int PagesDuTexte(string apercu)
+        => Math.Max(1, (apercu.Replace("\r\n", "\n").Split('\n').Length + LignesParPage - 1) / LignesParPage);
 }

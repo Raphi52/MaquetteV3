@@ -659,7 +659,8 @@ public sealed partial class SessionPlanTravail
             for (var feuille = 1; feuille <= total; feuille++)
             {
                 feuilles.Add(new FeuilleApercuVue(feuille, total, TextePage(n, feuille),
-                    feuille == 1
+                    // Un courrier produit (PlanTravailActions.cs) n'est la piece d'aucune etape de saisie.
+                    feuille == 1 && !ReferenceEquals(n, CourrierRedige)
                         ? ValeursDocument(n).Select(v => new ValeurApercuVue(v.Libelle, v.Valeur)).ToArray()
                         : null));
             }

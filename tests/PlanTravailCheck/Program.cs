@@ -95,6 +95,18 @@ internal static class Programme
                                      && !a.Code.Contains("PROC_") && a.Libelle.Length > 0 && a.Detail.Length > 0)
                && ActionsDossier.Verbes.All(v => catalogue.Any(a => a.Verbe == v)),
             "barre du dossier : codes neutres et uniques, chaque action sous un des cinq verbes, pour le RCS ou le judiciaire, une lettre");
+        // Lot 9 : « Ecrire › Courriers divers » ouvrait le CATALOGUE des modeles, un ecran de
+        // parametrage (constate par le chef le 20/11/2026 depuis 004182). Il reste a l'accueil.
+        Exiger(catalogue.All(a => a.Ecran != "PROC_COURRIER_DIVERS") && Monte("PROC_COURRIER_DIVERS"),
+            "aucune action du dossier n'ouvre le CATALOGUE des courriers divers (ecran de parametrage, toujours monte pour l'accueil)");
+        var ecranCatalogue = File.ReadAllText(Path.Combine(racine, "web/src/ecrans/EcranCourriersDivers.tsx"));
+        var catalogueCourriers = EcranCourriersDivers.Catalogue();
+        Exiger(ecranCatalogue.Contains("appeler<CatalogueCourriersVue>('EcranCourriersDivers.Catalogue')")
+               && CourriersDivers.Modeles.All(m => !ecranCatalogue.Contains(m.ParamEdition))
+               && catalogueCourriers.Courriers.Select(c => c.Code).SequenceEqual(CourriersDivers.Modeles.Select(m => m.Code))
+               && catalogueCourriers.Courriers.Count(c => c.Actif) == 4
+               && catalogueCourriers.Types.SequenceEqual(CourriersDivers.TypesEntite),
+            "une seule liste des modeles : l'ecran du catalogue la lit par son pont, il n'en garde aucune copie");
         foreach (var type in new[] { DomaineGed.Rcs, DomaineGed.Judiciaire })
         {
             var lettres = ActionsDossier.Pour(type).Select(a => a.Touche).ToList();
@@ -825,6 +837,8 @@ internal static class Programme
         s.Initialiser();
         void Faire(string geste, object? valeur = null) => s.Agir(geste, Valeur(valeur));
         string[] Codes(VerbeActionsVue[] verbes) => verbes.SelectMany(g => g.Actions).Select(a => a.Code).ToArray();
+        string[] EcrireDe(SessionPlanTravail session)
+            => session.Vue().Dossier!.Actions.SingleOrDefault(g => g.Verbe == ActionsDossier.Ecrire)?.Actions.Select(a => a.Code).ToArray() ?? [];
         bool Refuse(SessionPlanTravail session, string code)
         {
             try { session.Agir("actionDossier", Valeur(code)); return false; }
@@ -924,10 +938,15 @@ internal static class Programme
         Exiger(s.Vue() is { Dossier: null, Proc.Code: "PROC_ENCAISS" },
             "jumeau : le meme ecran ouvert depuis le menu, ferme, laisse la place a l'onglet voisin");
         Faire("ongletActiver", "AFFAIRE:004176");
-        Faire("actionDossier", "courriers");
-        Exiger(s.Vue().Proc is { Code: "PROC_COURRIER_DIVERS", Ecran.Dossier.Numero: "004176" }, "« Courriers divers » s'ouvre pour l'affaire");
+        // Lot 9 : les courriers divers sont judiciaires, et le code ne connait aucune lettre type
+        // RCS (Metier/CourriersDivers.cs) : un dossier RCS n'en propose aucun, ni le catalogue.
+        Exiger(EcrireDe(s).SequenceEqual(new[] { "envoyerDossier" }) && Refuse(s, "courriers") && Refuse(s, "courrier:CD_CONV")
+               && s.Vue() is { Proc: null, Dossier.Numero: "004176" },
+            "dossier RCS : « Ecrire » ne propose ni courrier type (aucun n'existe pour le RCS) ni le catalogue des modeles ; le geste est refuse");
+        Faire("actionDossier", "archivage");
+        Exiger(s.Vue().Proc is { Code: "PROC_ARCHIRAD", Ecran.Dossier.Numero: "004176" }, "« Archivage / radiation » s'ouvre pour l'affaire");
         Faire("echap");
-        Exiger(s.Vue() is { Proc: null, Dossier.Numero: "004176" } && s.Vue().Onglets!.All(o => o.Code != "PROC_COURRIER_DIVERS"),
+        Exiger(s.Vue() is { Proc: null, Dossier.Numero: "004176" } && s.Vue().Onglets!.All(o => o.Code != "PROC_ARCHIRAD"),
             "Echap sur l'ecran ouvert depuis l'affaire le ferme et y ramene aussi");
         Faire("actionDossier", "bodacc");
         Faire("ongletActiver", "PROC_ENCAISS");
@@ -958,6 +977,69 @@ internal static class Programme
         Faire("actionDossier", "depotsJudiciaires");
         Exiger(s.Vue().Proc is { Code: "PROC_DEPOTJUD", Ecran.Dossier: { Numero: "2026P00031", Type: "JUD" } },
             "jumeau : sur l'affaire judiciaire, « Depots judiciaires » ouvre son ecran pour elle");
+
+        // --- ECRIRE sur une affaire judiciaire (lot 9) : les courriers divers de SA nature (type
+        // d'entite du modele), produits remplis avec elle dans la colonne du document.
+        string TexteDuDocument(SessionPlanTravail session)
+            => string.Join("\n", session.Vue().Dossier?.Apercu?.Apercu?.Feuilles.Select(f => f.Texte) ?? []);
+        Faire("ouvrirNumero", "J-00931");
+        var barreJ = s.Vue().Dossier!.Actions.SelectMany(g => g.Actions).ToList();
+        Exiger(EcrireDe(s).SequenceEqual(new[] { "courrier:CD_NOTIF", "redaction", "envoyerDossier" })
+               && barreJ.Single(a => a.Code == "courrier:CD_NOTIF") is { Libelle: "Notification au mandataire", Ecran: false, Copie: null, Touche: "C" }
+               && barreJ.Select(a => a.Touche).Distinct().Count() == barreJ.Count,
+            "J-00931, procedure collective : « Ecrire » propose la notification au mandataire, seul modele actif de sa nature, sans ecran, par la lettre C");
+        Exiger(Refuse(s, "courriers") && Refuse(s, "courrier:CD_CONV") && Refuse(s, "courrier:CD_MESURE") && Refuse(s, "courrier:INCONNU"),
+            "jumeau : un modele d'une autre nature (convocation d'instance), inactif (suivi de mesure), inconnu, ou la famille elle-meme, est refuse");
+        var ongletsAvant = s.Vue().Onglets!.Length;
+        Faire("actionDossier", "courrier:CD_NOTIF");
+        v = s.Vue();
+        var lettre = v.Dossier?.Apercu?.Apercu;
+        var texte = TexteDuDocument(s);
+        Exiger(v.Proc is null && v.Onglets!.Length == ongletsAvant && v.Dossier?.Numero == "J-00931"
+               && lettre is { Libelle: "Notification au mandataire - J-00931", Pdf: false, Kbis: null }
+               && lettre.Feuilles.All(f => f.Valeurs is null),
+            "le courrier s'affiche dans la colonne du document de l'affaire, seul (aucune valeur de formulaire), sans ouvrir d'ecran ni d'onglet");
+        Exiger(new[] { "Greffe du Tribunal de Commerce d'Amiens", "Affaire n° J-00931 : TRANSNORD SA", "41 Route de Paris, 80000 AMIENS",
+                       "Maitre SERRANO Philippe", "Mandataire judiciaire", "Objet : Notification au mandataire",
+                       "a l'egard de TRANSNORD SA", "Amiens, le " + DateTime.Today.ToString("dd/MM/yyyy") }.All(texte.Contains)
+               && !texte.Contains('{') && !texte.Contains('}'),
+            "le courrier est rempli avec l'affaire : n°, denomination, adresse, et le mandataire judiciaire qu'il demande");
+        Faire("imprimer");
+        Exiger(s.Vue().Impression?.Libelle == "Notification au mandataire - J-00931", "le courrier s'imprime par le bouton du document");
+        Faire("lancerImpression");
+        Exiger(s.Vue().Dossier?.Apercu?.Apercu?.Message.StartsWith("Envoye a ") == true, "l'impression du courrier part et le dit");
+        Faire("envoiMail");
+        Exiger(s.Vue().EnvoiMail?.Libelle == "Notification au mandataire - J-00931", "le courrier part par mail par le bouton du document");
+        Faire("fermerMail");
+        Faire("actionDossier", "kbis");
+        Exiger(s.Vue().Dossier?.Apercu?.Apercu is { Libelle: "Kbis a jour", Kbis: not null },
+            "jumeau : une autre piece ouverte remplace le courrier dans la colonne du document");
+        Faire("actionDossier", "courrier:CD_NOTIF");
+
+        // Une autre affaire, sans Kbis (purement judiciaire) : le courrier ecrit pour TRANSNORD
+        // ne la suit pas -- il partirait a l'impression ou par mail sous le nom d'une autre affaire.
+        Faire("ouvrirNumero", "2026J00087");
+        Exiger(s.Vue().Dossier is { Numero: "2026J00087", Apercu: null },
+            "le courrier d'une affaire ne reste pas affiche sur la suivante : sans Kbis, la colonne du document se ferme");
+        Exiger(EcrireDe(s).SequenceEqual(new[] { "courrier:CD_CONV", "courrier:CD_RELAN", "redaction", "envoyerDossier" }),
+            "2026J00087, instance : la convocation et la relance de piece manquante");
+        Faire("actionDossier", "courrier:CD_CONV");
+        texte = TexteDuDocument(s);
+        Exiger(texte.Contains("Affaire n° 2026J00087 : DUPONT Jean") && texte.Contains("DUPONT Jean\n" + CourriersDivers.AdresseInconnue)
+               && !texte.Contains("SERRANO"),
+            "la convocation va a la partie, DUPONT Jean ; son adresse, inconnue au dossier, se dit au lieu de s'inventer");
+
+        Faire("ouvrirNumero", "2026C00059");
+        Exiger(EcrireDe(s).SequenceEqual(new[] { "courrier:CD_INFO", "redaction", "envoyerDossier" }),
+            "2026C00059, prevention : le courrier d'information");
+        Faire("actionDossier", "courrier:CD_INFO");
+        var enTete = TexteDuDocument(s).Split('\n').TakeWhile(l => !l.StartsWith("Amiens, le ")).Where(l => l.Trim().Length > 0).ToArray();
+        Exiger(enTete.Length == 2 && enTete[0] == "Greffe du Tribunal de Commerce d'Amiens" && TexteDuDocument(s).Contains("ATELIER DU MEUBLE"),
+            "un modele sans destinataire n'en imprime aucun : avant la date, le seul en-tete du greffe");
+
+        Faire("ouvrirNumero", "2026M00045");
+        Exiger(EcrireDe(s).SequenceEqual(new[] { "redaction", "envoyerDossier" }),
+            "2026M00045, mesure : son seul modele est inactif -- aucune entree de courrier, pas d'entree vide");
 
         // --- Le LOGIN : sans le RCS, ni Kbis ni ecran reserve au RCS, et le geste est refuse.
         s.SurGesteAccueil(new GesteIle("login", Valeur("pjudic")));

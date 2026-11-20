@@ -8,16 +8,19 @@
 // (INSTANCE, INSTANCE_PREVENTION, PROCEDURE_COLLECTIVE, PREVENTION, MESURE).
 //
 // Porte depuis Components/Ecrans/EcranCourriersDivers.razor (lot 5) : meme
-// balisage, memes classes CSS. L'ecran ne lisait rien dans Metier/ : son
-// catalogue de demonstration est ici, sans pont.
+// balisage, memes classes CSS. La liste des modeles vient du C#
+// (Pont/EcranCourriersDivers.cs, Metier/CourriersDivers.cs) : c'est la MEME que
+// celle d'ou la page du dossier tire les courriers qu'elle ecrit pour une
+// affaire (plan « Vue du dossier », lot 9). Gardee ici, elle aurait derive.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { appeler } from '../pont'
 import { contientSansCasse, estBlanc } from '../criteres'
 import { PourLeDossier } from '../composants/PourLeDossier'
 import type { ContexteDossierVue } from '../plan/types'
 
 // v2 : table COURRIER_JUDICIAIRE (colonnes COUJU_*).
-interface Courrier {
+export interface CourrierDiversVue {
   code: string
   libelle: string
   typeEntite: string
@@ -26,15 +29,11 @@ interface Courrier {
   actif: boolean
 }
 
-const Types = ['INSTANCE', 'INSTANCE_PREVENTION', 'PROCEDURE_COLLECTIVE', 'PREVENTION', 'MESURE']
-
-const Courriers: Courrier[] = [
-  { code: 'CD_CONV', libelle: 'Convocation simple', typeEntite: 'INSTANCE', paramEdition: 'MAQ_CONV_SIMPLE', avecDestinataire: true, actif: true },
-  { code: 'CD_RELAN', libelle: 'Relance de piece manquante', typeEntite: 'INSTANCE', paramEdition: 'MAQ_RELANCE', avecDestinataire: true, actif: true },
-  { code: 'CD_NOTIF', libelle: 'Notification au mandataire', typeEntite: 'PROCEDURE_COLLECTIVE', paramEdition: 'MAQ_NOTIF_MAND', avecDestinataire: true, actif: true },
-  { code: 'CD_INFO', libelle: 'Information sans destinataire', typeEntite: 'PREVENTION', paramEdition: 'MAQ_INFO', avecDestinataire: false, actif: true },
-  { code: 'CD_MESURE', libelle: 'Courrier de suivi de mesure', typeEntite: 'MESURE', paramEdition: 'MAQ_SUIVI_MES', avecDestinataire: true, actif: false },
-]
+/** Ce que Pont/EcranCourriersDivers.cs (Catalogue) rend : les types d'entite du filtre et tous les modeles. */
+export interface CatalogueCourriersVue {
+  types: string[]
+  courriers: CourrierDiversVue[]
+}
 
 export interface ProprietesEcranCourriersDivers {
   /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) : le courrier est pour elle,
@@ -46,9 +45,19 @@ export function EcranCourriersDivers({ dossier = null }: ProprietesEcranCourrier
   const [recherche, setRecherche] = useState('')
   const [typeFiltre, setTypeFiltre] = useState('')
   const [actifsSeuls, setActifsSeuls] = useState(true)
-  const [selection, setSelection] = useState<Courrier | null>(Courriers[0]!)
+  // null tant que le pont n'a pas repondu : ni ligne ni « aucun courrier », qui serait faux.
+  const [catalogue, setCatalogue] = useState<CatalogueCourriersVue | null>(null)
+  // Le code du modele clique ; null = le premier du catalogue, comme a l'ouverture.
+  const [selection, setSelection] = useState<string | null>(null)
 
-  let q = Courriers
+  useEffect(() => {
+    let perime = false
+    void appeler<CatalogueCourriersVue>('EcranCourriersDivers.Catalogue').then((c) => { if (!perime) setCatalogue(c) })
+    return () => { perime = true }
+  }, [])
+
+  const courriers = catalogue?.courriers ?? []
+  let q = courriers
   if (actifsSeuls) q = q.filter((c) => c.actif)
   if (typeFiltre !== '') q = q.filter((c) => c.typeEntite === typeFiltre)
   if (!estBlanc(recherche)) {
@@ -57,7 +66,7 @@ export function EcranCourriersDivers({ dossier = null }: ProprietesEcranCourrier
   }
   const trouves = q
 
-  const s = selection
+  const s = courriers.find((c) => c.code === selection) ?? courriers[0] ?? null
 
   return (
     <div className="rig-proc__corps">
@@ -76,7 +85,7 @@ export function EcranCourriersDivers({ dossier = null }: ProprietesEcranCourrier
           <span className="rig-saisie-champ__libelle">Type d'entite</span>
           <select className="rig-saisie-champ__saisie" value={typeFiltre} onChange={(e) => setTypeFiltre(e.target.value)}>
             <option value="">Tous</option>
-            {Types.map((t) => <option key={t} value={t}>{t}</option>)}
+            {(catalogue?.types ?? []).map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </label>
 
@@ -96,7 +105,7 @@ export function EcranCourriersDivers({ dossier = null }: ProprietesEcranCourrier
       <section className="rig-resultats-proc">
         <div className="rig-resultats-proc__entete">
           <div className="rig-kicker">Catalogue</div>
-          <span className="rig-resultats-proc__compte">{trouves.length} courrier(s)</span>
+          <span className="rig-resultats-proc__compte">{catalogue ? `${trouves.length} courrier(s)` : ''}</span>
         </div>
 
         <div className="rig-table-cadre">
@@ -113,7 +122,7 @@ export function EcranCourriersDivers({ dossier = null }: ProprietesEcranCourrier
             </thead>
             <tbody>
               {trouves.map((courrier) => (
-                <tr key={courrier.code} onClick={() => setSelection(courrier)}>
+                <tr key={courrier.code} onClick={() => setSelection(courrier.code)}>
                   <td className="rig-table__mono">{courrier.code}</td>
                   <td>{courrier.libelle}</td>
                   <td className="rig-table__mono">{courrier.typeEntite}</td>
@@ -122,7 +131,7 @@ export function EcranCourriersDivers({ dossier = null }: ProprietesEcranCourrier
                   <td className="rig-table__centre">{courrier.actif ? 'oui' : 'non'}</td>
                 </tr>
               ))}
-              {trouves.length === 0 && (
+              {catalogue && trouves.length === 0 && (
                 <tr><td colSpan={6} className="rig-table__vide">Aucun courrier divers ne repond a cette recherche.</td></tr>
               )}
             </tbody>

@@ -52,7 +52,7 @@ describe('ActionsDossier : sans mise en page mesurable, un menu par verbe', () =
         'Requisitions - commande de documents [R] (ecran)', 'Commandes web [W] (ecran)']],
       ['Enregistrer', ['Demandes [D] (ecran)', 'BODACC [B] (ecran)', 'Cloture [O] (ecran)', 'Archivage / radiation [A] (ecran)']],
       ['Facturer', ['Factures [F] (ecran)', 'Encaissements [E] (ecran)']],
-      ['Ecrire', ['Courriers divers [C] (ecran)', 'Envoyer le dossier par mail [M]']],
+      ['Ecrire', ['Envoyer le dossier par mail [M]']],
       ['Suivre', ['Copier le n° [N]', 'Copier le SIREN [S]', 'Dossiers verrouilles [V] (ecran)', 'Teletransmissions (EDI) [T] (ecran)']],
     ])
     // Rien a mesurer (pas de mise en page) : la forme la plus compacte, menus fermes.
@@ -68,7 +68,7 @@ describe('ActionsDossier : sans mise en page mesurable, un menu par verbe', () =
     expect(toutes).not.toContain('Kbis')
     expect(toutes).not.toContain('SIREN')
     expect(lu[1]![1]).toContain('Depots judiciaires [D] (ecran)')
-    expect(lu[3]![1]).toContain("Redaction d'une decision [R] (ecran)")
+    expect(lu[3]![1]).toEqual(['Notification au mandataire [C]', "Redaction d'une decision [R] (ecran)", 'Envoyer le dossier par mail [M]'])
     expect(lu[4]![1]).toEqual(['Copier le n° [N]', 'Consultation judiciaire [J] (ecran)', 'Audiences [U] (ecran)',
       'GED judiciaire [G] (ecran)', 'Dossiers verrouilles [V] (ecran)'])
   })
@@ -247,7 +247,7 @@ describe('ActionsDossier : des boutons groupes par verbe, un menu seulement si l
     expect(screen.getByRole('button', { name: 'Factures' }).getAttribute('title'))
       .toBe('Factures (infobulle) — touche F')
     const boutons = [...container.querySelectorAll<HTMLButtonElement>('.rig-vged__agir > .rig-vged__agir-groupe > button')]
-    expect(boutons.map((b) => / — touche ([A-Z])$/.exec(b.title)?.[1]).join('')).toBe('KIPRWDBOAFECMNSVT')
+    expect(boutons.map((b) => / — touche ([A-Z])$/.exec(b.title)?.[1]).join('')).toBe('KIPRWDBOAFEMNSVT')
     redimensionner(300)
     expect(screen.getByRole('menuitem', { name: /^Factures/ }).getAttribute('title')).toBe('Factures (infobulle) — touche F')
     expect(container.querySelector('.rig-vged__agir > details summary')!.getAttribute('title'))

@@ -107,7 +107,7 @@ describe('L\'aide des raccourcis (« ? »)', () => {
       ['Delivrer', ['K Kbis a jour', 'I Imprimer le Kbis', "P Imprimer l'arborescence", 'R Requisitions - commande de documents', 'W Commandes web']],
       ['Enregistrer', ['D Demandes', 'B BODACC', 'O Cloture', 'A Archivage / radiation']],
       ['Facturer', ['F Factures', 'E Encaissements']],
-      ['Ecrire', ['C Courriers divers', 'M Envoyer le dossier par mail']],
+      ['Ecrire', ['M Envoyer le dossier par mail']],
       ['Suivre', ['N Copier le n°', 'S Copier le SIREN', 'V Dossiers verrouilles', 'T Teletransmissions (EDI)']],
       ['Toute la page', ['Ctrl K Rechercher partout, et agir sur ce dossier', '? Afficher ou fermer cette aide',
                          'Echap Fermer : cette aide, un menu, la liste des points, puis l affaire']],

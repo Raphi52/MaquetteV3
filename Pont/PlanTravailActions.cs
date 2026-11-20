@@ -10,7 +10,11 @@ namespace RigV3Desktop.Pont;
 //   - une action d'ECRAN ouvre l'ecran dans son onglet « pour ce dossier »
 //     (OuvrirProcDepuisAffaire, PlanTravail.cs) : l'onglet retient l'affaire, l'ecran
 //     en recoit le contexte (EcranProcVue.Dossier) et montre la puce « ← Dossier »,
-//     qui y ramene (geste « retourDossier ») ; fermer l'onglet y ramene aussi.
+//     qui y ramene (geste « retourDossier ») ; fermer l'onglet y ramene aussi ;
+//   - un COURRIER (lot 9) : les modeles de courrier divers qui valent pour la nature de
+//     l'affaire remplacent la famille « courriers » de la barre ; en choisir un produit le
+//     courrier rempli avec l'affaire et le montre dans la colonne du document, ou les
+//     boutons Imprimer et Envoyer par mail du document valent pour lui.
 // Le pre-remplissage de chaque ecran par ce contexte est le lot 2 du plan.
 // ============================================================
 public sealed partial class SessionPlanTravail
@@ -23,10 +27,22 @@ public sealed partial class SessionPlanTravail
     /// le dossier entier. Nul = la piece ouverte (OuvrirEnvoiMail le remet a nul).</summary>
     private string? EnvoiDe;
 
+    /// <summary>Le dernier courrier produit depuis la barre : un document de la page, hors du
+    /// classeur. Tant qu'il est ouvert, la colonne du document ne lui accole aucune valeur de
+    /// formulaire (VueApercu) : un courrier n'est pas une piece d'une etape de saisie.</summary>
+    private NoeudGed? CourrierRedige;
+
     /// <summary>Les actions que la barre montre sur cette affaire : celles de son type,
-    /// moins celles qui n'y auraient pas d'effet ou pas de droit.</summary>
+    /// moins celles qui n'y auraient pas d'effet ou pas de droit ; la famille des courriers
+    /// cede sa place aux modeles qui valent pour la nature de l'affaire -- aucun, rien.</summary>
     private IEnumerable<ActionDossier> ActionsDisponibles(Dossier d)
-        => ActionsDossier.Pour(d.Type).Where(a => Disponible(a, d));
+    {
+        var actions = ActionsDossier.Pour(d.Type).Where(a => Disponible(a, d)).ToList();
+        if (!actions.Any(a => a.Code == ActionsDossier.Courriers)) return actions;
+        var courriers = ActionsDossier.DesCourriers(CourriersDivers.Pour(EcranRechAffaires.NatureDe(d.Numero)),
+                                                    actions.Where(a => a.Code != ActionsDossier.Courriers).Select(a => a.Touche));
+        return actions.SelectMany(a => a.Code == ActionsDossier.Courriers ? courriers : [a]);
+    }
 
     private bool Disponible(ActionDossier a, Dossier d)
     {
@@ -104,6 +120,10 @@ public sealed partial class SessionPlanTravail
             case ActionsDossier.CopierNumero or ActionsDossier.CopierSiren:
                 // Le presse-papiers est celui de la page : elle copie sans remonter le geste.
                 throw new InvalidOperationException($"L'action « {code} » se joue dans la page, pas dans la session.");
+            case var courrier when courrier.StartsWith(ActionsDossier.PrefixeCourrier, StringComparison.Ordinal):
+                // Disponible, donc un modele actif de la nature de l'affaire (ActionsDisponibles).
+                ProduireCourrier(d, CourriersDivers.DeCode(courrier[ActionsDossier.PrefixeCourrier.Length..])!);
+                break;
             default:
                 var proc = Groupes.SelectMany(g => g.Procs).FirstOrDefault(p => p.Code == action.Ecran)
                     ?? throw new InvalidOperationException($"L'ecran {action.Ecran} de l'action « {code} » n'est pas au catalogue.");
@@ -122,6 +142,47 @@ public sealed partial class SessionPlanTravail
         // s'ouvre quand meme -- le droit de le voir est deja verifie (KbisVisible).
         if (!GuideVisible || !ReferenceEquals(ApercuNoeud, kbis)) OuvrirApercu(kbis);
     }
+
+    /// <summary>
+    /// Ecrit un courrier divers pour l'affaire : rempli avec elle (n°, denomination, adresse
+    /// de sa fiche sommaire), adresse au destinataire que le modele demande, sous l'en-tete
+    /// du greffe du dossier (la regle du Kbis, Pont/ApercuKbis.cs), et montre dans la colonne
+    /// du document. L'etape de saisie et la piece choisie dans le classeur ne bougent pas.
+    /// </summary>
+    private void ProduireCourrier(Dossier d, ModeleCourrier modele)
+    {
+        var sommaire = SommaireDu(d);
+        var texte = CourriersDivers.Rediger(modele,
+            new AffaireCourrier(d.Numero, sommaire.Designation, sommaire.Adresse),
+            DestinataireDu(modele, sommaire),
+            Greffes.Trouver(LireSaisie("SIEGE", "ETBLS_CODE_GREFFE")), DateTime.Today);
+        // La nature « Courrier » du bouton Nouveau : son dessin et son extension.
+        CourrierRedige = AccesGed.NouveauSelonNature("courrier", DateTime.Today.ToString("dd/MM/yyyy")) with
+        {
+            Libelle = CourriersDivers.Titre(modele, d.Numero),
+            Origine = CourriersDivers.Origine,
+            Apercu = texte,
+            Pages = DocumentPartage.PagesDuTexte(texte)
+        };
+        ApercuNoeud = CourrierRedige;
+        ApercuMessage = "";
+        ApercuPage = 1;
+        ImpressionOuverte = false;
+        GuideVisible = true;
+    }
+
+    /// <summary>Le destinataire qu'un modele demande : la partie (la fiche sommaire de
+    /// l'affaire), ou le mandataire judiciaire du tableau des editions de l'affaire
+    /// (ArbreDemo.Editions) ; null si le modele n'en demande pas ou si le dossier ne le connait pas.</summary>
+    private AdresseCourrier? DestinataireDu(ModeleCourrier modele, Sommaire sommaire) => modele.Destinataire switch
+    {
+        DestinataireCourrier.Partie => new AdresseCourrier(sommaire.Designation, sommaire.Adresse),
+        DestinataireCourrier.Mandataire => Editions
+            .Select(l => l.Detail)
+            .FirstOrDefault(x => x is not null && x.AdressePostale.StartsWith("Mandataire judiciaire", StringComparison.Ordinal))
+            is { } m ? new AdresseCourrier(m.Designation, m.AdressePostale) : null,
+        _ => null
+    };
 
     /// <summary>Le contexte de l'affaire d'ou un ecran a ete ouvert, pour cet ecran.</summary>
     private ContexteDossierVue? ContexteDeLEcran(string code)
