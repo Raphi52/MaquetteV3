@@ -170,14 +170,19 @@ describe('EcranFactures ouvert depuis une affaire', () => {
     sansRienDeLaDemo(container)
   })
 
-  it('004151, un depot de bilan : le depot des comptes annuels, une fois, au prix unitaire du tarif', async () => {
-    const { container } = ouvrirPour(Transnord)
-    // Le tarif compte 2 depots a 53,52 EUR dans la facture de demonstration : un seul ici, 26,76 EUR.
-    expect(lignes(container)).toEqual([
-      ['DEP03', 'Depot des comptes annuels', '1', '22,30', '20,0 %', '0,00', '0,00', '0,00', '26,76', ''],
-    ])
-    expect(compte(container)).toBe('Total TTC 26,76 EUR — reste a encaisser 26,76 EUR')
+  // Un « depot de bilan » est la declaration de cessation des paiements (procedure
+  // collective ; glossaire du Brain, 50-metier-judiciaire), PAS le depot des comptes
+  // annuels : DEP03 ne le facture pas, et le tarif RCS de l'ecran n'a aucun article pour lui.
+  // fix-ok: refuse par le chef le 20/11 -- 004151 etait facture DEP03 « Depot des comptes annuels ».
+  it('004151, un depot de bilan : aucun article du tarif, mais sa demande et son client', async () => {
+    const { container, pont } = ouvrirPour(Transnord)
+    expect(lignes(container)).toEqual([[
+      'Aucun article du tarif pour cette affaire (Depot de bilan).',
+    ]])
+    expect(container.textContent).not.toMatch(/DEP03|Depot des comptes annuels/)
+    expect(compte(container)).toBe('Total TTC 0,00 EUR — reste a encaisser 0,00 EUR')
     await waitFor(() => expect(valeur('N de demande')).toBe('004151'))
+    expect(pont.appels).toHaveBeenCalledWith('EcranFactures.DemandeDe', '004151')
     expect(valeur('Abrege')).toBe('TRANSNORD')
     expect(valeur('Nom du client')).toBe('TRANSNORD SA')
     sansRienDeLaDemo(container)
@@ -192,8 +197,8 @@ describe('EcranFactures ouvert depuis une affaire', () => {
     sansRienDeLaDemo(container)
   })
 
-  // Le jumeau de 004151 : meme nature ecrite, mais une affaire JUDICIAIRE (procedure
-  // collective) n'a pas d'article au tarif RCS de l'ecran -- ni demande RCS, ni client.
+  // Le jumeau de 004151 : meme nature, sans demande RCS (Pont/EcranFactures.cs, DemandeDe
+  // rend null) -- ni numero de demande ni client, rien n'est emprunte a la demo.
   it('J-00931, un depot de bilan judiciaire sans demande : rien d\'emprunte, tout reste vide', async () => {
     const { container, pont } = ouvrirPour(contexteDossier({
       numero: 'J-00931', siren: '318 552 004', objet: 'Depot de bilan - TRANSNORD SA', type: 'JUD', nom: 'TRANSNORD SA',

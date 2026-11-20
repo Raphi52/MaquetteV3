@@ -89,13 +89,17 @@ const Fiches: readonly FicheClient[] = [
   { nom: 'Client de passage',       abrege: 'DIVERS', typeClient: 'Client divers',    adresse: '',                                    solde: 0 },
 ]
 
-// Le tarif de l'ecran, celui des formalites RCS. « Depot de bilan » est, au RCS, le
-// depot des comptes annuels : les pieces du depot D-2026-1170 de l'affaire 004151 sont
-// « Comptes annuels 2025 » et « Compte de resultat 2025 » (Metier/JeuDemo.cs, depots).
+// Le tarif de l'ecran, celui des formalites RCS. Un « Depot de bilan » n'y a AUCUN
+// article : c'est la declaration de cessation des paiements (procedure collective ;
+// glossaire du Brain, 50-metier-judiciaire), pas le depot des comptes annuels (DEP03).
+// Les « Comptes annuels 2025 » du depot D-2026-1170 de 004151 (Metier/JeuDemo.cs) sont
+// les pieces jointes a cette declaration (art. R631-1 du Code de commerce), pas un depot
+// des comptes. Aucune affaire de la demo n'est un depot des comptes : DEP03 ne facture
+// aucune nature, il ne sert qu'a la facture de demonstration.
 const Tarif: readonly ArticleTarif[] = [
   { code: 'IMM01', libelle: 'Immatriculation societe',   prixUht: 37.45, tauxTva: 20, bodacc: 105.90, inpi: 0,     autre: 0,    ttc: 194.85, natures: ['Immatriculation'] },
   { code: 'MOD02', libelle: 'Modification statutaire',   prixUht: 45.60, tauxTva: 20, bodacc: 108.00, inpi: 0,     autre: 0,    ttc: 162.72, natures: ['Modification'] },
-  { code: 'DEP03', libelle: 'Depot des comptes annuels', prixUht: 22.30, tauxTva: 20, bodacc: 0,      inpi: 0,     autre: 0,    ttc: 26.76,  natures: ['Depot de bilan'] },
+  { code: 'DEP03', libelle: 'Depot des comptes annuels', prixUht: 22.30, tauxTva: 20, bodacc: 0,      inpi: 0,     autre: 0,    ttc: 26.76,  natures: [] },
   { code: 'INP04', libelle: 'Transmission INPI',         prixUht: 12.00, tauxTva: 20, bodacc: 0,      inpi: 18.50, autre: 0,    ttc: 32.90,  natures: [] },
   { code: 'DIV05', libelle: 'Frais divers',              prixUht: 8.00,  tauxTva: 20, bodacc: 0,      inpi: 0,     autre: 4.20, ttc: 14.64,  natures: [] },
 ]
@@ -115,13 +119,11 @@ const natureDe = (dossier: ContexteDossierVue): string =>
   dossier.objet.includes(' - ') ? dossier.objet.slice(0, dossier.objet.indexOf(' - ')) : ''
 
 /** La facture de depart d'une affaire : une fois chaque article du tarif qui facture sa
- *  nature. Le tarif est celui du RCS : une affaire judiciaire n'y a aucun article. */
+ *  nature, aucun si le tarif n'en a pas (depot de bilan, liquidation, toute affaire judiciaire). */
 function factureDe(dossier: ContexteDossierVue): LigneFacture[] {
   const nature = natureDe(dossier)
-  return dossier.type !== 'RCS'
-    ? []
-    : Tarif.filter((t) => t.natures.includes(nature))
-           .map((t) => ({ code: t.code, quantite: 1, commentaire: '' }))
+  return Tarif.filter((t) => t.natures.includes(nature))
+              .map((t) => ({ code: t.code, quantite: 1, commentaire: '' }))
 }
 
 /** Une ligne de facture lue dans le tarif, ses montants calcules en centimes (exacts). */
