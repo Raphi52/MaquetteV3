@@ -28,10 +28,22 @@ public partial class MainWindow : Window
 #if DEBUG
             await ViderCacheAuDemarrage();
 #endif
-            await Pont.PageWeb.Brancher(Vue, Racine);
+            // SOC-001 : branchee au serveur, la page attend de savoir QUI ouvre RIG
+            // (sa session Windows) ; un agent refuse voit l'ecran de refus a la place
+            // de l'application, qui n'est jamais ouverte (Pont/SessionAgent.cs).
+            var identite = await Pont.SessionAgent.OuvrirAsync(() => Pont.ClientServeur.Actif);
+            if (identite is { Admis: false }) Refus = new Pont.RacineRefus(identite, App.Fenetre);
+            await Pont.PageWeb.Brancher(Vue, Refus ?? (Pont.RacineWeb)Racine);
         };
-        Closed += async (_, _) => await Racine.DisposeAsync();
+        Closed += async (_, _) =>
+        {
+            await Racine.DisposeAsync();
+            if (Refus is not null) await Refus.DisposeAsync();
+        };
     }
+
+    /// <summary>L'ecran de refus, quand le serveur n'admet pas l'agent (SOC-001) ; null sinon.</summary>
+    private Pont.RacineRefus? Refus;
 
 #if DEBUG
     /// <summary>

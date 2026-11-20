@@ -17,4 +17,10 @@
     <ProjectReference Include="../Base/RigV3.Migrations.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- SOC-001 : la session Windows de l'agent (Kerberos / NTLM), inscrite par
+         Socle/Identite/ModuleIdentite.cs. Hors du framework partage ASP.NET Core. -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" Version="10.0.13" />
+  </ItemGroup>
+
 </Project>

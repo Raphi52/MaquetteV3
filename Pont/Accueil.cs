@@ -185,7 +185,9 @@ public sealed class SessionAccueil : IAsyncDisposable
     // ---------------------------------------------------------------
     public string LoginCourant { get; private set; } = JeuDemo.Comptes[0].Login;
     public CompteRig CompteCourant => JeuDemo.Compte(LoginCourant);
-    public string Utilisateur => CompteCourant.Nom;
+    /// <summary>Le nom que l'entete salue : l'agent reconnu par sa session Windows quand l'app
+    /// est branchee au serveur (SOC-001, Pont/SessionAgent.cs), sinon le login de demonstration.</summary>
+    public string Utilisateur => SessionAgent.NomAgent ?? CompteCourant.Nom;
     public string[] Domaines => CompteCourant.Domaines;
 
     /// <summary>Theme d'affichage courant (code de ThemesRig). Clair par
@@ -1249,9 +1251,12 @@ public sealed class SessionAccueil : IAsyncDisposable
 
     /// <summary>Le rond de profil (« Commandes rondes », 18/11/2026) : les initiales
     /// du login ; un clic deroule les comptes. Il est a droite du titre de
-    /// l'accueil, et seulement la : la barre du haut ne porte plus que les onglets.</summary>
-    private ProfilVue Profil()
+    /// l'accueil, et seulement la : la barre du haut ne porte plus que les onglets.
+    /// C'est le selecteur des logins de DEMONSTRATION : branchee au serveur, l'agent est
+    /// celui de la session Windows et n'en change pas -- pas de rond (SOC-001 T03).</summary>
+    private ProfilVue? Profil()
     {
+        if (SessionAgent.NomAgent is not null) return null;
         var c = CompteCourant;
         return new ProfilVue(PanneauProfilOuvert, c.Initiales,
             $"{c.Login} · {c.Profil} ({c.DomainesLisibles}) : changer de login", c.Login,
