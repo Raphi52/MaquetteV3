@@ -89,6 +89,91 @@ var renommeRepose = arbre2.Enfants.First();
 Exiger(libelles2.TryGetValue(renommeRepose, out var nom) && nom == "Dossier RCS (renomme)",
     "le renommage revient sur le bon noeud");
 
+// ---------- Lot 4 du plan « Vue du dossier » (20/11/2026) : une PIECE JOINTE ----------
+// Un PDF depose sur la carte « Pieces jointes » : son contenu est ecrit a cote du fichier
+// d'etat, la piece rejoint les ajouts de l'arbre, et tout revient apres un redemarrage.
+string[] tousDomaines = [ArbreDemo.DomaineRcs, ArbreDemo.DomaineJudiciaire];
+var dossierPieces = AccueilEtat.DossierPiecesJointes;
+Exiger(dossierPieces == Path.Combine(dossierTemp, "accueil-pieces"),
+    $"les pieces jointes vont a cote du fichier d'etat de RIGV3_ETAT, jamais dans celui de l'utilisateur ({dossierPieces})");
+// Un vrai PDF de deux pages (deux objets /Type /Page sous un /Type /Pages).
+var pdf = "%PDF-1.4\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n2 0 obj << /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >> endobj\n3 0 obj << /Type /Page /Parent 2 0 R >> endobj\n4 0 obj << /Type /Page /Parent 2 0 R >> endobj\n%%EOF\n"u8.ToArray();
+var arbreJ = ArbreDemo.Racine("004176", "SCI DU PARC", "812 445 901");
+var pjJ = arbreJ.Descendants().First(n => n.Libelle == "Pieces jointes");
+var jointe = PiecesJointes.Ranger(dossierPieces, "004176", "Attestation URSSAF.pdf", pdf, new DateTime(2026, 11, 20));
+Exiger(jointe is { Libelle: "Attestation URSSAF", Extension: "PDF", Date: "20/11/2026", Pages: 2, EstPiece: true, APdf: true }
+       && jointe.Origine == PiecesJointes.Origine
+       && jointe.Fichier.StartsWith("https://pieces.rigv3.example/004176/") && jointe.Fichier.EndsWith(".pdf"),
+    $"la piece jointe porte le nom du fichier, la date du jour, ses 2 pages et l'adresse de son fichier ({jointe.Fichier})");
+var surDisque = Path.Combine(dossierPieces, "004176", jointe.Fichier.Split('/')[^1]);
+Exiger(File.Exists(surDisque) && File.ReadAllBytes(surDisque).SequenceEqual(pdf),
+    "le contenu est REELLEMENT ecrit, octet pour octet, dans le dossier de l'affaire");
+var deuxieme = PiecesJointes.Ranger(dossierPieces, "004176", "Attestation URSSAF.pdf", pdf, new DateTime(2026, 11, 20));
+Exiger(deuxieme.Fichier != jointe.Fichier && File.Exists(surDisque),
+    "deposer deux fois le meme fichier n'ecrase pas le premier");
+var ajoutsJ = AccesGed.NouveauxAjouts();
+ajoutsJ[pjJ] = [jointe];
+AccueilEtat.Charger().EnregistrerArbreGed("004176",
+    PersistanceGed.Capturer(arbreJ, ajoutsJ, AccesGed.NouveauxMasques(), AccesGed.NouveauxLibelles()));
+
+// L'application redemarre : arbre neuf, etat relu.
+var arbreJ2 = ArbreDemo.Racine("004176", "SCI DU PARC", "812 445 901");
+var ajoutsJ2 = AccesGed.NouveauxAjouts();
+var masquesJ2 = AccesGed.NouveauxMasques();
+PersistanceGed.Appliquer(arbreJ2, AccueilEtat.Charger().ArbreGedDe("004176"), ajoutsJ2, masquesJ2, AccesGed.NouveauxLibelles());
+var pjJ2 = arbreJ2.Descendants().First(n => n.Libelle == "Pieces jointes");
+var reposee = AccesGed.EnfantsVisibles(pjJ2, tousDomaines, ajoutsJ2, masquesJ2).LastOrDefault();
+Exiger(reposee is { Libelle: "Attestation URSSAF", Pages: 2, APdf: true } && reposee.Fichier == jointe.Fichier
+       && reposee.Origine == PiecesJointes.Origine && File.Exists(surDisque),
+    "apres redemarrage : la piece jointe est toujours dans « Pieces jointes », avec son fichier sur disque");
+
+// IMPRIMER UN DOSSIER ENTIER (_Print recursif de RIG v2) : toutes ses pieces, sous-dossiers compris.
+string[] PiecesDe(NoeudGed n) => [.. AccesGed.PiecesSous(n, tousDomaines, ajoutsJ2, masquesJ2).Select(p => p.Libelle)];
+Exiger(PiecesDe(pjJ2).Length == 5 && PiecesDe(pjJ2)[^1] == "Attestation URSSAF",
+    $"imprimer « Pieces jointes » : ses 4 pieces et la piece jointe ({PiecesDe(pjJ2).Length})");
+var actesJ2 = arbreJ2.Descendants().First(n => n.Libelle == "Depots d'actes");
+Exiger(PiecesDe(actesJ2).SequenceEqual(["Bail commercial", "Extrait de proces-verbal du conseil de surveillance du 03/10/2024",
+                                         "Certificat de depot d'actes"]),
+    "imprimer « Depots d'actes » : ses 3 pieces sur deux niveaux de sous-dossiers, dans l'ordre de l'arbre, sans la fiche");
+var rcsJ2 = arbreJ2.Enfants.First(e => e.Libelle == "Dossier RCS");
+Exiger(PiecesDe(rcsJ2).Length == rcsJ2.NbPieces + 1, $"imprimer le domaine « Dossier RCS » : ses {rcsJ2.NbPieces} pieces et la jointe");
+masquesJ2.Add(actesJ2.Descendants().First(n => n.Libelle == "Bail commercial"));
+Exiger(PiecesDe(actesJ2).Length == 2, "une piece supprimee n'est plus imprimee avec son dossier");
+// Les droits se lisent sur le domaine, cache a son parent : depuis la racine de l'affaire, un
+// login judiciaire n'a que les pieces de « Judiciaire ».
+var judJ2 = arbreJ2.Enfants.First(e => e.Libelle == "Judiciaire");
+Exiger(AccesGed.PiecesSous(arbreJ2, [ArbreDemo.DomaineJudiciaire], ajoutsJ2, masquesJ2).Count() == judJ2.NbPieces
+       && AccesGed.PiecesSous(jointe, tousDomaines).Count() == 0,
+    "un login sans le domaine RCS n'imprime aucune de ses pieces ; une piece ne range aucune piece");
+
+// Les REFUS, et le jumeau accepte de chacun (meme regle que refusFichier de ClasseurArbre.tsx).
+Exiger(PiecesJointes.Refus("notes.docx", pdf) == "« notes.docx » n'est pas joint : seuls les PDF et les images JPG ou PNG sont acceptes."
+       && PiecesJointes.Refus("notes.pdf", pdf) is null,
+    "un type non accepte est refuse en clair ; le meme contenu en .pdf passe");
+Exiger(PiecesJointes.Refus("faux.pdf", "<html></html>"u8.ToArray()) == "« faux.pdf » n'est pas un vrai PDF : il n'est pas joint."
+       && PiecesJointes.Refus("photo.JPEG", [0xFF, 0xD8, 0xFF, 0xE0]) is null
+       && PiecesJointes.Refus("photo.jpeg", "%PDF"u8.ToArray()) == "« photo.jpeg » n'est pas un vrai JPG : il n'est pas joint."
+       && PiecesJointes.Refus("scan.png", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0]) is null,
+    "un fichier dont le contenu n'est pas du type annonce est refuse ; JPG (en majuscules) et PNG vrais passent");
+Exiger(PiecesJointes.Refus("vide.pdf", []) == "« vide.pdf » est vide : il n'est pas joint.", "un fichier vide est refuse");
+var avantRefus = Directory.GetFiles(Path.Combine(dossierPieces, "004176")).Length;
+var refuse = false;
+try { PiecesJointes.Ranger(dossierPieces, "004176", "faux.pdf", "<html></html>"u8.ToArray(), DateTime.Today); }
+catch (InvalidOperationException) { refuse = true; }
+Exiger(refuse && Directory.GetFiles(Path.Combine(dossierPieces, "004176")).Length == avantRefus,
+    "un fichier refuse n'est jamais ecrit");
+var image = PiecesJointes.Ranger(dossierPieces, "004176", @"C:\scans\Carte d'identite.png",
+                                 [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0], DateTime.Today);
+Exiger(image is { Libelle: "Carte d'identite", Extension: "PNG", Pages: 1 } && AccesGed.CodeIcone(image) == "jpg",
+    "une image jointe : son nom sans chemin, une page, l'icone d'image");
+
+// « Copier le n° » d'un dossier : le numero que porte son libelle.
+Exiger(AccesGed.NumeroDe("Depot n A2024/038654") == "A2024/038654"
+       && AccesGed.NumeroDe("Instance n 2022J00114 - AMIENS BILLARDS / SCI DU PARC") == "2022J00114"
+       && AccesGed.NumeroDe("Formalite n J00092709138") == "J00092709138"
+       && AccesGed.NumeroDe("Pieces jointes") is null && AccesGed.NumeroDe("Jonctions et disjonctions") is null,
+    "le numero d'un dossier numerote se lit dans son libelle ; un dossier sans numero n'en a pas");
+
 // ---------- L'arbre revenu a l'etat d'origine n'encombre pas le fichier ----------
 var etat3 = AccueilEtat.Charger();
 etat3.EnregistrerArbreGed(affaire, new ArbreGedEnregistre());

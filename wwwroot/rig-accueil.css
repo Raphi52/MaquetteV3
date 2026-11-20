@@ -4535,6 +4535,31 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   box-shadow: 0 1px 2px rgba(0, 0, 0, .1);
 }
 
+/* JOINDRE UN FICHIER (lot 4 du plan « Vue du dossier », 20/11/2026) : le bouton de la
+   carte ouverte, le dossier qu'un fichier glisse survole, le refus d'un type non accepte. */
+.rig-classeur__joindre {
+  display: block; width: 100%; margin-top: 6px; padding: 5px 8px; cursor: pointer;
+  border: 1px dashed var(--rig-bord); border-radius: 7px; background: transparent;
+  font: 600 11px var(--rig-font); color: var(--rig-texte-3);
+}
+.rig-classeur__joindre::before { content: "+ "; }
+.rig-classeur__joindre:hover { border-color: var(--rig-accent); color: var(--rig-accent); background: var(--rig-fond-2); }
+.rig-classeur .rig-classeur__depot {
+  background: color-mix(in srgb, var(--rig-accent) 12%, transparent);
+  box-shadow: inset 0 0 0 2px var(--rig-accent);
+}
+.rig-classeur__refus {
+  display: flex; align-items: flex-start; gap: 8px; padding: 7px 10px; border-radius: 8px;
+  background: color-mix(in srgb, var(--rig-erreur) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rig-erreur) 45%, transparent);
+  font: 11.5px/1.35 var(--rig-font); color: var(--rig-texte);
+}
+.rig-classeur__refus > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rig-classeur__refus button {
+  flex: none; border: 0; background: transparent; cursor: pointer; padding: 0 2px;
+  font: 14px/1 var(--rig-font); color: var(--rig-texte-2);
+}
+
 /* « Par date » : la frise, un trait vertical sous les points (jour 40 px +
    ecart 8 px + demi-point 5 px = 53 px), l'annee en or, les decisions en or. */
 .rig-classeur__frise {

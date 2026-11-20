@@ -92,6 +92,13 @@ public static class PageWeb
         coeur.Settings.AreDevToolsEnabled = false;
 #endif
         coeur.SetVirtualHostNameToFolderMapping(Hote, DossierWwwroot, CoreWebView2HostResourceAccessKind.Allow);
+        // Les fichiers JOINTS aux affaires (Metier/ArbreGed.cs, PiecesJointes) : un second hote, sur
+        // le dossier qui va avec le fichier de reglages. Leur adresse est complete (https://pieces...),
+        // elle se lit donc aussi quand la page vient de Vite. DenyCors : la colonne du document les
+        // ouvre dans son cadre ; aucun script d'une autre origine ne les lit.
+        Directory.CreateDirectory(AccueilEtat.DossierPiecesJointes);
+        coeur.SetVirtualHostNameToFolderMapping(PiecesJointes.Hote, AccueilEtat.DossierPiecesJointes,
+                                                CoreWebView2HostResourceAccessKind.DenyCors);
 
         // Rien d'autre que la page ne se charge dans la fenetre : une autre
         // origine aurait acces au pont.

@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ClasseurArbre, frise, type LigneArbreVue, type ProprietesClasseurArbre, type TriClasseur } from './ClasseurArbre'
+import { ClasseurArbre, frise, refusFichier, type LigneArbreVue, type ProprietesClasseurArbre, type TriClasseur } from './ClasseurArbre'
 
 afterEach(cleanup)
 
@@ -66,6 +66,7 @@ function rendre(donnees = affaire(), tri: TriClasseur = 'date') {
     replier: (id) => gestes.push(['replier', id]),
     renommer: (r) => gestes.push(['renommer', r]),
     menuContextuel: vi.fn((s) => gestes.push(['menu', s.id])),
+    joindre: (f) => gestes.push(['joindre', f]),
   }
   const r = render(<ClasseurArbre {...p} />)
   return { ...r, gestes, p }
@@ -252,6 +253,101 @@ describe('ClasseurArbre : replier un sous-dossier en « Par dossier »', () => {
   it('« Par date » ignore les replis : la frise garde toutes les pieces', () => {
     const { container } = rendre(avecReplis(['d1', 'd2']), 'date')
     expect(container.querySelectorAll('.rig-classeur__ev')).toHaveLength(4)
+  })
+})
+
+describe('ClasseurArbre : joindre un fichier (glisse depuis l\'explorateur ou choisi)', () => {
+  const pdf = (nom = 'Attestation URSSAF.pdf', texte = '%PDF-1.4 deux pages') => new File([texte], nom, { type: 'application/pdf' })
+  // Ce que le navigateur passe a un glisser de FICHIERS depuis l'explorateur.
+  const glisse = (fichiers: File[]) => ({ dataTransfer: { types: ['Files'], files: fichiers, dropEffect: 'none' } })
+  const carte = (c: Element, nom: string) =>
+    [...c.querySelectorAll('.rig-classeur__carte')].find((e) => e.getAttribute('aria-label') === nom)!
+
+  it('un PDF glisse sur la carte FERMEE « Pieces jointes » : elle s\'eclaire, puis le pont recoit son nom et son contenu en base64', async () => {
+    const { container, gestes } = rendre()
+    const pj = carte(container, 'Pieces jointes')
+    // Sans preventDefault au survol, le navigateur refuse le depot (et ouvrirait le fichier).
+    expect(fireEvent.dragOver(pj, glisse([pdf()]))).toBe(false)
+    expect(pj.className).toContain('rig-classeur__depot')
+    fireEvent.drop(pj, glisse([pdf()]))
+    expect(pj.className).not.toContain('rig-classeur__depot')
+    await waitFor(() => expect(gestes).toEqual([
+      ['joindre', { id: 'pj', nom: 'Attestation URSSAF.pdf', contenu: btoa('%PDF-1.4 deux pages') }]]))
+    // Deposer n'ouvre pas la carte : c'est le pont qui ouvre la piece jointe.
+    expect(gestes.some(([g]) => g === 'rubrique')).toBe(false)
+  })
+
+  it('un glisser qui ne porte pas de fichier (un texte, un onglet) n\'est pas accepte', () => {
+    const { container } = rendre()
+    const pj = carte(container, 'Pieces jointes')
+    expect(fireEvent.dragOver(pj, { dataTransfer: { types: ['text/plain'], files: [] } })).toBe(true)
+    expect(pj.className).not.toContain('rig-classeur__depot')
+  })
+
+  it('sur l\'intertitre d\'un sous-dossier, le fichier va dans CE sous-dossier, pas dans la rubrique', async () => {
+    const { container, gestes } = rendre(affaire(), 'dossier')
+    const d2 = [...container.querySelectorAll('.rig-classeur__it')].find((e) => e.textContent!.includes('A2024/038654'))!
+    fireEvent.dragOver(d2, glisse([pdf()]))
+    expect(d2.className).toContain('rig-classeur__depot')
+    expect(carte(container, "Depots d'actes").className).not.toContain('rig-classeur__depot')
+    // Des OCTETS, pas une chaine : un File fait d'une chaine l'encode en UTF-8 (0x89 -> C2 89).
+    const png = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0])], 'scan.png', { type: 'image/png' })
+    fireEvent.drop(d2, glisse([png]))
+    await waitFor(() => expect(gestes.map(([g, f]) => [g, (f as { id: string }).id])).toEqual([['joindre', 'd2']]))
+  })
+
+  it('sur la carte « hors rubrique », le fichier va sous le domaine', async () => {
+    const { container, gestes } = rendre()
+    fireEvent.drop(container.querySelector('.rig-classeur__hors')!, glisse([pdf()]))
+    await waitFor(() => expect(gestes.map(([g, f]) => [g, (f as { id: string }).id])).toEqual([['joindre', 'rcs']]))
+  })
+
+  it('un type non accepte est refuse EN CLAIR, sans rien envoyer ; le PDF depose avec lui passe', async () => {
+    const { container, gestes } = rendre()
+    const notes = new File(['bonjour'], 'notes.docx')
+    fireEvent.drop(carte(container, 'Pieces jointes'), glisse([notes, pdf()]))
+    // fix-ok: waitFor ne reessaie que sur une exception -- un querySelector nul rendait null aussitot (mesure : TypeError ligne 308).
+    const refus = await waitFor(() => {
+      const r = container.querySelector('[role="alert"]')
+      expect(r).not.toBeNull()
+      return r!
+    })
+    expect(refus.textContent).toContain("« notes.docx » n'est pas joint : seuls les PDF et les images JPG ou PNG sont acceptes.")
+    expect(gestes.map(([g, f]) => [g, (f as { nom: string }).nom])).toEqual([['joindre', 'Attestation URSSAF.pdf']])
+    fireEvent.click(refus.querySelector('button')!)
+    expect(container.querySelector('[role="alert"]')).toBeNull()
+  })
+
+  it('un faux PDF (son contenu n\'en est pas un) est refuse aussi', async () => {
+    const { container, gestes } = rendre()
+    fireEvent.drop(carte(container, 'Pieces jointes'), glisse([pdf('faux.pdf', '<html></html>')]))
+    await waitFor(() => expect(container.querySelector('[role="alert"]')!.textContent)
+      .toBe("« faux.pdf » n'est pas un vrai PDF : il n'est pas joint.×"))
+    expect(gestes).toEqual([])
+  })
+
+  it('« Joindre un fichier » dans la carte ouverte : le selecteur s\'ouvre, le fichier choisi va dans cette rubrique', async () => {
+    const { container, gestes } = rendre()
+    const selecteur = container.querySelector('input[type="file"]') as HTMLInputElement
+    expect(selecteur.accept).toBe('.pdf,.jpg,.jpeg,.png')
+    const ouvrir = vi.spyOn(selecteur, 'click')
+    const bouton = container.querySelector('.rig-classeur__carte--ouverte .rig-classeur__joindre')!
+    expect(bouton.textContent).toBe('Joindre un fichier')
+    fireEvent.click(bouton)
+    expect(ouvrir).toHaveBeenCalledTimes(1)
+    fireEvent.change(selecteur, { target: { files: [pdf()] } })
+    await waitFor(() => expect(gestes.map(([g, f]) => [g, (f as { id: string }).id])).toEqual([['joindre', 'da']]))
+    // Une carte fermee n'a pas le bouton : elle s'ouvre d'abord (ou recoit un fichier glisse).
+    expect(carte(container, 'Pieces jointes').querySelector('.rig-classeur__joindre')).toBeNull()
+  })
+
+  it('refusFichier : chaque refus a son jumeau accepte', () => {
+    expect(refusFichier('notes.docx')).toContain('seuls les PDF')
+    expect(refusFichier('notes.pdf')).toBeNull()
+    expect(refusFichier('photo.JPEG', btoa('\xff\xd8\xff\xe0'))).toBeNull()
+    expect(refusFichier('photo.jpeg', btoa('%PDF'))).toBe("« photo.jpeg » n'est pas un vrai JPG : il n'est pas joint.")
+    expect(refusFichier('vide.png', '')).toBe("« vide.png » est vide : il n'est pas joint.")
+    expect(refusFichier('scan.png', btoa('\x89PNG\r\n\x1a\n'))).toBeNull()
   })
 })
 

@@ -196,7 +196,8 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
                            rubrique={(id) => plan('arbreRubrique', id)}
                            replier={(id) => plan('arbreReplierDossier', id)}
                            renommer={(r) => plan('arbreRenommer', r)}
-                           menuContextuel={(souris) => plan('arbreMenu', souris)} />
+                           menuContextuel={(souris) => plan('arbreMenu', souris)}
+                           joindre={(fichier) => plan('arbreJoindre', fichier)} />
           </div>
           {/* PROPAGATION -- EN PIED DE COLONNE (17/09/2026) : au-dessus de
               l'arbre, ouvrir la tache poussait tous les noeuds vers le bas. */}

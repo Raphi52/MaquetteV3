@@ -1,4 +1,6 @@
-﻿namespace RigV3Desktop;
+﻿using System.IO;
+
+namespace RigV3Desktop;
 
 // ============================================================
 // Arbre documentaire de l'affaire (esprit VGED de RIG v2).
@@ -542,6 +544,37 @@ public static class AccesGed
         return EnfantsVisibles(dossier, domaines, ajouts, masques, recette).Count > 0;
     }
 
+    /// <summary>
+    /// Les PIECES rangees sous ce noeud, sous-dossiers compris, dans l'ordre de l'arbre :
+    /// celles que le login a le droit de voir, les ajouts compris (pieces creees, jointes),
+    /// les elements supprimes (masques) exclus. Le mode tache n'y entre pas : imprimer un
+    /// dossier, c'est imprimer tout ce qu'il range (_Print recursif de RIG v2), et la carte
+    /// annonce ce meme nombre. Une piece n'en range aucune.
+    /// </summary>
+    public static IEnumerable<NoeudGed> PiecesSous(
+        NoeudGed dossier, IReadOnlyCollection<string> domaines,
+        IReadOnlyDictionary<NoeudGed, List<NoeudGed>>? ajouts = null,
+        IReadOnlyCollection<NoeudGed>? masques = null)
+    {
+        foreach (var e in EnfantsVisibles(dossier, domaines, ajouts, masques))
+        {
+            if (e.EstPiece) yield return e;
+            else foreach (var p in PiecesSous(e, domaines, ajouts, masques)) yield return p;
+        }
+    }
+
+    /// <summary>
+    /// Le NUMERO que porte le libelle d'un dossier (« Depot n A2024/038654 » -> « A2024/038654 »,
+    /// « Instance n 2022J00114 - AMIENS... » -> « 2022J00114 ») : ce que « Copier le n° » met dans le
+    /// presse-papiers (_Copy de RIG v2). Null quand le libelle n'en porte pas (« Pieces jointes »).
+    /// </summary>
+    public static string? NumeroDe(string libelle)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(libelle, @"(?:^|\s)n°?\s+(?<n>[A-Za-z]*\d[\w/.\-]*)",
+                                                            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return m.Success ? m.Groups["n"].Value : null;
+    }
+
     /// <summary>Un ensemble de noeuds qui distingue deux noeuds par leur identite.</summary>
     public static HashSet<NoeudGed> NouveauxMasques()
         => new(ReferenceEqualityComparer.Instance);
@@ -615,6 +648,85 @@ public static class AccesGed
             _ => "pdf"
         };
     }
+}
+
+// ============================================================
+// JOINDRE UN FICHIER a l'affaire (plan « Vue du dossier = coeur des actions »,
+// lot 4, 20/11/2026 ; RIG v2 : _ImporterPieceAutreSansBordereau). Un PDF ou une
+// image depose sur une carte du classeur, ou choisi par « Joindre un fichier »
+// (web/src/composants/ClasseurArbre.tsx), arrive en base64 par le pont. Son
+// contenu est ecrit a cote du fichier d'etat (AccueilEtat.DossierPiecesJointes),
+// un sous-dossier par affaire, et la piece rejoint les AJOUTS de l'arbre : elle
+// est retenue par PersistanceGed comme un element cree a la main. La page la lit
+// par un second hote virtuel (Pont/PageWeb.cs) : son Fichier est une adresse
+// complete, pas un chemin sous wwwroot.
+// ============================================================
+// fix-ok: ajout demande (lot 4, pas un correctif) — trois retouches : PiecesSous/NumeroDe, cette classe, et « using System.IO » (un projet WPF n'importe pas System.IO d'office ; TextePieces.cs fait de meme).
+public static class PiecesJointes
+{
+    /// <summary>L'hote virtuel qui sert le dossier des pieces jointes a la page (Pont/PageWeb.cs).</summary>
+    public const string Hote = "pieces.rigv3.example";
+
+    /// <summary>Les types acceptes et le debut de leur contenu. La page applique la MEME regle
+    /// avant d'envoyer (refusFichier, ClasseurArbre.tsx) ; ici, elle garde ce qu'on ecrit.</summary>
+    private static readonly (string Extension, byte[] Signature)[] Types =
+    [
+        ("PDF", "%PDF"u8.ToArray()),
+        ("JPG", [0xFF, 0xD8, 0xFF]),
+        ("JPEG", [0xFF, 0xD8, 0xFF]),
+        ("PNG", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+    ];
+
+    /// <summary>Le dossier des pieces jointes qui va avec ce fichier d'etat : « accueil.json »
+    /// -> « accueil-pieces », a cote. Une copie des reglages (RIGV3_ETAT) a donc les siennes.</summary>
+    public static string DossierPour(string fichierEtat)
+        => Path.Combine(Path.GetDirectoryName(Path.GetFullPath(fichierEtat)) ?? ".",
+                        Path.GetFileNameWithoutExtension(fichierEtat) + "-pieces");
+
+    /// <summary>Pourquoi ce fichier n'est pas joint ; null s'il l'est.</summary>
+    public static string? Refus(string nom, byte[] contenu)
+    {
+        var extension = Path.GetExtension(nom).TrimStart('.').ToUpperInvariant();
+        var type = Types.FirstOrDefault(t => t.Extension == extension);
+        if (type.Extension is null)
+            return $"« {nom} » n'est pas joint : seuls les PDF et les images JPG ou PNG sont acceptes.";
+        if (contenu.Length == 0) return $"« {nom} » est vide : il n'est pas joint.";
+        if (!contenu.AsSpan().StartsWith(type.Signature))
+            return $"« {nom} » n'est pas un vrai {(extension == "JPEG" ? "JPG" : extension)} : il n'est pas joint.";
+        return null;
+    }
+
+    /// <summary>
+    /// Ecrit le fichier dans le dossier de l'affaire, sous un nom neuf (deux depots du meme
+    /// fichier ne s'ecrasent pas), et rend la PIECE a poser dans l'arbre : son libelle est le
+    /// nom du fichier, sa date celle du jour. Un fichier refuse (Refus) est une erreur : la
+    /// page ne l'envoie pas.
+    /// </summary>
+    public static NoeudGed Ranger(string dossierPieces, string affaire, string nom, byte[] contenu, DateTime jour)
+    {
+        nom = Path.GetFileName(nom);
+        if (Refus(nom, contenu) is { } refus) throw new InvalidOperationException(refus);
+        var extension = Path.GetExtension(nom).TrimStart('.').ToUpperInvariant();
+        var sousDossier = string.Concat(affaire.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+        var fichier = Guid.NewGuid().ToString("N") + "." + extension.ToLowerInvariant();
+        Directory.CreateDirectory(Path.Combine(dossierPieces, sousDossier));
+        File.WriteAllBytes(Path.Combine(dossierPieces, sousDossier, fichier), contenu);
+        var libelle = Path.GetFileNameWithoutExtension(nom).Trim();
+        return new NoeudGed(libelle.Length > 0 ? libelle : "Piece jointe", "piece",
+                            jour.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture),
+                            Pages(contenu, extension), extension, Origine, "", [], "",
+                            $"https://{Hote}/{Uri.EscapeDataString(sousDossier)}/{fichier}");
+    }
+
+    /// <summary>L'origine d'une piece jointe, montree avec elle.</summary>
+    public const string Origine = "Piece jointe";
+
+    /// <summary>Le nombre de pages : une image en a une ; un PDF, ses objets « /Type /Page »
+    /// (0 quand ils sont compresses : le classeur n'affiche alors pas de nombre).</summary>
+    private static int Pages(byte[] contenu, string extension)
+        => extension != "PDF" ? 1
+           : System.Text.RegularExpressions.Regex.Matches(System.Text.Encoding.Latin1.GetString(contenu),
+                                                          @"/Type\s*/Page(?![a-zA-Z])").Count;
 }
 
 // ============================================================

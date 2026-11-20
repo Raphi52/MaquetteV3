@@ -398,4 +398,15 @@ export interface EnvoiMailVue {
 }
 export interface NouveauVue { cible: string, natures: NatureVue[] }
 export interface NatureVue { code: string, titre: string, extension: string }
-export interface MenuNoeudVue { titre: string, x: number, y: number, estPiece: boolean }
+/** Le menu du clic droit (Pont/PlanTravailVue.cs, MenuNoeudVue). */
+export interface MenuNoeudVue {
+  titre: string
+  x: number
+  y: number
+  estPiece: boolean
+  /** Un dossier : les pieces qu'il range, sous-dossiers compris ; 0 pour une piece ou une fiche. */
+  pieces: number
+  /** Ce que « Copier » met dans le presse-papiers : le numero d'un dossier numerote, sinon le libelle. */
+  copie: string
+  copieNumero: boolean
+}

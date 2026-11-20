@@ -213,7 +213,13 @@ public sealed record EnvoiMailVue(string Libelle, string[] Destinataires, string
                                   string Corps, string Destinataire, bool PeutEnvoyer);
 public sealed record NouveauVue(string Cible, NatureVue[] Natures);
 public sealed record NatureVue(string Code, string Titre, string Extension);
-public sealed record MenuNoeudVue(string Titre, double X, double Y, bool EstPiece);
+/// <summary>Le menu du clic droit sur un noeud du classeur (SessionPlanTravail.VueMenuNoeud).</summary>
+/// <param name="Pieces">Un dossier : les pieces qu'il range, sous-dossiers compris (« Imprimer », « Envoyer
+/// par mail » les annoncent) ; 0 pour une piece ou une fiche.</param>
+/// <param name="Copie">Ce que « Copier » met dans le presse-papiers, joue par la page : le numero d'un
+/// dossier numerote (<paramref name="CopieNumero"/>), sinon le libelle.</param>
+public sealed record MenuNoeudVue(string Titre, double X, double Y, bool EstPiece,
+                                  int Pieces, string Copie, bool CopieNumero);
 
 public sealed partial class SessionPlanTravail
 {
@@ -275,9 +281,7 @@ public sealed partial class SessionPlanTravail
                 ? new NouveauVue(Libelle(DossierCible),
                                  AccesGed.Natures.Select(n => new NatureVue(n.Code, n.Titre, n.Extension)).ToArray())
                 : null,
-            MenuNoeud is not null
-                ? new MenuNoeudVue(Libelle(MenuNoeud), MenuX, MenuY, MenuNoeud.EstPiece)
-                : null,
+            MenuNoeud is not null ? VueMenuNoeud(MenuNoeud) : null,
             Pagination,
             Defilement,
             VuePalette());
@@ -911,6 +915,17 @@ public sealed partial class SessionPlanTravail
             case "menuReplier": if (MenuNoeud is { } mp) ToutReplier(mp); break;
             case "menuDupliquer": if (MenuNoeud is { } mu) Dupliquer(mu); break;
             case "menuSupprimer": if (MenuNoeud is { } ms) SupprimerNoeud(ms); break;
+            // Les pieces du classeur (lot 4) : imprimer ou envoyer une piece ou un dossier entier,
+            // l'ouvrir dans une fenetre ; « Copier » se joue dans la page (MenuNoeudVue.Copie).
+            case "menuImprimer": if (MenuNoeud is { } mi) ImprimerNoeud(mi); break;
+            case "menuEnvoyer": if (MenuNoeud is { } me) EnvoyerNoeud(me); break;
+            case "menuFenetre": if (MenuNoeud is { } mf) OuvrirNoeudDansUneFenetre(mf); break;
+            case "arbreJoindre":
+            {
+                var g = Lire<GesteJoindreFichier>(valeur);
+                if (NoeudDe(g.Id) is { } cible) JoindreFichier(cible, g.Nom, Convert.FromBase64String(g.Contenu));
+                break;
+            }
 
             default: throw new InvalidOperationException($"Geste inconnu du plan de travail : {geste}.");
         }
