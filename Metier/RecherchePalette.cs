@@ -198,6 +198,37 @@ public static class RecherchePalette
     public static bool Attribuable(LigneTravail l, string moi)
         => l.Nature == "dem" && l.EnCours && l.Qui != moi;
 
+    /// <summary>
+    /// « SUR CE DOSSIER » (plan « Vue du dossier = coeur des actions », lot 5, 20/11/2026) :
+    /// les actions de la barre de l'affaire ouverte que la palette propose en tete, pour ce
+    /// qui est tape. Rien de tape : toutes, dans l'ordre du catalogue. Sinon, chaque mot doit
+    /// se retrouver dans le libelle ou dans le verbe (« fac » trouve « Factures » et, par son
+    /// verbe Facturer, « Encaissements ») ; une seule lettre suffit, comme la touche. Le
+    /// libelle passe avant le verbe : d'abord un mot du libelle qui COMMENCE par ce qui est
+    /// tape, puis un libelle qui le contient, puis le verbe seul ; a egalite, l'ordre du
+    /// catalogue.
+    /// </summary>
+    public static ActionDossier[] Actions(string texte, IEnumerable<ActionDossier> actions)
+    {
+        var mots = Mots(texte);
+        if (mots.Count == 0) return [.. actions];
+        int? Rang(ActionDossier a)
+        {
+            var libelle = Plier(a.Libelle);
+            var verbe = Plier(a.Verbe);
+            if (!mots.All(m => libelle.Contains(m, StringComparison.Ordinal) || verbe.Contains(m, StringComparison.Ordinal)))
+                return null;
+            if (Regex.Split(a.Libelle, @"[^\p{L}\p{N}]+").Select(Plier).Any(w => w.StartsWith(mots[0], StringComparison.Ordinal)))
+                return 0;
+            return mots.All(m => libelle.Contains(m, StringComparison.Ordinal)) ? 1 : 2;
+        }
+        // OrderBy est stable : a rang egal, l'ordre du catalogue (celui de la barre).
+        return [.. actions.Select(a => (Action: a, Rang: Rang(a)))
+                          .Where(x => x.Rang is not null)
+                          .OrderBy(x => x.Rang)
+                          .Select(x => x.Action)];
+    }
+
     /// <summary>Les lignes que garde un filtre de « Mon travail ».</summary>
     public static IEnumerable<LigneTravail> Filtrer(IEnumerable<LigneTravail> lignes, string filtre, string moi)
         => filtre switch

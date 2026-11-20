@@ -127,9 +127,11 @@ export function Application({ vue, geste, plan }: ProprietesApplication) {
         <Procedure key={p.code} proc={p} plan={gestePlan} cachee={p.code !== v.proc?.code} />
       ))}
       {/* VISIONNEUSE DOCUMENTAIRE (esprit VGED) */}
+      {/* Les raccourcis d'une lettre de l'affaire ne jouent que si rien n'est ouvert par-dessus. */}
       {v.dossier && (
         <Visionneuse dossier={v.dossier} pagination={v.pagination} defilement={v.defilement}
-                     defilementJoue={defilementJoue} plan={gestePlan} />
+                     defilementJoue={defilementJoue} plan={gestePlan}
+                     clavier={!(v.palette || v.impression || v.envoiMail || v.nouveau || v.menuNoeud)} />
       )}
       {v.impression && <Impression vue={v.impression} plan={gestePlan} />}
       {v.envoiMail && <EnvoiMail vue={v.envoiMail} plan={gestePlan} />}

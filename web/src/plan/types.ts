@@ -56,6 +56,23 @@ export interface PaletteVue {
   depots: DepotPaletteVue[]
   /** Ce que le dernier « Joindre a ce depot » a fait (page seule). */
   avis: string | null
+  /** « Sur ce dossier » : les actions de la barre de l'affaire ouverte pour ce qui est tape,
+   *  en tete (RecherchePalette.Actions) ; vide hors affaire. Entree joue « actionDossier ». */
+  actions: ActionPaletteVue[]
+}
+/** Une action de la barre du dossier proposee par la palette (Pont/PlanTravailPalette.cs). */
+export interface ActionPaletteVue {
+  code: string
+  /** Son groupe dans la barre (« Facturer »). */
+  verbe: string
+  libelle: string
+  /** Sa lettre : hors de la palette, elle la joue aussi. */
+  touche: string
+  detail: string
+  /** Elle ouvre un ecran dans un onglet « pour ce dossier ». */
+  ecran: boolean
+  /** Le texte qu'elle copie, joue par la page ; nul sinon. */
+  copie: string | null
 }
 export interface DepotPaletteVue { libelle: string, chemin: string[], lieu: string, pieces: string[], choisi: boolean }
 export interface EcranPaletteVue { code: string, libelle: string }

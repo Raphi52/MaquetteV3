@@ -93,6 +93,21 @@ describe('Application : les gestes du plan de travail', () => {
     expect(gestes()).toEqual([['echap', null, 1]])
   })
 
+  it('liste des points a corriger ouverte : Echap la referme SEULE, l\'affaire reste ouverte', () => {
+    // Defaut vu au lot 1 du plan « Vue du dossier » : Echap fermait toute l'affaire.
+    const { container, gestes } = rendre(vueApplication({ dossier: dossier() }))
+    // Les etapes remontent leur etape visible au montage : seul Echap est lu ici.
+    const echaps = () => gestes().filter(([nom]) => nom === 'echap').length
+    const liste = container.querySelector<HTMLDetailsElement>('.rig-vged__defauts details')!
+    liste.open = true
+    fireEvent.keyDown(liste.querySelector('summary')!, { key: 'Escape' })
+    expect(liste.open).toBe(false)
+    expect(echaps()).toBe(0)
+    // Refermee, Echap retrouve son sens : fermer l'affaire.
+    fireEvent.keyDown(liste.querySelector('summary')!, { key: 'Escape' })
+    expect(echaps()).toBe(1)
+  })
+
   it('les gestes de l\'accueil passent par le rappel « geste », sans numero', () => {
     const { container, geste, plan } = rendre(vueApplication({ barre: true, accueil: vuePlan() }))
     fireEvent.click(container.querySelector('.rig-menu__replier')!)
