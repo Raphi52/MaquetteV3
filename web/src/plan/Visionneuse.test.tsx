@@ -24,7 +24,8 @@ describe('Visionneuse : entete, fiche sommaire en puces, points a corriger', () 
     const entete = container.querySelector('.rig-vged > .rig-vged__entete')!
     expect(morceaux(entete)).toEqual(['<button>', ' ', '<span>', ' ', '<div>', '<div>', '<button>'])
     expect(entete.children[1]!.className).toBe('rig-filet-v rig-filet-v--alerte')
-    expect(morceaux(entete.querySelector('.rig-vged__titre')!)).toEqual(['<b>', ' ', '<span>'])
+    // Le numero est un bouton : un clic le copie (barre d'actions du dossier, 20/11/2026).
+    expect(morceaux(entete.querySelector('.rig-vged__titre')!)).toEqual(['<button>', ' ', '<span>'])
     expect(entete.querySelector('.rig-vged__titre')!.textContent).toBe('004176 Modification - SCI DU PARC')
     expect(entete.lastElementChild!.getAttribute('aria-label')).toBe("Fermer l'affaire")
   })

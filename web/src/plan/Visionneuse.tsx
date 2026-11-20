@@ -13,6 +13,7 @@ import type { CSSProperties, MutableRefObject } from 'react'
 import { ClasseurArbre } from '../composants/ClasseurArbre'
 import { FicheInformationsDossier } from '../composants/FicheInformationsDossier'
 import { Saisie } from '../session'
+import { ActionsDossier, useCopie } from './ActionsDossier'
 import { Apercu } from './Apercu'
 import { Etapes } from './Etapes'
 import { SuiviDossier } from './Suivi'
@@ -64,6 +65,9 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
     document.addEventListener('pointerdown', fermer)
     return () => document.removeEventListener('pointerdown', fermer)
   }, [])
+  // Le numero et la puce SIREN se copient d'un clic, comme les actions « Copier » de
+  // la barre ; un avis bref le confirme a la suite des puces.
+  const [avisCopie, copier] = useCopie()
   return (
     <div className="rig-vged">
       <div className="rig-vged__entete">
@@ -83,18 +87,28 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
             FLUX : chaque champ VIDE disparait, libelle compris. */}
         <div className="rig-vged__identite">
           <div className="rig-vged__titre">
-            <b className="rig-vged__numero">{d.numero}</b>{' '}<span>{d.objet}</span>
+            <button type="button" className="rig-vged__numero" title="Copier le n°"
+                    onClick={() => copier(d.numero, 'n°')}>{d.numero}</button>{' '}<span>{d.objet}</span>
           </div>
           <div className="rig-vged__puces" aria-label="Fiche sommaire">
-            {s.champs.map((c, i) => (
-              <span key={i} className="rig-vged__puce">
+            {s.champs.map((c, i) => {
+              const contenu = <>
                 <span className="rig-vged__puce-libelle">{c.libelle}</span>{' '}
                 <span className={'rig-vged__puce-valeur' + (c.mono ? ' rig-vged__puce-valeur--mono' : '')}>{c.valeur}</span>
-              </span>
-            ))}
+              </>
+              return c.libelle === 'SIREN'
+                ? <button key={i} type="button" className="rig-vged__puce rig-vged__puce--copie" title="Copier le SIREN"
+                          onClick={() => copier(c.valeur, 'SIREN')}>{contenu}</button>
+                : <span key={i} className="rig-vged__puce">{contenu}</span>
+            })}
             {s.mention.length > 0 && <span className="rig-vged__mention">{s.mention}</span>}
+            {avisCopie && <span className="rig-vged__copie" role="status">{avisCopie}</span>}
           </div>
         </div>
+        {/* LA BARRE D'ACTIONS (plan « Vue du dossier = coeur des actions », 20/11/2026) :
+            des boutons par verbe, replie en menu si la place manque ; les ecrans s'ouvrent
+            dans un onglet « pour ce dossier ». */}
+        <ActionsDossier verbes={d.actions} plan={plan} copier={copier} />
         {d.boutonDocument && (
           <button className="rig-bouton rig-bouton--plat" title="Reafficher le document a droite"
                   onClick={() => plan('afficherDocument')}>Document</button>

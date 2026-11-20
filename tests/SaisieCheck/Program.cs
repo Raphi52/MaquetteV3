@@ -410,13 +410,19 @@ Exiger(Regex.IsMatch(vue2, @"ActionsDe[\s\S]{0,500}?d\.Type == ""JUD"""),
     "les actions suivent le domaine de l affaire (RCS ou judiciaire)");
 
 // Le retour d affaire : sans lui, cliquer une action FERMAIT l affaire.
+// Depuis le 20/11/2026, la barre d actions du dossier (rig-vged__agir, Pont/PlanTravailActions.cs)
+// ramene ses actions dans la vue : ses ecrans s ouvrent « pour ce dossier », dans un onglet
+// qui retient l affaire et y ramene. La memoire est PAR ONGLET (AffaireDesEcrans) : une
+// valeur unique n etait consommee que si plus rien n etait montre, jamais depuis que
+// l affaire a son propre onglet. Le parcours est joue par tests/PlanTravailCheck (15).
 Exiger(Regex.IsMatch(vue2, @"private void OuvrirProcDepuisAffaire\("),
     "le chemin qui garde le contexte d une affaire reste disponible");
-Exiger(Regex.IsMatch(vue2, @"OuvrirProcDepuisAffaire[\s\S]{0,300}?RetourAffaire = depuis;"),
-    "l affaire d origine est memorisee au lancement du traitement");
-Exiger(Regex.IsMatch(vue2, @"private void FermerProc\(\)[\s\S]{0,400}?DossierOuvert = RetourAffaire;"),
-    "fermer le traitement ROUVRE l affaire d ou il a ete lance");
-Exiger(Regex.IsMatch(vue2, @"FermerProc\(\)[\s\S]{0,400}?RetourAffaire = null;"),
+Exiger(Regex.IsMatch(vue2, @"OuvrirProcDepuisAffaire[\s\S]{0,300}?AffaireDesEcrans\[proc\.Code\] = depuis;"),
+    "l affaire d origine est memorisee, pour l onglet de l ecran, au lancement du traitement");
+Exiger(Regex.IsMatch(vue2, @"private void FermerOnglet\(string code\)[\s\S]{0,700}?AffaireDesEcrans\.TryGetValue\(code[\s\S]{0,300}?RevenirAuDossier\(retour")
+       && Regex.IsMatch(vue2, @"private void FermerProc\(\)[\s\S]{0,200}?FermerOnglet\(courant\.Code\)"),
+    "fermer le traitement (sa croix, Echap) ROUVRE l affaire d ou il a ete lance");
+Exiger(Regex.IsMatch(vue2, @"private void FermerOnglet\(string code\)[\s\S]{0,700}?AffaireDesEcrans\.Remove\(code\);"),
     "le retour d affaire est consomme une fois, pas rejoue indefiniment");
 
 // --- 13. La colonne de droite sait afficher le FORMULAIRE, pas seulement le

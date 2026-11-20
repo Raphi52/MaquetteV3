@@ -757,7 +757,12 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         GuideVisible = false;
     }
 
-    private void OuvrirImpression() => ImpressionOuverte = true;
+    private void OuvrirImpression()
+    {
+        // La piece ouverte, sauf si la barre d'actions vise autre chose ensuite (ImpressionDe).
+        ImpressionDe = null;
+        ImpressionOuverte = true;
+    }
 
     /// <summary>
     /// « Editer » depuis la visionneuse : la piece reste affichee a droite,
@@ -870,6 +875,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     {
         MailDestinataire = "";
         MailMessageIndex = 0;
+        // La piece ouverte, sauf si la barre d'actions vise le dossier entier ensuite (EnvoiDe).
+        EnvoiDe = null;
         EnvoiMailOuvert = true;
     }
 
@@ -1646,9 +1653,13 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private void FermerOnglet(string code)
     {
         var fenetre = FenetresVues.FirstOrDefault(f => f.Code == code);
+        // Un ecran ouvert POUR une affaire, ferme sous les yeux, ramene a elle
+        // (barre d'actions du dossier, PlanTravailActions.cs).
+        var retour = Onglets.Montre?.Code == code && AffaireDesEcrans.TryGetValue(code, out var depuis) ? depuis : null;
+        AffaireDesEcrans.Remove(code);
         Onglets.Fermer(code);
-        // L'onglet voisin prend la place : une affaire s'y montre, un ecran la quitte.
-        SuivreOngletActif();
+        // Sinon l'onglet voisin prend la place : une affaire s'y montre, un ecran la quitte.
+        if (retour is null || !RevenirAuDossier(retour, rouvrir: false)) SuivreOngletActif();
         // Fermer l onglet ferme AUSSI sa fenetre : sinon la fenetre resterait
         // orpheline, sans onglet pour la retrouver.
         fenetre?.Close();
@@ -1759,18 +1770,23 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         SuivreOngletActif();
     }
 
-    /// <summary>L'affaire depuis laquelle un traitement a ete lance. Sans elle,
-    /// cliquer une action du contexte FERMAIT l'affaire : on repartait de zero,
-    /// exactement ce que la navigation par objet cherche a supprimer.</summary>
-    private Dossier? RetourAffaire;
+    /// <summary>L'affaire depuis laquelle chaque traitement a ete lance, PAR ONGLET. Sans
+    /// elle, cliquer une action du contexte FERMAIT l'affaire : on repartait de zero,
+    /// exactement ce que la navigation par objet cherche a supprimer. Une seule valeur
+    /// pour toute la session ne suffit plus depuis que l'affaire a son onglet (19/11/2026) :
+    /// elle n'etait consommee que si plus rien n'etait montre, et restait sinon en
+    /// attente d'un autre ecran (barre d'actions du dossier, 20/11/2026).</summary>
+    // fix-ok: l'ancien FermerProc ne rendait RetourAffaire que si Onglets.Montre etait nul,
+    // or l'onglet de l'affaire reste dans la barre : la valeur n'etait jamais consommee.
+    private readonly Dictionary<string, Dossier> AffaireDesEcrans = new(StringComparer.Ordinal);
 
-    /// <summary>Ouvre un traitement SANS perdre l'affaire : elle se rouvre d'elle-meme
-    /// quand on referme l'ecran.</summary>
+    /// <summary>Ouvre un traitement SANS perdre l'affaire : l'onglet de l'ecran la retient
+    /// (sa puce « ← Dossier » y ramene) et la remontre quand on le ferme.</summary>
     private void OuvrirProcDepuisAffaire(Proc proc)
     {
         var depuis = DossierOuvert;
         OuvrirProc(proc);
-        RetourAffaire = depuis;
+        if (depuis is not null) AffaireDesEcrans[proc.Code] = depuis;
     }
 
     /// <summary>
@@ -1786,17 +1802,11 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         RetenirAgencement();
     }
 
+    /// <summary>Echap sur un ecran : comme la croix de son onglet -- l'onglet voisin prend
+    /// la place, sauf pour un ecran ouvert depuis une affaire, qui ramene a elle.</summary>
     private void FermerProc()
     {
-        if (Onglets.Actuel is { } courant) Onglets.Fermer(courant.Code);
-        // L'onglet voisin prend la place : celui d'une affaire la montre.
-        SuivreOngletActif();
-        RetenirAgencement();
-        if (Onglets.Montre is null && RetourAffaire is not null)
-        {
-            DossierOuvert = RetourAffaire;
-            RetourAffaire = null;
-        }
+        if (Onglets.Actuel is { } courant) FermerOnglet(courant.Code);
     }
 
     /// <summary>Les traitements proposes DANS l'affaire ouverte. L'utilisateur n'a

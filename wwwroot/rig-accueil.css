@@ -4172,6 +4172,111 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   border-color: color-mix(in srgb, var(--rig-alerte) 65%, transparent);
 }
 
+/* ---- Le numero et la puce SIREN se copient d'un clic (barre d'actions du dossier, 20/11/2026) ---- */
+.rig-vged__titre > .rig-vged__numero {
+  background: none; border: 0; padding: 0 2px; margin: 0 -2px; border-radius: 4px; cursor: copy;
+}
+.rig-vged__puce--copie { font-family: inherit; cursor: copy; }
+.rig-vged__titre > .rig-vged__numero:hover,
+.rig-vged__puce--copie:hover { box-shadow: inset 0 -1px 0 var(--rig-or-clair); }
+.rig-vged__puce--copie:hover { border-color: var(--rig-or-clair); }
+.rig-vged__copie {
+  padding: 1px 8px; border-radius: 999px; font-size: 11px; line-height: 1.5; font-weight: 600;
+  color: var(--rig-rail-texte); border: 1px solid var(--rig-or-clair);
+  background: color-mix(in srgb, var(--rig-or-clair) 18%, transparent);
+}
+
+/* ---- LA BARRE D'ACTIONS (plan « Vue du dossier = coeur des actions », 20/11/2026) :
+   en pilule sur la proue, entre l'identite et « Document ». Chaque verbe y est un
+   groupe de BOUTONS ; celui qui ne tient plus se replie en menu deroulant
+   (ActionsDossier.tsx mesure la place). Le menu reprend la liste des points a corriger. ---- */
+.rig-vged__agir {
+  position: relative; /* bloc de la couche de mesure */
+  flex: none; display: flex; align-items: center; gap: 2px; padding: 2px;
+  border-radius: 999px; border: 1px solid var(--rig-rail-trait); background: var(--rig-rail-trait-faible);
+}
+/* Un verbe deplie : sa legende en petites capitales, puis ses boutons. Un trait le
+   separe de ce qui le precede et de ce qui le suit. */
+.rig-vged__agir-groupe { display: flex; align-items: center; gap: 1px; padding: 0 2px 0 8px; white-space: nowrap; }
+.rig-vged__agir-groupe:not(:first-child),
+.rig-vged__agir-groupe + .rig-vged__agir-verbe { border-left: 1px solid var(--rig-rail-trait); }
+.rig-vged__agir-legende {
+  padding-right: 5px; font: 700 9.5px/1 var(--rig-font); letter-spacing: .09em; text-transform: uppercase;
+  color: var(--rig-rail-texte-3);
+}
+.rig-vged__agir-bouton {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; white-space: nowrap; cursor: pointer;
+  border-radius: 999px; border: 1px solid transparent; background: none;
+  font: 500 var(--rig-fs-dense)/1.3 var(--rig-font); color: var(--rig-rail-texte);
+}
+.rig-vged__agir-bouton:hover { background: var(--rig-rail-trait-faible); border-color: var(--rig-rail-trait); }
+.rig-vged__agir-bouton:focus-visible { outline: 2px solid var(--rig-or-clair); outline-offset: 1px; }
+.rig-vged__agir-bouton svg {
+  flex: none; width: 11px; height: 11px; fill: none; stroke: currentColor; opacity: .6;
+  stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+}
+/* La couche de mesure : les deux formes de chaque verbe, a leur largeur naturelle,
+   invisibles et sans place dans la page (la boite 0 x 0 coupe tout debordement). */
+.rig-vged__agir-mesure { position: absolute; left: 0; top: 0; width: 0; height: 0; overflow: hidden; visibility: hidden; pointer-events: none; }
+.rig-vged__agir-mesure > div { display: flex; align-items: center; width: max-content; }
+.rig-vged__agir-verbe { position: relative; }
+.rig-vged__agir-titre {
+  display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px 3px 11px;
+  border-radius: 999px; list-style: none; cursor: pointer; user-select: none; white-space: nowrap;
+  font: 600 var(--rig-fs-dense)/1.3 var(--rig-font); color: var(--rig-rail-texte-2);
+}
+.rig-vged__agir-titre::-webkit-details-marker { display: none; }
+.rig-vged__agir-titre:hover,
+.rig-vged__agir-verbe[open] > .rig-vged__agir-titre { color: var(--rig-rail-texte); background: var(--rig-rail-trait-faible); }
+.rig-vged__agir-verbe[open] > .rig-vged__agir-titre { box-shadow: inset 0 0 0 1px var(--rig-or-clair); }
+.rig-vged__agir-titre:focus-visible { outline: 2px solid var(--rig-or-clair); outline-offset: 1px; }
+.rig-vged__agir-titre svg {
+  width: 12px; height: 12px; fill: none; stroke: currentColor; opacity: .7;
+  stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+}
+.rig-vged__agir-verbe[open] .rig-vged__agir-titre svg { transform: rotate(180deg); }
+.rig-vged__agir-menu {
+  position: absolute; left: 0; top: calc(100% + 6px); z-index: 30;
+  display: flex; flex-direction: column; gap: 1px; min-width: 250px; padding: 6px;
+  border-radius: var(--rig-radius-sm); border: 1px solid var(--rig-bord);
+  background: var(--rig-surface); box-shadow: var(--rig-ombre);
+}
+/* Les deux derniers verbes deroulent vers la gauche : la proue s'arrete au bord de la fenetre. */
+.rig-vged__agir-verbe--droite > .rig-vged__agir-menu { left: auto; right: 0; }
+.rig-vged__agir-action {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: none; border: none; border-radius: 6px; text-align: left; cursor: pointer;
+  padding: 5px 6px 5px 10px; color: var(--rig-texte); font: var(--rig-fs-dense)/1.4 var(--rig-font);
+}
+.rig-vged__agir-action:hover,
+.rig-vged__agir-action:focus-visible { background: var(--rig-survol-ligne); outline: none; }
+.rig-vged__agir-libelle { flex: 1 1 auto; white-space: nowrap; }
+.rig-vged__agir-action svg {
+  flex: none; width: 13px; height: 13px; fill: none; stroke: var(--rig-texte-3);
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.rig-vged__agir-touche {
+  flex: none; min-width: 18px; padding: 0 4px; box-sizing: border-box; border-radius: 4px; text-align: center;
+  font: 600 10px/16px var(--rig-font-mono); color: var(--rig-texte-3);
+  background: var(--rig-fond-2); border: 1px solid var(--rig-bord-faible);
+}
+
+/* ---- L'ecran ouvert depuis une affaire : la puce « ← Dossier » qui y ramene ---- */
+.rig-proc__dossier { flex: none; display: flex; align-items: center; padding: 6px var(--rig-esp-4) 0; }
+.rig-proc__dossier-retour {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%; cursor: pointer;
+  padding: 2px 12px 2px 6px; border-radius: 999px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font: var(--rig-fs-dense)/1.5 var(--rig-font); color: var(--rig-texte-2);
+  background: var(--rig-surface); border: 1px solid var(--rig-bord);
+}
+.rig-proc__dossier-retour:hover { color: var(--rig-texte); border-color: var(--rig-or); }
+.rig-proc__dossier-retour b { font: 600 12px var(--rig-font-mono); color: var(--rig-texte); }
+.rig-proc__dossier-retour span { font-weight: 600; }
+.rig-proc__dossier-retour svg {
+  flex: none; width: 14px; height: 14px; fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
 /* ---- Le corps : des cartes sur le fond, separees par un vide ---- */
 .rig-vged__corps { padding: 10px 12px 12px; background: var(--rig-fond); }
 .rig-vged__arbre,
