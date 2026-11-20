@@ -5,7 +5,8 @@
 
 import type { LigneArbreVue } from '../composants/ClasseurArbre'
 import type {
-  ApercuVue, DossierVue, EtapesVue, PageEtapeVue, PaletteVue, PieceHistoriqueVue, ProcVue, TacheVue, VueApplication,
+  ActionDossierVue, ApercuVue, DossierVue, EtapesVue, PageEtapeVue, PaletteVue, PieceHistoriqueVue, ProcVue, TacheVue,
+  VerbeActionsVue, VueApplication,
 } from '../plan/types'
 
 /** Une palette Ctrl K vide (Pont/PlanTravailPalette.cs), avant de taper. */
@@ -31,7 +32,7 @@ export function ligneArbre(id: string, texte: string, enfants: LigneArbreVue[] =
 export function proc(partiel: Partial<ProcVue> = {}): ProcVue {
   return {
     code: 'FACTURES', libelle: 'Factures',
-    ecran: { valides: [], sirenDemande: null, cleOuverture: 'ouverture-vierge', lot: null, motif: 'Motif lu dans le menu.', recherche: null },
+    ecran: { valides: [], sirenDemande: null, cleOuverture: 'ouverture-vierge', lot: null, motif: 'Motif lu dans le menu.', recherche: null, dossier: null },
     ...partiel,
   }
 }
@@ -127,9 +128,53 @@ export function dossier(partiel: Partial<DossierVue> = {}): DossierVue {
     apercu: { detachees: 0, apercu: apercu() }, voile: false,
     historique: historique(),
     arbreReplie: false, chemin: ['004176', 'Dossier RCS', 'Statuts signes'], pieces: 42,
-    fil: [], suiviReplie: false, triClasseur: 'date', sortie: false,
+    fil: [], suiviReplie: false, triClasseur: 'date', sortie: false, actions: [],
     ...partiel,
   }
+}
+
+/** Une action de la barre du dossier (Pont/PlanTravailActions.cs : VueActions). */
+function action(code: string, libelle: string, touche: string, ecran: boolean, copie: string | null = null): ActionDossierVue {
+  return { code, libelle, touche, detail: libelle + ' (infobulle)', ecran, copie }
+}
+
+/** La barre de l'affaire RCS 004176, telle que la session la rend (Metier/ActionsDossier.cs). */
+export function actionsRcs(): VerbeActionsVue[] {
+  return [
+    { verbe: 'Delivrer', actions: [
+      action('kbis', 'Kbis a jour', 'K', false), action('imprimerKbis', 'Imprimer le Kbis', 'I', false),
+      action('imprimerArborescence', "Imprimer l'arborescence", 'P', false),
+      action('requisitions', 'Requisitions - commande de documents', 'R', true), action('commandesWeb', 'Commandes web', 'W', true),
+    ] },
+    { verbe: 'Enregistrer', actions: [
+      action('demandes', 'Demandes', 'D', true), action('bodacc', 'BODACC', 'B', true),
+      action('cloture', 'Cloture', 'O', true), action('archivage', 'Archivage / radiation', 'A', true),
+    ] },
+    { verbe: 'Facturer', actions: [action('factures', 'Factures', 'F', true), action('encaissements', 'Encaissements', 'E', true)] },
+    { verbe: 'Ecrire', actions: [action('courriers', 'Courriers divers', 'C', true), action('envoyerDossier', 'Envoyer le dossier par mail', 'M', false)] },
+    { verbe: 'Suivre', actions: [
+      action('copierNumero', 'Copier le n°', 'N', false, '004176'), action('copierSiren', 'Copier le SIREN', 'S', false, '812 445 901'),
+      action('verrous', 'Dossiers verrouilles', 'V', true), action('teletransmissions', 'Teletransmissions (EDI)', 'T', true),
+    ] },
+  ]
+}
+
+/** La barre d'une affaire purement judiciaire (2026P00031) : ni Kbis, ni SIREN. */
+export function actionsJud(): VerbeActionsVue[] {
+  return [
+    { verbe: 'Delivrer', actions: [action('imprimerArborescence', "Imprimer l'arborescence", 'P', false)] },
+    { verbe: 'Enregistrer', actions: [action('depotsJudiciaires', 'Depots judiciaires', 'D', true), action('bodacc', 'BODACC', 'B', true)] },
+    { verbe: 'Facturer', actions: [action('factures', 'Factures', 'F', true), action('encaissements', 'Encaissements', 'E', true)] },
+    { verbe: 'Ecrire', actions: [
+      action('courriers', 'Courriers divers', 'C', true), action('redaction', "Redaction d'une decision", 'R', true),
+      action('envoyerDossier', 'Envoyer le dossier par mail', 'M', false),
+    ] },
+    { verbe: 'Suivre', actions: [
+      action('copierNumero', 'Copier le n°', 'N', false, '2026P00031'),
+      action('consultationJudiciaire', 'Consultation judiciaire', 'J', true), action('audiences', 'Audiences', 'U', true),
+      action('gedJudiciaire', 'GED judiciaire', 'G', true), action('verrous', 'Dossiers verrouilles', 'V', true),
+    ] },
+  ]
 }
 
 /** Neuf pieces datees de l'affaire 004176, la plus recente en tete (Pont : VueHistorique). */

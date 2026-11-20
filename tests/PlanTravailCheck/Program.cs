@@ -77,6 +77,31 @@ internal static class Programme
         Exiger(!codeAiguillage.Contains("IleReact") && !Regex.IsMatch(codeAiguillage, @"\.razor|Components/"),
             "l'aiguillage ne repasse par aucune coquille Blazor");
 
+        // --- 0 ter. LE CATALOGUE DE LA BARRE D'ACTIONS DU DOSSIER (Metier/ActionsDossier.cs, plan
+        // « Vue du dossier = coeur des actions », lot 1, 20/11/2026) : un ecran n'y entre que s'il
+        // est REELLEMENT monte par l'aiguillage -- un code qui tomberait sur « ecran a venir »
+        // (EcranNonMaquette, le cas par defaut) ferait une action qui n'agit pas.
+        bool Monte(string code) => Regex.IsMatch(codeAiguillage, $@"case '{Regex.Escape(code)}':\s*return\s*<(?!EcranNonMaquette\b)\w+");
+        var catalogue = ActionsDossier.Catalogue;
+        var ecransDesActions = catalogue.Where(a => a.Ecran is not null).Select(a => a.Ecran!).ToList();
+        var nonMontes = ecransDesActions.Where(c => !Monte(c)).ToList();
+        Exiger(ecransDesActions.Count >= 10 && nonMontes.Count == 0,
+            $"barre du dossier : ses {ecransDesActions.Count} ecrans sont tous montes par l'aiguillage ({string.Join(", ", nonMontes)})");
+        Exiger(Monte("PROC_FACTURE") && !Monte("PROC_CREANCE") && !Monte("PROC_STAT_INCONNU"),
+            "jumeau : le controle reconnait un ecran qui tomberait sur « ecran a venir » (PROC_CREANCE)");
+        Exiger(catalogue.Select(a => a.Code).Distinct().Count() == catalogue.Length
+               && catalogue.All(a => ActionsDossier.Verbes.Contains(a.Verbe) && char.IsAsciiLetterUpper(a.Touche)
+                                     && a.Types.Length > 0 && a.Types.All(t => t is DomaineGed.Rcs or DomaineGed.Judiciaire)
+                                     && !a.Code.Contains("PROC_") && a.Libelle.Length > 0 && a.Detail.Length > 0)
+               && ActionsDossier.Verbes.All(v => catalogue.Any(a => a.Verbe == v)),
+            "barre du dossier : codes neutres et uniques, chaque action sous un des cinq verbes, pour le RCS ou le judiciaire, une lettre");
+        foreach (var type in new[] { DomaineGed.Rcs, DomaineGed.Judiciaire })
+        {
+            var lettres = ActionsDossier.Pour(type).Select(a => a.Touche).ToList();
+            Exiger(lettres.Distinct().Count() == lettres.Count,
+                $"barre du dossier : une lettre par action sur une affaire {type} ({new string(lettres.ToArray())})");
+        }
+
         // Bac a sable : JAMAIS l'etat reel de l'utilisateur.
         var etatAvant = Environment.GetEnvironmentVariable("RIGV3_ETAT");
         var etatBanc = Path.Combine(Path.GetTempPath(), "rigv3-plantravail-" + Guid.NewGuid().ToString("N") + ".json");
@@ -783,5 +808,175 @@ internal static class Programme
             "une tache close ne se rouvre plus : l'affaire s'ouvre entiere");
 
         plan.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        JouerActionsDossier();
+    }
+
+    /// <summary>
+    /// 15. LA BARRE D'ACTIONS DU DOSSIER (plan « Vue du dossier = coeur des actions », lot 1,
+    /// 20/11/2026), sur une session neuve : les actions locales jouees dans la page de
+    /// l'affaire, l'ecran ouvert « pour ce dossier » (son contexte, la puce de retour, sa
+    /// fermeture qui ramene a l'affaire), le tri par type d'affaire, par login, et la
+    /// fenetre d'un onglet sorti.
+    /// </summary>
+    private static void JouerActionsDossier()
+    {
+        var s = new SessionPlanTravail(null, null);
+        s.Initialiser();
+        void Faire(string geste, object? valeur = null) => s.Agir(geste, Valeur(valeur));
+        string[] Codes(VerbeActionsVue[] verbes) => verbes.SelectMany(g => g.Actions).Select(a => a.Code).ToArray();
+        bool Refuse(SessionPlanTravail session, string code)
+        {
+            try { session.Agir("actionDossier", Valeur(code)); return false; }
+            catch (InvalidOperationException) { return true; }
+        }
+        // Les onglets que l'etat du banc a retenus ne comptent pas ici.
+        foreach (var o in s.Vue().Onglets ?? []) Faire("ongletFermer", o.Code);
+
+        Faire("actionDossier", "factures");
+        Exiger(s.Vue() is { Dossier: null, Proc: null, Onglets: null },
+            "sans affaire ouverte (fermee entre le clic et son traitement), une action ne fait rien");
+
+        // --- La barre d'une affaire RCS.
+        Faire("ouvrirNumero", "004176");
+        var v = s.Vue();
+        var barre = v.Dossier!.Actions;
+        var codes = Codes(barre);
+        Exiger(barre.Select(g => g.Verbe).SequenceEqual(ActionsDossier.Verbes),
+            "affaire RCS : la barre montre les cinq verbes, dans l'ordre");
+        Exiger(new[] { "kbis", "imprimerKbis", "imprimerArborescence", "factures", "demandes", "commandesWeb", "bodacc", "envoyerDossier" }.All(codes.Contains)
+               && !codes.Contains("depotsJudiciaires") && !codes.Contains("redaction"),
+            "affaire RCS : le Kbis, les ecrans du RCS et ceux de tous ; aucun ecran reserve au judiciaire");
+        var actions = barre.SelectMany(g => g.Actions).ToDictionary(a => a.Code);
+        Exiger(actions["copierNumero"].Copie == "004176" && actions["copierSiren"].Copie == "812 445 901"
+               && actions.Values.Count(a => a.Copie is not null) == 2
+               && actions["factures"] is { Ecran: true, Libelle: "Factures", Touche: "F" } && actions["kbis"] is { Ecran: false },
+            "les copies portent le numero et le SIREN ; une action d'ecran le dit ; chaque action a sa lettre");
+
+        // --- Les gestes LOCAUX : sans changer d'ecran.
+        var autre = v.Dossier.Historique.First(p => p.Libelle != ArbreDemo.LibelleKbisAJour);
+        Faire("historiqueOuvrir", autre.Id);
+        Faire("fermerApercu");
+        Exiger(s.Vue().Dossier!.Apercu is null, "precondition : une autre piece choisie, la colonne du document fermee");
+        Faire("actionDossier", "kbis");
+        v = s.Vue();
+        Exiger(v.Proc is null && v.Dossier!.Apercu?.Apercu is { Libelle: "Kbis a jour", Kbis: not null }
+               && Ligne(v.Dossier.Arbre, "Kbis a jour") is { Actif: true }
+               && v.Dossier.Historique.Single(p => p.Actif).Libelle == "Kbis a jour",
+            "« Kbis a jour » choisit le Kbis dans l'arbre et le montre dans la colonne du document, rouverte");
+        Faire("historiqueOuvrir", autre.Id);
+        Faire("actionDossier", "imprimerKbis");
+        v = s.Vue();
+        Exiger(v.Impression is { Libelle: "Kbis a jour" } && v.Dossier!.Apercu?.Apercu?.Libelle == "Kbis a jour",
+            "« Imprimer le Kbis » montre le Kbis et ouvre le choix de l'imprimante sur lui");
+        Faire("fermerImpression");
+        Faire("actionDossier", "imprimerArborescence");
+        Exiger(s.Vue().Impression?.Libelle == "Arborescence du dossier 004176",
+            "« Imprimer l'arborescence » ouvre la modale d'impression sur l'arborescence du dossier");
+        Faire("lancerImpression");
+        Exiger(s.Vue().Impression is null && s.Vue().Dossier!.Apercu!.Apercu!.Message.StartsWith("Envoye a "),
+            "l'impression de l'arborescence part et le dit");
+        Faire("imprimer");
+        Exiger(s.Vue().Impression?.Libelle == "Kbis a jour",
+            "jumeau : le bouton Imprimer du document reprend la piece ouverte, pas l'arborescence");
+        Faire("fermerImpression");
+        Faire("actionDossier", "envoyerDossier");
+        var pieces = s.Vue().Dossier!.Pieces;
+        Exiger(s.Vue().EnvoiMail is { PeutEnvoyer: false } envoi && envoi.Libelle == $"Dossier entier 004176 ({pieces} pieces)",
+            $"« Envoyer le dossier par mail » ouvre la modale d'envoi sur le dossier entier ({pieces} pieces)");
+        Faire("destinataire", "greffe.civil@exemple.fr");
+        Faire("envoyerMail");
+        Exiger(s.Vue().EnvoiMail is null && s.Vue().Dossier!.Apercu!.Apercu!.Message.Contains("greffe.civil@exemple.fr"),
+            "le dossier entier part par mail et le dit (maquette)");
+        Faire("envoiMail");
+        Exiger(s.Vue().EnvoiMail?.Libelle == "Kbis a jour", "jumeau : le mail du document reprend la piece ouverte");
+        Faire("fermerMail");
+        Exiger(Refuse(s, "copierSiren") && Refuse(s, "depotsJudiciaires") && Refuse(s, "inconnue")
+               && s.Vue() is { Proc: null, Dossier.Numero: "004176" },
+            "une copie se joue dans la page ; une action d'un autre type d'affaire, ou inconnue, est refusee franchement");
+
+        // --- Un ECRAN ouvert pour ce dossier : son contexte, la puce, la fermeture.
+        Faire("ouvrirCode", "PROC_ENCAISS");
+        Exiger(s.Vue().Proc is { Code: "PROC_ENCAISS", Ecran.Dossier: null },
+            "un ecran ouvert depuis le menu ne porte aucune affaire");
+        Faire("ongletActiver", "AFFAIRE:004176");
+        Faire("actionDossier", "factures");
+        v = s.Vue();
+        Exiger(v.Dossier is null && v.Proc is { Code: "PROC_FACTURE", Libelle: "Factures" } pf
+               && pf.Ecran.Dossier is { Numero: "004176", Siren: "812 445 901", Objet: "Modification - SCI DU PARC", Type: "RCS", Nom: "SCI DU PARC" }
+               && v.Onglets!.Select(o => o.Code).SequenceEqual(new[] { "AFFAIRE:004176", "PROC_ENCAISS", "PROC_FACTURE" })
+               && v.Onglets[2] is { Actif: true, Libelle: "Factures" },
+            "« Factures » ouvre l'ecran dans son onglet, au nom de l'action, avec le contexte de l'affaire (n°, SIREN, objet, type, nom)");
+        Faire("retourDossier");
+        v = s.Vue();
+        Exiger(v.Proc is null && v.Dossier is { Numero: "004176" } && v.Dossier.Apercu?.Apercu?.Libelle == "Kbis a jour"
+               && v.Onglets is { Length: 3 } ot && ot[0].Actif,
+            "la puce « ← Dossier » ramene a l'affaire telle qu'on l'a laissee ; l'onglet de l'ecran reste");
+        Faire("ongletActiver", "PROC_FACTURE");
+        Exiger(s.Vue().Proc?.Ecran.Dossier?.Numero == "004176", "revenu sur son onglet, l'ecran garde son affaire");
+        Faire("ongletFermer", "PROC_FACTURE");
+        v = s.Vue();
+        Exiger(v.Proc is null && v.Dossier?.Numero == "004176"
+               && v.Onglets!.Select(o => o.Code).SequenceEqual(new[] { "AFFAIRE:004176", "PROC_ENCAISS" }) && v.Onglets[0].Actif,
+            "fermer l'onglet de l'ecran ramene a SON affaire, pas a l'onglet voisin (Encaissements)");
+        Faire("ouvrirCode", "PROC_FACTURE");
+        Faire("ongletFermer", "PROC_FACTURE");
+        Exiger(s.Vue() is { Dossier: null, Proc.Code: "PROC_ENCAISS" },
+            "jumeau : le meme ecran ouvert depuis le menu, ferme, laisse la place a l'onglet voisin");
+        Faire("ongletActiver", "AFFAIRE:004176");
+        Faire("actionDossier", "courriers");
+        Exiger(s.Vue().Proc is { Code: "PROC_COURRIER_DIVERS", Ecran.Dossier.Numero: "004176" }, "« Courriers divers » s'ouvre pour l'affaire");
+        Faire("echap");
+        Exiger(s.Vue() is { Proc: null, Dossier.Numero: "004176" } && s.Vue().Onglets!.All(o => o.Code != "PROC_COURRIER_DIVERS"),
+            "Echap sur l'ecran ouvert depuis l'affaire le ferme et y ramene aussi");
+        Faire("actionDossier", "bodacc");
+        Faire("ongletActiver", "PROC_ENCAISS");
+        Faire("ongletFermer", "BODACC");
+        Exiger(s.Vue() is { Dossier: null, Proc.Code: "PROC_ENCAISS" },
+            "un ecran de l'affaire ferme en arriere-plan ne deplace pas la vue");
+        Faire("ongletActiver", "AFFAIRE:004176");
+        Faire("actionDossier", "demandes");
+        Faire("ongletFermer", "AFFAIRE:004176");
+        Exiger(s.Vue().Proc is { Code: "PROC_DEMANDE", Ecran.Dossier.Numero: "004176" },
+            "l'affaire fermee, l'ecran ouvert pour elle garde sa puce");
+        Faire("retourDossier");
+        Exiger(s.Vue().Dossier?.Numero == "004176" && s.Vue().Onglets!.Any(o => o is { Code: "AFFAIRE:004176", Actif: true }),
+            "la puce rouvre l'affaire fermee, dans son onglet");
+        Faire("ongletActiver", "PROC_DEMANDE");
+        Faire("ongletFermer", "AFFAIRE:004176");
+        Faire("ongletFermer", "PROC_DEMANDE");
+        Exiger(s.Vue() is { Dossier: null, Proc.Code: "PROC_ENCAISS" },
+            "fermer l'ecran ne rouvre pas une affaire qu'on a fermee : l'onglet voisin prend la place");
+
+        // --- Une affaire purement JUDICIAIRE : ni Kbis ni SIREN, les ecrans du judiciaire.
+        Faire("ouvrirNumero", "2026P00031");
+        var jud = Codes(s.Vue().Dossier!.Actions);
+        Exiger(new[] { "depotsJudiciaires", "redaction", "consultationJudiciaire", "audiences", "gedJudiciaire", "factures", "imprimerArborescence" }.All(jud.Contains)
+               && !jud.Contains("kbis") && !jud.Contains("imprimerKbis") && !jud.Contains("copierSiren")
+               && !jud.Contains("demandes") && !jud.Contains("commandesWeb"),
+            "affaire judiciaire : depots, redaction, role, audiences, GED ; ni Kbis (pas de dossier RCS), ni SIREN, ni ecran du RCS");
+        Faire("actionDossier", "depotsJudiciaires");
+        Exiger(s.Vue().Proc is { Code: "PROC_DEPOTJUD", Ecran.Dossier: { Numero: "2026P00031", Type: "JUD" } },
+            "jumeau : sur l'affaire judiciaire, « Depots judiciaires » ouvre son ecran pour elle");
+
+        // --- Le LOGIN : sans le RCS, ni Kbis ni ecran reserve au RCS, et le geste est refuse.
+        s.SurGesteAccueil(new GesteIle("login", Valeur("pjudic")));
+        Faire("ouvrirNumero", "004176");
+        var pj = Codes(s.Vue().Dossier!.Actions);
+        Exiger(!pj.Contains("kbis") && !pj.Contains("imprimerKbis") && !pj.Contains("commandesWeb") && pj.Contains("factures") && Refuse(s, "kbis"),
+            "un login sans le RCS ne se voit proposer ni le Kbis ni un ecran du RCS ; le geste est refuse");
+        s.SurGesteAccueil(new GesteIle("login", Valeur("rvilain")));
+        Exiger(Codes(s.Vue().Dossier!.Actions).Contains("kbis"), "jumeau : revenu au greffier, le Kbis est propose");
+
+        // --- La fenetre d'un onglet SORTI : pas d'onglets ou ouvrir un ecran.
+        var sortie = new SessionPlanTravail(null, null, modeFenetreVue: true, vueInitiale: "AFFAIRE:004176");
+        sortie.Initialiser();
+        var so = sortie.Vue().Dossier!.Actions;
+        Exiger(so.SelectMany(g => g.Actions).All(a => !a.Ecran) && Codes(so).Contains("kbis") && Codes(so).Contains("envoyerDossier")
+               && so.All(g => g.Verbe != ActionsDossier.Facturer) && Refuse(sortie, "factures"),
+            "dans la fenetre d'un onglet sorti, la barre garde les gestes locaux, sans aucun ecran (« Facturer » disparait)");
+        sortie.DisposeAsync().AsTask().GetAwaiter().GetResult();
+
+        foreach (var o in s.Vue().Onglets ?? []) Faire("ongletFermer", o.Code);
+        s.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 }

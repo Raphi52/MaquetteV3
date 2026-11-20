@@ -122,6 +122,17 @@ export interface EcranProcVue {
   motif: string | null
   /** La page « Recherche » (la palette etalee en page, ecran EcranRecherche) ; null ailleurs. */
   recherche: PaletteVue | null
+  /** L'affaire depuis laquelle l'ecran a ete ouvert (barre d'actions du dossier) ; null sinon. */
+  dossier: ContexteDossierVue | null
+}
+/** Le contexte d'une affaire transmis a l'ecran ouvert pour elle (Pont/PlanTravailActions.cs). */
+export interface ContexteDossierVue {
+  numero: string
+  siren: string
+  objet: string
+  type: string
+  /** La denomination, sinon l'objet de l'affaire. */
+  nom: string
 }
 
 // ---- La visionneuse d'affaire ----
@@ -160,6 +171,22 @@ export interface DossierVue {
   triClasseur: TriClasseur
   /** Montree dans la fenetre de son onglet sorti : pas d'accueil derriere, pas de fleche « Retour ». */
   sortie: boolean
+  /** La barre d'actions de l'entete, un groupe par verbe (Metier/ActionsDossier.cs). */
+  actions: VerbeActionsVue[]
+}
+/** Un verbe de la barre d'actions du dossier et ses actions disponibles. */
+export interface VerbeActionsVue { verbe: string, actions: ActionDossierVue[] }
+export interface ActionDossierVue {
+  /** Ce que remonte le geste « actionDossier ». */
+  code: string
+  libelle: string
+  /** Sa lettre au clavier, menu du verbe ouvert. */
+  touche: string
+  detail: string
+  /** Elle ouvre un ecran dans un onglet (sinon elle agit dans la page). */
+  ecran: boolean
+  /** Le texte qu'elle copie dans le presse-papiers, sans remonter au C# ; null sinon. */
+  copie: string | null
 }
 export interface PieceHistoriqueVue {
   id: string

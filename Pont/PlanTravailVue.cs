@@ -57,8 +57,15 @@ public sealed record ProcVue(string Code, string Libelle, EcranProcVue Ecran);
 /// <param name="Lot">La session de l'ecran des taches en lot, ouverte ici avec l'etat vivant.</param>
 /// <param name="Motif">Pourquoi la procedure n'a pas d'ecran (EcranNonMaquette).</param>
 /// <param name="Recherche">La page « Recherche » (la palette etalee en page) ; null pour les autres ecrans.</param>
+/// <param name="Dossier">L'affaire depuis laquelle l'ecran a ete ouvert (barre d'actions du dossier,
+/// Pont/PlanTravailActions.cs) : la puce « ← Dossier » y ramene. Null pour un ecran ouvert d'ailleurs.</param>
 public sealed record EcranProcVue(string[] Valides, string? SirenDemande, string CleOuverture,
-                                  SessionEcranVue? Lot, string? Motif, PaletteVue? Recherche);
+                                  SessionEcranVue? Lot, string? Motif, PaletteVue? Recherche,
+                                  ContexteDossierVue? Dossier);
+
+/// <summary>Le contexte d'une affaire transmis a l'ecran ouvert pour elle.</summary>
+/// <param name="Nom">La denomination (fiche sommaire), sinon l'objet de l'affaire.</param>
+public sealed record ContexteDossierVue(string Numero, string Siren, string Objet, string Type, string Nom);
 
 public sealed record SessionEcranVue(string Session, int Version);
 
@@ -74,13 +81,27 @@ public sealed record SessionEcranVue(string Session, int Version);
 /// (AccueilEtat.TriClasseur, retenu d'une affaire a l'autre et au redemarrage).</param>
 /// <param name="Sortie">L'affaire est montree dans la fenetre de son onglet SORTI (FenetreVue) :
 /// il n'y a pas d'accueil derriere elle, la fleche « Retour a l'accueil » disparait.</param>
+/// <param name="Actions">La barre d'actions de l'entete, un groupe par verbe (Metier/ActionsDossier.cs,
+/// Pont/PlanTravailActions.cs) ; dans la fenetre d'un onglet sorti, sans les ecrans.</param>
 public sealed record DossierVue(string Numero, string Objet, string Siren, string Type, string Statut,
                                 bool BoutonDocument, SommaireVue Sommaire, BandeauDefautsVue? Bandeau,
                                 string StyleCorps, TacheVue? Tache, string Filtre, LigneArbreVue Arbre,
                                 bool Poignee, FicheColonneVue? Fiche, EtapesVue? Etapes, bool Poignee2,
                                 ApercuColonneVue? Apercu, bool Voile, PieceHistoriqueVue[] Historique,
                                 bool ArbreReplie, string[] Chemin, int Pieces, MessageFilVue[] Fil,
-                                bool SuiviReplie, string TriClasseur, bool Sortie);
+                                bool SuiviReplie, string TriClasseur, bool Sortie,
+                                VerbeActionsVue[] Actions);
+
+/// <summary>Un verbe de la barre d'actions et ses actions disponibles.</summary>
+public sealed record VerbeActionsVue(string Verbe, ActionDossierVue[] Actions);
+
+/// <summary>Une action de la barre du dossier.</summary>
+/// <param name="Code">Ce que la page remonte par le geste « actionDossier ».</param>
+/// <param name="Touche">Sa lettre au clavier, menu du verbe ouvert.</param>
+/// <param name="Ecran">Elle ouvre un ecran dans un onglet (sinon elle agit dans la page).</param>
+/// <param name="Copie">Le texte qu'elle met dans le presse-papiers, joue par la page ; nul sinon.</param>
+public sealed record ActionDossierVue(string Code, string Libelle, string Touche, string Detail,
+                                      bool Ecran, string? Copie);
 
 /// <summary>
 /// Un message du FIL de l'affaire : une note ecrite dans l'onglet « Fil », ou une valeur
@@ -218,13 +239,14 @@ public sealed partial class SessionPlanTravail
             FinsDeGlisse,
             proc,
             dossier,
-            ImpressionOuverte && ApercuNoeud is not null
-                ? new ImpressionVue(ApercuNoeud.Libelle, ArbreDemo.Imprimantes, ArbreDemo.FilesDifferees,
+            // La piece ouverte, ou ce que la barre d'actions du dossier vise (l'arborescence, le dossier entier).
+            ImpressionOuverte && (ImpressionDe ?? ApercuNoeud?.Libelle) is { } aImprimer
+                ? new ImpressionVue(aImprimer, ArbreDemo.Imprimantes, ArbreDemo.FilesDifferees,
                                     ArbreDemo.TypesPapier, ImprImprimante, ImprFileDifferee, ImprTypePapier,
                                     ImprExemplaires, ImprRectoVerso)
                 : null,
-            EnvoiMailOuvert && ApercuNoeud is not null
-                ? new EnvoiMailVue(ApercuNoeud.Libelle, MailDestinatairesDemo,
+            EnvoiMailOuvert && (EnvoiDe ?? ApercuNoeud?.Libelle) is { } aEnvoyer
+                ? new EnvoiMailVue(aEnvoyer, MailDestinatairesDemo,
                                    MailMessagesDemo.Select(m => m.Titre).ToArray(), MailMessageIndex,
                                    MailMessagesDemo[MailMessageIndex].Corps, MailDestinataire,
                                    MailDestinataire.Trim().Length > 0)
@@ -251,7 +273,8 @@ public sealed partial class SessionPlanTravail
                 SirenAImmatriculer, CleOuverture.ToString() ?? "",
                 p.Code == "PROC_TACHES_LOT" ? VueSessionLot() : null,
                 MotifNonMaquette(p.Code),
-                p.Code == CodePageRecherche ? VuePageRecherche() : null));
+                p.Code == CodePageRecherche ? VuePageRecherche() : null,
+                ContexteDeLEcran(p.Code)));
     }
 
     // ---- Taches en lot : la session que Components/Ecrans/EcranTachesLot.razor ouvrait ----
@@ -395,7 +418,8 @@ public sealed partial class SessionPlanTravail
             ArbreReplie, CheminSelection(d.Numero), NbPiecesVisibles(), VueFil(d.Numero),
             SuiviReplie, Etat.TriClasseur == AccueilEtat.TriClasseurParDossier
                 ? AccueilEtat.TriClasseurParDossier : AccueilEtat.TriClasseurParDate,
-            ModeFenetreVue);
+            ModeFenetreVue,
+            VueActions(d));
     }
 
     /// <summary>
@@ -716,6 +740,9 @@ public sealed partial class SessionPlanTravail
 
             // ---- Visionneuse : entete, bandeau des defauts, colonnes ----
             case "fermerDossier": FermerAffaire(); break;
+            // La barre d'actions du dossier et la puce « ← Dossier » d'un ecran (PlanTravailActions.cs).
+            case "actionDossier": AgirSurDossier(Texte(valeur)); break;
+            case "retourDossier": RetournerAuDossierDeLEcran(); break;
             case "afficherDocument": GuideVisible = true; break;
             case "allerAuDefautBandeau":
             {
