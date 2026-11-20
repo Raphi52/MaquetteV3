@@ -40,8 +40,13 @@ public static class CodesNumerotation
     /// <summary>Restitution : numero lisible mais jamais donne (au-dela du compteur) ; refus journalise.</summary>
     public const int JamaisDonne = -4;
 
-    /// <summary>Attribution : le chrono suivant depasse la taille du format ; refus journalise.</summary>
+    /// <summary>Attribution : le chrono suivant depasse la taille du format, ou la fin de la plage de
+    /// La Poste (FinPlage, NUM-017 CA02) ; refus journalise.</summary>
     public const int SeriePleine = -5;
+
+    /// <summary>Attribution : annee au-dela de l'annee suivante (NUM-005 CA04, migration NUM-005_reprise) ;
+    /// refus journalise, rien n'est consomme. Les compteurs d'annees futures repris de la V2 ne servent plus.</summary>
+    public const int AnneeHorsLimite = -6;
 
     /// <summary>Serveur seulement (HTTP 503) : le compteur est tenu par une autre transaction au-dela
     /// du delai d'attente (erreur SQL 51001) ; rien n'est consomme, la demande peut etre refaite.</summary>
