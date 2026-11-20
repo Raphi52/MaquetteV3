@@ -2107,7 +2107,9 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             ["INSPM_DENOMINATION_STATUT"] = ouvert?.Denomination
                                           ?? (sommaire?.Designation is { Length: > 0 } nom ? nom : null)
                                           ?? societe?.Designation
-                                          ?? (d.Objet.Contains(" - ") ? Denomination(d.Objet) : ""),
+                                          // Le titre ne nomme une societe que si l'affaire en a une (un
+                                          // SIREN) : « Arrivee du courrier - lot 2026-36 » n'en est pas une.
+                                          ?? (d.Siren.Length > 0 && d.Objet.Contains(" - ") ? Denomination(d.Objet) : ""),
             ["DSSRC_NUM_GESTION"] = gestion,
             ["DSSRC_DATE_IMMAT"] = immatriculation,
             ["DSSRC_DATE_PREMIERE_IMMATRICULATION"] = immatriculation,

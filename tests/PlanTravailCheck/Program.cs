@@ -1070,6 +1070,12 @@ internal static class Programme
                    && Champ("004176", "CAPITAL", "CPTL_MONNAIE") == "EUR"
                    && Champ("J-00931", "CAPITAL", "CPTL_MONNAIE") == "EUR",
                 "les vraies saisies et les defauts neutres (type de dossier, monnaie) restent");
+            // Repris de la copie du run run-26218cd842c9-1 (20/11/2026), perdu quand une version
+            // suivante du meme travail est entree dans main sans lui.
+            Exiger(Champ("004138", "IDENTITE", "DSSRC_TYPE_RCS").Length > 0
+                   && Champ("004138", "IDENTITE", "INSPM_DENOMINATION_STATUT") == "",
+                $"une affaire sans societe (004138, arrivee du courrier, sans SIREN) garde sa denomination vide : "
+                + $"« lot 2026-36 », la fin de son titre, n'en est pas une (lu : « {Champ("004138", "IDENTITE", "INSPM_DENOMINATION_STATUT")} »)");
 
             // --- Jumeau de la reprise : elle ne joue qu'UNE fois. L'adresse « 12 rue des Trois
             // Cailloux » (une adresse de la liste) choisie ENSUITE sur 2026B01067 reste au redemarrage.
