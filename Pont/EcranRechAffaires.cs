@@ -65,11 +65,11 @@ public static class EcranRechAffaires
     private static readonly Affaire[] AffairesDemo =
     [
         new("2026B01067", "Affaire de demonstration - AMIENS BILLARDS", "109 678 235", "RCS", "instance",   new(2026, 9, 1),  0m,      "55339", "2026F00301", "010", "AMIENS BILLARDS",     "En cours",  new(2026, 8, 30)),
-        new("004176",  "Modification - SCI DU PARC",            "812 445 901", "RCS", "instance",   new(2026, 8, 24), 142.50m, "55210", "2026F00244", "010", "SCI DU PARC",           "En cours",  new(2026, 8, 20)),
+        new("004176",  "Modification - SCI DU PARC",            "812 445 906", "RCS", "instance",   new(2026, 8, 24), 142.50m, "55210", "2026F00244", "010", "SCI DU PARC",           "En cours",  new(2026, 8, 20)),
         new("004182",  "Immatriculation - AMIENS BILLARDS",     "109 678 235", "RCS", "instance",   new(2026, 8, 28), 0m,      "55288", "2026F00262", "011", "AMIENS BILLARDS",       "En cours",  new(2026, 8, 26)),
         new("004179",  "Radiation - MARTIN EURL",               "521 004 332", "RCS", "instance",   new(2026, 8, 12), 68.30m,  "55102", "2026F00198", "012", "MARTIN EURL",           "Radiee",    new(2026, 8, 5)),
         new("004168",  "Immatriculation - BATIPRO SARL",        "440 927 115", "RCS", "instance",   new(2026, 7, 30), 0m,      "54990", "2026F00151", "011", "BATIPRO SARL",          "Cloturee",  new(2026, 7, 25)),
-        new("J-00931", "Depot de bilan - TRANSNORD SA",         "318 552 004", "JUD", "collective", new(2026, 6, 18), 415.00m, "54771", "2026F00087", "300", "TRANSNORD SA",          "En cours",  new(2026, 6, 10)),
+        new("J-00931", "Depot de bilan - TRANSNORD SA",         "318 552 007", "JUD", "collective", new(2026, 6, 18), 415.00m, "54771", "2026F00087", "300", "TRANSNORD SA",          "En cours",  new(2026, 6, 10)),
         new("J-00944", "Liquidation judiciaire - COMPTOIR DU NORD", "402 118 776", "JUD", "collective", new(2026, 8, 5), 230.00m, "55044", "2026F00173", "310", "COMPTOIR DU NORD",   "En cours",  new(2026, 7, 29)),
         new("P-00218", "Mandat ad hoc - MENUISERIE PICARDE",    "789 220 431", "JUD", "prevention", new(2026, 8, 19), 0m,      "55177", "2026F00221", "400", "MENUISERIE PICARDE",    "En cours",  new(2026, 8, 14)),
         new("P-00221", "Conciliation - SOMME LOGISTIQUE",       "654 901 228", "JUD", "prevention", new(2026, 7, 22), 90.00m,  "54931", "2026F00139", "410", "SOMME LOGISTIQUE",      "Cloturee",  new(2026, 7, 18)),

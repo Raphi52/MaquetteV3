@@ -320,6 +320,14 @@ public sealed class AccueilEtat
     /// </summary>
     public Dictionary<string, Dictionary<string, List<Dictionary<string, string>>>> Saisies { get; set; } = new();
 
+    /// <summary>
+    /// Les fiches deja enregistrees ont ete purgees, UNE fois, des valeurs que l'ancien
+    /// preremplissage ecrivait pour toute affaire (AMIENS BILLARDS, demande 004188 ;
+    /// Pont/PlanTravail.cs, ReprendreAnciensDefauts, 20/11/2026). Apres elle, une valeur
+    /// choisie par l'utilisateur, meme egale a l'ancien defaut, n'est plus jamais touchee.
+    /// </summary>
+    public bool DefautsDemoRepris { get; set; }
+
     /// <summary>Affaires dont la saisie a passe le controle final.</summary>
     public HashSet<string> Valides { get; set; } = new();
 

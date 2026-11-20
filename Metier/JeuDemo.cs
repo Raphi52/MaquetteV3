@@ -383,12 +383,12 @@ public static class JeuDemo
     public static readonly DemandeRcs[] DemandesBase =
     [
         new("2026B01067",   "Immatriculation - AMIENS BILLARDS",      "2026B01067",   "109 678 235", "AMIENS BILL.",      "PROC_DEMANDE",   "En saisie",   true,  Aujourdhui.AddDays(-1),  "",           "R. VILAIN", false, "action"),
-        new("004176", "Modification - SCI DU PARC",        "004176", "812 445 901", "SCI DU PARC", "PROC_DEMANDE",   "En controle", true,  Aujourdhui.AddDays(-9),  "",           "M. DURAND", true,  "alerte"),
+        new("004176", "Modification - SCI DU PARC",        "004176", "812 445 906", "SCI DU PARC", "PROC_DEMANDE",   "En controle", true,  Aujourdhui.AddDays(-9),  "",           "M. DURAND", true,  "alerte"),
         new("004179", "Radiation - MARTIN EURL",           "004179", "521 004 332", "MARTIN EURL", "PROC_ARCHIRAD",  "En controle", true,  Aujourdhui.AddDays(-4),  "",           "R. VILAIN", false, "attente"),
         new("004182", "Immatriculation - AMIENS BILLARDS",      "004182", "109 678 235", "AMIENS BILL.",      "PROC_DEMANDE",   "En saisie",   true,  Aujourdhui.AddDays(-2),  "",           "R. VILAIN", false, "action"),
         new("004168", "Immatriculation - BATIPRO SARL",    "004168", "440 927 115", "BATIPRO",     "PROC_DEMANDE",   "Validee",     false, Aujourdhui.AddDays(-14), "29/08/2026", "M. DURAND", false, "ok"),
-        new("004155", "Depot d actes - TRANSNORD SA",      "004155", "318 552 004", "TRANSNORD",   "PROC_ACTES_NUM", "Validee",     false, Aujourdhui.AddDays(-21), "22/08/2026", "C. BENIER", false, "ok"),
-        new("004151", "Depot de bilan - TRANSNORD SA",     "004151", "318 552 004", "TRANSNORD",   "PROC_DEPOTJUD",  "En controle", true,  Aujourdhui.AddDays(-11), "",           "C. BENIER", true,  "alerte"),
+        new("004155", "Depot d actes - TRANSNORD SA",      "004155", "318 552 007", "TRANSNORD",   "PROC_ACTES_NUM", "Validee",     false, Aujourdhui.AddDays(-21), "22/08/2026", "C. BENIER", false, "ok"),
+        new("004151", "Depot de bilan - TRANSNORD SA",     "004151", "318 552 007", "TRANSNORD",   "PROC_DEPOTJUD",  "En controle", true,  Aujourdhui.AddDays(-11), "",           "C. BENIER", true,  "alerte"),
         new("004144", "Cloture - LES TROIS CHENES SARL",   "004144", "789 221 460", "LES 3 CHENES","PROC_CLOT",      "Rejetee",     false, Aujourdhui.AddDays(-25), "",           "M. DURAND", false, "attente"),
         new("004138", "Arrivee du courrier - lot 2026-36", "004138", "",            "",            "PROC_ARRIVEE",   "Validee",     false, Aujourdhui.AddDays(-30), "12/08/2026", "C. BENIER", false, "ok"),
         new("004131", "BODACC - envoi hebdomadaire",       "004131", "",            "",            "PROC_BODACC",    "Validee",     false, Aujourdhui.AddDays(-33), "09/08/2026", "R. VILAIN", false, "ok")
@@ -454,9 +454,9 @@ public static class JeuDemo
     [
         new("1",  "402 118 447", "2026B01067", "AMIENS BILLARDS",            "Siege",           "12 rue des Trois Cailloux, 80000 AMIENS",   "PM", false, 14, false, false, "80000", "AMIENS",   "DUPONT Jean",      "Commerce de detail"),
         new("2",  "402 118 447", "2026B01067", "AMIENS BILLARDS",            "Etablissement",   "4 avenue du General Leclerc, 80090 AMIENS",  "PM", false,  3, false, false, "80090", "AMIENS",   "DUPONT Jean",      "Commerce de detail"),
-        new("3",  "512 004 331", "004176",     "SCI DU PARC",                "Siege",           "18 rue du Parc, 80480 DURY",                 "PM", false,  6, false, false, "80480", "DURY",     "LEROY Anne",       "Location immobiliere"),
-        new("4",  "334 771 018", "004151",     "TRANSNORD SA",               "Siege",           "ZI Nord, 80440 BOVES",                       "PM", false, 21, false, true,  "80440", "BOVES",    "MARCHAND Paul",    "Transport routier"),
-        new("5",  "334 771 018", "004155",     "TRANSNORD SA",               "Etablissement",   "Quai de Somme, 80100 ABBEVILLE",             "PM", false,  2, false, true,  "80100", "ABBEVILLE","MARCHAND Paul",    "Transport routier"),
+        new("3",  "812 445 906", "004176",     "SCI DU PARC",                "Siege",           "18 rue du Parc, 80480 DURY",                 "PM", false,  6, false, false, "80480", "DURY",     "LEROY Anne",       "Location immobiliere"),
+        new("4",  "318 552 007", "004151",     "TRANSNORD SA",               "Siege",           "ZI Nord, 80440 BOVES",                       "PM", false, 21, false, true,  "80440", "BOVES",    "MARCHAND Paul",    "Transport routier"),
+        new("5",  "318 552 007", "004155",     "TRANSNORD SA",               "Etablissement",   "Quai de Somme, 80100 ABBEVILLE",             "PM", false,  2, false, true,  "80100", "ABBEVILLE","MARCHAND Paul",    "Transport routier"),
         new("6",  "790 220 114", "004168",     "BATIPRO SARL",               "Siege",           "7 rue de la Briqueterie, 80000 AMIENS",      "PM", false,  9, false, false, "80000", "AMIENS",   "BERTIN Sophie",    "Travaux de maconnerie"),
         new("7",  "",            "004179",     "MARTIN Eric (EURL)",         "Siege",           "2 place Gambetta, 80200 PERONNE",            "PP", false,  4, true,  false, "80200", "PERONNE",  "MARTIN Eric",      "Conseil de gestion"),
         new("8",  "823 445 902", "004144",     "LES TROIS CHENES",           "Siege",           "31 route de Doullens, 80260 VILLERS",        "PM", false, 11, true,  false, "80260", "VILLERS",  "CARON Luc",        "Restauration"),
@@ -469,7 +469,7 @@ public static class JeuDemo
     public static CommandeWeb[] CommandesWeb() =>
     [
         new() { Origine = "Site local", Numero = "CW-2026-000412", Recue = new DateTime(2026, 9, 8, 8, 14, 0),  Demandeur = "BANQUE DU NORD",        Famille = "Endettement",     CodeEdi = "ET-CREQ", Societe = "AMIENS BILLARDS", Siren = "402 118 447" },
-        new() { Origine = "Infogreffe", Numero = "CW-2026-000413", Recue = new DateTime(2026, 9, 8, 9, 2, 0),   Demandeur = "MAITRE CARPENTIER",     Famille = "Faillite",        CodeEdi = "ET-PREQ", Societe = "TRANSNORD SA",    Siren = "334 771 018" },
+        new() { Origine = "Infogreffe", Numero = "CW-2026-000413", Recue = new DateTime(2026, 9, 8, 9, 2, 0),   Demandeur = "MAITRE CARPENTIER",     Famille = "Faillite",        CodeEdi = "ET-PREQ", Societe = "TRANSNORD SA",    Siren = "318 552 007" },
         new() { Origine = "Infogreffe", Numero = "CW-2026-000414", Recue = new DateTime(2026, 9, 9, 14, 38, 0), Demandeur = "SCP DUBOIS ET ASSOCIES",Famille = "Non opposition",  CodeEdi = "ET-CREQ", Societe = "BATIPRO SARL",    Siren = "790 220 114" },
         new() { Origine = "Site local", Numero = "CW-2026-000415", Recue = new DateTime(2026, 9, 10, 7, 55, 0), Demandeur = "BANQUE DU NORD",        Famille = "Endettement",     CodeEdi = "ET-CREQ", Societe = "NORD MARINE SAS", Siren = "901 553 226" }
     ];

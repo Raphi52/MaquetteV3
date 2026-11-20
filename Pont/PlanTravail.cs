@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 
 namespace RigV3Desktop.Pont;
@@ -1093,6 +1094,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     public void Initialiser()
     {
         Accueil = new Pont.SessionAccueil(AccueilEtat.Charger());
+        // Avant toute vue : un onglet d'affaire restaure lirait sinon l'ancien defaut.
+        ReprendreAnciensDefauts();
         Accueil.Change += SurChangeAccueil;
         AccueilEtat.FavorisChanges += SurFavorisChanges;
         // L AGENCEMENT d abord : les onglets ouverts la derniere fois, dans leur
@@ -1231,11 +1234,11 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private static readonly Dossier[] FondsDemo =
     [
         new("2026B01067",   "Affaire de demonstration - AMIENS BILLARDS", "109 678 235", "RCS", "action"),
-        new("004176", "Modification - SCI DU PARC",     "812 445 901", "RCS", "alerte"),
+        new("004176", "Modification - SCI DU PARC",     "812 445 906", "RCS", "alerte"),
         new("004182", "Immatriculation - AMIENS BILLARDS",   "109 678 235", "RCS", "action"),
         new("004179", "Radiation - MARTIN EURL",        "521 004 332", "RCS", "attente"),
         new("004168", "Immatriculation - BATIPRO SARL", "440 927 115", "RCS", "neutre"),
-        new("J-00931", "Depot de bilan - TRANSNORD SA", "318 552 004", "JUD", "alerte"),
+        new("J-00931", "Depot de bilan - TRANSNORD SA", "318 552 007", "JUD", "alerte"),
         // Affaires PUREMENT judiciaires (demande du 16/09/2026) : pas de
         // dossier RCS, donc pas de Siren et une seule branche dans l arbre.
         new("2026J00087",  "Assignation en paiement - DUPONT Jean",   "", "JUD", "action",  true),
@@ -2056,18 +2059,143 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     /// Une fiche neuve part PREREMPLIE : chaque champ qui a une valeur de
     /// depart l'a deja ecrite. Le redacteur corrige ce qui differe au lieu de
     /// tout taper — et la valeur existe vraiment dans la fiche, donc elle part
-    /// au document et a l'enregistrement.
+    /// au document et a l'enregistrement. Ce qui decrit la societe vient de
+    /// L'AFFAIRE OUVERTE (<see cref="ValeursDeLAffaire"/>), meme vide : une colonne
+    /// que l'affaire decrit sans en avoir la valeur ne retombe pas sur le defaut du
+    /// champ (la date d'immatriculation de 004151 n'est pas la date du jour). Le defaut
+    /// ne sert qu'aux colonnes neutres (type de dossier, monnaie, Non/Oui) et a une
+    /// fiche sans affaire.
     /// </summary>
+    // fix-ok: le Defaut des champs SIREN, denomination, gestion, adresse, activite et demande etait
+    // SocieteDemo/DemandeDemo (AMIENS BILLARDS, 004188) pour toute affaire -- mesure : PlanTravailCheck
+    // rouge, Kbis de 004151 lu « 2026B01067 | AMIENS BILLARDS | 12 rue des Trois Cailloux ».
+    // fix-ok: une valeur VIDE de l'affaire retombait sur le Defaut DateDemo -- mesure : PlanTravailCheck
+    // rouge, date d'immatriculation du Kbis de 004151 lue « 09/09/2026 » (date du jeu, pas celle de TRANSNORD).
     private Dictionary<string, string> NouvelleFiche(string etape)
+        => NouvelleFiche(etape, ValeursDeLAffaire(DossierOuvert));
+
+    private Dictionary<string, string> NouvelleFiche(string etape, Dictionary<string, string> deLAffaire)
     {
         var fiche = new Dictionary<string, string>();
         var e = Etapes.FirstOrDefault(x => x.Code == etape);
         if (e is null) return fiche;
         foreach (var c in e.Champs)
         {
-            if (c.Defaut.Length > 0) fiche[c.Colonne] = c.Defaut;
+            var depart = deLAffaire.TryGetValue(c.Colonne, out var v) ? v : c.Defaut;
+            if (depart.Length > 0) fiche[c.Colonne] = depart;
         }
         return fiche;
+    }
+
+    /// <summary>
+    /// Ce que le jeu de demonstration sait de l'affaire, par colonne de la fiche :
+    /// le SIREN de son bandeau, le dossier cree par « Ouvrir un dossier »
+    /// (AffairesOuvertes), sa fiche sommaire (<see cref="SommairesDemo"/>), sa societe
+    /// (JeuDemo.EntreprisesRequi, par numero d'affaire, le siege d'abord) et sa demande
+    /// (JeuDemo.Demandes). Une donnee que l'affaire n'a pas reste VIDE : jusqu'au
+    /// 20/11/2026 ces champs prenaient AMIENS BILLARDS pour toute affaire (Kbis de 004151
+    /// TRANSNORD SA au nom d'AMIENS BILLARDS, SIREN refuse a la cle).
+    /// </summary>
+    private static Dictionary<string, string> ValeursDeLAffaire(Dossier? d)
+    {
+        if (d is null) return [];
+        var ouvert = AffairesOuvertes.Details.FirstOrDefault(x => x.Numero == d.Numero);
+        var sommaire = SommairesDemo.GetValueOrDefault(d.Numero);
+        var societe = JeuDemo.EntreprisesRequi.Where(x => x.Gestion == d.Numero)
+                                              .OrderBy(x => x.TypeAdresse == "Siege" ? 0 : 1).FirstOrDefault();
+        var demande = JeuDemo.Demandes.FirstOrDefault(x => x.Dossier == d.Numero);
+        var immatriculation = ouvert is { Immatriculation: var date } && date != default ? date.ToString("yyyy-MM-dd")
+            : DateTime.TryParseExact(sommaire?.Immatriculation, "dd/MM/yyyy",
+                                     CultureInfo.InvariantCulture, DateTimeStyles.None, out var immat)
+            ? immat.ToString("yyyy-MM-dd") : "";
+        var gestion = ouvert?.Numero ?? societe?.Gestion ?? "";
+        var valeurs = new Dictionary<string, string>
+        {
+            ["DMND_NUM_DEMANDE"] = demande?.Numero ?? "",
+            ["DMND_NUM_INDICATIF"] = gestion,
+            ["DMND_LIBELLE_ECRAN"] = demande?.Nom ?? "",
+            ["DMND_NOM"] = societe?.Dirigeant ?? "",
+            ["DSSRC_SIREN"] = d.Siren,
+            ["INSPM_DENOMINATION_STATUT"] = ouvert?.Denomination
+                                          ?? (sommaire?.Designation is { Length: > 0 } nom ? nom : null)
+                                          ?? societe?.Designation
+                                          ?? (d.Objet.Contains(" - ") ? Denomination(d.Objet) : ""),
+            ["DSSRC_NUM_GESTION"] = gestion,
+            ["DSSRC_DATE_IMMAT"] = immatriculation,
+            ["DSSRC_DATE_PREMIERE_IMMATRICULATION"] = immatriculation,
+            // L'adresse du bandeau d'abord : le Kbis et la fiche sommaire disent la meme.
+            ["ETBLS_ID_ADRBS"] = sommaire?.Adresse is { Length: > 0 } adresse ? AdresseSurUneLigne(adresse)
+                               : societe?.Adresse ?? "",
+            ["ACTVT_ACTIVITE_DECLAREE"] = societe?.Activite ?? "",
+        };
+        // L'etat d'une demande inconnue n'est pas une donnee de la societe : le defaut
+        // neutre du champ (« En saisie ») le tient.
+        if (demande is not null) valeurs["DMND_ETAT_DEMANDE"] = demande.Etat;
+        return valeurs;
+    }
+
+    /// <summary>« 8 Avenue du Parc\n80000 AMIENS » (fiche sommaire) ecrite comme les
+    /// adresses enregistrees : « 8 Avenue du Parc, 80000 AMIENS ».</summary>
+    private static string AdresseSurUneLigne(string adresse) => adresse.Replace("\n", ", ");
+
+    /// <summary>
+    /// Ce que l'ancien preremplissage ecrivait dans la fiche de TOUTE affaire
+    /// (societe de demonstration AMIENS BILLARDS, demande 004188 NORD MARINE SAS), releve
+    /// tel quel dans accueil.json le 20/11/2026 : onze affaires sur onze le portaient. Les
+    /// deux dates d'immatriculation y etaient la date du jeu (JeuDemo.Aujourdhui, ecrite ici
+    /// et non par DateDemo, initialise plus bas dans ce fichier), meme pour une affaire qui a
+    /// la sienne (004176 : 12/03/2014 au bandeau).
+    /// </summary>
+    private static readonly Dictionary<string, string> AnciensDefautsDemo = new()
+    {
+        ["DMND_NUM_DEMANDE"] = "004188",
+        ["DMND_NUM_INDICATIF"] = "2026B01067",
+        ["DMND_LIBELLE_ECRAN"] = "Modification - NORD MARINE SAS",
+        ["DMND_NOM"] = "DUPONT Jean",
+        ["DSSRC_SIREN"] = "402 118 447",
+        ["INSPM_DENOMINATION_STATUT"] = "AMIENS BILLARDS",
+        ["DSSRC_NUM_GESTION"] = "2026B01067",
+        ["ETBLS_ID_ADRBS"] = "12 rue des Trois Cailloux, 80000 AMIENS",
+        ["ACTVT_ACTIVITE_DECLAREE"] = "Commerce de detail",
+        ["CPTL_MONTANT"] = "10000",
+        ["CPTL_TEXTE_CAPITAL"] = "Capital de 10 000 EUR divise en 1 000 actions de 10 EUR",
+        ["DSSRC_DATE_IMMAT"] = JeuDemo.Aujourdhui.ToString("yyyy-MM-dd"),
+        ["DSSRC_DATE_PREMIERE_IMMATRICULATION"] = JeuDemo.Aujourdhui.ToString("yyyy-MM-dd"),
+    };
+
+    /// <summary>
+    /// Reprise UNIQUE des fiches deja enregistrees : une valeur egale a l'ancien
+    /// defaut, et qui n'est pas celle d'une fiche neuve de l'affaire, n'a jamais ete
+    /// saisie -- elle prend la valeur de la fiche neuve (ou se vide). Tout le reste est
+    /// une saisie et ne bouge pas. Une seule fois par fichier (<see cref="AccueilEtat.DefautsDemoRepris"/>) :
+    /// une valeur choisie ENSUITE, meme egale a l'ancien defaut, est une vraie saisie.
+    /// </summary>
+    private void ReprendreAnciensDefauts()
+    {
+        if (Etat.DefautsDemoRepris) return;
+        foreach (var (numero, parEtape) in Etat.Saisies)
+        {
+            // Une cle sans affaire connue (« sans-affaire ») n'a aucune valeur a elle.
+            var connue = Fonds.Any(f => f.Numero == numero) || JeuDemo.Demandes.Any(x => x.Dossier == numero);
+            var siennes = ValeursDeLAffaire(connue ? DossierDeNumero(numero) : null);
+            foreach (var (etape, fiches) in parEtape)
+            {
+                var neuve = NouvelleFiche(etape, siennes);
+                foreach (var fiche in fiches)
+                {
+                    foreach (var (colonne, ancien) in AnciensDefautsDemo)
+                    {
+                        if (!fiche.TryGetValue(colonne, out var v) || v != ancien) continue;
+                        var depart = neuve.GetValueOrDefault(colonne, "");
+                        if (depart == ancien) continue;
+                        if (depart.Length > 0) fiche[colonne] = depart;
+                        else fiche.Remove(colonne);
+                    }
+                }
+            }
+        }
+        Etat.DefautsDemoRepris = true;
+        Etat.Enregistrer();
     }
 
     private int IndexFiche(Etape etape)
@@ -2374,43 +2502,37 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private static readonly string DateDemo = JeuDemo.Aujourdhui.ToString("yyyy-MM-dd");
     private static readonly string GreffeDefaut = $"{Greffes.Defaut.Code} - {Greffes.Defaut.Ville}";
 
-    /// <summary>
-    /// La societe de reference du jeu de demonstration (Metier/JeuDemo.cs) :
-    /// AMIENS BILLARDS, siege. Les valeurs de depart des champs libres s'y
-    /// accrochent, exactement comme DateDemo et GreffeDefaut, pour qu'aucune
-    /// donnee ne soit ecrite en dur dans le formulaire.
-    /// </summary>
-    private static readonly EntrepriseRequi SocieteDemo = JeuDemo.EntreprisesRequi[0];
-    private static readonly DemandeRcs DemandeDemo = JeuDemo.Demandes[0];
+    // Les champs qui decrivent la SOCIETE (SIREN, denomination, gestion, adresse,
+    // activite, capital, demande, deposant) n'ont pas de defaut ici : ils partent de
+    // l'affaire ouverte (ValeursDeLAffaire). Ils prenaient AMIENS BILLARDS, la
+    // societe de demonstration, pour toute affaire, jusqu'au 20/11/2026.
 
     /// <summary>
     /// Les adresses connues du jeu de demonstration. La colonne v2 s'appelle
     /// ETABLISSEMENT.ID_ADRBS : c'est un RENVOI vers une adresse deja
-    /// enregistree, pas du texte saisi. Le champ est donc une liste.
+    /// enregistree, pas du texte saisi. Le champ est donc une liste : celles des
+    /// societes ET celles des fiches sommaires, que la fiche d'une affaire reprend.
     /// </summary>
     private static readonly string[] AdressesDemo =
-        JeuDemo.EntreprisesRequi.Select(e => e.Adresse).Distinct().ToArray();
+        JeuDemo.EntreprisesRequi.Select(e => e.Adresse)
+               .Concat(SommairesDemo.Values.Where(s => s.Adresse.Length > 0).Select(s => AdresseSurUneLigne(s.Adresse)))
+               .Distinct().ToArray();
 
     private readonly Etape[] Etapes =
     [
         new("DEMANDE", "Demande", "table DEMANDE",
         [
-            new("Numero de demande", "DMND_NUM_DEMANDE", Exemple: "2026B01067", Obligatoire: true,
-                Defaut: DemandeDemo.Numero),
-            new("Numero indicatif", "DMND_NUM_INDICATIF", Exemple: "2024/0141",
-                Defaut: SocieteDemo.Gestion),
-            new("Libelle a l'ecran", "DMND_LIBELLE_ECRAN", Exemple: "Immatriculation - AMIENS BILLARDS", Largeur: "pleine",
-                Defaut: DemandeDemo.Nom),
+            new("Numero de demande", "DMND_NUM_DEMANDE", Exemple: "2026B01067", Obligatoire: true),
+            new("Numero indicatif", "DMND_NUM_INDICATIF", Exemple: "2024/0141"),
+            new("Libelle a l'ecran", "DMND_LIBELLE_ECRAN", Exemple: "Immatriculation - AMIENS BILLARDS", Largeur: "pleine"),
             new("Etat de la demande", "DMND_ETAT_DEMANDE", Obligatoire: true,
                 ChoixPossibles: JeuDemo.EtatsDemande, Defaut: "En saisie"),
-            new("Nom du deposant", "DMND_NOM", Exemple: "DUPONT Jean",
-                Defaut: SocieteDemo.Dirigeant)
+            new("Nom du deposant", "DMND_NOM", Exemple: "DUPONT Jean")
         ]),
 
         new("IDENTITE", "Identite", "tables DOSSIER_RCS et INSCRIT_PM",
         [
-            new("SIREN", "DSSRC_SIREN", Exemple: "109 678 235", Obligatoire: true, Controle: "siren",
-                Defaut: SocieteDemo.Siren),
+            new("SIREN", "DSSRC_SIREN", Exemple: "109 678 235", Obligatoire: true, Controle: "siren"),
             // Kbis « Denomination ou raison sociale » : colonne v2
             // INSCRIT_PM.DENOMINATION_STATUT. L'apercu prenait jusqu'ici le
             // libelle de l'affaire, qui n'est pas la denomination statutaire.
@@ -2419,10 +2541,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             // miroir, les champs INSCRIT_PP pour une personne morale.
             new("Denomination statutaire", "INSPM_DENOMINATION_STATUT", Largeur: "pleine",
                 Obligatoire: true, Exemple: "AMIENS BILLARDS",
-                Defaut: SocieteDemo.Designation,
                 VisibleSi: "DSSRC_TYPE_RCS=Personne morale|Etablissement principal"),
-            new("Numero de gestion", "DSSRC_NUM_GESTION", Exemple: "2024 B 00141", Obligatoire: true,
-                Defaut: SocieteDemo.Gestion),
+            new("Numero de gestion", "DSSRC_NUM_GESTION", Exemple: "2024 B 00141", Obligatoire: true),
             new("Type de dossier", "DSSRC_TYPE_RCS", Obligatoire: true,
                 ChoixPossibles: ["Personne morale", "Personne physique", "Etablissement principal"],
                 Defaut: "Personne morale"),
@@ -2457,8 +2577,10 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
 
         new("CAPITAL", "Capital", "table CAPITAL",
         [
-            new("Montant du capital", "CPTL_MONTANT", Type: "number", Exemple: "10000", Obligatoire: true, Controle: "montant",
-                Defaut: "10000"),
+            // Ni montant ni texte par defaut : « 10 000 EUR, 1 000 actions de 10 EUR » est le capital
+            // d'AMIENS BILLARDS (Metier/ArbreGed.cs, son Kbis et son BODACC), et il partait sur le Kbis
+            // de toute affaire jusqu'au 20/11/2026. Le jeu ne connait le capital d'aucune affaire.
+            new("Montant du capital", "CPTL_MONTANT", Type: "number", Exemple: "10000", Obligatoire: true, Controle: "montant"),
             new("Monnaie", "CPTL_MONNAIE", ChoixPossibles: ["EUR", "USD", "CHF"], Obligatoire: true, Defaut: "EUR"),
             new("Capital variable", "CPTL_VARIABLE", ChoixPossibles: ["Non", "Oui"], Defaut: "Non"),
             // Le minimum statutaire ne se declare QUE pour un capital variable.
@@ -2468,8 +2590,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
                 Controle: "taux", Defaut: "100"),
             new("Apports en nature", "CPTL_APPORTS_NATURE", ChoixPossibles: ["Non", "Oui"], Defaut: "Non"),
             new("Texte du capital", "CPTL_TEXTE_CAPITAL", Largeur: "pleine",
-                Exemple: "Capital de 10 000 EUR divise en 1 000 actions de 10 EUR",
-                Defaut: "Capital de 10 000 EUR divise en 1 000 actions de 10 EUR")
+                Exemple: "Capital de 10 000 EUR divise en 1 000 actions de 10 EUR")
         ]),
 
         new("SIEGE", "Siege et etablissements", "tables SIEGER et ETABLISSEMENT",
@@ -2481,7 +2602,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             // L'apercu imprimait le TYPE d'adresse faute de ce champ.
             new("Adresse", "ETBLS_ID_ADRBS", Largeur: "pleine", Obligatoire: true,
                 Exemple: "12 rue des Lilas 80000 AMIENS",
-                ChoixPossibles: AdressesDemo, Defaut: SocieteDemo.Adresse),
+                ChoixPossibles: AdressesDemo),
             // Entete du Kbis : colonne v2 ETABLISSEMENT.CODE_GREFFE, jusqu'ici
             // ecrite en dur (« Amiens ») dans l'apercu.
             new("Code greffe", "ETBLS_CODE_GREFFE", Obligatoire: true,
@@ -2515,8 +2636,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         new("ACTIVITE", "Activite", "table ACTIVITE",
         [
             new("Activite declaree", "ACTVT_ACTIVITE_DECLAREE", Largeur: "pleine", Obligatoire: true,
-                Exemple: "Prestation de services informatiques, conseil en systemes",
-                Defaut: SocieteDemo.Activite),
+                Exemple: "Prestation de services informatiques, conseil en systemes"),
             new("Code NAF", "ACTVT_CODE_NAF", Exemple: "6202A", Controle: "naf"),
             new("Code APE", "ACTVT_CODE_APE", Exemple: "6202A", Controle: "naf"),
             new("Nature des activites", "ACTVT_NATURE_ACTIVITES",

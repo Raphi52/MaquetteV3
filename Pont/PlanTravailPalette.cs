@@ -75,7 +75,7 @@ public sealed record PiecePaletteVue(string Libelle, string[] Chemin, string Lie
                                      string Apres, int Passages, int Pages, string Date, string Origine, bool Annonce,
                                      string Texte, int[] Positions, int[] Longueurs, string Fichier,
                                      int[] PagesDesPassages, int NbPages);
-/// <param name="Sujet">Ce qui serait consulte (« TRANSNORD SA · 318 552 004 »).</param>
+/// <param name="Sujet">Ce qui serait consulte (« TRANSNORD SA · 318 552 007 »).</param>
 public sealed record HorsGreffePaletteVue(string Code, string Source, string Objet, string Sujet);
 /// <param name="PlusAncienne">Jours depuis la plus ancienne demande en cours confiee au login.</param>
 public sealed record BilanPaletteVue(string Jour, int HorsDelai, int ArriveesDuJour, int MAttendent, int PlusAncienne);

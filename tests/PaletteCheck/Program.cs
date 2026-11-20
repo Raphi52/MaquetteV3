@@ -102,7 +102,7 @@ internal static class Programme
         var activite = p.Travail[0].Activite;
         Exiger(activite.Length == 3 && activite[0] is { Agent: "Raphael", Verbe: "a valide" } && activite.All(a => a.Objet.Contains("004151")),
             "l'activite recente du dossier, la plus recente d'abord");
-        Exiger(p.HorsGreffe.Length == 3 && p.HorsGreffe.All(h => h.Sujet == "TRANSNORD SA · 318 552 004"),
+        Exiger(p.HorsGreffe.Length == 3 && p.HorsGreffe.All(h => h.Sujet == "TRANSNORD SA · 318 552 007"),
             "hors du greffe : FIBEN, interdits de gerer et beneficiaires sont proposes pour la societe");
 
         // --- 3. Les filtres de « Mon travail ».
@@ -223,7 +223,7 @@ internal static class Programme
         Exiger(P().Actions.Select(a => a.Code).SequenceEqual(["kbis", "imprimerKbis"]),
             "« kbis » : les deux actions du Kbis, dans l'ordre de la barre");
         Agir("paletteTexte", "copier siren");
-        Exiger(P().Actions is [{ Code: "copierSiren", Copie: "812 445 901", Ecran: false }],
+        Exiger(P().Actions is [{ Code: "copierSiren", Copie: "812 445 906", Ecran: false }],
             "une action de copie porte le texte a copier (jouee par la page)");
         Agir("paletteTexte", "zzz");
         Exiger(P().Actions.Length == 0, "rien ne repond : pas de section « Sur ce dossier »");

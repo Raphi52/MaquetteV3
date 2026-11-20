@@ -209,7 +209,7 @@ var apercu = File.ReadAllText(Path.Combine(racine, "web/src/plan/Apercu.tsx"));
 var tsxKbis = File.ReadAllText(Path.Combine(racine, "web/src/composants/ApercuKbis.tsx"));
 var kbis = File.ReadAllText(Path.Combine(racine, "Pont/ApercuKbis.cs"));
 Exiger(apercu.Contains("<ApercuKbis vue={a.kbis} />")
-       && planVue.Contains("kbis = ApercuKbis.Vue(d.Numero, d.Siren, DenominationAffaire(), LireSaisie);")
+       && planVue.Contains("kbis = ApercuKbis.Vue(d.Numero, d.Siren, DenominationAffaire(), SommaireDu(d).FormeJuridique, LireSaisie);")
        && tsxKbis.Contains("className=\"rig-kbis\"")
        && !File.Exists(Path.Combine(racine, "Components/ApercuKbis.razor")),
     "le plan de travail passe la lecture du formulaire au pont du Kbis et monte l'extrait React");
@@ -234,22 +234,26 @@ var saisieKbis = new Dictionary<(string, string), string>
     [("IDENTITE", "DSSRC_DATE_IMMAT")] = "2014-03-12",
     [("SIEGE", "ETBLS_ID_ADRBS")] = "3 rue de Rivoli 75001 PARIS",
     [("CAPITAL", "CPTL_MONTANT")] = "10000",
+    // Le type de dossier n'est pas une forme juridique : le Kbis ne doit pas l'imprimer.
+    [("IDENTITE", "DSSRC_TYPE_RCS")] = "Personne morale",
 };
 string LireKbis(string etape, string colonne) => saisieKbis.TryGetValue((etape, colonne), out var v) ? v : "";
-var extrait = RigV3Desktop.Pont.ApercuKbis.Vue("004176", "812 445 901", "SCI DU PARC", LireKbis);
+var extrait = RigV3Desktop.Pont.ApercuKbis.Vue("004176", "812 445 906", "SCI DU PARC", "Societe civile immobiliere", LireKbis);
 string? Ligne(string titre) => extrait.Sections.SelectMany(x => x.Lignes).FirstOrDefault(l => l.Titre == titre)?.Libelle;
 Exiger(extrait.GreffeLibelle == Greffes.Trouver("7501 - PARIS").Libelle && extrait.VilleRcs == "PARIS"
-       && Ligne("Immatriculation au RCS, numero") == "812 445 901 R.C.S. PARIS",
+       && Ligne("Immatriculation au RCS, numero") == "812 445 906 R.C.S. PARIS",
     "le Kbis calcule prend l'entete et la ville du greffe SAISI (execute)");
 Exiger(Ligne("Denomination ou raison sociale") == "NOUVELLE SAS"
        && Ligne("Adresse du siege") == "3 rue de Rivoli 75001 PARIS"
        && Ligne("Date d'immatriculation") == "12/03/2014",
     "le Kbis calcule imprime la denomination, l'adresse et la date saisies (execute)");
+Exiger(Ligne("Forme juridique") == "Societe civile immobiliere",
+    $"le Kbis imprime la forme juridique de l'affaire, pas le type de dossier saisi (execute ; lu : « {Ligne("Forme juridique")} »)");
 Exiger(Ligne("Capital social") == 10000m.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("fr-FR")) + " EUR"
        && extrait.Gestion == "—"
        && extrait.Sections.Length == 1,
     "le capital en N2 fr-FR, la gestion par defaut, et les sections vides masquees comme la XSL (execute)");
-var sansSaisie = RigV3Desktop.Pont.ApercuKbis.Vue("004176", "812 445 901", "SCI DU PARC", (_, _) => "");
+var sansSaisie = RigV3Desktop.Pont.ApercuKbis.Vue("004176", "812 445 906", "SCI DU PARC", "", (_, _) => "");
 Exiger(sansSaisie.GreffeLibelle == Greffes.Defaut.Libelle
        && sansSaisie.Sections.Single().Lignes.Single(l => l.Titre == "Denomination ou raison sociale").Libelle == "SCI DU PARC",
     "sans saisie, le greffe par defaut et la denomination de l'affaire (execute)");

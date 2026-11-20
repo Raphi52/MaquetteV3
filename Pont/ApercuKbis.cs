@@ -28,7 +28,13 @@ public sealed record VueKbis(string GreffeLibelle, string GreffeAdresse, string 
 /// </summary>
 public static class ApercuKbis
 {
-    public static VueKbis Vue(string numero, string siren, string denomination, Func<string, string, string> lire)
+    /// <param name="forme">La forme juridique de l'affaire (INSCRIT_PM.FORME_JURIDIQUE_UTI), celle que
+    /// la puce « Forme juridique » du bandeau montre : la fiche sommaire, ecrasee par ce qu'une tache a
+    /// ecrit. Vide si l'affaire n'en a pas -- la ligne disparait. Le « Type de dossier » du formulaire
+    /// (Personne morale...) n'est PAS une forme juridique : le Kbis l'imprimait a sa place jusqu'au
+    /// 20/11/2026 (004176 : « Personne morale » sur le Kbis, « Societe civile immobiliere » au bandeau).</param>
+    public static VueKbis Vue(string numero, string siren, string denomination, string forme,
+                              Func<string, string, string> lire)
     {
         string Val(string etape, string colonne, string defaut = "")
         {
@@ -60,7 +66,7 @@ public static class ApercuKbis
                 ("Immatriculation au RCS, numero", siren + " R.C.S. " + villeRcs),
                 ("Date d'immatriculation", Date(Val("IDENTITE", "DSSRC_DATE_IMMAT"))),
                 ("Denomination ou raison sociale", Val("IDENTITE", "INSPM_DENOMINATION_STATUT", denomination)),
-                ("Forme juridique", Val("IDENTITE", "DSSRC_TYPE_RCS")),
+                ("Forme juridique", forme),
                 ("Capital social", Capital()),
                 ("Adresse du siege", Val("SIEGE", "ETBLS_ID_ADRBS")),
                 ("Date de debut", Date(Val("SIEGE", "ETBLS_DATE_DEBUT"))),

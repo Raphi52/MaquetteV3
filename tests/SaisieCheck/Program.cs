@@ -454,7 +454,8 @@ Exiger(Regex.Matches(vue2, @"foreach \(var c in courante\.Champs\)").Count == 1
 // ce n est plus un encadre colle sous l apercu (« rig-apercu__saisie ») mais
 // l extrait Kbis LUI-MEME, re-rendu a chaque frappe : le controle porte donc
 // sur le branchement reel, pas sur le nom d une classe disparue.
-Exiger(Regex.IsMatch(vue2, @"ApercuKbis\.Vue\(d\.Numero, d\.Siren, DenominationAffaire\(\), LireSaisie\)")
+// La forme juridique est celle de la fiche sommaire de l'affaire (lot 7, 20/11/2026).
+Exiger(Regex.IsMatch(vue2, @"ApercuKbis\.Vue\(d\.Numero, d\.Siren, DenominationAffaire\(\), SommaireDu\(d\)\.FormeJuridique, LireSaisie\)")
        && vue2.Contains("<ApercuKbis vue={a.kbis} />"),
     "le document montre ce que le formulaire a renseigne");
 Exiger(Regex.IsMatch(vue2, @"private string LireSaisie\(string codeEtape, string colonne\)[\s\S]{0,400}?FicheVue\(etape\)\.TryGetValue\(colonne"),

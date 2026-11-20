@@ -54,7 +54,7 @@ Exiger(groupes.Select(g => g.Rang).SequenceEqual(new[] { 1, 4, 5 }), "rangs de c
 
 var tous = TraitementCommandes.CriteresParDefaut() with { Etats = new HashSet<EtatCommande>() };
 Exiger(TraitementCommandes.Filtrer(jeu, tous).Count == 11, "sans etat coche, toutes les commandes");
-Exiger(TraitementCommandes.Filtrer(jeu, tous with { Siren = "512 004" }).Count == 2, "filtre SIREN par chiffres, espaces ignores");
+Exiger(TraitementCommandes.Filtrer(jeu, tous with { Siren = "812 445" }).Count == 2, "filtre SIREN par chiffres, espaces ignores");
 Exiger(TraitementCommandes.Filtrer(jeu, tous with { Reference = "ig-908" }).Count == 2, "filtre n° de commande, casse ignoree");
 Exiger(TraitementCommandes.Filtrer(jeu, tous with { Famille = FamilleCommande.Faillite }).Count == 3, "filtre par type");
 Exiger(TraitementCommandes.Filtrer(jeu, tous with { Du = new DateTime(2026, 9, 7), Au = new DateTime(2026, 9, 8) }).Count == 4,
@@ -85,7 +85,7 @@ Exiger(!TraitementCommandes.RechercheAffinee(TraitementCommandes.CriteresParDefa
 var c5 = jeu.Single(c => c.Id == 5);
 Exiger(TraitementCommandes.LigneReference(c5) == "N° IG-90812 · 07/09/2026 · Infogreffe · CABINET FIDAL AMIENS",
     $"ligne sous le nom dans le panneau (lu : {TraitementCommandes.LigneReference(c5)})");
-Exiger(TraitementCommandes.Precisions(c5) == "IG-90812 · 07/09 · 512 004 331", $"seconde ligne de la liste (lu : {TraitementCommandes.Precisions(c5)})");
+Exiger(TraitementCommandes.Precisions(c5) == "IG-90812 · 07/09 · 812 445 906", $"seconde ligne de la liste (lu : {TraitementCommandes.Precisions(c5)})");
 Exiger(TraitementCommandes.Titre(c5) == "État d'endettement · N° IG-90812", "titre de l'en-tete : type · N°");
 Exiger(TraitementCommandes.SousTitre(c5) == "07/09/2026 · Infogreffe", "sous-titre : date · origine");
 
@@ -465,9 +465,9 @@ Exiger(OngletActif() == "Rejetee" && vue.Panneau?.Id == 11 && vue.Panneau.Traite
 Geste("ChoisirOnglet", "ATraiter");
 
 Geste("Basculer", "RechercheOuverte");
-Geste("Texte", new { champ = "SirenCherche", valeur = "512 004" });
+Geste("Texte", new { champ = "SirenCherche", valeur = "812 445" });
 Geste("Rechercher");
-var critSiren = defaut with { Siren = "512 004" };
+var critSiren = defaut with { Siren = "812 445" };
 Exiger(vue.RechercheOuverte && vue.RechercheAffinee && vue.ResumeCriteres == TraitementCommandes.Resumer(critSiren)
        && IdsLus().SequenceEqual(Ids(critSiren, false)) && LignesLues().Length > 0,
     $"joue : la saisie d'un SIREN puis « Rechercher » filtre comme Filtrer (lu : {LignesLues().Length} ligne(s), « {vue.ResumeCriteres} »)");

@@ -654,7 +654,7 @@ public sealed partial class SessionPlanTravail
         var feuilles = new List<FeuilleApercuVue>();
         if (!n.APdf && EstKbis(n))
         {
-            kbis = ApercuKbis.Vue(d.Numero, d.Siren, DenominationAffaire(), LireSaisie);
+            kbis = ApercuKbis.Vue(d.Numero, d.Siren, DenominationAffaire(), SommaireDu(d).FormeJuridique, LireSaisie);
         }
         else if (!n.APdf)
         {

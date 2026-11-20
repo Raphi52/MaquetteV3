@@ -229,7 +229,7 @@ public static class TraitementCommandes
     /// <summary>« 07/09/2026 · Infogreffe » : le sous-titre (EnTete_SousTitre).</summary>
     public static string SousTitre(CommandeRecue c) => $"{c.Date.ToString("dd/MM/yyyy", Fr)} · {Libelle(c.Origine)}";
 
-    /// <summary>« IG-90812 · 07/09 · 512 004 331 » : la seconde ligne d'une commande de la liste.</summary>
+    /// <summary>« IG-90812 · 07/09 · 812 445 906 » : la seconde ligne d'une commande de la liste.</summary>
     public static string Precisions(CommandeRecue c)
     {
         var morceaux = new List<string> { c.Reference, c.Date.ToString("dd/MM", Fr) };
@@ -497,7 +497,7 @@ public static class TraitementCommandes
     public static string ResumeRapprochement(IReadOnlyList<EntiteRapprochee> entites, int lignesAffichees) =>
         $"{lignesAffichees} ligne(s) · {entites.Count(e => !e.NonInscrit)} PM · {entites.Count(e => e.NonInscrit)} NI";
 
-    /// <summary>« SIREN 512 004 331 · gestion 004176 · 1 adresse(s) · 6 inscription(s) » (Entite_Resume).</summary>
+    /// <summary>« SIREN 812 445 906 · gestion 004176 · 1 adresse(s) · 6 inscription(s) » (Entite_Resume).</summary>
     public static string ResumeEntite(EntiteRapprochee e) =>
         $"SIREN {(e.Siren.Length > 0 ? FormaterSiren(e.Siren) : "—")} · {(e.NonInscrit ? "NI" : "gestion")} "
         + $"{(e.Gestion.Length > 0 ? e.Gestion : "—")} · {e.Lignes.Count} adresse(s) · {e.NbInscriptions} inscription(s)";
@@ -982,7 +982,7 @@ public static class TraitementCommandes
             {
                 Id = 5, Reference = "IG-90812", Date = new DateTime(2026, 9, 7, 10, 12, 0),
                 Famille = FamilleCommande.EtatEndettement, Origine = OrigineCommande.Infogreffe, Etat = EtatCommande.ATraiter,
-                Denomination = "SCI DU PARC", Siren = "512004331", Requerant = "CABINET FIDAL AMIENS",
+                Denomination = "SCI DU PARC", Siren = "812445906", Requerant = "CABINET FIDAL AMIENS",
                 ReferenceClient = "FID-2026-311", AdresseLivraison = fidal, Email = "immobilier@fidal-amiens.fr",
                 TypesRecus = ["NP", "Z"],
             },
@@ -990,7 +990,7 @@ public static class TraitementCommandes
             {
                 Id = 6, Reference = "IG-90812", Date = new DateTime(2026, 9, 7, 10, 12, 0),
                 Famille = FamilleCommande.Faillite, Origine = OrigineCommande.Infogreffe, Etat = EtatCommande.ATraiter,
-                Denomination = "SCI DU PARC", Siren = "512004331", Requerant = "CABINET FIDAL AMIENS", NumeroGestion = "004176",
+                Denomination = "SCI DU PARC", Siren = "812445906", Requerant = "CABINET FIDAL AMIENS", NumeroGestion = "004176",
                 ReferenceClient = "FID-2026-311", AdresseLivraison = fidal, Email = "immobilier@fidal-amiens.fr",
             },
             new()

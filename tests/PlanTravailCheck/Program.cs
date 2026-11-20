@@ -575,6 +575,11 @@ internal static class Programme
         Agir("ecrire", new { etape = "IDENTITE", colonne = "DSSRC_SIREN", valeur = "109 678 235" });
         Exiger(plan.Vue().Dossier!.Bandeau is { } bc && bc.Liens.All(l => l.Etape != "Identite"),
             "la saisie corrigee retire Identite du bandeau des defauts");
+        // Le jeu ne connait pas le capital de SCI DU PARC : la fiche ne prend plus celui d'AMIENS
+        // BILLARDS (lot 7, 20/11/2026), le montant est a saisir -- le redacteur le saisit.
+        Exiger(plan.Vue().Dossier!.Etapes!.Recap.Groupes.Any(g => g.Points.Any(x => x is { Colonne: "CPTL_MONTANT", Manquant: true })),
+            "le capital de 004176, inconnu du jeu, est a saisir");
+        Agir("ecrire", new { etape = "CAPITAL", colonne = "CPTL_MONTANT", valeur = "1500" });
 
         // --- 5 bis. L'etat du dossier : seul « Conforme » se valide (19/11/2026, conv-2022).
         Exiger(plan.Vue().Dossier!.Etapes!.Recap is { Valide: false, Nombre: 1, Refusees: 1 } rc
@@ -828,6 +833,190 @@ internal static class Programme
         plan.DisposeAsync().AsTask().GetAwaiter().GetResult();
         JouerActionsDossier();
         JouerEnCoursDossier();
+        JouerIdentiteDeLAffaire();
+    }
+
+    /// <summary>
+    /// 17. LE KBIS ET LA FICHE D'UNE AFFAIRE SONT LES SIENS (plan « Vue du dossier = coeur des
+    /// actions », lot 7, 20/11/2026). Constate par le chef sur main e34fea0 : « Kbis a jour » de
+    /// 004151 (TRANSNORD SA) et de 004176 (SCI DU PARC) montrait AMIENS BILLARDS, SIREN 402 118 447
+    /// refuse (cle de controle), gestion 2026B01067, 12 rue des Trois Cailloux : une fiche neuve
+    /// prenait les valeurs de la societe de demonstration, quelle que soit l'affaire. Une fiche
+    /// neuve part de SON affaire ; une valeur deja enregistree qui n'est que l'ancien defaut
+    /// d'AMIENS BILLARDS est reprise ; une vraie saisie, elle, ecrase toujours.
+    /// Etat a part : les sections precedentes ont saisi dans 004176.
+    /// </summary>
+    private static void JouerIdentiteDeLAffaire()
+    {
+        var etatAvant = Environment.GetEnvironmentVariable("RIGV3_ETAT");
+        var etatIci = Path.Combine(Path.GetTempPath(), "rigv3-identite-" + Guid.NewGuid().ToString("N") + ".json");
+        Environment.SetEnvironmentVariable("RIGV3_ETAT", etatIci);
+        try
+        {
+            // Ce qu'un poste a deja enregistre (constate dans accueil.json le 20/11/2026, onze
+            // affaires) : les anciens defauts d'AMIENS BILLARDS dans 004176, et dans 004168 une
+            // VRAIE saisie de l'utilisateur, qui doit rester.
+            var seme = AccueilEtat.Charger();
+            seme.Saisies["004176"] = new()
+            {
+                ["DEMANDE"] = [new() { ["DMND_NUM_DEMANDE"] = "004188", ["DMND_NUM_INDICATIF"] = "2026B01067",
+                                       ["DMND_LIBELLE_ECRAN"] = "Modification - NORD MARINE SAS", ["DMND_NOM"] = "DUPONT Jean" }],
+                ["IDENTITE"] = [new() { ["DSSRC_SIREN"] = "402 118 447", ["INSPM_DENOMINATION_STATUT"] = "AMIENS BILLARDS",
+                                        ["DSSRC_NUM_GESTION"] = "2026B01067", ["DSSRC_TYPE_RCS"] = "Personne morale",
+                                        ["DSSRC_DATE_IMMAT"] = JeuDemo.Aujourdhui.ToString("yyyy-MM-dd") }],
+                ["SIEGE"] = [new() { ["ETBLS_ID_ADRBS"] = "12 rue des Trois Cailloux, 80000 AMIENS" }],
+                ["ACTIVITE"] = [new() { ["ACTVT_ACTIVITE_DECLAREE"] = "Commerce de detail" }],
+                ["CAPITAL"] = [new() { ["CPTL_MONTANT"] = "10000", ["CPTL_MONNAIE"] = "EUR",
+                                       ["CPTL_TEXTE_CAPITAL"] = "Capital de 10 000 EUR divise en 1 000 actions de 10 EUR" }],
+            };
+            seme.Saisies["004168"] = new()
+            {
+                ["IDENTITE"] = [new() { ["DSSRC_SIREN"] = "552 100 554", ["INSPM_DENOMINATION_STATUT"] = "BATIPRO CONSTRUCTION" }],
+            };
+            // La forme juridique se change par une tache (« Modification de la forme juridique »,
+            // RecetteTache.FormeJuridique) : la trace des modifications fait foi pour le bandeau.
+            seme.Modifications["004168"] =
+            [
+                new(DateTime.Now, "Raphael", "INSCRIT_PM", "Forme juridique", "INSCRIT_PM.FORME_JURIDIQUE_UTI",
+                    "Societe par actions simplifiee", "Societe anonyme"),
+            ];
+            seme.Enregistrer();
+
+            var s = new SessionPlanTravail(null, null);
+            s.Initialiser();
+            void Faire(string geste, object? valeur = null) => s.Agir(geste, Valeur(valeur));
+            foreach (var o in s.Vue().Onglets ?? []) Faire("ongletFermer", o.Code);
+            static string LigneKbis(VueKbis k, string titre)
+                => k.Sections.SelectMany(x => x.Lignes).FirstOrDefault(l => l.Titre == titre)?.Libelle ?? "";
+            static string TexteKbis(VueKbis k)
+                => k.Gestion + " | " + string.Join(" | ", k.Sections.SelectMany(x => x.Lignes).Select(l => l.Libelle));
+            string[] amiens = ["AMIENS BILLARDS", "402 118 447", "2026B01067", "Trois Cailloux", "DUPONT Jean", "Commerce de detail"];
+            bool Montre(string texte, string[] traces) => traces.Any(t => texte.Contains(t, StringComparison.OrdinalIgnoreCase));
+            bool SirenValide(string siren) => ValiditeSaisie.LuhnValide(siren.Replace(" ", ""));
+            // La forme juridique que la puce du bandeau montre pour cette affaire (fiche sommaire).
+            static string FormeBandeau(DossierVue x)
+                => x.Sommaire.Champs.FirstOrDefault(c => c.Libelle == "Forme juridique")?.Valeur ?? "";
+
+            // --- 004151, TRANSNORD SA : « Delivrer › Kbis a jour ».
+            Faire("ouvrirNumero", "004151");
+            Faire("actionDossier", "kbis");
+            var d = s.Vue().Dossier!;
+            var k = d.Apercu?.Apercu?.Kbis;
+            Exiger(k is not null && LigneKbis(k, "Denomination ou raison sociale") == "TRANSNORD SA"
+                   && LigneKbis(k, "Immatriculation au RCS, numero").StartsWith(d.Siren + " R.C.S. ", StringComparison.Ordinal)
+                   && k.Gestion == "004151" && LigneKbis(k, "Adresse du siege") == "ZI Nord, 80440 BOVES",
+                $"004151 : le Kbis est celui de TRANSNORD SA, au SIREN du bandeau, gestion 004151, siege a BOVES (lu : {(k is null ? "aucun Kbis" : TexteKbis(k))})");
+            Exiger(SirenValide(d.Siren) && !(d.Bandeau?.Liens.Any(l => l.Etape == "Identite" && l.Refuse) ?? false),
+                $"004151 : le SIREN du bandeau ({d.Siren}) passe la cle de Luhn, la fiche Identite n'est pas refusee");
+            Exiger(k is not null && !Montre(TexteKbis(k), amiens), "004151 : rien d'AMIENS BILLARDS sur le Kbis");
+            // Le capital du jeu (10 000 EUR, « 1 000 actions de 10 EUR ») est celui d'AMIENS BILLARDS
+            // (Metier/ArbreGed.cs : son Kbis, son BODACC « SARL au capital de 10 000 EUR ») ; le jeu ne
+            // connait pas celui de TRANSNORD SA : la ligne reste vide.
+            Exiger(k is not null && LigneKbis(k, "Capital social") == "",
+                $"004151 : capital inconnu de l'affaire, pas celui d'AMIENS BILLARDS (lu : « {(k is null ? "aucun Kbis" : LigneKbis(k, "Capital social"))} »)");
+            Exiger(k is not null && LigneKbis(k, "Forme juridique") == FormeBandeau(d) && LigneKbis(k, "Forme juridique") != "Personne morale",
+                $"004151 : la forme juridique du Kbis est celle du bandeau, jamais le type de dossier (lu : Kbis « {(k is null ? "aucun Kbis" : LigneKbis(k, "Forme juridique"))} », bandeau « {FormeBandeau(d)} »)");
+            // Le jeu ne connait pas la date d'immatriculation de 004151 : la ligne reste vide, elle
+            // ne prend pas la date du jour (TRANSNORD, en depot de bilan, « immatricule » le jour meme).
+            // Jumeau : 004176, qui a la sienne au bandeau (12/03/2014), l'affiche (controle suivant).
+            Exiger(k is not null && LigneKbis(k, "Date d'immatriculation") == "",
+                $"004151 : date d'immatriculation inconnue de l'affaire, la ligne reste vide (lu : « {(k is null ? "aucun Kbis" : LigneKbis(k, "Date d'immatriculation"))} »)");
+
+            // --- 004176, SCI DU PARC : des anciens defauts d'AMIENS BILLARDS deja enregistres.
+            Faire("ouvrirNumero", "004176");
+            Faire("actionDossier", "kbis");
+            d = s.Vue().Dossier!;
+            k = d.Apercu?.Apercu?.Kbis;
+            var copieSiren = d.Actions.SelectMany(g => g.Actions).Single(a => a.Code == "copierSiren").Copie;
+            Exiger(k is not null && LigneKbis(k, "Denomination ou raison sociale") == "SCI DU PARC" && k.Gestion == "004176"
+                   && LigneKbis(k, "Date d'immatriculation") == "12/03/2014" && LigneKbis(k, "Adresse du siege") == "8 Avenue du Parc, 80000 AMIENS"
+                   && LigneKbis(k, "Immatriculation au RCS, numero").StartsWith(d.Siren + " R.C.S. ", StringComparison.Ordinal)
+                   && copieSiren == d.Siren && SirenValide(d.Siren) && !Montre(TexteKbis(k), amiens),
+                $"004176 : le Kbis est celui de SCI DU PARC, au SIREN du bandeau, valide ; l'ancien defaut enregistre est repris (lu : {(k is null ? "aucun Kbis" : TexteKbis(k))})");
+            Exiger(!(d.Bandeau?.Liens.Any(l => l.Etape == "Identite" && l.Refuse) ?? false),
+                "004176 : l'ancien SIREN 402 118 447 enregistre n'est plus refuse, il a laisse la place a celui de l'affaire");
+            // Le Kbis lisait le « Type de dossier » (Personne morale) comme forme juridique, et la
+            // puce du bandeau disait « Societe civile immobiliere » pour la meme affaire.
+            Exiger(k is not null && LigneKbis(k, "Forme juridique") == "Societe civile immobiliere"
+                   && FormeBandeau(d) == "Societe civile immobiliere",
+                $"004176 : le Kbis dit la forme juridique du bandeau, pas le type de dossier (lu : Kbis « {(k is null ? "aucun Kbis" : LigneKbis(k, "Forme juridique"))} », bandeau « {FormeBandeau(d)} »)");
+
+            // --- Jumeau : une VRAIE saisie de l'utilisateur ecrase toujours.
+            Faire("ouvrirNumero", "004168");
+            Faire("actionDossier", "kbis");
+            k = s.Vue().Dossier!.Apercu?.Apercu?.Kbis;
+            Exiger(k is not null && LigneKbis(k, "Denomination ou raison sociale") == "BATIPRO CONSTRUCTION",
+                "jumeau : la denomination saisie par l'utilisateur sur 004168 reste, le defaut de l'affaire ne l'ecrase pas");
+            Exiger(k is not null && LigneKbis(k, "Forme juridique") == "Societe anonyme" && FormeBandeau(s.Vue().Dossier!) == "Societe anonyme",
+                $"jumeau : la forme changee par une tache sur 004168 passe au Kbis comme au bandeau (lu : « {(k is null ? "aucun Kbis" : LigneKbis(k, "Forme juridique"))} »)");
+
+            // --- Toutes les affaires : aucune fiche ne montre AMIENS BILLARDS hors des siennes,
+            // ni la demande 004188 (NORD MARINE SAS) hors de la sienne.
+            var numeros = JeuDemo.Demandes.Select(x => x.Dossier).Where(n => n.Length > 0)
+                                 .Append("J-00931").Distinct().ToArray();
+            foreach (var n in numeros)
+            {
+                Faire("ouvrirNumero", n);
+                if (s.Vue().Dossier!.Actions.SelectMany(g => g.Actions).Any(a => a.Code == "kbis"))
+                    Faire("actionDossier", "kbis");
+                s.Vue();
+            }
+            Faire("ouvrirNumero", "004151");   // enregistre ce que la derniere affaire a cree
+            var saisies = AccueilEtat.Charger().Saisies;
+            string Valeurs(string n) => saisies.TryGetValue(n, out var e)
+                ? string.Join(" | ", e.Values.SelectMany(f => f).SelectMany(f => f.Values)) : "";
+            string Champ(string n, string etape, string colonne)
+                => saisies.TryGetValue(n, out var e) && e.TryGetValue(etape, out var f) && f.Count > 0
+                   && f[0].TryGetValue(colonne, out var v) ? v : "";
+            var avecFiche = numeros.Where(n => Champ(n, "IDENTITE", "DSSRC_TYPE_RCS").Length > 0).ToArray();
+            var fuites = numeros.Where(n => n is not "2026B01067" and not "004182" && Montre(Valeurs(n), amiens)).ToArray();
+            var fuitesDemande = numeros.Where(n => n != "004188" && Montre(Valeurs(n), ["NORD MARINE", "004188"])).ToArray();
+            Exiger(avecFiche.Length >= 8 && fuites.Length == 0 && fuitesDemande.Length == 0,
+                $"aucune fiche ne montre AMIENS BILLARDS hors de 2026B01067/004182, ni la demande 004188 hors de la sienne "
+                + $"({avecFiche.Length} affaires lues ; AMIENS : {string.Join(", ", fuites)} ; 004188 : {string.Join(", ", fuitesDemande)})");
+            Exiger(Champ("004151", "IDENTITE", "DSSRC_SIREN") == "318 552 007"
+                   && Champ("004151", "IDENTITE", "INSPM_DENOMINATION_STATUT") == "TRANSNORD SA"
+                   && Champ("004151", "DEMANDE", "DMND_NUM_DEMANDE") == "004151"
+                   && Champ("004151", "DEMANDE", "DMND_LIBELLE_ECRAN") == "Depot de bilan - TRANSNORD SA"
+                   && Champ("004151", "DEMANDE", "DMND_NOM") == "MARCHAND Paul"
+                   && Champ("004151", "ACTIVITE", "ACTVT_ACTIVITE_DECLAREE") == "Transport routier",
+                $"la fiche neuve de 004151 part de 004151 : SIREN, denomination, sa demande, son dirigeant, son activite "
+                + $"(lu : {Champ("004151", "IDENTITE", "DSSRC_SIREN")} · {Champ("004151", "DEMANDE", "DMND_NUM_DEMANDE")} · {Champ("004151", "DEMANDE", "DMND_NOM")})");
+            Exiger(Champ("004182", "IDENTITE", "INSPM_DENOMINATION_STATUT") == "AMIENS BILLARDS"
+                   && Champ("004182", "IDENTITE", "DSSRC_SIREN") == "109 678 235"
+                   && Champ("004182", "DEMANDE", "DMND_NUM_DEMANDE") == "004182",
+                "jumeau : l'affaire d'AMIENS BILLARDS (004182) garde sa societe, au SIREN de son bandeau (cle valide), et sa demande");
+            Exiger(Champ("004176", "CAPITAL", "CPTL_MONTANT") == "" && Champ("004176", "CAPITAL", "CPTL_TEXTE_CAPITAL") == ""
+                   && Champ("004151", "CAPITAL", "CPTL_MONTANT") == "" && Champ("004151", "CAPITAL", "CPTL_TEXTE_CAPITAL") == "",
+                $"le capital d'AMIENS BILLARDS ne part plus dans 004151 (fiche neuve) ni ne reste dans 004176 (ancien defaut enregistre) "
+                + $"(lu : 004151 « {Champ("004151", "CAPITAL", "CPTL_MONTANT")} », 004176 « {Champ("004176", "CAPITAL", "CPTL_MONTANT")} »)");
+            Exiger(Champ("004168", "IDENTITE", "DSSRC_SIREN") == "552 100 554"
+                   && Champ("004176", "IDENTITE", "DSSRC_TYPE_RCS") == "Personne morale"
+                   && Champ("004176", "CAPITAL", "CPTL_MONNAIE") == "EUR"
+                   && Champ("J-00931", "CAPITAL", "CPTL_MONNAIE") == "EUR",
+                "les vraies saisies et les defauts neutres (type de dossier, monnaie) restent");
+
+            // --- Jumeau de la reprise : elle ne joue qu'UNE fois. L'adresse « 12 rue des Trois
+            // Cailloux » (une adresse de la liste) choisie ENSUITE sur 2026B01067 reste au redemarrage.
+            Faire("ouvrirNumero", "2026B01067");
+            Faire("ecrire", new { etape = "SIEGE", colonne = "ETBLS_ID_ADRBS", valeur = "12 rue des Trois Cailloux, 80000 AMIENS" });
+            foreach (var o in s.Vue().Onglets ?? []) Faire("ongletFermer", o.Code);
+            s.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            var redemarre = new SessionPlanTravail(null, null);
+            redemarre.Initialiser();
+            redemarre.Agir("ouvrirNumero", Valeur("2026B01067"));
+            redemarre.Agir("actionDossier", Valeur("kbis"));
+            k = redemarre.Vue().Dossier!.Apercu?.Apercu?.Kbis;
+            Exiger(k is not null && LigneKbis(k, "Adresse du siege") == "12 rue des Trois Cailloux, 80000 AMIENS",
+                $"jumeau : une valeur choisie apres la reprise, meme egale a l'ancien defaut, n'est plus reprise (lu : {(k is null ? "aucun Kbis" : LigneKbis(k, "Adresse du siege"))})");
+            foreach (var o in redemarre.Vue().Onglets ?? []) redemarre.Agir("ongletFermer", Valeur(o.Code));
+            redemarre.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("RIGV3_ETAT", etatAvant);
+            try { File.Delete(etatIci); } catch (IOException) { }
+        }
     }
 
     /// <summary>
@@ -868,7 +1057,7 @@ internal static class Programme
                && !codes.Contains("depotsJudiciaires") && !codes.Contains("redaction"),
             "affaire RCS : le Kbis, les ecrans du RCS et ceux de tous ; aucun ecran reserve au judiciaire");
         var actions = barre.SelectMany(g => g.Actions).ToDictionary(a => a.Code);
-        Exiger(actions["copierNumero"].Copie == "004176" && actions["copierSiren"].Copie == "812 445 901"
+        Exiger(actions["copierNumero"].Copie == "004176" && actions["copierSiren"].Copie == "812 445 906"
                && actions.Values.Count(a => a.Copie is not null) == 2
                && actions["factures"] is { Ecran: true, Libelle: "Factures", Touche: "F" } && actions["kbis"] is { Ecran: false },
             "les copies portent le numero et le SIREN ; une action d'ecran le dit ; chaque action a sa lettre");
@@ -923,7 +1112,7 @@ internal static class Programme
         Faire("actionDossier", "factures");
         v = s.Vue();
         Exiger(v.Dossier is null && v.Proc is { Code: "PROC_FACTURE", Libelle: "Factures" } pf
-               && pf.Ecran.Dossier is { Numero: "004176", Siren: "812 445 901", Objet: "Modification - SCI DU PARC", Type: "RCS", Nom: "SCI DU PARC" }
+               && pf.Ecran.Dossier is { Numero: "004176", Siren: "812 445 906", Objet: "Modification - SCI DU PARC", Type: "RCS", Nom: "SCI DU PARC" }
                && v.Onglets!.Select(o => o.Code).SequenceEqual(new[] { "AFFAIRE:004176", "PROC_ENCAISS", "PROC_FACTURE" })
                && v.Onglets[2] is { Actif: true, Libelle: "Factures" },
             "« Factures » ouvre l'ecran dans son onglet, au nom de l'action, avec le contexte de l'affaire (n°, SIREN, objet, type, nom)");
