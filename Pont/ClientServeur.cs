@@ -1,8 +1,10 @@
 // fix-ok: CS0246 HttpClient mesure par compiler.ps1 -- un projet WPF n'importe pas System.Net.Http d'office.
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using RigV3.Contrats.Sante;
+using RigV3.Contrats.Socle;
 
 namespace RigV3Desktop.Pont;
 
@@ -38,6 +40,11 @@ public sealed class ClientServeur
     /// <summary>La variable d'environnement qui branche l'ecran sur le serveur.</summary>
     public const string Variable = "RIGV3_SERVEUR";
 
+    /// <summary>Developpement et recette : le compte a ouvrir A LA PLACE de la session Windows,
+    /// le pendant du parametre « utilisateur= » de la V2. Envoye dans l'en-tete
+    /// <see cref="RoutesIdentite.EnTeteCompte"/> ; un serveur de production l'ignore (SOC-001 CA07).</summary>
+    public const string VariableCompte = "RIGV3_COMPTE";
+
     private static readonly Lazy<ClientServeur?> Courant =
         new(() => Depuis(Environment.GetEnvironmentVariable(Variable)));
 
@@ -72,7 +79,13 @@ public sealed class ClientServeur
         // Une racine avec un chemin (http://h/rig) doit finir par « / », sinon
         // « sante » remplacerait « rig » au lieu de s'y ajouter.
         Adresse = adresse.AbsoluteUri.EndsWith('/') ? adresse : new Uri(adresse.AbsoluteUri + "/");
-        Http = gestionnaire is null ? new HttpClient() : new HttpClient(gestionnaire, disposeHandler: false);
+        // SOC-001 : sur le reseau, chaque appel porte la session Windows de l'agent (Kerberos
+        // ou NTLM) ; le serveur le reconnait par elle, sans identifiant ni mot de passe.
+        Http = gestionnaire is null
+            ? new HttpClient(new SocketsHttpHandler { Credentials = CredentialCache.DefaultCredentials })
+            : new HttpClient(gestionnaire, disposeHandler: false);
+        if (Environment.GetEnvironmentVariable(VariableCompte) is { } compte && !string.IsNullOrWhiteSpace(compte))
+            Http.DefaultRequestHeaders.Add(RoutesIdentite.EnTeteCompte, compte.Trim());
         Http.BaseAddress = Adresse;
         // Un agent attend devant son ecran : au-dela, mieux vaut un message qu'un sablier.
         Http.Timeout = TimeSpan.FromSeconds(30);
