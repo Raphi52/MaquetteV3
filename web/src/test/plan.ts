@@ -129,6 +129,7 @@ export function dossier(partiel: Partial<DossierVue> = {}): DossierVue {
     historique: historique(),
     arbreReplie: false, chemin: ['004176', 'Dossier RCS', 'Statuts signes'], pieces: 42,
     fil: [], suiviReplie: false, triClasseur: 'date', sortie: false, actions: [],
+    enCours: { travail: [], horsDelai: 0, activite: [] },
     ...partiel,
   }
 }

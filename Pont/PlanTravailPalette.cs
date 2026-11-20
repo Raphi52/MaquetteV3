@@ -264,7 +264,7 @@ public sealed partial class SessionPlanTravail
                 t.Qui.Length > 0 ? Agent(t.Qui) : null,
                 t.Qui == moi,
                 t.EnCours,
-                t.Nature == "dem" && t.EnCours && t.Qui != moi,
+                RecherchePalette.Attribuable(t, moi),
                 t.Delai, t.Siren,
                 [.. RecherchePalette.Activite(t.Cle, compte)
                     .Select(a => new ActivitePaletteVue(a.Agent, a.Verbe, a.Objet, a.Depuis))]))],

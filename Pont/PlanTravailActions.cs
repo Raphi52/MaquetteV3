@@ -32,7 +32,7 @@ public sealed partial class SessionPlanTravail
     {
         // Un ecran : seulement dans la fenetre principale -- celle d'un onglet SORTI n'a
         // ni barre d'onglets ni accueil ou l'ouvrir --, et dans le perimetre du login.
-        if (a.Ecran is { } ecran) return !ModeFenetreVue && PerimetreProfil.Visible(ecran, Domaines);
+        if (a.Ecran is { } ecran) return EcranPourLeDossier(ecran);
         return a.Code switch
         {
             // Une affaire purement judiciaire n'a pas de Kbis ; un login sans le RCS ne le voit pas.
@@ -41,6 +41,10 @@ public sealed partial class SessionPlanTravail
             _ => true
         };
     }
+
+    /// <summary>Un ecran peut s'ouvrir « pour ce dossier » : dans la fenetre principale et dans
+    /// le perimetre du login. La barre et la colonne de suivi (PlanTravailSuivi.cs) lisent cette regle.</summary>
+    private bool EcranPourLeDossier(string ecran) => !ModeFenetreVue && PerimetreProfil.Visible(ecran, Domaines);
 
     /// <summary>Le Kbis a jour, s'il est dans l'arbre que ce login a le droit de voir.</summary>
     private NoeudGed? KbisVisible()

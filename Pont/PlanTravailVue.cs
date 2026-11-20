@@ -90,7 +90,7 @@ public sealed record DossierVue(string Numero, string Objet, string Siren, strin
                                 ApercuColonneVue? Apercu, bool Voile, PieceHistoriqueVue[] Historique,
                                 bool ArbreReplie, string[] Chemin, int Pieces, MessageFilVue[] Fil,
                                 bool SuiviReplie, string TriClasseur, bool Sortie,
-                                VerbeActionsVue[] Actions);
+                                VerbeActionsVue[] Actions, EnCoursDossierVue EnCours);
 
 /// <summary>Un verbe de la barre d'actions et ses actions disponibles.</summary>
 public sealed record VerbeActionsVue(string Verbe, ActionDossierVue[] Actions);
@@ -102,6 +102,26 @@ public sealed record VerbeActionsVue(string Verbe, ActionDossierVue[] Actions);
 /// <param name="Copie">Le texte qu'elle met dans le presse-papiers, joue par la page ; nul sinon.</param>
 public sealed record ActionDossierVue(string Code, string Libelle, string Touche, string Detail,
                                       bool Ecran, string? Copie);
+
+/// <summary>
+/// Ce qui est EN COURS sur l'affaire, en tete de l'onglet « Suivi » (plan « Vue du dossier =
+/// coeur des actions », lot 3) : le travail qui la porte et les derniers gestes poses dessus.
+/// </summary>
+/// <param name="Travail">Le plus urgent d'abord (RecherchePalette.TravailDuDossier).</param>
+/// <param name="HorsDelai">Les lignes dont le delai legal est depasse : le rail replie les montre en alerte.</param>
+/// <param name="Activite">Les derniers gestes sur l'affaire, du plus recent au plus ancien (RecherchePalette.Activite).</param>
+public sealed record EnCoursDossierVue(TravailDossierVue[] Travail, int HorsDelai, ActivitePaletteVue[] Activite);
+
+/// <summary>Une ligne du travail en cours sur l'affaire.</summary>
+/// <param name="Nature">« dem » demande, « cmd » commande web, « cou » courrier, « doc » acte numerise.</param>
+/// <param name="Ton">Couleur de la pastille d'etat : « al » (alerte), « ok », ou vide.</param>
+/// <param name="Qui">L'agent qui s'en occupe ; nul = personne.</param>
+/// <param name="Attribuable">« M'attribuer » : meme regle que la palette (RecherchePalette.Attribuable).</param>
+/// <param name="EcranLibelle">L'ecran que la ligne ouvre pour ce dossier (geste « enCoursOuvrir »),
+/// nomme comme son onglet ; vide = aucun (hors du perimetre du login, fenetre d'un onglet sorti).</param>
+public sealed record TravailDossierVue(string Nature, string Numero, string Titre, string Detail, string Etat,
+                                       string Ton, string Filet, AgentPaletteVue? Qui, bool AMoi,
+                                       bool Attribuable, string? Delai, string EcranLibelle);
 
 /// <summary>
 /// Un message du FIL de l'affaire : une note ecrite dans l'onglet « Fil », ou une valeur
@@ -419,7 +439,7 @@ public sealed partial class SessionPlanTravail
             SuiviReplie, Etat.TriClasseur == AccueilEtat.TriClasseurParDossier
                 ? AccueilEtat.TriClasseurParDossier : AccueilEtat.TriClasseurParDate,
             ModeFenetreVue,
-            VueActions(d));
+            VueActions(d), VueEnCours(d));
     }
 
     /// <summary>
@@ -766,6 +786,8 @@ public sealed partial class SessionPlanTravail
             case "arbreDeplier": ArbreReplie = false; break;
             case "suiviReplier": SuiviReplie = true; break;
             case "suiviDeplier": SuiviReplie = false; break;
+            // « En cours » de la colonne de suivi (PlanTravailSuivi.cs) ; « M'attribuer » y est « paletteAttribuer ».
+            case "enCoursOuvrir": OuvrirTravailDuDossier(Lire<GesteTravailDossier>(valeur)); break;
             case "ouvrirNouveau": OuvrirNouveau(); break;
             case "filtre": FiltreDeLArbre = Texte(valeur); break;
             case "effacerFiltre": FiltreDeLArbre = string.Empty; break;

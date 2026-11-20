@@ -163,10 +163,40 @@ public static class RecherchePalette
             ? toutes.Where(l => l.EnCours)
             : toutes.Where(l => Correspond(texte, l.Numero, l.Titre, l.Siren, l.Detail, l.Qui));
 
-        return [.. gardees.OrderBy(l => l.Urgence)
-                          .ThenByDescending(l => l.Jours)
-                          .ThenBy(l => l.Numero, StringComparer.Ordinal)];
+        return PlusUrgentDabord(gardees);
     }
+
+    /// <summary>Hors delai (le plus ancien en tete), a traiter, en attente, termine.</summary>
+    private static LigneTravail[] PlusUrgentDabord(IEnumerable<LigneTravail> lignes)
+        => [.. lignes.OrderBy(l => l.Urgence)
+                     .ThenByDescending(l => l.Jours)
+                     .ThenBy(l => l.Numero, StringComparer.Ordinal)];
+
+    /// <summary>L'urgence d'une ligne terminee (validee, numerisee, rattachee).</summary>
+    public const int Termine = 3;
+
+    /// <summary>
+    /// Ce qui est EN COURS sur UNE affaire (colonne de suivi de la vue du dossier, plan « Vue
+    /// du dossier = coeur des actions », lot 3, 20/11/2026) : les demandes, le courrier, les
+    /// actes numerises et les commandes web dont la ligne ouvre CE numero
+    /// (<see cref="LigneTravail.Cle"/>), sauf ce qui est termine -- le plus urgent d'abord,
+    /// comme <see cref="Travail"/>. Les memes lignes que la palette : meme etat, meme delai,
+    /// meme agent. L'affaire elle-meme n'en est pas une ligne : on est dessus.
+    /// </summary>
+    public static LigneTravail[] TravailDuDossier(string dossier, Func<string, bool> estValide)
+    {
+        if (dossier.Length == 0) return [];
+        var lignes = JeuDemo.Demandes.Select(d => DeDemande(d, estValide(d.Dossier)))
+            .Concat(JeuDemo.Arrivees.Select(DuCourrier))
+            .Concat(JeuDemo.Actes.Select(DeLActe))
+            .Concat(JeuDemo.CommandesWeb().Select(DeLaCommande));
+        return PlusUrgentDabord(lignes.Where(l => l.Cle == dossier && l.Urgence < Termine));
+    }
+
+    /// <summary>« M'attribuer » : une demande encore en cours qui n'est pas deja a ce login
+    /// (sa signature). La palette et la colonne de suivi lisent cette regle-ci.</summary>
+    public static bool Attribuable(LigneTravail l, string moi)
+        => l.Nature == "dem" && l.EnCours && l.Qui != moi;
 
     /// <summary>Les lignes que garde un filtre de « Mon travail ».</summary>
     public static IEnumerable<LigneTravail> Filtrer(IEnumerable<LigneTravail> lignes, string filtre, string moi)
@@ -241,6 +271,27 @@ public static class RecherchePalette
                   "", a.DateDepot, 3, jours, null, "", false)
             : new("doc", a.Depot, a.Dossier, "PROC_ACTES_NUM", titre, detail, "A numeriser", "", "attente",
                   "", a.DateDepot, 2, jours, null, "", false);
+    }
+
+    /// <summary>
+    /// Une commande web (« cmd ») : elle porte un SIREN, pas de numero d'affaire. Elle va a
+    /// l'affaire que le fonds des requisitions range sous ce SIREN (le n° de gestion,
+    /// JeuDemo.EntreprisesRequi) ; sans dossier connu, sa ligne n'ouvre rien.
+    /// </summary>
+    private static LigneTravail DeLaCommande(CommandeWeb c)
+    {
+        var siren = Plier(c.Siren);
+        var dossier = siren.Length == 0 ? ""
+            : JeuDemo.EntreprisesRequi.FirstOrDefault(e => !e.NonInscrit && e.Gestion.Length > 0 && Plier(e.Siren) == siren)
+                  ?.Gestion ?? "";
+        var jours = (int)(JeuDemo.Aujourdhui.Date - c.Recue.Date).TotalDays;
+        var titre = $"{c.Famille} - {c.Societe}";
+        var detail = $"Commande web · {c.Origine} · {c.Demandeur} · {c.Recue:dd/MM/yyyy HH:mm}";
+        return c.Etat == "Traitee"
+            ? new("cmd", c.Numero, dossier, "PROC_COMMANDES_WEB", titre, detail, "Traitee", "ok", "ok",
+                  "", c.Recue, Termine, jours, null, c.Siren, false)
+            : new("cmd", c.Numero, dossier, "PROC_COMMANDES_WEB", titre, detail, c.Etat, "", "action",
+                  "", c.Recue, 1, jours, null, c.Siren, true);
     }
 
     private static string Jours(int n) => n == 1 ? "1 jour" : $"{n} jours";

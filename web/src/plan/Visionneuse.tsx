@@ -254,7 +254,8 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
         )}
 
         {/* ---- ZONE 4 : LE SUIVI ---- toujours a droite, onglets Suivi / Fil. */}
-        <SuiviDossier bandeau={d.bandeau} historique={d.historique} fil={d.fil} replie={d.suiviReplie} plan={plan} />
+        <SuiviDossier bandeau={d.bandeau} historique={d.historique} fil={d.fil} enCours={d.enCours}
+                      replie={d.suiviReplie} plan={plan} />
 
         {d.voile && (
           <div className="rig-vged__voile"

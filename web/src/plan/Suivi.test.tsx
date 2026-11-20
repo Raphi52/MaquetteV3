@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { Visionneuse } from './Visionneuse'
 import { dossier } from '../test/plan'
-import type { DossierVue, GestePlan, MessageFilVue } from './types'
+import type { DossierVue, EnCoursDossierVue, GestePlan, MessageFilVue } from './types'
 
 afterEach(cleanup)
 
@@ -149,5 +149,122 @@ describe('Vue du dossier : la colonne de suivi se replie a droite', () => {
   it('repliee sans defaut : le rail n\'affiche pas de nombre', () => {
     const { container } = rendre(dossier({ suiviReplie: true, bandeau: null }))
     expect(container.querySelector('.rig-suivi__rouvrir')!.textContent).toBe('Suivi')
+  })
+})
+
+// EN COURS SUR L'AFFAIRE (plan « Vue du dossier = coeur des actions », lot 3,
+// 20/11/2026) : ce que la session rend pour 004151 (Pont/PlanTravailSuivi.cs,
+// joue sur les vraies donnees par tests/PlanTravailCheck).
+function enCours004151(): EnCoursDossierVue {
+  const benier = { signature: 'C. BENIER', initiales: 'CB', nom: 'C. BENIER' }
+  return {
+    travail: [
+      { nature: 'dem', numero: '004151', titre: 'Depot de bilan - TRANSNORD SA', detail: 'Demande du 29/08/2026 · TRANSNORD',
+        etat: 'J+11', ton: 'al', filet: 'alerte', qui: benier, aMoi: false, attribuable: true,
+        delai: 'Delai legal de 7 jours depasse de 4 jours', ecranLibelle: 'Demandes' },
+      { nature: 'cmd', numero: 'CW-2026-000413', titre: 'Faillite - TRANSNORD SA', detail: 'Commande web · Infogreffe',
+        etat: 'A traiter', ton: '', filet: 'action', qui: null, aMoi: false, attribuable: false, delai: null, ecranLibelle: 'Commandes web' },
+      { nature: 'cou', numero: 'A-2026-0909', titre: 'Depot de bilan - TRANSNORD SA', detail: 'Courrier · Recommande',
+        etat: 'A numeriser', ton: '', filet: 'attente', qui: benier, aMoi: false, attribuable: false, delai: null, ecranLibelle: '' },
+    ],
+    horsDelai: 1,
+    activite: [
+      { agent: 'Raphael', verbe: 'a valide', objet: 'depot du dossier 004151', depuis: 'il y a 7 min' },
+      { agent: 'Claire', verbe: 'a depose', objet: 'acte au dossier 004151', depuis: 'il y a 22 min' },
+    ],
+  }
+}
+
+describe('Vue du dossier : « En cours » en tete de l\'onglet Suivi', () => {
+  it('les lignes de l\'affaire, le plus urgent d\'abord, avant le reste a faire ; le hors delai en alerte, avec son agent', () => {
+    const { container } = rendre(dossier({ numero: '004151', enCours: enCours004151() }))
+    const panneau = container.querySelector('.rig-suivi__panneau')!
+    expect([...panneau.children].map((e) => e.className)).toEqual(['rig-encours', 'rig-reste', 'rig-chrono'])
+    const titre = container.querySelector('.rig-encours > .rig-suivi__titre')!
+    expect(titre.textContent).toBe('En cours · 3')
+    expect(titre.getAttribute('title')).toBe('3 en cours, dont 1 hors delai')
+    const lignes = [...container.querySelectorAll('.rig-encours__ligne')]
+    expect(lignes.map((l) => l.querySelector('.rig-encours__tete')!.textContent))
+      .toEqual(['Demande004151J+11', 'Commande webCW-2026-000413A traiter', 'CourrierA-2026-0909A numeriser'])
+    // Hors delai : la ligne, sa pastille et son filet en alerte, le delai ecrit.
+    expect(lignes[0]!.className).toBe('rig-encours__ligne rig-encours__ligne--alerte')
+    expect(lignes[0]!.querySelector('.rig-encours__etat')!.className).toBe('rig-encours__etat rig-encours__etat--al')
+    expect(lignes[0]!.querySelector('.rig-filet-v')!.className).toBe('rig-filet-v rig-filet-v--alerte')
+    expect(lignes[0]!.querySelector('.rig-encours__titre')!.textContent).toBe('Depot de bilan - TRANSNORD SA')
+    expect(lignes[0]!.querySelector('.rig-encours__titre')!.getAttribute('title')).toBe('Demande du 29/08/2026 · TRANSNORD')
+    expect(lignes[0]!.querySelector('.rig-encours__delai')!.textContent).toBe('Delai legal de 7 jours depasse de 4 jours')
+    expect(lignes[0]!.querySelector('.rig-encours__qui')!.textContent).toBe('CBC. BENIER')
+    // Jumeau : une ligne a traiter n'est pas en alerte, et personne ne s'en occupe.
+    expect(lignes[1]!.className).toBe('rig-encours__ligne')
+    expect(lignes[1]!.querySelector('.rig-encours__etat')!.className).toBe('rig-encours__etat')
+    expect(lignes[1]!.querySelector('.rig-encours__delai')).toBeNull()
+    expect(lignes[1]!.querySelector('.rig-encours__qui')!.textContent).toBe('Personne')
+  })
+
+  it('un clic sur la ligne ouvre son ecran POUR ce dossier ; une ligne sans ecran ouvrable se lit seulement', () => {
+    const { container, gestes } = rendre(dossier({ numero: '004151', enCours: enCours004151() }))
+    const lignes = container.querySelectorAll('.rig-encours__ligne')
+    const ouvrir = lignes[0]!.querySelector('button.rig-encours__ouvrir')!
+    expect(ouvrir.getAttribute('title')).toBe('Ouvrir l\'ecran Demandes pour ce dossier')
+    fireEvent.click(ouvrir)
+    fireEvent.click(lignes[1]!.querySelector('button.rig-encours__ouvrir')!)
+    expect(gestes()).toEqual([
+      ['enCoursOuvrir', { nature: 'dem', numero: '004151' }],
+      ['enCoursOuvrir', { nature: 'cmd', numero: 'CW-2026-000413' }],
+    ])
+    expect(lignes[2]!.querySelector('button.rig-encours__ouvrir')).toBeNull()
+    fireEvent.click(lignes[2]!.querySelector('.rig-encours__ouvrir')!)
+    expect(gestes()).toHaveLength(2)
+  })
+
+  it('« M\'attribuer » sur la seule ligne attribuable : le geste de la palette, a mon nom', () => {
+    const { container, gestes } = rendre(dossier({ numero: '004151', enCours: enCours004151() }))
+    const boutons = [...container.querySelectorAll('.rig-encours__attribuer')]
+    expect(boutons.map((b) => b.closest('.rig-encours__ligne')!.querySelector('.rig-encours__numero')!.textContent)).toEqual(['004151'])
+    expect(boutons[0]!.textContent).toBe('M\'attribuer')
+    fireEvent.click(boutons[0]!)
+    expect(gestes()).toEqual([['paletteAttribuer', { numero: '004151', signature: null }]])
+  })
+
+  it('attribuee a moi : plus de « M\'attribuer », mon avatar marque', () => {
+    const e = enCours004151()
+    const moi = { signature: 'R. VILAIN', initiales: 'RV', nom: 'Raphael' }
+    e.travail[0] = { ...e.travail[0]!, qui: moi, aMoi: true, attribuable: false }
+    const { container } = rendre(dossier({ numero: '004151', enCours: e }))
+    const ligne = container.querySelector('.rig-encours__ligne')!
+    expect(ligne.querySelector('.rig-encours__attribuer')).toBeNull()
+    expect(ligne.querySelector('.rig-encours__qui')!.textContent).toBe('RVR. VILAIN')
+    expect(ligne.querySelector('.rig-encours__avatar')!.className).toBe('rig-encours__avatar rig-encours__avatar--moi')
+  })
+
+  it('les derniers gestes sur l\'affaire, du plus recent au plus ancien', () => {
+    const { container } = rendre(dossier({ numero: '004151', enCours: enCours004151() }))
+    expect(container.querySelector('.rig-encours__sous-titre')!.textContent).toBe('Dernieres actions')
+    expect([...container.querySelectorAll('.rig-encours__geste')].map((g) => g.textContent)).toEqual([
+      'Raphael a valide depot du dossier 004151il y a 7 min', 'Claire a depose acte au dossier 004151il y a 22 min',
+    ])
+  })
+
+  it('rien en cours : il le dit, sans section de gestes', () => {
+    const { container } = rendre()
+    expect(container.querySelector('.rig-encours')!.textContent).toBe('En cours · 0Rien en cours sur ce dossier.')
+    expect(container.querySelector('.rig-encours__sous-titre')).toBeNull()
+  })
+
+  it('repliee : le rail garde aussi le nombre en cours, en alerte s\'il y a du hors delai', () => {
+    const { container } = rendre(dossier({ suiviReplie: true, enCours: enCours004151() }))
+    const nombres = [...container.querySelectorAll('.rig-suivi__rouvrir .rig-suivi__nombre')]
+    expect(nombres.map((n) => [n.className, n.textContent, n.getAttribute('title')])).toEqual([
+      ['rig-suivi__nombre rig-suivi__nombre--alerte', '1', '1 etape a corriger'],
+      ['rig-suivi__nombre rig-suivi__nombre--encours rig-suivi__nombre--alerte', '3', '3 en cours, dont 1 hors delai'],
+    ])
+    expect(nombres[1]!.querySelector('svg')).not.toBeNull()
+  })
+
+  it('jumeau : sans hors delai, le nombre en cours du rail n\'est pas en alerte', () => {
+    const e = { ...enCours004151(), horsDelai: 0 }
+    const { container } = rendre(dossier({ suiviReplie: true, bandeau: null, enCours: e }))
+    const n = container.querySelector('.rig-suivi__nombre--encours')!
+    expect([n.className, n.getAttribute('title')]).toEqual(['rig-suivi__nombre rig-suivi__nombre--encours', '3 en cours'])
   })
 })

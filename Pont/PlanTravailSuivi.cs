@@ -8,8 +8,8 @@ namespace RigV3Desktop.Pont;
 //   - un LISERE de couleur par rubrique de l'arbre (Pieces jointes, Depots
 //     d'actes...) : tout ce qui va ensemble porte le meme filet, et le point de
 //     ses pieces dans l'historique prend la meme couleur ;
-//   - la colonne de SUIVI a droite, a deux onglets : Suivi (reste a faire et
-//     historique) et Fil (les notes ecrites sur le dossier et les valeurs
+//   - la colonne de SUIVI a droite, a deux onglets : Suivi (en cours, reste a
+//     faire et historique) et Fil (les notes ecrites sur le dossier et les valeurs
 //     changees dans le formulaire).
 // ============================================================
 public sealed partial class SessionPlanTravail
@@ -305,6 +305,54 @@ public sealed partial class SessionPlanTravail
             .OrderBy(x => x.Quand)
             .Select(x => x.Vue)
             .ToArray();
+    }
+
+    // ------------------------------------------------------------
+    // EN COURS SUR L'AFFAIRE (plan « Vue du dossier = coeur des actions », lot 3,
+    // 20/11/2026), en tete de l'onglet « Suivi » : les demandes, commandes web,
+    // courriers et actes attendus qui la portent, et les derniers gestes poses
+    // dessus. L'agent les voit et les traite sans quitter la page : chaque ligne
+    // ouvre son ecran POUR ce dossier, comme la barre d'actions
+    // (OuvrirProcDepuisAffaire : l'onglet retient l'affaire, l'ecran en recoit le
+    // contexte), et « M'attribuer » est le geste de la palette (« paletteAttribuer »),
+    // sur la meme regle (RecherchePalette.Attribuable).
+    // ------------------------------------------------------------
+
+    /// <summary>Combien de gestes recents la colonne montre sous « En cours ».</summary>
+    private const int ActiviteMontree = 4;
+
+    private sealed record GesteTravailDossier(string Nature, string Numero);
+
+    /// <summary>Ce qui est en cours sur l'affaire, tel que ce login le voit.</summary>
+    private EnCoursDossierVue VueEnCours(Dossier d)
+    {
+        var compte = Accueil.CompteCourant;
+        var moi = compte.Signature;
+        var travail = RecherchePalette.TravailDuDossier(d.Numero, EstValide);
+        return new EnCoursDossierVue(
+            [.. travail.Select(t => new TravailDossierVue(t.Nature, t.Numero, t.Titre, t.Detail, t.Etat, t.Ton, t.Filet,
+                                                          t.Qui.Length > 0 ? Agent(t.Qui) : null, t.Qui == moi,
+                                                          RecherchePalette.Attribuable(t, moi), t.Delai,
+                                                          EcranDuTravail(t.Ecran)?.Libelle ?? ""))],
+            travail.Count(t => t.Urgence == 0),
+            [.. RecherchePalette.Activite(d.Numero, compte, ActiviteMontree)
+                .Select(a => new ActivitePaletteVue(a.Agent, a.Verbe, a.Objet, a.Depuis))]);
+    }
+
+    /// <summary>L'ecran d'une ligne, s'il s'ouvre pour le dossier depuis cette fenetre et pour ce login.</summary>
+    private Proc? EcranDuTravail(string code)
+        => EcranPourLeDossier(code) ? Groupes.SelectMany(g => g.Procs).FirstOrDefault(p => p.Code == code) : null;
+
+    /// <summary>Le geste « enCoursOuvrir » : l'ecran de cette ligne, ouvert pour l'affaire ouverte.</summary>
+    private void OuvrirTravailDuDossier(GesteTravailDossier g)
+    {
+        // L'affaire fermee, ou la ligne terminee, entre le clic et son traitement : plus rien a ouvrir.
+        if (DossierOuvert is not { } d
+            || RecherchePalette.TravailDuDossier(d.Numero, EstValide)
+                   .FirstOrDefault(t => t.Nature == g.Nature && t.Numero == g.Numero) is not { } ligne) return;
+        var proc = EcranDuTravail(ligne.Ecran)
+            ?? throw new InvalidOperationException($"La ligne {g.Numero} n'ouvre aucun ecran pour l'affaire {d.Numero}.");
+        OuvrirProcDepuisAffaire(proc);
     }
 
     /// <summary>Le geste « filEcrire » : la note entre au fil de l'affaire ouverte, signee du login Windows

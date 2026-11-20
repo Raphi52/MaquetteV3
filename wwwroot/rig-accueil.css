@@ -4074,6 +4074,73 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 .rig-reste__etape { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .rig-reste__nombre { flex: none; font-size: 11px; color: var(--rig-texte-3); }
 
+/* EN COURS sur l'affaire (plan « Vue du dossier = coeur des actions », lot 3) : une ligne
+   par demande, commande web, courrier ou acte attendu, son filet d'importance a gauche ;
+   le haut de la ligne ouvre son ecran pour ce dossier. Le hors delai prend la teinte
+   d'alerte de la palette (--rig-alerte). Elle prend la hauteur de ses lignes et ne
+   retrecit pas : c'est l'historique qui cede (retrecissable, ses 44 pieces de 004176
+   ecrasaient la liste a zero). Au-dela de 70 % de la colonne, sa liste defile seule. */
+.rig-encours { flex: none; max-height: 70%; min-height: 0; display: flex; flex-direction: column; }
+.rig-encours__liste {
+  flex: 0 1 auto; min-height: 0; overflow-y: auto; list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.rig-encours__ligne { flex: none; display: flex; gap: 6px; min-width: 0; padding: 4px 4px 4px 2px; border-radius: 6px; }
+.rig-encours__ligne--alerte { background: color-mix(in srgb, var(--rig-alerte) 8%, transparent); }
+.rig-encours__corps { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.rig-encours__ouvrir {
+  display: flex; flex-direction: column; gap: 1px; width: 100%; min-width: 0; padding: 2px 4px;
+  background: none; border: 0; border-radius: 5px; text-align: left; cursor: pointer;
+  font: 12px/1.3 var(--rig-font); color: var(--rig-texte-2);
+}
+.rig-encours__ouvrir:hover { background: var(--rig-survol-ligne); color: var(--rig-texte); }
+.rig-encours__ouvrir--fixe, .rig-encours__ouvrir--fixe:hover { cursor: default; background: none; }
+.rig-encours__tete { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 11px; color: var(--rig-texte-3); }
+.rig-encours__nature { flex: none; font-weight: 600; }
+.rig-encours__numero {
+  flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--rig-font-mono);
+}
+.rig-encours__etat {
+  margin-left: auto; flex: none; padding: 1px 7px; border-radius: 999px;
+  background: var(--rig-fond-2); color: var(--rig-texte-2); font: 600 10.5px/1.4 var(--rig-font);
+}
+.rig-encours__etat--al {
+  background: color-mix(in srgb, var(--rig-alerte) 16%, transparent); color: var(--rig-alerte);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rig-alerte) 45%, transparent);
+}
+.rig-encours__titre {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 600; color: var(--rig-texte);
+}
+.rig-encours__delai { font-size: 11px; color: var(--rig-texte-3); }
+.rig-encours__ligne--alerte .rig-encours__delai { color: var(--rig-alerte); font-weight: 600; }
+.rig-encours__pied { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 0 4px; }
+.rig-encours__qui {
+  flex: 1 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 5px;
+  overflow: hidden; white-space: nowrap; font-size: 11.5px; color: var(--rig-texte-2);
+}
+.rig-encours__qui--personne { color: var(--rig-texte-3); font-style: italic; }
+.rig-encours__avatar {
+  flex: none; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--rig-fond-2); color: var(--rig-texte-2); font: 700 8.5px/1 var(--rig-font);
+}
+.rig-encours__avatar--moi { background: var(--rig-profil); color: var(--rig-profil-texte); }
+.rig-encours__attribuer {
+  flex: none; padding: 2px 9px; border: 1px solid var(--rig-bord); border-radius: 999px; background: transparent;
+  cursor: pointer; font: 600 11px/1.4 var(--rig-font); color: var(--rig-accent); white-space: nowrap;
+}
+.rig-encours__attribuer:hover { border-color: var(--rig-accent); background: color-mix(in srgb, var(--rig-accent) 10%, transparent); }
+.rig-encours__sous-titre { padding-top: 8px; }
+.rig-encours__activite { flex: none; list-style: none; margin: 0; padding: 0 6px; display: flex; flex-direction: column; gap: 3px; }
+.rig-encours__geste { display: flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 11.5px; color: var(--rig-texte-2); }
+.rig-encours__geste > :first-child { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rig-encours__geste b { color: var(--rig-texte); font-weight: 600; }
+.rig-encours__quand { flex: none; font: 10.5px var(--rig-font-mono); color: var(--rig-texte-3); }
+/* Le nombre en cours du rail replie : une horloge devant, pour ne pas le lire comme des etapes. */
+.rig-suivi__rouvrir .rig-suivi__nombre--encours { display: inline-flex; align-items: center; gap: 2px; }
+.rig-suivi__nombre--encours svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+
 /* L'HISTORIQUE dans l'onglet Suivi : il prend la hauteur restante et defile seul. */
 .rig-vged__suivi .rig-chrono { flex: 1 1 auto; max-height: none; border-left: 0; padding: 0; background: none; }
 .rig-vged__suivi .rig-chrono__entete { padding: 0 6px 4px; }
@@ -4597,6 +4664,7 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   background: linear-gradient(135deg, var(--rig-or), var(--rig-or-clair)); color: var(--rig-or-texte);
 }
 .rig-suivi__panneau { gap: 10px; }
+.rig-encours,
 .rig-reste,
 .rig-vged__suivi .rig-chrono,
 .rig-fil__liste,

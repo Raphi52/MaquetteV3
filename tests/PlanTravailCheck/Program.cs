@@ -809,6 +809,7 @@ internal static class Programme
 
         plan.DisposeAsync().AsTask().GetAwaiter().GetResult();
         JouerActionsDossier();
+        JouerEnCoursDossier();
     }
 
     /// <summary>
@@ -976,6 +977,121 @@ internal static class Programme
             "dans la fenetre d'un onglet sorti, la barre garde les gestes locaux, sans aucun ecran (« Facturer » disparait)");
         sortie.DisposeAsync().AsTask().GetAwaiter().GetResult();
 
+        foreach (var o in s.Vue().Onglets ?? []) Faire("ongletFermer", o.Code);
+        s.DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// 16. EN COURS SUR L'AFFAIRE (plan « Vue du dossier = coeur des actions », lot 3,
+    /// 20/11/2026), en tete de la colonne de suivi : le travail filtre sur le numero de
+    /// l'affaire (RecherchePalette.TravailDuDossier), « M'attribuer » sur la regle de la
+    /// palette, l'ecran de chaque ligne ouvert pour ce dossier, les derniers gestes.
+    /// </summary>
+    private static void JouerEnCoursDossier()
+    {
+        // --- Le FILTRE par affaire, sur les donnees de JeuDemo.
+        var t151 = RecherchePalette.TravailDuDossier("004151", _ => false);
+        Exiger(t151.Select(t => (t.Nature, t.Numero, t.Etat)).SequenceEqual(new[]
+               {
+                   ("dem", "004151", "J+11"), ("cmd", "CW-2026-000413", "A traiter"),
+                   ("doc", "D-2026-1170", "A numeriser"), ("cou", "A-2026-0909", "A numeriser"),
+               })
+               && t151.All(t => t.Cle == "004151" && t.Urgence < RecherchePalette.Termine),
+            "004151 : sa demande hors delai, sa commande web (rangee sous son SIREN par les requisitions), "
+            + "l'acte et le courrier attendus -- le plus urgent d'abord, rien d'une autre affaire, rien de termine");
+        Exiger(t151[1].Titre == "Faillite - TRANSNORD SA" && t151[2].Titre == "Compte de resultat 2025 - TRANSNORD SA"
+               && !t151.Any(t => t.Titre.StartsWith("Comptes annuels 2025", StringComparison.Ordinal)),
+            "jumeau : l'acte deja numerise de la meme affaire (Comptes annuels 2025) n'est plus en cours");
+        var t176 = RecherchePalette.TravailDuDossier("004176", _ => false);
+        Exiger(t176.Select(t => (t.Nature, t.Numero)).SequenceEqual(new[] { ("dem", "004176"), ("doc", "D-2026-1181") })
+               && t176[0] is { Ton: "al", Qui: "M. DURAND" } && t176[1] is { Etat: "page 3 illisible", Ton: "al", Urgence: 1 },
+            "004176 : sa demande hors delai (M. DURAND) et son acte en anomalie ; son courrier deja rattache n'y est plus");
+        Exiger(RecherchePalette.TravailDuDossier("004151", d => d == "004151").All(t => t.Nature != "dem")
+               && RecherchePalette.TravailDuDossier("", _ => false).Length == 0,
+            "une demande validee au controle final n'est plus en cours ; sans numero, rien");
+
+        // --- La VUE de l'affaire 004151 pour le greffier.
+        var s = new SessionPlanTravail(null, null);
+        s.Initialiser();
+        void Faire(string geste, object? valeur = null) => s.Agir(geste, Valeur(valeur));
+        foreach (var o in s.Vue().Onglets ?? []) Faire("ongletFermer", o.Code);
+        s.SurGesteAccueil(new GesteIle("login", Valeur("rvilain")));
+        Faire("ouvrirNumero", "004151");
+        var e = s.Vue().Dossier!.EnCours;
+        Exiger(e.Travail.Length == 4 && e.HorsDelai == 1
+               && e.Travail[0] is { Nature: "dem", Numero: "004151", Titre: "Depot de bilan - TRANSNORD SA", Etat: "J+11", Ton: "al",
+                                    Filet: "alerte", Qui.Signature: "C. BENIER", AMoi: false, Attribuable: true, EcranLibelle: "Demandes" }
+               && e.Travail[0].Delai == "Delai legal de 7 jours depasse de 4 jours",
+            "la colonne de 004151 liste « Depot de bilan - TRANSNORD SA » hors delai, en alerte, avec son agent (C. BENIER)");
+        Exiger(e.Travail.Skip(1).All(t => !t.Attribuable) && e.Travail[1] is { Qui: null, EcranLibelle: "Commandes web" }
+               && e.Travail[2].EcranLibelle == "Actes numerises" && e.Travail[3].EcranLibelle == "Arrivee du courrier",
+            $"jumeau : seule la demande s'attribue ; chaque ligne nomme l'ecran qu'elle ouvre ({string.Join(", ", e.Travail.Select(t => t.EcranLibelle))})");
+        Exiger(e.Activite.Length is > 0 and <= 4 && e.Activite.All(a => a.Objet.Contains("004151"))
+               && e.Activite[0] is { Agent: "Raphael", Verbe: "a valide", Objet: "depot du dossier 004151" },
+            "les derniers gestes sur 004151, le plus recent en tete (le greffier voit ceux de toute l'equipe)");
+
+        // --- « M'attribuer » : le geste de la palette, la meme regle des deux cotes.
+        Faire("paletteOuvrir");
+        Faire("paletteTexte", "transnord bilan");
+        bool PaletteAttribuable() => s.Vue().Palette!.Travail.Single(t => t.Numero == "004151").Attribuable;
+        Exiger(PaletteAttribuable(), "precondition : la palette propose aussi d'attribuer la demande 004151");
+        Faire("paletteFermer");
+        Faire("paletteAttribuer", new { numero = "004151", signature = (string?)null });
+        e = s.Vue().Dossier!.EnCours;
+        Exiger(e.Travail[0] is { Qui.Signature: "R. VILAIN", Qui.Initiales: "RV", AMoi: true, Attribuable: false }
+               && JeuDemo.Demandes.Single(d => d.Numero == "004151").Utilisateur == "R. VILAIN",
+            "« M'attribuer » passe la demande 004151 au nom du greffier : la ligne le dit et ne le propose plus");
+        Faire("paletteOuvrir");
+        Faire("paletteTexte", "transnord bilan");
+        Exiger(!PaletteAttribuable(), "jumeau : la palette lit la meme attribution et la meme regle");
+        Faire("paletteFermer");
+
+        // --- Un clic sur la ligne : son ecran, ouvert POUR ce dossier (contexte du lot 1).
+        Faire("enCoursOuvrir", new { nature = "dem", numero = "004151" });
+        var v = s.Vue();
+        Exiger(v.Dossier is null && v.Proc is { Code: "PROC_DEMANDE", Libelle: "Demandes" } pd
+               && pd.Ecran.Dossier is { Numero: "004151", Objet: "Depot de bilan - TRANSNORD SA" }
+               && v.Onglets!.Any(o => o.Code == "AFFAIRE:004151") && v.Onglets.Single(o => o.Actif).Code == "PROC_DEMANDE",
+            "un clic sur la demande ouvre l'ecran Demandes dans son onglet, avec le contexte de l'affaire 004151");
+        Faire("retourDossier");
+        Exiger(s.Vue() is { Proc: null, Dossier.Numero: "004151" }, "la puce « ← Dossier » ramene a l'affaire");
+        Faire("enCoursOuvrir", new { nature = "cou", numero = "A-2026-0909" });
+        Exiger(s.Vue().Proc is { Code: "PROC_ARRIVEE", Ecran.Dossier.Numero: "004151" },
+            "jumeau : le courrier attendu ouvre l'Arrivee du courrier, pour la meme affaire");
+        Faire("retourDossier");
+        var onglets = s.Vue().Onglets!.Length;
+        Faire("enCoursOuvrir", new { nature = "dem", numero = "004176" });
+        Faire("enCoursOuvrir", new { nature = "cou", numero = "A-2026-0912" });
+        Exiger(s.Vue() is { Proc: null, Dossier.Numero: "004151" } && s.Vue().Onglets!.Length == onglets,
+            "une ligne d'une autre affaire, ou terminee, n'ouvre rien depuis 004151");
+
+        // --- Un redacteur RCS : le journal des autres lui est cache, la demande reste attribuable.
+        s.SurGesteAccueil(new GesteIle("login", Valeur("cmartin")));
+        e = s.Vue().Dossier!.EnCours;
+        Exiger(e.Travail[0] is { Qui.Signature: "R. VILAIN", AMoi: false, Attribuable: true }
+               && e.Activite.Length > 0 && e.Activite.All(a => a.Agent == "Claire"),
+            "un redacteur ne voit que ses propres gestes ; la demande d'un autre lui reste attribuable");
+
+        // --- Un login sans le RCS : la commande web (ecran du RCS) se lit sans s'ouvrir.
+        s.SurGesteAccueil(new GesteIle("login", Valeur("pjudic")));
+        e = s.Vue().Dossier!.EnCours;
+        var refuse = false;
+        try { Faire("enCoursOuvrir", new { nature = "cmd", numero = "CW-2026-000413" }); }
+        catch (InvalidOperationException) { refuse = true; }
+        Exiger(e.Travail.Single(t => t.Nature == "cmd").EcranLibelle == "" && refuse
+               && e.Travail.Single(t => t.Nature == "dem").EcranLibelle == "Demandes",
+            "login judiciaire : la commande web n'offre pas son ecran (hors perimetre) et le geste est refuse ; la demande, si");
+        s.SurGesteAccueil(new GesteIle("login", Valeur("rvilain")));
+
+        // --- La fenetre d'un onglet SORTI : aucune ligne n'ouvre d'ecran.
+        var sortie = new SessionPlanTravail(null, null, modeFenetreVue: true, vueInitiale: "AFFAIRE:004151");
+        sortie.Initialiser();
+        Exiger(sortie.Vue().Dossier!.EnCours.Travail is { Length: 4 } ts && ts.All(t => t.EcranLibelle == ""),
+            "dans la fenetre d'un onglet sorti, les lignes se lisent sans ouvrir d'ecran");
+        sortie.DisposeAsync().AsTask().GetAwaiter().GetResult();
+
+        // L'attribution vit le temps du processus (JeuDemo) : elle est rendue a son agent.
+        JeuDemo.Attribuer("004151", "C. BENIER");
         foreach (var o in s.Vue().Onglets ?? []) Faire("ongletFermer", o.Code);
         s.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }

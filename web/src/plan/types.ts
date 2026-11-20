@@ -173,6 +173,35 @@ export interface DossierVue {
   sortie: boolean
   /** La barre d'actions de l'entete, un groupe par verbe (Metier/ActionsDossier.cs). */
   actions: VerbeActionsVue[]
+  /** Ce qui est en cours sur l'affaire, en tete de l'onglet Suivi (Pont/PlanTravailSuivi.cs). */
+  enCours: EnCoursDossierVue
+}
+/** Le travail en cours sur l'affaire et les derniers gestes poses dessus. */
+export interface EnCoursDossierVue {
+  /** Le plus urgent d'abord. */
+  travail: TravailDossierVue[]
+  /** Les lignes dont le delai legal est depasse. */
+  horsDelai: number
+  /** Du plus recent au plus ancien. */
+  activite: ActivitePaletteVue[]
+}
+export interface TravailDossierVue {
+  /** dem | cmd | cou | doc */
+  nature: string
+  numero: string
+  titre: string
+  detail: string
+  etat: string
+  /** al | ok | vide */
+  ton: string
+  filet: string
+  qui: AgentPaletteVue | null
+  aMoi: boolean
+  /** « M'attribuer » (geste « paletteAttribuer ») : meme regle que la palette. */
+  attribuable: boolean
+  delai: string | null
+  /** L'ecran que la ligne ouvre pour ce dossier (geste « enCoursOuvrir ») ; vide = aucun. */
+  ecranLibelle: string
 }
 /** Un verbe de la barre d'actions du dossier et ses actions disponibles. */
 export interface VerbeActionsVue { verbe: string, actions: ActionDossierVue[] }
