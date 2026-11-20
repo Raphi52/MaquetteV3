@@ -34,9 +34,14 @@ export function Apercu({ colonne, plan }: { colonne: ApercuColonneVue, plan: Ges
               <button className="rig-bouton rig-bouton--icone rig-bouton--fort" title="Imprimer" aria-label="Imprimer" onClick={() => plan('imprimer')}>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6"></path><rect x="3" y="9" width="18" height="8" rx="2"></rect><rect x="7" y="14" width="10" height="7"></rect></svg>
               </button>{' '}
-              <button className="rig-bouton rig-bouton--icone" title="Editer" aria-label="Editer" onClick={() => plan('editer')}>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path><path d="M13.5 6.5l4 4"></path></svg>
-              </button>{' '}
+              {/* Un courrier ecrit pour l'affaire n'a aucun formulaire a ouvrir : pas de « Editer ». */}
+              {a.editable && (
+                <>
+                  <button className="rig-bouton rig-bouton--icone" title="Editer" aria-label="Editer" onClick={() => plan('editer')}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path><path d="M13.5 6.5l4 4"></path></svg>
+                  </button>{' '}
+                </>
+              )}
               <button className="rig-bouton rig-bouton--icone" title="Detacher dans une fenetre" aria-label="Detacher" onClick={() => plan('detacher')}>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"></path><path d="M20 4l-9 9"></path><path d="M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"></path></svg>
               </button>{' '}

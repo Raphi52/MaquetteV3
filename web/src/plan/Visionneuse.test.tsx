@@ -461,6 +461,14 @@ describe('Visionneuse : le document et le mode tache', () => {
     expect(morceaux(feuilles[1]!.querySelector('.rig-apercu__folio')!)).toEqual(['2', ' / ', '2'])
   })
 
+  it('un document qu\'aucune etape ne remplit (courrier ecrit pour l\'affaire) n\'a pas « Editer » ; les autres actions restent', () => {
+    const { container, gestes } = rendre(dossier({ apercu: { detachees: 0, apercu: apercu({ editable: false }) } }))
+    const actions = [...container.querySelectorAll('.rig-apercu__actions button')]
+    expect(actions.map((b) => b.getAttribute('aria-label'))).toEqual(['Imprimer', 'Detacher', 'Sauvegarder', 'Envoyer par mail', 'Fermer'])
+    actions.forEach((b) => fireEvent.click(b))
+    expect(gestes().map(([n]) => n)).toEqual(['imprimer', 'detacher', 'sauvegarder', 'envoiMail', 'fermerApercu'])
+  })
+
   it('un PDF s ouvre a sa page : celle du passage lu quand la page Recherche l a ouvert', () => {
     const { container } = rendre(dossier({ apercu: { detachees: 0, apercu: apercu({ pdf: true, fichier: 'documents/synthese.pdf', page: 4, feuilles: [] }) } }))
     expect(container.querySelector('iframe.rig-apercu__pdf')!.getAttribute('src')).toBe('documents/synthese.pdf#page=4&view=FitH')

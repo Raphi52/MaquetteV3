@@ -388,6 +388,8 @@ export interface ApercuVue {
   page: number
   kbis: VueKbis | null
   feuilles: FeuilleApercuVue[]
+  /** « Editer » ouvre le formulaire de la piece ; faux pour un courrier ecrit pour l'affaire, qui n'en a aucun. */
+  editable: boolean
 }
 export interface FeuilleApercuVue { numero: number, total: number, texte: string, valeurs: ValeurApercuVue[] | null }
 export interface ValeurApercuVue { libelle: string, valeur: string }

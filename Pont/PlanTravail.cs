@@ -853,7 +853,9 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     /// </summary>
     private void EditerPiece()
     {
-        if (ApercuNoeud is null) return;
+        // Le courrier produit n'a aucun formulaire : la colonne ne lui montre pas « Editer » (VueApercu).
+        // fix-ok: mesure rouge (PlanTravailCheck, main 71f90e9) -- EtapeDuNoeud(courrier) = CONTROLE.
+        if (ApercuNoeud is null || HorsSaisie(ApercuNoeud)) return;
         NoeudSelectionne = ApercuNoeud;
         // L'etape deduite de la piece : « Editer » ouvre le formulaire QUI
         // correspond au document, pas une page de saisie au hasard.
@@ -920,6 +922,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     /// </summary>
     private List<(string Libelle, string Valeur)> ValeursDocument(NoeudGed n)
     {
+        // Aussi pour la fenetre detachee (DetacherDocument, PublierDocument), pas seulement l'apercu.
+        if (HorsSaisie(n)) return [];
         var etape = EtapeDuNoeud(n);
         var fiche = FicheVue(etape);
         return etape.Champs

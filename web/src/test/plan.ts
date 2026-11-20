@@ -106,6 +106,7 @@ export function apercu(partiel: Partial<ApercuVue> = {}): ApercuVue {
       { numero: 1, total: 2, texte: 'STATUTS DE LA SOCIETE', valeurs: [{ libelle: 'Montant du capital', valeur: '10000' }] },
       { numero: 2, total: 2, texte: 'Article 2', valeurs: null },
     ],
+    editable: true,
     ...partiel,
   }
 }

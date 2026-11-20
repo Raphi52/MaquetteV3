@@ -107,6 +107,12 @@ internal static class Programme
                && catalogueCourriers.Courriers.Count(c => c.Actif) == 4
                && catalogueCourriers.Types.SequenceEqual(CourriersDivers.TypesEntite),
             "une seule liste des modeles : l'ecran du catalogue la lit par son pont, il n'en garde aucune copie");
+        // Le courrier produit sorti dans une fenetre detachee (elle s'ouvrirait a l'ecran ici) : ses
+        // valeurs viennent de ValeursDocument, qui ecarte le courrier par la meme regle que l'apercu.
+        var sourcePlan = File.ReadAllText(Path.Combine(racine, "Pont/PlanTravail.cs"));
+        Exiger(Regex.IsMatch(sourcePlan, @"ValeursDocument\(NoeudGed n\)\s*\{\s*(//[^\n]*\s*)*if \(HorsSaisie\(n\)\) return \[\];")
+               && Regex.Matches(sourcePlan, @"ValeursDocument\(ApercuNoeud\)").Count == 2,
+            "le courrier sorti dans une fenetre n'y porte aucune valeur de formulaire (DetacherDocument, PublierDocument : ValeursDocument l'ecarte)");
         foreach (var type in new[] { DomaineGed.Rcs, DomaineGed.Judiciaire })
         {
             var lettres = ActionsDossier.Pour(type).Select(a => a.Touche).ToList();
@@ -1004,6 +1010,17 @@ internal static class Programme
                        "a l'egard de TRANSNORD SA", "Amiens, le " + DateTime.Today.ToString("dd/MM/yyyy") }.All(texte.Contains)
                && !texte.Contains('{') && !texte.Contains('}'),
             "le courrier est rempli avec l'affaire : n°, denomination, adresse, et le mandataire judiciaire qu'il demande");
+        // « Editer » ouvrait le formulaire de l'etape que le libelle evoque (« mandataire » :
+        // CONTROLE, EtapeDuNoeud) : un formulaire de l'affaire, pas le courrier affiche.
+        // fix-ok: mesure rouge sur main 71f90e9 (20/11/2026) -- EditerPiece suivait EtapeDuNoeud(courrier).
+        // Sans Fiche.Version : ce compteur avance a chaque lecture de la vue, geste ou non.
+        string EtatDeSaisie(SessionPlanTravail session)
+            => JsonSerializer.Serialize(new { session.Vue().Dossier!.Etapes, session.Vue().Dossier!.Fiche?.Branche });
+        Exiger(lettre is { Editable: false }, "la colonne du document ne montre pas « Editer » sur le courrier : il n'a aucun formulaire");
+        var saisieAvant = EtatDeSaisie(s);
+        Faire("editer");
+        Exiger(EtatDeSaisie(s) == saisieAvant && s.Vue().Dossier?.Apercu?.Apercu?.Libelle == "Notification au mandataire - J-00931",
+            "« Editer » sur le courrier n'ouvre aucun formulaire de l'affaire : l'etape et la fiche ne bougent pas, le courrier reste affiche");
         Faire("imprimer");
         Exiger(s.Vue().Impression?.Libelle == "Notification au mandataire - J-00931", "le courrier s'imprime par le bouton du document");
         Faire("lancerImpression");
@@ -1014,6 +1031,7 @@ internal static class Programme
         Faire("actionDossier", "kbis");
         Exiger(s.Vue().Dossier?.Apercu?.Apercu is { Libelle: "Kbis a jour", Kbis: not null },
             "jumeau : une autre piece ouverte remplace le courrier dans la colonne du document");
+        Exiger(s.Vue().Dossier?.Apercu?.Apercu is { Editable: true }, "jumeau : une piece du classeur (le Kbis) garde « Editer »");
         Faire("actionDossier", "courrier:CD_NOTIF");
 
         // Une autre affaire, sans Kbis (purement judiciaire) : le courrier ecrit pour TRANSNORD

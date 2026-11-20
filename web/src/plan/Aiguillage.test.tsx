@@ -83,7 +83,7 @@ describe('Aiguillage des ecrans de procedure', () => {
     const dossier = contexteDossier()
     const pourLAffaire = { ...proc().ecran, dossier }
     for (const code of ['PROC_DEMANDE', 'PROC_REQUI', 'PROC_COMMANDES_WEB', 'PROC_CLOT', 'BODACC', 'PROC_DEPOTJUD',
-                        'PROC_CJUD', 'PROC_GEDJUD', 'PROC_FACTURE', 'PROC_ENCAISS', 'PROC_COURRIER_DIVERS',
+                        'PROC_CJUD', 'PROC_GEDJUD', 'PROC_FACTURE', 'PROC_ENCAISS',
                         'PROC_VERROUS', 'PROC_TELETRANS']) {
       const avec = aiguiller(code, pourLAffaire).el!
       expect(avec.props.dossier, code).toBe(dossier)
@@ -94,7 +94,9 @@ describe('Aiguillage des ecrans de procedure', () => {
       expect(sans.key, code).toBeNull()
     }
     // Ceux-ci ne peuvent rien faire d'une affaire (aucun critere ni liste a son nom) : rien ne leur est passe.
-    for (const code of ['PROC_ARCHIRAD', 'PROC_REDA', 'PROC_AUDIENCE']) {
+    // PROC_COURRIER_DIVERS est le CATALOGUE des modeles (parametrage) : son bloc « Pour le dossier » ne
+    // servait a rien (constat du chef, 004182, 20/11/2026) ; on ecrit depuis l'affaire par « Ecrire » (lot 9).
+    for (const code of ['PROC_ARCHIRAD', 'PROC_REDA', 'PROC_AUDIENCE', 'PROC_COURRIER_DIVERS']) {
       const el = aiguiller(code, pourLAffaire).el!
       expect(el.props.dossier, code).toBeUndefined()
       expect(el.key, code).toBeNull()

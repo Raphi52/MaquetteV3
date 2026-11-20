@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EcranCourriersDivers, type CatalogueCourriersVue } from './EcranCourriersDivers'
-import { contexteDossier } from '../test/dossier'
 import { installerFauxPont, retirerFauxPont, type FauxPont } from '../test/faux-pont'
 
 // La liste des modeles vit dans Metier/CourriersDivers.cs, la meme que la page du
@@ -56,23 +55,5 @@ describe('EcranCourriersDivers', () => {
     expect(compte(container)).toBe('2 courrier(s)')
     fireEvent.change(screen.getByLabelText('Type d\'entite'), { target: { value: 'INSTANCE_PREVENTION' } })
     expect(screen.getByText('Aucun courrier divers ne repond a cette recherche.')).toBeTruthy()
-  })
-})
-
-// Ouvert depuis la page d'une affaire : le courrier est pour elle, deja choisie
-// (bloc « Pour le dossier ») ; le catalogue ne change pas (plan « Vue du dossier », lot 2).
-describe('EcranCourriersDivers ouvert depuis une affaire', () => {
-  it('montre l\'affaire choisie en tete ; sans affaire, l\'ecran d\'avant', async () => {
-    const avec = render(<EcranCourriersDivers dossier={contexteDossier()} />)
-    await screen.findByText('CD_CONV')
-    expect(screen.getByText('Pour le dossier')).toBeTruthy()
-    expect((screen.getByLabelText('N de dossier') as HTMLInputElement).value).toBe('004176')
-    expect((screen.getByLabelText('Denomination') as HTMLInputElement).value).toBe('SCI DU PARC')
-    expect(compte(avec.container)).toBe('4 courrier(s)')
-    avec.unmount()
-
-    const sans = render(<EcranCourriersDivers dossier={null} />)
-    expect(screen.queryByText('Pour le dossier')).toBeNull()
-    expect(sans.container.querySelector('.rig-criteres > .rig-kicker')!.textContent).toBe('Courriers divers')
   })
 })

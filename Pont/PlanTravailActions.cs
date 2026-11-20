@@ -32,6 +32,12 @@ public sealed partial class SessionPlanTravail
     /// formulaire (VueApercu) : un courrier n'est pas une piece d'une etape de saisie.</summary>
     private NoeudGed? CourrierRedige;
 
+    /// <summary>Vrai pour le courrier produit : il n'est la piece d'aucune etape de saisie. Son
+    /// libelle le rattacherait a une etape au hasard (EtapeDuNoeud : « mandataire » = CONTROLE) :
+    /// ni valeur de formulaire (apercu, fenetre detachee : ValeursDocument), ni « Editer ».</summary>
+    // fix-ok: PlanTravailCheck rouge sur main 71f90e9 -- « Editer » sur le courrier ouvrait CONTROLE.
+    private bool HorsSaisie(NoeudGed n) => ReferenceEquals(n, CourrierRedige);
+
     /// <summary>Les actions que la barre montre sur cette affaire : celles de son type,
     /// moins celles qui n'y auraient pas d'effet ou pas de droit ; la famille des courriers
     /// cede sa place aux modeles qui valent pour la nature de l'affaire -- aucun, rien.</summary>

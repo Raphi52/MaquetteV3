@@ -16,8 +16,6 @@
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, estBlanc } from '../criteres'
-import { PourLeDossier } from '../composants/PourLeDossier'
-import type { ContexteDossierVue } from '../plan/types'
 
 // v2 : table COURRIER_JUDICIAIRE (colonnes COUJU_*).
 export interface CourrierDiversVue {
@@ -35,13 +33,7 @@ export interface CatalogueCourriersVue {
   courriers: CourrierDiversVue[]
 }
 
-export interface ProprietesEcranCourriersDivers {
-  /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) : le courrier est pour elle,
-   *  deja choisie (bloc « Pour le dossier »). Absent ou null depuis l'accueil. */
-  dossier?: ContexteDossierVue | null
-}
-
-export function EcranCourriersDivers({ dossier = null }: ProprietesEcranCourriersDivers) {
+export function EcranCourriersDivers() {
   const [recherche, setRecherche] = useState('')
   const [typeFiltre, setTypeFiltre] = useState('')
   const [actifsSeuls, setActifsSeuls] = useState(true)
@@ -72,8 +64,6 @@ export function EcranCourriersDivers({ dossier = null }: ProprietesEcranCourrier
     <div className="rig-proc__corps">
 
       <aside className="rig-criteres">
-        {dossier && <PourLeDossier dossier={dossier} />}
-
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Courriers divers</div>
 
         <label className="rig-saisie-champ">

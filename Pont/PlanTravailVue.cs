@@ -200,8 +200,11 @@ public sealed record PointRecapVue(string Champ, string Motif, string Colonne, b
 
 /// <summary>La colonne de droite : documents sortis et apercu de la piece.</summary>
 public sealed record ApercuColonneVue(int Detachees, ApercuVue? Apercu);
+/// <param name="Editable">« Editer » ouvre le formulaire de la piece ; faux pour le courrier produit,
+/// qui n'en a aucun (SessionPlanTravail.HorsSaisie).</param>
 public sealed record ApercuVue(string Extension, int Pages, string Date, string Libelle, string Message,
-                               bool Pdf, string Fichier, int Page, VueKbis? Kbis, FeuilleApercuVue[] Feuilles);
+                               bool Pdf, string Fichier, int Page, VueKbis? Kbis, FeuilleApercuVue[] Feuilles,
+                               bool Editable);
 public sealed record FeuilleApercuVue(int Numero, int Total, string Texte, ValeurApercuVue[]? Valeurs);
 public sealed record ValeurApercuVue(string Libelle, string Valeur);
 
@@ -660,13 +663,13 @@ public sealed partial class SessionPlanTravail
             {
                 feuilles.Add(new FeuilleApercuVue(feuille, total, TextePage(n, feuille),
                     // Un courrier produit (PlanTravailActions.cs) n'est la piece d'aucune etape de saisie.
-                    feuille == 1 && !ReferenceEquals(n, CourrierRedige)
+                    feuille == 1 && !HorsSaisie(n)
                         ? ValeursDocument(n).Select(v => new ValeurApercuVue(v.Libelle, v.Valeur)).ToArray()
                         : null));
             }
         }
         return new ApercuVue(n.Extension, n.Pages, n.Date, n.Libelle, ApercuMessage, n.APdf, n.Fichier, ApercuPage,
-                             kbis, feuilles.ToArray());
+                             kbis, feuilles.ToArray(), !HorsSaisie(n));
     }
 
     // ================= LES GESTES =================

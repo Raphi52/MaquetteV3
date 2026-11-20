@@ -185,7 +185,9 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
       return <EcranComptabilisation />
 
     case 'PROC_COURRIER_DIVERS':
-      return <EcranCourriersDivers key={cle} dossier={dossier} />
+      // Le CATALOGUE des modeles (parametrage) : rien a faire d'une affaire. On ecrit depuis
+      // l'affaire par « Ecrire », qui produit le courrier rempli (Pont/PlanTravailActions.cs).
+      return <EcranCourriersDivers />
 
     case 'PROC_TACHES_LOT':
       // Traitement EN LOT : la meme recette sur plusieurs affaires. La session
