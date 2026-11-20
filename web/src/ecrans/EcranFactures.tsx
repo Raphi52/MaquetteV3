@@ -16,9 +16,17 @@
 //                                        txtCommentaire, TxtVentilationId
 //
 // Porte depuis Components/Ecrans/EcranFactures.razor (lot 1) : meme balisage,
-// memes classes CSS. Les fiches, articles et tiers payeurs etaient declares
-// dans l'ecran lui-meme : ils l'ont suivi ici. Seule la date du jour vient de
-// Metier/, par Pont/EcranFactures.cs.
+// memes classes CSS. Les fiches, le tarif et les tiers payeurs etaient declares
+// dans l'ecran lui-meme : ils l'ont suivi ici. La date du jour vient de Metier/,
+// par Pont/EcranFactures.cs.
+//
+// DEUX FACTURES DE DEPART, UN SEUL TARIF (plan « Vue du dossier », lot 8, 20/11/2026) :
+//   - depuis l'accueil, la facture de DEMONSTRATION, inchangee (458,63 EUR TTC) ;
+//   - depuis la page d'une affaire, une facture DE CETTE AFFAIRE : les articles du
+//     tarif qui facturent sa nature, sa demande et son client (Pont/EcranFactures.cs,
+//     DemandeDe). Ce que l'affaire ne dit pas reste vide, rien n'est emprunte a la demo.
+// fix-ok: constate sur 004182 le 20/11 -- l'etat de depart (client, n de demande,
+// articles, encaissement) etait celui de la demo quel que soit le dossier recu.
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
@@ -26,6 +34,30 @@ import { centimes, euros, nombre } from '../format'
 import { PourLeDossier } from '../composants/PourLeDossier'
 import type { ContexteDossierVue } from '../plan/types'
 
+/** Un article du tarif : ses montants POUR UNE UNITE. */
+interface ArticleTarif {
+  code: string
+  libelle: string
+  prixUht: number
+  tauxTva: number
+  bodacc: number
+  inpi: number
+  autre: number
+  ttc: number
+  /** Les natures d'affaire RCS que l'article facture : le debut de leur objet
+   *  (« Immatriculation - AMIENS BILLARDS »), comme Pont/PlanTravail.cs (SommaireDu) le lit. */
+  natures: readonly string[]
+}
+
+/** Une ligne de facture : un article du tarif, en quelle quantite, avec quel commentaire. */
+interface LigneFacture {
+  code: string
+  quantite: number
+  commentaire: string
+}
+
+/** Une ligne telle que la grille la montre : les montants de la ligne (unite x quantite),
+ *  sauf le prix UHT, qui reste celui d'une unite. */
 interface ArticleFacture {
   code: string
   libelle: string
@@ -46,7 +78,8 @@ interface FicheClient {
   abrege: string
   typeClient: string
   adresse: string
-  solde: number
+  /** null : solde inconnu (le client nomme par une affaire n'a pas de compte connu ici). */
+  solde: number | null
 }
 
 const Fiches: readonly FicheClient[] = [
@@ -56,17 +89,62 @@ const Fiches: readonly FicheClient[] = [
   { nom: 'Client de passage',       abrege: 'DIVERS', typeClient: 'Client divers',    adresse: '',                                    solde: 0 },
 ]
 
-const Articles: readonly ArticleFacture[] = [
-  { code: 'IMM01', libelle: 'Immatriculation societe',   quantite: 1, prixUht: 37.45, tauxTva: 20, bodacc: 105.90, inpi: 0,     autre: 0,    ttc: 194.85, commentaire: '' },
-  { code: 'MOD02', libelle: 'Modification statutaire',   quantite: 1, prixUht: 45.60, tauxTva: 20, bodacc: 108.00, inpi: 0,     autre: 0,    ttc: 162.72, commentaire: 'Changement de gerant' },
-  { code: 'DEP03', libelle: 'Depot des comptes annuels', quantite: 2, prixUht: 22.30, tauxTva: 20, bodacc: 0,      inpi: 0,     autre: 0,    ttc: 53.52,  commentaire: '' },
-  { code: 'INP04', libelle: 'Transmission INPI',         quantite: 1, prixUht: 12.00, tauxTva: 20, bodacc: 0,      inpi: 18.50, autre: 0,    ttc: 32.90,  commentaire: 'Refacturation INPI' },
-  { code: 'DIV05', libelle: 'Frais divers',              quantite: 1, prixUht: 8.00,  tauxTva: 20, bodacc: 0,      inpi: 0,     autre: 4.20, ttc: 14.64,  commentaire: '' },
+// Le tarif de l'ecran, celui des formalites RCS. « Depot de bilan » est, au RCS, le
+// depot des comptes annuels : les pieces du depot D-2026-1170 de l'affaire 004151 sont
+// « Comptes annuels 2025 » et « Compte de resultat 2025 » (Metier/JeuDemo.cs, depots).
+const Tarif: readonly ArticleTarif[] = [
+  { code: 'IMM01', libelle: 'Immatriculation societe',   prixUht: 37.45, tauxTva: 20, bodacc: 105.90, inpi: 0,     autre: 0,    ttc: 194.85, natures: ['Immatriculation'] },
+  { code: 'MOD02', libelle: 'Modification statutaire',   prixUht: 45.60, tauxTva: 20, bodacc: 108.00, inpi: 0,     autre: 0,    ttc: 162.72, natures: ['Modification'] },
+  { code: 'DEP03', libelle: 'Depot des comptes annuels', prixUht: 22.30, tauxTva: 20, bodacc: 0,      inpi: 0,     autre: 0,    ttc: 26.76,  natures: ['Depot de bilan'] },
+  { code: 'INP04', libelle: 'Transmission INPI',         prixUht: 12.00, tauxTva: 20, bodacc: 0,      inpi: 18.50, autre: 0,    ttc: 32.90,  natures: [] },
+  { code: 'DIV05', libelle: 'Frais divers',              prixUht: 8.00,  tauxTva: 20, bodacc: 0,      inpi: 0,     autre: 4.20, ttc: 14.64,  natures: [] },
 ]
+
+// La facture de demonstration, celle de l'ecran ouvert depuis l'accueil (capture
+// de l'ecran Blazor du 18/11/2026 : 458,63 EUR TTC).
+const FactureDemo: readonly LigneFacture[] = [
+  { code: 'IMM01', quantite: 1, commentaire: '' },
+  { code: 'MOD02', quantite: 1, commentaire: 'Changement de gerant' },
+  { code: 'DEP03', quantite: 2, commentaire: '' },
+  { code: 'INP04', quantite: 1, commentaire: 'Refacturation INPI' },
+  { code: 'DIV05', quantite: 1, commentaire: '' },
+]
+
+/** La nature d'une affaire, debut de son objet (« Depot de bilan - TRANSNORD SA » -> « Depot de bilan »). */
+const natureDe = (dossier: ContexteDossierVue): string =>
+  dossier.objet.includes(' - ') ? dossier.objet.slice(0, dossier.objet.indexOf(' - ')) : ''
+
+/** La facture de depart d'une affaire : une fois chaque article du tarif qui facture sa
+ *  nature. Le tarif est celui du RCS : une affaire judiciaire n'y a aucun article. */
+function factureDe(dossier: ContexteDossierVue): LigneFacture[] {
+  const nature = natureDe(dossier)
+  return dossier.type !== 'RCS'
+    ? []
+    : Tarif.filter((t) => t.natures.includes(nature))
+           .map((t) => ({ code: t.code, quantite: 1, commentaire: '' }))
+}
+
+/** Une ligne de facture lue dans le tarif, ses montants calcules en centimes (exacts). */
+function article(ligne: LigneFacture): ArticleFacture {
+  const t = Tarif.find((a) => a.code === ligne.code)
+  if (!t) throw new Error(`Article ${ligne.code} absent du tarif`)
+  const fois = (montant: number) => centimes(montant) * ligne.quantite / 100
+  return {
+    code: t.code, libelle: t.libelle, quantite: ligne.quantite, prixUht: t.prixUht, tauxTva: t.tauxTva,
+    bodacc: fois(t.bodacc), inpi: fois(t.inpi), autre: fois(t.autre), ttc: fois(t.ttc), commentaire: ligne.commentaire,
+  }
+}
 
 const Payeurs: readonly string[] = ['', 'Debiteur', 'Tiers payeur principal', 'Avocat mandataire']
 
-const premiereFiche: FicheClient = Fiches[0] ?? { nom: '', abrege: '', typeClient: '', adresse: '', solde: 0 }
+const FicheVide: FicheClient = { nom: '', abrege: '', typeClient: '', adresse: '', solde: null }
+
+/** La demande d'une affaire, telle que Pont/EcranFactures.cs (DemandeDe) la rend. */
+interface DemandeFacturee {
+  numero: string
+  /** L'abrege du client de la demande, vide si elle n'en nomme pas. */
+  client: string
+}
 
 export interface ProprietesEcranFactures {
   /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) : la facture est pour elle,
@@ -75,8 +153,13 @@ export interface ProprietesEcranFactures {
 }
 
 export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
-  const [client, setClient] = useState(premiereFiche.nom)
-  const [numDemande, setNumDemande] = useState('D2026-04118')
+  // Ouvert pour une affaire, la facture part d'elle seule : son client et sa demande
+  // arrivent du pont (DemandeDe) ; d'ici la, et si elle n'en a pas, ils restent vides.
+  const [client, setClient] = useState(dossier ? FicheVide.nom : (Fiches[0] ?? FicheVide).nom)
+  const [numDemande, setNumDemande] = useState(dossier ? '' : 'D2026-04118')
+  const [demande, setDemande] = useState<DemandeFacturee | null>(null)
+  // Une affaire est montee avec sa cle (Aiguillage.tsx) : sa facture est lue une fois.
+  const [lignes] = useState<readonly LigneFacture[]>(() => dossier ? factureDe(dossier) : FactureDemo)
 
   // v2 : ult_Facturer_Tarifer, "F" par defaut.
   const [tarifer, setTarifer] = useState(false)
@@ -84,15 +167,16 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
   const [payeur, setPayeur] = useState('')
   const [references, setReferences] = useState('')
   const [attention, setAttention] = useState('')
-  const ventilationId = 'V-2026-8801'
+  const ventilationId = dossier ? '' : 'V-2026-8801'
   const [mode, setMode] = useState('Compte')
   const [banque, setBanque] = useState('')
   const [numTitre, setNumTitre] = useState('')
   const [commentaire, setCommentaire] = useState('')
   // Le texte saisi et la derniere valeur LISIBLE : comme le @bind d'un
-  // decimal, une saisie illisible ne remet pas le montant a zero.
-  const [encaisseTexte, setEncaisseTexte] = useState('200')
-  const [encaisse, setEncaisse] = useState(200)
+  // decimal, une saisie illisible ne remet pas le montant a zero. Pour une
+  // affaire, rien n'est encaisse au depart.
+  const [encaisseTexte, setEncaisseTexte] = useState(dossier ? '' : '200')
+  const [encaisse, setEncaisse] = useState(dossier ? 0 : 200)
   const [dateEncaissement, setDateEncaissement] = useState<string | null>(null)
   const [retires, setRetires] = useState<ReadonlySet<string>>(new Set())
 
@@ -103,12 +187,34 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
     return () => { perime = true }
   }, [])
 
-  const fiche = Fiches.find((f) => f.nom === client) ?? premiereFiche
+  const numeroAffaire = dossier?.numero
+  const nomAffaire = dossier?.nom ?? ''
+  useEffect(() => {
+    if (numeroAffaire === undefined) return
+    let perime = false
+    void appeler<DemandeFacturee | null>('EcranFactures.DemandeDe', numeroAffaire).then((d) => {
+      if (perime || !d) return
+      setDemande(d)
+      // Ce que l'agent a deja saisi ou choisi entre-temps n'est pas ecrase.
+      setNumDemande((avant) => avant || d.numero)
+      if (d.client) setClient((avant) => avant || nomAffaire)
+    })
+    return () => { perime = true }
+  }, [numeroAffaire, nomAffaire])
+
+  // Le client nomme par l'affaire : l'abrege de sa demande, la societe de l'affaire
+  // (toutes les demandes du jeu de demonstration abregent la denomination de leur
+  // dossier). Ni type, ni adresse, ni solde : l'affaire ne les dit pas.
+  const ficheAffaire: FicheClient | null = dossier
+    ? (demande?.client ? { ...FicheVide, nom: nomAffaire, abrege: demande.client } : FicheVide)
+    : null
+  const fiches: readonly FicheClient[] = ficheAffaire ? [ficheAffaire, ...Fiches] : Fiches
+  const fiche = fiches.find((f) => f.nom === client) ?? fiches[0] ?? FicheVide
 
   // v2 : btn_Changer_client fait defiler les clients rattachables a la facture.
   function changerClient() {
-    const i = Fiches.findIndex((f) => f.nom === client)
-    setClient((Fiches[(i + 1) % Fiches.length] ?? premiereFiche).nom)
+    const i = fiches.findIndex((f) => f.nom === client)
+    setClient((fiches[(i + 1) % fiches.length] ?? FicheVide).nom)
   }
 
   function basculer(code: string) {
@@ -125,7 +231,8 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
     if (Number.isFinite(valeur)) setEncaisse(valeur)
   }
 
-  const total = Articles.filter((a) => !retires.has(a.code)).reduce((s, a) => s + centimes(a.ttc), 0)
+  const articles = lignes.map(article)
+  const total = articles.filter((a) => !retires.has(a.code)).reduce((s, a) => s + centimes(a.ttc), 0)
   const reste = Math.max(0, total - centimes(encaisse))
 
   return (
@@ -150,7 +257,7 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
         <label className="rig-saisie-champ">
           <span className="rig-saisie-champ__libelle">Nom du client</span>
           <select className="rig-saisie-champ__saisie" value={client} onChange={(e) => setClient(e.target.value)}>
-            {Fiches.map((c) => (
+            {fiches.map((c) => (
               <option key={c.nom} value={c.nom}>{c.nom}</option>
             ))}
           </select>
@@ -167,9 +274,11 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
             pastille decalee de la largeur d'une espace sans lui). */}
         <div className="rig-criteres__actions">
           <button className="rig-bouton" onClick={changerClient}>Changer de client</button>{' '}
-          <span className={`rig-etat rig-etat--${fiche.solde > 0 ? 'attente' : 'ok'}`}>
-            Solde client {nombre(fiche.solde, 2)} EUR
-          </span>
+          {fiche.solde !== null && (
+            <span className={`rig-etat rig-etat--${fiche.solde > 0 ? 'attente' : 'ok'}`}>
+              Solde client {nombre(fiche.solde, 2)} EUR
+            </span>
+          )}
         </div>
 
         <label className="rig-saisie-champ">
@@ -240,7 +349,14 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
               </tr>
             </thead>
             <tbody>
-              {Articles.map((art) => (
+              {articles.length === 0 && dossier && (
+                <tr>
+                  <td colSpan={10} className="rig-table__vide">
+                    Aucun article du tarif pour cette affaire{natureDe(dossier) ? ` (${natureDe(dossier)})` : ''}.
+                  </td>
+                </tr>
+              )}
+              {articles.map((art) => (
                 <tr key={art.code}
                     className={retires.has(art.code) ? 'rig-table__ligne--inerte' : undefined}
                     onClick={() => basculer(art.code)}>
