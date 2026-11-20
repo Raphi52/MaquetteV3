@@ -73,6 +73,7 @@ internal static class Programme
         var p = P();
         Exiger(p.Texte == "" && p.Travail.Length > 0 && p.Travail.All(t => t.Nature is "dem" or "cou"),
             "avant de taper : le travail encore ouvert (demandes en cours, courrier a rattacher)");
+        Exiger(p.Actions.Length == 0, "hors affaire : pas de section « Sur ce dossier »");
         Exiger(p.Travail[0] is { Numero: "004151", Etat: "J+11", Ton: "al", Filet: "alerte" }
                && p.Travail[0].Delai == "Delai legal de 7 jours depasse de 4 jours",
             $"le plus urgent d'abord : 004151 hors delai J+11 en tete ({p.Travail[0].Numero} {p.Travail[0].Etat} · {p.Travail[0].Delai})");
@@ -203,6 +204,47 @@ internal static class Programme
         Agir("paletteAller", new { nature = "dem", cle = "004176" });
         vue = plan.Vue();
         Exiger(vue.Palette is null && vue.Dossier is { Numero: "004176" }, "Entree sur une demande ouvre son dossier");
+
+        // --- 10 bis. « SUR CE DOSSIER » (plan « Vue du dossier = coeur des actions », lot 5) :
+        // sur l'affaire ouverte, ses actions viennent en tete, filtrees par ce qui est tape,
+        // et Entree en joue une par le geste de la barre (« actionDossier »).
+        var barre = vue.Dossier!.Actions.SelectMany(v => v.Actions).Select(a => a.Code).ToArray();
+        Agir("paletteOuvrir");
+        p = P();
+        Exiger(barre.Length > 0 && p.Actions.Select(a => a.Code).SequenceEqual(barre),
+            $"rien de tape : toutes les actions de la barre de 004176, dans son ordre ({string.Join(", ", p.Actions.Select(a => a.Code))})");
+        Agir("paletteTexte", "fac");
+        p = P();
+        Exiger(p.Actions.Length > 0 && p.Actions[0] is { Code: "factures", Libelle: "Factures", Verbe: "Facturer", Touche: "F", Ecran: true, Copie: null },
+            $"« fac » : Factures en tete, avec son verbe et sa lettre ({string.Join(", ", p.Actions.Select(a => a.Libelle))})");
+        Exiger(p.Actions.Select(a => a.Code).SequenceEqual(["factures", "encaissements"]),
+            "le libelle passe avant le verbe : Encaissements suit, trouve par « Facturer »");
+        Agir("paletteTexte", "kbis");
+        Exiger(P().Actions.Select(a => a.Code).SequenceEqual(["kbis", "imprimerKbis"]),
+            "« kbis » : les deux actions du Kbis, dans l'ordre de la barre");
+        Agir("paletteTexte", "copier siren");
+        Exiger(P().Actions is [{ Code: "copierSiren", Copie: "812 445 901", Ecran: false }],
+            "une action de copie porte le texte a copier (jouee par la page)");
+        Agir("paletteTexte", "zzz");
+        Exiger(P().Actions.Length == 0, "rien ne repond : pas de section « Sur ce dossier »");
+        Agir("paletteTexte", "fac");
+        Agir("actionDossier", P().Actions[0].Code);
+        vue = plan.Vue();
+        Exiger(vue.Palette is null && vue.Proc is { Code: "PROC_FACTURE" } && vue.Proc.Ecran.Dossier is { Numero: "004176" },
+            "Entree sur « Factures » : la palette se ferme, l'ecran Factures s'ouvre pour 004176");
+        Agir("paletteOuvrir");
+        Exiger(P().Actions.Length == 0 && P().Travail.Length > 0,
+            "sur un ecran, meme ouvert depuis l'affaire : la palette d'avant, sans « Sur ce dossier »");
+        Agir("paletteFermer");
+        Agir("retourDossier");
+        Exiger(plan.Vue().Dossier is { Numero: "004176" }, "la puce « ← Dossier » ramene a l'affaire");
+        Agir("paletteOuvrir");
+        Agir("paletteTexte", "kbis");
+        Agir("actionDossier", "kbis");
+        vue = plan.Vue();
+        Exiger(vue.Palette is null && vue.Dossier?.Apercu?.Apercu?.Libelle == ArbreDemo.LibelleKbisAJour,
+            "une action locale jouee depuis la palette la ferme : le Kbis a jour s'affiche dans la page");
+
         Agir("paletteOuvrir");
         Agir("paletteAller", new { nature = "ecran", cle = "BODACC" });
         Exiger(plan.Vue().Proc is { Code: "BODACC" }, "une annonce ouvre l'ecran BODACC");
@@ -245,8 +287,8 @@ internal static class Programme
         Agir("accueil");
         Exiger(plan.Vue() is { Proc: null, Dossier: null, Accueil: not null }, "la maison ramene a l'accueil");
         Agir("paletteOuvrir");
-        Exiger(plan.Vue().Palette is { Ancree: true, Texte: "" },
-            "Ctrl K sur l'accueil deroule la palette sous la barre, comme un clic dans la barre");
+        Exiger(plan.Vue().Palette is { Ancree: true, Texte: "", Actions.Length: 0 },
+            "Ctrl K sur l'accueil deroule la palette sous la barre, comme un clic dans la barre (sans « Sur ce dossier »)");
         Agir("paletteFermer");
         Agir("ouvrirCode", "BODACC");
         Agir("paletteOuvrir");

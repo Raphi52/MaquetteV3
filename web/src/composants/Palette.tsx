@@ -15,13 +15,19 @@
 // plan de travail (Pont/PlanTravailPalette.cs) ; ce composant ne tient que ce
 // qui est affichage : la ligne choisie, le mode « gestes », la frappe en cours.
 // Seules les annonces de l'ecran BODACC, declarees dans son .tsx, se filtrent ici.
+//
+// « SUR CE DOSSIER » (plan « Vue du dossier = coeur des actions », lot 5,
+// 20/11/2026) : sur une affaire ouverte, les actions de sa barre viennent EN
+// TETE, filtrees par le C# (RecherchePalette.Actions) ; Entree en joue une
+// comme la barre (jouerAction : le geste « actionDossier », ou la copie).
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ToucheReact, ReactNode } from 'react'
 import { AnnoncesBodacc } from '../ecrans/EcranBodacc'
 import type { AnnonceBodacc } from '../ecrans/EcranBodacc'
+import { jouerAction } from '../plan/ActionsDossier'
 import type {
-  ElementPaletteVue, EcranPaletteVue, GestePlan, HorsGreffePaletteVue, PaletteVue, PiecePaletteVue, TravailPaletteVue,
+  ActionPaletteVue, ElementPaletteVue, EcranPaletteVue, GestePlan, HorsGreffePaletteVue, PaletteVue, PiecePaletteVue, TravailPaletteVue,
 } from '../plan/types'
 
 // ---------------------------------------------------------------- texte
@@ -88,6 +94,7 @@ const TRACES: Record<string, ReactNode> = {
   loupe: <><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></>,
   ecran: <><path d="M2 3h12v8H2z" /><path d="M6 14h4M8 11v3" /></>,
   horloge: <><circle cx="8" cy="8" r="6" /><path d="M8 4.5V8l2.5 1.5" /></>,
+  agir: <path d="M9 1.5 3.5 9H8l-1 5.5L12.5 7H8z" />,
 }
 
 export function Picto({ nom }: { nom: string }) {
@@ -107,6 +114,7 @@ export function Touche({ children }: { children: ReactNode }) {
 // ---------------------------------------------------------------- ce que la liste montre
 
 type Element =
+  | { sorte: 'action', a: ActionPaletteVue }
   | { sorte: 'travail', t: TravailPaletteVue }
   | { sorte: 'ecran', e: EcranPaletteVue }
   | { sorte: 'element', el: ElementPaletteVue }
@@ -174,6 +182,10 @@ export function Palette({ vue, plan, ancree = false }: ProprietesPalette) {
   const annonces = useMemo(() => AnnoncesBodacc.filter((a) => annonceRepond(a, texte)), [texte])
 
   const groupes: Groupe[] = []
+  // Sur l'affaire ouverte, ce qu'on peut y faire passe devant ce qu'on peut y chercher.
+  if (vue.actions.length > 0) {
+    groupes.push({ titre: 'Sur ce dossier', compte: vue.actions.length, elements: vue.actions.map((a) => ({ sorte: 'action', a })) })
+  }
   if (texte.length === 0) {
     groupes.push({ titre: 'A traiter maintenant', compte: vue.travailTrouve, elements: vue.travail.map((t) => ({ sorte: 'travail', t })) })
   } else {
@@ -198,7 +210,7 @@ export function Palette({ vue, plan, ancree = false }: ProprietesPalette) {
   }
   const elements = groupes.flatMap((g) => g.elements)
   const rien = texte.length > 0 && vue.travail.length === 0 && vue.pieces.length === 0 && annonces.length === 0
-    && vue.ecrans.length === 0 && vue.elements.length === 0
+    && vue.ecrans.length === 0 && vue.elements.length === 0 && vue.actions.length === 0
   const index = Math.min(choisi, Math.max(elements.length - 1, 0))
   const courant: Element | undefined = elements[index]
 
@@ -212,6 +224,11 @@ export function Palette({ vue, plan, ancree = false }: ProprietesPalette) {
 
   function gestesDe(e: Element): Geste[] {
     switch (e.sorte) {
+      case 'action': {
+        const a = e.a
+        return [{ groupe: 'Sur ce dossier', libelle: a.libelle, detail: a.detail, touche: 'Entree',
+                  faire: () => jouerAction(a, plan, (texte, quoi) => copierAvecAvis(texte, quoi + ' copie')) }]
+      }
       case 'travail': {
         const t = e.t
         const g: Geste[] = []
@@ -437,7 +454,7 @@ export function Palette({ vue, plan, ancree = false }: ProprietesPalette) {
 
           {/* ---- L'apercu ---- */}
           <div className="rig-palette__apercu">
-            {texte.length === 0
+            {texte.length === 0 && courant?.sorte !== 'action'
               ? <ApercuBilan vue={vue} />
               : courant
                 ? <Apercu element={courant} vue={vue} saisie={texte} />
@@ -458,6 +475,7 @@ export function Palette({ vue, plan, ancree = false }: ProprietesPalette) {
 
 function libelleCourt(e: Element): string {
   switch (e.sorte) {
+    case 'action': return e.a.libelle
     case 'travail': return `${e.t.numero} · ${e.t.titre.split(' - ')[0]}`
     case 'ecran': return e.e.libelle
     case 'element': return e.el.libelle
@@ -482,6 +500,17 @@ interface ProprietesLigne {
 function Ligne({ element: e, saisie, choisie, survoler, ouvrir, gestes }: ProprietesLigne) {
   let corps: ReactNode
   switch (e.sorte) {
+    case 'action':
+      // Sa lettre a droite : sur la page du dossier, elle la joue sans ouvrir la palette.
+      corps = <>
+        <Picto nom={e.a.ecran ? 'ecran' : 'agir'} />
+        <span className="rig-palette__texte">
+          <span className="rig-palette__t1"><Surligne texte={e.a.libelle} saisie={saisie} /></span>
+          <span className="rig-palette__t2">{e.a.verbe} · {e.a.detail}</span>
+        </span>
+        <Touche>{e.a.touche}</Touche>
+      </>
+      break
     case 'travail':
       corps = <>
         <span className={'rig-palette__filet rig-filet-v--' + e.t.filet}></span>
@@ -604,6 +633,14 @@ function ApercuRien() {
 
 function Apercu({ element: e, vue, saisie }: { element: Element, vue: PaletteVue, saisie: string }) {
   switch (e.sorte) {
+    case 'action':
+      return <>
+        <div className="rig-palette__titre">Apercu · action sur le dossier</div>
+        <div className="rig-palette__nom"><Surligne texte={e.a.libelle} saisie={saisie} /></div>
+        <div className="rig-palette__para">{e.a.detail}</div>
+        <div className="rig-palette__para">{e.a.verbe} · dossier {vue.dossierDesPieces}</div>
+        <div className="rig-palette__para">Entree la lance. Sur la page du dossier, la touche <Touche>{e.a.touche}</Touche> aussi.</div>
+      </>
     case 'travail': {
       const t = e.t
       return <>

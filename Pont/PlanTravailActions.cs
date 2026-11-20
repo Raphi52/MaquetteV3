@@ -76,6 +76,9 @@ public sealed partial class SessionPlanTravail
     /// <summary>Le geste « actionDossier » : joue l'action de ce code sur l'affaire ouverte.</summary>
     private void AgirSurDossier(string code)
     {
+        // Jouee depuis la palette Ctrl K (« Sur ce dossier », lot 5) : elle se ferme, comme
+        // apres « paletteAller », pour laisser voir ce que l'action ouvre.
+        PaletteOuverte = false;
         // L'affaire a ete fermee entre le clic et son traitement : il n'y a plus rien ou agir.
         if (DossierOuvert is not { } d) return;
         var action = ActionsDisponibles(d).FirstOrDefault(a => a.Code == code)

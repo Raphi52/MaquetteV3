@@ -242,6 +242,18 @@ describe('ActionsDossier : des boutons groupes par verbe, un menu seulement si l
     expect(screen.getAllByRole('button', { name: 'Factures' })).toHaveLength(1)
   })
 
+  it('chaque bouton, et chaque action d\'un menu, donne sa lettre dans son infobulle (lot 5)', () => {
+    const { container } = rendreDansEntete(3000)
+    expect(screen.getByRole('button', { name: 'Factures' }).getAttribute('title'))
+      .toBe('Factures (infobulle) — touche F')
+    const boutons = [...container.querySelectorAll<HTMLButtonElement>('.rig-vged__agir > .rig-vged__agir-groupe > button')]
+    expect(boutons.map((b) => / — touche ([A-Z])$/.exec(b.title)?.[1]).join('')).toBe('KIPRWDBOAFECMNSVT')
+    redimensionner(300)
+    expect(screen.getByRole('menuitem', { name: /^Factures/ }).getAttribute('title')).toBe('Factures (infobulle) — touche F')
+    expect(container.querySelector('.rig-vged__agir > details summary')!.getAttribute('title'))
+      .toBe("Kbis a jour (K) · Imprimer le Kbis (I) · Imprimer l'arborescence (P) · Requisitions - commande de documents (R) · Commandes web (W)")
+  })
+
   it('la largeur manque : les verbes qui ne tiennent plus se replient en menu, et se redeplient quand elle revient', () => {
     const { container } = rendreDansEntete(3000)
     expect(formes(container)).toBe('BBBBB')

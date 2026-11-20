@@ -25,13 +25,24 @@ namespace RigV3Desktop.Pont;
 /// <param name="Ancree">Ouverte SUR L'ACCUEIL (sa barre de recherche, ou Ctrl K quand rien ne le
 /// recouvre) : elle pend SOUS la barre, en liste deroulante. Sur un ecran ou une affaire, elle
 /// flotte au milieu.</param>
+/// <param name="Actions">« Sur ce dossier » : les actions de la barre de l'affaire OUVERTE pour ce
+/// qui est tape (RecherchePalette.Actions), en tete de la palette ; vide hors affaire et dans la
+/// page « Recherche ». Entree en joue une par le geste de la barre, « actionDossier ».</param>
 public sealed record PaletteVue(string Texte, string Filtre, FiltrePaletteVue[] Filtres, AgentPaletteVue Moi,
                                 AgentPaletteVue[] Agents, TravailPaletteVue[] Travail, int TravailTrouve,
                                 PiecePaletteVue[] Pieces, string DossierDesPieces, string NumeroDesPieces,
                                 HorsGreffePaletteVue[] HorsGreffe,
                                 BilanPaletteVue Bilan, string? SirenInconnu,
                                 EcranPaletteVue[] Ecrans, ElementPaletteVue[] Elements, bool Ancree,
-                                DepotPaletteVue[] Depots, string? Avis);
+                                DepotPaletteVue[] Depots, string? Avis,
+                                ActionPaletteVue[] Actions);
+/// <summary>Une action de la barre du dossier, proposee par la palette (Metier/ActionsDossier.cs).</summary>
+/// <param name="Verbe">Son groupe dans la barre (« Facturer »).</param>
+/// <param name="Touche">Sa lettre : hors de la palette, elle la joue aussi.</param>
+/// <param name="Ecran">Elle ouvre un ecran dans un onglet « pour ce dossier ».</param>
+/// <param name="Copie">Le texte qu'elle copie, joue par la page ; nul sinon.</param>
+public sealed record ActionPaletteVue(string Code, string Verbe, string Libelle, string Touche, string Detail,
+                                      bool Ecran, string? Copie);
 /// <summary>Un depot de l'arbre (« Depot n 2024/0141 ») et les pieces qu'il contient deja.</summary>
 public sealed record DepotPaletteVue(string Libelle, string[] Chemin, string Lieu, string[] Pieces, bool Choisi);
 /// <summary>Un ecran du menu ; le geste « paletteAller » (nature « ecran ») l'ouvre par son code.</summary>
@@ -283,7 +294,11 @@ public sealed partial class SessionPlanTravail
                                                            e.Suite![^1].EstPiece))],
             ancree,
             page ? Depots(racine, Visibles) : [],
-            page ? AvisPageRecherche : null);
+            page ? AvisPageRecherche : null,
+            page || DossierOuvert is not { } ouvert ? []
+                : [.. RecherchePalette.Actions(texte, ActionsDisponibles(ouvert))
+                      .Select(a => new ActionPaletteVue(a.Code, a.Verbe, a.Libelle, a.Touche.ToString(), a.Detail,
+                                                        !a.EstLocale, TexteACopier(a, ouvert)))]);
     }
 
     // ================= Joindre une piece a un depot (liseuse de la page « Recherche ») =================

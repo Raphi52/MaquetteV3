@@ -93,6 +93,36 @@ var nomsRecherche = recherchesTsx.Select(Path.GetFileNameWithoutExtension).ToHas
 Exiger(new[] { "EcranRechAffaires", "EcranRequisitions", "EcranCommandesWeb" }.All(nomsRecherche.Contains),
     $"les ecrans de recherche sont trouves ({string.Join(", ", nomsRecherche.Order())})");
 
+// --- 4. Les raccourcis de la page du dossier (plan « Vue du dossier = coeur des actions »,
+// lot 5, 20/11/2026). vitest les joue (web/src/plan/AideClavier.test.tsx) ; ce banc tient
+// ce qui casserait EN SILENCE : une couche qui garde Echap pour elle, une fenetre ajoutee
+// sous laquelle les lettres joueraient encore.
+Exiger(Regex.IsMatch(js, @"if \(e\.key !== 'Escape' \|\| e\.defaultPrevented\) return\s*echap\(\)"),
+    "Echap deja traite par un composant (menu, liste, aide) ne ferme pas l'affaire");
+var raccourci = Regex.Match(js, @"export function toucheDeRaccourci\((?<c>.*?)\n\}", RegexOptions.Singleline).Groups["c"].Value;
+Exiger(new[] { "e.defaultPrevented", "e.repeat", "e.ctrlKey", "e.altKey", "e.metaKey", "dansUneSaisie(e.target)" }.All(raccourci.Contains),
+    "une lettre ne joue rien dans un champ, deja traitee, tenue, ou avec Ctrl, Alt ou Cmd");
+// Chaque fenetre que l'application pose par-dessus la page coupe les lettres.
+var fenetres = Regex.Matches(application, @"\{v\.(?<v>\w+) && (?:!\([^)]*\) && )?<(?<c>Impression|EnvoiMail|Nouveau|MenuNoeud|Palette)\b")
+    .Select(m => m.Groups["v"].Value).Distinct().ToList();
+var garde = Regex.Match(application, @"clavier=\{!\((?<g>[^)]*)\)\}").Groups["g"].Value;
+Exiger(fenetres.Count == 5 && fenetres.All(f => garde.Contains("v." + f)),
+    $"les lettres se taisent sous chaque fenetre de l'application ({string.Join(", ", fenetres)} ; garde : {garde})");
+var visionneuse = File.ReadAllText(Path.Combine(racine, "web/src/plan/Visionneuse.tsx"));
+Exiger(visionneuse.Contains("<RaccourcisDossier verbes={d.actions}") && visionneuse.Contains("actif={clavier}"),
+    "la page du dossier ecoute ses raccourcis, actifs selon l'application");
+// Une liste deroulante de la page (menu d'un verbe, points a corriger) se referme SEULE sur Echap.
+foreach (var nom in new[] { "web/src/plan/Visionneuse.tsx", "web/src/plan/ActionsDossier.tsx" })
+{
+    var t = File.ReadAllText(Path.Combine(racine, nom));
+    // La balise ouvrante jusqu'a son premier enfant (<summary>) : ses attributs portent des
+    // « => » ; une ligne de commentaire qui cite « <details> » n'en est pas une.
+    var listes = Regex.Matches(t, @"^\s*<details\b.*?<summary", RegexOptions.Singleline | RegexOptions.Multiline)
+        .Select(m => m.Value).ToList();
+    Exiger(listes.Count > 0 && listes.All(d => d.Contains("onKeyDown")),
+        $"{Path.GetFileName(nom)} : chaque liste deroulante (<details>) traite sa touche Echap ({listes.Count})");
+}
+
 Console.WriteLine();
 Console.WriteLine(echecs.Count == 0 ? "ClavierCheck : vert." : $"ClavierCheck : {echecs.Count} echec(s).");
 return echecs.Count;

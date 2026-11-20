@@ -25,7 +25,9 @@
 // (Metier/ActionsDossier.cs, Pont/PlanTravailActions.cs) ; la page remonte le
 // code de l'action (geste « actionDossier »), sauf pour une COPIE, qu'elle joue
 // elle-meme : le presse-papiers est le sien. Menu ouvert, la lettre d'une action
-// la joue ; un clic ailleurs ou Echap le referme.
+// la joue ; un clic ailleurs ou Echap le referme. Menu ferme, la meme lettre la
+// joue depuis toute la page (lot 5 : AideClavier.tsx, « ? » pour la liste) : chaque
+// infobulle la donne.
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
@@ -60,6 +62,20 @@ export function useCopie(duree = 1400): [string | null, (texte: string, quoi: st
 /** « Copier le SIREN » -> « SIREN » : ce que l'avis annonce comme copie. */
 function objetCopie(libelle: string): string {
   return libelle.replace(/^Copier (le |la |l')?/, '')
+}
+
+/** Ce que joue une action, d'un clic, de sa lettre ou depuis la palette Ctrl K : une COPIE
+ *  dans la page (le presse-papiers est le sien ; `copier` recoit l'objet copie, « SIREN »),
+ *  sinon le geste « actionDossier ». */
+export function jouerAction(a: { code: string, libelle: string, copie: string | null }, plan: GestePlan,
+                            copier: (texte: string, quoi: string) => void): void {
+  if (a.copie !== null) copier(a.copie, objetCopie(a.libelle))
+  else plan('actionDossier', a.code)
+}
+
+/** L'infobulle d'une action : ce qu'elle fait, et la lettre qui la joue. */
+export function infobulle(a: ActionDossierVue): string {
+  return `${a.detail} — touche ${a.touche}`
 }
 
 /** Le plancher de largeur de l'identite de l'affaire (n°, objet, puces) quand la barre
@@ -224,8 +240,7 @@ export function ActionsDossier({ verbes, plan, copier }: ProprietesActionsDossie
 
   const jouer = (a: ActionDossierVue, menu: HTMLDetailsElement | null) => {
     if (menu) menu.open = false
-    if (a.copie !== null) copier(a.copie, objetCopie(a.libelle))
-    else plan('actionDossier', a.code)
+    jouerAction(a, plan, copier)
   }
   // Un menu qui s'ouvre referme les autres.
   const ouvert = (menu: HTMLDetailsElement) => {
@@ -255,7 +270,7 @@ export function ActionsDossier({ verbes, plan, copier }: ProprietesActionsDossie
     <div key={v.verbe} className="rig-vged__agir-groupe" role={mesure ? undefined : 'group'} aria-label={mesure ? undefined : v.verbe}>
       <span className="rig-vged__agir-legende">{v.verbe}</span>
       {v.actions.map((a) => (
-        <button key={a.code} type="button" title={a.detail} tabIndex={mesure ? -1 : undefined}
+        <button key={a.code} type="button" title={infobulle(a)} tabIndex={mesure ? -1 : undefined}
                 className={'rig-vged__agir-bouton' + (a.ecran ? ' rig-vged__agir-bouton--ecran' : '')}
                 onClick={mesure ? undefined : () => jouer(a, null)}>
           {a.libelle}
@@ -270,12 +285,12 @@ export function ActionsDossier({ verbes, plan, copier }: ProprietesActionsDossie
       {verbes.map((v, i) => deplies[i] ? groupe(v) : (
         <details key={v.verbe} onToggle={(e) => ouvert(e.currentTarget)} onKeyDown={(e) => touche(e, v)}
                  className={'rig-vged__agir-verbe' + (i >= verbes.length - 2 ? ' rig-vged__agir-verbe--droite' : '')}>
-          <summary className="rig-vged__agir-titre" title={v.actions.map((a) => a.libelle).join(' · ')}>
+          <summary className="rig-vged__agir-titre" title={v.actions.map((a) => `${a.libelle} (${a.touche})`).join(' · ')}>
             {v.verbe}<Chevron />
           </summary>
           <div className="rig-vged__agir-menu" role="menu" aria-label={v.verbe}>
             {v.actions.map((a) => (
-              <button key={a.code} type="button" role="menuitem" title={a.detail}
+              <button key={a.code} type="button" role="menuitem" title={infobulle(a)}
                       className={'rig-vged__agir-action' + (a.ecran ? ' rig-vged__agir-action--ecran' : '')}
                       onClick={(e) => jouer(a, e.currentTarget.closest('details'))}>
                 <span className="rig-vged__agir-libelle">{a.libelle}</span>

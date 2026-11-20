@@ -14,6 +14,7 @@ import { ClasseurArbre } from '../composants/ClasseurArbre'
 import { FicheInformationsDossier } from '../composants/FicheInformationsDossier'
 import { Saisie } from '../session'
 import { ActionsDossier, useCopie } from './ActionsDossier'
+import { RaccourcisDossier } from './AideClavier'
 import { Apercu } from './Apercu'
 import { Etapes } from './Etapes'
 import { SuiviDossier } from './Suivi'
@@ -41,9 +42,12 @@ export interface ProprietesVisionneuse {
   defilement: DefilementVue | null
   defilementJoue: MutableRefObject<number>
   plan: GestePlan
+  /** Les raccourcis d'une lettre ecoutent la page : aucune fenetre n'est ouverte par-dessus
+   *  (Application.tsx). Absent : pas de raccourcis. */
+  clavier?: boolean
 }
 
-export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue, plan }: ProprietesVisionneuse) {
+export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue, plan, clavier = false }: ProprietesVisionneuse) {
   const s = d.sommaire
   // Une piece ouverte DEPUIS L'HISTORIQUE peut etre loin dans l'arbre (branche
   // Judiciaire, 40 lignes plus bas) : quand la piece ouverte change, l'arbre
@@ -118,7 +122,13 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
             corriger ; chaque lien ouvre l'etape (et la fiche). */}
         {d.bandeau && (
           <div className={'rig-vged__defauts' + (d.bandeau.erreur ? ' rig-vged__defauts--erreur' : '')} role="alert">
-            <details ref={defauts}>
+            {/* Echap referme la liste SEULE : la touche marquee traitee, l'ecoute du
+                document (clavier.ts) ne ferme pas l'affaire. */}
+            <details ref={defauts} onKeyDown={(e) => {
+              if (e.key !== 'Escape' || !e.currentTarget.open) return
+              e.preventDefault()
+              e.currentTarget.open = false
+            }}>
               <summary className="rig-vged__defauts-pastille" title="Voir les sections a corriger">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2z"></path><path d="M12 10v4"></path><path d="M12 17v.5"></path></svg>
                 <b>{d.bandeau.nombre}</b>{' '}{d.bandeau.nombre === 1 ? 'point a corriger' : 'points a corriger'}
@@ -265,6 +275,8 @@ export function Visionneuse({ dossier: d, pagination, defilement, defilementJoue
                onPointerLeave={() => plan('redimFin')}></div>
         )}
       </div>
+      {/* LES RACCOURCIS d'une lettre et leur aide « ? » (lot 5, AideClavier.tsx). */}
+      <RaccourcisDossier verbes={d.actions} numero={d.numero} plan={plan} copier={copier} actif={clavier} />
     </div>
   )
 }

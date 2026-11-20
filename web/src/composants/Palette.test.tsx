@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { ATTENTE_BARRE, Palette } from './Palette'
-import type { PaletteVue, TravailPaletteVue } from '../plan/types'
+import type { ActionPaletteVue, PaletteVue, TravailPaletteVue } from '../plan/types'
 
 afterEach(cleanup)
 
@@ -48,6 +48,7 @@ function vue(partiel: Partial<PaletteVue> = {}): PaletteVue {
     ancree: false,
     depots: [],
     avis: null,
+    actions: [],
     ...partiel,
   }
 }
@@ -258,5 +259,72 @@ describe('Palette Ctrl K (/draft « Page Recherche », propositions 3 et 6)', ()
     fireEvent.click(p.container.querySelectorAll('.rig-palette__liste .rig-palette__ligne')[0]!)
     expect(p.appels()).toEqual([['paletteAller', { nature: 'dem', cle: '004151' }]])
     expect(screen.getByRole('dialog', { name: 'Rechercher partout' })).toBeTruthy()
+  })
+})
+
+// « SUR CE DOSSIER » (plan « Vue du dossier = coeur des actions », lot 5, 20/11/2026) :
+// sur une affaire ouverte, les actions de sa barre viennent en tete, filtrees par le C#
+// (Metier/RecherchePalette.cs : Actions, joue par tests/PaletteCheck) ; Entree en joue une
+// par le geste de la barre. Hors affaire, la vue n'en porte aucune : la palette d'avant.
+describe('Palette : « Sur ce dossier »', () => {
+  const action = (code: string, verbe: string, libelle: string, touche: string, ecran: boolean, copie: string | null = null): ActionPaletteVue =>
+    ({ code, verbe, libelle, touche, detail: libelle + ' (infobulle)', ecran, copie })
+  const factures = action('factures', 'Facturer', 'Factures', 'F', true)
+  const encaissements = action('encaissements', 'Facturer', 'Encaissements', 'E', true)
+  const surDossier = { dossierDesPieces: '004176 SCI DU PARC', numeroDesPieces: '004176' }
+
+  it('« fac » sur l affaire : ses actions EN TETE, Factures choisie, Entree la joue (« actionDossier »)', () => {
+    const p = rendre(vue({ texte: 'fac', actions: [factures, encaissements], ...surDossier }))
+    expect(p.titres()).toEqual(['Sur ce dossier2', 'Le plus urgent d abord2', 'Dans le texte des pieces1', 'Hors du greffe1'])
+    const ligne = p.container.querySelector('.rig-palette__ligne--choisie')!
+    expect(ligne.querySelector('.rig-palette__t1')!.innerHTML).toBe('<mark>Fac</mark>tures')
+    expect(ligne.querySelector('.rig-palette__t2')!.textContent).toBe('Facturer · Factures (infobulle)')
+    // La lettre de l'action, qui la joue aussi hors de la palette.
+    expect(ligne.querySelector('.rig-palette__touche')!.textContent).toBe('F')
+    expect(p.apercu()).toContain('Factures')
+    expect(p.apercu()).toContain('004176 SCI DU PARC')
+    p.touche('Enter')
+    expect(p.appels()).toEqual([['actionDossier', 'factures']])
+  })
+
+  it('les fleches passent d une action a l autre, puis au travail', () => {
+    const p = rendre(vue({ texte: 'fac', actions: [factures, encaissements], ...surDossier }))
+    p.touche('ArrowDown')
+    p.touche('Enter')
+    p.touche('ArrowDown')
+    p.touche('Enter')
+    expect(p.appels()).toEqual([['actionDossier', 'encaissements'], ['paletteAller', { nature: 'dem', cle: '004151' }]])
+  })
+
+  it('avant de taper : toutes les actions de l affaire, puis le travail ; l apercu suit l action choisie', () => {
+    const p = rendre(vue({ texte: '', pieces: [], horsGreffe: [], actions: [factures, encaissements], ...surDossier }))
+    expect(p.titres()).toEqual(['Sur ce dossier2', 'A traiter maintenant2'])
+    expect(p.apercu()).toContain('Apercu · action sur le dossier')
+    p.touche('ArrowDown')
+    p.touche('ArrowDown')
+    expect(p.apercu()).toContain('Mon travail · mercredi 9 septembre')
+  })
+
+  it('une action de copie copie dans la page, sans remonter au C#', () => {
+    const ecrire = vi.fn<(texte: string) => Promise<void>>().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: ecrire }, configurable: true })
+    const p = rendre(vue({ texte: 'siren', travail: [], pieces: [], horsGreffe: [],
+                           actions: [action('copierSiren', 'Suivre', 'Copier le SIREN', 'S', false, '812 445 901')], ...surDossier }))
+    p.touche('Enter')
+    expect(ecrire).toHaveBeenCalledWith('812 445 901')
+    expect(p.appels()).toEqual([])
+    expect(p.container.querySelector('.rig-palette__copie')!.textContent).toBe('SIREN copie')
+  })
+
+  it('seules des actions repondent : pas de « Aucun resultat »', () => {
+    const p = rendre(vue({ texte: 'fac', travail: [], pieces: [], horsGreffe: [], actions: [factures] }))
+    expect(p.titres()).toEqual(['Sur ce dossier1'])
+    expect(p.container.querySelector('.rig-palette__rien')).toBeNull()
+  })
+
+  it('hors affaire (aucune action dans la vue) : la palette est inchangee', () => {
+    const p = rendre(vue({ texte: 'fac', actions: [] }))
+    expect(p.titres()).toEqual(['Le plus urgent d abord2', 'Dans le texte des pieces1', 'Hors du greffe1'])
+    expect(p.container.textContent).not.toContain('Sur ce dossier')
   })
 })
