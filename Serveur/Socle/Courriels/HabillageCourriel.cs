@@ -143,6 +143,26 @@ public static partial class HabillageCourriel
         return new RenduCourriel(rendu, vueHtml, vueTexte, logoEmbarque, logoEmbarque is null ? null : IdLogoHistorique, Habille: false);
     }
 
+    /// <summary>
+    /// Le courriel tel qu'un logiciel de messagerie l'affiche, pour l'apercu d'un ecran : la vue HTML si le rendu en a une
+    /// (c'est elle qu'un lecteur montre), sinon le corps ; le logo, embarque sous « cid: » dans le vrai courriel, est mis en
+    /// « data: » (un cadre d'ecran ne lit pas cid:). Un logo illisible laisse sa place vide, la cause va a <paramref name="signaler"/>.
+    /// </summary>
+    public static string Apercu(RenduCourriel rendu, Action<string>? signaler = null)
+    {
+        var html = rendu.VueHtml ?? rendu.Corps;
+        if (rendu.Logo is not { } logo || rendu.IdLogo is not { } id) return html;
+        try
+        {
+            return html.Replace("cid:" + id, $"data:{TypeImage(logo)};base64,{Convert.ToBase64String(File.ReadAllBytes(logo))}", StringComparison.Ordinal);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            signaler?.Invoke($"logo du greffe illisible ({e.Message})");
+            return html;
+        }
+    }
+
     /// <summary>Le message a remettre : adresses, objet, et le rendu tel que la V2 le pose dans son MailMessage.</summary>
     public static MailMessage Message(string expediteur, string? reponse, string destinataires, string? copie, string sujet, RenduCourriel rendu)
     {

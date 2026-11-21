@@ -1,3 +1,4 @@
+// fix-ok: la V2 signe GTA/E le 31/12 a 22h (SQLQuery_Deploy_Certification_FULL.sql l.2074 et l.2381) ; ClotureNocturne doit donc devoir l exercice, prouve par tests/SocleChainesCheck
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
@@ -19,7 +20,11 @@ namespace RigV3.Serveur.Socle.Chaines;
 ///   - chaque JOUR depuis l'ouverture jusqu'au jour en cours si l'heure reglee (<see cref="CleHeure"/>, 22:00 comme le job de la
 ///     V2, lue a l'heure du greffe : le fuseau de soc.Certification) est passee, sinon jusqu'a la veille ;
 ///   - le MOIS, apres le dernier jour du mois (a partir de l'heure reglee ce jour-la) ;
-///   - pas l'EXERCICE : il produit l'archive fiscale scellee et ouvre la purge, un geste humain (ecart avec la V2, a valider).
+///   - l'EXERCICE (GTA/E), apres le jour et le mois du 31/12, a partir de l'heure reglee ce soir-la, comme le job de la V2
+///     (SP_INSERT_Totaux_*_Periodiques, le 31/12) : un greffe ou personne ne clique a quand meme son total annuel. La route
+///     n'a pas eu besoin d'etre adaptee : elle accepte deja de clore l'exercice le 31/12 lui-meme (heure du greffe) et
+///     refuse avant. Clore l'exercice ecrit aussi l'ARCHIVE FISCALE scellee (V3 seulement, la V2 la fait a part) : elle
+///     reste dans le meme geste ; la PURGE du journal reste un geste humain.
 /// Un jour oublie (serveur arrete) est du tant qu'il n'est pas clos : il est rattrape au passage suivant, avant les
 /// suivants ; on ne clot jamais deux fois (une periode close n'est plus du, et la route refuse la seconde). Une copie
 /// anonymisee n'est pas close (ses chaines sont cassees par l'anonymisation).
@@ -81,10 +86,11 @@ public sealed class ClotureNocturne(ServiceChaines chaines, CatalogueGreffes cat
         var cible = DateOnly.FromDateTime(local.TimeOfDay >= heure ? local : local.AddDays(-1));
         var debut = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(ouverteLe, DateTimeKind.Utc), tz));
         var clos = new HashSet<string>(StringComparer.Ordinal);
-        await using (var cmd = new SqlCommand("SELECT Type + ':' + Periode FROM soc.GrandTotalFactures WHERE Type IN (@j, @m);", cn))
+        await using (var cmd = new SqlCommand("SELECT Type + ':' + Periode FROM soc.GrandTotalFactures WHERE Type IN (@j, @m, @e);", cn))
         {
             cmd.Parameters.AddWithValue("@j", PeriodesCloture.TypeJour);
             cmd.Parameters.AddWithValue("@m", PeriodesCloture.TypeMois);
+            cmd.Parameters.AddWithValue("@e", PeriodesCloture.TypeExercice);
             await using var l = await cmd.ExecuteReaderAsync(ct);
             while (await l.ReadAsync(ct)) clos.Add(l.GetString(0));
         }
@@ -95,13 +101,18 @@ public sealed class ClotureNocturne(ServiceChaines chaines, CatalogueGreffes cat
                 dues.Add(new DemandeCloture(PeriodesCloture.Jour, jour.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
             if (jour.AddDays(1).Day == 1 && !clos.Contains(Cle(PeriodesCloture.Mois, jour)))
                 dues.Add(new DemandeCloture(PeriodesCloture.Mois, jour.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
+            if (jour is { Month: 12, Day: 31 } && !clos.Contains(Cle(PeriodesCloture.Exercice, jour)))
+                dues.Add(new DemandeCloture(PeriodesCloture.Exercice, jour.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
         }
         return dues;
     }
 
-    private static string Cle(string periode, DateOnly jour) => periode == PeriodesCloture.Jour
-        ? $"{PeriodesCloture.TypeJour}:{jour:yyyyMMdd}"
-        : $"{PeriodesCloture.TypeMois}:{jour:yyyyMM}";
+    private static string Cle(string periode, DateOnly jour) => periode switch
+    {
+        PeriodesCloture.Jour => $"{PeriodesCloture.TypeJour}:{jour:yyyyMMdd}",
+        PeriodesCloture.Mois => $"{PeriodesCloture.TypeMois}:{jour:yyyyMM}",
+        _ => $"{PeriodesCloture.TypeExercice}:{jour:yyyy}",
+    };
 
     // -----------------------------------------------------------------------------------------------------------------
     // Les faire

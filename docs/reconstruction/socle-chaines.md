@@ -132,7 +132,7 @@ commune `toucheDeRecherche` de `web\src\plan\clavier.ts` (`Pont\EcranCorresponda
 | Purge | les lignes affichées de `JET_P` | l'exercice archivé, dans la limite de son archive | la story : « seule la partie purgeable, après archivage » |
 | Archive | fichier produit par `ArchiveFiscaleExercice.cs` | document JSON en base (`Fichier` = son nom d'export), scellé, lié à l'événement 30 | format à valider avec le certificateur (SOC-019) |
 | Clôture quotidienne | job planifié à 22 h, un `.bat` par greffe, jamais rattrapé | un traitement de fond planifié, à l’heure du greffe, avec rattrapage (voir « Clôtures automatiques ») | une journée oubliée ne reste pas ouverte |
-| Clôture de l’exercice | la V2 insère le total `GTA/E` le 31/12 au soir ; son archive est un geste à part (mode 11, exercice clos) | geste humain (la route) : le total et l’archive scellée vont ensemble | **à valider** : voir « Clôtures automatiques » |
+| Clôture de l’exercice | la V2 insère le total `GTA/E` le 31/12 au soir ; son archive est un geste à part (mode 11, exercice clos) | automatique le 31/12 à l’heure du greffe, comme la V2 : le total `GTA/E` et l’archive scellée vont ensemble (la V2 fait l’archive à part) ; la **purge** reste un geste humain | **à valider** : voir « Clôtures automatiques » |
 
 ## Ce qui reste, et pourquoi
 
@@ -140,8 +140,8 @@ commune `toucheDeRecherche` de `web\src\plan\clavier.ts` (`Pont\EcranCorresponda
 |---|---|---|
 | CA02 « elles restent vérifiables dans la V2 » | se prouve par `CertifExpressoApp` (mode 10) sur les vraies bases V2, avec leur clé : ni l'une ni l'autre sur ce poste. La V3 n'y touche pas (empreinte, banc) | exploitation, au passage |
 | Ouvrir les chaînes des 40 greffes | l'outil du passage appelle l'ouverture, base par base | lot 13 (SOC-024) |
-| Clôtures automatiques (jour, mois) | **faites** (lot 14) : voir « Clôtures automatiques » | — |
-| Clôture automatique de l’exercice | à décider : la V2 le fait pour le total, pas pour l’archive | référent Facturation |
+| Clôtures automatiques (jour, mois, exercice) | **faites** (lot 14) : voir « Clôtures automatiques » | — |
+| Archive fiscale produite dès le soir du 31/12 | la V2 ne la produit que sur un exercice clos (mode 11) ; la V3 la scelle avec le total annuel, donc une pièce émise après l’heure de clôture n’y figure pas | référent Facturation, certificateur (SOC-019) |
 | Heure réelle de 22 h sur les 40 greffes, nuit réelle chez Amitel | le banc joue l’horloge par instants choisis ; la vraie nuit ne se prouve pas depuis ce poste | exploitation, au passage |
 | Sauvegarde de la clé de chaque greffe | une clé CNG non exportable disparaît avec le serveur : les chaînes restent vérifiables (clé publique en base), la suite signe avec une nouvelle clé (événement 450). La politique (clé dans un HSM ou coffre) est une décision d'exploitation | Amitel, exploitation |
 | Signer les vraies factures et encaissements | les tables du domaine Facturation n'existent pas encore ; elles appelleront `SignerFactureAsync` / `SignerEncaissementAsync` dans leur transaction | lots Facturation |
@@ -162,7 +162,7 @@ tâche `ClotureNocturne` (traitement `chaines-clotures`, `ServeurSocleChainesClo
 
 - **dû** : dans un greffe dont les chaînes sont ouvertes, chaque jour depuis l’ouverture jusqu’au jour en cours si l’heure du
   greffe (fuseau de `soc.Certification`) a passé l’heure réglée, sinon jusqu’à la veille ; le mois, à la suite du jour qui le
-  termine ; rien pour l’exercice ;
+  termine ; l’exercice (`GTA/E`), le 31/12 à partir de l’heure réglée, après le jour et le mois ;
 - **ordre** : par date, le jour avant le mois ; une période déjà close (par une personne, un autre serveur, un passage précédent) n’est plus due,
   et `CloturerAsync` refuse de toute façon la seconde (409) ;
 - **rattrapage** : un jour oublié (serveur arrêté, greffe injoignable) reste dû et passe avant les suivants au passage suivant ;
@@ -181,10 +181,15 @@ planificateur), `Planificateur:PauseMinutes` (30).
 (même nom), l’inscrire par son module (les deux `AddSingleton` ; le planificateur est déjà là, ne pas en inscrire un second). Modèle :
 `ModuleChaines.Inscrire`.
 
-**Écart à valider.** La V2 insère aussi le total d’exercice `GTA/E` le 31/12 à 22 h ; la V3 laisse la clôture de l’exercice à une personne :
-elle produit l’archive fiscale scellée (empreinte au journal non purgeable) et ouvre la purge du journal, alors que la V2 ne produit son
-archive que sur un exercice clos (mode 11). Si le référent Facturation veut le total automatique, il suffit d’ajouter `exercice` aux clôtures dues de
-`ClotureNocturne.ClotureesDuesAsync` ; l’archive serait alors produite le soir du 31/12, avant les dernières pièces de la soirée.
+**Exercice : choix et écart à valider.** Comme la V2, le total d’exercice `GTA/E` (factures et encaissements) est signé tout seul le 31/12 à
+l’heure de clôture du greffe : un greffe où personne ne clique a son total annuel. La route n’a pas été adaptée : elle refuse déjà un
+exercice avant le 31/12 (« pas terminé ») et l’accepte le 31/12 lui-même ; clore au premier passage après minuit aurait fait
+attendre le total d’un jour de plus que la V2. Rattrapage et « une seule fois » sont ceux du jour et du mois (une période close n’est plus
+due ; la route refuse la seconde) ; une copie anonymisée est exclue.
+**L’archive fiscale scellée reste liée au total annuel** : `CloturerAsync` écrit l’événement 60, le total et l’archive dans une même
+transaction. Écart avec la V2, qui ne produit son archive qu’en un geste à part sur un exercice clos : la V3 la scelle dès le soir
+du 31/12, donc une pièce émise après l’heure de clôture ce soir-là n’y est pas. La **purge** du journal purgeable, elle, reste un geste
+humain. À valider avec le référent Facturation et le certificateur ; si l’archive doit rester séparée, il faudrait scinder `CloturerAsync`.
 
 ## Fichiers
 
