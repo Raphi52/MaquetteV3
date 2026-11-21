@@ -32,6 +32,8 @@ using SocleCourrielsCheck;
 // fix-ok: relecture avant le premier lancement -- connexion de LectureValeursGreffe laissee ouverte ; « localhost » peut
 // viser ::1 alors que le serveur jetable n'ecoute que 127.0.0.1 ; « n° » sort « n&#176; » de WebUtility.HtmlEncode
 // (codes 160-255 encodes, comme GreffeMailBuilder de la V2) ; le cas « habillage vide en base » passait par deux ecritures.
+// fix-ok: reception refusee du lot 1 (chef, 2026-11-21) -- aucun controle ne jouait l'ecran Messagerie, dont le .tsx rendait des
+// modeles inventes (vitest 8/8 rouge) : ajout des listes du banc, de CA05 par le nom du modele et de la partie « Messagerie ».
 
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
 var migrations = Path.Combine(racine, "Base", "migrations");
@@ -267,6 +269,18 @@ try
         ('BANC_HTML', 'Avis HTML', '<p>Bonjour</p>$LOGO$<p>Le greffe</p>', 1, '[ADRESSE_MAIL_RCS]', NULL, NULL, 0, 'defaut@greffe-banc.example'),
         ('BANC_AMITEL', 'Reserve Amitel', 'Interne', 0, '[ADRESSE_MAIL_RCS]', NULL, NULL, 1, NULL),
         ('BANC_ETIQUETTE', 'Sans expediteur', 'Texte', 0, '[ADRESSE_MAIL_COMPTABILITE]', NULL, NULL, 0, NULL);
+        """);
+    // Les listes de distribution du banc (la reprise de RIG_DEV n'en a aucune) : une publique (« * ») liee par defaut a
+    // BANC_DOC, une a l'agent du banc, une a un collegue (liee elle aussi a BANC_DOC : l'agent ne doit pas la voir), une
+    // publique inactive. Regle de la V2 : LSTDM_PRIVE = login OR LSTDM_PRIVE = '*' (ListeDistributionMail.cs:63).
+    await Executer(v3a.Connexion, """
+        INSERT INTO soc.ListeDiffusion (Code, Libelle, Adresses, Rcs, Judiciaire, Prive, Actif) VALUES
+        ('BANC_PUBLIQUE', 'Mandataires du banc', 'm1@etude-banc.example;m2@etude-banc.example', 0, 1, '*', 1),
+        ('BANC_PERSO', 'Liste de l''agent du banc', 'perso@client-banc.example', 1, 0, 'banc.courriel', 1),
+        ('BANC_COLLEGUE', 'Liste d''un collegue', 'collegue@client-banc.example', 1, 1, 'banc.autre', 1),
+        ('BANC_INACTIVE', 'Ancienne liste', 'ancien@etude-banc.example', 0, 1, '*', 0);
+        INSERT INTO soc.ModeleMessageListe (TypeModele, IdListe)
+        SELECT 'BANC_DOC', Id FROM soc.ListeDiffusion WHERE Code IN ('BANC_PUBLIQUE', 'BANC_COLLEGUE');
         """);
     var documents = new DocumentCourriel[]
     {
@@ -504,6 +518,14 @@ try
         $"SOC-006 CA05 : un agent du greffe ne voit pas les modeles reserves a Amitel ({modelesAgent.Length} modeles sur {tous}, BANC_AMITEL absent)");
     Exiger(modelesAmitel.Length == tous && modelesAmitel.Any(m => m.Type == "BANC_AMITEL" && m.ReserveAmitel),
         $"SOC-006 CA05 (jumeau) : un agent d'Amitel les voit tous ({modelesAmitel.Length})");
+    // Par son nom non plus : le modele reserve est « inconnu » pour l'agent du greffe (404), lisible pour Amitel.
+    using (var parNomAgent = await Appeler(RoutesCourriels.PourModele(GreffeA, "BANC_AMITEL"), Agent))
+    using (var parNomAmitel = await Appeler(RoutesCourriels.PourModele(GreffeA, "BANC_AMITEL"), AgentAmitel))
+    using (var modeleInconnu = await Appeler(RoutesCourriels.PourModele(GreffeA, "PIGEON"), AgentAmitel))
+        Exiger(parNomAgent.StatusCode == HttpStatusCode.NotFound && parNomAmitel.StatusCode == HttpStatusCode.OK
+               && modeleInconnu.StatusCode == HttpStatusCode.NotFound,
+            $"SOC-006 CA05 : un modele reserve a Amitel ne se lit pas non plus par son nom pour un agent du greffe ({(int)parNomAgent.StatusCode}, " +
+            $"comme un modele inconnu : {(int)modeleInconnu.StatusCode}) ; Amitel le lit ({(int)parNomAmitel.StatusCode})");
 
     // =====================================================================================================
     // La route de consultation : liste, filtres, detail, droits
@@ -536,11 +558,14 @@ try
     using (var r = await Appeler(RoutesCourriels.Pour(RoutesCourriels.Envois, GreffeA) + "?etat=pigeon", Agent))
         Exiger(r.StatusCode == HttpStatusCode.BadRequest, $"Route : une issue inconnue -> 400 ({(int)r.StatusCode})");
 
+    // Les deux premieres exigent MAIL_LOT1 ; les trois de la Messagerie (modeles, un modele, listes) seulement d'etre admis.
     var lectures = new[]
     {
         RoutesCourriels.Pour(RoutesCourriels.Envois, GreffeA),
         RoutesCourriels.Pour(RoutesCourriels.Envoi, GreffeA, accepte.Suivi),
         RoutesCourriels.Pour(RoutesCourriels.Modeles, GreffeA),
+        RoutesCourriels.PourModele(GreffeA, "BANC_DOC"),
+        RoutesCourriels.Pour(RoutesCourriels.ListesDiffusion, GreffeA),
     };
     var sansSession = new List<int>();
     var absent = new List<int>();
@@ -554,9 +579,12 @@ try
     var refusDroit = new List<(int Code, string Corps)>();
     foreach (var adresse in lectures[..2])
         using (var r = await Appeler(adresse, SansDroit)) refusDroit.Add(((int)r.StatusCode, await r.Content.ReadAsStringAsync()));
-    using (var r = await Appeler(lectures[2], SansDroit))
-        Exiger(refusDroit.All(x => x.Code == 403 && x.Corps.Contains("MAIL_LOT1")) && r.StatusCode == HttpStatusCode.OK,
-            $"Acces : sans la fonction MAIL_LOT1 (procedure V2 « Mails envoyés en Lot 1 »), la liste et le detail sont refuses (403, motif nomme) ; la liste des modeles reste lisible ({(int)r.StatusCode})");
+    var sansDroitMessagerie = new List<int>();
+    foreach (var adresse in lectures[2..])
+        using (var r = await Appeler(adresse, SansDroit)) sansDroitMessagerie.Add((int)r.StatusCode);
+    Exiger(refusDroit.All(x => x.Code == 403 && x.Corps.Contains("MAIL_LOT1")) && sansDroitMessagerie.All(c => c == 200),
+        $"Acces : sans la fonction MAIL_LOT1 (procedure V2 « Mails envoyés en Lot 1 »), la liste et le detail sont refuses (403, motif nomme) ; " +
+        $"les modeles, un modele et les listes restent lisibles ({string.Join(", ", sansDroitMessagerie)})");
     var routesModule = ((IEndpointRouteBuilder)app).DataSources.SelectMany(d => d.Endpoints).OfType<RouteEndpoint>()
         .Where(r => r.Metadata.GetMetadata<ModuleOrigine>()?.Nom == "RigV3.Serveur.Socle.Courriels.ModuleCourriels").ToList();
     var sansPolitique = routesModule.Where(r => !r.Metadata.GetOrderedMetadata<IAuthorizeData>().Any(a => a.Policy == PolitiquesSocle.AgentAdmis))
@@ -594,6 +622,57 @@ try
     Exiger(demo.Mode == "demo" && demo.Envois.Select(e => e.Etat).Order().SequenceEqual([EtatsCourriel.Echec, EtatsCourriel.Envoye, EtatsCourriel.Ignore])
            && demoDetail.Detail is not null && sansGreffe.Mode == "sans-greffe",
         "Ecran : sans RIGV3_SERVEUR, trois envois de demonstration (un par issue) ; branche sans greffe ouvert, il le dit");
+
+    // =====================================================================================================
+    // L'ecran « Messagerie » (Pont/EcranMessagerie.cs, SOC-006 T04) sur le vrai serveur : CA05 cote ecran
+    // ENTREE QUI LE FAIT TOMBER si le branchement est faux : l'agent du greffe banc.courriel (EstAmitel = 0) ouvre la
+    // Messagerie alors que la base porte BANC_AMITEL (ReserveAmitel = 1) -- l'ancienne maquette, ses modeles inventes et sa
+    // bascule « Amitel » pour tous ne passent aucun de ces controles.
+    // =====================================================================================================
+    Console.WriteLine("--- Ecran « Messagerie » (modeles du greffe, CA05 cote ecran)");
+    var messagerieAgent = await EcranMessagerie.OuvrirAsync(ClientEcran(Agent), GreffeA);
+    var messagerieAmitel = await EcranMessagerie.OuvrirAsync(ClientEcran(AgentAmitel), GreffeA);
+    Exiger(messagerieAgent.Mode == "serveur" && messagerieAgent.Greffe == GreffeA
+           && messagerieAgent.Modeles.Select(m => m.Type).SequenceEqual(modelesAgent.Select(m => m.Type))
+           && messagerieAgent.Modeles.All(m => !m.ReserveAmitel) && !messagerieAgent.Modeles.Any(m => m.Type == "BANC_AMITEL")
+           && !messagerieAgent.VoitReservesAmitel,
+        $"Ecran SOC-006 CA05 : la Messagerie d'un agent du greffe montre les modeles de SA base sans aucun reserve a Amitel, et sans la bascule « Amitel » ({messagerieAgent.Modeles.Length} sur {tous})");
+    Exiger(messagerieAmitel.Mode == "serveur" && messagerieAmitel.Modeles.Length == tous
+           && messagerieAmitel.Modeles.Any(m => m.Type == "BANC_AMITEL") && messagerieAmitel.VoitReservesAmitel,
+        $"Ecran SOC-006 CA05 (jumeau) : la Messagerie d'un agent d'Amitel montre aussi les modeles qui lui sont reserves, et la bascule « Amitel » ({messagerieAmitel.Modeles.Length})");
+    var ouvertParAgent = await EcranMessagerie.ModeleAsync(ClientEcran(Agent), GreffeA, "BANC_AMITEL");
+    var ouvertParAmitel = await EcranMessagerie.ModeleAsync(ClientEcran(AgentAmitel), GreffeA, "BANC_AMITEL");
+    Exiger(ouvertParAgent is { Mode: "erreur", Apercu: null } && (ouvertParAgent.Message ?? "").Contains("BANC_AMITEL")
+           && ouvertParAmitel.Apercu is { Modele.Type: "BANC_AMITEL", Modele.ReserveAmitel: true },
+        $"Ecran SOC-006 CA05 : un agent du greffe n'ouvre pas un modele reserve a Amitel en le demandant par son nom (« {ouvertParAgent.Message} ») ; Amitel l'ouvre");
+    Exiger(messagerieAgent.Listes.Select(l => l.Code).SequenceEqual(["BANC_INACTIVE", "BANC_PERSO", "BANC_PUBLIQUE"])
+           && messagerieAmitel.Listes.Select(l => l.Code).SequenceEqual(["BANC_INACTIVE", "BANC_PUBLIQUE"])
+           && messagerieAgent.Listes.Single(l => l.Code == "BANC_PUBLIQUE") is { Proprietaire: RoutesCourriels.ListePublique, Judiciaire: true, Actif: true }
+           && messagerieAgent.Listes.Single(l => l.Code == "BANC_INACTIVE").Actif == false,
+        $"Ecran SOC-006 : les listes de distribution du greffe -- publiques et les siennes, pas celle d'un collegue, inactives marquees ({string.Join(", ", messagerieAgent.Listes.Select(l => l.Code))} ; Amitel : {string.Join(", ", messagerieAmitel.Listes.Select(l => l.Code))})");
+
+    await PoserHabillage(habillageBase);
+    var apercuDoc = (await EcranMessagerie.ModeleAsync(ClientEcran(Agent), GreffeA, "BANC_DOC")).Apercu;
+    Exiger(apercuDoc is { Habille: true } ap
+           && ap.Expediteur == "Greffe du banc <judiciaire@greffe-banc.example>" && ap.Reponse == "ne-pas-repondre@greffe-banc.example"
+           && ap.Copie == "accuse-jud@greffe-banc.example" && ap.Corps == "Madame, Monsieur,|Voici vos documents :|$PieceJointe$|$LOGO$ Le greffe"
+           && ap.Rendu.Contains("Tribunal de commerce de GRENOBLE") && ap.Rendu.Contains("Le greffier : Maître Banc, greffier")
+           && ap.Rendu.Contains("Voici vos documents :") && ap.Rendu.Contains("href=\"#\"")
+           && ap.Rendu.Contains("data:image/png;base64,") && !ap.Rendu.Contains("cid:")
+           && ap.ListesParDefaut.Select(l => l.Code).SequenceEqual(["BANC_PUBLIQUE"]),
+        "Ecran SOC-006 : l'apercu d'un modele est le courriel du greffe tel qu'il partirait -- adresses d'INFO_GREFFE, habillage, ville, greffier, " +
+        "liens d'exemple, logo embarque -- avec ses listes par defaut, sans la liste privee d'un collegue");
+    var apercuEtiquette = (await EcranMessagerie.ModeleAsync(ClientEcran(Agent), GreffeA, "BANC_ETIQUETTE")).Apercu;
+    Exiger(apercuEtiquette is { Expediteur: "" } ae && ae.ValeursManquantes.Any(v => v.Contains("[ADRESSE_MAIL_COMPTABILITE]")),
+        $"Ecran SOC-006 (jumeau) : une etiquette sans valeur dans le greffe laisse l'adresse vide et l'apercu le dit ({string.Join(" ; ", apercuEtiquette?.ValeursManquantes ?? [])})");
+    var demoMessagerie = await EcranMessagerie.OuvrirAsync(null, null);
+    var demoFiche = await EcranMessagerie.ModeleAsync(null, null, demoMessagerie.Modeles[0].Type);
+    var messagerieSansGreffe = await EcranMessagerie.OuvrirAsync(ClientEcran(Agent), null);
+    var messagerieInconnu = await EcranMessagerie.OuvrirAsync(ClientEcran(@"AMITEL\banc.inconnu"), GreffeA);
+    Exiger(demoMessagerie is { Mode: "demo", VoitReservesAmitel: false } && demoMessagerie.Modeles.Length > 0
+           && demoMessagerie.Modeles.All(m => !m.ReserveAmitel) && demoFiche is { Mode: "demo", Apercu: not null }
+           && messagerieSansGreffe.Mode == "sans-greffe" && messagerieInconnu is { Mode: "refuse", Modeles.Length: 0 },
+        $"Ecran : la demonstration seulement sans RIGV3_SERVEUR (aucun modele reserve a Amitel) ; sans greffe ouvert ou compte refuse, aucun modele ({messagerieInconnu.Mode})");
 
     async Task<SqlConnection> OuvrirV3A()
     {

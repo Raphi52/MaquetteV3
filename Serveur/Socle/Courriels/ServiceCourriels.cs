@@ -212,23 +212,81 @@ public sealed class ServiceCourriels(OptionsCourriels options, CatalogueGreffes 
     /// <summary>
     /// Les modeles que l'appelant peut choisir (CA05) : un agent du greffe ne voit pas un modele reserve a Amitel, comme la
     /// liste des modeles du tableau des editions de la V2 (TreeviewEditions._GetMails, TreeviewEditions.cs:701-704).
+    /// <paramref name="type"/> : ce seul modele (l'apercu passe par la meme regle, il n'en a pas d'autre).
     /// </summary>
-    public static async Task<ModeleMessage[]> ModelesVisiblesAsync(SqlConnection cn, bool estAmitel, CancellationToken ct)
+    public static async Task<ModeleMessage[]> ModelesVisiblesAsync(SqlConnection cn, bool estAmitel, CancellationToken ct, string? type = null)
     {
         await using var cmd = new SqlCommand("""
             SELECT Type, LibelleEcran, Sujet, CorpsHtml, Expediteur, Reponse, Copie, DestinataireDefaut, ReserveAmitel,
-                   EnvoiAutomatique, UtilisableEnSaisie, Lot1, Lot2
-            FROM soc.ModeleMessage WHERE @amitel = 1 OR ReserveAmitel = 0 ORDER BY Type;
+                   EnvoiAutomatique, UtilisableEnSaisie, Lot1, Lot2, Inscription, Comptabilite
+            FROM soc.ModeleMessage WHERE (@amitel = 1 OR ReserveAmitel = 0) AND (@type IS NULL OR Type = @type) ORDER BY Type;
             """, cn);
         cmd.Parameters.Add(new SqlParameter("@amitel", SqlDbType.Bit) { Value = estAmitel });
+        cmd.Parameters.Add(new SqlParameter("@type", SqlDbType.VarChar, 40) { Value = (object?)type ?? DBNull.Value });
         var modeles = new List<ModeleMessage>();
         await using var r = await cmd.ExecuteReaderAsync(ct);
         while (await r.ReadAsync(ct))
             modeles.Add(new ModeleMessage(r.GetString(0), r.IsDBNull(1) ? null : r.GetString(1), r.GetString(2), r.GetBoolean(3),
                 r.IsDBNull(4) ? null : r.GetString(4), r.IsDBNull(5) ? null : r.GetString(5), r.IsDBNull(6) ? null : r.GetString(6),
                 r.IsDBNull(7) ? null : r.GetString(7), r.GetBoolean(8), r.GetBoolean(9), r.IsDBNull(10) ? null : r.GetBoolean(10),
-                r.GetBoolean(11), r.GetBoolean(12)));
+                r.GetBoolean(11), r.GetBoolean(12), r.IsDBNull(13) ? null : r.GetBoolean(13), r.IsDBNull(14) ? null : r.GetBoolean(14)));
         return [.. modeles];
+    }
+
+    /// <summary>
+    /// Les listes de distribution que l'agent <paramref name="compte"/> voit : les publiques (« * ») et les siennes, actives
+    /// ou non (l'ecran cache les inactives, comme la V2). ListeDistributionMail.GetAllListeDistributionMailByLogin
+    /// (ListeDistributionMail.cs:63) : <c>LSTDM_PRIVE = login OR LSTDM_PRIVE = '*'</c> -- la liste privee d'un collegue n'y est pas.
+    /// </summary>
+    public static async Task<ListeDiffusion[]> ListesVisiblesAsync(SqlConnection cn, string compte, CancellationToken ct, string? typeModele = null)
+    {
+        await using var cmd = new SqlCommand("""
+            SELECT l.Id, l.Code, l.Libelle, l.Adresses, l.Rcs, l.Judiciaire, l.Prive, l.Actif
+            FROM soc.ListeDiffusion l
+            WHERE (l.Prive = @moi OR l.Prive = @publique)
+              AND (@modele IS NULL OR EXISTS (SELECT 1 FROM soc.ModeleMessageListe ml WHERE ml.IdListe = l.Id AND ml.TypeModele = @modele))
+            ORDER BY l.Code;
+            """, cn);
+        cmd.Parameters.Add(new SqlParameter("@moi", SqlDbType.VarChar, 200) { Value = compte });
+        cmd.Parameters.Add(new SqlParameter("@publique", SqlDbType.VarChar, 200) { Value = RoutesCourriels.ListePublique });
+        cmd.Parameters.Add(new SqlParameter("@modele", SqlDbType.VarChar, 40) { Value = (object?)typeModele ?? DBNull.Value });
+        var listes = new List<ListeDiffusion>();
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            listes.Add(new ListeDiffusion(r.GetInt32(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetBoolean(4), r.GetBoolean(5),
+                r.IsDBNull(6) ? null : r.GetString(6), r.GetBoolean(7)));
+        return [.. listes];
+    }
+
+    /// <summary>Les deux documents de l'apercu, ceux de l'apercu de la V2 (OPE_EDIT_TEMPLATE_MAIL._Apercu) : ou les liens tombent.</summary>
+    public static readonly IReadOnlyList<DocumentCourriel> DocumentsExemple =
+        [new("Document n°1 (exemple)", "#"), new("Document n°2 (exemple)", "#")];
+
+    /// <summary>
+    /// Le modele <paramref name="type"/> tel qu'il partirait du greffe <paramref name="code"/>, sans rien envoyer ni ecrire :
+    /// adresses resolues, listes par defaut, rendu avec l'habillage et les valeurs du greffe (ecran « Messagerie »).
+    /// null s'il n'existe pas ou si l'appelant ne le voit pas (CA05, la meme regle que la liste).
+    /// </summary>
+    public async Task<ApercuModele?> ApercuAsync(string code, SqlConnection cn, string type, bool estAmitel, string compte, CancellationToken ct)
+    {
+        if ((await ModelesVisiblesAsync(cn, estAmitel, ct, type)).SingleOrDefault() is not { } modele) return null;
+        if (await ModeleAsync(cn, modele.Type, ct) is not { } complet) return null;
+        var valeurs = await LectureValeursGreffe.LireAsync(code, cn, catalogue, commune, ct);
+        var manques = new List<string>(valeurs.Manques);
+
+        var inconnues = new List<string>();
+        string Adresses(string? liste) => HabillageCourriel.Nettoyer(LectureValeursGreffe.ResoudreAdresses(liste, valeurs.InfoGreffe, inconnues));
+        var expediteur = Adresses(complet.Expediteur);
+        var reponse = Adresses(complet.Reponse);
+        var copie = Adresses(complet.Copie);
+        var destinataire = Adresses(complet.DestinataireDefaut);
+        manques.AddRange(inconnues.Distinct().Select(e => $"l'étiquette [{e}] n'a pas de valeur dans INFO_GREFFE : l'adresse reste vide"));
+
+        var rendu = HabillageCourriel.Rendre(complet.Corps, complet.CorpsHtml, DocumentsExemple, valeurs.Habillage, valeurs.Jetons, valeurs.Logo,
+            cause => manques.Add(cause));
+        return new ApercuModele(modele, complet.Corps, expediteur, reponse, copie, destinataire,
+            HabillageCourriel.Apercu(rendu, manques.Add), rendu.Habille, [.. manques],
+            await ListesVisiblesAsync(cn, compte, ct, modele.Type));
     }
 
     /// <summary>Le message d'une exception, et celui de sa cause s'il dit autre chose (SmtpException enveloppe souvent la vraie).</summary>
