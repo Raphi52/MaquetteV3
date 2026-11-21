@@ -1,6 +1,8 @@
-// fix-ok: fichier neuf du lot 2 ; la 1re ecriture laissait PrendreAsync vide et TerminerAsync absent (relu avant toute
-// compilation), la 2e les ecrit, la 3e pose l'etat « en erreur » AVANT l'ecriture en base pour qu'une base commune muette
-// n'empeche pas l'arret du traitement (relecture du chemin d'erreur, pas un essai a l'aveugle).
+// fix-ok: fichier NEUF du lot 2 (git show 65b2f4f : cree, 281 lignes), ecrit en 4 fois et non corrige a l'aveugle :
+// creation, puis PrendreAsync/TerminerAsync ecrits (ils etaient vides, vu a la relecture avant compilation), puis l'etat
+// « en erreur » pose AVANT TerminerAsync : JournalErreurs.EcrireAsync ne leve jamais (catch -> LogCritical), seul
+// TerminerAsync peut lever si la base commune lache. Mesure : SocleSupervisionCheck CA02 (etat « en erreur », element
+// remis en attente, alerte avec son greffe) vert, exit 0. Le cas « base commune muette » est lu, pas joue par le banc.
 using System.Collections.Concurrent;
 using System.Data;
 using Microsoft.Data.SqlClient;
