@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- L'OUTIL D'ANONYMISATION (SOC-021, lot 6 du plan de reconstruction, phase 2).
+       Il copie une base V2 de greffe dans le SQL Server LOCAL (docker-compose.yml)
+       en remplacant ses donnees personnelles PENDANT le transfert : aucune valeur
+       reelle n'est ecrite dans la copie. Il sert aux repetitions du transfert (REC-008).
+       Ligne de commande : en tete de Program.cs. Mode d'emploi et choix :
+       docs/reconstruction/socle-anonymisation.md. Banc : tests/SocleAnonymisationCheck. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>RigV3.Outils.Anonymisation</RootNamespace>
+    <AssemblyName>RigV3.Anonymisation</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- BaseJetable.ExigerServeurLocal : la copie ne s'ecrit que sur ce poste. -->
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- La seule porte de la V3 vers une base V2 (un SELECT seul) : la meme que la reprise,
+         liee et non recopiee, pour qu'un durcissement du garde-fou vaille pour les deux. -->
+    <Compile Include="../../Serveur/Socle/Greffes/LectureV2.cs" Link="LectureV2.cs" />
+  </ItemGroup>
+
+</Project>
