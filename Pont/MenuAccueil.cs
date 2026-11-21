@@ -304,7 +304,8 @@ public static class MenuAccueil
                 new("Modeles d'edition",      "la forme des courriers",             "PROC_EDIT_MAQUETTE"),
                 new("Modeles de redaction",   "maquettes des decisions",            "PROC_REDAA"),
                 new("Sceaux",                 "elements de fusion",                 "PROC_SCEAU"),
-                new("Messagerie",             "les envois automatiques",            "PROC_GESTEMAIL")
+                new("Messagerie",             "les envois automatiques",            "PROC_GESTEMAIL"),
+                new("Courriels envoyes",      "la trace de chaque envoi",           "PROC_MAIL_LOT1")
             ]),
             new("Argent et exports",
             [
