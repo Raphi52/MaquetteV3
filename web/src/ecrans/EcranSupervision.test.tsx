@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { EcranSupervision, pastilleTraitement, type EtatGreffe, type ErreurTechnique, type VueEcranSupervision } from './EcranSupervision'
+import { EcranSupervision, pastilleTraitement, type DefautSignale, type EtatGreffe, type ErreurTechnique, type VueEcranSupervision } from './EcranSupervision'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
@@ -105,6 +105,38 @@ describe('EcranSupervision', () => {
       { suivi: '7kq2-m9xp', greffe: null, compte: null, du: null, au: null })
     fireEvent.click(screen.getByText('EcranCompteurs.Rendre'))
     expect(screen.getByLabelText('Détail de l\'erreur').textContent).toContain('pile de l\'ecran')
+  })
+
+  it("SOC-022 CA06 : montre les defauts signales depuis la V3 ; l'identifiant d'un defaut et sa derniere erreur se cherchent", async () => {
+    const defaut: DefautSignale = {
+      id: 7, suivi: 'H8RZ-4K2Q', instant: '2026-11-21T09:05:00Z', codeGreffe: '4302', compte: 'jdupont', poste: 'RDS-PUY-03',
+      ecran: 'Compteurs de numéros', codeEcran: 'PROC_COMPTEURS_NUM', version: '2026.1.0', heurePoste: '2026-11-21T10:05:00+01:00',
+      derniereErreur: '7KQ2-M9XP', phrase: 'Le numéro rendu ne réapparaît pas.',
+    }
+    const pont = installerFauxPont({
+      'EcranSupervision.Ouvrir': () => vue({ defauts: [defaut] }),
+      'EcranSupervision.Rechercher': (c) => (c as { suivi: string }).suivi === 'H8RZ-4K2Q'
+        ? vue({ erreurs: [], defauts: [defaut], message: "H8RZ-4K2Q est un défaut signalé depuis la V3 (jdupont, greffe 4302) : voir l'onglet Défauts." })
+        : vue({ defauts: [defaut], message: 'Parcours 7KQ2-M9XP : 1 message(s), du premier au dernier.' }),
+    })
+    render(<EcranSupervision />)
+    fireEvent.click(await screen.findByText('Défauts (1)'))
+    const table = screen.getByRole('table', { name: 'Défauts signalés' })
+    expect(table.textContent).toContain('H8RZ-4K2Q')
+    expect(table.textContent).toContain('Le numéro rendu ne réapparaît pas.')
+    // L'identifiant que l'agent dicte est celui d'un defaut : la recherche mene a l'onglet des defauts.
+    fireEvent.click(screen.getByText('Erreurs (1)'))
+    fireEvent.change(screen.getByLabelText('Identifiant de suivi'), { target: { value: 'H8RZ-4K2Q' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Chercher' }))
+    expect((await screen.findByRole('status')).textContent).toContain('est un défaut signalé')
+    expect(screen.getByRole('table', { name: 'Défauts signalés' })).toBeTruthy()
+    // La derniere erreur que le defaut emporte ramene son parcours.
+    fireEvent.click(screen.getByRole('button', { name: '7KQ2-M9XP' }))
+    expect(await screen.findByText('Erreurs (1)')).toBeTruthy()
+    expect(pont.appels).toHaveBeenLastCalledWith('EcranSupervision.Rechercher', { suivi: '7KQ2-M9XP', greffe: null, compte: null, du: null, au: null })
+    fireEvent.click(screen.getByText('Défauts (1)'))
+    fireEvent.click(screen.getByText('Le numéro rendu ne réapparaît pas.'))
+    expect(screen.getByLabelText('Détail du défaut').textContent).toContain('RDS-PUY-03')
   })
 
   it('refuse un compte hors Amitel avec le motif du pont', async () => {

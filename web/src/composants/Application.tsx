@@ -17,6 +17,8 @@ import type { GesteIle } from '../accueil/types'
 import { ecouterEchap } from '../plan/clavier'
 import { EnvoiMail, Impression, MenuNoeud, Nouveau } from '../plan/Modales'
 import { Palette } from './Palette'
+import { SignalementDefaut, type EcranOuvert } from './SignalementDefaut'
+import { appeler } from '../pont'
 import { Procedure } from '../plan/Procedure'
 import type { GestePlan, ProcVue, VueApplication } from '../plan/types'
 import { Visionneuse } from '../plan/Visionneuse'
@@ -100,6 +102,23 @@ export function Application({ vue, geste, plan }: ProprietesApplication) {
     return () => window.removeEventListener('keydown', surTouche)
   }, [barre, gestePlan])
 
+  // SOC-026 CA06 (lot 17) : a la premiere ouverture de la V3 par l'agent -- sur ce serveur RDS ou un autre, la
+  // preference AideVue le suit (Pont/EcranAide.cs) --, l'aide « Premiers pas » s'ouvre d'elle-meme, une fois,
+  // dans la fenetre principale. Une reponse qui n'arrive pas est dite, pas avalee : l'accueil reste utilisable.
+  useEffect(() => {
+    if (!barre) return
+    let vivant = true
+    appeler<string | null>('EcranAide.AOuvrirAuDemarrage')
+      .then((code) => { if (vivant && code) gestePlan('ouvrirCode', code) })
+      .catch((erreur: unknown) => console.error('[aide] premiere ouverture non lue', erreur))
+    return () => { vivant = false }
+  }, [barre, gestePlan])
+
+  // SOC-022 CA06 (lot 17) : l'ecran d'ou l'agent signale un defaut (bouton de l'en-tete, Ctrl Maj D).
+  const ecranOuvert: EcranOuvert = v.dossier ? { nom: `Page du dossier ${v.dossier.numero}`, code: 'DOSSIER' }
+    : v.proc ? { nom: v.proc.libelle, code: v.proc.code }
+    : { nom: 'Accueil', code: null }
+
   // Le dernier defilement de la zone des etapes deja joue : tenu ici, il
   // survit a la fermeture et a la reouverture des etapes.
   const defilementJoue = useRef(vue.defilement?.numero ?? 0)
@@ -139,6 +158,8 @@ export function Application({ vue, geste, plan }: ProprietesApplication) {
       {v.menuNoeud && <MenuNoeud vue={v.menuNoeud} plan={gestePlan} />}
       {/* LA PALETTE Ctrl K, par-dessus tout le reste (sauf accrochee a la barre de l'accueil). */}
       {v.palette && !(v.palette.ancree && v.accueil) && <Palette vue={v.palette} plan={gestePlan} />}
+      {/* SIGNALER UN DEFAUT (SOC-022 CA06) : fermee tant que l'agent ne l'ouvre pas, dans chaque fenetre. */}
+      <SignalementDefaut ecran={ecranOuvert} />
     </div>
   )
 }

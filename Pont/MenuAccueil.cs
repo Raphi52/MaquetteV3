@@ -292,6 +292,12 @@ public static class MenuAccueil
                 new("Aide du greffe",         "le wiki interne",                    "PROC_WIKI"),
                 new("Page web interne",       "ouvrir un site dans RIG",            "PROC_WEB_BROWSER")
             ]),
+            new("Prendre en main la V3",
+            [
+                new("Premiers pas",           "les gestes principaux de la V3",     "PROC_PREMIERS_PAS"),
+                new("Ancienne touche, nouvelle touche", "les raccourcis de l'ancien RIG", "PROC_TOUCHES"),
+                new("Certificat NF525 de la V3", "organisme, numero, validite",     "PROC_CERTIFICAT")
+            ]),
             new("Referentiels",
             [
                 new("Tables de reference",    "les codes du greffe",                "PROC_GTABREF"),

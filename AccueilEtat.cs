@@ -598,6 +598,24 @@ public sealed class AccueilEtat
         etat.Ecrire();
     }
 
+    /// <summary>
+    /// L'aide de la premiere ouverture (SOC-026 CA06, ecran « Premiers pas », Pont/EcranAide.cs) a ete montree a l'agent :
+    /// elle ne s'ouvre plus d'elle-meme, elle se rouvre depuis le menu. Elle fait partie des <see cref="Preferences"/> :
+    /// vue sur un serveur RDS, elle ne revient pas sur un autre (decision du lot 4, SOC-013).
+    /// </summary>
+    public bool AideVue { get; set; }
+
+    /// <summary>Retient que l'aide a ete montree, en relisant le fichier comme les autres Memoriser* ; branchee au serveur,
+    /// la preference part aussi a <see cref="Distant"/>. Rend vrai si c'etait la premiere fois.</summary>
+    public static bool MemoriserAideVue()
+    {
+        var etat = Charger();
+        if (etat.AideVue) return false;
+        etat.AideVue = true;
+        etat.Ecrire();
+        return true;
+    }
+
     // ---------------------------------------------------------------------------------------------
     // SOC-013 : LES PREFERENCES SUIVENT L'AGENT D'UN SERVEUR RDS A L'AUTRE.
     // fix-ok: cause lue dans le code -- Chemin (plus bas) pose les reglages dans %APPDATA% du SERVEUR ou
@@ -622,6 +640,7 @@ public sealed class AccueilEtat
         nameof(FenetresVue), nameof(FenetresDocument), nameof(TriClasseur),
         nameof(Tuiles), nameof(VersionDisposition), nameof(Disposition), nameof(Mesures),
         nameof(Alertes), nameof(CategoriesAlertes), nameof(CategoriesRepliees), nameof(ReglagesAlertes),
+        nameof(AideVue),
     ];
 
     /// <summary>Ce qui recoit les preferences a chaque ecriture du fichier ; null sans serveur (rien ne part).</summary>
@@ -732,6 +751,7 @@ public sealed class AccueilEtat
             FenetresDocument = fichier.FenetresDocument;
             TriClasseur = fichier.TriClasseur;
             Imprimante = fichier.Imprimante;
+            AideVue = fichier.AideVue;
         }
         Ecrire();
     }

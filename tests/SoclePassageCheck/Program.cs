@@ -802,7 +802,7 @@ Exiger(nonDecrites.Count == 0, $"docs\\reconstruction\\socle-exploitation.md dec
 
 Reste("SOC-024 CA01, CA05, CA06 et SOC-025 CA01, CA03 sur les 40 vraies bases : pas d'acces aux instances de production ni aux copies anonymisees des greffes " +
       "depuis ce poste (et aucune copie ne sert de jeu de repetition avant la nouvelle reception du lot 6, decision du chef) ; l'outil est celui qu'on lancera");
-Reste("SOC-019 CA01, CA04, CA05 : le certificat lui-meme (organisme accredite, audit), son ecran dans la V3, celui de la V2 -- hors de ce poste");
+Reste("SOC-019 CA01, CA04, CA05 : le certificat lui-meme (organisme accredite, audit) et celui de la V2 -- hors de ce poste ; son ecran dans la V3 : lot 17, tests\\SocleBetaCheck");
 Reste("SOC-022 CA06 et SOC-026 CA06 : le signalement d'un defaut depuis la V3 et l'aide a la premiere ouverture sont des ecrans « a maquetter » hors des fichiers de ce lot");
 }
 finally

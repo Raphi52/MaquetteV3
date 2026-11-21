@@ -199,6 +199,9 @@ foreach (var (libelle, code) in toutesEntrees)
 // PROC_SUPERVISION (« Supervision », SOC-011 T04 et SOC-017 T04) est NEUVE : la V2
 // n'a pas d'ecran ; l'exploitation lit COMMUN_RIG (ETAT_SERVICE, LOG_RIG_ERREUR) a
 // la main et relance par l'outil MaintenanceServices, hors de RIG.
+// PROC_PREMIERS_PAS (« Premiers pas », SOC-026 CA06) et PROC_CERTIFICAT (« Certificat NF525 de la V3 », SOC-019 CA04) sont
+// NEUVES (lot 17 de la reconstruction) : la V2 n'a ni aide a la premiere ouverture ni ecran du certificat (il circule en
+// piece jointe, un greffe le demande a l'assistance).
 // PROC_CERTIF (« Certification NF525 », SOC-018 T03) n'a pas de fiche mais un dossier de sources, dans la branche
 // origin/Development de la V2 seulement : Source\RIG\DLL\Processus\PROC_CERTIF (FORM_CERTIF, journaux JET_NP et JET_P,
 // grands totaux des factures et des encaissements).
@@ -206,7 +209,7 @@ var sansFiche = new[] { "PROC_LISTE_DELIBERES", "PROC_SUIVI_IMPRESSION", "PROC_R
                         "PROC_ACTUALITES", "PROC_COMMANDES_WEB", "PROC_UTILISATEUR", "PROC_MAIL_LOT1",
                         "PROC_COMPTEURS_NUM", "PROC_REGLAGES_GREFFE",
                         "PROC_NUMEROS_MANQUANTS", "PROC_TOUCHES", "PROC_SUPERVISION", "PROC_CERTIF",
-                        "PROC_FICHES_CONFLIT", "PROC_HISTORIQUE_ANCIEN_RIG" };
+                        "PROC_FICHES_CONFLIT", "PROC_HISTORIQUE_ANCIEN_RIG", "PROC_PREMIERS_PAS", "PROC_CERTIFICAT" };
 
 var fiches = @"D:\RigApplication\Documentation\reference\proc";
 

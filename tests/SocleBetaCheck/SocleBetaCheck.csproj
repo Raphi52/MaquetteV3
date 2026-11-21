@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Banc du lot 17 du plan « Reconstruction de RIG — phase 2 » : les trois ecrans de la beta laisses « a maquetter » par
+       le lot 13. SOC-019 CA04 (le certificat de la V3 retrouve par un greffe, avec sa validite), SOC-022 CA06 (un defaut
+       signale depuis la V3 en un geste, avec l'identifiant de suivi, vu en Supervision et lu par « beta defauts »),
+       SOC-026 CA06 (l'aide de la premiere ouverture, « vue » d'un serveur RDS a l'autre). Un controle par critere CAxx :
+       le vrai serveur en memoire sur des bases jetables, les ponts des ecrans et l'outil RigV3.Passage.
+       Il lui faut le SQL Server de developpement : docker compose up -d. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SocleBetaCheck</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <!-- Les reglages de l'accueil (AccueilEtat : la preference AideVue) et ce qu'ils tirent de Metier/, comme tests/SoclePreferencesCheck. -->
+    <Compile Include="../../AccueilEtat.cs" Link="AccueilEtat.cs" />
+    <Compile Include="../../Metier/DossierRcs.cs" Link="Metier/DossierRcs.cs" />
+    <Compile Include="../../Metier/AffairesOuvertes.cs" Link="Metier/AffairesOuvertes.cs" />
+    <Compile Include="../../Metier/AlertesGreffe.cs" Link="Metier/AlertesGreffe.cs" />
+    <Compile Include="../../Metier/JeuDemo.cs" Link="Metier/JeuDemo.cs" />
+    <Compile Include="../../Metier/SimulationEdi.cs" Link="Metier/SimulationEdi.cs" />
+    <Compile Include="../../Metier/ActionsXaction.cs" Link="Metier/ActionsXaction.cs" />
+    <Compile Include="../../Metier/ArbreGed.cs" Link="Metier/ArbreGed.cs" />
+    <Compile Include="../../Metier/RecetteTache.cs" Link="Metier/RecetteTache.cs" />
+    <Compile Include="../../Metier/InformationsDossier.cs" Link="Metier/InformationsDossier.cs" />
+    <Compile Include="../../Metier/InformationsFormalite.cs" Link="Metier/InformationsFormalite.cs" />
+    <Compile Include="../../Metier/InformationsDepots.cs" Link="Metier/InformationsDepots.cs" />
+    <!-- Le client de l'app, la session de l'agent, ses preferences et les ponts des trois ecrans, joues contre le vrai serveur. -->
+    <Compile Include="../../Pont/ClientServeur.cs" Link="Pont/ClientServeur.cs" />
+    <Compile Include="../../Pont/JSInvokable.cs" Link="Pont/JSInvokable.cs" />
+    <Compile Include="../../Pont/SessionAgent.cs" Link="Pont/SessionAgent.cs" />
+    <Compile Include="../../Pont/PreferencesServeur.cs" Link="Pont/PreferencesServeur.cs" />
+    <Compile Include="../../Pont/DocumentsRecus.cs" Link="Pont/DocumentsRecus.cs" />
+    <Compile Include="../../Pont/EcranSupervision.cs" Link="Pont/EcranSupervision.cs" />
+    <Compile Include="../../Pont/EcranSignalement.cs" Link="Pont/EcranSignalement.cs" />
+    <Compile Include="../../Pont/EcranCertificat.cs" Link="Pont/EcranCertificat.cs" />
+    <Compile Include="../../Pont/EcranAide.cs" Link="Pont/EcranAide.cs" />
+    <!-- La fiche des touches (la touche du signalement y est), son inventaire de la V2 et le menu de la maquette. -->
+    <Compile Include="../../Pont/EcranCorrespondances.cs" Link="Pont/EcranCorrespondances.cs" />
+    <Compile Include="../../Pont/InventaireTouchesV2.cs" Link="Pont/InventaireTouchesV2.cs" />
+    <Compile Include="../../Pont/MenuAccueil.cs" Link="Pont/MenuAccueil.cs" />
+    <Compile Include="../../Pont/CatalogueEcrans.cs" Link="Pont/CatalogueEcrans.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Outils/Passage/RigV3.Passage.csproj" />
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+    <ProjectReference Include="../../Contrats/RigV3.Contrats.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
+  </ItemGroup>
+</Project>

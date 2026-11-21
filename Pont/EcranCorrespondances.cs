@@ -105,6 +105,10 @@ public static class EcranCorrespondances
     /// </summary>
     public static readonly IReadOnlySet<string> F5EffaceLesCriteres = new HashSet<string> { "PROC_REQUI" };
 
+    /// <summary>La touche qui signale un defaut a Amitel de partout dans la V3 (SOC-022 CA06, lot 17) : web/src/composants/
+    /// SignalementDefaut.tsx l'ecoute (Ctrl + Maj + D, D comme defaut) ; le bouton de l'en-tete de l'accueil fait de meme.</summary>
+    public const string ToucheSignalement = "Ctrl Maj D";
+
     /// <summary>Les touches qui lancent la recherche dans un critere de la V3 (TOUCHES_RECHERCHE de web/src/plan/clavier.ts).</summary>
     public static readonly IReadOnlySet<string> TouchesDeRecherche = new HashSet<string> { "Entree", "F5", "F7" };
 
@@ -313,6 +317,9 @@ public static class EcranCorrespondances
             "Nouveau dans la V3 : la palette s'ouvre de partout ; Entrée ouvre la ligne choisie.", PageRecherche, null);
         Ajouter(ToutesLesProcedures, "—", "Voir les touches de l'écran ouvert", "?", StatutsCorrespondance.Nouveau,
             "Nouveau dans la V3 (hors d'un champ) ; l'ancien RIG ne l'avait que sur les réquisitions (F1).", Code, null);
+        Ajouter(ToutesLesProcedures, "—", "Signaler un défaut à Amitel, avec l'identifiant de suivi", ToucheSignalement, StatutsCorrespondance.Nouveau,
+            "Nouveau dans la V3, de partout (même dans un champ), ou le bouton « Signaler un défaut » en haut de l'accueil : l'écran, le greffe, " +
+            "la version et l'heure partent avec votre phrase ; l'identifiant de suivi s'affiche.", Accueil, null);
 
         // Chaque raccourci de l'inventaire de la V2, ecran par ecran, dans l'ordre des noms.
         foreach (var t in InventaireTouchesV2.Lignes.OrderBy(t => t.EcranV2, StringComparer.CurrentCulture).ThenBy(t => t.Touche).ThenBy(t => t.Action))

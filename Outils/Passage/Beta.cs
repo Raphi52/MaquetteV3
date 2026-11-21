@@ -6,9 +6,11 @@ using RigV3.Contrats.Socle;
 
 namespace RigV3.Passage;
 
-/// <summary>Un certificat (de la V3 ou de la V2) tel que l'organisme le delivre : SOC-019 CA01, CA04, CA05.</summary>
-public sealed record Certificat(string Logiciel, string Organisme, string Accreditation, string Numero, string Referentiel,
-                                string VersionCouverte, DateOnly DelivreLe, DateOnly ValideJusquau);
+// Le certificat (record Certificat) et sa regle de validite (RegleCertificat) vivent dans Contrats/Socle/Certification.cs
+// depuis le lot 17 : la route du certificat de la V3 (SOC-019 CA04) juge avec la MEME regle que le critere de demarrage.
+// fix-ok: pas un defaut corrige -- deplacement mesure (grep du 2026-11-21 : la regle de validite n'existait que dans
+// CriteresBeta.CertificatValide, l'ecran du certificat en aurait fait une seconde copie) ; les signalements de la V3 lus par
+// « beta defauts » (lot 17) sont l'autre ajout de ce fichier.
 
 /// <summary>Une version de la V3 soumise au suivi de certification (SOC-019 CA03) : l'organisme a-t-il donne son accord ?</summary>
 public sealed record SuiviVersion(string Version, bool Accord, string Organisme, DateOnly Le, string? Reference = null);
@@ -55,15 +57,36 @@ public static class RegleDefauts
         return (false, d.GesteImpossible ? "geste empeche avec un contournement ecrit" : "gene sans perte ni geste empeche");
     }
 
-    public static string Liste(IEnumerable<DefautBeta> defauts)
+    /// <summary>
+    /// La liste des defauts ouverts, bloquants d'abord, avec leur identifiant de suivi ; puis les defauts SIGNALES DEPUIS
+    /// LA V3 (SOC-022 CA06, ecran de l'agent, base commune) qui ne sont pas encore classes : aucun defauts-beta.json ne
+    /// porte leur identifiant de suivi. Ils sont « A CLASSER » : la regle ne classe que ce qu'une personne a decrit
+    /// (les cases de <see cref="DefautBeta"/>), jamais une phrase d'agent devinee.
+    /// </summary>
+    public static string Liste(IEnumerable<DefautBeta> defauts, IReadOnlyList<DefautSignale>? signales = null)
     {
+        var tous = defauts.ToList();
         var s = new StringBuilder();
-        foreach (var d in defauts.Where(d => d.Etat == Ouvert).OrderByDescending(d => Classer(d).Bloquant).ThenBy(d => d.Id, StringComparer.Ordinal))
+        foreach (var d in tous.Where(d => d.Etat == Ouvert).OrderByDescending(d => Classer(d).Bloquant).ThenBy(d => d.Id, StringComparer.Ordinal))
         {
             var (b, raison) = Classer(d);
             s.AppendLine($"  {(b ? "BLOQUANT" : "non bloquant"),-12} {d.Id,-10} suivi {d.Suivi,-10} greffe {d.Greffe,-5} {d.Titre} ({raison})");
         }
+        var aClasser = AClasser(tous, signales ?? []);
+        foreach (var x in aClasser)
+            s.AppendLine($"  {"A CLASSER",-12} {"(V3)",-10} suivi {x.Suivi,-10} greffe {x.CodeGreffe ?? "?",-5} {x.Phrase} " +
+                         $"(signale depuis la V3 le {x.Instant:yyyy-MM-dd HH:mm} UTC par {x.Compte ?? "?"}, ecran « {x.Ecran} », version {x.Version ?? "?"}" +
+                         $"{(x.DerniereErreur is { } e ? $", derniere erreur {e}" : "")})");
+        if (aClasser.Count > 0)
+            s.AppendLine($"  -> {aClasser.Count} defaut(s) signale(s) depuis la V3 a classer : les decrire dans defauts-beta.json sous leur identifiant de suivi (regle de SOC-022 CA03).");
         return s.Length == 0 ? "  aucun defaut ouvert\n" : s.ToString();
+    }
+
+    /// <summary>Les defauts signales depuis la V3 qu'aucun defaut du dossier ne decrit (meme identifiant de suivi).</summary>
+    public static IReadOnlyList<DefautSignale> AClasser(IReadOnlyList<DefautBeta> defauts, IReadOnlyList<DefautSignale> signales)
+    {
+        var decrits = defauts.Select(d => (d.Suivi ?? string.Empty).Trim().ToUpperInvariant()).ToHashSet(StringComparer.Ordinal);
+        return [.. signales.Where(x => !decrits.Contains(x.Suivi.Trim().ToUpperInvariant())).OrderBy(x => x.Instant)];
     }
 }
 
@@ -85,6 +108,23 @@ public sealed record DossierBeta(IReadOnlyList<StoryCarnet> Stories, IReadOnlySe
                                  IReadOnlyList<DefautRepetition> DefautsRepetitions, PlanFormation? Formation, IReadOnlyList<DefautBeta> Defauts,
                                  IReadOnlyList<ValidationBeta> Validations, IReadOnlyList<FicheGreffe> Catalogue)
 {
+    /// <summary>Les defauts signales par les agents depuis la V3 (SOC-022 CA06), lus dans la base commune
+    /// (soc.DefautSignale, <see cref="LireSignalesAsync"/>) : la commande « beta » les ajoute au dossier.</summary>
+    public IReadOnlyList<DefautSignale> Signales { get; init; } = [];
+
+    /// <summary>Les defauts signales depuis la V3, dans la base commune <paramref name="commune"/> (la meme lecture que l'ecran
+    /// Supervision). Une base commune sans la table (migration SOC-022_defauts pas livree) est un refus nomme, pas une liste vide.</summary>
+    public static async Task<IReadOnlyList<DefautSignale>> LireSignalesAsync(string commune, CancellationToken ct)
+    {
+        await using var cn = new Microsoft.Data.SqlClient.SqlConnection(commune);
+        await cn.OpenAsync(ct);
+        await using (var existe = new Microsoft.Data.SqlClient.SqlCommand("SELECT OBJECT_ID('soc.DefautSignale', 'U');", cn))
+            if (await existe.ExecuteScalarAsync(ct) is null or DBNull)
+                throw new InvalidOperationException($"la base commune {cn.Database} n'a pas la table des defauts signales depuis la V3 " +
+                                                    "(migration SOC-022_defauts) : la livrer avant de lire les defauts de la beta.");
+        return await RigV3.Serveur.Socle.Supervision.DefautsSignales.LireAsync(cn, null, null, ct);
+    }
+
     public static DossierBeta Lire(string carnet, string dossier, string dossierBancs, IReadOnlyList<FicheGreffe> catalogue)
     {
         T? Fichier<T>(string nom) where T : class
@@ -167,10 +207,13 @@ public static class CriteresBeta
     {
         var bloquants = d.Defauts.Where(x => x.Etat == RegleDefauts.Ouvert && RegleDefauts.Classer(x).Bloquant).ToList();
         var sansSuivi = d.Defauts.Where(x => string.IsNullOrWhiteSpace(x.Suivi)).Select(x => x.Id).ToList();
+        // Un defaut signale depuis la V3 et pas encore classe peut etre bloquant : la beta ne se termine pas sur lui.
+        var aClasser = RegleDefauts.AClasser(d.Defauts, d.Signales);
         var c = new List<Constat>
         {
-            new("SOC-022 CA04 : aucun defaut bloquant ouvert", bloquants.Count == 0 && sansSuivi.Count == 0,
+            new("SOC-022 CA04 : aucun defaut bloquant ouvert", bloquants.Count == 0 && sansSuivi.Count == 0 && aClasser.Count == 0,
                 sansSuivi.Count > 0 ? $"defaut(s) sans identifiant de suivi, non recevable(s) : {string.Join(", ", sansSuivi)}"
+                : aClasser.Count > 0 ? $"{aClasser.Count} defaut(s) signale(s) depuis la V3 pas encore classe(s) dans defauts-beta.json : {string.Join(", ", aClasser.Select(x => x.Suivi))}"
                 : bloquants.Count == 0 ? $"{d.Defauts.Count(x => x.Etat == RegleDefauts.Ouvert)} defaut(s) ouvert(s), aucun bloquant (regle de SOC-022 CA03)"
                 : $"{bloquants.Count} defaut(s) bloquant(s) ouvert(s) : {string.Join(", ", bloquants.Select(x => $"{x.Id} [{x.Suivi}] {RegleDefauts.Classer(x).Raison}"))}"),
             Repetitions(d, "SOC-022 CA04 : transferts repetes sans ecart"),
@@ -201,25 +244,10 @@ public static class CriteresBeta
     private static Constat CertificatValide(Certificat? cert, string critere, DateOnly aujourdhui, string? versionV3)
     {
         if (cert is null) return new(critere, false, "aucun certificat au dossier (certificat-v3.json / certificat-v2.json)");
-        var trous = new List<string>();
-        if (string.IsNullOrWhiteSpace(cert.Organisme) || string.IsNullOrWhiteSpace(cert.Accreditation))
-            trous.Add("organisme ou accreditation absent (seul un organisme accredite est admis, BOI-TVA-DECLA-30-10-30)");
-        if (string.IsNullOrWhiteSpace(cert.Numero)) trous.Add("numero du certificat absent");
-        if (cert.ValideJusquau < aujourdhui) trous.Add($"echu le {cert.ValideJusquau:yyyy-MM-dd}");
-        if (cert.DelivreLe > aujourdhui) trous.Add($"delivre dans le futur ({cert.DelivreLe:yyyy-MM-dd})");
-        if (versionV3 is not null && !VersionCouverte(cert.VersionCouverte, versionV3))
-            trous.Add($"couvre la version {cert.VersionCouverte}, pas {versionV3}");
+        var trous = RegleCertificat.Manques(cert, aujourdhui, versionV3);
         return new(critere, trous.Count == 0, trous.Count == 0
             ? $"{cert.Logiciel} : certificat {cert.Numero} de {cert.Organisme} ({cert.Accreditation}), {cert.Referentiel}, version {cert.VersionCouverte}, valide jusqu'au {cert.ValideJusquau:yyyy-MM-dd}"
             : string.Join(" ; ", trous));
-    }
-
-    /// <summary>« 2026.1 » couvre 2026.1.x : le certificat couvre une version majeure (annee.version), une revision
-    /// mineure (evenement 255) n'en change pas, une majeure (250) passe par le suivi (SOC-019 CA03).</summary>
-    public static bool VersionCouverte(string couverte, string version)
-    {
-        static string Majeure(string v) => string.Join('.', v.Split('.').Take(2));
-        return Majeure(couverte) == Majeure(version);
     }
 
     private static Constat Repetitions(DossierBeta d, string critere)
