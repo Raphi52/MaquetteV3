@@ -236,6 +236,9 @@ const string ComptesDuGreffe = """
     -- La reattribution est reservee a XNUMERO (procedure de la V2, RoutesCompteur.FonctionReattribution).
     INSERT INTO soc.Fonction (Code, Libelle, TypeV2) VALUES ('XNUMERO', 'Reattribution de numero metier', 'PROCVB6');
     INSERT INTO soc.RoleFonction (Role, Fonction) VALUES ('BANC', 'XNUMERO');
+    -- La liste des numeros manquants est reservee a LNUMCM (RoutesCompteur.FonctionNumerosManquants).
+    INSERT INTO soc.Fonction (Code, Libelle, TypeV2) VALUES ('LNUMCM', 'Liste des numeros chrono manquants', 'PROCVB6');
+    INSERT INTO soc.RoleFonction (Role, Fonction) VALUES ('BANC', 'LNUMCM');
     """;
 await ExecuterSur(b.Connexion, ComptesDuGreffe, ("@greffe", GreffeA), ("@admis", AgentA), ("@refuse", RefuseA));
 await ExecuterSur(baseB.Connexion, ComptesDuGreffe, ("@greffe", GreffeB), ("@admis", AgentB), ("@refuse", ""));
@@ -794,10 +797,12 @@ async Task<HttpResponseMessage> Appeler(HttpMethod verbe, string adresse, object
     if (corps is not null) demande.Content = JsonContent.Create(corps, options: json);
     return await sansEnTete.SendAsync(demande);
 }
-// Les trois routes, pour un greffe. La restitution vise un numero jamais donne (-4, journalise) : servie,
-// elle ne rend rien qui serait redonne ensuite.
-(HttpMethod Verbe, string Adresse, object? Corps)[] TroisRoutes(string greffe) =>
+// Les routes du compteur, pour un greffe. La restitution vise un numero jamais donne (-4, journalise) : servie,
+// elle ne rend rien qui serait redonne ensuite. Une route ajoutee au module doit entrer ici : le controle
+// « Raccord (1) » compte les routes du serveur contre cette liste (la liste des manquants y est entree le 21/11).
+(HttpMethod Verbe, string Adresse, object? Corps)[] RoutesDuGreffe(string greffe) =>
 [
+    (HttpMethod.Get, RoutesCompteur.Pour(RoutesCompteur.Manquants, greffe), null),
     (HttpMethod.Get, RoutesCompteur.Pour(RoutesCompteur.Compteurs, greffe), null),
     (HttpMethod.Post, RoutesCompteur.Pour(RoutesCompteur.Numeros, greffe), new DemandeNumero("RGB", 2026)),
     (HttpMethod.Post, RoutesCompteur.Pour(RoutesCompteur.Restitutions, greffe), new DemandeRestitution("RGB", "2026B99999", "essai du raccord (lot 8)", 2026)),
@@ -806,7 +811,7 @@ async Task<(int[] Codes, string[] Corps)> Jouer(string greffe, string? compte)
 {
     var codes = new List<int>();
     var corps = new List<string>();
-    foreach (var (verbe, adresse, contenu) in TroisRoutes(greffe))
+    foreach (var (verbe, adresse, contenu) in RoutesDuGreffe(greffe))
         using (var r = await Appeler(verbe, adresse, contenu, compte))
         {
             codes.Add((int)r.StatusCode);
@@ -817,14 +822,14 @@ async Task<(int[] Codes, string[] Corps)> Jouer(string greffe, string? compte)
 string Codes(int[] codes) => string.Join(" ", codes);
 async Task<string> EtatDesTrois() => $"A {await Etat()} | B {await EtatSur(baseB.Connexion)} | commune {await EtatSur(commune.Connexion)}";
 
-// (1) Les trois routes exigent la session (lot 2) : posee sur leur groupe, lue dans le serveur lui-meme.
+// (1) Les routes exigent la session (lot 2) : posee sur leur groupe, lue dans le serveur lui-meme.
 var routesDuCompteur = ((IEndpointRouteBuilder)app).DataSources.SelectMany(d => d.Endpoints).OfType<RouteEndpoint>()
     .Where(r => r.Metadata.GetMetadata<ModuleOrigine>()?.Nom == "RigV3.Serveur.Numerotation.Compteur.ModuleCompteur").ToList();
 var malProtegees = routesDuCompteur
     .Where(r => !r.Metadata.GetOrderedMetadata<IAuthorizeData>().Any(a => a.Policy == PolitiquesSocle.AgentAdmis)
                 || r.RoutePattern.GetParameter(PolitiquesSocle.ParametreGreffe) is null)
     .Select(r => r.RoutePattern.RawText).ToList();
-Exiger(routesDuCompteur.Count == 3 && malProtegees.Count == 0,
+Exiger(routesDuCompteur.Count == RoutesDuGreffe(GreffeA).Length && malProtegees.Count == 0,
     $"Raccord (1) : les {routesDuCompteur.Count} routes du compteur portent PolitiquesSocle.AgentAdmis et le greffe dans leur adresse " +
     $"({string.Join(", ", routesDuCompteur.Select(r => r.RoutePattern.RawText))}){(malProtegees.Count > 0 ? " ; fautives : " + string.Join(", ", malProtegees) : "")}");
 var etatAvantRefus = await EtatDesTrois();
@@ -832,24 +837,24 @@ var anonyme = await Jouer(GreffeA, null);
 var desactive = await Jouer(GreffeA, RefuseA);
 var etatApresRefus = await EtatDesTrois();
 Exiger(anonyme.Codes.All(c => c == 401),
-    $"Raccord (1) : sans session Windows, les 3 routes du compteur du greffe A repondent 401 ({Codes(anonyme.Codes)})");
+    $"Raccord (1) : sans session Windows, les {RoutesDuGreffe(GreffeA).Length} routes du compteur du greffe A repondent 401 ({Codes(anonyme.Codes)})");
 Exiger(desactive.Codes.All(c => c == 403) && etatApresRefus == etatAvantRefus,
-    $"Raccord (1) : un compte desactive dans le greffe A recoit 403 sur les 3 routes ; ni ces refus ni les 401 n'ont fait tourner une route " +
+    $"Raccord (1) : un compte desactive dans le greffe A recoit 403 sur les {RoutesDuGreffe(GreffeA).Length} routes ; ni ces refus ni les 401 n'ont fait tourner une route " +
     $"(aucun compteur, numero rendu ni journal ne bouge) ({Codes(desactive.Codes)})");
 var admisA = await Jouer(GreffeA, AgentA);
 var compteJournalise = await Valeur<string>("SELECT TOP 1 Compte FROM num.Journal WHERE Logiciel = 'V3' AND Evenement = 'attribution' ORDER BY Id DESC;");
 Exiger(admisA.Codes.All(c => c == 200) && compteJournalise == AgentA,
-    $"Raccord (1) (jumeau) : l'agent admis du greffe A est servi par les 3 routes ({Codes(admisA.Codes)}) ; le journal porte le compte " +
+    $"Raccord (1) (jumeau) : l'agent admis du greffe A est servi par les {RoutesDuGreffe(GreffeA).Length} routes ({Codes(admisA.Codes)}) ; le journal porte le compte " +
     $"de sa session (« {compteJournalise} »), plus « (non identifie) » (NUM-001 CA06)");
 
 // (2) Base du greffe demande, par le catalogue (lot 4) : 404 inconnu, 503 injoignable sans repli, A et B separes.
 var absent = await Jouer(GreffeAbsent, AgentA);
 Exiger(absent.Codes.All(c => c == 404) && absent.Corps.All(c => c.Contains(GreffeAbsent)),
-    $"Raccord (2) : un greffe absent du catalogue ({GreffeAbsent}) -> 404 sur les 3 routes, qui le nomment ; aucune base par defaut ({Codes(absent.Codes)})");
+    $"Raccord (2) : un greffe absent du catalogue ({GreffeAbsent}) -> 404 sur les {RoutesDuGreffe(GreffeA).Length} routes, qui le nomment ; aucune base par defaut ({Codes(absent.Codes)})");
 var etatAvantMuet = await EtatDesTrois();
 var muet = await Jouer(GreffeMuet, AgentA);
 Exiger(muet.Codes.All(c => c == 503) && muet.Corps.All(c => c.Contains(baseMuette)) && await EtatDesTrois() == etatAvantMuet,
-    $"Raccord (2) : la base du greffe {GreffeMuet} ne repond pas -> 503 sur les 3 routes, la base nommee ; sans repli : ni la base commune, " +
+    $"Raccord (2) : la base du greffe {GreffeMuet} ne repond pas -> 503 sur les {RoutesDuGreffe(GreffeA).Length} routes, la base nommee ; sans repli : ni la base commune, " +
     $"ni A, ni B ne bougent ({Codes(muet.Codes)})");
 var rgbA = (await Dernier("RGB", 2026))!.Value;
 var rgbB = await ValeurSur<int>(baseB.Connexion, "SELECT Chrono FROM num.Compteur WHERE Type = 'RGB' AND Annee = 2026;");
@@ -891,7 +896,7 @@ var etatAvantCroise = await EtatDesTrois();
 var aSurB = await Jouer(GreffeB, AgentA);
 var bSurA = await Jouer(GreffeA, AgentB);
 Exiger(aSurB.Codes.All(c => c == 403) && await EtatDesTrois() == etatAvantCroise,
-    $"Raccord (3) : l'agent {AgentA}, connu du greffe A seulement, est refuse sur les 3 routes du greffe B (403) ; rien ne bouge ({Codes(aSurB.Codes)})");
+    $"Raccord (3) : l'agent {AgentA}, connu du greffe A seulement, est refuse sur les {RoutesDuGreffe(GreffeA).Length} routes du greffe B (403) ; rien ne bouge ({Codes(aSurB.Codes)})");
 Exiger(bSurA.Codes.All(c => c == 403),
     $"Raccord (3) : symetrique -- l'agent {AgentB}, connu du greffe B seulement, est refuse sur le greffe A (403) ({Codes(bSurA.Codes)})");
 var bSurB = await Jouer(GreffeB, AgentB);
@@ -957,6 +962,25 @@ Exiger(refusDroitEcran is { Mode: "serveur", Echec: true } && refusDroitEcran.Me
 var renduParResponsable = await EcranCompteurs.RendreAsync(ecranA, GreffeA, new DemandeRestitution("JPC", jpcDonnePourRefus.Numero!, "rendu par le responsable"));
 Exiger(renduParResponsable is { Echec: false } && etatAvantSansDroit != etatApresTirage,
     $"Ecran NUM-004 T08 (jumeau) : le meme numero, rendu par {AgentA} qui a XNUMERO, passe (« {renduParResponsable.Message} »)");
+
+// NUM-013 T04 : la liste des numeros manquants, par l'ecran « Numéros manquants » (Pont/EcranManquants.cs).
+var rc1Manquant = await V3("RC1", 2026);
+await ExecuterSur(b.Connexion, "EXEC num.DeclarerManquant @Type = 'RC1', @Numero = @n, @Motif = N'inscription abandonnée (banc)', @Logiciel = 'V3', @Compte = 'banc';",
+    ("@n", rc1Manquant.Numero!));
+var listeManquants = await EcranManquants.OuvrirAsync(ecranA, GreffeA);
+var declare = listeManquants.Manquants.SingleOrDefault(m => m.Numero == rc1Manquant.Numero);
+Exiger(listeManquants is { Mode: "serveur", Greffe: GreffeA } && declare is { Serie: "RC1", Logiciel: "V3", Motif: "inscription abandonnée (banc)" }
+       && declare.Chrono == rc1Manquant.Chrono,
+    $"Ecran NUM-013 T04, CA03 : {rc1Manquant.Numero}, donne puis declare manquant dans la V3, est dans la liste avec son motif « {declare?.Motif} » ({listeManquants.Manquants.Length} manquant(s))");
+var avecFiltre = await ecranA.LireAsync<NumeroManquant[]>(RoutesCompteur.Pour(RoutesCompteur.Manquants, GreffeA) + "?serie=RGB");
+Exiger(avecFiltre.All(m => m.Serie == "RGB") && !avecFiltre.Any(m => m.Numero == rc1Manquant.Numero),
+    $"Ecran NUM-013 CA04 (route) : ?serie=RGB ne rend que des RGB ({avecFiltre.Length}), sans {rc1Manquant.Numero}");
+var manquantsSansDroit = await EcranManquants.OuvrirAsync(ClientEcran(SansXnumeroA), GreffeA);
+Exiger(manquantsSansDroit is { Mode: "refuse", Manquants.Length: 0 } && manquantsSansDroit.Message!.Contains("LNUMCM") && !manquantsSansDroit.Message.Contains("{"),
+    $"Ecran NUM-013 : sans la fonction LNUMCM (procedure V2), la liste est refusee et l'ecran dit pourquoi (« {manquantsSansDroit.Message} »)");
+var manquantsDemo = await EcranManquants.OuvrirAsync(null, null);
+Exiger(manquantsDemo is { Mode: "demo" } && manquantsDemo.Manquants.Length == 7 && manquantsDemo.Manquants.All(m => m.Motif == "manquant constaté par la V2, motif inconnu"),
+    $"Ecran NUM-013 : sans serveur, les 7 numeros de RIG_DEV.NUMERO_CHRONO_MANQUANT avec le motif de la reprise (CA02)");
 
 var ecranDemo = await EcranCompteurs.OuvrirAsync(null, null);
 var ecranDemoRendu = await EcranCompteurs.RendreAsync(null, null, new DemandeRestitution("JPC", "2026RJ0012", "essai"));

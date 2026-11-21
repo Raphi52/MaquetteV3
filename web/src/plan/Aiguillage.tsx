@@ -35,6 +35,8 @@ import { EcranCommandesWeb } from '../ecrans/EcranCommandesWeb'
 import { EcranComptabilisation } from '../ecrans/EcranComptabilisation'
 import { EcranComptes } from '../ecrans/EcranComptes'
 import { EcranCompteurs } from '../ecrans/EcranCompteurs'
+import { EcranReglages } from '../ecrans/EcranReglages'
+import { EcranManquants } from '../ecrans/EcranManquants'
 import { EcranConsultationJud } from '../ecrans/EcranConsultationJud'
 import { EcranControleVidiged } from '../ecrans/EcranControleVidiged'
 import { EcranCourriersDivers } from '../ecrans/EcranCourriersDivers'
@@ -183,6 +185,15 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
       // Ecran NEUF de la V3 (« a maquetter », NUM-004 T04) : les compteurs de la base du greffe et la
       // reattribution d'un numero donne par erreur (sans RIGV3_SERVEUR : la demonstration, en lecture).
       return <EcranCompteurs />
+
+    case 'PROC_REGLAGES_GREFFE':
+      // Ecran NEUF de la V3 (« a maquetter », SOC-003 T03) : les reglages generaux du greffe (PARAMETRAGE de la V2),
+      // qui les a modifies et quand (sans RIGV3_SERVEUR : la demonstration, en lecture).
+      return <EcranReglages />
+
+    case 'PROC_NUMEROS_MANQUANTS':
+      // Reprise de LNUMCM de la V2 (NUM-013 T04) : les numeros manquants du registre avec leur motif.
+      return <EcranManquants />
 
     case 'PROC_GESTEMAIL':
       return <EcranMessagerie />

@@ -14,6 +14,7 @@ using RigV3.Contrats.Socle;
 using RigV3.Serveur;
 using RigV3.Serveur.Socle.Greffes;
 using RigV3.Serveur.Socle.Identite;
+using RigV3Desktop.Pont;
 
 // Banc du LOT 4 du plan de reconstruction (2026-11-20) : SOC-003, SOC-007, SOC-008.
 //
@@ -803,6 +804,42 @@ try
     var apresRetour = await Envoyer(HttpMethod.Put, RoutesGreffes.Pour(RoutesGreffes.Fuseau, "T002"), new SaisieFuseau("SA Western Standard Time"));
     Exiger(apresRetour.StatusCode == HttpStatusCode.OK && await Journaux("greffe") == (0, 0, 5),
         "Raccord (2) (jumeau) : le journal revenu, la meme modification passe et s'y ecrit");
+
+    // =====================================================================================
+    // L'ecran « Réglages du greffe » (Pont/EcranReglages.cs, SOC-003 T03 et CA07) sur le vrai serveur,
+    // par le meme client que l'app (ClientServeur, compte pose par RIGV3_COMPTE a sa construction).
+    // =====================================================================================
+    Console.WriteLine("--- Ecran des reglages");
+    ClientServeur ClientEcran(string compte)
+    {
+        Environment.SetEnvironmentVariable(ClientServeur.VariableCompte, compte);
+        try { return new ClientServeur(new Uri("http://localhost/"), app.GetTestServer().CreateHandler()); }
+        finally { Environment.SetEnvironmentVariable(ClientServeur.VariableCompte, null); }
+    }
+    const string ReglageEcran = "NUMERISE_LIASSE1";
+    var lusParRoute = await Lire<ReglageGreffe[]>(RoutesGreffes.Pour(RoutesGreffes.Reglages, "T001"));
+    var valeurAvantEcran = lusParRoute.Single(r => r.Code == ReglageEcran).Valeur;
+    var vueEcran = await EcranReglages.OuvrirAsync(ClientEcran(Agent), "T001");
+    Exiger(vueEcran is { Mode: "serveur", Greffe: "T001" } && vueEcran.Reglages.Length == lusParRoute.Length && vueEcran.Reglages.Any(r => r.Code == ReglageEcran),
+        $"Ecran SOC-003 T03 : l'ecran lit les reglages du greffe T001 par la route ({vueEcran.Mode}, {vueEcran.Reglages.Length} reglages, route : {lusParRoute.Length})");
+    var refusEcranReglage = await EcranReglages.ModifierAsync(ClientEcran(SansDroit), "T001", ReglageEcran, "valeur interdite");
+    var apresRefusEcran = (await Lire<ReglageGreffe[]>(RoutesGreffes.Pour(RoutesGreffes.Reglages, "T001"))).Single(r => r.Code == ReglageEcran).Valeur;
+    Exiger(refusEcranReglage is { Echec: true } && refusEcranReglage.Message!.Contains("n'a pas le droit de modifier le greffe")
+           && !refusEcranReglage.Message.Contains("{") && apresRefusEcran == valeurAvantEcran,
+        $"Ecran : sans le droit, le motif du serveur s'affiche tel quel (« {refusEcranReglage.Message} ») et le reglage ne bouge pas ({apresRefusEcran})");
+    var modifEcran = await EcranReglages.ModifierAsync(ClientEcran(Agent), "T001", ReglageEcran, "valeur ecran");
+    var modifie = modifEcran.Reglages.SingleOrDefault(r => r.Code == ReglageEcran);
+    Exiger(modifEcran is { Echec: false, Selection: ReglageEcran } && modifie is { Valeur: "valeur ecran", DateModif: not null }
+           && modifie.AuteurModif is { Length: > 0 } && modifEcran.Message!.Contains("modifié"),
+        $"Ecran SOC-003 CA07 : modifie depuis l'ecran, le reglage montre sa valeur, son auteur et sa date ({modifie?.Valeur}, {modifie?.AuteurModif}, {modifie?.DateModif:s}) -- « {modifEcran.Message} »");
+    await EcranReglages.ModifierAsync(ClientEcran(Agent), "T001", ReglageEcran, valeurAvantEcran);   // remis comme avant
+    var absentEcran = await EcranReglages.ModifierAsync(ClientEcran(Agent), "T001", "BANC_INEXISTANT", "1");
+    Exiger(absentEcran is { Echec: true } && absentEcran.Message!.Contains("n'existe pas"),
+        $"Ecran : un reglage absent est refuse avec le motif du serveur (« {absentEcran.Message} »)");
+    var sansGreffeEcran = await EcranReglages.OuvrirAsync(ClientEcran(Agent), null);
+    var demoReglages = await EcranReglages.OuvrirAsync(null, null);
+    Exiger(sansGreffeEcran is { Mode: "sans-greffe", Reglages.Length: 0 } && demoReglages is { Mode: "demo" } && demoReglages.Reglages.Length > 0,
+        $"Ecran : branche sans greffe ouvert, il le dit ({sansGreffeEcran.Mode}) ; sans serveur, {demoReglages.Reglages.Length} reglages de demonstration");
 
     // =====================================================================================
     // Acces — decision du plan (lot 2) : une route de donnees pose PolitiquesSocle.AgentAdmis

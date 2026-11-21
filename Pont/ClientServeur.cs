@@ -30,9 +30,13 @@ namespace RigV3Desktop.Pont;
 // ============================================================
 
 /// <summary>Une reponse du serveur en echec : le verbe, la route, le code HTTP et le debut du corps.</summary>
-public sealed class ErreurServeur(string message, int codeHttp) : Exception(message)
+public sealed class ErreurServeur(string message, int codeHttp, string? corps = null) : Exception(message)
 {
     public int CodeHttp { get; } = codeHttp;
+
+    /// <summary>Le corps entier de la reponse en echec (souvent un motif en JSON, ex. RefusGreffe) ; null sans corps.
+    /// Un ecran y lit le motif du serveur au lieu de recopier sa regle (Pont/EcranReglages.cs, 21/11).</summary>
+    public string? Corps { get; } = corps;
 }
 
 public sealed class ClientServeur
@@ -109,6 +113,14 @@ public sealed class ClientServeur
         return await Lire<TReponse>(reponse, "POST", route, ct);
     }
 
+    /// <summary>PUT <paramref name="route"/> avec <paramref name="demande"/> en JSON (une ressource remplacee, ex. un
+    /// reglage du greffe) ; leve <see cref="ErreurServeur"/> sur un code d'echec.</summary>
+    public async Task<TReponse> ModifierAsync<TDemande, TReponse>(string route, TDemande demande, CancellationToken ct = default)
+    {
+        using var reponse = await Http.PutAsJsonAsync(Relative(route), demande, Json, ct);
+        return await Lire<TReponse>(reponse, "PUT", route, ct);
+    }
+
     /// <summary>L'etat du serveur et de sa base. Un 503 n'est pas une exception ici :
     /// son corps dit la cause (base non configuree, injoignable), c'est la reponse.</summary>
     public async Task<EtatSante> SanteAsync(CancellationToken ct = default)
@@ -130,7 +142,7 @@ public sealed class ClientServeur
             var corps = await reponse.Content.ReadAsStringAsync(ct);
             throw new ErreurServeur(
                 $"{verbe} {route} : {(int)reponse.StatusCode} {reponse.ReasonPhrase} {corps[..Math.Min(corps.Length, 300)]}".TrimEnd(),
-                (int)reponse.StatusCode);
+                (int)reponse.StatusCode, corps.Length == 0 ? null : corps);
         }
         try
         {

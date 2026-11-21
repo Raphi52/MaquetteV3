@@ -16,6 +16,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <!-- L'ecran « Réglages du greffe » et son client, joues contre le vrai serveur en memoire. -->
+    <Compile Include="../../Pont/ClientServeur.cs" Link="Pont/ClientServeur.cs" />
+    <Compile Include="../../Pont/JSInvokable.cs" Link="Pont/JSInvokable.cs" />
+    <Compile Include="../../Pont/SessionAgent.cs" Link="Pont/SessionAgent.cs" />
+    <Compile Include="../../Pont/EcranReglages.cs" Link="Pont/EcranReglages.cs" />
     <!-- La copie d'essai de COMMUN_RIG.dbo.GREFFE (40 greffes exploites + 2 non exploites). -->
     <None Include="commun_rig_greffe.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

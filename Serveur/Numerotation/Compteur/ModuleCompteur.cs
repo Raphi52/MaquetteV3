@@ -1,5 +1,6 @@
 using Microsoft.Data.SqlClient;
 using RigV3.Contrats.Numerotation;
+using RigV3.Serveur.Numerotation.Series;
 using RigV3.Serveur.Socle.Comptes;
 using RigV3.Serveur.Socle.Greffes;
 using RigV3.Serveur.Socle.Identite;
@@ -32,6 +33,15 @@ internal sealed class ModuleCompteur : IModuleServeur
         compteur.MapGet(RoutesCompteur.Compteurs, async (string greffe, string? type, CatalogueGreffes c, CancellationToken ct) =>
             await SurBaseDuGreffe(c, greffe, ct, async cn =>
                 Results.Ok(await DistributeurNumeros.ListerAsync(cn, string.IsNullOrWhiteSpace(type) ? null : type.Trim(), ct))));
+
+        // NUM-013 T04 : la liste des numeros manquants du registre, reservee a LNUMCM comme la procedure de la V2.
+        compteur.MapGet(RoutesCompteur.Manquants, async (string greffe, string? serie, int? annee, HttpContext http, CatalogueGreffes c,
+                                                         ServiceDroits droits, BaseRig commune, CancellationToken ct) =>
+        {
+            if (await SansLaFonction(http, droits, commune, RoutesCompteur.FonctionNumerosManquants, greffe, ct) is { } refus) return refus;
+            return await SurBaseDuGreffe(c, greffe, ct, async cn => Results.Ok(await NumerosManquants.ListerAsync(cn,
+                string.IsNullOrWhiteSpace(serie) ? null : serie.Trim(), annee, ct)));
+        });
 
         compteur.MapPost(RoutesCompteur.Numeros, async (string greffe, DemandeNumero demande, HttpContext http, CatalogueGreffes c,
                                                         DistributeurNumeros numeros, CancellationToken ct) =>
@@ -67,13 +77,8 @@ internal sealed class ModuleCompteur : IModuleServeur
             // Reservee aux detenteurs de XNUMERO, comme la procedure de la V2 (NUM-004 T04, T08), jugee dans la
             // base de CE greffe (lot 9). Un refus ne touche a rien : ni compteur, ni numero rendu, ni journal.
             // Une panne de la verification est un refus (SOC-002 CA06, trace par ServiceDroits).
-            var moi = await droits.AppelantAsync(http, commune, ct);
-            var droit = moi is null ? null : await droits.VerifierAsync(http, commune, moi, RoutesCompteur.FonctionReattribution, ct);
-            if (droit is not { Autorise: true })
-                return Results.Json(new ResultatRestitution(CodesNumerotation.NonJouee, null, null,
-                    $"Restitution refusee : le compte {moi?.CompteWindows ?? http.User.Identity?.Name} n'a pas la fonction " +
-                    $"{RoutesCompteur.FonctionReattribution} (Reattribution de numero metier) dans le greffe {greffe}."),
-                    statusCode: StatusCodes.Status403Forbidden);
+            if (await SansLaFonction(http, droits, commune, RoutesCompteur.FonctionReattribution, greffe, ct) is { } refus)
+                return refus;
             return await SurBaseDuGreffe(c, greffe, ct, async cn =>
             {
                 try
@@ -88,6 +93,22 @@ internal sealed class ModuleCompteur : IModuleServeur
                 }
             });
         });
+    }
+
+    /// <summary>
+    /// 403 si l'agent n'a pas la fonction <paramref name="fonction"/> (procedure V2) dans la base de CE greffe ; null s'il
+    /// l'a. Le corps porte le motif en clair (ResultatRestitution, lu par les ecrans comme un refus) ; rien n'est lu ni ecrit.
+    /// </summary>
+    private static async Task<IResult?> SansLaFonction(HttpContext http, ServiceDroits droits, BaseRig commune, string fonction,
+                                                      string greffe, CancellationToken ct)
+    {
+        var moi = await droits.AppelantAsync(http, commune, ct);
+        var droit = moi is null ? null : await droits.VerifierAsync(http, commune, moi, fonction, ct);
+        if (droit is { Autorise: true }) return null;
+        var libelle = fonction == RoutesCompteur.FonctionReattribution ? "Reattribution de numero metier" : "Liste des numeros chrono manquants";
+        return Results.Json(new ResultatRestitution(CodesNumerotation.NonJouee, null, null,
+            $"Refuse : le compte {moi?.CompteWindows ?? http.User.Identity?.Name} n'a pas la fonction {fonction} ({libelle}) dans le greffe {greffe}."),
+            statusCode: StatusCodes.Status403Forbidden);
     }
 
     /// <summary>

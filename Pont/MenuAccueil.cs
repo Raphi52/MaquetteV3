@@ -214,7 +214,8 @@ public static class MenuAccueil
             [
                 new("Statistiques",           "les chiffres du greffe",             "PROC_STAT"),
                 new("Statistiques cour d'appel", "ce qui remonte a la CA",          "PROC_STATCA"),
-                new("Pilotage",               "tableaux de bord",                   "PROC_XPILOTAGE")
+                new("Pilotage",               "tableaux de bord",                   "PROC_XPILOTAGE"),
+                new("Numeros manquants",      "le registre chronologique",          "PROC_NUMEROS_MANQUANTS")
             ])
         ]),
         new("Terminer", "fin", "#",
@@ -294,7 +295,8 @@ public static class MenuAccueil
                 new("Cabinets",               "les salles d'audience",              "PROC_CABINET"),
                 new("Codes chefs IP",         "parametrage des injonctions",        "PROC_PARAM_IP"),
                 new("Bornes d'accueil",       "les kiosques KBIS",                  "PROC_BORNE"),
-                new("Compteurs de numeros",   "rendre un numero donne par erreur",  "PROC_COMPTEURS_NUM")
+                new("Compteurs de numeros",   "rendre un numero donne par erreur",  "PROC_COMPTEURS_NUM"),
+                new("Reglages du greffe",     "les parametres propres au greffe",   "PROC_REGLAGES_GREFFE")
             ]),
             new("Modeles et envois",
             [

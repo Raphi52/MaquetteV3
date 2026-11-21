@@ -29,6 +29,16 @@ public static class RoutesCompteur
     /// </summary>
     public const string FonctionReattribution = "XNUMERO";
 
+    /// <summary>GET : la liste des numeros manquants du registre (<see cref="NumeroManquant"/>[], NUM-013 T04) ;
+    /// « ?serie=RC1 » et « ?annee=2026 » la restreignent.</summary>
+    public const string Manquants = "/numerotation/{greffe}/manquants";
+
+    /// <summary>
+    /// La fonction qu'exige <see cref="Manquants"/> : LNUMCM, la procedure de menu de la V2 « Liste des numeros chrono
+    /// manquants » (PROCESSUS_ET_FONCTIONALITE ; roles RCSNIV01 et RCSNIV05 sur RIG_DEV). Sans elle : 403.
+    /// </summary>
+    public const string FonctionNumerosManquants = "LNUMCM";
+
     /// <summary>L'adresse d'une de ces routes pour le greffe <paramref name="greffe"/> (son code au catalogue).</summary>
     public static string Pour(string route, string greffe)
         => route.Replace("{greffe}", Uri.EscapeDataString(greffe));

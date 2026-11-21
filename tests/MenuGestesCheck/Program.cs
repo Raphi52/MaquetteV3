@@ -187,9 +187,14 @@ foreach (var (libelle, code) in toutesEntrees)
 // PROC_COMPTEURS_NUM (« Compteurs de numeros ») est l'ecran de reattribution
 // d'un numero de NUM-004 T04. Il reprend XNUMERO de la V2 (« Reattribution de
 // numero metier », procedure VB6 du menu), qui n'a ni fiche ni source ici.
+// PROC_REGLAGES_GREFFE (« Reglages du greffe », SOC-003 T03) est NEUVE : la V2
+// n'a pas d'ecran generique de sa table PARAMETRAGE (chaque ecran ecrit les siens).
+// PROC_NUMEROS_MANQUANTS (« Numeros manquants », NUM-013 T04) reprend LNUMCM de
+// la V2, procedure VB6 du menu sans fiche ni source ici, comme XNUMERO.
 var sansFiche = new[] { "PROC_LISTE_DELIBERES", "PROC_SUIVI_IMPRESSION", "PROC_REQUI",
                         "PROC_ACTUALITES", "PROC_COMMANDES_WEB", "PROC_UTILISATEUR",
-                        "PROC_COMPTEURS_NUM" };
+                        "PROC_COMPTEURS_NUM", "PROC_REGLAGES_GREFFE",
+                        "PROC_NUMEROS_MANQUANTS" };
 
 var fiches = @"D:\RigApplication\Documentation\reference\proc";
 
