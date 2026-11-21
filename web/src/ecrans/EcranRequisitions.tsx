@@ -19,6 +19,7 @@ import { EnteteTriable } from '../composants/EnteteTriable'
 import { appeler } from '../pont'
 import { Saisie, useSession, type PontDeSession } from '../session'
 import type { ContexteDossierVue } from '../plan/types'
+import { toucheDeRecherche } from '../plan/clavier'
 
 export interface LigneCommandeWebRequi {
   /** Sa place dans le jeu de l'ecran : elle revient avec le clic. */
@@ -191,8 +192,10 @@ export function EcranRequisitions({ dossier = null }: ProprietesEcranRequisition
   const article = (champ: string) => (valeur: string) => geste('Article', { champ, valeur })
   const rechercher = () => geste('Rechercher')
   const surToucheCritere = (e: KeyboardEvent) => {
-    // Entree dans le bloc des criteres = clic sur Rechercher : le geste de RIG v2.
-    if (e.key === 'Enter') rechercher()
+    // F5 efface les criteres et la liste, comme RAZ dans RIG v2 (frmREQUI.cs:421) : le bouton Reinitialiser.
+    if (e.key === 'F5') { e.preventDefault(); geste('Effacer'); return }
+    // Entree ou F7 dans le bloc des criteres = clic sur Rechercher : le geste de RIG v2 (frmREQUI.cs:424-425).
+    if (toucheDeRecherche(e)) rechercher()
   }
 
   /** Un champ nombre de la commande en cours (@bind d'un int : remonte au « change »). */

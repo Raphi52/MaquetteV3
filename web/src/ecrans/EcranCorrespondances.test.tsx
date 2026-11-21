@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { AideTouchesEcran, EcranCorrespondances, repond, type LigneCorrespondance, type VueEcranCorrespondances } from './EcranCorrespondances'
+import { AideTouchesEcran, EcranCorrespondances, RETOUR_A_LA_LIGNE, repond, type LigneCorrespondance, type VueEcranCorrespondances } from './EcranCorrespondances'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
@@ -47,6 +47,22 @@ describe('EcranCorrespondances', () => {
     expect(lignes[1]!.textContent).toContain('n\'a pas cette fonction')
     expect(lignes[2]!.textContent).toContain('Écran à venir')
     expect(screen.getByText('Avant les retours des greffes bêta')).toBeTruthy()
+  })
+
+  it('se lit en entier : aucune cellule coupee, chaque texte revient a la ligne (retour du chef, 21/11/2026)', async () => {
+    const longue = 'Un texte d\'explication long, qui ne tient pas sur une ligne de la colonne et doit se lire en entier, jusqu\'au dernier mot.'
+    installerFauxPont({ 'EcranCorrespondances.Ouvrir': () => ({ ...vue(), lignes: [ligne({ explication: longue, statut: 'nouveau' })] }) })
+    const { container } = render(<EcranCorrespondances ouvrir={() => {}} />)
+    await screen.findByText('1 raccourci(s)')
+    // Le texte entier est dans la cellule (pas seulement dans une infobulle), et rien ne le coupe.
+    expect(screen.getByText(longue).tagName).toBe('TD')
+    for (const cellule of container.querySelectorAll<HTMLElement>('.rig-fiche-touches th, .rig-fiche-touches td'))
+      expect([cellule.style.textOverflow, cellule.style.overflow, cellule.style.whiteSpace]).toEqual(['', '', ''])
+    // La regle de la page : pour les en-tetes, les cellules, les pastilles (« Nouveau dans la V3 ») et les boutons.
+    expect(container.querySelector('style')!.textContent).toBe(RETOUR_A_LA_LIGNE)
+    expect(RETOUR_A_LA_LIGNE).toMatch(/\.rig-table\.rig-fiche-touches thead th, \.rig-table\.rig-fiche-touches tbody td \{ white-space: normal; overflow: visible; text-overflow: clip; max-width: none;/)
+    expect(RETOUR_A_LA_LIGNE).toMatch(/\.rig-fiche-touches \.rig-etat, \.rig-table\.rig-fiche-touches \.rig-bouton \{ white-space: normal;/)
+    expect(screen.getByText('Nouveau dans la V3').className).toContain('rig-etat')
   })
 
   it('se cherche : un mot de l\'ecran, de la touche ou du geste filtre la fiche', async () => {

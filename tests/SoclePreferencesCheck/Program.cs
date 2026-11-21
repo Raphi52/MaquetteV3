@@ -216,7 +216,16 @@ try
     Exiger(avantBrancher > 0 && avantBrancher < fenetre.IndexOf("PageWeb.Brancher(Vue", StringComparison.Ordinal)
            && Regex.Matches(fenetre, @"PreferencesServeur\.BrancherSessionAsync").Count == 2 && fenetre.Contains("PreferencesServeur.FermerAsync()"),
         "SOC-013 T03 : l'app relit les preferences avant de monter l'accueil (greffe du lancement et ecran de choix), et les envoie a la fermeture");
+    // Les documents recus : l'app s'abonne avant la session, et chaque document ouvre une fenetre de document au rang
+    // libre de TOUTES les fenetres de document (sinon une affaire detachee et un document recu liraient le meme emplacement).
+    var abonnement = fenetre.IndexOf("DocumentsRecus.Brancher(new AfficheurFenetres(), AccueilEtat.DossierPiecesJointes)", StringComparison.Ordinal);
+    var fenetreDocument = File.ReadAllText(Path.Combine(racine, "FenetreDocument.xaml.cs"));
     var plan = File.ReadAllText(Path.Combine(racine, "Pont", "PlanTravail.cs"));
+    Exiger(abonnement > 0 && abonnement < avantBrancher
+           && Regex.IsMatch(fenetreDocument, @"class AfficheurFenetres : Pont\.IAfficheurDocuments[\s\S]{0,400}?Dispatcher\.BeginInvoke\(\(\) => FenetreDocument\.Ouvrir\(piece, valeurs\)\)")
+           && Regex.IsMatch(fenetreDocument, @"App\.Partage\.RangLibre\(RangsOuverts\(\)\);\s*App\.Partage\.Publier\(rang, piece, valeurs\);[\s\S]{0,200}?new FenetreDocument\(rang\)[\s\S]{0,200}?\.Show\(\)")
+           && plan.Contains("Partage!.RangLibre(FenetreDocument.RangsOuverts())"),
+        "SOC-013 T03 : l'app ouvre chaque document recu dans une fenetre de document (abonnee avant la session, au rang libre de toutes les fenetres de document)");
     var planVue = File.ReadAllText(Path.Combine(racine, "Pont", "PlanTravailVue.cs"));
     Exiger(plan.Contains("if (Etat.Imprimante is { Length: > 0 } imprimante) ImprImprimante = imprimante;")
            && Regex.IsMatch(planVue, @"case ""imprimante"":[\s\S]{0,200}?AccueilEtat\.MemoriserImprimante\(ImprImprimante\)"),
@@ -226,13 +235,29 @@ try
     // CA03 — un document prepare pour un agent s'ouvre dans SA session, nulle part ailleurs
     // -----------------------------------------------------------------------------------------------------------------
     Console.WriteLine();
-    Console.WriteLine("--- SOC-013 CA03 et CA04 : les documents de la partie serveur");
-    async Task<int> Deposer(string compte, string titre)
+    Console.WriteLine("--- SOC-013 CA03 et CA04 : les documents de la partie serveur, ouverts a l'ecran");
+    // Les editions de la partie serveur : de vrais fichiers sur « le serveur » (un dossier du banc). Un PDF d'une page.
+    var dossierEditions = Directory.CreateDirectory(Path.Combine(dossierEtat.FullName, "serveur-editions")).FullName;
+    byte[] Pdf(string titre) => System.Text.Encoding.Latin1.GetBytes($"%PDF-1.4\n1 0 obj << /Type /Page >> endobj\n% {titre}\n%%EOF\n");
+    async Task<int> Deposer(string compte, string titre, string extension = ".pdf", byte[]? contenu = null, bool fichierPresent = true)
     {
+        var fichier = Path.Combine(dossierEditions, titre + extension);
+        if (fichierPresent) await File.WriteAllBytesAsync(fichier, contenu ?? Pdf(titre));
         await using var cn = new SqlConnection(b.Connexion);
         await cn.OpenAsync();
-        return await DocumentsAgents.DeposerAsync(cn, compte, NaturesDocument.Afficher, titre, @"\\editions\banc\" + titre + ".pdf", "banc-editions", default);
+        return await DocumentsAgents.DeposerAsync(cn, compte, NaturesDocument.Afficher, titre, fichier, "banc-editions", default);
     }
+    // L'ecran : chaque document recu s'ouvre dans une fenetre de document (l'app : FenetreDocument ; ici, le releveur).
+    var dossierPieces = Path.Combine(dossierEtat.FullName, "pieces-du-poste");
+    var fenetres = new AfficheurDuBanc();
+    DocumentsRecus.Brancher(fenetres, dossierPieces);
+    // Le fichier du poste derriere une piece (son adresse https://pieces.rigv3.example/<sous-dossier>/<fichier>).
+    var hotePieces = $"https://{PiecesJointes.Hote}/";
+    string? FichierDuPoste(NoeudGed piece)
+        => piece.Fichier.StartsWith(hotePieces, StringComparison.Ordinal)
+            ? Path.Combine(dossierPieces, Uri.UnescapeDataString(piece.Fichier[hotePieces.Length..]).Replace('/', Path.DirectorySeparatorChar))
+            : null;
+    NoeudGed? Montree(string titre) => fenetres.Montres.Select(m => m.Piece).LastOrDefault(p => p.Libelle == titre);
     // L'agent 1 a ouvert sur RDS-A puis RDS-B puis RDS-A puis RDS-C : sa session est la derniere (RDS-C).
     SurLePoste("rds-c");
     var depotC = (await OuvrirDepot(Agent1, "RDS-C", "3:poste-c-2")).Depot;
@@ -247,6 +272,39 @@ try
     Exiger(aAncienne.Length == 0, $"SOC-013 CA03 : rien n'arrive dans une ancienne session du meme agent (RDS-A, {aAncienne.Length} recu)");
     Exiger(aLAutre.Length == 0, $"SOC-013 CA03 : rien n'arrive chez un autre agent ({aLAutre.Length} recu)");
     Exiger(deNouveau.Length == 0 && depotC.Recus.Count == 1, "SOC-013 CA03 : un document n'est remis qu'une fois");
+    await DocumentsRecus.AttendreAsync();
+    var montre = fenetres.Montres.Count == 1 ? fenetres.Montres[0] : default;
+    Exiger(montre.Piece is { APdf: true, Libelle: "Kbis 2026B00042", Extension: "PDF" } piece
+           && FichierDuPoste(piece) is { } surLePoste && File.Exists(surLePoste)
+           && File.ReadAllBytes(surLePoste).SequenceEqual(File.ReadAllBytes(Path.Combine(dossierEditions, "Kbis 2026B00042.pdf")))
+           && montre.Valeurs.Any(v => v == ("Préparé par", "banc-editions")),
+        "SOC-013 CA03 T03 : le document recu s'ouvre dans une fenetre de document de la session ou l'agent travaille, et nulle part ailleurs : "
+        + $"le PDF du serveur, range sur le poste ({fenetres.Montres.Count} fenetre(s) : {string.Join(", ", fenetres.Montres.Select(m => m.Piece.Libelle))})");
+    // Le contenu : le document de l'agent seulement (refus, et son jumeau accepte : le meme document, pour lui).
+    var routeKbis = RoutesPreferences.PourDocument(Greffe, idDoc);
+    var parUnAutre = await Statut(() => Client(Agent2).LireAsync<ContenuDocument>(routeKbis));
+    var parLui = await Client(Agent1).LireAsync<ContenuDocument>(routeKbis);
+    Exiger(parUnAutre == 404 && parLui.Nom == "Kbis 2026B00042.pdf" && parLui.Contenu.Length > 0,
+        $"SOC-013 CA03 : le contenu d'un document ne se lit que par son agent (un autre : {parUnAutre} ; lui : {parLui.Contenu.Length} octets)");
+    // Un fichier disparu du serveur, ou d'un type que la V3 n'affiche pas : la fenetre s'ouvre quand meme et dit pourquoi
+    // (jumeau : le PDF present, ouvert ci-dessus avec son contenu).
+    var idDisparu = await Deposer(Agent1, "Etat disparu", fichierPresent: false);
+    await Deposer(Agent1, "Courrier a relire", ".docx", [0x50, 0x4B, 0x03, 0x04, 0x77]);
+    var disparuSurServeur = await Statut(() => Client(Agent1).LireAsync<ContenuDocument>(RoutesPreferences.PourDocument(Greffe, idDisparu)));
+    await depotC.ReleverAsync();
+    await DocumentsRecus.AttendreAsync();
+    Exiger(disparuSurServeur == 404 && Montree("Etat disparu") is { APdf: false } disparu && disparu.Apercu.Contains("n'a pas pu être lu sur le serveur")
+           && Montree("Courrier a relire") is { APdf: false } word && word.Apercu.Contains("la V3 n'affiche que ceux-là"),
+        $"SOC-013 CA03 : un document sans fichier sur le serveur (404) ou d'un type que la V3 n'affiche pas s'ouvre quand meme, avec la raison ({fenetres.Montres.Count} fenetres)");
+    // Contre-epreuve du controle cle (l'essai refuse : DocumentsArrives sans abonne) : le document est recu, rien ne s'ouvre.
+    DocumentsRecus.Debrancher();
+    var avantSansAbonne = fenetres.Montres.Count;
+    await Deposer(Agent1, "Recu sans abonne");
+    var recuSansAbonne = await depotC.ReleverAsync();
+    await DocumentsRecus.AttendreAsync();
+    Exiger(recuSansAbonne.Length == 1 && fenetres.Montres.Count == avantSansAbonne,
+        "SOC-013 CA03 contre-epreuve : sans abonne a DocumentsArrives, un document recu ne s'ouvre pas (le controle voit l'absence)");
+    DocumentsRecus.Brancher(fenetres, dossierPieces);
     Exiger(await Valeur<string>("SELECT CONCAT(RemisServeur, '|', RemisSession) FROM soc.DocumentAgent WHERE Id = @id;", ("@id", idDoc)) == "RDS-C|3:poste-c-2",
         "SOC-013 CA03 : la base dit ou et dans quelle session le document a ete remis");
     var sansSession = await Statut(() => Client(Agent1).LireAsync<DocumentRecu[]>(RoutesPreferences.Pour(RoutesPreferences.Documents, Greffe)));
@@ -263,6 +321,10 @@ try
     var (ouverture3, _) = await OuvrirDepot(Agent3, "RDS-B", "5:agent3");
     Exiger(ouverture3.Documents.Length == 1 && ouverture3.Documents[0].Id == idAttente,
         $"SOC-013 CA04 : a sa prochaine ouverture, le document qui l'attendait lui est remis ({ouverture3.Documents.Length} recu)");
+    await DocumentsRecus.AttendreAsync();
+    Exiger(Montree("Courrier en attente") is { APdf: true } attendu && FichierDuPoste(attendu) is { } attenduSurPoste && File.Exists(attenduSurPoste),
+        "SOC-013 CA04 T03 : a l'ouverture de l'application, le document qui l'attendait s'ouvre dans une fenetre de document");
+    DocumentsRecus.Debrancher();
     var inconnu = false;
     try { await Deposer("banc.inconnu", "Perdu"); }
     catch (InvalidOperationException) { inconnu = true; }
@@ -382,8 +444,9 @@ try
         $"SOC-027 CA04 : un ecran annonce « construit » a bien son ecran dans l'aiguillage ({string.Join(", ", construitsSansCase.Select(l => l.EcranV3).Distinct())})");
     Exiger(fiche.Where(l => l.Ouvrable).All(l => ecransV3.Contains(l.EcranV3!) || l.EcranV3 == EcranCorrespondances.PageRecherche),
         "SOC-027 CA04 : le bouton d'une ligne ouvre un ecran du menu (ou la page Recherche), par le geste « ouvrirCode »");
-    // Entree lance la recherche : verifie dans le .tsx de chaque ecran annonce, et l'inverse (fiche en retard).
-    var entreeRecherche = new Regex(@"\.key\s*===?\s*['""]Enter['""][\s\S]{0,120}?rechercher\(");
+    // Entree lance la recherche : verifie dans le .tsx de chaque ecran annonce, et l'inverse (fiche en retard). Un ecran
+    // passe par toucheDeRecherche (Entree, F5, F7 : web/src/plan/clavier.ts), ou teste Entree lui-meme (un ecran en retard).
+    var entreeRecherche = new Regex(@"(\.key\s*===?\s*['""]Enter['""]|toucheDeRecherche\(e\)\))[\s\S]{0,120}?rechercher\(");
     string? Tsx(string code) => composants.TryGetValue(code, out var c) && File.Exists(Path.Combine(racine, "web", "src", "ecrans", c + ".tsx"))
         ? File.ReadAllText(Path.Combine(racine, "web", "src", "ecrans", c + ".tsx")) : null;
     foreach (var code in EcranCorrespondances.EntreeLanceLaRecherche)
@@ -403,6 +466,40 @@ try
                                                     && !EcranCorrespondances.RechercheAuFilDeLaSaisie.Contains(code)).ToList();
     Exiger(sansCritere.All(code => !criteres.IsMatch(Tsx(code)!)),
         $"SOC-027 CA04 : un ecran annonce « sans critere de recherche » n'a vraiment aucun champ ({string.Join(", ", sansCritere.Select(CatalogueEcrans.Nom))})");
+    // F5 et F7 (decision du chef du plan, 21/11/2026) : la fenetre ne recharge plus, et la recherche se lance sur ces touches
+    // la ou Entree la lance -- par la fonction commune du clavier, sur chaque ecran annonce. Sur Requisitions, F5 efface
+    // les criteres, comme dans la V2 (frmREQUI.cs:421).
+    var pageWeb = File.ReadAllText(Path.Combine(racine, "Pont", "PageWeb.cs"));
+    var clavierTs = File.ReadAllText(Path.Combine(racine, "web", "src", "plan", "clavier.ts"));
+    bool NeRechargePas(string page) => Regex.IsMatch(page, @"^\s*coeur\.Settings\.AreBrowserAcceleratorKeysEnabled = false;", RegexOptions.Multiline)
+                                       && !page.Contains("AreBrowserAcceleratorKeysEnabled = true", StringComparison.Ordinal);
+    Exiger(NeRechargePas(pageWeb),
+        "SOC-027 CA04 : F5 et F7 ne rechargent jamais la fenetre de la V3 (Pont/PageWeb.cs coupe les touches du navigateur)");
+    Exiger(!NeRechargePas(pageWeb.Replace("AreBrowserAcceleratorKeysEnabled = false;", "AreBrowserAcceleratorKeysEnabled = true;")),
+        "SOC-027 CA04 contre-epreuve : la fenetre qui garde les touches du navigateur (F5 recharge) est vue");
+    var touchesTs = Regex.Match(clavierTs, @"TOUCHES_RECHERCHE: readonly string\[\] = \[(?<t>[^\]]*)\]").Groups["t"].Value
+        .Split(',').Select(t => t.Trim().Trim('\'')).Select(t => t == "Enter" ? "Entree" : t).ToHashSet();
+    Exiger(touchesTs.SetEquals(EcranCorrespondances.TouchesDeRecherche) && touchesTs.SetEquals(["Entree", "F5", "F7"]),
+        $"SOC-027 CA04 : Entree, F5 et F7 lancent la recherche dans un critere (clavier.ts : {string.Join(", ", touchesTs)} ; la fiche : {string.Join(", ", EcranCorrespondances.TouchesDeRecherche)})");
+    var parLaFonction = new Regex(@"toucheDeRecherche\(e\)\)\s*rechercher\(");
+    foreach (var code in EcranCorrespondances.EntreeLanceLaRecherche)
+        Exiger(Tsx(code) is { } t && parLaFonction.IsMatch(t),
+            $"SOC-027 CA04 : F5 et F7 lancent la recherche comme Entree sur l'ecran annonce ({CatalogueEcrans.Nom(code)} passe par toucheDeRecherche)");
+    var effaceF5 = new Regex(@"e\.key === 'F5'\)\s*\{\s*e\.preventDefault\(\);\s*geste\('Effacer'\);\s*return\s*\}[\s\S]{0,200}?toucheDeRecherche\(e\)");
+    foreach (var code in EcranCorrespondances.F5EffaceLesCriteres)
+        Exiger(Tsx(code) is { } t && effaceF5.IsMatch(t), $"SOC-027 CA04 : F5 efface les criteres sur l'ecran annonce, avant la recherche ({CatalogueEcrans.Nom(code)})");
+    // Ou F5 efface les criteres, la fiche ne dit nulle part que F5 y lance la recherche.
+    var f5DitLancer = fiche.Where(l => l.EcranV3 is { } e && EcranCorrespondances.F5EffaceLesCriteres.Contains(e)
+                                       && Regex.IsMatch(l.Explication, @"F5[^;.]*la lancent|F5 ou F7")).ToList();
+    Exiger(f5DitLancer.Count == 0 && fiche.Any(l => l.EcranV3 == "PROC_REQUI" && l.AncienneTouche == "Entrée" && l.Explication.Contains("F5 y efface les critères")),
+        $"SOC-027 CA02 : sur Requisitions, la fiche dit que F5 efface les criteres, jamais qu'il lance la recherche ({string.Join(" | ", f5DitLancer.Select(l => $"{l.Numero} {l.AncienneTouche}"))})");
+    var rechargeDite = fiche.Where(l => l.Explication.Contains("recharge", StringComparison.OrdinalIgnoreCase)).ToList();
+    var f5f7NonIdentiques = fiche.Where(l => l.AncienneTouche is "F5" or "F7" && l.EcranV3 is { } e && EcranCorrespondances.EntreeLanceLaRecherche.Contains(e)
+                                             && l.Geste == "Lancer la recherche" && (l.Statut != StatutsCorrespondance.Identique || l.NouvelleTouche != l.AncienneTouche)).ToList();
+    Exiger(rechargeDite.Count == 0 && f5f7NonIdentiques.Count == 0 && fiche.Any(l => l.AncienneTouche == "F7" && l.EcranV3 == "PROC_REQUI" && l.Statut == StatutsCorrespondance.Identique)
+           && fiche.Any(l => l.AncienneTouche == "F5" && l.EcranV3 == "PROC_REQUI" && l.Statut == StatutsCorrespondance.Identique),
+        $"SOC-027 CA02 : la fiche ne previent plus que F5 recharge ({rechargeDite.Count} ligne(s)) ; F7 et F5 des Requisitions sont « meme touche »"
+        + (f5f7NonIdentiques.Count == 0 ? "" : $" ; en defaut : {string.Join(" | ", f5f7NonIdentiques.Take(4).Select(l => $"{l.Numero} {l.EcranV2} {l.AncienneTouche}"))}"));
     var application = File.ReadAllText(Path.Combine(racine, "web", "src", "composants", "Application.tsx"));
     var clavier = File.ReadAllText(Path.Combine(racine, "web", "src", "plan", "clavier.ts"));
     Exiger(application.Contains("e.key.toLowerCase() !== 'k'") && clavier.Contains("e.key !== 'Escape'") && aiguillage.Contains("case 'PROC_TOUCHES':"),
@@ -462,3 +559,13 @@ static HashSet<(string Procedure, string Touche)> LireToucheDeLaV2(string source
 
 static List<(string Procedure, string Touche)> Manquants(HashSet<(string Procedure, string Touche)> duCode, HashSet<(string Procedure, string Touche)> inventaire)
     => [.. duCode.Where(p => !inventaire.Contains(p)).OrderBy(p => p.Procedure).ThenBy(p => p.Touche)];
+
+// Le releveur des fenetres de document : ce que l'app montrerait (SOC-013 T03).
+sealed class AfficheurDuBanc : IAfficheurDocuments
+{
+    private readonly List<(NoeudGed Piece, IReadOnlyList<(string Libelle, string Valeur)> Valeurs)> montres = [];
+
+    public List<(NoeudGed Piece, IReadOnlyList<(string Libelle, string Valeur)> Valeurs)> Montres { get { lock (montres) return [.. montres]; } }
+
+    public void Montrer(NoeudGed piece, IReadOnlyList<(string Libelle, string Valeur)> valeurs) { lock (montres) montres.Add((piece, valeurs)); }
+}

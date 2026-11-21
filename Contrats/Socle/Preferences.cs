@@ -23,7 +23,16 @@ public static class RoutesPreferences
     /// cette session (<see cref="DocumentRecu"/>[], CA03) ; vide pour toute autre session.</summary>
     public const string Documents = "/socle/{greffe}/documents";
 
+    /// <summary>GET : le contenu d'un document de l'agent (<see cref="ContenuDocument"/>), pour l'ouvrir a l'ecran (T03). Le
+    /// fichier est sur le serveur, que le serveur RDS ne lit pas : il passe par ici. 404 pour le document d'un autre agent,
+    /// ou dont le fichier n'est plus sur le serveur.</summary>
+    public const string Document = "/socle/{greffe}/documents/{id:int}";
+
     public static string Pour(string route, string greffe) => route.Replace("{greffe}", Uri.EscapeDataString(greffe));
+
+    /// <summary>L'adresse du contenu du document <paramref name="id"/> (<see cref="Document"/>).</summary>
+    public static string PourDocument(string greffe, int id)
+        => Pour(Document, greffe).Replace("{id:int}", id.ToString(System.Globalization.CultureInfo.InvariantCulture));
 }
 
 /// <summary>Les noms de preference que la V3 connait, et ce qu'ils portent (valeur en JSON).</summary>
@@ -56,6 +65,9 @@ public sealed record OuvertureSessionAgent(string Serveur, string Session);
 
 /// <summary>Un document que la partie serveur a prepare pour l'agent (edition a afficher ou a relire).</summary>
 public sealed record DocumentRecu(int Id, string Nature, string Titre, string Fichier, DateTime DeposeLe, string DeposePar);
+
+/// <summary>Le contenu d'un document prepare pour l'agent : le nom de son fichier (son extension dit son type) et ses octets.</summary>
+public sealed record ContenuDocument(int Id, string Nom, byte[] Contenu);
 
 /// <summary>Les natures d'un document pour l'agent (contrainte CK_DocumentAgent_Nature).</summary>
 public static class NaturesDocument

@@ -85,9 +85,28 @@ public static class PageWeb
         // la popup blanche sur texte clair, illisible, constatee le 2026-09-10 :
         // `color-scheme` dans la feuille de style ne pouvait pas y arriver.
         coeur.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Dark;
+        // Les touches du NAVIGATEUR sont coupees (SOC-027, decision du chef du plan « Reconstruction de RIG --
+        // phase 2 », lot 4, 21/11/2026) : dans l'ancien RIG, F5 et F7 lancent la recherche ; ici F5 rechargeait
+        // toute la V3 -- la saisie en cours etait perdue -- et F7 basculait la navigation au curseur. Elles arrivent
+        // a la page, qui en fait ce que la V3 a decide (web/src/plan/clavier.ts, toucheDeRecherche). Le reglage
+        // coupe aussi Ctrl R, Ctrl F et F3 (chercher dans la page), Ctrl P (les ecrans ont leur bouton Imprimer),
+        // Ctrl + et Ctrl - (Ctrl + molette zoome toujours) et Alt fleche (retour arriere). Le controle WPF ne donne
+        // pas le reglage touche par touche (IsBrowserAcceleratorKeyEnabled vit sur CoreWebView2Controller, qu'il
+        // garde pour lui) : c'est donc le reglage d'ensemble, documente par Microsoft
+        // (learn.microsoft.com/dotnet/api/microsoft.web.webview2.core.corewebview2settings.arebrowseracceleratorkeysenabled).
+        // Copier, coller, tout selectionner, annuler et les touches de deplacement restent au navigateur.
+        coeur.Settings.AreBrowserAcceleratorKeysEnabled = false;
 #if DEBUG
-        // F12 ouvre les outils de developpement (console, elements) en Debug.
+        // F12 ouvre les outils de developpement (console, elements) en Debug. Le reglage ci-dessus coupe la
+        // touche, pas les outils : le controle WPF la remonte en KeyDown (comme toute touche de navigateur), et
+        // la fenetre s'ouvre APRES l'evenement -- pendant, le navigateur attend la reponse de l'evenement.
         coeur.Settings.AreDevToolsEnabled = true;
+        vue.KeyDown += (_, e) =>
+        {
+            if (e.Key != System.Windows.Input.Key.F12) return;
+            e.Handled = true;
+            vue.Dispatcher.BeginInvoke(() => coeur.OpenDevToolsWindow());
+        };
 #else
         coeur.Settings.AreDevToolsEnabled = false;
 #endif

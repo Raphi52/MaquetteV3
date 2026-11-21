@@ -154,4 +154,16 @@ describe('EcranRechAffaires', () => {
     fireEvent.keyDown(screen.getByLabelText('N° Affaire'), { key: 'Enter' })
     expect(screen.queryByText(/suppression simulee/)).toBeNull()
   })
+
+  it('F5 et F7 dans les criteres relancent la recherche comme Entree (touches de l\'ancien RIG)', async () => {
+    installerFauxPont({ 'EcranRechAffaires.Trouver': vue })
+    render(<EcranRechAffaires ouvrir={vi.fn()} ouvrirUnDossier={vi.fn()} />)
+    fireEvent.click(await screen.findByText('2026B01067'))
+    for (const touche of ['F5', 'F7']) {
+      fireEvent.click(await screen.findByRole('button', { name: 'Supprimer l\'instance' }))
+      expect(screen.getByText(/suppression simulee/)).toBeTruthy()
+      expect(fireEvent.keyDown(screen.getByLabelText('N° Affaire'), { key: touche })).toBe(false)
+      expect(screen.queryByText(/suppression simulee/)).toBeNull()
+    }
+  })
 })
