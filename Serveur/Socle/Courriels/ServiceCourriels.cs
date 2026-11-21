@@ -198,7 +198,7 @@ public sealed class ServiceCourriels(OptionsCourriels options, CatalogueGreffes 
     public static async Task<ModeleComplet?> ModeleAsync(SqlConnection cn, string type, CancellationToken ct)
     {
         await using var cmd = new SqlCommand("""
-            SELECT Type, Sujet, Corps, CorpsHtml, Expediteur, Reponse, Copie, DestinataireDefaut, ReserveAmitel
+            SELECT Type, Sujet, Corps, CorpsHtml, Expediteur, Reponse, Copie, DestinataireDefaut, ReserveAmitel, SignatureActive, Signature
             FROM soc.ModeleMessage WHERE Type = @t;
             """, cn);
         cmd.Parameters.Add(new SqlParameter("@t", SqlDbType.VarChar, 40) { Value = type });
@@ -206,7 +206,7 @@ public sealed class ServiceCourriels(OptionsCourriels options, CatalogueGreffes 
         if (!await r.ReadAsync(ct)) return null;
         return new ModeleComplet(r.GetString(0), r.GetString(1), r.GetString(2), r.GetBoolean(3),
             r.IsDBNull(4) ? null : r.GetString(4), r.IsDBNull(5) ? null : r.GetString(5), r.IsDBNull(6) ? null : r.GetString(6),
-            r.IsDBNull(7) ? null : r.GetString(7), r.GetBoolean(8));
+            r.IsDBNull(7) ? null : r.GetString(7), r.GetBoolean(8), r.GetBoolean(9), r.IsDBNull(10) ? null : r.GetString(10));
     }
 
     /// <summary>
@@ -286,7 +286,7 @@ public sealed class ServiceCourriels(OptionsCourriels options, CatalogueGreffes 
             cause => manques.Add(cause));
         return new ApercuModele(modele, complet.Corps, expediteur, reponse, copie, destinataire,
             HabillageCourriel.Apercu(rendu, manques.Add), rendu.Habille, [.. manques],
-            await ListesVisiblesAsync(cn, compte, ct, modele.Type));
+            await ListesVisiblesAsync(cn, compte, ct, modele.Type), complet.SignatureActive, complet.Signature);
     }
 
     /// <summary>Le message d'une exception, et celui de sa cause s'il dit autre chose (SmtpException enveloppe souvent la vraie).</summary>
@@ -296,9 +296,10 @@ public sealed class ServiceCourriels(OptionsCourriels options, CatalogueGreffes 
     private static string? Couper(string? s, int taille) => s is not null && s.Length > taille ? s[..taille] : s;
 }
 
-/// <summary>Un modele du greffe, texte compris (soc.ModeleMessage).</summary>
+/// <summary>Un modele du greffe, texte et signature compris (soc.ModeleMessage).</summary>
 public sealed record ModeleComplet(string Type, string Sujet, string Corps, bool CorpsHtml, string? Expediteur, string? Reponse,
-                                   string? Copie, string? DestinataireDefaut, bool ReserveAmitel);
+                                   string? Copie, string? DestinataireDefaut, bool ReserveAmitel, bool SignatureActive = false,
+                                   string? Signature = null);
 
 /// <summary>Le courriel pret a partir : ce que la trace et soc.CourrielEnvoye retiennent, et son rendu.</summary>
 /// <param name="Corps">Le texte du modele, tel que soc.CourrielEnvoye le garde (EMAILENV_CORPS : avant habillage).</param>
