@@ -20,9 +20,10 @@ namespace RigV3.Serveur.Socle.Supervision;
 //   2. l'etat de la partie serveur et de chacun de ses traitements, publie dans soc.EtatTraitement et son
 //      historique (CA01) ;
 //   3. les regles d'alerte (CA02) : base injoignable ou en retard de migrations, echec de numerotation, traitement
-//      en erreur, file qui ne baisse plus depuis le delai regle. Une cause = une alerte OUVERTE (premiere panne :
-//      alerte ; les passages suivants mettent son texte a jour sans la renvoyer) ; la cause disparue, l'alerte est
-//      fermee ;
+//      en erreur, file qui ne baisse plus depuis le delai regle ; et les causes des sources inscrites par d'autres
+//      sujets (ISourceAlertes : incident de recopie, ecart du controle de nuit -- REC-005, REC-006). Une cause = une
+//      alerte OUVERTE (premiere panne : alerte ; les passages suivants mettent son texte a jour sans la renvoyer) ; la
+//      cause disparue, l'alerte est fermee ;
 //   4. l'envoi des alertes ouvertes pas encore parties, par le canal (ICanalAlerte) ;
 //   5. une fois par jour, la purge selon les durees ecrites dans soc.ConservationTechnique (CA05, SOC-017 CA04).
 // La V2 n'a rien de tel : ETAT_SERVICE se lit a la main, sans le greffe, et n'est jamais purgee.
@@ -35,7 +36,7 @@ public sealed record BilanPassage(DateTime Instant, int Greffes, int AlertesOuve
 public sealed record BilanPurge(int Erreurs, int Etats, int Alertes, int File);
 
 public sealed class Surveillant(BaseRig commune, CatalogueGreffes catalogue, MoteurTraitements moteur, ICanalAlerte canal,
-                                ReglagesSupervision reglages, ILogger<Surveillant> log) : BackgroundService
+                                ReglagesSupervision reglages, ILogger<Surveillant> log, IEnumerable<ISourceAlertes> sources) : BackgroundService
 {
     private const string TraitementServeur = TraitementsSupervision.PartieServeur;
     private const string TraitementBase = TraitementsSupervision.BaseDuGreffe;
@@ -255,6 +256,22 @@ public sealed class Surveillant(BaseRig commune, CatalogueGreffes catalogue, Mot
                 }
             }
 
+        // Les sources des autres sujets (REC-005, REC-006). Une source en panne garde ses alertes ouvertes.
+        var enPanne = new List<string>();
+        foreach (var source in sources)
+        {
+            try
+            {
+                foreach (var c in await source.CausesAsync(maintenant, ct))
+                    causes.Add(new(c.Cle, c.Regle, c.CodeGreffe, c.Traitement, c.Erreur));
+            }
+            catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                enPanne.AddRange(source.Regles);
+                log.LogError(e, "Supervision : la source d'alertes {Source} est en panne, ses alertes restent ouvertes : {Cause}", source.GetType().Name, e.Message);
+            }
+        }
+
         var ouvertes = new Dictionary<string, int>(StringComparer.Ordinal);
         await using (var cmd = new SqlCommand("SELECT Cle, Id FROM soc.AlerteExploitation WHERE FermeeLe IS NULL;", cn))
         await using (var r = await cmd.ExecuteReaderAsync(ct))
@@ -288,7 +305,7 @@ public sealed class Surveillant(BaseRig commune, CatalogueGreffes catalogue, Mot
         var actuelles = causes.Select(c => Couper(c.Cle, 240)).ToHashSet(StringComparer.Ordinal);
         foreach (var (cle, id) in ouvertes)
         {
-            if (actuelles.Contains(cle)) continue;
+            if (actuelles.Contains(cle) || enPanne.Any(r => cle.StartsWith(r + "|", StringComparison.Ordinal))) continue;
             await using var cmd = new SqlCommand("UPDATE soc.AlerteExploitation SET FermeeLe = @le WHERE Id = @id AND FermeeLe IS NULL;", cn);
             cmd.Parameters.Add(new SqlParameter("@le", SqlDbType.DateTime2) { Value = maintenant });
             cmd.Parameters.Add(new SqlParameter("@id", SqlDbType.Int) { Value = id });

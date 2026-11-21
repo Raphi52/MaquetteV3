@@ -599,7 +599,10 @@ async Task<List<string>> Clos(BaseJetable b)
     while (await r.ReadAsync()) l.Add(r.GetString(0));
     return l;
 }
-IEnumerable<DepotPlanifie> Pour(IEnumerable<DepotPlanifie> bilan, params string[] codes) => bilan.Where(d => codes.Contains(d.Greffe));
+// Les depots des CLOTURES seulement : le planificateur porte d'autres travaux de nuit (le controle des deux bases, REC-006,
+// lot 8), qui ont leur propre ligne de bilan par greffe.
+IEnumerable<DepotPlanifie> Pour(IEnumerable<DepotPlanifie> bilan, params string[] codes)
+    => bilan.Where(d => d.Traitement == ClotureNocturne.NomTraitement && codes.Contains(d.Greffe));
 async Task<bool> JourSigne(BaseJetable b, string periode)
     => await Scalaire<int>(b.Connexion, "SELECT COUNT(*) FROM soc.GrandTotalFactures WHERE Type = 'GTP' AND Periode = @p AND Signature IS NOT NULL;", ("@p", periode)) == 1
     && await Scalaire<int>(b.Connexion, "SELECT COUNT(*) FROM soc.GrandTotalEncaissements WHERE Type = 'GTP' AND Periode = @p AND Signature IS NOT NULL;", ("@p", periode)) == 1;

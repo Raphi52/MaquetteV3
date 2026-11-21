@@ -28,11 +28,28 @@ public static class LigneDeCommande
                 var rapport = await MoteurTransfert.TransfererAsync(new OptionsTransfert(v2, v3)
                 {
                     TailleLot = lot,
+                    ReglesProvisoires = options.ContainsKey("provisoires"),
                     Suivre = e => sortie.WriteLine($"{e.Le:HH:mm:ss} {e.Genre,-10} {e.Message}"),
                 }, ct);
                 sortie.WriteLine();
                 sortie.WriteLine(Texte(rapport));
                 return rapport.CodeSortie;
+            }
+            case "rapport" when Option("v3") is not null || Option("liste") is not null:
+            {
+                // Le rapport du matin (REC-005 CA04) : lecture seule des bases V3 nommees, une par ligne dans --liste.
+                var bases = Option("liste") is { } f
+                    ? File.ReadAllLines(f).Select(x => x.Trim()).Where(x => x.Length > 0 && !x.StartsWith('#')).ToList()
+                    : [Option("v3")!];
+                if (!options.ContainsKey("exploitation") && bases.FirstOrDefault(b => !BaseJetable.EstServeurLocal(b)) is { } loin)
+                {
+                    sortie.WriteLine($"Refuse : {new SqlConnectionStringBuilder(loin).DataSource} n'est pas le serveur de ce poste (--exploitation chez Amitel).");
+                    return 3;
+                }
+                var etats = new List<EtatTransfertBase>();
+                foreach (var b in bases) etats.Add(await RapportDuMatin.LireAsync(b, ct));
+                sortie.WriteLine(RapportDuMatin.Texte(etats));
+                return etats.All(e => e.Etat == "termine") ? 0 : 1;
             }
             case "inventaire" when Option("v2") is { } v2:
             {
@@ -50,7 +67,8 @@ public static class LigneDeCommande
                 return 0;
             }
             default:
-                sortie.WriteLine("Usage : RigV3.Transfert transferer --v2 <chaine> --v3 <chaine> [--lot 50000] [--exploitation]");
+                sortie.WriteLine("Usage : RigV3.Transfert transferer --v2 <chaine> --v3 <chaine> [--lot 50000] [--provisoires] [--exploitation]");
+                sortie.WriteLine("        RigV3.Transfert rapport --v3 <chaine> | --liste <fichier> [--exploitation]");
                 sortie.WriteLine("        RigV3.Transfert inventaire --v2 <chaine> [--tables A,B]");
                 return 3;
         }
@@ -61,8 +79,12 @@ public static class LigneDeCommande
     {
         var s = new System.Text.StringBuilder();
         s.AppendLine($"Transfert {r.IdTransfert} de {r.BaseV2} : {r.Etat.ToUpperInvariant()} en {r.DureeMs / 1000.0:0.0} s" +
-                     (r.InstantaneLe is { } le ? $", etat fige du {le:yyyy-MM-dd HH:mm:ss}" : ""));
+                     (r.InstantaneLe is { } le ? $", etat fige du {le:yyyy-MM-dd HH:mm:ss}" : "") +
+                     (r.Passage > 0 ? $", reprise {r.Passage}" : "") +
+                     (r.Provisoires > 0 ? $", {r.Provisoires} tables par une regle PROVISOIRE (repetition)" : ""));
         if (r.Motif is not null) s.AppendLine("  " + r.Motif);
+        if (r.Etat == "interrompu")
+            s.AppendLine($"  point de reprise : {r.PointDeReprise ?? "aucune ligne ecrite"} — relancer la meme commande reprend de la (REC-005)");
         s.AppendLine($"  {"table",-32} {"regle",-12} {"lues",10} {"ecrites",10} {"rejetees",9} {"liens",6} {"ms",8}");
         foreach (var l in r.Tables)
             s.AppendLine($"  {l.TableV2,-32} {l.Regle,-12} {l.Lues,10} {(l.Ecrites?.ToString() ?? "-"),10} {(l.Rejetees?.ToString() ?? "-"),9} " +

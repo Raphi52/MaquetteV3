@@ -50,9 +50,49 @@ public sealed record RegleTable(string Table, SorteRegle Sorte, string Story, IR
     public static RegleTable TelleQuelle(string table, string story, params string[] colonnes)
         => new(table, SorteRegle.TelleQuelle, story, colonnes);
 
+    /// <summary>
+    /// La regle PROVISOIRE d'une table qui n'a pas encore la sienne (REC-008, decision du chef lots 7 et 8) : « telle
+    /// quelle », colonnes du catalogue de la base, MARQUEE comme telle au rapport (« provisoire ») et comptee. Elle ne se
+    /// declare jamais dans le code : seul <see cref="ReglesProvisoires.Completer"/> la fabrique, a la demande expresse de
+    /// qui repete (option --provisoires de l'outil). Le feu vert du jour J la refuse (REC-008 CA03).
+    /// </summary>
+    public static RegleTable PourRepetition(string table, IEnumerable<string> colonnes)
+        => new(table, SorteRegle.TelleQuelle, ReglesProvisoires.Story, [.. colonnes]) { Provisoire = true };
+
+    /// <summary>Une regle fabriquee pour une repetition, non ecrite par une story (<see cref="PourRepetition"/>).</summary>
+    public bool Provisoire { get; init; }
+
+    /// <summary>
+    /// Ce que deviennent les lignes REJETEES de la table (SiLienCasse = Rejeter) : la regle de reprise ecrite par le
+    /// referent du domaine (« ressaisies par le greffe », « reprises par REC-009 »...). Le feu vert d'une repetition
+    /// exige qu'un rejet ait la sienne (REC-008 CA03) ; null : aucune n'est ecrite.
+    /// </summary>
+    public string? RepriseDesRejets { get; init; }
+
     public string Libelle => Sorte == SorteRegle.TelleQuelle
-        ? $"telle quelle ({Story}, lien casse : {(SiLienCasse == SiLienCasse.Marquer ? "marquer" : "rejeter")})"
+        ? $"{(Provisoire ? "PROVISOIRE, " : "")}telle quelle ({Story}, lien casse : {(SiLienCasse == SiLienCasse.Marquer ? "marquer" : "rejeter")})"
         : $"reprise « {Reprise} » ({Story})";
+}
+
+/// <summary>
+/// LES REGLES PROVISOIRES D'UNE REPETITION (REC-008 ; decision du chef, lots 7 et 8). RIG_DEV a 833 tables sans regle :
+/// le transfert refuse une base entiere (REC-001 T03) tant que leur story n'a pas declare la sienne. Pour repeter et
+/// chronometrer une base ENTIERE avant les stories de domaine, l'outil fabrique, a la demande, une regle « telle quelle »
+/// provisoire pour chaque table du catalogue qui n'en a pas. Elle est marquee (« provisoire » au rapport, PROVISOIRE au
+/// journal), comptee (rec.Transfert.Provisoires) et le feu vert la refuse ; une story de domaine la remplace en declarant
+/// la regle de sa table, sans rien retirer ici.
+/// </summary>
+public static class ReglesProvisoires
+{
+    public const string Story = "REC-008";
+
+    /// <summary>Les regles du serveur, completees d'une regle provisoire pour chaque table du catalogue qui n'en a pas.</summary>
+    public static IReadOnlyList<RegleTable> Completer(IReadOnlyList<RegleTable> regles, CatalogueV2 catalogue)
+    {
+        var connues = new HashSet<string>(regles.Select(r => r.Table), StringComparer.OrdinalIgnoreCase);
+        return [.. regles, .. catalogue.Tables.Values.Where(t => !connues.Contains(t.Nom)).OrderBy(t => t.Nom, StringComparer.Ordinal)
+                                 .Select(t => RegleTable.PourRepetition(t.Nom, t.Colonnes.Select(c => c.Nom)))];
+    }
 }
 
 /// <summary>Une classe qui declare des regles « telle quelle » (constructeur sans parametre, trouvee seule).</summary>
