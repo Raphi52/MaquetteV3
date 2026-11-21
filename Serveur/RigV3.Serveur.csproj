@@ -27,4 +27,10 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.13" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- SOC-011 : la supervision lit les echecs de numerotation de l'ancien RIG par LE script que l'exploitation
+         lance a la main (NUM-007 CA05), embarque tel quel : Socle/Supervision/Surveillant.cs (LectureEchecs). -->
+    <EmbeddedResource Include="../Base/v2/echecs.sql" LogicalName="RigV3.Serveur.echecs.sql" Link="Socle/Supervision/echecs.sql" />
+  </ItemGroup>
+
 </Project>

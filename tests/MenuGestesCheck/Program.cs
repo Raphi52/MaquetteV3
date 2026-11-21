@@ -191,10 +191,13 @@ foreach (var (libelle, code) in toutesEntrees)
 // n'a pas d'ecran generique de sa table PARAMETRAGE (chaque ecran ecrit les siens).
 // PROC_NUMEROS_MANQUANTS (« Numeros manquants », NUM-013 T04) reprend LNUMCM de
 // la V2, procedure VB6 du menu sans fiche ni source ici, comme XNUMERO.
+// PROC_SUPERVISION (« Supervision », SOC-011 T04 et SOC-017 T04) est NEUVE : la V2
+// n'a pas d'ecran ; l'exploitation lit COMMUN_RIG (ETAT_SERVICE, LOG_RIG_ERREUR) a
+// la main et relance par l'outil MaintenanceServices, hors de RIG.
 var sansFiche = new[] { "PROC_LISTE_DELIBERES", "PROC_SUIVI_IMPRESSION", "PROC_REQUI",
                         "PROC_ACTUALITES", "PROC_COMMANDES_WEB", "PROC_UTILISATEUR",
                         "PROC_COMPTEURS_NUM", "PROC_REGLAGES_GREFFE",
-                        "PROC_NUMEROS_MANQUANTS" };
+                        "PROC_NUMEROS_MANQUANTS", "PROC_SUPERVISION" };
 
 var fiches = @"D:\RigApplication\Documentation\reference\proc";
 
