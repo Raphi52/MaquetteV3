@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Banc du lot 13 du plan de reconstruction, phase 2 (SOC-019, SOC-022, SOC-024, SOC-025, SOC-026) : le passage d'un
+       greffe joue de bout en bout par l'outil Outils/Passage sur des bases jetables (chaines, transfert, bascule,
+       controles, catalogue, retour), le plan du jour J, trois repetitions generales comparees, les criteres de la
+       beta, le suivi de certification, le comptage des agents a former et les supports de formation tires des ecrans.
+       Il lui faut le SQL Server du poste (docker compose up -d) et la lecture de RIG_DEV (SQL-DEV\DEV, compte Windows ;
+       autre serveur : RIGV3_RIG_DEV). En tete de Program.cs : ce que chaque controle prouve. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SoclePassageCheck</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="SupportsFormation.cs" />
+    <!-- La base V2 jetable tiree de RIG_DEV : celle du banc du transfert (lot 7), pas une seconde. -->
+    <Compile Include="../RecopieTransfertCheck/ExtraitRigDev.cs" Link="ExtraitRigDev.cs" />
+    <!-- Les ecrans de la V3 d'ou se tirent les supports de formation (SOC-026) : le menu, le catalogue des ecrans portes,
+         le perimetre de chaque metier, l'inventaire des ecrans de la V2 ; et ce qu'ils tirent de Metier/, comme
+         tests/SoclePreferencesCheck. -->
+    <Compile Include="../../Pont/MenuAccueil.cs" Link="Pont/MenuAccueil.cs" />
+    <Compile Include="../../Pont/CatalogueEcrans.cs" Link="Pont/CatalogueEcrans.cs" />
+    <Compile Include="../../Pont/InventaireTouchesV2.cs" Link="Pont/InventaireTouchesV2.cs" />
+    <Compile Include="../../Metier/PerimetreProfil.cs" Link="Metier/PerimetreProfil.cs" />
+    <Compile Include="../../AccueilEtat.cs" Link="AccueilEtat.cs" />
+    <Compile Include="../../Metier/DossierRcs.cs" Link="Metier/DossierRcs.cs" />
+    <Compile Include="../../Metier/AffairesOuvertes.cs" Link="Metier/AffairesOuvertes.cs" />
+    <Compile Include="../../Metier/AlertesGreffe.cs" Link="Metier/AlertesGreffe.cs" />
+    <Compile Include="../../Metier/JeuDemo.cs" Link="Metier/JeuDemo.cs" />
+    <Compile Include="../../Metier/SimulationEdi.cs" Link="Metier/SimulationEdi.cs" />
+    <Compile Include="../../Metier/ActionsXaction.cs" Link="Metier/ActionsXaction.cs" />
+    <Compile Include="../../Metier/ArbreGed.cs" Link="Metier/ArbreGed.cs" />
+    <Compile Include="../../Metier/RecetteTache.cs" Link="Metier/RecetteTache.cs" />
+    <Compile Include="../../Metier/InformationsDossier.cs" Link="Metier/InformationsDossier.cs" />
+    <Compile Include="../../Metier/InformationsFormalite.cs" Link="Metier/InformationsFormalite.cs" />
+    <Compile Include="../../Metier/InformationsDepots.cs" Link="Metier/InformationsDepots.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Outils/Passage/RigV3.Passage.csproj" />
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+    <ProjectReference Include="../../Contrats/RigV3.Contrats.csproj" />
+  </ItemGroup>
+
+</Project>

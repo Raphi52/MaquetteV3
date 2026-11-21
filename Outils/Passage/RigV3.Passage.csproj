@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- L'OUTIL DU PASSAGE D'UN GREFFE A LA V3 (lot 13 du plan de reconstruction, phase 2 : SOC-019, SOC-022,
+       SOC-024, SOC-025, SOC-026). Il enchaine, pour UN greffe, ce que les lots precedents ont construit :
+       ouverture des chaines signees (SOC-018), transfert initial (REC-001, Serveur/Recopie), bascule de la
+       numerotation (Base/v2/bascule.sql, NUM-002), date de passage au catalogue (SOC-007), controles, et le
+       retour a l'etat d'avant si une etape echoue. Il porte aussi le plan du jour J, la comparaison des
+       repetitions generales, les criteres de la beta, le suivi de certification et le comptage des agents
+       a former. Ligne de commande : en tete de Program.cs. Mode d'emploi :
+       docs/reconstruction/socle-exploitation.md. Banc : tests/SoclePassageCheck. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>RigV3.Passage</RootNamespace>
+    <AssemblyName>RigV3.Passage</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+  </ItemGroup>
+
+  <!-- Les scripts de la bascule de numerotation (lot 7 de la phase 1) voyagent avec l'outil : il joue CEUX-LA,
+       pas une copie (l'option « scripts » de la ligne de commande en donne un autre). -->
+  <ItemGroup>
+    <None Include="../../Base/v2/*.sql" Link="scripts-v2/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

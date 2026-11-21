@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- LA REPETITION DU TRANSFERT SUR DES COPIES ANONYMISEES (REC-008, lot 8 du plan de reconstruction, phase 2) :
+       le script qui enchaine, base par base, l'anonymisation (Outils/Anonymisation, SOC-021), le transfert
+       (Serveur/Recopie/MoteurTransfert, REC-001 et REC-005), le controle des deux bases (REC-006) et les mesures, puis
+       ecrit le rapport consolide et juge le feu vert du jour J. Ligne de commande : en tete de Program.cs.
+       Mode d'emploi : docs/reconstruction/recopie.md. Banc : tests/RecopieRepriseCheck. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>RigV3.Repetition</RootNamespace>
+    <AssemblyName>RigV3.Repetition</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+    <!-- L'outil d'anonymisation compile sa propre copie de LectureV2 (meme nom que celle du serveur) : PrivateAssets
+         l'empeche de passer aux projets qui referencent celui-ci, ou les deux se heurteraient (CS0433). -->
+    <ProjectReference Include="../Anonymisation/RigV3.Anonymisation.csproj" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

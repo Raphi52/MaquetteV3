@@ -191,4 +191,40 @@ internal static class Sql
     /// <summary>L'identifiant d'une ligne en texte : ses colonnes jointes par « | ».</summary>
     public static string Identifiant(string alias, IEnumerable<ColonneV2> colonnes)
         => string.Join(" + N'|' + ", colonnes.Select(c => EnTexte(alias, c)));
+
+    /// <summary>
+    /// « La ligne vient apres cette cle » dans l'ordre de la cle primaire (lecture par lots, REC-005 T03) :
+    /// (k1 &gt; @k0) OR (k1 = @k0 AND k2 &gt; @k1)... Les parametres ont EXACTEMENT le type de leur colonne (<see cref="Parametre"/>) :
+    /// un varchar compare a un nvarchar est converti, et sous un classement SQL_ le tri d'un texte non Unicode n'est pas
+    /// celui du meme texte en Unicode -- la lecture sauterait ou relirait des lignes.
+    /// </summary>
+    public static string Apres(string alias, IReadOnlyList<ColonneV2> cle, string prefixe)
+        => "(" + string.Join(" OR ", cle.Select((c, i) =>
+               "(" + string.Join(" AND ", cle.Take(i).Select((p, j) => $"{alias}.{Q(p.Nom)} = @{prefixe}{j}")
+                                           .Append($"{alias}.{Q(c.Nom)} > @{prefixe}{i}")) + ")")) + ")";
+
+    /// <summary>Le type de parametre d'une colonne de cle, ou null s'il n'est pas porte par la lecture par lots.</summary>
+    public static SqlParameter? Parametre(ColonneV2 c, string nom, object valeur)
+    {
+        System.Data.SqlDbType? type = c.TypeBase switch
+        {
+            "int" => System.Data.SqlDbType.Int, "bigint" => System.Data.SqlDbType.BigInt, "smallint" => System.Data.SqlDbType.SmallInt,
+            "tinyint" => System.Data.SqlDbType.TinyInt, "bit" => System.Data.SqlDbType.Bit, "uniqueidentifier" => System.Data.SqlDbType.UniqueIdentifier,
+            "varchar" => System.Data.SqlDbType.VarChar, "char" => System.Data.SqlDbType.Char, "nvarchar" => System.Data.SqlDbType.NVarChar,
+            "nchar" => System.Data.SqlDbType.NChar, "datetime" => System.Data.SqlDbType.DateTime, "smalldatetime" => System.Data.SqlDbType.SmallDateTime,
+            "datetime2" => System.Data.SqlDbType.DateTime2, "date" => System.Data.SqlDbType.Date, "decimal" or "numeric" => System.Data.SqlDbType.Decimal,
+            "binary" => System.Data.SqlDbType.Binary, "varbinary" => System.Data.SqlDbType.VarBinary,
+            _ => null,
+        };
+        if (type is null) return null;
+        var p = new SqlParameter(nom, type.Value) { Value = valeur };
+        switch (c.TypeBase)
+        {
+            case "varchar" or "char" or "binary" or "varbinary": p.Size = c.Longueur; break;
+            case "nvarchar" or "nchar": p.Size = c.Longueur < 0 ? -1 : c.Longueur / 2; break;
+            case "decimal" or "numeric": p.Precision = c.Precision; p.Scale = c.Echelle; break;
+            case "datetime2": p.Scale = c.Echelle; break;
+        }
+        return p;
+    }
 }

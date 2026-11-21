@@ -34,13 +34,15 @@ public sealed class Instantane : IAsyncDisposable
     private Instantane(string nom, string baseV2, DateTime le, long? version, string connexion, string master)
         => (Nom, BaseV2, Le, VersionSuivi, Connexion, Master) = (nom, baseV2, le, version, connexion, master);
 
-    public static async Task<Instantane> CreerAsync(string connexionV2, CancellationToken ct)
+    /// <param name="usage">Le mot du nom de l'instantane (« rigv3 » pour le transfert ; la comparaison de nuit, REC-006,
+    /// prend le sien : deux instantanes de la meme base pris dans la meme seconde n'ont pas le meme nom).</param>
+    public static async Task<Instantane> CreerAsync(string connexionV2, CancellationToken ct, string usage = "rigv3")
     {
         var b = new SqlConnectionStringBuilder(connexionV2);
         var baseV2 = b.InitialCatalog;
         if (string.IsNullOrWhiteSpace(baseV2)) throw new InvalidOperationException("La chaine de la base V2 ne nomme pas sa base (Database=...).");
         var master = new SqlConnectionStringBuilder(connexionV2) { InitialCatalog = "master", ApplicationIntent = ApplicationIntent.ReadWrite }.ConnectionString;
-        var nom = $"{baseV2}_rigv3_{DateTime.UtcNow:yyyyMMdd_HHmmss}";
+        var nom = $"{baseV2}_{usage}_{DateTime.UtcNow:yyyyMMdd_HHmmss}";
         if (nom.Length > 128) nom = nom[^128..];
 
         await using var cn = new SqlConnection(master);
@@ -62,6 +64,31 @@ public sealed class Instantane : IAsyncDisposable
         await using (var cmd = new SqlCommand($"CREATE DATABASE {Sql.Q(nom)} ON {string.Join(", ", specs)} AS SNAPSHOT OF {Sql.Q(baseV2)};", cn) { CommandTimeout = 600 })
             await cmd.ExecuteNonQueryAsync(ct);
 
+        return await LireAsync(cn, connexionV2, nom, baseV2, master, ct);
+    }
+
+    /// <summary>
+    /// Reprend l'instantane d'un transfert interrompu (REC-005 CA04) : le meme etat fige, la meme version de suivi -- la
+    /// reprise lit exactement ce que le premier passage lisait. Null s'il n'existe plus (il survit a un redemarrage de
+    /// SQL Server, pas a une restauration ni a une suppression a la main) ou s'il n'est pas un instantane de cette base.
+    /// </summary>
+    public static async Task<Instantane?> RattacherAsync(string connexionV2, string nom, CancellationToken ct)
+    {
+        var baseV2 = new SqlConnectionStringBuilder(connexionV2).InitialCatalog;
+        var master = new SqlConnectionStringBuilder(connexionV2) { InitialCatalog = "master", ApplicationIntent = ApplicationIntent.ReadWrite }.ConnectionString;
+        await using var cn = new SqlConnection(master);
+        await cn.OpenAsync(ct);
+        await using (var cmd = new SqlCommand("SELECT COUNT(*) FROM sys.databases WHERE name = @n AND source_database_id = DB_ID(@b);", cn))
+        {
+            cmd.Parameters.AddWithValue("@n", nom);
+            cmd.Parameters.AddWithValue("@b", baseV2);
+            if ((int)(await cmd.ExecuteScalarAsync(ct))! == 0) return null;
+        }
+        return await LireAsync(cn, connexionV2, nom, baseV2, master, ct);
+    }
+
+    private static async Task<Instantane> LireAsync(SqlConnection cn, string connexionV2, string nom, string baseV2, string master, CancellationToken ct)
+    {
         DateTime le;
         await using (var cmd = new SqlCommand("SELECT create_date FROM sys.databases WHERE name = @n;", cn))
         {
@@ -79,12 +106,19 @@ public sealed class Instantane : IAsyncDisposable
         return new Instantane(nom, baseV2, le, version, connexion, master);
     }
 
-    /// <summary>Supprime l'instantane (la base V2 n'en est pas touchee).</summary>
+    private bool Garde;
+
+    /// <summary>L'instantane d'un transfert interrompu reste sur le serveur : la reprise le relira (REC-005 CA04).
+    /// Il occupe la place des pages que la V2 modifie ensuite ; le transfert fini ou arrete le supprime.</summary>
+    public void Garder() => Garde = true;
+
+    /// <summary>Supprime l'instantane (la base V2 n'en est pas touchee), sauf s'il est <see cref="Garder">garde</see>.</summary>
     public async ValueTask DisposeAsync()
     {
         if (Supprime) return;
         Supprime = true;
         using (var cn = new SqlConnection(Connexion)) SqlConnection.ClearPool(cn);
+        if (Garde) return;
         await using var master = new SqlConnection(Master);
         await master.OpenAsync();
         await using var cmd = new SqlCommand($"IF DB_ID({Sql.Texte(Nom)}) IS NOT NULL DROP DATABASE {Sql.Q(Nom)};", master);

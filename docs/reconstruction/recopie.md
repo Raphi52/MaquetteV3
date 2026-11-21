@@ -15,9 +15,10 @@ sections après « Fichiers », sans réécrire les autres.
 
 `MoteurTransfert.TransfererAsync` (`Serveur\Recopie\MoteurTransfert.cs`), une base de greffe à la fois :
 
-1. **Journal ouvert** : une ligne dans `rec.Transfert` (état « en cours »). Refus si la base V2 a déjà un transfert
-   dans cette base V3 (reprendre après un incident, c'est REC-005), ou si la base V2 n'est pas sur l'instance de la
-   base V3 (Q4 ; `num.Reprendre` la lit par son nom).
+1. **Journal ouvert** : une ligne dans `rec.Transfert` (état « en cours »). Un transfert **interrompu** de la même
+   base est **repris** (REC-005, lot 8 : voir « Reprendre après un incident ») ; refus si elle a déjà un transfert fini
+   ou arrêté sur un écart dans cette base V3, ou si la base V2 n'est pas sur l'instance de la base V3 (Q4 ;
+   `num.Reprendre` la lit par son nom).
 2. **Instantané daté** de la base V2 (`CREATE DATABASE … AS SNAPSHOT OF`, `Serveur\Recopie\Instantane.cs`) : tout
    est lu dans cet état figé, sans verrou sur la V2. Sa date et la version du suivi des changements lue dedans vont
    au journal (CA05).
@@ -28,16 +29,18 @@ sections après « Fichiers », sans réécrire les autres.
      type non porté, une table `v2.X` déjà présente : **refus avant toute écriture de données** (CA01, T03).
 4. Les **reprises de la phase 1** placées avant les tables : réglages (SOC-003), puis comptes et droits (SOC-002).
    Elles sont **appelées, jamais refaites** : le transfert lance leur code, compte et relie ce qu'elles portent.
-5. Chaque table **« telle quelle »**, dans l'ordre déduit des clés étrangères (`CopieTelleQuelle.cs`), **une
-   transaction par table** : table `v2.<NOM>`, liens cassés, copie par lots, correspondance, contrôle de fin.
+5. Chaque table **« telle quelle »**, dans l'ordre déduit des clés étrangères (`CopieTelleQuelle.cs`) : **une
+   transaction par lot** (lignes, correspondance, point de reprise, REC-005), puis la transaction de fin de table
+   (liens cassés, rejets, contrôle de fin, ligne du rapport).
 6. Les reprises placées **après** les tables : les compteurs (NUM-005, `num.Reprendre`), lus dans la **V2 vivante**
    au dernier moment, puis `num.ReleverHeritage`.
 7. **Fini** : totaux, durée, un événement 210 « reprise de données » dans `soc.EvenementTechnique` ; l'instantané
    est supprimé.
 
-**Arrêt propre** : un écart (comptes, correspondances, valeurs, écart d'une reprise) ou une erreur annule la table en
-cours, rien de ce qui suit n'est fait, l'état « arrete » et son motif sont au journal, l'instantané est supprimé.
-Les tables finies avant restent, avec leur ligne de rapport. **La base V2 n'est jamais écrite** (CA06).
+**Arrêt propre** : un écart (comptes, correspondances, valeurs, écart d'une reprise) annule la table en cours, rien
+de ce qui suit n'est fait, l'état « arrete » et son motif sont au journal, l'instantané est supprimé. Les tables finies
+avant restent, avec leur ligne de rapport. Une **erreur** (incident technique) n'annule plus rien : le transfert est
+« interrompu » et se reprend (REC-005). **La base V2 n'est jamais écrite** (CA06).
 
 ## Le lancer
 
@@ -53,8 +56,8 @@ dotnet run --project Outils\Transfert\RigV3.Transfert.csproj -- transferer `
 dotnet run --project Outils\Transfert\RigV3.Transfert.csproj -- inventaire --v2 "<chaîne de RIG_DEV>" --tables AFFAIRE,DEMANDE
 ```
 
-Codes de sortie : **0** fini, **1** arrêté (écart, erreur), **2** refusé avant toute écriture, **3** commande mal
-formée ou serveur refusé. Sans `--exploitation`, l'outil refuse toute base qui n'est pas sur ce poste, **sans s'y
+Codes de sortie : **0** fini, **1** arrêté (un écart), **2** refusé avant toute écriture, **3** commande mal
+formée ou serveur refusé, **4** interrompu par un incident (la même commande reprend, REC-005). Sans `--exploitation`, l'outil refuse toute base qui n'est pas sur ce poste, **sans s'y
 connecter** : un agent qui le lance d'ici n'écrit jamais sur SQL-DEV, SQL-PROD ni un serveur de greffe.
 
 L'outil imprime le journal au fil de l'eau, puis **le rapport de fin de nuit** de la base (REC-001 T04) : par table,
@@ -148,9 +151,9 @@ pas leur classe.
 |---|---|
 | **REC-003** (lot 9) remonter les écritures de la V2 | `rec.Transfert.VersionSuivi` : la version du suivi des changements lue **dans** l'instantané. `CHANGETABLE(CHANGES <table>, VersionSuivi)` rend exactement ce que le transfert n'a pas pris (prouvé par le banc, CA05). Sans suivi activé sur la base V2 (REC-003 T01), la colonne est vide : l'activer **avant** le transfert. |
 | **REC-002 / REC-004** (lot 9) recopier vers la V2 | `rec.Correspondance`, index `(TableV3, IdV3)` : de la ligne V3 à sa ligne V2. |
-| **REC-005** (lot 8) reprendre après un incident | Une transaction par table, une ligne `rec.TransfertTable` par table finie, l'état « arrete » et son motif. Aujourd'hui un second transfert de la même base est **refusé** : la reprise au lot suivant est à écrire là (`MoteurTransfert`, contrôle « déjà un transfert »). |
-| **REC-006** (lot 8) comparer chaque nuit | `rec.Correspondance` et l'empreinte de `CopieTelleQuelle` (même calcul des deux côtés, sur un état figé). |
-| **REC-008** (lot 8) répéter sur les copies anonymisées | `RigV3.Transfert transferer` sur une copie de `Outils\Anonymisation` (lot 6) : le contrôle de la copie (lot 6, `MesureGardee.Toutes`) passe de 12 s à 32-44 s sur RIG_DEV entier, à compter dans la durée des répétitions. La copie anonymisée ne sert de jeu de répétition qu'une fois le lot 6 reçu à nouveau (décision du chef). |
+| **REC-005** (lot 8) reprendre après un incident | Fait : section « Reprendre après un incident (REC-005) » ci-dessous. |
+| **REC-006** (lot 8) comparer chaque nuit | Fait : section « Comparer chaque nuit (REC-006) » ci-dessous. |
+| **REC-008** (lot 8) répéter sur les copies anonymisées | Fait : section « Répéter le transfert (REC-008) » ci-dessous. |
 | **REC-009** (lot 11) anciens logiciels | `MIGRATION_ID`, `CORRESP_*` : une règle chacune ; la règle « déjà repris = marqué » de 2017 rejoint `rec.Rejet` / `rec.LienCasse`. |
 | **REC-010 à REC-019** fiches partagées | Leur table est aujourd'hui « telle quelle » dans `ReglesRec001.cs` (commentaire : la story qui la reprendra) ; `UTILISATEUR` est portée par la reprise des comptes. |
 
@@ -171,7 +174,7 @@ pas leur classe.
 |---|---|---|
 | CA02 sur la copie anonymisée de la **plus grosse** des 40 bases, serveur de la taille de la production | les bases des greffes ne se lisent pas d'ici sans accord ; la copie anonymisée attend la nouvelle réception du lot 6 ; pas de serveur de production | REC-008, lot 8 |
 | CA05 « la recopie continue rejoue » | le lecteur de changements | REC-003, lot 9 (le point de départ exact est prouvé ici) |
-| Transférer une base **entière** | RIG_DEV a **833 tables sans règle** : le moteur refuse (T03) tant que leur story n'a pas déclaré la sienne | stories de domaine |
+| Transférer une base **entière** | RIG_DEV a **833 tables sans règle** : le moteur refuse (T03) tant que leur story n'a pas déclaré la sienne ; une **répétition** les porte par des règles provisoires (REC-008, lot 8), pas un vrai passage | stories de domaine |
 | Écran du transfert (« à maquetter ») | l'exploitant d'Amitel lance l'outil ; aucun écran n'est dans les fichiers de ce lot | à décider |
 
 ## Fichiers
@@ -194,6 +197,194 @@ Preuve : `.\tests.ps1 RecopieTransfert` (il lui faut `docker compose up -d` et l
 `RIGV3_RIG_DEV`). Contre-épreuves faites : une valeur changée dans la V3 rougit l'oracle ; une valeur écrite dans la
 V2 change son empreinte ; une date arrondie en silence dans la V3 arrête le transfert ; le classement remis sur les
 colonnes non texte et le lien vers une mère rejetée non marqué rougissent le banc.
+
+## Reprendre après un incident (REC-005) — lot 8
+
+Story **REC-005** : relancer le transfert après une panne (serveur redémarré, base indisponible, erreur sur une ligne)
+et qu'il reparte de lui-même du dernier point sûr, sans perte ni doublon, sans intervention à la main dans les bases.
+
+### Ce que fait le transfert maintenant
+
+- **Par lots** (`CopieTelleQuelle.CopierAsync`, T03) : chaque lot — les lignes suivantes dans l'ordre de la clé
+  primaire, leur correspondance et **sa ligne `rec.TransfertLot`** (n° de lot, passage, lignes écrites, dernière clé)
+  — est **une transaction**. La ligne de lot existe si et seulement si ses lignes sont dans la base V3 (T01).
+- **Verrou de session** (`sp_getapplock`, connexion hors du pool) : un seul transfert d'une base à la fois ; un
+  processus tué le rend (SQL Server ferme sa session).
+- **Relancer = reprendre** : la même commande `RigV3.Transfert transferer` trouve le dernier transfert de la base
+  « interrompu », ou « en cours » sans processus derrière (verrou libre : arrêt brutal), et le **reprend** : même
+  identifiant (`rec.Correspondance`, `rec.Rejet`, `rec.LienCasse` lui appartiennent), même **instantané** de la V2
+  (gardé à l'interruption : la reprise lit exactement le même état figé et la même version de suivi), une reprise de
+  plus (`rec.Transfert.Reprises`). Les tables finies (ligne de rapport) ne sont pas refaites ; la table entamée repart
+  **après la dernière clé du dernier lot enregistré** ; les reprises de la phase 1 déjà rapportées ne sont pas rappelées.
+- **Le point de reprise est vérifié** avant de repartir : nombre de lignes et dernière clé de la table V3 contre la
+  ligne du lot. Incohérent (un lot effacé, une table touchée à la main) : **écart**, le transfert s'arrête au lieu de
+  doubler ou de sauter des lignes.
+- **Écart ≠ incident.** Un écart (valeurs, comptes, point incohérent) arrête le transfert (« arrete », code 1), annule
+  la table entamée et supprime l'instantané : il ne se reprend pas (corriger, repartir d'une base V3 neuve). Toute
+  autre erreur, une annulation ou un arrêt brutal : « interrompu » (code 4), ce qui est enregistré reste, motif et
+  point de reprise au journal (`rec.Transfert.Motif`, `PointDeReprise`).
+- **Rapport du matin** (CA04) : `RigV3.Transfert rapport --v3 <chaîne> | --liste <fichier>` dit pour chaque base
+  « TERMINE » ou « INTERROMPU » avec son point de reprise (table, lot, lignes, dernière clé) ; code 0 si toutes sont
+  terminées.
+- **Alerte** (CA05) : `Serveur\Recopie\AlertesRecopie.cs`, lue par le surveillant de la supervision (SOC-011) à
+  chaque passage : un transfert interrompu (ou mort en route) depuis plus de **5 minutes** (`Recopie:DelaiIncidentMinutes`,
+  seuil proposé) ouvre l'alerte « recopie-incident » qui nomme la base, la table et l'erreur ; elle se ferme quand le
+  transfert est repris et fini.
+
+### Les choix et leur raison
+
+| Choix | Raison |
+|---|---|
+| Point de reprise = **le lot**, dans la transaction de ses lignes | L'outil de 2017 notait « succès ou échec élément par élément » (`ImportFactureCompte.cs`) et ne reprenait que ce qui n'avait pas de numéro de destination (`MigrationFactureBulk.cs`) : marquer ce qui est fait rend la relance sans doublon. Ici la marque est la ligne `rec.TransfertLot`, écrite avec les lignes : impossible d'avoir l'une sans les autres. Rien n'est écrit dans la V2. |
+| Repartir **après la dernière clé** (lecture par clé, paramètres du type exact) | Un `OFFSET` relirait tout ; un `nvarchar` comparé à un `varchar` sous un classement SQL_ ne trie pas comme lui : la lecture sauterait ou relirait des lignes. Les paramètres ont le type, la taille et la précision de la colonne (`Sql.Parametre`). |
+| **Garder l'instantané** d'un transfert interrompu | Une reprise sur un nouvel état figé mêlerait deux dates de la V2 et la version de suivi (REC-003) mentirait. L'instantané survit au redémarrage de SQL Server ; disparu, la reprise est refusée (écart). Il occupe la place des pages que la V2 modifie entre-temps : à reprendre dans la nuit. |
+| Verrou applicatif de **session**, hors pool | Seul moyen sûr de savoir qu'un « en cours » n'a plus personne derrière : la session meurt avec le processus. |
+| Tables **sans clé primaire** (répétition seulement) | Une ligne ne s'y identifie pas : ni correspondance ni lot. Une règle provisoire la copie en une transaction (annulée entière par un incident, recopiée entière à la reprise). Un vrai passage les refuse toujours (T03). |
+
+### Écarts et choix à valider
+
+| Sujet | Codé comme | Qui tranche |
+|---|---|---|
+| Seuil d'alerte | 5 minutes (`Recopie:DelaiIncidentMinutes`) | exploitation Amitel (valeur proposée par la story) |
+| Taille d'un lot | 50 000 lignes (`--lot`) : un lot perdu au plus par incident | exploitation, après REC-008 sur la plus grosse base |
+| Instantané gardé | jusqu'à la reprise ; place disque sur le serveur de la V2 | exploitation Amitel |
+
+### Ce qui ne se fait pas encore
+
+| Critère | Ce qui manque | Où |
+|---|---|---|
+| CA01 à CA03 sur la **recopie continue** (changement rejouable, 3 essais puis mise de côté avec son message, les autres fiches continuent, la même fiche attend, relance unitaire dans l'ordre) | la file `rec.FileRecopie` et l'applicateur sont REC-002 (lot 9, pas encore sur main) ; aujourd'hui l'applicateur s'arrête au premier échec et compte ses essais | lot 9, ou un lot après lui |
+| CA05, second cas (alerte d'un changement mis de côté) | la même file ; la source `AlertesRecopie` l'accueille (règle « recopie-incident » déjà admise) | lot 9 |
+| Fiche d'incident pour l'exploitation (T04) | relance, lecture du rapport du matin, alerte : écrits ici ; la lecture des changements mis de côté attend la file | lot 9 |
+
+## Comparer chaque nuit (REC-006) — lot 8
+
+`ComparaisonBases.ComparerAsync` (`Serveur\Recopie\Comparaison.cs`), une base de greffe à la fois :
+
+1. **Purge** des rapports de plus de **90 jours** (CA04, `Recopie:ConservationRapportsJours`), détails compris.
+2. **Deux états figés** (instantanés de base, la V3 puis la V2) : la lecture ne pose aucun verrou sur les tables
+   vivantes ; les agents écrivent pendant le contrôle (CA05).
+3. Pour chaque **table partagée** (REC-006 `tables_v2` : ACTION_RCS, ADRESSE_BASE, ARRIVEE, CATEGORIE, CLIENT,
+   DOSSIER_RCS, INSCRIPTION, UTILISATEUR, ENTREPRISE, AFFAIRE, DEMANDE), **par la table de correspondance** (CA01) :
+   le nombre de lignes de chaque côté et une **empreinte SHA-256 de chaque ligne** (texte de ses colonnes, calculé par
+   SQL Server de la même façon des deux côtés : date ISO, binaire et horodatage en hexadécimal, flottant à 17 chiffres,
+   NULL distinct de toute valeur), lues dans l'ordre binaire de l'identifiant V2 et fusionnées. Chaque ligne est
+   comparée, en écart, sans correspondance (une ligne **rejetée** par le transfert est comptée à part), ou
+   correspondance sans sa ligne. Les lignes V3 sans correspondance sont comptées aussi.
+4. Chaque **écart** est détaillé (CA02) : les deux lignes relues colonne par colonne, **les colonnes qui diffèrent**.
+   Puis il est **relu dans les deux bases vivantes** : disparu, c'était une recopie en cours entre les deux états figés
+   (« résorbé », compté, non alerté).
+5. Les **liens orphelins** (CA03) : une demande ou une affaire de la V3 qui vise une fiche partagée sans
+   correspondance (hors liens cassés hérités, déjà dans `rec.LienCasse`).
+6. Le **rapport** dans la base V3 : `rec.Comparaison` (états figés, durée, totaux), `rec.ComparaisonTable`,
+   `rec.ComparaisonEcart` (genre, table, deux identifiants, colonnes) — **aucune valeur** ni donnée personnelle.
+
+**La nuit** (T04) : `ComparaisonNocturne` (ITraitementDeFond + ITachePlanifiee « recopie-comparaison », inscrits par
+`ModuleRecopieNuit`) est planifiée par le planificateur des clôtures NF525, sans second planificateur : due pour un
+greffe dont la base V3 est créée et a un transfert fini, entre **02:00** (`Recopie:ComparaisonHeure`, après la
+sauvegarde, proposé) et **06:00** (`Recopie:OuvertureHeure`) heure du greffe, si aucun contrôle n'a commencé depuis
+20 h. **Alerte** (CA04) : `AlertesRecopie`, règle « recopie-ecart » dès que le dernier rapport a un écart, un lien
+orphelin ou une ligne sans correspondance (base, tables, comptes) ; elle se ferme au contrôle propre suivant.
+
+**À la main** : `dotnet run --project Outils\Comparaison -- comparer --v2 <chaîne> --v3 <chaîne> [--tables A,B | --toutes]`
+(code 0 rien, 5 au moins un écart, 1 contrôle arrêté ; sans `--exploitation`, ce poste seulement).
+
+| Choix | Raison |
+|---|---|
+| Empreinte **par ligne** (SHA-256), pas `CHECKSUM_AGG` | Le transfert compare une empreinte de table (REC-001) ; ici il faut dire **quelle** ligne diffère. SHA-256 d'un texte défini colonne par colonne : pas de collision pratique, contrairement à `BINARY_CHECKSUM` (32 bits). |
+| Fusion de deux lectures triées | 4,5 millions d'arrivées dans RIG_DEV : un dictionnaire en mémoire ne tiendrait pas ; deux curseurs triés, une passe. |
+| Relecture des écarts dans les bases vivantes | Les deux instantanés ne sont pas pris au même instant : une fiche recopiée entre les deux serait un faux écart et une fausse alerte chaque nuit. |
+| Tables V3 qui ne sont pas la table V2 « telle quelle » | Correspondances seulement (UTILISATEUR → `soc.Compte`) : la conversion colonne par colonne est à décrire par la story de la table (T03). |
+
+**À valider / reste** : l'heure 02:00 et la durée de 90 jours (proposées) ; T03 — les colonnes « propres » que la
+recopie du lot 9 ne recopie jamais (état de transmission) devront être exclues du contrôle quand ses règles
+(`ReglesRec002`) seront sur main, sinon elles sortiront en écarts ; CA05 sur les 40 bases de production (pas sur ce
+poste). Mesure du banc : 57 640 lignes de 10 tables en 3,0 s (19 092 lignes/s, relecture comprise), 185 écritures
+d'agents pendant le contrôle, aucune bloquée (la plus longue 27 ms) ; extrapolé aux 16,5 millions de lignes des fiches
+partagées de RIG_DEV : **14 min 22 s**, dans la fenêtre 02 h → 06 h.
+
+## Répéter le transfert (REC-008) — lot 8
+
+`RigV3.Repetition repeter` (`Outils\Repetition`), base par base :
+
+1. **Anonymisation** (CA01, CA05) par l'outil de SOC-021 : la source est **lue** (SELECT seul) et la copie écrite
+   **déjà anonymisée** sur ce poste — aucune copie en clair n'existe ; puis son contrôle (un échantillon de 1 000
+   valeurs personnelles de la source cherchées dans la copie, volumes, clés et numéros gardés) doit être vert.
+2. **Garde** : le transfert ne lit qu'une copie **marquée** anonymisée (`anonymisation.Copie`) ; une copie en clair est
+   refusée avant toute lecture, et le **journal de préparation** le dit (CA05, T09).
+3. **Transfert** dans une base V3 neuve, avec des **règles provisoires** pour les tables sans règle (décision du chef,
+   lots 7 et 8 : `ReglesProvisoires.Completer`, « telle quelle », marquées « provisoire » au rapport, comptées dans
+   `rec.Transfert.Provisoires`). Jamais par défaut : `--provisoires` de `RigV3.Transfert`, ou la répétition.
+4. **Contrôle des deux bases** (REC-006).
+5. **Rapport** `repetition-<date>.json` et `.md` (CA02) : par base, la durée du transfert, les rejets par table et
+   règle (avec un exemple de motif), le retard maximal de recopie, les écarts du contrôle, les durées de chaque étape.
+
+**Le feu vert** (CA03, CA04) : `RigV3.Repetition feu --rapports <dossier> [--jour-j AAAA-MM-JJ]` (code 0 vert, 4 rouge)
+juge la dernière répétition : vert **seulement** si les **40 bases** sont allées au bout sur des copies **complètes**
+(une copie réduite par `--max-lignes` mesure le schéma entier, pas la durée), tiennent dans la **fenêtre de
+nuit** (10 h ; chacune, et toutes au parallélisme dit), si **chaque rejet a sa règle de reprise écrite**
+(`RegleTable.RepriseDesRejets` de sa table), si **aucune table n'est passée par une règle provisoire**, si le
+contrôle ne trouve **aucun écart**, si le **retard de recopie est mesuré**, et — jour J fixé — si la dernière
+répétition **complète** a **moins de 30 jours**.
+
+```powershell
+# Une base de greffe (chez Amitel, accord donné pour CETTE base) ; plusieurs : --sources <fichier, une chaîne par ligne>
+dotnet run --project Outils\Repetition -- repeter --source "Server=…;Database=RIG_<GREFFE>;…" --accord RIG_<GREFFE> `
+    --rapport "<dossier des rapports>" [--max-lignes N] [--echantillon 1000] [--lot 50000] [--garder]
+dotnet run --project Outils\Repetition -- feu --rapports "<dossier des rapports>" --jour-j 2027-06-01
+```
+
+| Choix | Raison |
+|---|---|
+| Une règle provisoire est **rouge** au feu | Elle n'est pas une règle de reprise écrite : le jour J ne part pas sur 833 tables que personne n'a validées. Elle sert à mesurer une base entière avant les stories de domaine. |
+| Retard de recopie « non mesuré » = **rouge** | CA02 exige la mesure ; un feu vert sans elle serait un faux vert. |
+| Copies et bases V3 de la répétition **supprimées** à la fin | Elles ne servent qu'à mesurer (C17) ; `--garder` pour les inspecter. |
+
+**Copie réduite** (`--max-lignes N`) : toutes les tables, au plus N lignes chacune. Son contrôle se juge sur la
+réduction (lot 6 : « volumes et lignes gardées diffèrent par construction ») : aucune valeur réelle retrouvée, colonnes
+à vider vidées, marque présente, aucun prénom dans une colonne gardée, et chaque volume égal à min(source, N) ; les
+numéros gardés ne sont pas jugés, et l'absence de fuite se prouve sur une copie complète (le banc le fait).
+
+**Une base entière, mesurée** (décision du chef, lots 7 et 8 ; RIG_DEV en lecture, 2026-11-21, copie réduite à
+200 lignes par table, rapport `C:\Users\raphael.vilain\Documents\Autowin\refonte-rig\repetitions\repetition-20261121-105245.md`) :
+
+| Étape | Résultat |
+|---|---|
+| Copie anonymisée | 860 tables, 1 057 colonnes traitées, 0 anomalie, **131,9 s** |
+| Contrôle de la copie | vert sur la réduction : 36 813 valeurs et 109 286 mots tirés de RIG_DEV, **aucun retrouvé**, 396 volumes réduits comme demandé, **222 s** |
+| Transfert | le schéma entier est **accepté** : **835 règles provisoires** (dont les 104 tables sans clé primaire de RIG_DEV, copiées en une transaction) — le refus « table sans règle » (T03) ne bloque plus une répétition |
+| Arrêt | « interrompu » dans la reprise des **comptes et droits** (SOC-002) : `FK_RoleFonction_Fonction` — les 200 premières lignes de chaque table ne sont pas **fermées sur les clés** (un rôle vise une fonction non copiée) |
+
+Le chronomètre d'une base **entière** demande donc soit une **copie complète** (RIG_DEV : 62,5 Go, un serveur dimensionné
+chez Amitel), soit une copie réduite **fermée sur ses clés étrangères** (comme l'extrait du banc, `ExtraitRigDev`) : à
+ajouter à `Outils\Anonymisation` (lot 6). Le banc, lui, répète jusqu'au bout une base complète de 27 tables.
+
+**Ce qui ne se fait pas d'ici** : les 40 bases des greffes (lecture sur accord de chaque base, chez Amitel, l'anonymisation
+sur le serveur du greffe : CA05) ; le **retard de recopie** (la recopie continue, lot 9, et le simulateur d'une journée
+d'écritures, REC-008 T04, manquent) ; la planification des répétitions avant la bêta (T03, exploitation).
+
+## Fichiers du lot 8
+
+| Fichier | Rôle |
+|---|---|
+| `Base\migrations\REC-005_reprise.sql` | état « interrompu », reprises et point de reprise de `rec.Transfert`, `rec.TransfertLot` ; les deux règles d'alerte de la recopie |
+| `Base\migrations\REC-006_comparaison.sql` | `rec.Comparaison`, `rec.ComparaisonTable`, `rec.ComparaisonEcart` |
+| `Serveur\Recopie\CopieTelleQuelle.cs` | copie par lots et point de reprise, annulation d'une table entamée, copie provisoire sans clé |
+| `Serveur\Recopie\MoteurTransfert.cs`, `JournalTransfert.cs`, `Instantane.cs` | reprise, verrou, états, instantané gardé et rattaché, règles provisoires |
+| `Serveur\Recopie\RapportDuMatin.cs` | le rapport du matin (REC-005 CA04) |
+| `Serveur\Recopie\Regles.cs` | `RegleTable.PourRepetition`, `Provisoire`, `RepriseDesRejets` ; `ReglesProvisoires` |
+| `Serveur\Recopie\Comparaison.cs` | le contrôle des deux bases (REC-006) |
+| `Serveur\Recopie\ComparaisonNocturne.cs`, `ModuleRecopieNuit.cs` | le contrôle de nuit planifié |
+| `Serveur\Recopie\AlertesRecopie.cs`, `Serveur\Socle\Supervision\SourcesAlertes.cs` | les alertes de la recopie, par le surveillant (`ISourceAlertes`) |
+| `Outils\Transfert\` | `transferer` (reprise, `--provisoires`), `rapport` |
+| `Outils\Comparaison\` (`RigV3.Comparaison`) | `comparer` |
+| `Outils\Repetition\` (`RigV3.Repetition`) | `repeter`, `feu` |
+| `tests\RecopieRepriseCheck\` | le banc : un contrôle par critère des trois stories |
+
+Preuve : `.\tests.ps1 RecopieReprise` (`docker compose up -d` et la lecture de RIG_DEV). Le processus du transfert y est
+**tué** au milieu d'ARRIVEE puis relancé. Contre-épreuves faites : un point de reprise saboté arrête le transfert au
+lieu de doubler ; la reprise qui ignore son point (défaut réinjecté à la main) rougit le banc ; les écarts injectés
+puis remis : vus puis plus vus ; une copie non anonymisée est refusée ; un rejet sans règle rougit le feu.
 
 ## La recopie continue (REC-002, REC-003, REC-004) — lot 9
 
