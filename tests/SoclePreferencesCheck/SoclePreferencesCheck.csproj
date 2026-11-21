@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Banc de SOC-013 (preferences et documents de l'agent sur tout serveur RDS) et de SOC-027 (fiche « ancienne
+       touche, nouvelle touche »), lot 4 du plan « Reconstruction de RIG — phase 2 ». Un controle par critere CAxx :
+       le vrai serveur en memoire sur des bases jetables, deux « postes » (deux fichiers accueil.json, deux serveurs
+       RDS) avec le meme client que l'app, et la fiche rejouee contre le code de la V2 et les ecrans de la V3.
+       Il lui faut le SQL Server de developpement : docker compose up -d. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SoclePreferencesCheck</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <!-- Les reglages de l'accueil (AccueilEtat) et ce qu'ils tirent de Metier/, comme tests/FavorisCheck. -->
+    <Compile Include="../../AccueilEtat.cs" Link="AccueilEtat.cs" />
+    <Compile Include="../../Metier/DossierRcs.cs" Link="Metier/DossierRcs.cs" />
+    <Compile Include="../../Metier/AffairesOuvertes.cs" Link="Metier/AffairesOuvertes.cs" />
+    <Compile Include="../../Metier/AlertesGreffe.cs" Link="Metier/AlertesGreffe.cs" />
+    <Compile Include="../../Metier/JeuDemo.cs" Link="Metier/JeuDemo.cs" />
+    <Compile Include="../../Metier/SimulationEdi.cs" Link="Metier/SimulationEdi.cs" />
+    <Compile Include="../../Metier/ActionsXaction.cs" Link="Metier/ActionsXaction.cs" />
+    <Compile Include="../../Metier/ArbreGed.cs" Link="Metier/ArbreGed.cs" />
+    <Compile Include="../../Metier/RecetteTache.cs" Link="Metier/RecetteTache.cs" />
+    <Compile Include="../../Metier/InformationsDossier.cs" Link="Metier/InformationsDossier.cs" />
+    <Compile Include="../../Metier/InformationsFormalite.cs" Link="Metier/InformationsFormalite.cs" />
+    <Compile Include="../../Metier/InformationsDepots.cs" Link="Metier/InformationsDepots.cs" />
+    <!-- Le client de l'app, la session de l'agent et le depot des preferences, joues contre le vrai serveur. -->
+    <Compile Include="../../Pont/ClientServeur.cs" Link="Pont/ClientServeur.cs" />
+    <Compile Include="../../Pont/JSInvokable.cs" Link="Pont/JSInvokable.cs" />
+    <Compile Include="../../Pont/SessionAgent.cs" Link="Pont/SessionAgent.cs" />
+    <Compile Include="../../Pont/PreferencesServeur.cs" Link="Pont/PreferencesServeur.cs" />
+    <!-- La fiche des touches, son inventaire de la V2 et le menu de la maquette. -->
+    <Compile Include="../../Pont/EcranCorrespondances.cs" Link="Pont/EcranCorrespondances.cs" />
+    <Compile Include="../../Pont/InventaireTouchesV2.cs" Link="Pont/InventaireTouchesV2.cs" />
+    <Compile Include="../../Pont/MenuAccueil.cs" Link="Pont/MenuAccueil.cs" />
+    <Compile Include="../../Pont/CatalogueEcrans.cs" Link="Pont/CatalogueEcrans.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+    <ProjectReference Include="../../Contrats/RigV3.Contrats.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
+  </ItemGroup>
+</Project>

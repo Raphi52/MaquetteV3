@@ -66,6 +66,7 @@ public static class CatalogueEcrans
         new("ADM", "Administration", "attente",
         [
             new("PROC_ACCUEIL_PARAM", "Parametres d'accueil"),
+            new("PROC_TOUCHES",       "Ancienne touche, nouvelle touche"),
             new("PROC_ACTUALITES", "Actualites"),
             new("PROC_UTILISATEUR",   "Comptes des agents"),
             new("PROC_COMPTEURS_NUM", "Compteurs de numeros"),

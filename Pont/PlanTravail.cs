@@ -1047,6 +1047,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     public void Initialiser()
     {
         Accueil = new Pont.SessionAccueil(AccueilEtat.Charger());
+        // SOC-013 CA05 : la boite d'impression s'ouvre sur l'imprimante de l'agent, retrouvee d'un serveur RDS a l'autre.
+        if (Etat.Imprimante is { Length: > 0 } imprimante) ImprImprimante = imprimante;
         // Avant toute vue : un onglet d'affaire restaure lirait sinon l'ancien defaut.
         ReprendreAnciensDefauts();
         Accueil.Change += SurChangeAccueil;

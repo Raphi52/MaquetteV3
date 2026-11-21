@@ -35,6 +35,7 @@ import { EcranCommandesWeb } from '../ecrans/EcranCommandesWeb'
 import { EcranComptabilisation } from '../ecrans/EcranComptabilisation'
 import { EcranComptes } from '../ecrans/EcranComptes'
 import { EcranCompteurs } from '../ecrans/EcranCompteurs'
+import { EcranCorrespondances } from '../ecrans/EcranCorrespondances'
 import { EcranReglages } from '../ecrans/EcranReglages'
 import { EcranManquants } from '../ecrans/EcranManquants'
 import { EcranConsultationJud } from '../ecrans/EcranConsultationJud'
@@ -194,6 +195,11 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
     case 'PROC_NUMEROS_MANQUANTS':
       // Reprise de LNUMCM de la V2 (NUM-013 T04) : les numeros manquants du registre avec leur motif.
       return <EcranManquants />
+
+    case 'PROC_TOUCHES':
+      // Ecran NEUF de la V3 (« a maquetter », SOC-027) : la fiche « ancienne touche, nouvelle touche » ; chaque ligne
+      // ouvre l'ecran de la V3 ou essayer la touche.
+      return <EcranCorrespondances ouvrir={(code) => plan('ouvrirCode', code)} />
 
     case 'PROC_GESTEMAIL':
       return <EcranMessagerie />

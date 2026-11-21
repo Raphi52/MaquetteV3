@@ -191,10 +191,12 @@ foreach (var (libelle, code) in toutesEntrees)
 // n'a pas d'ecran generique de sa table PARAMETRAGE (chaque ecran ecrit les siens).
 // PROC_NUMEROS_MANQUANTS (« Numeros manquants », NUM-013 T04) reprend LNUMCM de
 // la V2, procedure VB6 du menu sans fiche ni source ici, comme XNUMERO.
+// PROC_TOUCHES (« Ancienne touche, nouvelle touche », SOC-027) est NEUVE : la fiche
+// qui fait correspondre les raccourcis de la V2 a ceux de la V3 n'existe pas dans la V2.
 var sansFiche = new[] { "PROC_LISTE_DELIBERES", "PROC_SUIVI_IMPRESSION", "PROC_REQUI",
                         "PROC_ACTUALITES", "PROC_COMMANDES_WEB", "PROC_UTILISATEUR",
                         "PROC_COMPTEURS_NUM", "PROC_REGLAGES_GREFFE",
-                        "PROC_NUMEROS_MANQUANTS" };
+                        "PROC_NUMEROS_MANQUANTS", "PROC_TOUCHES" };
 
 var fiches = @"D:\RigApplication\Documentation\reference\proc";
 

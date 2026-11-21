@@ -270,7 +270,10 @@ public sealed partial class SessionPlanTravail
             dossier,
             // La piece ouverte, ou ce que la barre d'actions du dossier vise (l'arborescence, le dossier entier).
             ImpressionOuverte && (ImpressionDe ?? ApercuNoeud?.Libelle) is { } aImprimer
-                ? new ImpressionVue(aImprimer, ArbreDemo.Imprimantes, ArbreDemo.FilesDifferees,
+                // L'imprimante de l'agent peut venir d'un autre poste ou de la V2 (« Production ») : la liste la propose.
+                ? new ImpressionVue(aImprimer,
+                                    ArbreDemo.Imprimantes.Contains(ImprImprimante) ? ArbreDemo.Imprimantes : [ImprImprimante, .. ArbreDemo.Imprimantes],
+                                    ArbreDemo.FilesDifferees,
                                     ArbreDemo.TypesPapier, ImprImprimante, ImprFileDifferee, ImprTypePapier,
                                     ImprExemplaires, ImprRectoVerso)
                 : null,
@@ -889,7 +892,11 @@ public sealed partial class SessionPlanTravail
 
             // ---- Impression ----
             case "fermerImpression": ImpressionOuverte = false; break;
-            case "imprimante": ImprImprimante = Texte(valeur); break;
+            case "imprimante":
+                // SOC-013 CA05 : la derniere imprimante choisie devient celle de l'agent (V2 : UTLST_IMPRIMANTE_DEFAUT).
+                ImprImprimante = Texte(valeur);
+                AccueilEtat.MemoriserImprimante(ImprImprimante);
+                break;
             case "fileDifferee": ImprFileDifferee = Texte(valeur); break;
             case "papier": ImprTypePapier = Texte(valeur); break;
             case "exemplaires":

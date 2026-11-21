@@ -18,6 +18,7 @@
 // du dossier, 20/11/2026) montre la puce « ← Dossier 004176 SCI DU PARC », qui
 // y ramene (geste « retourDossier ») ; fermer son onglet y ramene aussi (C#).
 
+import { AideTouchesEcran } from '../ecrans/EcranCorrespondances'
 import { Aiguillage } from './Aiguillage'
 import type { GestePlan, ProcVue } from './types'
 import { EcranVisible } from './visibilite'
@@ -44,6 +45,8 @@ export function Procedure({ proc, plan, cachee = false }: ProprietesProcedure) {
       <EcranVisible.Provider value={!cachee}>
         <Aiguillage proc={proc} plan={plan} />
       </EcranVisible.Provider>
+      {/* SOC-027 CA03 : « ? » montre les touches de l'ecran visible, l'ancienne touche de la V2 a cote. */}
+      <AideTouchesEcran code={proc.code} actif={!cachee} />
     </div>
   )
 }

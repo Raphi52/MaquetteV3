@@ -36,10 +36,19 @@ public partial class MainWindow : Window
             var ouverture = await Pont.SessionAgent.PreparerAsync(() => Pont.ClientServeur.Actif,
                 Environment.GetCommandLineArgs()[1..],
                 Environment.GetEnvironmentVariable(Pont.SessionAgent.VariableGreffesDuPoste));
+            // fix-ok: cause lue dans le code -- rien ne relisait les reglages ailleurs qu'en %APPDATA% (AccueilEtat.Chemin) ;
+            // l'accueil les charge a son montage (PlanTravail.Initialiser) : la reprise doit passer avant Brancher.
+            // SOC-013 : l'agent admis retrouve ses reglages (lus dans la base du greffe, poses dans accueil.json AVANT
+            // l'accueil) et les documents qui l'attendaient, quel que soit le serveur RDS (Pont/PreferencesServeur.cs).
+            if (ouverture.Identite is { Admis: true }) await Pont.PreferencesServeur.BrancherSessionAsync(ReleveDocuments);
             Ouverture = ouverture switch
             {
-                { AChoisir.Length: > 0 } => new Pont.RacineChoixGreffe(ouverture,
-                    greffe => Pont.SessionAgent.OuvrirAsync(Pont.ClientServeur.Actif!, greffe), Racine, App.Fenetre),
+                { AChoisir.Length: > 0 } => new Pont.RacineChoixGreffe(ouverture, async greffe =>
+                {
+                    var identite = await Pont.SessionAgent.OuvrirAsync(Pont.ClientServeur.Actif!, greffe);
+                    if (identite.Admis) await Pont.PreferencesServeur.BrancherSessionAsync(ReleveDocuments);
+                    return identite;
+                }, Racine, App.Fenetre),
                 { Identite: { Admis: false } refus } => new Pont.RacineRefus(refus, App.Fenetre),
                 _ => null,
             };
@@ -47,10 +56,14 @@ public partial class MainWindow : Window
         };
         Closed += async (_, _) =>
         {
+            await Pont.PreferencesServeur.FermerAsync();
             await Racine.DisposeAsync();
             if (Ouverture is not null) await Ouverture.DisposeAsync();
         };
     }
+
+    /// <summary>La releve des documents que la partie serveur prepare pour l'agent (SOC-013 CA03).</summary>
+    private static readonly TimeSpan ReleveDocuments = TimeSpan.FromSeconds(30);
 
     /// <summary>Ce que la fenetre montre avant l'application : l'ecran de choix du greffe (lot 10), ou
     /// l'ecran de refus quand le serveur n'admet pas l'agent (SOC-001) ; null quand l'application s'ouvre d'emblee.</summary>

@@ -1,6 +1,7 @@
 ﻿using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 namespace RigV3Desktop;
@@ -581,6 +582,87 @@ public sealed class AccueilEtat
         etat.Ecrire();
     }
 
+    /// <summary>
+    /// L'imprimante par defaut de l'agent (SOC-013 CA05 ; V2 : UTILISATEUR.UTLST_IMPRIMANTE_DEFAUT) : la boite
+    /// d'impression s'ouvre sur elle, et la derniere choisie y devient la sienne. Vide : la premiere de la liste.
+    /// Elle fait partie des <see cref="Preferences"/> : branchee au serveur, l'agent la retrouve sur un autre serveur RDS.
+    /// </summary>
+    public string Imprimante { get; set; } = string.Empty;
+
+    /// <summary>Retient l'imprimante choisie, en relisant le fichier comme les autres Memoriser*.</summary>
+    public static void MemoriserImprimante(string imprimante)
+    {
+        if (string.IsNullOrWhiteSpace(imprimante)) return;
+        var etat = Charger();
+        etat.Imprimante = imprimante.Trim();
+        etat.Ecrire();
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // SOC-013 : LES PREFERENCES SUIVENT L'AGENT D'UN SERVEUR RDS A L'AUTRE.
+    // fix-ok: cause lue dans le code -- Chemin (plus bas) pose les reglages dans %APPDATA% du SERVEUR ou
+    // l'app tourne ; aucune autre copie n'existait. Banc : tests/SoclePreferencesCheck (poste A -> poste B).
+    //
+    // Sur une ferme RDS sans profil itinerant, ce fichier reste sur le serveur ou il a ete ecrit : la
+    // ferme qui envoie l'agent ailleurs lui fait perdre ses reglages. Branchee au serveur de la V3, l'app
+    // les garde aussi dans la base du greffe (soc.Preference, comme PARAMETRE_UTILISATEUR dans la V2) :
+    // Pont/PreferencesServeur.cs les relit a l'ouverture (ReprendrePreferences, avant l'accueil) et pose
+    // Distant, qui recoit chaque ecriture du fichier. Sans serveur, Distant reste null : rien ne change.
+    //
+    // Ne voyagent que les REGLAGES de l'agent (cette liste). Le reste du fichier -- saisies, journal,
+    // fil, taches, arbre GED, historique -- est la demonstration des affaires : il ira en base avec son
+    // domaine, pas dans les preferences.
+    // ---------------------------------------------------------------------------------------------
+
+    /// <summary>Les proprietes de cet etat qui sont des preferences de l'agent (nom = nom de la propriete).</summary>
+    public static readonly IReadOnlyList<string> Preferences =
+    [
+        nameof(Theme), nameof(Imprimante), nameof(VuesFavorites),
+        nameof(OngletsVue), nameof(OngletActif), nameof(VuesDetachees), nameof(AffairesDesOnglets),
+        nameof(FenetresVue), nameof(FenetresDocument), nameof(TriClasseur),
+        nameof(Tuiles), nameof(VersionDisposition), nameof(Disposition), nameof(Mesures),
+        nameof(Alertes), nameof(CategoriesAlertes), nameof(CategoriesRepliees), nameof(ReglagesAlertes),
+    ];
+
+    /// <summary>Ce qui recoit les preferences a chaque ecriture du fichier ; null sans serveur (rien ne part).</summary>
+    public static IDepotPreferences? Distant { get; set; }
+
+    /// <summary>Les <see cref="Preferences"/> de cet etat : nom -> valeur JSON, ecrite comme dans le fichier.</summary>
+    public Dictionary<string, string> PreferencesPartagees()
+    {
+        var tout = JsonSerializer.SerializeToNode(this, Options)!.AsObject();
+        return Preferences.Where(tout.ContainsKey)
+                          .ToDictionary(n => n, n => tout[n]?.ToJsonString() ?? "null", StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// Pose dans le fichier les preferences lues sur le serveur (ouverture sur un autre serveur RDS, SOC-013 CA01) :
+    /// chaque nom connu de <see cref="Preferences"/> remplace la valeur du fichier ; un nom inconnu, ou une valeur
+    /// qui ne se lit pas, laisse la valeur du fichier. Le reste du fichier ne bouge pas. Rien n'est renvoye au
+    /// serveur : ce sont ses valeurs. Rend le nombre de preferences reprises.
+    /// </summary>
+    public static int ReprendrePreferences(IReadOnlyDictionary<string, string> valeurs)
+    {
+        var tout = JsonSerializer.SerializeToNode(Charger(), Options)!.AsObject();
+        var reprises = 0;
+        foreach (var nom in Preferences)
+        {
+            if (!valeurs.TryGetValue(nom, out var texte)) continue;
+            JsonNode? valeur;
+            try { valeur = JsonNode.Parse(texte); }
+            catch (JsonException) { continue; }
+            var avant = tout[nom]?.DeepClone();
+            tout[nom] = valeur;
+            try { _ = tout.Deserialize<AccueilEtat>(Options); reprises++; }
+            catch (Exception e) when (e is JsonException or InvalidOperationException or NotSupportedException)
+            {
+                tout[nom] = avant;   // une valeur d'une autre forme ne casse pas l'accueil : la sienne reste
+            }
+        }
+        if (reprises > 0 && tout.Deserialize<AccueilEtat>(Options) is { } repris) repris.EcrireFichier();
+        return reprises;
+    }
+
     // RIGV3_ETAT : chemin de secours du fichier de reglages. Sert aux
     // controles internes, qui ne doivent PAS ecrire dans l'etat reel de
     // l'utilisateur. Vide en usage normal.
@@ -649,12 +731,21 @@ public sealed class AccueilEtat
             FenetresVue = fichier.FenetresVue;
             FenetresDocument = fichier.FenetresDocument;
             TriClasseur = fichier.TriClasseur;
+            Imprimante = fichier.Imprimante;
         }
         Ecrire();
     }
 
-    /// <summary>Ecrit cet etat tel quel : celui qu'un Memoriser* vient de relire et de modifier.</summary>
+    /// <summary>Ecrit cet etat tel quel : celui qu'un Memoriser* vient de relire et de modifier. Branchee au
+    /// serveur, les preferences partent aussi a <see cref="Distant"/> (SOC-013), qui n'envoie que ce qui a change.</summary>
     private void Ecrire()
+    {
+        EcrireFichier();
+        Distant?.Envoyer(PreferencesPartagees());
+    }
+
+    /// <summary>Ecrit le fichier seul, sans rien envoyer au serveur.</summary>
+    private void EcrireFichier()
     {
         try
         {
@@ -666,4 +757,14 @@ public sealed class AccueilEtat
             // Idem : ne pas faire tomber l'interface pour un disque en lecture seule.
         }
     }
+}
+
+/// <summary>
+/// Ce qui garde les preferences de l'agent hors du poste (SOC-013) : la base du greffe, par le serveur de la V3
+/// (Pont/PreferencesServeur.cs). Appele a chaque ecriture du fichier, sur le fil de l'interface : l'envoi lui-meme
+/// ne doit pas bloquer (il part en arriere-plan, et seulement ce qui a change).
+/// </summary>
+public interface IDepotPreferences
+{
+    void Envoyer(IReadOnlyDictionary<string, string> preferences);
 }
