@@ -148,6 +148,43 @@ describe('Saisie', () => {
     expect(changer).toHaveBeenCalledWith('5')
   })
 
+  it('suit la valeur de la session des que la vue est a l\'ecran, avant les effets differes de React', async () => {
+    // Cause du test instable « Actualites » (EcranActualites.test.tsx:65,
+    // 21/11/2026, 2 echecs sur 30) : meme course que le cas ci-dessus. La vue
+    // qui vide le titre arrive hors act ; si la reecriture du champ vit dans un
+    // useEffect repousse, le compte rendu est deja dans la page alors que le
+    // champ montre encore l'ancien titre.
+    let poser: (v: string) => void = () => {}
+    function RenduLent() {
+      const debut = performance.now()
+      while (performance.now() - debut < 20) { /* depasse la tranche de 5 ms */ }
+      return null
+    }
+    function Differe() {
+      const [valeur, setValeur] = useState('INPI HS')
+      poser = setValeur
+      return <><RenduLent /><p data-testid="cr">{valeur === '' ? 'publiee' : ''}</p>
+        <Saisie aria-label="champ" valeur={valeur} changer={() => {}} /></>
+    }
+    const { container } = render(<Differe />)
+    const champ = screen.getByLabelText('champ') as HTMLInputElement
+    const luAuRendu = new Promise<string>((fini) => {
+      // Juste apres l'ecriture du compte rendu dans la page, avant toute autre
+      // tache : le moment ou findByText rend la main au test.
+      const observateur = new MutationObserver(() => {
+        if (screen.getByTestId('cr').textContent !== 'publiee') return
+        observateur.disconnect()
+        fini(champ.value)
+      })
+      observateur.observe(container, { childList: true, subtree: true, characterData: true })
+    })
+    const avertir = vi.spyOn(console, 'error').mockImplementation(() => {}) // « not wrapped in act » : voulu
+    try {
+      poser('') // hors act, comme la reponse du pont dans useSession
+      expect(await luAuRendu).toBe('')
+    } finally { avertir.mockRestore() }
+  })
+
   it('ne reecrit le champ que quand la valeur de la session CHANGE', () => {
     const { rerender } = render(<Saisie aria-label="champ" valeur="DUPONT" changer={() => {}} />)
     const champ = screen.getByLabelText('champ') as HTMLInputElement

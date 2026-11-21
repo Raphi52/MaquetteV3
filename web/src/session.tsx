@@ -121,7 +121,10 @@ export function Saisie({ valeur, quand = 'input', changer, finir, ...attributs }
   useLayoutEffect(() => { changerCourant.current = changer }, [changer])
   useLayoutEffect(() => { finirCourant.current = finir }, [finir])
 
-  useEffect(() => {
+  // Meme course pour la valeur (21/11/2026) : dans un useEffect repousse, le
+  // reste de la vue (compte rendu) etait a l'ecran avec l'ancienne valeur dans
+  // le champ (test instable « Actualites », rejoue par session.test.tsx).
+  useLayoutEffect(() => {
     const el = champ.current
     if (el && el.value !== valeur) el.value = valeur
   }, [valeur])
