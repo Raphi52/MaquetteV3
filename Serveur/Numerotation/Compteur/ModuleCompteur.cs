@@ -1,5 +1,6 @@
 using Microsoft.Data.SqlClient;
 using RigV3.Contrats.Numerotation;
+using RigV3.Serveur.Socle.Comptes;
 using RigV3.Serveur.Socle.Greffes;
 using RigV3.Serveur.Socle.Identite;
 
@@ -54,7 +55,8 @@ internal sealed class ModuleCompteur : IModuleServeur
         });
 
         compteur.MapPost(RoutesCompteur.Restitutions, async (string greffe, DemandeRestitution demande, HttpContext http, CatalogueGreffes c,
-                                                             DistributeurNumeros numeros, CancellationToken ct) =>
+                                                             DistributeurNumeros numeros, ServiceDroits droits, BaseRig commune,
+                                                             CancellationToken ct) =>
         {
             // L'ecran de reattribution exige l'explication (NUM-004 T04) ; le programme, lui, accepte
             // une restitution sans explication venue de la V2 et le note (NUM-004 CA08).
@@ -62,6 +64,16 @@ internal sealed class ModuleCompteur : IModuleServeur
                 || string.IsNullOrWhiteSpace(demande.Explication))
                 return Results.BadRequest(new ResultatRestitution(CodesNumerotation.NonJouee, null, null,
                     "Le type, le numero et l'explication sont obligatoires."));
+            // Reservee aux detenteurs de XNUMERO, comme la procedure de la V2 (NUM-004 T04, T08), jugee dans la
+            // base de CE greffe (lot 9). Un refus ne touche a rien : ni compteur, ni numero rendu, ni journal.
+            // Une panne de la verification est un refus (SOC-002 CA06, trace par ServiceDroits).
+            var moi = await droits.AppelantAsync(http, commune, ct);
+            var droit = moi is null ? null : await droits.VerifierAsync(http, commune, moi, RoutesCompteur.FonctionReattribution, ct);
+            if (droit is not { Autorise: true })
+                return Results.Json(new ResultatRestitution(CodesNumerotation.NonJouee, null, null,
+                    $"Restitution refusee : le compte {moi?.CompteWindows ?? http.User.Identity?.Name} n'a pas la fonction " +
+                    $"{RoutesCompteur.FonctionReattribution} (Reattribution de numero metier) dans le greffe {greffe}."),
+                    statusCode: StatusCodes.Status403Forbidden);
             return await SurBaseDuGreffe(c, greffe, ct, async cn =>
             {
                 try

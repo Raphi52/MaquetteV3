@@ -95,7 +95,12 @@ public static class EcranCompteurs
         }
         catch (ErreurServeur e) when (e.CodeHttp == 403)
         {
-            return await OuvrirAsync(serveur, greffe);
+            // Reattribution reservee a la fonction XNUMERO, comme la procedure de la V2 (NUM-004 T04, T08) ; si
+            // l'agent n'est meme plus admis, la relecture des compteurs le dira (mode « refuse »).
+            return await OuvrirAsync(serveur, greffe,
+                $"Le numéro {demande.Numero} n'a pas été rendu : rendre un numéro est réservé aux agents qui ont la fonction " +
+                $"{RoutesCompteur.FonctionReattribution} (« Réattribution de numéro métier »), comme dans l'ancien RIG.",
+                echec: true);
         }
         catch (ErreurServeur e) when (e.CodeHttp == 503)
         {
