@@ -20,6 +20,7 @@
 // propriete vaut null et l'ecran est celui d'avant.
 
 import { EcranActes } from '../ecrans/EcranActes'
+import { EcranAide } from '../ecrans/EcranAide'
 import { EcranActeurs } from '../ecrans/EcranActeurs'
 import { EcranActualites } from '../ecrans/EcranActualites'
 import { EcranArchivage } from '../ecrans/EcranArchivage'
@@ -55,6 +56,7 @@ import { EcranGestionAudiences } from '../ecrans/EcranGestionAudiences'
 import { EcranMaquettesEdition } from '../ecrans/EcranMaquettesEdition'
 import { EcranMessagerie } from '../ecrans/EcranMessagerie'
 import { EcranCourriels } from '../ecrans/EcranCourriels'
+import { EcranCertificat } from '../ecrans/EcranCertificat'
 import { EcranNonMaquette } from '../ecrans/EcranNonMaquette'
 import { EcranOuvertureDossier } from '../ecrans/EcranOuvertureDossier'
 import { EcranParametresAccueil } from '../ecrans/EcranParametresAccueil'
@@ -204,6 +206,16 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
       // Ecran NEUF de la V3 (« a maquetter », SOC-027) : la fiche « ancienne touche, nouvelle touche » ; chaque ligne
       // ouvre l'ecran de la V3 ou essayer la touche.
       return <EcranCorrespondances ouvrir={(code) => plan('ouvrirCode', code)} />
+
+    case 'PROC_PREMIERS_PAS':
+      // Ecran NEUF de la V3 (« a maquetter », SOC-026 CA06) : l'aide de la premiere ouverture -- les gestes principaux et
+      // l'acces a la fiche des touches ; ouverte d'elle-meme une fois (Application.tsx), puis depuis le menu.
+      return <EcranAide ouvrir={(code) => plan('ouvrirCode', code)} />
+
+    case 'PROC_CERTIFICAT':
+      // Ecran NEUF de la V3 (« a maquetter », SOC-019 CA04) : le certificat NF525 de la V3 et sa validite, enregistre par
+      // Amitel ; sans certificat, « certification en cours » (sans RIGV3_SERVEUR : la meme phrase, jamais un exemple).
+      return <EcranCertificat />
 
     case 'PROC_FICHES_CONFLIT':
       // Ecran NEUF de la V3 (« a maquetter », REC-004 T03) : les fiches partagees modifiees dans l'ancien RIG et dans la V3

@@ -6,7 +6,12 @@
 // Porte en React (lot 1 du plan « finir le passage a React ») depuis le
 // <div class="rig-entete"> de Home.razor. Les morceaux de texte suivent ceux
 // que Razor creait (un noeud par @expression) : voir web/README.md, lot 3.
+//
+// Le rond « Signaler un défaut », entre le reglage et le profil (SOC-022 CA06, lot 17 de la reconstruction, 21/11/2026) : un agent d'un
+// greffe beta signale un defaut a Amitel en un geste ; la boite (composants/SignalementDefaut.tsx, montee par
+// Application.tsx) prend l'ecran, le greffe, la version et l'heure, il n'ecrit qu'une phrase. Ctrl Maj D fait de meme.
 
+import { demanderSignalement } from '../composants/SignalementDefaut'
 import { Liste } from './Liste'
 import { RondProfil } from './RondProfil'
 import { arreter, type EnteteVue, type GesteAccueil, type PhraseVue } from './types'
@@ -59,7 +64,7 @@ export function Entete({ entete, geste }: { entete: EnteteVue, geste: GesteAccue
         <Phrase phrase={entete.phrase} />
       </div>
       {' '}
-      {/* « Commandes rondes » (18/11/2026) : le reglage puis le profil, en ronds. */}
+      {/* « Commandes rondes » (18/11/2026) : le reglage, le signalement d'un defaut (lot 17), puis le profil, en ronds. */}
       <div className="rig-entete__outils">
         <button className={'rig-entete__action ' + (entete.panneauOuvert ? 'rig-entete__action--ouvert' : '')}
                 title="Reglages de l'accueil" aria-label="Reglages de l'accueil"
@@ -109,6 +114,10 @@ export function Entete({ entete, geste }: { entete: EnteteVue, geste: GesteAccue
             </div>
           </>
         )}
+        <button className="rig-entete__action" title="Signaler un défaut à Amitel (Ctrl Maj D)" aria-label="Signaler un défaut"
+                onClick={() => demanderSignalement()} onMouseDown={arreter}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.6 14.2V2.2M3.6 2.6h7.6l-1.7 2.7 1.7 2.7H3.6" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"></path></svg>
+        </button>
         {entete.profil && <RondProfil profil={entete.profil} geste={geste} />}
       </div>
     </div>

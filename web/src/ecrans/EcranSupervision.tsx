@@ -7,7 +7,9 @@
 // SOC-017 CA02), ou par greffe, compte et periode. A droite, quatre onglets : les 40 greffes (base V3, migrations,
 // echecs de numerotation de l'ancien RIG, SOC-011 CA03), les traitements publies par chaque serveur, avec la relance
 // d'un traitement arrete (CA04), les alertes envoyees a l'exploitation (CA02) et le journal technique (detail et pile
-// d'une erreur au clic). Les regles vivent dans le serveur (Serveur/Socle/Supervision, prouvees par
+// d'une erreur au clic). Un cinquieme (lot 17, SOC-022 CA06) : les defauts signales par les agents depuis la V3, avec
+// leur identifiant de suivi, l'ecran, le greffe, la version et la phrase de l'agent ; la derniere erreur suivie qu'un
+// defaut emporte ramene son parcours au clic. L'identifiant d'un defaut se cherche comme celui d'une erreur. Les regles vivent dans le serveur (Serveur/Socle/Supervision, prouvees par
 // tests/SocleSupervisionCheck) ; tout passe par Pont/EcranSupervision.cs.
 
 import { useEffect, useState } from 'react'
@@ -71,6 +73,21 @@ export interface ErreurTechnique {
   pile: string | null
 }
 
+export interface DefautSignale {
+  id: number
+  suivi: string
+  instant: string
+  codeGreffe: string | null
+  compte: string | null
+  poste: string
+  ecran: string
+  codeEcran: string | null
+  version: string | null
+  heurePoste: string | null
+  derniereErreur: string | null
+  phrase: string
+}
+
 export interface EtatSupervision {
   dernierPassage: string | null
   greffes: EtatGreffe[]
@@ -84,9 +101,11 @@ export interface VueEcranSupervision {
   echec: boolean
   etat: EtatSupervision | null
   erreurs: ErreurTechnique[]
+  /** Les defauts signales depuis la V3 (SOC-022 CA06) ; absent d'une vue de refus. */
+  defauts?: DefautSignale[] | null
 }
 
-type Onglet = 'greffes' | 'traitements' | 'alertes' | 'erreurs'
+type Onglet = 'greffes' | 'traitements' | 'alertes' | 'erreurs' | 'defauts'
 
 const Message = { margin: 0, padding: 'var(--rig-esp-2) var(--rig-esp-3)' } as const
 const GrilleRepartie = { tableLayout: 'fixed' } as const
@@ -141,6 +160,7 @@ export function EcranSupervision() {
   const [du, setDu] = useState('')
   const [au, setAu] = useState('')
   const [choisie, setChoisie] = useState<number | null>(null)
+  const [defautChoisi, setDefautChoisi] = useState<number | null>(null)
   const [occupe, setOccupe] = useState(false)
 
   useEffect(() => {
@@ -175,21 +195,28 @@ export function EcranSupervision() {
     greffes = greffes.filter((g) => contientSansCasse(g.code, t) || contientSansCasse(g.nom, t) || contientSansCasse(g.serveur, t))
   }
   const erreur = vue.erreurs.find((e) => e.id === choisie) ?? null
+  const defauts = vue.defauts ?? []
+  const defaut = defauts.find((d) => d.id === defautChoisi) ?? null
 
-  const agir = async (geste: () => Promise<VueEcranSupervision>, apres?: Onglet) => {
+  const agir = async (geste: () => Promise<VueEcranSupervision>, apres?: (v: VueEcranSupervision) => Onglet) => {
     setOccupe(true)
     try {
       const v = await geste()
       setVue(v)
-      if (apres) setOnglet(apres)
+      if (apres) setOnglet(apres(v))
     } finally { setOccupe(false) }
   }
-  const chercher = () => {
+  const chercher = (identifiant = suivi) => {
     setChoisie(null)
+    setDefautChoisi(null)
     void agir(() => appeler<VueEcranSupervision>('EcranSupervision.Rechercher', {
-      suivi: suivi.trim() || null, greffe: greffe.trim() || null, compte: compte.trim() || null, du: du || null, au: au || null,
-    }), 'erreurs')
+      suivi: identifiant.trim() || null, greffe: greffe.trim() || null, compte: compte.trim() || null, du: du || null, au: au || null,
+    }), (v) => (
+      // L'identifiant d'un defaut signale (aucune erreur sous lui) mene a l'onglet des defauts.
+      !estBlanc(identifiant) && v.erreurs.length === 0 && (v.defauts?.length ?? 0) > 0 ? 'defauts' : 'erreurs'))
   }
+  /** La derniere erreur suivie qu'un defaut emporte : son parcours, dans l'onglet des erreurs. */
+  const parcoursDe = (identifiant: string) => { setSuivi(identifiant); chercher(identifiant) }
 
   return (
     <div className="rig-proc__corps">
@@ -219,7 +246,7 @@ export function EcranSupervision() {
           <input className="rig-saisie-champ__saisie" type="date" value={au} onChange={(e) => setAu(e.target.value)} />
         </label>
         <div className="rig-criteres__actions">
-          <button className="rig-bouton rig-bouton--fort" disabled={occupe} onClick={chercher}>Chercher</button>
+          <button className="rig-bouton rig-bouton--fort" disabled={occupe} onClick={() => chercher()}>Chercher</button>
         </div>
       </aside>
 
@@ -237,6 +264,9 @@ export function EcranSupervision() {
             </button>
             <button className={`rig-onglet${onglet === 'erreurs' ? ' rig-onglet--actif' : ''}`} onClick={() => setOnglet('erreurs')}>
               Erreurs ({vue.erreurs.length})
+            </button>
+            <button className={`rig-onglet${onglet === 'defauts' ? ' rig-onglet--actif' : ''}`} onClick={() => setOnglet('defauts')}>
+              Défauts ({defauts.length})
             </button>
           </div>
           <span className="rig-resultats-proc__compte">
@@ -408,6 +438,57 @@ export function EcranSupervision() {
                   {erreur.serveur} — {erreur.type ?? 'type inconnu'} — {erreur.message}
                 </p>
                 <pre style={Pile}>{erreur.pile ?? 'Pas de pile d\'appels.'}</pre>
+              </div>
+            )}
+          </>
+        )}
+
+        {onglet === 'defauts' && (
+          <>
+            <p style={Message}>
+              Signalés par les agents depuis la V3 (SOC-022) ; « RigV3.Passage beta defauts » les classe par la règle écrite.
+            </p>
+            <div className="rig-table-cadre">
+              <table className="rig-table" style={GrilleRepartie} aria-label="Défauts signalés">
+                <colgroup>
+                  <col style={{ width: '124px' }} /><col style={{ width: '96px' }} /><col style={{ width: '58px' }} />
+                  <col style={{ width: '90px' }} /><col style={{ width: '150px' }} /><col style={{ width: '110px' }} /><col />
+                </colgroup>
+                <thead>
+                  <tr>{['Le', 'Suivi', 'Greffe', 'Compte', 'Écran', 'Dernière erreur', 'Phrase de l\'agent'].map((t) =>
+                    <th key={t} title={t} style={Coupe}>{t}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {defauts.map((d) => (
+                    <tr key={d.id} onClick={() => setDefautChoisi(d.id)} aria-selected={d.id === defautChoisi}>
+                      <td>{quand(d.instant)}</td>
+                      <td className="rig-table__mono">{d.suivi}</td>
+                      <td className="rig-table__mono">{d.codeGreffe ?? '—'}</td>
+                      <td style={Coupe} title={d.compte ?? ''}>{d.compte ?? '—'}</td>
+                      <td style={Coupe} title={d.ecran}>{d.ecran}</td>
+                      <td className="rig-table__mono">
+                        {d.derniereErreur
+                          ? <button className="rig-bouton" title={`Le parcours de l'erreur ${d.derniereErreur}`}
+                                    onClick={(e) => { e.stopPropagation(); parcoursDe(d.derniereErreur!) }}>{d.derniereErreur}</button>
+                          : '—'}
+                      </td>
+                      <td style={Coupe} title={d.phrase}>{d.phrase}</td>
+                    </tr>
+                  ))}
+                  {defauts.length === 0 && <tr><td colSpan={7} className="rig-table__vide">Aucun défaut signalé.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            {defaut && (
+              <div aria-label="Détail du défaut">
+                <p style={Message}>
+                  <span className="rig-etat rig-etat--attente">{'Suivi '}{defaut.suivi}</span>{' '}{defaut.phrase}
+                </p>
+                <p style={Message}>
+                  {'Écran « '}{defaut.ecran}{' »'}{defaut.codeEcran ? ` (${defaut.codeEcran})` : ''}
+                  {' — poste '}{defaut.poste}{' — version '}{defaut.version ?? '?'}
+                  {' — heure du poste '}{defaut.heurePoste ? quand(defaut.heurePoste) : '?'}
+                </p>
               </div>
             )}
           </>

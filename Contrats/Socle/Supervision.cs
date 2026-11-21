@@ -37,6 +37,22 @@ public static class RoutesSupervision
     /// <summary>Le plus de lignes qu'une recherche rend (les plus recentes).</summary>
     public const int ErreursAuPlus = 200;
 
+    /// <summary>POST <see cref="SignalementDefaut"/> : un agent signale un defaut depuis la V3, en un geste (SOC-022 CA06, lot 17).
+    /// Le serveur lui donne l'identifiant de suivi de SA requete (celui de <see cref="EnTeteSuivi"/>, le meme mecanisme que les
+    /// erreurs) et rend <see cref="SuiviErreur"/>. Le compte vient de la session, jamais du corps. Ouverte a toute session
+    /// Windows, comme <see cref="ErreursEcran"/> : un agent qui ne parvient pas a ouvrir son greffe doit pouvoir le dire.</summary>
+    public const string Defauts = "/socle/defauts";
+
+    /// <summary>GET (Amitel) : les defauts signales depuis la V3 (?suivi=&amp;greffe=), le plus recent en premier,
+    /// <see cref="DefautsAuPlus"/> au plus (<see cref="DefautSignale"/>). Lus aussi par « RigV3.Passage beta defauts ».</summary>
+    public const string DefautsSignales = "/socle/supervision/defauts";
+
+    /// <summary>Le plus de defauts qu'une lecture rend (les plus recents).</summary>
+    public const int DefautsAuPlus = 200;
+
+    /// <summary>La plus longue phrase qu'un agent peut ecrire avec son signalement.</summary>
+    public const int PhraseAuPlus = 1000;
+
     /// <summary>L'adresse du parcours d'un identifiant de suivi.</summary>
     public static string PourParcours(string suivi) => Parcours.Replace("{suivi}", Uri.EscapeDataString(suivi));
 }
@@ -125,8 +141,37 @@ public static class ReglesAlerte
 /// <param name="Poste">Le serveur RDS ou tourne l'ecran.</param>
 public sealed record ErreurEcran(string Programme, string Message, string? Type, string? Pile, string? CodeGreffe, string? Suivi, string? Poste);
 
-/// <summary>Ce qu'un agent recoit d'une erreur : son identifiant de suivi et une phrase pour l'assistance ; jamais le detail.</summary>
+/// <summary>Ce qu'un agent recoit d'une erreur : son identifiant de suivi et une phrase pour l'assistance ; jamais le detail.
+/// C'est aussi la reponse a un defaut signale (<see cref="RoutesSupervision.Defauts"/>).</summary>
 public sealed record SuiviErreur(string Suivi, string Message);
+
+/// <summary>Un defaut signale par un agent depuis la V3 (SOC-022 CA06, T03). Tout est pris par l'ecran sans saisie, sauf la
+/// phrase de l'agent ; le compte n'y est pas : le serveur le prend de la session Windows.</summary>
+/// <param name="Phrase">Ce que l'agent a constate, en une phrase (<see cref="RoutesSupervision.PhraseAuPlus"/> signes au plus).</param>
+/// <param name="Ecran">Le nom de l'ecran ouvert (« Compteurs de numéros », « Accueil », « Page du dossier 004176 »).</param>
+/// <param name="CodeEcran">Son code dans la V3 (PROC_COMPTEURS_NUM) ; null pour l'accueil.</param>
+/// <param name="Version">La version de l'ecran de la V3 (Directory.Build.props).</param>
+/// <param name="HeurePoste">L'heure du poste de l'agent, avec son decalage (outre-mer).</param>
+/// <param name="DerniereErreur">L'identifiant de suivi de la derniere erreur montree a l'agent dans cette session, s'il y en a une.</param>
+/// <param name="Poste">Le serveur RDS ou tourne l'ecran.</param>
+public sealed record SignalementDefaut(string Phrase, string Ecran, string? CodeEcran, string? CodeGreffe, string? Version,
+                                       DateTimeOffset? HeurePoste, string? DerniereErreur, string? Poste);
+
+/// <summary>Un defaut signale depuis la V3, tel qu'Amitel le lit (ecran Supervision, « beta defauts »). Instant en UTC.</summary>
+/// <param name="Suivi">L'identifiant de suivi rendu a l'agent : c'est par lui que le defaut se classe (defauts-beta.json, CA03).</param>
+public sealed record DefautSignale(
+    long Id,
+    string Suivi,
+    DateTime Instant,
+    string? CodeGreffe,
+    string? Compte,
+    string Poste,
+    string Ecran,
+    string? CodeEcran,
+    string? Version,
+    DateTimeOffset? HeurePoste,
+    string? DerniereErreur,
+    string Phrase);
 
 /// <summary>Une ligne du journal technique (SOC-017 CA01), lue par l'exploitation d'Amitel. Instant en UTC.</summary>
 public sealed record ErreurTechnique(

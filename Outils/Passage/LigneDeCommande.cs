@@ -89,7 +89,9 @@ public static class LigneDeCommande
                 case "beta" when args.Length > 1 && Option("carnet") is { } carnet && Option("dossier") is { } dossier && Option("commune") is { } commune:
                 {
                     var fiches = await CatalogueDe(o, commune).ListerAsync(ct);
-                    var d = DossierBeta.Lire(carnet, dossier, Option("bancs") ?? Path.Combine(Directory.GetCurrentDirectory(), "tests"), fiches);
+                    // Les defauts signales par les agents depuis la V3 (SOC-022 CA06) sont dans la base commune, a cote du catalogue.
+                    var d = DossierBeta.Lire(carnet, dossier, Option("bancs") ?? Path.Combine(Directory.GetCurrentDirectory(), "tests"), fiches)
+                        with { Signales = await DossierBeta.LireSignalesAsync(commune, ct) };
                     var aujourdhui = Option("aujourdhui") is { } a ? DateOnly.Parse(a, CultureInfo.InvariantCulture) : DateOnly.FromDateTime(DateTime.Today);
                     switch (args[1])
                     {
@@ -101,7 +103,7 @@ public static class LigneDeCommande
                                 "Criteres de fin remplis : la beta se termine, le jour J des 37 autres peut se fixer.",
                                 "La beta ne se termine pas : un critere de fin manque (SOC-022 CA04).");
                         case "defauts":
-                            sortie.Write(RegleDefauts.Liste(d.Defauts));
+                            sortie.Write(RegleDefauts.Liste(d.Defauts, d.Signales));
                             return 0;
                     }
                     break;

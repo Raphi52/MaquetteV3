@@ -265,3 +265,52 @@ describe('Application : un onglet quitte garde son ecran', () => {
     expect(palettes()).toBe(1)
   })
 })
+
+// Lot 17 de la reconstruction (21/11/2026) : l'aide de la premiere ouverture (SOC-026 CA06) et le signalement d'un defaut
+// (SOC-022 CA06), montes par la page. « Deja vue » suit l'agent par sa preference AideVue (tests/SocleBetaCheck) ; ici,
+// la page ouvre l'aide quand le pont le demande, et la boite du signalement recoit l'ecran ouvert.
+describe('Application : premiere ouverture et signalement d\'un defaut', () => {
+  afterEach(retirerFauxPont)
+
+  const contexte = (ecran: string, codeEcran: string | null) => ({
+    mode: 'serveur', ecran, codeEcran, codeGreffe: '4302', greffe: 'Le Puy (4302)', agent: 'Jeanne Dupont', version: '2026.1.0',
+    heure: '21/11/2026 14:32', derniereErreur: null,
+  })
+
+  it('SOC-026 CA06 : a la premiere ouverture, la page ouvre « Premiers pas » ; deja vue, elle n\'ouvre rien', async () => {
+    installerFauxPont({ 'EcranAide.AOuvrirAuDemarrage': () => 'PROC_PREMIERS_PAS' })
+    const premiere = rendre(vueApplication({ barre: true }))
+    await waitFor(() => expect(premiere.gestes()).toContainEqual(['ouvrirCode', 'PROC_PREMIERS_PAS', 1]))
+    cleanup()
+    retirerFauxPont()
+    const pont = installerFauxPont({ 'EcranAide.AOuvrirAuDemarrage': () => null })
+    const deja = rendre(vueApplication({ barre: true }))
+    await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranAide.AOuvrirAuDemarrage'))
+    await new Promise((r) => setTimeout(r, 10))
+    expect(deja.gestes().filter(([nom]) => nom === 'ouvrirCode')).toEqual([])
+  })
+
+  it('SOC-026 CA06 : la fenetre d\'un onglet sorti (sans barre) ne rouvre pas l\'aide', async () => {
+    const pont = installerFauxPont({ 'EcranAide.AOuvrirAuDemarrage': () => 'PROC_PREMIERS_PAS' })
+    const { gestes } = rendre(vueApplication({ barre: false }))
+    await new Promise((r) => setTimeout(r, 10))
+    expect(pont.appels).not.toHaveBeenCalledWith('EcranAide.AOuvrirAuDemarrage')
+    expect(gestes()).toEqual([])
+  })
+
+  it('SOC-022 CA06 : Ctrl Maj D sur un ecran signale CET ecran ; le bouton de l\'en-tete, l\'accueil', async () => {
+    const pont = installerFauxPont({
+      'EcranAide.AOuvrirAuDemarrage': () => null,
+      'EcranSignalement.Preparer': (ecran, code) => contexte(ecran as string, code as string | null),
+    })
+    const { rerender, geste, plan } = rendre(vueApplication({ barre: true, proc: proc({ libelle: 'Creances' }) }))
+    fireEvent.keyDown(window, { key: 'D', ctrlKey: true, shiftKey: true })
+    expect((await screen.findByLabelText('Ce qui part avec votre phrase')).textContent).toContain('Creances')
+    expect(pont.appels).toHaveBeenCalledWith('EcranSignalement.Preparer', 'Creances', 'PROC_CREANCE')
+    fireEvent.click(screen.getByRole('button', { name: 'Annuler' }))
+    rerender(<Application vue={vueApplication({ barre: true, accueil: vuePlan() })} geste={geste} plan={plan} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Signaler un défaut' }))
+    await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranSignalement.Preparer', 'Accueil', null))
+    expect(screen.getByRole('dialog', { name: 'Signaler un défaut' })).toBeTruthy()
+  })
+})

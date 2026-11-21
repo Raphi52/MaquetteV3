@@ -13,12 +13,15 @@ public sealed record RechercheErreurs(string? Suivi, string? Greffe, string? Com
 /// <param name="Message">Le compte rendu du dernier geste (relance, recherche), ou la raison d'un refus ; null sinon.</param>
 /// <param name="Echec">Le message est un refus ou une erreur.</param>
 /// <param name="Erreurs">Le resultat de la derniere recherche dans le journal technique (les plus recentes a l'ouverture).</param>
+/// <param name="Defauts">Les defauts signales par les agents depuis la V3 (SOC-022 CA06, lot 17), les plus recents en premier ;
+/// filtres comme la recherche (identifiant de suivi, greffe).</param>
 public sealed record VueEcranSupervision(
     string Mode,
     string? Message,
     bool Echec,
     EtatSupervision? Etat,
-    ErreurTechnique[] Erreurs);
+    ErreurTechnique[] Erreurs,
+    DefautSignale[]? Defauts = null);
 
 /// <summary>
 /// Pont de l'ecran « Supervision » (web/src/ecrans/EcranSupervision.tsx) : ecran NEUF de la V3, « a maquetter » dans le
@@ -49,14 +52,15 @@ public static class EcranSupervision
 
     /// <summary>L'etat des greffes et des traitements, et les erreurs les plus recentes, lus sur <paramref name="serveur"/>.</summary>
     public static async Task<VueEcranSupervision> OuvrirAsync(ClientServeur? serveur, string? message = null, bool echec = false,
-                                                              ErreurTechnique[]? erreurs = null)
+                                                              ErreurTechnique[]? erreurs = null, DefautSignale[]? defauts = null)
     {
         if (serveur is null) return Demonstration();
         try
         {
             var etat = await serveur.LireAsync<EtatSupervision>(RoutesSupervision.Etat);
             erreurs ??= await serveur.LireAsync<ErreurTechnique[]>(RoutesSupervision.Erreurs);
-            return new VueEcranSupervision("serveur", message, echec, etat, erreurs);
+            defauts ??= await serveur.LireAsync<DefautSignale[]>(RoutesSupervision.DefautsSignales);
+            return new VueEcranSupervision("serveur", message, echec, etat, erreurs, defauts);
         }
         catch (Exception e) when (e is ErreurServeur or HttpRequestException or TaskCanceledException)
         {
@@ -72,11 +76,14 @@ public static class EcranSupervision
     {
         if (serveur is null) return Demonstration() with { Message = "Démonstration : la recherche demande le serveur de RIG.", Echec = true };
         ErreurTechnique[] erreurs;
+        DefautSignale[] defauts;
         try
         {
             erreurs = !string.IsNullOrWhiteSpace(criteres.Suivi)
                 ? await serveur.LireAsync<ErreurTechnique[]>(RoutesSupervision.PourParcours(criteres.Suivi.Trim()))
                 : await serveur.LireAsync<ErreurTechnique[]>(RoutesSupervision.Erreurs + Requete(criteres));
+            // SOC-022 CA06 : l'identifiant que l'agent dicte peut etre celui d'un defaut signale, pas d'une erreur.
+            defauts = await serveur.LireAsync<DefautSignale[]>(RoutesSupervision.DefautsSignales + RequeteDefauts(criteres));
         }
         catch (ErreurServeur e) when (e.CodeHttp == 400)
         {
@@ -87,11 +94,13 @@ public static class EcranSupervision
             return Refus(serveur, e);
         }
         var message = erreurs.Length == 0
-            ? "Aucune erreur ne répond à cette recherche."
+            ? defauts.Length > 0 && !string.IsNullOrWhiteSpace(criteres.Suivi)
+                ? $"{criteres.Suivi.Trim().ToUpperInvariant()} est un défaut signalé depuis la V3 ({defauts[0].Compte ?? "?"}, greffe {defauts[0].CodeGreffe ?? "?"}) : voir l'onglet Défauts."
+                : "Aucune erreur ne répond à cette recherche."
             : !string.IsNullOrWhiteSpace(criteres.Suivi)
                 ? $"Parcours {criteres.Suivi.Trim().ToUpperInvariant()} : {erreurs.Length} message(s), du premier au dernier."
                 : $"{erreurs.Length} erreur(s) trouvée(s), la plus récente en premier.";
-        return await OuvrirAsync(serveur, message, echec: false, erreurs);
+        return await OuvrirAsync(serveur, message, echec: false, erreurs, defauts);
     }
 
     /// <summary>Relance un traitement arrete (SOC-011 CA04) : le serveur trace le geste avec son auteur.</summary>
@@ -126,9 +135,11 @@ public static class EcranSupervision
         try
         {
             using var delai = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            return await serveur.EnvoyerAsync<ErreurEcran, SuiviErreur>(RoutesSupervision.ErreursEcran,
+            var suivi = await serveur.EnvoyerAsync<ErreurEcran, SuiviErreur>(RoutesSupervision.ErreursEcran,
                 new ErreurEcran(programme, cause.Message, cause.GetType().FullName, cause.ToString(), greffe,
                     (cause as ErreurServeur)?.Suivi, Environment.MachineName), delai.Token);
+            DerniereErreur = suivi;
+            return suivi;
         }
         catch (Exception e) when (e is ErreurServeur or HttpRequestException or TaskCanceledException or OperationCanceledException)
         {
@@ -147,6 +158,20 @@ public static class EcranSupervision
         try { serveur = ClientServeur.Actif; }
         catch (InvalidOperationException) { return Task.FromResult<SuiviErreur?>(null); }
         return SignalerAsync(serveur, programme, cause, SessionAgent.CodeGreffe);
+    }
+
+    /// <summary>
+    /// La derniere erreur montree a l'agent dans cette session (son identifiant de suivi), posee par <see cref="SignalerAsync"/> :
+    /// le signalement d'un defaut l'emporte sans saisie (SOC-022 CA06, Pont/EcranSignalement.cs). Null tant qu'aucune.
+    /// </summary>
+    public static SuiviErreur? DerniereErreur { get; private set; }
+
+    private static string RequeteDefauts(RechercheErreurs c)
+    {
+        var parties = new List<string>();
+        if (!string.IsNullOrWhiteSpace(c.Suivi)) parties.Add($"suivi={Uri.EscapeDataString(c.Suivi.Trim())}");
+        if (!string.IsNullOrWhiteSpace(c.Greffe)) parties.Add($"greffe={Uri.EscapeDataString(c.Greffe.Trim())}");
+        return parties.Count == 0 ? "" : "?" + string.Join("&", parties);
     }
 
     private static string Requete(RechercheErreurs c)
@@ -181,7 +206,7 @@ public static class EcranSupervision
 
     /// <summary>
     /// Sans serveur : les 40 greffes exploites (code, nom, instance), relus le 2026-11-20 dans COMMUN_RIG.dbo.GREFFE
-    /// (C:\Users\raphael.vilain\Documents\Autowin\refonte-rig\controles\bases-greffes.json). Les etats, traitements,
+    /// (C:\Users\raphael.vilain\Documents\Autowin\refonte-rig\controles\bases-greffes.json). Les etats, traitements, defauts signales,
     /// alertes et erreurs sont INVENTES pour montrer l'ecran : la base V3 n'existe encore pour aucun greffe.
     /// </summary>
     private static readonly (string Code, string Nom, string Serveur)[] GreffesExploites =
@@ -249,6 +274,13 @@ public static class EcranSupervision
             new(1, "4TNM-2C7R", passage.AddHours(-5), NiveauxErreur.Grave, OriginesErreur.Serveur, "8002", "jdupont", "RIGV3-APP-01",
                 "POST /numerotation/{greffe}/restitutions", "System.InvalidOperationException", "Sequence contains no elements.", null),
         ];
-        return new VueEcranSupervision("demo", null, false, etat, erreurs);
+        DefautSignale[] defauts =
+        [
+            new(2, "H8RZ-4K2Q", passage.AddMinutes(-25), "4302", "jdupont", "RDS-PUY-03", "Compteurs de numéros", "PROC_COMPTEURS_NUM", "2026.1.0",
+                new DateTimeOffset(2026, 11, 21, 9, 5, 0, TimeSpan.FromHours(1)), "Q3VZ-81HD", "Le numéro rendu ne réapparaît pas dans la liste après Rendre."),
+            new(1, "M2CX-7T9B", passage.AddHours(-4), "2801", "mlefevre", "RDS-CHARTRES-01", "Accueil", null, "2026.1.0",
+                new DateTimeOffset(2026, 11, 21, 5, 30, 0, TimeSpan.FromHours(1)), null, "La tuile des arrivées compte 12 courriers, la liste en montre 11."),
+        ];
+        return new VueEcranSupervision("demo", null, false, etat, erreurs, defauts);
     }
 }
