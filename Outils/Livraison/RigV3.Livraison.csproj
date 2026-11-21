@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- L'OUTIL DE LIVRAISON DE LA V3 (lot 12 du plan de reconstruction, 2026-11-21) :
+       SOC-009 paquet d'une version de la base et livraison par vagues (beta, metropole,
+       outre-mer) avec controle d'ecart et retour a la version precedente ;
+       SOC-010 sites de la partie serveur, fenetres de mise a jour, configuration d'un site ;
+       SOC-012 releve des versions des parties serveur et des serveurs RDS.
+       Il reprend, sans les recopier : le migrateur et le journal des livraisons (Base/), le
+       catalogue des greffes et le releve de schema (Serveur/Socle/Greffes), la regle
+       d'installation des serveurs RDS (Lanceur/Installation.cs).
+       Ligne de commande : en tete de Program.cs ; mode d'emploi :
+       docs/reconstruction/socle-exploitation.md. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>RigV3.Livraison</RootNamespace>
+    <AssemblyName>RigV3.Livraison</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../Lanceur/Installation.cs" Link="Lanceur/Installation.cs" />
+    <None Include="sites.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="paquet-serveur.ps1;installer-serveur.ps1" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Contrats/RigV3.Contrats.csproj" />
+  </ItemGroup>
+
+</Project>

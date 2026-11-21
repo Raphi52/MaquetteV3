@@ -26,6 +26,12 @@
     <Compile Remove="Serveur/**;Base/**;Contrats/**;docs/**" />
     <Content Remove="Serveur/**;Base/**;Contrats/**;docs/**" />
     <None Remove="Serveur/**;Base/**;Contrats/**;docs/**" />
+    <!-- Les outils d'exploitation (Outils/, phase 2 du plan) et le lanceur des serveurs
+         RDS (Lanceur/, SOC-012) ont aussi leur projet : sans ces lignes, leurs .cs
+         entreraient dans RigV3Desktop.exe (doublons de Main, d'App, de types). -->
+    <Compile Remove="Outils/**;Lanceur/**" />
+    <Content Remove="Outils/**;Lanceur/**" />
+    <None Remove="Outils/**;Lanceur/**" />
   </ItemGroup>
 
   <!-- Les types echanges avec le serveur V3 (Pont/ClientServeur.cs) : le meme
@@ -131,6 +137,7 @@
     <!-- Ni le serveur V3, ni ses migrations, ni la documentation : l'app n'en
          depend pas (Contrats/, si : l'app le reference, une retouche la reconstruit). -->
     <Watch Remove="Serveur/**;Base/**;docs/**" />
+    <Watch Remove="Outils/**;Lanceur/**" />
   </ItemGroup>
 
   <!-- Le controle WebView2 DIRECT (19/11/2026, retrait de Blazor). Version

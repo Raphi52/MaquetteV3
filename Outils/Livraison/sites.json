@@ -1,0 +1,38 @@
+{
+  "_lisezmoi": "SOC-010 : ou tourne la partie serveur de la V3. Un site par lieu d'hebergement ; un greffe est servi par le site qui porte l'instance SQL de sa base (colonne Serveur du catalogue commun), pour que l'appel n'ait jamais a traverser l'ocean. Instances relevees dans COMMUN_RIG.dbo.GREFFE (SQL-PROD\\PROD, 2026-11-20, controles\\bases-greffes.json) : 34 greffes sur SQL-PROD\\PROD, 3 sur RIGBD-ANTILLES, 2 sur RIGBD-REUNION, 1 sur RIGBD-POLYNESIE. Les adresses des serveurs et les comptes de service se posent au deploiement (docs\\reconstruction\\socle-exploitation.md). Heures d'ouverture : hypothese a valider avec le referent Socle (SOC-010 T04).",
+  "ouverture": {
+    "jours": [ "Monday", "Tuesday", "Wednesday", "Thursday", "Friday" ],
+    "debut": "07:00",
+    "fin": "20:00"
+  },
+  "sites": [
+    {
+      "nom": "Amitel",
+      "lieu": "Amitel (metropole)",
+      "instances": [ "SQL-PROD\\PROD" ],
+      "baseCommune": { "instance": "SQL-PROD\\PROD", "base": "RIGV3_COMMUN" },
+      "adresse": null
+    },
+    {
+      "nom": "Antilles",
+      "lieu": "Antilles (Guadeloupe, Martinique)",
+      "instances": [ "RIGBD-ANTILLES" ],
+      "baseCommune": { "instance": "RIGBD-ANTILLES", "base": "RIGV3_COMMUN" },
+      "adresse": null
+    },
+    {
+      "nom": "Reunion",
+      "lieu": "La Reunion (et Mayotte)",
+      "instances": [ "RIGBD-REUNION" ],
+      "baseCommune": { "instance": "RIGBD-REUNION", "base": "RIGV3_COMMUN" },
+      "adresse": null
+    },
+    {
+      "nom": "Polynesie",
+      "lieu": "Polynesie francaise",
+      "instances": [ "RIGBD-POLYNESIE" ],
+      "baseCommune": { "instance": "RIGBD-POLYNESIE", "base": "RIGV3_COMMUN" },
+      "adresse": null
+    }
+  ]
+}
