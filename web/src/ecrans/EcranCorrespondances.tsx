@@ -65,8 +65,23 @@ const ETATS_FICHE: Record<VueEcranCorrespondances['etatFiche'], string> = {
 
 const Message = { margin: 0, padding: 'var(--rig-esp-2) var(--rig-esp-3)' } as const
 const Grille = { tableLayout: 'fixed' } as const
-const Coupe = { overflow: 'hidden', textOverflow: 'ellipsis' } as const
 const Explication = { fontSize: 'var(--rig-fs-dense)', color: 'var(--rig-texte-2)', maxWidth: 'none' } as const
+/**
+ * La fiche se LIT : chaque texte entier, revenu a la ligne (retour du chef du plan, 21/11/2026 : « Ancienne t… »,
+ * « Nouveau dans la \ » et les commentaires etaient coupes). Les grilles de la charte tiennent sur une ligne
+ * (.rig-table tbody td, regle du 17/09/2026) parce qu'on y cherche une ligne parmi des centaines ; ici, on lit chaque
+ * ligne. La regle est donc propre a cette table (meme poids que celle de la charte, plus loin dans la page : elle
+ * l'emporte), pastilles et boutons compris. Sous 900 px, la table garde sa largeur et le cadre defile : une colonne
+ * ne tombe pas a quelques lettres. A l'impression, le bloc de recherche disparait.
+ */
+export const RETOUR_A_LA_LIGNE = [
+  '.rig-table.rig-fiche-touches { min-width: 900px; }',
+  '.rig-table.rig-fiche-touches thead th, .rig-table.rig-fiche-touches tbody td {'
+    + ' white-space: normal; overflow: visible; text-overflow: clip; max-width: none; overflow-wrap: break-word; vertical-align: top; }',
+  '.rig-table.rig-fiche-touches .rig-etat, .rig-table.rig-fiche-touches .rig-bouton { white-space: normal; text-align: left; }',
+  '@media print { .rig-criteres { display: none; } }',
+].join('\n')
+
 /** Sous un champ du bloc de gauche : la note dense de l'ecran des compteurs. */
 const Aide = { margin: '0 0 var(--rig-esp-2)', fontSize: 'var(--rig-fs-dense)', color: 'var(--rig-texte-2)' } as const
 
@@ -149,34 +164,34 @@ export function EcranCorrespondances({ ouvrir }: ProprietesEcranCorrespondances)
         </p>
 
         <div className="rig-table-cadre">
-          {/* Une ligne par ligne de grille (regle de la charte, 17/09/2026) : le texte entier est dans l'infobulle et a l'impression. */}
-          <style>{'@media print { .rig-fiche-touches td { white-space: normal; max-width: none; } .rig-criteres { display: none; } }'}</style>
+          {/* Le texte entier de chaque ligne, revenu a la ligne : RETOUR_A_LA_LIGNE. */}
+          <style>{RETOUR_A_LA_LIGNE}</style>
           <table className="rig-table rig-fiche-touches" style={Grille}>
             <colgroup>
-              <col style={{ width: '14%' }} /><col style={{ width: '8%' }} /><col style={{ width: '15%' }} />
-              <col style={{ width: '9%' }} /><col style={{ width: '9%' }} /><col style={{ width: '13%' }} /><col />
+              <col style={{ width: '14%' }} /><col style={{ width: '10%' }} /><col style={{ width: '15%' }} />
+              <col style={{ width: '11%' }} /><col style={{ width: '10%' }} /><col style={{ width: '13%' }} /><col />
             </colgroup>
             <thead>
               <tr>
                 {['Écran de l\'ancien RIG', 'Ancienne touche', 'Ce qu\'elle faisait', 'Dans la V3', 'Nouvelle touche', 'Écran de la V3', 'Comment']
-                  .map((t) => <th key={t} title={t} style={Coupe}>{t}</th>)}
+                  .map((t) => <th key={t}>{t}</th>)}
               </tr>
             </thead>
             <tbody>
               {trouvees.map((l) => (
                 <tr key={l.numero}>
-                  <td title={l.ecranV2} style={Coupe}>{l.ecranV2}</td>
+                  <td>{l.ecranV2}</td>
                   <td><Touche t={l.ancienneTouche} /></td>
-                  <td title={l.geste} style={Coupe}>{l.geste}</td>
+                  <td>{l.geste}</td>
                   <td><Statut s={l.statut} /></td>
                   <td><Touche t={l.nouvelleTouche} /></td>
-                  <td style={Coupe}>
+                  <td>
                     {l.nomEcranV3 && l.ouvrable && l.ecranV3
                       ? <button type="button" className="rig-bouton rig-bouton--plat" title={`Ouvrir « ${l.nomEcranV3} » pour essayer la touche`}
                                 onClick={() => ouvrir(l.ecranV3!)}>{l.nomEcranV3}</button>
                       : <span>{l.nomEcranV3 ?? '—'}</span>}
                   </td>
-                  <td title={l.explication} style={Explication}>{l.explication}</td>
+                  <td style={Explication}>{l.explication}</td>
                 </tr>
               ))}
               {trouvees.length === 0 && (

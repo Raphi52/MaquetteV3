@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Banc du lot 5 de la phase 2 du plan de reconstruction : SOC-018 (ouvrir les chaines signees de la V3 le jour du
+       passage). Un controle par critere CAxx, qui cite son id. Il lui faut le SQL Server de developpement
+       (docker compose up -d, racine du depot). Mode d'emploi : docs/reconstruction/socle-chaines.md.
+
+       net10.0-windows + WPF : l'app est referencee entiere (comme SocleAiguillageCheck) pour jouer l'ecran
+       Pont/EcranChaines.cs par le vrai ClientServeur contre le serveur en memoire. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SocleChainesCheck</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../RigV3Desktop.csproj" />
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+    <ProjectReference Include="../../Contrats/RigV3.Contrats.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
+  </ItemGroup>
+</Project>

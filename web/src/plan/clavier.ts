@@ -68,6 +68,25 @@ export function toucheDeRaccourci(e: KeyboardEvent): string | null {
   return /^[a-z]$/i.test(e.key) ? e.key.toUpperCase() : null
 }
 
+// LES TOUCHES DE LA RECHERCHE (SOC-027, decision du chef du plan « Reconstruction de RIG -- phase 2 »,
+// lot 4, 21/11/2026). Dans un critere d'un ecran de recherche, Entree lance la recherche, et F5 et F7
+// aussi : ce sont les touches de l'ancien RIG (OPE_SEARCH_*, OPE_CRITERES, frmREQUI.cs:424-425). La
+// fenetre ne les prend plus pour elle : F5 y rechargeait toute la V3 (la saisie en cours etait perdue)
+// et F7 basculait la navigation au curseur (Pont/PageWeb.cs, AreBrowserAcceleratorKeysEnabled). Un
+// ecran ou F5 avait un autre sens dans la V2 (Requisitions : effacer les criteres) le traite AVANT.
+// Le banc SoclePreferencesCheck verifie que chaque ecran ou Entree lance la recherche passe par ici.
+
+/** Les touches qui lancent la recherche dans un critere. */
+export const TOUCHES_RECHERCHE: readonly string[] = ['Enter', 'F5', 'F7']
+
+/** Vrai pour une touche qui lance la recherche (TOUCHES_RECHERCHE). F5 et F7 sont alors marquees
+ *  traitees ; Entree reste libre, comme avant. */
+export function toucheDeRecherche(e: { key: string; preventDefault(): void }): boolean {
+  if (!TOUCHES_RECHERCHE.includes(e.key)) return false
+  if (e.key !== 'Enter') e.preventDefault()
+  return true
+}
+
 /** Branche les raccourcis : `agir` recoit la touche (toucheDeRaccourci) et rend vrai
  *  s'il l'a jouee -- elle est alors consommee. Rend la fonction qui retire l'ecoute. */
 export function ecouterRaccourcis(agir: (touche: string) => boolean, doc: Document = document): () => void {

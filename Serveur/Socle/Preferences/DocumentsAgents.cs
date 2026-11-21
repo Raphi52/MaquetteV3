@@ -86,6 +86,19 @@ public static class DocumentsAgents
             : throw new InvalidOperationException($"Aucun compte « {compte} » dans la base de ce greffe : le document n'est pas depose.");
     }
 
+    /// <summary>
+    /// Le fichier du document <paramref name="id"/> s'il est a l'agent <paramref name="idCompte"/> ; null sinon (le document
+    /// d'un autre agent n'existe pas pour lui). Le chemin a ete ecrit par la partie serveur (<see cref="DeposerAsync"/>),
+    /// jamais par un agent.
+    /// </summary>
+    public static async Task<string?> FichierAsync(SqlConnection cn, int idCompte, int id, CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("SELECT Fichier FROM soc.DocumentAgent WHERE Id = @doc AND IdCompte = @id;", cn);
+        cmd.Parameters.Add(new SqlParameter("@doc", SqlDbType.Int) { Value = id });
+        cmd.Parameters.Add(new SqlParameter("@id", SqlDbType.Int) { Value = idCompte });
+        return await cmd.ExecuteScalarAsync(ct) as string;
+    }
+
     /// <summary>Marque remis a cette session les documents non remis de l'agent, et les rend (du plus ancien au plus recent).</summary>
     private static async Task<DocumentRecu[]> RemettreAsync(SqlConnection cn, SqlTransaction tx, int idCompte, string serveur, string session,
                                                             CancellationToken ct)

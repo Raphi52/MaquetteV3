@@ -96,6 +96,17 @@ describe('EcranRequisitions', () => {
     expect(gestes).toEqual([['Critere', { champ: 'CritRaisonSociale', valeur: 'TRANS' }], ['Rechercher', null]])
   })
 
+  it('F7 lance la recherche et F5 efface les criteres, comme dans l\'ancien RIG (frmREQUI.cs:421-425) ; la page ne les garde pas', async () => {
+    const { gestes } = session()
+    render(<EcranRequisitions />)
+    const raison = await screen.findByPlaceholderText('nom de la societe')
+
+    // fireEvent rend faux quand la touche est marquee traitee (preventDefault) : le navigateur n'en fait rien.
+    expect(fireEvent.keyDown(raison, { key: 'F7' })).toBe(false)
+    expect(fireEvent.keyDown(raison, { key: 'F5' })).toBe(false)
+    expect(gestes).toEqual([['Rechercher', null], ['Effacer', null]])
+  })
+
   it('la limite de dossiers (un @bind d\'entier) ne remonte qu\'a la sortie du champ', async () => {
     const { gestes } = session()
     render(<EcranRequisitions />)

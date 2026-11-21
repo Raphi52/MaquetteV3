@@ -32,6 +32,7 @@ import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { EnteteTriable } from '../composants/EnteteTriable'
 import { dateSaisie } from '../saisie'
+import { toucheDeRecherche } from '../plan/clavier'
 
 export interface NatureAffaire {
   code: string
@@ -240,9 +241,9 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
   return (
     <div className="rig-proc__corps">
 
-      {/* Entree dans le bloc des criteres = clic sur Rechercher. C'est le geste
-          de RIG v2 : on tape, on valide, sans lacher le clavier. */}
-      <aside className="rig-criteres" onKeyDown={(e) => { if (e.key === 'Enter') rechercher() }}>
+      {/* Entree (ou F5, F7) dans le bloc des criteres = clic sur Rechercher. C'est le
+          geste de RIG v2 : on tape, on valide, sans lacher le clavier. */}
+      <aside className="rig-criteres" onKeyDown={(e) => { if (toucheDeRecherche(e)) rechercher() }}>
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Criteres de recherche</div>
 
         <label className="rig-saisie-champ">

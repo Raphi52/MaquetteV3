@@ -62,6 +62,7 @@ import { EcranRedaction } from '../ecrans/EcranRedaction'
 import { EcranRequisitions } from '../ecrans/EcranRequisitions'
 import { EcranStatistiques } from '../ecrans/EcranStatistiques'
 import { EcranTachesLot } from '../ecrans/EcranTachesLot'
+import { EcranChaines } from '../ecrans/EcranChaines'
 import { EcranTeletransmission } from '../ecrans/EcranTeletransmission'
 import { EcranVerrous } from '../ecrans/EcranVerrous'
 import type { GestePlan, ProcVue } from './types'
@@ -210,6 +211,11 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
 
     case 'PROC_GESTEMAIL':
       return <EcranMessagerie />
+
+    case 'PROC_CERTIF':
+      // Reprise de PROC_CERTIF de la V2 (SOC-018 T03, « a maquetter ») : les chaines signees de la V3 -- journal des
+      // evenements filtre, grands totaux en lecture seule, controle d'integrite, purge du seul journal purgeable archive.
+      return <EcranChaines />
 
     case 'PROC_MAIL_LOT1':
       // Reprise de PROC_MAIL_LOT1 de la V2 (« Mails envoyés en Lot 1 », SOC-006) : les courriels envoyes par la V3 et leur

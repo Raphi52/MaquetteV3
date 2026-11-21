@@ -877,7 +877,9 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private void DetacherDocument()
     {
         if (ApercuNoeud is null) return;
-        var rang = Partage!.RangLibre(FenetresDetachees.Select(f => f.Rang));
+        // Le rang libre se prend sur TOUTES les fenetres de document ouvertes (celles d'un autre onglet sorti,
+        // un document recu du serveur, SOC-013) : sur les seules siennes, deux fenetres liraient le meme emplacement.
+        var rang = Partage!.RangLibre(FenetreDocument.RangsOuverts());
         Partage!.Publier(rang, ApercuNoeud,
             ValeursDocument(ApercuNoeud).Select(v => (v.Libelle, v.Valeur)).ToList());
         var piece = ApercuNoeud;

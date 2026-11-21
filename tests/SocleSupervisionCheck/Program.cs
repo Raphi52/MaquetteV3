@@ -345,8 +345,9 @@ try
     await surveillant.PasserAsync();
     var publies = await Lignes(commune.Nom, "SELECT Traitement, Etat FROM soc.EtatTraitement WHERE Serveur = 'BANC-APP' ORDER BY Traitement;");
     var historique1 = Convert.ToInt32(await Scalaire(commune.Nom, "SELECT COUNT(*) FROM soc.EtatTraitementHistorique WHERE Serveur = 'BANC-APP';"));
-    Exiger(publies.Count == 2 && publies.Any(l => (string)l[0]! == TraitementsSupervision.PartieServeur && (string)l[1]! == EtatsTraitement.EnMarche)
-           && publies.Any(l => (string)l[0]! == "Banc") && historique1 == 2,
+    // Un etat par traitement inscrit sur le serveur (le « Banc », et ceux des modules du socle : clotures NF525...) plus la partie serveur.
+    Exiger(publies.Count == moteur.Noms.Count + 1 && publies.Any(l => (string)l[0]! == TraitementsSupervision.PartieServeur && (string)l[1]! == EtatsTraitement.EnMarche)
+           && publies.Any(l => (string)l[0]! == "Banc") && historique1 == publies.Count,
         $"SOC-011 CA01 : la partie serveur publie son etat et celui de chacun de ses traitements, et l'historique le garde " +
         $"({string.Join(", ", publies.Select(l => $"{l[0]} : {l[1]}"))})");
 
@@ -377,7 +378,7 @@ try
         }, [.. ServeurRig.Decouvrir(typeof(ServeurRig).Assembly), new ModuleBanc()]);
         await auto.StartAsync();
         var instants = await Attendre(async () => (await Lignes(communeAuto.Nom,
-                "SELECT PublieLe FROM soc.EtatTraitementHistorique WHERE Serveur = 'BANC-AUTO' ORDER BY PublieLe;"))
+                "SELECT PublieLe FROM soc.EtatTraitementHistorique WHERE Serveur = 'BANC-AUTO' AND Traitement = '" + TraitementsSupervision.PartieServeur + "' ORDER BY PublieLe;"))
                 .Select(l => (DateTime)l[0]!).ToList(), l => l.Count >= 3, 12);
         var ecarts = instants.Zip(instants.Skip(1), (a, b) => (b - a).TotalSeconds).ToList();
         Exiger(instants.Count >= 3 && ecarts.All(e => e is > 0.5 and < 3),

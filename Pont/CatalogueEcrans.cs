@@ -61,7 +61,8 @@ public static class CatalogueEcrans
             new("PROC_CREANCE", "Creances"),
             new("PROC_FCLIENT", "Fiches clients"),
             new("PROC_GCLIENT", "Gestion clients"),
-            new("PROC_COMPTABILISATION", "Comptabilisation")
+            new("PROC_COMPTABILISATION", "Comptabilisation"),
+            new("PROC_CERTIF", "Certification NF525")
         ]),
         new("ADM", "Administration", "attente",
         [

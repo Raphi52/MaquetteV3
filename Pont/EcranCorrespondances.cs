@@ -79,13 +79,14 @@ public static class EcranCorrespondances
     public const string PageRecherche = "RECHERCHE";
 
     /// <summary>
-    /// Les ecrans de la V3 ou Entree, dans un critere, lance la recherche. Le banc lit leur .tsx et refuse un ecran annonce
-    /// ici qui ne le fait pas, ou un ecran qui le fait sans y etre (CA04). Les autres ecrans de recherche de la V3 n'ont que
-    /// leur bouton Rechercher : la fiche le dit, plutot que de promettre Entree.
+    /// Les ecrans de la V3 ou Entree, F5 et F7, dans un critere, lancent la recherche (web/src/plan/clavier.ts,
+    /// toucheDeRecherche : les touches de l'ancien RIG ; la fenetre ne recharge plus sur F5, Pont/PageWeb.cs). Le banc lit
+    /// leur .tsx et refuse un ecran annonce ici qui ne le fait pas, ou un ecran qui le fait sans y etre (CA04). Les autres
+    /// ecrans de recherche de la V3 n'ont que leur bouton Rechercher : la fiche le dit, plutot que de promettre une touche.
     /// </summary>
     public static readonly IReadOnlySet<string> EntreeLanceLaRecherche = new HashSet<string>
     {
-        "PROC_RECHAFF", "PROC_REQUI", "PROC_COMMANDES_WEB",
+        "PROC_RECHAFF", "PROC_REQUI", "PROC_COMMANDES_WEB", "PROC_CERTIF",
     };
 
     /// <summary>
@@ -97,6 +98,15 @@ public static class EcranCorrespondances
     {
         "PROC_ACTES_NUM", "PROC_DEMANDE", "PROC_GEDJUD", "PROC_COFFRE_FORT", "PROC_GCLIENT", "PROC_UTILISATEUR",
     };
+
+    /// <summary>
+    /// Les ecrans de la V3 ou F5, dans un critere, efface les criteres et la liste comme dans la V2 (Requisitions : RAZ,
+    /// frmREQUI.cs:421) au lieu de lancer la recherche. Le banc le verifie dans leur .tsx.
+    /// </summary>
+    public static readonly IReadOnlySet<string> F5EffaceLesCriteres = new HashSet<string> { "PROC_REQUI" };
+
+    /// <summary>Les touches qui lancent la recherche dans un critere de la V3 (TOUCHES_RECHERCHE de web/src/plan/clavier.ts).</summary>
+    public static readonly IReadOnlySet<string> TouchesDeRecherche = new HashSet<string> { "Entree", "F5", "F7" };
 
     /// <summary>Les fenetres de la V2 que la V3 remplace par un autre ecran (ni au menu, ni sous leur code).</summary>
     public static readonly IReadOnlyDictionary<string, string> EcransRemplaces = new Dictionary<string, string>
@@ -219,9 +229,10 @@ public static class EcranCorrespondances
     // de l'accueil, F7 de la gestion des audiences, recherche en commentaire dans la V2) tombait dans la regle « rechercher » et
     // la fiche annoncait a tort « Entree n'y lance pas la recherche » : regle a part ; et quatre ecrans de la V2 au menu sous un
     // autre code (experts, juges, divergences BEN, habilitations) sortaient « pas au menu » : EcransRemplaces.
+    // Decision du chef du plan (21/11/2026) : F5 et F7 ne rechargent plus la fenetre (Pont/PageWeb.cs) et lancent la
+    // recherche la ou Entree la lance : la fiche ne previent plus que « F5 recharge toute la fenetre ».
     public static (string? Nouvelle, string Statut, string Explication) Regle(string touche, string action, string ecranV3, bool construit)
     {
-        const string F5Recharge = " Attention : dans la V3, F5 recharge toute la fenêtre.";
         switch (action)
         {
             case "sans-effet":
@@ -240,15 +251,19 @@ public static class EcranCorrespondances
             case "rechercher" or "valider-saisie" when ecranV3 == PageRecherche:
                 return ("Ctrl K", StatutsCorrespondance.NouvelleTouche, "Les fenêtres de recherche de l'ancien RIG sont remplacées par la palette : Ctrl K, la saisie, puis Entrée.");
             case "rechercher" when EntreeLanceLaRecherche.Contains(ecranV3):
-                return ("Entrée", touche == "Entree" ? StatutsCorrespondance.Identique : StatutsCorrespondance.NouvelleTouche,
-                        touche == "Entree" ? "Entrée dans un critère lance la recherche, comme avant."
-                                           : $"{Lisible(touche)} n'est pas repris : Entrée dans un critère lance la recherche." + (touche == "F5" ? F5Recharge : ""));
+            {
+                // Sur un ecran ou F5 efface les criteres (Requisitions), seules Entree et F7 lancent la recherche.
+                var f5Efface = F5EffaceLesCriteres.Contains(ecranV3);
+                var lancent = f5Efface ? "Entrée et F7 la lancent ; F5 y efface les critères" : "Entrée, F5 et F7 la lancent toutes les trois";
+                return TouchesDeRecherche.Contains(touche) && !(f5Efface && touche == "F5")
+                    ? (Lisible(touche), StatutsCorrespondance.Identique, $"{Lisible(touche)} dans un critère lance la recherche, comme avant ; {lancent}.")
+                    : ("Entrée", StatutsCorrespondance.NouvelleTouche, $"{Lisible(touche)} n'est pas repris pour la recherche : {lancent}.");
+            }
             case "rechercher" when RechercheAuFilDeLaSaisie.Contains(ecranV3):
-                return (null, StatutsCorrespondance.Geste,
-                        "La liste se filtre au fil de la saisie des critères : plus besoin de la lancer." + (touche == "F5" ? F5Recharge : ""));
+                return (null, StatutsCorrespondance.Geste, "La liste se filtre au fil de la saisie des critères : plus besoin de la lancer.");
             case "rechercher" when construit:
                 return (null, StatutsCorrespondance.Supprimee,
-                        "L'écran de la V3 n'a pas de critère de recherche : il montre sa liste entière (écart à valider)." + (touche == "F5" ? F5Recharge : ""));
+                        "L'écran de la V3 n'a pas de critère de recherche : il montre sa liste entière (écart à valider).");
             case "valider-saisie" when construit:
                 return (null, StatutsCorrespondance.Geste, "Plus besoin de valider le champ : la V3 prend la saisie au fil de la frappe.");
             case "valider-ligne" or "ouvrir-ligne" when ecranV3 == PageRecherche:
@@ -258,9 +273,11 @@ public static class EcranCorrespondances
                 return (null, StatutsCorrespondance.Geste, "Un clic sur la ligne l'ouvre : la V3 ne choisit pas encore une ligne au clavier (écart signalé).");
             case "actualiser" when construit:
                 return (null, StatutsCorrespondance.Geste,
-                        ecranV3 == Accueil ? "Les tuiles de l'accueil se relisent seules." : "La liste se relit à l'ouverture de l'écran et après chaque geste ; relancer la recherche la relit." + F5Recharge);
+                        ecranV3 == Accueil ? "Les tuiles de l'accueil se relisent seules." : "La liste se relit à l'ouverture de l'écran et après chaque geste ; relancer la recherche la relit.");
+            case "effacer-criteres" when touche == "F5" && F5EffaceLesCriteres.Contains(ecranV3):
+                return ("F5", StatutsCorrespondance.Identique, "F5 dans un critère efface les critères et la liste, comme avant (bouton Réinitialiser).");
             case "effacer-criteres" when construit:
-                return (null, StatutsCorrespondance.Geste, "Vider les champs des critères : la V3 n'a pas de touche pour tout effacer." + (touche == "F5" ? F5Recharge : ""));
+                return (null, StatutsCorrespondance.Geste, "Vider les champs des critères : la V3 n'a pas de touche pour tout effacer.");
             case "arreter-chargement" when construit:
                 return ("Échap", StatutsCorrespondance.NouvelleTouche, "Échap ferme l'affaire, et avec elle ce qu'elle chargeait.");
             case "adresse" when ecranV3 == "PROC_FCLIENT":

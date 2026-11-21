@@ -17,7 +17,8 @@ namespace RigV3Desktop.Pont;
 //   2. le depot se branche (AccueilEtat.Distant) : chaque reglage change part au serveur, en
 //      arriere-plan, seulement ce qui a change ;
 //   3. la session est declaree (serveur RDS + session) : les documents qui attendaient l'agent lui
-//      sont remis (CA04), puis la releve ne rend que ceux de CETTE session (CA03).
+//      sont remis (CA04), puis la releve ne rend que ceux de CETTE session (CA03). Chaque document
+//      remis leve DocumentsArrives ; Pont/DocumentsRecus.cs l'ouvre dans une fenetre de document.
 // Sans RIGV3_SERVEUR, rien de tout cela : accueil.json seul, comme avant.
 //
 // Ce fichier ne depend que de ClientServeur, de Contrats/ et d'AccueilEtat : le banc
@@ -71,8 +72,13 @@ public sealed class PreferencesServeur : IDepotPreferences
     /// <summary>Les documents recus par cette session, du plus ancien au plus recent.</summary>
     public IReadOnlyList<DocumentRecu> Recus { get { lock (verrou) return [.. recus]; } }
 
-    /// <summary>Des documents viennent d'arriver pour cette session (a l'ouverture ou a une releve).</summary>
-    public event Action<DocumentRecu[]>? DocumentsArrives;
+    /// <summary>
+    /// Des documents viennent d'arriver pour la session ouverte : a l'ouverture (CA04) ou a une releve (CA03). L'evenement
+    /// est celui de l'application, pas d'un depot : l'app s'y abonne UNE fois, avant l'ouverture, sinon les documents qui
+    /// attendaient l'agent arriveraient sans personne pour les ouvrir (Pont/DocumentsRecus.cs). Leve sur le fil de
+    /// l'ouverture, ou sur un fil du pool pour la releve.
+    /// </summary>
+    public static event Action<PreferencesServeur, DocumentRecu[]>? DocumentsArrives;
 
     /// <summary>
     /// L'ouverture (voir l'en-tete). <paramref name="serveur"/> et <paramref name="session"/> : null = ce poste
@@ -238,11 +244,15 @@ public sealed class PreferencesServeur : IDepotPreferences
         return documents;
     }
 
+    /// <summary>Le contenu d'un document de l'agent, pour l'ouvrir a l'ecran (le fichier est sur le serveur, pas ici).</summary>
+    public Task<ContenuDocument> LireContenuAsync(int id, CancellationToken ct = default)
+        => client.LireAsync<ContenuDocument>(RoutesPreferences.PourDocument(greffe, id), ct);
+
     private void Recevoir(DocumentRecu[] documents)
     {
         if (documents.Length == 0) return;
         lock (verrou) recus.AddRange(documents);
-        DocumentsArrives?.Invoke(documents);
+        DocumentsArrives?.Invoke(this, documents);
     }
 
     /// <summary>La session Windows de ce processus et une marque propre a cette V3.</summary>
