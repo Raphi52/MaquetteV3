@@ -17,6 +17,7 @@ using RigV3.Contrats.Socle;
 using RigV3.Serveur;
 using RigV3.Serveur.Socle.Chaines;
 using RigV3.Serveur.Socle.Greffes;
+using RigV3.Serveur.Socle.Supervision;
 using RigV3Desktop.Pont;
 
 // Banc du LOT 5 de la phase 2 du plan de reconstruction (2026-11-21) : SOC-018, ouvrir les chaines signees de la V3 le
@@ -147,6 +148,9 @@ await using var app = ServeurRig.Construire(["--environment", "Development"], s 
     s.Configuration["ConnectionStrings:RigV3"] = commune.Connexion;
     s.Configuration[CatalogueGreffes.CleAuthentification] = authentification.ConnectionString;
     s.Configuration[SignatureDeFond.Reglage] = "0";
+    // Les passages du planificateur et du moteur de traitements, le banc les joue lui-meme, a l'instant qu'il choisit.
+    s.Configuration["Supervision:Automatique"] = "false";
+    s.Configuration[ReglagesPlanificateur.CleIntervalle] = "0";
     s.Services.AddSingleton<ICoffreCles>(coffre);
 });
 await app.StartAsync();
@@ -543,7 +547,171 @@ if (OperatingSystem.IsWindows())
     finally { cle.Key.Delete(); }
 }
 
-Reste("SOC-018 CA05 : la cloture quotidienne automatique (job de la V2) n'est pas planifiee : la route des clotures attend le traitement de fond qui l'appellera (SOC-011)");
+// =====================================================================================================================
+// CA05 T02 : les clotures automatiques chaque soir et le dernier jour du mois (le job de 22h de la V2, avec rattrapage)
+// =====================================================================================================================
+Console.WriteLine("--- SOC-018 CA05 T02 : clotures automatiques (traitement de fond planifie)");
+// Les instants du banc sont ceux de la FIN d'annee 2025 (passes : la route refuse de clore une periode pas finie) ; le greffe
+// est a Paris (UTC+1 en hiver) : 22h00 chez lui = 21h00 UTC. Le planificateur recoit l'instant, le banc ne depend pas de l'horloge.
+static DateTime Z(int jour, int heure, int minute) => new(2025, 12, jour, heure, minute, 0, DateTimeKind.Utc);
+const string Panne = "9201";      // le greffe dont la base ne repond pas au moment de clore : code le plus petit, donc traite AVANT l'autre
+const string Bon = "9202";
+const string Copie = "9203";      // la copie anonymisee
+const string Absent = "9204";     // dans le catalogue, base introuvable
+await using var baseNuitPanne = await BaseJetable.CreerAsync("SocleChainesNuitP");
+await using var baseNuitBon = await BaseJetable.CreerAsync("SocleChainesNuitB");
+await using var baseNuitCopie = await BaseJetable.CreerAsync("SocleChainesNuitC");
+
+async Task OuvrirNuit(string code, BaseJetable b)
+{
+    await Migrateur.AppliquerAsync(b.Connexion, migrations);
+    await Executer(commune.Connexion,
+        "INSERT INTO soc.Greffe (CodeGreffe, Nom, Serveur, BaseV2, BaseV3, EstBeta, EstOutreMer, Fuseau, ModifiePar, ModifieLe) " +
+        "VALUES (@c, N'Greffe de nuit du banc', @s, @v2, @v3, 0, 0, 'Romance Standard Time', 'banc', SYSDATETIME());",
+        ("@c", code), ("@s", serveurBancs.DataSource), ("@v2", "RIG_BANC_" + code), ("@v3", b.Nom));
+    await using var cn = new SqlConnection(b.Connexion);
+    await cn.OpenAsync();
+    await chaines.OuvrirAsync(cn, code, "Romance Standard Time", "banc", null);
+    // Le passage a eu lieu le 29/12/2025 chez ce greffe : les jours se clotent a partir de la.
+    // (Bancs seulement, base jetable : l'ouverture est inalterable en vrai, le declencheur est leve le temps de dater le passage.)
+    await Executer(b.Connexion, "DISABLE TRIGGER soc.Certification_Inalterable ON soc.Certification; UPDATE soc.Certification SET OuverteLe = '2025-12-29T08:00:00'; ENABLE TRIGGER soc.Certification_Inalterable ON soc.Certification;");
+    for (var i = 0; i < 3; i++)
+    {
+        await using var tx = (SqlTransaction)await cn.BeginTransactionAsync();
+        await chaines.SignerFactureAsync(cn, tx, new PieceFacture($"N-{code}-{i + 1}", "FACTURE", new DateTime(2025, 12, 29 + i, 10, 0, 0), 100m + i, "Client", "80000", null,
+            [new LigneTva(20.00m, 100m + i)]));
+        await tx.CommitAsync();
+    }
+}
+await OuvrirNuit(Panne, baseNuitPanne);
+await OuvrirNuit(Bon, baseNuitBon);
+
+var planificateur = app.Services.GetRequiredService<PlanificateurNocturne>();
+var moteur = app.Services.GetRequiredService<MoteurTraitements>();
+async Task<List<string>> Clos(BaseJetable b)
+{
+    var l = new List<string>();
+    await using var cn = new SqlConnection(b.Connexion);
+    await cn.OpenAsync();
+    await using var cmd = new SqlCommand("SELECT Type + ':' + Periode FROM soc.GrandTotalFactures ORDER BY Seq;", cn);
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync()) l.Add(r.GetString(0));
+    return l;
+}
+IEnumerable<DepotPlanifie> Pour(IEnumerable<DepotPlanifie> bilan, params string[] codes) => bilan.Where(d => codes.Contains(d.Greffe));
+async Task<bool> JourSigne(BaseJetable b, string periode)
+    => await Scalaire<int>(b.Connexion, "SELECT COUNT(*) FROM soc.GrandTotalFactures WHERE Type = 'GTP' AND Periode = @p AND Signature IS NOT NULL;", ("@p", periode)) == 1
+    && await Scalaire<int>(b.Connexion, "SELECT COUNT(*) FROM soc.GrandTotalEncaissements WHERE Type = 'GTP' AND Periode = @p AND Signature IS NOT NULL;", ("@p", periode)) == 1;
+
+// --- Contre-epreuve (rouge attendu) : sans tache planifiee -- le defaut de la V3 avant ce lot, personne n'appelle la cloture --
+// le controle « chaque greffe a sa cloture du jour signee » doit etre ROUGE.
+var muette = new TacheMuette();
+var sansTache = new PlanificateurNocturne([muette], app.Services.GetRequiredService<CatalogueGreffes>(), moteur, app.Services.GetRequiredService<RigV3.Serveur.BaseRig>(),
+    app.Services.GetRequiredService<RigV3.Serveur.Socle.Supervision.JournalErreurs>(), app.Services.GetRequiredService<RigV3.Serveur.Socle.Supervision.ReglagesSupervision>(),
+    app.Services.GetRequiredService<ReglagesPlanificateur>(), Microsoft.Extensions.Logging.Abstractions.NullLogger<PlanificateurNocturne>.Instance);
+await sansTache.PasserAsync(Z(29, 21, 30));
+var faitsMuet = await moteur.PasserAsync(ClotureNocturne.NomTraitement);
+var controleRouge = await JourSigne(baseNuitPanne, "20251229") && await JourSigne(baseNuitBon, "20251229");
+Exiger(!controleRouge && faitsMuet == 0,
+    "SOC-018 CA05 T02 (contre-epreuve) : sans tache planifiee (le defaut d'avant ce lot), le controle « chaque greffe a sa cloture du jour signee » est ROUGE : personne ne clot");
+
+// --- Deux greffes ouverts, l'heure passee : chacun a sa cloture du jour signee -----------------------------------------
+var bilan1 = (await planificateur.PasserAsync(Z(29, 21, 30))).ToList();
+var faits1 = await moteur.PasserAsync(ClotureNocturne.NomTraitement);
+Exiger(Pour(bilan1, Panne, Bon).Count(d => d.Traitement == ClotureNocturne.NomTraitement && d.Deposes == 1 && d.Erreur is null) == 2 && faits1 == 2
+       && await JourSigne(baseNuitPanne, "20251229") && await JourSigne(baseNuitBon, "20251229"),
+    $"SOC-018 CA05 T02 : le 29/12 a 22h30 chez les deux greffes, chacun a sa cloture du jour (grands totaux des factures et des encaissements) signee ({faits1} elements faits)");
+await using (var cn = new SqlConnection(baseNuitBon.Connexion))
+{
+    await cn.OpenAsync();
+    var bilanBon = await ControleIntegrite.ControlerAsync(chaines, cn, "banc", null);
+    var auteur50 = await Scalaire<string>(baseNuitBon.Connexion, "SELECT TOP (1) Auteur FROM soc.EvenementTechnique WHERE Code = 50 AND Seq IS NOT NULL ORDER BY Seq DESC;");
+    Exiger(bilanBon.Integre && auteur50 == ClotureNocturne.Auteur,
+        $"SOC-018 CA05 T02 : la cloture automatique passe le controle d'integrite et son evenement 50 est signe par la partie serveur (« {auteur50} »)");
+}
+// Jumeau de la borne : 21h59 chez le greffe, rien de nouveau n'est du ; 22h00 pile, la veille du jour est due.
+var avant22 = await planificateur.PasserAsync(Z(30, 20, 59));
+Exiger(Pour(avant22, Panne, Bon).All(d => d.Deposes == 0 && d.Erreur is null),
+    "SOC-018 CA05 T02 (jumeau) : a 21h59 chez le greffe, le 30/12 n'est pas du : rien n'est depose (l'heure reglee est 22:00)");
+Exiger((await Clos(baseNuitBon)).SequenceEqual(["GTP:20251229"]),
+    $"SOC-018 CA05 T02 (jumeau) : pas de cloture du mois avant le dernier jour ({string.Join(", ", await Clos(baseNuitBon))})");
+
+// --- Un greffe injoignable n'arrete pas l'autre, et remonte en supervision ----------------------------------------------
+await Executer(commune.Connexion,
+    "INSERT INTO soc.Greffe (CodeGreffe, Nom, Serveur, BaseV2, BaseV3, EstBeta, EstOutreMer, Fuseau, ModifiePar, ModifieLe) " +
+    "VALUES (@c, N'Greffe sans base', @s, @v2, N'RIGV3_BANC_ABSENTE', 0, 0, 'Romance Standard Time', 'banc', SYSDATETIME());",
+    ("@c", Absent), ("@s", serveurBancs.DataSource), ("@v2", "RIG_BANC_" + Absent));
+var erreursAvant = await Scalaire<int>(commune.Connexion, "SELECT COUNT(*) FROM soc.ErreurTechnique WHERE CodeGreffe = @g AND Origine = 'traitement';", ("@g", Absent));
+var bilan3 = (await planificateur.PasserAsync(Z(30, 21, 0))).ToList();   // 22h00 pile chez le greffe : la borne est « a partir de »
+var enFile = await Scalaire<int>(commune.Connexion, "SELECT COUNT(*) FROM soc.FileTraitement WHERE Traitement = @t AND Etat = 'en attente';", ("@t", ClotureNocturne.NomTraitement));
+var injoignable = Pour(bilan3, Absent).Single(d => d.Traitement == ClotureNocturne.NomTraitement);
+var erreursApres = await Scalaire<int>(commune.Connexion, "SELECT COUNT(*) FROM soc.ErreurTechnique WHERE CodeGreffe = @g AND Origine = 'traitement';", ("@g", Absent));
+Exiger(injoignable.Erreur is not null && Pour(bilan3, Panne, Bon).All(d => d.Deposes == 1 && d.Erreur is null) && enFile == 2 && erreursApres == erreursAvant + 1,
+    $"SOC-018 CA05 T02 : un greffe dont la base est introuvable n'empeche pas le depot des deux autres, et son echec est au journal technique avec son code (supervision) : {injoignable.Erreur}");
+var meme = await planificateur.PasserAsync(Z(30, 21, 0));
+Exiger(Pour(meme, Panne, Bon).All(d => d.Deposes == 0)
+       && await Scalaire<int>(commune.Connexion, "SELECT COUNT(*) FROM soc.ErreurTechnique WHERE CodeGreffe = @g AND Origine = 'traitement';", ("@g", Absent)) == erreursApres,
+    "SOC-018 CA05 T02 (jumeau) : un second passage ne redepose pas ce qui attend deja en file et ne redit pas l'echec du meme greffe pendant la pause");
+
+// Au moment de clore, la base du greffe « Panne » ne repond plus (son code passe avant celui de « Bon »).
+await Executer(commune.Connexion, "UPDATE soc.Greffe SET BaseV3 = N'RIGV3_BANC_EN_PANNE', ModifiePar = 'banc', ModifieLe = SYSDATETIME() WHERE CodeGreffe = @c;", ("@c", Panne));
+var faits3 = await moteur.PasserAsync(ClotureNocturne.NomTraitement);
+var etatMoteur = (await moteur.EtatsAsync()).Single(e => e.Traitement == ClotureNocturne.NomTraitement);
+var erreurPanne = await Scalaire<int>(commune.Connexion, "SELECT COUNT(*) FROM soc.ErreurTechnique WHERE CodeGreffe = @g AND Origine = 'traitement' AND Programme LIKE '%chaines-clotures%';", ("@g", Panne));
+Exiger(faits3 == 2 && (await Clos(baseNuitBon)).SequenceEqual(["GTP:20251229", "GTP:20251230"]) && (await Clos(baseNuitPanne)).SequenceEqual(["GTP:20251229"])
+       && erreurPanne == 1 && etatMoteur.Etat != EtatsTraitement.EnErreur,
+    $"SOC-018 CA05 T02 : le greffe en panne ne ferme rien, remonte au journal technique avec son code, et le greffe suivant clot son 30/12 ; le traitement n'est pas « en erreur » pour les autres (etat : {etatMoteur.Etat})");
+// Pendant la pause, la cloture manquee n'est pas redeposee ; la pause passee, si.
+await Executer(commune.Connexion, "UPDATE soc.Greffe SET BaseV3 = @b, ModifiePar = 'banc', ModifieLe = SYSDATETIME() WHERE CodeGreffe = @c;", ("@b", baseNuitPanne.Nom), ("@c", Panne));
+var pendantPause = await planificateur.PasserAsync(Z(30, 21, 0));
+await Executer(commune.Connexion, "UPDATE soc.FileTraitement SET DeposeLe = DATEADD(HOUR, -1, DeposeLe) WHERE Traitement = @t;", ("@t", ClotureNocturne.NomTraitement));
+Exiger(Pour(pendantPause, Panne).Single(d => d.Traitement == ClotureNocturne.NomTraitement).Deposes == 0,
+    "SOC-018 CA05 T02 (jumeau) : juste apres un echec, la cloture du greffe n'est pas redeposee (pause de 30 min)");
+
+// --- Deux jours manques et fin de mois : rattrapes dans l'ordre, le mois en dernier, jamais deux fois ----------------------
+var bilan2 = (await planificateur.PasserAsync(Z(31, 21, 30))).ToList();    // le 31/12 a 22h30 : serveur arrete depuis le 30 pour « Panne »
+var faits2 = await moteur.PasserAsync(ClotureNocturne.NomTraitement);
+var closBon = await Clos(baseNuitBon);
+var closPanne = await Clos(baseNuitPanne);
+Exiger(Pour(bilan2, Panne, Bon).All(d => d.Deposes == 1) && faits2 == 2
+       && closPanne.SequenceEqual(["GTP:20251229", "GTP:20251230", "GTP:20251231", "GTM:202512"]),
+    $"SOC-018 CA05 T02 : le greffe repare rattrape ses deux jours manques (30 puis 31/12), dans l'ordre, puis clot le mois (le 31/12 etant son dernier jour) : {string.Join(", ", closPanne)}");
+Exiger(closBon.SequenceEqual(["GTP:20251229", "GTP:20251230", "GTP:20251231", "GTM:202512"]),
+    $"SOC-018 CA05 T02 : le dernier jour du mois, a l'heure du greffe, la cloture du mois suit celle du jour ({string.Join(", ", closBon)})");
+var apresMois = await planificateur.PasserAsync(Z(31, 21, 30));
+Exiger(Pour(apresMois, Panne, Bon).All(d => d.Deposes == 0) && (await Clos(baseNuitBon)).Count == 4 && (await Clos(baseNuitPanne)).Count == 4,
+    "SOC-018 CA05 T02 : une periode close n'est plus due : un nouveau passage ne depose rien et ne clot jamais deux fois");
+Exiger(await Scalaire<int>(baseNuitBon.Connexion, "SELECT COUNT(*) FROM soc.GrandTotalFactures WHERE Type = 'GTA/E';") == 0
+       && await Scalaire<int>(baseNuitBon.Connexion, "SELECT COUNT(*) FROM soc.ArchiveFiscale;") == 0,
+    "SOC-018 CA05 T02 : la cloture de l'exercice (archive fiscale scellee) reste un geste humain : le 31/12 au soir, rien n'est ecrit pour l'exercice");
+var controlePanne = await IntegreAsync(baseNuitPanne);
+Exiger(controlePanne, "SOC-018 CA05 T02 : les chaines du greffe rattrape passent le controle d'integrite apres le rattrapage (30, 31, mois)");
+async Task<bool> IntegreAsync(BaseJetable b)
+{
+    await using var cn = new SqlConnection(b.Connexion);
+    await cn.OpenAsync();
+    return (await ControleIntegrite.ControlerAsync(chaines, cn, "banc", null)).Integre;
+}
+
+// --- Une copie anonymisee n'est pas close automatiquement ---------------------------------------------------------------
+await OuvrirNuit(Copie, baseNuitCopie);
+await Executer(baseNuitCopie.Connexion, "EXEC sys.sp_addextendedproperty @name = N'RIGV3_ANONYMISATION', @value = N'banc';");
+var bilanCopie = await planificateur.PasserAsync(Z(31, 21, 30));
+// Meme un element depose avant que la copie soit marquee n'est pas fait.
+await moteur.DeposerAsync(ClotureNocturne.NomTraitement, Copie, System.Text.Json.JsonSerializer.Serialize(new[] { new DemandeCloture("jour", "2025-12-29") }));
+await moteur.PasserAsync(ClotureNocturne.NomTraitement);
+Exiger(Pour(bilanCopie, Copie).Single(d => d.Traitement == ClotureNocturne.NomTraitement).Deposes == 0 && (await Clos(baseNuitCopie)).Count == 0,
+    "SOC-018 CA05 T02 : une copie anonymisee (RIGV3_ANONYMISATION) n'est pas close automatiquement : rien n'est du, et un element deja en file n'y ecrit rien");
+await Executer(baseNuitCopie.Connexion, "EXEC sys.sp_dropextendedproperty @name = N'RIGV3_ANONYMISATION';");
+var bilanVrai = await planificateur.PasserAsync(Z(31, 21, 30));
+await moteur.PasserAsync(ClotureNocturne.NomTraitement);
+Exiger(Pour(bilanVrai, Copie).Single(d => d.Traitement == ClotureNocturne.NomTraitement).Deposes == 1 && (await Clos(baseNuitCopie)).Count == 4,
+    "SOC-018 CA05 T02 (jumeau) : la meme base sans la marque de copie est close comme les autres");
+Exiger(app.Services.GetServices<ITachePlanifiee>().Any(t => t.Traitement == ClotureNocturne.NomTraitement)
+       && moteur.Connait(ClotureNocturne.NomTraitement)
+       && app.Services.GetServices<PlanificateurNocturne>().Count() == 1,
+    "SOC-018 CA05 T02 : la tache est inscrite au planificateur unique du serveur (que REC-006 reprend), son traitement est dans le moteur de la supervision");
+Reste("SOC-018 CA05 : la cloture de l'EXERCICE n'est pas automatique (la V2 insere pourtant son total GTA/E le 31/12 a 22h : ecart a valider, docs/reconstruction/socle-chaines.md) ; l'heure reelle de 22h sur les 40 greffes ne se prouve pas depuis ce poste");
 Reste("SOC-018 : la certification NF525 de la V3 elle-meme (auditeur, attestation) n'est pas un banc : SOC-019, lot 13");
 Console.WriteLine();
 Console.WriteLine(echecs.Count == 0 ? "VERT : SOC-018 tient ses criteres." : $"ROUGE : {echecs.Count} controle(s) en echec.");
@@ -556,4 +724,11 @@ internal sealed class CoffreMemoire : ICoffreCles
     private readonly ConcurrentDictionary<string, ECDsa> cles = new();
     public ECDsa CleDuGreffe(string codeGreffe) => cles.GetOrAdd(codeGreffe, _ => ECDsa.Create(ECCurve.NamedCurves.nistP256));
     public string Conteneur(string codeGreffe) => $"memoire du banc SocleChainesCheck ({codeGreffe})";
+}
+
+/// <summary>Une tache qui ne depose jamais rien : le defaut d'avant ce lot (personne n'appelle la cloture), pour la contre-epreuve.</summary>
+internal sealed class TacheMuette : ITachePlanifiee
+{
+    public string Traitement => ClotureNocturne.NomTraitement;
+    public Task<IReadOnlyList<string>> ChargesDuesAsync(FicheGreffe greffe, DateTime maintenantUtc, CancellationToken ct) => Task.FromResult<IReadOnlyList<string>>([]);
 }

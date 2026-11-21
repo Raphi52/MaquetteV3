@@ -131,7 +131,8 @@ comptes › Certification NF525** (`PROC_CERTIF`) ; Entrée dans un critère lan
 | Séries sans greffe | ignorées par `TR_NUMERO_METIER_JET` | toutes tracées | une base V3 n'a qu'un greffe |
 | Purge | les lignes affichées de `JET_P` | l'exercice archivé, dans la limite de son archive | la story : « seule la partie purgeable, après archivage » |
 | Archive | fichier produit par `ArchiveFiscaleExercice.cs` | document JSON en base (`Fichier` = son nom d'export), scellé, lié à l'événement 30 | format à valider avec le certificateur (SOC-019) |
-| Clôture quotidienne | job SQL planifié | la route ; la planification reste à faire | voir ci-dessous |
+| Clôture quotidienne | job planifié à 22 h, un `.bat` par greffe, jamais rattrapé | un traitement de fond planifié, à l’heure du greffe, avec rattrapage (voir « Clôtures automatiques ») | une journée oubliée ne reste pas ouverte |
+| Clôture de l’exercice | la V2 insère le total `GTA/E` le 31/12 au soir ; son archive est un geste à part (mode 11, exercice clos) | geste humain (la route) : le total et l’archive scellée vont ensemble | **à valider** : voir « Clôtures automatiques » |
 
 ## Ce qui reste, et pourquoi
 
@@ -139,15 +140,56 @@ comptes › Certification NF525** (`PROC_CERTIF`) ; Entrée dans un critère lan
 |---|---|---|
 | CA02 « elles restent vérifiables dans la V2 » | se prouve par `CertifExpressoApp` (mode 10) sur les vraies bases V2, avec leur clé : ni l'une ni l'autre sur ce poste. La V3 n'y touche pas (empreinte, banc) | exploitation, au passage |
 | Ouvrir les chaînes des 40 greffes | l'outil du passage appelle l'ouverture, base par base | lot 13 (SOC-024) |
-| Clôtures automatiques (jour, mois) | un traitement de fond (SOC-011) appellera la route chaque soir, comme le job de la V2 | lot à désigner |
+| Clôtures automatiques (jour, mois) | **faites** (lot 14) : voir « Clôtures automatiques » | — |
+| Clôture automatique de l’exercice | à décider : la V2 le fait pour le total, pas pour l’archive | référent Facturation |
+| Heure réelle de 22 h sur les 40 greffes, nuit réelle chez Amitel | le banc joue l’horloge par instants choisis ; la vraie nuit ne se prouve pas depuis ce poste | exploitation, au passage |
 | Sauvegarde de la clé de chaque greffe | une clé CNG non exportable disparaît avec le serveur : les chaînes restent vérifiables (clé publique en base), la suite signe avec une nouvelle clé (événement 450). La politique (clé dans un HSM ou coffre) est une décision d'exploitation | Amitel, exploitation |
 | Signer les vraies factures et encaissements | les tables du domaine Facturation n'existent pas encore ; elles appelleront `SignerFactureAsync` / `SignerEncaissementAsync` dans leur transaction | lots Facturation |
 | La certification de la V3 (auditeur, attestation) | hors banc | SOC-019, lot 13 |
+
+## Clôtures automatiques (SOC-018 CA05 T02, lot 14)
+
+**La V2.** `Job_Exec_Hash_Totaux_FactEnc` (`CertifExpressoApp48Jobs`) : tous les jours à 22 h, `SP_INSERT_Totaux_Factures_Periodiques`
+puis `..._Encaissements_Periodiques` (le jour, `GTP` ; le dernier jour du mois, `GTM` ; le 31/12, `GTA/E`), puis la signature (mode 2).
+Un soir où le job ne tourne pas n’est jamais rattrapé. La section 6 du script de déploiement (`Job_Traitement_File`, toutes les
+10 secondes) ne sert que la file `FILE_TRAITEMENT` des factures et encaissements.
+
+**La V3.** Un seul planificateur pour toute la partie serveur (`ServeurSocleSupervisionPlanificateurNocturne.cs`), qui
+**ne connaît rien des chaînes** : il interroge chaque tâche inscrite (`ITachePlanifiee`) pour chaque greffe du catalogue et dépose
+ce qui est dû dans la file des traitements de fond (SOC-011). Il ne redépose ni ce qui attend déjà, ni ce qui a été tenté depuis
+moins de la pause (30 min), et l’échec d’un greffe va au journal technique avec son code (une fois par pause). La clôture est la
+tâche `ClotureNocturne` (traitement `chaines-clotures`, `ServeurSocleChainesClotureNocturne.cs`) :
+
+- **dû** : dans un greffe dont les chaînes sont ouvertes, chaque jour depuis l’ouverture jusqu’au jour en cours si l’heure du
+  greffe (fuseau de `soc.Certification`) a passé l’heure réglée, sinon jusqu’à la veille ; le mois, à la suite du jour qui le
+  termine ; rien pour l’exercice ;
+- **ordre** : par date, le jour avant le mois ; une période déjà close (par une personne, un autre serveur, un passage précédent) n’est plus due,
+  et `CloturerAsync` refuse de toute façon la seconde (409) ;
+- **rattrapage** : un jour oublié (serveur arrêté, greffe injoignable) reste dû et passe avant les suivants au passage suivant ;
+- **panne** : une erreur dans un greffe arrête SES clôtures et va au journal technique (SOC-017) avec son code ; le traitement ne passe
+  pas « en erreur » (il arrêterait les autres greffes) ; un greffe dont la base ne répond pas est de plus signalé par la supervision
+  (alerte « base injoignable ») ;
+- **copie anonymisée** (`RIGV3_ANONYMISATION` ou `anonymisation.Copie.ChainesInvalidees`) : jamais close automatiquement, même si
+  l’élément était déjà en file ;
+- **qui signe** : l’événement 50 porte l’auteur « Clôture automatique (partie serveur de la V3) ». Pas de ligne au journal des
+  gestes : il est celui des agents (une personne, un identifiant) ; l’événement 50, signé, est la trace.
+
+**Réglages** (configuration du serveur) : `Chaines:ClotureHeure` (« hh:mm », 22:00), `Planificateur:IntervalleSecondes` (60 ; 0 arrête le
+planificateur), `Planificateur:PauseMinutes` (30).
+
+**Reprise par un autre traitement de nuit (REC-006, lot 8).** Écrire une classe qui implémente `ITraitementDeFond` **et** `ITachePlanifiee`
+(même nom), l’inscrire par son module (les deux `AddSingleton` ; le planificateur est déjà là, ne pas en inscrire un second). Modèle :
+`ModuleChaines.Inscrire`.
+
+**Écart à valider.** La V2 insère aussi le total d’exercice `GTA/E` le 31/12 à 22 h ; la V3 laisse la clôture de l’exercice à une personne :
+elle produit l’archive fiscale scellée (empreinte au journal non purgeable) et ouvre la purge du journal, alors que la V2 ne produit son
+archive que sur un exercice clos (mode 11). Si le référent Facturation veut le total automatique, il suffit d’ajouter `exercice` aux clôtures dues de
+`ClotureNocturne.ClotureesDuesAsync` ; l’archive serait alors produite le soir du 31/12, avant les dernières pièces de la soirée.
 
 ## Fichiers
 
 `Base\migrations\SOC-018_chaines.sql` · `Contrats\Socle\Chaines.cs` · `Serveur\Socle\Chaines\` (`ModuleChaines.cs`,
 `ServiceChaines.cs`, `ServiceChaines.Clotures.cs`, `ControleIntegrite.cs`, `LectureChaines.cs`, `Signatures.cs`,
-`SignatureDeFond.cs`) · `Pont\EcranChaines.cs` · `web\src\ecrans\EcranChaines.tsx` (+ `.test.tsx`) · `tests\SocleChainesCheck` ·
+`SignatureDeFond.cs`, `ClotureNocturne.cs`) · `ServeurSocleSupervisionPlanificateurNocturne.cs` · `Pont\EcranChaines.cs` · `web\src\ecrans\EcranChaines.tsx` (+ `.test.tsx`) · `tests\SocleChainesCheck` ·
 listes partagées : `Pont\MenuAccueil.cs`, `Pont\CatalogueEcrans.cs`, `web\src\plan\Aiguillage.tsx`,
 `Pont\EcranCorrespondances.cs` (Entrée lance la recherche), `tests\MenuGestesCheck\Program.cs` (`PROC_CERTIF` sans fiche).

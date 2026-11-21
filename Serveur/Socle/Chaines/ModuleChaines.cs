@@ -6,6 +6,7 @@ using RigV3.Contrats.Socle;
 using RigV3.Serveur.Socle.Comptes;
 using RigV3.Serveur.Socle.Greffes;
 using RigV3.Serveur.Socle.Identite;
+using RigV3.Serveur.Socle.Supervision;
 
 namespace RigV3.Serveur.Socle.Chaines;
 
@@ -31,6 +32,17 @@ internal sealed class ModuleChaines : IModuleServeur
         services.AddSingleton<Acces>();
         services.AddSingleton<SignatureDeFond>();
         services.AddHostedService(sp => sp.GetRequiredService<SignatureDeFond>());
+        // Les clotures automatiques (CA05 T02) : le traitement de fond, sa tache, et le planificateur qu'une autre tache de nuit
+        // (REC-006) reprend telle quelle (le premier module qui le veut l'inscrit, les autres ne le doublent pas).
+        services.AddSingleton<ClotureNocturne>();
+        services.AddSingleton<ITraitementDeFond>(sp => sp.GetRequiredService<ClotureNocturne>());
+        services.AddSingleton<ITachePlanifiee>(sp => sp.GetRequiredService<ClotureNocturne>());
+        services.TryAddSingleton(ReglagesPlanificateur.Depuis(configuration));
+        if (!services.Any(d => d.ServiceType == typeof(PlanificateurNocturne)))
+        {
+            services.AddSingleton<PlanificateurNocturne>();
+            services.AddHostedService(sp => sp.GetRequiredService<PlanificateurNocturne>());
+        }
     }
 
     public void Brancher(IEndpointRouteBuilder routes)
