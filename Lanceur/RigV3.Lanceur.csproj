@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- LE LANCEUR DE RIG V3 SUR LES SERVEURS RDS (SOC-012, lot 12 du plan de reconstruction).
+       L'icone des agents : verifie la version de l'ecran contre celle de la partie serveur,
+       la presence du composant WebView2 et la version de la base du greffe, ramene la
+       fenetre deja ouverte, puis ouvre versions\<la plus recente>\RigV3Desktop.exe et veille.
+       WPF natif, SANS WebView2 : il doit pouvoir dire « composant absent ».
+       Il reprend du code de l'ecran sans le dupliquer : le client du serveur et la lecture
+       du greffe de lancement (Pont/ClientServeur.cs, Pont/SessionAgent.cs).
+       Mode d'emploi : docs/reconstruction/socle-exploitation.md. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>RigV3Lanceur</AssemblyName>
+    <RootNamespace>RigV3.Lanceur</RootNamespace>
+    <StartupObject>RigV3.Lanceur.Programme</StartupObject>
+    <ApplicationIcon>..\rig.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../Pont/ClientServeur.cs" Link="Pont/ClientServeur.cs" />
+    <Compile Include="../Pont/SessionAgent.cs" Link="Pont/SessionAgent.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Contrats/RigV3.Contrats.csproj" />
+  </ItemGroup>
+
+</Project>

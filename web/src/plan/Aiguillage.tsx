@@ -37,6 +37,7 @@ import { EcranComptes } from '../ecrans/EcranComptes'
 import { EcranCompteurs } from '../ecrans/EcranCompteurs'
 import { EcranReglages } from '../ecrans/EcranReglages'
 import { EcranManquants } from '../ecrans/EcranManquants'
+import { EcranSupervision } from '../ecrans/EcranSupervision'
 import { EcranConsultationJud } from '../ecrans/EcranConsultationJud'
 import { EcranControleVidiged } from '../ecrans/EcranControleVidiged'
 import { EcranCourriersDivers } from '../ecrans/EcranCourriersDivers'
@@ -51,6 +52,7 @@ import { EcranGedJud } from '../ecrans/EcranGedJud'
 import { EcranGestionAudiences } from '../ecrans/EcranGestionAudiences'
 import { EcranMaquettesEdition } from '../ecrans/EcranMaquettesEdition'
 import { EcranMessagerie } from '../ecrans/EcranMessagerie'
+import { EcranCourriels } from '../ecrans/EcranCourriels'
 import { EcranNonMaquette } from '../ecrans/EcranNonMaquette'
 import { EcranOuvertureDossier } from '../ecrans/EcranOuvertureDossier'
 import { EcranParametresAccueil } from '../ecrans/EcranParametresAccueil'
@@ -195,8 +197,18 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
       // Reprise de LNUMCM de la V2 (NUM-013 T04) : les numeros manquants du registre avec leur motif.
       return <EcranManquants />
 
+    case 'PROC_SUPERVISION':
+      // Ecran NEUF de la V3 (« a maquetter », SOC-011 T04, SOC-017 T04), reserve a Amitel : les 40 greffes, les
+      // traitements, les alertes et le journal technique (sans RIGV3_SERVEUR : la demonstration, en lecture).
+      return <EcranSupervision />
+
     case 'PROC_GESTEMAIL':
       return <EcranMessagerie />
+
+    case 'PROC_MAIL_LOT1':
+      // Reprise de PROC_MAIL_LOT1 de la V2 (« Mails envoyés en Lot 1 », SOC-006) : les courriels envoyes par la V3 et leur
+      // trace -- partis, refuses et pourquoi, non remis hors production (sans RIGV3_SERVEUR : la demonstration).
+      return <EcranCourriels />
 
     case 'PROC_GESTBANQ':
       return <EcranBanques />

@@ -303,7 +303,8 @@ public static class MenuAccueil
                 new("Modeles d'edition",      "la forme des courriers",             "PROC_EDIT_MAQUETTE"),
                 new("Modeles de redaction",   "maquettes des decisions",            "PROC_REDAA"),
                 new("Sceaux",                 "elements de fusion",                 "PROC_SCEAU"),
-                new("Messagerie",             "les envois automatiques",            "PROC_GESTEMAIL")
+                new("Messagerie",             "les envois automatiques",            "PROC_GESTEMAIL"),
+                new("Courriels envoyes",      "la trace de chaque envoi",           "PROC_MAIL_LOT1")
             ]),
             new("Argent et exports",
             [
@@ -318,7 +319,8 @@ public static class MenuAccueil
                 new("Analyse IA",             "controle des formalites INPI",       "PROC_IA"),
                 new("Retours CFE-NET",        "traitement des retours XML",         "PROC_CFENET_RET"),
                 new("EDI RPVA",               "inscriptions mandataires",           "PROC_EDI_RPVAINS"),
-                new("EDI RPJC",               "traitement / conciliation",          "PROC_EDI_RPJC_TRCNC")
+                new("EDI RPJC",               "traitement / conciliation",          "PROC_EDI_RPJC_TRCNC"),
+                new("Supervision",            "greffes, traitements, erreurs (Amitel)", "PROC_SUPERVISION")
             ])
         ])
     ];

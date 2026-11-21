@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Banc du lot 12 du plan de reconstruction : SOC-009 (livrer une version de la base en
+       trois vagues), SOC-010 (la partie serveur chez Amitel et sur place outre-mer), SOC-012
+       (lancer la V3 depuis le serveur RDS, toujours a la bonne version).
+       Un controle par critere CAxx faisable sur ce poste, qui cite son id ; le reste (serveurs
+       reels, RDS, mesure de disponibilite) est dans docs/reconstruction/socle-exploitation.md.
+       Il lui faut le SQL Server de developpement (docker compose up -d, racine du depot) :
+       chaque base du banc y est creee et supprimee par lui (BaseJetable). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SocleLivraisonCheck</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <!-- Le lanceur des serveurs RDS, sans sa fenetre : ses regles, jouees contre le vrai serveur en memoire. -->
+    <Compile Include="../../Lanceur/Verification.cs" Link="Lanceur/Verification.cs" />
+    <Compile Include="../../Lanceur/InstanceUnique.cs" Link="Lanceur/InstanceUnique.cs" />
+    <Compile Include="../../Pont/ClientServeur.cs" Link="Pont/ClientServeur.cs" />
+    <Compile Include="../../Pont/SessionAgent.cs" Link="Pont/SessionAgent.cs" />
+    <!-- La copie d'essai de COMMUN_RIG.dbo.GREFFE du lot 4 (40 greffes exploites, instances reelles) : lue, pas modifiee. -->
+    <None Include="../SocleGreffesCheck/commun_rig_greffe.sql" Link="commun_rig_greffe.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Outils/Livraison/RigV3.Livraison.csproj" />
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+    <ProjectReference Include="../../Contrats/RigV3.Contrats.csproj" />
+    <!-- Le lanceur complet (WPF) est CONSTRUIT par ce banc, sans etre reference (ses fichiers sont lies
+         ci-dessus) : une erreur de compilation de sa fenetre fait tomber .\tests.ps1. -->
+    <ProjectReference Include="../../Lanceur/RigV3.Lanceur.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
+  </ItemGroup>
+</Project>
