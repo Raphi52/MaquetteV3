@@ -4,15 +4,21 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RigV3.Base;
 using RigV3.Contrats.Numerotation;
+using RigV3.Contrats.Socle;
 using RigV3.Serveur;
 using RigV3.Serveur.Numerotation.Compteur;
+using RigV3.Serveur.Socle.Greffes;
+using RigV3.Serveur.Socle.Identite;
 
 // Banc du COMPTEUR CENTRAL DES NUMEROS (lot 5 du plan de reconstruction, 2026-11-20).
 // Stories NUM-001 (tenir les compteurs dans la base V3), NUM-004 (rendre un numero pour qu'il soit
@@ -26,6 +32,11 @@ using RigV3.Serveur.Numerotation.Compteur;
 //    DistributeurNumeros dans la transaction d'un acte) ;
 //  - une session « V2 » est une connexion SQL qui appelle num.Attribuer / num.Restituer avec
 //    @Logiciel = 'V2', exactement ce que feront GENERER_NUMERO et RESTITUER_NUMERO remplaces (lot 7).
+//
+// Raccord des lots 2, 4 et 5 (lot 8, 2026-11-21) : la base ci-dessous est celle du GREFFE A. Le serveur
+// lit le catalogue dans une base commune qui n'a aucun compte d'agent, et y trouve deux greffes, A et B,
+// chacun avec sa base jetable. Les routes portent le greffe (RoutesCompteur.Pour) et exigent la session :
+// l'agent du banc (en-tete de developpement X-RigV3-Compte) n'est connu que de la base du greffe A.
 //
 // Il lui faut le SQL Server de developpement : « docker compose up -d » a la racine du depot.
 
@@ -47,6 +58,12 @@ await using var b = await BaseJetable.CreerAsync("NumerotationCompteurCheck");
 var migrations = await Migrateur.AppliquerAsync(b.Connexion, Path.Combine(racine, "Base", "migrations"));
 Exiger(migrations.Jouees.Contains("NUM-001_compteurs"),
     $"migration NUM-001_compteurs jouee sur une base neuve, avec les autres du depot ({string.Join(", ", migrations.Jouees)})");
+await using var commune = await BaseJetable.CreerAsync("NumCompteurCommune");
+await using var baseB = await BaseJetable.CreerAsync("NumCompteurGreffeB");
+await Migrateur.AppliquerAsync(commune.Connexion, Path.Combine(racine, "Base", "migrations"));
+await Migrateur.AppliquerAsync(baseB.Connexion, Path.Combine(racine, "Base", "migrations"));
+const string GreffeA = "9101", GreffeB = "9102", GreffeMuet = "9103", GreffeAbsent = "9199";
+const string AgentA = "banc.numeros", RefuseA = "banc.refuse", AgentB = "banc.greffeb";
 
 async Task<SqlConnection> Ouvrir()
 {
@@ -55,17 +72,23 @@ async Task<SqlConnection> Ouvrir()
     return cn;
 }
 async Task<T> Valeur<T>(string sql, params (string Nom, object? Valeur)[] p)
+    => await ValeurSur<T>(b.Connexion, sql, p);
+async Task<T> ValeurSur<T>(string connexion, string sql, params (string Nom, object? Valeur)[] p)
 {
-    await using var cn = await Ouvrir();
+    await using var cn = new SqlConnection(connexion);
+    await cn.OpenAsync();
     await using var cmd = new SqlCommand(sql, cn);
     foreach (var (nom, valeur) in p) cmd.Parameters.AddWithValue(nom, valeur ?? DBNull.Value);
     var v = await cmd.ExecuteScalarAsync();
     return v is null or DBNull ? default! : (T)Convert.ChangeType(v, Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T));
 }
-async Task Executer(string sql)
+async Task Executer(string sql) => await ExecuterSur(b.Connexion, sql);
+async Task ExecuterSur(string connexion, string sql, params (string Nom, object Valeur)[] p)
 {
-    await using var cn = await Ouvrir();
+    await using var cn = new SqlConnection(connexion);
+    await cn.OpenAsync();
     await using var cmd = new SqlCommand(sql, cn);
+    foreach (var (nom, valeur) in p) cmd.Parameters.AddWithValue(nom, valeur);
     await cmd.ExecuteNonQueryAsync();
 }
 async Task<int?> Dernier(string type, int annee, int jour = 0)
@@ -74,8 +97,9 @@ async Task<int?> Dernier(string type, int annee, int jour = 0)
 async Task<int> Rendus(string serie, int annee, int jour = 0)
     => await Valeur<int>("SELECT COUNT(*) FROM num.NumeroRendu WHERE Serie = @s AND Annee = @a AND Jour = @j;",
                          ("@s", serie), ("@a", annee), ("@j", jour));
-async Task<string> Etat()
-    => await Valeur<string>("SELECT CONCAT((SELECT COUNT(*) FROM num.Compteur), '/', (SELECT COUNT(*) FROM num.NumeroRendu), '/', " +
+async Task<string> Etat() => await EtatSur(b.Connexion);
+async Task<string> EtatSur(string connexion)
+    => await ValeurSur<string>(connexion, "SELECT CONCAT((SELECT COUNT(*) FROM num.Compteur), '/', (SELECT COUNT(*) FROM num.NumeroRendu), '/', " +
                             "(SELECT COUNT_BIG(*) FROM num.Journal), '/', (SELECT CHECKSUM_AGG(CHECKSUM(Type, Annee, Jour, Chrono)) FROM num.Compteur));");
 
 // --- Les sessions « V2 » : les programmes, appeles en SQL comme le feront ceux de la V2 remplaces ----
@@ -196,27 +220,59 @@ await using (var cn = await Ouvrir())
     }
 }
 
-// --- Le vrai serveur, en memoire, sur cette base ------------------------------------------------------
-await using var app = ServeurRig.Construire([], s =>
+// --- Le greffe B (sa base, ses compteurs, son agent), le greffe A (ses agents), le catalogue commun -----
+await ExecuterSur(baseB.Connexion,
+    "INSERT num.Compteur (Type, Annee, Jour, Libelle, Structure, CodageAnnee, Lettre, Separateur, TailleChrono, CodeGreffe, Debut, Chrono, GestionRendus) " +
+    "VALUES ('RGB', 2026, 0, NULL, 'ALC', 4, 'B', NULL, 5, NULL, 1, 4242, 1), ('JPC', 2026, 0, NULL, 'ALC', 4, 'RJ', NULL, 4, NULL, 1, 10, 1);");
+const string ComptesDuGreffe = """
+    INSERT INTO soc.Service (CodeGreffe, Abrege, Nom) VALUES (@greffe, 'NUM', N'Numerotation');
+    INSERT INTO soc.Role (Nom, Libelle) VALUES ('BANC', 'Banc NumerotationCompteur');
+    INSERT INTO soc.Compte (CompteWindows, Nom, Prenom, Abrege, Civilite, CodeGreffe, IdService, Desactive)
+    SELECT v.Compte, 'BANC', 'Numeros', LEFT(v.Compte, 16), 'M.', @greffe, s.Id, v.Desactive
+    FROM (VALUES (@admis, 0), (@refuse, 1)) v (Compte, Desactive) CROSS JOIN soc.Service s WHERE v.Compte <> '';
+    INSERT INTO soc.CompteRole (IdCompte, Role) SELECT Id, 'BANC' FROM soc.Compte;
+    """;
+await ExecuterSur(b.Connexion, ComptesDuGreffe, ("@greffe", GreffeA), ("@admis", AgentA), ("@refuse", RefuseA));
+await ExecuterSur(baseB.Connexion, ComptesDuGreffe, ("@greffe", GreffeB), ("@admis", AgentB), ("@refuse", ""));
+var serveurBancs = new SqlConnectionStringBuilder(BaseJetable.ServeurDesBancs());
+var instance = serveurBancs.DataSource;                       // « 127.0.0.1,14330 »
+var authentification = new SqlConnectionStringBuilder(serveurBancs.ConnectionString);
+authentification.Remove("Data Source");                       // le serveur et la base viennent du catalogue
+var baseMuette = $"{BaseJetable.Prefixe}inexistante_{Guid.NewGuid():N}";   // jamais creee
+foreach (var (code, nomBase) in new[] { (GreffeA, b.Nom), (GreffeB, baseB.Nom), (GreffeMuet, baseMuette) })
+    await ExecuterSur(commune.Connexion,
+        "INSERT INTO soc.Greffe (CodeGreffe, Nom, Serveur, BaseV2, BaseV3, EstBeta, EstOutreMer, Fuseau, ModifiePar, ModifieLe) " +
+        "VALUES (@c, @n, @s, @v2, @v3, 0, 0, 'Romance Standard Time', 'banc', SYSDATETIME());",
+        ("@c", code), ("@n", $"Greffe {code} du banc"), ("@s", instance), ("@v2", "RIG_BANC_" + code), ("@v3", nomBase));
+
+// --- Le vrai serveur, en memoire, sur la base commune (catalogue) ; environnement de developpement : -----
+// --- l'agent se designe par l'en-tete X-RigV3-Compte, que la production ignore (SOC-001 CA07) ----------
+await using var app = ServeurRig.Construire(["--environment", "Development"], s =>
 {
     s.WebHost.UseTestServer();
     s.Logging.SetMinimumLevel(LogLevel.Warning);
-    s.Configuration["ConnectionStrings:RigV3"] = b.Connexion;
+    s.Configuration["ConnectionStrings:RigV3"] = commune.Connexion;
+    s.Configuration[CatalogueGreffes.CleAuthentification] = authentification.ConnectionString;
     s.Configuration[DistributeurNumeros.Reglage] = DelaiServeurMs.ToString();
 });
 await app.StartAsync();
 var http = app.GetTestClient();
 http.Timeout = TimeSpan.FromSeconds(120);
+http.DefaultRequestHeaders.Add(RoutesIdentite.EnTeteCompte, AgentA);   // l'agent du greffe A, pour tout le banc
+var sansEnTete = app.GetTestClient();                                   // chaque appel y dit son compte (ou aucun)
 var distributeur = app.Services.GetRequiredService<DistributeurNumeros>();
+var compteursA = RoutesCompteur.Pour(RoutesCompteur.Compteurs, GreffeA);
+var numerosA = RoutesCompteur.Pour(RoutesCompteur.Numeros, GreffeA);
+var restitutionsA = RoutesCompteur.Pour(RoutesCompteur.Restitutions, GreffeA);
 
 async Task<NumeroAttribue> V3(string type, int annee = 0, int jour = 0)
 {
-    using var r = await http.PostAsJsonAsync(RoutesCompteur.Numeros, new DemandeNumero(type, annee, jour), json);
+    using var r = await http.PostAsJsonAsync(numerosA, new DemandeNumero(type, annee, jour), json);
     return (await r.Content.ReadFromJsonAsync<NumeroAttribue>(json))!;
 }
 async Task<(HttpStatusCode Statut, ResultatRestitution Resultat)> V3Restituer(string type, string numero, string? explication, int annee = 0)
 {
-    using var r = await http.PostAsJsonAsync(RoutesCompteur.Restitutions, new DemandeRestitution(type, numero, explication, annee), json);
+    using var r = await http.PostAsJsonAsync(restitutionsA, new DemandeRestitution(type, numero, explication, annee), json);
     return (r.StatusCode, (await r.Content.ReadFromJsonAsync<ResultatRestitution>(json))!);
 }
 
@@ -225,7 +281,7 @@ async Task<(HttpStatusCode Statut, ResultatRestitution Resultat)> V3Restituer(st
 // =====================================================================================================
 
 // CA01 : chaque ligne a son equivalent (type, annee, jour, chrono, format, reglage, redirection, cible)...
-var liste = await http.GetFromJsonAsync<CompteurNumeros[]>(RoutesCompteur.Compteurs, json) ?? [];
+var liste = await http.GetFromJsonAsync<CompteurNumeros[]>(compteursA, json) ?? [];
 var manquants = depart.Where(f => !liste.Any(c =>
         c.Type == f.Type && c.Annee == f.Annee && c.Jour == f.Jour && c.Chrono == f.Chrono && c.Debut == f.Debut
         && c.Structure == f.Structure && c.CodageAnnee == f.Codage && c.Lettre == f.Lettre && c.Separateur == f.Sep
@@ -235,7 +291,7 @@ var manquants = depart.Where(f => !liste.Any(c =>
 Exiger(liste.Length == depart.Count && manquants.Count == 0,
     $"NUM-001 CA01 : GET {RoutesCompteur.Compteurs} rend chaque compteur avec type, annee, jour, chrono, format, reglage de restitution, " +
     $"redirection et cible ({liste.Length}/{depart.Count}{(manquants.Count > 0 ? " ; differents : " + string.Join(", ", manquants) : "")})");
-var unType = await http.GetFromJsonAsync<CompteurNumeros[]>(RoutesCompteur.Compteurs + "?type=JPC", json) ?? [];
+var unType = await http.GetFromJsonAsync<CompteurNumeros[]>(compteursA + "?type=JPC", json) ?? [];
 Exiger(unType.Length == 2 && unType.All(c => c.Type == "JPC"), $"NUM-001 CA01 : ?type=JPC ne rend que les compteurs JPC ({unType.Length})");
 
 // ... et seul le programme d'attribution peut les modifier (droits SQL).
@@ -329,7 +385,7 @@ async Task<List<NumeroAttribue>> EnMemeTemps(int nombre, Func<int, Task<NumeroAt
 }
 var annee2027 = await EnMemeTemps(12, i => i % 2 == 0 ? V2("RGB", 2027) : V3("RGB", 2027));
 var compteurs2027 = await Valeur<int>("SELECT COUNT(*) FROM num.Compteur WHERE Type = 'RGB' AND Annee = 2027;");
-var reglages2027 = (await http.GetFromJsonAsync<CompteurNumeros[]>(RoutesCompteur.Compteurs + "?type=RGB", json))!;
+var reglages2027 = (await http.GetFromJsonAsync<CompteurNumeros[]>(compteursA + "?type=RGB", json))!;
 var r2026 = reglages2027.Single(c => c.Annee == 2026);
 var r2027 = reglages2027.Single(c => c.Annee == 2027);
 Exiger(compteurs2027 == 1 && annee2027.All(n => n.Code == 0)
@@ -659,7 +715,7 @@ await using (var bloqueur = await Ouvrir())
     await using var tx = (SqlTransaction)await bloqueur.BeginTransactionAsync();
     numeroBloqueur = await V2Attribuer(bloqueur, tx, "RGB", 2026);     // la V2 tient RGB 2026 (jusqu'a 30 s dans le scenario)
     var chronoAttente = Stopwatch.StartNew();
-    using (var r = await http.PostAsJsonAsync(RoutesCompteur.Numeros, new DemandeNumero("RGB", 2026), json))
+    using (var r = await http.PostAsJsonAsync(numerosA, new DemandeNumero("RGB", 2026), json))
     {
         attente = chronoAttente.Elapsed;
         statutAttente = r.StatusCode;
@@ -715,6 +771,117 @@ Exiger(erreursAnnul.IsEmpty && annulees > 0 && suiteValide.SequenceEqual(Enumera
     $"NUM-008 CA06 : 2 400 actes (V2 et V3) dont {annulees} annules au hasard -> les {suiteValide.Count} numeros des actes valides se suivent " +
     $"sans trou ni doublon ({debut2025 + 1} a {fin2025}) et le journal en a exactement autant ({journal2025.Count})");
 rapport["NUM-008 CA06"] = new { actes = 2400, annulees, valides = suiteValide.Count, debut = debut2025 + 1, fin = fin2025, journal = journal2025.Count };
+
+// =====================================================================================================
+// Raccord des lots 2, 4 et 5 (lot 8) : session Windows, base DU GREFFE par le catalogue, agent du greffe
+// =====================================================================================================
+Console.WriteLine("--- Raccord : session Windows, base du greffe, agent du greffe (lot 8)");
+async Task<HttpResponseMessage> Appeler(HttpMethod verbe, string adresse, object? corps, string? compte)
+{
+    var demande = new HttpRequestMessage(verbe, adresse);
+    if (compte is not null) demande.Headers.Add(RoutesIdentite.EnTeteCompte, compte);
+    if (corps is not null) demande.Content = JsonContent.Create(corps, options: json);
+    return await sansEnTete.SendAsync(demande);
+}
+// Les trois routes, pour un greffe. La restitution vise un numero jamais donne (-4, journalise) : servie,
+// elle ne rend rien qui serait redonne ensuite.
+(HttpMethod Verbe, string Adresse, object? Corps)[] TroisRoutes(string greffe) =>
+[
+    (HttpMethod.Get, RoutesCompteur.Pour(RoutesCompteur.Compteurs, greffe), null),
+    (HttpMethod.Post, RoutesCompteur.Pour(RoutesCompteur.Numeros, greffe), new DemandeNumero("RGB", 2026)),
+    (HttpMethod.Post, RoutesCompteur.Pour(RoutesCompteur.Restitutions, greffe), new DemandeRestitution("RGB", "2026B99999", "essai du raccord (lot 8)", 2026)),
+];
+async Task<(int[] Codes, string[] Corps)> Jouer(string greffe, string? compte)
+{
+    var codes = new List<int>();
+    var corps = new List<string>();
+    foreach (var (verbe, adresse, contenu) in TroisRoutes(greffe))
+        using (var r = await Appeler(verbe, adresse, contenu, compte))
+        {
+            codes.Add((int)r.StatusCode);
+            corps.Add(await r.Content.ReadAsStringAsync());
+        }
+    return ([.. codes], [.. corps]);
+}
+string Codes(int[] codes) => string.Join(" ", codes);
+async Task<string> EtatDesTrois() => $"A {await Etat()} | B {await EtatSur(baseB.Connexion)} | commune {await EtatSur(commune.Connexion)}";
+
+// (1) Les trois routes exigent la session (lot 2) : posee sur leur groupe, lue dans le serveur lui-meme.
+var routesDuCompteur = ((IEndpointRouteBuilder)app).DataSources.SelectMany(d => d.Endpoints).OfType<RouteEndpoint>()
+    .Where(r => r.Metadata.GetMetadata<ModuleOrigine>()?.Nom == "RigV3.Serveur.Numerotation.Compteur.ModuleCompteur").ToList();
+var malProtegees = routesDuCompteur
+    .Where(r => !r.Metadata.GetOrderedMetadata<IAuthorizeData>().Any(a => a.Policy == PolitiquesSocle.AgentAdmis)
+                || r.RoutePattern.GetParameter(PolitiquesSocle.ParametreGreffe) is null)
+    .Select(r => r.RoutePattern.RawText).ToList();
+Exiger(routesDuCompteur.Count == 3 && malProtegees.Count == 0,
+    $"Raccord (1) : les {routesDuCompteur.Count} routes du compteur portent PolitiquesSocle.AgentAdmis et le greffe dans leur adresse " +
+    $"({string.Join(", ", routesDuCompteur.Select(r => r.RoutePattern.RawText))}){(malProtegees.Count > 0 ? " ; fautives : " + string.Join(", ", malProtegees) : "")}");
+var etatAvantRefus = await EtatDesTrois();
+var anonyme = await Jouer(GreffeA, null);
+var desactive = await Jouer(GreffeA, RefuseA);
+var etatApresRefus = await EtatDesTrois();
+Exiger(anonyme.Codes.All(c => c == 401),
+    $"Raccord (1) : sans session Windows, les 3 routes du compteur du greffe A repondent 401 ({Codes(anonyme.Codes)})");
+Exiger(desactive.Codes.All(c => c == 403) && etatApresRefus == etatAvantRefus,
+    $"Raccord (1) : un compte desactive dans le greffe A recoit 403 sur les 3 routes ; ni ces refus ni les 401 n'ont fait tourner une route " +
+    $"(aucun compteur, numero rendu ni journal ne bouge) ({Codes(desactive.Codes)})");
+var admisA = await Jouer(GreffeA, AgentA);
+var compteJournalise = await Valeur<string>("SELECT TOP 1 Compte FROM num.Journal WHERE Logiciel = 'V3' AND Evenement = 'attribution' ORDER BY Id DESC;");
+Exiger(admisA.Codes.All(c => c == 200) && compteJournalise == AgentA,
+    $"Raccord (1) (jumeau) : l'agent admis du greffe A est servi par les 3 routes ({Codes(admisA.Codes)}) ; le journal porte le compte " +
+    $"de sa session (« {compteJournalise} »), plus « (non identifie) » (NUM-001 CA06)");
+
+// (2) Base du greffe demande, par le catalogue (lot 4) : 404 inconnu, 503 injoignable sans repli, A et B separes.
+var absent = await Jouer(GreffeAbsent, AgentA);
+Exiger(absent.Codes.All(c => c == 404) && absent.Corps.All(c => c.Contains(GreffeAbsent)),
+    $"Raccord (2) : un greffe absent du catalogue ({GreffeAbsent}) -> 404 sur les 3 routes, qui le nomment ; aucune base par defaut ({Codes(absent.Codes)})");
+var etatAvantMuet = await EtatDesTrois();
+var muet = await Jouer(GreffeMuet, AgentA);
+Exiger(muet.Codes.All(c => c == 503) && muet.Corps.All(c => c.Contains(baseMuette)) && await EtatDesTrois() == etatAvantMuet,
+    $"Raccord (2) : la base du greffe {GreffeMuet} ne repond pas -> 503 sur les 3 routes, la base nommee ; sans repli : ni la base commune, " +
+    $"ni A, ni B ne bougent ({Codes(muet.Codes)})");
+var rgbA = (await Dernier("RGB", 2026))!.Value;
+var rgbB = await ValeurSur<int>(baseB.Connexion, "SELECT Chrono FROM num.Compteur WHERE Type = 'RGB' AND Annee = 2026;");
+var etatB = await EtatSur(baseB.Connexion);
+var tireA = await V3("RGB", 2026);
+Exiger(tireA.Code == 0 && tireA.Chrono == rgbA + 1 && await Dernier("RGB", 2026) == rgbA + 1 && await EtatSur(baseB.Connexion) == etatB,
+    $"Raccord (2) : un numero RGB 2026 tire pour le greffe A ({tireA.Numero}) avance le compteur de A ({rgbA} -> {rgbA + 1}) et laisse " +
+    $"celui de B intact ({rgbB}, ni compteur, ni rendu, ni journal ne bouge dans B)");
+var etatA = await Etat();
+using (var r = await Appeler(HttpMethod.Post, RoutesCompteur.Pour(RoutesCompteur.Numeros, GreffeB), new DemandeNumero("RGB", 2026), AgentB))
+{
+    var tireB = await r.Content.ReadFromJsonAsync<NumeroAttribue>(json);
+    var rgbBApres = await ValeurSur<int>(baseB.Connexion, "SELECT Chrono FROM num.Compteur WHERE Type = 'RGB' AND Annee = 2026;");
+    Exiger(r.StatusCode == HttpStatusCode.OK && tireB is { Code: 0 } && tireB.Chrono == rgbB + 1 && rgbBApres == rgbB + 1 && await Etat() == etatA,
+        $"Raccord (2) (jumeau) : tire pour le greffe B par son agent, le numero vient de B ({tireB?.Numero}, {rgbB} -> {rgbBApres}) et A ne bouge pas");
+}
+using (var r = await Appeler(HttpMethod.Get, RoutesCompteur.Pour(RoutesCompteur.Compteurs, GreffeB), null, AgentB))
+{
+    var listeB = await r.Content.ReadFromJsonAsync<CompteurNumeros[]>(json) ?? [];
+    Exiger(listeB.Length == 2 && listeB.Any(c => c.Type == "RGB" && c.Chrono == rgbB + 1) && listeB.Any(c => c.Type == "JPC" && c.Chrono == 10),
+        $"Raccord (2) : la liste du greffe B est celle de SA base, lue par le catalogue ({listeB.Length} compteurs : " +
+        $"{string.Join(", ", listeB.Select(c => $"{c.Type} {c.Chrono}"))}) ; celle de A en a {liste.Length} et plus");
+}
+var chaineEnDur = new Regex(@"BaseRig|ConnectionStrings|Data\s*Source\s*=|Server\s*=|Initial\s*Catalog|Database\s*=", RegexOptions.IgnoreCase);
+var sourceModule = File.ReadAllText(Path.Combine(racine, "Serveur", "Numerotation", "Compteur", "ModuleCompteur.cs"));
+Exiger(chaineEnDur.IsMatch("async (string? type, BaseRig b, CancellationToken ct)") && chaineEnDur.IsMatch("Server=SQL-PROD;Database=RIGV3_AMIENS"),
+    "Raccord (2) (jumeau) : le controle de la source reconnait la base unique (BaseRig) et une chaine de connexion");
+Exiger(!chaineEnDur.IsMatch(sourceModule) && sourceModule.Contains("OuvrirBaseV3Async"),
+    "Raccord (2) : ModuleCompteur.cs n'ouvre aucune base par une chaine ni par la base unique : seulement par le catalogue (OuvrirBaseV3Async)");
+
+// (3) L'agent est cherche dans la base du greffe choisi, comme la V2 : connu de A seulement -> refuse sur B.
+var comptesCommune = await ValeurSur<int>(commune.Connexion, "SELECT COUNT(*) FROM soc.Compte;");
+var etatAvantCroise = await EtatDesTrois();
+var aSurB = await Jouer(GreffeB, AgentA);
+var bSurA = await Jouer(GreffeA, AgentB);
+Exiger(aSurB.Codes.All(c => c == 403) && await EtatDesTrois() == etatAvantCroise,
+    $"Raccord (3) : l'agent {AgentA}, connu du greffe A seulement, est refuse sur les 3 routes du greffe B (403) ; rien ne bouge ({Codes(aSurB.Codes)})");
+Exiger(bSurA.Codes.All(c => c == 403),
+    $"Raccord (3) : symetrique -- l'agent {AgentB}, connu du greffe B seulement, est refuse sur le greffe A (403) ({Codes(bSurA.Codes)})");
+var bSurB = await Jouer(GreffeB, AgentB);
+Exiger(bSurB.Codes.All(c => c == 200) && comptesCommune == 0,
+    $"Raccord (3) (jumeau) : {AgentB} est servi sur SON greffe ({Codes(bSurB.Codes)}) ; la base commune n'a aucun compte d'agent " +
+    $"({comptesCommune}) : chaque admission vient de la base du greffe de l'adresse");
 
 // CA07 : copie anonymisee d'une vraie base de greffe, resultats archives avec le rapport de la beta.
 var cheminRapport = Path.Combine(AppContext.BaseDirectory, "numerotation-charge.json");

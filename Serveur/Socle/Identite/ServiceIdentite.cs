@@ -2,6 +2,7 @@ using System.Data;
 using System.Security.Claims;
 using Microsoft.Data.SqlClient;
 using RigV3.Contrats.Socle;
+using RigV3.Serveur.Socle.Greffes;
 
 namespace RigV3.Serveur.Socle.Identite;
 
@@ -18,8 +19,17 @@ namespace RigV3.Serveur.Socle.Identite;
 /// echoue donne le refus ; un compte desactive ET sans role est donc refuse pour
 /// « aucune habilitation », comme dans la V2.
 /// Rien n'est ecrit : un refus ne cree ni compte ni trace (CA03).
+///
+/// DANS QUELLE BASE (lot 8). Comme la V2 (Utilisateur.GetUtilisateurCourant(CodeGreffeRig),
+/// Utilisateur.cs:424-432), le compte se cherche dans la base DU GREFFE choisi : une route dont
+/// l'adresse porte <c>{greffe}</c> (<see cref="PolitiquesSocle.ParametreGreffe"/>) ouvre la base V3
+/// de ce greffe par le catalogue commun (<see cref="CatalogueGreffes.OuvrirBaseV3Async"/>) : greffe
+/// absent -> <see cref="GreffeInconnu"/> (404), base muette -> <see cref="BaseGreffeInjoignable"/>
+/// (503), jamais de repli sur une autre base. Un agent declare dans un seul greffe est donc inconnu
+/// des autres. Une route COMMUNE (sans greffe : le catalogue des greffes, /socle/identite) juge
+/// le compte dans la base commune du serveur (<see cref="BaseRig"/>).
 /// </summary>
-public sealed class ServiceIdentite
+public sealed class ServiceIdentite(CatalogueGreffes catalogue)
 {
     /// <summary>Cle de <see cref="Microsoft.AspNetCore.Http.HttpContext.Items"/> : l'identite
     /// jugee une fois par requete (la route et la politique d'acces la partagent).</summary>
@@ -43,24 +53,40 @@ public sealed class ServiceIdentite
         return compte.Length == 0 ? null : compte;
     }
 
-    /// <summary>L'identite de l'appelant de cette requete, jugee une seule fois ; null s'il n'est pas authentifie.</summary>
-    public async Task<IdentiteAgent?> DeLAppelantAsync(HttpContext contexte, BaseRig b, CancellationToken ct)
+    /// <summary>Le greffe choisi par la requete : la valeur <c>{greffe}</c> de son adresse ; null pour une route commune.</summary>
+    public static string? GreffeDe(HttpContext contexte)
+        => contexte.GetRouteValue(PolitiquesSocle.ParametreGreffe) is string { Length: > 0 } greffe ? greffe : null;
+
+    /// <summary>
+    /// L'identite de l'appelant de cette requete, jugee une seule fois ; null s'il n'est pas authentifie
+    /// (aucune base n'est alors ouverte). Le compte est cherche dans la base du greffe de la requete
+    /// (<see cref="GreffeDe"/>), sinon dans la base commune <paramref name="commune"/>.
+    /// </summary>
+    /// <exception cref="GreffeInconnu">Le greffe de l'adresse n'est pas au catalogue.</exception>
+    /// <exception cref="BaseGreffeInjoignable">Sa base V3 ne repond pas.</exception>
+    public async Task<IdentiteAgent?> DeLAppelantAsync(HttpContext contexte, BaseRig commune, CancellationToken ct)
     {
         if (contexte.Items.TryGetValue(CleRequete, out var deja)) return (IdentiteAgent?)deja;
         var compte = CompteDe(contexte.User);
-        var identite = compte is null ? null : await IdentifierAsync(b, compte, ct);
+        IdentiteAgent? identite = null;
+        if (compte is not null)
+        {
+            await using var cn = GreffeDe(contexte) is { } greffe
+                ? await catalogue.OuvrirBaseV3Async(greffe, ct)
+                : await commune.OuvrirAsync(ct);
+            identite = await IdentifierAsync(cn, compte, ct);
+        }
         contexte.Items[CleRequete] = identite;
         return identite;
     }
 
-    /// <summary>Juge le compte Windows <paramref name="compte"/> sur la base du greffe.</summary>
-    public async Task<IdentiteAgent> IdentifierAsync(BaseRig b, string compte, CancellationToken ct)
+    /// <summary>Juge le compte Windows <paramref name="compte"/> sur la base ouverte <paramref name="cn"/>.</summary>
+    public async Task<IdentiteAgent> IdentifierAsync(SqlConnection cn, string compte, CancellationToken ct)
     {
         // Un nom plus long que la colonne ne peut pas y etre ; le passer en varchar(35)
         // le tronquerait et pourrait reconnaitre un AUTRE compte.
         if (compte.Length > LongueurCompte) return Juger(compte, null);
 
-        await using var cn = await b.OuvrirAsync(ct);
         await using var cmd = new SqlCommand("""
             SELECT c.CompteWindows, c.Nom, c.Prenom, c.Abrege, c.Civilite, c.Desactive,
                    c.EstAmitel, c.EstAdministrateur, c.EstAssistance,
