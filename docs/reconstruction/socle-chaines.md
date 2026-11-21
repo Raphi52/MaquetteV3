@@ -115,8 +115,8 @@ délibéré ») ni dans la branche courante de `D:\RigApplication` : il est dans
 | Purger | `POST …/chaines/purge` `{ "exercice": 2025 }` | comptable, Amitel |
 
 Réglage : `Chaines:SignatureDeFondSecondes` (300 par défaut, 0 l'arrête). Écran : menu **Facturer › Tenir les
-comptes › Certification NF525** (`PROC_CERTIF`) ; Entrée dans un critère lance la recherche
-(`Pont\EcranCorrespondances.cs`).
+comptes › Certification NF525** (`PROC_CERTIF`) ; Entrée, F5 et F7 dans un critère lancent la recherche, par la touche
+commune `toucheDeRecherche` de `web\src\plan\clavier.ts` (`Pont\EcranCorrespondances.cs`).
 
 ## Écarts avec la V2, à valider (référent Facturation, co-valideur de la story)
 
@@ -150,4 +150,4 @@ comptes › Certification NF525** (`PROC_CERTIF`) ; Entrée dans un critère lan
 `ServiceChaines.cs`, `ServiceChaines.Clotures.cs`, `ControleIntegrite.cs`, `LectureChaines.cs`, `Signatures.cs`,
 `SignatureDeFond.cs`) · `Pont\EcranChaines.cs` · `web\src\ecrans\EcranChaines.tsx` (+ `.test.tsx`) · `tests\SocleChainesCheck` ·
 listes partagées : `Pont\MenuAccueil.cs`, `Pont\CatalogueEcrans.cs`, `web\src\plan\Aiguillage.tsx`,
-`Pont\EcranCorrespondances.cs` (Entrée lance la recherche), `tests\MenuGestesCheck\Program.cs` (`PROC_CERTIF` sans fiche).
+`Pont\EcranCorrespondances.cs` (Entrée, F5 et F7 lancent la recherche), `tests\MenuGestesCheck\Program.cs` (`PROC_CERTIF` sans fiche).

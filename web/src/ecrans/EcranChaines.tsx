@@ -13,6 +13,7 @@
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
+import { toucheDeRecherche } from '../plan/clavier'
 import { quand } from './EcranComptes'
 
 export interface EtatChaine {
@@ -200,8 +201,9 @@ export function EcranChaines() {
 
       <aside className="rig-criteres">
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Journal des événements</div>
-        {/* Entrée dans un critère lance la recherche, comme « Rechercher » (PROC_CERTIF de la V2 ; Pont/EcranCorrespondances.cs). */}
-        <div onKeyDown={(e) => { if (e.key === 'Enter') rechercher() }}>
+        {/* Entrée, F5 et F7 dans un critère lancent la recherche, comme « Rechercher » : la touche commune des écrans de
+            recherche (web/src/plan/clavier.ts, lot 4 ; PROC_CERTIF de la V2 ; Pont/EcranCorrespondances.cs). */}
+        <div onKeyDown={(e) => { if (toucheDeRecherche(e)) rechercher() }}>
         <label className="rig-saisie-champ">
           <span className="rig-saisie-champ__libelle">Partie du journal</span>
           <select className="rig-saisie-champ__saisie" value={partie} onChange={(e) => setPartie(e.target.value)}>

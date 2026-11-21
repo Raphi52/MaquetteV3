@@ -76,6 +76,17 @@ describe('EcranChaines', () => {
     expect(pont.appels).toHaveBeenCalledWith('EcranChaines.Rechercher', { partie: 'np', code: 10, du: '2026-09-01', au: '2026-11-30' })
   })
 
+  it('SOC-027 : Entree, F5 et F7 dans un critere lancent la recherche, sans laisser F5 recharger la page', async () => {
+    const pont = installerFauxPont({ 'EcranChaines.Ouvrir': () => vue(), 'EcranChaines.Rechercher': () => vue() })
+    render(<EcranChaines />)
+    await screen.findByText('Journal (3)')
+    for (const [rang, touche] of ['Enter', 'F5', 'F7'].entries()) {
+      const laissee = fireEvent.keyDown(screen.getByLabelText('Partie du journal'), { key: touche })
+      expect(laissee).toBe(touche === 'Enter')
+      expect(pont.appels.mock.calls.filter(([m]) => m === 'EcranChaines.Rechercher')).toHaveLength(rang + 1)
+    }
+  })
+
   it('SOC-018 CA07 : les grands totaux des factures et des encaissements se lisent, sans rien a modifier', async () => {
     installerFauxPont({ 'EcranChaines.Ouvrir': () => vue() })
     render(<EcranChaines />)
