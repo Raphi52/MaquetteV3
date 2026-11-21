@@ -19,23 +19,23 @@ namespace RigV3.Serveur.Socle.Comptes;
 /// Ecart retenu par la story (SOC-004 CA04, « a valider ») : la V2 supprime un compte en reattribuant
 /// ses demandes a un autre (OPE_SUPPRESSION_UTILISATEUR.cs:38-58) ; la V3 refuse de supprimer un compte
 /// qui a agi et propose de le desactiver -- l'auteur d'un geste ne change jamais.
+///
+/// Chaque methode travaille sur <c>cn</c>, la base V3 du greffe de la requete que la route a ouverte par le
+/// catalogue commun (lot 9, <see cref="ServiceDroits.OuvrirBaseAsync"/>) : un compte cree dans un greffe n'existe
+/// que dans la base de ce greffe.
 /// </summary>
-public sealed class ServiceComptes(IConfiguration configuration)
+public sealed class ServiceComptes
 {
     /// <summary>Le code greffe d'un compte cree par un agent d'Amitel (V2 : OPE_EDITION_UTILISATEUR.cs:165).</summary>
     public const string CodeGreffeAmitel = "9999";
-
-    /// <summary>La cle de configuration du code du greffe que sert ce serveur (le RIG.Common.CodeGreffeRig de la V2).</summary>
-    public const string CleCodeGreffe = "Greffe:Code";
 
     private const string Famille = "compte";
 
     // ---------------------------------------------------------------- lecture
 
     /// <summary>Ce que l'ecran affiche, filtre selon l'appelant (SOC-002 CA03).</summary>
-    public async Task<VueComptes> VueAsync(BaseRig b, Appelant appelant, CancellationToken ct)
+    public async Task<VueComptes> VueAsync(SqlConnection cn, Appelant appelant, CancellationToken ct)
     {
-        await using var cn = await b.OuvrirAsync(ct);
         var comptes = (await LireComptesAsync(cn, null, null, ct)).Where(c => appelant.EstAmitel || !c.EstAdministrateur).ToArray();
         var services = new List<ServiceGreffe>();
         await using (var cmd = new SqlCommand("""
@@ -54,15 +54,14 @@ public sealed class ServiceComptes(IConfiguration configuration)
     // ---------------------------------------------------------------- gestes
 
     /// <summary>SOC-004 CA01, CA02, CA07 : creer un compte actif, unique sans majuscules, avec son abrege et son code greffe.</summary>
-    public async Task<ResultatCompte> CreerAsync(BaseRig b, Appelant appelant, DemandeCompte d, CancellationToken ct)
+    /// <param name="greffe">Le greffe de la requete (son code au catalogue) : le code greffe d'un compte que le greffe cree,
+    /// comme le RIG.Common.CodeGreffeRig de la V2 (OPE_EDITION_UTILISATEUR.cs:165).</param>
+    public async Task<ResultatCompte> CreerAsync(SqlConnection cn, Appelant appelant, string greffe, DemandeCompte d, CancellationToken ct)
     {
         if (Valider(d) is { } invalide) return Refus(invalide);
         var login = d.CompteWindows.Trim();
-        var codeGreffe = appelant.EstAmitel ? CodeGreffeAmitel : configuration[CleCodeGreffe];
-        if (string.IsNullOrWhiteSpace(codeGreffe))
-            throw new InvalidOperationException($"Code du greffe non configure : poser {CleCodeGreffe} (variable Greffe__Code).");
+        var codeGreffe = appelant.EstAmitel ? CodeGreffeAmitel : greffe;
 
-        await using var cn = await b.OuvrirAsync(ct);
         if (await CompteParLoginAsync(cn, null, login, ct) is not null) return Refus(MessageDejaPris(login));
         var roles = (d.Roles ?? []).Select(r => r.Trim()).Where(r => r.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var connus = await LireRolesAsync(cn, null, ct);
@@ -103,12 +102,11 @@ public sealed class ServiceComptes(IConfiguration configuration)
     }
 
     /// <summary>SOC-004 : corriger le compte, le nom, le prenom, la civilite ou le service d'un compte.</summary>
-    public async Task<ResultatCompte> ModifierAsync(BaseRig b, Appelant appelant, DemandeCompte d, CancellationToken ct)
+    public async Task<ResultatCompte> ModifierAsync(SqlConnection cn, Appelant appelant, DemandeCompte d, CancellationToken ct)
     {
         if (d.Id is not { } id) return Refus("Aucun compte designe.");
         if (Valider(d) is { } invalide) return Refus(invalide);
         var login = d.CompteWindows.Trim();
-        await using var cn = await b.OuvrirAsync(ct);
         if (await CompteGerableAsync(cn, appelant, id, ct) is not { } avant) return RefusIntrouvable();
         // V2 : le doublon n'est cherche que si le compte change (OPE_EDITION_UTILISATEUR.cs:156).
         if (!string.Equals(login, avant.CompteWindows, StringComparison.Ordinal)
@@ -149,9 +147,8 @@ public sealed class ServiceComptes(IConfiguration configuration)
     }
 
     /// <summary>SOC-004 CA03 : desactiver un compte ; il n'ouvre plus RIG, ses gestes gardent son nom.</summary>
-    public async Task<ResultatCompte> DesactiverAsync(BaseRig b, Appelant appelant, DemandeSurCompte d, CancellationToken ct)
+    public async Task<ResultatCompte> DesactiverAsync(SqlConnection cn, Appelant appelant, DemandeSurCompte d, CancellationToken ct)
     {
-        await using var cn = await b.OuvrirAsync(ct);
         if (await CompteGerableAsync(cn, appelant, d.Id, ct) is not { } avant) return RefusIntrouvable();
         if (avant.Desactive) return new ResultatCompte(false, $"Le compte {avant.CompteWindows} est déjà désactivé.", avant);
         await using var tx = (SqlTransaction)await cn.BeginTransactionAsync(ct);
@@ -171,9 +168,8 @@ public sealed class ServiceComptes(IConfiguration configuration)
     /// SOC-004 CA04 : seul un compte qui n'a JAMAIS agi se supprime. A agi : il est l'auteur d'une ligne
     /// d'un journal de la V3, ou il vient de la V2 (sa trace -- demandes, factures -- y est encore).
     /// </summary>
-    public async Task<ResultatCompte> SupprimerAsync(BaseRig b, Appelant appelant, DemandeSurCompte d, CancellationToken ct)
+    public async Task<ResultatCompte> SupprimerAsync(SqlConnection cn, Appelant appelant, DemandeSurCompte d, CancellationToken ct)
     {
-        await using var cn = await b.OuvrirAsync(ct);
         if (await CompteGerableAsync(cn, appelant, d.Id, ct) is not { } avant) return RefusIntrouvable();
         if (await AAgiAsync(cn, d.Id, ct))
             return new ResultatCompte(false,
@@ -199,9 +195,8 @@ public sealed class ServiceComptes(IConfiguration configuration)
     }
 
     /// <summary>SOC-005 CA01, CA02 et SOC-002 CA03 : donner ou retirer un role que l'appelant peut attribuer.</summary>
-    public async Task<ResultatCompte> RoleAsync(BaseRig b, Appelant appelant, DemandeRole d, CancellationToken ct)
+    public async Task<ResultatCompte> RoleAsync(SqlConnection cn, Appelant appelant, DemandeRole d, CancellationToken ct)
     {
-        await using var cn = await b.OuvrirAsync(ct);
         if (await CompteGerableAsync(cn, appelant, d.IdCompte, ct) is not { } compte) return RefusIntrouvable();
         var role = (await LireRolesAsync(cn, null, ct)).FirstOrDefault(r => string.Equals(r.Nom, (d.Role ?? "").Trim(), StringComparison.OrdinalIgnoreCase));
         if (role is null || !appelant.Voit(role.ReserveAmitel, role.ReserveAdministrateur)) return Refus(MessageRoleNonAttribuable(d.Role ?? ""), compte);

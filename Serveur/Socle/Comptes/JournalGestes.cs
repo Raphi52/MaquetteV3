@@ -108,10 +108,9 @@ public static class JournalGestes
     /// Le journal des gestes, du plus recent au plus ancien, en phrases (SOC-016 CA03). Sans
     /// <paramref name="toutLeGreffe"/>, l'appelant ne voit que SES gestes : jamais l'activite d'un collegue.
     /// </summary>
-    public static async Task<VueJournal> LireAsync(BaseRig b, Appelant appelant, bool toutLeGreffe,
+    public static async Task<VueJournal> LireAsync(SqlConnection cn, Appelant appelant, bool toutLeGreffe,
                                                    string? agent, string? objet, DateOnly? du, DateOnly? au, CancellationToken ct)
     {
-        await using var cn = await b.OuvrirAsync(ct);
         await using var cmd = new SqlCommand("""
             SELECT TOP (500) Id, Instant, Source, Agent, CompteV2, Ecran, Famille, Objet, Verbe, Avant, Apres
             FROM soc.Journal
@@ -154,9 +153,8 @@ public static class JournalGestes
     }
 
     /// <summary>Le journal des droits filtre par compte vise, role et periode, du plus recent au plus ancien (SOC-005 CA05).</summary>
-    public static async Task<LigneJournalDroits[]> LireDroitsAsync(BaseRig b, string? compte, string? role, DateOnly? du, DateOnly? au, CancellationToken ct)
+    public static async Task<LigneJournalDroits[]> LireDroitsAsync(SqlConnection cn, string? compte, string? role, DateOnly? du, DateOnly? au, CancellationToken ct)
     {
-        await using var cn = await b.OuvrirAsync(ct);
         await using var cmd = new SqlCommand("""
             SELECT TOP (500) Id, Instant, CompteVise, Role, Sens, Auteur, Ecran
             FROM soc.JournalDroits

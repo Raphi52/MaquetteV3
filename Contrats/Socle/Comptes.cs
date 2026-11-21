@@ -6,26 +6,33 @@ namespace RigV3.Contrats.Socle;
 /// <see cref="RoutesDroits.RoleGestionDesDroits"/>) : sinon 403 (SOC-002 CA04).
 /// Un refus METIER (compte deja pris, suppression d'un compte qui a agi...) n'est pas une erreur HTTP :
 /// 200 avec <see cref="ResultatCompte.Fait"/> = false et le message, que l'ecran affiche.
+///
+/// Chaque adresse porte le code du greffe, <c>{greffe}</c> (lot 9, comme l'identite et le compteur au lot 8) :
+/// les comptes sont ceux de la base V3 de CE greffe, ouverte par le catalogue commun, et l'agent y est juge.
+/// 404 pour un greffe absent du catalogue, 503 si sa base ne repond pas, sans repli. L'adresse : <see cref="Pour"/>.
 /// </summary>
 public static class RoutesComptes
 {
     /// <summary>GET : <see cref="VueComptes"/> -- les comptes, les services et les roles que l'appelant peut voir.</summary>
-    public const string Comptes = "/socle/comptes";
+    public const string Comptes = "/socle/{greffe}/comptes";
 
     /// <summary>POST <see cref="DemandeCompte"/> (Id null) -> <see cref="ResultatCompte"/>.</summary>
-    public const string Creer = "/socle/comptes/creer";
+    public const string Creer = "/socle/{greffe}/comptes/creer";
 
     /// <summary>POST <see cref="DemandeCompte"/> (Id pose) -> <see cref="ResultatCompte"/>.</summary>
-    public const string Modifier = "/socle/comptes/modifier";
+    public const string Modifier = "/socle/{greffe}/comptes/modifier";
 
     /// <summary>POST <see cref="DemandeSurCompte"/> -> <see cref="ResultatCompte"/>.</summary>
-    public const string Desactiver = "/socle/comptes/desactiver";
+    public const string Desactiver = "/socle/{greffe}/comptes/desactiver";
 
     /// <summary>POST <see cref="DemandeSurCompte"/> -> <see cref="ResultatCompte"/> ; refuse pour un compte qui a agi (CA04).</summary>
-    public const string Supprimer = "/socle/comptes/supprimer";
+    public const string Supprimer = "/socle/{greffe}/comptes/supprimer";
 
     /// <summary>POST <see cref="DemandeRole"/> -> <see cref="ResultatCompte"/> : donner ou retirer un role.</summary>
-    public const string Role = "/socle/comptes/role";
+    public const string Role = "/socle/{greffe}/comptes/role";
+
+    /// <summary>L'adresse d'une de ces routes pour le greffe <paramref name="greffe"/> (son code au catalogue).</summary>
+    public static string Pour(string route, string greffe) => route.Replace("{greffe}", Uri.EscapeDataString(greffe));
 }
 
 /// <summary>Un compte d'agent tel que la gestion des comptes le montre (aucun mot de passe : SOC-001 CA08).</summary>

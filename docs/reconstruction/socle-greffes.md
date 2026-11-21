@@ -5,13 +5,13 @@ Lot 4 du plan « Reconstruction de RIG — phase 1 » (plan `plan-da1bba7f`, fil
 
 | Story | Ce qu'elle donne | Où |
 |---|---|---|
-| **SOC-007** Déclarer chaque greffe et ses deux bases dans un catalogue commun | `soc.Greffe` (+ son historique) dans la base commune ; la partie serveur ne trouve la base d'un greffe que là | `Base\migrations\SOC-007_catalogue.sql`, `Serveur\Socle\Greffes\CatalogueGreffes.cs`, `RepriseCatalogue.cs` |
+| **SOC-007** Déclarer chaque greffe et ses deux bases dans un catalogue commun | `soc.Greffe` (+ son historique) dans la base commune ; la partie serveur ne trouve la base d'un greffe que là | `Base\migrations\SOC-007_catalogue.sql`, `SOC-007_journal.sql` (famille « greffe » du journal, lot 9), `Serveur\Socle\Greffes\CatalogueGreffes.cs`, `RepriseCatalogue.cs` |
 | **SOC-008** Créer la base de chaque greffe à côté de sa base actuelle | création d'une base V3 sur l'instance de sa base V2, ses accès, et les contrôles d'exploitation (schéma, sauvegardes, disque, SQL Server 2017) | `Base\migrations\SOC-008_acces.sql`, `Serveur\Socle\Greffes\BaseGreffe.cs` |
 | **SOC-003** Retrouver les réglages de son greffe à l'identique | `soc.Reglage`, `soc.ParametreGreffe`, `soc.ModeleCourriel`, `soc.GreffeInfoV2` ; reprise, comparaison valeur par valeur, lecture « comme la V2 » | `Base\migrations\SOC-003_reglages.sql`, `Serveur\Socle\Greffes\LectureReglage.cs`, `RepriseReglages.cs`, `ModeleCourriel.cs`, `LectureV2.cs`, `AuteurReglage.cs` |
 
 Routes : `Serveur\Socle\Greffes\ModuleGreffes.cs` (types échangés : `Contrats\Socle\Greffes.cs`).
-Banc : `tests\SocleGreffesCheck` — **`.\tests.ps1 SocleGreffes`**, 94 contrôles, un par critère au moins,
-chacun cite son id (`SOC-007 CA03`…), chaque refus a son jumeau accepté.
+Banc : `tests\SocleGreffesCheck` — **`.\tests.ps1 SocleGreffes`**, 103 contrôles, un par critère au moins,
+chacun cite son id (`SOC-007 CA03`…, `Raccord (2)` pour le lot 9), chaque refus a son jumeau accepté.
 
 ## Les sources V2 vérifiées avant d'écrire
 
@@ -58,17 +58,22 @@ Lues en plus, parce que le comportement en dépend :
 | GET | `/socle/greffes` | toutes les fiches |
 | GET | `/socle/greffes/{code}` | une fiche : bases, bêta, outre-mer, fuseau et décalage, passage (404 si inconnu) |
 | GET | `/socle/greffes/{code}/historique` | les modifications de la fiche, auteur et date |
-| PUT | `/socle/greffes/{code}/passage` | `{"passageLocal":"2027-03-01T08:00"}`, heure locale ; 409 une fois le passage fait |
-| PUT | `/socle/greffes/{code}/fuseau` | `{"fuseau":"SA Western Standard Time"}` ; 409 une fois le passage fait |
+| PUT | `/socle/greffes/{code}/passage` | `{"passageLocal":"2027-03-01T08:00", "ecran":"…"}`, heure locale ; 403 sans le droit de modifier le greffe ; 409 une fois le passage fait ; geste au journal de la base commune |
+| PUT | `/socle/greffes/{code}/fuseau` | `{"fuseau":"SA Western Standard Time", "ecran":"…"}` ; 403 sans le droit ; 409 une fois le passage fait ; geste au journal de la base commune |
 | GET | `/socle/greffes/{code}/base` | la base V3 répond-elle, à quelle version (503 sinon, la base nommée) |
-| GET | `/socle/greffes/{code}/reglages` et `/reglages/{reglage}` | réglages lus dans la base du greffe |
-| PUT | `/socle/greffes/{code}/reglages/{reglage}` | `{"valeur":"1"}` ; pose auteur et date ; 404 si le réglage n'existe pas (comme la V2) |
+| GET | `/socle/greffes/{greffe}/reglages` et `/reglages/{reglage}` | réglages lus dans la base du greffe, l'agent jugé dans cette base (lot 9) |
+| PUT | `/socle/greffes/{greffe}/reglages/{reglage}` | `{"valeur":"1", "ecran":"…"}` ; 403 sans le droit ; pose auteur et date ; 404 si le réglage n'existe pas (comme la V2) ; geste au journal de la base du greffe |
 | GET | `/socle/greffes/{code}/reprise` | la liste remise au référent : réglages non lus par la V3, chemins réseau injoignables |
+
+`{code}` : route commune, l'agent est jugé dans la base commune. `{greffe}` : route du greffe, l'agent est
+jugé dans la base V3 de ce greffe (404 greffe inconnu, 503 base muette, réponse de la politique). L'adresse
+se forme par `RoutesGreffes.Pour(route, code, reglage)` dans les deux cas. `ecran` est facultatif.
 
 **Accès** : toutes ces routes portent `PolitiquesSocle.AgentAdmis` (lot 2, SOC-001), posée une fois sur
 leur groupe dans `ModuleGreffes.cs` : sans session Windows, 401 ; compte refusé (inconnu, sans rôle,
 désactivé, sans service), 403 ; la route ne s'exécute pas. L'auteur d'une modification est donc toujours
-un agent admis ; pour un réglage, c'est son nom, comme la V2 (SOC-003 CA07, tableau des écarts). Le banc appelle les 10 routes sans session (401), avec un compte désactivé (403), vérifie
+un agent admis ; pour un réglage, c'est son nom, comme la V2 (SOC-003 CA07, tableau des écarts). Modifier
+demande en plus le droit de modifier le greffe (lot 9, ci-dessous). Le banc appelle les 10 routes sans session (401), avec un compte désactivé (403), vérifie
 que rien n'a changé, et que l'agent admis lit par les 7 routes de lecture (200). Il vérifie aussi, dans le
 serveur lui-même, que chaque route du module porte la politique : une route ajoutée hors du groupe fait
 tomber le banc. Contre-épreuve faite (2026-11-21) : politique retirée du groupe → 3 contrôles rouges.
@@ -79,11 +84,44 @@ tomber le banc. Contre-épreuve faite (2026-11-21) : politique retirée du group
 |---|---|
 | L'identité (`Serveur\Socle\Identite\ServiceIdentite.cs`, `socle-identite.md`) | Sur une route dont l'adresse porte `{greffe}`, le compte de l'agent se cherche dans la base V3 de ce greffe, ouverte par `CatalogueGreffes.OuvrirBaseV3Async` ; la politique `AgentAdmis` rend `GreffeInconnu` en 404 et `BaseGreffeInjoignable` en 503, sans repli. |
 | Le compteur (`Serveur\Numerotation\Compteur\ModuleCompteur.cs`, `numerotation-compteur.md`) | `/numerotation/{greffe}/compteurs`, `/numeros`, `/restitutions` ouvrent la base du greffe par le catalogue ; plus aucune lecture de la base unique. Banc : un numéro tiré pour un greffe laisse le compteur de l'autre intact. |
-| Ce module (`Serveur\Socle\Greffes`) | **Rien.** Ses routes gardent `{code}` et restent des routes communes : l'agent y est jugé dans la base commune, comme avant. Une fiche existe avant la base V3 de son greffe (SOC-008) : la juger dans cette base rendrait 503 sur la saisie du passage d'un greffe pas encore créé (fiche T004 du banc), et remplacerait le corps `EtatBaseGreffe` de ses propres 503 (`…/reglages` de la fiche T003 dans le banc). |
+| Ce module (`Serveur\Socle\Greffes`) | **Rien au lot 8.** Ses routes du catalogue gardent `{code}` et restent des routes communes : une fiche existe avant la base V3 de son greffe (SOC-008) ; la juger dans cette base rendrait 503 sur la saisie du passage d'un greffe pas encore créé (fiche T004 du banc). Les réglages ont suivi au lot 9 (ci-dessous). |
 
-À trancher avec les droits du lot 3 (SOC-002) : qui modifie les **réglages** d'un greffe (`PUT …/reglages/{reglage}`).
-Aujourd'hui, l'agent admis de la base commune (exploitation d'Amitel) ; si c'est aussi l'agent chargé du
-paramétrage **dans** son greffe, ces routes passeront à `{greffe}` et l'agent sera jugé dans sa base.
+## Raccord fait (lot 9, 2026-11-21) : le droit de modifier, et chaque modification au journal
+
+**Qui a le droit de modifier** la fiche d'un greffe (date et fuseau de passage) ou ses réglages : la règle
+de la V2 pour modifier un greffe, `OPE_EDITER_GREFFE.cs:30-38` (`D:\RigApplication\Source\RIG\OUTILS\Exploitation\PROC_GREFFE`,
+le module V2 de SOC-007) : un **administrateur** (`IsUserAdministrateur` = Amitel **et** marque
+administrateur, `Utilisateur.cs:75-77`), le **service Outils** (`IsServiceOutils`) ou l'un des **trois comptes
+nommés** dans le code (`thevenon`, `benier`, `jouguet`) ; tout autre agent n'a que la lecture
+(`MetierReadOnly`). C'est la « fiche réservée à l'exploitation d'Amitel » de SOC-007 T05. Codée dans
+`ServiceDroits.PeutModifierLeGreffe` ; sans elle, **403**, et rien n'est lu ni écrit.
+
+Pourquoi pas une fonction vérifiée par `ServiceDroits.VerifierAsync` : la V2 n'en vérifie **aucune** ici (règle
+sur le compte, pas sur une fonction), et aucun écran de la V2 ne modifie un réglage **quelconque** : chacun ne
+touche que les siens, sous sa propre fonction (`PARAMJUD` pour `Judiciaire\Exe\PROC_PARAM`, `PARAMEXPRESSO`,
+`SURV_PARAM`, `PARAM_NAT_DIL`…, relu dans RIG_DEV le 2026-11-21). La fonction `GTABREF` du module que le carnet
+cite pour SOC-003 (`PROC_GTABREF`) n'écrit pas `PARAMETRAGE` (ses tables : codes d'actes, natures d'affaire,
+états…). La route générique des réglages prend donc la règle de la fiche du greffe, la plus stricte de la V2 :
+aucun agent n'y gagne un droit que la V2 ne lui donnait pas (SOC-002, « afin de »).
+
+| Qui | Ce qui a changé |
+|---|---|
+| `PUT …/passage`, `PUT …/fuseau` (`ModuleGreffes.cs`, `CatalogueGreffes.SaisirPassageAsync`, `SaisirFuseauAsync`) | 403 sans le droit ; la modification et son geste (`JournalGestes.EcrireAsync`, famille `greffe`, avant / après de la valeur changée, appelant = `ServiceDroits.AppelantAsync` dans la base commune) s'écrivent dans **une** transaction de la base commune, où vit le catalogue. |
+| Les réglages (`RoutesGreffes.Reglages`, `Reglage`) | Passent à `{greffe}` : l'agent est jugé dans la base du greffe, comme la V2 lit et écrit ses réglages sous l'utilisateur du greffe ; une base muette répond 503 par la politique (le corps `RefusGreffe` nomme la base ; `GET …/{code}/base` garde son `EtatBaseGreffe`). |
+| `PUT …/reglages/{reglage}` | 403 sans le droit ; lecture de l'avant, modification, relecture et geste (famille `reglage`, objet « le reglage CODE » : un code va jusqu'à 58 caractères dans RIG_DEV, `IdObjet` en tient 40) dans **une** transaction de la base du greffe. |
+| Le modèle de courriel | **Aucune route ne le modifie** : il n'est que lu (SOC-003 CA06, `ModeleCourriel.cs`) ; rien à journaliser. Sa modification viendra avec l'écran des réglages (SOC-003 T03) et suivra la même règle. |
+| `Base\migrations\SOC-007_journal.sql` | La famille `greffe` du journal (6 ans, comme les autres hors facturation). |
+
+Prouvé par le banc (contrôles « Raccord (2) », 2026-11-21) : un réglage modifié sur le greffe A s'écrit au
+journal de la base de A et de nulle autre (B, commune), avec l'agent, l'écran, l'heure, l'avant et l'après ;
+les trois modifications acceptées du catalogue sont au journal de la base commune, les refus (400, 401, 409)
+n'y ont rien écrit ; un agent admis **sans** le droit reçoit 403 sur la date, le fuseau et un réglage, et ni
+la fiche, ni son historique, ni le réglage, ni aucun journal ne bougent — il lit toujours, et le motif du refus
+lui dit toute la règle (administrateur d'Amitel ou l'un des trois comptes nommés par la V2, `ServiceDroits.QuiPeutModifierLeGreffe`) ; un compte nommé par
+la V2 modifie ; journal renommé (en panne) → les trois modifications sont annulées avec lui (même transaction),
+journal revenu → la même passe. Contre-épreuves, chaque fichier restauré à l'identique : contrôle du droit
+retiré → 3 rouges ; validation avant le journal → 1 rouge (la modification survit à la panne du journal) ;
+journal du réglage sauté → 3 rouges.
 
 ## Les gestes d'exploitation (code prêt, à lancer par l'exploitation)
 
@@ -123,6 +161,10 @@ await BaseGreffe.PlaceDisqueAsync(instance, [baseV2, baseV3], seuilOctets);
 | `SEND_EMAIL_TEMPLATE_PATH` de RIG_DEV | `\\ged2\PartageEdition$\Commun\templateMail\template-shell.txt`, **injoignable** depuis ce poste | Sans conséquence tant que le modèle est en base (il l'est) ; listé au référent (CA05). 8 des 9 chemins réseau de RIG_DEV répondent. |
 | Classement des bases | celui de la base V2 du greffe | À relever sur les 40 bases : s'ils diffèrent, la recopie compare comme chaque V2. |
 | Fuseau à la reprise | par département du code greffe (971, 972 → UTC−4 ; 974 → UTC+4 ; 976 → UTC+3 ; 987 → UTC−10 ; métropole → Paris) | Valeurs de SOC-007 CA03 ; un outre-mer non prévu (Guyane, 973) reste vide, à saisir. |
+| Qui modifie un greffe : trois comptes nommés dans le code | `thevenon`, `benier`, `jouguet` gardent le droit, comme la V2 (`OPE_EDITER_GREFFE.cs:31-35`, règle 6 du plan) | Le carnet dit « l'exploitation d'Amitel » (SOC-007 T05) ; la V2 code des personnes. Sur RIG_DEV, 1 des 3 comptes actifs n'est ni administrateur ni Outils : sans la liste, il perdrait ce droit. À remplacer par un rôle quand le référent Socle le décidera. |
+| Qui modifie un greffe : le service Outils | **non repris** : `UTLST_IS_OUTILS` n'est pas dans `soc.Compte` | Aucun compte actif de RIG_DEV ne l'a (mesuré le 2026-11-21) ; à relever sur les 40 bases. Un compte Outils non administrateur perdrait le droit de modifier : le reprendre (colonne et reprise, `RepriseDroits.cs`) si une base en a. |
+| Où l'agent est jugé pour la fiche | dans la base **commune** (route `{code}`, lot 8) | La V2 le juge dans la base du greffe qu'il modifie (`Utilisateur.GetUtilisateurCourant(_greffe.CodeGreffe)`, `OPE_EDITER_GREFFE.cs:30`). L'exploitation d'Amitel doit donc avoir son compte dans la base commune. |
+| Réglages : un droit pour tous | la route générique applique la règle de la fiche du greffe (administrateur, Outils, comptes nommés) | En V2, chaque écran de paramétrage ne modifie que ses réglages, sous sa fonction (`PARAMJUD`, `PARAMEXPRESSO`, `SURV_PARAM`…) : un agent qui n'a que `PARAMEXPRESSO` y règle la facturation, pas en V3 tant que l'écran correspondant n'existe pas. Chaque écran V3 qui reprendra un écran V2 de paramétrage portera la fonction de cet écran. |
 
 ## Ce qui ne peut pas se faire ici, et pourquoi
 
@@ -136,7 +178,7 @@ await BaseGreffe.PlaceDisqueAsync(instance, [baseV2, baseV3], seuilOctets);
 | SOC-008 CA05 : version de chaque instance | `CreerAsync` lit la version et refuse en dessous de 2017 ; migrations jouées au niveau 140 ; texte contrôlé | Relever la version réelle des 4 instances de production (l'outil de requête n'y a pas accès). |
 | SOC-008 CA06 : alerte de place disque | `PlaceDisqueAsync` dit quel volume passe sous le seuil | Brancher sur la supervision d'Amitel et fixer le seuil. |
 | Écrans « à maquetter » (SOC-003 T03, SOC-007 T05, écran d'exploitation SOC-008) | — | Aucun fichier d'écran n'est confié à ce lot ; à confier à un lot d'écrans (thèmes clair et sombre). |
-| Accès aux routes | toutes les routes réservées aux agents admis (`PolitiquesSocle.AgentAdmis`) | Droits fins (seuls l'exploitation d'Amitel et l'agent chargé du paramétrage modifient) : avec les droits du lot 3 (SOC-002). |
+| Droits par écran de paramétrage | la route générique des réglages, réservée à qui peut modifier le greffe (lot 9) | La fonction de chaque écran V2 de paramétrage (`PARAMJUD`, `PARAMEXPRESSO`, `SURV_PARAM`, `PARAM_NAT_DIL`…) vient avec l'écran V3 qui le reprend (SOC-003 T03 et les domaines). |
 | Envoi du courriel habillé | le modèle choisi est celui de la V2 (base, puis fichier, puis rien) | Le rendu (`GreffeMailBuilder`) appartient à la story d'envoi des courriels. |
 | Catalogue « lisible depuis chaque site » | — | Où poser la base commune et comment l'outre-mer la joint : déploiement. |
 
@@ -144,11 +186,13 @@ await BaseGreffe.PlaceDisqueAsync(instance, [baseV2, baseV3], seuilOctets);
 
 ```powershell
 docker compose up -d                 # le SQL Server local
-.\tests.ps1 SocleGreffes             # 94 contrôles, code 0 = vert
+.\tests.ps1 SocleGreffes             # 103 contrôles, code 0 = vert
 ```
 
-Le banc passe par l'identité du lot 2 : l'en-tête `X-RigV3-Compte` (lu en développement seulement) et deux
-comptes inscrits dans `soc.Compte` de sa base jetable, `banc.socle` (admis) et `banc.refuse` (désactivé).
+Le banc passe par l'identité du lot 2 : l'en-tête `X-RigV3-Compte` (lu en développement seulement) et quatre
+comptes inscrits dans `soc.Compte` de sa base commune et des bases des greffes T001 et T002 : `banc.socle`
+(admis, administrateur d'Amitel : il modifie), `banc.refuse` (désactivé), `banc.agent` (admis, sans le droit
+de modifier) et `benier` (admis, nommé par la V2).
 
 Il lit RIG_DEV sur `SQL-DEV\DEV` avec la session Windows (`RIGV3_V2_REGLAGES` pour une autre chaîne ; RIG_DEV
 ou RIG_RECETTE seulement), crée ses bases jetables, deux bases V3, quatre comptes SQL et quelques sauvegardes
@@ -156,4 +200,4 @@ sur le serveur local, et supprime tout en sortie. La copie d'essai de COMMUN_RIG
 (`tests\SocleGreffesCheck\commun_rig_greffe.sql`) se régénère par `generer_commun_rig_greffe.py`.
 Contre-épreuve faite : « Vrai » lu oui en case à cocher et marque bêta vide lue « bêta » → 3 contrôles rouges.
 
-<!-- fix-ok: trois retouches mesurees -- (1) les reglages ecrits « Vrai » sont lus par VB6 (frmParametrage.frm:1284), pas par la case a cocher .NET : l'ancienne ligne « probable defaut de la V2 » etait fausse ; (2) CA02 rouge sur main + ce lot (COLLATE ecrit dans SOC-001) : regle du classement reecrite ; (3) lot 2 fusionne pendant le lot, nombre de controles passe a 88 ; (4) objection du controle final : routes ouvertes sans AgentAdmis, politique posee, 92 controles ; (5) objection du controle final : l'auteur d'un reglage etait le compte (« AMITEL\banc.socle », banc rouge du 2026-11-21) au lieu du nom UTLST_NOM de la V2, corrige, 94 controles. -->
+<!-- fix-ok: trois retouches mesurees -- (1) les reglages ecrits « Vrai » sont lus par VB6 (frmParametrage.frm:1284), pas par la case a cocher .NET : l'ancienne ligne « probable defaut de la V2 » etait fausse ; (2) CA02 rouge sur main + ce lot (COLLATE ecrit dans SOC-001) : regle du classement reecrite ; (3) lot 2 fusionne pendant le lot, nombre de controles passe a 88 ; (4) objection du controle final : routes ouvertes sans AgentAdmis, politique posee, 92 controles ; (5) objection du controle final : l'auteur d'un reglage etait le compte (« AMITEL\banc.socle », banc rouge du 2026-11-21) au lieu du nom UTLST_NOM de la V2, corrige, 94 controles ; (6) lot 9 : « Accès aux routes / droits fins avec le lot 3 » et « À trancher : qui modifie les réglages » étaient des restes du raccord, faits (droit OPE_EDITER_GREFFE.cs:30-38, journal dans la transaction, réglages en {greffe}), 102 controles le 2026-11-21 ; (7) objection du controle final : le motif du 403 ne citait que l'administrateur d'Amitel, pas les trois comptes nommes ; motif tire de la meme liste que la regle, 103 controles. -->
