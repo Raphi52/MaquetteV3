@@ -215,5 +215,3 @@ public sealed record ApercuModele(
     bool Habille,
     string[] ValeursManquantes,
     ListeDiffusion[] ListesParDefaut);
-
-// fix-ok: pas un correctif a l'aveugle -- reception refusee du lot 1 : RoutesCourriels.Modeles n'etait lue par aucun ecran et EcranMessagerie.tsx montrait des modeles inventes (vitest 8/8 rouge le 2026-11-21) ; ajout des routes Modele et ListesDiffusion et de leurs formes pour le brancher.

@@ -72,6 +72,8 @@ Directory.CreateDirectory(Path.GetDirectoryName(logo)!);
 await File.WriteAllBytesAsync(logo, Convert.FromBase64String(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="));
 var habillageFichier = Path.Combine(dossier, "template-shell.txt");
+// Le journal du serveur : lu par les controles, et apres l'arret du serveur (fin du fichier).
+var capteur = new CapteurJournal();
 
 try
 {
@@ -167,7 +169,6 @@ try
 
     // --- Le vrai serveur, en memoire ; l'agent se designe par l'en-tete de developpement (SOC-001 CA07) ----------
     await using var smtp = new ServeurSmtpJetable();
-    var capteur = new CapteurJournal();
     await using var app = ServeurRig.Construire(["--environment", "Development"], s =>
     {
         s.WebHost.UseTestServer();
@@ -674,6 +675,10 @@ try
            && messagerieSansGreffe.Mode == "sans-greffe" && messagerieInconnu is { Mode: "refuse", Modeles.Length: 0 },
         $"Ecran : la demonstration seulement sans RIGV3_SERVEUR (aucun modele reserve a Amitel) ; sans greffe ouvert ou compte refuse, aucun modele ({messagerieInconnu.Mode})");
 
+    // Ce que l'arret du serveur ecrit au journal se lit apres sa destruction, a la sortie de ce bloc.
+    capteur.Vider();
+    await app.StopAsync();
+
     async Task<SqlConnection> OuvrirV3A()
     {
         var cn = new SqlConnection(v3a.Connexion);
@@ -685,6 +690,13 @@ finally
 {
     try { Directory.Delete(dossier, recursive: true); } catch (IOException) { }
 }
+
+// Le serveur du banc s'arrete proprement : rien au journal entre la fin des controles et sa destruction. Detruit sans
+// StopAsync, l'hote annule ses services de fond sans s'etre arrete, et le Surveillant (lot 2) sort en « BackgroundService
+// failed » (OperationCanceledException, Surveillant.cs WaitForNextTickAsync) : une fausse panne au milieu d'un banc vert.
+var arret = capteur.Evenements.ToArray();
+Exiger(arret.Length == 0,
+    $"Arret : le serveur du banc s'arrete sans erreur ni alerte au journal ({arret.Length} evenement(s){(arret.Length > 0 ? " : " + arret[0].Message : "")})");
 
 Console.WriteLine();
 Console.WriteLine(echecs.Count == 0 ? "SocleCourrielsCheck : tous les controles sont verts." : $"SocleCourrielsCheck : {echecs.Count} controle(s) ROUGE(S).");
