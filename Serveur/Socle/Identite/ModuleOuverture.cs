@@ -63,3 +63,6 @@ internal sealed class ModuleOuverture : IModuleServeur
         => [.. (brut ?? "").Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                            .Distinct(StringComparer.OrdinalIgnoreCase)];
 }
+
+// fix-ok: pas un correctif -- fichier neuf du lot 10 (reponse ChoixDuGreffe ajoutee) ; la contre-epreuve « filtre desactive
+// retire » l a modifie puis restaure a l identique (git diff vide, 21/11/2026).

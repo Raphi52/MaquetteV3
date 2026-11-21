@@ -323,10 +323,19 @@ await using (var baseB = await BaseJetable.CreerAsync("SocleIdentiteGreffeB"))
     }
 
     // --- La VRAIE session Windows : serveur de production sur 127.0.0.1 (Kestrel) -------------------
+    // L'ecran ouvre un greffe (lot 10) : la session est inscrite dans la base du greffe A, le seul du poste.
+    // fix-ok: lot 10 -- SessionAgent.OuvrirAsync(Func<ClientServeur?>) demandait l'identite SANS greffe (route commune) ; elle
+    // est remplacee par PreparerAsync, qui choisit le greffe d'abord : les quatre appels de ce banc suivent (CA01, CA03, demo, panne).
+    await ExecuterSur(baseA.Connexion, """
+        INSERT INTO soc.Compte (CompteWindows, Nom, Prenom, Abrege, Civilite, CodeGreffe, IdService, Desactive)
+        SELECT @compte, 'Windows', 'Session', LEFT(@compte, 16), 'M.', @greffe, s.Id, 0 FROM soc.Service s;
+        INSERT INTO soc.CompteRole (IdCompte, Role) SELECT Id, 'GREFFIER' FROM soc.Compte WHERE CompteWindows = @compte;
+        """, ("@compte", sessionInscrite), ("@greffe", GreffeA));
     await using (var app = ServeurRig.Construire(["--urls", "http://127.0.0.1:0"], s =>
     {
         Silence(s);
         s.Configuration[$"ConnectionStrings:{BaseRig.NomConnexion}"] = b.Connexion;
+        s.Configuration[CatalogueGreffes.CleAuthentification] = authentificationGreffes.ConnectionString;
     }))
     {
         await app.StartAsync();
@@ -337,13 +346,14 @@ await using (var baseB = await BaseJetable.CreerAsync("SocleIdentiteGreffeB"))
             Exiger(reponse.StatusCode == HttpStatusCode.Unauthorized && reponse.Headers.WwwAuthenticate.Any(a => a.Scheme == "Negotiate"),
                 $"SOC-001 T02 : sans session Windows transmise, le serveur la demande (401 Negotiate) ({reponse.StatusCode})");
 
-        // Le vrai chemin de l'ecran : SessionAgent -> ClientServeur (credentials de la session).
+        // Le vrai chemin de l'ecran : SessionAgent -> ClientServeur (credentials de la session), sur le seul
+        // greffe du poste, choisi d'office (lot 10 ; le choix lui-meme est prouve par tests/OuvertureGreffeCheck).
         var client = new ClientServeur(adresse);
-        var moi = await SessionAgent.OuvrirAsync(() => client);
+        var moi = (await SessionAgent.PreparerAsync(() => client, [], GreffeA)).Identite;
         Exiger(moi is { Admis: true, Agent: { Nom: "Windows", Prenom: "Session" } } && moi.Agent.CompteWindows == sessionInscrite
                && string.Equals(moi.Compte, session, StringComparison.OrdinalIgnoreCase)
-               && SessionAgent.NomAgent == "Session Windows",
-            $"SOC-001 CA01 : la session Windows « {session} » ouvre RIG sans aucune saisie, l'entete recoit « {SessionAgent.NomAgent} » (compte inscrit « {sessionInscrite} ») ({JsonSerializer.Serialize(moi, json)})");
+               && SessionAgent.NomAgent == "Session Windows" && SessionAgent.CodeGreffe == GreffeA,
+            $"SOC-001 CA01 : la session Windows « {session} » ouvre RIG sans aucune saisie, l'entete recoit « {SessionAgent.NomAgent} » (compte inscrit « {sessionInscrite} » dans la base du greffe {SessionAgent.CodeGreffe}) ({JsonSerializer.Serialize(moi, json)})");
 
         Environment.SetEnvironmentVariable(ClientServeur.VariableCompte, "jdupont");
         var clientParametre = new ClientServeur(adresse);
@@ -352,20 +362,22 @@ await using (var baseB = await BaseJetable.CreerAsync("SocleIdentiteGreffeB"))
         Exiger(ignore is { Admis: true } && ignore.Agent!.CompteWindows == sessionInscrite,
             $"SOC-001 CA07 : en production, RIGV3_COMPTE=jdupont est ignore ; RIG s'ouvre sous la session « {session} » ({ignore.Agent?.CompteWindows})");
 
-        await Executer("DELETE FROM soc.CompteRole WHERE IdCompte = (SELECT Id FROM soc.Compte WHERE CompteWindows = @c); DELETE FROM soc.Compte WHERE CompteWindows = @c;",
+        await ExecuterSur(baseA.Connexion,
+            "DELETE FROM soc.CompteRole WHERE IdCompte = (SELECT Id FROM soc.Compte WHERE CompteWindows = @c); DELETE FROM soc.Compte WHERE CompteWindows = @c;",
             ("@c", sessionInscrite));
-        var refuse = await SessionAgent.OuvrirAsync(() => new ClientServeur(adresse));
+        // Lancee sur ce greffe (« /g ») : la liste du poste ne le proposerait plus, la V2 non plus.
+        var refuse = (await SessionAgent.PreparerAsync(() => new ClientServeur(adresse), ["/g" + GreffeA], GreffeA)).Identite;
         Exiger(refuse is { Admis: false, Statut: StatutsIdentite.Inconnu, Agent: null } && refuse.Message!.Contains($"'{session}'")
                && SessionAgent.NomAgent is null,
-            $"SOC-001 CA03 : la meme session, retiree de la base, est refusee en la nommant ; l'entete ne recoit aucun nom ({refuse?.Message})");
+            $"SOC-001 CA03 : la meme session, retiree de la base du greffe, est refusee en la nommant ; l'entete ne recoit aucun nom ({refuse?.Message})");
         await app.StopAsync();
     }
 
     // --- L'ecran sans serveur, ou avec un serveur qui ne repond pas ---------------------------------
-    var demo = await SessionAgent.OuvrirAsync(() => null);
-    Exiger(demo is null && SessionAgent.NomAgent is null,
+    var demo = await SessionAgent.PreparerAsync(() => null, [], GreffeA);
+    Exiger(demo is { Demonstration: true, Identite: null } && SessionAgent.NomAgent is null,
         "sans RIGV3_SERVEUR, rien n'est demande : l'accueil reste sur ses comptes de demonstration");
-    var panne = await SessionAgent.OuvrirAsync(() => new ClientServeur(new Uri("http://127.0.0.1:1/")));
+    var panne = (await SessionAgent.PreparerAsync(() => new ClientServeur(new Uri("http://127.0.0.1:1/")), [], GreffeA)).Identite;
     Exiger(panne is { Admis: false, Statut: SessionAgent.StatutServeurInjoignable } && panne.Message!.Contains("127.0.0.1:1"),
         $"un serveur qui ne repond pas est un refus d'ouvrir qui dit la cause, pas un retour discret a la demonstration ({panne?.Message})");
 }

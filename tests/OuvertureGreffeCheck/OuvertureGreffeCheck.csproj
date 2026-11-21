@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Banc du choix du greffe a l'ouverture de RIG (lot 10 du plan de reconstruction) : comme la V2
+       (RigFormLogin.cs:282-319), un greffe passe au lancement, sinon ceux du poste, filtres par le serveur,
+       un seul choisi d'office, plusieurs proposes ; l'agent juge dans la base du greffe choisi, que la
+       session garde pour les ecrans. Il lui faut le SQL Server de developpement : docker compose up -d. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>OuvertureGreffeCheck</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <!-- Le client, la session et un ecran de greffe, compiles seuls (ils ne dependent que de Contrats/) :
+         joues contre le vrai serveur, par le meme chemin que l'application (ClientServeur.Actif). -->
+    <Compile Include="../../Pont/ClientServeur.cs" Link="Pont/ClientServeur.cs" />
+    <Compile Include="../../Pont/SessionAgent.cs" Link="Pont/SessionAgent.cs" />
+    <Compile Include="../../Pont/JSInvokable.cs" Link="Pont/JSInvokable.cs" />
+    <Compile Include="../../Pont/EcranCompteurs.cs" Link="Pont/EcranCompteurs.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+    <ProjectReference Include="../../Contrats/RigV3.Contrats.csproj" />
+  </ItemGroup>
+</Project>

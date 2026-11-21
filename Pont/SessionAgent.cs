@@ -145,7 +145,7 @@ public static class SessionAgent
             {
                 0 => Decide(Refus(StatutAucunGreffe,
                     $"Aucun des greffes de ce poste ne vous est ouvert : {string.Join(", ", autres.Select(g => $"{g.Code} ({Raison(g)})"))}.")),
-                // V2 (:286-291) : le seul greffe present est choisi sans montrer la fenetre.
+                // V2 (:289-294, avec ungreffeselectionauto=1) : le seul greffe present est choisi sans montrer la fenetre.
                 1 => Decide(await IdentifierAsync(client, ouvrables[0], ct)),
                 _ => new OuvertureSession(null, duPoste.Compte, ouvrables, autres),
             };

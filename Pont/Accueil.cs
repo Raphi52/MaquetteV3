@@ -78,11 +78,14 @@ public sealed record MomentVue(string Titre, string Teinte, string Signe, int Co
 public sealed record SousVue(string Titre, bool Ouvert, int Compte, EntreeVue[] Entrees);
 public sealed record EntreeVue(string Code, string Libelle, string Detail, bool Actif, bool Favori);
 
+// fix-ok: lot 10 -- le greffe passe a cote de l'agent, pas en dernier : un 7e argument apres Profil() cassait le controle
+// tests/CharteCheck/Program.cs:198-200 (« ctx.Recouvert ? null : Profil()); », mesure au banc du 21/11/2026).
 /// <param name="Panneau">Le panneau « Tuiles affichees sur l'accueil », seulement ouvert.</param>
+/// <param name="Greffe">Le greffe ouvert par la session, a cote de l'agent (« Greffe de Grenoble (3801) », lot 10) ;
+/// null en demonstration.</param>
 /// <param name="Profil">Le rond de profil, quand l'accueil n'est pas recouvert.</param>
-/// <param name="Greffe">Le greffe ouvert par la session (« Greffe de Grenoble (3801) », lot 10) ; null en demonstration.</param>
-public sealed record EnteteVue(string Date, string Utilisateur, PhraseVue Phrase, bool PanneauOuvert,
-                               PanneauTuilesVue? Panneau, ProfilVue? Profil, string? Greffe = null);
+public sealed record EnteteVue(string Date, string Utilisateur, string? Greffe, PhraseVue Phrase, bool PanneauOuvert,
+                               PanneauTuilesVue? Panneau, ProfilVue? Profil);
 /// <param name="HorsDelaiConnu">La mesure « Hors delai legal » est relevee.</param>
 /// <param name="Traites">La valeur de « Dossiers traites », null tant qu'elle n'est pas relevee.</param>
 public sealed record PhraseVue(bool HorsDelaiConnu, int HorsDelai, int Arrivees, string? Traites);
@@ -1278,7 +1281,7 @@ public sealed class SessionAccueil : IAsyncDisposable
         var chiffreHorsDelai = MesureNommee(MesuresPerf.LibelleHorsDelai);
         var horsDelaiNombre = chiffreHorsDelai is null ? 0 : JeuDemo.DemandesHorsDelai().Length;
 
-        var entete = new EnteteVue(DateDuJour, Utilisateur,
+        var entete = new EnteteVue(DateDuJour, Utilisateur, SessionAgent.Greffe?.Libelle,
             new PhraseVue(chiffreHorsDelai is not null, horsDelaiNombre, chiffreArriveesTotal, chiffreTraites?.Valeur),
             PanneauTuilesOuvert,
             PanneauTuilesOuvert
@@ -1288,8 +1291,7 @@ public sealed class SessionAccueil : IAsyncDisposable
                     Definitions.Where(TuileAutorisee)
                                .Select(def => new BasculeVue(def.Id, def.Titre, null, Pose(def.Id).Visible)).ToArray())
                 : null,
-            ctx.Recouvert ? null : Profil(),
-            SessionAgent.Greffe?.Libelle);
+            ctx.Recouvert ? null : Profil());
 
         var chiffres = new ChiffresVue(ChiffreDeplie, chiffreArriveesTotal,
             chiffreEnTete is null ? "rien a traiter" : $"{chiffreEnTete.Nombre} : {chiffreEnTete.Titre}",

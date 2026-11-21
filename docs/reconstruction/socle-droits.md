@@ -149,7 +149,7 @@ n'est pas au catalogue, 503 si sa base ne répond pas, sans repli.
 | **SOC-002 CA01 « sur les 40 bases »** et la reprise base par base (T04) | Seule RIG_DEV est lisible depuis ce poste. Le banc se rejoue tel quel sur une autre base V2 : `$env:RIGV3_V2 = "<chaîne de la copie anonymisée>"; .\tests.ps1 SocleDroits`. | Copies anonymisées des 40 greffes (REC-008) |
 | **SOC-016 CA01-CA02 pour les familles des domaines** (dossier, demande, facture, encaissement…) | Ces domaines n'existent pas encore dans la V3. Le journal est prêt : `JournalGestes.EcrireAsync(cn, tx, appelant, écran, famille, objet, id, verbe, avant, après)` dans la transaction du geste ; les quatre familles de la V2 sont déclarées. | Lots des domaines |
 | **SOC-016 T03, la tuile d'activité de l'accueil** (`web\src\accueil\Tuiles.tsx`) | Hors des fichiers de ce lot ; l'écran « Comptes des agents » porte déjà le journal (onglet « Journal des gestes »). La tuile lira `GET /socle/{greffe}/journal`. | Lot de l'accueil |
-| **Le greffe de l'écran choisi à l'ouverture** | En attendant, `Pont\EcranComptes.cs` lit le code du greffe dans la variable `RIGV3_GREFFE` (sans elle, avec un serveur, l'écran le dit au lieu d'appeler une adresse sans greffe). | Lot 10 (choix du greffe comme la V2, `RigFormLogin.cs:282-319`) |
+| ~~**Le greffe de l'écran choisi à l'ouverture**~~ | **Fait au lot 10** : `Pont\EcranComptes.cs` prend le greffe ouvert par la session (`SessionAgent.CodeGreffe`, choisi comme la V2, `docs\reconstruction\socle-identite.md`) ; la variable `RIGV3_GREFFE` n'existe plus. | — |
 | **SOC-016 T05, planifier la purge** et fixer les durées autres que la facturation | Geste d'exploitation (agent SQL), durées à fixer par le référent Socle et le DPO. `soc.PurgerJournal` est prête. | Exploitation |
 | **Signature du journal des événements** (C19, NF525) | Certification de la V3 (SOC-018). `soc.EvenementTechnique` en est le contenu, en ajout seul. | SOC-018 |
 | **Interdire `TRUNCATE` et la désactivation des déclencheurs** | Les déclencheurs arrêtent tout compte SQL sur `UPDATE`/`DELETE`, mais un propriétaire de la base peut les désactiver. Le compte SQL du serveur ne doit avoir que lecture et ajout sur les journaux. | Déploiement (droits SQL) |
@@ -162,7 +162,7 @@ n'est pas au catalogue, 503 si sa base ne répond pas, sans repli.
 | `ServiceDroits` | `OuvrirBaseAsync(http, b, ct)` : la base du greffe de l'adresse par `CatalogueGreffes.OuvrirBaseV3Async`, la base commune pour une route sans greffe (le catalogue). `AppelantAsync` et `VerifierAsync(http, b, moi, fonction, ct)` y lisent ; une base muette pendant la vérification reste un refus tracé (CA06). |
 | Les routes (`ModuleComptes.cs`) | Chacune ouvre la base du greffe une fois et la passe à `ServiceComptes` et `JournalGestes` (qui ne reçoivent plus `BaseRig`). La politique `AgentAdmis` y juge l'agent (lot 8) : 404 greffe inconnu, 503 base muette, sans repli ; la politique de gestion des droits laisse alors la réponse de `AgentAdmis`. |
 | Le code greffe d'un compte créé | Celui de l'adresse ; la clé `Greffe:Code` n'existe plus. |
-| L'écran (`Pont\EcranComptes.cs`) | Appelle les adresses du greffe de `RIGV3_GREFFE`, en attendant le choix du greffe à l'ouverture (lot 10). |
+| L'écran (`Pont\EcranComptes.cs`) | Appelle les adresses du greffe ouvert par la session (`SessionAgent.CodeGreffe`, lot 10). |
 
 Prouvé par le banc (contrôles « Raccord (1) ») : deux bases de greffe jetables et un greffe sans base au
 catalogue d'une base commune ; 404 et 503 sur chacune des 9 routes sans qu'aucune base ne change ; un compte
@@ -227,8 +227,8 @@ $env:ASPNETCORE_ENVIRONMENT = "Development"
 $env:ConnectionStrings__RigV3 = "Server=127.0.0.1,14330;Database=RIGV3_DEV;User ID=sa;Password=RigV3_dev_2026!;TrustServerCertificate=True"
 $env:Greffes__Authentification = "User ID=sa;Password=RigV3_dev_2026!;TrustServerCertificate=True"
 dotnet run --project Serveur\RigV3.Serveur.csproj --urls http://127.0.0.1:5080
-# L'app, sous un compte qui a le rôle GestionDesHabilitations, sur le greffe 3801 :
-$env:RIGV3_SERVEUR = "http://127.0.0.1:5080"; $env:RIGV3_COMPTE = "<compte>"; $env:RIGV3_GREFFE = "3801"
+# L'app, sous un compte qui a le rôle GestionDesHabilitations, sur le greffe 3801 (déclaré pour le poste, lot 10) :
+$env:RIGV3_SERVEUR = "http://127.0.0.1:5080"; $env:RIGV3_COMPTE = "<compte>"; $env:RIGV3_GREFFES = "3801"
 ```
 
 Écrire au journal depuis une autre route (lots des domaines) — une route DU greffe (`{greffe}` dans l'adresse) :
