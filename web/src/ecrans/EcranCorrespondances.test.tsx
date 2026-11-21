@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { AideTouchesEcran, EcranCorrespondances, RETOUR_A_LA_LIGNE, repond, type LigneCorrespondance, type VueEcranCorrespondances } from './EcranCorrespondances'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
@@ -112,6 +112,26 @@ describe('AideTouchesEcran', () => {
     expect(cellules[1]!.textContent).toBe('F7')
     fireEvent.keyDown(document.body, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  // L'aide s'ouvre a la reponse du pont (une promesse), pas pendant la frappe : son ecoute d'Echap ne doit pas
+  // attendre la fin du rendu. Echap est presse ici a l'instant ou la fenetre entre dans la page ; c'etait la
+  // cause du rouge intermittent du test ci-dessus sous la charge de tests.ps1 (chef du plan, 2026-11-21).
+  it('Echap ferme l\'aide des qu\'elle s\'affiche', async () => {
+    installerFauxPont({ 'EcranCorrespondances.DeLEcran': () => [ligne()] })
+    render(<AideTouchesEcran code="CODE_REQUI" actif />)
+    const echapAffichage = new Promise<void>((pret) => {
+      const veille = new MutationObserver(() => {
+        if (!document.querySelector('[role="dialog"]')) return
+        veille.disconnect()
+        fireEvent.keyDown(document.body, { key: 'Escape' })
+        pret()
+      })
+      veille.observe(document.body, { childList: true, subtree: true })
+    })
+    fireEvent.keyDown(document.body, { key: '?' })
+    await echapAffichage
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull(), { timeout: 300 })
   })
 
   it('ne repond pas quand l\'ecran est cache, ni dans un champ', () => {

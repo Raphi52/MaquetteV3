@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Banc du TIRAGE de la mesure des colonnes gardees (SOC-021 CA06, lot 6 du plan de reconstruction, phase 2).
+       Il est a part de tests/SocleAnonymisationCheck, que la relecture a fige tel qu'elle l'a relu : il tourne
+       avec lui (.\tests.ps1 SocleAnonymisation prend les deux). Il lit RIG_DEV (SQL-DEV\DEV) en LECTURE SEULE
+       par la porte de l'outil et n'ecrit nulle part (autre serveur : RIGV3_RIG_DEV).
+       Doc : docs/reconstruction/socle-anonymisation.md. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SocleAnonymisationTirageCheck</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Outils/Anonymisation/RigV3.Anonymisation.csproj" />
+  </ItemGroup>
+</Project>
