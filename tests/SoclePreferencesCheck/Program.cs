@@ -517,6 +517,11 @@ try
            && EcranCorrespondances.RefusLivraison("livrable", [], fiche) is not null,
         "SOC-027 CA05 : la fiche ne part aux autres greffes que lorsque chaque retour beta est integre (jumeau : integre, elle part)");
     Reste("SOC-027 CA05 : les retours des greffes beta (Le Puy, Chartres, Vienne) se recueillent chez eux, pas depuis ce poste.");
+
+    // Le serveur du banc s'arrete avant d'etre detruit (decision du lot 1 de la phase 2, controle « Arret » de
+    // tests/SocleCourrielsCheck) : detruit sans StopAsync, l'hote annule ses services de fond sans s'etre arrete et le
+    // Surveillant (lot 2) sort en « BackgroundService failed » au journal, une fausse panne apres un banc vert.
+    await app.StopAsync();
 }
 finally
 {
