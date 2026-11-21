@@ -1,0 +1,1717 @@
+{
+ "source": "C:/Users/raphael.vilain/Documents/Autowin/refonte-rig/controles/compteurs-d8.json (format compteurs-d8/1, mesure sur RIG_DEV le 2026-11-20) : type et formats seulement, recopies le 2026-11-21 pour NUM-002 CA03",
+ "nombre": 142,
+ "compteurs": [
+  {
+   "type": "6",
+   "formats": [
+    {
+     "structure": "AC",
+     "codage_annee": 4,
+     "lettre": "",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "ARRC",
+   "formats": [
+    {
+     "structure": "LAQC",
+     "codage_annee": 2,
+     "lettre": "C",
+     "separateur": "",
+     "taille_chrono": 4
+    }
+   ]
+  },
+  {
+   "type": "ARRD",
+   "formats": [
+    {
+     "structure": "LAQC",
+     "codage_annee": 2,
+     "lettre": "A",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "ARRHF",
+   "formats": [
+    {
+     "structure": "LAC",
+     "codage_annee": 2,
+     "lettre": "HF",
+     "separateur": "",
+     "taille_chrono": 7
+    }
+   ]
+  },
+  {
+   "type": "ARRNQ",
+   "formats": [
+    {
+     "structure": "LAC",
+     "codage_annee": 2,
+     "lettre": "NQ",
+     "separateur": "",
+     "taille_chrono": 7
+    }
+   ]
+  },
+  {
+   "type": "ARRR",
+   "formats": [
+    {
+     "structure": "LAC",
+     "codage_annee": 2,
+     "lettre": "RE",
+     "separateur": "",
+     "taille_chrono": 7
+    }
+   ]
+  },
+  {
+   "type": "DMD",
+   "formats": [
+    {
+     "structure": "LAQC",
+     "codage_annee": 2,
+     "lettre": "D",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "EAG",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "B",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EAN",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "M",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EAR",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 2,
+     "lettre": "e",
+     "separateur": "",
+     "taille_chrono": 7
+    }
+   ]
+  },
+  {
+   "type": "ECB",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "C",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "ECN",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "E",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EDC",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "D",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EFA",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "A",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EFC",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "N",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EGD",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "G",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EGS",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "K",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EHF",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "H",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EHM",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "Q",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EIN",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "I",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EIS",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "U",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EJF",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "JF",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "ELM",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "L",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EMO",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "O",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "ENJ",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "J",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "ENJSC",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "Z",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "ENP",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "E",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "ENPS",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "NP",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "EPD",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "F",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EPE",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "P",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EPT",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "T",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EPX",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "X",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "ERP",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "R",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "ESC",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "Y",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "ESF",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "SF",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "ESM",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "SM",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "ESP",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "SP",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "ESS",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "S",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EVF",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "V",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "EWA",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "WA",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "EWW",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "W",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "FACTU",
+   "formats": [
+    {
+     "structure": "A-C",
+     "codage_annee": 2,
+     "lettre": "",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "HF",
+   "formats": [
+    {
+     "structure": "LAC",
+     "codage_annee": 1,
+     "lettre": "HF",
+     "separateur": "",
+     "taille_chrono": 7
+    }
+   ]
+  },
+  {
+   "type": "IBREQ",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "BR",
+     "separateur": "/",
+     "taille_chrono": 4
+    }
+   ]
+  },
+  {
+   "type": "JD13",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "D13",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JD31",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "D31",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JD40",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "D40",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JD69",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "D69",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDCAS",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "CAS",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDCCC",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "CCC",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDCCO",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "CCO",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDCIA",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "CIA",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDCOL",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "COL",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDCS",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "DCS",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDDCP",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "DCP",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDDIL",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "DIL",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDDIV",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "DIV",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDEC",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "DEC",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDETA",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "ETA",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDETM",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "SANC",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDEX",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "DEX",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDEXT",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "EXT",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDHUI",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "HUI",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDIMP",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "IMP",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDINV",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "INV",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDOCP",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "OCP",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDOFF",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "OFF",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDPLA",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "PLA",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDPLI",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "PLI",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDPVC",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "PVC",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDPVR",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "PVR",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDRAN",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "RAN",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDRAP",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "RAP",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDRCP",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "RCP",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDRED",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "RED",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDREP",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "REP",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDRFM",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "FMS",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDRIP",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "RIP",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDSAI",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "SAI",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JDSAN",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "SANC",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JGAFF",
+   "formats": [
+    {
+     "structure": "AC",
+     "codage_annee": 4,
+     "lettre": "",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "JGDJ",
+   "formats": [
+    {
+     "structure": "AQC",
+     "codage_annee": 2,
+     "lettre": "",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JGJC",
+   "formats": [
+    {
+     "structure": "AQC",
+     "codage_annee": 2,
+     "lettre": "",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JGOP",
+   "formats": [
+    {
+     "structure": "AQC",
+     "codage_annee": 2,
+     "lettre": "",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JLR",
+   "formats": [
+    {
+     "structure": "LC",
+     "codage_annee": 4,
+     "lettre": "RB",
+     "separateur": "",
+     "taille_chrono": 8
+    }
+   ]
+  },
+  {
+   "type": "JLRAR",
+   "formats": [
+    {
+     "structure": "LC",
+     "codage_annee": 4,
+     "lettre": "RA",
+     "separateur": "",
+     "taille_chrono": 8
+    }
+   ]
+  },
+  {
+   "type": "JMEXP",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "E",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JPC",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "RJ",
+     "separateur": "",
+     "taille_chrono": 4
+    }
+   ]
+  },
+  {
+   "type": "JPCEX",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "EX",
+     "separateur": "",
+     "taille_chrono": 4
+    }
+   ]
+  },
+  {
+   "type": "JPRV",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "PR",
+     "separateur": "",
+     "taille_chrono": 4
+    }
+   ]
+  },
+  {
+   "type": "JRCT",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "J",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JRDD",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "DD",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JRDSJ",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "OR",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JRIP",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "IP",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JRJC",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "JC",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JRMC",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "LS",
+     "separateur": "",
+     "taille_chrono": 4
+    }
+   ]
+  },
+  {
+   "type": "JRMDE",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "MD",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JROP",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "OP",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JRORC",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "RC",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JRPC",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "F",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "JRPR",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "PP",
+     "separateur": "",
+     "taille_chrono": 4
+    }
+   ]
+  },
+  {
+   "type": "JRREF",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "R",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "LIAI",
+   "formats": [
+    {
+     "structure": "LGACK",
+     "codage_annee": 1,
+     "lettre": "G",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "LRARI",
+   "formats": [
+    {
+     "structure": "LC",
+     "codage_annee": 4,
+     "lettre": "RW",
+     "separateur": "",
+     "taille_chrono": 8
+    }
+   ]
+  },
+  {
+   "type": "LRARN",
+   "formats": [
+    {
+     "structure": "LC",
+     "codage_annee": 4,
+     "lettre": "2C",
+     "separateur": "",
+     "taille_chrono": 10
+    }
+   ]
+  },
+  {
+   "type": "LRARR",
+   "formats": [
+    {
+     "structure": "LC",
+     "codage_annee": 4,
+     "lettre": "RA",
+     "separateur": "",
+     "taille_chrono": 8
+    }
+   ]
+  },
+  {
+   "type": "LRI",
+   "formats": [
+    {
+     "structure": "LC",
+     "codage_annee": 4,
+     "lettre": "RZ",
+     "separateur": "",
+     "taille_chrono": 8
+    }
+   ]
+  },
+  {
+   "type": "LRN",
+   "formats": [
+    {
+     "structure": "LC",
+     "codage_annee": 4,
+     "lettre": "2D",
+     "separateur": "",
+     "taille_chrono": 10
+    }
+   ]
+  },
+  {
+   "type": "LRR",
+   "formats": [
+    {
+     "structure": "LC",
+     "codage_annee": 4,
+     "lettre": "RB",
+     "separateur": "",
+     "taille_chrono": 8
+    }
+   ]
+  },
+  {
+   "type": "LTIA",
+   "formats": [
+    {
+     "structure": "C",
+     "codage_annee": 4,
+     "lettre": "ACT",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "LTIC",
+   "formats": [
+    {
+     "structure": "C",
+     "codage_annee": 4,
+     "lettre": "CPT",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "LTIF",
+   "formats": [
+    {
+     "structure": "C",
+     "codage_annee": 4,
+     "lettre": "IMR",
+     "separateur": "/",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "OTIJ",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "OTJ",
+     "separateur": "",
+     "taille_chrono": 4
+    }
+   ]
+  },
+  {
+   "type": "PARA",
+   "formats": [
+    {
+     "structure": "AC",
+     "codage_annee": 2,
+     "lettre": "",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "PREV",
+   "formats": [
+    {
+     "structure": "ASC",
+     "codage_annee": 4,
+     "lettre": "",
+     "separateur": "/",
+     "taille_chrono": 4
+    }
+   ]
+  },
+  {
+   "type": "RA1",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 2,
+     "lettre": "r",
+     "separateur": "",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "RA4",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "P",
+     "separateur": "/",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "RAP",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 2,
+     "lettre": "AP",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "RBOE",
+   "formats": [
+    {
+     "structure": "ALSC",
+     "codage_annee": 2,
+     "lettre": "BB",
+     "separateur": "/",
+     "taille_chrono": 4
+    }
+   ]
+  },
+  {
+   "type": "RC1",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 2,
+     "lettre": "F",
+     "separateur": "/",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "RC5",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 2,
+     "lettre": "F",
+     "separateur": "/",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "RC6",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 2,
+     "lettre": "F",
+     "separateur": "/",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "RCJN",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "CJ",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "RD1",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "A",
+     "separateur": "/",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "RD2",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "D",
+     "separateur": "/",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "RD3",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "F",
+     "separateur": "/",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "RD4",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "E",
+     "separateur": "/",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "RD5",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "K",
+     "separateur": "/",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "RD6",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "G",
+     "separateur": "/",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "RD7",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "J",
+     "separateur": "/",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "RDB",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "N",
+     "separateur": "/",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "RDC",
+   "formats": [
+    {
+     "structure": "LASC",
+     "codage_annee": 4,
+     "lettre": "B",
+     "separateur": "/",
+     "taille_chrono": 6
+    }
+   ]
+  },
+  {
+   "type": "RGA",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "A",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "RGAC",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "AC",
+     "separateur": "",
+     "taille_chrono": 4
+    }
+   ]
+  },
+  {
+   "type": "RGB",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "B",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "RGC",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "C",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "RGCH",
+   "formats": [
+    {
+     "structure": "ASC",
+     "codage_annee": 4,
+     "lettre": "",
+     "separateur": "/",
+     "taille_chrono": 4
+    }
+   ]
+  },
+  {
+   "type": "RGD",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "D",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "RGI",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "I",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "RGNI",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "NI",
+     "separateur": "",
+     "taille_chrono": 4
+    },
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "NI",
+     "separateur": "",
+     "taille_chrono": 5
+    }
+   ]
+  },
+  {
+   "type": "SIREN",
+   "formats": [
+    {
+     "structure": "C",
+     "codage_annee": 0,
+     "lettre": "",
+     "separateur": "",
+     "taille_chrono": 9
+    }
+   ]
+  },
+  {
+   "type": "TPG",
+   "formats": [
+    {
+     "structure": "ALC",
+     "codage_annee": 4,
+     "lettre": "TPG",
+     "separateur": "",
+     "taille_chrono": 4
+    }
+   ]
+  }
+ ]
+}

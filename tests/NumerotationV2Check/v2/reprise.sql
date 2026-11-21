@@ -1,0 +1,77 @@
+-- La part « reprise » de la base V2 jetable du banc NumerotationV2Check : les tables que lisent
+-- num.Reprendre (NUM-005, lot 6, Base\migrations\NUM-005_reprise.sql) et num.ReleverHeritage, que
+-- bascule.sql joue avec Reprise=oui. Réduites aux colonnes que ces deux programmes lisent, et à leur
+-- identifiant ; types et tailles de D:\RigApplication\Source\BaseDeDonnées\RigDatabase\dbo\Tables\
+-- (2026-11-21). NUMERO_METIER_SAVE_CDU et NUMERO_CHRONO_MANQUANT ne sont pas dans ce projet : colonnes
+-- lues sur RIG_DEV (SQL-DEV\DEV, INFORMATION_SCHEMA.COLUMNS, lecture seule, 2026-11-21) -- la première a
+-- celles de NUMERO_METIER, la seconde celles de NUMERO_CHRONO_MANQUANT_X du projet.
+
+CREATE TABLE dbo.NUMERO_METIER_SAVE_CDU (
+    NMMTR_ID_NMMTR            int           IDENTITY(1,1) NOT NULL,
+    NMMTR_TYPE_METIER         varchar(5)    NOT NULL,
+    NMMTR_LIBELLE             varchar(50)   NULL,
+    NMMTR_STRUCTURE_NUMERO    varchar(16)   NOT NULL,
+    NMMTR_CODE_GREFFE         varchar(5)    NULL,
+    NMMTR_ANNEE               int           NOT NULL,
+    NMMTR_CODAGE_ANNEE        tinyint       NOT NULL,
+    NMMTR_LETTRE_CATEGORIE    varchar(16)   NULL,
+    NMMTR_TAILLE_CHRONO       smallint      NOT NULL,
+    NMMTR_CHRONO_DEBUT        int           NOT NULL,
+    NMMTR_CHRONO              int           NOT NULL,
+    NMMTR_DATE_ATTRIBUTION    smalldatetime NULL,
+    NMMTR_QUANTIEME           smallint      NULL,
+    NMMTR_GESTION_NUM_ERR     bit           NOT NULL,
+    NMMTR_ATTRIBUTION_ERRONEE bit           NOT NULL,
+    NMMTR_EXPLICATION         varchar(50)   NULL,
+    NMMTR_FILE_REDIRECTION    varchar(5)    NULL,
+    NMMTR_PARQUEE             bit           NOT NULL CONSTRAINT DF_SAVE_CDU_PARQUEE DEFAULT (0),
+    NMMTR_DATE_PARQUAGE       datetime      NULL,
+    NMMTR_NOM_RESP_PARQUAGE   varchar(10)   NULL,
+    NMMTR_DATE_CREATION       datetime      NULL,
+    NMMTR_AUTEUR_CREATION     varchar(10)   NULL,
+    NMMTR_DATE_MODIF          datetime      NULL,
+    NMMTR_AUTEUR_MODIF        varchar(10)   NULL,
+    NMMTR_SEPARATEUR          varchar(5)    NULL,
+    NMMTR_TABLE_AFFECTEE      varchar(32)   NULL,
+    NMMTR_ATTRIBUT_AFFECTE    varchar(32)   NULL
+);
+CREATE TABLE dbo.NUMERO_CHRONO_MANQUANT (
+    NMCHM_NUMERO_CHRONO varchar(15) NOT NULL,
+    NMCHM_TYPE          varchar(5)  NOT NULL,
+    NMCHM_ANNEE         int         NOT NULL,
+    NMCHM_DOMAINE       varchar(30) NOT NULL,
+    NMCHM_TYPE_METIER   varchar(5)  NULL,
+    NMCHM_ID_NMCHM      int         IDENTITY(1,1) NOT NULL CONSTRAINT PK_NUMERO_CHRONO_MANQUANT PRIMARY KEY NONCLUSTERED
+);
+-- Copie exacte de GREFFE_NUMERO_LIAISON.sql.
+CREATE TABLE dbo.GREFFE_NUMERO_LIAISON (
+    GRNLN_CODE varchar(5) NOT NULL,
+    CONSTRAINT PK_GREFFE_NUMERO_LIAISON PRIMARY KEY CLUSTERED (GRNLN_CODE ASC)
+);
+CREATE TABLE dbo.DOSSIER_RCS (
+    DSSRC_ID_DSRCS    int         IDENTITY(1,1) NOT NULL CONSTRAINT PK_DOSSIER_RCS PRIMARY KEY CLUSTERED,
+    DSSRC_NUM_GESTION varchar(10) NOT NULL
+);
+CREATE TABLE dbo.MENTION_OBSERVATION (
+    MNTOB_ID_MNOBS  int      IDENTITY(1,1) NOT NULL CONSTRAINT PK_MENTION_OBSERVATION PRIMARY KEY CLUSTERED,
+    MNTOB_ID_DSRCS  int      NULL CONSTRAINT FK_MENTION_OBSERVATION_DOSSIER_RCS REFERENCES dbo.DOSSIER_RCS (DSSRC_ID_DSRCS),
+    MNTOB_NUM_ORDRE smallint NOT NULL CONSTRAINT DF_MENTION_OBSERVATION_MNTOB_NUM_ORDRE DEFAULT (0)
+);
+CREATE TABLE dbo.ETABLISSEMENT (
+    ETBLS_ID_ETBLS     int         IDENTITY(1,1) NOT NULL CONSTRAINT PK_ETABLISSEMENT PRIMARY KEY CLUSTERED,
+    ETBLS_ID_DSRCS     int         NULL CONSTRAINT FK_ETABLISSEMENT_DOSSIER_RCS REFERENCES dbo.DOSSIER_RCS (DSSRC_ID_DSRCS),
+    ETBLS_NUM_ORDRE    int         NOT NULL,
+    ETBLS_TYPE_ADRESSE varchar(10) NULL,
+    ETBLS_SUPPRIME     bit         NOT NULL CONSTRAINT DF_ETABLISSEMENT_ETBLS_SUPPRIME DEFAULT (0)
+);
+CREATE TABLE dbo.EDI_BDF (
+    EDIBDF_ID_EDIBDF   int         IDENTITY(1,1) NOT NULL CONSTRAINT PK_EDI_BDF PRIMARY KEY CLUSTERED,
+    EDIBDF_NUM_GESTION varchar(10) NULL
+);
+CREATE TABLE dbo.INSTANCE (
+    INSTN_ID_INSTN int         IDENTITY(1,1) NOT NULL CONSTRAINT PK_INSTANCE PRIMARY KEY CLUSTERED,
+    INSTN_NUM_ROLE varchar(11) NULL
+);
+CREATE TABLE dbo.FACTURE (
+    FACTU_NUMERO_FACTURE varchar(25) NOT NULL CONSTRAINT PK_FACTURE PRIMARY KEY CLUSTERED
+);
