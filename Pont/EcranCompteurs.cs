@@ -30,8 +30,8 @@ public sealed record VueEcranCompteurs(
 /// restitution venue d'un programme, tenues par le serveur, Serveur/Numerotation/Compteur).
 ///
 /// Le greffe : les routes du compteur portent le code du greffe (lot 8). Il vient du choix du greffe a
-/// l'ouverture (lot 10, Pont/SessionAgent.cs) ; tant que la session n'en porte pas, <see cref="Ouvrir"/>
-/// passe null et l'ecran branche au serveur dit qu'aucun greffe n'est ouvert, sans en deviner un.
+/// l'ouverture (lot 10, <see cref="SessionAgent.CodeGreffe"/>) ; si la session n'en porte pas, l'ecran
+/// branche au serveur dit qu'aucun greffe n'est ouvert, sans en deviner un.
 /// Sans RIGV3_SERVEUR, l'ecran montre des compteurs de demonstration en lecture seule.
 /// </summary>
 public static class EcranCompteurs
@@ -40,11 +40,11 @@ public static class EcranCompteurs
     public const string NomEcran = "Compteurs de numéros";
 
     [JSInvokable("EcranCompteurs.Ouvrir")]
-    public static Task<VueEcranCompteurs> Ouvrir() => OuvrirAsync(ClientServeur.Actif, greffe: null);
+    public static Task<VueEcranCompteurs> Ouvrir() => OuvrirAsync(ClientServeur.Actif, SessionAgent.CodeGreffe);
 
     [JSInvokable("EcranCompteurs.Rendre")]
     public static Task<VueEcranCompteurs> Rendre(DemandeRestitution demande)
-        => RendreAsync(ClientServeur.Actif, greffe: null, demande);
+        => RendreAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, demande);
 
     /// <summary>Les compteurs du greffe <paramref name="greffe"/> lus sur <paramref name="serveur"/> (null : la demonstration).</summary>
     public static async Task<VueEcranCompteurs> OuvrirAsync(ClientServeur? serveur, string? greffe,

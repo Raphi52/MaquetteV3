@@ -82,10 +82,18 @@ public sealed class ServiceIdentite(CatalogueGreffes catalogue)
 
     /// <summary>Juge le compte Windows <paramref name="compte"/> sur la base ouverte <paramref name="cn"/>.</summary>
     public async Task<IdentiteAgent> IdentifierAsync(SqlConnection cn, string compte, CancellationToken ct)
+        => Juger(compte, await LireCompteAsync(cn, compte, ct));
+
+    /// <summary>
+    /// Ce que la base ouverte <paramref name="cn"/> dit du compte Windows <paramref name="compte"/>, avant
+    /// jugement ; null s'il n'y est pas. Le choix du greffe (<see cref="ModuleOuverture"/>) filtre sur ce
+    /// constat brut, comme la V2 (compte absent ou desactive, RigFormLogin.cs:183-185).
+    /// </summary>
+    internal static async Task<LigneCompte?> LireCompteAsync(SqlConnection cn, string compte, CancellationToken ct)
     {
         // Un nom plus long que la colonne ne peut pas y etre ; le passer en varchar(35)
         // le tronquerait et pourrait reconnaitre un AUTRE compte.
-        if (compte.Length > LongueurCompte) return Juger(compte, null);
+        if (compte.Length > LongueurCompte) return null;
 
         await using var cmd = new SqlCommand("""
             SELECT c.CompteWindows, c.Nom, c.Prenom, c.Abrege, c.Civilite, c.Desactive,
@@ -110,7 +118,7 @@ public sealed class ServiceIdentite(CatalogueGreffes catalogue)
                 Roles: lecteur.GetInt32(10),
                 AUnService: !lecteur.IsDBNull(9));
         }
-        return Juger(compte, ligne);
+        return ligne;
     }
 
     /// <summary>Ce que la base dit d'un compte, avant jugement.</summary>

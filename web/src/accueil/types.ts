@@ -45,6 +45,8 @@ export interface EnteteVue {
   panneauOuvert: boolean
   panneau: PanneauTuilesVue | null
   profil: ProfilVue | null
+  /** Le greffe ouvert par la session (lot 10) ; null en demonstration. */
+  greffe?: string | null
 }
 
 export interface ChiffresVue {

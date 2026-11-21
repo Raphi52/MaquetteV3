@@ -17,6 +17,8 @@
     <Compile Include="../../Pont/ClientServeur.cs" Link="Pont/ClientServeur.cs" />
     <Compile Include="../../Pont/JSInvokable.cs" Link="Pont/JSInvokable.cs" />
     <Compile Include="../../Pont/EcranCompteurs.cs" Link="Pont/EcranCompteurs.cs" />
+    <!-- Le greffe de la session (lot 10), que les gestes de l'ecran passent au serveur. -->
+    <Compile Include="../../Pont/SessionAgent.cs" Link="Pont/SessionAgent.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />

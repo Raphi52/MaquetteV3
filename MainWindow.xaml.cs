@@ -28,22 +28,33 @@ public partial class MainWindow : Window
 #if DEBUG
             await ViderCacheAuDemarrage();
 #endif
-            // SOC-001 : branchee au serveur, la page attend de savoir QUI ouvre RIG
-            // (sa session Windows) ; un agent refuse voit l'ecran de refus a la place
-            // de l'application, qui n'est jamais ouverte (Pont/SessionAgent.cs).
-            var identite = await Pont.SessionAgent.OuvrirAsync(() => Pont.ClientServeur.Actif);
-            if (identite is { Admis: false }) Refus = new Pont.RacineRefus(identite, App.Fenetre);
-            await Pont.PageWeb.Brancher(Vue, Refus ?? (Pont.RacineWeb)Racine);
+            // SOC-001 et lot 10 : branchee au serveur, la page attend de savoir QUEL greffe
+            // s'ouvre (le greffe du lancement, sinon ceux du poste) et QUI l'ouvre (sa session
+            // Windows, jugee dans la base de ce greffe). Plusieurs greffes : l'ecran de choix,
+            // comme la fenetre de connexion de la V2 ; un agent refuse voit l'ecran de refus a la
+            // place de l'application, qui n'est jamais ouverte (Pont/SessionAgent.cs).
+            var ouverture = await Pont.SessionAgent.PreparerAsync(() => Pont.ClientServeur.Actif,
+                Environment.GetCommandLineArgs()[1..],
+                Environment.GetEnvironmentVariable(Pont.SessionAgent.VariableGreffesDuPoste));
+            Ouverture = ouverture switch
+            {
+                { AChoisir.Length: > 0 } => new Pont.RacineChoixGreffe(ouverture,
+                    greffe => Pont.SessionAgent.OuvrirAsync(Pont.ClientServeur.Actif!, greffe), Racine, App.Fenetre),
+                { Identite: { Admis: false } refus } => new Pont.RacineRefus(refus, App.Fenetre),
+                _ => null,
+            };
+            await Pont.PageWeb.Brancher(Vue, Ouverture ?? Racine);
         };
         Closed += async (_, _) =>
         {
             await Racine.DisposeAsync();
-            if (Refus is not null) await Refus.DisposeAsync();
+            if (Ouverture is not null) await Ouverture.DisposeAsync();
         };
     }
 
-    /// <summary>L'ecran de refus, quand le serveur n'admet pas l'agent (SOC-001) ; null sinon.</summary>
-    private Pont.RacineRefus? Refus;
+    /// <summary>Ce que la fenetre montre avant l'application : l'ecran de choix du greffe (lot 10), ou
+    /// l'ecran de refus quand le serveur n'admet pas l'agent (SOC-001) ; null quand l'application s'ouvre d'emblee.</summary>
+    private Pont.RacineWeb? Ouverture;
 
 #if DEBUG
     /// <summary>

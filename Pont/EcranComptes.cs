@@ -41,13 +41,10 @@ public static class EcranComptes
     /// <summary>Le nom de l'ecran tel que le journal des gestes l'ecrit (SOC-016 CA01).</summary>
     public const string NomEcran = "Comptes des agents";
 
-    /// <summary>Le code du greffe de la session (ex. 3801), en attendant que RIG le choisisse a l'ouverture comme
-    /// la V2 (lot 10 du plan, RigFormLogin.cs:282-319) : celui-ci remplacera cette variable.</summary>
-    public const string VariableGreffe = "RIGV3_GREFFE";
     // fix-ok: les adresses des comptes, droits et journal portent {greffe} depuis le lot 9 (Contrats\Socle\Comptes.cs) ; sans code de greffe, l'ecran appellerait « /socle/{greffe}/comptes » en clair.
-
-    private static string? Greffe
-        => Environment.GetEnvironmentVariable(VariableGreffe)?.Trim() is { Length: > 0 } greffe ? greffe : null;
+    /// <summary>Le greffe ouvert par la session (ex. 3801), choisi a l'ouverture de RIG comme la V2
+    /// (Pont/SessionAgent.cs, lot 10 ; RigFormLogin.cs:282-319).</summary>
+    private static string? Greffe => SessionAgent.CodeGreffe;
 
     [JSInvokable("EcranComptes.Ouvrir")]
     public static Task<VueEcranComptes> Ouvrir() => OuvrirAsync(ClientServeur.Actif);
@@ -126,7 +123,7 @@ public static class EcranComptes
         => new(mode, message, true, "", [], [], [], [], [], false, null, false);
 
     private static VueEcranComptes SansGreffe()
-        => Vide("erreur", $"Aucun greffe n'est choisi pour cette session : la variable {VariableGreffe} donne son code (ex. 3801).");
+        => Vide("erreur", "Aucun greffe n'est ouvert dans cette session : les comptes se lisent dans la base du greffe choisi à l'ouverture de RIG.");
 
     /// <summary>Sans serveur : les comptes de la maquette, en lecture seule.</summary>
     private static VueEcranComptes Demonstration()

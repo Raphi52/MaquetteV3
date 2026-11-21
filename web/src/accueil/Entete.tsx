@@ -48,7 +48,11 @@ export function Entete({ entete, geste }: { entete: EnteteVue, geste: GesteAccue
   return (
     <div className="rig-entete">
       <div className="rig-proue">
-        <div className="rig-proue__date">{entete.date}</div>
+        {/* Branchee au serveur, le greffe ouvert a l'ouverture de RIG (lot 10), a la suite de la date. */}
+        <div className="rig-proue__date">
+          {entete.date}
+          {entete.greffe && <span className="rig-proue__greffe">{' · '}{entete.greffe}</span>}
+        </div>
         {' '}
         <div className="rig-titre">{'\n                    Bonjour '}<b>{entete.utilisateur}</b></div>
         {' '}

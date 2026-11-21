@@ -25,13 +25,17 @@ export interface IdentiteRefusee {
   assistance: string | null
 }
 
-/** Le titre de chaque refus : les quatre de la V2, dans leur ordre, puis la panne. */
+/** Le titre de chaque refus : les quatre de la V2, dans leur ordre, puis la panne, puis les refus du choix
+ *  du greffe (lot 10, Pont/SessionAgent.cs : les deux de RigFormLogin.cs:307-316, puis « aucun greffe »). */
 const TITRES: Record<string, string> = {
   inconnu: 'Compte inconnu de RIG',
   'sans-droit': 'Aucune habilitation',
   desactive: 'Compte désactivé',
   'sans-service': 'Aucun service rattaché',
   'serveur-injoignable': 'Serveur de RIG injoignable',
+  'greffe-inexistant': 'Greffe introuvable',
+  'greffe-hors-poste': 'Greffe non accessible depuis ce poste',
+  'aucun-greffe': 'Aucun greffe à ouvrir',
 }
 
 export function titreRefus(statut: string): string {

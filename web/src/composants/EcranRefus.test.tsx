@@ -53,6 +53,12 @@ describe('EcranRefus', () => {
     ])
   })
 
+  it('lot 10 : un titre pour chaque refus du choix du greffe (Pont/SessionAgent.cs)', () => {
+    expect(['greffe-inexistant', 'greffe-hors-poste', 'aucun-greffe'].map(titreRefus)).toEqual([
+      'Greffe introuvable', 'Greffe non accessible depuis ce poste', 'Aucun greffe à ouvrir',
+    ])
+  })
+
   it('sans contact d\'assistance, le bloc n\'est pas affiche', () => {
     const { container } = render(
       <EcranRefus refus={{ ...inconnu, assistance: null }} theme="clair" fermer={vi.fn()} deplacer={vi.fn()} />)
