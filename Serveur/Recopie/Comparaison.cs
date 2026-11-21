@@ -1,7 +1,9 @@
-// fix-ok: le controle de nuit comparait aussi les colonnes propres a chaque logiciel, que la recopie ne copie jamais --
-// mesure le 2026-11-21 par RecopieDeuxSensCheck (REC-006 sur les fiches recopiees, rouge : 2 faux ecarts DOSSIER_RCS,
-// [DSSRC_ETAT_TRANSMISSION, DSSRC_DATE_MODIF_FLAG_TRANS] du dossier 148 « M » dans la V2, « F » dans la V3) ; il lit
-// desormais RegleRecopie.ColonnesPropres (ReglesRecopie.cs) et les ecarte, en le disant dans le detail de la table.
+// fix-ok: le controle de nuit comparait d'une fiche recopiee des colonnes que la recopie ne garde pas egales : ses colonnes
+// propres (etat de transmission), puis son identifiant et ses liens bruts -- mesure le 2026-11-21 par RecopieDeuxSensCheck
+// (REC-006 sur les fiches recopiees, rouge : 5 faux ecarts, CLIENT 578727->578728 [CLIEN_ID_CLIEN] x2, DOSSIER_RCS
+// [DSSRC_ID_DSRCS] x2, ACTION_RCS 1550628 [ACTRC_ID_DSRCS] vers le dossier V3 214713 = V2 214714). Il compare desormais les
+// colonnes de la recopie elle-meme (FichesRecopiees.Construire sur les etats figes) et lit chaque lien de la V3 en
+// identifiant V2 par rec.Correspondance, comme EcrituresRecopie.TraduireAsync l'ecrit.
 using System.Data;
 using System.Diagnostics;
 using Microsoft.Data.SqlClient;
@@ -55,7 +57,8 @@ public sealed record RapportComparaison(int Id, string Etat, string? Motif, stri
 ///     tables vivantes, les agents ecrivent pendant le controle (CA05).
 ///  3. Pour chaque table partagee, par la table de correspondance (CA01) : le nombre de lignes de chaque cote, et une
 ///     EMPREINTE de chaque ligne (SHA-256 du texte de ses colonnes, calcule par SQL Server des deux cotes de la meme
-///     facon ; sans les colonnes propres a chaque logiciel de sa regle de recopie, ReglesRecopie.cs), lues dans l'ordre
+///     facon ; une fiche recopiee, ReglesRecopie.cs, par les colonnes que la recopie recopie : ni son identifiant, ni ses
+///     colonnes propres a chaque logiciel, et ses liens lus en identifiant V2), lues dans l'ordre
 ///     de l'identifiant V2 et fusionnees : ligne comparee, ecart, ligne sans correspondance (rejetee par le transfert :
 ///     comptee a part), correspondance sans sa ligne. Une table V3 qui n'est pas la table V2 telle quelle (une reprise :
 ///     UTILISATEUR -> soc.Compte) n'a que ses correspondances controlees : la conversion colonne par colonne est a
@@ -114,9 +117,6 @@ public static class ComparaisonBases
         Instantane? figeV3 = null, figeV2 = null;
         try
         {
-            // Les colonnes propres a chaque logiciel (l'etat de transmission) : la recopie ne les copie dans aucun sens, elles
-            // different par construction des que la V2 marque une fiche « a transmettre » (REC-002 CA04).
-            var propres = ReglesRecopie.Decouvrir().ToDictionary(r => r.TableV2, r => r.ColonnesPropres, StringComparer.OrdinalIgnoreCase);
             // 2. Les deux etats figes : la V3 d'abord (elle fait foi, Q7), puis la V2.
             figeV3 = await Instantane.CreerAsync(o.ConnexionV3, ct, Usage);
             figeV2 = await Instantane.CreerAsync(o.ConnexionV2, ct, Usage);
@@ -127,12 +127,15 @@ public static class ComparaisonBases
             await lv3.OpenAsync(ct);
             var catV2 = await CatalogueV2.LireAsync(lv2, ct);
             var catV3 = await CatalogueV2.LireAsync(lv3, ct);
+            // Les fiches recopiees telles que la recopie les voit (memes regles, memes catalogues) : ce qu'elle garde egal
+            // dans les deux bases, et seulement cela, est compare.
+            var recopiees = FichesRecopiees.Construire(baseV2, catV2, catV3, ReglesRecopie.Decouvrir());
 
             // 3, 4. Table par table.
             foreach (var nom in demandees)
             {
                 if (!catV2.Tables.TryGetValue(nom, out var t2)) { o.Suivre?.Invoke($"{nom} : absente de la base V2, non comparee"); continue; }
-                var t = await ComparerTableAsync(o, baseV2, t2, catV3, lv2, lv3, details, propres.GetValueOrDefault(nom) ?? [], ct);
+                var t = await ComparerTableAsync(o, baseV2, t2, catV3, lv2, lv3, details, recopiees.ParTableV2.GetValueOrDefault(nom), ct);
                 tables.Add(t);
                 o.Suivre?.Invoke($"{nom} -> {t.TableV3 ?? "aucune table V3"} : {t.LignesV2} lignes V2, {t.LignesV3} V3, {t.Comparees} comparees, {t.Ecarts} ecarts, " +
                                  $"{t.SansCorrespondanceV2} V2 et {t.SansCorrespondanceV3} V3 sans correspondance, {t.Rejetees} rejetees, {t.Resorbes} resorbes, {t.DureeMs} ms");
@@ -174,7 +177,7 @@ public static class ComparaisonBases
 
     private static async Task<TableComparee> ComparerTableAsync(OptionsComparaison o, string baseV2, TableV2 t2, CatalogueV2 catV3,
                                                                 SqlConnection lv2, SqlConnection lv3, List<EcartComparaison> details,
-                                                                IReadOnlyList<string> propres, CancellationToken ct)
+                                                                TableRecopiee? fiche, CancellationToken ct)
     {
         var chrono = Stopwatch.StartNew();
         // La table V3 : celle de ses correspondances (v2.X pour une table telle quelle, soc.Compte pour UTILISATEUR...).
@@ -197,15 +200,25 @@ public static class ComparaisonBases
                                      "sans cle primaire : non comparee (le transfert la refuse aussi)");
         var id2 = Sql.Identifiant("c", cle2);
         var id3 = Sql.Identifiant("t", cle3);
-        // Telle quelle : les memes colonnes des deux cotes, comparees toutes sauf les colonnes propres de sa regle de recopie.
-        // Sinon : les correspondances seulement.
+        // Telle quelle : les memes colonnes des deux cotes. Une fiche recopiee (sa regle, ReglesRecopie.cs) : les colonnes que
+        // la recopie recopie (FichesRecopiees), pas les autres -- son identifiant est propre a chaque base et apparie par la
+        // correspondance (une fiche creee d'un cote recoit le numero que l'autre base lui donne, REC-002 CA02), ses colonnes
+        // propres a chaque logiciel ne sont jamais recopiees (l'etat de transmission, REC-002 CA04) ; un lien vers une fiche
+        // recopiee est compare en identifiant V2, la valeur de la V3 lue par la correspondance (Texte). Sinon : les
+        // correspondances seulement.
         var telleQuelle = string.Equals(nomV3, "v2." + t2.Nom, StringComparison.OrdinalIgnoreCase);
-        var memes = telleQuelle
-            ? t2.Colonnes.Where(c => t3.Colonnes.Any(x => string.Equals(x.Nom, c.Nom, StringComparison.OrdinalIgnoreCase))
-                                     && !propres.Contains(c.Nom, StringComparer.OrdinalIgnoreCase)).ToList()
-            : [];
-        var propresEcartees = telleQuelle ? t2.Colonnes.Where(c => propres.Contains(c.Nom, StringComparer.OrdinalIgnoreCase)).Select(c => c.Nom).ToList() : [];
+        var recopiee = telleQuelle && fiche is not null && string.Equals(fiche.NomV3, nomV3, StringComparison.OrdinalIgnoreCase) ? fiche : null;
+        var memes = !telleQuelle ? []
+            : recopiee is not null ? recopiee.Colonnes.ToList()
+            : t2.Colonnes.Where(c => t3.Colonnes.Any(x => string.Equals(x.Nom, c.Nom, StringComparison.OrdinalIgnoreCase))).ToList();
+        var nonComparees = recopiee is null ? []
+            : t2.Colonnes.Where(c => !memes.Any(m => string.Equals(m.Nom, c.Nom, StringComparison.OrdinalIgnoreCase)))
+                         .Select(c => $"{c.Nom} ({(string.Equals(c.Nom, recopiee.Cle.Nom, StringComparison.OrdinalIgnoreCase) ? "identifiant propre a chaque base, apparie par rec.Correspondance"
+                                                   : recopiee.Regle.ColonnesPropres.Contains(c.Nom, StringComparer.OrdinalIgnoreCase) ? "propre a chaque logiciel, jamais recopiee"
+                                                   : "hors de la recopie")})").ToList();
+        var liens = memes.Where(c => recopiee is not null && recopiee.Liens.ContainsKey(c.Nom)).Select(c => $"{c.Nom} -> {recopiee!.Liens[c.Nom].NomV2}").ToList();
         var cols3 = memes.Select(c => t3.Colonne(c.Nom)).ToList();
+        var textes3 = cols3.Select(c => Texte("t", c, recopiee is not null && recopiee.Liens.TryGetValue(c.Nom, out var visee) ? visee : null)).ToList();
         var lignesV3 = Convert.ToInt64(await ValeurAsync(lv3, $"SELECT COUNT_BIG(*) FROM {t3.NomSql}", ct));
 
         // Les lignes rejetees par le transfert : sans correspondance, mais expliquees (rec.Rejet).
@@ -223,7 +236,7 @@ public static class ComparaisonBases
             if (genres[genre] <= o.DetailMax) details.Add(new EcartComparaison(genre, t2.Nom, idV2, nomV3, idV3, null, null));
         }
         var empreinte2 = memes.Count == 0 ? "CAST(NULL AS varbinary(32))" : Empreinte("c", memes);
-        var empreinte3 = memes.Count == 0 ? "CAST(NULL AS varbinary(32))" : Empreinte("t", cols3);
+        var empreinte3 = memes.Count == 0 ? "CAST(NULL AS varbinary(32))" : Empreinte(textes3);
         await using (var s2 = await LireAsync(lv2, $"SELECT {id2}, {empreinte2} FROM {t2.NomSql} AS c ORDER BY {id2} COLLATE Latin1_General_BIN2", ct))
         await using (var sc = await LireAsync(lv3,
             $"SELECT c.IdV2, c.IdV3, CASE WHEN t.{Sql.Q(cle3[0].Nom)} IS NULL THEN 0 ELSE 1 END, {empreinte3} " +
@@ -280,12 +293,12 @@ public static class ComparaisonBases
         var ecarts = new List<(string IdV2, string IdV3, List<string> Colonnes)>();
         if (candidats.Count > 0)
         {
-            var figes = await ColonnesQuiDifferentAsync(lv2, lv3, t2, t3, memes, cols3, baseV2, candidats, ct);
+            var figes = await ColonnesQuiDifferentAsync(lv2, lv3, t2, t3, memes, textes3, baseV2, candidats, ct);
             await using var vivV2 = new SqlConnection(new SqlConnectionStringBuilder(o.ConnexionV2) { ApplicationIntent = ApplicationIntent.ReadOnly }.ConnectionString);
             await using var vivV3 = new SqlConnection(o.ConnexionV3);
             await vivV2.OpenAsync(ct);
             await vivV3.OpenAsync(ct);
-            var vivantes = await ColonnesQuiDifferentAsync(vivV2, vivV3, t2, t3, memes, cols3, baseV2, candidats, ct);
+            var vivantes = await ColonnesQuiDifferentAsync(vivV2, vivV3, t2, t3, memes, textes3, baseV2, candidats, ct);
             foreach (var (idV2, idV3) in candidats)
             {
                 if (!vivantes.TryGetValue(idV2, out var vivant) || vivant.Count > 0)
@@ -298,7 +311,8 @@ public static class ComparaisonBases
         var nbEcarts = ecarts.Count + ecartsAuDela;
         var detail = memes.Count > 0
             ? $"{memes.Count} colonnes comparees (empreinte SHA-256 de chaque ligne, des deux cotes)"
-              + (propresEcartees.Count > 0 ? $" ; {string.Join(", ", propresEcartees)} non comparees : propres a chaque logiciel, jamais recopiees (ReglesRecopie)" : "")
+              + (nonComparees.Count > 0 ? $" ; non comparees, la recopie ne les recopie pas : {string.Join(", ", nonComparees)}" : "")
+              + (liens.Count > 0 ? $" ; liens compares en identifiant V2 par rec.Correspondance : {string.Join(", ", liens)}" : "")
               + (ecartsAuDela > 0 ? $" ; {ecartsAuDela} ecarts au-dela des {o.DetailMax} detailles" : "")
             : $"colonnes non comparees : {nomV3} n'est pas {t2.Nom} telle quelle ; la conversion colonne par colonne est a decrire par sa story (REC-006 T03) — correspondances controlees seulement";
         return new TableComparee(t2.Nom, nomV3, lignesV2, lignesV3, comparees, nbEcarts, sansV2, sansV3, sansLigneV2, sansLigneV3, rejetees, resorbes,
@@ -308,7 +322,7 @@ public static class ComparaisonBases
     /// <summary>Les colonnes qui different entre la ligne V2 et sa ligne V3, pour chaque identifiant V2 (absent du
     /// resultat : une des deux lignes n'existe pas).</summary>
     private static async Task<Dictionary<string, List<string>>> ColonnesQuiDifferentAsync(SqlConnection v2, SqlConnection v3, TableV2 t2, TableV2 t3,
-        List<ColonneV2> cols2, List<ColonneV2> cols3, string baseV2, List<(string IdV2, string IdV3)> ids, CancellationToken ct)
+        List<ColonneV2> cols2, IReadOnlyList<string> textes3, string baseV2, List<(string IdV2, string IdV3)> ids, CancellationToken ct)
     {
         var lignes2 = new Dictionary<string, string?[]>(StringComparer.Ordinal);
         var lignes3 = new Dictionary<string, string?[]>(StringComparer.Ordinal);
@@ -322,9 +336,9 @@ public static class ComparaisonBases
                                                            $"WHERE {id2} IN ({string.Join(", ", noms)})", ct, parametres2))
                 while (await l.ReadAsync(ct)) lignes2[l.GetString(0)] = [.. Enumerable.Range(1, cols2.Count).Select(i => l.IsDBNull(i) ? null : l.GetString(i))];
             var parametres3 = paquet.Select((x, i) => P($"@i{i}", x.IdV2)).Append(P("@b", baseV2)).Append(P("@t", t2.Nom)).ToArray();
-            await using (var l = await LireAsync(v3, $"SELECT c.IdV2, {string.Join(", ", cols3.Select(c => Texte("t", c)))} FROM rec.Correspondance AS c " +
+            await using (var l = await LireAsync(v3, $"SELECT c.IdV2, {string.Join(", ", textes3)} FROM rec.Correspondance AS c " +
                                                            $"JOIN {t3.NomSql} AS t ON {id3} = c.IdV3 WHERE c.BaseV2 = @b AND c.TableV2 = @t AND c.IdV2 IN ({string.Join(", ", noms)})", ct, parametres3))
-                while (await l.ReadAsync(ct)) lignes3[l.GetString(0)] = [.. Enumerable.Range(1, cols3.Count).Select(i => l.IsDBNull(i) ? null : l.GetString(i))];
+                while (await l.ReadAsync(ct)) lignes3[l.GetString(0)] = [.. Enumerable.Range(1, textes3.Count).Select(i => l.IsDBNull(i) ? null : l.GetString(i))];
         }
         var resultat = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         foreach (var (idV2, _) in ids)
@@ -375,7 +389,13 @@ public static class ComparaisonBases
     /// hexadecimal (un timestamp de la V2 est un binary(8) dans la V3), flottant a 17 chiffres (3), monnaie a 4 decimales
     /// (2), le reste par la conversion de SQL Server. NULL se distingue de toute valeur (« ~ » contre « = valeur »).
     /// </summary>
-    internal static string Texte(string alias, ColonneV2 c)
+    internal static string Texte(string alias, ColonneV2 c) => Texte(alias, c, null);
+
+    /// <param name="visee">La fiche recopiee que vise cette colonne d'une ligne de la V3 : sa valeur, un identifiant V3, est
+    /// lue en identifiant V2 dans rec.Correspondance (parametre @b de la requete), et telle quelle sans correspondance --
+    /// exactement ce que la recopie ecrit dans l'autre base (EcrituresRecopie.TraduireAsync). Identifiants en texte des deux
+    /// cotes par la meme conversion (Sql.EnTexte, celle du transfert).</param>
+    private static string Texte(string alias, ColonneV2 c, TableRecopiee? visee)
     {
         var x = $"{alias}.{Sql.Q(c.Nom)}";
         var conv = c.TypeBase switch
@@ -386,12 +406,17 @@ public static class ComparaisonBases
             "money" or "smallmoney" => $"CONVERT(nvarchar(40), {x}, 2)",
             _ => $"CONVERT(nvarchar(max), {x})",
         };
+        if (visee is not null)
+            conv = $"COALESCE((SELECT TOP (1) l.IdV2 FROM rec.Correspondance AS l WHERE l.TableV3 = {Sql.Texte(visee.NomV3)} AND l.IdV3 = {Sql.EnTexte(alias, c)} " +
+                   $"AND l.BaseV2 = @b AND l.TableV2 = {Sql.Texte(visee.NomV2)}), {conv})";
         return $"CASE WHEN {x} IS NULL THEN N'~' ELSE N'=' + {conv} END";
     }
 
     /// <summary>SHA-256 du texte des colonnes, separees par un caractere de controle (NCHAR(30)).</summary>
-    internal static string Empreinte(string alias, IReadOnlyList<ColonneV2> colonnes)
-        => "HASHBYTES('SHA2_256', CAST(N'' AS nvarchar(max)) + " + string.Join(" + NCHAR(30) + ", colonnes.Select(c => Texte(alias, c))) + ")";
+    internal static string Empreinte(string alias, IReadOnlyList<ColonneV2> colonnes) => Empreinte(colonnes.Select(c => Texte(alias, c)));
+
+    private static string Empreinte(IEnumerable<string> textes)
+        => "HASHBYTES('SHA2_256', CAST(N'' AS nvarchar(max)) + " + string.Join(" + NCHAR(30) + ", textes) + ")";
 
     // -----------------------------------------------------------------------------------------------------------------
     // Le rapport

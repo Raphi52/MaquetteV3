@@ -163,7 +163,13 @@ public sealed class FichesRecopiees
             await cn.OpenAsync(ct);
             v3 = await CatalogueV2.LireAsync(cn, ct);
         }
+        return Construire(baseV2, v2, v3, regles);
+    }
 
+    /// <summary>Les fiches partagees vues dans deux catalogues deja lus : ceux des bases vivantes (<see cref="ChargerAsync"/>),
+    /// ou ceux des etats figes du controle de nuit (ComparaisonBases), qui compare ainsi exactement ce que la recopie recopie.</summary>
+    internal static FichesRecopiees Construire(string baseV2, CatalogueV2 v2, CatalogueV2 v3, IReadOnlyList<RegleRecopie> regles)
+    {
         var problemes = new List<string>();
         var tables = new List<TableRecopiee>();
         foreach (var r in regles)

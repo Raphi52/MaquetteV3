@@ -609,25 +609,47 @@ Exiger(p9.Erreur is null && p9.Remontees == 1 && p9.Ecarts == 0 && compteSigne =
 // chaque logiciel (RegleRecopie.ColonnesPropres : l'etat de transmission), que la recopie ne copie dans aucun sens. Le
 // dossier temoin de CA04, change par un agent de la V2, y est « M » (a transmettre) et garde son etat dans la V3 : compare,
 // il sortirait en ecart chaque nuit.
+// Il ne compare pas non plus les identifiants tels quels : une fiche creee d'un cote recoit le numero que l'autre base lui
+// donne (CA02 : le client cree dans la V3 a un autre numero dans la V2) et ses liens sont traduits par la correspondance. Ici, un
+// dossier cree par un agent de la V2 et un dossier cree dans la V3 prennent le meme numero : la recopie donne a chacun le
+// numero suivant de l'autre base ; une action creee dans la V3 sur ce dossier V3 vise donc, dans la V2, un autre numero.
+// Comparees par leur identifiant et leur lien bruts, ces fiches sortiraient en ecart chaque nuit.
 var etatsTemoin = (V2: await EnV2("DOSSIER_RCS", "DSSRC_ETAT_TRANSMISSION", temoinCa04), V3: await EnV3("DOSSIER_RCS", "DSSRC_ETAT_TRANSMISSION", temoinCa04));
-string[] tablesNuit = ["DOSSIER_RCS", "INSCRIPTION"];
+var dossierIdsBase = Prendre("DOSSIER_RCS");
+var dossierIdsDeLaV2 = await Dupliquer(v2.Connexion, "dbo.DOSSIER_RCS", T("DOSSIER_RCS").V2, dossierIdsBase, "DSSRC_NUM_GESTION='2026B99902'");
+var dossierIdsV3 = await Dupliquer(v3.Connexion, "v2.DOSSIER_RCS", T("DOSSIER_RCS").V3, dossierIdsBase, "DSSRC_NUM_GESTION='2026B99903'", V3Ecrit(""));
+var actionIdsV3 = await Dupliquer(v3.Connexion, "v2.ACTION_RCS", T("ACTION_RCS").V3, Prendre("ACTION_RCS"), $"ACTRC_ID_DSRCS={dossierIdsV3}", V3Ecrit(""));
+var pIds = await Passer();
+var dossierIdsV2 = await V2De("DOSSIER_RCS", dossierIdsV3);
+var actionIdsV2 = await V2De("ACTION_RCS", actionIdsV3);
+var lienIdsV2 = actionIdsV2 is null ? null : await EnV2("ACTION_RCS", "ACTRC_ID_DSRCS", actionIdsV2);
+var idsDivergent = pIds.Erreur is null && dossierIdsV2 is not null && dossierIdsV2 != dossierIdsV3 && lienIdsV2 == dossierIdsV2
+                   && clientV2 is not null && clientV2 != clientV3 && await Differentes("ACTION_RCS", actionIdsV2!, actionIdsV3) == 0;
+string[] tablesNuit = ["CLIENT", "DOSSIER_RCS", "INSCRIPTION", "ACTION_RCS"];
 var nuit = await ComparaisonBases.ComparerAsync(new OptionsComparaison(v2.Connexion, v3.Connexion) { Tables = tablesNuit });
 var ecartsNuit = nuit.Details.Where(d => d.Genre == "ecart").ToList();
-var propresComparees = nuit.Tables.Where(t => t.Detail is null || !t.Detail.Contains("propres a chaque logiciel")).Select(t => t.TableV2).ToList();
-// Jumeau : une vraie difference sur une colonne recopiee (ecrite dans la V2, controlee avant le passage de la recopie) reste vue.
+var propresComparees = nuit.Tables.Where(t => T(t.TableV2).Propres.Any(p => t.Detail is null || !t.Detail.Contains(p.Nom))).Select(t => t.TableV2).ToList();
+// Jumeaux : une vraie difference reste vue (ecrite dans la V2, controlee avant le passage de la recopie) -- sur une colonne
+// recopiee, et sur un lien : l'action vise dans la V2 un autre dossier (meme numero des deux cotes) que dans la V3.
 var dossierNuit = Prendre("DOSSIER_RCS");
 await Executer(v2.Connexion, $"UPDATE dbo.DOSSIER_RCS SET [{colDossier.Nom}] = '{Val(colDossier, "NUIT V2")}' WHERE DSSRC_ID_DSRCS = {dossierNuit};");
+if (actionIdsV2 is not null) await Executer(v2.Connexion, $"UPDATE dbo.ACTION_RCS SET ACTRC_ID_DSRCS = {dossierNuit} WHERE ACTRC_ID_ACTRC = {actionIdsV2};");
 var nuitEcart = await ComparaisonBases.ComparerAsync(new OptionsComparaison(v2.Connexion, v3.Connexion) { Tables = tablesNuit });
 var ecartsNuit2 = nuitEcart.Details.Where(d => d.Genre == "ecart").ToList();
 var pNuit = await Passer();
 string Ecarts(IEnumerable<EcartComparaison> l) => string.Join(" ; ", l.Select(e => $"{e.TableV2} {e.IdV2}->{e.IdV3} [{e.Colonnes}]"));
-Exiger(etatsTemoin.V2 == "M" && etatsTemoin.V3 != "M" && nuit.Etat == "fini" && nuit.Ecarts == 0 && propresComparees.Count == 0
-       && nuitEcart.Etat == "fini" && nuitEcart.Ecarts == 1 && ecartsNuit2.Count == 1 && ecartsNuit2[0].IdV2 == dossierNuit && ecartsNuit2[0].Colonnes == colDossier.Nom
-       && pNuit.Erreur is null && pNuit.Remontees == 1,
+var vusAttendus = new[] { $"DOSSIER_RCS {dossierNuit}->{dossierNuit} [{colDossier.Nom}]", $"ACTION_RCS {actionIdsV2}->{actionIdsV3} [ACTRC_ID_DSRCS]" };
+Exiger(etatsTemoin.V2 == "M" && etatsTemoin.V3 != "M" && idsDivergent && nuit.Etat == "fini" && nuit.Tables.Count == tablesNuit.Length && nuit.Ecarts == 0
+       && propresComparees.Count == 0
+       && nuitEcart.Etat == "fini" && nuitEcart.Ecarts == 2 && ecartsNuit2.Select(e => $"{e.TableV2} {e.IdV2}->{e.IdV3} [{e.Colonnes}]").Order().SequenceEqual(vusAttendus.Order())
+       && pNuit.Erreur is null && pNuit.Remontees == 2,
     $"REC-006 sur les fiches recopiees : le dossier {temoinCa04} est « {etatsTemoin.V2} » dans la V2 et « {etatsTemoin.V3} » dans la V3 (etat de transmission, jamais recopie) ; " +
-    $"le controle de nuit de {string.Join(" et ", tablesNuit)} ({nuit.Etat}) n'y voit pas d'ecart : {nuit.Ecarts} ecart(s) {Ecarts(ecartsNuit)}" +
+    $"identifiants divergents : client V3 {clientV3} = V2 {clientV2}, dossier V3 {dossierIdsV3} = V2 {dossierIdsV2} (le dossier V2 {dossierIdsDeLaV2} a pris son numero), " +
+    $"action V3 {actionIdsV3} = V2 {actionIdsV2} qui vise le dossier V2 {lienIdsV2} {pIds.Erreur} ; " +
+    $"le controle de nuit de {string.Join(", ", tablesNuit)} ({nuit.Etat}, {nuit.Tables.Count} tables, {nuit.LignesComparees} lignes) n'y voit pas d'ecart : {nuit.Ecarts} ecart(s) {Ecarts(ecartsNuit)}" +
     (propresComparees.Count > 0 ? $" — colonnes propres comparees pour {string.Join(", ", propresComparees)}" : "") +
-    $" ; jumeau : {colDossier.Nom} change dans la V2 sur le dossier {dossierNuit} est vu ({nuitEcart.Ecarts} ecart : {Ecarts(ecartsNuit2)}), puis remonte {pNuit.Erreur}");
+    $" ; jumeaux : {colDossier.Nom} change dans la V2 sur le dossier {dossierNuit}, et l'action V2 {actionIdsV2} tournee vers ce dossier, sont vus " +
+    $"({nuitEcart.Ecarts} ecarts : {Ecarts(ecartsNuit2)}), puis remontes ({pNuit.Remontees}) {pNuit.Erreur}");
 
 // ====================================================================================================
 // B. La vraie boucle du serveur (RecopieContinue) : REC-002 CA01 et REC-003 CA01

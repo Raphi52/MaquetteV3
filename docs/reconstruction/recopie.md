@@ -296,10 +296,13 @@ orphelin ou une ligne sans correspondance (base, tables, comptes) ; elle se ferm
 | Relecture des écarts dans les bases vivantes | Les deux instantanés ne sont pas pris au même instant : une fiche recopiée entre les deux serait un faux écart et une fausse alerte chaque nuit. |
 | Tables V3 qui ne sont pas la table V2 « telle quelle » | Correspondances seulement (UTILISATEUR → `soc.Compte`) : la conversion colonne par colonne est à décrire par la story de la table (T03). |
 
-<!-- fix-ok: deux phrases fausses relevées par le juge et mesurées le 2026-11-21 par RecopieDeuxSensCheck : le contrôle de nuit voyait 2 faux écarts sur l'état de transmission (exclusion annoncée « à faire »), et le journal de la remontée écrivait « non noté par la V2 » pour un client dont la V2 note l'agent. -->
-**À valider / reste** : l'heure 02:00 et la durée de 90 jours (proposées) ; T03 — les colonnes « propres » que la
-recopie du lot 9 ne recopie jamais (état de transmission, `RegleRecopie.ColonnesPropres` de `ReglesRec002`) sont
-exclues du contrôle, qui le dit dans le détail de la table (lot 9 ; banc `RecopieDeuxSensCheck`, « REC-006 sur les
+<!-- fix-ok: phrases fausses relevées par le juge et mesurées le 2026-11-21 par RecopieDeuxSensCheck : le contrôle de nuit voyait 2 faux écarts sur l'état de transmission (exclusion annoncée « à faire »), puis 5 sur l'identifiant et les liens des fiches créées par la recopie (clients, dossiers, action) ; le journal de la remontée écrivait « non noté par la V2 » pour un client dont la V2 note l'agent. -->
+**À valider / reste** : l'heure 02:00 et la durée de 90 jours (proposées) ; T03 — une fiche que le lot 9 recopie
+(`ReglesRec002`) est comparée sur les colonnes que la recopie recopie (`FichesRecopiees`), et sur elles seules : ni son
+identifiant, propre à chaque base et apparié par `rec.Correspondance` (une fiche créée d'un côté reçoit le numéro que
+l'autre base lui donne), ni ses colonnes « propres » (état de transmission, `RegleRecopie.ColonnesPropres`) ; un lien
+vers une autre fiche recopiée est comparé en identifiant V2, la valeur de la V3 lue par la correspondance comme la
+recopie l'écrit. Le détail de la table le dit (lot 9 ; banc `RecopieDeuxSensCheck`, « REC-006 sur les
 fiches recopiées ») ; CA05 sur les 40 bases de production (pas sur ce
 poste). Mesure du banc : 57 640 lignes de 10 tables en 3,0 s (19 092 lignes/s, relecture comprise), 185 écritures
 d'agents pendant le contrôle, aucune bloquée (la plus longue 27 ms) ; extrapolé aux 16,5 millions de lignes des fiches
