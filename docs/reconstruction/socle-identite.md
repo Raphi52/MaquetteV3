@@ -38,9 +38,9 @@ contrôle) ; `Outils\AmiDLL\AmiSystem\AmiEnvironment.cs:14` (`System.Environment
 | Couche | Fichier | Rôle |
 |---|---|---|
 | Base | `Base\migrations\SOC-001_comptes.sql` | `soc.Service`, `soc.Compte`, `soc.Role`, `soc.CompteRole` — **aucune colonne de mot de passe** |
-| Contrat | `Contrats\Socle\IdentiteAgent.cs` | `RoutesIdentite` (`GET /socle/identite`, en-tête `X-RigV3-Compte`), `StatutsIdentite`, `IdentiteAgent`, `AgentReconnu` |
-| Serveur | `Serveur\Socle\Identite\ModuleIdentite.cs` | l'authentification du serveur, la route, la politique `PolitiquesSocle.AgentAdmis` |
-| Serveur | `Serveur\Socle\Identite\ServiceIdentite.cs` | le compte de l'appelant, la requête SQL, le jugement dans l'ordre de la V2 |
+| Contrat | `Contrats\Socle\IdentiteAgent.cs` | `RoutesIdentite` (`GET /socle/identite`, `GET /socle/identite/{greffe}`, en-tête `X-RigV3-Compte`), `StatutsIdentite`, `IdentiteAgent`, `AgentReconnu` |
+| Serveur | `Serveur\Socle\Identite\ModuleIdentite.cs` | l'authentification du serveur, les deux routes, la politique `PolitiquesSocle.AgentAdmis` et sa réponse 404 / 503 quand la base du greffe ne s'ouvre pas |
+| Serveur | `Serveur\Socle\Identite\ServiceIdentite.cs` | le compte de l'appelant, la base où le chercher (celle du greffe de l'adresse), la requête SQL, le jugement dans l'ordre de la V2 |
 | Écran | `Pont\ClientServeur.cs` (2 retouches) | chaque appel porte la session Windows ; `RIGV3_COMPTE` part dans l'en-tête |
 | Écran | `Pont\SessionAgent.cs` | demande au serveur qui est l'agent, à l'ouverture de la fenêtre principale |
 | Écran | `MainWindow.xaml.cs` (Loaded) | agent refusé → `RacineRefus` au lieu de l'application |
@@ -93,12 +93,32 @@ story).
 | **T04 reprise** : recopier les comptes des 40 bases V2 (même compte, même état, même service), sans `UTLST_PASSWORD` | Les comptes sont partagés avec la V2 (Q7) : leur recopie suit le thème Recopie V2-V3 (phase 2). Les colonnes `IdV2` de `soc.Compte` et `soc.Service` sont prêtes pour elle. Règle de reprise de la story : la colonne de mot de passe n'est ni lue, ni copiée, ni journalisée. | Phase 2, thème REC |
 | **T05 exploitation** : vérifier, sur chaque serveur RDS (outre-mer compris), que le serveur V3 reconnaît les comptes Windows de tous les greffes servis (domaines, approbations) | Hors poste de développement : pas d'accès aux RDS ni aux domaines des greffes. À noter pour ce contrôle : le serveur garde le compte **sans son domaine**, comme la V2 ; deux domaines qui portent le même nom de compte désigneraient le même agent. | Exploitation, avant la 1re répétition générale |
 | **T06, seconde moitié** : rejouer les tests sur les copies anonymisées des 3 greffes bêta | Les copies anonymisées n'existent pas encore. Le banc les jouera tel quel : il crée sa base, y inscrit ses comptes et ne lit rien d'autre. | Quand les copies seront livrées |
-| **Juger le compte dans la base DU GREFFE** | `ServiceIdentite` lit `soc.Compte` dans la base du serveur (`BaseRig`, `ConnectionStrings:RigV3`). Le lot 4 (SOC-007/008, en cours en parallèle) ouvre la base d'un greffe par `CatalogueGreffes.OuvrirBaseV3Async(code, ct)` ; son code n'était pas encore là. Il faudra aussi savoir QUEL greffe l'agent ouvre : la V2 le choisit dans sa fenêtre de connexion (`RigFormLogin.Login`, `RigConsoleAccueil.cs:78`), après le compte. Le raccord : `IdentifierAsync` reçoit la connexion du greffe au lieu de `BaseRig`. | Lot 4, ou le lot qui portera le choix du greffe |
+| **L'écran choisit son greffe** : `Pont\SessionAgent.cs` appelle encore `GET /socle/identite`, jugé dans la base commune | Le serveur sait juger l'agent dans la base d'un greffe (section « Raccord fait ») ; l'écran ne sait pas encore QUEL greffe il ouvre. La V2 le prend au lancement (`RigFormLogin.cs:282-319` : paramètre `greffe=` ou `CodeGreffe=`, sinon sa fenêtre de connexion, qui choisit d'office le seul greffe du serveur avec `ungreffeselectionauto=1`), puis y cherche le compte. Le raccord : l'écran appelle `RoutesIdentite.Pour(code)` puis les routes de ce greffe. En production, la base commune n'a pas de compte d'agent : sans ce choix, l'écran branché au serveur refusera tout agent de greffe. | Phase des écrans (fichiers `Pont\` hors de ce lot) |
 | **HTTPS** entre les RDS et le serveur | Comme au lot 1 : au déploiement, avec le certificat d'Amitel. Negotiate fonctionne en HTTP sur `127.0.0.1` pour le développement. | Déploiement |
+
+## Raccord fait (lot 8, 2026-11-21) : le compte se cherche dans la base du greffe
+
+Comme la V2 (`Utilisateur.GetUtilisateurCourant(CodeGreffeRig)`, `Utilisateur.cs:424-432`), le compte de
+l'agent se cherche dans la base **du greffe choisi**, plus dans la base unique du serveur.
+
+| Règle | Ce que fait le serveur |
+|---|---|
+| **Le greffe choisi est dans l'adresse** : `{greffe}` (`PolitiquesSocle.ParametreGreffe`) | `GET /socle/identite/{greffe}` (`RoutesIdentite.Pour(code)`), `/numerotation/{greffe}/…` : `ServiceIdentite` ouvre la base V3 de ce greffe par le catalogue commun (`CatalogueGreffes.OuvrirBaseV3Async`, lot 4) et y applique les quatre contrôles de la V2. Un agent déclaré dans un seul greffe est **inconnu** des autres. |
+| **Greffe absent du catalogue : 404 ; base qui ne répond pas : 503** | La cause est dite (le code, la base nommée), sans repli sur la base commune ni sur un autre greffe. Sur une route de données, la politique `AgentAdmis` rend elle-même ces 404 / 503 au lieu d'un 403 (`ReponseGreffeNonOuvert`, le traitement des refus d'ASP.NET Core, [documentation Microsoft](https://learn.microsoft.com/en-us/aspnet/core/security/authorization/customizingauthorizationmiddlewareresponse)) ; sans session, 401 d'abord, sans lire le catalogue. |
+| **Une route sans `{greffe}` est une route commune** : le compte s'y cherche dans la base commune (`ConnectionStrings:RigV3`) | Le catalogue des greffes (`/socle/greffes/{code}…`, lot 4) en est une : son `{code}` désigne la fiche gérée, pas le greffe où l'agent travaille, et une fiche existe **avant** la base V3 de son greffe (SOC-008 ; dans `SocleGreffesCheck`, la fiche T004 n'a pas de base V3 et sa route de passage doit pourtant répondre). `GET /socle/identite` sans greffe reste l'appel de l'écran d'aujourd'hui (reste ci-dessus). |
+
+Le banc ajoute deux bases de greffe jetables, A et B, au catalogue de sa base commune ; l'agent `agent.a`
+n'est inscrit que dans A, `agent.b` que dans B, `JDUPONT` que dans la base commune. Contrôles « Raccord » :
+`agent.a` est admis sur A (nom lu dans la base de A) et **refusé sur B** (statut `inconnu`, message de la V2) ;
+`agent.b` l'inverse ; `JDUPONT` est inconnu de A ; un compte désactivé dans A y est refusé pour ce motif ;
+404 / 503 / 401 sur un greffe absent, muet, sans session ; une route de données `/banc/{greffe}/donnees`
+refuse l'agent de A sur B et le compte commun sur A (403), rend 404 / 503 sans tourner.
+Contre-épreuves (2026-11-21, fichier restauré à l'identique chaque fois) : identité cherchée dans la base
+commune → 8 contrôles rouges ; réponse 404 / 503 de la politique retirée → 1 rouge (403 à la place).
 
 ## Preuves
 
-- `.\tests.ps1 SocleIdentite` → code 0 : 28 contrôles, dont chaque critère CA01 à CA08 nommé. CA01 et
+- `.\tests.ps1 SocleIdentite` → code 0 : 37 contrôles (28 du lot 2, 9 du raccord du lot 8), dont chaque critère CA01 à CA08 nommé. CA01 et
   CA07 passent par la **vraie** session Windows (Kestrel sur `127.0.0.1`, client de l'écran avec la
   session) ; CA02 à CA06 et l'ordre des refus par le changement de compte de développement ; CA08 sur
   toute la base (toutes les migrations du dépôt) et sur les sources des écrans (`.tsx`, `.ts`, `.xaml`,
@@ -125,15 +145,21 @@ $env:ASPNETCORE_ENVIRONMENT = "Development"   # côté serveur
 $env:RIGV3_COMPTE = "jdupont"                  # côté app (ignoré par un serveur de production)
 ```
 
-Protéger une route de données (lots suivants) :
+Protéger une route de données d'un greffe (lots suivants) : le greffe dans l'adresse, la base par le catalogue.
 
 ```csharp
-routes.MapGet(RoutesComptes.Liste, async (BaseRig b, CancellationToken ct) => { … })
+routes.MapGet("/<theme>/{greffe}/<sujet>", async (string greffe, CatalogueGreffes c, CancellationToken ct) =>
+      {
+          await using var cn = await c.OuvrirBaseV3Async(greffe, ct);   // l'agent vient d'y etre juge
+          …
+      })
       .RequireAuthorization(PolitiquesSocle.AgentAdmis);   // using RigV3.Serveur.Socle.Identite;
 ```
 
 Dans un banc : `ServeurRig.Construire(["--environment", "Development"], …)` puis l'en-tête
-`X-RigV3-Compte: <compte>` sur chaque requête (modèle : `tests\SocleIdentiteCheck\Program.cs`).
+`X-RigV3-Compte: <compte>` sur chaque requête ; pour une route d'un greffe, une ligne `soc.Greffe` dans la
+base commune, `Greffes:Authentification` et le compte dans `soc.Compte` de la base **du greffe** (modèle :
+`tests\SocleIdentiteCheck\Program.cs`).
 
-<!-- fix-ok: retouches de redaction, pas de correctif -- (1) « /sante repond 500 » remplace par ce que la contre-epreuve a mesure (NotSupportedException, controle /sante en echec) ; (2) raccord avec le lot 4 ajoute apres son message msg-e5208977 (CatalogueGreffes). -->
+<!-- fix-ok: retouches de redaction, pas de correctif -- (1) « /sante repond 500 » remplace par ce que la contre-epreuve a mesure (NotSupportedException, controle /sante en echec) ; (2) raccord avec le lot 4 ajoute apres son message msg-e5208977 (CatalogueGreffes). Lot 8 (2026-11-21) : pas un correctif -- section « Raccord fait », reste « base du greffe » remplace par le choix du greffe a l'ecran (citation RigFormLogin.cs:282-319 relue a la ligne), 37 controles comptes par grep sur tests.ps1 SocleIdentite -Detail. -->
 

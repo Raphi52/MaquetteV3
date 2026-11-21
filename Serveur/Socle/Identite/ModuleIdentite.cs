@@ -3,9 +3,11 @@ using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Connections.Features;
 using Microsoft.Extensions.Options;
 using RigV3.Contrats.Socle;
+using RigV3.Serveur.Socle.Greffes;
 
 namespace RigV3.Serveur.Socle.Identite;
 
@@ -13,8 +15,16 @@ namespace RigV3.Serveur.Socle.Identite;
 public static class PolitiquesSocle
 {
     /// <summary>L'appelant est un agent admis (SOC-001) : compte connu, avec un role, actif, avec un service.
-    /// Sinon : 401 sans session Windows, 403 pour un compte refuse ; la route ne s'execute pas.</summary>
+    /// Sinon : 401 sans session Windows, 403 pour un compte refuse ; la route ne s'execute pas.
+    /// Sur une route dont l'adresse porte <c>{greffe}</c> (<see cref="ParametreGreffe"/>), l'agent est juge
+    /// dans la base de CE greffe (lot 8) : 404 si le greffe n'est pas au catalogue, 503 si sa base ne
+    /// repond pas, sans repli ; sur une route sans greffe, dans la base commune.</summary>
     public const string AgentAdmis = "agent-admis";
+
+    /// <summary>Le parametre d'adresse qui nomme le greffe ou l'agent travaille (<c>/numerotation/{greffe}/numeros</c>).
+    /// Le <c>{code}</c> des routes du catalogue (/socle/greffes/{code}) n'en est pas un : il designe la fiche
+    /// geree depuis la base commune, qui existe avant la base V3 du greffe (SOC-008).</summary>
+    public const string ParametreGreffe = "greffe";
 }
 
 /// <summary>
@@ -60,14 +70,25 @@ internal sealed class ModuleIdentite : IModuleServeur
         services.AddAuthorization(o => o.AddPolicy(PolitiquesSocle.AgentAdmis,
             p => p.RequireAuthenticatedUser().AddRequirements(new ExigenceAgentAdmis())));
         services.AddSingleton<IAuthorizationHandler, ControleAgentAdmis>();
+        // Le refus d'une route dont le greffe ne s'ouvre pas : 404 / 503 au lieu du 403 d'office.
+        services.AddSingleton<IAuthorizationMiddlewareResultHandler, ReponseGreffeNonOuvert>();
     }
 
     public void Brancher(IEndpointRouteBuilder routes)
+    {
         // RequireAuthorization : sans session transmise, 401 « Negotiate » ; le client
         // de l'ecran (credentials de la session) refait alors la demande authentifiee.
-        => routes.MapGet(RoutesIdentite.Identite, async (HttpContext contexte, BaseRig b, ServiceIdentite identites, CancellationToken ct)
-                => Results.Ok(await identites.DeLAppelantAsync(contexte, b, ct)))
-            .RequireAuthorization();
+        // Les deux adresses ont le meme corps : DeLAppelantAsync lit le {greffe} de l'adresse.
+        routes.MapGet(RoutesIdentite.Identite, Identite).RequireAuthorization();
+        routes.MapGet(RoutesIdentite.IdentiteDuGreffe, Identite).RequireAuthorization();
+    }
+
+    private static async Task<IResult> Identite(HttpContext contexte, BaseRig b, ServiceIdentite identites, CancellationToken ct)
+    {
+        try { return Results.Ok(await identites.DeLAppelantAsync(contexte, b, ct)); }
+        catch (GreffeInconnu e) { return ReponseGreffeNonOuvert.Pour(e); }
+        catch (BaseGreffeInjoignable e) { return ReponseGreffeNonOuvert.Pour(e); }
+    }
 
     /// <summary>Le changement de compte n'existe qu'en developpement et en recette (CA07).</summary>
     internal static bool ChangementDeComptePermis(HttpContext contexte)
@@ -114,13 +135,47 @@ internal sealed class GestionnaireChangementDeCompte(IOptionsMonitor<Authenticat
 /// <summary>L'exigence de <see cref="PolitiquesSocle.AgentAdmis"/>.</summary>
 internal sealed class ExigenceAgentAdmis : IAuthorizationRequirement;
 
-/// <summary>Satisfait <see cref="ExigenceAgentAdmis"/> quand l'appelant passe les quatre controles de la V2.</summary>
+/// <summary>Satisfait <see cref="ExigenceAgentAdmis"/> quand l'appelant passe les quatre controles de la V2,
+/// dans la base du greffe de l'adresse (<see cref="ServiceIdentite.GreffeDe"/>) ou, sans greffe, dans la base commune.</summary>
 internal sealed class ControleAgentAdmis(ServiceIdentite identites, BaseRig b) : AuthorizationHandler<ExigenceAgentAdmis>
 {
     protected override async Task HandleRequirementAsync(AuthorizationHandlerContext contexte, ExigenceAgentAdmis exigence)
     {
         if (contexte.Resource is not HttpContext http) return;
-        var identite = await identites.DeLAppelantAsync(http, b, http.RequestAborted);
+        IdentiteAgent? identite;
+        try { identite = await identites.DeLAppelantAsync(http, b, http.RequestAborted); }
+        catch (GreffeInconnu e) { contexte.Fail(new GreffeNonOuvert(this, ReponseGreffeNonOuvert.Pour(e))); return; }
+        catch (BaseGreffeInjoignable e) { contexte.Fail(new GreffeNonOuvert(this, ReponseGreffeNonOuvert.Pour(e))); return; }
         if (identite is { Admis: true }) contexte.Succeed(exigence);
     }
+}
+
+/// <summary>Le refus porte par <see cref="ControleAgentAdmis"/> quand la base du greffe de l'adresse ne s'ouvre
+/// pas : la reponse a rendre a la place du 403.</summary>
+internal sealed class GreffeNonOuvert(IAuthorizationHandler controle, IResult reponse)
+    : AuthorizationFailureReason(controle, "la base du greffe de l'adresse ne s'ouvre pas")
+{
+    public IResult Reponse { get; } = reponse;
+}
+
+/// <summary>
+/// La reponse d'une route refusee. Un greffe absent du catalogue rend 404, une base de greffe muette 503,
+/// avec leur cause et sans repli (decision du lot 4) ; tout autre refus suit ASP.NET Core (401 sans session,
+/// 403 pour un compte refuse). Le serveur n'a qu'un traitement de ce type : celui-ci delegue le reste au
+/// traitement d'origine (https://learn.microsoft.com/en-us/aspnet/core/security/authorization/customizingauthorizationmiddlewareresponse).
+/// </summary>
+internal sealed class ReponseGreffeNonOuvert : IAuthorizationMiddlewareResultHandler
+{
+    private readonly AuthorizationMiddlewareResultHandler parDefaut = new();
+
+    public Task HandleAsync(RequestDelegate suite, HttpContext contexte, AuthorizationPolicy politique, PolicyAuthorizationResult resultat)
+        => resultat.AuthorizationFailure?.FailureReasons.OfType<GreffeNonOuvert>().FirstOrDefault() is { } refus
+            ? refus.Reponse.ExecuteAsync(contexte)
+            : parDefaut.HandleAsync(suite, contexte, politique, resultat);
+
+    /// <summary>404 : le greffe de l'adresse n'est pas au catalogue commun.</summary>
+    public static IResult Pour(GreffeInconnu e) => Results.Json(new RefusGreffe(e.Message), statusCode: StatusCodes.Status404NotFound);
+
+    /// <summary>503 : la base V3 du greffe ne repond pas ; aucune autre base n'est lue a sa place.</summary>
+    public static IResult Pour(BaseGreffeInjoignable e) => Results.Json(new RefusGreffe(e.Message), statusCode: StatusCodes.Status503ServiceUnavailable);
 }

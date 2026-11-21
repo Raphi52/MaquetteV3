@@ -5,17 +5,26 @@ namespace RigV3.Contrats.Numerotation;
 /// le serveur les publie (Serveur/Numerotation/Compteur/ModuleCompteur.cs), l'ecran les appelle.
 /// Un acte de la V3 qui numerote ne passe pas par ces routes mais par le service
 /// DistributeurNumeros, dans la transaction de l'acte (docs/reconstruction/numerotation-compteur.md).
+///
+/// Chaque adresse porte le code du greffe, <c>{greffe}</c> (lot 8) : le serveur ouvre la base V3 de
+/// CE greffe par le catalogue commun et y juge l'agent (session Windows). 401 sans session, 403 pour
+/// un compte refuse dans ce greffe, 404 pour un greffe absent du catalogue, 503 si sa base ne repond pas.
+/// L'adresse a appeler : <see cref="Pour"/>.
 /// </summary>
 public static class RoutesCompteur
 {
-    /// <summary>GET : les compteurs de la base (<see cref="CompteurNumeros"/>[]) ; « ?type=JPC » pour une seule serie.</summary>
-    public const string Compteurs = "/numerotation/compteurs";
+    /// <summary>GET : les compteurs de la base du greffe (<see cref="CompteurNumeros"/>[]) ; « ?type=JPC » pour une seule serie.</summary>
+    public const string Compteurs = "/numerotation/{greffe}/compteurs";
 
-    /// <summary>POST <see cref="DemandeNumero"/> : le numero suivant d'une serie (<see cref="NumeroAttribue"/>).</summary>
-    public const string Numeros = "/numerotation/numeros";
+    /// <summary>POST <see cref="DemandeNumero"/> : le numero suivant d'une serie du greffe (<see cref="NumeroAttribue"/>).</summary>
+    public const string Numeros = "/numerotation/{greffe}/numeros";
 
     /// <summary>POST <see cref="DemandeRestitution"/> : rendre un numero donne par erreur (<see cref="ResultatRestitution"/>).</summary>
-    public const string Restitutions = "/numerotation/restitutions";
+    public const string Restitutions = "/numerotation/{greffe}/restitutions";
+
+    /// <summary>L'adresse d'une de ces routes pour le greffe <paramref name="greffe"/> (son code au catalogue).</summary>
+    public static string Pour(string route, string greffe)
+        => route.Replace("{greffe}", Uri.EscapeDataString(greffe));
 }
 
 /// <summary>
