@@ -1,4 +1,7 @@
+// fix-ok: ajout du lot 19 (SOC-002 T05), pas une correction : la partie jointe d'une fiche (IRecopieJointe, RegleRecopie.Jointe),
+// posee en trois editions (l'interface, la propriete, l'espace de noms SqlClient qu'elle demande) avant toute compilation.
 using System.Reflection;
+using Microsoft.Data.SqlClient;
 
 namespace RigV3.Serveur.Recopie;
 
@@ -108,6 +111,13 @@ public sealed record RegleRecopie(string TableV2, string TableV3, string Story, 
     /// <summary>La valeur qu'une base tient unique (<see cref="CleMetier"/>).</summary>
     public CleMetier? Unique { get; init; }
 
+    /// <summary>Ce que la fiche porte dans d'AUTRES tables de la V3 et qui passe dans la V2 avec elle (<see cref="IRecopieJointe"/> :
+    /// les droits d'un compte, SOC-002 T05) ; null pour une fiche sans partie jointe.</summary>
+    public IRecopieJointe? Jointe { get; init; }
+
+    /// <summary>La marque des lignes de file qu'un changement de la partie jointe ecrit (colonne Colonnes : « (droits) »).</summary>
+    public string? MarqueJointe => Jointe is null ? null : "(" + Jointe.Libelle + ")";
+
     public bool ColonneParColonne => Correspondance is not null;
 
     public static RegleRecopie TelleQuelle(string tableV2, string story, string libelle) => new(tableV2, "v2." + tableV2, story, libelle);
@@ -117,9 +127,41 @@ public sealed record RegleRecopie(string TableV2, string TableV3, string Story, 
     public RegleRecopie EnTelleQuelle() => this with
     {
         TableV3 = "v2." + TableV2, Correspondance = null, CleV3 = null, SansCreationV2 = false, Unique = null,
-        LiensSansCle = new Dictionary<string, string>(),
+        LiensSansCle = new Dictionary<string, string>(), Jointe = null,
     };
 }
+
+/// <summary>
+/// CE QU'UNE FICHE PORTE DANS D'AUTRES TABLES DE LA V3 ET QUI PASSE DANS LA V2 AVEC ELLE (SOC-002 T05 : les droits d'un compte,
+/// soc.CompteRole et soc.CompteFonction, ecrits dans HABILIT_UTILISATEUR_ROLE_USER, l'ancien systeme et EXPRESSO_DROITS --
+/// Serveur\Recopie\DroitsRecopies.cs). Ce n'est pas un second mecanisme : un changement d'une de ces tables met LA FICHE en file
+/// (declencheur pose par la mise en service, PontRecopie, colonnes « (libelle) »), et l'applicateur ecrit la partie jointe dans
+/// la transaction de la fiche. Elle a donc tout ce que la file donne a la fiche : l'ordre, une transaction, panne ou refus, la
+/// mise de cote au 3e essai et la relance (REC-005), l'ecart (REC-004).
+/// </summary>
+public interface IRecopieJointe
+{
+    /// <summary>Le nom pour l'agent et la marque des lignes de file (« droits »).</summary>
+    string Libelle { get; }
+
+    /// <summary>Les tables de la V3 et la colonne qui y designe la fiche par son identifiant V3.</summary>
+    IReadOnlyList<TableJointe> Tables { get; }
+
+    /// <summary>Ecrit dans la V2 la partie jointe telle que la V3 la tient, dans la transaction de la fiche ; rend l'ecart
+    /// ecrit si la V2 l'avait changee depuis le dernier passage (REC-004), sinon null. Leve <see cref="RecopieRefusee"/> ou
+    /// <see cref="RecopieImpossible"/> quand la V2 ne peut pas la recevoir.</summary>
+    Task<long?> AppliquerAsync(SqlConnection cn, SqlTransaction tx, TableRecopiee fiche, string idV3, string idV2, ChangementJoint changement,
+                               CancellationToken ct);
+
+    /// <summary>Retire de la V2 la partie jointe d'une fiche supprimee dans la V3, AVANT la fiche (ses cles etrangeres).</summary>
+    Task SupprimerAsync(SqlConnection cn, SqlTransaction tx, TableRecopiee fiche, string idV2, CancellationToken ct);
+}
+
+/// <summary>Une table de la partie jointe : « soc.CompteRole », et sa colonne qui designe la fiche (« IdCompte »).</summary>
+public sealed record TableJointe(string TableV3, string ColonneFiche);
+
+/// <summary>Le changement de la V3 en cours d'application : la date de sa premiere ligne de file, ses agents (pour l'ecart).</summary>
+public sealed record ChangementJoint(DateTime Le, string Auteurs);
 
 /// <summary>Une classe qui declare des regles de recopie (constructeur sans parametre, trouvee seule).</summary>
 public interface IReglesRecopie

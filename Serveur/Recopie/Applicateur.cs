@@ -51,7 +51,10 @@ public sealed record BilanApplication(int Appliquees, int Fiches, int Ecarts, st
 /// </summary>
 internal static class Applicateur
 {
-    private sealed record LigneFile(long Id, string Genre, string? Avant, DateTime Le, string Auteur);
+    // fix-ok: lot 19 (SOC-002 T05), un ajout et non une correction : la partie jointe d'une fiche (les droits d'un compte) passe
+    // avec elle -- la colonne Colonnes des lignes lue (marque « (droits) »), l'ecriture apres la fiche, le retrait avant la
+    // suppression d'un compte (HABILIT_UTILISATEUR_ROLE_USER le vise par cle etrangere) ; quatre editions d'un meme ajout.
+    private sealed record LigneFile(long Id, string Genre, string? Avant, DateTime Le, string Auteur, string? Colonnes);
 
     public static async Task<BilanApplication> AppliquerAsync(string connexionV3, FichesRecopiees fiches, int idTransfert, int auPlus, CancellationToken ct)
     {
@@ -166,14 +169,15 @@ internal static class Applicateur
         try
         {
             var lignes = new List<LigneFile>();
-            await using (var cmd = new SqlCommand("SELECT Id, Genre, Avant, Le, Auteur FROM rec.FileRecopie WITH (UPDLOCK, ROWLOCK) " +
+            await using (var cmd = new SqlCommand("SELECT Id, Genre, Avant, Le, Auteur, Colonnes FROM rec.FileRecopie WITH (UPDLOCK, ROWLOCK) " +
                                                   "WHERE TableV3 = @t AND IdV3 = @id AND Etat = 'en attente' ORDER BY Id;", cn, tx))
             {
                 cmd.Parameters.AddWithValue("@t", t.NomV3);
                 cmd.Parameters.AddWithValue("@id", idV3);
                 await using var l = await cmd.ExecuteReaderAsync(ct);
                 while (await l.ReadAsync(ct))
-                    lignes.Add(new LigneFile(l.GetInt64(0), l.GetString(1), l.IsDBNull(2) ? null : l.GetString(2), l.GetDateTime(3), l.GetString(4)));
+                    lignes.Add(new LigneFile(l.GetInt64(0), l.GetString(1), l.IsDBNull(2) ? null : l.GetString(2), l.GetDateTime(3), l.GetString(4),
+                                             l.IsDBNull(5) ? null : l.GetString(5)));
             }
             if (lignes.Count == 0) { await tx.CommitAsync(ct); faites.Add((t.NomV3, idV3)); return; }
 
@@ -192,6 +196,8 @@ internal static class Applicateur
                         if (perdues.Count > 0)
                             ecart = await EcrireEcartAsync(cn, tx, t, idV2, idV3, v2, reference!, perdues.Select(c => (c, (string?)v2[c], (string?)null)).ToList(),
                                                            lignes, "supprimee dans la V3", ct);
+                        // Sa partie jointe d'abord (les roles d'un compte) : elle vise la fiche par ses cles etrangeres.
+                        if (t.Regle.Jointe is { } jointe) await jointe.SupprimerAsync(cn, tx, t, idV2, ct);
                         await SupprimerV2Async(cn, tx, t, idV2, ct);
                     }
                     await OublierAsync(cn, tx, t, idV2, ct);
@@ -251,6 +257,15 @@ internal static class Applicateur
                     var ecritsParLaV2 = LigneJson.Differences(apresEnV3, v3, t.Colonnes.Select(c => c.Nom));
                     if (ecritsParLaV2.Count > 0) await ModifierV3Async(cn, tx, t, idV3, apresEnV3, ecritsParLaV2, ct);
                     await NoterEtatAsync(cn, tx, t, idV2, apres, "V3 vers V2", ct);
+
+                    // 4. La partie jointe (les droits d'un compte, SOC-002 T05), dans la MEME transaction : a la creation de la fiche,
+                    // et a chaque changement qu'elle a mis en file (colonnes « (droits) »). Un refus annule la fiche entiere.
+                    if (t.Regle.Jointe is { } jointe && lignes.Any(l => l.Genre == "C" || l.Colonnes == t.Regle.MarqueJointe))
+                    {
+                        var ecartJoint = await jointe.AppliquerAsync(cn, tx, t, idV3, idV2, new ChangementJoint(lignes[0].Le,
+                            string.Join(", ", lignes.Select(l => l.Auteur).Distinct())), ct);
+                        ecart ??= ecartJoint;
+                    }
                 }
             }
 

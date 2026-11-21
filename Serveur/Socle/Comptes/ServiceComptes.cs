@@ -73,10 +73,15 @@ public sealed class ServiceComptes
         int id;
         try
         {
+            // OUTPUT ... INTO, et non OUTPUT seul : la recopie en service pose un declencheur sur soc.Compte (PontRecopie, REC-017),
+            // et SQL Server refuse alors un OUTPUT sans INTO (erreur 334, mesuree par tests\RecopieDroitsCheck le 2026-11-21 :
+            // aucun compte ne se creait plus depuis la V3 d'un greffe en recopie).
             await using var cmd = new SqlCommand("""
+                DECLARE @ids TABLE (Id int);
                 INSERT INTO soc.Compte (CompteWindows, Nom, Prenom, Abrege, Civilite, CodeGreffe, IdService, Desactive, DateCreation)
-                OUTPUT INSERTED.Id
+                OUTPUT INSERTED.Id INTO @ids
                 VALUES (@login, @nom, @prenom, @abrege, @civilite, @greffe, @service, 0, GETDATE());
+                SELECT Id FROM @ids;
                 """, cn, tx);
             cmd.Parameters.Add(new SqlParameter("@login", SqlDbType.VarChar, 35) { Value = login });
             cmd.Parameters.Add(new SqlParameter("@nom", SqlDbType.VarChar, 35) { Value = d.Nom.Trim() });

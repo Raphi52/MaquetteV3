@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Banc de SOC-002 T05 / CA07 et de la fin de REC-017 CA01 (la recopie V3 -> V2 des droits d'un compte), lot 19 du plan de
+       reconstruction, phase 2. Il lui faut le SQL Server du poste (docker compose up -d) et la lecture de RIG_DEV (SQL-DEV\DEV,
+       compte Windows ; autre serveur : RIGV3_RIG_DEV). En tete de Program.cs : ce que chaque controle prouve. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <!-- La base V2 jetable tiree de RIG_DEV : la meme construction que le banc du transfert (lot 7). -->
+    <Compile Include="../RecopieTransfertCheck/ExtraitRigDev.cs" Link="ExtraitRigDev.cs" />
+    <!-- Le script de la V2 (Base\v2\recopie-v2.sql) joue comme sqlcmd le jouerait (banc de la numerotation V2). -->
+    <Compile Include="../NumerotationV2Check/Sqlcmd.cs" Link="Sqlcmd.cs" />
+    <!-- L'oracle de la V2 (Utilisateur.ALaFonctionnalite rejoue sur ses tables), celui de la reprise des droits (lot 3). -->
+    <Compile Include="../SocleDroitsCheck/OracleDroitsV2.cs" Link="OracleDroitsV2.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+  </ItemGroup>
+
+</Project>

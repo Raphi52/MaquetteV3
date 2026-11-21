@@ -658,7 +658,7 @@ laissée à la V2 par une raison écrite (clé, état de transmission, déroulem
 | | CA02 | 42 adresses référencées par plusieurs fiches : mêmes références dans la V3 |
 | | CA03 | deux adresses inconnues dans la V2 → une seule dans la V3, les trois fiches la visent |
 | | CA04 | dix adresses de formes variées saisies dans la V3 → même découpage dans la V2 que celui que la V2 avait produit |
-| REC-017 | CA01 | compte créé dans la V3 → V2, même nom de session, actif, même service (reste : les rôles, plus bas) |
+| REC-017 | CA01 | compte créé dans la V3 → V2, même nom de session, actif, même service (ses rôles, et l'ouverture de la V2 : lot 19, `tests\RecopieDroitsCheck`) |
 | | CA02 | désactivation dans la V3 → V2 en moins d'une minute, par la vraie boucle du serveur |
 | | CA03 | imprimante et scanner du poste gardés ; vides pour un nouveau compte |
 | | CA04 | nom de session déjà pris dans la V2 : mis de côté d'emblée, motif, écart |
@@ -694,7 +694,7 @@ CLIENT / DOSSIER_RCS à ARRIVEE, et le banc du lot 9 met en service ses sept fic
 
 | Critère | Ce qui manque | Où |
 |---|---|---|
-| REC-017 CA01 « l'agent ouvre la V2 sans autre geste » | la V2 exige au moins un rôle (`HABILIT_UTILISATEUR_ROLE_USER`) ; T02 laisse les droits aux stories du Socle commun : compte, actif et service sont prouvés | Socle (SOC-002) |
+| ~~REC-017 CA01 « l'agent ouvre la V2 sans autre geste »~~ | **Fait au lot 19** : les rôles et droits du compte passent avec lui (SOC-002 T05), section « Les droits d'un compte passent avec lui » plus bas | — |
 | REC-012 CA02 « un seul envoi à Infogreffe sur l'environnement de test » | l'environnement de test d'Infogreffe est « à obtenir » ; la V3 n'envoie pas encore : prouvé ici que la V2 ne marque pas le dossier | Échanges, partenaire |
 | Les 40 bases | mesure sur RIG_DEV et RIG_RECETTE seulement (les bases des greffes ne se lisent pas d'ici sans accord) ; un schéma de greffe sans une colonne de la correspondance la laisse hors de la recopie | répétition REC-008 (lot 18) |
 | Écran « à maquetter » des stories | aucun écran de fiche n'est dans ce lot ; les écarts d'une fiche sans écran restent sans « Ouvrir la fiche » | stories de domaine |
@@ -713,3 +713,43 @@ CLIENT / DOSSIER_RCS à ARRIVEE, et le banc du lot 9 met en service ses sept fic
 | `Serveur\Recopie\CopieTelleQuelle.cs`, `MoteurTransfert.cs` | la copie colonne par colonne (cible, traductions, colonnes calculées) |
 | `Serveur\Recopie\FichesRecopiees.cs`, `EcrituresRecopie.cs`, `PontRecopie.cs`, `Applicateur.cs`, `Remontee.cs`, `MisesDeCote.cs`, `Comparaison.cs` | la recopie sous les noms V2, les règles de la mise en service, le déclencheur binaire, les valeurs uniques, la comparaison de nuit des fiches |
 | `tests\RecopieFichesCheck\` | le banc : un contrôle par critère des sept stories |
+
+## Les droits d'un compte passent avec lui (SOC-002 T05, fin de REC-017 CA01) — lot 19
+
+Un compte créé ou changé dans la V3 arrivait dans la V2 sans ses rôles : la V2 ne l'ouvrait pas (au moins un rôle,
+`RigClientAccueil\RigConsoleAccueil.cs:117-131`) et ne lui donnait aucune fonction. Ses rôles et ses droits directs passent
+désormais **avec lui**, chacun dans son origine V2 (rôles, ancien système, menus de comptabilité). Le détail métier, les choix
+et les écarts à valider sont dans `docs\reconstruction\socle-droits.md`, section « Recopie V3 → V2 des droits ».
+
+**Le mécanisme, pour les lots suivants : la partie jointe d'une fiche** (`IRecopieJointe`, `RegleRecopie.Jointe`,
+`Serveur\Recopie\ReglesRecopie.cs`). Ce qu'une fiche porte dans d'autres tables de la V3 et qui doit passer dans la V2 avec elle
+se déclare sur SA règle : les tables et la colonne qui désigne la fiche (`TableJointe`), l'écriture dans la V2
+(`AppliquerAsync`, dans la transaction de la fiche) et le retrait avant une suppression (`SupprimerAsync`). La mise en service
+(`PontRecopie`) pose sur chaque table jointe un déclencheur qui met **la fiche** en file (genre « M », colonnes
+« (libellé) », la ligne de la fiche en « avant ») ; l'applicateur appelle la partie jointe à la création de la fiche et pour
+chaque ligne marquée (étape 4 de `Applicateur.FicheSansNomAsync`). Rien d'autre à brancher : ordre, panne, refus, mise de côté
+au 3e essai, relance et écart sont ceux de la fiche. Aujourd'hui une seule partie jointe : les droits du compte
+(`Serveur\Recopie\DroitsRecopies.cs`, tables `soc.CompteRole` et `soc.CompteFonction`).
+
+**Mettre un greffe en recopie** : la mise en service pose maintenant **trois** déclencheurs pour le compte
+(`soc.TR_Compte_FileRecopie`, `soc.TR_CompteRole_FileRecopie`, `soc.TR_CompteFonction_FileRecopie`). Un greffe mis en service
+avant ce lot rejoue sa mise en service pour les avoir (sans risque).
+
+**Corrigé en route** : `ServiceComptes.CreerAsync` (`OUTPUT INSERTED.Id` sans `INTO`) ne pouvait plus créer de compte dans
+la base d'un greffe en recopie : SQL Server refuse ce `OUTPUT` sur une table qui porte un déclencheur (erreur 334). Les autres
+`OUTPUT` sans `INTO` du serveur (relevés le 2026-11-21) visent des tables sans déclencheur de recopie (`rec.*`, courriels,
+traitements, documents) ; une story qui donnera une fiche partagée à l'une d'elles devra le revoir.
+
+| Fichier | Rôle |
+|---|---|
+| `Serveur\Recopie\DroitsRecopies.cs` | les droits d'un compte écrits dans leurs trois origines V2, vérifiés avant validation ; l'ancien système (`AncienSysteme.Resoudre`) |
+| `Serveur\Recopie\ReglesRecopie.cs`, `FichesV3.cs` | `IRecopieJointe`, `TableJointe`, `RegleRecopie.Jointe` ; la fiche « compte d'agent » porte ses droits |
+| `Serveur\Recopie\PontRecopie.cs`, `Applicateur.cs` | les déclencheurs des tables jointes ; l'écriture avec la fiche, le retrait avant la suppression |
+| `Serveur\Socle\Comptes\RepriseDroits.cs` | la réponse de la V2 (`ReponsesV2`) et la lecture des droits d'un compte (`DonneesV2.LireCompteAsync`) |
+| `Serveur\Socle\Comptes\ServiceComptes.cs` | la création d'un compte sous un déclencheur (`OUTPUT … INTO`) |
+| `tests\RecopieDroitsCheck\` | le banc : compte créé avec un rôle (ouverture de la V2), rôle ajouté puis retiré, droits directs « comptabilité » et « ancien », mise de côté, refus au 3e essai, écart, suppression, contre-épreuve |
+
+Preuve : `.\tests.ps1 RecopieDroits` → code 0 (22 contrôles, oracle de la V2 = V3 sur les 876 fonctions de chaque compte).
+
+<!-- fix-ok: lot 19 (2026-11-21), pas un correctif de ce document : deux lignes du lot 10 qui laissaient les roles de REC-017 CA01 au Socle renvoient a leur preuve (banc RecopieDroits vert, code 0, 22 controles lus dans sa sortie) et la section du lot 19 est ajoutee a la fin. -->
+

@@ -243,7 +243,9 @@ internal sealed class ReglesFichesV3 : IReglesRecopie, IReglesTransfert
         // REC-017 : le compte d'un agent, celui de la V3 (soc.Compte, SOC-001), porte par la reprise des comptes ; recopie par
         // son nom de session, unique des deux cotes (CA04). Les reglages du poste dans la V2 (imprimantes, scanner, bac de
         // sortie, derniere session) et son mot de passe n'ont pas de colonne dans la V3 : jamais ecrases, vides pour un compte
-        // cree par la V3 (CA03). Les droits (roles) restent ceux des stories du Socle commun (T02).
+        // cree par la V3 (CA03). Ses droits -- roles et droits directs, le detail que T02 laisse au Socle commun -- passent AVEC
+        // lui, dans sa transaction, chacun dans son origine V2 (SOC-002 T05, DroitsRecopies.cs) : un compte cree dans la V3 avec
+        // un role ouvre la V2 sans autre geste (CA01).
         new FicheV3(FicheV3.Fiche("UTILISATEUR", "soc.Compte", "REC-017", "compte d'agent", "Id",
             ("CompteWindows", "UTLST_LOGIN"), ("Nom", "UTLST_NOM"), ("Prenom", "UTLST_PRENOM"),
             ("Abrege", "UTLST_ABREGE"), ("Civilite", "UTLST_CIVILITE"), ("CodeGreffe", "UTLST_CODE_GREFFE"),
@@ -252,6 +254,7 @@ internal sealed class ReglesFichesV3 : IReglesRecopie, IReglesTransfert
             .Traduite("UTLST_ID_SRVC", TraductionsFiches.ParService) with
         {
             ColonneNom = "UTLST_LOGIN", Unique = new CleMetier("UTLST_LOGIN", "nom de session", UniqueDansV2: true, UniqueDansV3: true),
+            Jointe = DroitsRecopies.Instance,
         }, CopieeParLeTransfert: false),
     ];
 
