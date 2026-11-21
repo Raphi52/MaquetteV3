@@ -22,7 +22,8 @@
 // LES GESTES DE LA V2 (lot 16) :
 //  - le texte d'un modele HTML s'edite dans un editeur mis en forme (les boutons de RigHtmlEditor) quand le greffe a un
 //    habillage regle, la condition de la V2 (OPE_EDIT_EMAILMODEL.LinkDonnees : EMAILMOD_CORPS_HTML && _TemplateActif) ;
-//    le serveur assainit le HTML a chaque enregistrement (regles de RigHtmlSanitizer) ;
+//    le serveur retire le contenu actif du HTML a chaque enregistrement (script, attributs on…, liens javascript:), le reste
+//    est garde tel que saisi, comme la V2 ;
 //  - expediteur, « Répondre à » et « Copie cachée » se choisissent parmi les boites du greffe, montrees par leur ADRESSE
 //    (INFO_GREFFE, lue par le serveur), ou en saisie libre ; la base garde l'etiquette [ADRESSE_MAIL_X]
 //    (OPE_EDIT_EMAILMODEL_ONE_CHOICE, OPE_EDIT_EMAILMODEL_MANY_CHOICES « RA » et « CC ») ;
@@ -431,8 +432,8 @@ const BoutonsEditeur: ({ texte: string; nom: string; titre: string; commande: st
 
 /**
  * L'editeur mis en forme du texte d'un modele HTML : une zone editable et la barre de RigHtmlEditor. <c>valeur</c> est son HTML ;
- * chaque saisie, collage ou mise en forme le rend par <c>changer</c>. Le HTML n'est pas assaini ici : le serveur l'assainit a
- * chaque enregistrement (regles de RigHtmlSanitizer), seul juge de ce qui est garde.
+ * chaque saisie, collage ou mise en forme le rend par <c>changer</c>. Le HTML n'est pas nettoye ici : le serveur en retire le
+ * contenu actif a chaque enregistrement (script, attributs on…, liens javascript:), seul juge de ce qui est garde.
  */
 function EditeurHtml({ libelle, valeur, changer }: { libelle: string; valeur: string; changer: (html: string) => void }) {
   const zone = useRef<HTMLDivElement>(null)

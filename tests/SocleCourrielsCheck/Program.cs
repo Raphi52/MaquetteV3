@@ -36,8 +36,9 @@ using SocleCourrielsCheck;
 // modeles inventes (vitest 8/8 rouge) : ajout des listes du banc, de CA05 par le nom du modele et de la partie « Messagerie ».
 // LOT 15 (2026-11-21) : la partie « SOC-006 T04 (suite) » joue la gestion des modeles et des listes (fonction GESTEMAIL, regles de
 // saisie de la V2, modele reserve a Amitel, journal des gestes) par les routes, puis par l'ecran.
-// LOT 16 (2026-11-21) : la partie « SOC-006 T04 (fin) » joue les gestes de l'ecran V2 « Modele de mail » repris : texte HTML assaini
-// a l'enregistrement (RigHtmlSanitizer), boites du greffe par leur adresse enregistrees en etiquette, « Ajouter le logo ».
+// LOT 16 (2026-11-21) : la partie « SOC-006 T04 (fin) » joue les gestes de l'ecran V2 « Modele de mail » repris : contenu actif
+// retire du texte HTML a l'enregistrement (le reste tel que la V2 l'ecrivait), boites du greffe par leur adresse enregistrees en
+// etiquette, « Ajouter le logo ».
 // fix-ok: lot 16 -- aucun controle ne jouait ces gestes : ControlerModele ecrivait le HTML tel que recu et aucune route ne rendait
 // les adresses des boites (lus avant d'ecrire ce lot).
 
@@ -1008,73 +1009,134 @@ try
         "Ecran SOC-006 T04 : une liste creee depuis l'ecran revient dans ses listes ; Désactiver depuis l'ecran rend le modele inactif");
 
     // =====================================================================================================
-    // SOC-006 T04 (fin, lot 16) — les gestes de l'ecran V2 « Modele de mail » : texte HTML assaini a l'enregistrement
-    // (RigHtmlSanitizer), boites du greffe proposees par leur adresse et enregistrees en etiquette, « Ajouter le logo ».
+    // SOC-006 T04 (fin, lot 16) — les gestes de l'ecran V2 « Modele de mail » : contenu actif retire du texte HTML a
+    // l'enregistrement, boites du greffe proposees par leur adresse et enregistrees en etiquette, « Ajouter le logo ».
     // ENTREES QUI LE FONT TOMBER : un <script>, un onclick, un lien javascript: saisis dans un modele HTML ; une boite
     // dont l'adresse partirait en base a la place de son etiquette ; $LOGO$ ajoute a un modele texte.
     // Etat ici : SEND_EMAIL_TEMPLATE_PATH regle (fichier absent), aucun habillage en base -- regle, pas present.
     // =====================================================================================================
     Console.WriteLine("--- SOC-006 T04 (lot 16) : assainissement, boites du greffe, logo");
-    // Les regles de RigHtmlSanitizer, une par une, dans son ordre (RigHtmlSanitizer.cs:17-41).
+    // Le CONTENU ACTIF seul est retire (decision du chef, 2026-11-21) : blocs script, attributs on… d'une balise, liens javascript:
+    // (valeur « # »). L'ecran V2 enregistrait le HTML de son editeur tel quel (Ult_HtmlEditor.cs:228-231, InnerHtml) : la mise en
+    // forme, <font>, <style>, les commentaires, les &nbsp; et les blancs restent. ENTREES QUI FONT TOMBER CES CONTROLES : un
+    // assainisseur qui retire <font>, <style>, un commentaire, des &nbsp; ou rogne les blancs (RigHtmlSanitizer entier, l'essai
+    // refuse) ; un assainisseur qui laisse un onerror colle apres un guillemet, un </SCRIPT > ou un « jav&#x61;script: » encode.
     var assaini = ReglesCourriels.Assainir(
         "<p onclick=\"alert(1)\" onmouseover='x()' onload=y>Bonjour</p><script type=\"text/javascript\">alert(2)</script>" +
-        "<style>p{color:red}</style><!-- note interne --><font color=\"#80ff80\" size=4>Vert</font><a href=\"javascript:alert(3)\">lien</a>" +
-        "<img src='javascript:x'>a&nbsp;&nbsp;&nbsp;b  ");
-    const string MiseEnFormeSaine = "<p><b>Gras</b>, <i>italique</i>, <u>souligné</u></p><ul><li>un</li></ul><ol><li>deux</li></ol>" +
-                             "<p><a href=\"https://documents.greffe-banc.example/d\">le document</a>&nbsp;$PieceJointe$ $LOGO$ $$NumeroAffaireJud</p>";
-    Exiger(assaini == "<p>Bonjour</p>Vert<a href=\"#\">lien</a><img src=\"#\">a b" && ReglesCourriels.Assainir(MiseEnFormeSaine) == MiseEnFormeSaine,
-        $"SOC-006 T04 : les regles de RigHtmlSanitizer -- blocs script et style, commentaires, balises font (texte garde), liens javascript: " +
-        $"(href=\"#\"), gestionnaires on…, &nbsp; repetes, blancs des bords (« {assaini} ») ; jumeau : la mise en forme de l'editeur (gras, " +
-        "italique, souligne, listes, lien) et les jetons restent tels quels");
+        "<a href=\"javascript:alert(3)\">lien</a><img src='javascript:x'><img src=\"logo.png\"onerror=\"alert(4)\"/>" +
+        "<a HREF=\" jav&#x61;script:alert(5)\">encode</a><SCRIPT>\nalert(6)\n</SCRIPT >");
+    Exiger(assaini == "<p>Bonjour</p><a href=\"#\">lien</a><img src=\"#\"><img src=\"logo.png\"/><a HREF=\"#\">encode</a>",
+        "SOC-006 T04 : le contenu ACTIF d'un texte HTML est retire -- blocs script (casse et blanc de fin compris), attributs on… (meme " +
+        $"colles apres un guillemet), liens javascript: (meme encodes) remplaces par « # » (« {assaini} »)");
+    // Jumeau : ce que l'editeur et la V2 ecrivent reste octet pour octet, et ce qui RESSEMBLE a un attribut hors d'une balise aussi.
+    const string MiseEnFormeV2 = "  <style>p{color:red}</style><!-- note interne --><p><font color=\"#80ff80\" size=4>Vert</font>, <b>Gras</b>, " +
+        "<i>italique</i>, <u>souligné</u></p><ul><li>un</li></ul><ol><li>deux</li></ol><p><a href=\"https://documents.greffe-banc.example/d\" " +
+        "title=\"voir onclick=1\">le document</a>&nbsp;&nbsp;&nbsp;$PieceJointe$ $LOGO$ $$NumeroAffaireJud</p><p>Si on = 2, javascript: reste du texte</p>  \r\n";
+    var garde = ReglesCourriels.Assainir(MiseEnFormeV2);
+    Exiger(garde == MiseEnFormeV2,
+        "SOC-006 T04 (jumeau) : le reste du HTML s'enregistre tel que la V2 l'ecrivait -- <style>, commentaire, <font>, gras, italique, " +
+        "souligne, listes, lien, &nbsp; repetes, blancs des bords, jetons ; « on = » et « javascript: » hors d'une balise ou dans un titre " +
+        $"restent ({(garde == MiseEnFormeV2 ? "identique" : "change : « " + garde + " »")})");
 
-    // A l'enregistrement, par la route : la base (et le journal) gardent le texte assaini d'un modele HTML.
+    // A l'enregistrement, par la route : la base (et le journal) n'ont plus le contenu actif ; le reste est garde.
     const string SaisieHostile = "<p onclick=\"alert(1)\">Bonjour</p><script>alert(2)</script><a href=\"javascript:alert(3)\">lien</a>" +
                           "<font color=red>Rouge</font><!-- interne -->$PieceJointe$";
     var hostile = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_HTML"), Agent, Saisie("BANC_HTML", corps: SaisieHostile));
     var corpsHostile = (await Scalaire(v3a.Connexion, "SELECT Corps FROM soc.ModeleMessage WHERE Type = 'BANC_HTML'"))?.ToString();
     var journalHostile = (await Scalaire(v3a.Connexion,
         "SELECT TOP 1 Apres FROM soc.Journal WHERE Famille = 'courriel' AND IdObjet = 'BANC_HTML' ORDER BY Id DESC"))?.ToString() ?? "";
-    Exiger(hostile.Code == 200 && corpsHostile == "<p>Bonjour</p><a href=\"#\">lien</a>Rouge$PieceJointe$"
+    Exiger(hostile.Code == 200 && corpsHostile == "<p>Bonjour</p><a href=\"#\">lien</a><font color=red>Rouge</font><!-- interne -->$PieceJointe$"
            && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_HTML' AND CorpsHtml = 1") == 1
            // « alert( » : le contenu des trois pieges ; pas « script », que porte la cle « inscription » du journal.
            && journalHostile.Contains("Bonjour", StringComparison.Ordinal) && !journalHostile.Contains("alert(", StringComparison.Ordinal)
            && !journalHostile.Contains("onclick", StringComparison.OrdinalIgnoreCase),
-        $"SOC-006 T04 : le texte d'un modele HTML est ASSAINI a l'enregistrement (regles de RigHtmlSanitizer) -- le <script>, le onclick, le lien " +
-        $"javascript: et la balise font saisis ne vont ni en base ni au journal ({hostile.Code}, « {corpsHostile} »)");
-    var sain = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_HTML"), Agent,
-        Saisie("BANC_HTML", corps: MiseEnFormeSaine.Replace(" $LOGO$", "", StringComparison.Ordinal)));
+        "SOC-006 T04 : le texte d'un modele HTML est ASSAINI a l'enregistrement -- le <script>, le onclick et le lien javascript: saisis ne " +
+        $"vont ni en base ni au journal ; la balise font et le commentaire restent ({hostile.Code}, « {corpsHostile} »)");
+    var sainAttendu = MiseEnFormeV2.Replace(" $LOGO$", "", StringComparison.Ordinal);
+    var sain = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_HTML"), Agent, Saisie("BANC_HTML", corps: sainAttendu));
     var texteGarde = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_SIMPLE"), Agent,
         Saisie("BANC_SIMPLE", corps: "Bonjour,|<!-- garde en texte -->|  Le greffe  "));
-    Exiger(sain.Code == 200
-           && (await Scalaire(v3a.Connexion, "SELECT Corps FROM soc.ModeleMessage WHERE Type = 'BANC_HTML'"))?.ToString()
-              == MiseEnFormeSaine.Replace(" $LOGO$", "", StringComparison.Ordinal)
+    // Lus et compares ici, pas par « Corps = '…' » : SQL Server ignore les blancs de fin dans une egalite de varchar.
+    var corpsSain = (await Scalaire(v3a.Connexion, "SELECT Corps FROM soc.ModeleMessage WHERE Type = 'BANC_HTML'"))?.ToString();
+    Exiger(sain.Code == 200 && corpsSain == sainAttendu
            && texteGarde.Code == 200
-           // Lu et compare ici, pas par « Corps = '…' » : SQL Server ignore les blancs de fin dans une egalite de varchar.
            && (await Scalaire(v3a.Connexion, "SELECT CONCAT(CAST(CorpsHtml AS char(1)), '#', Corps) FROM soc.ModeleMessage WHERE Type = 'BANC_SIMPLE'"))?.ToString()
               == "0#Bonjour,|<!-- garde en texte -->|  Le greffe  ",
-        $"SOC-006 T04 (jumeaux) : la mise en forme de l'editeur s'enregistre telle quelle ({sain.Code}) ; un modele TEXTE garde son texte tel que " +
-        $"saisi, blancs compris, comme la V2 (qui n'assainit que l'editeur HTML) ({texteGarde.Code})");
+        "SOC-006 T04 (jumeaux) : un texte HTML sans contenu actif s'enregistre tel quel, <style>, <font>, commentaire, &nbsp; et blancs " +
+        $"compris ({sain.Code}{(sain.Code == 200 && corpsSain != sainAttendu ? ", change : « " + corpsSain + " »" : "")}) ; " +
+        $"un modele TEXTE garde son texte tel que saisi ({texteGarde.Code})");
 
-    // Sur les modeles de RIG_DEV : l'assainissement de leur prochain enregistrement ne leur retire aucun jeton ($PieceJointe$, $LOGO$, $$…).
-    var assainisV2 = new List<string>();
-    var jetonsPerdus = new List<string>();
-    var htmlV2 = 0;
-    await using (var cn = await OuvrirV3A())
-    await using (var cmd = new SqlCommand("SELECT Type, Corps FROM soc.ModeleMessage WHERE CorpsHtml = 1 AND Type NOT LIKE 'BANC[_]%' ORDER BY Type;", cn))
-    await using (var r = await cmd.ExecuteReaderAsync())
+    // La taille se juge sur la SAISIE, avant le nettoyage (la V2 ecrivait le texte brut dans EMAILMOD_CORPS, 4000) : le nettoyage
+    // ne lit jamais plus de 4000 caracteres. ENTREE QUI LE FAIT TOMBER : une taille jugee apres le nettoyage -- 4001 caracteres dont
+    // un <script> passeraient, et 1 Mo de « <a » occuperait le serveur (mesure avant la borne : plus de 5 minutes).
+    var pile4000 = "$PieceJointe$" + new string('x', 4000 - "$PieceJointe$".Length);
+    var unDeTrop = "<script>x</script>" + pile4000[..(4001 - "<script>x</script>".Length)];
+    var trop = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_HTML"), Agent, Saisie("BANC_HTML", corps: unDeTrop));
+    var chrono = System.Diagnostics.Stopwatch.StartNew();
+    var unMo = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_HTML"), Agent,
+        Saisie("BANC_HTML", corps: "$PieceJointe$" + string.Concat(Enumerable.Repeat("<a ", 350_000))));
+    chrono.Stop();
+    var pile = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_HTML"), Agent, Saisie("BANC_HTML", corps: pile4000));
+    var corpsPile = (await Scalaire(v3a.Connexion, "SELECT Corps FROM soc.ModeleMessage WHERE Type = 'BANC_HTML'"))?.ToString();
+    Exiger(trop.Code == 400 && trop.Corps.Contains("Le texte du modèle tient en 4000 caractères (4001 saisis)")
+           && unMo.Code == 400 && chrono.ElapsedMilliseconds < 5000 && pile.Code == 200 && corpsPile == pile4000,
+        $"SOC-006 T04 : la taille du texte se juge sur la saisie -- 4001 caracteres dont un <script> refuses ({trop.Code}), 1 Mo de « <a » " +
+        $"refuse en {chrono.ElapsedMilliseconds} ms ({unMo.Code}) ; jumeau : 4000 caracteres pile enregistres ({pile.Code}, " +
+        $"{(corpsPile == pile4000 ? "identiques" : "differents")})");
+
+    // Les modeles HTML de RIG_DEV, LUS DANS LA V2 (pas dans la copie V3, que des gestes du banc ont pu toucher) : l'assainissement de
+    // leur prochain enregistrement ne change AUCUN octet (la V2 les enregistrait tels quels). CREJET, INPI_DCA_RECLA et
+    // MPCS_INFO_OUV_JUGE portent des <font>, douze autres des blancs de bord : ce sont eux que l'essai refuse changeait.
+    var changesV2 = new List<string>();
+    var corpsV2 = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    await using (var cnV2 = new SqlConnection(sourceV2.ConnectionString))
+    {
+        await cnV2.OpenAsync();
+        await using var r = await LectureV2.LireAsync(cnV2,
+            "SELECT EMAILMOD_TYPE, EMAILMOD_CORPS FROM dbo.EMAIL_MODEL WHERE EMAILMOD_CORPS_HTML = 1 ORDER BY EMAILMOD_TYPE", default);
         while (await r.ReadAsync())
         {
-            htmlV2++;
             var avant = r.GetString(1);
-            var apres = ReglesCourriels.Assainir(avant);
-            if (apres != avant.Trim()) assainisV2.Add(r.GetString(0));
-            static string Jetons(string t) => string.Join(",", System.Text.RegularExpressions.Regex.Matches(t, @"\$\$\w+|\$\w+\$").Select(m => m.Value));
-            if (Jetons(avant) != Jetons(apres)) jetonsPerdus.Add(r.GetString(0));
+            corpsV2[r.GetString(0)] = avant;
+            if (ReglesCourriels.Assainir(avant) != avant) changesV2.Add(r.GetString(0));
         }
-    Exiger(htmlV2 > 0 && jetonsPerdus.Count == 0,
-        $"SOC-006 T04 : sur les {htmlV2} modeles HTML repris de {sourceV2.InitialCatalog}, l'assainissement ne retire aucun jeton ($PieceJointe$, $LOGO$, " +
-        $"$$…) ; il change le texte de {assainisV2.Count} ({(assainisV2.Count == 0 ? "aucun" : string.Join(", ", assainisV2))}) a leur prochain " +
-        $"enregistrement ({jetonsPerdus.Count} avec un jeton perdu)");
+    }
+    Exiger(corpsV2.Count > 0 && changesV2.Count == 0,
+        $"SOC-006 T04 : sur les {corpsV2.Count} modeles HTML de {sourceV2.InitialCatalog}, l'assainissement a l'enregistrement change " +
+        $"{changesV2.Count} texte(s) ({(changesV2.Count == 0 ? "aucun" : string.Join(", ", changesV2))})");
+
+    // Le geste de l'agent : il re-enregistre un modele V2 a <font> sans toucher son texte (pour cocher une case, par exemple), par
+    // la route comme l'ecran. Le texte en base reste celui de la V2, octet pour octet.
+    var reenregistres = new List<string>();
+    foreach (var type in new[] { "CREJET", "MPCS_INFO_OUV_JUGE" }.Where(corpsV2.ContainsKey))
+    {
+        SaisieModele? telQuel = null;
+        await using (var cn = await OuvrirV3A())
+        await using (var cmd = new SqlCommand("""
+            SELECT Type, LibelleEcran, Sujet, Expediteur, Reponse, Copie, DestinataireDefaut, Lot1, Lot2, Inscription, Comptabilite,
+                   EnvoiAutomatique, ReserveAmitel, SignatureActive, Signature
+            FROM soc.ModeleMessage WHERE Type = @t;
+            """, cn))
+        {
+            cmd.Parameters.Add(new SqlParameter("@t", System.Data.SqlDbType.VarChar, 40) { Value = type });
+            await using var r = await cmd.ExecuteReaderAsync();
+            if (await r.ReadAsync())
+            {
+                string? T(int i) => r.IsDBNull(i) ? null : r.GetString(i);
+                bool B(int i) => !r.IsDBNull(i) && r.GetBoolean(i);
+                telQuel = new SaisieModele(r.GetString(0), T(1), r.GetString(2), corpsV2[type], T(3), T(4), T(5), T(6), B(7), B(8), B(9),
+                    B(10), B(11), B(12), B(13), T(14));
+            }
+        }
+        var g = telQuel is null
+            ? (Code: 0, Corps: "absent de la copie V3")
+            : await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, type), Agent, telQuel);
+        var enBase = (await Scalaire(v3a.Connexion, "SELECT Corps FROM soc.ModeleMessage WHERE Type = @t", ("@t", type)))?.ToString();
+        reenregistres.Add($"{type} : {g.Code}{(g.Code == 200 ? "" : " " + g.Corps)}, {(enBase == corpsV2[type] ? "texte identique" : "TEXTE CHANGE")}");
+    }
+    Exiger(reenregistres.Count == 2 && reenregistres.All(x => x.EndsWith(": 200, texte identique", StringComparison.Ordinal)),
+        $"SOC-006 T04 : un modele V2 a <font> re-enregistre tel quel par l'agent garde son texte de {sourceV2.InitialCatalog} octet pour " +
+        $"octet ({string.Join(" ; ", reenregistres)})");
 
     // Les boites du greffe par leur ADRESSE (INFO_GREFFE de sa base V2, lue comme l'envoi), pour le formulaire d'un modele.
     var routeBoites = RoutesCourriels.Pour(RoutesCourriels.Boites, GreffeA);
