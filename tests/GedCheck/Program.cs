@@ -239,8 +239,12 @@ Exiger(Regex.IsMatch(partage, @"Dictionary<int, DocumentDetache> _emplacements")
 Exiger(Regex.IsMatch(vue, @"List<FenetreDocument> FenetresDetachees")
        && !Regex.IsMatch(vue, @"private bool DocumentDetache;"),
     "VDossier garde une LISTE de fenetres detachees (plusieurs documents a la fois)");
-Exiger(Regex.IsMatch(vue, @"RangLibre\(FenetresDetachees"),
-    "chaque detachement prend le plus petit rang libre");
+// Le rang libre se prend sur TOUTES les fenetres de document ouvertes (lot 4 du plan « Reconstruction de
+// RIG -- phase 2 », 21/11/2026) : un autre onglet sorti ou un document recu du serveur (SOC-013) en tient
+// aussi ; sur les seules siennes, deux fenetres liraient le meme emplacement.
+Exiger(Regex.IsMatch(vue, @"RangLibre\(FenetreDocument\.RangsOuverts\(\)\)")
+       && Regex.IsMatch(fenDoc, @"RangsOuverts\(\)\s*=>\s*Application\.Current\?\.Windows\.OfType<FenetreDocument>\(\)"),
+    "chaque detachement prend le plus petit rang libre, sur toutes les fenetres de document ouvertes");
 
 Exiger(!Regex.IsMatch(fenDoc, @"Application\.Current\.MainWindow\s*\.\s*(Width|Height|Left|Top)"),
     "la fenetre detachee ne redimensionne pas la fenetre principale");

@@ -75,12 +75,18 @@ var ecransTsx = Directory.Exists(racineWeb)
 var recherchesTsx = ecransTsx
     .Where(f => Regex.IsMatch(File.ReadAllText(f), @"onClick=\{\s*(?:\(\)\s*=>\s*)?rechercher(?:\(\))?\s*\}"))
     .ToList();
+// Depuis le lot 4 du plan « Reconstruction de RIG -- phase 2 » (21/11/2026), un ecran passe par
+// toucheDeRecherche (web/src/plan/clavier.ts) : Entree, et F5 et F7 de l'ancien RIG. Elle compte
+// ici si elle prend bien Entree.
+var clavierTs = File.ReadAllText(Path.Combine(racine, "web", "src", "plan", "clavier.ts"));
+var entreeParLaFonction = Regex.IsMatch(clavierTs, @"TOUCHES_RECHERCHE: readonly string\[\] = \[[^\]]*'Enter'");
 foreach (var f in recherchesTsx)
 {
     var t = File.ReadAllText(f);
     var nom = Path.GetFileName(f);
     Exiger(t.Contains("onKeyDown"), $"{nom} ecoute le clavier");
-    Exiger(Regex.IsMatch(t, @"\.key\s*===?\s*['""]Enter['""][\s\S]{0,80}?rechercher\(\)"),
+    Exiger(Regex.IsMatch(t, @"\.key\s*===?\s*['""]Enter['""][\s\S]{0,80}?rechercher\(\)")
+           || (entreeParLaFonction && Regex.IsMatch(t, @"toucheDeRecherche\(e\)\)\s*rechercher\(\)")),
         $"{nom} lance la recherche sur Entree");
 }
 Exiger(recherchesTsx.Count >= 2,
