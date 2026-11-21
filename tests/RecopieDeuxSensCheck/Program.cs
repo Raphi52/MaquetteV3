@@ -104,10 +104,17 @@ catch (SqlException e)
 }
 
 // Les regles du transfert prises explicitement (celles de REC-001 et les reprises de la phase 1) : le banc ne depend pas
-// des regles que d'autres lots ajoutent pour d'autres tables.
+// des regles que d'autres lots ajoutent pour d'autres tables. Et sous leur forme TELLE QUELLE (v2.X) : ce banc eprouve le
+// moteur de la recopie sur les copies telles quelles, forme toujours valide (ARRIVEE, et toute fiche avant sa story) ; depuis
+// le lot 10, les fiches qui ont leur table dans la V3 (rec.Client, soc.Compte...) ont leur banc, RecopieFichesCheck.
 var reglesServeur = ReglesTransfert.Decouvrir();
 var tablesRec001 = new[] { "AFFAIRE", "DEMANDE", "ACTION_RCS", "ADRESSE_BASE", "ARRIVEE", "CATEGORIE", "CLIENT", "DOSSIER_RCS", "INSCRIPTION" };
-var reglesTransfert = reglesServeur.Regles.Where(r => r.Sorte == SorteRegle.Reprise || tablesRec001.Contains(r.Table, StringComparer.OrdinalIgnoreCase)).ToList();
+var reprisesPhase1 = reglesServeur.Reprises.Where(r => r.Story is not ("REC-016" or "REC-019")).ToList();
+var reglesTransfert = reglesServeur.Regles
+    .Where(r => r.Sorte == SorteRegle.Reprise && reprisesPhase1.Any(p => p.Nom == r.Reprise) || tablesRec001.Contains(r.Table, StringComparer.OrdinalIgnoreCase))
+    .Select(r => r.Cible is not null ? r with { Cible = null }
+                 : r.Sorte == SorteRegle.Reprise && !reprisesPhase1.Any(p => p.Nom == r.Reprise) ? RegleTable.TelleQuelle(r.Table, "REC-001", [.. r.Colonnes]) : r)
+    .ToList();
 var entieres = reglesTransfert.Where(r => r.Sorte == SorteRegle.Reprise).Select(r => r.Table).Append("CATEGORIE").Distinct().ToList();
 var extraits = new Dictionary<string, string>
 {
@@ -120,7 +127,8 @@ var extraits = new Dictionary<string, string>
     ["DOSSIER_RCS"] = "SELECT TOP (1000) * FROM dbo.DOSSIER_RCS ORDER BY DSSRC_ID_DSRCS DESC",
     ["INSCRIPTION"] = "SELECT TOP (1000) * FROM dbo.INSCRIPTION ORDER BY INEDT_ID_INSCR DESC",
 };
-var reglesRecopie = ReglesRecopie.Decouvrir();
+var reglesRecopie = ReglesRecopie.Decouvrir().Where(r => tablesRec001.Contains(r.TableV2, StringComparer.OrdinalIgnoreCase))
+    .Select(r => r.ColonneParColonne ? r.EnTelleQuelle() : r).ToList();
 var partagees = reglesRecopie.Select(r => r.TableV2).ToList();
 Exiger(partagees.Count == 7 && partagees.All(t => tablesRec001.Contains(t)),
     $"REC-002 T03 : une regle de recopie par fiche partagee qui a sa table dans la V3 ({string.Join(", ", partagees)}) ; les autres tables_v2 de REC-002 n'ont pas encore de regle de transfert");
@@ -167,12 +175,14 @@ Exiger(partagees.All(suivies.Contains) && suivies.Count == partagees.Count && re
 await using var v3 = await BaseJetable.CreerAsync("RecopieDeuxSensV3");
 await Migrateur.AppliquerAsync(v3.Connexion, migrations);
 var transfert = await MoteurTransfert.TransfererAsync(new OptionsTransfert(v2.Connexion, v3.Connexion)
-    { Regles = reglesTransfert, Reprises = reglesServeur.Reprises, TailleLot = 5000 });
+    { Regles = reglesTransfert, Reprises = reprisesPhase1, TailleLot = 5000 });
 Exiger(transfert.Etat == "fini" && transfert.VersionSuivi is not null,
     $"REC-001 prealable : la base V2 transferee dans la V3 (transfert {transfert.IdTransfert} « {transfert.Etat} », version de suivi {transfert.VersionSuivi}) {transfert.Motif}");
 if (transfert.Etat != "fini") return Bilan();
 
-var fiches = await FichesRecopiees.ChargerAsync(v3.Connexion, v2.Nom, null, default);
+// La premiere mise en service avec ces regles telles quelles ; le serveur (parties B et C) recopie ensuite la base avec les
+// regles de sa mise en service (rec.FicheEnService).
+var fiches = await FichesRecopiees.ChargerAsync(v3.Connexion, v2.Nom, reglesRecopie, default);
 var mes = await PontRecopie.MettreEnServiceAsync(v3.Connexion, v2.Nom, fiches);
 Exiger(fiches.Problemes.Count == 0 && mes.Faite && mes.Declencheurs.Count == partagees.Count && mes.Version == transfert.VersionSuivi
        && fiches.ParTableV2["ACTION_RCS"].Liens.ContainsKey("ACTRC_ID_DSRCS") && fiches.ParTableV2["INSCRIPTION"].Liens.ContainsKey("INEDT_ID_ADRBS"),

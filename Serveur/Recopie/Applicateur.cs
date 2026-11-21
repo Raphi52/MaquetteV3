@@ -80,11 +80,25 @@ internal static class Applicateur
             }
             // Une annulation (arret du service) n'est ni un refus ni une panne : elle remonte, la transaction de la fiche est
             // annulee et tout repart du dernier changement applique au demarrage suivant (REC-005 CA01).
-            catch (Exception e) when (!ct.IsCancellationRequested && e is SqlException or RecopieEnAttente or RecopieBloquee or EchecFiche)
+            catch (Exception e) when (!ct.IsCancellationRequested && e is SqlException or RecopieEnAttente or RecopieBloquee or RecopieRefusee or RecopieImpossible or EchecFiche)
             {
                 await RetirerMarqueAsync(cn);
                 var (tableEnCause, idEnCause, cause) = e is EchecFiche f ? (f.Table, f.Id, f.InnerException!) : (tableV3, idV3, e);
                 var nomV2 = fiches.ParTableV3.TryGetValue(tableEnCause, out var tc) ? tc.NomV2 : tableEnCause;
+                if (cause is RecopieImpossible impossible && tc is not null)
+                {
+                    // Aucun essai ne la fera passer : mise de cote d'emblee, et l'ecart pour l'agent designe (REC-017 CA04).
+                    arretees.Add((tableEnCause, idEnCause));
+                    arretees.Add((tableV3, idV3));
+                    bilan.Refusees++;
+                    if (await MisesDeCote.RefuserV3Async(cn, tableEnCause, idEnCause, cause.Message, ct, seuil: 1))
+                    {
+                        bilan.MisesDeCote++;
+                        await EcrireEcartImpossibleAsync(cn, tc, impossible, ct);
+                        bilan.Ecarts++;
+                    }
+                    continue;
+                }
                 if (cause is RecopieBloquee)
                 {
                     arretees.Add((tableV3, idV3));
@@ -122,7 +136,7 @@ internal static class Applicateur
             await FicheSansNomAsync(cn, fiches, t, idV3, idTransfert, pile, faites, arretees, bilan, ct);
         }
         // L'echec porte le nom de SA fiche : une fiche visee refusee compte son essai, pas celle qui la vise.
-        catch (Exception e) when (!ct.IsCancellationRequested && e is SqlException or RecopieEnAttente)
+        catch (Exception e) when (!ct.IsCancellationRequested && e is SqlException or RecopieEnAttente or RecopieRefusee or RecopieImpossible)
         {
             throw new EchecFiche(t.NomV3, idV3, e);
         }
@@ -195,10 +209,26 @@ internal static class Applicateur
                     await OublierAsync(cn, tx, t, idV2, ct);
                     idV2 = null;
                 }
-                if (idV2 is null)
+                if (idV2 is null && t.Regle.SansCreationV2)
+                {
+                    // REC-019 CA03 : une fiche creee dans la V3 seule n'a pas d'equivalent dans la V2 ; elle n'y est pas creee, et
+                    // la V3 le sait (sans correspondance). Ses lignes de file sont appliquees : il n'y a rien a ecrire en face.
+                    await ExecuterAsync(cn, tx, $"UPDATE rec.FileRecopie SET Erreur = N'sans equivalent dans la V2 (cree dans la V3 seulement)' " +
+                                                $"WHERE Id IN ({string.Join(", ", lignes.Select(l => l.Id))});", ct);
+                }
+                else if (idV2 is null)
                 {
                     // CA02 : creee dans la V3 -> la V2 lui donne son identifiant, la correspondance le garde.
                     var avecPropres = await TraduireAsync(cn, tx, t, (await LireV3Async(cn, tx, t, idV3, false, ct, avecPropres: true))!, versV2: true, ct);
+                    // Une valeur que la V2 tient unique et qu'une AUTRE fiche de la V2 porte deja : la fiche ne passe pas
+                    // (REC-017 CA04 : le nom de session).
+                    if (t.Regle.Unique is { UniqueDansV2: true } u && avecPropres.TryGetValue(u.ColonneV2, out var brutUnique)
+                        && TableRecopiee.TexteDe(brutUnique) is { } valeurUnique
+                        && await ScalaireAsync(cn, tx, $"SELECT TOP (1) {Sql.EnTexte("x", t.Cle)} FROM {t.NomV2Sql} AS x WHERE x.{Sql.Q(u.ColonneV2)} = @u;",
+                                               ct, ("@u", valeurUnique)) is { } autreV2)
+                        throw new RecopieImpossible($"{u.Libelle} deja pris dans la V2 : « {valeurUnique} » est celui de la fiche {t.Regle.Libelle} {autreV2} " +
+                                                    $"de la V2 (il y est unique) ; la fiche {idV3} de la V3 n'y est pas creee", autreV2, idV3, u.ColonneV2,
+                                                    brutUnique, brutUnique);
                     idV2 = await CreerV2Async(cn, tx, t, idV3, avecPropres, ct);
                     await CorrespondreAsync(cn, tx, t, idV2, idV3, idTransfert, "recopie", ct);
                 }
@@ -214,11 +244,14 @@ internal static class Applicateur
                 }
 
                 // 3. L'etat commun : la fiche V2 relue (ce que ses declencheurs ont ecrit compris) ; la V3 le recoit.
-                var apres = (await LireV2Async(cn, tx, t, idV2, false, ct))!;
-                var apresEnV3 = await TraduireAsync(cn, tx, t, apres, versV2: false, ct);
-                var ecritsParLaV2 = LigneJson.Differences(apresEnV3, v3, t.Colonnes.Select(c => c.Nom));
-                if (ecritsParLaV2.Count > 0) await ModifierV3Async(cn, tx, t, idV3, apresEnV3, ecritsParLaV2, ct);
-                await NoterEtatAsync(cn, tx, t, idV2, apres, "V3 vers V2", ct);
+                if (idV2 is not null)
+                {
+                    var apres = (await LireV2Async(cn, tx, t, idV2, false, ct))!;
+                    var apresEnV3 = await TraduireAsync(cn, tx, t, apres, versV2: false, ct);
+                    var ecritsParLaV2 = LigneJson.Differences(apresEnV3, v3, t.Colonnes.Select(c => c.Nom));
+                    if (ecritsParLaV2.Count > 0) await ModifierV3Async(cn, tx, t, idV3, apresEnV3, ecritsParLaV2, ct);
+                    await NoterEtatAsync(cn, tx, t, idV2, apres, "V3 vers V2", ct);
+                }
             }
 
             await using (var cmd = new SqlCommand(
@@ -252,6 +285,24 @@ internal static class Applicateur
         if (await EtatAsync(cn, tx, t, idV2, ct) is { } etat) return etat;
         return lignes.FirstOrDefault(l => l.Avant is not null) is { Avant: { } avant } && LigneJson.Lire(avant) is { } ligne
             ? await TraduireAsync(cn, tx, t, ligne, versV2: true, ct) : null;
+    }
+
+    /// <summary>L'ecart d'une fiche qui ne peut pas passer (<see cref="RecopieImpossible"/>) : la fiche V3 et la fiche V2 en
+    /// cause, le champ et ses deux valeurs ; l'agent designe le voit dans « Fiches en conflit » et dit qui garde la valeur.</summary>
+    internal static async Task EcrireEcartImpossibleAsync(SqlConnection cn, TableRecopiee t, RecopieImpossible e, CancellationToken ct, string sens = "V3 vers V2")
+    {
+        var v3 = await LireV3Async(cn, null, t, e.IdV3, false, ct);
+        var nom = t.Regle.ColonneNom is { } cn3 && v3 is not null && v3.TryGetValue(cn3, out var b) ? LigneJson.Lisible(b)?.Trim() : null;
+        var auteurV3 = await ScalaireAsync(cn, null, "SELECT TOP (1) Auteur FROM rec.FileRecopie WHERE TableV3 = @t AND IdV3 = @id ORDER BY Id DESC;", ct,
+                                           ("@t", t.NomV3), ("@id", e.IdV3)) ?? "recopie V2-V3";
+        var id = await ScalaireAsync(cn, null, """
+            INSERT INTO rec.Ecart (BaseV2, TableV2, IdV2, TableV3, IdV3, Fiche, Cible, DateV2, AuteurV2, DateV3, AuteurV3)
+            OUTPUT CONVERT(nvarchar(20), inserted.Id) VALUES (@b, @t2, @id2, @t3, @id3, LEFT(@f, 300), NULL, SYSDATETIME(), NULL, SYSDATETIME(), LEFT(@a3, 128));
+            """, ct, ("@b", t.BaseV2), ("@t2", t.NomV2), ("@id2", e.IdV2), ("@t3", t.NomV3), ("@id3", e.IdV3),
+            ("@f", $"{t.Regle.Libelle} {e.IdV3}" + (string.IsNullOrEmpty(nom) ? "" : $" — {nom}") + $" ({sens} impossible : {e.Message})"), ("@a3", auteurV3));
+        await ExecuterAsync(cn, null, "INSERT INTO rec.EcartChamp (IdEcart, Champ, ValeurV2, ValeurV3) VALUES (@id, @c, @v2, @v3);", ct,
+                            ("@id", long.Parse(id!, CultureInfo.InvariantCulture)), ("@c", e.Champ),
+                            ("@v2", (object?)e.ValeurV2 ?? DBNull.Value), ("@v3", (object?)e.ValeurV3 ?? DBNull.Value));
     }
 
     /// <summary>L'ecart d'une fiche modifiee des deux cotes (REC-004 CA01) : un champ par valeur que la V2 avait changee.</summary>

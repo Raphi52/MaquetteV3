@@ -129,7 +129,22 @@ public static class ComparaisonBases
             var catV3 = await CatalogueV2.LireAsync(lv3, ct);
             // Les fiches recopiees telles que la recopie les voit (memes regles, memes catalogues) : ce qu'elle garde egal
             // dans les deux bases, et seulement cela, est compare.
-            var recopiees = FichesRecopiees.Construire(baseV2, catV2, catV3, ReglesRecopie.Decouvrir());
+            // fix-ok: comparaison faite avec toutes les regles du serveur au lieu de celles de la mise en service (512 faux ecarts CLIEN_ID_UTLST mesures).
+            // Les regles sont celles de la MISE EN SERVICE de la base (rec.FicheEnService), comme pour la recopie : comparer
+            // avec toutes les regles du serveur traduisait des liens que cette base ne recopie pas (512 faux ecarts
+            // CLIENT [CLIEN_ID_UTLST] mesures par RecopieDeuxSensCheck, ou UTILISATEUR n'est pas mise en service).
+            // Avant toute mise en service, une fiche transferee dans sa copie v2.X (REC-012 a REC-019) est comparee par la
+            // forme telle quelle de sa regle : la table V3 qui compte est celle de ses correspondances.
+            var (regles, _, misEnService) = await FichesRecopiees.ReglesEnServiceAsync(lv3, baseV2, ct);
+            if (!misEnService)
+            {
+                var tablesV3 = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                await using (var l = await LireAsync(lv3, "SELECT TableV2, MAX(TableV3) FROM rec.Correspondance WHERE BaseV2 = @b GROUP BY TableV2", ct, P("@b", baseV2)))
+                    while (await l.ReadAsync(ct)) tablesV3[l.GetString(0)] = l.GetString(1);
+                regles = [.. regles.Select(r => tablesV3.TryGetValue(r.TableV2, out var ecrite)
+                                                && string.Equals(ecrite, "v2." + r.TableV2, StringComparison.OrdinalIgnoreCase) ? r.EnTelleQuelle() : r)];
+            }
+            var recopiees = FichesRecopiees.Construire(baseV2, catV2, catV3, regles);
 
             // 3, 4. Table par table.
             foreach (var nom in demandees)
@@ -206,19 +221,24 @@ public static class ComparaisonBases
         // propres a chaque logiciel ne sont jamais recopiees (l'etat de transmission, REC-002 CA04) ; un lien vers une fiche
         // recopiee est compare en identifiant V2, la valeur de la V3 lue par la correspondance (Texte). Sinon : les
         // correspondances seulement.
+        // Une fiche qui a sa table dans la V3 (REC-012 a REC-019) est comparee de la meme facon, chaque colonne V2 avec sa
+        // colonne V3 (sa correspondance) ; une colonne traduite (un agent par son compte de session) ne l'est pas.
         var telleQuelle = string.Equals(nomV3, "v2." + t2.Nom, StringComparison.OrdinalIgnoreCase);
-        var recopiee = telleQuelle && fiche is not null && string.Equals(fiche.NomV3, nomV3, StringComparison.OrdinalIgnoreCase) ? fiche : null;
-        var memes = !telleQuelle ? []
-            : recopiee is not null ? recopiee.Colonnes.ToList()
+        var recopiee = fiche is not null && string.Equals(fiche.NomV3, nomV3, StringComparison.OrdinalIgnoreCase) ? fiche : null;
+        var memes = recopiee is not null ? recopiee.Colonnes.Where(c => recopiee.TraductionDe(c.Nom) is null).ToList()
+            : !telleQuelle ? []
             : t2.Colonnes.Where(c => t3.Colonnes.Any(x => string.Equals(x.Nom, c.Nom, StringComparison.OrdinalIgnoreCase))).ToList();
         var nonComparees = recopiee is null ? []
             : t2.Colonnes.Where(c => !memes.Any(m => string.Equals(m.Nom, c.Nom, StringComparison.OrdinalIgnoreCase)))
                          .Select(c => $"{c.Nom} ({(string.Equals(c.Nom, recopiee.Cle.Nom, StringComparison.OrdinalIgnoreCase) ? "identifiant propre a chaque base, apparie par rec.Correspondance"
                                                    : recopiee.Regle.ColonnesPropres.Contains(c.Nom, StringComparer.OrdinalIgnoreCase) ? "propre a chaque logiciel, jamais recopiee"
+                                                   : recopiee.TraductionDe(c.Nom) is { } tr ? $"traduite par {tr.Par}"
                                                    : "hors de la recopie")})").ToList();
         var liens = memes.Where(c => recopiee is not null && recopiee.Liens.ContainsKey(c.Nom)).Select(c => $"{c.Nom} -> {recopiee!.Liens[c.Nom].NomV2}").ToList();
-        var cols3 = memes.Select(c => t3.Colonne(c.Nom)).ToList();
-        var textes3 = cols3.Select(c => Texte("t", c, recopiee is not null && recopiee.Liens.TryGetValue(c.Nom, out var visee) ? visee : null)).ToList();
+        var cols3 = memes.Select(c => recopiee is not null ? recopiee.ColonneV3(c) : t3.Colonne(c.Nom)).ToList();
+        // fix-ok: les liens d'une fiche sont ranges sous leur nom V2 ; cherches sous le nom V3 (IdFamille), ils n'etaient pas
+        // lus par la correspondance -- 873 faux ecarts CATEGORIE mesures par RecopieRepriseCheck (numeros V3 propres, REC-019).
+        var textes3 = memes.Select((c, i) => Texte("t", cols3[i], recopiee is not null && recopiee.Liens.TryGetValue(c.Nom, out var visee) ? visee : null)).ToList();
         var lignesV3 = Convert.ToInt64(await ValeurAsync(lv3, $"SELECT COUNT_BIG(*) FROM {t3.NomSql}", ct));
 
         // Les lignes rejetees par le transfert : sans correspondance, mais expliquees (rec.Rejet).
@@ -314,7 +334,7 @@ public static class ComparaisonBases
               + (nonComparees.Count > 0 ? $" ; non comparees, la recopie ne les recopie pas : {string.Join(", ", nonComparees)}" : "")
               + (liens.Count > 0 ? $" ; liens compares en identifiant V2 par rec.Correspondance : {string.Join(", ", liens)}" : "")
               + (ecartsAuDela > 0 ? $" ; {ecartsAuDela} ecarts au-dela des {o.DetailMax} detailles" : "")
-            : $"colonnes non comparees : {nomV3} n'est pas {t2.Nom} telle quelle ; la conversion colonne par colonne est a decrire par sa story (REC-006 T03) — correspondances controlees seulement";
+            : $"colonnes non comparees : {nomV3} n'est pas {t2.Nom} telle quelle et n'a pas de regle de recopie colonne par colonne (REC-006 T03) — correspondances controlees seulement";
         return new TableComparee(t2.Nom, nomV3, lignesV2, lignesV3, comparees, nbEcarts, sansV2, sansV3, sansLigneV2, sansLigneV3, rejetees, resorbes,
                                  memes.Count, chrono.ElapsedMilliseconds, detail);
     }
@@ -392,7 +412,8 @@ public static class ComparaisonBases
     internal static string Texte(string alias, ColonneV2 c) => Texte(alias, c, null);
 
     /// <param name="visee">La fiche recopiee que vise cette colonne d'une ligne de la V3 : sa valeur, un identifiant V3, est
-    /// lue en identifiant V2 dans rec.Correspondance (parametre @b de la requete), et telle quelle sans correspondance --
+    /// lue en identifiant V2 dans rec.Correspondance (parametre @b de la requete ; une fiche V3 qui en a plusieurs, des types
+    /// de demande fusionnes, suit celle qui n'est pas une fusion, comme EcrituresRecopie.IdV2Async), et telle quelle sans correspondance --
     /// exactement ce que la recopie ecrit dans l'autre base (EcrituresRecopie.TraduireAsync). Identifiants en texte des deux
     /// cotes par la meme conversion (Sql.EnTexte, celle du transfert).</param>
     private static string Texte(string alias, ColonneV2 c, TableRecopiee? visee)
@@ -408,7 +429,7 @@ public static class ComparaisonBases
         };
         if (visee is not null)
             conv = $"COALESCE((SELECT TOP (1) l.IdV2 FROM rec.Correspondance AS l WHERE l.TableV3 = {Sql.Texte(visee.NomV3)} AND l.IdV3 = {Sql.EnTexte(alias, c)} " +
-                   $"AND l.BaseV2 = @b AND l.TableV2 = {Sql.Texte(visee.NomV2)}), {conv})";
+                   $"AND l.BaseV2 = @b AND l.TableV2 = {Sql.Texte(visee.NomV2)} ORDER BY CASE WHEN l.Origine = 'fusion' THEN 1 ELSE 0 END, l.Le), {conv})";
         return $"CASE WHEN {x} IS NULL THEN N'~' ELSE N'=' + {conv} END";
     }
 

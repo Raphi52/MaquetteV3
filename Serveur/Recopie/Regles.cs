@@ -69,9 +69,35 @@ public sealed record RegleTable(string Table, SorteRegle Sorte, string Story, IR
     /// </summary>
     public string? RepriseDesRejets { get; init; }
 
+    /// <summary>La table V3 d'une fiche qui a la sienne (REC-012 a REC-019, FichesV3.cs) : la table V2 y est ecrite colonne
+    /// par colonne, par la meme copie par lots que la copie telle quelle (CopieTelleQuelle) -- memes valeurs, memes
+    /// identifiants, memes controles de fin --, au lieu de sa copie v2.X. Null : copie telle quelle.</summary>
+    public CibleFiche? Cible { get; init; }
+
     public string Libelle => Sorte == SorteRegle.TelleQuelle
-        ? $"{(Provisoire ? "PROVISOIRE, " : "")}telle quelle ({Story}, lien casse : {(SiLienCasse == SiLienCasse.Marquer ? "marquer" : "rejeter")})"
+        ? Cible is { } c
+            ? $"colonne par colonne vers {c.TableV3} ({Story}, lien casse : {(SiLienCasse == SiLienCasse.Marquer ? "marquer" : "rejeter")})"
+            : $"{(Provisoire ? "PROVISOIRE, " : "")}telle quelle ({Story}, lien casse : {(SiLienCasse == SiLienCasse.Marquer ? "marquer" : "rejeter")})"
         : $"reprise « {Reprise} » ({Story})";
+}
+
+/// <summary>
+/// La table V3 ou le transfert ecrit une fiche partagee qui a la sienne (REC-012 a REC-019) : la table (creee par sa
+/// migration, vide avant le transfert), sa cle, la correspondance de ses colonnes (celle de sa regle de recopie : une seule
+/// declaration, FichesV3.cs). Une colonne traduite (<see cref="ColonneFiche.Traduction"/>) recoit d'abord la valeur de la V2,
+/// puis sa traduction dans la transaction du lot ; une valeur que la traduction ne trouve pas est videe et notee dans
+/// rec.LienCasse (jamais inventee). Hors de l'empreinte de controle : elle n'a plus la valeur de la V2.
+/// </summary>
+/// <param name="TableV3">« rec.Client ».</param>
+/// <param name="CleV3">Sa cle primaire (« Id »), qui recoit l'identifiant de la V2.</param>
+public sealed record CibleFiche(string TableV3, string CleV3, IReadOnlyList<ColonneFiche> Colonnes)
+{
+    /// <summary>Les colonnes de la V3 seule calculees au transfert depuis l'instantane : une expression SQL sur la ligne V2
+    /// (alias « c »), ex. « doublon herite » du code abrege d'un client (REC-013 T01).</summary>
+    public IReadOnlyList<(string V3, string Expression)> Calculees { get; init; } = [];
+
+    /// <summary>« [rec].[Client] ».</summary>
+    public string NomSql => string.Join(".", TableV3.Split('.').Select(Sql.Q));
 }
 
 /// <summary>

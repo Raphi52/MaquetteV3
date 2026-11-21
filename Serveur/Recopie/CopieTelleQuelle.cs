@@ -108,7 +108,22 @@ public static class CopieTelleQuelle
         var cle = t.ClePrimaire.Select(t.Colonne).ToList();
         var identifiantV2 = Sql.Identifiant("c", cle);
         var rejeter = regle.SiLienCasse == SiLienCasse.Rejeter;
-        var nomRegle = regle.Provisoire ? "provisoire" : "telle quelle";
+        var nomRegle = regle.Provisoire ? "provisoire" : regle.Cible is null ? "telle quelle" : "colonne par colonne";
+
+        // La table V3 : v2.NOM, creee ici a l'image de la V2 ; ou la table de la fiche (REC-012 a REC-019), creee par sa
+        // migration, ou chaque colonne V2 est ecrite sous son nom V3 (sa cle recoit l'identifiant de la V2, comme v2.NOM).
+        var cible = regle.Cible;
+        if (cible is not null && cle.Count != 1) throw new EcartTransfert($"{t.Nom} : une fiche colonne par colonne demande une cle d'une colonne");
+        var tableV3 = cible?.NomSql ?? NomV3(t);
+        var tableV3Texte = cible?.TableV3 ?? NomV3Texte(t);
+        string NomV3De(string nomV2) => cible is null ? nomV2
+            : string.Equals(nomV2, cle[0].Nom, StringComparison.OrdinalIgnoreCase) ? cible.CleV3
+            : cible.Colonnes.First(m => string.Equals(m.V2, nomV2, StringComparison.OrdinalIgnoreCase)).V3;
+        var copiees = cible is null ? t.Colonnes
+            : [.. t.Colonnes.Where(c => cle.Contains(c) || cible.Colonnes.Any(m => string.Equals(m.V2, c.Nom, StringComparison.OrdinalIgnoreCase)))];
+        var traduites = cible?.Colonnes.Where(m => m.Traduction is not null).ToList() ?? [];
+        var cleV3 = cle.Select(c => c with { Nom = NomV3De(c.Nom) }).ToList();
+        var identifiantV3 = Sql.Identifiant("c", cleV3);
 
         // Le point de reprise de la table, verifie contre la table V3 elle-meme (REC-005 CA04).
         var point = await PointAsync(v3, idTransfert, t.Nom, ct);
@@ -116,21 +131,21 @@ public static class CopieTelleQuelle
         object[]? derniere = null;
         if (point is not null)
         {
-            if (await ScalaireAsync(v3, null, $"SELECT OBJECT_ID({Sql.Texte(NomV3(t))});", ct) is null)
-                throw new EcartTransfert($"{t.Nom} : le point de reprise dit {point.Lignes} lignes ecrites (lot {point.Lot}), mais {NomV3Texte(t)} n'existe pas");
-            var deja = Convert.ToInt64(await ScalaireAsync(v3, null, $"SELECT COUNT_BIG(*) FROM {NomV3(t)};", ct));
-            string? cleV3 = null;
-            await using (var cmd = new SqlCommand($"SELECT TOP (1) {identifiantV2}, {string.Join(", ", cle.Select(c => $"c.{Sql.Q(c.Nom)}"))} " +
-                                                  $"FROM {NomV3(t)} AS c ORDER BY {string.Join(", ", cle.Select(c => $"c.{Sql.Q(c.Nom)} DESC"))};", v3) { CommandTimeout = 0 })
+            if (await ScalaireAsync(v3, null, $"SELECT OBJECT_ID({Sql.Texte(tableV3)});", ct) is null)
+                throw new EcartTransfert($"{t.Nom} : le point de reprise dit {point.Lignes} lignes ecrites (lot {point.Lot}), mais {tableV3Texte} n'existe pas");
+            var deja = Convert.ToInt64(await ScalaireAsync(v3, null, $"SELECT COUNT_BIG(*) FROM {tableV3};", ct));
+            string? cleEcrite = null;
+            await using (var cmd = new SqlCommand($"SELECT TOP (1) {identifiantV3}, {string.Join(", ", cleV3.Select(c => $"c.{Sql.Q(c.Nom)}"))} " +
+                                                  $"FROM {tableV3} AS c ORDER BY {string.Join(", ", cleV3.Select(c => $"c.{Sql.Q(c.Nom)} DESC"))};", v3) { CommandTimeout = 0 })
             await using (var l = await cmd.ExecuteReaderAsync(ct))
                 if (await l.ReadAsync(ct))
                 {
-                    cleV3 = l.GetString(0);
+                    cleEcrite = l.GetString(0);
                     derniere = [.. Enumerable.Range(1, cle.Count).Select(l.GetValue)];
                 }
-            if (deja != point.Lignes || !string.Equals(cleV3, point.DerniereCle, StringComparison.Ordinal))
+            if (deja != point.Lignes || !string.Equals(cleEcrite, point.DerniereCle, StringComparison.Ordinal))
                 throw new EcartTransfert($"{t.Nom} : point de reprise incoherent : lot {point.Lot} enregistre avec {point.Lignes} lignes et la derniere cle " +
-                                         $"« {point.DerniereCle ?? "aucune"} », mais {NomV3Texte(t)} a {deja} lignes et sa derniere cle est « {cleV3 ?? "aucune"} »");
+                                         $"« {point.DerniereCle ?? "aucune"} », mais {tableV3Texte} a {deja} lignes et sa derniere cle est « {cleEcrite ?? "aucune"} »");
         }
 
         // 2. Les liens casses de la V2, avant d'ecrire quoi que ce soit (lecture de l'instantane).
@@ -150,7 +165,9 @@ public static class CopieTelleQuelle
 
         // 1, 3, 4. La table, puis la copie lot par lot depuis l'instantane, chaque lot avec sa correspondance (meme
         // identifiant des deux cotes) et son point de reprise, dans SA transaction.
-        var colonnes = string.Join(", ", t.Colonnes.Select(c => $"c.{Sql.Q(c.Nom)}"));
+        // Une colonne calculee de la V3 seule (doublon herite...) est lue sous un nom a elle, qu'aucune colonne V2 ne porte.
+        var calculees = cible?.Calculees.Select((k, i) => (k.V3, k.Expression, Alias: $"rigv3_calculee_{i}")).ToList() ?? [];
+        var colonnes = string.Join(", ", copiees.Select(c => $"c.{Sql.Q(c.Nom)}").Concat(calculees.Select(k => $"{k.Expression} AS {Sql.Q(k.Alias)}")));
         var ordreCle = string.Join(", ", cle.Select(c => $"c.{Sql.Q(c.Nom)}"));
         var lot = point?.Lot ?? 0;
         var ecritesLots = point?.Lignes ?? 0;
@@ -174,37 +191,67 @@ public static class CopieTelleQuelle
         {
             var chronoLot = Stopwatch.StartNew();
             await using var txLot = (SqlTransaction)await v3.BeginTransactionAsync(ct);
-            if (lot == 0) await ExecuterAsync(v3, txLot, Ddl(t), ct);
+            if (lot == 0 && cible is null) await ExecuterAsync(v3, txLot, Ddl(t), ct);
+            else if (lot == 0 && Convert.ToInt64(await ScalaireAsync(v3, txLot, $"SELECT COUNT_BIG(*) FROM {tableV3};", ct)) > 0)
+                throw new EcartTransfert($"{t.Nom} : la table {tableV3Texte} a deja des lignes avant le transfert (elle doit etre vide)");
             var depuis = derniere;
             await using (var cmd = Lecture(instantane, $"SELECT TOP ({tailleLot}) {colonnes} FROM {t.NomSql} AS c" +
                                                        (depuis is null ? filtre : " WHERE " + Condition()) + $" ORDER BY {ordreCle}"))
             {
                 if (depuis is not null) AjouterCle(cmd, depuis);
-                await using var lecteur = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct);
+                // fix-ok: « Tentative non valide de lecture du numero de colonne '0'. Avec CommandBehavior.SequentialAccess, vous ne
+                // pouvez lire qu'a partir du numero de colonne '10' » (RecopieFichesCheck, 2e essai, ADRESSE_BASE -> rec.Adresse) :
+                // SqlBulkCopy lit la source dans l'ordre des colonnes de la DESTINATION ; v2.NOM a l'ordre de la V2, rec.Adresse a sa
+                // cle en premier. Lecture sequentielle pour la copie telle quelle seulement.
+                await using var lecteur = await cmd.ExecuteReaderAsync(cible is null ? CommandBehavior.SequentialAccess : CommandBehavior.Default, ct);
                 using var copie = new SqlBulkCopy(v3, SqlBulkCopyOptions.KeepIdentity | SqlBulkCopyOptions.KeepNulls | SqlBulkCopyOptions.TableLock, txLot)
                 {
-                    DestinationTableName = NomV3(t),
+                    DestinationTableName = tableV3,
                     BatchSize = tailleLot,
                     BulkCopyTimeout = 0,
                     EnableStreaming = true,
                 };
-                foreach (var c in t.Colonnes) copie.ColumnMappings.Add(c.Nom, c.Nom);
-                foreach (var c in cle) copie.ColumnOrderHints.Add(c.Nom, SortOrder.Ascending);
+                foreach (var c in copiees) copie.ColumnMappings.Add(c.Nom, NomV3De(c.Nom));
+                foreach (var k in calculees) copie.ColumnMappings.Add(k.Alias, k.V3);
+                foreach (var c in cleV3) copie.ColumnOrderHints.Add(c.Nom, SortOrder.Ascending);
                 await copie.WriteToServerAsync(lecteur, ct);
+            }
+            var duLot = depuis is null ? "" : " WHERE " + Sql.Apres("c", cleV3, "k");
+            // Les colonnes traduites du lot (un agent par son compte de session...) : la valeur de la V2 sans traduction est
+            // notee lien casse, puis videe ; les autres recoivent leur valeur V3 (CibleFiche).
+            foreach (var m in traduites)
+            {
+                var colonne = $"c.{Sql.Q(m.V3)}";
+                var traduite = "(" + m.Traduction!.SqlVersV3(instantane.Database).Replace("@v", colonne, StringComparison.Ordinal) + ")";
+                await using (var cmd = new SqlCommand(
+                    "INSERT INTO rec.LienCasse (IdTransfert, BaseV2, TableV2, IdV2, Cle, Colonnes, Valeur, TableVisee, Cause) " +
+                    $"SELECT {idTransfert}, {Sql.Texte(baseV2)}, {Sql.Texte(t.Nom)}, {identifiantV3}, {Sql.Texte("traduction " + m.V2)}, {Sql.Texte(m.V2)}, " +
+                    $"CONVERT(nvarchar(400), {colonne}), {Sql.Texte(m.Traduction.Par)}, N'sans equivalent dans la V3' FROM {tableV3} AS c " +
+                    $"{(duLot.Length == 0 ? " WHERE " : duLot + " AND ")}{colonne} IS NOT NULL AND {traduite} IS NULL;", v3, txLot) { CommandTimeout = 0 })
+                {
+                    if (depuis is not null) AjouterCle(cmd, depuis);
+                    await cmd.ExecuteNonQueryAsync(ct);
+                }
+                await using (var cmd = new SqlCommand($"UPDATE c SET {colonne} = {traduite} FROM {tableV3} AS c{(duLot.Length == 0 ? " WHERE " : duLot + " AND ")}{colonne} IS NOT NULL;",
+                                                      v3, txLot) { CommandTimeout = 0 })
+                {
+                    if (depuis is not null) AjouterCle(cmd, depuis);
+                    await cmd.ExecuteNonQueryAsync(ct);
+                }
             }
             long n;
             await using (var cmd = new SqlCommand(
                 $"INSERT INTO rec.Correspondance (BaseV2, TableV2, IdV2, TableV3, IdV3, IdTransfert) " +
-                $"SELECT {Sql.Texte(baseV2)}, {Sql.Texte(t.Nom)}, {identifiantV2}, {Sql.Texte(NomV3Texte(t))}, {identifiantV2}, {idTransfert} " +
-                $"FROM {NomV3(t)} AS c{(depuis is null ? "" : " WHERE " + Sql.Apres("c", cle, "k"))};", v3, txLot) { CommandTimeout = 0 })
+                $"SELECT {Sql.Texte(baseV2)}, {Sql.Texte(t.Nom)}, {identifiantV3}, {Sql.Texte(tableV3Texte)}, {identifiantV3}, {idTransfert} " +
+                $"FROM {tableV3} AS c{duLot};", v3, txLot) { CommandTimeout = 0 })
             {
                 if (depuis is not null) AjouterCle(cmd, depuis);
                 n = await cmd.ExecuteNonQueryAsync(ct);
             }
             string? texteCle = null;
             if (n > 0)
-                await using (var cmd = new SqlCommand($"SELECT TOP (1) {identifiantV2}, {string.Join(", ", cle.Select(c => $"c.{Sql.Q(c.Nom)}"))} " +
-                                                      $"FROM {NomV3(t)} AS c ORDER BY {string.Join(", ", cle.Select(c => $"c.{Sql.Q(c.Nom)} DESC"))};", v3, txLot) { CommandTimeout = 0 })
+                await using (var cmd = new SqlCommand($"SELECT TOP (1) {identifiantV3}, {string.Join(", ", cleV3.Select(c => $"c.{Sql.Q(c.Nom)}"))} " +
+                                                      $"FROM {tableV3} AS c ORDER BY {string.Join(", ", cleV3.Select(c => $"c.{Sql.Q(c.Nom)} DESC"))};", v3, txLot) { CommandTimeout = 0 })
                 await using (var l = await cmd.ExecuteReaderAsync(ct))
                 {
                     await l.ReadAsync(ct);
@@ -266,48 +313,58 @@ public static class CopieTelleQuelle
         {
             var visee = catalogue.Tables[k.TableVisee];
             if (!k.ColonnesVisees.SequenceEqual(visee.ClePrimaire, StringComparer.OrdinalIgnoreCase)) continue;
+            if (!k.Colonnes.All(n => copiees.Any(c => string.Equals(c.Nom, n, StringComparison.OrdinalIgnoreCase)))) continue;
+            // Le lien lu dans la table V3, sous ses noms V3 (les memes pour v2.NOM).
+            var valeurV3 = Sql.Identifiant("c", k.Colonnes.Select(n => t.Colonne(n) with { Nom = NomV3De(n) }));
             await ExecuterAsync(v3, tx,
                 "INSERT INTO rec.LienCasse (IdTransfert, BaseV2, TableV2, IdV2, Cle, Colonnes, Valeur, TableVisee, Cause) " +
-                $"SELECT {idTransfert}, {Sql.Texte(baseV2)}, {Sql.Texte(t.Nom)}, {identifiantV2}, {Sql.Texte(k.Nom)}, " +
-                $"{Sql.Texte(string.Join(", ", k.Colonnes))}, {Valeur(t, k)}, {Sql.Texte(k.TableVisee)}, 'rejetee par le transfert' " +
-                $"FROM {NomV3(t)} AS c WHERE EXISTS (SELECT 1 FROM rec.Rejet r WHERE r.IdTransfert = {idTransfert} " +
-                $"AND r.BaseV2 = {Sql.Texte(baseV2)} AND r.TableV2 = {Sql.Texte(k.TableVisee)} AND r.IdV2 = {Valeur(t, k)});", ct);
+                $"SELECT {idTransfert}, {Sql.Texte(baseV2)}, {Sql.Texte(t.Nom)}, {identifiantV3}, {Sql.Texte(k.Nom)}, " +
+                $"{Sql.Texte(string.Join(", ", k.Colonnes))}, {valeurV3}, {Sql.Texte(k.TableVisee)}, 'rejetee par le transfert' " +
+                $"FROM {tableV3} AS c WHERE EXISTS (SELECT 1 FROM rec.Rejet r WHERE r.IdTransfert = {idTransfert} " +
+                $"AND r.BaseV2 = {Sql.Texte(baseV2)} AND r.TableV2 = {Sql.Texte(k.TableVisee)} AND r.IdV2 = {valeurV3});", ct);
         }
 
         // 6. Le controle de fin de table.
         var lues = Convert.ToInt64(await ScalaireLectureAsync(instantane, $"SELECT COUNT_BIG(*) FROM {t.NomSql} AS c", ct));
-        var ecrites = Convert.ToInt64(await ScalaireAsync(v3, tx, $"SELECT COUNT_BIG(*) FROM {NomV3(t)};", ct));
+        var ecrites = Convert.ToInt64(await ScalaireAsync(v3, tx, $"SELECT COUNT_BIG(*) FROM {tableV3};", ct));
         long rejetees = rejetes.Count;
         var correspondances = Convert.ToInt64(await ScalaireAsync(v3, tx,
             $"SELECT COUNT_BIG(*) FROM rec.Correspondance WHERE BaseV2 = {Sql.Texte(baseV2)} AND TableV2 = {Sql.Texte(t.Nom)} AND IdTransfert = {idTransfert};", ct));
         var liens = Convert.ToInt64(await ScalaireAsync(v3, tx,
             $"SELECT COUNT_BIG(*) FROM rec.LienCasse WHERE IdTransfert = {idTransfert} AND TableV2 = {Sql.Texte(t.Nom)};", ct));
+        var sansTraduction = traduites.Count == 0 ? 0 : Convert.ToInt64(await ScalaireAsync(v3, tx,
+            $"SELECT COUNT_BIG(*) FROM rec.LienCasse WHERE IdTransfert = {idTransfert} AND TableV2 = {Sql.Texte(t.Nom)} AND Cause = N'sans equivalent dans la V3';", ct));
         if (lues != ecrites + rejetees)
             throw new EcartTransfert($"{t.Nom} : {lues} lignes lues dans la V2, {ecrites} ecrites et {rejetees} rejetees (lues = ecrites + rejetees attendu)");
         if (correspondances != ecrites)
             throw new EcartTransfert($"{t.Nom} : {ecrites} lignes ecrites mais {correspondances} correspondances");
-        var empreinte = t.Colonnes.Where(c => !c.HorsEmpreinte).ToList();
+        // L'empreinte : toutes les colonnes ecrites telles quelles (une colonne traduite n'a plus la valeur de la V2), chacune
+        // sous son nom de chaque cote.
+        var empreinte = copiees.Where(c => !c.HorsEmpreinte && !traduites.Any(m => string.Equals(m.V2, c.Nom, StringComparison.OrdinalIgnoreCase))).ToList();
         if (empreinte.Count > 0)
         {
             string Liste(bool cote2) => string.Join(", ", empreinte.Select(c => c.TypeBase == "timestamp" && cote2
-                ? $"CONVERT(binary(8), c.{Sql.Q(c.Nom)})" : $"c.{Sql.Q(c.Nom)}"));
+                ? $"CONVERT(binary(8), c.{Sql.Q(c.Nom)})" : $"c.{Sql.Q(cote2 ? c.Nom : NomV3De(c.Nom))}"));
             var e2 = await ScalaireLectureAsync(instantane, $"SELECT CHECKSUM_AGG(BINARY_CHECKSUM({Liste(true)})) FROM {t.NomSql} AS c{filtre}", ct);
-            var e3 = await ScalaireAsync(v3, tx, $"SELECT CHECKSUM_AGG(BINARY_CHECKSUM({Liste(false)})) FROM {NomV3(t)} AS c;", ct);
+            var e3 = await ScalaireAsync(v3, tx, $"SELECT CHECKSUM_AGG(BINARY_CHECKSUM({Liste(false)})) FROM {tableV3} AS c;", ct);
             if (!Equals(e2, e3))
                 throw new EcartTransfert($"{t.Nom} : les valeurs ecrites ne sont pas celles de la V2 (empreinte V2 {e2 ?? "vide"}, V3 {e3 ?? "vide"})");
         }
         var octets = Convert.ToInt64(await ScalaireAsync(v3, tx,
             "SELECT ISNULL(SUM(a.total_pages), 0) * 8192 FROM sys.partitions p JOIN sys.allocation_units a ON a.container_id = p.partition_id " +
-            $"WHERE p.object_id = OBJECT_ID({Sql.Texte(NomV3(t))});", ct));
+            $"WHERE p.object_id = OBJECT_ID({Sql.Texte(tableV3)});", ct));
 
         var cassesHerites = rejeter ? 0 : casses.Count;
         var detail = $"{t.Cles.Count} cles etrangeres verifiees ({t.Cles.Count(k => k.Desactivee || k.NonVerifiee)} desactivees ou non verifiees dans la V2), " +
-                     $"{cassesHerites} liens casses herites marques, {liens - cassesHerites} liens vers une ligne rejetee, " +
+                     $"{cassesHerites} liens casses herites marques, {liens - cassesHerites - sansTraduction} liens vers une ligne rejetee, " +
                      $"{t.Declencheurs.Count} declencheurs releves (non recopies), {lots} lots de {tailleLot}" +
+                     (cible is null ? "" : $" ; {copiees.Count} colonnes ecrites sous leur nom V3 dans {cible.TableV3}, " +
+                                           $"{t.Colonnes.Count - copiees.Count} propres a la V2 non reprises" +
+                                           (traduites.Count == 0 ? "" : $", {traduites.Count} traduite(s) ({string.Join(", ", traduites.Select(m => $"{m.V2} par {m.Traduction!.Par}"))}) dont {sansTraduction} valeur(s) sans equivalent")) +
                      (point is null ? "" : $" (repris apres le lot {point.Lot} : ses {point.Lignes} lignes, deja ecrites, ne sont pas reecrites)") +
                      (regle.Provisoire ? " ; REGLE PROVISOIRE (REC-008) : la story du domaine doit declarer la sienne" : "");
         // Duree de la table : ses lots, tous passages confondus, et cette transaction de fin.
-        var ligne = new LigneRapport(t.Nom, ordre, nomRegle, regle.Story, NomV3Texte(t), lues, ecrites, rejetees, liens,
+        var ligne = new LigneRapport(t.Nom, ordre, nomRegle, regle.Story, tableV3Texte, lues, ecrites, rejetees, liens,
                                      correspondances, octets, dureeLots + chronoFin.ElapsedMilliseconds, detail);
         await JournalTransfert.InsererTableAsync(v3, tx, idTransfert, ligne, debut, ct);
         await tx.CommitAsync(ct);
@@ -369,14 +426,15 @@ public static class CopieTelleQuelle
     /// lots. C'est l'ARRET PROPRE d'un ecart (REC-001) : un ecart ne se reprend pas, la table ne garde rien de ses lots
     /// deja ecrits. Un incident technique, lui, garde les lots : la reprise repart du dernier (REC-005).
     /// </summary>
-    public static async Task AnnulerAsync(string connexionV3, int idTransfert, TableV2 t)
+    public static async Task AnnulerAsync(string connexionV3, int idTransfert, TableV2 t, RegleTable? regle = null)
     {
         await using var v3 = new SqlConnection(connexionV3);
         await v3.OpenAsync(CancellationToken.None);
         await using var tx = (SqlTransaction)await v3.BeginTransactionAsync(CancellationToken.None);
         if (Convert.ToInt32(await ScalaireAsync(v3, tx, $"SELECT COUNT(*) FROM rec.TransfertTable WHERE IdTransfert = {idTransfert} AND TableV2 = {Sql.Texte(t.Nom)};",
                                                 CancellationToken.None)) > 0) return;
-        await ExecuterAsync(v3, tx, $"DROP TABLE IF EXISTS {NomV3(t)}; " +
+        // La table d'une fiche est celle de sa migration : elle est videe, pas supprimee.
+        await ExecuterAsync(v3, tx, (regle?.Cible is { } c ? $"DELETE FROM {c.NomSql}; " : $"DROP TABLE IF EXISTS {NomV3(t)}; ") +
             $"DELETE FROM rec.Correspondance WHERE IdTransfert = {idTransfert} AND TableV2 = {Sql.Texte(t.Nom)}; " +
             $"DELETE FROM rec.TransfertLot WHERE IdTransfert = {idTransfert} AND TableV2 = {Sql.Texte(t.Nom)};", CancellationToken.None);
         await tx.CommitAsync(CancellationToken.None);

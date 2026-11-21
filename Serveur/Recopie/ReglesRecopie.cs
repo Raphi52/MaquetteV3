@@ -14,16 +14,50 @@ namespace RigV3.Serveur.Recopie;
 // Regles.cs) : un lot ajoute sa classe IReglesRecopie, aucun fichier commun. Une table declaree deux fois arrete la
 // recopie en nommant les deux classes.
 //
-// La regle dit ce qu'il y a de PROPRE a chaque logiciel, le reste est recopie colonne a colonne : aujourd'hui la table
-// V3 d'une fiche partagee est sa copie « telle quelle » du schema v2 (REC-001), memes colonnes, meme cle. Quand la story
-// du domaine (REC-012 a REC-019, lot 10) ecrira sa table V3, elle REMPLACERA la ligne de sa table dans ReglesRec002 par
-// une regle qui nomme sa table et la correspondance de ses colonnes (une sorte nouvelle de regle, a ecrire avec elle).
-// Mode d'emploi : docs/reconstruction/recopie.md, section « La recopie continue ».
+// Deux sortes de regles :
+//   - « telle quelle » : la table V3 est la copie du schema v2 (v2.ARRIVEE), memes colonnes, meme cle ; la regle ne dit que
+//     ce qu'il y a de PROPRE a chaque logiciel, le reste est recopie colonne a colonne sous le meme nom ;
+//   - « colonne par colonne » (REC-012 a REC-019, lot 10) : la fiche a SA table dans la V3 (rec.Client, soc.Compte...), et
+//     sa regle donne la correspondance de chaque colonne (RegleRecopie.Correspondance), la cle de la V3, les traductions
+//     (un agent par son compte de session, un service) et ce qui ne passe que dans un sens (FichesV3.cs).
+// Dans les deux cas la recopie lit et compare une fiche SOUS LES NOMS DE LA V2 (LigneJson) : la table V3 est lue « AS » ses
+// noms V2 et ecrite par eux (FichesRecopiees.cs) -- applicateur, remontee, ecarts et controle de nuit n'ont qu'une ecriture.
+// Mode d'emploi : docs/reconstruction/recopie.md, sections « La recopie continue » et « Les fiches partagees ».
 // ============================================================
+
+/// <summary>Une colonne d'une fiche qui a sa table dans la V3 : son nom dans la V3, son nom dans la V2 (REC-012 a REC-019).</summary>
+public sealed record ColonneFiche(string V3, string V2)
+{
+    /// <summary>La valeur ne passe pas telle quelle : elle designe une fiche tenue des deux cotes sous des identifiants
+    /// differents, que ni la correspondance des fiches partagees ni leurs liens ne relient (un agent, un service).</summary>
+    public Traduction? Traduction { get; init; }
+}
+
+/// <summary>
+/// La traduction d'une valeur d'une base a l'autre : deux expressions SQL scalaires jouees sur la base V3, ou « @v » est la
+/// valeur a traduire et « {V2} » la base V2 du greffe sur la meme instance (Q4). Exemple : l'agent de rattachement d'un
+/// client, retrouve par son COMPTE DE SESSION, jamais par son identifiant numerique (REC-013 CA02). Une valeur renseignee
+/// sans traduction est un refus (la fiche attend, l'exploitation le voit) : jamais une valeur inventee ni recopiee brute.
+/// </summary>
+/// <param name="Par">Ce par quoi la valeur est retrouvee, pour le journal et les refus (« le compte de session »).</param>
+public sealed record Traduction(string Par, string VersV2, string VersV3)
+{
+    public string SqlVersV2(string baseV2) => VersV2.Replace("{V2}", Sql.Q(baseV2) + ".dbo", StringComparison.Ordinal);
+    public string SqlVersV3(string baseV2) => VersV3.Replace("{V2}", Sql.Q(baseV2) + ".dbo", StringComparison.Ordinal);
+}
+
+/// <summary>Une valeur qu'une base tient UNIQUE (le code abrege d'un client dans la V3, le nom de session d'un compte dans
+/// les deux) : une fiche recue qui la prendrait a une AUTRE fiche de cette base n'y est pas ecrite -- elle est mise de cote
+/// d'emblee, avec son motif, et l'ecart est montre a l'agent designe (REC-013 CA03, REC-017 CA04). Rejouer ne servirait a
+/// rien : seul un agent peut dire laquelle des deux garde la valeur.</summary>
+/// <param name="ColonneV2">La colonne (nom V2).</param>
+/// <param name="Libelle">Le nom pour l'agent (« nom de session »).</param>
+public sealed record CleMetier(string ColonneV2, string Libelle, bool UniqueDansV2, bool UniqueDansV3);
 
 /// <summary>La regle de recopie d'une table partagee.</summary>
 /// <param name="TableV2">La table dans la base V2 (dbo).</param>
-/// <param name="TableV3">La table dans la base V3 (« v2.CLIENT » tant que la fiche est telle quelle).</param>
+/// <param name="TableV3">La table dans la base V3 : « v2.ARRIVEE » pour une fiche telle quelle, « rec.Client », « soc.Compte »
+/// pour une fiche qui a sa table (<see cref="Correspondance"/>).</param>
 /// <param name="Story">La story qui en repond.</param>
 /// <param name="Libelle">Le nom de la fiche pour l'agent (« client », « dossier RCS ») : ecran des ecarts, journal.</param>
 public sealed record RegleRecopie(string TableV2, string TableV3, string Story, string Libelle)
@@ -53,7 +87,36 @@ public sealed record RegleRecopie(string TableV2, string TableV3, string Story, 
     /// <summary>Ou mene le clic sur un ecart : « dossier:{COLONNE} » (l'affaire), « ecran:CODE » ; null = aucun ecran.</summary>
     public string? Cible { get; init; }
 
+    /// <summary>La correspondance colonne par colonne d'une fiche qui a sa table dans la V3 ; null pour une table telle
+    /// quelle (memes noms des deux cotes). Une colonne de la V2 absente ici n'est jamais touchee par la V3 (elle est propre a
+    /// la V2 : imprimante d'un poste, deroulement d'un type) ; une colonne de la V3 absente ici n'existe que dans la V3.</summary>
+    public IReadOnlyList<ColonneFiche>? Correspondance { get; init; }
+
+    /// <summary>La cle primaire de la table V3 (« Id ») quand elle ne porte pas le nom de celle de la V2.</summary>
+    public string? CleV3 { get; init; }
+
+    /// <summary>Les liens vers une autre fiche partagee que la V2 tient sans cle etrangere (CLIAD_ID_ADRBS -> ADRESSE_BASE) :
+    /// colonne V2 -> table V2 visee. Les liens portes par une cle de la V2 sont lus dans son catalogue.</summary>
+    public IReadOnlyDictionary<string, string> LiensSansCle { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>Une fiche creee dans la V3 n'est PAS creee dans la V2 : elle n'y a pas d'equivalent, et la V3 le sait (le
+    /// type de demande cree seulement dans la V3, REC-019 CA03 : liste, jamais range sous un autre type).</summary>
+    public bool SansCreationV2 { get; init; }
+
+    /// <summary>La valeur qu'une base tient unique (<see cref="CleMetier"/>).</summary>
+    public CleMetier? Unique { get; init; }
+
+    public bool ColonneParColonne => Correspondance is not null;
+
     public static RegleRecopie TelleQuelle(string tableV2, string story, string libelle) => new(tableV2, "v2." + tableV2, story, libelle);
+
+    /// <summary>La meme fiche dans sa copie telle quelle du schema v2 : la regle d'une base transferee avant que la fiche n'ait
+    /// sa table (ses colonnes propres, sa date, son auteur et son nom sont des noms V2, gardes).</summary>
+    public RegleRecopie EnTelleQuelle() => this with
+    {
+        TableV3 = "v2." + TableV2, Correspondance = null, CleV3 = null, SansCreationV2 = false, Unique = null,
+        LiensSansCle = new Dictionary<string, string>(),
+    };
 }
 
 /// <summary>Une classe qui declare des regles de recopie (constructeur sans parametre, trouvee seule).</summary>
@@ -83,46 +146,17 @@ public static class ReglesRecopie
 }
 
 /// <summary>
-/// LES FICHES PARTAGEES DE REC-002 qui ont aujourd'hui une table dans la V3 : les 7 tables « telles quelles » de REC-001
-/// que tables_v2 de REC-002 nomme. Les autres (ENTREPRISE, BODACC, DEPOT_RCS, INSCRIPTION_RCS, INSTANCE, NON_INSCRIT,
-/// PASSAGE_CFE, BATEAU, CREANCE_END) n'ont pas encore de regle de transfert (lot 8 : regle provisoire ; lot 10 : leur
-/// story) : leur ligne s'ajoute ici avec leur table V3. UTILISATEUR est porte par la reprise des comptes (soc.Compte) :
-/// sa recopie demande la correspondance de ses colonnes, a ecrire avec la story des agents.
-/// Colonnes de transmission : DOSSIER_RCS.sql:85-103 et INSCRIPTION.sql:71-89 de la V2 (le declencheur marque « M » ;
-/// l'etat « N », reserve a la migration, le bloque). Dates de mise a jour : relevees dans RIG_DEV le 2026-11-21.
+/// LA FICHE PARTAGEE DE REC-002 QUI RESTE TELLE QUELLE : l'arrivee (ARRIVEE -> v2.ARRIVEE), dont la story (REC-018) est au
+/// lot 11. Les six autres du lot 9 (client, dossier, inscription, adresse, action du registre, categorie) ont leur table
+/// dans la V3 depuis le lot 10 : leur regle colonne par colonne est dans FichesV3.cs, avec les fiches que REC-012 a REC-019
+/// y ajoutent (entreprise, adresses et contacts d'un client, provisions reprises, creance, bateau, comptes, objets du
+/// registre et radiations).
 /// </summary>
 internal sealed class ReglesRec002 : IReglesRecopie
 {
     public IEnumerable<RegleRecopie> Regles =>
     [
-        // fix-ok: auteur V2 d'un ecart client toujours vide -- mesure 2026-11-21 par RecopieDeuxSensCheck (REC-004 CA01 rouge :
-        // CLIEN_ID_UTLST 1 -> 189 change par la V2, AuteurV2 vide) : la regle ne nommait pas la colonne d'agent de la V2.
-        // REC-013. Client.Sauve de la V2 (RigMetier\Facture\Client.cs:522-523) ecrit la date ET l'agent courant ; sa fiche
-        // client les affiche (« Derniere modification le ... par ... », PROC_FCLIENT.cs:47). Les 6 autres tables n'ont aucune
-        // colonne d'agent (RigDatabase\dbo\Tables\*.sql).
-        RegleRecopie.TelleQuelle("CLIENT", "REC-002", "client") with
-            { ColonneDateV2 = "CLIEN_DATE_DERNIERE_MODIF", ColonneAuteurV2 = "CLIEN_ID_UTLST", ColonneNom = "CLIEN_NOM", Cible = "ecran:PROC_FCLIENT" },
-        // REC-012
-        RegleRecopie.TelleQuelle("DOSSIER_RCS", "REC-002", "dossier RCS") with
-        {
-            ColonnesPropres = ["DSSRC_ETAT_TRANSMISSION", "DSSRC_DATE_MODIF_FLAG_TRANS"],
-            CreationV2 = new Dictionary<string, string> { ["DSSRC_ETAT_TRANSMISSION"] = "'N'" },
-            ColonneDateV2 = "DSSRC_DATE_MAJ", ColonneNom = "DSSRC_NUM_GESTION", Cible = "dossier:{DSSRC_NUM_GESTION}",
-        },
-        // REC-014
-        RegleRecopie.TelleQuelle("INSCRIPTION", "REC-002", "inscription") with
-        {
-            ColonnesPropres = ["INEDT_ETAT_TRANSMISSION", "INEDT_DATE_MODIF_FLAG_TRANS"],
-            CreationV2 = new Dictionary<string, string> { ["INEDT_ETAT_TRANSMISSION"] = "'N'" },
-            ColonneDateV2 = "INEDT_DATE_MAJ", ColonneNom = "INEDT_NUM_INSCRIPTION",
-        },
-        // REC-016
-        RegleRecopie.TelleQuelle("ADRESSE_BASE", "REC-002", "adresse") with { ColonneNom = "ADRBS_NOM_VOIE" },
-        // REC-015
-        RegleRecopie.TelleQuelle("ACTION_RCS", "REC-002", "action du registre") with { ColonneNom = "ACTRC_NUM_ARRIVEE" },
         // REC-018
         RegleRecopie.TelleQuelle("ARRIVEE", "REC-002", "arrivée") with { ColonneNom = "ARRV_NUM_ARRIVEE" },
-        // REC-019
-        RegleRecopie.TelleQuelle("CATEGORIE", "REC-002", "catégorie") with { ColonneNom = "CTGR_NOM" },
     ];
 }

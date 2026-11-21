@@ -60,15 +60,16 @@ internal static class MisesDeCote
         => await ScalaireAsync(cn, tx, "SELECT TOP (1) CONVERT(nvarchar(20), Id) FROM rec.FileRecopie WHERE TableV3 = @t AND IdV3 = @id AND Etat = 'mise de cote';",
                                ct, ("@t", tableV3), ("@id", idV3)) is not null;
 
-    /// <summary>Le refus du changement en tete de la fiche : un essai de plus ; au seuil, mis de cote. Vrai s'il l'est.</summary>
-    public static async Task<bool> RefuserV3Async(SqlConnection cn, string tableV3, string idV3, string erreur, CancellationToken ct)
+    /// <summary>Le refus du changement en tete de la fiche : un essai de plus ; au seuil, mis de cote. Vrai s'il l'est.
+    /// <paramref name="seuil"/> 1 : un refus qu'aucun essai ne levera (RecopieImpossible), mis de cote d'emblee.</summary>
+    public static async Task<bool> RefuserV3Async(SqlConnection cn, string tableV3, string idV3, string erreur, CancellationToken ct, int seuil = Seuil)
         => await ScalaireAsync(cn, null, """
             DECLARE @tete bigint = (SELECT MIN(Id) FROM rec.FileRecopie WHERE TableV3 = @t AND IdV3 = @id AND Etat = 'en attente');
             UPDATE rec.FileRecopie SET Essais = Essais + 1, Erreur = LEFT(@e, 2000),
                    Etat = CASE WHEN Essais + 1 >= @seuil THEN 'mise de cote' ELSE Etat END,
                    MiseDeCoteLe = CASE WHEN Essais + 1 >= @seuil THEN SYSDATETIME() ELSE MiseDeCoteLe END
             OUTPUT inserted.Etat WHERE Id = @tete;
-            """, ct, ("@t", tableV3), ("@id", idV3), ("@e", erreur), ("@seuil", Seuil)) == "mise de cote";
+            """, ct, ("@t", tableV3), ("@id", idV3), ("@e", erreur), ("@seuil", seuil)) == "mise de cote";
 
     /// <summary>Le motif d'une attente sans essai (panne, fiche bloquee), note sur la tete de la fiche.</summary>
     public static async Task NoterMotifV3Async(SqlConnection cn, string tableV3, string idV3, string motif, CancellationToken ct)
@@ -91,7 +92,8 @@ internal static class MisesDeCote
 
     /// <summary>Le refus d'une fiche de la V2 par la V3 : un essai de plus (une fiche « resolue » qui echoue a nouveau
     /// repart d'un premier essai) ; au seuil, mise de cote. Vrai si elle l'est.</summary>
-    public static async Task<bool> RefuserV2Async(SqlConnection cn, string baseV2, string tableV2, string idV2, long version, string erreur, CancellationToken ct)
+    public static async Task<bool> RefuserV2Async(SqlConnection cn, string baseV2, string tableV2, string idV2, long version, string erreur, CancellationToken ct,
+                                                  int seuil = Seuil)
         => await ScalaireAsync(cn, null, """
             MERGE rec.RemonteeEchec WITH (HOLDLOCK) AS r
             USING (SELECT @b AS BaseV2, @t AS TableV2, @id AS IdV2) AS s ON r.BaseV2 = s.BaseV2 AND r.TableV2 = s.TableV2 AND r.IdV2 = s.IdV2
@@ -110,7 +112,7 @@ internal static class MisesDeCote
             WHEN NOT MATCHED THEN INSERT (BaseV2, TableV2, IdV2, Version, Etat, Essais, Erreur)
                 VALUES (@b, @t, @id, @v, CASE WHEN 1 >= @seuil THEN 'mise de cote' ELSE 'en echec' END, 1, LEFT(@e, 2000))
             OUTPUT inserted.Etat;
-            """, ct, ("@b", baseV2), ("@t", tableV2), ("@id", idV2), ("@v", version), ("@e", erreur), ("@seuil", Seuil)) == "mise de cote";
+            """, ct, ("@b", baseV2), ("@t", tableV2), ("@id", idV2), ("@v", version), ("@e", erreur), ("@seuil", seuil)) == "mise de cote";
 
     /// <summary>Une fiche de la V2 qui ATTEND une fiche refusee ou mise de cote qu'elle vise : sans essai, mais notee « en
     /// echec » pour etre rejouee aux passages suivants -- le point de reprise de la remontee avance, son changement ne doit

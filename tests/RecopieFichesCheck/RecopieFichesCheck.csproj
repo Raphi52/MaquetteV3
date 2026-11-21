@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Banc de REC-012 a REC-017 et REC-019 (les fiches partagees entre la V2 et la V3 d'un greffe, chacune dans sa table V3
+       avec sa correspondance colonne par colonne, recopiees dans les deux sens), lot 10 du plan de reconstruction, phase 2.
+       Il lui faut le SQL Server du poste (docker compose up -d) et la lecture de RIG_DEV et RIG_RECETTE (SQL-DEV\DEV, compte
+       Windows ; autres serveurs : RIGV3_RIG_DEV, RIGV3_RIG_RECETTE). En tete de Program.cs : ce que chaque controle prouve. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <!-- La base V2 jetable tiree de RIG_DEV : la meme construction que le banc du transfert (lot 7). -->
+    <Compile Include="../RecopieTransfertCheck/ExtraitRigDev.cs" Link="ExtraitRigDev.cs" />
+    <!-- Le script de la V2 (Base\v2\recopie-v2.sql) joue comme sqlcmd le jouerait (banc de la numerotation V2). -->
+    <Compile Include="../NumerotationV2Check/Sqlcmd.cs" Link="Sqlcmd.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
+  </ItemGroup>
+
+</Project>

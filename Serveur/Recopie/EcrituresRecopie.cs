@@ -9,6 +9,24 @@ namespace RigV3.Serveur.Recopie;
 /// <summary>Une fiche attend une autre fiche qui n'est pas encore passee : la ligne reste en file, rien n'est ecrit.</summary>
 public sealed class RecopieEnAttente(string message) : Exception(message);
 
+/// <summary>La base d'en face ne peut pas recevoir la fiche telle qu'elle est (une valeur sans equivalent, REC-013 CA02) : un
+/// REFUS, compte comme celui d'une contrainte de la base (un essai, mise de cote au 3e), avec ce motif lisible.</summary>
+public sealed class RecopieRefusee(string message) : Exception(message);
+
+/// <summary>Un refus qu'aucun nouvel essai ne levera (une valeur unique deja prise par une autre fiche, REC-013 CA03,
+/// REC-017 CA04) : la fiche est mise de cote D'EMBLEE, avec son motif, et l'ecart est ecrit pour l'agent designe.</summary>
+/// <param name="IdV2">La fiche de la V2 en cause (celle qui tient la valeur, ou celle qui ne passe pas).</param>
+/// <param name="IdV3">La fiche de la V3 en cause (celle qui ne passe pas, ou celle qui tient la valeur).</param>
+/// <param name="Champ">La colonne (nom V2) et ses deux valeurs (texte JSON).</param>
+public sealed class RecopieImpossible(string message, string idV2, string idV3, string champ, string? valeurV2, string? valeurV3) : Exception(message)
+{
+    public string IdV2 { get; } = idV2;
+    public string IdV3 { get; } = idV3;
+    public string Champ { get; } = champ;
+    public string? ValeurV2 { get; } = valeurV2;
+    public string? ValeurV3 { get; } = valeurV3;
+}
+
 /// <summary>
 /// Les gestes elementaires de la recopie, dans les deux sens, sur UNE connexion a la base V3 : la base V2 est nommee sur
 /// la meme instance (Q4), si bien qu'une fiche recopiee, sa correspondance, son etat commun et sa ligne de file tiennent
@@ -21,21 +39,25 @@ internal static class EcrituresRecopie
     public static async Task<LigneJson?> LireV2Async(SqlConnection cn, SqlTransaction? tx, TableRecopiee t, string idV2, bool verrou, CancellationToken ct)
         => LigneJson.Lire(await ScalaireAsync(cn, tx, t.SelectJson(t.NomV2Sql, t.Colonnes, "@id", verrou ? "WITH (UPDLOCK, HOLDLOCK)" : null), ct, ("@id", idV2)));
 
+    /// <summary>La fiche V3, lue sous les noms de la V2 (une table colonne par colonne : « x.[Nom] AS [CLIEN_NOM] »).</summary>
     public static async Task<LigneJson?> LireV3Async(SqlConnection cn, SqlTransaction? tx, TableRecopiee t, string idV3, bool verrou, CancellationToken ct,
                                                      bool avecPropres = false)
-        => LigneJson.Lire(await ScalaireAsync(cn, tx, t.SelectJson(t.NomV3Sql, avecPropres ? t.Colonnes.Concat(t.Propres) : t.Colonnes, "@id",
-                                                                    verrou ? "WITH (UPDLOCK, HOLDLOCK)" : null), ct, ("@id", idV3)));
+        => LigneJson.Lire(await ScalaireAsync(cn, tx, t.SelectJsonV3(avecPropres ? t.Colonnes.Concat(t.PropresV3) : t.Colonnes, "@id",
+                                                                      verrou ? "WITH (UPDLOCK, HOLDLOCK)" : null), ct, ("@id", idV3)));
 
     public static async Task<bool> ExisteV3Async(SqlConnection cn, SqlTransaction? tx, TableRecopiee t, string idV3, CancellationToken ct)
-        => await ScalaireAsync(cn, tx, $"SELECT CONVERT(nvarchar(1), 1) FROM {t.NomV3Sql} AS x WHERE {t.CleEgale("x", "@id")};", ct, ("@id", idV3)) is not null;
+        => await ScalaireAsync(cn, tx, $"SELECT CONVERT(nvarchar(1), 1) FROM {t.NomV3Sql} AS x WHERE {t.CleEgaleV3("x", "@id")};", ct, ("@id", idV3)) is not null;
 
     public static async Task<bool> ExisteV2Async(SqlConnection cn, SqlTransaction? tx, TableRecopiee t, string idV2, CancellationToken ct)
         => await ScalaireAsync(cn, tx, $"SELECT CONVERT(nvarchar(1), 1) FROM {t.NomV2Sql} AS x WHERE {t.CleEgale("x", "@id")};", ct, ("@id", idV2)) is not null;
 
     // --- la correspondance (rec.Correspondance, REC-001 T01) ----------------------------------------------------
 
+    /// <summary>La ligne V2 d'une fiche V3. Une fiche V3 qui en represente plusieurs de la V2 (l'adresse inconnue, REC-016
+    /// CA03) n'a qu'une correspondance qui n'est pas « fusion » : c'est elle que la recopie V3 -> V2 suit.</summary>
     public static Task<string?> IdV2Async(SqlConnection cn, SqlTransaction? tx, TableRecopiee t, string idV3, CancellationToken ct)
-        => ScalaireAsync(cn, tx, "SELECT TOP (1) IdV2 FROM rec.Correspondance WHERE TableV3 = @t3 AND IdV3 = @id AND BaseV2 = @b AND TableV2 = @t2;", ct,
+        => ScalaireAsync(cn, tx, "SELECT TOP (1) IdV2 FROM rec.Correspondance WHERE TableV3 = @t3 AND IdV3 = @id AND BaseV2 = @b AND TableV2 = @t2 " +
+                                 "ORDER BY CASE WHEN Origine = 'fusion' THEN 1 ELSE 0 END, Le;", ct,
                          ("@t3", t.NomV3), ("@id", idV3), ("@b", t.BaseV2), ("@t2", t.NomV2));
 
     public static Task<string?> IdV3Async(SqlConnection cn, SqlTransaction? tx, TableRecopiee t, string idV2, CancellationToken ct)
@@ -66,6 +88,19 @@ internal static class EcrituresRecopie
             if (!r.TryGetValue(colonne, out var brut) || TableRecopiee.TexteDe(brut) is not { } valeur) continue;
             var autre = versV2 ? await IdV2Async(cn, tx, visee, valeur, ct) : await IdV3Async(cn, tx, visee, valeur, ct);
             if (autre is not null) r[colonne] = TableRecopiee.Brut(autre, t.V2.Colonne(colonne));
+        }
+        // Les colonnes traduites (un agent par son compte de session, REC-013 CA02 ; un service) : une valeur renseignee qui
+        // n'a pas d'equivalent de l'autre cote est un REFUS -- la fiche attend, l'exploitant le voit --, jamais une valeur
+        // recopiee brute ni inventee.
+        foreach (var c in t.Colonnes)
+        {
+            if (t.TraductionDe(c.Nom) is not { } traduction || !r.TryGetValue(c.Nom, out var brut) || TableRecopiee.TexteDe(brut) is not { } valeur) continue;
+            var sql = versV2 ? traduction.SqlVersV2(t.BaseV2) : traduction.SqlVersV3(t.BaseV2);
+            var source = versV2 ? t.ColonneV3(c) : c;
+            var autre = await ScalaireAsync(cn, tx, $"SELECT CONVERT(nvarchar(400), ({sql.Replace("@v", $"CONVERT({source.TypeSql}, @valeur)", StringComparison.Ordinal)}));",
+                                            ct, ("@valeur", valeur))
+                        ?? throw new RecopieRefusee($"{t.NomV2}.{c.Nom} = {valeur} : sans equivalent dans la {(versV2 ? "V2" : "V3")} par {traduction.Par}");
+            r[c.Nom] = TableRecopiee.Brut(autre, versV2 ? c : t.ColonneV3(c));
         }
         return r;
     }
@@ -111,7 +146,9 @@ internal static class EcrituresRecopie
     /// de la V3.</summary>
     public static async Task<string> CreerV2Async(SqlConnection cn, SqlTransaction tx, TableRecopiee t, string idV3, LigneJson ligneAvecPropres, CancellationToken ct)
     {
-        var lues = t.Colonnes.Concat(t.Propres).ToList();
+        // Une fiche colonne par colonne n'a pas ses colonnes propres dans la V3 : seules celles qui ont une valeur de creation
+        // sont ecrites (l'etat « N »), les autres prennent la valeur par defaut de la V2 (une imprimante reste vide, REC-017 CA03).
+        var lues = t.Colonnes.Concat(t.Regle.ColonneParColonne ? t.Propres.Where(p => t.Regle.CreationV2.ContainsKey(p.Nom)) : t.Propres).ToList();
         var cibles = lues.Select(c => Sql.Q(c.Nom)).ToList();
         var valeurs = lues.Select(c => t.Regle.CreationV2.TryGetValue(c.Nom, out var e) ? e : $"j.{Sql.Q(c.Nom)}").ToList();
         if (!t.CleIdentiteV2) { cibles.Add(Sql.Q(t.Cle.Nom)); valeurs.Add($"CONVERT({t.Cle.TypeSql}, @id3)"); }
@@ -135,8 +172,8 @@ internal static class EcrituresRecopie
                                        CancellationToken ct)
     {
         var cols = t.Colonnes.Where(c => colonnes.Contains(c.Nom, StringComparer.OrdinalIgnoreCase)).ToList();
-        return SousMarqueAsync(cn, tx, $"UPDATE x SET {string.Join(", ", cols.Select(c => $"x.{Sql.Q(c.Nom)} = j.{Sql.Q(c.Nom)}"))} " +
-                                       $"FROM {t.NomV3Sql} AS x CROSS JOIN OPENJSON(@json) {TableRecopiee.OpenJson(cols)} AS j WHERE {t.CleEgale("x", "@id")};",
+        return SousMarqueAsync(cn, tx, $"UPDATE x SET {string.Join(", ", cols.Select(c => $"x.{Sql.Q(t.ColonneV3(c).Nom)} = j.{Sql.Q(c.Nom)}"))} " +
+                                       $"FROM {t.NomV3Sql} AS x CROSS JOIN OPENJSON(@json) {t.OpenJsonV3(cols)} AS j WHERE {t.CleEgaleV3("x", "@id")};",
                                ct, ("@id", idV3), ("@json", ligne.Ecrire()));
     }
 
@@ -144,22 +181,22 @@ internal static class EcrituresRecopie
     /// (REC-003 CA03). Les colonnes propres recoivent la valeur de la V2.</summary>
     public static async Task<string> CreerV3Async(SqlConnection cn, SqlTransaction tx, TableRecopiee t, string idV2, LigneJson ligneAvecPropres, CancellationToken ct)
     {
-        var lues = t.Colonnes.Concat(t.Propres).ToList();
-        var cibles = lues.Select(c => Sql.Q(c.Nom)).ToList();
+        var lues = t.Colonnes.Concat(t.PropresV3).ToList();
+        var cibles = lues.Select(c => Sql.Q(t.ColonneV3(c).Nom)).ToList();
         var valeurs = lues.Select(c => $"j.{Sql.Q(c.Nom)}").ToList();
-        if (!t.CleIdentiteV3) { cibles.Add(Sql.Q(t.Cle.Nom)); valeurs.Add($"CONVERT({t.Cle.TypeSql}, @id2)"); }
+        if (!t.CleIdentiteV3) { cibles.Add(Sql.Q(t.CleV3.Nom)); valeurs.Add($"CONVERT({t.CleV3.TypeSql}, @id2)"); }
         string? id = null;
         await SousMarqueAsync(cn, tx, $"""
-            DECLARE @ids TABLE (Id {t.Cle.TypeSql});
-            INSERT INTO {t.NomV3Sql} ({string.Join(", ", cibles)}) OUTPUT inserted.{Sql.Q(t.Cle.Nom)} INTO @ids
-            SELECT {string.Join(", ", valeurs)} FROM OPENJSON(@json) {TableRecopiee.OpenJson(lues)} AS j;
-            SELECT {Sql.EnTexte("x", t.Cle with { Nom = "Id" })} FROM @ids AS x;
+            DECLARE @ids TABLE (Id {t.CleV3.TypeSql});
+            INSERT INTO {t.NomV3Sql} ({string.Join(", ", cibles)}) OUTPUT inserted.{Sql.Q(t.CleV3.Nom)} INTO @ids
+            SELECT {string.Join(", ", valeurs)} FROM OPENJSON(@json) {t.OpenJsonV3(lues)} AS j;
+            SELECT {Sql.EnTexte("x", t.CleV3 with { Nom = "Id" })} FROM @ids AS x;
             """, ct, v => id = v, ("@id2", idV2), ("@json", ligneAvecPropres.Ecrire()));
         return id ?? throw new InvalidOperationException($"{t.NomV3} : la V3 n'a rendu aucun identifiant pour la fiche V2 {idV2}");
     }
 
     public static Task SupprimerV3Async(SqlConnection cn, SqlTransaction tx, TableRecopiee t, string idV3, CancellationToken ct)
-        => SousMarqueAsync(cn, tx, $"DELETE x FROM {t.NomV3Sql} AS x WHERE {t.CleEgale("x", "@id")};", ct, ("@id", idV3));
+        => SousMarqueAsync(cn, tx, $"DELETE x FROM {t.NomV3Sql} AS x WHERE {t.CleEgaleV3("x", "@id")};", ct, ("@id", idV3));
 
     private static Task SousMarqueAsync(SqlConnection cn, SqlTransaction tx, string sql, CancellationToken ct, params (string, object)[] p)
         => SousMarqueAsync(cn, tx, sql, ct, null, p);

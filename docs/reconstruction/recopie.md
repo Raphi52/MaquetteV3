@@ -155,7 +155,7 @@ pas leur classe.
 | **REC-006** (lot 8) comparer chaque nuit | Fait : section « Comparer chaque nuit (REC-006) » ci-dessous. |
 | **REC-008** (lot 8) répéter sur les copies anonymisées | Fait : section « Répéter le transfert (REC-008) » ci-dessous. |
 | **REC-009** (lot 11) anciens logiciels | `MIGRATION_ID`, `CORRESP_*` : une règle chacune ; la règle « déjà repris = marqué » de 2017 rejoint `rec.Rejet` / `rec.LienCasse`. |
-| **REC-010 à REC-019** fiches partagées | Leur table est aujourd'hui « telle quelle » dans `ReglesRec001.cs` (commentaire : la story qui la reprendra) ; `UTILISATEUR` est portée par la reprise des comptes. |
+| **REC-010 à REC-019** fiches partagées | REC-012 à REC-017 et REC-019 : faites au lot 10, chaque fiche dans sa table V3 (`Serveur\Recopie\FichesV3.cs`, section « Les fiches partagées » plus bas) ; REC-010, REC-011, REC-018 (historique, demandes liées, arrivées) : lot 11, leur table est encore « telle quelle » dans `ReglesRec001.cs`. |
 
 ## Écarts code ↔ métier et choix à valider
 
@@ -188,7 +188,7 @@ pas leur classe.
 | `Serveur\Recopie\CopieTelleQuelle.cs` | la copie d'une table, ses liens cassés, sa correspondance, son contrôle de fin |
 | `Serveur\Recopie\JournalTransfert.cs` | le journal et l'événement 210 |
 | `Serveur\Recopie\Regles.cs` | règles, reprises, découverte et refus des doublons |
-| `Serveur\Recopie\ReglesRec001.cs` | les 9 tables telles quelles de REC-001 |
+| `Serveur\Recopie\ReglesRec001.cs` | les tables telles quelles de REC-001 (9 au lot 1 ; AFFAIRE, DEMANDE, ARRIVEE depuis le lot 10, les autres dans `FichesV3.cs`) |
 | `Serveur\Recopie\ReprisesPhase1.cs` | réglages, comptes et droits, compteurs : appelés, pas refaits |
 | `Outils\Transfert\` (`RigV3.Transfert`) | l'outil de l'exploitant : `transferer`, `inventaire` |
 | `tests\RecopieTransfertCheck\` | le banc : base V2 jetable tirée de RIG_DEV (`ExtraitRigDev.cs`), un contrôle par critère |
@@ -294,7 +294,7 @@ orphelin ou une ligne sans correspondance (base, tables, comptes) ; elle se ferm
 | Empreinte **par ligne** (SHA-256), pas `CHECKSUM_AGG` | Le transfert compare une empreinte de table (REC-001) ; ici il faut dire **quelle** ligne diffère. SHA-256 d'un texte défini colonne par colonne : pas de collision pratique, contrairement à `BINARY_CHECKSUM` (32 bits). |
 | Fusion de deux lectures triées | 4,5 millions d'arrivées dans RIG_DEV : un dictionnaire en mémoire ne tiendrait pas ; deux curseurs triés, une passe. |
 | Relecture des écarts dans les bases vivantes | Les deux instantanés ne sont pas pris au même instant : une fiche recopiée entre les deux serait un faux écart et une fausse alerte chaque nuit. |
-| Tables V3 qui ne sont pas la table V2 « telle quelle » | Correspondances seulement (UTILISATEUR → `soc.Compte`) : la conversion colonne par colonne est à décrire par la story de la table (T03). |
+| Tables V3 qui ne sont pas la table V2 « telle quelle » | Comparées colonne par colonne par la règle de leur fiche (lot 10 : `rec.*`, UTILISATEUR → `soc.Compte`) ; une table V3 sans règle colonne par colonne : correspondances seulement (T03). |
 
 <!-- fix-ok: phrases fausses relevées par le juge et mesurées le 2026-11-21 par RecopieDeuxSensCheck : le contrôle de nuit voyait 2 faux écarts sur l'état de transmission (exclusion annoncée « à faire »), puis 5 sur l'identifiant et les liens des fiches créées par la recopie (clients, dossiers, action) ; le journal de la remontée écrivait « non noté par la V2 » pour un client dont la V2 note l'agent. -->
 **À valider / reste** : l'heure 02:00 et la durée de 90 jours (proposées) ; T03 — une fiche que le lot 9 recopie
@@ -467,12 +467,14 @@ Décision du chef du 21/11 : la file de la recopie continue tient REC-005 comme 
 
 ```powershell
 # 1. Base V2, AVANT le transfert : le suivi des changements de la base et de ses tables partagées (aucun programme
-#    de la V2 n'est touché, REC-003 CA02). Les tables : celles de Serveur\Recopie\ReglesRecopie.cs.
+#    de la V2 n'est touché, REC-003 CA02). Les tables : celles des règles de recopie du serveur (ReglesRecopie.Decouvrir() :
+#    ReglesRecopie.cs, et depuis le lot 10 FichesV3.cs) -- 21 tables le 2026-11-21.
 cd Base\v2
-sqlcmd -S <instance> -E -f 65001 -b -i recopie-v2.sql -v BaseV2=RIG_<GREFFE> RetentionJours=7 Tables="ACTION_RCS,ADRESSE_BASE,ARRIVEE,CATEGORIE,CLIENT,DOSSIER_RCS,INSCRIPTION"
+sqlcmd -S <instance> -E -f 65001 -b -i recopie-v2.sql -v BaseV2=RIG_<GREFFE> RetentionJours=7 Tables="ACTION_RCS,ADRESSE_BASE,ARRIVEE,BATEAU,BODACC,CATEGORIE,CLIENT,CLIENT_ADRESSE,CLIENT_CONTACT,CREANCE_END,DEPOT_RCS,DOSSIER_RCS,ENCAISSEMENT_REPRIS,ENTREPRISE,INSCRIPTION,INSCRIPTION_RCS,INSTANCE,NON_INSCRIT,PASSAGE_CFE,RADIATION_TOTALE,UTILISATEUR"
 # 2. Le transfert (plus haut).
-# 3. La mise en service, côté V3 : PontRecopie.MettreEnServiceAsync(connexionV3, "RIG_<GREFFE>") pose les 7 déclencheurs
-#    de file et le point de départ (refus nommés : pas de transfert fini, suivi absent, rétention dépassée).
+# 3. La mise en service, côté V3 : PontRecopie.MettreEnServiceAsync(connexionV3, "RIG_<GREFFE>") pose un déclencheur de file
+#    par fiche, le point de départ, et fige les fiches de la base (rec.FicheEnService, lot 10) ; refus nommés : pas de transfert
+#    fini, suivi absent, rétention dépassée, fiche écrite par le transfert ailleurs que dans la table V3 de sa règle.
 # 4. Le serveur : "Recopie": { "Continue": true, "IntervalleSecondes": 5, "SeuilRetardMinutes": 5 }.
 ```
 
@@ -503,7 +505,7 @@ sqlcmd -S <instance> -E -f 65001 -b -i recopie-v2.sql -v BaseV2=RIG_<GREFFE> Ret
 | Seuil de mise de côté | 3 essais refusés (REC-005 CA02, « seuil proposé ») | à valider avec l'exploitation d'Amitel. |
 | Panne ou refus | liste fermée des numéros d'erreur de panne (`MisesDeCote.NumerosDePanne`) ; tout le reste est un refus | un numéro qui manque fait compter des essais pendant une panne : la mise de côté apparaîtrait à tort (alerte visible, relance sans dommage). |
 | Libellés de l'écran | le titre du champ sur la fiche de la V2 quand elle en a un (32 colonnes, « V2 » dans `Contrats\Recopie\Libelles.cs`) ; sinon un libellé proposé | relevé dans `D:\RigApplication\Source` (`MetierTitre` du contrôle lié à la colonne). La fiche client de la V2 dit « E-mail » (pas « Adresse e-mail »). Le mot de passe d'un compte web (`CLIEN_MDP`) ne s'affiche jamais. Libellés proposés : référent Socle. |
-| Ce qui est recopié | les 7 tables partagées qui ont une table dans la V3 (`ReglesRec002`) | ENTREPRISE, BODACC, DEPOT_RCS, INSCRIPTION_RCS, INSTANCE, NON_INSCRIT, PASSAGE_CFE, BATEAU, CREANCE_END n'ont pas encore de règle de transfert ; UTILISATEUR → `soc.Compte` demande la correspondance de ses colonnes (story des agents). |
+| Ce qui est recopié | au lot 9, les 7 tables partagées qui avaient une table dans la V3 (`ReglesRec002`) | depuis le lot 10 : 21 tables (section « Les fiches partagées » plus bas) ; seule ARRIVEE reste dans `ReglesRec002`. |
 
 ### Ce qui ne se fait pas depuis ce poste, ou reste
 
@@ -513,7 +515,7 @@ sqlcmd -S <instance> -E -f 65001 -b -i recopie-v2.sql -v BaseV2=RIG_<GREFFE> Ret
 | REC-005 CA05 sur le vrai canal d'Amitel | prouvé sur le canal simulé de la supervision (hors production) ; l'envoi réel suit le canal du lot 2 | supervision, production |
 | REC-005 T04 : un écran pour la liste et la relance | les deux routes existent (exploitation d'Amitel) ; l'écran de supervision ne les montre pas encore | supervision |
 | REC-004 CA02 : « chaque ligne ouvre la fiche » | un dossier ouvre son affaire, un client l'écran des fiches clients ; inscription, adresse, action, arrivée et catégorie n'ont pas encore d'écran de fiche dans la V3 ; la story qui donne son écran à une de ces fiches renseigne `Cible` de sa règle dans `ReglesRec002` (`Serveur\Recopie\ReglesRecopie.cs`, ex. `ecran:PROC_FCLIENT`), sinon son écart reste sans « Ouvrir la fiche » | stories de domaine (lot 10) |
-| Une story de domaine (lot 10) qui remplace `v2.<TABLE>` | elle remplace la ligne de sa table dans `ReglesRec002` par une règle qui nomme sa table V3 et la correspondance de ses colonnes (une sorte nouvelle de règle, à écrire avec elle) | lot 10 |
+| Une story de domaine (lot 10) qui remplace `v2.<TABLE>` | fait au lot 10 : la règle « colonne par colonne » (`RegleRecopie.Correspondance`, `RegleTable.Cible`), section « Les fiches partagées » | — |
 
 ### Fichiers de la recopie continue
 
@@ -541,3 +543,170 @@ de la V2 disparaît en silence, et l'oracle de CA01 le voit. REC-005 (21/11) : l
 écrits et joués d'abord sur l'ancien code (main 40624c2) — rouges : le client « REFUSE PAR LA V2 » (contrainte
 CK_BANC_REC005) arrêtait chaque passage (0 appliqué, SUIT LE REFUS 1 et 2 jamais recopiés), « REFUSE PAR LA V3 » bloquait le
 point de reprise (366 pour une version courante de 370), une V2 hors ligne comptait des essais ; verts après la correction.
+
+## Les fiches partagées (REC-012 à REC-017, REC-019) — lot 10
+
+Lot 10 du plan (2026-11-21). Les fiches que la V2 et la V3 d'un greffe partagent ont désormais **leur table dans la V3**,
+avec la correspondance de **chaque colonne** de la V2, et sont transférées (REC-001) puis recopiées dans les deux sens
+(REC-002, REC-003) par cette correspondance. Jusqu'ici, leur copie telle quelle (`v2.CLIENT`…) en tenait lieu.
+
+### Les tables V3 et leur correspondance
+
+Migration `Base\migrations\REC-012_fiches-partagees.sql` (schéma `rec`, règle des migrations) ; correspondance colonne par
+colonne dans `Serveur\Recopie\FichesV3.cs` (une ligne par colonne : nom V3, nom V2 ; le nom V2 est aussi en commentaire dans
+la migration). **Une seule déclaration par fiche** donne sa règle de transfert (`RegleTable.Cible`) et sa règle de recopie
+(`RegleRecopie.Correspondance`).
+
+| Table V3 | Table V2 | Story | Colonnes | Particularités |
+|---|---|---|---|---|
+| `rec.Adresse` | ADRESSE_BASE | REC-016 | 19 + clé | `EstInconnue` : une seule adresse inconnue (CA03) |
+| `rec.Entreprise` | ENTREPRISE | REC-012 | 17 + clé | `Denomination` (ENTRP_DESIGNATION) |
+| `rec.DossierRcs` | DOSSIER_RCS | REC-012 | 40 + clé | état de transmission propre à la V2 (CA02) |
+| `rec.Client` | CLIENT | REC-013 | 33 + clé | agent par compte de session (CA02) ; code abrégé unique, `DoublonHerite` (T01) |
+| `rec.ClientAdresse` | CLIENT_ADRESSE | REC-013 | 9 + clé | lien vers l'adresse sans clé dans la V2 (`LiensSansCle`) |
+| `rec.ClientContact` | CLIENT_CONTACT | REC-013 | 9 + clé | |
+| `rec.ProvisionReprise` | ENCAISSEMENT_REPRIS | REC-013 | 7 + clé | consommée une seule fois (CA06, `ProvisionsReprises.cs`) |
+| `rec.Creance`, `rec.Bateau` | CREANCE_END, BATEAU | REC-014 | 18, 25 + clé | agent de l'appel au registre des navires par compte de session |
+| `rec.Inscription` | INSCRIPTION | REC-014 | 23 + clé | chaîne des renouvellements ; état de transmission propre à la V2 (CA03) |
+| `rec.ActionRegistre` | ACTION_RCS | REC-015 | 14 + clé | ses six objets restent tels quels (`v2.DEPOT_RCS`…, T02) |
+| `rec.TypeDemande` | CATEGORIE | REC-019 | 30 + clé | identifiant de la V3 ; le numéro V2 n'est que dans `rec.Correspondance` |
+| `soc.Compte` (SOC-001) | UTILISATEUR | REC-017 | 11 + clé | réglages du poste, mot de passe… propres à la V2 (CA03) ; nom de session unique |
+
+Tables restées **telles quelles** et recopiées comme au lot 9 (`ReglesObjetsDuRegistre`, même fichier) : BODACC, DEPOT_RCS,
+INSCRIPTION_RCS, INSTANCE, NON_INSCRIT, PASSAGE_CFE (les objets d'une action, dont les colonnes métier sont celles de leurs
+stories RCS et Judiciaire, REC-015 T02) et RADIATION_TOTALE (la radiation d'une inscription, REC-014 CA04). Avec ARRIVEE
+(lot 11), **21 tables** sont recopiées.
+
+Le banc vérifie la correspondance contre le **catalogue réel de RIG_DEV** : chaque colonne de chaque table V2 est nommée, ou
+laissée à la V2 par une raison écrite (clé, état de transmission, déroulement d'un type, réglages d'un poste), au même type.
+
+### Comment le transfert les écrit
+
+- **Même copie par lots** que la copie telle quelle (`CopieTelleQuelle.cs`, `RegleTable.Cible`) : chaque colonne V2 sous son
+  nom V3, mêmes identifiants (IDENTITY gardée), même point de reprise (REC-005), mêmes contrôles de fin (lues = écrites,
+  une correspondance par ligne, empreinte des valeurs). La table V3 doit exister (migration) et être vide ; annulée sur un
+  écart, elle est vidée (pas supprimée). Rapport : règle « colonne par colonne », table V3 de la fiche.
+- **Une colonne traduite** (un agent par son compte de session, un service par `soc.Service.IdV2`) reçoit la valeur de la V2
+  puis sa traduction dans la transaction du lot ; une valeur sans équivalent est vidée et notée dans `rec.LienCasse`
+  (cause « sans equivalent dans la V3 »), jamais inventée ; elle est hors de l'empreinte.
+- **Colonnes de la V3 seule calculées** au transfert : `rec.Client.DoublonHerite` (les codes abrégés que la V2 porte deux fois,
+  gardés : RIG_DEV en a 15 lignes sur 7 codes) et `rec.Adresse.EstInconnue`.
+- **Types de demande** : par la reprise « types de demande par reference » (`TypesDemande.cs`, rang 30, après les comptes) :
+  la V3 donne à chaque type SON identifiant, le numéro V2 va dans `rec.Correspondance` ; parents et service traduits ; types
+  indiscernables listés par la vue `rec.TypesDemandeIndiscernables`.
+- **Adresse inconnue unique** : la reprise « adresse inconnue unique » (après les tables) garde la première, y rattache les
+  fiches V3 et les correspondances des autres (origine « fusion »), et les retire.
+
+### Comment la recopie les recopie
+
+- La recopie lit et compare une fiche **sous ses noms V2** : la table V3 est lue « AS » ses noms V2 et écrite par eux
+  (`TableRecopiee.SelectJsonV3`, `OpenJsonV3`, `ColonneV3`) ; applicateur, remontée, écarts et contrôle de nuit n'ont qu'une
+  écriture pour les deux sortes de règles.
+- **Règles figées à la mise en service** (`rec.FicheEnService`) : le serveur recopie une base avec les fiches de sa mise en
+  service, pas avec celles que son code déclare au jour le jour. Sans cela, une règle ajoutée au serveur entrait dans la
+  recopie d'un greffe déjà en service alors que sa table V2 n'y est pas suivie : la remontée s'arrêtait. Une fiche mise en
+  service telle quelle (`v2.X`) garde sa forme telle quelle (`RegleRecopie.EnTelleQuelle`) ; la mise en service refuse une
+  fiche que le transfert a écrite dans une autre table que celle de sa règle. Le **contrôle de nuit** prend les mêmes
+  règles (`Comparaison.cs`) : comparer avec toutes celles du serveur traduisait des liens que la base ne recopie pas
+  (512 faux écarts `CLIENT [CLIEN_ID_UTLST]` mesurés par `RecopieDeuxSensCheck`, où UTILISATEUR n'est pas en service).
+- **Les parents d'un type de demande** (domaine, famille, activité) sont d'autres types, sans clé étrangère dans la V2 :
+  déclarés liens (`LiensSansCle`), ils sont lus par la correspondance ; sans cela, 873 faux écarts au contrôle de nuit
+  (`RecopieRepriseCheck`), et un numéro V2 écrit dans la V3.
+- **Une colonne traduite n'est jamais un lien** : depuis que les comptes sont recopiés, `CLIEN_ID_UTLST → UTILISATEUR` est
+  aussi une clé vers une fiche partagée ; traduite deux fois, l'agent V3 « azuredevops » devenait l'agent V2 « Moulinette »
+  (mesuré, REC-013 CA02 rouge au 4e essai du banc).
+- **Le déclencheur de file compare au classement binaire** : sous le classement de la base (insensible à la casse), « Dupont »
+  → « DUPONT » n'était pas un changement et n'arrivait jamais dans l'autre base (contre-épreuve dans le banc). Vaut pour
+  toutes les fiches, telles quelles comprises.
+- **Valeur unique prise par une autre fiche** (`CleMetier`) : la fiche est mise de côté d'emblée (1 essai, pas 3 : rejouer ne
+  servirait à rien) avec son motif, et l'écart est ouvert dans « Fiches en conflit » — code abrégé d'un client dans la V3
+  (REC-013 CA03), nom de session d'un compte dans les deux (REC-017 CA04).
+- **Sans création dans la V2** (`SansCreationV2`) : un type de demande créé dans la V3 seule n'est pas créé dans la V2 ; ses
+  lignes de file sont appliquées avec « sans equivalent dans la V2 » et `TypesDemande.SansEquivalentAsync` le liste (REC-019
+  CA03, pour REC-007).
+- **Provision reprise** (`ProvisionsReprises.ConsommerAsync`) : la V3 la réserve d'abord dans la V2 par l'UPDATE conditionnel
+  de la V2 elle-même (`Encaissement.Sauve`), dans sa transaction ; le premier qui réserve consomme. C'est la seule écriture de
+  la V3 dans la V2 hors de la file : une file laisserait consommer deux fois.
+
+### Contrôles (banc `tests\RecopieFichesCheck`)
+
+| Story | CA | Ce que le banc fait et vérifie |
+|---|---|---|
+| — | T01/T02 | 13 fiches, chaque colonne de RIG_DEV nommée ou laissée à la V2 par une raison, mêmes types |
+| REC-012 | CA01 | les 345 dossiers transférés : SIREN et numéro de gestion égaux au classement binaire, même longueur, dont 61 hors norme ; contre-épreuve (minuscules) vue |
+| | CA02 | dénomination changée dans la V3 (et changement de casse seul) → V2 ; dossier non marqué « à transmettre » (« F » reste « F ») ; contre-épreuve du classement binaire |
+| | CA03 | procédure collective portée par la V2 → V3 ; la V2 la marque « M » (c'est elle qui transmet), la V3 ne la renvoie pas |
+| | CA04 | entreprise et dossier créés dans la V3 → V2, liés, trouvés par SIREN + numéro de gestion, état « N » |
+| REC-013 | CA01 | client et adresse créés dans la V3 → V2, trouvé par code abrégé, fiche identique |
+| | CA02 | agent de rattachement dans les deux sens par le compte de session (identifiants V2 et V3 différents) ; au transfert, 312 clients, 0 faux |
+| | CA03 | même code abrégé créé des deux côtés : le client V3 le garde, celui de la V2 est mis de côté d'emblée, écart ouvert |
+| | CA04 | affaire V3 pour un client V2 : elle vise sa fiche, sans copie |
+| | CA05 | adresse et contacts modifiés dans la V3 → V2 ; contact retiré dans la V3 → absent de la V2 |
+| | CA06 | provision consommée par la V2 d'abord → la V3 refuse avec le motif ; par la V3 d'abord → l'UPDATE de la V2 ne touche rien ; soldes égaux |
+| REC-014 | CA01 | renouvellement V3 d'une inscription V2 : même chaîne dans les deux |
+| | CA02 | créance et bateau écrits avant l'inscription, qui garde son numéro |
+| | CA03 | mise à jour recopiée : état de transmission de la V2 inchangé |
+| | CA04 | radiation (RADIATION_TOTALE) saisie dans la V2 → la V3 voit l'inscription radiée |
+| REC-015 | CA01 | une action de chacune des six sortes dans la V3, objet compris → historique V2, objet écrit avant |
+| | CA02 | action saisie dans la V2 → même dossier dans la V3 |
+| | CA03 | journée simulée (10 actions de chaque côté) : historiques identiques et dans le même ordre sur 100 dossiers tirés au hasard |
+| | CA04 | demande V3 portant une action → mène à l'action ; les demandes transférées aussi |
+| REC-016 | CA01 | adresse partagée par deux entreprises corrigée dans la V3 → les deux fiches V2 la voient |
+| | CA02 | 42 adresses référencées par plusieurs fiches : mêmes références dans la V3 |
+| | CA03 | deux adresses inconnues dans la V2 → une seule dans la V3, les trois fiches la visent |
+| | CA04 | dix adresses de formes variées saisies dans la V3 → même découpage dans la V2 que celui que la V2 avait produit |
+| REC-017 | CA01 | compte créé dans la V3 → V2, même nom de session, actif, même service (reste : les rôles, plus bas) |
+| | CA02 | désactivation dans la V3 → V2 en moins d'une minute, par la vraie boucle du serveur |
+| | CA03 | imprimante et scanner du poste gardés ; vides pour un nouveau compte |
+| | CA04 | nom de session déjà pris dans la V2 : mis de côté d'emblée, motif, écart |
+| REC-019 | CA01 | les 892 types de RIG_DEV (table entière) : retrouvés par référence et niveau, parents traduits, identifiant de la V3, numéro V2 nulle part ailleurs |
+| | CA02 | RIG_DEV (demandes du 1417 = MODIFREPER) et RIG_RECETTE (du 2136 = EDS) : chaque demande garde le type de SA référence |
+| | CA03 | type créé dans la V3 seule : pas créé dans la V2, sans numéro V2, listé sans équivalent |
+| | CA04 | libellé et service changés dans la V3 → V2 ; déroulement inchangé |
+| | CA05 | RIG_DEV : références en double distinguées par le niveau, aucune indiscernable ; RIG_RECETTE avec une jumelle posée par le banc : les deux transférées et listées |
+
+Preuve : `.\tests.ps1 RecopieFiches` (il lui faut `docker compose up -d` et la lecture de RIG_DEV et RIG_RECETTE). Les bancs du
+moteur (lots 7, 8, 9, 13) gardent la copie et la recopie telles quelles : leur extrait est complété des tables des règles du
+serveur (`ExtraitRigDev.Completer`), le témoin de la colonne en plus et de l'arrêt sur conversion silencieuse est passé de
+CLIENT / DOSSIER_RCS à ARRIVEE, et le banc du lot 9 met en service ses sept fiches sous leur forme telle quelle.
+
+### Écarts code ↔ métier et choix à valider
+
+| Sujet | Codé comme | Pourquoi / qui tranche |
+|---|---|---|
+| Noms des colonnes V3 | proposés (français, sans le préfixe V2), types de la V2 à l'identique | la story du domaine (RCS, Facturation…) peut les changer par une migration neuve |
+| Schéma `rec` | règle des migrations (préfixe de la story) | les stories de domaine pourront déplacer leur table dans leur schéma |
+| Code abrégé unique (REC-013 T01) | unique pour ce que la V3 crée ou reçoit ; les doublons hérités gardés, marqués | RIG_DEV en a 7 ; les fusionner est l'affaire du référent Facturation |
+| Même code abrégé créé des deux côtés (CA03) | le client V3 est recopié (la V2 tolère les doublons, `IDX_CLIEN_ABREGE` non unique) ; celui de la V2 n'entre pas dans la V3, mis de côté avec un écart | « le client V3 garde le code » ; l'agent désigné décide du sort du client V2 |
+| Adresse inconnue (REC-016 CA03) | le texte exact des reprises de 2017 (`* Adresse inconnu pour le client*`) | RIG_DEV n'en a aucune ; ses deux « ADRESSE INCONNUE » sont des saisies d'agent, non rattachées : référent à consulter |
+| Découpage d'une adresse (REC-016 CA04) | la V3 tient les champs découpés de la V2 et la recopie les écrit tels quels | le découpage d'une adresse saisie en texte libre (`AdresseStandardisation.ExtraireAdresse`) est celui de l'écran d'adresse de la V3, à faire avec sa story |
+| Radiation d'une inscription (REC-014 CA04) | RADIATION_TOTALE recopiée telle quelle | la story n'en parle pas (tables_v2 : INSCRIPTION, CREANCE_END, BATEAU) ; c'est ainsi que la V2 radie (`Inscription.IsRadieeOuPerimee`) |
+| INSTANCE (objet d'action) | `INSTN_TOP_EXPERIAN` propre à la V2 | son déclencheur remet aussi `AUDIENCE_CABINET.AUDNC_TOP_DIFFUSION` à 0 quand la date Infogreffe change : non neutralisable par la recopie, référent Judiciaire |
+| REC-019 T08 | deux AMITEL « indiscernables » annoncés | mesuré : niveaux 1, 2 et 3, tous discernables ; la liste est prouvée sur une jumelle posée par le banc |
+| Provision : la V3 écrit la V2 hors de la file | réservation directe, même instance | c'est la seule façon qu'une provision ne soit consommée qu'une fois (CA06) ; si la V2 est hors ligne, la V3 refuse (pas de consommation sans réservation) |
+| Une adresse V3 qui représente plusieurs adresses V2 | recopie vers la première (correspondance non « fusion ») | l'adresse inconnue ne change pas en pratique ; une modification de la seconde dans la V2 réécrirait la V3 |
+| Mot de passe du compte web d'un client (`CLIEN_MDP`) | aucune colonne dans `rec.Client` : il reste dans la V2, jamais recopié ; un client créé par la V3 n'en a pas | SOC-001 CA08 : aucun mot de passe dans la V3 (`SocleIdentiteCheck` l'a vu rouge) ; le compte web des clients est à reprendre par sa story |
+
+### Ce qui ne se fait pas depuis ce poste, ou reste
+
+| Critère | Ce qui manque | Où |
+|---|---|---|
+| REC-017 CA01 « l'agent ouvre la V2 sans autre geste » | la V2 exige au moins un rôle (`HABILIT_UTILISATEUR_ROLE_USER`) ; T02 laisse les droits aux stories du Socle commun : compte, actif et service sont prouvés | Socle (SOC-002) |
+| REC-012 CA02 « un seul envoi à Infogreffe sur l'environnement de test » | l'environnement de test d'Infogreffe est « à obtenir » ; la V3 n'envoie pas encore : prouvé ici que la V2 ne marque pas le dossier | Échanges, partenaire |
+| Les 40 bases | mesure sur RIG_DEV et RIG_RECETTE seulement (les bases des greffes ne se lisent pas d'ici sans accord) ; un schéma de greffe sans une colonne de la correspondance la laisse hors de la recopie | répétition REC-008 (lot 18) |
+| Écran « à maquetter » des stories | aucun écran de fiche n'est dans ce lot ; les écarts d'une fiche sans écran restent sans « Ouvrir la fiche » | stories de domaine |
+| Les demandes recopiées par leur type (REC-019 T03) | la recopie des demandes est au lot 11 (REC-011, REC-007) : `TypesDemande.NumeroV2Async` / `TypeV3Async` / `SansEquivalentAsync` sont là pour elle | lot 11 |
+| Un type dont le parent V2 n'existe pas (lien cassé hérité) | le transfert le laisse vide dans la V3 et le note (`rec.LienCasse`) ; la recopie, elle, garde un lien sans correspondance tel quel (règle commune du lot 9) : modifié dans la V2, ce type porterait dans la V3 un numéro V2 comme parent. Non mesuré sur RIG_DEV | à valider (recopie) |
+
+### Fichiers du lot 10
+
+| Fichier | Rôle |
+|---|---|
+| `Base\migrations\REC-012_fiches-partagees.sql` | les 12 tables `rec.*`, `rec.TypesDemandeIndiscernables`, `rec.FicheEnService`, origine « fusion », cause « sans equivalent dans la V3 » |
+| `Serveur\Recopie\FichesV3.cs` | une déclaration par fiche (correspondance colonne par colonne), les objets du registre tels quels, l'adresse inconnue unique |
+| `Serveur\Recopie\TypesDemande.cs` | la reprise des types par référence, le numéro V2 d'un type, les types sans équivalent |
+| `Serveur\Recopie\ProvisionsReprises.cs` | la consommation d'une provision reprise, réservée dans la V2 |
+| `Serveur\Recopie\ReglesRecopie.cs`, `Regles.cs` | `ColonneFiche`, `Traduction`, `CleMetier`, `RegleRecopie.Correspondance`, `EnTelleQuelle`, `RegleTable.Cible`, `CibleFiche` |
+| `Serveur\Recopie\CopieTelleQuelle.cs`, `MoteurTransfert.cs` | la copie colonne par colonne (cible, traductions, colonnes calculées) |
+| `Serveur\Recopie\FichesRecopiees.cs`, `EcrituresRecopie.cs`, `PontRecopie.cs`, `Applicateur.cs`, `Remontee.cs`, `MisesDeCote.cs`, `Comparaison.cs` | la recopie sous les noms V2, les règles de la mise en service, le déclencheur binaire, les valeurs uniques, la comparaison de nuit des fiches |
+| `tests\RecopieFichesCheck\` | le banc : un contrôle par critère des sept stories |

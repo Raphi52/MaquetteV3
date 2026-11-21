@@ -90,6 +90,24 @@ public static class PontRecopie
                     refus.Add($"{t.NomV2} : le suivi des changements ne remonte plus a la version {v} du transfert (minimum {min?.ToString() ?? "inconnu"}) : " +
                               "des changements de la V2 sont perdus, la base est a comparer (REC-006) et a retransferer");
             }
+        // Chaque fiche dans la table V3 ou le transfert l'a ecrite (son rapport, rec.TransfertTable) : une regle qui viserait
+        // une autre table recopierait une table vide pendant que la vraie fiche reste figee (REC-012 a REC-019 : v2.CLIENT
+        // d'une base transferee avant le lot 10, rec.Client apres).
+        if (idTransfert is not null)
+        {
+            var ecrites = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            await using (var cmd = new SqlCommand("SELECT TableV2, TableV3 FROM rec.TransfertTable WHERE IdTransfert = @id;", cn))
+            {
+                cmd.Parameters.AddWithValue("@id", idTransfert.Value);
+                await using var l = await cmd.ExecuteReaderAsync(ct);
+                while (await l.ReadAsync(ct)) ecrites[l.GetString(0)] = l.IsDBNull(1) ? null : l.GetString(1);
+            }
+            foreach (var t in fiches.Tables)
+                if (!ecrites.TryGetValue(t.NomV2, out var ecrite))
+                    refus.Add($"{t.NomV2} : le transfert {idTransfert} ne l'a pas portee dans la V3 (pas de ligne a son rapport)");
+                else if (!string.Equals(ecrite, t.NomV3, StringComparison.OrdinalIgnoreCase))
+                    refus.Add($"{t.NomV2} : le transfert l'a ecrite dans {ecrite ?? "aucune table"}, sa regle de recopie vise {t.NomV3}");
+        }
         if (refus.Count > 0) return new MiseEnServiceRecopie(false, refus, [], version, idTransfert);
 
         var poses = new List<string>();
@@ -98,6 +116,19 @@ public static class PontRecopie
             await using var cmd = new SqlCommand(Declencheur(t), cn);
             await cmd.ExecuteNonQueryAsync(ct);
             poses.Add($"{t.V3.Schema}.{NomDeclencheur(t)}");
+        }
+        // Les fiches de cette mise en service, et elles seules, sont celles que le serveur recopie pour cette base
+        // (FichesRecopiees.ReglesEnServiceAsync).
+        await using (var cmd = new SqlCommand("DELETE FROM rec.FicheEnService WHERE BaseV2 = @b;" + string.Concat(fiches.Tables.Select((t, i) =>
+            $" INSERT INTO rec.FicheEnService (BaseV2, TableV2, TableV3) VALUES (@b, @t2_{i}, @t3_{i});")), cn))
+        {
+            cmd.Parameters.AddWithValue("@b", baseV2);
+            for (var i = 0; i < fiches.Tables.Count; i++)
+            {
+                cmd.Parameters.AddWithValue($"@t2_{i}", fiches.Tables[i].NomV2);
+                cmd.Parameters.AddWithValue($"@t3_{i}", fiches.Tables[i].NomV3);
+            }
+            await cmd.ExecuteNonQueryAsync(ct);
         }
         await using (var cmd = new SqlCommand("""
             IF NOT EXISTS (SELECT 1 FROM rec.Remontee WHERE BaseV2 = @b)
@@ -142,21 +173,26 @@ public static class PontRecopie
     /// </summary>
     internal static string Declencheur(TableRecopiee t)
     {
-        var k = Sql.Q(t.Cle.Nom);
+        var k = Sql.Q(t.CleV3.Nom);
         var cols = t.ColonnesDeclencheur.ToList();
+        // La colonne V3 d'une colonne recopiee ; un texte compare au classement binaire : sous le classement de la base
+        // (insensible a la casse), « Dupont » -> « DUPONT » n'etait pas un changement et n'etait jamais recopie
+        // (mesure par RecopieFichesCheck, REC-012 CA02, sur la denomination).
+        string V3(string alias, ColonneV2 c) => $"{alias}.{Sql.Q(t.ColonneV3(c).Nom)}" + (t.ColonneV3(c).PorteClassement ? " COLLATE Latin1_General_BIN2" : "");
         string Changees()
         {
             if (cols.Count == 0) return "NULL";
-            // CONCAT_WS prend 254 arguments au plus : par paquets, puis les paquets ensemble.
+            // CONCAT_WS prend 254 arguments au plus : par paquets, puis les paquets ensemble. Les noms sont ceux de la V2.
             var paquets = cols.Chunk(200).Select(p => "CONCAT_WS(N','" + string.Concat(p.Select(c =>
-                $", CASE WHEN NOT EXISTS (SELECT i.{Sql.Q(c.Nom)} INTERSECT SELECT d.{Sql.Q(c.Nom)}) THEN {Sql.Texte(c.Nom)} END")) + ")").ToList();
+                $", CASE WHEN NOT EXISTS (SELECT {V3("i", c)} INTERSECT SELECT {V3("d", c)}) THEN {Sql.Texte(c.Nom)} END")) + ")").ToList();
             var tout = paquets.Count == 1 ? paquets[0] : "CONCAT_WS(N','," + string.Join(", ", paquets.Select(p => $"NULLIF({p}, N'')")) + ")";
             return $"NULLIF({tout}, N'')";
         }
+        // La ligne d'avant, sous les noms de la V2 : c'est l'etat commun quand la fiche n'a jamais ete recopiee (REC-004).
         var avant = cols.Count == 0 ? "NULL"
-            : $"(SELECT {string.Join(", ", cols.Select(c => $"d.{Sql.Q(c.Nom)} AS {Sql.Q(c.Nom)}"))} FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES)";
+            : $"(SELECT {string.Join(", ", cols.Select(c => $"d.{Sql.Q(t.ColonneV3(c).Nom)} AS {Sql.Q(c.Nom)}"))} FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES)";
         var change = cols.Count == 0 ? "1 = 0"
-            : $"EXISTS (SELECT {string.Join(", ", cols.Select(c => $"i.{Sql.Q(c.Nom)}"))} EXCEPT SELECT {string.Join(", ", cols.Select(c => $"d.{Sql.Q(c.Nom)}"))})";
+            : $"EXISTS (SELECT {string.Join(", ", cols.Select(c => V3("i", c)))} EXCEPT SELECT {string.Join(", ", cols.Select(c => V3("d", c)))})";
         var sb = new StringBuilder();
         sb.AppendLine($"CREATE OR ALTER TRIGGER {Sql.Q(t.V3.Schema)}.{Sql.Q(NomDeclencheur(t))} ON {t.NomV3Sql}");
         sb.AppendLine("AFTER INSERT, UPDATE, DELETE");
@@ -167,7 +203,7 @@ public static class PontRecopie
         sb.AppendLine("    IF NOT EXISTS (SELECT 1 FROM inserted) AND NOT EXISTS (SELECT 1 FROM deleted) RETURN;");
         sb.AppendLine($"    IF ISNULL(CONVERT(int, SESSION_CONTEXT(N'{CleRemontee}')), 0) = 1 RETURN;   -- une ecriture de la remontee (REC-003) n'est pas renvoyee");
         sb.AppendLine("    INSERT INTO rec.FileRecopie (TableV3, IdV3, Genre, Colonnes, Avant, Auteur)");
-        sb.AppendLine($"    SELECT {Sql.Texte(t.NomV3)}, COALESCE({Sql.EnTexte("i", t.Cle)}, {Sql.EnTexte("d", t.Cle)}),");
+        sb.AppendLine($"    SELECT {Sql.Texte(t.NomV3)}, COALESCE({Sql.EnTexte("i", t.CleV3)}, {Sql.EnTexte("d", t.CleV3)}),");
         sb.AppendLine($"           CASE WHEN d.{k} IS NULL THEN 'C' WHEN i.{k} IS NULL THEN 'S' ELSE 'M' END,");
         sb.AppendLine($"           CASE WHEN i.{k} IS NOT NULL AND d.{k} IS NOT NULL THEN {Changees()} END,");
         sb.AppendLine($"           CASE WHEN d.{k} IS NOT NULL THEN {avant} END,");

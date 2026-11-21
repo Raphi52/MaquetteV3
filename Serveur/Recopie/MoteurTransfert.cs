@@ -107,6 +107,7 @@ public static class MoteurTransfert
         var schema = new List<string>();
         Instantane? instantane = null;
         TableV2? enCours = null;
+        RegleTable? parTableEnCours = null;
         var provisoires = 0;
         // Les totaux ne comptent que les tables portees une ligne pour une ligne (lues = ecrites + rejetees) : une table
         // traduite par une reprise (droits, compteurs) a sa preuve dans le comparateur de sa story.
@@ -216,6 +217,20 @@ public static class MoteurTransfert
                 await v3.OpenAsync(ct);
                 foreach (var t in tellesQuelles.Where(t => !nomsFinis.Contains(t.Nom) && !entamees.Contains(t.Nom)))
                 {
+                    // Une fiche qui a sa table (REC-012 a REC-019) : sa migration l'a creee, elle doit etre vide.
+                    if (parTable[t.Nom].Cible is { } cible)
+                    {
+                        await using var existe = new SqlCommand($"SELECT CASE WHEN OBJECT_ID(@n, 'U') IS NULL THEN -1 ELSE 0 END;", v3);
+                        existe.Parameters.AddWithValue("@n", cible.NomSql);
+                        if ((int)(await existe.ExecuteScalarAsync(ct))! < 0)
+                            refus.Add($"{t.Nom} : sa table V3 {cible.TableV3} n'existe pas (migrations de la base V3 a jouer : REC-012_fiches-partagees)");
+                        else
+                        {
+                            await using var vide = new SqlCommand($"SELECT CASE WHEN EXISTS (SELECT 1 FROM {cible.NomSql}) THEN 1 ELSE 0 END;", v3);
+                            if ((int)(await vide.ExecuteScalarAsync(ct))! == 1) refus.Add($"{t.Nom} : sa table V3 {cible.TableV3} a deja des lignes avant le transfert");
+                        }
+                        continue;
+                    }
                     await using var cmd = new SqlCommand("SELECT OBJECT_ID(@n);", v3);
                     cmd.Parameters.AddWithValue("@n", CopieTelleQuelle.NomV3(t));
                     if (await cmd.ExecuteScalarAsync(ct) is not DBNull) refus.Add($"la table {CopieTelleQuelle.NomV3Texte(t)} existe deja dans la base V3");
@@ -250,7 +265,9 @@ public static class MoteurTransfert
                     var t = ordre[i];
                     if (nomsFinis.Contains(t.Nom)) continue;
                     enCours = t;
-                    await journal.EcrireAsync("table", $"{t.Nom} : copie {(parTable[t.Nom].Provisoire ? "PROVISOIRE " : "")}telle quelle ({t.Lignes} lignes au catalogue)" +
+                    parTableEnCours = parTable[t.Nom];
+                    await journal.EcrireAsync("table", $"{t.Nom} : copie {(parTable[t.Nom].Provisoire ? "PROVISOIRE " : "")}" +
+                                                       (parTable[t.Nom].Cible is { } c ? $"colonne par colonne vers {c.TableV3}" : "telle quelle") + $" ({t.Lignes} lignes au catalogue)" +
                                                        (entamees.Contains(t.Nom) ? " — reprise apres son dernier lot enregistre" : ""), ct);
                     var l = await CopieTelleQuelle.CopierAsync(lecture, v3, catalogue, t, parTable[t.Nom], i + 1, journal.Id, baseV2,
                                                                o.TailleLot, avecRejets, ct, journal.Passage, ApresLot);
@@ -277,7 +294,7 @@ public static class MoteurTransfert
         catch (EcartTransfert e)
         {
             // ARRET PROPRE (REC-001) : un ecart ne se reprend pas ; la table entamee est annulee, l'instantane supprime.
-            if (enCours is not null) await CopieTelleQuelle.AnnulerAsync(o.ConnexionV3, journal.Id, enCours);
+            if (enCours is not null) await CopieTelleQuelle.AnnulerAsync(o.ConnexionV3, journal.Id, enCours, parTableEnCours);
             await ArreterAsync(journal, "Arret sur un ecart : " + e.Message, Totaux(), baseV2, chrono);
             return Rapport("arrete", "Arret sur un ecart : " + e.Message);
         }

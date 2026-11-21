@@ -23,9 +23,29 @@ public static class ExtraitRigDev
 {
     public sealed record Bilan(IReadOnlyDictionary<string, long> Lignes, int Cles, int Declencheurs, IReadOnlyList<string> DeclencheursNonRecrees);
 
+    /// <summary>
+    /// L'extrait d'un banc complete d'un petit extrait de chaque table des regles du serveur qu'il ne tire pas deja : un banc qui
+    /// transfere avec les regles du serveur (l'outil, le passage) doit les avoir toutes dans sa base V2, sinon le transfert la
+    /// refuse (« table attendue absente », REC-001 CA01). Depuis le lot 10, ces regles portent aussi les fiches de REC-012 a
+    /// REC-019 (FichesV3.cs) ; une story qui en ajoute d'autres n'a rien a changer aux bancs.
+    /// </summary>
+    public static Dictionary<string, string> Completer(IReadOnlyDictionary<string, string> extraits, IEnumerable<string> entieres,
+                                                       IEnumerable<string> tablesDesRegles, int lignes = 20)
+    {
+        var complet = new Dictionary<string, string>(extraits, StringComparer.OrdinalIgnoreCase);
+        var deja = new HashSet<string>(entieres, StringComparer.OrdinalIgnoreCase);
+        foreach (var t in tablesDesRegles.Where(t => !deja.Contains(t) && !complet.ContainsKey(t)))
+            complet[t] = $"SELECT TOP ({lignes}) * FROM dbo.[{t}]";
+        return complet;
+    }
+
     public static async Task<Bilan> ConstruireAsync(string rigDev, string v2, IReadOnlyList<string> entieres,
                                                     IReadOnlyDictionary<string, string> extraits, Action<string> info)
     {
+        // Une table demandee deux fois (entiere et en extrait, ou deux fois entiere : CATEGORIE est lue par une reprise depuis le
+        // lot 10) n'est creee qu'une fois ; entiere l'emporte.
+        entieres = [.. entieres.Distinct(StringComparer.OrdinalIgnoreCase)];
+        extraits = extraits.Where(e => !entieres.Contains(e.Key, StringComparer.OrdinalIgnoreCase)).ToDictionary(e => e.Key, e => e.Value, StringComparer.OrdinalIgnoreCase);
         var tables = entieres.Concat(extraits.Keys).ToList();
         var dans = string.Join(", ", tables.Select(t => $"'{t}'"));
         var cles = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
@@ -112,6 +132,9 @@ public static class ExtraitRigDev
         var recrees = 0;
         foreach (DataRow r in declencheurs.Rows)
         {
+            // Une base qui ne laisse pas lire la definition de ses declencheurs (RIG_RECETTE pour le compte du poste, lu le
+            // 2026-11-21 : T_DEMANDE_VALIDATION) : le declencheur n'est pas recree, il est nomme.
+            if (r[2] is DBNull) { echoues.Add($"{r[0]} ({r[1]}) : definition illisible dans la base source"); continue; }
             try
             {
                 await using var cn = new SqlConnection(v2);

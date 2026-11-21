@@ -111,10 +111,24 @@ internal static class Remontee
             {
                 await FicheAsync(cn, fiches, c, parFiche, [], faites, arretees, compte, ct);
             }
-            catch (Exception e) when (!ct.IsCancellationRequested && e is SqlException or RecopieEnAttente or RecopieBloquee or EchecFiche)
+            catch (Exception e) when (!ct.IsCancellationRequested && e is SqlException or RecopieEnAttente or RecopieBloquee or RecopieRefusee or RecopieImpossible or EchecFiche)
             {
                 await RetirerMarqueAsync(cn);
                 var (tableEnCause, idEnCause, cause) = e is EchecFiche f ? (f.Table, f.Id, f.InnerException!) : (c.Table.NomV2, c.IdV2, e);
+                if (cause is RecopieImpossible impossible && fiches.ParTableV2.TryGetValue(tableEnCause, out var ti))
+                {
+                    // Aucun essai ne la fera passer : mise de cote d'emblee, et l'ecart pour l'agent designe (REC-013 CA03).
+                    var versionImpossible = parFiche.TryGetValue((tableEnCause, idEnCause), out var ci) ? ci.Version : c.Version;
+                    arretees.Add((tableEnCause, idEnCause));
+                    arretees.Add((c.Table.NomV2, c.IdV2));
+                    compte.Refusees++;
+                    if (await MisesDeCote.RefuserV2Async(cn, b, tableEnCause, idEnCause, versionImpossible, cause.Message, ct, seuil: 1))
+                    {
+                        compte.MisesDeCote++;
+                        await Applicateur.EcrireEcartImpossibleAsync(cn, ti, impossible, ct, "V2 vers V3");
+                    }
+                    continue;
+                }
                 if (cause is RecopieBloquee)
                 {
                     // Elle attend sans essai ; notee « en echec » pour etre rejouee : le point de reprise avance quand meme.
@@ -163,7 +177,7 @@ internal static class Remontee
             await FicheSansNomAsync(cn, fiches, c, parFiche, pile, faites, arretees, compte, ct);
         }
         // L'echec porte le nom de SA fiche : une fiche visee refusee compte son essai, pas celle qui la vise.
-        catch (Exception e) when (!ct.IsCancellationRequested && e is SqlException or RecopieEnAttente)
+        catch (Exception e) when (!ct.IsCancellationRequested && e is SqlException or RecopieEnAttente or RecopieRefusee or RecopieImpossible)
         {
             throw new EchecFiche(t.NomV2, c.IdV2, e);
         }
@@ -228,8 +242,17 @@ internal static class Remontee
                     var idTransfert = int.Parse((await ScalaireAsync(cn, tx, "SELECT CONVERT(nvarchar(20), IdTransfert) FROM rec.Remontee WHERE BaseV2 = @b;", ct,
                                                                      ("@b", t.BaseV2)))!);
                     var avecPropres = await TraduireAsync(cn, tx, t,
-                        LigneJson.Lire(await ScalaireAsync(cn, tx, t.SelectJson(t.NomV2Sql, t.Colonnes.Concat(t.Propres), "@id"), ct, ("@id", c.IdV2)))!,
+                        LigneJson.Lire(await ScalaireAsync(cn, tx, t.SelectJson(t.NomV2Sql, t.Colonnes.Concat(t.PropresV3), "@id"), ct, ("@id", c.IdV2)))!,
                         versV2: false, ct);
+                    // Une valeur que la V3 tient unique et qu'une AUTRE fiche de la V3 porte deja : le doublon n'est pas cree en
+                    // silence (REC-013 CA03 : le code abrege, la fiche de la V3 le garde).
+                    if (t.Regle.Unique is { UniqueDansV3: true } u && avecPropres.TryGetValue(u.ColonneV2, out var brutUnique)
+                        && TableRecopiee.TexteDe(brutUnique) is { } valeurUnique
+                        && await ScalaireAsync(cn, tx, $"SELECT TOP (1) {Sql.EnTexte("x", t.CleV3)} FROM {t.NomV3Sql} AS x " +
+                                                       $"WHERE x.{Sql.Q(t.ColonneV3(t.V2.Colonne(u.ColonneV2)).Nom)} = @u;", ct, ("@u", valeurUnique)) is { } autreV3)
+                        throw new RecopieImpossible($"{u.Libelle} deja pris dans la V3 : « {valeurUnique} » est celui de la fiche {t.Regle.Libelle} {autreV3} " +
+                                                    $"de la V3, qui le garde ; la fiche {c.IdV2} de la V2 n'y est pas creee", c.IdV2, autreV3, u.ColonneV2,
+                                                    brutUnique, brutUnique);
                     idV3 = await CreerV3Async(cn, tx, t, c.IdV2, avecPropres, ct);
                     await CorrespondreAsync(cn, tx, t, c.IdV2, idV3, idTransfert, "remontee", ct);
                     await JournalAsync(cn, tx, t, idV3, "a cree", Lisibles(enV3, t.Colonnes.Select(x => x.Nom)), ct,

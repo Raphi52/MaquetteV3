@@ -161,6 +161,8 @@ var extraits = new Dictionary<string, string>
     ["DOSSIER_RCS"] = "SELECT TOP (300) * FROM dbo.DOSSIER_RCS ORDER BY DSSRC_ID_DSRCS DESC",
     ["INSCRIPTION"] = "SELECT TOP (300) * FROM dbo.INSCRIPTION ORDER BY INEDT_ID_INSCR DESC",
 };
+// Le passage transfere avec les regles du serveur : la base V2 a chacune de leurs tables (REC-012 a REC-019 depuis le lot 10).
+extraits = ExtraitRigDev.Completer(extraits, entieres, reglesServeur.Regles.Select(r => r.Table));
 var modeleV2 = await NouvelleBase("PassageModeleV2");
 var extrait = await ExtraitRigDev.ConstruireAsync(chaineRigDev, modeleV2.Connexion, entieres, extraits, Info);
 // Les trois programmes de numerotation d'origine, tels que la V2 les a (QUOTED_IDENTIFIER OFF : ils ecrivent « "9999" »).

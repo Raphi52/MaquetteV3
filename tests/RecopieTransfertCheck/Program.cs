@@ -79,12 +79,14 @@ catch (SqlException e)
 }
 
 var reglesServeur = ReglesTransfert.Decouvrir();
-var tellesQuelles = reglesServeur.Regles.Where(r => r.Sorte == SorteRegle.TelleQuelle).Select(r => r.Table).ToList();
+// Les tables copiees telles quelles dans v2.X ; depuis le lot 10, les fiches partagees ont leur table dans la V3 (rec.Client...,
+// RegleTable.Cible) et leur banc (RecopieFichesCheck) : ce banc garde la copie telle quelle et le rapport de toutes.
+var tellesQuelles = reglesServeur.Regles.Where(r => r.Sorte == SorteRegle.TelleQuelle && r.Cible is null).Select(r => r.Table).ToList();
 var tablesPrevues = new[] { "AFFAIRE", "DEMANDE", "ACTION_RCS", "ADRESSE_BASE", "ARRIVEE", "CATEGORIE", "CLIENT", "DOSSIER_RCS", "INSCRIPTION", "UTILISATEUR" };
 Exiger(tablesPrevues.All(t => reglesServeur.Regles.Any(r => r.Table == t)) &&
-       reglesServeur.Reprises.Select(r => r.Nom).SequenceEqual(["reglages du greffe", "comptes et droits", "compteurs de numeros"]),
+       reglesServeur.Reprises.Select(r => r.Nom).SequenceEqual(["reglages du greffe", "comptes et droits", "types de demande par reference", "adresse inconnue unique", "compteurs de numeros"]),
     $"REC-001 T03 : chaque table de tables_v2 de REC-001 a sa regle ({tellesQuelles.Count} telles quelles, UTILISATEUR par la reprise des comptes), " +
-    $"et les 3 reprises de la phase 1 sont branchees dans l'ordre : {string.Join(", ", reglesServeur.Reprises.Select(r => $"{r.Nom} ({r.Story})"))}");
+    $"et les 3 reprises de la phase 1 et les 2 du lot 10 sont branchees dans l'ordre : {string.Join(", ", reglesServeur.Reprises.Select(r => $"{r.Nom} ({r.Story})"))}");
 
 // Le catalogue REEL de RIG_DEV, lu par le moteur (CA01) : ses tables telles quelles se recreent sur ce poste avec les memes
 // types. RIG_DEV garde un classement sur des colonnes bit et datetime, que la base jetable ne peut pas reproduire : c'est
@@ -101,7 +103,7 @@ await using (var ddl = await BaseJetable.CreerAsync("RecopieTransfertDdl"))
 {
     await Executer(ddl.Connexion, "EXEC (N'CREATE SCHEMA v2');");
     var ecarts = new List<string>();
-    foreach (var t in tablesPrevues.Where(tellesQuellesServeur => reglesServeur.Regles.Single(r => r.Table == tellesQuellesServeur).Sorte == SorteRegle.TelleQuelle))
+    foreach (var t in tablesPrevues.Where(t => tellesQuelles.Contains(t)))
     {
         await Executer(ddl.Connexion, CopieTelleQuelle.Ddl(catalogueRigDev.Tables[t]));
         var attendu = await Lire(chaineRigDev, $"SELECT name, TYPE_NAME(system_type_id), max_length, precision, scale, is_nullable, is_identity FROM sys.columns WHERE object_id = OBJECT_ID('dbo.{t}') ORDER BY column_id");
@@ -114,7 +116,7 @@ await using (var ddl = await BaseJetable.CreerAsync("RecopieTransfertDdl"))
     Exiger(catalogueRigDev.Tables.Count == Convert.ToInt32(direct[0]) && catalogueRigDev.NombreCles == Convert.ToInt32(direct[1])
            && catalogueRigDev.NombreDeclencheurs == Convert.ToInt32(direct[2]) && ecarts.Count == 0 && bitsClasses > 0,
         $"REC-001 CA01 : le moteur lit le catalogue reel de RIG_DEV ({catalogueRigDev.Tables.Count} tables, {catalogueRigDev.NombreCles} cles etrangeres, " +
-        $"{catalogueRigDev.NombreDeclencheurs} declencheurs : les nombres de SQL Server) et recree ses 9 tables telles quelles avec les memes colonnes, types, " +
+        $"{catalogueRigDev.NombreDeclencheurs} declencheurs : les nombres de SQL Server) et recree ses tables telles quelles avec les memes colonnes, types, " +
         $"tailles et identites, malgre les {bitsClasses} colonnes non texte qui y portent un classement {string.Join(", ", ecarts)}");
 }
 var sansRegle = catalogueRigDev.Tables.Keys.Count(t => !reglesServeur.Regles.Any(r => string.Equals(r.Table, t, StringComparison.OrdinalIgnoreCase)));
@@ -133,6 +135,8 @@ var extraits = new Dictionary<string, string>
     ["DOSSIER_RCS"] = "SELECT TOP (3000) * FROM dbo.DOSSIER_RCS ORDER BY DSSRC_ID_DSRCS DESC",
     ["INSCRIPTION"] = "SELECT TOP (3000) * FROM dbo.INSCRIPTION ORDER BY INEDT_ID_INSCR DESC",
 };
+// L'outil transfere avec les regles du serveur : la base V2 a chacune de leurs tables (REC-012 a REC-019 depuis le lot 10).
+extraits = ExtraitRigDev.Completer(extraits, entieres, reglesServeur.Regles.Select(r => r.Table));
 await using var v2 = await BaseJetable.CreerAsync("RecopieTransfertV2");
 var chronoExtrait = Stopwatch.StartNew();
 var extrait = await ExtraitRigDev.ConstruireAsync(chaineRigDev, v2.Connexion, entieres, extraits, Info);
@@ -140,12 +144,13 @@ Info($"base V2 jetable {v2.Nom} : {extrait.Lignes.Values.Sum()} lignes dans {ext
      $"{extrait.Declencheurs} declencheurs recrees (desactives) en {chronoExtrait.Elapsed.TotalSeconds:0} s ; " +
      string.Join(", ", extrait.Lignes.Where(l => extraits.ContainsKey(l.Key)).Select(l => $"{l.Key} {l.Value}")));
 foreach (var d in extrait.DeclencheursNonRecrees) Info("declencheur non recree : " + d);
-Exiger(extrait.Lignes.Count == tellesQuelles.Count + entieres.Count - 1 && extrait.Lignes.All(l => l.Value > 0 || l.Key is "NUMERO_METIER_SAVE_CDU" or "MAIL_TEMPLATE"),
+Exiger(extrait.Lignes.Count == reglesServeur.Regles.Select(r => r.Table).Concat(entieres).Distinct(StringComparer.OrdinalIgnoreCase).Count()
+       && extrait.Lignes.All(l => l.Value > 0 || l.Key is "NUMERO_METIER_SAVE_CDU" or "MAIL_TEMPLATE" or "CLIENT_CONTACT" or "BATEAU"),
     $"base V2 jetable tiree de RIG_DEV : {extrait.Lignes.Count} tables, fermee sur ses {extrait.Cles} cles etrangeres (reposees avec verification)");
 
 // La colonne en plus (CA01, jumeau accepte) et les deux liens casses herites (CA04), cle desactivee comme dans une base reprise.
-await Executer(v2.Connexion, "ALTER TABLE dbo.CLIENT ADD COLONNE_EN_PLUS_REC001 varchar(30) NULL;");
-await Executer(v2.Connexion, "UPDATE dbo.CLIENT SET COLONNE_EN_PLUS_REC001 = 'en plus ' + CONVERT(varchar(12), CLIEN_ID_CLIEN);");
+await Executer(v2.Connexion, "ALTER TABLE dbo.ARRIVEE ADD COLONNE_EN_PLUS_REC001 varchar(30) NULL;");
+await Executer(v2.Connexion, "UPDATE dbo.ARRIVEE SET COLONNE_EN_PLUS_REC001 = 'en plus ' + CONVERT(varchar(12), ARRV_ID_ARRV);");
 var cleAdresse = (string)(await Valeur(v2.Connexion, "SELECT name FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('dbo.DEMANDE') AND referenced_object_id = OBJECT_ID('dbo.ADRESSE_BASE')"))!;
 var cleClient = (string)(await Valeur(v2.Connexion, "SELECT name FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('dbo.AFFAIRE') AND referenced_object_id = OBJECT_ID('dbo.CLIENT')"))!;
 var cleMere = (string)(await Valeur(v2.Connexion, "SELECT f.name FROM sys.foreign_keys f JOIN sys.foreign_key_columns c ON c.constraint_object_id = f.object_id " +
@@ -253,23 +258,23 @@ async Task<List<string>> Differences(BaseJetable v3, IEnumerable<string> tables,
     return diff;
 }
 var diffA = await Differences(v3A, tellesQuelles);
-var colonneEnPlus = await Nombre(v3A.Connexion, $"SELECT COUNT(*) FROM v2.CLIENT c JOIN [{v2.Nom}].dbo.CLIENT o ON o.CLIEN_ID_CLIEN = c.CLIEN_ID_CLIEN AND o.COLONNE_EN_PLUS_REC001 = c.COLONNE_EN_PLUS_REC001");
+var colonneEnPlus = await Nombre(v3A.Connexion, $"SELECT COUNT(*) FROM v2.ARRIVEE c JOIN [{v2.Nom}].dbo.ARRIVEE o ON o.ARRV_ID_ARRV = c.ARRV_ID_ARRV AND o.COLONNE_EN_PLUS_REC001 = c.COLONNE_EN_PLUS_REC001");
 Exiger(diffA.Count == 0,
     $"REC-001 : valeurs identiques — pour les {tellesQuelles.Count} tables telles quelles, chaque ligne de la V2 a sa pareille exacte dans la V3 et reciproquement " +
     $"(EXCEPT, toutes colonnes) {string.Join(" ; ", diffA)}");
 // Contre-epreuve : une seule valeur changee dans la V3 rougit l'oracle.
-var clientTemoin = await Nombre(v3A.Connexion, "SELECT MAX(CLIEN_ID_CLIEN) FROM v2.CLIENT");
-await Executer(v3A.Connexion, $"UPDATE v2.CLIENT SET COLONNE_EN_PLUS_REC001 = 'change' WHERE CLIEN_ID_CLIEN = {clientTemoin}");
-var diffTemoin = await Differences(v3A, ["CLIENT"]);
-await Executer(v3A.Connexion, $"UPDATE v2.CLIENT SET COLONNE_EN_PLUS_REC001 = 'en plus ' + CONVERT(varchar(12), CLIEN_ID_CLIEN) WHERE CLIEN_ID_CLIEN = {clientTemoin}");
-Exiger(diffTemoin.Count == 1 && diffTemoin[0].Contains("1 lignes V2") && (await Differences(v3A, ["CLIENT"])).Count == 0,
-    $"REC-001 contre-epreuve : une valeur changee dans la V3 (CLIENT {clientTemoin}) est vue par l'oracle ({string.Join("", diffTemoin)}), et plus rien une fois remise");
+var clientTemoin = await Nombre(v3A.Connexion, "SELECT MAX(ARRV_ID_ARRV) FROM v2.ARRIVEE");
+await Executer(v3A.Connexion, $"UPDATE v2.ARRIVEE SET COLONNE_EN_PLUS_REC001 = 'change' WHERE ARRV_ID_ARRV = {clientTemoin}");
+var diffTemoin = await Differences(v3A, ["ARRIVEE"]);
+await Executer(v3A.Connexion, $"UPDATE v2.ARRIVEE SET COLONNE_EN_PLUS_REC001 = 'en plus ' + CONVERT(varchar(12), ARRV_ID_ARRV) WHERE ARRV_ID_ARRV = {clientTemoin}");
+Exiger(diffTemoin.Count == 1 && diffTemoin[0].Contains("1 lignes V2") && (await Differences(v3A, ["ARRIVEE"])).Count == 0,
+    $"REC-001 contre-epreuve : une valeur changee dans la V3 (ARRIVEE {clientTemoin}) est vue par l'oracle ({string.Join("", diffTemoin)}), et plus rien une fois remise");
 
 // CA01, jumeau accepte : une colonne en plus est imprimee et copiee telle quelle, le transfert continue.
 var journalA = await Lire(v3A.Connexion, $"SELECT Genre, Message FROM rec.TransfertEvenement WHERE IdTransfert = {idA} ORDER BY Id");
 var lignesJournalA = journalA.Rows.Cast<DataRow>().Select(r => ((string)r[0], (string)r[1])).ToList();
-Exiger(lignesJournalA.Any(l => l.Item1 == "schema" && l.Item2.Contains("colonne en plus : CLIENT.COLONNE_EN_PLUS_REC001")) && texteA.Contains("CLIENT.COLONNE_EN_PLUS_REC001")
-       && colonneEnPlus == extrait.Lignes["CLIENT"],
+Exiger(lignesJournalA.Any(l => l.Item1 == "schema" && l.Item2.Contains("colonne en plus : ARRIVEE.COLONNE_EN_PLUS_REC001")) && texteA.Contains("ARRIVEE.COLONNE_EN_PLUS_REC001")
+       && colonneEnPlus == extrait.Lignes["ARRIVEE"],
     $"REC-001 CA01 (jumeau accepte) : la colonne en plus de la base est imprimee et au journal, puis copiee telle quelle ({colonneEnPlus} valeurs identiques) ; une colonne ne bloque pas");
 
 // Les reprises de la phase 1 : appelees (journal), leurs tables remplies par leur propre code, et jamais refaites ici.
@@ -295,11 +300,12 @@ Exiger(Appel("reglages du greffe") >= 0 && Appel("reglages du greffe") < Appel("
     "REC-001 : reglages et comptes repris avant les tables ; les compteurs en dernier, dans la V2 vivante (NUM-005 : leur derniere valeur)");
 
 // L'ordre d'ecriture deduit des cles etrangeres.
-var ordreTables = tablesA.Rows.Cast<DataRow>().Where(r => (string)r["Regle"] == "telle quelle").ToDictionary(r => (string)r["TableV2"], r => (int)r["Ordre"]);
+// Toutes les tables copiees par lots, telles quelles ou colonne par colonne (lot 10) : un seul ordre d'ecriture.
+var ordreTables = tablesA.Rows.Cast<DataRow>().Where(r => (string)r["Regle"] is "telle quelle" or "colonne par colonne").ToDictionary(r => (string)r["TableV2"], r => (int)r["Ordre"]);
 var liensTQ = await Lire(v2.Connexion, "SELECT OBJECT_NAME(parent_object_id), OBJECT_NAME(referenced_object_id) FROM sys.foreign_keys WHERE parent_object_id <> referenced_object_id");
 var inverses = liensTQ.Rows.Cast<DataRow>().Where(r => ordreTables.ContainsKey((string)r[0]) && ordreTables.ContainsKey((string)r[1]) && ordreTables[(string)r[0]] <= ordreTables[(string)r[1]])
     .Select(r => $"{r[0]} -> {r[1]}").ToList();
-Exiger(inverses.Count == 0 && ordreTables.Count == tellesQuelles.Count,
+Exiger(inverses.Count == 0 && ordreTables.Count == reglesServeur.Regles.Count(r => r.Sorte == SorteRegle.TelleQuelle),
     $"REC-001 T02 : ordre d'ecriture deduit des cles etrangeres, chaque table apres celles qu'elle vise : " +
     $"{string.Join(", ", ordreTables.OrderBy(o => o.Value).Select(o => o.Key))} {string.Join(", ", inverses)}");
 
@@ -326,9 +332,9 @@ Exiger(marquees.Rows.Count == 2 && Marque("DEMANDE", demandeCassee, cleAdresse, 
 Exiger(avant == apres && ecrituresApres == ecrituresAvant && await InstantanesRestes() == 0,
     $"REC-001 CA06 : la base V2 est identique avant et apres le transfert (empreinte de ses {avant.Split('|').Length} tables, " +
     $"{ecrituresApres - ecrituresAvant} ecriture physique comptee par SQL Server sur ses index) ; l'instantane est supprime");
-await Executer(v2.Connexion, $"UPDATE dbo.CLIENT SET COLONNE_EN_PLUS_REC001 = 'temoin' WHERE CLIEN_ID_CLIEN = {clientTemoin}");
+await Executer(v2.Connexion, $"UPDATE dbo.ARRIVEE SET COLONNE_EN_PLUS_REC001 = 'temoin' WHERE ARRV_ID_ARRV = {clientTemoin}");
 var empreinteTemoin = await Empreinte();
-await Executer(v2.Connexion, $"UPDATE dbo.CLIENT SET COLONNE_EN_PLUS_REC001 = 'en plus ' + CONVERT(varchar(12), CLIEN_ID_CLIEN) WHERE CLIEN_ID_CLIEN = {clientTemoin}");
+await Executer(v2.Connexion, $"UPDATE dbo.ARRIVEE SET COLONNE_EN_PLUS_REC001 = 'en plus ' + CONVERT(varchar(12), ARRV_ID_ARRV) WHERE ARRV_ID_ARRV = {clientTemoin}");
 Exiger(empreinteTemoin != avant && await EcrituresPhysiques() > ecrituresApres,
     "REC-001 CA06 contre-epreuve : une seule valeur ecrite dans la V2 change son empreinte et le compte des ecritures physiques");
 
@@ -359,7 +365,7 @@ Reste("REC-001 CA02 sur la copie anonymisee de la PLUS GROSSE des 40 bases, sur 
 
 // Le rapport de fin de nuit (T04) et l'evenement 210.
 var evenement210 = await Nombre(v3A.Connexion, $"SELECT COUNT(*) FROM soc.EvenementTechnique WHERE Code = 210 AND Detail LIKE N'Transfert initial de la base V2 {v2.Nom} (transfert {idA})%'");
-Exiger(texteA.Contains("table ") && tablesPrevues.All(t => Regex.IsMatch(texteA, $@"^\s+{t}\s+(telle quelle|reprise)\s+\d+", RegexOptions.Multiline)) && evenement210 == 1
+Exiger(texteA.Contains("table ") && tablesPrevues.All(t => Regex.IsMatch(texteA, $@"^\s+{t}\s+(telle quelle|colonne par colonne|reprise)\s+\d+", RegexOptions.Multiline)) && evenement210 == 1
        && transfertA["InstantaneLe"] is DateTime,
     $"REC-001 T04 : le rapport de fin de nuit imprime chaque table (lues, ecrites, rejetees, liens, duree), le journal garde l'instantane date " +
     $"({transfertA["InstantaneLe"]:yyyy-MM-dd HH:mm:ss}) et un seul evenement 210 « reprise de donnees » le dit");
@@ -418,7 +424,7 @@ var agents = Task.Run(async () =>
             await using var cmd = new SqlCommand(
                 $"INSERT INTO dbo.ARRIVEE ({string.Join(", ", colonnesArrivee)}) SELECT {string.Join(", ", colonnesArrivee)} FROM dbo.ARRIVEE WHERE ARRV_ID_ARRV = {modeleArrivee}; " +
                 "DECLARE @id bigint = SCOPE_IDENTITY(); " +
-                $"UPDATE dbo.CLIENT SET COLONNE_EN_PLUS_REC001 = 'ecrit {n}' WHERE CLIEN_ID_CLIEN = {clientTemoin}; SELECT @id;", cn);
+                $"UPDATE dbo.ARRIVEE SET COLONNE_EN_PLUS_REC001 = 'ecrit {n}' WHERE ARRV_ID_ARRV = {clientTemoin}; SELECT @id;", cn);
             var id = Convert.ToInt64(await cmd.ExecuteScalarAsync());
             ecritures.Add((n, id, debut, DateTime.Now, false));
         }
@@ -443,7 +449,7 @@ var faites = ecritures.Where(e => !e.Bloquee).ToList();
 var pendant = faites.Where(e => e.Debut > instantanePris).ToList();
 var avantInstantane = faites.Where(e => e.Fin < debutTransfert).ToList();
 var idsV3 = (await Lire(v3B.Connexion, "SELECT ARRV_ID_ARRV FROM v2.ARRIVEE")).Rows.Cast<DataRow>().Select(r => Convert.ToInt64(r[0])).ToHashSet();
-var valeurV3 = (string?)await Valeur(v3B.Connexion, $"SELECT COLONNE_EN_PLUS_REC001 FROM v2.CLIENT WHERE CLIEN_ID_CLIEN = {clientTemoin}");
+var valeurV3 = (string?)await Valeur(v3B.Connexion, $"SELECT COLONNE_EN_PLUS_REC001 FROM v2.ARRIVEE WHERE ARRV_ID_ARRV = {clientTemoin}");
 var kV3 = valeurV3 is { } vv && vv.StartsWith("ecrit ") ? int.Parse(vv[6..]) : 0;
 var plusLongue = faites.Count == 0 ? 0 : faites.Max(e => (e.Fin - e.Debut).TotalMilliseconds);
 Exiger(rapportB.Etat == "fini" && ecritures.Count(e => e.Bloquee) == 0 && plusLongue < 2000 && pendant.Count > 0,
@@ -452,53 +458,56 @@ Exiger(rapportB.Etat == "fini" && ecritures.Count(e => e.Bloquee) == 0 && plusLo
 Exiger(avantInstantane.All(e => idsV3.Contains(e.Id)) && pendant.All(e => !idsV3.Contains(e.Id)) && avantInstantane.Count > 0
        && kV3 >= avantInstantane.Max(e => e.N) && kV3 < pendant.Min(e => e.N),
     $"REC-001 CA05 : la V3 porte l'etat fige date du {rapportB.InstantaneLe:HH:mm:ss.fff} — les {avantInstantane.Count} arrivees ecrites avant y sont, " +
-    $"aucune des {pendant.Count} ecrites apres ; le client modifie y a la valeur « {valeurV3} » de ce moment, la V2 a continue jusqu'a « ecrit {faites.Max(e => e.N)} »");
-var aRejouer = (await Lire(v2.Connexion, $"SELECT ARRV_ID_ARRV FROM CHANGETABLE(CHANGES dbo.ARRIVEE, {rapportB.VersionSuivi ?? 0}) c"))
+    $"aucune des {pendant.Count} ecrites apres ; l'arrivee temoin modifiee y a la valeur « {valeurV3} » de ce moment, la V2 a continue jusqu'a « ecrit {faites.Max(e => e.N)} »");
+// La ligne temoin est une arrivee depuis le lot 10 (CLIENT a sa table rec.Client) : elle est dans la V3, modifiee apres, et
+// comptee a part ; les autres changements d'ARRIVEE sont exactement les arrivees que le transfert n'a pas prises.
+var aRejouer = (await Lire(v2.Connexion, $"SELECT ARRV_ID_ARRV FROM CHANGETABLE(CHANGES dbo.ARRIVEE, {rapportB.VersionSuivi ?? 0}) c WHERE c.ARRV_ID_ARRV <> {clientTemoin}"))
     .Rows.Cast<DataRow>().Select(r => Convert.ToInt64(r[0])).ToHashSet();
 var manquantes = faites.Select(e => e.Id).Where(id => !idsV3.Contains(id)).ToHashSet();
-var clientARejouer = await Nombre(v2.Connexion, $"SELECT COUNT(*) FROM CHANGETABLE(CHANGES dbo.CLIENT, {rapportB.VersionSuivi ?? 0}) c WHERE c.CLIEN_ID_CLIEN = {clientTemoin}");
+var clientARejouer = await Nombre(v2.Connexion, $"SELECT COUNT(*) FROM CHANGETABLE(CHANGES dbo.ARRIVEE, {rapportB.VersionSuivi ?? 0}) c WHERE c.ARRV_ID_ARRV = {clientTemoin}");
 Exiger(rapportB.VersionSuivi is not null && aRejouer.SetEquals(manquantes) && clientARejouer == 1,
     $"REC-001 CA05 : le journal garde la version du suivi des changements lue dans l'instantane ({rapportB.VersionSuivi}) ; les changements de la V2 depuis cette version " +
-    $"sont exactement ce que le transfert n'a pas pris ({aRejouer.Count} arrivees, le client modifie) : la recopie continue (REC-003) les rejouera de la");
+    $"sont exactement ce que le transfert n'a pas pris ({aRejouer.Count} arrivees ecrites, l'arrivee temoin modifiee) : la recopie continue (REC-003) les rejouera de la");
 Reste("REC-001 CA05 « la recopie continue rejoue ce qui a ete ecrit apres » : le lecteur de changements est REC-003 (lot 9) ; ce banc prouve qu'il a son point de depart exact");
 
 // ====================================================================================================
 // E. Un ecart pendant l'ecriture : arret propre
 // ====================================================================================================
 var v3E = await NouvelleV3("RecopieTransfertE");
-// Une conversion qui CHANGE les valeurs sans erreur : une date a la milliseconde devient une date a la minute.
+// Une conversion qui CHANGE les valeurs sans erreur : une date a la milliseconde devient une date a la minute. Sur ARRIVEE,
+// copiee telle quelle (DOSSIER_RCS, la table des premiers essais, a sa table V3 depuis le lot 10).
 // fix-ok: le 1er scenario (varchar -> nvarchar) gardait chaque valeur a l'identique — BINARY_CHECKSUM('ABC123') vaut 72745491
 // en varchar comme en nvarchar (mesure sur le SQL Server du poste) — il n'y avait donc pas d'ecart de valeurs a voir.
 string? colonneConvertie = null;
-foreach (DataRow r in (await Lire(v2.Connexion, "SELECT name FROM sys.columns WHERE object_id = OBJECT_ID('dbo.DOSSIER_RCS') AND TYPE_NAME(system_type_id) = 'datetime' " +
+foreach (DataRow r in (await Lire(v2.Connexion, "SELECT name FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ARRIVEE') AND TYPE_NAME(system_type_id) = 'datetime' " +
                                                 "AND is_nullable = 1 ORDER BY column_id")).Rows)
 {
     var c = (string)r[0];
     if (await Nombre(v2.Connexion, $"SELECT CASE WHEN MIN([{c}]) >= '19000101' AND MAX([{c}]) < '20790601' AND COUNT(CASE WHEN DATEPART(second, [{c}]) <> 0 " +
-                                    $"OR DATEPART(millisecond, [{c}]) <> 0 THEN 1 END) > 0 THEN 1 ELSE 0 END FROM dbo.DOSSIER_RCS") == 1) { colonneConvertie = c; break; }
+                                    $"OR DATEPART(millisecond, [{c}]) <> 0 THEN 1 END) > 0 THEN 1 ELSE 0 END FROM dbo.ARRIVEE") == 1) { colonneConvertie = c; break; }
 }
-Exiger(colonneConvertie is not null, $"banc : une colonne date de DOSSIER_RCS a des secondes ({colonneConvertie})");
+Exiger(colonneConvertie is not null, $"banc : une colonne date de ARRIVEE a des secondes ({colonneConvertie})");
 await Executer(v3E.Connexion, $"""
     CREATE TRIGGER rec001_conversion_silencieuse ON DATABASE AFTER CREATE_TABLE AS
     BEGIN
         DECLARE @e xml = EVENTDATA();
-        IF @e.value('(/EVENT_INSTANCE/SchemaName)[1]', 'sysname') = N'v2' AND @e.value('(/EVENT_INSTANCE/ObjectName)[1]', 'sysname') = N'DOSSIER_RCS'
-            ALTER TABLE v2.DOSSIER_RCS ALTER COLUMN [{colonneConvertie}] smalldatetime NULL;
+        IF @e.value('(/EVENT_INSTANCE/SchemaName)[1]', 'sysname') = N'v2' AND @e.value('(/EVENT_INSTANCE/ObjectName)[1]', 'sysname') = N'ARRIVEE'
+            ALTER TABLE v2.ARRIVEE ALTER COLUMN [{colonneConvertie}] smalldatetime NULL;
     END
     """);
 var rapportE = await MoteurTransfert.TransfererAsync(new OptionsTransfert(v2.Connexion, v3E.Connexion) { TailleLot = 5000 });
-var ordreE = rapportE.Tables.Where(t => t.Regle == "telle quelle").Select(t => t.TableV2).ToList();
+var ordreE = rapportE.Tables.Where(t => t.Regle is "telle quelle" or "colonne par colonne").Select(t => t.TableV2).ToList();
 var tablesV3E = (await Lire(v3E.Connexion, "SELECT name FROM sys.tables WHERE schema_id = SCHEMA_ID('v2')")).Rows.Cast<DataRow>().Select(r => (string)r[0]).ToHashSet();
 var transfertE = (await Lire(v3E.Connexion, $"SELECT Etat, Motif FROM rec.Transfert WHERE Id = {rapportE.IdTransfert}")).Rows[0];
-var apresDossier = ordreTables.Where(o => o.Value > ordreTables["DOSSIER_RCS"]).Select(o => o.Key).ToList();
-Exiger(rapportE.Etat == "arrete" && rapportE.CodeSortie == 1 && (string)transfertE[0] == "arrete" && ((string)transfertE[1]).Contains("DOSSIER_RCS : les valeurs ecrites ne sont pas celles de la V2")
-       && !tablesV3E.Contains("DOSSIER_RCS") && ordreE.All(tablesV3E.Contains) && ordreE.Count == ordreTables["DOSSIER_RCS"] - 1
-       && apresDossier.All(t => !tablesV3E.Contains(t)) && await Nombre(v3E.Connexion, "SELECT COUNT(*) FROM num.Compteur") == 0
-       && await Nombre(v3E.Connexion, "SELECT COUNT(*) FROM rec.Correspondance WHERE TableV2 = 'DOSSIER_RCS'") == 0
+var apresArrivee = ordreTables.Where(o => o.Value > ordreTables["ARRIVEE"]).Select(o => o.Key).ToList();
+Exiger(rapportE.Etat == "arrete" && rapportE.CodeSortie == 1 && (string)transfertE[0] == "arrete" && ((string)transfertE[1]).Contains("ARRIVEE : les valeurs ecrites ne sont pas celles de la V2")
+       && !tablesV3E.Contains("ARRIVEE") && ordreE.Where(tellesQuelles.Contains).All(tablesV3E.Contains) && ordreE.Count == ordreTables["ARRIVEE"] - 1
+       && apresArrivee.All(t => !tablesV3E.Contains(t)) && await Nombre(v3E.Connexion, "SELECT COUNT(*) FROM num.Compteur") == 0
+       && await Nombre(v3E.Connexion, "SELECT COUNT(*) FROM rec.Correspondance WHERE TableV2 = 'ARRIVEE'") == 0
        && await Nombre(v3E.Connexion, "SELECT COUNT(*) FROM soc.EvenementTechnique WHERE Code = 210 AND Detail LIKE N'Transfert initial%'") == 0
        && await InstantanesRestes() == 0,
-    $"REC-001 : un ecart arrete le transfert proprement — colonne {colonneConvertie} de DOSSIER_RCS convertie en silence dans la V3 : l'empreinte de fin de table le voit, " +
-    $"la table est annulee (ni table ni correspondance), les {ordreE.Count} tables d'avant restent avec leur rapport, les {apresDossier.Count} d'apres et les compteurs ne sont pas faits, " +
+    $"REC-001 : un ecart arrete le transfert proprement — colonne {colonneConvertie} de ARRIVEE convertie en silence dans la V3 : l'empreinte de fin de table le voit, " +
+    $"la table est annulee (ni table ni correspondance), les {ordreE.Count} tables d'avant restent avec leur rapport, les {apresArrivee.Count} d'apres et les compteurs ne sont pas faits, " +
     $"journal « arrete » avec le motif (« {transfertE[1]} »), instantane supprime, code 1");
 
 // ====================================================================================================

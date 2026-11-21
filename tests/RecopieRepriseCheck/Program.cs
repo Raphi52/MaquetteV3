@@ -86,7 +86,9 @@ catch (SqlException e)
     return 1;
 }
 var reglesServeur = ReglesTransfert.Decouvrir();
-var tellesQuelles = reglesServeur.Regles.Where(r => r.Sorte == SorteRegle.TelleQuelle).Select(r => r.Table).ToList();
+// Les tables copiees telles quelles dans v2.X ; depuis le lot 10, CLIENT et les autres fiches partagees ont leur table dans la V3
+// (rec.Client..., RegleTable.Cible), reprises par lots de la meme facon : la reprise de CLIENT, plus bas, le prouve sur rec.Client.
+var tellesQuelles = reglesServeur.Regles.Where(r => r.Sorte == SorteRegle.TelleQuelle && r.Cible is null).Select(r => r.Table).ToList();
 var entieres = reglesServeur.Regles.Where(r => r.Sorte == SorteRegle.Reprise).Select(r => r.Table).Append("CATEGORIE").ToList();
 var extraits = new Dictionary<string, string>
 {
@@ -99,6 +101,8 @@ var extraits = new Dictionary<string, string>
     ["DOSSIER_RCS"] = "SELECT TOP (3000) * FROM dbo.DOSSIER_RCS ORDER BY DSSRC_ID_DSRCS DESC",
     ["INSCRIPTION"] = "SELECT TOP (3000) * FROM dbo.INSCRIPTION ORDER BY INEDT_ID_INSCR DESC",
 };
+// L'outil et le moteur transferent avec les regles du serveur : la base V2 a chacune de leurs tables (REC-012 a REC-019).
+extraits = ExtraitRigDev.Completer(extraits, entieres, reglesServeur.Regles.Select(r => r.Table));
 await using var v2 = await BaseJetable.CreerAsync("RecopieRepriseV2");
 var chronoExtrait = Stopwatch.StartNew();
 var extrait = await ExtraitRigDev.ConstruireAsync(chaineRigDev, v2.Connexion, entieres, extraits, Info);
@@ -256,13 +260,14 @@ var rapportB = await MoteurTransfert.TransfererAsync(new OptionsTransfert(v2.Con
 var transfertB = (await Lire(v3B.Connexion, "SELECT Etat, Motif, PointDeReprise FROM rec.Transfert")).Rows[0];
 Exiger(rapportB.Etat == "interrompu" && rapportB.CodeSortie == 4 && (string)transfertB[0] == "interrompu" && ((string)transfertB[1]).Contains("table CLIENT")
        && ((string)transfertB[1]).Contains("la base ne repond plus") && ((string)transfertB[2]).Contains("table en cours CLIENT : lot 3 enregistre (1500 lignes")
-       && await Instantanes() == 1 && await Nombre(v3B.Connexion, "SELECT COUNT(*) FROM v2.CLIENT") == 3 * Lot,
+       && await Instantanes() == 1 && await Nombre(v3B.Connexion, "SELECT COUNT(*) FROM rec.Client") == 3 * Lot,
     $"REC-005 : un incident (erreur sur un lot) laisse le transfert « interrompu », code {rapportB.CodeSortie}, motif et point de reprise au journal " +
     $"(« {transfertB[2]} »), les 3 lots enregistres gardes et l'instantane garde pour la reprise");
 // Contre-epreuve : on efface le dernier lot enregistre de CLIENT -- le point de reprise ne dit plus ce que la table contient.
 await Executer(v3B.Connexion, "DELETE FROM rec.TransfertLot WHERE TableV2 = 'CLIENT' AND Lot = 3");
 var rapportB2 = await MoteurTransfert.TransfererAsync(new OptionsTransfert(v2.Connexion, v3B.Connexion) { TailleLot = Lot });
-var clientsB = await Nombre(v3B.Connexion, "SELECT COUNT(*) FROM sys.tables WHERE name = 'CLIENT' AND schema_id = SCHEMA_ID('v2')");
+// CLIENT a sa table V3 (rec.Client, lot 10) : annulee, elle est videe (sa migration l'a creee, elle reste).
+var clientsB = await Nombre(v3B.Connexion, "SELECT COUNT(*) FROM rec.Client");
 Exiger(rapportB2.Etat == "arrete" && rapportB2.CodeSortie == 1 && rapportB2.Motif!.Contains("CLIENT : point de reprise incoherent : lot 2 enregistre avec 1000 lignes")
        && rapportB2.Motif.Contains("a 1500 lignes") && clientsB == 0 && await Nombre(v3B.Connexion, "SELECT COUNT(*) FROM rec.Correspondance WHERE TableV2 = 'CLIENT'") == 0
        && await Instantanes() == 0,
@@ -281,19 +286,23 @@ var tablesC = (await Lire(v3A.Connexion, "SELECT TableV2, TableV3, LignesV2, Lig
                                          "WHERE IdComparaison = (SELECT MAX(Id) FROM rec.Comparaison)")).Rows.Cast<DataRow>().ToList();
 var comparaisonC = (await Lire(v3A.Connexion, "SELECT TOP (1) Etat, Tables, LignesComparees, Ecarts, Orphelins, SansCorrespondance, InstantaneV2, InstantaneV3 FROM rec.Comparaison ORDER BY Id DESC")).Rows[0];
 var tqComparees = tablesC.Where(r => (string)r[1] == "v2." + (string)r[0]).ToList();
+// Depuis le lot 10, 7 des fiches partagees ont leur table V3 (rec.*, REC-012 a REC-019) : comparees colonne par colonne, par
+// leur correspondance ; le nombre de lignes V3 d'un type de demande peut etre plus petit (types indiscernables fusionnes).
+var fichesC = tablesC.Where(r => ((string)r[1]).StartsWith("rec.", StringComparison.Ordinal)).ToList();
 var utilisateurC = tablesC.SingleOrDefault(r => (string)r[0] == "UTILISATEUR");
-Exiger(codeC == 0 && (string)comparaisonC[0] == "fini" && tqComparees.Count == 9
-       && tqComparees.All(r => Convert.ToInt64(r[2]) == extrait.Lignes[(string)r[0]] && Convert.ToInt64(r[3]) == Convert.ToInt64(r[2]) && Convert.ToInt64(r[4]) == Convert.ToInt64(r[2])
-                               && Convert.ToInt64(r[5]) == 0 && Convert.ToInt64(r[6]) == 0 && Convert.ToInt64(r[7]) == 0 && Convert.ToInt32(r[8]) > 5)
-       && utilisateurC is not null && (string)utilisateurC[1] == "soc.Compte" && Convert.ToInt64(utilisateurC[4]) == extrait.Lignes["UTILISATEUR"]
+bool Egale(DataRow r) => Convert.ToInt64(r[2]) == extrait.Lignes[(string)r[0]] && Convert.ToInt64(r[4]) == Convert.ToInt64(r[2])
+                         && Convert.ToInt64(r[5]) == 0 && Convert.ToInt64(r[6]) == 0 && Convert.ToInt64(r[7]) == 0;
+Exiger(codeC == 0 && (string)comparaisonC[0] == "fini" && tqComparees.Count == 3 && fichesC.Count == 7 && tablesC.Count == 11
+       && tqComparees.All(r => Egale(r) && Convert.ToInt64(r[3]) == Convert.ToInt64(r[2]) && Convert.ToInt32(r[8]) > 5)
+       && fichesC.All(r => Egale(r) && ((string)r[0] == "CATEGORIE" || Convert.ToInt64(r[3]) == Convert.ToInt64(r[2])) && Convert.ToInt32(r[8]) > 0)
+       && utilisateurC is not null && (string)utilisateurC[1] == "soc.Compte" && Egale(utilisateurC) && Convert.ToInt32(utilisateurC[8]) > 5
        && Convert.ToInt64(comparaisonC[3]) == 0 && Convert.ToInt64(comparaisonC[4]) == 0 && Convert.ToInt64(comparaisonC[5]) == 0 && comparaisonC[6] is string && comparaisonC[7] is string
        && await Instantanes(ComparaisonBases.Usage) == 0,
     $"REC-006 CA01 et T05 : le controle (outil, code {codeC}) compare pour chaque table partagee le nombre de lignes et l'empreinte de chaque ligne par la correspondance, " +
-    $"et ecrit son rapport : {comparaisonC[1]} tables, {comparaisonC[2]} lignes comparees, 0 ecart, 0 sans correspondance, 0 orphelin ; les 9 tables telles quelles toutes colonnes " +
-    $"({string.Join(", ", tqComparees.Select(r => $"{r[0]} {r[4]}/{r[2]}"))}), UTILISATEUR -> soc.Compte par ses {utilisateurC?[4]} correspondances ; " +
-    $"etats figes {comparaisonC[6]} et {comparaisonC[7]}, supprimes a la fin");
-Reste("REC-006 T03 : UTILISATEUR (porte par la reprise des comptes, SOC-002) n'a que ses correspondances controlees : la conversion de ses colonnes vers soc.Compte est a decrire " +
-      "par sa story (les colonnes propres des tables recopiees par le lot 9, ReglesRec002, sont ecartees du controle : RecopieDeuxSensCheck)");
+    $"et ecrit son rapport : {comparaisonC[1]} tables, {comparaisonC[2]} lignes comparees, 0 ecart, 0 sans correspondance, 0 orphelin ; les 3 tables telles quelles toutes colonnes " +
+    $"({string.Join(", ", tqComparees.Select(r => $"{r[0]} {r[4]}/{r[2]}"))}), les 7 fiches dans leur table V3 colonne par colonne " +
+    $"({string.Join(", ", fichesC.Select(r => $"{r[0]} -> {r[1]} {r[4]}/{r[2]}, {r[8]} colonnes"))}), UTILISATEUR -> soc.Compte par ses {utilisateurC?[4]} correspondances, " +
+    $"{utilisateurC?[8]} colonnes (REC-017) ; etats figes {comparaisonC[6]} et {comparaisonC[7]}, supprimes a la fin");
 
 // CA02 : un ecart introduit EXPRES de chaque cote, sans passer par la capture.
 var clientEcart = await Nombre(v2.Connexion, "SELECT MAX(CLIEN_ID_CLIEN) FROM dbo.CLIENT");
@@ -314,8 +323,8 @@ Exiger(rapportEcart.CodeSortie == 5 && rapportEcart.Ecarts == 3 && ecartsVus.Cou
     $"REC-006 CA02 et T06 : trois ecarts injectes sans la capture (deux dans la V2, un dans la V3) sont listes avec leur table, les deux identifiants et les colonnes qui different : " +
     string.Join(" ; ", ecartsVus.Select(e => $"{e.TableV2} {e.IdV2}->{e.IdV3} [{e.Colonnes}]")) + $" (code {rapportEcart.CodeSortie}, rec.ComparaisonEcart : {ecartsEnBase})");
 // Contre-epreuve : les valeurs remises, plus rien.
-await Executer(v2.Connexion, $"UPDATE dbo.CLIENT SET CLIEN_NOM = (SELECT CLIEN_NOM FROM [{v3A.Nom}].v2.CLIENT WHERE CLIEN_ID_CLIEN = {clientEcart}), " +
-                             $"CLIEN_EMAIL = (SELECT CLIEN_EMAIL FROM [{v3A.Nom}].v2.CLIENT WHERE CLIEN_ID_CLIEN = {clientEcart}) WHERE CLIEN_ID_CLIEN = {clientEcart};");
+await Executer(v2.Connexion, $"UPDATE dbo.CLIENT SET CLIEN_NOM = (SELECT Nom FROM [{v3A.Nom}].rec.Client WHERE Id = {clientEcart}), " +
+                             $"CLIEN_EMAIL = (SELECT Email FROM [{v3A.Nom}].rec.Client WHERE Id = {clientEcart}) WHERE CLIEN_ID_CLIEN = {clientEcart};");
 await Executer(v2.Connexion, $"UPDATE dbo.DEMANDE SET DMND_LIBELLE = (SELECT DMND_LIBELLE FROM [{v3A.Nom}].v2.DEMANDE WHERE DMND_ID_DMND = {demandeEcart}) WHERE DMND_ID_DMND = {demandeEcart};");
 await Executer(v3A.Connexion, $"UPDATE v2.ARRIVEE SET ARRV_REFERENCES = (SELECT ARRV_REFERENCES FROM [{v2.Nom}].dbo.ARRIVEE WHERE ARRV_ID_ARRV = {arriveeEcart}) WHERE ARRV_ID_ARRV = {arriveeEcart};");
 var rapportPropre = await ComparaisonBases.ComparerAsync(new OptionsComparaison(v2.Connexion, v3A.Connexion));
@@ -354,7 +363,7 @@ var orphelinAffaire = orphelins.FirstOrDefault(o => o.TableV2 == "AFFAIRE" && o.
 var clientSans = rapportOrph.Details.Any(d => d.Genre == "sans correspondance V2" && d.TableV2 == "CLIENT" && d.IdV2 == clientOrph.ToString())
                  && rapportOrph.Details.Any(d => d.Genre == "sans correspondance V3" && d.TableV2 == "CLIENT" && d.IdV3 == clientOrph.ToString());
 await Executer(v3A.Connexion, "INSERT INTO rec.Correspondance (BaseV2, TableV2, IdV2, TableV3, IdV3, IdTransfert) " +
-                              $"VALUES (N'{v2.Nom}', N'CLIENT', N'{clientOrph}', N'v2.CLIENT', N'{clientOrph}', {idA});");
+                              $"VALUES (N'{v2.Nom}', N'CLIENT', N'{clientOrph}', N'rec.Client', N'{clientOrph}', {idA});");
 Exiger(orphelinAffaire is not null && orphelinAffaire.Colonnes == "AFFRE_ID_CLIEN" && orphelinAffaire.Detail!.Contains($"vise CLIENT {clientOrph}")
        && orphelins.Count(o => o.TableV2 == "AFFAIRE") == affairesDuClient && rapportOrph.Orphelins >= affairesDuClient && clientSans,
     $"REC-006 CA03 et T07 : une correspondance supprimee (CLIENT {clientOrph}) : l'affaire V3 {affaireOrph} qui le vise est listee « lien orphelin » ({orphelinAffaire?.Detail}), " +
@@ -471,7 +480,7 @@ await Executer(v2.Connexion, $"UPDATE dbo.CLIENT SET CLIEN_NOM = 'ECART NUIT' WH
 var rapportNuit = await ComparaisonBases.ComparerAsync(new OptionsComparaison(v2.Connexion, v3A.Connexion));
 await surveillant.PasserAsync();
 var ecartAlerte = (await Alertes()).FirstOrDefault(a => a.Regle == AlertesRecopie.RegleEcart && a.Greffe == "9301" && !a.Fermee);
-await Executer(v2.Connexion, $"UPDATE dbo.CLIENT SET CLIEN_NOM = (SELECT CLIEN_NOM FROM [{v3A.Nom}].v2.CLIENT WHERE CLIEN_ID_CLIEN = {clientEcart}) WHERE CLIEN_ID_CLIEN = {clientEcart};");
+await Executer(v2.Connexion, $"UPDATE dbo.CLIENT SET CLIEN_NOM = (SELECT Nom FROM [{v3A.Nom}].rec.Client WHERE Id = {clientEcart}) WHERE CLIEN_ID_CLIEN = {clientEcart};");
 // CA05 a laisse des ecritures d'agents dans la V2 (ARRV_CASE_COURRIER remis a lui-meme : aucune valeur changee).
 var rapportNuitPropre = await ComparaisonBases.ComparerAsync(new OptionsComparaison(v2.Connexion, v3A.Connexion));
 await surveillant.PasserAsync();
