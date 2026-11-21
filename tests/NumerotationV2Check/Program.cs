@@ -795,6 +795,11 @@ try
         SELECT '{AgentV3}', 'BANC', 'NumerotationV2', 'BANC.NUMV2', 'M.', '{CodeGreffe}', Id, 0
         FROM soc.Service WHERE CodeGreffe = '{CodeGreffe}' AND Abrege = 'NUMV2';
         INSERT INTO soc.CompteRole (IdCompte, Role) SELECT Id, 'BANCNUMV2' FROM soc.Compte WHERE CompteWindows = '{AgentV3}';
+        -- La restitution par la route est reservee a XNUMERO (RoutesCompteur.FonctionReattribution, 21/11) : sans
+        -- elle, 403 (« 200 403 200 200 » mesure). La reprise la donne aux roles qui l'ont dans la V2.
+        IF NOT EXISTS (SELECT 1 FROM soc.Fonction WHERE Code = '{RoutesCompteur.FonctionReattribution}')
+            INSERT INTO soc.Fonction (Code, Libelle, TypeV2) VALUES ('{RoutesCompteur.FonctionReattribution}', 'Reattribution de numero metier', 'PROCVB6');
+        INSERT INTO soc.RoleFonction (Role, Fonction) VALUES ('BANCNUMV2', '{RoutesCompteur.FonctionReattribution}');
         """);
     var serveurBancs = new SqlConnectionStringBuilder(BaseJetable.ServeurDesBancs());
     await Executer(SansPool(commune.Connexion),

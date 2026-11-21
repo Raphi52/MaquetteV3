@@ -22,6 +22,13 @@ public static class RoutesCompteur
     /// <summary>POST <see cref="DemandeRestitution"/> : rendre un numero donne par erreur (<see cref="ResultatRestitution"/>).</summary>
     public const string Restitutions = "/numerotation/{greffe}/restitutions";
 
+    /// <summary>
+    /// La fonction (droit) qu'exige <see cref="Restitutions"/> : XNUMERO, la procedure de menu de la V2
+    /// « Reattribution de numero metier » (PROCESSUS_ET_FONCTIONALITE ; roles RCSNIV03 et RCSNIV05 sur RIG_DEV).
+    /// Sans elle : 403 et rien n'est rendu (NUM-004 T04, T08). Lire les compteurs n'exige que d'etre admis.
+    /// </summary>
+    public const string FonctionReattribution = "XNUMERO";
+
     /// <summary>L'adresse d'une de ces routes pour le greffe <paramref name="greffe"/> (son code au catalogue).</summary>
     public static string Pour(string route, string greffe)
         => route.Replace("{greffe}", Uri.EscapeDataString(greffe));

@@ -65,6 +65,7 @@ await Migrateur.AppliquerAsync(commune.Connexion, Path.Combine(racine, "Base", "
 await Migrateur.AppliquerAsync(baseB.Connexion, Path.Combine(racine, "Base", "migrations"));
 const string GreffeA = "9101", GreffeB = "9102", GreffeMuet = "9103", GreffeAbsent = "9199";
 const string AgentA = "banc.numeros", RefuseA = "banc.refuse", AgentB = "banc.greffeb";
+const string SansXnumeroA = "banc.lecture";   // admis dans A, sans la fonction XNUMERO (NUM-004 T08)
 
 async Task<SqlConnection> Ouvrir()
 {
@@ -232,9 +233,18 @@ const string ComptesDuGreffe = """
     SELECT v.Compte, 'BANC', 'Numeros', LEFT(v.Compte, 16), 'M.', @greffe, s.Id, v.Desactive
     FROM (VALUES (@admis, 0), (@refuse, 1)) v (Compte, Desactive) CROSS JOIN soc.Service s WHERE v.Compte <> '';
     INSERT INTO soc.CompteRole (IdCompte, Role) SELECT Id, 'BANC' FROM soc.Compte;
+    -- La reattribution est reservee a XNUMERO (procedure de la V2, RoutesCompteur.FonctionReattribution).
+    INSERT INTO soc.Fonction (Code, Libelle, TypeV2) VALUES ('XNUMERO', 'Reattribution de numero metier', 'PROCVB6');
+    INSERT INTO soc.RoleFonction (Role, Fonction) VALUES ('BANC', 'XNUMERO');
     """;
 await ExecuterSur(b.Connexion, ComptesDuGreffe, ("@greffe", GreffeA), ("@admis", AgentA), ("@refuse", RefuseA));
 await ExecuterSur(baseB.Connexion, ComptesDuGreffe, ("@greffe", GreffeB), ("@admis", AgentB), ("@refuse", ""));
+await ExecuterSur(b.Connexion, """
+    INSERT INTO soc.Role (Nom, Libelle) VALUES ('BANC_LECTURE', 'Banc : admis sans XNUMERO');
+    INSERT INTO soc.Compte (CompteWindows, Nom, Prenom, Abrege, Civilite, CodeGreffe, IdService, Desactive)
+    SELECT @compte, 'BANC', 'Lecture', LEFT(@compte, 16), 'M.', @greffe, MIN(Id), 0 FROM soc.Service;
+    INSERT INTO soc.CompteRole (IdCompte, Role) SELECT Id, 'BANC_LECTURE' FROM soc.Compte WHERE CompteWindows = @compte;
+    """, ("@greffe", GreffeA), ("@compte", SansXnumeroA));
 var serveurBancs = new SqlConnectionStringBuilder(BaseJetable.ServeurDesBancs());
 var instance = serveurBancs.DataSource;                       // « 127.0.0.1,14330 »
 var authentification = new SqlConnectionStringBuilder(serveurBancs.ConnectionString);
@@ -863,10 +873,15 @@ using (var r = await Appeler(HttpMethod.Get, RoutesCompteur.Pour(RoutesCompteur.
         $"Raccord (2) : la liste du greffe B est celle de SA base, lue par le catalogue ({listeB.Length} compteurs : " +
         $"{string.Join(", ", listeB.Select(c => $"{c.Type} {c.Chrono}"))}) ; celle de A en a {liste.Length} et plus");
 }
-var chaineEnDur = new Regex(@"BaseRig|ConnectionStrings|Data\s*Source\s*=|Server\s*=|Initial\s*Catalog|Database\s*=", RegexOptions.IgnoreCase);
+// Ce qui est interdit, c'est d'OUVRIR une base autrement que par le catalogue : BaseRig.OuvrirAsync (la base
+// unique) ou une chaine de connexion. Le module peut NOMMER BaseRig pour le passer a ServiceDroits (droit
+// XNUMERO de la restitution, 21/11) : sur une adresse de greffe, l'identite et les droits n'ouvrent que la
+// base du greffe (ServiceIdentite.DeLAppelantAsync, ServiceDroits.OuvrirBaseAsync). Le mot seul n'ouvre rien.
+var chaineEnDur = new Regex(@"\.OuvrirAsync\(|ConnectionStrings|Data\s*Source\s*=|Server\s*=|Initial\s*Catalog|Database\s*=", RegexOptions.IgnoreCase);
 var sourceModule = File.ReadAllText(Path.Combine(racine, "Serveur", "Numerotation", "Compteur", "ModuleCompteur.cs"));
-Exiger(chaineEnDur.IsMatch("async (string? type, BaseRig b, CancellationToken ct)") && chaineEnDur.IsMatch("Server=SQL-PROD;Database=RIGV3_AMIENS"),
-    "Raccord (2) (jumeau) : le controle de la source reconnait la base unique (BaseRig) et une chaine de connexion");
+Exiger(chaineEnDur.IsMatch("await using var cn = await b.OuvrirAsync(ct);") && chaineEnDur.IsMatch("Server=SQL-PROD;Database=RIGV3_AMIENS")
+       && !chaineEnDur.IsMatch("await c.OuvrirBaseV3Async(greffe, ct)"),
+    "Raccord (2) (jumeau) : le controle de la source reconnait l'ouverture de la base unique (BaseRig.OuvrirAsync) et une chaine de connexion, pas le catalogue");
 Exiger(!chaineEnDur.IsMatch(sourceModule) && sourceModule.Contains("OuvrirBaseV3Async"),
     "Raccord (2) : ModuleCompteur.cs n'ouvre aucune base par une chaine ni par la base unique : seulement par le catalogue (OuvrirBaseV3Async)");
 
@@ -920,6 +935,29 @@ var ecranAbsent = await EcranCompteurs.OuvrirAsync(ecranA, GreffeAbsent);
 var ecranMuet = await EcranCompteurs.OuvrirAsync(ecranA, GreffeMuet);
 Exiger(ecranAbsent is { Mode: "erreur" } && ecranAbsent.Message!.Contains("pas au catalogue") && ecranMuet is { Mode: "erreur" } && ecranMuet.Message!.Contains("ne répond pas") && !ecranMuet.Message.Contains("{"),
     $"Ecran : greffe absent du catalogue -> « {ecranAbsent.Message} » ; base muette -> « {ecranMuet.Message} »");
+// NUM-004 T08 : la reattribution avec un agent sans XNUMERO -- 403, et rien ne bouge (compteurs, rendus, journal).
+var etatAvantSansDroit = await Etat();
+var jpcDonnePourRefus = await V3("JPC", 2026);
+var etatApresTirage = await Etat();
+using (var r = await Appeler(HttpMethod.Post, restitutionsA, new DemandeRestitution("JPC", jpcDonnePourRefus.Numero!, "essai sans le droit"), SansXnumeroA))
+{
+    var corps = await r.Content.ReadAsStringAsync();
+    Exiger(r.StatusCode == HttpStatusCode.Forbidden && corps.Contains(RoutesCompteur.FonctionReattribution) && await Etat() == etatApresTirage,
+        $"NUM-004 T08 / CA10 : {SansXnumeroA}, admis dans le greffe A sans la fonction XNUMERO, ne rend pas {jpcDonnePourRefus.Numero} " +
+        $"({(int)r.StatusCode}) et rien ne bouge (etat {etatApresTirage} -> {await Etat()})");
+}
+using (var r = await Appeler(HttpMethod.Get, compteursA, null, SansXnumeroA))
+    Exiger(r.StatusCode == HttpStatusCode.OK,
+        $"NUM-004 T08 (jumeau) : le meme agent lit les compteurs ({(int)r.StatusCode}) : seule la reattribution est reservee");
+var refusDroitEcran = await EcranCompteurs.RendreAsync(ClientEcran(SansXnumeroA), GreffeA,
+    new DemandeRestitution("JPC", jpcDonnePourRefus.Numero!, "essai sans le droit (ecran)"));
+Exiger(refusDroitEcran is { Mode: "serveur", Echec: true } && refusDroitEcran.Message!.Contains("XNUMERO") && !refusDroitEcran.Message.Contains("{")
+       && await Etat() == etatApresTirage,
+    $"Ecran NUM-004 T08 : sans XNUMERO, l'ecran dit pourquoi (« {refusDroitEcran.Message} ») et rien n'est rendu");
+var renduParResponsable = await EcranCompteurs.RendreAsync(ecranA, GreffeA, new DemandeRestitution("JPC", jpcDonnePourRefus.Numero!, "rendu par le responsable"));
+Exiger(renduParResponsable is { Echec: false } && etatAvantSansDroit != etatApresTirage,
+    $"Ecran NUM-004 T08 (jumeau) : le meme numero, rendu par {AgentA} qui a XNUMERO, passe (« {renduParResponsable.Message} »)");
+
 var ecranDemo = await EcranCompteurs.OuvrirAsync(null, null);
 var ecranDemoRendu = await EcranCompteurs.RendreAsync(null, null, new DemandeRestitution("JPC", "2026RJ0012", "essai"));
 Exiger(ecranDemo is { Mode: "demo", Greffe: null } && ecranDemo.Compteurs.Length > 0 && ecranDemoRendu is { Mode: "demo", Echec: true },
