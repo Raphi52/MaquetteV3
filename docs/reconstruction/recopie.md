@@ -753,3 +753,68 @@ Preuve : `.\tests.ps1 RecopieDroits` → code 0 (22 contrôles, oracle de la V2 
 
 <!-- fix-ok: lot 19 (2026-11-21), pas un correctif de ce document : deux lignes du lot 10 qui laissaient les roles de REC-017 CA01 au Socle renvoient a leur preuve (banc RecopieDroits vert, code 0, 22 controles lus dans sa sortie) et la section du lot 19 est ajoutee a la fin. -->
 
+## Le contrôle de nuit compare aussi les droits (REC-006 CA01 « pour chaque table partagée », CA02, CA04 ; SOC-002 T06) — lot 20
+
+Depuis le lot 19, les droits d'un compte passent de la V3 à la V2 (rôles, ancien système, menus de comptabilité). Le contrôle de
+nuit ne les regardait pas : un rôle donné à la main dans l'ancien RIG, ou une recopie de droits ratée, passait inaperçu jusqu'au
+prochain changement du compte dans la V3. Il les compare maintenant, comme une table partagée de plus : **`UTILISATEUR (droits)`**.
+
+**Ce qui est comparé : la réponse, pas les lignes.** Les rôles de la V3 ne correspondent pas ligne à ligne à ceux de la V2 (rôles
+« RIGV3 n° », trois origines). Pour chaque compte **actif** de la V3 qui a une correspondance V2 (`rec.Correspondance`
+`UTILISATEUR` → `soc.Compte`, actif aussi dans la V2) et chaque fonction du catalogue de la V2 (`PROCESSUS_ET_FONCTIONALITE`), la
+**réponse de la V2** est celle de la V3 (`soc.Droit`, toutes origines). La réponse de la V2 est calculée **une seule fois, par le
+calcul que la recopie fait déjà avant d'écrire** : `DroitsRecopies.Differences` (qui appelle `RepriseDroits.ReponsesV2`) sert à
+la vérification d'avant validation de la recopie (étape 8) **et** au contrôle de nuit. Pas de second calcul.
+
+**Un état figé, comme le reste du contrôle (CA05).** La réponse de la V2 se lit dans l'instantané de la V2 pris pour le contrôle,
+celle de la V3 dans l'instantané de la V3 : aucune lecture ne bloque les agents. Comme pour les autres fiches, un écart est **relu dans
+les bases vivantes** : disparu entre-temps (une recopie des droits est passée entre les deux états figés), il est « résorbé »,
+compté, non alerté.
+
+**Ce que dit le rapport** (`rec.ComparaisonTable`, `rec.ComparaisonEcart`, contrôle de la base) :
+- une ligne `UTILISATEUR (droits)` → `soc.Droit` : nombre de comptes (colonnes « lignes »), réponses comparées (comptes × fonctions),
+  écarts, résorbés ; son détail dit « N comptes actifs recopiés, M fonctions de la V2 chacun » ;
+- un écart (genre « ecart ») par compte et par fonction : `IdV2` = compte V2, `IdV3` = compte V3, `Colonnes` = la fonction,
+  `Detail` = « V2 : accordée ; V3 : refusée » (ou l'inverse). Ni login ni valeur : des identifiants et un code de fonction.
+
+**L'alerte d'exploitation est celle qui existe (CA04, `AlertesRecopie`, règle `recopie-ecart`)** : les écarts de droits entrent dans
+le total du rapport (`RapportComparaison.Ecarts`, code de sortie 5) ; le message nomme la table (« tables : UTILISATEUR (droits)
+(144 ecarts, …) ») et renvoie au contrôle. Le contrôle propre suivant ferme l'alerte.
+
+**Quand il s'exécute.** Seulement quand la recopie de la fiche « compte d'agent » est **en service** pour la base
+(`rec.FicheEnService`, règle `UTILISATEUR` avec sa partie jointe `DroitsRecopies`) et que `UTILISATEUR` fait partie des tables
+comparées : avant la mise en service, la V3 n'écrit pas les droits dans la V2, il n'y aurait que de faux écarts. Une base V2 sans les
+tables de droits n'est pas comparée sur ce point.
+
+### Contrôles (banc `tests\RecopieDroitsCheck`, section 4)
+
+| Critère | Ce que le banc prouve |
+|---|---|
+| REC-006 CA01 / SOC-002 T06 | après la journée de recopie du banc, le contrôle compte 97 comptes × 876 fonctions = 84 972 réponses, **0 écart**, écrit au rapport de la base |
+| REC-006 CA02 | un rôle donné à la main dans la V2 (hors recopie) à un compte est listé : compte V2, compte V3, fonction, « V2 : accordée ; V3 : refusée » — les mêmes 144 fonctions que l'oracle indépendant de la V2 (`tests\SocleDroitsCheck\OracleDroitsV2.cs`) ; code de sortie 5 |
+| REC-006 CA04 | le vrai surveillant lève « recopie-ecart » (canal d'alerte), qui nomme `UTILISATEUR (droits)` et le contrôle ; le rôle retiré, le contrôle suivant est propre et ferme l'alerte (jumeau) |
+| REC-006 CA01 | une recopie de droits ratée (déclencheur coupé, rôle retiré dans la V3 seulement) est vue : mêmes 142 fonctions que l'oracle ; la recopie passée, plus d'écart (jumeau) |
+| Contre-épreuve | l'étape des droits neutralisée dans `ComparaisonBases` (`if (false && …)`) : le banc est **rouge** (rapport sans ligne de droits) ; remise, vert |
+
+### Écarts code ↔ métier et choix à valider
+
+- **Seuls les comptes actifs, des deux côtés.** Un compte désactivé dans la V3 ou dans la V2 n'est pas comparé ici (la comparaison de la
+  fiche `UTILISATEUR` voit son état). À valider : faut-il aussi contrôler les droits d'un compte désactivé (il n'ouvre plus la V2) ?
+- **Une fonction que la V3 connaît et pas la V2** (catalogue V3 plus large) n'est pas comparée : la V2 n'a pas de réponse.
+- **Le contrôle ne fait pas la distinction « par origine »** : un droit direct de la V3 que la V2 donne par un rôle (ou
+  l'inverse) n'est pas un écart tant que les réponses concordent — c'est voulu (la recopie écrit chaque droit dans son origine,
+  la correspondance n'est pas ligne à ligne).
+
+### Ce qui ne se fait pas depuis ce poste
+
+- La durée sur les **40 bases**, la nuit, sur le serveur de production : le banc mesure une base jetable de RIG_DEV (97 comptes actifs,
+  876 fonctions, environ 85 000 réponses par contrôle). Le coût n'a pas été mesuré sur une base de greffe réelle, ni sous la charge de
+  la nuit (REC-006 CA05 reste, comme au lot 8, une estimation du poste de développement).
+
+| Fichier | Rôle |
+|---|---|
+| `Serveur\Recopie\DroitsRecopies.cs` | `Differences` (le calcul partagé), `ComparerAsync` (le contrôle des droits), `TableControle` |
+| `Serveur\Recopie\Comparaison.cs` | l'étape « 4 bis » : appelle le contrôle des droits quand la recopie des comptes est en service |
+| `Serveur\Recopie\ComparaisonNocturne.cs` | le journal du contrôle de nuit dit combien d'écarts sont des écarts de droits |
+| `tests\RecopieDroitsCheck\` | section 4 du banc : contrôle propre, rôle à la main, alerte, recopie ratée, jumeaux |
+
