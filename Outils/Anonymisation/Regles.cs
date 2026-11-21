@@ -11,6 +11,8 @@ public enum Traitement
     Mots,
     /// <summary>Comme <see cref="Mots"/>, extension du domaine gardee.</summary>
     Courriel,
+    /// <summary>Nom de fichier : comme <see cref="Mots"/>, extension connue (« .pdf ») gardee.</summary>
+    Fichier,
     /// <summary>Chiffres permutes ensemble, deux premiers gardes.</summary>
     Telephone,
     /// <summary>Autre jour de la meme annee.</summary>
@@ -40,9 +42,12 @@ public sealed record Regle(Traitement Traitement, string Origine, string? Colonn
 ///    ce qui est GARDE et pourquoi.
 /// 2. Pour toute autre colonne, le NOM : decoupe en segments (« DRGPP_NOM_USAGE » -> DRGPP, NOM,
 ///    USAGE), un segment personnel (NOM, PRENOM, MAIL, TEL, NAISSANCE, ADRESSE, TEXTE…) donne la
-///    regle ; un segment technique (CODE, TYPE, FICHIER, ROLE…) la leve. Par defaut, ce qui
+///    regle ; un segment technique (CODE, TYPE, ROLE…) la leve, SAUF dans un compose (ETAT_CIVIL,
+///    DENOMINATION_STATUT, NOM_DOMAINE, NOM_IMPRIMANTE : voir Composes) ; un secret (PWD, MDP…) n'est
+///    jamais leve ; un nom avec « FICHIER » est un nom de fichier (extension gardee). Par defaut, ce qui
 ///    ressemble a une donnee personnelle est TRAITE (on prefere abimer un libelle que laisser
-///    passer un nom) et le rapport le dit « a relire ».
+///    passer un nom) et le rapport le dit « a relire ». Une regle qui garde a tort une colonne de
+///    prenoms se voit au controle (ControleCopie.MesurerGardeesAsync).
 /// 3. Des REMPLACEMENTS « TABLE.COLONNE=traitement » (option --regles) : la relecture du delegue
 ///    s'applique sans toucher au code. Ils priment sur le reste.
 /// </summary>
@@ -72,7 +77,7 @@ public sealed partial class CatalogueRegles
             if (ligne.Length == 0) continue;
             var egal = ligne.IndexOf('=');
             if (egal <= 0 || !Enum.TryParse<Traitement>(ligne[(egal + 1)..].Trim(), ignoreCase: true, out var t))
-                throw new ArgumentException($"{fichier} : ligne illisible « {ligne} » (attendu TABLE.COLONNE=Garder|Mots|Courriel|Telephone|DateNaissance|Vider|Xml).");
+                throw new ArgumentException($"{fichier} : ligne illisible « {ligne} » (attendu TABLE.COLONNE=Garder|Mots|Courriel|Fichier|Telephone|DateNaissance|Vider|Xml).");
             yield return new(ligne[..egal].Trim(), t);
         }
     }
@@ -143,18 +148,26 @@ public sealed partial class CatalogueRegles
         return parNom;
     }
 
-    /// <summary>Les colonnes que le nom designe comme personnelles mais qu'un segment technique ou le
-    /// catalogue garde : le rapport les liste « a relire ».</summary>
-    public string? Suspicion(string table, string colonne)
+    /// <summary>
+    /// Les colonnes que le nom designe comme personnelles mais qu'un segment technique ou le catalogue garde : le
+    /// rapport les liste « a relire ». Une colonne qui n'est pas du texte (cle entiere, indicateur, date) ne porte pas
+    /// de nom : elle n'y est pas -- sauf un telephone range dans un nombre, que les regles de texte ne touchent pas.
+    /// </summary>
+    public string? Suspicion(string table, string colonne, string typeSql)
     {
         if (_remplacements.ContainsKey((table, colonne)) || _parLesCles.ContainsKey((table, colonne))) return null;
+        var nom = Lire(colonne);
         if (_explicites.TryGetValue((table, colonne), out var r))
-            return r.Traitement == Traitement.Garder && MarqueurPersonnel(Segments(colonne)) is { } m ? $"segment « {m} », gardee par le catalogue : {r.Origine}" : null;
-        var segments = Segments(colonne);
-        if (MarqueurPersonnel(segments) is { } marqueur && segments.FirstOrDefault(Techniques.Contains) is { } technique)
-            return $"segment personnel « {marqueur} » mais segment technique « {technique} » : gardee";
-        return null;
+            return r.Traitement == Traitement.Garder && nom.Marqueur is { } m ? $"segment « {m} », gardee par le catalogue : {r.Origine}" : null;
+        if (nom.Marqueur is null || ParLeNom(colonne, typeSql).Anonymise) return null;
+        if (!EstTexte(typeSql) && typeSql != "xml")
+            return Personnels[nom.Marqueur] == Traitement.Telephone && EstNombre(typeSql)
+                ? $"telephone « {nom.Marqueur} » dans une colonne {typeSql} : gardee" : null;
+        return nom.Technique is { } technique ? $"segment personnel « {nom.Marqueur} » mais segment technique « {technique} » : gardee" : null;
     }
+
+    /// <summary>Le segment personnel du nom d'une colonne (« PRENOMS », « ETAT_CIVIL »), ou null.</summary>
+    public static string? Marqueur(string colonne) => Lire(colonne).Marqueur;
 
     private static Regle Compatible(Regle r, string typeSql)
     {
@@ -177,6 +190,7 @@ public sealed partial class CatalogueRegles
 
     public static bool EstTexte(string t) => t is "varchar" or "nvarchar" or "char" or "nchar" or "text" or "ntext" or "sysname";
     public static bool EstDate(string t) => t is "datetime" or "datetime2" or "smalldatetime" or "date" or "datetimeoffset";
+    private static bool EstNombre(string t) => t is "bigint" or "int" or "decimal" or "numeric" or "float" or "real" or "money";
 
     // ------------------------------------------------------------------ par le nom
 
@@ -200,6 +214,7 @@ public sealed partial class CatalogueRegles
         ["TELECOPIE"] = Traitement.Telephone,
         ["NAISSANCE"] = Traitement.DateNaissance, ["NAISS"] = Traitement.DateNaissance, ["NAIS"] = Traitement.DateNaissance,
         ["NOM"] = Traitement.Mots, ["NOMS"] = Traitement.Mots, ["PRENOM"] = Traitement.Mots, ["PRENOMS"] = Traitement.Mots,
+        ["ETAT_CIVIL"] = Traitement.Mots, // un compose (voir Composes) : jamais un segment seul
         ["PATRONYME"] = Traitement.Mots, ["SURNOM"] = Traitement.Mots, ["PSEUDONYME"] = Traitement.Mots,
         ["PSEUDO"] = Traitement.Mots, ["DESIGNATION"] = Traitement.Mots, ["DENOMINATION"] = Traitement.Mots,
         ["ENSEIGNE"] = Traitement.Mots, ["ADRESSE"] = Traitement.Mots, ["VOIE"] = Traitement.Mots,
@@ -216,19 +231,56 @@ public sealed partial class CatalogueRegles
         ["REMARQUES"] = Traitement.Mots,
     };
 
+    /// <summary>
+    /// LES COMPOSES : deux segments qui, ensemble, designent une personne alors que l'un d'eux, seul, serait technique.
+    /// Le segment technique d'un compose ne leve plus rien ; un compose sans autre segment personnel en est un.
+    /// fix-ok: refus du chef (2026-11-21), mesure sur RIG_DEV par la porte de lecture (empreintes) -- « ETAT » levait
+    /// CSRJD/INSPP/BENEF/RPPM/BDCRCX_PRENOMS_ETAT_CIVIL (89 a 99 % de valeurs a prenom) ; « STATUT » levait
+    /// INSPM_DENOMINATION_STATUT (61 % de noms) ; « DOMAINE » levait ETBLS_NOM_DOMAINE (sites des etablissements) ;
+    /// « IMPRIMANTE » levait GPIMP_NOM_IMPRIMANTE (4 noms d'imprimantes sur 26 sont des noms d'agents).
+    /// </summary>
+    private static readonly (string Avant, string Apres, string Sens)[] Composes =
+    [
+        ("ETAT", "CIVIL", "l'etat civil d'une personne"),
+        ("DENOMINATION", "STATUT", "denomination statutaire d'une societe"),
+        ("NOM", "DOMAINE", "nom de domaine internet (le nom de la societe s'y lit)"),
+        ("NOM", "IMPRIMANTE", "nom d'une imprimante (souvent celui de l'agent qui s'en sert)"),
+    ];
+
+    /// <summary>Ce que dit le nom d'une colonne : son segment personnel, le segment technique qui le leve, et si c'est
+    /// un nom de fichier (segment « FICHIER » a cote d'un segment de nom).</summary>
+    private readonly record struct LectureNom(string? Marqueur, string? Technique, bool NomDeFichier, string? Compose);
+
+    private static LectureNom Lire(string colonne)
+    {
+        var s = Segments(colonne);
+        // Les composes presents, par la position de leur premier segment.
+        var debuts = Enumerable.Range(0, Math.Max(0, s.Length - 1))
+            .SelectMany(i => Composes.Where(k => s[i] == k.Avant && s[i + 1] == k.Apres).Select(k => (i, Nom: $"{k.Avant}_{k.Apres}", k.Sens))).ToList();
+        bool DansCompose(int i) => debuts.Any(d => d.i == i || d.i == i - 1);
+        var marqueur = s.FirstOrDefault(Personnels.ContainsKey) ?? debuts.Select(d => d.Nom).FirstOrDefault(Personnels.ContainsKey);
+        var compose = debuts.Select(d => $"{d.Nom} : {d.Sens}").FirstOrDefault();
+        var fichier = marqueur is not null && Personnels[marqueur] == Traitement.Mots && s.Any(x => x is "FICHIER" or "FICHIERS");
+        var technique = Enumerable.Range(0, s.Length).Where(i => Techniques.Contains(s[i]) && !DansCompose(i) && !(fichier && s[i] is "FICHIER" or "FICHIERS"))
+            .Select(i => s[i]).FirstOrDefault();
+        return new LectureNom(marqueur, technique, fichier, compose);
+    }
+
     private static Regle ParLeNom(string colonne, string typeSql)
     {
         if (typeSql == "xml") return new Regle(Traitement.Xml, "colonne XML : chaque valeur par le nom de son attribut ou element");
-        var segments = Segments(colonne);
-        if (MarqueurPersonnel(segments) is not { } marqueur) return new Regle(Traitement.Garder, "nom sans segment personnel");
-        if (segments.FirstOrDefault(Techniques.Contains) is { } technique)
-            return new Regle(Traitement.Garder, $"segment « {marqueur} » leve par le segment technique « {technique} » (a relire)");
+        var nom = Lire(colonne);
+        if (nom.Marqueur is not { } marqueur) return new Regle(Traitement.Garder, "nom sans segment personnel");
         var t = Personnels[marqueur];
+        // Un secret (PWD, MDP…) n'est jamais leve : INFO_GREFFE.PWD_SQL est un mot de passe, pas un mot de la langue SQL.
+        if (t == Traitement.Vider) return new Regle(t, $"nom de colonne : secret « {marqueur} », vide quel que soit le reste du nom");
+        if (nom.NomDeFichier)
+            return new Regle(Traitement.Fichier, $"nom de fichier : segments « {marqueur} » et « FICHIER » (mesure RIG_DEV : 7 colonnes sur 38 portent des noms ; toutes traitees, extension gardee)");
+        if (nom.Technique is { } technique)
+            return new Regle(Traitement.Garder, $"segment « {marqueur} » leve par le segment technique « {technique} » (a relire)");
         if (t == Traitement.DateNaissance && !EstDate(typeSql)) t = Traitement.Mots;
-        return new Regle(t, $"nom de colonne : segment « {marqueur} » (a relire)");
+        return new Regle(t, $"nom de colonne : segment « {marqueur} »{(nom.Compose is { } k ? $" (compose « {k} »)" : "")} (a relire)");
     }
-
-    private static string? MarqueurPersonnel(string[] segments) => segments.FirstOrDefault(Personnels.ContainsKey);
 
     /// <summary>« DRGPP_NOM_USAGE » -> DRGPP, NOM, USAGE ; « NomUsage » (XML) -> NOM, USAGE.</summary>
     public static string[] Segments(string nom)
@@ -321,6 +373,11 @@ public sealed partial class CatalogueRegles
             "ENCMT_DESIGNATION_BANQUE", "ENCMT_COMPTE_BANCAIRE_REMIS");
         Ajouter("ENCAISSEMENT", Traitement.Garder, "numero (CA03)", "ENCMT_NUMERO_TITRE", "ENCMT_GUID", "ENCMT_EXT_ID");
         Ajouter("ENCAISSEMENT", Traitement.Garder, "signature gardee telle quelle : elle ne vaut plus (CA05)", "ENCMT_SIGN_ELEC");
+
+        // IMPRIMANTE_EDITION : son « nom logique » est le nom de l'imprimante, celui de GROUPE_IMPRESSION.GPIMP_NOM_IMPRIMANTE
+        // et TAG_POSTSCRIPT.TAGPS_NOM_IMPRIMANTE (compose NOM_IMPRIMANTE) : meme regle, le meme faux nom des trois cotes.
+        // Mesure RIG_DEV (2026-11-21) : 4 imprimantes sur 26 portent le nom d'un agent.
+        Ajouter("IMPRIMANTE_EDITION", Traitement.Mots, "nom de l'imprimante (comme NOM_IMPRIMANTE)", "IMPED_NOM_LOGIQUE");
     }
 
     /// <summary>Les colonnes que le catalogue nomme (le banc verifie que chaque table de la story y est).</summary>

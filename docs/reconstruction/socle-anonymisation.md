@@ -32,8 +32,42 @@ dotnet run --project Outils\Anonymisation -- inventaire --source "<source>" --ac
 ```
 
 Options : `--tables A,B` (sous-ensemble), `--max-lignes N` (copie réduite), `--regles <fichier>` (relecture du
-délégué, une ligne `TABLE.COLONNE=Garder|Mots|Courriel|Telephone|DateNaissance|Vider|Xml`), `--graine <texte>`
+délégué, une ligne `TABLE.COLONNE=Garder|Mots|Courriel|Fichier|Telephone|DateNaissance|Vider|Xml`), `--graine <texte>`
 (valeurs reproductibles, **refusée** pour une source hors de ce poste).
+
+## Correction du 2026-11-21 (refus du chef à la première réception)
+
+<!-- fix-ok: refus du chef rejoué sur main 2e28acc puis mesuré sur RIG_DEV par la porte de lecture : « ETAT » levait les
+     prénoms d'état civil (83-100 % de valeurs à prénom) et CA06 ne tirait que les colonnes traitées. -->
+
+**Le défaut.** La règle par le nom prenait « ETAT » pour un segment technique : les colonnes
+`*_PRENOM(S)_ETAT_CIVIL(_ANC)` restaient en clair. Compté par le chef sur RIG_DEV : 173 812 prénoms remplis dans
+`CASIER_JUDICIAIRE`, 77 635 dans `INSCRIT_PP`, 74 535 dans `BENEFICIAIRE_EFFECTIF`, 6 183 dans `REPRESENTANT_PM`,
+et les mêmes colonnes dans `BENEFICIAIRE_EFFECTIF_HISTO`, `BODACC_RCS_XML`, `NOTIFICATION_RCS_XML_DETAIL`. Le banc
+restait vert : son extrait n'avait pas ces tables, et le contrôle CA06 ne tirait que les colonnes déjà traitées —
+il suit les mêmes règles que la copie, donc il ne peut pas voir une règle fausse.
+
+**Une copie faite avant cette correction garde ces prénoms en clair** (commit `2f1d970`) : elle est à refaire, elle
+ne sort pas du poste et ne sert pas de jeu de répétition (décision du chef).
+
+**Mesuré sur RIG_DEV avant de corriger** (porte de lecture, empreintes salées : aucune valeur sortie). Pour chacune
+des 174 colonnes « gardées, à relire », la part de ses valeurs qui portent un prénom fréquent de la base :
+
+| Colonnes | Part de valeurs à prénom | Décision |
+|---|---:|---|
+| les 11 `*_PRENOM(S)_ETAT_CIVIL(_ANC)` | 83 à 100 % | **traitées** : « ETAT » suivi de « CIVIL » n'est plus technique (composé `ETAT_CIVIL`) ; `NTXDT_PRENOMS_ETAT_CIVIL_DT`, une date de changement, reste gardée |
+| les 38 `*NOM*FICHIER*` | 7 portent des noms de personnes ou d'affaires (jusqu'à 24 % de prénoms, 37 % de noms : `CRTRA_NOM_FICHIER`, `DMCOPJ_NOM_FICHIER`, `PRCLL_NOM_AFFAIRE_FICHIER`, `GDRG_NOM_FICHIER`…), 19 des noms structurés (`a9999a9999….pdf`) ou des libellés fixes, 12 sont vides | **toutes traitées**, extension connue gardée (`Fichier`) : le contenu change d'un greffe à l'autre, et un nom structuré garde sa forme |
+| `GPIMP/TAGPS/LOT_NOM_IMPRIMANTE`, `IMPED_NOM_LOGIQUE` | 66 à 73 % — 4 noms d'imprimantes sur 26 portent le nom d'un agent | **traitées** (composé `NOM_IMPRIMANTE`), la même règle des quatre côtés : le lien entre elles tient |
+| `INSPM/DRGPM_DENOMINATION_STATUT` | 25 % de prénoms, 61 % de noms | **traitées** (composé `DENOMINATION_STATUT` : « statutaire ») |
+| `ETBLS_NOM_DOMAINE` | sites des établissements (le nom de la société s'y lit) | **traitée** (composé `NOM_DOMAINE`) ; `ETBLS_ETAT_NOM_DOMAINE` (3 codes) reste gardée |
+| `INFO_GREFFE.PWD_SQL` | vide sur RIG_DEV ; c'est un mot de passe | **vidée** : un secret n'est jamais levé par un segment technique (« SQL ») |
+| 20 entiers et indicateurs (`*_ID_ADRESSE_*`, `*_MAIL_FORMAT_*`…) | ne portent pas de texte | sortis de la liste « à relire » (une clé, un bit ne portent pas de nom) ; un téléphone rangé dans un nombre y reste |
+| les 98 autres (`TYPE_VOIE`, `NOM_LOGIQUE`, `TEXTE_PARAMETRE`, `CODE_*`…) | 16 % au plus | gardées, toujours « à relire » ; le contrôle les mesure à chaque copie |
+
+**Le contrôle voit désormais une règle fausse.** CA06 tire aussi chaque colonne **gardée** dont le nom a un segment
+personnel (voir « Le contrôle automatique ») ; une colonne au-delà de 35 % de prénoms le rend rouge, même sans
+« fuite » par les colonnes traitées. Réinjectée dans le code, l'ancienne règle fait rougir le banc (14 échecs, dont
+le contrôle de la copie et la mesure de RIG_DEV entier).
 
 ## Les sources V2 vérifiées avant d'écrire
 
@@ -63,7 +97,8 @@ délégué, une ligne `TABLE.COLONNE=Garder|Mots|Courriel|Telephone|DateNaissanc
 | **Commune, code postal, pays, codes : gardés** | Seuls, ils ne désignent personne ; le routage et la géographie des tests restent vrais. Numéro et nom de voie sont remplacés. |
 | **Champs libres : anonymisés mot à mot** (longueur gardée) ; **secrets vidés** (mots de passe) | Le volume des textes reste (CA03). Le rapport dit pour chacun : « anonymisé » ou « vidé » (CA04). |
 | **XML du journal : chaque attribut prend la règle de sa colonne** dans la table que nomme `AUDIT_TABLE` | Le journal garde sa forme et ses numéros ; la désignation du client y reçoit la même valeur fictive que dans la facture (CA02, CA04). |
-| **Règles : un catalogue colonne par colonne, puis le nom de la colonne** (segments NOM, PRENOM, MAIL, TEL, NAISSANCE, ADRESSE, TEXTE… ; levés par CODE, TYPE, FICHIER, ROLE…) | 1 000 colonnes traitées sur les 15 590 de RIG_DEV ; ce qui ressemble à une donnée personnelle est **traité par défaut** (on préfère abîmer un libellé que laisser passer un nom), et listé « à relire ». |
+| **Règles : un catalogue colonne par colonne, puis le nom de la colonne** (segments NOM, PRENOM, MAIL, TEL, NAISSANCE, ADRESSE, TEXTE… ; levés par CODE, TYPE, ROLE… **sauf dans un composé** : `ETAT_CIVIL`, `DENOMINATION_STATUT`, `NOM_DOMAINE`, `NOM_IMPRIMANTE` ; un secret — PWD, MDP, PASSWORD — n'est **jamais** levé) | 1 057 colonnes traitées sur les 15 590 de RIG_DEV ; ce qui ressemble à une donnée personnelle est **traité par défaut** (on préfère abîmer un libellé que laisser passer un nom), et listé « à relire ». |
+| **Nom de fichier** (un segment de nom avec « FICHIER ») : mots remplacés, **extension connue gardée** (`.pdf`, `.doc(x)`, `.xml`, `.txt`, `.zip`, `.sql`, `.html`, `.dat`, `.tif`…, liste mesurée sur RIG_DEV) | Le fichier reste du même genre. Liste fermée : une fin « .JEAN » n'est pas une extension, elle est remplacée. |
 | **Les deux côtés d'une clé étrangère prennent la même règle** | Sinon le lien casse (mesuré : `DMNED_LOT` gardé, `LOT_NOM` remplacé, la clé ne se vérifiait plus). Le côté anonymisé l'emporte. |
 | **La copie a la forme de la source** : colonnes, classements, identités, défauts, index, clés étrangères (vérifiées quand la source les vérifie), contraintes, vues, fonctions, procédures, déclencheurs | Les tests et les répétitions tournent sur la vraie structure. Un module qui ne se crée pas (il dépend d'un serveur lié, d'une colonne disparue) est listé, sans arrêter la copie. |
 | **Marque « chaînes invalidées par l'anonymisation »** dès qu'une ligne signée change (CA05) | La signature couvre le nom du client (fiche team #1316). La marque est dans `anonymisation.Copie`, dans la propriété de base `RIGV3_ANONYMISATION` et en tête du rapport. |
@@ -85,13 +120,26 @@ dans un XML, même attribut personnel) : valeur entière, puis chaque mot de 5 c
   clair est forcément trouvée ; une coïncidence ne peut pas y tomber.
 - **Tirage** : toute la table jusqu'à 50 000 lignes, au-delà des pages au hasard (`TABLESAMPLE`) ; une requête
   par table. Avant ce choix, le contrôle ne finissait pas en 10 min sur RIG_DEV.
+- **Les colonnes gardées à segment personnel** (refus du 2026-11-21) : le contrôle suit les mêmes règles que la
+  copie, donc une règle qui garde à tort une colonne de prénoms lui échappait. Il tire aussi chaque colonne de texte
+  **gardée** dont le nom a un segment personnel (segment technique, décision du catalogue ou remplacement
+  `--regles`), jusqu'à 200 valeurs distinctes, et compte celles qui portent un **prénom fréquent de la base**. Le
+  lexique vient des colonnes dont le nom porte PRENOM(S), **quelle que soit leur règle** ; un mot n'y compte que
+  s'il est vu 3 fois dans les prénoms d'au moins **2 autres tables** (mesuré : « SUPPLEANT », « DIRECTEUR »,
+  « GRENOBLE » sont saisis dans des prénoms de RIG_DEV, chacun dans une seule ou peu de tables). Au-delà de **35 %**
+  la colonne est rouge : mesuré, les colonnes gardées de RIG_DEV montent à 16 % au plus, les prénoms d'état civil
+  gardés par l'ancienne règle à 83-96 % (53 à 100 % sur l'extrait du banc, dont le lexique est plus petit). Une
+  colonne rouge se **traite** (`--regles TABLE.COLONNE=Mots`) : la garder ne passe pas le contrôle.
+  **Limite** : le lexique voit les prénoms ; une colonne gardée qui ne porterait que des noms de famille
+  n'atteindrait pas le seuil.
 - Il vérifie aussi : mêmes volumes, colonnes gardées identiques sur des lignes tirées, secrets vides, marque.
 
 ## Mesures sur RIG_DEV (lecture seule, accord « RIG_DEV », 2026-11-21)
 
 | Mesure | Résultat |
 |---|---|
-| Inventaire (`inventaire`) | 15 590 colonnes, 1 000 traitées (888 mots, 51 téléphones, 32 courriels, 19 dates de naissance, 6 vidées, 2 XML), 1 094 à relire |
+| Inventaire (`inventaire`) | 15 590 colonnes, 1 057 traitées, 1 029 à relire dont 98 gardées (avant la correction du 2026-11-21 : 1 000 traitées, 174 gardées à relire) |
+| Colonnes gardées à segment personnel, mesurées (banc, `MesurerGardeesAsync`) | 15 s : 67 colonnes remplies, 4 683 valeurs, lexique de 2 507 prénoms tirés de 42 colonnes ; la plus haute à 16 % ; avec l'ancienne règle, les prénoms d'état civil à 83-96 % |
 | Copie réduite des 860 tables (`--max-lignes 20`) | 83 s, aucune anomalie : 1 893 index, 789 clés étrangères (posées sans vérification : copie réduite), 468 vues, fonctions, procédures et déclencheurs ; 8 modules non refaits parce qu'ils sont cassés dans RIG_DEV même (serveur lié `RIGBD4`, colonnes `*_ID_SSADR` disparues) |
 | Contrôle de cette copie (`controler --echantillon 100`) | 180 s pour les 860 tables : 1 000 colonnes personnelles, 34 236 valeurs et 104 733 mots réels tirés (empreintes), aucun retrouvé ; 29 tables sans clé primaire d'une colonne non tirées (listées). **Limite** : dans une copie réduite à 20 lignes par table, la plupart des lignes tirées n'y sont pas — ce passage prouve la durée et la tenue du contrôle sur le vrai schéma, pas l'absence de fuite (c'est le banc qui la prouve, sur une copie complète de son extrait). Volumes et lignes gardées diffèrent par construction (code 3). |
 | Écritures du serveur sur RIG_DEV pendant la copie | 6 861 285 avant, 6 861 295 après : d'autres sessions écrivent sur RIG_DEV ; l'outil, lui, n'y joue que des SELECT (869 requêtes, toutes par la porte) |
@@ -100,22 +148,24 @@ dans un XML, même attribut personnel) : valeur entière, puis chaque mot de 5 c
 
 Il lit un extrait **cohérent** de RIG_DEV (440 factures, récentes ou commentées, avec leurs clients et leur
 journal de 2 217 lignes, 684 parties avec leurs clients et adresses, 300 dirigeants, les 243 agents, 800 courriels
-et traces, les 61 lots d'éditions et 300 demandes qui les citent), en fait une base V2 jetable avec les vraies
-clés étrangères de RIG_DEV (8, vérifiées), la copie avec l'outil, puis compare source et copie ligne à ligne.
-71 contrôles, en 36 s.
+et traces, les 61 lots d'éditions et 300 demandes qui les citent ; depuis le 2026-11-21, 1 500 lignes à prénoms
+d'état civil de chacune des 7 tables du refus et 1 500 noms de fichiers de `CREANCE_TRANSITOIRE`), en fait une base
+V2 jetable avec les vraies clés étrangères de RIG_DEV (11, vérifiées), la copie avec l'outil, puis compare source
+et copie ligne à ligne. Il mesure aussi RIG_DEV entier (colonnes gardées). Environ 2 min 30.
 
 | Critère | Contrôle |
 |---|---|
-| CA01 | 24 colonnes (noms, prénoms, naissances, adresses, courriels, téléphones de clients, dirigeants, parties, agents) : aucune valeur restée, même longueur, même forme, @ et extension, indicatif ; mots de passe vides ; et les valeurs fictives elles-mêmes (bijection sans point fixe sur tous les mots de 2 lettres, casse, accents, dates, téléphones) |
+| CA01 | 33 colonnes (noms, prénoms — dont les 8 prénoms d'état civil du refus —, naissances, adresses, courriels, téléphones, noms de fichiers) : aucune valeur restée, même longueur, même forme, @ et extension, indicatif, extension de fichier ; mots de passe vides ; 29 règles mesurées sur RIG_DEV vérifiées au point d'appel, avec leurs jumeaux gardés ; sur RIG_DEV entier, aucune colonne gardée ne porte de prénoms ; et les valeurs fictives elles-mêmes (bijection sans point fixe sur tous les mots de 2 lettres, casse, accents, dates, téléphones, fichiers) |
 | CA02 | nom du client dans la désignation de ses 440 factures ; désignation identique dans le journal XML (2 113 lignes) ; compte de l'agent dans le journal ; aucun nom fusionné ; les 8 clés étrangères refaites et vérifiées, dont la clé en texte `DMNED_LOT → LOT_NOM` |
 | CA03 | mêmes volumes ; 278 colonnes gardées identiques ligne à ligne ; compteurs d'identité à la même valeur |
 | CA04 | 16 champs libres nommés (XML du journal, destinataires, copie cachée, objet et ligne de commande des traces, corps de courriels, notes, textes de partie, commentaire de facture) : aucune valeur intacte, chacun listé au rapport ; le XML garde sa forme. L'extrait prend exprès des lignes où ils sont remplis ; `EMTRC_REPLY` et `DRGPP_TEXTE_RPPP` restent vides (le second dans tout RIG_DEV) : le banc le dit |
 | CA05 | 406 factures signées au client anonymisé → marque « chaînes invalidées par l'anonymisation » (table, propriété, rapport) ; jumeau : une copie sans ligne signée porte « chaînes intactes » |
-| CA06 | le contrôle ne trouve rien, et ne sort de la source que des empreintes, des clés et des nombres ; **contre-épreuve rouge** : `CLIEN_NOM` laissé en clair → le contrôle le trouve ; même graine → mêmes valeurs |
+| CA06 | le contrôle ne trouve rien, et ne sort de la source que des empreintes, des clés et des nombres ; il tire aussi les colonnes gardées à segment personnel (aucune à 35 % de prénoms) ; **contre-épreuves rouges** : `CLIEN_NOM` laissé en clair → le contrôle le trouve ; copie **et** contrôle avec l'ancienne règle sur les 9 prénoms d'état civil → aucune fuite par les colonnes traitées, mais le contrôle les trouve gardées (53 à 100 %) ; même chose sur RIG_DEV entier (83-96 %) ; même graine → mêmes valeurs |
 | CA07 | aucune écriture sur la source pendant la copie (journal du serveur et empreinte du contenu) ; refus avant connexion d'une copie vers SQL-DEV ; refus de RIG_DEV sans accord, avec l'accord d'une autre base, avec une graine ; jumeau accepté : l'inventaire avec l'accord ; la porte refuse un UPDATE ; refus d'écrire sur la source ou sur une base déjà remplie |
 
-Les deux corrections faites en route sont gardées par le banc : réinjectées, elles le font rougir
-(alignement des clés retiré : 4 rouges ; extensions longues gardées : 2 rouges).
+Les corrections faites en route sont gardées par le banc : réinjectées, elles le font rougir
+(alignement des clés retiré : 4 rouges ; extensions longues gardées : 2 rouges ; composé `ETAT_CIVIL` retiré, le
+2026-11-21 : 14 rouges).
 
 ## Ce qui ne se fait pas depuis ce poste
 

@@ -43,6 +43,7 @@ public sealed class Anonymiseur(Pseudonymes pseudonymes, CatalogueRegles catalog
         Traitement.Garder => v,
         Traitement.Vider => null,
         Traitement.Courriel => pseudonymes.Courriel(v),
+        Traitement.Fichier => pseudonymes.Fichier(v),
         Traitement.Telephone => pseudonymes.Telephone(v),
         Traitement.DateNaissance => pseudonymes.DateTexte(v),
         _ => pseudonymes.Texte(v),
