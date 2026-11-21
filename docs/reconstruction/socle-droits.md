@@ -145,7 +145,7 @@ n'est pas au catalogue, 503 si sa base ne répond pas, sans repli.
 
 | Tâche | Raison | Qui / quand |
 |---|---|---|
-| **SOC-002 CA07, SOC-004 CA06 et la moitié V2 de SOC-004 CA03** : la V2 applique un droit, un compte, une désactivation faits dans la V3 | C'est la recopie V3 → V2 (REC-002, REC-017), en phase 2 ; aucune écriture dans une base V2 n'est permise ici. Ce que la recopie lira est prêt : chaque geste est journalisé dans sa transaction, avec le compte Windows, le nom du rôle et l'identifiant V2 du service. Le banc les marque **REPORTÉ**, pas OK. | Phase 2, thème REC |
+| ~~**SOC-002 CA07, SOC-004 CA06 et la moitié V2 de SOC-004 CA03** : la V2 applique un droit, un compte, une désactivation faits dans la V3~~ | **Fait en phase 2** : le compte et sa désactivation au lot 10 (`tests\RecopieFichesCheck`, REC-017 CA01 et CA02), ses rôles et ses droits au lot 19 (`tests\RecopieDroitsCheck`, section « Recopie V3 → V2 des droits » plus bas). Le banc de ce lot n'a plus ces trois REPORTÉ : il renvoie à ces preuves. | — |
 | **SOC-002 CA01 « sur les 40 bases »** et la reprise base par base (T04) | Seule RIG_DEV est lisible depuis ce poste. Le banc se rejoue tel quel sur une autre base V2 : `$env:RIGV3_V2 = "<chaîne de la copie anonymisée>"; .\tests.ps1 SocleDroits`. | Copies anonymisées des 40 greffes (REC-008) |
 | **SOC-016 CA01-CA02 pour les familles des domaines** (dossier, demande, facture, encaissement…) | Ces domaines n'existent pas encore dans la V3. Le journal est prêt : `JournalGestes.EcrireAsync(cn, tx, appelant, écran, famille, objet, id, verbe, avant, après)` dans la transaction du geste ; les quatre familles de la V2 sont déclarées. | Lots des domaines |
 | **SOC-016 T03, la tuile d'activité de l'accueil** (`web\src\accueil\Tuiles.tsx`) | Hors des fichiers de ce lot ; l'écran « Comptes des agents » porte déjà le journal (onglet « Journal des gestes »). La tuile lira `GET /socle/{greffe}/journal`. | Lot de l'accueil |
@@ -169,6 +169,83 @@ catalogue d'une base commune ; 404 et 503 sur chacune des 9 routes sans qu'aucun
 du greffe A inconnu du greffe B (ouverture, droits, gestion des comptes) ; un geste sur A journalisé dans A
 seulement, le même sur B dans B seulement, chacun avec le code greffe de son adresse. Contre-épreuve
 (2026-11-21) : `OuvrirBaseAsync` ramené à la base commune → 9 contrôles rouges, fichier restauré à l'identique.
+
+## Recopie V3 → V2 des droits (lot 19, 2026-11-21) : SOC-002 T05 et CA07, fin de REC-017 CA01
+
+Un droit ajouté ou retiré dans la V3 est appliqué par la V2 (CA07) : un agent créé dans la V3 avec un rôle ouvre l'ancien
+RIG sans autre geste (REC-017 CA01) et y retrouve exactement ses droits pour une ancienne affaire (SOC-015). Le code :
+`Serveur\Recopie\DroitsRecopies.cs` (avec `RepriseDroits.ReponsesV2` et `DonneesV2.LireCompteAsync`, le sens inverse de la
+reprise) ; le banc : `tests\RecopieDroitsCheck`.
+
+**Branché sur la recopie existante, sans second mécanisme.** Les droits sont la partie jointe de la fiche « compte d'agent »
+(REC-017, `FichesV3.cs`, `RegleRecopie.Jointe`). Un changement de `soc.CompteRole` ou de `soc.CompteFonction` met **le compte**
+en file (`rec.FileRecopie`, colonnes « (droits) ») par deux déclencheurs que la mise en service pose avec celui du compte
+(`soc.TR_CompteRole_FileRecopie`, `soc.TR_CompteFonction_FileRecopie`) ; l'applicateur écrit ses droits dans la transaction du
+compte. Ils ont donc l'ordre de la file, la panne qui arrête le passage, le refus qui compte un essai et la mise de côté au
+3e (REC-005), la relance, et l'écart (REC-004).
+
+**Chaque droit dans son origine V2** (l'ordre de `Utilisateur.ALaFonctionnalite`, `Utilisateur.cs:298-347`) :
+
+| Dans la V3 | Écrit dans la V2 |
+|---|---|
+| un rôle du compte (`soc.CompteRole`) | `HABILIT_UTILISATEUR_ROLE_USER`, au nom du rôle de la V2, avec le compte de session dans `HUROL_LOGIN_UTLST` comme la V2 l'écrit (`HabilitationUtilisateurRoleUser.cs:50-55`) ; ajout et retrait |
+| un droit direct sur une fonction `FONCVB6` (`OLD`, `VB6`) | l'ancien système : les degrés du compte (`UTILISATEUR_A_POUR_ROLE`, `COMPOSER_HABILITATION`) qui donnent exactement ses droits, la primauté des catégories supérieures comprise |
+| un droit direct sur une autre fonction | ses menus de comptabilité (`EXPRESSO_DROITS`) : le menu au nom de la fonction, sinon à son ancien nom (`GESTDROITSEXP` → `DROITS`…) ; au retrait, les deux |
+
+Avant de valider, les droits du compte sont **relus dans la V2** et la réponse de la V2 recalculée pour chacune des fonctions
+de son catalogue (876 sur RIG_DEV) : un seul écart avec la V3 et rien n'est écrit (refus). Ce que la V2 ne peut pas recevoir est
+**mis de côté d'emblée** avec son motif et un écart pour l'agent désigné, jamais écrit à peu près : un rôle absent de la V2,
+une fonction sans menu de comptabilité, une fonction `FONCVB6` sans catégorie, une combinaison que l'ancien système ne sait pas
+représenter, un rôle dont les fonctions diffèrent entre les deux logiciels. Des droits changés dans la V2 depuis le dernier
+passage sont écrasés (la V3 fait foi, Q7) et l'écart garde la valeur perdue (« droits : rôles », « droits : menus de
+comptabilité », « droits : ancien système »), dans « Fiches en conflit ». Un compte supprimé dans la V3 perd ses droits V2
+avant d'être supprimé de la V2 (ses clés étrangères).
+
+**Corrigé en route** : `ServiceComptes.CreerAsync` écrivait `OUTPUT INSERTED.Id` sans `INTO`. Dès qu'un greffe est en
+recopie (déclencheur sur `soc.Compte`, lot 10), SQL Server le refuse (erreur 334) : **aucun compte ne se créait plus depuis la
+V3**. Mesuré par le banc (exception au premier lancement), vert après la correction (`OUTPUT … INTO @ids`).
+
+### Les choix et leur raison
+
+| Choix | Raison |
+|---|---|
+| **Partie jointe du compte**, pas une fiche à part | `soc.CompteRole` a une clé de deux colonnes, que la recopie ne porte pas (une colonne de chaque côté) ; l'ancien système n'a pas une ligne par droit ; et les droits suivent l'utilisateur (Q7, note de SOC-002). |
+| **Le type de la fonction décide l'origine**, pas l'origine notée dans la V3 | La V2 ne consulte que l'ancien système pour une `FONCVB6`, que les menus pour une autre : écrire ailleurs n'ouvrirait rien. |
+| **Ce qu'un rôle donne vient d'un rôle, des deux côtés** | Une fonction que seul un rôle de la V3 donne, ou que les rôles de la V2 donnent et la V3 non, signale des définitions de rôle différentes : un droit direct inventé la masquerait. Refus nommé. |
+| **Dans l'ancien système, un rôle à lui par compte** (« RIGV3 &lt;n° V2&gt; »), seulement quand un de ses droits « ancien » change | L'ancien système n'a que des rôles **partagés** (RIG_DEV : 24 rôles, `ADMINISTRATEUR` sert 62 comptes) : changer un degré d'un rôle partagé changerait les autres comptes. Le rôle du compte reçoit d'abord le plus haut degré de chacun de ses rôles anciens (même réponse partout, la réponse ne dépend que de ces degrés), puis le changement ; le compte quitte les rôles partagés. Prouvé : les autres comptes de ces rôles gardent leurs droits. |
+| **Accorder : degré 3 ; refuser : retirer, sinon 0** ; un domaine (ou une activité) qui prime à 2 ou moins est retiré au compte | 3 est le degré de la V2 (RIG_DEV : 165 degrés à 3, 46 à 0, aucun autre) ; un degré initial nul refuse toujours (`GestionDroitRIG.cls:378`). Les fonctions voisines qui dépendaient du domaine retiré sont reprises jusqu'à ce que tout réponde comme la V3 ; sinon, refus nommé. |
+| **Relire la V2 et comparer chaque fonction avant de valider** | La recopie écrit la V2 « à la main » de la V2 : la preuve qu'elle répond comme la V3 se fait dans la transaction, pas après. |
+| **L'état commun des droits** (`rec.EtatLigne`, table « UTILISATEUR (droits) ») | Comme pour une fiche : c'est contre lui qu'un changement de droits fait dans la V2 se mesure (écart). |
+
+### Écarts code ↔ métier et choix « à valider »
+
+1. **Un compte dont un droit « ancien » change quitte ses rôles anciens partagés** pour son rôle à lui : un degré changé
+   ensuite sur un rôle partagé, dans la V2, ne le touche plus. Codé ainsi parce que la V3 fait foi (Q7) et que la V2 ne
+   sait pas autrement changer un degré pour un seul compte. Le rôle « RIGV3 &lt;n&gt; » se voit dans l'écran des rôles de l'ancien
+   système. Référent Socle.
+2. **Les droits ne remontent pas de la V2.** Un rôle donné dans la V2 est retiré au prochain changement de droits du compte
+   dans la V3 (écart signalé) ; un compte créé dans la V2 arrive dans la V3 sans droits : à lui donner dans la V3 (Q7).
+3. **Le premier changement de droits d'un compte après le passage** n'a pas d'état commun : un changement de ses droits fait
+   dans la V2 entre le passage et lui est écrasé sans écart. Les suivants ont leur écart.
+4. **L'ouverture de la V2 sans rôle** : la V2 teste `RoleUsers == null`, jamais vrai (`Utilisateur.cs:250-253`) ; un compte
+   sans rôle s'ouvre mais n'a aucune fonction. Le banc applique le contrôle comme la V2 le prévoit (écart déjà signalé par
+   SOC-001) : un compte créé dans la V3 avec un rôle ouvre la V2, le même sans rôle non.
+5. **Un greffe mis en recopie avant ce lot** n'a pas les déclencheurs des droits : rejouer sa mise en service
+   (`PontRecopie.MettreEnServiceAsync`, sans risque : les déclencheurs sont réécrits, le point de reprise n'est pas touché).
+6. **Aucun écran ne donne encore un droit direct** : le banc écrit `soc.CompteFonction` comme le ferait ce geste ; le
+   déclencheur le suivra quand il existera.
+
+### Ce qui ne se fait pas depuis ce poste
+
+| Tâche | Raison | Qui / quand |
+|---|---|---|
+| Ouvrir **le vrai RIG V2** (`RigClientAccueil`) sous le compte recopié, sur un RDS | Pas de RDS ni de session Windows de greffe ici. Le banc rejoue `CheckUser` (`RIG\EXE\Accueil\RigClientAccueil\RigConsoleAccueil.cs:117-131`) et `ALaFonctionnalite` (oracle `OracleDroitsV2`), pas la DLL. | Recette sur RDS, greffe bêta |
+| Les 40 bases | RIG_DEV seule est lisible : `$env:RIGV3_RIG_DEV = "<copie anonymisée>"; .\tests.ps1 RecopieDroits`. | Répétition REC-008 |
+
+Preuve : `.\tests.ps1 RecopieDroits` → **code 0**, 22 contrôles (dont la contre-épreuve : déclencheur des rôles coupé → 142
+fonctions différentes vues par l'oracle), puis chaque compte actif de la V2 (97) comparé à la V3 sur chaque fonction (84 972
+comparaisons, 0 écart). Défaut réinjecté le 2026-11-21 (l'applicateur n'écrit plus les droits) → 12 contrôles rouges, fichier
+restauré à l'identique.
 
 ## Preuves
 

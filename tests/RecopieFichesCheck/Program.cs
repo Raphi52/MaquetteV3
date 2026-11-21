@@ -40,7 +40,6 @@ void Exiger(bool ok, string quoi)
     Console.WriteLine((ok ? "OK   " : "ECHEC") + " : " + quoi);
     if (!ok) echecs.Add(quoi);
 }
-void Reste(string quoi) => Console.WriteLine("RESTE : " + quoi);
 void Info(string quoi) => Console.WriteLine("        " + quoi);
 
 async Task<DataTable> Lire(string chaine, string sql)
@@ -725,8 +724,9 @@ try
     Exiger(p17a.Erreur is null && compteV2.Rows.Count == 1 && Convert.ToString(compteV2.Rows[0][1]) == Convert.ToString(service[1]) && !(bool)compteV2.Rows[0][2]
            && Convert.ToString(compteV2.Rows[0][0]) == await V2De("UTILISATEUR", compteCa01),
         $"REC-017 CA01 : le compte cree dans la V3 est dans la V2 au meme nom de session, actif, rattache au meme service (V3 n° {service[0]} -> V2 n° {(compteV2.Rows.Count > 0 ? compteV2.Rows[0][1] : "?")})");
-    Reste("REC-017 CA01 « l'agent ouvre la V2 sans autre geste » : la V2 exige aussi au moins un role (HABILIT_UTILISATEUR_ROLE_USER, RigConsoleAccueil.cs:113-133) ; " +
-          "les roles d'un compte se recopient avec les droits, que T02 laisse aux stories du Socle commun (SOC-002) -- compte, actif et service sont prouves ici");
+    // REC-017 CA01 « l'agent ouvre la V2 sans autre geste » (au moins un role, RigClientAccueil\RigConsoleAccueil.cs:117-131) : les
+    // roles et droits du compte passent avec lui (SOC-002 T05, Serveur\Recopie\DroitsRecopies.cs), prouve par tests\RecopieDroitsCheck
+    // (lot 19) -- compte cree par le geste de la V3 avec un role, controle d'ouverture de la V2 passe ; compte, actif et service ici.
 
     // CA03 : les reglages du poste dans la V2 ne sont jamais ecrases ; vides pour un nouveau compte.
     var posteV3 = await V3De("UTILISATEUR", posteRegle!);

@@ -1,3 +1,7 @@
+// fix-ok: ajout du lot 19 (SOC-002 T05), pas une correction : la lecture des droits d'UN compte (LireCompteAsync) et la reponse
+// de la V2 (ReponsesV2), ecrites en trois passes avant toute compilation -- la 2e a remplace une reponse fonction par fonction
+// par une reponse calculee une fois par compte, la verification de la recopie l'appelant pour les 876 fonctions du catalogue de
+// RIG_DEV (lu le 2026-11-20, SOC-002 sources).
 using System.Data;
 using Microsoft.Data.SqlClient;
 
@@ -53,6 +57,36 @@ public static class RepriseDroits
     /// (ProcessusEtFonctionalite.cs:186-192). Tout autre type passe par les menus de comptabilite.
     /// </summary>
     public static bool EstFonctionVb6(string typeV2) => typeV2 is "FONCVB6" or "OLD" or "VB6";
+
+    /// <summary>
+    /// LA REPONSE DE LA V2 pour un compte et une fonction de son catalogue, sur des donnees lues : Utilisateur.ALaFonctionnalite
+    /// (Utilisateur.cs:298-347) dans son ordre -- un role du compte qui porte la fonction (jointure SQL de la V2 : majuscules
+    /// et espaces de fin ignores) ; sinon, pour une fonction FONCVB6, l'ancien systeme au-dessus du degre 2 ; sinon un menu de
+    /// comptabilite au nom de la fonction ou a son ancien nom (compare a l'identique, C#). C'est le partage que la reprise
+    /// traduit ; la recopie V3 -> V2 (Serveur\Recopie\DroitsRecopies.cs) s'en sert pour ecrire chaque droit dans SON origine,
+    /// puis pour verifier, avant de valider, que la V2 repond comme la V3.
+    /// </summary>
+    /// <returns>Code de chaque fonction du catalogue de la V2 -> autorisee ou refusee.</returns>
+    public static Dictionary<string, bool> ReponsesV2(DonneesV2 v2, int idUtlst)
+    {
+        var parRole = FonctionsParUnRoleV2(v2, idUtlst);
+        var degres = v2.DegresDuCompte(idUtlst);
+        var menus = v2.MenusDuCompte(idUtlst);
+        var reponses = new Dictionary<string, bool>(StringComparer.Ordinal);
+        foreach (var f in v2.Fonctions)
+            reponses[f.Code] = parRole.Contains(DonneesV2.Cle(f.Code)) || (EstFonctionVb6(f.Type)
+                ? DegreAncien(v2, degres, f.Code) is > 2
+                : menus.Contains(f.Code) || (AnciensNomsDeMenu.TryGetValue(f.Code, out var ancienNom) && menus.Contains(ancienNom)));
+        return reponses;
+    }
+
+    /// <summary>Les fonctions (cle SQL, <see cref="DonneesV2.Cle"/>) que les roles du compte lui donnent dans la V2
+    /// (HABILIT_UTILISATEUR_ROLE_USER puis HABILIT_ROLE_USER_PROCESSUS, joints comme SQL Server les joint).</summary>
+    public static HashSet<string> FonctionsParUnRoleV2(DonneesV2 v2, int idUtlst)
+    {
+        var roles = v2.ComptesRoles.Where(r => r.IdUtlst == idUtlst).Select(r => DonneesV2.Cle(r.Role)).ToHashSet(StringComparer.Ordinal);
+        return v2.RoleFonctions.Where(rf => roles.Contains(DonneesV2.Cle(rf.Role))).Select(rf => DonneesV2.Cle(rf.Code)).ToHashSet(StringComparer.Ordinal);
+    }
 
     /// <summary>Lit la V2, puis ecrit la V3. Rend ce qui a ete repris.</summary>
     public static async Task<BilanReprise> ReprendreAsync(string connexionV2, string connexionV3, CancellationToken ct = default)
@@ -299,10 +333,27 @@ public sealed class DonneesV2
         var cs = new SqlConnectionStringBuilder(connexionV2) { ApplicationIntent = ApplicationIntent.ReadOnly };
         await using var cn = new SqlConnection(cs.ConnectionString);
         await cn.OpenAsync(ct);
+        return await LireAsync(cn, null, null, null, ct);
+    }
 
+    /// <summary>
+    /// Les droits d'UN compte de la V2 et le catalogue qui les explique (fonctions, roles et leurs fonctions, categories, menus),
+    /// lus sur une connexion a la base V3 dans SA transaction : la base V2 est nommee sur la meme instance (Q4). La recopie
+    /// V3 -> V2 des droits (Serveur\Recopie\DroitsRecopies.cs) relit ainsi ce qu'elle vient d'ecrire avant de valider.
+    /// </summary>
+    public static Task<DonneesV2> LireCompteAsync(SqlConnection cn, SqlTransaction? tx, string baseV2, int idUtlst, CancellationToken ct)
+        => LireAsync(cn, tx, baseV2, idUtlst, ct);
+
+    /// <param name="baseV2">La base V2 nommee depuis une autre base de l'instance ; null = la base de la connexion.</param>
+    /// <param name="idUtlst">Un seul compte (ses roles, son ancien systeme, ses menus) ; null = tous.</param>
+    private static async Task<DonneesV2> LireAsync(SqlConnection cn, SqlTransaction? tx, string? baseV2, int? idUtlst, CancellationToken ct)
+    {
+        var b = baseV2 is null ? "dbo." : "[" + baseV2.Replace("]", "]]") + "].dbo.";
+        string Filtre(string colonne) => idUtlst is null ? "" : $" WHERE {colonne} = @u";
         async Task<List<T>> Lire<T>(string sql, Func<SqlDataReader, T> ligne)
         {
-            await using var cmd = new SqlCommand(sql, cn) { CommandTimeout = 300 };
+            await using var cmd = new SqlCommand(sql, cn, tx) { CommandTimeout = 300 };
+            if (idUtlst is { } u) cmd.Parameters.Add(new SqlParameter("@u", SqlDbType.Int) { Value = u });
             await using var l = await cmd.ExecuteReaderAsync(ct);
             var liste = new List<T>();
             while (await l.ReadAsync(ct)) liste.Add(ligne(l));
@@ -311,40 +362,41 @@ public sealed class DonneesV2
         static int? Int(SqlDataReader l, int i) => l.IsDBNull(i) ? null : Convert.ToInt32(l.GetValue(i));
         static string? Str(SqlDataReader l, int i) => l.IsDBNull(i) ? null : l.GetString(i);
 
-        var categories = await Lire("SELECT CTGR_ID_CTGR, CTGR_REFERENCE, CTGR_NIVEAU, CTGR_ID_CTGR_DOMAINE, CTGR_ID_CTGR_ACTIVITE FROM dbo.CATEGORIE;",
+        var categories = await Lire($"SELECT CTGR_ID_CTGR, CTGR_REFERENCE, CTGR_NIVEAU, CTGR_ID_CTGR_DOMAINE, CTGR_ID_CTGR_ACTIVITE FROM {b}CATEGORIE;",
             l => new Categorie(l.GetInt32(0), l.GetString(1), Convert.ToInt32(l.GetValue(2)), Int(l, 3), Int(l, 4)));
         return new DonneesV2
         {
-            Services = await Lire("""
+            Services = await Lire($"""
                 SELECT SRVC_ID_SRVC, SRVC_CODE_DIRECTION, SRVC_CODE_GREFFE, SRVC_ABREGE, SRVC_NOM, SRVC_DISTRI_SPECIFIQUE,
-                       SRVC_DISTRIBUTION_AUTO, SRVC_HEURE_DISTRIBUTION FROM dbo.SERVICE;
+                       SRVC_DISTRIBUTION_AUTO, SRVC_HEURE_DISTRIBUTION FROM {b}SERVICE;
                 """, l => new Service(l.GetInt32(0), Str(l, 1), l.GetString(2), l.GetString(3), Str(l, 4), l.GetBoolean(5), l.GetBoolean(6),
                     l.IsDBNull(7) ? null : l.GetDateTime(7))),
             // Sans UTLST_PASSWORD : la colonne n'est ni lue ni copiee (SOC-001 CA08).
-            Utilisateurs = await Lire("""
+            Utilisateurs = await Lire($"""
                 SELECT UTLST_ID_UTLST, UTLST_ID_SRVC, UTLST_CODE_GREFFE, UTLST_ABREGE, UTLST_CIVILITE, UTLST_LOGIN, UTLST_NOM, UTLST_PRENOM,
-                       UTLST_DESACTIVE, UTLST_DATE_CREATION, UTLST_ISAMITEL, UTLST_ISADMIN, UTLST_IS_HOTLINE FROM dbo.UTILISATEUR;
+                       UTLST_DESACTIVE, UTLST_DATE_CREATION, UTLST_ISAMITEL, UTLST_ISADMIN, UTLST_IS_HOTLINE FROM {b}UTILISATEUR{Filtre("UTLST_ID_UTLST")};
                 """, l => new Utilisateur(l.GetInt32(0), Int(l, 1), Str(l, 2), l.GetString(3), l.GetString(4), l.GetString(5), l.GetString(6),
                     l.GetString(7), l.GetBoolean(8), l.IsDBNull(9) ? null : l.GetDateTime(9), l.GetBoolean(10), l.GetBoolean(11), l.GetBoolean(12))),
-            Roles = await Lire("SELECT HROLE_NOM_ROLE, HROLE_LIBELLE, HROLE_ONLYAMITEL, HROLE_ONLYADMIN FROM dbo.HABILIT_ROLE_USER;",
+            Roles = await Lire($"SELECT HROLE_NOM_ROLE, HROLE_LIBELLE, HROLE_ONLYAMITEL, HROLE_ONLYADMIN FROM {b}HABILIT_ROLE_USER;",
                 l => new Role(l.GetString(0), l.GetString(1), l.GetBoolean(2), l.GetBoolean(3))),
-            Fonctions = await Lire("""
+            Fonctions = await Lire($"""
                 SELECT PROCF_CODE_PROC, PROCF_TYPE, PROCF_LIBELLE, PROCF_DOMAINE, PROCF_ONLYAMITEL, PROCF_ONLYADMIN
-                FROM dbo.PROCESSUS_ET_FONCTIONALITE;
+                FROM {b}PROCESSUS_ET_FONCTIONALITE;
                 """, l => new Fonction(l.GetString(0), l.GetString(1), l.GetString(2), Int(l, 3), l.GetBoolean(4), l.GetBoolean(5))),
-            RoleFonctions = await Lire("SELECT HRFON_NOM_ROLE, HRFON_CODE_PROC FROM dbo.HABILIT_ROLE_USER_PROCESSUS;",
+            RoleFonctions = await Lire($"SELECT HRFON_NOM_ROLE, HRFON_CODE_PROC FROM {b}HABILIT_ROLE_USER_PROCESSUS;",
                 l => (l.GetString(0), l.GetString(1))),
-            ComptesRoles = await Lire("SELECT HUROL_ID_UTLST, HUROL_NOM_ROLE FROM dbo.HABILIT_UTILISATEUR_ROLE_USER;",
+            ComptesRoles = await Lire($"SELECT HUROL_ID_UTLST, HUROL_NOM_ROLE FROM {b}HABILIT_UTILISATEUR_ROLE_USER{Filtre("HUROL_ID_UTLST")};",
                 l => (l.GetInt32(0), l.GetString(1))),
             Categories = categories.ToDictionary(c => c.Id),
             PremiereCategorie = categories.GroupBy(c => Cle(c.Reference)).ToDictionary(g => g.Key, g => g.MinBy(c => c.Id)!),
-            Degres = await Lire("SELECT X_CPSHB_ID_UTROL, X_CPSHB_REFERENCE_CTGR, X_CPSHB_DEGRE FROM dbo.COMPOSER_HABILITATION;",
+            Degres = await Lire($"SELECT X_CPSHB_ID_UTROL, X_CPSHB_REFERENCE_CTGR, X_CPSHB_DEGRE FROM {b}COMPOSER_HABILITATION" +
+                                (idUtlst is null ? ";" : $" WHERE X_CPSHB_ID_UTROL IN (SELECT X_UTARL_ID_UTROL FROM {b}UTILISATEUR_A_POUR_ROLE WHERE X_UTARL_ID_UTLST = @u);"),
                 l => (l.GetInt32(0), l.GetString(1), Convert.ToInt32(l.GetValue(2)))),
-            RolesAnciens = await Lire("SELECT X_UTARL_ID_UTROL, X_UTARL_ID_UTLST FROM dbo.UTILISATEUR_A_POUR_ROLE;",
+            RolesAnciens = await Lire($"SELECT X_UTARL_ID_UTROL, X_UTARL_ID_UTLST FROM {b}UTILISATEUR_A_POUR_ROLE{Filtre("X_UTARL_ID_UTLST")};",
                 l => (l.GetInt32(0), l.GetInt32(1))),
-            Menus = (await Lire("SELECT EXPME_ID_EXPME, EXPME_CLE FROM dbo.EXPRESSO_MENU WHERE EXPME_CLE IS NOT NULL;",
+            Menus = (await Lire($"SELECT EXPME_ID_EXPME, EXPME_CLE FROM {b}EXPRESSO_MENU WHERE EXPME_CLE IS NOT NULL;",
                 l => (l.GetInt32(0), l.GetString(1)))).ToDictionary(m => m.Item1, m => m.Item2),
-            MenusDroits = await Lire("SELECT EXPDR_ID_EXPME, EXPDR_ID_UTLST FROM dbo.EXPRESSO_DROITS;",
+            MenusDroits = await Lire($"SELECT EXPDR_ID_EXPME, EXPDR_ID_UTLST FROM {b}EXPRESSO_DROITS{Filtre("EXPDR_ID_UTLST")};",
                 l => (l.GetInt32(0), l.GetInt32(1))),
         };
     }
