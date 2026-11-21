@@ -32,7 +32,12 @@ services:
       # des BASES (SQL_Latin1_General_CP1_CI_AS, comme RIG_DEV) est posee a leur
       # creation (Base/BaseJetable.cs) : la recopie compare les textes comme la V2.
       MSSQL_COLLATION: "French_CI_AS"
-      MSSQL_MEMORY_LIMIT_MB: "2048"
+      # 4096 et pas 2048 (2026-11-21) : 2048 est le MINIMUM de SQL Server sous
+      # Linux. Mesure ce jour-la avec 2048 : sqlservr a 1,8 Go, « memoire
+      # physique basse » signalee, cache de donnees a 18 Mo ; la copie en masse
+      # (SqlBulkCopy) d'un banc attendait sa memoire (RESOURCE_SEMAPHORE) jusqu'a
+      # son delai de 600 s -- SocleCourrielsCheck rouge en 615 s, vert en 21 s.
+      MSSQL_MEMORY_LIMIT_MB: "4096"
     ports:
       # 14330 et pas 1433 : un SQL Server installe sur le poste tient souvent 1433.
       - "127.0.0.1:${RIGV3_SQL_PORT:-14330}:1433"
