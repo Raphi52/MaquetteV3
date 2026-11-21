@@ -609,9 +609,12 @@ laissée à la V2 par une raison écrite (clé, état de transmission, déroulem
   fiche que le transfert a écrite dans une autre table que celle de sa règle. Le **contrôle de nuit** prend les mêmes
   règles (`Comparaison.cs`) : comparer avec toutes celles du serveur traduisait des liens que la base ne recopie pas
   (512 faux écarts `CLIENT [CLIEN_ID_UTLST]` mesurés par `RecopieDeuxSensCheck`, où UTILISATEUR n'est pas en service).
-- **Les parents d'un type de demande** (domaine, famille, activité) sont d'autres types, sans clé étrangère dans la V2 :
-  déclarés liens (`LiensSansCle`), ils sont lus par la correspondance ; sans cela, 873 faux écarts au contrôle de nuit
-  (`RecopieRepriseCheck`), et un numéro V2 écrit dans la V3.
+- **Les parents d'un type de demande** (domaine, famille, activité) sont d'autres types. La V2 les tient par trois clés
+  étrangères vers `CATEGORIE.CTGR_ID_CTGR` (`FK_CATEGORIE_CTGR_ID_CTGR_DOMAINE|FAMILLE|ACTIVITE_…`, actives et vérifiées
+  sur RIG_DEV et RIG_RECETTE, lu le 2026-11-21) ; la règle les déclare aussi liens (`LiensSansCle`), pour qu'ils restent
+  traduits sur une base où ces clés manqueraient (sans lien, un numéro V2 serait écrit dans la V3). Ils sont lus par la
+  correspondance sous leur nom V2 : le contrôle de nuit qui les cherchait sous le nom V3 voyait 873 faux écarts
+  (`RecopieRepriseCheck`, corrigé dans `Comparaison.cs`).
 - **Une colonne traduite n'est jamais un lien** : depuis que les comptes sont recopiés, `CLIEN_ID_UTLST → UTILISATEUR` est
   aussi une clé vers une fiche partagée ; traduite deux fois, l'agent V3 « azuredevops » devenait l'agent V2 « Moulinette »
   (mesuré, REC-013 CA02 rouge au 4e essai du banc).
@@ -696,7 +699,7 @@ CLIENT / DOSSIER_RCS à ARRIVEE, et le banc du lot 9 met en service ses sept fic
 | Les 40 bases | mesure sur RIG_DEV et RIG_RECETTE seulement (les bases des greffes ne se lisent pas d'ici sans accord) ; un schéma de greffe sans une colonne de la correspondance la laisse hors de la recopie | répétition REC-008 (lot 18) |
 | Écran « à maquetter » des stories | aucun écran de fiche n'est dans ce lot ; les écarts d'une fiche sans écran restent sans « Ouvrir la fiche » | stories de domaine |
 | Les demandes recopiées par leur type (REC-019 T03) | la recopie des demandes est au lot 11 (REC-011, REC-007) : `TypesDemande.NumeroV2Async` / `TypeV3Async` / `SansEquivalentAsync` sont là pour elle | lot 11 |
-| Un type dont le parent V2 n'existe pas (lien cassé hérité) | le transfert le laisse vide dans la V3 et le note (`rec.LienCasse`) ; la recopie, elle, garde un lien sans correspondance tel quel (règle commune du lot 9) : modifié dans la V2, ce type porterait dans la V3 un numéro V2 comme parent. Non mesuré sur RIG_DEV | à valider (recopie) |
+| Un type dont le parent V2 n'existe pas (lien cassé hérité) | mesuré le 2026-11-21 en lecture seule : **0 cas** sur RIG_DEV (892 types, 873 avec un parent) et **0** sur RIG_RECETTE (857 types, 834 avec un parent) ; la V2 l'interdit par ses trois clés étrangères, actives et vérifiées (`is_disabled = 0`, `is_not_trusted = 0`) sur les deux bases. Si le cas existait (clé désactivée sur une base de greffe), le transfert laisserait le parent vide dans la V3 et le noterait (`rec.LienCasse`), et la recopie garderait le lien sans correspondance tel quel (règle commune du lot 9) : un numéro V2 comme parent dans la V3. Reste à lire l'état de ces clés sur les 40 bases | répétition REC-008 (lot 18) |
 
 ### Fichiers du lot 10
 

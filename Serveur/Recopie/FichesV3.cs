@@ -231,9 +231,10 @@ internal sealed class ReglesFichesV3 : IReglesRecopie, IReglesTransfert
             .Traduite("CTGR_ID_SRVC", TraductionsFiches.ParService) with
         {
             ColonnesPropres = ["CTGR_ID_MDPRC"], ColonneNom = "CTGR_LIBELLE_ECRAN", SansCreationV2 = true,
-            // Le domaine, la famille et l'activite d'un type sont d'autres types : sans cle etrangere dans la V2, ils sont lus
-            // par la correspondance (la V3 donne ses propres numeros, RepriseTypesDemande) -- sinon un numero V2 serait ecrit
-            // dans la V3 et le controle de nuit les verrait tous differents (873 ecarts mesures par RecopieRepriseCheck).
+            // Le domaine, la famille et l'activite d'un type sont d'autres types, lus par la correspondance (la V3 donne ses
+            // propres numeros, RepriseTypesDemande). La V2 les tient par trois cles etrangeres vers CTGR_ID_CTGR (actives et
+            // verifiees sur RIG_DEV et RIG_RECETTE, lu le 2026-11-21) ; declares ici aussi, ils restent traduits sur une base
+            // ou ces cles manqueraient -- sinon un numero V2 y serait ecrit dans la V3.
             LiensSansCle = new Dictionary<string, string>
             {
                 ["CTGR_ID_CTGR_DOMAINE"] = "CATEGORIE", ["CTGR_ID_CTGR_FAMILLE"] = "CATEGORIE", ["CTGR_ID_CTGR_ACTIVITE"] = "CATEGORIE",
