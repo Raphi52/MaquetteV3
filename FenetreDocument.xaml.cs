@@ -39,6 +39,26 @@ public partial class FenetreDocument : Window
     /// l'emplacement <see cref="Rang"/>.</summary>
     public Pont.RacineDocumentDetache Racine { get; }
 
+    /// <summary>Les rangs des fenetres de document ouvertes, quelle que soit leur origine (une affaire,
+    /// un document recu) : le prochain rang libre se prend sur elles TOUTES, sinon deux fenetres
+    /// liraient le meme emplacement du passe-plat et montreraient le meme document.</summary>
+    public static IEnumerable<int> RangsOuverts()
+        => Application.Current?.Windows.OfType<FenetreDocument>().Select(f => f.Rang).ToList() ?? [];
+
+    /// <summary>
+    /// Ouvre <paramref name="piece"/> dans une fenetre de document neuve, au plus petit rang libre ;
+    /// a sa fermeture, l'emplacement est libere. Sur le fil de l'interface.
+    /// </summary>
+    public static FenetreDocument Ouvrir(NoeudGed piece, IReadOnlyList<(string Libelle, string Valeur)> valeurs)
+    {
+        var rang = App.Partage.RangLibre(RangsOuverts());
+        App.Partage.Publier(rang, piece, valeurs);
+        var fenetre = new FenetreDocument(rang) { Title = "RIG V3 - " + piece.Libelle };
+        fenetre.Closed += (_, _) => App.Partage.Liberer(fenetre.Rang);
+        fenetre.Show();
+        return fenetre;
+    }
+
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
@@ -183,4 +203,15 @@ public partial class FenetreDocument : Window
         public RECT rcWork;
         public int dwFlags;
     }
+}
+
+/// <summary>
+/// SOC-013 CA03 et CA04 : un document que la partie serveur a prepare pour l'agent s'ouvre dans sa
+/// propre fenetre de document (Pont/DocumentsRecus.cs), a l'ouverture de l'application comme a la
+/// releve. La releve arrive sur un fil du pool : la fenetre s'ouvre sur celui de l'interface.
+/// </summary>
+public sealed class AfficheurFenetres : Pont.IAfficheurDocuments
+{
+    public void Montrer(NoeudGed piece, IReadOnlyList<(string Libelle, string Valeur)> valeurs)
+        => Application.Current.Dispatcher.BeginInvoke(() => FenetreDocument.Ouvrir(piece, valeurs));
 }

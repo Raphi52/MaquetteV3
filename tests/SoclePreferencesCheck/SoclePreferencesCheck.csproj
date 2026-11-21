@@ -32,6 +32,7 @@
     <Compile Include="../../Pont/JSInvokable.cs" Link="Pont/JSInvokable.cs" />
     <Compile Include="../../Pont/SessionAgent.cs" Link="Pont/SessionAgent.cs" />
     <Compile Include="../../Pont/PreferencesServeur.cs" Link="Pont/PreferencesServeur.cs" />
+    <Compile Include="../../Pont/DocumentsRecus.cs" Link="Pont/DocumentsRecus.cs" />
     <!-- La fiche des touches, son inventaire de la V2 et le menu de la maquette. -->
     <Compile Include="../../Pont/EcranCorrespondances.cs" Link="Pont/EcranCorrespondances.cs" />
     <Compile Include="../../Pont/InventaireTouchesV2.cs" Link="Pont/InventaireTouchesV2.cs" />

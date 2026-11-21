@@ -19,13 +19,15 @@ les perd dès que la ferme l'envoie sur un autre serveur. La V2 les garde en bas
 |---|---|---|
 | Base | `Base\migrations\SOC-013_preferences.sql` | `soc.Preference` (agent, nom, valeur JSON, date, serveur RDS qui l'a écrite) ; `soc.SessionAgent` (la dernière session ouverte : serveur + session) ; `soc.DocumentAgent` (documents préparés pour un agent, remis une seule fois) |
 | Contrats | `Contrats\Socle\Preferences.cs` | `RoutesPreferences`, `PreferencesAgent`, `OuvertureSessionAgent`, `DocumentRecu`, `NomsPreferences` |
-| Serveur | `Serveur\Socle\Preferences\` | `ModulePreferences` (4 routes, greffe dans l'adresse, `AgentAdmis`) ; `ServicePreferences` ; `DocumentsAgents` ; `ReprisePreferences` |
+| Serveur | `Serveur\Socle\Preferences\` | `ModulePreferences` (5 routes, greffe dans l'adresse, `AgentAdmis`) ; `ServicePreferences` ; `DocumentsAgents` ; `ReprisePreferences` |
 | App | `AccueilEtat.cs`, `Pont\PreferencesServeur.cs`, `MainWindow.xaml.cs` | la liste des préférences, la reprise à l'ouverture, l'envoi de ce qui change |
+| App | `Pont\DocumentsRecus.cs`, `FenetreDocument.xaml.cs` (`AfficheurFenetres`, `Ouvrir`) | chaque document reçu s'ouvre dans une fenêtre de document (CA03, CA04) |
 | App | `Pont\PlanTravail.cs`, `Pont\PlanTravailVue.cs` | la boîte d'impression s'ouvre sur l'imprimante de l'agent ; la dernière choisie devient la sienne (CA05) |
 
 - **Routes** (toutes `/socle/{greffe}/…`, l'agent est celui de la session Windows, aucune adresse ne nomme un autre
   agent) : `GET`/`PUT preferences` ; `POST session` (la V3 s'ouvre ici, les documents en attente sont remis) ;
-  `GET documents?serveur=…&session=…` (la relève de cette session seulement).
+  `GET documents?serveur=…&session=…` (la relève de cette session seulement) ; `GET documents/{id}` (le contenu d'un
+  de SES documents : 404 pour celui d'un autre agent, ou si le fichier n'est plus sur le serveur).
 - **Ouverture** (`MainWindow`, avant `PageWeb.Brancher`, donc avant que l'accueil lise `accueil.json`) : une fois
   l'agent admis dans son greffe — greffe du lancement ou écran de choix —, `PreferencesServeur.BrancherSessionAsync`
   lit ses préférences, les pose dans `accueil.json` (`AccueilEtat.ReprendrePreferences`), branche le dépôt
@@ -70,6 +72,19 @@ la session notée ne l'a pas relevé, ou part à la prochaine ouverture. Il est 
 dans la même instruction qui le lit : jamais deux fois. Le dépôt n'est pas une route : c'est la partie serveur
 (`DocumentsAgents.DeposerAsync`) ; aucun agent ne pose de document chez un autre.
 
+**À l'écran (T03).** Chaque document remis — à l'ouverture de l'application (CA04) comme à la relève (CA03) — lève
+`PreferencesServeur.DocumentsArrives`, un événement de l'application auquel `MainWindow` s'abonne **avant** la session
+(`DocumentsRecus.Brancher(new AfficheurFenetres(), …)`), sinon les documents qui attendaient arriveraient sans personne
+pour les ouvrir. `Pont\DocumentsRecus.cs` lit le contenu par `GET documents/{id}` — le fichier est sur le serveur de la V3,
+chez Amitel, que le serveur RDS ne lit pas —, le range à côté des réglages de l'agent (`accueil-pieces\documents-recus`,
+servi à la page par l'hôte des pièces jointes, `Pont\PageWeb.cs`) et l'ouvre dans une **fenêtre de document**
+(`FenetreDocument.Ouvrir`, la fenêtre de « Détacher »), titre du document en barre de titre, avec sa nature, qui l'a
+préparé et quand. Les documents s'ouvrent un par un, dans l'ordre d'arrivée. Un document qui ne s'affiche pas (fichier
+disparu du serveur, serveur muet, type autre que PDF, JPG ou PNG) s'ouvre **quand même**, avec la raison à la place du
+contenu : l'agent sait qu'il est arrivé. Le rang d'une fenêtre se prend désormais sur **toutes** les fenêtres de document
+ouvertes (`FenetreDocument.RangsOuverts`, aussi pour « Détacher » dans `Pont\PlanTravail.cs`) : sur les seules siennes,
+une affaire détachée et un document reçu liraient le même emplacement.
+
 ## SOC-027 — la fiche « ancienne touche, nouvelle touche »
 
 Écran **neuf** (« à maquetter »), menu **Configurer › Mon poste › Ancienne touche, nouvelle touche**
@@ -91,9 +106,25 @@ explication. Elle **se cherche** (un mot sur tous les textes de la ligne, et un 
    remplace (`EcransRemplaces`) : l'accueil, la page du dossier (VGED, VDOSSIER), la palette Ctrl K (les fenêtres de
    recherche OCX de la V2), et quatre écrans au menu sous un autre code (experts, juges, divergences BEN,
    habilitations — **à valider**).
-3. **La nouvelle touche** : les règles du clavier de la V3 (`EcranCorrespondances.Regle`) — Entrée lance la recherche
-   là où l'écran le fait vraiment (`EntreeLanceLaRecherche`, vérifié dans son `.tsx`), Échap ferme, la palette Ctrl K
-   remplace les fenêtres de recherche, « ? » montre les touches, une ligne s'ouvre au clic.
+3. **La nouvelle touche** : les règles du clavier de la V3 (`EcranCorrespondances.Regle`) — Entrée, **F5 et F7** lancent
+   la recherche là où l'écran le fait vraiment (`EntreeLanceLaRecherche`, vérifié dans son `.tsx`), Échap ferme, la
+   palette Ctrl K remplace les fenêtres de recherche, « ? » montre les touches, une ligne s'ouvre au clic.
+
+**F5 et F7 (décision du chef du plan, 2026-11-21).** La fenêtre ne recharge plus jamais la V3 : `Pont\PageWeb.cs` coupe
+les touches du navigateur (`AreBrowserAcceleratorKeysEnabled = false`). Avant, F5 rechargeait toute la fenêtre — la
+saisie en cours était perdue — et F7 basculait la navigation au curseur. Les touches arrivent à la page : dans un critère
+d'un écran de recherche, `toucheDeRecherche` (`web\src\plan\clavier.ts`) lance la recherche sur Entrée, F5 et F7, comme
+la V2 (`OPE_SEARCH_*`, `frmREQUI.cs:424-425`). Sur les réquisitions, F5 efface les critères et la liste, comme `RAZ` de la
+V2 (`frmREQUI.cs:421`, `F5EffaceLesCriteres`). Tout écran de recherche construit ensuite passe par `toucheDeRecherche` :
+le banc refuse un écran de `EntreeLanceLaRecherche` qui teste Entrée lui-même. Le contrôle WPF ne donne pas le réglage
+touche par touche (`IsBrowserAcceleratorKeyEnabled` vit sur `CoreWebView2Controller`, qu'il garde pour lui) : le réglage
+d'ensemble coupe aussi Ctrl R, Ctrl F et F3 (chercher dans la page), Ctrl P (chaque écran a son bouton Imprimer), Ctrl +
+et Ctrl − (Ctrl + molette zoome toujours) et Alt + flèche. Copier, coller, tout sélectionner, annuler et les touches de
+déplacement restent. En Debug, F12 ouvre toujours les outils de développement.
+
+**La fiche se lit en entier** : chaque texte revient à la ligne, pastilles et boutons compris (`RETOUR_A_LA_LIGNE`,
+propre à cette table ; les grilles de la charte restent sur une ligne). Sous 900 px, la table garde sa largeur et le
+cadre défile.
 4. **Trois lignes globales** : Alt + lettre soulignée (V2, `RigConsoleAccueil.cs:97`) → la lettre de l'action sans
    Alt sur la page du dossier ; Ctrl K et « ? », nouveaux.
 
@@ -101,14 +132,15 @@ explication. Elle **se cherche** (un mot sur tous les textes de la ligne, et un 
 touches de cet écran avec l'ancienne touche à côté (`AideTouchesEcran`, monté par `web\src\plan\Procedure.tsx`) ;
 Échap ou « ? » la ferment.
 
-**Répartition au 2026-11-21** (188 lignes, sortie du banc) : identique 22 ; nouvelle touche 32 ; remplacée par un
-geste 29 ; supprimée 19 ; nouveau 2 ; écran à venir 84. Le banc imprime le compte à jour à chaque passage.
+**Répartition au 2026-11-21** (188 lignes, sortie du banc après F5/F7) : identique 24 ; nouvelle touche 31 ; remplacée
+par un geste 28 ; supprimée 19 ; nouveau 2 ; écran à venir 84. Le banc imprime le compte à jour à chaque passage.
 
 ## Écarts à valider (règle 4 du plan)
 
 | Écart | Ce que fait la V3 | Pourquoi / qui tranche |
 |---|---|---|
-| **F5 recharge toute la fenêtre de la V3.** Dans la V2, F5 et F7 lancent la recherche ou actualisent la liste sur des dizaines d'écrans. Le contrôle WebView2 garde ses touches de navigateur : F5 recharge la page, F7 bascule la navigation au curseur. | La fiche le dit sur chaque ligne F5. | Décision produit : neutraliser F5/F7 (réglage WebView2 `AreBrowserAcceleratorKeysEnabled`) ou les faire lancer la recherche. Hors de ce lot : touche à `Pont\PageWeb.cs` et à chaque écran. |
+| **Les touches du navigateur sont coupées** (décision du chef : F5 et F7 ne rechargent plus). | Ctrl F, F3, Ctrl P, Ctrl +/−, Ctrl R, Alt + flèche ne font plus rien ; copier-coller, annuler, déplacement restent ; Ctrl + molette zoome. | Si un greffe se servait de Ctrl F (chercher dans la page) ou de Ctrl + (zoom au clavier), le dire au référent : chaque touche se rend par la page, écran par écran. |
+| **Un document « à relire » s'ouvre en lecture.** La V2 l'ouvrait dans Word, visible, pour le relire (`LGEDT_WORD_VISIBLE`, `LigneEdition.cs:806-823`). | La fenêtre de document affiche les PDF et les images ; un autre type (Word) s'ouvre avec la raison à la place du contenu. | Le moteur d'éditions de la V3 (pas encore construit) dira ce qu'il produit ; si c'est du Word à corriger, décider avec le référent comment l'agent le relit. |
 | **Recherche sans touche** sur des écrans déjà construits : Actes numérisés, Demandes, GED judiciaire, Coffre-fort, Gestion des clients filtrent leur liste au fil de la saisie (ni bouton, ni Entrée) ; Actualités n'a aucun critère. | La fiche dit « la liste se filtre au fil de la saisie » ou « pas de critère (écart à valider) ». Le banc vérifie chaque affirmation dans le `.tsx` (Entrée → `rechercher()`, champs sans bouton, aucun champ) et repère un écran changé sans que la fiche suive. | Filtrer à chaque frappe est un choix de la maquette ; sur une vraie base, une requête coûteuse se lance plutôt sur validation (la V2 l'a voulu : `proc_demande.md:194`). À décider écran par écran (autres lots). |
 | **Choisir une ligne au clavier** (Entrée, F10, F11, F12 dans une liste de la V2). | Un clic sur la ligne. | Écart de vitesse au clavier, à décider pour toutes les listes de la V3. |
 | Fonctions d'écran absentes de la V3 construite : F10 de la facture (encaissements repris), F2-F4 des réquisitions (dernier DCA, dernier statut), F7 adresse d'une nouvelle entreprise, F5 du tableau des lots. | « Supprimée : l'écran de la V3 n'a pas cette fonction ». | Référent Socle : reprendre la fonction ou la supprimer. |
@@ -123,7 +155,7 @@ geste 29 ; supprimée 19 ; nouveau 2 ; écran à venir 84. Le banc imprime le co
 |---|---|
 | Deux vrais serveurs RDS de recette (SOC-013 T05) | Pas de ferme RDS ici ; le banc simule deux postes (deux `accueil.json`, deux noms de serveur) sur le même serveur de la V3. |
 | La reprise des 40 bases de greffe (SOC-013 T04) | Elle se joue au passage, base par base, avec l'outil de la recopie ; aucune écriture sur SQL-PROD depuis ce poste. |
-| **Ouvrir à l'écran** un document reçu (SOC-013 T03) | Le pont reçoit les documents (`PreferencesServeur.DocumentsArrives`) ; les montrer dans une fenêtre de document reste à brancher (`App.Partage`, `FenetreDocument`) avec le moteur d'éditions, qui n'existe pas encore en V3. |
+| La fenêtre de document **à l'écran** d'un vrai serveur RDS | Le banc joue la chaîne entière contre le vrai serveur (document déposé, relevé, contenu lu, rangé, montré) et vérifie le branchement WPF dans le code (`MainWindow`, `AfficheurFenetres`, `FenetreDocument.Ouvrir`) ; l'ouverture de la fenêtre elle-même se voit avec un serveur branché (`RIGV3_SERVEUR`), qu'aucun bureau caché de ce poste n'a. |
 | Les retours des greffes bêta sur la fiche (SOC-027 CA05, T03, T05) | Ils se recueillent chez Le Puy, Chartres et Vienne. La fiche porte son état (`EtatFiche = "avant-beta"`) et ses retours (`RetoursBeta`) ; `RefusLivraison` refuse « livrable » tant qu'un retour n'est pas intégré (contrôlé, avec son jumeau). |
 
 ## Relancer l'inventaire des touches
@@ -144,6 +176,13 @@ Le script s'arrête sur une touche qu'il ne sait pas classer : ajouter un motif 
 - Contre-épreuve du contrôle clé (SOC-013 CA01) : l'envoi au serveur coupé dans `AccueilEtat.Ecrire`, le banc sort
   rouge (7 contrôles en échec, code 1) ; rétabli, il repasse vert. SOC-027 CA01 porte sa contre-épreuve dans le banc
   (une touche retirée de l'inventaire est vue manquante).
-- `web\src\ecrans\EcranCorrespondances.test.tsx` (vitest) : affichage, recherche, ouverture d'un écran, aide « ? ».
+- Contre-épreuve des corrections du 2026-11-21 : `DocumentsArrives` jamais levé, `AreBrowserAcceleratorKeysEnabled`
+  retiré et la recherche d'affaires revenue à « Entrée seule » → le banc sort rouge (5 échecs, code 1) ; rétablis, vert.
+  Le banc porte aussi la sienne (sans abonné, un document reçu ne s'ouvre pas ; une page qui garde les touches du
+  navigateur est vue).
+- `web\src\ecrans\EcranCorrespondances.test.tsx` (vitest) : affichage, recherche, ouverture d'un écran, aide « ? »,
+  texte entier sans coupure. `web\src\plan\clavier.test.ts`, `EcranRequisitions.test.tsx`, `EcranRechAffaires.test.tsx` :
+  Entrée, F5 et F7 lancent la recherche, F5 efface les critères des réquisitions (contre-épreuve : F5 et F7 retirés de
+  `TOUCHES_RECHERCHE`, 4 tests rouges).
 
 <!-- fix-ok: comptes de la fiche relus dans la sortie du banc du 2026-11-21 (INFO : a-venir 84, geste 29, identique 22, nouveau 2, nouvelle-touche 32, supprimee 19) apres les regles « valider le champ » et « filtre au fil de la saisie ». -->

@@ -50,6 +50,7 @@ import { appeler } from '../pont'
 import { EcranVisible } from '../plan/visibilite'
 import { Saisie, useSession, type Geste, type PontDeSession } from '../session'
 import type { ContexteDossierVue } from '../plan/types'
+import { toucheDeRecherche } from '../plan/clavier'
 
 export interface OptionCw { valeur: string; libelle: string }
 export interface MessageCw { texte: string; severite: string }
@@ -964,7 +965,8 @@ export function EcranCommandesWeb({ dossier = null }: ProprietesEcranCommandesWe
   const texte = (champ: string) => (valeur: string) => geste('Texte', { champ, valeur })
   const rechercher = () => geste('Rechercher')
   const surToucheRecherche = (e: KeyboardEvent) => {
-    if (e.key === 'Enter') rechercher()
+    // Entree, F5 ou F7 dans un critere lance la recherche (plan/clavier.ts : les touches de l'ancien RIG).
+    if (toucheDeRecherche(e)) rechercher()
   }
 
   return (

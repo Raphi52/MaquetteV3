@@ -40,6 +40,9 @@ public partial class MainWindow : Window
             // l'accueil les charge a son montage (PlanTravail.Initialiser) : la reprise doit passer avant Brancher.
             // SOC-013 : l'agent admis retrouve ses reglages (lus dans la base du greffe, poses dans accueil.json AVANT
             // l'accueil) et les documents qui l'attendaient, quel que soit le serveur RDS (Pont/PreferencesServeur.cs).
+            // Chaque document recu -- a l'ouverture (CA04) comme a la releve (CA03) -- s'ouvre dans une fenetre de
+            // document : l'abonnement se pose AVANT la session, pendant laquelle arrivent ceux qui attendaient.
+            Pont.DocumentsRecus.Brancher(new AfficheurFenetres(), AccueilEtat.DossierPiecesJointes);
             if (ouverture.Identite is { Admis: true }) await Pont.PreferencesServeur.BrancherSessionAsync(ReleveDocuments);
             Ouverture = ouverture switch
             {
