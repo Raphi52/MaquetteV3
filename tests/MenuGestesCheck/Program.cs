@@ -184,6 +184,9 @@ foreach (var (libelle, code) in toutesEntrees)
 // PROC_UTILISATEUR (« Comptes des agents », lot 3 de la reconstruction) n'a pas
 // de fiche mais un dossier de sources : Source\Outils\Exe\Processus\PROC_UTILISATEUR
 // (FORM_UTILISATEUR, OPE_EDITION_UTILISATEUR, processus GUTILI de MODELE_PROCESSUS).
+// PROC_MAIL_LOT1 (« Courriels envoyes », SOC-006) n'a pas de fiche dans ce dossier mais
+// un dossier de sources : Source\RIG\DLL\Processus\PROC_MAIL_LOT1 (OPE_LISTE_MAILS_LOT1,
+// fonction MAIL_LOT1 « Mails envoyés en Lot 1 » de PROCESSUS_ET_FONCTIONALITE).
 // PROC_COMPTEURS_NUM (« Compteurs de numeros ») est l'ecran de reattribution
 // d'un numero de NUM-004 T04. Il reprend XNUMERO de la V2 (« Reattribution de
 // numero metier », procedure VB6 du menu), qui n'a ni fiche ni source ici.
@@ -192,7 +195,7 @@ foreach (var (libelle, code) in toutesEntrees)
 // PROC_NUMEROS_MANQUANTS (« Numeros manquants », NUM-013 T04) reprend LNUMCM de
 // la V2, procedure VB6 du menu sans fiche ni source ici, comme XNUMERO.
 var sansFiche = new[] { "PROC_LISTE_DELIBERES", "PROC_SUIVI_IMPRESSION", "PROC_REQUI",
-                        "PROC_ACTUALITES", "PROC_COMMANDES_WEB", "PROC_UTILISATEUR",
+                        "PROC_ACTUALITES", "PROC_COMMANDES_WEB", "PROC_UTILISATEUR", "PROC_MAIL_LOT1",
                         "PROC_COMPTEURS_NUM", "PROC_REGLAGES_GREFFE",
                         "PROC_NUMEROS_MANQUANTS" };
 

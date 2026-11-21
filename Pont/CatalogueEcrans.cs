@@ -75,6 +75,7 @@ public static class CatalogueEcrans
             new("PROC_VERROUS",       "Dossiers verrouilles"),
             new("PROC_STAT",       "Statistiques"),
             new("PROC_GESTEMAIL",     "Messagerie"),
+            new("PROC_MAIL_LOT1",     "Courriels envoyes"),
             new("PROC_GESTBANQ",      "Banques"),
             new("PROC_EDIT_MAQUETTE", "Maquettes d'edition"),
             new("PROC_COURRIER_DIVERS", "Courriers divers")

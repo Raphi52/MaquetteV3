@@ -51,6 +51,7 @@ import { EcranGedJud } from '../ecrans/EcranGedJud'
 import { EcranGestionAudiences } from '../ecrans/EcranGestionAudiences'
 import { EcranMaquettesEdition } from '../ecrans/EcranMaquettesEdition'
 import { EcranMessagerie } from '../ecrans/EcranMessagerie'
+import { EcranCourriels } from '../ecrans/EcranCourriels'
 import { EcranNonMaquette } from '../ecrans/EcranNonMaquette'
 import { EcranOuvertureDossier } from '../ecrans/EcranOuvertureDossier'
 import { EcranParametresAccueil } from '../ecrans/EcranParametresAccueil'
@@ -197,6 +198,11 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
 
     case 'PROC_GESTEMAIL':
       return <EcranMessagerie />
+
+    case 'PROC_MAIL_LOT1':
+      // Reprise de PROC_MAIL_LOT1 de la V2 (« Mails envoyés en Lot 1 », SOC-006) : les courriels envoyes par la V3 et leur
+      // trace -- partis, refuses et pourquoi, non remis hors production (sans RIGV3_SERVEUR : la demonstration).
+      return <EcranCourriels />
 
     case 'PROC_GESTBANQ':
       return <EcranBanques />
