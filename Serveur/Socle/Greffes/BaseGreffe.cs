@@ -262,7 +262,12 @@ public static partial class BaseGreffe
     /// Avant une repetition generale (T05) : la base existe, elle est vide de donnees (hors
     /// journal des migrations), elle porte la derniere migration attendue et le schema livre.
     /// </summary>
+    /// <param name="lignesLivrees">Les lignes de chaque table d'une base neuve a jour des migrations
+    /// (<see cref="LignesAsync"/> sur la base de reference) : les donnees de reference que les
+    /// migrations posent elles-memes (roles, fonctions, familles du journal...). « Vide » veut
+    /// dire « rien de plus que la version livree », pas « zero ligne ».</param>
     public static async Task<VerificationBaseV3> VerifierAsync(string connexionBase, IReadOnlyList<string> schemaLivre,
+                                                               IReadOnlyDictionary<string, long> lignesLivrees,
                                                                string? derniereMigrationAttendue, CancellationToken ct = default)
     {
         var nom = new SqlConnectionStringBuilder(connexionBase).InitialCatalog;
@@ -275,15 +280,21 @@ public static partial class BaseGreffe
         if (derniere != derniereMigrationAttendue)
             problemes.Add($"version de schema : derniere migration {derniere ?? "(aucune)"}, attendue {derniereMigrationAttendue ?? "(aucune)"}");
 
-        long lignes;
-        await using (var cn = new SqlConnection(connexionBase))
-        {
-            await cn.OpenAsync(ct);
-            lignes = Convert.ToInt64(await ScalaireAsync(cn,
-                "SELECT ISNULL(SUM(p.rows), 0) FROM sys.partitions p JOIN sys.tables t ON t.object_id = p.object_id " +
-                "WHERE p.index_id IN (0, 1) AND t.is_ms_shipped = 0 AND NOT (SCHEMA_NAME(t.schema_id) = 'rigv3' AND t.name = 'Migration');", ct));
-        }
-        if (lignes > 0) problemes.Add($"la base n'est pas vide : {lignes} ligne(s) de donnees");
+        // Table par table, les lignes au-dela (ou en deca) de la version livree. Les migrations
+        // posent des donnees de reference (SOC-002 : le role des habilitations ; SOC-016 : les
+        // familles du journal...) : les compter comme « donnees » rendait toute base neuve non vide.
+        var ecarts = (await LignesAsync(connexionBase, ct))
+            .Select(t => (Table: t.Key, Lignes: t.Value, Livrees: lignesLivrees.GetValueOrDefault(t.Key)))
+            .Concat(lignesLivrees.Select(t => (Table: t.Key, Lignes: 0L, Livrees: t.Value)))
+            .GroupBy(t => t.Table, StringComparer.Ordinal)
+            .Select(g => g.First())
+            .Where(t => t.Lignes != t.Livrees)
+            .OrderBy(t => t.Table, StringComparer.Ordinal)
+            .ToList();
+        var enPlus = ecarts.Where(t => t.Lignes > t.Livrees).Sum(t => t.Lignes - t.Livrees);
+        if (ecarts.Count > 0)
+            problemes.Add($"la base n'est pas vide : {enPlus} ligne(s) de plus que la version livree, sur {ecarts.Count} table(s)" +
+                          $" ; ex. {ecarts[0].Table} : {ecarts[0].Lignes} ligne(s) au lieu de {ecarts[0].Livrees}");
 
         var schema = await SchemaAsync(connexionBase, ct);
         var enTrop = schema.Except(schemaLivre, StringComparer.Ordinal).ToList();
@@ -292,7 +303,26 @@ public static partial class BaseGreffe
             problemes.Add($"schema different de la version livree : {enTrop.Count} en trop, {manquants.Count} manquant(s)" +
                           (enTrop.Count > 0 ? $" ; ex. en trop « {enTrop[0]} »" : "") +
                           (manquants.Count > 0 ? $" ; ex. manquant « {manquants[0]} »" : ""));
-        return new VerificationBaseV3(true, lignes == 0, jouees, derniere, problemes);
+        return new VerificationBaseV3(true, ecarts.Count == 0, jouees, derniere, problemes);
+    }
+
+    /// <summary>
+    /// Les lignes de chaque table (« schema.table »), hors la table des migrations jouees.
+    /// Sur une base neuve a jour des migrations : ce que la version livree contient d'elle-meme.
+    /// </summary>
+    public static async Task<IReadOnlyDictionary<string, long>> LignesAsync(string connexionBase, CancellationToken ct = default)
+    {
+        await using var cn = new SqlConnection(connexionBase);
+        await cn.OpenAsync(ct);
+        await using var cmd = new SqlCommand(
+            "SELECT SCHEMA_NAME(t.schema_id) + '.' + t.name, SUM(p.rows) FROM sys.tables t " +
+            "JOIN sys.partitions p ON p.object_id = t.object_id AND p.index_id IN (0, 1) " +
+            "WHERE t.is_ms_shipped = 0 AND NOT (SCHEMA_NAME(t.schema_id) = 'rigv3' AND t.name = 'Migration') " +
+            "GROUP BY t.schema_id, t.name;", cn);
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        var lignes = new Dictionary<string, long>(StringComparer.Ordinal);
+        while (await r.ReadAsync(ct)) lignes[r.GetString(0)] = r.GetInt64(1);
+        return lignes;
     }
 
     // --- CA04 : sauvegardes et restauration d'essai ------------------------------

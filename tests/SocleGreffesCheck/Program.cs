@@ -294,19 +294,27 @@ try
     Exiger(SansClassement(schemaA).SequenceEqual(SansClassement(schemaB)) && !schemaA.SequenceEqual(schemaB),
         "SOC-008 CA02 : entre deux greffes de classements differents, seul le classement differe (tables, colonnes, index, roles identiques)");
     var derniere = Migrateur.Lire(migrations)[^1].Id;
-    var verifA = await BaseGreffe.VerifierAsync(Chaine(v3a), livre, derniere);
+    // Les donnees de reference que les migrations posent elles-memes (SOC-002, SOC-016...) :
+    // une base neuve a jour (referenceFr) les porte, une base V3 « vide » n'a rien de plus.
+    var lignesLivrees = await BaseGreffe.LignesAsync(referenceFr.Connexion);
+    var verifA = await BaseGreffe.VerifierAsync(Chaine(v3a), livre, lignesLivrees, derniere);
     Exiger(verifA.Prete && verifA.Vide && verifA.MigrationsJouees == Migrateur.Lire(migrations).Count,
         $"SOC-008 T05 : avant repetition, la base V3 existe, est vide et porte la version livree ({verifA.MigrationsJouees} migrations, {verifA.DerniereMigration})");
-    var verifB = await BaseGreffe.VerifierAsync(Chaine(v3b), livre, derniere);
+    var verifB = await BaseGreffe.VerifierAsync(Chaine(v3b), livre, lignesLivrees, derniere);
     Exiger(!verifB.Prete && verifB.Problemes.Any(p => p.Contains("schema different") && p.Contains("French_CI_AS")),
         "SOC-008 CA02 (jumeau) : comparee a la version livree d'un autre classement, la base est signalee, le classement nomme");
     await Executer(v3a, "ALTER TABLE soc.Reglage ADD Derive int NULL;");
-    var verifDerive = await BaseGreffe.VerifierAsync(Chaine(v3a), livre, derniere);
+    var verifDerive = await BaseGreffe.VerifierAsync(Chaine(v3a), livre, lignesLivrees, derniere);
     Exiger(!verifDerive.Prete && verifDerive.Problemes.Any(p => p.Contains("schema different") && p.Contains("Derive")),
         "SOC-008 CA02 (jumeau) : une base dont le schema a derive est signalee, l'ecart nomme");
     await Executer(v3a, "ALTER TABLE soc.Reglage DROP COLUMN Derive;");
-    Exiger((await BaseGreffe.VerifierAsync(Chaine(v3a), livre, derniere)).Prete,
+    Exiger((await BaseGreffe.VerifierAsync(Chaine(v3a), livre, lignesLivrees, derniere)).Prete,
         "SOC-008 CA02 (jumeau) : la derive retiree, la base redevient conforme");
+    await Executer(v3a, "INSERT INTO soc.Role (Nom, Libelle) VALUES ('BancDonnee', 'Donnee de banc');");
+    var verifDonnee = await BaseGreffe.VerifierAsync(Chaine(v3a), livre, lignesLivrees, derniere);
+    Exiger(!verifDonnee.Vide && verifDonnee.Problemes.Any(p => p.Contains("pas vide") && p.Contains("soc.Role")),
+        "SOC-008 T05 (jumeau) : une ligne de plus que la version livree rend la base non vide, la table nommee");
+    await Executer(v3a, "DELETE FROM soc.Role WHERE Nom = 'BancDonnee';");
 
     // CA03
     var agentV3 = await Lever(async () =>
