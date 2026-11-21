@@ -408,14 +408,16 @@ version de la V3 dans les deux bases, et l'écart est montré à un agent désig
    - **l'applicateur** (`Applicateur.cs`) recopie chaque fiche dans la V2, sur la même instance (Q4), **une transaction
      par fiche** (fiche V2, correspondance, état commun, lignes de file) ; les fiches passent dans l'ordre de leur
      première ligne, et une fiche **visée** qui attend encore passe avant celle qui la vise (CA03) ; une fiche créée
-     reçoit son identifiant de la V2 et sa correspondance (CA02) ; la première fiche qui échoue arrête le passage et
-     reste en file avec ses essais (CA06) ;
+     reçoit son identifiant de la V2 et sa correspondance (CA02) ; une **panne** de la V2 (hors ligne, injoignable)
+     arrête le passage sans compter d'essai, tout reste en file avec le motif (CA06) ; un **refus** de la V2 (contrainte,
+     déclencheur) ne coûte qu'à sa fiche : un essai, les autres continuent, mise de côté au 3e (REC-005, plus bas) ;
    - **la remontée** (`Remontee.cs`) lit le suivi des changements de SQL Server de la base V2 depuis son point de
      reprise (`rec.Remontee`, au départ la version lue par le transfert), dans l'ordre des versions, une fiche visée
      d'abord (CA03), et écrit chaque fiche dans la V3 sous la marque `rigv3.remontee` (le déclencheur de file ne la
      renvoie pas), au journal des gestes au nom de la recopie et du compte V2 d'origine (SOC-016 CA06 : pour un client,
      le `UTLST_LOGIN` de l'agent que la V2 a noté dans `CLIEN_ID_UTLST` pour ce changement ; sinon « non noté par la
-     V2 ») ; le point avance après le lot.
+     V2 ») ; le point avance après le lot. Une fiche que la V3 **refuse** ne le retient pas : elle va dans
+     `rec.RemonteeEchec`, rejouée de son état courant à chaque passage, mise de côté au 3e essai (REC-005, plus bas).
 3. **Pas d'aller-retour** (REC-002 CA05, REC-003 CA05) : après chaque fiche, les deux bases ont le même état, noté dans
    `rec.EtatLigne`. Un changement de la V2 dont l'état est exactement celui-là est une écriture de la recopie : ignoré.
 4. **Conflit** (REC-004) : si la fiche V2 n'a plus l'état commun au moment d'appliquer un changement de la V3, la V2
@@ -424,6 +426,42 @@ version de la V3 dans les deux bases, et l'écart est montré à un agent désig
    L'écran **« Fiches en conflit »** (`PROC_FICHES_CONFLIT`, Surveiller › Les envois et les éditions) les montre à
    l'agent qui a la fonction `RECOPIE_ECARTS` ; « Traité » le sort de l'alerte (CA03) ; rouge à 5 jours ouvrés.
    `rec.EcartsParJour` donne le compte par jour, base et table au contrôle quotidien (REC-006, CA05).
+
+### Un changement refusé : mis de côté, relancé (REC-005 CA01-CA03, CA05 sur la file continue)
+
+Décision du chef du 21/11 : la file de la recopie continue tient REC-005 comme le transfert (lot 8). Le code :
+`Serveur\Recopie\MisesDeCote.cs` (règles communes), `Applicateur.cs`, `Remontee.cs`, `AlertesRecopie.cs` ; la migration
+`Base\migrations\REC-005_file-recopie.sql` (REC-002_recopie.sql est déjà jouée, elle ne se modifie plus).
+
+- **Panne ou refus.** Une erreur qui touche la base entière (hors ligne 942, en transition 952, ouverture refusée 4060,
+  délai, réseau, droit retiré, interblocage…) est une **panne** : le passage s'arrête, aucun essai n'est compté, tout
+  repart au passage suivant. Toute autre erreur de SQL Server est un **refus** du changement par la base d'en face
+  (contrainte, clé, déclencheur, conversion) : un essai de plus pour **sa** fiche — la fiche visée, si c'est elle qui est
+  refusée —, et les autres fiches continuent.
+- **3 essais, puis mis de côté** (seuil proposé, `ServiceRecopie.EssaisAvantMiseDeCote`) : V3 → V2, la ligne de tête de
+  la fiche passe « mise de cote » avec son message (`rec.FileRecopie.Erreur`, `MiseDeCoteLe`) ; V2 → V3, la fiche passe
+  « mise de cote » dans `rec.RemonteeEchec`. Les changements suivants de **la même fiche** attendent derrière elle, et une
+  fiche qui la **vise** attend aussi (la ligne visée doit exister avant elle).
+- **Rejouable** (CA01) : un passage coupé au milieu d'une fiche n'en laisse rien (une transaction par fiche) ; rejouer
+  un changement déjà appliqué compare avant d'écrire : la ligne de l'autre base n'est pas réécrite (sa version de suivi
+  ne bouge pas), aucun doublon.
+- **Alerte d'exploitation** (CA05, règle `recopie-incident` de la supervision, `AlertesRecopie`) : un changement mis de
+  côté (base, sens, table, première fiche, erreur) ; la recopie arrêtée depuis plus de 5 minutes (les passages échouent :
+  base, table où il s'est arrêté, erreur) ; ou plus aucun passage et un changement de la V3 qui attend depuis plus de
+  5 minutes (la boucle du serveur arrêtée). L'alerte se ferme d'elle-même quand la cause disparaît.
+
+**Fiche d'incident (exploitation d'Amitel).**
+
+1. Lire l'alerte « recopie-incident » : elle nomme la base, la table et l'erreur.
+2. Lire la liste : `GET /recopie/{greffe}/mises-de-cote` (agent marqué Amitel dans la base du greffe, sinon 403) — sens,
+   ligne ou fiche, essais, message, nombre de changements qui attendent derrière.
+3. Corriger la cause (donnée, contrainte, paramétrage de la V2 ou de la V3). Une panne ne demande rien : la recopie
+   repart seule au retour de la base.
+4. Relancer **un** changement : `POST /recopie/{greffe}/mises-de-cote/relancer` avec
+   `{ "sens": "V3 vers V2", "ligne": <ligne> }` ou `{ "sens": "V2 vers V3", "tableV2": "CLIENT", "idV2": "<id>" }`.
+   Il repart à zéro essai ; au passage suivant (5 s), il passe, puis ceux qui attendaient derrière lui, dans l'ordre.
+   La relance est au journal des gestes (famille « fiche-partagee ») et sur la ligne (`RelanceLe`, `RelancePar`).
+5. S'il est refusé de nouveau, il compte de nouveaux essais et revient dans la liste au 3e.
 
 ### Mettre un greffe en recopie
 
@@ -462,6 +500,9 @@ sqlcmd -S <instance> -E -f 65001 -b -i recopie-v2.sql -v BaseV2=RIG_<GREFFE> Ret
 | Date côté V2 | la date de mise à jour de la fiche quand elle a changé (`CLIEN_DATE_DERNIERE_MODIF`, `DSSRC_DATE_MAJ`, `INEDT_DATE_MAJ`), sinon l'heure où la recopie l'a vue | REC-004 T04. |
 | Jours ouvrés du rouge | lundi-vendredi hors les 11 jours fériés légaux de métropole | outre-mer et Alsace-Moselle à ajouter : référent Socle. |
 | Suppression d'une fiche | recopiée dans les deux sens ; supprimée dans la V2 et modifiée dans la V3 = recréée dans la V2 (écart « (fiche) ») | les stories ne parlent que de création et de modification : référent Socle. |
+| Seuil de mise de côté | 3 essais refusés (REC-005 CA02, « seuil proposé ») | à valider avec l'exploitation d'Amitel. |
+| Panne ou refus | liste fermée des numéros d'erreur de panne (`MisesDeCote.NumerosDePanne`) ; tout le reste est un refus | un numéro qui manque fait compter des essais pendant une panne : la mise de côté apparaîtrait à tort (alerte visible, relance sans dommage). |
+| Libellés de l'écran | le titre du champ sur la fiche de la V2 quand elle en a un (32 colonnes, « V2 » dans `Contrats\Recopie\Libelles.cs`) ; sinon un libellé proposé | relevé dans `D:\RigApplication\Source` (`MetierTitre` du contrôle lié à la colonne). La fiche client de la V2 dit « E-mail » (pas « Adresse e-mail »). Le mot de passe d'un compte web (`CLIEN_MDP`) ne s'affiche jamais. Libellés proposés : référent Socle. |
 | Ce qui est recopié | les 7 tables partagées qui ont une table dans la V3 (`ReglesRec002`) | ENTREPRISE, BODACC, DEPOT_RCS, INSCRIPTION_RCS, INSTANCE, NON_INSCRIT, PASSAGE_CFE, BATEAU, CREANCE_END n'ont pas encore de règle de transfert ; UTILISATEUR → `soc.Compte` demande la correspondance de ses colonnes (story des agents). |
 
 ### Ce qui ne se fait pas depuis ce poste, ou reste
@@ -469,8 +510,8 @@ sqlcmd -S <instance> -E -f 65001 -b -i recopie-v2.sql -v BaseV2=RIG_<GREFFE> Ret
 | Critère | Ce qui manque | Où |
 |---|---|---|
 | REC-003 T01 : coût du suivi sur la plus grosse base | la copie anonymisée de la plus grosse base (attend la nouvelle réception du lot 6) | REC-008, lot 8 |
-| REC-002 T04 / REC-003 T04 : alerte de retard | le retard au-delà de 5 min va au journal technique en erreur ; une règle d'alerte du Surveillant (lot 2) reste à poser | supervision |
-| REC-004 CA02 : l'alerte dans la tuile « À traiter » de l'accueil | l'alerte est servie (`EcranConflits.Alerte`, `GET /recopie/{greffe}/ecarts/alerte`) ; `Pont\Accueil.cs` est en cours dans un autre fil, et la tuile ne montre aujourd'hui que les alertes de la feuille métier (décision du 17/09/2026) : à trancher | chef, lot de l'accueil |
+| REC-005 CA05 sur le vrai canal d'Amitel | prouvé sur le canal simulé de la supervision (hors production) ; l'envoi réel suit le canal du lot 2 | supervision, production |
+| REC-005 T04 : un écran pour la liste et la relance | les deux routes existent (exploitation d'Amitel) ; l'écran de supervision ne les montre pas encore | supervision |
 | REC-004 CA02 : « chaque ligne ouvre la fiche » | un dossier ouvre son affaire, un client l'écran des fiches clients ; inscription, adresse, action, arrivée et catégorie n'ont pas encore d'écran de fiche dans la V3 | stories de domaine (lot 10) |
 | Une story de domaine (lot 10) qui remplace `v2.<TABLE>` | elle remplace la ligne de sa table dans `ReglesRec002` par une règle qui nomme sa table V3 et la correspondance de ses colonnes (une sorte nouvelle de règle, à écrire avec elle) | lot 10 |
 
@@ -485,11 +526,18 @@ sqlcmd -S <instance> -E -f 65001 -b -i recopie-v2.sql -v BaseV2=RIG_<GREFFE> Ret
 | `Serveur\Recopie\PontRecopie.cs` | la mise en service : déclencheurs de file, point de départ |
 | `Serveur\Recopie\Applicateur.cs`, `Remontee.cs`, `EcrituresRecopie.cs` | V3 → V2 et conflits ; V2 → V3 ; les écritures d'une fiche |
 | `Serveur\Recopie\ServiceRecopie.cs` | un passage, et la boucle du serveur `RecopieContinue` |
-| `Serveur\Recopie\ModuleConflits.cs`, `Contrats\Recopie\Conflits.cs` | les routes des écarts (liste, alerte, « Traité »), les jours ouvrés |
+| `Serveur\Recopie\ModuleConflits.cs`, `Contrats\Recopie\Conflits.cs` | les routes des écarts (liste, alerte, « Traité »), les jours ouvrés, les routes des changements mis de côté (liste, relance) |
+| `Base\migrations\REC-005_file-recopie.sql`, `Serveur\Recopie\MisesDeCote.cs`, `Contrats\Recopie\MisesDeCote.cs` | REC-005 sur la file continue : panne ou refus, essais, mise de côté, relance, liste de l'exploitation |
+| `Serveur\Recopie\AlertesRecopie.cs` | l'alerte d'exploitation d'un changement mis de côté, d'une recopie arrêtée ou en retard (REC-005 CA05) |
+| `Contrats\Recopie\Libelles.cs` | ce que l'agent lit à la place des noms de colonnes (« Client », « E-mail ») |
 | `Pont\EcranConflits.cs`, `web\src\ecrans\EcranConflits.tsx` (+ test) | l'écran « Fiches en conflit » |
+| `Pont\Accueil.cs` | l'alerte « fiche(s) modifiée(s) des deux côtés » dans la tuile « À traiter » de l'agent désigné (catégorie « Corrections diverses ») ; son clic ouvre la liste (REC-004 CA02) |
 | `tests\RecopieDeuxSensCheck\` | le banc : un contrôle par critère des trois stories |
 
 Preuve : `.\tests.ps1 RecopieDeuxSens` (il lui faut `docker compose up -d` et la lecture de RIG_DEV). Défauts réinjectés le
 2026-11-21 : sans la remise de l'état de transmission, REC-002 CA04 rougit (dossier « M ») ; sans la détection du conflit,
 REC-004 CA01, CA02, CA04 et CA05 rougissent. Le banc fait aussi sa propre contre-épreuve : l'état commun effacé, la valeur
-de la V2 disparaît en silence, et l'oracle de CA01 le voit.
+de la V2 disparaît en silence, et l'oracle de CA01 le voit. REC-005 (21/11) : les contrôles de la mise de côté ont été
+écrits et joués d'abord sur l'ancien code (main 40624c2) — rouges : le client « REFUSE PAR LA V2 » (contrainte
+CK_BANC_REC005) arrêtait chaque passage (0 appliqué, SUIT LE REFUS 1 et 2 jamais recopiés), « REFUSE PAR LA V3 » bloquait le
+point de reprise (366 pour une version courante de 370), une V2 hors ligne comptait des essais ; verts après la correction.

@@ -1,11 +1,14 @@
 // fix-ok: fichier NEUF du lot 9 ; l'age d'un ecart (rouge a 5 jours ouvres) se mesurait avec DateTime.Now du programme alors
 // que DetecteLe vient de SYSDATETIME() -- le SQL Server des bancs est a l'heure UTC (mesure 2026-11-21 : 08:52 contre 09:52
 // au poste) ; « maintenant » est desormais lu au serveur SQL, dans la meme requete.
+// fix-ok: refus du chef (21/11) : un changement mis de cote n'avait ni liste ni relance (REC-005 CA03 rouge dans
+// RecopieDeuxSensCheck), et l'ecran lisait les noms de colonnes (CLIEN_EMAIL) -- routes de l'exploitation et LibellesRecopie.
 using Microsoft.Data.SqlClient;
 using RigV3.Contrats.Recopie;
 using RigV3.Serveur.Socle.Comptes;
 using RigV3.Serveur.Socle.Greffes;
 using RigV3.Serveur.Socle.Identite;
+using RigV3.Serveur.Socle.Supervision;
 
 namespace RigV3.Serveur.Recopie;
 
@@ -29,6 +32,7 @@ internal sealed class ModuleConflits : IModuleServeur
     public void Brancher(IEndpointRouteBuilder routes)
     {
         var groupe = routes.MapGroup(string.Empty).RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        BrancherMisesDeCote(routes);
 
         groupe.MapGet(RoutesConflits.Ecarts, async (string greffe, bool? traites, string? table, HttpContext http, CatalogueGreffes c,
                                                     ServiceDroits droits, BaseRig commune, CancellationToken ct) =>
@@ -74,6 +78,53 @@ internal sealed class ModuleConflits : IModuleServeur
         });
     }
 
+    /// <summary>
+    /// LES CHANGEMENTS MIS DE COTE (REC-005 CA02, CA03 sur la file continue) : reserves a l'exploitation d'Amitel (agent admis
+    /// du greffe marque Amitel, comme la supervision). Elle lit la liste, corrige la cause, puis relance un changement : il
+    /// repasse au passage suivant de la recopie, puis ceux qui attendaient derriere lui. Le geste va au journal (SOC-016).
+    /// </summary>
+    internal static void BrancherMisesDeCote(IEndpointRouteBuilder routes)
+    {
+        var exploitation = new[] { PolitiquesSocle.AgentAdmis, PolitiquesSupervision.ExploitationAmitel };
+        routes.MapGet(RoutesMisesDeCote.Liste, async (string greffe, CatalogueGreffes c, CancellationToken ct) =>
+                await SurBaseDuGreffe(c, greffe, ct, async cn => Results.Ok(await MisesDeCote.ListerAsync(cn, ct))))
+            .RequireAuthorization(exploitation);
+
+        routes.MapPost(RoutesMisesDeCote.Relancer, async (string greffe, DemandeRelanceRecopie d, HttpContext http, CatalogueGreffes c, ServiceDroits droits,
+                                                          BaseRig commune, CancellationToken ct) =>
+                await SurBaseDuGreffe(c, greffe, ct, async cn =>
+                {
+                    var moi = await droits.AppelantAsync(http, commune, cn, ct);
+                    if (moi is null) return Results.Json(new { motif = "Agent inconnu dans la base de ce greffe." }, statusCode: StatusCodes.Status403Forbidden);
+                    var (relance, quoi) = d.Sens switch
+                    {
+                        RoutesMisesDeCote.SensV3VersV2 when d.Ligne is { } ligne => (await MisesDeCote.RelancerV3Async(cn, ligne, moi.NomAffiche, ct), $"ligne {ligne}"),
+                        RoutesMisesDeCote.SensV2VersV3 when d.TableV2 is { Length: > 0 } t && d.IdV2 is { Length: > 0 } id =>
+                            (await MisesDeCote.RelancerV2Async(cn, (await BaseV2Async(cn, ct))!, t, id, moi.NomAffiche, ct), $"{t} {id}"),
+                        _ => (false, (string?)null),
+                    };
+                    if (quoi is null)
+                        return Results.BadRequest(new { motif = $"Sens « {d.Sens} » : « {RoutesMisesDeCote.SensV3VersV2} » demande la ligne, « {RoutesMisesDeCote.SensV2VersV3} » la table et l'identifiant V2." });
+                    if (!relance) return Results.NotFound(new { motif = $"Aucun changement mis de cote pour {quoi} dans le greffe {greffe}." });
+                    var vue = (await MisesDeCote.ListerAsync(cn, ct, d.Ligne, d.TableV2, d.IdV2))
+                        .First(m => m.Sens == d.Sens && (d.Ligne is null ? m.TableV2 == d.TableV2 && m.Fiche == d.IdV2 : m.Ligne == d.Ligne));
+                    await using (var tx = cn.BeginTransaction())
+                    {
+                        await JournalGestes.EcrireAsync(cn, tx, moi, "Recopie (exploitation)", "fiche-partagee", $"changement mis de cote {vue.TableV2} {vue.Fiche}",
+                                                        vue.Fiche, "a modifie", new { etat = "mise de cote", sens = d.Sens }, new { etat = "relance", sens = d.Sens }, ct);
+                        await tx.CommitAsync(ct);
+                    }
+                    return Results.Ok(vue);
+                }))
+            .RequireAuthorization(exploitation);
+    }
+
+    private static async Task<string?> BaseV2Async(SqlConnection cn, CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("SELECT TOP (1) BaseV2 FROM rec.Remontee;", cn);
+        return await cmd.ExecuteScalarAsync(ct) as string;
+    }
+
     /// <summary>Les ecarts : non traites (<paramref name="traites"/> faux), traites (vrai) ou tous (null), le plus recent d'abord.</summary>
     internal static async Task<VueEcarts> LireAsync(SqlConnection cn, bool? traites, string? table, long? id, CancellationToken ct)
     {
@@ -105,15 +156,20 @@ internal sealed class ModuleConflits : IModuleServeur
                 lus.Add((l.GetInt64(0), v));
             }
             await l.NextResultAsync(ct);
+            var tableDe = lus.ToDictionary(x => x.Id, x => (string)x.V[1]);
             while (await l.ReadAsync(ct))
             {
-                if (!champs.TryGetValue(l.GetInt64(0), out var liste)) champs[l.GetInt64(0)] = liste = [];
-                liste.Add(new ChampEcart(l.GetString(1), LigneJson.Lisible(l.IsDBNull(2) ? null : l.GetString(2)),
-                                         LigneJson.Lisible(l.IsDBNull(3) ? null : l.GetString(3))));
+                var idEcart = l.GetInt64(0);
+                if (!champs.TryGetValue(idEcart, out var liste)) champs[idEcart] = liste = [];
+                var (tableEcart, champ) = (tableDe[idEcart], l.GetString(1));
+                // Ce que l'agent lit : le titre du champ sur la fiche de la V2, jamais la colonne. Une valeur masquee (le mot
+                // de passe d'un compte web) ne quitte pas le serveur.
+                string? Valeur(int i) => l.IsDBNull(i) ? null : LibellesRecopie.Masque(tableEcart, champ) ? "(masqué)" : LigneJson.Lisible(l.GetString(i));
+                liste.Add(new ChampEcart(champ, LibellesRecopie.Champ(tableEcart, champ), Valeur(2), Valeur(3)));
             }
             await l.NextResultAsync(ct);
-            var tables = new List<string>();
-            while (await l.ReadAsync(ct)) tables.Add(l.GetString(0));
+            var tables = new List<TableEcarts>();
+            while (await l.ReadAsync(ct)) tables.Add(new TableEcarts(l.GetString(0), LibellesRecopie.Table(l.GetString(0))));
             // L'age d'un ecart se mesure a l'horloge qui l'a date : celle du serveur SQL (DetecteLe = SYSDATETIME()).
             await l.NextResultAsync(ct);
             await l.ReadAsync(ct);
@@ -121,7 +177,7 @@ internal sealed class ModuleConflits : IModuleServeur
             foreach (var (n, v) in lus)
             {
                 DateTime? traiteLe = v[11] is DBNull ? null : (DateTime)v[11];
-                ecarts.Add(new EcartRecopie(n, (string)v[1], (string)v[2], (string)v[3], (string)v[4], v[5] as string, (DateTime)v[6], (DateTime)v[7],
+                ecarts.Add(new EcartRecopie(n, (string)v[1], LibellesRecopie.Table((string)v[1]), (string)v[2], (string)v[3], (string)v[4], v[5] as string, (DateTime)v[6], (DateTime)v[7],
                     v[8] as string, (DateTime)v[9], (string)v[10], [.. champs.GetValueOrDefault(n) ?? []], traiteLe, v[12] as string,
                     traiteLe is null && JoursOuvres.Entre((DateTime)v[6], maintenant) >= RoutesConflits.JoursOuvresAvantRouge));
             }

@@ -11,13 +11,18 @@
 // prouvees par tests/RecopieDeuxSensCheck) : l'ecran montre ce qu'il rend. Tout passe par Pont/EcranConflits.cs.
 // fix-ok: fichier NEUF du lot 9 ; la premiere ecriture mettait la fiche en lien par une classe « rig-lien » absente de la
 // charte (grep de wwwroot/*.css : 0 occurrence) -> bouton « Ouvrir la fiche » (rig-bouton) dans le detail.
+// fix-ok: refus du chef (21/11) sur la capture : la liste montrait CLIENT et CLIEN_EMAIL (noms de colonnes) ; l'ecran lit
+// desormais les libelles que le serveur donne (titre du champ sur la fiche de la V2 : « Client », « E-mail »).
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { quand } from './EcranComptes'
 
 export interface ChampEcart {
+  /** La colonne de la V2 : seulement en infobulle. */
   champ: string
+  /** Ce que l'agent lit : le titre du champ sur la fiche de la V2 (« E-mail »). */
+  libelle: string
   valeurV2: string | null
   valeurV3: string | null
 }
@@ -25,6 +30,8 @@ export interface ChampEcart {
 export interface EcartRecopie {
   id: number
   tableV2: string
+  /** La sorte de fiche pour l'agent (« Client », « Dossier RCS »). */
+  libelleTable: string
   idV2: string
   idV3: string
   fiche: string
@@ -46,6 +53,11 @@ export interface AlerteEcarts {
   plusAncien: string | null
 }
 
+export interface TableEcarts {
+  code: string
+  libelle: string
+}
+
 export interface VueEcranConflits {
   mode: 'serveur' | 'demo' | 'sans-greffe' | 'refuse' | 'erreur'
   message: string | null
@@ -55,7 +67,7 @@ export interface VueEcranConflits {
   traites: boolean
   table: string | null
   ecarts: EcartRecopie[]
-  tables: string[]
+  tables: TableEcarts[]
   alerte: AlerteEcarts | null
 }
 
@@ -71,9 +83,11 @@ const Coupe = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowra
 const Aide = { margin: 0, fontSize: 'var(--rig-fs-dense)', color: 'var(--rig-texte-2)' } as const
 const Detail = { padding: 'var(--rig-esp-2) var(--rig-esp-3)', borderTop: '1px solid var(--rig-bord)' } as const
 
-/** Une valeur pour l'agent : vide se lit « (vide) », une date ISO se lit jj/mm/aaaa. */
+/** Une valeur pour l'agent : vide se lit « (vide) », une date ISO jj/mm/aaaa, une case a cocher « Oui » ou « Non ». */
 export function lisible(valeur: string | null): string {
   if (valeur === null || valeur.trim() === '') return '(vide)'
+  if (valeur === 'true') return 'Oui'
+  if (valeur === 'false') return 'Non'
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(valeur)) {
     const d = quand(valeur)
     return d.endsWith(' 00:00') ? d.slice(0, -6) : d
@@ -154,11 +168,11 @@ export function EcranConflits({ ouvrirDossier, ouvrir }: ProprietesEcranConflits
           </select>
         </label>
         <label className="rig-saisie-champ">
-          <span className="rig-saisie-champ__libelle">Table</span>
+          <span className="rig-saisie-champ__libelle">Type de fiche</span>
           <select className="rig-saisie-champ__saisie" value={vue.table ?? ''} disabled={occupe}
                   onChange={(e) => void relire(vue.traites, e.target.value === '' ? null : e.target.value)}>
             <option value="">Toutes</option>
-            {vue.tables.map((t) => <option key={t} value={t}>{t}</option>)}
+            {vue.tables.map((t) => <option key={t.code} value={t.code}>{t.libelle}</option>)}
           </select>
         </label>
         <p style={Aide}>
@@ -191,17 +205,17 @@ export function EcranConflits({ ouvrirDossier, ouvrir }: ProprietesEcranConflits
         <div className="rig-table-cadre">
           <table className="rig-table" style={{ tableLayout: 'fixed' }}>
             <colgroup>
-              <col /><col style={{ width: '120px' }} /><col style={{ width: '124px' }} /><col style={{ width: '70px' }} />
+              <col /><col style={{ width: '140px' }} /><col style={{ width: '124px' }} /><col style={{ width: '70px' }} />
               <col style={{ width: '150px' }} />
             </colgroup>
             <thead>
-              <tr>{['Fiche', 'Table', 'Vu le', 'Champs', 'État'].map((t) => <th key={t} title={t} style={Coupe}>{t}</th>)}</tr>
+              <tr>{['Fiche', 'Type de fiche', 'Vu le', 'Champs', 'État'].map((t) => <th key={t} title={t} style={Coupe}>{t}</th>)}</tr>
             </thead>
             <tbody>
               {vue.ecarts.map((e) => (
                 <tr key={e.id} onClick={() => setChoisi(e.id)} aria-selected={detail?.id === e.id}>
                   <td style={Coupe} title={e.fiche}>{e.fiche}</td>
-                  <td className="rig-table__mono" style={Coupe}>{e.tableV2}</td>
+                  <td style={Coupe} title={e.libelleTable}>{e.libelleTable}</td>
                   <td>{quand(e.detecteLe)}</td>
                   <td>{e.champs.length}</td>
                   <td>
@@ -234,7 +248,7 @@ export function EcranConflits({ ouvrirDossier, ouvrir }: ProprietesEcranConflits
               <tbody>
                 {detail.champs.map((c) => (
                   <tr key={c.champ}>
-                    <td className="rig-table__mono" style={Coupe} title={c.champ}>{c.champ}</td>
+                    <td style={Coupe} title={`${c.libelle} (${c.champ} dans l'ancien RIG)`}>{c.libelle}</td>
                     <td style={Coupe} title={lisible(c.valeurV2)}>{lisible(c.valeurV2)}</td>
                     <td style={Coupe} title={lisible(c.valeurV3)}>{lisible(c.valeurV3)}</td>
                   </tr>

@@ -1,3 +1,5 @@
+// fix-ok: refus du chef (21/11) constate sur la capture : la liste et la demonstration montraient CLIENT / CLIEN_EMAIL, des
+// noms de colonnes ; elles portent desormais le libelle d'agent (LibellesRecopie, titres des fiches de la V2).
 using System.Net.Http;
 using RigV3.Contrats.Recopie;
 using RigV3.Contrats.Socle;
@@ -21,7 +23,7 @@ public sealed record VueEcranConflits(
     bool Traites,
     string? Table,
     EcartRecopie[] Ecarts,
-    string[] Tables,
+    TableEcarts[] Tables,
     AlerteEcarts? Alerte);
 
 /// <summary>L'alerte « fiche modifiée des deux côtés » de l'accueil (REC-004 CA02, CA03) ; null pour un agent non designe.</summary>
@@ -146,19 +148,24 @@ public static class EcranConflits
         var maintenant = DateTime.Now;
         EcartRecopie[] tous =
         [
-            new(3, "CLIENT", "41877", "41877", "client 41877 — SARL BOULANGERIE DES REMPARTS", "ecran:PROC_FCLIENT", maintenant.AddMinutes(-12),
-                maintenant.AddMinutes(-20), null, maintenant.AddMinutes(-14), "Claire MARTIN",
-                [new("CLIEN_EMAIL", "contact@remparts-boulangerie.fr", "compta@remparts-boulangerie.fr"),
-                 new("CLIEN_TELEPHONE", "03 22 91 40 12", "03 22 91 40 10")], null, null, false),
-            new(2, "DOSSIER_RCS", "250918", "250918", "dossier RCS 250918 — 2019B00412", "dossier:2019B00412", maintenant.AddHours(-3),
-                maintenant.AddHours(-3).AddMinutes(-5), null, maintenant.AddHours(-3).AddMinutes(-2), "Julien PETIT",
-                [new("DSSRC_DATE_RADIATION", "2026-11-18T00:00:00", null)], null, null, false),
-            new(1, "ADRESSE_BASE", "1180522", "1180522", "adresse 1180522 — RUE DES JACOBINS", null, maintenant.AddDays(-9),
-                maintenant.AddDays(-9).AddMinutes(-30), null, maintenant.AddDays(-9).AddMinutes(-10), "Claire MARTIN",
-                [new("ADRBS_NUM_VOIE", "12", "14"), new("ADRBS_CODE_POSTAL", "80000", "80080")], null, null, true),
+            new(3, "CLIENT", LibellesRecopie.Table("CLIENT"), "41877", "41877", "client 41877 — SARL BOULANGERIE DES REMPARTS", "ecran:PROC_FCLIENT",
+                maintenant.AddMinutes(-12), maintenant.AddMinutes(-20), null, maintenant.AddMinutes(-14), "Claire MARTIN",
+                [Champ("CLIENT", "CLIEN_EMAIL", "contact@remparts-boulangerie.fr", "compta@remparts-boulangerie.fr"),
+                 Champ("CLIENT", "CLIEN_TELEPHONE", "03 22 91 40 12", "03 22 91 40 10")], null, null, false),
+            new(2, "DOSSIER_RCS", LibellesRecopie.Table("DOSSIER_RCS"), "250918", "250918", "dossier RCS 250918 — 2019B00412", "dossier:2019B00412",
+                maintenant.AddHours(-3), maintenant.AddHours(-3).AddMinutes(-5), null, maintenant.AddHours(-3).AddMinutes(-2), "Julien PETIT",
+                [Champ("DOSSIER_RCS", "DSSRC_DATE_RADIATION", "2026-11-18T00:00:00", null)], null, null, false),
+            new(1, "ADRESSE_BASE", LibellesRecopie.Table("ADRESSE_BASE"), "1180522", "1180522", "adresse 1180522 — RUE DES JACOBINS", null,
+                maintenant.AddDays(-9), maintenant.AddDays(-9).AddMinutes(-30), null, maintenant.AddDays(-9).AddMinutes(-10), "Claire MARTIN",
+                [Champ("ADRESSE_BASE", "ADRBS_NUM_VOIE", "12", "14"), Champ("ADRESSE_BASE", "ADRBS_CODE_POSTAL", "80000", "80080")], null, null, true),
         ];
         var choisis = tous.Where(e => (table is null || e.TableV2 == table) && !traites).ToArray();
-        return new VueEcranConflits("demo", null, false, null, false, traites, table, choisis, [.. tous.Select(e => e.TableV2).Distinct().Order()],
+        return new VueEcranConflits("demo", null, false, null, false, traites, table, choisis,
+                                    [.. tous.Select(e => e.TableV2).Distinct().Order().Select(t => new TableEcarts(t, LibellesRecopie.Table(t)))],
                                     new AlerteEcarts(tous.Length, tous.Count(e => e.EnRouge), tous.Min(e => e.DetecteLe)));
     }
+
+    /// <summary>Un champ de la demonstration, nomme comme le serveur le nomme (le titre de la fiche de la V2).</summary>
+    private static ChampEcart Champ(string table, string colonne, string? valeurV2, string? valeurV3)
+        => new(colonne, LibellesRecopie.Champ(table, colonne), valeurV2, valeurV3);
 }

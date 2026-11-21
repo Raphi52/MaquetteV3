@@ -1,12 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- Banc de REC-002, REC-003 et REC-004 (la recopie continue entre la V2 et la V3 d'un greffe, et les fiches modifiees des
-       deux cotes), lot 9 du plan de reconstruction, phase 2. Il lui faut le SQL Server du poste (docker compose up -d) et la
-       lecture de RIG_DEV (SQL-DEV\DEV, compte Windows ; autre serveur : RIGV3_RIG_DEV). En tete de Program.cs : ce que
-       chaque controle prouve. -->
+       deux cotes), et de REC-005 CA01-CA03, CA05 sur cette file, lot 9 du plan de reconstruction, phase 2. Il lui faut le
+       SQL Server du poste (docker compose up -d) et la lecture de RIG_DEV (SQL-DEV\DEV, compte Windows ; autre serveur :
+       RIGV3_RIG_DEV). En tete de Program.cs : ce que chaque controle prouve.
+       net10.0-windows + WPF, l'application referencee entiere (comme SocleAiguillageCheck) : REC-004 CA02 joue l'ACCUEIL de
+       l'agent (Pont/Accueil.cs) et le clic de son alerte dans le plan de travail (Pont/PlanTravail.cs), pas seulement le pont
+       de l'ecran « Fiches en conflit ». -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>RecopieDeuxSensCheck</RootNamespace>
@@ -19,14 +23,16 @@
     <Compile Include="../RecopieTransfertCheck/ExtraitRigDev.cs" Link="ExtraitRigDev.cs" />
     <!-- Le script de la V2 (Base\v2\recopie-v2.sql) joue comme sqlcmd le jouerait (banc de la numerotation V2). -->
     <Compile Include="../NumerotationV2Check/Sqlcmd.cs" Link="Sqlcmd.cs" />
-    <!-- L'ecran « Fiches en conflit » et son client, joues contre le vrai serveur en memoire. -->
-    <Compile Include="../../Pont/ClientServeur.cs" Link="Pont/ClientServeur.cs" />
-    <Compile Include="../../Pont/JSInvokable.cs" Link="Pont/JSInvokable.cs" />
-    <Compile Include="../../Pont/SessionAgent.cs" Link="Pont/SessionAgent.cs" />
-    <Compile Include="../../Pont/EcranConflits.cs" Link="Pont/EcranConflits.cs" />
+  </ItemGroup>
+
+  <!-- Un projet WPF ne recoit pas System.IO ni System.Net.Http en usings implicites : le banc et Sqlcmd.cs s'en servent. -->
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <Using Include="System.Net.Http" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../RigV3Desktop.csproj" />
     <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
     <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
     <ProjectReference Include="../../Contrats/RigV3.Contrats.csproj" />

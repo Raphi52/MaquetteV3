@@ -178,6 +178,37 @@ public sealed class SessionAccueil : IAsyncDisposable
         Theme = etat.Theme;
     }
 
+    // ================= Fiches en conflit (REC-004 CA02) =================
+    // fix-ok: refus du chef (21/11) : l'alerte des fiches modifiees des deux cotes etait servie par le serveur mais absente de
+    // l'accueil (RecopieDeuxSensCheck : « Alerte inconnue de l'accueil : alerte-fiches-conflit » au clic) ; elle est relevee ici.
+    /// <summary>L'alerte « fiche(s) modifiée(s) des deux côtés » de la tuile « A traiter ».</summary>
+    public const string IdAlerteConflits = "alerte-fiches-conflit";
+
+    /// <summary>Ou l'accueil lit cette alerte : par defaut le pont de l'ecran « Fiches en conflit » (le serveur du greffe de la
+    /// session ; rien pour un agent que le greffe n'a pas designe ; la demonstration sans serveur). Un banc y branche le sien.</summary>
+    public Func<Task<AlerteFichesEnConflit?>> SourceConflits { get; init; } = EcranConflits.Alerte;
+
+    /// <summary>La derniere releve de l'alerte, lancee par <see cref="ReleverAlertes"/> et chaque minute : la vue suit a sa fin.</summary>
+    public Task ReleveConflits { get; private set; } = Task.CompletedTask;
+
+    private AlerteGreffe? AlerteConflits;
+
+    /// <summary>Lit l'alerte au serveur. Le clic mene a la liste (l'ecran « Fiches en conflit »). Sans ecart a revoir, pas de
+    /// ligne. Serveur injoignable : l'alerte garde son dernier etat, la releve suivante (une minute) reessaie.</summary>
+    private async Task RelireConflitsAsync()
+    {
+        AlerteFichesEnConflit? a;
+        try { a = await SourceConflits(); }
+        catch (Exception e) when (e is System.Net.Http.HttpRequestException or TaskCanceledException or ErreurServeur) { return; }
+        var nouvelle = a is { Nombre: > 0 }
+            ? new AlerteGreffe(IdAlerteConflits, a.Titre, a.Detail, a.Statut, a.Cible, "la liste des fiches en conflit", CatalogueAlertes.Corrections, a.Nombre)
+            : null;
+        if (nouvelle == AlerteConflits) return;
+        AlerteConflits = nouvelle;
+        Alertes = AlertesOuvertes();
+        Change?.Invoke();
+    }
+
     /// <summary>L'etat retenu d'une session a l'autre (accueil.json).</summary>
     public AccueilEtat Etat { get; }
 
@@ -249,6 +280,8 @@ public sealed class SessionAccueil : IAsyncDisposable
         MinuteurActualites ??= new Timer(_ =>
         {
             ReleveActualites();
+            // Les fiches en conflit vivent sur le serveur : une minute suffit aussi (la releve previent la vue a sa fin).
+            ReleveConflits = RelireConflitsAsync();
             Change?.Invoke();
         }, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
     }
@@ -625,6 +658,7 @@ public sealed class SessionAccueil : IAsyncDisposable
     {
         Alertes = AlertesOuvertes();
         Taches = TachesOuvertes();
+        ReleveConflits = RelireConflitsAsync();
     }
 
     /// <summary>
@@ -645,6 +679,8 @@ public sealed class SessionAccueil : IAsyncDisposable
     public AlerteGreffe[] AlertesOuvertes()
         => SondeAlertes.Relever()
             .Where(a => a.Tache is not { } t || !TacheDejaFaite(t.Code, t.Dossier))
+            // Les fiches modifiees des deux cotes (REC-004 CA02) : relevees au serveur, pour l'agent designe seulement.
+            .Concat(AlerteConflits is { } conflits ? [conflits] : Array.Empty<AlerteGreffe>())
             .ToArray();
 
     /// <summary>

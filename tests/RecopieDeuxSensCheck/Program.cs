@@ -1,9 +1,12 @@
 using System.Data;
 using System.Diagnostics;
 using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Logging;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.DependencyInjection;
 using RecopieTransfertCheck;
 using RigV3.Base;
 using RigV3.Contrats.Recopie;
@@ -11,8 +14,12 @@ using RigV3.Contrats.Socle;
 using RigV3.Serveur;
 using RigV3.Serveur.Recopie;
 using RigV3.Serveur.Socle.Greffes;
+using RigV3.Serveur.Socle.Chaines;
 using RigV3.Serveur.Socle.Identite;
+using RigV3.Serveur.Socle.Supervision;
+using RigV3Desktop;
 using RigV3Desktop.Pont;
+using BilanPassage = RigV3.Serveur.Recopie.BilanPassage;
 
 // Banc de REC-002, REC-003 et REC-004 (carnet\recopie.json) : la recopie continue entre la base V2 et la base V3 d'un
 // greffe, dans les deux sens, et les fiches modifiees des deux cotes. Lot 9 du plan de reconstruction, phase 2
@@ -22,15 +29,21 @@ using RigV3Desktop.Pont;
 //     transmission REACTIVES ; Base\v2\recopie-v2.sql joue dessus (le suivi des changements) ; le transfert (REC-001)
 //     dans une base V3 jetable ; la mise en service de la recopie (PontRecopie).
 //  A. Les passages un a un (ServiceRecopie.PasserAsync, ce que fait la boucle du serveur) : creation, ordre, transmission,
-//     pas d'aller-retour, V2 hors ligne, ecritures de la V2, V3 arretee, conflits.
+//     pas d'aller-retour, V2 hors ligne, ecritures de la V2, V3 arretee, conflits ; REC-005 sur la file (decision du chef du
+//     21/11) : passage coupe puis repris, changement rejoue, refus mis de cote au 3e essai et relance, dans les deux sens.
 //  B. La vraie boucle du serveur (RecopieContinue, « Recopie:Continue ») : le delai d'une fiche dans chaque sens.
-//  C. Le vrai serveur en memoire et l'ecran (Pont/EcranConflits.cs) : l'alerte, la liste, « Traité », le rouge.
+//  C. Le vrai serveur en memoire et l'ecran (Pont/EcranConflits.cs) : l'alerte, la liste, « Traité », le rouge ; l'alerte
+//     sur l'ACCUEIL de l'agent designe (Pont/Accueil.cs) et son clic dans le plan de travail ; les libelles d'agent ;
+//     REC-005 CA05 : les alertes d'exploitation (surveillant de la supervision) et la relance par la route d'Amitel.
 // Il lui faut « docker compose up -d » et l'acces en lecture a RIG_DEV (autre serveur : RIGV3_RIG_DEV).
 // Doc : docs/reconstruction/recopie.md, section « La recopie continue ».
 // fix-ok: banc NEUF du lot 9, retouche avant son premier essai : (1) le SQL Server des bancs est a l'heure UTC (mesure
 // 2026-11-21 : SYSDATETIME() 08:52, poste 09:52) -- les dates comparees viennent de son horloge, plus de DateTime.Now ;
 // (2) l'ordre de CA06 se lit par fiche (les lignes d'une meme fiche passent ensemble), pas ligne a ligne ; (3) le pool de
 // connexions est vide apres la remise en ligne d'une base coupee.
+// fix-ok: refus du chef (21/11, rejoue sur main 40624c2) : un changement refuse a chaque essai arretait toute la recopie du
+// greffe (Applicateur.cs, « return » au premier echec ; Remontee.cs, idem) -- REC-005 CA01-CA03 et CA05 s'ajoutent ici sur
+// la file continue, avec l'alerte de l'accueil (REC-004 CA02) et les libelles d'agent de l'ecran.
 
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
 var migrations = Path.Combine(racine, "Base", "migrations");
@@ -63,7 +76,10 @@ async Task<object?> Valeur(string chaine, string sql)
     var t = await Lire(chaine, sql);
     return t.Rows.Count == 0 || t.Rows[0][0] is DBNull ? null : t.Rows[0][0];
 }
-async Task<string?> Texte(string chaine, string sql) => Convert.ToString(await Valeur(chaine, sql), System.Globalization.CultureInfo.InvariantCulture);
+// Aucune ligne (ou NULL) rend null, pas "" : Convert.ToString(null) rend une chaine vide, et un controle « absente » (is null)
+// ne pouvait alors jamais etre vrai (mesure le 2026-11-21 sur REC-005 « fiche visee » : correspondance vide, V3De rendait "").
+async Task<string?> Texte(string chaine, string sql) =>
+    await Valeur(chaine, sql) is { } v ? Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture) : null;
 async Task<long> Nombre(string chaine, string sql) => Convert.ToInt64(await Valeur(chaine, sql) ?? 0L);
 async Task Executer(string chaine, string sql)
 {
@@ -358,18 +374,23 @@ finally
     await Executer(serveurBancs, $"ALTER DATABASE [{v2.Nom}] SET ONLINE;");
     SqlConnection.ClearAllPools();   // les connexions de la base coupee ne servent plus
 }
+// Une panne de la base n'est pas un refus du changement (REC-005 CA02) : aucun essai n'est compte, sinon trois passages
+// d'une V2 arretee mettraient de cote tout ce que les agents ecrivent ; le motif, lui, est note sur la ligne.
 var essais = await Nombre(v3.Connexion, $"SELECT MAX(Essais) FROM rec.FileRecopie WHERE TableV3 = 'v2.CLIENT' AND IdV3 = '{clientCa06}'");
+var motifHorsLigne = await Texte(v3.Connexion, $"SELECT MAX(Erreur) FROM rec.FileRecopie WHERE TableV3 = 'v2.CLIENT' AND IdV3 = '{clientCa06}'");
 var attenteHorsLigne = await EnAttente();
 var retour = await Passer();
 // L'ordre : les fiches passent dans l'ordre de leur premiere ligne en attente (le client, ecrit d'abord, puis l'adresse).
 var ordreRetour = (await Lire(v3.Connexion, $"SELECT TableV3 FROM rec.FileRecopie WHERE (TableV3 = 'v2.CLIENT' AND IdV3 = '{clientCa06}') OR (TableV3 = 'v2.ADRESSE_BASE' AND IdV3 = '{adresseCa06}') " +
                                             "GROUP BY TableV3 ORDER BY MIN(AppliqueeLe), MIN(Id)")).Rows.Cast<DataRow>().Select(r => (string)r[0]).ToList();
-Exiger(horsLigne.All(b => b.Erreur is not null && b.Appliquees == 0) && ecrituresV3.All(ms => ms < 2000) && attenteHorsLigne == 3 && essais >= 2
+Exiger(horsLigne.All(b => b.Erreur is not null && b.Appliquees == 0 && b.Refusees == 0) && ecrituresV3.All(ms => ms < 2000) && attenteHorsLigne == 3 && essais == 0
+       && motifHorsLigne?.Contains(v2.Nom) == true
        && retour.Erreur is null && retour.Appliquees == 3 && await EnAttente() == 0
        && await EnV2("CLIENT", "CLIEN_NOM", clientCa06) == "HORS LIGNE 2" && await EnV2("ADRESSE_BASE", colAdresse.Nom, adresseCa06) == Val(colAdresse, "HL-ADR")
        && ordreRetour.SequenceEqual(["v2.CLIENT", "v2.ADRESSE_BASE"]),
     $"REC-002 CA06 : base V2 hors ligne, la V3 ecrit sans attendre ({string.Join(", ", ecrituresV3)} ms) ; trois passages echouent (« {horsLigne[0].Erreur?[..Math.Min(90, horsLigne[0].Erreur!.Length)]} »), " +
-    $"les {attenteHorsLigne} changements attendent dans la file ({essais} essais notes) ; au retour, un passage les applique dans l'ordre, la V2 a la derniere valeur (« HORS LIGNE 2 »)");
+    $"les {attenteHorsLigne} changements attendent dans la file, motif note, aucun essai compte ({essais} : une panne n'est pas un refus, rien n'est mis de cote) ; " +
+    "au retour, un passage les applique dans l'ordre, la V2 a la derniere valeur (« HORS LIGNE 2 »)");
 
 // ====================================================================================================
 // A. REC-003 — remonter dans le nouveau RIG ce que l'ancien ecrit sur les fiches partagees
@@ -652,6 +673,212 @@ Exiger(etatsTemoin.V2 == "M" && etatsTemoin.V3 != "M" && idsDivergent && nuit.Et
     $"({nuitEcart.Ecarts} ecarts : {Ecarts(ecartsNuit2)}), puis remontes ({pNuit.Remontees}) {pNuit.Erreur}");
 
 // ====================================================================================================
+// A. REC-005 sur la file continue : reprendre sans perte ni doublon ; un changement refuse est mis de cote, pas bloquant
+// ====================================================================================================
+// Contre-epreuve (rouge avant la correction) : sur le code d'avant (main 40624c2), le premier refus arretait le passage
+// (« return » de Applicateur.AppliquerAsync et de Remontee.RemonterAsync) -- l'entree qui le montre est le client
+// « REFUSE PAR LA V2 » que la contrainte CK_BANC_REC005 de la V2 refuse : SUIT LE REFUS 1 et 2 n'arrivaient jamais.
+async Task<bool> JusquA(Func<Task<bool>> vu, double secondes = 30)
+{
+    var t0 = Stopwatch.StartNew();
+    while (t0.Elapsed < TimeSpan.FromSeconds(secondes)) { if (await vu()) return true; await Task.Delay(100); }
+    return false;
+}
+// La version du suivi des changements de la V2 pour une ligne : elle ne bouge que si la ligne est reecrite.
+async Task<long?> VersionV2(string table, string id) => await Valeur(v2.Connexion,
+    $"SELECT c.SYS_CHANGE_VERSION FROM CHANGETABLE(VERSION dbo.[{table}], ([{Cle(table)}]), ({id})) AS c") is { } vv ? Convert.ToInt64(vv) : null;
+async Task<string?> LigneV2(string table, string id) => await Texte(v2.Connexion, $"SELECT * FROM dbo.[{table}] WHERE [{Cle(table)}] = {id} FOR JSON PATH");
+async Task<List<(long Id, string Etat, int Essais, string? Erreur, DateTime? RelanceLe, string? RelancePar)>> LignesDe(string table, string idV3) =>
+    [.. (await Lire(v3.Connexion, $"SELECT Id, Etat, Essais, Erreur, RelanceLe, RelancePar FROM rec.FileRecopie WHERE TableV3 = 'v2.{table}' AND IdV3 = '{idV3}' ORDER BY Id"))
+        .Rows.Cast<DataRow>().Select(r => (Convert.ToInt64(r[0]), (string)r[1], Convert.ToInt32(r[2]), r[3] as string, r[4] as DateTime?, r[5] as string))];
+async Task<(string Etat, int Essais, string? Erreur, string? RelancePar)?> EchecDe(string table, string idV2) =>
+    (await Lire(v3.Connexion, $"SELECT Etat, Essais, Erreur, RelancePar FROM rec.RemonteeEchec WHERE BaseV2 = '{v2.Nom}' AND TableV2 = '{table}' AND IdV2 = '{idV2}'"))
+        .Rows.Cast<DataRow>().Select(r => ((string, int, string?, string?)?)((string)r[0], Convert.ToInt32(r[1]), r[2] as string, r[3] as string)).FirstOrDefault();
+Info($"file avant REC-005 : {await EnAttente()} changement(s) en attente");
+
+// CA01 (1/2) : un passage coupe au milieu d'un lot. Trois clients changes dans la V3 ; un agent de la V2 tient le 2e (sa
+// transaction reste ouverte), le passage s'arrete donc dessus ; on le coupe la (annulation : la connexion du passage
+// abandonne sa transaction, comme un service arrete brutalement). Puis le passage suivant (le service redemarre).
+var coupes = new[] { Prendre("CLIENT"), Prendre("CLIENT"), Prendre("CLIENT") };
+for (var i = 0; i < coupes.Length; i++)
+    await Executer(v3.Connexion, V3Ecrit($"UPDATE v2.CLIENT SET CLIEN_NOM = 'COUPE {i + 1}' WHERE CLIEN_ID_CLIEN = {coupes[i]};"));
+var clientsAvantCoupe = await Nombre(v2.Connexion, "SELECT COUNT(*) FROM dbo.CLIENT");
+bool premiereAppliquee, passageBloque;
+string arretCoupe;
+var etatsCoupe = new List<string>();
+{
+    await using var agentV2 = new SqlConnection(v2.Connexion);
+    await agentV2.OpenAsync();
+    await using var tenue = (SqlTransaction)await agentV2.BeginTransactionAsync();
+    int spid;
+    await using (var cmd = new SqlCommand($"UPDATE dbo.CLIENT SET CLIEN_FAX = CLIEN_FAX WHERE CLIEN_ID_CLIEN = {coupes[1]}; SELECT @@SPID;", agentV2, tenue))
+        spid = Convert.ToInt32(await cmd.ExecuteScalarAsync());
+    using var coupe = new CancellationTokenSource();
+    var enCours = ServiceRecopie.PasserAsync(v3.Connexion, v2.Nom, fiches, ct: coupe.Token);
+    premiereAppliquee = await JusquA(async () => (await LignesDe("CLIENT", coupes[0])).All(l => l.Etat == "appliquee"));
+    passageBloque = await JusquA(async () => await Nombre(serveurBancs, $"SELECT COUNT(*) FROM sys.dm_exec_requests WHERE blocking_session_id = {spid}") > 0);
+    coupe.Cancel();
+    try { arretCoupe = (await enCours).Erreur ?? "passage fini sans erreur"; }
+    catch (Exception e) { arretCoupe = $"{e.GetType().Name} : {e.Message}"; }
+    await tenue.RollbackAsync();
+    foreach (var id in coupes) etatsCoupe.Add(string.Join("+", (await LignesDe("CLIENT", id)).Select(l => l.Etat)));
+}
+var versionPremiere = await VersionV2("CLIENT", coupes[0]);
+var repriseCoupe = await Passer();
+var nomsApresCoupe = new List<string?>();
+var differentesCoupe = 0L;
+foreach (var id in coupes) { nomsApresCoupe.Add(await EnV2("CLIENT", "CLIEN_NOM", id)); differentesCoupe += await Differentes("CLIENT", id, id); }
+Exiger(premiereAppliquee && passageBloque && etatsCoupe.SequenceEqual(["appliquee", "en attente", "en attente"])
+       && repriseCoupe.Erreur is null && repriseCoupe.Appliquees == 2 && await VersionV2("CLIENT", coupes[0]) == versionPremiere
+       && nomsApresCoupe.SequenceEqual(["COUPE 1", "COUPE 2", "COUPE 3"]) && differentesCoupe == 0
+       && await Nombre(v2.Connexion, "SELECT COUNT(*) FROM dbo.CLIENT") == clientsAvantCoupe,
+    $"REC-005 CA01 : un passage coupe pendant l'ecriture du 2e de trois clients (« {arretCoupe[..Math.Min(80, arretCoupe.Length)]} ») laisse le 1er applique et les deux " +
+    $"suivants en file ({string.Join(", ", etatsCoupe)}) ; au redemarrage, le passage repart du dernier changement applique et enregistre : il applique les 2 autres " +
+    $"({repriseCoupe.Appliquees}), ne reecrit pas le 1er (sa version de suivi dans la V2 reste {versionPremiere}), les trois fiches sont identiques des deux cotes, aucun client en plus");
+
+// CA01 (2/2) : rejouer un changement deja applique (une modification, et la creation du client de CA02) laisse la ligne
+// identique -- la V2 n'est meme pas reecrite (version de suivi inchangee), aucun doublon, aucun ecart.
+var rejoues = new[] { (V3: coupes[0], V2: coupes[0]), (V3: clientV3, V2: clientV2!) };
+var avantRejeu = new List<(long? Version, string? Ligne)>();
+foreach (var r in rejoues) avantRejeu.Add((await VersionV2("CLIENT", r.V2), await LigneV2("CLIENT", r.V2)));
+var clientsAvantRejeu = await Nombre(v2.Connexion, "SELECT COUNT(*) FROM dbo.CLIENT");
+var lignesRejouees = await Nombre(v3.Connexion, $"SELECT COUNT(*) FROM rec.FileRecopie WHERE TableV3 = 'v2.CLIENT' AND IdV3 IN ('{coupes[0]}', '{clientV3}')");
+await Executer(v3.Connexion, $"UPDATE rec.FileRecopie SET Etat = 'en attente', AppliqueeLe = NULL WHERE TableV3 = 'v2.CLIENT' AND IdV3 IN ('{coupes[0]}', '{clientV3}');");
+var rejeu = await Passer();
+var identiques = 0;
+for (var i = 0; i < rejoues.Length; i++)
+    if (await VersionV2("CLIENT", rejoues[i].V2) == avantRejeu[i].Version && await LigneV2("CLIENT", rejoues[i].V2) == avantRejeu[i].Ligne) identiques++;
+Exiger(rejeu.Erreur is null && rejeu.Appliquees == lignesRejouees && rejeu.Ecarts == 0 && identiques == rejoues.Length
+       && await Nombre(v2.Connexion, "SELECT COUNT(*) FROM dbo.CLIENT") == clientsAvantRejeu
+       && await Nombre(v3.Connexion, $"SELECT COUNT(*) FROM rec.Correspondance WHERE TableV3 = 'v2.CLIENT' AND IdV3 = '{clientV3}'") == 1,
+    $"REC-005 CA01 : {lignesRejouees} changements deja appliques rejoues (le client {coupes[0]} modifie, le client {clientV3} cree dans la V3) : {identiques} lignes V2 " +
+    $"identiques au caractere pres et jamais reecrites (version de suivi inchangee), aucun client en plus ({clientsAvantRejeu}), une seule correspondance, aucun ecart");
+
+// CA02 (V3 vers V2) : un changement que la V2 refuse a chaque essai (une contrainte de la V2 : CK_BANC_REC005).
+var colDerriere = colClient[1];
+await Executer(v2.Connexion, "ALTER TABLE dbo.CLIENT WITH NOCHECK ADD CONSTRAINT CK_BANC_REC005 CHECK (CLIEN_NOM NOT LIKE 'REFUSE PAR LA V2%');");
+var refuse = Prendre("CLIENT");
+var suit1 = Prendre("CLIENT");
+var suit2 = Prendre("CLIENT");
+var nomAvantRefus = await EnV2("CLIENT", "CLIEN_NOM", refuse);
+await Executer(v3.Connexion, V3Ecrit($"UPDATE v2.CLIENT SET CLIEN_NOM = 'REFUSE PAR LA V2' WHERE CLIEN_ID_CLIEN = {refuse};"));
+await Executer(v3.Connexion, V3Ecrit($"UPDATE v2.CLIENT SET CLIEN_NOM = 'SUIT LE REFUS 1' WHERE CLIEN_ID_CLIEN = {suit1};"));
+var refus1 = await Passer();
+var refus2 = await Passer();
+var apresDeux = await LignesDe("CLIENT", refuse);
+await Executer(v3.Connexion, V3Ecrit($"UPDATE v2.CLIENT SET CLIEN_NOM = 'SUIT LE REFUS 2' WHERE CLIEN_ID_CLIEN = {suit2};"));
+var refus3 = await Passer();
+// La meme fiche change encore dans la V3 : ce changement attend derriere celui qui est mis de cote.
+await Executer(v3.Connexion, V3Ecrit($"UPDATE v2.CLIENT SET [{colDerriere.Nom}] = '{Val(colDerriere, "DERRIERE")}' WHERE CLIEN_ID_CLIEN = {refuse};"));
+var refus4 = await Passer();
+var lignesRefus = await LignesDe("CLIENT", refuse);
+string Bilans(params BilanPassage[] b) => string.Join(" ; ", b.Select(x => $"{x.Appliquees} appl., {x.Remontees} rem., {x.Refusees} refus, {x.MisesDeCote} de cote{(x.Erreur is null ? "" : " — " + x.Erreur)}"));
+Exiger(refus1.Erreur is null && refus1.Refusees == 1 && refus1.Appliquees == 1 && refus2.Refusees == 1 && refus2.MisesDeCote == 0
+       && apresDeux.Count == 1 && apresDeux[0] is { Etat: "en attente", Essais: 2 }
+       && refus3.Refusees == 1 && refus3.MisesDeCote == 1 && refus3.Appliquees == 1
+       && lignesRefus.Count == 2 && lignesRefus[0] is { Etat: "mise de cote", Essais: 3 } && lignesRefus[0].Erreur?.Contains("CK_BANC_REC005") == true
+       && lignesRefus[1] is { Etat: "en attente", Essais: 0 } && refus4.Erreur is null && refus4.Refusees == 0 && refus4.Appliquees == 0
+       && await EnV2("CLIENT", "CLIEN_NOM", suit1) == "SUIT LE REFUS 1" && await EnV2("CLIENT", "CLIEN_NOM", suit2) == "SUIT LE REFUS 2"
+       && await EnV2("CLIENT", "CLIEN_NOM", refuse) == nomAvantRefus && await EnV2("CLIENT", colDerriere.Nom, refuse) != Val(colDerriere, "DERRIERE"),
+    $"REC-005 CA02 (V3 vers V2) : le client {refuse} « REFUSE PAR LA V2 », que la contrainte CK_BANC_REC005 de la V2 refuse, compte un essai par passage " +
+    $"(apres 2 : « {apresDeux.FirstOrDefault().Etat} », {apresDeux.FirstOrDefault().Essais} essais) et il est mis de cote au 3e avec son message " +
+    $"(« {lignesRefus.FirstOrDefault().Erreur?[..Math.Min(90, lignesRefus.FirstOrDefault().Erreur?.Length ?? 0)]} ») ; pendant ce temps les autres fiches passent (SUIT LE REFUS 1 et 2 " +
+    $"dans la V2) et le changement suivant de la meme fiche attend derriere lui ({string.Join(", ", lignesRefus.Select(l => $"{l.Etat} {l.Essais}"))}) — passages : " +
+    Bilans(refus1, refus2, refus3, refus4));
+
+// CA03 (V3 vers V2) : l'exploitant corrige la cause (la contrainte retiree) et relance le changement mis de cote.
+await Executer(v2.Connexion, "ALTER TABLE dbo.CLIENT DROP CONSTRAINT CK_BANC_REC005;");
+var relanceAttente = lignesRefus.Count > 1 && await ServiceRecopie.RelancerAsync(v3.Connexion, lignesRefus[1].Id, "banc exploitant");
+var relancee = lignesRefus.Count > 0 && await ServiceRecopie.RelancerAsync(v3.Connexion, lignesRefus[0].Id, "banc exploitant");
+var refus5 = await Passer();
+var lignesRelancees = await LignesDe("CLIENT", refuse);
+Exiger(relancee && !relanceAttente && refus5.Erreur is null && refus5.Appliquees == 2 && lignesRelancees.All(l => l.Etat == "appliquee")
+       && lignesRelancees.FirstOrDefault() is { RelanceLe: not null, RelancePar: "banc exploitant" }
+       && await EnV2("CLIENT", "CLIEN_NOM", refuse) == "REFUSE PAR LA V2" && await EnV2("CLIENT", colDerriere.Nom, refuse) == Val(colDerriere, "DERRIERE")
+       && await Differentes("CLIENT", refuse, refuse) == 0,
+    $"REC-005 CA03 (V3 vers V2) : la cause corrigee, la relance du changement mis de cote (ligne {lignesRefus.FirstOrDefault().Id}, trace « {lignesRelancees.FirstOrDefault().RelancePar} ») " +
+    $"l'applique au passage suivant, puis celui qui attendait derriere lui : {refus5.Appliquees} lignes appliquees dans l'ordre, la V2 a les deux valeurs (« REFUSE PAR LA V2 », " +
+    $"« {Val(colDerriere, "DERRIERE")} »), identique a la V3 ; jumeau : une ligne qui n'est pas mise de cote ne se relance pas ({(relanceAttente ? "relancee" : "refuse")})");
+
+// CA02 et CA03 (V2 vers V3) : un changement de la V2 que la V3 refuse (CK_BANC_REC005_V3, posee sur la table de la V3).
+await Executer(v3.Connexion, "ALTER TABLE v2.CLIENT WITH NOCHECK ADD CONSTRAINT CK_BANC_REC005_V3 CHECK (CLIEN_NOM NOT LIKE 'REFUSE PAR LA V3%');");
+var refuseV2 = Prendre("CLIENT");
+var monte1 = Prendre("CLIENT");
+var monte2 = Prendre("CLIENT");
+var nomV3AvantRefus = await EnV3("CLIENT", "CLIEN_NOM", refuseV2);
+await Executer(v2.Connexion, $"UPDATE dbo.CLIENT SET CLIEN_NOM = 'REFUSE PAR LA V3' WHERE CLIEN_ID_CLIEN = {refuseV2};");
+await Executer(v2.Connexion, $"UPDATE dbo.CLIENT SET CLIEN_NOM = 'REMONTE APRES LE REFUS 1' WHERE CLIEN_ID_CLIEN = {monte1};");
+var monte1Bilan = await Passer();
+var monte2Bilan = await Passer();
+var echecDeux = await EchecDe("CLIENT", refuseV2);
+await Executer(v2.Connexion, $"UPDATE dbo.CLIENT SET CLIEN_NOM = 'REMONTE APRES LE REFUS 2' WHERE CLIEN_ID_CLIEN = {monte2};");
+var monte3Bilan = await Passer();
+await Executer(v2.Connexion, $"UPDATE dbo.CLIENT SET [{colDerriere.Nom}] = '{Val(colDerriere, "DERRIERE V2")}' WHERE CLIEN_ID_CLIEN = {refuseV2};");
+var monte4Bilan = await Passer();
+var echecCote = await EchecDe("CLIENT", refuseV2);
+var pointRefus = await Nombre(v3.Connexion, "SELECT Version FROM rec.Remontee");
+var couranteRefus = await Nombre(v2.Connexion, "SELECT CHANGE_TRACKING_CURRENT_VERSION()");
+Exiger(monte1Bilan.Erreur is null && monte1Bilan.Refusees == 1 && monte1Bilan.Remontees == 1 && monte2Bilan.Refusees == 1 && echecDeux is { Etat: "en echec", Essais: 2 }
+       && monte3Bilan.Refusees == 1 && monte3Bilan.MisesDeCote == 1 && monte3Bilan.Remontees == 1 && monte4Bilan.Erreur is null && monte4Bilan.Refusees == 0
+       && echecCote is { Etat: "mise de cote", Essais: 3 } && echecCote.Value.Erreur?.Contains("CK_BANC_REC005_V3") == true && pointRefus == couranteRefus
+       && await EnV3("CLIENT", "CLIEN_NOM", monte1) == "REMONTE APRES LE REFUS 1" && await EnV3("CLIENT", "CLIEN_NOM", monte2) == "REMONTE APRES LE REFUS 2"
+       && await EnV3("CLIENT", "CLIEN_NOM", refuseV2) == nomV3AvantRefus && await EnV3("CLIENT", colDerriere.Nom, refuseV2) != Val(colDerriere, "DERRIERE V2"),
+    $"REC-005 CA02 (V2 vers V3) : le client {refuseV2} « REFUSE PAR LA V3 » ecrit par un agent de la V2 compte un essai par passage (apres 2 : « {echecDeux?.Etat} » " +
+    $"{echecDeux?.Essais}), mis de cote au 3e avec son message (« {echecCote?.Erreur?[..Math.Min(90, echecCote?.Erreur?.Length ?? 0)]} ») ; les autres remontent " +
+    $"(REMONTE APRES LE REFUS 1 et 2), le point de reprise avance quand meme ({pointRefus} = version courante {couranteRefus}) et le changement suivant de la meme fiche " +
+    $"attend derriere lui — passages : {Bilans(monte1Bilan, monte2Bilan, monte3Bilan, monte4Bilan)}");
+await Executer(v3.Connexion, "ALTER TABLE v2.CLIENT DROP CONSTRAINT CK_BANC_REC005_V3;");
+var relanceeV2 = await ServiceRecopie.RelancerRemonteeAsync(v3.Connexion, v2.Nom, "CLIENT", refuseV2, "banc exploitant");
+var monte5Bilan = await Passer();
+var echecResolu = await EchecDe("CLIENT", refuseV2);
+Exiger(relanceeV2 && monte5Bilan.Erreur is null && monte5Bilan.Remontees == 1 && echecResolu is { Etat: "resolue", RelancePar: "banc exploitant" }
+       && await EnV3("CLIENT", "CLIEN_NOM", refuseV2) == "REFUSE PAR LA V3" && await EnV3("CLIENT", colDerriere.Nom, refuseV2) == Val(colDerriere, "DERRIERE V2")
+       && await Differentes("CLIENT", refuseV2, refuseV2) == 0,
+    $"REC-005 CA03 (V2 vers V3) : la cause corrigee et la fiche relancee, elle remonte au passage suivant avec les deux changements de la V2, dans l'ordre (« REFUSE PAR LA V3 », " +
+    $"« {Val(colDerriere, "DERRIERE V2")} »), identique des deux cotes ; sa trace reste (« {echecResolu?.Etat} », relancee par « {echecResolu?.RelancePar} ») {monte5Bilan.Erreur}");
+
+// CA02 et CA03 (V2 vers V3), une fiche qui en VISE une refusee : un dossier et son action crees ensemble par un agent de la
+// V2 (meme version de suivi) ; la V3 refuse le dossier. L'action attend derriere lui sans compter d'essai et SANS SE PERDRE,
+// alors que le point de reprise avance ; la relance du dossier fait passer les deux, l'action visant le dossier de la V3.
+// Defaut mesure a la relecture : l'action, ecartee sans etre notee, disparaissait de la remontee une fois le point avance.
+await Executer(v3.Connexion, "ALTER TABLE v2.DOSSIER_RCS WITH NOCHECK ADD CONSTRAINT CK_BANC_REC005_LIEN CHECK (DSSRC_NUM_GESTION <> '2026B99904');");
+var dossierBase3 = Prendre("DOSSIER_RCS");
+var ids3 = (await Lire(v2.Connexion, $"""
+    BEGIN TRANSACTION;
+    DECLARE @a TABLE (Id int); DECLARE @d TABLE (Id int);
+    INSERT INTO dbo.DOSSIER_RCS ({string.Join(", ", colsDossierV2.Select(c => $"[{c}]"))}) OUTPUT inserted.DSSRC_ID_DSRCS INTO @d
+    SELECT {string.Join(", ", colsDossierV2.Select(c => c == "DSSRC_NUM_GESTION" ? "'2026B99904'" : $"[{c}]"))} FROM dbo.DOSSIER_RCS WHERE DSSRC_ID_DSRCS = {dossierBase3};
+    INSERT INTO dbo.ACTION_RCS ({string.Join(", ", colsActionV2.Select(c => $"[{c}]"))}) OUTPUT inserted.ACTRC_ID_ACTRC INTO @a
+    SELECT {string.Join(", ", colsActionV2.Select(c => c == "ACTRC_ID_DSRCS" ? "(SELECT Id FROM @d)" : $"[{c}]"))} FROM dbo.ACTION_RCS WHERE ACTRC_ID_ACTRC = {actionBase};
+    COMMIT;
+    SELECT (SELECT CONVERT(nvarchar(20), Id) FROM @a), (SELECT CONVERT(nvarchar(20), Id) FROM @d);
+    """)).Rows[0];
+var (actionVisee, dossierRefuse) = ((string)ids3[0], (string)ids3[1]);
+var visees = new List<BilanPassage>();
+for (var i = 0; i < 3; i++) visees.Add(await Passer());
+var dossierCote = await EchecDe("DOSSIER_RCS", dossierRefuse);
+var actionAttend = await EchecDe("ACTION_RCS", actionVisee);
+var actionAbsente = await V3De("ACTION_RCS", actionVisee) is null;
+var pointVisee = await Nombre(v3.Connexion, "SELECT Version FROM rec.Remontee");
+var couranteVisee = await Nombre(v2.Connexion, "SELECT CHANGE_TRACKING_CURRENT_VERSION()");
+await Executer(v3.Connexion, "ALTER TABLE v2.DOSSIER_RCS DROP CONSTRAINT CK_BANC_REC005_LIEN;");
+var relanceVisee = await ServiceRecopie.RelancerRemonteeAsync(v3.Connexion, v2.Nom, "DOSSIER_RCS", dossierRefuse, "banc exploitant");
+var apresVisee = await Passer();
+var dossierV3Visee = await V3De("DOSSIER_RCS", dossierRefuse);
+var actionV3Visee = await V3De("ACTION_RCS", actionVisee);
+var lienVisee = actionV3Visee is null ? null : await EnV3("ACTION_RCS", "ACTRC_ID_DSRCS", actionV3Visee);
+var (finAction, finDossier) = (await EchecDe("ACTION_RCS", actionVisee), await EchecDe("DOSSIER_RCS", dossierRefuse));
+Exiger(visees.All(b => b.Erreur is null && b.Refusees == 1) && dossierCote is { Etat: "mise de cote", Essais: 3 }
+       && actionAttend is { Etat: "en echec", Essais: 0 } && actionAttend.Value.Erreur?.Contains("attend") == true && actionAbsente && pointVisee == couranteVisee
+       && relanceVisee && apresVisee.Erreur is null && dossierV3Visee is not null && actionV3Visee is not null
+       && lienVisee == dossierV3Visee && finAction is { Etat: "resolue" } && finDossier is { Etat: "resolue" },
+    $"REC-005 CA02 et CA03 (fiche visee, V2 vers V3) : le dossier {dossierRefuse} refuse par la V3 est mis de cote au 3e essai (« {dossierCote?.Etat} », {dossierCote?.Essais}) ; " +
+    $"l'action {actionVisee} qui le vise attend sans essai (« {actionAttend?.Etat} », {actionAttend?.Essais} essai, « {actionAttend?.Erreur?[..Math.Min(60, actionAttend?.Erreur?.Length ?? 0)]} »), " +
+    $"absente de la V3 mais pas perdue alors que le point de reprise avance ({pointVisee} = {couranteVisee}) ; la relance du dossier fait passer les deux : " +
+    $"l'action V3 {actionV3Visee} vise le dossier V3 {lienVisee} (attendu {dossierV3Visee}), les deux « {finAction?.Etat} » / « {finDossier?.Etat} » " +
+    $"(absente avant : {actionAbsente}, relance : {relanceVisee}) — passages : {Bilans([.. visees, apresVisee])}");
+
+// ====================================================================================================
 // B. La vraie boucle du serveur (RecopieContinue) : REC-002 CA01 et REC-003 CA01
 // ====================================================================================================
 await using var commune = await BaseJetable.CreerAsync("RecopieDeuxSensCommune");
@@ -738,6 +965,10 @@ appC = ServeurRig.Construire(["--environment", "Development"], s =>
     s.Logging.SetMinimumLevel(LogLevel.Warning);
     s.Configuration["ConnectionStrings:RigV3"] = commune.Connexion;
     s.Configuration[CatalogueGreffes.CleAuthentification] = authentification.ConnectionString;
+    // La supervision est jouee par le banc (REC-005 CA05), passage par passage, comme le banc du lot 8.
+    s.Configuration["Supervision:Automatique"] = "false";
+    s.Configuration[SignatureDeFond.Reglage] = "0";
+    s.Configuration[ReglagesPlanificateur.CleIntervalle] = "0";
 });
 await appC.StartAsync();
 ClientServeur ClientEcran(string compte)
@@ -776,8 +1007,64 @@ if (vueDesigne.Ecarts.Length < 2)
     return Bilan();
 }
 var sansEcran = vueDesigne.Ecarts.Where(e => e.Cible is null).Select(e => e.TableV2).Distinct().ToList();
-Reste($"REC-004 CA02 : {string.Join(", ", sansEcran)} n'ont pas encore d'ecran de fiche dans la V3 : leur ecart s'affiche sans « Ouvrir la fiche » ; " +
-      "l'alerte est servie (EcranConflits.Alerte) mais pas encore posee dans la tuile « A traiter » de l'accueil (Pont/Accueil.cs, en cours dans un autre fil)");
+Reste($"REC-004 CA02 : {string.Join(", ", sansEcran)} n'ont pas encore d'ecran de fiche dans la V3 : leur ecart s'affiche sans « Ouvrir la fiche »");
+
+// REC-004 CA02 sur l'ACCUEIL : l'agent designe ouvre l'accueil de la V3 (la session que la fenetre monte, Pont/Accueil.cs,
+// branchee ici sur le vrai serveur en memoire) : l'alerte « fiche(s) modifiee(s) des deux cotes » est dans la tuile
+// « A traiter », avec le nombre d'ecarts non traites ; son clic ouvre la liste (l'ecran « Fiches en conflit »). Jumeau :
+// l'agent non designe ne l'a pas. Le clic est joue dans le vrai plan de travail (Pont/PlanTravail.cs) : sans serveur dans ce
+// processus, son accueil montre la demonstration de la meme alerte, et le chemin du clic est le meme.
+var etatAvant = Environment.GetEnvironmentVariable("RIGV3_ETAT");
+var etatBanc = Path.Combine(Path.GetTempPath(), "rigv3-recopie-" + Guid.NewGuid().ToString("N") + ".json");
+Environment.SetEnvironmentVariable("RIGV3_ETAT", etatBanc);
+try
+{
+    await using var accueilDesigne = new SessionAccueil(AccueilEtat.Charger()) { SourceConflits = () => EcranConflits.AlerteAsync(designe, Greffe) };
+    accueilDesigne.Initialiser();
+    await accueilDesigne.ReleveConflits;
+    var ligneAccueil = accueilDesigne.Alertes.FirstOrDefault(a => a.Id == SessionAccueil.IdAlerteConflits);
+    var dansLaTuile = accueilDesigne.Vue(new ContexteAccueil(false, null)).Accueil.Tuiles.FirstOrDefault(t => t.Id == "alertes")?.Alertes?.Groupes
+        .SelectMany(g => g.Lignes.Select(l => (g.Categorie, Ligne: l))).FirstOrDefault(x => x.Ligne.Id == SessionAccueil.IdAlerteConflits);
+    var clic = accueilDesigne.Agir("alerte", JsonSerializer.SerializeToElement(SessionAccueil.IdAlerteConflits));
+    await using var accueilAutre = new SessionAccueil(AccueilEtat.Charger()) { SourceConflits = () => EcranConflits.AlerteAsync(autre, Greffe) };
+    accueilAutre.Initialiser();
+    await accueilAutre.ReleveConflits;
+    await using var plan = new SessionPlanTravail(null, null);
+    plan.Initialiser();
+    plan.SurGesteAccueil(new GesteIle("alerte", JsonSerializer.SerializeToElement(SessionAccueil.IdAlerteConflits)));
+    var ouvert = plan.Vue().Proc?.Code;
+    Exiger(ligneAccueil is { Cible: EcranConflits.Code } && ligneAccueil.Nombre == alerte!.Nombre && ligneAccueil.Titre == alerte.Titre
+           && dansLaTuile?.Ligne is { } l && l.Nombre == alerte.Nombre && clic is { Quoi: DemandeAccueil.OuvrirAlerte, Alerte.Cible: EcranConflits.Code }
+           && accueilAutre.Alertes.All(a => a.Id != SessionAccueil.IdAlerteConflits) && ouvert == EcranConflits.Code,
+        $"REC-004 CA02 (accueil) : l'agent designe ouvre l'accueil de la V3 : la tuile « A traiter » ({dansLaTuile?.Categorie}) porte l'alerte « {ligneAccueil?.Titre} », " +
+        $"{ligneAccueil?.Nombre} = les ecarts non traites du serveur ({alerte?.Nombre}) ; son clic demande l'ecran {clic?.Alerte?.Cible}, que le plan de travail ouvre " +
+        $"(ecran ouvert : {ouvert ?? "aucun"}) ; l'agent non designe n'a pas l'alerte sur son accueil");
+}
+finally
+{
+    Environment.SetEnvironmentVariable("RIGV3_ETAT", etatAvant);
+    try { File.Delete(etatBanc); } catch (IOException) { }
+}
+
+// L'ecran parle comme l'agent (refus du chef du 21/11) : « Client », « E-mail » -- les titres de la fiche de la V2 --, jamais
+// CLIENT ni CLIEN_EMAIL. Chaque colonne de chaque fiche partagee a son libelle (une table ajoutee a la recopie ajoute les
+// siens a LibellesRecopie). Le mot de passe d'un compte web client ne sort jamais du serveur, meme dans un ecart.
+var sansLibelle = fiches.Tables.SelectMany(t => t.Colonnes.Concat(t.Propres).Append(t.Cle).Select(c => $"{t.NomV2}.{c.Nom}"))
+    .Where(c => !LibellesRecopie.Connu(c.Split('.')[0], c.Split('.')[1])).ToList();
+var champsVus = vueDesigne.Ecarts.SelectMany(e => e.Champs.Select(c => (e.TableV2, Champ: c))).ToList();
+var ecartClientMdp = vueDesigne.Ecarts.First(e => e.TableV2 == "CLIENT");
+await Executer(v3.Connexion, $"INSERT INTO rec.EcartChamp (IdEcart, Champ, ValeurV2, ValeurV3) VALUES ({ecartClientMdp.Id}, 'CLIEN_MDP', '\"secret-v2\"', '\"secret-v3\"');");
+var champMdp = (await EcranConflits.OuvrirAsync(designe, Greffe)).Ecarts.First(e => e.Id == ecartClientMdp.Id).Champs.FirstOrDefault(c => c.Champ == "CLIEN_MDP");
+await Executer(v3.Connexion, $"DELETE FROM rec.EcartChamp WHERE IdEcart = {ecartClientMdp.Id} AND Champ = 'CLIEN_MDP';");
+Exiger(sansLibelle.Count == 0 && champsVus.Count > 0 && champsVus.All(x => x.Champ.Libelle == LibellesRecopie.Champ(x.TableV2, x.Champ.Champ) && x.Champ.Libelle != x.Champ.Champ)
+       && vueDesigne.Ecarts.All(e => e.LibelleTable == LibellesRecopie.Table(e.TableV2) && e.LibelleTable != e.TableV2)
+       && vueDesigne.Tables.All(t => t.Libelle == LibellesRecopie.Table(t.Code) && t.Libelle != t.Code)
+       && LibellesRecopie.Champ("CLIENT", "CLIEN_EMAIL") == "E-mail" && LibellesRecopie.Table("CLIENT") == "Client"
+       && champMdp is { Libelle: "Mot de passe", ValeurV2: "(masqué)", ValeurV3: "(masqué)" },
+    $"REC-004 T03 (ecran) : les {champsVus.Count} champs des ecarts portent le titre de la fiche de la V2 (ex. {string.Join(", ", champsVus.Take(4).Select(x => $"{x.Champ.Champ} -> « {x.Champ.Libelle} »"))}), " +
+    $"les tables leur nom d'agent ({string.Join(", ", vueDesigne.Tables.Select(t => $"{t.Code} -> « {t.Libelle} »"))}) ; " +
+    $"{fiches.Tables.Sum(t => t.Colonnes.Count + t.Propres.Count + 1)} colonnes recopiees, {sansLibelle.Count} sans libelle {string.Join(", ", sansLibelle.Take(8))} ; " +
+    $"le mot de passe d'un client se lit « {champMdp?.ValeurV2} »");
 
 // CA03 : marquer traite ; vieillir deux ecarts de 5 et de 4 jours ouvres.
 var aTraiter = vueDesigne.Ecarts[^1];
@@ -816,6 +1103,116 @@ Exiger(vieux.Ecarts.Single(e => e.Id == restants[0].Id).EnRouge && !vieux.Ecarts
        && alerteRouge is { EnRouge: 1, Statut: "alerte" } && JoursOuvres.Entre(IlYa(5), maintenantSql) == 5 && JoursOuvres.Entre(IlYa(4), maintenantSql) == 4,
     $"REC-004 CA03 : un ecart non traite depuis 5 jours ouvres (vu le {IlYa(5):dd/MM}) passe en rouge, celui de 4 jours ouvres (le {IlYa(4):dd/MM}) non ; " +
     $"l'alerte de l'accueil devient « {alerteRouge?.Statut} » : « {alerteRouge?.Detail} » (week-ends et jours feries ne comptent pas)");
+
+// ====================================================================================================
+// C. REC-005 CA05 : l'exploitation d'Amitel alertee (le surveillant de SOC-011 lit AlertesRecopie), et sa relance
+// ====================================================================================================
+// « Quand il dure plus de 5 minutes ou met un changement de cote » : trois incidents de la recopie continue, chacun avec son
+// jumeau sous le seuil (2 essais ; 4 minutes), et leur fin (l'alerte se ferme au passage suivant de la supervision).
+var surveillant = appC.Services.GetRequiredService<Surveillant>();
+var canal = (CanalAlerteSimule)appC.Services.GetRequiredService<ICanalAlerte>();
+async Task<List<(string Erreur, bool Fermee)>> Incidents() =>
+    [.. (await Lire(commune.Connexion, $"SELECT Erreur, CASE WHEN FermeeLe IS NULL THEN 0 ELSE 1 END FROM soc.AlerteExploitation " +
+                                       $"WHERE Regle = '{AlertesRecopie.RegleIncident}' AND CodeGreffe = '{Greffe}' ORDER BY Id"))
+        .Rows.Cast<DataRow>().Select(r => ((string)r[0], Convert.ToInt32(r[1]) == 1))];
+async Task<List<string>> Ouverts() => [.. (await Incidents()).Where(a => !a.Fermee).Select(a => a.Erreur)];
+string Court(IEnumerable<string> l) => string.Join(" | ", l.Select(e => e[..Math.Min(160, e.Length)]));
+HttpClient Http(string compte)
+{
+    var c = appC.GetTestClient();
+    c.DefaultRequestHeaders.Add(RoutesIdentite.EnTeteCompte, compte);
+    return c;
+}
+const string Exploitant = "banc_amitel";
+await Executer(v3.Connexion, $"""
+    INSERT INTO soc.Role (Nom, Libelle) VALUES ('BANC_EXPL', 'Banc : exploitation Amitel');
+    INSERT INTO soc.Compte (CompteWindows, Nom, Prenom, Abrege, Civilite, CodeGreffe, IdService, Desactive, EstAmitel, EstAdministrateur)
+    SELECT '{Exploitant}', 'EXPLOITANT', 'Banc', 'BEXP', 'M.', '{Greffe}', (SELECT MAX(Id) FROM soc.Service WHERE Abrege = 'REC'), 0, 1, 0;
+    INSERT INTO soc.CompteRole (IdCompte, Role) SELECT Id, 'BANC_EXPL' FROM soc.Compte WHERE CompteWindows = '{Exploitant}';
+    """);
+
+// 1. Un changement mis de cote : pas d'alerte a 2 essais, une alerte au 3e (base, table, erreur) ; l'exploitation lit la
+// liste et relance par sa route (un agent du greffe est refuse), l'alerte se ferme.
+await Executer(v2.Connexion, "ALTER TABLE dbo.CLIENT WITH NOCHECK ADD CONSTRAINT CK_BANC_REC005 CHECK (CLIEN_NOM NOT LIKE 'REFUSE PAR LA V2%');");
+var cote = Prendre("CLIENT");
+await Executer(v3.Connexion, V3Ecrit($"UPDATE v2.CLIENT SET CLIEN_NOM = 'REFUSE PAR LA V2 (ALERTE)' WHERE CLIEN_ID_CLIEN = {cote};"));
+await Passer();
+await Passer();
+await surveillant.PasserAsync();
+var aDeuxEssais = await Ouverts();
+await Passer();
+await surveillant.PasserAsync();
+var aTroisEssais = await Ouverts();
+var envoyee = canal.Recues.LastOrDefault(a => a.Regle == AlertesRecopie.RegleIncident && a.CodeGreffe == Greffe);
+var listeAgent = await Http(Designe).GetAsync(RoutesMisesDeCote.Pour(RoutesMisesDeCote.Liste, Greffe));
+var listeExploitant = await Http(Exploitant).GetFromJsonAsync<ChangementMisDeCote[]>(RoutesMisesDeCote.Pour(RoutesMisesDeCote.Liste, Greffe)) ?? [];
+var misDeCote = listeExploitant.FirstOrDefault(m => m.Fiche == cote);
+await Executer(v2.Connexion, "ALTER TABLE dbo.CLIENT DROP CONSTRAINT CK_BANC_REC005;");
+var demande = new DemandeRelanceRecopie(RoutesMisesDeCote.SensV3VersV2, misDeCote?.Ligne, null, null);
+var relanceAgent = await Http(Designe).PostAsJsonAsync(RoutesMisesDeCote.Pour(RoutesMisesDeCote.Relancer, Greffe), demande);
+var relanceExploitant = await Http(Exploitant).PostAsJsonAsync(RoutesMisesDeCote.Pour(RoutesMisesDeCote.Relancer, Greffe), demande);
+var relanceVue = relanceExploitant.IsSuccessStatusCode ? await relanceExploitant.Content.ReadFromJsonAsync<ChangementMisDeCote>() : null;
+var apresRelance = await Passer();
+await surveillant.PasserAsync();
+var finCote = await Ouverts();
+Exiger(aDeuxEssais.Count == 0 && aTroisEssais.Count == 1 && aTroisEssais[0].Contains($"base {v2.Nom}") && aTroisEssais[0].Contains("table CLIENT")
+       && aTroisEssais[0].Contains("CK_BANC_REC005") && aTroisEssais[0].Contains("mis de cote") && envoyee is not null
+       && listeAgent.StatusCode == HttpStatusCode.Forbidden && misDeCote is { Sens: RoutesMisesDeCote.SensV3VersV2, Essais: 3, TableV2: "CLIENT" }
+       && relanceAgent.StatusCode == HttpStatusCode.Forbidden && relanceVue is { RelancePar: not null }
+       && apresRelance.Erreur is null && apresRelance.Appliquees == 1 && await EnV2("CLIENT", "CLIEN_NOM", cote) == "REFUSE PAR LA V2 (ALERTE)" && finCote.Count == 0,
+    $"REC-005 CA05 (mis de cote) : a 2 essais, aucune alerte ; au 3e, l'exploitation recoit (canal {canal.Nom}) « {Court(aTroisEssais)} » ; elle lit la liste " +
+    $"({listeExploitant.Length} changement(s), {misDeCote?.Essais} essais) et relance par sa route (relance par « {relanceVue?.RelancePar} » ; un agent du greffe : " +
+    $"{(int)listeAgent.StatusCode} / {(int)relanceAgent.StatusCode}) ; le passage suivant l'applique et l'alerte se ferme ({finCote.Count} ouverte)");
+
+// 2. Une panne de la base V2 qui dure : a 4 minutes pas d'alerte, a 6 minutes une alerte (base, table, erreur) ; fermee au retour.
+var enPanne = Prendre("CLIENT");
+List<string> panne4, panne6;
+await Executer(serveurBancs, $"ALTER DATABASE [{v2.Nom}] SET OFFLINE WITH ROLLBACK IMMEDIATE;");
+try
+{
+    await Executer(v3.Connexion, V3Ecrit($"UPDATE v2.CLIENT SET CLIEN_NOM = 'PANNE' WHERE CLIEN_ID_CLIEN = {enPanne};"));
+    await Passer();
+    await Passer();
+    // Le debut de la panne : le premier passage en erreur depuis le dernier passage reussi, recule de 4 puis de 6 minutes.
+    const string Recul = "UPDATE rec.PassageRecopie SET Debut = DATEADD(minute, -{0}, Debut), Fin = DATEADD(minute, -{0}, Fin) WHERE Id = (SELECT MIN(Id) FROM rec.PassageRecopie " +
+                         "WHERE Erreur IS NOT NULL AND Id > ISNULL((SELECT MAX(Id) FROM rec.PassageRecopie WHERE Erreur IS NULL), 0));";
+    await Executer(v3.Connexion, string.Format(Recul, 4));
+    await surveillant.PasserAsync();
+    panne4 = await Ouverts();
+    await Executer(v3.Connexion, string.Format(Recul, 2));
+    await surveillant.PasserAsync();
+    panne6 = await Ouverts();
+}
+finally
+{
+    await Executer(serveurBancs, $"ALTER DATABASE [{v2.Nom}] SET ONLINE;");
+    SqlConnection.ClearAllPools();
+}
+var finPanne = await Passer();
+await surveillant.PasserAsync();
+var apresPanne = await Ouverts();
+Exiger(panne4.Count == 0 && panne6.Count == 1 && panne6[0].Contains($"base {v2.Nom}") && panne6[0].Contains("table CLIENT") && panne6[0].Contains("depuis 6 min")
+       && panne6[0].Contains("offline", StringComparison.OrdinalIgnoreCase) && finPanne.Erreur is null && finPanne.Appliquees == 1 && apresPanne.Count == 0,
+    $"REC-005 CA05 (panne) : la base V2 coupee, les passages echouent ; a 4 minutes aucune alerte, a 6 minutes « {Court(panne6)} » ; au retour de la base le passage " +
+    $"applique le changement en attente et l'alerte se ferme ({apresPanne.Count} ouverte)");
+
+// 3. La recopie qui ne passe plus du tout (la boucle arretee, aucun passage) : le plus vieux changement de la V3 attend.
+var enRetard = Prendre("CLIENT");
+await Executer(v3.Connexion, V3Ecrit($"UPDATE v2.CLIENT SET CLIEN_NOM = 'RETARD' WHERE CLIEN_ID_CLIEN = {enRetard};"));
+const string Vieillir = "UPDATE rec.FileRecopie SET Le = DATEADD(minute, -{0}, Le) WHERE Etat = 'en attente';";
+await Executer(v3.Connexion, string.Format(Vieillir, 4));
+await surveillant.PasserAsync();
+var retard4 = await Ouverts();
+await Executer(v3.Connexion, string.Format(Vieillir, 2));
+await surveillant.PasserAsync();
+var retard6 = await Ouverts();
+var finRetard = await Passer();
+await surveillant.PasserAsync();
+var apresRetard = await Ouverts();
+Exiger(retard4.Count == 0 && retard6.Count == 1 && retard6[0].Contains($"base {v2.Nom}") && retard6[0].Contains("table CLIENT") && retard6[0].Contains("depuis 6 min")
+       && finRetard.Erreur is null && finRetard.Appliquees == 1 && apresRetard.Count == 0,
+    $"REC-005 CA05 (retard) : sans aucun passage, un changement de la V3 qui attend depuis 4 minutes n'alerte pas ; depuis 6 minutes : « {Court(retard6)} » ; " +
+    $"le passage suivant l'applique et l'alerte se ferme ({apresRetard.Count} ouverte)");
 }
 finally
 {
@@ -823,7 +1220,6 @@ finally
     if (appC is not null) { await appC.StopAsync(); await appC.DisposeAsync(); }
 }
 
-Reste("REC-002 T04 / REC-003 T04 : le retard au-dela de 5 minutes va au journal technique en erreur (RecopieContinue) ; une regle d'alerte de la supervision (Surveillant, lot 2) reste a poser");
 Reste("REC-003 T01 : le cout du suivi des changements se mesure ici sur une base jetable ; la mesure sur la copie anonymisee de la plus grosse base attend REC-008 (lot 8)");
 return Bilan();
 
@@ -832,7 +1228,7 @@ int Bilan()
     Console.WriteLine();
     if (echecs.Count == 0)
     {
-        Console.WriteLine("VERT : la recopie dans les deux sens et les fiches en conflit tiennent leurs criteres (REC-002, REC-003, REC-004).");
+        Console.WriteLine("VERT : la recopie dans les deux sens, les fiches en conflit et la reprise de la file tiennent leurs criteres (REC-002, REC-003, REC-004, REC-005 CA01-CA03 et CA05).");
         return 0;
     }
     Console.WriteLine($"ROUGE : {echecs.Count} controle(s) en echec.");

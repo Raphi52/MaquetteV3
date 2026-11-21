@@ -121,8 +121,8 @@ internal sealed class ReglesRec002 : IReglesRecopie
         // REC-015
         RegleRecopie.TelleQuelle("ACTION_RCS", "REC-002", "action du registre") with { ColonneNom = "ACTRC_NUM_ARRIVEE" },
         // REC-018
-        RegleRecopie.TelleQuelle("ARRIVEE", "REC-002", "arrivee") with { ColonneNom = "ARRV_NUM_ARRIVEE" },
+        RegleRecopie.TelleQuelle("ARRIVEE", "REC-002", "arrivée") with { ColonneNom = "ARRV_NUM_ARRIVEE" },
         // REC-019
-        RegleRecopie.TelleQuelle("CATEGORIE", "REC-002", "categorie") with { ColonneNom = "CTGR_NOM" },
+        RegleRecopie.TelleQuelle("CATEGORIE", "REC-002", "catégorie") with { ColonneNom = "CTGR_NOM" },
     ];
 }

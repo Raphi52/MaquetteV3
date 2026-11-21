@@ -4,6 +4,9 @@
 // est a l'heure UTC -- mesure le 2026-11-21 : SYSDATETIME() 08:52, poste 09:52 -- ; elle vient desormais de SYSDATETIME().
 // Puis l'auteur V2 d'un ecart : ecrit NULL en dur, alors que la V2 note l'agent d'un client (CLIEN_ID_UTLST) -- mesure par
 // RecopieDeuxSensCheck (REC-004 CA01 rouge : CLIEN_ID_UTLST 1 -> 189, AuteurV2 vide) ; il est lu par RegleRecopie.ColonneAuteurV2.
+// fix-ok: refus du chef (21/11) mesure par RecopieDeuxSensCheck sur l'ancien code : le client « REFUSE PAR LA V2 », refuse par
+// la contrainte CK_BANC_REC005, arretait tout le passage au premier echec (« return » ici) -- SUIT LE REFUS 1 et 2 n'arrivaient
+// jamais dans la V2 (REC-005 CA02 rouge). Une panne arrete toujours le passage, un refus ne coute plus qu'a sa fiche.
 using System.Data;
 using System.Globalization;
 using Microsoft.Data.SqlClient;
@@ -14,8 +17,14 @@ namespace RigV3.Serveur.Recopie;
 /// <param name="Appliquees">Lignes de file appliquees.</param>
 /// <param name="Fiches">Fiches recopiees (plusieurs lignes d'une meme fiche passent ensemble).</param>
 /// <param name="Ecarts">Fiches modifiees des deux cotes : la V3 a gagne, l'ecart est ecrit (REC-004).</param>
-/// <param name="Erreur">Ce qui a arrete le passage (base V2 muette, refus de la V2, fiche visee qui attend) ; null sinon.</param>
-public sealed record BilanApplication(int Appliquees, int Fiches, int Ecarts, string? Erreur, long? LigneArretee);
+/// <param name="Erreur">Ce qui a arrete le passage : une PANNE (base V2 muette, injoignable) ; null sinon -- un refus de la
+/// V2 n'arrete plus rien (REC-005 CA02).</param>
+/// <param name="Refusees">Fiches dont le changement de tete a ete refuse par la V2 pendant ce passage (un essai de plus).</param>
+/// <param name="MisesDeCote">Parmi elles, celles mises de cote a ce passage (3e essai).</param>
+/// <param name="Bloquees">Fiches qui attendent derriere un changement mis de cote (le leur, ou celui d'une fiche visee).</param>
+/// <param name="TableArret">La table V2 de la fiche sur laquelle une panne a arrete le passage.</param>
+public sealed record BilanApplication(int Appliquees, int Fiches, int Ecarts, string? Erreur, long? LigneArretee,
+                                      int Refusees = 0, int MisesDeCote = 0, int Bloquees = 0, string? TableArret = null);
 
 /// <summary>
 /// L'APPLICATEUR V3 -> V2 (REC-002 T02, REC-004 T02). Il lit rec.FileRecopie dans l'ordre et recopie chaque fiche dans la
@@ -24,9 +33,11 @@ public sealed record BilanApplication(int Appliquees, int Fiches, int Ecarts, st
 ///
 ///  - ORDRE GARANTI. Les fiches passent dans l'ordre de leur premiere ligne en attente. Avant une fiche, toute fiche
 ///    qu'elle vise (une action du registre et son dossier) et qui attend encore passe d'abord : la ligne visee existe
-///    dans la V2 avant celle qui la vise, aucune erreur de cle etrangere (CA03). La premiere fiche qui echoue (base V2
-///    muette, refus de la V2) ARRETE le passage : rien de ce qui la suit n'est applique avant elle ; ses lignes restent en
-///    file, avec le nombre d'essais et le motif (CA06). La V3, elle, n'attend jamais la V2 : elle n'ecrit que la file.
+///    dans la V2 avant celle qui la vise, aucune erreur de cle etrangere (CA03). Une PANNE de la V2 (muette, hors ligne)
+///    ARRETE le passage sans compter d'essai : tout reste en file avec le motif (CA06). Un REFUS de la V2 (contrainte,
+///    declencheur) ne coute qu'a sa fiche : un essai de plus, mise de cote au 3e, les autres fiches continuent et les
+///    changements suivants de la meme fiche attendent derriere lui (REC-005 CA02, <see cref="MisesDeCote"/>). La V3, elle,
+///    n'attend jamais la V2 : elle n'ecrit que la file.
 ///  - CREATION (CA02). Une fiche sans correspondance est creee dans la V2, qui lui donne son identifiant ; la
 ///    correspondance est ecrite ; un changement suivant met a jour CETTE ligne.
 ///  - TRANSMISSION (CA04). Les colonnes propres (etat de transmission) ne sont jamais recopiees et sont remises a leur
@@ -47,51 +58,93 @@ internal static class Applicateur
         await using var cn = new SqlConnection(connexionV3);
         await cn.OpenAsync(ct);
         var attente = new List<(long Id, string TableV3, string IdV3)>();
+        // Une fiche qui a un changement mis de cote ne passe pas : ses changements suivants attendent derriere lui.
         await using (var cmd = new SqlCommand(
-            $"SELECT TOP ({auPlus}) Id, TableV3, IdV3 FROM rec.FileRecopie WHERE Etat = 'en attente' ORDER BY Id;", cn))
+            $"SELECT TOP ({auPlus}) f.Id, f.TableV3, f.IdV3 FROM rec.FileRecopie AS f WHERE f.Etat = 'en attente' AND NOT EXISTS " +
+            "(SELECT 1 FROM rec.FileRecopie AS m WHERE m.TableV3 = f.TableV3 AND m.IdV3 = f.IdV3 AND m.Etat = 'mise de cote') ORDER BY f.Id;", cn))
         await using (var l = await cmd.ExecuteReaderAsync(ct))
             while (await l.ReadAsync(ct)) attente.Add((l.GetInt64(0), l.GetString(1), l.GetString(2)));
 
         var bilan = new Compte();
         var faites = new HashSet<(string, string)>();
+        // Les fiches refusees ou bloquees a ce passage : un seul essai par passage, et celles qui les visent attendent.
+        var arretees = new HashSet<(string, string)>();
         foreach (var (id, tableV3, idV3) in attente)
         {
-            if (faites.Contains((tableV3, idV3))) continue;
+            if (faites.Contains((tableV3, idV3)) || arretees.Contains((tableV3, idV3))) continue;
             try
             {
                 if (!fiches.ParTableV3.TryGetValue(tableV3, out var t))
-                    throw new RecopieEnAttente($"{tableV3} n'est plus dans la recopie de {fiches.BaseV2} ({string.Join(" ; ", fiches.Problemes)})");
-                await FicheAsync(cn, fiches, t, idV3, idTransfert, [], faites, bilan, ct);
+                    throw new RecopieBloquee($"{tableV3} n'est plus dans la recopie de {fiches.BaseV2} ({string.Join(" ; ", fiches.Problemes)})");
+                await FicheAsync(cn, fiches, t, idV3, idTransfert, [], faites, arretees, bilan, ct);
             }
-            catch (Exception e) when (e is SqlException or RecopieEnAttente)
+            // Une annulation (arret du service) n'est ni un refus ni une panne : elle remonte, la transaction de la fiche est
+            // annulee et tout repart du dernier changement applique au demarrage suivant (REC-005 CA01).
+            catch (Exception e) when (!ct.IsCancellationRequested && e is SqlException or RecopieEnAttente or RecopieBloquee or EchecFiche)
             {
                 await RetirerMarqueAsync(cn);
-                await ExecuterAsync(cn, null,
-                    "UPDATE rec.FileRecopie SET Essais = Essais + 1, Erreur = LEFT(@e, 2000) WHERE TableV3 = @t AND IdV3 = @id AND Etat = 'en attente';",
-                    ct, ("@e", e.Message), ("@t", tableV3), ("@id", idV3));
-                return new BilanApplication(bilan.Lignes, bilan.Fiches, bilan.Ecarts, $"{tableV3} {idV3} (ligne {id}) : {e.Message}", id);
+                var (tableEnCause, idEnCause, cause) = e is EchecFiche f ? (f.Table, f.Id, f.InnerException!) : (tableV3, idV3, e);
+                var nomV2 = fiches.ParTableV3.TryGetValue(tableEnCause, out var tc) ? tc.NomV2 : tableEnCause;
+                if (cause is RecopieBloquee)
+                {
+                    arretees.Add((tableV3, idV3));
+                    await MisesDeCote.NoterMotifV3Async(cn, tableV3, idV3, cause.Message, ct);
+                    bilan.Bloquees++;
+                    continue;
+                }
+                if (MisesDeCote.EstPanne(cause, cn))
+                {
+                    await MisesDeCote.NoterMotifV3Async(cn, tableEnCause, idEnCause, cause.Message, ct);
+                    return new BilanApplication(bilan.Lignes, bilan.Fiches, bilan.Ecarts, $"{tableEnCause} {idEnCause} (ligne {id}) : {cause.Message}", id,
+                                                bilan.Refusees, bilan.MisesDeCote, bilan.Bloquees, nomV2);
+                }
+                // Le refus de la V2 : il ne coute qu'a la fiche refusee (la visee, si c'est elle) ; celle qui la vise attend.
+                arretees.Add((tableEnCause, idEnCause));
+                arretees.Add((tableV3, idV3));
+                bilan.Refusees++;
+                if (await MisesDeCote.RefuserV3Async(cn, tableEnCause, idEnCause, cause.Message, ct)) bilan.MisesDeCote++;
+                if ((tableEnCause, idEnCause) != (tableV3, idV3))
+                    await MisesDeCote.NoterMotifV3Async(cn, tableV3, idV3, $"attend {nomV2} {idEnCause}, refuse par la V2 : {cause.Message}", ct);
             }
         }
-        return new BilanApplication(bilan.Lignes, bilan.Fiches, bilan.Ecarts, null, null);
+        return new BilanApplication(bilan.Lignes, bilan.Fiches, bilan.Ecarts, null, null, bilan.Refusees, bilan.MisesDeCote, bilan.Bloquees);
     }
 
-    private sealed class Compte { public int Lignes, Fiches, Ecarts; }
+    private sealed class Compte { public int Lignes, Fiches, Ecarts, Refusees, MisesDeCote, Bloquees; }
 
     private static async Task FicheAsync(SqlConnection cn, FichesRecopiees fiches, TableRecopiee t, string idV3, int idTransfert,
-                                         HashSet<(string, string)> pile, HashSet<(string, string)> faites, Compte bilan, CancellationToken ct)
+                                         HashSet<(string, string)> pile, HashSet<(string, string)> faites, HashSet<(string, string)> arretees,
+                                         Compte bilan, CancellationToken ct)
     {
         if (faites.Contains((t.NomV3, idV3)) || !pile.Add((t.NomV3, idV3))) return;
+        try
+        {
+            await FicheSansNomAsync(cn, fiches, t, idV3, idTransfert, pile, faites, arretees, bilan, ct);
+        }
+        // L'echec porte le nom de SA fiche : une fiche visee refusee compte son essai, pas celle qui la vise.
+        catch (Exception e) when (!ct.IsCancellationRequested && e is SqlException or RecopieEnAttente)
+        {
+            throw new EchecFiche(t.NomV3, idV3, e);
+        }
+    }
 
-        // 1. Les fiches visees d'abord (CA03), chacune dans sa transaction.
+    private static async Task FicheSansNomAsync(SqlConnection cn, FichesRecopiees fiches, TableRecopiee t, string idV3, int idTransfert,
+                                                HashSet<(string, string)> pile, HashSet<(string, string)> faites, HashSet<(string, string)> arretees,
+                                                Compte bilan, CancellationToken ct)
+    {
+        // 1. Les fiches visees d'abord (CA03), chacune dans sa transaction. Une visee mise de cote, ou refusee a ce passage,
+        // fait attendre celle-ci : la ligne visee doit exister dans la V2 avant elle.
         if (await LireV3Async(cn, null, t, idV3, false, ct) is { } avantTout)
             foreach (var (colonne, visee) in t.Liens)
             {
                 if (!avantTout.TryGetValue(colonne, out var brut) || TableRecopiee.TexteDe(brut) is not { } valeur) continue;
                 if (await IdV2Async(cn, null, visee, valeur, ct) is not null || !await ExisteV3Async(cn, null, visee, valeur, ct)) continue;
+                if (arretees.Contains((visee.NomV3, valeur)) || await MisesDeCote.BloqueeV3Async(cn, null, visee.NomV3, valeur, ct))
+                    throw new RecopieBloquee($"{t.NomV2} {idV3} attend {visee.NomV2} {valeur} ({colonne}), dont un changement est refuse par la V2 ou mis de cote");
                 if (await ScalaireAsync(cn, null, "SELECT CONVERT(nvarchar(20), MIN(Id)) FROM rec.FileRecopie WHERE TableV3 = @t AND IdV3 = @id AND Etat = 'en attente';",
                                         ct, ("@t", visee.NomV3), ("@id", valeur)) is null)
                     throw new RecopieEnAttente($"{t.NomV2} {idV3} vise {visee.NomV2} {valeur} ({colonne}), qui n'a ni correspondance dans la V2 ni changement en attente");
-                await FicheAsync(cn, fiches, visee, valeur, idTransfert, pile, faites, bilan, ct);
+                await FicheAsync(cn, fiches, visee, valeur, idTransfert, pile, faites, arretees, bilan, ct);
             }
 
         // 2. La fiche, dans UNE transaction.
@@ -169,7 +222,9 @@ internal static class Applicateur
             }
 
             await using (var cmd = new SqlCommand(
-                $"UPDATE rec.FileRecopie SET Etat = 'appliquee', AppliqueeLe = SYSDATETIME(), BaseV2 = @b, IdV2 = @id2, IdEcart = @e, Erreur = NULL " +
+                // Un changement relance garde le message qui l'avait mis de cote : la trace de l'incident reste sur sa ligne.
+                $"UPDATE rec.FileRecopie SET Etat = 'appliquee', AppliqueeLe = SYSDATETIME(), BaseV2 = @b, IdV2 = @id2, IdEcart = @e, " +
+                "Erreur = CASE WHEN RelanceLe IS NULL THEN NULL ELSE Erreur END " +
                 $"WHERE Id IN ({string.Join(", ", lignes.Select(l => l.Id))});", cn, tx))
             {
                 cmd.Parameters.AddWithValue("@b", t.BaseV2);

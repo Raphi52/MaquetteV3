@@ -10,9 +10,9 @@ afterEach(() => { cleanup(); retirerFauxPont() })
 // « Traité ».
 function ecart(partiel: Partial<EcartRecopie> = {}): EcartRecopie {
   return {
-    id: 7, tableV2: 'CLIENT', idV2: '3002', idV3: '3001', fiche: 'client 3001 — DUPONT', cible: 'ecran:PROC_FCLIENT',
+    id: 7, tableV2: 'CLIENT', libelleTable: 'Client', idV2: '3002', idV3: '3001', fiche: 'client 3001 — DUPONT', cible: 'ecran:PROC_FCLIENT',
     detecteLe: '2026-11-21T10:15:00', dateV2: '2026-11-21T10:12:00', auteurV2: null, dateV3: '2026-11-21T10:10:00', auteurV3: 'Claire MARTIN',
-    champs: [{ champ: 'CLIEN_EMAIL', valeurV2: 'v2@exemple.fr', valeurV3: 'v3@exemple.fr' }], traiteLe: null, traitePar: null, enRouge: false,
+    champs: [{ champ: 'CLIEN_EMAIL', libelle: 'E-mail', valeurV2: 'v2@exemple.fr', valeurV3: 'v3@exemple.fr' }], traiteLe: null, traitePar: null, enRouge: false,
     ...partiel,
   }
 }
@@ -22,10 +22,10 @@ function vue(partiel: Partial<VueEcranConflits> = {}): VueEcranConflits {
     mode: 'serveur', message: null, echec: false, greffe: '8002', peutTraiter: true, traites: false, table: null,
     ecarts: [
       ecart(),
-      ecart({ id: 6, tableV2: 'DOSSIER_RCS', fiche: 'dossier RCS 12 — 2019B00412', cible: 'dossier:2019B00412', enRouge: true,
-              champs: [{ champ: 'DSSRC_DATE_RADIATION', valeurV2: '2026-11-18T00:00:00', valeurV3: null }] }),
+      ecart({ id: 6, tableV2: 'DOSSIER_RCS', libelleTable: 'Dossier RCS', fiche: 'dossier RCS 12 — 2019B00412', cible: 'dossier:2019B00412', enRouge: true,
+              champs: [{ champ: 'DSSRC_DATE_RADIATION', libelle: 'Date de radiation', valeurV2: '2026-11-18T00:00:00', valeurV3: null }] }),
     ],
-    tables: ['CLIENT', 'DOSSIER_RCS'], alerte: { nonTraites: 2, enRouge: 1, plusAncien: '2026-11-12T09:00:00' },
+    tables: [{ code: 'CLIENT', libelle: 'Client' }, { code: 'DOSSIER_RCS', libelle: 'Dossier RCS' }], alerte: { nonTraites: 2, enRouge: 1, plusAncien: '2026-11-12T09:00:00' },
     ...partiel,
   }
 }
@@ -44,6 +44,11 @@ describe('EcranConflits', () => {
     expect(within(detail).getByText('v3@exemple.fr')).toBeTruthy()
     expect(detail.textContent).toContain('par Claire MARTIN')
     expect(detail.textContent).toContain("auteur non noté par l'ancien RIG")
+    // L'agent lit les titres de la fiche de la V2, jamais les noms de colonnes (refus du chef du 21/11).
+    expect(within(detail).getByText('E-mail')).toBeTruthy()
+    expect(lignes[0]!.textContent).toContain('Client')
+    expect(document.body.textContent).not.toContain('CLIEN_EMAIL')
+    expect(document.body.textContent).not.toContain('DOSSIER_RCS')
     // Une autre ligne : son detail, une date lisible et une valeur vide nommee.
     fireEvent.click(lignes[1]!)
     expect(within(screen.getByLabelText("Détail de l'écart")).getByText('18/11/2026')).toBeTruthy()
@@ -97,11 +102,12 @@ describe('EcranConflits', () => {
     expect(screen.queryByRole('table')).toBeNull()
   })
 
-  it('le filtre par table relit la liste aupres du pont', async () => {
+  it("le filtre par type de fiche relit la liste aupres du pont, sous le nom que lit l'agent", async () => {
     const pont = installerFauxPont({ 'EcranConflits.Ouvrir': (_t, table) => vue(table === 'CLIENT' ? { table: 'CLIENT', ecarts: [ecart()] } : {}) })
     render(<EcranConflits ouvrirDossier={() => {}} ouvrir={() => {}} />)
     await screen.findByText('2 écart(s) — greffe 8002')
-    fireEvent.change(screen.getByLabelText('Table'), { target: { value: 'CLIENT' } })
+    expect(screen.getByRole('option', { name: 'Dossier RCS' })).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('Type de fiche'), { target: { value: 'CLIENT' } })
     expect(await screen.findByText('1 écart(s) — greffe 8002')).toBeTruthy()
     expect(pont.appels).toHaveBeenLastCalledWith('EcranConflits.Ouvrir', false, 'CLIENT')
   })
@@ -111,6 +117,8 @@ describe('EcranConflits', () => {
     expect(lisible('  ')).toBe('(vide)')
     expect(lisible('2026-11-18T00:00:00')).toBe('18/11/2026')
     expect(lisible('DUPONT')).toBe('DUPONT')
+    expect(lisible('true')).toBe('Oui')
+    expect(lisible('false')).toBe('Non')
     expect(destination('dossier:2019B00412')).toEqual({ genre: 'dossier', valeur: '2019B00412' })
     expect(destination('ecran:PROC_FCLIENT')).toEqual({ genre: 'ecran', valeur: 'PROC_FCLIENT' })
     expect(destination('dossier:')).toBeNull()

@@ -5,6 +5,9 @@
 // la boucle ouvrait toutes les 5 s la base V3 de CHAQUE greffe du catalogue, meme pas encore creee (BaseV3CreeeLe nul),
 // et journalisait chaque passage en panne -- une erreur toutes les 5 s par greffe ; elle ne vise plus que les bases V3
 // creees, et une meme panne n'est signalee qu'une fois par 10 minutes.
+// fix-ok: refus du chef (21/11) mesure par RecopieDeuxSensCheck sur l'ancien code (REC-005 CA02/CA03 rouges) : la relance d'un
+// changement mis de cote n'existait pas, et le bilan d'un passage ne disait ni les refus ni les mises de cote -- d'ou
+// RelancerAsync / RelancerRemonteeAsync, Refusees / MisesDeCote / TableArret au journal des passages (rec.PassageRecopie).
 using System.Collections.Concurrent;
 using System.Data;
 using Microsoft.Data.SqlClient;
@@ -17,7 +20,7 @@ namespace RigV3.Serveur.Recopie;
 /// <param name="EnService">La recopie est en service pour cette base (rec.Remontee) ; sinon rien n'est fait.</param>
 /// <param name="RetardSecondes">L'age du plus vieux changement V3 pas encore recopie apres le passage (REC-002 T04) ; null si la file est vide.</param>
 public sealed record BilanPassage(string BaseV2, bool EnService, int Appliquees, int Remontees, int Echos, int Laissees, int Ecarts,
-                                  long? VersionV2, double? RetardSecondes, string? Erreur);
+                                  long? VersionV2, double? RetardSecondes, string? Erreur, int Refusees = 0, int MisesDeCote = 0);
 
 /// <summary>
 /// UN PASSAGE DE LA RECOPIE CONTINUE d'une base : d'abord la file V3 -> V2 (l'applicateur, qui detecte les fiches
@@ -28,6 +31,27 @@ public sealed record BilanPassage(string BaseV2, bool EnService, int Appliquees,
 /// </summary>
 public static class ServiceRecopie
 {
+    /// <summary>REC-005 CA02 (seuil propose) : au 3e essai refuse par la base d'en face, un changement est mis de cote.</summary>
+    public const int EssaisAvantMiseDeCote = 3;
+
+    /// <summary>Relance un changement V3 -> V2 mis de cote, une fois la cause corrigee (REC-005 CA03) : il repasse au passage
+    /// suivant, puis ceux de la meme fiche qui attendaient derriere lui, dans l'ordre. Faux si la ligne n'est pas mise de cote.</summary>
+    public static async Task<bool> RelancerAsync(string connexionV3, long ligne, string par, CancellationToken ct = default)
+    {
+        await using var cn = new SqlConnection(connexionV3);
+        await cn.OpenAsync(ct);
+        return await MisesDeCote.RelancerV3Async(cn, ligne, par, ct);
+    }
+
+    /// <summary>Relance une fiche de la V2 que la V3 refusait (REC-005 CA03) : elle remonte au passage suivant, de son etat
+    /// courant dans la V2 (ses changements suivants compris). Faux si elle n'est pas mise de cote.</summary>
+    public static async Task<bool> RelancerRemonteeAsync(string connexionV3, string baseV2, string tableV2, string idV2, string par, CancellationToken ct = default)
+    {
+        await using var cn = new SqlConnection(connexionV3);
+        await cn.OpenAsync(ct);
+        return await MisesDeCote.RelancerV2Async(cn, baseV2, tableV2, idV2, par, ct);
+    }
+
     public static async Task<BilanPassage> PasserAsync(string connexionV3, string baseV2, FichesRecopiees? fiches = null, int auPlus = 500,
                                                        ILogger? log = null, CancellationToken ct = default)
     {
@@ -64,22 +88,35 @@ public static class ServiceRecopie
         if ((a?.Erreur ?? r?.Erreur) is { } motif)
             log?.LogError("Recopie de {BaseV2} : passage arrete, les changements attendent le suivant : {Erreur}", baseV2, motif);
 
+        var refusees = (a?.Refusees ?? 0) + (r?.Refusees ?? 0);
+        var misesDeCote = (a?.MisesDeCote ?? 0) + (r?.MisesDeCote ?? 0);
+        var tableArret = a?.TableArret ?? r?.TableArret;
         double? retard = null;
         try
         {
-            var plusVieux = await ScalaireAsync(verrou, null, "SELECT CONVERT(nvarchar(30), DATEDIFF_BIG(millisecond, MIN(Le), SYSDATETIME())) FROM rec.FileRecopie WHERE Etat = 'en attente';", ct);
+            // Le retard (REC-002 T04) : le plus vieux changement V3 qui attend un passage -- pas ceux qui attendent derriere un
+            // changement mis de cote, qui a sa propre alerte (REC-005 CA05).
+            var plusVieux = await ScalaireAsync(verrou, null, """
+                SELECT CONVERT(nvarchar(30), DATEDIFF_BIG(millisecond, MIN(f.Le), SYSDATETIME())) FROM rec.FileRecopie AS f
+                WHERE f.Etat = 'en attente' AND NOT EXISTS (SELECT 1 FROM rec.FileRecopie AS m WHERE m.TableV3 = f.TableV3 AND m.IdV3 = f.IdV3 AND m.Etat = 'mise de cote');
+                """, ct);
             retard = plusVieux is null ? null : long.Parse(plusVieux) / 1000.0;
             await ExecuterAsync(verrou, null, """
-                INSERT INTO rec.PassageRecopie (BaseV2, Debut, Fin, Appliquees, Remontees, Echos, Ecarts, VersionV2, Erreur)
-                VALUES (@b, CONVERT(datetime2(3), @d, 126), SYSDATETIME(), @a, @r, @e, @x, @v, LEFT(@err, 2000));
+                INSERT INTO rec.PassageRecopie (BaseV2, Debut, Fin, Appliquees, Remontees, Echos, Ecarts, VersionV2, Erreur, Refusees, MisesDeCote, TableArret)
+                VALUES (@b, CONVERT(datetime2(3), @d, 126), SYSDATETIME(), @a, @r, @e, @x, @v, LEFT(@err, 2000), @ref, @cote, @arret);
                 """, ct, ("@b", baseV2), ("@d", debut), ("@a", a?.Appliquees ?? 0), ("@r", r?.Remontees ?? 0), ("@e", r?.Echos ?? 0),
-                ("@x", a?.Ecarts ?? 0), ("@v", (object?)r?.Version ?? DBNull.Value), ("@err", (object?)erreur ?? DBNull.Value));
+                ("@x", a?.Ecarts ?? 0), ("@v", (object?)r?.Version ?? DBNull.Value), ("@err", (object?)erreur ?? DBNull.Value),
+                ("@ref", refusees), ("@cote", misesDeCote), ("@arret", (object?)tableArret ?? DBNull.Value));
         }
         finally
         {
             await ExecuterAsync(verrou, null, "EXEC sp_releaseapplock @Resource = @n, @LockOwner = 'Session';", CancellationToken.None, ("@n", "rigv3.recopie." + baseV2));
         }
-        return new BilanPassage(baseV2, true, a?.Appliquees ?? 0, r?.Remontees ?? 0, r?.Echos ?? 0, r?.Laissees ?? 0, a?.Ecarts ?? 0, r?.Version, retard, erreur);
+        if (misesDeCote > 0)
+            log?.LogError("Recopie de {BaseV2} : {MisesDeCote} changement(s) mis de cote apres {Seuil} essais refuses (les autres fiches continuent ; " +
+                          "a corriger puis relancer, alerte d'exploitation « recopie-incident »)", baseV2, misesDeCote, EssaisAvantMiseDeCote);
+        return new BilanPassage(baseV2, true, a?.Appliquees ?? 0, r?.Remontees ?? 0, r?.Echos ?? 0, r?.Laissees ?? 0, a?.Ecarts ?? 0, r?.Version, retard, erreur,
+                                refusees, misesDeCote);
     }
 }
 
@@ -153,6 +190,11 @@ public sealed class RecopieContinue(CatalogueGreffes catalogue, IConfiguration c
                 if (ASignaler($"{code}|passage|{bilan.Erreur}"))
                     log.LogError("Recopie du greffe {Greffe} ({BaseV2}) : passage arrete, les changements attendent le suivant : {Erreur}", code, baseV2, bilan.Erreur);
             }
+            // Une mise de cote arrive une fois par changement : elle va au journal technique sans filtre.
+            if (bilan.MisesDeCote > 0)
+                log.LogError("Recopie du greffe {Greffe} ({BaseV2}) : {MisesDeCote} changement(s) mis de cote apres {Seuil} essais refuses ; les autres fiches " +
+                             "continuent, l'alerte d'exploitation « recopie-incident » nomme la table et l'erreur", code, baseV2, bilan.MisesDeCote,
+                             ServiceRecopie.EssaisAvantMiseDeCote);
             if (bilan.RetardSecondes is { } r && r > seuil.TotalSeconds && ASignaler($"{code}|retard"))
                 log.LogError("Recopie du greffe {Greffe} ({BaseV2}) en retard : le plus vieux changement V3 attend depuis {Minutes:0} min (seuil {Seuil} min)",
                              code, baseV2, r / 60, seuil.TotalMinutes);

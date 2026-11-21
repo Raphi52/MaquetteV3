@@ -1,5 +1,9 @@
+// fix-ok: refus du chef (21/11) : la mise de cote d'un changement de la recopie continue n'avait pas d'alerte (le lot 8 l'avait
+// laissee « a brancher », RecopieRepriseCheck RESTE REC-005 CA05 second cas) ; CausesRecopieContinueAsync la porte, avec la panne
+// et le retard de plus de 5 minutes, verifies par RecopieDeuxSensCheck (REC-005 CA05).
 using System.Globalization;
 using Microsoft.Data.SqlClient;
+using RigV3.Contrats.Recopie;
 using RigV3.Contrats.Socle;
 using RigV3.Serveur.Socle.Greffes;
 using RigV3.Serveur.Socle.Supervision;
@@ -15,8 +19,9 @@ namespace RigV3.Serveur.Recopie;
 ///    delai ; ou le dernier controle de nuit s'est arrete. L'alerte nomme la base, la table et l'erreur.
 ///  - « recopie-ecart » : le dernier controle de nuit a trouve au moins un ecart, un lien orphelin ou une ligne sans
 ///    correspondance (CA04) ; l'alerte nomme la base, les tables et les comptes, jamais une valeur.
-/// La file des changements de la recopie continue (REC-002, lot 9) branchera ici ses changements mis de cote (REC-005
-/// CA05, second cas) : sa table n'est pas encore dans ce depot.
+///  - « recopie-incident » encore, pour la recopie CONTINUE (REC-002, REC-003 ; lot 9) : un changement mis de cote apres
+///    3 essais refuses, ou la recopie arretee (panne, ou plus aucun passage) depuis plus du delai
+///    (<see cref="CausesRecopieContinueAsync"/>).
 /// </summary>
 public sealed class AlertesRecopie(CatalogueGreffes catalogue, IConfiguration configuration) : ISourceAlertes
 {
@@ -104,8 +109,86 @@ public sealed class AlertesRecopie(CatalogueGreffes catalogue, IConfiguration co
                         (l.IsDBNull(9) ? "" : $" — liens orphelins : {l.GetString(9)}") + $". Detail : rec.ComparaisonEcart, controle {id}."));
             }
         }
+        if (await Valeur(cn, "SELECT CASE WHEN OBJECT_ID(N'rec.RemonteeEchec', N'U') IS NULL THEN 0 ELSE 1 END;", ct) is 1)
+            causes.AddRange(await CausesRecopieContinueAsync(cn, f, ct));
         return causes;
     }
+
+    /// <summary>
+    /// La recopie CONTINUE d'une base (REC-002, REC-003 ; REC-005 CA05 sur sa file) : « un incident qui dure plus de 5 minutes
+    /// ou met un changement de cote » nomme la base, la table et l'erreur.
+    ///  - un changement MIS DE COTE (3 essais refuses), une alerte par sens et par table, tant qu'il n'est pas relance ;
+    ///  - la recopie ARRETEE : les passages echouent (panne) depuis le delai, ou -- aucun passage ne reussit plus, la boucle
+    ///    du serveur arretee -- le plus vieux changement de la V3 qui attend un passage a depasse le delai (REC-002 T04).
+    /// </summary>
+    private async Task<List<CauseAlerte>> CausesRecopieContinueAsync(SqlConnection cn, FicheGreffe f, CancellationToken ct)
+    {
+        var causes = new List<CauseAlerte>();
+        if (await Texte(cn, "SELECT TOP (1) BaseV2 FROM rec.Remontee;", ct) is not { } baseV2) return causes;   // recopie pas en service
+        var tables = ReglesRecopie.Decouvrir().ToDictionary(r => r.TableV3, r => r.TableV2, StringComparer.OrdinalIgnoreCase);
+        string TableV2(string table, string sens) => sens != RoutesMisesDeCote.SensV3VersV2 ? table
+            : tables.TryGetValue(table, out var t2) ? t2 : table[(table.IndexOf('.') + 1)..];
+
+        await using (var cmd = new SqlCommand("""
+            WITH m AS (
+                SELECT 'V3 vers V2' AS Sens, f.TableV3 AS TableFiche, f.IdV3 AS Fiche, f.Id AS Ligne, f.Erreur, f.MiseDeCoteLe
+                FROM rec.FileRecopie AS f WHERE f.Etat = 'mise de cote'
+                UNION ALL
+                SELECT 'V2 vers V3', r.TableV2, r.IdV2, NULL, r.Erreur, r.MiseDeCoteLe FROM rec.RemonteeEchec AS r WHERE r.Etat = 'mise de cote'),
+            n AS (SELECT *, COUNT(*) OVER (PARTITION BY Sens, TableFiche) AS Nombre,
+                         ROW_NUMBER() OVER (PARTITION BY Sens, TableFiche ORDER BY MiseDeCoteLe, Ligne) AS Rang FROM m)
+            SELECT Sens, TableFiche, Nombre, Fiche, Ligne, Erreur, CONVERT(nvarchar(16), MiseDeCoteLe, 120) FROM n WHERE Rang = 1 ORDER BY Sens, TableFiche;
+            """, cn))
+        await using (var l = await cmd.ExecuteReaderAsync(ct))
+            while (await l.ReadAsync(ct))
+            {
+                var (sens, nombre, fiche) = (l.GetString(0), l.GetInt32(2), l.GetString(3));
+                var table = TableV2(l.GetString(1), sens);
+                var ligne = l.IsDBNull(4) ? "" : $" (ligne {l.GetInt64(4)})";
+                causes.Add(new CauseAlerte($"{RegleIncident}|{f.Code}|{baseV2}|cote|{sens}|{table}", RegleIncident, f.Code, Traitement,
+                    $"Recopie {sens} de la base {baseV2} (greffe {f.Code}) : {nombre} changement(s) mis de cote apres {ServiceRecopie.EssaisAvantMiseDeCote} essais " +
+                    $"refuses, table {table} ; le premier, fiche {fiche}{ligne}, le {(l.IsDBNull(6) ? "?" : l.GetString(6))} : {(l.IsDBNull(5) ? "sans message" : l.GetString(5))}. " +
+                    $"Les autres fiches continuent ; corriger la cause puis le relancer (POST {RoutesMisesDeCote.Relancer}) : il repasse, puis ceux qui attendaient derriere lui."));
+            }
+
+        // La panne en cours : le dernier passage en erreur, depuis le premier passage en erreur qui suit le dernier reussi.
+        await using (var cmd = new SqlCommand("""
+            SELECT TOP (1) p.Erreur, p.TableArret,
+                   DATEDIFF(second, (SELECT MIN(e.Debut) FROM rec.PassageRecopie AS e WHERE e.BaseV2 = p.BaseV2 AND e.Erreur IS NOT NULL
+                                     AND e.Id > ISNULL((SELECT MAX(o.Id) FROM rec.PassageRecopie AS o WHERE o.BaseV2 = p.BaseV2 AND o.Erreur IS NULL), 0)), SYSDATETIME())
+            FROM rec.PassageRecopie AS p WHERE p.BaseV2 = @b ORDER BY p.Id DESC;
+            SELECT TOP (1) f.TableV3, f.IdV3, f.Id, f.Erreur, DATEDIFF(second, f.Le, SYSDATETIME()) FROM rec.FileRecopie AS f
+            WHERE f.Etat = 'en attente' AND NOT EXISTS (SELECT 1 FROM rec.FileRecopie AS m WHERE m.TableV3 = f.TableV3 AND m.IdV3 = f.IdV3 AND m.Etat = 'mise de cote')
+            ORDER BY f.Le, f.Id;
+            SELECT CONVERT(nvarchar(16), MAX(Fin), 120) FROM rec.PassageRecopie WHERE BaseV2 = @b AND Erreur IS NULL;
+            """, cn))
+        {
+            cmd.Parameters.AddWithValue("@b", baseV2);
+            await using var l = await cmd.ExecuteReaderAsync(ct);
+            (string Erreur, string? Table, int Secondes)? panne = null;
+            if (await l.ReadAsync(ct) && !l.IsDBNull(0) && !l.IsDBNull(2))
+                panne = (l.GetString(0), l.IsDBNull(1) ? null : l.GetString(1), l.GetInt32(2));
+            await l.NextResultAsync(ct);
+            (string Table, string Fiche, long Ligne, string? Erreur, int Secondes)? vieux = null;
+            if (await l.ReadAsync(ct))
+                vieux = (TableV2(l.GetString(0), RoutesMisesDeCote.SensV3VersV2), l.GetString(1), l.GetInt64(2), l.IsDBNull(3) ? null : l.GetString(3), l.GetInt32(4));
+            await l.NextResultAsync(ct);
+            var dernierReussi = await l.ReadAsync(ct) && !l.IsDBNull(0) ? l.GetString(0) : null;
+            var cle = $"{RegleIncident}|{f.Code}|{baseV2}|continue";
+            if (panne is { } p && p.Secondes >= delai * 60)
+                causes.Add(new CauseAlerte(cle, RegleIncident, f.Code, Traitement,
+                    $"Recopie de la base {baseV2} (greffe {f.Code}) arretee depuis {p.Secondes / 60} min, table {p.Table ?? vieux?.Table ?? "inconnue"} : {p.Erreur}. " +
+                    "Les changements attendent dans la file ; ils repartent d'eux-memes quand la base repond."));
+            else if (vieux is { } v && v.Secondes >= delai * 60)
+                causes.Add(new CauseAlerte(cle, RegleIncident, f.Code, Traitement,
+                    $"Recopie de la base {baseV2} (greffe {f.Code}) en retard : le plus vieux changement de la V3, table {v.Table}, fiche {v.Fiche} (ligne {v.Ligne}), " +
+                    $"attend depuis {v.Secondes / 60} min ; dernier passage reussi : {dernierReussi ?? "aucun"}" + (v.Erreur is null ? "" : $" ; dernier motif : {v.Erreur}") +
+                    ". La boucle de la recopie du serveur (« Recopie:Continue ») tourne-t-elle ?"));
+        }
+        return causes;
+    }
+
+    private static async Task<string?> Texte(SqlConnection cn, string sql, CancellationToken ct) => await Valeur(cn, sql, ct) as string;
 
     private static async Task<object?> Valeur(SqlConnection cn, string sql, CancellationToken ct)
     {
