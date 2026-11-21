@@ -199,10 +199,13 @@ foreach (var (libelle, code) in toutesEntrees)
 // PROC_SUPERVISION (« Supervision », SOC-011 T04 et SOC-017 T04) est NEUVE : la V2
 // n'a pas d'ecran ; l'exploitation lit COMMUN_RIG (ETAT_SERVICE, LOG_RIG_ERREUR) a
 // la main et relance par l'outil MaintenanceServices, hors de RIG.
+// PROC_CERTIF (« Certification NF525 », SOC-018 T03) n'a pas de fiche mais un dossier de sources, dans la branche
+// origin/Development de la V2 seulement : Source\RIG\DLL\Processus\PROC_CERTIF (FORM_CERTIF, journaux JET_NP et JET_P,
+// grands totaux des factures et des encaissements).
 var sansFiche = new[] { "PROC_LISTE_DELIBERES", "PROC_SUIVI_IMPRESSION", "PROC_REQUI",
                         "PROC_ACTUALITES", "PROC_COMMANDES_WEB", "PROC_UTILISATEUR", "PROC_MAIL_LOT1",
                         "PROC_COMPTEURS_NUM", "PROC_REGLAGES_GREFFE",
-                        "PROC_NUMEROS_MANQUANTS", "PROC_TOUCHES", "PROC_SUPERVISION" };
+                        "PROC_NUMEROS_MANQUANTS", "PROC_TOUCHES", "PROC_SUPERVISION", "PROC_CERTIF" };
 
 var fiches = @"D:\RigApplication\Documentation\reference\proc";
 

@@ -251,7 +251,8 @@ public static class MenuAccueil
                 new("Journal de vente",       "les ventes du greffe",               "PROC_JVENTE"),
                 new("Livre de repertoire",    "le journal du repertoire",           "PROC_JLR"),
                 new("Lettrage",               "solder les mouvements",              "PROC_VLETTRAGE"),
-                new("Figer les ecritures",    "comptabiliser la journee",           "PROC_COMPTABILISATION")
+                new("Figer les ecritures",    "comptabiliser la journee",           "PROC_COMPTABILISATION"),
+                new("Certification NF525",    "journal et grands totaux signes",    "PROC_CERTIF")
             ]),
             new("Creances",
             [

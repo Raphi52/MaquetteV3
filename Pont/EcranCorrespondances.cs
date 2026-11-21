@@ -85,7 +85,7 @@ public static class EcranCorrespondances
     /// </summary>
     public static readonly IReadOnlySet<string> EntreeLanceLaRecherche = new HashSet<string>
     {
-        "PROC_RECHAFF", "PROC_REQUI", "PROC_COMMANDES_WEB",
+        "PROC_RECHAFF", "PROC_REQUI", "PROC_COMMANDES_WEB", "PROC_CERTIF",
     };
 
     /// <summary>
