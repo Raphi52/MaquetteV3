@@ -235,7 +235,7 @@ public sealed partial class CatalogueRegles
     /// LES COMPOSES : deux segments qui, ensemble, designent une personne alors que l'un d'eux, seul, serait technique.
     /// Le segment technique d'un compose ne leve plus rien ; un compose sans autre segment personnel en est un.
     /// fix-ok: refus du chef (2026-11-21), mesure sur RIG_DEV par la porte de lecture (empreintes) -- « ETAT » levait
-    /// CSRJD/INSPP/BENEF/RPPM/BDCRCX_PRENOMS_ETAT_CIVIL (89 a 99 % de valeurs a prenom) ; « STATUT » levait
+    /// CSRJD/INSPP/BENEF/RPPM/BDCRCX_PRENOMS_ETAT_CIVIL (80 a 96 % de valeurs a prenom) ; « STATUT » levait
     /// INSPM_DENOMINATION_STATUT (61 % de noms) ; « DOMAINE » levait ETBLS_NOM_DOMAINE (sites des etablissements) ;
     /// « IMPRIMANTE » levait GPIMP_NOM_IMPRIMANTE (4 noms d'imprimantes sur 26 sont des noms d'agents).
     /// </summary>

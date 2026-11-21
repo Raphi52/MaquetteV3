@@ -38,7 +38,7 @@ délégué, une ligne `TABLE.COLONNE=Garder|Mots|Courriel|Fichier|Telephone|Date
 ## Correction du 2026-11-21 (refus du chef à la première réception)
 
 <!-- fix-ok: refus du chef rejoué sur main 2e28acc puis mesuré sur RIG_DEV par la porte de lecture : « ETAT » levait les
-     prénoms d'état civil (83-100 % de valeurs à prénom) et CA06 ne tirait que les colonnes traitées. -->
+     prénoms d'état civil (80-96 % de valeurs à prénom) et CA06 ne tirait que les colonnes traitées. -->
 
 **Le défaut.** La règle par le nom prenait « ETAT » pour un segment technique : les colonnes
 `*_PRENOM(S)_ETAT_CIVIL(_ANC)` restaient en clair. Compté par le chef sur RIG_DEV : 173 812 prénoms remplis dans
@@ -55,19 +55,33 @@ des 174 colonnes « gardées, à relire », la part de ses valeurs qui portent u
 
 | Colonnes | Part de valeurs à prénom | Décision |
 |---|---:|---|
-| les 11 `*_PRENOM(S)_ETAT_CIVIL(_ANC)` | 83 à 100 % | **traitées** : « ETAT » suivi de « CIVIL » n'est plus technique (composé `ETAT_CIVIL`) ; `NTXDT_PRENOMS_ETAT_CIVIL_DT`, une date de changement, reste gardée |
+| les 11 `*_PRENOM(S)_ETAT_CIVIL(_ANC)` | 80 à 96 % (les 6 plus remplies, RIG_DEV entier) ; 55 à 100 % sur l'extrait du banc (9) | **traitées** : « ETAT » suivi de « CIVIL » n'est plus technique (composé `ETAT_CIVIL`) ; `NTXDT_PRENOMS_ETAT_CIVIL_DT`, une date de changement, reste gardée |
 | les 38 `*NOM*FICHIER*` | 7 portent des noms de personnes ou d'affaires (jusqu'à 24 % de prénoms, 37 % de noms : `CRTRA_NOM_FICHIER`, `DMCOPJ_NOM_FICHIER`, `PRCLL_NOM_AFFAIRE_FICHIER`, `GDRG_NOM_FICHIER`…), 19 des noms structurés (`a9999a9999….pdf`) ou des libellés fixes, 12 sont vides | **toutes traitées**, extension connue gardée (`Fichier`) : le contenu change d'un greffe à l'autre, et un nom structuré garde sa forme |
 | `GPIMP/TAGPS/LOT_NOM_IMPRIMANTE`, `IMPED_NOM_LOGIQUE` | 66 à 73 % — 4 noms d'imprimantes sur 26 portent le nom d'un agent | **traitées** (composé `NOM_IMPRIMANTE`), la même règle des quatre côtés : le lien entre elles tient |
 | `INSPM/DRGPM_DENOMINATION_STATUT` | 25 % de prénoms, 61 % de noms | **traitées** (composé `DENOMINATION_STATUT` : « statutaire ») |
 | `ETBLS_NOM_DOMAINE` | sites des établissements (le nom de la société s'y lit) | **traitée** (composé `NOM_DOMAINE`) ; `ETBLS_ETAT_NOM_DOMAINE` (3 codes) reste gardée |
 | `INFO_GREFFE.PWD_SQL` | vide sur RIG_DEV ; c'est un mot de passe | **vidée** : un secret n'est jamais levé par un segment technique (« SQL ») |
 | 20 entiers et indicateurs (`*_ID_ADRESSE_*`, `*_MAIL_FORMAT_*`…) | ne portent pas de texte | sortis de la liste « à relire » (une clé, un bit ne portent pas de nom) ; un téléphone rangé dans un nombre y reste |
-| les 98 autres (`TYPE_VOIE`, `NOM_LOGIQUE`, `TEXTE_PARAMETRE`, `CODE_*`…) | 16 % au plus | gardées, toujours « à relire » ; le contrôle les mesure à chaque copie |
+| les 98 autres (`TYPE_VOIE`, `NOM_LOGIQUE`, `TEXTE_PARAMETRE`, `CODE_*`…) | 14 % au plus (`ENCMT_DESIGNATION_BANQUE`) | gardées, toujours « à relire » ; le contrôle les mesure à chaque copie |
 
 **Le contrôle voit désormais une règle fausse.** CA06 tire aussi chaque colonne **gardée** dont le nom a un segment
 personnel (voir « Le contrôle automatique ») ; une colonne au-delà de 35 % de prénoms le rend rouge, même sans
 « fuite » par les colonnes traitées. Réinjectée dans le code, l'ancienne règle fait rougir le banc (14 échecs, dont
 le contrôle de la copie et la mesure de RIG_DEV entier).
+
+**Deuxième correction : le tirage d'une grande table** (objection de la relecture, même jour). Le banc rougissait au
+hasard : `.\tests.ps1 SocleAnonymisation` a rendu 1 sur un passage, `DEMANDE_EDITION.DMNED_CODE_ENTITE_DESTINATAIRE`
+signalée à 50 %. Cause mesurée : cette table a 4 300 504 lignes, mais la colonne n'a que 82 valeurs distinctes ; des
+pages tirées au hasard n'en rendent que les plus fréquentes (4 à 9 par passage), et un seul mot à prénom y faisait
+12 à 50 %. Le seuil s'appliquait sans nombre minimum de valeurs. Désormais, une colonne qui sort de ses pages avec
+moins de 200 valeurs est **relue sur toute la table** : soit elle rend 200 valeurs tirées parmi toutes ses
+distinctes, soit elle les rend toutes, et la mesure devient exacte, sans hasard (`MesureGardee.Toutes`). Sur
+RIG_DEV, 19 colonnes de grandes tables sont ainsi lues en entier ; les autres relues rendent 200 valeurs.
+`DMNED_CODE_ENTITE_DESTINATAIRE` est lue en entier : 82 sur 82, 4 % à chaque passage. Ce que ça coûte : la mesure de RIG_DEV entier passe de 12 s à 32-40 s (6 s au
+plus par colonne relue). Une relecture parcourt toute la table : sur une base dix fois plus grosse que RIG_DEV,
+compter environ dix fois plus (estimation, non mesurée). Le banc le garde : une colonne de grande table jugée sur moins de 200 valeurs doit l'être
+sur toutes ses distinctes, qu'il compte à part (rouge avant la correction : `DMNED_CODE_ENTITE_DESTINATAIRE 9 sur
+82`, et 20 autres colonnes). Six passages de suite du banc sont verts.
 
 ## Les sources V2 vérifiées avant d'écrire
 
@@ -119,16 +133,20 @@ dans un XML, même attribut personnel) : valeur entière, puis chaque mot de 5 c
   banque ou de commune gardé exprès partage un mot avec un nom de client. À sa place, une valeur restée en
   clair est forcément trouvée ; une coïncidence ne peut pas y tomber.
 - **Tirage** : toute la table jusqu'à 50 000 lignes, au-delà des pages au hasard (`TABLESAMPLE`) ; une requête
-  par table. Avant ce choix, le contrôle ne finissait pas en 10 min sur RIG_DEV.
+  par table. Avant ce choix, le contrôle ne finissait pas en 10 min sur RIG_DEV. Pour les colonnes gardées
+  (ci-dessous), une colonne dont les pages rendent moins de 200 valeurs distinctes est relue sur toute la table.
 - **Les colonnes gardées à segment personnel** (refus du 2026-11-21) : le contrôle suit les mêmes règles que la
   copie, donc une règle qui garde à tort une colonne de prénoms lui échappait. Il tire aussi chaque colonne de texte
   **gardée** dont le nom a un segment personnel (segment technique, décision du catalogue ou remplacement
-  `--regles`), jusqu'à 200 valeurs distinctes, et compte celles qui portent un **prénom fréquent de la base**. Le
+  `--regles`), 200 valeurs distinctes tirées au hasard, ou **toutes** si elle en a moins, et compte celles qui
+  portent un **prénom fréquent de la base**. Le
   lexique vient des colonnes dont le nom porte PRENOM(S), **quelle que soit leur règle** ; un mot n'y compte que
   s'il est vu 3 fois dans les prénoms d'au moins **2 autres tables** (mesuré : « SUPPLEANT », « DIRECTEUR »,
   « GRENOBLE » sont saisis dans des prénoms de RIG_DEV, chacun dans une seule ou peu de tables). Au-delà de **35 %**
-  la colonne est rouge : mesuré, les colonnes gardées de RIG_DEV montent à 16 % au plus, les prénoms d'état civil
-  gardés par l'ancienne règle à 83-96 % (53 à 100 % sur l'extrait du banc, dont le lexique est plus petit). Une
+  la colonne est rouge : mesuré le 2026-11-21 (6 passages sur RIG_DEV entier, 3 sur l'extrait), les colonnes
+  gardées de RIG_DEV montent à 14 % au plus, les prénoms d'état civil gardés par l'ancienne règle sont à 80-96 %
+  (55 à 100 % sur l'extrait du banc, dont le lexique est plus petit). D'un passage à l'autre, une colonne jugée sur
+  200 valeurs bouge de 5 points au plus ; une colonne lue en entier ne bouge pas. Une
   colonne rouge se **traite** (`--regles TABLE.COLONNE=Mots`) : la garder ne passe pas le contrôle.
   **Limite** : le lexique voit les prénoms ; une colonne gardée qui ne porterait que des noms de famille
   n'atteindrait pas le seuil.
@@ -139,7 +157,7 @@ dans un XML, même attribut personnel) : valeur entière, puis chaque mot de 5 c
 | Mesure | Résultat |
 |---|---|
 | Inventaire (`inventaire`) | 15 590 colonnes, 1 057 traitées, 1 029 à relire dont 98 gardées (avant la correction du 2026-11-21 : 1 000 traitées, 174 gardées à relire) |
-| Colonnes gardées à segment personnel, mesurées (banc, `MesurerGardeesAsync`) | 15 s : 67 colonnes remplies, 4 683 valeurs, lexique de 2 507 prénoms tirés de 42 colonnes ; la plus haute à 16 % ; avec l'ancienne règle, les prénoms d'état civil à 83-96 % |
+| Colonnes gardées à segment personnel, mesurées (banc, `MesurerGardeesAsync`) | 32 à 40 s : 69 colonnes remplies, 5 254 valeurs, lexique de 2 487 à 2 501 prénoms tirés de 42 colonnes ; 19 colonnes de grandes tables lues en entier ; la plus haute à 14 % ; avec l'ancienne règle, les prénoms d'état civil à 80-96 % |
 | Copie réduite des 860 tables (`--max-lignes 20`) | 83 s, aucune anomalie : 1 893 index, 789 clés étrangères (posées sans vérification : copie réduite), 468 vues, fonctions, procédures et déclencheurs ; 8 modules non refaits parce qu'ils sont cassés dans RIG_DEV même (serveur lié `RIGBD4`, colonnes `*_ID_SSADR` disparues) |
 | Contrôle de cette copie (`controler --echantillon 100`) | 180 s pour les 860 tables : 1 000 colonnes personnelles, 34 236 valeurs et 104 733 mots réels tirés (empreintes), aucun retrouvé ; 29 tables sans clé primaire d'une colonne non tirées (listées). **Limite** : dans une copie réduite à 20 lignes par table, la plupart des lignes tirées n'y sont pas — ce passage prouve la durée et la tenue du contrôle sur le vrai schéma, pas l'absence de fuite (c'est le banc qui la prouve, sur une copie complète de son extrait). Volumes et lignes gardées diffèrent par construction (code 3). |
 | Écritures du serveur sur RIG_DEV pendant la copie | 6 861 285 avant, 6 861 295 après : d'autres sessions écrivent sur RIG_DEV ; l'outil, lui, n'y joue que des SELECT (869 requêtes, toutes par la porte) |
@@ -160,12 +178,13 @@ et copie ligne à ligne. Il mesure aussi RIG_DEV entier (colonnes gardées). Env
 | CA03 | mêmes volumes ; 278 colonnes gardées identiques ligne à ligne ; compteurs d'identité à la même valeur |
 | CA04 | 16 champs libres nommés (XML du journal, destinataires, copie cachée, objet et ligne de commande des traces, corps de courriels, notes, textes de partie, commentaire de facture) : aucune valeur intacte, chacun listé au rapport ; le XML garde sa forme. L'extrait prend exprès des lignes où ils sont remplis ; `EMTRC_REPLY` et `DRGPP_TEXTE_RPPP` restent vides (le second dans tout RIG_DEV) : le banc le dit |
 | CA05 | 406 factures signées au client anonymisé → marque « chaînes invalidées par l'anonymisation » (table, propriété, rapport) ; jumeau : une copie sans ligne signée porte « chaînes intactes » |
-| CA06 | le contrôle ne trouve rien, et ne sort de la source que des empreintes, des clés et des nombres ; il tire aussi les colonnes gardées à segment personnel (aucune à 35 % de prénoms) ; **contre-épreuves rouges** : `CLIEN_NOM` laissé en clair → le contrôle le trouve ; copie **et** contrôle avec l'ancienne règle sur les 9 prénoms d'état civil → aucune fuite par les colonnes traitées, mais le contrôle les trouve gardées (53 à 100 %) ; même chose sur RIG_DEV entier (83-96 %) ; même graine → mêmes valeurs |
+| CA06 | le contrôle ne trouve rien, et ne sort de la source que des empreintes, des clés et des nombres ; il tire aussi les colonnes gardées à segment personnel (aucune à 35 % de prénoms) ; **contre-épreuves rouges** : `CLIEN_NOM` laissé en clair → le contrôle le trouve ; copie **et** contrôle avec l'ancienne règle sur les 9 prénoms d'état civil → aucune fuite par les colonnes traitées, mais le contrôle les trouve gardées (55 à 100 %) ; même chose sur RIG_DEV entier (80-96 %) ; une colonne de grande table jugée sur moins de 200 valeurs l'est sur toutes ses distinctes (`DMNED_CODE_ENTITE_DESTINATAIRE` 82 sur 82) ; même graine → mêmes valeurs |
 | CA07 | aucune écriture sur la source pendant la copie (journal du serveur et empreinte du contenu) ; refus avant connexion d'une copie vers SQL-DEV ; refus de RIG_DEV sans accord, avec l'accord d'une autre base, avec une graine ; jumeau accepté : l'inventaire avec l'accord ; la porte refuse un UPDATE ; refus d'écrire sur la source ou sur une base déjà remplie |
 
 Les corrections faites en route sont gardées par le banc : réinjectées, elles le font rougir
 (alignement des clés retiré : 4 rouges ; extensions longues gardées : 2 rouges ; composé `ETAT_CIVIL` retiré, le
-2026-11-21 : 14 rouges).
+2026-11-21 : 14 rouges ; tirage par pages sans relecture, le même jour : 1 rouge, 21 colonnes jugées sur un tirage
+maigre).
 
 ## Ce qui ne se fait pas depuis ce poste
 

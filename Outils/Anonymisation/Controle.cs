@@ -44,8 +44,9 @@ public sealed class ResultatControle
 /// <summary>
 /// Une colonne gardee a segment personnel, mesuree dans la source : <paramref name="Valeurs"/> valeurs distinctes tirees,
 /// dont <paramref name="AvecPrenom"/> portent un prenom frequent de la base. <paramref name="Raison"/> : pourquoi elle est gardee.
+/// <paramref name="Toutes"/> : ce sont TOUTES les valeurs distinctes de la colonne (mesure exacte, sans hasard).
 /// </summary>
-public sealed record MesureGardee(string Colonne, string Raison, int Valeurs, int AvecPrenom)
+public sealed record MesureGardee(string Colonne, string Raison, int Valeurs, int AvecPrenom, bool Toutes)
 {
     public double Part => Valeurs == 0 ? 0 : (double)AvecPrenom / Valeurs;
     /// <summary>Gardee en clair alors qu'elle porte des prenoms : la regle qui la garde est fausse.</summary>
@@ -89,11 +90,13 @@ public sealed class MesureGardees
 public static class ControleCopie
 {
     /// <summary>
-    /// Part des valeurs a prenom au-dela de laquelle une colonne gardee porte des prenoms. Mesure du 2026-11-21, 200
-    /// valeurs distinctes par colonne, lexique de deux tables : sur RIG_DEV entier (2 507 prenoms), les 67 colonnes que
-    /// les regles gardent montent a 15 % au plus (ENCMT_DESIGNATION_BANQUE) et les prenoms d'etat civil gardes par
-    /// l'ancienne regle a 83-96 % ; sur l'extrait du banc (321 prenoms), ces memes colonnes a 56-100 %. Le seuil passe a
-    /// mi-chemin (20 points de chaque cote) : a 200 valeurs, le hasard du tirage (3 a 4 points) ne le franchit pas.
+    /// Part des valeurs a prenom au-dela de laquelle une colonne gardee porte des prenoms. Mesure du 2026-11-21 apres la
+    /// relecture des colonnes maigres (6 passages sur RIG_DEV entier, 3 sur l'extrait du banc), lexique de deux tables :
+    /// sur RIG_DEV entier (2 487 a 2 501 prenoms), les 69 colonnes que les regles gardent montent a 14 % au plus
+    /// (ENCMT_DESIGNATION_BANQUE) et les prenoms d'etat civil gardes par l'ancienne regle sont a 80-96 % ; sur l'extrait du
+    /// banc (321 prenoms), ces memes colonnes a 55-100 %. Le seuil passe entre les deux (21 points au-dessus, 20 au-dessous).
+    /// Chaque colonne est jugee sur 200 valeurs tirees parmi ses distinctes (5 points au plus d'un passage a l'autre,
+    /// mesure) ou sur TOUTES ses valeurs distinctes si elle en a moins (mesure exacte) : voir <see cref="MesurerGardeesAsync"/>.
     /// Une colonne gardee au-dela se TRAITE (--regles TABLE.COLONNE=Mots) : on prefere abimer un libelle.
     /// </summary>
     public const double PartPrenomsMax = 0.35;
@@ -281,11 +284,13 @@ public static class ControleCopie
     /// LES COLONNES GARDEES A SEGMENT PERSONNEL, MESUREES DANS LA SOURCE (CA06). Pour chaque colonne de texte que
     /// <paramref name="catalogue"/> GARDE et dont le nom a un segment personnel (CatalogueRegles.Marqueur), jusqu'a
     /// <paramref name="echantillon"/> valeurs distinctes tirees au hasard : combien portent un prenom frequent de la base.
+    /// Une colonne qui a moins de <paramref name="echantillon"/> valeurs distinctes est lue EN ENTIER (MesureGardee.Toutes) :
+    /// les pages au hasard d'une grande table ne suffisent pas a la juger (voir plus bas).
     /// Le lexique vient des colonnes de texte dont le nom porte PRENOM ou PRENOMS, QUELLE QUE SOIT leur regle (une regle
     /// fausse ne le vide pas) ; un mot n'y compte que s'il est frequent dans <see cref="TablesLexique"/> autres tables.
     /// Ne sortent de la source que des empreintes salees (sel tire puis oublie), des rangs de tirage et des nombres de lignes.
     /// fix-ok: refus du chef (2026-11-21) -- CA06 ne tirait que les colonnes que les regles traitent, donc jamais celle
-    /// qu'une regle fausse garde ; mesure RIG_DEV : les prenoms d'etat civil gardes portent 79-100 % de prenoms frequents.
+    /// qu'une regle fausse garde ; mesure RIG_DEV : les prenoms d'etat civil gardes portent 80-96 % de prenoms frequents.
     /// </summary>
     public static async Task<MesureGardees> MesurerGardeesAsync(PorteSource src, SchemaSource schema, CatalogueRegles catalogue,
         IReadOnlyCollection<TableSql> tables, int echantillon, CancellationToken ct)
@@ -332,14 +337,25 @@ public static class ControleCopie
                 if (regle.Anonymise) continue;
                 var col = Ddl.Q(c.Nom);
                 var n = volumes.GetValueOrDefault(t.Id); // TableSql.Id = object_id (Schema.cs)
-                var source = n <= GrandeTable ? $"{t.Complet} WITH (NOLOCK)"
-                    : $"{t.Complet} TABLESAMPLE SYSTEM ({Math.Min(100.0, Math.Max(0.001, 100.0 * 50 * echantillon / n)).ToString("0.###", CultureInfo.InvariantCulture)} PERCENT) WITH (NOLOCK)";
-                var valeurs = new Dictionary<string, bool>();
-                await using (var l = await src.LireAsync(
-                    $"SELECT CONVERT(nvarchar(20), x.i), HASHBYTES('SHA2_256', @sel + LTRIM(RTRIM(s.value))) FROM (SELECT TOP (@n) ROW_NUMBER() OVER (ORDER BY NEWID()) AS i, d.v " +
-                    $"FROM (SELECT DISTINCT CONVERT(nvarchar(4000), {col}) AS v FROM {source} WHERE {col} LIKE N'%[A-Za-z]%') d ORDER BY i) x " +
-                    $"OUTER APPLY (SELECT value FROM STRING_SPLIT({Decoupe("UPPER(x.v)")}, N' ') WHERE LEN(value) >= {LongueurPrenom}) s", ct,
-                    PSel(), new SqlParameter("@n", System.Data.SqlDbType.Int) { Value = echantillon }))
+                var parPages = $"{t.Complet} TABLESAMPLE SYSTEM ({Math.Min(100.0, Math.Max(0.001, 100.0 * 50 * echantillon / n)).ToString("0.###", CultureInfo.InvariantCulture)} PERCENT) WITH (NOLOCK)";
+                var entiere = $"{t.Complet} WITH (NOLOCK)";
+                // fix-ok: objection du juge (2026-11-21) -- des pages au hasard d'une grande table ne rendent que les valeurs
+                // FREQUENTES d'une colonne qui en a peu : 4 a 9 des 82 valeurs de DEMANDE_EDITION.DMNED_CODE_ENTITE_DESTINATAIRE
+                // (4 300 504 lignes), et un seul mot a prenom y faisait 12 a 50 % (rouge au hasard). Moins de @n valeurs par pages :
+                // la colonne est relue sur TOUTE la table (6 s au plus par colonne sur RIG_DEV), et la mesure devient exacte.
+                var valeurs = await ValeursAsync(n <= GrandeTable ? entiere : parPages);
+                if (n > GrandeTable && valeurs.Count < echantillon) valeurs = await ValeursAsync(entiere);
+                m.Colonnes.Add(new MesureGardee($"{t.Libelle}.{c.Nom}", regle.Origine, valeurs.Count, valeurs.Values.Count(v => v), valeurs.Count < echantillon));
+
+                // Jusqu'a @n valeurs distinctes tirees au hasard dans « source » : rang de tirage -> porte un prenom frequent.
+                async Task<Dictionary<string, bool>> ValeursAsync(string source)
+                {
+                    var lues = new Dictionary<string, bool>();
+                    await using var l = await src.LireAsync(
+                        $"SELECT CONVERT(nvarchar(20), x.i), HASHBYTES('SHA2_256', @sel + LTRIM(RTRIM(s.value))) FROM (SELECT TOP (@n) ROW_NUMBER() OVER (ORDER BY NEWID()) AS i, d.v " +
+                        $"FROM (SELECT DISTINCT CONVERT(nvarchar(4000), {col}) AS v FROM {source} WHERE {col} LIKE N'%[A-Za-z]%') d ORDER BY i) x " +
+                        $"OUTER APPLY (SELECT value FROM STRING_SPLIT({Decoupe("UPPER(x.v)")}, N' ') WHERE LEN(value) >= {LongueurPrenom}) s", ct,
+                        PSel(), new SqlParameter("@n", System.Data.SqlDbType.Int) { Value = echantillon });
                     while (await l.ReadAsync(ct))
                     {
                         m.GenresLus.Add("nombre");
@@ -351,9 +367,10 @@ public static class ControleCopie
                             prenom = lexique.TryGetValue(Cle(h), out var ou) && ou.Count(x => x != t.Id) >= TablesLexique;
                         }
                         else if (!l.IsDBNull(1)) m.GenresLus.Add("AUTRE"); // NULL : valeur sans mot de 4 lettres
-                        valeurs[rang] = valeurs.GetValueOrDefault(rang) || prenom;
+                        lues[rang] = lues.GetValueOrDefault(rang) || prenom;
                     }
-                m.Colonnes.Add(new MesureGardee($"{t.Libelle}.{c.Nom}", regle.Origine, valeurs.Count, valeurs.Values.Count(v => v)));
+                    return lues;
+                }
             }
         return m;
     }
