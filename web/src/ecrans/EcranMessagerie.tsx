@@ -611,7 +611,7 @@ export function EcranMessagerie() {
             </div>
             <div className="rig-criteres__paire">
               <Saisie libelle="Nom du modèle" valeur={saisie.type} changer={(v) => changer('type', v)} requis taille={40} lecture={saisie.origine !== null} />
-              <Saisie libelle="Libellé écran" valeur={saisie.libelleEcran} changer={(v) => changer('libelleEcran', v)} taille={100} />
+              <Saisie libelle="Libellé écran" valeur={saisie.libelleEcran} changer={(v) => changer('libelleEcran', v)} requis taille={100} />
             </div>
             <Saisie libelle="Sujet" valeur={saisie.sujet} changer={(v) => changer('sujet', v)} requis taille={200} />
             <datalist id="rig-messagerie-boites">

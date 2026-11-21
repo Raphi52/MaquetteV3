@@ -216,6 +216,18 @@ describe('EcranMessagerie', () => {
     expect((bouton('Enregistrer') as HTMLButtonElement).disabled).toBe(true)
   })
 
+  it('« requis » marque les champs que le serveur exige, ceux de la V2 (MetierObligatoire, OPE_EDIT_EMAILMODEL.Designer.cs:103, :115, :172, :191)', async () => {
+    installerFauxPont({
+      'EcranMessagerie.Ouvrir': () => gestionnaire(),
+      'EcranMessagerie.Modele': (t) => apercu(t as string),
+    })
+    render(<EcranMessagerie />)
+    await screen.findByTitle('Aperçu du courriel')
+    const requis = [...document.querySelectorAll('.rig-saisie-champ__requis')]
+      .map((m) => (m.parentElement?.textContent ?? '').replace(/requis$/, ''))
+    expect(requis).toEqual(['Nom du modèle', 'Libellé écran', 'Sujet', 'Expéditeur', 'Texte du modèle'])
+  })
+
   it('un refus du serveur : son motif s\'affiche tel quel, la saisie reste a l\'ecran', async () => {
     installerFauxPont({
       'EcranMessagerie.Ouvrir': () => gestionnaire(),

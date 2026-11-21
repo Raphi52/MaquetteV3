@@ -62,9 +62,12 @@ public static partial class ReglesCourriels
     {
         var erreurs = new List<string>();
         var type = Obligatoire(s.Type, "Le nom du modèle", 40, erreurs);
-        var libelle = Facultatif(s.LibelleEcran, "Le libellé écran", 100, erreurs);
-        // Le sujet peut rester vide, comme la V2 (RIG_DEV : DIVJUD, lu par tests/SocleCourrielsCheck) ; EMAILMOD_SUJET le garde "".
-        var sujet = Facultatif(s.Sujet, "Le sujet", 200, erreurs) ?? "";
+        // Libelle ecran et sujet obligatoires comme la V2 : MetierObligatoire (OPE_EDIT_EMAILMODEL.Designer.cs:191 et :103), refuse a
+        // la validation par Ult.moteur.cs:516. Un modele repris vide (RIG_DEV : DIVJUD sans sujet) se complete a son prochain
+        // enregistrement, comme dans la V2.
+        // fix-ok: Facultatif() laissait passer sujet et libelle vides (tests/SocleCourrielsCheck : 201/201 avant, 400/400 apres).
+        var libelle = Obligatoire(s.LibelleEcran, "Le libellé écran", 100, erreurs);
+        var sujet = Obligatoire(s.Sujet, "Le sujet", 200, erreurs);
         // Le texte garde ses blancs (la V2 l'enregistre tel que saisi) ; il ne peut pas etre vide (EMAILMOD_CORPS NOT NULL).
         var corps = s.Corps ?? "";
         if (corps.Trim().Length == 0) erreurs.Add("Le texte du modèle est obligatoire.");
@@ -83,7 +86,7 @@ public static partial class ReglesCourriels
             erreurs.Add("Le tag $LOGO$ est interdit quand un template est actif (le logo est positionné dans le template).");
 
         if (erreurs.Count > 0) return (null, erreurs);
-        return (new ModeleAEcrire(type!, libelle, sujet, corps, corpsHtmlAvant || corps.Contains("$LOGO$", StringComparison.Ordinal),
+        return (new ModeleAEcrire(type!, libelle, sujet!, corps, corpsHtmlAvant || corps.Contains("$LOGO$", StringComparison.Ordinal),
             expediteur!, reponse, copie, destinataire, s.Lot1, s.Lot2, s.Inscription, s.Comptabilite, s.Lot1 && s.EnvoiAutomatique,
             s.ReserveAmitel, s.SignatureActive, signature, [.. (s.ListesParDefaut ?? []).Distinct()]), erreurs);
     }

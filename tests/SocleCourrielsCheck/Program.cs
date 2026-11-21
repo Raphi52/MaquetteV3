@@ -727,8 +727,12 @@ try
         INSERT INTO soc.RoleFonction (Role, Fonction) VALUES ('BANC', 'GESTEMAIL');
         """, ("@libelle", libelleGestemail ?? "Modèle de mail"));
 
-    // Aucun modele de la V2 ne devient impossible a enregistrer : les regles de saisie de la V3 acceptent les 40 de RIG_DEV.
+    // Aucun modele de la V2 ne devient impossible a enregistrer : les regles de saisie de la V3 acceptent les 40 de RIG_DEV, sauf
+    // un champ que la V2 exige aussi (sujet, libelle ecran : MetierObligatoire, OPE_EDIT_EMAILMODEL.Designer.cs:103 et :191) --
+    // l'agent le complete a l'enregistrement, en V2 comme en V3.
+    string[] exigesParLaV2 = ["Le sujet est obligatoire.", "Le libellé écran est obligatoire."];
     var refusesV2 = new List<string>();
+    var aCompleterV2 = new List<string>();
     await using (var cn = await OuvrirV3A())
     await using (var cmd = new SqlCommand("""
         SELECT Type, LibelleEcran, Sujet, Corps, Expediteur, Reponse, Copie, DestinataireDefaut, Lot1, Lot2, CorpsHtml
@@ -740,12 +744,14 @@ try
             string? T(int i) => r.IsDBNull(i) ? null : r.GetString(i);
             var (ok, erreurs) = ReglesCourriels.ControlerModele(new SaisieModele(r.GetString(0), T(1), r.GetString(2), r.GetString(3), T(4), T(5),
                 T(6), T(7), r.GetBoolean(8), r.GetBoolean(9), false, false, false, false, false, null), r.GetBoolean(10), new HabillageDuGreffe(false, false));
-            if (ok is null) refusesV2.Add($"{r.GetString(0)} : {string.Join(" ", erreurs)}");
+            if (ok is null && erreurs.All(exigesParLaV2.Contains)) aCompleterV2.Add($"{r.GetString(0)} ({string.Join(" ", erreurs)})");
+            else if (ok is null) refusesV2.Add($"{r.GetString(0)} : {string.Join(" ", erreurs)}");
         }
     var nbV2 = await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type NOT LIKE 'BANC[_]%'");
     Exiger(refusesV2.Count == 0 && nbV2 > 0,
         $"SOC-006 T04 : les {nbV2} modeles repris de {sourceV2.InitialCatalog} passent les regles de saisie de la V3 (noms, tailles, adresses et etiquettes) : " +
-        $"aucun ne devient impossible a enregistrer ({refusesV2.Count} refuse(s){(refusesV2.Count > 0 ? ", ex. " + refusesV2[0] : "")})");
+        $"aucun ne devient impossible a enregistrer ({refusesV2.Count} refuse(s){(refusesV2.Count > 0 ? ", ex. " + refusesV2[0] : "")} ; " +
+        $"a completer comme en V2 : {(aCompleterV2.Count == 0 ? "aucun" : string.Join(", ", aCompleterV2))})");
 
     // --- Creation d'un modele par un agent GESTEMAIL ---------------------------------------------------------------
     var gestesAvant = await Gestes();
@@ -778,6 +784,16 @@ try
            && await Gestes() == gestesAvant + 1,
         $"SOC-006 T04 : controle des saisies -- nom deja pris (meme en minuscules), sujet trop long, adresse ou copie invalide, expediteur absent, etiquette " +
         $"de mot de passe : 400 avec le motif, rien n'est ecrit ni journalise (« {Court(invalide.Corps, 140)} »)");
+    // La V2 refuse d'enregistrer sans sujet ni libelle ecran : MetierObligatoire (OPE_EDIT_EMAILMODEL.Designer.cs:103 et :191),
+    // controle a la validation par Ult.moteur.cs:516. La V3 aussi.
+    var sansSujet = await Geste(HttpMethod.Post, modelesGreffe, Agent, Saisie("BANC_SANS_SUJET", sujet: ""));
+    var sansLibelle = await Geste(HttpMethod.Post, modelesGreffe, Agent, Saisie("BANC_SANS_LIBELLE") with { LibelleEcran = null });
+    Exiger(sansSujet.Code == 400 && sansSujet.Corps.Contains("Le sujet est obligatoire")
+           && sansLibelle.Code == 400 && sansLibelle.Corps.Contains("Le libellé écran est obligatoire")
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type IN ('BANC_SANS_SUJET', 'BANC_SANS_LIBELLE')") == 0
+           && await Gestes() == gestesAvant + 1,
+        $"SOC-006 T04 : sujet et libelle ecran obligatoires comme la V2 (OPE_EDIT_EMAILMODEL.Designer.cs:103, :191) -- 400 avec le motif, " +
+        $"rien n'est ecrit ni journalise ({sansSujet.Code} « {Court(sansSujet.Corps, 60)} » / {sansLibelle.Code} « {Court(sansLibelle.Corps, 60)} »)");
 
     // --- Modification ------------------------------------------------------------------------------------------------
     var modifie = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_NEUF"), Agent,
