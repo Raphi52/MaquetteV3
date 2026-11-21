@@ -296,9 +296,11 @@ orphelin ou une ligne sans correspondance (base, tables, comptes) ; elle se ferm
 | Relecture des écarts dans les bases vivantes | Les deux instantanés ne sont pas pris au même instant : une fiche recopiée entre les deux serait un faux écart et une fausse alerte chaque nuit. |
 | Tables V3 qui ne sont pas la table V2 « telle quelle » | Correspondances seulement (UTILISATEUR → `soc.Compte`) : la conversion colonne par colonne est à décrire par la story de la table (T03). |
 
+<!-- fix-ok: deux phrases fausses relevées par le juge et mesurées le 2026-11-21 par RecopieDeuxSensCheck : le contrôle de nuit voyait 2 faux écarts sur l'état de transmission (exclusion annoncée « à faire »), et le journal de la remontée écrivait « non noté par la V2 » pour un client dont la V2 note l'agent. -->
 **À valider / reste** : l'heure 02:00 et la durée de 90 jours (proposées) ; T03 — les colonnes « propres » que la
-recopie du lot 9 ne recopie jamais (état de transmission) devront être exclues du contrôle quand ses règles
-(`ReglesRec002`) seront sur main, sinon elles sortiront en écarts ; CA05 sur les 40 bases de production (pas sur ce
+recopie du lot 9 ne recopie jamais (état de transmission, `RegleRecopie.ColonnesPropres` de `ReglesRec002`) sont
+exclues du contrôle, qui le dit dans le détail de la table (lot 9 ; banc `RecopieDeuxSensCheck`, « REC-006 sur les
+fiches recopiées ») ; CA05 sur les 40 bases de production (pas sur ce
 poste). Mesure du banc : 57 640 lignes de 10 tables en 3,0 s (19 092 lignes/s, relecture comprise), 185 écritures
 d'agents pendant le contrôle, aucune bloquée (la plus longue 27 ms) ; extrapolé aux 16,5 millions de lignes des fiches
 partagées de RIG_DEV : **14 min 22 s**, dans la fenêtre 02 h → 06 h.
@@ -408,7 +410,9 @@ version de la V3 dans les deux bases, et l'écart est montré à un agent désig
    - **la remontée** (`Remontee.cs`) lit le suivi des changements de SQL Server de la base V2 depuis son point de
      reprise (`rec.Remontee`, au départ la version lue par le transfert), dans l'ordre des versions, une fiche visée
      d'abord (CA03), et écrit chaque fiche dans la V3 sous la marque `rigv3.remontee` (le déclencheur de file ne la
-     renvoie pas), au journal des gestes au nom de la recopie (SOC-016 CA06) ; le point avance après le lot.
+     renvoie pas), au journal des gestes au nom de la recopie et du compte V2 d'origine (SOC-016 CA06 : pour un client,
+     le `UTLST_LOGIN` de l'agent que la V2 a noté dans `CLIEN_ID_UTLST` pour ce changement ; sinon « non noté par la
+     V2 ») ; le point avance après le lot.
 3. **Pas d'aller-retour** (REC-002 CA05, REC-003 CA05) : après chaque fiche, les deux bases ont le même état, noté dans
    `rec.EtatLigne`. Un changement de la V2 dont l'état est exactement celui-là est une écriture de la recopie : ignoré.
 4. **Conflit** (REC-004) : si la fiche V2 n'a plus l'état commun au moment d'appliquer un changement de la V3, la V2

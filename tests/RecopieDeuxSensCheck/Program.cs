@@ -575,6 +575,60 @@ Exiger(parJour.Count == ecartsProvoques.Count && ecartsProvoques.All(p => parJou
     $"REC-004 CA05 : rec.EcartsParJour (lue par le controle quotidien, REC-006) donne pour la journee, base {v2.Nom}, le nombre exact d'ecarts provoques par table : " +
     string.Join(", ", parJour.OrderBy(p => p.Key).Select(p => $"{p.Key} {p.Value.Nombre}")));
 
+// SOC-016 CA06 sur la remontee (REC-003) : une ecriture venue de la V2 est au journal de la V3 au nom de la recopie ET du
+// compte V2 d'origine. La V2 note l'agent d'un client (CLIEN_ID_UTLST, ecrit avec la date par Client.Sauve,
+// RigMetier\Facture\Client.cs:522-523) : le journal porte son compte de connexion (UTLST_LOGIN, varchar(35) comme
+// soc.Journal.CompteV2, « le compte jdupont » de SOC-016_gestes.sql). Jumeaux : le client « suite » ci-dessus, change par la
+// V2 sans date ni agent, et le dossier temoin de CA04 (DOSSIER_RCS n'a pas de colonne d'agent) restent « non note par la V2 ».
+var signe = Prendre("CLIENT");
+var agentSigne = (await Lire(v2.Connexion, "SELECT TOP (1) CONVERT(nvarchar(20), UTLST_ID_UTLST), UTLST_LOGIN FROM dbo.UTILISATEUR " +
+                                           $"WHERE UTLST_ID_UTLST <> ISNULL((SELECT CLIEN_ID_UTLST FROM dbo.CLIENT WHERE CLIEN_ID_CLIEN = {signe}), -1) ORDER BY UTLST_ID_UTLST")).Rows[0];
+await Executer(v2.Connexion, $"UPDATE dbo.CLIENT SET [{colClient[0].Nom}] = '{Val(colClient[0], "V2 SIGNE")}', CLIEN_DATE_DERNIERE_MODIF = '2026-11-21T08:45:00', " +
+                             $"CLIEN_ID_UTLST = {agentSigne[0]} WHERE CLIEN_ID_CLIEN = {signe};");
+var p9 = await Passer();
+Task<string?> CompteJournal(string objet) =>
+    Texte(v3.Connexion, $"SELECT TOP (1) CompteV2 FROM soc.Journal WHERE Source = 'recopie-v2' AND Famille = 'fiche-partagee' AND Objet = '{objet}' ORDER BY Id DESC");
+var compteSigne = await CompteJournal($"client {signe}");
+var compteSuite = await CompteJournal($"client {suite}");
+var compteTemoin = await CompteJournal($"dossier RCS {temoinCa04}");
+// Aucun compte d'agent de RIG_DEV n'est affiche, meme en echec : seulement ce qu'il est.
+string Dit(string? compte) => compte switch
+{
+    null => "aucune ligne au journal",
+    "non note par la V2" => "« non note par la V2 »",
+    _ when compte == (string)agentSigne[1] => "le UTLST_LOGIN de l'agent n° " + agentSigne[0],
+    _ => "un compte d'agent",
+};
+Exiger(p9.Erreur is null && p9.Remontees == 1 && p9.Ecarts == 0 && compteSigne == (string)agentSigne[1]
+       && compteSuite == "non note par la V2" && compteTemoin == "non note par la V2",
+    $"SOC-016 CA06 (REC-003) : le client {signe} enregistre dans la V2 par l'agent n° {agentSigne[0]} (date et CLIEN_ID_UTLST) est au journal de la V3 au nom de la recopie et du " +
+    $"compte V2 de cet agent ({Dit(compteSigne)}) ; jumeaux : le client {suite}, change sans date ni agent, {Dit(compteSuite)} ; le dossier {temoinCa04}, sans colonne d'agent, " +
+    $"{Dit(compteTemoin)} {p9.Erreur}");
+
+// REC-006 sur les fiches recopiees : le controle de nuit (ComparaisonBases, lot 8) ne compare pas les colonnes propres a
+// chaque logiciel (RegleRecopie.ColonnesPropres : l'etat de transmission), que la recopie ne copie dans aucun sens. Le
+// dossier temoin de CA04, change par un agent de la V2, y est « M » (a transmettre) et garde son etat dans la V3 : compare,
+// il sortirait en ecart chaque nuit.
+var etatsTemoin = (V2: await EnV2("DOSSIER_RCS", "DSSRC_ETAT_TRANSMISSION", temoinCa04), V3: await EnV3("DOSSIER_RCS", "DSSRC_ETAT_TRANSMISSION", temoinCa04));
+string[] tablesNuit = ["DOSSIER_RCS", "INSCRIPTION"];
+var nuit = await ComparaisonBases.ComparerAsync(new OptionsComparaison(v2.Connexion, v3.Connexion) { Tables = tablesNuit });
+var ecartsNuit = nuit.Details.Where(d => d.Genre == "ecart").ToList();
+var propresComparees = nuit.Tables.Where(t => t.Detail is null || !t.Detail.Contains("propres a chaque logiciel")).Select(t => t.TableV2).ToList();
+// Jumeau : une vraie difference sur une colonne recopiee (ecrite dans la V2, controlee avant le passage de la recopie) reste vue.
+var dossierNuit = Prendre("DOSSIER_RCS");
+await Executer(v2.Connexion, $"UPDATE dbo.DOSSIER_RCS SET [{colDossier.Nom}] = '{Val(colDossier, "NUIT V2")}' WHERE DSSRC_ID_DSRCS = {dossierNuit};");
+var nuitEcart = await ComparaisonBases.ComparerAsync(new OptionsComparaison(v2.Connexion, v3.Connexion) { Tables = tablesNuit });
+var ecartsNuit2 = nuitEcart.Details.Where(d => d.Genre == "ecart").ToList();
+var pNuit = await Passer();
+string Ecarts(IEnumerable<EcartComparaison> l) => string.Join(" ; ", l.Select(e => $"{e.TableV2} {e.IdV2}->{e.IdV3} [{e.Colonnes}]"));
+Exiger(etatsTemoin.V2 == "M" && etatsTemoin.V3 != "M" && nuit.Etat == "fini" && nuit.Ecarts == 0 && propresComparees.Count == 0
+       && nuitEcart.Etat == "fini" && nuitEcart.Ecarts == 1 && ecartsNuit2.Count == 1 && ecartsNuit2[0].IdV2 == dossierNuit && ecartsNuit2[0].Colonnes == colDossier.Nom
+       && pNuit.Erreur is null && pNuit.Remontees == 1,
+    $"REC-006 sur les fiches recopiees : le dossier {temoinCa04} est « {etatsTemoin.V2} » dans la V2 et « {etatsTemoin.V3} » dans la V3 (etat de transmission, jamais recopie) ; " +
+    $"le controle de nuit de {string.Join(" et ", tablesNuit)} ({nuit.Etat}) n'y voit pas d'ecart : {nuit.Ecarts} ecart(s) {Ecarts(ecartsNuit)}" +
+    (propresComparees.Count > 0 ? $" — colonnes propres comparees pour {string.Join(", ", propresComparees)}" : "") +
+    $" ; jumeau : {colDossier.Nom} change dans la V2 sur le dossier {dossierNuit} est vu ({nuitEcart.Ecarts} ecart : {Ecarts(ecartsNuit2)}), puis remonte {pNuit.Erreur}");
+
 // ====================================================================================================
 // B. La vraie boucle du serveur (RecopieContinue) : REC-002 CA01 et REC-003 CA01
 // ====================================================================================================

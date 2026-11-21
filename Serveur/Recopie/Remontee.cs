@@ -147,7 +147,8 @@ internal static class Remontee
                         versV2: false, ct);
                     idV3 = await CreerV3Async(cn, tx, t, c.IdV2, avecPropres, ct);
                     await CorrespondreAsync(cn, tx, t, c.IdV2, idV3, idTransfert, "remontee", ct);
-                    await JournalAsync(cn, tx, t, idV3, "a cree", Lisibles(enV3, t.Colonnes.Select(x => x.Nom)), ct);
+                    await JournalAsync(cn, tx, t, idV3, "a cree", Lisibles(enV3, t.Colonnes.Select(x => x.Nom)), ct,
+                                       compteV2: (await AgentV2Async(cn, tx, t, v2, null, ct))?.Compte);
                     compte.Remontees++;
                 }
                 else
@@ -157,7 +158,8 @@ internal static class Remontee
                     {
                         // v3 lue -> idV3 connu
                         await ModifierV3Async(cn, tx, t, idV3!, enV3, aEcrire, ct);
-                        await JournalAsync(cn, tx, t, idV3!, "a modifie", Lisibles(enV3, aEcrire), ct, Lisibles(v3, aEcrire));
+                        await JournalAsync(cn, tx, t, idV3!, "a modifie", Lisibles(enV3, aEcrire), ct, Lisibles(v3, aEcrire),
+                                           (await AgentV2Async(cn, tx, t, v2, v3, ct))?.Compte);
                         compte.Remontees++;
                     }
                     else compte.Echos++;
@@ -177,9 +179,11 @@ internal static class Remontee
     private static Dictionary<string, string?> Lisibles(LigneJson l, IEnumerable<string> colonnes)
         => colonnes.Where(l.ContainsKey).ToDictionary(c => c, c => LigneJson.Lisible(l[c]));
 
-    /// <summary>Le geste au journal de la V3, au nom de la recopie V2 (SOC-016 CA06). La V2 ne note pas qui modifie ses
-    /// fiches partagees : le compte d'origine est inconnu, et le journal le dit.</summary>
+    /// <summary>Le geste au journal de la V3, au nom de la recopie V2 et du compte V2 d'origine (SOC-016 CA06) : le compte
+    /// de l'agent que la V2 a note sur la fiche pour ce changement (<see cref="EcrituresRecopie.AgentV2Async"/> : un client,
+    /// CLIEN_ID_UTLST). Sinon le compte est inconnu, et le journal le dit : les autres fiches partagees n'ont pas de colonne
+    /// d'agent dans la V2, un changement qui n'a note ni date ni agent ne dit pas qui l'a fait, une suppression n'en laisse rien.</summary>
     private static Task JournalAsync(SqlConnection cn, SqlTransaction tx, TableRecopiee t, string idV3, string verbe, object? apres, CancellationToken ct,
-                                     object? avant = null)
-        => JournalGestes.EcrireRecopieAsync(cn, tx, "non note par la V2", "fiche-partagee", $"{t.Regle.Libelle} {idV3}", idV3, verbe, avant, apres, ct);
+                                     object? avant = null, string? compteV2 = null)
+        => JournalGestes.EcrireRecopieAsync(cn, tx, compteV2 ?? "non note par la V2", "fiche-partagee", $"{t.Regle.Libelle} {idV3}", idV3, verbe, avant, apres, ct);
 }

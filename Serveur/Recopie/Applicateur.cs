@@ -220,10 +220,7 @@ internal static class Applicateur
         // L'auteur cote V2 : l'agent que la V2 note sur la fiche (CLIEN_ID_UTLST d'un client), nomme comme la V2 l'affiche
         // (Utilisateur.NomPrenomAbrege : « NOM Prenom (ABREGE) »). Seulement si le changement de la V2 l'a note -- sa date
         // ou son agent a change depuis l'etat commun ; sinon l'agent de la fiche est celui d'un enregistrement plus ancien.
-        object auteurV2 = DBNull.Value;
-        if (Valeur(t.Regle.ColonneAuteurV2, v2) is { Length: > 0 } agent && (dateV2 is not DBNull || Valeur(t.Regle.ColonneAuteurV2, reference) != agent))
-            auteurV2 = (object?)await ScalaireAsync(cn, tx, "SELECT CONCAT(UTLST_NOM, ' ', UTLST_PRENOM, ' (', UTLST_ABREGE, ')') " +
-                                                            $"FROM {Sql.Q(t.BaseV2)}.dbo.UTILISATEUR WHERE UTLST_ID_UTLST = @u;", ct, ("@u", agent)) ?? DBNull.Value;
+        object auteurV2 = await AgentV2Async(cn, tx, t, v2, reference, ct) is { } agentV2 ? agentV2.Nom : DBNull.Value;
         var id = long.Parse((await ScalaireAsync(cn, tx, """
             INSERT INTO rec.Ecart (BaseV2, TableV2, IdV2, TableV3, IdV3, Fiche, Cible, DateV2, AuteurV2, DateV3, AuteurV3)
             OUTPUT CONVERT(nvarchar(20), inserted.Id) VALUES (@b, @t2, @id2, @t3, @id3, LEFT(@f, 300), @c, ISNULL(CONVERT(datetime2(3), @d2), SYSDATETIME()), LEFT(@a2, 128), @d3, LEFT(@a3, 128));

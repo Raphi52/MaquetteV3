@@ -1,3 +1,6 @@
+// fix-ok: le journal de la remontee ecrivait « non note par la V2 » pour un client dont la V2 note l'agent (CLIEN_ID_UTLST) --
+// mesure le 2026-11-21 par RecopieDeuxSensCheck (SOC-016 CA06 rouge : client 578508 enregistre par l'agent n° 1, CompteV2
+// « non note par la V2 ») ; l'agent se lit desormais ici (AgentV2Async), pour l'ecart (Applicateur) comme pour le journal (Remontee).
 using System.Data;
 using Microsoft.Data.SqlClient;
 
@@ -188,6 +191,27 @@ internal static class EcrituresRecopie
     public static async Task RetirerMarqueAsync(SqlConnection cn)
     {
         if (cn.State == ConnectionState.Open) await ExecuterAsync(cn, null, RetraitMarque, CancellationToken.None);
+    }
+
+    // --- l'agent de la V2 --------------------------------------------------------------------------------------------
+
+    /// <summary>L'agent V2 qui a enregistre le changement <paramref name="v2"/> d'une fiche (REC-004 CA01, SOC-016 CA06) :
+    /// celui que la V2 note sur la fiche (<see cref="RegleRecopie.ColonneAuteurV2"/> : CLIEN_ID_UTLST d'un client, ecrit avec
+    /// la date par Client.Sauve), seulement si ce changement l'a note -- sa date ou son agent differe de <paramref name="avant"/>
+    /// (null : fiche neuve). Sinon l'agent de la fiche est celui d'un enregistrement plus ancien : null, « non note ».
+    /// Nom : tel que la fiche client de la V2 l'affiche (Utilisateur.NomPrenomAbrege, « NOM Prenom (ABREGE) ») ; Compte : son
+    /// compte de connexion (UTLST_LOGIN, varchar(35) comme soc.Journal.CompteV2).</summary>
+    public static async Task<(string Nom, string Compte)?> AgentV2Async(SqlConnection cn, SqlTransaction? tx, TableRecopiee t, LigneJson? v2, LigneJson? avant,
+                                                                        CancellationToken ct)
+    {
+        static string? Valeur(string? colonne, LigneJson? l) => colonne is not null && l is not null && l.TryGetValue(colonne, out var b) ? LigneJson.Lisible(b)?.Trim() : null;
+        if (Valeur(t.Regle.ColonneAuteurV2, v2) is not { Length: > 0 } agent) return null;
+        if (avant is not null && Valeur(t.Regle.ColonneDateV2, v2) == Valeur(t.Regle.ColonneDateV2, avant) && Valeur(t.Regle.ColonneAuteurV2, avant) == agent) return null;
+        await using var cmd = new SqlCommand("SELECT CONCAT(UTLST_NOM, ' ', UTLST_PRENOM, ' (', UTLST_ABREGE, ')'), UTLST_LOGIN " +
+                                             $"FROM {Sql.Q(t.BaseV2)}.dbo.UTILISATEUR WHERE UTLST_ID_UTLST = @u;", cn, tx) { CommandTimeout = 120 };
+        cmd.Parameters.Add(Parametre("@u", agent));
+        await using var l = await cmd.ExecuteReaderAsync(ct);
+        return await l.ReadAsync(ct) ? (l.GetString(0), l.GetString(1)) : null;
     }
 
     // --- bas niveau ------------------------------------------------------------------------------------------------

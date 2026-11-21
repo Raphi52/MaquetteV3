@@ -293,7 +293,7 @@ Exiger(codeC == 0 && (string)comparaisonC[0] == "fini" && tqComparees.Count == 9
     $"({string.Join(", ", tqComparees.Select(r => $"{r[0]} {r[4]}/{r[2]}"))}), UTILISATEUR -> soc.Compte par ses {utilisateurC?[4]} correspondances ; " +
     $"etats figes {comparaisonC[6]} et {comparaisonC[7]}, supprimes a la fin");
 Reste("REC-006 T03 : UTILISATEUR (porte par la reprise des comptes, SOC-002) n'a que ses correspondances controlees : la conversion de ses colonnes vers soc.Compte est a decrire " +
-      "par sa story ; les tables recopiees par le lot 9 (ReglesRec002) declareront leurs colonnes propres, que le controle devra ignorer");
+      "par sa story (les colonnes propres des tables recopiees par le lot 9, ReglesRec002, sont ecartees du controle : RecopieDeuxSensCheck)");
 
 // CA02 : un ecart introduit EXPRES de chaque cote, sans passer par la capture.
 var clientEcart = await Nombre(v2.Connexion, "SELECT MAX(CLIEN_ID_CLIEN) FROM dbo.CLIENT");
