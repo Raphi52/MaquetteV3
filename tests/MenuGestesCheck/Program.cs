@@ -184,8 +184,12 @@ foreach (var (libelle, code) in toutesEntrees)
 // PROC_UTILISATEUR (« Comptes des agents », lot 3 de la reconstruction) n'a pas
 // de fiche mais un dossier de sources : Source\Outils\Exe\Processus\PROC_UTILISATEUR
 // (FORM_UTILISATEUR, OPE_EDITION_UTILISATEUR, processus GUTILI de MODELE_PROCESSUS).
+// PROC_COMPTEURS_NUM (« Compteurs de numeros ») est l'ecran de reattribution
+// d'un numero de NUM-004 T04. Il reprend XNUMERO de la V2 (« Reattribution de
+// numero metier », procedure VB6 du menu), qui n'a ni fiche ni source ici.
 var sansFiche = new[] { "PROC_LISTE_DELIBERES", "PROC_SUIVI_IMPRESSION", "PROC_REQUI",
-                        "PROC_ACTUALITES", "PROC_COMMANDES_WEB", "PROC_UTILISATEUR" };
+                        "PROC_ACTUALITES", "PROC_COMMANDES_WEB", "PROC_UTILISATEUR",
+                        "PROC_COMPTEURS_NUM" };
 
 var fiches = @"D:\RigApplication\Documentation\reference\proc";
 

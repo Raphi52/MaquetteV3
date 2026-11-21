@@ -367,13 +367,17 @@ foreach (var code in codesMenu)
 // pas de procedure a citer : il doit alors le DIRE, faute de quoi la regle
 // exigerait un code invente. EcranNonMaquette.tsx en est exempt : il ne vient
 // d aucune procedure, il NOMME celle qui n a pas d ecran (porte au lot 5, 18/11/2026).
+// Une procedure v2 du menu n a pas toujours de classe PROC_ : celles de type PROCVB6
+// de PROCESSUS_ET_FONCTIONALITE (XNUMERO, LNUMCM...) se citent par leur code, sous la
+// forme « Procedure RIG v2 : XNUMERO » (EcranCompteurs.tsx, 21/11/2026) ; un PROC_
+// invente pour passer la regle aurait fait croire a une classe v2 qui n existe pas.
 var ecransPortes = fichiersTsx.Where(f => Regex.IsMatch(Path.GetFileName(f), @"^Ecran\w*\.tsx$")).ToArray();
 Exiger(ecransPortes.Length >= 37, $"les ecrans React sont tous lus ({ecransPortes.Length})");
 foreach (var fichier in ecransPortes)
 {
     var nom = Path.GetFileName(fichier);
     if (nom == "EcranNonMaquette.tsx") continue;
-    Exiger(Regex.IsMatch(File.ReadAllText(fichier), @"(PROC_[A-Z_]+|BODACC|Sans origine RIG v2)"),
+    Exiger(Regex.IsMatch(File.ReadAllText(fichier), @"(PROC_[A-Z_]+|BODACC|Sans origine RIG v2|Procedure RIG v2 : [A-Z][A-Z0-9_]{2,})"),
         $"{nom} nomme la procedure RIG v2 dont il est porte, ou dit qu il n en a pas");
 }
 

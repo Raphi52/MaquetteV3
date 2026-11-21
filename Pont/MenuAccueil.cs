@@ -293,7 +293,8 @@ public static class MenuAccueil
                 new("Natures de document",    "typologie de la GED",                "PROC_GED_NATURE_DOC"),
                 new("Cabinets",               "les salles d'audience",              "PROC_CABINET"),
                 new("Codes chefs IP",         "parametrage des injonctions",        "PROC_PARAM_IP"),
-                new("Bornes d'accueil",       "les kiosques KBIS",                  "PROC_BORNE")
+                new("Bornes d'accueil",       "les kiosques KBIS",                  "PROC_BORNE"),
+                new("Compteurs de numeros",   "rendre un numero donne par erreur",  "PROC_COMPTEURS_NUM")
             ]),
             new("Modeles et envois",
             [

@@ -13,6 +13,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <!-- L'ecran « Compteurs de numéros » et son client, joues contre le vrai serveur en memoire. -->
+    <Compile Include="../../Pont/ClientServeur.cs" Link="Pont/ClientServeur.cs" />
+    <Compile Include="../../Pont/JSInvokable.cs" Link="Pont/JSInvokable.cs" />
+    <Compile Include="../../Pont/EcranCompteurs.cs" Link="Pont/EcranCompteurs.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />

@@ -34,6 +34,7 @@ import { EcranCoffreFort } from '../ecrans/EcranCoffreFort'
 import { EcranCommandesWeb } from '../ecrans/EcranCommandesWeb'
 import { EcranComptabilisation } from '../ecrans/EcranComptabilisation'
 import { EcranComptes } from '../ecrans/EcranComptes'
+import { EcranCompteurs } from '../ecrans/EcranCompteurs'
 import { EcranConsultationJud } from '../ecrans/EcranConsultationJud'
 import { EcranControleVidiged } from '../ecrans/EcranControleVidiged'
 import { EcranCourriersDivers } from '../ecrans/EcranCourriersDivers'
@@ -177,6 +178,11 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
       // Ecran NEUF de la V3 (« a maquetter », SOC-002/004/005/016) : les comptes des agents, leurs roles et
       // les journaux, servis par la partie serveur (sans RIGV3_SERVEUR : la demonstration, en lecture).
       return <EcranComptes />
+
+    case 'PROC_COMPTEURS_NUM':
+      // Ecran NEUF de la V3 (« a maquetter », NUM-004 T04) : les compteurs de la base du greffe et la
+      // reattribution d'un numero donne par erreur (sans RIGV3_SERVEUR : la demonstration, en lecture).
+      return <EcranCompteurs />
 
     case 'PROC_GESTEMAIL':
       return <EcranMessagerie />

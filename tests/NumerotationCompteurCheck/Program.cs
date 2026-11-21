@@ -19,6 +19,7 @@ using RigV3.Serveur;
 using RigV3.Serveur.Numerotation.Compteur;
 using RigV3.Serveur.Socle.Greffes;
 using RigV3.Serveur.Socle.Identite;
+using RigV3Desktop.Pont;
 
 // Banc du COMPTEUR CENTRAL DES NUMEROS (lot 5 du plan de reconstruction, 2026-11-20).
 // Stories NUM-001 (tenir les compteurs dans la base V3), NUM-004 (rendre un numero pour qu'il soit
@@ -882,6 +883,47 @@ var bSurB = await Jouer(GreffeB, AgentB);
 Exiger(bSurB.Codes.All(c => c == 200) && comptesCommune == 0,
     $"Raccord (3) (jumeau) : {AgentB} est servi sur SON greffe ({Codes(bSurB.Codes)}) ; la base commune n'a aucun compte d'agent " +
     $"({comptesCommune}) : chaque admission vient de la base du greffe de l'adresse");
+
+// --- L'ecran « Compteurs de numéros » (Pont/EcranCompteurs.cs, NUM-004 CA10) sur le vrai serveur : -------
+// --- le meme client que l'app (ClientServeur, en-tete RIGV3_COMPTE pose a sa construction). ----------------
+ClientServeur ClientEcran(string compte)
+{
+    Environment.SetEnvironmentVariable(ClientServeur.VariableCompte, compte);
+    try { return new ClientServeur(new Uri("http://localhost/"), app.GetTestServer().CreateHandler()); }
+    finally { Environment.SetEnvironmentVariable(ClientServeur.VariableCompte, null); }
+}
+var ecranA = ClientEcran(AgentA);
+var ecranLus = await http.GetFromJsonAsync<CompteurNumeros[]>(compteursA, json) ?? [];
+var vueA = await EcranCompteurs.OuvrirAsync(ecranA, GreffeA);
+Exiger(vueA is { Mode: "serveur", Greffe: GreffeA } && vueA.Compteurs.Length == ecranLus.Length && vueA.Compteurs.Length > 0,
+    $"Ecran NUM-001 CA01 : l'ecran lit les compteurs du greffe {GreffeA} par la route ({vueA.Mode}, {vueA.Compteurs.Length} compteurs, route : {ecranLus.Length})");
+var sansGreffe = await EcranCompteurs.OuvrirAsync(ecranA, null);
+Exiger(sansGreffe is { Mode: "sans-greffe", Echec: true, Compteurs.Length: 0 },
+    $"Ecran : branche au serveur sans greffe ouvert, il le dit et ne devine aucun greffe ({sansGreffe.Mode} : {sansGreffe.Message})");
+var ecranDonne = await V3("JPC", 2026);
+var jpcAvant = vueA.Compteurs.Where(c => c.Type == "JPC" && c.Annee == 2026).Sum(c => c.NumerosRendus);
+var apresRendu = await EcranCompteurs.RendreAsync(ecranA, GreffeA, new DemandeRestitution("JPC", ecranDonne.Numero!, "acte annulé (écran des compteurs)"));
+var jpcApres = apresRendu.Compteurs.Where(c => c.Type == "JPC" && c.Annee == 2026).Sum(c => c.NumerosRendus);
+Exiger(apresRendu is { Mode: "serveur", Echec: false } && apresRendu.Message!.Contains(ecranDonne.Numero!) && apresRendu.Message.Contains("sera redonné") && jpcApres == jpcAvant + 1,
+    $"Ecran NUM-004 CA10 : {ecranDonne.Numero} rendu depuis l'ecran -> « {apresRendu.Message} », numeros rendus JPC 2026 {jpcAvant} -> {jpcApres}");
+var ecranRedonneApres = await V3("JPC", 2026);
+Exiger(ecranRedonneApres.Numero == ecranDonne.Numero,
+    $"Ecran NUM-004 CA10 : memes regles qu'un programme -- le numero rendu par l'ecran est redonne au prochain acte ({ecranRedonneApres.Numero})");
+var ecranJamais = ecranDonne.Numero![..^4] + ((ecranDonne.Chrono ?? 0) + 500).ToString("D4");
+var refusEcran = await EcranCompteurs.RendreAsync(ecranA, GreffeA, new DemandeRestitution("JPC", ecranJamais, "essai"));
+Exiger(refusEcran is { Echec: true } && refusEcran.Message!.Contains("refusée") && !refusEcran.Message.Contains("{"),
+    $"Ecran NUM-004 CA09 : {ecranJamais}, jamais donne, est refuse et l'ecran le montre en refus (« {refusEcran.Message} »)");
+var vueBSurA = await EcranCompteurs.OuvrirAsync(ClientEcran(AgentB), GreffeA);
+Exiger(vueBSurA is { Mode: "refuse", Compteurs.Length: 0 },
+    $"Ecran : l'agent du greffe B sur le greffe A recoit le refus, sans compteur ({vueBSurA.Mode} : {vueBSurA.Message})");
+var ecranAbsent = await EcranCompteurs.OuvrirAsync(ecranA, GreffeAbsent);
+var ecranMuet = await EcranCompteurs.OuvrirAsync(ecranA, GreffeMuet);
+Exiger(ecranAbsent is { Mode: "erreur" } && ecranAbsent.Message!.Contains("pas au catalogue") && ecranMuet is { Mode: "erreur" } && ecranMuet.Message!.Contains("ne répond pas") && !ecranMuet.Message.Contains("{"),
+    $"Ecran : greffe absent du catalogue -> « {ecranAbsent.Message} » ; base muette -> « {ecranMuet.Message} »");
+var ecranDemo = await EcranCompteurs.OuvrirAsync(null, null);
+var ecranDemoRendu = await EcranCompteurs.RendreAsync(null, null, new DemandeRestitution("JPC", "2026RJ0012", "essai"));
+Exiger(ecranDemo is { Mode: "demo", Greffe: null } && ecranDemo.Compteurs.Length > 0 && ecranDemoRendu is { Mode: "demo", Echec: true },
+    $"Ecran : sans RIGV3_SERVEUR, des compteurs de demonstration ({ecranDemo.Compteurs.Length}) en lecture seule (« {ecranDemoRendu.Message} »)");
 
 // CA07 : copie anonymisee d'une vraie base de greffe, resultats archives avec le rapport de la beta.
 var cheminRapport = Path.Combine(AppContext.BaseDirectory, "numerotation-charge.json");

@@ -172,6 +172,26 @@ Pour un banc ou un essai : une ligne `soc.Greffe` dans la base commune (serveur,
 `Greffes:Authentification` (la façon de se connecter aux instances, sans serveur ni base) et le compte de
 l'agent dans `soc.Compte` de la base **du greffe** (modèle : `tests\NumerotationCompteurCheck\Program.cs`).
 
+## L'écran « Compteurs de numéros » (2026-11-21, fil chef conv-2052)
+
+Menu **Configurer › Référentiels › Compteurs de numeros** (code `PROC_COMPTEURS_NUM`), aussi trouvé par la
+recherche (« compteurs »). Il reprend la procédure de menu **`XNUMERO`** de la V2, « Reattribution de numero
+metier » (PROCVB6, ouverte aux rôles RCSNIV03 et RCSNIV05 sur RIG_DEV : `PROCESSUS_ET_FONCTIONALITE`,
+`HABILIT_ROLE_USER_PROCESSUS`, lus le 21/11) ; ses sources VB6 ne sont pas dans le dépôt de la V2.
+
+| Partie | Ce que montre l'écran | Où |
+|---|---|---|
+| Compteurs (NUM-001 CA01) | une ligne par série, année et jour : libellé, dernier chrono, « Redonnés » / « n en attente » / « Non redonnés », date du dernier numéro ; recherche par série ou libellé | `web\src\ecrans\EcranCompteurs.tsx`, route `GET /numerotation/{greffe}/compteurs` |
+| Rendre un numéro (NUM-004 CA10) | série, numéro, explication obligatoire ; année demandée seulement si le format de la série ne la porte pas (CA07) ; au-delà de 50 caractères, l'écran dit que la V2 n'en recevra que le début (CA08) ; la phrase du serveur s'affiche telle quelle (rendu, non redonnable, déjà rendu, refus) | `Pont\EcranCompteurs.cs`, route `POST /numerotation/{greffe}/restitutions` |
+| Sans `RIGV3_SERVEUR` | 9 compteurs de démonstration (libellés et chronos de RIG_DEV, 21/11), lecture seule | `Pont\EcranCompteurs.cs` |
+| Branchée sans greffe ouvert | « Aucun greffe ouvert », aucun compteur : l'écran ne devine pas de greffe | idem |
+
+Preuves : `web\src\ecrans\EcranCompteurs.test.tsx` (8 tests) ; dans `tests\NumerotationCompteurCheck`, la partie
+« Ecran » joue `Pont\EcranCompteurs.cs` par le vrai `ClientServeur` contre le serveur en mémoire : lecture des
+51 compteurs du greffe A, numéro rendu puis redonné, numéro jamais donné refusé, agent du greffe B refusé,
+greffe absent (404) et base muette (503) en phrase lisible, démonstration. Captures : bureau caché, thèmes clair
+et sombre (application de la copie de travail, démonstration).
+
 ## Comment la simultanéité est tenue (NUM-001 CA02, NUM-008)
 
 1. Chaque compteur (série, année, jour), **qu'il existe ou non**, a un verrou applicatif
@@ -218,9 +238,8 @@ le numéro réel est `2026RJ0012`, c'est lui que le banc joue.
 
 | Reste | Raison | Qui |
 |---|---|---|
-| **L'écran choisit son greffe** : l'app (`Pont\`) n'appelle encore aucune route du compteur ; quand elle le fera, elle passera le code de son greffe (`RoutesCompteur.Pour`) | le choix du greffe à l'ouverture (fenêtre de connexion de la V2, `RigFormLogin`) n'a pas encore d'écran ; voir `socle-identite.md` | phase des écrans |
-| NUM-004 CA10 / T04 / T08 : l'écran de réattribution, réservé au responsable | il attend les droits (SOC-002, lot 3) ; la route qu'il appellera est prouvée (mêmes règles que le programme) | phase des écrans, après le lot 3 |
-| Écrans « à maquetter » de NUM-001 (liste des compteurs) et NUM-004 | hors de la liste de fichiers de ce lot (aucun `web\src\ecrans`) ; les routes et contrats sont prêts | plan suivant |
+| **L'écran choisit son greffe** : `Pont\EcranCompteurs.cs` passe encore `null` comme greffe (`Ouvrir`, `Rendre`) ; branchée au serveur, l'écran dit donc « Aucun greffe ouvert » | le choix du greffe à l'ouverture (fenêtre de connexion de la V2, `RigFormLogin`) est le lot 10 ; il y passera le greffe de la session | lot 10 |
+| NUM-004 T04 / T08 : la réattribution **réservée** aux détenteurs de `XNUMERO` (rôles RCSNIV03, RCSNIV05 de la V2), et son essai avec un agent sans le droit | la route de restitution n'exige encore qu'un agent admis ; le droit se vérifie par `ServiceDroits`, que le lot 9 raccorde en ce moment à la base du greffe | après le lot 9 |
 | NUM-001 T05, NUM-004 T05 : reprise des lignes de la V2 | story NUM-005 | lot 6 |
 | NUM-004 T02 : nouveau corps de `RESTITUER_NUMERO` ; NUM-008 « sessions V2 par les programmes remplacés » | les programmes V2 remplacés sont le lot 7 ; ici, une session V2 appelle `num.Attribuer`/`num.Restituer` en SQL avec `@Logiciel = 'V2'`, ce que feront ces programmes. Le lot 7 rejoue la charge avec ses vrais programmes (`NumerotationV2Check`). | lot 7 |
 | NUM-008 CA07 : rejouer la charge sur une copie anonymisée d'une base de greffe, archiver avec le rapport de la bêta (SOC-022) | aucune copie anonymisée sur ce poste ; le banc écrit déjà son relevé (`numerotation-charge.json` à côté du banc) | avant la bêta |
