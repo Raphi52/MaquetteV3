@@ -11,7 +11,7 @@ Story du carnet `C:\Users\raphael.vilain\Documents\Autowin\refonte-rig\carnet\so
 | Les valeurs fictives (permutation à clé, mot par mot) | `Outils\Anonymisation\Pseudonymes.cs`, `Anonymiseur.cs` |
 | La copie : schéma, données, index, clés, contraintes, vues et procédures, marque, rapport | `Outils\Anonymisation\Copie.cs`, `Schema.cs`, `Rapport.cs`, `PorteSource.cs` |
 | Le contrôle automatique d'une copie (CA06) | `Outils\Anonymisation\Controle.cs` ; commande `controler` |
-| Le banc | `tests\SocleAnonymisationCheck` — **`.\tests.ps1 SocleAnonymisation`** (71 contrôles, chacun cite son CA) |
+| Les bancs | `tests\SocleAnonymisationCheck` (la copie et son contrôle) et `tests\SocleAnonymisationTirageCheck` (le tirage du contrôle) — **`.\tests.ps1 SocleAnonymisation`** lance les deux ; chaque contrôle cite son CA |
 
 Pour la suite : REC-008 (répétitions du transfert) part d'une copie faite par cet outil. Elle se reconnaît à
 `anonymisation.Copie` et à la propriété de base `RIGV3_ANONYMISATION` (décision notée au plan).
@@ -79,9 +79,12 @@ distinctes, soit elle les rend toutes, et la mesure devient exacte, sans hasard 
 RIG_DEV, 19 colonnes de grandes tables sont ainsi lues en entier ; les autres relues rendent 200 valeurs.
 `DMNED_CODE_ENTITE_DESTINATAIRE` est lue en entier : 82 sur 82, 4 % à chaque passage. Ce que ça coûte : la mesure de RIG_DEV entier passe de 12 s à 32-44 s (6 s au
 plus par colonne relue). Une relecture parcourt toute la table : sur une base dix fois plus grosse que RIG_DEV,
-compter environ dix fois plus (estimation, non mesurée). Le banc le garde : une colonne de grande table jugée sur moins de 200 valeurs doit l'être
-sur toutes ses distinctes, qu'il compte à part (rouge avant la correction : `DMNED_CODE_ENTITE_DESTINATAIRE 9 sur
-82`, et 20 autres colonnes). Six passages de suite du banc sont verts.
+compter environ dix fois plus (estimation, non mesurée). Le banc `tests\SocleAnonymisationTirageCheck` le garde :
+une colonne de grande table jugée sur moins de 200 valeurs doit l'être sur toutes ses distinctes, qu'il compte à
+part. L'entrée qui le fait rougir si la correction est fausse : `DMNED_CODE_ENTITE_DESTINATAIRE`. Sans la
+relecture en entier, il rend 1 (`DMNED_CODE_ENTITE_DESTINATAIRE 7 sur 82`, 19 colonnes jugées sur un tirage
+maigre) ; avec, il rend 0 (82 sur 82). Son jumeau : une colonne qui a 200 valeurs ou plus reste jugée sur 200
+valeurs tirées, sans relire la table.
 
 ## Les sources V2 vérifiées avant d'écrire
 
@@ -171,6 +174,14 @@ d'état civil de chacune des 7 tables du refus et 1 500 noms de fichiers de `CRE
 V2 jetable avec les vraies clés étrangères de RIG_DEV (11, vérifiées), la copie avec l'outil, puis compare source
 et copie ligne à ligne. Il mesure aussi RIG_DEV entier (colonnes gardées). Environ 2 min 30.
 
+Ses commentaires gardent les mesures de son premier passage, faites avant la relecture des colonnes maigres
+(par exemple « 79-100 % ») : ce fichier est figé tel que la relecture l'a relu. Les chiffres qui font foi sont
+ceux de cette page.
+
+Le second banc, `tests\SocleAnonymisationTirageCheck`, lit RIG_DEV en lecture seule et n'écrit nulle part. Il
+mesure les colonnes gardées des 151 tables de plus de 50 000 lignes, puis compte à part les valeurs distinctes de
+chaque colonne jugée sur moins de 200 valeurs (27 colonnes, vides comprises). Environ 50 s.
+
 | Critère | Contrôle |
 |---|---|
 | CA01 | 33 colonnes (noms, prénoms — dont les 8 prénoms d'état civil du refus —, naissances, adresses, courriels, téléphones, noms de fichiers) : aucune valeur restée, même longueur, même forme, @ et extension, indicatif, extension de fichier ; mots de passe vides ; 29 règles mesurées sur RIG_DEV vérifiées au point d'appel, avec leurs jumeaux gardés ; sur RIG_DEV entier, aucune colonne gardée ne porte de prénoms ; et les valeurs fictives elles-mêmes (bijection sans point fixe sur tous les mots de 2 lettres, casse, accents, dates, téléphones, fichiers) |
@@ -178,13 +189,13 @@ et copie ligne à ligne. Il mesure aussi RIG_DEV entier (colonnes gardées). Env
 | CA03 | mêmes volumes ; 278 colonnes gardées identiques ligne à ligne ; compteurs d'identité à la même valeur |
 | CA04 | 16 champs libres nommés (XML du journal, destinataires, copie cachée, objet et ligne de commande des traces, corps de courriels, notes, textes de partie, commentaire de facture) : aucune valeur intacte, chacun listé au rapport ; le XML garde sa forme. L'extrait prend exprès des lignes où ils sont remplis ; `EMTRC_REPLY` et `DRGPP_TEXTE_RPPP` restent vides (le second dans tout RIG_DEV) : le banc le dit |
 | CA05 | 406 factures signées au client anonymisé → marque « chaînes invalidées par l'anonymisation » (table, propriété, rapport) ; jumeau : une copie sans ligne signée porte « chaînes intactes » |
-| CA06 | le contrôle ne trouve rien, et ne sort de la source que des empreintes, des clés et des nombres ; il tire aussi les colonnes gardées à segment personnel (aucune à 35 % de prénoms) ; **contre-épreuves rouges** : `CLIEN_NOM` laissé en clair → le contrôle le trouve ; copie **et** contrôle avec l'ancienne règle sur les 9 prénoms d'état civil → aucune fuite par les colonnes traitées, mais le contrôle les trouve gardées (52 à 100 %) ; même chose sur RIG_DEV entier (80-96 %) ; une colonne de grande table jugée sur moins de 200 valeurs l'est sur toutes ses distinctes (`DMNED_CODE_ENTITE_DESTINATAIRE` 82 sur 82) ; même graine → mêmes valeurs |
+| CA06 | le contrôle ne trouve rien, et ne sort de la source que des empreintes, des clés et des nombres ; il tire aussi les colonnes gardées à segment personnel (aucune à 35 % de prénoms) ; **contre-épreuves rouges** : `CLIEN_NOM` laissé en clair → le contrôle le trouve ; copie **et** contrôle avec l'ancienne règle sur les 9 prénoms d'état civil → aucune fuite par les colonnes traitées, mais le contrôle les trouve gardées (52 à 100 %) ; même chose sur RIG_DEV entier (80-96 %) ; même graine → mêmes valeurs. Second banc : une colonne de grande table jugée sur moins de 200 valeurs l'est sur toutes ses distinctes (`DMNED_CODE_ENTITE_DESTINATAIRE` 82 sur 82), et une colonne qui en a 200 ou plus reste tirée |
 | CA07 | aucune écriture sur la source pendant la copie (journal du serveur et empreinte du contenu) ; refus avant connexion d'une copie vers SQL-DEV ; refus de RIG_DEV sans accord, avec l'accord d'une autre base, avec une graine ; jumeau accepté : l'inventaire avec l'accord ; la porte refuse un UPDATE ; refus d'écrire sur la source ou sur une base déjà remplie |
 
 Les corrections faites en route sont gardées par le banc : réinjectées, elles le font rougir
 (alignement des clés retiré : 4 rouges ; extensions longues gardées : 2 rouges ; composé `ETAT_CIVIL` retiré, le
-2026-11-21 : 14 rouges ; tirage par pages sans relecture, le même jour : 1 rouge, 21 colonnes jugées sur un tirage
-maigre).
+2026-11-21 : 14 rouges ; tirage par pages sans relecture, le même jour : 2 rouges au second banc, 19 colonnes
+jugées sur un tirage maigre).
 
 ## Ce qui ne se fait pas depuis ce poste
 

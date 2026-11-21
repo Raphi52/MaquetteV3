@@ -102,7 +102,7 @@ using (var p = Pseudonymes.DepuisGraine("banc"))
     var cat = new CatalogueRegles();
     var attendues = new (string Table, string Colonne, string Type, string Traitement, string Pourquoi)[]
     {
-        // Prenoms d'etat civil : 80 a 96 % des valeurs tirees portent un prenom de la base (mesure RIG_DEV).
+        // Prenoms d'etat civil : 89 a 99 % des valeurs tirees portent un prenom de la base (mesure RIG_DEV).
         ("CASIER_JUDICIAIRE", "CSRJD_PRENOMS_ETAT_CIVIL", "varchar", "Mots", "prenoms d'etat civil (« ETAT » suivi de « CIVIL » n'est pas un segment technique)"),
         ("INSCRIT_PP", "INSPP_PRENOMS_ETAT_CIVIL", "varchar", "Mots", ""), ("INSCRIT_PP", "INSPP_PRENOMS_ETAT_CIVIL_ANC", "varchar", "Mots", ""),
         ("BENEFICIAIRE_EFFECTIF", "BENEF_PRENOM_ETAT_CIVIL", "varchar", "Mots", ""), ("BENEFICIAIRE_EFFECTIF_HISTO", "BENEFHI_PRENOM_ETAT_CIVIL", "varchar", "Mots", ""),
@@ -120,11 +120,11 @@ using (var p = Pseudonymes.DepuisGraine("banc"))
         ("DIRIGEANT_PM", "DRGPM_DENOMINATION_STATUT", "varchar", "Mots", ""),
         // Nom de domaine internet d'un etablissement (le nom de la societe s'y lit).
         ("ETABLISSEMENT", "ETBLS_NOM_DOMAINE", "varchar", "Mots", "nom de domaine internet"),
-        // Les 38 colonnes NOM_FICHIER : 7 portent des noms sur RIG_DEV (jusqu'a 24 % de prenoms, 37 % de noms), toutes traitees, extension gardee.
+        // Les 38 colonnes NOM_FICHIER : 7 portent des noms sur RIG_DEV (jusqu'a 37 % de prenoms), toutes traitees, extension gardee.
         ("CREANCE_TRANSITOIRE", "CRTRA_NOM_FICHIER", "varchar", "Fichier", "nom de fichier"), ("DEMAT_CREFO_PJ", "DMCOPJ_NOM_FICHIER", "varchar", "Fichier", ""),
         ("PROCEDURE_COLLECTIVE", "PRCLL_NOM_AFFAIRE_FICHIER", "varchar", "Fichier", ""), ("GED_RIG", "GDRG_NOM_FICHIER", "varchar", "Fichier", ""),
         ("DEMAT_DCA", "DMTDCA_NOM_FICHIER_RAPPORT_CAC", "varchar", "Fichier", ""), ("CFE_LIASSE_XML", "LIAXML_PC_NOM_FICHIER", "varchar", "Fichier", ""),
-        // Jumeaux gardes : segments techniques relus (parametrage), mesures a 0-7 % de prenoms sur RIG_DEV.
+        // Jumeaux gardes : segments techniques relus (parametrage), mesures a 0-13 % de prenoms sur RIG_DEV.
         ("ADAPTAT_LIGNE_EDIT", "ADLGE_NOM_LOGIQUE", "varchar", "Garder", "nom logique d'une etape"), ("DEMANDE_EDITION", "DMNED_TYPE_DESTINATAIRE", "varchar", "Garder", "type de destinataire"),
         ("ULT", "ULT_TEXTE_PARAMETRE", "varchar", "Garder", "parametre d'une tache"),
         // Noms d'imprimantes : 4 sur 26 portent le nom d'un agent (RIG_DEV) ; les quatre colonnes prennent le meme faux nom.
@@ -476,7 +476,7 @@ Exiger(controle.Vert && controle.EchantillonValeurs > 0 && controle.EchantillonM
     $"sorti de la source : {string.Join(", ", controle.GenresLusSource)} (jamais une valeur)");
 // fix-ok: refus du chef (2026-11-21) -- le controle ne tirait que des colonnes DEJA traitees : une regle fausse (« ETAT »
 // pris pour technique) laissait 173 812 prenoms de CASIER_JUDICIAIRE en clair sans qu'il le voie. Mesure RIG_DEV : prenoms
-// d'etat civil 80-96 % de valeurs a prenom frequent, colonnes gardees 15 % au plus (lexique a 2 tables).
+// d'etat civil 79-100 % de valeurs a prenom frequent, colonnes techniques gardees 0-37 % (lexique a 2 tables).
 var gardees = controle.Gardees.Where(g => g.Valeurs > 0).ToList();
 Exiger(gardees.Count > 0 && controle.LexiquePrenoms > 0 && gardees.All(g => !g.Prenoms),
     $"SOC-021 CA06 : le controle tire aussi les {gardees.Count} colonnes GARDEES a segment personnel ({gardees.Sum(g => g.Valeurs)} valeurs ; lexique : {controle.LexiquePrenoms} prenoms " +
@@ -522,26 +522,6 @@ Exiger(rempliesRigDev.Count > 50 && mesureRigDev.MotsLexique > 0 && rempliesRigD
     $"lexique {mesureRigDev.MotsLexique} prenoms de {mesureRigDev.ColonnesLexique} colonnes) : aucune n'atteint {ControleCopie.PartPrenomsMax:P0} de prenoms ; les plus hautes : " +
     string.Join(", ", rempliesRigDev.OrderByDescending(g => g.Part).Take(3).Select(g => $"{g.Colonne[4..]} {g.Part:P0}")) +
     (rempliesRigDev.Any(g => g.Prenoms) ? $" -- EN CLAIR : {string.Join(", ", rempliesRigDev.Where(g => g.Prenoms).Select(g => $"{g.Colonne[4..]} {g.Part:P0}"))}" : ""));
-// Le TIRAGE d'une grande table (objection du juge, 2026-11-21) : des pages au hasard ne rendaient que 4 a 9 des 82 valeurs de
-// DEMANDE_EDITION.DMNED_CODE_ENTITE_DESTINATAIRE (4 300 504 lignes) -- un mot a prenom y faisait 12 a 50 %, le banc rougissait
-// au hasard. Une colonne jugee sur moins de 200 valeurs doit l'etre sur TOUTES ses valeurs distinctes, comptees ici a part
-// (COUNT DISTINCT par la porte de lecture : un nombre). Rouge sans la correction : DMNED_CODE_ENTITE_DESTINATAIRE 9 sur 82, et 20 autres.
-chrono.Restart();
-var volumesRigDev = (await rigDev.LignesAsync("SELECT p.object_id, SUM(p.rows) FROM sys.partitions p WHERE p.index_id IN (0, 1) GROUP BY p.object_id", CancellationToken.None))
-    .ToDictionary(l => Convert.ToInt32(l[0]), l => Convert.ToInt64(l[1]));
-var maigres = new List<string>();
-var exhaustives = new List<string>();
-foreach (var t in schemaRigDev.Tables.Where(t => volumesRigDev.GetValueOrDefault(t.Id) > ControleCopie.GrandeTable))
-    foreach (var g in rempliesRigDev.Where(g => g.Colonne.StartsWith(t.Libelle + ".", StringComparison.Ordinal) && g.Valeurs < 200))
-    {
-        var col = "[" + g.Colonne[(t.Libelle.Length + 1)..] + "]";
-        var distinctes = Convert.ToInt64(await rigDev.ValeurAsync($"SELECT COUNT(DISTINCT CONVERT(nvarchar(4000), {col})) FROM {t.Complet} WITH (NOLOCK) WHERE {col} LIKE N'%[A-Za-z]%'", CancellationToken.None));
-        (g.Valeurs == distinctes && g.Toutes ? exhaustives : maigres).Add($"{g.Colonne[4..]} {g.Valeurs} sur {distinctes} ({volumesRigDev[t.Id]} lignes)");
-    }
-Exiger(maigres.Count == 0 && exhaustives.Any(e => e.StartsWith("DEMANDE_EDITION.DMNED_CODE_ENTITE_DESTINATAIRE ", StringComparison.Ordinal)),
-    $"SOC-021 CA06 (tirage) : sur {baseRigDev} ({chrono.Elapsed.TotalSeconds:0} s), une colonne gardee d'une grande table jugee sur moins de 200 valeurs l'est sur TOUTES ses valeurs distinctes " +
-    $"({exhaustives.Count} colonnes, dont {exhaustives.FirstOrDefault(e => e.StartsWith("DEMANDE_EDITION.", StringComparison.Ordinal)) ?? "DEMANDE_EDITION absente"})" +
-    (maigres.Count == 0 ? "" : $" -- JUGEES SUR UN TIRAGE MAIGRE : {string.Join(", ", maigres)}"));
 string[] etatCivilRigDev = ["CASIER_JUDICIAIRE.CSRJD_PRENOMS_ETAT_CIVIL", "INSCRIT_PP.INSPP_PRENOMS_ETAT_CIVIL", "BENEFICIAIRE_EFFECTIF.BENEF_PRENOM_ETAT_CIVIL",
                             "BENEFICIAIRE_EFFECTIF_HISTO.BENEFHI_PRENOM_ETAT_CIVIL", "REPRESENTANT_PM.RPPM_PRENOMS_ETAT_CIVIL", "BODACC_RCS_XML.BDCRCX_PRENOMS_ETAT_CIVIL"];
 var catalogueAncien = new CatalogueRegles(etatCivilRigDev.Select(c => new KeyValuePair<string, Traitement>(c, Traitement.Garder)));
