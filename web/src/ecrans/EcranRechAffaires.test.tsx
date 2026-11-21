@@ -85,6 +85,64 @@ describe('EcranRechAffaires', () => {
     expect(ouvrirUnDossier).toHaveBeenCalledWith('512345678')
   })
 
+  // SOC-015 (lot 3 de la phase 2) : l'aiguillage vient de Pont/AncienRig.cs (banc tests/SocleAiguillageCheck).
+  const aiguiller = (numeros: unknown) => ({
+    mode: 'demo', greffe: null, passage: '01/08/2026 08:00', message: null,
+    affaires: (numeros as string[]).map((numero) => numero === '004176'
+      ? { numero, logiciel: 'V2', motif: 'creee le 24/08/2026 00:00, avant le passage du 01/09/2026 08:00 : traitee dans la V2' }
+      : { numero, logiciel: 'V3', motif: 'traitee dans la V3' }),
+  })
+
+  it('SOC-015 CA01 : une affaire creee avant le passage porte la mention « traitee dans la V2 », les autres non', async () => {
+    const pont = installerFauxPont({ 'EcranRechAffaires.Trouver': vue, 'EcranRechAffaires.Aiguiller': aiguiller })
+    const { container } = render(<EcranRechAffaires ouvrir={vi.fn()} ouvrirUnDossier={vi.fn()} />)
+    const mention = await screen.findByText('traitee dans la V2')
+    expect(mention.closest('tr')!.firstElementChild!.firstChild!.textContent).toBe('004176')
+    expect(container.querySelectorAll('.rig-badge')).toHaveLength(1)
+    expect(container.querySelectorAll('tbody tr')[0]!.querySelectorAll('td')).toHaveLength(13)
+    expect(pont.appels.mock.calls.find((c) => c[0] === 'EcranRechAffaires.Aiguiller')![1]).toEqual(['004176', '2026B01067'])
+
+    // Un tri ne change pas la liste des numeros : l'aiguillage n'est pas redemande.
+    fireEvent.click(screen.getByText('Nom'))
+    await waitFor(() => expect(pont.appels.mock.lastCall!.slice(2, 4)).toEqual(['Nom', true]))
+    expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranRechAffaires.Aiguiller')).toHaveLength(1)
+  })
+
+  it('SOC-015 CA02, CA03 : une ancienne affaire choisie propose « Ouvrir dans l\'ancien RIG », qui rend compte du geste', async () => {
+    const pont = installerFauxPont({
+      'EcranRechAffaires.Trouver': vue, 'EcranRechAffaires.Aiguiller': aiguiller,
+      'EcranRechAffaires.OuvrirDansAncienRig': (numero: unknown) => ({ fait: true, geste: 'lance', numero, ligneDeCommande: '"C:\\RIG\\exe\\RigClientAccueil.exe" /g8002',
+        message: `Le numero ${String(numero)} est copie : collez-le dans « N° affaire » de la recherche d'affaires de l'ancien RIG.` }),
+    })
+    render(<EcranRechAffaires ouvrir={vi.fn()} ouvrirUnDossier={vi.fn()} />)
+    await screen.findByText('traitee dans la V2')
+    // Une affaire de la V3 choisie : pas de bloc « Ancien RIG », l'ecran est celui d'avant.
+    fireEvent.click(screen.getByText('2026B01067'))
+    await screen.findByText('2026B01067 · instance 55339 · role 2026F00301')
+    expect(screen.queryByRole('button', { name: 'Ouvrir dans l\'ancien RIG' })).toBeNull()
+
+    fireEvent.click(screen.getByText('004176'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir dans l\'ancien RIG' }))
+    expect((await screen.findByRole('status')).textContent).toContain('Le numero 004176 est copie')
+    expect(pont.appels.mock.calls.find((c) => c[0] === 'EcranRechAffaires.OuvrirDansAncienRig')!.slice(1)).toEqual(['004176'])
+  })
+
+  it('SOC-015 CA04 : la suppression d\'une ancienne affaire est refusee ; celle d\'une affaire de la V3 reste simulee', async () => {
+    installerFauxPont({ 'EcranRechAffaires.Trouver': vue, 'EcranRechAffaires.Aiguiller': aiguiller })
+    render(<EcranRechAffaires ouvrir={vi.fn()} ouvrirUnDossier={vi.fn()} />)
+    await screen.findByText('traitee dans la V2')
+    fireEvent.click(screen.getByText('004176'))
+    await screen.findByRole('button', { name: 'Ouvrir dans l\'ancien RIG' })
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer l\'instance' }))
+    expect(screen.getByText(/affaire traitee dans la V2, elle ne se supprime pas ici\. Ouvrez-la dans l'ancien RIG\./)).toBeTruthy()
+    expect(screen.queryByText(/suppression simulee/)).toBeNull()
+
+    fireEvent.click(screen.getByText('2026B01067'))
+    await screen.findByText('2026B01067 · instance 55339 · role 2026F00301')
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer l\'instance' }))
+    expect(screen.getByText(/suppression simulee — numeros metiers liberes\./)).toBeTruthy()
+  })
+
   it('Entree dans les criteres et suppression simulee de l\'instance choisie', async () => {
     installerFauxPont({ 'EcranRechAffaires.Trouver': vue })
     render(<EcranRechAffaires ouvrir={vi.fn()} ouvrirUnDossier={vi.fn()} />)
