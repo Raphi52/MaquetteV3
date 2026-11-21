@@ -73,6 +73,18 @@ que rien n'a changé, et que l'agent admis lit par les 7 routes de lecture (200)
 serveur lui-même, que chaque route du module porte la politique : une route ajoutée hors du groupe fait
 tomber le banc. Contre-épreuve faite (2026-11-21) : politique retirée du groupe → 3 contrôles rouges.
 
+## Raccord fait (lot 8, 2026-11-21) : le catalogue ouvre la base du greffe pour l'identité et le compteur
+
+| Qui | Ce qui a changé |
+|---|---|
+| L'identité (`Serveur\Socle\Identite\ServiceIdentite.cs`, `socle-identite.md`) | Sur une route dont l'adresse porte `{greffe}`, le compte de l'agent se cherche dans la base V3 de ce greffe, ouverte par `CatalogueGreffes.OuvrirBaseV3Async` ; la politique `AgentAdmis` rend `GreffeInconnu` en 404 et `BaseGreffeInjoignable` en 503, sans repli. |
+| Le compteur (`Serveur\Numerotation\Compteur\ModuleCompteur.cs`, `numerotation-compteur.md`) | `/numerotation/{greffe}/compteurs`, `/numeros`, `/restitutions` ouvrent la base du greffe par le catalogue ; plus aucune lecture de la base unique. Banc : un numéro tiré pour un greffe laisse le compteur de l'autre intact. |
+| Ce module (`Serveur\Socle\Greffes`) | **Rien.** Ses routes gardent `{code}` et restent des routes communes : l'agent y est jugé dans la base commune, comme avant. Une fiche existe avant la base V3 de son greffe (SOC-008) : la juger dans cette base rendrait 503 sur la saisie du passage d'un greffe pas encore créé (fiche T004 du banc), et remplacerait le corps `EtatBaseGreffe` de ses propres 503 (`…/reglages` de la fiche T003 dans le banc). |
+
+À trancher avec les droits du lot 3 (SOC-002) : qui modifie les **réglages** d'un greffe (`PUT …/reglages/{reglage}`).
+Aujourd'hui, l'agent admis de la base commune (exploitation d'Amitel) ; si c'est aussi l'agent chargé du
+paramétrage **dans** son greffe, ces routes passeront à `{greffe}` et l'agent sera jugé dans sa base.
+
 ## Les gestes d'exploitation (code prêt, à lancer par l'exploitation)
 
 ```csharp

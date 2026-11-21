@@ -12,6 +12,7 @@ using RigV3.Base;
 using RigV3.Contrats.Sante;
 using RigV3.Contrats.Socle;
 using RigV3.Serveur;
+using RigV3.Serveur.Socle.Greffes;
 using RigV3.Serveur.Socle.Identite;
 using RigV3Desktop.Pont;
 
@@ -25,6 +26,8 @@ using RigV3Desktop.Pont;
 //  - CA02 a CA06 et l'ordre des refus par le changement de compte, qui n'existe
 //    qu'en developpement (serveur en memoire, --environment Development) ;
 //  - CA08 sur toute la base V3 (migrations du depot) et sur les sources des ecrans.
+//  - le raccord avec le catalogue des greffes (lot 8) : deux bases de greffe jetables, A et B, au
+//    catalogue de la base commune ; un agent n'est connu que de la base de SON greffe.
 // Chaque controle cite son critere. Il lui faut « docker compose up -d ».
 
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
@@ -46,9 +49,13 @@ var session = Environment.UserName;
 var sessionInscrite = session.ToUpperInvariant();
 
 string nomBase;
+string[] nomsGreffes;
 await using (var b = await BaseJetable.CreerAsync("SocleIdentiteCheck"))
+await using (var baseA = await BaseJetable.CreerAsync("SocleIdentiteGreffeA"))
+await using (var baseB = await BaseJetable.CreerAsync("SocleIdentiteGreffeB"))
 {
     nomBase = b.Nom;
+    nomsGreffes = [baseA.Nom, baseB.Nom];
     var rapport = await Migrateur.AppliquerAsync(b.Connexion, migrations);
     Exiger(rapport.Jouees.Contains("SOC-001_comptes"),
         $"SOC-001 T01 : la migration des comptes passe sur une base neuve ({string.Join(", ", rapport.Jouees)})");
@@ -61,8 +68,10 @@ await using (var b = await BaseJetable.CreerAsync("SocleIdentiteCheck"))
         return (T)(await cmd.ExecuteScalarAsync())!;
     }
     async Task Executer(string sql, params (string Nom, object Valeur)[] parametres)
+        => await ExecuterSur(b.Connexion, sql, parametres);
+    async Task ExecuterSur(string connexion, string sql, params (string Nom, object Valeur)[] parametres)
     {
-        await using var cn = new SqlConnection(b.Connexion);
+        await using var cn = new SqlConnection(connexion);
         await cn.OpenAsync();
         await using var cmd = new SqlCommand(sql, cn);
         foreach (var (nom, valeur) in parametres) cmd.Parameters.AddWithValue(nom, valeur);
@@ -118,6 +127,32 @@ await using (var b = await BaseJetable.CreerAsync("SocleIdentiteCheck"))
     Exiger(doublon is SqlException { Number: 2627 or 2601 },
         $"SOC-001 CA02 : « jdupont » est refuse en base quand « JDUPONT » existe (unicite sans majuscules) ({doublon?.Message})");
 
+    // --- Raccord (lot 8) : deux greffes au catalogue de la base commune (b), chacun avec SA base ------
+    // Un agent par greffe, connu de sa base seulement ; un compte desactive dans A. La base commune garde
+    // les comptes ci-dessus (JDUPONT...) : ceux des routes communes, inconnus des deux greffes.
+    const string GreffeA = "9201", GreffeB = "9202", GreffeMuet = "9203", GreffeAbsent = "9299";
+    foreach (var cs in new[] { baseA.Connexion, baseB.Connexion })
+        await Migrateur.AppliquerAsync(cs, migrations);
+    const string ComptesDuGreffe = """
+        INSERT INTO soc.Service (CodeGreffe, Abrege, Nom) VALUES (@greffe, 'GRF', N'Service du greffe');
+        INSERT INTO soc.Role (Nom, Libelle) VALUES ('GREFFIER', 'Greffier');
+        INSERT INTO soc.Compte (CompteWindows, Nom, Prenom, Abrege, Civilite, CodeGreffe, IdService, Desactive)
+        SELECT v.Compte, @nom, 'Agent', LEFT(v.Compte, 16), 'M.', @greffe, s.Id, v.Desactive
+        FROM (VALUES (@admis, 0), (@desactive, 1)) v (Compte, Desactive) CROSS JOIN soc.Service s WHERE v.Compte <> '';
+        INSERT INTO soc.CompteRole (IdCompte, Role) SELECT Id, 'GREFFIER' FROM soc.Compte;
+        """;
+    await ExecuterSur(baseA.Connexion, ComptesDuGreffe, ("@greffe", GreffeA), ("@nom", "GreffeA"), ("@admis", "AGENT.A"), ("@desactive", "DESACTIVE.A"));
+    await ExecuterSur(baseB.Connexion, ComptesDuGreffe, ("@greffe", GreffeB), ("@nom", "GreffeB"), ("@admis", "AGENT.B"), ("@desactive", ""));
+    var serveurBancs = new SqlConnectionStringBuilder(BaseJetable.ServeurDesBancs());
+    var authentificationGreffes = new SqlConnectionStringBuilder(serveurBancs.ConnectionString);
+    authentificationGreffes.Remove("Data Source");             // le serveur et la base viennent du catalogue
+    var baseMuette = $"{BaseJetable.Prefixe}inexistante_{Guid.NewGuid():N}";   // jamais creee
+    foreach (var (code, nom) in new[] { (GreffeA, baseA.Nom), (GreffeB, baseB.Nom), (GreffeMuet, baseMuette) })
+        await Executer("""
+            INSERT INTO soc.Greffe (CodeGreffe, Nom, Serveur, BaseV2, BaseV3, EstBeta, EstOutreMer, Fuseau, ModifiePar, ModifieLe)
+            VALUES (@c, @n, @s, @v2, @v3, 0, 0, 'Romance Standard Time', 'banc', SYSDATETIME());
+            """, ("@c", code), ("@n", $"Greffe {code} du banc"), ("@s", serveurBancs.DataSource), ("@v2", "RIG_BANC_" + code), ("@v3", nom));
+
     async Task<long> LignesDeLaBase() => await Scalaire<long>("""
         DECLARE @sql nvarchar(max) = N'SELECT CAST(0 AS bigint)';
         SELECT @sql += N' + (SELECT COUNT_BIG(*) FROM ' + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name) + N')'
@@ -132,6 +167,7 @@ await using (var b = await BaseJetable.CreerAsync("SocleIdentiteCheck"))
         Silence(s);
         s.WebHost.UseTestServer();
         s.Configuration[$"ConnectionStrings:{BaseRig.NomConnexion}"] = b.Connexion;
+        s.Configuration[CatalogueGreffes.CleAuthentification] = authentificationGreffes.ConnectionString;
     }, [.. ServeurRig.Decouvrir(typeof(ServeurRig).Assembly), new ModuleDonneesDeBanc(appels)]))
     {
         await app.StartAsync();
@@ -143,7 +179,7 @@ await using (var b = await BaseJetable.CreerAsync("SocleIdentiteCheck"))
             if (compte is not null) demande.Headers.Add(RoutesIdentite.EnTeteCompte, compte);
             using var reponse = await http.SendAsync(demande);
             var brut = await reponse.Content.ReadAsStringAsync();
-            var identite = reponse.IsSuccessStatusCode && route == RoutesIdentite.Identite
+            var identite = reponse.IsSuccessStatusCode && route.StartsWith(RoutesIdentite.Identite, StringComparison.Ordinal)
                 ? JsonSerializer.Deserialize<IdentiteAgent>(brut, json) : null;
             return (reponse.StatusCode, identite, brut);
         }
@@ -215,6 +251,56 @@ await using (var b = await BaseJetable.CreerAsync("SocleIdentiteCheck"))
         var parClientDev = await clientDev.LireAsync<IdentiteAgent>(RoutesIdentite.Identite);
         Exiger(parClientDev is { Admis: true, Agent.CompteWindows: "JDUPONT" },
             "SOC-001 CA07 (jumeau) : en developpement, RIGV3_COMPTE=jdupont ouvre RIG sous ce compte (le « utilisateur= » de la V2)");
+
+        // --- Raccord (lot 8) : le compte se cherche dans la base DU GREFFE choisi, comme la V2 ------------
+        // (Utilisateur.GetUtilisateurCourant(CodeGreffeRig), Utilisateur.cs:424-432).
+        var aSurA = await Ouvrir("agent.a", RoutesIdentite.Pour(GreffeA));
+        var aSurB = await Ouvrir("agent.a", RoutesIdentite.Pour(GreffeB));
+        var bSurB = await Ouvrir("agent.b", RoutesIdentite.Pour(GreffeB));
+        var bSurA = await Ouvrir("agent.b", RoutesIdentite.Pour(GreffeA));
+        Exiger(aSurA.Identite is { Admis: true, Agent: { CompteWindows: "AGENT.A", Nom: "GreffeA", Service: "Service du greffe" } },
+            $"Raccord (3) : l'agent du greffe A ouvre le greffe A, reconnu dans la base de A (nom « {aSurA.Identite?.Agent?.Nom} ») ({aSurA.Brut})");
+        Exiger(aSurB.Code == HttpStatusCode.OK && aSurB.Identite is { Admis: false, Statut: StatutsIdentite.Inconnu, Agent: null }
+               && aSurB.Identite.Message == "L'utilisateur 'agent.a' n'a pas été défini dans RIG.",
+            $"Raccord (3) : l'agent connu du greffe A seulement est refuse sur le greffe B, comme un compte inconnu de la V2 ({aSurB.Brut})");
+        Exiger(bSurB.Identite is { Admis: true, Agent.Nom: "GreffeB" } && bSurA.Identite is { Statut: StatutsIdentite.Inconnu },
+            $"Raccord (3) (jumeau) : l'agent du greffe B ouvre B ({bSurB.Identite?.Agent?.Nom}) et il est inconnu de A ({bSurA.Identite?.Statut})");
+        var communSurA = await Ouvrir("jdupont", RoutesIdentite.Pour(GreffeA));
+        Exiger(communSurA.Identite is { Statut: StatutsIdentite.Inconnu } && jdupont.Identite is { Admis: true },
+            $"Raccord (3) : JDUPONT, inscrit dans la base commune seulement, est inconnu du greffe A : la base commune ne sert plus " +
+            $"a juger l'agent d'un greffe ({communSurA.Identite?.Statut})");
+        var desactiveA = await Ouvrir("desactive.a", RoutesIdentite.Pour(GreffeA));
+        Exiger(desactiveA.Identite is { Statut: StatutsIdentite.Desactive, Message: "L'utilisateur 'desactive.a' a été désactivé." },
+            $"Raccord (3) : les controles de la V2 jouent sur la base du greffe -- un compte desactive dans A y est refuse pour ce motif ({desactiveA.Brut})");
+        var absentId = await Ouvrir("agent.a", RoutesIdentite.Pour(GreffeAbsent));
+        var muetId = await Ouvrir("agent.a", RoutesIdentite.Pour(GreffeMuet));
+        var anonymeId = await Ouvrir(null, RoutesIdentite.Pour(GreffeA));
+        Exiger(absentId.Code == HttpStatusCode.NotFound && absentId.Brut.Contains(GreffeAbsent)
+               && muetId.Code == HttpStatusCode.ServiceUnavailable && muetId.Brut.Contains(baseMuette)
+               && anonymeId.Code == HttpStatusCode.Unauthorized,
+            $"Raccord (2) : identite sur un greffe absent du catalogue -> 404, sur un greffe dont la base ne repond pas -> 503 (la base nommee, " +
+            $"aucun repli sur la base commune), sans session -> 401 ({(int)absentId.Code}, {(int)muetId.Code}, {(int)anonymeId.Code})");
+
+        // La politique AgentAdmis sur une route de donnees d'un greffe : elle juge l'agent dans CE greffe.
+        var routeA = ModuleDonneesDeBanc.Pour(GreffeA);
+        var avantGreffe = appels.Nombre;
+        var donneesA = await Ouvrir("agent.a", routeA);
+        var apresAdmis = appels.Nombre;
+        var donneesAsurB = await Ouvrir("agent.a", ModuleDonneesDeBanc.Pour(GreffeB));
+        var donneesJdupontA = await Ouvrir("jdupont", routeA);
+        var donneesAnonymeA = await Ouvrir(null, routeA);
+        var donneesAbsent = await Ouvrir("agent.a", ModuleDonneesDeBanc.Pour(GreffeAbsent));
+        var donneesMuet = await Ouvrir("agent.a", ModuleDonneesDeBanc.Pour(GreffeMuet));
+        Exiger(donneesA.Code == HttpStatusCode.OK && apresAdmis == avantGreffe + 1,
+            $"Raccord (3) (jumeau) : une route {ModuleDonneesDeBanc.RouteDuGreffe} sert l'agent admis de son greffe ({(int)donneesA.Code})");
+        Exiger(donneesAsurB.Code == HttpStatusCode.Forbidden && donneesJdupontA.Code == HttpStatusCode.Forbidden
+               && donneesAnonymeA.Code == HttpStatusCode.Unauthorized && appels.Nombre == apresAdmis,
+            $"Raccord (3) : la meme route refuse l'agent de A sur le greffe B (403) et le compte de la base commune sur A (403), " +
+            $"demande la session (401) ; elle n'a pas tourne ({(int)donneesAsurB.Code}, {(int)donneesJdupontA.Code}, {(int)donneesAnonymeA.Code})");
+        Exiger(donneesAbsent.Code == HttpStatusCode.NotFound && donneesMuet.Code == HttpStatusCode.ServiceUnavailable
+               && donneesMuet.Brut.Contains(baseMuette) && appels.Nombre == apresAdmis,
+            $"Raccord (2) : la politique rend 404 pour un greffe absent du catalogue et 503 pour une base de greffe muette, " +
+            $"au lieu d'un 403 ; la route n'a pas tourne ({(int)donneesAbsent.Code}, {(int)donneesMuet.Code})");
         await app.StopAsync();
     }
 
@@ -298,7 +384,8 @@ var fautifs = sources.Where(f => champMotDePasse.IsMatch(File.ReadAllText(f))).S
 Exiger(sources.Count > 50 && fautifs.Count == 0,
     $"SOC-001 CA08 : aucun ecran ne demande de mot de passe ({sources.Count} sources d'ecran lues{(fautifs.Count > 0 ? " ; fautifs : " + string.Join(", ", fautifs) : "")})");
 
-Exiger(!await BaseJetable.ExisteAsync(nomBase), $"base jetable supprimee : {nomBase}");
+Exiger(!await BaseJetable.ExisteAsync(nomBase) && !await BaseJetable.ExisteAsync(nomsGreffes[0]) && !await BaseJetable.ExisteAsync(nomsGreffes[1]),
+    $"bases jetables supprimees : {nomBase}, {string.Join(", ", nomsGreffes)}");
 
 Console.WriteLine();
 Console.WriteLine(echecs.Count == 0
@@ -309,12 +396,21 @@ return echecs.Count == 0 ? 0 : 1;
 /// <summary>Combien de fois la route de donnees du banc a tourne.</summary>
 sealed class CompteurDeBanc { public int Nombre; }
 
-/// <summary>Une route de donnees comme celles des lots suivants : reservee a l'agent admis.</summary>
+/// <summary>Des routes de donnees comme celles des lots suivants : reservees a l'agent admis, commune et d'un greffe.</summary>
 sealed class ModuleDonneesDeBanc(CompteurDeBanc appels) : IModuleServeur
 {
     public const string Route = "/banc/donnees";
 
+    /// <summary>Une route d'un greffe (lot 8) : son adresse porte {greffe}.</summary>
+    public const string RouteDuGreffe = "/banc/{greffe}/donnees";
+
+    public static string Pour(string greffe) => RouteDuGreffe.Replace("{greffe}", greffe);
+
     public void Brancher(IEndpointRouteBuilder routes)
-        => routes.MapGet(Route, () => { Interlocked.Increment(ref appels.Nombre); return "donnees du greffe"; })
+    {
+        routes.MapGet(Route, () => { Interlocked.Increment(ref appels.Nombre); return "donnees du greffe"; })
             .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        routes.MapGet(RouteDuGreffe, (string greffe) => { Interlocked.Increment(ref appels.Nombre); return $"donnees du greffe {greffe}"; })
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+    }
 }

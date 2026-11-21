@@ -6,15 +6,15 @@ Lot 5 du plan « Reconstruction de RIG — phase 1 » (plan `plan-da1bba7f`, fil
 | Story | Ce qu'elle demande | Où c'est fait |
 |---|---|---|
 | NUM-001 | Un seul compteur par série, dans la base V3 du greffe ; la V2 comme la V3 y prennent leurs numéros | `Base\migrations\NUM-001_compteurs.sql` (tables, `num.Attribuer`, droits) |
-| NUM-004 | Rendre un numéro donné par erreur pour qu'il soit redonné | même fichier : `num.Restituer` ; route `POST /numerotation/restitutions` |
+| NUM-004 | Rendre un numéro donné par erreur pour qu'il soit redonné | même fichier : `num.Restituer` ; route `POST /numerotation/{greffe}/restitutions` |
 | NUM-008 | Prouver qu'aucun numéro n'est donné deux fois quand les deux logiciels numérotent ensemble | `tests\NumerotationCompteurCheck` (charge V2 + V3) |
 
 Décision de départ : **Q16** du cadrage — la V3 distribue tous les numéros ; `GENERER_NUMERO`,
 `CHERCHER_NUMERO` et `RESTITUER_NUMERO` des bases V2 lui demandent, sur la même instance, dans leur
 transaction, sans réseau (Q4).
 
-**Preuve** : `.\tests.ps1 NumerotationCompteur` rend 0 — 38 contrôles verts, au moins un par critère, et 2 lignes « RESTE » pour
-ce qu'aucun banc du poste ne peut faire (voir la fin). Dont
+**Preuve** : `.\tests.ps1 NumerotationCompteur` rend 0 — 52 contrôles verts (38 du lot 5, 14 du raccord du lot 8), au moins un
+par critère, et 2 lignes « RESTE » pour ce qu'aucun banc du poste ne peut faire (voir la fin). Dont
 8 sessions (4 V2, 4 V3) qui tirent 10 000 numéros RGB en même temps : 10 000 différents et consécutifs,
 compteur +10 000 (≈ 22 s, ≈ 460 numéros/s sur le SQL Server Docker du poste). Contre-épreuves faites :
 verrou du compteur retiré → 62 paires en double sur 100 (NUM-001 CA02 rouge) et la clé unique arrête la
@@ -144,9 +144,33 @@ await tx.CommitAsync(ct);
 annulation (minute, instance, procédure, demande au Trésor : NUM-004 T03). `CompteurOccupeException` =
 compteur tenu au-delà de `Numerotation:DelaiVerrouMs` (10 000 ms par défaut).
 
-Les routes (`Contrats\Numerotation\RoutesCompteur.cs`) servent l'écran : `GET /numerotation/compteurs`
-(`?type=`), `POST /numerotation/numeros`, `POST /numerotation/restitutions` (explication obligatoire :
-400 sinon). Compteur occupé : HTTP 503, code `-9`.
+Les routes (`Contrats\Numerotation\RoutesCompteur.cs`) servent l'écran : `GET /numerotation/{greffe}/compteurs`
+(`?type=`), `POST /numerotation/{greffe}/numeros`, `POST /numerotation/{greffe}/restitutions` (explication
+obligatoire : 400 sinon). Compteur occupé : HTTP 503, code `-9`. L'adresse d'un greffe :
+`RoutesCompteur.Pour(RoutesCompteur.Numeros, code)` ; accès et base du greffe : section « Raccord fait » ci-dessous.
+
+## Raccord fait (lot 8, 2026-11-21) : session Windows et base du greffe
+
+| Point | Ce que fait la V3 | Où |
+|---|---|---|
+| Session | Les trois routes portent `PolitiquesSocle.AgentAdmis` (lot 2), posée une fois sur leur groupe : 401 sans session Windows, 403 pour un compte refusé ; la route ne tourne pas. Le journal (`num.Journal.Compte`) prend le compte de la session admise ; « (non identifie) » a disparu. | `Serveur\Numerotation\Compteur\ModuleCompteur.cs` |
+| Base du greffe | L'adresse porte le code du greffe (`{greffe}`) ; la route ouvre sa base V3 par le catalogue commun (`CatalogueGreffes.OuvrirBaseV3Async`, lot 4). Greffe absent du catalogue : 404 ; base qui ne répond pas : 503, la base nommée, sans repli sur la base commune ni sur un autre greffe. Aucune chaîne de connexion dans le module. | même fichier, `Contrats\Numerotation\RoutesCompteur.cs` |
+| Agent du greffe | La politique juge l'agent dans la base du greffe de l'adresse (`Serveur\Socle\Identite`, voir `socle-identite.md`) : un agent connu d'un seul greffe est refusé (403) sur les routes des autres. | `Serveur\Socle\Identite\ServiceIdentite.cs` |
+| `DistributeurNumeros` | Inchangé : il reçoit toujours la connexion ouverte de l'acte. | — |
+
+Le banc joue trois bases jetables : la base **commune** (le catalogue, sans aucun compte d'agent), celle du
+**greffe A** (les compteurs de RIG_DEV, l'agent `banc.numeros`, un compte désactivé) et celle du **greffe B**
+(RGB 2026 à 4242, JPC 2026 à 10, l'agent `banc.greffeb`), plus un greffe au catalogue dont la base n'existe
+pas. Contrôles « Raccord (1) à (3) » : les 3 routes répondent 401 sans session, 403 au compte désactivé, 404
+pour un greffe inconnu, 503 pour la base muette, sans que rien ne bouge dans les trois bases ; un numéro tiré
+pour A avance A et laisse B intact, et l'inverse ; l'agent de A est refusé sur B, celui de B sur A.
+Contre-épreuves faites (2026-11-21), chaque fois fichier restauré à l'identique : politique retirée du groupe
+→ 5 contrôles rouges ; identité cherchée dans la base commune → banc rouge (403 dès le premier appel) ; réponse
+404 / 503 de la politique retirée → 2 rouges (403 à la place) ; route qui ouvre toujours la base de A → 2 rouges.
+
+Pour un banc ou un essai : une ligne `soc.Greffe` dans la base commune (serveur, base V3), la configuration
+`Greffes:Authentification` (la façon de se connecter aux instances, sans serveur ni base) et le compte de
+l'agent dans `soc.Compte` de la base **du greffe** (modèle : `tests\NumerotationCompteurCheck\Program.cs`).
 
 ## Comment la simultanéité est tenue (NUM-001 CA02, NUM-008)
 
@@ -194,8 +218,7 @@ le numéro réel est `2026RJ0012`, c'est lui que le banc joue.
 
 | Reste | Raison | Qui |
 |---|---|---|
-| **Authentifier les trois routes** : `.RequireAuthorization(PolitiquesSocle.AgentAdmis)` (décision du lot 2) ; le banc envoie alors l'en-tête `X-RigV3-Compte` en environnement Development | le code du lot 2 (`Serveur\Socle\Identite`) n'est pas encore dans le dépôt : ce lot ne compilerait plus. Le journal prend déjà le compte authentifié (`User.Identity.Name`) ; d'ici là il écrit « (non identifie) ». | à l'intégration des lots 2 et 5 |
-| **Base du greffe** : les routes ouvrent la base du serveur (`BaseRig`) ; avec le lot 4 elles deviennent `/numerotation/{code}/…` et ouvrent `CatalogueGreffes.OuvrirBaseV3Async(code, ct)` | le code du lot 4 (`Serveur\Socle\Greffes`) n'est pas encore dans le dépôt. `DistributeurNumeros` prend déjà une connexion ouverte : il ne change pas. | à l'intégration des lots 4 et 5 |
+| **L'écran choisit son greffe** : l'app (`Pont\`) n'appelle encore aucune route du compteur ; quand elle le fera, elle passera le code de son greffe (`RoutesCompteur.Pour`) | le choix du greffe à l'ouverture (fenêtre de connexion de la V2, `RigFormLogin`) n'a pas encore d'écran ; voir `socle-identite.md` | phase des écrans |
 | NUM-004 CA10 / T04 / T08 : l'écran de réattribution, réservé au responsable | il attend les droits (SOC-002, lot 3) ; la route qu'il appellera est prouvée (mêmes règles que le programme) | phase des écrans, après le lot 3 |
 | Écrans « à maquetter » de NUM-001 (liste des compteurs) et NUM-004 | hors de la liste de fichiers de ce lot (aucun `web\src\ecrans`) ; les routes et contrats sont prêts | plan suivant |
 | NUM-001 T05, NUM-004 T05 : reprise des lignes de la V2 | story NUM-005 | lot 6 |
@@ -209,7 +232,7 @@ le numéro réel est `2026RJ0012`, c'est lui que le banc joue.
 
 ```powershell
 docker compose up -d                                  # le SQL Server du poste
-.\tests.ps1 NumerotationCompteur                      # le banc (≈ 40 s)
+.\tests.ps1 NumerotationCompteur                      # le banc (≈ 55 s)
 ```
 
 Sur une base de développement (`architecture.md`, « Travailler en développement ») :
@@ -221,4 +244,4 @@ EXEC @rc = num.Restituer @Type = 'RGB', @Numero = '2026B00891', @Explication = N
 SELECT * FROM num.Journal ORDER BY Id DESC;
 ```
 
-<!-- fix-ok: chiffres corriges apres mesure -- 38 lignes « OK » et 2 « RESTE » comptees par grep -c sur la sortie du banc (2026-11-20) ; le nombre de bases V2 retire, non verifie ici. -->
+<!-- fix-ok: chiffres corriges apres mesure -- 38 lignes « OK » et 2 « RESTE » comptees par grep -c sur la sortie du banc (2026-11-20) ; le nombre de bases V2 retire, non verifie ici. Lot 8 (2026-11-21) : pas un correctif, le raccord -- adresses avec {greffe}, section « Raccord fait », deux restes retires ; 52 lignes « OK » comptees par grep -c sur tests.ps1 NumerotationCompteur -Detail, duree mesuree 54-57 s. -->
