@@ -285,7 +285,9 @@ interface QuestionEnCours { objet: string; texte: string; oui: () => void }
 function Question({ texte, oui, non }: { texte: string; oui: () => void; non: () => void }) {
   return (
     <div role="alertdialog" aria-label={texte} style={Demande}>
-      <span className="rig-etat rig-etat--attente">{texte}</span>
+      {/* fix-ok: capture claire du 2026-11-21 lue -- la question entiere dans la pastille sortait en petits caracteres ;
+          la pastille dit l'avertissement (WarningYesNo de la V2), la question est en texte normal. */}
+      <span className="rig-etat rig-etat--attente">Attention</span><span>{texte}</span>
       <button type="button" className="rig-bouton rig-bouton--fort" onClick={oui}>Oui</button>
       <button type="button" className="rig-bouton" onClick={non}>Non</button>
     </div>
