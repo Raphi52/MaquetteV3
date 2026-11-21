@@ -318,7 +318,8 @@ public static class MenuAccueil
                 new("Analyse IA",             "controle des formalites INPI",       "PROC_IA"),
                 new("Retours CFE-NET",        "traitement des retours XML",         "PROC_CFENET_RET"),
                 new("EDI RPVA",               "inscriptions mandataires",           "PROC_EDI_RPVAINS"),
-                new("EDI RPJC",               "traitement / conciliation",          "PROC_EDI_RPJC_TRCNC")
+                new("EDI RPJC",               "traitement / conciliation",          "PROC_EDI_RPJC_TRCNC"),
+                new("Supervision",            "greffes, traitements, erreurs (Amitel)", "PROC_SUPERVISION")
             ])
         ])
     ];

@@ -30,13 +30,17 @@ namespace RigV3Desktop.Pont;
 // ============================================================
 
 /// <summary>Une reponse du serveur en echec : le verbe, la route, le code HTTP et le debut du corps.</summary>
-public sealed class ErreurServeur(string message, int codeHttp, string? corps = null) : Exception(message)
+public sealed class ErreurServeur(string message, int codeHttp, string? corps = null, string? suivi = null) : Exception(message)
 {
     public int CodeHttp { get; } = codeHttp;
 
     /// <summary>Le corps entier de la reponse en echec (souvent un motif en JSON, ex. RefusGreffe) ; null sans corps.
     /// Un ecran y lit le motif du serveur au lieu de recopier sa regle (Pont/EcranReglages.cs, 21/11).</summary>
     public string? Corps { get; } = corps;
+
+    /// <summary>L'identifiant de suivi du parcours (en-tete X-Rig-Suivi, SOC-017) : l'erreur de l'ecran qui suit s'y
+    /// rattache, et l'assistance d'Amitel retrouve les deux par lui ; null si le serveur n'en a pas rendu.</summary>
+    public string? Suivi { get; } = suivi;
 }
 
 public sealed class ClientServeur
@@ -140,9 +144,10 @@ public sealed class ClientServeur
         if (!reponse.IsSuccessStatusCode)
         {
             var corps = await reponse.Content.ReadAsStringAsync(ct);
+            var suivi = reponse.Headers.TryGetValues(RoutesSupervision.EnTeteSuivi, out var valeurs) ? valeurs.FirstOrDefault() : null;
             throw new ErreurServeur(
                 $"{verbe} {route} : {(int)reponse.StatusCode} {reponse.ReasonPhrase} {corps[..Math.Min(corps.Length, 300)]}".TrimEnd(),
-                (int)reponse.StatusCode, corps.Length == 0 ? null : corps);
+                (int)reponse.StatusCode, corps.Length == 0 ? null : corps, suivi);
         }
         try
         {

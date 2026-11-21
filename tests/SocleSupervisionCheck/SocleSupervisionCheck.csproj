@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Banc du lot 2 de la phase 2 du plan de reconstruction : SOC-017 (retrouver une erreur technique sans aller
+       sur les serveurs) et SOC-011 (surveiller la partie serveur et ses traitements depuis Amitel).
+       Un controle par critere CAxx, qui cite son id. Il lui faut le SQL Server de developpement
+       (docker compose up -d, racine du depot) : il y cree ses bases jetables et une session d'evenements, et
+       supprime tout en sortie. Mode d'emploi : docs/reconstruction/socle-supervision.md. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SocleSupervisionCheck</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <!-- L'ecran « Supervision » et son client, joues contre le vrai serveur en memoire. -->
+    <Compile Include="../../Pont/ClientServeur.cs" Link="Pont/ClientServeur.cs" />
+    <Compile Include="../../Pont/JSInvokable.cs" Link="Pont/JSInvokable.cs" />
+    <Compile Include="../../Pont/SessionAgent.cs" Link="Pont/SessionAgent.cs" />
+    <Compile Include="../../Pont/EcranSupervision.cs" Link="Pont/EcranSupervision.cs" />
+    <!-- La copie d'essai de COMMUN_RIG.dbo.GREFFE (les 40 greffes exploites), celle du banc du catalogue. -->
+    <None Include="../SocleGreffesCheck/commun_rig_greffe.sql" Link="commun_rig_greffe.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+    <ProjectReference Include="../../Contrats/RigV3.Contrats.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
+  </ItemGroup>
+</Project>
