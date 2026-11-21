@@ -283,6 +283,7 @@ public static class MenuAccueil
                 new("Mon accueil",            "tuiles et alertes",                  "PROC_ACCUEIL_PARAM"),
                 new("Actualites",             "les messages de l'accueil",          "PROC_ACTUALITES"),
                 new("Dates de travail",       "la date du greffe",                  "PROC_GESTDATE"),
+                new("Comptes des agents",     "qui ouvre RIG, et avec quels droits", "PROC_UTILISATEUR"),
                 new("Aide du greffe",         "le wiki interne",                    "PROC_WIKI"),
                 new("Page web interne",       "ouvrir un site dans RIG",            "PROC_WEB_BROWSER")
             ]),

@@ -33,6 +33,7 @@ import { EcranCloture } from '../ecrans/EcranCloture'
 import { EcranCoffreFort } from '../ecrans/EcranCoffreFort'
 import { EcranCommandesWeb } from '../ecrans/EcranCommandesWeb'
 import { EcranComptabilisation } from '../ecrans/EcranComptabilisation'
+import { EcranComptes } from '../ecrans/EcranComptes'
 import { EcranConsultationJud } from '../ecrans/EcranConsultationJud'
 import { EcranControleVidiged } from '../ecrans/EcranControleVidiged'
 import { EcranCourriersDivers } from '../ecrans/EcranCourriersDivers'
@@ -171,6 +172,11 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
 
     case 'PROC_ACTUALITES':
       return <EcranActualites />
+
+    case 'PROC_UTILISATEUR':
+      // Ecran NEUF de la V3 (« a maquetter », SOC-002/004/005/016) : les comptes des agents, leurs roles et
+      // les journaux, servis par la partie serveur (sans RIGV3_SERVEUR : la demonstration, en lecture).
+      return <EcranComptes />
 
     case 'PROC_GESTEMAIL':
       return <EcranMessagerie />

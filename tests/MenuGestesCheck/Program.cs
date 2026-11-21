@@ -181,8 +181,11 @@ foreach (var (libelle, code) in toutesEntrees)
 // PROC_COMMANDES_WEB est NEUVE aussi : c'est l'ecran « Traitement des
 // commandes » de NeoRIG (D:\RIG-V3, CommandesWebViewModel) ; la V2 traitait
 // les commandes web depuis PROC_REQUI, sans procedure a elles.
+// PROC_UTILISATEUR (« Comptes des agents », lot 3 de la reconstruction) n'a pas
+// de fiche mais un dossier de sources : Source\Outils\Exe\Processus\PROC_UTILISATEUR
+// (FORM_UTILISATEUR, OPE_EDITION_UTILISATEUR, processus GUTILI de MODELE_PROCESSUS).
 var sansFiche = new[] { "PROC_LISTE_DELIBERES", "PROC_SUIVI_IMPRESSION", "PROC_REQUI",
-                        "PROC_ACTUALITES", "PROC_COMMANDES_WEB" };
+                        "PROC_ACTUALITES", "PROC_COMMANDES_WEB", "PROC_UTILISATEUR" };
 
 var fiches = @"D:\RigApplication\Documentation\reference\proc";
 
