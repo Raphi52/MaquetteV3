@@ -8,9 +8,9 @@ namespace RigV3.Serveur.Socle.Courriels;
 
 /// <summary>
 /// Les courriels du greffe (SOC-006) : le service d'envoi (<see cref="ServiceCourriels"/>) pour les actes de la V3, le
-/// menage quotidien des traces (<see cref="MenageCourriels"/>), cinq routes de lecture pour les ecrans « Courriels
-/// envoyés » (les envois, un envoi) et « Messagerie » (les modeles, un modele et son apercu, les listes de distribution), et six
-/// routes d'ecriture pour la Messagerie (creer, modifier, activer ou desactiver un modele et une liste : <see cref="GestionCourriels"/>).
+/// menage quotidien des traces (<see cref="MenageCourriels"/>), six routes de lecture pour les ecrans « Courriels
+/// envoyés » (les envois, un envoi) et « Messagerie » (les modeles, un modele et son apercu, les listes de distribution, les boites
+/// du greffe par leur adresse), et six routes d'ecriture pour la Messagerie (creer, modifier, activer ou desactiver un modele et une liste : <see cref="GestionCourriels"/>).
 ///
 /// Les routes portent le greffe dans leur adresse et <see cref="PolitiquesSocle.AgentAdmis"/>, posee une fois sur leur
 /// groupe : l'agent est juge dans la base de CE greffe (401, 403, 404, 503 par la politique). La liste des envois et le
@@ -77,6 +77,14 @@ internal sealed class ModuleCourriels : IModuleServeur
                 await droits.AppelantAsync(http, commune, cn, ct) is { } moi
                     ? Results.Ok(await ServiceCourriels.ListesVisiblesAsync(cn, moi.CompteWindows, ct))
                     : NonAdmis()));
+
+        // Le formulaire d'un modele (lot 16) : les boites du greffe par leur adresse (INFO_GREFFE) et l'etat de son habillage.
+        courriels.MapGet(RoutesCourriels.Boites, async (string greffe, HttpContext http, CatalogueGreffes c,
+                                                        ServiceDroits droits, BaseRig commune, CancellationToken ct) =>
+            await SurBaseDuGreffe(c, greffe, ct, async cn =>
+                await droits.AppelantAsync(http, commune, cn, ct) is null
+                    ? NonAdmis()
+                    : Results.Ok(await GestionCourriels.BoitesAsync(greffe, cn, c, commune, ct))));
 
         // --- La gestion (ecran « Messagerie », procedure V2 PROC_GESTEMAIL) : chaque geste dans sa transaction, avec sa ligne au
         // --- journal des gestes ; un modele reserve a Amitel n'existe pas pour un agent du greffe (404, CA05).

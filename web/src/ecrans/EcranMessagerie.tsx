@@ -15,13 +15,24 @@
 //
 // L'ECRITURE (lot 15) : un agent qui a la fonction GESTEMAIL (vue.peutModifier, dit par le serveur) cree, modifie,
 // desactive et reactive un modele et une liste : Nouveau, Enregistrer, Annuler, Désactiver / Réactiver, comme les barres
-// de la V2. Le serveur controle chaque saisie ; son motif s'affiche tel quel et la saisie reste a l'ecran. Une saisie non
-// enregistree n'est jamais perdue en silence : ouvrir un autre modele ou une autre liste est refuse tant qu'elle n'est ni
-// enregistree ni annulee (la V2 posait la question, OPE_RECHERCHE_EMAILMODEL.LoadEmailModel). Sans GESTEMAIL : la
-// lecture, sans aucun bouton d'ecriture. Sans serveur : la demonstration du pont, avec son bandeau ; chaque enregistrement
-// y est refuse et le dit.
+// de la V2. Le serveur controle chaque saisie ; son motif s'affiche tel quel et la saisie reste a l'ecran. Sans GESTEMAIL :
+// la lecture, sans aucun bouton d'ecriture. Sans serveur : la demonstration du pont, avec son bandeau ; chaque
+// enregistrement y est refuse et le dit.
+//
+// LES GESTES DE LA V2 (lot 16) :
+//  - le texte d'un modele HTML s'edite dans un editeur mis en forme (les boutons de RigHtmlEditor) quand le greffe a un
+//    habillage regle, la condition de la V2 (OPE_EDIT_EMAILMODEL.LinkDonnees : EMAILMOD_CORPS_HTML && _TemplateActif) ;
+//    le serveur assainit le HTML a chaque enregistrement (regles de RigHtmlSanitizer) ;
+//  - expediteur, « Répondre à » et « Copie cachée » se choisissent parmi les boites du greffe, montrees par leur ADRESSE
+//    (INFO_GREFFE, lue par le serveur), ou en saisie libre ; la base garde l'etiquette [ADRESSE_MAIL_X]
+//    (OPE_EDIT_EMAILMODEL_ONE_CHOICE, OPE_EDIT_EMAILMODEL_MANY_CHOICES « RA » et « CC ») ;
+//  - « Ajouter le logo » ajoute $LOGO$ au texte, le modele passe en HTML ; refuse sous l'habillage du greffe, comme le serveur ;
+//  - ouvrir un autre modele avec une saisie en cours pose la question de la V2 (OPE_RECHERCHE_EMAILMODEL.LoadEmailModel) :
+//    « Oui » enregistre puis ouvre l'autre (un refus du serveur garde la saisie et n'ouvre rien), « Non » abandonne la saisie.
+// fix-ok: ecarts V2 releves par le chef et lus dans ce fichier avant le lot 16 -- texte HTML en <textarea> brut, adresses tapees
+// en etiquettes (datalist [ADRESSE_MAIL_…]), aucun bouton « Ajouter le logo », changement de modele refuse par un message.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, estBlanc } from '../criteres'
 
@@ -69,6 +80,22 @@ export interface ApercuModele {
   signature: string | null
 }
 
+/** Une boite du greffe (Contrats/Socle/Courriels.cs, BoiteCourriel) : son etiquette et son adresse dans INFO_GREFFE. */
+export interface BoiteCourriel {
+  etiquette: string
+  /** "" : le greffe n'a pas d'adresse pour cette boite. */
+  adresse: string
+}
+
+/** Ce que le formulaire d'un modele propose pour CE greffe (BoitesDuGreffe). */
+export interface BoitesDuGreffe {
+  boites: BoiteCourriel[]
+  /** SEND_EMAIL_TEMPLATE_PATH est regle : un modele HTML s'edite dans l'editeur mis en forme (_TemplateActif de la V2). */
+  habillageRegle: boolean
+  /** Le greffe a un habillage (en base ou en fichier) : $LOGO$ est refuse. */
+  habillagePresent: boolean
+}
+
 export interface VueEcranMessagerie {
   mode: 'serveur' | 'demo' | 'sans-greffe' | 'refuse' | 'erreur'
   message: string | null
@@ -84,6 +111,8 @@ export interface VueEcranMessagerie {
   compte: string | null
   /** Le dictionnaire des tags de la V2, pour un agent d'Amitel seulement. */
   dictionnaire: string | null
+  /** Les boites du greffe et son habillage ; null quand rien n'est lu (refus, panne, aucun greffe). */
+  boites: BoitesDuGreffe | null
 }
 
 export interface VueModeleMessagerie {
@@ -143,8 +172,32 @@ const Domaines: { nom: string; libelle: string; vrai: (m: ModeleMessage) => bool
 /** CheckBoxAmitel de la V2, visible pour un agent d'Amitel seulement (OPE_EDIT_EMAILMODEL.cs:333). */
 const DomaineAmitel = { nom: 'Amitel', libelle: 'Modèle modifiable uniquement par Amitel', vrai: (m: ModeleMessage) => m.reserveAmitel }
 const LibelleEnvoiAuto = 'Mail envoyé automatiquement (sans affichage de l\'écran de mail)'
-/** Les boites du greffe que la V2 propose pour l'expediteur (OPE_EDIT_EMAILMODEL_ONE_CHOICE.ConstructGroupRadioButton). */
-const BoitesDuGreffe = ['ADRESSE_MAIL_RCS', 'ADRESSE_MAIL_JUDICIAIRE', 'ADRESSE_MAIL_NANTISSEMENTS', 'ADRESSE_MAIL_COMPTABILITE', 'ADRESSE_MAIL_NO_REPLY']
+
+// Les boites du greffe (colonnes d'INFO_GREFFE) et leur nom court, montre a cote de leur adresse : deux boites d'un greffe
+// ont souvent la meme adresse (RIG_DEV : RCS et nantissements, comptabilite et « ne pas répondre »).
+const NoReply = 'ADRESSE_MAIL_NO_REPLY'
+const NomsDesBoites: Record<string, string> = {
+  ADRESSE_MAIL_RCS: 'RCS', ADRESSE_MAIL_JUDICIAIRE: 'judiciaire', ADRESSE_MAIL_NANTISSEMENTS: 'nantissements',
+  ADRESSE_MAIL_COMPTABILITE: 'comptabilité', [NoReply]: 'ne pas répondre',
+  ADRESSE_MAIL_ACCUSE_ENVOI_JUD: 'accusé d\'envoi judiciaire', ADRESSE_MAIL_ACCUSE_ENVOI_RCS: 'accusé d\'envoi RCS',
+  ADRESSE_MAIL_ACCUSE_ENVOI_NANT: 'accusé d\'envoi nantissements', ADRESSE_MAIL_ACCUSE_ENVOI_CPT: 'accusé d\'envoi comptabilité',
+}
+/** Expediteur et « Répondre à » : OPE_EDIT_EMAILMODEL_ONE_CHOICE.ConstructGroupRadioButton et MANY_CHOICES « RA ». */
+const BoitesExpediteur = ['ADRESSE_MAIL_RCS', 'ADRESSE_MAIL_JUDICIAIRE', 'ADRESSE_MAIL_NANTISSEMENTS', 'ADRESSE_MAIL_COMPTABILITE', NoReply]
+/** « Copie cachée » : MANY_CHOICES « CC », sans « ne pas répondre » (interdit en copie), avec les accuses d'envoi. */
+const BoitesCopie = ['ADRESSE_MAIL_RCS', 'ADRESSE_MAIL_JUDICIAIRE', 'ADRESSE_MAIL_NANTISSEMENTS', 'ADRESSE_MAIL_COMPTABILITE',
+  'ADRESSE_MAIL_ACCUSE_ENVOI_JUD', 'ADRESSE_MAIL_ACCUSE_ENVOI_RCS', 'ADRESSE_MAIL_ACCUSE_ENVOI_NANT', 'ADRESSE_MAIL_ACCUSE_ENVOI_CPT']
+/** V2 CheckUtilisableEn : cocher « Utilisable X » coche l'accuse d'envoi X en copie cachee. */
+const AccuseDe = {
+  lot1: 'ADRESSE_MAIL_ACCUSE_ENVOI_RCS', lot2: 'ADRESSE_MAIL_ACCUSE_ENVOI_JUD', inscription: 'ADRESSE_MAIL_ACCUSE_ENVOI_NANT',
+  comptabilite: 'ADRESSE_MAIL_ACCUSE_ENVOI_CPT',
+} as const
+type CaseUtilisable = keyof typeof AccuseDe
+
+/** Le refus du serveur sous habillage (ReglesCourriels.ControlerModele), dit des le clic sur « Ajouter le logo ». */
+const RefusLogo = 'Le tag $LOGO$ est interdit quand un template est actif (le logo est positionné dans le template).'
+/** La question de la V2 avant d'ouvrir un autre modele (OPE_RECHERCHE_EMAILMODEL.LoadEmailModel, :107). */
+const QuestionChangement = 'Des changements ont été saisis, voulez-vous les enregistrer ?'
 
 const Message = { margin: 0, padding: 'var(--rig-esp-2) var(--rig-esp-3)' } as const
 const Fiche = { padding: 'var(--rig-esp-3)', display: 'flex', flexDirection: 'column', gap: 'var(--rig-esp-2)', overflow: 'auto' } as const
@@ -157,6 +210,11 @@ const Bascules = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minm
 const Actions = { display: 'flex', flexWrap: 'wrap', gap: 'var(--rig-esp-2)', paddingTop: 'var(--rig-esp-2)' } as const
 const Demande = { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--rig-esp-2)' } as const
 const Dictionnaire = { margin: 0, padding: 'var(--rig-esp-2)', fontSize: 'var(--rig-fs-dense)', whiteSpace: 'pre-wrap', border: '1px solid var(--rig-bord)', borderRadius: 'var(--rig-rayon, 4px)' } as const
+const BarreEditeur = { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--rig-esp-1)' } as const
+const TitreRequis = { display: 'flex', alignItems: 'center', gap: 'var(--rig-esp-2)' } as const
+const Separateur = { width: '1px', alignSelf: 'stretch', background: 'var(--rig-bord)', margin: '0 var(--rig-esp-1)' } as const
+// La zone editable : le style d'une zone de saisie de la maquette, hauteur de la zone de texte qu'elle remplace (7 lignes).
+const ZoneEditeur = { minHeight: '9.5em', maxHeight: '24em', overflow: 'auto', whiteSpace: 'normal', lineHeight: 1.45, cursor: 'text' } as const
 
 const ouiNon = (b: boolean) => (b ? 'Oui' : 'Non')
 const proprietaire = (p: string | null) => (p === '*' ? 'Tous les agents' : p ?? '—')
@@ -170,6 +228,54 @@ const enBarres = (corps: string) => !/[\r\n]/.test(corps)
 const versSaisie = (corps: string) => (enBarres(corps) ? corps.split('|').join('\n') : corps)
 const versBase = (texte: string, barres: boolean) => (barres ? texte.split('\n').join('|') : texte)
 
+// L'editeur mis en forme recoit un texte deja HTML tel quel ; un texte sans balise (25 des 37 modeles HTML de RIG_DEV, ecrits
+// en lignes) y entre avec ses sauts de ligne en <br />, comme l'editeur de la V2 (Ult_HtmlEditor._CorpsToHtml).
+const echapper = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+const versEditeur = (corps: string) => (corps.includes('<') ? corps : echapper(corps).replace(/\r\n|\n|\|/g, '<br />'))
+
+/** L'expediteur tel que la V2 le decoupe (RegEx.DecoupeMailInfoGreffe) : libelle, et une boite du greffe OU une adresse libre. */
+interface Expediteur {
+  libelle: string
+  /** L'etiquette choisie (« ADRESSE_MAIL_RCS ») ; null : « Saisie libre ». */
+  boite: string | null
+  adresse: string
+}
+
+function expediteurDe(valeur: string): Expediteur {
+  const m = /([^;<]*)<([^;>]*)>/.exec(valeur)
+  const libelle = (m ? m[1]! : '').trim()
+  const adresse = (m ? m[2]! : valeur).trim()
+  const etiquette = /^\[([A-Za-z_]+)\]$/.exec(adresse)?.[1]
+  // Une etiquette que le formulaire ne propose pas reste en saisie libre, telle quelle : rien ne se perd.
+  return etiquette && BoitesExpediteur.includes(etiquette) ? { libelle, boite: etiquette, adresse: '' } : { libelle, boite: null, adresse }
+}
+
+/** « Libellé <[ADRESSE_MAIL_X]> », comme OPE_EDIT_EMAILMODEL_ONE_CHOICE (DoPreparerSauvegarde) ; "" sans adresse (le serveur
+ *  le refuse : l'expediteur est obligatoire). */
+function expediteurEnBase(e: Expediteur): string {
+  const adresse = e.boite ? `[${e.boite}]` : e.adresse.trim()
+  if (adresse.length === 0) return ''
+  return e.libelle.trim().length > 0 ? `${e.libelle.trim()} <${adresse}>` : adresse
+}
+
+/** « Répondre à » ou « Copie cachée » : les boites cochees et la saisie libre (OPE_EDIT_EMAILMODEL_MANY_CHOICES). */
+interface Adresses { boites: string[]; libre: string }
+
+function adressesDe(valeur: string, proposees: string[]): Adresses {
+  const boites: string[] = []
+  const libres: string[] = []
+  for (const morceau of valeur.split(';').map((x) => x.trim()).filter((x) => x.length > 0)) {
+    const etiquette = /^\[([A-Za-z_]+)\]$/.exec(morceau)?.[1]
+    // La V2 laissait tomber une etiquette qu'elle ne proposait pas (GetValueOfPropertyForCheckbox) : ici elle reste en saisie libre.
+    if (etiquette && proposees.includes(etiquette)) { if (!boites.includes(etiquette)) boites.push(etiquette) } else libres.push(morceau)
+  }
+  return { boites, libre: libres.join(';') }
+}
+
+/** La saisie libre d'abord, puis les etiquettes cochees dans l'ordre du formulaire, comme MANY_CHOICES.Valider. */
+const adressesEnBase = (a: Adresses, proposees: string[]) =>
+  [a.libre.trim(), ...proposees.filter((b) => a.boites.includes(b)).map((b) => `[${b}]`)].filter((x) => x.length > 0).join(';')
+
 /** Le formulaire d'un modele, tel que l'agent le saisit. */
 interface FicheModele {
   /** null : un modele neuf (« Ajout d'un modèle de mail ») ; sinon le nom du modele en base. */
@@ -177,11 +283,18 @@ interface FicheModele {
   type: string
   libelleEcran: string
   sujet: string
+  /** Le texte : en lignes dans la zone de texte, en HTML dans l'editeur mis en forme. */
   texte: string
   barres: boolean
-  expediteur: string
-  reponse: string
-  copie: string
+  /** Ouvert dans l'editeur mis en forme : modele HTML sous un habillage regle, decide a l'ouverture comme la V2 (LinkDonnees). */
+  editeur: boolean
+  /** Le texte tel qu'en base : renvoye tel quel tant que l'agent n'a pas touche au texte de l'editeur. */
+  corpsOrigine: string
+  /** Le modele est HTML, ou le devient (« Ajouter le logo »). */
+  html: boolean
+  expediteur: Expediteur
+  reponse: Adresses
+  copie: Adresses
   destinataireDefaut: string
   lot1: boolean
   lot2: boolean
@@ -194,18 +307,24 @@ interface FicheModele {
   listes: number[]
 }
 
-// Un modele neuf : les valeurs par defaut de soc.ModeleMessage (RCS et judiciaire coches, comme EMAIL_MODEL).
+// Un modele neuf : les valeurs par defaut de soc.ModeleMessage (RCS et judiciaire coches, comme EMAIL_MODEL), un texte
+// (la V2 cree un modele texte), l'expediteur en saisie libre, et l'accuse d'envoi judiciaire en copie cachee comme
+// l'ajout de la V2 (MANY_CHOICES.LinkDonnees : « en mode ajout, je coche CheckBoxAdrMailAccuseEnvoiJud »).
 const ModeleNeuf: FicheModele = {
-  origine: null, type: '', libelleEcran: '', sujet: '', texte: '', barres: true, expediteur: '', reponse: '', copie: '',
-  destinataireDefaut: '', lot1: true, lot2: true, inscription: false, comptabilite: false, envoiAutomatique: false,
-  reserveAmitel: false, signatureActive: false, signature: '', listes: [],
+  origine: null, type: '', libelleEcran: '', sujet: '', texte: '', barres: true, editeur: false, corpsOrigine: '', html: false,
+  expediteur: { libelle: '', boite: null, adresse: '' }, reponse: { boites: [], libre: '' },
+  copie: { boites: ['ADRESSE_MAIL_ACCUSE_ENVOI_JUD'], libre: '' }, destinataireDefaut: '', lot1: true, lot2: true,
+  inscription: false, comptabilite: false, envoiAutomatique: false, reserveAmitel: false, signatureActive: false, signature: '', listes: [],
 }
 
-function ficheDe(a: ApercuModele): FicheModele {
+function ficheDe(a: ApercuModele, habillageRegle: boolean): FicheModele {
   const m = a.modele
+  const editeur = m.corpsHtml && habillageRegle
   return {
-    origine: m.type, type: m.type, libelleEcran: m.libelleEcran ?? '', sujet: m.sujet, texte: versSaisie(a.corps), barres: enBarres(a.corps),
-    expediteur: m.expediteur ?? '', reponse: m.reponse ?? '', copie: m.copie ?? '', destinataireDefaut: m.destinataireDefaut ?? '',
+    origine: m.type, type: m.type, libelleEcran: m.libelleEcran ?? '', sujet: m.sujet,
+    texte: editeur ? versEditeur(a.corps) : versSaisie(a.corps), barres: enBarres(a.corps), editeur, corpsOrigine: a.corps, html: m.corpsHtml,
+    expediteur: expediteurDe(m.expediteur ?? ''), reponse: adressesDe(m.reponse ?? '', BoitesExpediteur),
+    copie: adressesDe(m.copie ?? '', BoitesCopie), destinataireDefaut: m.destinataireDefaut ?? '',
     lot1: m.lot1, lot2: m.lot2, inscription: m.inscription === true, comptabilite: m.comptabilite === true,
     envoiAutomatique: m.envoiAutomatique, reserveAmitel: m.reserveAmitel, signatureActive: a.signatureActive, signature: a.signature ?? '',
     // Cochees : les listes liees que l'agent peut cocher, les actives (OPE_EDIT_EMAILMODEL_LISTE_DISTRIB.LinkDonnees) ; a
@@ -215,9 +334,12 @@ function ficheDe(a: ApercuModele): FicheModele {
 }
 
 function saisieDe(f: FicheModele): SaisieModele {
+  // L'editeur : le texte de la base tant que l'agent n'y a pas touche (la V2 : _userEdited), sinon le HTML saisi.
+  const corps = f.editeur ? (f.texte === versEditeur(f.corpsOrigine) ? f.corpsOrigine : f.texte) : versBase(f.texte, f.barres)
   return {
-    type: f.type, libelleEcran: f.libelleEcran, sujet: f.sujet, corps: versBase(f.texte, f.barres), expediteur: f.expediteur,
-    reponse: f.reponse, copie: f.copie, destinataireDefaut: f.destinataireDefaut, lot1: f.lot1, lot2: f.lot2, inscription: f.inscription,
+    type: f.type, libelleEcran: f.libelleEcran, sujet: f.sujet, corps, expediteur: expediteurEnBase(f.expediteur),
+    reponse: adressesEnBase(f.reponse, BoitesExpediteur), copie: adressesEnBase(f.copie, BoitesCopie),
+    destinataireDefaut: f.destinataireDefaut, lot1: f.lot1, lot2: f.lot2, inscription: f.inscription,
     comptabilite: f.comptabilite, envoiAutomatique: f.lot1 && f.envoiAutomatique, reserveAmitel: f.reserveAmitel,
     signatureActive: f.signatureActive, signature: f.signature, listesParDefaut: f.listes, ecran: null,
   }
@@ -252,14 +374,14 @@ function Champ({ libelle, valeur, titre }: { libelle: string; valeur: string; ti
   )
 }
 
-function Saisie({ libelle, valeur, changer, requis, taille, lecture, liste, titre }: {
-  libelle: string; valeur: string; changer: (v: string) => void; requis?: boolean; taille: number; lecture?: boolean; liste?: string; titre?: string
+function Saisie({ libelle, valeur, changer, requis, taille, lecture, titre }: {
+  libelle: string; valeur: string; changer: (v: string) => void; requis?: boolean; taille: number; lecture?: boolean; titre?: string | undefined
 }) {
   return (
     <label className="rig-saisie-champ">
       <span className="rig-saisie-champ__libelle">{libelle}{requis && <span className="rig-saisie-champ__requis">requis</span>}</span>
       {/* Le nom du champ est son libelle seul : la marque « requis » n'en fait pas partie. */}
-      <input className="rig-saisie-champ__saisie" aria-label={libelle} value={valeur} maxLength={taille} readOnly={lecture} list={liste}
+      <input className="rig-saisie-champ__saisie" aria-label={libelle} value={valeur} maxLength={taille} readOnly={lecture}
              title={titre} onChange={(e) => changer(e.target.value)} />
     </label>
   )
@@ -276,9 +398,116 @@ function Bascule({ libelle, vrai, basculer, inactif, titre }: {
   )
 }
 
-/** Desactiver / activer un modele ou une liste attend la reponse de l'agent. Son objet (« modele:CA », « liste:7 ») : la
- *  question ne se montre que sur la fiche qui l'a posee. */
-interface QuestionEnCours { objet: string; texte: string; oui: () => void }
+/** Un choix parmi plusieurs (l'expediteur : une boite OU la saisie libre), dans le style des bascules de la maquette. */
+function Choix({ libelle, vrai, choisir, titre }: { libelle: string; vrai: boolean; choisir: () => void; titre?: string | undefined }) {
+  return (
+    <button type="button" role="radio" aria-checked={vrai} className={`rig-bascule${vrai ? ' rig-bascule--actif' : ''}`} title={titre}
+            onClick={choisir}>
+      <span className="rig-bascule__temoin"></span><span>{libelle}</span>
+    </button>
+  )
+}
+
+/** Une boite du greffe telle que l'agent la choisit : son ADRESSE dans ce greffe, son nom court ; l'etiquette en infobulle. */
+const libelleBoite = (etiquette: string, adresse: string) =>
+  `${adresse.length > 0 ? adresse : 'aucune adresse dans ce greffe'} (${NomsDesBoites[etiquette] ?? etiquette})`
+
+/**
+ * Les boutons de RigHtmlEditor (D:\RigApplication\Source\Outils\DLL\RigHtmlEditor\RigHtmlEditor.cs, AjouterBouton), dans son
+ * ordre et avec ses textes ; leur nom est l'infobulle de la V2 (« Effacer mise en forme » : son texte). Chacun est la commande
+ * d'edition du navigateur que la V2 passait a ExecCommand (WebBrowser), sans paquet de plus.
+ */
+const BoutonsEditeur: ({ texte: string; nom: string; titre: string; commande: string; style?: CSSProperties } | null)[] = [
+  { texte: 'G', nom: 'Gras', titre: 'Gras', commande: 'bold', style: { fontWeight: 700 } },
+  { texte: 'I', nom: 'Italique', titre: 'Italique', commande: 'italic', style: { fontStyle: 'italic' } },
+  { texte: 'S', nom: 'Souligné', titre: 'Souligné', commande: 'underline', style: { textDecoration: 'underline' } },
+  null,
+  { texte: '• Liste', nom: 'Liste à puces', titre: 'Liste à puces', commande: 'insertUnorderedList' },
+  { texte: '1. Liste', nom: 'Liste numérotée', titre: 'Liste numérotée', commande: 'insertOrderedList' },
+  null,
+  { texte: 'Lien', nom: 'Insérer un lien', titre: 'Insérer un lien', commande: 'createLink' },
+  { texte: 'Effacer mise en forme', nom: 'Effacer mise en forme', titre: 'Retirer la mise en forme', commande: 'removeFormat' },
+]
+
+/**
+ * L'editeur mis en forme du texte d'un modele HTML : une zone editable et la barre de RigHtmlEditor. <c>valeur</c> est son HTML ;
+ * chaque saisie, collage ou mise en forme le rend par <c>changer</c>. Le HTML n'est pas assaini ici : le serveur l'assainit a
+ * chaque enregistrement (regles de RigHtmlSanitizer), seul juge de ce qui est garde.
+ */
+function EditeurHtml({ libelle, valeur, changer }: { libelle: string; valeur: string; changer: (html: string) => void }) {
+  const zone = useRef<HTMLDivElement>(null)
+  // La selection de l'agent dans la zone : un clic sur la barre ou la saisie de l'adresse d'un lien la lui ferait perdre (la
+  // V2 agissait au MouseDown pour la garder, Bouton_MouseDown).
+  const selection = useRef<Range | null>(null)
+  const [lien, setLien] = useState<string | null>(null)
+
+  // Le HTML ne se recopie dans la zone que s'il vient d'ailleurs (ouverture, Annuler, logo) : sinon le curseur sauterait.
+  // Pose AVANT l'affichage (effet de mise en page) : par un effet differe, la zone restait vide un instant, et un test qui la
+  // lisait juste apres l'ouverture la trouvait vide sous charge (vitest complet du 2026-11-21 : '' au lieu du texte).
+  useLayoutEffect(() => {
+    const z = zone.current
+    if (z && z.innerHTML !== valeur) z.innerHTML = valeur
+  }, [valeur])
+
+  const retenir = () => {
+    const s = window.getSelection()
+    if (zone.current && s && s.rangeCount > 0 && zone.current.contains(s.anchorNode)) selection.current = s.getRangeAt(0).cloneRange()
+  }
+  const lire = () => {
+    retenir()
+    if (zone.current) changer(zone.current.innerHTML)
+  }
+  const executer = (commande: string, argument?: string) => {
+    const z = zone.current
+    if (!z) return
+    z.focus()
+    const s = window.getSelection()
+    if (s && selection.current) { s.removeAllRanges(); s.addRange(selection.current) }
+    document.execCommand(commande, false, argument)
+    lire()
+  }
+  const poserLien = () => {
+    const adresse = (lien ?? '').trim()
+    setLien(null)
+    // V2 DemanderUrl : une adresse vide ne cree rien.
+    if (adresse.length > 0 && adresse !== 'https://') executer('createLink', adresse)
+  }
+
+  return (
+    <div className="rig-saisie-champ">
+      <span className="rig-saisie-champ__libelle">{libelle}<span className="rig-saisie-champ__requis">requis</span></span>
+      <div role="toolbar" aria-label="Mise en forme du texte" style={BarreEditeur}>
+        {BoutonsEditeur.map((b, i) => b === null ? <span key={`sep${i}`} style={Separateur} aria-hidden="true"></span> : (
+          <button key={b.commande} type="button" className="rig-bouton rig-bouton--plat" aria-label={b.nom} title={b.titre} style={b.style}
+                  // Le clic ne prend pas le focus a la zone : la selection a mettre en forme reste celle de l'agent.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => (b.commande === 'createLink' ? setLien('https://') : executer(b.commande))}>
+            {b.texte}
+          </button>
+        ))}
+      </div>
+      {lien !== null && (
+        // DemanderUrl de la V2 : l'adresse, pre-remplie « https:// », OK ou Annuler.
+        <div role="dialog" aria-label="Insérer un lien" style={BarreEditeur}>
+          <input className="rig-saisie-champ__saisie" aria-label="Adresse du lien" value={lien} autoFocus style={{ flex: '1 1 18em' }}
+                 onChange={(e) => setLien(e.target.value)}
+                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); poserLien() } else if (e.key === 'Escape') setLien(null) }} />
+          <button type="button" className="rig-bouton rig-bouton--fort" onClick={poserLien}>OK</button>
+          <button type="button" className="rig-bouton" onClick={() => setLien(null)}>Annuler</button>
+        </div>
+      )}
+      <div ref={zone} className="rig-saisie-champ__saisie" role="textbox" aria-multiline="true" aria-label={libelle}
+           contentEditable suppressContentEditableWarning style={ZoneEditeur}
+           // La saisie seule change la valeur (comme _userEdited de la V2) : entrer dans la zone et en sortir ne « modifie » rien,
+           // meme si le navigateur ecrit autrement le HTML de la base (<BR> devient <br>).
+           onInput={lire} onKeyUp={retenir} onMouseUp={retenir} />
+    </div>
+  )
+}
+
+/** Une question attend la reponse de l'agent : Desactiver / activer (son objet : « modele:CA », « liste:7 », la question ne se
+ *  montre que sur la fiche qui l'a posee), ou ouvrir un autre modele avec une saisie en cours (« changement »). */
+interface QuestionEnCours { objet: string; texte: string; oui: () => void; non?: () => void }
 
 /** La question de la V2 avant Désactiver / Activer (DialogBox.Show(..., WarningYesNo), OPE_EDIT_EMAILMODEL.cs:63, :68 ;
  *  OPE_EDIT_LISTEDISTRIBUTIONMAIL.cs:39, :44) : « Oui » fait le geste, « Non » ne fait rien. */
@@ -315,18 +544,27 @@ export function EcranMessagerie() {
   const modifie = saisie !== null && !memes(saisie, initiale)
   const listeModifiee = liste !== null && !memes(liste, listeInitiale)
 
+  // L'habillage regle du greffe, lu a l'ouverture : il decide de l'editeur d'un modele qu'on ouvre (une fiche peut s'ouvrir dans
+  // le meme tour que la vue est posee, avant que son etat soit relu).
+  const habillageRegle = useRef(false)
+  const poserVue = (v: VueEcranMessagerie) => {
+    habillageRegle.current = v.boites?.habillageRegle === true
+    setVue(v)
+  }
+
   const poserFiche = (f: VueModeleMessagerie | null) => {
     setQuestion(null)
     setFiche(f)
-    const formulaire = f?.apercu ? ficheDe(f.apercu) : null
+    const formulaire = f?.apercu ? ficheDe(f.apercu, habillageRegle.current) : null
     setSaisie(formulaire)
     setInitiale(formulaire)
   }
 
-  /** Refuse de quitter une saisie non enregistree (le message le dit) ; vrai si l'agent peut changer de fiche. */
+  /** Refuse d'ouvrir une liste tant qu'une saisie est en cours, et un modele tant qu'une saisie de LISTE l'est (le message dit
+   *  laquelle ; un modele en cours pose la question de la V2, voir quitterModele) ; vrai si l'agent peut changer de fiche. */
   const libre = () => {
     if (modifie || listeModifiee) {
-      const quoi = modifie ? `Le modèle ${saisie?.origine ?? 'neuf'}` : `La liste ${liste?.code || 'neuve'}`
+      const quoi = listeModifiee ? `La liste ${liste?.code || 'neuve'}` : `Le modèle ${saisie?.origine ?? 'neuf'}`
       setResultat({ ok: false, texte: `${quoi} a des modifications non enregistrées : enregistrez-les ou annulez-les avant d'ouvrir autre chose.` })
       return false
     }
@@ -343,7 +581,7 @@ export function EcranMessagerie() {
     let vivant = true
     void appeler<VueEcranMessagerie>('EcranMessagerie.Ouvrir').then((v) => {
       if (!vivant) return
-      setVue(v)
+      poserVue(v)
       const premier = v.modeles.find(actif)
       if (premier && (v.mode === 'serveur' || v.mode === 'demo')) void ouvrir(premier.type)
     })
@@ -357,7 +595,7 @@ export function EcranMessagerie() {
       const r = await geste()
       setResultat({ ok: r.ok, texte: r.message })
       if (!r.ok) return
-      if (r.vue) setVue(r.vue)
+      if (r.vue) poserVue(r.vue)
       if (r.fiche) {
         setChoisi(r.fiche.apercu?.modele.type ?? choisi)
         poserFiche(r.fiche)
@@ -404,22 +642,67 @@ export function EcranMessagerie() {
   const listeCourante = liste?.id != null ? vue.listes.find((l) => l.id === liste.id) : undefined
 
   const changer = <K extends keyof FicheModele>(cle: K, valeur: FicheModele[K]) => setSaisie((f) => (f ? { ...f, [cle]: valeur } : f))
-  // V2 _SetVisibilityChkEnvoiAuto : sans RCS, l'envoi automatique est remis a faux.
-  const basculerRcs = () => setSaisie((f) => (f ? { ...f, lot1: !f.lot1, envoiAutomatique: f.lot1 ? false : f.envoiAutomatique } : f))
+  /** Les cases « Utilisable … » : sans RCS, l'envoi automatique est remis a faux (_SetVisibilityChkEnvoiAuto) ; cocher une case
+   *  coche son accuse d'envoi en copie cachee (CheckBoxUtilisableEn_ChangementValeur -> CheckUtilisableEn). */
+  const basculerUtilisable = (cle: CaseUtilisable) => setSaisie((f) => {
+    if (!f) return f
+    const suite: FicheModele = { ...f, [cle]: !f[cle] }
+    if (cle === 'lot1' && f.lot1) suite.envoiAutomatique = false
+    if (!f[cle] && !f.copie.boites.includes(AccuseDe[cle])) suite.copie = { ...f.copie, boites: [...f.copie.boites, AccuseDe[cle]] }
+    return suite
+  })
   const basculerListeDefaut = (id: number) =>
     setSaisie((f) => (f ? { ...f, listes: f.listes.includes(id) ? f.listes.filter((x) => x !== id) : [...f.listes, id] } : f))
   // Les listes a cocher : les actives que l'agent voit (OPE_EDIT_EMAILMODEL_LISTE_DISTRIB.DoInitZoneSaisie, :99).
   const listesACocher = vue.listes.filter((l) => l.actif)
 
-  const nouveauModele = () => {
-    if (!libre()) return
+  /** L'adresse d'une boite dans CE greffe (INFO_GREFFE, rendue par le serveur) ; "" s'il n'en a pas. */
+  const adresseDe = (etiquette: string) => vue.boites?.boites.find((b) => b.etiquette === etiquette)?.adresse ?? ''
+  const changerExpediteur = (e: Partial<Expediteur>) => setSaisie((f) => (f ? { ...f, expediteur: { ...f.expediteur, ...e } } : f))
+  /** « Répondre à » : « ne pas répondre » exclut les autres boites et la saisie libre, et inversement (MANY_CHOICES « RA »,
+   *  CheckBox_ChangementValeur). */
+  const basculerReponse = (b: string) => setSaisie((f) => {
+    if (!f) return f
+    const coche = !f.reponse.boites.includes(b)
+    const boites = coche ? [...f.reponse.boites, b] : f.reponse.boites.filter((x) => x !== b)
+    return { ...f, reponse: coche && b === NoReply ? { boites: [NoReply], libre: '' } : { ...f.reponse, boites } }
+  })
+  const basculerCopie = (b: string) => setSaisie((f) => (f ? {
+    ...f, copie: { ...f.copie, boites: f.copie.boites.includes(b) ? f.copie.boites.filter((x) => x !== b) : [...f.copie.boites, b] },
+  } : f))
+
+  /** « Ajouter le logo » (OPE_EDIT_EMAILMODEL.Toolbar_ButtonClick, APERCU) : $LOGO$ a la fin du texte, le modele passe en HTML.
+   *  Sous l'habillage du greffe, le serveur le refuserait : l'ecran le dit tout de suite, avec la meme phrase, sans rien ajouter. */
+  const ajouterLogo = () => {
+    if (vue.boites?.habillagePresent) { setResultat({ ok: false, texte: RefusLogo }); return }
+    setResultat(null)
+    setSaisie((f) => (f ? { ...f, html: true, texte: f.editeur ? `${f.texte}<br />$LOGO$` : `${f.texte}\n$LOGO$` } : f))
+  }
+
+  /**
+   * Quitter le modele ouvert pour <c>suite</c> (ouvrir un autre modele, en creer un). Avec une saisie en cours, la question de la
+   * V2 (OPE_RECHERCHE_EMAILMODEL.LoadEmailModel) : « Oui » l'enregistre puis fait la suite -- refusee par le serveur, la saisie
+   * reste et rien d'autre ne s'ouvre ; « Non » l'abandonne et fait la suite. Une saisie de LISTE en cours reste refusee (libre).
+   */
+  const quitterModele = (suite: () => void) => {
+    if (listeModifiee) { libre(); return }
+    setResultat(null)
+    if (!modifie || !saisie) { suite(); return }
+    const enCours = saisie
+    setQuestion({
+      objet: 'changement', texte: QuestionChangement,
+      oui: () => void agir(() => appeler<ResultatMessagerie>('EcranMessagerie.EnregistrerModele', saisieDe(enCours), enCours.origine), suite),
+      non: suite,
+    })
+  }
+
+  const nouveauModele = () => quitterModele(() => {
     setOnglet('modele')
     setChoisi(null)
     setFiche(null)
     setSaisie(ModeleNeuf)
     setInitiale(ModeleNeuf)
-    setResultat(null)
-  }
+  })
   const enregistrerModele = () => {
     if (!saisie) return
     void agir(() => appeler<ResultatMessagerie>('EcranMessagerie.EnregistrerModele', saisieDe(saisie), saisie.origine))
@@ -435,7 +718,7 @@ export function EcranMessagerie() {
   })
   /** La question posee sur la fiche <c>objet</c>, s'il y en a une : sa reponse la referme. */
   const questionSur = (objet: string) => question?.objet === objet && (
-    <Question texte={question.texte} oui={() => { setQuestion(null); question.oui() }} non={() => setQuestion(null)} />
+    <Question texte={question.texte} oui={() => { setQuestion(null); question.oui() }} non={() => { setQuestion(null); question.non?.() }} />
   )
 
   const changerListe = <K extends keyof FicheListe>(cle: K, valeur: FicheListe[K]) => setListe((f) => (f ? { ...f, [cle]: valeur } : f))
@@ -514,7 +797,7 @@ export function EcranMessagerie() {
             {trouves.map((m) => (
               <div role="listitem" key={m.type}>
                 <button type="button" className={`rig-bascule${choisi === m.type ? ' rig-bascule--actif' : ''}`}
-                        title={m.sujet} onClick={() => { if (!libre()) return; setOnglet('modele'); setResultat(null); void ouvrir(m.type) }}>
+                        title={m.sujet} onClick={() => quitterModele(() => { setOnglet('modele'); void ouvrir(m.type) })}>
                   <span className="rig-bascule__temoin"></span>
                   <span>{m.type} — {m.libelleEcran ?? m.sujet}{actif(m) ? '' : ' (désactivé)'}</span>
                 </button>
@@ -554,6 +837,7 @@ export function EcranMessagerie() {
             {' '}{resultat.texte}
           </p>
         )}
+        {question?.objet === 'changement' && <div style={Message}>{questionSur('changement')}</div>}
 
         {onglet === 'listes' ? (
           <div style={Fiche}>
@@ -648,16 +932,55 @@ export function EcranMessagerie() {
               <Saisie libelle="Libellé écran" valeur={saisie.libelleEcran} changer={(v) => changer('libelleEcran', v)} requis taille={100} />
             </div>
             <Saisie libelle="Sujet" valeur={saisie.sujet} changer={(v) => changer('sujet', v)} requis taille={200} />
-            <datalist id="rig-messagerie-boites">
-              {BoitesDuGreffe.map((b) => <option key={b} value={`[${b}]`} />)}
-            </datalist>
-            <div className="rig-criteres__paire">
-              <Saisie libelle="Expéditeur" valeur={saisie.expediteur} changer={(v) => changer('expediteur', v)} requis taille={200} liste="rig-messagerie-boites"
-                      titre="Une boîte du greffe, ex. « Greffe du tribunal de commerce <[ADRESSE_MAIL_JUDICIAIRE]> », ou une adresse" />
-              <Saisie libelle="Répondre à" valeur={saisie.reponse} changer={(v) => changer('reponse', v)} taille={200} liste="rig-messagerie-boites" />
+            {/* OPE_EDIT_EMAILMODEL_ONE_CHOICE : « Saisie libre » ou une boite du greffe, montree par son ADRESSE ; la base garde
+                l'etiquette (« Libellé <[ADRESSE_MAIL_RCS]> »). L'adresse d'une boite se lit, celle de la saisie libre se tape. */}
+            {/* La marque « requis » espacee comme dans le libelle d'un champ (.rig-saisie-champ__libelle : flex, gap esp-2) ;
+                collee au titre sur la capture claire du 2026-11-21 (« EXPÉDITEURREQUIS »). */}
+            <div className="rig-kicker" style={TitreRequis}>Expéditeur<span className="rig-saisie-champ__requis">requis</span></div>
+            <div style={Bascules} role="radiogroup" aria-label="Expéditeur">
+              <Choix libelle="Saisie libre" vrai={saisie.expediteur.boite === null} choisir={() => changerExpediteur({ boite: null })} />
+              {BoitesExpediteur.map((b) => (
+                <Choix key={b} libelle={libelleBoite(b, adresseDe(b))} titre={`[${b}]`} vrai={saisie.expediteur.boite === b}
+                       choisir={() => changerExpediteur({ boite: b })} />
+              ))}
             </div>
             <div className="rig-criteres__paire">
-              <Saisie libelle="Copie cachée" valeur={saisie.copie} changer={(v) => changer('copie', v)} taille={200} liste="rig-messagerie-boites" />
+              <Saisie libelle="Expéditeur du courrier (libellé du mail)" valeur={saisie.expediteur.libelle} taille={150}
+                      changer={(v) => changerExpediteur({ libelle: v })} />
+              <Saisie libelle="Expéditeur du courrier (adresse du mail)" taille={200} lecture={saisie.expediteur.boite !== null}
+                      valeur={saisie.expediteur.boite === null ? saisie.expediteur.adresse : adresseDe(saisie.expediteur.boite)}
+                      titre={saisie.expediteur.boite === null ? undefined : `[${saisie.expediteur.boite}]`}
+                      changer={(v) => changerExpediteur({ adresse: v })} />
+            </div>
+
+            {/* MANY_CHOICES « RA » : les memes boites, a cocher ; « ne pas répondre » seule ou rien. */}
+            <div className="rig-kicker">Répondre à</div>
+            <div style={Bascules} role="group" aria-label="Répondre à">
+              {BoitesExpediteur.map((b) => {
+                const autres = saisie.reponse.boites.some((x) => x !== NoReply)
+                const seuleNoReply = saisie.reponse.boites.includes(NoReply) && !autres
+                return (
+                  <Bascule key={b} libelle={libelleBoite(b, adresseDe(b))} titre={`[${b}]`} vrai={saisie.reponse.boites.includes(b)}
+                           inactif={b === NoReply ? autres && !saisie.reponse.boites.includes(NoReply) : seuleNoReply}
+                           basculer={() => basculerReponse(b)} />
+                )
+              })}
+            </div>
+            <Saisie libelle="Répondre à (saisie libre)" valeur={saisie.reponse.libre} taille={200}
+                    lecture={saisie.reponse.boites.includes(NoReply) && saisie.reponse.boites.length === 1}
+                    changer={(v) => changer('reponse', { ...saisie.reponse, libre: v })} />
+
+            {/* MANY_CHOICES « CC » : sans « ne pas répondre », avec les accuses d'envoi du greffe. */}
+            <div className="rig-kicker">Copie cachée</div>
+            <div style={Bascules} role="group" aria-label="Copie cachée">
+              {BoitesCopie.map((b) => (
+                <Bascule key={b} libelle={libelleBoite(b, adresseDe(b))} titre={`[${b}]`} vrai={saisie.copie.boites.includes(b)}
+                         basculer={() => basculerCopie(b)} />
+              ))}
+            </div>
+            <div className="rig-criteres__paire">
+              <Saisie libelle="Copie cachée à (saisie libre)" valeur={saisie.copie.libre} taille={200}
+                      changer={(v) => changer('copie', { ...saisie.copie, libre: v })} />
               <Saisie libelle="Destinataire par défaut" valeur={saisie.destinataireDefaut} changer={(v) => changer('destinataireDefaut', v)} taille={200} />
             </div>
             {a && saisie.origine !== null && (
@@ -676,10 +999,10 @@ export function EcranMessagerie() {
 
             <div className="rig-kicker">Utilisation</div>
             <div style={Bascules} aria-label="Cases du modèle">
-              <Bascule libelle="Utilisable RCS" vrai={saisie.lot1} basculer={basculerRcs} />
-              <Bascule libelle="Utilisable judiciaire" vrai={saisie.lot2} basculer={() => changer('lot2', !saisie.lot2)} />
-              <Bascule libelle="Utilisable privilège" vrai={saisie.inscription} basculer={() => changer('inscription', !saisie.inscription)} />
-              <Bascule libelle="Utilisable comptabilité" vrai={saisie.comptabilite} basculer={() => changer('comptabilite', !saisie.comptabilite)} />
+              <Bascule libelle="Utilisable RCS" vrai={saisie.lot1} basculer={() => basculerUtilisable('lot1')} />
+              <Bascule libelle="Utilisable judiciaire" vrai={saisie.lot2} basculer={() => basculerUtilisable('lot2')} />
+              <Bascule libelle="Utilisable privilège" vrai={saisie.inscription} basculer={() => basculerUtilisable('inscription')} />
+              <Bascule libelle="Utilisable comptabilité" vrai={saisie.comptabilite} basculer={() => basculerUtilisable('comptabilite')} />
               {vue.estAmitel && (
                 <Bascule libelle={DomaineAmitel.libelle} vrai={saisie.reserveAmitel} basculer={() => changer('reserveAmitel', !saisie.reserveAmitel)} />
               )}
@@ -689,12 +1012,26 @@ export function EcranMessagerie() {
               )}
             </div>
 
-            <label className="rig-saisie-champ">
-              <span className="rig-saisie-champ__libelle">Texte du modèle<span className="rig-saisie-champ__requis">requis</span></span>
-              <textarea className="rig-saisie-champ__saisie" aria-label="Texte du modèle" rows={7} value={saisie.texte}
-                        onChange={(e) => changer('texte', e.target.value)} />
-            </label>
+            {/* La condition de la V2 (LinkDonnees) : l'editeur mis en forme pour un modele HTML quand le greffe a un habillage
+                regle ; sinon la zone de texte, HTML compris. */}
+            {saisie.editeur ? (
+              <EditeurHtml libelle="Texte du modèle" valeur={saisie.texte} changer={(v) => changer('texte', v)} />
+            ) : (
+              <label className="rig-saisie-champ">
+                <span className="rig-saisie-champ__libelle">Texte du modèle<span className="rig-saisie-champ__requis">requis</span></span>
+                <textarea className="rig-saisie-champ__saisie" aria-label="Texte du modèle" rows={7} value={saisie.texte}
+                          onChange={(e) => changer('texte', e.target.value)} />
+              </label>
+            )}
+            <p style={Note} aria-label="Format du texte">
+              Format : {saisie.html ? 'HTML' : 'texte'}{saisie.editeur ? ' — éditeur mis en forme (habillage du greffe réglé)' : ''}
+            </p>
+            {/* La barre sous le texte, comme la V2 (ToolbarAddSignature) : le logo, la signature, le dictionnaire. */}
             <div style={Bascules}>
+              {/* A sa largeur, pas a celle d'une case de la grille (etire sur la capture claire du 2026-11-21). */}
+              <button type="button" className="rig-bouton rig-bouton--plat" style={{ justifySelf: 'start' }} disabled={occupe} onClick={ajouterLogo}>
+                Ajouter le logo
+              </button>
               <Bascule libelle="Signature active" vrai={saisie.signatureActive} basculer={() => changer('signatureActive', !saisie.signatureActive)} />
               {vue.dictionnaire && (
                 <button type="button" className="rig-bouton rig-bouton--plat" aria-expanded={voirTags} onClick={() => setVoirTags((x) => !x)}>

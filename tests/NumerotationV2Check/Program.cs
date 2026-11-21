@@ -922,6 +922,10 @@ try
     var echecsProvoques = 0;
 
     // CA04 : la partie serveur arretee, la base V3 en service -> la V2 obtient son numero.
+    // Arretee AVANT d'etre detruite (decision du lot 1 de la phase 2, controle « Arret » de tests/SocleCourrielsCheck) :
+    // detruit sans StopAsync, l'hote annule ses services de fond sans s'etre arrete et le Surveillant (lot 2) sort en
+    // « BackgroundService failed » au journal (1 avant ce changement, mesure du 2026-11-21), une fausse panne dans un banc vert.
+    await app.StopAsync();
     await app.DisposeAsync();
     app = null;
     SqlConnection.ClearAllPools();

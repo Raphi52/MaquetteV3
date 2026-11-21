@@ -1,12 +1,13 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import {
-  EcranMessagerie, type ApercuModele, type ListeDiffusion, type ModeleMessage, type ResultatMessagerie, type SaisieListe, type SaisieModele,
-  type VueEcranMessagerie, type VueModeleMessagerie,
+  EcranMessagerie, type ApercuModele, type BoitesDuGreffe, type ListeDiffusion, type ModeleMessage, type ResultatMessagerie, type SaisieListe,
+  type SaisieModele, type VueEcranMessagerie, type VueModeleMessagerie,
 } from './EcranMessagerie'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
-afterEach(() => { cleanup(); retirerFauxPont() })
+// jsdom n'a pas les commandes d'edition du navigateur (document.execCommand) : un test de l'editeur les remplace par un espion.
+afterEach(() => { cleanup(); retirerFauxPont(); delete (document as { execCommand?: unknown }).execCommand })
 
 // Ce que le serveur rend est prouve par tests/SocleCourrielsCheck (CA05 : un agent du greffe ne recoit jamais un modele
 // reserve a Amitel, ni par la liste ni par son nom ; GESTEMAIL exige pour ecrire ; regles de saisie de la V2). Ici : l'ecran
@@ -36,10 +37,28 @@ const modelesDuGreffe = [
 const listesDuGreffe = [liste(), liste({ id: 8, code: 'COMPTA_PERSO', libelle: 'Ma liste', proprietaire: 'banc.courriel', judiciaire: false }),
                         liste({ id: 9, code: 'VIEILLE', libelle: 'Liste inactive', actif: false })]
 
+/** Les boites du greffe 3801 telles que le serveur les lit dans INFO_GREFFE (Contrats/Socle/Courriels.cs, BoitesDuGreffe). */
+function boitesDuGreffe(partiel: Partial<BoitesDuGreffe> = {}): BoitesDuGreffe {
+  return {
+    boites: [
+      { etiquette: 'ADRESSE_MAIL_RCS', adresse: 'rcs@greffe-banc.example' },
+      { etiquette: 'ADRESSE_MAIL_JUDICIAIRE', adresse: 'judiciaire@greffe-banc.example' },
+      { etiquette: 'ADRESSE_MAIL_NANTISSEMENTS', adresse: '' },
+      { etiquette: 'ADRESSE_MAIL_COMPTABILITE', adresse: 'compta@greffe-banc.example' },
+      { etiquette: 'ADRESSE_MAIL_NO_REPLY', adresse: 'ne-pas-repondre@greffe-banc.example' },
+      { etiquette: 'ADRESSE_MAIL_ACCUSE_ENVOI_JUD', adresse: 'accuse-jud@greffe-banc.example' },
+      { etiquette: 'ADRESSE_MAIL_ACCUSE_ENVOI_RCS', adresse: 'accuse-rcs@greffe-banc.example' },
+      { etiquette: 'ADRESSE_MAIL_ACCUSE_ENVOI_NANT', adresse: '' },
+      { etiquette: 'ADRESSE_MAIL_ACCUSE_ENVOI_CPT', adresse: '' },
+    ],
+    habillageRegle: false, habillagePresent: false, ...partiel,
+  }
+}
+
 function vue(partiel: Partial<VueEcranMessagerie> = {}): VueEcranMessagerie {
   return {
     mode: 'serveur', message: null, greffe: '3801', voitReservesAmitel: false, modeles: modelesDuGreffe, listes: listesDuGreffe,
-    peutModifier: false, estAmitel: false, compte: 'banc.courriel', dictionnaire: null, ...partiel,
+    peutModifier: false, estAmitel: false, compte: 'banc.courriel', dictionnaire: null, boites: boitesDuGreffe(), ...partiel,
   }
 }
 
@@ -65,6 +84,13 @@ const BoutonsDEcriture = ['Nouveau modèle', 'Enregistrer', 'Créer le modèle',
 /** La question de la V2 avant Désactiver / Activer (DialogBox WarningYesNo), et ses deux reponses. */
 const question = () => screen.getByRole('alertdialog')
 const repondre = (r: 'Oui' | 'Non') => fireEvent.click(within(question()).getByRole('button', { name: r }))
+/** Le choix d'une boite du greffe : son nom accessible est son ADRESSE et son nom court (l'etiquette est en infobulle). */
+const choix = (nom: string) => screen.getByRole('radio', { name: nom })
+const coche = (e: HTMLElement) => e.getAttribute('aria-checked') ?? e.getAttribute('aria-pressed')
+const dansGroupe = (groupe: string) => within(screen.getByRole('group', { name: groupe })).getAllByRole('button')
+const boiteDe = (groupe: string, nom: string) => within(screen.getByRole('group', { name: groupe })).getByRole('button', { name: nom })
+const saisieEnvoyee = (pont: ReturnType<typeof installerFauxPont>) =>
+  pont.appels.mock.calls.find((c) => c[0] === 'EcranMessagerie.EnregistrerModele')![1] as SaisieModele
 
 describe('EcranMessagerie', () => {
   it('SOC-006 CA05 : un agent du greffe voit les modeles de SON greffe, lus par le pont, sans la bascule « Amitel »', async () => {
@@ -200,8 +226,9 @@ describe('EcranMessagerie', () => {
     render(<EcranMessagerie />)
     await screen.findByTitle('Aperçu du courriel')
     expect(screen.queryByText('Lecture seule')).toBeNull()
-    // En modification, l'adresse se saisit telle qu'en base (l'etiquette de la boite du greffe) ; le nom ne change plus.
-    expect(valeur('Expéditeur')).toBe('[ADRESSE_MAIL_JUDICIAIRE]')
+    // En modification, la boite du greffe se choisit par son ADRESSE (lot 16), la base garde l'etiquette ; le nom ne change plus.
+    // fix-ok: lot 16 -- l'expediteur n'est plus une zone ou l'on tape l'etiquette (ce test lisait '[ADRESSE_MAIL_JUDICIAIRE]').
+    expect(coche(choix('judiciaire@greffe-banc.example (judiciaire)'))).toBe('true')
     expect((screen.getByLabelText('Nom du modèle') as HTMLInputElement).readOnly).toBe(true)
     expect((bouton('Enregistrer') as HTMLButtonElement).disabled).toBe(true)
     saisir('Texte du modèle', 'Maître,\nLe certificat corrigé.\n$PieceJointe$')
@@ -241,10 +268,11 @@ describe('EcranMessagerie', () => {
     })
     render(<EcranMessagerie />)
     await screen.findByTitle('Aperçu du courriel')
-    saisir('Expéditeur', 'pas une adresse')
+    fireEvent.click(choix('Saisie libre'))
+    saisir('Expéditeur du courrier (adresse du mail)', 'pas une adresse')
     fireEvent.click(bouton('Enregistrer'))
     expect((await screen.findByRole('alert')).textContent).toContain('« pas une adresse » n\'est ni une adresse de courriel')
-    expect(valeur('Expéditeur')).toBe('pas une adresse')
+    expect(valeur('Expéditeur du courrier (adresse du mail)')).toBe('pas une adresse')
     expect((bouton('Enregistrer') as HTMLButtonElement).disabled).toBe(false)
   })
 
@@ -271,29 +299,306 @@ describe('EcranMessagerie', () => {
     fireEvent.click(bouton('Nouveau modèle'))
     saisir('Nom du modèle', 'NOUVEAU')
     saisir('Sujet', 'Un courrier')
-    saisir('Expéditeur', 'Greffe <[ADRESSE_MAIL_RCS]>')
+    // Un modele neuf : l'expediteur en saisie libre, l'accuse d'envoi judiciaire coche en copie cachee (ajout de la V2).
+    expect(coche(choix('Saisie libre'))).toBe('true')
+    expect(coche(bouton('accuse-jud@greffe-banc.example (accusé d\'envoi judiciaire)'))).toBe('true')
+    saisir('Expéditeur du courrier (libellé du mail)', 'Greffe')
+    fireEvent.click(choix('rcs@greffe-banc.example (RCS)'))
     saisir('Texte du modèle', 'Bonjour,\nLe greffe')
     fireEvent.click(bouton('Créer le modèle'))
     expect((await screen.findByRole('status')).textContent).toContain('Modèle « NOUVEAU » créé.')
     const appel = pont.appels.mock.calls.find((c) => c[0] === 'EcranMessagerie.EnregistrerModele')!
     expect(appel[2]).toBeNull()
-    expect(appel[1]).toMatchObject({ type: 'NOUVEAU', corps: 'Bonjour,|Le greffe', expediteur: 'Greffe <[ADRESSE_MAIL_RCS]>', lot1: true, lot2: true })
+    expect(appel[1]).toMatchObject({ type: 'NOUVEAU', corps: 'Bonjour,|Le greffe', expediteur: 'Greffe <[ADRESSE_MAIL_RCS]>', lot1: true, lot2: true,
+                                     copie: '[ADRESSE_MAIL_ACCUSE_ENVOI_JUD]' })
     expect(resultats()).toContain('NOUVEAU — Nouveau courrier')
     expect(screen.getByText('Modèle NOUVEAU')).toBeTruthy()
   })
 
-  it('Annuler remet le modele tel qu\'il etait ; une saisie non enregistree empeche d\'ouvrir un autre modele', async () => {
+  it('Annuler remet le modele tel qu\'il etait', async () => {
+    installerFauxPont({ 'EcranMessagerie.Ouvrir': () => gestionnaire(), 'EcranMessagerie.Modele': (t) => apercu(t as string) })
+    render(<EcranMessagerie />)
+    await screen.findByTitle('Aperçu du courriel')
+    saisir('Sujet', 'Sujet change')
+    fireEvent.click(bouton('Annuler'))
+    expect(valeur('Sujet')).toBe("Certificat d'audience")
+    expect((bouton('Enregistrer') as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  // ------------------------------------------------------------------------------------------------------------------
+  // Lot 16 : les gestes de l'ecran V2 « Modele de mail » -- question au changement de modele, editeur mis en forme,
+  // boites du greffe par leur adresse, « Ajouter le logo ».
+  // ------------------------------------------------------------------------------------------------------------------
+
+  it('changer de modele avec une saisie en cours : la question de la V2 (OPE_RECHERCHE_EMAILMODEL.LoadEmailModel) ; « Non » abandonne la saisie et ouvre l\'autre', async () => {
+    const pont = installerFauxPont({ 'EcranMessagerie.Ouvrir': () => gestionnaire(), 'EcranMessagerie.Modele': (t) => apercu(t as string) })
+    render(<EcranMessagerie />)
+    await screen.findByTitle('Aperçu du courriel')
+    // Sans saisie en cours, pas de question : l'autre modele s'ouvre.
+    fireEvent.click(bouton('RELANCE — Relance de facture'))
+    expect(await screen.findByText('Modèle RELANCE')).toBeTruthy()
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+
+    saisir('Sujet', 'Sujet change')
+    fireEvent.click(bouton('REFUS_RCS — Refus de formalité'))
+    // La question, dans la forme de celle de « Désactiver » : la pastille « Attention », Oui / Non ; rien n'est encore ouvert.
+    expect(question().textContent).toContain('Des changements ont été saisis, voulez-vous les enregistrer ?')
+    expect(within(question()).getByText('Attention')).toBeTruthy()
+    expect(pont.appels).not.toHaveBeenCalledWith('EcranMessagerie.Modele', 'REFUS_RCS')
+    repondre('Non')
+    expect(await screen.findByText('Modèle REFUS_RCS')).toBeTruthy()
+    expect(pont.appels).toHaveBeenCalledWith('EcranMessagerie.Modele', 'REFUS_RCS')
+    expect(pont.appels.mock.calls.some((c) => c[0] === 'EcranMessagerie.EnregistrerModele')).toBe(false)
+    expect(valeur('Sujet')).toBe('Refus')
+    // Revenir au modele quitte : sa saisie est bien abandonnee.
+    fireEvent.click(bouton("CA — Certificat d'audience"))
+    expect(await screen.findByText('Modèle CA')).toBeTruthy()
+    expect(valeur('Sujet')).toBe("Certificat d'audience")
+  })
+
+  it('changer de modele avec une saisie en cours : « Oui » l\'enregistre puis ouvre l\'autre ; refusee par le serveur, la saisie reste et rien ne s\'ouvre', async () => {
+    let refuser = true
+    const pont = installerFauxPont({
+      'EcranMessagerie.Ouvrir': () => gestionnaire(),
+      'EcranMessagerie.Modele': (t) => apercu(t as string),
+      'EcranMessagerie.EnregistrerModele': (): ResultatMessagerie => (refuser
+        ? { ok: false, message: 'Le sujet tient en 200 caractères (201 saisis).', vue: null, fiche: null }
+        : { ok: true, message: 'Modèle « CA » enregistré.', vue: gestionnaire(), fiche: apercu('CA', { modele: modele({ sujet: 'Sujet enregistré' }) }) }),
+    })
+    render(<EcranMessagerie />)
+    await screen.findByTitle('Aperçu du courriel')
+    saisir('Sujet', 'Sujet enregistré')
+    fireEvent.click(bouton('REFUS_RCS — Refus de formalité'))
+    repondre('Oui')
+    expect((await screen.findByRole('alert')).textContent).toContain('Le sujet tient en 200 caractères')
+    expect(pont.appels).not.toHaveBeenCalledWith('EcranMessagerie.Modele', 'REFUS_RCS')
+    expect(valeur('Sujet')).toBe('Sujet enregistré')
+    expect(screen.getByText('Modèle CA')).toBeTruthy()
+
+    refuser = false
+    fireEvent.click(bouton('REFUS_RCS — Refus de formalité'))
+    repondre('Oui')
+    expect(await screen.findByText('Modèle REFUS_RCS')).toBeTruthy()
+    const enregistrements = pont.appels.mock.calls.filter((c) => c[0] === 'EcranMessagerie.EnregistrerModele')
+    expect(enregistrements).toHaveLength(2)
+    expect(enregistrements[1]![2]).toBe('CA')
+    expect((enregistrements[1]![1] as SaisieModele).sujet).toBe('Sujet enregistré')
+    expect(pont.appels).toHaveBeenCalledWith('EcranMessagerie.Modele', 'REFUS_RCS')
+    // Le message de l'enregistrement reste a l'ecran sur le modele ouvert ensuite.
+    expect(screen.getByRole('status').textContent).toContain('Modèle « CA » enregistré.')
+  })
+
+  it('« Nouveau modèle » avec une saisie en cours pose la meme question', async () => {
     const pont = installerFauxPont({ 'EcranMessagerie.Ouvrir': () => gestionnaire(), 'EcranMessagerie.Modele': (t) => apercu(t as string) })
     render(<EcranMessagerie />)
     await screen.findByTitle('Aperçu du courriel')
     saisir('Sujet', 'Sujet change')
-    fireEvent.click(bouton('REFUS_RCS — Refus de formalité'))
-    expect((await screen.findByRole('alert')).textContent).toContain('modifications non enregistrées')
-    expect(pont.appels).not.toHaveBeenCalledWith('EcranMessagerie.Modele', 'REFUS_RCS')
-    fireEvent.click(bouton('Annuler'))
-    expect(valeur('Sujet')).toBe("Certificat d'audience")
-    fireEvent.click(bouton('REFUS_RCS — Refus de formalité'))
-    expect(await screen.findByText('Modèle REFUS_RCS')).toBeTruthy()
+    fireEvent.click(bouton('Nouveau modèle'))
+    expect(question().textContent).toContain('Des changements ont été saisis')
+    repondre('Non')
+    expect(screen.getByText('Ajout d\'un modèle de mail')).toBeTruthy()
+    expect(pont.appels.mock.calls.some((c) => c[0] === 'EcranMessagerie.EnregistrerModele')).toBe(false)
+  })
+
+  it('un modele HTML sous un habillage regle s\'edite dans l\'editeur mis en forme : les boutons de RigHtmlEditor, le HTML saisi part au pont', async () => {
+    const html = modele({ type: 'AVIS_HTML', libelleEcran: 'Avis HTML', sujet: 'Avis', corpsHtml: true })
+    const corps = '<p>Maître,</p><p>Le <b>certificat</b>.</p><p>$PieceJointe$</p>'
+    const pont = installerFauxPont({
+      'EcranMessagerie.Ouvrir': () => gestionnaire({ modeles: [html, ...modelesDuGreffe], boites: boitesDuGreffe({ habillageRegle: true }) }),
+      'EcranMessagerie.Modele': (t) => (t === 'AVIS_HTML' ? apercu('CA', { modele: html, corps }) : apercu(t as string)),
+      'EcranMessagerie.EnregistrerModele': (): ResultatMessagerie => ({ ok: false, message: 'refus du banc', vue: null, fiche: null }),
+    })
+    const execCommand = vi.fn(() => true)
+    Object.defineProperty(document, 'execCommand', { value: execCommand, configurable: true, writable: true })
+    render(<EcranMessagerie />)
+    await screen.findByText('Modèle AVIS_HTML')
+    // La barre de RigHtmlEditor, dans son ordre (AjouterBouton : G, I, S, listes, lien, effacer).
+    const barre = within(screen.getByRole('toolbar', { name: 'Mise en forme du texte' })).getAllByRole('button')
+    expect(barre.map((b) => b.getAttribute('aria-label'))).toEqual(
+      ['Gras', 'Italique', 'Souligné', 'Liste à puces', 'Liste numérotée', 'Insérer un lien', 'Effacer mise en forme'])
+    expect(barre.map((b) => b.textContent)).toEqual(['G', 'I', 'S', '• Liste', '1. Liste', 'Lien', 'Effacer mise en forme'])
+    // Le texte est mis en forme (pas le HTML brut d'une zone de texte) ; l'ouvrir ne le « modifie » pas.
+    const zone = screen.getByRole('textbox', { name: 'Texte du modèle' })
+    expect(zone.tagName).toBe('DIV')
+    expect(zone.getAttribute('contenteditable')).toBe('true')
+    expect(zone.innerHTML).toBe(corps)
+    expect(zone.querySelector('b')?.textContent).toBe('certificat')
+    expect(screen.getByLabelText('Format du texte').textContent).toContain('HTML — éditeur mis en forme')
+    expect((bouton('Enregistrer') as HTMLButtonElement).disabled).toBe(true)
+
+    // Chaque bouton passe sa commande au navigateur, comme ExecCommand de la V2.
+    const commandes: [string, string][] = [['Gras', 'bold'], ['Italique', 'italic'], ['Souligné', 'underline'],
+      ['Liste à puces', 'insertUnorderedList'], ['Liste numérotée', 'insertOrderedList'], ['Effacer mise en forme', 'removeFormat']]
+    for (const [nom, commande] of commandes) {
+      fireEvent.click(bouton(nom))
+      expect(execCommand).toHaveBeenLastCalledWith(commande, false, undefined)
+    }
+    // « Insérer un lien » demande l'adresse (« https:// » d'abord, comme DemanderUrl), puis cree le lien.
+    fireEvent.click(bouton('Insérer un lien'))
+    const lien = screen.getByRole('dialog', { name: 'Insérer un lien' })
+    expect((within(lien).getByLabelText('Adresse du lien') as HTMLInputElement).value).toBe('https://')
+    fireEvent.change(within(lien).getByLabelText('Adresse du lien'), { target: { value: 'https://greffe.example/doc' } })
+    fireEvent.click(within(lien).getByRole('button', { name: 'OK' }))
+    expect(execCommand).toHaveBeenLastCalledWith('createLink', false, 'https://greffe.example/doc')
+    expect(screen.queryByRole('dialog', { name: 'Insérer un lien' })).toBeNull()
+
+    // La saisie de l'agent : le HTML de la zone part au pont tel quel (le serveur l'assainit).
+    zone.innerHTML = '<p>Maître,</p><p>Le <b>certificat</b> <i>corrigé</i>.</p><p>$PieceJointe$</p>'
+    fireEvent.input(zone)
+    fireEvent.click(bouton('Enregistrer'))
+    await screen.findByRole('alert')
+    expect(saisieEnvoyee(pont).corps).toBe('<p>Maître,</p><p>Le <b>certificat</b> <i>corrigé</i>.</p><p>$PieceJointe$</p>')
+  })
+
+  it('l\'editeur : un modele HTML ecrit en lignes y entre avec ses sauts de ligne, et repart TEL QUEL tant que l\'agent ne touche pas au texte', async () => {
+    const lignes = modele({ type: 'COPIE_CEP', libelleEcran: 'Copie CEP', sujet: 'Duplicata', corpsHtml: true })
+    const corps = 'Cher Maître,\r\nVeuillez trouver ci-joint la demande de règlement & provision.\r\n$PieceJointe$'
+    const pont = installerFauxPont({
+      'EcranMessagerie.Ouvrir': () => gestionnaire({ modeles: [lignes], boites: boitesDuGreffe({ habillageRegle: true }) }),
+      'EcranMessagerie.Modele': () => apercu('CA', { modele: lignes, corps }),
+      'EcranMessagerie.EnregistrerModele': (): ResultatMessagerie => ({ ok: false, message: 'refus du banc', vue: null, fiche: null }),
+    })
+    render(<EcranMessagerie />)
+    await screen.findByText('Modèle COPIE_CEP')
+    // Ult_HtmlEditor._CorpsToHtml de la V2 : un texte sans balise y entre echappe, ses sauts de ligne en <br />.
+    const zone = screen.getByRole('textbox', { name: 'Texte du modèle' })
+    expect(zone.innerHTML).toBe('Cher Maître,<br>Veuillez trouver ci-joint la demande de règlement &amp; provision.<br>$PieceJointe$')
+    saisir('Sujet', 'Duplicata (corrigé)')
+    fireEvent.click(bouton('Enregistrer'))
+    await screen.findByRole('alert')
+    expect(saisieEnvoyee(pont)).toMatchObject({ sujet: 'Duplicata (corrigé)', corps })
+  })
+
+  it('jumeaux : un modele HTML SANS habillage regle, ou un modele texte sous habillage, garde la zone de texte (condition de la V2)', async () => {
+    const html = modele({ type: 'AVIS_HTML', libelleEcran: 'Avis HTML', sujet: 'Avis', corpsHtml: true })
+    const corps = '<p>Le <b>certificat</b>.</p>$PieceJointe$'
+    installerFauxPont({
+      'EcranMessagerie.Ouvrir': () => gestionnaire({ modeles: [html, ...modelesDuGreffe], boites: boitesDuGreffe({ habillageRegle: false }) }),
+      'EcranMessagerie.Modele': (t) => (t === 'AVIS_HTML' ? apercu('CA', { modele: html, corps }) : apercu(t as string)),
+    })
+    render(<EcranMessagerie />)
+    await screen.findByText('Modèle AVIS_HTML')
+    expect(screen.getByLabelText('Texte du modèle').tagName).toBe('TEXTAREA')
+    expect((screen.getByLabelText('Texte du modèle') as HTMLTextAreaElement).value).toBe(corps)
+    expect(screen.queryByRole('toolbar', { name: 'Mise en forme du texte' })).toBeNull()
+    cleanup()
+    retirerFauxPont()
+
+    installerFauxPont({
+      'EcranMessagerie.Ouvrir': () => gestionnaire({ boites: boitesDuGreffe({ habillageRegle: true }) }),
+      'EcranMessagerie.Modele': (t) => apercu(t as string),
+    })
+    render(<EcranMessagerie />)
+    await screen.findByText('Modèle CA')
+    expect(screen.getByLabelText('Texte du modèle').tagName).toBe('TEXTAREA')
+    expect(screen.queryByRole('toolbar', { name: 'Mise en forme du texte' })).toBeNull()
+  })
+
+  it('expediteur, « Répondre à », « Copie cachée » : les boites du greffe par leur ADRESSE, la saisie libre ; la base garde l\'etiquette [ADRESSE_MAIL_X]', async () => {
+    const pont = installerFauxPont({
+      'EcranMessagerie.Ouvrir': () => gestionnaire(),
+      'EcranMessagerie.Modele': (t) => apercu(t as string),
+      'EcranMessagerie.EnregistrerModele': (): ResultatMessagerie => ({ ok: false, message: 'refus du banc', vue: null, fiche: null }),
+    })
+    render(<EcranMessagerie />)
+    await screen.findByText('Modèle CA')
+    // OPE_EDIT_EMAILMODEL_ONE_CHOICE.ConstructGroupRadioButton : « Saisie libre » puis les cinq boites, par leur adresse.
+    const expediteur = within(screen.getByRole('radiogroup', { name: 'Expéditeur' })).getAllByRole('radio')
+    expect(expediteur.map((r) => r.textContent)).toEqual(['Saisie libre', 'rcs@greffe-banc.example (RCS)',
+      'judiciaire@greffe-banc.example (judiciaire)', 'aucune adresse dans ce greffe (nantissements)',
+      'compta@greffe-banc.example (comptabilité)', 'ne-pas-repondre@greffe-banc.example (ne pas répondre)'])
+    expect(expediteur.map((r) => r.getAttribute('title'))).toEqual([null, '[ADRESSE_MAIL_RCS]', '[ADRESSE_MAIL_JUDICIAIRE]',
+      '[ADRESSE_MAIL_NANTISSEMENTS]', '[ADRESSE_MAIL_COMPTABILITE]', '[ADRESSE_MAIL_NO_REPLY]'])
+    // L'etiquette en base ([ADRESSE_MAIL_JUDICIAIRE]) se montre par son adresse, en lecture (TxtExpediteurCourrierAdr).
+    expect(coche(choix('judiciaire@greffe-banc.example (judiciaire)'))).toBe('true')
+    const adresse = screen.getByLabelText('Expéditeur du courrier (adresse du mail)') as HTMLInputElement
+    expect(adresse.value).toBe('judiciaire@greffe-banc.example')
+    expect(adresse.readOnly).toBe(true)
+    fireEvent.click(choix('rcs@greffe-banc.example (RCS)'))
+    saisir('Expéditeur du courrier (libellé du mail)', 'Greffe du tribunal de commerce')
+
+    // MANY_CHOICES « RA » : « ne pas répondre » exclut les autres boites et la saisie libre, et inversement.
+    expect(dansGroupe('Répondre à').map((b) => b.textContent)).toEqual(expediteur.slice(1).map((r) => r.textContent))
+    expect(coche(bouton('ne-pas-repondre@greffe-banc.example (ne pas répondre)'))).toBe('true')
+    expect((boiteDe('Répondre à', 'rcs@greffe-banc.example (RCS)') as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByLabelText('Répondre à (saisie libre)') as HTMLInputElement).readOnly).toBe(true)
+    fireEvent.click(bouton('ne-pas-repondre@greffe-banc.example (ne pas répondre)'))
+    fireEvent.click(boiteDe('Répondre à', 'judiciaire@greffe-banc.example (judiciaire)'))
+    expect((bouton('ne-pas-repondre@greffe-banc.example (ne pas répondre)') as HTMLButtonElement).disabled).toBe(true)
+    saisir('Répondre à (saisie libre)', 'secretariat@etude.example')
+
+    // MANY_CHOICES « CC » : sans « ne pas répondre », avec les quatre accuses d'envoi.
+    expect(dansGroupe('Copie cachée').map((b) => b.getAttribute('title'))).toEqual(['[ADRESSE_MAIL_RCS]', '[ADRESSE_MAIL_JUDICIAIRE]',
+      '[ADRESSE_MAIL_NANTISSEMENTS]', '[ADRESSE_MAIL_COMPTABILITE]', '[ADRESSE_MAIL_ACCUSE_ENVOI_JUD]', '[ADRESSE_MAIL_ACCUSE_ENVOI_RCS]',
+      '[ADRESSE_MAIL_ACCUSE_ENVOI_NANT]', '[ADRESSE_MAIL_ACCUSE_ENVOI_CPT]'])
+    fireEvent.click(bouton('accuse-jud@greffe-banc.example (accusé d\'envoi judiciaire)'))
+    // V2 CheckUtilisableEn : cocher « Utilisable RCS » coche l'accuse d'envoi RCS en copie cachee.
+    fireEvent.click(bouton('Utilisable RCS'))
+    expect(coche(bouton('accuse-rcs@greffe-banc.example (accusé d\'envoi RCS)'))).toBe('true')
+
+    fireEvent.click(bouton('Enregistrer'))
+    await screen.findByRole('alert')
+    const s = saisieEnvoyee(pont)
+    expect(s).toMatchObject({
+      expediteur: 'Greffe du tribunal de commerce <[ADRESSE_MAIL_RCS]>',
+      reponse: 'secretariat@etude.example;[ADRESSE_MAIL_JUDICIAIRE]',
+      copie: '[ADRESSE_MAIL_ACCUSE_ENVOI_JUD];[ADRESSE_MAIL_ACCUSE_ENVOI_RCS]',
+    })
+    // Aucune adresse du greffe ne part en base : les etiquettes seules.
+    expect(JSON.stringify(s)).not.toContain('greffe-banc.example')
+  })
+
+  it('« Saisie libre » : l\'adresse de l\'expediteur se tape (une adresse ou une etiquette non proposee reste telle quelle)', async () => {
+    const pont = installerFauxPont({
+      'EcranMessagerie.Ouvrir': () => gestionnaire(),
+      'EcranMessagerie.Modele': (t) => apercu(t as string, {
+        modele: modele({ expediteur: 'Greffe <greffe@autre.example>', reponse: '[ADRESSE_MAIL_ACCUSE_ENVOI_JUD];x@etude.example' }),
+      }),
+      'EcranMessagerie.EnregistrerModele': (): ResultatMessagerie => ({ ok: false, message: 'refus du banc', vue: null, fiche: null }),
+    })
+    render(<EcranMessagerie />)
+    await screen.findByText('Modèle CA')
+    expect(coche(choix('Saisie libre'))).toBe('true')
+    expect(valeur('Expéditeur du courrier (libellé du mail)')).toBe('Greffe')
+    expect((screen.getByLabelText('Expéditeur du courrier (adresse du mail)') as HTMLInputElement).readOnly).toBe(false)
+    expect(valeur('Expéditeur du courrier (adresse du mail)')).toBe('greffe@autre.example')
+    // La V2 laissait tomber une etiquette qu'elle ne propose pas en « Répondre à » : ici elle reste, en saisie libre.
+    expect(valeur('Répondre à (saisie libre)')).toBe('[ADRESSE_MAIL_ACCUSE_ENVOI_JUD];x@etude.example')
+    saisir('Expéditeur du courrier (adresse du mail)', 'accueil@autre.example')
+    fireEvent.click(bouton('Enregistrer'))
+    await screen.findByRole('alert')
+    expect(saisieEnvoyee(pont)).toMatchObject({ expediteur: 'Greffe <accueil@autre.example>', reponse: '[ADRESSE_MAIL_ACCUSE_ENVOI_JUD];x@etude.example' })
+  })
+
+  it('« Ajouter le logo » : $LOGO$ a la fin du texte, le modele passe en HTML ; sous l\'habillage du greffe, refuse avec la phrase du serveur', async () => {
+    const pont = installerFauxPont({
+      'EcranMessagerie.Ouvrir': () => gestionnaire(),
+      'EcranMessagerie.Modele': (t) => apercu(t as string),
+      'EcranMessagerie.EnregistrerModele': (): ResultatMessagerie => ({ ok: false, message: 'refus du banc', vue: null, fiche: null }),
+    })
+    render(<EcranMessagerie />)
+    await screen.findByText('Modèle CA')
+    expect(screen.getByLabelText('Format du texte').textContent).toBe('Format : texte')
+    fireEvent.click(bouton('Ajouter le logo'))
+    expect((screen.getByLabelText('Texte du modèle') as HTMLTextAreaElement).value).toBe('Maître,\nLe certificat.\n$PieceJointe$\n$LOGO$')
+    expect(screen.getByLabelText('Format du texte').textContent).toBe('Format : HTML')
+    fireEvent.click(bouton('Enregistrer'))
+    await screen.findByRole('alert')
+    expect(saisieEnvoyee(pont).corps).toBe('Maître,|Le certificat.|$PieceJointe$|$LOGO$')
+    cleanup()
+    retirerFauxPont()
+
+    installerFauxPont({
+      'EcranMessagerie.Ouvrir': () => gestionnaire({ boites: boitesDuGreffe({ habillageRegle: true, habillagePresent: true }) }),
+      'EcranMessagerie.Modele': (t) => apercu(t as string),
+    })
+    render(<EcranMessagerie />)
+    await screen.findByText('Modèle CA')
+    fireEvent.click(bouton('Ajouter le logo'))
+    expect(screen.getByRole('alert').textContent).toContain(
+      'Le tag $LOGO$ est interdit quand un template est actif (le logo est positionné dans le template).')
+    expect((screen.getByLabelText('Texte du modèle') as HTMLTextAreaElement).value).toBe('Maître,\nLe certificat.\n$PieceJointe$')
+    expect((bouton('Enregistrer') as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('Désactiver puis Réactiver : la question de la V2 d\'abord (OPE_EDIT_EMAILMODEL.cs:63, :68), puis ActiverModele(type, faux / vrai) ; rien pendant une saisie en cours', async () => {
