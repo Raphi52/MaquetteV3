@@ -253,9 +253,9 @@ et qu'il reparte de lui-même du dernier point sûr, sans perte ni doublon, sans
 
 | Critère | Ce qui manque | Où |
 |---|---|---|
-| CA01 à CA03 sur la **recopie continue** (changement rejouable, 3 essais puis mise de côté avec son message, les autres fiches continuent, la même fiche attend, relance unitaire dans l'ordre) | la file `rec.FileRecopie` et l'applicateur sont REC-002 (lot 9, pas encore sur main) ; aujourd'hui l'applicateur s'arrête au premier échec et compte ses essais | lot 9, ou un lot après lui |
-| CA05, second cas (alerte d'un changement mis de côté) | la même file ; la source `AlertesRecopie` l'accueille (règle « recopie-incident » déjà admise) | lot 9 |
-| Fiche d'incident pour l'exploitation (T04) | relance, lecture du rapport du matin, alerte : écrits ici ; la lecture des changements mis de côté attend la file | lot 9 |
+| CA01 à CA03 sur la **recopie continue** (changement rejouable, 3 essais puis mise de côté avec son message, les autres fiches continuent, la même fiche attend, relance unitaire dans l'ordre) | fait au lot 9 : section « Un changement refusé : mis de côté, relancé » plus bas, contrôles REC-005 de `tests\RecopieDeuxSensCheck` | lot 9 (fait) |
+| CA05, second cas (alerte d'un changement mis de côté) | fait au lot 9 : `AlertesRecopie` (règle « recopie-incident »), contrôle « REC-005 CA05 (mis de cote) » de `tests\RecopieDeuxSensCheck` | lot 9 (fait) |
+| Fiche d'incident pour l'exploitation (T04) | la lecture et la relance des changements mis de côté : section « Un changement refusé : mis de côté, relancé » plus bas | lot 9 (fait) |
 
 ## Comparer chaque nuit (REC-006) — lot 8
 
