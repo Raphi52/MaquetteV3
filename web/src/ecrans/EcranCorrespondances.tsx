@@ -13,7 +13,7 @@
 // .rig-proc__corps (prevue pour le bloc des criteres) : tableau ecrase a 320 px. La recherche et le filtre vont donc dans
 // l'aside .rig-criteres, la fiche dans .rig-resultats-proc, comme l'ecran des compteurs.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, MouseEvent } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, estBlanc } from '../criteres'
@@ -234,7 +234,9 @@ function FenetreAide({ lignes, fermer }: { lignes: LigneCorrespondance[]; fermer
   const boite = useRef<HTMLDivElement>(null)
   const fermerCourant = useRef(fermer)
   fermerCourant.current = fermer
-  useEffect(() => {
+  // useLayoutEffect, pas useEffect : la fenetre s'ouvre a la reponse du pont (hors frappe), et un useEffect ne
+  // passe qu'apres l'affichage -- Echap presse a cet instant n'etait pas entendu (test « des qu'elle s'affiche »).
+  useLayoutEffect(() => {
     const avant = document.activeElement instanceof HTMLElement ? document.activeElement : null
     boite.current?.focus()
     const arreter = ecouterEchapDabord(() => fermerCourant.current())
