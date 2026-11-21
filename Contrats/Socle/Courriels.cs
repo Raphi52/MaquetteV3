@@ -264,8 +264,8 @@ public sealed record ApercuModele(
 /// </summary>
 /// <param name="Type">Le nom du modele (EMAILMOD_TYPE, 40 caracteres au plus), unique ; il ne change plus une fois cree.</param>
 /// <param name="Corps">Le texte (« | » = saut de ligne) ; il devient HTML s'il porte $LOGO$ (EmailModel.Sauve, EmailModel.cs:307-308).
-/// Le texte d'un modele HTML est assaini a chaque enregistrement, regles de RigHtmlSanitizer (scripts, styles, commentaires,
-/// balises font, gestionnaires on…, liens javascript: retires) : la base garde le texte assaini.</param>
+/// Le texte d'un modele HTML perd son contenu ACTIF a chaque enregistrement (blocs script, attributs on…, adresses javascript:) ;
+/// le reste -- font, style, commentaires, &amp;nbsp;, blancs -- est garde tel que saisi, comme la V2 (Ult_HtmlEditor).</param>
 /// <param name="Expediteur">Obligatoire : une boite du greffe en etiquette (« Greffe &lt;[ADRESSE_MAIL_RCS]&gt; ») ou une adresse ;
 /// l'ecran fait choisir la boite par son adresse (<see cref="RoutesCourriels.Boites"/>) et envoie l'etiquette.</param>
 /// <param name="Reponse">« Répondre à » : adresses ou etiquettes separees par « ; ».</param>

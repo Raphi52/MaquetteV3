@@ -1,4 +1,5 @@
 using System.Data;
+using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.Data.SqlClient;
 using RigV3.Contrats.Socle;
@@ -34,7 +35,8 @@ public sealed record HabillageDuGreffe(bool Regle, bool Present);
 ///    la transaction (<see cref="GestionCourriels"/>) ;
 ///  - un modele HTML sous un habillage regle porte $PieceJointe$ ; $LOGO$ est interdit quand le greffe a un habillage
 ///    (OPE_EDIT_EMAILMODEL.cs:91-110) ; le texte devient HTML s'il porte $LOGO$ (EmailModel.Sauve, EmailModel.cs:307-308) ;
-///  - le texte d'un modele HTML est assaini a chaque enregistrement, regles de RigHtmlSanitizer (<see cref="Assainir"/>) ;
+///  - le texte d'un modele HTML perd son contenu ACTIF a chaque enregistrement (<see cref="Assainir"/>) ; le reste est enregistre
+///    tel que saisi, comme l'editeur de l'ecran V2 (Ult_HtmlEditor.cs:228-231, InnerHtml) ;
 ///  - l'envoi automatique n'existe que pour un modele RCS : sans RCS il est remis a faux (_SetVisibilityChkEnvoiAuto, :271-279) ;
 ///  - une adresse est une adresse de courriel, nue ou nommee, ou -- pour un modele -- une boite du greffe en etiquette
 ///    (« Greffe &lt;[ADRESSE_MAIL_RCS]&gt; », OPE_EDIT_EMAILMODEL_ONE_CHOICE.cs:56-73) ; les expressions sont celles de
@@ -70,14 +72,17 @@ public static partial class ReglesCourriels
         var libelle = Obligatoire(s.LibelleEcran, "Le libellé écran", 100, erreurs);
         var sujet = Obligatoire(s.Sujet, "Le sujet", 200, erreurs);
         // Le texte garde ses blancs (la V2 l'enregistre tel que saisi) ; il ne peut pas etre vide (EMAILMOD_CORPS NOT NULL).
-        // Un modele HTML -- deja HTML, ou qui le devient par $LOGO$ (EmailModel.Sauve) -- est ASSAINI a chaque enregistrement,
-        // regles de RigHtmlSanitizer (<see cref="Assainir"/>) : la base garde le texte assaini, et c'est lui que les controles
-        // suivants jugent (longueur, $PieceJointe$, vide). Un modele texte reste tel que saisi, comme la V2.
+        // Un modele HTML -- deja HTML, ou qui le devient par $LOGO$ (EmailModel.Sauve) -- perd son contenu actif a chaque
+        // enregistrement (<see cref="Assainir"/>) : la base garde ce texte, et c'est lui que les controles suivants jugent (vide,
+        // $PieceJointe$, $LOGO$). Un modele texte reste tel que saisi, comme la V2.
         var corpsSaisi = s.Corps ?? "";
         var html = corpsHtmlAvant || corpsSaisi.Contains("$LOGO$", StringComparison.Ordinal);
-        var corps = html ? Assainir(corpsSaisi) : corpsSaisi;
-        if (corps.Trim().Length == 0) erreurs.Add("Le texte du modèle est obligatoire.");
-        else if (corps.Length > 4000) erreurs.Add($"Le texte du modèle tient en 4000 caractères ({corps.Length} saisis).");
+        // La taille se juge sur la SAISIE, avant le nettoyage : la V2 ecrivait le texte tel quel dans EMAILMOD_CORPS (4000), et le
+        // nettoyage ne parcourt ainsi jamais plus de 4000 caracteres (mesure : sur 1 Mo de « <a », il passait plus de 5 minutes).
+        var tropLong = corpsSaisi.Length > 4000;
+        var corps = html && !tropLong ? Assainir(corpsSaisi) : corpsSaisi;
+        if (tropLong) erreurs.Add($"Le texte du modèle tient en 4000 caractères ({corpsSaisi.Length} saisis).");
+        else if (corps.Trim().Length == 0) erreurs.Add("Le texte du modèle est obligatoire.");
         var expediteur = AdressesDuModele(s.Expediteur, "Expéditeur", erreurs);
         if (expediteur is null) erreurs.Add("L'expéditeur est obligatoire : une boîte du greffe ([ADRESSE_MAIL_…]) ou une adresse.");
         else if (expediteur.Contains(';')) erreurs.Add("L'expéditeur est une seule adresse.");
@@ -97,38 +102,71 @@ public static partial class ReglesCourriels
             s.ReserveAmitel, s.SignatureActive, signature, [.. (s.ListesParDefaut ?? []).Distinct()]), erreurs);
     }
 
-    // --- RigHtmlSanitizer (D:\RigApplication\Source\Outils\DLL\RigHtmlEditor\RigHtmlSanitizer.cs), ses expressions telles quelles,
-    // --- IgnoreCase | Singleline comme la V2. Le but de la V2 : retirer le bruit de l'editeur (execCommand) et ce qui n'a rien a
-    // --- faire dans un courriel ; ce n'est pas un filtre de HTML hostile (la saisie est celle d'un agent du greffe).
-    private const RegexOptions OptionsHtml = RegexOptions.IgnoreCase | RegexOptions.Singleline;
-    [GeneratedRegex(@"<script\b[^>]*>.*?</script>", OptionsHtml)] private static partial Regex BlocScript();
-    [GeneratedRegex(@"<style\b[^>]*>.*?</style>", OptionsHtml)] private static partial Regex BlocStyle();
-    [GeneratedRegex(@"<!--.*?-->", OptionsHtml)] private static partial Regex Commentaire();
-    // Balises <font ...> et </font> retirees, le texte interieur garde.
-    [GeneratedRegex(@"</?font\b[^>]*>", OptionsHtml)] private static partial Regex BaliseFont();
-    // Gestionnaires d'evenements : onclick="...", onerror='...', onload=...
-    [GeneratedRegex(@"\s+on\w+\s*=\s*(""[^""]*""|'[^']*'|[^\s>]+)", OptionsHtml)] private static partial Regex Evenement();
-    [GeneratedRegex(@"(href|src)\s*=\s*([""']?)\s*javascript:[^""'>\s]*\2", OptionsHtml)] private static partial Regex LienJavascript();
-    [GeneratedRegex(@"(&nbsp;){2,}", OptionsHtml)] private static partial Regex EspacesInsecables();
+    // --- Le CONTENU ACTIF d'un texte HTML, et lui seul (decision du chef, 2026-11-21). L'ecran V2 « Modele de mail » enregistrait le
+    // --- HTML de son editeur TEL QUEL (Ult_HtmlEditor.cs:228-231, InnerHtml ; RigHtmlSanitizer ne sert qu'a l'ecran d'envoi) : la
+    // --- V3 garde donc <font>, <style>, commentaires, &nbsp; et blancs -- avec les regles entieres de RigHtmlSanitizer, 15 des 37
+    // --- modeles HTML de RIG_DEV (CREJET, INPI_DCA_RECLA, MPCS_INFO_OUV_JUGE, et douze par leurs blancs de bord) changeaient au
+    // --- premier enregistrement. Ce qui part : ce qui s'executerait dans l'editeur de l'ecran (innerHTML de la page de l'app).
+    private const RegexOptions OptionsHtml = RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant;
+    // Un bloc script (l'expression de RigHtmlSanitizer), fin ecrite « </script > » comprise : le navigateur l'accepte.
+    [GeneratedRegex(@"<script\b[^>]*>.*?</script\s*>", OptionsHtml)] private static partial Regex BlocScript();
+    // Une balise ouvrante : son nom, puis ses attributs ; une valeur entre guillemets peut porter un « > ». Hors guillemets, la balise
+    // s'arrete au « < » suivant (« <a <b onclick=x> » : la balise b est lue seule, son onclick part) -- sans cela, chaque « < »
+    // d'un texte sans « > » relisait tout le reste du texte.
+    [GeneratedRegex(@"<(?<nom>[a-z][^\s/<>""']*)(?<attributs>(?:""[^""]*""|'[^']*'|[^""'<>])*)>", OptionsHtml)] private static partial Regex Balise();
+    // Un attribut et son separateur : blancs, « / », ou rien quand il suit un guillemet (« src="x"onerror=… », le navigateur le lit).
+    [GeneratedRegex(@"(?<avant>[\s/]*)(?<nom>[^\s""'>/=]+)(?:\s*=\s*(?<valeur>""[^""]*""|'[^']*'|[^\s""'>]+))?", OptionsHtml)]
+    private static partial Regex Attribut();
+    // Les entites que le navigateur decode et que WebUtility.HtmlDecode (HTML 4) ne connait pas : « java&Tab;script&colon; ».
+    [GeneratedRegex(@"&(colon|tab|newline);", OptionsHtml)] private static partial Regex EntiteHtml5();
+    // Les attributs dont le navigateur ouvre la valeur comme une adresse.
+    private static readonly HashSet<string> AttributsAdresse = new(StringComparer.OrdinalIgnoreCase)
+        { "href", "src", "action", "formaction", "xlink:href" };
 
     /// <summary>
-    /// Le HTML d'un modele assaini comme RigHtmlSanitizer.Sanitize, dans le meme ordre : blocs script et style, commentaires,
-    /// balises font (le texte reste), liens javascript: (href="#"), gestionnaires on…, &amp;nbsp; repetes (une espace), blancs
-    /// des bords. La V2 l'appliquait dans son editeur (GetSanitizedHtml) ; la V3 l'applique au serveur, a chaque enregistrement.
+    /// Le HTML d'un modele sans son contenu actif : blocs &lt;script&gt;, attributs on… d'une balise (onclick, onerror…), adresses
+    /// javascript: d'un lien ou d'une image (remplacees par « # », comme RigHtmlSanitizer). Le reste est rendu octet pour octet --
+    /// un « on = » ou un « javascript: » du texte, hors d'une balise, aussi. La V3 l'applique au serveur, a chaque enregistrement.
     /// </summary>
-    // fix-ok: lot 16 -- avant, ControlerModele ecrivait le texte HTML tel que recu (lu : « var corps = s.Corps ?? "" » puis
-    // INSERT/UPDATE sans traitement) : un <script> ou un onclick saisi allait en base et dans le courriel.
+    // fix-ok: lot 16, essai refuse -- les regles ENTIERES de RigHtmlSanitizer retiraient <font>, <style>, commentaires, &nbsp; repetes
+    // et blancs de bord : 15 modeles de RIG_DEV changeaient (mesure : tests/SocleCourrielsCheck, 6 controles rouges avant ce code).
     public static string Assainir(string? html)
     {
         if (string.IsNullOrEmpty(html)) return "";
-        var r = BlocScript().Replace(html, "");
-        r = BlocStyle().Replace(r, "");
-        r = Commentaire().Replace(r, "");
-        r = BaliseFont().Replace(r, "");
-        r = LienJavascript().Replace(r, "$1=\"#\"");
-        r = Evenement().Replace(r, "");
-        r = EspacesInsecables().Replace(r, " ");
-        return r.Trim();
+        // Jusqu'a ce que rien ne change : « <scr<script></script>ipt> » refait un bloc une fois le premier retire.
+        string r = html, avant;
+        do { avant = r; r = BlocScript().Replace(r, ""); } while (r.Length != avant.Length);
+        return Balise().Replace(r, b =>
+        {
+            var attributs = b.Groups["attributs"].Value;
+            var propres = Attribut().Replace(attributs, a => AttributSansContenuActif(a, attributs));
+            return propres == attributs ? b.Value : "<" + b.Groups["nom"].Value + propres + ">";
+        });
+    }
+
+    private static string AttributSansContenuActif(Match a, string attributs)
+    {
+        if (!a.Groups["valeur"].Success) return a.Value;
+        var nom = a.Groups["nom"].Value;
+        if (nom.StartsWith("on", StringComparison.OrdinalIgnoreCase))
+        {
+            // Retire avec son separateur ; une espace s'il colle a l'attribut suivant, pour que deux noms ne se soudent pas.
+            var fin = a.Index + a.Length;
+            return fin < attributs.Length && !char.IsWhiteSpace(attributs[fin]) && attributs[fin] != '/' ? " " : "";
+        }
+        return AttributsAdresse.Contains(nom) && AdresseJavascript(a.Groups["valeur"].Value)
+            ? a.Groups["avant"].Value + nom + "=\"#\""
+            : a.Value;
+    }
+
+    /// <summary>L'adresse, lue comme le navigateur la lit (entites decodees, tabulations et sauts de ligne retires, blancs et
+    /// caracteres de controle de tete ignores), ouvre-t-elle du javascript ?</summary>
+    private static bool AdresseJavascript(string valeur)
+    {
+        var v = valeur.Length >= 2 && valeur[0] is '"' or '\'' ? valeur[1..^1] : valeur;
+        v = WebUtility.HtmlDecode(EntiteHtml5().Replace(v, e => e.Groups[1].Value.Equals("colon", StringComparison.OrdinalIgnoreCase) ? ":" : ""));
+        v = new string([.. v.Where(c => c is not ('\t' or '\n' or '\r'))]).TrimStart([.. Enumerable.Range(0, 33).Select(i => (char)i)]);
+        return v.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Controle et met en forme une liste saisie : rend la liste a ecrire, ou null et les refus.</summary>
