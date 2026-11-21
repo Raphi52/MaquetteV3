@@ -91,11 +91,11 @@ public static class ControleCopie
 {
     /// <summary>
     /// Part des valeurs a prenom au-dela de laquelle une colonne gardee porte des prenoms. Mesure du 2026-11-21 apres la
-    /// relecture des colonnes maigres (6 passages sur RIG_DEV entier, 3 sur l'extrait du banc), lexique de deux tables :
-    /// sur RIG_DEV entier (2 487 a 2 501 prenoms), les 69 colonnes que les regles gardent montent a 14 % au plus
-    /// (ENCMT_DESIGNATION_BANQUE) et les prenoms d'etat civil gardes par l'ancienne regle sont a 80-96 % ; sur l'extrait du
-    /// banc (321 prenoms), ces memes colonnes a 55-100 %. Le seuil passe entre les deux (21 points au-dessus, 20 au-dessous).
-    /// Chaque colonne est jugee sur 200 valeurs tirees parmi ses distinctes (5 points au plus d'un passage a l'autre,
+    /// relecture des colonnes maigres (8 passages sur RIG_DEV entier, 5 sur l'extrait du banc), lexique de deux tables :
+    /// sur RIG_DEV entier (2 487 a 2 501 prenoms), les 69 colonnes que les regles gardent montent a 15 % au plus
+    /// (LGEDT_TEXTE_PARAMETRE) et les prenoms d'etat civil gardes par l'ancienne regle sont a 80-96 % ; sur l'extrait du
+    /// banc (321 prenoms), ces memes colonnes a 52-100 %. Le seuil passe entre les deux (20 points au-dessus, 17 au-dessous).
+    /// Chaque colonne est jugee sur 200 valeurs tirees parmi ses distinctes (6 points au plus d'un passage a l'autre,
     /// mesure) ou sur TOUTES ses valeurs distinctes si elle en a moins (mesure exacte) : voir <see cref="MesurerGardeesAsync"/>.
     /// Une colonne gardee au-dela se TRAITE (--regles TABLE.COLONNE=Mots) : on prefere abimer un libelle.
     /// </summary>

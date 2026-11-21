@@ -476,7 +476,7 @@ Exiger(controle.Vert && controle.EchantillonValeurs > 0 && controle.EchantillonM
     $"sorti de la source : {string.Join(", ", controle.GenresLusSource)} (jamais une valeur)");
 // fix-ok: refus du chef (2026-11-21) -- le controle ne tirait que des colonnes DEJA traitees : une regle fausse (« ETAT »
 // pris pour technique) laissait 173 812 prenoms de CASIER_JUDICIAIRE en clair sans qu'il le voie. Mesure RIG_DEV : prenoms
-// d'etat civil 80-96 % de valeurs a prenom frequent, colonnes gardees 14 % au plus (lexique a 2 tables).
+// d'etat civil 80-96 % de valeurs a prenom frequent, colonnes gardees 15 % au plus (lexique a 2 tables).
 var gardees = controle.Gardees.Where(g => g.Valeurs > 0).ToList();
 Exiger(gardees.Count > 0 && controle.LexiquePrenoms > 0 && gardees.All(g => !g.Prenoms),
     $"SOC-021 CA06 : le controle tire aussi les {gardees.Count} colonnes GARDEES a segment personnel ({gardees.Sum(g => g.Valeurs)} valeurs ; lexique : {controle.LexiquePrenoms} prenoms " +
