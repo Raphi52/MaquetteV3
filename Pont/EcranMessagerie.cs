@@ -21,6 +21,10 @@ namespace RigV3Desktop.Pont;
 /// Amitel » et le dictionnaire des tags ne sont qu'a lui (OPE_EDIT_EMAILMODEL.cs:192-193, :333).</param>
 /// <param name="Compte">Le compte de l'agent : le proprietaire d'une liste privee qu'il cree (« Privé (compte) » de la V2).</param>
 /// <param name="Dictionnaire">Le dictionnaire des tags de la V2, pour un agent d'Amitel seulement ; null pour les autres.</param>
+/// <param name="Boites">Les boites du greffe par leur adresse (INFO_GREFFE) et l'etat de son habillage, lus par le serveur
+/// (RoutesCourriels.Boites) : l'expediteur, « Répondre à » et « Copie cachée » se choisissent par l'adresse, la base garde
+/// l'etiquette ; un modele HTML s'edite mis en forme sous un habillage regle ; « Ajouter le logo » est refuse sous un habillage.
+/// null quand rien n'est lu (refus, panne, aucun greffe).</param>
 public sealed record VueEcranMessagerie(
     string Mode,
     string? Message,
@@ -31,7 +35,8 @@ public sealed record VueEcranMessagerie(
     bool PeutModifier,
     bool EstAmitel,
     string? Compte,
-    string? Dictionnaire);
+    string? Dictionnaire,
+    BoitesDuGreffe? Boites = null);
 
 /// <summary>Un modele ouvert : <paramref name="Apercu"/>, ou la raison de son absence dans <paramref name="Message"/>.</summary>
 public sealed record VueModeleMessagerie(string Mode, string? Message, ApercuModele? Apercu);
@@ -87,7 +92,7 @@ public static class EcranMessagerie
     /// <summary>Les modeles et les listes de <paramref name="greffe"/>, lus sur <paramref name="serveur"/> (null : la demonstration).</summary>
     public static async Task<VueEcranMessagerie> OuvrirAsync(ClientServeur? serveur, string? greffe)
     {
-        if (serveur is null) return new("demo", null, null, false, DemoModeles, DemoListes, true, false, DemoCompte, null);
+        if (serveur is null) return new("demo", null, null, false, DemoModeles, DemoListes, true, false, DemoCompte, null, DemoBoites);
         if (string.IsNullOrWhiteSpace(greffe))
             return Vide("sans-greffe", null,
                 "Aucun greffe n'est ouvert dans cette session : les modèles se lisent dans la base du greffe choisi à l'ouverture de RIG.");
@@ -100,8 +105,9 @@ public static class EcranMessagerie
                 RoutesDroits.Pour(RoutesDroits.Verifier, greffe) + "?fonction=" + Uri.EscapeDataString(RoutesCourriels.FonctionGestion));
             var agent = (await serveur.LireAsync<IdentiteAgent>(RoutesIdentite.Pour(greffe))).Agent;
             var amitel = agent?.EstAmitel == true;
+            var boites = await serveur.LireAsync<BoitesDuGreffe>(RoutesCourriels.Pour(RoutesCourriels.Boites, greffe));
             return new("serveur", null, greffe, modeles.Any(m => m.ReserveAmitel), modeles, listes, droit.Autorise, amitel,
-                agent?.CompteWindows, amitel ? DictionnaireDesTags : null);
+                agent?.CompteWindows, amitel ? DictionnaireDesTags : null, boites);
         }
         catch (ErreurServeur e) when (e.CodeHttp is 401 or 403)
         {
@@ -255,7 +261,7 @@ public static class EcranMessagerie
     }
 
     private static VueEcranMessagerie Vide(string mode, string? greffe, string message)
-        => new(mode, message, greffe, false, [], [], false, false, null, null);
+        => new(mode, message, greffe, false, [], [], false, false, null, null, null);
 
     // --- Demonstration (sans RIGV3_SERVEUR) : cinq modeles dont les noms, libelles, objets et cases sont ceux de
     // RIG_DEV.dbo.EMAIL_MODEL (lu le 2026-11-21, lecture seule) ; textes et adresses fictifs. Aucun modele reserve a
@@ -295,9 +301,19 @@ public static class EcranMessagerie
         ["[ADRESSE_MAIL_NO_REPLY]"] = "ne-pas-repondre@greffe-demo.fr",
         ["[ADRESSE_MAIL_ACCUSE_ENVOI_JUD]"] = "accuse-jud@greffe-demo.fr",
         ["[ADRESSE_MAIL_ACCUSE_ENVOI_RCS]"] = "accuse-rcs@greffe-demo.fr",
+        ["[ADRESSE_MAIL_ACCUSE_ENVOI_NANT]"] = "accuse-privileges@greffe-demo.fr",
+        ["[ADRESSE_MAIL_ACCUSE_ENVOI_CPT]"] = "accuse-compta@greffe-demo.fr",
         ["[ADRESSE_MAIL_COMPTABILITE]"] = "comptabilite@greffe-demo.fr",
+        ["[ADRESSE_MAIL_NANTISSEMENTS]"] = "privileges@greffe-demo.fr",
         ["[ADRESSE_MAIL_RCS]"] = "rcs@greffe-demo.fr",
     };
+
+    // fix-ok: lot 16 -- la demonstration ne donnait ni les adresses des boites ni l'habillage (VueEcranMessagerie sans eux, lue
+    // avant le lot) : sans elles, l'ecran ne peut montrer ni le choix par adresse ni l'editeur mis en forme.
+    /// <summary>Les boites de la demonstration, adresses fictives ; un habillage regle et present, comme l'apercu « habillé ».</summary>
+    private static readonly BoitesDuGreffe DemoBoites = new(
+        [.. BoitesDuGreffe.Proposees.Select(e => new BoiteCourriel(e, DemoAdresses.GetValueOrDefault($"[{e}]", "")))],
+        HabillageRegle: true, HabillagePresent: true);
 
     private static string DemoAdresse(string? liste)
         => DemoAdresses.Aggregate(liste ?? "", (s, p) => s.Replace(p.Key, p.Value, StringComparison.Ordinal));
@@ -305,8 +321,13 @@ public static class EcranMessagerie
     private static ApercuModele? DemoApercu(string type)
     {
         if (DemoModeles.FirstOrDefault(m => m.Type == type) is not { } m) return null;
-        var corps = $"Madame, Monsieur,|Vous trouverez ci-dessous le lien vers le document « {m.LibelleEcran} ».|$PieceJointe$|Le greffe";
-        var texte = WebUtility.HtmlEncode(corps).Replace("|", "<br/>").Replace("$PieceJointe$",
+        // Un modele HTML de la demonstration est mis en forme (paragraphes, gras, liste), comme les modeles HTML de RIG_DEV
+        // (« Convocation » : <P>, <BR>) : l'editeur mis en forme le montre tel qu'il partira.
+        var corps = m.CorpsHtml
+            ? $"<p>Madame, Monsieur,</p><p>Vous trouverez ci-dessous le lien vers le document <b>« {WebUtility.HtmlEncode(m.LibelleEcran)} »</b> :</p>"
+              + "<p>$PieceJointe$</p><ul><li>à conserver avec votre dossier ;</li><li>à présenter à toute demande du greffe.</li></ul><p>Le greffe</p>"
+            : $"Madame, Monsieur,|Vous trouverez ci-dessous le lien vers le document « {m.LibelleEcran} ».|$PieceJointe$|Le greffe";
+        var texte = (m.CorpsHtml ? corps : WebUtility.HtmlEncode(corps).Replace("|", "<br/>")).Replace("$PieceJointe$",
             "<a href=\"#\">Lien n°1</a><br/><a href=\"#\">Lien n°2</a>", StringComparison.Ordinal);
         var rendu = "<html><body style=\"font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1f2937\">"
                     + "<h2 style=\"color:#0055a4;margin:0 0 12px\">Tribunal de commerce de DÉMONSTRATION</h2>"

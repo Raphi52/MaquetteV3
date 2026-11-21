@@ -36,6 +36,10 @@ using SocleCourrielsCheck;
 // modeles inventes (vitest 8/8 rouge) : ajout des listes du banc, de CA05 par le nom du modele et de la partie « Messagerie ».
 // LOT 15 (2026-11-21) : la partie « SOC-006 T04 (suite) » joue la gestion des modeles et des listes (fonction GESTEMAIL, regles de
 // saisie de la V2, modele reserve a Amitel, journal des gestes) par les routes, puis par l'ecran.
+// LOT 16 (2026-11-21) : la partie « SOC-006 T04 (fin) » joue les gestes de l'ecran V2 « Modele de mail » repris : texte HTML assaini
+// a l'enregistrement (RigHtmlSanitizer), boites du greffe par leur adresse enregistrees en etiquette, « Ajouter le logo ».
+// fix-ok: lot 16 -- aucun controle ne jouait ces gestes : ControlerModele ecrivait le HTML tel que recu et aucune route ne rendait
+// les adresses des boites (lus avant d'ecrire ce lot).
 
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
 var migrations = Path.Combine(racine, "Base", "migrations");
@@ -569,6 +573,7 @@ try
         RoutesCourriels.Pour(RoutesCourriels.Modeles, GreffeA),
         RoutesCourriels.PourModele(GreffeA, "BANC_DOC"),
         RoutesCourriels.Pour(RoutesCourriels.ListesDiffusion, GreffeA),
+        RoutesCourriels.Pour(RoutesCourriels.Boites, GreffeA),   // lot 16 : les boites du greffe pour le formulaire d'un modele
     };
     var sansSession = new List<int>();
     var absent = new List<int>();
@@ -587,7 +592,7 @@ try
         using (var r = await Appeler(adresse, SansDroit)) sansDroitMessagerie.Add((int)r.StatusCode);
     Exiger(refusDroit.All(x => x.Code == 403 && x.Corps.Contains("MAIL_LOT1")) && sansDroitMessagerie.All(c => c == 200),
         $"Acces : sans la fonction MAIL_LOT1 (procedure V2 « Mails envoyés en Lot 1 »), la liste et le detail sont refuses (403, motif nomme) ; " +
-        $"les modeles, un modele et les listes restent lisibles ({string.Join(", ", sansDroitMessagerie)})");
+        $"les modeles, un modele, les listes et les boites du greffe restent lisibles ({string.Join(", ", sansDroitMessagerie)})");
     var routesModule = ((IEndpointRouteBuilder)app).DataSources.SelectMany(d => d.Endpoints).OfType<RouteEndpoint>()
         .Where(r => r.Metadata.GetMetadata<ModuleOrigine>()?.Nom == "RigV3.Serveur.Socle.Courriels.ModuleCourriels").ToList();
     var sansPolitique = routesModule.Where(r => !r.Metadata.GetOrderedMetadata<IAuthorizeData>().Any(a => a.Policy == PolitiquesSocle.AgentAdmis))
@@ -1001,6 +1006,134 @@ try
     Exiger(listeParEcran is { Ok: true } && listeParEcran.Vue!.Listes.Any(l => l.Code == "BANC_ECRAN" && l.Proprietaire == "banc.courriel")
            && activeParEcran is { Ok: true, Fiche.Apercu.Modele.UtilisableEnSaisie: false },
         "Ecran SOC-006 T04 : une liste creee depuis l'ecran revient dans ses listes ; Désactiver depuis l'ecran rend le modele inactif");
+
+    // =====================================================================================================
+    // SOC-006 T04 (fin, lot 16) — les gestes de l'ecran V2 « Modele de mail » : texte HTML assaini a l'enregistrement
+    // (RigHtmlSanitizer), boites du greffe proposees par leur adresse et enregistrees en etiquette, « Ajouter le logo ».
+    // ENTREES QUI LE FONT TOMBER : un <script>, un onclick, un lien javascript: saisis dans un modele HTML ; une boite
+    // dont l'adresse partirait en base a la place de son etiquette ; $LOGO$ ajoute a un modele texte.
+    // Etat ici : SEND_EMAIL_TEMPLATE_PATH regle (fichier absent), aucun habillage en base -- regle, pas present.
+    // =====================================================================================================
+    Console.WriteLine("--- SOC-006 T04 (lot 16) : assainissement, boites du greffe, logo");
+    // Les regles de RigHtmlSanitizer, une par une, dans son ordre (RigHtmlSanitizer.cs:17-41).
+    var assaini = ReglesCourriels.Assainir(
+        "<p onclick=\"alert(1)\" onmouseover='x()' onload=y>Bonjour</p><script type=\"text/javascript\">alert(2)</script>" +
+        "<style>p{color:red}</style><!-- note interne --><font color=\"#80ff80\" size=4>Vert</font><a href=\"javascript:alert(3)\">lien</a>" +
+        "<img src='javascript:x'>a&nbsp;&nbsp;&nbsp;b  ");
+    const string MiseEnFormeSaine = "<p><b>Gras</b>, <i>italique</i>, <u>souligné</u></p><ul><li>un</li></ul><ol><li>deux</li></ol>" +
+                             "<p><a href=\"https://documents.greffe-banc.example/d\">le document</a>&nbsp;$PieceJointe$ $LOGO$ $$NumeroAffaireJud</p>";
+    Exiger(assaini == "<p>Bonjour</p>Vert<a href=\"#\">lien</a><img src=\"#\">a b" && ReglesCourriels.Assainir(MiseEnFormeSaine) == MiseEnFormeSaine,
+        $"SOC-006 T04 : les regles de RigHtmlSanitizer -- blocs script et style, commentaires, balises font (texte garde), liens javascript: " +
+        $"(href=\"#\"), gestionnaires on…, &nbsp; repetes, blancs des bords (« {assaini} ») ; jumeau : la mise en forme de l'editeur (gras, " +
+        "italique, souligne, listes, lien) et les jetons restent tels quels");
+
+    // A l'enregistrement, par la route : la base (et le journal) gardent le texte assaini d'un modele HTML.
+    const string SaisieHostile = "<p onclick=\"alert(1)\">Bonjour</p><script>alert(2)</script><a href=\"javascript:alert(3)\">lien</a>" +
+                          "<font color=red>Rouge</font><!-- interne -->$PieceJointe$";
+    var hostile = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_HTML"), Agent, Saisie("BANC_HTML", corps: SaisieHostile));
+    var corpsHostile = (await Scalaire(v3a.Connexion, "SELECT Corps FROM soc.ModeleMessage WHERE Type = 'BANC_HTML'"))?.ToString();
+    var journalHostile = (await Scalaire(v3a.Connexion,
+        "SELECT TOP 1 Apres FROM soc.Journal WHERE Famille = 'courriel' AND IdObjet = 'BANC_HTML' ORDER BY Id DESC"))?.ToString() ?? "";
+    Exiger(hostile.Code == 200 && corpsHostile == "<p>Bonjour</p><a href=\"#\">lien</a>Rouge$PieceJointe$"
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_HTML' AND CorpsHtml = 1") == 1
+           // « alert( » : le contenu des trois pieges ; pas « script », que porte la cle « inscription » du journal.
+           && journalHostile.Contains("Bonjour", StringComparison.Ordinal) && !journalHostile.Contains("alert(", StringComparison.Ordinal)
+           && !journalHostile.Contains("onclick", StringComparison.OrdinalIgnoreCase),
+        $"SOC-006 T04 : le texte d'un modele HTML est ASSAINI a l'enregistrement (regles de RigHtmlSanitizer) -- le <script>, le onclick, le lien " +
+        $"javascript: et la balise font saisis ne vont ni en base ni au journal ({hostile.Code}, « {corpsHostile} »)");
+    var sain = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_HTML"), Agent,
+        Saisie("BANC_HTML", corps: MiseEnFormeSaine.Replace(" $LOGO$", "", StringComparison.Ordinal)));
+    var texteGarde = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_SIMPLE"), Agent,
+        Saisie("BANC_SIMPLE", corps: "Bonjour,|<!-- garde en texte -->|  Le greffe  "));
+    Exiger(sain.Code == 200
+           && (await Scalaire(v3a.Connexion, "SELECT Corps FROM soc.ModeleMessage WHERE Type = 'BANC_HTML'"))?.ToString()
+              == MiseEnFormeSaine.Replace(" $LOGO$", "", StringComparison.Ordinal)
+           && texteGarde.Code == 200
+           // Lu et compare ici, pas par « Corps = '…' » : SQL Server ignore les blancs de fin dans une egalite de varchar.
+           && (await Scalaire(v3a.Connexion, "SELECT CONCAT(CAST(CorpsHtml AS char(1)), '#', Corps) FROM soc.ModeleMessage WHERE Type = 'BANC_SIMPLE'"))?.ToString()
+              == "0#Bonjour,|<!-- garde en texte -->|  Le greffe  ",
+        $"SOC-006 T04 (jumeaux) : la mise en forme de l'editeur s'enregistre telle quelle ({sain.Code}) ; un modele TEXTE garde son texte tel que " +
+        $"saisi, blancs compris, comme la V2 (qui n'assainit que l'editeur HTML) ({texteGarde.Code})");
+
+    // Sur les modeles de RIG_DEV : l'assainissement de leur prochain enregistrement ne leur retire aucun jeton ($PieceJointe$, $LOGO$, $$…).
+    var assainisV2 = new List<string>();
+    var jetonsPerdus = new List<string>();
+    var htmlV2 = 0;
+    await using (var cn = await OuvrirV3A())
+    await using (var cmd = new SqlCommand("SELECT Type, Corps FROM soc.ModeleMessage WHERE CorpsHtml = 1 AND Type NOT LIKE 'BANC[_]%' ORDER BY Type;", cn))
+    await using (var r = await cmd.ExecuteReaderAsync())
+        while (await r.ReadAsync())
+        {
+            htmlV2++;
+            var avant = r.GetString(1);
+            var apres = ReglesCourriels.Assainir(avant);
+            if (apres != avant.Trim()) assainisV2.Add(r.GetString(0));
+            static string Jetons(string t) => string.Join(",", System.Text.RegularExpressions.Regex.Matches(t, @"\$\$\w+|\$\w+\$").Select(m => m.Value));
+            if (Jetons(avant) != Jetons(apres)) jetonsPerdus.Add(r.GetString(0));
+        }
+    Exiger(htmlV2 > 0 && jetonsPerdus.Count == 0,
+        $"SOC-006 T04 : sur les {htmlV2} modeles HTML repris de {sourceV2.InitialCatalog}, l'assainissement ne retire aucun jeton ($PieceJointe$, $LOGO$, " +
+        $"$$…) ; il change le texte de {assainisV2.Count} ({(assainisV2.Count == 0 ? "aucun" : string.Join(", ", assainisV2))}) a leur prochain " +
+        $"enregistrement ({jetonsPerdus.Count} avec un jeton perdu)");
+
+    // Les boites du greffe par leur ADRESSE (INFO_GREFFE de sa base V2, lue comme l'envoi), pour le formulaire d'un modele.
+    var routeBoites = RoutesCourriels.Pour(RoutesCourriels.Boites, GreffeA);
+    var boites = await Lire<BoitesDuGreffe>(routeBoites);
+    string AdresseDe(BoitesDuGreffe b, string etiquette) => b.Boites.Single(x => x.Etiquette == etiquette).Adresse;
+    // Sans session (401), greffe absent (404), sans MAIL_LOT1 (lisible) : la route est dans les lectures des controles « Acces ».
+    Exiger(boites.Boites.Select(b => b.Etiquette).SequenceEqual(BoitesDuGreffe.Proposees)
+           && AdresseDe(boites, "ADRESSE_MAIL_RCS") == "rcs@greffe-banc.example" && AdresseDe(boites, "ADRESSE_MAIL_JUDICIAIRE") == "judiciaire@greffe-banc.example"
+           && AdresseDe(boites, "ADRESSE_MAIL_NO_REPLY") == "ne-pas-repondre@greffe-banc.example"
+           && AdresseDe(boites, "ADRESSE_MAIL_ACCUSE_ENVOI_JUD") == "accuse-jud@greffe-banc.example"
+           && AdresseDe(boites, "ADRESSE_MAIL_COMPTABILITE") == "" && AdresseDe(boites, "ADRESSE_MAIL_NANTISSEMENTS") == ""
+           && !JsonSerializer.Serialize(boites).Contains("secret", StringComparison.Ordinal),
+        $"SOC-006 T04 : GET {RoutesCourriels.Boites} rend les {boites.Boites.Length} boites du formulaire V2 (expediteur, « Répondre à », accuses " +
+        "d'envoi) par leur ADRESSE dans le greffe (INFO_GREFFE ; colonne vide ou absente -> \"\", jamais un mot de passe)");
+    await PoserHabillage(habillageBase);
+    var boitesHabille = await Lire<BoitesDuGreffe>(routeBoites);
+    await PoserHabillage(null);
+    Exiger(boites is { HabillageRegle: true, HabillagePresent: false } && boitesHabille is { HabillageRegle: true, HabillagePresent: true },
+        "SOC-006 T04 : le formulaire sait si le greffe a un habillage regle (editeur mis en forme d'un modele HTML, _TemplateActif de la V2) et " +
+        "s'il en a un (« Ajouter le logo » refuse) -- sans habillage en base : regle, absent ; habillage pose : present");
+
+    // Par l'ecran : la Messagerie recoit les boites ; la boite CHOISIE part en etiquette (ce que l'ecran compose, prouve par vitest),
+    // la base garde l'etiquette et jamais l'adresse, l'apercu relu la resout pour le greffe.
+    var ecranBoites = (await EcranMessagerie.OuvrirAsync(ClientEcran(Agent), GreffeA)).Boites;
+    var parBoites = await EcranMessagerie.EnregistrerModeleAsync(ClientEcran(Agent), GreffeA, Saisie("BANC_NEUF") with
+    {
+        Expediteur = "Greffe du banc <[ADRESSE_MAIL_JUDICIAIRE]>", Reponse = "secretariat@etude-banc.example;[ADRESSE_MAIL_NO_REPLY]",
+        Copie = "[ADRESSE_MAIL_ACCUSE_ENVOI_JUD]",
+    }, "BANC_NEUF");
+    Exiger(ecranBoites is not null && AdresseDe(ecranBoites, "ADRESSE_MAIL_JUDICIAIRE") == "judiciaire@greffe-banc.example"
+           && parBoites is { Ok: true, Fiche.Apercu: { } ap3 }
+           && ap3.Expediteur == "Greffe du banc <judiciaire@greffe-banc.example>"
+           && ap3.Reponse == "secretariat@etude-banc.example;ne-pas-repondre@greffe-banc.example" && ap3.Copie == "accuse-jud@greffe-banc.example"
+           && await Compter(v3a.Connexion, """
+                  SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_NEUF' AND Expediteur = 'Greffe du banc <[ADRESSE_MAIL_JUDICIAIRE]>'
+                    AND Reponse = 'secretariat@etude-banc.example;[ADRESSE_MAIL_NO_REPLY]' AND Copie = '[ADRESSE_MAIL_ACCUSE_ENVOI_JUD]'
+                    AND CONCAT(Expediteur, Reponse, Copie) NOT LIKE '%greffe-banc.example%';
+                  """) == 1,
+        $"Ecran SOC-006 T04 : la Messagerie propose les boites par leur adresse (de « {(ecranBoites is null ? "?" : AdresseDe(ecranBoites, "ADRESSE_MAIL_JUDICIAIRE"))} ») ; " +
+        $"la boite choisie s'enregistre en ETIQUETTE [ADRESSE_MAIL_X], jamais son adresse, et l'apercu relu la resout ({parBoites.Message})");
+    var demoBoites = (await EcranMessagerie.OuvrirAsync(null, null)).Boites;
+    var refusBoites = (await EcranMessagerie.OuvrirAsync(ClientEcran(@"AMITEL\banc.inconnu"), GreffeA)).Boites;
+    Exiger(demoBoites is { HabillageRegle: true } && demoBoites.Boites.Length == BoitesDuGreffe.Proposees.Length
+           && demoBoites.Boites.All(b => b.Adresse.EndsWith("@greffe-demo.fr", StringComparison.Ordinal)) && refusBoites is null,
+        "Ecran SOC-006 T04 : la demonstration a ses boites (adresses fictives) et un habillage regle ; un compte refuse ne recoit aucune boite");
+
+    // « Ajouter le logo » (OPE_EDIT_EMAILMODEL.cs:58-59) : $LOGO$ a la fin du texte d'un modele TEXTE -> le modele passe en HTML.
+    var logoTexte = await EcranMessagerie.EnregistrerModeleAsync(ClientEcran(Agent), GreffeA,
+        Saisie("BANC_SIMPLE", corps: "Bonjour,|Un avis.|$LOGO$"), "BANC_SIMPLE");
+    await PoserHabillage(habillageBase);
+    var logoHabille = await EcranMessagerie.EnregistrerModeleAsync(ClientEcran(Agent), GreffeA,
+        Saisie("BANC_NEUF", corps: "Bonjour,|Un avis.|$PieceJointe$|$LOGO$"), "BANC_NEUF");
+    await PoserHabillage(null);
+    Exiger(logoTexte is { Ok: true, Fiche.Apercu.Modele.CorpsHtml: true }
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_SIMPLE' AND CorpsHtml = 1 AND Corps = 'Bonjour,|Un avis.|$LOGO$'") == 1
+           && logoHabille is { Ok: false } && logoHabille.Message.Contains("$LOGO$ est interdit")
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_NEUF' AND Corps LIKE '%$LOGO$%'") == 0,
+        $"SOC-006 T04 : « Ajouter le logo » -- $LOGO$ ajoute au texte d'un modele texte (BANC_SIMPLE) : le modele passe en HTML ; jumeau : sous " +
+        $"l'habillage du greffe, refuse avec le motif du serveur, rien n'est ecrit (« {Court(logoHabille.Message, 90)} »)");
 
     // Ce que l'arret du serveur ecrit au journal se lit apres sa destruction, a la sortie de ce bloc.
     capteur.Vider();

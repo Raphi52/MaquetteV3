@@ -9,7 +9,7 @@ les courriels du greffe avec ses modèles et en garder la trace ».
 | Base (T01) | modèles (`soc.ModeleMessage`), listes de diffusion (`soc.ListeDiffusion`, `soc.ModeleMessageListe`), courriels partis (`soc.CourrielEnvoye`), trace de chaque étape (`soc.TraceEnvoi`) | `Base\migrations\SOC-006_courriels.sql` |
 | Serveur (T02) | le service d'envoi : modèle du greffe, adresses, jetons, habillage en base puis fichier, remise ou boîte de dépôt, trace à chaque étape | `Serveur\Socle\Courriels\ServiceCourriels.cs`, `HabillageCourriel.cs`, `ValeursGreffe.cs`, `RemiseCourriel.cs`, `OptionsCourriels.cs`, `TracesCourriels.cs` |
 | Exploitation (T03) | le ménage quotidien des traces de plus de 90 jours, durée réglable | `Serveur\Socle\Courriels\MenageCourriels.cs` |
-| Écran (T04) | « Messagerie » (gestion des modèles : modèles et listes du greffe, aperçu ; ni modèle ni bascule « Amitel » pour un agent du greffe, CA05 ; **création, modification, désactivation et réactivation** d'un modèle et d'une liste pour un agent qui a la fonction `GESTEMAIL`, lot 15) et « Courriels envoyés » (menu Configurer › Modèles et envois) | `Pont\EcranMessagerie.cs`, `web\src\ecrans\EcranMessagerie.tsx`, `Pont\EcranCourriels.cs`, `web\src\ecrans\EcranCourriels.tsx`, `ModuleCourriels.cs`, `GestionCourriels.cs`, `Base\migrations\SOC-006_gestion.sql` |
+| Écran (T04) | « Messagerie » (gestion des modèles : modèles et listes du greffe, aperçu ; ni modèle ni bascule « Amitel » pour un agent du greffe, CA05 ; **création, modification, désactivation et réactivation** d'un modèle et d'une liste pour un agent qui a la fonction `GESTEMAIL`, lot 15 ; **les gestes de l'écran V2** — éditeur mis en forme du texte HTML, assainissement à l'enregistrement, boîtes du greffe choisies par leur adresse, « Ajouter le logo », question au changement de modèle, lot 16) et « Courriels envoyés » (menu Configurer › Modèles et envois) | `Pont\EcranMessagerie.cs`, `web\src\ecrans\EcranMessagerie.tsx`, `Pont\EcranCourriels.cs`, `web\src\ecrans\EcranCourriels.tsx`, `ModuleCourriels.cs`, `GestionCourriels.cs`, `Base\migrations\SOC-006_gestion.sql` |
 | Reprise (T05) | modèles et listes de la V2, comparaison colonne par colonne | `Serveur\Socle\Courriels\RepriseCourriels.cs` |
 | Tests (T06) | un contrôle par critère, contre-épreuves faites | `tests\SocleCourrielsCheck` — **`.\tests.ps1 SocleCourriels`** |
 
@@ -109,13 +109,14 @@ production sans `smtp`, `smtp` sans hôte, durée nulle.
 | POST | `/socle/greffes/{greffe}/listes-diffusion` | crée une liste (`SaisieListe` → `ListeDiffusion`, 201) ; réservé à **GESTEMAIL** |
 | PUT | `/socle/greffes/{greffe}/listes-diffusion/{id}` | modifie une liste que l'agent voit (404 pour la liste privée d'un collègue) ; réservé à **GESTEMAIL** |
 | PUT | `/socle/greffes/{greffe}/listes-diffusion/{id}/actif` | désactive ou réactive une liste ; mêmes règles |
+| GET | `/socle/greffes/{greffe}/boites-courriel` | ce que le formulaire d'un modèle propose pour ce greffe (`BoitesDuGreffe`, lot 16) : ses 9 boîtes par leur **adresse** (`INFO_GREFFE` de sa base V2, lue comme l'envoi) et l'état de son habillage (réglé : éditeur mis en forme ; présent : `$LOGO$` refusé) |
 
 Toutes portent `PolitiquesSocle.AgentAdmis` (401 sans session, 403 compte refusé, 404 greffe absent, 503 base muette) et
-ouvrent la base du greffe par le catalogue. Les cinq premières ne font que lire ; les six d'écriture exigent la fonction
+ouvrent la base du greffe par le catalogue. Les six de lecture ne font que lire ; les six d'écriture exigent la fonction
 `GESTEMAIL` (403 sinon, motif nommé, rien n'est écrit) et rendent **400 avec le motif** quand une saisie est refusée.
 Pour les lectures : `MAIL_LOT1` est la fonction de l'écran V2 « Mails
-envoyés en Lot 1 » ; sans elle, 403 et rien n'est lu. Les trois routes de la Messagerie n'exigent que d'être admis :
-ce sont les modèles qu'un agent choisit pour envoyer. La règle CA05 est **une seule requête**
+envoyés en Lot 1 » ; sans elle, 403 et rien n'est lu. Les quatre routes de lecture de la Messagerie n'exigent que d'être
+admis : ce sont les modèles qu'un agent choisit pour envoyer, et les adresses de son greffe. La règle CA05 est **une seule requête**
 (`ServiceCourriels.ModelesVisiblesAsync`) pour la liste et pour le modèle demandé par son nom. L'**envoi** n'est pas une
 route : un acte appelle le service.
 
@@ -179,7 +180,7 @@ modèle n'est enregistré… »).
 | À l'enregistrement, le modèle n'a plus **que** les listes cochées | `OPE_EDIT_EMAILMODEL_LISTE_DISTRIB.cs:58-61` (tous les liens marqués à supprimer, les cochés gardés) | même règle : un lien vers la liste privée d'un collègue ou vers une liste désactivée part aussi (à valider, voir « Écarts ») |
 | Signature du modèle | colonnes `EMAILMOD_SIGNATURE_ACTIVE`, `EMAILMOD_SIGNATURE` (RIG_DEV ; aucun code V2 versionné ne les lit) | « Signature active » et son texte, enregistrés tels quels |
 | Dictionnaire des tags réservé à Amitel | `OPE_EDIT_EMAILMODEL.cs:192-193`, texte `OPE_EDIT_TEMPLATE_MAIL.cs:167-182` | le pont ne le rend qu'à un agent d'Amitel (bouton « Dictionnaire de tags ») |
-| Une saisie en cours n'est jamais perdue en silence | `OPE_RECHERCHE_EMAILMODEL.LoadEmailModel` (`proc_gestemail.md` § 4) | ouvrir un autre modèle ou une autre liste est refusé, avec un message, tant qu'elle n'est ni enregistrée ni annulée |
+| Une saisie en cours n'est jamais perdue en silence | `OPE_RECHERCHE_EMAILMODEL.LoadEmailModel` (`proc_gestemail.md` § 4) | **modèle** (lot 16) : la question de la V2, voir plus bas ; **liste** : ouvrir autre chose est refusé, avec un message, tant qu'elle n'est ni enregistrée ni annulée (la V2 a mis sa question en commentaire, `OPE_RECHERCHE_LISTEDISTRIBUTIONMAIL.cs:90`) |
 
 Sur les **40 modèles de RIG_DEV** (contrôle du banc), **38** passent ces règles tels quels et **2** sont à compléter :
 incomplets en base, la V2 les refuserait aussi à l'enregistrement — `DIVJUD` (sans sujet) et « Envoi document
@@ -204,8 +205,8 @@ comparaison est faite sur les formulaires de la V2 (`OPE_*.Designer.cs`, titres 
 |---|---|
 | Recherche : colonnes « Type », « Libellé écran », « Sujet » ; filtre sur le nom au fil de la saisie | liste « nom — libellé écran » (l'objet en infobulle) ; filtre au fil de la saisie sur le nom **ou** le libellé écran |
 | Bouton « Afficher / Masquer les éléments inactifs » (modèles `EMAILMOD_UTILISABLE_EN_SAISIE = 0`, listes `LSTDM_ACTIF = 0`) | le même bouton, mêmes libellés, pour les deux |
-| « Nom du modèle », « Libellé écran », « Sujet », « Corps » | mêmes libellés ; le corps en « Texte du modèle » (lecture) **et** en aperçu rendu |
-| « Expéditeur » (boîte du greffe ou saisie libre), « Répondre à », « Copie cachée » | mêmes libellés ; l'adresse **résolue** pour le greffe, l'étiquette `[ADRESSE_MAIL_…]` en infobulle |
+| « Nom du modèle », « Libellé écran », « Sujet », « Corps » | mêmes libellés ; le corps en « Texte du modèle » (lecture) **et** en aperçu rendu ; en modification, l'éditeur mis en forme pour un modèle HTML sous un habillage réglé (lot 16) |
+| « Expéditeur » (boîte du greffe ou saisie libre), « Répondre à », « Copie cachée » | lecture : l'adresse **résolue** pour le greffe, l'étiquette en infobulle ; modification (lot 16) : « Saisie libre » et les boîtes du greffe **par leur adresse**, « Expéditeur du courrier (libellé / adresse du mail) », « Répondre à (saisie libre) », « Copie cachée à (saisie libre) » |
 | « Destinataire par défaut (optionnel) » : saisie libre + listes cochées | « Destinataire par défaut » + « Listes par défaut » (les actives que l'agent voit, comme la V2) |
 | Cases « Utilisable RCS / judiciaire / privilège / comptabilité » | pastilles du modèle, et filtres « Domaine » (RCS, Judiciaire, Privilège, Comptabilité) |
 | « Modèle modifiable uniquement par Amitel » (visible pour Amitel seul) | pastille et filtre « Amitel », pour un agent d'Amitel seul |
@@ -214,7 +215,38 @@ comparaison est faite sur les formulaires de la V2 (`OPE_*.Designer.cs`, titres 
 | Barre : « Ajouter un modèle », « Désactiver/Activer », Valider / Annuler du formulaire | « Nouveau modèle », « Désactiver » / « Réactiver », « Enregistrer » / « Annuler » (lot 15), pour un agent `GESTEMAIL` |
 | « Dictionnaire de tags » (Amitel) | le même texte, pour un agent d'Amitel seul (lot 15) |
 | Listes : « Ajouter », Valider, « Désactiver/Activer » ; « Public » / « Privé (login) » | « Nouvelle liste », « Enregistrer », « Désactiver » / « Réactiver » ; « Publique (tous les agents) » / « Privée (compte) » (lot 15) |
-| « Signature du greffe », « Ajouter le logo », « Éditer le template courriel » (Amitel) | **non repris** (voir « ce qui reste ») ; `$LOGO$` se tape dans le texte |
+| « Ajouter le logo » | le même bouton, sous le texte (lot 16) |
+| « Signature du greffe », « Éditer le template courriel » (Amitel) | **non repris** (voir « ce qui reste ») |
+
+## Les gestes de l'écran V2 repris (T04 fin, lot 16)
+
+Écarts relevés par le chef en comparant la Messagerie du lot 15 à l'écran V2 « Modele de mail », repris un par un. Sources
+relues : `OPE_EDIT_EMAILMODEL.cs` (`LinkDonnees`, `Toolbar_ButtonClick`, `_TemplateActif`), `OPE_EDIT_EMAILMODEL_ONE_CHOICE.cs`,
+`OPE_EDIT_EMAILMODEL_MANY_CHOICES.cs` (`RigOpeOutilsMetier\EMAIL`), `OPE_RECHERCHE_EMAILMODEL.cs` (`LoadEmailModel`),
+`RigHtmlEditor.cs`, `RigHtmlSanitizer.cs`, `Ult_HtmlEditor.cs` (`Rig_Ult_Metier`), `RegEx.cs` (`DecoupeMailInfoGreffe`).
+
+| Geste | V2 | V3 |
+|---|---|---|
+| Texte d'un modèle HTML | éditeur mis en forme si le modèle est HTML **et** que le greffe a un habillage réglé (`EMAILMOD_CORPS_HTML && _TemplateActif`, `LinkDonnees`) ; sinon zone de texte | même condition, décidée à l'ouverture du modèle (`FicheModele.editeur`). Barre de `RigHtmlEditor`, dans son ordre et avec ses textes : **G** (Gras), **I** (Italique), **S** (Souligné), **• Liste** (Liste à puces), **1. Liste** (Liste numérotée), **Lien** (Insérer un lien, adresse pré-remplie « https:// »), **Effacer mise en forme**. Chaque bouton est la commande d'édition du navigateur que la V2 passait à `ExecCommand` (`bold`, `italic`, `underline`, `insertUnorderedList`, `insertOrderedList`, `createLink`, `removeFormat`) : **aucun paquet npm de plus**. La sélection de l'agent est gardée (la V2 agissait au `MouseDown`) |
+| Texte écrit en lignes dans un modèle HTML (25 des 37 de `RIG_DEV`) | `Ult_HtmlEditor._CorpsToHtml` : texte sans balise échappé, sauts de ligne en `<br />` | même règle ; et comme `_userEdited` de la V2, le texte de la base **repart tel quel** tant que l'agent n'a pas tapé dans l'éditeur (entrer et sortir ne modifie rien) |
+| Assainissement | `RigHtmlSanitizer.Sanitize` dans l'éditeur | au **serveur**, à **chaque** enregistrement d'un modèle HTML (déjà HTML, ou qui le devient par `$LOGO$`), mêmes expressions dans le même ordre : blocs `<script>` et `<style>`, commentaires, balises `<font>` (texte gardé), liens `javascript:` (`href="#"`), gestionnaires `on…`, `&nbsp;` répétés, blancs des bords (`ReglesCourriels.Assainir`). La base **et le journal** gardent le texte assaini ; les contrôles (vide, 4 000 caractères, `$PieceJointe$`) jugent le texte assaini. Un modèle texte reste tel que saisi, comme la V2 |
+| Expéditeur | `ONE_CHOICE` : « Saisie libre » + 5 boîtes montrées par leur **adresse** (`INFO_GREFFE`) ; libellé et adresse (lecture pour une boîte) ; enregistre « Libellé <[ADRESSE_MAIL_X]> » | même choix, mêmes libellés ; l'adresse vient du serveur (`GET …/boites-courriel`) ; à côté de l'adresse, le nom court de la boîte (« RCS », « judiciaire »…) ; l'étiquette en infobulle ; la base garde l'**étiquette** |
+| Répondre à | `MANY_CHOICES « RA »` : 5 boîtes à cocher + saisie libre ; « ne pas répondre » exclut les autres et la saisie libre, et inversement | même chose ; enregistre « saisie libre;[ÉTIQUETTE];… » dans l'ordre de la V2 |
+| Copie cachée | `MANY_CHOICES « CC »` : 4 boîtes (sans « ne pas répondre ») + 4 accusés d'envoi + saisie libre ; à l'ajout, accusé d'envoi judiciaire coché ; cocher « Utilisable X » coche l'accusé d'envoi X (`CheckUtilisableEn`) | même chose |
+| « Ajouter le logo » | ajoute `$LOGO$` à la fin du texte, le modèle passe en HTML ; refusé à la validation sous un habillage | même geste ; sous l'habillage du greffe, l'écran le refuse **tout de suite**, avec la phrase du serveur, sans rien ajouter ; le serveur le refuse aussi (400) |
+| Ouvrir un autre modèle (ou « Nouveau modèle ») avec une saisie en cours | « Des changements ont été saisis, voulez-vous les enregistrer ? » Oui (enregistre puis ouvre) / Non (abandonne) | la même question, dans la forme de celle de « Désactiver » (pastille « Attention », Oui / Non) |
+
+Les adresses des boîtes sont lues **où la V3 les lit aujourd'hui** : `INFO_GREFFE` de la base V2 du greffe, par
+`LectureValeursGreffe.LireAsync` (lecture seule) ; jamais une colonne de mot de passe. Une boîte que le greffe n'a pas
+s'affiche « aucune adresse dans ce greffe » (la V2 montrait un bouton sans libellé). Quand TRA-025 reprendra `INFO_GREFFE`,
+seule cette lecture changera de base.
+
+Sur `RIG_DEV` (lu le 2026-11-21) : **3** des 37 modèles HTML perdront leurs balises `<font>` (couleur, taille, police ; le
+texte reste) à leur prochain enregistrement — `CREJET`, `INPI_DCA_RECLA`, `MPCS_INFO_OUV_JUGE` ; l'assainissement ne retire
+**aucun** jeton (`$PieceJointe$`, `$LOGO$`, `$$…`) des 37 (contrôle du banc).
+
+Captures (bureau caché, démonstration, adresses fictives) : voir le compte rendu du lot 16 —
+`C:\Users\raphael.vilain\Documents\Autowin\refonte-rig\captures\phase2-lot16-messagerie\`.
 
 ## Écarts avec la V2
 
@@ -234,7 +266,11 @@ comparaison est faite sur les formulaires de la V2 (`OPE_*.Designer.cs`, titres 
 | Modèle réservé à Amitel : un agent du greffe reçoit 404 en le modifiant | suite de CA05 (il ne le voit pas) ; la V2 le lui montrait en lecture seule. **À valider** avec l'écart CA05 ci-dessus |
 | Une étiquette d'adresse est ancrée des deux côtés (`[ADRESSE_MAIL_RCS]xyz` est refusé) et jamais celle d'un mot de passe (`[PWD_SQL]`) | l'expression de la V2 (`EmailTableInfogreffe`) n'ancrait chaque alternative que d'un côté ; les mots de passe ne sont jamais des adresses (écart déjà pris à l'envoi) |
 | La trace d'un geste est une ligne du journal des gestes, dans la transaction du geste | la V2 créait une demande déjà validée (« Désactivation du modèle mail : … »), sur une autre connexion que l'écriture (`proc_gestemail.md` § 9) : une écriture ratée laissait une trace orpheline |
-| Changer de modèle avec une saisie en cours : refusé avec un message | la V2 proposait Oui / Non / Annuler ; ici l'agent enregistre ou annule d'abord : rien n'est perdu ni enregistré sans lui |
+| Changer de modèle avec une saisie en cours : « Oui » refusé par le serveur garde la saisie et n'ouvre rien (lot 16) | la V2 appelait `Processus.Valider()` puis chargeait l'autre modèle sans lire son résultat (`OPE_RECHERCHE_EMAILMODEL.cs:107-124`) : une saisie refusée était remplacée. Ici le motif s'affiche et la saisie reste |
+| Le texte HTML est assaini à chaque enregistrement, même hors de l'éditeur (lot 16) | dans GESTEMAIL, la V2 enregistrait le HTML **brut** : son éditeur branché est `Ult_HtmlEditor` (`HtmlCorps`, G/I/S et deux listes, `InnerHtml` tel quel) ; `RigHtmlEditor` et son assainisseur servent à l'écran d'envoi (`RIG_Send_Email`, `frmEditerMail`), et `_InitHtmlEditor` d'`OPE_EDIT_EMAILMODEL` n'est jamais appelé. La V3 suit la demande du chef : les 7 boutons de `RigHtmlEditor`, l'assainissement au serveur. Conséquence : 3 modèles de `RIG_DEV` perdent leurs `<font>` à leur prochain enregistrement (ci-dessus). **À valider** par le métier |
+| Expéditeur : libellé sans blancs de bord (lot 16) | la V2 recollait « libellé + " <" » sans couper l'espace lu (`DecoupeMailInfoGreffe` le garde) : 22 des 32 expéditeurs nommés de `RIG_DEV` ont deux espaces avant « < ». La V3 en remet un seul, au prochain enregistrement du modèle |
+| « Répondre à » / « Copie cachée » : une étiquette que le formulaire ne propose pas reste en saisie libre (lot 16) | la V2 la laissait tomber sans le dire (`GetValueOfPropertyForCheckbox` : ni case cochée, ni texte libre) |
+| Le lien de l'éditeur se saisit dans la fiche (champ « Adresse du lien », OK / Annuler) | la V2 ouvrait une petite fenêtre (`DemanderUrl`) ; même pré-remplissage « https:// », même refus d'une adresse vide |
 
 ## Ce qui ne se fait pas depuis ce poste, et ce qui reste
 
@@ -243,8 +279,11 @@ comparaison est faite sur les formulaires de la V2 (`OPE_*.Designer.cs`, titres 
 | CA01 « 0 écart sur les 40 bases » | prouvé sur `RIG_DEV` (40 modèles, 0 écart) et sur un schéma V2 « versionné » ; les 40 bases des greffes sont sur les serveurs des greffes (lecture SQL-PROD seulement greffe nommé) : à jouer au transfert (`RepriseCourriels.ReprendreAsync` puis `ComparerAsync`, base par base) |
 | La durée de 90 jours | à faire valider par le délégué à la protection des données d'Amitel (la trace garde des adresses et des objets de courriers judiciaires) |
 | Le chemin de l'habillage en fichier depuis les serveurs de la V3 | `RepriseReglages.RapportAsync` (SOC-003 CA05) le liste s'il est injoignable ; à vérifier sur les serveurs réels |
-| Les boutons « Signature du greffe » (insère `RigGreffe.SignatureJudiciaire` dans le texte) et « Ajouter le logo » | la signature judiciaire du greffe vient de ses réglages d'éditions (SED-001), pas encore dans la V3 ; `$LOGO$` se tape dans le texte. À reprendre avec les éditions |
-| L'éditeur HTML du texte (`RigHtmlEditor`, quand un habillage est réglé) et « Éditer le template courriel » (Amitel, l'habillage) | le texte se modifie en zone de texte (HTML brut pour un modèle HTML) ; l'habillage relève de SOC-003 (`soc.ModeleCourriel`) et n'a pas encore d'écran |
+| Le bouton « Signature du greffe » (insère `RigGreffe.SignatureJudiciaire` dans le texte) | la signature judiciaire du greffe vient de ses réglages d'éditions (SED-001), pas encore dans la V3. À reprendre avec les éditions (« Ajouter le logo » : fait, lot 16) |
+| « Éditer le template courriel » (Amitel, l'habillage) | l'habillage relève de SOC-003 (`soc.ModeleCourriel`) et n'a pas encore d'écran (l'éditeur mis en forme du texte : fait, lot 16) |
+| « Répondre à » obligatoire | la V2 le refuse vide (`OPE_EDIT_EMAILMODEL_MANY_CHOICES.Verifier`) ; le serveur de la V3 ne l'exige pas (lot 15). 1 modèle de `RIG_DEV` n'a pas de réponse : la règle le ferait compléter à son prochain enregistrement. À reprendre dans `ReglesCourriels.ControlerModele` après accord |
+| Le libellé de l'expéditeur d'un modèle neuf | la V2 le pré-remplit du nom du greffe (`ParametresEdition.TypeEtNomGreffeMin`, `PARAM_EDITIONS`) ; la V3 le laisse vide : `PARAM_EDITIONS` n'est pas encore dans la V3 (SED-001) |
+| Les captures de la V2 | aucun exécutable de `PROC_GESTEMAIL` n'est construit sur ce poste : la comparaison des captures V3 se fait sur les formulaires de la V2 (`*.Designer.cs`), pas sur une image |
 | La fonction `GESTEMAIL` dans chaque base de greffe | elle vient du catalogue V2 (`PROCESSUS_ET_FONCTIONALITE`) par la reprise des droits (SOC-002) ; les rôles qui l'ont se vérifient greffe par greffe au transfert |
 | Les documents « par lien » | la V2 publie la pièce et met son lien (`_getLienHttp`) ; la V3 reçoit le lien tout fait de l'acte : la publication des pièces viendra avec les éditions |
 | La reprise de l'historique (`EMAIL_ENVOYE`, `EMAIL_ENVOI_TRACE`) | non faite ici : la trace V2 se purge à 90 jours ; l'historique des courriels relève de la recopie (REC) |
@@ -266,6 +305,10 @@ Chaque fichier remis à l'identique après coup, banc vert ensuite :
 | lot 15 : la vérification de `GESTEMAIL` retirée des routes d'écriture (`ModuleCourriels.Gerer`) | « SANS la fonction GESTEMAIL, chacune des 6 écritures … est refusée » (201, 200, 200, 201, 200, 200) et le contrôle de l'écran sans GESTEMAIL |
 | lot 15 : la ligne du journal de la création retirée (`GestionCourriels.CreerModeleAsync`) | « la création est écrite au journal des gestes… » et le décompte des gestes du contrôle des saisies |
 | lot 15 : l'écran montre ses boutons d'écriture sans `GESTEMAIL` (`EcranMessagerie.tsx`, vitest) | 2 tests de `EcranMessagerie.test.tsx` (« sans GESTEMAIL : … AUCUN bouton d'écriture », agent du greffe) |
+| lot 16 : l'assainissement retiré de `ReglesCourriels.ControlerModele` (le texte reçu écrit tel quel) | « le texte d'un modèle HTML est ASSAINI à l'enregistrement » — le `<script>`, le `onclick` et le lien `javascript:` passaient en base |
+| lot 16 : `$LOGO$` ne fait plus passer le modèle en HTML | 3 : « Ajouter le logo », le `$LOGO$` sans habillage du lot 15, les listes par défaut (BANC_DOC reste texte) |
+| lot 16 : le pont ne transmet pas les boîtes du greffe (`EcranMessagerie.OuvrirAsync`) | « Ecran SOC-006 T04 : la Messagerie propose les boîtes par leur adresse… » |
+| lot 16 (vitest, ensemble) : éditeur jamais montré, étiquette envoyée sans crochets, pas de question au changement de modèle, logo accepté sous habillage (`EcranMessagerie.tsx`) | 9 des 29 tests de `EcranMessagerie.test.tsx` : 7 des 9 tests du lot 16 (éditeur ×2, boîtes, logo, question ×3 ; les jumeaux « zone de texte » et « saisie libre » restent verts, comme ils le doivent) et 2 tests du lot 15 qui composent l'expéditeur |
 
 L'ancienne maquette de la Messagerie (modèles inventés, bascule « Amitel » pour tous, aucun appel au pont) faisait
 échouer les 8 tests de `EcranMessagerie.test.tsx` écrits avant le branchement (2026-11-21).
@@ -274,6 +317,9 @@ Lot 15 : les bancs `NumerotationCompteurCheck`, `SocleAiguillageCheck`, `SocleLi
 `SocleSupervisionCheck` arrêtent désormais leur serveur (`await app.StopAsync()`) avant de le détruire, comme le contrôle
 « Arrêt » de ce banc : avant, quatre d'entre eux écrivaient « BackgroundService failed » au journal à leur sortie (le
 cinquième, Supervision, filtre sa console en dessous de « critique »).
+Lot 16 : `NumerotationV2Check` aussi (`await app.StopAsync()` avant le `DisposeAsync` de NUM-007 CA04) : « BackgroundService
+failed » à sa sortie passe de 1 à 0, ses 58 contrôles restent verts (mesuré le 2026-11-21).
 
+<!-- fix-ok: lot 16 -- écarts V2 relevés par le chef et lus dans cette page avant d'écrire : « non repris » pour l'éditeur HTML et « Ajouter le logo », adresses en étiquettes tapées, changement de modèle refusé par un message. -->
 <!-- fix-ok: réception refusée du lot 1 (chef, 2026-11-21) : l'écran de la story (EcranMessagerie.tsx) n'était branché sur aucune route ; sections Messagerie, routes, écarts, reste et contre-épreuves ajoutées. -->
 

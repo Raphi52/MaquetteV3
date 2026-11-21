@@ -34,6 +34,7 @@ public sealed record HabillageDuGreffe(bool Regle, bool Present);
 ///    la transaction (<see cref="GestionCourriels"/>) ;
 ///  - un modele HTML sous un habillage regle porte $PieceJointe$ ; $LOGO$ est interdit quand le greffe a un habillage
 ///    (OPE_EDIT_EMAILMODEL.cs:91-110) ; le texte devient HTML s'il porte $LOGO$ (EmailModel.Sauve, EmailModel.cs:307-308) ;
+///  - le texte d'un modele HTML est assaini a chaque enregistrement, regles de RigHtmlSanitizer (<see cref="Assainir"/>) ;
 ///  - l'envoi automatique n'existe que pour un modele RCS : sans RCS il est remis a faux (_SetVisibilityChkEnvoiAuto, :271-279) ;
 ///  - une adresse est une adresse de courriel, nue ou nommee, ou -- pour un modele -- une boite du greffe en etiquette
 ///    (« Greffe &lt;[ADRESSE_MAIL_RCS]&gt; », OPE_EDIT_EMAILMODEL_ONE_CHOICE.cs:56-73) ; les expressions sont celles de
@@ -69,7 +70,12 @@ public static partial class ReglesCourriels
         var libelle = Obligatoire(s.LibelleEcran, "Le libellé écran", 100, erreurs);
         var sujet = Obligatoire(s.Sujet, "Le sujet", 200, erreurs);
         // Le texte garde ses blancs (la V2 l'enregistre tel que saisi) ; il ne peut pas etre vide (EMAILMOD_CORPS NOT NULL).
-        var corps = s.Corps ?? "";
+        // Un modele HTML -- deja HTML, ou qui le devient par $LOGO$ (EmailModel.Sauve) -- est ASSAINI a chaque enregistrement,
+        // regles de RigHtmlSanitizer (<see cref="Assainir"/>) : la base garde le texte assaini, et c'est lui que les controles
+        // suivants jugent (longueur, $PieceJointe$, vide). Un modele texte reste tel que saisi, comme la V2.
+        var corpsSaisi = s.Corps ?? "";
+        var html = corpsHtmlAvant || corpsSaisi.Contains("$LOGO$", StringComparison.Ordinal);
+        var corps = html ? Assainir(corpsSaisi) : corpsSaisi;
         if (corps.Trim().Length == 0) erreurs.Add("Le texte du modèle est obligatoire.");
         else if (corps.Length > 4000) erreurs.Add($"Le texte du modèle tient en 4000 caractères ({corps.Length} saisis).");
         var expediteur = AdressesDuModele(s.Expediteur, "Expéditeur", erreurs);
@@ -86,9 +92,43 @@ public static partial class ReglesCourriels
             erreurs.Add("Le tag $LOGO$ est interdit quand un template est actif (le logo est positionné dans le template).");
 
         if (erreurs.Count > 0) return (null, erreurs);
-        return (new ModeleAEcrire(type!, libelle, sujet!, corps, corpsHtmlAvant || corps.Contains("$LOGO$", StringComparison.Ordinal),
+        return (new ModeleAEcrire(type!, libelle, sujet!, corps, html,
             expediteur!, reponse, copie, destinataire, s.Lot1, s.Lot2, s.Inscription, s.Comptabilite, s.Lot1 && s.EnvoiAutomatique,
             s.ReserveAmitel, s.SignatureActive, signature, [.. (s.ListesParDefaut ?? []).Distinct()]), erreurs);
+    }
+
+    // --- RigHtmlSanitizer (D:\RigApplication\Source\Outils\DLL\RigHtmlEditor\RigHtmlSanitizer.cs), ses expressions telles quelles,
+    // --- IgnoreCase | Singleline comme la V2. Le but de la V2 : retirer le bruit de l'editeur (execCommand) et ce qui n'a rien a
+    // --- faire dans un courriel ; ce n'est pas un filtre de HTML hostile (la saisie est celle d'un agent du greffe).
+    private const RegexOptions OptionsHtml = RegexOptions.IgnoreCase | RegexOptions.Singleline;
+    [GeneratedRegex(@"<script\b[^>]*>.*?</script>", OptionsHtml)] private static partial Regex BlocScript();
+    [GeneratedRegex(@"<style\b[^>]*>.*?</style>", OptionsHtml)] private static partial Regex BlocStyle();
+    [GeneratedRegex(@"<!--.*?-->", OptionsHtml)] private static partial Regex Commentaire();
+    // Balises <font ...> et </font> retirees, le texte interieur garde.
+    [GeneratedRegex(@"</?font\b[^>]*>", OptionsHtml)] private static partial Regex BaliseFont();
+    // Gestionnaires d'evenements : onclick="...", onerror='...', onload=...
+    [GeneratedRegex(@"\s+on\w+\s*=\s*(""[^""]*""|'[^']*'|[^\s>]+)", OptionsHtml)] private static partial Regex Evenement();
+    [GeneratedRegex(@"(href|src)\s*=\s*([""']?)\s*javascript:[^""'>\s]*\2", OptionsHtml)] private static partial Regex LienJavascript();
+    [GeneratedRegex(@"(&nbsp;){2,}", OptionsHtml)] private static partial Regex EspacesInsecables();
+
+    /// <summary>
+    /// Le HTML d'un modele assaini comme RigHtmlSanitizer.Sanitize, dans le meme ordre : blocs script et style, commentaires,
+    /// balises font (le texte reste), liens javascript: (href="#"), gestionnaires on…, &amp;nbsp; repetes (une espace), blancs
+    /// des bords. La V2 l'appliquait dans son editeur (GetSanitizedHtml) ; la V3 l'applique au serveur, a chaque enregistrement.
+    /// </summary>
+    // fix-ok: lot 16 -- avant, ControlerModele ecrivait le texte HTML tel que recu (lu : « var corps = s.Corps ?? "" » puis
+    // INSERT/UPDATE sans traitement) : un <script> ou un onclick saisi allait en base et dans le courriel.
+    public static string Assainir(string? html)
+    {
+        if (string.IsNullOrEmpty(html)) return "";
+        var r = BlocScript().Replace(html, "");
+        r = BlocStyle().Replace(r, "");
+        r = Commentaire().Replace(r, "");
+        r = BaliseFont().Replace(r, "");
+        r = LienJavascript().Replace(r, "$1=\"#\"");
+        r = Evenement().Replace(r, "");
+        r = EspacesInsecables().Replace(r, " ");
+        return r.Trim();
     }
 
     /// <summary>Controle et met en forme une liste saisie : rend la liste a ecrire, ou null et les refus.</summary>
@@ -170,6 +210,22 @@ public static class GestionCourriels
     public static async Task<HabillageDuGreffe> HabillageAsync(SqlConnection cn, CancellationToken ct)
         => new(!string.IsNullOrEmpty(await ModeleCourriel.CheminFichier.LireTexteAsync(cn, ct)),
                !string.IsNullOrEmpty(await ModeleCourriel.LireAvecRepliFichierAsync(cn, ct)));
+
+    /// <summary>
+    /// Ce que le formulaire d'un modele propose pour le greffe <paramref name="code"/> : ses boites (<see cref="BoitesDuGreffe.Proposees"/>)
+    /// par leur ADRESSE, lues ou la
+    /// V3 les lit aujourd'hui (INFO_GREFFE de sa base V2, <see cref="LectureValeursGreffe.LireAsync"/>), et l'etat de son habillage.
+    /// Une boite que le greffe n'a pas rend une adresse vide ; une base V2 illisible, toutes (la cause va au journal, comme l'envoi).
+    /// </summary>
+    public static async Task<BoitesDuGreffe> BoitesAsync(string code, SqlConnection cn, CatalogueGreffes catalogue, BaseRig commune,
+                                                         CancellationToken ct)
+    {
+        var habillage = await HabillageAsync(cn, ct);
+        var valeurs = await LectureValeursGreffe.LireAsync(code, cn, catalogue, commune, ct);
+        return new BoitesDuGreffe(
+            [.. BoitesDuGreffe.Proposees.Select(e => new BoiteCourriel(e, valeurs.InfoGreffe.TryGetValue(e, out var a) ? a.Trim() : ""))],
+            habillage.Regle, habillage.Present);
+    }
 
     // --- Modeles ------------------------------------------------------------------------------------------------
 

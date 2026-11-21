@@ -54,6 +54,11 @@ public static class RoutesCourriels
     /// (OPE_EDIT_LISTEDISTRIBUTIONMAIL.cs:103-109). Reserve a <see cref="FonctionGestion"/>.</summary>
     public const string ActivationListe = "/socle/greffes/{greffe}/listes-diffusion/{id:int}/actif";
 
+    /// <summary>GET : ce que le formulaire d'un modele propose pour CE greffe (<see cref="BoitesDuGreffe"/>) -- ses boites de courriel
+    /// par leur ADRESSE (INFO_GREFFE, comme OPE_EDIT_EMAILMODEL_ONE_CHOICE.ConstructGroupRadioButton) et l'etat de son habillage
+    /// (editeur mis en forme, $LOGO$). Lecture ; il suffit d'etre admis, comme les modeles.</summary>
+    public const string Boites = "/socle/greffes/{greffe}/boites-courriel";
+
     /// <summary>
     /// La fonction (droit) qu'exigent la creation, la modification et l'activation des modeles et des listes : GESTEMAIL, le
     /// code processus de la procedure V2 « Modele de mail » (PROC_GESTEMAIL, proc_gestemail.md:6). Sans elle : 403, et
@@ -258,8 +263,11 @@ public sealed record ApercuModele(
 /// champ obligatoire vide, texte trop long, adresse invalide, $PieceJointe$ manquant, $LOGO$ sous un habillage.
 /// </summary>
 /// <param name="Type">Le nom du modele (EMAILMOD_TYPE, 40 caracteres au plus), unique ; il ne change plus une fois cree.</param>
-/// <param name="Corps">Le texte (« | » = saut de ligne) ; il devient HTML s'il porte $LOGO$ (EmailModel.Sauve, EmailModel.cs:307-308).</param>
-/// <param name="Expediteur">Obligatoire : une boite du greffe en etiquette (« Greffe &lt;[ADRESSE_MAIL_RCS]&gt; ») ou une adresse.</param>
+/// <param name="Corps">Le texte (« | » = saut de ligne) ; il devient HTML s'il porte $LOGO$ (EmailModel.Sauve, EmailModel.cs:307-308).
+/// Le texte d'un modele HTML est assaini a chaque enregistrement, regles de RigHtmlSanitizer (scripts, styles, commentaires,
+/// balises font, gestionnaires on…, liens javascript: retires) : la base garde le texte assaini.</param>
+/// <param name="Expediteur">Obligatoire : une boite du greffe en etiquette (« Greffe &lt;[ADRESSE_MAIL_RCS]&gt; ») ou une adresse ;
+/// l'ecran fait choisir la boite par son adresse (<see cref="RoutesCourriels.Boites"/>) et envoie l'etiquette.</param>
 /// <param name="Reponse">« Répondre à » : adresses ou etiquettes separees par « ; ».</param>
 /// <param name="Copie">« Copie cachée » : adresses ou etiquettes separees par « ; ».</param>
 /// <param name="EnvoiAutomatique">N'existe que pour un modele RCS (<paramref name="Lot1"/>) : sans lui, il est remis a faux, comme
@@ -308,3 +316,31 @@ public sealed record SaisieListe(
 
 /// <summary>Activer (vrai) ou desactiver (faux) un modele ou une liste.</summary>
 public sealed record SaisieActivation(bool Actif, string? Ecran = null);
+
+/// <summary>Une boite de courriel du greffe : son etiquette (la colonne d'INFO_GREFFE, « ADRESSE_MAIL_RCS ») et son adresse
+/// dans CE greffe ("" s'il n'en a pas). Un modele enregistre l'etiquette (« [ADRESSE_MAIL_RCS] »), jamais l'adresse.</summary>
+// fix-ok: lot 16 -- aucune route ne donnait a l'ecran les adresses des boites du greffe (VueEcranMessagerie lue avant le lot :
+// modeles, listes, droit, identite seulement) : l'agent tapait l'etiquette au lieu de choisir l'adresse, comme dans la V2.
+public sealed record BoiteCourriel(string Etiquette, string Adresse);
+
+/// <summary>
+/// Ce que le formulaire d'un modele propose pour CE greffe (GET <see cref="RoutesCourriels.Boites"/>).
+/// </summary>
+/// <param name="Boites">Les boites que la V2 propose (expediteur, « Répondre à », « Copie cachée » : OPE_EDIT_EMAILMODEL_ONE_CHOICE,
+/// OPE_EDIT_EMAILMODEL_MANY_CHOICES), avec leur adresse d'INFO_GREFFE ; jamais une colonne de mot de passe.</param>
+/// <param name="HabillageRegle">Le reglage SEND_EMAIL_TEMPLATE_PATH est rempli : un modele HTML s'edite dans l'editeur mis en forme
+/// (OPE_EDIT_EMAILMODEL._TemplateActif) et doit porter $PieceJointe$.</param>
+/// <param name="HabillagePresent">Le greffe a un habillage, en base ou en fichier : $LOGO$ est refuse (le logo est dans l'habillage).</param>
+public sealed record BoitesDuGreffe(BoiteCourriel[] Boites, bool HabillageRegle, bool HabillagePresent)
+{
+    /// <summary>
+    /// Les boites que le formulaire d'un modele propose, colonnes d'INFO_GREFFE : les cinq de l'expediteur et de « Répondre à »
+    /// (OPE_EDIT_EMAILMODEL_ONE_CHOICE.ConstructGroupRadioButton), puis les quatre accuses d'envoi de « Copie cachée »
+    /// (OPE_EDIT_EMAILMODEL_MANY_CHOICES.ConstructCheckBox). Jamais une colonne de mot de passe.
+    /// </summary>
+    public static readonly string[] Proposees =
+    [
+        "ADRESSE_MAIL_RCS", "ADRESSE_MAIL_JUDICIAIRE", "ADRESSE_MAIL_NANTISSEMENTS", "ADRESSE_MAIL_COMPTABILITE", "ADRESSE_MAIL_NO_REPLY",
+        "ADRESSE_MAIL_ACCUSE_ENVOI_JUD", "ADRESSE_MAIL_ACCUSE_ENVOI_RCS", "ADRESSE_MAIL_ACCUSE_ENVOI_NANT", "ADRESSE_MAIL_ACCUSE_ENVOI_CPT",
+    ];
+}
