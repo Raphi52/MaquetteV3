@@ -194,3 +194,103 @@ Preuve : `.\tests.ps1 RecopieTransfert` (il lui faut `docker compose up -d` et l
 `RIGV3_RIG_DEV`). Contre-épreuves faites : une valeur changée dans la V3 rougit l'oracle ; une valeur écrite dans la
 V2 change son empreinte ; une date arrondie en silence dans la V3 arrête le transfert ; le classement remis sur les
 colonnes non texte et le lien vers une mère rejetée non marqué rougissent le banc.
+
+## La recopie continue (REC-002, REC-003, REC-004) — lot 9
+
+Après le transfert d'une base, la V2 continue de tourner (Q15) : ce qu'un agent change dans la V3 sur une **fiche
+partagée** est recopié dans la V2 (REC-002, la V3 fait foi, Q7) ; ce que la V2 écrit encore sur ces fiches pour ses
+anciennes affaires remonte dans la V3 (REC-003) ; une fiche changée **des deux côtés** entre deux passages garde la
+version de la V3 dans les deux bases, et l'écart est montré à un agent désigné (REC-004).
+
+### Ce qui se passe, dans l'ordre
+
+1. **La V3 écrit une fiche partagée** (aujourd'hui sa copie `v2.<TABLE>`) : le déclencheur de la table, posé par la mise
+   en service, écrit une ligne dans `rec.FileRecopie` **dans la même transaction** (fiche, identifiant V3, colonnes
+   changées, ligne d'avant en JSON, agent, date). La V3 n'attend jamais la V2.
+2. **Un passage** (`ServiceRecopie.PasserAsync`, lancé toutes les 5 s par `RecopieContinue` quand
+   `Recopie:Continue=true`) traite d'abord la file, puis les changements de la V2 :
+   - **l'applicateur** (`Applicateur.cs`) recopie chaque fiche dans la V2, sur la même instance (Q4), **une transaction
+     par fiche** (fiche V2, correspondance, état commun, lignes de file) ; les fiches passent dans l'ordre de leur
+     première ligne, et une fiche **visée** qui attend encore passe avant celle qui la vise (CA03) ; une fiche créée
+     reçoit son identifiant de la V2 et sa correspondance (CA02) ; la première fiche qui échoue arrête le passage et
+     reste en file avec ses essais (CA06) ;
+   - **la remontée** (`Remontee.cs`) lit le suivi des changements de SQL Server de la base V2 depuis son point de
+     reprise (`rec.Remontee`, au départ la version lue par le transfert), dans l'ordre des versions, une fiche visée
+     d'abord (CA03), et écrit chaque fiche dans la V3 sous la marque `rigv3.remontee` (le déclencheur de file ne la
+     renvoie pas), au journal des gestes au nom de la recopie (SOC-016 CA06) ; le point avance après le lot.
+3. **Pas d'aller-retour** (REC-002 CA05, REC-003 CA05) : après chaque fiche, les deux bases ont le même état, noté dans
+   `rec.EtatLigne`. Un changement de la V2 dont l'état est exactement celui-là est une écriture de la recopie : ignoré.
+4. **Conflit** (REC-004) : si la fiche V2 n'a plus l'état commun au moment d'appliquer un changement de la V3, la V2
+   l'a changée entre deux passages ; la V3 gagne sur la fiche entière (CA04) et `rec.Ecart` / `rec.EcartChamp` gardent
+   chaque champ que la V2 avait changé (valeur perdue, valeur gardée), les deux dates et les deux auteurs (CA01).
+   L'écran **« Fiches en conflit »** (`PROC_FICHES_CONFLIT`, Surveiller › Les envois et les éditions) les montre à
+   l'agent qui a la fonction `RECOPIE_ECARTS` ; « Traité » le sort de l'alerte (CA03) ; rouge à 5 jours ouvrés.
+   `rec.EcartsParJour` donne le compte par jour, base et table au contrôle quotidien (REC-006, CA05).
+
+### Mettre un greffe en recopie
+
+```powershell
+# 1. Base V2, AVANT le transfert : le suivi des changements de la base et de ses tables partagées (aucun programme
+#    de la V2 n'est touché, REC-003 CA02). Les tables : celles de Serveur\Recopie\ReglesRecopie.cs.
+cd Base\v2
+sqlcmd -S <instance> -E -f 65001 -b -i recopie-v2.sql -v BaseV2=RIG_<GREFFE> RetentionJours=7 Tables="ACTION_RCS,ADRESSE_BASE,ARRIVEE,CATEGORIE,CLIENT,DOSSIER_RCS,INSCRIPTION"
+# 2. Le transfert (plus haut).
+# 3. La mise en service, côté V3 : PontRecopie.MettreEnServiceAsync(connexionV3, "RIG_<GREFFE>") pose les 7 déclencheurs
+#    de file et le point de départ (refus nommés : pas de transfert fini, suivi absent, rétention dépassée).
+# 4. Le serveur : "Recopie": { "Continue": true, "IntervalleSecondes": 5, "SeuilRetardMinutes": 5 }.
+```
+
+### Les choix et leur raison
+
+| Choix | Raison |
+|---|---|
+| **Une file dans la V3**, écrite par déclencheur ; la V2 écrite après | REC-002 CA06 : la V2 hors ligne ne bloque pas la V3. Le pont de numérotation écrit la V2 dans sa transaction : ici ce serait suspendre la V3 à la V2. Un déclencheur garantit qu'aucun code de domaine n'oublie la file. |
+| **Suivi des changements de SQL Server** (CHANGE_TRACKING) côté V2 | REC-003 CA02 : aucun programme de la V2 modifié. Il écrit dans la transaction de l'agent, sans attendre la V3 (mesuré sur le poste : 4,32 ms par modification avec, 3,17 ms sans). La V3 arrêtée ne perd rien tant que la rétention (7 jours, proposée) couvre l'arrêt (CA04). |
+| **L'état commun** (`rec.EtatLigne`), pas la marque du suivi, pour reconnaître une recopie | Mesuré le 2026-11-21 : un déclencheur de la V2 qui réécrit la ligne dans la même instruction donne une version **sans** le `CHANGE_TRACKING_CONTEXT` de la recopie. La marque reste posée (trace), l'état commun décide ; le même état sert à détecter le conflit. |
+| La V3 reçoit ce que **les déclencheurs de la V2** écrivent pendant une recopie | Sans cela, le changement V3 suivant réécrirait dans la V2 les valeurs que ses déclencheurs venaient de poser, et la fiche ne reviendrait jamais à l'état commun. |
+| **Colonnes propres** à chaque logiciel (état de transmission) | REC-002 CA04 : ni recopiées ni remontées, remises à leur valeur d'avant si le déclencheur de la V2 les marque « M » ; une fiche créée par la V3 reçoit « N » dans la V2. Prouvé : sans cette remise, le dossier passe « M », donc envoyé par la vue Infogreffe (défaut réinjecté, banc rouge). |
+| Une transaction **par fiche**, d'une base à l'autre | Même instance (Q4) : une transaction locale suffit, sans coordinateur distribué ; une panne au milieu ne laisse ni demi-fiche ni correspondance orpheline. |
+| **Les dates de `rec.*` à l'horloge du serveur SQL** | Le SQL Server des bancs (Docker) est à l'heure UTC, le poste à Paris (08:52 contre 09:52, mesuré) : l'âge d'un écart et la durée d'un passage se mesurent avec `SYSDATETIME()`, jamais `DateTime.Now`. |
+| Un passage à la fois par base | Verrou applicatif `rigv3.recopie.<base>` : deux serveurs ne recopient pas deux fois la même file. |
+
+### Écarts code ↔ métier et choix à valider
+
+| Sujet | Codé comme | Pourquoi / qui tranche |
+|---|---|---|
+| Neutraliser la transmission de la V2 | état d'avant remis dans la même transaction ; « N » pour une fiche créée par la V3 | règle retenue de REC-002 (« à valider ») ; seules `*_ETAT_TRANSMISSION` et `*_DATE_MODIF_FLAG_TRANS` (les colonnes que les déclencheurs écrivent) sont propres. Les états INPI et Infogreffe (`DSSRC_INPI_ETAT`…) sont recopiés : référent Échanges. |
+| Fiche entière ou champ par champ | fiche entière (la V3 gagne partout), l'écart liste les champs V2 perdus | décision du tour 8 ; la fusion champ par champ est la question ouverte de REC-004 au référent Socle. |
+| Auteur côté V2 | « non noté par la V2 » | la V2 ne garde pas qui modifie ses fiches partagées, et le suivi des changements ne le dit pas. |
+| Date côté V2 | la date de mise à jour de la fiche quand elle a changé (`CLIEN_DATE_DERNIERE_MODIF`, `DSSRC_DATE_MAJ`, `INEDT_DATE_MAJ`), sinon l'heure où la recopie l'a vue | REC-004 T04. |
+| Jours ouvrés du rouge | lundi-vendredi hors les 11 jours fériés légaux de métropole | outre-mer et Alsace-Moselle à ajouter : référent Socle. |
+| Suppression d'une fiche | recopiée dans les deux sens ; supprimée dans la V2 et modifiée dans la V3 = recréée dans la V2 (écart « (fiche) ») | les stories ne parlent que de création et de modification : référent Socle. |
+| Ce qui est recopié | les 7 tables partagées qui ont une table dans la V3 (`ReglesRec002`) | ENTREPRISE, BODACC, DEPOT_RCS, INSCRIPTION_RCS, INSTANCE, NON_INSCRIT, PASSAGE_CFE, BATEAU, CREANCE_END n'ont pas encore de règle de transfert ; UTILISATEUR → `soc.Compte` demande la correspondance de ses colonnes (story des agents). |
+
+### Ce qui ne se fait pas depuis ce poste, ou reste
+
+| Critère | Ce qui manque | Où |
+|---|---|---|
+| REC-003 T01 : coût du suivi sur la plus grosse base | la copie anonymisée de la plus grosse base (attend la nouvelle réception du lot 6) | REC-008, lot 8 |
+| REC-002 T04 / REC-003 T04 : alerte de retard | le retard au-delà de 5 min va au journal technique en erreur ; une règle d'alerte du Surveillant (lot 2) reste à poser | supervision |
+| REC-004 CA02 : l'alerte dans la tuile « À traiter » de l'accueil | l'alerte est servie (`EcranConflits.Alerte`, `GET /recopie/{greffe}/ecarts/alerte`) ; `Pont\Accueil.cs` est en cours dans un autre fil, et la tuile ne montre aujourd'hui que les alertes de la feuille métier (décision du 17/09/2026) : à trancher | chef, lot de l'accueil |
+| REC-004 CA02 : « chaque ligne ouvre la fiche » | un dossier ouvre son affaire, un client l'écran des fiches clients ; inscription, adresse, action, arrivée et catégorie n'ont pas encore d'écran de fiche dans la V3 | stories de domaine (lot 10) |
+| Une story de domaine (lot 10) qui remplace `v2.<TABLE>` | elle remplace la ligne de sa table dans `ReglesRec002` par une règle qui nomme sa table V3 et la correspondance de ses colonnes (une sorte nouvelle de règle, à écrire avec elle) | lot 10 |
+
+### Fichiers de la recopie continue
+
+| Fichier | Rôle |
+|---|---|
+| `Base\migrations\REC-002_recopie.sql` | `rec.FileRecopie`, `rec.EtatLigne`, `rec.Remontee`, `rec.PassageRecopie`, `rec.Ecart`, `rec.EcartChamp`, `rec.EcartsParJour`, fonction `RECOPIE_ECARTS`, origine des correspondances |
+| `Base\v2\recopie-v2.sql` | le suivi des changements de la base V2 et de ses tables partagées |
+| `Serveur\Recopie\ReglesRecopie.cs` | une règle par table partagée (colonnes propres, date, nom, cible de l'écran) |
+| `Serveur\Recopie\FichesRecopiees.cs` | les fiches lues dans le catalogue des deux bases, la ligne en JSON |
+| `Serveur\Recopie\PontRecopie.cs` | la mise en service : déclencheurs de file, point de départ |
+| `Serveur\Recopie\Applicateur.cs`, `Remontee.cs`, `EcrituresRecopie.cs` | V3 → V2 et conflits ; V2 → V3 ; les écritures d'une fiche |
+| `Serveur\Recopie\ServiceRecopie.cs` | un passage, et la boucle du serveur `RecopieContinue` |
+| `Serveur\Recopie\ModuleConflits.cs`, `Contrats\Recopie\Conflits.cs` | les routes des écarts (liste, alerte, « Traité »), les jours ouvrés |
+| `Pont\EcranConflits.cs`, `web\src\ecrans\EcranConflits.tsx` (+ test) | l'écran « Fiches en conflit » |
+| `tests\RecopieDeuxSensCheck\` | le banc : un contrôle par critère des trois stories |
+
+Preuve : `.\tests.ps1 RecopieDeuxSens` (il lui faut `docker compose up -d` et la lecture de RIG_DEV). Défauts réinjectés le
+2026-11-21 : sans la remise de l'état de transmission, REC-002 CA04 rougit (dossier « M ») ; sans la détection du conflit,
+REC-004 CA01, CA02, CA04 et CA05 rougissent. Le banc fait aussi sa propre contre-épreuve : l'état commun effacé, la valeur
+de la V2 disparaît en silence, et l'oracle de CA01 le voit.

@@ -35,6 +35,7 @@ import { EcranCommandesWeb } from '../ecrans/EcranCommandesWeb'
 import { EcranComptabilisation } from '../ecrans/EcranComptabilisation'
 import { EcranComptes } from '../ecrans/EcranComptes'
 import { EcranCompteurs } from '../ecrans/EcranCompteurs'
+import { EcranConflits } from '../ecrans/EcranConflits'
 import { EcranCorrespondances } from '../ecrans/EcranCorrespondances'
 import { EcranReglages } from '../ecrans/EcranReglages'
 import { EcranManquants } from '../ecrans/EcranManquants'
@@ -203,6 +204,11 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
       // Ecran NEUF de la V3 (« a maquetter », SOC-027) : la fiche « ancienne touche, nouvelle touche » ; chaque ligne
       // ouvre l'ecran de la V3 ou essayer la touche.
       return <EcranCorrespondances ouvrir={(code) => plan('ouvrirCode', code)} />
+
+    case 'PROC_FICHES_CONFLIT':
+      // Ecran NEUF de la V3 (« a maquetter », REC-004 T03) : les fiches partagees modifiees dans l'ancien RIG et dans la V3
+      // entre deux passages de la recopie ; chaque fiche ouvre son affaire ou l'ecran de sa fiche (sans RIGV3_SERVEUR : demonstration).
+      return <EcranConflits ouvrirDossier={ouvrirParNumero} ouvrir={(code) => plan('ouvrirCode', code)} />
 
     case 'PROC_SUPERVISION':
       // Ecran NEUF de la V3 (« a maquetter », SOC-011 T04, SOC-017 T04), reserve a Amitel : les 40 greffes, les

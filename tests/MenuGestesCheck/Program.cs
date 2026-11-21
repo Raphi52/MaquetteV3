@@ -205,7 +205,8 @@ foreach (var (libelle, code) in toutesEntrees)
 var sansFiche = new[] { "PROC_LISTE_DELIBERES", "PROC_SUIVI_IMPRESSION", "PROC_REQUI",
                         "PROC_ACTUALITES", "PROC_COMMANDES_WEB", "PROC_UTILISATEUR", "PROC_MAIL_LOT1",
                         "PROC_COMPTEURS_NUM", "PROC_REGLAGES_GREFFE",
-                        "PROC_NUMEROS_MANQUANTS", "PROC_TOUCHES", "PROC_SUPERVISION", "PROC_CERTIF" };
+                        "PROC_NUMEROS_MANQUANTS", "PROC_TOUCHES", "PROC_SUPERVISION", "PROC_CERTIF",
+                        "PROC_FICHES_CONFLIT" };
 
 var fiches = @"D:\RigApplication\Documentation\reference\proc";
 
