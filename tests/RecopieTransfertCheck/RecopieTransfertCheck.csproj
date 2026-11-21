@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Banc de REC-001 (transfert initial d'une base V2 vers sa base V3), lot 7 du plan de reconstruction, phase 2.
+       Il lui faut le SQL Server du poste (docker compose up -d) et la lecture de RIG_DEV (SQL-DEV\DEV, compte Windows ;
+       autre serveur : RIGV3_RIG_DEV). En tete de Program.cs : ce que chaque controle prouve. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="ExtraitRigDev.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Outils/Transfert/RigV3.Transfert.csproj" />
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+  </ItemGroup>
+
+</Project>
