@@ -113,6 +113,11 @@ public static class EcranRechAffaires
     /// divers qu'elle propose (Pont/PlanTravailActions.cs, lot 9 du plan « Vue du dossier »).</summary>
     public static string? NatureDe(string numero) => Affaires.FirstOrDefault(a => a.Numero == numero)?.Nature;
 
+    /// <summary>La date de creation d'une affaire du fonds, ou null si elle n'y est pas. L'aiguillage la compare a
+    /// la date de passage du greffe pour dire si l'affaire se traite dans l'ancien RIG (SOC-014, SOC-015 :
+    /// Pont/AncienRig.cs). Ce fichier reste sans dependance : GedCheck, OuvertureCheck et TriCheck le compilent seul.</summary>
+    public static DateTime? CreationDe(string numero) => Affaires.FirstOrDefault(a => a.Numero == numero)?.Creation;
+
     /// <param name="cleTri">La colonne cliquee ; null = ordre d'origine (du plus recent au plus ancien).</param>
     /// <param name="selection">Le numero de la ligne selectionnee, ou null.</param>
     [JSInvokable("EcranRechAffaires.Trouver")]

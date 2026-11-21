@@ -20,6 +20,13 @@
 // des chaines .NET) sont faits par Pont/EcranRechAffaires.cs ; ici restent les
 // criteres saisis, la colonne de tri choisie, la selection et la suppression
 // simulee. La coquille .razor monte cet ecran et recoit ouvrir / ouvrirUnDossier.
+//
+// L'ANCIEN RIG (SOC-014, SOC-015 ; lot 3 de la phase 2, Pont/AncienRig.cs) : une affaire creee avant le
+// passage du greffe a la V3 porte la mention « traitee dans la V2 » ; choisie, elle propose « Ouvrir dans
+// l'ancien RIG » (la V2 du greffe, lancee ou ramenee, sur sa recherche d'affaires, numero copie), et sa
+// suppression est refusee ici (elle se fait dans l'ancien RIG). Le double-clic l'ouvre toujours dans la
+// visionneuse : la consulter dans la V3 reste permis. L'aiguillage est demande au pont quand la LISTE des
+// numeros change (pas a chaque tri) ; s'il ne repond pas, l'ecran reste tel qu'avant ce lot.
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
@@ -64,6 +71,31 @@ export interface VueAffaires {
   aucunCritere: boolean
   sirenCherche: string
   choisie: AffaireChoisie | null
+}
+
+/** Le logiciel d'une affaire, dit par l'aiguillage (Pont/AncienRig.cs, LigneAiguillee). */
+export interface LigneAiguillee {
+  numero: string
+  /** « V2 » : creee avant le passage du greffe, traitee dans l'ancien RIG ; « V3 » sinon. */
+  logiciel: string
+  motif: string
+}
+
+export interface VueAiguillage {
+  mode: string
+  greffe: string | null
+  passage: string | null
+  message: string | null
+  affaires: LigneAiguillee[]
+}
+
+/** Le compte rendu de « Ouvrir dans l'ancien RIG » (Pont/AncienRig.cs, ResultatAncienRig). */
+export interface ResultatAncienRig {
+  fait: boolean
+  geste: string
+  numero: string
+  message: string
+  ligneDeCommande: string | null
 }
 
 export interface ProprietesEcranRechAffaires {
@@ -136,6 +168,32 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
   const trouvees = vue?.lignes ?? []
   const choisie = vue?.choisie ?? null
 
+  // Le logiciel de chaque affaire affichee, par numero. La cle est l'ENSEMBLE des numeros : un tri ne change
+  // rien, donc ne redemande rien.
+  const [aiguillage, setAiguillage] = useState<Record<string, LigneAiguillee>>({})
+  const [ancienRig, setAncienRig] = useState<ResultatAncienRig | null>(null)
+  const cleNumeros = [...new Set(trouvees.map((a) => a.numero))].sort().join('\n')
+  useEffect(() => {
+    let perime = false
+    if (cleNumeros === '') { setAiguillage({}); return }
+    appeler<VueAiguillage>('EcranRechAffaires.Aiguiller', cleNumeros.split('\n')).then(
+      (v) => { if (!perime) setAiguillage(Object.fromEntries(v.affaires.map((a) => [a.numero, a]))) },
+      // Sans reponse, aucune mention : l'ecran reste celui d'avant l'aiguillage.
+      () => { if (!perime) setAiguillage({}) })
+    return () => { perime = true }
+  }, [cleNumeros])
+
+  /** L'affaire choisie se traite-t-elle dans l'ancien RIG ? Alors son aiguillage, sinon null. */
+  const choisieV2 = choisie !== null && aiguillage[choisie.numero]?.logiciel === 'V2' ? aiguillage[choisie.numero]! : null
+
+  /** SOC-015 CA02, CA03 : la V2 du greffe, lancee ou ramenee, numero copie. */
+  function ouvrirDansAncienRig(numero: string) {
+    void appeler<ResultatAncienRig>('EcranRechAffaires.OuvrirDansAncienRig', numero).then(
+      (r) => setAncienRig(r),
+      (e: unknown) => setAncienRig({ fait: false, geste: 'refuse', numero, ligneDeCommande: null,
+                                     message: `L'ancien RIG n'a pas pu etre ouvert : ${e instanceof Error ? e.message : String(e)}` }))
+  }
+
   /** Premier clic : ordre croissant. Second clic sur la MEME colonne : ordre inverse. C'est le geste de RIG v2. */
   function basculerTri(cle: string) {
     if (cleTri === cle) setTriAscendant(!triAscendant)
@@ -169,6 +227,12 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
    */
   function supprimer() {
     if (choisie === null) return
+    // SOC-015 CA04 : une ancienne affaire ne se modifie pas dans la V3 ; le bloc « Ancien RIG » propose de l'y ouvrir.
+    if (choisieV2 !== null) {
+      setMessage(`Instance ${choisie.idInstance} (${choisie.numero}) : affaire traitee dans la V2, elle ne se supprime pas ici.`
+        + ' Ouvrez-la dans l\'ancien RIG.')
+      return
+    }
     setMessage(`Instance ${choisie.idInstance} (${choisie.numero}) : suppression simulee`
       + (libererNumeros ? ' — numeros metiers liberes.' : ' — numeros metiers conserves.'))
   }
@@ -296,9 +360,15 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
               {trouvees.map((affaire, i) => (
                 <tr key={`${i}:${affaire.numero}`}
                     className={affaire.numero === selection ? 'rig-ligne--valide' : undefined}
-                    onClick={() => setSelection(affaire.numero)}
+                    onClick={() => { setSelection(affaire.numero); setAncienRig(null) }}
                     onDoubleClick={() => ouvrir(affaire.numero)} style={{ cursor: 'pointer' }}>
-                  <td className="rig-table__mono">{affaire.numero}</td>
+                  <td className="rig-table__mono">
+                    {affaire.numero}
+                    {aiguillage[affaire.numero]?.logiciel === 'V2' && (
+                      <span className="rig-badge" title={aiguillage[affaire.numero]!.motif}
+                            style={{ marginLeft: 'var(--rig-esp-2)', whiteSpace: 'nowrap' }}>traitee dans la V2</span>
+                    )}
+                  </td>
                   <td className="rig-table__mono">{affaire.idInstance}</td>
                   <td className="rig-table__mono">{affaire.role}</td>
                   <td className="rig-table__mono">{affaire.codeAffaire}</td>
@@ -346,6 +416,27 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
             </tbody>
           </table>
         </div>
+
+        {/* Le bloc n'apparait que pour une ancienne affaire choisie (ou le compte rendu du geste) : pour une
+            affaire de la V3, l'ecran est celui d'avant. fix-ok: ajout SOC-015 T01 en plusieurs pas, pas un correctif. */}
+        {(choisieV2 !== null || ancienRig !== null) && (
+          <div className="rig-criteres__bloc" style={{ padding: 'var(--rig-esp-3) var(--rig-esp-4)' }}>
+            <div className="rig-kicker">Ancien RIG</div>
+            {choisieV2 !== null && (
+              <span className="rig-resultats-proc__compte">
+                {choisieV2.numero}{' · '}{choisieV2.motif}
+              </span>
+            )}
+            {choisieV2 !== null && (
+              <button className="rig-bouton rig-bouton--fort" onClick={() => ouvrirDansAncienRig(choisieV2.numero)}>
+                Ouvrir dans l'ancien RIG
+              </button>
+            )}
+            {ancienRig !== null && (
+              <span className="rig-resultats-proc__compte" role="status">{ancienRig.message}</span>
+            )}
+          </div>
+        )}
 
         <div className="rig-criteres__bloc" style={{ padding: 'var(--rig-esp-3) var(--rig-esp-4)' }}>
           <div className="rig-kicker">Suppression (XXAFF)</div>

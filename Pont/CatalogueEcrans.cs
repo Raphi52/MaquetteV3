@@ -72,6 +72,7 @@ public static class CatalogueEcrans
             new("PROC_COMPTEURS_NUM", "Compteurs de numeros"),
             new("PROC_REGLAGES_GREFFE", "Reglages du greffe"),
             new("PROC_NUMEROS_MANQUANTS", "Numeros manquants"),
+            new("PROC_SUPERVISION",   "Supervision"),
             new("PROC_TACHES_LOT",    "Taches en lot"),
             new("PROC_VERROUS",       "Dossiers verrouilles"),
             new("PROC_STAT",       "Statistiques"),

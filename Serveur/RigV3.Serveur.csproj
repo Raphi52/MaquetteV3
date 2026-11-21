@@ -21,6 +21,16 @@
     <!-- SOC-001 : la session Windows de l'agent (Kerberos / NTLM), inscrite par
          Socle/Identite/ModuleIdentite.cs. Hors du framework partage ASP.NET Core. -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" Version="10.0.13" />
+    <!-- SOC-010 : la partie serveur tourne en SERVICE WINDOWS sur chaque site (Amitel, Antilles,
+         Reunion, Polynesie), comme la vingtaine de services de la V2 (catalogue-services.md:11-20).
+         Program.cs appelle UseWindowsService, sans effet hors service (bancs, dotnet run). -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- SOC-011 : la supervision lit les echecs de numerotation de l'ancien RIG par LE script que l'exploitation
+         lance a la main (NUM-007 CA05), embarque tel quel : Socle/Supervision/Surveillant.cs (LectureEchecs). -->
+    <EmbeddedResource Include="../Base/v2/echecs.sql" LogicalName="RigV3.Serveur.echecs.sql" Link="Socle/Supervision/echecs.sql" />
   </ItemGroup>
 
 </Project>

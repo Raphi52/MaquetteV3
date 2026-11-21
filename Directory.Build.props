@@ -1,0 +1,23 @@
+<Project>
+  <!-- LA VERSION DE LA V3 (SOC-009 CA01, lot 12 du plan de reconstruction, 2026-11-21).
+
+       UNE seule source pour les trois pieces qui doivent porter le meme numero :
+         - l'ecran (RigV3Desktop.exe), que le lanceur des serveurs RDS compare a la
+           partie serveur (Lanceur/, SOC-012 CA03) ;
+         - la partie serveur (Serveur/), qui refuse de demarrer sur une base commune
+           livree dans une autre version (SOC-009 CA05) et donne la version attendue
+           par greffe (GET /socle/greffes/{greffe}/version) ;
+         - le paquet de livraison de la base (Outils/Livraison), dont la version par
+           defaut est celle-ci : chaque base V3 enregistre la version qu'elle porte.
+       Livrer une nouvelle version = changer CE numero, puis construire les trois.
+
+       Format de la V2 : annee.version.revision (« 2026.5.5 », fiche team #681 ;
+       OPE_LOT_LIVRAISON : Annee, NumVersion, NumRevision). Une revision seule est une
+       version MINEURE (evenement 255), un changement d'annee ou de version est une
+       version MAJEURE (evenement 250) : Contrats/Socle/Versions.cs, VersionV3.
+       Ce fichier est lu par MSBuild pour TOUS les projets du depot (bancs compris) :
+       n'y mettre que ce qui vaut pour tous. -->
+  <PropertyGroup>
+    <Version>2026.1.0</Version>
+  </PropertyGroup>
+</Project>

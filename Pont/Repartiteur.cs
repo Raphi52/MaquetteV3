@@ -95,7 +95,9 @@ public sealed class Repartiteur
         {
             var cause = erreur is TargetInvocationException { InnerException: { } interieure } ? interieure : erreur;
             System.Diagnostics.Debug.WriteLine($"[pont] {nom} : {cause}");
-            Envoyer(JsonSerializer.Serialize(new { reponse = numero, erreur = cause.Message }, Json));
+            // SOC-017 T03 : l'erreur part au journal technique du serveur ; l'agent recoit son identifiant de suivi.
+            var suivi = await EcranSupervision.SignalerDepuisLePontAsync(nom, cause);
+            Envoyer(JsonSerializer.Serialize(new { reponse = numero, erreur = suivi is null ? cause.Message : $"{cause.Message} — {suivi.Message}" }, Json));
             return;
         }
         Envoyer(JsonSerializer.Serialize(new { reponse = numero, valeur }, Json));
