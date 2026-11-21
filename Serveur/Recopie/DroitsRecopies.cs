@@ -175,9 +175,8 @@ public sealed class DroitsRecopies : IRecopieJointe
 
         // 8. VERIFIER : les droits relus dans la V2, la reponse de la V2 pour CHAQUE fonction de son catalogue = celle de la V3.
         var apres = await DonneesV2.LireCompteAsync(cn, tx, fiche.BaseV2, idUtlst, ct);
-        var reponses = RepriseDroits.ReponsesV2(apres, idUtlst);
-        var differentes = apres.Fonctions.Where(f => reponses[f.Code] != accordees.Contains(Cle(f.Code)))
-                                         .Select(f => $"{f.Code} (V3 : {(accordees.Contains(Cle(f.Code)) ? "accordée" : "refusée")})").ToList();
+        var differentes = Differences(apres, idUtlst, accordees)
+            .Select(d => $"{d.Code} (V3 : {(d.V3 ? "accordée" : "refusée")})").ToList();
         if (differentes.Count > 0)
             throw new RecopieRefusee($"apres ecriture, la V2 ne repond pas comme la V3 pour le compte {login} : {Resume(differentes)} ; rien n'est ecrit");
 
@@ -293,6 +292,109 @@ public sealed class DroitsRecopies : IRecopieJointe
     }
 
     private static string Json(string texte) => JsonSerializer.Serialize(texte);
+
+    /// <summary>
+    /// LA REPONSE DE LA V2 CONTRE CELLE DE LA V3 pour un compte, sur chaque fonction du catalogue de la V2 : celles ou elles
+    /// different. Le seul calcul de la reponse V2 (<see cref="RepriseDroits.ReponsesV2"/>), partage par la verification d'avant
+    /// validation (etape 8 de <see cref="AppliquerAsync"/>) et par le controle de nuit (<see cref="ComparerAsync"/>, REC-006).
+    /// </summary>
+    /// <param name="accordeesV3">Les fonctions que la V3 accorde (soc.Droit, toutes origines), en cle SQL (<see cref="DonneesV2.Cle"/>).</param>
+    internal static List<(string Code, bool V2, bool V3)> Differences(DonneesV2 v2, int idUtlst, IReadOnlySet<string> accordeesV3)
+    {
+        var reponses = RepriseDroits.ReponsesV2(v2, idUtlst);
+        return [.. v2.Fonctions.Where(f => reponses[f.Code] != accordeesV3.Contains(Cle(f.Code)))
+                               .Select(f => (f.Code, reponses[f.Code], accordeesV3.Contains(Cle(f.Code))))];
+    }
+
+    /// <summary>Le nom de la « table » des droits au rapport du controle de nuit : la partie jointe de la fiche UTILISATEUR.</summary>
+    public const string TableControle = "UTILISATEUR (droits)";
+
+    /// <summary>
+    /// LE CONTROLE DE NUIT DES DROITS (REC-006 CA01 « pour chaque table partagee », CA02, CA04 ; SOC-002 T06). Les droits ne se
+    /// correspondent pas ligne a ligne (roles « RIGV3 n », trois origines) : on compare la REPONSE. Pour chaque compte actif de
+    /// la V3 recopie (rec.Correspondance UTILISATEUR -> soc.Compte) et chaque fonction du catalogue de la V2, la reponse de la V2
+    /// (<see cref="Differences"/>, le calcul de la recopie, sur l'etat fige de la V2) est celle de la V3 (soc.Droit, etat fige).
+    /// Un ecart est relu dans les deux bases vivantes : change depuis (une recopie en cours entre les deux etats figes), il est
+    /// « resorbe », compte, non alerte ; sinon il va au rapport (compte V2 et V3, fonction, les deux reponses) et compte dans les
+    /// ecarts qui alertent l'exploitation. Le detail de la table dit combien de comptes et de fonctions ont ete compares.
+    /// </summary>
+    internal static async Task<TableComparee> ComparerAsync(OptionsComparaison o, string baseV2, string connexionFigeV2, SqlConnection lv3,
+                                                            List<EcartComparaison> details, CancellationToken ct)
+    {
+        var chrono = System.Diagnostics.Stopwatch.StartNew();
+        var comptes = new List<(int IdV2, int IdV3)>();
+        await using (var cmd = new SqlCommand("""
+            SELECT TRY_CONVERT(int, k.IdV2), c.Id FROM rec.Correspondance AS k JOIN soc.Compte AS c ON c.Id = TRY_CONVERT(int, k.IdV3)
+            WHERE k.BaseV2 = @b AND k.TableV2 = N'UTILISATEUR' AND k.TableV3 = N'soc.Compte' AND c.Desactive = 0 AND TRY_CONVERT(int, k.IdV2) IS NOT NULL
+            ORDER BY 1;
+            """, lv3) { CommandTimeout = 0 })
+        {
+            cmd.Parameters.Add(new SqlParameter("@b", SqlDbType.NVarChar, 128) { Value = baseV2 });
+            await using var l = await cmd.ExecuteReaderAsync(ct);
+            while (await l.ReadAsync(ct)) comptes.Add((l.GetInt32(0), l.GetInt32(1)));
+        }
+        var v2 = await DonneesV2.LireAsync(connexionFigeV2, ct);
+        var actifsV2 = v2.Utilisateurs.Where(u => !u.Desactive).Select(u => u.Id).ToHashSet();
+        comptes = [.. comptes.Where(c => actifsV2.Contains(c.IdV2))];
+
+        var accordees = new Dictionary<int, HashSet<string>>();
+        await using (var cmd = new SqlCommand("SELECT DISTINCT IdCompte, Fonction FROM soc.Droit;", lv3) { CommandTimeout = 0 })
+        {
+            await using var l = await cmd.ExecuteReaderAsync(ct);
+            while (await l.ReadAsync(ct))
+            {
+                if (!accordees.TryGetValue(l.GetInt32(0), out var f)) accordees[l.GetInt32(0)] = f = new HashSet<string>(StringComparer.Ordinal);
+                f.Add(Cle(l.GetString(1)));
+            }
+        }
+
+        long ecarts = 0, resorbes = 0, ecrits = 0;
+        SqlConnection? vivantV2 = null, vivantV3 = null;
+        try
+        {
+            foreach (var (idV2, idV3) in comptes)
+            {
+                var d = Differences(v2, idV2, accordees.GetValueOrDefault(idV3) ?? []);
+                if (d.Count == 0) continue;
+                // Relu dans les bases vivantes : une recopie des droits peut passer entre les deux etats figes.
+                vivantV2 ??= await OuvrirAsync(o.ConnexionV2, ct);
+                vivantV3 ??= await OuvrirAsync(o.ConnexionV3, ct);
+                var maintenantV3 = new HashSet<string>(StringComparer.Ordinal);
+                await using (var cmd = new SqlCommand("SELECT DISTINCT Fonction FROM soc.Droit WHERE IdCompte = @c;", vivantV3))
+                {
+                    cmd.Parameters.Add(new SqlParameter("@c", SqlDbType.Int) { Value = idV3 });
+                    await using var l = await cmd.ExecuteReaderAsync(ct);
+                    while (await l.ReadAsync(ct)) maintenantV3.Add(Cle(l.GetString(0)));
+                }
+                var vivant = await DonneesV2.LireCompteAsync(vivantV2, null, vivantV2.Database, idV2, ct);
+                var encore = Differences(vivant, idV2, maintenantV3).Select(x => x.Code).ToHashSet(StringComparer.Ordinal);
+                foreach (var (code, reponseV2, reponseV3) in d)
+                {
+                    if (!encore.Contains(code)) { resorbes++; continue; }
+                    ecarts++;
+                    if (ecrits++ < o.DetailMax)
+                        details.Add(new EcartComparaison("ecart", TableControle, idV2.ToString(CultureInfo.InvariantCulture), "soc.Droit",
+                            idV3.ToString(CultureInfo.InvariantCulture), code,
+                            $"V2 : {(reponseV2 ? "accordée" : "refusée")} ; V3 : {(reponseV3 ? "accordée" : "refusée")}"));
+                }
+            }
+        }
+        finally
+        {
+            if (vivantV2 is not null) await vivantV2.DisposeAsync();
+            if (vivantV3 is not null) await vivantV3.DisposeAsync();
+        }
+        var fonctions = v2.Fonctions.Count;
+        return new TableComparee(TableControle, "soc.Droit", comptes.Count, comptes.Count, (long)comptes.Count * fonctions, ecarts, 0, 0, 0, 0, 0, resorbes, 0,
+                                 chrono.ElapsedMilliseconds, $"{comptes.Count} comptes actifs recopies, {fonctions} fonctions de la V2 chacun, la reponse de la V2 contre celle de la V3");
+    }
+
+    private static async Task<SqlConnection> OuvrirAsync(string connexion, CancellationToken ct)
+    {
+        var cn = new SqlConnection(connexion);
+        await cn.OpenAsync(ct);
+        return cn;
+    }
 
     private static string Resume(List<string> motifs) => string.Join(" ; ", motifs.Take(5)) + (motifs.Count > 5 ? $" ; et {motifs.Count - 5} autre(s)" : "");
 
