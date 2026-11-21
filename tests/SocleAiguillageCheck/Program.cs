@@ -325,6 +325,11 @@ try
     Exiger(new PosteWindows().FenetreV2(Path.GetFileNameWithoutExtension(exeFausse), OutreMerAvant) is null,
         "SOC-015 CA02 (jumeau) : la console d'un AUTRE greffe (T004) n'est pas prise pour celle de T001");
     Environment.SetEnvironmentVariable(VariableFausseV2, null);
+
+    // Le serveur du banc s'arrete avant d'etre detruit (decision du lot 1 de la phase 2, controle « Arret » de
+    // tests/SocleCourrielsCheck) : detruit sans StopAsync, l'hote annule ses services de fond sans s'etre arrete et le
+    // Surveillant (lot 2) sort en « BackgroundService failed » au journal, une fausse panne apres un banc vert.
+    await app.StopAsync();
 }
 finally
 {

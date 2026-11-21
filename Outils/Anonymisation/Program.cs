@@ -15,7 +15,7 @@ namespace RigV3.Outils.Anonymisation;
 //   --source   la base V2 (Database=… obligatoire), LUE SEULEMENT
 //   --cible    la copie : serveur de CE poste seulement (docker compose up -d) ; base absente ou vide
 //   --accord   source hors de ce poste : son nom de base, l'accord donne pour CETTE base (CA07)
-//   --regles   remplacements relus « TABLE.COLONNE=Garder|Mots|Courriel|Telephone|DateNaissance|Vider|Xml »
+//   --regles   remplacements relus « TABLE.COLONNE=Garder|Mots|Courriel|Fichier|Telephone|DateNaissance|Vider|Xml »
 //   --graine   valeurs fictives reproductibles (source sur ce poste seulement)
 //
 // Code de sortie : 0 = fait (controle : rien trouve), 1 = refus ou echec, 2 = mauvais usage,
@@ -82,6 +82,10 @@ public static class Programme
                     sortie.WriteLine($"Colonnes gardees : {r.LignesComparees} lignes tirees, changees : {(r.NumerosChanges.Count == 0 ? "aucune" : string.Join(", ", r.NumerosChanges))}");
                     sortie.WriteLine($"Tables sans cle primaire simple, non tirees : {(r.TablesSansCle.Count == 0 ? "aucune" : string.Join(", ", r.TablesSansCle))}");
                     sortie.WriteLine($"A vider et non vides : {(r.NonVidees.Count == 0 ? "aucune" : string.Join(", ", r.NonVidees))}");
+                    var enClair = r.Gardees.Where(g => g.Prenoms).Select(g => $"{g.Colonne} ({g.Part:P0} de {g.Valeurs} valeurs{(g.Toutes ? ", toutes celles de la colonne" : "")} ; gardee : {g.Raison})").ToList();
+                    sortie.WriteLine($"Colonnes gardees a segment personnel : {r.Gardees.Count(g => g.Valeurs > 0)} tirees, dont {r.Gardees.Count(g => g.Valeurs > 0 && g.Toutes)} lues en entier (lexique : {r.LexiquePrenoms} prenoms de {r.ColonnesLexique} colonnes) ; " +
+                                     $"prenoms en clair : {(enClair.Count == 0 ? "aucune" : string.Join(", ", enClair))}" +
+                                     (r.GardeesNonJugees ? " -- NON JUGEES : la base n'a donne aucun prenom" : ""));
                     return r.Vert ? 0 : 3;
                 }
                 default:
@@ -130,7 +134,7 @@ public static class Programme
                     sb.AppendLine($"| {t.Libelle}.{c.Nom} | {c.Type} | {r.Traitement} | {r.Origine} |");
                     if (r.Origine.Contains("a relire")) aRelire++;
                 }
-                else if (catalogue.Suspicion(t.Nom, c.Nom) is { } raison)
+                else if (catalogue.Suspicion(t.Nom, c.Nom, c.Type) is { } raison)
                 {
                     aRelire++;
                     relire.Add($"- `{t.Libelle}.{c.Nom}` ({c.Type}) : {raison}");

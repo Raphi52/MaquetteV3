@@ -11,7 +11,10 @@ using RigV3.Outils.Anonymisation;
 //  1. RIG_DEV (SQL-DEV\DEV) est lu en LECTURE SEULE, par la porte de l'outil (PorteSource : SELECT seul,
 //     accord « RIG_DEV ») : un extrait COHERENT -- factures recentes (signees) de leurs clients, et leur
 //     journal AUDIT ; parties et leurs clients et adresses ; dirigeants ; tous les agents ; courriels
-//     envoyes et leurs traces ; lots d'editions et des demandes qui les citent (cle etrangere en TEXTE).
+//     envoyes et leurs traces ; lots d'editions et des demandes qui les citent (cle etrangere en TEXTE) ; depuis le
+//     refus du 2026-11-21, les prenoms d'etat civil (CASIER_JUDICIAIRE, INSCRIT_PP, BENEFICIAIRE_EFFECTIF et son
+//     historique, REPRESENTANT_PM, BODACC_RCS_XML, NOTIFICATION_RCS_XML_DETAIL) et des noms de fichiers.
+//     Il mesure aussi RIG_DEV ENTIER : aucune colonne que les regles gardent ne doit porter de prenoms.
 //  2. Cet extrait devient une base V2 JETABLE sur le SQL Server local, avec les vraies cles etrangeres de
 //     RIG_DEV entre ces tables (verifiees), l'index unique des comptes d'agents et une vue.
 //  3. L'outil la copie (Outils/Anonymisation), puis le banc compare source et copie, ligne a ligne.
@@ -82,6 +85,63 @@ using (var p = Pseudonymes.DepuisGraine("banc"))
            && xml.Contains($"FACTU_DESIGNATION_FACTURATION=\"{p.Texte("DUPONT JEAN")}\"") && xml.Contains($"\"{p.Texte("MARTIN")}\"")
            && !xml.Contains("DUPONT") && xml.Split("<deleted").Length == 3,
         "SOC-021 CA04 : un XML du journal (deux lignes) garde ses noms, ses numeros et montants ; la designation du client prend la regle de sa colonne");
+
+    // Un nom de fichier : chaque mot remplace, l'extension connue gardee ; un « .JEAN » final n'est pas une extension.
+    var fichier = p.Fichier("Kbis DUPONT Jean.pdf");
+    var sansExtension = p.Fichier("dupont.jean");
+    Exiger(fichier.EndsWith(".pdf", StringComparison.Ordinal) && Forme(fichier) == Forme("Kbis DUPONT Jean.pdf") && fichier.StartsWith(p.Texte("Kbis DUPONT Jean"), StringComparison.Ordinal)
+           && sansExtension == p.Texte("dupont.jean") && p.Fichier(@"\\srv\ged\2024\A_B.DOCX; C.xml").EndsWith(".DOCX; " + p.Mot("C") + ".xml", StringComparison.Ordinal),
+        $"SOC-021 CA01 : nom de fichier « Kbis DUPONT Jean.pdf » -> « {fichier} » (memes mots que les noms, extension gardee) ; « dupont.jean » -> « {sansExtension} » (pas d'extension connue : tout remplace)");
+}
+
+// ====================================================================================================
+// 0 bis. Les regles sur les colonnes que la mesure de RIG_DEV a designees (2026-11-21, refus du chef au lot 6) :
+// au point d'appel (CatalogueRegles.Pour), chaque refus de « garder » avec son jumeau garde (meme segment, autre cote).
+// ====================================================================================================
+{
+    var cat = new CatalogueRegles();
+    var attendues = new (string Table, string Colonne, string Type, string Traitement, string Pourquoi)[]
+    {
+        // Prenoms d'etat civil : 89 a 99 % des valeurs tirees portent un prenom de la base (mesure RIG_DEV).
+        ("CASIER_JUDICIAIRE", "CSRJD_PRENOMS_ETAT_CIVIL", "varchar", "Mots", "prenoms d'etat civil (« ETAT » suivi de « CIVIL » n'est pas un segment technique)"),
+        ("INSCRIT_PP", "INSPP_PRENOMS_ETAT_CIVIL", "varchar", "Mots", ""), ("INSCRIT_PP", "INSPP_PRENOMS_ETAT_CIVIL_ANC", "varchar", "Mots", ""),
+        ("BENEFICIAIRE_EFFECTIF", "BENEF_PRENOM_ETAT_CIVIL", "varchar", "Mots", ""), ("BENEFICIAIRE_EFFECTIF_HISTO", "BENEFHI_PRENOM_ETAT_CIVIL", "varchar", "Mots", ""),
+        ("REPRESENTANT_PM", "RPPM_PRENOMS_ETAT_CIVIL", "varchar", "Mots", ""), ("BODACC_RCS_XML", "BDCRCX_PRENOMS_ETAT_CIVIL", "varchar", "Mots", ""),
+        ("NOTIFICATION_RCS_XML_DETAIL", "NTXDT_PRENOMS_ETAT_CIVIL", "varchar", "Mots", ""), ("NOTIFICATION_RCS_XML_DETAIL", "NTXDT_PRENOMS_ETAT_CIVIL_ANC", "varchar", "Mots", ""),
+        ("UNE_TABLE", "X_ETAT_CIVIL", "varchar", "Mots", "l'etat civil seul"),
+        // Jumeau : « ETAT » sans « CIVIL » reste technique (etat du nom de domaine : 3 valeurs, des codes).
+        ("ETABLISSEMENT", "ETBLS_ETAT_NOM_DOMAINE", "varchar", "Garder", "etat d'un nom de domaine (code)"),
+        // Jumeau : la date du changement de prenom est une date, pas un prenom.
+        ("NOTIFICATION_RCS_XML_DETAIL", "NTXDT_PRENOMS_ETAT_CIVIL_DT", "datetime", "Garder", "date du changement"),
+        // Un secret n'est jamais leve par un segment technique : INFO_GREFFE.PWD_SQL est un mot de passe.
+        ("INFO_GREFFE", "PWD_SQL", "varchar", "Vider", "mot de passe SQL"),
+        // Denomination statutaire d'une personne morale (25 % de prenoms, 61 % de noms) : « STATUT » y est « statutaire ».
+        ("INSCRIT_PM", "INSPM_DENOMINATION_STATUT", "varchar", "Mots", "denomination statutaire"),
+        ("DIRIGEANT_PM", "DRGPM_DENOMINATION_STATUT", "varchar", "Mots", ""),
+        // Nom de domaine internet d'un etablissement (le nom de la societe s'y lit).
+        ("ETABLISSEMENT", "ETBLS_NOM_DOMAINE", "varchar", "Mots", "nom de domaine internet"),
+        // Les 38 colonnes NOM_FICHIER : 7 portent des noms sur RIG_DEV (jusqu'a 37 % de prenoms), toutes traitees, extension gardee.
+        ("CREANCE_TRANSITOIRE", "CRTRA_NOM_FICHIER", "varchar", "Fichier", "nom de fichier"), ("DEMAT_CREFO_PJ", "DMCOPJ_NOM_FICHIER", "varchar", "Fichier", ""),
+        ("PROCEDURE_COLLECTIVE", "PRCLL_NOM_AFFAIRE_FICHIER", "varchar", "Fichier", ""), ("GED_RIG", "GDRG_NOM_FICHIER", "varchar", "Fichier", ""),
+        ("DEMAT_DCA", "DMTDCA_NOM_FICHIER_RAPPORT_CAC", "varchar", "Fichier", ""), ("CFE_LIASSE_XML", "LIAXML_PC_NOM_FICHIER", "varchar", "Fichier", ""),
+        // Jumeaux gardes : segments techniques relus (parametrage), mesures a 0-13 % de prenoms sur RIG_DEV.
+        ("ADAPTAT_LIGNE_EDIT", "ADLGE_NOM_LOGIQUE", "varchar", "Garder", "nom logique d'une etape"), ("DEMANDE_EDITION", "DMNED_TYPE_DESTINATAIRE", "varchar", "Garder", "type de destinataire"),
+        ("ULT", "ULT_TEXTE_PARAMETRE", "varchar", "Garder", "parametre d'une tache"),
+        // Noms d'imprimantes : 4 sur 26 portent le nom d'un agent (RIG_DEV) ; les quatre colonnes prennent le meme faux nom.
+        ("GROUPE_IMPRESSION", "GPIMP_NOM_IMPRIMANTE", "varchar", "Mots", "nom d'imprimante"), ("TAG_POSTSCRIPT", "TAGPS_NOM_IMPRIMANTE", "varchar", "Mots", ""),
+        ("LOT", "LOT_NOM_IMPRIMANTE", "varchar", "Mots", ""), ("IMPRIMANTE_EDITION", "IMPED_NOM_LOGIQUE", "varchar", "Mots", ""),
+    };
+    var fausses = attendues.Select(a => (a, r: cat.Pour(a.Table, a.Colonne, a.Type))).Where(x => x.r.Traitement.ToString() != x.a.Traitement)
+        .Select(x => $"{x.a.Table}.{x.a.Colonne} : {x.r.Traitement} au lieu de {x.a.Traitement} ({x.r.Origine})").ToList();
+    Exiger(fausses.Count == 0,
+        $"SOC-021 CA01 : {attendues.Length} regles mesurees sur RIG_DEV -- prenoms d'etat civil, mot de passe SQL, denomination statutaire, nom de domaine et noms de fichiers traites ; " +
+        $"noms d'imprimantes traites ; jumeaux gardes (etat d'un domaine, date d'un changement, nom logique, type, parametre){(fausses.Count == 0 ? "" : " -- FAUSSES : " + string.Join(" ; ", fausses))}");
+    var relire = new[] { ("CASIER_JUDICIAIRE", "CSRJD_PRENOMS_ETAT_CIVIL", "varchar"), ("INFO_GREFFE", "PWD_SQL", "varchar"), ("CREANCE_TRANSITOIRE", "CRTRA_NOM_FICHIER", "varchar") }
+        .Where(x => cat.Suspicion(x.Item1, x.Item2, x.Item3) is not null).ToList();
+    Exiger(relire.Count == 0 && cat.Suspicion("ADAPTAT_LIGNE_EDIT", "ADLGE_NOM_LOGIQUE", "varchar") is not null
+           && cat.Suspicion("DEMANDE_EDITION", "DMNED_ID_EMAIL_ENVOYE", "int") is null && cat.Suspicion("CASIER_JUDICIAIRE", "CSRJD_DATE_NAISS_FORCEE", "bit") is null,
+        "SOC-021 T01 : la liste « gardees, a relire » de l'inventaire ne porte plus ces colonnes traitees ; elle garde les segments techniques en texte (nom logique) " +
+        "et laisse les entiers et les indicateurs (une cle, un bit ne portent pas de nom)");
 }
 
 // ====================================================================================================
@@ -149,7 +209,23 @@ var extrait = new (string Table, string? Filtre)[]
     ("EMAIL_ENVOYE", "EMAILENV_ID_EMAILENV IN (SELECT TOP 300 EMAILENV_ID_EMAILENV FROM dbo.EMAIL_ENVOYE WITH (NOLOCK) ORDER BY EMAILENV_ID_EMAILENV DESC)"),
     ("LOT", null),
     ("DEMANDE_EDITION", $"DMNED_ID_DMNED IN ({Liste(demandes)})"),
+    // Les prenoms d'etat civil (refus du chef, 2026-11-21) : remplis sur RIG_DEV dans CASIER_JUDICIAIRE (173 812 lignes),
+    // INSCRIT_PP (77 627), BENEFICIAIRE_EFFECTIF (74 535), REPRESENTANT_PM (6 183), leurs historiques et les echanges RCS.
+    ("CASIER_JUDICIAIRE", Remplis("CASIER_JUDICIAIRE", "CSRJD_ID_CSRJD", "CSRJD_PRENOMS_ETAT_CIVIL")),
+    ("INSCRIT_PP", Remplis("INSCRIT_PP", "INSPP_ID_INSPP", "INSPP_PRENOMS_ETAT_CIVIL") + " OR INSPP_PRENOMS_ETAT_CIVIL_ANC LIKE '%[a-z]%'"),
+    ("BENEFICIAIRE_EFFECTIF", Remplis("BENEFICIAIRE_EFFECTIF", "BENEF_ID_BENEF", "BENEF_PRENOM_ETAT_CIVIL")),
+    ("BENEFICIAIRE_EFFECTIF_HISTO", Remplis("BENEFICIAIRE_EFFECTIF_HISTO", "BENEFHI_ID_BENEFHI", "BENEFHI_PRENOM_ETAT_CIVIL")),
+    ("REPRESENTANT_PM", Remplis("REPRESENTANT_PM", "RPPM_ID_RPPM", "RPPM_PRENOMS_ETAT_CIVIL")),
+    ("BODACC_RCS_XML", Remplis("BODACC_RCS_XML", "BDCRCX_ID_BDCRCX", "BDCRCX_PRENOMS_ETAT_CIVIL")),
+    ("NOTIFICATION_RCS_XML_DETAIL", Remplis("NOTIFICATION_RCS_XML_DETAIL", "NTXDT_ID_NTXDT", "NTXDT_PRENOMS_ETAT_CIVIL") +
+                                    " OR NTXDT_ID_NTXDT IN (SELECT TOP 100 NTXDT_ID_NTXDT FROM dbo.NOTIFICATION_RCS_XML_DETAIL WITH (NOLOCK) ORDER BY NTXDT_ID_NTXDT DESC)"),
+    // Un nom de fichier qui porte des noms (24 % de prenoms, 37 % de noms sur RIG_DEV) ; extension a garder.
+    ("CREANCE_TRANSITOIRE", Remplis("CREANCE_TRANSITOIRE", "CRTRA_ID_CRTRA", "CRTRA_NOM_FICHIER")),
 };
+// Les 1 500 dernieres lignes ou le champ porte des lettres : assez de personnes pour que les prenoms courants s'y repetent
+// (le lexique du controle ne retient qu'un mot vu 3 fois dans 2 tables ; a 300 lignes, 81 prenoms seulement).
+static string Remplis(string table, string cle, string colonne)
+    => $"{cle} IN (SELECT TOP 1500 {cle} FROM dbo.{table} WITH (NOLOCK) WHERE {colonne} LIKE '%[a-z]%' ORDER BY {cle} DESC)";
 var nomsExtrait = extrait.Select(e => e.Table).ToHashSet(StringComparer.OrdinalIgnoreCase);
 var lignesSource = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 foreach (var (table, filtre) in extrait)
@@ -234,6 +310,11 @@ var personnelles = new (string Genre, string Table, string Cle, string Colonne)[
     ("adresse", "ADRESSE_BASE", "ADRBS_ID_ADRBS", "ADRBS_NUM_VOIE"), ("adresse", "ADRESSE_BASE", "ADRBS_ID_ADRBS", "ADRBS_NOM_VOIE"),
     ("adresse", "ADRESSE_BASE", "ADRBS_ID_ADRBS", "ADRBS_SUITE_ADRESSE"),
     ("adresse", "FACTURE", "FACTU_NUMERO_FACTURE", "FACTU_LIGNE_ADRESSE_FACTURATION"),
+    ("prenom", "CASIER_JUDICIAIRE", "CSRJD_ID_CSRJD", "CSRJD_PRENOMS_ETAT_CIVIL"), ("prenom", "INSCRIT_PP", "INSPP_ID_INSPP", "INSPP_PRENOMS_ETAT_CIVIL"),
+    ("prenom", "INSCRIT_PP", "INSPP_ID_INSPP", "INSPP_PRENOMS_ETAT_CIVIL_ANC"), ("prenom", "BENEFICIAIRE_EFFECTIF", "BENEF_ID_BENEF", "BENEF_PRENOM_ETAT_CIVIL"),
+    ("prenom", "BENEFICIAIRE_EFFECTIF_HISTO", "BENEFHI_ID_BENEFHI", "BENEFHI_PRENOM_ETAT_CIVIL"), ("prenom", "REPRESENTANT_PM", "RPPM_ID_RPPM", "RPPM_PRENOMS_ETAT_CIVIL"),
+    ("prenom", "BODACC_RCS_XML", "BDCRCX_ID_BDCRCX", "BDCRCX_PRENOMS_ETAT_CIVIL"), ("prenom", "NOTIFICATION_RCS_XML_DETAIL", "NTXDT_ID_NTXDT", "NTXDT_PRENOMS_ETAT_CIVIL"),
+    ("fichier", "CREANCE_TRANSITOIRE", "CRTRA_ID_CRTRA", "CRTRA_NOM_FICHIER"),
 };
 var parGenre = new Dictionary<string, long>();
 foreach (var (genre, table, cle, colonne) in personnelles)
@@ -263,14 +344,18 @@ foreach (var (genre, table, cle, colonne) in personnelles)
         if (genre == "courriel" && vs.Contains('@') && (!vc.Contains('@')
             || (System.Text.RegularExpressions.Regex.IsMatch(vs.TrimEnd(), @"\.\p{L}{2,4}$") && vs.TrimEnd()[(vs.TrimEnd().LastIndexOf('.') + 1)..] != vc.TrimEnd()[(vc.TrimEnd().LastIndexOf('.') + 1)..]))) autre++;
         if (genre == "telephone" && vs.Count(char.IsAsciiDigit) >= 6 && new string([.. vs.Where(char.IsAsciiDigit).Take(2)]) != new string([.. vc.Where(char.IsAsciiDigit).Take(2)])) autre++;
+        // Nom de fichier : une extension connue (« .pdf », « .DOC ») reste en fin de valeur.
+        if (genre == "fichier" && System.Text.RegularExpressions.Regex.Match(vs.TrimEnd(), @"\.(pdf|docx?|xml|txt|zip)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase) is { Success: true } ext
+            && !vc.TrimEnd().EndsWith(ext.Value, StringComparison.Ordinal)) autre++;
     }
     parGenre[genre] = parGenre.GetValueOrDefault(genre) + n;
     if (n == 0) { Info($"CA01 : {table}.{colonne} vide dans l'extrait de RIG_DEV"); continue; }
     Exiger(restees == 0 && longueur == 0 && forme == 0 && autre == 0,
         $"SOC-021 CA01 : {table}.{colonne} ({genre}) : {n} valeurs, {restees} restee(s), {longueur} longueur(s) changee(s), {forme} forme(s) changee(s)" +
-        (genre == "courriel" ? $", {autre} courriel(s) sans @ ou extension changee" : genre == "telephone" ? $", {autre} indicatif(s) change(s)" : ""));
+        (genre == "courriel" ? $", {autre} courriel(s) sans @ ou extension changee" : genre == "telephone" ? $", {autre} indicatif(s) change(s)" :
+         genre == "fichier" ? $", {autre} extension(s) changee(s)" : ""));
 }
-Exiger(new[] { "nom", "prenom", "naissance", "adresse", "courriel", "telephone" }.All(g => parGenre.GetValueOrDefault(g) > 0),
+Exiger(new[] { "nom", "prenom", "naissance", "adresse", "courriel", "telephone", "fichier" }.All(g => parGenre.GetValueOrDefault(g) > 0),
     $"SOC-021 CA01 : chaque genre est present dans l'extrait et remplace ({string.Join(", ", parGenre.Select(g => $"{g.Key} {g.Value}"))}) ; clients, dirigeants, parties et agents");
 var secrets = await EntierAsync(copie.Connexion, $"SELECT (SELECT COUNT(*) FROM {C("CLIENT")} WHERE CLIEN_MDP IS NOT NULL) + (SELECT COUNT(*) FROM {C("UTILISATEUR")} WHERE UTLST_PASSWORD IS NOT NULL)");
 var secretsSource = await EntierAsync(copie.Connexion, $"SELECT (SELECT COUNT(*) FROM {S("CLIENT")} WHERE CLIEN_MDP IS NOT NULL) + (SELECT COUNT(*) FROM {S("UTILISATEUR")} WHERE UTLST_PASSWORD IS NOT NULL)");
@@ -389,6 +474,29 @@ Exiger(controle.Vert && controle.EchantillonValeurs > 0 && controle.EchantillonM
     $"SOC-021 CA06 : controle de la copie : {controle.ColonnesControlees} colonnes personnelles, {controle.EchantillonValeurs} valeurs et {controle.EchantillonMots} mots reels tires, " +
     $"retrouves : {(controle.Fuites.Count == 0 ? "aucun" : string.Join(", ", controle.Fuites))} ; volumes {controle.TablesComparees} tables ; {controle.LignesComparees} lignes gardees comparees ; " +
     $"sorti de la source : {string.Join(", ", controle.GenresLusSource)} (jamais une valeur)");
+// fix-ok: refus du chef (2026-11-21) -- le controle ne tirait que des colonnes DEJA traitees : une regle fausse (« ETAT »
+// pris pour technique) laissait 173 812 prenoms de CASIER_JUDICIAIRE en clair sans qu'il le voie. Mesure RIG_DEV : prenoms
+// d'etat civil 79-100 % de valeurs a prenom frequent, colonnes techniques gardees 0-37 % (lexique a 2 tables).
+var gardees = controle.Gardees.Where(g => g.Valeurs > 0).ToList();
+Exiger(gardees.Count > 0 && controle.LexiquePrenoms > 0 && gardees.All(g => !g.Prenoms),
+    $"SOC-021 CA06 : le controle tire aussi les {gardees.Count} colonnes GARDEES a segment personnel ({gardees.Sum(g => g.Valeurs)} valeurs ; lexique : {controle.LexiquePrenoms} prenoms " +
+    $"frequents dans {controle.ColonnesLexique} colonnes de prenoms) : aucune n'atteint {ControleCopie.PartPrenomsMax:P0} de prenoms " +
+    $"(la plus haute : {gardees.OrderByDescending(g => g.Part).Select(g => $"{g.Colonne} {g.Part:P0}").FirstOrDefault()})");
+
+// CONTRE-EPREUVE ROUGE de la regle elle-meme : la copie ET le controle prennent l'ancienne regle (« ETAT » technique), ici
+// en remplacements « Garder » sur les prenoms d'etat civil de l'extrait. Le controle ne peut plus les voir par les colonnes
+// traitees : il doit les trouver par les colonnes gardees -- sinon un vert ne prouverait pas que la regle est juste.
+var ancienneRegle = rapport.Colonnes.Where(c => c.Colonne.Contains("ETAT_CIVIL", StringComparison.Ordinal) && c.Valeurs > 0)
+    .Select(c => new KeyValuePair<string, Traitement>($"{c.Table[4..]}.{c.Colonne}", Traitement.Garder)).ToList();
+await using var etatCivil = await BaseJetable.CreerAsync("SocleAnonymisationEtatCivil");
+await CopieAnonymisee.CopierAsync(new OptionsCopie { Source = v2.Connexion, Cible = etatCivil.Connexion, Graine = "SOC-021", Remplacements = ancienneRegle });
+var controleEtatCivil = await ControleCopie.ControlerAsync(v2.Connexion, etatCivil.Connexion, null, 200, remplacements: ancienneRegle);
+var vus = controleEtatCivil.Gardees.Where(g => g.Prenoms).Select(g => g.Colonne).ToHashSet();
+var attendusVus = ancienneRegle.Select(r => "dbo." + r.Key).ToList();
+Exiger(ancienneRegle.Count >= 7 && !controleEtatCivil.Vert && controleEtatCivil.Fuites.Count == 0 && attendusVus.All(vus.Contains),
+    $"SOC-021 CA06 (contre-epreuve) : copie ET controle avec l'ancienne regle sur {ancienneRegle.Count} colonnes de prenoms d'etat civil -> aucune « fuite » par les " +
+    $"colonnes traitees, mais le controle les trouve gardees en clair : {string.Join(", ", controleEtatCivil.Gardees.Where(g => g.Prenoms).Select(g => $"{g.Colonne[4..]} {g.Part:P0}"))}" +
+    (attendusVus.All(vus.Contains) ? "" : $" -- MANQUENT : {string.Join(", ", attendusVus.Where(a => !vus.Contains(a)))}"));
 
 // CONTRE-EPREUVE ROUGE : une copie ou CLIENT.CLIEN_NOM est laisse en clair (remplacement « Garder »). Le controle,
 // qui ne se fie pas a la liste de la copie, DOIT trouver les noms reels ; sans quoi un vert ne prouverait rien.
@@ -401,6 +509,29 @@ var rapportSabot = await CopieAnonymisee.CopierAsync(new OptionsCopie
 var controleSabot = await ControleCopie.ControlerAsync(v2.Connexion, saboteur.Connexion, null, 200);
 Exiger(!controleSabot.Vert && controleSabot.Fuites.Any(f => f.StartsWith("dbo.CLIENT.CLIEN_NOM ", StringComparison.Ordinal)),
     $"SOC-021 CA06 (contre-epreuve) : CLIEN_NOM laisse en clair -> le controle le trouve : {string.Join(", ", controleSabot.Fuites)}");
+// Sur RIG_DEV ENTIER (pas seulement l'extrait) : les colonnes que les regles GARDENT et dont le nom a un segment personnel,
+// tirees au hasard par la porte de lecture (empreintes salees seulement). C'est la mesure qui aurait vu le refus du chef.
+chrono.Restart();
+var schemaRigDev = await SchemaSource.LireAsync(rigDev, CancellationToken.None);
+var catalogueRigDev = new CatalogueRegles();
+catalogueRigDev.AlignerSurLesCles(schemaRigDev);
+var mesureRigDev = await ControleCopie.MesurerGardeesAsync(rigDev, schemaRigDev, catalogueRigDev, schemaRigDev.Tables, 200, CancellationToken.None);
+var rempliesRigDev = mesureRigDev.Colonnes.Where(g => g.Valeurs > 0).ToList();
+Exiger(rempliesRigDev.Count > 50 && mesureRigDev.MotsLexique > 0 && rempliesRigDev.All(g => !g.Prenoms) && mesureRigDev.GenresLus.IsSubsetOf(genresAdmis),
+    $"SOC-021 CA01, CA06 : sur {baseRigDev} entier ({chrono.Elapsed.TotalSeconds:0} s), {rempliesRigDev.Count} colonnes gardees a segment personnel tirees ({rempliesRigDev.Sum(g => g.Valeurs)} valeurs, " +
+    $"lexique {mesureRigDev.MotsLexique} prenoms de {mesureRigDev.ColonnesLexique} colonnes) : aucune n'atteint {ControleCopie.PartPrenomsMax:P0} de prenoms ; les plus hautes : " +
+    string.Join(", ", rempliesRigDev.OrderByDescending(g => g.Part).Take(3).Select(g => $"{g.Colonne[4..]} {g.Part:P0}")) +
+    (rempliesRigDev.Any(g => g.Prenoms) ? $" -- EN CLAIR : {string.Join(", ", rempliesRigDev.Where(g => g.Prenoms).Select(g => $"{g.Colonne[4..]} {g.Part:P0}"))}" : ""));
+string[] etatCivilRigDev = ["CASIER_JUDICIAIRE.CSRJD_PRENOMS_ETAT_CIVIL", "INSCRIT_PP.INSPP_PRENOMS_ETAT_CIVIL", "BENEFICIAIRE_EFFECTIF.BENEF_PRENOM_ETAT_CIVIL",
+                            "BENEFICIAIRE_EFFECTIF_HISTO.BENEFHI_PRENOM_ETAT_CIVIL", "REPRESENTANT_PM.RPPM_PRENOMS_ETAT_CIVIL", "BODACC_RCS_XML.BDCRCX_PRENOMS_ETAT_CIVIL"];
+var catalogueAncien = new CatalogueRegles(etatCivilRigDev.Select(c => new KeyValuePair<string, Traitement>(c, Traitement.Garder)));
+var mesureAncienne = await ControleCopie.MesurerGardeesAsync(rigDev, schemaRigDev, catalogueAncien,
+    schemaRigDev.Tables.Where(t => etatCivilRigDev.Any(c => c.StartsWith(t.Nom + ".", StringComparison.Ordinal))).ToList(), 200, CancellationToken.None);
+var vusRigDev = mesureAncienne.Colonnes.Where(g => g.Prenoms).Select(g => g.Colonne[4..]).ToHashSet();
+Exiger(etatCivilRigDev.All(vusRigDev.Contains),
+    $"SOC-021 CA06 (contre-epreuve sur {baseRigDev}) : avec l'ancienne regle, les prenoms d'etat civil gardes sont vus : " +
+    string.Join(", ", mesureAncienne.Colonnes.Where(g => etatCivilRigDev.Contains(g.Colonne[4..])).Select(g => $"{g.Colonne[4..]} {g.Part:P0} de {g.Valeurs}")));
+
 // La meme graine donne la meme copie (regles deterministes) : hors CLIEN_NOM, la copie sabotee est celle du banc.
 var memes = new List<string>();
 foreach (var (table, cols) in new[] { ("CLIENT", "CLIEN_ID_CLIEN, CLIEN_PRENOM, CLIEN_EMAIL, CLIEN_TELEPHONE, CLIEN_DATE_NAISSANCE"),

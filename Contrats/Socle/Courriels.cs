@@ -4,8 +4,10 @@ namespace RigV3.Contrats.Socle;
 /// Les adresses des courriels du greffe (SOC-006) : la liste des envois et leur trace, le detail d'un envoi, les
 /// modeles qu'un agent peut choisir et leur apercu, les listes de distribution. Le serveur les publie
 /// (Serveur/Socle/Courriels/ModuleCourriels.cs) ; l'ecran « Courriels envoyés » (Pont/EcranCourriels.cs) lit les envois,
-/// l'ecran « Messagerie » (Pont/EcranMessagerie.cs) les modeles et les listes. L'ENVOI n'est pas une route : un acte de la V3 qui
-/// envoie un courriel appelle le service du serveur (ServiceCourriels.EnvoyerAsync), comme la V2 lancait RIG_Send_Email.
+/// l'ecran « Messagerie » (Pont/EcranMessagerie.cs) les modeles et les listes, et un agent qui a la fonction
+/// <see cref="FonctionGestion"/> les y cree, les modifie, les desactive et les reactive (procedure V2 PROC_GESTEMAIL). L'ENVOI
+/// n'est pas une route : un acte de la V3 qui envoie un courriel appelle le service du serveur (ServiceCourriels.EnvoyerAsync),
+/// comme la V2 lancait RIG_Send_Email.
 ///
 /// Chaque adresse porte le code du greffe (<c>{greffe}</c>) : l'agent est juge dans la base V3 de CE greffe (401 sans
 /// session, 403 compte refuse, 404 greffe absent du catalogue, 503 base muette). L'adresse a appeler : <see cref="Pour"/>.
@@ -22,18 +24,42 @@ public static class RoutesCourriels
     public const string Envoi = "/socle/greffes/{greffe}/courriels/{suivi:guid}";
 
     /// <summary>GET : les modeles de courriel que l'agent peut choisir (<see cref="ModeleMessage"/>[]). Un modele
-    /// reserve a Amitel n'y est pas pour un agent du greffe (SOC-006 CA05).</summary>
+    /// reserve a Amitel n'y est pas pour un agent du greffe (SOC-006 CA05).
+    /// POST : cree le modele <see cref="SaisieModele"/> -> <see cref="ModeleMessage"/> (201) ; reserve a <see cref="FonctionGestion"/>.</summary>
     public const string Modeles = "/socle/greffes/{greffe}/modeles-courriel";
 
     /// <summary>GET : un modele, son texte, ses adresses resolues pour le greffe, ses listes par defaut et son apercu
     /// (<see cref="ApercuModele"/>) ; 404 s'il n'existe pas OU s'il est reserve a Amitel et que l'agent est du greffe
-    /// (CA05 : il ne le voit pas, meme en tapant son nom). L'adresse : <see cref="PourModele"/>.</summary>
+    /// (CA05 : il ne le voit pas, meme en tapant son nom). L'adresse : <see cref="PourModele"/>.
+    /// PUT : le modifie (<see cref="SaisieModele"/> -> <see cref="ModeleMessage"/>) ; reserve a <see cref="FonctionGestion"/> ; un modele
+    /// reserve a Amitel n'est modifiable que par Amitel (404 pour un agent du greffe, qui ne le voit pas).</summary>
     public const string Modele = "/socle/greffes/{greffe}/modeles-courriel/{type}";
+
+    /// <summary>PUT : active ou desactive un modele (<see cref="SaisieActivation"/> -> <see cref="ModeleMessage"/>), comme les boutons
+    /// « Désactiver » / « Activer » de la V2 (OPE_EDIT_EMAILMODEL.cs:202-210) : un modele ne se supprime jamais. Reserve a
+    /// <see cref="FonctionGestion"/>. L'adresse : <see cref="PourModele"/>.</summary>
+    public const string ActivationModele = "/socle/greffes/{greffe}/modeles-courriel/{type}/actif";
 
     /// <summary>GET : les listes de distribution que l'agent peut voir (<see cref="ListeDiffusion"/>[]), actives ou non :
     /// les listes publiques (proprietaire « * ») et les siennes, comme la V2
     /// (ListeDistributionMail.GetAllListeDistributionMailByLogin, ListeDistributionMail.cs:63).</summary>
     public const string ListesDiffusion = "/socle/greffes/{greffe}/listes-diffusion";
+
+    /// <summary>PUT : modifie une liste que l'agent voit (<see cref="SaisieListe"/> -> <see cref="ListeDiffusion"/>) ; 404 pour la liste
+    /// privee d'un collegue. La creation est un POST sur <see cref="ListesDiffusion"/> (201). Reserve a <see cref="FonctionGestion"/>.
+    /// L'adresse : <see cref="PourListe"/>.</summary>
+    public const string ListeDiffusion = "/socle/greffes/{greffe}/listes-diffusion/{id:int}";
+
+    /// <summary>PUT : active ou desactive une liste (<see cref="SaisieActivation"/> -> <see cref="ListeDiffusion"/>), comme la V2
+    /// (OPE_EDIT_LISTEDISTRIBUTIONMAIL.cs:103-109). Reserve a <see cref="FonctionGestion"/>.</summary>
+    public const string ActivationListe = "/socle/greffes/{greffe}/listes-diffusion/{id:int}/actif";
+
+    /// <summary>
+    /// La fonction (droit) qu'exigent la creation, la modification et l'activation des modeles et des listes : GESTEMAIL, le
+    /// code processus de la procedure V2 « Modele de mail » (PROC_GESTEMAIL, proc_gestemail.md:6). Sans elle : 403, et
+    /// l'ecran garde la lecture des modeles, sans bouton d'ecriture.
+    /// </summary>
+    public const string FonctionGestion = "GESTEMAIL";
 
     /// <summary>Le proprietaire d'une liste de distribution publique (LSTDM_PRIVE = « * », ListeDistributionMail.cs:31).</summary>
     public const string ListePublique = "*";
@@ -53,9 +79,14 @@ public static class RoutesCourriels
         => route.Replace("{greffe}", Uri.EscapeDataString(greffe))
                 .Replace("{suivi:guid}", suivi?.ToString("D") ?? "");
 
-    /// <summary>L'adresse de <see cref="Modele"/> pour le modele <paramref name="type"/> du greffe <paramref name="greffe"/>.</summary>
-    public static string PourModele(string greffe, string type)
-        => Pour(Modele, greffe).Replace("{type}", Uri.EscapeDataString(type));
+    /// <summary>L'adresse de <see cref="Modele"/> (ou de <see cref="ActivationModele"/>) pour le modele <paramref name="type"/> du
+    /// greffe <paramref name="greffe"/>.</summary>
+    public static string PourModele(string greffe, string type, string route = Modele)
+        => Pour(route, greffe).Replace("{type}", Uri.EscapeDataString(type));
+
+    /// <summary>L'adresse de <see cref="ListeDiffusion"/> (ou de <see cref="ActivationListe"/>) pour la liste <paramref name="id"/>.</summary>
+    public static string PourListe(string greffe, int id, string route = ListeDiffusion)
+        => Pour(route, greffe).Replace("{id:int}", id.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
     /// <summary>L'adresse de <see cref="Envois"/> avec ses filtres (vides omis).</summary>
     public static string Filtrer(string greffe, DateOnly? du = null, DateOnly? au = null, string? destinataire = null,
@@ -204,6 +235,8 @@ public sealed record ListeDiffusion(
 /// <param name="Rendu">Le courriel en HTML, logo inclus (data:), a montrer dans un cadre sans script.</param>
 /// <param name="Habille">L'habillage du greffe a ete applique (sinon : le rendu historique de la V2).</param>
 /// <param name="ValeursManquantes">Ce que le greffe n'a pas pour ce courriel (etiquette sans valeur, ville, greffier, logo).</param>
+/// <param name="SignatureActive">EMAILMOD_SIGNATURE_ACTIVE (colonne de RIG_DEV, absente du projet V2 versionne).</param>
+/// <param name="Signature">EMAILMOD_SIGNATURE, la signature gardee avec le modele.</param>
 public sealed record ApercuModele(
     ModeleMessage Modele,
     string Corps,
@@ -214,4 +247,64 @@ public sealed record ApercuModele(
     string Rendu,
     bool Habille,
     string[] ValeursManquantes,
-    ListeDiffusion[] ListesParDefaut);
+    ListeDiffusion[] ListesParDefaut,
+    bool SignatureActive = false,
+    string? Signature = null);
+
+/// <summary>
+/// Un modele de courriel tel que l'ecran « Messagerie » l'enregistre : POST <see cref="RoutesCourriels.Modeles"/> pour le creer,
+/// PUT <see cref="RoutesCourriels.Modele"/> pour le modifier. Les champs de l'ecran V2 « Modele de mail » (OPE_EDIT_EMAILMODEL et
+/// ses sous-operations). Le serveur controle chaque saisie et rend 400 avec le motif (<see cref="RefusGreffe"/>) : nom deja pris,
+/// champ obligatoire vide, texte trop long, adresse invalide, $PieceJointe$ manquant, $LOGO$ sous un habillage.
+/// </summary>
+/// <param name="Type">Le nom du modele (EMAILMOD_TYPE, 40 caracteres au plus), unique ; il ne change plus une fois cree.</param>
+/// <param name="Corps">Le texte (« | » = saut de ligne) ; il devient HTML s'il porte $LOGO$ (EmailModel.Sauve, EmailModel.cs:307-308).</param>
+/// <param name="Expediteur">Obligatoire : une boite du greffe en etiquette (« Greffe &lt;[ADRESSE_MAIL_RCS]&gt; ») ou une adresse.</param>
+/// <param name="Reponse">« Répondre à » : adresses ou etiquettes separees par « ; ».</param>
+/// <param name="Copie">« Copie cachée » : adresses ou etiquettes separees par « ; ».</param>
+/// <param name="EnvoiAutomatique">N'existe que pour un modele RCS (<paramref name="Lot1"/>) : sans lui, il est remis a faux, comme
+/// la V2 (OPE_EDIT_EMAILMODEL._SetVisibilityChkEnvoiAuto).</param>
+/// <param name="ReserveAmitel">« Modèle modifiable uniquement par Amitel » : un agent du greffe qui le coche est refuse (403).</param>
+/// <param name="ListesParDefaut">Les listes de distribution par defaut, parmi les ACTIVES que l'agent voit (publiques et les
+/// siennes). Comme la V2, le modele n'a plus ensuite QUE ces listes : un lien vers la liste privee d'un collegue ou vers une liste
+/// desactivee part aussi (OPE_EDIT_EMAILMODEL_LISTE_DISTRIB.cs:58-61).</param>
+/// <param name="Ecran">L'ecran du geste, ecrit au journal des gestes.</param>
+public sealed record SaisieModele(
+    string Type,
+    string? LibelleEcran,
+    string Sujet,
+    string Corps,
+    string? Expediteur,
+    string? Reponse,
+    string? Copie,
+    string? DestinataireDefaut,
+    bool Lot1,
+    bool Lot2,
+    bool Inscription,
+    bool Comptabilite,
+    bool EnvoiAutomatique,
+    bool ReserveAmitel,
+    bool SignatureActive,
+    string? Signature,
+    int[]? ListesParDefaut = null,
+    string? Ecran = null);
+
+/// <summary>
+/// Une liste de distribution telle que l'ecran « Messagerie » l'enregistre : POST <see cref="RoutesCourriels.ListesDiffusion"/>
+/// pour la creer, PUT <see cref="RoutesCourriels.ListeDiffusion"/> pour la modifier (OPE_EDIT_LISTEDISTRIBUTIONMAIL de la V2).
+/// </summary>
+/// <param name="Code">Le code (LSTDM_CODE, 35 au plus), unique dans le greffe ; il ne change plus une fois cree.</param>
+/// <param name="Adresses">Les adresses, une par ligne ou separees par « ; » ; chacune doit etre valide (ULT_MULTITEXT_MULTIMAIL).</param>
+/// <param name="Publique">Vrai : liste de tous les agents (« * ») ; faux : liste privee de l'agent qui l'enregistre. Une liste
+/// publique ne redevient pas privee (OPE_EDIT_LISTEDISTRIBUTIONMAIL.cs:198).</param>
+public sealed record SaisieListe(
+    string Code,
+    string Libelle,
+    string Adresses,
+    bool Rcs,
+    bool Judiciaire,
+    bool Publique,
+    string? Ecran = null);
+
+/// <summary>Activer (vrai) ou desactiver (faux) un modele ou une liste.</summary>
+public sealed record SaisieActivation(bool Actif, string? Ecran = null);

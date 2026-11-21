@@ -546,6 +546,11 @@ try
         "il y a 400 jours et l'element fait il y a 40 jours ; une alerte encore ouverte n'est jamais purgee");
     Reste("SOC-011 CA02 : le canal reel vers l'exploitation (courriel, outil d'astreinte) est a choisir par l'exploitation d'Amitel ; " +
           "le developpement utilise le canal simule (Supervision:DossierAlertes)");
+
+    // Le serveur du banc s'arrete avant d'etre detruit (decision du lot 1 de la phase 2, controle « Arret » de
+    // tests/SocleCourrielsCheck) : detruit sans StopAsync, l'hote annule ses services de fond sans s'etre arrete et le
+    // Surveillant (lot 2) sort en « BackgroundService failed » au journal, une fausse panne apres un banc vert.
+    await app.StopAsync();
 }
 finally
 {

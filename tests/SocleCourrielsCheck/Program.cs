@@ -34,6 +34,8 @@ using SocleCourrielsCheck;
 // (codes 160-255 encodes, comme GreffeMailBuilder de la V2) ; le cas « habillage vide en base » passait par deux ecritures.
 // fix-ok: reception refusee du lot 1 (chef, 2026-11-21) -- aucun controle ne jouait l'ecran Messagerie, dont le .tsx rendait des
 // modeles inventes (vitest 8/8 rouge) : ajout des listes du banc, de CA05 par le nom du modele et de la partie « Messagerie ».
+// LOT 15 (2026-11-21) : la partie « SOC-006 T04 (suite) » joue la gestion des modeles et des listes (fonction GESTEMAIL, regles de
+// saisie de la V2, modele reserve a Amitel, journal des gestes) par les routes, puis par l'ecran.
 
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
 var migrations = Path.Combine(racine, "Base", "migrations");
@@ -590,8 +592,10 @@ try
         .Where(r => r.Metadata.GetMetadata<ModuleOrigine>()?.Nom == "RigV3.Serveur.Socle.Courriels.ModuleCourriels").ToList();
     var sansPolitique = routesModule.Where(r => !r.Metadata.GetOrderedMetadata<IAuthorizeData>().Any(a => a.Policy == PolitiquesSocle.AgentAdmis))
         .Select(r => r.RoutePattern.RawText).ToList();
-    Exiger(routesModule.Count == lectures.Length && sansPolitique.Count == 0,
-        $"Acces : les {routesModule.Count} routes du module portent PolitiquesSocle.AgentAdmis, toutes appelees ci-dessus");
+    const int RoutesDEcriture = 6;   // creer, modifier, activer : un modele et une liste (partie « SOC-006 T04 » plus bas)
+    Exiger(routesModule.Count == lectures.Length + RoutesDEcriture && sansPolitique.Count == 0,
+        $"Acces : les {routesModule.Count} routes du module portent PolitiquesSocle.AgentAdmis -- les {lectures.Length} de lecture appelees ci-dessus, " +
+        $"les {RoutesDEcriture} d'ecriture dans la partie « SOC-006 T04 »");
     var source = await File.ReadAllTextAsync(Path.Combine(racine, "Serveur", "Socle", "Courriels", "ModuleCourriels.cs"));
     Exiger(!source.Contains("BaseRig b,") && !source.Contains(".OuvrirAsync(") && source.Contains("OuvrirBaseV3Async"),
         "Acces : le module n'ouvre la base du greffe que par le catalogue (OuvrirBaseV3Async), jamais la base unique");
@@ -675,6 +679,329 @@ try
            && messagerieSansGreffe.Mode == "sans-greffe" && messagerieInconnu is { Mode: "refuse", Modeles.Length: 0 },
         $"Ecran : la demonstration seulement sans RIGV3_SERVEUR (aucun modele reserve a Amitel) ; sans greffe ouvert ou compte refuse, aucun modele ({messagerieInconnu.Mode})");
 
+    // =====================================================================================================
+    // SOC-006 T04 (suite, lot 15) — la gestion des modeles et des listes depuis la Messagerie (procedure V2 PROC_GESTEMAIL)
+    // ENTREES QUI LE FONT TOMBER si une regle manque : banc.lecteur (admis, SANS GESTEMAIL) qui ecrit ; banc.courriel (agent
+    // du greffe) qui modifie BANC_AMITEL (ReserveAmitel = 1) ; un nom ou un code deja pris ; une adresse invalide.
+    // =====================================================================================================
+    Console.WriteLine("--- SOC-006 T04 : creer, modifier, desactiver un modele et une liste (GESTEMAIL)");
+    async Task<HttpResponseMessage> Ecrire<T>(HttpMethod verbe, string adresse, string? compte, T corps)
+    {
+        using var demande = new HttpRequestMessage(verbe, adresse) { Content = JsonContent.Create(corps, options: json) };
+        if (compte is not null) demande.Headers.Add(RoutesIdentite.EnTeteCompte, compte);
+        return await http.SendAsync(demande);
+    }
+    async Task<(int Code, string Corps)> Geste<T>(HttpMethod verbe, string adresse, string? compte, T corps)
+    {
+        using var r = await Ecrire(verbe, adresse, compte, corps);
+        return ((int)r.StatusCode, await r.Content.ReadAsStringAsync());
+    }
+    SaisieModele Saisie(string type, string sujet = "Avis du banc", string corps = "Bonjour,|Un avis du greffe.|$PieceJointe$",
+                        string? expediteur = "Greffe du banc <[ADRESSE_MAIL_RCS]>", bool lot1 = true, bool auto = false, bool amitel = false,
+                        int[]? listes = null)
+        => new(type, "Avis du banc", sujet, corps, expediteur, "[ADRESSE_MAIL_NO_REPLY]", null, null, lot1, true, false, false, auto, amitel,
+               false, null, listes);
+    var modelesGreffe = RoutesCourriels.Pour(RoutesCourriels.Modeles, GreffeA);
+    var listesGreffe = RoutesCourriels.Pour(RoutesCourriels.ListesDiffusion, GreffeA);
+    Task<int> Gestes() => Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.Journal WHERE Famille = 'courriel'");
+    var idAgent = await Compter(v3a.Connexion, "SELECT Id FROM soc.Compte WHERE CompteWindows = 'banc.courriel'");
+    var idPublique = await Compter(v3a.Connexion, "SELECT Id FROM soc.ListeDiffusion WHERE Code = 'BANC_PUBLIQUE'");
+    var idCollegue = await Compter(v3a.Connexion, "SELECT Id FROM soc.ListeDiffusion WHERE Code = 'BANC_COLLEGUE'");
+    // GESTEMAIL est bien une fonction du catalogue de la V2 : la reprise des droits (SOC-002, RepriseDroits) la porte dans la
+    // base V3 de chaque greffe avec les roles qui l'ont. Le banc la pose avec SON libelle V2 (lu, jamais ecrit).
+    string? libelleGestemail;
+    int rolesGestemail;
+    await using (var cnV2 = new SqlConnection(sourceV2.ConnectionString))
+    {
+        await cnV2.OpenAsync();
+        libelleGestemail = (await LectureV2.ValeurAsync(cnV2,
+            "SELECT PROCF_LIBELLE FROM dbo.PROCESSUS_ET_FONCTIONALITE WHERE PROCF_CODE_PROC = 'GESTEMAIL'", default))?.ToString();
+        rolesGestemail = Convert.ToInt32(await LectureV2.ValeurAsync(cnV2,
+            "SELECT COUNT(*) FROM dbo.HABILIT_ROLE_USER_PROCESSUS WHERE HRFON_CODE_PROC = 'GESTEMAIL'", default));
+    }
+    Exiger(libelleGestemail is { Length: > 0 },
+        $"SOC-006 T04 : GESTEMAIL est une fonction du catalogue de {sourceV2.InitialCatalog} (« {libelleGestemail} », donnee a {rolesGestemail} role(s)) : " +
+        "la reprise des droits la porte dans chaque base de greffe");
+    await Executer(v3a.Connexion, """
+        INSERT INTO soc.Fonction (Code, Libelle, TypeV2) VALUES ('GESTEMAIL', @libelle, 'DLL');
+        INSERT INTO soc.RoleFonction (Role, Fonction) VALUES ('BANC', 'GESTEMAIL');
+        """, ("@libelle", libelleGestemail ?? "Modèle de mail"));
+
+    // Aucun modele de la V2 ne devient impossible a enregistrer : les regles de saisie de la V3 acceptent les 40 de RIG_DEV, sauf
+    // un champ que la V2 exige aussi (sujet, libelle ecran : MetierObligatoire, OPE_EDIT_EMAILMODEL.Designer.cs:103 et :191) --
+    // l'agent le complete a l'enregistrement, en V2 comme en V3.
+    string[] exigesParLaV2 = ["Le sujet est obligatoire.", "Le libellé écran est obligatoire."];
+    var refusesV2 = new List<string>();
+    var aCompleterV2 = new List<string>();
+    await using (var cn = await OuvrirV3A())
+    await using (var cmd = new SqlCommand("""
+        SELECT Type, LibelleEcran, Sujet, Corps, Expediteur, Reponse, Copie, DestinataireDefaut, Lot1, Lot2, CorpsHtml
+        FROM soc.ModeleMessage WHERE Type NOT LIKE 'BANC[_]%';
+        """, cn))
+    await using (var r = await cmd.ExecuteReaderAsync())
+        while (await r.ReadAsync())
+        {
+            string? T(int i) => r.IsDBNull(i) ? null : r.GetString(i);
+            var (ok, erreurs) = ReglesCourriels.ControlerModele(new SaisieModele(r.GetString(0), T(1), r.GetString(2), r.GetString(3), T(4), T(5),
+                T(6), T(7), r.GetBoolean(8), r.GetBoolean(9), false, false, false, false, false, null), r.GetBoolean(10), new HabillageDuGreffe(false, false));
+            if (ok is null && erreurs.All(exigesParLaV2.Contains)) aCompleterV2.Add($"{r.GetString(0)} ({string.Join(" ", erreurs)})");
+            else if (ok is null) refusesV2.Add($"{r.GetString(0)} : {string.Join(" ", erreurs)}");
+        }
+    var nbV2 = await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type NOT LIKE 'BANC[_]%'");
+    Exiger(refusesV2.Count == 0 && nbV2 > 0,
+        $"SOC-006 T04 : des {nbV2} modeles repris de {sourceV2.InitialCatalog}, {nbV2 - aCompleterV2.Count - refusesV2.Count} passent tels quels les regles de " +
+        $"saisie de la V3 (noms, tailles, adresses et etiquettes), {aCompleterV2.Count} sont a completer comme en V2 " +
+        $"({(aCompleterV2.Count == 0 ? "aucun" : string.Join(", ", aCompleterV2))}) ; aucun ne devient impossible a enregistrer " +
+        $"({refusesV2.Count} refuse(s){(refusesV2.Count > 0 ? ", ex. " + refusesV2[0] : "")})");
+
+    // --- Creation d'un modele par un agent GESTEMAIL ---------------------------------------------------------------
+    var gestesAvant = await Gestes();
+    var cree = await Geste(HttpMethod.Post, modelesGreffe, Agent, Saisie("BANC_NEUF", listes: [idPublique]) with { Ecran = "banc" });
+    Exiger(cree.Code == 201 && await Compter(v3a.Connexion, """
+               SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_NEUF' AND Sujet = 'Avis du banc' AND Corps = 'Bonjour,|Un avis du greffe.|$PieceJointe$'
+                 AND CorpsHtml = 0 AND Expediteur = 'Greffe du banc <[ADRESSE_MAIL_RCS]>' AND Reponse = '[ADRESSE_MAIL_NO_REPLY]' AND Lot1 = 1
+                 AND ReserveAmitel = 0 AND UtilisableEnSaisie = 1;
+               """) == 1
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessageListe WHERE TypeModele = 'BANC_NEUF' AND IdListe = @l", ("@l", idPublique)) == 1,
+        $"SOC-006 T04 : un agent GESTEMAIL CREE un modele (POST {RoutesCourriels.Modeles}) -- {cree.Code}, ses champs et sa liste par defaut en base");
+    Exiger(await Gestes() == gestesAvant + 1 && await Compter(v3a.Connexion, """
+               SELECT COUNT(*) FROM soc.Journal WHERE Famille = 'courriel' AND Source = 'v3' AND IdAgent = @a AND Agent = 'Courriels BANC'
+                 AND Verbe = 'a cree' AND Objet = 'le modèle de courriel BANC_NEUF' AND IdObjet = 'BANC_NEUF' AND Ecran = 'banc'
+                 AND Avant IS NULL AND Apres LIKE '%"sujet":"Avis du banc"%';
+               """, ("@a", idAgent)) == 1,
+        "SOC-016 / SOC-006 T04 : la creation est ecrite au journal des gestes, au nom de l'agent, avec son ecran et le modele cree");
+    var double_ = await Geste(HttpMethod.Post, modelesGreffe, Agent, Saisie("banc_neuf"));
+    var invalide = await Geste(HttpMethod.Post, modelesGreffe, Agent, Saisie("BANC_INVALIDE", sujet: new string('s', 201), expediteur: "pas une adresse") with
+    {
+        Copie = "[ADRESSE_MAIL_ACCUSE_ENVOI_JUD];copie@@banc",
+    });
+    var sansExpediteurSaisi = await Geste(HttpMethod.Post, modelesGreffe, Agent, Saisie("BANC_SANS_DE", expediteur: null));
+    var etiquetteSecrete = await Geste(HttpMethod.Post, modelesGreffe, Agent, Saisie("BANC_SECRET", expediteur: "[PWD_SQL]"));
+    Exiger(double_.Code == 400 && double_.Corps.Contains("existe déjà") && invalide.Code == 400 && invalide.Corps.Contains("Le sujet tient en 200 caractères (201 saisis)")
+           && invalide.Corps.Contains("« pas une adresse »") && invalide.Corps.Contains("« copie@@banc »")
+           && sansExpediteurSaisi.Code == 400 && sansExpediteurSaisi.Corps.Contains("L'expéditeur est obligatoire")
+           && etiquetteSecrete.Code == 400 && etiquetteSecrete.Corps.Contains("[PWD_SQL]")
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type IN ('BANC_INVALIDE', 'BANC_SANS_DE', 'BANC_SECRET')") == 0
+           && await Gestes() == gestesAvant + 1,
+        $"SOC-006 T04 : controle des saisies -- nom deja pris (meme en minuscules), sujet trop long, adresse ou copie invalide, expediteur absent, etiquette " +
+        $"de mot de passe : 400 avec le motif, rien n'est ecrit ni journalise (« {Court(invalide.Corps, 140)} »)");
+    // La V2 refuse d'enregistrer sans sujet ni libelle ecran : MetierObligatoire (OPE_EDIT_EMAILMODEL.Designer.cs:103 et :191),
+    // controle a la validation par Ult.moteur.cs:516. La V3 aussi.
+    var sansSujet = await Geste(HttpMethod.Post, modelesGreffe, Agent, Saisie("BANC_SANS_SUJET", sujet: ""));
+    var sansLibelle = await Geste(HttpMethod.Post, modelesGreffe, Agent, Saisie("BANC_SANS_LIBELLE") with { LibelleEcran = null });
+    Exiger(sansSujet.Code == 400 && sansSujet.Corps.Contains("Le sujet est obligatoire")
+           && sansLibelle.Code == 400 && sansLibelle.Corps.Contains("Le libellé écran est obligatoire")
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type IN ('BANC_SANS_SUJET', 'BANC_SANS_LIBELLE')") == 0
+           && await Gestes() == gestesAvant + 1,
+        $"SOC-006 T04 : sujet et libelle ecran obligatoires comme la V2 (OPE_EDIT_EMAILMODEL.Designer.cs:103, :191) -- 400 avec le motif, " +
+        $"rien n'est ecrit ni journalise ({sansSujet.Code} « {Court(sansSujet.Corps, 60)} » / {sansLibelle.Code} « {Court(sansLibelle.Corps, 60)} »)");
+
+    // --- Modification ------------------------------------------------------------------------------------------------
+    var modifie = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_NEUF"), Agent,
+        Saisie("BANC_NEUF", sujet: "Avis modifie", lot1: false, auto: true, listes: []) with { Signature = "Le greffier du banc", SignatureActive = true });
+    Exiger(modifie.Code == 200 && await Compter(v3a.Connexion, """
+               SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_NEUF' AND Sujet = 'Avis modifie' AND Lot1 = 0 AND EnvoiAutomatique = 0
+                 AND SignatureActive = 1 AND Signature = 'Le greffier du banc';
+               """) == 1
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessageListe WHERE TypeModele = 'BANC_NEUF'") == 0,
+        $"SOC-006 T04 : un agent GESTEMAIL MODIFIE un modele (PUT) -- objet, signature (EMAILMOD_SIGNATURE_ACTIVE, EMAILMOD_SIGNATURE), liste par defaut retiree ; " +
+        $"envoi automatique demande sans RCS -> remis a faux, comme la V2 ({modifie.Code})");
+    Exiger(await Compter(v3a.Connexion, """
+               SELECT COUNT(*) FROM soc.Journal WHERE Famille = 'courriel' AND IdAgent = @a AND Verbe = 'a modifie' AND IdObjet = 'BANC_NEUF'
+                 AND Avant LIKE '%"sujet":"Avis du banc"%' AND Apres LIKE '%"sujet":"Avis modifie"%' AND Apres LIKE '%"envoiAutomatique":false%';
+               """, ("@a", idAgent)) == 1,
+        "SOC-016 / SOC-006 T04 : la modification est ecrite au journal avec les valeurs avant et apres");
+    var renomme = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_NEUF"), Agent, Saisie("BANC_AUTRE_NOM"));
+    var avecRcs = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_NEUF"), Agent, Saisie("BANC_NEUF", lot1: true, auto: true));
+    Exiger(renomme.Code == 400 && renomme.Corps.Contains("ne change pas")
+           && avecRcs.Code == 200 && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_NEUF' AND Lot1 = 1 AND EnvoiAutomatique = 1") == 1,
+        "SOC-006 T04 : le nom d'un modele ne change pas une fois cree (400) ; jumeau : l'envoi automatique d'un modele RCS est garde");
+
+    // V2 OPE_EDIT_EMAILMODEL.cs:91-110 : sous un habillage, $LOGO$ est interdit ; un modele HTML sous un habillage regle porte $PieceJointe$.
+    var logoSousHabillage = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_NEUF"), Agent,
+        Saisie("BANC_NEUF", corps: "Bonjour|$LOGO$|$PieceJointe$"));
+    var htmlSansPiece = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_HTML"), Agent,
+        Saisie("BANC_HTML", corps: "<p>Bonjour</p><p>Le greffe</p>"));
+    await PoserHabillage(null);   // plus d'habillage en base ; le reglage pointe un fichier absent : le greffe n'a plus d'habillage
+    var logoSansHabillage = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_NEUF"), Agent,
+        Saisie("BANC_NEUF", corps: "Bonjour|$LOGO$|$PieceJointe$"));
+    Exiger(logoSousHabillage.Code == 400 && logoSousHabillage.Corps.Contains("$LOGO$ est interdit")
+           && htmlSansPiece.Code == 400 && htmlSansPiece.Corps.Contains("$PieceJointe$ est obligatoire")
+           && logoSansHabillage.Code == 200
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_NEUF' AND CorpsHtml = 1 AND Corps = 'Bonjour|$LOGO$|$PieceJointe$'") == 1,
+        "SOC-006 T04 : $LOGO$ refuse sous l'habillage du greffe, $PieceJointe$ exige d'un modele HTML ; jumeau : sans habillage, $LOGO$ passe et le " +
+        "modele devient HTML (EmailModel.Sauve)");
+
+    // --- Desactivation, reactivation ----------------------------------------------------------------------------------
+    var activationNeuf = RoutesCourriels.PourModele(GreffeA, "BANC_NEUF", RoutesCourriels.ActivationModele);
+    var desactive = await Geste(HttpMethod.Put, activationNeuf, Agent, new SaisieActivation(false, "banc"));
+    var etatDesactive = await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_NEUF' AND UtilisableEnSaisie = 0");
+    var vuParLaListe = (await Lire<ModeleMessage[]>(modelesGreffe)).Single(m => m.Type == "BANC_NEUF");
+    var gestesDesactive = await Gestes();
+    var encore = await Geste(HttpMethod.Put, activationNeuf, Agent, new SaisieActivation(false, "banc"));
+    var gestesEncore = await Gestes();
+    var reactive = await Geste(HttpMethod.Put, activationNeuf, Agent, new SaisieActivation(true, "banc"));
+    Exiger(desactive.Code == 200 && etatDesactive == 1 && vuParLaListe.UtilisableEnSaisie == false && encore.Code == 200 && gestesEncore == gestesDesactive
+           && reactive.Code == 200 && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_NEUF' AND UtilisableEnSaisie = 1") == 1
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.Journal WHERE Famille = 'courriel' AND IdObjet = 'BANC_NEUF' AND Verbe = 'a desactive' AND Apres = '{\"actif\":false}'") == 1
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.Journal WHERE Famille = 'courriel' AND IdObjet = 'BANC_NEUF' AND Verbe = 'a modifie' AND Apres = '{\"actif\":true}'") == 1,
+        "SOC-006 T04 : un agent GESTEMAIL DESACTIVE un modele (il reste en base, la liste le rend inactif) puis le REACTIVE ; chaque geste au journal, " +
+        "un second « désactiver » ne change rien et n'ecrit rien");
+
+    // --- Sans GESTEMAIL : 403, rien n'est ecrit -------------------------------------------------------------------------
+    var gestesAvant403 = await Gestes();
+    var refus403 = new[]
+    {
+        await Geste(HttpMethod.Post, modelesGreffe, SansDroit, Saisie("BANC_LECTEUR")),
+        await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_NEUF"), SansDroit, Saisie("BANC_NEUF", sujet: "par le lecteur")),
+        await Geste(HttpMethod.Put, activationNeuf, SansDroit, new SaisieActivation(false)),
+        await Geste(HttpMethod.Post, listesGreffe, SansDroit, new SaisieListe("BANC_LECTEUR", "Liste du lecteur", "l@banc.example", true, false, true)),
+        await Geste(HttpMethod.Put, RoutesCourriels.PourListe(GreffeA, idPublique), SansDroit,
+            new SaisieListe("BANC_PUBLIQUE", "par le lecteur", "l@banc.example", false, true, true)),
+        await Geste(HttpMethod.Put, RoutesCourriels.PourListe(GreffeA, idPublique, RoutesCourriels.ActivationListe), SansDroit, new SaisieActivation(false)),
+    };
+    Exiger(refus403.All(r => r.Code == 403 && r.Corps.Contains(RoutesCourriels.FonctionGestion))
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_LECTEUR' OR Sujet = 'par le lecteur'") == 0
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ListeDiffusion WHERE Code = 'BANC_LECTEUR' OR Libelle = 'par le lecteur' OR (Code = 'BANC_PUBLIQUE' AND Actif = 0)") == 0
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_NEUF' AND UtilisableEnSaisie = 1") == 1
+           && await Gestes() == gestesAvant403,
+        $"SOC-006 T04 : SANS la fonction GESTEMAIL, chacune des 6 ecritures (modele et liste : creer, modifier, desactiver) est refusee -- 403, motif nomme, " +
+        $"rien n'est ecrit ni journalise ({string.Join(", ", refus403.Select(r => r.Code))})");
+    var sansSessionEcriture = await Geste(HttpMethod.Post, modelesGreffe, null, Saisie("BANC_ANONYME"));
+    var greffeAbsentEcriture = await Geste(HttpMethod.Post, modelesGreffe.Replace(GreffeA, GreffeAbsent), Agent, Saisie("BANC_ABSENT"));
+    Exiger(sansSessionEcriture.Code == 401 && greffeAbsentEcriture.Code == 404,
+        $"Acces : une ecriture sans session -> 401 ({sansSessionEcriture.Code}) ; dans un greffe absent du catalogue -> 404 ({greffeAbsentEcriture.Code})");
+
+    // --- Un modele reserve a Amitel n'est modifiable que par Amitel (CA05 : l'agent du greffe ne le voit pas) -----------
+    var amitelAvant = await Scalaire(v3a.Connexion, "SELECT Sujet + '|' + CAST(UtilisableEnSaisie AS varchar(1)) FROM soc.ModeleMessage WHERE Type = 'BANC_AMITEL'");
+    var amitelParAgent = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_AMITEL"), Agent,
+        Saisie("BANC_AMITEL", sujet: "modifie par le greffe") with { Expediteur = "[ADRESSE_MAIL_RCS]" });
+    var amitelDesactiveParAgent = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_AMITEL", RoutesCourriels.ActivationModele), Agent,
+        new SaisieActivation(false));
+    var cocheAmitelParAgent = await Geste(HttpMethod.Post, modelesGreffe, Agent, Saisie("BANC_FAUX_AMITEL", amitel: true));
+    var amitelApresAgent = await Scalaire(v3a.Connexion, "SELECT Sujet + '|' + CAST(UtilisableEnSaisie AS varchar(1)) FROM soc.ModeleMessage WHERE Type = 'BANC_AMITEL'");
+    Exiger(amitelParAgent.Code == 404 && amitelDesactiveParAgent.Code == 404 && amitelApresAgent?.ToString() == amitelAvant?.ToString()
+           && cocheAmitelParAgent.Code == 403 && cocheAmitelParAgent.Corps.Contains("Amitel")
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_FAUX_AMITEL'") == 0,
+        $"SOC-006 T04 / CA05 : un agent du GREFFE ne modifie ni ne desactive un modele reserve a Amitel -- {amitelParAgent.Code} / {amitelDesactiveParAgent.Code}, " +
+        $"comme un modele inconnu, rien ne bouge (« {amitelApresAgent} ») ; il ne coche pas « réservé à Amitel » ({cocheAmitelParAgent.Code})");
+    var amitelParAmitel = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_AMITEL"), AgentAmitel,
+        Saisie("BANC_AMITEL", sujet: "modifie par Amitel", amitel: true) with { Expediteur = "[ADRESSE_MAIL_RCS]" });
+    Exiger(amitelParAmitel.Code == 200
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_AMITEL' AND Sujet = 'modifie par Amitel' AND ReserveAmitel = 1") == 1,
+        $"SOC-006 T04 / CA05 (jumeau) : un agent d'AMITEL modifie le modele qui lui est reserve, et il le reste ({amitelParAmitel.Code})");
+
+    // --- Les listes par defaut, comme la V2 : a l'enregistrement, le modele n'a plus QUE les listes cochees ------------
+    // OPE_EDIT_EMAILMODEL_LISTE_DISTRIB.cs:58-61 marque tous les liens « a supprimer » puis ne garde que les lignes cochees,
+    // et l'agent ne coche que les listes actives qu'il voit (DoInitZoneSaisie, :99) : les liens vers la liste privee d'un
+    // collegue et vers une liste desactivee partent donc aussi (ecart a valider, socle-courriels.md).
+    var idPerso = await Compter(v3a.Connexion, "SELECT Id FROM soc.ListeDiffusion WHERE Code = 'BANC_PERSO'");
+    var idInactive = await Compter(v3a.Connexion, "SELECT Id FROM soc.ListeDiffusion WHERE Code = 'BANC_INACTIVE'");
+    await Executer(v3a.Connexion, $"INSERT INTO soc.ModeleMessageListe (TypeModele, IdListe) VALUES ('BANC_DOC', {idInactive});");
+    var docListePerso = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_DOC"), Agent,
+        Saisie("BANC_DOC", corps: "Madame, Monsieur,|Voici vos documents :|$PieceJointe$|$LOGO$ Le greffe", listes: [idPerso]) with
+        {
+            Expediteur = "Greffe du banc <[ADRESSE_MAIL_JUDICIAIRE]>", Copie = "[ADRESSE_MAIL_ACCUSE_ENVOI_JUD]",
+        });
+    Task<int> LiensDoc() => Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessageListe WHERE TypeModele = 'BANC_DOC'");
+    Task<int> LienDoc(int idListe) => Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessageListe WHERE TypeModele = 'BANC_DOC' AND IdListe = @l",
+        ("@l", idListe));
+    var liensApres = await LiensDoc();
+    var journalListes = await Compter(v3a.Connexion, """
+        SELECT COUNT(*) FROM soc.Journal WHERE Famille = 'courriel' AND IdObjet = 'BANC_DOC' AND Verbe = 'a modifie' AND Apres LIKE @l
+          AND Id = (SELECT MAX(Id) FROM soc.Journal WHERE Famille = 'courriel' AND IdObjet = 'BANC_DOC');
+        """, ("@l", $"%\"listesParDefaut\":[[]{idPerso}]%"));
+    Exiger(docListePerso.Code == 200 && liensApres == 1 && await LienDoc(idPerso) == 1 && await LienDoc(idPublique) == 0
+           && await LienDoc(idCollegue) == 0 && await LienDoc(idInactive) == 0 && journalListes == 1
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_DOC' AND CorpsHtml = 1") == 1,
+        $"SOC-006 T04 : comme la V2, enregistrer un modele ne lui laisse QUE les listes cochees -- la sienne cochee reste, la publique decochee part, " +
+        $"la liste privee d'un collegue et la liste desactivee partent aussi, le journal dit les listes apres ({docListePerso.Code}, " +
+        $"{liensApres} lien(s) apres, journal {journalListes})");
+    // Le meme texte : BANC_DOC est devenu HTML ($LOGO$, EmailModel.Sauve), seule la liste demandee doit faire refuser.
+    var docListeCollegue = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_DOC"), Agent,
+        Saisie("BANC_DOC", corps: "Madame, Monsieur,|Voici vos documents :|$PieceJointe$|$LOGO$ Le greffe", listes: [idCollegue]));
+    var docListeInactive = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_DOC"), Agent,
+        Saisie("BANC_DOC", corps: "Madame, Monsieur,|Voici vos documents :|$PieceJointe$|$LOGO$ Le greffe", listes: [idInactive]));
+    Exiger(docListeCollegue.Code == 400 && docListeCollegue.Corps.Contains($"n° {idCollegue}")
+           && docListeInactive.Code == 400 && docListeInactive.Corps.Contains($"n° {idInactive}") && await LiensDoc() == 1 && await LienDoc(idPerso) == 1,
+        $"SOC-006 T04 : une liste par defaut se coche parmi les listes ACTIVES que l'agent voit -- la liste privee d'un collegue et une liste " +
+        $"desactivee sont refusees (400), le modele garde sa liste ({docListeCollegue.Code} {Court(docListeCollegue.Corps, 120)} / " +
+        $"{docListeInactive.Code} {Court(docListeInactive.Corps, 120)})");
+
+    // --- Les listes de distribution : creer, modifier, publique / privee, desactiver ---------------------------------
+    var gestesListes = await Gestes();
+    var listeCree = await Geste(HttpMethod.Post, listesGreffe, Agent,
+        new SaisieListe("BANC_EXPERTS", "Experts du banc", "expert.un@cabinet.example\r\n expert.deux@cabinet.example;expert.un@cabinet.example", true, false, false, "banc"));
+    var idExperts = await Compter(v3a.Connexion, "SELECT ISNULL(MAX(Id), 0) FROM soc.ListeDiffusion WHERE Code = 'BANC_EXPERTS'");
+    Exiger(listeCree.Code == 201 && await Compter(v3a.Connexion, """
+               SELECT COUNT(*) FROM soc.ListeDiffusion WHERE Code = 'BANC_EXPERTS' AND Libelle = 'Experts du banc'
+                 AND Adresses = 'expert.un@cabinet.example;expert.deux@cabinet.example' AND Rcs = 1 AND Judiciaire = 0 AND Prive = 'banc.courriel' AND Actif = 1;
+               """) == 1
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.Journal WHERE Famille = 'courriel' AND Verbe = 'a cree' AND Objet = 'la liste de distribution BANC_EXPERTS' AND IdAgent = @a",
+               ("@a", idAgent)) == 1,
+        $"SOC-006 T04 : un agent GESTEMAIL CREE une liste privee (proprietaire : lui), adresses une par ligne dedoublonnees en « a;b », geste au journal ({listeCree.Code})");
+    var codePris = await Geste(HttpMethod.Post, listesGreffe, Agent, new SaisieListe("banc_collegue", "Meme code qu'un collegue", "x@banc.example", false, true, true));
+    var adresseInvalide = await Geste(HttpMethod.Post, listesGreffe, Agent, new SaisieListe("BANC_FAUSSE", "Adresse fausse", "bon@banc.example;pas-une-adresse", false, true, true));
+    var listeVide = await Geste(HttpMethod.Post, listesGreffe, Agent, new SaisieListe("BANC_VIDE", "Sans adresse", " ; ", false, true, true));
+    Exiger(codePris.Code == 400 && codePris.Corps.Contains("existe déjà") && adresseInvalide.Code == 400 && adresseInvalide.Corps.Contains("Courriel (pas-une-adresse) invalide")
+           && listeVide.Code == 400 && listeVide.Corps.Contains("au moins une adresse")
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ListeDiffusion WHERE Code IN ('BANC_FAUSSE', 'BANC_VIDE') OR Libelle = 'Meme code qu''un collegue'") == 0,
+        "SOC-006 T04 : controle des saisies d'une liste -- code deja pris (meme par la liste privee d'un collegue), adresse invalide (« Courriel (x) invalide » " +
+        "de la V2), aucune adresse : 400, rien n'est ecrit");
+    var listePublique = await Geste(HttpMethod.Put, RoutesCourriels.PourListe(GreffeA, idExperts), Agent,
+        new SaisieListe("BANC_EXPERTS", "Experts du ressort", "expert.un@cabinet.example;expert.trois@cabinet.example", true, true, true, "banc"));
+    var redevientPrivee = await Geste(HttpMethod.Put, RoutesCourriels.PourListe(GreffeA, idExperts), Agent,
+        new SaisieListe("BANC_EXPERTS", "Experts du ressort", "expert.un@cabinet.example", true, true, false));
+    var listeDuCollegue = await Geste(HttpMethod.Put, RoutesCourriels.PourListe(GreffeA, idCollegue), Agent,
+        new SaisieListe("BANC_COLLEGUE", "prise au collegue", "x@banc.example", true, true, true));
+    Exiger(listePublique.Code == 200 && await Compter(v3a.Connexion, """
+               SELECT COUNT(*) FROM soc.ListeDiffusion WHERE Id = @id AND Libelle = 'Experts du ressort' AND Prive = '*' AND Judiciaire = 1
+                 AND Adresses = 'expert.un@cabinet.example;expert.trois@cabinet.example';
+               """, ("@id", idExperts)) == 1
+           && redevientPrivee.Code == 400 && redevientPrivee.Corps.Contains("ne redevient pas privée")
+           && listeDuCollegue.Code == 404 && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ListeDiffusion WHERE Code = 'BANC_COLLEGUE' AND Libelle = 'Liste d''un collegue'") == 1,
+        "SOC-006 T04 : un agent GESTEMAIL MODIFIE sa liste et la rend publique ; une liste publique ne redevient pas privee (400, V2 :198) ; la liste privee " +
+        "d'un collegue n'existe pas pour lui (404), elle ne bouge pas");
+    var listeDesactivee = await Geste(HttpMethod.Put, RoutesCourriels.PourListe(GreffeA, idExperts, RoutesCourriels.ActivationListe), Agent, new SaisieActivation(false, "banc"));
+    var listesVues = await Lire<ListeDiffusion[]>(listesGreffe);
+    Exiger(listeDesactivee.Code == 200 && listesVues.Single(l => l.Id == idExperts).Actif == false
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.Journal WHERE Famille = 'courriel' AND Verbe = 'a desactive' AND IdObjet = @id", ("@id", idExperts.ToString())) == 1
+           && await Gestes() == gestesListes + 3,
+        $"SOC-006 T04 : un agent GESTEMAIL DESACTIVE une liste (elle reste, inactive) ; creer, modifier, desactiver : 3 gestes au journal, les refus aucun");
+
+    // --- L'ecran « Messagerie » sur le vrai serveur : boutons selon GESTEMAIL, motif du serveur, apercu recalcule ------
+    Console.WriteLine("--- Ecran « Messagerie » : ecriture");
+    var ecranGestion = await EcranMessagerie.OuvrirAsync(ClientEcran(Agent), GreffeA);
+    var ecranLecteur = await EcranMessagerie.OuvrirAsync(ClientEcran(SansDroit), GreffeA);
+    var ecranAmitel = await EcranMessagerie.OuvrirAsync(ClientEcran(AgentAmitel), GreffeA);
+    Exiger(ecranGestion is { PeutModifier: true, EstAmitel: false, Dictionnaire: null, Compte: "banc.courriel" }
+           && ecranLecteur is { Mode: "serveur", PeutModifier: false } && ecranLecteur.Modeles.Length > 0
+           && ecranAmitel is { PeutModifier: true, EstAmitel: true } && (ecranAmitel.Dictionnaire ?? "").Contains("{{MESSAGE_PERSONNALISE}}"),
+        "Ecran SOC-006 T04 : la Messagerie montre ses boutons d'ecriture a un agent GESTEMAIL, la LECTURE seule sans (le serveur le dit) ; le " +
+        "dictionnaire des tags et la case Amitel a un agent d'Amitel seul");
+    var parEcran = await EcranMessagerie.EnregistrerModeleAsync(ClientEcran(Agent), GreffeA,
+        Saisie("BANC_NEUF", sujet: "Avis par l'écran", corps: "Bonjour,|Recalcul de l'apercu.|$PieceJointe$"), "BANC_NEUF");
+    Exiger(parEcran is { Ok: true, Fiche.Apercu: { } ap2 } && ap2.Modele.Sujet == "Avis par l'écran" && ap2.Rendu.Contains("Recalcul")
+           && parEcran.Vue!.Modeles.Single(m => m.Type == "BANC_NEUF").Sujet == "Avis par l'écran"
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.Journal WHERE Famille = 'courriel' AND IdObjet = 'BANC_NEUF' AND Ecran = @e", ("@e", EcranMessagerie.NomEcran)) == 1,
+        $"Ecran SOC-006 T04 : Enregistrer depuis la Messagerie modifie le modele, relit la liste et RECALCULE l'apercu ; le journal nomme l'ecran (« {parEcran.Message} »)");
+    var refusParEcran = await EcranMessagerie.EnregistrerModeleAsync(ClientEcran(Agent), GreffeA, Saisie("BANC_NEUF", expediteur: "pas une adresse"), "BANC_NEUF");
+    var lecteurParEcran = await EcranMessagerie.EnregistrerModeleAsync(ClientEcran(SansDroit), GreffeA, Saisie("BANC_NEUF"), "BANC_NEUF");
+    var demoEcriture = await EcranMessagerie.EnregistrerModeleAsync(null, null, Saisie("ASS"), "ASS");
+    var demoActivation = await EcranMessagerie.ActiverListeAsync(null, null, 1, false);
+    Exiger(refusParEcran is { Ok: false, Vue: null } && refusParEcran.Message.Contains("« pas une adresse »") && !refusParEcran.Message.Contains("{")
+           && lecteurParEcran is { Ok: false } && lecteurParEcran.Message.Contains(RoutesCourriels.FonctionGestion)
+           && demoEcriture is { Ok: false } && demoEcriture.Message.StartsWith("Démonstration") && demoActivation is { Ok: false }
+           && (await EcranMessagerie.OuvrirAsync(null, null)).PeutModifier,
+        $"Ecran SOC-006 T04 : un refus du serveur s'affiche avec SON motif (« {Court(refusParEcran.Message, 90)} »), sans GESTEMAIL le motif nomme la fonction ; " +
+        "sans serveur, la demonstration montre le formulaire et refuse proprement chaque ecriture");
+    var listeParEcran = await EcranMessagerie.EnregistrerListeAsync(ClientEcran(Agent), GreffeA,
+        new SaisieListe("BANC_ECRAN", "Liste de l'écran", "ecran@banc.example", false, true, false), null);
+    var activeParEcran = await EcranMessagerie.ActiverModeleAsync(ClientEcran(Agent), GreffeA, "BANC_NEUF", false);
+    Exiger(listeParEcran is { Ok: true } && listeParEcran.Vue!.Listes.Any(l => l.Code == "BANC_ECRAN" && l.Proprietaire == "banc.courriel")
+           && activeParEcran is { Ok: true, Fiche.Apercu.Modele.UtilisableEnSaisie: false },
+        "Ecran SOC-006 T04 : une liste creee depuis l'ecran revient dans ses listes ; Désactiver depuis l'ecran rend le modele inactif");
+
     // Ce que l'arret du serveur ecrit au journal se lit apres sa destruction, a la sortie de ce bloc.
     capteur.Vider();
     await app.StopAsync();
@@ -701,6 +1028,8 @@ Exiger(arret.Length == 0,
 Console.WriteLine();
 Console.WriteLine(echecs.Count == 0 ? "SocleCourrielsCheck : tous les controles sont verts." : $"SocleCourrielsCheck : {echecs.Count} controle(s) ROUGE(S).");
 return echecs.Count == 0 ? 0 : 1;
+
+static string Court(string? texte, int taille) => texte is null ? "" : texte.Length <= taille ? texte : texte[..taille] + "…";
 
 static int PortLibre()
 {
