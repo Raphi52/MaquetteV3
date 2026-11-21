@@ -240,8 +240,8 @@ var matinFin = new StringWriter();
 var codeMatinFin = await OutilTransfert.ExecuterAsync(["rapport", "--v3", v3A.Connexion], matinFin);
 Exiger(codeMatinFin == 0 && matinFin.ToString().Contains("TERMINE") && matinFin.ToString().Contains("1 reprise(s)"),
     $"REC-005 CA04 : le rapport du matin suivant dit « termine » (1 reprise) : « {matinFin.ToString().Split('\n').Skip(1).FirstOrDefault()?.Trim()} »");
-Reste("REC-005 CA01 a CA03 sur la RECOPIE CONTINUE (changement rejouable, 3 essais puis mise de cote, attente par fiche, relance unitaire) : ils portent sur la file " +
-      "des changements rec.FileRecopie de REC-002 (lot 9), pas encore dans ce depot ; le transfert, lui, est prouve ci-dessus");
+// REC-005 CA01 a CA03 sur la RECOPIE CONTINUE (changement rejouable, 3 essais puis mise de cote, attente par fiche, relance
+// unitaire) : prouves sur la file rec.FileRecopie par tests\RecopieDeuxSensCheck (lot 9) ; ce banc prouve le transfert.
 
 // ====================================================================================================
 // B. REC-005 : un incident (base qui ne repond plus) en cours de table ; contre-epreuve : point de reprise sabote
@@ -463,7 +463,8 @@ var rapportCrep = await MoteurTransfert.TransfererAsync(new OptionsTransfert(v2.
 await surveillant.PasserAsync();
 Exiger(rapportCrep.Etat == "fini" && rapportCrep.Passage == 1 && (await Alertes()).Single(a => a.Regle == AlertesRecopie.RegleIncident).Fermee,
     $"REC-005 : le transfert repris et fini (reprise {rapportCrep.Passage}), l'alerte d'incident se ferme au passage suivant de la supervision");
-Reste("REC-005 CA05 (second cas) : l'alerte d'un CHANGEMENT MIS DE COTE se branchera sur la file de la recopie continue (REC-002, lot 9) par la meme source (AlertesRecopie)");
+// REC-005 CA05 (second cas, changement MIS DE COTE sur la file continue, meme source AlertesRecopie) : prouve par
+// tests\RecopieDeuxSensCheck (lot 9).
 
 // REC-006 CA04 : un rapport avec ecart alerte ; le controle propre suivant ferme l'alerte.
 await Executer(v2.Connexion, $"UPDATE dbo.CLIENT SET CLIEN_NOM = 'ECART NUIT' WHERE CLIEN_ID_CLIEN = {clientEcart};");

@@ -512,7 +512,7 @@ sqlcmd -S <instance> -E -f 65001 -b -i recopie-v2.sql -v BaseV2=RIG_<GREFFE> Ret
 | REC-003 T01 : coût du suivi sur la plus grosse base | la copie anonymisée de la plus grosse base (attend la nouvelle réception du lot 6) | REC-008, lot 8 |
 | REC-005 CA05 sur le vrai canal d'Amitel | prouvé sur le canal simulé de la supervision (hors production) ; l'envoi réel suit le canal du lot 2 | supervision, production |
 | REC-005 T04 : un écran pour la liste et la relance | les deux routes existent (exploitation d'Amitel) ; l'écran de supervision ne les montre pas encore | supervision |
-| REC-004 CA02 : « chaque ligne ouvre la fiche » | un dossier ouvre son affaire, un client l'écran des fiches clients ; inscription, adresse, action, arrivée et catégorie n'ont pas encore d'écran de fiche dans la V3 | stories de domaine (lot 10) |
+| REC-004 CA02 : « chaque ligne ouvre la fiche » | un dossier ouvre son affaire, un client l'écran des fiches clients ; inscription, adresse, action, arrivée et catégorie n'ont pas encore d'écran de fiche dans la V3 ; la story qui donne son écran à une de ces fiches renseigne `Cible` de sa règle dans `ReglesRec002` (`Serveur\Recopie\ReglesRecopie.cs`, ex. `ecran:PROC_FCLIENT`), sinon son écart reste sans « Ouvrir la fiche » | stories de domaine (lot 10) |
 | Une story de domaine (lot 10) qui remplace `v2.<TABLE>` | elle remplace la ligne de sa table dans `ReglesRec002` par une règle qui nomme sa table V3 et la correspondance de ses colonnes (une sorte nouvelle de règle, à écrire avec elle) | lot 10 |
 
 ### Fichiers de la recopie continue
