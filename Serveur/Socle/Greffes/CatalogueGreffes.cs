@@ -37,6 +37,10 @@ public sealed class BaseGreffeInjoignable(string code, string serveur, string no
     public string Base { get; } = nomBase;
 }
 
+/// <summary>Ce qu'une modification du catalogue ecrit DANS sa transaction : son geste au journal des gestes
+/// (SOC-016, lot 9), avec la fiche avant et apres.</summary>
+public delegate Task EcritureDuGeste(SqlConnection cn, SqlTransaction tx, FicheGreffe avant, FicheGreffe apres, CancellationToken ct);
+
 public sealed class CatalogueGreffes(BaseRig commune, IConfiguration configuration)
 {
     /// <summary>Cle de configuration : comment s'authentifier aupres des instances des greffes
@@ -110,33 +114,50 @@ public sealed class CatalogueGreffes(BaseRig commune, IConfiguration configurati
     /// Saisit la date et l'heure de passage, en heure LOCALE du greffe (CA05). Refusee
     /// (<see cref="InvalidOperationException"/>) si le greffe n'a pas de fuseau ou si son
     /// passage est deja fait ; la base le refuse aussi (declencheur soc.TR_Greffe_Regles).
+    /// <paramref name="journal"/> s'ecrit DANS la transaction de la modification (SOC-016) : si
+    /// l'un echoue, ni la fiche ni le journal ne changent.
     /// </summary>
-    public async Task<FicheGreffe> SaisirPassageAsync(string code, DateTime passageLocal, string auteur, CancellationToken ct = default)
+    public async Task<FicheGreffe> SaisirPassageAsync(string code, DateTime passageLocal, string auteur,
+                                                      EcritureDuGeste? journal = null, CancellationToken ct = default)
     {
         await using var cn = await commune.OuvrirAsync(ct);
-        var fiche = await LireAsync(cn, null, code, ct) ?? throw new GreffeInconnu(code);
+        await using var tx = (SqlTransaction)await cn.BeginTransactionAsync(ct);
+        var fiche = await LireAsync(cn, tx, code, ct) ?? throw new GreffeInconnu(code);
         if (fiche.Fuseau is null)
             throw new InvalidOperationException($"Le greffe {code} n'a pas de fuseau : le saisir avant sa date de passage (heure locale).");
         if (fiche.PassageFait)
             throw new InvalidOperationException(
                 $"Le passage du greffe {code} est fait ({fiche.PassageLocal:dd/MM/yyyy HH:mm}, heure locale) : sa date ne change plus.");
-        await ModifierAsync(cn, code, auteur, "PassageLocal = @v",
+        await ModifierAsync(cn, tx, code, auteur, "PassageLocal = @v",
             new SqlParameter("@v", System.Data.SqlDbType.DateTime2) { Value = DateTime.SpecifyKind(passageLocal, DateTimeKind.Unspecified) }, ct);
-        return (await LireAsync(cn, null, code, ct))!;
+        return await TerminerAsync(cn, tx, code, fiche, journal, ct);
     }
 
-    /// <summary>Saisit le fuseau (nom Windows connu de .NET et de SQL Server). Fige une fois le passage fait.</summary>
-    public async Task<FicheGreffe> SaisirFuseauAsync(string code, string fuseau, string auteur, CancellationToken ct = default)
+    /// <summary>Saisit le fuseau (nom Windows connu de .NET et de SQL Server). Fige une fois le passage fait.
+    /// <paramref name="journal"/> s'ecrit dans la meme transaction.</summary>
+    public async Task<FicheGreffe> SaisirFuseauAsync(string code, string fuseau, string auteur,
+                                                     EcritureDuGeste? journal = null, CancellationToken ct = default)
     {
         if (Fuseaux.Decalage(fuseau) is null)
             throw new ArgumentException($"Fuseau inconnu : « {fuseau} » (nom Windows attendu, ex. « SA Western Standard Time »).");
         await using var cn = await commune.OuvrirAsync(ct);
-        var fiche = await LireAsync(cn, null, code, ct) ?? throw new GreffeInconnu(code);
+        await using var tx = (SqlTransaction)await cn.BeginTransactionAsync(ct);
+        var fiche = await LireAsync(cn, tx, code, ct) ?? throw new GreffeInconnu(code);
         if (fiche.PassageFait)
             throw new InvalidOperationException($"Le passage du greffe {code} est fait : son fuseau ne change plus.");
-        await ModifierAsync(cn, code, auteur, "Fuseau = @v",
+        await ModifierAsync(cn, tx, code, auteur, "Fuseau = @v",
             new SqlParameter("@v", System.Data.SqlDbType.VarChar, 64) { Value = fuseau }, ct);
-        return (await LireAsync(cn, null, code, ct))!;
+        return await TerminerAsync(cn, tx, code, fiche, journal, ct);
+    }
+
+    /// <summary>La fiche relue apres la modification, le geste ecrit au journal, puis la validation : tout ou rien.</summary>
+    private static async Task<FicheGreffe> TerminerAsync(SqlConnection cn, SqlTransaction tx, string code, FicheGreffe avant,
+                                                         EcritureDuGeste? journal, CancellationToken ct)
+    {
+        var apres = (await LireAsync(cn, tx, code, ct))!;
+        if (journal is not null) await journal(cn, tx, avant, apres, ct);
+        await tx.CommitAsync(ct);
+        return apres;
     }
 
     /// <summary>Inscrit la base V3 creee pour le greffe (SOC-008 CA01).</summary>
@@ -144,16 +165,16 @@ public sealed class CatalogueGreffes(BaseRig commune, IConfiguration configurati
     {
         await using var cn = await commune.OuvrirAsync(ct);
         _ = await LireAsync(cn, null, code, ct) ?? throw new GreffeInconnu(code);
-        await ModifierAsync(cn, code, auteur, "BaseV3 = @v, BaseV3CreeeLe = SYSDATETIME()",
+        await ModifierAsync(cn, null, code, auteur, "BaseV3 = @v, BaseV3CreeeLe = SYSDATETIME()",
             new SqlParameter("@v", System.Data.SqlDbType.VarChar, 128) { Value = baseV3 }, ct);
     }
 
-    private static async Task ModifierAsync(SqlConnection cn, string code, string auteur, string affectation,
+    private static async Task ModifierAsync(SqlConnection cn, SqlTransaction? tx, string code, string auteur, string affectation,
                                             SqlParameter valeur, CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(auteur);
         await using var cmd = new SqlCommand(
-            $"UPDATE soc.Greffe SET {affectation}, ModifiePar = @auteur, ModifieLe = SYSDATETIME() WHERE CodeGreffe = @c;", cn);
+            $"UPDATE soc.Greffe SET {affectation}, ModifiePar = @auteur, ModifieLe = SYSDATETIME() WHERE CodeGreffe = @c;", cn, tx);
         cmd.Parameters.Add(valeur);
         cmd.Parameters.Add(new SqlParameter("@auteur", System.Data.SqlDbType.VarChar, 128) { Value = auteur });
         cmd.Parameters.Add(new SqlParameter("@c", System.Data.SqlDbType.VarChar, 20) { Value = code });

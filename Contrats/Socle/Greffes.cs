@@ -5,7 +5,14 @@ namespace RigV3.Contrats.Socle;
 // docs/reconstruction/socle-greffes.md). Le serveur les publie
 // (Serveur/Socle/Greffes/ModuleGreffes.cs).
 
-/// <summary>Les adresses du catalogue des greffes. {code} = code greffe (« 8002 »).</summary>
+/// <summary>
+/// Les adresses du catalogue des greffes. {code} = code greffe (« 8002 ») d'une route COMMUNE : l'agent y est juge
+/// dans la base commune (la fiche existe avant la base V3 du greffe, SOC-008). {greffe} = code greffe d'une route
+/// DU GREFFE (les reglages, lot 9) : l'agent y est juge dans la base V3 de ce greffe, comme la V2 lit ses reglages
+/// sous l'utilisateur du greffe (Parametrage.cs:65-71) ; 404 greffe inconnu, 503 base muette, sans repli.
+/// Une modification (passage, fuseau, reglage) exige en plus le droit de modifier le greffe
+/// (ServiceDroits.PeutModifierLeGreffe, 403 sinon) et s'ecrit au journal des gestes dans sa transaction (SOC-016).
+/// </summary>
 public static class RoutesGreffes
 {
     /// <summary>GET : les fiches de tous les greffes du catalogue (SOC-007).</summary>
@@ -27,17 +34,18 @@ public static class RoutesGreffes
     public const string Base = "/socle/greffes/{code}/base";
 
     /// <summary>GET : les reglages du greffe, lus dans SA base V3 (SOC-003).</summary>
-    public const string Reglages = "/socle/greffes/{code}/reglages";
+    public const string Reglages = "/socle/greffes/{greffe}/reglages";
 
     /// <summary>GET un reglage ; PUT <see cref="SaisieReglage"/> le modifie, auteur et date gardes (SOC-003 CA07).</summary>
-    public const string Reglage = "/socle/greffes/{code}/reglages/{reglage}";
+    public const string Reglage = "/socle/greffes/{greffe}/reglages/{reglage}";
 
     /// <summary>GET : la liste remise au referent Socle apres une reprise (SOC-003 CA04, CA05).</summary>
     public const string Reprise = "/socle/greffes/{code}/reprise";
 
-    /// <summary>L'adresse d'une route pour un greffe (et un reglage) donnes.</summary>
+    /// <summary>L'adresse d'une route pour un greffe (et un reglage) donnes, que la route le nomme {code} ou {greffe}.</summary>
     public static string Pour(string route, string code, string? reglage = null)
         => route.Replace("{code}", Uri.EscapeDataString(code))
+                .Replace("{greffe}", Uri.EscapeDataString(code))
                 .Replace("{reglage}", Uri.EscapeDataString(reglage ?? ""));
 }
 
@@ -78,10 +86,12 @@ public sealed record ModificationGreffe(
     DateTime? PassageLocal);
 
 /// <summary>Saisie de la date de passage : « 2027-03-01T08:00 », heure locale du greffe, sans decalage.</summary>
-public sealed record SaisiePassage(string PassageLocal);
+/// <param name="Ecran">L'ecran d'ou part le geste, pour le journal des gestes (SOC-016 CA01) ; null sans ecran.</param>
+public sealed record SaisiePassage(string PassageLocal, string? Ecran = null);
 
 /// <summary>Saisie du fuseau : un nom Windows connu (« Romance Standard Time », « SA Western Standard Time »).</summary>
-public sealed record SaisieFuseau(string Fuseau);
+/// <param name="Ecran">L'ecran d'ou part le geste, pour le journal des gestes (SOC-016 CA01) ; null sans ecran.</param>
+public sealed record SaisieFuseau(string Fuseau, string? Ecran = null);
 
 /// <summary>Ce que la route <see cref="RoutesGreffes.Base"/> dit de la base V3 d'un greffe.</summary>
 /// <param name="Joignable">La base a repondu.</param>
@@ -108,7 +118,8 @@ public sealed record ReglageGreffe(
     DateTime? DateModif);
 
 /// <summary>Nouvelle valeur d'un reglage (texte, null permis comme en V2).</summary>
-public sealed record SaisieReglage(string? Valeur);
+/// <param name="Ecran">L'ecran d'ou part le geste, pour le journal des gestes (SOC-016 CA01) ; null sans ecran.</param>
+public sealed record SaisieReglage(string? Valeur, string? Ecran = null);
 
 /// <summary>La liste remise au referent Socle apres une reprise (SOC-003 T05).</summary>
 /// <param name="Reglages">Nombre de reglages repris dans la base V3.</param>

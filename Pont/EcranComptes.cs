@@ -34,11 +34,20 @@ public sealed record VueEcranComptes(
 /// journal des droits. Les refus du serveur sont des reponses (message), pas des pannes ; un 403 dit que
 /// l'agent n'a pas le droit de gerer les droits.
 /// Sans RIGV3_SERVEUR, l'ecran montre les comptes de demonstration (Metier/JeuDemo.cs) en lecture seule.
+/// Avec lui, les adresses portent le code du greffe (lot 9) : les comptes sont ceux de la base de CE greffe.
 /// </summary>
 public static class EcranComptes
 {
     /// <summary>Le nom de l'ecran tel que le journal des gestes l'ecrit (SOC-016 CA01).</summary>
     public const string NomEcran = "Comptes des agents";
+
+    /// <summary>Le code du greffe de la session (ex. 3801), en attendant que RIG le choisisse a l'ouverture comme
+    /// la V2 (lot 10 du plan, RigFormLogin.cs:282-319) : celui-ci remplacera cette variable.</summary>
+    public const string VariableGreffe = "RIGV3_GREFFE";
+    // fix-ok: les adresses des comptes, droits et journal portent {greffe} depuis le lot 9 (Contrats\Socle\Comptes.cs) ; sans code de greffe, l'ecran appellerait « /socle/{greffe}/comptes » en clair.
+
+    private static string? Greffe
+        => Environment.GetEnvironmentVariable(VariableGreffe)?.Trim() is { Length: > 0 } greffe ? greffe : null;
 
     [JSInvokable("EcranComptes.Ouvrir")]
     public static Task<VueEcranComptes> Ouvrir() => OuvrirAsync(ClientServeur.Actif);
@@ -68,11 +77,12 @@ public static class EcranComptes
                                                           int? selection = null, bool proposerDesactivation = false)
     {
         if (serveur is null) return Demonstration();
+        if (Greffe is not { } greffe) return SansGreffe();
         try
         {
-            var vue = await serveur.LireAsync<VueComptes>(RoutesComptes.Comptes);
-            var journal = await serveur.LireAsync<VueJournal>(RoutesJournal.Gestes);
-            var droits = await serveur.LireAsync<LigneJournalDroits[]>(RoutesDroits.Journal);
+            var vue = await serveur.LireAsync<VueComptes>(RoutesComptes.Pour(RoutesComptes.Comptes, greffe));
+            var journal = await serveur.LireAsync<VueJournal>(RoutesJournal.Pour(RoutesJournal.Gestes, greffe));
+            var droits = await serveur.LireAsync<LigneJournalDroits[]>(RoutesDroits.Pour(RoutesDroits.Journal, greffe));
             return new VueEcranComptes("serveur", message, echec, vue.Agent, vue.Comptes, vue.Services, vue.Roles,
                 journal.Lignes, droits, journal.ToutLeGreffe, selection, proposerDesactivation);
         }
@@ -91,10 +101,11 @@ public static class EcranComptes
     {
         if (serveur is null)
             return Demonstration() with { Message = "Démonstration : sans serveur, les comptes ne se modifient pas.", Echec = true };
+        if (Greffe is not { } greffe) return SansGreffe();
         ResultatCompte resultat;
         try
         {
-            resultat = await serveur.EnvoyerAsync<TDemande, ResultatCompte>(route, demande);
+            resultat = await serveur.EnvoyerAsync<TDemande, ResultatCompte>(RoutesComptes.Pour(route, greffe), demande);
         }
         catch (ErreurServeur e) when (e.CodeHttp == 403)
         {
@@ -113,6 +124,9 @@ public static class EcranComptes
 
     private static VueEcranComptes Vide(string mode, string message)
         => new(mode, message, true, "", [], [], [], [], [], false, null, false);
+
+    private static VueEcranComptes SansGreffe()
+        => Vide("erreur", $"Aucun greffe n'est choisi pour cette session : la variable {VariableGreffe} donne son code (ex. 3801).");
 
     /// <summary>Sans serveur : les comptes de la maquette, en lecture seule.</summary>
     private static VueEcranComptes Demonstration()

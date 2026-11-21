@@ -2,7 +2,9 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
@@ -10,6 +12,7 @@ using RigV3.Base;
 using RigV3.Contrats.Socle;
 using RigV3.Serveur;
 using RigV3.Serveur.Socle.Comptes;
+using RigV3.Serveur.Socle.Greffes;
 using SocleDroitsCheck;
 
 // Banc du lot 3 du plan de reconstruction (2026-11-20) : SOC-002, SOC-004, SOC-005, SOC-016
@@ -22,12 +25,29 @@ using SocleDroitsCheck;
 //     compte actif et chaque fonction du catalogue, la reponse de la V3 est comparee a celle de la V2,
 //     recalculee par OracleDroitsV2 (portage de Utilisateur.cs:298-347 et GestionDroitRIG.cls).
 // Il lui faut « docker compose up -d » ; RIGV3_V2 remplace la base V2 lue (defaut : RIG_DEV).
+//
+// RACCORD (lot 9) : le serveur tourne sur une base COMMUNE (le catalogue soc.Greffe) ; le jeu repris est la
+// base du greffe A (CodeGreffe), a cote d'une base de greffe B jetable et d'un greffe dont la base n'existe
+// pas. Chaque route porte le greffe dans son adresse : comptes, droits et journaux sont lus dans SA base.
+// fix-ok: le banc lancait le serveur sur la base du jeu et Greffe:Code (lot 3) ; les routes demandent maintenant le greffe de l'adresse (Contrats\Socle\Comptes.cs), qu'un catalogue commun doit connaitre.
 
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
 var migrations = Path.Combine(racine, "Base", "migrations");
 var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 const string Ecran = "Comptes des agents";
-const string CodeGreffe = "3801";
+const string CodeGreffe = "3801";                                   // le greffe A : le jeu V2 repris
+const string GreffeB = "3802", GreffeMuet = "3803", GreffeAbsent = "3899", CodeRig = "9990";
+// Les adresses du greffe A (ou d'un autre) : le code du greffe dans l'adresse, par les contrats eux-memes.
+string C(string route, string greffe = CodeGreffe) => RoutesComptes.Pour(route, greffe);
+string D(string route, string greffe = CodeGreffe) => RoutesDroits.Pour(route, greffe);
+string J(string route, string greffe = CodeGreffe) => RoutesJournal.Pour(route, greffe);
+
+// Le serveur des bancs : le catalogue y nomme l'instance ; la facon de s'y connecter vient de Greffes:Authentification.
+var serveurBancs = new SqlConnectionStringBuilder(BaseJetable.ServeurDesBancs());
+var instance = serveurBancs.DataSource;
+var authentification = new SqlConnectionStringBuilder(serveurBancs.ConnectionString);
+authentification.Remove("Data Source");
+var baseMuette = $"{BaseJetable.Prefixe}inexistante_{Guid.NewGuid():N}";   // jamais creee
 
 var echecs = new List<string>();
 var reportes = new List<string>();
@@ -65,27 +85,54 @@ async Task Executer(string cs, string sql)
     await cmd.ExecuteNonQueryAsync();
 }
 
-WebApplication Serveur(string cs) => ServeurRig.Construire(["--environment", "Development"], s =>
+// Le serveur sur la base COMMUNE <paramref name="commune"/> : le catalogue des greffes y dit ou est la base de chacun.
+WebApplication Serveur(string commune) => ServeurRig.Construire(["--environment", "Development"], s =>
 {
     s.Logging.ClearProviders();
     s.Logging.SetMinimumLevel(LogLevel.Warning);
     s.Logging.AddProvider(journalServeur);
     s.WebHost.UseTestServer();
-    s.Configuration[$"ConnectionStrings:{BaseRig.NomConnexion}"] = cs;
-    s.Configuration[ServiceComptes.CleCodeGreffe] = CodeGreffe;
+    s.Configuration[$"ConnectionStrings:{BaseRig.NomConnexion}"] = commune;
+    s.Configuration[CatalogueGreffes.CleAuthentification] = authentification.ConnectionString;
 });
+async Task Inscrire(string commune, string code, string nomBase) => await Executer(commune,
+    "INSERT INTO soc.Greffe (CodeGreffe, Nom, Serveur, BaseV2, BaseV3, EstBeta, EstOutreMer, Fuseau, ModifiePar, ModifieLe) " +
+    $"VALUES ('{code}', 'Greffe {code} du banc', '{instance}', 'RIG_BANC_{code}', '{nomBase}', 0, 0, 'Romance Standard Time', 'banc', SYSDATETIME());");
+// Toutes les lignes d'une base (comptes, roles, journaux...) : ce qu'un refus ne doit pas changer.
+async Task<long> LignesDe(string cs) => await Scalaire<long>(cs, """
+    DECLARE @sql nvarchar(max) = N'SELECT CAST(0 AS bigint)';
+    SELECT @sql += N' + (SELECT COUNT_BIG(*) FROM ' + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name) + N')'
+    FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id;
+    EXEC sp_executesql @sql;
+    """);
 
 // =====================================================================================================
-// 1. LE JEU V2 JETABLE, REPRIS, PUIS LE SERVEUR
+// 1. LE JEU V2 JETABLE, REPRIS DANS LA BASE DU GREFFE A, PUIS LE SERVEUR SUR LA BASE COMMUNE
 // =====================================================================================================
 await using (var v2 = await BaseJetable.CreerAsync("SocleDroitsCheckV2"))
 await using (var v3 = await BaseJetable.CreerAsync("SocleDroitsCheck"))
+await using (var commune = await BaseJetable.CreerAsync("SocleDroitsCommune"))
+await using (var vB = await BaseJetable.CreerAsync("SocleDroitsGreffeB"))
 {
-    noms.Add(v2.Nom); noms.Add(v3.Nom);
+    noms.Add(v2.Nom); noms.Add(v3.Nom); noms.Add(commune.Nom); noms.Add(vB.Nom);
     await BaseV2Jetable.CreerAsync(v2.Connexion);
     var rapport = await Migrateur.AppliquerAsync(v3.Connexion, migrations);
-    Exiger(new[] { "SOC-002_droits", "SOC-004_services", "SOC-005_journal", "SOC-016_gestes" }.All(rapport.Jouees.Contains),
+    Exiger(new[] { "SOC-002_droits", "SOC-004_services", "SOC-005_journal", "SOC-016_gestes", "SOC-007_journal" }.All(rapport.Jouees.Contains),
         $"les migrations du lot passent sur une base neuve, apres SOC-001 ({string.Join(", ", rapport.Jouees)})");
+    await Migrateur.AppliquerAsync(commune.Connexion, migrations);
+    await Migrateur.AppliquerAsync(vB.Connexion, migrations);
+    // Le catalogue commun : A (le jeu repris), B (une autre base), un greffe dont la base n'existe pas.
+    await Inscrire(commune.Connexion, CodeGreffe, v3.Nom);
+    await Inscrire(commune.Connexion, GreffeB, vB.Nom);
+    await Inscrire(commune.Connexion, GreffeMuet, baseMuette);
+    // Le greffe B : son service, son responsable (role de gestion des droits) et un role a lui.
+    await Executer(vB.Connexion, $"""
+        INSERT INTO soc.Service (CodeGreffe, Abrege, Nom) VALUES ('{GreffeB}', 'RCS', N'Registre du greffe B');
+        INSERT INTO soc.Role (Nom, Libelle) VALUES ('AGENT_B', 'Agent du greffe B');
+        INSERT INTO soc.Compte (CompteWindows, Nom, Prenom, Abrege, Civilite, CodeGreffe, IdService, Desactive)
+        SELECT 'bresp', 'Responsable', 'Berthe', 'bresp', 'Mme', '{GreffeB}', Id, 0 FROM soc.Service;
+        INSERT INTO soc.CompteRole (IdCompte, Role) SELECT Id, '{RoutesDroits.RoleGestionDesDroits}' FROM soc.Compte;
+        """);
 
     var bilan = await RepriseDroits.ReprendreAsync(v2.Connexion, v3.Connexion);
     Exiger(bilan is { Comptes: 8, Services: 2, Roles: 6, Fonctions: 8, RolesAttribues: 10 },
@@ -127,8 +174,8 @@ await using (var v3 = await BaseJetable.CreerAsync("SocleDroitsCheck"))
     Exiger(ouverture.StartsWith("1|passage|a ouvert|") && ouverture.Contains("reste dans la V2"),
         $"SOC-016 CA05 : le journal de la V3 commence au passage par une ligne qui dit que celui de la V2 y reste (journal V2 non copie) ({ouverture})");
 
-    // ---------------- Le serveur --------------------------------------------------------------------
-    await using var app = Serveur(v3.Connexion);
+    // ---------------- Le serveur, sur la base commune ---------------------------------------------------
+    await using var app = Serveur(commune.Connexion);
     await app.StartAsync();
     var http = app.GetTestClient();
 
@@ -149,7 +196,7 @@ await using (var v3 = await BaseJetable.CreerAsync("SocleDroitsCheck"))
         return (r.StatusCode, r.IsSuccessStatusCode ? JsonSerializer.Deserialize<ResultatCompte>(brut, json) : null, brut);
     }
     async Task<VerificationDroit> Verifier(string compte, string fonction)
-        => (await Get<VerificationDroit>(compte, $"{RoutesDroits.Verifier}?fonction={Uri.EscapeDataString(fonction)}")).Corps
+        => (await Get<VerificationDroit>(compte, $"{D(RoutesDroits.Verifier)}?fonction={Uri.EscapeDataString(fonction)}")).Corps
            ?? new VerificationDroit(fonction, false, "http-en-echec", null);
 
     // ---------------- SOC-002 CA02 : les trois origines de la V2, un seul modele ----------------------
@@ -224,10 +271,10 @@ await using (var v3 = await BaseJetable.CreerAsync("SocleDroitsCheck"))
         "SOC-002 CA06 (jumeau) : la base revenue, la meme verification accorde a nouveau");
 
     // ---------------- SOC-002 CA04 : seul qui gere les droits ouvre la gestion des comptes ----------
-    var refusVue = await Get<VueComptes>("jagent", RoutesComptes.Comptes);
-    var refusCreer = await Post("jagent", RoutesComptes.Creer, new DemandeCompte(null, "intrus", "Intrus", "Ivan", "M.", null, null, Ecran));
-    var refusJournal = await Get<LigneJournalDroits[]>("jagent", RoutesDroits.Journal);
-    var vueResp = await Get<VueComptes>("rresp", RoutesComptes.Comptes);
+    var refusVue = await Get<VueComptes>("jagent", C(RoutesComptes.Comptes));
+    var refusCreer = await Post("jagent", C(RoutesComptes.Creer), new DemandeCompte(null, "intrus", "Intrus", "Ivan", "M.", null, null, Ecran));
+    var refusJournal = await Get<LigneJournalDroits[]>("jagent", D(RoutesDroits.Journal));
+    var vueResp = await Get<VueComptes>("rresp", C(RoutesComptes.Comptes));
     Exiger(refusVue.Code == HttpStatusCode.Forbidden && refusCreer.Code == HttpStatusCode.Forbidden && refusJournal.Code == HttpStatusCode.Forbidden
            && await Scalaire<int>(v3.Connexion, "SELECT COUNT(*) FROM soc.Compte WHERE CompteWindows = 'intrus'") == 0,
         $"SOC-002 CA04 : un agent sans le droit de gerer les droits est refuse a l'ouverture des comptes, a la creation et au journal des droits ({refusVue.Code}, {refusCreer.Code}, {refusJournal.Code})");
@@ -236,40 +283,40 @@ await using (var v3 = await BaseJetable.CreerAsync("SocleDroitsCheck"))
 
     // ---------------- SOC-002 CA03 : roles reserves ---------------------------------------------------
     var rolesResp = vueResp.Corps!.Roles.Select(r => r.Nom).ToList();
-    var rolesAmitel = (await Get<VueComptes>("aamitel", RoutesComptes.Comptes)).Corps!.Roles.Select(r => r.Nom).ToList();
-    var rolesAdmin = (await Get<VueComptes>("aadmin", RoutesComptes.Comptes)).Corps!.Roles.Select(r => r.Nom).ToList();
+    var rolesAmitel = (await Get<VueComptes>("aamitel", C(RoutesComptes.Comptes))).Corps!.Roles.Select(r => r.Nom).ToList();
+    var rolesAdmin = (await Get<VueComptes>("aadmin", C(RoutesComptes.Comptes))).Corps!.Roles.Select(r => r.Nom).ToList();
     var idAgent = vueResp.Corps.Comptes.First(c => c.CompteWindows == "jagent").Id;
-    var attribuerReserve = await Post("rresp", RoutesComptes.Role, new DemandeRole(idAgent, "ADMINAMITEL", true, Ecran));
-    var attribuerAdmin = await Post("rresp", RoutesComptes.Role, new DemandeRole(idAgent, "ADMINRIG", true, Ecran));
+    var attribuerReserve = await Post("rresp", C(RoutesComptes.Role), new DemandeRole(idAgent, "ADMINAMITEL", true, Ecran));
+    var attribuerAdmin = await Post("rresp", C(RoutesComptes.Role), new DemandeRole(idAgent, "ADMINRIG", true, Ecran));
     Exiger(!rolesResp.Contains("ADMINAMITEL") && !rolesResp.Contains("ADMINRIG") && rolesResp.Contains("GREFFIER")
            && attribuerReserve.Corps is { Fait: false } && attribuerAdmin.Corps is { Fait: false }
            && await Scalaire<int>(v3.Connexion, "SELECT COUNT(*) FROM soc.CompteRole WHERE Role IN ('ADMINAMITEL', 'ADMINRIG') AND IdCompte = " + idAgent) == 0,
         $"SOC-002 CA03 : un responsable du greffe ne voit pas les roles reserves a Amitel ou aux administrateurs et ne peut pas les attribuer ({string.Join(", ", rolesResp)} ; « {attribuerReserve.Corps?.Message} »)");
-    var adminDonne = await Post("aadmin", RoutesComptes.Role, new DemandeRole(idAgent, "ADMINRIG", true, Ecran));
+    var adminDonne = await Post("aadmin", C(RoutesComptes.Role), new DemandeRole(idAgent, "ADMINRIG", true, Ecran));
     Exiger(rolesAmitel.Contains("ADMINAMITEL") && !rolesAmitel.Contains("ADMINRIG") && rolesAdmin.Contains("ADMINRIG") && rolesAdmin.Contains("ADMINAMITEL")
            && adminDonne.Corps is { Fait: true },
         $"SOC-002 CA03 (jumeau) : un agent d'Amitel voit les roles Amitel, un administrateur voit et attribue aussi les roles administrateur ({adminDonne.Corps?.Message})");
-    await Post("aadmin", RoutesComptes.Role, new DemandeRole(idAgent, "ADMINRIG", false, Ecran));
+    await Post("aadmin", C(RoutesComptes.Role), new DemandeRole(idAgent, "ADMINRIG", false, Ecran));
 
     // ---------------- SOC-004 CA01, CA07 : creer un compte ------------------------------------------
     var idRcs = vueResp.Corps.Services.First(s => s.Abrege == "RCS").Id;
     var long21 = "nouvel.agent.lot3abcd";   // 21 caracteres
-    var cree = await Post("rresp", RoutesComptes.Creer, new DemandeCompte(null, long21, "Martin", "Lucie", "Mme", idRcs, ["GREFFIER"], Ecran));
-    var identiteNouveau = await Get<IdentiteAgent>(long21, RoutesIdentite.Identite);
+    var cree = await Post("rresp", C(RoutesComptes.Creer), new DemandeCompte(null, long21, "Martin", "Lucie", "Mme", idRcs, ["GREFFIER"], Ecran));
+    var identiteNouveau = await Get<IdentiteAgent>(long21, RoutesIdentite.Pour(CodeGreffe));
     Exiger(cree.Corps is { Fait: true, Compte: { Desactive: false, Abrege: "nouvel.agent.lot", CodeGreffe: CodeGreffe } }
            && identiteNouveau.Corps is { Admis: true, Agent.Nom: "Martin" },
         $"SOC-004 CA01 : le compte est cree actif, abrege tire du compte (16 caracteres : « {cree.Corps?.Compte?.Abrege} »), et l'agent ouvre la V3 aussitot ({identiteNouveau.Corps?.Statut})");
-    var court = await Post("rresp", RoutesComptes.Creer, new DemandeCompte(null, "lcourt", "Court", "Leo", "M.", idRcs, ["GREFFIER"], Ecran));
+    var court = await Post("rresp", C(RoutesComptes.Creer), new DemandeCompte(null, "lcourt", "Court", "Leo", "M.", idRcs, ["GREFFIER"], Ecran));
     Exiger(court.Corps is { Fait: true, Compte.Abrege: "lcourt" },
         "SOC-004 CA01 (jumeau) : un compte de 15 caracteres ou moins est son propre abrege, comme la V2");
-    var parAmitel = await Post("aamitel", RoutesComptes.Creer, new DemandeCompte(null, "cree.par.amitel", "Par", "Amitel", "M.", idRcs, ["GREFFIER"], Ecran));
+    var parAmitel = await Post("aamitel", C(RoutesComptes.Creer), new DemandeCompte(null, "cree.par.amitel", "Par", "Amitel", "M.", idRcs, ["GREFFIER"], Ecran));
     Exiger(parAmitel.Corps is { Fait: true, Compte.CodeGreffe: ServiceComptes.CodeGreffeAmitel } && cree.Corps.Compte.CodeGreffe == CodeGreffe,
-        $"SOC-004 CA07 : un compte cree par un agent d'Amitel recoit le code greffe 9999, un compte cree par le greffe celui du greffe ({parAmitel.Corps?.Compte?.CodeGreffe} / {cree.Corps.Compte.CodeGreffe})");
+        $"SOC-004 CA07 : un compte cree par un agent d'Amitel recoit le code greffe 9999, un compte cree par le greffe celui du greffe de l'adresse ({parAmitel.Corps?.Compte?.CodeGreffe} / {cree.Corps.Compte.CodeGreffe})");
 
     // ---------------- SOC-004 CA02 : doublon a d'autres majuscules ----------------------------------
-    var doublon = await Post("rresp", RoutesComptes.Creer, new DemandeCompte(null, long21.ToUpperInvariant(), "Autre", "Agent", "M.", idRcs, ["GREFFIER"], Ecran));
+    var doublon = await Post("rresp", C(RoutesComptes.Creer), new DemandeCompte(null, long21.ToUpperInvariant(), "Autre", "Agent", "M.", idRcs, ["GREFFIER"], Ecran));
     var c0 = court.Corps!.Compte!;
-    var renommage = await Post("rresp", RoutesComptes.Modifier, new DemandeCompte(c0.Id, "JAGENT", c0.Nom, c0.Prenom, c0.Civilite, c0.IdService, null, Ecran));
+    var renommage = await Post("rresp", C(RoutesComptes.Modifier), new DemandeCompte(c0.Id, "JAGENT", c0.Nom, c0.Prenom, c0.Civilite, c0.IdService, null, Ecran));
     Exiger(doublon.Corps is { Fait: false, Message: var m1 } && m1 == $"Ce login existe déjà : {long21.ToUpperInvariant()}"
            && renommage.Corps is { Fait: false } && renommage.Corps.Message!.StartsWith("Ce login existe déjà")
            && await Scalaire<int>(v3.Connexion, $"SELECT COUNT(*) FROM soc.Compte WHERE CompteWindows = '{long21}'") == 1,
@@ -277,7 +324,7 @@ await using (var v3 = await BaseJetable.CreerAsync("SocleDroitsCheck"))
 
     // ---------------- SOC-004 CA05, SOC-016 CA01 : modifier, journal avec avant/apres --------------
     var nouveau = cree.Corps.Compte!;
-    var modif = await Post("rresp", RoutesComptes.Modifier, new DemandeCompte(nouveau.Id, long21, "Martin-Durand", "Lucie", "Mme", idRcs, null, Ecran));
+    var modif = await Post("rresp", C(RoutesComptes.Modifier), new DemandeCompte(nouveau.Id, long21, "Martin-Durand", "Lucie", "Mme", idRcs, null, Ecran));
     Exiger(modif.Corps is { Fait: true, Compte.Nom: "Martin-Durand" }, $"SOC-004 : le responsable corrige le nom d'un compte ({modif.Corps?.Message})");
     var ligneModif = await Scalaire<string>(v3.Connexion, $"""
         SELECT CONCAT(Agent, '|', Ecran, '|', Famille, '|', Objet, '|', Verbe, '|', JSON_VALUE(Avant, '$.nom'), '|', JSON_VALUE(Apres, '$.nom'), '|',
@@ -288,11 +335,11 @@ await using (var v3 = await BaseJetable.CreerAsync("SocleDroitsCheck"))
         $"SOC-016 CA01 : une modification garde l'agent, la date et l'heure, l'ecran, l'objet et les valeurs avant et apres ({ligneModif})");
 
     // ---------------- SOC-004 CA03 : l'agent agit, puis part ----------------------------------------
-    await Post("rresp", RoutesComptes.Role, new DemandeRole(nouveau.Id, RoutesDroits.RoleGestionDesDroits, true, Ecran));
-    var gesteDuPartant = await Post(long21, RoutesComptes.Modifier, new DemandeCompte(court.Corps.Compte!.Id, "lcourt", "Court", "Leon", "M.", idRcs, null, Ecran));
-    var desactive = await Post("rresp", RoutesComptes.Desactiver, new DemandeSurCompte(nouveau.Id, Ecran));
-    var identiteParti = await Get<IdentiteAgent>(long21, RoutesIdentite.Identite);
-    var vueApresDepart = await Get<VueJournal>("rresp", $"{RoutesJournal.Gestes}?objet=lcourt");
+    await Post("rresp", C(RoutesComptes.Role), new DemandeRole(nouveau.Id, RoutesDroits.RoleGestionDesDroits, true, Ecran));
+    var gesteDuPartant = await Post(long21, C(RoutesComptes.Modifier), new DemandeCompte(court.Corps.Compte!.Id, "lcourt", "Court", "Leon", "M.", idRcs, null, Ecran));
+    var desactive = await Post("rresp", C(RoutesComptes.Desactiver), new DemandeSurCompte(nouveau.Id, Ecran));
+    var identiteParti = await Get<IdentiteAgent>(long21, RoutesIdentite.Pour(CodeGreffe));
+    var vueApresDepart = await Get<VueJournal>("rresp", $"{J(RoutesJournal.Gestes)}?objet=lcourt");
     Exiger(gesteDuPartant.Corps is { Fait: true } && desactive.Corps is { Fait: true, Compte.Desactive: true }
            && identiteParti.Corps is { Admis: false, Statut: StatutsIdentite.Desactive }
            && vueApresDepart.Corps!.Lignes.Any(l => l.Qui == "Lucie Martin-Durand" && l.Verbe == "a modifié"),
@@ -300,22 +347,22 @@ await using (var v3 = await BaseJetable.CreerAsync("SocleDroitsCheck"))
     Reporter("SOC-004 CA03, moitie V2 : « il ne peut plus ouvrir la V2 » suppose la recopie du compte vers la V2 (REC-017 CA02, phase 2) ; la desactivation est journalisee dans la transaction du geste, prete pour elle");
 
     // ---------------- SOC-004 CA04 : suppression ------------------------------------------------------
-    var suppRefusee = await Post("rresp", RoutesComptes.Supprimer, new DemandeSurCompte(nouveau.Id, Ecran));
+    var suppRefusee = await Post("rresp", C(RoutesComptes.Supprimer), new DemandeSurCompte(nouveau.Id, Ecran));
     var reprisV2 = vueResp.Corps.Comptes.First(c => c.CompteWindows == "jagent");
-    var suppRepris = await Post("rresp", RoutesComptes.Supprimer, new DemandeSurCompte(reprisV2.Id, Ecran));
+    var suppRepris = await Post("rresp", C(RoutesComptes.Supprimer), new DemandeSurCompte(reprisV2.Id, Ecran));
     var parSql = await Lever(() => Executer(v3.Connexion, $"SET XACT_ABORT ON; BEGIN TRAN; DELETE FROM soc.CompteRole WHERE IdCompte = {nouveau.Id}; DELETE FROM soc.Compte WHERE Id = {nouveau.Id}; COMMIT;"));
     Exiger(suppRefusee.Corps is { Fait: false, ProposerDesactivation: true } && suppRepris.Corps is { Fait: false, ProposerDesactivation: true }
            && parSql is SqlException { Number: 547 }
            && await Scalaire<int>(v3.Connexion, $"SELECT COUNT(*) FROM soc.Compte WHERE Id IN ({nouveau.Id}, {reprisV2.Id})") == 2,
         $"SOC-004 CA04 : la suppression d'un compte qui a agi (ou repris de la V2) est refusee et propose la desactivation ; la base elle-meme la refuse ({suppRefusee.Corps?.Message} ; SQL {(parSql as SqlException)?.Number})");
-    var jamais = await Post("rresp", RoutesComptes.Creer, new DemandeCompte(null, "jamais.agi", "Jamais", "Agi", "M.", idRcs, ["GREFFIER"], Ecran));
-    var suppOk = await Post("rresp", RoutesComptes.Supprimer, new DemandeSurCompte(jamais.Corps!.Compte!.Id, Ecran));
+    var jamais = await Post("rresp", C(RoutesComptes.Creer), new DemandeCompte(null, "jamais.agi", "Jamais", "Agi", "M.", idRcs, ["GREFFIER"], Ecran));
+    var suppOk = await Post("rresp", C(RoutesComptes.Supprimer), new DemandeSurCompte(jamais.Corps!.Compte!.Id, Ecran));
     Exiger(suppOk.Corps is { Fait: true } && await Scalaire<int>(v3.Connexion, "SELECT COUNT(*) FROM soc.Compte WHERE CompteWindows = 'jamais.agi'") == 0
            && await Scalaire<int>(v3.Connexion, "SELECT COUNT(*) FROM soc.Journal WHERE Objet = 'le compte jamais.agi' AND Verbe = 'a supprime'") == 1,
         "SOC-004 CA04 (jumeau) : un compte qui n'a jamais agi est supprime, et la suppression est journalisee");
 
     // ---------------- SOC-004 CA05 : le journal du compte ----------------------------------------------
-    var journalCompte = await Get<VueJournal>("rresp", $"{RoutesJournal.Gestes}?objet={Uri.EscapeDataString("le compte " + long21)}");
+    var journalCompte = await Get<VueJournal>("rresp", $"{J(RoutesJournal.Gestes)}?objet={Uri.EscapeDataString("le compte " + long21)}");
     var verbes = journalCompte.Corps!.Lignes.Where(l => l.Objet == $"le compte {long21}").Select(l => l.Verbe).ToList();
     Exiger(verbes.SequenceEqual(["a désactivé", "a modifié", "a créé"])
            && journalCompte.Corps.Lignes.All(l => l.Qui == "Rose Responsable" && l.Instant > DateTime.UtcNow.AddMinutes(-5)),
@@ -325,10 +372,10 @@ await using (var v3 = await BaseJetable.CreerAsync("SocleDroitsCheck"))
     // ---------------- SOC-005 CA01, CA02 : journal des droits et evenement 130 -----------------------
     var avant130 = await Scalaire<int>(v3.Connexion, "SELECT COUNT(*) FROM soc.EvenementTechnique WHERE Code = 130");
     var avantDroits = await Scalaire<long>(v3.Connexion, "SELECT ISNULL(MAX(Id), 0) FROM soc.JournalDroits");
-    await Post("rresp", RoutesComptes.Role, new DemandeRole(idAgent, "GREFFIER", true, Ecran));
+    await Post("rresp", C(RoutesComptes.Role), new DemandeRole(idAgent, "GREFFIER", true, Ecran));
     var apres130SansCompta = await Scalaire<int>(v3.Connexion, "SELECT COUNT(*) FROM soc.EvenementTechnique WHERE Code = 130");
-    await Post("rresp", RoutesComptes.Role, new DemandeRole(idAgent, "FACT : STANDARD", true, Ecran));
-    await Post("rresp", RoutesComptes.Role, new DemandeRole(idAgent, "GREFFIER", false, Ecran));
+    await Post("rresp", C(RoutesComptes.Role), new DemandeRole(idAgent, "FACT : STANDARD", true, Ecran));
+    await Post("rresp", C(RoutesComptes.Role), new DemandeRole(idAgent, "GREFFIER", false, Ecran));
     var lignes = new List<string>();
     await using (var cn = new SqlConnection(v3.Connexion))
     {
@@ -354,7 +401,7 @@ await using (var v3 = await BaseJetable.CreerAsync("SocleDroitsCheck"))
     var routesEcriture = new List<HttpStatusCode>();
     foreach (var verbe in new[] { HttpMethod.Put, HttpMethod.Delete, HttpMethod.Post })
     {
-        using var d = new HttpRequestMessage(verbe, RoutesDroits.Journal);
+        using var d = new HttpRequestMessage(verbe, D(RoutesDroits.Journal));
         d.Headers.Add(RoutesIdentite.EnTeteCompte, "aadmin");
         using var r = await http.SendAsync(d);
         routesEcriture.Add(r.StatusCode);
@@ -380,11 +427,11 @@ await using (var v3 = await BaseJetable.CreerAsync("SocleDroitsCheck"))
 
     // ---------------- SOC-005 CA05 : filtres du journal des droits -----------------------------------
     var aujourdhui = DateTime.UtcNow.ToString("yyyy-MM-dd");
-    var parCompte = (await Get<LigneJournalDroits[]>("rresp", $"{RoutesDroits.Journal}?compte=jagent")).Corps!;
-    var parRoleJ = (await Get<LigneJournalDroits[]>("rresp", $"{RoutesDroits.Journal}?role=GREFFIER")).Corps!;
-    var parPeriode = (await Get<LigneJournalDroits[]>("rresp", $"{RoutesDroits.Journal}?du={aujourdhui}&au={aujourdhui}")).Corps!;
-    var passe = (await Get<LigneJournalDroits[]>("rresp", $"{RoutesDroits.Journal}?du=2020-01-01&au=2020-12-31")).Corps!;
-    var mauvaiseDate = await Get<LigneJournalDroits[]>("rresp", $"{RoutesDroits.Journal}?du=20/11/2026");
+    var parCompte = (await Get<LigneJournalDroits[]>("rresp", $"{D(RoutesDroits.Journal)}?compte=jagent")).Corps!;
+    var parRoleJ = (await Get<LigneJournalDroits[]>("rresp", $"{D(RoutesDroits.Journal)}?role=GREFFIER")).Corps!;
+    var parPeriode = (await Get<LigneJournalDroits[]>("rresp", $"{D(RoutesDroits.Journal)}?du={aujourdhui}&au={aujourdhui}")).Corps!;
+    var passe = (await Get<LigneJournalDroits[]>("rresp", $"{D(RoutesDroits.Journal)}?du=2020-01-01&au=2020-12-31")).Corps!;
+    var mauvaiseDate = await Get<LigneJournalDroits[]>("rresp", $"{D(RoutesDroits.Journal)}?du=20/11/2026");
     Exiger(parCompte.Length >= 3 && parCompte.All(l => l.CompteVise == "jagent") && parCompte.Zip(parCompte.Skip(1)).All(p => p.First.Instant >= p.Second.Instant && p.First.Id > p.Second.Id)
            && parRoleJ.Length >= 2 && parRoleJ.All(l => l.Role == "GREFFIER") && parRoleJ[0].Sens == "retrait"
            && parPeriode.Length >= parCompte.Length && passe.Length == 0 && mauvaiseDate.Code == HttpStatusCode.BadRequest,
@@ -407,10 +454,10 @@ await using (var v3 = await BaseJetable.CreerAsync("SocleDroitsCheck"))
         await JournalGestes.EcrireAsync(cn, tx, agentJules, "Demandes", "demande", "la demande D-1", "D-1", "a valide", null, new { etat = "validee" }, default);
         await tx.CommitAsync();
     }
-    var chef = (await Get<VueJournal>("rresp", RoutesJournal.Gestes)).Corps!;
-    var jules = (await Get<VueJournal>("jagent", RoutesJournal.Gestes)).Corps!;
-    var filtreAgent = (await Get<VueJournal>("rresp", $"{RoutesJournal.Gestes}?agent=Jules")).Corps!;
-    var filtrePasse = (await Get<VueJournal>("rresp", $"{RoutesJournal.Gestes}?du=2020-01-01&au=2020-12-31")).Corps!;
+    var chef = (await Get<VueJournal>("rresp", J(RoutesJournal.Gestes))).Corps!;
+    var jules = (await Get<VueJournal>("jagent", J(RoutesJournal.Gestes))).Corps!;
+    var filtreAgent = (await Get<VueJournal>("rresp", $"{J(RoutesJournal.Gestes)}?agent=Jules")).Corps!;
+    var filtrePasse = (await Get<VueJournal>("rresp", $"{J(RoutesJournal.Gestes)}?du=2020-01-01&au=2020-12-31")).Corps!;
     Exiger(chef.ToutLeGreffe && chef.Lignes.Length > 5 && chef.Lignes.Zip(chef.Lignes.Skip(1)).All(p => p.First.Instant >= p.Second.Instant)
            && chef.Lignes.Any(l => l.Phrase == $"Rose Responsable a modifié le compte {long21}")
            && filtreAgent.Lignes.All(l => l.Qui == "Jules Agent") && filtreAgent.Lignes.Length == 1 && filtrePasse.Lignes.Length == 0,
@@ -424,12 +471,94 @@ await using (var v3 = await BaseJetable.CreerAsync("SocleDroitsCheck"))
         await cn.OpenAsync();
         await JournalGestes.EcrireRecopieAsync(cn, null, "jdupont_v2", "client", "le client C-42", "C-42", "a modifie", new { nom = "A" }, new { nom = "B" }, default);
     }
-    var recopie = (await Get<VueJournal>("rresp", $"{RoutesJournal.Gestes}?objet=C-42")).Corps!.Lignes.Single();
+    var recopie = (await Get<VueJournal>("rresp", $"{J(RoutesJournal.Gestes)}?objet=C-42")).Corps!.Lignes.Single();
     var recopieAvecAgent = await Lever(() => Executer(v3.Connexion, $"INSERT INTO soc.Journal (Source, IdAgent, Agent, CompteV2, Famille, Objet, Verbe) VALUES ('recopie-v2', {idAgent}, 'Jules Agent', 'jdupont_v2', 'client', 'le client C-43', 'a modifie');"));
     Exiger(recopie is { Source: "recopie-v2", Phrase: "La recopie de la V2 (compte V2 jdupont_v2) a modifié le client C-42" }
            && await Scalaire<int>(v3.Connexion, "SELECT COUNT(*) FROM soc.Journal WHERE Objet = 'le client C-42' AND IdAgent IS NULL AND CompteV2 = 'jdupont_v2'") == 1
            && recopieAvecAgent is SqlException { Number: 547 },
         $"SOC-016 CA06 : une ecriture de la recopie est attribuee a la recopie et au compte V2 d'origine, jamais a un agent de la V3 (« {recopie.Phrase} »)");
+
+    // ---------------- Raccord (lot 9) : la base du GREFFE de l'adresse, ouverte par le catalogue ---------
+    async Task<(HttpStatusCode Code, string Brut)> Appel(HttpMethod verbe, string compte, string route, object? corps)
+    {
+        using var d = new HttpRequestMessage(verbe, route);
+        if (corps is not null) d.Content = JsonContent.Create(corps, corps.GetType(), options: json);
+        d.Headers.Add(RoutesIdentite.EnTeteCompte, compte);
+        using var r = await http.SendAsync(d);
+        return (r.StatusCode, await r.Content.ReadAsStringAsync());
+    }
+    // Les routes du module, lues dans le serveur lui-meme : chacune porte {greffe}, et chacune est appelee ci-dessous.
+    var routesComptes = ((IEndpointRouteBuilder)app).DataSources.SelectMany(s => s.Endpoints).OfType<RouteEndpoint>()
+        .Where(r => r.Metadata.GetMetadata<ModuleOrigine>()?.Nom == "RigV3.Serveur.Socle.Comptes.ModuleComptes")
+        .Select(r => r.RoutePattern.RawText ?? "").ToList();
+    var appelsGreffe = new (HttpMethod Verbe, string Route, object? Corps)[]
+    {
+        (HttpMethod.Get, RoutesComptes.Comptes, null),
+        (HttpMethod.Post, RoutesComptes.Creer, new DemandeCompte(null, "fantome", "Fantome", "Felix", "M.", idRcs, ["GREFFIER"], Ecran)),
+        (HttpMethod.Post, RoutesComptes.Modifier, new DemandeCompte(nouveau.Id, "fantome", "Fantome", "Felix", "M.", idRcs, null, Ecran)),
+        (HttpMethod.Post, RoutesComptes.Desactiver, new DemandeSurCompte(idAgent, Ecran)),
+        (HttpMethod.Post, RoutesComptes.Supprimer, new DemandeSurCompte(idAgent, Ecran)),
+        (HttpMethod.Post, RoutesComptes.Role, new DemandeRole(idAgent, "GREFFIER", true, Ecran)),
+        (HttpMethod.Get, RoutesDroits.Journal, null),
+        (HttpMethod.Get, RoutesDroits.Verifier + "?fonction=RCS_CONSULT", null),
+        (HttpMethod.Get, RoutesJournal.Gestes, null),
+    };
+    Exiger(routesComptes.Count == appelsGreffe.Length && routesComptes.All(r => r.Contains("{greffe}"))
+           && appelsGreffe.All(a => routesComptes.Contains(a.Route.Split('?')[0])),
+        $"Raccord (1) : les {routesComptes.Count} routes des comptes, des droits et du journal portent le greffe dans leur adresse ({string.Join(", ", routesComptes)})");
+    var sourcesComptes = string.Join("\n", new[] { "ModuleComptes.cs", "ServiceComptes.cs", "ServiceDroits.cs", "JournalGestes.cs" }
+        .Select(f => File.ReadAllText(Path.Combine(racine, "Serveur", "Socle", "Comptes", f))));
+    var ouvertures = Regex.Matches(sourcesComptes, @"\w+\.OuvrirAsync\(|\w+\.OuvrirBaseV3Async\(").Select(m => m.Value).ToList();
+    Exiger(ouvertures.SequenceEqual(["catalogue.OuvrirBaseV3Async(", "commune.OuvrirAsync("]) && !sourcesComptes.Contains("Greffe:Code"),
+        $"Raccord (1) : les comptes et les droits n'ouvrent une base que par ServiceDroits.OuvrirBaseAsync -- le catalogue pour une adresse de greffe, la base commune sinon -- et plus par Greffe:Code ({string.Join(", ", ouvertures)})");
+
+    // Greffe absent du catalogue -> 404 ; base du greffe muette -> 503, nommee, sans repli ; rien n'est ecrit nulle part.
+    var lignesAvantRefus = (await LignesDe(v3.Connexion), await LignesDe(vB.Connexion), await LignesDe(commune.Connexion));
+    var pas404 = new List<string>();
+    var pas503 = new List<string>();
+    foreach (var (verbe, route, corps) in appelsGreffe)
+    {
+        var inconnu = await Appel(verbe, "rresp", C(route, GreffeAbsent), corps);
+        if (inconnu.Code != HttpStatusCode.NotFound || !inconnu.Brut.Contains(GreffeAbsent)) pas404.Add($"{verbe} {route} -> {(int)inconnu.Code}");
+        var muet = await Appel(verbe, "rresp", C(route, GreffeMuet), corps);
+        if (muet.Code != HttpStatusCode.ServiceUnavailable || !muet.Brut.Contains(baseMuette)) pas503.Add($"{verbe} {route} -> {(int)muet.Code}");
+    }
+    var lignesApresRefus = (await LignesDe(v3.Connexion), await LignesDe(vB.Connexion), await LignesDe(commune.Connexion));
+    Exiger(pas404.Count == 0 && lignesApresRefus == lignesAvantRefus,
+        $"Raccord (1) : un greffe absent du catalogue rend 404 sur chacune des {appelsGreffe.Length} routes, et aucune base ne change" + (pas404.Count > 0 ? $" ({string.Join(" ; ", pas404)})" : ""));
+    Exiger(pas503.Count == 0 && lignesApresRefus == lignesAvantRefus,
+        $"Raccord (1) : une base de greffe qui ne repond pas rend 503 en la nommant, sur chacune des {appelsGreffe.Length} routes, sans repli sur une autre base" + (pas503.Count > 0 ? $" ({string.Join(" ; ", pas503)})" : ""));
+
+    // Un compte du greffe A est inconnu du greffe B ; le responsable de A n'y gere rien ; B ne voit que ses comptes.
+    var jagentSurB = await Get<IdentiteAgent>("jagent", RoutesIdentite.Pour(GreffeB));
+    var verifierSurB = await Get<VerificationDroit>("jagent", $"{D(RoutesDroits.Verifier, GreffeB)}?fonction=RCS_CONSULT");
+    var rrespSurB = await Get<VueComptes>("rresp", C(RoutesComptes.Comptes, GreffeB));
+    var vueB = await Get<VueComptes>("bresp", C(RoutesComptes.Comptes, GreffeB));
+    Exiger(jagentSurB.Corps is { Admis: false, Statut: StatutsIdentite.Inconnu } && verifierSurB.Code == HttpStatusCode.Forbidden
+           && rrespSurB.Code == HttpStatusCode.Forbidden && vueB.Corps is { } vb && vb.Comptes.Select(c => c.CompteWindows).SequenceEqual(["bresp"])
+           && await Scalaire<int>(vB.Connexion, $"SELECT COUNT(*) FROM soc.Compte WHERE CompteWindows IN ('jagent', 'rresp', '{long21}')") == 0,
+        $"Raccord (1) : un compte du greffe A est absent du greffe B -- inconnu a l'ouverture ({jagentSurB.Corps?.Statut}), refuse sur ses droits ({verifierSurB.Code}) et sur la gestion des comptes ({rrespSurB.Code}) ; B ne liste que les siens ({string.Join(", ", vueB.Corps?.Comptes.Select(c => c.CompteWindows) ?? [])})");
+    var jagentSurA = await Get<VerificationDroit>("jagent", $"{D(RoutesDroits.Verifier)}?fonction=RCS_CONSULT");
+    Exiger(jagentSurA.Corps is { Autorise: true } && vueResp.Corps.Comptes.Any(c => c.CompteWindows == "jagent"),
+        "Raccord (1) (jumeau) : le meme compte, dans le greffe A, ouvre et garde ses droits");
+
+    // Un geste sur le greffe A est journalise dans A seulement ; celui de B, dans B ; le code greffe vient de l'adresse.
+    async Task<(int A, int B, int Commune)> Journaux() => (await Scalaire<int>(v3.Connexion, "SELECT COUNT(*) FROM soc.Journal"),
+        await Scalaire<int>(vB.Connexion, "SELECT COUNT(*) FROM soc.Journal"), await Scalaire<int>(commune.Connexion, "SELECT COUNT(*) FROM soc.Journal"));
+    var journauxAvant = await Journaux();
+    var gesteA = await Post("rresp", C(RoutesComptes.Creer), new DemandeCompte(null, "geste.sur.a", "Geste", "Ali", "M.", idRcs, null, Ecran));
+    var journauxA = await Journaux();
+    var idServiceB = vueB.Corps!.Services.Single().Id;
+    var gesteB = await Post("bresp", C(RoutesComptes.Creer, GreffeB), new DemandeCompte(null, "agent.de.b", "Bernard", "Bea", "Mme", idServiceB, ["AGENT_B"], Ecran));
+    var journauxB = await Journaux();
+    var ligneB = await Scalaire<string>(vB.Connexion, "SELECT CONCAT(Agent, '|', Objet, '|', Verbe) FROM soc.Journal WHERE Objet = 'le compte agent.de.b'");
+    Exiger(gesteA.Corps is { Fait: true, Compte.CodeGreffe: CodeGreffe } && journauxA == (journauxAvant.A + 1, journauxAvant.B, journauxAvant.Commune)
+           && await Scalaire<int>(vB.Connexion, "SELECT COUNT(*) FROM soc.Compte WHERE CompteWindows = 'geste.sur.a'") == 0,
+        $"Raccord (1) : un geste sur le greffe A (creation d'un compte) est journalise dans la base de A seulement, et le compte n'existe que dans A (journaux A/B/commune {journauxAvant} -> {journauxA})");
+    Exiger(gesteB.Corps is { Fait: true, Compte.CodeGreffe: GreffeB } && journauxB == (journauxA.A, journauxA.B + 2, journauxA.Commune)
+           && ligneB == "Berthe Responsable|le compte agent.de.b|a cree"
+           && await Scalaire<int>(v3.Connexion, "SELECT COUNT(*) FROM soc.Compte WHERE CompteWindows = 'agent.de.b'") == 0,
+        $"Raccord (1) (jumeau) : le meme geste sur le greffe B, par le responsable de B, recoit le code greffe de B et s'ecrit dans le journal de B seulement (creation et roles : {journauxA} -> {journauxB} ; « {ligneB} »)");
 
     Reporter("SOC-002 CA07 : la V2 applique un droit change dans la V3 -- recopie V3 -> V2 des roles (REC-002, phase 2). Chaque changement est journalise (compte Windows et nom de role de la V2) dans la transaction du geste");
     await app.StopAsync();
@@ -483,6 +612,8 @@ if (oracle is not null)
         $"SOC-002 CA02 : dans {nomV2}, les trois origines de droits sont reprises dans le modele unique ({bilan.RolesAttribues} roles attribues, {bilan.DroitsAncien} droits de l'ancien systeme, {bilan.DroitsComptabilite} de la comptabilite)");
 
     // Le VRAI chemin d'un agent : la route du serveur, compte par compte, pour un echantillon de comptes admis.
+    // La base reprise sert ici de base commune et se declare elle-meme au catalogue, sous un code d'essai.
+    await Inscrire(rig.Connexion, CodeRig, rig.Nom);
     await using (var app = Serveur(rig.Connexion))
     {
         await app.StartAsync();
@@ -490,7 +621,7 @@ if (oracle is not null)
         var admis = new List<(int Id, string Login)>();
         foreach (var c in oracle.ComptesActifs)
         {
-            using var d = new HttpRequestMessage(HttpMethod.Get, RoutesIdentite.Identite);
+            using var d = new HttpRequestMessage(HttpMethod.Get, RoutesIdentite.Pour(CodeRig));
             d.Headers.Add(RoutesIdentite.EnTeteCompte, c.Login);
             using var r = await http.SendAsync(d);
             if ((await r.Content.ReadFromJsonAsync<IdentiteAgent>(json))?.Admis == true) admis.Add(c);
@@ -501,7 +632,7 @@ if (oracle is not null)
         foreach (var (id, login) in admis)
             await Parallel.ForEachAsync(oracle.Fonctions, new ParallelOptions { MaxDegreeOfParallelism = 8 }, async (f, ct) =>
             {
-                using var d = new HttpRequestMessage(HttpMethod.Get, $"{RoutesDroits.Verifier}?fonction={Uri.EscapeDataString(f)}");
+                using var d = new HttpRequestMessage(HttpMethod.Get, $"{D(RoutesDroits.Verifier, CodeRig)}?fonction={Uri.EscapeDataString(f)}");
                 d.Headers.Add(RoutesIdentite.EnTeteCompte, login);
                 using var r = await http.SendAsync(d, ct);
                 var v = await r.Content.ReadFromJsonAsync<VerificationDroit>(json, ct);
@@ -509,7 +640,7 @@ if (oracle is not null)
                 if (v is null || v.Autorise != oracle.ALaFonctionnalite(id, f)) ecartsRoute.Add($"{login}/{f}");
             });
         Exiger(admis.Count == 3 && ecartsRoute.IsEmpty && appels == 3 * oracle.Fonctions.Count,
-            $"SOC-002 CA01 : par la route de l'agent (GET {RoutesDroits.Verifier}), 3 comptes admis de {nomV2} x {oracle.Fonctions.Count} fonctions = la V2 ({ecartsRoute.Count} ecart sur {appels} appels : {string.Join(", ", admis.Select(a => a.Login))})");
+            $"SOC-002 CA01 : par la route de l'agent (GET {D(RoutesDroits.Verifier, CodeRig)}), 3 comptes admis de {nomV2} x {oracle.Fonctions.Count} fonctions = la V2 ({ecartsRoute.Count} ecart sur {appels} appels : {string.Join(", ", admis.Select(a => a.Login))})");
         await app.StopAsync();
     }
 

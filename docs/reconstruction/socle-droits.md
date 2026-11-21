@@ -83,15 +83,19 @@ ne touche pas un compte Amitel) ; `RigMetier\Admin\ExpressoMenu.cs:26-39`.
 | Banc | `tests\SocleDroitsCheck\` (+ `OracleDroitsV2.cs`, `BaseV2Jetable.cs`) | un contrôle par critère ; comparaison avec RIG_DEV |
 | Banc voisin | `tests\MenuGestesCheck\Program.cs` | `PROC_UTILISATEUR` ajouté aux procédures sans fiche (elle a un dossier de sources V2) |
 
-Routes (toutes derrière `PolitiquesSocle.AgentAdmis`) :
+Routes (toutes derrière `PolitiquesSocle.AgentAdmis` ; `{greffe}` = code du greffe au catalogue, adresse
+par `RoutesComptes.Pour`, `RoutesDroits.Pour`, `RoutesJournal.Pour`) :
 
 | Route | Qui | Rôle |
 |---|---|---|
-| `GET /socle/comptes` | gère les droits | comptes, services, rôles **visibles** |
-| `POST /socle/comptes/creer`, `/modifier`, `/desactiver`, `/supprimer`, `/role` | gère les droits | les gestes ; un refus métier = 200 avec `Fait = false` et le message |
-| `GET /socle/droits/journal?compte=&role=&du=&au=` | gère les droits | journal des droits filtré, du plus récent au plus ancien |
-| `GET /socle/droits/verifier?fonction=` | tout agent admis | ses propres droits |
-| `GET /socle/journal?agent=&objet=&du=&au=` | tout agent admis | tout le greffe avec `JOURNAL_GESTES`, ses seuls gestes sinon |
+| `GET /socle/{greffe}/comptes` | gère les droits | comptes, services, rôles **visibles** |
+| `POST /socle/{greffe}/comptes/creer`, `/modifier`, `/desactiver`, `/supprimer`, `/role` | gère les droits | les gestes ; un refus métier = 200 avec `Fait = false` et le message |
+| `GET /socle/{greffe}/droits/journal?compte=&role=&du=&au=` | gère les droits | journal des droits filtré, du plus récent au plus ancien |
+| `GET /socle/{greffe}/droits/verifier?fonction=` | tout agent admis | ses propres droits |
+| `GET /socle/{greffe}/journal?agent=&objet=&du=&au=` | tout agent admis | tout le greffe avec `JOURNAL_GESTES`, ses seuls gestes sinon |
+
+Chacune lit et écrit dans la base V3 de **ce** greffe (voir « Raccord fait », plus bas) : 404 si le greffe
+n'est pas au catalogue, 503 si sa base ne répond pas, sans repli.
 
 ## Les choix et leur raison
 
@@ -108,7 +112,7 @@ Routes (toutes derrière `PolitiquesSocle.AgentAdmis`) :
 | **Ajout seul par déclencheurs** (`THROW 51010`, `51011`) | Refusé à tout compte SQL, même `sa`. Seule `soc.PurgerJournal` efface, et seulement une ligne échue : même la purge ne peut pas retirer une ligne récente. |
 | **Durées de conservation par famille** (`soc.FamilleJournal`), contrainte « au moins 6 ans » pour la facturation | CA04 de SOC-016. Les autres durées valent 6 ans **en attendant** le référent Socle et le délégué à la protection des données. |
 | **Le nom de l'écran part dans le corps de chaque demande** (`Ecran`), posé par `Pont\EcranComptes.cs` | Sans toucher `Pont\ClientServeur.cs` (fichier commun du lot 1). Un en-tête commun à tous les écrans serait plus général : à décider quand les domaines journaliseront. |
-| **Code du greffe d'un compte créé par le greffe** : configuration `Greffe:Code` du serveur | Le `RIG.Common.CodeGreffeRig` de la V2. Les services de RIG_DEV portent `9999`, pas le code du greffe : on ne peut pas le déduire du service. À raccorder au catalogue du lot 4 (voir plus bas). |
+| **Code du greffe d'un compte créé par le greffe** : celui de l'adresse (`{greffe}`) | Le `RIG.Common.CodeGreffeRig` de la V2, le greffe ouvert. Les services de RIG_DEV portent `9999`, pas le code du greffe : on ne peut pas le déduire du service. (Jusqu'au lot 9 : la configuration `Greffe:Code`, retirée.) |
 | **`JOURNAL_GESTES`** : une fonction de la V3, donnée d'office au rôle `GestionDesHabilitations` | Le « chef de greffe » n'existe pas comme tel dans la V2 (la maquette le décide par `PeutValider`). Une fonction du modèle de droits laisse le greffe l'attribuer à qui il veut (au rôle `GREFFIER`, par exemple). À valider. |
 | **Écran dans `Configurer › Mon poste`** | Le seul sous-menu de réglages du greffe qui avait de la place (6 entrées sur 8 permises par `MenuGestesCheck`) ; un sous-menu « Les agents » aurait demandé trois écrans. |
 
@@ -144,16 +148,33 @@ Routes (toutes derrière `PolitiquesSocle.AgentAdmis`) :
 | **SOC-002 CA07, SOC-004 CA06 et la moitié V2 de SOC-004 CA03** : la V2 applique un droit, un compte, une désactivation faits dans la V3 | C'est la recopie V3 → V2 (REC-002, REC-017), en phase 2 ; aucune écriture dans une base V2 n'est permise ici. Ce que la recopie lira est prêt : chaque geste est journalisé dans sa transaction, avec le compte Windows, le nom du rôle et l'identifiant V2 du service. Le banc les marque **REPORTÉ**, pas OK. | Phase 2, thème REC |
 | **SOC-002 CA01 « sur les 40 bases »** et la reprise base par base (T04) | Seule RIG_DEV est lisible depuis ce poste. Le banc se rejoue tel quel sur une autre base V2 : `$env:RIGV3_V2 = "<chaîne de la copie anonymisée>"; .\tests.ps1 SocleDroits`. | Copies anonymisées des 40 greffes (REC-008) |
 | **SOC-016 CA01-CA02 pour les familles des domaines** (dossier, demande, facture, encaissement…) | Ces domaines n'existent pas encore dans la V3. Le journal est prêt : `JournalGestes.EcrireAsync(cn, tx, appelant, écran, famille, objet, id, verbe, avant, après)` dans la transaction du geste ; les quatre familles de la V2 sont déclarées. | Lots des domaines |
-| **SOC-016 T03, la tuile d'activité de l'accueil** (`web\src\accueil\Tuiles.tsx`) | Hors des fichiers de ce lot ; l'écran « Comptes des agents » porte déjà le journal (onglet « Journal des gestes »). La tuile lira `GET /socle/journal`. | Lot de l'accueil |
+| **SOC-016 T03, la tuile d'activité de l'accueil** (`web\src\accueil\Tuiles.tsx`) | Hors des fichiers de ce lot ; l'écran « Comptes des agents » porte déjà le journal (onglet « Journal des gestes »). La tuile lira `GET /socle/{greffe}/journal`. | Lot de l'accueil |
+| **Le greffe de l'écran choisi à l'ouverture** | En attendant, `Pont\EcranComptes.cs` lit le code du greffe dans la variable `RIGV3_GREFFE` (sans elle, avec un serveur, l'écran le dit au lieu d'appeler une adresse sans greffe). | Lot 10 (choix du greffe comme la V2, `RigFormLogin.cs:282-319`) |
 | **SOC-016 T05, planifier la purge** et fixer les durées autres que la facturation | Geste d'exploitation (agent SQL), durées à fixer par le référent Socle et le DPO. `soc.PurgerJournal` est prête. | Exploitation |
 | **Signature du journal des événements** (C19, NF525) | Certification de la V3 (SOC-018). `soc.EvenementTechnique` en est le contenu, en ajout seul. | SOC-018 |
 | **Interdire `TRUNCATE` et la désactivation des déclencheurs** | Les déclencheurs arrêtent tout compte SQL sur `UPDATE`/`DELETE`, mais un propriétaire de la base peut les désactiver. Le compte SQL du serveur ne doit avoir que lecture et ajout sur les journaux. | Déploiement (droits SQL) |
-| **Juger dans la base DU GREFFE** | Comme l'identité (lot 2), les routes lisent `BaseRig`. Quand le lot 4 sera réuni, `ServiceDroits.AppelantAsync` et les routes recevront la base du greffe par `CatalogueGreffes.OuvrirBaseV3Async(code, ct)`, et `Greffe:Code` viendra du catalogue. | Après le lot 4 |
+
+## Raccord fait (lot 9, 2026-11-21) : comptes, droits et journaux dans la base DU greffe
+
+| Qui | Ce qui a changé |
+|---|---|
+| Les adresses (`Contrats\Socle\Comptes.cs`, `Droits.cs`, `JournalGestes.cs`) | Les 9 routes portent `{greffe}` : `/socle/{greffe}/comptes…`, `/socle/{greffe}/droits/…`, `/socle/{greffe}/journal`, adresse par `Pour(route, greffe)`. |
+| `ServiceDroits` | `OuvrirBaseAsync(http, b, ct)` : la base du greffe de l'adresse par `CatalogueGreffes.OuvrirBaseV3Async`, la base commune pour une route sans greffe (le catalogue). `AppelantAsync` et `VerifierAsync(http, b, moi, fonction, ct)` y lisent ; une base muette pendant la vérification reste un refus tracé (CA06). |
+| Les routes (`ModuleComptes.cs`) | Chacune ouvre la base du greffe une fois et la passe à `ServiceComptes` et `JournalGestes` (qui ne reçoivent plus `BaseRig`). La politique `AgentAdmis` y juge l'agent (lot 8) : 404 greffe inconnu, 503 base muette, sans repli ; la politique de gestion des droits laisse alors la réponse de `AgentAdmis`. |
+| Le code greffe d'un compte créé | Celui de l'adresse ; la clé `Greffe:Code` n'existe plus. |
+| L'écran (`Pont\EcranComptes.cs`) | Appelle les adresses du greffe de `RIGV3_GREFFE`, en attendant le choix du greffe à l'ouverture (lot 10). |
+
+Prouvé par le banc (contrôles « Raccord (1) ») : deux bases de greffe jetables et un greffe sans base au
+catalogue d'une base commune ; 404 et 503 sur chacune des 9 routes sans qu'aucune base ne change ; un compte
+du greffe A inconnu du greffe B (ouverture, droits, gestion des comptes) ; un geste sur A journalisé dans A
+seulement, le même sur B dans B seulement, chacun avec le code greffe de son adresse. Contre-épreuve
+(2026-11-21) : `OuvrirBaseAsync` ramené à la base commune → 9 contrôles rouges, fichier restauré à l'identique.
 
 ## Preuves
 
-- `.\tests.ps1 SocleDroits` → **code 0** : 50 contrôles OK et 4 parties **REPORTÉES**, nommées (recopie
-  de la phase 2, 40 bases). Chaque critère des quatre stories est cité.
+- `.\tests.ps1 SocleDroits` → **code 0** : 60 contrôles OK (dont 8 du raccord et la suppression des 4 bases
+  jetables) et 4 parties **REPORTÉES**, nommées (recopie de la phase 2, 40 bases). Chaque critère des quatre
+  stories est cité.
 - **Comparaison avec la V2 sur RIG_DEV** (lue en lecture seule, reprise dans une base jetable) :
   96 comptes actifs × 876 fonctions = **84 096 comparaisons, 0 écart** (59 714 autorisations) ; par la
   route de l'agent, 3 comptes × 876 fonctions = 2 628 appels, 0 écart. Reprise en 0,5 s : 243 comptes,
@@ -198,22 +219,30 @@ Routes (toutes derrière `PolitiquesSocle.AgentAdmis`) :
 ```powershell
 # Base V3 de développement, migrations jouées (architecture.md), puis la reprise d'une base V2 :
 #   RepriseDroits.ReprendreAsync("<chaîne V2>", "<chaîne V3>")  -- base V3 neuve seulement
-# Serveur en développement (changement de compte par l'en-tête), code du greffe :
+# Elle se déclare au catalogue de la base commune (ici la même), sous le code du greffe :
+#   INSERT INTO soc.Greffe (CodeGreffe, Nom, Serveur, BaseV2, BaseV3, EstBeta, EstOutreMer, Fuseau, ModifiePar, ModifieLe)
+#   VALUES ('3801', 'Greffe de dev', '127.0.0.1,14330', 'RIG_DEV', 'RIGV3_DEV', 0, 0, 'Romance Standard Time', 'dev', SYSDATETIME());
+# Serveur en développement (changement de compte par l'en-tête) :
 $env:ASPNETCORE_ENVIRONMENT = "Development"
-$env:Greffe__Code = "3801"
 $env:ConnectionStrings__RigV3 = "Server=127.0.0.1,14330;Database=RIGV3_DEV;User ID=sa;Password=RigV3_dev_2026!;TrustServerCertificate=True"
+$env:Greffes__Authentification = "User ID=sa;Password=RigV3_dev_2026!;TrustServerCertificate=True"
 dotnet run --project Serveur\RigV3.Serveur.csproj --urls http://127.0.0.1:5080
-# L'app, sous un compte qui a le rôle GestionDesHabilitations :
-$env:RIGV3_SERVEUR = "http://127.0.0.1:5080"; $env:RIGV3_COMPTE = "<compte>"
+# L'app, sous un compte qui a le rôle GestionDesHabilitations, sur le greffe 3801 :
+$env:RIGV3_SERVEUR = "http://127.0.0.1:5080"; $env:RIGV3_COMPTE = "<compte>"; $env:RIGV3_GREFFE = "3801"
 ```
 
-Écrire au journal depuis une autre route (lots des domaines) :
+Écrire au journal depuis une autre route (lots des domaines) — une route DU greffe (`{greffe}` dans l'adresse) :
 
 ```csharp
-var moi = (await droits.AppelantAsync(http, b, ct))!;            // ServiceDroits, en paramètre de la route
+await using var cn = await droits.OuvrirBaseAsync(http, b, ct);   // la base du greffe de l'adresse
+var moi = (await droits.AppelantAsync(http, b, cn, ct))!;         // ServiceDroits, en paramètre de la route
+await using var tx = (SqlTransaction)await cn.BeginTransactionAsync(ct);
+// ... le geste ...
 await JournalGestes.EcrireAsync(cn, tx, moi, demande.Ecran, "facture", $"la facture {num}", num,
                                 "a modifie", avant, apres, ct);   // dans la transaction du geste
+await tx.CommitAsync(ct);
 ```
 
-Vérifier un droit : `await droits.VerifierAsync(b, moi.Id, moi.CompteWindows, "FACT", ct)` (jamais
-d'exception : une panne est un refus tracé).
+Vérifier un droit : `await droits.VerifierAsync(http, b, moi, "FACT", ct)`, dans la base du greffe de
+l'adresse (jamais d'exception : une panne est un refus tracé).
+<!-- fix-ok: la doc décrivait les routes sans greffe, la clé Greffe:Code et « Juger dans la base DU GREFFE » en reste à faire ; le lot 9 a fait ce raccord (banc SocleDroitsCheck, contrôles « Raccord (1) », code 0 le 2026-11-21). -->

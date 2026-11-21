@@ -5,8 +5,12 @@ public static class RoutesJournal
 {
     /// <summary>GET ?agent=&amp;objet=&amp;du=&amp;au= (dates yyyy-MM-dd, bornes comprises) -> <see cref="VueJournal"/>,
     /// du plus recent au plus ancien. Le chef de greffe (fonction <see cref="FonctionJournalDuGreffe"/>)
-    /// voit tout le greffe ; un autre agent ne voit que ses propres gestes (CA03).</summary>
-    public const string Gestes = "/socle/journal";
+    /// voit tout le greffe ; un autre agent ne voit que ses propres gestes (CA03). Le journal est celui de la base V3
+    /// du greffe <c>{greffe}</c> (lot 9) ; 404 greffe inconnu, 503 base muette. L'adresse : <see cref="Pour"/>.</summary>
+    public const string Gestes = "/socle/{greffe}/journal";
+
+    /// <summary>L'adresse de <see cref="Gestes"/> pour le greffe <paramref name="greffe"/> (son code au catalogue).</summary>
+    public static string Pour(string route, string greffe) => route.Replace("{greffe}", Uri.EscapeDataString(greffe));
 
     /// <summary>La fonction qui ouvre le journal de TOUT le greffe (migration SOC-016_gestes.sql).</summary>
     public const string FonctionJournalDuGreffe = "JOURNAL_GESTES";

@@ -36,11 +36,27 @@ using RigV3.Serveur.Socle.Identite;
 // (COLLATE ecrit en clair dans SOC-001 : chaque base se compare desormais a la version livree a son classement).
 // Puis, objection du controle final : les routes du module etaient ouvertes sans PolitiquesSocle.AgentAdmis (decision
 // du plan, lot 2) ; le banc passe par l'identite du lot 2 (comptes dans soc.Compte) et controle l'acces de chaque route.
+// Lot 9 (raccord aux droits du lot 3) : modifier exige le droit de modifier le greffe (regle V2 OPE_EDITER_GREFFE.cs:30-38)
+// et ecrit le geste au journal dans la transaction ; les routes des reglages jugent l'agent dans la base du greffe.
+// fix-ok: banc.socle n'etait qu'un agent admis ; la V2 ne laisse modifier un greffe qu'a un administrateur (OPE_EDITER_GREFFE.cs:37), il le devient, et banc.agent garde le role d'agent sans ce droit.
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
 var migrations = Path.Combine(racine, "Base", "migrations");
 // Les comptes du banc, inscrits dans soc.Compte (lot 2) : la politique AgentAdmis les juge.
-const string Agent = @"AMITEL\banc.socle";      // admis : un service, un role, actif
+const string Agent = @"AMITEL\banc.socle";      // admis, administrateur d'Amitel : il a le droit de modifier le greffe
 const string Refuse = @"AMITEL\banc.refuse";    // desactive : refuse (403)
+const string SansDroit = @"AMITEL\banc.agent";  // admis, ni administrateur ni nomme par la V2 : lecture seule (403 a la modification)
+const string NommeV2 = @"AMITEL\benier";        // admis, non administrateur, mais nomme par la V2 (OPE_EDITER_GREFFE.cs:31-35)
+// Les memes comptes, dans la base ou la politique les juge : la commune (catalogue), ou celle d'un greffe (reglages).
+const string ComptesDuBanc = """
+    INSERT INTO soc.Service (CodeGreffe, Abrege, Nom) VALUES (@greffe, 'EXPL', N'Exploitation');
+    INSERT INTO soc.Role (Nom, Libelle) VALUES ('BANC', 'Banc SocleGreffes');
+    INSERT INTO soc.Compte (CompteWindows, Nom, Prenom, Abrege, Civilite, CodeGreffe, IdService, Desactive, EstAmitel, EstAdministrateur)
+    SELECT v.Compte, 'BANC', 'Socle', v.Abrege, 'M.', @greffe, s.Id, v.Desactive, v.Admin, v.Admin
+    FROM (VALUES ('banc.socle', 'BSOC', 0, 1), ('banc.refuse', 'BREF', 1, 0), ('banc.agent', 'BAGT', 0, 0), ('benier', 'BENI', 0, 0))
+         v (Compte, Abrege, Desactive, Admin)
+    CROSS JOIN soc.Service s;
+    INSERT INTO soc.CompteRole (IdCompte, Role) SELECT Id, 'BANC' FROM soc.Compte;
+    """;
 
 var echecs = new List<string>();
 void Exiger(bool ok, string quoi)
@@ -108,15 +124,8 @@ try
     await Migrateur.AppliquerAsync(commune.Connexion, migrations);
     // Les comptes du banc, dans la base que la politique AgentAdmis interroge (ConnectionStrings:RigV3).
     // Le domaine « AMITEL\ » de l'en-tete est retire par ServiceIdentite.CompteDe, comme en production.
-    await Executer(commune.Nom, """
-        INSERT INTO soc.Service (CodeGreffe, Abrege, Nom) VALUES ('T001', 'EXPL', N'Exploitation');
-        INSERT INTO soc.Role (Nom, Libelle) VALUES ('BANC', 'Banc SocleGreffes');
-        INSERT INTO soc.Compte (CompteWindows, Nom, Prenom, Abrege, Civilite, CodeGreffe, IdService, Desactive)
-        SELECT v.Compte, 'BANC', 'Socle', v.Abrege, 'M.', 'T001', s.Id, v.Desactive
-        FROM (VALUES ('banc.socle', 'BSOC', 0), ('banc.refuse', 'BREF', 1)) v (Compte, Abrege, Desactive)
-        CROSS JOIN soc.Service s;
-        INSERT INTO soc.CompteRole (IdCompte, Role) SELECT Id, 'BANC' FROM soc.Compte;
-        """);
+    async Task InscrireComptes(string nomBase, string greffe) => await Executer(nomBase, ComptesDuBanc.Replace("@greffe", $"'{greffe}'"));
+    await InscrireComptes(commune.Nom, "T001");
     await Executer(communV2.Nom, File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "commun_rig_greffe.sql")));
 
     await using var app = ServeurRig.Construire(["--environment", "Development"], s =>
@@ -565,16 +574,39 @@ try
     }
     finally { File.Delete(fichierModele); }
 
+    // Lot 9 : les routes des reglages jugent l'agent dans la base DU GREFFE (comme la V2 sous l'utilisateur du
+    // greffe) : les comptes du banc y sont inscrits, comme dans la base commune -- et dans la base du controle
+    // de compatibilite, que SOC-007 CA04 fait designer a T001 plus bas.
+    await InscrireComptes(v3a, "T001");
+    await InscrireComptes(v3b, "T002");
+    await InscrireComptes(compat.Nom, "T001");
+    async Task<(int A, int B, int Commune)> Journaux(string famille) => (
+        Convert.ToInt32(await Scalaire(v3a, $"SELECT COUNT(*) FROM soc.Journal WHERE Famille = '{famille}';")),
+        Convert.ToInt32(await Scalaire(v3b, $"SELECT COUNT(*) FROM soc.Journal WHERE Famille = '{famille}';")),
+        Convert.ToInt32(await Scalaire(commune.Nom, $"SELECT COUNT(*) FROM soc.Journal WHERE Famille = '{famille}';")));
+
     // CA07 : modifier un reglage garde qui et quand, COMME LA V2 : l'auteur est le NOM de
     // l'agent (UTLST_NOM, Parametrage.cs:104-108), pas son compte Windows.
     var adresse = RoutesGreffes.Pour(RoutesGreffes.Reglage, "T001", "NUMERISE_LIASSE1");
     var maintenantSql = (DateTime)(await Scalaire(v3a, "SELECT GETDATE();"))!;
-    var nomAgent = (string)(await Scalaire(commune.Nom, "SELECT Nom FROM soc.Compte WHERE CompteWindows = 'banc.socle';"))!;
-    var modif = await Envoyer(HttpMethod.Put, adresse, new SaisieReglage("0"));
+    var nomAgent = (string)(await Scalaire(v3a, "SELECT Nom FROM soc.Compte WHERE CompteWindows = 'banc.socle';"))!;
+    var valeurAvant = (string?)await Scalaire(v3a, "SELECT Valeur FROM soc.Reglage WHERE Code = 'NUMERISE_LIASSE1';");
+    var reglagesAvant = await Journaux("reglage");
+    var modif = await Envoyer(HttpMethod.Put, adresse, new SaisieReglage("0", "Reglages du greffe"));
     var apres = await Lire<ReglageGreffe>(adresse);
     Exiger(modif.StatusCode == HttpStatusCode.OK && apres.Valeur == "0" && apres.AuteurModif == nomAgent
            && apres.DateModif is { } d && Math.Abs((d - maintenantSql).TotalSeconds) < 120,
         $"SOC-003 CA07 : un reglage modifie montre qui l'a modifie et quand, le nom de l'agent comme la V2 ({apres.AuteurModif}, attendu {nomAgent}, {apres.DateModif:dd/MM/yyyy HH:mm:ss})");
+    // Lot 9, SOC-016 CA01 : le geste est au journal de la base du greffe A, et de nulle autre.
+    var reglagesApres = await Journaux("reglage");
+    var ligneReglage = (string?)await Scalaire(v3a, """
+        SELECT TOP 1 CONCAT(Agent, '|', Ecran, '|', Objet, '|', Verbe, '|', JSON_VALUE(Avant, '$.valeur'), '|', JSON_VALUE(Apres, '$.valeur'), '|',
+                            CASE WHEN Instant > DATEADD(minute, -5, SYSUTCDATETIME()) THEN 'recent' ELSE 'ancien' END)
+        FROM soc.Journal WHERE Famille = 'reglage' ORDER BY Id DESC;
+        """);
+    Exiger(reglagesApres == (reglagesAvant.A + 1, reglagesAvant.B, reglagesAvant.Commune)
+           && ligneReglage == $"Socle BANC|Reglages du greffe|le reglage NUMERISE_LIASSE1|a modifie|{valeurAvant}|0|recent",
+        $"Raccord (2), SOC-016 CA01 : la modification d'un reglage du greffe A s'ecrit au journal de la base de A seulement, avec l'agent, l'ecran, l'heure, l'avant et l'apres (journaux A/B/commune {reglagesAvant} -> {reglagesApres} ; « {ligneReglage} »)");
     // Le repli de la V2 : agent introuvable -> AmiEnvironment.UserName, le compte SANS domaine.
     // La politique AgentAdmis n'en laisse passer aucun par la route : la regle se juge seule.
     var sessionInconnue = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
@@ -621,10 +653,14 @@ try
     await Executer(commune.Nom,
         "INSERT INTO soc.Greffe (CodeGreffe, Nom, Serveur, BaseV2, BaseV3, EstBeta, EstOutreMer, Fuseau, ModifiePar, ModifieLe) " +
         $"VALUES ('T003', 'Greffe sans base', '{instance}', '{injoignable}', '{injoignable}', 0, 0, 'Romance Standard Time', 'banc', SYSDATETIME());");
+    // La route des reglages porte {greffe} (lot 9) : c'est la politique qui ouvre la base du greffe, et la nomme.
     var horsLigne = await Envoyer(HttpMethod.Get, RoutesGreffes.Pour(RoutesGreffes.Reglages, "T003"));
-    var corpsHorsLigne = await horsLigne.Content.ReadFromJsonAsync<EtatBaseGreffe>();
-    Exiger(horsLigne.StatusCode == HttpStatusCode.ServiceUnavailable && corpsHorsLigne is { Joignable: false } && corpsHorsLigne.Base == injoignable,
-        $"SOC-007 CA04 : une base qui ne repond pas est signalee (503, {corpsHorsLigne?.Base}), sans repli sur une autre");
+    var corpsHorsLigne = await horsLigne.Content.ReadFromJsonAsync<RefusGreffe>();
+    var etatHorsLigne = await Envoyer(HttpMethod.Get, RoutesGreffes.Pour(RoutesGreffes.Base, "T003"));
+    var corpsEtatHorsLigne = await etatHorsLigne.Content.ReadFromJsonAsync<EtatBaseGreffe>();
+    Exiger(horsLigne.StatusCode == HttpStatusCode.ServiceUnavailable && corpsHorsLigne is { } refusHorsLigne && refusHorsLigne.Motif.Contains(injoignable)
+           && etatHorsLigne.StatusCode == HttpStatusCode.ServiceUnavailable && corpsEtatHorsLigne is { Joignable: false } && corpsEtatHorsLigne.Base == injoignable,
+        $"SOC-007 CA04 : une base qui ne repond pas est signalee (503 sur ses reglages et sur son etat, {corpsEtatHorsLigne?.Base}), sans repli sur une autre ({corpsHorsLigne?.Motif})");
     Exiger((await Envoyer(HttpMethod.Get, RoutesGreffes.Pour(RoutesGreffes.Base, "0000"))).StatusCode == HttpStatusCode.NotFound,
         "SOC-007 CA04 (jumeau) : un greffe absent du catalogue est refuse (404), sans base par defaut");
 
@@ -678,6 +714,95 @@ try
     var sqlAnonyme = await Lever(() => Executer(commune.Nom, "UPDATE soc.Greffe SET Nom = 'x' WHERE CodeGreffe = 'T002';"));
     Exiger(sqlAnonyme is SqlException { Number: 51701 },
         "SOC-007 CA06 : meme une requete SQL ecrite a la main ne modifie pas le catalogue sans auteur ni date");
+
+    // =====================================================================================
+    // Lot 9 — le droit de modifier le greffe (V2 : OPE_EDITER_GREFFE.cs:30-38) et le journal des gestes
+    // =====================================================================================
+    Console.WriteLine("--- Lot 9 : droit de modifier, journal des gestes dans la transaction");
+    // Les gestes du catalogue faits plus haut (passage de T001 deux fois, fuseau de T002) sont au journal de la
+    // base COMMUNE, ou vit le catalogue ; les refus (400, 401, 409) n'y ont rien ecrit.
+    var gestesFiche = new List<string>();
+    await using (var cn = new SqlConnection(commune.Connexion))
+    {
+        await cn.OpenAsync();
+        await using var cmd = new SqlCommand("""
+            SELECT CONCAT(Agent, '|', Objet, '|', IdObjet, '|', Verbe, '|', COALESCE(JSON_VALUE(Avant, '$.passageLocal'), JSON_VALUE(Avant, '$.fuseau')), '|',
+                          COALESCE(JSON_VALUE(Apres, '$.passageLocal'), JSON_VALUE(Apres, '$.fuseau')))
+            FROM soc.Journal WHERE Famille = 'greffe' ORDER BY Id;
+            """, cn);
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync()) gestesFiche.Add(r.GetString(0));
+    }
+    var hierJournal = hier.ToString("yyyy-MM-ddTHH:mm", System.Globalization.CultureInfo.InvariantCulture) + ":00";
+    Exiger(gestesFiche.SequenceEqual([
+               "Socle BANC|la fiche du greffe T001|T001|a modifie||2099-01-01T08:00:00",
+               $"Socle BANC|la fiche du greffe T001|T001|a modifie|2099-01-01T08:00:00|{hierJournal}",
+               "Socle BANC|la fiche du greffe T002|T002|a modifie|Romance Standard Time|SA Western Standard Time"])
+           && await Journaux("greffe") == (0, 0, 3),
+        $"Raccord (2), SOC-016 CA01 : chaque modification acceptee du catalogue (date et fuseau de passage) s'ecrit au journal de la base commune avec l'agent, l'avant et l'apres ; les refus n'y ecrivent rien ({string.Join(" ; ", gestesFiche)})");
+
+    // Un agent admis SANS le droit : 403 sur les trois modifications, rien ne change, rien n'est journalise.
+    var reglageT001Lot9 = RoutesGreffes.Pour(RoutesGreffes.Reglage, "T001", "NUMERISE_LIASSE1");
+    async Task<string> Etat403() => string.Join("|",
+        (await Lire<FicheGreffe>(RoutesGreffes.Pour(RoutesGreffes.Fiche, "T002"))) is var f2 ? $"{f2.Fuseau}/{f2.PassageLocal:o}/{f2.ModifiePar}" : "",
+        (await Lire<ModificationGreffe[]>(RoutesGreffes.Pour(RoutesGreffes.Historique, "T002"))).Length,
+        (await Lire<ReglageGreffe>(reglageT001Lot9)) is var r1 ? $"{r1.Valeur}/{r1.AuteurModif}/{r1.DateModif:o}" : "",
+        await Journaux("greffe"), await Journaux("reglage"));
+    var avant403 = await Etat403();
+    var refus403 = new List<(HttpStatusCode Code, string Motif)>();
+    foreach (var (adresse403, corps403) in new (string, object)[]
+             {
+                 (RoutesGreffes.Pour(RoutesGreffes.Passage, "T002"), new SaisiePassage("2099-01-01T08:00")),
+                 (RoutesGreffes.Pour(RoutesGreffes.Fuseau, "T002"), new SaisieFuseau("Romance Standard Time")),
+                 (reglageT001Lot9, new SaisieReglage("1")),
+             })
+    {
+        var reponse = await Envoyer(HttpMethod.Put, adresse403, corps403, compte: SansDroit);
+        refus403.Add((reponse.StatusCode, (await reponse.Content.ReadFromJsonAsync<RefusGreffe>())?.Motif ?? ""));
+    }
+    var apres403 = await Etat403();
+    var lectureSansDroit = await Envoyer(HttpMethod.Get, reglageT001Lot9, compte: SansDroit);
+    Exiger(refus403.All(r => r.Code == HttpStatusCode.Forbidden && r.Motif.Contains("banc.agent")) && apres403 == avant403,
+        $"Raccord (2) : un agent admis sans le droit de modifier le greffe recoit 403 sur la date de passage, le fuseau et un reglage ; ni la fiche, ni son historique, ni le reglage, ni aucun journal ne changent ({string.Join(", ", refus403.Select(r => (int)r.Code))} ; {avant403} -> {apres403})");
+    // Le motif du refus dit TOUTE la regle de la V2 (OPE_EDITER_GREFFE.cs:30-38) : l'agent refuse doit savoir qui
+    // peut modifier. Les noms sont ecrits ici en clair, pas relus du serveur, pour que le controle ne se juge pas lui-meme.
+    string[] reglePublique = ["administrateur d'Amitel", "thevenon", "benier", "jouguet"];
+    Exiger(refus403.Count == 3 && refus403.All(r => reglePublique.All(r.Motif.Contains)),
+        $"Raccord (2) : le motif du 403 nomme toute la regle de la V2, administrateur d'Amitel ou l'un des trois comptes nommes ({refus403.FirstOrDefault().Motif})");
+    Exiger(lectureSansDroit.StatusCode == HttpStatusCode.OK,
+        "Raccord (2) (jumeau) : le meme agent lit toujours le reglage (la V2 lui laisse la lecture : MetierReadOnly)");
+    // Jumeau : un compte que la V2 nomme (sans etre administrateur) modifie, et son geste est journalise.
+    var parNomme = await Envoyer(HttpMethod.Put, RoutesGreffes.Pour(RoutesGreffes.Fuseau, "T002"), new SaisieFuseau("Romance Standard Time"), compte: NommeV2);
+    var reglageNomme = await Envoyer(HttpMethod.Put, reglageT001Lot9, new SaisieReglage("1"), compte: NommeV2);
+    Exiger(parNomme.StatusCode == HttpStatusCode.OK && reglageNomme.StatusCode == HttpStatusCode.OK
+           && (await Lire<ModificationGreffe[]>(RoutesGreffes.Pour(RoutesGreffes.Historique, "T002")))[0] is { ModifiePar: NommeV2, Fuseau: "Romance Standard Time" }
+           && await Journaux("greffe") == (0, 0, 4) && (await Journaux("reglage")).A == reglagesApres.A + 1,
+        $"Raccord (2) (jumeau) : un compte nomme par la V2 (OPE_EDITER_GREFFE.cs:31-35) modifie le fuseau et un reglage, et chaque geste est journalise ({(int)parNomme.StatusCode}, {(int)reglageNomme.StatusCode})");
+
+    // LA MEME TRANSACTION : journal en panne -> la modification est annulee avec lui (tout ou rien).
+    async Task<(HttpStatusCode? Statut, Exception? Erreur)> SousPanne(string nomBase, Func<Task<HttpResponseMessage>> appel)
+    {
+        await Executer(nomBase, "EXEC sp_rename 'soc.Journal', 'Journal_enPanne';");
+        try
+        {
+            HttpStatusCode? statut = null;
+            var erreur = await Lever(async () => statut = (await appel()).StatusCode);
+            return (statut, erreur);
+        }
+        finally { await Executer(nomBase, "EXEC sp_rename 'soc.Journal_enPanne', 'Journal';"); }
+    }
+    var avantPanne = await Etat403();
+    var panneFiche = await SousPanne(commune.Nom,
+        () => Envoyer(HttpMethod.Put, RoutesGreffes.Pour(RoutesGreffes.Fuseau, "T002"), new SaisieFuseau("SA Western Standard Time")));
+    var pannePassage = await SousPanne(commune.Nom,
+        () => Envoyer(HttpMethod.Put, RoutesGreffes.Pour(RoutesGreffes.Passage, "T002"), new SaisiePassage("2099-01-01T08:00")));
+    var panneReglage = await SousPanne(v3a, () => Envoyer(HttpMethod.Put, reglageT001Lot9, new SaisieReglage("0")));
+    var apresPanne = await Etat403();
+    Exiger(new[] { panneFiche, pannePassage, panneReglage }.All(p => p.Statut is not HttpStatusCode.OK) && apresPanne == avantPanne,
+        $"Raccord (2) : le geste s'ecrit dans la MEME transaction que la modification -- journal en panne, la date de passage, le fuseau et le reglage restent tels quels ({panneFiche.Statut?.ToString() ?? panneFiche.Erreur?.GetType().Name}, {pannePassage.Statut?.ToString() ?? pannePassage.Erreur?.GetType().Name}, {panneReglage.Statut?.ToString() ?? panneReglage.Erreur?.GetType().Name} ; {avantPanne} -> {apresPanne})");
+    var apresRetour = await Envoyer(HttpMethod.Put, RoutesGreffes.Pour(RoutesGreffes.Fuseau, "T002"), new SaisieFuseau("SA Western Standard Time"));
+    Exiger(apresRetour.StatusCode == HttpStatusCode.OK && await Journaux("greffe") == (0, 0, 5),
+        "Raccord (2) (jumeau) : le journal revenu, la meme modification passe et s'y ecrit");
 
     // =====================================================================================
     // Acces — decision du plan (lot 2) : une route de donnees pose PolitiquesSocle.AgentAdmis

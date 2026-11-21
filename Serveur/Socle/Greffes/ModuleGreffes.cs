@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Data.SqlClient;
 using RigV3.Base;
 using RigV3.Contrats.Socle;
+using RigV3.Serveur.Socle.Comptes;
 using RigV3.Serveur.Socle.Identite;
 
 namespace RigV3.Serveur.Socle.Greffes;
@@ -13,11 +14,18 @@ namespace RigV3.Serveur.Socle.Greffes;
 ///
 /// ACCES : toutes les routes du module portent <see cref="PolitiquesSocle.AgentAdmis"/>
 /// (lot 2, SOC-001), posee une fois sur leur groupe pour qu'aucune ne l'oublie : 401 sans
-/// session Windows, 403 pour un compte refuse ; la route ne s'execute pas.
-/// L'AUTEUR d'une modification du catalogue est l'identite de cet agent admis (SOC-007
-/// CA06) ; celui d'un reglage est son NOM, comme la V2 (SOC-003 CA07,
-/// <see cref="AuteurReglage"/>). Le droit de modifier (exploitation d'Amitel, agent charge du
-/// parametrage) viendra des droits du lot 3 (SOC-002).
+/// session Windows, 403 pour un compte refuse ; la route ne s'execute pas. Les routes du
+/// catalogue (<c>{code}</c>) jugent l'agent dans la base commune ; celles des reglages
+/// (<c>{greffe}</c>, lot 9) dans la base V3 du greffe, comme la V2 lit et ecrit ses reglages
+/// sous l'utilisateur du greffe -- 404 greffe inconnu, 503 base muette, sans repli.
+///
+/// MODIFIER (lot 9) : date et fuseau de passage, valeur d'un reglage. L'appelant doit avoir le
+/// droit de modifier le greffe (<see cref="ServiceDroits.PeutModifierLeGreffe"/>, regle de la V2,
+/// OPE_EDITER_GREFFE.cs:30-38) : sinon 403, rien n'est lu ni ecrit. Le geste s'ecrit au journal
+/// des gestes (<see cref="JournalGestes.EcrireAsync"/>) DANS la transaction de la modification,
+/// dans la base qu'elle modifie : la base commune pour le catalogue, celle du greffe pour un
+/// reglage. L'AUTEUR d'une modification du catalogue est l'identite de l'agent (SOC-007 CA06) ;
+/// celui d'un reglage est son NOM, comme la V2 (SOC-003 CA07, <see cref="AuteurReglage"/>).
 ///
 /// La creation des bases (BaseGreffe) et les reprises (RepriseCatalogue,
 /// RepriseReglages) ne sont PAS des routes : ce sont des gestes d'exploitation sur
@@ -27,6 +35,10 @@ internal sealed class ModuleGreffes : IModuleServeur
 {
     /// <summary>Delai au-dela duquel un chemin reseau est declare injoignable (CA05).</summary>
     private static readonly TimeSpan DelaiChemin = TimeSpan.FromSeconds(5);
+
+    /// <summary>Familles du journal des gestes (soc.FamilleJournal) : la fiche du catalogue
+    /// (migration SOC-007_journal.sql) et un reglage du greffe (SOC-016_gestes.sql).</summary>
+    internal const string FamilleGreffe = "greffe", FamilleReglage = "reglage";
 
     public void Inscrire(IServiceCollection services, IConfiguration configuration)
         => services.AddSingleton<CatalogueGreffes>();
@@ -45,20 +57,27 @@ internal sealed class ModuleGreffes : IModuleServeur
             await c.LireAsync(code, ct) is null ? Inconnu(code) : Results.Ok(await c.HistoriqueAsync(code, ct)));
 
         greffes.MapPut(RoutesGreffes.Passage, async (string code, SaisiePassage saisie, HttpContext http, CatalogueGreffes c,
-                                                   CancellationToken ct) =>
+                                                   ServiceDroits droits, BaseRig b, CancellationToken ct) =>
         {
-            if (Auteur(http) is not { } auteur) return SansAuteur();
+            if (Auteur(http) is not { } auteur || await droits.AppelantAsync(http, b, ct) is not { } moi) return SansAuteur();
+            if (!ServiceDroits.PeutModifierLeGreffe(moi)) return SansLeDroit(moi);
             // Heure LOCALE du greffe, sans decalage ni « Z » : « 2027-03-01T08:00 » (CA05).
             if (!DateTime.TryParseExact(saisie.PassageLocal, ["yyyy-MM-ddTHH:mm", "yyyy-MM-ddTHH:mm:ss"],
                     CultureInfo.InvariantCulture, DateTimeStyles.None, out var local))
                 return Refus(StatusCodes.Status400BadRequest,
                     $"Date de passage illisible : « {saisie.PassageLocal} ». Forme attendue : 2027-03-01T08:00, heure locale du greffe, sans decalage.");
-            return await Modifier(() => c.SaisirPassageAsync(code, local, auteur, ct));
+            return await Modifier(() => c.SaisirPassageAsync(code, local, auteur,
+                JournalDeLaFiche(moi, saisie.Ecran, code, f => new { passageLocal = f.PassageLocal }), ct));
         });
 
         greffes.MapPut(RoutesGreffes.Fuseau, async (string code, SaisieFuseau saisie, HttpContext http, CatalogueGreffes c,
-                                                  CancellationToken ct) =>
-            Auteur(http) is { } auteur ? await Modifier(() => c.SaisirFuseauAsync(code, saisie.Fuseau, auteur, ct)) : SansAuteur());
+                                                  ServiceDroits droits, BaseRig b, CancellationToken ct) =>
+        {
+            if (Auteur(http) is not { } auteur || await droits.AppelantAsync(http, b, ct) is not { } moi) return SansAuteur();
+            if (!ServiceDroits.PeutModifierLeGreffe(moi)) return SansLeDroit(moi);
+            return await Modifier(() => c.SaisirFuseauAsync(code, saisie.Fuseau, auteur,
+                JournalDeLaFiche(moi, saisie.Ecran, code, f => new { fuseau = f.Fuseau }), ct));
+        });
 
         greffes.MapGet(RoutesGreffes.Base, async (string code, CatalogueGreffes c, CancellationToken ct) =>
             await SurBaseV3(c, code, ct, async cn =>
@@ -68,34 +87,46 @@ internal sealed class ModuleGreffes : IModuleServeur
                 return Results.Ok(new EtatBaseGreffe(code, fiche.Serveur, fiche.BaseV3, true, jouees, derniere, null));
             }));
 
-        greffes.MapGet(RoutesGreffes.Reglages, async (string code, CatalogueGreffes c, CancellationToken ct) =>
-            await SurBaseV3(c, code, ct, async cn => Results.Ok(await LireReglagesAsync(cn, null, ct))));
+        greffes.MapGet(RoutesGreffes.Reglages, async (string greffe, CatalogueGreffes c, CancellationToken ct) =>
+            await SurBaseV3(c, greffe, ct, async cn => Results.Ok(await LireReglagesAsync(cn, null, null, ct))));
 
-        greffes.MapGet(RoutesGreffes.Reglage, async (string code, string reglage, CatalogueGreffes c, CancellationToken ct) =>
-            await SurBaseV3(c, code, ct, async cn =>
-                (await LireReglagesAsync(cn, reglage, ct)).FirstOrDefault() is { } r ? Results.Ok(r) : ReglageAbsent(code, reglage)));
+        greffes.MapGet(RoutesGreffes.Reglage, async (string greffe, string reglage, CatalogueGreffes c, CancellationToken ct) =>
+            await SurBaseV3(c, greffe, ct, async cn =>
+                (await LireReglagesAsync(cn, null, reglage, ct)).FirstOrDefault() is { } r ? Results.Ok(r) : ReglageAbsent(greffe, reglage)));
 
         // CA07 : comme Parametrage.UpdateValeurParametrage (Parametrage.cs:103-121) -- l'auteur
         // (le NOM de l'agent, AuteurReglage) et la date sont poses avec la valeur ; un reglage
         // absent ne se cree pas (404). L'agent est celui que la politique AgentAdmis vient de
-        // juger : DeLAppelantAsync le reprend de la requete, sans relire la base.
+        // juger dans la base de CE greffe : DeLAppelantAsync le reprend de la requete.
         // fix-ok: la route ecrivait le compte de la session (« AMITEL\banc.socle », banc rouge du 2026-11-21) au lieu du nom UTLST_NOM de la V2.
-        greffes.MapPut(RoutesGreffes.Reglage, async (string code, string reglage, SaisieReglage saisie, HttpContext http,
-                                                   CatalogueGreffes c, ServiceIdentite identites, BaseRig b,
+        greffes.MapPut(RoutesGreffes.Reglage, async (string greffe, string reglage, SaisieReglage saisie, HttpContext http,
+                                                   CatalogueGreffes c, ServiceIdentite identites, ServiceDroits droits, BaseRig b,
                                                    CancellationToken ct) =>
         {
             if (AuteurReglage.De(await identites.DeLAppelantAsync(http, b, ct), http.User) is not { } auteur)
                 return SansAuteur();
-            return await SurBaseV3(c, code, ct, async cn =>
+            return await SurBaseV3(c, greffe, ct, async cn =>
             {
-                await using var cmd = new SqlCommand(
-                    "UPDATE soc.Reglage SET Valeur = @v, AuteurModif = @a, DateModif = GETDATE() WHERE Code = @c;", cn);
-                cmd.Parameters.Add(new SqlParameter("@v", System.Data.SqlDbType.VarChar, 1000) { Value = (object?)saisie.Valeur ?? DBNull.Value });
-                // varchar(50) comme PARAM_AUTEUR_MODIF : la V2 coupe aussi ses textes a la taille de la colonne.
-                cmd.Parameters.Add(new SqlParameter("@a", System.Data.SqlDbType.VarChar, 50) { Value = auteur.Length > 50 ? auteur[..50] : auteur });
-                cmd.Parameters.Add(new SqlParameter("@c", System.Data.SqlDbType.VarChar, 100) { Value = reglage });
-                if (await cmd.ExecuteNonQueryAsync(ct) == 0) return ReglageAbsent(code, reglage);
-                return Results.Ok((await LireReglagesAsync(cn, reglage, ct)).Single());
+                if (await droits.AppelantAsync(http, b, cn, ct) is not { } moi) return SansAuteur();
+                if (!ServiceDroits.PeutModifierLeGreffe(moi)) return SansLeDroit(moi);
+                await using var tx = (SqlTransaction)await cn.BeginTransactionAsync(ct);
+                if ((await LireReglagesAsync(cn, tx, reglage, ct)).FirstOrDefault() is not { } avant) return ReglageAbsent(greffe, reglage);
+                await using (var cmd = new SqlCommand(
+                    "UPDATE soc.Reglage SET Valeur = @v, AuteurModif = @a, DateModif = GETDATE() WHERE Code = @c;", cn, tx))
+                {
+                    cmd.Parameters.Add(new SqlParameter("@v", System.Data.SqlDbType.VarChar, 1000) { Value = (object?)saisie.Valeur ?? DBNull.Value });
+                    // varchar(50) comme PARAM_AUTEUR_MODIF : la V2 coupe aussi ses textes a la taille de la colonne.
+                    cmd.Parameters.Add(new SqlParameter("@a", System.Data.SqlDbType.VarChar, 50) { Value = auteur.Length > 50 ? auteur[..50] : auteur });
+                    cmd.Parameters.Add(new SqlParameter("@c", System.Data.SqlDbType.VarChar, 100) { Value = reglage });
+                    await cmd.ExecuteNonQueryAsync(ct);
+                }
+                var apres = (await LireReglagesAsync(cn, tx, reglage, ct)).Single();
+                // Le code d'un reglage va jusqu'a 58 caracteres dans RIG_DEV (soc.Journal.IdObjet en tient 40) :
+                // il est dans l'objet, ecrit en entier.
+                await JournalGestes.EcrireAsync(cn, tx, moi, saisie.Ecran, FamilleReglage, $"le reglage {apres.Code}", null, "a modifie",
+                    new { valeur = avant.Valeur }, new { valeur = apres.Valeur }, ct);
+                await tx.CommitAsync(ct);
+                return Results.Ok(apres);
             });
         });
 
@@ -108,6 +139,13 @@ internal sealed class ModuleGreffes : IModuleServeur
     /// si une route sortait un jour du groupe.</summary>
     private static string? Auteur(HttpContext http)
         => http.User.Identity is { IsAuthenticated: true, Name: { Length: > 0 } nom } ? nom : null;
+
+    /// <summary>Le geste d'une modification de la fiche, ecrit au journal de la base commune dans la
+    /// transaction du catalogue (<see cref="CatalogueGreffes.SaisirPassageAsync"/>) : avant et apres de
+    /// la seule valeur changee.</summary>
+    private static EcritureDuGeste JournalDeLaFiche(Appelant moi, string? ecran, string code, Func<FicheGreffe, object> valeur)
+        => (cn, tx, avant, apres, ct) => JournalGestes.EcrireAsync(cn, tx, moi, ecran, FamilleGreffe, $"la fiche du greffe {code}", code,
+            "a modifie", valeur(avant), valeur(apres), ct);
 
     private static async Task<IResult> SurBaseV3(CatalogueGreffes c, string code, CancellationToken ct, Func<SqlConnection, Task<IResult>> travail)
     {
@@ -133,11 +171,11 @@ internal sealed class ModuleGreffes : IModuleServeur
         catch (SqlException e) when (e.Number is >= 51700 and <= 51704) { return Refus(StatusCodes.Status409Conflict, e.Message); }
     }
 
-    private static async Task<List<ReglageGreffe>> LireReglagesAsync(SqlConnection cn, string? code, CancellationToken ct)
+    private static async Task<List<ReglageGreffe>> LireReglagesAsync(SqlConnection cn, SqlTransaction? tx, string? code, CancellationToken ct)
     {
         await using var cmd = new SqlCommand(
             "SELECT Code, Libelle, Valeur, Utilisation, AuteurCreation, DateCreation, AuteurModif, DateModif FROM soc.Reglage " +
-            (code is null ? "ORDER BY Code;" : "WHERE Code = @c;"), cn);
+            (code is null ? "ORDER BY Code;" : "WHERE Code = @c;"), cn, tx);
         if (code is not null) cmd.Parameters.Add(new SqlParameter("@c", System.Data.SqlDbType.VarChar, 100) { Value = code });
         await using var r = await cmd.ExecuteReaderAsync(ct);
         var liste = new List<ReglageGreffe>();
@@ -157,6 +195,11 @@ internal sealed class ModuleGreffes : IModuleServeur
     private static IResult SansAuteur()
         => Refus(StatusCodes.Status401Unauthorized,
             "Modification refusee : la requete n'a pas d'identite (session Windows), son auteur ne serait pas garde.");
+
+    /// <summary>403 : l'agent est admis mais n'a pas le droit de modifier le greffe ; rien n'a ete lu ni ecrit.</summary>
+    private static IResult SansLeDroit(Appelant moi)
+        => Refus(StatusCodes.Status403Forbidden,
+            $"Modification refusee : le compte {moi.CompteWindows} n'a pas le droit de modifier le greffe (il faut etre {ServiceDroits.QuiPeutModifierLeGreffe}).");
 
     private static IResult Refus(int statut, string motif) => Results.Json(new RefusGreffe(motif), statusCode: statut);
 }
