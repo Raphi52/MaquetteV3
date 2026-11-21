@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- L'OUTIL DU TRANSFERT INITIAL V2 -> V3 (REC-001, lot 7 du plan de reconstruction, phase 2) : le « script de
+       transfert des donnees » de la demande, une base de greffe a la fois. Le moteur est dans la partie serveur
+       (Serveur/Recopie/MoteurTransfert.cs) pour que la recopie continue, la reprise apres incident et la
+       comparaison de nuit (lots 8 a 11) s'appuient sur les memes regles et le meme journal.
+       Ligne de commande : en tete de Program.cs. Mode d'emploi : docs/reconstruction/recopie.md.
+       Banc : tests/RecopieTransfertCheck. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>RigV3.Transfert</RootNamespace>
+    <AssemblyName>RigV3.Transfert</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+  </ItemGroup>
+
+</Project>
