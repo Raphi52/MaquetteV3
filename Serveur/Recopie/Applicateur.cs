@@ -2,6 +2,8 @@
 // des champs perdus passaient une valeur non nullable la ou la liste attend (string?) (avertissement CS8620 a la compilation).
 // Puis la date V2 d'un ecart sans date de mise a jour : DateTime.Now du programme, alors que le SQL Server des bancs (Docker)
 // est a l'heure UTC -- mesure le 2026-11-21 : SYSDATETIME() 08:52, poste 09:52 -- ; elle vient desormais de SYSDATETIME().
+// Puis l'auteur V2 d'un ecart : ecrit NULL en dur, alors que la V2 note l'agent d'un client (CLIEN_ID_UTLST) -- mesure par
+// RecopieDeuxSensCheck (REC-004 CA01 rouge : CLIEN_ID_UTLST 1 -> 189, AuteurV2 vide) ; il est lu par RegleRecopie.ColonneAuteurV2.
 using System.Data;
 using System.Globalization;
 using Microsoft.Data.SqlClient;
@@ -215,11 +217,18 @@ internal static class Applicateur
         object dateV2 = Valeur(t.Regle.ColonneDateV2, v2) is { } d && DateTime.TryParse(d, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dv) &&
                         (reference is null || Valeur(t.Regle.ColonneDateV2, reference) != d) ? dv : DBNull.Value;
         var auteursV3 = string.Join(", ", lignes.Select(l => l.Auteur).Distinct());
+        // L'auteur cote V2 : l'agent que la V2 note sur la fiche (CLIEN_ID_UTLST d'un client), nomme comme la V2 l'affiche
+        // (Utilisateur.NomPrenomAbrege : « NOM Prenom (ABREGE) »). Seulement si le changement de la V2 l'a note -- sa date
+        // ou son agent a change depuis l'etat commun ; sinon l'agent de la fiche est celui d'un enregistrement plus ancien.
+        object auteurV2 = DBNull.Value;
+        if (Valeur(t.Regle.ColonneAuteurV2, v2) is { Length: > 0 } agent && (dateV2 is not DBNull || Valeur(t.Regle.ColonneAuteurV2, reference) != agent))
+            auteurV2 = (object?)await ScalaireAsync(cn, tx, "SELECT CONCAT(UTLST_NOM, ' ', UTLST_PRENOM, ' (', UTLST_ABREGE, ')') " +
+                                                            $"FROM {Sql.Q(t.BaseV2)}.dbo.UTILISATEUR WHERE UTLST_ID_UTLST = @u;", ct, ("@u", agent)) ?? DBNull.Value;
         var id = long.Parse((await ScalaireAsync(cn, tx, """
             INSERT INTO rec.Ecart (BaseV2, TableV2, IdV2, TableV3, IdV3, Fiche, Cible, DateV2, AuteurV2, DateV3, AuteurV3)
-            OUTPUT CONVERT(nvarchar(20), inserted.Id) VALUES (@b, @t2, @id2, @t3, @id3, LEFT(@f, 300), @c, ISNULL(CONVERT(datetime2(3), @d2), SYSDATETIME()), NULL, @d3, LEFT(@a3, 128));
+            OUTPUT CONVERT(nvarchar(20), inserted.Id) VALUES (@b, @t2, @id2, @t3, @id3, LEFT(@f, 300), @c, ISNULL(CONVERT(datetime2(3), @d2), SYSDATETIME()), LEFT(@a2, 128), @d3, LEFT(@a3, 128));
             """, ct, ("@b", t.BaseV2), ("@t2", t.NomV2), ("@id2", idV2), ("@t3", t.NomV3), ("@id3", idV3), ("@f", fiche), ("@c", (object?)cible ?? DBNull.Value),
-            ("@d2", dateV2), ("@d3", lignes[0].Le), ("@a3", auteursV3)))!, CultureInfo.InvariantCulture);
+            ("@d2", dateV2), ("@a2", auteurV2), ("@d3", lignes[0].Le), ("@a3", auteursV3)))!, CultureInfo.InvariantCulture);
         foreach (var (champ, valeurV2, valeurV3) in champs)
             await ExecuterAsync(cn, tx, "INSERT INTO rec.EcartChamp (IdEcart, Champ, ValeurV2, ValeurV3) VALUES (@id, @c, @v2, @v3);", ct,
                                 ("@id", id), ("@c", champ), ("@v2", (object?)valeurV2 ?? DBNull.Value), ("@v3", (object?)valeurV3 ?? DBNull.Value));

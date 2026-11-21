@@ -463,39 +463,54 @@ Exiger(avecSuivi < 50 && reprise.Erreur is null && manquants.Count == 0 && repri
 // Les dates de rec.* sont celles du serveur SQL (le SQL Server de Docker est a l'heure UTC) : le banc lit son horloge.
 async Task<DateTime> MaintenantSql() => (DateTime)(await Valeur(v3.Connexion, "SELECT SYSDATETIME()"))!;
 var debutConflits = await MaintenantSql();
-var conflits = new List<(string Table, string Id, ColonneV2 Col, string ValV3, string ValV2)>();
+var conflits = new List<(string Table, string Id, ColonneV2 Col, string ValV3, string ValV2, string? AuteurV2, string? IdAgentV2)>();
 foreach (var t in partagees)
 {
     var id = Prendre(t);
     var col = Textes(t)[0];
     var valV3 = Val(col, $"V3-{t}");
     var valV2 = Val(col, $"V2-{t}");
+    // Le client : l'agent de la V2 l'enregistre comme Client.Sauve de la V2 (RigMetier\Facture\Client.cs:522-523) -- la date
+    // de mise a jour ET l'agent courant dans CLIEN_ID_UTLST, un autre agent que celui de la fiche. Son nom attendu est celui
+    // que la fiche client de la V2 affiche (Utilisateur.NomPrenomAbrege : « NOM Prenom (ABREGE) »), lu ici colonne a colonne.
+    string? auteurV2 = null, idAgentV2 = null;
+    if (t == "CLIENT" && (await Lire(v2.Connexion, "SELECT TOP (1) UTLST_ID_UTLST, UTLST_NOM, UTLST_PRENOM, UTLST_ABREGE FROM dbo.UTILISATEUR " +
+                                                    $"WHERE UTLST_ID_UTLST <> ISNULL((SELECT CLIEN_ID_UTLST FROM dbo.CLIENT WHERE CLIEN_ID_CLIEN = {id}), -1) " +
+                                                    "ORDER BY UTLST_ID_UTLST")).Rows.Cast<DataRow>().FirstOrDefault() is { } agent)
+        (idAgentV2, auteurV2) = (Convert.ToString(agent[0]), $"{agent[1]} {agent[2]} ({agent[3]})");
     await Executer(v3.Connexion, V3Ecrit($"UPDATE v2.[{t}] SET [{col.Nom}] = '{valV3}' WHERE [{Cle(t)}] = {id};"));
-    await Executer(v2.Connexion, $"UPDATE dbo.[{t}] SET [{col.Nom}] = '{valV2}'" + (t == "CLIENT" ? ", CLIEN_DATE_DERNIERE_MODIF = '2026-11-21T08:30:00'" : "") + $" WHERE [{Cle(t)}] = {id};");
-    conflits.Add((t, id, col, valV3, valV2));
+    await Executer(v2.Connexion, $"UPDATE dbo.[{t}] SET [{col.Nom}] = '{valV2}'" +
+                                 (t == "CLIENT" ? $", CLIEN_DATE_DERNIERE_MODIF = '2026-11-21T08:30:00', CLIEN_ID_UTLST = {idAgentV2 ?? "NULL"}" : "") + $" WHERE [{Cle(t)}] = {id};");
+    conflits.Add((t, id, col, valV3, valV2, auteurV2, idAgentV2));
     ecartsProvoques[t] = 1;
 }
 var p7 = await Passer();
 var ca01 = new List<string>();
-foreach (var (t, id, col, valV3, valV2) in conflits)
+foreach (var (t, id, col, valV3, valV2, auteurV2, idAgentV2) in conflits)
 {
-    // Une ligne par champ perdu. Le client : l'agent de la V2 a change le champ ET sa date de mise a jour -- deux champs perdus.
+    // Une ligne par champ perdu. Le client : l'agent de la V2 a change le champ, sa date de mise a jour et son agent -- trois
+    // champs perdus, et l'auteur V2 de l'ecart est cet agent. Les 6 autres tables n'ont aucune colonne d'agent (leurs .sql
+    // dans RigDatabase\dbo\Tables) : leur auteur V2 reste vide.
     var e = (await Lire(v3.Connexion, $"SELECT e.Id, e.DateV2, e.DateV3, e.AuteurV3, e.AuteurV2, e.Fiche, c.Champ, c.ValeurV2, c.ValeurV3 " +
                                        $"FROM rec.Ecart e JOIN rec.EcartChamp c ON c.IdEcart = e.Id WHERE e.TableV2 = '{t}' AND e.IdV2 = '{id}' ORDER BY c.Champ")).Rows.Cast<DataRow>().ToList();
-    var attendus = t == "CLIENT" ? new[] { col.Nom, "CLIEN_DATE_DERNIERE_MODIF" }.Order(StringComparer.Ordinal).ToArray() : [col.Nom];
+    var attendus = t == "CLIENT" ? new[] { col.Nom, "CLIEN_DATE_DERNIERE_MODIF", "CLIEN_ID_UTLST" }.Order(StringComparer.Ordinal).ToArray() : [col.Nom];
     var champ = e.FirstOrDefault(r => (string)r[6] == col.Nom);
     var ok = e.Select(r => (string)r[6]).Order(StringComparer.Ordinal).SequenceEqual(attendus) && e.Select(r => Convert.ToInt64(r[0])).Distinct().Count() == 1
              && champ is not null && LigneJson.Lisible((string)champ[7]) == valV2 && LigneJson.Lisible((string)champ[8]) == valV3
-             && (string)e[0][3] == AgentV3 && e[0][4] is DBNull && (DateTime)e[0][2] >= debutConflits.AddSeconds(-1)
+             && (string)e[0][3] == AgentV3 && (DateTime)e[0][2] >= debutConflits.AddSeconds(-1)
+             && (t == "CLIENT" ? auteurV2 is not null && e[0][4] as string == auteurV2 : e[0][4] is DBNull)
              && (t != "CLIENT" || (DateTime)e[0][1] == new DateTime(2026, 11, 21, 8, 30, 0))
              && await EnV2(t, col.Nom, id) == valV3 && await EnV3(t, col.Nom, id) == valV3 && await Differentes(t, id, id) == 0;
-    if (!ok) ca01.Add($"{t} {id} ({e.Count} champ(s) : {string.Join(", ", e.Select(r => $"{r[6]} {r[7]} -> {r[8]}"))} ; V2 « {await EnV2(t, col.Nom, id)} », V3 « {await EnV3(t, col.Nom, id)} »)");
+    if (!ok) ca01.Add($"{t} {id} ({e.Count} champ(s) : {string.Join(", ", e.Select(r => $"{r[6]} {r[7]} -> {r[8]}"))} ; auteur V2 " +
+                      $"{(e.FirstOrDefault()?[4] is string a ? (a == auteurV2 ? "juste" : "autre que le nom de l'agent n° " + idAgentV2) : "vide")} ; V2 « {await EnV2(t, col.Nom, id)} », V3 « {await EnV3(t, col.Nom, id)} »)");
 }
 var exemple = conflits[0];
+var agentClient = conflits.FirstOrDefault(c => c.Table == "CLIENT").IdAgentV2;
 Exiger(p7.Erreur is null && p7.Ecarts == conflits.Count && ca01.Count == 0,
     $"REC-004 CA01 : une fiche de chaque table partagee modifiee dans la V3 puis dans la V2 avant le passage : la V3 gagne dans les deux bases, et {p7.Ecarts} ecarts sont ecrits, " +
-    $"chacun avec le champ, la valeur V2 perdue, la valeur V3 gardee, les deux dates (celle de la V2 lue dans CLIEN_DATE_DERNIERE_MODIF pour un client) et l'auteur V3 " +
-    $"(« {AgentV3} » ; la V2 ne note pas le sien) -- ex. {exemple.Table} {exemple.Id}.{exemple.Col.Nom} : « {exemple.ValV2} » perdu, « {exemple.ValV3} » garde {string.Join(" ; ", ca01)} {p7.Erreur}");
+    $"chacun avec le champ, la valeur V2 perdue, la valeur V3 gardee, les deux dates (celle de la V2 lue dans CLIEN_DATE_DERNIERE_MODIF pour un client) et les deux auteurs : " +
+    $"V3 « {AgentV3} », V2 pour le client : le nom de l'agent n° {agentClient} que la V2 note dans CLIEN_ID_UTLST, ecrit comme sa fiche client l'affiche (« NOM Prenom (ABREGE) ») -- les 6 autres tables " +
+    $"ne notent pas le leur -- ex. {exemple.Table} {exemple.Id}.{exemple.Col.Nom} : « {exemple.ValV2} » perdu, « {exemple.ValV3} » garde {string.Join(" ; ", ca01)} {p7.Erreur}");
 var apresConflits = await Passer();
 Exiger(apresConflits.Erreur is null && apresConflits.Ecarts == 0 && apresConflits.Remontees == 0 && await Nombre(v3.Connexion, "SELECT COUNT(*) FROM rec.Ecart") == conflits.Count,
     "REC-004 CA01 (suite) : le passage suivant ne remonte pas la valeur perdue de la V2 et n'ecrit aucun nouvel ecart : la valeur de la V3 reste dans les deux bases");
@@ -531,17 +546,27 @@ var ca04 = Prendre("CLIENT");
 var champA = colClient[0];
 var champB = colClient[1];
 var avantA = await EnV2("CLIENT", champA.Nom, ca04);
+// L'agent deja note sur la fiche (celui d'un enregistrement plus ancien) : la V2 change ici le champ sans noter ni date ni
+// agent, cet agent n'est donc pas l'auteur du changement -- jumeau accepte de l'auteur V2 de CA01.
+var agentAncien = await Texte(v2.Connexion, $"SELECT CLIEN_ID_UTLST FROM dbo.CLIENT WHERE CLIEN_ID_CLIEN = {ca04}");
+if (agentAncien is null)
+{
+    agentAncien = await Texte(v2.Connexion, "SELECT MIN(UTLST_ID_UTLST) FROM dbo.UTILISATEUR");
+    await Executer(v3.Connexion, V3Ecrit($"UPDATE v2.CLIENT SET CLIEN_ID_UTLST = {agentAncien} WHERE CLIEN_ID_CLIEN = {ca04};"));
+    await Passer();
+}
 await Executer(v2.Connexion, $"UPDATE dbo.CLIENT SET [{champA.Nom}] = '{Val(champA, "V2 CHAMP A")}' WHERE CLIEN_ID_CLIEN = {ca04};");
 await Executer(v3.Connexion, V3Ecrit($"UPDATE v2.CLIENT SET [{champB.Nom}] = '{Val(champB, "V3 CHAMP B")}' WHERE CLIEN_ID_CLIEN = {ca04};"));
 var p8 = await Passer();
 ecartsProvoques["CLIENT"]++;
-var champsCa04 = (await Lire(v3.Connexion, $"SELECT c.Champ, c.ValeurV2, c.ValeurV3 FROM rec.Ecart e JOIN rec.EcartChamp c ON c.IdEcart = e.Id WHERE e.TableV2 = 'CLIENT' AND e.IdV2 = '{ca04}'"))
+var champsCa04 = (await Lire(v3.Connexion, $"SELECT c.Champ, c.ValeurV2, c.ValeurV3, e.AuteurV2 FROM rec.Ecart e JOIN rec.EcartChamp c ON c.IdEcart = e.Id WHERE e.TableV2 = 'CLIENT' AND e.IdV2 = '{ca04}'"))
     .Rows.Cast<DataRow>().ToList();
 Exiger(p8.Ecarts == 1 && champsCa04.Count == 1 && (string)champsCa04[0][0] == champA.Nom && LigneJson.Lisible((string)champsCa04[0][1]) == Val(champA, "V2 CHAMP A")
-       && LigneJson.Lisible(champsCa04[0][2] as string) == avantA
+       && LigneJson.Lisible(champsCa04[0][2] as string) == avantA && champsCa04[0][3] is DBNull && agentAncien is not null
        && await EnV2("CLIENT", champA.Nom, ca04) == avantA && await EnV2("CLIENT", champB.Nom, ca04) == Val(champB, "V3 CHAMP B") && await Differentes("CLIENT", ca04, ca04) == 0,
     $"REC-004 CA04 : la V2 change {champA.Nom}, la V3 change {champB.Nom} : la fiche entiere de la V3 gagne ({champA.Nom} revient a « {avantA} », {champB.Nom} = « {Val(champB, "V3 CHAMP B")} » " +
-    $"dans les deux bases) et l'ecart liste le seul champ V2 perdu, {champA.Nom} « {Val(champA, "V2 CHAMP A")} » (fusion champ par champ : question ouverte au referent)");
+    $"dans les deux bases) et l'ecart liste le seul champ V2 perdu, {champA.Nom} « {Val(champA, "V2 CHAMP A")} » (fusion champ par champ : question ouverte au referent) ; " +
+    $"la V2 n'a note ni date ni agent : l'agent {agentAncien} deja sur la fiche n'est pas donne pour auteur (auteur V2 {(champsCa04.FirstOrDefault()?[3] is string ? "donne : un nom d'agent" : "non note")})");
 
 // CA05 : le compte du controle quotidien (REC-006) par base et par table.
 var parJour = (await Lire(v3.Connexion, "SELECT BaseV2, TableV2, Ecarts FROM rec.EcartsParJour WHERE Jour = CAST(SYSDATETIME() AS date)")).Rows.Cast<DataRow>()

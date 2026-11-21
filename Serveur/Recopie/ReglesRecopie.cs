@@ -42,6 +42,11 @@ public sealed record RegleRecopie(string TableV2, string TableV3, string Story, 
     /// recopie l'a vu. Le conflit, lui, se mesure toujours sur la ligne entiere (son etat au dernier passage).</summary>
     public string? ColonneDateV2 { get; init; }
 
+    /// <summary>La colonne ou la V2 note l'agent qui a enregistre la fiche (un UTLST_ID_UTLST de dbo.UTILISATEUR), ecrite
+    /// avec <see cref="ColonneDateV2"/> (REC-004 CA01). L'ecart en prend le nom, tel que la V2 l'affiche, quand le changement
+    /// de la V2 l'a notee ; sans elle, ou sans changement note, l'auteur V2 reste « non note ».</summary>
+    public string? ColonneAuteurV2 { get; init; }
+
     /// <summary>La colonne qui nomme la fiche pour l'agent (« DUPONT », « 2026B00012 »).</summary>
     public string? ColonneNom { get; init; }
 
@@ -90,9 +95,13 @@ internal sealed class ReglesRec002 : IReglesRecopie
 {
     public IEnumerable<RegleRecopie> Regles =>
     [
-        // REC-013
+        // fix-ok: auteur V2 d'un ecart client toujours vide -- mesure 2026-11-21 par RecopieDeuxSensCheck (REC-004 CA01 rouge :
+        // CLIEN_ID_UTLST 1 -> 189 change par la V2, AuteurV2 vide) : la regle ne nommait pas la colonne d'agent de la V2.
+        // REC-013. Client.Sauve de la V2 (RigMetier\Facture\Client.cs:522-523) ecrit la date ET l'agent courant ; sa fiche
+        // client les affiche (« Derniere modification le ... par ... », PROC_FCLIENT.cs:47). Les 6 autres tables n'ont aucune
+        // colonne d'agent (RigDatabase\dbo\Tables\*.sql).
         RegleRecopie.TelleQuelle("CLIENT", "REC-002", "client") with
-            { ColonneDateV2 = "CLIEN_DATE_DERNIERE_MODIF", ColonneNom = "CLIEN_NOM", Cible = "ecran:PROC_FCLIENT" },
+            { ColonneDateV2 = "CLIEN_DATE_DERNIERE_MODIF", ColonneAuteurV2 = "CLIEN_ID_UTLST", ColonneNom = "CLIEN_NOM", Cible = "ecran:PROC_FCLIENT" },
         // REC-012
         RegleRecopie.TelleQuelle("DOSSIER_RCS", "REC-002", "dossier RCS") with
         {
