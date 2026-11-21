@@ -8,13 +8,15 @@ namespace RigV3.Serveur.Socle.Courriels;
 
 /// <summary>
 /// Les courriels du greffe (SOC-006) : le service d'envoi (<see cref="ServiceCourriels"/>) pour les actes de la V3, le
-/// menage quotidien des traces (<see cref="MenageCourriels"/>), et cinq routes de lecture pour les ecrans « Courriels
-/// envoyés » (les envois, un envoi) et « Messagerie » (les modeles, un modele et son apercu, les listes de distribution).
+/// menage quotidien des traces (<see cref="MenageCourriels"/>), cinq routes de lecture pour les ecrans « Courriels
+/// envoyés » (les envois, un envoi) et « Messagerie » (les modeles, un modele et son apercu, les listes de distribution), et six
+/// routes d'ecriture pour la Messagerie (creer, modifier, activer ou desactiver un modele et une liste : <see cref="GestionCourriels"/>).
 ///
 /// Les routes portent le greffe dans leur adresse et <see cref="PolitiquesSocle.AgentAdmis"/>, posee une fois sur leur
 /// groupe : l'agent est juge dans la base de CE greffe (401, 403, 404, 503 par la politique). La liste des envois et le
 /// detail d'un envoi exigent en plus la fonction MAIL_LOT1, celle de l'ecran « Mails envoyés » de la V2 : sans elle,
-/// 403 et rien n'est lu. La base du greffe s'ouvre par le catalogue commun, jamais autrement.
+/// 403 et rien n'est lu. Les routes d'ecriture exigent la fonction GESTEMAIL, celle de l'ecran V2 « Modele de mail » : sans
+/// elle, 403 et rien n'est ecrit. La base du greffe s'ouvre par le catalogue commun, jamais autrement.
 /// </summary>
 internal sealed class ModuleCourriels : IModuleServeur
 {
@@ -75,7 +77,56 @@ internal sealed class ModuleCourriels : IModuleServeur
                 await droits.AppelantAsync(http, commune, cn, ct) is { } moi
                     ? Results.Ok(await ServiceCourriels.ListesVisiblesAsync(cn, moi.CompteWindows, ct))
                     : NonAdmis()));
+
+        // --- La gestion (ecran « Messagerie », procedure V2 PROC_GESTEMAIL) : chaque geste dans sa transaction, avec sa ligne au
+        // --- journal des gestes ; un modele reserve a Amitel n'existe pas pour un agent du greffe (404, CA05).
+        courriels.MapPost(RoutesCourriels.Modeles, (string greffe, SaisieModele saisie, HttpContext http, CatalogueGreffes c,
+                                                    ServiceDroits droits, BaseRig commune, CancellationToken ct) =>
+            Gerer(http, c, droits, commune, greffe, ct, async (cn, moi) =>
+                Results.Json(await GestionCourriels.CreerModeleAsync(cn, greffe, moi, saisie, ct), statusCode: StatusCodes.Status201Created)));
+
+        courriels.MapPut(RoutesCourriels.Modele, (string greffe, string type, SaisieModele saisie, HttpContext http, CatalogueGreffes c,
+                                                  ServiceDroits droits, BaseRig commune, CancellationToken ct) =>
+            Gerer(http, c, droits, commune, greffe, ct, async (cn, moi) =>
+                Results.Ok(await GestionCourriels.ModifierModeleAsync(cn, greffe, moi, type, saisie, ct))));
+
+        courriels.MapPut(RoutesCourriels.ActivationModele, (string greffe, string type, SaisieActivation saisie, HttpContext http,
+                                                            CatalogueGreffes c, ServiceDroits droits, BaseRig commune, CancellationToken ct) =>
+            Gerer(http, c, droits, commune, greffe, ct, async (cn, moi) =>
+                Results.Ok(await GestionCourriels.ActiverModeleAsync(cn, greffe, moi, type, saisie, ct))));
+
+        courriels.MapPost(RoutesCourriels.ListesDiffusion, (string greffe, SaisieListe saisie, HttpContext http, CatalogueGreffes c,
+                                                            ServiceDroits droits, BaseRig commune, CancellationToken ct) =>
+            Gerer(http, c, droits, commune, greffe, ct, async (cn, moi) =>
+                Results.Json(await GestionCourriels.CreerListeAsync(cn, moi, saisie, ct), statusCode: StatusCodes.Status201Created)));
+
+        courriels.MapPut(RoutesCourriels.ListeDiffusion, (string greffe, int id, SaisieListe saisie, HttpContext http, CatalogueGreffes c,
+                                                          ServiceDroits droits, BaseRig commune, CancellationToken ct) =>
+            Gerer(http, c, droits, commune, greffe, ct, async (cn, moi) =>
+                Results.Ok(await GestionCourriels.ModifierListeAsync(cn, greffe, moi, id, saisie, ct))));
+
+        courriels.MapPut(RoutesCourriels.ActivationListe, (string greffe, int id, SaisieActivation saisie, HttpContext http,
+                                                           CatalogueGreffes c, ServiceDroits droits, BaseRig commune, CancellationToken ct) =>
+            Gerer(http, c, droits, commune, greffe, ct, async (cn, moi) =>
+                Results.Ok(await GestionCourriels.ActiverListeAsync(cn, greffe, moi, id, saisie, ct))));
     }
+
+    /// <summary>
+    /// Un geste de gestion : l'appelant admis, qui a la fonction GESTEMAIL dans la base de CE greffe -- sinon 403 et rien n'est
+    /// ecrit (une panne de la verification est un refus, SOC-002 CA06) ; un geste refuse rend son statut et son motif.
+    /// </summary>
+    private static Task<IResult> Gerer(HttpContext http, CatalogueGreffes c, ServiceDroits droits, BaseRig commune, string greffe,
+                                       CancellationToken ct, Func<SqlConnection, Appelant, Task<IResult>> geste)
+        => SurBaseDuGreffe(c, greffe, ct, async cn =>
+        {
+            if (await droits.AppelantAsync(http, commune, cn, ct) is not { } moi) return NonAdmis();
+            if (await droits.VerifierAsync(http, commune, moi, RoutesCourriels.FonctionGestion, ct) is not { Autorise: true })
+                return Refus(StatusCodes.Status403Forbidden,
+                    $"Refusé : le compte {moi.CompteWindows} n'a pas la fonction {RoutesCourriels.FonctionGestion} (« Gestion modèles emails ») " +
+                    $"dans le greffe {greffe} : il lit les modèles et les listes, il ne les modifie pas.");
+            try { return await geste(cn, moi); }
+            catch (RefusGestionCourriels e) { return Refus(e.Statut, e.Message); }
+        });
 
     private static IResult NonAdmis() => Refus(StatusCodes.Status403Forbidden, "Refuse : l'agent n'est pas admis dans ce greffe.");
 

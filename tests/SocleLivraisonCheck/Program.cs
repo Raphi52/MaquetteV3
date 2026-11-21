@@ -568,11 +568,17 @@ try
         await site.StartAsync();
         var vSite = await site.GetTestClient().GetFromJsonAsync<VersionServeur>(RoutesVersions.Serveur);
         Exiger(vSite?.Site == "Antilles", "SOC-010 T02 : la partie serveur configuree pour les Antilles se presente comme telle (GET /socle/version)");
+        await site.StopAsync();
     }
     var programmeServeur = File.ReadAllText(Path.Combine(racine, "Serveur", "Program.cs"));
     Exiger(programmeServeur.Contains("UseWindowsService") && File.Exists(Path.Combine(AppContext.BaseDirectory, "installer-serveur.ps1"))
            && File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "installer-serveur.ps1")).Contains("sc.exe failure"),
         "SOC-010 T02 / CA04 : la partie serveur tourne en service Windows, redemarre seule apres une panne (sc.exe failure)");
+
+    // Le serveur du banc s'arrete avant d'etre detruit (decision du lot 1 de la phase 2, controle « Arret » de
+    // tests/SocleCourrielsCheck) : detruit sans StopAsync, l'hote annule ses services de fond sans s'etre arrete et le
+    // Surveillant (lot 2) sort en « BackgroundService failed » au journal, une fausse panne apres un banc vert.
+    await app.StopAsync();
 }
 finally
 {

@@ -996,6 +996,11 @@ Exiger(File.Exists(cheminRapport), $"NUM-008 CA07 (releve) : les resultats de la
 Reste("NUM-008 CA07 : rejouer cette charge sur une copie anonymisee d'une base de greffe et l'archiver avec le rapport de la beta (SOC-022) -- " +
       "aucune copie anonymisee n'existe sur ce poste");
 
+// Le serveur du banc s'arrete avant d'etre detruit (decision du lot 1 de la phase 2, controle « Arret » de
+// tests/SocleCourrielsCheck) : detruit sans StopAsync, l'hote annule ses services de fond sans s'etre arrete et le
+// Surveillant (lot 2) sort en « BackgroundService failed » au journal, une fausse panne apres un banc vert.
+await app.StopAsync();
+
 Console.WriteLine();
 Console.WriteLine(echecs.Count == 0
     ? "NumerotationCompteurCheck : tout est VERT."

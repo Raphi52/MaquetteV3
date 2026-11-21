@@ -30,7 +30,36 @@ public sealed class ResultatControle
     /// <summary>Ce qui est sorti de la source : des nombres, des cles primaires, des noms d'attributs et des
     /// empreintes de 32 octets -- jamais une valeur.</summary>
     public HashSet<string> GenresLusSource { get; } = [];
-    public bool Vert => Fuites.Count == 0 && VolumesDifferents.Count == 0 && NumerosChanges.Count == 0 && NonVidees.Count == 0 && Marquee;
+    /// <summary>Les colonnes GARDEES dont le nom a un segment personnel, tirees dans la source (CA06) : une regle fausse s'y voit.</summary>
+    public List<MesureGardee> Gardees { get; } = [];
+    /// <summary>Le lexique de prenoms de la base (empreintes) et le nombre de colonnes de prenoms qui l'ont donne.</summary>
+    public int LexiquePrenoms { get; set; }
+    public int ColonnesLexique { get; set; }
+    /// <summary>Des colonnes gardees a segment personnel ont des valeurs, mais la base n'a donne aucun prenom pour les juger.</summary>
+    public bool GardeesNonJugees => LexiquePrenoms == 0 && Gardees.Any(g => g.Valeurs > 0);
+    public bool Vert => Fuites.Count == 0 && VolumesDifferents.Count == 0 && NumerosChanges.Count == 0 && NonVidees.Count == 0 && Marquee
+                        && !Gardees.Any(g => g.Prenoms) && !GardeesNonJugees;
+}
+
+/// <summary>
+/// Une colonne gardee a segment personnel, mesuree dans la source : <paramref name="Valeurs"/> valeurs distinctes tirees,
+/// dont <paramref name="AvecPrenom"/> portent un prenom frequent de la base. <paramref name="Raison"/> : pourquoi elle est gardee.
+/// <paramref name="Toutes"/> : ce sont TOUTES les valeurs distinctes de la colonne (mesure exacte, sans hasard).
+/// </summary>
+public sealed record MesureGardee(string Colonne, string Raison, int Valeurs, int AvecPrenom, bool Toutes)
+{
+    public double Part => Valeurs == 0 ? 0 : (double)AvecPrenom / Valeurs;
+    /// <summary>Gardee en clair alors qu'elle porte des prenoms : la regle qui la garde est fausse.</summary>
+    public bool Prenoms => AvecPrenom > 0 && Part >= ControleCopie.PartPrenomsMax;
+}
+
+/// <summary>Le resultat de <see cref="ControleCopie.MesurerGardeesAsync"/> : des noms et des nombres.</summary>
+public sealed class MesureGardees
+{
+    public List<MesureGardee> Colonnes { get; } = [];
+    public int MotsLexique { get; set; }
+    public int ColonnesLexique { get; set; }
+    public HashSet<string> GenresLus { get; } = [];
 }
 
 /// <summary>
@@ -48,11 +77,34 @@ public sealed class ResultatControle
 /// oublie. Les colonnes personnelles sont celles que le CATALOGUE designe dans le schema de la source, pas
 /// la liste que la copie tient d'elle-meme : une colonne oubliee par la copie est controlee quand meme.
 ///
+/// UNE REGLE FAUSSE SE VOIT AUSSI (refus du chef, 2026-11-21). Les colonnes ci-dessus sont celles que les regles
+/// traitent : si une regle garde a tort une colonne de prenoms (« ETAT » pris pour technique dans
+/// CSRJD_PRENOMS_ETAT_CIVIL : 173 812 prenoms de RIG_DEV en clair), le controle, qui suit les memes regles, ne la tire
+/// pas. Il tire donc AUSSI chaque colonne GARDEE dont le nom a un segment personnel (segment technique, decision du
+/// catalogue ou remplacement) et mesure la part de ses valeurs qui portent un prenom frequent de la base : au-dela de
+/// <see cref="PartPrenomsMax"/>, la regle est fausse et le controle est rouge (voir <see cref="MesurerGardeesAsync"/>).
+///
 /// Il verifie aussi : memes volumes par table, colonnes gardees identiques sur des lignes tirees au hasard,
 /// colonnes « a vider » vides, marque presente.
 /// </summary>
 public static class ControleCopie
 {
+    /// <summary>
+    /// Part des valeurs a prenom au-dela de laquelle une colonne gardee porte des prenoms. Mesure du 2026-11-21 apres la
+    /// relecture des colonnes maigres (8 passages sur RIG_DEV entier, 5 sur l'extrait du banc), lexique de deux tables :
+    /// sur RIG_DEV entier (2 487 a 2 501 prenoms), les 69 colonnes que les regles gardent montent a 15 % au plus
+    /// (LGEDT_TEXTE_PARAMETRE) et les prenoms d'etat civil gardes par l'ancienne regle sont a 80-96 % ; sur l'extrait du
+    /// banc (321 prenoms), ces memes colonnes a 52-100 %. Le seuil passe entre les deux (20 points au-dessus, 17 au-dessous).
+    /// Chaque colonne est jugee sur 200 valeurs tirees parmi ses distinctes (6 points au plus d'un passage a l'autre,
+    /// mesure) ou sur TOUTES ses valeurs distinctes si elle en a moins (mesure exacte) : voir <see cref="MesurerGardeesAsync"/>.
+    /// Une colonne gardee au-dela se TRAITE (--regles TABLE.COLONNE=Mots) : on prefere abimer un libelle.
+    /// </summary>
+    public const double PartPrenomsMax = 0.35;
+
+    /// <summary>Un mot du lexique doit etre frequent (<see cref="FrequenceLexique"/> fois et plus) dans les colonnes de
+    /// prenoms d'au moins <see cref="TablesLexique"/> tables, la table mesuree exclue : un mot saisi a tort dans une seule
+    /// table (« SUPPLEANT », 80 fois dans DRGPP_PRENOMS_ETAT_CIVIL de RIG_DEV, absent de CASIER_JUDICIAIRE) n'est pas un prenom.</summary>
+    public const int FrequenceLexique = 3, TablesLexique = 2, LongueurPrenom = 4, LignesLexique = 30_000;
     /// <summary>Les mots plus courts peuvent etre l'image d'un autre mot de la meme valeur : on cherche les
     /// valeurs entieres (toutes) et les mots de 5 caracteres et plus.</summary>
     public const int MotMin = 5;
@@ -131,7 +183,6 @@ public static class ControleCopie
         SqlParameter PSel() => new("@sel", System.Data.SqlDbType.NVarChar, 64) { Value = sel };
         SqlParameter PN() => new("@n", System.Data.SqlDbType.Int) { Value = echantillon };
         SqlParameter PCles(IEnumerable<string> cles) => new("@cles", System.Data.SqlDbType.NVarChar, -1) { Value = string.Join('\u001f', cles) };
-        string Decoupe(string expr) => Separateurs.Aggregate(expr, (e, c) => $"REPLACE({e}, NCHAR({(int)c}), N' ')");
         var mots = $"CROSS APPLY (SELECT 1 AS g, u.v AS v UNION ALL SELECT 2, m.value FROM STRING_SPLIT(u.d, N' ') m WHERE LEN(m.value) >= {MotMin}) k";
 
         // ---- valeurs reelles restees a leur place (CA06)
@@ -194,6 +245,14 @@ public static class ControleCopie
             Etape($"{t.Libelle} : {cols.Count} colonne(s) personnelle(s) tirees");
         }
 
+        // ---- colonnes GARDEES a segment personnel : une regle fausse s'y voit (CA06, voir l'en-tete)
+        var mesure = await MesurerGardeesAsync(src, schema, catalogue, tables, echantillon, ct);
+        r.Gardees.AddRange(mesure.Colonnes);
+        r.LexiquePrenoms = mesure.MotsLexique;
+        r.ColonnesLexique = mesure.ColonnesLexique;
+        r.GenresLusSource.UnionWith(mesure.GenresLus);
+        Etape($"colonnes gardees a segment personnel : {mesure.Colonnes.Count} tirees, {mesure.Colonnes.Count(g => g.Prenoms)} avec des prenoms");
+
         // ---- colonnes gardees identiques, sur des lignes tirees au hasard (CA03)
         foreach (var t in tables)
         {
@@ -220,6 +279,103 @@ public static class ControleCopie
         Etape($"colonnes gardees : {r.LignesComparees} lignes comparees");
         return r;
     }
+
+    /// <summary>
+    /// LES COLONNES GARDEES A SEGMENT PERSONNEL, MESUREES DANS LA SOURCE (CA06). Pour chaque colonne de texte que
+    /// <paramref name="catalogue"/> GARDE et dont le nom a un segment personnel (CatalogueRegles.Marqueur), jusqu'a
+    /// <paramref name="echantillon"/> valeurs distinctes tirees au hasard : combien portent un prenom frequent de la base.
+    /// Une colonne qui a moins de <paramref name="echantillon"/> valeurs distinctes est lue EN ENTIER (MesureGardee.Toutes) :
+    /// les pages au hasard d'une grande table ne suffisent pas a la juger (voir plus bas).
+    /// Le lexique vient des colonnes de texte dont le nom porte PRENOM ou PRENOMS, QUELLE QUE SOIT leur regle (une regle
+    /// fausse ne le vide pas) ; un mot n'y compte que s'il est frequent dans <see cref="TablesLexique"/> autres tables.
+    /// Ne sortent de la source que des empreintes salees (sel tire puis oublie), des rangs de tirage et des nombres de lignes.
+    /// fix-ok: refus du chef (2026-11-21) -- CA06 ne tirait que les colonnes que les regles traitent, donc jamais celle
+    /// qu'une regle fausse garde ; mesure RIG_DEV : les prenoms d'etat civil gardes portent 80-96 % de prenoms frequents.
+    /// </summary>
+    public static async Task<MesureGardees> MesurerGardeesAsync(PorteSource src, SchemaSource schema, CatalogueRegles catalogue,
+        IReadOnlyCollection<TableSql> tables, int echantillon, CancellationToken ct)
+    {
+        var m = new MesureGardees();
+        var sel = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+        SqlParameter PSel() => new("@sel", System.Data.SqlDbType.NVarChar, 64) { Value = sel };
+
+        // Le lexique : empreinte du mot -> tables ou il est frequent dans une colonne de prenoms.
+        var lexique = new Dictionary<UInt128, HashSet<int>>();
+        foreach (var t in schema.Tables)
+            foreach (var c in t.Colonnes.Where(c => !c.Calculee && CatalogueRegles.EstTexte(c.Type)
+                                                    && CatalogueRegles.Segments(c.Nom).Any(s => s is "PRENOM" or "PRENOMS")))
+            {
+                var col = Ddl.Q(c.Nom);
+                var lus = 0;
+                await using (var l = await src.LireAsync(
+                    $"SELECT HASHBYTES('SHA2_256', @sel + y.w) FROM (SELECT LTRIM(RTRIM(s.value)) AS w FROM (SELECT TOP ({LignesLexique}) {col} AS v " +
+                    $"FROM {t.Complet} WITH (NOLOCK) WHERE {col} LIKE N'%[A-Za-z]%') x CROSS APPLY STRING_SPLIT({Decoupe("UPPER(CONVERT(nvarchar(4000), x.v))")}, N' ') s " +
+                    $"WHERE LEN(s.value) >= {LongueurPrenom}) y GROUP BY y.w HAVING COUNT(*) >= {FrequenceLexique}", ct, PSel()))
+                    while (await l.ReadAsync(ct))
+                    {
+                        if (l.GetValue(0) is not byte[] { Length: 32 } h) { m.GenresLus.Add("AUTRE"); continue; }
+                        m.GenresLus.Add("empreinte");
+                        var k = Cle(h);
+                        if (!lexique.TryGetValue(k, out var ou)) lexique[k] = ou = [];
+                        ou.Add(t.Id);
+                        lus++;
+                    }
+                if (lus > 0) m.ColonnesLexique++;
+            }
+        m.MotsLexique = lexique.Count(x => x.Value.Count >= TablesLexique);
+
+        // Les volumes (metadonnees) : une grande table se tire par pages, comme le reste du controle.
+        var volumes = new Dictionary<int, long>();
+        foreach (var l in await src.LignesAsync("SELECT p.object_id, SUM(p.rows) FROM sys.partitions p WHERE p.index_id IN (0, 1) GROUP BY p.object_id", ct))
+            volumes[Convert.ToInt32(l[0])] = Convert.ToInt64(l[1]);
+        m.GenresLus.Add("nombre");
+
+        foreach (var t in tables)
+            foreach (var c in t.Colonnes.Where(c => !c.Calculee && CatalogueRegles.EstTexte(c.Type) && CatalogueRegles.Marqueur(c.Nom) is not null))
+            {
+                var regle = catalogue.Pour(t.Nom, c.Nom, c.Type);
+                if (regle.Anonymise) continue;
+                var col = Ddl.Q(c.Nom);
+                var n = volumes.GetValueOrDefault(t.Id); // TableSql.Id = object_id (Schema.cs)
+                var parPages = $"{t.Complet} TABLESAMPLE SYSTEM ({Math.Min(100.0, Math.Max(0.001, 100.0 * 50 * echantillon / n)).ToString("0.###", CultureInfo.InvariantCulture)} PERCENT) WITH (NOLOCK)";
+                var entiere = $"{t.Complet} WITH (NOLOCK)";
+                // fix-ok: objection du juge (2026-11-21) -- des pages au hasard d'une grande table ne rendent que les valeurs
+                // FREQUENTES d'une colonne qui en a peu : 4 a 9 des 82 valeurs de DEMANDE_EDITION.DMNED_CODE_ENTITE_DESTINATAIRE
+                // (4 300 504 lignes), et un seul mot a prenom y faisait 12 a 50 % (rouge au hasard). Moins de @n valeurs par pages :
+                // la colonne est relue sur TOUTE la table (6 s au plus par colonne sur RIG_DEV), et la mesure devient exacte.
+                var valeurs = await ValeursAsync(n <= GrandeTable ? entiere : parPages);
+                if (n > GrandeTable && valeurs.Count < echantillon) valeurs = await ValeursAsync(entiere);
+                m.Colonnes.Add(new MesureGardee($"{t.Libelle}.{c.Nom}", regle.Origine, valeurs.Count, valeurs.Values.Count(v => v), valeurs.Count < echantillon));
+
+                // Jusqu'a @n valeurs distinctes tirees au hasard dans « source » : rang de tirage -> porte un prenom frequent.
+                async Task<Dictionary<string, bool>> ValeursAsync(string source)
+                {
+                    var lues = new Dictionary<string, bool>();
+                    await using var l = await src.LireAsync(
+                        $"SELECT CONVERT(nvarchar(20), x.i), HASHBYTES('SHA2_256', @sel + LTRIM(RTRIM(s.value))) FROM (SELECT TOP (@n) ROW_NUMBER() OVER (ORDER BY NEWID()) AS i, d.v " +
+                        $"FROM (SELECT DISTINCT CONVERT(nvarchar(4000), {col}) AS v FROM {source} WHERE {col} LIKE N'%[A-Za-z]%') d ORDER BY i) x " +
+                        $"OUTER APPLY (SELECT value FROM STRING_SPLIT({Decoupe("UPPER(x.v)")}, N' ') WHERE LEN(value) >= {LongueurPrenom}) s", ct,
+                        PSel(), new SqlParameter("@n", System.Data.SqlDbType.Int) { Value = echantillon });
+                    while (await l.ReadAsync(ct))
+                    {
+                        m.GenresLus.Add("nombre");
+                        var rang = l.GetString(0);
+                        var prenom = false;
+                        if (l.GetValue(1) is byte[] { Length: 32 } h)
+                        {
+                            m.GenresLus.Add("empreinte");
+                            prenom = lexique.TryGetValue(Cle(h), out var ou) && ou.Count(x => x != t.Id) >= TablesLexique;
+                        }
+                        else if (!l.IsDBNull(1)) m.GenresLus.Add("AUTRE"); // NULL : valeur sans mot de 4 lettres
+                        lues[rang] = lues.GetValueOrDefault(rang) || prenom;
+                    }
+                    return lues;
+                }
+            }
+        return m;
+    }
+
+    private static string Decoupe(string expr) => Separateurs.Aggregate(expr, (e, c) => $"REPLACE({e}, NCHAR({(int)c}), N' ')");
 
     /// <summary>(cle primaire, rang de la colonne ou nom de l'attribut, genre, empreinte).</summary>
     private readonly record struct Empreinte(string Cle, string Rang, int Genre, UInt128 Valeur);
