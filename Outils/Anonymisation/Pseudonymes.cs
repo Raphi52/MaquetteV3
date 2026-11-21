@@ -93,6 +93,29 @@ public sealed class Pseudonymes : IDisposable
     }
 
     /// <summary>
+    /// Nom(s) de fichier : comme <see cref="Texte"/>, mais une extension CONNUE (« .pdf », « .DOC ») en fin de nom est
+    /// gardee : le fichier reste un fichier du meme genre. Liste fermee, mesuree sur les 38 colonnes *NOM*FICHIER* de
+    /// RIG_DEV (2026-11-21 : DOC 3,4 M, XML 2,8 M, PDF 2,2 M, TXT, ZIP, SQL, DOCX, HTML, DAT, TIF…) : une fin « .JEAN »
+    /// n'est pas une extension, elle est remplacee. Chemins (« \\serveur\dossier\ ») : chaque mot remplace.
+    /// </summary>
+    public string Fichier(string texte)
+    {
+        bool[]? protege = null;
+        foreach (Match m in ExtensionFichier().Matches(texte))
+        {
+            protege ??= new bool[texte.Length];
+            var g = m.Groups["ext"];
+            for (var i = g.Index; i < g.Index + g.Length; i++) protege[i] = true;
+        }
+        return RemplacerMots(texte, protege);
+    }
+
+    private static Regex ExtensionFichier() => _extensionFichier;
+    private static readonly Regex _extensionFichier =
+        new(@"\.(?<ext>(?i:pdf|docx?|xml|txt|zip|sql|html?|dat|tiff?|rpt|json|xlsx?|csv|png|gif|jpe?g|rtf|odt|ods|msg|eml|p7[sm]|xsd))(?![\p{L}\p{N}])",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    /// <summary>
     /// Telephone : les chiffres sont permutes ENSEMBLE (« 06 12 34 56 78 » et « 0612345678 » donnent
     /// les memes chiffres), les deux premiers gardes des qu'il y en a six (fixe, portable, indicatif) ;
     /// separateurs a leur place ; un mot (« poste ») remplace comme un texte.

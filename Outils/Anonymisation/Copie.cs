@@ -183,7 +183,7 @@ public static class CopieAnonymisee
         rapport.Fin = DateTime.Now;
         foreach (var t in tables)
             foreach (var c in t.Colonnes)
-                if (catalogue.Suspicion(t.Nom, c.Nom) is { } raison) rapport.ARelire.Add(($"{t.Libelle}.{c.Nom}", raison));
+                if (catalogue.Suspicion(t.Nom, c.Nom, c.Type) is { } raison) rapport.ARelire.Add(($"{t.Libelle}.{c.Nom}", raison));
         await MarquerAsync(cn, rapport, ct);
         if (o.FichierRapport is not null)
         {
