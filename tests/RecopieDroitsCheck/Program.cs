@@ -1,14 +1,22 @@
-// fix-ok: banc NEUF du lot 19, retouche avant son premier lancement : la compilation a dit qu'il ne pouvait pas nommer
+// fix-ok: lot 20, section 4 du banc : la 1re compilation a dit BilanPassage ambigu (RigV3.Serveur.Recopie et Socle.Supervision, alias pose) et SignatureDeFond\n// absent (RigV3.Serveur.Socle.Chaines, using ajoute) ; ensuite la section a ete verte du premier coup, puis rouge avec l'etape des droits neutralisee.\n// fix-ok: banc NEUF du lot 19, retouche avant son premier lancement : la compilation a dit qu'il ne pouvait pas nommer
 // DroitsRecopies (internal, rendu public), qu'un tuple sans nom ne se lisait pas par ses champs (rNouveau), et un CS8604 sur
 // fSansCategorie ; la comparaison des noms de declencheurs passe en ensemble (l'ordre culturel de « _ » et des lettres varie).
 using System.Data;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using RecopieTransfertCheck;
 using RigV3.Base;
 using RigV3.Contrats.Socle;
+using RigV3.Serveur;
 using RigV3.Serveur.Recopie;
 using RigV3.Serveur.Socle.Comptes;
 using RigV3.Serveur.Socle.Greffes;
+using RigV3.Serveur.Socle.Chaines;
+using RigV3.Serveur.Socle.Supervision;
+using BilanPassage = RigV3.Serveur.Recopie.BilanPassage;
 using SocleDroitsCheck;
 
 // Banc de SOC-002 T05 / CA07 (carnet\socle.json) et de la fin de REC-017 CA01 (carnet\recopie.json) : les droits d'un compte
@@ -445,6 +453,101 @@ await using (var cn = new SqlConnection(v3.Connexion))
 Exiger(comptesFaux.Count == 0 && comparaisons > 0,
     $"SOC-002 CA07 : apres tous les cas, chaque compte actif de la V2 ({actifs.Count(correspondances.ContainsKey)}) repond comme la V3 pour chaque fonction ({comparaisons} comparaisons) " +
     string.Join(", ", comptesFaux));
+
+// ====================================================================================================
+// 4. LE CONTROLE DE NUIT DES DROITS (lot 20 : REC-006 CA01 « pour chaque table partagee », CA02, CA04 ; SOC-002 T06)
+//    Le meme controle que la nuit (ComparaisonBases : etats figes des deux bases), sur la base de ce banc apres sa « journee » de
+//    recopie de droits ci-dessus. Il compare la REPONSE de la V2 a celle de la V3, compte par compte, fonction par fonction.
+// ====================================================================================================
+var optionsNuit = new OptionsComparaison(v2.Connexion, v3.Connexion) { Tables = ["UTILISATEUR"] };
+var nuitPropre = await ComparaisonBases.ComparerAsync(optionsNuit);
+var droitsPropre = nuitPropre.Tables.SingleOrDefault(t => t.TableV2 == DroitsRecopies.TableControle);
+var comptesActifsRecopies = actifs.Count(correspondances.ContainsKey);
+var enBasePropre = await Texte(v3.Connexion, $"SELECT CONCAT(LignesV2, '/', Comparees, '/', Ecarts) FROM rec.ComparaisonTable WHERE IdComparaison = {nuitPropre.Id} AND TableV2 = '{DroitsRecopies.TableControle}'");
+Exiger(nuitPropre.Etat == "fini" && droitsPropre is not null && droitsPropre.LignesV2 == comptesActifsRecopies && comptesActifsRecopies > 0
+       && droitsPropre.Comparees == (long)comptesActifsRecopies * oracleFinal.Fonctions.Count && droitsPropre.Ecarts == 0
+       && !nuitPropre.Details.Any(d => d.TableV2 == DroitsRecopies.TableControle)
+       && enBasePropre == $"{comptesActifsRecopies}/{droitsPropre.Comparees}/0",
+    $"REC-006 CA01 (droits) / SOC-002 T06 : apres la journee de recopie, le controle de nuit compare les droits de chaque compte actif recopie ({droitsPropre?.LignesV2} comptes, " +
+    $"{oracleFinal.Fonctions.Count} fonctions : {droitsPropre?.Comparees} reponses V2 / V3), 0 ecart, et l'ecrit au rapport de la base (rec.ComparaisonTable : {enBasePropre}) — {droitsPropre?.Detail}");
+
+// Un role donne A LA MAIN dans l'ancien RIG, hors recopie (aucun declencheur ne le suit : le rapport est la seule trace).
+var roleMain = (await Texte(v2.Connexion, $"SELECT TOP (1) r.HROLE_NOM_ROLE FROM dbo.HABILIT_ROLE_USER AS r WHERE r.HROLE_NOM_ROLE IN ('{R1}', '{R2}', '{R3}') " +
+                                          $"AND NOT EXISTS (SELECT 1 FROM dbo.HABILIT_UTILISATEUR_ROLE_USER AS h WHERE h.HUROL_ID_UTLST = {compteCompta} AND h.HUROL_NOM_ROLE = r.HROLE_NOM_ROLE) " +
+                                          "ORDER BY r.HROLE_NOM_ROLE"))!;
+await Executer(v2.Connexion, $"INSERT INTO dbo.HABILIT_UTILISATEUR_ROLE_USER (HUROL_ID_UTLST, HUROL_NOM_ROLE) VALUES ({compteCompta}, '{roleMain}');");
+var attenduMain = await Comparer(compteCompta);   // l'oracle de la V2 contre la V3, independant du serveur
+var nuitMain = await ComparaisonBases.ComparerAsync(optionsNuit);
+var droitsMain = nuitMain.Tables.Single(t => t.TableV2 == DroitsRecopies.TableControle);
+var ecartsDroits = nuitMain.Details.Where(d => d.TableV2 == DroitsRecopies.TableControle).ToList();
+var enBaseMain = await Lire(v3.Connexion, $"SELECT IdV2, IdV3, Colonnes, Detail FROM rec.ComparaisonEcart WHERE IdComparaison = {nuitMain.Id} AND TableV2 = '{DroitsRecopies.TableControle}'");
+Exiger(attenduMain.Ecarts.Count > 0 && droitsMain.Ecarts == attenduMain.Ecarts.Count && ecartsDroits.Count == attenduMain.Ecarts.Count
+       && ecartsDroits.All(d => d.IdV2 == compteCompta && d.IdV3 == idComptaV3.ToString() && d.Detail == "V2 : accordée ; V3 : refusée")
+       && ecartsDroits.Select(d => d.Colonnes).Order(StringComparer.Ordinal).SequenceEqual(attenduMain.Ecarts.Select(e => e.Split(' ')[0]).Order(StringComparer.Ordinal))
+       && enBaseMain.Rows.Count == ecartsDroits.Count && nuitMain.Ecarts >= droitsMain.Ecarts && nuitMain.CodeSortie == 5,
+    $"REC-006 CA02 (droits) : le role {roleMain} donne a la main dans la V2 au compte {compteCompta} (hors recopie) est liste : {droitsMain.Ecarts} fonction(s) que la V2 accorde et que la V3 refuse " +
+    $"(compte V2 {compteCompta}, V3 {idComptaV3}, fonction, « V2 : accordée ; V3 : refusée »), les memes que l'oracle de la V2 — par ex. {string.Join(", ", ecartsDroits.Take(4).Select(d => d.Colonnes))} ; " +
+    $"ecrit dans rec.ComparaisonEcart ({enBaseMain.Rows.Count} lignes), code de sortie du controle {nuitMain.CodeSortie}");
+
+// REC-006 CA04 : l'alerte d'exploitation (le vrai surveillant, la source AlertesRecopie) nomme la table des droits ; le controle propre suivant la ferme.
+const string GreffeNuit = "9303";
+var serveurBancs = new SqlConnectionStringBuilder(BaseJetable.ServeurDesBancs());
+var authentification = new SqlConnectionStringBuilder(serveurBancs.ConnectionString);
+authentification.Remove("Data Source");
+await Executer(v3.Connexion,
+    "INSERT INTO soc.Greffe (CodeGreffe, Nom, Serveur, BaseV2, BaseV3, BaseV3CreeeLe, EstBeta, EstOutreMer, Fuseau, ModifiePar, ModifieLe) VALUES " +
+    $"('{GreffeNuit}', N'Greffe du banc (droits)', '{serveurBancs.DataSource}', '{v2.Nom}', '{v3.Nom}', SYSDATETIME(), 0, 0, 'Romance Standard Time', 'banc', SYSDATETIME());");
+await using var app = ServeurRig.Construire(["--environment", "Development"], s =>
+{
+    s.WebHost.UseTestServer();
+    s.Logging.SetMinimumLevel(LogLevel.Warning);
+    s.Configuration["ConnectionStrings:RigV3"] = v3.Connexion;
+    s.Configuration[CatalogueGreffes.CleAuthentification] = authentification.ConnectionString;
+    s.Configuration[SignatureDeFond.Reglage] = "0";
+    s.Configuration["Supervision:Automatique"] = "false";
+    s.Configuration[ReglagesPlanificateur.CleIntervalle] = "0";
+});
+await app.StartAsync();
+var surveillant = app.Services.GetRequiredService<Surveillant>();
+var canal = (CanalAlerteSimule)app.Services.GetRequiredService<ICanalAlerte>();
+async Task<List<(string Erreur, bool Fermee)>> AlertesEcart() =>
+    [.. (await Lire(v3.Connexion, $"SELECT Erreur, CASE WHEN FermeeLe IS NULL THEN 0 ELSE 1 END FROM soc.AlerteExploitation WHERE Regle = '{AlertesRecopie.RegleEcart}' AND CodeGreffe = '{GreffeNuit}' ORDER BY Id"))
+        .Rows.Cast<DataRow>().Select(r => ((string)r[0], Convert.ToInt32(r[1]) == 1))];
+await surveillant.PasserAsync();
+var alertes = await AlertesEcart();
+var ouverte = alertes.FirstOrDefault(a => !a.Fermee);
+Exiger(ouverte != default && ouverte.Erreur.Contains($"{DroitsRecopies.TableControle} ({droitsMain.Ecarts} ecarts") && ouverte.Erreur.Contains($"controle {nuitMain.Id}")
+       && !ouverte.Erreur.Contains(roleMain) && canal.Recues.Any(a => a.Regle == AlertesRecopie.RegleEcart && a.CodeGreffe == GreffeNuit),
+    $"REC-006 CA04 (droits) : le role donne a la main leve l'alerte d'exploitation « recopie-ecart » du greffe {GreffeNuit}, qui nomme la table des droits et le rapport (« {ouverte.Erreur} ») " +
+    "— aucun role ni valeur dans le message ; envoyee par le canal d'alerte");
+
+// Le jumeau (meme controle, ce que la V2 dit est ce que la V3 dit) : le role retire a la main, plus aucun ecart de droits, l'alerte se ferme.
+await Executer(v2.Connexion, $"DELETE FROM dbo.HABILIT_UTILISATEUR_ROLE_USER WHERE HUROL_ID_UTLST = {compteCompta} AND HUROL_NOM_ROLE = '{roleMain}';");
+var nuitRetire = await ComparaisonBases.ComparerAsync(optionsNuit);
+var droitsRetire = nuitRetire.Tables.Single(t => t.TableV2 == DroitsRecopies.TableControle);
+await surveillant.PasserAsync();
+Exiger(droitsRetire.Ecarts == 0 && droitsRetire.Comparees == droitsPropre!.Comparees && (await AlertesEcart()).All(a => a.Fermee),
+    $"REC-006 CA04 (droits, jumeau) : le role retire a la main, le controle suivant ne trouve plus d'ecart de droits ({droitsRetire.Ecarts}) et l'alerte est fermee");
+
+// Un droit retire dans la V3 sans que la recopie l'ait passe (le declencheur coupe, l'agent garde le droit dans la V2) : meme controle, meme alerte.
+await Executer(v3.Connexion, "DISABLE TRIGGER soc.TR_CompteRole_FileRecopie ON soc.CompteRole;");
+var roleRetireV3 = await Geste(cn => comptes.RoleAsync(cn, resp, new DemandeRole(idRolesV3, R2, false, Ecran), default));
+var nuitRatee = await ComparaisonBases.ComparerAsync(optionsNuit);
+await Executer(v3.Connexion, "ENABLE TRIGGER soc.TR_CompteRole_FileRecopie ON soc.CompteRole;");
+var droitsRatee = nuitRatee.Tables.Single(t => t.TableV2 == DroitsRecopies.TableControle);
+var attenduRatee = await Comparer(compteRoles);
+Exiger(roleRetireV3.Fait && droitsRatee.Ecarts > 0 && droitsRatee.Ecarts == attenduRatee.Ecarts.Count
+       && nuitRatee.Details.Where(d => d.TableV2 == DroitsRecopies.TableControle).All(d => d.IdV2 == compteRoles && d.Detail == "V2 : accordée ; V3 : refusée"),
+    $"REC-006 CA01 (droits) : une recopie de droits ratee (le role {R2} retire dans la V3, jamais passe dans la V2) est vue par le controle : {droitsRatee.Ecarts} fonction(s) du compte {compteRoles}, " +
+    $"comme l'oracle de la V2 ({attenduRatee.Ecarts.Count})");
+// Le changement suivant du compte (declencheur remis) met la V2 d'accord, comme dans la contre-epreuve ci-dessus.
+await Geste(cn => comptes.RoleAsync(cn, resp, new DemandeRole(idRolesV3, R2, true, Ecran), default));
+await Geste(cn => comptes.RoleAsync(cn, resp, new DemandeRole(idRolesV3, R2, false, Ecran), default));
+await Passer();
+var nuitRattrapee = await ComparaisonBases.ComparerAsync(optionsNuit);
+Exiger(nuitRattrapee.Tables.Single(t => t.TableV2 == DroitsRecopies.TableControle).Ecarts == 0,
+    "REC-006 CA01 (droits, jumeau) : la recopie passee, le controle suivant ne voit plus d'ecart de droits");
+await app.StopAsync();
 
 await SupprimerInstantanes(v2.Nom);
 return Bilan();

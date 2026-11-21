@@ -74,8 +74,8 @@ public sealed class ComparaisonNocturne(CatalogueGreffes catalogue, JournalErreu
                 ConservationJours = conservation,
                 Journal = log,
             }, ct);
-            log.LogInformation("Controle de nuit {Id} du greffe {Greffe} : {Etat}, {Ecarts} ecarts, {Orphelins} orphelins, {Sans} sans correspondance, {Ms} ms",
-                               rapport.Id, fiche.Code, rapport.Etat, rapport.Ecarts, rapport.Orphelins, rapport.SansCorrespondance, rapport.DureeMs);
+            log.LogInformation("Controle de nuit {Id} du greffe {Greffe} : {Etat}, {Ecarts} ecarts dont {EcartsDroits} de droits, {Orphelins} orphelins, {Sans} sans correspondance, {Ms} ms",
+                               rapport.Id, fiche.Code, rapport.Etat, rapport.Ecarts, rapport.Tables.Where(t => t.TableV2 == DroitsRecopies.TableControle).Sum(t => t.Ecarts), rapport.Orphelins, rapport.SansCorrespondance, rapport.DureeMs);
         }
         catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
         {

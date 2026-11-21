@@ -66,6 +66,8 @@ public sealed record RapportComparaison(int Id, string Etat, string? Motif, stri
 ///  4. Un ecart est DETAILLE (CA02) : les deux lignes relues colonne par colonne, les colonnes qui different. Puis il
 ///     est RELU dans les deux bases vivantes : disparu, c'etait une recopie en cours entre les deux etats figes
 ///     (« resorbe », compte, non alerte) ; present, il est au rapport.
+///  4 bis. Les DROITS des comptes (fiche UTILISATEUR en service) : pas ligne a ligne, la REPONSE de la V2 contre celle de la V3 pour chaque
+///     compte actif recopie et chaque fonction (DroitsRecopies.ComparerAsync) ; un ecart va au rapport comme les autres.
 ///  5. Les LIENS ORPHELINS (CA03) : une demande ou une affaire de la V3 qui vise une fiche partagee sans correspondance
 ///     (hors liens casses herites, deja notes par le transfert dans rec.LienCasse).
 ///  6. Le rapport, ecrit dans la base V3 (rec.Comparaison, rec.ComparaisonTable, rec.ComparaisonEcart) : lignes
@@ -154,6 +156,18 @@ public static class ComparaisonBases
                 tables.Add(t);
                 o.Suivre?.Invoke($"{nom} -> {t.TableV3 ?? "aucune table V3"} : {t.LignesV2} lignes V2, {t.LignesV3} V3, {t.Comparees} comparees, {t.Ecarts} ecarts, " +
                                  $"{t.SansCorrespondanceV2} V2 et {t.SansCorrespondanceV3} V3 sans correspondance, {t.Rejetees} rejetees, {t.Resorbes} resorbes, {t.DureeMs} ms");
+            }
+
+            // 4 bis. Les droits des comptes (REC-006 CA01 pour UTILISATEUR, SOC-002 T06) : la partie jointe de la fiche compte, comparee par la
+            // REPONSE (DroitsRecopies.ComparerAsync) des que la recopie de la fiche est en service -- avant, la V3 ne les ecrit pas dans la V2.
+            if (misEnService && demandees.Contains("UTILISATEUR", StringComparer.OrdinalIgnoreCase)
+                && regles.Any(r => string.Equals(r.TableV2, "UTILISATEUR", StringComparison.OrdinalIgnoreCase) && r.Jointe is DroitsRecopies)
+                && catV2.Tables.ContainsKey("HABILIT_UTILISATEUR_ROLE_USER") && catV2.Tables.ContainsKey("PROCESSUS_ET_FONCTIONALITE")
+                && await Scalaire(lv3, "SELECT OBJECT_ID(N'soc.Droit', N'V');", ct) is not null)
+            {
+                var t = await DroitsRecopies.ComparerAsync(o, baseV2, figeV2.Connexion, lv3, details, ct);
+                tables.Add(t);
+                o.Suivre?.Invoke($"{t.TableV2} -> {t.TableV3} : {t.Detail}, {t.Comparees} reponses comparees, {t.Ecarts} ecarts, {t.Resorbes} resorbes, {t.DureeMs} ms");
             }
 
             // 5. Les liens orphelins.

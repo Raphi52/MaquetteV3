@@ -26,4 +26,9 @@
     <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Le serveur de test : le controle de nuit des droits leve l'alerte d'exploitation par le vrai surveillant (REC-006 CA04). -->
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
+  </ItemGroup>
+
 </Project>
