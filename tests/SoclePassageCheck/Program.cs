@@ -352,6 +352,17 @@ var sortieB0 = new StringWriter();
 var codeB0 = await RigV3.Passage.LigneDeCommande.ExecuterAsync(Cli("passer", commune, "1801", "--passage", Iso(passageDemain)), sortieB0, coffre);
 Exiger(codeB0 == 2 && sortieB0.ToString().Contains("n'est pas sur ce poste"),
     $"SOC-024 T02 : un greffe dont l'instance n'est pas sur ce poste ({fiches["1801"][2]}) est refuse sans connexion ni ecriture (code {codeB0})");
+// Un catalogue d'un autre poste : refuse AVANT de s'y connecter (sans quoi l'appel attendrait le delai de connexion), passage comme retour.
+const string CommuneDistante = @"Server=SQL-PROD\PROD;Database=RIGV3_COMMUN;Integrated Security=True;TrustServerCertificate=True;Connect Timeout=30";
+var chronoDistant = Stopwatch.StartNew();
+var sortieB0b = new StringWriter();
+var codeB0b = await RigV3.Passage.LigneDeCommande.ExecuterAsync(["passer", "--commune", CommuneDistante, "--greffe", "8002"], sortieB0b, coffre);
+var sortieB0c = new StringWriter();
+var codeB0c = await RigV3.Passage.LigneDeCommande.ExecuterAsync(["retour", "--commune", CommuneDistante, "--greffe", "8002"], sortieB0c, coffre);
+Exiger(codeB0b == 2 && codeB0c == 2 && sortieB0b.ToString().Contains("le catalogue (SQL-PROD") && sortieB0c.ToString().Contains("le catalogue (SQL-PROD")
+       && chronoDistant.Elapsed < TimeSpan.FromSeconds(10),
+    $"SOC-024 T02 : un catalogue qui n'est pas sur ce poste est refuse sans s'y connecter, pour « passer » ({codeB0b}) comme pour « retour » ({codeB0c}), " +
+    $"en {chronoDistant.ElapsedMilliseconds} ms");
 var v2B = await Copie("PassageBourgesV2", sauvegardeV2, modeleV2);
 // La base V3 de Chartres, deja servie, donnee a Bourges : le catalogue refuse qu'elle serve deux greffes a la fois
 // (UQ_Greffe_BaseV3), Chartres la rend d'abord.

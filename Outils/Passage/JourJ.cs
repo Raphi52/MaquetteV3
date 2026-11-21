@@ -96,7 +96,11 @@ public static class MoteurRepetition
         /// <summary>« greffe » -> etape qui echoue expres (SOC-024 T06 : echec simule sur un greffe).</summary>
         public IReadOnlyDictionary<string, string> EchecsSimules { get; init; } = new Dictionary<string, string>();
         public bool AuxHeures { get; init; }
-        public TimeSpan Avance { get; init; } = TimeSpan.FromHours(2);
+        /// <summary>Avec <see cref="AuxHeures"/> : le passage d'un greffe part a son heure de passage moins cette avance, soit
+        /// 20:00 la veille, heure locale, pour une ouverture a 07:00 (fenetre de nuit de REC-001 T04, proposee).</summary>
+        // fix-ok: 2 h d'avance (premiere ecriture) ne couvraient pas un transfert estime a 4 h 16 - 4 h 44 sur RIG_DEV
+        // (docs/reconstruction/recopie.md, « Mesures ») : le passage part au debut de la nuit du greffe.
+        public TimeSpan Avance { get; init; } = TimeSpan.FromHours(11);
         /// <summary>Vrai pour une repetition (copies seulement, CA06) ; faux le jour J, sur les vraies bases.</summary>
         public bool EstRepetition { get; init; } = true;
         public Action<string>? Suivre { get; init; }

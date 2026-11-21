@@ -195,7 +195,13 @@ public static class MoteurPassage
                 throw new EchecEtape($"{nom} : {e.Message}");
             }
             finally { Ecrire(o, r); }
-            if (o.ApresEtape is not null) await o.ApresEtape(nom, ct);
+            // Ce qui se passe dans la V2 pendant le passage : s'il echoue, le passage s'arrete et revient, comme pour une etape.
+            if (o.ApresEtape is not null)
+                try { await o.ApresEtape(nom, ct); }
+                catch (Exception e) when (e is not OperationCanceledException and not EchecEtape)
+                {
+                    throw new EchecEtape($"apres {nom} : l'activite jouee dans la V2 pendant le passage a echoue : {e.Message}");
+                }
         }
 
         // ---------------------------------------------------------------------------------------------
@@ -317,9 +323,19 @@ public static class MoteurPassage
         var chrono = Stopwatch.StartNew();
         var r = new RapportPassage { Greffe = o.CodeGreffe, DebutUtc = DateTime.UtcNow };
         var catalogue = Catalogue(o);
-        var fiche = await catalogue.LireAsync(o.CodeGreffe, ct) ?? throw new GreffeInconnu(o.CodeGreffe);
-        Remplir(r, fiche);
-        ExigerPoste(o, fiche);
+        FicheGreffe fiche;
+        try
+        {
+            ExigerPoste(o, null);
+            fiche = await catalogue.LireAsync(o.CodeGreffe, ct) ?? throw new EchecEtape($"le greffe « {o.CodeGreffe} » n'est pas au catalogue commun");
+            Remplir(r, fiche);
+            ExigerPoste(o, fiche);
+        }
+        catch (EchecEtape e)
+        {
+            r.Erreurs.Add(e.Message);
+            return Finir(r, chrono, IssuesPassage.Refuse, e.Message, o);
+        }
         var etat = new EtatPassage { Fiche = fiche, Master = catalogue.ConnexionBase(fiche.Serveur, "master") };
         var debut = DateTime.UtcNow;
         var sw = Stopwatch.StartNew();
@@ -365,11 +381,18 @@ public static class MoteurPassage
             [CatalogueGreffes.CleAuthentification] = o.Authentification,
         }).Build());
 
-    private static void ExigerPoste(OptionsPassage o, FicheGreffe fiche)
+    /// <summary>Sans --exploitation : le catalogue (<paramref name="fiche"/> null, AVANT de s'y connecter), puis l'instance du
+    /// greffe (avant toute connexion a ses bases) doivent etre sur ce poste.</summary>
+    // fix-ok: relecture du 2026-11-21 -- le catalogue etait LU avant ce controle (une connexion a une base commune distante sans
+    // --exploitation), et RevenirAsync laissait l'EchecEtape de ce controle sortir de l'outil sans rapport : les deux refusent ici, avant.
+    private static void ExigerPoste(OptionsPassage o, FicheGreffe? fiche)
     {
         if (o.Exploitation) return;
-        if (!BaseJetable.EstServeurLocal(o.Commune) || !BaseJetable.EstServeurLocal($"Server={fiche.Serveur}"))
-            throw new EchecEtape($"le catalogue ou l'instance du greffe ({fiche.Serveur}) n'est pas sur ce poste : le passage d'un greffe " +
+        if (!BaseJetable.EstServeurLocal(o.Commune))
+            throw new EchecEtape($"le catalogue ({new SqlConnectionStringBuilder(o.Commune).DataSource}) n'est pas sur ce poste : le passage d'un " +
+                                 "greffe se lance chez Amitel, avec --exploitation");
+        if (fiche is not null && !BaseJetable.EstServeurLocal($"Server={fiche.Serveur}"))
+            throw new EchecEtape($"l'instance du greffe ({fiche.Serveur}) n'est pas sur ce poste : le passage d'un greffe " +
                                  "se lance chez Amitel, avec --exploitation");
     }
 
@@ -382,6 +405,7 @@ public static class MoteurPassage
     private static async Task<string> ControlerAvantAsync(OptionsPassage o, CatalogueGreffes catalogue, RapportPassage r, EtatPassage etat,
                                                           CancellationToken ct)
     {
+        ExigerPoste(o, null);
         var fiche = await catalogue.LireAsync(o.CodeGreffe, ct)
                     ?? throw new EchecEtape($"le greffe « {o.CodeGreffe} » n'est pas au catalogue commun");
         etat.Fiche = fiche;
@@ -471,8 +495,12 @@ public static class MoteurPassage
                 "SELECT BaseV3 FROM rigv3.Pont WHERE Id = 1 AND RetourLe IS NULL", ct));
             if (!string.Equals(pont, fiche.BaseV3, StringComparison.OrdinalIgnoreCase))
                 problemes.Add($"le pont de {fiche.BaseV2} vise « {pont} », pas {fiche.BaseV3}");
-            var presentes = await DemandesEnCoursAsync(v2, ct, toutes: true);
-            var perdues = etat.DemandesEnCours.Except(presentes).Count();
+            // Par paquets de 1000 identifiants : on recompte celles d'avant, sans relire toute la table DEMANDE d'une vraie base.
+            var presentes = 0;
+            foreach (var paquet in etat.DemandesEnCours.Chunk(1000))
+                presentes += Convert.ToInt32(await LectureV2.ValeurAsync(v2,
+                    $"SELECT COUNT(*) FROM dbo.DEMANDE WHERE DMND_ID_DMND IN ({string.Join(",", paquet)})", ct));
+            var perdues = etat.DemandesEnCours.Count - presentes;
             if (perdues > 0)
             {
                 r.Ecarts.Add(new EcartPassage("demandes", $"{perdues} demande(s) en cours avant le passage absente(s) de {fiche.BaseV2}"));
@@ -575,12 +603,11 @@ public static class MoteurPassage
             "WHERE o.schema_id = SCHEMA_ID(N'dbo') AND o.name IN (N'GENERER_NUMERO', N'CHERCHER_NUMERO', N'RESTITUER_NUMERO') " +
             "AND m.definition LIKE N'%rigv3.%'", ct));
 
-    /// <summary>Les demandes en cours de la V2 (DMND_EN_COURS = 1) ; <paramref name="toutes"/> : toutes les demandes.</summary>
-    private static async Task<List<long>> DemandesEnCoursAsync(SqlConnection v2, CancellationToken ct, bool toutes = false)
+    /// <summary>Les demandes en cours de la V2 (DMND_EN_COURS = 1) : celles qu'aucun passage ne doit perdre (SOC-024 CA04).</summary>
+    private static async Task<List<long>> DemandesEnCoursAsync(SqlConnection v2, CancellationToken ct)
     {
         var ids = new List<long>();
-        await using var l = await LectureV2.LireAsync(v2,
-            "SELECT CAST(DMND_ID_DMND AS bigint) FROM dbo.DEMANDE" + (toutes ? "" : " WHERE DMND_EN_COURS = 1"), ct);
+        await using var l = await LectureV2.LireAsync(v2, "SELECT CAST(DMND_ID_DMND AS bigint) FROM dbo.DEMANDE WHERE DMND_EN_COURS = 1", ct);
         while (await l.ReadAsync(ct)) ids.Add(l.GetInt64(0));
         return ids;
     }
