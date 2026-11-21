@@ -265,8 +265,9 @@ public sealed record ApercuModele(
 /// <param name="EnvoiAutomatique">N'existe que pour un modele RCS (<paramref name="Lot1"/>) : sans lui, il est remis a faux, comme
 /// la V2 (OPE_EDIT_EMAILMODEL._SetVisibilityChkEnvoiAuto).</param>
 /// <param name="ReserveAmitel">« Modèle modifiable uniquement par Amitel » : un agent du greffe qui le coche est refuse (403).</param>
-/// <param name="ListesParDefaut">Les listes de distribution par defaut, parmi celles que l'agent voit (publiques et les siennes) ;
-/// celles qu'il ne voit pas (la liste privee d'un collegue) restent liees, il n'y touche pas.</param>
+/// <param name="ListesParDefaut">Les listes de distribution par defaut, parmi les ACTIVES que l'agent voit (publiques et les
+/// siennes). Comme la V2, le modele n'a plus ensuite QUE ces listes : un lien vers la liste privee d'un collegue ou vers une liste
+/// desactivee part aussi (OPE_EDIT_EMAILMODEL_LISTE_DISTRIB.cs:58-61).</param>
 /// <param name="Ecran">L'ecran du geste, ecrit au journal des gestes.</param>
 public sealed record SaisieModele(
     string Type,

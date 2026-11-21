@@ -180,8 +180,7 @@ public static class GestionCourriels
         await using var tx = (SqlTransaction)await cn.BeginTransactionAsync(ct);
         if (await LireModeleAsync(cn, tx, m.Type, ct) is not null)
             throw new RefusGestionCourriels(StatusCodes.Status400BadRequest, $"Le nom du modèle de mail existe déjà : « {m.Type} ».");
-        var visibles = await ListesVisiblesAsync(cn, tx, moi, ct);
-        ExigerVisibles(m.ListesParDefaut, visibles);
+        ExigerACocher(m.ListesParDefaut, await ListesACocherAsync(cn, tx, moi, ct));
         await using (var cmd = new SqlCommand("""
             INSERT INTO soc.ModeleMessage (Type, Sujet, Corps, CorpsHtml, Expediteur, Reponse, Copie, Lot1, Lot2, ReserveAmitel, LibelleEcran,
                                            Inscription, UtilisableEnSaisie, Comptabilite, DestinataireDefaut, EnvoiAutomatique, SignatureActive, Signature)
@@ -191,7 +190,7 @@ public static class GestionCourriels
             Parametres(cmd, m);
             await cmd.ExecuteNonQueryAsync(ct);
         }
-        await LierListesAsync(cn, tx, m.Type, m.ListesParDefaut, visibles, ct);
+        await LierListesAsync(cn, tx, m.Type, m.ListesParDefaut, ct);
         await JournalGestes.EcrireAsync(cn, tx, moi, saisie.Ecran, Famille, ObjetModele(m.Type), m.Type, "a cree", null, Instantane(m), ct);
         await tx.CommitAsync(ct);
         return await RelireModeleAsync(cn, m.Type, ct);
@@ -208,8 +207,7 @@ public static class GestionCourriels
                 $"Le nom d'un modèle ne change pas une fois créé (« {avant.Type} ») : créez un nouveau modèle.");
         if (saisie.ReserveAmitel && !moi.EstAmitel) throw ReserveAmitel();
         var m = Controle(ReglesCourriels.ControlerModele(saisie with { Type = avant.Type }, avant.CorpsHtml, habillage));
-        var visibles = await ListesVisiblesAsync(cn, tx, moi, ct);
-        ExigerVisibles(m.ListesParDefaut, visibles);
+        ExigerACocher(m.ListesParDefaut, await ListesACocherAsync(cn, tx, moi, ct));
         await using (var cmd = new SqlCommand("""
             UPDATE soc.ModeleMessage SET Sujet = @sujet, Corps = @corps, CorpsHtml = @html, Expediteur = @de, Reponse = @reponse, Copie = @copie,
                    Lot1 = @lot1, Lot2 = @lot2, ReserveAmitel = @amitel, LibelleEcran = @libelle, Inscription = @ins, Comptabilite = @cpt,
@@ -220,11 +218,9 @@ public static class GestionCourriels
             Parametres(cmd, m);
             await cmd.ExecuteNonQueryAsync(ct);
         }
-        await LierListesAsync(cn, tx, m.Type, m.ListesParDefaut, visibles, ct);
-        // Apres le geste, le modele garde aussi ses liens vers les listes que l'agent ne voit pas : le journal dit l'etat reel.
-        var listesApres = avant.ListesParDefaut.Where(id => !visibles.Contains(id)).Concat(m.ListesParDefaut).Distinct().Order().ToArray();
+        await LierListesAsync(cn, tx, m.Type, m.ListesParDefaut, ct);
         await JournalGestes.EcrireAsync(cn, tx, moi, saisie.Ecran, Famille, ObjetModele(m.Type), m.Type, "a modifie",
-            Instantane(avant), Instantane(m with { ListesParDefaut = listesApres }), ct);
+            Instantane(avant), Instantane(m), ct);
         await tx.CommitAsync(ct);
         return await RelireModeleAsync(cn, m.Type, ct);
     }
@@ -369,10 +365,11 @@ public static class GestionCourriels
     private static async Task<ModeleMessage> RelireModeleAsync(SqlConnection cn, string type, CancellationToken ct)
         => (await ServiceCourriels.ModelesVisiblesAsync(cn, estAmitel: true, ct, type)).Single();
 
-    /// <summary>Les listes que l'appelant voit : les publiques et les siennes (ListeDistributionMail.cs:63).</summary>
-    private static async Task<HashSet<int>> ListesVisiblesAsync(SqlConnection cn, SqlTransaction tx, Appelant moi, CancellationToken ct)
+    /// <summary>Les listes que l'appelant peut cocher comme listes par defaut : les ACTIVES parmi les publiques et les siennes
+    /// (OPE_EDIT_EMAILMODEL_LISTE_DISTRIB.DoInitZoneSaisie, :99 ; ListeDistributionMail.cs:63).</summary>
+    private static async Task<HashSet<int>> ListesACocherAsync(SqlConnection cn, SqlTransaction tx, Appelant moi, CancellationToken ct)
     {
-        await using var cmd = new SqlCommand("SELECT Id FROM soc.ListeDiffusion WHERE Prive = @moi OR Prive = @publique;", cn, tx);
+        await using var cmd = new SqlCommand("SELECT Id FROM soc.ListeDiffusion WHERE (Prive = @moi OR Prive = @publique) AND Actif = 1;", cn, tx);
         cmd.Parameters.Add(new SqlParameter("@moi", SqlDbType.VarChar, 200) { Value = moi.CompteWindows });
         cmd.Parameters.Add(new SqlParameter("@publique", SqlDbType.VarChar, 200) { Value = RoutesCourriels.ListePublique });
         var ids = new HashSet<int>();
@@ -381,20 +378,21 @@ public static class GestionCourriels
         return ids;
     }
 
-    private static void ExigerVisibles(int[] voulues, HashSet<int> visibles)
+    private static void ExigerACocher(int[] voulues, HashSet<int> aCocher)
     {
-        var inconnues = voulues.Where(id => !visibles.Contains(id)).ToList();
-        if (inconnues.Count > 0)
+        var refusees = voulues.Where(id => !aCocher.Contains(id)).ToList();
+        if (refusees.Count > 0)
             throw new RefusGestionCourriels(StatusCodes.Status400BadRequest,
-                $"Liste(s) de distribution n° {string.Join(", ", inconnues)} : ni publique(s) ni à vous dans ce greffe.");
+                $"Liste(s) de distribution n° {string.Join(", ", refusees)} : une liste par défaut doit être active, et publique ou à vous, dans ce greffe.");
     }
 
     /// <summary>
-    /// Les listes par defaut du modele : parmi celles que l'agent voit, exactement <paramref name="voulues"/> ; un lien vers une
-    /// liste qu'il ne voit pas reste. (La V2 effacait tout lien non coche, y compris vers la liste privee d'un collegue, que sa
-    /// liste a cocher ne montrait pas : ecart voulu, socle-courriels.md.)
+    /// Les listes par defaut du modele deviennent exactement <paramref name="voulues"/>, comme la V2 : elle marque tous les liens
+    /// « a supprimer » puis ne garde que les lignes cochees (OPE_EDIT_EMAILMODEL_LISTE_DISTRIB.cs:58-61). Un lien vers une liste
+    /// que l'agent ne peut pas cocher (la liste privee d'un collegue, une liste desactivee) part donc aussi : ecart a valider par
+    /// le metier, socle-courriels.md.
     /// </summary>
-    private static async Task LierListesAsync(SqlConnection cn, SqlTransaction tx, string type, int[] voulues, HashSet<int> visibles, CancellationToken ct)
+    private static async Task LierListesAsync(SqlConnection cn, SqlTransaction tx, string type, int[] voulues, CancellationToken ct)
     {
         var liens = new List<(int Id, int IdListe)>();
         await using (var cmd = new SqlCommand("SELECT Id, IdListe FROM soc.ModeleMessageListe WHERE TypeModele = @type;", cn, tx))
@@ -403,7 +401,7 @@ public static class GestionCourriels
             await using var r = await cmd.ExecuteReaderAsync(ct);
             while (await r.ReadAsync(ct)) liens.Add((r.GetInt32(0), r.GetInt32(1)));
         }
-        foreach (var lien in liens.Where(l => visibles.Contains(l.IdListe) && !voulues.Contains(l.IdListe)))
+        foreach (var lien in liens.Where(l => !voulues.Contains(l.IdListe)))
         {
             await using var cmd = new SqlCommand("DELETE FROM soc.ModeleMessageListe WHERE Id = @id;", cn, tx);
             cmd.Parameters.Add(new SqlParameter("@id", SqlDbType.Int) { Value = lien.Id });

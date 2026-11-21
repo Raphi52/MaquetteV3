@@ -155,6 +155,7 @@ const Liste = { display: 'flex', flexDirection: 'column', gap: '2px' } as const
 const Pastilles = { display: 'flex', flexWrap: 'wrap', gap: 'var(--rig-esp-2)' } as const
 const Bascules = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', columnGap: 'var(--rig-esp-3)' } as const
 const Actions = { display: 'flex', flexWrap: 'wrap', gap: 'var(--rig-esp-2)', paddingTop: 'var(--rig-esp-2)' } as const
+const Demande = { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--rig-esp-2)' } as const
 const Dictionnaire = { margin: 0, padding: 'var(--rig-esp-2)', fontSize: 'var(--rig-fs-dense)', whiteSpace: 'pre-wrap', border: '1px solid var(--rig-bord)', borderRadius: 'var(--rig-rayon, 4px)' } as const
 
 const ouiNon = (b: boolean) => (b ? 'Oui' : 'Non')
@@ -207,7 +208,9 @@ function ficheDe(a: ApercuModele): FicheModele {
     expediteur: m.expediteur ?? '', reponse: m.reponse ?? '', copie: m.copie ?? '', destinataireDefaut: m.destinataireDefaut ?? '',
     lot1: m.lot1, lot2: m.lot2, inscription: m.inscription === true, comptabilite: m.comptabilite === true,
     envoiAutomatique: m.envoiAutomatique, reserveAmitel: m.reserveAmitel, signatureActive: a.signatureActive, signature: a.signature ?? '',
-    listes: a.listesParDefaut.map((l) => l.id),
+    // Cochees : les listes liees que l'agent peut cocher, les actives (OPE_EDIT_EMAILMODEL_LISTE_DISTRIB.LinkDonnees) ; a
+    // l'enregistrement, le modele ne garde QUE les cochees (:58-61), comme la V2.
+    listes: a.listesParDefaut.filter((l) => l.actif).map((l) => l.id),
   }
 }
 
@@ -273,6 +276,22 @@ function Bascule({ libelle, vrai, basculer, inactif, titre }: {
   )
 }
 
+/** Desactiver / activer un modele ou une liste attend la reponse de l'agent. Son objet (« modele:CA », « liste:7 ») : la
+ *  question ne se montre que sur la fiche qui l'a posee. */
+interface QuestionEnCours { objet: string; texte: string; oui: () => void }
+
+/** La question de la V2 avant Désactiver / Activer (DialogBox.Show(..., WarningYesNo), OPE_EDIT_EMAILMODEL.cs:63, :68 ;
+ *  OPE_EDIT_LISTEDISTRIBUTIONMAIL.cs:39, :44) : « Oui » fait le geste, « Non » ne fait rien. */
+function Question({ texte, oui, non }: { texte: string; oui: () => void; non: () => void }) {
+  return (
+    <div role="alertdialog" aria-label={texte} style={Demande}>
+      <span className="rig-etat rig-etat--attente">{texte}</span>
+      <button type="button" className="rig-bouton rig-bouton--fort" onClick={oui}>Oui</button>
+      <button type="button" className="rig-bouton" onClick={non}>Non</button>
+    </div>
+  )
+}
+
 export function EcranMessagerie() {
   const [vue, setVue] = useState<VueEcranMessagerie | null>(null)
   const [recherche, setRecherche] = useState('')
@@ -289,11 +308,13 @@ export function EcranMessagerie() {
   const [resultat, setResultat] = useState<{ ok: boolean; texte: string } | null>(null)
   const [occupe, setOccupe] = useState(false)
   const [voirTags, setVoirTags] = useState(false)
+  const [question, setQuestion] = useState<QuestionEnCours | null>(null)
 
   const modifie = saisie !== null && !memes(saisie, initiale)
   const listeModifiee = liste !== null && !memes(liste, listeInitiale)
 
   const poserFiche = (f: VueModeleMessagerie | null) => {
+    setQuestion(null)
     setFiche(f)
     const formulaire = f?.apercu ? ficheDe(f.apercu) : null
     setSaisie(formulaire)
@@ -385,8 +406,8 @@ export function EcranMessagerie() {
   const basculerRcs = () => setSaisie((f) => (f ? { ...f, lot1: !f.lot1, envoiAutomatique: f.lot1 ? false : f.envoiAutomatique } : f))
   const basculerListeDefaut = (id: number) =>
     setSaisie((f) => (f ? { ...f, listes: f.listes.includes(id) ? f.listes.filter((x) => x !== id) : [...f.listes, id] } : f))
-  // Les listes a cocher : les actives que l'agent voit (OPE_EDIT_EMAILMODEL_LISTE_DISTRIB.DoInitZoneSaisie), et celles deja liees.
-  const listesACocher = vue.listes.filter((l) => l.actif || saisie?.listes.includes(l.id))
+  // Les listes a cocher : les actives que l'agent voit (OPE_EDIT_EMAILMODEL_LISTE_DISTRIB.DoInitZoneSaisie, :99).
+  const listesACocher = vue.listes.filter((l) => l.actif)
 
   const nouveauModele = () => {
     if (!libre()) return
@@ -406,13 +427,20 @@ export function EcranMessagerie() {
     if (saisie?.origine === null) { setSaisie(null); setInitiale(null); return }
     setSaisie(initiale)
   }
-  const activerModele = (type: string, actifVoulu: boolean) =>
-    void agir(() => appeler<ResultatMessagerie>('EcranMessagerie.ActiverModele', type, actifVoulu))
+  const activerModele = (type: string, actifVoulu: boolean) => setQuestion({
+    objet: `modele:${type}`, texte: `Voulez-vous vraiment ${actifVoulu ? 'activer' : 'désactiver'} ce modèle ?`,
+    oui: () => void agir(() => appeler<ResultatMessagerie>('EcranMessagerie.ActiverModele', type, actifVoulu)),
+  })
+  /** La question posee sur la fiche <c>objet</c>, s'il y en a une : sa reponse la referme. */
+  const questionSur = (objet: string) => question?.objet === objet && (
+    <Question texte={question.texte} oui={() => { setQuestion(null); question.oui() }} non={() => setQuestion(null)} />
+  )
 
   const changerListe = <K extends keyof FicheListe>(cle: K, valeur: FicheListe[K]) => setListe((f) => (f ? { ...f, [cle]: valeur } : f))
   const ouvrirListe = (l: ListeDiffusion | null) => {
     if (!ecriture || !libre()) return
     const f = l ? ficheListeDe(l) : ListeNeuve
+    setQuestion(null)
     setListe(f)
     setListeInitiale(f)
     setResultat(null)
@@ -436,13 +464,15 @@ export function EcranMessagerie() {
     if (liste?.id === null) { setListe(null); setListeInitiale(null); return }
     setListe(listeInitiale)
   }
-  const activerListe = (l: ListeDiffusion) =>
-    void agir(() => appeler<ResultatMessagerie>('EcranMessagerie.ActiverListe', l.id, !l.actif), (r) => {
+  const activerListe = (l: ListeDiffusion) => setQuestion({
+    objet: `liste:${l.id}`, texte: `Voulez-vous vraiment ${l.actif ? 'désactiver' : 'activer'} cette liste ?`,
+    oui: () => void agir(() => appeler<ResultatMessagerie>('EcranMessagerie.ActiverListe', l.id, !l.actif), (r) => {
       const relue = r.vue?.listes.find((x) => x.id === l.id)
       const f = relue ? ficheListeDe(relue) : null
       setListe(f)
       setListeInitiale(f)
-    })
+    }),
+  })
 
   return (
     <div className="rig-proc__corps">
@@ -566,6 +596,7 @@ export function EcranMessagerie() {
                     </button>
                   )}
                 </div>
+                {listeCourante && !listeModifiee && questionSur(`liste:${listeCourante.id}`)}
                 <div className="rig-criteres__paire">
                   <Saisie libelle="Code" valeur={liste.code} changer={(v) => changerListe('code', v)} requis taille={35} lecture={liste.id !== null} />
                   <Saisie libelle="Libellé" valeur={liste.libelle} changer={(v) => changerListe('libelle', v)} requis taille={200} />
@@ -609,6 +640,7 @@ export function EcranMessagerie() {
                 </button>
               )}
             </div>
+            {courant && !modifie && questionSur(`modele:${courant.type}`)}
             <div className="rig-criteres__paire">
               <Saisie libelle="Nom du modèle" valeur={saisie.type} changer={(v) => changer('type', v)} requis taille={40} lecture={saisie.origine !== null} />
               <Saisie libelle="Libellé écran" valeur={saisie.libelleEcran} changer={(v) => changer('libelleEcran', v)} requis taille={100} />
@@ -633,7 +665,7 @@ export function EcranMessagerie() {
             )}
 
             <div className="rig-kicker">Listes par défaut</div>
-            <div style={Bascules} aria-label="Listes par défaut">
+            <div style={Bascules} role="group" aria-label="Listes par défaut">
               {listesACocher.map((l) => (
                 <Bascule key={l.id} libelle={`${l.code} — ${l.libelle}`} vrai={saisie.listes.includes(l.id)} basculer={() => basculerListeDefaut(l.id)} />
               ))}

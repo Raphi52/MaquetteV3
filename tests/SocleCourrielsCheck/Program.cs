@@ -749,9 +749,10 @@ try
         }
     var nbV2 = await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type NOT LIKE 'BANC[_]%'");
     Exiger(refusesV2.Count == 0 && nbV2 > 0,
-        $"SOC-006 T04 : les {nbV2} modeles repris de {sourceV2.InitialCatalog} passent les regles de saisie de la V3 (noms, tailles, adresses et etiquettes) : " +
-        $"aucun ne devient impossible a enregistrer ({refusesV2.Count} refuse(s){(refusesV2.Count > 0 ? ", ex. " + refusesV2[0] : "")} ; " +
-        $"a completer comme en V2 : {(aCompleterV2.Count == 0 ? "aucun" : string.Join(", ", aCompleterV2))})");
+        $"SOC-006 T04 : des {nbV2} modeles repris de {sourceV2.InitialCatalog}, {nbV2 - aCompleterV2.Count - refusesV2.Count} passent tels quels les regles de " +
+        $"saisie de la V3 (noms, tailles, adresses et etiquettes), {aCompleterV2.Count} sont a completer comme en V2 " +
+        $"({(aCompleterV2.Count == 0 ? "aucun" : string.Join(", ", aCompleterV2))}) ; aucun ne devient impossible a enregistrer " +
+        $"({refusesV2.Count} refuse(s){(refusesV2.Count > 0 ? ", ex. " + refusesV2[0] : "")})");
 
     // --- Creation d'un modele par un agent GESTEMAIL ---------------------------------------------------------------
     var gestesAvant = await Gestes();
@@ -890,22 +891,42 @@ try
            && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_AMITEL' AND Sujet = 'modifie par Amitel' AND ReserveAmitel = 1") == 1,
         $"SOC-006 T04 / CA05 (jumeau) : un agent d'AMITEL modifie le modele qui lui est reserve, et il le reste ({amitelParAmitel.Code})");
 
-    // --- Les listes par defaut : seulement parmi les listes que l'agent voit ; celle d'un collegue reste liee ----------
-    var docSansListes = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_DOC"), Agent,
-        Saisie("BANC_DOC", corps: "Madame, Monsieur,|Voici vos documents :|$PieceJointe$|$LOGO$ Le greffe", listes: []) with
+    // --- Les listes par defaut, comme la V2 : a l'enregistrement, le modele n'a plus QUE les listes cochees ------------
+    // OPE_EDIT_EMAILMODEL_LISTE_DISTRIB.cs:58-61 marque tous les liens « a supprimer » puis ne garde que les lignes cochees,
+    // et l'agent ne coche que les listes actives qu'il voit (DoInitZoneSaisie, :99) : les liens vers la liste privee d'un
+    // collegue et vers une liste desactivee partent donc aussi (ecart a valider, socle-courriels.md).
+    var idPerso = await Compter(v3a.Connexion, "SELECT Id FROM soc.ListeDiffusion WHERE Code = 'BANC_PERSO'");
+    var idInactive = await Compter(v3a.Connexion, "SELECT Id FROM soc.ListeDiffusion WHERE Code = 'BANC_INACTIVE'");
+    await Executer(v3a.Connexion, $"INSERT INTO soc.ModeleMessageListe (TypeModele, IdListe) VALUES ('BANC_DOC', {idInactive});");
+    var docListePerso = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_DOC"), Agent,
+        Saisie("BANC_DOC", corps: "Madame, Monsieur,|Voici vos documents :|$PieceJointe$|$LOGO$ Le greffe", listes: [idPerso]) with
         {
             Expediteur = "Greffe du banc <[ADRESSE_MAIL_JUDICIAIRE]>", Copie = "[ADRESSE_MAIL_ACCUSE_ENVOI_JUD]",
         });
+    Task<int> LiensDoc() => Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessageListe WHERE TypeModele = 'BANC_DOC'");
+    Task<int> LienDoc(int idListe) => Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessageListe WHERE TypeModele = 'BANC_DOC' AND IdListe = @l",
+        ("@l", idListe));
+    var liensApres = await LiensDoc();
+    var journalListes = await Compter(v3a.Connexion, """
+        SELECT COUNT(*) FROM soc.Journal WHERE Famille = 'courriel' AND IdObjet = 'BANC_DOC' AND Verbe = 'a modifie' AND Apres LIKE @l
+          AND Id = (SELECT MAX(Id) FROM soc.Journal WHERE Famille = 'courriel' AND IdObjet = 'BANC_DOC');
+        """, ("@l", $"%\"listesParDefaut\":[[]{idPerso}]%"));
+    Exiger(docListePerso.Code == 200 && liensApres == 1 && await LienDoc(idPerso) == 1 && await LienDoc(idPublique) == 0
+           && await LienDoc(idCollegue) == 0 && await LienDoc(idInactive) == 0 && journalListes == 1
+           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_DOC' AND CorpsHtml = 1") == 1,
+        $"SOC-006 T04 : comme la V2, enregistrer un modele ne lui laisse QUE les listes cochees -- la sienne cochee reste, la publique decochee part, " +
+        $"la liste privee d'un collegue et la liste desactivee partent aussi, le journal dit les listes apres ({docListePerso.Code}, " +
+        $"{liensApres} lien(s) apres, journal {journalListes})");
     // Le meme texte : BANC_DOC est devenu HTML ($LOGO$, EmailModel.Sauve), seule la liste demandee doit faire refuser.
     var docListeCollegue = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_DOC"), Agent,
         Saisie("BANC_DOC", corps: "Madame, Monsieur,|Voici vos documents :|$PieceJointe$|$LOGO$ Le greffe", listes: [idCollegue]));
-    Exiger(docSansListes.Code == 200
-           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessageListe WHERE TypeModele = 'BANC_DOC' AND IdListe = @l", ("@l", idPublique)) == 0
-           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessageListe WHERE TypeModele = 'BANC_DOC' AND IdListe = @l", ("@l", idCollegue)) == 1
-           && await Compter(v3a.Connexion, "SELECT COUNT(*) FROM soc.ModeleMessage WHERE Type = 'BANC_DOC' AND CorpsHtml = 1") == 1
-           && docListeCollegue.Code == 400 && docListeCollegue.Corps.Contains($"n° {idCollegue}"),
-        $"SOC-006 T04 : les listes par defaut se choisissent parmi celles que l'agent voit -- la liste publique decochee part, la liste privee d'un collegue " +
-        $"reste liee ; la lui demander est refuse (400) ({docSansListes.Code} {Court(docSansListes.Corps, 200)} / {docListeCollegue.Code} {Court(docListeCollegue.Corps, 120)})");
+    var docListeInactive = await Geste(HttpMethod.Put, RoutesCourriels.PourModele(GreffeA, "BANC_DOC"), Agent,
+        Saisie("BANC_DOC", corps: "Madame, Monsieur,|Voici vos documents :|$PieceJointe$|$LOGO$ Le greffe", listes: [idInactive]));
+    Exiger(docListeCollegue.Code == 400 && docListeCollegue.Corps.Contains($"n° {idCollegue}")
+           && docListeInactive.Code == 400 && docListeInactive.Corps.Contains($"n° {idInactive}") && await LiensDoc() == 1 && await LienDoc(idPerso) == 1,
+        $"SOC-006 T04 : une liste par defaut se coche parmi les listes ACTIVES que l'agent voit -- la liste privee d'un collegue et une liste " +
+        $"desactivee sont refusees (400), le modele garde sa liste ({docListeCollegue.Code} {Court(docListeCollegue.Corps, 120)} / " +
+        $"{docListeInactive.Code} {Court(docListeInactive.Corps, 120)})");
 
     // --- Les listes de distribution : creer, modifier, publique / privee, desactiver ---------------------------------
     var gestesListes = await Gestes();

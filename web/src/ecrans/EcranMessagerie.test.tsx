@@ -62,6 +62,9 @@ const saisir = (libelle: string, texte: string) => fireEvent.change(screen.getBy
 const bouton = (nom: string) => screen.getByRole('button', { name: nom })
 const resultats = () => within(screen.getByRole('list', { name: 'Modèles' })).getAllByRole('button').map((b) => b.textContent)
 const BoutonsDEcriture = ['Nouveau modèle', 'Enregistrer', 'Créer le modèle', 'Annuler', 'Désactiver', 'Réactiver', 'Nouvelle liste']
+/** La question de la V2 avant Désactiver / Activer (DialogBox WarningYesNo), et ses deux reponses. */
+const question = () => screen.getByRole('alertdialog')
+const repondre = (r: 'Oui' | 'Non') => fireEvent.click(within(question()).getByRole('button', { name: r }))
 
 describe('EcranMessagerie', () => {
   it('SOC-006 CA05 : un agent du greffe voit les modeles de SON greffe, lus par le pont, sans la bascule « Amitel »', async () => {
@@ -293,7 +296,7 @@ describe('EcranMessagerie', () => {
     expect(await screen.findByText('Modèle REFUS_RCS')).toBeTruthy()
   })
 
-  it('Désactiver puis Réactiver : ActiverModele(type, faux / vrai), comme les boutons de la V2 ; rien pendant une saisie en cours', async () => {
+  it('Désactiver puis Réactiver : la question de la V2 d\'abord (OPE_EDIT_EMAILMODEL.cs:63, :68), puis ActiverModele(type, faux / vrai) ; rien pendant une saisie en cours', async () => {
     let actifEnBase = true
     const pont = installerFauxPont({
       'EcranMessagerie.Ouvrir': () => gestionnaire(),
@@ -310,13 +313,44 @@ describe('EcranMessagerie', () => {
     saisir('Sujet', 'en cours')
     expect((bouton('Désactiver') as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(bouton('Annuler'))
+    // « Non » : rien ne part au pont, la question se referme.
     fireEvent.click(bouton('Désactiver'))
+    expect(question().textContent).toContain('Voulez-vous vraiment désactiver ce modèle ?')
+    repondre('Non')
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(pont.appels).not.toHaveBeenCalledWith('EcranMessagerie.ActiverModele', 'CA', false)
+    fireEvent.click(bouton('Désactiver'))
+    repondre('Oui')
     expect((await screen.findByRole('status')).textContent).toContain('Modèle « CA » désactivé.')
     expect(pont.appels).toHaveBeenCalledWith('EcranMessagerie.ActiverModele', 'CA', false)
+    expect(screen.queryByRole('alertdialog')).toBeNull()
     expect(screen.getAllByText('Désactivé').length).toBeGreaterThan(0)
     fireEvent.click(bouton('Réactiver'))
+    expect(question().textContent).toContain('Voulez-vous vraiment activer ce modèle ?')
+    repondre('Oui')
     expect((await screen.findByRole('status')).textContent).toContain('Modèle « CA » réactivé.')
     expect(pont.appels).toHaveBeenCalledWith('EcranMessagerie.ActiverModele', 'CA', true)
+  })
+
+  it('listes par defaut : seules les listes ACTIVES se cochent, et le modele ne garde que les cochees (OPE_EDIT_EMAILMODEL_LISTE_DISTRIB.cs:58-61, :99)', async () => {
+    const vieille = listesDuGreffe.find((l) => l.code === 'VIEILLE')!
+    const pont = installerFauxPont({
+      'EcranMessagerie.Ouvrir': () => gestionnaire(),
+      'EcranMessagerie.Modele': (t) => apercu(t as string, { listesParDefaut: [liste(), vieille] }),
+      'EcranMessagerie.EnregistrerModele': (): ResultatMessagerie => ({ ok: true, message: 'Modèle « CA » enregistré.', vue: gestionnaire(), fiche: apercu('CA') }),
+    })
+    render(<EcranMessagerie />)
+    await screen.findByTitle('Aperçu du courriel')
+    const aCocher = within(screen.getByRole('group', { name: 'Listes par défaut' })).getAllByRole('button').map((b) => b.textContent)
+    expect(aCocher).toEqual(['MANDATAIRES — Mandataires du ressort', 'COMPTA_PERSO — Ma liste'])
+    expect(bouton('MANDATAIRES — Mandataires du ressort').getAttribute('aria-pressed')).toBe('true')
+    // Rien ne change tant que l'agent ne touche a rien ; la fiche enregistree ne garde que ses listes cochees, sans la desactivee.
+    expect((bouton('Enregistrer') as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(bouton('COMPTA_PERSO — Ma liste'))
+    fireEvent.click(bouton('Enregistrer'))
+    expect((await screen.findByRole('status')).textContent).toContain('Modèle « CA » enregistré.')
+    const [, saisie] = pont.appels.mock.calls.find((c) => c[0] === 'EcranMessagerie.EnregistrerModele')! as [string, SaisieModele, string]
+    expect(saisie.listesParDefaut).toEqual([7, 8])
   })
 
   it('l\'envoi automatique n\'est propose qu\'a un modele RCS, et decocher RCS le remet a faux (V2 _SetVisibilityChkEnvoiAuto)', async () => {
@@ -396,10 +430,20 @@ describe('EcranMessagerie', () => {
     expect(screen.getByText('Liste MANDATAIRES')).toBeTruthy()
     expect((bouton('Privée (banc.courriel)') as HTMLButtonElement).disabled).toBe(true)
     expect((screen.getByLabelText('Code') as HTMLInputElement).readOnly).toBe(true)
+    // La question de la V2 (OPE_EDIT_LISTEDISTRIBUTIONMAIL.cs:39, :44) : « Non » ne fait rien, « Oui » desactive.
     fireEvent.click(bouton('Désactiver'))
+    expect(question().textContent).toContain('Voulez-vous vraiment désactiver cette liste ?')
+    repondre('Non')
+    expect(pont.appels).not.toHaveBeenCalledWith('EcranMessagerie.ActiverListe', 7, false)
+    fireEvent.click(bouton('Désactiver'))
+    repondre('Oui')
     expect((await screen.findByRole('status')).textContent).toContain('Liste « MANDATAIRES » désactivée.')
     expect(pont.appels).toHaveBeenCalledWith('EcranMessagerie.ActiverListe', 7, false)
-    expect(bouton('Réactiver')).toBeTruthy()
+    fireEvent.click(bouton('Réactiver'))
+    expect(question().textContent).toContain('Voulez-vous vraiment activer cette liste ?')
+    repondre('Oui')
+    expect((await screen.findByRole('status')).textContent).toContain('Liste « MANDATAIRES » réactivée.')
+    expect(pont.appels).toHaveBeenCalledWith('EcranMessagerie.ActiverListe', 7, true)
   })
 
   it('sans serveur : le formulaire de la demonstration, et l\'enregistrement refuse proprement par le pont', async () => {
