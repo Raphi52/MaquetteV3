@@ -44,6 +44,42 @@ public static class PontRecopie
 
     public static string NomDeclencheur(TableRecopiee t) => $"TR_{t.V3.NomSeul}_FileRecopie";
 
+    public static string NomDeclencheur(TableJointe j) => $"TR_{j.TableV3.Split('.')[^1]}_FileRecopie";
+
+    /// <summary>
+    /// Le declencheur d'une table de la partie jointe d'une fiche (soc.CompteRole, soc.CompteFonction : les droits d'un compte,
+    /// SOC-002 T05) : un ajout, un retrait ou un changement REEL y met LA FICHE en file -- genre « M », colonnes « (droits) »,
+    /// la ligne de la fiche telle qu'elle est (l'etat commun tant qu'elle n'a pas ete recopiee, REC-004), l'agent de la V3 --,
+    /// dans la transaction du changement. L'applicateur ecrit alors la partie jointe avec la fiche (Applicateur.cs, etape 4).
+    /// </summary>
+    internal static string DeclencheurJoint(TableRecopiee t, TableJointe j)
+    {
+        var parties = j.TableV3.Split('.');
+        var table = $"{Sql.Q(parties[0])}.{Sql.Q(parties[1])}";
+        var f = Sql.Q(j.ColonneFiche);
+        var cols = t.ColonnesDeclencheur.ToList();
+        var fiche = cols.Count == 0 ? "NULL"
+            : $"(SELECT {string.Join(", ", cols.Select(c => $"d.{Sql.Q(t.ColonneV3(c).Nom)} AS {Sql.Q(c.Nom)}"))} FROM {t.NomV3Sql} AS d " +
+              $"WHERE d.{Sql.Q(t.CleV3.Nom)} = x.{f} FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES)";
+        return $"""
+            CREATE OR ALTER TRIGGER {Sql.Q(parties[0])}.{Sql.Q(NomDeclencheur(j))} ON {table}
+            AFTER INSERT, UPDATE, DELETE
+            AS
+            BEGIN
+                -- Pose par Serveur\Recopie\PontRecopie.cs (SOC-002 T05) : un changement de {j.TableV3} met la fiche {t.NomV3} en file.
+                SET NOCOUNT ON;
+                IF NOT EXISTS (SELECT 1 FROM inserted) AND NOT EXISTS (SELECT 1 FROM deleted) RETURN;
+                IF ISNULL(CONVERT(int, SESSION_CONTEXT(N'{CleRemontee}')), 0) = 1 RETURN;
+                INSERT INTO rec.FileRecopie (TableV3, IdV3, Genre, Colonnes, Avant, Auteur)
+                SELECT {Sql.Texte(t.NomV3)}, CONVERT(nvarchar(200), x.{f}), 'M', {Sql.Texte(t.Regle.MarqueJointe!)}, {fiche},
+                       ISNULL(CONVERT(nvarchar(128), SESSION_CONTEXT(N'{CleAgent}')), ORIGINAL_LOGIN())
+                FROM (SELECT {f} FROM inserted UNION SELECT {f} FROM deleted) AS x
+                WHERE EXISTS (SELECT * FROM inserted AS i WHERE i.{f} = x.{f} EXCEPT SELECT * FROM deleted AS d WHERE d.{f} = x.{f})
+                   OR EXISTS (SELECT * FROM deleted AS d WHERE d.{f} = x.{f} EXCEPT SELECT * FROM inserted AS i WHERE i.{f} = x.{f});
+            END;
+            """;
+    }
+
     public static async Task<MiseEnServiceRecopie> MettreEnServiceAsync(string connexionV3, string baseV2, FichesRecopiees? fiches = null,
                                                                          CancellationToken ct = default)
     {
@@ -116,6 +152,13 @@ public static class PontRecopie
             await using var cmd = new SqlCommand(Declencheur(t), cn);
             await cmd.ExecuteNonQueryAsync(ct);
             poses.Add($"{t.V3.Schema}.{NomDeclencheur(t)}");
+            // La partie jointe d'une fiche (les droits d'un compte, SOC-002 T05) : un changement de ses tables met la FICHE en file.
+            foreach (var j in t.Regle.Jointe?.Tables ?? [])
+            {
+                await using var joint = new SqlCommand(DeclencheurJoint(t, j), cn);
+                await joint.ExecuteNonQueryAsync(ct);
+                poses.Add($"{j.TableV3.Split('.')[0]}.{NomDeclencheur(j)}");
+            }
         }
         // Les fiches de cette mise en service, et elles seules, sont celles que le serveur recopie pour cette base
         // (FichesRecopiees.ReglesEnServiceAsync).

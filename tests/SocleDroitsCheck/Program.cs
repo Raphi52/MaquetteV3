@@ -344,7 +344,8 @@ await using (var vB = await BaseJetable.CreerAsync("SocleDroitsGreffeB"))
            && identiteParti.Corps is { Admis: false, Statut: StatutsIdentite.Desactive }
            && vueApresDepart.Corps!.Lignes.Any(l => l.Qui == "Lucie Martin-Durand" && l.Verbe == "a modifié"),
         $"SOC-004 CA03 : desactive, l'agent n'ouvre plus la V3 ({identiteParti.Corps?.Statut}) et son geste garde son nom comme auteur ({string.Join(" / ", vueApresDepart.Corps.Lignes.Select(l => l.Phrase))})");
-    Reporter("SOC-004 CA03, moitie V2 : « il ne peut plus ouvrir la V2 » suppose la recopie du compte vers la V2 (REC-017 CA02, phase 2) ; la desactivation est journalisee dans la transaction du geste, prete pour elle");
+    // SOC-004 CA03, moitie V2 (« il ne peut plus ouvrir la V2 ») : prouve par tests\RecopieFichesCheck, REC-017 CA02 -- le compte
+    // desactive dans la V3 l'est dans la V2 en moins d'une minute, par la boucle du serveur (lot 10).
 
     // ---------------- SOC-004 CA04 : suppression ------------------------------------------------------
     var suppRefusee = await Post("rresp", C(RoutesComptes.Supprimer), new DemandeSurCompte(nouveau.Id, Ecran));
@@ -367,7 +368,9 @@ await using (var vB = await BaseJetable.CreerAsync("SocleDroitsGreffeB"))
     Exiger(verbes.SequenceEqual(["a désactivé", "a modifié", "a créé"])
            && journalCompte.Corps.Lignes.All(l => l.Qui == "Rose Responsable" && l.Instant > DateTime.UtcNow.AddMinutes(-5)),
         $"SOC-004 CA05 : creation, modification et desactivation figurent au journal avec l'auteur, la date et le compte vise ({string.Join(" / ", journalCompte.Corps.Lignes.Select(l => l.Phrase))})");
-    Reporter("SOC-004 CA06 : la V2 reconnait un compte cree ou change dans la V3 -- recopie V3 -> V2 (REC-002, REC-017, phase 2). Le compte garde les cles qu'elle lira : compte Windows, service (IdV2 du service), etat");
+    // SOC-004 CA06 (la V2 reconnait un compte cree ou change dans la V3, meme etat, meme service) : prouve par
+    // tests\RecopieFichesCheck, REC-017 CA01 et CA02 (lot 10), et l'ouverture de la V2 par ce compte, ses roles compris, par
+    // tests\RecopieDroitsCheck, REC-017 CA01 (lot 19).
 
     // ---------------- SOC-005 CA01, CA02 : journal des droits et evenement 130 -----------------------
     var avant130 = await Scalaire<int>(v3.Connexion, "SELECT COUNT(*) FROM soc.EvenementTechnique WHERE Code = 130");
@@ -560,7 +563,10 @@ await using (var vB = await BaseJetable.CreerAsync("SocleDroitsGreffeB"))
            && await Scalaire<int>(v3.Connexion, "SELECT COUNT(*) FROM soc.Compte WHERE CompteWindows = 'agent.de.b'") == 0,
         $"Raccord (1) (jumeau) : le meme geste sur le greffe B, par le responsable de B, recoit le code greffe de B et s'ecrit dans le journal de B seulement (creation et roles : {journauxA} -> {journauxB} ; « {ligneB} »)");
 
-    Reporter("SOC-002 CA07 : la V2 applique un droit change dans la V3 -- recopie V3 -> V2 des roles (REC-002, phase 2). Chaque changement est journalise (compte Windows et nom de role de la V2) dans la transaction du geste");
+    // SOC-002 CA07 (la V2 applique un droit ajoute ou retire dans la V3) : prouve par tests\RecopieDroitsCheck (lot 19) -- role
+    // ajoute puis retire, droits directs « ancien » et « comptabilite » recopies dans leur origine V2, l'oracle de la V2
+    // (OracleDroitsV2, ce banc) repondant comme la V3 pour chaque fonction. Chaque changement reste journalise ici (compte
+    // Windows et nom de role de la V2) dans la transaction du geste.
     await app.StopAsync();
 }
 
@@ -707,7 +713,10 @@ foreach (var nom in noms)
 
 Console.WriteLine();
 Console.WriteLine(echecs.Count == 0
-    ? $"TOUT VERT : SOC-002, SOC-004, SOC-005, SOC-016 -- chaque critere a son controle ; {reportes.Count} partie(s) REPORTEE(S), nommee(s) ci-dessus (recopie de la phase 2, 40 bases)."
+    // fix-ok: lot 19, pas une correction : les trois REPORTE de la recopie (SOC-002 CA07, SOC-004 CA03 et CA06) renvoient a
+    // leur preuve, tests\RecopieDroitsCheck et tests\RecopieFichesCheck ; ne reste que les 40 bases (SOC-002 CA01).
+    ? $"TOUT VERT : SOC-002, SOC-004, SOC-005, SOC-016 -- chaque critere a son controle ; {reportes.Count} partie(s) REPORTEE(S), nommee(s) ci-dessus (40 bases) ; " +
+      "la recopie vers la V2 (SOC-002 CA07, SOC-004 CA03 et CA06) est prouvee par RecopieDroitsCheck et RecopieFichesCheck."
     : $"{echecs.Count} ECHEC(S).");
 return echecs.Count == 0 ? 0 : 1;
 
