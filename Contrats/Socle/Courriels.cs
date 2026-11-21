@@ -2,8 +2,9 @@ namespace RigV3.Contrats.Socle;
 
 /// <summary>
 /// Les adresses des courriels du greffe (SOC-006) : la liste des envois et leur trace, le detail d'un envoi, les
-/// modeles qu'un agent peut choisir. Le serveur les publie (Serveur/Socle/Courriels/ModuleCourriels.cs), l'ecran
-/// « Courriels envoyés » les appelle (Pont/EcranCourriels.cs). L'ENVOI n'est pas une route : un acte de la V3 qui
+/// modeles qu'un agent peut choisir et leur apercu, les listes de distribution. Le serveur les publie
+/// (Serveur/Socle/Courriels/ModuleCourriels.cs) ; l'ecran « Courriels envoyés » (Pont/EcranCourriels.cs) lit les envois,
+/// l'ecran « Messagerie » (Pont/EcranMessagerie.cs) les modeles et les listes. L'ENVOI n'est pas une route : un acte de la V3 qui
 /// envoie un courriel appelle le service du serveur (ServiceCourriels.EnvoyerAsync), comme la V2 lancait RIG_Send_Email.
 ///
 /// Chaque adresse porte le code du greffe (<c>{greffe}</c>) : l'agent est juge dans la base V3 de CE greffe (401 sans
@@ -24,6 +25,19 @@ public static class RoutesCourriels
     /// reserve a Amitel n'y est pas pour un agent du greffe (SOC-006 CA05).</summary>
     public const string Modeles = "/socle/greffes/{greffe}/modeles-courriel";
 
+    /// <summary>GET : un modele, son texte, ses adresses resolues pour le greffe, ses listes par defaut et son apercu
+    /// (<see cref="ApercuModele"/>) ; 404 s'il n'existe pas OU s'il est reserve a Amitel et que l'agent est du greffe
+    /// (CA05 : il ne le voit pas, meme en tapant son nom). L'adresse : <see cref="PourModele"/>.</summary>
+    public const string Modele = "/socle/greffes/{greffe}/modeles-courriel/{type}";
+
+    /// <summary>GET : les listes de distribution que l'agent peut voir (<see cref="ListeDiffusion"/>[]), actives ou non :
+    /// les listes publiques (proprietaire « * ») et les siennes, comme la V2
+    /// (ListeDistributionMail.GetAllListeDistributionMailByLogin, ListeDistributionMail.cs:63).</summary>
+    public const string ListesDiffusion = "/socle/greffes/{greffe}/listes-diffusion";
+
+    /// <summary>Le proprietaire d'une liste de distribution publique (LSTDM_PRIVE = « * », ListeDistributionMail.cs:31).</summary>
+    public const string ListePublique = "*";
+
     /// <summary>
     /// La fonction (droit) qu'exigent <see cref="Envois"/> et <see cref="Envoi"/> : MAIL_LOT1, la procedure de la V2
     /// « Mails envoyés en Lot 1 » (PROCESSUS_ET_FONCTIONALITE de RIG_DEV, DLL PROC_MAIL_LOT1, lu le 2026-11-21), l'ecran
@@ -38,6 +52,10 @@ public static class RoutesCourriels
     public static string Pour(string route, string greffe, Guid? suivi = null)
         => route.Replace("{greffe}", Uri.EscapeDataString(greffe))
                 .Replace("{suivi:guid}", suivi?.ToString("D") ?? "");
+
+    /// <summary>L'adresse de <see cref="Modele"/> pour le modele <paramref name="type"/> du greffe <paramref name="greffe"/>.</summary>
+    public static string PourModele(string greffe, string type)
+        => Pour(Modele, greffe).Replace("{type}", Uri.EscapeDataString(type));
 
     /// <summary>L'adresse de <see cref="Envois"/> avec ses filtres (vides omis).</summary>
     public static string Filtrer(string greffe, DateOnly? du = null, DateOnly? au = null, string? destinataire = null,
@@ -139,7 +157,11 @@ public sealed record DetailCourriel(
 
 /// <summary>
 /// Un modele de courriel du greffe (soc.ModeleMessage, EMAIL_MODEL de la V2), sans son texte : ce que montre une liste de choix.
+/// Les cases « Utilisable … » de l'ecran V2 (OPE_EDIT_EMAILMODEL.cs:254-258) : <paramref name="Lot1"/> RCS,
+/// <paramref name="Lot2"/> judiciaire, <paramref name="Inscription"/> privilege, <paramref name="Comptabilite"/> comptabilite.
 /// </summary>
+/// <param name="Expediteur">Tel qu'en base : une etiquette « [ADRESSE_MAIL_…] » pour une boite du greffe, sinon l'adresse.</param>
+/// <param name="UtilisableEnSaisie">Faux : le modele est desactive (la V2 ne le supprime jamais, elle decoche cette case).</param>
 public sealed record ModeleMessage(
     string Type,
     string? LibelleEcran,
@@ -153,4 +175,43 @@ public sealed record ModeleMessage(
     bool EnvoiAutomatique,
     bool? UtilisableEnSaisie,
     bool Lot1,
-    bool Lot2);
+    bool Lot2,
+    bool? Inscription = null,
+    bool? Comptabilite = null);
+
+/// <summary>Une liste de distribution du greffe (soc.ListeDiffusion, LISTE_DISTRIBUTION_MAIL de la V2).</summary>
+/// <param name="Adresses">« a;b;c », comme LSTDM_ADR_MAILS.</param>
+/// <param name="Proprietaire">« * » (<see cref="RoutesCourriels.ListePublique"/>) pour une liste de tous les agents, sinon le
+/// compte de l'agent a qui elle est (LSTDM_PRIVE).</param>
+public sealed record ListeDiffusion(
+    int Id,
+    string Code,
+    string Libelle,
+    string Adresses,
+    bool Rcs,
+    bool Judiciaire,
+    string? Proprietaire,
+    bool Actif);
+
+/// <summary>
+/// Un modele ouvert dans l'ecran « Messagerie » : son texte, ses adresses telles qu'elles partiraient pour CE greffe
+/// (etiquettes « [ADRESSE_MAIL_…] » remplacees par INFO_GREFFE, comme SendEmail.filtrerMail), ses listes de distribution par
+/// defaut, et le courriel rendu comme il partirait (habillage du greffe, jetons, logo), avec deux documents d'exemple
+/// comme l'apercu de la V2 (OPE_EDIT_TEMPLATE_MAIL._Apercu). Rien n'est envoye ni ecrit pour le construire.
+/// </summary>
+/// <param name="Corps">Le texte du modele tel qu'en base (« | » = saut de ligne).</param>
+/// <param name="Expediteur">L'expediteur resolu ; "" si son etiquette n'a pas de valeur dans le greffe.</param>
+/// <param name="Rendu">Le courriel en HTML, logo inclus (data:), a montrer dans un cadre sans script.</param>
+/// <param name="Habille">L'habillage du greffe a ete applique (sinon : le rendu historique de la V2).</param>
+/// <param name="ValeursManquantes">Ce que le greffe n'a pas pour ce courriel (etiquette sans valeur, ville, greffier, logo).</param>
+public sealed record ApercuModele(
+    ModeleMessage Modele,
+    string Corps,
+    string Expediteur,
+    string Reponse,
+    string Copie,
+    string DestinataireDefaut,
+    string Rendu,
+    bool Habille,
+    string[] ValeursManquantes,
+    ListeDiffusion[] ListesParDefaut);

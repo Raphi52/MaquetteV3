@@ -21,6 +21,8 @@
     <Compile Include="../../Pont/JSInvokable.cs" Link="Pont/JSInvokable.cs" />
     <Compile Include="../../Pont/SessionAgent.cs" Link="Pont/SessionAgent.cs" />
     <Compile Include="../../Pont/EcranCourriels.cs" Link="Pont/EcranCourriels.cs" />
+    <!-- L'ecran « Messagerie » (modeles du greffe, listes, apercu : SOC-006 T04, CA05 cote ecran). -->
+    <Compile Include="../../Pont/EcranMessagerie.cs" Link="Pont/EcranMessagerie.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />

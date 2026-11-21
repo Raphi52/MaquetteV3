@@ -8,7 +8,8 @@ namespace RigV3.Serveur.Socle.Courriels;
 
 /// <summary>
 /// Les courriels du greffe (SOC-006) : le service d'envoi (<see cref="ServiceCourriels"/>) pour les actes de la V3, le
-/// menage quotidien des traces (<see cref="MenageCourriels"/>), et trois routes de lecture pour les ecrans.
+/// menage quotidien des traces (<see cref="MenageCourriels"/>), et cinq routes de lecture pour les ecrans « Courriels
+/// envoyés » (les envois, un envoi) et « Messagerie » (les modeles, un modele et son apercu, les listes de distribution).
 ///
 /// Les routes portent le greffe dans leur adresse et <see cref="PolitiquesSocle.AgentAdmis"/>, posee une fois sur leur
 /// groupe : l'agent est juge dans la base de CE greffe (401, 403, 404, 503 par la politique). La liste des envois et le
@@ -58,8 +59,25 @@ internal sealed class ModuleCourriels : IModuleServeur
             await SurBaseDuGreffe(c, greffe, ct, async cn =>
                 await droits.AppelantAsync(http, commune, cn, ct) is { } moi
                     ? Results.Ok(await ServiceCourriels.ModelesVisiblesAsync(cn, moi.EstAmitel, ct))
-                    : Refus(StatusCodes.Status403Forbidden, "Refuse : l'agent n'est pas admis dans ce greffe.")));
+                    : NonAdmis()));
+
+        // CA05 encore : un modele reserve a Amitel n'est pas plus lisible par son nom que par la liste (404, comme inconnu).
+        courriels.MapGet(RoutesCourriels.Modele, async (string greffe, string type, HttpContext http, CatalogueGreffes c,
+                                                        ServiceDroits droits, BaseRig commune, ServiceCourriels service, CancellationToken ct) =>
+            await SurBaseDuGreffe(c, greffe, ct, async cn =>
+                await droits.AppelantAsync(http, commune, cn, ct) is not { } moi ? NonAdmis()
+                : await service.ApercuAsync(greffe, cn, type, moi.EstAmitel, moi.CompteWindows, ct) is { } apercu ? Results.Ok(apercu)
+                : Refus(StatusCodes.Status404NotFound, $"Le modèle de courriel « {type} » n'est pas dans le greffe {greffe}.")));
+
+        courriels.MapGet(RoutesCourriels.ListesDiffusion, async (string greffe, HttpContext http, CatalogueGreffes c,
+                                                                 ServiceDroits droits, BaseRig commune, CancellationToken ct) =>
+            await SurBaseDuGreffe(c, greffe, ct, async cn =>
+                await droits.AppelantAsync(http, commune, cn, ct) is { } moi
+                    ? Results.Ok(await ServiceCourriels.ListesVisiblesAsync(cn, moi.CompteWindows, ct))
+                    : NonAdmis()));
     }
+
+    private static IResult NonAdmis() => Refus(StatusCodes.Status403Forbidden, "Refuse : l'agent n'est pas admis dans ce greffe.");
 
     /// <summary>403 si l'agent n'a pas la fonction MAIL_LOT1 dans la base de CE greffe ; null s'il l'a. Une panne de la
     /// verification est un refus (SOC-002 CA06, trace par ServiceDroits).</summary>
