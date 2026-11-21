@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- L'OUTIL DE L'EXPLOITANT POUR LE CONTROLE DES DEUX BASES D'UN GREFFE (REC-006, lot 8 du plan de reconstruction,
+       phase 2) : la meme comparaison que celle de la nuit (Serveur/Recopie/Comparaison.cs, planifiee par
+       ComparaisonNocturne), lancee a la main sur une base. Ligne de commande : en tete de Program.cs.
+       Mode d'emploi : docs/reconstruction/recopie.md. Banc : tests/RecopieRepriseCheck. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>RigV3.Comparaison</RootNamespace>
+    <AssemblyName>RigV3.Comparaison</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+  </ItemGroup>
+
+</Project>

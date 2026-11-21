@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Banc de REC-005 (reprendre apres un incident), REC-006 (comparer chaque nuit) et REC-008 (repeter le transfert sur
+       des copies anonymisees), lot 8 du plan de reconstruction, phase 2. Il lui faut le SQL Server du poste
+       (docker compose up -d) et la lecture de RIG_DEV (SQL-DEV\DEV, compte Windows ; autre serveur : RIGV3_RIG_DEV).
+       La base V2 jetable est celle du banc de REC-001 (ExtraitRigDev.cs, lie et non recopie).
+       En tete de Program.cs : ce que chaque controle prouve. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../RecopieTransfertCheck/ExtraitRigDev.cs" Link="ExtraitRigDev.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- L'outil de transfert est aussi LANCE comme un processus (RigV3.Transfert.exe), pour le tuer au milieu d'une table. -->
+    <ProjectReference Include="../../Outils/Transfert/RigV3.Transfert.csproj" />
+    <ProjectReference Include="../../Outils/Comparaison/RigV3.Comparaison.csproj" />
+    <ProjectReference Include="../../Outils/Repetition/RigV3.Repetition.csproj" />
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+    <ProjectReference Include="../../Contrats/RigV3.Contrats.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
+  </ItemGroup>
+
+</Project>
