@@ -559,8 +559,11 @@ var instance = new SqlConnectionStringBuilder(BaseJetable.ServeurDesBancs()).Dat
 var authentification = new SqlConnectionStringBuilder(BaseJetable.ServeurDesBancs());
 authentification.Remove("Data Source");
 const string Greffe = "9901";
-await Executer(commune.Connexion, "INSERT INTO soc.Greffe (CodeGreffe, Nom, Serveur, BaseV2, BaseV3, EstBeta, EstOutreMer, Fuseau, ModifiePar, ModifieLe) " +
-                                  $"VALUES ('{Greffe}', N'Greffe du banc de la recopie', '{instance}', '{v2.Nom}', '{v3.Nom}', 0, 0, 'Romance Standard Time', 'banc', SYSDATETIME());");
+// Le greffe du banc (sa base V3 creee), et un greffe pas encore passe (base V3 nommee, jamais creee) que la boucle doit ignorer.
+const string GreffePasPasse = "9902";
+await Executer(commune.Connexion, "INSERT INTO soc.Greffe (CodeGreffe, Nom, Serveur, BaseV2, BaseV3, BaseV3CreeeLe, EstBeta, EstOutreMer, Fuseau, ModifiePar, ModifieLe) " +
+                                  $"VALUES ('{Greffe}', N'Greffe du banc de la recopie', '{instance}', '{v2.Nom}', '{v3.Nom}', SYSDATETIME(), 0, 0, 'Romance Standard Time', 'banc', SYSDATETIME()), " +
+                                  $"('{GreffePasPasse}', N'Greffe pas encore passe', '{instance}', 'RIG_BANC_PAS_PASSE', '{BaseJetable.Prefixe}jamais_creee_{Guid.NewGuid():N}', NULL, 0, 0, 'Romance Standard Time', 'banc', SYSDATETIME());");
 appB = new BaseRigApp(ServeurRig.Construire(["--environment", "Development"], s =>
 {
     s.WebHost.UseTestServer();
@@ -603,6 +606,15 @@ Exiger(delaisV3.All(d => d.S < 60),
 Exiger(delaisV2.All(d => d.S < 60),
     $"REC-003 CA01 : une fiche de chaque table partagee modifiee dans la V2 se lit dans la V3 en {delaisV2.Max(d => d.S):0.0} s au plus (delai propose : une minute) — " +
     string.Join(", ", delaisV2.Select(d => $"{d.Table} {d.S:0.0} s")));
+// Les erreurs de la recopie elle-meme (les autres traitements du serveur -- planificateur de nuit, surveillance -- se
+// plaignent a leur facon du greffe sans base, et c'est leur affaire).
+var erreursBoucle = await Lire(commune.Connexion, "SELECT ISNULL(CodeGreffe, '-'), Programme, LEFT(Message, 160) FROM soc.ErreurTechnique " +
+                                                  "WHERE Programme LIKE '%Recopie%' OR Message LIKE 'Recopie%'");
+var autresErreurs = await Nombre(commune.Connexion, "SELECT COUNT(*) FROM soc.ErreurTechnique");
+Exiger(erreursBoucle.Rows.Count == 0 && autresErreurs > 0,
+    $"la boucle du serveur laisse de cote le greffe {GreffePasPasse}, dont la base V3 n'est pas creee : aucune erreur de la recopie au journal technique pendant ses " +
+    $"{passagesBoucle} passages (le journal est bien ecrit : {autresErreurs} lignes des autres traitements du serveur) " +
+    string.Join(" ; ", erreursBoucle.Rows.Cast<DataRow>().Select(r => $"{r[0]} {r[1]} : {r[2]}")));
 
 // ====================================================================================================
 // C. Le vrai serveur et l'ecran « Fiches en conflit » : REC-004 CA02 et CA03

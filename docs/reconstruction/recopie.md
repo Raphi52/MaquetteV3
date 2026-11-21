@@ -252,6 +252,7 @@ sqlcmd -S <instance> -E -f 65001 -b -i recopie-v2.sql -v BaseV2=RIG_<GREFFE> Ret
 | Une transaction **par fiche**, d'une base à l'autre | Même instance (Q4) : une transaction locale suffit, sans coordinateur distribué ; une panne au milieu ne laisse ni demi-fiche ni correspondance orpheline. |
 | **Les dates de `rec.*` à l'horloge du serveur SQL** | Le SQL Server des bancs (Docker) est à l'heure UTC, le poste à Paris (08:52 contre 09:52, mesuré) : l'âge d'un écart et la durée d'un passage se mesurent avec `SYSDATETIME()`, jamais `DateTime.Now`. |
 | Un passage à la fois par base | Verrou applicatif `rigv3.recopie.<base>` : deux serveurs ne recopient pas deux fois la même file. |
+| La boucle ne vise que les greffes **dont la base V3 existe** (`BaseV3CreeeLe`), et une même panne ne va au journal technique qu'une fois par 10 minutes | Mesuré par le banc : sans ce filtre, un greffe pas encore passé donnait une erreur à chaque passage (toutes les 5 s) ; chaque passage garde de toute façon son erreur dans `rec.PassageRecopie`. |
 
 ### Écarts code ↔ métier et choix à valider
 

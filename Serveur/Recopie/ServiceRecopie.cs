@@ -1,7 +1,10 @@
 // fix-ok: fichier NEUF du lot 9 retouche avant tout essai : (1) le catch du passage journalise dans son bloc (regle
 // statique SocleSupervisionCheck, Avalement.Dans : un catch (Exception) sans Log... est une faute) ; (2) le debut d'un
 // passage lu au serveur SQL et non DateTime.Now -- le SQL Server des bancs est a l'heure UTC (mesure 2026-11-21 : 08:52
-// contre 09:52 au poste), Debut et Fin de rec.PassageRecopie venaient de deux horloges.
+// contre 09:52 au poste), Debut et Fin de rec.PassageRecopie venaient de deux horloges. (3) Relecture apres la suite verte :
+// la boucle ouvrait toutes les 5 s la base V3 de CHAQUE greffe du catalogue, meme pas encore creee (BaseV3CreeeLe nul),
+// et journalisait chaque passage en panne -- une erreur toutes les 5 s par greffe ; elle ne vise plus que les bases V3
+// creees, et une meme panne n'est signalee qu'une fois par 10 minutes.
 using System.Collections.Concurrent;
 using System.Data;
 using Microsoft.Data.SqlClient;
@@ -58,8 +61,8 @@ public static class ServiceRecopie
             erreur = e.Message;
             log?.LogError(e, "Recopie de {BaseV2} : passage arrete sur une erreur, les changements attendent le suivant", baseV2);
         }
-        if (erreur is not null && a?.Erreur is not null || r?.Erreur is not null)
-            log?.LogError("Recopie de {BaseV2} : passage arrete, les changements attendent le suivant : {Erreur}", baseV2, erreur);
+        if ((a?.Erreur ?? r?.Erreur) is { } motif)
+            log?.LogError("Recopie de {BaseV2} : passage arrete, les changements attendent le suivant : {Erreur}", baseV2, motif);
 
         double? retard = null;
         try
@@ -93,6 +96,17 @@ public sealed class RecopieContinue(CatalogueGreffes catalogue, IConfiguration c
     public const string Reglage = "Recopie:Continue";
     public const int IntervalleParDefaut = 5;
     private readonly ConcurrentDictionary<string, (FichesRecopiees Fiches, DateTime Le)> cache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, DateTime> signales = new(StringComparer.Ordinal);
+
+    /// <summary>Une meme panne d'un greffe (base V2 coupee, retard) ne va au journal technique qu'une fois par 10 minutes :
+    /// a un passage toutes les 5 s, elle le remplirait. Chaque passage garde son erreur dans rec.PassageRecopie.</summary>
+    private bool ASignaler(string cle)
+    {
+        var maintenant = DateTime.UtcNow;
+        if (signales.TryGetValue(cle, out var le) && maintenant - le < TimeSpan.FromMinutes(10)) return false;
+        signales[cle] = maintenant;
+        return true;
+    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -102,7 +116,8 @@ public sealed class RecopieContinue(CatalogueGreffes catalogue, IConfiguration c
         {
             try
             {
-                foreach (var g in await catalogue.ListerAsync(stoppingToken))
+                // Seuls les greffes dont la base V3 existe (SOC-008) : un greffe pas encore passe n'a rien a recopier.
+                foreach (var g in (await catalogue.ListerAsync(stoppingToken)).Where(g => g.BaseV3CreeeLe is not null && !string.IsNullOrWhiteSpace(g.BaseV3)))
                     await PasserGreffeAsync(g.Code, catalogue.ConnexionBase(g.Serveur, g.BaseV3), g.BaseV2, seuil, stoppingToken);
             }
             catch (Exception e) when (e is not OperationCanceledException)
@@ -130,16 +145,23 @@ public sealed class RecopieContinue(CatalogueGreffes catalogue, IConfiguration c
                 c = (await FichesRecopiees.ChargerAsync(connexionV3, baseV2, null, ct), DateTime.UtcNow);
                 cache[code] = c;
             }
-            var bilan = await ServiceRecopie.PasserAsync(connexionV3, baseV2, c.Fiches, log: log, ct: ct);
-            if (bilan.Erreur is not null) cache.TryRemove(code, out _);
-            if (bilan.RetardSecondes is { } r && r > seuil.TotalSeconds)
+            // Le passage ne journalise pas lui-meme (log: null) : son erreur revient dans le bilan, signalee ici une fois par 10 min.
+            var bilan = await ServiceRecopie.PasserAsync(connexionV3, baseV2, c.Fiches, log: null, ct: ct);
+            if (bilan.Erreur is not null)
+            {
+                cache.TryRemove(code, out _);
+                if (ASignaler($"{code}|passage|{bilan.Erreur}"))
+                    log.LogError("Recopie du greffe {Greffe} ({BaseV2}) : passage arrete, les changements attendent le suivant : {Erreur}", code, baseV2, bilan.Erreur);
+            }
+            if (bilan.RetardSecondes is { } r && r > seuil.TotalSeconds && ASignaler($"{code}|retard"))
                 log.LogError("Recopie du greffe {Greffe} ({BaseV2}) en retard : le plus vieux changement V3 attend depuis {Minutes:0} min (seuil {Seuil} min)",
                              code, baseV2, r / 60, seuil.TotalMinutes);
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
             cache.TryRemove(code, out _);
-            log.LogError(e, "Recopie du greffe {Greffe} ({BaseV2}) : passage impossible, nouvel essai au suivant", code, baseV2);
+            if (ASignaler($"{code}|exception|{e.Message}"))
+                log.LogError(e, "Recopie du greffe {Greffe} ({BaseV2}) : passage impossible, nouvel essai au suivant", code, baseV2);
         }
     }
 }
