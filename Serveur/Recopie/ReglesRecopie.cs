@@ -95,8 +95,10 @@ public sealed record RegleRecopie(string TableV2, string TableV3, string Story, 
     /// <summary>La cle primaire de la table V3 (« Id ») quand elle ne porte pas le nom de celle de la V2.</summary>
     public string? CleV3 { get; init; }
 
-    /// <summary>Les liens vers une autre fiche partagee que la V2 tient sans cle etrangere (CLIAD_ID_ADRBS -> ADRESSE_BASE) :
-    /// colonne V2 -> table V2 visee. Les liens portes par une cle de la V2 sont lus dans son catalogue.</summary>
+    /// <summary>Les liens vers une autre fiche partagee qu'une base V2 peut tenir sans cle etrangere : colonne V2 -> table V2
+    /// visee. Ex. CLIAD_ID_ADRBS -> ADRESSE_BASE, sans cle sur RIG_DEV mais avec une cle active sur RIG_RECETTE (lu le
+    /// 2026-11-21) : la base qui a la cle donne le meme lien par son catalogue, la declaration couvre celle qui ne l'a pas.
+    /// Les liens portes par une cle de la V2 sont lus dans son catalogue.</summary>
     public IReadOnlyDictionary<string, string> LiensSansCle { get; init; } = new Dictionary<string, string>();
 
     /// <summary>Une fiche creee dans la V3 n'est PAS creee dans la V2 : elle n'y a pas d'equivalent, et la V3 le sait (le

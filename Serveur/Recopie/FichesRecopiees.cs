@@ -281,7 +281,8 @@ public sealed class FichesRecopiees
                     && string.Equals(k.ColonnesVisees[0], parent.Cle.Nom, StringComparison.OrdinalIgnoreCase)
                     && t.Colonnes.Any(c => string.Equals(c.Nom, k.Colonnes[0], StringComparison.OrdinalIgnoreCase)))
                     t.Liens[k.Colonnes[0]] = parent;
-            // Les liens que la V2 tient sans cle etrangere, declares par la regle (CLIAD_ID_ADRBS -> ADRESSE_BASE).
+            // Les liens qu'une base V2 peut tenir sans cle etrangere, declares par la regle (CLIAD_ID_ADRBS -> ADRESSE_BASE :
+            // sans cle sur RIG_DEV, avec cle sur RIG_RECETTE, ou la boucle ci-dessus pose deja le meme lien).
             foreach (var (colonne, visee) in t.Regle.LiensSansCle)
                 if (tables.FirstOrDefault(p => string.Equals(p.NomV2, visee, StringComparison.OrdinalIgnoreCase)) is { } parent
                     && t.Colonnes.Any(c => string.Equals(c.Nom, colonne, StringComparison.OrdinalIgnoreCase)))

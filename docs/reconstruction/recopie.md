@@ -563,7 +563,7 @@ la migration). **Une seule déclaration par fiche** donne sa règle de transfert
 | `rec.Entreprise` | ENTREPRISE | REC-012 | 17 + clé | `Denomination` (ENTRP_DESIGNATION) |
 | `rec.DossierRcs` | DOSSIER_RCS | REC-012 | 40 + clé | état de transmission propre à la V2 (CA02) |
 | `rec.Client` | CLIENT | REC-013 | 33 + clé | agent par compte de session (CA02) ; code abrégé unique, `DoublonHerite` (T01) |
-| `rec.ClientAdresse` | CLIENT_ADRESSE | REC-013 | 9 + clé | lien vers l'adresse sans clé dans la V2 (`LiensSansCle`) |
+| `rec.ClientAdresse` | CLIENT_ADRESSE | REC-013 | 9 + clé | lien vers l'adresse : sans clé étrangère sur RIG_DEV, avec une clé active sur RIG_RECETTE (lu le 2026-11-21) ; déclaré dans `LiensSansCle`, il vaut pour les deux |
 | `rec.ClientContact` | CLIENT_CONTACT | REC-013 | 9 + clé | |
 | `rec.ProvisionReprise` | ENCAISSEMENT_REPRIS | REC-013 | 7 + clé | consommée une seule fois (CA06, `ProvisionsReprises.cs`) |
 | `rec.Creance`, `rec.Bateau` | CREANCE_END, BATEAU | REC-014 | 18, 25 + clé | agent de l'appel au registre des navires par compte de session |

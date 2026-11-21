@@ -182,7 +182,7 @@ CREATE TABLE rec.ClientAdresse (
     ParDefaut                   bit          NOT NULL,  -- CLIAD_ADRESSE_PAR_DEFAUT
     TypeAdresse                 varchar(1)   NULL,      -- CLIAD_TYPE_ADRESSE
     Pays                        varchar(32)  NULL,      -- CLIAD_PAYS
-    IdAdresse                   int          NULL       -- CLIAD_ID_ADRBS -> rec.Adresse (sans cle dans la V2)
+    IdAdresse                   int          NULL       -- CLIAD_ID_ADRBS -> rec.Adresse (sans cle sur RIG_DEV, avec cle sur RIG_RECETTE)
 );
 CREATE INDEX IX_ClientAdresse_Client ON rec.ClientAdresse (IdClient);
 
