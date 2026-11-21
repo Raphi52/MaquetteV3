@@ -69,6 +69,19 @@ CREATE TABLE rigv3.AppelChercher (
     Numero      varchar(40)   NULL,
     Code        int           NULL
 );
+
+-- Le retour d'un greffe bêta avec ses affaires de la V3 (REC-007 CA04, lot 11, Serveur\Recopie\RetourBeta.cs) : les
+-- factures, articles, lettrages et ventilations de la V3 n'entrent pas dans les chaînes signées de la V2 (C19) ; chaque
+-- ligne de facturation restée dans la V3 a ici son renvoi, par l'affaire de la V2 qui s'y rattache.
+IF OBJECT_ID(N'rigv3.RenvoiFactureV3', N'U') IS NULL
+CREATE TABLE rigv3.RenvoiFactureV3 (
+    Id          int IDENTITY(1,1) NOT NULL CONSTRAINT PK_RenvoiFactureV3 PRIMARY KEY,
+    IdAffaireV2 int           NOT NULL,          -- AFFAIRE.AFFRE_ID_AFFRE de cette base
+    TableV3     sysname       NOT NULL,          -- la table de la V3 où la ligne reste (v2.ARTICLE_UTILISE...)
+    IdV3        nvarchar(200) NOT NULL,          -- sa clé dans la V3
+    BaseV3      sysname       NOT NULL,          -- la base V3 du greffe, où elle se lit
+    Le          datetime2(0)  NOT NULL CONSTRAINT DF_RenvoiFactureV3_Le DEFAULT (SYSDATETIME())
+);
 GO
 
 IF OBJECT_ID(N'rigv3.Attribuer', N'SN') IS NOT NULL DROP SYNONYM rigv3.Attribuer;

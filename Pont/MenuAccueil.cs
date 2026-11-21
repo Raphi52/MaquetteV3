@@ -209,7 +209,8 @@ public static class MenuAccueil
                 new("Suivi d'impression",     "ce qui est sorti",                   "PROC_SUIVI_IMPRESSION"),
                 new("Relancer un fichier",    "edition bloquee",                    "PROC_RELANCEFILE"),
                 new("Relancer un lot",        "lot d'impression bloque",            "PROC_RELANCELOT"),
-                new("Fiches en conflit",      "modifiees dans les deux RIG",        "PROC_FICHES_CONFLIT")
+                new("Fiches en conflit",      "modifiees dans les deux RIG",        "PROC_FICHES_CONFLIT"),
+                new("Historique de l'ancien RIG", "affaires des deux RIG, anciens numeros", "PROC_HISTORIQUE_ANCIEN_RIG")
             ]),
             new("Chiffres",
             [

@@ -84,9 +84,10 @@ var reglesServeur = ReglesTransfert.Decouvrir();
 var tellesQuelles = reglesServeur.Regles.Where(r => r.Sorte == SorteRegle.TelleQuelle && r.Cible is null).Select(r => r.Table).ToList();
 var tablesPrevues = new[] { "AFFAIRE", "DEMANDE", "ACTION_RCS", "ADRESSE_BASE", "ARRIVEE", "CATEGORIE", "CLIENT", "DOSSIER_RCS", "INSCRIPTION", "UTILISATEUR" };
 Exiger(tablesPrevues.All(t => reglesServeur.Regles.Any(r => r.Table == t)) &&
-       reglesServeur.Reprises.Select(r => r.Nom).SequenceEqual(["reglages du greffe", "comptes et droits", "types de demande par reference", "adresse inconnue unique", "compteurs de numeros"]),
+       reglesServeur.Reprises.Select(r => r.Nom).SequenceEqual(["reglages du greffe", "comptes et droits", "types de demande par reference", "anciens numeros",
+                                                                "adresse inconnue unique", "compteurs de numeros"]),
     $"REC-001 T03 : chaque table de tables_v2 de REC-001 a sa regle ({tellesQuelles.Count} telles quelles, UTILISATEUR par la reprise des comptes), " +
-    $"et les 3 reprises de la phase 1 et les 2 du lot 10 sont branchees dans l'ordre : {string.Join(", ", reglesServeur.Reprises.Select(r => $"{r.Nom} ({r.Story})"))}");
+    $"et les 3 reprises de la phase 1, les 2 du lot 10 et celle du lot 11 (REC-009) sont branchees dans l'ordre : {string.Join(", ", reglesServeur.Reprises.Select(r => $"{r.Nom} ({r.Story})"))}");
 
 // Le catalogue REEL de RIG_DEV, lu par le moteur (CA01) : ses tables telles quelles se recreent sur ce poste avec les memes
 // types. RIG_DEV garde un classement sur des colonnes bit et datetime, que la base jetable ne peut pas reproduire : c'est
@@ -145,7 +146,10 @@ Info($"base V2 jetable {v2.Nom} : {extrait.Lignes.Values.Sum()} lignes dans {ext
      string.Join(", ", extrait.Lignes.Where(l => extraits.ContainsKey(l.Key)).Select(l => $"{l.Key} {l.Value}")));
 foreach (var d in extrait.DeclencheursNonRecrees) Info("declencheur non recree : " + d);
 Exiger(extrait.Lignes.Count == reglesServeur.Regles.Select(r => r.Table).Concat(entieres).Distinct(StringComparer.OrdinalIgnoreCase).Count()
-       && extrait.Lignes.All(l => l.Value > 0 || l.Key is "NUMERO_METIER_SAVE_CDU" or "MAIL_TEMPLATE" or "CLIENT_CONTACT" or "BATEAU"),
+       // Les tables des anciennes reprises (REC-009, lot 11) sont vides sur RIG_DEV, qui n'est pas un greffe repris (lu le 2026-11-20).
+       && extrait.Lignes.All(l => l.Value > 0 || l.Key is "NUMERO_METIER_SAVE_CDU" or "MAIL_TEMPLATE" or "CLIENT_CONTACT" or "BATEAU"
+                                                   or "CORRESP_MIGRATION_RIG" or "CORRESP_ORACLE_RIG" or "CORRESP_GAGI_RIG" or "MIGRATION_REFERENCE"
+                                                   or "MIGRATION_TABLE" or "MIGRATION_CHAMP" or "MIGRATION_ID"),
     $"base V2 jetable tiree de RIG_DEV : {extrait.Lignes.Count} tables, fermee sur ses {extrait.Cles} cles etrangeres (reposees avec verification)");
 
 // La colonne en plus (CA01, jumeau accepte) et les deux liens casses herites (CA04), cle desactivee comme dans une base reprise.

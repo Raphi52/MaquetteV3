@@ -98,7 +98,13 @@ public static class ExtraitRigDev
             $"WHERE OBJECT_NAME(f.parent_object_id) IN ({dans}) AND OBJECT_NAME(f.referenced_object_id) IN ({dans}) ORDER BY f.name");
         var simples = liens.Rows.Cast<DataRow>().Where(r => Convert.ToInt32(r[5]) == 1)
             .Select(r => (Nom: (string)r[0], Enfant: (string)r[1], Colonne: (string)r[2], Parent: (string)r[3], Visee: (string)r[4])).ToList();
-        if (simples.Count != liens.Rows.Count) throw new InvalidOperationException("RIG_DEV : une cle etrangere a plusieurs colonnes entre les tables de l'extrait (non prevu par le banc).");
+        // fix-ok: mesure le 2026-11-21 par RecopieRetourCheck (lot 11) : MIGRATION_CHAMP et MIGRATION_ID visent MIGRATION_TABLE par une cle a
+        // DEUX colonnes (REC-009 leur donne une regle, donc tout banc qui complete son extrait les tire) ; elles levaient « une cle etrangere a
+        // plusieurs colonnes ». Une telle cle est recreee et verifiee comme les autres (etape 3), sans servir a la fermeture : si l'extrait
+        // n'a pas la ligne visee, sa creation echoue et le dit.
+        var multiples = liens.Rows.Cast<DataRow>().Where(r => Convert.ToInt32(r[5]) > 1).GroupBy(r => (string)r[0])
+            .Select(g => (Nom: g.Key, Enfant: (string)g.First()[1], Colonnes: g.Select(r => (string)r[2]).ToList(), Parent: (string)g.First()[3],
+                          Visees: g.Select(r => (string)r[4]).ToList())).ToList();
         for (var tour = 1; ; tour++)
         {
             var ajoutees = 0;
@@ -125,6 +131,9 @@ public static class ExtraitRigDev
             await ExecuterAsync(v2, $"CREATE UNIQUE INDEX [UX_{parent}_{visee}] ON dbo.[{parent}] ([{visee}]);");
         foreach (var k in simples)
             await ExecuterAsync(v2, $"ALTER TABLE dbo.[{k.Enfant}] WITH CHECK ADD CONSTRAINT [{k.Nom}] FOREIGN KEY ([{k.Colonne}]) REFERENCES dbo.[{k.Parent}] ([{k.Visee}]);");
+        foreach (var k in multiples)
+            await ExecuterAsync(v2, $"ALTER TABLE dbo.[{k.Enfant}] WITH CHECK ADD CONSTRAINT [{k.Nom}] FOREIGN KEY ({string.Join(", ", k.Colonnes.Select(c => $"[{c}]"))}) " +
+                                    $"REFERENCES dbo.[{k.Parent}] ({string.Join(", ", k.Visees.Select(c => $"[{c}]"))});");
         var declencheurs = await LireAsync(rigDev,
             "SELECT g.name, OBJECT_NAME(g.parent_id), m.definition, m.uses_quoted_identifier, m.uses_ansi_nulls FROM sys.triggers g " +
             $"JOIN sys.sql_modules m ON m.object_id = g.object_id WHERE OBJECT_NAME(g.parent_id) IN ({dans}) ORDER BY g.name");
@@ -150,7 +159,7 @@ public static class ExtraitRigDev
 
         var lignes = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         foreach (var t in tables) lignes[t] = Convert.ToInt64((await LireAsync(v2, $"SELECT COUNT_BIG(*) FROM dbo.[{t}]")).Rows[0][0]);
-        return new Bilan(lignes, simples.Count, recrees, echoues);
+        return new Bilan(lignes, simples.Count + multiples.Count, recrees, echoues);
     }
 
     /// <summary>Une lecture de RIG_DEV : la porte de la V2 la refuse si ce n'est pas un SELECT seul.</summary>

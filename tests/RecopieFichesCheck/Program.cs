@@ -88,7 +88,9 @@ var reglesServeur = ReglesTransfert.Decouvrir();
 var reglesRecopie = ReglesRecopie.Decouvrir();
 var fichesV3 = reglesRecopie.Where(r => r.ColonneParColonne).ToList();
 const string Inconnue = "* Adresse inconnu pour le client*";
-var entieres = reglesServeur.Regles.Where(r => r.Sorte == SorteRegle.Reprise).Select(r => r.Table).Append("ENCAISSEMENT_REPRIS").Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+// Les tables des anciennes reprises (REC-009, lot 11 : quelques lignes, ou aucune, sur RIG_DEV) sont tirees entieres.
+var entieres = reglesServeur.Regles.Where(r => r.Sorte == SorteRegle.Reprise).Select(r => r.Table).Append("ENCAISSEMENT_REPRIS")
+    .Concat(["MIGRATION_REFERENCE", "MIGRATION_TABLE", "MIGRATION_CHAMP", "MIGRATION_ID", "ARTICLE_CORRESP_REPLAY"]).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 // Les lignes de l'extrait se choisissent par leurs identifiants, lus d'abord dans RIG_DEV : une seule requete faite de « OR »
 // de sous-requetes sur les grosses tables y depassait dix minutes (mesure le 2026-11-21, 1er essai du banc).
 async Task<string> Ids(string sql) => string.Join(", ", Colonne0(await Lire(chaineRigDev, sql)).Append("-1"));
@@ -669,9 +671,10 @@ try
         $"REC-015 CA03 : apres une journee simulee (10 actions dans la V3, 10 dans la V2), les historiques de {auHasard.Count} dossiers tires au hasard ont les memes actions, dans le " +
         $"meme ordre, dans les deux logiciels {string.Join(", ", historiquesDifferents.Take(5))}");
 
-    // CA04 : une demande V3 qui porte une action du registre.
+    // CA04 : une demande V3 qui porte une action du registre. Hors de toute ancienne affaire : depuis le lot 11, la V3 refuse d'ajouter une
+    // demande a une affaire de l'ancien RIG (REC-010 CA03, Serveur\Recopie\GardeAffaires.cs), et son modele est une demande transferee.
     var modeleDemande = await Texte(v3.Connexion, "SELECT TOP (1) CONVERT(varchar(20), DMND_ID_DMND) FROM v2.DEMANDE ORDER BY DMND_ID_DMND DESC");
-    var demandeV3 = await Dupliquer(v3.Connexion, "v2.DEMANDE", catV3.Tables["v2.DEMANDE"], modeleDemande!, $"DMND_ID_ACTRC={actionsCa01.First(a => a.Action != "").Action};DMND_ID_DMND_MERE=NULL");
+    var demandeV3 = await Dupliquer(v3.Connexion, "v2.DEMANDE", catV3.Tables["v2.DEMANDE"], modeleDemande!, $"DMND_ID_ACTRC={actionsCa01.First(a => a.Action != "").Action};DMND_ID_DMND_MERE=NULL;DMND_ID_AFFRE=NULL;DMND_ID_DMND_INHIBITRICE=NULL");
     var suivie = await Texte(v3.Connexion, $"SELECT a.NumeroArrivee FROM v2.DEMANDE d JOIN rec.ActionRegistre a ON a.Id = d.DMND_ID_ACTRC WHERE d.DMND_ID_DMND = {demandeV3}");
     var demandesTransferees = await Nombre(v3.Connexion, "SELECT COUNT(*) FROM v2.DEMANDE WHERE DMND_ID_ACTRC IS NOT NULL");
     var demandesOrphelines = await Nombre(v3.Connexion, "SELECT COUNT(*) FROM v2.DEMANDE d WHERE d.DMND_ID_ACTRC IS NOT NULL AND NOT EXISTS (SELECT 1 FROM rec.ActionRegistre a WHERE a.Id = d.DMND_ID_ACTRC)");

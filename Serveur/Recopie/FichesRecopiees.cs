@@ -276,7 +276,9 @@ public sealed class FichesRecopiees
             // depuis que les comptes sont recopies (REC-017), CLIEN_ID_UTLST -> UTILISATEUR est aussi une cle vers une fiche
             // partagee ; la valeur etait traduite deux fois (par la correspondance, puis par le compte de session), et
             // l'agent V3 243 « azuredevops » devenait l'agent V2 50 « Moulinette ».
-            foreach (var k in t.V2.Cles.Where(k => k.Colonnes.Count == 1 && t.TraductionDe(k.Colonnes[0]) is null))
+            // Une colonne qui garde le numero de la V2 dans la copie de la V3 (RegleRecopie.NumerosV2) n'est pas un lien non plus.
+            foreach (var k in t.V2.Cles.Where(k => k.Colonnes.Count == 1 && t.TraductionDe(k.Colonnes[0]) is null
+                                                   && !t.Regle.NumerosV2.Keys.Contains(k.Colonnes[0], StringComparer.OrdinalIgnoreCase)))
                 if (tables.FirstOrDefault(p => string.Equals(p.NomV2, k.TableVisee, StringComparison.OrdinalIgnoreCase)) is { } parent
                     && string.Equals(k.ColonnesVisees[0], parent.Cle.Nom, StringComparison.OrdinalIgnoreCase)
                     && t.Colonnes.Any(c => string.Equals(c.Nom, k.Colonnes[0], StringComparison.OrdinalIgnoreCase)))

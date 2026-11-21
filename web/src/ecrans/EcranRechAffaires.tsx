@@ -27,12 +27,16 @@
 // suppression est refusee ici (elle se fait dans l'ancien RIG). Le double-clic l'ouvre toujours dans la
 // visionneuse : la consulter dans la V3 reste permis. L'aiguillage est demande au pont quand la LISTE des
 // numeros change (pas a chaque tri) ; s'il ne repond pas, l'ecran reste tel qu'avant ce lot.
+// Lot 11 (REC-010 ; SOC-015 CA01 laisse ouvert par le lot 3, decision du chef) : le bloc propose aussi « Voir son historique
+// (lecture seule) » -- ses affaires et demandes lues par le pont de l'historique (Pont/EcranHistoriqueV2.cs). fix-ok: ajout en
+// quatre petits pas (import, etat, remise a zero a la selection, bouton), pas un correctif.
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { EnteteTriable } from '../composants/EnteteTriable'
 import { dateSaisie } from '../saisie'
 import { toucheDeRecherche } from '../plan/clavier'
+import type { VueEcranHistorique } from './EcranHistoriqueV2'
 
 export interface NatureAffaire {
   code: string
@@ -173,6 +177,11 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
   // rien, donc ne redemande rien.
   const [aiguillage, setAiguillage] = useState<Record<string, LigneAiguillee>>({})
   const [ancienRig, setAncienRig] = useState<ResultatAncienRig | null>(null)
+  // SOC-015 CA01 (lot 11, REC-010) : l'historique d'une ancienne affaire, en lecture, par le pont de l'historique de l'ancien RIG.
+  const [historique, setHistorique] = useState<VueEcranHistorique | null>(null)
+  function voirHistorique(numero: string) {
+    void appeler<VueEcranHistorique>('EcranRechAffaires.HistoriqueAncienne', numero).then((v) => setHistorique(v), () => setHistorique(null))
+  }
   const cleNumeros = [...new Set(trouvees.map((a) => a.numero))].sort().join('\n')
   useEffect(() => {
     let perime = false
@@ -361,7 +370,7 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
               {trouvees.map((affaire, i) => (
                 <tr key={`${i}:${affaire.numero}`}
                     className={affaire.numero === selection ? 'rig-ligne--valide' : undefined}
-                    onClick={() => { setSelection(affaire.numero); setAncienRig(null) }}
+                    onClick={() => { setSelection(affaire.numero); setAncienRig(null); setHistorique(null) }}
                     onDoubleClick={() => ouvrir(affaire.numero)} style={{ cursor: 'pointer' }}>
                   <td className="rig-table__mono">
                     {affaire.numero}
@@ -432,6 +441,20 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
               <button className="rig-bouton rig-bouton--fort" onClick={() => ouvrirDansAncienRig(choisieV2.numero)}>
                 Ouvrir dans l'ancien RIG
               </button>
+            )}
+            {choisieV2 !== null && (
+              <button className="rig-bouton" onClick={() => voirHistorique(choisieV2.numero)}>
+                Voir son historique (lecture seule)
+              </button>
+            )}
+            {historique !== null && (
+              <span className="rig-resultats-proc__compte" role="status" aria-label="Historique de l'ancienne affaire">
+                {historique.historique
+                  ? `${historique.historique.titre ?? choisieV2?.numero ?? ''} : ` + (historique.historique.affaires.length === 0 ? 'aucune affaire trouvée'
+                      : historique.historique.affaires.map((a) => `${a.libelle ?? a.id} (${a.marque}, ${a.etat}, ${a.demandes.length} demande(s) : `
+                          + a.demandes.map((d) => `${d.numero ?? d.id} ${d.etatLibelle}`).join(', ') + ')').join(' ; '))
+                  : historique.message}
+              </span>
             )}
             {ancienRig !== null && (
               <span className="rig-resultats-proc__compte" role="status">{ancienRig.message}</span>

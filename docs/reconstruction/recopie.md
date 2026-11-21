@@ -713,3 +713,144 @@ CLIENT / DOSSIER_RCS à ARRIVEE, et le banc du lot 9 met en service ses sept fic
 | `Serveur\Recopie\CopieTelleQuelle.cs`, `MoteurTransfert.cs` | la copie colonne par colonne (cible, traductions, colonnes calculées) |
 | `Serveur\Recopie\FichesRecopiees.cs`, `EcrituresRecopie.cs`, `PontRecopie.cs`, `Applicateur.cs`, `Remontee.cs`, `MisesDeCote.cs`, `Comparaison.cs` | la recopie sous les noms V2, les règles de la mise en service, le déclencheur binaire, les valeurs uniques, la comparaison de nuit des fiches |
 | `tests\RecopieFichesCheck\` | le banc : un contrôle par critère des sept stories |
+
+## Les affaires des deux logiciels, les anciens logiciels et le retour à l'ancien RIG (REC-007, REC-009, REC-010, REC-011, REC-018) — lot 11
+
+Lot 11 du plan (2026-11-21). Une affaire se traite dans **un seul** logiciel (Q5, Q14 ; SOC-014) : créée avant le passage,
+dans l'ancien RIG ; après, dans la V3. La base V3 tient pourtant les deux dans `v2.AFFAIRE` et `v2.DEMANDE`, et ce lot dit
+comment elles y vivent, comment l'agent les voit, comment elles se lient, et comment un greffe bêta revient à l'ancien RIG.
+
+### Les affaires des deux logiciels dans la base V3 (REC-010, REC-011, REC-018)
+
+- **L'origine d'une ligne est sa correspondance** (REC-010 T01) : une affaire ou une demande qui a une ligne dans
+  `rec.Correspondance` est de l'ancien RIG (transférée, ou remontée) ; sans correspondance, elle a été créée dans la V3.
+  Aucune colonne en plus : le retour (plus bas) donne la sienne à chaque ligne de la V3 qu'il recopie, origine « retour ».
+- **AFFAIRE et DEMANDE ne font que remonter** (`RegleRecopie.RemonteeSeule`, `Serveur\Recopie\GardeAffaires.cs`, classe
+  `ReglesAffaires`) : les anciennes affaires et leurs demandes restent à jour dans la V3 par la remontée du lot 9 (une demande
+  validée dans l'ancien RIG se relit validée au passage suivant, 5 s : REC-010 CA02) ; une ligne de la V3 n'est jamais mise
+  en file vers la V2. `Base\v2\recopie-v2.sql` suit donc aussi AFFAIRE et DEMANDE (les tables viennent de
+  `ReglesRecopie.Decouvrir()` : **23 tables** depuis ce lot).
+- **Les numéros de la V2 gardés** (`RegleRecopie.NumerosV2`) : dans la copie, `DMND_ID_CTGR` et `DMND_ID_UTLST` des
+  anciennes demandes sont des numéros de CATEGORIE et d'UTILISATEUR (le transfert les a copiés tels quels), alors que
+  `rec.TypeDemande` et `soc.Compte` ont leurs propres identifiants. Ces colonnes ne sont pas des liens : ni traduites à la
+  remontée, ni lues par la correspondance au contrôle de nuit (sinon une ligne remontée et une ligne transférée n'auraient
+  pas le même sens). **Une ligne créée dans la V3 y porte l'identifiant de la V3** (type, compte) : le retour le traduit.
+- **La garde** (déclencheur posé par la mise en service sur `v2.AFFAIRE` et `v2.DEMANDE`, avec les index qu'il lit) :
+  1. une écriture dans une ancienne affaire — l'affaire, une de ses demandes, une demande ajoutée — est refusée, erreur
+     51030 « Cette affaire se traite dans l'ancien RIG … », rien n'est écrit (REC-010 CA03) ;
+  2. une création pour un greffe revenu à l'ancien RIG est refusée, erreur 51031, qui dit depuis quand (REC-007 CA03) ;
+  3. **la règle de blocage de la V2, d'un logiciel à l'autre** (REC-011 CA01) : une demande créée dans la V3 sur un dossier
+     où une ancienne demande **encore en cours** bloque déjà les autres demandes du dossier (`DMND_INHIBEE`,
+     `DMND_ID_DMND_INHIBITRICE` : `ULT_9ANLWIN.cls:148`) est bloquée par elle ; son lien vise la ligne de l'ancienne dans la
+     V3, la trace va dans `rec.LienDemande` ;
+  4. sous la marque de la remontée : une ancienne demande **validée ou abandonnée** dans l'ancien RIG lève, au passage qui la
+     remonte, les blocages qu'elle posait sur des demandes de la V3 (REC-011 CA02) ; la trace reste lisible.
+  Les écritures de la remontée ne sont jamais refusées : c'est l'ancien RIG qui les a faites.
+- **Les liens entre demandes** (REC-011) : une demande de la V3 vise une ancienne par ses colonnes de la V2
+  (`DMND_ID_DMND_MERE`, `DMND_ID_DMND_INHIBITRICE` → la ligne de l'ancienne dans la V3, son identifiant V2 dans la
+  correspondance, T01) ; le lien qu'une **ancienne** demande porte vers une demande de la V3 (bloquée par elle, née d'elle)
+  est gardé dans `rec.LienDemande` (`HistoriqueAffaires.LierAncienneAsync`) et écrit dans la V2 au retour, quand la demande de
+  la V3 y a une ligne (CA04).
+- **L'arrivée** (REC-018) reste la copie telle quelle `v2.ARRIVEE`, recopiée dans les deux sens depuis le lot 9 (même numéro,
+  mode, date et heure : CA01) ; l'agent de la V2 la retrouve par son numéro et y rattache une demande d'une ancienne affaire,
+  qui remonte (CA02) ; ses demandes des deux logiciels se lisent ensemble (`HistoriqueAffaires.ArriveeAsync`, CA03).
+- **Le contrôle de nuit** (REC-006, `Comparaison.cs`) ne compte plus comme « sans correspondance » une affaire ou une demande
+  créée dans la V3 : c'est une affaire de la V3 (sinon chaque affaire nouvelle ouvrait l'alerte « recopie-ecart » chaque nuit).
+
+### Les anciens logiciels (REC-009)
+
+- **Les anciens numéros** : `CORRESP_MIGRATION_RIG`, `CORRESP_ORACLE_RIG`, `CORRESP_GAGI_RIG` — deux d'entre elles n'ont pas de
+  clé primaire dans la V2 — sont reprises ligne pour ligne dans `rec.AncienNumero` (reprise « anciens numeros »,
+  `Serveur\Recopie\AnciensNumeros.cs`), indexée sur l'ancien numéro et sur la fiche RIG (T01). La recherche
+  (`AnciensNumeros.ChercherAsync`, route `GET /recopie/{greffe}/anciens-numeros?numero=|rig=`) reprend celle de la V2
+  (`PROC_CORRESPMIG`, `OPE_RECHERCHE.cs` ; `PROC_CORRESP_MIGRATION|ORACLE|GAGI`) : la fiche RIG, son numéro, l'ancien numéro,
+  le numéro Infogreffe, et la fiche de la V3 par la correspondance (CA01, CA02).
+- **Les tables de reprise base à base** (`MIGRATION_REFERENCE`, `MIGRATION_TABLE`, `MIGRATION_CHAMP`, `MIGRATION_ID`) et la
+  **correspondance des articles Replay** (`ARTICLE_CORRESP_REPLAY`, dates comprises) : telles quelles (`ReglesRec009`),
+  facultatives, **en lecture seule** dans la V3 (déclencheur, erreur 51040), leur nombre de lignes au rapport du transfert,
+  même vides (CA04, CA05).
+- **Les fiches de remplissage** des reprises de 2017 (client « Fake data … », client « crée automatiquement par la
+  migration RIG », adresse « * Adresse inconnu pour le client* » : `MigrationClient.cs:211-215`, `ClientExtended.cs:21,51`)
+  sont repérées dans l'état figé et listées dans `rec.FicheAncienneReprise`, telles quelles, aucune supprimée ni corrigée
+  (CA03 ; route `GET /recopie/{greffe}/anciennes-reprises`).
+
+### L'écran « Historique de l'ancien RIG » (`PROC_HISTORIQUE_ANCIEN_RIG`)
+
+Surveiller › Les envois et les éditions. `Pont\EcranHistoriqueV2.cs`, `web\src\ecrans\EcranHistoriqueV2.tsx` (+ test) ; sans
+`RIGV3_SERVEUR`, une démonstration. Critères : entreprise (SIREN), dossier (numéro de gestion), client (code abrégé), arrivée,
+ancien numéro, numéro RIG, fiches des anciennes reprises ; Entrée, F5 et F7 lancent la recherche (`EntreeLanceLaRecherche`).
+Les affaires des deux logiciels, les anciennes marquées « traitée dans l'ancien RIG » ; le détail : les demandes et leur état,
+le blocage et les liens avec le logiciel de chaque demande liée (un clic l'ouvre en lecture), les échanges avec les partenaires.
+Le bloc « Ancien RIG » de la recherche d'affaires propose aussi « Voir son historique (lecture seule) »
+(`EcranRechAffaires.HistoriqueAncienne`, SOC-015 CA01 laissé ouvert par le lot 3). Captures clair et sombre (démonstration) :
+`C:\Users\raphael.vilain\Documents\Autowin\refonte-rig\captures\phase2-lot11-historique\`.
+
+Les échanges (REC-010 CA04) se lisent dans la base des échanges (`EDI_GREFFE`, `FLUX_SORTANT` / `FLUX_ENTRANT`, lecture seule)
+par code greffe et identifiant V2 de chaque demande ; réglage `Recopie:BaseEchanges` (absent : l'écran le dit).
+
+### Revenir à l'ancien RIG pendant la bêta (REC-007)
+
+Il prolonge le retour de la numérotation (NUM-022, `Base\v2\retour.sql`) : `Serveur\Recopie\RetourBeta.cs`, routes
+`GET|POST /recopie/{greffe}/retour`, `PUT …/retour/responsable`, `PUT …/retour/types` (exploitation d'Amitel).
+
+1. **La décision** (CA08) : seule la personne désignée (`rec.ResponsableRetour`) décide ; toute demande, prise ou refusée,
+   est enregistrée avec son auteur, sa date et son motif (`rec.DecisionRetour`) et va au journal des gestes.
+2. **Les refus avant toute écriture** (`RetourBeta.PreparerAsync`) : greffe hors bêta, ou **jour J des autres greffes passé**
+   (la fin de bêta de `rigv3.Pont` de la base V2, celle de NUM-022 ; CA05) ; un **type de demande de la V3 seule** sans
+   règle choisie (CA06, `rec.RegleTypeRetour`) ; une table qui pointe vers une affaire ou une demande de la V3 **sans règle
+   de retour** (T03 : la règle de chacune des 33 tables est celle de la story de son domaine ; aujourd'hui aucune, donc
+   refus — mesuré avec `INSTANCE`) ; un compte de la V3 sans équivalent dans l'ancien RIG.
+3. **La V3 se ferme** pour le greffe (`rec.EtatRetour` « en retour », puis « revenu en V2 ») : plus aucune création (CA03).
+4. **Une transaction**, sous le verrou de la recopie de la base : chaque affaire de la V3, puis chaque demande **une par une**
+   dans l'ordre de création, sa date de validation de la V3 écrite (les déclencheurs de la V2 ne la remplacent pas : CA02),
+   ses numéros tels quels, ses liens traduits par la correspondance (client, dossier, arrivée, type, agent…) ; un lien vers une
+   demande de la V3 créée après est écrit à la fin ; les liens d'anciennes demandes vers la V3 (REC-011 CA04) ; la
+   **facturation de la V3 reste dans la V3** — rien n'entre dans les chaînes signées de la V2 — et la V2 reçoit un renvoi par
+   ligne dans `rigv3.RenvoiFactureV3` (`Base\v2\pont-v2.sql`, CA04). Chaque ligne a sa correspondance (« retour ») et son
+   état commun : la remontée ne la renvoie pas, le contrôle de nuit la compare (CA07).
+5. Une erreur annule tout et rouvre la V3 ; la décision est « arretee » avec sa cause.
+
+### Écarts code ↔ métier et choix à valider
+
+| Sujet | Codé comme | Pourquoi / qui tranche |
+|---|---|---|
+| Recopie d'une demande au retour (REC-007, écart de la story) | une par une, date de validation de la V3 écrite | les déclencheurs de la V2 lisent une ligne (`DEMANDE.sql:189-233`) ; référent Socle |
+| Factures de la V3 au retour (CA04) | restent dans la V3, renvoi par affaire dans `rigv3.RenvoiFactureV3` | règle proposée par la story ; référent de la Facturation (Q6) |
+| Jour J (CA05) | la fin de bêta de `rigv3.Pont` (NUM-022), posée par la bascule | une seule date pour la numérotation et les affaires |
+| Lignes qui dépendent d'une demande (33 tables) | refus tant que la story de leur domaine n'a pas écrit sa règle de retour | REC-007 T03 « par renvoi aux stories de domaine » |
+| Blocage entre logiciels (REC-011) | une ancienne demande en cours qui bloque déjà une demande de son dossier bloque la demande de la V3 ; levé à « validée » ou « supprimée » | quels types bloquent : stories du domaine RCS (note de la story) |
+| Ancienne demande bloquée par une demande de la V3 | gardé dans la V3, écrit dans la V2 au retour seulement | pendant la bêta, l'ancien RIG ne voit pas ce blocage : référent RCS |
+| Arrivée (REC-018 T01, T02) | `v2.ARRIVEE`, telle quelle, mêmes noms des deux côtés | une table `rec.Arrivee` changerait le témoin de trois bancs du moteur (lots 7, 8) ; à faire avec l'écran d'arrivée |
+| Échanges d'une affaire (REC-010 CA04) | les flux dont l'identifiant RIG est celui d'une demande | les autres (dossier, tables de dématérialisation) : story Échanges de leur flux |
+| Personne désignée (CA08) | un compte par greffe, désigné par l'exploitation | à nommer chez Amitel (dossier de retour, REC-007 T04) |
+
+### Ce qui ne se fait pas depuis ce poste, ou reste
+
+| Critère | Ce qui manque | Où |
+|---|---|---|
+| REC-007 CA07 sur la copie anonymisée d'un greffe bêta (un mois d'affaires simulées) | la nouvelle réception du lot 6 et un greffe bêta (Le Puy, Chartres, Vienne) ; mesuré ici sur RIG_DEV : 370 lignes en 6,5 s, extrapolé au mois le plus chargé de RIG_DEV (35 180 demandes) à 16 min | REC-008 (lot 18) |
+| REC-007 dans l'outil du passage | `RigV3.Passage retour` (`Outils\Passage\MoteurPassage.cs`, `RevenirAsync`) joue `retour.sql` ; le retour des affaires se lance par sa route, avant | lot 13 / 17 |
+| L'aiguillage après un retour | `RegleAiguillage` (lot 3) répond encore « V3 » pour une affaire nouvelle d'un greffe revenu ; la V3 refuse la création et le dit | lot 3 (SOC-014) |
+| REC-007 T04 (procédure de retour : préavis, fenêtre, communication) | écrite par l'exploitation d'Amitel | exploitation |
+| REC-009 T05 (comptage sur les 40 bases) | les bases des greffes ne se lisent pas d'ici sans accord | répétition REC-008 (lot 18) |
+| « Ouvrir dans l'ancien RIG » depuis l'historique | le geste existe dans la recherche d'affaires (lot 3) ; l'historique le dit en texte | écran |
+
+### Fichiers du lot 11
+
+| Fichier | Rôle |
+|---|---|
+| `Base\migrations\REC-007_retour.sql`, `REC-009_anciens-numeros.sql`, `REC-011_liens-demandes.sql` | décision, personne désignée, règles de type, état du greffe, origine « retour » ; anciens numéros, fiches d'anciennes reprises ; liens entre demandes |
+| `Base\v2\pont-v2.sql` | `rigv3.RenvoiFactureV3` (renvoi vers la facturation de la V3) |
+| `Serveur\Recopie\GardeAffaires.cs` | les règles AFFAIRE / DEMANDE (remontée seule, numéros V2) et le déclencheur de garde |
+| `Serveur\Recopie\HistoriqueAffaires.cs` | l'historique, les demandes et leurs liens, l'arrivée, les échanges |
+| `Serveur\Recopie\AnciensNumeros.cs` | REC-009 : règles, reprise, recherche, fiches d'anciennes reprises |
+| `Serveur\Recopie\RetourBeta.cs` | REC-007 : préparation, décision, retour |
+| `Serveur\Recopie\ModuleHistorique.cs`, `Contrats\Recopie\Historique.cs` | les routes et leurs données |
+| `Serveur\Recopie\ReglesRecopie.cs`, `FichesRecopiees.cs`, `PontRecopie.cs`, `Comparaison.cs` | `RemonteeSeule`, `NumerosV2`, la garde posée à la mise en service, les affaires de la V3 hors « sans correspondance » |
+| `Pont\EcranHistoriqueV2.cs`, `web\src\ecrans\EcranHistoriqueV2.tsx` (+ test), `web\src\ecrans\EcranRechAffaires.tsx` | l'écran, et le bloc « Ancien RIG » de la recherche d'affaires |
+| `tests\RecopieRetourCheck\` | le banc : un contrôle par critère des cinq stories |
+
+Preuve : `.\tests.ps1 RecopieRetour` (il lui faut `docker compose up -d` et la lecture de RIG_DEV). Les identifiants de la V2 y
+sont décalés de 100 000 de ceux de la V3 avant toute écriture : un identifiant de la V3 écrit tel quel dans la V2 viserait une
+autre ligne. Contre-épreuve faite le 2026-11-21 : le retour réécrit sans la date de validation (défaut réinjecté) — REC-007
+CA02 rouge (0 date gardée sur 100) et le contrôle de nuit voit 120 écarts `DMND_DATE_VALIDATION` ; vert une fois remis.

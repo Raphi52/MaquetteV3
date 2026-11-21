@@ -108,6 +108,25 @@ public sealed record RegleRecopie(string TableV2, string TableV3, string Story, 
     /// <summary>La valeur qu'une base tient unique (<see cref="CleMetier"/>).</summary>
     public CleMetier? Unique { get; init; }
 
+    /// <summary>
+    /// La table ne se recopie que de la V2 vers la V3 (REC-010 T02) : une affaire et ses demandes se traitent dans UN seul
+    /// logiciel (Q5, Q14). Ses lignes de la V2 (anciennes affaires) remontent et restent a jour dans la V3, en lecture ; une
+    /// ligne creee dans la V3 n'est jamais mise en file vers la V2 -- elle n'y va qu'au retour d'un greffe beta (REC-007).
+    /// La mise en service pose sur sa table V3 le declencheur de garde de <see cref="GardeAffaires"/> au lieu du declencheur
+    /// de file : refus d'ecrire dans une ancienne affaire (REC-010 CA03), de creer apres le retour (REC-007 CA03), blocages
+    /// entre demandes des deux logiciels (REC-011 CA01, CA02).
+    /// </summary>
+    public bool RemonteeSeule { get; init; }
+
+    /// <summary>Les colonnes (nom V2 -> table V2 visee) d'une table telle quelle dont la valeur reste le NUMERO DE LA V2 dans les
+    /// anciennes lignes de la copie de la V3, meme quand elles visent une fiche recopiee : le transfert les a copiees telles
+    /// quelles (v2.DEMANDE.DMND_ID_CTGR est un numero de CATEGORIE, alors que rec.TypeDemande a ses propres identifiants,
+    /// REC-019 CA01 ; DMND_ID_UTLST un numero d'UTILISATEUR, soc.Compte les siens). Elles ne sont pas des liens : ni traduites
+    /// a la remontee, ni lues par la correspondance au controle de nuit -- sinon une ligne remontee et une ligne transferee
+    /// n'auraient pas le meme sens. Une ligne creee dans la V3 y porte l'identifiant de la V3 (le type, le compte) : le retour
+    /// (REC-007) le traduit par la correspondance de la table visee.</summary>
+    public IReadOnlyDictionary<string, string> NumerosV2 { get; init; } = new Dictionary<string, string>();
+
     public bool ColonneParColonne => Correspondance is not null;
 
     public static RegleRecopie TelleQuelle(string tableV2, string story, string libelle) => new(tableV2, "v2." + tableV2, story, libelle);

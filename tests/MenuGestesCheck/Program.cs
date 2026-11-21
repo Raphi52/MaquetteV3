@@ -206,7 +206,7 @@ var sansFiche = new[] { "PROC_LISTE_DELIBERES", "PROC_SUIVI_IMPRESSION", "PROC_R
                         "PROC_ACTUALITES", "PROC_COMMANDES_WEB", "PROC_UTILISATEUR", "PROC_MAIL_LOT1",
                         "PROC_COMPTEURS_NUM", "PROC_REGLAGES_GREFFE",
                         "PROC_NUMEROS_MANQUANTS", "PROC_TOUCHES", "PROC_SUPERVISION", "PROC_CERTIF",
-                        "PROC_FICHES_CONFLIT" };
+                        "PROC_FICHES_CONFLIT", "PROC_HISTORIQUE_ANCIEN_RIG" };
 
 var fiches = @"D:\RigApplication\Documentation\reference\proc";
 

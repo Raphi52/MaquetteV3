@@ -75,6 +75,7 @@ public static class CatalogueEcrans
             new("PROC_NUMEROS_MANQUANTS", "Numeros manquants"),
             new("PROC_SUPERVISION",   "Supervision"),
             new("PROC_FICHES_CONFLIT", "Fiches en conflit"),
+            new("PROC_HISTORIQUE_ANCIEN_RIG", "Historique de l'ancien RIG"),
             new("PROC_TACHES_LOT",    "Taches en lot"),
             new("PROC_VERROUS",       "Dossiers verrouilles"),
             new("PROC_STAT",       "Statistiques"),

@@ -113,9 +113,14 @@ public static class PontRecopie
         var poses = new List<string>();
         foreach (var t in fiches.Tables)
         {
-            await using var cmd = new SqlCommand(Declencheur(t), cn);
-            await cmd.ExecuteNonQueryAsync(ct);
-            poses.Add($"{t.V3.Schema}.{NomDeclencheur(t)}");
+            // Une table qui ne fait que remonter (les affaires et leurs demandes, REC-010) n'a pas de file vers la V2 : son
+            // declencheur est la garde des anciennes affaires, avec les index qu'il lit (GardeAffaires.cs).
+            foreach (var lot in t.Regle.RemonteeSeule ? GardeAffaires.Lots(t, baseV2) : [Declencheur(t)])
+            {
+                await using var cmd = new SqlCommand(lot, cn) { CommandTimeout = 3600 };
+                await cmd.ExecuteNonQueryAsync(ct);
+            }
+            poses.Add($"{t.V3.Schema}.{(t.Regle.RemonteeSeule ? GardeAffaires.NomDeclencheur(t) : NomDeclencheur(t))}");
         }
         // Les fiches de cette mise en service, et elles seules, sont celles que le serveur recopie pour cette base
         // (FichesRecopiees.ReglesEnServiceAsync).

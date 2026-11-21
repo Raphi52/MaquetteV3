@@ -127,7 +127,9 @@ var extraits = new Dictionary<string, string>
     ["DOSSIER_RCS"] = "SELECT TOP (1000) * FROM dbo.DOSSIER_RCS ORDER BY DSSRC_ID_DSRCS DESC",
     ["INSCRIPTION"] = "SELECT TOP (1000) * FROM dbo.INSCRIPTION ORDER BY INEDT_ID_INSCR DESC",
 };
-var reglesRecopie = ReglesRecopie.Decouvrir().Where(r => tablesRec001.Contains(r.TableV2, StringComparer.OrdinalIgnoreCase))
+// Les fiches recopiees dans les deux sens ; les affaires et les demandes, qui ne font que remonter depuis le lot 11 (REC-010), ont leur
+// banc (RecopieRetourCheck).
+var reglesRecopie = ReglesRecopie.Decouvrir().Where(r => !r.RemonteeSeule && tablesRec001.Contains(r.TableV2, StringComparer.OrdinalIgnoreCase))
     .Select(r => r.ColonneParColonne ? r.EnTelleQuelle() : r).ToList();
 var partagees = reglesRecopie.Select(r => r.TableV2).ToList();
 Exiger(partagees.Count == 7 && partagees.All(t => tablesRec001.Contains(t)),

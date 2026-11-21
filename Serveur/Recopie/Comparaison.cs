@@ -301,12 +301,17 @@ public static class ComparaisonBases
             }
         }
 
-        // Les lignes V3 sans correspondance (creees dans la V3, jamais recopiees).
+        // Les lignes V3 sans correspondance (creees dans la V3, jamais recopiees). Sauf pour une table qui ne fait que remonter
+        // (les affaires et leurs demandes, REC-010) : une ligne creee dans la V3 y est une affaire de la V3, traitee dans la V3
+        // seule (Q5, Q14) ; elle n'a de correspondance qu'au retour d'un greffe beta (REC-007) -- ce n'est pas un ecart.
         long sansV3 = 0;
-        await using (var l = await LireAsync(lv3,
-            $"SELECT {id3} FROM {t3.NomSql} AS t WHERE NOT EXISTS (SELECT 1 FROM rec.Correspondance AS c WHERE c.TableV3 = @t3 AND c.IdV3 = {id3} AND c.BaseV2 = @b)", ct,
-            P("@b", baseV2), P("@t3", nomV3, 260)))
+        if (recopiee?.Regle.RemonteeSeule != true)
+        {
+            await using var l = await LireAsync(lv3,
+                $"SELECT {id3} FROM {t3.NomSql} AS t WHERE NOT EXISTS (SELECT 1 FROM rec.Correspondance AS c WHERE c.TableV3 = @t3 AND c.IdV3 = {id3} AND c.BaseV2 = @b)", ct,
+                P("@b", baseV2), P("@t3", nomV3, 260));
             while (await l.ReadAsync(ct)) { sansV3++; Noter("sans correspondance V3", null, l.GetString(0)); }
+        }
 
         // 4. Les ecarts : detail des colonnes dans l'etat fige, puis relecture dans les bases vivantes.
         long resorbes = 0;
