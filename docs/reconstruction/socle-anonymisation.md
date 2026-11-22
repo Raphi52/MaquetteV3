@@ -31,7 +31,8 @@ dotnet run --project Outils\Anonymisation -- controler --source "<même source>"
 dotnet run --project Outils\Anonymisation -- inventaire --source "<source>" --accord RIG_AMIENS --sortie D:\copies\inventaire.md
 ```
 
-Options : `--tables A,B` (sous-ensemble), `--max-lignes N` (copie réduite), `--regles <fichier>` (relecture du
+Options : `--tables A,B` (sous-ensemble), `--max-lignes N` (copie réduite **fermée sur ses clés étrangères**, voir
+« La copie réduite, fermée sur ses clés »), `--regles <fichier>` (relecture du
 délégué, une ligne `TABLE.COLONNE=Garder|Mots|Courriel|Fichier|Telephone|DateNaissance|Vider|Xml`), `--graine <texte>`
 (valeurs reproductibles, **refusée** pour une source hors de ce poste).
 
@@ -120,6 +121,31 @@ valeurs tirées, sans relire la table.
 | **La copie a la forme de la source** : colonnes, classements, identités, défauts, index, clés étrangères (vérifiées quand la source les vérifie), contraintes, vues, fonctions, procédures, déclencheurs | Les tests et les répétitions tournent sur la vraie structure. Un module qui ne se crée pas (il dépend d'un serveur lié, d'une colonne disparue) est listé, sans arrêter la copie. |
 | **Marque « chaînes invalidées par l'anonymisation »** dès qu'une ligne signée change (CA05) | La signature couvre le nom du client (fiche team #1316). La marque est dans `anonymisation.Copie`, dans la propriété de base `RIGV3_ANONYMISATION` et en tête du rapport. |
 | **Lecture seule de la source** : accord par base, `ApplicationIntent=ReadOnly`, chaque requête par `LectureV2.ExigerLecture` (la porte de la reprise, liée et non recopiée) ; copie **sur ce poste** seulement (`BaseJetable.ExigerServeurLocal`), base neuve ou vide, jamais la source | CA07. Les refus tombent **avant** toute connexion. Le rapport note les écritures recensées par le serveur source avant et après. |
+| **Copie réduite fermée sur ses clés étrangères** (lot 18), clés posées **avec** vérification | Les N premières lignes de chaque table ne tiennent pas ensemble : au lot 8, la répétition sur RIG_DEV s'arrêtait dans la reprise des droits (un rôle visait une fonction non copiée). Fermée, une copie réduite a des liens justes comme une copie complète, et la vérification des clés par SQL Server le prouve à chaque copie. |
+
+## La copie réduite, fermée sur ses clés (lot 18, `Outils\Anonymisation\Fermeture.cs`)
+
+`--max-lignes N` copie les N premières lignes de chaque table (dans l'ordre de la clé primaire ; une table sans clé
+primaire — 104 dans RIG_DEV — dans l'ordre du serveur, comme au lot 8), puis **toutes les lignes parentes qu'elles
+visent, de proche en proche**, jusqu'à ce qu'aucune clé étrangère ne pointe dans le vide (le modèle est l'extrait du
+banc du transfert, `tests\RecopieTransfertCheck\ExtraitRigDev.cs`) :
+
+1. Pendant la copie, chaque ligne écrite est notée par ses valeurs **source** (avant anonymisation) : ce qui l'identifie
+   (clé primaire, colonnes visées par une clé) et ce qu'elle vise.
+2. Tour par tour, pour chaque clé étrangère entre tables copiées (789 dans RIG_DEV, dont 2 à deux colonnes et 18 vers
+   leur propre table), les valeurs visées absentes du parent copié sont relues dans la source (SELECT seul, paquets de
+   2 000 paramètres au type de la colonne : l'index de la source sert), et ces lignes parentes sont copiées
+   **anonymisées** comme les autres ; une ligne déjà copiée n'est jamais réécrite.
+3. Un tour sans ajout arrête : chaque tour ajoute une ligne de la source ou demande une valeur jamais demandée, les deux
+   sont en nombre fini. Les valeurs se comparent comme SQL Server les compare (blancs finaux ignorés, majuscules et
+   accents selon le classement de la colonne visée).
+4. Les clés de la copie sont alors posées **avec vérification** : une fermeture incomplète serait une anomalie de la
+   copie, et la répétition s'arrêterait à l'anonymisation. Le rapport dit les lignes ajoutées par table, les tours et
+   la durée.
+
+Le contrôle de la copie (`controler`) reste exigé avant usage. Sur une copie réduite, ses volumes diffèrent par
+construction ; la répétition les juge sur la réduction : chaque table a min(source, N) lignes **plus** celles que la
+fermeture lui a ajoutées (`Repetition.JugerControle`), pas une de plus.
 
 ## Le contrôle automatique (CA06)
 
@@ -164,6 +190,22 @@ dans un XML, même attribut personnel) : valeur entière, puis chaque mot de 5 c
 | Copie réduite des 860 tables (`--max-lignes 20`) | 83 s, aucune anomalie : 1 893 index, 789 clés étrangères (posées sans vérification : copie réduite), 468 vues, fonctions, procédures et déclencheurs ; 8 modules non refaits parce qu'ils sont cassés dans RIG_DEV même (serveur lié `RIGBD4`, colonnes `*_ID_SSADR` disparues) |
 | Contrôle de cette copie (`controler --echantillon 100`) | 180 s pour les 860 tables : 1 000 colonnes personnelles, 34 236 valeurs et 104 733 mots réels tirés (empreintes), aucun retrouvé ; 29 tables sans clé primaire d'une colonne non tirées (listées). **Limite** : dans une copie réduite à 20 lignes par table, la plupart des lignes tirées n'y sont pas — ce passage prouve la durée et la tenue du contrôle sur le vrai schéma, pas l'absence de fuite (c'est le banc qui la prouve, sur une copie complète de son extrait). Volumes et lignes gardées diffèrent par construction (code 3). |
 | Écritures du serveur sur RIG_DEV pendant la copie | 6 861 285 avant, 6 861 295 après : d'autres sessions écrivent sur RIG_DEV ; l'outil, lui, n'y joue que des SELECT (869 requêtes, toutes par la porte) |
+| Copie réduite **fermée** des 860 tables (`--max-lignes 200`, lot 18, 2026-11-22) | **282,8 s**, aucune anomalie : 109 342 premières lignes, puis **109 025 lignes parentes** ajoutées dans 112 tables en **7 tours (180,3 s)** ; les **789 clés étrangères posées avec vérification**, 0 sans ; 2,0 Go sur le SQL du poste (les documents de `GED_RIG` visés par les éditions) |
+
+Deux défauts de la copie, vus en fermant RIG_DEV et corrigés dans `EcrireAsync` (`Copie.cs`) : la lecture **asynchrone**
+d'une ligne à gros binaire est quadratique dans SqlClient ([dotnet/SqlClient#593](https://github.com/dotnet/SqlClient/issues/593),
+ouvert) — 4 lignes de `GED_RIG` (`GDRG_FICHIER`, `image`) en 137 s, client à 100 % d'un cœur ; lecture synchrone : 4 lignes
+en 7 s. Et un lot n'était borné qu'en lignes : au premier passage, le processus de copie est monté à **4,3 Go** pendant
+la fermeture de `GED_RIG` (relevé du processus, arrêté là ; une lecture de fermeture y rapporte au plus 2 000 lignes) ;
+un lot s'écrit maintenant aussi dès 64 Mo, et les passages suivants sont restés entre 255 et 640 Mo. Le plafond est
+arrivé au deuxième passage, la lecture synchrone au troisième : ces relevés ne séparent pas l'effet de l'un et de l'autre.
+
+**Défaut relevé au lot 18, non corrigé (à trancher)** : les colonnes **binaires** ne sont jamais traitées
+(`Regles.cs`, `CatalogueRegles.Pour` : seuls les textes et le XML le sont). Les documents de la GED — `GED_RIG.GDRG_FICHIER`
+(`image`), `GDRG_FICHIER_PDF`, `GDRG_FICHIER_PS` — passent donc **en clair** dans la copie, alors qu'un Kbis ou un acte
+porte des noms. C'était déjà vrai au lot 6 (une copie complète les prend tous) ; la fermeture en tire les documents que
+visent les éditions copiées. La copie reste sur ce poste et se supprime en fin de répétition, mais elle ne doit pas
+en sortir tant que la règle des documents (vider, ou remplacer par un document fictif) n'est pas décidée.
 
 ## Le banc (`tests\SocleAnonymisationCheck`)
 
@@ -191,6 +233,7 @@ chaque colonne jugée sur moins de 200 valeurs (27 colonnes, vides comprises). E
 | CA05 | 406 factures signées au client anonymisé → marque « chaînes invalidées par l'anonymisation » (table, propriété, rapport) ; jumeau : une copie sans ligne signée porte « chaînes intactes » |
 | CA06 | le contrôle ne trouve rien, et ne sort de la source que des empreintes, des clés et des nombres ; il tire aussi les colonnes gardées à segment personnel (aucune à 35 % de prénoms) ; **contre-épreuves rouges** : `CLIEN_NOM` laissé en clair → le contrôle le trouve ; copie **et** contrôle avec l'ancienne règle sur les 9 prénoms d'état civil → aucune fuite par les colonnes traitées, mais le contrôle les trouve gardées (52 à 100 %) ; même chose sur RIG_DEV entier (80-96 %) ; même graine → mêmes valeurs. Second banc : une colonne de grande table jugée sur moins de 200 valeurs l'est sur toutes ses distinctes (`DMNED_CODE_ENTITE_DESTINATAIRE` 82 sur 82), et une colonne qui en a 200 ou plus reste tirée |
 | CA07 | aucune écriture sur la source pendant la copie (journal du serveur et empreinte du contenu) ; refus avant connexion d'une copie vers SQL-DEV ; refus de RIG_DEV sans accord, avec l'accord d'une autre base, avec une graine ; jumeau accepté : l'inventaire avec l'accord ; la porte refuse un UPDATE ; refus d'écrire sur la source ou sur une base déjà remplie |
+| REC-008 (lot 18) | « **copie réduite fermée : aucune clé étrangère orpheline** » : 20 premières lignes par table, puis les lignes parentes (26 : `ADRESSE_BASE` +17, `UTILISATEUR` +9, en 2 tours) ; le banc compte **lui-même**, clé par clé de la copie, les lignes dont la clé est remplie sans parent : 0 sur les 11 clés, toutes vérifiées, volumes = min(source, 20) + ajouts ; **contre-épreuve** : la réduction non fermée laisse 74 lignes orphelines sur 4 clés ; la copie fermée passe le contrôle de l'outil (aucune valeur réelle retrouvée). Fermeture retirée du code (défaut réinjecté) : ce contrôle rougit |
 
 Les corrections faites en route sont gardées par le banc : réinjectées, elles le font rougir
 (alignement des clés retiré : 4 rouges ; extensions longues gardées : 2 rouges ; composé `ETAT_CIVIL` retiré, le

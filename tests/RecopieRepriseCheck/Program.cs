@@ -613,8 +613,12 @@ Exiger(br.MaxLignes == 100 && br.CopieAnonymisee && br.ControleCopie!.StartsWith
        && !br.ControleCopie.Contains("HORS REDUCTION") && !feuReduit.Vert && feuReduit.Rouges.Single().StartsWith("copie(s) REDUITE(S)"),
     $"REC-008 (copie reduite, --max-lignes 100) : le controle de la copie se juge sur la reduction (« {br.ControleCopie?[..Math.Min(170, br.ControleCopie.Length)]}… ») ; " +
     $"40 bases parfaites mais reduites : feu ROUGE (« {feuReduit.Rouges.FirstOrDefault()} »)");
-Reste($"REC-008, base entiere en copie reduite : la reduction (les N premieres lignes de chaque table) n'est pas fermee sur les cles etrangeres ; la reprise des comptes " +
-      $"et droits (SOC-002) s'y arrete (ici : {br.Etat}, « {br.Motif?[..Math.Min(140, br.Motif.Length)]} ») — mesure sur RIG_DEV entier dans docs\\reconstruction\\recopie.md");
+// Depuis le lot 18, une copie reduite est FERMEE sur ses cles etrangeres (Outils\Anonymisation\Fermeture.cs) : la repetition d'une
+// base reduite va au bout (au lot 8, la reduction non fermee s'arretait dans la reprise des comptes et droits, SOC-002). Mesure sur
+// RIG_DEV entier : docs\reconstruction\recopie.md.
+Exiger(br.Etat == "fini" && br.ControleCopie?.Contains("par la fermeture sur les cles") == true,
+    $"REC-008 (lot 18) : base entiere en copie reduite FERMEE sur ses cles : la repetition va au bout (etat {br.Etat}" +
+    $"{(br.Motif is null ? "" : ", « " + br.Motif[..Math.Min(140, br.Motif.Length)] + " »")})");
 Reste("REC-008 sur les 40 bases des greffes : leur lecture demande l'accord pour chaque base (regle d'acces SQL des agents) et se fait chez Amitel, l'anonymisation sur le " +
       "serveur du greffe ; RigV3.Repetition repeter --sources <liste> --accord <BASE> le fait ; ce banc le prouve sur une base du poste");
 try { Directory.Delete(dossierRep, recursive: true); } catch (IOException) { }
