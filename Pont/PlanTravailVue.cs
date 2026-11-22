@@ -440,7 +440,7 @@ public sealed partial class SessionPlanTravail
         }
 
         return new DossierVue(d.Numero, d.Objet, d.Siren, d.Type, d.Statut,
-            !GuideVisible && ApercuNoeud is not null, sommaire, bandeau, StyleCorps, VueTache(),
+            !GuideVisible && DocumentAReafficher is not null, sommaire, bandeau, StyleCorps, VueTache(),
             FiltreDeLArbre, arbre, !ArbreReplie && (DonneesVisible || GuideVisible), fiche, etapes,
             DonneesVisible && GuideVisible,
             GuideVisible ? new ApercuColonneVue(FenetresDetachees.Count, VueApercu(d)) : null,
@@ -614,7 +614,7 @@ public sealed partial class SessionPlanTravail
                 ChampsVue(courante));
         }
 
-        return new EtapesVue(EtapeCourante, nombre, ApercuNoeud?.Libelle ?? d.Numero, !GuideVisible,
+        return new EtapesVue(EtapeCourante, nombre, ApercuNoeud?.Libelle ?? d.Numero, !GuideVisible && DocumentAReafficher is not null,
                              pas, pages, VueRecap(), ChampsVue(Etapes[IndexControle]));
     }
 
@@ -774,7 +774,7 @@ public sealed partial class SessionPlanTravail
             // La barre d'actions du dossier et la puce « ← Dossier » d'un ecran (PlanTravailActions.cs).
             case "actionDossier": AgirSurDossier(Texte(valeur)); break;
             case "retourDossier": RetournerAuDossierDeLEcran(); break;
-            case "afficherDocument": GuideVisible = true; break;
+            case "afficherDocument": ReafficherDocument(); break;
             case "allerAuDefautBandeau":
             {
                 var g = Lire<GesteDefaut>(valeur);

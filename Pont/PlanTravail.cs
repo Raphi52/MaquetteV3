@@ -109,6 +109,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             ApercuNoeud = null;
             GuideVisible = false;
         }
+        if (DocumentFerme is not null && !ArbreVisible().Any(n => ReferenceEquals(n, DocumentFerme)))
+            DocumentFerme = null;
     }
 
     // ---------------------------------------------------------------
@@ -595,6 +597,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         foreach (var d in n.Descendants()) NoeudsOuverts.Remove(d);
         NoeudsOuverts.Remove(n);
         if (ReferenceEquals(NoeudSelectionne, n)) { NoeudSelectionne = null; ApercuNoeud = null; GuideVisible = false; }
+        if (DocumentFerme is not null && (ReferenceEquals(DocumentFerme, n) || n.Descendants().Any(x => ReferenceEquals(x, DocumentFerme))))
+            DocumentFerme = null;
         if (ReferenceEquals(NoeudRenomme, n)) NoeudRenomme = null;
         MemoriserArbre();
     }
@@ -834,11 +838,37 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
 
     private void FermerApercu()
     {
+        // La croix ferme la colonne, mais la piece reste a portee de l'oeil des etapes et de « Document ».
+        DocumentFerme = ApercuNoeud;
         ApercuNoeud = null;
         ImpressionOuverte = false;
         // Demande du 15/09/2026 : la croix ferme directement la colonne de
         // droite -- il n'existe plus de vue « Aucune piece ouverte ».
         GuideVisible = false;
+    }
+
+    /// <summary>
+    /// La piece que la croix du document a fermee, dans l'affaire ouverte. Sans elle, l'oeil
+    /// des etapes rouvrait la colonne de droite VIDE, sans croix pour la refermer (22/11/2026,
+    /// PlanTravailCheck 19). Oubliee quand l'affaire change ou que la piece quitte l'arbre.
+    /// </summary>
+    private NoeudGed? DocumentFerme;
+
+    /// <summary>Ce que l'oeil des etapes et « Document » remontrent : la piece restee ouverte
+    /// (sortie dans une fenetre), sinon celle que la croix a fermee. Nul : ils ne s'affichent pas.</summary>
+    private NoeudGed? DocumentAReafficher => ApercuNoeud ?? DocumentFerme;
+
+    /// <summary>Geste « afficherDocument » (oeil des etapes, « Document » de l'entete).</summary>
+    private void ReafficherDocument()
+    {
+        if (DocumentAReafficher is not { } piece) return;
+        if (ApercuNoeud is null)
+        {
+            ApercuNoeud = piece;
+            ApercuMessage = "";
+        }
+        DocumentFerme = null;
+        GuideVisible = true;
     }
 
     private void OuvrirImpression()
@@ -1525,6 +1555,8 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
             NoeudsOuverts.Add(n);
 
         NoeudSelectionne = Arbre.Descendants().FirstOrDefault(n => n.EstPiece);
+        // Une piece fermee dans l'affaire d'avant ne se rouvre pas a cote de celle-ci.
+        DocumentFerme = null;
 
         // KBIS A JOUR (demande du 18/09/2026) : le dossier s'ouvre sur
         // « Informations du dossier » au milieu et le KBIS en vigueur a droite.

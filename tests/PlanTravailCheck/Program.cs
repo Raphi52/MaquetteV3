@@ -890,6 +890,55 @@ internal static class Programme
         JouerEnCoursDossier();
         JouerIdentiteDeLAffaire();
         JouerParcoursDuDossier();
+        JouerOeilDuDocument();
+    }
+
+    /// <summary>
+    /// 19. L'OEIL DU PIED DES ETAPES rouvre LE DOCUMENT, pas une colonne vide (capture de
+    /// l'utilisateur, 22/11/2026 : « le document s'ouvre pas mais le panel oui »). La croix du
+    /// document oubliait la piece ; l'oeil, offert des que la colonne etait fermee, la rouvrait
+    /// sans rien dedans -- ni piece, ni croix pour la refermer. Etat a part, comme 17 et 18.
+    /// </summary>
+    private static void JouerOeilDuDocument()
+    {
+        var etatAvant = Environment.GetEnvironmentVariable("RIGV3_ETAT");
+        var etatIci = Path.Combine(Path.GetTempPath(), "rigv3-oeil-" + Guid.NewGuid().ToString("N") + ".json");
+        Environment.SetEnvironmentVariable("RIGV3_ETAT", etatIci);
+        try
+        {
+            var s = new SessionPlanTravail(null, null);
+            s.Initialiser();
+            void Faire(string geste, object? valeur = null) => s.Agir(geste, Valeur(valeur));
+            DossierVue D() => s.Vue().Dossier!;
+
+            Faire("ouvrirNumero", "004176");
+            Faire("historiqueOuvrir", D().Historique.Single(p => p.Libelle == "Statuts signes").Id);
+            Exiger(D() is { Etapes.Oeil: false, BoutonDocument: false, Apercu.Apercu.Libelle: "Statuts signes" },
+                "precondition : les statuts a droite, les etapes au milieu ; rien a reafficher, ni oeil ni « Document »");
+
+            Faire("fermerApercu");
+            Exiger(D() is { Apercu: null, Etapes.Oeil: true, BoutonDocument: true },
+                "la croix ferme la colonne du document : l'oeil des etapes et « Document » proposent de la rouvrir");
+            Faire("afficherDocument");
+            Exiger(D() is { Apercu.Apercu.Libelle: "Statuts signes", Etapes.Oeil: false, BoutonDocument: false },
+                "l'oeil rouvre la colonne SUR la piece fermee (Statuts signes), pas vide");
+
+            // Jumeau : la piece fermee reste a SON affaire. Sans Kbis, 2026J00087 n'a rien a montrer :
+            // ni oeil ni « Document », et le geste ne rouvre pas les statuts de 004176 a cote d'elle.
+            Faire("fermerApercu");
+            Faire("ouvrirNumero", "2026J00087");
+            Exiger(D() is { Numero: "2026J00087", Apercu: null, BoutonDocument: false } d && d.Etapes is null or { Oeil: false },
+                "jumeau : une affaire sans document n'offre ni l'oeil ni « Document » (ils ouvriraient une colonne vide)");
+            Faire("afficherDocument");
+            Exiger(D().Apercu is null,
+                "jumeau : le geste n'y ouvre rien -- ni colonne vide, ni la piece d'une autre affaire");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("RIGV3_ETAT", etatAvant);
+            try { File.Delete(etatIci); } catch (IOException) { }
+            try { Directory.Delete(PiecesJointes.DossierPour(etatIci), recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
     }
 
     /// <summary>
