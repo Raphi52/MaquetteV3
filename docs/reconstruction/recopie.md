@@ -275,7 +275,11 @@ et qu'il reparte de lui-même du dernier point sûr, sans perte ni doublon, sans
    Puis il est **relu dans les deux bases vivantes** : disparu, c'était une recopie en cours entre les deux états figés
    (« résorbé », compté, non alerté).
 5. Les **liens orphelins** (CA03) : une demande ou une affaire de la V3 qui vise une fiche partagée sans
-   correspondance (hors liens cassés hérités, déjà dans `rec.LienCasse`).
+   correspondance (hors liens cassés hérités, déjà dans `rec.LienCasse`). Le lien est lu en **identifiant de la V3** de
+   la fiche visée (la remontée le traduit, une ligne de la V3 le porte ; une ligne transférée porte celui de la V2, égal),
+   sauf une colonne `NumerosV2` (type, agent : numéro de la V2 dans une ligne qui est dans la V2). Une ligne de la V3 qui
+   vise une ligne que la V3 tient seule par règle (affaire ou demande de la V3, type de la V3 seule) n'est pas orpheline ;
+   une ligne qui est dans la V2 doit viser une fiche de la V2 (lot 11).
 6. Le **rapport** dans la base V3 : `rec.Comparaison` (états figés, durée, totaux), `rec.ComparaisonTable`,
    `rec.ComparaisonEcart` (genre, table, deux identifiants, colonnes) — **aucune valeur** ni donnée personnelle.
 
@@ -809,6 +813,14 @@ Il prolonge le retour de la numérotation (NUM-022, `Base\v2\retour.sql`) : `Ser
    ligne dans `rigv3.RenvoiFactureV3` (`Base\v2\pont-v2.sql`, CA04). Chaque ligne a sa correspondance (« retour ») et son
    état commun : la remontée ne la renvoie pas, le contrôle de nuit la compare (CA07).
 5. Une erreur annule tout et rouvre la V3 ; la décision est « arretee » avec sa cause.
+6. **La création d'affaires est rouverte dans la V2** (T02) : l'aiguillage (`ModuleAiguillage`, `RegleAiguillage`) lit
+   l'état du retour dans la base V3 d'un greffe bêta passé (`RetourBeta.RevenuDepuisAsync`) et donne alors **toute** affaire
+   à la V2 — la date de passage, atteinte, ne change plus (SOC-007 CA05), c'est cet état qui décide. Preuve : `REC-007 T02`
+   de `tests\SocleAiguillageCheck` (par la route) et de `tests\RecopieRetourCheck` (l'état posé par le vrai retour).
+
+Le contrôle de nuit d'un greffe bêta n'alerte pas pour ses affaires de la V3, ni pendant la bêta ni après un retour : ni
+« sans correspondance » (affaires, demandes, type de la V3 seule), ni lien orphelin (identifiants de la V3, voir REC-006 point 5).
+Mesuré le 2026-11-22 : avant cette lecture, 497 liens orphelins pendant la bêta et 253 après le retour pour 248 demandes de la V3.
 
 ### Écarts code ↔ métier et choix à valider
 
@@ -830,7 +842,6 @@ Il prolonge le retour de la numérotation (NUM-022, `Base\v2\retour.sql`) : `Ser
 |---|---|---|
 | REC-007 CA07 sur la copie anonymisée d'un greffe bêta (un mois d'affaires simulées) | la nouvelle réception du lot 6 et un greffe bêta (Le Puy, Chartres, Vienne) ; mesuré ici sur RIG_DEV : 370 lignes en 6,5 s, extrapolé au mois le plus chargé de RIG_DEV (35 180 demandes) à 16 min | REC-008 (lot 18) |
 | REC-007 dans l'outil du passage | `RigV3.Passage retour` (`Outils\Passage\MoteurPassage.cs`, `RevenirAsync`) joue `retour.sql` ; le retour des affaires se lance par sa route, avant | lot 13 / 17 |
-| L'aiguillage après un retour | `RegleAiguillage` (lot 3) répond encore « V3 » pour une affaire nouvelle d'un greffe revenu ; la V3 refuse la création et le dit | lot 3 (SOC-014) |
 | REC-007 T04 (procédure de retour : préavis, fenêtre, communication) | écrite par l'exploitation d'Amitel | exploitation |
 | REC-009 T05 (comptage sur les 40 bases) | les bases des greffes ne se lisent pas d'ici sans accord | répétition REC-008 (lot 18) |
 | « Ouvrir dans l'ancien RIG » depuis l'historique | le geste existe dans la recherche d'affaires (lot 3) ; l'historique le dit en texte | écran |
@@ -846,7 +857,8 @@ Il prolonge le retour de la numérotation (NUM-022, `Base\v2\retour.sql`) : `Ser
 | `Serveur\Recopie\AnciensNumeros.cs` | REC-009 : règles, reprise, recherche, fiches d'anciennes reprises |
 | `Serveur\Recopie\RetourBeta.cs` | REC-007 : préparation, décision, retour |
 | `Serveur\Recopie\ModuleHistorique.cs`, `Contrats\Recopie\Historique.cs` | les routes et leurs données |
-| `Serveur\Recopie\ReglesRecopie.cs`, `FichesRecopiees.cs`, `PontRecopie.cs`, `Comparaison.cs` | `RemonteeSeule`, `NumerosV2`, la garde posée à la mise en service, les affaires de la V3 hors « sans correspondance » |
+| `Serveur\Recopie\ReglesRecopie.cs`, `FichesRecopiees.cs`, `PontRecopie.cs`, `Comparaison.cs` | `RemonteeSeule`, `NumerosV2`, la garde posée à la mise en service ; au contrôle de nuit, les lignes que la V3 tient seule hors « sans correspondance » et les liens lus en identifiant de la V3 |
+| `Contrats\Socle\Aiguillage.cs`, `Serveur\Socle\Aiguillage\ModuleAiguillage.cs` | REC-007 T02 : un greffe bêta revenu, toute affaire à la V2 |
 | `Pont\EcranHistoriqueV2.cs`, `web\src\ecrans\EcranHistoriqueV2.tsx` (+ test), `web\src\ecrans\EcranRechAffaires.tsx` | l'écran, et le bloc « Ancien RIG » de la recherche d'affaires |
 | `tests\RecopieRetourCheck\` | le banc : un contrôle par critère des cinq stories |
 
@@ -854,6 +866,10 @@ Preuve : `.\tests.ps1 RecopieRetour` (il lui faut `docker compose up -d` et la l
 sont décalés de 100 000 de ceux de la V3 avant toute écriture : un identifiant de la V3 écrit tel quel dans la V2 viserait une
 autre ligne. Contre-épreuve faite le 2026-11-21 : le retour réécrit sans la date de validation (défaut réinjecté) — REC-007
 CA02 rouge (0 date gardée sur 100) et le contrôle de nuit voit 120 écarts `DMND_DATE_VALIDATION` ; vert une fois remis.
+Le 2026-11-22, CA07 passe par le contrôle de nuit complet (toutes les fiches partagées) et exige « rien à traiter », liens
+orphelins compris, pendant la bêta et après le retour ; contre-épreuve : la correspondance d'une affaire rendue mise de côté,
+ses deux demandes sont listées orphelines. L'aiguillage ignorant l'état du retour (défaut réinjecté) : `REC-007 T02` de
+`SocleAiguillageCheck` rouge ; vert une fois remis.
 
 ## Les droits d'un compte passent avec lui (SOC-002 T05, fin de REC-017 CA01) — lot 19
 

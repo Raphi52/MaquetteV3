@@ -69,7 +69,9 @@ public sealed record RapportComparaison(int Id, string Etat, string? Motif, stri
 ///  4 bis. Les DROITS des comptes (fiche UTILISATEUR en service) : pas ligne a ligne, la REPONSE de la V2 contre celle de la V3 pour chaque
 ///     compte actif recopie et chaque fonction (DroitsRecopies.ComparerAsync) ; un ecart va au rapport comme les autres.
 ///  5. Les LIENS ORPHELINS (CA03) : une demande ou une affaire de la V3 qui vise une fiche partagee sans correspondance
-///     (hors liens casses herites, deja notes par le transfert dans rec.LienCasse).
+///     (hors liens casses herites, deja notes par le transfert dans rec.LienCasse). Le lien est lu en identifiant de la V3
+///     (sauf les colonnes RegleRecopie.NumerosV2) ; une ligne de la V3 qui vise une ligne que la V3 tient seule par regle
+///     (affaire ou demande de la V3, type de la V3 seule) n'est pas orpheline.
 ///  6. Le rapport, ecrit dans la base V3 (rec.Comparaison, rec.ComparaisonTable, rec.ComparaisonEcart) : lignes
 ///     comparees, ecarts, lignes sans correspondance, orphelins. Ni valeur ni donnee personnelle : des noms de colonnes.
 /// La base V2 n'est jamais ecrite (instantane et SELECT seuls, par LectureV2). Planifie chaque nuit par
@@ -173,7 +175,7 @@ public static class ComparaisonBases
             // 5. Les liens orphelins.
             long orphelins = 0;
             foreach (var nom in TablesDesLiens.Where(n => catV2.Tables.ContainsKey(n) && catV3.Tables.ContainsKey("v2." + n)))
-                orphelins += await OrphelinsAsync(o, baseV2, catV2.Tables[nom], catV2, demandees, lv3, details, ct);
+                orphelins += await OrphelinsAsync(o, baseV2, catV2.Tables[nom], catV2, demandees, recopiees, lv3, details, ct);
             o.Suivre?.Invoke($"Liens orphelins : {orphelins}");
 
             var rapport = new RapportComparaison(id, "fini", null, baseV2, figeV2.Le, chrono.ElapsedMilliseconds, tables, details, orphelins, purges);
@@ -317,9 +319,14 @@ public static class ComparaisonBases
 
         // Les lignes V3 sans correspondance (creees dans la V3, jamais recopiees). Sauf pour une table qui ne fait que remonter
         // (les affaires et leurs demandes, REC-010) : une ligne creee dans la V3 y est une affaire de la V3, traitee dans la V3
-        // seule (Q5, Q14) ; elle n'a de correspondance qu'au retour d'un greffe beta (REC-007) -- ce n'est pas un ecart.
+        // seule (Q5, Q14) ; elle n'a de correspondance qu'au retour d'un greffe beta (REC-007) -- ce n'est pas un ecart. De meme
+        // pour une fiche que la V3 ne cree jamais dans la V2 (SansCreationV2 : un type de demande de la V3 seule, REC-019 CA03 --
+        // « la V3 le sait », l'applicateur ne la cree pas) ; le retour la liste (REC-007 CA06). Une ligne de la V2 qui perd sa
+        // correspondance reste vue, du cote de la V2 (« sans correspondance V2 »).
+        // fix-ok: un type de la V3 seule etait compte « sans correspondance V3 » a chaque nuit -- mesure le 2026-11-22 par
+        // RecopieRetourCheck (REC-007 CA07 sur toutes les fiches partagees, rouge : CATEGORIE /893, le type cree par CA06).
         long sansV3 = 0;
-        if (recopiee?.Regle.RemonteeSeule != true)
+        if (recopiee?.Regle is not ({ RemonteeSeule: true } or { SansCreationV2: true }))
         {
             await using var l = await LireAsync(lv3,
                 $"SELECT {id3} FROM {t3.NomSql} AS t WHERE NOT EXISTS (SELECT 1 FROM rec.Correspondance AS c WHERE c.TableV3 = @t3 AND c.IdV3 = {id3} AND c.BaseV2 = @b)", ct,
@@ -390,23 +397,48 @@ public static class ComparaisonBases
     // Les liens orphelins (CA03)
     // -----------------------------------------------------------------------------------------------------------------
 
+    // fix-ok: le lien d'une demande ou d'une affaire de la V3 etait cherche comme un identifiant V2 (c.IdV2 = valeur), alors que
+    // v2.<SOURCE> de la V3 porte l'identifiant de la V3 de la fiche visee (egal a celui de la V2 pour une ligne transferee
+    // seulement) -- mesure le 2026-11-22 par RecopieRetourCheck (REC-007 CA07, rouge) : apres le retour, 253 liens orphelins
+    // (DMND_ID_AFFRE x248 vers des affaires rendues, V3 5502427 = V2 autre ; DMND_ID_ARRV x2, DMND_ID_DMND_MERE x2,
+    // DMND_ID_DMND_INHIBITRICE x1) ; pendant la beta, 497 (dont DMND_ID_CTGR x247 : rec.TypeDemande 671 lu comme CATEGORIE 671).
     private static async Task<long> OrphelinsAsync(OptionsComparaison o, string baseV2, TableV2 source, CatalogueV2 catV2, IReadOnlyList<string> partagees,
-                                                   SqlConnection lv3, List<EcartComparaison> details, CancellationToken ct)
+                                                   FichesRecopiees recopiees, SqlConnection lv3, List<EcartComparaison> details, CancellationToken ct)
     {
         long total = 0;
         var idS = Sql.Identifiant("d", source.ClePrimaire.Select(source.Colonne));
+        var regleSource = recopiees.ParTableV2.GetValueOrDefault(source.Nom)?.Regle;
+        // La ligne source est dans la V2 : elle a sa correspondance (ancienne ligne, ou ligne de la V3 rendue au retour, REC-007).
+        var dansLaV2 = $"EXISTS (SELECT 1 FROM rec.Correspondance AS s WHERE s.TableV3 = @s3 AND s.IdV3 = {idS} AND s.BaseV2 = @b AND s.TableV2 = @s)";
         foreach (var k in source.Cles.Where(k => partagees.Contains(k.TableVisee, StringComparer.OrdinalIgnoreCase) && catV2.Tables.ContainsKey(k.TableVisee)))
         {
             var visee = catV2.Tables[k.TableVisee];
-            // La valeur du lien dans v2.<SOURCE> est un identifiant V2 (table telle quelle) : sa fiche a une correspondance
-            // de la V2 si elle a ete recopiee. Un lien casse herite (rec.LienCasse) est deja note : il n'est pas orphelin ici.
+            var regleVisee = recopiees.ParTableV2.GetValueOrDefault(visee.Nom)?.Regle;
+            // La table V3 de la fiche visee : celle de ses correspondances (v2.X telle quelle, rec.Client, rec.TypeDemande...).
+            var nomV3Visee = (string?)await Scalaire(lv3, "SELECT TOP (1) TableV3 FROM rec.Correspondance WHERE BaseV2 = @b AND TableV2 = @t GROUP BY TableV3 ORDER BY COUNT_BIG(*) DESC;", ct,
+                                                     P("@b", baseV2), P("@t", visee.Nom)) ?? "v2." + visee.Nom;
+            // La valeur du lien dans v2.<SOURCE> de la V3 est l'identifiant V3 de la fiche visee : la remontee le traduit
+            // (EcrituresRecopie.TraduireAsync), une ligne creee dans la V3 le porte, et une ligne transferee porte celui de la
+            // V2, egal a celui de la V3 (REC-001). Sauf une colonne qui garde le numero de la V2 (RegleRecopie.NumerosV2 : le
+            // type, l'agent) : numero de la V2 dans une ligne qui est dans la V2, identifiant de la V3 dans une ligne de la V3.
+            // Un lien casse herite (rec.LienCasse) est deja note : il n'est pas orphelin ici.
             var valeur = Sql.Identifiant("d", k.Colonnes.Select(source.Colonne));
             var renseigne = string.Join(" AND ", k.Colonnes.Select(c => $"d.{Sql.Q(c)} IS NOT NULL"));
-            var sql = $"SELECT {idS}, {valeur} FROM {Sql.Q("v2")}.{Sql.Q(source.Nom)} AS d WHERE {renseigne} " +
-                      "AND NOT EXISTS (SELECT 1 FROM rec.Correspondance AS c WHERE c.BaseV2 = @b AND c.TableV2 = @v AND c.IdV2 = " + valeur + ") " +
+            var parIdV3 = $"EXISTS (SELECT 1 FROM rec.Correspondance AS c WHERE c.TableV3 = @v3 AND c.IdV3 = {valeur} AND c.BaseV2 = @b AND c.TableV2 = @v)";
+            var numeroV2 = k.Colonnes.Count == 1 && regleSource?.NumerosV2.Keys.Contains(k.Colonnes[0], StringComparer.OrdinalIgnoreCase) == true;
+            var trouvee = numeroV2
+                ? $"(({dansLaV2} AND EXISTS (SELECT 1 FROM rec.Correspondance AS c WHERE c.BaseV2 = @b AND c.TableV2 = @v AND c.IdV2 = {valeur})) OR (NOT {dansLaV2} AND {parIdV3}))"
+                : parIdV3;
+            // Une fiche visee dont la V3 tient des lignes seule, par regle -- les affaires et demandes de la V3 (RemonteeSeule,
+            // REC-010 T02), un type cree dans la V3 seulement (SansCreationV2, REC-019 CA03) : une ligne de la V3 qui en vise une
+            // relie deux lignes de la V3, ce n'est pas un lien orphelin. Une ligne qui est dans la V2 doit, elle, viser une fiche de la V2.
+            var lignesV3Seules = regleVisee is { RemonteeSeule: true } or { SansCreationV2: true };
+            var sql = $"SELECT {idS}, {valeur} FROM {Sql.Q("v2")}.{Sql.Q(source.Nom)} AS d WHERE {renseigne} AND NOT {trouvee} " +
+                      (lignesV3Seules ? $"AND {dansLaV2} " : "") +
                       "AND NOT EXISTS (SELECT 1 FROM rec.LienCasse AS lc WHERE lc.BaseV2 = @b AND lc.TableV2 = @s AND lc.IdV2 = " + idS + " AND lc.Cle = @k)";
             long n = 0;
-            await using var l = await LireAsync(lv3, sql, ct, P("@b", baseV2), P("@v", visee.Nom), P("@s", source.Nom), P("@k", k.Nom));
+            await using var l = await LireAsync(lv3, sql, ct, P("@b", baseV2), P("@v", visee.Nom), P("@v3", nomV3Visee, 260), P("@s", source.Nom),
+                                                P("@s3", "v2." + source.Nom, 260), P("@k", k.Nom));
             while (await l.ReadAsync(ct))
             {
                 n++;

@@ -95,6 +95,16 @@ public static class RetourBeta
     private const string DemandesV3 = "SELECT d.DMND_ID_DMND FROM v2.DEMANDE AS d WHERE NOT EXISTS (SELECT 1 FROM rec.Correspondance AS c " +
                                       "WHERE c.TableV3 = N'v2.DEMANDE' AND c.IdV3 = CONVERT(nvarchar(200), d.DMND_ID_DMND) AND c.BaseV2 = @b AND c.TableV2 = N'DEMANDE')";
 
+    /// <summary>Depuis quand le greffe est revenu (ou revient) a l'ancien RIG (rec.EtatRetour, « en retour » ou « revenu en V2 ») ;
+    /// null s'il travaille dans la V3. L'aiguillage le lit (REC-007 T02 : la creation d'affaires rouverte dans la V2,
+    /// RegleAiguillage) ; une base V3 d'avant la migration REC-007 n'a pas de retour.</summary>
+    public static async Task<DateTime?> RevenuDepuisAsync(SqlConnection v3, string baseV2, CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("IF OBJECT_ID(N'rec.EtatRetour', N'U') IS NOT NULL SELECT Depuis FROM rec.EtatRetour WHERE BaseV2 = @b;", v3);
+        cmd.Parameters.Add(new SqlParameter("@b", SqlDbType.NVarChar, 128) { Value = baseV2 });
+        return await cmd.ExecuteScalarAsync(ct) is DateTime depuis ? depuis : null;
+    }
+
     public static async Task<PreparationRetour> PreparerAsync(SqlConnection v3, string baseV2, string greffe, CancellationToken ct)
     {
         var refus = new List<string>();

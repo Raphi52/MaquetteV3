@@ -60,7 +60,8 @@ public sealed record ReponseAiguillage(
 
 /// <summary>
 /// LA regle de SOC-014 (CA06) : une affaire se traite dans la V3 si et seulement si elle est creee a
-/// l'heure de passage de son greffe ou apres ; sinon, et tant que le passage n'est pas saisi, dans la V2.
+/// l'heure de passage de son greffe ou apres ; sinon, et tant que le passage n'est pas saisi, dans la V2
+/// (et pour un greffe beta revenu a l'ancien RIG, toujours dans la V2 : voir plus bas).
 /// Aucune regle par domaine (Q18), aucune exception par nature d'affaire.
 ///
 /// Elle vit ici, dans les contrats, parce que deux appelants la jouent : le serveur
@@ -68,6 +69,11 @@ public sealed record ReponseAiguillage(
 /// (Pont/AncienRig.cs). Une seule ecriture : ils ne peuvent pas juger differemment.
 /// La borne est celle de <see cref="FicheGreffe.PassageFait"/> (heure atteinte = passage fait) :
 /// une affaire creee a la minute du passage est deja une affaire de la V3.
+///
+/// Une seule exception, le RETOUR d'un greffe beta a l'ancien RIG (REC-007 T02) : ses affaires de la V3 y sont
+/// recopiees, la V3 refuse toute creation (REC-007 CA03), et la date de passage, atteinte, ne change plus (SOC-007
+/// CA05) -- la creation est rouverte dans la V2 par ce seul etat, que le serveur lit dans la base V3 du greffe
+/// (rec.EtatRetour, RetourBeta.RevenuDepuisAsync) : toute affaire, ancienne ou nouvelle, se traite alors dans la V2.
 /// </summary>
 public static class RegleAiguillage
 {
@@ -75,11 +81,16 @@ public static class RegleAiguillage
     /// <param name="creeeLe">La date de creation de l'affaire (heure locale du greffe) ; null = nouvelle affaire.</param>
     /// <param name="maintenantLocal">L'heure locale du greffe maintenant : la date de creation d'une nouvelle affaire.
     /// null seulement pour un greffe sans fuseau, qui n'a donc pas de date de passage (CatalogueGreffes.SaisirPassageAsync).</param>
-    public static AffaireAiguillee Aiguiller(string numero, DateTime? passageLocal, DateTime? creeeLe, DateTime? maintenantLocal)
+    /// <param name="revenuV2Depuis">Le greffe beta est revenu (ou revient) a l'ancien RIG depuis cette date (REC-007) ;
+    /// null : pas de retour.</param>
+    public static AffaireAiguillee Aiguiller(string numero, DateTime? passageLocal, DateTime? creeeLe, DateTime? maintenantLocal,
+                                             DateTime? revenuV2Depuis = null)
     {
         var creation = creeeLe ?? maintenantLocal;
         var quoi = creeeLe is { } c ? $"creee le {Date(c)}"
                  : maintenantLocal is { } m ? $"nouvelle affaire ({Date(m)})" : "nouvelle affaire";
+        if (revenuV2Depuis is { } retour)
+            return new(numero, Logiciels.V2, $"{quoi} ; greffe revenu a l'ancien RIG le {Date(retour)} (retour de beta) : traitee dans la V2");
         if (passageLocal is not { } passage)
             return new(numero, Logiciels.V2, $"{quoi} ; passage du greffe a la V3 pas encore fixe : traitee dans la V2");
         if (creation is null)

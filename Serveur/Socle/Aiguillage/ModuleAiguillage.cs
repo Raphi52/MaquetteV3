@@ -1,4 +1,6 @@
+using Microsoft.Data.SqlClient;
 using RigV3.Contrats.Socle;
+using RigV3.Serveur.Recopie;
 using RigV3.Serveur.Socle.Greffes;
 using RigV3.Serveur.Socle.Identite;
 
@@ -16,8 +18,12 @@ namespace RigV3.Serveur.Socle.Aiguillage;
 /// - aucun domaine, aucune nature dans la question : il n'y a rien sur quoi brancher une regle par
 ///   domaine (CA06, Q18).
 ///
-/// Lecture seule : la route ne lit que la fiche du catalogue (base commune), aucune base de greffe ; elle
-/// n'ecrit rien, d'ou l'absence de journal des gestes. ACCES : <see cref="PolitiquesSocle.AgentAdmis"/>,
+/// - un greffe beta revenu a l'ancien RIG (REC-007 T02) : tout va a la V2. Son etat de retour vit dans SA base V3
+///   (rec.EtatRetour, RetourBeta.RevenuDepuisAsync) : elle n'est lue que pour un greffe beta dont le passage est fait,
+///   le seul qui puisse revenir (CA05) ; injoignable, la reponse est celle d'un greffe non ouvert.
+///
+/// Lecture seule : la route lit la fiche du catalogue (base commune) et, pour ce seul cas, la base V3 du greffe ;
+/// elle n'ecrit rien, d'ou l'absence de journal des gestes. ACCES : <see cref="PolitiquesSocle.AgentAdmis"/>,
 /// l'agent juge dans la base commune comme pour la fiche du greffe (401 sans session, 403 compte refuse).
 /// </summary>
 internal sealed class ModuleAiguillage : IModuleServeur
@@ -39,8 +45,16 @@ internal sealed class ModuleAiguillage : IModuleServeur
 
             // L'heure du greffe, pas celle du serveur : un greffe d'outre-mer passe a SON heure (SOC-007 CA05).
             DateTime? maintenant = fiche.Fuseau is null ? null : Fuseaux.MaintenantLocal(fiche.Fuseau);
+            DateTime? revenu = null;
+            if (fiche.EstBeta && fiche.PassageFait)
+            {
+                SqlConnection v3;
+                try { v3 = await catalogue.OuvrirBaseV3Async(fiche.Code, ct); }
+                catch (BaseGreffeInjoignable e) { return ReponseGreffeNonOuvert.Pour(e); }
+                await using (v3) revenu = await RetourBeta.RevenuDepuisAsync(v3, fiche.BaseV2, ct);
+            }
             var reponses = affaires
-                .Select(a => RegleAiguillage.Aiguiller(a.Numero, fiche.PassageLocal, a.CreeeLe, maintenant))
+                .Select(a => RegleAiguillage.Aiguiller(a.Numero, fiche.PassageLocal, a.CreeeLe, maintenant, revenu))
                 .ToList();
             return Results.Ok(new ReponseAiguillage(fiche.Code, fiche.PassageLocal, maintenant, reponses));
         });

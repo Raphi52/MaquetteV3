@@ -18,6 +18,7 @@ heure **locale** du greffe) ; la borne est celle de `FicheGreffe.PassageFait` (h
 | nouvelle affaire (CA01) | maintenant, **à l'heure du greffe** | après le passage → V3 ; greffe au passage à venir ou sans date → V2 |
 | nouvelle formalité sur une entreprise déjà immatriculée (CA03) | maintenant (c'est une nouvelle affaire) | V3, même si l'affaire d'immatriculation de 2019 reste V2 |
 | arrivée (échange partenaire, dépôt) (CA05) | celle de l'affaire visée ; aucune visée = nouvelle | affaire de juillet → V2 ; sans affaire → V3 |
+| greffe bêta **revenu à l'ancien RIG** (REC-007 T02, lot 11) | aucune : l'état du retour, lu dans sa base V3 (`rec.EtatRetour`) | toute affaire → V2 (la date de passage, atteinte, ne change plus) |
 
 La règle est écrite **une fois**, dans `Contrats\Socle\Aiguillage.cs` (`RegleAiguillage.Aiguiller`) : le serveur
 la joue avec la date du catalogue, la démonstration de l'écran (sans serveur) avec un passage fixé au

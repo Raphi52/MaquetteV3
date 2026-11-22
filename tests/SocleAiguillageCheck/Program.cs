@@ -67,6 +67,9 @@ static DateTime D(string iso) => DateTime.Parse(iso, System.Globalization.Cultur
 
 // Les greffes du catalogue d'essai.
 const string Passe = "T001", Futur = "T002", SansPassage = "T003", OutreMerAvant = "T004", OutreMerApres = "T005";
+// Deux greffes beta passes (REC-007 T02, lot 11) : l'un revenu a l'ancien RIG -- sa base V3 est la base jetable du banc (elle a
+// toutes les migrations, rec.EtatRetour compris) --, l'autre non (une base V3 vide). L'aiguillage les lit pour eux seuls.
+const string BetaRevenu = "T006", BetaEnV3 = "T007";
 var passageT001 = D("2026-08-01T08:00:00");
 const string Hawai = "Hawaiian Standard Time";   // UTC-10 : 11 h de moins que Paris en hiver
 var maintenantHawai = Fuseaux.MaintenantLocal(Hawai);
@@ -74,6 +77,8 @@ var passageT004 = maintenantHawai.AddHours(3);    // pas encore atteint A HAWAI,
 var passageT005 = maintenantHawai.AddHours(-3);   // atteint a Hawai
 
 await using var commune = await BaseJetable.CreerAsync("SocleAiguillageCheck");
+// La base V3 du greffe beta sans retour (une base V3 par greffe, UQ_Greffe_BaseV3) : vide, comme une base d'avant la migration REC-007.
+await using var v3SansRetour = await BaseJetable.CreerAsync("SocleAiguillageV3");
 var dossierTemp = Directory.CreateTempSubdirectory("rigv3-banc-aiguillage-");
 var fausseV2Lancees = new List<Process>();
 try
@@ -102,13 +107,32 @@ try
             cmd.Parameters.Add(new SqlParameter("@p", System.Data.SqlDbType.DateTime2) { Value = (object?)passage ?? DBNull.Value });
             await cmd.ExecuteNonQueryAsync();
         }
+        var instance = new SqlConnectionStringBuilder(BaseJetable.ServeurDesBancs()).DataSource;
+        await using (var cmd = new SqlCommand($"""
+            INSERT INTO soc.Greffe (CodeGreffe, Nom, Serveur, BaseV2, BaseV3, EstBeta, EstOutreMer, Fuseau, PassageLocal, ModifiePar, ModifieLe)
+            VALUES ('{BetaRevenu}', N'Greffe beta revenu (banc)', @i, 'RIG_BANC_{BetaRevenu}', @v3, 1, 0, @f, @p, 'banc', SYSDATETIME()),
+                   ('{BetaEnV3}', N'Greffe beta en V3 (banc)', @i, 'RIG_BANC_{BetaEnV3}', @v3b, 1, 0, @f, @p, 'banc', SYSDATETIME());
+            INSERT INTO rec.DecisionRetour (BaseV2, Auteur, Motif, Etat) VALUES ('RIG_BANC_{BetaRevenu}', N'banc.responsable', N'banc', 'faite');
+            INSERT INTO rec.EtatRetour (BaseV2, Etat, Depuis, IdDecision) VALUES ('RIG_BANC_{BetaRevenu}', 'revenu en V2', '2026-11-20T21:30:00', SCOPE_IDENTITY());
+            """, cn))
+        {
+            cmd.Parameters.AddWithValue("@i", instance);
+            cmd.Parameters.AddWithValue("@v3", commune.Nom);
+            cmd.Parameters.AddWithValue("@v3b", v3SansRetour.Nom);
+            cmd.Parameters.AddWithValue("@f", Fuseaux.Metropole);
+            cmd.Parameters.Add(new SqlParameter("@p", System.Data.SqlDbType.DateTime2) { Value = passageT001 });
+            await cmd.ExecuteNonQueryAsync();
+        }
     }
+    var authentification = new SqlConnectionStringBuilder(BaseJetable.ServeurDesBancs());
+    authentification.Remove("Data Source");
 
     await using var app = ServeurRig.Construire(["--environment", "Development"], s =>
     {
         s.WebHost.UseTestServer();
         s.Logging.SetMinimumLevel(LogLevel.Warning);
         s.Configuration[$"ConnectionStrings:{BaseRig.NomConnexion}"] = commune.Connexion;
+        s.Configuration[CatalogueGreffes.CleAuthentification] = authentification.ConnectionString;
     });
     await app.StartAsync();
     var http = app.GetTestClient();
@@ -215,6 +239,17 @@ try
         "un domaine ou une nature glisses dans la demande ne changent rien (RCS et JUD du meme jour : meme reponse)");
     Exiger(domaines.Affaires.All(a => a.Logiciel is Logiciels.V2 or Logiciels.V3),
         "SOC-014 CA06 : la reponse ne prend que les valeurs « V2 » ou « V3 »");
+
+    // REC-007 T02 (lot 11) : un greffe beta revenu a l'ancien RIG -- passage atteint, qui ne change plus (SOC-007 CA05) --
+    // donne toute affaire a la V2, nouvelle comme creee apres le passage : la creation est rouverte dans la V2, la V3 la
+    // refuse (REC-007 CA03, GardeAffaires). Jumeau : le meme greffe beta passe, sans retour, garde la regle des dates.
+    var revenu = await Aiguiller(BetaRevenu, nouvelle, new("creee apres le passage", D("2026-08-24T00:00:00")));
+    var enV3 = await Aiguiller(BetaEnV3, nouvelle, new("creee apres le passage", D("2026-08-24T00:00:00")), new("creee avant", D("2026-07-30T00:00:00")));
+    Exiger(revenu.Affaires.All(a => a.Logiciel == Logiciels.V2 && a.Motif.Contains("revenu a l'ancien RIG le 20/11/2026 21:30")) && revenu.PassageLocal == passageT001,
+        $"REC-007 T02 : greffe beta revenu a l'ancien RIG (rec.EtatRetour de sa base V3), passage du 01/08 atteint : une nouvelle affaire et une affaire " +
+        $"creee apres le passage vont a la V2 ({revenu.Affaires[0].Motif})");
+    Exiger(Logiciel(enV3, "nouvelle") == Logiciels.V3 && Logiciel(enV3, "creee apres le passage") == Logiciels.V3 && Logiciel(enV3, "creee avant") == Logiciels.V2,
+        "REC-007 T02 (jumeau) : un greffe beta passe sans retour garde la regle des dates (nouvelle et posterieure : V3, anterieure : V2)");
 
     // Acces et refus de la route (chacun a son jumeau accepte plus haut : agent admis, greffe connu, liste lisible).
     Exiger((await Poser(Passe, new QuestionAiguillage([nouvelle]), compte: null)).StatusCode == HttpStatusCode.Unauthorized

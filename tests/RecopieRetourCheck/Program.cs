@@ -8,6 +8,7 @@ using Microsoft.Data.SqlClient;
 using RecopieTransfertCheck;
 using RigV3.Base;
 using RigV3.Contrats.Recopie;
+using RigV3.Contrats.Socle;
 using RigV3.Serveur.Recopie;
 using RigV3.Serveur.Socle.Chaines;
 using RigV3.Serveur.Socle.Greffes;
@@ -49,6 +50,10 @@ void Exiger(bool ok, string quoi)
 }
 void Reste(string quoi) => Console.WriteLine("RESTE : " + quoi);
 void Info(string quoi) => Console.WriteLine("        " + quoi);
+// Ce qu'un controle de nuit a a traiter, compte par genre, table et colonne (un lien orphelin : sa colonne), avec trois exemples par groupe.
+string ATraiterEnClair(RapportComparaison r) => r.Details.Count == 0 ? "" : " -- a traiter : " + string.Join(" ; ", r.Details
+    .GroupBy(d => $"{d.Genre} {d.TableV2}{(d.Genre == "lien orphelin" ? "." + d.Colonnes : "")}")
+    .Select(g => $"{g.Key} x{g.Count()} ({string.Join(", ", g.Take(3).Select(d => d.Genre == "lien orphelin" ? $"{d.IdV3} : {d.Detail}" : $"{d.IdV2}/{d.IdV3} {d.Colonnes}"))})"));
 int Bilan()
 {
     Console.WriteLine();
@@ -597,6 +602,17 @@ var mereApres = await DemandeV3(modeles[0].Item2, mois[0].Affaire, "Q", null);
 await Executer(v3.Connexion, $"UPDATE v2.DEMANDE SET DMND_ID_DMND_MERE = {mereApres} WHERE DMND_ID_DMND = {filleAvant}");
 await Executer(v3.Connexion, $"INSERT INTO v2.ARTICLE_UTILISE (ARTUT_ID_AFFRE) VALUES ({mois[1].Affaire});");
 
+// REC-007 CA07, pendant la beta (jumeau du controle d'apres le retour) : le controle de nuit d'un greffe qui cree ses affaires dans la V3 n'alerte
+// pas pour elles. Une affaire ou une demande de la V3 n'a pas de correspondance (REC-010 T02) et ses liens portent des identifiants de la V3
+// (RegleRecopie.NumerosV2) : ni un ecart, ni un lien orphelin. Pris apres un passage, pour que les fiches de la V3 (arrivee) soient recopiees.
+var passageBeta = await Passer();
+var pendantBeta = await ComparaisonBases.ComparerAsync(new OptionsComparaison(v2.Connexion, v3.Connexion));
+var lignesV3Beta = await Nombre(v3.Connexion, "SELECT COUNT(*) FROM v2.DEMANDE AS d WHERE NOT EXISTS (SELECT 1 FROM rec.Correspondance AS c WHERE c.TableV3 = 'v2.DEMANDE' AND c.IdV3 = CONVERT(nvarchar(200), d.DMND_ID_DMND))");
+Exiger(pendantBeta.Etat == "fini" && pendantBeta.Orphelins == 0 && pendantBeta.ATraiter == 0 && pendantBeta.CodeSortie == 0 && lignesV3Beta >= 240 && passageBeta.Erreur is null,
+    $"REC-007 CA07 pendant la beta : {lignesV3Beta} demandes de la V3 sans correspondance (le mois et les controles precedents) ; le controle de nuit " +
+    $"({pendantBeta.Tables.Count} tables, code {pendantBeta.CodeSortie}) : {pendantBeta.LignesComparees} lignes comparees, {pendantBeta.Ecarts} ecart(s), " +
+    $"{pendantBeta.SansCorrespondance} sans correspondance, {pendantBeta.Orphelins} lien(s) orphelin(s){ATraiterEnClair(pendantBeta)} {passageBeta.Erreur}");
+
 await using (var cn = new SqlConnection(v3.Connexion))
 {
     await cn.OpenAsync();
@@ -673,6 +689,9 @@ var demandesV2Avant = await Nombre(v2.Connexion, "SELECT COUNT(*) FROM dbo.DEMAN
 PreparationRetour preparation;
 await using (var cn = new SqlConnection(v3.Connexion)) { await cn.OpenAsync(); preparation = await RetourBeta.PreparerAsync(cn, v2.Nom, Greffe, default); }
 Info($"avant le retour : {preparation.Affaires} affaires et {preparation.Demandes} demandes de la V3, refus : {string.Join(" ; ", preparation.Refus)}");
+// T02 (jumeau, avant le retour) : l'etat que l'aiguillage lit dans la base V3 (ModuleAiguillage -> RetourBeta.RevenuDepuisAsync) est vide.
+DateTime? revenuAvant;
+await using (var cn = new SqlConnection(v3.Connexion)) { await cn.OpenAsync(); revenuAvant = await RetourBeta.RevenuDepuisAsync(cn, v2.Nom, default); }
 chrono.Restart();
 var retour = await RetourBeta.RevenirAsync(v3.Connexion, v2.Nom, Greffe, Responsable, "defaut bloquant du module des actes pendant la beta (banc)");
 var dureeRetour = chrono.Elapsed;
@@ -744,6 +763,16 @@ var remontee = await V3De("AFFAIRE", affaireApresV2);
 Exiger(creationV3?.Number == GardeAffaires.ErreurGreffeRevenu && creationV3.Message.Contains("revenu à l'ancien RIG") && remontee is not null,
     $"REC-007 CA03 (T07) : apres le retour, une creation dans la V3 est refusee « {creationV3?.Message} » ; dans la V2, l'affaire {affaireApresV2} se cree et remonte dans la V3 " +
     $"en ancienne affaire ({remontee}) {passageApres.Erreur}");
+// T02 : la creation d'affaires est rouverte dans la V2 -- l'aiguillage d'un greffe passe (passage du 01/08, atteint, qui ne change plus) lit l'etat
+// pose par le retour et envoie la nouvelle affaire a la V2 ; avant le retour, la meme regle l'envoyait a la V3. La route elle-meme : SocleAiguillageCheck.
+DateTime? revenuApres;
+await using (var cn = new SqlConnection(v3.Connexion)) { await cn.OpenAsync(); revenuApres = await RetourBeta.RevenuDepuisAsync(cn, v2.Nom, default); }
+var passageGreffe = new DateTime(2026, 8, 1, 8, 0, 0);
+var aiguilleAvant = RegleAiguillage.Aiguiller("nouvelle", passageGreffe, null, DateTime.Now, revenuAvant);
+var aiguilleApres = RegleAiguillage.Aiguiller("nouvelle", passageGreffe, null, DateTime.Now, revenuApres);
+Exiger(revenuAvant is null && aiguilleAvant.Logiciel == Logiciels.V3 && revenuApres is not null && aiguilleApres.Logiciel == Logiciels.V2,
+    $"REC-007 T02 : creation d'affaires refermee dans la V3 et rouverte dans la V2 -- l'aiguillage envoie une nouvelle affaire a la V2 apres le retour " +
+    $"(« {aiguilleApres.Motif} ») ; avant le retour, a la V3 (« {aiguilleAvant.Motif} »)");
 
 // CA04 (T08) : les chaines signees de la V2 intactes (aucune table de la V2 n'a change, hors affaires, demandes et renvois) ; la facture de la V3 lisible et
 // integre ; la ligne de facturation de la V3 restee dans la V3, avec son renvoi dans la V2.
@@ -774,12 +803,27 @@ var passageFinal = await Passer();
 var moisMax = (await Lire(chaineRigDev, "SELECT TOP (1) COUNT(*) FROM dbo.DEMANDE WHERE DMND_DATE_CREATION >= '2024-01-01' GROUP BY YEAR(DMND_DATE_CREATION) * 100 + MONTH(DMND_DATE_CREATION) ORDER BY 1 DESC")).Rows[0][0];
 var parDemande = dureeRetour.TotalSeconds / Math.Max(1, retour.Demandes + retour.Affaires);
 var extrapole = TimeSpan.FromSeconds(parDemande * (Convert.ToInt64(moisMax) * 1.5));
-var controle = await ComparaisonBases.ComparerAsync(new OptionsComparaison(v2.Connexion, v3.Connexion) { Tables = ["AFFAIRE", "DEMANDE", "ARRIVEE"] });
-Exiger(controle.Etat == "fini" && controle.Ecarts == 0 && controle.SansCorrespondance == 0 && extrapole < TimeSpan.FromHours(10) && passageFinal.Erreur is null,
+// Le controle de nuit tel qu'il tourne (ComparaisonNocturne : toutes les fiches partagees) ; ce qui alerte l'exploitation est ATraiter
+// (ecarts + liens orphelins + sans correspondance, AlertesRecopie) : c'est lui qui doit etre nul, liens orphelins compris.
+var controle = await ComparaisonBases.ComparerAsync(new OptionsComparaison(v2.Connexion, v3.Connexion));
+Exiger(controle.Etat == "fini" && controle.Ecarts == 0 && controle.SansCorrespondance == 0 && controle.Orphelins == 0 && controle.ATraiter == 0 && controle.CodeSortie == 0
+       && extrapole < TimeSpan.FromHours(10) && passageFinal.Erreur is null,
     $"REC-007 CA07 (T11) : retour de {retour.Affaires} affaires et {retour.Demandes} demandes en {dureeRetour.TotalSeconds:0.0} s ({parDemande * 1000:0.0} ms par ligne) ; extrapole au " +
-    $"mois le plus charge de RIG_DEV ({moisMax} demandes, plus la moitie en affaires) : {extrapole:hh\\:mm\\:ss}, dans la nuit (20 h -> 6 h) ; le controle de nuit ensuite : " +
-    $"{controle.LignesComparees} lignes comparees, {controle.Ecarts} ecart(s), {controle.SansCorrespondance} sans correspondance " +
-    $"({string.Join(", ", controle.Details.Take(5).Select(d => $"{d.Genre} {d.TableV2} {d.IdV2}/{d.IdV3} {d.Colonnes}"))})");
+    $"mois le plus charge de RIG_DEV ({moisMax} demandes, plus la moitie en affaires) : {extrapole:hh\\:mm\\:ss}, dans la nuit (20 h -> 6 h) ; le controle de nuit ensuite " +
+    $"({controle.Tables.Count} tables, {controle.Etat}, code {controle.CodeSortie}) : {controle.LignesComparees} lignes comparees, {controle.Ecarts} ecart(s), " +
+    $"{controle.SansCorrespondance} sans correspondance, {controle.Orphelins} lien(s) orphelin(s){ATraiterEnClair(controle)}");
+// Contre-epreuve de CA07 (l'autre cote de la borne) : une ligne qui est dans la V2 doit toujours viser une fiche de la V2. La correspondance d'une
+// affaire rendue mise de cote, ses deux demandes rendues (dans la V2) visent une affaire sans equivalent : deux liens orphelins, et seulement elles.
+var affaireTemoin = mois[5].Affaire.ToString(CultureInfo.InvariantCulture);
+await Executer(v3.Connexion, $"UPDATE rec.Correspondance SET TableV2 = N'AFFAIRE_TEMOIN' WHERE TableV2 = N'AFFAIRE' AND TableV3 = N'v2.AFFAIRE' AND IdV3 = N'{affaireTemoin}'");
+var temoin07 = await ComparaisonBases.ComparerAsync(new OptionsComparaison(v2.Connexion, v3.Connexion) { Tables = ["AFFAIRE", "DEMANDE"] });
+await Executer(v3.Connexion, $"UPDATE rec.Correspondance SET TableV2 = N'AFFAIRE' WHERE TableV2 = N'AFFAIRE_TEMOIN' AND IdV3 = N'{affaireTemoin}'");
+var orphelinsTemoin = temoin07.Details.Where(d => d.Genre == "lien orphelin").ToList();
+var demandesTemoin = new[] { mois[5].Validee, mois[5].EnCours }.Select(x => x.ToString(CultureInfo.InvariantCulture)).ToHashSet();
+Exiger(temoin07.Orphelins == 2 && orphelinsTemoin.All(d => d.Colonnes == "DMND_ID_AFFRE" && demandesTemoin.Contains(d.IdV3!)) && temoin07.CodeSortie == 5,
+    $"REC-007 CA07 contre-epreuve : la correspondance de l'affaire rendue {affaireTemoin} mise de cote, le controle de nuit liste {temoin07.Orphelins} lien(s) orphelin(s) " +
+    $"(attendu : ses demandes {string.Join(" et ", demandesTemoin)}){ATraiterEnClair(temoin07)}");
+
 Reste("REC-007 CA07 sur la copie anonymisee d'un greffe beta avec un mois d'affaires simulees : depend de la nouvelle reception du lot 6 et d'un greffe beta (Le Puy, Chartres, Vienne) ; " +
       "ici une base tiree de RIG_DEV et un mois simule de 120 affaires");
 
