@@ -129,6 +129,45 @@ describe('EcranHistoriqueV2', () => {
     expect(screen.queryByRole('table', { name: 'Affaires' })).toBeNull()
   })
 
+  // Un tableau à largeur fixe donne 0 px à sa seule colonne libre (sans largeur) dès que ses colonnes fixes remplissent la place :
+  // en fenêtre étroite (1 080 px, critères au-dessus des résultats), le nom de l'affaire et les liens entre demandes disparaissaient
+  // (capture du 22/11/2026). Chaque tableau réserve donc une largeur minimale qui laisse sa place à la colonne libre ; en deçà,
+  // son cadre défile. jsdom ne mesure rien : on relit le contrat posé sur le tableau (colonnes et largeur minimale).
+  function placeDeLaColonneLibre(table: HTMLElement): number {
+    const colonnes = [...table.querySelectorAll('col')]
+    expect(colonnes.filter((c) => !c.style.width)).toHaveLength(1)
+    const fixes = colonnes.reduce((s, c) => s + (parseFloat(c.style.width) || 0), 0)
+    const marges = colonnes.length * 16   // var(--rig-esp-2) de chaque côté de chaque cellule (rig-accueil.css, .rig-table)
+    return (parseFloat(table.style.minWidth) || 0) - fixes - marges
+  }
+
+  it('fenêtre étroite : chaque tableau garde au moins 200 px à sa colonne libre (affaire, libellé et liens, ancien numéro…)', async () => {
+    const reprise = { tableV2: 'CLIENT', idV2: '578727', tableV3: 'rec.Client', idV3: '578727', motif: 'client « Fake data » d\'une ancienne reprise', libelle: 'Fake data' }
+    const ancien = { logiciel: 'migration', tableRig: 'DOSSIER_RCS', sorteFiche: 'dossier RCS', ancienId: 'NO-DED-2004-007', ancienNumero: 'DED-2004-007', idRig: 177021,
+                     numeroRig: '2004B00117', numeroInfogreffe: 'IG2004B00117', tableV3: 'rec.DossierRcs', idV3: '177021' }
+    const vues = [vue(), vue({ critere: 'ancien', historique: null, anciens: [ancien] }), vue({ critere: 'reprises', historique: null, reprises: [reprise] })]
+    let rang = 0
+    installerFauxPont({ 'EcranHistoriqueV2.Chercher': () => vues[Math.min(rang++, vues.length - 1)]! })
+    render(<EcranHistoriqueV2 />)
+    const vus: Record<string, number> = {}
+    const relever = () => document.body.querySelectorAll('table').forEach((t) => { vus[t.getAttribute('aria-label') ?? '?'] = placeDeLaColonneLibre(t) })
+
+    fireEvent.click(screen.getByText('Rechercher'))
+    const lignes = within(await screen.findByRole('table', { name: 'Affaires' })).getAllByRole('row').slice(1)
+    relever()
+    fireEvent.click(lignes[1]!)                                   // l'ancienne affaire : ses échanges
+    relever()
+    fireEvent.click(screen.getByText('Rechercher'))
+    await screen.findByRole('table', { name: 'Anciens numéros' })
+    relever()
+    fireEvent.click(screen.getByText('Rechercher'))
+    await screen.findByRole('table', { name: 'Fiches à vérifier' })
+    relever()
+
+    expect(Object.keys(vus).sort()).toEqual(['Affaires', 'Anciens numéros', 'Demandes', 'Fiches à vérifier', 'Échanges'])
+    for (const [nom, place] of Object.entries(vus)) expect(place, nom).toBeGreaterThanOrEqual(200)
+  })
+
   it('le texte d\'un lien levé garde sa trace', () => {
     expect(texteLien({ lien: 'bloquée par', idDemande: 1, numero: 'D1', logiciel: 'ancien RIG', etat: 'V', etatLibelle: 'validée', leve: true, leveLe: null }))
       .toBe('bloquée par D1 (ancien RIG, validée, levé)')

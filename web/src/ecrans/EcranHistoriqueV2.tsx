@@ -13,8 +13,10 @@
 // fix-ok: deux causes mesurees apres la premiere ecriture : (1) capture claire du 21/11 (1 920 px) -- la liste des affaires prenait
 // toute la hauteur et le detail sortait coupe en bas : liste plafonnee, detail qui defile ; (2) SoclePreferencesCheck rouge
 // (SOC-027 CA04) -- la touche de recherche appelait « chercher » et la regle des ecrans de recherche attend « rechercher ».
+// fix-ok: capture du 22/11 en fenetre de 1 080 px -- les colonnes « Affaire » et « Libelle et liens » rendues a 0 px : en
+// table-layout fixed, la seule colonne sans largeur prend le reste, nul quand les colonnes fixes remplissent la place ; d'ou grille().
 
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { appeler } from '../pont'
 import { toucheDeRecherche } from '../plan/clavier'
 import { quand } from './EcranComptes'
@@ -150,6 +152,25 @@ const Detail = { padding: 'var(--rig-esp-2) var(--rig-esp-3)', borderTop: '1px s
 const ListeCourte = { flex: '0 1 auto', maxHeight: '40%' } as const
 const Lien = { padding: '0 var(--rig-esp-1)', fontSize: 'var(--rig-fs-dense)' } as const
 
+// Un tableau en largeur fixe donne 0 px a sa seule colonne libre (le libelle) des que ses colonnes fixes remplissent la place :
+// capture du 22/11/2026 en fenetre etroite (1 080 px, criteres au-dessus des resultats), le nom des affaires et les liens entre
+// demandes avaient disparu. Chaque grille tire donc ses colonnes ET sa largeur minimale des memes nombres (null = la colonne
+// libre) : la colonne libre garde PlaceLibre px, et en deca c'est le cadre du tableau qui defile.
+const PlaceLibre = 200
+const MargesCellule = 16   // var(--rig-esp-2) de chaque cote de chaque cellule (rig-accueil.css, .rig-table th/td)
+function grille(largeurs: (number | null)[], style: CSSProperties = {}) {
+  const fixes = largeurs.reduce<number>((s, l) => s + (l ?? 0), 0)
+  return {
+    style: { tableLayout: 'fixed', minWidth: fixes + PlaceLibre + largeurs.length * MargesCellule, ...style } as CSSProperties,
+    colonnes: <colgroup>{largeurs.map((l, i) => <col key={i} style={l === null ? undefined : { width: `${l}px` }} />)}</colgroup>,
+  }
+}
+const GrilleAffaires = grille([null, 120, 170, 96, 190])
+const GrilleDemandes = grille([118, null, 112, 120, 104, 92], { marginTop: 'var(--rig-esp-2)' })
+const GrilleEchanges = grille([96, 150, 64, 124, null], { marginTop: 'var(--rig-esp-2)' })
+const GrilleAnciens = grille([96, 170, null, 130, 150, 110])
+const GrilleReprises = grille([110, null, 280, 110])
+
 /** Une date pour l'agent : jj/mm/aaaa hh:mm, ou un tiret. */
 export function date(instant: string | null): string {
   return instant ? quand(instant) : '—'
@@ -168,11 +189,8 @@ export function texteLien(l: LienDemandeVue): string {
 
 function TableDemandes({ demandes, ouvrir }: { demandes: DemandeHistorique[]; ouvrir: (id: number) => void }) {
   return (
-    <table className="rig-table" style={{ tableLayout: 'fixed', marginTop: 'var(--rig-esp-2)' }} aria-label="Demandes">
-      <colgroup>
-        <col style={{ width: '118px' }} /><col /><col style={{ width: '112px' }} /><col style={{ width: '120px' }} />
-        <col style={{ width: '104px' }} /><col style={{ width: '92px' }} />
-      </colgroup>
+    <table className="rig-table" style={GrilleDemandes.style} aria-label="Demandes">
+      {GrilleDemandes.colonnes}
       <thead><tr>{['Demande', 'Libellé et liens', 'État', 'Validée le', 'Arrivée', 'Logiciel'].map((t) => <th key={t} style={Coupe}>{t}</th>)}</tr></thead>
       <tbody>
         {demandes.map((d) => (
@@ -292,10 +310,8 @@ export function EcranHistoriqueV2() {
             {h.titre && <p style={{ ...Message, fontWeight: 600 }}>{h.titre}</p>}
             {h.note && <p style={{ ...Message, ...Aide }}>{h.note}</p>}
             <div className="rig-table-cadre" style={ListeCourte}>
-              <table className="rig-table" style={{ tableLayout: 'fixed' }} aria-label="Affaires">
-                <colgroup>
-                  <col /><col style={{ width: '120px' }} /><col style={{ width: '170px' }} /><col style={{ width: '96px' }} /><col style={{ width: '190px' }} />
-                </colgroup>
+              <table className="rig-table" style={GrilleAffaires.style} aria-label="Affaires">
+                {GrilleAffaires.colonnes}
                 <thead><tr>{['Affaire', 'Créée le', 'Client', 'État', 'Logiciel'].map((t) => <th key={t} style={Coupe}>{t}</th>)}</tr></thead>
                 <tbody>
                   {h.affaires.map((a) => (
@@ -327,8 +343,8 @@ export function EcranHistoriqueV2() {
                 <div className="rig-kicker" style={{ marginTop: 'var(--rig-esp-3)' }}>Échanges avec les partenaires</div>
                 {detail.echangesNote && <p style={Aide}>{detail.echangesNote}</p>}
                 {detail.echanges.length > 0 && (
-                  <table className="rig-table" style={{ tableLayout: 'fixed', marginTop: 'var(--rig-esp-2)' }} aria-label="Échanges">
-                    <colgroup><col style={{ width: '96px' }} /><col style={{ width: '150px' }} /><col style={{ width: '64px' }} /><col style={{ width: '124px' }} /><col /></colgroup>
+                  <table className="rig-table" style={GrilleEchanges.style} aria-label="Échanges">
+                    {GrilleEchanges.colonnes}
                     <thead><tr>{['Sens', 'Flux', 'État', 'Le', 'Référence'].map((t) => <th key={t}>{t}</th>)}</tr></thead>
                     <tbody>
                       {detail.echanges.map((e) => (
@@ -356,8 +372,8 @@ export function EcranHistoriqueV2() {
 
         {vue && (vue.critere === 'ancien' || vue.critere === 'rig') && vue.mode !== 'vide' && !enErreur && (
           <div className="rig-table-cadre">
-            <table className="rig-table" style={{ tableLayout: 'fixed' }} aria-label="Anciens numéros">
-              <colgroup><col style={{ width: '96px' }} /><col style={{ width: '170px' }} /><col /><col style={{ width: '130px' }} /><col style={{ width: '150px' }} /><col style={{ width: '110px' }} /></colgroup>
+            <table className="rig-table" style={GrilleAnciens.style} aria-label="Anciens numéros">
+              {GrilleAnciens.colonnes}
               <thead><tr>{['Logiciel', 'Fiche', 'Ancien numéro', 'Numéro RIG', 'Numéro Infogreffe', 'Dans la V3'].map((t) => <th key={t} style={Coupe}>{t}</th>)}</tr></thead>
               <tbody>
                 {vue.anciens.map((a, i) => (
@@ -377,8 +393,8 @@ export function EcranHistoriqueV2() {
         {vue && vue.critere === 'reprises' && !enErreur && (
           <div className="rig-table-cadre">
             <p style={{ ...Message, ...Aide }}>Fiches créées par une ancienne reprise pour combler un lien cassé : transférées telles quelles, à vérifier par le greffe.</p>
-            <table className="rig-table" style={{ tableLayout: 'fixed' }} aria-label="Fiches à vérifier">
-              <colgroup><col style={{ width: '110px' }} /><col /><col style={{ width: '280px' }} /><col style={{ width: '110px' }} /></colgroup>
+            <table className="rig-table" style={GrilleReprises.style} aria-label="Fiches à vérifier">
+              {GrilleReprises.colonnes}
               <thead><tr>{['Fiche', 'Libellé', 'Pourquoi', 'Dans la V3'].map((t) => <th key={t}>{t}</th>)}</tr></thead>
               <tbody>
                 {vue.reprises.map((f) => (

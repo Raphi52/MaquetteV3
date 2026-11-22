@@ -854,7 +854,10 @@ Les affaires des deux logiciels, les anciennes marquées « traitée dans l'anci
 le blocage et les liens avec le logiciel de chaque demande liée (un clic l'ouvre en lecture), les échanges avec les partenaires.
 Le bloc « Ancien RIG » de la recherche d'affaires propose aussi « Voir son historique (lecture seule) »
 (`EcranRechAffaires.HistoriqueAncienne`, SOC-015 CA01 laissé ouvert par le lot 3). Captures clair et sombre (démonstration) :
-`C:\Users\raphael.vilain\Documents\Autowin\refonte-rig\captures\phase2-lot11-historique\`.
+`C:\Users\raphael.vilain\Documents\Autowin\refonte-rig\captures\phase2-lot11-historique\`. En fenêtre étroite (1 080 px,
+`etroit-*.png`, 22/11), les tableaux à colonnes fixes donnaient 0 px à leur colonne libre — le nom de l'affaire et les liens
+entre demandes disparaissaient (`etroit-avant-correctif-clair.png`) : chaque tableau garde désormais 200 px à cette colonne
+(`grille()` de l'écran) et défile au-delà ; contrôle « fenêtre étroite » de `EcranHistoriqueV2.test.tsx`.
 
 Les échanges (REC-010 CA04) se lisent dans la base des échanges (`EDI_GREFFE`, `FLUX_SORTANT` / `FLUX_ENTRANT`, lecture seule)
 par code greffe et identifiant V2 de chaque demande ; réglage `Recopie:BaseEchanges` (absent : l'écran le dit).
