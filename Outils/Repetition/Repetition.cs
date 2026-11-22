@@ -129,7 +129,11 @@ public static class Repetition
                     }, ct);
                     dAnon = chrono.ElapsedMilliseconds;
                     Noter($"{nomBase} : copie anonymisee en {dAnon / 1000.0:0.0} s — {anon.Volumes.Count} tables, {anon.Colonnes.Count} colonnes traitees, " +
-                          $"{anon.Anomalies.Count} anomalie(s)");
+                          $"{anon.Anomalies.Count} anomalie(s)" + (anon.Fermee
+                              ? $" ; copie reduite FERMEE sur ses cles : {anon.LiensFermes} cles suivies, {anon.AjoutsFermeture.Sum(a => a.Lignes)} lignes parentes " +
+                                $"ajoutees dans {anon.AjoutsFermeture.Count} tables en {anon.ToursFermeture} tours ({anon.DureeFermetureMs / 1000.0:0.0} s), " +
+                                $"{anon.ClesVerifiees.Count} cles verifiees, {anon.ClesNonVerifiees.Count} sans verification"
+                              : ""));
                     if (anon.Anomalies.Count > 0)
                     {
                         bases.Add(Fin("anonymisation", "anomalies de la copie : " + string.Join(" ; ", anon.Anomalies.Take(5))));
@@ -138,7 +142,7 @@ public static class Repetition
                     chrono.Restart();
                     var r = await ControleCopie.ControlerAsync(chaine, copie, o.Accord, o.Echantillon, ct);
                     dControle = chrono.ElapsedMilliseconds;
-                    var (vert, reduite) = JugerControle(r, o.MaxLignes);
+                    var (vert, reduite) = JugerControle(r, o.MaxLignes, anon.AjoutsFermeture.ToDictionary(a => a.Table, a => a.Lignes, StringComparer.OrdinalIgnoreCase));
                     controle = $"{(vert ? "vert" : "ROUGE")} : {r.ColonnesControlees} colonnes personnelles, {r.EchantillonValeurs} valeurs et {r.EchantillonMots} mots " +
                                $"tires de la source, retrouves dans la copie : {(r.Fuites.Count == 0 ? "aucun" : string.Join(", ", r.Fuites.Take(10)))} ; " +
                                $"{r.TablesComparees} tables, " + (reduite ??
@@ -212,16 +216,21 @@ public static class Repetition
     /// (--max-lignes) : volumes et lignes gardees y different par construction (docs\reconstruction\socle-anonymisation.md,
     /// « Volumes et lignes gardees different par construction ») ; on exige alors qu'aucune valeur reelle ne soit retrouvee,
     /// que les colonnes a vider le soient, que la marque soit la, qu'aucune colonne gardee ne porte de prenoms, et que chaque
-    /// volume soit celui de la reduction (min(source, N)) ; les numeros gardes ne sont pas juges. Limite ecrite au rapport :
-    /// dans une copie reduite, la plupart des valeurs tirees n'y sont pas -- l'absence de fuite se prouve sur une copie complete.
+    /// volume soit celui de la reduction : min(source, N), plus les lignes parentes que la fermeture sur les cles a ajoutees a
+    /// cette table (<paramref name="ajoutsFermeture"/>, rapport de la copie) ; les numeros gardes ne sont pas juges. Limite
+    /// ecrite au rapport : dans une copie reduite, la plupart des valeurs tirees n'y sont pas -- l'absence de fuite se prouve
+    /// sur une copie complete.
     /// </summary>
-    internal static (bool Vert, string? Reduite) JugerControle(ResultatControle r, long? maxLignes)
+    internal static (bool Vert, string? Reduite) JugerControle(ResultatControle r, long? maxLignes, IReadOnlyDictionary<string, long>? ajoutsFermeture = null)
     {
         if (maxLignes is not { } max) return (r.Vert, null);
-        var horsReduction = r.VolumesDifferents.Where(v => Regex.Match(v, @"\((\d+) dans la source, (\d+) dans la copie\)$") is not { Success: true } m
-                                                           || long.Parse(m.Groups[2].Value) != Math.Min(long.Parse(m.Groups[1].Value), max)).ToList();
+        long Ajouts(string table) => ajoutsFermeture?.GetValueOrDefault(table) ?? 0;
+        var horsReduction = r.VolumesDifferents.Where(v => Regex.Match(v, @"^(.+) \((\d+) dans la source, (\d+) dans la copie\)$") is not { Success: true } m
+                                                           || long.Parse(m.Groups[3].Value) != Math.Min(long.Parse(m.Groups[2].Value), max) + Ajouts(m.Groups[1].Value)).ToList();
+        var completees = r.VolumesDifferents.Except(horsReduction).Count(v => Ajouts(v[..v.LastIndexOf(" (", StringComparison.Ordinal)]) > 0);
         var vert = r.Fuites.Count == 0 && r.NonVidees.Count == 0 && r.Marquee && !r.Gardees.Any(g => g.Prenoms) && !r.GardeesNonJugees && horsReduction.Count == 0;
         return (vert, $"copie REDUITE a {max} lignes par table : {r.VolumesDifferents.Count - horsReduction.Count} volumes reduits comme demande" +
+                      (ajoutsFermeture is null ? "" : $" (dont {completees} completes par la fermeture sur les cles : {ajoutsFermeture.Values.Sum()} lignes parentes)") +
                       (horsReduction.Count > 0 ? $", HORS REDUCTION : {string.Join(", ", horsReduction)}" : "") +
                       " ; numeros gardes non juges (les lignes tirees de la source n'y sont pas toutes) ; l'absence de fuite se prouve sur une copie complete");
     }

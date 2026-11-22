@@ -606,6 +606,72 @@ Exiger(marqueLots == false && !rapportLots.ChainesInvalidees && !rapportLots.Rep
     $"tables signees touchees : {(rapportLots.TablesSigneesTouchees.Count == 0 ? "aucune" : string.Join(", ", rapportLots.TablesSigneesTouchees.Select(t => t.Table)))}) ; " +
     $"cle aleatoire (reproductible : {rapportLots.Reproductible}), cles verifiees : {string.Join(", ", rapportLots.ClesVerifiees)}");
 
+// ====================================================================================================
+// REC-008 (lot 18) -- copie REDUITE fermee sur ses cles etrangeres : aucune ligne n'y vise un parent absent
+// ====================================================================================================
+// L'extrait porte les vraies cles de RIG_DEV entre ses tables (PARTIE -> CLIENT, CLIENT -> UTILISATEUR, DEMANDE_EDITION -> LOT
+// et vers elle-meme...). Ses 20 premieres lignes par table (ordre de la cle) ne sont pas fermees : la fermeture doit y ajouter les
+// parents. Le banc compte LUI-MEME, cle par cle de la copie, les lignes dont toutes les colonnes de la cle sont remplies et qui ne
+// trouvent pas leur parent (la regle de SQL Server) -- sans se fier au rapport de l'outil.
+async Task<(int Cles, int NonVerifiees, long Orphelins, List<string> Detail)> OrphelinsAsync(string chaine)
+{
+    var cles = await LireAsync(chaine,
+        "SELECT fk.object_id, QUOTENAME(SCHEMA_NAME(e.schema_id)) + '.' + QUOTENAME(e.name), QUOTENAME(SCHEMA_NAME(p.schema_id)) + '.' + QUOTENAME(p.name), " +
+        "QUOTENAME(COL_NAME(fkc.parent_object_id, fkc.parent_column_id)), QUOTENAME(COL_NAME(fkc.referenced_object_id, fkc.referenced_column_id)), fk.name, fk.is_not_trusted " +
+        "FROM sys.foreign_keys fk JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id " +
+        "JOIN sys.tables e ON e.object_id = fk.parent_object_id JOIN sys.tables p ON p.object_id = fk.referenced_object_id ORDER BY fk.object_id, fkc.constraint_column_id");
+    var parCle = cles.Rows.Cast<DataRow>().GroupBy(r => (int)r[0]).ToList();
+    long orphelins = 0;
+    var detail = new List<string>();
+    foreach (var k in parCle)
+    {
+        var (enfant, parent) = ((string)k.First()[1], (string)k.First()[2]);
+        var remplies = string.Join(" AND ", k.Select(r => $"c.{r[3]} IS NOT NULL"));
+        var lien = string.Join(" AND ", k.Select(r => $"p.{r[4]} = c.{r[3]}"));
+        var n = await EntierAsync(chaine, $"SELECT COUNT_BIG(*) FROM {enfant} c WHERE {remplies} AND NOT EXISTS (SELECT 1 FROM {parent} p WHERE {lien})");
+        orphelins += n;
+        if (n > 0) detail.Add($"{k.First()[5]} ({n})");
+    }
+    return (parCle.Count, parCle.Count(k => (bool)k.First()[6]), orphelins, detail);
+}
+const int Reduite = 20;
+await using var fermee = await BaseJetable.CreerAsync("SocleAnonymisationFermee");
+chrono.Restart();
+var rapportFermee = await CopieAnonymisee.CopierAsync(new OptionsCopie { Source = v2.Connexion, Cible = fermee.Connexion, Graine = "SOC-021", MaxLignes = Reduite });
+var dureeFermee = chrono.Elapsed;
+var orphelinsFermee = await OrphelinsAsync(fermee.Connexion);
+var volumesFermee = new List<string>();
+foreach (var t in nomsExtrait.Order())
+{
+    var n = await EntierAsync(fermee.Connexion, $"SELECT COUNT_BIG(*) FROM dbo.[{t}]");
+    var ajout = rapportFermee.AjoutsFermeture.FirstOrDefault(a => a.Table == $"dbo.{t}").Lignes;
+    if (n != Math.Min(lignesSource[t], Reduite) + ajout || n > lignesSource[t]) volumesFermee.Add($"{t} ({n} : {lignesSource[t]} dans la source, {ajout} ajoutees)");
+}
+// La contre-epreuve : la reduction du lot 8 (les N premieres lignes seules) sur la meme source. Le compte du banc DOIT y trouver des
+// lignes orphelines, sinon le vert du controle ci-dessous ne prouverait pas que la fermeture les a reparees.
+await using var nonFermee = await BaseJetable.CreerAsync("SocleAnonymisationNonFermee");
+var rapportNonFermee = await CopieAnonymisee.CopierAsync(new OptionsCopie
+{
+    Source = v2.Connexion, Cible = nonFermee.Connexion, Graine = "SOC-021", MaxLignes = Reduite, FermerSurLesCles = false,
+});
+var orphelinsNonFermee = await OrphelinsAsync(nonFermee.Connexion);
+Exiger(orphelinsNonFermee.Orphelins > 0 && !rapportNonFermee.Fermee && rapportNonFermee.ClesVerifiees.Count == 0,
+    $"REC-008 (contre-epreuve) : la reduction NON fermee ({Reduite} premieres lignes par table) laisse {orphelinsNonFermee.Orphelins} lignes orphelines " +
+    $"sur {orphelinsNonFermee.Detail.Count} cles ({string.Join(", ", orphelinsNonFermee.Detail.Take(4))}) ; ses {rapportNonFermee.ClesNonVerifiees.Count} cles posees sans verification");
+Exiger(rapportFermee.Fermee && rapportFermee.Anomalies.Count == 0 && orphelinsFermee.Orphelins == 0 && orphelinsFermee.NonVerifiees == 0
+       && orphelinsFermee.Cles == clesSource.Count && rapportFermee.ClesVerifiees.Count == clesSource.Count
+       && rapportFermee.AjoutsFermeture.Sum(a => a.Lignes) > 0 && volumesFermee.Count == 0,
+    $"REC-008 : copie réduite fermée : aucune clé étrangère orpheline -- {Reduite} premieres lignes par table puis {rapportFermee.AjoutsFermeture.Sum(a => a.Lignes)} lignes parentes " +
+    $"({string.Join(", ", rapportFermee.AjoutsFermeture.Select(a => $"{a.Table} +{a.Lignes}"))}) en {rapportFermee.ToursFermeture} tours, {dureeFermee.TotalSeconds:0.0} s ; " +
+    $"compte du banc : {orphelinsFermee.Cles} cles, {orphelinsFermee.Orphelins} orphelines{(orphelinsFermee.Detail.Count == 0 ? "" : " (" + string.Join(", ", orphelinsFermee.Detail) + ")")}, " +
+    $"{orphelinsFermee.NonVerifiees} non verifiees ; anomalies : {(rapportFermee.Anomalies.Count == 0 ? "aucune" : string.Join(" ; ", rapportFermee.Anomalies))} ; " +
+    $"volumes = min(source, {Reduite}) + ajouts : {(volumesFermee.Count == 0 ? "tous" : "SAUF " + string.Join(", ", volumesFermee))}");
+// La copie fermee passe le controle de l'outil comme une autre (exige avant usage par la repetition) : aucune valeur reelle retrouvee.
+var controleFermee = await ControleCopie.ControlerAsync(v2.Connexion, fermee.Connexion, null, 200, CancellationToken.None);
+Exiger(controleFermee.Fuites.Count == 0 && controleFermee.NonVidees.Count == 0 && controleFermee.Marquee && controleFermee.EchantillonValeurs > 0,
+    $"REC-008 / SOC-021 CA06 : le controle de la copie reduite fermee ne retrouve aucune des {controleFermee.EchantillonValeurs} valeurs reelles tirees " +
+    $"(retrouvees : {(controleFermee.Fuites.Count == 0 ? "aucune" : string.Join(", ", controleFermee.Fuites))}) ; marque presente, colonnes a vider vides");
+
 Reste("SOC-021 T01 : relecture de l'inventaire par le delegue a la protection des donnees (fichier inventaire-rig-dev.md a cote du banc) -- hors de ce poste");
 Reste("SOC-021 T03, CA07 : lancer l'outil base par base avec l'accord donne pour chaque base de production (40 greffes, SQL-PROD) -- aucun accord sur ce poste");
 Reste("SOC-021 T05 : sur un serveur de production, d'autres sessions ecrivent : le journal du serveur ne prouve plus seul l'absence d'ecriture de l'outil (la porte de lecture reste la garantie)");

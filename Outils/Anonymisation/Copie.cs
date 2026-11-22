@@ -18,8 +18,15 @@ public sealed record OptionsCopie
     public string? Graine { get; init; }
     /// <summary>Tables a copier (« CLIENT » ou « dbo.CLIENT ») ; vide = toutes.</summary>
     public IReadOnlyList<string>? Tables { get; init; }
-    /// <summary>Copie reduite : au plus N lignes par table (les premieres dans l'ordre de la cle).</summary>
+    /// <summary>Copie reduite : au plus N lignes par table (les premieres dans l'ordre de la cle), puis les lignes parentes
+    /// qu'elles visent (<see cref="FermerSurLesCles"/>).</summary>
     public long? MaxLignes { get; init; }
+    /// <summary>
+    /// Copie reduite seulement : la fermer sur ses cles etrangeres (Fermeture.cs) -- aucune ligne n'y vise un parent absent,
+    /// et ses cles sont posees AVEC verification. Faux : les N premieres lignes seules, cles posees sans verification
+    /// (la reduction du lot 8, gardee pour la contre-epreuve du banc).
+    /// </summary>
+    public bool FermerSurLesCles { get; init; } = true;
     /// <summary>Regles relues (« TABLE.COLONNE » -> traitement), prioritaires sur le catalogue.</summary>
     public IEnumerable<KeyValuePair<string, Traitement>>? Remplacements { get; init; }
     /// <summary>Fichier Markdown du rapport (aucune valeur des bases n'y est ecrite).</summary>
@@ -37,7 +44,8 @@ public sealed record OptionsCopie
 ///  3. Table par table : lecture en continu, REMPLACEMENT des valeurs personnelles en memoire, ecriture
 ///     par lots (SqlBulkCopy) -- les valeurs reelles ne sont jamais ecrites sur l'instance de test.
 ///     Identifiants, numeros, dates des affaires, montants : recopies tels quels (CA03), identites
-///     reprises a la derniere valeur de la source (les vrais compteurs).
+///     reprises a la derniere valeur de la source (les vrais compteurs). Copie reduite : puis la
+///     fermeture sur les cles etrangeres (Fermeture.cs), les lignes parentes anonymisees de meme.
 ///  4. Index, cles etrangeres (verifiees sur les donnees copiees quand la source les verifie),
 ///     contraintes, vues, fonctions, procedures, declencheurs.
 ///  5. Marque de la copie (schema « anonymisation ») : regle de chaque colonne, et « chaines
@@ -95,6 +103,10 @@ public static class CopieAnonymisee
             await ExecuterAsync(cn, $"IF SCHEMA_ID(N'{s.Replace("'", "''")}') IS NULL EXEC(N'CREATE SCHEMA {Ddl.Q(s).Replace("'", "''")}');", ct);
 
         var copiees = tables.ToDictionary(t => t.Id);
+        var enCopie = tables.ToDictionary(t => t.Id, t => TableEnCopie.Preparer(t, catalogue, rapport));
+        var fermeture = o.MaxLignes is not null && o.FermerSurLesCles
+            ? new FermetureSurLesCles(schema, enCopie.ToDictionary(e => e.Key, e => e.Value.Colonnes))
+            : null;
         foreach (var t in tables)
         {
             ct.ThrowIfCancellationRequested();
@@ -108,17 +120,28 @@ public static class CopieAnonymisee
                     await ExecuterAsync(cn, Ddl.CreerIndex(t, i), ct);
                     rapport.IndexCrees.Add($"{t.Libelle}.{i.Nom}");
                 }
-                lignes = await CopierTableAsync(src, cn, t, schema, catalogue, anonymiseur, o, rapport, ct);
+                lignes = await CopierTableAsync(src, cn, enCopie[t.Id], schema, anonymiseur, fermeture, o, rapport, ct);
             }
             catch (Exception e) when (e is SqlException or InvalidOperationException)
             {
                 // Une copie incomplete n'est pas une copie : on s'arrete, en nommant la table.
                 throw new InvalidOperationException($"Table {t.Libelle} : {e.Message}", e);
             }
-            rapport.Volumes.Add((t.Libelle, lignes));
             journal.WriteLine($"  {t.Libelle} : {lignes} lignes");
             if (t.DerniereIdentite is { } derniere)
                 await ExecuterAsync(cn, $"DBCC CHECKIDENT ('{t.Complet.Replace("'", "''")}', RESEED, {derniere.ToString(CultureInfo.InvariantCulture)}) WITH NO_INFOMSGS;", ct);
+        }
+
+        // ---- 3 bis. copie reduite : la fermeture sur les cles etrangeres (les lignes ajoutees n'ont jamais une identite
+        // au-dela de la derniere de la source : le compteur repris ci-dessus tient).
+        // fix-ok: repetition du lot 8 sur RIG_DEV (repetition-20261121-105245.md) arretee sur FK_RoleFonction_Fonction : les 200
+        // premieres lignes de HABILIT_ROLE_USER_PROCESSUS visent des fonctions hors des 200 premieres de PROCESSUS_ET_FONCTIONALITE
+        // (cle FK_HABILIT_ROLE_USER_PROCESSUS_HRFON_CODE_PROC_... de RIG_DEV, lue le 2026-11-22 : 789 cles, toutes verifiees).
+        if (fermeture is not null) await FermerAsync(src, cn, fermeture, enCopie, anonymiseur, o, rapport, journal, ct);
+        foreach (var t in tables)
+        {
+            rapport.Volumes.Add((t.Libelle, enCopie[t.Id].Lignes));
+            if (enCopie[t.Id].SigneesTouchees > 0) rapport.TablesSigneesTouchees.Add((t.Libelle, enCopie[t.Id].SigneesTouchees));
         }
 
         // ---- 4. la forme : index, cles, contraintes, modules
@@ -145,12 +168,16 @@ public static class CopieAnonymisee
                 rapport.Ignores.Add($"cle {t.Libelle}.{k.Nom} : la table referencee n'est pas copiee");
                 continue;
             }
-            var verifier = !k.NonVerifiee && !k.Desactivee && o.MaxLignes is null;
+            // Copie reduite FERMEE : ses cles se verifient comme celles d'une copie complete -- c'est la preuve que la fermeture
+            // est complete. Non fermee (contre-epreuve) ou cle hors fermeture : posee sans verification, et dit pourquoi.
+            var horsFermeture = o.MaxLignes is not null && (fermeture is null || fermeture.HorsFermeture.Contains($"{t.Libelle}.{k.Nom}"));
+            var verifier = !k.NonVerifiee && !k.Desactivee && !horsFermeture;
             try
             {
                 await ExecuterAsync(cn, Ddl.CreerCle(t, r, k, verifier), ct);
                 (verifier ? rapport.ClesVerifiees : rapport.ClesNonVerifiees).Add(
-                    $"{t.Libelle}.{k.Nom}" + (verifier ? "" : k.NonVerifiee ? " (deja non verifiee dans la source)" : o.MaxLignes is null ? " (desactivee dans la source)" : " (copie reduite)"));
+                    $"{t.Libelle}.{k.Nom}" + (verifier ? "" : k.NonVerifiee ? " (deja non verifiee dans la source)" : k.Desactivee ? " (desactivee dans la source)"
+                                              : fermeture is null ? " (copie reduite non fermee)" : " (copie reduite : cle hors fermeture, colonne calculee)"));
             }
             catch (SqlException e) when (verifier)
             {
@@ -232,71 +259,165 @@ public static class CopieAnonymisee
             throw new RefusAnonymisation($"La base copie « {nom} » existe et n'est pas vide : l'outil n'ecrase jamais une base.");
     }
 
-    private static async Task<long> CopierTableAsync(PorteSource src, SqlConnection cn, TableSql t, SchemaSource schema,
-        CatalogueRegles catalogue, Anonymiseur anonymiseur, OptionsCopie o, Rapport rapport, CancellationToken ct)
+    /// <summary>
+    /// Une table en cours de copie : ses colonnes copiees, leur regle, les compteurs du rapport. Gardee jusqu'a la fin de la
+    /// copie : les lignes que la fermeture ajoute passent par les memes regles et les memes compteurs.
+    /// </summary>
+    private sealed class TableEnCopie
     {
-        var colonnes = t.Colonnes.Where(c => !c.Calculee).ToList();
-        if (colonnes.Count == 0) return 0;
-        var regles = colonnes.Select(c => catalogue.Pour(t.Nom, c.Nom, c.Type)).ToArray();
-        var traitees = new ColonneTraitee?[colonnes.Count];
-        for (var i = 0; i < colonnes.Count; i++)
-            if (regles[i].Anonymise)
-            {
-                traitees[i] = new ColonneTraitee(t.Libelle, colonnes[i].Nom, colonnes[i].Type, colonnes[i].Longueur, regles[i]);
-                rapport.Colonnes.Add(traitees[i]!);
-            }
-        // Les colonnes d'une signature (FACTU_SIGN_SEQ, GTPF_SIGNATURE…) : une ligne signee dont le contenu
-        // change n'a plus une signature valable (CA05).
-        var signatures = colonnes.Select((c, i) => (c, i))
-            .Where(x => CatalogueRegles.Segments(x.c.Nom).Any(s => s is "SIGN" or "SIGNATURE"))
-            .Select(x => x.i).ToArray();
-        long signeesTouchees = 0;
+        public required TableSql Table { get; init; }
+        public required List<ColonneSql> Colonnes { get; init; }
+        public required Regle[] Regles { get; init; }
+        public required ColonneTraitee?[] Traitees { get; init; }
+        /// <summary>Les colonnes d'une signature (FACTU_SIGN_SEQ, GTPF_SIGNATURE…) : une ligne signee dont le contenu
+        /// change n'a plus une signature valable (CA05).</summary>
+        public required int[] Signatures { get; init; }
+        public required Dictionary<string, int> Index { get; init; }
+        public long Lignes { get; set; }
+        public long SigneesTouchees { get; set; }
 
+        public static TableEnCopie Preparer(TableSql t, CatalogueRegles catalogue, Rapport rapport)
+        {
+            var colonnes = t.Colonnes.Where(c => !c.Calculee).ToList();
+            var regles = colonnes.Select(c => catalogue.Pour(t.Nom, c.Nom, c.Type)).ToArray();
+            var traitees = new ColonneTraitee?[colonnes.Count];
+            for (var i = 0; i < colonnes.Count; i++)
+                if (regles[i].Anonymise)
+                {
+                    traitees[i] = new ColonneTraitee(t.Libelle, colonnes[i].Nom, colonnes[i].Type, colonnes[i].Longueur, regles[i]);
+                    rapport.Colonnes.Add(traitees[i]!);
+                }
+            return new TableEnCopie
+            {
+                Table = t, Colonnes = colonnes, Regles = regles, Traitees = traitees,
+                Signatures = [.. colonnes.Select((c, i) => (c, i)).Where(x => CatalogueRegles.Segments(x.c.Nom).Any(s => s is "SIGN" or "SIGNATURE")).Select(x => x.i)],
+                Index = colonnes.Select((c, i) => (c.Nom, i)).ToDictionary(x => x.Nom, x => x.i, StringComparer.OrdinalIgnoreCase),
+            };
+        }
+    }
+
+    private static async Task<long> CopierTableAsync(PorteSource src, SqlConnection cn, TableEnCopie e, SchemaSource schema,
+        Anonymiseur anonymiseur, FermetureSurLesCles? fermeture, OptionsCopie o, Rapport rapport, CancellationToken ct)
+    {
+        var t = e.Table;
+        if (e.Colonnes.Count == 0) return 0;
+        // Une table sans cle primaire (104 dans RIG_DEV) : ses N premieres lignes dans l'ordre du serveur, comme au lot 8.
         var cle = schema.Index.FirstOrDefault(i => i.Table == t.Id && i.Primaire)?.Colonnes.Where(c => !c.Inclus).Select(c => Ddl.Q(c.Colonne)).ToList();
-        var sql = $"SELECT {(o.MaxLignes is { } m ? $"TOP ({m}) " : "")}{string.Join(", ", colonnes.Select(c => Ddl.Q(c.Nom)))} " +
+        var sql = $"SELECT {(o.MaxLignes is { } m ? $"TOP ({m}) " : "")}{string.Join(", ", e.Colonnes.Select(c => Ddl.Q(c.Nom)))} " +
                   $"FROM {t.Complet} WITH (NOLOCK)" +
                   (o.MaxLignes is not null && cle is { Count: > 0 } ? $" ORDER BY {string.Join(", ", cle)}" : "");
+        await using (var lecteur = await src.LireAsync(sql, ct))
+            await EcrireAsync(lecteur, cn, e, anonymiseur, fermeture, sauterDejaCopiees: false, o.TailleLot, ct);
+        if (e.Colonnes.Any(c => c.Type is "timestamp" or "rowversion"))
+            rapport.Ignores.Add($"{t.Libelle} : colonne rowversion recopiee en binary(8) (une rowversion ne s'ecrit pas)");
+        return e.Lignes;
+    }
 
-        var index = colonnes.Select((c, i) => (c.Nom, i)).ToDictionary(x => x.Nom, x => x.i, StringComparer.OrdinalIgnoreCase);
-        long lignes = 0;
-        await using var lecteur = await src.LireAsync(sql, ct);
+    /// <summary>
+    /// Un lot ecrit des qu'il atteint ce volume, meme sous <see cref="OptionsCopie.TailleLot"/> lignes. Mesure du 2026-11-22
+    /// (fermeture de RIG_DEV) : sans ce plafond, le processus de copie est monte a 4,3 Go sur les documents de GED_RIG ;
+    /// avec lui (et la lecture synchrone), 255 a 640 Mo.
+    /// </summary>
+    private const long OctetsParLot = 64L * 1024 * 1024;
+
+    /// <summary>
+    /// Ecrit dans la copie les lignes d'un lecteur de la source, ANONYMISEES en memoire, par lots (SqlBulkCopy). Fermeture :
+    /// chaque ligne est notee par ses valeurs SOURCE ; <paramref name="sauterDejaCopiees"/> (lignes parentes) : une ligne
+    /// deja dans la copie n'est pas reecrite. Rend le nombre de lignes ecrites.
+    /// </summary>
+    private static async Task<long> EcrireAsync(SqlDataReader lecteur, SqlConnection cn, TableEnCopie e, Anonymiseur anonymiseur,
+        FermetureSurLesCles? fermeture, bool sauterDejaCopiees, int tailleLot, CancellationToken ct)
+    {
         using var lot = new DataTable();
-        for (var i = 0; i < lecteur.FieldCount; i++) lot.Columns.Add(colonnes[i].Nom, lecteur.GetFieldType(i));
+        for (var i = 0; i < lecteur.FieldCount; i++) lot.Columns.Add(e.Colonnes[i].Nom, lecteur.GetFieldType(i));
         using var bulk = new SqlBulkCopy(cn, SqlBulkCopyOptions.KeepIdentity | SqlBulkCopyOptions.KeepNulls | SqlBulkCopyOptions.TableLock, null)
         {
-            DestinationTableName = t.Complet,
+            DestinationTableName = e.Table.Complet,
             BulkCopyTimeout = 0,
-            BatchSize = o.TailleLot,
+            BatchSize = tailleLot,
         };
-        foreach (var c in colonnes) bulk.ColumnMappings.Add(c.Nom, c.Nom);
+        foreach (var c in e.Colonnes) bulk.ColumnMappings.Add(c.Nom, c.Nom);
 
-        var valeurs = new object[colonnes.Count];
-        while (await lecteur.ReadAsync(ct))
+        long ecrites = 0, octets = 0;
+        var valeurs = new object[e.Colonnes.Count];
+        // Lecture SYNCHRONE des lignes : en asynchrone, SqlClient lit une grosse valeur binaire en un temps quadratique
+        // (dotnet/SqlClient#593, ouvert ; 20 Mo : 52 s). fix-ok: mesure du 2026-11-22 sur la fermeture de RIG_DEV : 4 lignes de
+        // GED_RIG (GDRG_FICHIER, image) en 137 s, client a 100 % d'un coeur, serveur en ASYNC_NETWORK_IO.
+        while (lecteur.Read())
         {
+            ct.ThrowIfCancellationRequested();
             lecteur.GetValues(valeurs);
             var avant = (object[])valeurs.Clone();
+            if (sauterDejaCopiees && fermeture!.DejaCopiee(e.Table.Id, avant)) continue;
             var change = false;
             for (var i = 0; i < valeurs.Length; i++)
             {
-                if (traitees[i] is not { } traitee || avant[i] is DBNull) continue;
+                if (e.Traitees[i] is not { } traitee || avant[i] is DBNull) continue;
                 traitee.Valeurs++;
-                valeurs[i] = anonymiseur.Appliquer(regles[i], avant[i], colonnes[i].AccepteNull, n => index.TryGetValue(n, out var k) ? avant[k] : null);
+                valeurs[i] = anonymiseur.Appliquer(e.Regles[i], avant[i], e.Colonnes[i].AccepteNull, n => e.Index.TryGetValue(n, out var k) ? avant[k] : null);
                 if (!Equals(valeurs[i], avant[i])) { traitee.Modifiees++; change = true; }
             }
-            if (change && signatures.Any(s => avant[s] is not DBNull)) signeesTouchees++;
+            if (change && e.Signatures.Any(s => avant[s] is not DBNull)) e.SigneesTouchees++;
+            fermeture?.Noter(e.Table.Id, avant);
             lot.Rows.Add(valeurs);
-            lignes++;
-            if (lot.Rows.Count >= o.TailleLot)
+            ecrites++;
+            octets += valeurs.Sum(v => v switch { byte[] b => b.Length, string s => 2L * s.Length, _ => 8L });
+            if (lot.Rows.Count >= tailleLot || octets >= OctetsParLot)
             {
                 await bulk.WriteToServerAsync(lot, ct);
                 lot.Clear();
+                octets = 0;
             }
         }
         if (lot.Rows.Count > 0) await bulk.WriteToServerAsync(lot, ct);
-        if (signeesTouchees > 0) rapport.TablesSigneesTouchees.Add((t.Libelle, signeesTouchees));
-        if (colonnes.Any(c => c.Type is "timestamp" or "rowversion"))
-            rapport.Ignores.Add($"{t.Libelle} : colonne rowversion recopiee en binary(8) (une rowversion ne s'ecrit pas)");
-        return lignes;
+        e.Lignes += ecrites;
+        return ecrites;
+    }
+
+    /// <summary>
+    /// LA FERMETURE (Fermeture.cs) : tour par tour, les lignes parentes que visent les lignes copiees et qui manquent,
+    /// relues dans la source (SELECT seul) et copiees anonymisees, jusqu'a un tour sans ajout. Au rapport : tours, duree,
+    /// lignes ajoutees par table.
+    /// </summary>
+    private static async Task FermerAsync(PorteSource src, SqlConnection cn, FermetureSurLesCles fermeture, Dictionary<int, TableEnCopie> enCopie,
+        Anonymiseur anonymiseur, OptionsCopie o, Rapport rapport, TextWriter journal, CancellationToken ct)
+    {
+        var chrono = System.Diagnostics.Stopwatch.StartNew();
+        var ajouts = new Dictionary<int, long>();
+        rapport.Fermee = true;
+        for (var tour = 1; ; tour++)
+        {
+            long ajouteesTour = 0;
+            foreach (var l in fermeture.Liens)
+            {
+                ct.ThrowIfCancellationRequested();
+                var manquantes = fermeture.AManquer(l);
+                if (manquantes.Count == 0) continue;
+                var e = enCopie[l.Parent.Id];
+                try
+                {
+                    foreach (var (sql, parametres) in FermetureSurLesCles.Lectures(l, e.Colonnes, manquantes))
+                    {
+                        await using var lecteur = await src.LireAsync(sql, ct, parametres);
+                        var n = await EcrireAsync(lecteur, cn, e, anonymiseur, fermeture, sauterDejaCopiees: true, o.TailleLot, ct);
+                        ajouteesTour += n;
+                        ajouts[l.Parent.Id] = ajouts.GetValueOrDefault(l.Parent.Id) + n;
+                    }
+                }
+                catch (Exception ex) when (ex is SqlException or InvalidOperationException)
+                {
+                    throw new InvalidOperationException($"Fermeture, table {l.Parent.Libelle} (cle {l.Enfant.Libelle}.{l.Cle.Nom}) : {ex.Message}", ex);
+                }
+            }
+            rapport.ToursFermeture = tour;
+            journal.WriteLine($"  fermeture sur les cles, tour {tour} : {ajouteesTour} lignes parentes ajoutees");
+            if (ajouteesTour == 0) break;
+        }
+        rapport.DureeFermetureMs = chrono.ElapsedMilliseconds;
+        rapport.LiensFermes = fermeture.Liens.Count;
+        foreach (var (table, n) in ajouts.Where(a => a.Value > 0).OrderBy(a => enCopie[a.Key].Table.Libelle, StringComparer.Ordinal))
+            rapport.AjoutsFermeture.Add((enCopie[table].Table.Libelle, n));
+        foreach (var h in fermeture.HorsFermeture) rapport.Ignores.Add($"cle {h} : hors fermeture (colonne calculee), posee sans verification");
     }
 
     /// <summary>

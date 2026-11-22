@@ -365,12 +365,79 @@ numéros gardés ne sont pas jugés, et l'absence de fuite se prouve sur une cop
 | Arrêt | « interrompu » dans la reprise des **comptes et droits** (SOC-002) : `FK_RoleFonction_Fonction` — les 200 premières lignes de chaque table ne sont pas **fermées sur les clés** (un rôle vise une fonction non copiée) |
 
 Le chronomètre d'une base **entière** demande donc soit une **copie complète** (RIG_DEV : 62,5 Go, un serveur dimensionné
-chez Amitel), soit une copie réduite **fermée sur ses clés étrangères** (comme l'extrait du banc, `ExtraitRigDev`) : à
-ajouter à `Outils\Anonymisation` (lot 6). Le banc, lui, répète jusqu'au bout une base complète de 27 tables.
+chez Amitel), soit une copie réduite **fermée sur ses clés étrangères** (comme l'extrait du banc, `ExtraitRigDev`). La
+seconde est faite au lot 18 : voir « Une base entière sur une copie réduite fermée » ci-dessous.
 
 **Ce qui ne se fait pas d'ici** : les 40 bases des greffes (lecture sur accord de chaque base, chez Amitel, l'anonymisation
 sur le serveur du greffe : CA05) ; le **retard de recopie** (la recopie continue, lot 9, et le simulateur d'une journée
 d'écritures, REC-008 T04, manquent) ; la planification des répétitions avant la bêta (T03, exploitation).
+
+### Une base entière sur une copie réduite fermée (REC-008) — lot 18
+
+La copie réduite est maintenant **fermée sur ses clés étrangères** (`Outils\Anonymisation\Fermeture.cs`, mode d'emploi dans
+`docs\reconstruction\socle-anonymisation.md`, « La copie réduite, fermée sur ses clés ») : les N premières lignes de chaque
+table, puis toutes les lignes parentes qu'elles visent, de proche en proche ; ses clés sont posées **avec** vérification.
+Répétition jouée sur RIG_DEV (SQL-DEV, lecture seule, accord « RIG_DEV »), copie et base V3 sur le SQL Docker du poste,
+supprimées à la fin :
+
+```powershell
+RigV3.Repetition repeter --source "Server=SQL-DEV\DEV;Database=RIG_DEV;Integrated Security=True;…" --accord RIG_DEV `
+    --rapport C:\Users\raphael.vilain\Documents\Autowin\refonte-rig\repetitions --max-lignes 200
+```
+
+Rapport : `C:\Users\raphael.vilain\Documents\Autowin\refonte-rig\repetitions\repetition-20261122-003351.md` (et `.json`) ;
+rapport de la copie : `RIGDEV-anonymisation.md` à côté. Code de sortie **0** : la base est allée au bout, 17 min en tout.
+
+| Étape | Chronomètre | Résultat |
+|---|---|---|
+| Copie anonymisée, réduite à 200 lignes par table | **282,8 s**, dont fermeture **180,3 s** | 860 tables, 1 057 colonnes traitées, 0 anomalie ; 109 342 premières lignes, puis **109 025 lignes parentes dans 112 tables, en 7 tours** (les plus grosses : `ADRESSE_BASE` 14 777, `ENTREPRISE` 10 317, `DOSSIER_RCS` 9 641, `AFFAIRE` 8 916 lignes au total) ; les **789 clés étrangères posées avec vérification**, 0 sans (relu dans `sys.foreign_keys` de la copie : 0 non vérifiée) ; 2,0 Go, dont 531 Mo de documents de `GED_RIG` (le plus gros : 510 Mo) |
+| Contrôle de la copie | **559,7 s** | **vert** : 1 057 colonnes personnelles, 308 653 valeurs et 881 565 mots tirés de RIG_DEV, **aucun retrouvé** ; 396 volumes conformes à la réduction, dont 112 complétés par la fermeture (min(source, 200) + les lignes ajoutées, pas une de plus). Plus long qu'au lot 8 (222 s) : la comparaison des colonnes gardées relit en entier les petites tables à documents (`DOCUMENT_OCERISE` : 551 lignes, 2,2 Go, 2 min à elle seule) |
+| Transfert (règles provisoires du lot 8) | **150,8 s** | **fini** : 861 tables, dont **822 par une règle provisoire** ; 198 613 lignes écrites, 1,14 Go, **0 rejet, 0 lien cassé**. Les reprises passent toutes, dont celle des **comptes et droits (SOC-002)** qui arrêtait le lot 8 : 223 comptes, 5 services, 43 rôles, 412 fonctions, 253 droits. Les trois tables à documents font la moitié du temps : `GED_RIG` 546 Mo en 43,5 s, `DOCUMENT_OCERISE` 191 Mo en 19,8 s, `INPI_REVERSEMENTS` 140 Mo en 13,8 s (10 à 12,5 Mo/s) ; les 858 autres : 73,6 s (0,09 s par table) |
+| Contrôle des deux bases (REC-006) | **6,3 s** | **fini** : 67 362 lignes comparées sur les 11 fiches partagées, **0 écart, 0 lien orphelin, 0 ligne sans correspondance** |
+| Feu vert (`RigV3.Repetition feu`) | — | **rouge**, comme prévu : copie réduite, 822 tables en règle provisoire, retard de recopie non mesuré ; tenus : la base au bout, la fenêtre de nuit, aucun rejet sans règle, aucun écart |
+
+**Ce que la répétition prouve** : le transfert passe sur **les 860 tables réelles de RIG_DEV** (schéma entier, avec des
+données dont tous les liens tiennent) : aucune reprise ne s'arrête — ni SOC-002, ni les compteurs (NUM-005, NUM-013,
+NUM-019), ni les réglages (SOC-003, SOC-004), ni les fiches partagées (REC-012 à REC-019) —, rien n'est rejeté, et le
+contrôle des deux bases ne trouve aucun écart. L'arrêt du lot 8 venait bien de la copie (les N premières lignes ne
+tenaient pas ensemble), pas d'une reprise : aucun défaut de reprise n'est apparu, aucun n'est donc à corriger ici.
+
+**Ce qu'elle ne prouve pas** : la durée d'une base complète (copie réduite : le feu vert la refuse) ; l'absence de fuite
+(dans une copie réduite, la plupart des valeurs tirées n'y sont pas : le banc la prouve sur une copie complète de son
+extrait) ; le retard de recopie (toujours « non mesuré »).
+
+**Extrapolation au volume réel** (estimation d'un poste de développement, **pas CA02**). RIG_DEV, catalogue lu le
+2026-11-22 : 64,0 Go, dont **47,9 Go de données** (tables sans leurs index non groupés, que le transfert ne recopie pas),
+dont **20,0 Go de grandes valeurs** (documents, textes longs) ; 129,7 millions de lignes. Méthode : le coût fixe par table
+mesuré ici, plus le volume divisé par le débit mesuré de son genre ; on garde le plus long du volume et des lignes.
+
+| Étape | Mesure qui sert | Base entière (RIG_DEV) |
+|---|---|---|
+| Transfert : coût fixe | 0,09 s par table (858 tables, 73,6 s) | ≈ 1 min 30 |
+| Transfert : grandes valeurs | 10 à 12,5 Mo/s (`GED_RIG`, `DOCUMENT_OCERISE`, `INPI_REVERSEMENTS`, ci-dessus) | 20,0 Go → 27 à 33 min |
+| Transfert : lignes | 3,8 à 4,2 Mo/s ou 29 000 à 32 000 lignes/s (banc du lot 7, « Mesures ») | 27,8 Go → **1 h 50 à 2 h 02** (aux lignes : 1 h 08 à 1 h 15) |
+| **Transfert, total** | | **≈ 2 h 20 à 2 h 40** — dans la fenêtre de nuit de 10 h (le lot 7 estimait 4 h 16 à 4 h 44 en comptant les index) |
+| Contrôle des deux bases | 10 700 lignes/s (67 362 en 6,3 s, coût fixe compris) | 16,5 millions de lignes dans les 11 fiches partagées → ≈ 26 min au plus |
+| Copie anonymisée complète | 6,7 à 7,1 Mo/s (fermeture : 1,2 Go en 180 s ; copie : 2,0 Go en 283 s) | 47,9 Go → ≈ 2 h, **sans** la reconstruction des index ni le calcul des valeurs fictives sur les textes longs, non mesurés à ce volume |
+| Contrôle de la copie | par tirage : peu sensible au volume | ≈ 10 min |
+
+La nuit du passage (transfert puis contrôle) tiendrait donc en **3 h environ** ; une répétition complète (copie
+anonymisée comprise) en 5 h environ. Une copie complète reste à faire chez Amitel (serveur dimensionné) pour remplacer
+cette estimation par une mesure.
+
+**Ce que la répétition a fait corriger en route** (outil de copie, `Outils\Anonymisation\Copie.cs`, `EcrireAsync`) : la
+lecture des lignes est **synchrone** — en asynchrone, SqlClient lit un gros binaire en un temps quadratique
+([dotnet/SqlClient#593](https://github.com/dotnet/SqlClient/issues/593)) : la fermeture restait sur 4 documents de
+`GED_RIG` (dont un de 510 Mo) plus de 2 min, à 100 % d'un cœur ; ensuite 4 documents en 7 s — et un lot s'écrit dès
+64 Mo (au premier passage, lots bornés en lignes seulement, le processus de copie est monté à 4,3 Go pendant la fermeture
+de `GED_RIG` ; ensuite 255 à 640 Mo). Et un **défaut relevé, non corrigé** : les documents de
+la GED passent en clair dans la copie (`socle-anonymisation.md`, « Défaut relevé au lot 18 »).
+
+**Fichiers du lot 18** : `Outils\Anonymisation\Fermeture.cs` (la fermeture), `Copie.cs` (copie par table réutilisée par
+la fermeture, clés vérifiées, lecture synchrone, lots bornés en octets), `Rapport.cs` (lignes ajoutées, tours, durée) ;
+`Outils\Repetition\Repetition.cs` (contrôle d'une copie réduite fermée : min(source, N) + ajouts) ; bancs
+`tests\SocleAnonymisationCheck` (« copie réduite fermée : aucune clé étrangère orpheline », contre-épreuve sans la
+fermeture) et `tests\RecopieRepriseCheck` (la répétition d'une base réduite fermée va au bout).
 
 ## Fichiers du lot 8
 

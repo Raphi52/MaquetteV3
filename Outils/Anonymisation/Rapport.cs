@@ -34,6 +34,14 @@ public sealed class Rapport
     public long? EcrituresSourceAvant { get; set; }
     public long? EcrituresSourceApres { get; set; }
     public long? MaxLignes { get; set; }
+    /// <summary>Copie reduite fermee sur ses cles etrangeres (Fermeture.cs) : ses cles sont posees avec verification.</summary>
+    public bool Fermee { get; set; }
+    public int ToursFermeture { get; set; }
+    public long DureeFermetureMs { get; set; }
+    /// <summary>Cles etrangeres entre tables copiees que la fermeture a suivies.</summary>
+    public int LiensFermes { get; set; }
+    /// <summary>Lignes parentes ajoutees par la fermeture, par table (en plus des N premieres).</summary>
+    public List<(string Table, long Lignes)> AjoutsFermeture { get; } = [];
     public List<(string Table, long Lignes)> Volumes { get; } = [];
     public List<ColonneTraitee> Colonnes { get; } = [];
     public List<(string Colonne, string Raison)> ARelire { get; } = [];
@@ -60,7 +68,12 @@ public sealed class Rapport
         sb.AppendLine($"- Début : {Debut:yyyy-MM-dd HH:mm:ss}, fin : {Fin:yyyy-MM-dd HH:mm:ss} ({(Fin - Debut).TotalSeconds:0} s)");
         sb.AppendLine($"- Clé des valeurs fictives : {(Reproductible ? "tirée d'une GRAINE (copie reproductible ; refusée pour une source hors de ce poste)" : "aléatoire, effacée de la mémoire en fin de copie : la correspondance est détruite")}");
         sb.AppendLine($"- Accord : {(Accord is null ? "source sur ce poste, pas d'accord requis" : $"donné pour `{Accord}`")}");
-        if (MaxLignes is { } m) sb.AppendLine($"- Copie RÉDUITE : au plus {N(m)} lignes par table (clés étrangères posées sans vérification)");
+        if (MaxLignes is { } m)
+            sb.AppendLine(Fermee
+                ? $"- Copie RÉDUITE : les {N(m)} premières lignes de chaque table, puis FERMÉE sur ses clés étrangères ({LiensFermes} clés suivies) : " +
+                  $"{N(AjoutsFermeture.Sum(a => a.Lignes))} lignes parentes ajoutées dans {AjoutsFermeture.Count} tables, en {ToursFermeture} tours, " +
+                  $"{DureeFermetureMs / 1000.0:0.0} s ; clés étrangères posées AVEC vérification"
+                : $"- Copie RÉDUITE : au plus {N(m)} lignes par table, NON fermée sur ses clés (clés étrangères posées sans vérification)");
         sb.AppendLine($"- **Chaînes signées : {(ChainesInvalidees ? $"INVALIDÉES par l'anonymisation ({N(LignesSigneesTouchees)} lignes signées touchées)" : "aucune ligne signée touchée")}**");
         sb.AppendLine();
 
@@ -75,6 +88,13 @@ public sealed class Rapport
         sb.AppendLine("| Table | Lignes copiées |").AppendLine("|---|---:|");
         foreach (var (t, n) in Volumes) sb.AppendLine($"| {t} | {N(n)} |");
         sb.AppendLine();
+        if (Fermee)
+        {
+            sb.AppendLine("Dont lignes parentes ajoutées par la fermeture sur les clés étrangères :").AppendLine();
+            sb.AppendLine("| Table | Lignes ajoutées |").AppendLine("|---|---:|");
+            foreach (var (t, n) in AjoutsFermeture) sb.AppendLine($"| {t} | {N(n)} |");
+            sb.AppendLine();
+        }
 
         sb.AppendLine("## Colonnes anonymisées (CA01, CA02)").AppendLine();
         sb.AppendLine("| Colonne | Traitement | Origine de la règle | Valeurs | Modifiées |").AppendLine("|---|---|---|---:|---:|");
