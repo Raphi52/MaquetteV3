@@ -399,20 +399,33 @@ Exiger(modifier?.Number == GardeAffaires.ErreurAncienneAffaire && modifier.Messa
 
 // CA04 : les echanges d'une ancienne affaire, lus dans la base des echanges (EDI_GREFFE) par code greffe et identifiant V2.
 await using var edi = await BaseJetable.CreerAsync("RecopieRetourEdi");
-// Les deux tables de la base des echanges, colonnes lues sur EDI_GREFFE_2025 de SQL-DEV le 2026-11-21 (celles que l'historique lit).
+// Les tables de la base des echanges, colonnes lues sur EDI_GREFFE_2025 de SQL-DEV le 2026-11-21 (celles que l'historique lit) ; les
+// tables d'etats et leurs libelles, lus sur la meme base le 2026-11-22 (FLUX_SORTANT_ETAT : 0, 1, 2, 6, 7 ; FLUX_ENTRANT_ETAT : 0, 1, 2, 7).
 await Executer(edi.Connexion, """
     CREATE TABLE dbo.FLUX_SORTANT (FLUSOR_ID_FLUSOR int IDENTITY PRIMARY KEY, FLUSOR_CODE_EDI varchar(20) NOT NULL, FLUSOR_CODE_GREFFE char(4) NOT NULL,
         FLUSOR_ETAT int NOT NULL, FLUSOR_RIG_ID int NULL, FLUSOR_REFERENCE varchar(1024) NULL, FLUSOR_DATE_CREATION datetime NOT NULL, FLUSOR_ERREUR varchar(max) NULL);
     CREATE TABLE dbo.FLUX_ENTRANT (FLUENT_ID_FLUENT int IDENTITY PRIMARY KEY, FLUENT_CODE_EDI varchar(20) NOT NULL, FLUENT_CODE_GREFFE char(4) NOT NULL,
         FLUENT_ETAT int NOT NULL, FLUENT_RIG_ID int NULL, FLUENT_REFERENCE varchar(1024) NULL, FLUENT_DATE_CREATION datetime NOT NULL, FLUENT_ERREUR varchar(max) NULL);
+    CREATE TABLE dbo.FLUX_SORTANT_ETAT (FLSOET_ID_FLSOET int NOT NULL PRIMARY KEY, FLSOET_LIBELLE varchar(50) NOT NULL, FLSOET_DESCRIPTION varchar(max) NOT NULL);
+    CREATE TABLE dbo.FLUX_ENTRANT_ETAT (FLENET_ID_FLENET int NOT NULL PRIMARY KEY, FLENET_LIBELLE varchar(50) NOT NULL, FLENET_DESCRIPTION varchar(max) NOT NULL);
+    INSERT INTO dbo.FLUX_SORTANT_ETAT VALUES (0, 'Annulé', ''), (1, 'Extrait avec succès', ''), (2, 'Intégré avec succès', ''), (6, 'Erreur d''extraction', ''),
+        (7, 'Erreur d''intégration', '');
+    INSERT INTO dbo.FLUX_ENTRANT_ETAT VALUES (0, 'Annulé', ''), (1, 'Extrait avec succès', ''), (2, 'Intégré avec succès', ''), (7, 'Erreur d''intégration', '');
     """);
 var demandeEchange = (await Texte(v3.Connexion, $"SELECT TOP (1) CONVERT(varchar(20), d.DMND_ID_DMND) FROM v2.DEMANDE AS d WHERE d.DMND_ID_AFFRE = {ancienneAffaire} ORDER BY 1"))!;
 var demandeEchangeV2 = (await V2De("v2.DEMANDE", demandeEchange))!;
+// Quatre flux de la demande : un envoi en echec d'integration (7) avec son message, un envoi en echec d'extraction (6, que seule la table
+// des etats SORTANTS a : une jointure croisee sur FLUX_ENTRANT_ETAT le rendrait sans libelle), une reception integree (2), une reception
+// dans un etat que la base ne decrit pas (5 : repli sur le numero).
 await Executer(edi.Connexion, $"""
-    INSERT INTO dbo.FLUX_SORTANT (FLUSOR_CODE_EDI, FLUSOR_CODE_GREFFE, FLUSOR_ETAT, FLUSOR_RIG_ID, FLUSOR_REFERENCE, FLUSOR_DATE_CREATION)
-        VALUES ('INPI_FORMALITE', '{Greffe}', 7, {demandeEchangeV2}, 'envoi banc', '2026-11-02 10:00'), ('INPI_FORMALITE', '5601', 7, {demandeEchangeV2}, 'autre greffe', '2026-11-02 10:00');
+    INSERT INTO dbo.FLUX_SORTANT (FLUSOR_CODE_EDI, FLUSOR_CODE_GREFFE, FLUSOR_ETAT, FLUSOR_RIG_ID, FLUSOR_REFERENCE, FLUSOR_DATE_CREATION, FLUSOR_ERREUR)
+        VALUES ('INPI_FORMALITE', '{Greffe}', 7, {demandeEchangeV2}, 'envoi banc', '2026-11-02 10:00', 'Pièce jointe absente'),
+               ('INPI_FORMALITE', '{Greffe}', 6, {demandeEchangeV2}, 'extraction banc', '2026-11-02 11:00', 'Demande illisible'),
+               ('INPI_FORMALITE', '5601', 7, {demandeEchangeV2}, 'autre greffe', '2026-11-02 10:00', NULL);
     INSERT INTO dbo.FLUX_ENTRANT (FLUENT_CODE_EDI, FLUENT_CODE_GREFFE, FLUENT_ETAT, FLUENT_RIG_ID, FLUENT_REFERENCE, FLUENT_DATE_CREATION, FLUENT_ERREUR)
-        VALUES ('INPI_RETOUR', '{Greffe}', 2, {demandeEchangeV2}, 'accuse banc', '2026-11-03 09:00', NULL), ('INPI_RETOUR', '{Greffe}', 2, 999999999, 'autre demande', '2026-11-03 09:00', NULL);
+        VALUES ('INPI_RETOUR', '{Greffe}', 2, {demandeEchangeV2}, 'accuse banc', '2026-11-03 09:00', NULL),
+               ('INPI_RETOUR', '{Greffe}', 5, {demandeEchangeV2}, 'etat inconnu', '2026-11-03 10:00', NULL),
+               ('INPI_RETOUR', '{Greffe}', 2, 999999999, 'autre demande', '2026-11-03 09:00', NULL);
     """);
 await using (var cn = new SqlConnection(v3.Connexion))
 {
@@ -422,12 +435,22 @@ await using (var cn = new SqlConnection(v3.Connexion))
     var sansBase = await HistoriqueAffaires.LireAsync(cn, v2.Nom, Greffe, "siren", siren, null, default);
     var attendus = await Nombre(edi.Connexion, $"SELECT (SELECT COUNT(*) FROM dbo.FLUX_SORTANT WHERE FLUSOR_CODE_GREFFE = '{Greffe}' AND FLUSOR_RIG_ID = {demandeEchangeV2}) " +
                                                 $"+ (SELECT COUNT(*) FROM dbo.FLUX_ENTRANT WHERE FLUENT_CODE_GREFFE = '{Greffe}' AND FLUENT_RIG_ID = {demandeEchangeV2})");
-    Exiger(a.Echanges.Length == attendus && attendus == 2 && a.Echanges.Any(e => e is { Sens: "envoi", Etat: 7 }) && a.Echanges.Any(e => e is { Sens: "réception", Etat: 2 })
+    // fix-ok: l'etat des echanges sortait en numero (« 7 ») faute de joindre FLUX_SORTANT_ETAT / FLUX_ENTRANT_ETAT ; ce controle
+    // mesure rouge avant la jointure (« etat 7 « 7 » »), vert apres (22/11/2026).
+    // L'etat se lit en clair (le libelle de la base des echanges), un echec est marque avec son message : un agent qui lit « 7 » ne
+    // voit pas que l'envoi a echoue (refus du chef du 22/11/2026 sur la premiere version de l'ecran).
+    EchangeHistorique? Flux(string reference) => a.Echanges.SingleOrDefault(e => e.Reference == reference);
+    Exiger(a.Echanges.Length == attendus && attendus == 4
+           && Flux("envoi banc") is { Sens: "envoi", Etat: 7, EtatLibelle: "Erreur d'intégration", EnErreur: true, Erreur: "Pièce jointe absente" }
+           && Flux("extraction banc") is { Sens: "envoi", Etat: 6, EtatLibelle: "Erreur d'extraction", EnErreur: true }
+           && Flux("accuse banc") is { Sens: "réception", Etat: 2, EtatLibelle: "Intégré avec succès", EnErreur: false }
+           && Flux("etat inconnu") is { Sens: "réception", Etat: 5, EtatLibelle: "5", EnErreur: false }
            && a.Echanges.All(e => e.Reference is not ("autre greffe" or "autre demande")) && a.EchangesNote is null
            && sansBase.Affaires.Single(x => x.Id == a.Id).EchangesNote?.Contains("Recopie:BaseEchanges") == true,
         $"REC-010 CA04 (T08) : l'ancienne affaire {a.Id} liste ses {a.Echanges.Length} echanges de la base des echanges (la base en a {attendus} pour ce greffe et la demande " +
-        $"{demandeEchangeV2} de la V2) avec leur etat : {string.Join(" ; ", a.Echanges.Select(e => $"{e.Sens} {e.CodeEdi} etat {e.Etat} ({e.Demande})"))} ; ni l'autre greffe ni " +
-        "l'autre demande ; sans base des echanges reglee, l'historique le dit");
+        $"{demandeEchangeV2} de la V2) avec leur etat en clair : {string.Join(" ; ", a.Echanges.Select(e => $"{e.Sens} {e.CodeEdi} etat {e.Etat} « {e.EtatLibelle} »" +
+        $"{(e.EnErreur ? $" EN ERREUR ({e.Erreur})" : "")} ({e.Demande})"))} ; 7 = « Erreur d'intégration » et 6 = « Erreur d'extraction » marques en erreur, un etat sans " +
+        "libelle rendu par son numero ; ni l'autre greffe ni l'autre demande ; sans base des echanges reglee, l'historique le dit");
 }
 
 // CA05 : le client d'une ancienne affaire est la fiche de la V3 (la V3 fait foi), relue apres une modification dans la V3.
@@ -824,7 +847,8 @@ Exiger(temoin07.Orphelins == 2 && orphelinsTemoin.All(d => d.Colonnes == "DMND_I
     $"REC-007 CA07 contre-epreuve : la correspondance de l'affaire rendue {affaireTemoin} mise de cote, le controle de nuit liste {temoin07.Orphelins} lien(s) orphelin(s) " +
     $"(attendu : ses demandes {string.Join(" et ", demandesTemoin)}){ATraiterEnClair(temoin07)}");
 
-Reste("REC-007 CA07 sur la copie anonymisee d'un greffe beta avec un mois d'affaires simulees : depend de la nouvelle reception du lot 6 et d'un greffe beta (Le Puy, Chartres, Vienne) ; " +
+Reste("REC-007 CA07 sur la copie anonymisee d'un greffe beta avec un mois d'affaires simulees : attend un vrai greffe beta (Le Puy, Chartres, Vienne), la copie anonymisee " +
+      "(lot 6) est recue ; " +
       "ici une base tiree de RIG_DEV et un mois simule de 120 affaires");
 
 return await Fin();

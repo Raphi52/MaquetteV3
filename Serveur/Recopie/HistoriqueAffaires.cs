@@ -285,7 +285,10 @@ public static class HistoriqueAffaires
     /// Les envois et receptions de la base des echanges (EDI_GREFFE) de ces demandes : FLUX_SORTANT / FLUX_ENTRANT par code greffe
     /// et identifiant V2 (FLUSOR_RIG_ID, FLUENT_RIG_ID). Lecture seule (LectureV2). Seuls les flux dont l'identifiant RIG est
     /// celui d'une demande sont relies : c'est le cas courant des receptions (DMND_ID_DMND, 14 affectations dans Source\Edi) ;
-    /// les autres (dossier, tables de dematerialisation) le seront par la story Echanges de leur flux.
+    /// les autres (dossier, tables de dematerialisation) le seront par la story Echanges de leur flux. L'etat se lit en clair :
+    /// le libelle de sa table d'etats (FLUX_SORTANT_ETAT pour un envoi, FLUX_ENTRANT_ETAT pour une reception -- 6 « Erreur
+    /// d'extraction » n'existe que dans la premiere), celui que la V2 affiche (FluxSortantEtats.GetLibelle) ; un etat que la
+    /// table ne decrit pas garde son numero.
     /// </summary>
     internal static async Task<(List<EchangeHistorique> Echanges, string? Note)> EchangesAsync(string? connexionEchanges, string codeGreffe,
                                                                                             IReadOnlyList<DemandeHistorique> demandes, CancellationToken ct)
@@ -300,15 +303,22 @@ public static class HistoriqueAffaires
             await using var cn = new SqlConnection(new SqlConnectionStringBuilder(connexionEchanges) { ApplicationIntent = ApplicationIntent.ReadOnly }.ConnectionString);
             await cn.OpenAsync(ct);
             await using var l = await LectureV2.LireAsync(cn,
-                "SELECT N'envoi', FLUSOR_ID_FLUSOR, FLUSOR_CODE_EDI, FLUSOR_ETAT, FLUSOR_DATE_CREATION, FLUSOR_REFERENCE, FLUSOR_ERREUR, FLUSOR_RIG_ID " +
-                $"FROM dbo.FLUX_SORTANT WHERE FLUSOR_CODE_GREFFE = @g AND FLUSOR_RIG_ID IN ({ids}) " +
-                "UNION ALL SELECT N'réception', FLUENT_ID_FLUENT, FLUENT_CODE_EDI, FLUENT_ETAT, FLUENT_DATE_CREATION, FLUENT_REFERENCE, FLUENT_ERREUR, FLUENT_RIG_ID " +
-                $"FROM dbo.FLUX_ENTRANT WHERE FLUENT_CODE_GREFFE = @g AND FLUENT_RIG_ID IN ({ids})", ct,
+                "SELECT N'envoi', s.FLUSOR_ID_FLUSOR, s.FLUSOR_CODE_EDI, s.FLUSOR_ETAT, e.FLSOET_LIBELLE, s.FLUSOR_DATE_CREATION, s.FLUSOR_REFERENCE, " +
+                "s.FLUSOR_ERREUR, s.FLUSOR_RIG_ID FROM dbo.FLUX_SORTANT AS s LEFT JOIN dbo.FLUX_SORTANT_ETAT AS e ON e.FLSOET_ID_FLSOET = s.FLUSOR_ETAT " +
+                $"WHERE s.FLUSOR_CODE_GREFFE = @g AND s.FLUSOR_RIG_ID IN ({ids}) " +
+                "UNION ALL SELECT N'réception', f.FLUENT_ID_FLUENT, f.FLUENT_CODE_EDI, f.FLUENT_ETAT, e.FLENET_LIBELLE, f.FLUENT_DATE_CREATION, f.FLUENT_REFERENCE, " +
+                "f.FLUENT_ERREUR, f.FLUENT_RIG_ID FROM dbo.FLUX_ENTRANT AS f LEFT JOIN dbo.FLUX_ENTRANT_ETAT AS e ON e.FLENET_ID_FLENET = f.FLUENT_ETAT " +
+                $"WHERE f.FLUENT_CODE_GREFFE = @g AND f.FLUENT_RIG_ID IN ({ids})", ct,
                 new SqlParameter("@g", SqlDbType.Char, 4) { Value = codeGreffe });
             while (await l.ReadAsync(ct))
-                r.Add(new EchangeHistorique(l.GetString(0), l.GetInt32(1), l.GetString(2), l.GetInt32(3), l.GetDateTime(4),
-                                            l.IsDBNull(5) ? null : l.GetString(5), l.IsDBNull(6) ? null : l.GetString(6),
-                                            l.IsDBNull(7) ? null : l.GetInt32(7).ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            {
+                var etat = l.GetInt32(3);
+                var libelle = l.IsDBNull(4) || string.IsNullOrWhiteSpace(l.GetString(4))
+                    ? etat.ToString(System.Globalization.CultureInfo.InvariantCulture) : l.GetString(4).Trim();
+                r.Add(new EchangeHistorique(l.GetString(0), l.GetInt32(1), l.GetString(2), etat, libelle, EchangeHistorique.EtatEnErreur(etat), l.GetDateTime(5),
+                                            l.IsDBNull(6) ? null : l.GetString(6), l.IsDBNull(7) ? null : l.GetString(7),
+                                            l.IsDBNull(8) ? null : l.GetInt32(8).ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            }
         }
         catch (SqlException e)
         {

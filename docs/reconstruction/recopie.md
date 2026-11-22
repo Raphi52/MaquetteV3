@@ -860,7 +860,13 @@ entre demandes disparaissaient (`etroit-avant-correctif-clair.png`) : chaque tab
 (`grille()` de l'écran) et défile au-delà ; contrôle « fenêtre étroite » de `EcranHistoriqueV2.test.tsx`.
 
 Les échanges (REC-010 CA04) se lisent dans la base des échanges (`EDI_GREFFE`, `FLUX_SORTANT` / `FLUX_ENTRANT`, lecture seule)
-par code greffe et identifiant V2 de chaque demande ; réglage `Recopie:BaseEchanges` (absent : l'écran le dit).
+par code greffe et identifiant V2 de chaque demande ; réglage `Recopie:BaseEchanges` (absent : l'écran le dit). L'état d'un
+flux s'affiche en clair, avec le libellé de la base des échanges (`FLUX_SORTANT_ETAT` pour un envoi, `FLUX_ENTRANT_ETAT` pour
+une réception, comme la V2 : `FluxSortantEtats.GetLibelle`) ; un état qu'elle ne décrit pas garde son numéro. Un échec
+(6 « Erreur d'extraction », 7 « Erreur d'intégration ») est marqué, avec son message (`FLUSOR_ERREUR`, `FLUENT_ERREUR`) :
+la première version affichait « 7 », et l'agent ne voyait pas que l'envoi avait échoué (refus du 22/11/2026). Captures
+`echanges-etat-clair.png` et `echanges-etat-sombre.png` du même dossier.
+<!-- fix-ok: l'etat des echanges sortait en numero faute de joindre FLUX_SORTANT_ETAT / FLUX_ENTRANT_ETAT (banc RecopieRetour rouge avant, vert apres, 22/11/2026) -->
 
 ### Revenir à l'ancien RIG pendant la bêta (REC-007)
 
@@ -910,7 +916,7 @@ Mesuré le 2026-11-22 : avant cette lecture, 497 liens orphelins pendant la bêt
 
 | Critère | Ce qui manque | Où |
 |---|---|---|
-| REC-007 CA07 sur la copie anonymisée d'un greffe bêta (un mois d'affaires simulées) | la nouvelle réception du lot 6 et un greffe bêta (Le Puy, Chartres, Vienne) ; mesuré ici sur RIG_DEV : 370 lignes en 6,5 s, extrapolé au mois le plus chargé de RIG_DEV (35 180 demandes) à 16 min | REC-008 (lot 18) |
+| REC-007 CA07 sur la copie anonymisée d'un greffe bêta (un mois d'affaires simulées) | un vrai greffe bêta (Le Puy, Chartres, Vienne) — la copie anonymisée (lot 6) est reçue (22/11/2026) ; mesuré ici sur RIG_DEV : 370 lignes en 6,5 s, extrapolé au mois le plus chargé de RIG_DEV (35 180 demandes) à 16 min | REC-008 (lot 18) |
 | REC-007 dans l'outil du passage | `RigV3.Passage retour` (`Outils\Passage\MoteurPassage.cs`, `RevenirAsync`) joue `retour.sql` ; le retour des affaires se lance par sa route, avant | lot 13 / 17 |
 | REC-007 T04 (procédure de retour : préavis, fenêtre, communication) | écrite par l'exploitation d'Amitel | exploitation |
 | REC-009 T05 (comptage sur les 40 bases) | les bases des greffes ne se lisent pas d'ici sans accord | répétition REC-008 (lot 18) |

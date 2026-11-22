@@ -70,7 +70,19 @@ public sealed record DemandeHistorique(int Id, string? IdV2, string Logiciel, st
 /// <summary>Un envoi ou une reception tracee dans la base des echanges (EDI_GREFFE) pour une demande (REC-010 CA04).</summary>
 /// <param name="Sens">« envoi » (FLUX_SORTANT) ou « réception » (FLUX_ENTRANT).</param>
 /// <param name="Etat">L'etat du flux dans la base des echanges (son numero, tel qu'elle le tient).</param>
-public sealed record EchangeHistorique(string Sens, int Id, string CodeEdi, int Etat, DateTime Le, string? Reference, string? Erreur, string? Demande);
+/// <param name="EtatLibelle">Ce que l'agent lit : le libelle de la base des echanges (FLUX_SORTANT_ETAT, FLUX_ENTRANT_ETAT), comme la
+/// V2 l'affiche (FluxSortantEtats.GetLibelle) ; le numero seul si la base n'a pas de libelle pour lui.</param>
+/// <param name="EnErreur">Le flux a echoue (<see cref="EtatEnErreur"/>) : l'ecran le marque, avec <paramref name="Erreur"/>.</param>
+public sealed record EchangeHistorique(string Sens, int Id, string CodeEdi, int Etat, string EtatLibelle, bool EnErreur, DateTime Le, string? Reference,
+                                       string? Erreur, string? Demande)
+{
+    /// <summary>
+    /// Un etat d'echec de la base des echanges : 6 « Erreur d'extraction » (envoi) et 7 « Erreur d'integration » (envoi et reception),
+    /// les seuls des enums de la V2 (Source\Edi\DLL\EdiTools\FluxSortant.cs:349 FluxSortantEtat, FluxEntrant.cs:349 FluxEntrantEtat) ;
+    /// 0 annule, 1 extrait et 2 integre ne le sont pas.
+    /// </summary>
+    public static bool EtatEnErreur(int etat) => etat is 6 or 7;
+}
 
 /// <summary>Une affaire de l'historique.</summary>
 /// <param name="Logiciel">Ou elle se traite (<see cref="Origines.V2"/> : une ancienne affaire, en lecture seule dans la V3).</param>

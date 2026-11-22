@@ -29,7 +29,12 @@ function vue(partiel: Partial<VueEcranHistorique> = {}): VueEcranHistorique {
                          liens: [{ lien: 'bloquée par', idDemande: 9001, numero: 'D2607903046', logiciel: 'ancien RIG', etat: 'Q', etatLibelle: 'qualifiée', leve: false, leveLe: null }] })],
   })
   const ancienne = affaire({
-    echanges: [{ sens: 'envoi', id: 41207, codeEdi: 'INPI_FORMALITE', etat: 7, le: '2026-10-11T12:30:00', reference: 'Dépôt des comptes 2025', erreur: null, demande: 'D2607903047' }],
+    echanges: [
+      { sens: 'envoi', id: 41207, codeEdi: 'INPI_FORMALITE', etat: 7, etatLibelle: "Erreur d'intégration", enErreur: true, le: '2026-10-11T12:30:00',
+        reference: 'Dépôt des comptes 2025', erreur: 'Pièce jointe absente', demande: 'D2607903047' },
+      { sens: 'réception', id: 52119, codeEdi: 'INPI_RETOUR', etat: 2, etatLibelle: 'Intégré avec succès', enErreur: false, le: '2026-10-12T09:00:00',
+        reference: 'Accusé de réception INPI', erreur: null, demande: 'D2607903047' },
+    ],
   })
   return {
     mode: 'serveur', message: null, greffe: '8002', critere: 'siren', valeur: '512345678', arrivee: null, anciens: [], reprises: [],
@@ -80,7 +85,13 @@ describe('EcranHistoriqueV2', () => {
     expect(detail.textContent).toContain("Cette affaire se traite dans l'ancien RIG : la V3 la montre en lecture seule")
     const echanges = within(detail).getByRole('table', { name: 'Échanges' })
     expect(echanges.textContent).toContain('INPI_FORMALITE')
-    expect(echanges.textContent).toContain('7')
+    // L'etat en clair, l'echec marque avec son message : « 7 » seul ne dit pas a l'agent que l'envoi a echoue (refus du 22/11/2026).
+    const [envoi, reception] = within(echanges).getAllByRole('row').slice(1)
+    const etatEnvoi = within(envoi!).getByText("Erreur d'intégration")
+    expect(etatEnvoi.className).toContain('rig-etat--alerte')
+    expect(envoi!.textContent).toContain('Pièce jointe absente')
+    expect(envoi!.textContent).not.toMatch(/(^|\D)7(\D|$)/)
+    expect(within(reception!).getByText('Intégré avec succès').className).not.toContain('rig-etat--alerte')
     expect(document.body.querySelector('button.rig-bouton--fort')?.textContent).toBe('Rechercher')
   })
 

@@ -179,8 +179,13 @@ public static class EcranHistoriqueV2
             };
         var echanges = new[]
         {
-            new EchangeHistorique("envoi", 41207, "INPI_FORMALITE", 7, Jour.AddDays(-37).AddHours(3), "Dépôt des comptes 2025", null, "D2607903047"),
-            new EchangeHistorique("réception", 52119, "INPI_RETOUR", 2, Jour.AddDays(-36), "Accusé de réception INPI", null, "D2607903047"),
+            // Les libelles sont ceux de la base des echanges (FLUX_SORTANT_ETAT, FLUX_ENTRANT_ETAT d'EDI_GREFFE_2025, SQL-DEV, lus le 22/11/2026).
+            new EchangeHistorique("envoi", 41207, "INPI_FORMALITE", 7, "Erreur d'intégration", EchangeHistorique.EtatEnErreur(7), Jour.AddDays(-37).AddHours(3),
+                                  "Dépôt des comptes 2025", "Pièce jointe absente : le fichier des comptes annuels n'a pas été trouvé.", "D2607903047"),
+            new EchangeHistorique("envoi", 41231, "INPI_FORMALITE", 2, "Intégré avec succès", EchangeHistorique.EtatEnErreur(2), Jour.AddDays(-37).AddHours(5),
+                                  "Dépôt des comptes 2025", null, "D2607903047"),
+            new EchangeHistorique("réception", 52119, "INPI_RETOUR", 2, "Intégré avec succès", EchangeHistorique.EtatEnErreur(2), Jour.AddDays(-36),
+                                  "Accusé de réception INPI", null, "D2607903047"),
         };
         var affaires = new[]
         {

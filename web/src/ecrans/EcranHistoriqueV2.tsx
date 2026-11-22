@@ -54,6 +54,10 @@ export interface EchangeHistorique {
   id: number
   codeEdi: string
   etat: number
+  /** Le libelle de la base des echanges (« Erreur d'intégration ») ; le numero seul si elle n'en a pas. */
+  etatLibelle: string
+  /** Le flux a echoue (6, 7) : l'ecran le marque, avec son message d'erreur. */
+  enErreur: boolean
   le: string
   reference: string | null
   erreur: string | null
@@ -167,7 +171,9 @@ function grille(largeurs: (number | null)[], style: CSSProperties = {}) {
 }
 const GrilleAffaires = grille([null, 120, 170, 96, 190])
 const GrilleDemandes = grille([118, null, 112, 120, 104, 92], { marginTop: 'var(--rig-esp-2)' })
-const GrilleEchanges = grille([96, 150, 64, 124, null], { marginTop: 'var(--rig-esp-2)' })
+// L'etat est un libelle (« Erreur d'intégration », 20 lettres), pas un numero : sa colonne le tient en entier.
+const GrilleEchanges = grille([96, 150, 170, 124, null], { marginTop: 'var(--rig-esp-2)' })
+const MessageErreur = { ...Coupe, color: 'var(--rig-alerte)', fontSize: 'var(--rig-fs-dense)' } as const
 const GrilleAnciens = grille([96, 170, null, 130, 150, 110])
 const GrilleReprises = grille([110, null, 280, 110])
 
@@ -349,8 +355,15 @@ export function EcranHistoriqueV2() {
                     <tbody>
                       {detail.echanges.map((e) => (
                         <tr key={`${e.sens}${e.id}`}>
-                          <td>{e.sens}</td><td style={Coupe}>{e.codeEdi}</td><td>{e.etat}</td><td>{date(e.le)}</td>
-                          <td style={Coupe} title={e.erreur ?? e.reference ?? undefined}>{e.reference ?? '—'}{e.demande ? ` · ${e.demande}` : ''}</td>
+                          <td>{e.sens}</td><td style={Coupe}>{e.codeEdi}</td>
+                          <td style={Coupe} title={`État ${e.etat} de la base des échanges`}>
+                            {e.enErreur ? <span className="rig-etat rig-etat--alerte">{e.etatLibelle}</span> : e.etatLibelle}
+                          </td>
+                          <td>{date(e.le)}</td>
+                          <td>
+                            <div style={Coupe} title={e.reference ?? undefined}>{e.reference ?? '—'}{e.demande ? ` · ${e.demande}` : ''}</div>
+                            {e.enErreur && e.erreur && <div style={MessageErreur} title={e.erreur}>{e.erreur}</div>}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
