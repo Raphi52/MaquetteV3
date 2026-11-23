@@ -1044,10 +1044,13 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         if (e is not null) OuvrirProc(new Proc(code, e.Libelle));
     }
 
+    /// <summary>Toutes les entrees du menu de l'accueil, tous moments confondus.</summary>
+    private IEnumerable<Pont.EntreeMenu> EntreesDuMenu
+        => Moments.SelectMany(m => m.Sous).SelectMany(s => s.Entrees);
+
     /// <summary>L'entree de menu qui porte un code, ou null.</summary>
     private Pont.EntreeMenu? EntreeDeCode(string code)
-        => Moments.SelectMany(m => m.Sous).SelectMany(s => s.Entrees)
-                  .FirstOrDefault(x => x.Code == code);
+        => EntreesDuMenu.FirstOrDefault(x => x.Code == code);
 
     /// <summary>Le catalogue des ecrans portes depuis RIG v2 (Pont/CatalogueEcrans.cs, la seule
     /// source de leurs noms), sous la forme que la session aiguille : il sert d'aiguillage, de
@@ -1274,16 +1277,41 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         .. FondsDemo
     ];
 
-    /// <summary>Les TRAITEMENTS dont le libelle porte ce qui est tape. Le menu de
-    /// gauche suppose qu'on sait deja quel outil repond au besoin ; la recherche,
-    /// elle, part des mots de l'utilisateur. Taper « facture » doit donc proposer
-    /// l'ecran des factures, exactement comme taper un SIREN propose l'affaire.</summary>
+    /// <summary>Les entrees du menu, vues comme des traitements (meme code, meme libelle).</summary>
+    private IEnumerable<Proc> ProcsDuMenu => EntreesDuMenu.Select(e => new Proc(e.Code, e.Libelle));
+
+    // fix-ok: TraitementsPour mettait les Groupes avant le menu, sans tri par rang, puis coupait
+    // a 4 (Take). Mesure par PaletteCheck avant ce correctif : 5 libelles du menu hors tete
+    // (Requisitions, Redaction, Archivage, Clients, Fiche client), et « EDI » ne faisait pas
+    // figurer les deux ecrans du menu qui commencent par ce mot.
+    /// <summary>Les TRAITEMENTS dont le libelle porte ce qui est tape. Le menu de l'accueil
+    /// passe d'abord : il porte aussi des ecrans absents du plan (« Mandataires », « Tables de
+    /// reference »). Puis vient le plan de travail (Groupes). Le libelle tape en entier passe en
+    /// tete, puis celui qui commence par lui (RangDuLibelle) : Entree ouvre le premier. Le plafond
+    /// de 4 coupe ce qui vient apres : un ecran du menu ne sort que s'il y a quatre libelles de
+    /// rang egal ou meilleur devant lui, jamais au profit d'un ecran du plan qui ne fait que le
+    /// contenir. A rang egal, l'ordre menu puis plan reste. Un code present dans les deux sources
+    /// ne sort qu'une fois, sous le libelle qui l'a trouve. Le menu de gauche suppose qu'on sait
+    /// deja quel outil repond au besoin ; la recherche, elle, part des mots de l'utilisateur. Taper
+    /// « facture » doit donc proposer l'ecran des factures, exactement comme taper un SIREN propose
+    /// l'affaire.</summary>
     private Proc[] TraitementsPour(string terme)
-        => [.. Groupes.SelectMany(g => g.Procs)
-                      .Where(p => PerimetreProfil.Visible(p.Code, Domaines))
-                      .Where(p => RecherchePalette.Correspond(terme, p.Libelle))
-                      .DistinctBy(p => p.Code)
-                      .Take(4)];
+        => [.. ProcsDuMenu.Concat(Groupes.SelectMany(g => g.Procs))
+               .Where(p => PerimetreProfil.Visible(p.Code, Domaines))
+               .Where(p => RecherchePalette.Correspond(terme, p.Libelle))
+               .OrderBy(p => RangDuLibelle(terme, p.Libelle))
+               .DistinctBy(p => p.Code)
+               .Take(4)];
+
+    /// <summary>Le rang d'un libelle devant ce qui est tape : 0 s'il est exactement cela, 1 s'il
+    /// commence par cela, 2 s'il ne fait que le contenir. Plie comme la recherche (accents, casse,
+    /// espaces ignores) : « Clients » passe avant « Gestion clients ».</summary>
+    private static int RangDuLibelle(string terme, string libelle)
+    {
+        var tape = RecherchePalette.Plier(terme);
+        var lu = RecherchePalette.Plier(libelle);
+        return lu == tape ? 0 : lu.StartsWith(tape, StringComparison.Ordinal) ? 1 : 2;
+    }
 
     /// <summary>Un ELEMENT de l'arbre trouve par la recherche : l'affaire qui
     /// le porte et son chemin de libelles depuis la racine.</summary>
