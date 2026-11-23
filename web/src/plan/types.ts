@@ -141,6 +141,8 @@ export interface EcranProcVue {
   recherche: PaletteVue | null
   /** L'affaire depuis laquelle l'ecran a ete ouvert (barre d'actions du dossier) ; null sinon. */
   dossier: ContexteDossierVue | null
+  /** Le descripteur d'un ecran generique (Pont/EcransGeneres/), monte par EcranGenere ; null : ecran « a venir ». */
+  descripteur: DescripteurEcranVue | null
 }
 /** Le contexte d'une affaire transmis a l'ecran ouvert pour elle (Pont/PlanTravailActions.cs). */
 export interface ContexteDossierVue {
@@ -151,6 +153,26 @@ export interface ContexteDossierVue {
   /** La denomination, sinon l'objet de l'affaire. */
   nom: string
 }
+
+// ---- L'ecran generique (Pont/EcransGeneres/DescripteurEcran) : le contenu d'une procedure ----
+export interface DescripteurEcranVue {
+  code: string
+  titre: string
+  sujet: string
+  recherche: string
+  criteres: string[]
+  valider: string
+  /** La teinte du verbe du menu : la classe rig-tcw__rang-N. */
+  rang: number
+  etats: EtatEcranVue[]
+  groupes: string[]
+  marches: MarcheEcranVue[]
+  lignes: LigneEcranVue[]
+}
+/** Une tuile : son code (AFaire, EnCours, Validee, EnAttente, Rejetee) et son icone de l'accueil. */
+export interface EtatEcranVue { code: string; libelle: string; icone: string }
+export interface MarcheEcranVue { titre: string; consigne: string; obligatoire: boolean; champs: string[] }
+export interface LigneEcranVue { nom: string; precisions: string; groupe: string; etat: string; faites: number[] }
 
 // ---- La visionneuse d'affaire ----
 export interface DossierVue {

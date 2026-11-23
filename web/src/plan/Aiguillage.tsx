@@ -59,6 +59,7 @@ import { EcranMessagerie } from '../ecrans/EcranMessagerie'
 import { EcranCourriels } from '../ecrans/EcranCourriels'
 import { EcranCertificat } from '../ecrans/EcranCertificat'
 import { EcranNonMaquette } from '../ecrans/EcranNonMaquette'
+import { EcranGenere } from '../ecrans/EcranGenere'
 import { EcranOuvertureDossier } from '../ecrans/EcranOuvertureDossier'
 import { EcranParametresAccueil } from '../ecrans/EcranParametresAccueil'
 import { EcranRechAffaires } from '../ecrans/EcranRechAffaires'
@@ -279,6 +280,9 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
     // Il n'y a donc rien a porter ; inventer un ecran de creances serait
     // inventer RIG v2.
     default:
+      // Un ecran GENERIQUE (Pont/EcransGeneres/) : sa procedure porte son descripteur, que
+      // EcranGenere met en page. Sans descripteur, l'ecran est « a venir ».
+      if (ecran.descripteur) return <EcranGenere key={proc.code} descripteur={ecran.descripteur} />
       return <EcranNonMaquette code={proc.code} libelle={proc.libelle} motif={ecran.motif} />
   }
 }

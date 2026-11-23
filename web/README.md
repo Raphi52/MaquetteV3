@@ -429,3 +429,20 @@ MainWindow / FenetreVue / FenetreDocument (WPF, controle WebView2 direct)
 
 Avec `dev.ps1`, un `.tsx` modifié est repris **à chaud** par le serveur Vite dans
 la fenêtre ouverte : rien à lancer à côté.
+
+## Ajouts du lot 1 (écran générique, plan « les 125 écrans manquants du menu »)
+
+Une procédure du menu qui n'a pas son écran à part se décrit en **données**, sans React :
+
+- **Le descripteur** : `Pont/EcransGeneres/<Verbe>.cs`, une classe `IDomaineEcrans` par verbe
+  qui renvoie des `DescripteurEcran`. `Descripteur.cs` est le modèle, `Ouvrir.cs` l'exemple.
+  `CatalogueGenere` les trouve par réflexion : rien d'autre à éditer.
+- **Le contenu** se fonde sur la fiche RIG v2 de la procédure (`proc_<code>.md`, « Détail OPE »
+  faisant foi) : les étapes deviennent les marches, les règles les consignes, les contrôles les
+  messages. Les lignes sont une démonstration anonyme (6 à 15).
+- **Le moteur** : `src/ecrans/EcranGenere.tsx` met le descripteur en page dans le style « Proue »
+  de Commandes web. Il garde son état en React : aucun geste ne passe par le pont.
+- **L'aiguillage** : la branche par défaut de `src/plan/Aiguillage.tsx` monte `EcranGenere` quand
+  la procédure porte un descripteur, sinon `EcranNonMaquette`.
+- **Les règles** : les états qui portent les gestes sont `AFaire`, `EnCours` et `Validee` ; le
+  titre est le libellé du menu. `.\tests.ps1 EcransGeneres` contrôle tout cela.

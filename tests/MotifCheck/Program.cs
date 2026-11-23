@@ -38,9 +38,10 @@ internal static class Programme
         var portes = Regex.Matches(source, "case '(?<c>[A-Z_0-9]+)'")
             .Select(m => m.Groups["c"].Value).ToHashSet();
         Exiger(portes.Count > 20, $"l'aiguillage expose bien ses branches ({portes.Count} lues)");
-        // Le cas par defaut de l'aiguillage montre bien l'ecran qui se nomme, avec son motif.
-        Exiger(Regex.IsMatch(source, @"default:\s*return <EcranNonMaquette code=\{proc\.code\} libelle=\{proc\.libelle\} motif=\{ecran\.motif\} />"),
-            "une entree sans ecran tombe sur l'ecran qui se nomme, avec son motif");
+        // Le cas par defaut de l'aiguillage porte l'ecran generique (Pont/EcransGeneres/) quand la
+        // procedure a un descripteur, sinon l'ecran qui se nomme, avec son motif (la regle inchangee).
+        Exiger(Regex.IsMatch(source, @"default:\s*(?://[^\n]*\n\s*)*if \(ecran\.descripteur\) return <EcranGenere key=\{proc\.code\} descripteur=\{ecran\.descripteur\} />\s*return <EcranNonMaquette code=\{proc\.code\} libelle=\{proc\.libelle\} motif=\{ecran\.motif\} />"),
+            "une entree sans ecran tombe sur l'ecran generique si elle porte un descripteur, sinon sur l'ecran qui se nomme, avec son motif");
 
         // Le menu, lu dans l'objet lui-meme et non dans le texte.
         var plan = typeof(RigV3Desktop.Pont.SessionPlanTravail);

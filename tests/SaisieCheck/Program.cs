@@ -376,7 +376,10 @@ Exiger(ecransPortes.Length >= 37, $"les ecrans React sont tous lus ({ecransPorte
 foreach (var fichier in ecransPortes)
 {
     var nom = Path.GetFileName(fichier);
-    if (nom == "EcranNonMaquette.tsx") continue;
+    // EcranGenere.tsx ne porte AUCUNE procedure, et tests/NomMetierCheck interdit "PROC_" hors
+    // de l'aiguilleur : le code de chaque procedure vit dans son descripteur (Pont/EcransGeneres/,
+    // champ Code), que tests/EcransGeneresCheck rapproche des entrees du menu.
+    if (nom is "EcranNonMaquette.tsx" or "EcranGenere.tsx") continue;
     Exiger(Regex.IsMatch(File.ReadAllText(fichier), @"(PROC_[A-Z_]+|BODACC|Sans origine RIG v2|Procedure RIG v2 : [A-Z][A-Z0-9_]{2,})"),
         $"{nom} nomme la procedure RIG v2 dont il est porte, ou dit qu il n en a pas");
 }
