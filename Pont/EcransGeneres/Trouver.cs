@@ -6,23 +6,25 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 //
 // Chaque descripteur reprend sa fiche RIG v2 (Documentation\reference\proc\proc_<code>.md, « Detail
 // OPE » faisant foi) : les criteres de recherche et les colonnes deviennent les champs, les etapes
-// deviennent les marches, l'action finale devient Valider. Les lignes sont une demonstration
-// ANONYME (noms fictifs).
+// deviennent les marches. Les lignes sont une demonstration ANONYME (noms fictifs).
+//
+// Le bouton final (Valider) est toujours un libelle que la fiche cite : un bouton visible de sa
+// barre d'outils, ou une action de son menu. La ligne de la fiche est donnee au-dessus du Valider de
+// chaque descripteur. Une fiche sans validation (« Processus sans validation », proc_image.md:85) prend
+// pour bouton final une action qu'elle cite, a confirmer : c'est le cas de Voir une image (APERCU).
 //
 // Ce que la fiche ne dit pas, et que la maquette prend a sa charge :
-//   - Valider est un geste de maquette quand la fiche n'a pas d'action finale (consultations en
-//     lecture seule : Dossier judiciaire, Voir un PDF, Voir une image, Encaissements, Notifications,
-//     Rechercher un beneficiaire). Il change l'etat de la ligne, rien n'est enregistre.
 //   - Documents (PROC_RECHERCHE_GED) : sa fiche le decrit comme un outil de maintenance de la GED ;
 //     ses marches le disent tel quel.
 //   - FIBEN : sa fiche decrit un outil de facturation des transmissions (releve mensuel FIBEN et
 //     releve trimestriel BODACC) ; le titre reste « FIBEN », libelle du menu.
 //   - « Interdits de gerer » et « Rechercher un beneficiaire » sont repris tels quels du menu, sans
 //     accent : tests/EcransGeneresCheck exige l'egalite du titre avec le libelle du menu.
+//   - Voir une image (PROC_IMAGE) : la fiche decrit un visualiseur passif, sans etat ni validation
+//     (proc_image.md:101-105). Ses etats et la marche « Ajustement » sont de maquette ; son bouton
+//     final est APERCU, a confirmer.
 
-// fix-ok: textes des marches verifies un a un contre les fiches proc_*.md (grep) : « expires » absent de
-// PROC_VJUD, colonne « Nom le plus recent » liee a la case d'historique (PROC_RECHERCHE_BATEAU), aucune vue
-// XML documentee dans PROC_VNOTIF, aucun refus de fichier documente dans PROC_IMAGE : corriges a la source.
+// fix-ok: cause mesurée — 14 des 16 « Valider » de la version committée (HEAD d242adc) n'existaient pas dans leur fiche (gestes de maquette) ; chacun est cité sur sa ligne de fiche. PROC_IMAGE, lui, restait sans écran (banc EcransGeneres -Detail, liste « sans ecran ni descripteur ») : descripteur ajouté (contrôle : 16/16).
 public sealed class DomaineTrouver : IDomaineEcrans
 {
     public IEnumerable<DescripteurEcran> Ecrans() =>
@@ -32,7 +34,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_VDOSSIER", Titre = "Dossier RCS", Sujet = "dossiers RCS", Rang = 4,
             Recherche = "Rechercher un dossier : numéro, SIREN, dépôt, inscription…",
             Criteres = ["Numéro : dossier, SIREN, dépôt, inscription, liaison, chrono ou non-inscrit", "Numéro d'inscription privilège"],
-            Valider = "Valider le dossier",
+            // Valider : proc_vdossier.md:378 (barre « Valider/Annuler » de l'étape de choix du dossier) et :397 (VALIDER → _Valider).
+            Valider = "Valider",
             Etats = EtatsEcran.Trois("À consulter", "En consultation", "Consulté"),
             Groupes = ["Dossier RCS", "Non-inscrit", "Demande"],
             Marches =
@@ -66,7 +69,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_VJUD", Titre = "Dossier judiciaire", Sujet = "dossiers judiciaires", Rang = 4,
             Recherche = "Rechercher une instance, une procédure collective ou une prévention…",
             Criteres = ["Type d'entité : instance, procédure collective ou prévention", "Entité recherchée"],
-            Valider = "Terminer la consultation",
+            // Valider : proc_vjud.md:172 et :176 (bouton MODIFIER ; visible avec POOL_EDIT si le dossier est une entité judiciaire).
+            Valider = "Modifier",
             Etats = EtatsEcran.Trois("À consulter", "En consultation", "Consultée"),
             Groupes = ["Instance", "Procédure collective", "Prévention"],
             Marches =
@@ -99,7 +103,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_REGJUD", Titre = "Registres judiciaires", Sujet = "lignes de registre", Rang = 4,
             Recherche = "Filtrer les lignes du registre : rôle, nature, chambre…",
             Criteres = ["Date d'acte", "Date de saisine", "Date d'enrôlement", "Type d'instance"],
-            Valider = "Imprimer le registre",
+            // Valider : proc_regjud.md:271 et :347 (bouton VALIDER de la barre : édition du registre, actif s'il y a des lignes).
+            Valider = "Valider",
             Etats = EtatsEcran.Trois("À filtrer", "Sélection en cours", "Imprimé"),
             Groupes = ["Répertoire général", "Injonctions de payer", "Ordonnances du président"],
             Marches =
@@ -132,7 +137,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_RECHERCHE_BATEAU", Titre = "Navires", Sujet = "navires", Rang = 4,
             Recherche = "Rechercher un navire : nom ou numéro d'enregistrement…",
             Criteres = ["Nom du navire (recherche dans le texte)", "Numéro d'enregistrement (une partie suffit)", "Afficher l'historique des noms"],
-            Valider = "Renvoyer la sélection",
+            // Valider : proc_recherche_bateau.md:64 et :148 (VALIDER toujours visible) ; renvoie la liste à l'écran appelant (:72).
+            Valider = "Valider",
             Etats = EtatsEcran.Trois("À chercher", "Sélection en cours", "Renvoyée"),
             Groupes = ["Nom actuel", "Ancien nom"],
             Marches =
@@ -163,7 +169,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_RECHERCHE_GED", Titre = "Documents", Sujet = "documents", Rang = 4,
             Recherche = "Rechercher un document : numéro interne ou login d'extraction…",
             Criteres = ["Catégorie : maquettes, éléments de fusion, documents d'édition, factures, documents SIREN, orphelins", "Numéro interne du document", "Login d'extraction"],
-            Valider = "Appliquer à la sélection",
+            // Valider : proc_recherche_ged.md:115 (« Archiver » : IMPORT (Archiver) → _Archiver(), section « Actions toolbar »).
+            Valider = "Archiver",
             Etats = EtatsEcran.Trois("À traiter", "En cours", "Traité"),
             Groupes = ["Maquettes", "Éléments de fusion", "Documents d'édition", "Factures", "Documents SIREN", "Orphelins"],
             Marches =
@@ -194,7 +201,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_PDF", Titre = "Voir un PDF", Sujet = "pièces PDF", Rang = 4,
             Recherche = "Rechercher une pièce à lire…",
             Criteres = ["Fichier PDF unique, ou dossier de PDF", "Pièces non lues affichées en gras", "Alerte à la fermeture si une pièce n'est pas lue"],
-            Valider = "Marquer comme lu",
+            // Valider : proc_pdf.md:110 (« Imprimer tout », impression de masse du mode dossier, :203) ; VALIDER (ligne 106) n'est jamais visible.
+            Valider = "Imprimer tout",
             Etats = EtatsEcran.Trois("Non lu", "En lecture", "Lu"),
             Groupes = ["Pièce unique", "Dossier de pièces"],
             Marches =
@@ -220,30 +228,33 @@ public sealed class DomaineTrouver : IDomaineEcrans
 
         new DescripteurEcran
         {
-            Code = "PROC_IMAGE", Titre = "Voir une image", Sujet = "images et PDF multi-pages", Rang = 4,
-            Recherche = "Rechercher une pièce numérisée…",
-            Criteres = ["Formats : PDF et TIFF multi-pages, JPEG, PNG, BMP", "Navigation entre les pages à partir de deux pages", "Zoom par clic ou à la molette"],
-            Valider = "Terminer la lecture",
-            Etats = EtatsEcran.Trois("Non vue", "En cours de lecture", "Vue"),
-            Groupes = ["Image", "PDF ou TIFF multi-pages"],
+            Code = "PROC_IMAGE", Titre = "Voir une image", Sujet = "fichiers à afficher", Rang = 4,
+            Recherche = "Rechercher un fichier à afficher…",
+            Criteres = ["Fichier : chemin absolu d'une image ou d'un PDF (paramètre Filename)", "Titre de la fenêtre, facultatif (paramètre Titre)"],
+            // Voir une image n'a pas de VALIDER (proc_image.md:85, :105) : son bouton final est l'action APERCU, à confirmer.
+            // La table :59 dit « miniatures » ; le Détail OPE (:21, :158) corrige : ajuster à la fenêtre, sans miniatures.
+            // Valider : proc_image.md:158 (« ajuster à la fenêtre », action APERCU ; :156 « réajuste l'image »).
+            Valider = "Ajuster à la fenêtre",
+            Etats = EtatsEcran.Trois("À ouvrir", "Ouverte", "Affichée"),
+            Groupes = ["PDF multi-pages", "TIFF multi-pages", "Image à page unique"],
             Marches =
             [
-                Marche("Ouverture", "Ouvrir l'image ou le PDF, par son chemin complet.", true,
-                    "Fichier", "Titre de la fenêtre"),
-                Marche("Pages", "Parcourir toutes les pages. La navigation n'apparaît qu'à partir de deux pages.", true,
-                    "Page précédente", "Page suivante"),
-                Marche("Zoom", "Zoomer sur un détail, par clic ou à la molette.", false,
-                    "Zoom par clic", "Zoom à la molette"),
+                Marche("Ouverture", "Charger le fichier passé en paramètre : une image ou un PDF, chemin absolu. Sans fichier, la fenêtre reste vide ; sans titre, elle prend « Aperçu du fichier » et le nom du fichier.", true,
+                    "Fichier", "Titre"),
+                Marche("Pages", "Visible seulement si le document a plusieurs pages (PDF ou TIFF) : première, précédente, suivante, dernière. Une image à page unique n'affiche aucune navigation.", false,
+                    "Pages"),
+                Marche("Ajustement", "Le bouton APERCU ajuste l'image à la fenêtre : ce n'est pas une vue de miniatures. Le zoom se fait aussi au clic ou à la molette.", true,
+                    "Zoom au clic", "Zoom à la molette"),
             ],
             Lignes =
             [
-                Ligne("Pièce numérisée 2026-0501", "JPEG · page unique", "Image", "AFaire"),
-                Ligne("Pièce numérisée 2026-0502", "PNG · page unique", "Image", "Validee", 0, 1),
-                Ligne("Pièce numérisée 2026-0503", "BMP · page unique", "Image", "EnCours", 0),
-                Ligne("Acte numérisé 2026-0504", "TIFF · 6 pages", "PDF ou TIFF multi-pages", "EnCours", 0),
-                Ligne("Jugement numérisé 2026-0505", "PDF · 14 pages", "PDF ou TIFF multi-pages", "AFaire"),
-                Ligne("Bilan numérisé 2026-0506", "PDF · 9 pages", "PDF ou TIFF multi-pages", "Validee", 0, 1, 2),
-                Ligne("Attestation numérisée 2026-0507", "JPEG · page unique", "Image", "AFaire"),
+                Ligne("Courrier scanné 2026-0501", "PNG · page unique", "Image à page unique", "AFaire"),
+                Ligne("Plan de situation 2026-0502", "JPEG · page unique", "Image à page unique", "Validee", 0, 2),
+                Ligne("Jugement annexé 2026-0503", "PDF · 12 pages", "PDF multi-pages", "EnCours", 0),
+                Ligne("Statuts de la société Gamma", "PDF · 8 pages", "PDF multi-pages", "Validee", 0, 1, 2),
+                Ligne("Bilan 2025 numérisé", "TIFF · 6 pages", "TIFF multi-pages", "AFaire"),
+                Ligne("Procès-verbal 2026-0504", "TIFF · 3 pages", "TIFF multi-pages", "EnCours", 0, 1),
+                Ligne("Attestation 2026-0505", "BMP · page unique", "Image à page unique", "EnCours", 0),
             ],
         },
 
@@ -252,7 +263,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_VCHIFFRES", Titre = "Chiffres d'un dossier", Sujet = "exercices", Rang = 4,
             Recherche = "Rechercher un dossier RCS : numéro ou SIREN…",
             Criteres = ["Dossier RCS : numéro ou SIREN", "Exercices sans chiffres clés (réglage du greffe)"],
-            Valider = "Générer le PDF",
+            // Valider : proc_vchiffres.md:254 (bouton EXPORT « Exporter le contenu des chiffres seuils au format PDF », visible en phase Saisie).
+            Valider = "Exporter",
             Etats = EtatsEcran.Trois("À consulter", "En cours", "PDF généré"),
             Groupes = ["Bilans déposés", "Exercices sans chiffres"],
             Marches =
@@ -263,7 +275,7 @@ public sealed class DomaineTrouver : IDomaineEcrans
                     "Chiffre d'affaires", "Résultat", "Actif", "Capital", "Effectif"),
                 Marche("Actes de l'exercice", "Les actes et dépôts de bilan rattachés à l'exercice choisi.", false,
                     "Actes déposés", "Dépôt du bilan"),
-                Marche("Export PDF", "Générer le PDF des chiffres seuils, en brouillon.", true,
+                Marche("Export PDF", "Exporter le PDF des chiffres seuils, en brouillon.", true,
                     "Édition PDF"),
             ],
             Lignes =
@@ -282,7 +294,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_RECHENC", Titre = "Encaissements", Sujet = "encaissements", Rang = 4,
             Recherche = "Rechercher un encaissement : client, remise, banque, commentaire…",
             Criteres = ["Dates de début et de fin (à cocher pour les activer)", "Mode de paiement", "Banque", "Payeur ou tiers payeur", "Numéro de remise", "Montant minimum et maximum", "Affaire"],
-            Valider = "Marquer comme contrôlé",
+            // Valider : proc_rechenc.md:351 (« EXPORT → export Excel », action nommée « Export Excel » en :209) ; bouton toujours visible (:346).
+            Valider = "Export Excel",
             Etats = EtatsEcran.Trois("À contrôler", "En contrôle", "Contrôlé"),
             Groupes = ["Encaissement ventilé", "Encaissement sans ventilation"],
             Marches =
@@ -313,7 +326,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_TARIFS", Titre = "Tarifs", Sujet = "articles tarifaires", Rang = 4,
             Recherche = "Filtrer les articles : code, libellé…",
             Criteres = ["Statut : actif, inactif ou tous", "Type d'article", "Période de tarification", "Catégorie d'article", "Code événement (affiche sa colonne)"],
-            Valider = "Justifier l'incohérence",
+            // Valider : proc_tarifs.md:186 (« Justifier » du menu contextuel d'une ligne incohérente) ; VALIDER masqué (:215).
+            Valider = "Justifier",
             Etats = EtatsEcran.Trois("À justifier", "En cours", "Justifié"),
             Groupes = ["Article de base", "Article dérivé"],
             Marches =
@@ -346,7 +360,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_REJETS_BILANS", Titre = "Bilans en rejet", Sujet = "bilans en rejet", Rang = 4,
             Recherche = "Rechercher un bilan : SIREN, numéro de gestion ou numéro de dépôt…",
             Criteres = ["SIREN, numéro de gestion ou numéro de dépôt", "Codes motifs de rejet (plusieurs possibles)"],
-            Valider = "Marquer comme corrigé",
+            // Valider : proc_rejets_bilans.md:208 (bouton « Envoyer vers XDCA », actif si la grille a des lignes, :398).
+            Valider = "Envoyer vers XDCA",
             Etats = EtatsEcran.Trois("Rejeté", "En correction", "Corrigé"),
             Groupes = ["Rejet Infogreffe", "Rejet INPI"],
             Marches =
@@ -379,7 +394,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_VFNIG", Titre = "Interdits de gerer", Sujet = "personnes", Rang = 4,
             Recherche = "Rechercher une personne : nom, prénom, date de naissance…",
             Criteres = ["Nom", "Prénom", "Date de naissance", "Pays de naissance (France par défaut)", "Commune de naissance (si France)"],
-            Valider = "Valider la personne",
+            // Valider : proc_vfnig.md:32 et :449 (bouton « Editer les résultats », actif dès qu'une ligne est sélectionnée, :171).
+            Valider = "Editer les résultats",
             Etats = EtatsEcran.Trois("À vérifier", "En cours", "Vérifiée"),
             Groupes = ["Personne trouvée", "Personne inexistante"],
             Marches =
@@ -412,7 +428,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_FIBEN", Titre = "FIBEN", Sujet = "relevés", Rang = 4,
             Recherche = "Rechercher un relevé : mois ou trimestre…",
             Criteres = ["Mois (transmission FIBEN, mensuelle)", "Trimestre et année (relevé BODACC, trimestriel)", "Tarifs unitaires"],
-            Valider = "Générer le relevé",
+            // Valider : proc_fiben.md:10-11 et :60-61 (bouton « Générer » de chaque opération).
+            Valider = "Générer",
             Etats = EtatsEcran.Trois("À générer", "En cours", "Généré"),
             Groupes = ["Transmission FIBEN", "Relevé BODACC"],
             Marches =
@@ -440,7 +457,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_VNOTIF", Titre = "Notifications", Sujet = "notifications", Rang = 4,
             Recherche = "Rechercher une notification : greffe, date, état…",
             Criteres = ["Dates", "États", "Greffes", "Origine (alerte)"],
-            Valider = "Marquer comme traitée",
+            // Valider : proc_vnotif.md:249 et :262 (barre « Rechercher / Effacer », bouton « Rechercher »).
+            Valider = "Rechercher",
             Etats = EtatsEcran.Trois("À traiter", "En cours", "Traitée"),
             Groupes = ["Émises (RCS)", "Émises (judiciaire)", "Reçues"],
             Marches =
@@ -467,7 +485,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_VTRID", Titre = "Tribunal digital", Sujet = "échanges avec le tribunal digital", Rang = 4,
             Recherche = "Rechercher un envoi ou une demande…",
             Criteres = ["Date (critère par défaut)", "Type d'entité : instance, procédure collective, mesure, prévention"],
-            Valider = "Ouvrir dans le dossier judiciaire",
+            // Valider : proc_vtrid.md:234 (bouton « Envoyer vers VJUD », actif selon la sélection).
+            Valider = "Envoyer vers VJUD",
             Etats = EtatsEcran.Trois("Non traité", "En cours", "Traité"),
             Groupes = ["Documents transmis", "Demandes reçues"],
             Marches =
@@ -498,7 +517,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_BEN", Titre = "Rechercher un beneficiaire", Sujet = "bénéficiaires effectifs", Rang = 4,
             Recherche = "Rechercher un bénéficiaire : nom, prénom, numéro de dossier…",
             Criteres = ["Numéro de dossier", "Nom d'usage", "Nom patronymique", "Prénoms", "Date de naissance", "Dossiers radiés", "Divergences seulement"],
-            Valider = "Signaler une divergence",
+            // Valider : proc_ben.md:321 (bouton de colonne « Signaler », « Visualiser » si une divergence existe).
+            Valider = "Signaler",
             Etats = EtatsEcran.Trois("À examiner", "En cours", "Divergence signalée"),
             Groupes = ["Bénéficiaire en vigueur", "Dossier radié"],
             Marches =
