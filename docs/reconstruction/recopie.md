@@ -932,6 +932,9 @@ propre fiche du pont : elle est re-pointée vers la V3 de la répétition, ses c
 
 `RigV3.Repetition supprimer --base rigv3_rep_<…>` supprime une base gardée par `--garder`, sur le serveur des bancs du poste
 seulement (le garde-fou SQL des agents refuse `sqlcmd` vers une base qu'il ne connaît pas : c'est le chemin prévu).
+Tout autre nom est refusé (code 2), sans rien effacer : `RecopieRepriseCheck` (section F) le lance comme un processus sur une
+base de banc `rigv3_banc_…`, qui doit rester, et sur une base `rigv3_rep_…`, qui doit partir. Contre-épreuve du 2026-11-23 :
+le préfixe exigé élargi à `rigv3_` (défaut réinjecté), la base de banc est effacée et le banc sort rouge.
 
 **Mesure du 2026-11-23, RIG_DEV** (lecture seule, accord « RIG_DEV », à la place de Le Puy : la copie d'un greffe bêta de
 production est remise au changement de base). La copie anonymisée a été faite par le premier lancement (arrêté ensuite sur un

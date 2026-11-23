@@ -35,6 +35,8 @@ using OutilTransfert = RigV3.Transfert.LigneDeCommande;
 //     avec ecart, fermee au controle propre) et T04 (le controle de nuit planifie et joue par le planificateur).
 //  E. REC-008 : une repetition complete sur une copie anonymisee (CA01, CA02, CA05), son rapport, le feu vert (CA03,
 //     CA04) et le refus d'une copie en clair (CA05).
+//  F. REC-007 CA07 (l'outil) : RigV3.Repetition supprimer, lance comme un processus, n'efface qu'une base gardee
+//     (rigv3_rep_...) ; une base de banc et un nom hors lettres, chiffres et _ sont refuses (code 2), rien n'est efface.
 // Il lui faut « docker compose up -d » et l'acces en lecture a RIG_DEV (autre serveur : RIGV3_RIG_DEV).
 // Doc : docs/reconstruction/recopie.md, sections REC-005, REC-006, REC-008.
 
@@ -622,6 +624,44 @@ Exiger(br.Etat == "fini" && br.ControleCopie?.Contains("par la fermeture sur les
 Reste("REC-008 sur les 40 bases des greffes : leur lecture demande l'accord pour chaque base (regle d'acces SQL des agents) et se fait chez Amitel, l'anonymisation sur le " +
       "serveur du greffe ; RigV3.Repetition repeter --sources <liste> --accord <BASE> le fait ; ce banc le prouve sur une base du poste");
 try { Directory.Delete(dossierRep, recursive: true); } catch (IOException) { }
+
+// ====================================================================================================
+// F. REC-007 CA07 (l'outil) : RigV3.Repetition supprimer n'efface qu'une base gardee par --garder (rigv3_rep_...)
+// ====================================================================================================
+// Lancee comme un PROCESSUS (le chemin de l'exploitant) sur deux bases vides du serveur des bancs : un temoin jetable
+// (rigv3_banc_..., une base de banc, pas de repetition) qui doit rester, et une base au nom d'une base gardee qui doit partir.
+// Contre-epreuve faite le 2026-11-23 : le prefixe exige elargi a « rigv3_ » (defaut reinjecte), le temoin est efface : rouge.
+await using var temoinSupprimer = await BaseJetable.CreerAsync("RecopieRepriseSupprimer");
+var gardee = $"rigv3_rep_banc_supprimer_{Guid.NewGuid().ToString("N")[..8]}";
+var masterBancs = new SqlConnectionStringBuilder(BaseJetable.ServeurDesBancs()) { InitialCatalog = "master" }.ConnectionString;
+await Executer(masterBancs, $"CREATE DATABASE [{gardee}] COLLATE {BaseJetable.Collation};");
+async Task<(int Code, string Sortie)> SupprimerParLOutil(string nom)
+{
+    var d = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, "RigV3.Repetition.exe"))
+        { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+    foreach (var a in new[] { "supprimer", "--base", nom }) d.ArgumentList.Add(a);
+    using var p = Process.Start(d)!;
+    var (sortie, erreur) = (p.StandardOutput.ReadToEndAsync(), p.StandardError.ReadToEndAsync());
+    await p.WaitForExitAsync();
+    return (p.ExitCode, (await sortie + await erreur).Trim());
+}
+try
+{
+    var refusBanc = await SupprimerParLOutil(temoinSupprimer.Nom);
+    var refusCaractere = await SupprimerParLOutil(gardee + "-x");
+    var rienEfface = await BaseJetable.ExisteAsync(temoinSupprimer.Nom) && await BaseJetable.ExisteAsync(gardee);
+    var accepte = await SupprimerParLOutil(gardee);
+    var gardeePartie = !await BaseJetable.ExisteAsync(gardee);
+    Exiger(refusBanc.Code == 2 && refusBanc.Sortie.Contains("n'est pas une base de repetition") && refusCaractere.Code == 2 && rienEfface
+           && accepte.Code == 0 && gardeePartie && await BaseJetable.ExisteAsync(temoinSupprimer.Nom),
+        $"REC-007 CA07 (outil) : RigV3.Repetition supprimer REFUSE une base qui n'est pas gardee par une repetition — le temoin {temoinSupprimer.Nom} " +
+        $"(code {refusBanc.Code}, « {refusBanc.Sortie} ») et un nom rigv3_rep_ avec un caractere hors lettres, chiffres et _ (code {refusCaractere.Code}) — " +
+        $"sans rien effacer ; la base gardee {gardee} est supprimee (code {accepte.Code}, « {accepte.Sortie} »)");
+}
+finally
+{
+    await Executer(masterBancs, $"IF DB_ID(N'{gardee}') IS NOT NULL BEGIN ALTER DATABASE [{gardee}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{gardee}]; END");
+}
 }
 finally
 {
