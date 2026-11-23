@@ -1,0 +1,534 @@
+namespace RigV3Desktop.Pont.EcransGeneres;
+
+// fix-ok: libelles de bouton final non cites par leur fiche (grep des 14, mesure : « Enregistrer » absent de PARTIES, MDJUD, XLIEN ; « Voir le recapitulatif » absent de CHORGANESENMASSE ; « Valider » absent de MDIL) : remplaces par le libelle cite, ligne donnee en commentaire ; decision chef 13:18.
+// LE VERBE MODIFIER, blocs « L'affaire », « Defaire » et « En masse » du menu (14 ecrans) :
+// Instance judiciaire, Procedure collective, Mentions en marge, Diligences RCS, Mots
+// directeurs, Repertoire, Parties d'une instance, Beneficiaires d'un dossier, Liens entre
+// PC, Supprimer une instance, Liberer une affaire, Changer le juge-commissaire, Changer les
+// organes, Debiteurs multiples.
+//
+// Chaque descripteur reprend sa fiche RIG v2 (Documentation\reference\proc\proc_<code>.md).
+// Quand la section « Detail OPE » contredit le reste de la fiche, elle fait foi (le code lu
+// le confirme) : PROC_MDJUD (une chaine de mots, pas une grille), PROC_XXAFF (le role reel
+// est la suppression d'une instance), PROC_LIBAFFAIRE (ni verification ni filtre texte dans
+// le code), PROC_CHORGANESENMASSE (un ecran de recherche par juge-commissaire, qui
+// n'enregistre aucun changement : la description du menu parle de mandataires, on suit la fiche).
+//
+// Le rang 2 est la teinte du verbe Modifier (decision du chef) : sa classe rig-tcw__rang-2
+// vit dans wwwroot/rig-ecrans-generes.css (lot 9), que tests/EcransGeneresCheck lit aussi.
+//
+// Les lignes sont une demonstration ANONYME (noms fictifs).
+public sealed class DomaineModifierAffaire : IDomaineEcrans
+{
+    public IEnumerable<DescripteurEcran> Ecrans() =>
+    [
+        new DescripteurEcran
+        {
+            Code = "PROC_MJUD", Titre = "Instance judiciaire", Sujet = "instances judiciaires",
+            Recherche = "Rechercher une instance, un numéro de rôle, un nom…",
+            Criteres = ["Numéro de rôle", "Nom courant"],
+            // Valider : la fiche decrit une etape de validation (l.31 « Afficher post-validation », l.209 « après validation ») sans nommer le bouton ; boutons cites l.298-305 : GED, LANCER REDA, POOL_EDIT, INTERROMPRE. A confirmer.
+            Valider = "Valider",
+            Rang = 2,
+            Etats = [.. EtatsEcran.Trois("À modifier", "En cours", "Modifiée"), new EtatEcran("EnAttente", "Verrouillée", "en-attente")],
+            Groupes = ["Au fond", "En référé"],
+            Marches =
+            [
+                Marche("Instance", "Recherche par numéro de rôle. L'instance est verrouillée pour la modification : tenue par un autre utilisateur, elle reste en lecture seule.", true,
+                    "Numéro de rôle", "Nom courant"),
+                Marche("Parties", "Demandeurs, défendeurs et intervenants, chacun dans sa propre étape.", false,
+                    "Demandeurs", "Défendeurs", "Intervenants"),
+                Marche("Appels d'affaire", "Dernier appel passé, prochain appel et liste complète.", false,
+                    "Dernier appel", "Prochain appel", "Liste des appels"),
+                Marche("Décision et chef de demande", "Décisions judiciaires rendues, chef de demande et réponse du défendeur.", false,
+                    "Décisions judiciaires", "Chef de demande", "Réponse du défendeur"),
+                Marche("Événements", "Événements survenus, puis événements futurs.", false,
+                    "Événements survenus", "Événements futurs"),
+                Marche("Facturation", "Ne facture pas par défaut : l'étape n'apparaît que si le paramétrage le demande.", false,
+                    "Articles"),
+                Marche("Notes et calendrier", "Note sur l'instance, calendrier de la procédure, coffre-fort et Tribunal digital.", false,
+                    "Note sur l'instance", "Calendrier de procédure", "Coffre-fort"),
+            ],
+            Lignes =
+            [
+                Ligne("Alpha Services SARL c/ Bêta Industrie SAS", "Rôle 2026J00201 · modification de la partie", "Au fond", "AFaire"),
+                Ligne("Gamma Conseil SARL c/ Delta Transports SAS", "Rôle 2026J00202 · appels à compléter", "Au fond", "EnCours", 0, 1),
+                Ligne("Epsilon Habitat SARL c/ Zêta Commerce SAS", "Rôle 2026J00203 · référé en cours", "En référé", "EnCours", 0),
+                Ligne("Êta Boulangerie SARL c/ Thêta Import SAS", "Rôle 2026J00204 · référé enregistré", "En référé", "Validee", 0, 2, 3),
+                Ligne("Iota Études SARL c/ Kappa Négoce SAS", "Rôle 2026J00205 · décision rendue", "Au fond", "Validee", 0, 2, 4, 6),
+                Ligne("Lambda Pêche SARL c/ Mu Logistique SAS", "Rôle 2026J00206 · verrouillée par un autre utilisateur", "Au fond", "EnAttente"),
+                Ligne("Nu Paiement SAS c/ Xi Entrepôts SARL", "Rôle 2026J00207 · référé", "En référé", "AFaire"),
+                Ligne("Omicron Bâtiment SARL c/ Pi Services SAS", "Rôle 2026J00208 · événements futurs", "Au fond", "EnCours", 0, 3),
+            ],
+        },
+
+        new DescripteurEcran
+        {
+            Code = "PROC_MPC", Titre = "Procedure collective", Sujet = "procédures collectives et préventions",
+            Recherche = "Rechercher une PC, un débiteur, un numéro de prévention…",
+            Criteres = ["Numéro de PC ou de prévention", "Instance liée", "Débiteur"],
+            // Valider : fiche l.127, « Le bouton VALIDER est surchargé » (DoValider, l.130-136).
+            Valider = "Valider",
+            Rang = 2,
+            Etats = [.. EtatsEcran.Trois("À modifier", "En cours", "Modifiée"),
+                     new EtatEcran("EnAttente", "Verrouillée", "en-attente"),
+                     new EtatEcran("Rejetee", "Notification refusée", "rejetee")],
+            Groupes = ["Procédure collective (PC)", "Prévention (PRV)"],
+            Marches =
+            [
+                Marche("Entité judiciaire", "Recherche de la PC, ou de l'instance qui y est liée. Verrouillée par un autre utilisateur, l'entité reste en lecture seule.", true,
+                    "Numéro de PC", "Instance liée"),
+                Marche("Procédure", "Données de la PC, ou de la prévention selon le mode d'entrée. Les dates clés se renseignent ici.", true,
+                    "Dates clés", "Mode (PC ou prévention)"),
+                Marche("Organes", "Organes de la PC ou de la prévention, et les organes en fin de mission.", false,
+                    "Organes de la procédure", "Fin de mission"),
+                Marche("Parties et appels", "Parties de l'instance liée, appels d'affaire, décision judiciaire, chef de demande et réponse du défendeur.", false,
+                    "Parties", "Appels d'affaire", "Décision judiciaire", "Chef de demande", "Réponse du défendeur"),
+                Marche("Événements", "Événements de l'instance et de la PC ou de la prévention.", false,
+                    "Événements de l'instance", "Événements de la procédure"),
+                Marche("Établissement et chiffres", "Établissement, dirigeants, chiffres économiques et éléments actifs (mode PC seulement).", false,
+                    "Établissement", "Dirigeants", "Chiffres économiques", "Éléments actifs"),
+                Marche("Notification", "Notification dématérialisée : elle s'accepte ou se refuse, sans mise en attente. Refusée, la demande est refusée.", false,
+                    "Accepter", "Refuser"),
+                Marche("Facturation", "Au forfait, pas de facturation ligne à ligne. Sinon, les articles suivent le paramétrage de la PC.", false,
+                    "Articles"),
+            ],
+            Lignes =
+            [
+                Ligne("Alpha Services SARL", "PC 2026P00301 · sauvegarde", "Procédure collective (PC)", "AFaire"),
+                Ligne("Bêta Industrie SAS", "PC 2026P00302 · redressement judiciaire", "Procédure collective (PC)", "EnCours", 0),
+                Ligne("Gamma Conseil SARL", "PC 2026P00303 · notification à accepter", "Procédure collective (PC)", "EnCours", 0, 1, 2),
+                Ligne("Delta Transports SAS", "PC 2026P00304 · liquidation judiciaire", "Procédure collective (PC)", "Validee", 0, 1, 2, 5, 7),
+                Ligne("Epsilon Habitat SARL", "Prévention 2026V00305 · saisie du 09/03/2026", "Prévention (PRV)", "AFaire"),
+                Ligne("Zêta Commerce SAS", "Prévention 2026V00306 · verrouillée par un autre utilisateur", "Prévention (PRV)", "EnAttente"),
+                Ligne("Êta Boulangerie SARL", "PC 2026P00307 · notification refusée le 12/03/2026", "Procédure collective (PC)", "Rejetee"),
+                Ligne("Thêta Import SAS", "Prévention 2026V00308 · prévention en cours", "Prévention (PRV)", "EnCours", 0, 1),
+            ],
+        },
+
+        new DescripteurEcran
+        {
+            Code = "PROC_MMA", Titre = "Mentions en marge", Sujet = "mentions en marge d'inscriptions",
+            Recherche = "Rechercher une inscription, un débiteur, un créancier…",
+            Criteres = ["Numéro d'inscription", "Débiteur", "Créancier"],
+            // Valider : fiche l.4 (« Validée (acceptation) ») et l.195 (« on ne peut pas valider un MMA sans saisir une mention ») ; Réclamer, Refuser, Attendre : l.22-23 et l.189.
+            Valider = "Valider",
+            Rang = 2,
+            // La fiche range « Reclamee » et « En Attente » parmi les issues ; l'ecran les met
+            // toutes deux en « En attente » : figees, sans geste, comme le maintien en attente.
+            Etats = [.. EtatsEcran.Trois("À traiter", "En cours", "Validée"),
+                     new EtatEcran("EnAttente", "En attente", "en-attente"),
+                     new EtatEcran("Rejetee", "Refusée", "rejetee")],
+            Groupes = ["Inscriptions maritimes", "Autres inscriptions"],
+            Marches =
+            [
+                Marche("Inscription", "Lecture seule : l'inscription est vérifiée avant toute modification.", true,
+                    "Numéro d'inscription", "Débiteur", "Créancier"),
+                Marche("Mention en marge", "Obligatoire pour valider. Si l'inscription n'a pas encore de mention, une mention vierge est proposée pour guider la saisie.", true,
+                    "Mention marginale", "Date de la mention"),
+                Marche("Bateau", "Données du bateau, pour une inscription maritime seulement.", false,
+                    "Données du bateau"),
+                Marche("Débiteurs et biens", "Débiteurs et biens concernés par l'inscription.", false,
+                    "Débiteurs", "Biens concernés"),
+                Marche("Créance et facturation", "Créance ou endettement. Le certificat est facturé automatiquement pour certains types d'inscription ; les frais postaux s'affichent en saisie.", false,
+                    "Créance ou endettement", "Facturation", "Frais postaux"),
+                Marche("Décision", "Valider accepte la mention. Réclamer demande une correction au déposant. Refuser rejette la demande. Attendre la met en attente.", true,
+                    "Valider", "Réclamer", "Refuser", "Attendre"),
+            ],
+            Lignes =
+            [
+                Ligne("Alpha Services SARL", "Inscription 2026-0401 · modification de mention", "Autres inscriptions", "AFaire"),
+                Ligne("Bêta Navigation SAS", "Inscription 2026-0402 · bateau", "Inscriptions maritimes", "EnCours", 0, 1),
+                Ligne("Gamma Conseil SARL", "Inscription 2026-0403 · réclamée le 05/03/2026", "Autres inscriptions", "EnAttente"),
+                Ligne("Delta Transports SAS", "Inscription 2026-0404 · validée le 06/03/2026", "Autres inscriptions", "Validee", 0, 1, 3, 5),
+                Ligne("Epsilon Habitat SARL", "Inscription 2026-0405 · refusée le 09/03/2026", "Autres inscriptions", "Rejetee"),
+                Ligne("Zêta Pêche SAS", "Inscription 2026-0406 · bateau de pêche", "Inscriptions maritimes", "AFaire"),
+                Ligne("Êta Boulangerie SARL", "Inscription 2026-0407 · en attente de la décision", "Autres inscriptions", "EnCours", 0),
+                Ligne("Thêta Import SAS", "Inscription 2026-0408 · mise en attente le 10/03/2026", "Autres inscriptions", "EnAttente"),
+                Ligne("Iota Yachting SAS", "Inscription 2026-0409 · bateau · validée", "Inscriptions maritimes", "Validee", 0, 1, 2, 5),
+            ],
+        },
+
+        new DescripteurEcran
+        {
+            Code = "PROC_MDIL", Titre = "Diligences RCS", Sujet = "diligences de dossiers RCS",
+            Recherche = "Rechercher un dossier RCS, une diligence, une relance…",
+            Criteres = ["Numéro de dossier RCS", "Nature de la diligence", "État de la relance"],
+            // Modifier : la fiche ne nomme ni validation ni sauvegarde ; l'action citee est « modifier » (l.1, l.133 « seulement modifier les existantes »). A confirmer.
+            Valider = "Modifier",
+            Rang = 2,
+            Etats = [.. EtatsEcran.Trois("À modifier", "En cours", "Modifiée"), new EtatEcran("EnAttente", "Sans diligence", "en-attente")],
+            Groupes = ["Avec relance", "Sans relance"],
+            Marches =
+            [
+                Marche("Diligence", "Modification seulement : aucune diligence ne se crée. Un dossier sans diligence reste en lecture seule, avec un avertissement.", true,
+                    "Origine de l'information", "Nature de la diligence", "Motif de la diligence"),
+                Marche("État", "État courant de la diligence et de sa relance.", true,
+                    "État de la diligence", "État de la relance"),
+                Marche("Régularisation", "Date prévue ou effective de régularisation, et valeur attendue : montant, document, etc.", false,
+                    "Date de régularisation", "Valeur attendue"),
+                Marche("Paramètres", "Visible seulement si la nature de la diligence a ses propres paramètres.", false,
+                    "Paramètres de la nature"),
+                Marche("Relances", "Chaque diligence peut avoir plusieurs relances, gérées une à une.", false,
+                    "Relances de la diligence"),
+            ],
+            Lignes =
+            [
+                Ligne("Alpha Services SARL", "Dossier RCS 2026B00701 · demande de pièces · non relancée", "Sans relance", "AFaire"),
+                Ligne("Bêta Industrie SAS", "Dossier RCS 2026B00702 · régularisation attendue · relance du 04/03/2026", "Avec relance", "EnCours", 0),
+                Ligne("Gamma Conseil SARL", "Dossier RCS 2026B00703 · relance du 05/03/2026", "Avec relance", "EnCours", 0, 1),
+                Ligne("Delta Transports SAS", "Dossier RCS 2026B00704 · régularisée le 06/03/2026", "Sans relance", "Validee", 0, 1, 2),
+                Ligne("Epsilon Habitat SARL", "Dossier RCS 2026B00705 · aucune diligence", "Sans relance", "EnAttente"),
+                Ligne("Zêta Commerce SAS", "Dossier RCS 2026B00706 · relances multiples", "Avec relance", "Validee", 0, 1, 2, 4),
+                Ligne("Êta Boulangerie SARL", "Dossier RCS 2026B00707 · paramètres de nature", "Sans relance", "EnCours", 0, 1, 3),
+            ],
+        },
+
+        new DescripteurEcran
+        {
+            Code = "PROC_MDJUD", Titre = "Mots directeurs", Sujet = "affaires judiciaires",
+            Recherche = "Rechercher une affaire, un numéro de rôle, un mot directeur…",
+            Criteres = ["Numéro de rôle, de PC ou de prévention", "Nom courant", "Famille d'affaire"],
+            // Valider : la fiche decrit une validation avant sauvegarde (l.4 « valide leur format avant sauvegarde », l.210 « APRES la validation (DoVerifier) ») ; aucun libelle de bouton nomme.
+            Valider = "Valider",
+            Rang = 2,
+            // La fiche decrit une grille de mots ; le Detail OPE fait foi : c'est UNE chaine de
+            // mots, normalisee a l'enregistrement. La grille de codes n'est qu'une legende.
+            Etats = EtatsEcran.Trois("À compléter", "En cours", "Enregistrés"),
+            Groupes = ["Instances", "Procédures collectives", "Préventions"],
+            Marches =
+            [
+                Marche("Affaire", "Recherche de l'instance, de la PC ou de la prévention. Le numéro et le nom courant s'affichent en lecture.", true,
+                    "Numéro de l'affaire", "Nom courant"),
+                Marche("Mots directeurs", "Une seule chaîne de mots, séparés par des espaces. Chaque mot commence par un code de deux lettres propre à la famille, et compte au moins trois caractères.", true,
+                    "Mots directeurs"),
+                Marche("Contrôle", "Un mot nouveau au préfixe inconnu bloque l'enregistrement. Un mot déjà enregistré au préfixe inconnu ne donne qu'un avertissement.", true,
+                    "Préfixes reconnus"),
+                Marche("Enregistrement", "Espaces réduits ; chaque mot purement alphabétique de plus de deux lettres : deux premières lettres en majuscules, le reste en minuscules.", true,
+                    "Chaîne normalisée"),
+            ],
+            Lignes =
+            [
+                Ligne("Alpha Services SARL c/ Bêta Industrie SAS", "Instance · rôle 2026J00401", "Instances", "AFaire"),
+                Ligne("Gamma Conseil SARL c/ Delta Transports SAS", "Instance · rôle 2026J00402", "Instances", "EnCours", 0),
+                Ligne("Epsilon Habitat SARL", "PC 2026P00403", "Procédures collectives", "EnCours", 0, 1),
+                Ligne("Zêta Commerce SAS", "PC 2026P00404", "Procédures collectives", "Validee", 0, 1, 2, 3),
+                Ligne("Êta Boulangerie SARL", "Prévention 2026V00405", "Préventions", "AFaire"),
+                Ligne("Thêta Import SAS", "Prévention 2026V00406", "Préventions", "Validee", 0, 1, 2, 3),
+                Ligne("Iota Études SARL c/ Kappa Négoce SAS", "Instance · rôle 2026J00407", "Instances", "Validee", 0, 1, 2, 3),
+                Ligne("Lambda Pêche SARL", "PC 2026P00408", "Procédures collectives", "EnCours", 0, 1),
+            ],
+        },
+
+        new DescripteurEcran
+        {
+            Code = "PROC_MODIF_REPER", Titre = "Repertoire", Sujet = "répertoriés",
+            Recherche = "Rechercher un répertorié, un abrégé, une désignation…",
+            Criteres = ["Abrégé", "Désignation", "Répertoriés actifs seulement"],
+            // Valider : fiche l.260 (« Yes ⇒ Valider() »), l.287 (cascade transactionnelle), l.322 (civilité des parties cochées) ; le VALIDER global est désarmé (l.244).
+            Valider = "Valider",
+            Rang = 2,
+            Etats = EtatsEcran.Trois("À corriger", "En cours", "Enregistré"),
+            Groupes = ["Mandataires", "Avocats", "Représentants"],
+            Marches =
+            [
+                Marche("Recherche", "Recherche plein texte sur l'abrégé et la désignation. « Actifs seulement » masque les répertoriés inactifs.", true,
+                    "Abrégé", "Désignation"),
+                Marche("Fiche", "Abrégé et désignation obligatoires ; l'abrégé est unique dans le greffe. Une adresse mail mal formée n'est qu'un avertissement. Suppression bloquée si l'abrégé sert à un code affaire.", true,
+                    "Abrégé", "Désignation", "Adresse mail", "Civilité"),
+                Marche("Civilité des parties", "Applique la civilité du répertorié aux parties cochées.", false,
+                    "Parties liées", "Civilité"),
+            ],
+            Lignes =
+            [
+                Ligne("MAND-ALPHA", "Alpha Mandats SELARL · actif", "Mandataires", "AFaire"),
+                Ligne("MAND-BETA", "Bêta Administrateurs SARL · actif", "Mandataires", "EnCours", 0),
+                Ligne("AVOC-GAMMA", "Cabinet Gamma Avocats · actif", "Avocats", "EnCours", 0, 1),
+                Ligne("AVOC-DELTA", "Cabinet Delta Avocats · inactif", "Avocats", "AFaire"),
+                Ligne("REPR-EPSILON", "Représentant Epsilon · actif", "Représentants", "Validee", 0, 1, 2),
+                Ligne("REPR-ZETA", "Représentant Zêta · actif", "Représentants", "Validee", 0, 1),
+                Ligne("MAND-ETA", "Mandataire Êta · actif", "Mandataires", "AFaire"),
+                Ligne("AVOC-THETA", "Cabinet Thêta Avocats · actif", "Avocats", "EnCours", 0, 1),
+            ],
+        },
+
+        new DescripteurEcran
+        {
+            Code = "PROC_PARTIES", Titre = "Parties d'une instance", Sujet = "parties d'instances",
+            Recherche = "Rechercher une partie, une instance, un répertorié…",
+            Criteres = ["Numéro de rôle de l'instance", "Qualité de la partie", "Aide juridictionnelle"],
+            // Valider : fiche l.133 (« Regles de validation (DoVerifier) ») et l.174 (« declencher la sauvegarde de l'instance ») ; aucun libelle de bouton nomme.
+            Valider = "Valider",
+            Rang = 2,
+            Etats = EtatsEcran.Trois("À compléter", "En cours", "Enregistrée"),
+            Groupes = ["Demandeurs", "Défendeurs", "Intervenants"],
+            Marches =
+            [
+                Marche("Identité", "Nom et adresse de la partie. Une partie vide est créée si la liste est vide : une ligne est toujours à remplir.", true,
+                    "Nom", "Adresse"),
+                Marche("Mandataire et répertorié", "Mandataire, et répertorié qui le désigne si la partie figure au répertoire.", false,
+                    "Mandataire", "Répertorié"),
+                Marche("Aide juridictionnelle", "Case AJ cochée : il faut choisir Partielle ou Totale, sinon l'enregistrement est refusé.", false,
+                    "Aide juridictionnelle", "Partielle", "Totale"),
+            ],
+            Lignes =
+            [
+                Ligne("Alpha Services SARL", "Demandeur · instance 2026J00501", "Demandeurs", "AFaire"),
+                Ligne("Bêta Industrie SAS", "Demandeur · instance 2026J00501 · AJ partielle", "Demandeurs", "Validee", 0, 2),
+                Ligne("Gamma Conseil SARL", "Demandeur · instance 2026J00502", "Demandeurs", "EnCours", 0),
+                Ligne("Delta Transports SAS", "Défendeur · instance 2026J00502", "Défendeurs", "Validee", 0, 1),
+                Ligne("Epsilon Habitat SARL", "Défendeur · instance 2026J00503", "Défendeurs", "AFaire"),
+                Ligne("Zêta Commerce SAS", "Défendeur · instance 2026J00503 · AJ totale", "Défendeurs", "EnCours", 0, 2),
+                Ligne("Êta Boulangerie SARL", "Intervenant · instance 2026J00504", "Intervenants", "EnCours", 0),
+                Ligne("Thêta Import SAS", "Intervenant · instance 2026J00504", "Intervenants", "AFaire"),
+                Ligne("Iota Études SARL", "Intervenant · instance 2026J00505 · répertorié", "Intervenants", "Validee", 0, 1),
+            ],
+        },
+
+        new DescripteurEcran
+        {
+            Code = "PROC_BE", Titre = "Beneficiaires d'un dossier", Sujet = "bénéficiaires effectifs",
+            Recherche = "Rechercher un bénéficiaire, un dossier RCS…",
+            Criteres = ["Dossier RCS", "Nom du bénéficiaire", "Type de déclaration"],
+            // Valider : fiche l.430-431, bouton Valider (masqué en consultation) ; DoSauve l.425.
+            Valider = "Valider",
+            Rang = 2,
+            Etats = [.. EtatsEcran.Trois("À déclarer", "En cours", "Déclaré"), new EtatEcran("EnAttente", "Consultation seule", "en-attente")],
+            Groupes = ["Déclaration standard", "Placement collectif"],
+            Marches =
+            [
+                Marche("Identité", "Patronyme, prénoms de l'état civil et date de naissance sont obligatoires.", true,
+                    "Civilité", "Patronyme", "Prénoms (état civil)", "Nom d'usage", "Date de naissance", "Département de naissance"),
+                Marche("Modalités de contrôle", "Les champs changent selon le type de déclaration du dossier : le placement collectif en ajoute sept.", true,
+                    "Modalités selon la déclaration"),
+                Marche("Acte déposé", "Visualise l'acte déposé, et les données brutes renvoyées par le service de déclaration.", false,
+                    "Acte déposé", "Données de déclaration"),
+            ],
+            Lignes =
+            [
+                Ligne("Bénéficiaire Alpha", "Dossier RCS 2026B00801 · déclaration standard", "Déclaration standard", "AFaire"),
+                Ligne("Bénéficiaire Bêta", "Dossier RCS 2026B00801 · déclaration standard", "Déclaration standard", "EnCours", 0),
+                Ligne("Bénéficiaire Gamma", "Dossier RCS 2026B00801 · déclaration standard", "Déclaration standard", "Validee", 0, 1, 2),
+                Ligne("Bénéficiaire Delta", "Placement collectif · acte à visualiser", "Placement collectif", "EnCours", 0, 1),
+                Ligne("Bénéficiaire Epsilon", "Placement collectif", "Placement collectif", "Validee", 0, 1),
+                Ligne("Bénéficiaire Zêta", "Dossier en consultation seule", "Déclaration standard", "EnAttente"),
+                Ligne("Bénéficiaire Êta", "Placement collectif · consultation seule", "Placement collectif", "EnAttente"),
+                Ligne("Bénéficiaire Thêta", "Dossier RCS 2026B00801 · déclaration standard", "Déclaration standard", "AFaire"),
+            ],
+        },
+
+        new DescripteurEcran
+        {
+            Code = "PROC_XLIEN", Titre = "Liens entre PC", Sujet = "instances à relier",
+            Recherche = "Rechercher une instance, un numéro de rôle, une PC…",
+            Criteres = ["Numéro de rôle", "Numéro de PC ou de prévention", "Type de lien"],
+            // Valider : fiche l.93 (« se ferme automatiquement après validation ») ; l.135 : seule l'Instance est sauvée.
+            Valider = "Valider",
+            Rang = 2,
+            Etats = [.. EtatsEcran.Trois("À rattacher", "En cours", "Rattachée"), new EtatEcran("EnAttente", "Verrouillée", "en-attente")],
+            Groupes = ["Vers une PC", "Vers une prévention"],
+            Marches =
+            [
+                Marche("Instance", "Recherche de l'instance, verrouillée pour la demande. Déjà ouverte ailleurs, elle reste verrouillée et l'écran ne passe pas en saisie.", true,
+                    "Numéro de rôle", "Numéro métier"),
+                Marche("Lien", "Rattachement à une PC ou à une prévention. Une instance ne peut pas être dans les deux : le lien d'un type est refusé tant que l'autre existe.", true,
+                    "Procédure collective", "Prévention"),
+                Marche("Détachement", "Le détachement se lance depuis l'information de la PC et s'exécute sur l'instance.", false,
+                    "Détacher le lien"),
+            ],
+            Lignes =
+            [
+                Ligne("Alpha Services SARL c/ Bêta Industrie SAS", "Rôle 2026J00901 · à rattacher à une PC", "Vers une PC", "AFaire"),
+                Ligne("Gamma Conseil SARL c/ Delta Transports SAS", "Rôle 2026J00902 · PC 2026P00902", "Vers une PC", "Validee", 0, 1),
+                Ligne("Epsilon Habitat SARL c/ Zêta Commerce SAS", "Rôle 2026J00903 · prévention en cours", "Vers une prévention", "EnCours", 0),
+                Ligne("Êta Boulangerie SARL c/ Thêta Import SAS", "Rôle 2026J00904 · prévention 2026V00904", "Vers une prévention", "Validee", 0, 1),
+                Ligne("Iota Études SARL c/ Kappa Négoce SAS", "Rôle 2026J00905 · ouverte ailleurs", "Vers une PC", "EnAttente"),
+                Ligne("Lambda Pêche SARL c/ Mu Logistique SAS", "Rôle 2026J00906 · détachement demandé", "Vers une PC", "EnCours", 0, 1, 2),
+                Ligne("Nu Paiement SAS c/ Xi Entrepôts SARL", "Rôle 2026J00907 · à rattacher à une prévention", "Vers une prévention", "AFaire"),
+            ],
+        },
+
+        new DescripteurEcran
+        {
+            Code = "PROC_XXAFF", Titre = "Supprimer une instance", Sujet = "instances à supprimer",
+            Recherche = "Rechercher une instance, un numéro d'instance…",
+            Criteres = ["Numéro d'instance", "Nom courant", "Date de saisine"],
+            // Valider : fiche l.126, OnButtonClick ne traite que VALIDER ; l.155, avertissement « Corriger / Valider ».
+            Valider = "Valider",
+            Rang = 2,
+            // Le Detail OPE fait foi : le role reel est la suppression d'une instance, avec
+            // restitution des numeros metiers qu'elle consommait (la fiche disait « saisie rapide »).
+            Etats = EtatsEcran.Trois("À supprimer", "En cours", "Supprimée"),
+            Groupes = ["Numéros à libérer", "Sans numéro à libérer"],
+            Marches =
+            [
+                Marche("Instance", "Recherche de l'instance à supprimer, puis lecture seule de sa fiche. Rien n'est supprimé avant la validation.", true,
+                    "Numéro d'instance", "Nom courant"),
+                Marche("Résumé", "Résumé de l'instance choisie. Il se retire seul si aucune instance n'est retenue.", false,
+                    "Résumé de l'instance"),
+                Marche("Demande", "Informations de la demande, masquables.", false,
+                    "Informations de la demande"),
+                Marche("Numéros à libérer", "La case « Libérer le numéro d'instance » est cochée par défaut. Décochée, un avertissement demande de corriger ou de valider. À la validation, les numéros cochés sont restitués, et un courriel part à chaque suppression.", true,
+                    "Libérer le numéro d'instance", "Répertoire général", "Numéro de rôle", "Dossier judiciaire"),
+            ],
+            Lignes =
+            [
+                Ligne("Alpha Services SARL c/ Bêta Industrie SAS", "Rôle 2026J01001 · répertoire général et dossier judiciaire", "Numéros à libérer", "AFaire"),
+                Ligne("Gamma Conseil SARL c/ Delta Transports SAS", "Rôle 2026J01002 · numéro de rôle", "Numéros à libérer", "EnCours", 0),
+                Ligne("Epsilon Habitat SARL c/ Zêta Commerce SAS", "Rôle 2026J01003 · sans numéro à libérer", "Sans numéro à libérer", "AFaire"),
+                Ligne("Êta Boulangerie SARL c/ Thêta Import SAS", "Rôle 2026J01004 · supprimée le 05/03/2026", "Numéros à libérer", "Validee", 0, 1, 3),
+                Ligne("Iota Études SARL c/ Kappa Négoce SAS", "Rôle 2026J01005 · libération non cochée", "Sans numéro à libérer", "EnCours", 0, 1),
+                Ligne("Lambda Pêche SARL c/ Mu Logistique SAS", "Rôle 2026J01006 · en cours de suppression", "Numéros à libérer", "EnCours", 0, 1, 3),
+                Ligne("Nu Paiement SAS c/ Xi Entrepôts SARL", "Rôle 2026J01007 · répertoire général", "Numéros à libérer", "AFaire"),
+                Ligne("Omicron Bâtiment SARL c/ Pi Services SAS", "Rôle 2026J01008 · sans numéro à libérer", "Sans numéro à libérer", "Validee", 0, 3),
+            ],
+        },
+
+        new DescripteurEcran
+        {
+            Code = "PROC_LIBAFFAIRE", Titre = "Liberer une affaire", Sujet = "affaires verrouillées",
+            // La fiche cite un filtre texte que le code n'a pas : la pilule ne filtre ici que la
+            // liste affichée, comme sur tous les écrans du plan.
+            Recherche = "Rechercher une affaire ou un utilisateur…",
+            Criteres = ["Numéro d'affaire", "Utilisateur", "Demande"],
+            // Valider : fiche l.202, bouton générique TRAITER (déclenche la libération ; le libellé « LIBERER » de la fiche n'existe pas).
+            Valider = "Traiter",
+            Rang = 2,
+            Etats = EtatsEcran.Trois("Verrouillée", "Sélectionnée", "Libérée"),
+            Groupes = ["Avec une demande", "Sans demande"],
+            Marches =
+            [
+                Marche("Sélection", "Cocher les affaires à libérer. Le titre compte les affaires encore verrouillées.", true,
+                    "Case à cocher"),
+                Marche("Libération", "Le verrou saute tout de suite, sans retour arrière : les modifications non enregistrées de l'utilisateur qui la tenait sont perdues.", true,
+                    "Affaire libérée"),
+            ],
+            Lignes =
+            [
+                Ligne("Alpha Services SARL", "Affaire 2026J01101 · Utilisateur Alpha · demande en cours", "Avec une demande", "AFaire"),
+                Ligne("Bêta Industrie SAS", "Affaire 2026J01102 · Utilisateur Bêta", "Sans demande", "EnCours", 0),
+                Ligne("Gamma Conseil SARL", "Affaire 2026J01103 · Utilisateur Gamma · demande en cours", "Avec une demande", "Validee", 0, 1),
+                Ligne("Delta Transports SAS", "Affaire 2026J01104 · Utilisateur Delta", "Sans demande", "AFaire"),
+                Ligne("Epsilon Habitat SARL", "Affaire 2026J01105 · Utilisateur Epsilon", "Avec une demande", "EnCours", 0),
+                Ligne("Zêta Commerce SAS", "Affaire 2026J01106 · Utilisateur Zêta · libérée", "Sans demande", "Validee", 0, 1),
+                Ligne("Êta Boulangerie SARL", "Affaire 2026J01107 · Utilisateur Êta", "Sans demande", "AFaire"),
+                Ligne("Thêta Import SAS", "Affaire 2026J01108 · Utilisateur Thêta", "Avec une demande", "AFaire"),
+            ],
+        },
+
+        new DescripteurEcran
+        {
+            Code = "PROC_CHM", Titre = "Changer le juge-commissaire", Sujet = "procédures collectives",
+            Recherche = "Rechercher une PC, un juge, un numéro de PC…",
+            Criteres = ["Juge à remplacer", "Statut titulaire ou suppléant", "Code affaire"],
+            // Valider : fiche l.141, barre Modifier / Annuler / Valider ; l.40, DoSauver.
+            Valider = "Valider",
+            Rang = 2,
+            Etats = [.. EtatsEcran.Trois("À traiter", "En cours", "Changée"), new EtatEcran("Rejetee", "Bloquée", "rejetee")],
+            Groupes = ["Au forfait", "Hors forfait"],
+            Marches =
+            [
+                Marche("Paramètres", "Lecture seule par défaut. Seuls le code affaire et le mode de facturation sont enregistrés.", true,
+                    "Code affaire", "Mode de facturation"),
+                Marche("Recherche", "Juge à remplacer obligatoire. Statut titulaire ou suppléant ; juge secondaire facultatif, égal ou différent.", true,
+                    "Juge à remplacer", "Statut recherché", "Juge secondaire"),
+                Marche("Sélection", "Cocher les PC à traiter : il en faut au moins une. Le nouveau juge ne peut pas être déjà juge de la PC. Une erreur bloquante met la PC à part.", true,
+                    "À traiter"),
+                Marche("Nouveau juge", "Date de l'acte jamais postérieure à aujourd'hui. Le nouveau juge doit être différent de l'ancien.", true,
+                    "Nouveau juge-commissaire", "Date de l'acte"),
+                Marche("Décision", "Types proposés selon le code affaire ; s'il n'y en a qu'un, il est choisi seul.", false,
+                    "Type de décision"),
+                Marche("Ordonnances et résumé", "Une ordonnance du président par PC, puis un rapport de suivi. Une facture en échec n'arrête pas le traitement.", false,
+                    "Ordonnances du président", "Rapport de suivi"),
+            ],
+            Lignes =
+            [
+                Ligne("Alpha Services SARL", "PC 2026P01201 · juge à remplacer : Juge A", "Hors forfait", "AFaire"),
+                Ligne("Bêta Industrie SAS", "PC 2026P01202 · au forfait", "Au forfait", "EnCours", 0, 1),
+                Ligne("Gamma Conseil SARL", "PC 2026P01203 · sélectionnée", "Hors forfait", "EnCours", 0, 1, 2),
+                Ligne("Delta Transports SAS", "PC 2026P01204 · changée le 05/03/2026", "Hors forfait", "Validee", 0, 1, 2, 3),
+                Ligne("Epsilon Habitat SARL", "PC 2026P01205 · au forfait · changée le 06/03/2026", "Au forfait", "Validee", 0, 1, 2, 3, 4),
+                Ligne("Zêta Commerce SAS", "PC 2026P01206 · juge à remplacer figurant deux fois : bloquée", "Hors forfait", "Rejetee"),
+                Ligne("Êta Boulangerie SARL", "PC 2026P01207 · PC extérieure : bloquée", "Hors forfait", "Rejetee"),
+                Ligne("Thêta Import SAS", "PC 2026P01208 · au forfait", "Au forfait", "AFaire"),
+                Ligne("Iota Études SARL", "PC 2026P01209 · décision à choisir", "Hors forfait", "EnCours", 0, 1, 2, 3),
+            ],
+        },
+
+        new DescripteurEcran
+        {
+            Code = "PROC_CHORGANESENMASSE", Titre = "Changer les organes", Sujet = "procédures collectives par juge",
+            Recherche = "Rechercher une PC par juge-commissaire…",
+            Criteres = ["Juge principal", "Juge secondaire", "Statut recherché"],
+            // Valider : pas de VALIDER (masqué, l.41 et l.113) ; le geste final cité est « Changer le juge » (l.199, ultButtonChangerJuge), qui n'affiche qu'un récapitulatif (l.100).
+            Valider = "Changer le juge",
+            Rang = 2,
+            Etats = EtatsEcran.Trois("À examiner", "En cours", "Récapitulée"),
+            Groupes = ["Juge titulaire", "Juge suppléant"],
+            Marches =
+            [
+                Marche("Recherche", "Le juge principal est le seul critère requis : sans lui, un message demande d'en choisir un. Statut titulaire ou suppléant.", true,
+                    "Juge principal", "Juge secondaire", "Statut recherché"),
+                Marche("Date et cabinet", "Nouvelle date et cabinet, sur le premier onglet.", false,
+                    "Nouvelle date", "Cabinet"),
+                Marche("Juge titulaire", "Choix du nouveau juge titulaire.", false,
+                    "Nouveau juge titulaire"),
+                Marche("Juge suppléant", "Choix du nouveau suppléant, facultatif.", false,
+                    "Nouveau juge suppléant"),
+                Marche("Récapitulatif", "Affiche le récapitulatif des changements, sans rien enregistrer.", true,
+                    "Récapitulatif des changements"),
+            ],
+            Lignes =
+            [
+                Ligne("Alpha Services SARL", "PC 2026P01301 · juge titulaire Juge A", "Juge titulaire", "AFaire"),
+                Ligne("Bêta Industrie SAS", "PC 2026P01302 · juge titulaire Juge B", "Juge titulaire", "EnCours", 0),
+                Ligne("Gamma Conseil SARL", "PC 2026P01303 · juge suppléant Juge C", "Juge suppléant", "EnCours", 0, 1),
+                Ligne("Delta Transports SAS", "PC 2026P01304 · juge suppléant Juge D", "Juge suppléant", "Validee", 0, 4),
+                Ligne("Epsilon Habitat SARL", "PC 2026P01305 · juge titulaire Juge A", "Juge titulaire", "Validee", 0, 2, 4),
+                Ligne("Zêta Commerce SAS", "PC 2026P01306 · juge titulaire Juge E", "Juge titulaire", "AFaire"),
+                Ligne("Êta Boulangerie SARL", "PC 2026P01307 · juge suppléant Juge B", "Juge suppléant", "EnCours", 0, 3),
+                Ligne("Thêta Import SAS", "PC 2026P01308 · juge suppléant Juge C", "Juge suppléant", "AFaire"),
+            ],
+        },
+
+        new DescripteurEcran
+        {
+            Code = "PROC_DEBITEURS_MULTIPLES", Titre = "Debiteurs multiples", Sujet = "débiteurs de procédures collectives",
+            Recherche = "Rechercher une procédure, un débiteur, un SIREN…",
+            Criteres = ["Numéro de PC", "Débiteur principal", "Registre des métiers"],
+            // Valider : fiche l.176 (« 9. Validation ») et l.131 (« se ferme après validation »).
+            Valider = "Valider",
+            Rang = 2,
+            Etats = [.. EtatsEcran.Trois("À compléter", "En cours", "Enregistré"), new EtatEcran("EnAttente", "Principal (lecture)", "en-attente")],
+            Groupes = ["Débiteur principal", "Débiteurs additionnels"],
+            Marches =
+            [
+                Marche("Entreprise", "L'entreprise se choisit d'abord : tant qu'elle manque, le nom et l'adresse restent masqués. Le débiteur principal se modifie ailleurs : ici, il est en lecture seule.", true,
+                    "Entreprise"),
+                Marche("Identité", "Nom et adresse. Pour une extension : date d'extension et lien avec le débiteur principal.", true,
+                    "Nom", "Adresse", "Date d'extension", "Lien avec le principal"),
+                Marche("Registre des métiers", "Visible si l'entreprise est inscrite. Numéro, département et organisme ne s'affichent que si la case est cochée.", false,
+                    "Inscrit au registre des métiers", "Numéro", "Département", "Organisme dépendant"),
+                Marche("Enregistrement", "À la validation, le nom de l'affaire et les établissements et dirigeants de la PC sont mis à jour.", true,
+                    "Nom de l'affaire", "Établissements et dirigeants"),
+            ],
+            Lignes =
+            [
+                Ligne("Alpha Services SARL", "PC 2026P01401 · débiteur principal", "Débiteur principal", "EnAttente"),
+                Ligne("Bêta Industrie SAS", "Extension · entreprise choisie", "Débiteurs additionnels", "EnCours", 0),
+                Ligne("Gamma Conseil SARL", "Extension · nom et adresse saisis", "Débiteurs additionnels", "EnCours", 0, 1),
+                Ligne("Delta Transports SAS", "Extension · inscrite au registre des métiers", "Débiteurs additionnels", "Validee", 0, 1, 2, 3),
+                Ligne("Epsilon Habitat SARL", "Extension · pas encore d'entreprise", "Débiteurs additionnels", "AFaire"),
+                Ligne("Zêta Commerce SAS", "Extension · lien avec le principal", "Débiteurs additionnels", "Validee", 0, 1, 3),
+                Ligne("Êta Boulangerie SARL", "Extension · non inscrite au registre", "Débiteurs additionnels", "EnCours", 0, 1),
+                Ligne("Thêta Import SAS", "Extension · à compléter", "Débiteurs additionnels", "AFaire"),
+            ],
+        },
+    ];
+
+    private static MarcheEcran Marche(string titre, string consigne, bool obligatoire, params string[] champs) =>
+        new(titre, consigne, obligatoire, champs);
+
+    private static LigneEcran Ligne(string nom, string precisions, string groupe, string etat, params int[] faites) =>
+        new(nom, precisions, groupe, etat, faites);
+}
