@@ -210,7 +210,7 @@ public static class CopieAnonymisee
         rapport.Fin = DateTime.Now;
         foreach (var t in tables)
             foreach (var c in t.Colonnes)
-                if (catalogue.Suspicion(t.Nom, c.Nom, c.Type) is { } raison) rapport.ARelire.Add(($"{t.Libelle}.{c.Nom}", raison));
+                if (catalogue.Suspicion(t.Nom, c.Nom, c.Type, c.Longueur) is { } raison) rapport.ARelire.Add(($"{t.Libelle}.{c.Nom}", raison));
         await MarquerAsync(cn, rapport, ct);
         if (o.FichierRapport is not null)
         {
@@ -267,6 +267,9 @@ public static class CopieAnonymisee
     {
         public required TableSql Table { get; init; }
         public required List<ColonneSql> Colonnes { get; init; }
+        /// <summary>Ce que le SELECT de la source lit pour chaque colonne : la colonne, ou pour un document sa SEULE signature
+        /// (format et taille, DocumentsFictifs.ExpressionSignature) -- un document reel ne sort jamais de la source.</summary>
+        public required string[] Selection { get; init; }
         public required Regle[] Regles { get; init; }
         public required ColonneTraitee?[] Traitees { get; init; }
         /// <summary>Les colonnes d'une signature (FACTU_SIGN_SEQ, GTPF_SIGNATURE…) : une ligne signee dont le contenu
@@ -279,7 +282,7 @@ public static class CopieAnonymisee
         public static TableEnCopie Preparer(TableSql t, CatalogueRegles catalogue, Rapport rapport)
         {
             var colonnes = t.Colonnes.Where(c => !c.Calculee).ToList();
-            var regles = colonnes.Select(c => catalogue.Pour(t.Nom, c.Nom, c.Type)).ToArray();
+            var regles = colonnes.Select(c => catalogue.Pour(t.Nom, c.Nom, c.Type, c.Longueur)).ToArray();
             var traitees = new ColonneTraitee?[colonnes.Count];
             for (var i = 0; i < colonnes.Count; i++)
                 if (regles[i].Anonymise)
@@ -287,9 +290,14 @@ public static class CopieAnonymisee
                     traitees[i] = new ColonneTraitee(t.Libelle, colonnes[i].Nom, colonnes[i].Type, colonnes[i].Longueur, regles[i]);
                     rapport.Colonnes.Add(traitees[i]!);
                 }
+                else if (CatalogueRegles.EstBinaire(colonnes[i].Type))
+                    rapport.BinairesGardes.Add(($"{t.Libelle}.{colonnes[i].Nom}", colonnes[i].Type, regles[i].Origine));
             return new TableEnCopie
             {
                 Table = t, Colonnes = colonnes, Regles = regles, Traitees = traitees,
+                Selection = [.. colonnes.Select((c, i) => regles[i].Traitement == Traitement.Document
+                    ? $"{DocumentsFictifs.ExpressionSignature(Ddl.Q(c.Nom))} AS {Ddl.Q(c.Nom)}"
+                    : Ddl.Q(c.Nom))],
                 Signatures = [.. colonnes.Select((c, i) => (c, i)).Where(x => CatalogueRegles.Segments(x.c.Nom).Any(s => s is "SIGN" or "SIGNATURE")).Select(x => x.i)],
                 Index = colonnes.Select((c, i) => (c.Nom, i)).ToDictionary(x => x.Nom, x => x.i, StringComparer.OrdinalIgnoreCase),
             };
@@ -303,7 +311,7 @@ public static class CopieAnonymisee
         if (e.Colonnes.Count == 0) return 0;
         // Une table sans cle primaire (104 dans RIG_DEV) : ses N premieres lignes dans l'ordre du serveur, comme au lot 8.
         var cle = schema.Index.FirstOrDefault(i => i.Table == t.Id && i.Primaire)?.Colonnes.Where(c => !c.Inclus).Select(c => Ddl.Q(c.Colonne)).ToList();
-        var sql = $"SELECT {(o.MaxLignes is { } m ? $"TOP ({m}) " : "")}{string.Join(", ", e.Colonnes.Select(c => Ddl.Q(c.Nom)))} " +
+        var sql = $"SELECT {(o.MaxLignes is { } m ? $"TOP ({m}) " : "")}{string.Join(", ", e.Selection)} " +
                   $"FROM {t.Complet} WITH (NOLOCK)" +
                   (o.MaxLignes is not null && cle is { Count: > 0 } ? $" ORDER BY {string.Join(", ", cle)}" : "");
         await using (var lecteur = await src.LireAsync(sql, ct))
@@ -329,7 +337,9 @@ public static class CopieAnonymisee
         FermetureSurLesCles? fermeture, bool sauterDejaCopiees, int tailleLot, CancellationToken ct)
     {
         using var lot = new DataTable();
-        for (var i = 0; i < lecteur.FieldCount; i++) lot.Columns.Add(e.Colonnes[i].Nom, lecteur.GetFieldType(i));
+        // Un document arrive en signature (texte) et repart en document fictif (octets).
+        for (var i = 0; i < lecteur.FieldCount; i++)
+            lot.Columns.Add(e.Colonnes[i].Nom, e.Regles[i].Traitement == Traitement.Document ? typeof(byte[]) : lecteur.GetFieldType(i));
         using var bulk = new SqlBulkCopy(cn, SqlBulkCopyOptions.KeepIdentity | SqlBulkCopyOptions.KeepNulls | SqlBulkCopyOptions.TableLock, null)
         {
             DestinationTableName = e.Table.Complet,
@@ -340,9 +350,10 @@ public static class CopieAnonymisee
 
         long ecrites = 0, octets = 0;
         var valeurs = new object[e.Colonnes.Count];
-        // Lecture SYNCHRONE des lignes : en asynchrone, SqlClient lit une grosse valeur binaire en un temps quadratique
+        // Lecture SYNCHRONE des lignes : en asynchrone, SqlClient lit une grosse valeur en un temps quadratique
         // (dotnet/SqlClient#593, ouvert ; 20 Mo : 52 s). fix-ok: mesure du 2026-11-22 sur la fermeture de RIG_DEV : 4 lignes de
-        // GED_RIG (GDRG_FICHIER, image) en 137 s, client a 100 % d'un coeur, serveur en ASYNC_NETWORK_IO.
+        // GED_RIG (GDRG_FICHIER, image) en 137 s, client a 100 % d'un coeur, serveur en ASYNC_NETWORK_IO. Depuis la regle des
+        // documents (meme jour), un document n'est plus lu du tout -- sa signature seule -- ; les gros textes et XML restent.
         while (lecteur.Read())
         {
             ct.ThrowIfCancellationRequested();
@@ -355,6 +366,12 @@ public static class CopieAnonymisee
                 if (e.Traitees[i] is not { } traitee || avant[i] is DBNull) continue;
                 traitee.Valeurs++;
                 valeurs[i] = anonymiseur.Appliquer(e.Regles[i], avant[i], e.Colonnes[i].AccepteNull, n => e.Index.TryGetValue(n, out var k) ? avant[k] : null);
+                if (traitee.Document && SignatureDocument.TryLire(avant[i] as string, out var signature))
+                {
+                    var format = signature.Format.ToString();
+                    traitee.Formats[format] = traitee.Formats.GetValueOrDefault(format) + 1;
+                    traitee.Octets += signature.Taille;
+                }
                 if (!Equals(valeurs[i], avant[i])) { traitee.Modifiees++; change = true; }
             }
             if (change && e.Signatures.Any(s => avant[s] is not DBNull)) e.SigneesTouchees++;
@@ -396,7 +413,7 @@ public static class CopieAnonymisee
                 var e = enCopie[l.Parent.Id];
                 try
                 {
-                    foreach (var (sql, parametres) in FermetureSurLesCles.Lectures(l, e.Colonnes, manquantes))
+                    foreach (var (sql, parametres) in FermetureSurLesCles.Lectures(l, e.Selection, manquantes))
                     {
                         await using var lecteur = await src.LireAsync(sql, ct, parametres);
                         var n = await EcrireAsync(lecteur, cn, e, anonymiseur, fermeture, sauterDejaCopiees: true, o.TailleLot, ct);

@@ -1,5 +1,10 @@
 using System.Data;
 using System.Diagnostics;
+using System.IO.Compression;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using Microsoft.Data.SqlClient;
 using RigV3.Base;
 using RigV3.Outils.Anonymisation;
@@ -221,6 +226,11 @@ var extrait = new (string Table, string? Filtre)[]
                                     " OR NTXDT_ID_NTXDT IN (SELECT TOP 100 NTXDT_ID_NTXDT FROM dbo.NOTIFICATION_RCS_XML_DETAIL WITH (NOLOCK) ORDER BY NTXDT_ID_NTXDT DESC)"),
     // Un nom de fichier qui porte des noms (24 % de prenoms, 37 % de noms sur RIG_DEV) ; extension a garder.
     ("CREANCE_TRANSITOIRE", Remplis("CREANCE_TRANSITOIRE", "CRTRA_ID_CRTRA", "CRTRA_NOM_FICHIER")),
+    // Des DOCUMENTS (regle des binaires) : les 40 derniers documents de la GED de 200 Ko au plus (RIG_DEV, 2026-11-23 :
+    // 38 ZIP et 2 XML ; GDRG_FICHIER_PDF et _PS y sont NULL) et les 20 derniers Kbis en PDF (7 a 20 Ko).
+    ("GED_RIG", "GDRG_NUM_DOCUMENT IN (SELECT TOP 40 GDRG_NUM_DOCUMENT FROM dbo.GED_RIG WITH (NOLOCK) WHERE GDRG_FICHIER IS NOT NULL " +
+                "AND DATALENGTH(GDRG_FICHIER) BETWEEN 1 AND 200000 ORDER BY GDRG_NUM_DOCUMENT DESC)"),
+    ("KBIS_XML", "KBIS_ID_KBIS IN (SELECT TOP 20 KBIS_ID_KBIS FROM dbo.KBIS_XML WITH (NOLOCK) WHERE KBIS_PDF IS NOT NULL ORDER BY KBIS_ID_KBIS DESC)"),
 };
 // Les 1 500 dernieres lignes ou le champ porte des lettres : assez de personnes pour que les prenoms courants s'y repetent
 // (le lexique du controle ne retient qu'un mot vu 3 fois dans 2 tables ; a 300 lignes, 81 prenoms seulement).
@@ -469,7 +479,7 @@ Exiger(signees > 0 && marque.Rows.Count == 1 && (bool)marque.Rows[0][0] && (stri
 // CA06 -- un controle automatique ne trouve aucune valeur reelle d'un echantillon ; comparaison chez la source
 // ====================================================================================================
 var controle = await ControleCopie.ControlerAsync(v2.Connexion, copie.Connexion, null, 200);
-var genresAdmis = new HashSet<string> { "empreinte", "nombre", "cle primaire" };
+var genresAdmis = new HashSet<string> { "empreinte", "nombre", "cle primaire", "format et taille" };
 Exiger(controle.Vert && controle.EchantillonValeurs > 0 && controle.EchantillonMots > 0 && controle.GenresLusSource.IsSubsetOf(genresAdmis),
     $"SOC-021 CA06 : controle de la copie : {controle.ColonnesControlees} colonnes personnelles, {controle.EchantillonValeurs} valeurs et {controle.EchantillonMots} mots reels tires, " +
     $"retrouves : {(controle.Fuites.Count == 0 ? "aucun" : string.Join(", ", controle.Fuites))} ; volumes {controle.TablesComparees} tables ; {controle.LignesComparees} lignes gardees comparees ; " +
@@ -546,6 +556,94 @@ foreach (var (table, cols) in new[] { ("CLIENT", "CLIEN_ID_CLIEN, CLIEN_PRENOM, 
 Exiger(memes.Count == 0, $"SOC-021 T02 : regles deterministes : meme graine, memes valeurs fictives dans les deux copies (CLIENT, FACTURE, PARTIE, AUDIT){(memes.Count == 0 ? "" : " -- ecarts : " + string.Join(", ", memes))}");
 
 // ====================================================================================================
+// SOC-021 CA01, CA03, CA04, CA06 -- DOCUMENTS (regle des binaires du lot 18) : chaque document de la source devient un
+// document FICTIF du meme format et de la meme taille ; aucun n'est retrouve dans la copie
+// ====================================================================================================
+// fix-ok: lot 18 (2026-11-22) -- la copie recopiait les Kbis et les actes tels quels (GED_RIG.GDRG_FICHIER, KBIS_XML.KBIS_PDF :
+// 1 367 documents, 531 Mo dans la copie reduite de RIG_DEV). Le banc compte LUI-MEME, source et copie etant sur ce serveur, sans
+// se fier au rapport ni au controle de l'outil : empreinte SHA-256 de chaque document des deux cotes, taille, NULL ; puis il
+// OUVRE chaque document de la copie avec un lecteur du format de la source (archive ZIP, XML, table xref du PDF).
+var colonnesDocuments = new (string Table, string Cle, string Colonne)[]
+{
+    ("GED_RIG", "GDRG_NUM_DOCUMENT", "GDRG_FICHIER"), ("GED_RIG", "GDRG_NUM_DOCUMENT", "GDRG_FICHIER_PDF"),
+    ("GED_RIG", "GDRG_NUM_DOCUMENT", "GDRG_FICHIER_PS"), ("KBIS_XML", "KBIS_ID_KBIS", "KBIS_PDF"),
+};
+async Task<BilanDocuments> DocumentsAsync(string chaineCopie, string? exemples = null)
+{
+    var nomC = new SqlConnectionStringBuilder(chaineCopie).InitialCatalog;
+    var b = new BilanDocuments();
+    var empreintesSource = new HashSet<string>();
+    var empreintesCopie = new HashSet<string>();
+    foreach (var (table, cle, col) in colonnesDocuments)
+    {
+        var lignes = await LireAsync(chaineCopie,
+            $"SELECT CONVERT(varbinary(8), SUBSTRING(CONVERT(varbinary(max), s.[{col}]), 1, 8)), CONVERT(bigint, DATALENGTH(s.[{col}])), " +
+            $"HASHBYTES('SHA2_256', CONVERT(varbinary(max), s.[{col}])), CONVERT(varbinary(max), c.[{col}]) " +
+            $"FROM {S(table)} s JOIN [{nomC}].dbo.[{table}] c ON c.[{cle}] = s.[{cle}]");
+        foreach (DataRow l in lignes.Rows)
+        {
+            var colonne = $"{table}.{col}";
+            if (l[1] is DBNull != l[3] is DBNull) b.NullsDifferents.Add(colonne);
+            if (l[1] is DBNull) { b.Nulls++; continue; }
+            if (l[3] is not byte[] doc) continue;
+            b.Documents++;
+            var format = FormatSource((byte[])l[0]);
+            b.Formats[format] = b.Formats.GetValueOrDefault(format) + 1;
+            if (doc.LongLength != (long)l[1]) b.AutreTaille.Add(colonne);
+            var empreinteSource = Convert.ToHexString((byte[])l[2]);
+            var empreinteCopie = Convert.ToHexString(SHA256.HashData(doc));
+            if (empreinteSource == empreinteCopie) b.ASaPlace.Add(colonne);
+            empreintesSource.Add(empreinteSource);
+            empreintesCopie.Add(empreinteCopie);
+            if (!Lisible(format, doc, (byte[])l[0])) b.Illisibles.Add($"{colonne} ({format})");
+            if (exemples is not null && !b.Exemples.ContainsKey(format))
+            {
+                b.Exemples[format] = Path.Combine(exemples, $"document-fictif-{format.ToLowerInvariant()}.{format.ToLowerInvariant()}");
+                await File.WriteAllBytesAsync(b.Exemples[format], doc);
+            }
+        }
+    }
+    b.Ailleurs = empreintesCopie.Count(empreintesSource.Contains);
+    return b;
+}
+var exemplesFictifs = Path.Combine(dossier, "documents-fictifs");
+Directory.CreateDirectory(exemplesFictifs);
+var documents = await DocumentsAsync(copie.Connexion, exemplesFictifs);
+var sectionDocuments = texteRapport.Contains("## Documents remplacés") && texteRapport.Contains("## Champs libres")
+    ? texteRapport[texteRapport.IndexOf("## Documents remplacés", StringComparison.Ordinal)..texteRapport.IndexOf("## Champs libres", StringComparison.Ordinal)] : "";
+Exiger(documents.Documents >= 40 && documents.Formats.Count >= 3 && documents.Nulls > 0 && documents.ASaPlace.Count == 0 && documents.Ailleurs == 0
+       && documents.AutreTaille.Count == 0 && documents.Illisibles.Count == 0 && documents.NullsDifferents.Count == 0
+       && sectionDocuments.Contains("dbo.GED_RIG.GDRG_FICHIER") && sectionDocuments.Contains("dbo.KBIS_XML.KBIS_PDF"),
+    $"SOC-021 CA01, CA03, CA04, CA06 : documents remplacés : aucun document de la source retrouvé, même format, même taille -- {documents.Documents} documents " +
+    $"({string.Join(", ", documents.Formats.Select(f => $"{f.Key} {f.Value}"))}) : retrouves a leur place {documents.ASaPlace.Count}, ailleurs dans la copie {documents.Ailleurs} (empreintes SHA-256) ; " +
+    $"autre taille {documents.AutreTaille.Count} ; illisibles dans le format de la source {documents.Illisibles.Count}{(documents.Illisibles.Count == 0 ? "" : " (" + string.Join(", ", documents.Illisibles.Distinct()) + ")")} " +
+    $"(archive ZIP ouverte, XML lu, table xref du PDF suivie) ; {documents.Nulls} NULL restes NULL ; colonnes listees au rapport (CA04) : " +
+    $"{(sectionDocuments.Contains("GDRG_FICHIER") && sectionDocuments.Contains("KBIS_PDF") ? "GED_RIG.GDRG_FICHIER, KBIS_XML.KBIS_PDF" : "NON")}");
+Exiger(controle.ColonnesDocuments >= 2 && controle.DocumentsTires > 0 && controle.DocumentsRetrouves.Count == 0 && controle.DocumentsAutreForme.Count == 0
+       && controle.GenresLusSource.Contains("format et taille"),
+    $"SOC-021 CA06 : le controle de l'outil tire {controle.DocumentsTires} documents de {controle.ColonnesDocuments} colonnes « document » (empreinte calculee sur le serveur de la source) : " +
+    $"retrouves {(controle.DocumentsRetrouves.Count == 0 ? "aucun" : string.Join(", ", controle.DocumentsRetrouves))}, autre forme " +
+    $"{(controle.DocumentsAutreForme.Count == 0 ? "aucune" : string.Join(", ", controle.DocumentsAutreForme))}");
+
+// CONTRE-EPREUVE ROUGE : la regle des binaires retiree (remplacements « Garder » sur les deux colonnes de documents). Le compte du
+// banc DOIT retrouver les documents, le controle de l'outil aussi -- par les colonnes « document » avec ses regles, et par les
+// binaires GARDES quand il prend la regle fausse : sinon le vert ci-dessus ne prouverait pas que les documents sont remplaces.
+KeyValuePair<string, Traitement>[] sansRegleBinaires = [new("GED_RIG.GDRG_FICHIER", Traitement.Garder), new("KBIS_XML.KBIS_PDF", Traitement.Garder)];
+await using var documentsEnClair = await BaseJetable.CreerAsync("SocleAnonymisationDocuments");
+await CopieAnonymisee.CopierAsync(new OptionsCopie { Source = v2.Connexion, Cible = documentsEnClair.Connexion, Graine = "SOC-021", Remplacements = sansRegleBinaires });
+var documentsSabot = await DocumentsAsync(documentsEnClair.Connexion);
+var controleDocuments = await ControleCopie.ControlerAsync(v2.Connexion, documentsEnClair.Connexion, null, 200);
+var controleRegleFausse = await ControleCopie.ControlerAsync(v2.Connexion, documentsEnClair.Connexion, null, 200, remplacements: sansRegleBinaires);
+var gardesAvecDocuments = controleRegleFausse.BinairesGardes.Where(g => g.Documents > 0).Select(g => g.Colonne).ToList();
+Exiger(documentsSabot.ASaPlace.Count == documentsSabot.Documents && documentsSabot.Documents >= 40
+       && !controleDocuments.Vert && controleDocuments.DocumentsRetrouves.Any(d => d.StartsWith("dbo.GED_RIG.GDRG_FICHIER ", StringComparison.Ordinal))
+       && controleDocuments.DocumentsRetrouves.Any(d => d.StartsWith("dbo.KBIS_XML.KBIS_PDF ", StringComparison.Ordinal))
+       && !controleRegleFausse.Vert && gardesAvecDocuments.Contains("dbo.GED_RIG.GDRG_FICHIER") && gardesAvecDocuments.Contains("dbo.KBIS_XML.KBIS_PDF"),
+    $"SOC-021 CA06 (contre-epreuve) : regle des binaires retiree -> le banc retrouve {documentsSabot.ASaPlace.Count} documents sur {documentsSabot.Documents} ; " +
+    $"le controle de l'outil aussi : {string.Join(", ", controleDocuments.DocumentsRetrouves)} ; avec la regle fausse, il voit des documents dans les binaires gardes : " +
+    $"{string.Join(", ", controleRegleFausse.BinairesGardes.Where(g => g.Documents > 0).Select(g => $"{g.Colonne} ({g.Documents} sur {g.Valeurs} : {g.Formats})"))}");
+
+// ====================================================================================================
 // CA07 -- la source n'est lue qu'en lecture seule, avec l'accord donne pour elle ; on n'ecrit que la copie
 // ====================================================================================================
 Exiger(avant == apres && rapport.EcrituresSourceAvant == rapport.EcrituresSourceApres && rapport.EcrituresSourceAvant is not null,
@@ -577,6 +675,21 @@ var inventaire = Path.Combine(dossier, "inventaire-rig-dev.md");
 var codeInventaire = await Programme.ExecuterAsync(["inventaire", "--source", chaineRigDev, "--accord", baseRigDev, "--sortie", inventaire], sortie, erreurs);
 Exiger(codeInventaire == 0 && File.Exists(inventaire),
     $"SOC-021 CA07 (jumeau accepte), T01 : avec l'accord donne pour {baseRigDev}, l'outil la lit -- inventaire du schema (aucune donnee) : {sortie.ToString().Trim().Split('\n').Last()}");
+// L'inventaire des binaires (regle du lot 18) : CHAQUE colonne binary, varbinary ou image des tables de RIG_DEV, lue par le banc
+// lui-meme, y est classee -- remplacee (document) ou gardee avec sa raison (binaire technique).
+var binairesRigDev = (await rigDev.LignesAsync(
+        "SELECT OBJECT_SCHEMA_NAME(c.object_id) + '.' + OBJECT_NAME(c.object_id) + '.' + c.name FROM sys.columns c JOIN sys.tables t ON t.object_id = c.object_id " +
+        "WHERE t.is_ms_shipped = 0 AND TYPE_NAME(c.system_type_id) IN ('binary', 'varbinary', 'image')", CancellationToken.None))
+    .Select(l => (string)l[0]!).ToList();
+var texteInventaire = File.Exists(inventaire) ? await File.ReadAllTextAsync(inventaire) : "";
+var sectionBinaires = texteInventaire.Contains("## Colonnes binaires") ? texteInventaire[texteInventaire.IndexOf("## Colonnes binaires", StringComparison.Ordinal)..] : "";
+var lignesBinaires = sectionBinaires.Split('\n').Where(l => l.StartsWith("| dbo.", StringComparison.Ordinal)).ToList();
+var nonClassees = binairesRigDev.Where(b => !lignesBinaires.Any(l => l.StartsWith($"| {b} |", StringComparison.Ordinal)
+    && (l.Contains("**remplacée**") || l.Contains("**gardée**")) && l.TrimEnd().TrimEnd('|').Split('|').Last().Trim().Length > 10)).ToList();
+Exiger(binairesRigDev.Count > 0 && nonClassees.Count == 0,
+    $"SOC-021 T01, CA04 : inventaire des binaires de {baseRigDev} : {binairesRigDev.Count} colonnes, chacune classee avec sa raison " +
+    $"({lignesBinaires.Count(l => l.Contains("**remplacée**"))} remplacees, {lignesBinaires.Count(l => l.Contains("**gardée**"))} gardees)" +
+    (nonClassees.Count == 0 ? "" : $" -- NON CLASSEES : {string.Join(", ", nonClassees)}"));
 await using (var porte = await PorteSource.OuvrirAsync(v2.Connexion, null, CancellationToken.None))
 {
     string? refus = null;
@@ -710,13 +823,15 @@ static async Task<DataTable> LireAsync(string chaine, string sql)
 }
 
 /// <summary>
-/// La table telle que RIG_DEV la declare (colonnes, types, identite, cle primaire), ecrite par le banc LUI-MEME
-/// (independamment de la reecriture de l'outil, Outils/Anonymisation/Schema.cs, qu'il controle).
+/// La table telle que RIG_DEV la declare (colonnes, types, collation, identite, cle primaire), ecrite par le banc LUI-MEME
+/// (independamment de la reecriture de l'outil, Outils/Anonymisation/Schema.cs, qu'il controle). La collation de chaque texte
+/// est reprise : KBIS_XML.KBIS_XML est en French_CI_AS dans une base en SQL_Latin1_General_CP1_CI_AS, et la copie en masse
+/// refuse deux colonnes de langues differentes (« L'ID '1036' ... ne correspond pas a l'ID '1033' »).
 /// </summary>
 static async Task<string> DdlBancAsync(PorteSource rigDev, string table)
 {
     var colonnes = await rigDev.LignesAsync(
-        "SELECT c.name, TYPE_NAME(c.system_type_id), CONVERT(int, c.max_length), CONVERT(int, c.precision), CONVERT(int, c.scale), c.is_nullable, c.is_identity " +
+        "SELECT c.name, TYPE_NAME(c.system_type_id), CONVERT(int, c.max_length), CONVERT(int, c.precision), CONVERT(int, c.scale), c.is_nullable, c.is_identity, c.collation_name " +
         $"FROM sys.columns c WHERE c.object_id = OBJECT_ID('dbo.{table}') AND c.is_computed = 0 ORDER BY c.column_id", CancellationToken.None);
     var cle = await rigDev.LignesAsync(
         "SELECT COL_NAME(ic.object_id, ic.column_id) FROM sys.indexes i JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id " +
@@ -733,8 +848,113 @@ static async Task<string> DdlBancAsync(PorteSource rigDev, string table)
             "timestamp" => "binary(8)",
             _ => type,
         };
-        return $"[{nom}] {t}{((bool)c[6]! ? " IDENTITY(1,1)" : "")}{((bool)c[5]! ? " NULL" : " NOT NULL")}";
+        return $"[{nom}] {t}{(c[7] is string collation ? $" COLLATE {collation}" : "")}{((bool)c[6]! ? " IDENTITY(1,1)" : "")}{((bool)c[5]! ? " NULL" : " NOT NULL")}";
     });
     var pk = cle.Count > 0 ? $", CONSTRAINT [PK_{table}] PRIMARY KEY CLUSTERED ({string.Join(", ", cle.Select(k => $"[{k[0]}]"))})" : "";
     return $"CREATE TABLE dbo.[{table}] ({string.Join(", ", defs)}{pk});";
+}
+
+// ----------------------------------------------------------------------------------------------------
+// Les documents, lus par le banc LUI-MEME (independamment de Outils/Anonymisation/Documents.cs, qu'il controle).
+
+/// <summary>Le format d'un document de la source, reconnu a ses premiers octets.</summary>
+static string FormatSource(byte[] tete)
+{
+    ReadOnlySpan<byte> t = tete;
+    if (t.StartsWith("%PDF"u8)) return "Pdf";
+    if (t.StartsWith("%!"u8)) return "PostScript";
+    if (t.StartsWith("PK\u0003\u0004"u8) || t.StartsWith("PK\u0005\u0006"u8)) return "Zip";
+    ReadOnlySpan<byte> marqueUtf8 = [0xEF, 0xBB, 0xBF];
+    if (t.StartsWith(marqueUtf8)) t = t[3..];
+    return t.StartsWith("<"u8) ? "Xml" : "Autre";
+}
+
+/// <summary>
+/// Le document de la copie se lit-il comme un document du format de la source, et ne dit-il que le texte fictif ? ZIP : l'archive
+/// s'ouvre et son unique fichier le porte ; XML : il se charge et sa racine le porte ; PDF : voir <see cref="PdfLisible"/> ;
+/// PostScript : il l'imprime ; autre format : il garde la signature de la source.
+/// </summary>
+static bool Lisible(string format, byte[] doc, byte[] teteSource)
+{
+    const string texte = "Document anonymisé — copie de travail";
+    try
+    {
+        switch (format)
+        {
+            case "Pdf":
+                return PdfLisible(doc);
+            case "Zip":
+            {
+                using var zip = new ZipArchive(new MemoryStream(doc), ZipArchiveMode.Read);
+                if (zip.Entries.Count != 1) return false;
+                using var lu = new StreamReader(zip.Entries[0].Open(), Encoding.UTF8);
+                return lu.ReadToEnd().StartsWith(texte, StringComparison.Ordinal);
+            }
+            case "Xml":
+                return XDocument.Load(new MemoryStream(doc)).Root?.Value.Contains(texte, StringComparison.Ordinal) == true;
+            case "PostScript":
+                var ps = Encoding.Latin1.GetString(doc);
+                return ps.StartsWith("%!PS", StringComparison.Ordinal) && ps.Contains("copie de travail) show", StringComparison.Ordinal) && ps.EndsWith("%%EOF\n", StringComparison.Ordinal);
+            default:
+                return doc.AsSpan().StartsWith(teteSource.AsSpan(0, Math.Min(4, teteSource.Length)));
+        }
+    }
+    catch (Exception e) when (e is InvalidDataException or System.Xml.XmlException or IOException)
+    {
+        return false;
+    }
+}
+
+/// <summary>
+/// Un PDF lisible : en-tete « %PDF-1. », « startxref » qui mene a la table xref, chaque objet « n » de la table a sa position
+/// exacte, racine /Catalog, et le flux de la page (de longueur /Length exacte) ecrit le texte fictif. C'est ce que suit un lecteur
+/// pour ouvrir le fichier sans le reparer.
+/// </summary>
+static bool PdfLisible(byte[] pdf)
+{
+    var s = Encoding.Latin1.GetString(pdf);
+    var fin = Regex.Match(s, @"startxref\n(\d+)\n%%EOF\n?$");
+    if (!s.StartsWith("%PDF-1.", StringComparison.Ordinal) || !fin.Success) return false;
+    var xref = long.Parse(fin.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+    if (xref >= s.Length) return false;
+    var table = Regex.Match(s[(int)xref..], @"^xref\n0 (\d+)\n((?:\d{10} \d{5} [nf] \n)+)trailer\n<<(.*?)>>", RegexOptions.Singleline);
+    if (!table.Success) return false;
+    var entrees = table.Groups[2].Value.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+    if (entrees.Length != int.Parse(table.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture)) return false;
+    var objets = new Dictionary<int, string>();
+    for (var i = 1; i < entrees.Length; i++)
+    {
+        var pos = int.Parse(entrees[i][..10], System.Globalization.CultureInfo.InvariantCulture);
+        if (entrees[i][17] != 'n' || pos >= s.Length || !s.AsSpan(pos).StartsWith($"{i} 0 obj")) return false;
+        var finObjet = s.IndexOf("endobj", pos, StringComparison.Ordinal);
+        if (finObjet < 0) return false;
+        objets[i] = s[pos..finObjet];
+    }
+    var racine = Regex.Match(table.Groups[3].Value, @"/Root (\d+) 0 R");
+    if (!racine.Success || !objets.TryGetValue(int.Parse(racine.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture), out var catalogue)
+        || !catalogue.Contains("/Type /Catalog", StringComparison.Ordinal)) return false;
+    var flux = objets.Values.Select(o => Regex.Match(o, @"<< /Length (\d+) >>\nstream\n")).FirstOrDefault(m => m.Success);
+    if (flux is null) return false;
+    var objet = objets.Values.First(o => o.Contains(flux.Value, StringComparison.Ordinal));
+    var debut = objet.IndexOf(flux.Value, StringComparison.Ordinal) + flux.Length;
+    var longueur = int.Parse(flux.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+    return debut + longueur <= objet.Length && objet.AsSpan(debut + longueur).StartsWith("\nendstream")
+           && objet.Substring(debut, longueur).Contains(@"(Document anonymis\351 \227 copie de travail) Tj", StringComparison.Ordinal);
+}
+
+/// <summary>Ce que le banc a vu des documents d'une copie (section « DOCUMENTS »).</summary>
+sealed class BilanDocuments
+{
+    public long Documents { get; set; }
+    public long Nulls { get; set; }
+    public SortedDictionary<string, long> Formats { get; } = new(StringComparer.Ordinal);
+    /// <summary>Colonnes dont un document de la copie a l'empreinte de celui de la source, a sa place.</summary>
+    public List<string> ASaPlace { get; } = [];
+    /// <summary>Documents de la copie dont l'empreinte est celle d'un document de la source, ou qu'il soit.</summary>
+    public int Ailleurs { get; set; }
+    public List<string> AutreTaille { get; } = [];
+    public List<string> Illisibles { get; } = [];
+    public List<string> NullsDifferents { get; } = [];
+    /// <summary>Un document fictif par format, ecrit a cote du banc pour qu'on l'ouvre a la main.</summary>
+    public Dictionary<string, string> Exemples { get; } = [];
 }

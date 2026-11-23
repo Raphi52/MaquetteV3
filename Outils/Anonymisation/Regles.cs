@@ -21,6 +21,9 @@ public enum Traitement
     Vider,
     /// <summary>XML : chaque attribut ou element traite par la regle de la colonne qu'il porte.</summary>
     Xml,
+    /// <summary>Colonne binaire qui porte un document : document FICTIF du meme format, a la meme taille (Documents.cs).
+    /// La source n'en rend que la signature (format et taille).</summary>
+    Document,
 }
 
 /// <summary>
@@ -50,6 +53,10 @@ public sealed record Regle(Traitement Traitement, string Origine, string? Colonn
 ///    prenoms se voit au controle (ControleCopie.MesurerGardeesAsync).
 /// 3. Des REMPLACEMENTS « TABLE.COLONNE=traitement » (option --regles) : la relecture du delegue
 ///    s'applique sans toucher au code. Ils priment sur le reste.
+/// 4. Une colonne BINAIRE (binary, varbinary, image) est un DOCUMENT, remplace par un document fictif (Documents.cs),
+///    sauf un binaire technique : colonne de cle (primaire, unique, etrangere), ou nom a segment technique (EMPREINTE,
+///    HASH, CLE, SIGNATURE…) ET taille declaree bornee -- une empreinte, une cle ou une signature de chaine a une taille
+///    fixe, un document non. Une regle de texte posee sur un binaire le fait document (on prefere abimer).
 /// </summary>
 public sealed partial class CatalogueRegles
 {
@@ -77,7 +84,7 @@ public sealed partial class CatalogueRegles
             if (ligne.Length == 0) continue;
             var egal = ligne.IndexOf('=');
             if (egal <= 0 || !Enum.TryParse<Traitement>(ligne[(egal + 1)..].Trim(), ignoreCase: true, out var t))
-                throw new ArgumentException($"{fichier} : ligne illisible « {ligne} » (attendu TABLE.COLONNE=Garder|Mots|Courriel|Fichier|Telephone|DateNaissance|Vider|Xml).");
+                throw new ArgumentException($"{fichier} : ligne illisible « {ligne} » (attendu TABLE.COLONNE=Garder|Mots|Courriel|Fichier|Telephone|DateNaissance|Vider|Xml|Document).");
             yield return new(ligne[..egal].Trim(), t);
         }
     }
@@ -85,13 +92,15 @@ public sealed partial class CatalogueRegles
     /// <summary>
     /// La regle d'une colonne. <paramref name="table"/> sans schema (« CLIENT ») ; <paramref name="typeSql"/>
     /// le type de base (varchar, datetime, xml…) : une regle de texte ne s'applique qu'a un texte.
+    /// <paramref name="longueur"/> : la taille declaree (sys.columns.max_length, -1 = max) ; elle ne compte que pour un
+    /// binaire (une taille bornee peut etre une empreinte ; inconnue, il est un document).
     /// </summary>
-    public Regle Pour(string table, string colonne, string typeSql)
+    public Regle Pour(string table, string colonne, string typeSql, int longueur = -1)
     {
         var regle = _remplacements.GetValueOrDefault((table, colonne))
                     ?? _parLesCles.GetValueOrDefault((table, colonne))
                     ?? _explicites.GetValueOrDefault((table, colonne))
-                    ?? ParLeNom(colonne, typeSql);
+                    ?? ParLeNom(colonne, typeSql, longueur);
         return Compatible(regle, typeSql);
     }
 
@@ -110,7 +119,16 @@ public sealed partial class CatalogueRegles
     public void AlignerSurLesCles(SchemaSource schema)
     {
         var tables = schema.Tables.ToDictionary(t => t.Id);
+        // UN BINAIRE DE CLE N'EST PAS UN DOCUMENT : il identifie une ligne (cle primaire, index unique, cle etrangere). Remplace
+        // par un document fictif, qui ne depend que du format et de la taille, deux lignes y deviendraient egales.
+        var cles = schema.Index.Where(i => i.Primaire || i.Unique).SelectMany(i => i.Colonnes.Where(c => !c.Inclus).Select(c => (i.Table, c.Colonne)))
+            .Concat(schema.Cles.SelectMany(k => k.Colonnes.Select(c => (k.Table, c.Colonne)).Concat(k.Colonnes.Select(c => (Table: k.Reference, Colonne: c.Referencee)))));
+        foreach (var (id, nom) in cles.Distinct())
+            if (tables.TryGetValue(id, out var t) && t.Colonnes.FirstOrDefault(c => c.Nom == nom) is { } c && EstBinaire(c.Type)
+                && !_remplacements.ContainsKey((t.Nom, nom)) && !_explicites.ContainsKey((t.Nom, nom)))
+                _parLesCles[(t.Nom, nom)] = new Regle(Traitement.Garder, "binaire technique : colonne de cle (primaire, unique ou etrangere), elle identifie une ligne -- ce n'est pas un document");
         string TypeDe(TableSql t, string c) => t.Colonnes.FirstOrDefault(x => x.Nom == c)?.Type ?? "varchar";
+        int LongueurDe(TableSql t, string c) => t.Colonnes.FirstOrDefault(x => x.Nom == c)?.Longueur ?? -1;
         var paires = schema.Cles
             .Where(k => tables.ContainsKey(k.Table) && tables.ContainsKey(k.Reference))
             .SelectMany(k => k.Colonnes.Select(c => (T: tables[k.Table], C: c.Colonne, R: tables[k.Reference], RC: c.Referencee, Cle: k.Nom)))
@@ -121,8 +139,8 @@ public sealed partial class CatalogueRegles
             var change = false;
             foreach (var p in paires)
             {
-                var a = Pour(p.T.Nom, p.C, TypeDe(p.T, p.C));
-                var b = Pour(p.R.Nom, p.RC, TypeDe(p.R, p.RC));
+                var a = Pour(p.T.Nom, p.C, TypeDe(p.T, p.C), LongueurDe(p.T, p.C));
+                var b = Pour(p.R.Nom, p.RC, TypeDe(p.R, p.RC), LongueurDe(p.R, p.RC));
                 if (a.Traitement == b.Traitement) continue;
                 var (modele, table, colonne) = b.Anonymise ? (b, p.T.Nom, p.C) : (a, p.R.Nom, p.RC);
                 if (_remplacements.ContainsKey((table, colonne)) || _parLesCles.ContainsKey((table, colonne))) continue;
@@ -153,9 +171,13 @@ public sealed partial class CatalogueRegles
     /// rapport les liste « a relire ». Une colonne qui n'est pas du texte (cle entiere, indicateur, date) ne porte pas
     /// de nom : elle n'y est pas -- sauf un telephone range dans un nombre, que les regles de texte ne touchent pas.
     /// </summary>
-    public string? Suspicion(string table, string colonne, string typeSql)
+    public string? Suspicion(string table, string colonne, string typeSql, int longueur = -1)
     {
-        if (_remplacements.ContainsKey((table, colonne)) || _parLesCles.ContainsKey((table, colonne))) return null;
+        if (_remplacements.ContainsKey((table, colonne))) return null;
+        // Un binaire GARDE est toujours a relire : la regle le croit technique (cle, empreinte), le controle le verifie.
+        if (EstBinaire(typeSql))
+            return Pour(table, colonne, typeSql, longueur) is { Anonymise: false } garde ? $"binaire GARDÉ : {garde.Origine}" : null;
+        if (_parLesCles.ContainsKey((table, colonne))) return null;
         var nom = Lire(colonne);
         if (_explicites.TryGetValue((table, colonne), out var r))
             return r.Traitement == Traitement.Garder && nom.Marqueur is { } m ? $"segment « {m} », gardee par le catalogue : {r.Origine}" : null;
@@ -175,10 +197,14 @@ public sealed partial class CatalogueRegles
         return r.Traitement switch
         {
             Traitement.Garder => r,
+            Traitement.Vider => r,
+            Traitement.Document when EstBinaire(typeSql) => r,
+            Traitement.Document => Garde(r, typeSql),
+            // Une regle de texte (nom, adresse, champ libre) sur un binaire : le binaire porte ce texte, c'est un document.
+            _ when EstBinaire(typeSql) => r with { Traitement = Traitement.Document, Origine = $"{r.Origine} -- colonne binaire : document fictif" },
             Traitement.Xml when typeSql == "xml" => r,
             Traitement.Xml => texte ? r with { Traitement = Traitement.Mots } : Garde(r, typeSql),
             Traitement.DateNaissance when EstDate(typeSql) || texte => r,
-            Traitement.Vider => r,
             _ when texte => r,
             _ when typeSql == "xml" => r with { Traitement = Traitement.Xml },
             _ => Garde(r, typeSql),
@@ -189,6 +215,8 @@ public sealed partial class CatalogueRegles
         => new(Traitement.Garder, $"{r.Origine} -- non applicable au type {typeSql} : gardee");
 
     public static bool EstTexte(string t) => t is "varchar" or "nvarchar" or "char" or "nchar" or "text" or "ntext" or "sysname";
+    /// <summary>Un binaire (rowversion/timestamp a part : un compteur de version, recopie, voir Copie.cs).</summary>
+    public static bool EstBinaire(string t) => t is "binary" or "varbinary" or "image";
     public static bool EstDate(string t) => t is "datetime" or "datetime2" or "smalldatetime" or "date" or "datetimeoffset";
     private static bool EstNombre(string t) => t is "bigint" or "int" or "decimal" or "numeric" or "float" or "real" or "money";
 
@@ -266,8 +294,31 @@ public sealed partial class CatalogueRegles
         return new LectureNom(marqueur, technique, fichier, compose);
     }
 
-    private static Regle ParLeNom(string colonne, string typeSql)
+    /// <summary>
+    /// Les segments d'un binaire TECHNIQUE (empreinte, cle, signature de chaine, identifiant), qui ne porte pas de personne --
+    /// a condition que sa taille declaree soit bornee : une IMAGE de signature manuscrite, en varbinary(max) ou image, est un
+    /// document. Regle du chef (lot 18, 2026-11-22) ; aucun binaire de RIG_DEV ne la remplit (12 colonnes, toutes documents).
+    /// </summary>
+    private static readonly HashSet<string> BinairesTechniques = new(StringComparer.OrdinalIgnoreCase)
     {
+        "EMPREINTE", "HASH", "HACHAGE", "CHECKSUM", "CLE", "KEY", "SEL", "SALT", "SIGN", "SIGNATURE", "JETON", "TOKEN",
+        "ID", "GUID", "UUID", "VERSION", "ROWVERSION", "IV", "NONCE",
+    };
+
+    private static Regle Binaire(string colonne, string typeSql, int longueur)
+    {
+        var technique = Segments(colonne).FirstOrDefault(BinairesTechniques.Contains);
+        var bornee = typeSql != "image" && longueur > 0;
+        if (technique is not null && bornee)
+            return new Regle(Traitement.Garder, $"binaire technique : segment « {technique} », taille bornee ({longueur} octets) -- empreinte, cle ou signature de chaine, ne porte pas de personne");
+        return new Regle(Traitement.Document,
+            "binaire : document ou contenu qui peut porter une personne -- document fictif du meme format, a la meme taille" +
+            (technique is null ? "" : $" (segment « {technique} », mais taille non bornee : un document)"));
+    }
+
+    private static Regle ParLeNom(string colonne, string typeSql, int longueur = -1)
+    {
+        if (EstBinaire(typeSql)) return Binaire(colonne, typeSql, longueur);
         if (typeSql == "xml") return new Regle(Traitement.Xml, "colonne XML : chaque valeur par le nom de son attribut ou element");
         var nom = Lire(colonne);
         if (nom.Marqueur is not { } marqueur) return new Regle(Traitement.Garder, "nom sans segment personnel");

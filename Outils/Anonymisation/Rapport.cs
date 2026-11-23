@@ -13,8 +13,12 @@ public sealed class ColonneTraitee(string table, string colonne, string type, in
     public Regle Regle { get; } = regle;
     public long Valeurs { get; set; }
     public long Modifiees { get; set; }
+    public bool Document => Regle.Traitement == Traitement.Document;
+    /// <summary>Document : nombre de documents par format (« Pdf », « Zip »…) et octets ecrits (les memes que la source).</summary>
+    public SortedDictionary<string, long> Formats { get; } = new(StringComparer.Ordinal);
+    public long Octets { get; set; }
     /// <summary>Champ libre au sens de CA04 : texte long (plus de 100 caracteres ou max) ou XML.</summary>
-    public bool ChampLibre => Type == "xml" || Longueur < 0 || Longueur > 100 * (Type.StartsWith('n') ? 2 : 1);
+    public bool ChampLibre => !Document && (Type == "xml" || Longueur < 0 || Longueur > 100 * (Type.StartsWith('n') ? 2 : 1));
 }
 
 /// <summary>
@@ -44,6 +48,8 @@ public sealed class Rapport
     public List<(string Table, long Lignes)> AjoutsFermeture { get; } = [];
     public List<(string Table, long Lignes)> Volumes { get; } = [];
     public List<ColonneTraitee> Colonnes { get; } = [];
+    /// <summary>Les colonnes binaires GARDEES (binaire technique : cle, empreinte, signature de chaine) et pourquoi.</summary>
+    public List<(string Colonne, string Type, string Raison)> BinairesGardes { get; } = [];
     public List<(string Colonne, string Raison)> ARelire { get; } = [];
     public List<(string Table, long Lignes)> TablesSigneesTouchees { get; } = [];
     public List<string> IndexCrees { get; } = [];
@@ -98,8 +104,23 @@ public sealed class Rapport
 
         sb.AppendLine("## Colonnes anonymisées (CA01, CA02)").AppendLine();
         sb.AppendLine("| Colonne | Traitement | Origine de la règle | Valeurs | Modifiées |").AppendLine("|---|---|---|---:|---:|");
-        foreach (var c in Colonnes.Where(c => !c.ChampLibre))
+        foreach (var c in Colonnes.Where(c => !c.ChampLibre && !c.Document))
             sb.AppendLine($"| {c.Table}.{c.Colonne} | {c.Regle.Traitement} | {c.Regle.Origine} | {N(c.Valeurs)} | {N(c.Modifiees)} |");
+        sb.AppendLine();
+
+        sb.AppendLine("## Documents remplacés (CA01, CA03, CA04)").AppendLine();
+        sb.AppendLine("Colonnes binaires qui portent un document (GED, Kbis, flux, pièces numérisées) : chaque document est remplacé par un " +
+                      $"document FICTIF du même format, complété à la même taille (« {DocumentsFictifs.TexteFictif} »). La source n'a rendu " +
+                      "que le format et la taille de chacun : aucun octet d'un document réel n'est sorti de la source. NULL reste NULL.").AppendLine();
+        sb.AppendLine("| Colonne | Type | Documents | Remplacés | Formats | Octets |").AppendLine("|---|---|---:|---:|---|---:|");
+        foreach (var c in Colonnes.Where(c => c.Document))
+            sb.AppendLine($"| {c.Table}.{c.Colonne} | {c.Type} | {N(c.Valeurs)} | {N(c.Modifiees)} | " +
+                          $"{(c.Formats.Count == 0 ? "—" : string.Join(", ", c.Formats.Select(f => $"{f.Key} {N(f.Value)}")))} | {N(c.Octets)} |");
+        if (!Colonnes.Any(c => c.Document)) sb.AppendLine("| aucune | | | | | |");
+        sb.AppendLine();
+        sb.AppendLine("Binaires gardés (binaire technique, sans personne) :").AppendLine();
+        if (BinairesGardes.Count == 0) sb.AppendLine("- aucun.");
+        foreach (var (c, t, r) in BinairesGardes) sb.AppendLine($"- `{c}` ({t}) : {r}");
         sb.AppendLine();
 
         sb.AppendLine("## Champs libres (CA04)").AppendLine();

@@ -430,8 +430,10 @@ lecture des lignes est **synchrone** — en asynchrone, SqlClient lit un gros bi
 ([dotnet/SqlClient#593](https://github.com/dotnet/SqlClient/issues/593)) : la fermeture restait sur 4 documents de
 `GED_RIG` (dont un de 510 Mo) plus de 2 min, à 100 % d'un cœur ; ensuite 4 documents en 7 s — et un lot s'écrit dès
 64 Mo (au premier passage, lots bornés en lignes seulement, le processus de copie est monté à 4,3 Go pendant la fermeture
-de `GED_RIG` ; ensuite 255 à 640 Mo). Et un **défaut relevé, non corrigé** : les documents de
-la GED passent en clair dans la copie (`socle-anonymisation.md`, « Défaut relevé au lot 18 »).
+de `GED_RIG` ; ensuite 255 à 640 Mo). Et un **défaut relevé** : les documents de la GED passaient en clair dans la
+copie — **corrigé le 2026-11-23** (SOC-021, `socle-anonymisation.md`, « Les documents ») : chaque document devient un
+document fictif du même format et de la même taille, et la source n'en rend plus que le format et la taille. Une copie
+de répétition faite avant cette date porte des documents réels : on la refait.
 
 **Fichiers du lot 18** : `Outils\Anonymisation\Fermeture.cs` (la fermeture), `Copie.cs` (copie par table réutilisée par
 la fermeture, clés vérifiées, lecture synchrone, lots bornés en octets), `Rapport.cs` (lignes ajoutées, tours, durée) ;
