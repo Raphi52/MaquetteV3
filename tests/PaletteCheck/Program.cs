@@ -282,6 +282,68 @@ internal static class Programme
         Exiger(plan.Vue().Proc is { Libelle: var lib } && lib.Contains("Facture", StringComparison.OrdinalIgnoreCase),
             "Entree sur un ecran du menu l'ouvre");
 
+        // --- 12 bis. Ctrl K trouve TOUT le menu par son libelle, pas seulement les ecrans du
+        // plan de travail (Groupes). « Mandataires » et « Tables de reference » ne sont qu'au
+        // menu. Le filtre de profil vaut aussi pour le menu : PROC_MANDATAIRE est reserve au
+        // judiciaire, donc un login RCS seul ne le trouve pas. Un ecran present dans les deux
+        // sources ne sort qu'une fois (« Commandes web »).
+        Agir("paletteOuvrir");
+        Agir("paletteTexte", "Mandataires");
+        Exiger(P().Ecrans.Any(e => e is { Code: "PROC_MANDATAIRE", Libelle: "Mandataires" }),
+            "Ctrl K « Mandataires » trouve l'ecran du menu par son libelle");
+        Agir("paletteTexte", "Tables de reference");
+        Exiger(P().Ecrans.Any(e => e.Code == "PROC_GTABREF"),
+            "Ctrl K « Tables de reference » trouve l'ecran du menu par son libelle");
+        Agir("paletteTexte", "Commandes web");
+        Exiger(P().Ecrans.Count(e => e.Code == "PROC_COMMANDES_WEB") == 1,
+            "Ctrl K « Commandes web » reste trouve, et une seule fois");
+        Agir("paletteFermer");
+        plan.SurGesteAccueil(new GesteIle("login", Valeur("cmartin")));
+        Agir("paletteOuvrir");
+        Agir("paletteTexte", "Mandataires");
+        Exiger(!P().Ecrans.Any(e => e.Code == "PROC_MANDATAIRE"),
+            "un login RCS seul ne trouve pas un ecran reserve au judiciaire : le filtre du profil vaut pour le menu");
+        Agir("paletteFermer");
+        plan.SurGesteAccueil(new GesteIle("login", Valeur("rvilain")));
+        Agir("paletteOuvrir");
+        Agir("paletteTexte", "Mandataires");
+        Agir("paletteAller", new { nature = "ecran", cle = "PROC_MANDATAIRE" });
+        Exiger(plan.Vue().Proc is { Code: "PROC_MANDATAIRE" },
+            "Entree sur « Mandataires » l'ouvre dans un onglet");
+
+        // --- 12 ter. Ctrl K trouve le menu par son libelle, et Entree ouvre le premier ecran.
+        // fix-ok: Pont/PlanTravail.cs TraitementsPour : les Groupes passaient avant le menu, sans
+        // rang, puis Take(4). Mesure par ce banc avant correction : 5 libelles du menu n'etaient pas
+        // en tete (Requisitions, Redaction, Archivage, Clients, Fiche client) et « EDI » ne faisait
+        // pas figurer les deux ecrans du menu qui commencent par ce mot.
+        // Mesure sur TOUTES les entrees visibles du menu, pas sur un echantillon.
+        Agir("accueil");
+        Agir("paletteOuvrir");
+        var sansLibelle = new List<string>();
+        var pasEnTete = new List<string>();
+        foreach (var entree in MenuAccueil.Moments.SelectMany(m => m.Sous).SelectMany(s => s.Entrees))
+        {
+            if (!PerimetreProfil.Visible(entree.Code, JeuDemo.Compte("rvilain").Domaines)) continue;
+            Agir("paletteTexte", entree.Libelle);
+            var liste = P().Ecrans;
+            if (!liste.Any(e => e.Code == entree.Code)) sansLibelle.Add($"{entree.Libelle} ({entree.Code})");
+            // Deux entrees du menu peuvent porter le meme libelle (« Encaissements ») : la premiere
+            // ligne doit porter le libelle tape, pas forcement ce code-la.
+            else if (RecherchePalette.Plier(liste[0].Libelle) != RecherchePalette.Plier(entree.Libelle))
+                pasEnTete.Add($"{entree.Libelle} (d'abord : {liste[0].Libelle})");
+        }
+        Exiger(sansLibelle.Count == 0,
+            $"chaque entree du menu visible se trouve par son libelle ({sansLibelle.Count} absente(s) : {string.Join(", ", sansLibelle)})");
+        Exiger(pasEnTete.Count == 0,
+            $"tape en entier, un libelle du menu sort en tete : Entree l'ouvre ({pasEnTete.Count} hors tete : {string.Join(", ", pasEnTete)})");
+
+        // Un mot tape qui COMMENCE deux libelles du menu les fait figurer tous les deux (la limite
+        // de 4 ne coupe qu'au-dela) : « EDI » commence « EDI RPVA » et « EDI RPJC ».
+        Agir("paletteTexte", "EDI");
+        Exiger(P().Ecrans.Any(e => e.Code == "PROC_EDI_RPVAINS") && P().Ecrans.Any(e => e.Code == "PROC_EDI_RPJC_TRCNC"),
+            "« EDI » fait figurer les deux libelles du menu qui commencent par ce mot, pas seulement les ecrans du plan qui le contiennent");
+        Agir("paletteFermer");
+
         // --- 12. Ctrl K SUR L'ACCUEIL : la liste deroulante de sa barre ; sur un
         // ecran, la palette flotte au milieu.
         Agir("accueil");
