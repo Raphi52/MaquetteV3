@@ -707,6 +707,31 @@ var codePleine = await Programme.ExecuterAsync(["copier", "--source", v2.Connexi
 var refusPleine = erreurs.ToString();
 Exiger(codeMeme == 1 && refusMeme.Contains("meme base") && codePleine == 1 && refusPleine.Contains("n'est pas vide"),
     "SOC-021 CA07 : l'outil n'ecrit que dans une copie neuve : refus de copier sur la source elle-meme, et sur une base deja remplie (jumeau accepte : base vide, ci-dessus)");
+// Une source qui CACHE ses definitions -- compte de lecture sans VIEW DEFINITION, comme sur RIG_LE_PUY (SQL-PROD) le 2026-11-23 --
+// est refusee AVANT toute base copie. Sans ce refus, la copie perdait en silence valeurs par defaut, contraintes, filtres d'index
+// et modules, puis plantait apres 36 min de donnees sur « CHECK ; ». Ici, la vue de l'extrait est le module cache.
+var loginLimite = $"banc_sans_definition_{Guid.NewGuid():N}"[..40];
+var mdpLimite = $"Banc_{Guid.NewGuid():N}!";
+await ExecuterAsync(copie.Connexion, $"CREATE LOGIN [{loginLimite}] WITH PASSWORD = N'{mdpLimite}', CHECK_POLICY = OFF;");
+try
+{
+    await ExecuterAsync(v2.Connexion, $"CREATE USER [{loginLimite}] FOR LOGIN [{loginLimite}]; ALTER ROLE db_datareader ADD MEMBER [{loginLimite}];");
+    var sourceLimitee = new SqlConnectionStringBuilder(v2.Connexion) { UserID = loginLimite, Password = mdpLimite }.ConnectionString;
+    var nomCache = $"{BaseJetable.Prefixe}SocleAnonymisationCache_{Guid.NewGuid():N}"[..60];
+    erreurs.GetStringBuilder().Clear();
+    var codeCache = await Programme.ExecuterAsync(["copier", "--source", sourceLimitee, "--cible",
+        new SqlConnectionStringBuilder(copie.Connexion) { InitialCatalog = nomCache }.ConnectionString, "--rapport", Path.Combine(dossier, "refus.md")], sortie, erreurs);
+    var refusCache = erreurs.ToString();
+    Exiger(codeCache == 1 && refusCache.Contains("VIEW DEFINITION") && refusCache.Contains("modules") && !await BaseJetable.ExisteAsync(nomCache),
+        $"SOC-021 CA07 : une source qui cache ses definitions (compte sans VIEW DEFINITION) est refusee avant toute base copie (code {codeCache} : " +
+        $"« {refusCache.Trim()[..Math.Min(140, refusCache.Trim().Length)]}… ») ; jumeau accepte : la copie par un compte qui les voit, ci-dessus");
+}
+finally
+{
+    // Les connexions du compte restent dans le pool : sans les fermer, SQL Server refuse de supprimer un compte connecte.
+    SqlConnection.ClearAllPools();
+    await ExecuterAsync(copie.Connexion, $"DROP LOGIN [{loginLimite}];");
+}
 
 // Une copie qui ne touche aucune ligne signee porte « chaines intactes » (jumeau de CA05).
 await using var sansSignature = await BaseJetable.CreerAsync("SocleAnonymisationLots");

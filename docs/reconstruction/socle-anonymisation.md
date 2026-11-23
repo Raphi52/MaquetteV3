@@ -31,6 +31,11 @@ dotnet run --project Outils\Anonymisation -- controler --source "<même source>"
 dotnet run --project Outils\Anonymisation -- inventaire --source "<source>" --accord RIG_AMIENS --sortie D:\copies\inventaire.md
 ```
 
+Le compte qui lit la source doit avoir, en plus de la lecture, le droit **`VIEW DEFINITION`** sur la base : sans lui,
+SQL Server cache les définitions (valeurs par défaut, contraintes, filtres d'index, modules) et la copie n'aurait pas la forme
+de la source ; l'outil refuse alors avant de créer la copie (mesuré sur RIG_LE_PUY le 2026-11-23 : 1 251 valeurs par défaut,
+24 contraintes, 190 filtres d'index et 305 modules cachés ; la copie, avant ce refus, plantait après 36 min de données).
+
 Options : `--tables A,B` (sous-ensemble), `--max-lignes N` (copie réduite **fermée sur ses clés étrangères**, voir
 « La copie réduite, fermée sur ses clés »), `--regles <fichier>` (relecture du
 délégué, une ligne `TABLE.COLONNE=Garder|Mots|Courriel|Fichier|Telephone|DateNaissance|Vider|Xml|Document`), `--graine <texte>`
@@ -286,7 +291,7 @@ chaque colonne jugée sur moins de 200 valeurs (27 colonnes, vides comprises). E
 | CA05 | 406 factures signées au client anonymisé → marque « chaînes invalidées par l'anonymisation » (table, propriété, rapport) ; jumeau : une copie sans ligne signée porte « chaînes intactes » |
 | CA06 | le contrôle ne trouve rien, et ne sort de la source que des empreintes, des clés, des nombres et des signatures de documents (format et taille) ; il tire aussi les colonnes gardées à segment personnel (aucune à 35 % de prénoms) ; **contre-épreuves rouges** : `CLIEN_NOM` laissé en clair → le contrôle le trouve ; copie **et** contrôle avec l'ancienne règle sur les 9 prénoms d'état civil → aucune fuite par les colonnes traitées, mais le contrôle les trouve gardées (52 à 100 %) ; même chose sur RIG_DEV entier (80-96 %) ; même graine → mêmes valeurs. Second banc : une colonne de grande table jugée sur moins de 200 valeurs l'est sur toutes ses distinctes (`DMNED_CODE_ENTITE_DESTINATAIRE` 82 sur 82), et une colonne qui en a 200 ou plus reste tirée |
 | Documents (CA01, CA03, CA04, CA06 ; 2026-11-23) | « **documents remplacés : aucun document de la source retrouvé, même format, même taille** » : le banc compte **lui-même**, source et copie étant sur le même serveur, 60 documents (38 ZIP, 2 XML, 20 PDF) : empreinte SHA-256 à sa place 0, ailleurs dans la copie 0 ; taille différente 0 ; chaque document de la copie **ouvert** dans le format de la source (archive ZIP, XML chargé, table xref du PDF suivie) ; 80 NULL restés NULL ; colonnes listées au rapport. Le contrôle de l'outil tire les 60 et n'en retrouve aucun. **Contre-épreuve rouge** : règle des binaires retirée (`Garder` sur `GDRG_FICHIER` et `KBIS_PDF`) → le banc retrouve 60 documents sur 60, le contrôle de l'outil aussi, et avec la règle fausse il voit les documents dans les binaires gardés. L'inventaire de RIG_DEV classe ses 12 colonnes binaires, chacune avec sa raison |
-| CA07 | aucune écriture sur la source pendant la copie (journal du serveur et empreinte du contenu) ; refus avant connexion d'une copie vers SQL-DEV ; refus de RIG_DEV sans accord, avec l'accord d'une autre base, avec une graine ; jumeau accepté : l'inventaire avec l'accord ; la porte refuse un UPDATE ; refus d'écrire sur la source ou sur une base déjà remplie |
+| CA07 | aucune écriture sur la source pendant la copie (journal du serveur et empreinte du contenu) ; refus avant connexion d'une copie vers SQL-DEV ; refus de RIG_DEV sans accord, avec l'accord d'une autre base, avec une graine ; jumeau accepté : l'inventaire avec l'accord ; la porte refuse un UPDATE ; refus d'écrire sur la source ou sur une base déjà remplie ; une source qui **cache ses définitions** (compte de lecture sans `VIEW DEFINITION`) est refusée avant toute base copie — contre-épreuve : refus retiré du code, la copie passe en code 0 en perdant la vue (rouge) |
 | REC-008 (lot 18) | « **copie réduite fermée : aucune clé étrangère orpheline** » : 20 premières lignes par table, puis les lignes parentes (26 : `ADRESSE_BASE` +17, `UTILISATEUR` +9, en 2 tours) ; le banc compte **lui-même**, clé par clé de la copie, les lignes dont la clé est remplie sans parent : 0 sur les 11 clés, toutes vérifiées, volumes = min(source, 20) + ajouts ; **contre-épreuve** : la réduction non fermée laisse 74 lignes orphelines sur 4 clés ; la copie fermée passe le contrôle de l'outil (aucune valeur réelle retrouvée). Fermeture retirée du code (défaut réinjecté) : ce contrôle rougit |
 
 Les corrections faites en route sont gardées par le banc : réinjectées, elles le font rougir
@@ -299,6 +304,7 @@ jugées sur un tirage maigre ; règle des binaires retirée du code — `Catalog
 
 | Reste | Pourquoi | Quand |
 |---|---|---|
+| T03 : copie de RIG_LE_PUY (accord donné le 2026-11-23) | Le compte Windows de ce poste lit RIG_LE_PUY (SQL-PROD\PROD) mais n'y a pas `VIEW DEFINITION` : l'outil refuse. Un DBA doit l'accorder (lecture seule des définitions), ou la copie se lance avec un compte qui l'a. | dès que le droit est donné |
 | T01 : relecture de l'inventaire par le délégué à la protection des données | Décision humaine. L'inventaire est produit (`inventaire`), ses corrections s'écrivent dans un fichier `--regles` sans toucher au code. | avant la première copie de production |
 | T03, CA07 : lancer l'outil base par base sur les 40 greffes | Aucun accord pour une base de production sur ce poste ; l'outil exige `--accord <BASE>` pour chacune. | avant REC-008 |
 | T05 sur un serveur de production | D'autres sessions écrivent : le compteur du serveur ne prouve plus seul l'absence d'écriture ; la garantie reste la porte de lecture (le rapport donne les deux). | à chaque copie |

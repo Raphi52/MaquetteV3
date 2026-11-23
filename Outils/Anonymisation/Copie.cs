@@ -90,6 +90,11 @@ public static class CopieAnonymisee
         await using var src = await PorteSource.OuvrirAsync(o.Source, o.Accord, ct);
         rapport.EcrituresSourceAvant = await src.EcrituresServeurAsync(ct);
         var schema = await SchemaSource.LireAsync(src, ct);
+        if (await DefinitionsCacheesAsync(src, ct) is { Count: > 0 } cachees)
+            throw new InvalidOperationException(
+                $"Definitions cachees par la source ({string.Join(", ", cachees)}) : le compte qui la lit n'a pas le droit VIEW DEFINITION sur cette base. " +
+                "La copie n'aurait pas la forme de la source (valeurs par defaut, contraintes, index filtres, declencheurs et procedures perdus). " +
+                "Il faut ce droit, en lecture seule, pour ce compte ; aucune base copie n'a ete creee.");
         catalogue.AlignerSurLesCles(schema);
         var tables = Choisir(schema.Tables, o.Tables);
         journal.WriteLine($"Source {rapport.Source} : {schema.Tables.Count} tables, {tables.Count} a copier.");
@@ -236,6 +241,27 @@ public static class CopieAnonymisee
 
     private static bool MemeServeur(string a, string b)
         => string.Equals(a.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Les definitions que la source CACHE au compte qui la lit : sans le droit VIEW DEFINITION, SQL Server rend NULL pour la
+    /// definition d'une valeur par defaut, d'une contrainte, d'une colonne calculee, du filtre d'un index et d'un module (un
+    /// module CHIFFRE est a part : illisible meme avec le droit). Le schema lu ne le dit pas : la copie perdait ces objets sans
+    /// rien signaler, ou plantait apres la copie des donnees sur « CHECK ; ».
+    /// fix-ok: RIG_LE_PUY (SQL-PROD\PROD), 2026-11-23 -- compte sans VIEW DEFINITION : 1 251 valeurs par defaut, 24 contraintes,
+    /// 190 filtres d'index et 305 modules a NULL ; copie arretee apres 36 min sur « Incorrect syntax near ';' ». RIG_DEV : aucune.
+    /// </summary>
+    private static async Task<List<string>> DefinitionsCacheesAsync(PorteSource src, CancellationToken ct)
+    {
+        var l = (await src.LignesAsync(
+            "SELECT (SELECT COUNT(*) FROM sys.default_constraints WHERE definition IS NULL), " +
+            "(SELECT COUNT(*) FROM sys.check_constraints WHERE definition IS NULL), " +
+            "(SELECT COUNT(*) FROM sys.computed_columns WHERE definition IS NULL), " +
+            "(SELECT COUNT(*) FROM sys.indexes WHERE has_filter = 1 AND filter_definition IS NULL), " +
+            "(SELECT COUNT(*) FROM sys.sql_modules m JOIN sys.objects o ON o.object_id = m.object_id " +
+            " WHERE o.is_ms_shipped = 0 AND m.definition IS NULL AND ISNULL(OBJECTPROPERTY(o.object_id, 'IsEncrypted'), 0) = 0)", ct))[0];
+        string[] genres = ["valeurs par defaut", "contraintes", "colonnes calculees", "filtres d'index", "modules"];
+        return [.. genres.Select((g, i) => (Genre: g, N: Convert.ToInt32(l[i]))).Where(x => x.N > 0).Select(x => $"{x.N} {x.Genre}")];
+    }
 
     /// <summary>Base absente : creee au classement de la source. Presente : doit etre VIDE (jamais ecrasee).</summary>
     private static async Task CreerBaseAsync(SqlConnectionStringBuilder cible, string collation, CancellationToken ct)
