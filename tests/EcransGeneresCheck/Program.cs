@@ -31,6 +31,10 @@ var aiguillage = Lire("web/src/plan/Aiguillage.tsx");
 var ecranGenere = Lire("web/src/ecrans/EcranGenere.tsx");
 var planTravailVue = Lire("Pont/PlanTravailVue.cs");
 var css = Lire("wwwroot/rig-accueil.css");
+// Les teintes 2, 3, 6, 7 vivent dans rig-ecrans-generes.css (la reference ne se modifie pas) ;
+// elles ne comptent que si index.html lie ce fichier.
+var cssGenere = Lire("wwwroot/rig-ecrans-generes.css");
+var cssGenereLie = Regex.IsMatch(Lire("wwwroot/index.html"), @"href=""rig-ecrans-generes\.css""");
 
 // ============================================================ 1. LE MENU ET L'AIGUILLAGE
 
@@ -70,8 +74,9 @@ foreach (var d in descripteurs)
     foreach (var etat in d.Etats)
         if (!Regex.IsMatch(css, $@"\.rig-tcw__icone--{Regex.Escape(etat.Icone)}\b"))
             defauts.Add($"l'icone « {etat.Icone} » de « {etat.Libelle} » n'a pas de classe dans rig-accueil.css");
-    if (!Regex.IsMatch(css, $@"\.rig-tcw__rang-{d.Rang}\s*\{{"))
-        defauts.Add($"la teinte {d.Rang} n'a pas de classe rig-tcw__rang-{d.Rang} dans rig-accueil.css");
+    var classeRang = $@"\.rig-tcw__rang-{d.Rang}\s*\{{";
+    if (!Regex.IsMatch(css, classeRang) && !(cssGenereLie && Regex.IsMatch(cssGenere, classeRang)))
+        defauts.Add($"la teinte {d.Rang} n'a pas de classe rig-tcw__rang-{d.Rang} dans rig-accueil.css ni dans rig-ecrans-generes.css (lie par index.html)");
 
     if (d.Marches.Length == 0) defauts.Add("aucune marche");
     if (d.Groupes.Length == 0) defauts.Add("aucun groupe");

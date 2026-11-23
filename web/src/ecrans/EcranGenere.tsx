@@ -279,9 +279,12 @@ function Marche({ m, faite, figee, franchir }: { m: MarcheEcranVue; faite: boole
         <div className="rig-tcw__marche-ligne">
           <span className="rig-tcw__section">{m.titre}</span>
           {!m.obligatoire && <span className="rig-tcw__marche-resume">facultative</span>}
-          <button className="rig-tcw__lien" style={{ marginLeft: 'auto' }} disabled={figee} onClick={franchir}>
-            {faite ? 'Reprendre' : 'Terminer l’étape'}
-          </button>
+          {/* Ligne figee : aucun lien (un lien disabled gardait l'allure active ; le bandeau « Ligne validee » dit pourquoi). */}
+          {!figee && (
+            <button className="rig-tcw__lien" style={{ marginLeft: 'auto' }} onClick={franchir}>
+              {faite ? 'Reprendre' : 'Terminer l’étape'}
+            </button>
+          )}
         </div>
         <p className="rig-tcw__discret">{m.consigne}</p>
         {m.champs.length > 0 && (

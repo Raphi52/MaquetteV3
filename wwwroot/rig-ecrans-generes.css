@@ -1,0 +1,14 @@
+/* Teintes des ecrans generes (web/src/ecrans/EcranGenere.tsx).
+   rig-accueil.css (la reference, a ne pas modifier) ne porte que les rangs 1, 4 et 5.
+   Rang = verbe du menu : 1 Ouvrir, 2 Modifier, 3 Terminer, 4 Trouver, 5 Surveiller,
+   6 Facturer, 7 Configurer. Les rangs 2, 3, 6 et 7 sont poses ici, sur le modele exact
+   de rig-accueil.css : --tcw-teinte (repere, barre) et --tcw-teinte-lue (titre du
+   groupe et pastille, 40 % de teinte, scene ouverte). */
+.rig-tcw__rang-2 { --tcw-teinte: var(--rig-verbe-modifier); }
+.rig-tcw__rang-3 { --tcw-teinte: var(--rig-verbe-terminer); }
+.rig-tcw__rang-6 { --tcw-teinte: var(--rig-verbe-facturer); }
+.rig-tcw__rang-7 { --tcw-teinte: var(--rig-verbe-configurer); }
+.rig-tcw__scene--ouverte .rig-tcw__liste .rig-tcw__rang-2 { --tcw-teinte-lue: color-mix(in srgb, var(--rig-verbe-modifier) 40%, var(--rig-rail-melange)); }
+.rig-tcw__scene--ouverte .rig-tcw__liste .rig-tcw__rang-3 { --tcw-teinte-lue: color-mix(in srgb, var(--rig-verbe-terminer) 40%, var(--rig-rail-melange)); }
+.rig-tcw__scene--ouverte .rig-tcw__liste .rig-tcw__rang-6 { --tcw-teinte-lue: color-mix(in srgb, var(--rig-verbe-facturer) 40%, var(--rig-rail-melange)); }
+.rig-tcw__scene--ouverte .rig-tcw__liste .rig-tcw__rang-7 { --tcw-teinte-lue: color-mix(in srgb, var(--rig-verbe-configurer) 40%, var(--rig-rail-melange)); }

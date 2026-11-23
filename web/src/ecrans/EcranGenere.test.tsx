@@ -90,7 +90,7 @@ describe('EcranGenere', () => {
   it('une ligne validee ne se modifie plus : ses marches sont figees', () => {
     const { ligne, boutonsMarche, valider } = monter()
     fireEvent.click(ligne('Gamma SARL'))
-    expect(boutonsMarche().every((b) => b.disabled)).toBe(true)
+    expect(boutonsMarche()).toHaveLength(0)
     expect(valider().disabled).toBe(true)
   })
 
