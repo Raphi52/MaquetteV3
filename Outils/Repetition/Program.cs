@@ -15,7 +15,15 @@ using RigV3.Repetition;
 //       QUE sur ce poste. --copie : une copie deja faite, refusee si elle n'est pas marquee anonymisee (CA05).
 //   RigV3.Repetition feu --rapports <dossier> [--jour-j AAAA-MM-JJ] [--attendues 40] [--fenetre 10] [--parallele 1]
 //       juge le feu vert de la beta ou du jour J sur la derniere repetition du dossier (CA03, CA04).
-// Code de sortie : repeter 0 toutes les bases au bout, 1 sinon ; feu 0 vert, 4 rouge ; 2 commande mal formee.
+//   RigV3.Repetition retour (--source <chaine V2> --accord <BASE> | --copie <chaine copie anonymisee> --mois N)
+//                    --rapport <dossier> [--max-lignes N] [--mois N] [--fenetre 10] [--greffe <code>] [--garder] [--graine <texte>]
+//       la repetition du retour a l'ancien RIG (REC-007 CA07, RepetitionRetour.cs) : la repetition du transfert, le greffe
+//       mis en beta, un mois d'affaires de la V3 (N demandes ; par defaut le mois le plus charge de la source), le retour
+//       chronometre, le controle de nuit ensuite et sa contre-epreuve ; rapport retour-<date>.json et .md.
+//   RigV3.Repetition supprimer --base rigv3_rep_<...>
+//       supprime une base gardee par --garder, sur le serveur des bancs de ce poste seulement.
+// Code de sortie : repeter 0 toutes les bases au bout, 1 sinon ; feu 0 vert, 4 rouge ; retour 0 vert, 1 rouge ;
+// 2 commande mal formee.
 // ============================================================
 
 var o = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -38,7 +46,7 @@ switch (args.FirstOrDefault())
             Copies = Opt("copie") is { } c ? [c] : [],
             Accord = Opt("accord"),
             DossierRapport = dossier,
-            DossierMigrations = Opt("migrations") ?? Migrations(),
+            DossierMigrations = Opt("migrations") ?? Dossier("Base", "migrations"),
             MaxLignes = Opt("max-lignes") is { } m ? long.Parse(m, CultureInfo.InvariantCulture) : null,
             Echantillon = Opt("echantillon") is { } e ? int.Parse(e, CultureInfo.InvariantCulture) : 1000,
             TailleLot = Opt("lot") is { } l ? int.Parse(l, CultureInfo.InvariantCulture) : 50_000,
@@ -62,16 +70,53 @@ switch (args.FirstOrDefault())
         Console.WriteLine(Feu.Texte(feu));
         return feu.Vert ? 0 : 4;
     }
+    case "retour" when Opt("rapport") is { } dossier && (Opt("source") is not null ^ Opt("copie") is not null)
+                       && (Opt("copie") is null || Opt("mois") is not null):
+    {
+        var rapport = await RepetitionRetour.RepeterAsync(new OptionsRetour
+        {
+            Source = Opt("source"),
+            Copie = Opt("copie"),
+            Accord = Opt("accord"),
+            DossierRapport = dossier,
+            DossierMigrations = Opt("migrations") ?? Dossier("Base", "migrations"),
+            DossierScriptsV2 = Opt("scripts") ?? Dossier("Base", "v2"),
+            MaxLignes = Opt("max-lignes") is { } m ? long.Parse(m, CultureInfo.InvariantCulture) : null,
+            DemandesDuMois = Opt("mois") is { } n ? int.Parse(n, CultureInfo.InvariantCulture) : null,
+            FenetreHeures = Opt("fenetre") is { } w ? double.Parse(w, CultureInfo.InvariantCulture) : 10,
+            Greffe = Opt("greffe"),
+            Garder = o.ContainsKey("garder"),
+            Graine = Opt("graine"),
+            Sortie = Console.Out,
+        });
+        Console.WriteLine();
+        Console.WriteLine(RepetitionRetour.EnMarkdown(rapport));
+        return rapport.Vert ? 0 : 1;
+    }
+    case "supprimer" when Opt("base") is { } nomBase:
+    {
+        // Les bases qu'une repetition a gardees (--garder), une fois lues : sur ce poste seulement, et seulement elles.
+        if (!nomBase.StartsWith("rigv3_rep_", StringComparison.OrdinalIgnoreCase) || nomBase.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '_'))
+        {
+            Console.Error.WriteLine($"Refuse : « {nomBase} » n'est pas une base de repetition (rigv3_rep_...).");
+            return 2;
+        }
+        await Repetition.SupprimerAsync(new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(RigV3.Base.BaseJetable.ServeurDesBancs()) { InitialCatalog = nomBase }.ConnectionString);
+        Console.WriteLine($"{nomBase} supprimee (ou deja absente).");
+        return 0;
+    }
     default:
         Console.Error.WriteLine("Usage : RigV3.Repetition repeter (--source <chaine> | --sources <fichier> | --copie <chaine>) --rapport <dossier> [...]");
         Console.Error.WriteLine("        RigV3.Repetition feu --rapports <dossier> [--jour-j AAAA-MM-JJ] [--attendues 40] [--fenetre 10] [--parallele 1]");
+        Console.Error.WriteLine("        RigV3.Repetition retour (--source <chaine> --accord <BASE> | --copie <chaine> --mois N) --rapport <dossier> [--max-lignes N] [--mois N] [--garder]");
+        Console.Error.WriteLine("        RigV3.Repetition supprimer --base rigv3_rep_<...>");
         return 2;
 }
 
-// Le dossier Base\migrations du depot : en remontant depuis l'outil.
-static string Migrations()
+// Un dossier du depot (Base\migrations, Base\v2) : en remontant depuis l'outil.
+static string Dossier(params string[] chemin)
 {
     for (var d = new DirectoryInfo(AppContext.BaseDirectory); d is not null; d = d.Parent)
-        if (Directory.Exists(Path.Combine(d.FullName, "Base", "migrations"))) return Path.Combine(d.FullName, "Base", "migrations");
-    throw new DirectoryNotFoundException("Base\\migrations introuvable au-dessus de l'outil : passer --migrations <dossier>.");
+        if (Directory.Exists(Path.Combine([d.FullName, .. chemin]))) return Path.Combine([d.FullName, .. chemin]);
+    throw new DirectoryNotFoundException($"{Path.Combine(chemin)} introuvable au-dessus de l'outil : passer --migrations / --scripts <dossier>.");
 }

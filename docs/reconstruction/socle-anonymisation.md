@@ -304,7 +304,7 @@ jugées sur un tirage maigre ; règle des binaires retirée du code — `Catalog
 
 | Reste | Pourquoi | Quand |
 |---|---|---|
-| T03 : copie de RIG_LE_PUY (accord donné le 2026-11-23) | Le compte Windows de ce poste lit RIG_LE_PUY (SQL-PROD\PROD) mais n'y a pas `VIEW DEFINITION` : l'outil refuse. Un DBA doit l'accorder (lecture seule des définitions), ou la copie se lance avec un compte qui l'a. | dès que le droit est donné |
+| T03 : copie de RIG_LE_PUY (accord donné le 2026-11-23, puis **remise à plus tard** le même jour : « on touche pas à la prod pour le moment », tout se fait sur RIG_DEV en attendant le changement de base) | Le compte Windows de ce poste (`INTRANET\raphael.vilain`, lecteur de la base, pas propriétaire) lit RIG_LE_PUY (SQL-PROD\PROD) mais n'y a pas `VIEW DEFINITION` : l'outil refuse. Le droit se donne par un compte d'administration SQL : `USE RIG_LE_PUY; GRANT VIEW DEFINITION TO [INTRANET\raphael.vilain];` (lecture des définitions seulement ; `REVOKE` après la copie). | au changement de base |
 | T01 : relecture de l'inventaire par le délégué à la protection des données | Décision humaine. L'inventaire est produit (`inventaire`), ses corrections s'écrivent dans un fichier `--regles` sans toucher au code. | avant la première copie de production |
 | T03, CA07 : lancer l'outil base par base sur les 40 greffes | Aucun accord pour une base de production sur ce poste ; l'outil exige `--accord <BASE>` pour chacune. | avant REC-008 |
 | T05 sur un serveur de production | D'autres sessions écrivent : le compteur du serveur ne prouve plus seul l'absence d'écriture ; la garantie reste la porte de lecture (le rapport donne les deux). | à chaque copie |

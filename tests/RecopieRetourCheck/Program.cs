@@ -847,9 +847,9 @@ Exiger(temoin07.Orphelins == 2 && orphelinsTemoin.All(d => d.Colonnes == "DMND_I
     $"REC-007 CA07 contre-epreuve : la correspondance de l'affaire rendue {affaireTemoin} mise de cote, le controle de nuit liste {temoin07.Orphelins} lien(s) orphelin(s) " +
     $"(attendu : ses demandes {string.Join(" et ", demandesTemoin)}){ATraiterEnClair(temoin07)}");
 
-Reste("REC-007 CA07 sur la copie anonymisee d'un greffe beta avec un mois d'affaires simulees : attend un vrai greffe beta (Le Puy, Chartres, Vienne), la copie anonymisee " +
-      "(lot 6) est recue ; " +
-      "ici une base tiree de RIG_DEV et un mois simule de 120 affaires");
+Reste("REC-007 CA07 sur la copie anonymisee d'un greffe beta avec un mois d'affaires simulees : ici une base tiree de RIG_DEV et un mois simule de 120 affaires ; " +
+      "au volume reel, sur une copie anonymisee : RigV3.Repetition retour (joue sur RIG_DEV le 2026-11-23, docs\\reconstruction\\recopie.md) ; " +
+      "attend la copie d'un vrai greffe beta (Le Puy, Chartres, Vienne) au changement de base");
 
 return await Fin();
 

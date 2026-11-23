@@ -29,6 +29,10 @@ public sealed record OptionsRepetition
     /// <summary>Valeurs fictives reproductibles : source sur ce poste seulement (refusee sinon par l'anonymisation).</summary>
     public string? Graine { get; init; }
     public TextWriter? Sortie { get; init; }
+    /// <summary>Joue sur la copie anonymisee (sa chaine), apres sa garde et AVANT le transfert ; rend ce qui est ecrit au
+    /// journal. La repetition du retour (<see cref="RepetitionRetour"/>) y pose Base\v2\recopie-v2.sql : le suivi des
+    /// changements doit preceder le transfert, dont l'instantane lit la version d'ou la recopie repart (PontRecopie).</summary>
+    public Func<string, CancellationToken, Task<string>>? AvantTransfert { get; init; }
 }
 
 /// <summary>Les lignes rejetees d'une table, par regle (REC-008 CA02), et la regle de reprise ecrite pour elles (CA03).</summary>
@@ -168,6 +172,7 @@ public static class Repetition
                     continue;
                 }
                 Noter($"{nomBase} : copie {new SqlConnectionStringBuilder(copie).InitialCatalog} marquee anonymisee : elle sert de jeu de repetition");
+                if (o.AvantTransfert is { } avant) Noter($"{nomBase} : {await avant(copie, ct)}");
 
                 // 3. Le transfert, dans une base V3 neuve.
                 v3 = new SqlConnectionStringBuilder(serveurLocal) { InitialCatalog = $"rigv3_rep_{propre}_v3_{etiquette}" }.ConnectionString;
@@ -277,7 +282,7 @@ public static class Repetition
     }
 
     /// <summary>Supprime une base de la repetition (sur ce poste seulement) et ce qui reste de ses instantanes.</summary>
-    private static async Task SupprimerAsync(string chaine)
+    internal static async Task SupprimerAsync(string chaine)
     {
         BaseJetable.ExigerServeurLocal(chaine);
         var nom = new SqlConnectionStringBuilder(chaine).InitialCatalog;
