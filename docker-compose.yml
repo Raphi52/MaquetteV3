@@ -38,6 +38,10 @@ services:
       # (SqlBulkCopy) d'un banc attendait sa memoire (RESOURCE_SEMAPHORE) jusqu'a
       # son delai de 600 s -- SocleCourrielsCheck rouge en 615 s, vert en 21 s.
       MSSQL_MEMORY_LIMIT_MB: "4096"
+      # Heure de Paris, comme les serveurs SQL d'Amitel : en heure universelle,
+      # GETDATE() du banc tombe la veille entre minuit et 1 h (2 h l'ete) et les
+      # tests qui datent « aujourd'hui » (courriels) rougissent dans ce creneau.
+      TZ: "Europe/Paris"
     ports:
       # 14330 et pas 1433 : un SQL Server installe sur le poste tient souvent 1433.
       - "127.0.0.1:${RIGV3_SQL_PORT:-14330}:1433"
