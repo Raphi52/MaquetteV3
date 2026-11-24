@@ -89,7 +89,11 @@ Le mot de passe `RigV3_dev_2026!` ne protège qu'un serveur local sans donnée r
 démo, on est le vrai projet ») : `dev.ps1` — que lance aussi le bouton « Lancer » d'Autowin
 (`.autowin\scripts.json`) — et `lancer.ps1` (raccourci du bureau) ouvrent l'app sur une copie anonymisée de
 RIG_DEV, sans jamais avoir une donnée en clair sur le poste. Si ces données ne sont pas disponibles (Docker arrêté,
-préparation en échec), le lanceur s'arrête et le dit : il ne retombe jamais en silence sur la démonstration.
+préparation en échec), le lanceur s'arrête et le dit : il ne retombe jamais en silence sur la démonstration. Il les
+prépare **avant** de fermer l'instance ouverte : Docker arrêté, l'application déjà à l'écran reste ouverte. Banc :
+`.\tests.ps1 Lanceurs` (l'ordre dans les deux scripts, et `dev.ps1` lancé avec un Docker injoignable : code 1, la
+cause, le recours `-Demo`, rien de lancé ; contre-épreuves faites : ordre d'avant remis, rouge ; message de Docker
+d'avant remis, rouge).
 
 ```powershell
 .\dev.ps1                      # mode développement (reprise à chaud) sur les données de dev

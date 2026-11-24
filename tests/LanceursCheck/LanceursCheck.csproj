@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- LES LANCEURS (dev.ps1, lancer.ps1, donnees-dev.ps1) : donnees de developpement par defaut, et un echec qui le dit
+       AVANT de fermer l'application ouverte (2026-11-24, conv-2122). Aucune reference : le banc lit les scripts et lance
+       dev.ps1 comme l'utilisateur, avec un Docker injoignable. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+
+</Project>
