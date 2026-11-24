@@ -12,10 +12,10 @@ using RigV3Desktop.Pont.EcransGeneres;
 //   2. il est ATTEIGNABLE : l'aiguillage le monte (branche par defaut), aucun cas de l'aiguillage
 //      ne le doublonne, sa teinte et ses icones ont leur classe dans rig-accueil.css, et il sort
 //      en JSON aux noms que web/src lit ;
-//   3. le verbe OUVRIR a ses onze ecrans (PROC_CJUDINFOG retire du menu : sa fiche RIG v2 dit la
-//      procedure supprimee le 22/11/2018) ;
-//   4. le compte des entrees du menu SANS ecran NI descripteur est RAPPORTE sans rougir : les
-//      autres lots tournent encore. PROC_CREANCE est exclu (rien dans RIG v2, motif etabli).
+//   3. le verbe OUVRIR a ses onze ecrans (PROC_CJUDINFOG retire du menu, voir la section 3) ;
+//   4. STRICT : aucune entree du menu n'est sans ecran NI descripteur, hors les exceptions
+//      nommees en section 3 (chacune porte sa raison ; une exception perimee est rouge) ;
+//   5. STRICT : un descripteur VIDE est rouge (ni colonne, ni ligne de demonstration, ni action).
 
 var echecs = new List<string>();
 void Exiger(bool ok, string quoi)
@@ -78,9 +78,15 @@ foreach (var d in descripteurs)
     if (!Regex.IsMatch(css, classeRang) && !(cssGenereLie && Regex.IsMatch(cssGenere, classeRang)))
         defauts.Add($"la teinte {d.Rang} n'a pas de classe rig-tcw__rang-{d.Rang} dans rig-accueil.css ni dans rig-ecrans-generes.css (lie par index.html)");
 
-    if (d.Marches.Length == 0) defauts.Add("aucune marche");
+    // Un descripteur VIDE ne se rend pas : il lui faut des colonnes (les criteres affiches en tete
+    // de grille, cf. Surveiller.cs), des lignes de demonstration et des actions (etapes + bouton final).
+    if (d.Criteres.Length == 0 || d.Criteres.Any(c => string.IsNullOrWhiteSpace(c)))
+        defauts.Add("aucune colonne : la grille n'affiche aucun critere");
+    if (d.Marches.Length == 0 || string.IsNullOrWhiteSpace(d.Valider))
+        defauts.Add("aucune action : pas d'etape a franchir, ou pas de bouton final");
     if (d.Groupes.Length == 0) defauts.Add("aucun groupe");
-    if (d.Lignes.Length < 6 || d.Lignes.Length > 15)
+    if (d.Lignes.Length == 0) defauts.Add("aucune ligne de demonstration");
+    else if (d.Lignes.Length < 6 || d.Lignes.Length > 15)
         defauts.Add($"{d.Lignes.Length} lignes de demonstration (6 a 15 attendues)");
     var obligatoires = Enumerable.Range(0, d.Marches.Length).Where(k => d.Marches[k].Obligatoire).ToList();
     foreach (var l in d.Lignes)
@@ -125,20 +131,49 @@ if (descripteurs.Count > 0)
         Exiger(json.Contains($"\"{cle}\":"), $"le descripteur sort en JSON avec la cle « {cle} »");
 }
 
-// ============================================================ 3. LE RESTE A FAIRE (rapporte, sans bloquer)
+// ============================================================ 3. ZERO ENTREE SANS ECRAN (strict)
+// fix-ok: cause mesuree (main, 23/11) — le banc etait VERT avec 2 entrees du menu sans ecran
+// (PROC_CJUDINFOG, PROC_PARAM_LISTEEXCEL), seulement NOTEES, et ne controlait aucun descripteur vide.
+// La regle est une assertion maintenant.
 
-var sansEcran = codesMenu
-    .Where(c => c != "PROC_CREANCE" && !casAiguillage.Contains(c) && !parCode.ContainsKey(c))
-    .ToList();
-Note($"sans ecran ni descripteur : {string.Join(", ", sansEcran)}");
-// PROC_CJUDINFOG (fiche RIG v2 « OBSOLETE », factorisee dans PROC_CJUD) a quitte le menu le
-// 2026-11-23 : s'il y revenait sans ecran, il compterait ici comme un reste a faire.
-Exiger(!codesMenu.Contains("PROC_CJUDINFOG"), "PROC_CJUDINFOG (obsolete, factorise dans PROC_CJUD) n'est plus au menu");
+// Les entrees du menu qu'on ne porte PAS encore, a dessein. Chacune garde sa raison : tant qu'elle
+// est au menu sans ecran, elle est toleree. Une exception qui ne sert plus (le code n'est plus au
+// menu, ou il a enfin son ecran) est ROUGE : il faut la retirer de cette liste.
+var exceptions = new Dictionary<string, string>
+{
+    ["PROC_CREANCE"] = "rien dans la fiche RIG v2 : motif etabli",
+    ["PROC_PARAM_LISTEEXCEL"] = "fiche RIG v2 vide, « une coquille, pas une couche OPE » (decision du chef)",
+};
+foreach (var (code, raison) in exceptions)
+    Exiger(codesMenu.Contains(code) && !casAiguillage.Contains(code) && !parCode.ContainsKey(code),
+        $"exception {code} perimee : elle n'est plus au menu sans ecran, la retirer de la liste ({raison})");
 
-var bilan = $"RESTANTS : {sansEcran.Count} entree(s) du menu sans ecran ni descripteur (PROC_CREANCE exclu, rapporte sans bloquer)";
+// Retire du menu le 2026-11-23 par decision de l'utilisateur (fiche RIG v2 « OBSOLETE », supprimee le
+// 22/11/2018, factorisee dans PROC_CJUD) : ni au menu, ni en descripteur. S'il revenait, c'est rouge.
+const string retire = "PROC_CJUDINFOG";
+Exiger(!codesMenu.Contains(retire), $"{retire} (obsolete, factorise dans PROC_CJUD) n'est plus au menu");
+Exiger(!parCode.ContainsKey(retire), $"{retire} n'a pas de descripteur : il ne revient pas");
+
+var sansEcran = codesMenu.Where(c => !casAiguillage.Contains(c) && !parCode.ContainsKey(c)).ToList();
+var tolerees = 0;
+foreach (var code in sansEcran)
+{
+    if (exceptions.ContainsKey(code))
+    {
+        tolerees++;
+        Note($"{code} sans ecran, tolere : {exceptions[code]}");
+    }
+    else Exiger(false, $"{code} ({libelleDuCode[code]}) : entree du menu sans ecran ni descripteur");
+}
+
+// Le compte par verbe du menu : ce que l'utilisateur voit, verbe par verbe.
+foreach (var verbe in MenuAccueil.Moments)
+    Note($"verbe {verbe.Titre} : {descripteurs.Count(d => MenuAccueil.VerbeDe(d.Code)?.Titre == verbe.Titre)} ecran(s) generique(s)");
+
+var bilan = $"{descripteurs.Count} ecrans generiques, {codesMenu.Count(c => casAiguillage.Contains(c))} entrees portees par un ecran, {tolerees} tolerees (exceptions nommees)";
 if (echecs.Count == 0)
 {
-    Console.WriteLine("VERT : les descripteurs generiques tiennent leurs regles. " + bilan);
+    Console.WriteLine("VERT : aucune entree du menu sans ecran hors exceptions, descripteurs sains. " + bilan);
     return 0;
 }
 Console.WriteLine($"ROUGE : {echecs.Count} regle(s) non tenue(s). " + bilan);
