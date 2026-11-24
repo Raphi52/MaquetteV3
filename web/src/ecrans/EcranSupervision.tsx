@@ -11,11 +11,23 @@
 // leur identifiant de suivi, l'ecran, le greffe, la version et la phrase de l'agent ; la derniere erreur suivie qu'un
 // defaut emporte ramene son parcours au clic. L'identifiant d'un defaut se cherche comme celui d'une erreur. Les regles vivent dans le serveur (Serveur/Socle/Supervision, prouvees par
 // tests/SocleSupervisionCheck) ; tout passe par Pont/EcranSupervision.cs.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 6) : les cinq listes de droite prennent les
+// briques de composants/ListeModerne.tsx -- tete (titre de la liste, synthese, filtre Ctrl K sur la liste montree ; le
+// champ « Greffe ou serveur » des greffes en est devenu le filtre), les cinq onglets devenus des puces de vues (meme
+// geste : changer de liste, decision du lot 7), etats en point colore, regles et niveaux en pastille, comptes en
+// avatar + nom, pied. Les traitements ont huit colonnes : « En cours » et le dernier message passent dans la ligne
+// depliee par le chevron, avec « Relancer ». Le detail d'une erreur ou d'un defaut reste sous sa liste.
+// fix-ok: application du socle des listes en plusieurs editions (lot 6), pas un correctif a l'aveugle.
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, estBlanc } from '../criteres'
 import { quand } from './EcranComptes'
+import {
+  CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe,
+  type Teinte,
+} from '../composants/ListeModerne'
 
 export interface EtatGreffe {
   code: string
@@ -108,7 +120,6 @@ export interface VueEcranSupervision {
 type Onglet = 'greffes' | 'traitements' | 'alertes' | 'erreurs' | 'defauts'
 
 const Message = { margin: 0, padding: 'var(--rig-esp-2) var(--rig-esp-3)' } as const
-const GrilleRepartie = { tableLayout: 'fixed' } as const
 const Coupe = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const
 const Aide = { margin: 0, fontSize: 'var(--rig-fs-dense)', color: 'var(--rig-texte-2)' } as const
 const Pile = {
@@ -146,9 +157,39 @@ const LibellesRegles: Record<string, string> = {
   'echec-numerotation': 'Échec de numérotation',
 }
 
-function Pastille({ p }: { p: { classe: string; libelle: string } }) {
-  return <span className={`rig-etat${p.classe ? ` rig-etat--${p.classe}` : ''}`}>{p.libelle}</span>
+/** La teinte du point d'etat, tiree de la classe d'etat de la charte (rig-etat--*) que rendent pastilleSante et pastilleTraitement. */
+const TeinteClasse: Record<string, Teinte> = { ok: 'vert', alerte: 'rouge', action: 'bleu', attente: 'orange' }
+const TeinteRegle: Record<string, Teinte> = {
+  'traitement-en-erreur': 'rouge', 'file-bloquee': 'orange', 'base-injoignable': 'violet', 'migrations-en-retard': 'ardoise',
+  'echec-numerotation': 'bleu',
 }
+const TeinteNiveau: Record<ErreurTechnique['niveau'], Teinte> = { grave: 'rouge', erreur: 'orange', avertissement: 'ardoise' }
+
+function Etat({ p }: { p: { classe: string; libelle: string } }) {
+  return <PointEtat teinte={TeinteClasse[p.classe] ?? 'gris'}>{p.libelle}</PointEtat>
+}
+
+/** Un compte (login) en avatar + nom ; sans compte, un tiret. */
+function CelluleCompte({ compte }: { compte: string | null }) {
+  return compte ? <CelluleIdentite nom={compte} titre={compte} /> : <td>—</td>
+}
+
+/** Les titres des cinq listes, et l'indication de leur filtre rapide. */
+const TitreOnglet: Record<Onglet, string> = {
+  greffes: 'Greffes', traitements: 'Traitements', alertes: 'Alertes', erreurs: 'Erreurs', defauts: 'Défauts signalés',
+}
+const IndicationOnglet: Record<Onglet, string> = {
+  greffes: 'Greffe ou serveur…', traitements: 'Aller à un traitement…', alertes: 'Aller à une alerte…',
+  erreurs: 'Aller à une erreur…', defauts: 'Aller à un défaut…',
+}
+
+/** Ce que compte le pied de chaque liste. fix-ok: le pied lisait « 40 affiché(s) » sans dire quoi (capture du bureau caché, lot 6). */
+const NomLigne: Record<Onglet, string> = {
+  greffes: 'greffe(s)', traitements: 'traitement(s)', alertes: 'alerte(s)', erreurs: 'erreur(s)', defauts: 'défaut(s)',
+}
+
+/** Les colonnes des traitements : chevron, Serveur, Traitement, Etat, En file, Echoues, Relancer. */
+const NbColonnesTraitements = 7
 
 export function EcranSupervision() {
   const [vue, setVue] = useState<VueEcranSupervision | null>(null)
@@ -162,6 +203,8 @@ export function EcranSupervision() {
   const [choisie, setChoisie] = useState<number | null>(null)
   const [defautChoisi, setDefautChoisi] = useState<number | null>(null)
   const [occupe, setOccupe] = useState(false)
+  // Le traitement deplie par son chevron (un a la fois).
+  const [deplie, setDeplie] = useState<string | null>(null)
 
   useEffect(() => {
     let vivant = true
@@ -187,23 +230,43 @@ export function EcranSupervision() {
   const etat = vue.etat
   const lecture = vue.mode === 'demo'
   const ouvertes = etat.alertes.filter((a) => a.fermeeLe === null)
-  const outreMer = etat.greffes.filter((g) => g.estOutreMer).length
-  const enPanne = etat.greffes.filter((g) => g.sante === 'injoignable' || g.sante === 'migrations en retard').length
-  let greffes = etat.greffes
-  if (!estBlanc(filtre)) {
-    const t = filtre.trim()
-    greffes = greffes.filter((g) => contientSansCasse(g.code, t) || contientSansCasse(g.nom, t) || contientSansCasse(g.serveur, t))
-  }
+  // Le filtre rapide (Ctrl K) vaut pour la liste montree ; changer de liste le vide.
+  const t = filtre.trim()
+  const garde = (...champs: Array<string | null>) => estBlanc(t) || champs.some((c) => c !== null && contientSansCasse(c, t))
+  const greffes = etat.greffes.filter((g) => garde(g.code, g.nom, g.serveur))
+  const traitements = etat.traitements.filter((x) => garde(x.serveur, x.traitement, x.message, x.codeGreffe))
+  const alertes = etat.alertes.filter((a) => garde(LibellesRegles[a.regle] ?? a.regle, a.codeGreffe, a.traitement, a.erreur))
+  const erreurs = vue.erreurs.filter((e) => garde(e.suivi, e.codeGreffe, e.compte, e.programme, e.message))
+  const outreMer = greffes.filter((g) => g.estOutreMer).length
+  const enPanne = greffes.filter((g) => g.sante === 'injoignable' || g.sante === 'migrations en retard').length
   const erreur = vue.erreurs.find((e) => e.id === choisie) ?? null
-  const defauts = vue.defauts ?? []
-  const defaut = defauts.find((d) => d.id === defautChoisi) ?? null
+  const tousDefauts = vue.defauts ?? []
+  const defauts = tousDefauts.filter((d) => garde(d.suivi, d.codeGreffe, d.compte, d.ecran, d.phrase))
+  const defaut = tousDefauts.find((d) => d.id === defautChoisi) ?? null
+  const changerOnglet = (o: Onglet) => { setOnglet(o); setFiltre('') }
+  const relancer = (traitement: string) => void agir(() => appeler<VueEcranSupervision>('EcranSupervision.Relancer', traitement))
+  const relancable = (x: EtatTraitement) => x.etat === 'en erreur' || x.etat === 'arrete'
+
+  // La synthese de chaque liste : son compte et un ou deux chiffres tires de ses lignes.
+  const passage = lecture ? <b>Démonstration</b> : etat.dernierPassage ? `Dernier passage ${quand(etat.dernierPassage)}` : 'Supervision pas encore passée'
+  const synthese: Record<Onglet, string> = {
+    greffes: `${greffes.length} greffe(s), dont ${outreMer} d'outre-mer — ${enPanne} à surveiller`,
+    traitements: `${traitements.length} traitement(s) · ${traitements.filter(relancable).length} en erreur ou arrêté(s) · `
+      + `${traitements.reduce((n, x) => n + x.enAttente, 0)} en file`,
+    alertes: `${alertes.length} alerte(s) · ${alertes.filter((a) => a.fermeeLe === null).length} ouverte(s)`,
+    erreurs: `${erreurs.length} erreur(s) · ${erreurs.filter((e) => e.niveau === 'grave').length} grave(s)`,
+    defauts: `${defauts.length} défaut(s) · ${defauts.filter((d) => d.derniereErreur !== null).length} avec une erreur suivie`,
+  }
+  const affiches: Record<Onglet, number> = {
+    greffes: greffes.length, traitements: traitements.length, alertes: alertes.length, erreurs: erreurs.length, defauts: defauts.length,
+  }
 
   const agir = async (geste: () => Promise<VueEcranSupervision>, apres?: (v: VueEcranSupervision) => Onglet) => {
     setOccupe(true)
     try {
       const v = await geste()
       setVue(v)
-      if (apres) setOnglet(apres(v))
+      if (apres) changerOnglet(apres(v))
     } finally { setOccupe(false) }
   }
   const chercher = (identifiant = suivi) => {
@@ -250,29 +313,19 @@ export function EcranSupervision() {
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-onglets">
-            <button className={`rig-onglet${onglet === 'greffes' ? ' rig-onglet--actif' : ''}`} onClick={() => setOnglet('greffes')}>
-              Greffes ({etat.greffes.length})
-            </button>
-            <button className={`rig-onglet${onglet === 'traitements' ? ' rig-onglet--actif' : ''}`} onClick={() => setOnglet('traitements')}>
-              Traitements ({etat.traitements.length})
-            </button>
-            <button className={`rig-onglet${onglet === 'alertes' ? ' rig-onglet--actif' : ''}`} onClick={() => setOnglet('alertes')}>
-              Alertes ({ouvertes.length})
-            </button>
-            <button className={`rig-onglet${onglet === 'erreurs' ? ' rig-onglet--actif' : ''}`} onClick={() => setOnglet('erreurs')}>
-              Erreurs ({vue.erreurs.length})
-            </button>
-            <button className={`rig-onglet${onglet === 'defauts' ? ' rig-onglet--actif' : ''}`} onClick={() => setOnglet('defauts')}>
-              Défauts ({defauts.length})
-            </button>
-          </div>
-          <span className="rig-resultats-proc__compte">
-            {lecture ? 'Démonstration' : etat.dernierPassage ? `Dernier passage ${quand(etat.dernierPassage)}` : 'Supervision pas encore passée'}
-          </span>
-        </div>
+      <ListeModerne etiquette={TitreOnglet[onglet]}>
+        <EnteteListe titre={TitreOnglet[onglet]}
+                     synthese={<>{passage}{' · '}{synthese[onglet]}</>}
+                     filtre={{ valeur: filtre, changer: setFiltre, indication: IndicationOnglet[onglet] }} />
+
+        <VuesListe vues={[
+                     { cle: 'greffes', libelle: 'Greffes', compte: etat.greffes.length },
+                     { cle: 'traitements', libelle: 'Traitements', compte: etat.traitements.length },
+                     { cle: 'alertes', libelle: 'Alertes', compte: ouvertes.length },
+                     { cle: 'erreurs', libelle: 'Erreurs', compte: vue.erreurs.length },
+                     { cle: 'defauts', libelle: 'Défauts', compte: tousDefauts.length },
+                   ]}
+                   active={onglet} choisir={(cle) => changerOnglet(cle as Onglet)} />
 
         {lecture && (
           <p style={Message}>
@@ -294,80 +347,92 @@ export function EcranSupervision() {
         )}
 
         {onglet === 'greffes' && (
-          <>
-            <p style={Message}>
-              {etat.greffes.length} greffe(s), dont {outreMer} d'outre-mer — {enPanne} à surveiller.
-            </p>
-            <label className="rig-saisie-champ" style={{ margin: 'var(--rig-esp-2) var(--rig-esp-3)' }}>
-              <span className="rig-saisie-champ__libelle">Greffe ou serveur</span>
-              <input className="rig-saisie-champ__saisie" value={filtre} onChange={(e) => setFiltre(e.target.value)} />
-            </label>
-            <div className="rig-table-cadre">
-              <table className="rig-table" style={GrilleRepartie}>
-                <colgroup>
-                  <col style={{ width: '58px' }} /><col /><col style={{ width: '140px' }} /><col style={{ width: '170px' }} />
-                  {/* « ÉCHECS NUMÉROTATION » finissait par « … » a 150 px (capture du 21/11, 1500 px de large). */}
-                  <col style={{ width: '96px' }} /><col style={{ width: '186px' }} /><col style={{ width: '124px' }} />
-                </colgroup>
-                <thead>
-                  <tr>{['Code', 'Greffe', 'Serveur', 'Base V3', 'Migrations', 'Échecs numérotation', 'Vérifié le'].map((t) =>
-                    <th key={t} title={t} style={Coupe}>{t}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {greffes.map((g) => (
-                    <tr key={g.code}>
-                      <td className="rig-table__mono">{g.code}</td>
-                      <td style={Coupe} title={g.nom}>{g.nom}{g.estOutreMer ? ' · outre-mer' : ''}</td>
-                      <td className="rig-table__mono" style={Coupe} title={g.serveur}>{g.serveur}</td>
-                      <td title={g.detail ?? ''}><Pastille p={pastilleSante(g.sante)} /></td>
-                      <td className="rig-table__mono" title={g.derniereMigration ?? ''}>{g.migrationsJouees ?? '—'}</td>
-                      <td title={g.echecsDetail ?? ''}>
-                        {g.echecs === null ? <span className="rig-etat rig-etat--attente">Non relevés</span>
-                          : g.echecs > 0 ? <span className="rig-etat rig-etat--alerte">{g.echecs} échec(s)</span>
-                          : <span className="rig-etat rig-etat--ok">Aucun</span>}
-                      </td>
-                      <td>{g.verifieLe ? quand(g.verifieLe) : '—'}</td>
-                    </tr>
-                  ))}
-                  {greffes.length === 0 && <tr><td colSpan={7} className="rig-table__vide">Aucun greffe ne répond à ce filtre.</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </>
+          <div className="rig-table-cadre">
+            <table className="rig-table rig-lm-table">
+              <colgroup>
+                <col style={{ width: '58px' }} /><col /><col style={{ width: '140px' }} /><col style={{ width: '170px' }} />
+                {/* « ÉCHECS NUMÉROTATION » finissait par « … » a 150 px (capture du 21/11, 1500 px de large). */}
+                <col style={{ width: '96px' }} /><col style={{ width: '186px' }} /><col style={{ width: '124px' }} />
+              </colgroup>
+              <thead>
+                <tr>{['Code', 'Greffe', 'Serveur', 'Base V3', 'Migrations', 'Échecs numérotation', 'Vérifié le'].map((x) =>
+                  <th key={x} title={x} style={Coupe} className={x === 'Migrations' ? 'rig-lm-droite' : undefined}>{x}</th>)}</tr>
+              </thead>
+              <tbody>
+                {greffes.map((g) => (
+                  <tr key={g.code}>
+                    <td className="rig-table__mono">{g.code}</td>
+                    <CelluleIdentite nom={g.nom} objet={g.estOutreMer ? 'outre-mer' : undefined} titre={`${g.nom}${g.estOutreMer ? ' · outre-mer' : ''}`} />
+                    <td className="rig-table__mono" style={Coupe} title={g.serveur}>{g.serveur}</td>
+                    <td title={g.detail ?? ''}><Etat p={pastilleSante(g.sante)} /></td>
+                    <td className="rig-lm-droite rig-table__mono" title={g.derniereMigration ?? ''}>{g.migrationsJouees ?? '—'}</td>
+                    <td title={g.echecsDetail ?? ''}>
+                      {g.echecs === null ? <PointEtat teinte="orange">Non relevés</PointEtat>
+                        : g.echecs > 0 ? <PointEtat teinte="rouge">{g.echecs} échec(s)</PointEtat>
+                        : <PointEtat teinte="vert">Aucun</PointEtat>}
+                    </td>
+                    <td>{g.verifieLe ? quand(g.verifieLe) : '—'}</td>
+                  </tr>
+                ))}
+                {greffes.length === 0 && <tr><td colSpan={7} className="rig-table__vide">Aucun greffe ne répond à ce filtre.</td></tr>}
+              </tbody>
+            </table>
+          </div>
         )}
 
         {onglet === 'traitements' && (
           <div className="rig-table-cadre">
-            <table className="rig-table" style={GrilleRepartie}>
+            <table className="rig-table rig-lm-table">
               <colgroup>
-                <col style={{ width: '120px' }} /><col style={{ width: '160px' }} /><col style={{ width: '132px' }} />
-                <col style={{ width: '70px' }} /><col style={{ width: '78px' }} /><col style={{ width: '70px' }} /><col /><col style={{ width: '96px' }} />
+                <col style={{ width: '30px' }} /><col style={{ width: '150px' }} /><col /><col style={{ width: '150px' }} />
+                <col style={{ width: '78px' }} /><col style={{ width: '78px' }} /><col style={{ width: '104px' }} />
               </colgroup>
               <thead>
-                <tr>{['Serveur', 'Traitement', 'État', 'En cours', 'En file', 'Échoués', 'Dernier message', ''].map((t, i) =>
-                  <th key={i} title={t} style={Coupe}>{t}</th>)}</tr>
+                <tr>
+                  <th aria-label="Deplier"></th>
+                  {['Serveur', 'Traitement', 'État', 'En file', 'Échoués', ''].map((x, i) =>
+                    <th key={i} title={x} style={Coupe} className={x === 'En file' || x === 'Échoués' ? 'rig-lm-droite' : undefined}>{x}</th>)}
+                </tr>
               </thead>
               <tbody>
-                {etat.traitements.map((t) => (
-                  <tr key={`${t.serveur}-${t.traitement}`}>
-                    <td className="rig-table__mono" style={Coupe} title={t.serveur}>{t.serveur}</td>
-                    <td style={Coupe} title={t.traitement}>{t.traitement}</td>
-                    <td><Pastille p={pastilleTraitement(t.etat)} /></td>
-                    <td className="rig-table__mono">{t.enCours}</td>
-                    <td className="rig-table__mono">{t.enAttente}</td>
-                    <td className="rig-table__mono">{t.enErreur}</td>
-                    <td style={Coupe} title={t.message ?? ''}>{t.codeGreffe ? `Greffe ${t.codeGreffe} — ` : ''}{t.message ?? '—'}</td>
-                    <td>
-                      {(t.etat === 'en erreur' || t.etat === 'arrete') && (
-                        <button className="rig-bouton" disabled={lecture || occupe}
-                                onClick={() => void agir(() => appeler<VueEcranSupervision>('EcranSupervision.Relancer', t.traitement))}>
-                          Relancer
-                        </button>
+                {traitements.map((x) => {
+                  const cle = `${x.serveur}-${x.traitement}`
+                  const ouvert = deplie === cle
+                  return (
+                    <Fragment key={cle}>
+                      <tr className={ouvert ? 'rig-lm-ouverte' : undefined}>
+                        <CelluleChevron ouverte={ouvert} basculer={() => setDeplie(ouvert ? null : cle)} />
+                        <td className="rig-table__mono" style={Coupe} title={x.serveur}>{x.serveur}</td>
+                        <td style={Coupe} title={x.traitement}>{x.traitement}</td>
+                        <td><Etat p={pastilleTraitement(x.etat)} /></td>
+                        <td className="rig-lm-droite rig-table__mono">{x.enAttente}</td>
+                        <td className="rig-lm-droite rig-table__mono">{x.enErreur}</td>
+                        <td>
+                          {/* Depliee, la ligne porte « Relancer » dans son detail : un seul bouton a l'ecran. */}
+                          {relancable(x) && !ouvert && (
+                            <button className="rig-bouton" disabled={lecture || occupe} onClick={() => relancer(x.traitement)}>
+                              Relancer
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                      {ouvert && (
+                        <LigneDetail colonnes={NbColonnesTraitements} champs={[
+                          { libelle: 'En cours', valeur: String(x.enCours) },
+                          { libelle: 'Dernier message', valeur: `${x.codeGreffe ? `Greffe ${x.codeGreffe} — ` : ''}${x.message ?? '—'}` },
+                          { libelle: 'Publié le', valeur: quand(x.publieLe) },
+                          { libelle: 'File baissée le', valeur: x.fileBaisseLe ? quand(x.fileBaisseLe) : '' },
+                        ]} actions={relancable(x)
+                          ? [{ libelle: 'Relancer', fort: true, desactive: lecture || occupe, agir: () => relancer(x.traitement) }] : []} />
                       )}
-                    </td>
-                  </tr>
-                ))}
-                {etat.traitements.length === 0 && <tr><td colSpan={8} className="rig-table__vide">Aucun état publié.</td></tr>}
+                    </Fragment>
+                  )
+                })}
+                {traitements.length === 0 && (
+                  <tr><td colSpan={NbColonnesTraitements} className="rig-table__vide">
+                    {etat.traitements.length === 0 ? 'Aucun état publié.' : 'Aucun traitement ne répond à ce filtre.'}
+                  </td></tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -375,30 +440,36 @@ export function EcranSupervision() {
 
         {onglet === 'alertes' && (
           <div className="rig-table-cadre">
-            <table className="rig-table" style={GrilleRepartie}>
+            <table className="rig-table rig-lm-table">
               <colgroup>
-                <col style={{ width: '124px' }} /><col style={{ width: '160px' }} /><col style={{ width: '58px' }} />
+                <col style={{ width: '124px' }} /><col style={{ width: '180px' }} /><col style={{ width: '58px' }} />
                 <col style={{ width: '170px' }} /><col /><col style={{ width: '124px' }} />
               </colgroup>
               <thead>
-                <tr>{['Ouverte le', 'Règle', 'Greffe', 'Traitement', 'Erreur', 'État'].map((t) => <th key={t} title={t} style={Coupe}>{t}</th>)}</tr>
+                <tr>{['Ouverte le', 'Règle', 'Greffe', 'Traitement', 'Erreur', 'État'].map((x) => <th key={x} title={x} style={Coupe}>{x}</th>)}</tr>
               </thead>
               <tbody>
-                {etat.alertes.map((a) => (
+                {alertes.map((a) => (
                   <tr key={a.id}>
                     <td>{quand(a.ouverteLe)}</td>
-                    <td style={Coupe}>{LibellesRegles[a.regle] ?? a.regle}</td>
+                    <td title={LibellesRegles[a.regle] ?? a.regle}>
+                      <Pastille teinte={TeinteRegle[a.regle] ?? 'gris'}>{LibellesRegles[a.regle] ?? a.regle}</Pastille>
+                    </td>
                     <td className="rig-table__mono">{a.codeGreffe ?? '—'}</td>
                     <td style={Coupe} title={a.traitement}>{a.traitement}</td>
                     <td style={Coupe} title={a.erreur}>{a.erreur}</td>
                     <td title={a.envoyeeLe ? `Envoyée le ${quand(a.envoyeeLe)} (${a.canal ?? '?'})` : 'Pas encore envoyée'}>
-                      {a.fermeeLe ? <span className="rig-etat rig-etat--ok">Fermée</span>
-                        : a.envoyeeLe ? <span className="rig-etat rig-etat--alerte">Envoyée</span>
-                        : <span className="rig-etat rig-etat--attente">À envoyer</span>}
+                      {a.fermeeLe ? <PointEtat teinte="vert">Fermée</PointEtat>
+                        : a.envoyeeLe ? <PointEtat teinte="rouge">Envoyée</PointEtat>
+                        : <PointEtat teinte="orange">À envoyer</PointEtat>}
                     </td>
                   </tr>
                 ))}
-                {etat.alertes.length === 0 && <tr><td colSpan={6} className="rig-table__vide">Aucune alerte.</td></tr>}
+                {alertes.length === 0 && (
+                  <tr><td colSpan={6} className="rig-table__vide">
+                    {etat.alertes.length === 0 ? 'Aucune alerte.' : 'Aucune alerte ne répond à ce filtre.'}
+                  </td></tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -407,27 +478,32 @@ export function EcranSupervision() {
         {onglet === 'erreurs' && (
           <>
             <div className="rig-table-cadre">
-              <table className="rig-table" style={GrilleRepartie}>
+              <table className="rig-table rig-lm-table">
                 <colgroup>
-                  <col style={{ width: '124px' }} /><col style={{ width: '96px' }} /><col style={{ width: '96px' }} />
-                  <col style={{ width: '58px' }} /><col style={{ width: '90px' }} /><col style={{ width: '190px' }} /><col />
+                  <col style={{ width: '124px' }} /><col style={{ width: '96px' }} /><col style={{ width: '112px' }} />
+                  <col style={{ width: '58px' }} /><col style={{ width: '130px' }} /><col style={{ width: '190px' }} /><col />
                 </colgroup>
                 <thead>
-                  <tr>{['Le', 'Suivi', 'Niveau', 'Greffe', 'Compte', 'Programme', 'Message'].map((t) => <th key={t} title={t} style={Coupe}>{t}</th>)}</tr>
+                  <tr>{['Le', 'Suivi', 'Niveau', 'Greffe', 'Compte', 'Programme', 'Message'].map((x) => <th key={x} title={x} style={Coupe}>{x}</th>)}</tr>
                 </thead>
                 <tbody>
-                  {vue.erreurs.map((e) => (
-                    <tr key={e.id} onClick={() => setChoisie(e.id)} aria-selected={e.id === choisie}>
+                  {erreurs.map((e) => (
+                    <tr key={e.id} onClick={() => setChoisie(e.id)} aria-selected={e.id === choisie}
+                        className={e.id === choisie ? 'rig-ligne--valide' : undefined}>
                       <td>{quand(e.instant)}</td>
                       <td className="rig-table__mono">{e.suivi}</td>
-                      <td><span className={`rig-etat rig-etat--${e.niveau === 'avertissement' ? 'attente' : 'alerte'}`}>{e.niveau}</span></td>
+                      <td><Pastille teinte={TeinteNiveau[e.niveau] ?? 'gris'}>{e.niveau}</Pastille></td>
                       <td className="rig-table__mono">{e.codeGreffe ?? '—'}</td>
-                      <td style={Coupe} title={e.compte ?? ''}>{e.compte ?? '—'}</td>
+                      <CelluleCompte compte={e.compte} />
                       <td className="rig-table__mono" style={Coupe} title={e.programme}>{e.programme}</td>
                       <td style={Coupe} title={e.message}>{e.message}</td>
                     </tr>
                   ))}
-                  {vue.erreurs.length === 0 && <tr><td colSpan={7} className="rig-table__vide">Aucune erreur à montrer.</td></tr>}
+                  {erreurs.length === 0 && (
+                    <tr><td colSpan={7} className="rig-table__vide">
+                      {vue.erreurs.length === 0 ? 'Aucune erreur à montrer.' : 'Aucune erreur ne répond à ce filtre.'}
+                    </td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -449,22 +525,23 @@ export function EcranSupervision() {
               Signalés par les agents depuis la V3 (SOC-022) ; « RigV3.Passage beta defauts » les classe par la règle écrite.
             </p>
             <div className="rig-table-cadre">
-              <table className="rig-table" style={GrilleRepartie} aria-label="Défauts signalés">
+              <table className="rig-table rig-lm-table" aria-label="Défauts signalés">
                 <colgroup>
                   <col style={{ width: '124px' }} /><col style={{ width: '96px' }} /><col style={{ width: '58px' }} />
-                  <col style={{ width: '90px' }} /><col style={{ width: '150px' }} /><col style={{ width: '110px' }} /><col />
+                  <col style={{ width: '130px' }} /><col style={{ width: '150px' }} /><col style={{ width: '110px' }} /><col />
                 </colgroup>
                 <thead>
-                  <tr>{['Le', 'Suivi', 'Greffe', 'Compte', 'Écran', 'Dernière erreur', 'Phrase de l\'agent'].map((t) =>
-                    <th key={t} title={t} style={Coupe}>{t}</th>)}</tr>
+                  <tr>{['Le', 'Suivi', 'Greffe', 'Compte', 'Écran', 'Dernière erreur', 'Phrase de l\'agent'].map((x) =>
+                    <th key={x} title={x} style={Coupe}>{x}</th>)}</tr>
                 </thead>
                 <tbody>
                   {defauts.map((d) => (
-                    <tr key={d.id} onClick={() => setDefautChoisi(d.id)} aria-selected={d.id === defautChoisi}>
+                    <tr key={d.id} onClick={() => setDefautChoisi(d.id)} aria-selected={d.id === defautChoisi}
+                        className={d.id === defautChoisi ? 'rig-ligne--valide' : undefined}>
                       <td>{quand(d.instant)}</td>
                       <td className="rig-table__mono">{d.suivi}</td>
                       <td className="rig-table__mono">{d.codeGreffe ?? '—'}</td>
-                      <td style={Coupe} title={d.compte ?? ''}>{d.compte ?? '—'}</td>
+                      <CelluleCompte compte={d.compte} />
                       <td style={Coupe} title={d.ecran}>{d.ecran}</td>
                       <td className="rig-table__mono">
                         {d.derniereErreur
@@ -475,7 +552,11 @@ export function EcranSupervision() {
                       <td style={Coupe} title={d.phrase}>{d.phrase}</td>
                     </tr>
                   ))}
-                  {defauts.length === 0 && <tr><td colSpan={7} className="rig-table__vide">Aucun défaut signalé.</td></tr>}
+                  {defauts.length === 0 && (
+                    <tr><td colSpan={7} className="rig-table__vide">
+                      {tousDefauts.length === 0 ? 'Aucun défaut signalé.' : 'Aucun défaut ne répond à ce filtre.'}
+                    </td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -493,7 +574,17 @@ export function EcranSupervision() {
             )}
           </>
         )}
-      </section>
+
+        <PiedListe aide={{
+          greffes: 'Survol d\'un état : son détail (base, migrations, échecs).',
+          traitements: 'Le chevron déplie le dernier message ; Relancer reprend un traitement en erreur ou arrêté.',
+          alertes: 'Survol d\'un état : quand et par quel canal l\'alerte est partie.',
+          erreurs: 'Clic sur une erreur : son détail et sa pile d\'appels.',
+          defauts: 'Clic sur un défaut : son détail ; sa dernière erreur ramène son parcours.',
+        }[onglet]}>
+          <span><b>{affiches[onglet]}</b>{` ${NomLigne[onglet]} affiché(s)`}</span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }

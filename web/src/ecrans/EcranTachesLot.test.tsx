@@ -5,6 +5,7 @@ import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 import { morceaux } from '../test/morceaux'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
+// fix-ok: tests suivis sur la liste moderne (lot 6 des listes) : tete, avatar, point d'etat, pied, filtre Ctrl K -- pas un correctif.
 
 // Les regles (lots, saisie dans la trace DU dossier, cloture par dossier) vivent
 // dans Pont/EcranTachesLot.cs, executees par tests/GedCheck. Ici : l'ecran lit la
@@ -53,8 +54,9 @@ describe('EcranTachesLot', () => {
     expect(morceaux(lots[1]!.querySelector('.rig-alerte__detail')))
       .toEqual(['1', ' dossier(s) ', '· saisie ligne par ligne'])
     expect(lots[1]!.getAttribute('title')).toBe('Cette tache se saisit dossier par dossier')
-    expect(container.querySelector('.rig-resultats-proc__entete .rig-kicker')!.textContent)
-      .toBe('Changer la denomination ·  DENO')
+    // La tete de la liste moderne : le titre de la recette, puis ses evenements et les comptes du lot.
+    expect(container.querySelector('.rig-lm-titre')!.textContent).toBe('Changer la denomination')
+    expect(container.querySelector('.rig-lm-synthese')!.textContent).toBe('DENO · 2 dossier(s) · 1 pret(s) a terminer')
     expect(screen.getByText('Denomination').getAttribute('title')).toBe('INSCRIT_PM.DENOMINATION')
 
     const [incomplet, pret] = [...container.querySelectorAll('tbody tr')]
@@ -64,6 +66,46 @@ describe('EcranTachesLot', () => {
     expect((incomplet!.querySelector('.rig-tache__terminer') as HTMLButtonElement).disabled).toBe(true)
     expect(pret!.getAttribute('title')).toBe('Pret a terminer')
     expect((pret!.querySelector('.rig-tache__terminer') as HTMLButtonElement).disabled).toBe(false)
+    // La societe en avatar + nom, son numero en gris ; l'etat du dossier en point colore.
+    expect(incomplet!.querySelectorAll('td')[0]!.textContent).toBe('TTRANSNORD SA004151')
+    expect(incomplet!.querySelectorAll('td')[2]!.textContent).toBe('3 a traiter')
+    expect(incomplet!.querySelector('.rig-lm-etat')!.className).toBe('rig-lm-etat rig-lm-t-orange')
+    expect(pret!.querySelector('.rig-lm-etat')!.className).toBe('rig-lm-etat rig-lm-t-vert')
+    expect(container.querySelector('.rig-lm-pied')!.textContent)
+      .toBe('2 dossier(s) affiche(s)Prets 1Terminer clot la tache sur ce seul dossier, quand ses champs et ses publications sont faits.')
+  })
+
+  it('« Aller a un dossier… » (Ctrl K) filtre les lignes affichees, sans geste vers la session', async () => {
+    const pont = installerFauxPont({ 'EcranTachesLot.Vue': () => vueDeno() })
+    const { container } = render(<EcranTachesLot session="s1" version={0} />)
+    await screen.findByText('TRANSNORD SA')
+    const appels = pont.appels.mock.calls.length
+    const champ = screen.getByLabelText('Aller a un dossier…')
+    expect(fireEvent.keyDown(window, { key: 'k', ctrlKey: true })).toBe(false)
+    expect(document.activeElement).toBe(champ)
+    fireEvent.change(champ, { target: { value: '004176' } })
+    expect([...container.querySelectorAll('tbody tr')].map((tr) => tr.querySelector('td')!.textContent)).toEqual(['PSCI DU PARC004176'])
+    expect(container.querySelector('.rig-lm-synthese')!.textContent).toBe('DENO · 1 dossier(s) · 1 pret(s) a terminer')
+    fireEvent.change(champ, { target: { value: 'zzz' } })
+    expect(screen.getByText('Aucun des 2 dossiers ne contient « zzz ».')).toBeTruthy()
+    expect(pont.appels.mock.calls.length).toBe(appels)
+  })
+
+  it('le filtre ne vaut que pour sa tache : une autre tache choisie repart sans filtre', async () => {
+    const autre: VueTachesLot = {
+      ...vueDeno(),
+      recette: { ...vueDeno().recette!, code: 'SIEGE', titre: 'Transferer le siege', evenements: 'SIEGE' },
+      dossiers: [{ dossier: '004188', nom: 'NORD MARINE SAS', valeurs: [''], restants: 1, effetsRestants: 1, pret: false }],
+    }
+    installerFauxPont({ 'EcranTachesLot.Vue': () => vueDeno(), 'EcranTachesLot.Agir': () => autre })
+    const { container } = render(<EcranTachesLot session="s1" version={0} />)
+    await screen.findByText('TRANSNORD SA')
+    fireEvent.change(screen.getByLabelText('Aller a un dossier…'), { target: { value: 'zzz' } })
+    expect(screen.getByText('Aucun des 2 dossiers ne contient « zzz ».')).toBeTruthy()
+    fireEvent.click(screen.getByText('Changer un dirigeant'))
+    await screen.findByText('NORD MARINE SAS')
+    expect((screen.getByLabelText('Aller a un dossier…') as HTMLInputElement).value).toBe('')
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
   })
 
   it('remonte la saisie (a la sortie du champ), la propagation et la cloture du dossier', async () => {

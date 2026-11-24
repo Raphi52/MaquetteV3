@@ -5,6 +5,7 @@ import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 import { contexteDossier } from '../test/dossier'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
+// fix-ok: tests suivis sur la liste moderne (lot 6 des listes) : tete, vues, chevron, pastilles, filtre Ctrl K, pied -- pas un correctif.
 
 // Les regles (filtre, tri, panier, quantites d'inscription) sont dans
 // Pont/EcranRequisitions.cs et EXECUTEES par tests/RequiCheck. Ici : l'ecran
@@ -53,11 +54,16 @@ describe('EcranRequisitions', () => {
     expect(screen.queryByText('Saisissez un critere puis lancez la recherche.')).toBeNull()
 
     repondre(vueDeBase())
-    expect(await screen.findByText('Commandes web a traiter (2)')).toBeTruthy()
+    expect(await screen.findByText('Commandes web a traiter')).toBeTruthy()
     expect(screen.getByText('Saisissez un critere puis lancez la recherche.')).toBeTruthy()
-    expect(container.querySelector('.rig-resultats-proc__compte')!.textContent).toBe('recherche non lancee')
+    expect(container.querySelector('.rig-cmdweb .rig-lm-synthese')!.textContent).toBe('2 a traiter · 2 affichee(s)')
+    expect(container.querySelector('.rig-resultats-proc .rig-lm-synthese')!.textContent).toBe('recherche non lancee')
+    // Neuf colonnes d'avant : origine, demandeur, EDI et SIREN sont dans la ligne depliee (et dans « Trier »).
     const entetes = [...container.querySelectorAll('.rig-cmdweb thead th')].map((th) => th.textContent?.trim())
-    expect(entetes).toEqual(['Origine', 'N commande', 'Recue le', 'Demandeur', 'Famille', 'EDI', 'Societe visee', 'Siren', 'Etat'])
+    expect(entetes).toEqual(['', 'Societe visee', 'N commande', 'Recue le', 'Famille', 'Etat'])
+    const tri = within(container.querySelector('.rig-cmdweb') as HTMLElement).getByLabelText('Trier') as HTMLSelectElement
+    expect([...tri.options].map((o) => o.textContent))
+      .toEqual(['Ordre d\'arrivee', 'Origine', 'N commande', 'Recue le', 'Demandeur', 'Famille', 'EDI', 'Societe visee', 'Siren', 'Etat'])
   })
 
   it('un clic sur l\'en-tete « Recue le » remonte le tri sur la cle Recue, la session rend le nouvel ordre', async () => {
@@ -70,9 +76,63 @@ describe('EcranRequisitions', () => {
     const { container } = render(<EcranRequisitions />)
     await screen.findByText('IG-2')
 
-    fireEvent.click(screen.getByText('Recue le'))
-    await waitFor(() => expect(container.querySelector('.rig-cmdweb tbody tr td:nth-child(2)')!.textContent).toBe('IG-1'))
+    // L'en-tete de colonne (« Recue le » est aussi une option de « Trier »).
+    fireEvent.click(within(container.querySelector('.rig-cmdweb thead') as HTMLElement).getByText('Recue le'))
+    await waitFor(() => expect(container.querySelector('.rig-cmdweb tbody tr td:nth-child(3)')!.textContent).toBe('IG-1'))
     expect(gestes).toEqual([['BasculerTri', 'Recue']])
+  })
+
+  it('« Trier » remonte la meme bascule que l\'en-tete, pour une colonne passee dans la ligne depliee ; le sens la rejoue', async () => {
+    const { gestes } = session((v, geste, cle) => {
+      if (geste === 'BasculerTri') v.cleTri = cle as string
+      return v
+    })
+    const { container } = render(<EcranRequisitions />)
+    await screen.findByText('IG-2')
+    const zone = within(container.querySelector('.rig-cmdweb') as HTMLElement)
+    fireEvent.change(zone.getByLabelText('Trier'), { target: { value: 'Demandeur' } })
+    await waitFor(() => expect((zone.getByLabelText('Trier') as HTMLSelectElement).value).toBe('Demandeur'))
+    fireEvent.click(zone.getByRole('button', { name: 'Ordre croissant, inverser' }))
+    expect(gestes).toEqual([['BasculerTri', 'Demandeur'], ['BasculerTri', 'Demandeur']])
+  })
+
+  it('les vues « Toutes » et « A traiter » sont la bascule « Masquer les traitees » ; « Marquer traitee » est dans la barre', async () => {
+    const { gestes } = session((v, geste) => {
+      if (geste === 'MasquerTraitees') v.masquerTraitees = !v.masquerTraitees
+      if (geste === 'ChoisirCommandeWeb') v.commandeWebChoisie = true
+      return v
+    })
+    const { container } = render(<EcranRequisitions />)
+    await screen.findByText('IG-2')
+    const zone = within(container.querySelector('.rig-cmdweb') as HTMLElement)
+    expect(zone.getByRole('button', { name: 'Toutes' }).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(zone.getByRole('button', { name: 'Toutes' }))
+    expect(gestes).toEqual([])
+    fireEvent.click(zone.getByRole('button', { name: 'A traiter 2' }))
+    await waitFor(() => expect(zone.getByRole('button', { name: 'A traiter 2' }).getAttribute('aria-pressed')).toBe('true'))
+    const marquer = zone.getByRole('button', { name: 'Marquer traitee' }) as HTMLButtonElement
+    expect(marquer.disabled).toBe(true)
+    fireEvent.click(screen.getByText('IG-1').closest('tr')!)
+    await waitFor(() => expect(marquer.disabled).toBe(false))
+    fireEvent.click(marquer)
+    expect(gestes).toEqual([['MasquerTraitees', null], ['ChoisirCommandeWeb', 1], ['MarquerTraitee', null]])
+  })
+
+  it('la ligne depliee d\'une commande web montre origine, demandeur, EDI et SIREN, et rapproche par son rang', async () => {
+    const { gestes } = session()
+    const { container } = render(<EcranRequisitions />)
+    const ligne = (await screen.findByText('IG-1')).closest('tr')!
+    expect(ligne.querySelector('.rig-lm-pastille')!.className).toBe('rig-lm-pastille rig-lm-t-orange')
+    expect(ligne.querySelector('.rig-lm-etat')!.className).toBe('rig-lm-etat rig-lm-t-orange')
+    expect(ligne.querySelector('.rig-lm-identite')!.textContent).toBe('TTRANSNORD SA412 345 678')
+    fireEvent.click(within(ligne).getByRole('button', { name: 'Deplier la ligne' }))
+    const detail = container.querySelector('.rig-cmdweb tr.rig-lm-detail')!
+    expect(detail.textContent).toContain('OrigineInfogreffe')
+    expect(detail.textContent).toContain('DemandeurETUDE MARTIN')
+    expect(detail.textContent).toContain('EDIET-CREQ')
+    expect(gestes).toEqual([])
+    fireEvent.click(within(detail as HTMLElement).getByRole('button', { name: 'Rapprocher d\'un dossier' }))
+    expect(gestes).toEqual([['RapprocherCommandeWeb', 1]])
   })
 
   it('choisir puis double-cliquer une commande web remonte son RANG (rapprochement)', async () => {
@@ -141,8 +201,51 @@ describe('EcranRequisitions', () => {
     const ligne = (await screen.findByText('2001B00042')).closest('tr')!
     expect(ligne.className).toBe('rig-table__ligne--inerte')
     expect(ligne.getAttribute('title')).toBe('TRANSNORD SA\nDossier radie')
+    // La societe en avatar + nom, gestion et SIREN en gris ; le type en pastille, l'etat en point colore.
+    expect(ligne.querySelector('.rig-lm-identite')!.textContent).toBe('TTRANSNORD SA2001B00042 · 412 345 678')
+    expect(ligne.querySelector('.rig-lm-pastille')!.className).toBe('rig-lm-pastille rig-lm-t-bleu')
+    expect(ligne.querySelector('.rig-lm-etat')!.textContent).toBe('Radiee')
+    expect(document.querySelector('.rig-resultats-proc .rig-lm-pied')!.textContent)
+      .toBe('1 societe(s) affichee(s)Radiees 1Double-clic sur une ligne pour l\'ajouter au panier.')
     fireEvent.doubleClick(ligne)
     expect(gestes).toEqual([['AjouterAuPanier', 0]])
+    // La ligne depliee : Id, gestion, adresse, et « Ajouter au panier », le geste du double-clic.
+    fireEvent.click(within(ligne).getByRole('button', { name: 'Deplier la ligne' }))
+    const detail = document.querySelector('.rig-resultats-proc tr.rig-lm-detail')!
+    expect(detail.textContent).toContain('Id7')
+    expect(detail.textContent).toContain('Type AdresseSiege')
+    fireEvent.click(within(detail as HTMLElement).getByRole('button', { name: 'Ajouter au panier' }))
+    expect(gestes).toEqual([['AjouterAuPanier', 0], ['AjouterAuPanier', 0]])
+  })
+
+  it('« Aller a une societe… » (Ctrl K) filtre les resultats affiches, sans geste ; les puces changent de volet', async () => {
+    const gestes: Array<[string, unknown]> = []
+    const societe = (rang: number, designation: string, gestion: string) => ({
+      rang, radie: false, infobulle: designation, id: String(rang), siren: '412 345 678', gestion, designation,
+      typeAdresse: 'Siege', adresse: '1 rue du Port', type: 'PM', nonInscrit: false, nbInscriptions: 1,
+    })
+    installerFauxPont({
+      'EcranRequisitions.Ouvrir': () => ({
+        ...vueDeBase(), aRecherche: true, compteur: '2 ligne(s) / 2 dossiers',
+        trouvees: [societe(0, 'TRANSNORD SA', '2001B00042'), societe(1, 'SCI DU PARC', '2019B00412')],
+      }),
+      'EcranRequisitions.Agir': (_s, geste, valeur) => { gestes.push([geste as string, valeur]); return vueDeBase() },
+    })
+    const { container } = render(<EcranRequisitions />)
+    await screen.findByText('2001B00042')
+    const champ = screen.getByLabelText('Aller a une societe…')
+    expect(fireEvent.keyDown(window, { key: 'k', ctrlKey: true })).toBe(false)
+    expect(document.activeElement).toBe(champ)
+    fireEvent.change(champ, { target: { value: 'parc' } })
+    expect([...container.querySelectorAll('.rig-resultats-proc tbody tr')].map((tr) => tr.querySelector('.rig-lm-identite__nom')!.textContent))
+      .toEqual(['SCI DU PARC'])
+    fireEvent.change(champ, { target: { value: 'zzz' } })
+    expect(screen.getByText('Aucune des 2 societes ne contient « zzz ».')).toBeTruthy()
+    expect(gestes).toEqual([])
+    const vues = within(container.querySelector('.rig-resultats-proc .rig-lm-vues') as HTMLElement)
+    expect(vues.getByRole('button', { name: 'Resultats 2' }).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(vues.getByRole('button', { name: 'Panier 0' }))
+    expect(gestes).toEqual([['Volet', 'panier']])
   })
 
   it('volet Articles : refus KBIS, travail perime, et la quantite d\'une inscription cochee', async () => {
@@ -206,11 +309,30 @@ describe('EcranRequisitions ouvert depuis une affaire', () => {
   it('sans affaire, ou une affaire sans SIREN : aucun geste a l\'ouverture', async () => {
     const { gestes } = session()
     const sans = render(<EcranRequisitions dossier={null} />)
-    await screen.findByText('Commandes web a traiter (2)')
+    await screen.findByText('Commandes web a traiter')
     sans.unmount()
     render(<EcranRequisitions dossier={contexteDossier({ siren: '' })} />)
-    await screen.findByText('Commandes web a traiter (2)')
+    await screen.findByText('Commandes web a traiter')
     fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
     await waitFor(() => expect(gestes).toEqual([['Rechercher', null]]))
+  })
+})
+
+// Une societe non inscrite n'a pas de gestion : son objet gris ne garde pas de « · » orphelin (capture du lot 6).
+describe('EcranRequisitions, identite d\'une societe', () => {
+  it('sans gestion, le SIREN seul ; avec, « gestion · SIREN »', async () => {
+    const societe = (rang: number, gestion: string, siren: string) => ({
+      rang, radie: false, infobulle: '', id: String(rang), siren, gestion, designation: `SOCIETE ${rang}`,
+      typeAdresse: 'Siege', adresse: '1 rue du Port', type: 'PP', nonInscrit: gestion === '', nbInscriptions: 0,
+    })
+    installerFauxPont({
+      'EcranRequisitions.Ouvrir': () => ({ ...vueDeBase(), aRecherche: true, compteur: '3 ligne(s)',
+        trouvees: [societe(0, '', '412 345 678'), societe(1, '2001B00042', '412 345 679'), societe(2, '', '')] }),
+    })
+    const { container } = render(<EcranRequisitions />)
+    await screen.findByText('2001B00042')
+    expect([...container.querySelectorAll('.rig-resultats-proc .rig-lm-identite__objet')].map((o) => o.textContent))
+      .toEqual(['412 345 678', '2001B00042 · 412 345 679', ''])
+    expect(container.querySelector('.rig-resultats-proc tbody .rig-lm-etat')!.textContent).toBe('Non inscrite')
   })
 })

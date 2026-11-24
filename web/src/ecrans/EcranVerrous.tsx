@@ -4,12 +4,17 @@
 // (JeuDemo), jamais ecrites ici : une demande encore en cours portee par un
 // autre login est un verrou.
 //
-// Porte depuis Components/Ecrans/EcranVerrous.razor (lot 1) : meme balisage,
-// memes classes CSS. La coquille .razor monte cet ecran et recoit ouvrirDossier.
+// Porte depuis Components/Ecrans/EcranVerrous.razor (lot 1). La coquille .razor monte cet ecran et recoit ouvrirDossier.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 6) : la liste prend les briques de
+// composants/ListeModerne.tsx -- tete (synthese, « Aller a un dossier… » Ctrl K qui filtre la liste affichee),
+// societe en avatar + nom, objet et numero en gris, etat en point colore, pied. Cinq colonnes : pas de ligne
+// depliee ; aucun critere d'etat ou de type : pas de vues. Le clic ouvre toujours l'affaire.
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import type { ContexteDossierVue } from '../plan/types'
+import { CelluleIdentite, EnteteListe, ListeModerne, PiedListe, PointEtat, type Teinte } from '../composants/ListeModerne'
 
 export interface LigneVerrou {
   dossier: string
@@ -37,6 +42,19 @@ export interface ProprietesEcranVerrous {
   dossier?: ContexteDossierVue | null
 }
 
+/** La teinte du point d'etat, tiree du statut de la demande (les rig-etat--* de la charte). */
+const TeinteStatut: Record<string, Teinte> = { alerte: 'rouge', attente: 'orange', action: 'bleu', ok: 'vert' }
+
+/** « Depot de bilan - TRANSNORD SA » : la societe (apres « - ») et l'objet (avant). */
+export function societeEtObjet(nom: string): { societe: string; objet: string } {
+  const tiret = nom.indexOf(' - ')
+  return tiret < 0 ? { societe: nom, objet: '' } : { societe: nom.slice(tiret + 3), objet: nom.slice(0, tiret) }
+}
+
+function normaliser(texte: string): string {
+  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
 export function EcranVerrous({ ouvrirDossier, dossier = null }: ProprietesEcranVerrous) {
   const [utilisateur, setUtilisateur] = useState('R. VILAIN')
   const [moiCompris, setMoiCompris] = useState(false)
@@ -59,6 +77,14 @@ export function EcranVerrous({ ouvrirDossier, dossier = null }: ProprietesEcranV
 
   const tous = vue?.lignes ?? []
   const verrouilles = filtre ? tous.filter((v) => v.dossier === filtre.numero) : tous
+
+  // « Aller a un dossier… » (Ctrl K) : filtre la liste AFFICHEE, sans redemander au pont.
+  const [rapide, setRapide] = useState('')
+  const cherche = normaliser(rapide.trim())
+  const affiches = cherche === '' ? verrouilles
+    : verrouilles.filter((v) => normaliser(`${v.dossier} ${v.nom} ${v.utilisateur}`).includes(cherche))
+  const detenteurs = new Set(affiches.map((v) => v.utilisateur)).size
+  const plusAncien = affiches.reduce((m, v) => (v.age > m ? v.age : m), 0)
 
   return (
     <div className="rig-proc__corps">
@@ -100,44 +126,56 @@ export function EcranVerrous({ ouvrirDossier, dossier = null }: ProprietesEcranV
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Dossiers verrouilles</div>
-          <span className="rig-resultats-proc__compte">{vue ? `${verrouilles.length} dossier(s)` : ''}</span>
-        </div>
+      <ListeModerne etiquette="Dossiers verrouilles">
+        <EnteteListe titre="Dossiers verrouilles"
+                     synthese={vue && <>{affiches.length}{' dossier(s)'}{affiches.length > 0 && <>{' · '}<b>{detenteurs}</b>{' detenteur(s) · plus ancien '}<b>{plusAncien} j</b></>}</>}
+                     filtre={{ valeur: rapide, changer: setRapide, indication: 'Aller a un dossier…',
+                               valider: () => { if (affiches.length === 1) ouvrirDossier(affiches[0]!.dossier) } }} />
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup>
+              <col /><col style={{ width: '20%' }} /><col style={{ width: '22%' }} /><col style={{ width: '12%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>Dossier</th>
-                <th>Objet</th>
                 <th>Etat</th>
                 <th>Detenu par</th>
-                <th>Depuis</th>
+                <th className="rig-lm-droite">Depuis</th>
               </tr>
             </thead>
             <tbody>
               {/* Cle par rang : un dossier peut porter plusieurs demandes. */}
-              {verrouilles.map((v, i) => (
-                <tr key={`${i}:${v.dossier}`} onClick={() => ouvrirDossier(v.dossier)}
-                    title={`Ouvrir l'affaire ${v.dossier}`}>
-                  <td className="rig-table__mono">{v.dossier}</td>
-                  <td>{v.nom}</td>
-                  <td><span className={`rig-etat rig-etat--${v.statut}`}>{v.etat}</span></td>
-                  <td>{v.utilisateur}</td>
-                  <td className="rig-table__mono">{v.age} j</td>
-                </tr>
-              ))}
+              {affiches.map((v, i) => {
+                const { societe, objet } = societeEtObjet(v.nom)
+                return (
+                  <tr key={`${i}:${v.dossier}`} onClick={() => ouvrirDossier(v.dossier)}
+                      title={`Ouvrir l'affaire ${v.dossier}`}>
+                    <CelluleIdentite nom={societe} titre={`${v.nom} · ${v.dossier}`}
+                                     objet={<>{objet}{objet !== '' ? ' · ' : ''}<span>{v.dossier}</span></>} />
+                    <td title={v.etat}><PointEtat teinte={TeinteStatut[v.statut] ?? 'gris'}>{v.etat}</PointEtat></td>
+                    <td title={v.utilisateur}>{v.utilisateur}</td>
+                    <td className="rig-lm-droite rig-table__mono">{v.age} j</td>
+                  </tr>
+                )
+              })}
               {vue && verrouilles.length === 0 && (
-                <tr><td colSpan={5} className="rig-table__vide">
+                <tr><td colSpan={4} className="rig-table__vide">
                   {filtre ? `Le dossier ${filtre.numero} n'est retenu par aucun autre poste.` : "Aucun dossier n'est retenu par un autre poste."}
                 </td></tr>
+              )}
+              {verrouilles.length > 0 && affiches.length === 0 && (
+                <tr><td colSpan={4} className="rig-table__vide">{`Aucun des ${verrouilles.length} dossiers ne contient « ${rapide.trim()} ».`}</td></tr>
               )}
             </tbody>
           </table>
         </div>
-      </section>
+
+        <PiedListe aide="Clic sur une ligne pour ouvrir l'affaire.">
+          <span><b>{affiches.length}</b>{' dossier(s) affiche(s)'}</span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }
