@@ -32,7 +32,7 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Surveiller > Relancer | Retention d'actes | actes retenus au depot | `PROC_ACTRET` | a venir |
 | Surveiller > Relancer | Actes rejetes | rejets Infogreffe | `PROC_ACTREJ` | a venir |
 | Surveiller > Relancer | Divergences BEN | alertes de coherence | `PROC_DBEN_ALERT` | a venir |
-| Terminer >  | Extinction RCS | eteindre un dossier du registre | `PROC_XEX` | a venir |
+| Terminer >  | Édition interne d'un Kbis | extrait Kbis a usage interne | `PROC_XEX` | a venir |
 | Facturer > Facturer | Reversements INPI | ce qui part a l'INPI | `PROC_INPIPAY` | a venir |
 | Facturer > Facturer | Formalites INPI | paiements en attente | `PROC_GINPI` | a venir |
 | Configurer > Les clients | Non-inscrits | creer une personne hors registre | `PROC_CNI` | a venir |

@@ -226,10 +226,13 @@ select option {
      clair ». Pas de bord : le filet interieur de --rig-rail-ombre le dessine. */
   --rig-rail: linear-gradient(180deg, #121316, #0A0A0B);
   --rig-rail-bord: transparent;
-  /* Pastilles des verbes du menu : famille de l'or, eclaircie la nuit. */
+  /* Pastilles des verbes du menu : famille de l'or, eclaircie la nuit.
+     Modifier tire vers le jaune olive (#BDBF4F, teinte 61 degres) : a #C9A646
+     (44 degres) il n'etait qu'a 5 degres de l'or d'Ouvrir (39) et les deux
+     ecrans se confondaient la nuit (captures du 24/11/2026). */
   --rig-verbe-ouvrir: #D9B26A;
   --rig-verbe-trouver: #7083C2;
-  --rig-verbe-modifier: #C9A646;
+  --rig-verbe-modifier: #BDBF4F;
   --rig-verbe-surveiller: #CC6A55;
   --rig-verbe-terminer: #7A7668;
   --rig-verbe-facturer: #D98A55;

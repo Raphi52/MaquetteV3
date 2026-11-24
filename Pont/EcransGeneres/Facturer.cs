@@ -3,7 +3,7 @@ using System.Globalization;
 namespace RigV3Desktop.Pont.EcransGeneres;
 
 // LE VERBE FACTURER du menu (Facturer, Encaisser, Tenir les comptes, Creances), plus
-// « Extinction RCS » (verbe Terminer, teinte 3), rangee ici a la demande du lot 6 du plan.
+// « Édition interne d'un Kbis » (verbe Terminer, teinte 3), rangee ici a la demande du lot 6 du plan.
 // Chaque descripteur reprend sa fiche RIG v2 (Documentation\reference\proc\proc_<code>.md) :
 // les etapes deviennent les marches, les regles les consignes, les controles les messages.
 // La section « Detail OPE » fait foi : quand elle contredit le corps de la fiche, c'est elle
@@ -563,12 +563,13 @@ public sealed class DomaineFacturer : IDomaineEcrans
             ],
         },
 
-        // ÉCART A TRANCHER (produit) : le menu dit « Extinction RCS », le code dit édition interne
-        // d'un extrait Kbis, sans clôture ni radiation (Détail OPE, MetierDescription). Le contenu
-        // suit le code ; le titre du menu est gardé. Teinte 3 = verbe Terminer.
+        // Le menu de RIG v2 disait « Extinction RCS », mais la fiche décrit l'édition interne d'un
+        // extrait Kbis, sans clôture ni radiation (Détail OPE, MetierDescription). Décision de
+        // l'utilisateur (24/11/2026) : l'entrée et l'écran prennent le nom de ce que fait la
+        // procédure. Teinte 3 = verbe Terminer.
         new DescripteurEcran
         {
-            Code = "PROC_XEX", Titre = "Extinction RCS", Sujet = "dossiers RCS",
+            Code = "PROC_XEX", Titre = "Édition interne d'un Kbis", Sujet = "dossiers RCS",
             Recherche = "Rechercher un dossier RCS, un numéro de gestion…",
             Criteres = ["Numéro de gestion du dossier RCS"],
             // Action citée par la fiche (proc_xex.md, Détail OPE) : « Edition interne d'un Kbis ».

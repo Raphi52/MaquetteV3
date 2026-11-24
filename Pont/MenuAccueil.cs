@@ -225,7 +225,7 @@ public static class MenuAccueil
             [
                 new("Cloture",                "fermer une affaire terminee",        "PROC_CLOT"),
                 new("Archivage",              "archiver ou radier",                 "PROC_ARCHIRAD"),
-                new("Extinction RCS",         "eteindre un dossier du registre",    "PROC_XEX")
+                new("Édition interne d'un Kbis", "extrait Kbis a usage interne",     "PROC_XEX")
             ])
         ]),
         new("Facturer", "compta", "$",
