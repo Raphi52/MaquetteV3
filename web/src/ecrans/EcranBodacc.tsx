@@ -19,11 +19,27 @@
 // memes classes CSS. La date du jour, qui dit si une annonce a envoyer est en
 // retard, vient de Pont/EcranBodacc.cs ; le reste etait declare dans l'ecran
 // et l'a suivi. La coquille .razor monte cet ecran et recoit ouvrirDossier.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 3) : les annonces prennent les briques
+// de composants/ListeModerne.tsx. Les deux onglets v2 deviennent les deux puces de vues (« BODACC a envoyer »,
+// « BODACC deja envoye », avec leur compte) ; la tete fait la synthese (retards, parutions), le type d'annonce
+// passe en pastille. Le texte de l'annonce reste une cellule simple, sans avatar : ce n'est pas un nom, et une
+// copie des classes de CelluleIdentite n'est pas permise (decision du plan, lot 4). « A envoyer » garde ses six
+// colonnes v2 ; « deja envoye » en avait douze : sa ligne garde Texte, Type, Date envoi, Date parution, Num
+// parution, et le reste (Num ann., Num PC, code et date eve pro, date de transmission, bordereau, facture, et
+// le dossier que le clic ouvre) est dans la ligne depliee par le chevron. Le critere « Num annonce / dossier », filtre sur place sans le pont, devient
+// le champ « Aller a une annonce… » (Ctrl K) de la tete : meme etat, memes colonnes comparees,
+// retire du panneau de gauche (decision du plan, lot 2). « Effacer » le vide toujours. Criteres, retard surligne
+// et clic qui ouvre le dossier ne changent pas.
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, dateCourte, distinctsTries, estBlanc } from '../criteres'
 import type { ContexteDossierVue } from '../plan/types'
+import {
+  CelluleChevron, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille, PiedListe, PointEtat,
+  VuesListe, type ActionLigne, type Teinte,
+} from '../composants/ListeModerne'
 
 interface Annonce {
   numAnnonce: string
@@ -55,6 +71,14 @@ const Lignes: Annonce[] = [
 export { Lignes as AnnoncesBodacc, type Annonce as AnnonceBodacc }
 
 const date = (d: string | null): string => (d === null ? '' : dateCourte(d))
+
+/** La teinte d'un type d'annonce ; un type inconnu reste gris. */
+const TeinteType: Record<string, Teinte> = {
+  Immatriculation: 'vert', Modification: 'bleu', 'Procedure collective': 'orange', Radiation: 'rouge', 'Depot des comptes': 'ardoise',
+}
+
+/** Les colonnes de « deja envoye » a une ligne : chevron, Annonce, Type, Date envoi, Date parution, Num parution, menu. */
+const NbColonnesEnvoye = 7
 
 export interface ProprietesEcranBodacc {
   /** Remonte le NUMERO de dossier de l'annonce cliquee : l'ecran ne connait pas la visionneuse. */
@@ -88,27 +112,30 @@ export function EcranBodacc({ ouvrirDossier, dossier = null }: ProprietesEcranBo
     setCritDu(''); setCritAu('')
   }
 
-  let q = Lignes.filter((l) => (l.envoi === null) === aEnvoyer)
-  if (!estBlanc(critTexte)) {
-    const t = critTexte.trim()
-    q = q.filter((l) => contientSansCasse(l.numAnnonce, t) || contientSansCasse(l.dossier, t))
+  /** Les annonces d'un onglet (a envoyer ou deja envoye) qui repondent aux criteres de gauche. */
+  function filtrees(onglet: boolean): Annonce[] {
+    let q = Lignes.filter((l) => (l.envoi === null) === onglet)
+    if (!estBlanc(critTexte)) {
+      const t = critTexte.trim()
+      q = q.filter((l) => contientSansCasse(l.numAnnonce, t) || contientSansCasse(l.dossier, t))
+    }
+    if (critType !== '') q = q.filter((l) => l.typeAnnonce === critType)
+    if (critDu !== '') q = q.filter((l) => l.prevueEnvoi >= critDu)
+    if (critAu !== '') q = q.filter((l) => l.prevueEnvoi <= critAu)
+    return q
   }
-  if (critType !== '') q = q.filter((l) => l.typeAnnonce === critType)
-  if (critDu !== '') q = q.filter((l) => l.prevueEnvoi >= critDu)
-  if (critAu !== '') q = q.filter((l) => l.prevueEnvoi <= critAu)
-  const trouvees = q
+  const trouvees = filtrees(aEnvoyer)
+  // La ligne depliee de « deja envoye » (une a la fois).
+  const [ouverte, setOuverte] = useState<string | null>(null)
+
+  const enRetard = aujourdhui === null ? 0 : trouvees.filter((l) => aEnvoyer && l.prevueEnvoi < aujourdhui).length
+  const parues = trouvees.filter((l) => l.parution !== null).length
 
   return (
     <div className="rig-proc__corps">
 
       <aside className="rig-criteres">
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Recherche BODACC</div>
-
-        <label className="rig-saisie-champ">
-          <span className="rig-saisie-champ__libelle">Num annonce / dossier</span>
-          <input className="rig-saisie-champ__saisie" placeholder="num ann. ou dossier"
-                 value={critTexte} onChange={(e) => setCritTexte(e.target.value)} />
-        </label>
 
         <label className="rig-saisie-champ">
           <span className="rig-saisie-champ__libelle">Type d'annonce</span>
@@ -148,19 +175,34 @@ export function EcranBodacc({ ouvrirDossier, dossier = null }: ProprietesEcranBo
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-onglets">
-            <button className={`rig-onglet${aEnvoyer ? ' rig-onglet--actif' : ''}`}
-                    onClick={() => setAEnvoyer(true)}>BODACC a envoyer</button>
-            <button className={`rig-onglet${!aEnvoyer ? ' rig-onglet--actif' : ''}`}
-                    onClick={() => setAEnvoyer(false)}>BODACC deja envoye</button>
-          </div>
-          <span className="rig-resultats-proc__compte">{trouvees.length} annonce(s)</span>
-        </div>
+      <ListeModerne etiquette="Annonces BODACC">
+        <EnteteListe titre="Annonces BODACC"
+                     synthese={aujourdhui === null ? undefined : (aEnvoyer
+                       ? <>{trouvees.length}{' annonce(s) a envoyer · '}<b>{enRetard}</b>{' en retard'}</>
+                       : <>{trouvees.length}{' annonce(s) envoyee(s) · '}<b>{parues}</b>{' parue(s)'}</>)}
+                     filtre={{ valeur: critTexte, changer: setCritTexte, indication: 'Aller a une annonce…' }} />
+
+        {/* Les deux onglets v2 : une puce par grille, avec le nombre d'annonces qu'elle montre pour ces criteres. */}
+        <VuesListe vues={[
+                     { cle: 'a-envoyer', libelle: 'BODACC a envoyer', compte: filtrees(true).length },
+                     { cle: 'envoye', libelle: 'BODACC deja envoye', compte: filtrees(false).length },
+                   ]}
+                   active={aEnvoyer ? 'a-envoyer' : 'envoye'}
+                   choisir={(cle) => { setAEnvoyer(cle === 'a-envoyer'); setOuverte(null) }} />
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            {aEnvoyer ? (
+              <colgroup>
+                <col style={{ width: '14%' }} /><col style={{ width: '9%' }} /><col style={{ width: '11%' }} /><col />
+                <col style={{ width: '15%' }} /><col style={{ width: '19%' }} />
+              </colgroup>
+            ) : (
+              <colgroup>
+                <col style={{ width: 30 }} /><col /><col style={{ width: '19%' }} /><col style={{ width: '12%' }} />
+                <col style={{ width: '13%' }} /><col style={{ width: '12%' }} /><col style={{ width: 34 }} />
+              </colgroup>
+            )}
             <thead>
               {aEnvoyer ? (
                 // Colonnes de BodaccToSendRigDataGridView.cs (RIG v2).
@@ -173,64 +215,82 @@ export function EcranBodacc({ ouvrirDossier, dossier = null }: ProprietesEcranBo
                   <th>Type annonce</th>
                 </tr>
               ) : (
-                // Colonnes de BodaccAlreadySentRigDataGridView.cs (RIG v2).
+                // Colonnes de BodaccAlreadySentRigDataGridView.cs (RIG v2) : les secondaires sont dans la ligne depliee.
                 <tr>
-                  <th>Num PC ou prevention</th>
-                  <th>Code eve pro</th>
-                  <th>Date eve pro</th>
+                  <th aria-label="Deplier"></th>
+                  <th>Texte Bodacc</th>
+                  <th>Type annonce</th>
                   <th>Date envoi</th>
-                  <th>Date trans.</th>
-                  <th>Num bord.</th>
-                  <th>Num fact.</th>
                   <th>Date parution</th>
                   <th>Num parution</th>
-                  <th>Num ann.</th>
-                  <th>Type annonce</th>
-                  <th>Texte Bodacc</th>
+                  <th aria-label="Actions"></th>
                 </tr>
               )}
             </thead>
             <tbody>
               {aujourdhui !== null && trouvees.map((ligne) => {
                 const retard = aEnvoyer && ligne.prevueEnvoi < aujourdhui
+                const type = <Pastille teinte={TeinteType[ligne.typeAnnonce] ?? 'gris'}>{ligne.typeAnnonce}</Pastille>
+                if (aEnvoyer) {
+                  return (
+                    <tr key={ligne.numAnnonce} className={retard ? 'rig-table__ligne--alerte' : ''}
+                        onClick={() => ouvrirDossier(ligne.dossier)}>
+                      <td className="rig-table__mono">{ligne.numPc}</td>
+                      <td className="rig-table__mono">{ligne.codeEvePro}</td>
+                      <td className="rig-table__mono">{dateCourte(ligne.dateEvePro)}</td>
+                      <td title={ligne.texte}>{ligne.texte}</td>
+                      <td title={retard ? 'Envoi en retard' : undefined}>
+                        <PointEtat teinte={retard ? 'rouge' : 'bleu'}>{dateCourte(ligne.prevueEnvoi)}</PointEtat>
+                      </td>
+                      <td title={ligne.typeAnnonce}>{type}</td>
+                    </tr>
+                  )
+                }
+                const estOuverte = ouverte === ligne.numAnnonce
+                const ouvrir: ActionLigne = { libelle: 'Ouvrir le dossier', fort: true, agir: () => ouvrirDossier(ligne.dossier) }
                 return (
-                  <tr key={ligne.numAnnonce} className={retard ? 'rig-table__ligne--alerte' : ''}
-                      onClick={() => ouvrirDossier(ligne.dossier)}>
-                    {aEnvoyer ? (
-                      <>
-                        <td className="rig-table__mono">{ligne.numPc}</td>
-                        <td className="rig-table__mono">{ligne.codeEvePro}</td>
-                        <td className="rig-table__mono">{dateCourte(ligne.dateEvePro)}</td>
-                        <td>{ligne.texte}</td>
-                        <td className="rig-table__mono">{dateCourte(ligne.prevueEnvoi)}</td>
-                        <td>{ligne.typeAnnonce}</td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="rig-table__mono">{ligne.numPc}</td>
-                        <td className="rig-table__mono">{ligne.codeEvePro}</td>
-                        <td className="rig-table__mono">{dateCourte(ligne.dateEvePro)}</td>
-                        <td className="rig-table__mono">{date(ligne.envoi)}</td>
-                        <td className="rig-table__mono">{date(ligne.transmission)}</td>
-                        <td className="rig-table__mono">{ligne.numBord}</td>
-                        <td className="rig-table__mono">{ligne.numFact}</td>
-                        <td className="rig-table__mono">{date(ligne.parution)}</td>
-                        <td className="rig-table__mono">{ligne.numParution}</td>
-                        <td className="rig-table__mono">{ligne.numAnnonce}</td>
-                        <td>{ligne.typeAnnonce}</td>
-                        <td>{ligne.texte}</td>
-                      </>
+                  <Fragment key={ligne.numAnnonce}>
+                    <tr className={estOuverte ? 'rig-lm-ouverte' : ''} onClick={() => ouvrirDossier(ligne.dossier)}>
+                      <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : ligne.numAnnonce)} />
+                      <td title={ligne.texte}>{ligne.texte}</td>
+                      <td title={ligne.typeAnnonce}>{type}</td>
+                      <td className="rig-table__mono">{date(ligne.envoi)}</td>
+                      <td className="rig-table__mono">{date(ligne.parution)}</td>
+                      <td className="rig-table__mono">{ligne.numParution}</td>
+                      <td className="rig-lm-cellule-menu">
+                        <MenuLigne libelle={`Actions de l'annonce ${ligne.numAnnonce}`} actions={[
+                          ouvrir,
+                          { libelle: estOuverte ? 'Replier la ligne' : 'Deplier la ligne', agir: () => setOuverte(estOuverte ? null : ligne.numAnnonce) },
+                        ]} />
+                      </td>
+                    </tr>
+                    {estOuverte && (
+                      <LigneDetail colonnes={NbColonnesEnvoye} actions={[ouvrir]} champs={[
+                        { libelle: 'Num ann.', valeur: ligne.numAnnonce },
+                        { libelle: 'Dossier', valeur: ligne.dossier },
+                        { libelle: 'Num PC ou prevention', valeur: ligne.numPc },
+                        { libelle: 'Code eve pro', valeur: ligne.codeEvePro },
+                        { libelle: 'Date eve pro', valeur: dateCourte(ligne.dateEvePro) },
+                        { libelle: 'Date trans.', valeur: date(ligne.transmission) },
+                        { libelle: 'Num bord.', valeur: ligne.numBord },
+                        { libelle: 'Num fact.', valeur: ligne.numFact },
+                      ]} />
                     )}
-                  </tr>
+                  </Fragment>
                 )
               })}
               {aujourdhui !== null && trouvees.length === 0 && (
-                <tr><td colSpan={aEnvoyer ? 6 : 12} className="rig-table__vide">Aucune annonce ne repond a ces criteres.</td></tr>
+                <tr><td colSpan={aEnvoyer ? 6 : NbColonnesEnvoye} className="rig-table__vide">Aucune annonce ne repond a ces criteres.</td></tr>
               )}
             </tbody>
           </table>
         </div>
-      </section>
+
+        <PiedListe aide="Clic sur une annonce pour ouvrir son dossier.">
+          <span><b>{trouvees.length}</b>{trouvees.length > 1 ? ' annonces affichees' : ' annonce affichee'}</span>
+          {aEnvoyer ? <span>En retard <b>{enRetard}</b></span> : <span>Parues <b>{parues}</b></span>}
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }
