@@ -55,7 +55,7 @@ dossiers (ni leurs `obj\`) n'entre dans l'application. L'app **référence** seu
 | **Collations** : serveur `French_CI_AS` (celle de `SQL-DEV\DEV`), bases `SQL_Latin1_General_CP1_CI_AS` (celle de `RIG_DEV`) — lues le 2026-11-20 | La recopie V2 ↔ V3 doit comparer les textes comme la V2. À revérifier sur les serveurs des greffes au déploiement (`SQL-DEV` est en SQL Server 2017, 14.0.3485.1). |
 | **Une base jetable par banc** (`BaseJetable`), nommée `rigv3_banc_<Banc>_<instant>_<hasard>` | Plusieurs lots lancent leurs bancs en même temps sur le même serveur : chacun a sa base, la supprime à la fin. |
 | **Garde-fou : une base ne se crée que sur le poste** (`BaseJetable.EstServeurLocal`) | Règle commune du plan : jamais d'écriture sur SQL-DEV ni SQL-PROD. C'est le code qui la tient (bancs et `--creer` de l'outil), vérifié par `ServeurCheck` — contre-épreuve faite : garde-fou retiré, le banc passe au rouge. |
-| **`RIGV3_SERVEUR`** décide de la source des données de l'écran | Absente (cas d'aujourd'hui) : `ClientServeur.Actif` vaut `null`, l'écran reste sur `Metier/JeuDemo.cs`, les 33 bancs existants ne voient aucune différence. Posée mais illisible : erreur nommée, pas de retour discret à la démonstration. |
+| **`RIGV3_SERVEUR`** décide de la source des données de l'écran | Absente (l'exe seul, les bancs, `dev.ps1 -Demo`) : `ClientServeur.Actif` vaut `null`, l'écran reste sur `Metier/JeuDemo.cs`, les 33 bancs existants ne voient aucune différence. Posée mais illisible : erreur nommée, pas de retour discret à la démonstration. |
 | **`Microsoft.Data.SqlClient` 7.1.2** | La 6.1.6 tire `System.Security.Cryptography.Pkcs` 9.0.11, signalé vulnérable à la restauration (NU1902 / NU1903). |
 | **`/sante`** : 200 si la base répond, 503 sinon, avec la cause | Première question d'un exploitant et d'un répartiteur de charge ; elle dit aussi où en sont les migrations de la base. |
 
@@ -82,6 +82,50 @@ $env:RIGV3_SERVEUR = "http://127.0.0.1:5080"
 Le mot de passe `RigV3_dev_2026!` ne protège qu'un serveur local sans donnée réelle. Pour le changer :
 `RIGV3_SQL_MDP` (et `RIGV3_SQL_PORT`) avant `docker compose up`, et la chaîne complète aux bancs par
 `RIGV3_SQL`. Repartir de zéro : `docker compose down -v`.
+
+### Travailler sur les données de développement (copie anonymisée de RIG_DEV)
+
+**C'est le mode par défaut des lanceurs depuis le 2026-11-24** (décision de l'utilisateur : « on n'est plus une
+démo, on est le vrai projet ») : `dev.ps1` — que lance aussi le bouton « Lancer » d'Autowin
+(`.autowin\scripts.json`) — et `lancer.ps1` (raccourci du bureau) ouvrent l'app sur une copie anonymisée de
+RIG_DEV, sans jamais avoir une donnée en clair sur le poste. Si ces données ne sont pas disponibles (Docker arrêté,
+préparation en échec), le lanceur s'arrête et le dit : il ne retombe jamais en silence sur la démonstration. Il les
+prépare **avant** de fermer l'instance ouverte : Docker arrêté, l'application déjà à l'écran reste ouverte. Banc :
+`.\tests.ps1 Lanceurs` (l'ordre dans les deux scripts, et `dev.ps1` lancé avec un Docker injoignable : code 1, la
+cause, le recours `-Demo`, rien de lancé ; contre-épreuves faites : ordre d'avant remis, rouge ; message de Docker
+d'avant remis, rouge).
+
+```powershell
+.\dev.ps1                      # mode développement (reprise à chaud) sur les données de dev
+.\lancer.ps1                   # compile puis lance l'exe, sur les données de dev
+.\dev.ps1 -Demo                # (ou .\lancer.ps1 -Demo) la démonstration, Metier\JeuDemo.cs, sans serveur
+.\donnees-dev.ps1 -Refaire     # refaire la copie (RIG_DEV a changé, migration nouvelle)
+.\donnees-dev.ps1 -Arreter     # arrêter le serveur lancé par le script
+```
+
+L'exe lancé seul, sans `RIGV3_SERVEUR` (les bancs, un bureau caché sans le script), reste sur la démonstration :
+c'est le comportement de l'app elle-même, que les bancs exigent. Pour voir l'app comme l'utilisateur la voit,
+appeler `& .\donnees-dev.ps1` dans le même PowerShell avant de la lancer.
+
+| Étape | Qui la fait | Ce qui se passe |
+|---|---|---|
+| Bases | `RigV3.Repetition donnees-dev` (`Outils\Repetition\DonneesDev.cs`) | RIG_DEV est **lu** sur `SQL-DEV\DEV` (SELECT seul) ; la copie s'écrit **déjà anonymisée** sur le SQL Docker du poste (SOC-021 : noms, adresses, documents remplacés), réduite à 200 lignes par table et fermée sur ses clés, **sauf** les tables que lisent les reprises du transfert (21 au 24/11 : comptes, droits, réglages, compteurs, catégories, correspondances des anciens numéros), copiées en entier ; elle est transférée dans une base V3 (comptes, droits, réglages, compteurs : les reprises de la phase 1) ; une base commune porte le greffe **3801** au catalogue, base V2 = la copie, base V3 = la base transférée. ~19 min la première fois ; ensuite, quelques secondes (bases retrouvées). |
+| Agent | la même commande | un compte **actif, administrateur d'Amitel**, avec un service et des rôles (les quatre contrôles de SOC-001), qui gère les droits s'il y en a un. Son identifiant est un pseudonyme : ta session Windows n'est pas dans la copie, l'app ouvre donc le greffe par `RIGV3_COMPTE`, que seul un serveur en `Development` écoute. Il est aussi inscrit dans la base commune (routes communes). |
+| Serveur | `donnees-dev.ps1` | compilé dans `%LOCALAPPDATA%\RigV3\serveur-dev` (il ne verrouille ni `Serveur\bin` ni `bin\Debug`), lancé sur `http://127.0.0.1:5080` avec la base commune, l'accès aux bases des greffes par le compte `sa` du Docker, en `Development` ; repris tel quel au lancement suivant ; `-Arreter` l'arrête, lui seul (pid noté, chemin vérifié). |
+| App | `donnees-dev.ps1` | `RIGV3_SERVEUR`, `RIGV3_COMPTE`, `RIGV3_GREFFES=3801` posées dans le processus PowerShell : `dotnet watch` (via `dev.ps1`) ou l'exe (`-Lancer`) en hérite. |
+
+Les noms des trois bases et de l'agent : `%LOCALAPPDATA%\RigV3\donnees-dev.json` ; journal du serveur :
+`serveur-dev.log` à côté. Une préparation refaite supprime l'ancien jeu **après** sa réussite (un échec laisse
+l'ancien en service). Les bases sont des bases de répétition (`rigv3_rep_…`) : `RigV3.Repetition supprimer`
+les accepte.
+
+Ce que ces données ne donnent pas : les écrans qui n'ont pas encore de partie serveur (actes, audiences,
+facturation… : phase 3) restent sur leur démonstration ; hors socle, la copie est réduite (200 premières lignes par
+table et leurs parents), pas le volume de RIG_DEV.
+
+Le serveur est lancé par `cmd`, sans redirection côté PowerShell : redirigé, il héritait des canaux du script, et un
+appelant qui lisait sa sortie (pipe, `Tee-Object`, un lanceur) attendait la fin du serveur, c'est-à-dire jamais
+(mesuré le 2026-11-24).
 
 Les bancs : `.\tests.ps1 ServeurCheck` (ou `.\tests.ps1` pour tous). Sans `docker compose up -d`, un banc
 qui a besoin de la base est **rouge** et le dit (il attend 90 s que SQL Server démarre, puis abandonne).

@@ -124,10 +124,11 @@ internal sealed class FermetureSurLesCles
     /// <summary>
     /// Les lectures qui ramenent les lignes parentes de <paramref name="manquantes"/> : un SELECT seul par paquet (au plus
     /// 2 000 parametres, la limite du serveur est 2 100), parametres au type de la colonne visee (l'index de la source sert).
+    /// <paramref name="selection"/> : ce que la copie lit de chaque colonne du parent (un document : sa signature seule).
     /// </summary>
-    public static IEnumerable<(string Sql, SqlParameter[] Parametres)> Lectures(Lien l, List<ColonneSql> colonnesParent, List<object[]> manquantes)
+    public static IEnumerable<(string Sql, SqlParameter[] Parametres)> Lectures(Lien l, IReadOnlyList<string> selection, List<object[]> manquantes)
     {
-        var select = $"SELECT {string.Join(", ", colonnesParent.Select(c => Ddl.Q(c.Nom)))} FROM {l.Parent.Complet} WITH (NOLOCK) WHERE ";
+        var select = $"SELECT {string.Join(", ", selection)} FROM {l.Parent.Complet} WITH (NOLOCK) WHERE ";
         var parPaquet = Math.Max(1, 2000 / l.Visees.Length);
         foreach (var paquet in manquantes.Chunk(parPaquet))
         {

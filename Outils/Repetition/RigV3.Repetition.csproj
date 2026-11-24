@@ -17,6 +17,9 @@
   <ItemGroup>
     <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
     <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+    <!-- Le lecteur des scripts sqlcmd de Base\v2 (ScriptSqlcmd) : la repetition du retour joue recopie-v2.sql et pont-v2.sql,
+         les scripts memes de l'exploitation, comme l'outil du passage. -->
+    <ProjectReference Include="../Passage/RigV3.Passage.csproj" />
     <!-- L'outil d'anonymisation compile sa propre copie de LectureV2 (meme nom que celle du serveur) : PrivateAssets
          l'empeche de passer aux projets qui referencent celui-ci, ou les deux se heurteraient (CS0433). -->
     <ProjectReference Include="../Anonymisation/RigV3.Anonymisation.csproj" PrivateAssets="all" />

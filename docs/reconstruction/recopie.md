@@ -430,8 +430,10 @@ lecture des lignes est **synchrone** — en asynchrone, SqlClient lit un gros bi
 ([dotnet/SqlClient#593](https://github.com/dotnet/SqlClient/issues/593)) : la fermeture restait sur 4 documents de
 `GED_RIG` (dont un de 510 Mo) plus de 2 min, à 100 % d'un cœur ; ensuite 4 documents en 7 s — et un lot s'écrit dès
 64 Mo (au premier passage, lots bornés en lignes seulement, le processus de copie est monté à 4,3 Go pendant la fermeture
-de `GED_RIG` ; ensuite 255 à 640 Mo). Et un **défaut relevé, non corrigé** : les documents de
-la GED passent en clair dans la copie (`socle-anonymisation.md`, « Défaut relevé au lot 18 »).
+de `GED_RIG` ; ensuite 255 à 640 Mo). Et un **défaut relevé** : les documents de la GED passaient en clair dans la
+copie — **corrigé le 2026-11-23** (SOC-021, `socle-anonymisation.md`, « Les documents ») : chaque document devient un
+document fictif du même format et de la même taille, et la source n'en rend plus que le format et la taille. Une copie
+de répétition faite avant cette date porte des documents réels : on la refait.
 
 **Fichiers du lot 18** : `Outils\Anonymisation\Fermeture.cs` (la fermeture), `Copie.cs` (copie par table réutilisée par
 la fermeture, clés vérifiées, lecture synchrone, lots bornés en octets), `Rapport.cs` (lignes ajoutées, tours, durée) ;
@@ -894,6 +896,70 @@ Il prolonge le retour de la numérotation (NUM-022, `Base\v2\retour.sql`) : `Ser
    à la V2 — la date de passage, atteinte, ne change plus (SOC-007 CA05), c'est cet état qui décide. Preuve : `REC-007 T02`
    de `tests\SocleAiguillageCheck` (par la route) et de `tests\RecopieRetourCheck` (l'état posé par le vrai retour).
 
+### Répéter le retour sur une copie anonymisée (REC-007 CA07)
+
+CA07 : « la copie anonymisée d'un greffe bêta avec un mois d'affaires V3 simulées ; on répète le retour ; il se termine en
+une nuit et le contrôle quotidien (REC-006) ne trouve aucun écart ensuite ». Le banc `RecopieRetourCheck` le prouve sur un
+extrait de RIG_DEV **en clair** et **120 affaires**, la durée d'un vrai mois étant **extrapolée**. La répétition du retour
+le joue au volume réel, sur une copie **anonymisée** :
+
+```powershell
+RigV3.Repetition retour --source "Server=SQL-DEV\DEV;Database=RIG_DEV;Integrated Security=True;…" --accord RIG_DEV `
+    --rapport C:\Users\raphael.vilain\Documents\Autowin\refonte-rig\repetitions --max-lignes 200 [--mois N] [--garder]
+```
+
+`Outils\Repetition\RepetitionRetour.cs`, dans l'ordre :
+
+1. **La répétition du transfert** (REC-008, ci-dessus), gardée : copie anonymisée (SOC-021, la source est lue), son contrôle,
+   puis `Base\v2\recopie-v2.sql` joué sur la copie **avant** le transfert (option `AvantTransfert` de la répétition : la
+   recopie repart de la version que l'instantané du transfert a lue), le transfert et le contrôle des deux bases.
+2. **Le greffe mis en bêta** comme la bascule le laisse : mise en service de la recopie (garde des affaires),
+   `Base\v2\pont-v2.sql`, la fiche du pont (fin de bêta dans 30 jours) et le corps d'origine des trois programmes de
+   numérotation (sans lui, `RetourBeta` ne voit pas un greffe bêta) ; la personne désignée (CA08) : le compte qui lance.
+3. **Un mois d'affaires de la V3** : autant de demandes que le **mois le plus chargé des 36 derniers** de la source (lu par
+   un SELECT ; `--mois N` sinon), deux par affaire — l'une validée, l'autre en cours —, copiées d'affaires transférées,
+   agents et types en identifiants de la V3, par lots de 5 000 affaires. Les identifiants de la V2 sont décalés de 100 000
+   avant : un identifiant de la V3 écrit tel quel dans la V2 y viserait une autre ligne, et le contrôle le verrait.
+4. Un passage de la recopie et **le contrôle de nuit pendant la bêta** ; **le retour, chronométré** ; un passage et **le
+   contrôle de nuit complet** ; sa **contre-épreuve** à chaque répétition : la correspondance d'une affaire rendue mise de
+   côté, le contrôle doit lister ses deux demandes en liens orphelins (puis elle est remise).
+5. Rapport `retour-<date>.md` et `.json` ; code 0 vert, 1 rouge. Vert = tout le mois rendu, retour **et** contrôle de nuit
+   dans la fenêtre (`--fenetre`, 10 h : 20 h → 6 h), rien à traiter pendant la bêta ni après, contre-épreuve vue.
+
+Ce qui n'y est pas joué : `bascule.sql` (les programmes de numérotation remplacés) et son retour `retour.sql` (NUM-022,
+`SoclePassageCheck`) : on mesure ici le retour des **affaires** (`RetourBeta`). Une copie d'un greffe déjà basculé porte sa
+propre fiche du pont : elle est re-pointée vers la V3 de la répétition, ses corps d'origine gardés.
+
+`RigV3.Repetition supprimer --base rigv3_rep_<…>` supprime une base gardée par `--garder`, sur le serveur des bancs du poste
+seulement (le garde-fou SQL des agents refuse `sqlcmd` vers une base qu'il ne connaît pas : c'est le chemin prévu).
+Tout autre nom est refusé (code 2), sans rien effacer : `RecopieRepriseCheck` (section F) le lance comme un processus sur une
+base de banc `rigv3_banc_…`, qui doit rester, et sur une base `rigv3_rep_…`, qui doit partir. Contre-épreuve du 2026-11-23 :
+le préfixe exigé élargi à `rigv3_` (défaut réinjecté), la base de banc est effacée et le banc sort rouge.
+
+**Mesure du 2026-11-23, RIG_DEV** (lecture seule, accord « RIG_DEV », à la place de Le Puy : la copie d'un greffe bêta de
+production est remise au changement de base). La copie anonymisée a été faite par le premier lancement (arrêté ensuite sur un
+conflit de collation dans le mois simulé, corrigé), le second l'a reprise par `--copie` ; rapports
+`C:\Users\raphael.vilain\Documents\Autowin\refonte-rig\repetitions\retour-20261123-193703.md` et `retour-20261123-195557.md`.
+
+| Étape | Chronomètre | Résultat |
+|---|---|---|
+| Copie anonymisée, réduite à 200 lignes par table, fermée | **271,8 s** | 860 tables, 1 069 colonnes traitées, 0 anomalie ; 109 027 lignes parentes, 789 clés vérifiées |
+| Contrôle de la copie | **565,5 s** | **vert** : 308 545 valeurs et 880 127 mots tirés de RIG_DEV, **aucun retrouvé** |
+| Transfert (avec `recopie-v2.sql` avant) | **149,1 s** | fini, 866 tables (819 par une règle provisoire), 0 rejet ; contrôle des deux bases : 67 362 lignes, 0 écart |
+| Le greffe en bêta | — | recopie en service (garde des affaires), déclencheurs de date de validation de la V2 **actifs**, pont posé, 3 corps d'origine gardés |
+| Mois simulé : le plus chargé des 36 derniers de RIG_DEV (03/2024) | **39,1 s** | **17 590 affaires, 35 180 demandes** de la V3, copiées de 200 affaires transférées |
+| Contrôle de nuit pendant la bêta | 8,0 s | 99 498 lignes, **rien à traiter** ; aucun refus avant le retour |
+| **Retour** | **3 167,5 s (52 min 47 s)** | **fait** : 17 590 affaires et 35 180 demandes écrites dans la V2, **60,0 ms par ligne** |
+| Contrôle de nuit après le retour | 18,6 s | 152 268 lignes sur 12 tables, **0 écart, 0 lien orphelin, 0 sans correspondance** |
+| Contre-épreuve | 15 s | vue : l'affaire rendue 5506473 sans sa correspondance, le contrôle liste ses **2** demandes (7067405, 7067406), code 5 |
+
+**CA07 tenu** sur RIG_DEV : retour et contrôle de nuit en **53 min 6 s**, dans la fenêtre de 10 h ; rien à traiter ensuite.
+**Écart à l'estimation** : le banc extrapolait 16 min (17,6 ms par ligne, mesuré sur 370 lignes) ; au volume d'un mois, la
+ligne coûte **3,4 fois** plus (60 ms), tout le temps étant passé dans SQL Server (un cœur à 95 %, le programme 153 s de
+processeur en 53 min). La cause n'est pas encore localisée (pistes écartées : index de la copie — ils sont recopiés ; clés de
+lecture — elles convertissent le paramètre, pas la colonne). Si le coût croît avec le volume, un mois double prendrait
+environ 3 h 30 : toujours dans la nuit, mais à mesurer sur la copie du greffe bêta lui-même.
+
 Le contrôle de nuit d'un greffe bêta n'alerte pas pour ses affaires de la V3, ni pendant la bêta ni après un retour : ni
 « sans correspondance » (affaires, demandes, type de la V3 seule), ni lien orphelin (identifiants de la V3, voir REC-006 point 5).
 Mesuré le 2026-11-22 : avant cette lecture, 497 liens orphelins pendant la bêta et 253 après le retour pour 248 demandes de la V3.
@@ -916,7 +982,7 @@ Mesuré le 2026-11-22 : avant cette lecture, 497 liens orphelins pendant la bêt
 
 | Critère | Ce qui manque | Où |
 |---|---|---|
-| REC-007 CA07 sur la copie anonymisée d'un greffe bêta (un mois d'affaires simulées) | un vrai greffe bêta (Le Puy, Chartres, Vienne) — la copie anonymisée (lot 6) est reçue (22/11/2026) ; mesuré ici sur RIG_DEV : 370 lignes en 6,5 s, extrapolé au mois le plus chargé de RIG_DEV (35 180 demandes) à 16 min | REC-008 (lot 18) |
+| REC-007 CA07 sur la copie anonymisée d'un greffe bêta (un mois d'affaires simulées) | **joué sur RIG_DEV** le 2026-11-23 (`RigV3.Repetition retour`, ci-dessus : 35 180 demandes rendues en 52 min 47 s, contrôle de nuit à 0) ; reste la copie d'un **vrai greffe bêta** (Le Puy, Chartres, Vienne) : remise au changement de base, et il faut `VIEW DEFINITION` sur la base du greffe (`socle-anonymisation.md`) | au changement de base |
 | REC-007 dans l'outil du passage | `RigV3.Passage retour` (`Outils\Passage\MoteurPassage.cs`, `RevenirAsync`) joue `retour.sql` ; le retour des affaires se lance par sa route, avant | lot 13 / 17 |
 | REC-007 T04 (procédure de retour : préavis, fenêtre, communication) | écrite par l'exploitation d'Amitel | exploitation |
 | REC-009 T05 (comptage sur les 40 bases) | les bases des greffes ne se lisent pas d'ici sans accord | répétition REC-008 (lot 18) |
@@ -937,6 +1003,7 @@ Mesuré le 2026-11-22 : avant cette lecture, 497 liens orphelins pendant la bêt
 | `Contrats\Socle\Aiguillage.cs`, `Serveur\Socle\Aiguillage\ModuleAiguillage.cs` | REC-007 T02 : un greffe bêta revenu, toute affaire à la V2 |
 | `Pont\EcranHistoriqueV2.cs`, `web\src\ecrans\EcranHistoriqueV2.tsx` (+ test), `web\src\ecrans\EcranRechAffaires.tsx` | l'écran, et le bloc « Ancien RIG » de la recherche d'affaires |
 | `tests\RecopieRetourCheck\` | le banc : un contrôle par critère des cinq stories |
+| `Outils\Repetition\RepetitionRetour.cs` (+ `Program.cs` : `retour`, `supprimer`) | REC-007 CA07 au volume réel : la répétition du retour sur une copie anonymisée |
 
 Preuve : `.\tests.ps1 RecopieRetour` (il lui faut `docker compose up -d` et la lecture de RIG_DEV). Les identifiants de la V2 y
 sont décalés de 100 000 de ceux de la V3 avant toute écriture : un identifiant de la V3 écrit tel quel dans la V2 viserait une

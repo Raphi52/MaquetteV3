@@ -15,7 +15,7 @@ namespace RigV3.Outils.Anonymisation;
 //   --source   la base V2 (Database=… obligatoire), LUE SEULEMENT
 //   --cible    la copie : serveur de CE poste seulement (docker compose up -d) ; base absente ou vide
 //   --accord   source hors de ce poste : son nom de base, l'accord donne pour CETTE base (CA07)
-//   --regles   remplacements relus « TABLE.COLONNE=Garder|Mots|Courriel|Fichier|Telephone|DateNaissance|Vider|Xml »
+//   --regles   remplacements relus « TABLE.COLONNE=Garder|Mots|Courriel|Fichier|Telephone|DateNaissance|Vider|Xml|Document »
 //   --graine   valeurs fictives reproductibles (source sur ce poste seulement)
 //
 // Code de sortie : 0 = fait (controle : rien trouve), 1 = refus ou echec, 2 = mauvais usage,
@@ -86,6 +86,13 @@ public static class Programme
                     sortie.WriteLine($"Colonnes gardees a segment personnel : {r.Gardees.Count(g => g.Valeurs > 0)} tirees, dont {r.Gardees.Count(g => g.Valeurs > 0 && g.Toutes)} lues en entier (lexique : {r.LexiquePrenoms} prenoms de {r.ColonnesLexique} colonnes) ; " +
                                      $"prenoms en clair : {(enClair.Count == 0 ? "aucune" : string.Join(", ", enClair))}" +
                                      (r.GardeesNonJugees ? " -- NON JUGEES : la base n'a donne aucun prenom" : ""));
+                    sortie.WriteLine($"Documents : {r.ColonnesDocuments} colonnes, {r.DocumentsTires} documents tires (empreintes) ; retrouves dans la copie : " +
+                                     $"{(r.DocumentsRetrouves.Count == 0 ? "aucun" : string.Join(", ", r.DocumentsRetrouves))} ; autre format ou autre taille : " +
+                                     $"{(r.DocumentsAutreForme.Count == 0 ? "aucun" : string.Join(", ", r.DocumentsAutreForme))}" +
+                                     (r.DocumentsAbsents > 0 ? $" ; {r.DocumentsAbsents} absents de la copie (copie reduite)" : "") +
+                                     (r.DocumentsCoincidences > 0 ? $" ; {r.DocumentsCoincidences} identiques au document fictif (degeneres)" : ""));
+                    var binaires = r.BinairesGardes.Where(b => b.Documents > 0).Select(b => $"{b.Colonne} ({b.Documents} sur {b.Valeurs} : {b.Formats} ; gardee : {b.Raison})").ToList();
+                    sortie.WriteLine($"Binaires gardes : {r.BinairesGardes.Count} tires ; portant des documents : {(binaires.Count == 0 ? "aucun" : string.Join(", ", binaires))}");
                     return r.Vert ? 0 : 3;
                 }
                 default:
@@ -123,18 +130,22 @@ public static class Programme
         sb.AppendLine("| Colonne | Type | Traitement | Origine |").AppendLine("|---|---|---|---|");
         int traitees = 0, aRelire = 0, total = 0;
         var relire = new List<string>();
+        var binaires = new List<string>();
         foreach (var t in schema.Tables)
             foreach (var c in t.Colonnes)
             {
                 total++;
-                var r = catalogue.Pour(t.Nom, c.Nom, c.Type);
+                var r = catalogue.Pour(t.Nom, c.Nom, c.Type, c.Longueur);
+                if (CatalogueRegles.EstBinaire(c.Type))
+                    binaires.Add($"| {t.Libelle}.{c.Nom} | {c.Type}{(c.Type == "image" ? "" : c.Longueur < 0 ? "(max)" : $"({c.Longueur})")} | " +
+                                 $"{(r.Traitement == Traitement.Document ? "**remplacée** (document fictif)" : r.Anonymise ? r.Traitement.ToString() : "**gardée**")} | {r.Origine} |");
                 if (r.Anonymise)
                 {
                     traitees++;
                     sb.AppendLine($"| {t.Libelle}.{c.Nom} | {c.Type} | {r.Traitement} | {r.Origine} |");
                     if (r.Origine.Contains("a relire")) aRelire++;
                 }
-                else if (catalogue.Suspicion(t.Nom, c.Nom, c.Type) is { } raison)
+                else if (catalogue.Suspicion(t.Nom, c.Nom, c.Type, c.Longueur) is { } raison)
                 {
                     aRelire++;
                     relire.Add($"- `{t.Libelle}.{c.Nom}` ({c.Type}) : {raison}");
@@ -142,6 +153,12 @@ public static class Programme
             }
         sb.AppendLine().AppendLine("## Gardées, à relire").AppendLine();
         foreach (var l in relire) sb.AppendLine(l);
+        sb.AppendLine().AppendLine("## Colonnes binaires").AppendLine();
+        sb.AppendLine("Toutes les colonnes binary, varbinary et image : un document (ou un contenu qui peut porter une personne) est remplacé ; " +
+                      "un binaire technique (clé, empreinte, signature de chaîne, à taille bornée) est gardé, raison écrite.").AppendLine();
+        sb.AppendLine("| Colonne | Type | Dans la copie | Raison |").AppendLine("|---|---|---|---|");
+        foreach (var l in binaires) sb.AppendLine(l);
+        if (binaires.Count == 0) sb.AppendLine("| aucune | | | |");
         return (sb.ToString(), traitees, aRelire, total);
     }
 }

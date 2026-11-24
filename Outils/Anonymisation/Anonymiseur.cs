@@ -20,7 +20,13 @@ public sealed class Anonymiseur(Pseudonymes pseudonymes, CatalogueRegles catalog
         switch (regle.Traitement)
         {
             case Traitement.Vider:
-                return accepteNull ? DBNull.Value : valeur is string ? "" : valeur;
+                return accepteNull ? DBNull.Value : valeur switch { string => "", byte[] => Array.Empty<byte>(), _ => valeur };
+            case Traitement.Document:
+                // La source ne rend que la signature du document (Copie : DocumentsFictifs.ExpressionSignature) ; un document
+                // arrive ici en clair = la lecture n'a pas pris la signature : on s'arrete plutot que de le recopier.
+                return valeur is string etiquette && SignatureDocument.TryLire(etiquette, out var signature)
+                    ? DocumentsFictifs.Fabriquer(signature)
+                    : throw new InvalidOperationException("Document lu en clair : la source doit rendre sa signature (format et taille), jamais son contenu.");
             case Traitement.DateNaissance:
                 return valeur switch
                 {

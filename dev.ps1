@@ -1,6 +1,9 @@
 ﻿# Lance RIG V3 en mode developpement, avec reprise a chaud.
 #
-#   .\dev.ps1
+#   .\dev.ps1          sur les DONNEES DE DEVELOPPEMENT (copie anonymisee de RIG_DEV,
+#                      serveur V3 local : donnees-dev.ps1), le mode par defaut depuis le
+#                      2026-11-24 -- NeoRIG est le vrai projet, plus une maquette
+#   .\dev.ps1 -Demo    sur les donnees de demonstration (Metier/JeuDemo.cs), sans serveur
 #
 # Rien a faire a la main :
 #  - ecrans React (web/src, .tsx/.ts) : le serveur Vite, lance ici, les reprend
@@ -14,6 +17,26 @@
 #
 # Si une modification C# est trop profonde pour etre appliquee a chaud
 # (« rude edit »), l'application est relancee automatiquement.
+
+param([switch]$Demo)
+
+# --- DONNEES DE DEVELOPPEMENT (par defaut ; -Demo pour la demonstration). EN PREMIER :
+# un echec s'arrete ici et le dit, AVANT de fermer l'instance ouverte et sans rien
+# laisser tourner -- jamais de retour discret a la demonstration, et jamais une
+# fenetre fermee pour rien (Docker arrete : l'utilisateur garde son application).
+# donnees-dev.ps1 pose RIGV3_SERVEUR, RIGV3_COMPTE et RIGV3_GREFFES dans ce
+# processus : dotnet watch, puis l'application, en heritent.
+if (-not $Demo) {
+    try { & (Join-Path $PSScriptRoot 'donnees-dev.ps1') }
+    catch {
+        Write-Host "Donnees de developpement indisponibles : $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host 'Pour ouvrir quand meme sur la demonstration : .\dev.ps1 -Demo' -ForegroundColor DarkGray
+        exit 1
+    }
+} else {
+    # Une console qui a deja lance donnees-dev.ps1 garde ces variables : -Demo les retire.
+    Remove-Item Env:RIGV3_SERVEUR, Env:RIGV3_COMPTE, Env:RIGV3_GREFFES -ErrorAction SilentlyContinue
+}
 
 # Une instance deja ouverte VERROUILLE RigV3Desktop.exe : la premiere
 # compilation de watch echouerait (MSB3027). On ferme donc l'instance

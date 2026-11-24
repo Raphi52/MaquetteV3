@@ -21,6 +21,10 @@ public sealed record OptionsCopie
     /// <summary>Copie reduite : au plus N lignes par table (les premieres dans l'ordre de la cle), puis les lignes parentes
     /// qu'elles visent (<see cref="FermerSurLesCles"/>).</summary>
     public long? MaxLignes { get; init; }
+    /// <summary>Copie reduite : les tables copiees EN ENTIER malgre <see cref="MaxLignes"/> (« TABLE » ou « dbo.TABLE ») --
+    /// celles dont un usage a besoin completes (les donnees de developpement : comptes, droits, reglages, compteurs). Leurs
+    /// lignes parentes suivent par la fermeture, comme pour les autres. Une table absente de la source est ignoree.</summary>
+    public IReadOnlyCollection<string>? TablesEntieres { get; init; }
     /// <summary>
     /// Copie reduite seulement : la fermer sur ses cles etrangeres (Fermeture.cs) -- aucune ligne n'y vise un parent absent,
     /// et ses cles sont posees AVEC verification. Faux : les N premieres lignes seules, cles posees sans verification
@@ -90,6 +94,11 @@ public static class CopieAnonymisee
         await using var src = await PorteSource.OuvrirAsync(o.Source, o.Accord, ct);
         rapport.EcrituresSourceAvant = await src.EcrituresServeurAsync(ct);
         var schema = await SchemaSource.LireAsync(src, ct);
+        if (await DefinitionsCacheesAsync(src, ct) is { Count: > 0 } cachees)
+            throw new InvalidOperationException(
+                $"Definitions cachees par la source ({string.Join(", ", cachees)}) : le compte qui la lit n'a pas le droit VIEW DEFINITION sur cette base. " +
+                "La copie n'aurait pas la forme de la source (valeurs par defaut, contraintes, index filtres, declencheurs et procedures perdus). " +
+                "Il faut ce droit, en lecture seule, pour ce compte ; aucune base copie n'a ete creee.");
         catalogue.AlignerSurLesCles(schema);
         var tables = Choisir(schema.Tables, o.Tables);
         journal.WriteLine($"Source {rapport.Source} : {schema.Tables.Count} tables, {tables.Count} a copier.");
@@ -210,7 +219,7 @@ public static class CopieAnonymisee
         rapport.Fin = DateTime.Now;
         foreach (var t in tables)
             foreach (var c in t.Colonnes)
-                if (catalogue.Suspicion(t.Nom, c.Nom, c.Type) is { } raison) rapport.ARelire.Add(($"{t.Libelle}.{c.Nom}", raison));
+                if (catalogue.Suspicion(t.Nom, c.Nom, c.Type, c.Longueur) is { } raison) rapport.ARelire.Add(($"{t.Libelle}.{c.Nom}", raison));
         await MarquerAsync(cn, rapport, ct);
         if (o.FichierRapport is not null)
         {
@@ -234,8 +243,34 @@ public static class CopieAnonymisee
         return choisies;
     }
 
+    /// <summary>La table est-elle demandee en entier (meme lecture des noms que <see cref="Choisir"/>) ?</summary>
+    internal static bool EstEntiere(TableSql t, IReadOnlyCollection<string>? entieres)
+        => entieres is not null && entieres.Any(n => string.Equals(t.Libelle, n, StringComparison.OrdinalIgnoreCase)
+                                                    || string.Equals(t.Nom, n, StringComparison.OrdinalIgnoreCase));
+
     private static bool MemeServeur(string a, string b)
         => string.Equals(a.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Les definitions que la source CACHE au compte qui la lit : sans le droit VIEW DEFINITION, SQL Server rend NULL pour la
+    /// definition d'une valeur par defaut, d'une contrainte, d'une colonne calculee, du filtre d'un index et d'un module (un
+    /// module CHIFFRE est a part : illisible meme avec le droit). Le schema lu ne le dit pas : la copie perdait ces objets sans
+    /// rien signaler, ou plantait apres la copie des donnees sur « CHECK ; ».
+    /// fix-ok: RIG_LE_PUY (SQL-PROD\PROD), 2026-11-23 -- compte sans VIEW DEFINITION : 1 251 valeurs par defaut, 24 contraintes,
+    /// 190 filtres d'index et 305 modules a NULL ; copie arretee apres 36 min sur « Incorrect syntax near ';' ». RIG_DEV : aucune.
+    /// </summary>
+    private static async Task<List<string>> DefinitionsCacheesAsync(PorteSource src, CancellationToken ct)
+    {
+        var l = (await src.LignesAsync(
+            "SELECT (SELECT COUNT(*) FROM sys.default_constraints WHERE definition IS NULL), " +
+            "(SELECT COUNT(*) FROM sys.check_constraints WHERE definition IS NULL), " +
+            "(SELECT COUNT(*) FROM sys.computed_columns WHERE definition IS NULL), " +
+            "(SELECT COUNT(*) FROM sys.indexes WHERE has_filter = 1 AND filter_definition IS NULL), " +
+            "(SELECT COUNT(*) FROM sys.sql_modules m JOIN sys.objects o ON o.object_id = m.object_id " +
+            " WHERE o.is_ms_shipped = 0 AND m.definition IS NULL AND ISNULL(OBJECTPROPERTY(o.object_id, 'IsEncrypted'), 0) = 0)", ct))[0];
+        string[] genres = ["valeurs par defaut", "contraintes", "colonnes calculees", "filtres d'index", "modules"];
+        return [.. genres.Select((g, i) => (Genre: g, N: Convert.ToInt32(l[i]))).Where(x => x.N > 0).Select(x => $"{x.N} {x.Genre}")];
+    }
 
     /// <summary>Base absente : creee au classement de la source. Presente : doit etre VIDE (jamais ecrasee).</summary>
     private static async Task CreerBaseAsync(SqlConnectionStringBuilder cible, string collation, CancellationToken ct)
@@ -267,6 +302,9 @@ public static class CopieAnonymisee
     {
         public required TableSql Table { get; init; }
         public required List<ColonneSql> Colonnes { get; init; }
+        /// <summary>Ce que le SELECT de la source lit pour chaque colonne : la colonne, ou pour un document sa SEULE signature
+        /// (format et taille, DocumentsFictifs.ExpressionSignature) -- un document reel ne sort jamais de la source.</summary>
+        public required string[] Selection { get; init; }
         public required Regle[] Regles { get; init; }
         public required ColonneTraitee?[] Traitees { get; init; }
         /// <summary>Les colonnes d'une signature (FACTU_SIGN_SEQ, GTPF_SIGNATURE…) : une ligne signee dont le contenu
@@ -279,7 +317,7 @@ public static class CopieAnonymisee
         public static TableEnCopie Preparer(TableSql t, CatalogueRegles catalogue, Rapport rapport)
         {
             var colonnes = t.Colonnes.Where(c => !c.Calculee).ToList();
-            var regles = colonnes.Select(c => catalogue.Pour(t.Nom, c.Nom, c.Type)).ToArray();
+            var regles = colonnes.Select(c => catalogue.Pour(t.Nom, c.Nom, c.Type, c.Longueur)).ToArray();
             var traitees = new ColonneTraitee?[colonnes.Count];
             for (var i = 0; i < colonnes.Count; i++)
                 if (regles[i].Anonymise)
@@ -287,9 +325,14 @@ public static class CopieAnonymisee
                     traitees[i] = new ColonneTraitee(t.Libelle, colonnes[i].Nom, colonnes[i].Type, colonnes[i].Longueur, regles[i]);
                     rapport.Colonnes.Add(traitees[i]!);
                 }
+                else if (CatalogueRegles.EstBinaire(colonnes[i].Type))
+                    rapport.BinairesGardes.Add(($"{t.Libelle}.{colonnes[i].Nom}", colonnes[i].Type, regles[i].Origine));
             return new TableEnCopie
             {
                 Table = t, Colonnes = colonnes, Regles = regles, Traitees = traitees,
+                Selection = [.. colonnes.Select((c, i) => regles[i].Traitement == Traitement.Document
+                    ? $"{DocumentsFictifs.ExpressionSignature(Ddl.Q(c.Nom))} AS {Ddl.Q(c.Nom)}"
+                    : Ddl.Q(c.Nom))],
                 Signatures = [.. colonnes.Select((c, i) => (c, i)).Where(x => CatalogueRegles.Segments(x.c.Nom).Any(s => s is "SIGN" or "SIGNATURE")).Select(x => x.i)],
                 Index = colonnes.Select((c, i) => (c.Nom, i)).ToDictionary(x => x.Nom, x => x.i, StringComparer.OrdinalIgnoreCase),
             };
@@ -303,9 +346,11 @@ public static class CopieAnonymisee
         if (e.Colonnes.Count == 0) return 0;
         // Une table sans cle primaire (104 dans RIG_DEV) : ses N premieres lignes dans l'ordre du serveur, comme au lot 8.
         var cle = schema.Index.FirstOrDefault(i => i.Table == t.Id && i.Primaire)?.Colonnes.Where(c => !c.Inclus).Select(c => Ddl.Q(c.Colonne)).ToList();
-        var sql = $"SELECT {(o.MaxLignes is { } m ? $"TOP ({m}) " : "")}{string.Join(", ", e.Colonnes.Select(c => Ddl.Q(c.Nom)))} " +
+        var max = EstEntiere(t, o.TablesEntieres) ? null : o.MaxLignes;
+        if (o.MaxLignes is not null && max is null) rapport.TablesEntieres.Add(t.Libelle);
+        var sql = $"SELECT {(max is { } m ? $"TOP ({m}) " : "")}{string.Join(", ", e.Selection)} " +
                   $"FROM {t.Complet} WITH (NOLOCK)" +
-                  (o.MaxLignes is not null && cle is { Count: > 0 } ? $" ORDER BY {string.Join(", ", cle)}" : "");
+                  (max is not null && cle is { Count: > 0 } ? $" ORDER BY {string.Join(", ", cle)}" : "");
         await using (var lecteur = await src.LireAsync(sql, ct))
             await EcrireAsync(lecteur, cn, e, anonymiseur, fermeture, sauterDejaCopiees: false, o.TailleLot, ct);
         if (e.Colonnes.Any(c => c.Type is "timestamp" or "rowversion"))
@@ -329,7 +374,9 @@ public static class CopieAnonymisee
         FermetureSurLesCles? fermeture, bool sauterDejaCopiees, int tailleLot, CancellationToken ct)
     {
         using var lot = new DataTable();
-        for (var i = 0; i < lecteur.FieldCount; i++) lot.Columns.Add(e.Colonnes[i].Nom, lecteur.GetFieldType(i));
+        // Un document arrive en signature (texte) et repart en document fictif (octets).
+        for (var i = 0; i < lecteur.FieldCount; i++)
+            lot.Columns.Add(e.Colonnes[i].Nom, e.Regles[i].Traitement == Traitement.Document ? typeof(byte[]) : lecteur.GetFieldType(i));
         using var bulk = new SqlBulkCopy(cn, SqlBulkCopyOptions.KeepIdentity | SqlBulkCopyOptions.KeepNulls | SqlBulkCopyOptions.TableLock, null)
         {
             DestinationTableName = e.Table.Complet,
@@ -340,9 +387,10 @@ public static class CopieAnonymisee
 
         long ecrites = 0, octets = 0;
         var valeurs = new object[e.Colonnes.Count];
-        // Lecture SYNCHRONE des lignes : en asynchrone, SqlClient lit une grosse valeur binaire en un temps quadratique
+        // Lecture SYNCHRONE des lignes : en asynchrone, SqlClient lit une grosse valeur en un temps quadratique
         // (dotnet/SqlClient#593, ouvert ; 20 Mo : 52 s). fix-ok: mesure du 2026-11-22 sur la fermeture de RIG_DEV : 4 lignes de
-        // GED_RIG (GDRG_FICHIER, image) en 137 s, client a 100 % d'un coeur, serveur en ASYNC_NETWORK_IO.
+        // GED_RIG (GDRG_FICHIER, image) en 137 s, client a 100 % d'un coeur, serveur en ASYNC_NETWORK_IO. Depuis la regle des
+        // documents (meme jour), un document n'est plus lu du tout -- sa signature seule -- ; les gros textes et XML restent.
         while (lecteur.Read())
         {
             ct.ThrowIfCancellationRequested();
@@ -355,6 +403,12 @@ public static class CopieAnonymisee
                 if (e.Traitees[i] is not { } traitee || avant[i] is DBNull) continue;
                 traitee.Valeurs++;
                 valeurs[i] = anonymiseur.Appliquer(e.Regles[i], avant[i], e.Colonnes[i].AccepteNull, n => e.Index.TryGetValue(n, out var k) ? avant[k] : null);
+                if (traitee.Document && SignatureDocument.TryLire(avant[i] as string, out var signature))
+                {
+                    var format = signature.Format.ToString();
+                    traitee.Formats[format] = traitee.Formats.GetValueOrDefault(format) + 1;
+                    traitee.Octets += signature.Taille;
+                }
                 if (!Equals(valeurs[i], avant[i])) { traitee.Modifiees++; change = true; }
             }
             if (change && e.Signatures.Any(s => avant[s] is not DBNull)) e.SigneesTouchees++;
@@ -396,7 +450,7 @@ public static class CopieAnonymisee
                 var e = enCopie[l.Parent.Id];
                 try
                 {
-                    foreach (var (sql, parametres) in FermetureSurLesCles.Lectures(l, e.Colonnes, manquantes))
+                    foreach (var (sql, parametres) in FermetureSurLesCles.Lectures(l, e.Selection, manquantes))
                     {
                         await using var lecteur = await src.LireAsync(sql, ct, parametres);
                         var n = await EcrireAsync(lecteur, cn, e, anonymiseur, fermeture, sauterDejaCopiees: true, o.TailleLot, ct);

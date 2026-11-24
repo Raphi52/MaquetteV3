@@ -27,8 +27,8 @@ public sealed class ResultatControle
     public List<string> NonVidees { get; } = [];
     public bool Marquee { get; set; }
     public bool ChainesInvalidees { get; set; }
-    /// <summary>Ce qui est sorti de la source : des nombres, des cles primaires, des noms d'attributs et des
-    /// empreintes de 32 octets -- jamais une valeur.</summary>
+    /// <summary>Ce qui est sorti de la source : des nombres, des cles primaires, des noms d'attributs, des
+    /// empreintes de 32 octets et des signatures de documents (format et taille) -- jamais une valeur.</summary>
     public HashSet<string> GenresLusSource { get; } = [];
     /// <summary>Les colonnes GARDEES dont le nom a un segment personnel, tirees dans la source (CA06) : une regle fausse s'y voit.</summary>
     public List<MesureGardee> Gardees { get; } = [];
@@ -37,9 +37,34 @@ public sealed class ResultatControle
     public int ColonnesLexique { get; set; }
     /// <summary>Des colonnes gardees a segment personnel ont des valeurs, mais la base n'a donne aucun prenom pour les juger.</summary>
     public bool GardeesNonJugees => LexiquePrenoms == 0 && Gardees.Any(g => g.Valeurs > 0);
+
+    /// <summary>Colonnes « document » (binaires remplaces) controlees, et documents tires dans la source (empreintes).</summary>
+    public int ColonnesDocuments { get; set; }
+    public int DocumentsTires { get; set; }
+    /// <summary>Un document de la source retrouve dans la copie par son empreinte, a sa place ou ailleurs dans la colonne :
+    /// « table.colonne (n sur m) ». Une colonne « document » restee identique y est.</summary>
+    public List<string> DocumentsRetrouves { get; } = [];
+    /// <summary>A sa place, le document de la copie n'a pas le format ou la taille de celui de la source (CA01, CA03).</summary>
+    public List<string> DocumentsAutreForme { get; } = [];
+    /// <summary>Documents tires que la copie n'a pas (copie reduite) : ni retrouves ni compares a leur place.</summary>
+    public int DocumentsAbsents { get; set; }
+    /// <summary>Documents de la source identiques, octet pour octet, au document fictif de leur signature (un document
+    /// degenere : vide de sens) -- retrouves, mais pas une fuite.</summary>
+    public int DocumentsCoincidences { get; set; }
+    /// <summary>Les binaires que les regles GARDENT, tires dans la source : un document parmi eux = la regle est fausse.</summary>
+    public List<MesureBinaireGarde> BinairesGardes { get; } = [];
+
     public bool Vert => Fuites.Count == 0 && VolumesDifferents.Count == 0 && NumerosChanges.Count == 0 && NonVidees.Count == 0 && Marquee
-                        && !Gardees.Any(g => g.Prenoms) && !GardeesNonJugees;
+                        && !Gardees.Any(g => g.Prenoms) && !GardeesNonJugees
+                        && DocumentsRetrouves.Count == 0 && DocumentsAutreForme.Count == 0 && !BinairesGardes.Any(b => b.Documents > 0);
 }
+
+/// <summary>
+/// Un binaire GARDE, tire dans la source : <paramref name="Valeurs"/> valeurs, dont <paramref name="Documents"/> ressemblent a
+/// un document (signature d'un format de document, ou plus de <see cref="ControleCopie.BinaireTechniqueMax"/> octets) ;
+/// <paramref name="Formats"/> : les formats vus. <paramref name="Toutes"/> : relu sur toute la table (pages trop maigres).
+/// </summary>
+public sealed record MesureBinaireGarde(string Colonne, string Raison, int Valeurs, int Documents, string Formats, bool Toutes);
 
 /// <summary>
 /// Une colonne gardee a segment personnel, mesuree dans la source : <paramref name="Valeurs"/> valeurs distinctes tirees,
@@ -84,11 +109,24 @@ public sealed class MesureGardees
 /// catalogue ou remplacement) et mesure la part de ses valeurs qui portent un prenom frequent de la base : au-dela de
 /// <see cref="PartPrenomsMax"/>, la regle est fausse et le controle est rouge (voir <see cref="MesurerGardeesAsync"/>).
 ///
+/// LES DOCUMENTS (regle des binaires, lot 18). Un echantillon de documents de chaque colonne « document » de la source n'est
+/// retrouve dans la copie par AUCUNE empreinte -- ni a sa place, ni ailleurs dans la colonne -- et, a sa place, le document de
+/// la copie a le meme format et la meme taille. L'empreinte se calcule sur chaque serveur (HASHBYTES, meme sel) : de la source
+/// ne sortent qu'elle, la cle et la signature (format et taille). Et comme pour les textes, une regle fausse se voit : chaque
+/// binaire que les regles GARDENT est tire, et un seul document parmi ses valeurs le rend rouge.
+///
 /// Il verifie aussi : memes volumes par table, colonnes gardees identiques sur des lignes tirees au hasard,
 /// colonnes « a vider » vides, marque presente.
 /// </summary>
 public static class ControleCopie
 {
+    /// <summary>Une colonne de grande table dont les pages au hasard rendent moins de documents est relue sur toute la table
+    /// (une colonne peu remplie : KBIS_XML.KBIS_PDF de RIG_DEV a 298 documents sur 1 335 544 lignes).</summary>
+    public const int DocumentsMin = 20;
+    /// <summary>Au-dela, une valeur d'un binaire GARDE est un document : une empreinte, une cle ou une signature de chaine
+    /// tient en quelques centaines d'octets (RSA 4096 : 512) ; un certificat, plus long, porte un nom.</summary>
+    public const int BinaireTechniqueMax = 1024;
+
     /// <summary>
     /// Part des valeurs a prenom au-dela de laquelle une colonne gardee porte des prenoms. Mesure du 2026-11-21 apres la
     /// relecture des colonnes maigres (8 passages sur RIG_DEV entier, 5 sur l'extrait du banc), lexique de deux tables :
@@ -146,7 +184,7 @@ public static class ControleCopie
         catalogue.AlignerSurLesCles(schema);
         var tables = schema.Tables.Where(t => tablesCopie.Contains(t.Libelle)).ToList();
         var regles = tables.ToDictionary(t => t, t => t.Colonnes.Where(c => !c.Calculee)
-            .Select(c => (Colonne: c, Regle: catalogue.Pour(t.Nom, c.Nom, c.Type))).Where(x => x.Regle.Anonymise).ToList());
+            .Select(c => (Colonne: c, Regle: catalogue.Pour(t.Nom, c.Nom, c.Type, c.Longueur))).Where(x => x.Regle.Anonymise).ToList());
         r.ColonnesControlees = regles.Values.Sum(v => v.Count);
 
         // ---- volumes (CA03)
@@ -185,9 +223,10 @@ public static class ControleCopie
         SqlParameter PCles(IEnumerable<string> cles) => new("@cles", System.Data.SqlDbType.NVarChar, -1) { Value = string.Join('\u001f', cles) };
         var mots = $"CROSS APPLY (SELECT 1 AS g, u.v AS v UNION ALL SELECT 2, m.value FROM STRING_SPLIT(u.d, N' ') m WHERE LEN(m.value) >= {MotMin}) k";
 
-        // ---- valeurs reelles restees a leur place (CA06)
-        foreach (var (t, cols) in regles.Where(x => x.Value.Any(c => c.Regle.Traitement != Traitement.Vider)))
+        // ---- valeurs reelles restees a leur place (CA06) ; les documents ont leur controle (plus bas)
+        foreach (var (t, toutes) in regles.Where(x => x.Value.Any(c => c.Regle.Traitement is not (Traitement.Vider or Traitement.Document))))
         {
+            var cols = toutes.Where(c => c.Regle.Traitement != Traitement.Document).ToList();
             var cle = schema.Index.FirstOrDefault(i => i.Table == t.Id && i.Primaire)?.Colonnes.Where(c => !c.Inclus).ToList();
             if (cle is not { Count: 1 } || cols.Any(c => c.Colonne.Nom == cle[0].Colonne))
             {
@@ -244,6 +283,103 @@ public static class ControleCopie
             foreach (var (ou, n) in fuites) r.Fuites.Add($"{ou} ({n})");
             Etape($"{t.Libelle} : {cols.Count} colonne(s) personnelle(s) tirees");
         }
+
+        // ---- documents (CA06, CA01, CA03) : aucun document de la source retrouve dans la copie, meme format, meme taille
+        var selBinaire = System.Text.Encoding.Unicode.GetBytes(sel);   // CONVERT(varbinary(max), @sel) : l'UTF-16 du sel
+        string Empreinte(string col) => $"HASHBYTES('SHA2_256', CONVERT(varbinary(max), @sel) + CONVERT(varbinary(max), {col}))";
+        bool Grande(TableSql t) => volumes.GetValueOrDefault(t.Libelle) > GrandeTable;
+        foreach (var (t, cols) in regles)
+            foreach (var (c, _) in cols.Where(x => x.Regle.Traitement == Traitement.Document))
+            {
+                r.ColonnesDocuments++;
+                var col = Ddl.Q(c.Nom);
+                var cle = schema.Index.FirstOrDefault(i => i.Table == t.Id && i.Primaire)?.Colonnes.Where(x => !x.Inclus).ToList();
+                var k = cle is { Count: 1 } ? Ddl.Q(cle[0].Colonne) : null;
+                var remplis = $"{col} IS NOT NULL AND DATALENGTH({col}) > 0";   // un document vide reste vide : rien a chercher
+                // Les documents tires, par leur cle : d'abord la cle (sans le document), puis l'empreinte de ceux-la seulement.
+                string Lecture(string depuis) => k is null
+                    ? $"SELECT CONVERT(nvarchar(400), NULL), x.s, x.h FROM (SELECT TOP (@n) {DocumentsFictifs.ExpressionSignature(col)} AS s, {Empreinte(col)} AS h " +
+                      $"FROM {depuis} WHERE {remplis} ORDER BY NEWID()) x"
+                    : $"SELECT CONVERT(nvarchar(400), x.{k}), {DocumentsFictifs.ExpressionSignature("x." + col)}, {Empreinte("x." + col)} FROM {t.Complet} x WITH (NOLOCK) " +
+                      $"WHERE x.{k} IN (SELECT TOP (@n) {k} FROM {depuis} WHERE {remplis} ORDER BY NEWID())";
+                var source = await DocumentsSource(src, r, Lecture(Tirage(t)), ct, PSel(), PN());
+                if (Grande(t) && source.Count < DocumentsMin) source = await DocumentsSource(src, r, Lecture($"{t.Complet} WITH (NOLOCK)"), ct, PSel(), PN());
+                r.DocumentsTires += source.Count;
+                if (source.Count == 0) continue;
+
+                // A sa place : meme format, meme taille, autre empreinte.
+                var aSaPlace = new Dictionary<string, (string Signature, UInt128 Empreinte)>();
+                if (k is not null)
+                {
+                    await using var cmd = new SqlCommand(
+                        $"SELECT CONVERT(nvarchar(400), {k}), {DocumentsFictifs.ExpressionSignature(col)}, {Empreinte(col)} FROM {t.Complet} " +
+                        $"WHERE CONVERT(nvarchar(400), {k}) IN (SELECT value FROM STRING_SPLIT(@cles, NCHAR(31)))", copie) { CommandTimeout = 0 };
+                    cmd.Parameters.AddRange([PSel(), PCles(source.Select(s => s.Cle!))]);
+                    await using var l = await cmd.ExecuteReaderAsync(ct);
+                    while (await l.ReadAsync(ct))
+                        aSaPlace[l.GetString(0)] = (l.IsDBNull(1) ? "NULL" : l.GetString(1), l.IsDBNull(2) ? default : Cle((byte[])l[2]));
+                }
+                // Ailleurs dans la colonne : toute valeur de la copie de la meme taille (la seule qui puisse etre egale).
+                var dansLaColonne = new HashSet<UInt128>();
+                await using (var cmd = new SqlCommand(
+                    $"SELECT {Empreinte(col)} FROM {t.Complet} WHERE DATALENGTH({col}) IN (SELECT CONVERT(bigint, value) FROM STRING_SPLIT(@tailles, N','))", copie) { CommandTimeout = 0 })
+                {
+                    cmd.Parameters.AddRange([PSel(), new SqlParameter("@tailles", System.Data.SqlDbType.NVarChar, -1)
+                        { Value = string.Join(',', source.Select(s => s.Signature.Taille).Distinct()) }]);
+                    await using var l = await cmd.ExecuteReaderAsync(ct);
+                    while (await l.ReadAsync(ct)) if (!l.IsDBNull(0)) dansLaColonne.Add(Cle((byte[])l[0]));
+                }
+                int retrouves = 0, autreForme = 0;
+                foreach (var d in source)
+                {
+                    var place = d.Cle is not null && aSaPlace.TryGetValue(d.Cle, out var p) ? p : ((string Signature, UInt128 Empreinte)?)null;
+                    if (d.Cle is not null && place is null) { r.DocumentsAbsents++; continue; }
+                    if (place is { } q && q.Signature != d.Signature.Etiquette) autreForme++;
+                    if (place is { } e && e.Empreinte == d.Empreinte || dansLaColonne.Contains(d.Empreinte))
+                    {
+                        // Le document de la source EST le document fictif de sa signature (degenere) : retrouve, pas une fuite.
+                        if (EmpreinteLocale(selBinaire, DocumentsFictifs.Fabriquer(d.Signature)) == d.Empreinte)
+                            r.DocumentsCoincidences++;
+                        else retrouves++;
+                    }
+                }
+                if (retrouves > 0) r.DocumentsRetrouves.Add($"{t.Libelle}.{c.Nom} ({retrouves} sur {source.Count})");
+                if (autreForme > 0) r.DocumentsAutreForme.Add($"{t.Libelle}.{c.Nom} ({autreForme} sur {source.Count})");
+                Etape($"{t.Libelle}.{c.Nom} : {source.Count} documents tires, {retrouves} retrouves, {autreForme} d'une autre forme");
+            }
+
+        // ---- les binaires GARDES : un document parmi leurs valeurs = la regle qui les garde est fausse (comme les textes)
+        foreach (var t in tables)
+            foreach (var c in t.Colonnes.Where(c => !c.Calculee && CatalogueRegles.EstBinaire(c.Type)))
+            {
+                var regle = catalogue.Pour(t.Nom, c.Nom, c.Type, c.Longueur);
+                if (regle.Anonymise) continue;
+                var col = Ddl.Q(c.Nom);
+                string Lecture(string depuis) =>
+                    $"SELECT x.s FROM (SELECT TOP (@n) {DocumentsFictifs.ExpressionSignature(col)} AS s FROM {depuis} WHERE {col} IS NOT NULL ORDER BY NEWID()) x";
+                var lues = await Signatures(Lecture(Tirage(t)));
+                var toutes = !Grande(t);
+                if (Grande(t) && lues.Count < DocumentsMin) { lues = await Signatures(Lecture($"{t.Complet} WITH (NOLOCK)")); toutes = true; }
+                var documents = lues.Count(s => DocumentsFictifs.SignaturesFortes.Contains(s.Format) || s.Taille > BinaireTechniqueMax);
+                r.BinairesGardes.Add(new MesureBinaireGarde($"{t.Libelle}.{c.Nom}", regle.Origine, lues.Count, documents,
+                    string.Join(", ", lues.GroupBy(s => s.Format).OrderByDescending(g => g.Count()).Select(g => $"{g.Key} {g.Count()}")), toutes));
+
+                async Task<List<SignatureDocument>> Signatures(string sql)
+                {
+                    var liste = new List<SignatureDocument>();
+                    await using var l = await src.LireAsync(sql, ct, PN());
+                    while (await l.ReadAsync(ct))
+                    {
+                        if (l.IsDBNull(0)) continue;
+                        if (!SignatureDocument.TryLire(l.GetValue(0) as string, out var s)) { r.GenresLusSource.Add("AUTRE"); continue; }
+                        r.GenresLusSource.Add("format et taille");
+                        liste.Add(s);
+                    }
+                    return liste;
+                }
+            }
+        Etape($"documents : {r.ColonnesDocuments} colonnes, {r.DocumentsTires} tires ; binaires gardes : {r.BinairesGardes.Count}, " +
+              $"dont {r.BinairesGardes.Count(b => b.Documents > 0)} avec des documents");
 
         // ---- colonnes GARDEES a segment personnel : une regle fausse s'y voit (CA06, voir l'en-tete)
         var mesure = await MesurerGardeesAsync(src, schema, catalogue, tables, echantillon, ct);
@@ -401,6 +537,40 @@ public static class ControleCopie
             liste.Add(new Empreinte(l.GetString(0), l.GetString(1), g, Cle(h)));
         }
         return liste;
+    }
+
+    /// <summary>Un document tire dans la source : sa cle (null : table sans cle primaire d'une colonne), sa signature, son empreinte.</summary>
+    private readonly record struct DocumentTire(string? Cle, SignatureDocument Signature, UInt128 Empreinte);
+
+    /// <summary>Les documents rendus par la source : une cle, une signature (format et taille) et une empreinte de 32 octets --
+    /// tout autre contenu est compte « AUTRE » et ecarte.</summary>
+    private static async Task<List<DocumentTire>> DocumentsSource(PorteSource src, ResultatControle r, string sql, CancellationToken ct, params SqlParameter[] p)
+    {
+        var liste = new List<DocumentTire>();
+        await using var l = await src.LireAsync(sql, ct, p);
+        while (await l.ReadAsync(ct))
+        {
+            if (l.GetValue(2) is not byte[] { Length: 32 } h || !SignatureDocument.TryLire(l.GetValue(1) as string, out var s))
+            {
+                r.GenresLusSource.Add("AUTRE");
+                continue;
+            }
+            if (!l.IsDBNull(0)) r.GenresLusSource.Add("cle primaire");
+            r.GenresLusSource.Add("format et taille");
+            r.GenresLusSource.Add("empreinte");
+            liste.Add(new DocumentTire(l.IsDBNull(0) ? null : l.GetString(0), s, Cle(h)));
+        }
+        return liste;
+    }
+
+    /// <summary>L'empreinte que calculerait HASHBYTES('SHA2_256', CONVERT(varbinary(max), @sel) + document), ici, sur un document
+    /// fabrique sur ce poste.</summary>
+    private static UInt128 EmpreinteLocale(byte[] sel, byte[] document)
+    {
+        using var h = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        h.AppendData(sel);
+        h.AppendData(document);
+        return Cle(h.GetHashAndReset());
     }
 
     private static async Task<HashSet<Empreinte>> EmpreintesCopie(SqlConnection copie, string sql, CancellationToken ct, params SqlParameter[] p)
