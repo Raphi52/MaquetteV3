@@ -1,6 +1,9 @@
 ﻿# Lance RIG V3 en mode developpement, avec reprise a chaud.
 #
 #   .\dev.ps1
+#   .\dev.ps1 -DonneesDev   sur les donnees de developpement (copie anonymisee de
+#                           RIG_DEV, serveur V3 local) au lieu de la demonstration :
+#                           donnees-dev.ps1 prepare les bases et demarre le serveur
 #
 # Rien a faire a la main :
 #  - ecrans React (web/src, .tsx/.ts) : le serveur Vite, lance ici, les reprend
@@ -14,6 +17,8 @@
 #
 # Si une modification C# est trop profonde pour etre appliquee a chaud
 # (« rude edit »), l'application est relancee automatiquement.
+
+param([switch]$DonneesDev)
 
 # Une instance deja ouverte VERROUILLE RigV3Desktop.exe : la premiere
 # compilation de watch echouerait (MSB3027). On ferme donc l'instance
@@ -30,6 +35,14 @@ Get-Process -Name 'RigV3Desktop' -ErrorAction SilentlyContinue |
 $env:DOTNET_WATCH_RESTART_ON_RUDE_EDIT = '1'
 $env:DOTNET_USE_POLLING_FILE_WATCHER = '0'
 $env:DOTNET_ENVIRONMENT = 'Development'
+
+# --- DONNEES DE DEVELOPPEMENT (-DonneesDev). Avant Vite : un echec s'arrete ici, sans
+# rien laisser tourner. donnees-dev.ps1 pose RIGV3_SERVEUR, RIGV3_COMPTE et
+# RIGV3_GREFFES dans ce processus : dotnet watch, puis l'application, en heritent.
+if ($DonneesDev) {
+    try { & (Join-Path $PSScriptRoot 'donnees-dev.ps1') }
+    catch { Write-Host "Donnees de developpement indisponibles : $($_.Exception.Message)" -ForegroundColor Red; exit 1 }
+}
 
 # --- SERVEUR VITE (ecrans React a chaud, 19/11/2026, retrait de Blazor).
 # Un port LIBRE, choisi ici : deux copies du depot peuvent tourner en meme

@@ -21,6 +21,8 @@ public sealed record OptionsRepetition
     public required string DossierMigrations { get; init; }
     /// <summary>Lignes copiees par table au plus (copie reduite : une base ENTIERE en tables, pas en volume).</summary>
     public long? MaxLignes { get; init; }
+    /// <summary>Copie reduite : les tables copiees en entier malgre <see cref="MaxLignes"/> (OptionsCopie.TablesEntieres).</summary>
+    public IReadOnlyCollection<string>? TablesEntieres { get; init; }
     /// <summary>Valeurs personnelles tirees de la source et cherchees dans la copie (REC-008 T05 : 1 000).</summary>
     public int Echantillon { get; init; } = 1000;
     public int TailleLot { get; init; } = 50_000;
@@ -128,6 +130,7 @@ public static class Repetition
                         Cible = copie,
                         Accord = o.Accord,
                         MaxLignes = o.MaxLignes,
+                        TablesEntieres = o.TablesEntieres,
                         Graine = o.Graine,
                         FichierRapport = Path.Combine(o.DossierRapport, $"{propre}-anonymisation.md"),
                     }, ct);

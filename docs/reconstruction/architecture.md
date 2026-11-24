@@ -83,6 +83,38 @@ Le mot de passe `RigV3_dev_2026!` ne protège qu'un serveur local sans donnée r
 `RIGV3_SQL_MDP` (et `RIGV3_SQL_PORT`) avant `docker compose up`, et la chaîne complète aux bancs par
 `RIGV3_SQL`. Repartir de zéro : `docker compose down -v`.
 
+### Travailler sur les données de développement (copie anonymisée de RIG_DEV)
+
+Sans `RIGV3_SERVEUR`, chaque écran montre sa démonstration (`Metier\JeuDemo.cs`). Pour voir de **vraies données**
+sans jamais en avoir une en clair sur le poste (2026-11-24) :
+
+```powershell
+.\dev.ps1 -DonneesDev          # le mode développement (reprise à chaud) branché sur ces données
+.\donnees-dev.ps1 -Lancer      # ou : prépare, démarre le serveur, lance bin\Debug\…\RigV3Desktop.exe
+.\donnees-dev.ps1 -Refaire     # refaire la copie (RIG_DEV a changé, migration nouvelle)
+.\donnees-dev.ps1 -Arreter     # arrêter le serveur lancé par le script
+```
+
+| Étape | Qui la fait | Ce qui se passe |
+|---|---|---|
+| Bases | `RigV3.Repetition donnees-dev` (`Outils\Repetition\DonneesDev.cs`) | RIG_DEV est **lu** sur `SQL-DEV\DEV` (SELECT seul) ; la copie s'écrit **déjà anonymisée** sur le SQL Docker du poste (SOC-021 : noms, adresses, documents remplacés), réduite à 200 lignes par table et fermée sur ses clés, **sauf** les tables que lisent les reprises du transfert (21 au 24/11 : comptes, droits, réglages, compteurs, catégories, correspondances des anciens numéros), copiées en entier ; elle est transférée dans une base V3 (comptes, droits, réglages, compteurs : les reprises de la phase 1) ; une base commune porte le greffe **3801** au catalogue, base V2 = la copie, base V3 = la base transférée. ~19 min la première fois ; ensuite, quelques secondes (bases retrouvées). |
+| Agent | la même commande | un compte **actif, administrateur d'Amitel**, avec un service et des rôles (les quatre contrôles de SOC-001), qui gère les droits s'il y en a un. Son identifiant est un pseudonyme : ta session Windows n'est pas dans la copie, l'app ouvre donc le greffe par `RIGV3_COMPTE`, que seul un serveur en `Development` écoute. Il est aussi inscrit dans la base commune (routes communes). |
+| Serveur | `donnees-dev.ps1` | compilé dans `%LOCALAPPDATA%\RigV3\serveur-dev` (il ne verrouille ni `Serveur\bin` ni `bin\Debug`), lancé sur `http://127.0.0.1:5080` avec la base commune, l'accès aux bases des greffes par le compte `sa` du Docker, en `Development` ; repris tel quel au lancement suivant ; `-Arreter` l'arrête, lui seul (pid noté, chemin vérifié). |
+| App | `donnees-dev.ps1` | `RIGV3_SERVEUR`, `RIGV3_COMPTE`, `RIGV3_GREFFES=3801` posées dans le processus PowerShell : `dotnet watch` (via `dev.ps1`) ou l'exe (`-Lancer`) en hérite. |
+
+Les noms des trois bases et de l'agent : `%LOCALAPPDATA%\RigV3\donnees-dev.json` ; journal du serveur :
+`serveur-dev.log` à côté. Une préparation refaite supprime l'ancien jeu **après** sa réussite (un échec laisse
+l'ancien en service). Les bases sont des bases de répétition (`rigv3_rep_…`) : `RigV3.Repetition supprimer`
+les accepte.
+
+Ce que ces données ne donnent pas : les écrans qui n'ont pas encore de partie serveur (actes, audiences,
+facturation… : phase 3) restent sur leur démonstration ; hors socle, la copie est réduite (200 premières lignes par
+table et leurs parents), pas le volume de RIG_DEV.
+
+Le serveur est lancé par `cmd`, sans redirection côté PowerShell : redirigé, il héritait des canaux du script, et un
+appelant qui lisait sa sortie (pipe, `Tee-Object`, un lanceur) attendait la fin du serveur, c'est-à-dire jamais
+(mesuré le 2026-11-24).
+
 Les bancs : `.\tests.ps1 ServeurCheck` (ou `.\tests.ps1` pour tous). Sans `docker compose up -d`, un banc
 qui a besoin de la base est **rouge** et le dit (il attend 90 s que SQL Server démarre, puis abandonne).
 

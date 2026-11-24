@@ -153,6 +153,16 @@ Le contrôle de la copie (`controler`) reste exigé avant usage. Sur une copie r
 construction ; la répétition les juge sur la réduction : chaque table a min(source, N) lignes **plus** celles que la
 fermeture lui a ajoutées (`Repetition.JugerControle`), pas une de plus.
 
+**Des tables en entier dans une copie réduite** (`OptionsCopie.TablesEntieres`, 2026-11-24) : les tables nommées sont
+copiées sans limite, les autres restent réduites, et la fermeture suit aussi leurs clés. Les données de développement
+de l'app s'en servent pour les tables que lisent les reprises du transfert (21 au 24/11 : comptes, droits, réglages, compteurs,
+catégories, correspondances des anciens numéros ;
+`PreparationDonneesDev.TablesDuSocle`) : réduites à 200 lignes, un agent perdait ses rôles
+(`HABILIT_UTILISATEUR_ROLE_USER` : 2 900 lignes dans RIG_DEV) et l'écran « Comptes des agents » refusait l'agent
+choisi. Une table entière a le volume de la source : le contrôle de la copie ne la voit donc pas comme une différence.
+Le rapport de la copie les nomme. Banc : `SocleAnonymisationCheck`, contrôle « Donnees de dev » (contre-épreuve faite :
+l'option ignorée, la table retombe à 20 lignes, rouge).
+
 ## Le contrôle automatique (CA06)
 
 Il tire au hasard des lignes de la **source** qui portent des données personnelles (le catalogue appliqué au

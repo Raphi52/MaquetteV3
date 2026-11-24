@@ -46,6 +46,8 @@ public sealed class Rapport
     public int LiensFermes { get; set; }
     /// <summary>Lignes parentes ajoutees par la fermeture, par table (en plus des N premieres).</summary>
     public List<(string Table, long Lignes)> AjoutsFermeture { get; } = [];
+    /// <summary>Copie reduite : les tables copiees en entier (OptionsCopie.TablesEntieres).</summary>
+    public List<string> TablesEntieres { get; } = [];
     public List<(string Table, long Lignes)> Volumes { get; } = [];
     public List<ColonneTraitee> Colonnes { get; } = [];
     /// <summary>Les colonnes binaires GARDEES (binaire technique : cle, empreinte, signature de chaine) et pourquoi.</summary>
@@ -80,6 +82,8 @@ public sealed class Rapport
                   $"{N(AjoutsFermeture.Sum(a => a.Lignes))} lignes parentes ajoutées dans {AjoutsFermeture.Count} tables, en {ToursFermeture} tours, " +
                   $"{DureeFermetureMs / 1000.0:0.0} s ; clés étrangères posées AVEC vérification"
                 : $"- Copie RÉDUITE : au plus {N(m)} lignes par table, NON fermée sur ses clés (clés étrangères posées sans vérification)");
+        if (TablesEntieres.Count > 0)
+            sb.AppendLine($"- Tables copiées EN ENTIER malgré la réduction ({TablesEntieres.Count}) : {string.Join(", ", TablesEntieres)}");
         sb.AppendLine($"- **Chaînes signées : {(ChainesInvalidees ? $"INVALIDÉES par l'anonymisation ({N(LignesSigneesTouchees)} lignes signées touchées)" : "aucune ligne signée touchée")}**");
         sb.AppendLine();
 

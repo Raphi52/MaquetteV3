@@ -810,6 +810,30 @@ Exiger(controleFermee.Fuites.Count == 0 && controleFermee.NonVidees.Count == 0 &
     $"REC-008 / SOC-021 CA06 : le controle de la copie reduite fermee ne retrouve aucune des {controleFermee.EchantillonValeurs} valeurs reelles tirees " +
     $"(retrouvees : {(controleFermee.Fuites.Count == 0 ? "aucune" : string.Join(", ", controleFermee.Fuites))}) ; marque presente, colonnes a vider vides");
 
+// Une copie reduite qui garde des tables EN ENTIER (OptionsCopie.TablesEntieres : les donnees de developpement, dont les comptes,
+// droits et compteurs doivent etre complets) : la plus grosse table de l'extrait a toutes ses lignes, les autres restent reduites,
+// la copie reste fermee. Jumeau : dans la copie reduite sans l'option (ci-dessus), la meme table n'a pas toutes ses lignes.
+var entiere = nomsExtrait.Where(t => lignesSource[t] > Reduite).OrderByDescending(t => lignesSource[t]).First();
+await using var avecEntiere = await BaseJetable.CreerAsync("SocleAnonymisationEntiere");
+var rapportEntiere = await CopieAnonymisee.CopierAsync(new OptionsCopie
+{
+    Source = v2.Connexion, Cible = avecEntiere.Connexion, Graine = "SOC-021", MaxLignes = Reduite, TablesEntieres = [entiere],
+});
+var lignesEntiere = await EntierAsync(avecEntiere.Connexion, $"SELECT COUNT_BIG(*) FROM dbo.[{entiere}]");
+var lignesSansOption = await EntierAsync(fermee.Connexion, $"SELECT COUNT_BIG(*) FROM dbo.[{entiere}]");
+var autresReduites = new List<string>();
+foreach (var t in nomsExtrait.Where(t => t != entiere && lignesSource[t] > Reduite))
+{
+    var n = await EntierAsync(avecEntiere.Connexion, $"SELECT COUNT_BIG(*) FROM dbo.[{t}]");
+    if (n >= lignesSource[t]) autresReduites.Add($"{t} ({n} sur {lignesSource[t]})");
+}
+var orphelinsEntiere = await OrphelinsAsync(avecEntiere.Connexion);
+Exiger(lignesEntiere == lignesSource[entiere] && lignesSansOption < lignesSource[entiere] && rapportEntiere.TablesEntieres.SequenceEqual([$"dbo.{entiere}"])
+       && autresReduites.Count == 0 && orphelinsEntiere.Orphelins == 0 && rapportEntiere.Anomalies.Count == 0,
+    $"Donnees de dev : copie reduite a {Reduite} lignes avec {entiere} EN ENTIER : {lignesEntiere} lignes sur {lignesSource[entiere]} " +
+    $"(sans l'option : {lignesSansOption}) ; les autres tables restent reduites{(autresReduites.Count == 0 ? "" : " SAUF " + string.Join(", ", autresReduites))} ; " +
+    $"{orphelinsEntiere.Orphelins} ligne(s) orpheline(s), rapport : {string.Join(", ", rapportEntiere.TablesEntieres)}");
+
 Reste("SOC-021 T01 : relecture de l'inventaire par le delegue a la protection des donnees (fichier inventaire-rig-dev.md a cote du banc) -- hors de ce poste");
 Reste("SOC-021 T03, CA07 : lancer l'outil base par base avec l'accord donne pour chaque base de production (40 greffes, SQL-PROD) -- aucun accord sur ce poste");
 Reste("SOC-021 T05 : sur un serveur de production, d'autres sessions ecrivent : le journal du serveur ne prouve plus seul l'absence d'ecriture de l'outil (la porte de lecture reste la garantie)");

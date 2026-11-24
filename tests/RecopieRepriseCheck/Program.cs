@@ -37,6 +37,7 @@ using OutilTransfert = RigV3.Transfert.LigneDeCommande;
 //     CA04) et le refus d'une copie en clair (CA05).
 //  F. REC-007 CA07 (l'outil) : RigV3.Repetition supprimer, lance comme un processus, n'efface qu'une base gardee
 //     (rigv3_rep_...) ; une base de banc et un nom hors lettres, chiffres et _ sont refuses (code 2), rien n'est efface.
+//  G. Les donnees de developpement (DonneesDev.cs) : l'agent choisi passe les controles de SOC-001 et voit tout.
 // Il lui faut « docker compose up -d » et l'acces en lecture a RIG_DEV (autre serveur : RIGV3_RIG_DEV).
 // Doc : docs/reconstruction/recopie.md, sections REC-005, REC-006, REC-008.
 
@@ -70,6 +71,9 @@ async Task<object?> Valeur(string chaine, string sql)
     return t.Rows.Count == 0 || t.Rows[0][0] is DBNull ? null : t.Rows[0][0];
 }
 async Task<long> Nombre(string chaine, string sql) => Convert.ToInt64(await Valeur(chaine, sql) ?? 0L);
+// Chaque ligne en texte, ses colonnes separees par « | ».
+async Task<List<string>> LireLignes(string chaine, string sql)
+    => [.. (await Lire(chaine, sql)).Rows.Cast<DataRow>().Select(r => string.Join("|", r.ItemArray.Select(v => Convert.ToString(v))))];
 async Task Executer(string chaine, string sql)
 {
     await using var cn = new SqlConnection(chaine);
@@ -661,6 +665,60 @@ try
 finally
 {
     await Executer(masterBancs, $"IF DB_ID(N'{gardee}') IS NOT NULL BEGIN ALTER DATABASE [{gardee}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{gardee}]; END");
+}
+
+// ====================================================================================================
+// G. Les donnees de developpement (Outils\Repetition\DonneesDev.cs) : l'agent sous lequel l'app s'ouvre
+// ====================================================================================================
+// Ses comptes sont des pseudonymes de la copie : l'app l'ouvre par RIGV3_COMPTE. Il doit passer les quatre controles de
+// SOC-001 (un role, actif, un service), etre administrateur d'Amitel (il voit tout), et gerer les droits si l'un le peut.
+// Chaque compte ecarte manque d'UNE condition et passerait avant l'agent attendu si elle n'etait pas verifiee.
+await using (var baseAgents = await BaseJetable.CreerAsync("RecopieRepriseAgentDev"))
+{
+    await Migrateur.AppliquerAsync(baseAgents.Connexion, migrations);
+    await Executer(baseAgents.Connexion, """
+        INSERT INTO soc.Service (CodeGreffe, Abrege, Nom) VALUES ('3801', 'GRF', N'Greffe');
+        INSERT INTO soc.Role (Nom, Libelle) VALUES ('GREFFIER', 'Greffier');   -- GestionDesHabilitations : pose par SOC-002
+        INSERT INTO soc.Compte (CompteWindows, Nom, Prenom, Abrege, Civilite, CodeGreffe, IdService, Desactive, EstAmitel, EstAdministrateur) VALUES
+            ('agent.greffe',   'Greffe',   'Agent', 'AG',  'M.', '3801', 1,    0, 0, 0),
+            ('amitel.simple',  'Simple',   'Agent', 'AS',  'M.', '9999', 1,    0, 1, 0),
+            ('admin.desact',   'Desact',   'Agent', 'AD',  'M.', '9999', 1,    1, 1, 1),
+            ('admin.sansrole', 'Sansrole', 'Agent', 'AR',  'M.', '9999', 1,    0, 1, 1),
+            ('admin.sansserv', 'Sansserv', 'Agent', 'AV',  'M.', '9999', NULL, 0, 1, 1),
+            ('admin.greffier', 'Greffier', 'Agent', 'AGR', 'M.', '9999', 1,    0, 1, 1),
+            ('admin.droits',   'Droits',   'Agent', 'ADR', 'M.', '9999', 1,    0, 1, 1);
+        INSERT INTO soc.CompteRole (IdCompte, Role) SELECT Id, 'GREFFIER' FROM soc.Compte WHERE CompteWindows <> 'admin.sansrole';
+        INSERT INTO soc.CompteRole (IdCompte, Role) SELECT Id, 'GestionDesHabilitations' FROM soc.Compte
+        WHERE CompteWindows IN ('agent.greffe', 'admin.desact', 'admin.sansserv', 'admin.droits');
+        """);
+    var gere = await PreparationDonneesDev.ChoisirAgentAsync(baseAgents.Connexion, CancellationToken.None);
+
+    // La base commune : le greffe au catalogue et l'agent avec ses roles, dont GestionDesHabilitations que la migration SOC-002
+    // y a deja pose (le recopier arretait la preparation sur PK_Role, mesure le 2026-11-24 sur RIG_DEV).
+    await using (var communeDev = await BaseJetable.CreerAsync("RecopieRepriseCommuneDev"))
+    {
+        await Migrateur.AppliquerAsync(communeDev.Connexion, migrations);
+        string? arret = null;
+        try { await PreparationDonneesDev.InscrireDansLaCommuneAsync(communeDev.Connexion, "3801", "Banc anonymisee", "RIG_BANC_COPIE", baseAgents.Nom, gere.Id, CancellationToken.None); }
+        catch (SqlException e) { arret = e.Message; }
+        var greffe = await LireLignes(communeDev.Connexion, "SELECT CodeGreffe, BaseV3, BaseV2 FROM soc.Greffe;");
+        var roles = await LireLignes(communeDev.Connexion,
+            "SELECT c.CompteWindows + ':' + r.Role FROM soc.Compte c JOIN soc.CompteRole r ON r.IdCompte = c.Id ORDER BY r.Role;");
+        Exiger(arret is null && greffe.Count == 1 && greffe[0] == $"3801|{baseAgents.Nom}|RIG_BANC_COPIE"
+               && roles.SequenceEqual(["admin.droits:GestionDesHabilitations", "admin.droits:GREFFIER"]),
+            $"Donnees de dev : la base commune porte le greffe au catalogue (base V3 sur le meme serveur) et l'agent avec tous ses roles, " +
+            $"y compris celui que la migration a deja pose ({(arret is null ? $"{string.Join(", ", greffe)} ; {string.Join(", ", roles)}" : "ARRET : " + arret)})");
+    }
+    await Executer(baseAgents.Connexion, "DELETE r FROM soc.CompteRole r JOIN soc.Compte c ON c.Id = r.IdCompte WHERE c.CompteWindows = 'admin.droits' AND r.Role = 'GestionDesHabilitations';");
+    var sansGestion = await PreparationDonneesDev.ChoisirAgentAsync(baseAgents.Connexion, CancellationToken.None);
+    await Executer(baseAgents.Connexion, "UPDATE soc.Compte SET Desactive = 1 WHERE CompteWindows IN ('admin.droits', 'admin.greffier');");
+    string? aucun = null;
+    try { await PreparationDonneesDev.ChoisirAgentAsync(baseAgents.Connexion, CancellationToken.None); }
+    catch (InvalidOperationException e) { aucun = e.Message; }
+    Exiger(gere is { Compte: "admin.droits", Nom: "Agent Droits" } && sansGestion.Compte == "admin.greffier" && aucun is not null,
+        $"Donnees de dev (SOC-001) : l'agent choisi est actif, administrateur d'Amitel, avec un service et un role, et gere les droits " +
+        $"s'il le peut ({gere.Compte} « {gere.Nom} ») ; sinon le premier admis ({sansGestion.Compte}) ; jamais un compte hors Amitel, Amitel non " +
+        $"administrateur, desactive, sans role ou sans service ; aucun : la preparation s'arrete et le dit (« {aucun} »)");
 }
 }
 finally

@@ -21,6 +21,10 @@ public sealed record OptionsCopie
     /// <summary>Copie reduite : au plus N lignes par table (les premieres dans l'ordre de la cle), puis les lignes parentes
     /// qu'elles visent (<see cref="FermerSurLesCles"/>).</summary>
     public long? MaxLignes { get; init; }
+    /// <summary>Copie reduite : les tables copiees EN ENTIER malgre <see cref="MaxLignes"/> (« TABLE » ou « dbo.TABLE ») --
+    /// celles dont un usage a besoin completes (les donnees de developpement : comptes, droits, reglages, compteurs). Leurs
+    /// lignes parentes suivent par la fermeture, comme pour les autres. Une table absente de la source est ignoree.</summary>
+    public IReadOnlyCollection<string>? TablesEntieres { get; init; }
     /// <summary>
     /// Copie reduite seulement : la fermer sur ses cles etrangeres (Fermeture.cs) -- aucune ligne n'y vise un parent absent,
     /// et ses cles sont posees AVEC verification. Faux : les N premieres lignes seules, cles posees sans verification
@@ -239,6 +243,11 @@ public static class CopieAnonymisee
         return choisies;
     }
 
+    /// <summary>La table est-elle demandee en entier (meme lecture des noms que <see cref="Choisir"/>) ?</summary>
+    internal static bool EstEntiere(TableSql t, IReadOnlyCollection<string>? entieres)
+        => entieres is not null && entieres.Any(n => string.Equals(t.Libelle, n, StringComparison.OrdinalIgnoreCase)
+                                                    || string.Equals(t.Nom, n, StringComparison.OrdinalIgnoreCase));
+
     private static bool MemeServeur(string a, string b)
         => string.Equals(a.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
 
@@ -337,9 +346,11 @@ public static class CopieAnonymisee
         if (e.Colonnes.Count == 0) return 0;
         // Une table sans cle primaire (104 dans RIG_DEV) : ses N premieres lignes dans l'ordre du serveur, comme au lot 8.
         var cle = schema.Index.FirstOrDefault(i => i.Table == t.Id && i.Primaire)?.Colonnes.Where(c => !c.Inclus).Select(c => Ddl.Q(c.Colonne)).ToList();
-        var sql = $"SELECT {(o.MaxLignes is { } m ? $"TOP ({m}) " : "")}{string.Join(", ", e.Selection)} " +
+        var max = EstEntiere(t, o.TablesEntieres) ? null : o.MaxLignes;
+        if (o.MaxLignes is not null && max is null) rapport.TablesEntieres.Add(t.Libelle);
+        var sql = $"SELECT {(max is { } m ? $"TOP ({m}) " : "")}{string.Join(", ", e.Selection)} " +
                   $"FROM {t.Complet} WITH (NOLOCK)" +
-                  (o.MaxLignes is not null && cle is { Count: > 0 } ? $" ORDER BY {string.Join(", ", cle)}" : "");
+                  (max is not null && cle is { Count: > 0 } ? $" ORDER BY {string.Join(", ", cle)}" : "");
         await using (var lecteur = await src.LireAsync(sql, ct))
             await EcrireAsync(lecteur, cn, e, anonymiseur, fermeture, sauterDejaCopiees: false, o.TailleLot, ct);
         if (e.Colonnes.Any(c => c.Type is "timestamp" or "rowversion"))
