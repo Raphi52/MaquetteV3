@@ -62,7 +62,6 @@ public static class MenuAccueil
             [
                 new("Courrier du jour",       "le papier entre ce matin",           "PROC_ARRIVEE"),
                 new("Demandes recues",        "ce qu'on attend de moi",             "PROC_DEMANDE"),
-                new("Creation via Infogreffe","enrolement recu par RPJC",           "PROC_CJUDINFOG"),
                 new("Ordonnance d'enrolement","ordonnance RCS",                     "PROC_CORDJRCS"),
                 new("Requisitions",           "commander des documents",            "PROC_REQUI"),
                 new("Commandes web",          "traiter les commandes recues",       "PROC_COMMANDES_WEB")
@@ -226,7 +225,7 @@ public static class MenuAccueil
             [
                 new("Cloture",                "fermer une affaire terminee",        "PROC_CLOT"),
                 new("Archivage",              "archiver ou radier",                 "PROC_ARCHIRAD"),
-                new("Extinction RCS",         "eteindre un dossier du registre",    "PROC_XEX")
+                new("Édition interne d'un Kbis", "extrait Kbis a usage interne",     "PROC_XEX")
             ])
         ]),
         new("Facturer", "compta", "$",

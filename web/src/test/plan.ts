@@ -32,7 +32,7 @@ export function ligneArbre(id: string, texte: string, enfants: LigneArbreVue[] =
 export function proc(partiel: Partial<ProcVue> = {}): ProcVue {
   return {
     code: 'FACTURES', libelle: 'Factures',
-    ecran: { valides: [], sirenDemande: null, cleOuverture: 'ouverture-vierge', lot: null, motif: 'Motif lu dans le menu.', recherche: null, dossier: null },
+    ecran: { valides: [], sirenDemande: null, cleOuverture: 'ouverture-vierge', lot: null, motif: 'Motif lu dans le menu.', recherche: null, dossier: null, descripteur: null },
     ...partiel,
   }
 }

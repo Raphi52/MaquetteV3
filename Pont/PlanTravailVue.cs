@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using RigV3Desktop.Pont.EcransGeneres;
 
 namespace RigV3Desktop.Pont;
 
@@ -59,9 +60,13 @@ public sealed record ProcVue(string Code, string Libelle, EcranProcVue Ecran);
 /// <param name="Recherche">La page « Recherche » (la palette etalee en page) ; null pour les autres ecrans.</param>
 /// <param name="Dossier">L'affaire depuis laquelle l'ecran a ete ouvert (barre d'actions du dossier,
 /// Pont/PlanTravailActions.cs) : la puce « ← Dossier » y ramene. Null pour un ecran ouvert d'ailleurs.</param>
+/// <param name="Descripteur">Le descripteur d'un ecran generique (Pont/EcransGeneres/), monte par
+/// web/src/ecrans/EcranGenere.tsx ; null pour une procedure sans descripteur (EcranNonMaquette).
+/// fix-ok: sans ce champ, l'aiguillage React ne recevait jamais de descripteur : EcranProcVue n'en
+/// portait aucun (mesure : un seul constructeur, VueProc), donc EcranGenere ne pouvait pas etre monte.</param>
 public sealed record EcranProcVue(string[] Valides, string? SirenDemande, string CleOuverture,
                                   SessionEcranVue? Lot, string? Motif, PaletteVue? Recherche,
-                                  ContexteDossierVue? Dossier);
+                                  ContexteDossierVue? Dossier, DescripteurEcran? Descripteur);
 
 /// <summary>Le contexte d'une affaire transmis a l'ecran ouvert pour elle.</summary>
 /// <param name="Nom">La denomination (fiche sommaire), sinon l'objet de l'affaire.</param>
@@ -304,7 +309,8 @@ public sealed partial class SessionPlanTravail
                 p.Code == "PROC_TACHES_LOT" ? VueSessionLot() : null,
                 MotifNonMaquette(p.Code),
                 p.Code == CodePageRecherche ? VuePageRecherche() : null,
-                ContexteDeLEcran(p.Code)));
+                ContexteDeLEcran(p.Code),
+                CatalogueGenere.Descripteur(p.Code)));
     }
 
     // ---- Taches en lot : la session que Components/Ecrans/EcranTachesLot.razor ouvrait ----

@@ -10,6 +10,7 @@ import { EcranBodacc } from '../ecrans/EcranBodacc'
 import { EcranClients } from '../ecrans/EcranClients'
 import { EcranCommandesWeb } from '../ecrans/EcranCommandesWeb'
 import { EcranDemandes } from '../ecrans/EcranDemandes'
+import { EcranGenere } from '../ecrans/EcranGenere'
 import { EcranNonMaquette } from '../ecrans/EcranNonMaquette'
 import { EcranOuvertureDossier } from '../ecrans/EcranOuvertureDossier'
 import { EcranRechAffaires } from '../ecrans/EcranRechAffaires'
@@ -35,6 +36,14 @@ describe('Aiguillage des ecrans de procedure', () => {
     ['PROC_GCLIENT', EcranClients],
   ])('%s monte son ecran', (code, ecran) => {
     expect(aiguiller(code).el!.type).toBe(ecran)
+  })
+
+  // Un ecran generique (Pont/EcransGeneres/) : la procedure sans ecran a part porte son descripteur.
+  it('une procedure dont le descripteur est porte monte EcranGenere ; sans descripteur, elle reste a venir', () => {
+    const descripteur = { code: 'ECRAN_TEST', titre: 'Ecran test', sujet: 'dossiers', recherche: '', criteres: [],
+      valider: 'Valider', rang: 1, etats: [], groupes: [], marches: [], lignes: [] }
+    expect(aiguiller('ECRAN_TEST', { ...proc().ecran, descripteur }).el!.type).toBe(EcranGenere)
+    expect(aiguiller('ECRAN_TEST').el!.type).toBe(EcranNonMaquette)
   })
 
   it('un ecran qui ouvre un dossier remonte son NUMERO au plan de travail', () => {
