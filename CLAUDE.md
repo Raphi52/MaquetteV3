@@ -62,7 +62,12 @@ t'ont donné (`chat-<id du fil>` ou `run-<id du run>`, jamais un nom inventé) :
 Copy-Item "$env:APPDATA\RigV3\accueil.json" "<dossier temporaire du fil>\accueil.json"
 $env:RIGV3_ETAT = "<dossier temporaire du fil>\accueil.json"
 
-# 2. Le lanceur transmet cet environnement à l'app :
+# 2. Les données de dev, comme chez l'utilisateur (mode par défaut de dev.ps1 et
+#    lancer.ps1 depuis le 2026-11-24) : serveur V3 local, RIGV3_SERVEUR / _COMPTE /
+#    _GREFFES posées dans CE PowerShell. Sans cette ligne, l'app montre la démonstration.
+& D:\RigV3Desktop\donnees-dev.ps1
+
+# 3. Le lanceur transmet cet environnement à l'app :
 powershell -NoProfile -File D:\AutoWinOS\scripts\hdesk-lancer.ps1 `
   -Id <ton-id> -Executable "D:\RigV3Desktop\bin\Debug\net10.0-windows\RigV3Desktop.exe" `
   -Travail "<ce que tu vérifies>"

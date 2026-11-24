@@ -55,7 +55,7 @@ dossiers (ni leurs `obj\`) n'entre dans l'application. L'app **référence** seu
 | **Collations** : serveur `French_CI_AS` (celle de `SQL-DEV\DEV`), bases `SQL_Latin1_General_CP1_CI_AS` (celle de `RIG_DEV`) — lues le 2026-11-20 | La recopie V2 ↔ V3 doit comparer les textes comme la V2. À revérifier sur les serveurs des greffes au déploiement (`SQL-DEV` est en SQL Server 2017, 14.0.3485.1). |
 | **Une base jetable par banc** (`BaseJetable`), nommée `rigv3_banc_<Banc>_<instant>_<hasard>` | Plusieurs lots lancent leurs bancs en même temps sur le même serveur : chacun a sa base, la supprime à la fin. |
 | **Garde-fou : une base ne se crée que sur le poste** (`BaseJetable.EstServeurLocal`) | Règle commune du plan : jamais d'écriture sur SQL-DEV ni SQL-PROD. C'est le code qui la tient (bancs et `--creer` de l'outil), vérifié par `ServeurCheck` — contre-épreuve faite : garde-fou retiré, le banc passe au rouge. |
-| **`RIGV3_SERVEUR`** décide de la source des données de l'écran | Absente (cas d'aujourd'hui) : `ClientServeur.Actif` vaut `null`, l'écran reste sur `Metier/JeuDemo.cs`, les 33 bancs existants ne voient aucune différence. Posée mais illisible : erreur nommée, pas de retour discret à la démonstration. |
+| **`RIGV3_SERVEUR`** décide de la source des données de l'écran | Absente (l'exe seul, les bancs, `dev.ps1 -Demo`) : `ClientServeur.Actif` vaut `null`, l'écran reste sur `Metier/JeuDemo.cs`, les 33 bancs existants ne voient aucune différence. Posée mais illisible : erreur nommée, pas de retour discret à la démonstration. |
 | **`Microsoft.Data.SqlClient` 7.1.2** | La 6.1.6 tire `System.Security.Cryptography.Pkcs` 9.0.11, signalé vulnérable à la restauration (NU1902 / NU1903). |
 | **`/sante`** : 200 si la base répond, 503 sinon, avec la cause | Première question d'un exploitant et d'un répartiteur de charge ; elle dit aussi où en sont les migrations de la base. |
 
@@ -85,15 +85,23 @@ Le mot de passe `RigV3_dev_2026!` ne protège qu'un serveur local sans donnée r
 
 ### Travailler sur les données de développement (copie anonymisée de RIG_DEV)
 
-Sans `RIGV3_SERVEUR`, chaque écran montre sa démonstration (`Metier\JeuDemo.cs`). Pour voir de **vraies données**
-sans jamais en avoir une en clair sur le poste (2026-11-24) :
+**C'est le mode par défaut des lanceurs depuis le 2026-11-24** (décision de l'utilisateur : « on n'est plus une
+démo, on est le vrai projet ») : `dev.ps1` — que lance aussi le bouton « Lancer » d'Autowin
+(`.autowin\scripts.json`) — et `lancer.ps1` (raccourci du bureau) ouvrent l'app sur une copie anonymisée de
+RIG_DEV, sans jamais avoir une donnée en clair sur le poste. Si ces données ne sont pas disponibles (Docker arrêté,
+préparation en échec), le lanceur s'arrête et le dit : il ne retombe jamais en silence sur la démonstration.
 
 ```powershell
-.\dev.ps1 -DonneesDev          # le mode développement (reprise à chaud) branché sur ces données
-.\donnees-dev.ps1 -Lancer      # ou : prépare, démarre le serveur, lance bin\Debug\…\RigV3Desktop.exe
+.\dev.ps1                      # mode développement (reprise à chaud) sur les données de dev
+.\lancer.ps1                   # compile puis lance l'exe, sur les données de dev
+.\dev.ps1 -Demo                # (ou .\lancer.ps1 -Demo) la démonstration, Metier\JeuDemo.cs, sans serveur
 .\donnees-dev.ps1 -Refaire     # refaire la copie (RIG_DEV a changé, migration nouvelle)
 .\donnees-dev.ps1 -Arreter     # arrêter le serveur lancé par le script
 ```
+
+L'exe lancé seul, sans `RIGV3_SERVEUR` (les bancs, un bureau caché sans le script), reste sur la démonstration :
+c'est le comportement de l'app elle-même, que les bancs exigent. Pour voir l'app comme l'utilisateur la voit,
+appeler `& .\donnees-dev.ps1` dans le même PowerShell avant de la lancer.
 
 | Étape | Qui la fait | Ce qui se passe |
 |---|---|---|

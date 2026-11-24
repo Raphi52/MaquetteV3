@@ -6,7 +6,8 @@
 #   .\donnees-dev.ps1 -Lancer    ... puis lance l'application (bin\Debug) branchee
 #   .\donnees-dev.ps1 -Refaire   refait la copie (RIG_DEV a change, migration nouvelle)
 #   .\donnees-dev.ps1 -Arreter   arrete le serveur lance par ce script
-#   .\dev.ps1 -DonneesDev        le mode developpement (reprise a chaud) sur ces donnees
+#   .\dev.ps1, .\lancer.ps1      l'appellent d'office (mode par defaut depuis le 2026-11-24 ;
+#                                -Demo pour la demonstration)
 #
 # Ce qui est prepare (Outils\Repetition\DonneesDev.cs, commande "donnees-dev") :
 #   - RIG_DEV est LU sur SQL-DEV\DEV (SELECT seul) ; la copie s'ecrit deja anonymisee
@@ -78,8 +79,13 @@ function Get-Sante {
 if ($Arreter) { Stop-ServeurDev; return }
 
 # --- 1. Le SQL Server Docker de ce poste ------------------------------------------------
+# En 'Continue' le temps de l'appel : en 'Stop', Windows PowerShell leve des la 1re ligne d'erreur de
+# docker (2>&1), et ce message-ci ne s'affichait jamais (mesure le 2026-11-24, contexte docker absent).
+$ErrorActionPreference = 'Continue'
 $etatSql = (& docker ps --filter 'name=^rigv3-sql$' --format '{{.Status}}' 2>&1) -join ' '
-if ($LASTEXITCODE -ne 0) { throw "Docker ne repond pas ($etatSql) : demarrer Docker Desktop, puis relancer ce script." }
+$codeDocker = $LASTEXITCODE
+$ErrorActionPreference = 'Stop'
+if ($codeDocker -ne 0) { throw "Docker ne repond pas ($etatSql) : demarrer Docker Desktop, puis relancer." }
 if (-not $etatSql) {
     Ecrire 'SQL Server de developpement arrete : docker compose up -d'
     & docker compose -f (Join-Path $racine 'docker-compose.yml') up -d
