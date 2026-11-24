@@ -12,10 +12,17 @@
 // (Pont/EcranCourriersDivers.cs, Metier/CourriersDivers.cs) : c'est la MEME que
 // celle d'ou la page du dossier tire les courriers qu'elle ecrit pour une
 // affaire (plan « Vue du dossier », lot 9). Gardee ici, elle aurait derive.
+//
+// LISTE MODERNE (24/11/2026, plan des listes modernes, lot 5) : le catalogue prend les briques de
+// composants/ListeModerne.tsx -- tete (synthese, « Aller a un courrier… » Ctrl K qui filtre la liste affichee,
+// Entree choisit le courrier reste seul), vues = les criteres existants (actifs seulement ou non, type d'entite),
+// type d'entite en pastille, actif en point colore, pied. Les criteres, le clic sur une ligne et la fiche du
+// courrier choisi ne changent pas.
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, estBlanc } from '../criteres'
+import { EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, type Teinte } from '../composants/ListeModerne'
 
 // v2 : table COURRIER_JUDICIAIRE (colonnes COUJU_*).
 export interface CourrierDiversVue {
@@ -33,6 +40,24 @@ export interface CatalogueCourriersVue {
   courriers: CourrierDiversVue[]
 }
 
+/** La teinte d'un type d'entite : celle de la nature d'affaire correspondante (Recherche d'affaires). */
+const TeinteType: Record<string, Teinte> = {
+  INSTANCE: 'bleu', INSTANCE_PREVENTION: 'violet', PROCEDURE_COLLECTIVE: 'orange', PREVENTION: 'ardoise', MESURE: 'vert',
+}
+
+/** « PROCEDURE_COLLECTIVE » -> « Procedure collective » : le libelle d'une vue. */
+function nomDuType(type: string): string {
+  return type.charAt(0) + type.slice(1).toLowerCase().replace(/_/g, ' ')
+}
+
+/** Une vue : un jeu des deux criteres d'etat et de type de l'ecran. */
+interface VueCatalogue {
+  cle: string
+  libelle: string
+  actifsSeuls: boolean
+  type: string
+}
+
 export function EcranCourriersDivers() {
   const [recherche, setRecherche] = useState('')
   const [typeFiltre, setTypeFiltre] = useState('')
@@ -41,6 +66,8 @@ export function EcranCourriersDivers() {
   const [catalogue, setCatalogue] = useState<CatalogueCourriersVue | null>(null)
   // Le code du modele clique ; null = le premier du catalogue, comme a l'ouverture.
   const [selection, setSelection] = useState<string | null>(null)
+  // « Aller a un courrier… » (Ctrl K) : filtre la liste AFFICHEE, sans toucher aux criteres.
+  const [filtreRapide, setFiltreRapide] = useState('')
 
   useEffect(() => {
     let perime = false
@@ -49,16 +76,31 @@ export function EcranCourriersDivers() {
   }, [])
 
   const courriers = catalogue?.courriers ?? []
-  let q = courriers
-  if (actifsSeuls) q = q.filter((c) => c.actif)
-  if (typeFiltre !== '') q = q.filter((c) => c.typeEntite === typeFiltre)
-  if (!estBlanc(recherche)) {
-    const t = recherche.trim()
-    q = q.filter((c) => contientSansCasse(c.code, t) || contientSansCasse(c.libelle, t))
+  /** Les courriers que montrent ces criteres (la recherche saisie comprise). */
+  function trouver(actifs: boolean, type: string): CourrierDiversVue[] {
+    let q = courriers
+    if (actifs) q = q.filter((c) => c.actif)
+    if (type !== '') q = q.filter((c) => c.typeEntite === type)
+    if (!estBlanc(recherche)) {
+      const t = recherche.trim()
+      q = q.filter((c) => contientSansCasse(c.code, t) || contientSansCasse(c.libelle, t))
+    }
+    return q
   }
-  const trouves = q
+  const trouves = trouver(actifsSeuls, typeFiltre)
+  const affiches = estBlanc(filtreRapide) ? trouves
+    : trouves.filter((c) => contientSansCasse(`${c.code} ${c.libelle}`, filtreRapide.trim()))
 
   const s = courriers.find((c) => c.code === selection) ?? courriers[0] ?? null
+
+  const vues: VueCatalogue[] = [
+    { cle: 'actifs', libelle: 'Actifs', actifsSeuls: true, type: '' },
+    { cle: 'tous', libelle: 'Tous', actifsSeuls: false, type: '' },
+    ...(catalogue?.types ?? []).map((t) => ({ cle: t, libelle: nomDuType(t), actifsSeuls: true, type: t })),
+  ]
+  const vueActive = vues.find((v) => v.actifsSeuls === actifsSeuls && v.type === typeFiltre)?.cle ?? null
+  const avecDestinataire = affiches.filter((c) => c.avecDestinataire).length
+  const inactifs = affiches.filter((c) => !c.actif).length
 
   return (
     <div className="rig-proc__corps">
@@ -92,14 +134,29 @@ export function EcranCourriersDivers() {
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Catalogue</div>
-          <span className="rig-resultats-proc__compte">{catalogue ? `${trouves.length} courrier(s)` : ''}</span>
-        </div>
+      <ListeModerne etiquette="Catalogue">
+        <EnteteListe titre="Catalogue"
+                     synthese={catalogue ? <>{affiches.length}{affiches.length > 1 ? ' courriers' : ' courrier'}
+                       {' · '}<b>{avecDestinataire}</b>{' avec destinataire'}
+                       {inactifs > 0 && <>{' · '}<b>{inactifs}</b>{inactifs > 1 ? ' inactifs' : ' inactif'}</>}</> : undefined}
+                     filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a un courrier…',
+                               valider: () => { if (affiches.length === 1) setSelection(affiches[0]!.code) } }} />
+
+        {catalogue && (
+          <VuesListe vues={vues.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: trouver(v.actifsSeuls, v.type).length }))}
+                     active={vueActive}
+                     choisir={(cle) => {
+                       const v = vues.find((x) => x.cle === cle)
+                       if (v) { setActifsSeuls(v.actifsSeuls); setTypeFiltre(v.type) }
+                     }} />
+        )}
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup>
+              <col style={{ width: '15%' }} /><col /><col style={{ width: '20%' }} /><col style={{ width: '17%' }} />
+              <col style={{ width: '13%' }} /><col style={{ width: '10%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>Code</th>
@@ -107,22 +164,29 @@ export function EcranCourriersDivers() {
                 <th>Type entite</th>
                 <th>Parametre edition</th>
                 <th className="rig-table__centre">Avec destinataire</th>
-                <th className="rig-table__centre">Actif</th>
+                <th>Etat</th>
               </tr>
             </thead>
             <tbody>
-              {trouves.map((courrier) => (
+              {affiches.map((courrier) => (
                 <tr key={courrier.code} onClick={() => setSelection(courrier.code)}>
                   <td className="rig-table__mono">{courrier.code}</td>
-                  <td>{courrier.libelle}</td>
-                  <td className="rig-table__mono">{courrier.typeEntite}</td>
+                  <td title={courrier.libelle}>{courrier.libelle}</td>
+                  <td title={courrier.typeEntite}>
+                    <Pastille teinte={TeinteType[courrier.typeEntite] ?? 'gris'}>{nomDuType(courrier.typeEntite)}</Pastille>
+                  </td>
                   <td className="rig-table__mono">{courrier.paramEdition}</td>
                   <td className="rig-table__centre">{courrier.avecDestinataire ? 'oui' : 'non'}</td>
-                  <td className="rig-table__centre">{courrier.actif ? 'oui' : 'non'}</td>
+                  <td><PointEtat teinte={courrier.actif ? 'vert' : 'gris'}>{courrier.actif ? 'Actif' : 'Inactif'}</PointEtat></td>
                 </tr>
               ))}
               {catalogue && trouves.length === 0 && (
                 <tr><td colSpan={6} className="rig-table__vide">Aucun courrier divers ne repond a cette recherche.</td></tr>
+              )}
+              {trouves.length > 0 && affiches.length === 0 && (
+                <tr><td colSpan={6} className="rig-table__vide">
+                  {`Aucun des ${trouves.length} courriers ne contient « ${filtreRapide.trim()} ».`}
+                </td></tr>
               )}
             </tbody>
           </table>
@@ -160,7 +224,13 @@ export function EcranCourriersDivers() {
             </div>
           </div>
         )}
-      </section>
+
+        {catalogue && (
+          <PiedListe>
+            <span><b>{affiches.length}</b>{affiches.length > 1 ? ' courriers affiches' : ' courrier affiche'}</span>
+          </PiedListe>
+        )}
+      </ListeModerne>
     </div>
   )
 }

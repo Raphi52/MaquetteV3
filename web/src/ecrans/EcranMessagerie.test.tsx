@@ -159,13 +159,43 @@ describe('EcranMessagerie', () => {
     const { container } = render(<EcranMessagerie />)
     await screen.findByText('3 modèle(s) — greffe 3801')
     fireEvent.click(screen.getByRole('button', { name: 'Listes de distribution' }))
-    const lignes = () => [...container.querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent))
+    // Une ligne : libelle (avatar) et code, domaines en pastilles, proprietaire en clair, etat en point colore, adresses.
+    const lignes = () => [...container.querySelectorAll('tbody tr')].map((tr) => [
+      tr.querySelector('.rig-lm-identite__nom')!.textContent, tr.querySelector('.rig-lm-identite__objet')!.textContent,
+      ...[...tr.querySelectorAll('td')].slice(1).map((td) => td.textContent)])
     expect(lignes()).toEqual([
-      ['MANDATAIRES', 'Mandataires du ressort', 'Non', 'Oui', 'Tous les agents', 'Oui', 'a@etude.example ; b@etude.example'],
-      ['COMPTA_PERSO', 'Ma liste', 'Non', 'Non', 'banc.courriel', 'Oui', 'a@etude.example ; b@etude.example'],
+      ['Mandataires du ressort', 'MANDATAIRES', 'Judiciaire', 'Tous les agents', 'Active', 'a@etude.example ; b@etude.example'],
+      ['Ma liste', 'COMPTA_PERSO', '—', 'banc.courriel', 'Active', 'a@etude.example ; b@etude.example'],
     ])
+    expect(container.querySelector('tbody tr .rig-lm-pastille')!.className).toBe('rig-lm-pastille rig-lm-t-ardoise')
+    expect(container.querySelector('tbody tr .rig-lm-etat')!.className).toBe('rig-lm-etat rig-lm-t-vert')
+    expect(container.querySelector('.rig-lm-synthese')!.textContent).toBe('2 listes · 1 publique')
+    expect(container.querySelector('.rig-lm-pied')!.textContent).toBe('2 listes affichées')
     fireEvent.click(screen.getByRole('button', { name: 'Afficher les éléments inactifs' }))
     expect(lignes()).toHaveLength(3)
+    expect(lignes()[2]!.slice(0, 5)).toEqual(['Liste inactive', 'VIEILLE', 'Judiciaire', 'Tous les agents', 'Désactivée'])
+    expect(container.querySelector('.rig-lm-synthese')!.textContent).toBe('3 listes · 2 publiques · 1 désactivée')
+  })
+
+  it('les listes de distribution : les vues sont le critere « éléments inactifs » ; « Aller à une liste… » filtre la liste affichee', async () => {
+    installerFauxPont({ 'EcranMessagerie.Ouvrir': () => vue(), 'EcranMessagerie.Modele': (t) => apercu(t as string) })
+    const { container } = render(<EcranMessagerie />)
+    await screen.findByText('3 modèle(s) — greffe 3801')
+    fireEvent.click(screen.getByRole('button', { name: 'Listes de distribution' }))
+    expect([...container.querySelectorAll('.rig-lm-vue')].map((v) => v.textContent)).toEqual(['Actives 2', 'Toutes 3'])
+    expect(screen.getByRole('button', { name: 'Actives 2' }).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: 'Toutes 3' }))
+    // La puce pose le critere du volet de gauche, qui vaut aussi pour les modeles.
+    expect(screen.getByRole('button', { name: 'Masquer les éléments inactifs' })).toBeTruthy()
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(3)
+    expect(screen.getByRole('button', { name: 'Toutes 3' }).getAttribute('aria-pressed')).toBe('true')
+
+    const champ = screen.getByLabelText('Aller à une liste…')
+    fireEvent.change(champ, { target: { value: 'compta' } })
+    expect([...container.querySelectorAll('tbody tr .rig-lm-identite__objet')].map((o) => o.textContent)).toEqual(['COMPTA_PERSO'])
+    expect(container.querySelector('.rig-lm-synthese')!.textContent).toBe('1 liste · 0 publique')
+    fireEvent.change(champ, { target: { value: 'zzz' } })
+    expect(screen.getByText('Aucune des 3 listes ne contient « zzz ».')).toBeTruthy()
   })
 
   it('sans serveur : la demonstration, avec son bandeau, et sans bascule « Amitel »', async () => {

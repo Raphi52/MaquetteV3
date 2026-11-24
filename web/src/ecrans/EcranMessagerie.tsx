@@ -32,10 +32,19 @@
 //    « Oui » enregistre puis ouvre l'autre (un refus du serveur garde la saisie et n'ouvre rien), « Non » abandonne la saisie.
 // fix-ok: ecarts V2 releves par le chef et lus dans ce fichier avant le lot 16 -- texte HTML en <textarea> brut, adresses tapees
 // en etiquettes (datalist [ADRESSE_MAIL_…]), aucun bouton « Ajouter le logo », changement de modele refuse par un message.
+//
+// LISTE MODERNE (24/11/2026, plan des listes modernes, lot 5) : la liste des listes de distribution (onglet « Listes de
+// distribution ») prend les briques de composants/ListeModerne.tsx -- tete (synthese, « Aller à une liste… » Ctrl K qui
+// filtre la liste affichee, Entree ouvre la liste restee seule), vues = le critere existant « éléments inactifs »
+// (Actives / Toutes), avatar + libelle + code, domaines (RCS, judiciaire) en pastilles, etat en point colore, pied ;
+// « Nouvelle liste » passe dans les outils de la liste. La liste des modeles reste dans le volet de gauche (ce n'est pas
+// un tableau) et la fiche d'un modele n'est pas une liste. Les criteres, le clic sur une liste et l'ecriture ne changent
+// pas. fix-ok: ajout du socle des listes en plusieurs pas (lot 5), pas un correctif.
 
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, estBlanc } from '../criteres'
+import { CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe } from '../composants/ListeModerne'
 
 export interface ModeleMessage {
   type: string
@@ -541,6 +550,8 @@ export function EcranMessagerie() {
   const [occupe, setOccupe] = useState(false)
   const [voirTags, setVoirTags] = useState(false)
   const [question, setQuestion] = useState<QuestionEnCours | null>(null)
+  // « Aller à une liste… » (Ctrl K) : filtre la liste des listes de distribution AFFICHEE, sans toucher aux criteres.
+  const [filtreListes, setFiltreListes] = useState('')
 
   const modifie = saisie !== null && !memes(saisie, initiale)
   const listeModifiee = liste !== null && !memes(liste, listeInitiale)
@@ -638,6 +649,10 @@ export function EcranMessagerie() {
   }
   if (critDomaines.size > 0) trouves = trouves.filter((m) => domaines.some((d) => critDomaines.has(d.nom) && d.vrai(m)))
   const listes = vue.listes.filter((l) => inactifs || l.actif)
+  const listesAffichees = estBlanc(filtreListes) ? listes
+    : listes.filter((l) => contientSansCasse(`${l.code} ${l.libelle} ${l.adresses}`, filtreListes.trim()))
+  const publiques = listesAffichees.filter((l) => l.proprietaire === '*').length
+  const desactivees = listesAffichees.filter((l) => !l.actif).length
   const a = fiche?.apercu
   const courant = saisie?.origine ? vue.modeles.find((m) => m.type === saisie.origine) : undefined
   const listeCourante = liste?.id != null ? vue.listes.find((l) => l.id === liste.id) : undefined
@@ -842,34 +857,56 @@ export function EcranMessagerie() {
 
         {onglet === 'listes' ? (
           <div style={Fiche}>
-            {ecriture && (
-              <div style={Actions}>
-                <button type="button" className="rig-bouton rig-bouton--fort" disabled={occupe} onClick={() => ouvrirListe(null)}>Nouvelle liste</button>
+            <ListeModerne etiquette="Listes de distribution">
+              <EnteteListe titre="Listes de distribution"
+                           synthese={<>{listesAffichees.length}{listesAffichees.length > 1 ? ' listes' : ' liste'}
+                             {' · '}<b>{publiques}</b>{publiques > 1 ? ' publiques' : ' publique'}
+                             {desactivees > 0 && <>{' · '}<b>{desactivees}</b>{desactivees > 1 ? ' désactivées' : ' désactivée'}</>}</>}
+                           filtre={{ valeur: filtreListes, changer: setFiltreListes, indication: 'Aller à une liste…',
+                                     valider: () => { if (listesAffichees.length === 1) ouvrirListe(listesAffichees[0]!) } }} />
+              <VuesListe vues={[{ cle: 'actives', libelle: 'Actives', compte: vue.listes.filter((l) => l.actif).length },
+                                { cle: 'toutes', libelle: 'Toutes', compte: vue.listes.length }]}
+                         active={inactifs ? 'toutes' : 'actives'} choisir={(cle) => setInactifs(cle === 'toutes')}>
+                {ecriture && (
+                  <button type="button" className="rig-lm-outil rig-lm-outil--fort" disabled={occupe} onClick={() => ouvrirListe(null)}>Nouvelle liste</button>
+                )}
+              </VuesListe>
+              <div className="rig-table-cadre">
+                <table className="rig-table rig-lm-table">
+                  <colgroup>
+                    <col style={{ width: '30%' }} /><col style={{ width: '18%' }} /><col style={{ width: '15%' }} />
+                    <col style={{ width: '12%' }} /><col />
+                  </colgroup>
+                  <thead>
+                    <tr>{['Liste', 'Domaines', 'Propriétaire', 'État', 'Adresses'].map((t) => <th key={t}>{t}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {listesAffichees.map((l) => (
+                      <tr key={l.id} aria-selected={liste?.id === l.id} onClick={() => ouvrirListe(l)}>
+                        <CelluleIdentite nom={l.libelle} objet={l.code} titre={`${l.libelle} · ${l.code}`} />
+                        <td title={`RCS : ${ouiNon(l.rcs)}, judiciaire : ${ouiNon(l.judiciaire)}`}>
+                          {l.rcs && <Pastille teinte="bleu">RCS</Pastille>}{l.rcs && l.judiciaire && ' '}
+                          {l.judiciaire && <Pastille teinte="ardoise">Judiciaire</Pastille>}
+                          {!l.rcs && !l.judiciaire && '—'}
+                        </td>
+                        <td title={proprietaire(l.proprietaire)}>{proprietaire(l.proprietaire)}</td>
+                        <td><PointEtat teinte={l.actif ? 'vert' : 'gris'}>{l.actif ? 'Active' : 'Désactivée'}</PointEtat></td>
+                        <td className="rig-table__mono" title={adresses(l.adresses)}>{adresses(l.adresses)}</td>
+                      </tr>
+                    ))}
+                    {listes.length === 0 && (
+                      <tr><td colSpan={5} className="rig-table__vide">Aucune liste de distribution dans ce greffe.</td></tr>
+                    )}
+                    {listes.length > 0 && listesAffichees.length === 0 && (
+                      <tr><td colSpan={5} className="rig-table__vide">{`Aucune des ${listes.length} listes ne contient « ${filtreListes.trim()} ».`}</td></tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            )}
-            <div className="rig-table-cadre">
-              <table className="rig-table">
-                <thead>
-                  <tr>{['Code', 'Libellé', 'RCS', 'Judiciaire', 'Propriétaire', 'Actif', 'Adresses'].map((t) => <th key={t}>{t}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {listes.map((l) => (
-                    <tr key={l.id} aria-selected={liste?.id === l.id} onClick={() => ouvrirListe(l)}>
-                      <td className="rig-table__mono">{l.code}</td>
-                      <td>{l.libelle}</td>
-                      <td>{ouiNon(l.rcs)}</td>
-                      <td>{ouiNon(l.judiciaire)}</td>
-                      <td>{proprietaire(l.proprietaire)}</td>
-                      <td>{ouiNon(l.actif)}</td>
-                      <td className="rig-table__mono">{adresses(l.adresses)}</td>
-                    </tr>
-                  ))}
-                  {listes.length === 0 && (
-                    <tr><td colSpan={7} className="rig-table__vide">Aucune liste de distribution dans ce greffe.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+              <PiedListe>
+                <span><b>{listesAffichees.length}</b>{listesAffichees.length > 1 ? ' listes affichées' : ' liste affichée'}</span>
+              </PiedListe>
+            </ListeModerne>
 
             {ecriture && liste && (
               <div className="rig-criteres__bloc" aria-label="Liste de distribution">

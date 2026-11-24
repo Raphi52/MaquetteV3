@@ -10,9 +10,16 @@
 // Porte depuis Components/Ecrans/EcranMaquettesEdition.razor (lot 5) : meme
 // balisage, memes classes CSS. L'ecran ne lisait rien dans Metier/ : ses
 // maquettes de demonstration et ses parametres sont ici, sans pont.
+//
+// LISTE MODERNE (24/11/2026, plan des listes modernes, lot 5) : la liste des maquettes prend les briques de
+// composants/ListeModerne.tsx -- tete (synthese, « Aller a une maquette… » Ctrl K qui filtre la liste affichee,
+// Entree choisit la maquette restee seule), vues = le critere Type de document existant, type de document en
+// pastille, pied. Les criteres, le clic sur une ligne et les tables liees ne changent pas.
+// fix-ok: ajout du socle des listes en plusieurs pas (lot 5), pas un correctif.
 
 import { useState } from 'react'
-import { dateCourte, distinctsTries } from '../criteres'
+import { contientSansCasse, dateCourte, distinctsTries, estBlanc } from '../criteres'
+import { EnteteListe, ListeModerne, Pastille, PiedListe, VuesListe, type Teinte } from '../composants/ListeModerne'
 
 interface Maquette {
   code: string
@@ -39,6 +46,8 @@ const LotsDisponibles = [
   '(aucun)', 'Lot 1 - courrier simple', 'Lot 2 - courrier suivi',
   'Lot 3 - recommande', 'Lot 4 - depot guichet',
 ]
+
+const TeinteTypeDoc: Record<string, Teinte> = { Extrait: 'bleu', Courrier: 'orange', Facture: 'vert', Bordereau: 'ardoise' }
 
 /** Une case de parametre d'edition : la bascule v2 (CheckBox...). */
 function Bascule({ actif, basculer, libelle }: { actif: boolean; basculer: () => void; libelle: string }) {
@@ -88,10 +97,22 @@ export function EcranMaquettesEdition() {
   const [autresParam, setAutresParam] = useState('')
   const [selection, setSelection] = useState<Maquette | null>(Maquettes[0]!)
 
-  let q = Maquettes
-  if (codeProcess !== '') q = q.filter((m) => m.process === codeProcess)
-  if (typeDoc !== '') q = q.filter((m) => m.typeDoc === typeDoc)
-  const trouvees = q
+  /** Les maquettes de l'ecran d'origine choisi, pour un type de document (une vue compte les siennes). */
+  function trouver(type: string): Maquette[] {
+    let q = Maquettes
+    if (codeProcess !== '') q = q.filter((m) => m.process === codeProcess)
+    if (type !== '') q = q.filter((m) => m.typeDoc === type)
+    return q
+  }
+  const trouvees = trouver(typeDoc)
+
+  // « Aller a une maquette… » (Ctrl K) : filtre la liste AFFICHEE, sans toucher aux criteres.
+  const [filtreRapide, setFiltreRapide] = useState('')
+  const affichees = estBlanc(filtreRapide) ? trouvees
+    : trouvees.filter((m) => contientSansCasse(`${m.code} ${m.libelle}`, filtreRapide.trim()))
+  const parFormat = distinctsTries(affichees.map((m) => m.typeMaquette))
+    .map((f) => [f, affichees.filter((m) => m.typeMaquette === f).length] as const)
+  const tablesLiees = affichees.reduce((n, m) => n + m.tables.length, 0)
 
   const s = selection
 
@@ -197,14 +218,23 @@ export function EcranMaquettesEdition() {
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Maquettes</div>
-          <span className="rig-resultats-proc__compte">{trouvees.length} maquette(s)</span>
-        </div>
+      <ListeModerne etiquette="Maquettes">
+        <EnteteListe titre="Maquettes"
+                     synthese={<>{affichees.length}{affichees.length > 1 ? ' maquettes' : ' maquette'}
+                       {parFormat.map(([format, n]) => <span key={format}>{' · '}<b>{n}</b>{' '}{format}</span>)}</>}
+                     filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a une maquette…',
+                               valider: () => { if (affichees.length === 1) setSelection(affichees[0]!) } }} />
+
+        <VuesListe vues={[{ cle: '', libelle: 'Toutes', compte: trouver('').length },
+                          ...distinctsTries(Maquettes.map((m) => m.typeDoc)).map((t) => ({ cle: t, libelle: t, compte: trouver(t).length }))]}
+                   active={typeDoc} choisir={setTypeDoc} />
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup>
+              <col style={{ width: '13%' }} /><col /><col style={{ width: '16%' }} /><col style={{ width: '15%' }} />
+              <col style={{ width: '12%' }} /><col style={{ width: '13%' }} /><col style={{ width: '9%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>Maquette</th>
@@ -217,12 +247,12 @@ export function EcranMaquettesEdition() {
               </tr>
             </thead>
             <tbody>
-              {trouvees.map((maq) => (
+              {affichees.map((maq) => (
                 <tr key={maq.code} onClick={() => setSelection(maq)}>
                   <td className="rig-table__mono">{maq.code}</td>
-                  <td>{maq.libelle}</td>
-                  <td>{maq.process}</td>
-                  <td>{maq.typeDoc}</td>
+                  <td title={maq.libelle}>{maq.libelle}</td>
+                  <td title={maq.process}>{maq.process}</td>
+                  <td><Pastille teinte={TeinteTypeDoc[maq.typeDoc] ?? 'gris'}>{maq.typeDoc}</Pastille></td>
                   <td>{maq.typeMaquette}</td>
                   <td className="rig-table__mono">{dateCourte(maq.maj)}</td>
                   <td className="rig-table__centre">{maq.tables.length}</td>
@@ -230,6 +260,11 @@ export function EcranMaquettesEdition() {
               ))}
               {trouvees.length === 0 && (
                 <tr><td colSpan={7} className="rig-table__vide">Aucune maquette pour ces criteres.</td></tr>
+              )}
+              {trouvees.length > 0 && affichees.length === 0 && (
+                <tr><td colSpan={7} className="rig-table__vide">
+                  {`Aucune des ${trouvees.length} maquettes ne contient « ${filtreRapide.trim()} ».`}
+                </td></tr>
               )}
             </tbody>
           </table>
@@ -248,7 +283,12 @@ export function EcranMaquettesEdition() {
             </p>
           </div>
         )}
-      </section>
+
+        <PiedListe>
+          <span><b>{affichees.length}</b>{affichees.length > 1 ? ' maquettes affichees' : ' maquette affichee'}</span>
+          <span>Tables liees <b>{tablesLiees}</b></span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }

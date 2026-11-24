@@ -14,9 +14,16 @@
 // memes classes CSS. L'ecran ne lisait rien dans Metier/ : ses formalites de
 // demonstration sont ici, sans pont. La coquille .razor monte cet ecran et
 // recoit ouvrirDossier.
+//
+// LISTE MODERNE (24/11/2026, plan des listes modernes, lot 5) : les formalites retenues prennent les briques de
+// composants/ListeModerne.tsx -- tete (synthese, « Aller a une formalite… » Ctrl K qui filtre la liste affichee,
+// Entree ouvre le dossier reste seul), vues = le critere Type RCS existant, avatar + denomination + numero de
+// dossier, type en pastille, etat en point colore, pied. Les criteres, le clic sur une ligne et le bordereau ne
+// changent pas. fix-ok: ajout du socle des listes en plusieurs pas (lot 5), pas un correctif.
 
 import { useState } from 'react'
-import { dateCourte, entierLisible } from '../criteres'
+import { contientSansCasse, dateCourte, entierLisible, estBlanc } from '../criteres'
+import { CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, type Teinte } from '../composants/ListeModerne'
 
 interface LigneArchi {
   dossier: string
@@ -36,6 +43,15 @@ const Lignes: LigneArchi[] = [
   { dossier: '2004B01344', denomination: 'EURL LE PETIT CAFE', type: 'PM', radiation: '2018-01-25', dernierDepot: '2017-09-12', pieces: 11 },
   { dossier: '1999A00456', denomination: 'MARTIN Claire', type: 'PP', radiation: '2015-06-03', dernierDepot: '2015-01-15', pieces: 9 },
 ]
+
+/** Les vues : le critere Type RCS de l'ecran, preregle. */
+const VuesType: { cle: string; libelle: string }[] = [
+  { cle: '', libelle: 'Toutes' },
+  { cle: 'PM', libelle: 'Personnes morales' },
+  { cle: 'PP', libelle: 'Personnes physiques' },
+]
+const TeinteType: Record<string, Teinte> = { PM: 'bleu', PP: 'orange' }
+const NomType: Record<string, string> = { PM: 'Personne morale', PP: 'Personne physique' }
 
 export interface ProprietesEcranArchivage {
   /** Remonte le NUMERO de dossier de la formalite cliquee : l'ecran ne connait pas la visionneuse. */
@@ -63,11 +79,21 @@ export function EcranArchivage({ ouvrirDossier }: ProprietesEcranArchivage) {
     if (n !== null) setNbDossiers(n)
   }
 
-  let q = Lignes
-  if (dateMin !== '') q = q.filter((l) => l.radiation >= dateMin)
-  if (dateMax !== '') q = q.filter((l) => l.radiation <= dateMax)
-  if (typeRcs !== '') q = q.filter((l) => l.type === typeRcs)
-  const retenues = q.slice(0, Math.min(Math.max(nbDossiers, 1), 999))
+  /** Les formalites retenues par les criteres, pour un type RCS donne (une vue compte les siennes). */
+  function retenir(type: string): LigneArchi[] {
+    let q = Lignes
+    if (dateMin !== '') q = q.filter((l) => l.radiation >= dateMin)
+    if (dateMax !== '') q = q.filter((l) => l.radiation <= dateMax)
+    if (type !== '') q = q.filter((l) => l.type === type)
+    return q.slice(0, Math.min(Math.max(nbDossiers, 1), 999))
+  }
+  const retenues = retenir(typeRcs)
+
+  // « Aller a une formalite… » (Ctrl K) : filtre la liste AFFICHEE, sans toucher aux criteres.
+  const [filtreRapide, setFiltreRapide] = useState('')
+  const affichees = estBlanc(filtreRapide) ? retenues
+    : retenues.filter((l) => contientSansCasse(`${l.dossier} ${l.denomination}`, filtreRapide.trim()))
+  const pieces = affichees.reduce((s, l) => s + l.pieces, 0)
 
   return (
     <div className="rig-proc__corps">
@@ -138,20 +164,25 @@ export function EcranArchivage({ ouvrirDossier }: ProprietesEcranArchivage) {
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Formalites retenues</div>
-          <span className="rig-resultats-proc__compte">
-            {retenues.length} retenue(s) sur {Lignes.length} — bordereau {prepare ? 'prepare' : 'non prepare'}
-          </span>
-        </div>
+      <ListeModerne etiquette="Formalites retenues">
+        <EnteteListe titre="Formalites retenues"
+                     synthese={<>{affichees.length}{affichees.length > 1 ? ' retenues' : ' retenue'}{' sur '}{Lignes.length}
+                       {' · '}<b>{pieces}</b>{pieces > 1 ? ' pieces' : ' piece'}{' · bordereau '}{prepare ? 'prepare' : 'non prepare'}</>}
+                     filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a une formalite…',
+                               valider: () => { if (affichees.length === 1) ouvrirDossier(affichees[0]!.dossier) } }} />
+
+        <VuesListe vues={VuesType.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: retenir(v.cle).length }))}
+                   active={typeRcs} choisir={setTypeRcs} />
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup>
+              <col /><col style={{ width: '14%' }} /><col style={{ width: '15%' }} /><col style={{ width: '13%' }} />
+              <col style={{ width: '8%' }} /><col style={{ width: '16%' }} />
+            </colgroup>
             <thead>
               <tr>
-                <th>N Dossier</th>
-                <th>Denomination</th>
+                <th>Dossier</th>
                 <th>Type RCS</th>
                 <th>Date de radiation</th>
                 <th>Dernier depot</th>
@@ -160,24 +191,33 @@ export function EcranArchivage({ ouvrirDossier }: ProprietesEcranArchivage) {
               </tr>
             </thead>
             <tbody>
-              {retenues.map((ligne) => (
+              {affichees.map((ligne) => (
                 <tr key={ligne.dossier} onClick={() => ouvrirDossier(ligne.dossier)}>
-                  <td className="rig-table__mono">{ligne.dossier}</td>
-                  <td>{ligne.denomination}</td>
-                  <td className="rig-table__mono">{ligne.type}</td>
+                  <CelluleIdentite nom={ligne.denomination} objet={ligne.dossier} titre={`${ligne.denomination} · ${ligne.dossier}`} />
+                  <td><Pastille teinte={TeinteType[ligne.type] ?? 'gris'} titre={NomType[ligne.type]}>{ligne.type}</Pastille></td>
                   <td className="rig-table__mono">{dateCourte(ligne.radiation)}</td>
                   <td className="rig-table__mono">{dateCourte(ligne.dernierDepot)}</td>
                   <td className="rig-table__centre">{ligne.pieces}</td>
-                  <td><span className={`rig-etat rig-etat--${prepare ? 'ok' : 'attente'}`}>{prepare ? 'Sur bordereau' : 'A archiver'}</span></td>
+                  <td><PointEtat teinte={prepare ? 'vert' : 'orange'}>{prepare ? 'Sur bordereau' : 'A archiver'}</PointEtat></td>
                 </tr>
               ))}
               {retenues.length === 0 && (
-                <tr><td colSpan={7} className="rig-table__vide">Aucune formalite dans cette plage de radiation.</td></tr>
+                <tr><td colSpan={6} className="rig-table__vide">Aucune formalite dans cette plage de radiation.</td></tr>
+              )}
+              {retenues.length > 0 && affichees.length === 0 && (
+                <tr><td colSpan={6} className="rig-table__vide">
+                  {`Aucune des ${retenues.length} formalites ne contient « ${filtreRapide.trim()} ».`}
+                </td></tr>
               )}
             </tbody>
           </table>
         </div>
-      </section>
+
+        <PiedListe>
+          <span><b>{affichees.length}</b>{affichees.length > 1 ? ' formalites affichees' : ' formalite affichee'}</span>
+          <span>Pieces <b>{pieces}</b></span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }

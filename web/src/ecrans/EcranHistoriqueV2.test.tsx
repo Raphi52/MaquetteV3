@@ -51,12 +51,40 @@ describe('EcranHistoriqueV2', () => {
     const saisie = screen.getByPlaceholderText('512345678')
     fireEvent.change(saisie, { target: { value: '512345678' } })
     fireEvent.keyDown(saisie, { key: 'Enter' })
-    expect(await screen.findByText("2 affaire(s) — 1 dans l'ancien RIG, 1 dans la V3")).toBeTruthy()
+    expect((await screen.findByText(/ · /, { selector: '.rig-lm-synthese' })).textContent).toBe("2 affaires · 1 dans l'ancien RIG · 1 dans la V3")
     expect(chercher).toHaveBeenCalledWith('siren', '512345678')
     const lignes = within(screen.getByRole('table', { name: 'Affaires' })).getAllByRole('row').slice(1)
     expect(lignes[0]!.textContent).toContain('traitée dans la V3')
     expect(lignes[1]!.textContent).toContain("traitée dans l'ancien RIG")
     expect(lignes[1]!.textContent).toContain('BOULANGERIE DUPONT')
+    // Le logiciel en pastille (V3 en vert, ancien RIG en orange), l'etat en point colore, le client avec son avatar et son code.
+    expect(lignes.map((l) => l.querySelector('.rig-lm-pastille')!.className)).toEqual(['rig-lm-pastille rig-lm-t-vert', 'rig-lm-pastille rig-lm-t-orange'])
+    expect(lignes[0]!.querySelector('.rig-lm-etat')!.className).toBe('rig-lm-etat rig-lm-t-bleu')
+    expect(lignes[0]!.querySelector('.rig-lm-identite__nom')!.textContent).toBe('BOULANGERIE DUPONT')
+    expect(lignes[0]!.querySelector('.rig-lm-identite__objet')!.textContent).toBe('DUPONT01')
+    expect(document.body.querySelector('.rig-lm-pied')!.textContent).toBe('2 affaires affichées')
+  })
+
+  it('« Aller à une affaire… » filtre la liste affichee sans relancer la recherche ; Entree choisit l\'affaire restee seule', async () => {
+    const chercher = vi.fn(() => vue())
+    installerFauxPont({ 'EcranHistoriqueV2.Chercher': chercher })
+    render(<EcranHistoriqueV2 />)
+    // Sans liste, ni champ ni Ctrl K.
+    expect(screen.queryByLabelText('Aller à une affaire…')).toBeNull()
+    fireEvent.click(screen.getByText('Rechercher'))
+    const champ = await screen.findByLabelText('Aller à une affaire…')
+    fireEvent.change(champ, { target: { value: 'modifications' } })
+    const lignes = within(screen.getByRole('table', { name: 'Affaires' })).getAllByRole('row').slice(1)
+    expect(lignes).toHaveLength(1)
+    expect(lignes[0]!.textContent).toContain('MODIFICATIONS 2026')
+    expect(document.body.querySelector('.rig-lm-synthese')!.textContent).toBe("1 sur 2 affaires · 1 dans l'ancien RIG · 0 dans la V3")
+    expect(chercher).toHaveBeenCalledTimes(1)
+    // Le detail montre encore la premiere affaire (celle de la V3) tant qu'Entree n'a pas choisi.
+    expect(screen.getByLabelText("Détail de l'affaire").textContent).not.toContain("Cette affaire se traite dans l'ancien RIG")
+    fireEvent.keyDown(champ, { key: 'Enter' })
+    expect(screen.getByLabelText("Détail de l'affaire").textContent).toContain("Cette affaire se traite dans l'ancien RIG")
+    fireEvent.change(champ, { target: { value: 'zzz' } })
+    expect(screen.getByText('Aucune des 2 affaires ne contient « zzz ».')).toBeTruthy()
   })
 
   it('REC-011 CA01, CA03 : une demande bloquée dit par quelle demande et dans quel logiciel ; le lien ouvre la demande liée en lecture', async () => {

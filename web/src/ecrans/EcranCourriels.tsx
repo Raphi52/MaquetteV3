@@ -10,9 +10,17 @@
 // est desormais une page d'alerte (un 400 ne peut pas venir de cet ecran : dates et issue viennent de champs fermes).
 // fix-ok: capture claire du 2026-11-21 sur bureau cache -- « Non remis (hors production) » coupe dans une colonne de
 // 150 px (200 px desormais) ; « Tout afficher » en rig-bouton--plat (11 px) a cote de « Chercher » : bouton simple.
+//
+// LISTE MODERNE (24/11/2026, plan des listes modernes, lot 5) : la liste des courriels prend les briques de
+// composants/ListeModerne.tsx -- tete (synthese, « Aller à un courriel… » Ctrl K qui filtre la liste affichee, Entree
+// ouvre le detail du courriel reste seul), vues = le critere « Issue » existant (une puce part au serveur comme la liste
+// deroulante), issue en point colore, modele en pastille, destinataire en avatar + adresse + objet, pied. Les criteres,
+// le clic sur une ligne et le detail ne changent pas. fix-ok: ajout du socle des listes en plusieurs pas (lot 5), pas un correctif.
 
 import { useEffect, useState, type FormEvent } from 'react'
 import { appeler } from '../pont'
+import { contientSansCasse, estBlanc } from '../criteres'
+import { CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, type Teinte } from '../composants/ListeModerne'
 import { quand } from './EcranComptes'
 
 export interface CourrielSuivi {
@@ -82,11 +90,11 @@ const Texte = { margin: 'var(--rig-esp-2) 0 0', padding: 'var(--rig-esp-2)', whi
   border: '1px solid var(--rig-bord)', borderRadius: 'var(--rig-rayon, 4px)', maxHeight: '180px', overflow: 'auto' } as const
 
 /** L'issue d'un envoi, en clair, et la couleur de sa pastille. */
-export const Etats: Record<CourrielSuivi['etat'], { libelle: string; teinte: string }> = {
-  envoye: { libelle: 'Envoyé', teinte: 'ok' },
-  ignore: { libelle: 'Non remis (hors production)', teinte: 'attente' },
-  echec: { libelle: 'Échec', teinte: 'alerte' },
-  'en-cours': { libelle: 'Sans issue', teinte: 'action' },
+export const Etats: Record<CourrielSuivi['etat'], { libelle: string; teinte: Teinte }> = {
+  envoye: { libelle: 'Envoyé', teinte: 'vert' },
+  ignore: { libelle: 'Non remis (hors production)', teinte: 'orange' },
+  echec: { libelle: 'Échec', teinte: 'rouge' },
+  'en-cours': { libelle: 'Sans issue', teinte: 'bleu' },
 }
 
 /** Les etapes de la trace (EMAIL_ENVOI_TRACE de la V2), en clair. */
@@ -113,6 +121,8 @@ export function EcranCourriels() {
   const [choisi, setChoisi] = useState<string | null>(null)
   const [detail, setDetail] = useState<VueDetailCourriel | null>(null)
   const [occupe, setOccupe] = useState(false)
+  // « Aller à un courriel… » (Ctrl K) : filtre la liste AFFICHEE, sans toucher aux criteres envoyes au serveur.
+  const [filtreRapide, setFiltreRapide] = useState('')
 
   const recevoir = (v: VueEcranCourriels) => {
     setVue(v)
@@ -160,6 +170,14 @@ export function EcranCourriels() {
 
   const demo = vue.mode === 'demo'
   const d = detail?.detail
+  const affiches = estBlanc(filtreRapide) ? vue.envois
+    : vue.envois.filter((e) => contientSansCasse([e.destinataires, e.sujet, e.typeModele].join(' '), filtreRapide.trim()))
+  const echecs = affiches.filter((e) => e.etat === 'echec').length
+  /** Une vue = une issue (la liste deroulante « Issue ») ; son compte n'est connu que si la liste les contient toutes. */
+  const issues = Object.keys(Etats) as CourrielSuivi['etat'][]
+  const compteIssue = (k: string) => (etat === '' ? (k === '' ? vue.envois.length : vue.envois.filter((e) => e.etat === k).length)
+    : k === etat ? vue.envois.length : undefined)
+  const choisirIssue = (k: string) => { setEtat(k); void chercher(filtre({ etat: sansVide(k) })) }
 
   return (
     <div className="rig-proc__corps">
@@ -202,41 +220,48 @@ export function EcranCourriels() {
         </form>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Courriels envoyés</div>
-          <span className="rig-resultats-proc__compte">
-            {demo ? 'Démonstration' : `${vue.envois.length} courriel(s) — greffe ${vue.greffe ?? ''}`}
-          </span>
-        </div>
+      <ListeModerne etiquette="Courriels envoyés">
+        <EnteteListe titre="Courriels envoyés"
+                     synthese={<>{demo && 'Démonstration · '}{affiches.length}{affiches.length > 1 ? ' courriels' : ' courriel'}
+                       {' · '}<b>{echecs}</b>{echecs > 1 ? ' échecs' : ' échec'}{demo ? '' : ` · greffe ${vue.greffe ?? ''}`}</>}
+                     filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller à un courriel…',
+                               valider: () => { if (affiches.length === 1) void ouvrir(affiches[0]!) } }} />
         {demo && (
           <p style={Message}>
             <span className="rig-etat rig-etat--attente">Démonstration</span>
             {' '}Sans serveur, trois envois d'exemple s'affichent : un parti, un non remis hors production, un refusé.
           </p>
         )}
+        <VuesListe vues={[{ cle: '', libelle: 'Toutes', compte: compteIssue('') },
+                          ...issues.map((k) => ({ cle: k, libelle: Etats[k].libelle, compte: compteIssue(k) }))]}
+                   active={etat} choisir={(k) => { if (!occupe) choisirIssue(k) }} />
         <div className="rig-table-cadre">
-          <table className="rig-table" style={GrilleRepartie}>
+          <table className="rig-table rig-lm-table" style={GrilleRepartie}>
             <colgroup>
               <col style={{ width: '120px' }} /><col style={{ width: '200px' }} /><col style={{ width: '110px' }} />
-              <col style={{ width: '24%' }} /><col /><col style={{ width: '60px' }} />
+              <col /><col style={{ width: '60px' }} />
             </colgroup>
             <thead>
-              <tr>{['Le', 'Issue', 'Modèle', 'Destinataires', 'Objet', 'Pièces'].map((t) => <th key={t} title={t} style={Coupe}>{t}</th>)}</tr>
+              <tr>{['Le', 'Issue', 'Modèle', 'Destinataire et objet', 'Pièces'].map((t) => <th key={t} title={t} style={Coupe}>{t}</th>)}</tr>
             </thead>
             <tbody>
-              {vue.envois.map((e) => (
+              {affiches.map((e) => (
                 <tr key={e.suivi} onClick={() => void ouvrir(e)} style={e.suivi === choisi ? FiletChoisi : undefined}>
                   <td>{quand(e.debut)}</td>
-                  <td style={Coupe}><span className={`rig-etat rig-etat--${Etats[e.etat].teinte}`}>{Etats[e.etat].libelle}</span></td>
-                  <td className="rig-table__mono" title={e.typeModele ?? ''} style={Coupe}>{e.typeModele ?? '—'}</td>
-                  <td title={e.destinataires ?? ''} style={Coupe}>{e.destinataires ?? '—'}</td>
-                  <td title={e.erreur ?? e.sujet ?? ''} style={Coupe}>{e.sujet ?? '—'}</td>
+                  <td title={Etats[e.etat].libelle}><PointEtat teinte={Etats[e.etat].teinte}>{Etats[e.etat].libelle}</PointEtat></td>
+                  <td title={e.typeModele ?? ''}>{e.typeModele ? <Pastille teinte="ardoise">{e.typeModele}</Pastille> : '—'}</td>
+                  <CelluleIdentite nom={e.destinataires ?? '—'} objet={e.sujet ?? '—'}
+                                   titre={`${e.destinataires ?? '—'} — ${e.erreur ?? e.sujet ?? ''}`} />
                   <td>{e.nbPieces ?? 0}</td>
                 </tr>
               ))}
               {vue.envois.length === 0 && (
-                <tr><td colSpan={6} className="rig-table__vide">Aucun courriel pour cette recherche.</td></tr>
+                <tr><td colSpan={5} className="rig-table__vide">Aucun courriel pour cette recherche.</td></tr>
+              )}
+              {vue.envois.length > 0 && affiches.length === 0 && (
+                <tr><td colSpan={5} className="rig-table__vide">
+                  {`Aucun des ${vue.envois.length} courriels ne contient « ${filtreRapide.trim()} ».`}
+                </td></tr>
               )}
             </tbody>
           </table>
@@ -272,7 +297,11 @@ export function EcranCourriels() {
             )}
           </div>
         )}
-      </section>
+
+        <PiedListe>
+          <span><b>{affiches.length}</b>{affiches.length > 1 ? ' courriels affichés' : ' courriel affiché'}</span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }

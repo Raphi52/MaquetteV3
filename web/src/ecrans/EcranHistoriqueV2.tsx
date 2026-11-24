@@ -15,10 +15,20 @@
 // (SOC-027 CA04) -- la touche de recherche appelait « chercher » et la regle des ecrans de recherche attend « rechercher ».
 // fix-ok: capture du 22/11 en fenetre de 1 080 px -- les colonnes « Affaire » et « Libelle et liens » rendues a 0 px : en
 // table-layout fixed, la seule colonne sans largeur prend le reste, nul quand les colonnes fixes remplissent la place ; d'ou grille().
+//
+// LISTE MODERNE (24/11/2026, plan des listes modernes, lot 5) : la colonne des resultats prend les briques de
+// composants/ListeModerne.tsx -- tete (synthese, « Aller à… » Ctrl K qui filtre la liste affichee -- affaires, anciens numeros
+// ou fiches a verifier --, Entree choisit l'affaire restee seule), et dans ces trois listes : client en avatar + nom + code,
+// etat et « Dans la V3 » en point colore, logiciel et sorte de fiche en pastille, pied. Les demandes et les echanges d'une
+// affaire (son detail) et les demandes d'une arrivee ne sont pas des listes de resultats : ils gardent le restyle commun.
+// Aucune vue : l'ecran n'a pas de critere d'etat ni de type sur ses lignes (« Rechercher par » choisit QUOI chercher).
+// fix-ok: ajout du socle des listes en plusieurs pas (lot 5), pas un correctif.
 
 import { useState, type CSSProperties } from 'react'
 import { appeler } from '../pont'
+import { contientSansCasse, estBlanc } from '../criteres'
 import { toucheDeRecherche } from '../plan/clavier'
+import { CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat } from '../composants/ListeModerne'
 import { quand } from './EcranComptes'
 
 export interface LienDemandeVue {
@@ -250,6 +260,22 @@ export function EcranHistoriqueV2() {
   const decrit = CRITERES.find((c) => c.code === critere)!
   const enErreur = vue !== null && (vue.mode === 'refuse' || vue.mode === 'erreur' || vue.mode === 'sans-greffe')
 
+  // « Aller à… » (Ctrl K) : filtre la liste AFFICHEE (affaires, anciens numeros ou fiches a verifier), sans relancer la recherche.
+  const [filtreRapide, setFiltreRapide] = useState('')
+  const garde = (textes: (string | number | null)[]) => estBlanc(filtreRapide) || contientSansCasse(textes.join(' '), filtreRapide.trim())
+  const affaires = (h?.affaires ?? []).filter((a) => garde([a.libelle, a.id, a.idV2, ...a.dossiers, a.client, a.clientCode]))
+  const listeAnciens = vue !== null && (vue.critere === 'ancien' || vue.critere === 'rig') && vue.mode !== 'vide' && !enErreur
+  const anciens = listeAnciens ? vue.anciens.filter((a) => garde([a.ancienNumero, a.ancienId, a.numeroRig, a.idRig, a.numeroInfogreffe, a.sorteFiche])) : []
+  const listeReprises = vue !== null && vue.critere === 'reprises' && !enErreur
+  const reprises = listeReprises ? vue.reprises.filter((f) => garde([f.libelle, f.idV2, f.motif, f.tableV2])) : []
+  // La liste que montre l'ecran, s'il en montre une : ce qu'en disent la tete, le filtre et le pied.
+  const liste = h ? { mot: ['affaire', 'affaires'], affichees: affaires.length, total: h.affaires.length, aller: 'Aller à une affaire…' }
+    : listeAnciens ? { mot: ['correspondance', 'correspondances'], affichees: anciens.length, total: vue.anciens.length, aller: 'Aller à un numéro…' }
+    : listeReprises ? { mot: ['fiche à vérifier', 'fiches à vérifier'], affichees: reprises.length, total: vue.reprises.length, aller: 'Aller à une fiche…' }
+    : null
+  const nombre = (n: number, mot: string[]) => `${n} ${n > 1 ? mot[1] : mot[0]}`
+  const anciennes = affaires.filter((a) => a.logiciel !== 'V3').length
+
   return (
     <div className="rig-proc__corps">
       <aside className="rig-criteres">
@@ -278,17 +304,16 @@ export function EcranHistoriqueV2() {
         </p>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Historique de l'ancien RIG</div>
-          <span className="rig-resultats-proc__compte">
-            {vue === null ? 'Saisissez un critère'
-              : vue.mode === 'demo' ? 'Démonstration'
-              : h ? `${h.affaires.length} affaire(s) — ${h.anciennes} dans l'ancien RIG, ${h.nouvelles} dans la V3`
-              : vue.critere === 'ancien' || vue.critere === 'rig' ? `${vue.anciens.length} correspondance(s)`
-              : vue.critere === 'reprises' ? `${vue.reprises.length} fiche(s) à vérifier` : ''}
-          </span>
-        </div>
+      <ListeModerne etiquette="Historique de l'ancien RIG">
+        <EnteteListe titre="Historique de l'ancien RIG"
+                     synthese={vue === null ? 'Saisissez un critère'
+                       : <>{vue.mode === 'demo' && 'Démonstration · '}
+                           {liste && (liste.affichees === liste.total ? nombre(liste.total, liste.mot) : `${liste.affichees} sur ${nombre(liste.total, liste.mot)}`)}
+                           {h && <>{' · '}<b>{anciennes}</b>{' dans l\'ancien RIG · '}<b>{affaires.length - anciennes}</b>{' dans la V3'}</>}</>}
+                     filtre={liste ? {
+                       valeur: filtreRapide, changer: setFiltreRapide, indication: liste.aller,
+                       valider: () => { if (affaires.length === 1) { setChoisie(affaires[0]!.id); setLiee(null) } },
+                     } : undefined} />
 
         {vue?.message && (
           <p style={Message} role={enErreur ? 'alert' : 'status'}>
@@ -316,20 +341,25 @@ export function EcranHistoriqueV2() {
             {h.titre && <p style={{ ...Message, fontWeight: 600 }}>{h.titre}</p>}
             {h.note && <p style={{ ...Message, ...Aide }}>{h.note}</p>}
             <div className="rig-table-cadre" style={ListeCourte}>
-              <table className="rig-table" style={GrilleAffaires.style} aria-label="Affaires">
+              <table className="rig-table rig-lm-table" style={GrilleAffaires.style} aria-label="Affaires">
                 {GrilleAffaires.colonnes}
                 <thead><tr>{['Affaire', 'Créée le', 'Client', 'État', 'Logiciel'].map((t) => <th key={t} style={Coupe}>{t}</th>)}</tr></thead>
                 <tbody>
-                  {h.affaires.map((a) => (
+                  {affaires.map((a) => (
                     <tr key={a.id} onClick={() => { setChoisie(a.id); setLiee(null) }} aria-selected={detail?.id === a.id}>
                       <td style={Coupe} title={a.libelle ?? undefined}>{a.libelle ?? a.id}{a.dossiers.length > 0 ? ` · ${a.dossiers.join(', ')}` : ''}</td>
                       <td>{date(a.creeeLe)}</td>
-                      <td style={Coupe} title={a.clientCode ?? undefined}>{a.client ?? '—'}</td>
-                      <td>{a.etat}</td>
-                      <td><Logiciel logiciel={a.logiciel} texte={a.marque} /></td>
+                      {a.client
+                        ? <CelluleIdentite nom={a.client} objet={a.clientCode ?? undefined} titre={`${a.client}${a.clientCode ? ` · ${a.clientCode}` : ''}`} />
+                        : <td>—</td>}
+                      <td title={a.etat}><PointEtat teinte={a.etat === 'en cours' ? 'bleu' : 'gris'}>{a.etat}</PointEtat></td>
+                      <td title={a.marque}><Pastille teinte={a.logiciel === 'V3' ? 'vert' : 'orange'}>{a.marque}</Pastille></td>
                     </tr>
                   ))}
                   {h.affaires.length === 0 && <tr><td colSpan={5} className="rig-table__vide">Aucune affaire pour ce critère.</td></tr>}
+                  {h.affaires.length > 0 && affaires.length === 0 && (
+                    <tr><td colSpan={5} className="rig-table__vide">{`Aucune des ${h.affaires.length} affaires ne contient « ${filtreRapide.trim()} ».`}</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -383,47 +413,63 @@ export function EcranHistoriqueV2() {
           </div>
         )}
 
-        {vue && (vue.critere === 'ancien' || vue.critere === 'rig') && vue.mode !== 'vide' && !enErreur && (
+        {vue && listeAnciens && (
           <div className="rig-table-cadre">
-            <table className="rig-table" style={GrilleAnciens.style} aria-label="Anciens numéros">
+            <table className="rig-table rig-lm-table" style={GrilleAnciens.style} aria-label="Anciens numéros">
               {GrilleAnciens.colonnes}
               <thead><tr>{['Logiciel', 'Fiche', 'Ancien numéro', 'Numéro RIG', 'Numéro Infogreffe', 'Dans la V3'].map((t) => <th key={t} style={Coupe}>{t}</th>)}</tr></thead>
               <tbody>
-                {vue.anciens.map((a, i) => (
+                {anciens.map((a, i) => (
                   <tr key={i}>
-                    <td>{a.logiciel}</td><td style={Coupe}>{a.sorteFiche}</td>
+                    <td title={a.logiciel}><Pastille teinte="ardoise">{a.logiciel}</Pastille></td><td style={Coupe}>{a.sorteFiche}</td>
                     <td style={Coupe} title={a.ancienId ?? undefined}>{a.ancienNumero ?? a.ancienId ?? '—'}</td>
                     <td>{a.numeroRig ?? a.idRig ?? '—'}</td><td style={Coupe}>{a.numeroInfogreffe ?? '—'}</td>
-                    <td>{a.idV3 ? <span className="rig-etat rig-etat--ok">Reprise</span> : <span className="rig-etat rig-etat--attente">Pas encore</span>}</td>
+                    <td>{a.idV3 ? <PointEtat teinte="vert">Reprise</PointEtat> : <PointEtat teinte="orange">Pas encore</PointEtat>}</td>
                   </tr>
                 ))}
                 {vue.anciens.length === 0 && <tr><td colSpan={6} className="rig-table__vide">Le numéro n'a pas de correspondance.</td></tr>}
+                {vue.anciens.length > 0 && anciens.length === 0 && (
+                  <tr><td colSpan={6} className="rig-table__vide">{`Aucune des ${vue.anciens.length} correspondances ne contient « ${filtreRapide.trim()} ».`}</td></tr>
+                )}
               </tbody>
             </table>
           </div>
         )}
 
-        {vue && vue.critere === 'reprises' && !enErreur && (
+        {vue && listeReprises && (
           <div className="rig-table-cadre">
             <p style={{ ...Message, ...Aide }}>Fiches créées par une ancienne reprise pour combler un lien cassé : transférées telles quelles, à vérifier par le greffe.</p>
-            <table className="rig-table" style={GrilleReprises.style} aria-label="Fiches à vérifier">
+            <table className="rig-table rig-lm-table" style={GrilleReprises.style} aria-label="Fiches à vérifier">
               {GrilleReprises.colonnes}
               <thead><tr>{['Fiche', 'Libellé', 'Pourquoi', 'Dans la V3'].map((t) => <th key={t}>{t}</th>)}</tr></thead>
               <tbody>
-                {vue.reprises.map((f) => (
+                {reprises.map((f) => (
                   <tr key={`${f.tableV2}${f.idV2}`}>
-                    <td>{f.tableV2 === 'CLIENT' ? 'Client' : f.tableV2 === 'ADRESSE_BASE' ? 'Adresse' : f.tableV2} {f.idV2}</td>
-                    <td style={Coupe} title={f.libelle ?? undefined}>{f.libelle ?? '—'}</td>
+                    <td title={`${f.tableV2} ${f.idV2}`}>
+                      <Pastille teinte={f.tableV2 === 'CLIENT' ? 'bleu' : f.tableV2 === 'ADRESSE_BASE' ? 'violet' : 'gris'}>
+                        {f.tableV2 === 'CLIENT' ? 'Client' : f.tableV2 === 'ADRESSE_BASE' ? 'Adresse' : f.tableV2}
+                      </Pastille> {f.idV2}
+                    </td>
+                    {f.libelle ? <CelluleIdentite nom={f.libelle} titre={f.libelle} /> : <td>—</td>}
                     <td style={Coupe} title={f.motif}>{f.motif}</td>
                     <td>{f.idV3 ?? '—'}</td>
                   </tr>
                 ))}
                 {vue.reprises.length === 0 && <tr><td colSpan={4} className="rig-table__vide">Aucune fiche d'ancienne reprise dans ce greffe.</td></tr>}
+                {vue.reprises.length > 0 && reprises.length === 0 && (
+                  <tr><td colSpan={4} className="rig-table__vide">{`Aucune des ${vue.reprises.length} fiches ne contient « ${filtreRapide.trim()} ».`}</td></tr>
+                )}
               </tbody>
             </table>
           </div>
         )}
-      </section>
+
+        {liste && (
+          <PiedListe>
+            <span><b>{liste.affichees}</b>{` ${liste.affichees > 1 ? liste.mot[1] : liste.mot[0]} ${liste.affichees > 1 ? 'affichées' : 'affichée'}`}</span>
+          </PiedListe>
+        )}
+      </ListeModerne>
     </div>
   )
 }
