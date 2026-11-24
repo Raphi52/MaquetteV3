@@ -49,7 +49,7 @@ public static class PerimetreProfil
 
         // ---- Judiciaire ----
         ["PROC_XAFF"] = Jud, ["PROC_NPC"] = Jud, ["PROC_CJUD"] = Jud,
-        ["PROC_CJUDINFOG"] = Jud, ["PROC_MESIN"] = Jud, ["PROC_JOIN"] = Jud,
+        ["PROC_MESIN"] = Jud, ["PROC_JOIN"] = Jud,
         ["PROC_DEPOTJUD"] = Jud, ["PROC_DEP"] = Jud, ["PROC_DEPPCM"] = Jud,
         ["PROC_VJUD"] = Jud, ["PROC_REGJUD"] = Jud, ["PROC_RECHERCHE_BATEAU"] = Jud,
         ["PROC_ACTEUR_JUD"] = Jud, ["PROC_EXPERT"] = Jud, ["PROC_MANDATAIRE"] = Jud,

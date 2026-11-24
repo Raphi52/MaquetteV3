@@ -12,7 +12,7 @@ using RigV3Desktop.Pont.EcransGeneres;
 //   2. il est ATTEIGNABLE : l'aiguillage le monte (branche par defaut), aucun cas de l'aiguillage
 //      ne le doublonne, sa teinte et ses icones ont leur classe dans rig-accueil.css, et il sort
 //      en JSON aux noms que web/src lit ;
-//   3. le verbe OUVRIR a ses onze ecrans (PROC_CJUDINFOG exclu : sa fiche RIG v2 dit la
+//   3. le verbe OUVRIR a ses onze ecrans (PROC_CJUDINFOG retire du menu : sa fiche RIG v2 dit la
 //      procedure supprimee le 22/11/2018) ;
 //   4. le compte des entrees du menu SANS ecran NI descripteur est RAPPORTE sans rougir : les
 //      autres lots tournent encore. PROC_CREANCE est exclu (rien dans RIG v2, motif etabli).
@@ -110,7 +110,7 @@ foreach (var d in descripteurs)
     foreach (var defaut in defauts) Exiger(false, $"{d.Code} : {defaut}");
 }
 
-// Le verbe OUVRIR : ses onze ecrans. PROC_CJUDINFOG est absent a dessein (voir DomaineOuvrir).
+// Le verbe OUVRIR : ses onze ecrans. PROC_CJUDINFOG a quitte le menu (voir DomaineOuvrir).
 var ouvrir = new[] { "PROC_XAFF", "PROC_NF", "PROC_NPC", "PROC_IPE", "PROC_MESIN", "PROC_JOIN",
                      "PROC_CORDJRCS", "PROC_DAS", "PROC_DEP", "PROC_DEPPCM", "PROC_DASBEN" };
 Exiger(ouvrir.All(parCode.ContainsKey),
@@ -131,8 +131,9 @@ var sansEcran = codesMenu
     .Where(c => c != "PROC_CREANCE" && !casAiguillage.Contains(c) && !parCode.ContainsKey(c))
     .ToList();
 Note($"sans ecran ni descripteur : {string.Join(", ", sansEcran)}");
-if (sansEcran.Contains("PROC_CJUDINFOG"))
-    Note("PROC_CJUDINFOG : fiche RIG v2 « OBSOLETE » (supprimee le 22/11/2018, factorisee dans PROC_CJUD) : pas d'ecran genere, a trancher par le chef");
+// PROC_CJUDINFOG (fiche RIG v2 « OBSOLETE », factorisee dans PROC_CJUD) a quitte le menu le
+// 2026-11-23 : s'il y revenait sans ecran, il compterait ici comme un reste a faire.
+Exiger(!codesMenu.Contains("PROC_CJUDINFOG"), "PROC_CJUDINFOG (obsolete, factorise dans PROC_CJUD) n'est plus au menu");
 
 var bilan = $"RESTANTS : {sansEcran.Count} entree(s) du menu sans ecran ni descripteur (PROC_CREANCE exclu, rapporte sans bloquer)";
 if (echecs.Count == 0)

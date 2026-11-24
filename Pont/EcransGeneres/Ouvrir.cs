@@ -6,8 +6,8 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 // les messages. Les lignes sont une demonstration anonyme (noms fictifs).
 //
 // PROC_CJUDINFOG (« Creation via Infogreffe ») n'a PAS de descripteur : sa fiche le dit
-// obsolete (supprime le 22/11/2018, factorise dans PROC_CJUD). Il reste « a venir » dans le
-// menu ; le retirer ou le router vers PROC_CJUD est une decision du chef.
+// obsolete (supprime le 22/11/2018, factorise dans PROC_CJUD). Son entree a ete retiree du
+// menu (decision utilisateur du 2026-11-23) : l'enrolement passe par PROC_CJUD.
 public sealed class DomaineOuvrir : IDomaineEcrans
 {
     public IEnumerable<DescripteurEcran> Ecrans() =>
