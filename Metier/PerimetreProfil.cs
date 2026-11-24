@@ -81,7 +81,30 @@ public static class PerimetreProfil
         ["PROC_GESTEMAIL"] = RcsJud, ["PROC_GESTBANQ"] = RcsJud,
         ["PROC_BORNE"] = RcsJud, ["PROC_PARAM_IP"] = Jud,
         ["PROC_PARAM_LISTEEXCEL"] = RcsJud, ["PROC_PARAMEXPRESSO"] = RcsJud,
-        ["PROC_REQUETES"] = RcsJud, ["PROC_IA"] = Rcs
+        ["PROC_REQUETES"] = RcsJud, ["PROC_IA"] = Rcs,
+
+        // ---- Les fonctions de RIG v2 retrouvees le 24/11/2026 (conv-2142,
+        // Pont/EcransGeneres/FonctionsRetrouvees.cs) : le metier de l'ecran qui
+        // les reunit, ou celui de leurs voisines.
+        ["PROC_DCA"] = Rcs,
+        ["PROC_ROFSURVEILLANCES"] = RcsEnd, ["PROC_ACTREJ_CMD_WEB"] = RcsEnd, ["PROC_REJETSKBISXML"] = RcsEnd,
+        ["PROC_GDEST_INST"] = Jud, ["PROC_EDI_RPJC_INS"] = Jud, ["PROC_EDI_RPJC_REN"] = Jud,
+        ["PROC_IMP_WIN"] = RcsJud,
+
+        // ---- Les ECRANS REUNIS (Pont/MenuAccueil.cs, EntreeMenu.Reunit) : le
+        // metier de leurs procedures, qui est le meme pour toutes (tests/
+        // EcransGeneresCheck le verifie). Un ecran reuni transverse n'est pas ici.
+        ["SYNTHESE_DEPOTS_REGISTRE"] = Rcs, ["SYNTHESE_CHIFFRES_RCS"] = Rcs,
+        ["SYNTHESE_CORRIGER_RCS"] = Rcs, ["SYNTHESE_INPI"] = Rcs, ["SYNTHESE_FORMALITES_DEMAT"] = Rcs,
+        ["SYNTHESE_RELANCES"] = RcsEnd, ["SYNTHESE_ACTES_BLOQUES"] = RcsEnd,
+        ["SYNTHESE_NOUVELLE_AFFAIRE_JUD"] = Jud, ["SYNTHESE_DEPOTS_PC"] = Jud,
+        ["SYNTHESE_DOSSIERS_JUD"] = Jud, ["SYNTHESE_CORRIGER_JUD"] = Jud,
+        ["SYNTHESE_DEFAIRE"] = Jud, ["SYNTHESE_PC_EN_MASSE"] = Jud,
+        ["SYNTHESE_DECISIONS"] = Jud, ["SYNTHESE_PREPARER_AUDIENCE"] = Jud,
+        ["SYNTHESE_APRES_AUDIENCE"] = Jud, ["SYNTHESE_FICHES_ACTEURS"] = Jud,
+        ["SYNTHESE_EDI_AVOCATS"] = Jud,
+        ["SYNTHESE_IP"] = JudEnd,
+        ["SYNTHESE_TABLES"] = RcsJud
     };
 
     /// <summary>Cet ecran est-il dans le perimetre de ces domaines ? Un ecran

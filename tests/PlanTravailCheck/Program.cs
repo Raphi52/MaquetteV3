@@ -128,8 +128,8 @@ internal static class Programme
         var nonMontes = ecransDesActions.Where(c => !Monte(c)).ToList();
         Exiger(ecransDesActions.Count >= 10 && nonMontes.Count == 0,
             $"barre du dossier : ses {ecransDesActions.Count} ecrans sont tous montes par l'aiguillage ({string.Join(", ", nonMontes)})");
-        Exiger(Monte("PROC_FACTURE") && !Monte("PROC_CREANCE") && !Monte("PROC_STAT_INCONNU"),
-            "jumeau : le controle reconnait un ecran qui tomberait sur « ecran a venir » (PROC_CREANCE)");
+        Exiger(Monte("PROC_FACTURE") && !Monte("PROC_PARAM_LISTEEXCEL") && !Monte("PROC_STAT_INCONNU"),
+            "jumeau : le controle reconnait un ecran qui tomberait sur « ecran a venir » (PROC_PARAM_LISTEEXCEL)");
         Exiger(catalogue.Select(a => a.Code).Distinct().Count() == catalogue.Length
                && catalogue.All(a => ActionsDossier.Verbes.Contains(a.Verbe) && char.IsAsciiLetterUpper(a.Touche)
                                      && a.Types.Length > 0 && a.Types.All(t => t is DomaineGed.Rcs or DomaineGed.Judiciaire)

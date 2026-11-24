@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using RigV3Desktop;
 using RigV3Desktop.Pont;
 using RigV3Desktop.Pont.EcransGeneres;
 
@@ -15,7 +16,11 @@ using RigV3Desktop.Pont.EcransGeneres;
 //   3. le verbe OUVRIR a ses onze ecrans (PROC_CJUDINFOG retire du menu, voir la section 3) ;
 //   4. STRICT : aucune entree du menu n'est sans ecran NI descripteur, hors les exceptions
 //      nommees en section 3 (chacune porte sa raison ; une exception perimee est rouge) ;
-//   5. STRICT : un descripteur VIDE est rouge (ni colonne, ni ligne de demonstration, ni action).
+//   5. STRICT : un descripteur VIDE est rouge (ni colonne, ni ligne de demonstration, ni action) ;
+//   6. les ECRANS REUNIS (24/11/2026, conv-2142 : « on groupe ce qui peut l'etre ») : chaque
+//      entree du menu qui reunit des procedures a un descripteur fabrique de LEURS descripteurs
+//      (un groupe chacune, leurs lignes, leurs marches), et ne melange jamais des procedures que
+//      des metiers differents voient (Metier/PerimetreProfil.cs).
 
 var echecs = new List<string>();
 void Exiger(bool ok, string quoi)
@@ -40,9 +45,16 @@ var cssGenereLie = Regex.IsMatch(Lire("wwwroot/index.html"), @"href=""rig-ecrans
 
 var entrees = MenuAccueil.Moments.SelectMany(m => m.Sous).SelectMany(s => s.Entrees).ToList();
 var codesMenu = entrees.Select(e => e.Code).Distinct().ToList();
-var libelleDuCode = entrees.GroupBy(e => e.Code).ToDictionary(g => g.Key, g => g.First().Libelle);
+// Une procedure reunie garde son nom et son code : le menu la porte, sous l'ecran qui la reunit.
+var libelleDuCode = MenuAccueil.Toutes.GroupBy(e => e.Code).ToDictionary(g => g.Key, g => g.First().Libelle);
+var reunions = entrees.Where(e => e.Membres.Length > 0).DistinctBy(e => e.Code).ToList();
 var casAiguillage = Regex.Matches(aiguillage, @"case '([A-Z_0-9]+)':").Select(m => m.Groups[1].Value).ToHashSet();
-Exiger(codesMenu.Count >= 150, $"le menu expose ses procedures ({codesMenu.Count} codes distincts, {entrees.Count} entrees)");
+Exiger(libelleDuCode.Count >= 150,
+    $"le menu expose ses procedures ({libelleDuCode.Count} codes atteignables, dont {libelleDuCode.Count - codesMenu.Count} reunis ; {entrees.Count} entrees affichees)");
+// Mesure du 24/11/2026 : 152 entrees affichees avant, 107 apres. Ce qui reste a part est un ecran
+// porte en React (sa propre logique), ou une procedure vue par d'autres metiers que ses voisines.
+Exiger(reunions.Count >= 25 && entrees.Count <= 110,
+    $"le menu est resserre : {reunions.Count} ecrans reunissent plusieurs procedures, {entrees.Count} entrees affichees (152 avant le 24/11/2026)");
 
 // L'aiguillage monte le descripteur par sa branche par defaut, et seulement la.
 Exiger(aiguillage.Contains("import { EcranGenere } from '../ecrans/EcranGenere'")
@@ -61,7 +73,54 @@ var descripteurs = CatalogueGenere.Tous.OrderBy(d => d.Code, StringComparer.Ordi
 var parCode = descripteurs.ToDictionary(d => d.Code);
 Note($"{descripteurs.Count} descripteur(s) decouvert(s) par reflexion : {string.Join(", ", descripteurs.Select(d => d.Code))}");
 
-foreach (var d in descripteurs)
+foreach (var d in descripteurs.Where(d => d.Membres.Length > 0))
+{
+    // Un ecran REUNI : fabrique a partir de ses procedures (CatalogueGenere.Reunir), rien a la main.
+    var defauts = new List<string>();
+    var entree = reunions.FirstOrDefault(e => e.Code == d.Code);
+    if (entree is null) { Exiger(false, $"{d.Code} : un descripteur a membres sans entree du menu qui reunisse"); continue; }
+    if (d.Titre != entree.Libelle) defauts.Add($"son titre « {d.Titre} » n'est pas le libelle du menu « {entree.Libelle} »");
+    if (!d.Membres.Select(m => m.Code).SequenceEqual(entree.Membres.Select(m => m.Code)))
+        defauts.Add("ses procedures ne sont pas celles que le menu reunit, dans le meme ordre");
+    if (!d.Groupes.SequenceEqual(d.Membres.Select(m => m.Titre))) defauts.Add("un groupe par procedure, a son titre, est attendu");
+    if (d.Marches.Length != 0) defauts.Add("un ecran reuni n'a pas de marches propres : chaque ligne suit celles de sa procedure");
+    if (d.Lignes.Length != d.Membres.Sum(m => m.Lignes.Length)) defauts.Add("ses lignes ne sont pas exactement celles de ses procedures");
+    if (casAiguillage.Contains(d.Code)) defauts.Add("un cas de l'aiguillage le doublonne : le descripteur serait mort");
+    foreach (var etat in new[] { "AFaire", "EnCours", "Validee" })
+        if (d.Etats.All(e => e.Code != etat)) defauts.Add($"l'etat « {etat} » manque (il porte les gestes)");
+    foreach (var l in d.Lignes)
+    {
+        var parcours = d.Membres.FirstOrDefault(m => m.Titre == l.Groupe);
+        if (parcours is null) { defauts.Add($"la ligne « {l.Nom} » n'appartient a aucune procedure reunie"); continue; }
+        if (l.Faites.Any(k => k < 0 || k >= parcours.Marches.Length))
+            defauts.Add($"la ligne « {l.Nom} » franchit une marche hors de l'escalier de sa procedure");
+    }
+    // Le meme metier pour l'ecran et pour chacune de ses procedures : un agent ne voit jamais, dans un
+    // ecran reuni, la liste d'une procedure que son profil lui cache.
+    string Metiers(string code) => string.Join(",", PerimetreProfil.Reserve(code).OrderBy(x => x, StringComparer.Ordinal));
+    foreach (var m in d.Membres.Where(m => Metiers(m.Code) != Metiers(d.Code)))
+        defauts.Add($"{m.Code} est vu par [{Metiers(m.Code)}], l'ecran qui le reunit par [{Metiers(d.Code)}]");
+    if (defauts.Count == 0)
+        Exiger(true, $"{d.Code} ({d.Titre}) : reunit {d.Membres.Length} procedures ({string.Join(", ", d.Membres.Select(m => m.Titre))}), {d.Lignes.Length} lignes, metier [{Metiers(d.Code)}]");
+    foreach (var defaut in defauts) Exiger(false, $"{d.Code} : {defaut}");
+}
+
+// Chaque procedure reunie a son descripteur, et n'est reunie qu'une fois (sinon deux ecrans se la disputent).
+var reunies = reunions.SelectMany(e => e.Membres.Select(m => (Reunion: e.Code, m.Code))).ToList();
+var sansDescripteur = reunies.Where(r => !parCode.TryGetValue(r.Code, out var x) || x.Membres.Length > 0).ToList();
+Exiger(sansDescripteur.Count == 0,
+    $"chaque procedure reunie a son propre descripteur ({reunies.Count} procedures dans {reunions.Count} ecrans)"
+    + (sansDescripteur.Count == 0 ? "" : $" ; sans : {string.Join(", ", sansDescripteur.Select(r => $"{r.Code} dans {r.Reunion}"))}"));
+var deuxFois = reunies.GroupBy(r => r.Code).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+Exiger(deuxFois.Count == 0 && !reunies.Any(r => codesMenu.Contains(r.Code)),
+    "une procedure reunie l'est une seule fois, et n'a plus d'entree a elle au menu"
+    + (deuxFois.Count == 0 ? "" : $" (deux fois : {string.Join(", ", deuxFois)})"));
+// La fabrique est la seule source : un ecran reuni ne se decrit pas aussi a la main.
+Exiger(MenuAccueil.SyntheseDe("PROC_MMA")?.Code == "SYNTHESE_CORRIGER_RCS" && MenuAccueil.SyntheseDe("PROC_FACTURE") is null
+       && MenuAccueil.VerbeDe("PROC_MMA")?.Titre == "Modifier",
+    "une procedure reunie mene a l'ecran qui la reunit, et prend son verbe (Mentions en marge -> Corriger un dossier RCS, Modifier)");
+
+foreach (var d in descripteurs.Where(d => d.Membres.Length == 0))
 {
     var defauts = new List<string>();
     if (!libelleDuCode.TryGetValue(d.Code, out var libelle)) defauts.Add("son code n'est pas une entree du menu");
@@ -127,7 +186,7 @@ if (descripteurs.Count > 0)
 {
     var json = JsonSerializer.Serialize(descripteurs[0], new JsonSerializerOptions(JsonSerializerDefaults.Web));
     foreach (var cle in new[] { "code", "titre", "sujet", "recherche", "criteres", "valider", "rang", "etats",
-                                "groupes", "marches", "lignes", "icone", "obligatoire", "faites" })
+                                "groupes", "marches", "lignes", "icone", "obligatoire", "faites", "membres" })
         Exiger(json.Contains($"\"{cle}\":"), $"le descripteur sort en JSON avec la cle « {cle} »");
 }
 
@@ -141,7 +200,6 @@ if (descripteurs.Count > 0)
 // menu, ou il a enfin son ecran) est ROUGE : il faut la retirer de cette liste.
 var exceptions = new Dictionary<string, string>
 {
-    ["PROC_CREANCE"] = "rien dans la fiche RIG v2 : motif etabli",
     ["PROC_PARAM_LISTEEXCEL"] = "fiche RIG v2 vide, « une coquille, pas une couche OPE » (decision du chef)",
 };
 foreach (var (code, raison) in exceptions)
@@ -153,6 +211,12 @@ foreach (var (code, raison) in exceptions)
 const string retire = "PROC_CJUDINFOG";
 Exiger(!codesMenu.Contains(retire), $"{retire} (obsolete, factorise dans PROC_CJUD) n'est plus au menu");
 Exiger(!parCode.ContainsKey(retire), $"{retire} n'a pas de descripteur : il ne revient pas");
+
+// PROC_CREANCE etait toleree sans ecran (« rien dans la fiche RIG v2 ») jusqu'au 24/11/2026 : FORM_CREANCE n'etait
+// qu'un conteneur, et c'est le role qu'il garde -- l'ecran qui reunit les quatre procedures des creances.
+Exiger(reunions.FirstOrDefault(e => e.Code == "PROC_CREANCE") is { } creances
+       && creances.Membres.Select(m => m.Code).SequenceEqual(["PROC_ADDCREANCE", "PROC_MODCREANCE", "PROC_INTEGCREANCE", "PROC_CREANREP"]),
+    "PROC_CREANCE, conteneur vide de RIG v2, reunit les quatre procedures des creances");
 
 var sansEcran = codesMenu.Where(c => !casAiguillage.Contains(c) && !parCode.ContainsKey(c)).ToList();
 var tolerees = 0;

@@ -10,13 +10,19 @@ les gestes au clavier sont dans la fiche « Ancienne touche, nouvelle touche » 
 |---|---|---|
 | `PROC_ACCUEIL_PARAM` | Parametres de l'accueil | Parametres d'accueil |
 | `PROC_ACTREJ` | Actes rejetes par Infogreffe | Actes rejetes |
+| `PROC_ACTREJ_CMD_WEB` | Commandes web rejetees | Actes web non transmis |
 | `PROC_BEN` | Beneficiaires effectifs | Rechercher un beneficiaire |
+| `PROC_EDI_RPJC_INS` | EDI RPJC (inscriptions) | EDI RPJC inscriptions |
 | `PROC_EDI_RPVAINS` | EDI RPVA (inscriptions) | EDI RPVA |
 | `PROC_FACTURE` | Facture | Factures |
 | `PROC_FCLIENT` | Fiche client | Fiches clients |
 | `PROC_GCLIENT` | Gestion des clients | Gestion clients |
+| `PROC_GDEST_INST` | Destinataires d'une instance | Destinataires institutionnels |
 | `PROC_RECHENC` | Recherche d'encaissements | Encaissements |
 | `PROC_RECHERCHE_BATEAU` | Recherche de navires | Navires |
+| `PROC_REJETSKBISXML` | Rejets des Kbis XML | Kbis XML rejetes |
 | `PROC_REQUI` | Requisitions | Requisitions - commande de documents |
+| `PROC_ROFSURVEILLANCES` | Surveillances ROF | Radiations d'office |
 | `PROC_SURVMES` | Surveillance des mesures | Mesures |
+| `PROC_TRAITEMENTNPAI` | Courriers revenus (NPAI) | Courriers revenus NPAI |
 | `PROC_WIKI` | Aide du greffe (wiki) | Aide du greffe |

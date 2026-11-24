@@ -26,8 +26,36 @@ function descripteur(partiel: Partial<DescripteurEcranVue> = {}): DescripteurEcr
       { nom: 'Bêta SAS', precisions: 'Rôle 2', groupe: 'Référé', etat: 'EnCours', faites: [0] },
       { nom: 'Gamma SARL', precisions: 'Rôle 3', groupe: 'Fond', etat: 'Validee', faites: [0, 1] },
     ],
+    membres: [],
     ...partiel,
   }
+}
+
+// Un ecran REUNI comme le fabrique Pont/EcransGeneres/CatalogueGenere.cs : un groupe par procedure,
+// tuiles communes, marches vides ; chaque procedure garde ses marches, son bouton, ses etats.
+function reuni(): DescripteurEcranVue {
+  const relance = descripteur({
+    code: 'RELANCE_TEST', titre: 'Relances', valider: 'Envoyer la relance', groupes: ['Sans réponse'],
+    etats: [
+      { code: 'AFaire', libelle: 'À relancer', icone: 'a-traiter' },
+      { code: 'EnCours', libelle: 'En cours', icone: 'saisie-manuelle' },
+      { code: 'Validee', libelle: 'Relancé', icone: 'validee' },
+    ],
+    marches: [{ titre: 'Exercices', consigne: 'Cocher.', obligatoire: true, champs: [] }],
+    lignes: [{ nom: 'Delta SAS', precisions: 'Exercice 2025', groupe: 'Sans réponse', etat: 'AFaire', faites: [] }],
+  })
+  const membres = [descripteur(), relance]
+  return descripteur({
+    code: 'REUNI_TEST', titre: 'Ecran reuni', valider: 'Valider', marches: [],
+    etats: [
+      { code: 'AFaire', libelle: 'À traiter', icone: 'a-traiter' },
+      { code: 'EnCours', libelle: 'En cours', icone: 'saisie-manuelle' },
+      { code: 'Validee', libelle: 'Terminé', icone: 'validee' },
+    ],
+    groupes: membres.map((m) => m.titre),
+    lignes: membres.flatMap((m) => m.lignes.map((l) => ({ ...l, groupe: m.titre, precisions: `${l.groupe} · ${l.precisions}` }))),
+    membres,
+  })
 }
 
 function monter(d: DescripteurEcranVue = descripteur()) {
@@ -101,5 +129,26 @@ describe('EcranGenere', () => {
     expect(groupe.classList.contains('rig-tcw__groupe--plie')).toBe(true)
     expect(groupe.querySelector('.rig-tcw__groupe-resume')!.textContent).toBe('Alpha SARL · Gamma SARL')
     expect(groupe.querySelector('.rig-tcw__groupe-corps')!.hasAttribute('inert')).toBe(true)
+  })
+
+  it('un ecran reuni : un groupe par procedure, et chaque ligne suit les marches, le bouton et les etats de la sienne', () => {
+    const { container, ligne, boutonsMarche, valider, valeurs } = monter(reuni())
+    expect([...container.querySelectorAll('.rig-tcw__groupe-titre')].map((t) => t.textContent)).toEqual(['Ecran test', 'Relances'])
+    expect([...container.querySelectorAll('.rig-chiffre__libelle')].map((t) => t.textContent)).toEqual(['À traiter', 'En cours', 'Terminé'])
+    expect(valeurs()).toEqual(['2', '1', '1'])
+    // La ligne garde le nom d'etat et l'avancement de SA procedure.
+    const delta = ligne('Delta SAS')
+    expect(delta.querySelector('.rig-tcw__cmd-type')!.textContent).toBe('À relancer')
+    expect(delta.querySelector('.rig-tcw__avancement')!.textContent).toBe('0/1')
+    expect(ligne('Alpha SARL').querySelector('.rig-tcw__avancement')!.textContent).toBe('0/3')
+
+    fireEvent.click(delta)
+    expect(container.querySelector('.rig-tcw__type')!.textContent).toBe('Relances')
+    expect(container.querySelectorAll('.rig-tcw__marche')).toHaveLength(1)
+    expect(valider().textContent).toBe('Envoyer la relance0/1')
+    fireEvent.click(boutonsMarche()[0]!)
+    fireEvent.click(valider())
+    expect(valeurs()).toEqual(['1', '1', '2'])
+    expect(delta.querySelector('.rig-tcw__cmd-type')!.textContent).toBe('Relancé')
   })
 })

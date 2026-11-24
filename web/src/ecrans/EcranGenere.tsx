@@ -7,6 +7,10 @@
 // marche, Valider. Rien ne passe par le pont (une maquette ne rend rien a Metier/) : l'etat
 // se garde ici. Les etats qui portent les gestes sont ceux du descripteur (AFaire, EnCours,
 // Validee) ; les autres (EnAttente, Rejetee...) sont figes.
+//
+// Un ecran REUNI (descripteur.membres, 24/11/2026) met plusieurs procedures dans une seule
+// liste : un groupe par procedure, et chaque ligne suit le PARCOURS de la sienne -- ses
+// marches, son bouton, le nom de son etat. Les tuiles comptent tout l'ecran.
 
 import { useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { contientSansCasse } from '../criteres'
@@ -54,6 +58,11 @@ function manquantes(d: DescripteurEcranVue, faites: number[]): MarcheEcranVue[] 
   return d.marches.filter((m, k) => m.obligatoire && !faites.includes(k))
 }
 
+/** Le parcours d'une ligne : la procedure de son groupe dans un ecran reuni, sinon l'ecran lui-meme. */
+function parcoursDe(d: DescripteurEcranVue, groupe: string): DescripteurEcranVue {
+  return d.membres?.find((m) => m.titre === groupe) ?? d
+}
+
 /** La part d'un etat dans la liste, en pour cent : elle remplit l'anneau de sa tuile. */
 const part = (nombre: number, total: number) => (total === 0 ? 0 : Math.round((nombre * 100) / total))
 
@@ -98,8 +107,12 @@ export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
     .map((titre) => ({ titre, lignes: visibles.filter((l) => l.groupe === titre) }))
     .filter((g) => g.lignes.length > 0)
   const tuiles = d.etats.map((e) => ({ ...e, nombre: lignes.filter((l) => l.etat === e.code).length }))
-  const libelleEtat = (code: string) => d.etats.find((e) => e.code === code)?.libelle ?? code
-  const iconeEtat = (code: string) => d.etats.find((e) => e.code === code)?.icone ?? 'a-traiter'
+  // Le nom d'un etat sur une LIGNE est celui de sa procedure (« A relancer ») ; les tuiles gardent
+  // celui de l'ecran (« A traiter »), commun a toutes les procedures reunies.
+  const etatDe = (groupe: string, code: string) =>
+    parcoursDe(d, groupe).etats.find((e) => e.code === code) ?? d.etats.find((e) => e.code === code)
+  const libelleEtat = (groupe: string, code: string) => etatDe(groupe, code)?.libelle ?? code
+  const iconeEtat = (groupe: string, code: string) => etatDe(groupe, code)?.icone ?? 'a-traiter'
 
   const ouvrir = (i: number) => { poserOuverte(i); poserBascule(true) }
   const fermer = () => { poserOuverte(null); poserBascule(true) }
@@ -116,7 +129,7 @@ export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
     return { ...l, faites, etat: faites.length > 0 ? ENCOURS : AFAIRE }
   }))
   const valider = (i: number) => poserLignes((avant) => avant.map((l, j) =>
-    j === i && modifiable(l.etat) && manquantes(d, l.faites).length === 0 ? { ...l, etat: VALIDEE } : l))
+    j === i && modifiable(l.etat) && manquantes(parcoursDe(d, l.groupe), l.faites).length === 0 ? { ...l, etat: VALIDEE } : l))
 
   // fix-ok: lignes[ouverte] vaut T | undefined (noUncheckedIndexedAccess) : mesure par le typecheck (TS2322, TS18048 sur sel).
   const sel = ouverte === null ? null : (lignes[ouverte] ?? null)
@@ -193,9 +206,9 @@ export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
                             <span className="rig-tcw__cmd-nom">{l.nom}</span>
                             <span className="rig-tcw__cmd-precisions">{l.precisions}</span>
                           </span>
-                          <span className="rig-tcw__cmd-type">{libelleEtat(l.etat)}</span>
-                          <span className={`rig-tcw__avancement ${manquantes(d, l.faites).length === 0 ? 'rig-tcw__avancement--prete' : ''}`}
-                                title="Étapes franchies">{l.faites.length}/{d.marches.length}</span>
+                          <span className="rig-tcw__cmd-type">{libelleEtat(l.groupe, l.etat)}</span>
+                          <span className={`rig-tcw__avancement ${manquantes(parcoursDe(d, l.groupe), l.faites).length === 0 ? 'rig-tcw__avancement--prete' : ''}`}
+                                title="Étapes franchies">{l.faites.length}/{parcoursDe(d, l.groupe).marches.length}</span>
                         </button>
                       ))}
                     </div>
@@ -208,7 +221,8 @@ export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
 
         {sel !== null && ouverte !== null && (
           // key : chaque ligne ouverte est un panneau NEUF, qui s'ouvre en fondu.
-          <Panneau key={ouverte} d={d} ligne={sel} libelle={libelleEtat(sel.etat)} icone={iconeEtat(sel.etat)}
+          <Panneau key={ouverte} d={parcoursDe(d, sel.groupe)} rang={d.rang} ligne={sel}
+                   libelle={libelleEtat(sel.groupe, sel.etat)} icone={iconeEtat(sel.groupe, sel.etat)}
                    franchir={(k) => basculerMarche(ouverte, k)} valider={() => valider(ouverte)} fermer={fermer} />
         )}
       </div>
@@ -216,9 +230,10 @@ export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
   )
 }
 
-/** Le detail d'une ligne : son en-tete, l'escalier de ses marches, et le pied qui valide. */
-function Panneau({ d, ligne, libelle, icone, franchir, valider, fermer }: {
-  d: DescripteurEcranVue; ligne: LigneTenue; libelle: string; icone: string
+/** Le detail d'une ligne : son en-tete, l'escalier de ses marches, et le pied qui valide.
+ * <d> est le PARCOURS de la ligne (sa procedure dans un ecran reuni) ; <rang> la teinte de l'ecran. */
+function Panneau({ d, rang, ligne, libelle, icone, franchir, valider, fermer }: {
+  d: DescripteurEcranVue; rang: number; ligne: LigneTenue; libelle: string; icone: string
   franchir: (k: number) => void; valider: () => void; fermer: () => void
 }) {
   const figee = !modifiable(ligne.etat)
@@ -227,7 +242,7 @@ function Panneau({ d, ligne, libelle, icone, franchir, valider, fermer }: {
     <section className="rig-tcw__panneau" aria-label={ligne.nom}>
       <div className="rig-tcw__panneau-haut">
         <div className="rig-tcw__panneau-tete">
-          <span className={`rig-tcw__type rig-tcw__rang-${d.rang}`}>{d.titre}</span>
+          <span className={`rig-tcw__type rig-tcw__rang-${rang}`}>{d.titre}</span>
           <span className="rig-tcw__etat"><span className={`rig-tcw__icone rig-tcw__icone--${icone}`}></span>{libelle}</span>
           <span className="rig-tcw__espace"></span>
           <button className="rig-tcw__fermer rig-tcw__fermer--rond" title="Fermer" aria-label="Fermer" onClick={fermer}>×</button>

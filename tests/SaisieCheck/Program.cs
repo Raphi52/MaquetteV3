@@ -344,8 +344,12 @@ var codesMenu = Regex.Matches(blocMenu, @"new\(""(?<code>[A-Z][A-Z_]{3,})"",\s*"
     .Select(m => m.Groups["code"].Value).Distinct().ToArray();
 Exiger(codesMenu.Length >= 20, $"le menu expose bien ses procedures ({codesMenu.Length} lues)");
 
-// Codes SANS ecran assume : la raison doit etre ecrite dans le code.
-var sansEcran = new[] { "PROC_CREANCE" };
+// Codes SANS ecran assume : la raison doit etre ecrite dans le code. Liste vide depuis le
+// 24/11/2026 : PROC_CREANCE, coquille vide de RIG v2, a quitte ce catalogue pour devenir
+// l'ecran qui REUNIT les procedures des creances (Pont/MenuAccueil.cs, tests/EcransGeneresCheck).
+var sansEcran = Array.Empty<string>();
+Exiger(!codesMenu.Contains("PROC_CREANCE"),
+    "PROC_CREANCE n est plus un ecran porte sans ecran : il reunit les creances au menu");
 foreach (var code in codesMenu)
 {
     var porte = aiguillage.Contains($"case '{code}':");

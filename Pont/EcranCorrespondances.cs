@@ -137,6 +137,29 @@ public static class EcranCorrespondances
         ["PROC_RECHERCHE_PROCEDURECOLLECTIVE"] = PageRecherche,
         ["PROC_RECHRECHE_JUGE"] = PageRecherche,
         ["PROC_RECHRECHE_MANDATAIRE_PC"] = PageRecherche,
+        // Releve du 24/11/2026 (conv-2142) : les ecrans de la V2 qui sortaient « pas encore au menu » alors que la V3 sert
+        // deja leur fonction sous un autre code. Une cible REUNIE (Pont/MenuAccueil.cs) mene a l'ecran qui la reunit.
+        ["PROC_RAPPRO_ACTEURS"] = "PROC_RAPPACTEUR",           // meme rapprochement des juges et des mandataires
+        ["PROC_ENV_BOD"] = "BODACC",                           // web/src/ecrans/EcranBodacc.tsx en cite la source
+        ["PROC_RSURV"] = "PROC_DCA_RELANCE",                   // surveillance des relances DCA / DBE
+        ["PROC_ISURV"] = "PROC_DCA_INJ",                       // surveillance des injonctions DCA / DBE
+        ["PROC_ROFSURV"] = "PROC_ROFSURVEILLANCES",            // radiations d'office
+        ["PROC_IMPRIMANTEWINDOWS"] = "PROC_IMP_WIN",           // pilotes et imprimantes du serveur
+        ["PROC_TABLEAU_LOT_2"] = PageDossier,                  // le tableau des editions s'ouvre depuis l'affaire
+        ["PROC_CORRESP_ORACLE"] = "PROC_HISTORIQUE_ANCIEN_RIG", // anciens numeros (Serveur/Recopie/AnciensNumeros.cs)
+        ["PROC_CORRESP_MIGRATION"] = "PROC_HISTORIQUE_ANCIEN_RIG",
+        ["PROC_GCOM"] = "PROC_RECHAFF",                        // recherche d'affaires et leur arbre (demandes, factures, encaissements)
+    };
+
+    /// <summary>Les fenetres de la V2 que la V3 n'a pas a reprendre, et pourquoi (releve du 24/11/2026, conv-2142).
+    /// Leurs touches sont « supprimees », avec cette raison, au lieu de rester « a venir » sans fin.</summary>
+    public static readonly IReadOnlyDictionary<string, string> EcransRetires = new Dictionary<string, string>
+    {
+        ["PROC_GESTIONMENU"] = "Le menu de la V3 est le même pour tout le greffe : chacun n'y voit que les écrans de son métier. Il ne se compose plus à la main.",
+        ["PROC_PARAM_VIDIGED"] = "Outil d'exploitation d'Amitel (paramétrage des bases VidiGED des greffes) : il n'est pas sur le poste du greffe.",
+        // tests/MenuGestesCheck le tient hors du menu : « traitement de fond, sans écran ». Ses touches ne vont pas sur la
+        // Supervision, dont la recherche n'est pas la sienne (identifiant de suivi, greffe, compte, dates).
+        ["PROC_BATCH"] = "Les traitements de fond ne se suivent plus depuis le poste du greffe : Amitel les surveille (écran Supervision) et prévient le greffe.",
     };
 
     /// <summary>
@@ -182,8 +205,10 @@ public static class EcranCorrespondances
     /// <summary>Le code de l'ecran de la V3 ou essayer une touche d'une procedure de la V2 ; null si la V3 n'en a pas.</summary>
     public static string? EcranV3De(string procedureV2)
     {
-        if (EcransRemplaces.TryGetValue(procedureV2, out var remplace)) return remplace;
-        return CatalogueEcrans.Nom(procedureV2).Length > 0 ? procedureV2 : null;
+        var ecran = EcransRemplaces.TryGetValue(procedureV2, out var remplace) ? remplace
+                  : CatalogueEcrans.Nom(procedureV2).Length > 0 ? procedureV2 : null;
+        // Une procedure reunie s'essaie dans l'ecran qui la reunit : c'est la qu'on la trouve au menu.
+        return ecran is null ? null : MenuAccueil.SyntheseDe(ecran)?.Code ?? ecran;
     }
 
     /// <summary>L'ecran existe-t-il deja dans la V3 (maquette) ? Les pages (accueil, dossier, recherche) toujours.</summary>
@@ -331,7 +356,9 @@ public static class EcranCorrespondances
             {
                 (nouvelle, statut, explication) = t.Action is "sans-effet" or "essai-developpeur"
                     ? Regle(t.Touche, t.Action, "", false)
-                    : (null, StatutsCorrespondance.AVenir, "Cet écran de l'ancien RIG n'a pas encore sa place dans le menu de la V3 (à décider avec le référent).");
+                    : EcransRetires.TryGetValue(t.Procedure, out var raison)
+                        ? (null, StatutsCorrespondance.Supprimee, raison)
+                        : (null, StatutsCorrespondance.AVenir, "Cet écran de l'ancien RIG n'a pas encore sa place dans le menu de la V3 (à décider avec le référent).");
             }
             else (nouvelle, statut, explication) = Regle(t.Touche, t.Action, ecranV3, EstConstruit(ecranV3));
             // Un ecran supprime n'a pas d'ecran ou l'essayer.

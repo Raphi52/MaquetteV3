@@ -338,7 +338,9 @@ try
     Console.WriteLine("--- SOC-013 CA02 : reprise des preferences de la V2 (copie d'essai relue sur RIG_DEV)");
     await using var v2 = await BaseJetable.CreerAsync("SoclePrefV2");
     await Executer(v2.Connexion, File.ReadAllText(Path.Combine(racine, "tests", "SoclePreferencesCheck", "preferences_v2_rig_dev.sql")));
-    var ecransV3 = MenuAccueil.Moments.SelectMany(m => m.Sous).SelectMany(s => s.Entrees).Select(e => e.Code)
+    // Les ecrans de la V3 : ceux du menu, procedures reunies comprises (un favori « Mentions en marge » ouvre
+    // l'ecran qui la reunit, Pont/MenuAccueil.cs), et ceux du catalogue.
+    var ecransV3 = MenuAccueil.Toutes.Select(e => e.Code)
         .Concat(CatalogueEcrans.Familles.SelectMany(f => f.Ecrans).Select(e => e.Code)).ToHashSet();
     BilanReprisePreferences bilan, bilan2;
     const string EtatPreferences = "SELECT CONCAT(COUNT(*), '/', CHECKSUM_AGG(CHECKSUM(IdCompte, Nom, Valeur))) FROM soc.Preference;";

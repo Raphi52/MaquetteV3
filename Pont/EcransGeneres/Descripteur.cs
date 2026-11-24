@@ -23,7 +23,10 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 //     les autres etats (EnAttente, Rejetee...) sont figes : aucun geste sur la ligne ;
 //   - AFaire : aucune marche franchie ; EnCours : au moins une ; Validee : toutes les
 //     marches OBLIGATOIRES franchies ;
-//   - le titre est le libelle du menu, tel quel.
+//   - le titre est le libelle du menu, tel quel ;
+//   - un ECRAN REUNI (24/11/2026, conv-2142) n'est pas ecrit a la main : CatalogueGenere le
+//     fabrique a partir de l'entree du menu qui reunit plusieurs procedures (MenuAccueil,
+//     EntreeMenu.Reunit) et des descripteurs de ces procedures (Membres).
 // ============================================================
 
 /// <summary>Un ecran generique : ce que la mise en page affiche pour une procedure.</summary>
@@ -60,8 +63,14 @@ public sealed record DescripteurEcran
     /// <summary>L'escalier : les etapes de la fiche, communes a toutes les lignes de l'ecran.</summary>
     public required MarcheEcran[] Marches { get; init; }
 
-    /// <summary>Les lignes de demonstration (6 a 15).</summary>
+    /// <summary>Les lignes de demonstration (6 a 15 ; un ecran reuni porte celles de ses membres).</summary>
     public required LigneEcran[] Lignes { get; init; }
+
+    /// <summary>Un ECRAN REUNI (entree du menu qui reunit plusieurs procedures) : les
+    /// descripteurs de ses procedures, un groupe chacun, titre = groupe. Chaque ligne suit les
+    /// marches et le bouton de SA procedure ; <see cref="Marches"/> reste vide. Vide pour
+    /// l'ecran d'une seule procedure. Fabrique par <see cref="CatalogueGenere"/>.</summary>
+    public DescripteurEcran[] Membres { get; init; } = [];
 }
 
 /// <summary>Une tuile : son code, son libelle et son icone de l'accueil (a-traiter,

@@ -67,13 +67,18 @@ public static class EcranAide
         return new VueEcranAide(premiereFois, gestes, EcranCorrespondances.Code, EcranCorrespondances.NomEcran, CheminMenu(Code));
     }
 
-    /// <summary>« Configurer › Prendre en main › Premiers pas » : ou le menu range un ecran ; son seul nom s'il n'y est pas.</summary>
+    /// <summary>« Configurer › Prendre en main › Premiers pas » : ou le menu range un ecran ; son seul nom s'il n'y est pas.
+    /// Une procedure reunie se trouve sous l'ecran qui la reunit : « Modifier › L'affaire › Corriger un dossier RCS › Mentions en marge ».</summary>
     public static string CheminMenu(string code)
     {
         foreach (var m in MenuAccueil.Moments)
             foreach (var s in m.Sous)
+            {
                 if (s.Entrees.FirstOrDefault(e => e.Code == code) is { } e)
                     return string.Join(" › ", new[] { m.Titre, s.Titre, e.Libelle }.Where(t => t.Length > 0));
+                if (s.Entrees.FirstOrDefault(e => e.Membres.Any(x => x.Code == code)) is { } reunion)
+                    return string.Join(" › ", new[] { m.Titre, s.Titre, reunion.Libelle, CatalogueEcrans.Nom(code) }.Where(t => t.Length > 0));
+            }
         return CatalogueEcrans.Nom(code);
     }
 }

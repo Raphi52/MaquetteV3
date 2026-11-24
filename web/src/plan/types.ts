@@ -168,6 +168,9 @@ export interface DescripteurEcranVue {
   groupes: string[]
   marches: MarcheEcranVue[]
   lignes: LigneEcranVue[]
+  /** Un ecran REUNI : les procedures qu'il reunit, une par groupe (titre = groupe). Chaque ligne
+   * suit les marches et le bouton de SA procedure ; vide pour l'ecran d'une seule procedure. */
+  membres: DescripteurEcranVue[]
 }
 /** Une tuile : son code (AFaire, EnCours, Validee, EnAttente, Rejetee) et son icone de l'accueil. */
 export interface EtatEcranVue { code: string; libelle: string; icone: string }

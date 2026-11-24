@@ -308,8 +308,11 @@ internal static class Programme
         Agir("paletteOuvrir");
         Agir("paletteTexte", "Mandataires");
         Agir("paletteAller", new { nature = "ecran", cle = "PROC_MANDATAIRE" });
-        Exiger(plan.Vue().Proc is { Code: "PROC_MANDATAIRE" },
-            "Entree sur « Mandataires » l'ouvre dans un onglet");
+        // Depuis le 24/11/2026, les mandataires sont REUNIS avec les destinataires institutionnels et les
+        // rapprochements d'acteurs (Pont/MenuAccueil.cs) : la palette trouve « Mandataires » par son nom, et
+        // l'ouvre dans l'ecran qui le reunit -- un onglet, pas un de plus par procedure.
+        Exiger(plan.Vue().Proc is { Code: "SYNTHESE_FICHES_ACTEURS", Libelle: "Mandataires et destinataires" },
+            $"Entree sur « Mandataires » l'ouvre dans un onglet, celui de l'ecran qui le reunit ({plan.Vue().Proc?.Code})");
 
         // --- 12 ter. Ctrl K trouve le menu par son libelle, et Entree ouvre le premier ecran.
         // fix-ok: Pont/PlanTravail.cs TraitementsPour : les Groupes passaient avant le menu, sans

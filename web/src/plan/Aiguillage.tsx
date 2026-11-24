@@ -274,14 +274,14 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
     case 'PROC_TELETRANS':
       return <EcranTeletransmission key={cle} ouvrirDossier={ouvrirParNumero} dossier={dossier} />
 
-    // PROC_CREANCE n'a PAS d'ecran porte, et ce n'est pas un oubli : dans
-    // RIG v2, PROC_CREANCE.cs ne contient qu'un constructeur et
-    // FORM_CREANCE.Designer.cs aucun controle (32 lignes, un simple conteneur).
-    // Il n'y a donc rien a porter ; inventer un ecran de creances serait
-    // inventer RIG v2.
+    // PROC_CREANCE n'a PAS d'ecran porte : dans RIG v2, PROC_CREANCE.cs ne contient qu'un
+    // constructeur et FORM_CREANCE.Designer.cs aucun controle (un simple conteneur). Depuis le
+    // 24/11/2026 il garde ce role de conteneur : c'est l'ecran REUNI des quatre procedures des
+    // creances (Pont/MenuAccueil.cs), monte ici comme tout ecran generique.
     default:
       // Un ecran GENERIQUE (Pont/EcransGeneres/) : sa procedure porte son descripteur, que
-      // EcranGenere met en page. Sans descripteur, l'ecran est « a venir ».
+      // EcranGenere met en page -- un ecran REUNI aussi (descripteur.membres). Sans descripteur,
+      // l'ecran est « a venir ».
       if (ecran.descripteur) return <EcranGenere key={proc.code} descripteur={ecran.descripteur} />
       return <EcranNonMaquette code={proc.code} libelle={proc.libelle} motif={ecran.motif} />
   }

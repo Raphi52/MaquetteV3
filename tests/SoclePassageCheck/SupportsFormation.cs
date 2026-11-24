@@ -36,8 +36,11 @@ internal static class SupportsFormation
     private static IEnumerable<Ligne> Menu() =>
         MenuAccueil.Moments.SelectMany(m => m.Sous.SelectMany(s => s.Entrees.Select(e => new Ligne($"{m.Titre} > {s.Titre}", e))));
 
+    // Un ecran REUNI (Pont/MenuAccueil.cs, 24/11/2026) nomme les ecrans de RIG V2 qu'il rassemble : l'agent les y retrouve.
     private static string LigneTableau(Ligne l)
-        => $"| {l.Chemin} | {l.Entree.Libelle} | {l.Entree.Detail} | `{l.Entree.Code}` | {(Portes.Contains(l.Entree.Code) ? "dans la V3" : "a venir")} |";
+        => $"| {l.Chemin} | {l.Entree.Libelle} | {l.Entree.Detail}"
+         + (l.Entree.Membres.Length == 0 ? "" : $" — réunit : {string.Join(", ", l.Entree.Membres.Select(m => $"{m.Libelle} (`{m.Code}`)"))}")
+         + $" | {(l.Entree.Membres.Length == 0 ? $"`{l.Entree.Code}`" : "—")} | {(Portes.Contains(l.Entree.Code) ? "dans la V3" : "a venir")} |";
 
     public static string EcransParMetier()
     {

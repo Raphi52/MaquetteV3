@@ -341,12 +341,12 @@ public sealed class SessionAccueil : IAsyncDisposable
 
     /// <summary>Les ecrans etoiles, dans l'ordre ou ils l'ont ete. Un favori
     /// pointant vers un ecran que le profil courant ne voit plus est FILTRE
-    /// ici, pas efface du fichier : le droit peut revenir.</summary>
+    /// ici, pas efface du fichier : le droit peut revenir. Un favori sur une
+    /// procedure aujourd'hui REUNIE (« Mentions en marge ») reste a sa place :
+    /// il ouvre l'ecran qui la reunit.</summary>
     private EntreeMenu[] EntreesFavorites()
         => Etat.VuesFavorites
-               .Select(c => MenuAccueil.Moments.SelectMany(m => m.Sous)
-                                   .SelectMany(s => s.Entrees)
-                                   .FirstOrDefault(e => e.Code == c))
+               .Select(c => MenuAccueil.Toutes.FirstOrDefault(e => e.Code == c))
                .Where(e => e is not null && PerimetreProfil.Visible(e.Code, Domaines))
                .Select(e => e!)
                .ToArray();

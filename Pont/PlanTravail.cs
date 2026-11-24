@@ -1044,9 +1044,15 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
         if (e is not null) OuvrirProc(new Proc(code, e.Libelle));
     }
 
-    /// <summary>Toutes les entrees du menu de l'accueil, tous moments confondus.</summary>
-    private IEnumerable<Pont.EntreeMenu> EntreesDuMenu
-        => Moments.SelectMany(m => m.Sous).SelectMany(s => s.Entrees);
+    /// <summary>Toutes les entrees du menu de l'accueil, tous moments confondus, procedures
+    /// reunies comprises : la palette trouve « Mentions en marge » meme si le menu ne montre
+    /// que « Corriger un dossier RCS » (OuvrirProc mene alors a l'ecran qui la reunit).</summary>
+    private IEnumerable<Pont.EntreeMenu> EntreesDuMenu => Pont.MenuAccueil.Toutes;
+
+    /// <summary>Une procedure REUNIE (Pont/MenuAccueil.cs, EntreeMenu.Reunit) s'ouvre dans l'ecran
+    /// qui la reunit : un seul onglet pour les relances, pas six. Les autres passent telles quelles.</summary>
+    private static Proc EcranQuiReunit(Proc proc)
+        => Pont.MenuAccueil.SyntheseDe(proc.Code) is { } reunion ? new Proc(reunion.Code, reunion.Libelle) : proc;
 
     /// <summary>L'entree de menu qui porte un code, ou null.</summary>
     private Pont.EntreeMenu? EntreeDeCode(string code)
@@ -1630,19 +1636,10 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     /// </summary>
     private string? MotifNonMaquette(string code)
     {
-        // Les motifs ETABLIS dans les sources de RIG v2 restent ecrits ici, un
-        // par un : ils disent un constat, pas une place dans le menu.
-        var etabli = code switch
-        {
-            "PROC_CREANCE" =>
-                "L'ancienne application ne contenait aucun ecran pour les creances : "
-                + "ni champ de recherche, ni colonne, ni action. Il n'y a donc rien a "
-                + "reprendre, et en inventer donnerait un ecran trompeur. Cet ecran "
-                + "reste a definir avec le greffe.",
-            _ => null
-        };
-        if (etabli is not null) return etabli;
-
+        // Le seul motif ETABLI ecrit ici a la main (PROC_CREANCE, « l'ancienne
+        // application ne contenait aucun ecran pour les creances ») est tombe le
+        // 24/11/2026 : ce conteneur vide de RIG v2 est devenu l'ecran qui REUNIT les
+        // quatre procedures des creances (Pont/MenuAccueil.cs).
         // Le motif se LIT dans le menu, il ne s'invente pas : le besoin servi
         // par l'entree (« Detail ») et sa place dans le metier y sont deja
         // ecrits. Dire cela vaut mieux que le texte generique « Cet ecran n'est
@@ -1690,6 +1687,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
 
     private void OuvrirProc(Proc proc)
     {
+        proc = EcranQuiReunit(proc);
         ProcsConnues[proc.Code] = proc;
         // Deja ouverte ? On revient dessus au lieu d en creer un doublon.
         Onglets.Ouvrir(proc.Code, proc.Libelle);
@@ -1930,6 +1928,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     /// (sa puce « ← Dossier » y ramene) et la remontre quand on le ferme.</summary>
     private void OuvrirProcDepuisAffaire(Proc proc)
     {
+        proc = EcranQuiReunit(proc);
         var depuis = DossierOuvert;
         OuvrirProc(proc);
         if (depuis is null) return;

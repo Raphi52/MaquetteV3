@@ -81,7 +81,12 @@ var gestes = new List<(string Titre, string Teinte, List<(string Verbe, List<(st
 
 var reGeste = new Regex(@"^        new\(""([^""]+)"", ""([a-z]+)"", ""[^""]*"",\s*$");
 var reVerbe = new Regex(@"^            new\(""([^""]*)"",\s*$");
-var reEntree = new Regex(@"^                new\(""([^""]+)"",\s*""[^""]*"",\s*""(PROC_[A-Z0-9_]+)""\),?\s*$");
+// Une entree d'une seule procedure se ferme sur sa ligne ; un ECRAN REUNI (24/11/2026) finit sa
+// ligne par une virgule et liste ses procedures en dessous, a 20 espaces.
+var reEntree = new Regex(@"^                new\(""([^""]+)"",\s*""[^""]*"",\s*""((?:PROC|SYNTHESE)_[A-Z0-9_]+)""(?:\),?|,)\s*$");
+var reMembre = new Regex(@"^                    new\(""([^""]+)"",\s*""[^""]*"",\s*""(PROC_[A-Z0-9_]+)""\),?\s*$");
+var membresDe = new Dictionary<string, List<(string Libelle, string Code)>>();
+string? derniereEntree = null;
 
 foreach (var ligne in bloc.Split('\n'))
 {
@@ -103,15 +108,32 @@ foreach (var ligne in bloc.Split('\n'))
 
     var e = reEntree.Match(l);
     if (e.Success && gestes.Count > 0 && gestes[^1].Verbes.Count > 0)
+    {
         gestes[^1].Verbes[^1].Entrees.Add((e.Groups[1].Value, e.Groups[2].Value));
+        derniereEntree = e.Groups[2].Value;
+        continue;
+    }
+
+    var mb = reMembre.Match(l);
+    if (mb.Success && derniereEntree is not null)
+    {
+        if (!membresDe.TryGetValue(derniereEntree, out var liste)) membresDe[derniereEntree] = liste = new();
+        liste.Add((mb.Groups[1].Value, mb.Groups[2].Value));
+    }
 }
 
 Exiger(gestes.Count >= 7, $"le menu porte au moins 7 gestes (lu : {gestes.Count})");
 
 var toutesEntrees = gestes.SelectMany(g => g.Verbes).SelectMany(v => v.Entrees).ToList();
-Exiger(toutesEntrees.Count >= 100,
-    $"le menu couvre largement le catalogue v2 (lu : {toutesEntrees.Count} entrees, "
-    + $"{toutesEntrees.Select(x => x.Code).Distinct().Count()} procedures distinctes)");
+// Le catalogue v2 est couvert par les entrees ET par les procedures que les ecrans reunis rangent.
+var toutesProcedures = toutesEntrees.Concat(membresDe.Values.SelectMany(x => x)).ToList();
+Exiger(toutesProcedures.Select(x => x.Code).Distinct().Count() >= 150,
+    $"le menu couvre largement le catalogue v2 (lu : {toutesEntrees.Count} entrees, {membresDe.Count} ecrans reunis, "
+    + $"{toutesProcedures.Select(x => x.Code).Distinct().Count()} procedures distinctes)");
+var reunionsSansMembre = toutesEntrees.Where(x => x.Code.StartsWith("SYNTHESE_", StringComparison.Ordinal) && !membresDe.ContainsKey(x.Code)).ToList();
+Exiger(reunionsSansMembre.Count == 0,
+    "un code SYNTHESE_ n'existe pas sans les procedures qu'il reunit"
+    + (reunionsSansMembre.Count == 0 ? "" : $" ({string.Join(", ", reunionsSansMembre.Select(x => x.Code))})"));
 
 // ---- 1. Aucun code technique ni obsolete --------------------------------
 // Chaque motif dit POURQUOI le code n'a rien a faire dans le menu : le
@@ -135,7 +157,7 @@ var interdits = new (string Motif, string Pourquoi)[]
     (@"^PROC_EXPLOIT$",        "outil d'exploitation, hors poste greffier"),
 };
 
-foreach (var (libelle, code) in toutesEntrees.DistinctBy(x => x.Code))
+foreach (var (libelle, code) in toutesProcedures.DistinctBy(x => x.Code))
     foreach (var (motif, pourquoi) in interdits)
         if (Regex.IsMatch(code, motif))
             Exiger(false, $"« {libelle} » ({code}) n'entre pas dans le menu : {pourquoi}");
@@ -209,7 +231,14 @@ var sansFiche = new[] { "PROC_LISTE_DELIBERES", "PROC_SUIVI_IMPRESSION", "PROC_R
                         "PROC_ACTUALITES", "PROC_COMMANDES_WEB", "PROC_UTILISATEUR", "PROC_MAIL_LOT1",
                         "PROC_COMPTEURS_NUM", "PROC_REGLAGES_GREFFE",
                         "PROC_NUMEROS_MANQUANTS", "PROC_TOUCHES", "PROC_SUPERVISION", "PROC_CERTIF",
-                        "PROC_FICHES_CONFLIT", "PROC_HISTORIQUE_ANCIEN_RIG", "PROC_PREMIERS_PAS", "PROC_CERTIFICAT" };
+                        "PROC_FICHES_CONFLIT", "PROC_HISTORIQUE_ANCIEN_RIG", "PROC_PREMIERS_PAS", "PROC_CERTIFICAT",
+                        // Les fonctions retrouvees le 24/11/2026 (Pont/EcransGeneres/FonctionsRetrouvees.cs) : pas de fiche,
+                        // mais un dossier de sources et leurs touches dans l'inventaire de la V2 (Pont/InventaireTouchesV2.cs) :
+                        // RCS\Exe\PROC_ROFSurveillances, RCS\Exe\PROC_RejetsKbisXml, Judiciaire\Exe\PROC_EDI_RPJC_INS,
+                        // Judiciaire\Exe\PROC_GDEST_INST, RIG\EXE\Accueil\PROC_PoolEdition, RCS\Exe\PROC_TraitementNpai,
+                        // Outils\Impression\PROC_IMP_WIN.
+                        "PROC_ROFSURVEILLANCES", "PROC_REJETSKBISXML", "PROC_EDI_RPJC_INS", "PROC_GDEST_INST",
+                        "PROC_POOLEDITION", "PROC_TRAITEMENTNPAI", "PROC_IMP_WIN" };
 
 var fiches = @"D:\RigApplication\Documentation\reference\proc";
 
@@ -218,10 +247,16 @@ if (Directory.Exists(fiches))
     var connus = Directory.GetFiles(fiches, "*.md")
         .Select(f => Path.GetFileNameWithoutExtension(f).ToUpperInvariant())
         .ToHashSet();
+    bool Atteste(string code) => connus.Contains(code) || sansFiche.Contains(code);
 
+    // Un ecran REUNI (code SYNTHESE_) est atteste par ses procedures : il n'invente rien, il les range ensemble.
     foreach (var (libelle, code) in toutesEntrees.DistinctBy(x => x.Code))
-        Exiger(connus.Contains(code) || sansFiche.Contains(code),
+        Exiger(code.StartsWith("SYNTHESE_", StringComparison.Ordinal)
+                   ? membresDe.TryGetValue(code, out var m) && m.All(x => Atteste(x.Code))
+                   : Atteste(code),
             $"« {libelle} » ({code}) existe bien dans RIG v2");
+    foreach (var (libelle, code) in membresDe.Values.SelectMany(x => x).DistinctBy(x => x.Code))
+        Exiger(Atteste(code), $"« {libelle} » ({code}), reunie dans un ecran, existe bien dans RIG v2");
 }
 else
 {

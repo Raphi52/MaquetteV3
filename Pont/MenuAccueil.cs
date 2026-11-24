@@ -10,15 +10,33 @@ namespace RigV3Desktop.Pont;
 // (motif d'un ecran a venir, tache voisine) par un champ qui pointe ici.
 //
 // Le tableau garde son indentation fixe (geste 8 espaces, verbe 12,
-// entree 16) : tests/MenuGestesCheck le lit ligne a ligne.
+// entree 16, procedure reunie 20) : tests/MenuGestesCheck le lit ligne a ligne.
+//
+// ECRANS REUNIS (24/11/2026, conv-2142). RIG v2 avait un ecran par procedure :
+// huit pour corriger une affaire, six pour les relances, cinq pour les creances.
+// Demande de l'utilisateur : « on ne reprend pas les vues telles quelles, on
+// groupe ce qui peut l'etre ; s'il y a trop d'ecrans, on synthetise ». Une entree
+// peut donc REUNIR plusieurs procedures (Reunit) : un seul ecran, une liste, un
+// groupe par procedure, et chaque ligne garde les etapes de SA procedure
+// (Pont/EcransGeneres/CatalogueGenere.cs fabrique ce descripteur). Les procedures
+// reunies gardent leur code : ouvertes depuis une affaire, la palette, un favori
+// ou un onglet retenu, elles menent a l'ecran qui les reunit (SyntheseDe).
+// Regle tenue par tests/EcransGeneresCheck : on ne reunit que des procedures vues
+// par les MEMES metiers (Metier/PerimetreProfil.cs) -- un ecran reuni ne montre
+// jamais a un agent une liste qu'il ne verrait pas seule.
 // ============================================================
 
 /// <summary>Une entree du panneau de gauche, nommee par le BESOIN et non par
 /// l'outil. « Procedure » est un mot de l'architecture de RIG v2 : l'agent ne
 /// cherche pas « PROC_ARRIVEE », il cherche le courrier arrive ce matin.
 /// <paramref name="Detail"/> dit ce qu'on y trouve, pour qu'on n'ait pas a
-/// ouvrir pour savoir.</summary>
-public sealed record EntreeMenu(string Libelle, string Detail, string Code);
+/// ouvrir pour savoir. <paramref name="Reunit"/> : les procedures que cet ecran
+/// reunit (ecran de synthese), null pour un ecran d'une seule procedure.</summary>
+public sealed record EntreeMenu(string Libelle, string Detail, string Code, EntreeMenu[]? Reunit = null)
+{
+    /// <summary>Les procedures reunies, vide pour un ecran simple.</summary>
+    public EntreeMenu[] Membres => Reunit ?? [];
+}
 
 /// <summary><paramref name="Teinte"/> nomme la couleur du groupe (le CSS
 /// porte les valeurs), <paramref name="Signe"/> le symbole de sa pastille.
@@ -49,13 +67,16 @@ public static class MenuAccueil
         [
             new("Creer une affaire",
             [
-                new("Nouvelle instance",      "saisir une affaire judiciaire",      "PROC_XAFF"),
-                new("Nouvelle formalite",     "ouvrir une procedure collective",    "PROC_NF"),
-                new("Nouvelle proc. collective", "PC ou prevention",                "PROC_NPC"),
+                new("Nouvelle affaire judiciaire", "instance, PC, mesure, jonction", "SYNTHESE_NOUVELLE_AFFAIRE_JUD",
+                [
+                    new("Nouvelle instance",      "saisir une affaire judiciaire",      "PROC_XAFF"),
+                    new("Nouvelle proc. collective", "PC ou prevention",                "PROC_NPC"),
+                    new("Mesure provisoire",      "inscrire une mesure en instance",    "PROC_MESIN"),
+                    new("Jonction d'instances",   "joindre deux affaires",              "PROC_JOIN")
+                ]),
                 new("Injonction de payer",    "creer une IP",                       "PROC_IPE"),
                 new("Enrolement judiciaire",  "mettre l'affaire au role",           "PROC_CJUD"),
-                new("Mesure provisoire",      "inscrire une mesure en instance",    "PROC_MESIN"),
-                new("Jonction d'instances",   "joindre deux affaires",              "PROC_JOIN"),
+                new("Nouvelle formalite",     "ouvrir une procedure collective",    "PROC_NF"),
                 new("Ouvrir un dossier",      "une societe arrive au registre",     "OUVERTURE_DOSSIER")
             ]),
             new("Recevoir",
@@ -69,10 +90,17 @@ public static class MenuAccueil
             new("Enregistrer un depot",
             [
                 new("Depots au tribunal",     "les depots judiciaires",             "PROC_DEPOTJUD"),
-                new("Depots d'actes RCS",     "actes deposes au registre",          "PROC_DAS"),
-                new("Depots d'evenement PC",  "evenement de PC ou prevention",      "PROC_DEP"),
-                new("Depots PC en masse",     "traiter un lot de depots",           "PROC_DEPPCM"),
-                new("Depots beneficiaires",   "actes BEN",                          "PROC_DASBEN")
+                new("Depots au registre",     "actes, comptes annuels, beneficiaires", "SYNTHESE_DEPOTS_REGISTRE",
+                [
+                    new("Depots d'actes RCS",     "actes deposes au registre",          "PROC_DAS"),
+                    new("Comptes annuels",        "deposer les comptes de l'exercice",  "PROC_DCA"),
+                    new("Depots beneficiaires",   "actes BEN",                          "PROC_DASBEN")
+                ]),
+                new("Depots de procedure collective", "un evenement ou un lot de PC", "SYNTHESE_DEPOTS_PC",
+                [
+                    new("Depots d'evenement PC",  "evenement de PC ou prevention",      "PROC_DEP"),
+                    new("Depots PC en masse",     "traiter un lot de depots",           "PROC_DEPPCM")
+                ])
             ])
         ]),
         new("Trouver", "jud", "?",
@@ -81,34 +109,44 @@ public static class MenuAccueil
             [
                 new("Mes affaires",           "tout ce qui m'est confie",           "PROC_RECHAFF"),
                 new("Dossier RCS",            "voir un dossier du registre",        "PROC_VDOSSIER"),
-                new("Dossier judiciaire",     "instance, PC ou prevention",         "PROC_VJUD"),
-                new("Registres judiciaires",  "les registres du greffe",            "PROC_REGJUD"),
-                new("Navires",                "recherche de bateaux",               "PROC_RECHERCHE_BATEAU")
+                new("Dossiers et registres judiciaires", "instance, PC, registres, navires", "SYNTHESE_DOSSIERS_JUD",
+                [
+                    new("Dossier judiciaire",     "instance, PC ou prevention",         "PROC_VJUD"),
+                    new("Registres judiciaires",  "les registres du greffe",            "PROC_REGJUD"),
+                    new("Navires",                "recherche de bateaux",               "PROC_RECHERCHE_BATEAU")
+                ])
             ]),
             new("Les documents",
             [
-                new("Documents",              "chercher dans la GED",               "PROC_RECHERCHE_GED"),
+                new("Chercher et lire une piece", "la GED, un PDF, une image",      "SYNTHESE_PIECES",
+                [
+                    new("Documents",              "chercher dans la GED",               "PROC_RECHERCHE_GED"),
+                    new("Voir un PDF",            "lire une piece",                     "PROC_PDF"),
+                    new("Voir une image",         "image ou PDF multi-pages",           "PROC_IMAGE")
+                ]),
                 new("Documents de l'affaire", "la GED de l'affaire",                "PROC_DOC_DEMAT"),
                 new("Documents judiciaires",  "la GED du judiciaire",               "PROC_GEDJUD"),
                 new("Actes numerises",        "ce que le scanner a produit",        "PROC_ACTES_NUM"),
                 new("Controle des scans",     "verifier avant de valider",          "PROC_CONTROLE_VIDIGED"),
-                new("Coffre-fort",            "les pieces mises a l'abri",          "PROC_COFFRE_FORT"),
-                new("Voir un PDF",            "lire une piece",                     "PROC_PDF"),
-                new("Voir une image",         "image ou PDF multi-pages",           "PROC_IMAGE")
+                new("Coffre-fort",            "les pieces mises a l'abri",          "PROC_COFFRE_FORT")
             ]),
-            new("Un chiffre, un reglement",
+            new("Chiffres et fichiers exterieurs",
             [
-                new("Chiffres d'un dossier",  "donnees financieres RCS",            "PROC_VCHIFFRES"),
+                new("Chiffres du registre",   "chiffres, tarifs, bilans en rejet",  "SYNTHESE_CHIFFRES_RCS",
+                [
+                    new("Chiffres d'un dossier",  "donnees financieres RCS",            "PROC_VCHIFFRES"),
+                    new("Tarifs",                 "articles tarifaires RCS",            "PROC_TARIFS"),
+                    new("Bilans en rejet",        "comptes annuels refuses",            "PROC_REJETS_BILANS")
+                ]),
                 new("Encaissements",          "retrouver un reglement",             "PROC_RECHENC"),
-                new("Tarifs",                 "articles tarifaires RCS",            "PROC_TARIFS"),
-                new("Bilans en rejet",        "comptes annuels refuses",            "PROC_REJETS_BILANS")
-            ]),
-            new("Hors du greffe",
-            [
-                new("Interdits de gerer",     "consultation FNIG",                  "PROC_VFNIG"),
-                new("FIBEN",                  "fichier bancaire des entreprises",   "PROC_FIBEN"),
-                new("Notifications",          "echanges entre greffes",             "PROC_VNOTIF"),
-                new("Tribunal digital",       "ce qui vient du portail",            "PROC_VTRID"),
+                new("Fichiers et echanges exterieurs", "FNIG, FIBEN, notifications, tribunal digital", "SYNTHESE_FICHIERS_EXTERIEURS",
+                [
+                    new("Interdits de gerer",     "consultation FNIG",                  "PROC_VFNIG"),
+                    new("Demandes FNIG",          "alimenter le fichier des interdits", "PROC_FNIG"),
+                    new("FIBEN",                  "fichier bancaire des entreprises",   "PROC_FIBEN"),
+                    new("Notifications",          "echanges entre greffes",             "PROC_VNOTIF"),
+                    new("Tribunal digital",       "ce qui vient du portail",            "PROC_VTRID")
+                ]),
                 new("Rechercher un beneficiaire", "consultation BEN",               "PROC_BEN")
             ])
         ]),
@@ -116,98 +154,136 @@ public static class MenuAccueil
         [
             new("L'affaire",
             [
-                new("Instance judiciaire",    "corriger une instance",              "PROC_MJUD"),
-                new("Procedure collective",   "corriger une PC ou prevention",      "PROC_MPC"),
-                new("Mentions en marge",      "MMA du registre",                    "PROC_MMA"),
-                new("Diligences RCS",         "les diligences d'un dossier",        "PROC_MDIL"),
-                new("Mots directeurs",        "qualification judiciaire",           "PROC_MDJUD"),
-                new("Repertoire",             "corriger le repertoire",             "PROC_MODIF_REPER"),
-                new("Parties d'une instance", "qui s'oppose a qui",                 "PROC_PARTIES"),
-                new("Beneficiaires d'un dossier", "les BE d'une societe",           "PROC_BE")
-            ]),
-            new("Defaire",
-            [
-                new("Liens entre PC",         "rattacher ou detacher",              "PROC_XLIEN"),
-                new("Supprimer une instance", "et rendre les numeros",              "PROC_XXAFF"),
-                new("Liberer une affaire",    "rendre la main sur un dossier",      "PROC_LIBAFFAIRE")
-            ]),
-            new("En masse",
-            [
-                new("Changer le juge-commissaire", "sur plusieurs PC",              "PROC_CHM"),
-                new("Changer les organes",    "mandataires sur un lot de PC",       "PROC_CHORGANESENMASSE"),
-                new("Debiteurs multiples",    "plusieurs debiteurs sur une PC",     "PROC_DEBITEURS_MULTIPLES")
+                new("Corriger une affaire judiciaire", "instance, PC, mots directeurs, repertoire, parties", "SYNTHESE_CORRIGER_JUD",
+                [
+                    new("Instance judiciaire",    "corriger une instance",              "PROC_MJUD"),
+                    new("Procedure collective",   "corriger une PC ou prevention",      "PROC_MPC"),
+                    new("Mots directeurs",        "qualification judiciaire",           "PROC_MDJUD"),
+                    new("Repertoire",             "corriger le repertoire",             "PROC_MODIF_REPER"),
+                    new("Parties d'une instance", "qui s'oppose a qui",                 "PROC_PARTIES")
+                ]),
+                new("Corriger un dossier RCS", "mentions en marge, diligences, beneficiaires", "SYNTHESE_CORRIGER_RCS",
+                [
+                    new("Mentions en marge",      "MMA du registre",                    "PROC_MMA"),
+                    new("Diligences RCS",         "les diligences d'un dossier",        "PROC_MDIL"),
+                    new("Beneficiaires d'un dossier", "les BE d'une societe",           "PROC_BE")
+                ]),
+                new("Defaire une affaire",    "liens entre PC, suppression, liberation", "SYNTHESE_DEFAIRE",
+                [
+                    new("Liens entre PC",         "rattacher ou detacher",              "PROC_XLIEN"),
+                    new("Supprimer une instance", "et rendre les numeros",              "PROC_XXAFF"),
+                    new("Liberer une affaire",    "rendre la main sur un dossier",      "PROC_LIBAFFAIRE")
+                ]),
+                new("Modifier un lot de PC",  "juge-commissaire, organes, debiteurs", "SYNTHESE_PC_EN_MASSE",
+                [
+                    new("Changer le juge-commissaire", "sur plusieurs PC",              "PROC_CHM"),
+                    new("Changer les organes",    "mandataires sur un lot de PC",       "PROC_CHORGANESENMASSE"),
+                    new("Debiteurs multiples",    "plusieurs debiteurs sur une PC",     "PROC_DEBITEURS_MULTIPLES")
+                ])
             ]),
             new("Rediger et signer",
             [
                 new("Redaction",              "ecrire une decision",                "PROC_REDA"),
                 new("Redaction en masse",     "rediger un lot de decisions",        "PROC_REDA_MASSE"),
-                new("Destinataires",          "a qui part la decision",             "PROC_DEST_REDA"),
-                new("Signature electronique", "signer les decisions",               "PROC_SIGNJUD"),
-                new("Ordonnances a signer",   "la pile a signer",                   "PROC_ORDOSIGN"),
-                new("Occultations",           "masquer avant diffusion",            "PROC_DJ_OCCULTATIONS"),
-                new("Impression legale",      "jugements en masse",                 "PROC_IMPLEG")
+                new("Signer et diffuser les decisions", "destinataires, signature, occultations, impression", "SYNTHESE_DECISIONS",
+                [
+                    new("Destinataires",          "a qui part la decision",             "PROC_DEST_REDA"),
+                    new("Signature electronique", "signer les decisions",               "PROC_SIGNJUD"),
+                    new("Ordonnances a signer",   "la pile a signer",                   "PROC_ORDOSIGN"),
+                    new("Occultations",           "masquer avant diffusion",            "PROC_DJ_OCCULTATIONS"),
+                    new("Impression legale",      "jugements en masse",                 "PROC_IMPLEG")
+                ])
             ]),
             new("Editer un courrier",
             [
                 new("Courriers divers",       "les lettres types du greffe",        "PROC_COURRIER_DIVERS"),
                 new("Courriers en masse",     "un courrier pour un lot",            "PROC_COURRIERM"),
-                new("Editions differees",     "ce qui partira plus tard",           "PROC_EDT_DIFF"),
-                new("Pivoter des pages",      "redresser un scan",                  "PROC_PDF_WRITER"),
-                new("Documents ocerises",     "numerotation des pages",             "PROC_NUM")
+                new("Retoucher un document",  "pivoter, numeroter les pages",       "SYNTHESE_RETOUCHER",
+                [
+                    new("Pivoter des pages",      "redresser un scan",                  "PROC_PDF_WRITER"),
+                    new("Documents ocerises",     "numerotation des pages",             "PROC_NUM")
+                ])
             ]),
             new("Envoyer",
             [
                 new("Transmission",           "envoyer un document dematerialise",  "PROC_TRANSDOC"),
-                new("Bordereaux LR",          "recommandes du jour",                "PROC_BORDLR"),
-                new("Retours LRAR",           "accuses de reception",               "PROC_RETOURLRAR"),
-                new("Envoi JAL / BODACC",     "ce qui part en publication",         "PROC_ENV_JAL"),
-                new("Publications BODACC",    "gerer les annonces",                 "PROC_GESTBOD"),
-                new("File d'impression",      "ce qui attend l'imprimante",         "PROC_PAPERCUT"),
+                new("Recommandes et retours", "bordereaux, accuses, courriers NPAI", "SYNTHESE_RECOMMANDES",
+                [
+                    new("Bordereaux LR",          "recommandes du jour",                "PROC_BORDLR"),
+                    new("Retours LRAR",           "accuses de reception",               "PROC_RETOURLRAR"),
+                    new("Courriers revenus NPAI", "n'habite pas a l'adresse indiquee",  "PROC_TRAITEMENTNPAI")
+                ]),
+                new("Publications JAL et BODACC", "envois, annonces, rejets",       "SYNTHESE_PUBLICATIONS",
+                [
+                    new("Envoi JAL / BODACC",     "ce qui part en publication",         "PROC_ENV_JAL"),
+                    new("Publications BODACC",    "gerer les annonces",                 "PROC_GESTBOD"),
+                    new("Surveillance BODACC",    "rejets et annonces en attente",      "PROC_SURVBOD")
+                ]),
+                new("Impressions et editions", "files, editions differees, relances, suivi", "SYNTHESE_IMPRESSIONS",
+                [
+                    new("File d'impression",      "ce qui attend l'imprimante",         "PROC_PAPERCUT"),
+                    new("File des editions",      "ce qui attend d'etre emis",          "PROC_POOLEDITION"),
+                    new("Editions differees",     "ce qui partira plus tard",           "PROC_EDT_DIFF"),
+                    new("Suivi d'impression",     "ce qui est sorti",                   "PROC_SUIVI_IMPRESSION"),
+                    new("Relancer un fichier",    "edition bloquee",                    "PROC_RELANCEFILE"),
+                    new("Relancer un lot",        "lot d'impression bloque",            "PROC_RELANCELOT")
+                ]),
                 new("Export Excel",           "sortir une liste",                   "PROC_LISTEEXCEL")
             ])
         ]),
         new("Surveiller", "surv", "!",
         [
-            new("Preparer les audiences",
+            new("Les audiences",
             [
                 new("Roles et cabinets",      "organiser les audiences a venir",    "PROC_GESTAUDS"),
-                new("Composition",            "qui siege ce jour-la",               "PROC_COMPO"),
-                new("Preparation d'audience", "plumitif avant l'audience",          "PROC_PREAUD"),
-                new("Convocations",           "convoquer les parties",              "PROC_GCONV"),
-                new("Mise au point chambres", "audiences de cabinet",               "PROC_MPCS")
-            ]),
-            new("Suivre les audiences",
-            [
                 new("Audiences",              "les dates qui approchent",           "PROC_AUDIENCE"),
-                new("Retour d'audience",      "saisir ce qui a ete dit",            "PROC_RETAUD"),
-                new("Deliberes",              "ce qui reste a rendre",              "PROC_LISTE_DELIBERES"),
-                new("Taxes et tours de role", "editions PC d'audience",             "PROC_TAXESETTOURS")
+                new("Preparer l'audience",    "composition, plumitif, convocations, chambres", "SYNTHESE_PREPARER_AUDIENCE",
+                [
+                    new("Composition",            "qui siege ce jour-la",               "PROC_COMPO"),
+                    new("Preparation d'audience", "plumitif avant l'audience",          "PROC_PREAUD"),
+                    new("Convocations",           "convoquer les parties",              "PROC_GCONV"),
+                    new("Mise au point chambres", "audiences de cabinet",               "PROC_MPCS")
+                ]),
+                new("Apres l'audience",       "retour, deliberes, taxes et tours",  "SYNTHESE_APRES_AUDIENCE",
+                [
+                    new("Retour d'audience",      "saisir ce qui a ete dit",            "PROC_RETAUD"),
+                    new("Deliberes",              "ce qui reste a rendre",              "PROC_LISTE_DELIBERES"),
+                    new("Taxes et tours de role", "editions PC d'audience",             "PROC_TAXESETTOURS")
+                ])
             ]),
             new("Relancer",
             [
-                new("Relances comptes annuels", "DCA en retard",                    "PROC_DCA_RELANCE"),
-                new("Injonctions comptes annuels", "passer a l'injonction",         "PROC_DCA_INJ"),
-                new("Relances beneficiaires", "DBE en retard",                      "PROC_DBE_RELANCE"),
-                new("Injonctions beneficiaires", "injonction DBE",                  "PROC_DBE_INJ"),
-                new("Rappels RBE",            "registre des beneficiaires",         "PROC_SRBE_RAPPEL"),
-                new("Retention d'actes",      "actes retenus au depot",             "PROC_ACTRET"),
-                new("Actes rejetes",          "rejets Infogreffe",                  "PROC_ACTREJ"),
+                new("Relances et injonctions", "comptes annuels, beneficiaires, RBE, radiations d'office", "SYNTHESE_RELANCES",
+                [
+                    new("Relances comptes annuels", "DCA en retard",                    "PROC_DCA_RELANCE"),
+                    new("Injonctions comptes annuels", "passer a l'injonction",         "PROC_DCA_INJ"),
+                    new("Relances beneficiaires", "DBE en retard",                      "PROC_DBE_RELANCE"),
+                    new("Injonctions beneficiaires", "injonction DBE",                  "PROC_DBE_INJ"),
+                    new("Rappels RBE",            "registre des beneficiaires",         "PROC_SRBE_RAPPEL"),
+                    new("Radiations d'office",    "relances expirees, lettre au procureur", "PROC_ROFSURVEILLANCES")
+                ]),
+                new("Actes retenus et rejetes", "retenus, rejets Infogreffe, actes web, Kbis XML", "SYNTHESE_ACTES_BLOQUES",
+                [
+                    new("Retention d'actes",      "actes retenus au depot",             "PROC_ACTRET"),
+                    new("Actes rejetes",          "rejets Infogreffe",                  "PROC_ACTREJ"),
+                    new("Actes web non transmis", "commandes web bloquees avant la GED", "PROC_ACTREJ_CMD_WEB"),
+                    new("Kbis XML rejetes",       "erreurs bloquantes et avertissements", "PROC_REJETSKBISXML")
+                ]),
                 new("Divergences BEN",        "alertes de coherence",               "PROC_DBEN_ALERT")
             ]),
             new("Les instances",
             [
-                new("Injonctions de payer",   "les IP en attente",                  "PROC_SURVIP"),
-                new("Suivi des preventions",  "les IP de prevention",               "PROC_IPSUIVI"),
+                new("Suivi des injonctions de payer", "IP en attente, preventions", "SYNTHESE_IP",
+                [
+                    new("Injonctions de payer",   "les IP en attente",                  "PROC_SURVIP"),
+                    new("Suivi des preventions",  "les IP de prevention",               "PROC_IPSUIVI")
+                ]),
                 new("Mesures",                "surveillance des mesures",           "PROC_SURVMES"),
                 new("Lots",                   "les lots en cours",                  "PROC_GESTLOT")
             ]),
-            new("Les envois et les editions",
+            new("Les echanges et l'ancien RIG",
             [
-                new("Surveillance BODACC",    "rejets et annonces en attente",      "PROC_SURVBOD"),
                 new("Suivi dematerialisation","ce qui est parti au JAL/BODACC",     "PROC_SDEMATJUD"),
-                new("Suivi d'impression",     "ce qui est sorti",                   "PROC_SUIVI_IMPRESSION"),
-                new("Relancer un fichier",    "edition bloquee",                    "PROC_RELANCEFILE"),
-                new("Relancer un lot",        "lot d'impression bloque",            "PROC_RELANCELOT"),
                 new("Fiches en conflit",      "modifiees dans les deux RIG",        "PROC_FICHES_CONFLIT"),
                 new("Historique de l'ancien RIG", "affaires des deux RIG, anciens numeros", "PROC_HISTORIQUE_ANCIEN_RIG")
             ]),
@@ -233,35 +309,45 @@ public static class MenuAccueil
             new("Facturer",
             [
                 new("Factures",               "ce qui est du",                      "PROC_FACTURE"),
-                new("Refacturation",          "reediter une facture",               "PROC_FACTREEDIT"),
-                new("Releve de compte",       "le compte d'un client",              "PROC_RELCLI"),
+                new("Refacturation et releves", "reediter une facture, le compte d'un client", "SYNTHESE_REFACTURATION",
+                [
+                    new("Refacturation",          "reediter une facture",               "PROC_FACTREEDIT"),
+                    new("Releve de compte",       "le compte d'un client",              "PROC_RELCLI")
+                ]),
                 new("Articles tarifaires",    "ce qu'on facture",                   "PROC_ARTICLE"),
-                new("Reversements INPI",      "ce qui part a l'INPI",               "PROC_INPIPAY"),
-                new("Formalites INPI",        "paiements en attente",               "PROC_GINPI")
+                new("Paiements INPI",         "reversements, formalites en attente", "SYNTHESE_INPI",
+                [
+                    new("Reversements INPI",      "ce qui part a l'INPI",               "PROC_INPIPAY"),
+                    new("Formalites INPI",        "paiements en attente",               "PROC_GINPI")
+                ]),
+                // PROC_CREANCE etait dans RIG v2 un CONTENEUR vide (FORM_CREANCE : aucun controle) :
+                // le code garde ce role, l'ecran reunit les quatre procedures des creances.
+                new("Creances",               "declarer, corriger, integrer, representer", "PROC_CREANCE",
+                [
+                    new("Ajouter une creance",    "declarer une creance",               "PROC_ADDCREANCE"),
+                    new("Modifier une creance",   "corriger une declaration",           "PROC_MODCREANCE"),
+                    new("Integrer des creances",  "reprise en lot",                     "PROC_INTEGCREANCE"),
+                    new("Representation",         "qui represente le creancier",        "PROC_CREANREP")
+                ])
             ]),
-            new("Encaisser",
+            new("Encaisser et tenir les comptes",
             [
                 new("Encaissements",          "ce qui est rentre",                  "PROC_ENCAISS"),
-                new("Rejets d'encaissement",  "un reglement revenu",                "PROC_REJET"),
-                new("Remise en banque",       "porter les reglements en banque",    "PROC_REMBANQ"),
-                new("Cheques emis",           "ce que le greffe a paye",            "PROC_EDCHQEMIS")
-            ]),
-            new("Tenir les comptes",
-            [
-                new("Journal de caisse",      "la caisse du jour",                  "PROC_JCAISSE"),
-                new("Journal de vente",       "les ventes du greffe",               "PROC_JVENTE"),
-                new("Livre de repertoire",    "le journal du repertoire",           "PROC_JLR"),
-                new("Lettrage",               "solder les mouvements",              "PROC_VLETTRAGE"),
+                new("Banque, rejets et cheques", "remises en banque, reglements revenus, cheques emis", "SYNTHESE_BANQUE",
+                [
+                    new("Remise en banque",       "porter les reglements en banque",    "PROC_REMBANQ"),
+                    new("Rejets d'encaissement",  "un reglement revenu",                "PROC_REJET"),
+                    new("Cheques emis",           "ce que le greffe a paye",            "PROC_EDCHQEMIS")
+                ]),
+                new("Journaux et lettrage",   "caisse, ventes, repertoire, lettrage", "SYNTHESE_JOURNAUX",
+                [
+                    new("Journal de caisse",      "la caisse du jour",                  "PROC_JCAISSE"),
+                    new("Journal de vente",       "les ventes du greffe",               "PROC_JVENTE"),
+                    new("Livre de repertoire",    "le journal du repertoire",           "PROC_JLR"),
+                    new("Lettrage",               "solder les mouvements",              "PROC_VLETTRAGE")
+                ]),
                 new("Figer les ecritures",    "comptabiliser la journee",           "PROC_COMPTABILISATION"),
                 new("Certification NF525",    "journal et grands totaux signes",    "PROC_CERTIF")
-            ]),
-            new("Creances",
-            [
-                new("Creances",               "les creances d'une PC",              "PROC_CREANCE"),
-                new("Ajouter une creance",    "declarer une creance",               "PROC_ADDCREANCE"),
-                new("Modifier une creance",   "corriger une declaration",           "PROC_MODCREANCE"),
-                new("Integrer des creances",  "reprise en lot",                     "PROC_INTEGCREANCE"),
-                new("Representation",         "qui represente le creancier",        "PROC_CREANREP")
             ])
         ]),
         new("Configurer", "reg", "@",
@@ -270,9 +356,13 @@ public static class MenuAccueil
             [
                 new("Acteurs judiciaires",    "juges, parquet, intervenants",       "PROC_ACTEUR_JUD"),
                 new("Experts",                "qui designer, qui a deja siege",     "PROC_EXPERT"),
-                new("Mandataires",            "mandataires et praticiens",          "PROC_MANDATAIRE"),
-                new("Rapprocher des acteurs", "fusionner deux fiches",              "PROC_RAPPACTEUR"),
-                new("Remplacer un acteur",    "substituer dans les instances",      "PROC_SUPP_ACTEUR_JUD")
+                new("Mandataires et destinataires", "mandataires, destinataires institutionnels, rapprocher, remplacer", "SYNTHESE_FICHES_ACTEURS",
+                [
+                    new("Mandataires",            "mandataires et praticiens",          "PROC_MANDATAIRE"),
+                    new("Destinataires institutionnels", "parquet, administrations, coffre-fort", "PROC_GDEST_INST"),
+                    new("Rapprocher des acteurs", "fusionner deux fiches",              "PROC_RAPPACTEUR"),
+                    new("Remplacer un acteur",    "substituer dans les instances",      "PROC_SUPP_ACTEUR_JUD")
+                ])
             ]),
             new("Les clients",
             [
@@ -288,8 +378,11 @@ public static class MenuAccueil
                 new("Actualites",             "les messages de l'accueil",          "PROC_ACTUALITES"),
                 new("Dates de travail",       "la date du greffe",                  "PROC_GESTDATE"),
                 new("Comptes des agents",     "qui ouvre RIG, et avec quels droits", "PROC_UTILISATEUR"),
-                new("Aide du greffe",         "le wiki interne",                    "PROC_WIKI"),
-                new("Page web interne",       "ouvrir un site dans RIG",            "PROC_WEB_BROWSER")
+                new("Pages internes",         "aide du greffe, site web dans RIG",  "SYNTHESE_PAGES_INTERNES",
+                [
+                    new("Aide du greffe",         "le wiki interne",                    "PROC_WIKI"),
+                    new("Page web interne",       "ouvrir un site dans RIG",            "PROC_WEB_BROWSER")
+                ])
             ]),
             new("Prendre en main la V3",
             [
@@ -299,8 +392,11 @@ public static class MenuAccueil
             ]),
             new("Referentiels",
             [
-                new("Tables de reference",    "les codes du greffe",                "PROC_GTABREF"),
-                new("Natures de document",    "typologie de la GED",                "PROC_GED_NATURE_DOC"),
+                new("Tables et natures de document", "codes du greffe, typologie de la GED", "SYNTHESE_TABLES",
+                [
+                    new("Tables de reference",    "les codes du greffe",                "PROC_GTABREF"),
+                    new("Natures de document",    "typologie de la GED",                "PROC_GED_NATURE_DOC")
+                ]),
                 new("Cabinets",               "les salles d'audience",              "PROC_CABINET"),
                 new("Codes chefs IP",         "parametrage des injonctions",        "PROC_PARAM_IP"),
                 new("Bornes d'accueil",       "les kiosques KBIS",                  "PROC_BORNE"),
@@ -318,6 +414,8 @@ public static class MenuAccueil
             new("Argent et exports",
             [
                 new("Banques",                "les comptes du greffe",              "PROC_GESTBANQ"),
+                // Non reunis : les modes de paiement sont vus par tous, Expresso est ferme a
+                // l'endettement (Metier/PerimetreProfil.cs) -- un ecran reuni ne melange pas les metiers.
                 new("Modes de paiement",      "les moyens acceptes",                "PROC_GESTMODEPAIEMENT"),
                 new("Facturation Expresso",   "parametrage de la facturation",      "PROC_PARAMEXPRESSO"),
                 new("Listes Excel",           "parametrage des exports",            "PROC_PARAM_LISTEEXCEL")
@@ -325,19 +423,41 @@ public static class MenuAccueil
             new("Outils",
             [
                 new("Requetes metier",        "executer une requete preparee",      "PROC_REQUETES"),
-                new("Analyse IA",             "controle des formalites INPI",       "PROC_IA"),
-                new("Retours CFE-NET",        "traitement des retours XML",         "PROC_CFENET_RET"),
-                new("EDI RPVA",               "inscriptions mandataires",           "PROC_EDI_RPVAINS"),
-                new("EDI RPJC",               "traitement / conciliation",          "PROC_EDI_RPJC_TRCNC"),
+                new("Formalites dematerialisees", "analyse IA, retours CFE-NET",    "SYNTHESE_FORMALITES_DEMAT",
+                [
+                    new("Analyse IA",             "controle des formalites INPI",       "PROC_IA"),
+                    new("Retours CFE-NET",        "traitement des retours XML",         "PROC_CFENET_RET")
+                ]),
+                new("Echanges avec les avocats", "RPVA et RPJC : inscriptions, renvois, conciliation", "SYNTHESE_EDI_AVOCATS",
+                [
+                    new("EDI RPVA",               "inscriptions mandataires",           "PROC_EDI_RPVAINS"),
+                    new("EDI RPJC",               "traitement / conciliation",          "PROC_EDI_RPJC_TRCNC"),
+                    new("EDI RPJC inscriptions",  "demandes d'inscription des avocats", "PROC_EDI_RPJC_INS"),
+                    new("EDI RPJC renvois",       "demandes de renvoi d'audience",      "PROC_EDI_RPJC_REN")
+                ]),
+                new("Imprimantes du greffe",  "lots, bacs et pilotes",              "PROC_IMP_WIN"),
                 new("Supervision",            "greffes, traitements, erreurs (Amitel)", "PROC_SUPERVISION")
             ])
         ])
     ];
 
+    /// <summary>Toutes les entrees, procedures reunies comprises : ce qu'on cherche par son
+    /// code (nom d'un ecran, favori, palette). Le menu affiche, lui, <see cref="Moments"/>.</summary>
+    public static readonly EntreeMenu[] Toutes =
+        [.. Moments.SelectMany(m => m.Sous).SelectMany(s => s.Entrees).SelectMany(e => e.Membres.Prepend(e))];
+
+    /// <summary>L'entree du menu qui REUNIT une procedure, ou null si la procedure a son
+    /// propre ecran (ou n'est pas au menu). Ouvrir une procedure reunie, c'est ouvrir
+    /// l'ecran qui la reunit.</summary>
+    public static EntreeMenu? SyntheseDe(string code)
+        => Moments.SelectMany(m => m.Sous).SelectMany(s => s.Entrees)
+                  .FirstOrDefault(e => e.Membres.Any(x => x.Code == code));
+
     /// <summary>Le VERBE du menu (Ouvrir, Trouver...) qui range un ecran, ou null
     /// pour un ecran hors du menu (PROC_TACHES_LOT, ouvert par une alerte de lot).
     /// L'onglet de la vue en porte la pastille (19/11/2026) : on reconnait d'un
-    /// coup d'oeil ce qu'on est venu y faire, aux couleurs du menu.</summary>
+    /// coup d'oeil ce qu'on est venu y faire, aux couleurs du menu. Une procedure
+    /// reunie prend le verbe de l'ecran qui la reunit.</summary>
     public static MomentMenu? VerbeDe(string code)
-        => Moments.FirstOrDefault(m => m.Sous.Any(s => s.Entrees.Any(e => e.Code == code)));
+        => Moments.FirstOrDefault(m => m.Sous.Any(s => s.Entrees.Any(e => e.Code == code || e.Membres.Any(x => x.Code == code))));
 }

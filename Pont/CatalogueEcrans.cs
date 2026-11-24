@@ -58,7 +58,9 @@ public static class CatalogueEcrans
         [
             new("PROC_FACTURE", "Factures"),
             new("PROC_ENCAISS", "Encaissements"),
-            new("PROC_CREANCE", "Creances"),
+            // PROC_CREANCE a quitte ce catalogue le 24/11/2026 (conv-2142) : ce n'est pas un ecran
+            // porte mais l'ecran REUNI des creances (Pont/MenuAccueil.cs), comme dans RIG v2 ou
+            // FORM_CREANCE n'etait qu'un conteneur.
             new("PROC_FCLIENT", "Fiches clients"),
             new("PROC_GCLIENT", "Gestion clients"),
             new("PROC_COMPTABILISATION", "Comptabilisation"),
@@ -90,12 +92,11 @@ public static class CatalogueEcrans
     ];
 
     /// <summary>Le nom d'un ecran tel que son onglet l'affiche, sinon tel que le menu de
-    /// l'accueil le nomme ; vide s'il n'est ni l'un ni l'autre. La palette et l'ecran
+    /// l'accueil le nomme (une procedure reunie garde son nom) ; vide s'il n'est ni l'un ni l'autre. La palette et l'ecran
     /// Demandes lisent cette meme regle : jamais le code a l'ecran.</summary>
     public static string Nom(string code)
         => code.Length == 0 ? ""
          : Familles.SelectMany(f => f.Ecrans).FirstOrDefault(e => e.Code == code)?.Libelle
-           ?? MenuAccueil.Moments.SelectMany(m => m.Sous).SelectMany(s => s.Entrees)
-                  .FirstOrDefault(x => x.Code == code)?.Libelle
+           ?? MenuAccueil.Toutes.FirstOrDefault(x => x.Code == code)?.Libelle
            ?? "";
 }
