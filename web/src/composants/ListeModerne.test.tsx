@@ -57,6 +57,11 @@ describe('outils de texte', () => {
     expect(montant(0)).toBe('0,00 €')
   })
 
+  it('montant : milliers separes par une espace insecable normale, pas l\'espace fine quasi invisible a 12 px', () => {
+    expect(montant(1379.3)).toBe('1\u00a0379,30 €')
+    expect(montant(1379.3)).not.toContain('\u202f')
+  })
+
   it('texteCsv : point-virgule, guillemets doubles seulement quand il le faut', () => {
     expect(texteCsv(['N°', 'Libelle'], [['004176', 'Modification - SCI "DU" PARC'], ['1', 'a;b']]))
       .toBe('N°;Libelle\r\n004176;"Modification - SCI ""DU"" PARC"\r\n1;"a;b"')

@@ -53,9 +53,15 @@ export function ListeModerne({ etiquette, children }: { etiquette?: string | und
 
 // ---------------------------------------------------------------- outils de texte
 
-/** Un montant en euros, a la francaise : « 1 379,30 € ». */
+/**
+ * Un montant en euros, a la francaise : « 1 379,30 € ». Le separateur des milliers est une espace
+ * insecable NORMALE (U+00A0) : celle de toLocaleString('fr-FR') est l'espace FINE (U+202F), quasi
+ * invisible a 12 px -- la synthese et le pied lisaient « 1379,30 » quand la carte lisait « 1 379,30 »
+ * (captures du lot 1, conv-2135).
+ */
 export function montant(valeur: number): string {
-  return `${valeur.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+  const nombre = valeur.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return `${nombre.replace(/\u202f/g, '\u00a0')} €`
 }
 
 // Ni une forme juridique ni un mot de liaison ne donnent une initiale : « SCI DU PARC » -> « P »,

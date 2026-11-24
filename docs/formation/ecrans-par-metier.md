@@ -47,7 +47,7 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Configurer > Outils | Analyse IA | controle des formalites INPI | `PROC_IA` | a venir |
 | Configurer > Outils | Retours CFE-NET | traitement des retours XML | `PROC_CFENET_RET` | a venir |
 
-## Judiciaire — 69 entrée(s) propres au métier
+## Judiciaire — 68 entrée(s) propres au métier
 
 | Geste › verbe | Entrée du menu | Ce qu'on y trouve | Procédure V2 | Écran |
 |---|---|---|---|---|
@@ -57,7 +57,6 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Ouvrir > Creer une affaire | Enrolement judiciaire | mettre l'affaire au role | `PROC_CJUD` | dans la V3 |
 | Ouvrir > Creer une affaire | Mesure provisoire | inscrire une mesure en instance | `PROC_MESIN` | a venir |
 | Ouvrir > Creer une affaire | Jonction d'instances | joindre deux affaires | `PROC_JOIN` | a venir |
-| Ouvrir > Recevoir | Creation via Infogreffe | enrolement recu par RPJC | `PROC_CJUDINFOG` | a venir |
 | Ouvrir > Enregistrer un depot | Depots au tribunal | les depots judiciaires | `PROC_DEPOTJUD` | dans la V3 |
 | Ouvrir > Enregistrer un depot | Depots d'evenement PC | evenement de PC ou prevention | `PROC_DEP` | a venir |
 | Ouvrir > Enregistrer un depot | Depots PC en masse | traiter un lot de depots | `PROC_DEPPCM` | a venir |
@@ -142,7 +141,7 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Facturer > Creances | Integrer des creances | reprise en lot | `PROC_INTEGCREANCE` | a venir |
 | Facturer > Creances | Representation | qui represente le creancier | `PROC_CREANREP` | a venir |
 
-## Tous les métiers — 69 entrée(s) communes (courrier, documents, comptabilité, réglages)
+## Tous les métiers — 74 entrée(s) communes (courrier, documents, comptabilité, réglages)
 
 | Geste › verbe | Entrée du menu | Ce qu'on y trouve | Procédure V2 | Écran |
 |---|---|---|---|---|
@@ -179,6 +178,8 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Surveiller > Les envois et les editions | Suivi d'impression | ce qui est sorti | `PROC_SUIVI_IMPRESSION` | a venir |
 | Surveiller > Les envois et les editions | Relancer un fichier | edition bloquee | `PROC_RELANCEFILE` | a venir |
 | Surveiller > Les envois et les editions | Relancer un lot | lot d'impression bloque | `PROC_RELANCELOT` | a venir |
+| Surveiller > Les envois et les editions | Fiches en conflit | modifiees dans les deux RIG | `PROC_FICHES_CONFLIT` | dans la V3 |
+| Surveiller > Les envois et les editions | Historique de l'ancien RIG | affaires des deux RIG, anciens numeros | `PROC_HISTORIQUE_ANCIEN_RIG` | dans la V3 |
 | Surveiller > Chiffres | Statistiques | les chiffres du greffe | `PROC_STAT` | dans la V3 |
 | Surveiller > Chiffres | Pilotage | tableaux de bord | `PROC_XPILOTAGE` | a venir |
 | Surveiller > Chiffres | Numeros manquants | le registre chronologique | `PROC_NUMEROS_MANQUANTS` | dans la V3 |
@@ -208,6 +209,9 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Configurer > Mon poste | Comptes des agents | qui ouvre RIG, et avec quels droits | `PROC_UTILISATEUR` | dans la V3 |
 | Configurer > Mon poste | Aide du greffe | le wiki interne | `PROC_WIKI` | a venir |
 | Configurer > Mon poste | Page web interne | ouvrir un site dans RIG | `PROC_WEB_BROWSER` | a venir |
+| Configurer > Prendre en main la V3 | Premiers pas | les gestes principaux de la V3 | `PROC_PREMIERS_PAS` | dans la V3 |
+| Configurer > Prendre en main la V3 | Ancienne touche, nouvelle touche | les raccourcis de l'ancien RIG | `PROC_TOUCHES` | dans la V3 |
+| Configurer > Prendre en main la V3 | Certificat NF525 de la V3 | organisme, numero, validite | `PROC_CERTIFICAT` | dans la V3 |
 | Configurer > Referentiels | Compteurs de numeros | rendre un numero donne par erreur | `PROC_COMPTEURS_NUM` | dans la V3 |
 | Configurer > Referentiels | Reglages du greffe | les parametres propres au greffe | `PROC_REGLAGES_GREFFE` | dans la V3 |
 | Configurer > Modeles et envois | Modeles d'edition | la forme des courriers | `PROC_EDIT_MAQUETTE` | dans la V3 |
