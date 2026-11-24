@@ -13,19 +13,33 @@ function ouvrir(ouvrirDossier = vi.fn()) {
   return { ouvrirDossier, ...render(<EcranBodacc ouvrirDossier={ouvrirDossier} />) }
 }
 
-const compte = (c: HTMLElement) => c.querySelector('.rig-resultats-proc__compte')!.textContent
+const compte = (c: HTMLElement) => c.querySelector('.rig-lm-synthese')!.textContent
 const entetes = (c: HTMLElement) => [...c.querySelectorAll('thead th')].map((th) => th.textContent)
+const rangees = (c: HTMLElement) => [...c.querySelectorAll('tbody tr:not(.rig-lm-detail)')]
+const cellules = (tr: Element) => [...tr.querySelectorAll('td')].map((td) => td.textContent)
+/** « Num annonce / dossier », filtre sur place : le champ « Aller a… » de la tete (decision du plan, lot 2). */
+const champ = () => screen.getByRole('textbox', { name: 'Aller a une annonce…' })
+/** La puce d'un onglet v2 : son nom est suivi de son compte. */
+const puce = (nom: string) => screen.getByRole('button', { name: new RegExp(`^${nom} \\d+$`) })
 
 describe('EcranBodacc', () => {
   it('« a envoyer » : six colonnes, les annonces en retard surlignees', async () => {
     const { container } = ouvrir()
     await screen.findByText('Immatriculation SARL LES TILLEULS')
-    expect(compte(container)).toBe('3 annonce(s)')
-    expect(entetes(container)).toHaveLength(6)
-    const rangees = [...container.querySelectorAll('tbody tr')]
-    expect(rangees.map((r) => r.className)).toEqual(['rig-table__ligne--alerte', '', 'rig-table__ligne--alerte'])
-    expect([...rangees[0]!.querySelectorAll('td')].map((td) => td.textContent))
+    expect(compte(container)).toBe('3 annonce(s) a envoyer · 2 en retard')
+    expect(entetes(container)).toEqual(['Num PC ou prevention', 'Code eve pro', 'Date eve pro', 'Texte Bodacc', 'Date prevue d\'envoi', 'Type annonce'])
+    const lignes = rangees(container)
+    expect(lignes.map((r) => r.className)).toEqual(['rig-table__ligne--alerte', '', 'rig-table__ligne--alerte'])
+    // Le texte reste une cellule simple, sans avatar ni classes d'identite : ce n'est pas un nom (decision du lot 4).
+    expect(cellules(lignes[0]!))
       .toEqual(['PC2026-041', 'IMM', '02/09/2026', 'Immatriculation SARL LES TILLEULS', '08/09/2026', 'Immatriculation'])
+    expect(container.querySelector('tbody .rig-lm-identite')).toBeNull()
+    // Le retard se lit aussi au point de la date prevue, le type en pastille.
+    expect(lignes[0]!.querySelector('.rig-lm-etat')!.className).toBe('rig-lm-etat rig-lm-t-rouge')
+    expect(lignes[1]!.querySelector('.rig-lm-etat')!.className).toBe('rig-lm-etat rig-lm-t-bleu')
+    expect(lignes[0]!.querySelector('.rig-lm-pastille')!.className).toBe('rig-lm-pastille rig-lm-t-vert')
+    expect(container.querySelector('tbody .rig-lm-avatar')).toBeNull()
+    expect(container.querySelector('.rig-lm-pied')!.textContent).toBe('3 annonces afficheesEn retard 2Clic sur une annonce pour ouvrir son dossier.')
   })
 
   it('n\'affiche aucune ligne tant que la date du jour n\'est pas connue', () => {
@@ -33,37 +47,51 @@ describe('EcranBodacc', () => {
     const { container } = render(<EcranBodacc ouvrirDossier={vi.fn()} />)
     expect(container.querySelectorAll('tbody tr')).toHaveLength(0)
     expect(screen.queryByText('Aucune annonce ne repond a ces criteres.')).toBeNull()
+    expect(container.querySelector('.rig-lm-synthese')).toBeNull()
   })
 
-  it('« deja envoye » : douze colonnes et les dates d\'envoi, de transmission, de parution', async () => {
-    const { container } = ouvrir()
+  it('« deja envoye » : les douze colonnes v2, cinq sur la ligne et le reste dans la ligne depliee', async () => {
+    const { container, ouvrirDossier } = ouvrir()
     await screen.findByText('Immatriculation SARL LES TILLEULS')
-    fireEvent.click(screen.getByRole('button', { name: 'BODACC deja envoye' }))
-    expect(screen.getByRole('button', { name: 'BODACC deja envoye' }).className).toBe('rig-onglet rig-onglet--actif')
-    expect(entetes(container)).toHaveLength(12)
-    expect(compte(container)).toBe('2 annonce(s)')
-    const premiere = container.querySelectorAll('tbody tr')[0]!
+    expect(puce('BODACC a envoyer').getAttribute('aria-pressed')).toBe('true')
+    expect(puce('BODACC a envoyer').textContent).toBe('BODACC a envoyer 3')
+    expect(puce('BODACC deja envoye').textContent).toBe('BODACC deja envoye 2')
+    fireEvent.click(puce('BODACC deja envoye'))
+    expect(puce('BODACC deja envoye').getAttribute('aria-pressed')).toBe('true')
+    expect(puce('BODACC a envoyer').getAttribute('aria-pressed')).toBe('false')
+    expect(entetes(container)).toEqual(['', 'Texte Bodacc', 'Type annonce', 'Date envoi', 'Date parution', 'Num parution', ''])
+    expect(compte(container)).toBe('2 annonce(s) envoyee(s) · 2 parue(s)')
+    const premiere = rangees(container)[0]!
     expect(premiere.className).toBe('')
-    expect([...premiere.querySelectorAll('td')].map((td) => td.textContent)).toEqual(
-      ['', 'RAD', '12/08/2026', '18/08/2026', '19/08/2026', 'BD-2610', 'FA-45120', '24/08/2026', '2026-171', 'A2026-1150',
-       'Radiation', 'Radiation EURL LE PETIT CAFE'])
+    expect(cellules(premiere)).toEqual(['', 'Radiation EURL LE PETIT CAFE', 'Radiation', '18/08/2026', '24/08/2026', '2026-171', ''])
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Deplier la ligne' })[0]!)
+    expect(ouvrirDossier).not.toHaveBeenCalled()
+    expect([...container.querySelectorAll('tr.rig-lm-detail .rig-lm-champ')].map((c) => c.textContent)).toEqual([
+      'Num ann.A2026-1150', 'Dossier2004B01344', 'Num PC ou prevention—', 'Code eve proRAD', 'Date eve pro12/08/2026', 'Date trans.19/08/2026', 'Num bord.BD-2610', 'Num fact.FA-45120'])
+    fireEvent.click(screen.getByRole('button', { name: 'Ouvrir le dossier' }))
+    expect(ouvrirDossier).toHaveBeenCalledWith('2004B01344')
   })
 
   it('filtre par texte et par type ; « Effacer » remet ces criteres a vide', async () => {
     const { container } = ouvrir()
     await screen.findByText('Immatriculation SARL LES TILLEULS')
+    // Le critere n'est plus a gauche : il est dans la tete de la liste.
+    expect(screen.queryByLabelText('Num annonce / dossier')).toBeNull()
     expect([...(screen.getByLabelText('Type d\'annonce') as HTMLSelectElement).options].map((o) => o.textContent))
       .toEqual(['Tous', 'Depot des comptes', 'Immatriculation', 'Modification', 'Procedure collective', 'Radiation'])
-    fireEvent.change(screen.getByLabelText('Num annonce / dossier'), { target: { value: '2019b' } })
-    expect(compte(container)).toBe('1 annonce(s)')
-    fireEvent.change(screen.getByLabelText('Num annonce / dossier'), { target: { value: 'rien' } })
+    fireEvent.change(champ(), { target: { value: '2019b' } })
+    expect(compte(container)).toBe('1 annonce(s) a envoyer · 0 en retard')
+    // Les puces comptent avec les memes criteres.
+    expect(puce('BODACC deja envoye').textContent).toBe('BODACC deja envoye 0')
+    fireEvent.change(champ(), { target: { value: 'rien' } })
     const vide = screen.getByText('Aucune annonce ne repond a ces criteres.')
     expect(vide.getAttribute('colspan')).toBe('6')
 
     fireEvent.change(screen.getByLabelText('Num bordereau'), { target: { value: 'BD' } })
     fireEvent.click(screen.getByRole('button', { name: 'Effacer' }))
-    expect(compte(container)).toBe('3 annonce(s)')
-    expect((screen.getByLabelText('Num annonce / dossier') as HTMLInputElement).value).toBe('')
+    expect(compte(container)).toBe('3 annonce(s) a envoyer · 2 en retard')
+    expect((champ() as HTMLInputElement).value).toBe('')
     // Comme dans Blazor, « Effacer » ne touche pas aux numeros de bordereau et de facture.
     expect((screen.getByLabelText('Num bordereau') as HTMLInputElement).value).toBe('BD')
   })
@@ -76,7 +104,7 @@ describe('EcranBodacc', () => {
 })
 
 // Ouvert depuis la page d'une affaire : ses annonces, par son numero dans
-// « Num annonce / dossier » (plan « Vue du dossier », lot 2).
+// « Num annonce / dossier », devenu le champ « Aller a… » de la tete (plan « Vue du dossier », lot 2).
 describe('EcranBodacc ouvert depuis une affaire', () => {
   const rendre = (dossier: ReturnType<typeof contexteDossier> | null) => {
     installerFauxPont({ 'EcranBodacc.DateDuJour': () => '2026-09-09' })
@@ -86,20 +114,20 @@ describe('EcranBodacc ouvert depuis une affaire', () => {
   it('montre ses seules annonces, le critere deja rempli', async () => {
     const { container } = rendre(contexteDossier({ numero: '2019B00233' }))
     expect(await screen.findByText('Changement de gerant')).toBeTruthy()
-    expect(compte(container)).toBe('1 annonce(s)')
-    expect((screen.getByLabelText('Num annonce / dossier') as HTMLInputElement).value).toBe('2019B00233')
+    expect(compte(container)).toBe('1 annonce(s) a envoyer · 0 en retard')
+    expect((champ() as HTMLInputElement).value).toBe('2019B00233')
   })
 
   it('une affaire sans annonce le dit ; sans affaire, toute la liste', async () => {
     const avec = rendre(contexteDossier())
     expect(await screen.findByText('Aucune annonce ne repond a ces criteres.')).toBeTruthy()
-    expect(compte(avec.container)).toBe('0 annonce(s)')
+    expect(compte(avec.container)).toBe('0 annonce(s) a envoyer · 0 en retard')
     avec.unmount()
     retirerFauxPont()
 
     const sans = rendre(null)
     expect(await screen.findByText('Immatriculation SARL LES TILLEULS')).toBeTruthy()
-    expect(compte(sans.container)).toBe('3 annonce(s)')
-    expect((screen.getByLabelText('Num annonce / dossier') as HTMLInputElement).value).toBe('')
+    expect(compte(sans.container)).toBe('3 annonce(s) a envoyer · 2 en retard')
+    expect((champ() as HTMLInputElement).value).toBe('')
   })
 })

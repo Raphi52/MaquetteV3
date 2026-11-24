@@ -7,10 +7,22 @@
 // Porte depuis Components/Ecrans/EcranArrivee.razor (lot 3) : meme balisage,
 // memes classes CSS. Le filtre est fait par Pont/EcranArrivee.cs sur
 // JeuDemo.Arrivees ; la coquille .razor monte cet ecran et recoit ouvrirDossier.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 3) : les resultats prennent les briques
+// de composants/ListeModerne.tsx. Tete (synthese, « Aller a une arrivee… » Ctrl K qui filtre la liste affichee,
+// Entree ouvre la demande si une seule arrivee reste), trois cartes qui POSENT les criteres existants (mode
+// d'arrivee, « Reste a numeriser », « Paiement joint »), des vues = jeux de criteres de gauche, export CSV. Le
+// tableau passe a UNE ligne par arrivee (Expediteur, Mode, N Demande, Numerisation, Date et heure) ; N Arrivee,
+// References, Case, Paiement, Type de demande, Utilisateur designe et Attestation sont dans la ligne depliee.
+// Le clic qui ouvre la demande, la ligne inerte sans demande et la ligne en alerte ne changent pas.
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { dateSaisie, useNombreSaisi } from '../saisie'
+import {
+  CartesChiffrees, CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille,
+  PiedListe, PointEtat, VuesListe, exporterCsv, type ActionLigne, type Teinte,
+} from '../composants/ListeModerne'
 
 export interface OptionArrivee {
   code: string
@@ -45,6 +57,83 @@ export interface ProprietesEcranArrivee {
   ouvrirDossier: (numero: string) => void
 }
 
+/** Les criteres de gauche, tels que saisis. « Nombre maxi. » n'en est pas : c'est une limite d'affichage. */
+export interface CriteresArrivee {
+  critNumArrivee: string
+  critNomArrivee: string
+  critReferences: string
+  critMode: string
+  critCase: string
+  critDu: string
+  critAu: string
+  critPaiement: boolean
+  critNonNumerise: boolean
+}
+
+const SansCritere: CriteresArrivee = {
+  critNumArrivee: '', critNomArrivee: '', critReferences: '', critMode: '', critCase: '', critDu: '', critAu: '',
+  critPaiement: false, critNonNumerise: false,
+}
+
+/** Ce que le pont recoit (Pont/EcranArrivee.cs, CriteresArrivee) : les dates vides deviennent null. */
+function pourLePont(c: CriteresArrivee, topMax: number) {
+  return {
+    critNumArrivee: c.critNumArrivee, critNomArrivee: c.critNomArrivee, critReferences: c.critReferences,
+    critMode: c.critMode, critCase: c.critCase, critDu: dateSaisie(c.critDu), critAu: dateSaisie(c.critAu),
+    critPaiement: c.critPaiement, critNonNumerise: c.critNonNumerise, critTopMax: topMax,
+  }
+}
+
+function memesCriteres(a: CriteresArrivee, b: CriteresArrivee): boolean {
+  return (Object.keys(SansCritere) as (keyof CriteresArrivee)[]).every((k) => a[k] === b[k])
+}
+
+/** Une vue enregistree : un nom et un jeu complet de criteres. */
+export interface VueArriveeEnregistree {
+  cle: string
+  libelle: string
+  criteres: CriteresArrivee
+}
+
+/** Les vues toujours la : les criteres de l'ecran, preposes. */
+export const VuesPrereglees: VueArriveeEnregistree[] = [
+  { cle: 'toutes', libelle: 'Toutes', criteres: SansCritere },
+  { cle: 'a-numeriser', libelle: 'Reste a numeriser', criteres: { ...SansCritere, critNonNumerise: true } },
+  { cle: 'paiement', libelle: 'Paiement joint', criteres: { ...SansCritere, critPaiement: true } },
+  { cle: 'edi', libelle: 'Teletransmises', criteres: { ...SansCritere, critMode: 'EDI' } },
+]
+
+/** Les vues ajoutees par « + Nouvelle vue » : elles vivent le temps de la session (aucun reglage ne les porte). */
+const VuesDeLaSession: VueArriveeEnregistree[] = []
+
+/** Pour les tests : repartir d'une session sans vue ajoutee. */
+export function oublierVuesDeLaSession(): void {
+  VuesDeLaSession.length = 0
+}
+
+/** La teinte d'un mode d'arrivee (libelles de dbo.MODE_ARRIVEE) ; l'ecran des teletransmissions la reprend. */
+export function teinteModeArrivee(libelle: string): Teinte {
+  switch (libelle) {
+    case 'Accueil': return 'vert'
+    case 'Poste': return 'bleu'
+    case 'Recommande': return 'orange'
+    case 'Edi': return 'violet'
+    case 'e-Mail': return 'ardoise'
+    default: return 'gris'
+  }
+}
+
+/** Les colonnes du tableau a une ligne : chevron, Expediteur, Mode, N Demande, Numerisation, Date et heure, menu. */
+const NbColonnes = 7
+
+/**
+ * « Aller a… » compare sans casse ni accents, comme la Recherche d'affaires : « réf » trouve « REF ».
+ * fix-ok: contientSansCasse (criteres.ts) garde les accents ; test « Aller a une arrivee… » rouge sur « réf », vert ici.
+ */
+function normaliser(texte: string): string {
+  return texte.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+}
+
 export function EcranArrivee({ ouvrirDossier }: ProprietesEcranArrivee) {
   const [critNumArrivee, setCritNumArrivee] = useState('')
   const [critNomArrivee, setCritNomArrivee] = useState('')
@@ -58,19 +147,62 @@ export function EcranArrivee({ ouvrirDossier }: ProprietesEcranArrivee) {
   const topMax = useNombreSaisi(50)
   // null tant que le pont n'a pas repondu : ni ligne ni « aucune arrivee ».
   const [vue, setVue] = useState<VueArrivee | null>(null)
+  // La ligne depliee par son chevron (une a la fois).
+  const [ouverte, setOuverte] = useState<string | null>(null)
+
+  const criteres: CriteresArrivee = {
+    critNumArrivee, critNomArrivee, critReferences, critMode, critCase, critDu, critAu, critPaiement, critNonNumerise,
+  }
+  function poserCriteres(c: CriteresArrivee) {
+    setCritNumArrivee(c.critNumArrivee)
+    setCritNomArrivee(c.critNomArrivee)
+    setCritReferences(c.critReferences)
+    setCritMode(c.critMode)
+    setCritCase(c.critCase)
+    setCritDu(c.critDu)
+    setCritAu(c.critAu)
+    setCritPaiement(c.critPaiement)
+    setCritNonNumerise(c.critNonNumerise)
+  }
 
   useEffect(() => {
     let perime = false
-    void appeler<VueArrivee>('EcranArrivee.Trouver', {
-      critNumArrivee, critNomArrivee, critReferences, critMode, critCase,
-      critDu: dateSaisie(critDu), critAu: dateSaisie(critAu),
-      critPaiement, critNonNumerise, critTopMax: topMax.valeur,
-    }).then((v) => { if (!perime) setVue(v) })
+    void appeler<VueArrivee>('EcranArrivee.Trouver', pourLePont({
+      critNumArrivee, critNomArrivee, critReferences, critMode, critCase, critDu, critAu, critPaiement, critNonNumerise,
+    }, topMax.valeur)).then((v) => { if (!perime) setVue(v) })
     return () => { perime = true }
   }, [critNumArrivee, critNomArrivee, critReferences, critMode, critCase, critDu, critAu,
       critPaiement, critNonNumerise, topMax.valeur])
 
   const trouvees = vue?.lignes ?? []
+
+  // « Aller a une arrivee… » (Ctrl K) : filtre la liste AFFICHEE, sans toucher aux criteres du pont.
+  const [filtreRapide, setFiltreRapide] = useState('')
+  const cherche = filtreRapide.trim()
+  const chercheNormal = normaliser(cherche)
+  const affichees = cherche === '' ? trouvees : trouvees.filter((a) => normaliser(
+    [a.numero, a.nom, a.references, a.numDemande, a.typeDemande, a.case, a.utilisateur].join(' ')).includes(chercheNormal))
+
+  // Les vues : les preposees, puis celles de la session. Leur compte est demande au pont, critere par critere,
+  // avec la meme limite d'affichage : c'est le nombre de lignes que la vue MONTRERAIT.
+  const [vuesAjoutees, setVuesAjoutees] = useState<VueArriveeEnregistree[]>(() => [...VuesDeLaSession])
+  const vues = [...VuesPrereglees, ...vuesAjoutees]
+  const [comptes, setComptes] = useState<number[] | null>(null)
+  const cleVues = JSON.stringify(vues.map((v) => v.criteres))
+  useEffect(() => {
+    let perime = false
+    Promise.all((JSON.parse(cleVues) as CriteresArrivee[]).map((c) =>
+      appeler<VueArrivee>('EcranArrivee.Trouver', pourLePont(c, topMax.valeur)).then((v) => v.lignes.length))).then(
+      (c) => { if (!perime) setComptes(c) },
+      // Sans reponse, les puces restent sans compte.
+      () => { if (!perime) setComptes(null) })
+    return () => { perime = true }
+  }, [cleVues, topMax.valeur])
+  const vueActive = vues.find((v) => memesCriteres(v.criteres, criteres))?.cle ?? null
+  function enregistrerVue(nom: string) {
+    VuesDeLaSession.push({ cle: `session-${VuesDeLaSession.length + 1}`, libelle: nom, criteres })
+    setVuesAjoutees([...VuesDeLaSession])
+  }
 
   /**
    * Une arrivee mene a SA demande. Toutes n en ont pas : un pli peut
@@ -92,6 +224,20 @@ export function EcranArrivee({ ouvrirDossier }: ProprietesEcranArrivee) {
     setCritPaiement(false)
     setCritNonNumerise(false)
     topMax.poser(50)
+  }
+
+  // Les chiffres de la tete, des cartes et du pied : sur la liste AFFICHEE.
+  const aNumeriser = affichees.filter((a) => !a.numerise).length
+  const avecPaiement = affichees.filter((a) => a.paiementJoint).length
+  const modes = vue?.modes ?? []
+  const parMode = (libelle: string) => affichees.filter((a) => a.modeLisible === libelle).length
+
+  function exporter() {
+    exporterCsv('arrivees.csv',
+      ['N Arrivee', 'Date et heure', 'Mode', 'Nom', 'References', 'Case', 'Paiement', 'N Demande', 'Type de demande',
+       'Utilisateur designe', 'Numerisation', 'Attestation'],
+      affichees.map((a) => [a.numero, a.horodatage, a.modeLisible, a.nom, a.references, a.case, a.paiementJoint ? 'oui' : '',
+                            a.numDemande, a.typeDemande, a.utilisateur, a.numerise ? 'faite' : 'a faire', a.attestation ? 'oui' : '']))
   }
 
   return (
@@ -177,70 +323,123 @@ export function EcranArrivee({ ouvrirDossier }: ProprietesEcranArrivee) {
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Courrier arrive</div>
-          <span className="rig-resultats-proc__compte">
-            {/* Memes noeuds de texte que Razor : voir EcranRechAffaires.tsx. */}
-            {vue && <>{trouvees.length}{' affichee(s) sur '}{vue.total}{' ·\n                '}{vue.aNumeriser}{' a numeriser\n            '}</>}
-          </span>
-        </div>
+      <ListeModerne etiquette="Courrier arrive">
+        <EnteteListe titre="Courrier arrive"
+                     synthese={vue && <>{affichees.length}{' affichee(s) sur '}{vue.total}{' · '}<b>{aNumeriser}</b>{' a numeriser · '}
+                       <b>{avecPaiement}</b>{' avec paiement'}</>}
+                     filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a une arrivee…',
+                               valider: () => { if (affichees.length === 1) ouvrir(affichees[0]!) } }} />
+
+        {vue && (
+          <CartesChiffrees cartes={[
+            { cle: 'modes', titre: 'Modes d arrivee', valeur: affichees.length, complement: affichees.length > 1 ? 'arrivees' : 'arrivee',
+              legende: true,
+              ...(critMode !== '' ? { choisir: () => setCritMode(''), indication: 'Tous les modes' } : {}),
+              // Seuls les modes presents (ou le mode choisi) : la legende des huit modes noierait la carte.
+              segments: modes.filter((m) => parMode(m.libelle) > 0 || m.code === critMode).map((m) => ({
+                cle: m.code, libelle: m.libelle, teinte: teinteModeArrivee(m.libelle),
+                valeur: parMode(m.libelle), texte: String(parMode(m.libelle)),
+                actif: critMode === m.code, choisir: () => setCritMode(critMode === m.code ? '' : m.code),
+              })) },
+            { cle: 'a-numeriser', titre: 'Reste a numeriser', valeur: aNumeriser, complement: `sur ${affichees.length}`,
+              anneau: { part: aNumeriser, total: affichees.length, teinte: 'orange' },
+              actif: critNonNumerise, choisir: () => setCritNonNumerise(!critNonNumerise),
+              indication: critNonNumerise ? 'Toutes les arrivees' : 'Seulement les arrivees a numeriser' },
+            { cle: 'paiement', titre: 'Paiement joint', valeur: avecPaiement, complement: `sur ${affichees.length}`,
+              anneau: { part: avecPaiement, total: affichees.length, teinte: 'vert' },
+              actif: critPaiement, choisir: () => setCritPaiement(!critPaiement),
+              indication: critPaiement ? 'Toutes les arrivees' : 'Seulement les arrivees avec paiement joint' },
+          ]} />
+        )}
+
+        <VuesListe vues={vues.map((v, i) => ({ cle: v.cle, libelle: v.libelle, compte: comptes?.[i] }))} active={vueActive}
+                   choisir={(cle) => { const v = vues.find((x) => x.cle === cle); if (v) poserCriteres(v.criteres) }}
+                   enregistrer={enregistrerVue}>
+          <button type="button" className="rig-lm-outil" disabled={affichees.length === 0} onClick={exporter}>Exporter</button>
+        </VuesListe>
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup>
+              <col style={{ width: 30 }} /><col /><col style={{ width: '13%' }} /><col style={{ width: '15%' }} />
+              <col style={{ width: '14%' }} /><col style={{ width: '17%' }} /><col style={{ width: 34 }} />
+            </colgroup>
             <thead>
               <tr>
-                <th>N Arrivee</th>
-                <th>Date et heure</th>
+                <th aria-label="Deplier"></th>
+                <th>Expediteur</th>
                 <th>Mode</th>
-                <th>Nom</th>
-                <th>References</th>
-                <th className="rig-table__centre">Case</th>
-                <th className="rig-table__centre">Paiement</th>
                 <th>N Demande</th>
-                <th>Type de demande</th>
-                <th>Utilisateur designe</th>
-                <th className="rig-table__centre">Numerisation</th>
-                <th className="rig-table__centre">Attestation</th>
+                <th>Numerisation</th>
+                <th>Date et heure</th>
+                <th aria-label="Actions"></th>
               </tr>
             </thead>
             <tbody>
-              {trouvees.map((a, i) => {
+              {affichees.map((a, i) => {
+                const cle = `${i}:${a.numero}`
                 const liee = a.numDemande.trim() !== ''
-                const classe = [a.numerise ? '' : 'rig-table__ligne--alerte', liee ? '' : 'rig-table__ligne--inerte']
-                  .filter((c) => c !== '').join(' ')
+                const estOuverte = ouverte === cle
+                const classe = [a.numerise ? '' : 'rig-table__ligne--alerte', liee ? '' : 'rig-table__ligne--inerte',
+                                estOuverte ? 'rig-lm-ouverte' : ''].filter((c) => c !== '').join(' ')
+                const ouvrirDemande: ActionLigne = { libelle: 'Ouvrir la demande', fort: true, desactive: !liee, agir: () => ouvrir(a) }
                 return (
-                  <tr key={`${i}:${a.numero}`} className={classe || undefined}
+                  <Fragment key={cle}>
+                  <tr className={classe || undefined}
                       title={liee ? `Ouvrir la demande ${a.numDemande}` : 'Aucune demande rattachee a cette arrivee'}
                       onClick={() => ouvrir(a)}>
-                    <td className="rig-table__mono">{a.numero}</td>
-                    <td className="rig-table__mono">{a.horodatage}</td>
-                    <td><span className="rig-etat">{a.modeLisible}</span></td>
-                    <td>{a.nom}</td>
-                    <td className="rig-table__mono">{a.references}</td>
-                    <td className="rig-table__centre rig-table__mono">{a.case}</td>
-                    <td className="rig-table__centre">{a.paiementJoint ? 'oui' : ''}</td>
+                    <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : cle)} />
+                    <CelluleIdentite nom={a.nom}
+                                     objet={<>{a.typeDemande}{a.typeDemande !== '' ? ' · ' : ''}<span>{a.numero}</span></>} />
+                    <td><Pastille teinte={teinteModeArrivee(a.modeLisible)}>{a.modeLisible}</Pastille></td>
                     <td className="rig-table__mono">
                       {liee ? a.numDemande : <span className="rig-table__sans">non rattachee</span>}
                     </td>
-                    <td>{a.typeDemande}</td>
-                    <td>{a.utilisateur}</td>
-                    <td className="rig-table__centre">{a.numerise ? 'faite' : 'a faire'}</td>
-                    <td className="rig-table__centre">{a.attestation ? 'oui' : ''}</td>
+                    <td>{a.numerise ? <PointEtat teinte="vert">faite</PointEtat> : <PointEtat teinte="orange">a faire</PointEtat>}</td>
+                    <td className="rig-table__mono">{a.horodatage}</td>
+                    <td className="rig-lm-cellule-menu">
+                      <MenuLigne libelle={`Actions de l'arrivee ${a.numero}`} actions={[
+                        ouvrirDemande,
+                        { libelle: estOuverte ? 'Replier la ligne' : 'Deplier la ligne', agir: () => setOuverte(estOuverte ? null : cle) },
+                      ]} />
+                    </td>
                   </tr>
+                  {estOuverte && (
+                    <LigneDetail colonnes={NbColonnes} actions={[ouvrirDemande]} champs={[
+                      { libelle: 'N Arrivee', valeur: a.numero },
+                      { libelle: 'References', valeur: a.references },
+                      { libelle: 'Case', valeur: a.case },
+                      { libelle: 'Paiement joint', valeur: a.paiementJoint ? 'oui' : 'non' },
+                      { libelle: 'Type de demande', valeur: a.typeDemande },
+                      { libelle: 'Utilisateur designe', valeur: a.utilisateur },
+                      { libelle: 'Attestation', valeur: a.attestation ? 'oui' : 'non' },
+                    ]} />
+                  )}
+                  </Fragment>
                 )
               })}
               {vue && trouvees.length === 0 && (
                 <tr>
-                  <td colSpan={12} className="rig-table__vide">
+                  <td colSpan={NbColonnes} className="rig-table__vide">
                     Aucune arrivee ne repond a ces criteres.
                   </td>
                 </tr>
               )}
+              {trouvees.length > 0 && affichees.length === 0 && (
+                <tr><td colSpan={NbColonnes} className="rig-table__vide">
+                  {`Aucune des ${trouvees.length} arrivees ne contient « ${cherche} ».`}
+                </td></tr>
+              )}
             </tbody>
           </table>
         </div>
-      </section>
+
+        <PiedListe aide="Clic sur une arrivee pour ouvrir sa demande.">
+          <span><b>{affichees.length}</b>{affichees.length > 1 ? ' arrivees affichees' : ' arrivee affichee'}</span>
+          <span>A numeriser <b>{aNumeriser}</b></span>
+          <span>Paiement joint <b>{avecPaiement}</b></span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }

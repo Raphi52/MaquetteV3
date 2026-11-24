@@ -14,10 +14,18 @@
 // par Pont/EcranOuvertureDossier.cs, qui ecrit dans le registre partage
 // (Metier/AffairesOuvertes.cs, conserve dans accueil.json). La coquille .razor
 // passe sirenDemande, pose quand on arrive d'une recherche restee vide.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 3) : la liste des dossiers ouverts
+// prend les briques de composants/ListeModerne.tsx. Tete (synthese : nombre, capital ; « Aller a un dossier… »
+// Ctrl K, le registre grandit a chaque ouverture), une ligne par dossier : la denomination avec son avatar, le
+// numero de gestion et le SIREN en gris, la forme et l'origine en pastilles, la date, le capital avec sa
+// mini-barre (par monnaie), et un pied. Pas de vues ni de cartes : la colonne de gauche est une fiche a remplir,
+// pas des criteres. La fiche, ses controles et l'ouverture ne changent pas.
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { dateSaisie, decimalLisible, useNombreSaisi } from '../saisie'
+import { CelluleIdentite, EnteteListe, ListeModerne, MontantBarre, Pastille, PiedListe, type Teinte } from '../composants/ListeModerne'
 
 export interface LigneDossierOuvert {
   numero: string
@@ -58,6 +66,38 @@ const Formes = ['SAS', 'SASU', 'SARL', 'EURL', 'SA', 'SNC', 'SCI', 'Societe civi
 
 const Qualites = ['President', 'Directeur general', 'Gerant', 'Administrateur', 'Associe unique']
 
+/** La teinte d'une forme juridique, par famille (actions, parts, civiles, personnes). */
+const TeinteForme: Record<string, Teinte> = {
+  SAS: 'bleu', SASU: 'bleu', SA: 'violet', SARL: 'vert', EURL: 'vert', SNC: 'orange', SCI: 'ardoise', 'Societe civile': 'ardoise',
+}
+
+/** La teinte de chaque porte d'entree (Origines). */
+const TeinteOrigine: Record<string, Teinte> = {
+  'Guichet unique (INPI)': 'violet', 'Demande recue au greffe': 'bleu', 'Depot au guichet': 'orange',
+}
+
+/** Le capital rendu par le pont en « N0 » (« 1 000 », separateur selon la culture) : ses seuls chiffres. */
+export function valeurCapital(capital: string): number {
+  const chiffres = capital.replace(/\D/g, '')
+  return chiffres === '' ? 0 : Number(chiffres)
+}
+
+/** Un nombre entier a la francaise, l'espace des milliers lisible (meme choix que montant() du socle). */
+function entier(valeur: number): string {
+  return valeur.toLocaleString('fr-FR', { maximumFractionDigits: 0 }).replace(/\u202f/g, '\u00a0')
+}
+
+/** Les colonnes du tableau : Dossier, Forme, Origine, Immatriculation, Capital. */
+const NbColonnes = 5
+
+/**
+ * « Aller a… » compare sans casse ni accents, comme la Recherche d'affaires : « dépôt » trouve « Depot au guichet ».
+ * fix-ok: contientSansCasse (criteres.ts) garde les accents ; test « Aller a un dossier… » rouge sur « dépôt », vert ici.
+ */
+function normaliser(texte: string): string {
+  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
 export function EcranOuvertureDossier({ sirenDemande }: ProprietesEcranOuvertureDossier) {
   const [origine, setOrigine] = useState(Origines[0]!)
   const [siren, setSiren] = useState(() => (sirenDemande ?? '').trim())
@@ -77,6 +117,8 @@ export function EcranOuvertureDossier({ sirenDemande }: ProprietesEcranOuverture
   const [bloquant, setBloquant] = useState(false)
   // null tant que le pont n'a pas repondu : ni ligne ni « aucun dossier ouvert ».
   const [ouverts, setOuverts] = useState<LigneDossierOuvert[] | null>(null)
+  // « Aller a un dossier… » (Ctrl K) : filtre la liste AFFICHEE.
+  const [filtreRapide, setFiltreRapide] = useState('')
 
   useEffect(() => {
     let perime = false
@@ -114,6 +156,17 @@ export function EcranOuvertureDossier({ sirenDemande }: ProprietesEcranOuverture
     setMessage('')
     setBloquant(false)
   }
+
+  const tous = ouverts ?? []
+  const cherche = filtreRapide.trim()
+  const chercheNormal = normaliser(cherche)
+  const affiches = cherche === '' ? tous : tous.filter((d) => normaliser(
+    [d.numero, d.siren, d.denomination, d.forme, d.origine].join(' ')).includes(chercheNormal))
+  // Le capital se compare et s'additionne dans sa monnaie : une barre EUR ne se mesure pas a un capital CHF.
+  const monnaies = [...new Set(affiches.map((d) => d.monnaie))]
+  const capitalMax = (monnaie: string) => affiches.filter((d) => d.monnaie === monnaie).reduce((m, d) => Math.max(m, valeurCapital(d.capital)), 0)
+  const capitalTotal = (monnaie: string) => affiches.filter((d) => d.monnaie === monnaie).reduce((s, d) => s + valeurCapital(d.capital), 0)
+  const totaux = monnaies.map((m) => `${entier(capitalTotal(m))} ${m}`).join(' · ')
 
   return (
     <div className="rig-proc__corps">
@@ -220,46 +273,60 @@ export function EcranOuvertureDossier({ sirenDemande }: ProprietesEcranOuverture
         )}
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Dossiers ouverts</div>
-          <span className="rig-resultats-proc__compte">{ouverts && <>{ouverts.length}{' dossier(s)'}</>}</span>
-        </div>
+      <ListeModerne etiquette="Dossiers ouverts">
+        <EnteteListe titre="Dossiers ouverts"
+                     synthese={ouverts ? <>{affiches.length}{' dossier(s)'}{affiches.length > 0 ? ` · capital ${totaux}` : ''}</> : undefined}
+                     filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a un dossier…' }} />
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup>
+              <col /><col style={{ width: '13%' }} /><col style={{ width: '22%' }} /><col style={{ width: '15%' }} />
+              <col style={{ width: '20%' }} />
+            </colgroup>
             <thead>
               <tr>
-                <th>N° de gestion</th>
-                <th>N° SIREN</th>
-                <th>Denomination</th>
+                <th>Dossier</th>
                 <th>Forme</th>
-                <th>Immatriculation</th>
-                <th>Capital</th>
                 <th>Origine</th>
+                <th>Immatriculation</th>
+                <th className="rig-lm-droite">Capital</th>
               </tr>
             </thead>
             <tbody>
-              {(ouverts ?? []).map((d) => (
+              {affiches.map((d) => (
                 <tr key={d.numero}>
-                  <td className="rig-table__mono">{d.numero}</td>
-                  <td className="rig-table__mono">{d.siren}</td>
-                  <td>{d.denomination}</td>
-                  <td>{d.forme}</td>
+                  <CelluleIdentite nom={d.denomination} titre={`${d.denomination} · ${d.numero} · SIREN ${d.siren}`}
+                                   objet={<><span>{d.numero}</span>{' · SIREN '}{d.siren}</>} />
+                  <td><Pastille teinte={TeinteForme[d.forme] ?? 'gris'}>{d.forme}</Pastille></td>
+                  <td title={d.origine}><Pastille teinte={TeinteOrigine[d.origine] ?? 'gris'}>{d.origine}</Pastille></td>
                   <td className="rig-table__mono">{d.immatriculation}</td>
-                  <td className="rig-table__mono">{d.capital} {d.monnaie}</td>
-                  <td>{d.origine}</td>
+                  <td className="rig-lm-droite" title={`${d.capital} ${d.monnaie}`}>
+                    <MontantBarre valeur={valeurCapital(d.capital)} max={capitalMax(d.monnaie)} texte={`${d.capital} ${d.monnaie}`} />
+                  </td>
                 </tr>
               ))}
               {ouverts && ouverts.length === 0 && (
-                <tr><td colSpan={7} className="rig-table__vide">
+                <tr><td colSpan={NbColonnes} className="rig-table__vide">
                   Aucun dossier ouvert pour l'instant : remplissez la fiche a gauche.
+                </td></tr>
+              )}
+              {tous.length > 0 && affiches.length === 0 && (
+                <tr><td colSpan={NbColonnes} className="rig-table__vide">
+                  {`Aucun des ${tous.length} dossiers ne contient « ${cherche} ».`}
                 </td></tr>
               )}
             </tbody>
           </table>
         </div>
-      </section>
+
+        {ouverts && (
+          <PiedListe>
+            <span><b>{affiches.length}</b>{affiches.length > 1 ? ' dossiers ouverts' : ' dossier ouvert'}</span>
+            {monnaies.map((m) => <span key={m}>Capital <b>{`${entier(capitalTotal(m))} ${m}`}</b></span>)}
+          </PiedListe>
+        )}
+      </ListeModerne>
     </div>
   )
 }
