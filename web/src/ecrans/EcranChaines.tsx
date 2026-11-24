@@ -10,11 +10,23 @@
 // apres archive) vivent dans le serveur (Serveur/Socle/Chaines, prouvees par tests/SocleChainesCheck) ; l'ecran montre
 // sa reponse. Tout passe par Pont/EcranChaines.cs.
 // fix-ok: fichier neuf, aucune correction a l'aveugle -- les retouches posent Entree dans un critere (decision du chef msg-e5e55277, regle lue dans tests/SoclePreferencesCheck/Program.cs:386, l'ecran inscrit dans EntreeLanceLaRecherche de Pont/EcranCorrespondances.cs).
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 6) : les listes de droite prennent les briques
+// de composants/ListeModerne.tsx -- tete (titre de la liste, synthese, « Aller a un evenement… » Ctrl K qui filtre le
+// journal affiche), les trois onglets devenus des puces de vues (meme geste : changer de liste), maillon en pastille
+// (en attente : point orange), auteur en avatar + nom, pied. Les grands totaux ont huit colonnes : cumul absolu, taux
+// de TVA, date de calcul et maillon passent dans la ligne depliee par le chevron ; le total prend sa mini-barre.
+// La « Partie du journal » reste un critere de gauche : les puces sont deja les trois listes.
+// fix-ok: application du socle des listes en plusieurs editions (lot 6), pas un correctif a l'aveugle.
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { toucheDeRecherche } from '../plan/clavier'
 import { quand } from './EcranComptes'
+import {
+  CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MontantBarre, Pastille, PiedListe, PointEtat, VuesListe,
+  type Teinte,
+} from '../composants/ListeModerne'
 
 export interface EtatChaine {
   code: string
@@ -118,7 +130,6 @@ export interface VueEcranChaines {
 type Onglet = 'journal' | 'GTF' | 'GTE'
 
 const Message = { margin: 0, padding: 'var(--rig-esp-2) var(--rig-esp-3)' } as const
-const GrilleRepartie = { tableLayout: 'fixed' } as const
 const Coupe = { overflow: 'hidden', textOverflow: 'ellipsis' } as const
 const Aide = { margin: 0, fontSize: 'var(--rig-fs-dense)', color: 'var(--rig-texte-2)' } as const
 const Bandeau = { display: 'flex', flexWrap: 'wrap', gap: 'var(--rig-esp-2)', padding: 'var(--rig-esp-2) var(--rig-esp-3)' } as const
@@ -136,6 +147,19 @@ export function periodeLisible(type: string, periode: string): string {
 }
 
 const NomType: Record<string, string> = { GTP: 'Jour', GTM: 'Mois', 'GTA/E': 'Exercice' }
+const TeinteType: Record<string, Teinte> = { GTP: 'bleu', GTM: 'violet', 'GTA/E': 'orange' }
+
+/** Le titre de chaque liste : celui de son onglet d'avant. */
+const TitreOnglet: Record<Onglet, string> = {
+  journal: 'Journal des événements', GTF: 'Grands totaux des factures', GTE: 'Grands totaux des encaissements',
+}
+
+/** Les colonnes des grands totaux : chevron, Cloture, Periode, Total, Cumul perpetuel, Pieces. */
+const NbColonnesTotaux = 6
+
+function normaliser(texte: string): string {
+  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
 
 export function EcranChaines() {
   const [vue, setVue] = useState<VueEcranChaines | null>(null)
@@ -146,6 +170,10 @@ export function EcranChaines() {
   const [au, setAu] = useState('')
   const [exercice, setExercice] = useState(String(new Date().getFullYear() - 1))
   const [occupe, setOccupe] = useState(false)
+  // « Aller a un evenement… » (Ctrl K) : filtre le journal AFFICHE, sans redemander au pont.
+  const [rapide, setRapide] = useState('')
+  // La periode depliee par son chevron (une a la fois).
+  const [ouverte, setOuverte] = useState<string | null>(null)
 
   useEffect(() => {
     let vivant = true
@@ -190,6 +218,13 @@ export function EcranChaines() {
     void jouer('EcranChaines.Purger', { exercice: Number(exercice) || 0 })
   }
   const totaux = vue.totaux.filter((t) => t.chaine === onglet)
+  const cherche = normaliser(rapide.trim())
+  const journal = cherche === '' ? vue.journal
+    : vue.journal.filter((e) => normaliser(`${e.code} ${e.libelle} ${e.detail} ${e.auteur}`).includes(cherche))
+  const enAttenteJournal = journal.filter((e) => e.seq === null).length
+  const totalMax = totaux.reduce((m, t) => (t.total > m ? t.total : m), 0)
+  // Le dernier maillon des totaux porte le cumul perpetuel a jour.
+  const dernier = totaux.reduce<GrandTotal | null>((d, t) => (d === null || t.seq > d.seq ? t : d), null)
   const archive = etat?.exercicesArchives.includes(Number(exercice)) ?? false
   const defauts = vue.controle
     ? vue.controle.chaines.flatMap((c) => [...c.defauts.map((d) => `${c.libelle} — ${d}`), ...c.ruptures.map((r) => `${c.libelle} — ${r}`)])
@@ -253,25 +288,24 @@ export function EcranChaines() {
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-onglets">
-            <button className={`rig-onglet${onglet === 'journal' ? ' rig-onglet--actif' : ''}`} onClick={() => setOnglet('journal')}>
-              Journal ({vue.journal.length})
-            </button>
-            <button className={`rig-onglet${onglet === 'GTF' ? ' rig-onglet--actif' : ''}`} onClick={() => setOnglet('GTF')}>
-              Grands totaux des factures
-            </button>
-            <button className={`rig-onglet${onglet === 'GTE' ? ' rig-onglet--actif' : ''}`} onClick={() => setOnglet('GTE')}>
-              Grands totaux des encaissements
-            </button>
-          </div>
-          <span className="rig-resultats-proc__compte">
-            {lecture ? 'Démonstration'
-              : etat?.ouverte ? `Greffe ${vue.greffe ?? ''} — chaînes ouvertes le ${etat.ouverteLe ? quand(etat.ouverteLe) : '—'}`
-              : `Greffe ${vue.greffe ?? ''} — chaînes pas encore ouvertes`}
-          </span>
-        </div>
+      <ListeModerne etiquette={TitreOnglet[onglet]}>
+        <EnteteListe titre={TitreOnglet[onglet]}
+                     synthese={<>
+                       {lecture ? <b>Démonstration</b>
+                         : etat?.ouverte ? `Greffe ${vue.greffe ?? ''} — chaînes ouvertes le ${etat.ouverteLe ? quand(etat.ouverteLe) : '—'}`
+                         : `Greffe ${vue.greffe ?? ''} — chaînes pas encore ouvertes`}
+                       {onglet === 'journal'
+                         ? <>{' · '}{journal.length}{' événement(s)'}{enAttenteJournal > 0 && <>{' · '}<b>{enAttenteJournal}</b>{' en attente de signature'}</>}</>
+                         : <>{' · '}{totaux.length}{' période(s)'}</>}
+                     </>}
+                     filtre={onglet === 'journal' ? { valeur: rapide, changer: setRapide, indication: 'Aller à un événement…' } : undefined} />
+
+        <VuesListe vues={[
+                     { cle: 'journal', libelle: 'Journal', compte: vue.journal.length },
+                     { cle: 'GTF', libelle: 'Grands totaux des factures' },
+                     { cle: 'GTE', libelle: 'Grands totaux des encaissements' },
+                   ]}
+                   active={onglet} choisir={(cle) => setOnglet(cle as Onglet)} />
 
         {lecture && (
           <p style={Message}>
@@ -310,16 +344,16 @@ export function EcranChaines() {
 
         {onglet === 'journal' && (
           <div className="rig-table-cadre">
-            <table className="rig-table" style={GrilleRepartie}>
+            <table className="rig-table rig-lm-table">
               <colgroup>
                 <col style={{ width: '128px' }} /><col style={{ width: '56px' }} /><col style={{ width: '220px' }} /><col />
-                <col style={{ width: '118px' }} /><col style={{ width: '150px' }} />
+                <col style={{ width: '128px' }} /><col style={{ width: '170px' }} />
               </colgroup>
               <thead>
                 <tr>{['Date', 'Code', 'Événement', 'Détail', 'Maillon', 'Auteur'].map((t) => <th key={t} title={t} style={Coupe}>{t}</th>)}</tr>
               </thead>
               <tbody>
-                {vue.journal.map((e) => (
+                {journal.map((e) => (
                   <tr key={e.id}>
                     <td>{quand(e.instant)}</td>
                     <td className="rig-table__mono">{e.code}</td>
@@ -327,14 +361,17 @@ export function EcranChaines() {
                     <td style={Coupe} title={e.detail}>{e.detail}</td>
                     <td title={e.purgeable ? 'Journal purgeable' : 'Journal non purgeable'}>
                       {e.seq === null
-                        ? <span className="rig-etat rig-etat--attente">En attente</span>
-                        : <span className="rig-etat">{e.purgeable ? `P ${e.exercice ?? ''} n° ${e.seq}` : `NP n° ${e.seq}`}</span>}
+                        ? <PointEtat teinte="orange">En attente</PointEtat>
+                        : <Pastille teinte={e.purgeable ? 'bleu' : 'ardoise'}>{e.purgeable ? `P ${e.exercice ?? ''} n° ${e.seq}` : `NP n° ${e.seq}`}</Pastille>}
                     </td>
-                    <td style={Coupe} title={e.auteur}>{e.auteur}</td>
+                    <CelluleIdentite nom={e.auteur} titre={e.auteur} />
                   </tr>
                 ))}
                 {vue.journal.length === 0 && (
                   <tr><td colSpan={6} className="rig-table__vide">Aucun événement ne répond à ces critères.</td></tr>
+                )}
+                {vue.journal.length > 0 && journal.length === 0 && (
+                  <tr><td colSpan={6} className="rig-table__vide">{`Aucun des ${vue.journal.length} événements ne contient « ${rapide.trim()} ».`}</td></tr>
                 )}
               </tbody>
             </table>
@@ -343,40 +380,65 @@ export function EcranChaines() {
 
         {onglet !== 'journal' && (
           <div className="rig-table-cadre">
-            <table className="rig-table" style={GrilleRepartie}>
+            <table className="rig-table rig-lm-table">
               <colgroup>
-                <col style={{ width: '82px' }} /><col style={{ width: '120px' }} /><col style={{ width: '112px' }} /><col style={{ width: '128px' }} />
-                <col style={{ width: '128px' }} /><col style={{ width: '64px' }} /><col /><col style={{ width: '72px' }} />
+                <col style={{ width: '30px' }} /><col style={{ width: '104px' }} /><col style={{ width: '130px' }} /><col />
+                <col style={{ width: '150px' }} /><col style={{ width: '72px' }} />
               </colgroup>
               <thead>
-                <tr>{['Clôture', 'Période', 'Total', 'Cumul perpétuel', 'Cumul absolu', 'Pièces', onglet === 'GTF' ? 'Par taux de TVA' : 'Calculé le', 'Maillon']
-                  .map((t) => <th key={t} title={t} style={Coupe}>{t}</th>)}</tr>
+                <tr>
+                  <th aria-label="Deplier"></th>
+                  {['Clôture', 'Période', 'Total', 'Cumul perpétuel', 'Pièces'].map((t) =>
+                    <th key={t} title={t} style={Coupe} className={t === 'Période' || t === 'Clôture' ? undefined : 'rig-lm-droite'}>{t}</th>)}
+                </tr>
               </thead>
               <tbody>
-                {totaux.map((t) => (
-                  <tr key={`${t.chaine}-${t.type}-${t.periode}`}>
-                    <td>{NomType[t.type] ?? t.type}</td>
-                    <td title={t.information ?? ''}>{periodeLisible(t.type, t.periode)}</td>
-                    <td className="rig-table__mono">{euros(t.total)}</td>
-                    <td className="rig-table__mono">{euros(t.cumulReel)}</td>
-                    <td className="rig-table__mono">{euros(t.cumulAbsolu)}</td>
-                    <td>{t.nbPieces}</td>
-                    <td style={Coupe}>
-                      {onglet === 'GTF'
-                        ? (t.parTaux.length === 0 ? '—' : t.parTaux.map((x) => `${x.taux.toLocaleString('fr-FR')} % : ${euros(x.montantTtc)}`).join(' · '))
-                        : quand(t.calculeLe)}
-                    </td>
-                    <td className="rig-table__mono">{t.seq}</td>
-                  </tr>
-                ))}
+                {totaux.map((t) => {
+                  const cle = `${t.chaine}-${t.type}-${t.periode}`
+                  const estOuverte = ouverte === cle
+                  return (
+                    <Fragment key={cle}>
+                      <tr className={estOuverte ? 'rig-lm-ouverte' : undefined}>
+                        <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : cle)} />
+                        <td><Pastille teinte={TeinteType[t.type] ?? 'gris'}>{NomType[t.type] ?? t.type}</Pastille></td>
+                        <td title={t.information ?? ''}>{periodeLisible(t.type, t.periode)}</td>
+                        <td className="rig-lm-droite" title={euros(t.total)}><MontantBarre valeur={t.total} max={totalMax} texte={euros(t.total)} /></td>
+                        <td className="rig-lm-droite rig-table__mono">{euros(t.cumulReel)}</td>
+                        <td className="rig-lm-droite">{t.nbPieces}</td>
+                      </tr>
+                      {estOuverte && (
+                        <LigneDetail colonnes={NbColonnesTotaux} champs={[
+                          { libelle: 'Cumul absolu', valeur: euros(t.cumulAbsolu) },
+                          ...(onglet === 'GTF' ? [{ libelle: 'Par taux de TVA', valeur: t.parTaux.length === 0 ? '—'
+                            : t.parTaux.map((x) => `${x.taux.toLocaleString('fr-FR')} % : ${euros(x.montantTtc)}`).join(' · ') }] : []),
+                          { libelle: 'Calculé le', valeur: quand(t.calculeLe) },
+                          { libelle: 'Maillon', valeur: <span className="rig-table__mono">{t.seq}</span> },
+                          { libelle: 'Information', valeur: t.information ?? '' },
+                        ]} />
+                      )}
+                    </Fragment>
+                  )
+                })}
                 {totaux.length === 0 && (
-                  <tr><td colSpan={8} className="rig-table__vide">Aucune période close pour l'instant.</td></tr>
+                  <tr><td colSpan={NbColonnesTotaux} className="rig-table__vide">Aucune période close pour l'instant.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         )}
-      </section>
+
+        {onglet === 'journal' ? (
+          <PiedListe aide="Lecture seule : un événement signé ne se modifie pas.">
+            <span><b>{journal.length}</b>{' événement(s) affiché(s)'}</span>
+            <span>En attente de signature <b>{enAttenteJournal}</b></span>
+          </PiedListe>
+        ) : (
+          <PiedListe aide="Le chevron déplie le cumul absolu, les taux de TVA et le maillon.">
+            <span><b>{totaux.length}</b>{' période(s)'}</span>
+            {dernier !== null && <span>Cumul perpétuel <b>{euros(dernier.cumulReel)}</b></span>}
+          </PiedListe>
+        )}
+      </ListeModerne>
     </div>
   )
 }

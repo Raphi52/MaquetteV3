@@ -8,11 +8,18 @@
 // regles (format lu dans le numero, jamais donne refuse, deja rendu, serie sans restitution) sont
 // tenues par le serveur (Serveur/Numerotation/Compteur, prouvees par tests/NumerotationCompteurCheck) :
 // l'ecran montre sa reponse telle quelle. Tout passe par Pont/EcranCompteurs.cs.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 6) : la liste des compteurs prend les
+// briques de composants/ListeModerne.tsx -- tete (synthese, le champ « Série ou libellé » devenu le filtre Ctrl K
+// de la tete), restitution en point colore, pied. Sept colonnes : pas de ligne depliee ; aucun critere d'etat ou de
+// type sur la liste : pas de vues. Le clic sur une ligne choisit toujours sa serie a gauche.
+// fix-ok: application du socle des listes en plusieurs editions (lot 6), pas un correctif a l'aveugle.
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, estBlanc } from '../criteres'
 import { quand } from './EcranComptes'
+import { EnteteListe, ListeModerne, PiedListe, PointEtat } from '../composants/ListeModerne'
 
 export interface CompteurNumeros {
   type: string
@@ -47,7 +54,6 @@ export interface VueEcranCompteurs {
 export const LongueurExplicationV2 = 50
 
 const Message = { margin: 0, padding: 'var(--rig-esp-2) var(--rig-esp-3)' } as const
-const GrilleRepartie = { tableLayout: 'fixed' } as const
 const Coupe = { overflow: 'hidden', textOverflow: 'ellipsis' } as const
 /** Sous un champ : la note dense de l'ecran des comptes (DetailGeste). */
 const Aide = { margin: 0, fontSize: 'var(--rig-fs-dense)', color: 'var(--rig-texte-2)' } as const
@@ -100,6 +106,8 @@ export function EcranCompteurs() {
     trouves = trouves.filter((c) => contientSansCasse(c.type, t) || contientSansCasse(c.libelle ?? '', t))
   }
   const complet = !estBlanc(type) && !estBlanc(numero) && !estBlanc(explication)
+  // Les numeros rendus qui attendent d'etre redonnes, sur la liste affichee : la synthese et le pied.
+  const enAttente = trouves.reduce((n, c) => n + (c.gestionRendus ? c.numerosRendus : 0), 0)
 
   const rendre = async () => {
     setOccupe(true)
@@ -151,13 +159,14 @@ export function EcranCompteurs() {
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Compteurs de numéros</div>
-          <span className="rig-resultats-proc__compte">
-            {lecture ? 'Démonstration' : `${vue.compteurs.length} compteur(s) — greffe ${vue.greffe ?? ''}`}
-          </span>
-        </div>
+      <ListeModerne etiquette="Compteurs de numéros">
+        <EnteteListe titre="Compteurs de numéros"
+                     synthese={<>
+                       {lecture ? <b>Démonstration</b> : `${vue.compteurs.length} compteur(s) — greffe ${vue.greffe ?? ''}`}
+                       {lecture && ` · ${vue.compteurs.length} compteur(s)`}
+                       {enAttente > 0 && <>{' · '}<b>{enAttente}</b>{' numéro(s) rendu(s) en attente'}</>}
+                     </>}
+                     filtre={{ valeur: recherche, changer: setRecherche, indication: 'Série ou libellé…' }} />
 
         {lecture && (
           <p style={Message}>
@@ -172,13 +181,8 @@ export function EcranCompteurs() {
           </p>
         )}
 
-        <label className="rig-saisie-champ" style={{ margin: 'var(--rig-esp-2) var(--rig-esp-3)' }}>
-          <span className="rig-saisie-champ__libelle">Série ou libellé</span>
-          <input className="rig-saisie-champ__saisie" value={recherche} onChange={(e) => setRecherche(e.target.value)} />
-        </label>
-
         <div className="rig-table-cadre">
-          <table className="rig-table" style={GrilleRepartie}>
+          <table className="rig-table rig-lm-table">
             <colgroup>
               {/* Largeurs mesurees sur la capture du 21/11 (1516 px) : a 44 et 92 px, « JOUR » et la puce
                   « 2 en attente » finissaient par « … » ; « Non redonnés » demande 118 px. */}
@@ -201,8 +205,8 @@ export function EcranCompteurs() {
                   <td className="rig-table__mono">{c.chrono ?? '—'}</td>
                   <td title={c.gestionRendus ? 'Un numéro rendu est redonné au prochain acte' : 'Série sans restitution : un numéro rendu n\'est pas redonné'}>
                     {c.gestionRendus
-                      ? <span className={`rig-etat rig-etat--${c.numerosRendus > 0 ? 'attente' : 'ok'}`}>{c.numerosRendus > 0 ? `${c.numerosRendus} en attente` : 'Redonnés'}</span>
-                      : <span className="rig-etat">Non redonnés</span>}
+                      ? <PointEtat teinte={c.numerosRendus > 0 ? 'orange' : 'vert'}>{c.numerosRendus > 0 ? `${c.numerosRendus} en attente` : 'Redonnés'}</PointEtat>
+                      : <PointEtat teinte="gris">Non redonnés</PointEtat>}
                   </td>
                   <td>{c.derniereAttribution ? quand(c.derniereAttribution) : '—'}</td>
                 </tr>
@@ -213,7 +217,12 @@ export function EcranCompteurs() {
             </tbody>
           </table>
         </div>
-      </section>
+
+        <PiedListe aide="Clic sur une ligne pour choisir sa série à gauche.">
+          <span><b>{trouves.length}</b>{' compteur(s) affiché(s)'}</span>
+          <span>Rendus en attente <b>{enAttente}</b></span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }

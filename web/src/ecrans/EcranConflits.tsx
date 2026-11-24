@@ -13,10 +13,18 @@
 // charte (grep de wwwroot/*.css : 0 occurrence) -> bouton « Ouvrir la fiche » (rig-bouton) dans le detail.
 // fix-ok: refus du chef (21/11) sur la capture : la liste montrait CLIENT et CLIEN_EMAIL (noms de colonnes) ; l'ecran lit
 // desormais les libelles que le serveur donne (titre du champ sur la fiche de la V2 : « Client », « E-mail »).
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 6) : la liste des ecarts prend les briques
+// de composants/ListeModerne.tsx -- tete (synthese, « Aller a une fiche… » Ctrl K qui filtre la liste affichee), vues
+// = le critere « Ecarts » existant (A traiter, Deja traites), fiche en avatar + nom, type en pastille, etat en point
+// colore, pied. Cinq colonnes : pas de ligne depliee, le detail de l'ecart reste sous la liste. La table des champs du
+// detail n'est pas une liste de resultats : elle garde le restyle commun des tableaux.
+// fix-ok: application du socle des listes en plusieurs editions (lot 6), pas un correctif a l'aveugle.
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { quand } from './EcranComptes'
+import { CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, type Teinte } from '../composants/ListeModerne'
 
 export interface ChampEcart {
   /** La colonne de la V2 : seulement en infobulle. */
@@ -95,6 +103,19 @@ export function lisible(valeur: string | null): string {
   return valeur
 }
 
+/** La teinte de la pastille d'un type de fiche : son rang dans la liste des types que rend le pont. */
+const TeintesTypes: Teinte[] = ['bleu', 'orange', 'violet', 'vert', 'ardoise', 'rouge']
+
+/** « client 3001 — DUPONT » : le nom (apres « — ») et la sorte de fiche (avant). */
+export function nomDeFiche(fiche: string): { nom: string; objet: string } {
+  const tiret = fiche.indexOf(' — ')
+  return tiret < 0 ? { nom: fiche, objet: '' } : { nom: fiche.slice(tiret + 3), objet: fiche.slice(0, tiret) }
+}
+
+function normaliser(texte: string): string {
+  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
 /** Ou mene la fiche d'un ecart : « dossier:… » ouvre l'affaire, « ecran:… » un ecran ; null, rien. */
 export function destination(cible: string | null): { genre: 'dossier' | 'ecran'; valeur: string } | null {
   if (!cible) return null
@@ -108,6 +129,8 @@ export function EcranConflits({ ouvrirDossier, ouvrir }: ProprietesEcranConflits
   const [vue, setVue] = useState<VueEcranConflits | null>(null)
   const [choisi, setChoisi] = useState<number | null>(null)
   const [occupe, setOccupe] = useState(false)
+  // « Aller a une fiche… » (Ctrl K) : filtre la liste AFFICHEE, sans relire le pont.
+  const [rapide, setRapide] = useState('')
 
   useEffect(() => {
     let vivant = true
@@ -143,8 +166,18 @@ export function EcranConflits({ ouvrirDossier, ouvrir }: ProprietesEcranConflits
     else if (d?.genre === 'ecran') ouvrir(d.valeur)
   }
 
-  const detail = vue.ecarts.find((e) => e.id === choisi) ?? vue.ecarts[0] ?? null
+  const cherche = normaliser(rapide.trim())
+  const affiches = cherche === '' ? vue.ecarts
+    : vue.ecarts.filter((e) => normaliser(`${e.fiche} ${e.libelleTable}`).includes(cherche))
+  const detail = vue.ecarts.find((e) => e.id === choisi) ?? affiches[0] ?? null
   const a = vue.alerte
+  const enRetard = affiches.filter((e) => !e.traiteLe && e.enRouge).length
+  const teinteType = (code: string): Teinte => {
+    const rang = vue.tables.findIndex((t) => t.code === code)
+    return rang < 0 ? 'gris' : TeintesTypes[rang % TeintesTypes.length]!
+  }
+  // Les vues : les deux valeurs du critere « Ecarts » ; aucune n'est active quand un type de fiche est choisi.
+  const vueActive = vue.table !== null ? null : vue.traites ? 'traites' : 'attente'
 
   return (
     <div className="rig-proc__corps">
@@ -181,13 +214,21 @@ export function EcranConflits({ ouvrirDossier, ouvrir }: ProprietesEcranConflits
         </p>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Fiches en conflit</div>
-          <span className="rig-resultats-proc__compte">
-            {vue.mode === 'demo' ? 'Démonstration' : `${vue.ecarts.length} écart(s) — greffe ${vue.greffe ?? ''}`}
-          </span>
-        </div>
+      <ListeModerne etiquette="Fiches en conflit">
+        <EnteteListe titre="Fiches en conflit"
+                     synthese={<>
+                       {vue.mode === 'demo' ? <b>Démonstration</b> : `${vue.ecarts.length} écart(s) — greffe ${vue.greffe ?? ''}`}
+                       {vue.mode === 'demo' && ` · ${vue.ecarts.length} écart(s)`}
+                       {enRetard > 0 && <>{' · '}<b>{enRetard}</b>{' en retard'}</>}
+                     </>}
+                     filtre={{ valeur: rapide, changer: setRapide, indication: 'Aller à une fiche…',
+                               valider: () => { if (affiches.length === 1) setChoisi(affiches[0]!.id) } }} />
+
+        <VuesListe vues={[
+                     { cle: 'attente', libelle: 'À traiter', compte: a?.nonTraites },
+                     { cle: 'traites', libelle: 'Déjà traités' },
+                   ]}
+                   active={vueActive} choisir={(cle) => void relire(cle === 'traites', null)} />
 
         {vue.mode === 'demo' && (
           <p style={Message}>
@@ -203,36 +244,49 @@ export function EcranConflits({ ouvrirDossier, ouvrir }: ProprietesEcranConflits
         )}
 
         <div className="rig-table-cadre">
-          <table className="rig-table" style={{ tableLayout: 'fixed' }}>
+          <table className="rig-table rig-lm-table">
             <colgroup>
-              <col /><col style={{ width: '140px' }} /><col style={{ width: '124px' }} /><col style={{ width: '70px' }} />
-              <col style={{ width: '150px' }} />
+              <col /><col style={{ width: '150px' }} /><col style={{ width: '124px' }} /><col style={{ width: '70px' }} />
+              <col style={{ width: '130px' }} />
             </colgroup>
             <thead>
-              <tr>{['Fiche', 'Type de fiche', 'Vu le', 'Champs', 'État'].map((t) => <th key={t} title={t} style={Coupe}>{t}</th>)}</tr>
+              <tr>{['Fiche', 'Type de fiche', 'Vu le', 'Champs', 'État'].map((t) =>
+                <th key={t} title={t} style={Coupe} className={t === 'Champs' ? 'rig-lm-droite' : undefined}>{t}</th>)}</tr>
             </thead>
             <tbody>
-              {vue.ecarts.map((e) => (
-                <tr key={e.id} onClick={() => setChoisi(e.id)} aria-selected={detail?.id === e.id}>
-                  <td style={Coupe} title={e.fiche}>{e.fiche}</td>
-                  <td style={Coupe} title={e.libelleTable}>{e.libelleTable}</td>
-                  <td>{quand(e.detecteLe)}</td>
-                  <td>{e.champs.length}</td>
-                  <td>
-                    {e.traiteLe
-                      ? <span className="rig-etat rig-etat--ok" title={`par ${e.traitePar ?? '?'} le ${quand(e.traiteLe)}`}>Traité</span>
-                      : <span className={`rig-etat rig-etat--${e.enRouge ? 'alerte' : 'attente'}`}>{e.enRouge ? 'En retard' : 'À traiter'}</span>}
-                  </td>
-                </tr>
-              ))}
+              {affiches.map((e) => {
+                const { nom, objet } = nomDeFiche(e.fiche)
+                return (
+                  <tr key={e.id} onClick={() => setChoisi(e.id)} aria-selected={detail?.id === e.id}
+                      className={detail?.id === e.id ? 'rig-ligne--valide' : undefined}>
+                    <CelluleIdentite nom={nom} objet={objet} titre={e.fiche} />
+                    <td title={e.libelleTable}><Pastille teinte={teinteType(e.tableV2)}>{e.libelleTable}</Pastille></td>
+                    <td>{quand(e.detecteLe)}</td>
+                    <td className="rig-lm-droite">{e.champs.length}</td>
+                    <td>
+                      {e.traiteLe
+                        ? <span title={`par ${e.traitePar ?? '?'} le ${quand(e.traiteLe)}`}><PointEtat teinte="vert">Traité</PointEtat></span>
+                        : <PointEtat teinte={e.enRouge ? 'rouge' : 'orange'}>{e.enRouge ? 'En retard' : 'À traiter'}</PointEtat>}
+                    </td>
+                  </tr>
+                )
+              })}
               {vue.ecarts.length === 0 && (
                 <tr><td colSpan={5} className="rig-table__vide">
                   {vue.traites ? 'Aucun écart traité pour ce filtre.' : 'Aucune fiche modifiée des deux côtés : rien à revoir.'}
                 </td></tr>
               )}
+              {vue.ecarts.length > 0 && affiches.length === 0 && (
+                <tr><td colSpan={5} className="rig-table__vide">{`Aucune des ${vue.ecarts.length} fiches ne contient « ${rapide.trim()} ».`}</td></tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        <PiedListe aide="Clic sur une ligne pour voir ses champs ci-dessous.">
+          <span><b>{affiches.length}</b>{' écart(s) affiché(s)'}</span>
+          <span>En retard <b>{enRetard}</b></span>
+        </PiedListe>
 
         {detail && (
           <div style={Detail} aria-label="Détail de l'écart">
@@ -265,7 +319,7 @@ export function EcranConflits({ ouvrirDossier, ouvrir }: ProprietesEcranConflits
             </div>
           </div>
         )}
-      </section>
+      </ListeModerne>
     </div>
   )
 }

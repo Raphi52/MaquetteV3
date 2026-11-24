@@ -17,10 +17,19 @@
 // session que la COQUILLE ouvre avec l'etat vivant de l'accueil : React recoit
 // son identifiant (session) et « version », qui change quand la coquille
 // rouvre l'ecran sur une autre recette.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 6) : la grille du lot prend les briques de
+// composants/ListeModerne.tsx -- tete (titre de la recette, synthese, « Aller a un dossier… » Ctrl K qui filtre les
+// lignes affichees : un lot compte parfois quarante dossiers), societe en avatar + nom et numero en gris, etat du
+// dossier en point colore (ce que disait seulement l'infobulle de la ligne), pied. Les champs de la recette RESTENT en
+// colonnes, meme au-dela de sept : c'est la saisie en lot elle-meme, les replier dans une ligne depliee la casserait.
+// Aucun critere d'etat ou de type : pas de vues. Saisie, propagation et cloture par dossier ne changent pas.
+// fix-ok: application du socle des listes en plusieurs editions (lot 6), pas un correctif a l'aveugle.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { appeler } from '../pont'
 import { Saisie } from '../session'
+import { CelluleIdentite, EnteteListe, ListeModerne, PiedListe, PointEtat } from '../composants/ListeModerne'
 
 export interface LotVue {
   code: string
@@ -99,11 +108,25 @@ function useVueDeLot(session: string, version: number): [VueTachesLot | null, (g
   return [vue, geste]
 }
 
+function normaliser(texte: string): string {
+  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
 export function EcranTachesLot({ session, version }: ProprietesEcranTachesLot) {
   const [vue, geste] = useVueDeLot(session, version)
+  // « Aller a un dossier… » (Ctrl K) : filtre les lignes AFFICHEES, sans rien demander a la session. Il ne vaut que
+  // pour la recette ou il a ete tape : une autre tache (clic a gauche, ou la coquille) repart sans filtre.
+  const [filtreDe, setFiltreDe] = useState({ recette: '', texte: '' })
   if (vue === null) return null
 
   const recette = vue.recette
+  const rapide = filtreDe.recette === (recette?.code ?? '') ? filtreDe.texte : ''
+  const setRapide = (texte: string) => setFiltreDe({ recette: recette?.code ?? '', texte })
+  const cherche = normaliser(rapide.trim())
+  const affiches = cherche === '' ? vue.dossiers : vue.dossiers.filter((d) => normaliser(`${d.dossier} ${d.nom}`).includes(cherche))
+  const prets = affiches.filter((d) => d.pret).length
+  // Societe, champs de la recette, etat, propagation, cloture.
+  const nbColonnes = (recette?.champs.length ?? 0) + 4
 
   return (
     <div className="rig-proc__corps">
@@ -135,21 +158,15 @@ export function EcranTachesLot({ session, version }: ProprietesEcranTachesLot) {
         )}
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">
-            <span>{recette?.titre ?? 'Traitement en lot'}</span>
-            {recette !== null && (
-              <>
-                {/* Un espace insecable AVANT la puce : sans lui, le code se
-                    collait au titre (« ...NOM DE DOMAINEDENO », vu le 16/09). */}
-                <span>{' · '}</span>{' '}
-                <span className="rig-infos__table">{recette.evenements}</span>
-              </>
-            )}
-          </div>
-          <span className="rig-resultats-proc__compte">{vue.dossiers.length} dossier(s)</span>
-        </div>
+      <ListeModerne etiquette="Traitement en lot">
+        <EnteteListe titre={recette?.titre ?? 'Traitement en lot'}
+                     synthese={<>
+                       {recette !== null && <>{recette.evenements}{' · '}</>}
+                       {affiches.length}{' dossier(s)'}
+                       {prets > 0 && <>{' · '}<b>{prets}</b>{' pret(s) a terminer'}</>}
+                     </>}
+                     filtre={recette !== null && !recette.aRepetition
+                       ? { valeur: rapide, changer: setRapide, indication: 'Aller a un dossier…' } : undefined} />
 
         {recette === null ? (
           <div className="rig-vide">Choisir une tache a gauche pour traiter ses dossiers ensemble.</div>
@@ -163,24 +180,28 @@ export function EcranTachesLot({ session, version }: ProprietesEcranTachesLot) {
         ) : (
           <>
             <div className="rig-table-cadre">
-              <table className="rig-table">
+              <table className="rig-table rig-lm-table">
+                <colgroup>
+                  <col style={{ width: '24%' }} />
+                  {recette.champs.map((_, j) => <col key={j} />)}
+                  <col style={{ width: '120px' }} /><col style={{ width: '104px' }} /><col style={{ width: '104px' }} />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>Dossier</th>
-                    <th>Societe</th>
                     {recette.champs.map((c, j) => (
                       <th key={j} title={c.colonne}>{c.libelle}</th>
                     ))}
+                    <th>Etat</th>
                     <th>Propagation</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {vue.dossiers.map((d) => (
+                  {affiches.map((d) => (
                     <tr key={d.dossier}
                         title={d.pret ? 'Pret a terminer' : `${d.restants} champ(s) et ${d.effetsRestants} publication(s) a traiter`}>
-                      <td className="rig-table__mono">{d.dossier}</td>
-                      <td>{d.nom}</td>
+                      <CelluleIdentite nom={d.nom} objet={<span>{d.dossier}</span>} titre={`${d.nom} · ${d.dossier}`} />
                       {recette.champs.map((_, j) => (
                         <td key={j}>
                           <Saisie className="rig-saisie-champ__saisie" quand="change"
@@ -188,6 +209,10 @@ export function EcranTachesLot({ session, version }: ProprietesEcranTachesLot) {
                                   changer={(v) => geste('Ecrire', { dossier: d.dossier, champ: j, valeur: v })} />
                         </td>
                       ))}
+                      <td>
+                        {d.pret ? <PointEtat teinte="vert">Pret</PointEtat>
+                          : <PointEtat teinte="orange">{d.restants + d.effetsRestants}{' a traiter'}</PointEtat>}
+                      </td>
                       <td className="rig-table__mono">
                         {recette.effets - d.effetsRestants}{' / '}{recette.effets}{' '}
                         <button className="rig-bouton rig-bouton--plat"
@@ -204,7 +229,12 @@ export function EcranTachesLot({ session, version }: ProprietesEcranTachesLot) {
                     </tr>
                   ))}
                   {vue.dossiers.length === 0 && (
-                    <tr><td colSpan={9} className="rig-table__vide">Plus aucun dossier en attente pour cette tache.</td></tr>
+                    <tr><td colSpan={nbColonnes} className="rig-table__vide">Plus aucun dossier en attente pour cette tache.</td></tr>
+                  )}
+                  {vue.dossiers.length > 0 && affiches.length === 0 && (
+                    <tr><td colSpan={nbColonnes} className="rig-table__vide">
+                      {`Aucun des ${vue.dossiers.length} dossiers ne contient « ${rapide.trim()} ».`}
+                    </td></tr>
                   )}
                 </tbody>
               </table>
@@ -212,9 +242,13 @@ export function EcranTachesLot({ session, version }: ProprietesEcranTachesLot) {
             {vue.dernierMessage.length > 0 && (
               <div className="rig-fiche__note">{vue.dernierMessage}</div>
             )}
+            <PiedListe aide="Terminer clot la tache sur ce seul dossier, quand ses champs et ses publications sont faits.">
+              <span><b>{affiches.length}</b>{' dossier(s) affiche(s)'}</span>
+              <span>Prets <b>{prets}</b></span>
+            </PiedListe>
           </>
         )}
-      </section>
+      </ListeModerne>
     </div>
   )
 }

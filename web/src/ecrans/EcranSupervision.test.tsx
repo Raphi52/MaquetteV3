@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { EcranSupervision, pastilleTraitement, type DefautSignale, type EtatGreffe, type ErreurTechnique, type VueEcranSupervision } from './EcranSupervision'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
+// fix-ok: tests suivis sur la liste moderne (lot 6 des listes) : puces de vues, points d'etat, ligne depliee, filtre Ctrl K, pied -- pas un correctif.
+
+/** Les onglets sont devenus des puces de vues : « Greffes » et son compte (« Greffes 40 »). */
+const puce = (nom: string) => screen.getByRole('button', { name: nom })
 
 // Les regles (journal, alertes, relance, purge) vivent dans le serveur et sont prouvees par
 // tests/SocleSupervisionCheck. Ici : l'ecran montre ce que le pont lui rend et lui remonte chaque geste.
@@ -55,23 +59,31 @@ describe('EcranSupervision', () => {
   it('SOC-011 CA03 : montre les 40 greffes, outre-mer compris, et la base en panne', async () => {
     installerFauxPont({ 'EcranSupervision.Ouvrir': () => vue() })
     render(<EcranSupervision />)
-    expect(await screen.findByText('Greffes (40)')).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Greffes 40' })).toBeTruthy()
     expect(screen.getByText(/40 greffe\(s\), dont 6 d'outre-mer — 1 à surveiller/)).toBeTruthy()
     const lignes = screen.getAllByRole('row').slice(1)
     expect(lignes).toHaveLength(40)
     expect(lignes.find((l) => l.textContent?.includes('3802'))!.textContent).toContain('Injoignable')
     expect(lignes.find((l) => l.textContent?.includes('9871'))!.textContent).toContain('outre-mer')
+    // La base en point colore : injoignable rouge ; le greffe en avatar + nom.
+    const vienne = lignes.find((l) => l.textContent?.includes('3802'))!
+    expect(vienne.querySelector('.rig-lm-etat')!.className).toBe('rig-lm-etat rig-lm-t-rouge')
+    expect(vienne.querySelector('.rig-lm-identite__nom')!.textContent).toBe('Greffe 3802')
+    expect(document.querySelector('.rig-lm-titre')!.textContent).toBe('Greffes')
+    expect(document.querySelector('.rig-lm-pied')!.textContent).toBe('40 greffe(s) affiché(s)Survol d\'un état : son détail (base, migrations, échecs).')
   })
 
   it('SOC-011 CA02 : rappelle l\'alerte ouverte, qui nomme le greffe', async () => {
     installerFauxPont({ 'EcranSupervision.Ouvrir': () => vue() })
     render(<EcranSupervision />)
     expect(await screen.findByText('1 alerte(s)')).toBeTruthy()
-    fireEvent.click(screen.getByText('Alertes (1)'))
+    fireEvent.click(puce('Alertes 1'))
     const ligne = screen.getAllByRole('row')[1]!
     expect(ligne.textContent).toContain('Base injoignable')
     expect(ligne.textContent).toContain('3802')
     expect(ligne.textContent).toContain('Envoyée')
+    expect(ligne.querySelector('.rig-lm-pastille')!.className).toBe('rig-lm-pastille rig-lm-t-violet')
+    expect(ligne.querySelector('.rig-lm-etat')!.className).toBe('rig-lm-etat rig-lm-t-rouge')
   })
 
   it('SOC-011 CA04 : relance un traitement en erreur par son nom', async () => {
@@ -80,12 +92,48 @@ describe('EcranSupervision', () => {
       'EcranSupervision.Relancer': () => vue({ message: 'Traitement Recopie relancé (en erreur → en marche) : 3 élément(s) en file repris, rien n\'est perdu.' }),
     })
     render(<EcranSupervision />)
-    fireEvent.click(await screen.findByText('Traitements (2)'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Traitements 2' }))
     const boutons = screen.getAllByRole('button', { name: 'Relancer' })
     expect(boutons).toHaveLength(1)
     fireEvent.click(boutons[0]!)
     expect((await screen.findByRole('status')).textContent).toContain('rien n\'est perdu')
     expect(pont.appels).toHaveBeenCalledWith('EcranSupervision.Relancer', 'Recopie')
+  })
+
+  it('SOC-011 CA04 : huit colonnes d\'avant -- « En cours » et le dernier message sont dans la ligne depliee, avec « Relancer »', async () => {
+    const pont = installerFauxPont({
+      'EcranSupervision.Ouvrir': () => vue(),
+      'EcranSupervision.Relancer': () => vue({ message: 'Traitement Recopie relancé.' }),
+    })
+    render(<EcranSupervision />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Traitements 2' }))
+    const recopie = screen.getAllByRole('row').find((l) => l.textContent?.includes('Recopie'))!
+    expect(recopie.textContent).not.toContain('Délai dépassé')
+    expect(recopie.querySelector('.rig-lm-etat')!.className).toBe('rig-lm-etat rig-lm-t-rouge')
+    fireEvent.click(within(recopie).getByRole('button', { name: 'Deplier la ligne' }))
+    const detail = document.querySelector('tr.rig-lm-detail')!
+    expect(detail.textContent).toContain('Greffe 4302 — Délai dépassé (suivi 7KQ2-M9XP)')
+    // Depliee, la ligne n'offre « Relancer » qu'une fois : dans son detail, pas aussi dans la rangee.
+    expect(screen.getAllByRole('button', { name: 'Relancer' })).toHaveLength(1)
+    expect(within(recopie).queryByRole('button', { name: 'Relancer' })).toBeNull()
+    fireEvent.click(within(detail as HTMLElement).getByRole('button', { name: 'Relancer' }))
+    expect((await screen.findByRole('status')).textContent).toContain('relancé')
+    expect(pont.appels).toHaveBeenCalledWith('EcranSupervision.Relancer', 'Recopie')
+  })
+
+  it('le filtre rapide (Ctrl K) filtre la liste montree ; changer de liste le vide', async () => {
+    installerFauxPont({ 'EcranSupervision.Ouvrir': () => vue() })
+    render(<EcranSupervision />)
+    await screen.findByRole('button', { name: 'Greffes 40' })
+    const champ = screen.getByLabelText('Greffe ou serveur…')
+    expect(fireEvent.keyDown(window, { key: 'k', ctrlKey: true })).toBe(false)
+    expect(document.activeElement).toBe(champ)
+    fireEvent.change(champ, { target: { value: '97' } })
+    expect(screen.getAllByRole('row').slice(1)).toHaveLength(5)
+    expect(screen.getByText(/5 greffe\(s\), dont 5 d'outre-mer — 0 à surveiller/)).toBeTruthy()
+    fireEvent.click(puce('Erreurs 1'))
+    expect((screen.getByLabelText('Aller à une erreur…') as HTMLInputElement).value).toBe('')
+    expect(screen.getAllByRole('row').slice(1)).toHaveLength(1)
   })
 
   it('SOC-017 CA02 : cherche par identifiant de suivi et montre le detail de l\'erreur', async () => {
@@ -97,10 +145,10 @@ describe('EcranSupervision', () => {
       }),
     })
     render(<EcranSupervision />)
-    await screen.findByText('Greffes (40)')
+    await screen.findByRole('button', { name: 'Greffes 40' })
     fireEvent.change(screen.getByLabelText('Identifiant de suivi'), { target: { value: ' 7kq2-m9xp ' } })
     fireEvent.click(screen.getByRole('button', { name: 'Chercher' }))
-    expect(await screen.findByText('Erreurs (2)')).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Erreurs 2' })).toBeTruthy()
     expect(pont.appels).toHaveBeenCalledWith('EcranSupervision.Rechercher',
       { suivi: '7kq2-m9xp', greffe: null, compte: null, du: null, au: null })
     fireEvent.click(screen.getByText('EcranCompteurs.Rendre'))
@@ -120,21 +168,21 @@ describe('EcranSupervision', () => {
         : vue({ defauts: [defaut], message: 'Parcours 7KQ2-M9XP : 1 message(s), du premier au dernier.' }),
     })
     render(<EcranSupervision />)
-    fireEvent.click(await screen.findByText('Défauts (1)'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Défauts 1' }))
     const table = screen.getByRole('table', { name: 'Défauts signalés' })
     expect(table.textContent).toContain('H8RZ-4K2Q')
     expect(table.textContent).toContain('Le numéro rendu ne réapparaît pas.')
     // L'identifiant que l'agent dicte est celui d'un defaut : la recherche mene a l'onglet des defauts.
-    fireEvent.click(screen.getByText('Erreurs (1)'))
+    fireEvent.click(puce('Erreurs 1'))
     fireEvent.change(screen.getByLabelText('Identifiant de suivi'), { target: { value: 'H8RZ-4K2Q' } })
     fireEvent.click(screen.getByRole('button', { name: 'Chercher' }))
     expect((await screen.findByRole('status')).textContent).toContain('est un défaut signalé')
     expect(screen.getByRole('table', { name: 'Défauts signalés' })).toBeTruthy()
     // La derniere erreur que le defaut emporte ramene son parcours.
     fireEvent.click(screen.getByRole('button', { name: '7KQ2-M9XP' }))
-    expect(await screen.findByText('Erreurs (1)')).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Erreurs 1' })).toBeTruthy()
     expect(pont.appels).toHaveBeenLastCalledWith('EcranSupervision.Rechercher', { suivi: '7KQ2-M9XP', greffe: null, compte: null, du: null, au: null })
-    fireEvent.click(screen.getByText('Défauts (1)'))
+    fireEvent.click(puce('Défauts 1'))
     fireEvent.click(screen.getByText('Le numéro rendu ne réapparaît pas.'))
     expect(screen.getByLabelText('Détail du défaut').textContent).toContain('RDS-PUY-03')
   })

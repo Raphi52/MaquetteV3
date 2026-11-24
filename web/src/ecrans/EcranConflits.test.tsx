@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { EcranConflits, destination, lisible, type EcartRecopie, type VueEcranConflits } from './EcranConflits'
+import { EcranConflits, destination, lisible, nomDeFiche, type EcartRecopie, type VueEcranConflits } from './EcranConflits'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
+// fix-ok: tests suivis sur la liste moderne (lot 6 des listes) : tete, vues, filtre Ctrl K, pastilles, pied -- pas un correctif.
 
 // Qui gagne, ce qui est un conflit et qui peut traiter : le serveur (tests/RecopieDeuxSensCheck). Ici : l'ecran montre
 // les ecarts que le pont lui rend, la valeur perdue et la valeur gardee de chaque champ, ouvre la fiche, et remonte
@@ -34,11 +35,19 @@ describe('EcranConflits', () => {
   it('REC-004 CA01 : montre chaque fiche, et pour chaque champ la valeur perdue de l\'ancien RIG et celle gardee par la V3', async () => {
     installerFauxPont({ 'EcranConflits.Ouvrir': () => vue() })
     render(<EcranConflits ouvrirDossier={() => {}} ouvrir={() => {}} />)
-    expect(await screen.findByText('2 écart(s) — greffe 8002')).toBeTruthy()
+    expect(await screen.findByText(/^2 écart\(s\) — greffe 8002/)).toBeTruthy()
     const lignes = screen.getAllByRole('row').slice(1, 3)
-    expect(lignes[0]!.textContent).toContain('client 3001 — DUPONT')
+    // La fiche en avatar + nom, sa sorte en gris ; le type en pastille ; l'etat en point colore.
+    expect(lignes[0]!.querySelector('td')!.textContent).toBe('DDUPONTclient 3001')
+    expect(lignes[0]!.querySelector('td')!.getAttribute('title')).toBe('client 3001 — DUPONT')
     expect(lignes[0]!.textContent).toContain('À traiter')
     expect(lignes[1]!.textContent).toContain('En retard')
+    expect(lignes.map((l) => l.querySelector('.rig-lm-pastille')!.className))
+      .toEqual(['rig-lm-pastille rig-lm-t-bleu', 'rig-lm-pastille rig-lm-t-orange'])
+    expect(lignes.map((l) => l.querySelector('.rig-lm-etat')!.className))
+      .toEqual(['rig-lm-etat rig-lm-t-orange', 'rig-lm-etat rig-lm-t-rouge'])
+    expect(document.querySelector('.rig-lm-synthese')!.textContent).toBe('2 écart(s) — greffe 8002 · 1 en retard')
+    expect(document.querySelector('.rig-lm-pied')!.textContent).toBe('2 écart(s) affiché(s)En retard 1Clic sur une ligne pour voir ses champs ci-dessous.')
     const detail = screen.getByLabelText("Détail de l'écart")
     expect(within(detail).getByText('v2@exemple.fr')).toBeTruthy()
     expect(within(detail).getByText('v3@exemple.fr')).toBeTruthy()
@@ -75,7 +84,7 @@ describe('EcranConflits', () => {
                                            message: 'client 3001 — DUPONT : marqué traité par Claire MARTIN le 21/11/2026 à 10:20.' }),
     })
     render(<EcranConflits ouvrirDossier={() => {}} ouvrir={() => {}} />)
-    await screen.findByText('2 écart(s) — greffe 8002')
+    await screen.findByText(/^2 écart\(s\) — greffe 8002/)
     fireEvent.click(screen.getByRole('button', { name: 'Traité' }))
     expect(await screen.findByText(/marqué traité par Claire MARTIN/)).toBeTruthy()
     expect(pont.appels).toHaveBeenCalledWith('EcranConflits.Traiter', 7, false, null)
@@ -85,12 +94,12 @@ describe('EcranConflits', () => {
   it('le bouton « Traité » n\'est pas montre a qui n\'a pas le droit, ni pour un ecart deja traite', async () => {
     installerFauxPont({ 'EcranConflits.Ouvrir': () => vue({ peutTraiter: false }) })
     render(<EcranConflits ouvrirDossier={() => {}} ouvrir={() => {}} />)
-    await screen.findByText('2 écart(s) — greffe 8002')
+    await screen.findByText(/^2 écart\(s\) — greffe 8002/)
     expect(screen.queryByRole('button', { name: 'Traité' })).toBeNull()
     cleanup()
     installerFauxPont({ 'EcranConflits.Ouvrir': () => vue({ traites: true, ecarts: [ecart({ traiteLe: '2026-11-21T10:20:00', traitePar: 'Claire MARTIN' })] }) })
     render(<EcranConflits ouvrirDossier={() => {}} ouvrir={() => {}} />)
-    await screen.findByText('1 écart(s) — greffe 8002')
+    await screen.findByText(/^1 écart\(s\) — greffe 8002/)
     expect(screen.queryByRole('button', { name: 'Traité' })).toBeNull()
     expect(screen.getByLabelText("Détail de l'écart").textContent).toContain('traité par Claire MARTIN le 21/11/2026 10:20')
   })
@@ -105,10 +114,10 @@ describe('EcranConflits', () => {
   it("le filtre par type de fiche relit la liste aupres du pont, sous le nom que lit l'agent", async () => {
     const pont = installerFauxPont({ 'EcranConflits.Ouvrir': (_t, table) => vue(table === 'CLIENT' ? { table: 'CLIENT', ecarts: [ecart()] } : {}) })
     render(<EcranConflits ouvrirDossier={() => {}} ouvrir={() => {}} />)
-    await screen.findByText('2 écart(s) — greffe 8002')
+    await screen.findByText(/^2 écart\(s\) — greffe 8002/)
     expect(screen.getByRole('option', { name: 'Dossier RCS' })).toBeTruthy()
     fireEvent.change(screen.getByLabelText('Type de fiche'), { target: { value: 'CLIENT' } })
-    expect(await screen.findByText('1 écart(s) — greffe 8002')).toBeTruthy()
+    expect(await screen.findByText(/^1 écart\(s\) — greffe 8002/)).toBeTruthy()
     expect(pont.appels).toHaveBeenLastCalledWith('EcranConflits.Ouvrir', false, 'CLIENT')
   })
 
@@ -124,5 +133,55 @@ describe('EcranConflits', () => {
     expect(destination('dossier:')).toBeNull()
     expect(destination(null)).toBeNull()
     expect(destination('autre:x')).toBeNull()
+  })
+})
+
+// La tete de la liste moderne : vues du critere « Ecarts », filtre rapide Ctrl K (lot 6 des listes modernes).
+describe('EcranConflits, liste moderne', () => {
+  it('les vues « À traiter » et « Déjà traités » relisent le pont comme le critere « Écarts »', async () => {
+    const pont = installerFauxPont({ 'EcranConflits.Ouvrir': (traites) => vue(traites === true ? { traites: true, ecarts: [] } : {}) })
+    render(<EcranConflits ouvrirDossier={() => {}} ouvrir={() => {}} />)
+    await screen.findByText(/^2 écart\(s\) — greffe 8002/)
+    const vues = within(screen.getByRole('group', { name: 'Vues' }))
+    expect(vues.getByRole('button', { name: 'À traiter 2' }).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(vues.getByRole('button', { name: 'Déjà traités' }))
+    expect(await screen.findByText('Aucun écart traité pour ce filtre.')).toBeTruthy()
+    expect(pont.appels).toHaveBeenLastCalledWith('EcranConflits.Ouvrir', true, null)
+    expect((screen.getByLabelText('Écarts') as HTMLSelectElement).value).toBe('traites')
+    expect(vues.getByRole('button', { name: 'Déjà traités' }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('un type de fiche choisi : aucune vue n\'est active', async () => {
+    installerFauxPont({ 'EcranConflits.Ouvrir': (_t, table) => vue(table === 'CLIENT' ? { table: 'CLIENT', ecarts: [ecart()] } : {}) })
+    render(<EcranConflits ouvrirDossier={() => {}} ouvrir={() => {}} />)
+    await screen.findByText(/^2 écart\(s\) — greffe 8002/)
+    fireEvent.change(screen.getByLabelText('Type de fiche'), { target: { value: 'CLIENT' } })
+    await screen.findByText(/^1 écart\(s\) — greffe 8002/)
+    const vues = within(screen.getByRole('group', { name: 'Vues' }))
+    expect(vues.getAllByRole('button').map((b) => b.getAttribute('aria-pressed'))).toEqual(['false', 'false'])
+  })
+
+  it('Ctrl K pose le curseur dans « Aller a une fiche… » ; la frappe filtre la liste affichee sans relire le pont', async () => {
+    const pont = installerFauxPont({ 'EcranConflits.Ouvrir': () => vue() })
+    render(<EcranConflits ouvrirDossier={() => {}} ouvrir={() => {}} />)
+    await screen.findByText(/^2 écart\(s\) — greffe 8002/)
+    const appels = pont.appels.mock.calls.length
+    const champ = screen.getByLabelText('Aller à une fiche…')
+    expect(fireEvent.keyDown(window, { key: 'k', ctrlKey: true })).toBe(false)
+    expect(document.activeElement).toBe(champ)
+    fireEvent.change(champ, { target: { value: 'dossier rcs' } })
+    const lignes = screen.getAllByRole('row').slice(1, 2)
+    expect(lignes[0]!.textContent).toContain('2019B00412')
+    expect(document.querySelector('.rig-lm-pied')!.textContent).toContain('1 écart(s) affiché(s)')
+    // Le detail suit la premiere ligne affichee : la date de radiation de ce dossier.
+    expect(within(screen.getByLabelText("Détail de l'écart")).getByText('Date de radiation')).toBeTruthy()
+    expect(pont.appels.mock.calls.length).toBe(appels)
+    fireEvent.change(champ, { target: { value: 'zzz' } })
+    expect(screen.getByText('Aucune des 2 fiches ne contient « zzz ».')).toBeTruthy()
+  })
+
+  it('nomDeFiche separe le nom de la sorte de fiche', () => {
+    expect(nomDeFiche('client 3001 — DUPONT')).toEqual({ nom: 'DUPONT', objet: 'client 3001' })
+    expect(nomDeFiche('DUPONT')).toEqual({ nom: 'DUPONT', objet: '' })
   })
 })

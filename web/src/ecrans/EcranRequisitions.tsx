@@ -13,9 +13,30 @@
 // meme balisage, memes classes CSS. ECRAN A SESSION (src/session.tsx) : l'etat
 // et les regles de l'ancien @code vivent dans Pont/EcranRequisitions.cs
 // (SessionRequisitions) ; cet ecran affiche la vue et remonte chaque geste.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 6) : les deux listes de resultats prennent
+// les briques de composants/ListeModerne.tsx.
+//   - Zone haute, les commandes web : tete (titre, synthese), vues = la bascule « Masquer les traitees » d'avant
+//     (Toutes, A traiter), « Trier » sur les 9 cles du pont et « Marquer traitee » dans la barre ; societe visee en
+//     avatar + nom, famille en pastille, etat en point colore. Neuf colonnes : origine, demandeur, EDI et SIREN passent
+//     dans la ligne depliee par le chevron, avec « Rapprocher d'un dossier » (le double-clic, toujours la).
+//     Ni pied ni filtre Ctrl K ici : le compte est deja dans la synthese, il n'y a aucun montant a totaliser, l'aide
+//     reste l'infobulle de la ligne, et la bande est bornee a 32vh (rig-accueil.css, .rig-cmdweb) ; Ctrl K appartient
+//     a la liste des resultats, un seul champ par ecran.
+//   - A droite : les onglets Resultats, Panier, Articles devenus des puces de vues (meme geste « Volet »), tete avec
+//     le compteur du pont, « Aller a une societe… » Ctrl K qui filtre les resultats affiches. Resultats : societe en
+//     avatar + nom (gestion et SIREN en gris), type en pastille, etat (radiee, non inscrite, inscrite) en point colore ;
+//     l'Id, le SIREN, la gestion et l'adresse detaillee sont dans la ligne depliee, avec « Ajouter au panier » (le
+//     double-clic). Panier : meme identite ; pied de liste sous chacun. Le volet Articles est un formulaire, pas une
+//     liste : il ne change pas.
+// fix-ok: application du socle des listes en plusieurs editions (lot 6), pas un correctif a l'aveugle.
 
-import { useEffect, useRef, type KeyboardEvent } from 'react'
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { EnteteTriable } from '../composants/EnteteTriable'
+import {
+  CelluleChevron, CelluleIdentite, ChoixTri, EnteteListe, LigneDetail, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe,
+  type Teinte,
+} from '../composants/ListeModerne'
 import { appeler } from '../pont'
 import { Saisie, useSession, type PontDeSession } from '../session'
 import type { ContexteDossierVue } from '../plan/types'
@@ -162,6 +183,28 @@ const colonnesCommandesWeb: ReadonlyArray<readonly [string, string, string?]> = 
 
 const bascule = (actif: boolean) => `rig-bascule ${actif ? 'rig-bascule--actif' : ''}`
 
+/** Les colonnes de la zone haute restees au tableau, dans leur ordre ; les autres sont dans la ligne depliee
+ *  (et toutes dans « Trier »). */
+const entetesCommandesWeb = ['Societe', 'Numero', 'Recue', 'Famille', 'Etat']
+  .map((cle) => colonnesCommandesWeb.find(([, c]) => c === cle)!)
+/** Chevron, Societe visee, N commande, Recue le, Famille, Etat. */
+const NbColonnesWeb = 6
+/** Chevron, Societe, Adresse, Type, Etat, Nb inscriptions. */
+const NbColonnesResultats = 6
+
+const TeinteFamille: Record<string, Teinte> = { Endettement: 'orange', Faillite: 'rouge', 'Non opposition': 'bleu' }
+const TeinteTypeSociete: Record<string, Teinte> = { PM: 'bleu', PP: 'violet' }
+const TitreVolet: Record<string, string> = { resultats: 'Resultats', panier: 'Panier', articles: 'Articles commandes' }
+
+/** L'objet gris d'une societe : « 2001B00042 · 412 345 678 », sans « · » quand l'un des deux manque. */
+function GestionSiren({ gestion, siren }: { gestion: string; siren: string }) {
+  return <>{gestion !== '' && <span>{gestion}</span>}{gestion !== '' && siren !== '' && ' · '}{siren}</>
+}
+
+function normaliser(texte: string): string {
+  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
 export interface ProprietesEcranRequisitions {
   /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) ; absent ou null depuis l'accueil. */
   dossier?: ContexteDossierVue | null
@@ -169,6 +212,11 @@ export interface ProprietesEcranRequisitions {
 
 export function EcranRequisitions({ dossier = null }: ProprietesEcranRequisitions) {
   const [vue, geste] = useSession(pont)
+  // Les lignes depliees par leur chevron (une par liste), par rang ; reglage d'affichage, hors session.
+  const [webOuverte, setWebOuverte] = useState<number | null>(null)
+  const [societeOuverte, setSocieteOuverte] = useState<number | null>(null)
+  // « Aller a une societe… » (Ctrl K) : filtre les resultats AFFICHES, sans geste vers la session.
+  const [rapide, setRapide] = useState('')
 
   // Ouvert depuis une affaire : des que la session repond, son entreprise est
   // cherchee par son SIREN -- les gestes de l'agent qui le saisit puis clique
@@ -206,6 +254,10 @@ export function EcranRequisitions({ dossier = null }: ProprietesEcranRequisition
   const date = (champ: string, valeur: string) => (
     <Saisie className="rig-saisie-champ__saisie" type="date" quand="change" valeur={valeur} changer={article(champ)} />
   )
+  const cherche = normaliser(rapide.trim())
+  const trouvees = cherche === '' ? vue.trouvees : vue.trouvees.filter((soc) => normaliser(
+    `${soc.designation} ${soc.siren} ${soc.siren.replace(/\s/g, '')} ${soc.gestion} ${soc.id} ${soc.adresse}`).includes(cherche))
+  const radiees = trouvees.filter((soc) => soc.radie).length
 
   return (
     <div className="rig-proc__corps rig-proc__corps--cmdweb">
@@ -214,48 +266,71 @@ export function EcranRequisitions({ dossier = null }: ProprietesEcranRequisition
           C est le raccordement demande par la fiche 275 : choisir une commande
           remplit les criteres et lance la recherche pour rapprocher un dossier. */}
       <section className="rig-cmdweb">
-        <div className="rig-cmdweb__entete">
-          <div className="rig-kicker">Commandes web a traiter ({vue.nbATraiter})</div>
-          <button className={bascule(vue.masquerTraitees)} onClick={() => geste('MasquerTraitees')}>
-            <span className="rig-bascule__temoin"></span><span>Masquer les traitees</span>
-          </button>
-        </div>
+        <EnteteListe titre="Commandes web a traiter"
+                     synthese={<><b>{vue.nbATraiter}</b>{' a traiter · '}{vue.commandesWeb.length}{' affichee(s)'}</>} />
+        <VuesListe vues={[{ cle: 'toutes', libelle: 'Toutes' }, { cle: 'a-traiter', libelle: 'A traiter', compte: vue.nbATraiter }]}
+                   active={vue.masquerTraitees ? 'a-traiter' : 'toutes'}
+                   choisir={(cle) => { if ((cle === 'a-traiter') !== vue.masquerTraitees) geste('MasquerTraitees') }}>
+          {/* Le pont ne connait que la bascule d'une cle : l'ordre d'arrivee se retrouve en rouvrant l'ecran. */}
+          <ChoixTri cles={colonnesCommandesWeb.map(([libelle, cle]) => [libelle, cle] as const)} cleActive={vue.cleTri}
+                    ascendant={vue.triAscendant} origine="Ordre d'arrivee"
+                    choisir={(cle) => { if (cle !== null && cle !== vue.cleTri) geste('BasculerTri', cle) }}
+                    inverser={() => { if (vue.cleTri !== null) geste('BasculerTri', vue.cleTri) }} />
+          <button type="button" className="rig-lm-outil" disabled={!vue.commandeWebChoisie}
+                  onClick={() => geste('MarquerTraitee')}>Marquer traitee</button>
+        </VuesListe>
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup>
+              <col style={{ width: '30px' }} /><col /><col style={{ width: '14%' }} /><col style={{ width: '16%' }} />
+              <col style={{ width: '15%' }} /><col style={{ width: '13%' }} />
+            </colgroup>
             <thead>
               <tr>
-                {colonnesCommandesWeb.map(([libelle, cle, classe]) => (
-                  <EnteteTriable key={cle} libelle={libelle} cle={cle} {...(classe ? { classe } : {})} cleActive={vue.cleTri}
+                <th aria-label="Deplier"></th>
+                {entetesCommandesWeb.map(([libelle, cle]) => (
+                  <EnteteTriable key={cle} libelle={libelle} cle={cle} cleActive={vue.cleTri}
                                  ascendant={vue.triAscendant} trier={(c) => geste('BasculerTri', c)} />
                 ))}
               </tr>
             </thead>
             <tbody>
-              {vue.commandesWeb.map((web) => (
-                <tr key={web.rang} className={web.classe}
-                    title="Double-cliquez pour rapprocher cette commande d un dossier."
-                    onClick={() => geste('ChoisirCommandeWeb', web.rang)}
-                    onDoubleClick={() => geste('RapprocherCommandeWeb', web.rang)}>
-                  <td>{web.origine}</td>
-                  <td className="rig-table__mono">{web.numero}</td>
-                  <td className="rig-table__mono">{web.recue}</td>
-                  <td>{web.demandeur}</td>
-                  <td>{web.famille}</td>
-                  <td className="rig-table__centre rig-table__mono">{web.codeEdi}</td>
-                  <td>{web.societe}</td>
-                  <td className="rig-table__mono">{web.siren}</td>
-                  <td className="rig-table__centre">{web.etat}</td>
-                </tr>
-              ))}
+              {vue.commandesWeb.map((web) => {
+                const ouverte = webOuverte === web.rang
+                const classes = [web.classe, ouverte ? 'rig-lm-ouverte' : ''].filter(Boolean).join(' ')
+                return (
+                  <Fragment key={web.rang}>
+                    <tr className={classes || undefined}
+                        title="Double-cliquez pour rapprocher cette commande d un dossier."
+                        onClick={() => geste('ChoisirCommandeWeb', web.rang)}
+                        onDoubleClick={() => geste('RapprocherCommandeWeb', web.rang)}>
+                      <CelluleChevron ouverte={ouverte} basculer={() => setWebOuverte(ouverte ? null : web.rang)} />
+                      <CelluleIdentite nom={web.societe} objet={web.siren} titre={`${web.societe} · ${web.siren}`} />
+                      <td className="rig-table__mono">{web.numero}</td>
+                      <td className="rig-table__mono">{web.recue}</td>
+                      <td title={web.famille}><Pastille teinte={TeinteFamille[web.famille] ?? 'ardoise'}>{web.famille}</Pastille></td>
+                      <td>
+                        <PointEtat teinte={web.etat === 'Traitee' ? 'vert' : 'orange'}>{web.etat}</PointEtat>
+                      </td>
+                    </tr>
+                    {ouverte && (
+                      <LigneDetail colonnes={NbColonnesWeb} champs={[
+                        { libelle: 'Origine', valeur: <>{web.origine}</> },
+                        { libelle: 'Demandeur', valeur: web.demandeur },
+                        { libelle: 'EDI', valeur: <span className="rig-table__mono">{web.codeEdi}</span> },
+                        { libelle: 'Siren', valeur: <span className="rig-table__mono">{web.siren}</span> },
+                      ]} actions={[
+                        { libelle: 'Rapprocher d\'un dossier', fort: true, agir: () => geste('RapprocherCommandeWeb', web.rang) },
+                      ]} />
+                    )}
+                  </Fragment>
+                )
+              })}
               {vue.commandesWeb.length === 0 && (
-                <tr><td colSpan={9} className="rig-table__vide">Aucune commande web en attente.</td></tr>
+                <tr><td colSpan={NbColonnesWeb} className="rig-table__vide">Aucune commande web en attente.</td></tr>
               )}
             </tbody>
           </table>
-        </div>
-        <div className="rig-criteres__actions" style={{ padding: 'var(--rig-esp-2) var(--rig-esp-4)' }}>
-          <button className="rig-bouton" disabled={!vue.commandeWebChoisie}
-                  onClick={() => geste('MarquerTraitee')}>Marquer traitee</button>
         </div>
       </section>
 
@@ -352,18 +427,16 @@ export function EcranRequisitions({ dossier = null }: ProprietesEcranRequisition
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-onglets">
-            <button className={`rig-onglet ${vue.volet === 'resultats' ? 'rig-onglet--actif' : ''}`}
-                    onClick={() => geste('Volet', 'resultats')}>Resultats</button>
-            <button className={`rig-onglet ${vue.volet === 'panier' ? 'rig-onglet--actif' : ''}`}
-                    onClick={() => geste('Volet', 'panier')}>Panier ({vue.nbPanier})</button>
-            <button className={`rig-onglet ${vue.volet === 'articles' ? 'rig-onglet--actif' : ''}`}
-                    onClick={() => geste('Volet', 'articles')}>Articles commandes</button>
-          </div>
-          <span className="rig-resultats-proc__compte">{vue.compteur}</span>
-        </div>
+      <ListeModerne etiquette={TitreVolet[vue.volet] ?? 'Resultats'}>
+        <EnteteListe titre={TitreVolet[vue.volet] ?? 'Resultats'} synthese={vue.compteur}
+                     filtre={vue.volet === 'resultats'
+                       ? { valeur: rapide, changer: setRapide, indication: 'Aller a une societe…' } : undefined} />
+        <VuesListe vues={[
+                     { cle: 'resultats', libelle: 'Resultats', compte: vue.aRecherche ? vue.trouvees.length : undefined },
+                     { cle: 'panier', libelle: 'Panier', compte: vue.nbPanier },
+                     { cle: 'articles', libelle: 'Articles commandes' },
+                   ]}
+                   active={vue.volet} choisir={(cle) => geste('Volet', cle)} />
 
         {vue.message !== '' && (
           <div className="rig-nonmaq__texte" style={{ padding: '0 var(--rig-esp-4) var(--rig-esp-3)' }}>{vue.message}</div>
@@ -372,34 +445,60 @@ export function EcranRequisitions({ dossier = null }: ProprietesEcranRequisition
         {vue.volet === 'resultats' ? (
           <>
             <div className="rig-table-cadre">
-              <table className="rig-table">
+              <table className="rig-table rig-lm-table">
+                <colgroup>
+                  <col style={{ width: '30px' }} /><col style={{ width: '34%' }} /><col /><col style={{ width: '9%' }} />
+                  <col style={{ width: '15%' }} /><col style={{ width: '12%' }} />
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>Id</th><th>Siren</th><th>Gestion</th><th>Designation</th>
-                    <th>Type Adresse</th><th>Adresse</th><th className="rig-table__centre">Type</th>
-                    <th className="rig-table__centre">Non Inscrit</th>
-                    <th className="rig-table__centre">Nb Inscriptions</th>
+                    <th aria-label="Deplier"></th><th>Designation</th><th>Adresse</th>
+                    <th>Type</th><th>Etat</th>
+                    <th className="rig-lm-droite">Nb Inscriptions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {vue.trouvees.map((soc) => (
-                    <tr key={soc.rang} className={soc.radie ? 'rig-table__ligne--inerte' : ''}
-                        title={soc.infobulle}
-                        onDoubleClick={() => geste('AjouterAuPanier', soc.rang)}>
-                      <td className="rig-table__mono">{soc.id}</td>
-                      <td className="rig-table__mono">{soc.siren}</td>
-                      <td className="rig-table__mono">{soc.gestion}</td>
-                      <td>{soc.designation}</td>
-                      <td>{soc.typeAdresse}</td>
-                      <td>{soc.adresse}</td>
-                      <td className="rig-table__centre">{soc.type}</td>
-                      <td className="rig-table__centre">{soc.nonInscrit ? 'oui' : ''}</td>
-                      <td className="rig-table__centre">{soc.nbInscriptions}</td>
-                    </tr>
-                  ))}
+                  {trouvees.map((soc) => {
+                    const ouverte = societeOuverte === soc.rang
+                    const classes = [soc.radie ? 'rig-table__ligne--inerte' : '', ouverte ? 'rig-lm-ouverte' : ''].filter(Boolean).join(' ')
+                    return (
+                      <Fragment key={soc.rang}>
+                        <tr className={classes || undefined}
+                            title={soc.infobulle}
+                            onDoubleClick={() => geste('AjouterAuPanier', soc.rang)}>
+                          <CelluleChevron ouverte={ouverte} basculer={() => setSocieteOuverte(ouverte ? null : soc.rang)} />
+                          <CelluleIdentite nom={soc.designation}
+                                           objet={<GestionSiren gestion={soc.gestion} siren={soc.siren} />} />
+                          <td title={`${soc.typeAdresse} · ${soc.adresse}`}>{soc.adresse}</td>
+                          <td><Pastille teinte={TeinteTypeSociete[soc.type] ?? 'ardoise'}>{soc.type}</Pastille></td>
+                          <td>
+                            {soc.radie ? <PointEtat teinte="rouge">Radiee</PointEtat>
+                              : soc.nonInscrit ? <PointEtat teinte="gris">Non inscrite</PointEtat>
+                              : <PointEtat teinte="vert">Inscrite</PointEtat>}
+                          </td>
+                          <td className="rig-lm-droite">{soc.nbInscriptions}</td>
+                        </tr>
+                        {ouverte && (
+                          <LigneDetail colonnes={NbColonnesResultats} champs={[
+                            { libelle: 'Id', valeur: <span className="rig-table__mono">{soc.id}</span> },
+                            { libelle: 'Siren', valeur: <span className="rig-table__mono">{soc.siren}</span> },
+                            { libelle: 'Gestion', valeur: <span className="rig-table__mono">{soc.gestion}</span> },
+                            { libelle: 'Type Adresse', valeur: soc.typeAdresse },
+                            { libelle: 'Adresse', valeur: soc.adresse },
+                            { libelle: 'Non Inscrit', valeur: soc.nonInscrit ? 'oui' : 'non' },
+                          ]} actions={[{ libelle: 'Ajouter au panier', fort: true, agir: () => geste('AjouterAuPanier', soc.rang) }]} />
+                        )}
+                      </Fragment>
+                    )
+                  })}
                   {vue.trouvees.length === 0 && (
-                    <tr><td colSpan={9} className="rig-table__vide">
+                    <tr><td colSpan={NbColonnesResultats} className="rig-table__vide">
                       {vue.aRecherche ? 'Aucune societe ne repond a ces criteres.' : 'Saisissez un critere puis lancez la recherche.'}
+                    </td></tr>
+                  )}
+                  {vue.trouvees.length > 0 && trouvees.length === 0 && (
+                    <tr><td colSpan={NbColonnesResultats} className="rig-table__vide">
+                      {`Aucune des ${vue.trouvees.length} societes ne contient « ${rapide.trim()} ».`}
                     </td></tr>
                   )}
                 </tbody>
@@ -411,15 +510,21 @@ export function EcranRequisitions({ dossier = null }: ProprietesEcranRequisition
                 Veuillez preciser votre recherche pour reduire le nombre de resultats.
               </div>
             )}
+            <PiedListe aide="Double-clic sur une ligne pour l'ajouter au panier.">
+              <span><b>{trouvees.length}</b>{' societe(s) affichee(s)'}</span>
+              <span>Radiees <b>{radiees}</b></span>
+            </PiedListe>
           </>
         ) : vue.volet === 'panier' ? (
           <>
             <div className="rig-table-cadre">
-              <table className="rig-table">
+              <table className="rig-table rig-lm-table">
+                <colgroup>
+                  <col style={{ width: '44px' }} /><col style={{ width: '32%' }} /><col style={{ width: '26%' }} /><col />
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>N</th><th>Siren</th><th>Gestion</th><th>Designation</th>
-                    <th>Adresse</th><th>Articles commandes</th>
+                    <th>N</th><th>Designation</th><th>Adresse</th><th>Articles commandes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -428,15 +533,13 @@ export function EcranRequisitions({ dossier = null }: ProprietesEcranRequisition
                         onClick={() => geste('Selectionner', cmd.rang)}
                         onDoubleClick={() => geste('Supprimer', cmd.rang)}>
                       <td className="rig-table__mono">{cmd.numCommande}</td>
-                      <td className="rig-table__mono">{cmd.siren}</td>
-                      <td className="rig-table__mono">{cmd.gestion}</td>
-                      <td>{cmd.designation}</td>
-                      <td>{cmd.adresse}</td>
-                      <td>{cmd.resume}</td>
+                      <CelluleIdentite nom={cmd.designation} objet={<GestionSiren gestion={cmd.gestion} siren={cmd.siren} />} />
+                      <td title={cmd.adresse}>{cmd.adresse}</td>
+                      <td title={cmd.resume}>{cmd.resume}</td>
                     </tr>
                   ))}
                   {vue.panier.length === 0 && (
-                    <tr><td colSpan={6} className="rig-table__vide">
+                    <tr><td colSpan={4} className="rig-table__vide">
                       Le panier est vide : double-cliquez une ligne des resultats pour l y ajouter.
                     </td></tr>
                   )}
@@ -447,6 +550,9 @@ export function EcranRequisitions({ dossier = null }: ProprietesEcranRequisition
               <button className="rig-bouton" onClick={() => geste('Valider')}>Valider</button>{' '}
               <button className="rig-bouton rig-bouton--fort" onClick={() => geste('Terminer')}>Terminer</button>
             </div>
+            <PiedListe aide="Clic : ses articles ; double-clic : la retirer du panier.">
+              <span><b>{vue.panier.length}</b>{' commande(s) au panier'}</span>
+            </PiedListe>
           </>
         ) : a === null ? (
           <div className="rig-table__vide" style={{ padding: 'var(--rig-esp-4)' }}>
@@ -604,7 +710,7 @@ export function EcranRequisitions({ dossier = null }: ProprietesEcranRequisition
             </div>
           </div>
         )}
-      </section>
+      </ListeModerne>
     </div>
   )
 }
