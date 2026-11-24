@@ -11,9 +11,19 @@
 // Porte depuis Components/Ecrans/EcranClients.razor (lot 4) : meme balisage,
 // memes classes CSS. L'ecran ne lisait rien dans Metier/ : ses clients de
 // demonstration l'ont suivi ici. La coquille .razor recoit selectionner.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 4) : le resultat prend les briques de
+// composants/ListeModerne.tsx. Tete (compte, actifs, « Aller a un client… » Ctrl K qui filtre la liste affichee,
+// Entree choisit le client reste seul), deux cartes qui POSENT les criteres existants (Actifs, Type de client),
+// des vues = jeux de criteres (statut, type) dont « + Nouvelle vue » pour la session, une ligne par client
+// (avatar, nom, abrege · compte ; statut en point, type en pastille), pied de totaux. Les criteres de gauche et
+// le clic qui remonte l'abrege ne changent pas. Aucun montant dans cette liste : pas de carte en euros.
 
 import { useState } from 'react'
 import { contientSansCasse, estBlanc } from '../criteres'
+import {
+  CartesChiffrees, CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, type Teinte,
+} from '../composants/ListeModerne'
 
 interface ClientRcs {
   id: number
@@ -28,6 +38,9 @@ interface ClientRcs {
 // v2 : ult_ChckBxActif, ult_ChckBxBloque, ult_ChckBxSommeil.
 const Statuts = ['Actif', 'Bloque', 'En sommeil']
 const Types = ['En compte', 'Greffe', 'Prevention', 'PC', 'Web']
+
+const TeinteStatut: Record<string, Teinte> = { Actif: 'vert', Bloque: 'rouge', 'En sommeil': 'gris' }
+const TeinteType: Record<string, Teinte> = { 'En compte': 'bleu', Greffe: 'ardoise', Prevention: 'violet', PC: 'orange', Web: 'vert' }
 
 const Clients: ClientRcs[] = [
   { id: 1042, compte: 'C-000142', abrege: 'LEROY', nom: 'SELARL LEROY & ASSOCIES', groupe: 'Mandataires', statut: 'Actif', type: 'En compte' },
@@ -49,24 +62,93 @@ function basculer(ensemble: ReadonlySet<string>, valeur: string): Set<string> {
   return s
 }
 
-export function EcranClients({ selectionner }: ProprietesEcranClients) {
-  const [motCle, setMotCle] = useState('')
-  const [critStatuts, setCritStatuts] = useState<ReadonlySet<string>>(new Set())
-  const [critTypes, setCritTypes] = useState<ReadonlySet<string>>(new Set())
+/** Les criteres de gauche, tels que saisis. Une vue en est un jeu complet. */
+export interface CriteresClients {
+  motCle: string
+  statuts: ReadonlySet<string>
+  types: ReadonlySet<string>
+}
 
-  function effacer() {
-    setMotCle('')
-    setCritStatuts(new Set())
-    setCritTypes(new Set())
-  }
+const SansCritere: CriteresClients = { motCle: '', statuts: new Set(), types: new Set() }
 
+/** Les clients qui repondent aux criteres (le filtre de l'ecran, inchange). */
+function filtrer({ motCle, statuts, types }: CriteresClients): ClientRcs[] {
   let trouves = Clients
   if (!estBlanc(motCle)) {
     const t = motCle.trim()
     trouves = trouves.filter((c) => contientSansCasse(c.nom, t) || contientSansCasse(c.abrege, t) || contientSansCasse(c.compte, t))
   }
-  if (critStatuts.size > 0) trouves = trouves.filter((c) => critStatuts.has(c.statut))
-  if (critTypes.size > 0) trouves = trouves.filter((c) => critTypes.has(c.type))
+  if (statuts.size > 0) trouves = trouves.filter((c) => statuts.has(c.statut))
+  if (types.size > 0) trouves = trouves.filter((c) => types.has(c.type))
+  return trouves
+}
+
+const memeEnsemble = (a: ReadonlySet<string>, b: ReadonlySet<string>) => a.size === b.size && [...a].every((v) => b.has(v))
+const memesCriteres = (a: CriteresClients, b: CriteresClients) =>
+  a.motCle === b.motCle && memeEnsemble(a.statuts, b.statuts) && memeEnsemble(a.types, b.types)
+
+/** Une vue enregistree : un nom et un jeu complet de criteres. */
+export interface VueClients {
+  cle: string
+  libelle: string
+  criteres: CriteresClients
+}
+
+/** Les vues toujours la : les criteres de statut et de type de l'ecran. */
+export const VuesPrereglees: VueClients[] = [
+  { cle: 'tous', libelle: 'Tous', criteres: SansCritere },
+  { cle: 'actifs', libelle: 'Actifs', criteres: { ...SansCritere, statuts: new Set(['Actif']) } },
+  { cle: 'bloques-sommeil', libelle: 'Bloques ou en sommeil', criteres: { ...SansCritere, statuts: new Set(['Bloque', 'En sommeil']) } },
+  { cle: 'en-compte', libelle: 'En compte', criteres: { ...SansCritere, types: new Set(['En compte']) } },
+]
+
+/** Les vues ajoutees par « + Nouvelle vue » pendant la session (aucun reglage ne les porte, decision du lot 1). */
+const VuesDeLaSession: VueClients[] = []
+
+/** Pour les tests : repartir d'une session sans vue ajoutee. */
+export function oublierVuesDeLaSession(): void {
+  VuesDeLaSession.length = 0
+}
+
+function normaliser(texte: string): string {
+  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+export function EcranClients({ selectionner }: ProprietesEcranClients) {
+  const [motCle, setMotCle] = useState('')
+  const [critStatuts, setCritStatuts] = useState<ReadonlySet<string>>(new Set())
+  const [critTypes, setCritTypes] = useState<ReadonlySet<string>>(new Set())
+  const criteres: CriteresClients = { motCle, statuts: critStatuts, types: critTypes }
+
+  function poserCriteres(c: CriteresClients) {
+    setMotCle(c.motCle)
+    setCritStatuts(new Set(c.statuts))
+    setCritTypes(new Set(c.types))
+  }
+
+  function effacer() {
+    poserCriteres(SansCritere)
+  }
+
+  const trouves = filtrer(criteres)
+
+  // « Aller a un client… » (Ctrl K) : filtre la liste AFFICHEE, sans toucher aux criteres.
+  const [filtreRapide, setFiltreRapide] = useState('')
+  const cherche = normaliser(filtreRapide.trim())
+  const affiches = cherche === '' ? trouves
+    : trouves.filter((c) => normaliser([c.nom, c.abrege, c.compte, String(c.id)].join(' ')).includes(cherche))
+
+  const [vuesAjoutees, setVuesAjoutees] = useState<VueClients[]>(() => [...VuesDeLaSession])
+  const vues = [...VuesPrereglees, ...vuesAjoutees]
+  const vueActive = vues.find((v) => memesCriteres(v.criteres, criteres))?.cle ?? null
+  function enregistrerVue(nom: string) {
+    VuesDeLaSession.push({ cle: `session-${VuesDeLaSession.length + 1}`, libelle: nom,
+                           criteres: { motCle, statuts: new Set(critStatuts), types: new Set(critTypes) } })
+    setVuesAjoutees([...VuesDeLaSession])
+  }
+
+  const actifs = affiches.filter((c) => c.statut === 'Actif').length
+  const parType = (t: string) => affiches.filter((c) => c.type === t).length
 
   return (
     <div className="rig-proc__corps">
@@ -107,44 +189,71 @@ export function EcranClients({ selectionner }: ProprietesEcranClients) {
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Resultat</div>
-          <span className="rig-resultats-proc__compte">{trouves.length} client(s) sur {Clients.length}</span>
-        </div>
+      <ListeModerne etiquette="Resultat">
+        <EnteteListe titre="Resultat"
+                     synthese={<>{affiches.length}{affiches.length > 1 ? ' clients' : ' client'}{` sur ${Clients.length} · `}<b>{actifs}</b>
+                       {actifs > 1 ? ' actifs' : ' actif'}</>}
+                     filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a un client…',
+                               valider: () => { if (affiches.length === 1) selectionner(affiches[0]!.abrege) } }} />
+
+        <CartesChiffrees cartes={[
+          { cle: 'actifs', titre: 'Actifs', valeur: actifs, complement: `sur ${affiches.length}`,
+            anneau: { part: actifs, total: affiches.length, teinte: 'vert' },
+            actif: critStatuts.has('Actif'), choisir: () => setCritStatuts((avant) => basculer(avant, 'Actif')),
+            indication: critStatuts.has('Actif') ? 'Retirer le statut Actif des criteres' : 'Ajouter le statut Actif aux criteres' },
+          { cle: 'types', titre: 'Type de client', valeur: affiches.length, complement: affiches.length > 1 ? 'clients' : 'client',
+            legende: true,
+            ...(critTypes.size > 0 ? { choisir: () => setCritTypes(new Set()), indication: 'Tous les types' } : {}),
+            segments: Types.map((t) => ({
+              cle: t, libelle: t, valeur: parType(t), texte: String(parType(t)), teinte: TeinteType[t] ?? 'gris',
+              actif: critTypes.has(t), choisir: () => setCritTypes((avant) => basculer(avant, t)),
+            })) },
+        ]} />
+
+        <VuesListe vues={vues.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer(v.criteres).length }))} active={vueActive}
+                   choisir={(cle) => { const v = vues.find((x) => x.cle === cle); if (v) poserCriteres(v.criteres) }}
+                   enregistrer={enregistrerVue} />
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup>
+              <col /><col style={{ width: '12%' }} /><col style={{ width: '18%' }} /><col style={{ width: '15%' }} /><col style={{ width: '17%' }} />
+            </colgroup>
             <thead>
               <tr>
+                <th>Client</th>
                 <th>Id Client</th>
-                <th>N Compte</th>
-                <th>Abrege</th>
-                <th>Nom</th>
                 <th>Groupe</th>
                 <th>Statut</th>
                 <th>Type</th>
               </tr>
             </thead>
             <tbody>
-              {trouves.map((cli) => (
+              {affiches.map((cli) => (
                 <tr key={cli.id} onClick={() => selectionner(cli.abrege)}>
+                  <CelluleIdentite nom={cli.nom} objet={`${cli.abrege} · ${cli.compte}`} titre={`${cli.nom} — ${cli.abrege} · ${cli.compte}`} />
                   <td className="rig-table__mono">{cli.id}</td>
-                  <td className="rig-table__mono">{cli.compte}</td>
-                  <td className="rig-table__mono">{cli.abrege}</td>
-                  <td>{cli.nom}</td>
-                  <td>{cli.groupe}</td>
-                  <td><span className={`rig-etat rig-etat--${cli.statut === 'Actif' ? 'ok' : 'attente'}`}>{cli.statut}</span></td>
-                  <td>{cli.type}</td>
+                  <td title={cli.groupe}>{cli.groupe}</td>
+                  <td><PointEtat teinte={TeinteStatut[cli.statut] ?? 'gris'}>{cli.statut}</PointEtat></td>
+                  <td><Pastille teinte={TeinteType[cli.type] ?? 'gris'}>{cli.type}</Pastille></td>
                 </tr>
               ))}
               {trouves.length === 0 && (
-                <tr><td colSpan={7} className="rig-table__vide">Aucun client ne repond a ces criteres.</td></tr>
+                <tr><td colSpan={5} className="rig-table__vide">Aucun client ne repond a ces criteres.</td></tr>
+              )}
+              {trouves.length > 0 && affiches.length === 0 && (
+                <tr><td colSpan={5} className="rig-table__vide">{`Aucun des ${trouves.length} clients ne contient « ${filtreRapide.trim()} ».`}</td></tr>
               )}
             </tbody>
           </table>
         </div>
-      </section>
+
+        <PiedListe aide="Clic sur une ligne pour choisir le client.">
+          <span><b>{affiches.length}</b>{affiches.length > 1 ? ' clients affiches' : ' client affiche'}</span>
+          <span>Actifs <b>{actifs}</b></span>
+          <span>Fichier <b>{Clients.length}</b></span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }

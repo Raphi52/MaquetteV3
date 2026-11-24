@@ -19,10 +19,25 @@
 // compare la limite d'examen, vient de Pont/EcranCloture.cs ; les affaires de
 // demonstration etaient declarees dans l'ecran et l'ont suivi. La coquille
 // .razor recoit ouvrirDossier.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 4) : la liste prend les briques de
+// composants/ListeModerne.tsx. Les deux etapes restent deux onglets (ce sont deux jeux de colonnes, pas des
+// criteres). Tete (compte, a facturer, total des forfaits, « Aller a une affaire… » Ctrl K, Entree ouvre le
+// dossier reste seul), trois cartes qui POSENT les criteres existants (Forfaits par classement, A facturer,
+// Limite d'examen depassee), des vues = jeux de criteres dont « + Nouvelle vue » pour la session. « Selection
+// PC » : une ligne par affaire (avatar, nom, N PC · chambre ; classement en pastille ; limite en point rouge si
+// depassee ; forfait avec sa mini-barre), heures, courrier, dirigeants, liquidateurs, huissier et ville dans la
+// ligne depliee. « Enrolement / requete » : 6 colonnes, N Role et N PC sous le defendeur. Criteres, clic qui
+// ouvre le dossier et ligne en alerte ne changent pas.
+// fix-ok: application du socle des listes (lot 4) en plusieurs pas, pas un correctif.
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, dateCourte, distinctsTries, estBlanc } from '../criteres'
+import {
+  CartesChiffrees, CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MenuLigne, MontantBarre, Pastille,
+  PiedListe, PointEtat, VuesListe, montant, type ActionLigne, type Teinte,
+} from '../composants/ListeModerne'
 import type { ContexteDossierVue } from '../plan/types'
 
 interface LigneClot {
@@ -65,6 +80,86 @@ const Lignes: LigneClot[] = [
 
 const Chambres = distinctsTries(Lignes.map((l) => l.chambre))
 
+const TeinteClassement: Record<string, Teinte> = {
+  'Insuffisance d\'actif': 'orange', 'Extinction du passif': 'vert', 'Conversion en liquidation': 'rouge', Report: 'ardoise',
+}
+const TeinteSaisine: Record<string, Teinte> = { Assignation: 'orange', Requete: 'bleu' }
+const TeinteFacturation: Record<string, Teinte> = { Facturee: 'vert', 'A facturer': 'orange' }
+
+/** Le forfait en euros (« 450,00 » -> 450). */
+const forfaitDe = (l: LigneClot): number => Number(l.forfait.replace(/\s/g, '').replace(',', '.')) || 0
+
+/** Les criteres de gauche, tels que saisis. Une vue en est un jeu complet. */
+export interface CriteresCloture {
+  critAffaire: string
+  critChambre: string
+  critDu: string
+  critAu: string
+  critAFacturer: boolean
+  critExamenDepasse: boolean
+  critTypes: ReadonlySet<string>
+}
+
+const SansCritere: CriteresCloture = {
+  critAffaire: '', critChambre: '', critDu: '', critAu: '', critAFacturer: false, critExamenDepasse: false, critTypes: new Set(),
+}
+
+/** La limite d'examen est-elle depassee ? Jamais tant que la date du jour n'est pas connue. */
+const enRetardLe = (aujourdhui: string | null) => (l: LigneClot) => aujourdhui !== null && l.limiteExamen < aujourdhui
+
+/** Les affaires qui repondent aux criteres (le filtre de l'ecran, inchange). */
+function filtrer(c: CriteresCloture, aujourdhui: string | null): LigneClot[] {
+  let trouvees = Lignes
+  if (!estBlanc(c.critAffaire)) {
+    const t = c.critAffaire.trim()
+    trouvees = trouvees.filter((l) => contientSansCasse(l.affaire, t) || contientSansCasse(l.role, t))
+  }
+  if (!estBlanc(c.critChambre)) trouvees = trouvees.filter((l) => l.chambre === c.critChambre)
+  if (c.critDu !== '') trouvees = trouvees.filter((l) => l.audience >= c.critDu)
+  if (c.critAu !== '') trouvees = trouvees.filter((l) => l.audience <= c.critAu)
+  if (c.critTypes.size > 0) trouvees = trouvees.filter((l) => c.critTypes.has(l.classement))
+  if (c.critAFacturer) trouvees = trouvees.filter((l) => l.aFacturer)
+  if (c.critExamenDepasse) trouvees = trouvees.filter(enRetardLe(aujourdhui))
+  return trouvees
+}
+
+const memeEnsemble = (a: ReadonlySet<string>, b: ReadonlySet<string>) => a.size === b.size && [...a].every((v) => b.has(v))
+const memesCriteres = (a: CriteresCloture, b: CriteresCloture) =>
+  a.critAffaire === b.critAffaire && a.critChambre === b.critChambre && a.critDu === b.critDu && a.critAu === b.critAu
+  && a.critAFacturer === b.critAFacturer && a.critExamenDepasse === b.critExamenDepasse && memeEnsemble(a.critTypes, b.critTypes)
+
+/** Une vue enregistree : un nom et un jeu complet de criteres. */
+export interface VueCloture {
+  cle: string
+  libelle: string
+  criteres: CriteresCloture
+}
+
+/** Les vues toujours la : les criteres de facturation, d'examen et de classement de l'ecran. */
+export const VuesPrereglees: VueCloture[] = [
+  { cle: 'toutes', libelle: 'Toutes', criteres: SansCritere },
+  { cle: 'a-facturer', libelle: 'A facturer', criteres: { ...SansCritere, critAFacturer: true } },
+  { cle: 'examen-depasse', libelle: 'Limite d\'examen depassee', criteres: { ...SansCritere, critExamenDepasse: true } },
+  { cle: 'insuffisance', libelle: 'Insuffisance d\'actif', criteres: { ...SansCritere, critTypes: new Set(['Insuffisance d\'actif']) } },
+]
+
+/** Les vues ajoutees par « + Nouvelle vue » pendant la session (aucun reglage ne les porte, decision du lot 1). */
+const VuesDeLaSession: VueCloture[] = []
+
+/** Pour les tests : repartir d'une session sans vue ajoutee. */
+export function oublierVuesDeLaSession(): void {
+  VuesDeLaSession.length = 0
+}
+
+function normaliser(texte: string): string {
+  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+/** Colonnes de « Selection PC » : chevron, Affaire, Audience, Classement, Limite, A facturer, Forfait, menu. */
+const NbColonnesSelection = 8
+/** Colonnes de « Enrolement / requete » : Defendeur, Demandeur, Acte de saisine, Audience, Depot, Facturation. */
+const NbColonnesEnrolement = 6
+
 export interface ProprietesEcranCloture {
   /** Remonte le dossier a ouvrir dans la visionneuse. */
   ouvrirDossier: (dossier: string) => void
@@ -88,6 +183,8 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
   // JeuDemo.Aujourdhui : null tant que le pont n'a pas repondu (aucune ligne
   // n'est alors marquee en retard).
   const [aujourdhui, setAujourdhui] = useState<string | null>(null)
+  // La ligne depliee par son chevron (etape « Selection PC »).
+  const [ouverte, setOuverte] = useState<string | null>(null)
 
   useEffect(() => {
     let perime = false
@@ -95,7 +192,8 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
     return () => { perime = true }
   }, [])
 
-  const enRetard = (l: LigneClot) => aujourdhui !== null && l.limiteExamen < aujourdhui
+  const enRetard = enRetardLe(aujourdhui)
+  const criteres: CriteresCloture = { critAffaire, critChambre, critDu, critAu, critAFacturer, critExamenDepasse, critTypes }
 
   function basculer(t: string) {
     setCritTypes((avant) => {
@@ -105,24 +203,41 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
     })
   }
 
-  function effacer() {
-    setCritAffaire(''); setCritChambre('')
-    setCritDu(''); setCritAu('')
-    setCritAFacturer(false); setCritExamenDepasse(false)
-    setCritTypes(new Set())
+  /** Pose un jeu complet de criteres : une vue choisie, ou « Effacer ». */
+  function poserCriteres(c: CriteresCloture) {
+    setCritAffaire(c.critAffaire); setCritChambre(c.critChambre)
+    setCritDu(c.critDu); setCritAu(c.critAu)
+    setCritAFacturer(c.critAFacturer); setCritExamenDepasse(c.critExamenDepasse)
+    setCritTypes(new Set(c.critTypes))
   }
 
-  let trouvees = Lignes
-  if (!estBlanc(critAffaire)) {
-    const t = critAffaire.trim()
-    trouvees = trouvees.filter((l) => contientSansCasse(l.affaire, t) || contientSansCasse(l.role, t))
+  function effacer() {
+    poserCriteres(SansCritere)
   }
-  if (!estBlanc(critChambre)) trouvees = trouvees.filter((l) => l.chambre === critChambre)
-  if (critDu !== '') trouvees = trouvees.filter((l) => l.audience >= critDu)
-  if (critAu !== '') trouvees = trouvees.filter((l) => l.audience <= critAu)
-  if (critTypes.size > 0) trouvees = trouvees.filter((l) => critTypes.has(l.classement))
-  if (critAFacturer) trouvees = trouvees.filter((l) => l.aFacturer)
-  if (critExamenDepasse) trouvees = trouvees.filter(enRetard)
+
+  const trouvees = filtrer(criteres, aujourdhui)
+
+  // « Aller a une affaire… » (Ctrl K) : filtre la liste AFFICHEE, sans toucher aux criteres.
+  const [filtreRapide, setFiltreRapide] = useState('')
+  const cherche = normaliser(filtreRapide.trim())
+  const affichees = cherche === '' ? trouvees : trouvees.filter((l) => normaliser(
+    [l.affaire, l.role, l.numPc, l.dossier, l.demandeur, l.defendeur].join(' ')).includes(cherche))
+
+  const [vuesAjoutees, setVuesAjoutees] = useState<VueCloture[]>(() => [...VuesDeLaSession])
+  const vues = [...VuesPrereglees, ...vuesAjoutees]
+  const vueActive = vues.find((v) => memesCriteres(v.criteres, criteres))?.cle ?? null
+  function enregistrerVue(nom: string) {
+    VuesDeLaSession.push({ cle: `session-${VuesDeLaSession.length + 1}`, libelle: nom, criteres: { ...criteres, critTypes: new Set(critTypes) } })
+    setVuesAjoutees([...VuesDeLaSession])
+  }
+
+  // Les chiffres de la tete, des cartes et du pied : sur la liste AFFICHEE.
+  const forfaits = affichees.reduce((s, l) => s + forfaitDe(l), 0)
+  const forfaitMax = affichees.reduce((m, l) => Math.max(m, forfaitDe(l)), 0)
+  const aFacturer = affichees.filter((l) => l.aFacturer).length
+  const depassees = affichees.filter(enRetard).length
+  const parClassement = (c: string) => affichees.filter((l) => l.classement === c)
+  const nbColonnes = etapeSelection ? NbColonnesSelection : NbColonnesEnrolement
 
   return (
     <div className="rig-proc__corps">
@@ -187,50 +302,73 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-onglets" style={{ margin: 'var(--rig-esp-2) var(--rig-esp-3) 0' }}>
+      <ListeModerne etiquette="Procedures collectives a cloturer">
+        <div className="rig-onglets" style={{ margin: 'var(--rig-esp-3) var(--rig-esp-4) 0' }}>
           <button className={`rig-onglet${etapeSelection ? ' rig-onglet--actif' : ''}`}
                   onClick={() => setEtapeSelection(true)}>Selection PC</button>
           <button className={`rig-onglet${etapeSelection ? '' : ' rig-onglet--actif'}`}
                   onClick={() => setEtapeSelection(false)}>Enrolement / requete</button>
         </div>
 
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">{etapeSelection ? 'Selection des procedures collectives' : 'Enrolement et requete'}</div>
-          <span className="rig-resultats-proc__compte">
-            {trouvees.length} affichee(s) sur {Lignes.length}
-          </span>
-        </div>
+        <EnteteListe titre={etapeSelection ? 'Selection des procedures collectives' : 'Enrolement et requete'}
+                     synthese={<>{affichees.length}{affichees.length > 1 ? ' affaires' : ' affaire'}{` sur ${Lignes.length} · `}
+                       <b>{aFacturer}</b>{' a facturer · forfaits '}<b>{montant(forfaits)}</b></>}
+                     filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a une affaire…',
+                               valider: () => { if (affichees.length === 1) ouvrirDossier(affichees[0]!.dossier) } }} />
+
+        <CartesChiffrees cartes={[
+          { cle: 'forfaits', titre: 'Forfaits', valeur: montant(forfaits), legende: true,
+            ...(critTypes.size > 0 ? { choisir: () => setCritTypes(new Set()), indication: 'Tous les classements' } : {}),
+            segments: Classements.map((c) => {
+              const somme = parClassement(c).reduce((s, l) => s + forfaitDe(l), 0)
+              return { cle: c, libelle: c, valeur: somme, texte: montant(somme), teinte: TeinteClassement[c] ?? 'gris',
+                       actif: critTypes.has(c), choisir: () => basculer(c) }
+            }) },
+          { cle: 'a-facturer', titre: 'A facturer', valeur: aFacturer, complement: `sur ${affichees.length}`,
+            anneau: { part: aFacturer, total: affichees.length, teinte: 'orange' },
+            actif: critAFacturer, choisir: () => setCritAFacturer(!critAFacturer),
+            indication: critAFacturer ? 'Toutes les affaires' : 'Seulement les affaires a facturer' },
+          { cle: 'examen', titre: 'Limite d\'examen depassee', valeur: depassees, complement: `sur ${affichees.length}`,
+            anneau: { part: depassees, total: affichees.length, teinte: 'rouge' },
+            actif: critExamenDepasse, choisir: () => setCritExamenDepasse(!critExamenDepasse),
+            indication: critExamenDepasse ? 'Toutes les affaires' : 'Seulement les limites depassees' },
+        ]} />
+
+        <VuesListe vues={vues.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer(v.criteres, aujourdhui).length }))}
+                   active={vueActive} enregistrer={enregistrerVue}
+                   choisir={(cle) => { const v = vues.find((x) => x.cle === cle); if (v) poserCriteres(v.criteres) }} />
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            {etapeSelection ? (
+              <colgroup>
+                <col style={{ width: 30 }} /><col /><col style={{ width: '15%' }} /><col style={{ width: '19%' }} />
+                <col style={{ width: '13%' }} /><col style={{ width: '10%' }} /><col style={{ width: '14%' }} /><col style={{ width: 34 }} />
+              </colgroup>
+            ) : (
+              <colgroup>
+                <col /><col style={{ width: '13%' }} /><col style={{ width: '15%' }} /><col style={{ width: '12%' }} />
+                <col style={{ width: '12%' }} /><col style={{ width: '14%' }} />
+              </colgroup>
+            )}
             <thead>
               {etapeSelection ? (
-                // Colonnes de « 1-4-5 Selection PC » (RIG v2).
+                // Colonnes de « 1-4-5 Selection PC » (RIG v2) : les secondaires sont dans la ligne depliee.
                 <tr>
-                  <th>N PC</th>
+                  <th aria-label="Deplier"></th>
                   <th>Nom de l'Affaire</th>
-                  <th>Chambre</th>
                   <th>Date d'audience</th>
-                  <th>Heure d'appel</th>
-                  <th>Heure de debut</th>
                   <th>Type de classement</th>
-                  <th className="rig-table__centre">A facturer</th>
                   <th>Limite Examen</th>
-                  <th>Dernier courrier envoye</th>
-                  <th>Dirigeants</th>
-                  <th>Liquidateurs</th>
-                  <th>Forfait</th>
-                  <th>Huissier</th>
-                  <th>Code Postal - Ville</th>
+                  <th>A facturer</th>
+                  <th className="rig-lm-droite">Forfait</th>
+                  <th aria-label="Actions"></th>
                 </tr>
               ) : (
-                // Colonnes de « 2-3 Enrolement Requete » (RIG v2).
+                // Colonnes de « 2-3 Enrolement Requete » (RIG v2) : N Role et N PC sous le defendeur.
                 <tr>
-                  <th>N Role</th>
-                  <th>N PC</th>
-                  <th>Demandeur</th>
                   <th>Defendeur</th>
+                  <th>Demandeur</th>
                   <th>Acte de saisine</th>
                   <th>Audience</th>
                   <th>Depot</th>
@@ -239,48 +377,79 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
               )}
             </thead>
             <tbody>
-              {trouvees.map((ligne) => (
-                <tr key={ligne.role} className={enRetard(ligne) ? 'rig-table__ligne--alerte' : ''}
-                    onClick={() => ouvrirDossier(ligne.dossier)}>
-                  {etapeSelection ? (
-                    <>
-                      <td className="rig-table__mono">{ligne.numPc}</td>
-                      <td>{ligne.affaire}</td>
-                      <td className="rig-table__mono">{ligne.chambre}</td>
-                      <td className="rig-table__mono">{dateCourte(ligne.audience)}</td>
-                      <td className="rig-table__mono">{ligne.heureAppel}</td>
-                      <td className="rig-table__mono">{ligne.heureDebut}</td>
-                      <td>{ligne.classement}</td>
-                      <td className="rig-table__centre">{ligne.aFacturer ? 'oui' : ''}</td>
-                      <td className="rig-table__mono">{dateCourte(ligne.limiteExamen)}</td>
-                      <td className="rig-table__mono">{ligne.dernierCourrier}</td>
-                      <td>{ligne.dirigeants}</td>
-                      <td>{ligne.liquidateurs}</td>
-                      <td className="rig-table__mono">{ligne.forfait}</td>
-                      <td>{ligne.huissier}</td>
-                      <td>{ligne.codePostalVille}</td>
-                    </>
-                  ) : (
-                    <>
-                      <td className="rig-table__mono">{ligne.role}</td>
-                      <td className="rig-table__mono">{ligne.numPc}</td>
-                      <td>{ligne.demandeur}</td>
-                      <td>{ligne.defendeur}</td>
-                      <td>{ligne.acteSaisine}</td>
-                      <td className="rig-table__mono">{dateCourte(ligne.audience)}</td>
-                      <td className="rig-table__mono">{dateCourte(ligne.depot)}</td>
-                      <td>{ligne.facturation}</td>
-                    </>
+              {affichees.map((ligne) => {
+                const retard = enRetard(ligne)
+                const estOuverte = etapeSelection && ouverte === ligne.role
+                const ouvrir: ActionLigne = { libelle: 'Ouvrir le dossier', agir: () => ouvrirDossier(ligne.dossier) }
+                const classes = [retard ? 'rig-table__ligne--alerte' : '', estOuverte ? 'rig-lm-ouverte' : ''].filter(Boolean).join(' ')
+                return (
+                  <Fragment key={ligne.role}>
+                  <tr className={classes} onClick={() => ouvrirDossier(ligne.dossier)}>
+                    {etapeSelection ? (
+                      <>
+                        <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : ligne.role)} />
+                        <CelluleIdentite nom={ligne.affaire} objet={`${ligne.numPc} · ${ligne.chambre}`}
+                                         titre={`${ligne.affaire} — ${ligne.numPc} · chambre ${ligne.chambre}`} />
+                        <td className="rig-table__mono">{dateCourte(ligne.audience)} {ligne.heureAppel}</td>
+                        <td title={ligne.classement}><Pastille teinte={TeinteClassement[ligne.classement] ?? 'gris'}>{ligne.classement}</Pastille></td>
+                        <td>
+                          <PointEtat teinte={aujourdhui === null ? 'gris' : retard ? 'rouge' : 'vert'}>{dateCourte(ligne.limiteExamen)}</PointEtat>
+                        </td>
+                        <td>{ligne.aFacturer && <PointEtat teinte="orange">oui</PointEtat>}</td>
+                        <td className="rig-lm-droite" title={`${ligne.forfait} €`}>
+                          <MontantBarre valeur={forfaitDe(ligne)} max={forfaitMax} texte={montant(forfaitDe(ligne))} />
+                        </td>
+                        <td className="rig-lm-cellule-menu">
+                          <MenuLigne libelle={`Actions de l'affaire ${ligne.numPc}`} actions={[
+                            ouvrir,
+                            { libelle: estOuverte ? 'Replier la ligne' : 'Deplier la ligne', agir: () => setOuverte(estOuverte ? null : ligne.role) },
+                          ]} />
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <CelluleIdentite nom={ligne.defendeur} objet={`${ligne.role} · ${ligne.numPc}`}
+                                         titre={`${ligne.defendeur} — role ${ligne.role} · ${ligne.numPc}`} />
+                        <td title={ligne.demandeur}>{ligne.demandeur}</td>
+                        <td><Pastille teinte={TeinteSaisine[ligne.acteSaisine] ?? 'gris'}>{ligne.acteSaisine}</Pastille></td>
+                        <td className="rig-table__mono">{dateCourte(ligne.audience)}</td>
+                        <td className="rig-table__mono">{dateCourte(ligne.depot)}</td>
+                        <td><PointEtat teinte={TeinteFacturation[ligne.facturation] ?? 'gris'}>{ligne.facturation}</PointEtat></td>
+                      </>
+                    )}
+                  </tr>
+                  {estOuverte && (
+                    <LigneDetail colonnes={NbColonnesSelection} actions={[{ ...ouvrir, fort: true }]} champs={[
+                      { libelle: 'Heure de debut', valeur: ligne.heureDebut },
+                      { libelle: 'Dernier courrier envoye', valeur: ligne.dernierCourrier },
+                      { libelle: 'Dirigeants', valeur: ligne.dirigeants },
+                      { libelle: 'Liquidateurs', valeur: ligne.liquidateurs },
+                      { libelle: 'Huissier', valeur: ligne.huissier },
+                      { libelle: 'Code Postal - Ville', valeur: ligne.codePostalVille },
+                    ]} />
                   )}
-                </tr>
-              ))}
+                  </Fragment>
+                )
+              })}
               {trouvees.length === 0 && (
-                <tr><td colSpan={etapeSelection ? 15 : 8} className="rig-table__vide">Aucune affaire ne repond a ces criteres.</td></tr>
+                <tr><td colSpan={nbColonnes} className="rig-table__vide">Aucune affaire ne repond a ces criteres.</td></tr>
+              )}
+              {trouvees.length > 0 && affichees.length === 0 && (
+                <tr><td colSpan={nbColonnes} className="rig-table__vide">
+                  {`Aucune des ${trouvees.length} affaires ne contient « ${filtreRapide.trim()} ».`}
+                </td></tr>
               )}
             </tbody>
           </table>
         </div>
-      </section>
+
+        <PiedListe aide="Clic sur une ligne pour ouvrir le dossier.">
+          <span><b>{affichees.length}</b>{affichees.length > 1 ? ' affaires affichees' : ' affaire affichee'}</span>
+          <span>Forfaits <b>{montant(forfaits)}</b></span>
+          <span>A facturer <b>{aFacturer}</b></span>
+          <span>Limite depassee <b>{depassees}</b></span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }

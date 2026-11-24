@@ -16,9 +16,20 @@
 // Porte depuis Components/Ecrans/EcranCoffreFort.razor (lot 4) : meme
 // balisage, memes classes CSS. L'ecran ne lisait rien dans Metier/ : ses
 // depots de demonstration l'ont suivi ici.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 4) : la liste prend les briques de
+// composants/ListeModerne.tsx. Tete (compte, depots en erreur, « Aller a un depot… » Ctrl K), les onglets
+// « A transmettre / Deja transmis » deviennent des puces comptees (sans « + Nouvelle vue » : ce sont deux listes,
+// pas un jeu de criteres), une ligne par depot (avatar et destinataire, code · abrege ; etat en point colore),
+// les six dates de suivi, le coffre et le type de decision dans la ligne depliee. Aucun montant : pas de carte.
+// Le clic qui montre l'historique, la ligne en alerte et les criteres ne changent pas.
+// fix-ok: application du socle des listes (lot 4) en plusieurs pas, pas un correctif.
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { contientSansCasse, dateCourte, distinctsTries, entierLisible, estBlanc } from '../criteres'
+import {
+  CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, PiedListe, PointEtat, VuesListe, type Teinte,
+} from '../composants/ListeModerne'
 
 interface DepotCoffre {
   code: string
@@ -69,6 +80,19 @@ const Coffres = distinctsTries(Depots.map((d) => d.coffre))
 
 const jour = (d: string | null) => (d === null ? '' : dateCourte(d))
 
+/** L'etat d'un depot en couleur : transmis, a envoyer, en erreur. */
+const TeinteStatut: Record<string, Teinte> = { ok: 'vert', attente: 'orange', alerte: 'rouge' }
+
+/** Colonnes : chevron, Destinataire, Etat, Date envoi infogreffe, Code de depot, Erreur. */
+const NbColonnes = 6
+
+/** Un depot est « a transmettre » s'il n'est jamais parti ou s'il est en erreur (l'onglet de l'ecran). */
+const aTransmettreLe = (d: DepotCoffre) => d.envoiInfogreffe === null || d.erreur !== ''
+
+function normaliser(texte: string): string {
+  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
 export function EcranCoffreFort() {
   const [recherche, setRecherche] = useState('')
   const [coffre, setCoffre] = useState('')
@@ -83,6 +107,8 @@ export function EcranCoffreFort() {
   const [coffreDefaut, setCoffreDefaut] = useState('COFFRE_LEROY')
   const [aTransmettre, setATransmettre] = useState(true)
   const [selection, setSelection] = useState<DepotCoffre | null>(null)
+  // La ligne depliee par son chevron.
+  const [ouverte, setOuverte] = useState<string | null>(null)
 
   function basculerNature(n: string) {
     setNaturesActives((avant) => {
@@ -98,14 +124,27 @@ export function EcranCoffreFort() {
     if (n !== null) setNbLignesHisto(n)
   }
 
-  let trouves = Depots.filter((d) => (d.envoiInfogreffe === null || d.erreur !== '') === aTransmettre)
-  if (!estBlanc(recherche)) {
-    const t = recherche.trim()
-    trouves = trouves.filter((d) => contientSansCasse(d.code, t) || contientSansCasse(d.destinataire, t))
+  /** Les depots d'un onglet qui repondent aux criteres (le filtre de l'ecran, inchange). */
+  function filtrer(transmettre: boolean): DepotCoffre[] {
+    let trouves = Depots.filter((d) => aTransmettreLe(d) === transmettre)
+    if (!estBlanc(recherche)) {
+      const t = recherche.trim()
+      trouves = trouves.filter((d) => contientSansCasse(d.code, t) || contientSansCasse(d.destinataire, t))
+    }
+    if (coffre !== '') trouves = trouves.filter((d) => d.coffre === coffre)
+    if (typeDecision !== '') trouves = trouves.filter((d) => d.typeDecision === typeDecision)
+    return trouves
   }
-  if (coffre !== '') trouves = trouves.filter((d) => d.coffre === coffre)
-  if (typeDecision !== '') trouves = trouves.filter((d) => d.typeDecision === typeDecision)
+
+  const trouves = filtrer(aTransmettre)
   const s = selection
+
+  // « Aller a un depot… » (Ctrl K) : filtre la liste AFFICHEE, sans toucher aux criteres.
+  const [filtreRapide, setFiltreRapide] = useState('')
+  const cherche = normaliser(filtreRapide.trim())
+  const affiches = cherche === '' ? trouves : trouves.filter((d) => normaliser(
+    [d.code, d.abrege, d.destinataire, d.coffre, d.codeDepot, d.erreur].join(' ')).includes(cherche))
+  const enErreur = affiches.filter((d) => d.erreur !== '').length
 
   return (
     <div className="rig-proc__corps">
@@ -180,55 +219,72 @@ export function EcranCoffreFort() {
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-onglets">
-            <button className={`rig-onglet${aTransmettre ? ' rig-onglet--actif' : ''}`}
-                    onClick={() => setATransmettre(true)}>A transmettre</button>
-            <button className={`rig-onglet${!aTransmettre ? ' rig-onglet--actif' : ''}`}
-                    onClick={() => setATransmettre(false)}>Deja transmis</button>
-          </div>
-          <span className="rig-resultats-proc__compte">{trouves.length} depot(s)</span>
-        </div>
+      <ListeModerne etiquette="Depots">
+        <EnteteListe titre="Depots"
+                     synthese={<>{affiches.length}{affiches.length > 1 ? ' depots ' : ' depot '}
+                       {aTransmettre ? 'a transmettre' : 'deja transmis'}{' · '}<b>{enErreur}</b>{' en erreur'}</>}
+                     filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a un depot…',
+                               valider: () => { if (affiches.length === 1) setSelection(affiches[0]!) } }} />
+
+        {/* Les deux onglets de l'ecran, en puces comptees (decision du lot 7 : onglets de listes differentes). */}
+        <VuesListe vues={[
+          { cle: 'a-transmettre', libelle: 'A transmettre', compte: filtrer(true).length },
+          { cle: 'deja-transmis', libelle: 'Deja transmis', compte: filtrer(false).length },
+        ]} active={aTransmettre ? 'a-transmettre' : 'deja-transmis'} choisir={(cle) => setATransmettre(cle === 'a-transmettre')} />
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup>
+              <col style={{ width: 30 }} /><col /><col style={{ width: '15%' }} /><col style={{ width: '17%' }} />
+              <col style={{ width: '15%' }} /><col style={{ width: '20%' }} />
+            </colgroup>
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Abrege</th>
+                <th aria-label="Deplier"></th>
                 <th>Destinataire</th>
                 <th>Etat</th>
                 <th>Date envoi infogreffe</th>
-                <th>Date AR Infogreffe</th>
-                <th>Date AR destinataire</th>
-                <th>Date lecture destinataire</th>
-                <th>Date traitement RIG</th>
-                <th>Date avis de depot coffre</th>
                 <th>Code de depot</th>
                 <th>Erreur</th>
               </tr>
             </thead>
             <tbody>
-              {trouves.map((dep) => (
-                <tr key={dep.code} className={dep.erreur === '' ? '' : 'rig-table__ligne--alerte'}
-                    onClick={() => setSelection(dep)}>
-                  <td className="rig-table__mono">{dep.code}</td>
-                  <td className="rig-table__mono">{dep.abrege}</td>
-                  <td>{dep.destinataire}</td>
-                  <td><span className={`rig-etat rig-etat--${dep.statut}`}>{dep.etat}</span></td>
-                  <td className="rig-table__mono">{jour(dep.envoiInfogreffe)}</td>
-                  <td className="rig-table__mono">{jour(dep.arInfogreffe)}</td>
-                  <td className="rig-table__mono">{jour(dep.arDestinataire)}</td>
-                  <td className="rig-table__mono">{jour(dep.lectureDestinataire)}</td>
-                  <td className="rig-table__mono">{jour(dep.traitementRig)}</td>
-                  <td className="rig-table__mono">{jour(dep.avisDepotCoffre)}</td>
-                  <td className="rig-table__mono">{dep.codeDepot}</td>
-                  <td>{dep.erreur}</td>
-                </tr>
-              ))}
+              {affiches.map((dep) => {
+                const estOuverte = ouverte === dep.code
+                const classes = [dep.erreur === '' ? '' : 'rig-table__ligne--alerte', estOuverte ? 'rig-lm-ouverte' : ''].filter(Boolean).join(' ')
+                return (
+                  <Fragment key={dep.code}>
+                  <tr className={classes} onClick={() => setSelection(dep)}>
+                    <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : dep.code)} />
+                    <CelluleIdentite nom={dep.destinataire} objet={`${dep.code} · ${dep.abrege}`}
+                                     titre={`${dep.destinataire} — ${dep.code} · ${dep.abrege}`} />
+                    <td><PointEtat teinte={TeinteStatut[dep.statut] ?? 'gris'}>{dep.etat}</PointEtat></td>
+                    <td className="rig-table__mono">{jour(dep.envoiInfogreffe)}</td>
+                    <td className="rig-table__mono">{dep.codeDepot}</td>
+                    <td title={dep.erreur}>{dep.erreur}</td>
+                  </tr>
+                  {estOuverte && (
+                    <LigneDetail colonnes={NbColonnes}
+                                 actions={[{ libelle: 'Voir l\'historique', fort: true, agir: () => setSelection(dep) }]} champs={[
+                      { libelle: 'Date AR Infogreffe', valeur: jour(dep.arInfogreffe) },
+                      { libelle: 'Date AR destinataire', valeur: jour(dep.arDestinataire) },
+                      { libelle: 'Date lecture destinataire', valeur: jour(dep.lectureDestinataire) },
+                      { libelle: 'Date traitement RIG', valeur: jour(dep.traitementRig) },
+                      { libelle: 'Date avis de depot coffre', valeur: jour(dep.avisDepotCoffre) },
+                      { libelle: 'Coffre', valeur: dep.coffre },
+                      { libelle: 'Type de decision', valeur: dep.typeDecision },
+                    ]} />
+                  )}
+                  </Fragment>
+                )
+              })}
               {trouves.length === 0 && (
-                <tr><td colSpan={12} className="rig-table__vide">Aucun depot ne repond a ces criteres.</td></tr>
+                <tr><td colSpan={NbColonnes} className="rig-table__vide">Aucun depot ne repond a ces criteres.</td></tr>
+              )}
+              {trouves.length > 0 && affiches.length === 0 && (
+                <tr><td colSpan={NbColonnes} className="rig-table__vide">
+                  {`Aucun des ${trouves.length} depots ne contient « ${filtreRapide.trim()} ».`}
+                </td></tr>
               )}
             </tbody>
           </table>
@@ -242,7 +298,12 @@ export function EcranCoffreFort() {
             </ul>
           </div>
         )}
-      </section>
+
+        <PiedListe aide="Clic sur un depot pour voir son historique.">
+          <span><b>{affiches.length}</b>{affiches.length > 1 ? ' depots affiches' : ' depot affiche'}</span>
+          <span>En erreur <b>{enErreur}</b></span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }

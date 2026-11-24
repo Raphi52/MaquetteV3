@@ -14,22 +14,30 @@ function ouvrir() {
   return render(<EcranFactures />)
 }
 
-const compte = (c: HTMLElement) => c.querySelector('.rig-resultats-proc__compte')!.textContent
+// La synthese de la tete de liste (socle des listes modernes, lot 4) : le compte et les totaux.
+const compte = (c: HTMLElement) => c.querySelector('.rig-lm-synthese')!.textContent
 const solde = (c: HTMLElement) => c.querySelector('section > .rig-criteres__bloc > .rig-etat')!
+/** Les cellules de chaque ligne d'article affichee (hors lignes depliees). */
+const lignes = (c: HTMLElement) =>
+  [...c.querySelectorAll('tbody tr:not(.rig-lm-detail)')].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent))
 
 describe('EcranFactures', () => {
   it('affiche le total et le reste comme l\'ecran Blazor', async () => {
     const { container } = ouvrir()
-    expect(compte(container)).toBe('Total TTC 458,63 EUR — reste a encaisser 258,63 EUR')
+    expect(compte(container)).toBe('5 articles · total TTC 458,63 € · reste a encaisser 258,63 €')
     expect(solde(container).textContent).toBe('Solde restant 258,63 EUR')
     expect(solde(container).className).toBe('rig-etat rig-etat--attente')
     expect(await screen.findByDisplayValue('2026-09-09')).toBeTruthy()
   })
 
-  it('ecrit les colonnes de la grille a la francaise', () => {
+  it('ecrit les colonnes de la grille a la francaise ; les secondaires sont dans la ligne depliee', () => {
     const { container } = ouvrir()
-    const cellules = [...container.querySelectorAll('tbody tr')[0]!.querySelectorAll('td')].map((td) => td.textContent)
-    expect(cellules).toEqual(['IMM01', 'Immatriculation societe', '1', '37,45', '20,0 %', '105,90', '0,00', '0,00', '194,85', ''])
+    // Chevron, Code, Libelle, Quantite, Etat, Montant TTC, Commentaire, menu.
+    expect(lignes(container)[0]).toEqual(['', 'IMM01', 'Immatriculation societe', '1', 'Retenu', '194,85 €', '', ''])
+    expect(lignes(container)[1]![6]).toBe('Changement de gerant')
+    fireEvent.click(screen.getAllByRole('button', { name: 'Deplier la ligne' })[0]!)
+    expect([...container.querySelectorAll('.rig-lm-champ')].map((c) => c.textContent))
+      .toEqual(['Prix UHT37,45', 'Taux TVA20,0 %', 'BODACC105,90', 'INPI0,00', 'Autre0,00'])
   })
 
   it('un clic sur un article le retire du total, un second l\'y remet', () => {
@@ -37,10 +45,47 @@ describe('EcranFactures', () => {
     const ligne = screen.getByText('IMM01').closest('tr')!
     fireEvent.click(ligne)
     expect(ligne.className).toBe('rig-table__ligne--inerte')
-    expect(compte(container)).toBe('Total TTC 263,78 EUR — reste a encaisser 63,78 EUR')
+    expect(ligne.textContent).toContain('Retire')
+    expect(compte(container)).toBe('5 articles · 1 retire · total TTC 263,78 € · reste a encaisser 63,78 €')
     fireEvent.click(ligne)
     expect(ligne.hasAttribute('class')).toBe(false)
-    expect(compte(container)).toBe('Total TTC 458,63 EUR — reste a encaisser 258,63 EUR')
+    expect(compte(container)).toBe('5 articles · total TTC 458,63 € · reste a encaisser 258,63 €')
+  })
+
+  it('le chevron deplie la ligne sans retirer l\'article ; le menu « … » le retire', () => {
+    const { container } = ouvrir()
+    const ligne = screen.getByText('IMM01').closest('tr')!
+    fireEvent.click(ligne.querySelector('.rig-lm-chevron')!)
+    expect(ligne.className).toBe('rig-lm-ouverte')
+    expect(compte(container)).toBe('5 articles · total TTC 458,63 € · reste a encaisser 258,63 €')
+    fireEvent.click(screen.getByRole('button', { name: 'Actions de l\'article IMM01' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retirer du total' }))
+    expect(ligne.className).toBe('rig-table__ligne--inerte rig-lm-ouverte')
+    expect(compte(container)).toBe('5 articles · 1 retire · total TTC 263,78 € · reste a encaisser 63,78 €')
+    // Le bouton de la ligne depliee fait le meme geste, dans l'autre sens.
+    fireEvent.click(screen.getByRole('button', { name: 'Remettre dans le total' }))
+    expect(compte(container)).toBe('5 articles · total TTC 458,63 € · reste a encaisser 258,63 €')
+  })
+
+  it('les cartes chiffrent la facture ; un clic sur une repartition filtre les articles, un second les remet', () => {
+    const { container } = ouvrir()
+    const cartes = () => [...container.querySelectorAll('.rig-lm-carte')].map((c) => c.querySelector('.rig-lm-carte__valeur')!.textContent)
+    expect(cartes()).toEqual(['458,63 €', '200,00 € sur 458,63 €', '236,60 €'])
+    // BODACC : IMM01 et MOD02 seulement (105,90 + 108,00).
+    fireEvent.click(screen.getByRole('button', { name: 'BODACC 213,90 €', pressed: false }))
+    expect(lignes(container).map((l) => l[1])).toEqual(['IMM01', 'MOD02'])
+    expect(container.querySelector('.rig-lm-pied')!.textContent).toContain('2 articles affiches')
+    // Le total ne bouge pas : le filtre montre, il ne retire rien.
+    expect(compte(container)).toBe('5 articles · total TTC 458,63 € · reste a encaisser 258,63 €')
+    fireEvent.click(screen.getByRole('button', { name: 'BODACC 213,90 €', pressed: true }))
+    expect(lignes(container)).toHaveLength(5)
+
+    // Retires : l'article retire, seul ; la carte « Total TTC » enleve le filtre.
+    fireEvent.click(screen.getByText('DIV05').closest('tr')!)
+    fireEvent.click(screen.getByRole('button', { name: 'Retires 14,64 €', pressed: false }))
+    expect(lignes(container).map((l) => l[1])).toEqual(['DIV05'])
+    fireEvent.click(screen.getByRole('button', { name: /^Total TTC/ }))
+    expect(lignes(container)).toHaveLength(5)
   })
 
   it('une facture couverte est soldee (calcul exact, pas en virgule flottante)', () => {
@@ -53,7 +98,7 @@ describe('EcranFactures', () => {
   it('une saisie illisible garde le dernier montant lisible, comme le @bind d\'un decimal', () => {
     const { container } = ouvrir()
     fireEvent.change(screen.getByLabelText('Montant encaisse'), { target: { value: '' } })
-    expect(compte(container)).toBe('Total TTC 458,63 EUR — reste a encaisser 258,63 EUR')
+    expect(compte(container)).toBe('5 articles · total TTC 458,63 € · reste a encaisser 258,63 €')
   })
 
   it('« Changer de client » fait defiler les fiches et met la fiche a jour', () => {
@@ -117,9 +162,6 @@ function ouvrirPour(dossier: ContexteDossierVue | null) {
   return { pont, ...render(<EcranFactures dossier={dossier} />) }
 }
 
-/** Les cellules de chaque ligne d'article affichee. */
-const lignes = (c: HTMLElement) =>
-  [...c.querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent))
 
 const valeur = (libelle: string) => (screen.getByLabelText(libelle) as HTMLInputElement).value
 
@@ -137,6 +179,8 @@ function sansRienDeLaDemo(c: HTMLElement) {
 function sansFactureNiEncaissement(c: HTMLElement) {
   expect(compte(c)).toBe('Aucun article')
   expect(c.textContent).not.toMatch(/Total TTC|Facture soldee|une facture numerotee sera emise/)
+  expect(c.querySelector('.rig-lm-cartes')).toBeNull()
+  expect(c.querySelector('.rig-lm-pied')).toBeNull()
   expect(screen.queryByRole('button', { name: 'Facturer' })).toBeNull()
   expect(screen.queryByRole('button', { name: 'Tarifer' })).toBeNull()
   expect(screen.getByText('Aucune facture ne sera emise.')).toBeTruthy()
@@ -166,7 +210,7 @@ describe('EcranFactures ouvert depuis une affaire', () => {
   it('004182, une immatriculation : l\'article d\'immatriculation du tarif, sa demande, son client', async () => {
     const { container, pont } = ouvrirPour(AmiensBillards)
     expect(lignes(container)).toEqual([
-      ['IMM01', 'Immatriculation societe', '1', '37,45', '20,0 %', '105,90', '0,00', '0,00', '194,85', ''],
+      ['', 'IMM01', 'Immatriculation societe', '1', 'Retenu', '194,85 €', '', ''],
     ])
     await waitFor(() => expect(valeur('N de demande')).toBe('004182'))
     expect(pont.appels).toHaveBeenCalledWith('EcranFactures.DemandeDe', '004182')
@@ -178,7 +222,7 @@ describe('EcranFactures ouvert depuis une affaire', () => {
     expect(valeur('Adresse')).toBe('')
     expect(screen.queryByText(/Solde client/)).toBeNull()
     // Rien n'est encaisse sur cette facture : tout reste a encaisser.
-    expect(compte(container)).toBe('Total TTC 194,85 EUR — reste a encaisser 194,85 EUR')
+    expect(compte(container)).toBe('1 article · total TTC 194,85 € · reste a encaisser 194,85 €')
     expect(valeur('Montant encaisse')).toBe('')
     expect(solde(container).textContent).toBe('Solde restant 194,85 EUR')
     // Le jumeau de 004151 : une facture qui a un article s'emet, comme depuis l'accueil.
@@ -210,8 +254,11 @@ describe('EcranFactures ouvert depuis une affaire', () => {
   it('une modification : l\'article de modification, sans le commentaire de la demo', async () => {
     const { container } = ouvrirPour(contexteDossier())
     expect(lignes(container)).toEqual([
-      ['MOD02', 'Modification statutaire', '1', '45,60', '20,0 %', '108,00', '0,00', '0,00', '162,72', ''],
+      ['', 'MOD02', 'Modification statutaire', '1', 'Retenu', '162,72 €', '', ''],
     ])
+    fireEvent.click(screen.getByRole('button', { name: 'Deplier la ligne' }))
+    expect([...container.querySelectorAll('.rig-lm-champ')].map((c) => c.textContent))
+      .toEqual(['Prix UHT45,60', 'Taux TVA20,0 %', 'BODACC108,00', 'INPI0,00', 'Autre0,00'])
     await waitFor(() => expect(valeur('N de demande')).toBe('004176'))
     sansRienDeLaDemo(container)
   })

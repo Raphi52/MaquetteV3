@@ -23,10 +23,21 @@
 // balisage, memes classes CSS. L'ecran ne lisait rien dans Metier/ : ses
 // fiches, mouvements et contacts de demonstration l'ont suivi ici. Montants
 // en centimes entiers (le C# calculait en decimal, exact).
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 4) : les deux listes de la fiche
+// prennent les briques de composants/ListeModerne.tsx. Les onglets Compte / Contacts deviennent des puces
+// comptees (decision du lot 7). Compte : tete (mouvements, solde actuel, « Aller a un mouvement… » Ctrl K),
+// trois cartes (Solde actuel ; Debits et Credits, dont le clic filtre), debit, credit et solde avec leur
+// mini-barre, pied de totaux. Contacts : avatar, nom et fonction, principal en point vert. La fiche de gauche
+// ne change pas.
+// fix-ok: application du socle des listes (lot 4) en plusieurs pas, pas un correctif.
 
 import { useState } from 'react'
 import { dateCourte } from '../criteres'
 import { euros } from '../format'
+import {
+  CartesChiffrees, CelluleIdentite, EnteteListe, ListeModerne, MontantBarre, PiedListe, PointEtat, VuesListe, montant,
+} from '../composants/ListeModerne'
 
 interface FicheCli {
   abrege: string
@@ -100,6 +111,10 @@ const Contacts: Contact[] = [
   { abrege: 'DUPONT', nom: 'Marc DUPONT', fonction: 'Avocat', tel: '03 26 77 43 09', mail: 'm.dupont@exemple.fr', principal: true },
 ]
 
+function normaliser(texte: string): string {
+  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
 export function EcranFicheClient() {
   const [abrege, setAbrege] = useState('LEROY')
   const [ongletCompte, setOngletCompte] = useState(true)
@@ -108,6 +123,22 @@ export function EcranFicheClient() {
   const mouvementsClient = Mouvements.filter((m) => m.abrege === abrege)
   const contactsClient = Contacts.filter((c) => c.abrege === abrege)
   const solde = mouvementsClient.at(-1)?.solde ?? 0
+
+  // Le filtre des cartes (debits ou credits) et « Aller a un mouvement… » (Ctrl K) : ils montrent, ils ne
+  // changent ni le solde ni les totaux, qui restent ceux du compte.
+  const [filtreSens, setFiltreSens] = useState<'debit' | 'credit' | null>(null)
+  const [filtreRapide, setFiltreRapide] = useState('')
+  const cherche = normaliser(filtreRapide.trim())
+  const mouvementsAffiches = mouvementsClient.filter((m) =>
+    (filtreSens === null || m[filtreSens] > 0)
+    && (cherche === '' || normaliser(`${m.libelle} ${dateCourte(m.date)}`).includes(cherche)))
+  const totalDebit = mouvementsClient.reduce((s, m) => s + m.debit, 0)
+  const totalCredit = mouvementsClient.reduce((s, m) => s + m.credit, 0)
+  const mouvementMax = mouvementsAffiches.reduce((x, m) => Math.max(x, m.debit, m.credit), 0)
+  const soldeMax = mouvementsAffiches.reduce((x, m) => Math.max(x, m.solde), 0)
+  const principaux = contactsClient.filter((c) => c.principal).length
+  const euro = (c: number) => montant(c / 100)
+  const basculerSens = (sens: 'debit' | 'credit') => () => setFiltreSens(filtreSens === sens ? null : sens)
 
   return (
     <div className="rig-proc__corps">
@@ -259,75 +290,115 @@ export function EcranFicheClient() {
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-onglets">
-            <button className={`rig-onglet${ongletCompte ? ' rig-onglet--actif' : ''}`}
-                    onClick={() => setOngletCompte(true)}>Compte</button>
-            <button className={`rig-onglet${!ongletCompte ? ' rig-onglet--actif' : ''}`}
-                    onClick={() => setOngletCompte(false)}>Contacts</button>
-          </div>
-          <span className="rig-resultats-proc__compte">Solde actuel {euros(solde)} EUR</span>
-        </div>
+      <ListeModerne etiquette={ongletCompte ? 'Compte' : 'Contacts'}>
+        {ongletCompte ? (
+          <EnteteListe titre="Compte"
+                       synthese={<>{mouvementsClient.length}{mouvementsClient.length > 1 ? ' mouvements' : ' mouvement'}
+                         {' · solde actuel '}<b>{euro(solde)}</b></>}
+                       filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a un mouvement…' }} />
+        ) : (
+          <EnteteListe titre="Contacts"
+                       synthese={<>{contactsClient.length}{contactsClient.length > 1 ? ' contacts' : ' contact'}{' · '}
+                         <b>{principaux}</b>{' principal'}</>} />
+        )}
+
+        {ongletCompte && (
+          <CartesChiffrees cartes={[
+            { cle: 'solde', titre: 'Solde actuel', valeur: euro(solde) },
+            { cle: 'debit', titre: 'Debits', valeur: euro(totalDebit),
+              complement: `${mouvementsClient.filter((m) => m.debit > 0).length} mouvement(s)`,
+              actif: filtreSens === 'debit', choisir: basculerSens('debit'),
+              indication: filtreSens === 'debit' ? 'Tous les mouvements' : 'Seulement les debits' },
+            { cle: 'credit', titre: 'Credits', valeur: euro(totalCredit),
+              complement: `${mouvementsClient.filter((m) => m.credit > 0).length} mouvement(s)`,
+              actif: filtreSens === 'credit', choisir: basculerSens('credit'),
+              indication: filtreSens === 'credit' ? 'Tous les mouvements' : 'Seulement les credits' },
+          ]} />
+        )}
+
+        {/* Les deux onglets de la fiche, en puces comptees (decision du lot 7 : onglets de listes differentes). */}
+        <VuesListe vues={[
+          { cle: 'compte', libelle: 'Compte', compte: mouvementsClient.length },
+          { cle: 'contacts', libelle: 'Contacts', compte: contactsClient.length },
+        ]} active={ongletCompte ? 'compte' : 'contacts'} choisir={(cle) => setOngletCompte(cle === 'compte')} />
 
         {ongletCompte ? (
           <div className="rig-table-cadre">
-            <table className="rig-table">
+            <table className="rig-table rig-lm-table">
+              <colgroup>
+                <col style={{ width: '14%' }} /><col /><col style={{ width: '19%' }} /><col style={{ width: '19%' }} /><col style={{ width: '19%' }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Date</th>
                   <th>Mouvement</th>
-                  <th>Debit</th>
-                  <th>Credit</th>
-                  <th>Solde</th>
+                  <th className="rig-lm-droite">Debit</th>
+                  <th className="rig-lm-droite">Credit</th>
+                  <th className="rig-lm-droite">Solde</th>
                 </tr>
               </thead>
               <tbody>
-                {mouvementsClient.map((m, i) => (
+                {mouvementsAffiches.map((m, i) => (
                   <tr key={i}>
                     <td className="rig-table__mono">{dateCourte(m.date)}</td>
-                    <td>{m.libelle}</td>
-                    <td className="rig-table__mono">{m.debit === 0 ? '' : euros(m.debit)}</td>
-                    <td className="rig-table__mono">{m.credit === 0 ? '' : euros(m.credit)}</td>
-                    <td className="rig-table__mono">{euros(m.solde)}</td>
+                    <td title={m.libelle}>{m.libelle}</td>
+                    <td className="rig-lm-droite">{m.debit > 0 && <MontantBarre valeur={m.debit} max={mouvementMax} texte={euro(m.debit)} />}</td>
+                    <td className="rig-lm-droite">{m.credit > 0 && <MontantBarre valeur={m.credit} max={mouvementMax} texte={euro(m.credit)} />}</td>
+                    <td className="rig-lm-droite"><MontantBarre valeur={m.solde} max={soldeMax} texte={euro(m.solde)} /></td>
                   </tr>
                 ))}
                 {mouvementsClient.length === 0 && (
                   <tr><td colSpan={5} className="rig-table__vide">Aucun mouvement sur ce compte.</td></tr>
+                )}
+                {mouvementsClient.length > 0 && mouvementsAffiches.length === 0 && (
+                  <tr><td colSpan={5} className="rig-table__vide">Aucun mouvement ne repond a ce filtre.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         ) : (
           <div className="rig-table-cadre">
-            <table className="rig-table">
+            <table className="rig-table rig-lm-table">
+              <colgroup><col /><col style={{ width: '20%' }} /><col style={{ width: '30%' }} /><col style={{ width: '13%' }} /></colgroup>
               <thead>
                 <tr>
-                  <th>Nom</th>
-                  <th>Fonction</th>
+                  <th>Contact</th>
                   <th>Telephone</th>
                   <th>E-mail</th>
-                  <th className="rig-table__centre">Principal</th>
+                  <th>Principal</th>
                 </tr>
               </thead>
               <tbody>
                 {contactsClient.map((c) => (
                   <tr key={c.nom}>
-                    <td>{c.nom}</td>
-                    <td>{c.fonction}</td>
+                    <CelluleIdentite nom={c.nom} objet={c.fonction} titre={`${c.nom} — ${c.fonction}`} />
                     <td className="rig-table__mono">{c.tel}</td>
-                    <td className="rig-table__mono">{c.mail}</td>
-                    <td className="rig-table__centre">{c.principal ? 'oui' : ''}</td>
+                    <td className="rig-table__mono" title={c.mail}>{c.mail}</td>
+                    <td>{c.principal && <PointEtat teinte="vert">oui</PointEtat>}</td>
                   </tr>
                 ))}
                 {contactsClient.length === 0 && (
-                  <tr><td colSpan={5} className="rig-table__vide">Aucun contact enregistre.</td></tr>
+                  <tr><td colSpan={4} className="rig-table__vide">Aucun contact enregistre.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         )}
-      </section>
+
+        {ongletCompte ? (
+          <PiedListe>
+            <span><b>{mouvementsAffiches.length}</b>{mouvementsAffiches.length > 1 ? ' mouvements affiches' : ' mouvement affiche'}</span>
+            <span>Debit <b>{euro(totalDebit)}</b></span>
+            <span>Credit <b>{euro(totalCredit)}</b></span>
+            <span>Solde <b>{euro(solde)}</b></span>
+          </PiedListe>
+        ) : (
+          <PiedListe>
+            <span><b>{contactsClient.length}</b>{contactsClient.length > 1 ? ' contacts' : ' contact'}</span>
+            <span>Principal <b>{principaux}</b></span>
+          </PiedListe>
+        )}
+      </ListeModerne>
     </div>
   )
 }

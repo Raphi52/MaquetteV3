@@ -30,10 +30,23 @@
 // fix-ok: constate sur 004151 le 20/11 (chef, exe bf90a8a) -- une facture SANS article
 // gardait le mode « Facturer » (facture numerotee a 0 EUR), le total 0,00 et l'encaissement
 // « Facture soldee » : l'ecran supposait qu'il y a toujours quelque chose a facturer.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 4) : les articles prennent les
+// briques de composants/ListeModerne.tsx. Tete (nombre d'articles, total TTC, reste a encaisser), trois cartes :
+// Total TTC (retenus / retires, le clic filtre), Encaisse (anneau sur le total), BODACC · INPI · Autre (le clic
+// montre les articles qui portent ces frais). Une ligne par article (Code, Libelle, Quantite, Etat, Montant TTC
+// avec sa mini-barre, Commentaire) ; prix UHT, TVA, BODACC, INPI et Autre sont dans la ligne depliee par le chevron.
+// Pas de CelluleIdentite : un article n'est ni un client, ni une entreprise, ni un dossier (pas d'avatar).
+// Le clic sur un article le retire du total ou l'y remet, comme avant ; l'encaissement ne change pas.
+// fix-ok: application du socle des listes (lot 4) en plusieurs pas, pas un correctif.
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { centimes, euros, nombre } from '../format'
+import {
+  CartesChiffrees, CelluleChevron, EnteteListe, LigneDetail, ListeModerne, MenuLigne, MontantBarre, PiedListe, PointEtat,
+  montant, type ActionLigne,
+} from '../composants/ListeModerne'
 import { PourLeDossier } from '../composants/PourLeDossier'
 import type { ContexteDossierVue } from '../plan/types'
 
@@ -154,6 +167,12 @@ const Payeurs: readonly string[] = ['', 'Debiteur', 'Tiers payeur principal', 'A
 
 const FicheVide: FicheClient = { nom: '', abrege: '', typeClient: '', adresse: '', solde: null }
 
+/** Les filtres des cartes : articles retenus ou retires, articles qui portent un frais. */
+type FiltreArticles = 'retenus' | 'retires' | 'bodacc' | 'inpi' | 'autre'
+
+/** Les colonnes du tableau : chevron, Code, Libelle, Quantite, Etat, Montant TTC, Commentaire, menu. */
+const NbColonnes = 8
+
 /** La demande d'une affaire, telle que Pont/EcranFactures.cs (DemandeDe) la rend. */
 interface DemandeFacturee {
   numero: string
@@ -194,6 +213,9 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
   const [encaisse, setEncaisse] = useState(dossier ? 0 : 200)
   const [dateEncaissement, setDateEncaissement] = useState<string | null>(null)
   const [retires, setRetires] = useState<ReadonlySet<string>>(new Set())
+  // La ligne depliee par son chevron, et le filtre pose par une carte.
+  const [ouverte, setOuverte] = useState<string | null>(null)
+  const [filtre, setFiltre] = useState<FiltreArticles | null>(null)
 
   useEffect(() => {
     let perime = false
@@ -256,6 +278,22 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
   const pourquoiRien = NaturesGratuites.includes(nature)
     ? `Rien a facturer : ${nature}, depot gratuit au greffe.`
     : `Aucun article du tarif pour cette affaire${nature ? ` (${nature})` : ''}.`
+
+  // Les chiffres des cartes et du pied, en centimes. Les frais sont ceux des articles RETENUS, comme le total.
+  const retenus = articles.filter((a) => !retires.has(a.code))
+  const totalRetires = articles.filter((a) => retires.has(a.code)).reduce((s, a) => s + centimes(a.ttc), 0)
+  const frais = (champ: 'bodacc' | 'inpi' | 'autre') => retenus.reduce((s, a) => s + centimes(a[champ]), 0)
+  const affiches = articles.filter((a) => {
+    switch (filtre) {
+      case 'retenus': return !retires.has(a.code)
+      case 'retires': return retires.has(a.code)
+      case 'bodacc': case 'inpi': case 'autre': return a[filtre] > 0
+      default: return true
+    }
+  })
+  const ttcMax = affiches.reduce((m, a) => Math.max(m, a.ttc), 0)
+  const basculerFiltre = (f: FiltreArticles) => () => setFiltre(filtre === f ? null : f)
+  const filtreFrais = filtre === 'bodacc' || filtre === 'inpi' || filtre === 'autre'
 
   return (
     <div className="rig-proc__corps">
@@ -350,52 +388,102 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Articles de la facture</div>
-          <span className="rig-resultats-proc__compte">
-            {sansArticle ? 'Aucun article' : `Total TTC ${euros(total)} EUR — reste a encaisser ${euros(reste)} EUR`}
-          </span>
-        </div>
+      <ListeModerne etiquette="Articles de la facture">
+        <EnteteListe titre="Articles de la facture"
+                     synthese={sansArticle ? 'Aucun article' : <>
+                       {articles.length}{articles.length > 1 ? ' articles' : ' article'}
+                       {retires.size > 0 && ` · ${retires.size} retire${retires.size > 1 ? 's' : ''}`}
+                       {' · total TTC '}<b>{montant(total / 100)}</b>{' · reste a encaisser '}<b>{montant(reste / 100)}</b></>} />
+
+        {!sansArticle && (
+          <CartesChiffrees cartes={[
+            { cle: 'total', titre: 'Total TTC', valeur: montant(total / 100), legende: true,
+              ...(filtre === 'retenus' || filtre === 'retires' ? { choisir: () => setFiltre(null), indication: 'Tous les articles' } : {}),
+              segments: [
+                { cle: 'retenus', libelle: 'Retenus', valeur: total, teinte: 'vert', texte: montant(total / 100),
+                  actif: filtre === 'retenus', choisir: basculerFiltre('retenus') },
+                { cle: 'retires', libelle: 'Retires', valeur: totalRetires, teinte: 'gris', texte: montant(totalRetires / 100),
+                  actif: filtre === 'retires', choisir: basculerFiltre('retires') },
+              ] },
+            { cle: 'encaisse', titre: 'Encaisse', valeur: montant(encaisse), complement: `sur ${montant(total / 100)}`,
+              anneau: { part: Math.min(centimes(encaisse), total), total, teinte: 'vert' } },
+            { cle: 'frais', titre: 'BODACC · INPI · Autre', valeur: montant((frais('bodacc') + frais('inpi') + frais('autre')) / 100),
+              legende: true,
+              ...(filtreFrais ? { choisir: () => setFiltre(null), indication: 'Tous les articles' } : {}),
+              segments: [
+                { cle: 'bodacc', libelle: 'BODACC', valeur: frais('bodacc'), teinte: 'bleu', texte: montant(frais('bodacc') / 100),
+                  actif: filtre === 'bodacc', choisir: basculerFiltre('bodacc') },
+                { cle: 'inpi', libelle: 'INPI', valeur: frais('inpi'), teinte: 'violet', texte: montant(frais('inpi') / 100),
+                  actif: filtre === 'inpi', choisir: basculerFiltre('inpi') },
+                { cle: 'autre', libelle: 'Autre', valeur: frais('autre'), teinte: 'ardoise', texte: montant(frais('autre') / 100),
+                  actif: filtre === 'autre', choisir: basculerFiltre('autre') },
+              ] },
+          ]} />
+        )}
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup>
+              <col style={{ width: 30 }} /><col style={{ width: '10%' }} /><col /><col style={{ width: '9%' }} />
+              <col style={{ width: '12%' }} /><col style={{ width: '18%' }} /><col style={{ width: '20%' }} /><col style={{ width: 34 }} />
+            </colgroup>
             <thead>
               <tr>
-                <th>Article</th>
+                <th aria-label="Deplier"></th>
+                <th>Code</th>
                 <th>Libelle</th>
                 <th className="rig-table__centre">Quantite</th>
-                <th>Prix UHT</th>
-                <th>Taux TVA</th>
-                <th>BODACC</th>
-                <th>INPI</th>
-                <th>Autre</th>
-                <th>Montant TTC</th>
+                <th>Etat</th>
+                <th className="rig-lm-droite">Montant TTC</th>
                 <th>Commentaire</th>
+                <th aria-label="Actions"></th>
               </tr>
             </thead>
             <tbody>
               {sansArticle && (
                 <tr>
-                  <td colSpan={10} className="rig-table__vide">{pourquoiRien}</td>
+                  <td colSpan={NbColonnes} className="rig-table__vide">{pourquoiRien}</td>
                 </tr>
               )}
-              {articles.map((art) => (
-                <tr key={art.code}
-                    className={retires.has(art.code) ? 'rig-table__ligne--inerte' : undefined}
-                    onClick={() => basculer(art.code)}>
-                  <td className="rig-table__mono">{art.code}</td>
-                  <td>{art.libelle}</td>
-                  <td className="rig-table__centre">{art.quantite}</td>
-                  <td className="rig-table__mono">{nombre(art.prixUht, 2)}</td>
-                  <td className="rig-table__mono">{nombre(art.tauxTva, 1)} %</td>
-                  <td className="rig-table__mono">{nombre(art.bodacc, 2)}</td>
-                  <td className="rig-table__mono">{nombre(art.inpi, 2)}</td>
-                  <td className="rig-table__mono">{nombre(art.autre, 2)}</td>
-                  <td className="rig-table__mono">{nombre(art.ttc, 2)}</td>
-                  <td>{art.commentaire}</td>
-                </tr>
-              ))}
+              {affiches.map((art) => {
+                const retire = retires.has(art.code)
+                const estOuverte = ouverte === art.code
+                const action: ActionLigne = { libelle: retire ? 'Remettre dans le total' : 'Retirer du total', agir: () => basculer(art.code) }
+                const classes = [retire ? 'rig-table__ligne--inerte' : '', estOuverte ? 'rig-lm-ouverte' : ''].filter(Boolean).join(' ')
+                return (
+                  <Fragment key={art.code}>
+                  <tr className={classes || undefined} onClick={() => basculer(art.code)}>
+                    <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : art.code)} />
+                    <td className="rig-table__mono">{art.code}</td>
+                    <td title={art.libelle}>{art.libelle}</td>
+                    <td className="rig-table__centre">{art.quantite}</td>
+                    <td><PointEtat teinte={retire ? 'gris' : 'vert'}>{retire ? 'Retire' : 'Retenu'}</PointEtat></td>
+                    <td className="rig-lm-droite" title={montant(art.ttc)}>
+                      <MontantBarre valeur={art.ttc} max={ttcMax} texte={montant(art.ttc)} />
+                    </td>
+                    <td title={art.commentaire}>{art.commentaire}</td>
+                    <td className="rig-lm-cellule-menu">
+                      <MenuLigne libelle={`Actions de l'article ${art.code}`} actions={[
+                        action,
+                        { libelle: estOuverte ? 'Replier la ligne' : 'Deplier la ligne', agir: () => setOuverte(estOuverte ? null : art.code) },
+                      ]} />
+                    </td>
+                  </tr>
+                  {estOuverte && (
+                    <LigneDetail colonnes={NbColonnes} actions={[{ ...action, fort: true }]} champs={[
+                      { libelle: 'Prix UHT', valeur: nombre(art.prixUht, 2) },
+                      { libelle: 'Taux TVA', valeur: `${nombre(art.tauxTva, 1)} %` },
+                      { libelle: 'BODACC', valeur: nombre(art.bodacc, 2) },
+                      { libelle: 'INPI', valeur: nombre(art.inpi, 2) },
+                      { libelle: 'Autre', valeur: nombre(art.autre, 2) },
+                    ]} />
+                  )}
+                  </Fragment>
+                )
+              })}
+              {!sansArticle && affiches.length === 0 && (
+                <tr><td colSpan={NbColonnes} className="rig-table__vide">Aucun article ne repond a ce filtre.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -449,7 +537,16 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
             {reste <= 0 ? 'Facture soldee' : `Solde restant ${euros(reste)} EUR`}
           </span>
         </div>}
-      </section>
+
+        {!sansArticle && (
+          <PiedListe aide="Clic sur un article pour le retirer du total ou l'y remettre.">
+            <span><b>{affiches.length}</b>{affiches.length > 1 ? ' articles affiches' : ' article affiche'}</span>
+            <span>Total TTC <b>{montant(total / 100)}</b></span>
+            <span>Encaisse <b>{montant(encaisse)}</b></span>
+            <span>Reste <b>{montant(reste / 100)}</b></span>
+          </PiedListe>
+        )}
+      </ListeModerne>
     </div>
   )
 }

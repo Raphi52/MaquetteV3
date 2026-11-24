@@ -13,11 +13,23 @@
 // (JeuDemo.Aujourdhui) vient de Pont/EcranEncaissements.cs ; les ventilations
 // de demonstration etaient declarees dans l'ecran et l'ont suivi. Montants en
 // centimes entiers (le C# calculait en decimal, exact).
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 4) : les ventilations prennent les
+// briques de composants/ListeModerne.tsx. Tete (choisies, ventile sur encaisse, reste, « Aller a une ventilation… »
+// Ctrl K, Entree coche ou decoche la ventilation restee seule), trois cartes : Ventile
+// (anneau sur le montant encaisse ; le clic montre les seules ventilations choisies), Montants par client (le clic
+// sur un client filtre), A ventiler. Une ligne par ventilation (client en avatar et abrege, montant avec sa
+// mini-barre, ventile en point vert), pied de totaux. Le clic qui coche ou decoche une ventilation, la saisie et
+// le compte rendu de ventilation ne changent pas ; les filtres montrent, ils ne cochent rien.
+// fix-ok: application du socle des listes (lot 4) en plusieurs pas, pas un correctif.
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { centimes, euros } from '../format'
 import { PourLeDossier } from '../composants/PourLeDossier'
+import {
+  CartesChiffrees, CelluleIdentite, EnteteListe, ListeModerne, MontantBarre, PiedListe, PointEtat, montant as texteMontant, type Teinte,
+} from '../composants/ListeModerne'
 import type { ContexteDossierVue } from '../plan/types'
 
 interface Ventilation {
@@ -46,6 +58,13 @@ const EncaissementRepris: string | null = 'E-2026-0447 du 02/09/2026'
 
 /** Le numero de l'affaire d'une ventilation (« 2026B00811 — Immatriculation » -> « 2026B00811 »). */
 const numeroAffaire = (l: Ventilation): string => l.affaire.split(' — ')[0] ?? ''
+
+function normaliser(texte: string): string {
+  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+/** Les teintes de la carte « Montants par client », dans l'ordre d'apparition des clients. */
+const TeintesClients: readonly Teinte[] = ['bleu', 'violet', 'orange', 'vert', 'ardoise', 'rouge']
 
 export interface ProprietesEcranEncaissements {
   /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) : le reglement est pour elle
@@ -96,6 +115,20 @@ export function EcranEncaissements({ dossier = null }: ProprietesEcranEncaisseme
 
   const ventile = Lignes.filter((l) => choisies.has(l.identifiant)).reduce((s, l) => s + l.montant, 0)
   const nonVentile = montant - ventile
+
+  // Les filtres des cartes : les ventilations choisies seulement, un client. Ils montrent, ils ne cochent rien.
+  const [seulementChoisies, setSeulementChoisies] = useState(false)
+  const [filtreClient, setFiltreClient] = useState<string | null>(null)
+  // « Aller a une ventilation… » (Ctrl K) : un payeur peut solder beaucoup d'affaires d'un coup.
+  const [filtreRapide, setFiltreRapide] = useState('')
+  const cherche = normaliser(filtreRapide.trim())
+  const affichees = Lignes.filter((l) => (!seulementChoisies || choisies.has(l.identifiant))
+                                        && (filtreClient === null || l.abrege === filtreClient)
+                                        && (cherche === '' || normaliser([l.identifiant, l.affaire, l.client, l.abrege].join(' ')).includes(cherche)))
+  const montantMax = affichees.reduce((m, l) => Math.max(m, l.montant), 0)
+  const clients = [...new Set(Lignes.map((l) => l.abrege))]
+  const parClient = (abrege: string) => Lignes.filter((l) => l.abrege === abrege).reduce((s, l) => s + l.montant, 0)
+  const euro = (c: number) => texteMontant(c / 100)
 
   return (
     <div className="rig-proc__corps">
@@ -167,43 +200,64 @@ export function EcranEncaissements({ dossier = null }: ProprietesEcranEncaisseme
         )}
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Ventilations</div>
-          <span className="rig-resultats-proc__compte">
-            {euros(ventile)} EUR ventile(s) sur {euros(montant)} EUR — {nonVentile === 0 ? 'solde nul' : euros(nonVentile) + ' EUR a ventiler'}
-          </span>
-        </div>
+      <ListeModerne etiquette="Ventilations">
+        <EnteteListe titre="Ventilations"
+                     synthese={<>{choisies.size}{` choisie(s) sur ${Lignes.length} · `}<b>{euro(ventile)}</b>{' ventile(s) sur '}<b>{euro(montant)}</b>
+                       {' · '}{nonVentile === 0 ? 'solde nul' : <><b>{euro(nonVentile)}</b>{' a ventiler'}</>}</>}
+                     filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a une ventilation…',
+                               valider: () => { if (affichees.length === 1) basculer(affichees[0]!.identifiant) } }} />
+
+        <CartesChiffrees cartes={[
+          { cle: 'ventile', titre: 'Ventile', valeur: euro(ventile), complement: `sur ${euro(montant)}`,
+            anneau: { part: Math.min(ventile, montant), total: montant, teinte: 'vert' },
+            actif: seulementChoisies, choisir: () => setSeulementChoisies(!seulementChoisies),
+            indication: seulementChoisies ? 'Toutes les ventilations' : 'Seulement les ventilations choisies' },
+          { cle: 'clients', titre: 'Montants par client', valeur: euro(Lignes.reduce((s, l) => s + l.montant, 0)), legende: true,
+            ...(filtreClient !== null ? { choisir: () => setFiltreClient(null), indication: 'Tous les clients' } : {}),
+            segments: clients.map((abrege, i) => ({
+              cle: abrege, libelle: abrege, valeur: parClient(abrege), texte: euro(parClient(abrege)),
+              teinte: TeintesClients[i % TeintesClients.length]!, actif: filtreClient === abrege,
+              choisir: () => setFiltreClient(filtreClient === abrege ? null : abrege),
+            })) },
+          { cle: 'reste', titre: 'A ventiler', valeur: nonVentile === 0 ? 'solde nul' : euro(nonVentile) },
+        ]} />
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup>
+              <col style={{ width: '15%' }} /><col /><col style={{ width: '24%' }} /><col style={{ width: '16%' }} />
+              <col style={{ width: '17%' }} /><col style={{ width: '10%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>N identifiant</th>
-                <th>Affaire</th>
                 <th>Client</th>
-                <th>Abrege client</th>
-                <th>Montant</th>
-                <th>Solde (affaire / client)</th>
-                <th className="rig-table__centre">Ventile</th>
+                <th>Affaire</th>
+                <th className="rig-lm-droite">Montant</th>
+                <th className="rig-lm-droite">Solde (affaire / client)</th>
+                <th>Ventile</th>
               </tr>
             </thead>
             <tbody>
-              {Lignes.map((ligne) => {
+              {affichees.map((ligne) => {
                 const choisi = choisies.has(ligne.identifiant)
                 return (
                   <tr key={ligne.identifiant} className={choisi ? 'rig-ligne--valide' : ''}
                       onClick={() => basculer(ligne.identifiant)}>
                     <td className="rig-table__mono">{ligne.identifiant}</td>
-                    <td>{ligne.affaire}</td>
-                    <td>{ligne.client}</td>
-                    <td className="rig-table__mono">{ligne.abrege}</td>
-                    <td className="rig-table__mono">{euros(ligne.montant)}</td>
-                    <td className="rig-table__mono">{euros(ligne.soldeAffaire)} / {euros(ligne.soldeClient)}</td>
-                    <td className="rig-table__centre">{choisi ? 'oui' : ''}</td>
+                    <CelluleIdentite nom={ligne.client} objet={ligne.abrege} titre={`${ligne.client} — ${ligne.abrege}`} />
+                    <td title={ligne.affaire}>{ligne.affaire}</td>
+                    <td className="rig-lm-droite" title={euro(ligne.montant)}>
+                      <MontantBarre valeur={ligne.montant} max={montantMax} texte={euro(ligne.montant)} />
+                    </td>
+                    <td className="rig-lm-droite rig-table__mono">{euros(ligne.soldeAffaire)} / {euros(ligne.soldeClient)}</td>
+                    <td>{choisi && <PointEtat teinte="vert">oui</PointEtat>}</td>
                   </tr>
                 )
               })}
+              {affichees.length === 0 && (
+                <tr><td colSpan={6} className="rig-table__vide">Aucune ventilation ne repond a ce filtre.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -217,7 +271,14 @@ export function EcranEncaissements({ dossier = null }: ProprietesEcranEncaisseme
                 : 'Ventilation incomplete'}
           </span>
         </div>
-      </section>
+
+        <PiedListe aide="Clic sur une ligne pour la ventiler ou la retirer.">
+          <span><b>{affichees.length}</b>{affichees.length > 1 ? ' ventilations affichees' : ' ventilation affichee'}</span>
+          <span>Ventile <b>{euro(ventile)}</b></span>
+          <span>Encaisse <b>{euro(montant)}</b></span>
+          <span>A ventiler <b>{euro(nonVentile)}</b></span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }

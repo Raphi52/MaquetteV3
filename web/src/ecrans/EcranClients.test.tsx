@@ -1,36 +1,44 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { EcranClients } from './EcranClients'
+import { EcranClients, oublierVuesDeLaSession } from './EcranClients'
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); oublierVuesDeLaSession() })
 
 // Valeurs attendues : celles de l'ecran Blazor (EcranClients.razor, 6 clients de demonstration).
 const lignes = (c: HTMLElement) =>
   [...c.querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent))
+// L'abrege de chaque client affiche : le debut de l'objet de sa cellule (« LEROY · C-000142 »).
+const abreges = (c: HTMLElement) =>
+  [...c.querySelectorAll('tbody .rig-lm-identite__objet')].map((o) => o.textContent!.split(' · ')[0])
+const synthese = (c: HTMLElement) => c.querySelector('.rig-lm-synthese')!.textContent
 
 describe('EcranClients', () => {
-  it('affiche les six clients, avec leur statut en pastille', () => {
+  it('affiche les six clients : avatar et nom, statut en point colore, type en pastille', () => {
     const { container } = render(<EcranClients selectionner={vi.fn()} />)
-    expect(container.querySelector('.rig-resultats-proc__compte')!.textContent).toBe('6 client(s) sur 6')
-    expect(lignes(container)[0]).toEqual(['1042', 'C-000142', 'LEROY', 'SELARL LEROY & ASSOCIES', 'Mandataires', 'Actif', 'En compte'])
-    expect(screen.getByText('Bloque', { selector: 'span.rig-etat' }).className).toBe('rig-etat rig-etat--attente')
+    expect(synthese(container)).toBe('6 clients sur 6 · 4 actifs')
+    // Avatar « LA » (ni SELARL ni & ne donnent d'initiale), nom, abrege · compte, puis Id, Groupe, Statut, Type.
+    expect(lignes(container)[0]).toEqual(['LASELARL LEROY & ASSOCIESLEROY · C-000142', '1042', 'Mandataires', 'Actif', 'En compte'])
+    expect(screen.getByText('Bloque', { selector: 'span.rig-lm-etat' }).className).toBe('rig-lm-etat rig-lm-t-rouge')
+    expect(screen.getByText('Actif', { selector: 'tbody tr:first-child span.rig-lm-etat' }).className).toBe('rig-lm-etat rig-lm-t-vert')
+    expect(container.querySelector('tbody tr:nth-child(4) .rig-lm-pastille')!.className).toBe('rig-lm-pastille rig-lm-t-vert')
+    expect(container.querySelector('.rig-lm-pied')!.textContent).toContain('6 clients affiches')
   })
 
   it('filtre par mot cle (sans casse) et par statut, et « Effacer » remet tout', () => {
     const { container } = render(<EcranClients selectionner={vi.fn()} />)
     fireEvent.change(screen.getByLabelText('Mot cle'), { target: { value: 'dup' } })
-    expect(lignes(container).map((l) => l[2])).toEqual(['DUPONT'])
+    expect(abreges(container)).toEqual(['DUPONT'])
 
     fireEvent.change(screen.getByLabelText('Mot cle'), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'En sommeil' }))
     expect(screen.getByRole('button', { name: 'En sommeil' }).className).toBe('rig-bascule rig-bascule--actif')
-    expect(lignes(container).map((l) => l[2])).toEqual(['PREV51'])
+    expect(abreges(container)).toEqual(['PREV51'])
 
     fireEvent.click(screen.getByRole('button', { name: 'Greffe' }))
     expect(container.querySelector('.rig-table__vide')!.textContent).toBe('Aucun client ne repond a ces criteres.')
 
     fireEvent.click(screen.getByRole('button', { name: 'Effacer' }))
-    expect(container.querySelector('.rig-resultats-proc__compte')!.textContent).toBe('6 client(s) sur 6')
+    expect(synthese(container)).toBe('6 clients sur 6 · 4 actifs')
   })
 
   it('un clic sur une ligne remonte l\'abrege du client a Blazor', () => {
@@ -38,5 +46,65 @@ describe('EcranClients', () => {
     const { container } = render(<EcranClients selectionner={selectionner} />)
     fireEvent.click(container.querySelectorAll('tbody tr')[2]!)
     expect(selectionner).toHaveBeenCalledWith('DUPONT')
+  })
+
+  it('les cartes POSENT les criteres existants : Actifs, et un type par segment de la legende', () => {
+    const { container } = render(<EcranClients selectionner={vi.fn()} />)
+    const carteActifs = container.querySelector('.rig-lm-carte')!
+    expect(carteActifs.textContent).toBe('Actifs4 sur 6')
+    fireEvent.click(carteActifs)
+    expect(screen.getByRole('button', { name: 'Actif' }).className).toBe('rig-bascule rig-bascule--actif')
+    expect(abreges(container)).toEqual(['LEROY', 'BLANC', 'WEBPRO', 'GRFCPY'])
+    fireEvent.click(screen.getByRole('button', { name: 'Web 1', pressed: false }))
+    expect(screen.getByRole('button', { name: 'Web' }).className).toBe('rig-bascule rig-bascule--actif')
+    expect(abreges(container)).toEqual(['WEBPRO'])
+    // La carte « Type de client » enleve les types ; « Actifs » un second clic enleve le statut.
+    fireEvent.click(screen.getByRole('button', { name: /^Type de client/ }))
+    expect(screen.getByRole('button', { name: 'Web' }).className).toBe('rig-bascule')
+    fireEvent.click(carteActifs)
+    expect(abreges(container)).toHaveLength(6)
+  })
+
+  it('les vues POSENT leurs criteres et la puce active suit les criteres ; « + Nouvelle vue » garde les criteres pour la session', () => {
+    const premier = render(<EcranClients selectionner={vi.fn()} />)
+    const vue = (nom: RegExp) => screen.getByRole('button', { name: nom })
+    expect(vue(/^Tous/).getAttribute('aria-pressed')).toBe('true')
+    expect(vue(/^Bloques ou en sommeil/).textContent).toBe('Bloques ou en sommeil 2')
+    fireEvent.click(vue(/^Bloques ou en sommeil/))
+    expect(abreges(premier.container)).toEqual(['DUPONT', 'PREV51'])
+    expect(screen.getByRole('button', { name: 'Bloque' }).className).toBe('rig-bascule rig-bascule--actif')
+    // Un critere de plus : plus aucune vue n'est celle de l'ecran.
+    fireEvent.click(screen.getByRole('button', { name: 'En compte' }))
+    expect(premier.container.querySelector('.rig-lm-vue--active')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Nouvelle vue' }))
+    fireEvent.change(screen.getByLabelText('Nom de la nouvelle vue'), { target: { value: 'Bloques en compte' } })
+    fireEvent.keyDown(screen.getByLabelText('Nom de la nouvelle vue'), { key: 'Enter' })
+    expect(vue(/^Bloques en compte/).getAttribute('aria-pressed')).toBe('true')
+    premier.unmount()
+
+    // L'ecran rouvert la garde ; la choisir repose ses criteres.
+    const second = render(<EcranClients selectionner={vi.fn()} />)
+    fireEvent.click(vue(/^Bloques en compte/))
+    expect(abreges(second.container)).toEqual(['DUPONT'])
+  })
+
+  it('« Aller a un client… » filtre la liste affichee sans toucher aux criteres ; Ctrl K y pose le curseur ; Entree choisit le client reste seul', () => {
+    const selectionner = vi.fn()
+    const { container } = render(<EcranClients selectionner={selectionner} />)
+    const champ = screen.getByLabelText('Aller a un client…') as HTMLInputElement
+    const touche = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true, cancelable: true })
+    window.dispatchEvent(touche)
+    expect(touche.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(champ)
+
+    fireEvent.change(champ, { target: { value: 'compiegne' } })
+    expect(abreges(container)).toEqual(['GRFCPY'])
+    expect((screen.getByLabelText('Mot cle') as HTMLInputElement).value).toBe('')
+    fireEvent.keyDown(champ, { key: 'Enter' })
+    expect(selectionner).toHaveBeenCalledWith('GRFCPY')
+
+    fireEvent.change(champ, { target: { value: 'zzz' } })
+    expect(container.querySelector('.rig-table__vide')!.textContent).toBe('Aucun des 6 clients ne contient « zzz ».')
   })
 })

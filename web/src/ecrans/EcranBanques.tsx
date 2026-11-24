@@ -7,9 +7,16 @@
 // Porte depuis Components/Ecrans/EcranBanques.razor (lot 4) : meme balisage,
 // memes classes CSS. L'ecran ne lisait rien dans Metier/ : ses banques de
 // demonstration l'ont suivi ici.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 4) : la liste prend les briques de
+// composants/ListeModerne.tsx -- tete, une ligne par banque (avatar, designation, code), modes de paiement en
+// pastilles, pied. Ni montant, ni critere d'etat, ni plus de quelques banques par greffe : pas de carte, pas de
+// vue, pas de « Aller a… ». Le clic qui montre la fiche ne change pas.
+// fix-ok: application du socle des listes (lot 4) en plusieurs pas, pas un correctif.
 
 import { useState } from 'react'
 import { contientSansCasse, estBlanc } from '../criteres'
+import { CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, type Teinte } from '../composants/ListeModerne'
 
 // v2 : OPE_BANQIDENTITE (ult_BanqCode, ult_BanqNom), OPE_BANQADRESSE,
 // OPE_PARAMCOMPTABLE, et OPE_BANQCHEQUE (ult_CBModel, ult_NumLettreCheque,
@@ -34,6 +41,8 @@ const Banques: Banque[] = [
   { code: 'LBP', designation: 'LA BANQUE POSTALE', compte: '512300', journal: 'BQ3', adresse: '1 rue Cerf-Volant\n51100 Reims', maquetteCheque: 'LC_POSTALE', modes: ['Cheque', 'Virement', 'Carte bancaire'], numLettreCheque: 'LC-2026-0088', chequeFournisseur: false, chequeNotification: true, chequeTropPercu: true },
   { code: 'CAI', designation: 'CAISSE (especes)', compte: '531000', journal: 'CA1', adresse: '', maquetteCheque: '', modes: ['Especes'], numLettreCheque: '', chequeFournisseur: false, chequeNotification: false, chequeTropPercu: false },
 ]
+
+const TeinteMode: Record<string, Teinte> = { Cheque: 'bleu', Virement: 'violet', 'Carte bancaire': 'orange', Especes: 'vert' }
 
 export function EcranBanques() {
   const [recherche, setRecherche] = useState('')
@@ -69,18 +78,15 @@ export function EcranBanques() {
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Banques declarees</div>
-          <span className="rig-resultats-proc__compte">{trouvees.length} banque(s)</span>
-        </div>
+      <ListeModerne etiquette="Banques declarees">
+        <EnteteListe titre="Banques declarees" synthese={`${trouvees.length}${trouvees.length > 1 ? ' banques' : ' banque'}`} />
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup><col /><col style={{ width: '16%' }} /><col style={{ width: '44%' }} /></colgroup>
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Designation</th>
+                <th>Banque</th>
                 <th>Compte</th>
                 <th>Modes associes</th>
               </tr>
@@ -88,14 +94,17 @@ export function EcranBanques() {
             <tbody>
               {trouvees.map((banque) => (
                 <tr key={banque.code} onClick={() => setSelection(banque)}>
-                  <td className="rig-table__mono">{banque.code}</td>
-                  <td>{banque.designation}</td>
+                  <CelluleIdentite nom={banque.designation} objet={banque.code} titre={`${banque.designation} · ${banque.code}`} />
                   <td className="rig-table__mono">{banque.compte}</td>
-                  <td>{banque.modes.join(', ')}</td>
+                  <td title={banque.modes.join(', ')}>
+                    {banque.modes.map((m, i) => (
+                      <span key={m}>{i > 0 && ' '}<Pastille teinte={TeinteMode[m] ?? 'gris'}>{m}</Pastille></span>
+                    ))}
+                  </td>
                 </tr>
               ))}
               {trouvees.length === 0 && (
-                <tr><td colSpan={4} className="rig-table__vide">Aucune banque ne repond a cette recherche.</td></tr>
+                <tr><td colSpan={3} className="rig-table__vide">Aucune banque ne repond a cette recherche.</td></tr>
               )}
             </tbody>
           </table>
@@ -157,7 +166,12 @@ export function EcranBanques() {
             </label>
           </div>
         )}
-      </section>
+
+        <PiedListe aide="Clic sur une ligne pour voir la fiche de la banque.">
+          <span><b>{trouvees.length}</b>{trouvees.length > 1 ? ' banques affichees' : ' banque affichee'}</span>
+          <span>Fichier <b>{Banques.length}</b></span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }
