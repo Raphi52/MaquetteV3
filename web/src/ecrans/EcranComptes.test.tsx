@@ -212,7 +212,9 @@ describe('EcranComptes', () => {
     expect(touche.defaultPrevented).toBe(true)
     expect(document.activeElement).toBe(champ)
     fireEvent.change(champ, { target: { value: 'ancien' } })
-    expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
+    // Les noms des lignes restantes, pas le nombre de <tr> : quand rien ne correspond, la ligne « Aucun compte… »
+    // est aussi un <tr>, et un compte de 1 passerait a tort (piege releve au lot 3 du plan des listes modernes).
+    expect([...container.querySelectorAll('tbody .rig-lm-identite__nom')].map((n) => n.textContent)).toEqual(['Paul Ancien'])
     expect(await synthese()).toBe('1 compte · 0 actif — Rose Responsable')
     // Entree sur un seul compte restant : il passe dans la fiche, comme un clic sur sa ligne.
     fireEvent.keyDown(champ, { key: 'Enter' })
@@ -229,7 +231,8 @@ describe('EcranComptes', () => {
     expect(droits.map((r) => r.querySelector('.rig-lm-etat')!.className)).toEqual(['rig-lm-etat rig-lm-t-vert', 'rig-lm-etat rig-lm-t-orange'])
     expect(droits[0]!.querySelector('.rig-lm-identite__nom')!.textContent).toBe('Rose Responsable')
     fireEvent.change(screen.getByLabelText('Aller à un compte ou un rôle…'), { target: { value: 'pancien' } })
-    expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
+    // Le changement qui reste (le retrait du role de pancien), pas le nombre de <tr> (meme piege que ci-dessus).
+    expect([...container.querySelectorAll('tbody .rig-lm-etat')].map((e) => espaces(e.textContent))).toEqual(['Retiré'])
     expect(espaces(container.querySelector('.rig-lm-pied')!.textContent)).toBe('1 changement affiché' + 'Ajouts 0' + 'Retraits 1')
     fireEvent.change(screen.getByLabelText('Aller à un compte ou un rôle…'), { target: { value: 'zzz' } })
     expect(screen.getByText('Aucun des 2 changements ne contient « zzz ».')).toBeTruthy()
