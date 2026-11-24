@@ -125,6 +125,31 @@ internal static class Programme
                 "EcranRechAffaires : un clic sur « Nom » range la grille dans l'ordre");
             Exiger(decroissant.SequenceEqual(croissant.AsEnumerable().Reverse()),
                 "EcranRechAffaires : un second clic inverse l'ordre");
+
+            // Listes modernes, lot 1 (24/11/2026) : « Trier » propose les memes cles que les en-tetes, et
+            // les vues de la maquette sont comptees par le pont sur le fonds de demonstration (15 affaires :
+            // Toutes 15, Proc. collectives en cours 3, Solde > 100 € 4, Cloturees 2). Le solde minimum se
+            // lit a la francaise et filtre STRICTEMENT au-dela ; illisible, il ne filtre rien.
+            var cles = System.Text.RegularExpressions.Regex.Matches(tsxRech, @"\['[^']+', '([A-Za-z]+)'\]").Select(m => m.Groups[1].Value).ToList();
+            Exiger(cles.SequenceEqual(new[] { "Numero", "IdInstance", "Role", "CodeAffaire", "Nature", "Libelle", "Nom", "Etat",
+                                              "Siren", "Type", "Saisine", "Creation", "Solde" })
+                   && tsxRech.Contains("<ChoixTri cles={Colonnes}"),
+                $"EcranRechAffaires : « Trier » propose les 13 cles de tri du pont ({string.Join(", ", cles)})");
+            RigV3Desktop.Pont.CriteresAffaires Vue(string nature = "", string etat = "", string? soldeMin = null)
+                => sansCritere with { CritNature = nature, CritEtat = etat, CritSoldeMin = soldeMin };
+            var comptes = RigV3Desktop.Pont.EcranRechAffaires.Compter(
+                [Vue(), Vue("collective", "En cours"), Vue(soldeMin: "100"), Vue(etat: "Cloturee")]);
+            Exiger(comptes.SequenceEqual(new[] { 15, 3, 4, 2 }),
+                $"EcranRechAffaires : les vues comptent 15, 3, 4, 2 comme la maquette ({string.Join(", ", comptes)})");
+            var auDela = RigV3Desktop.Pont.EcranRechAffaires.Trouver(Vue(soldeMin: "142,50"), null, true, null);
+            Exiger(auDela.Lignes.Length == 3 && auDela.Lignes.All(l => l.SoldeValeur > 142.50m) && !auDela.AucunCritere,
+                $"EcranRechAffaires : « Solde superieur a 142,50 » garde les soldes au-dela, pas l'egal ({auDela.Lignes.Length})");
+            var illisible = RigV3Desktop.Pont.EcranRechAffaires.Trouver(Vue(soldeMin: "abc"), null, true, null);
+            Exiger(illisible.Lignes.Length == 15 && illisible.AucunCritere,
+                "EcranRechAffaires : un solde minimum illisible ne filtre rien et ne compte pas comme critere");
+            var tous = RigV3Desktop.Pont.EcranRechAffaires.Trouver(sansCritere, null, true, null).Lignes;
+            Exiger(tous.Sum(l => l.SoldeValeur) == 1379.30m && tous.All(l => l.Solde == l.SoldeValeur.ToString("N2")),
+                "EcranRechAffaires : le solde en nombre est celui du texte, total 1 379,30 comme la maquette");
         }
         Verifier("EcranRequisitions", "CommandesWebVisibles", "Recue", o => Membre(o, "Recue"));
 

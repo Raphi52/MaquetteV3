@@ -1581,21 +1581,29 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   font-size: var(--rig-fs-dense);
 }
 .rig-table { width: 100%; }
+/* 2026-11-24, listes « Tout reuni » (/draft conv-2132, plan des listes modernes, lot 1) : en-tetes en
+   casse normale, petits et gris -- plus de capitales espacees --, lignes de 32 px, un seul filet fin
+   entre les lignes (plus de zebrure), survol leger, ligne choisie en accent. Toutes les listes en
+   profitent ; les briques de la maquette (avatar, pastille, ligne depliee) sont dans rig-listes.css.
+   fix-ok: restyle demande (lot 1), pose en blocs de la meme grille (en-tete, lignes, ligne inerte) ; la ligne inerte : cause
+   lue, sa regle (0,2,1) perdait contre le survol general (0,2,3), corrigee par la specificite, pas par !important. */
 .rig-table thead th {
   position: sticky; top: 0; z-index: 1;
   background: var(--rig-fond);
-  text-align: left; font-weight: 600;
+  text-align: left; font-weight: 500;
   color: var(--rig-texte-3);
-  font-size: 10px; letter-spacing: var(--rig-ls-kicker); text-transform: uppercase;
-  padding: var(--rig-esp-2);
-  border-bottom: 1px solid var(--rig-bord);
+  font-size: 11.5px; letter-spacing: normal; text-transform: none;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--rig-bord-faible);
   white-space: nowrap;
 }
 .rig-table { table-layout: auto; }
 .rig-table tbody td {
-  padding: 3px var(--rig-esp-2);
+  height: 32px;
+  padding: 0 10px;
   border-bottom: 1px solid var(--rig-bord-faible);
   color: var(--rig-texte-2);
+  font-variant-numeric: tabular-nums;
   /* 2026-09-17, demande utilisateur : UNE seule ligne par ligne de grille.
      Avant, une cellule longue (Utilisateur, Libelle) repliait sur deux lignes
      et la hauteur des lignes devenait irreguliere. Le trop-plein se coupe,
@@ -1606,9 +1614,13 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   max-width: 320px;
 }
 .rig-table tbody tr { cursor: pointer; }
-/* Une ligne sur deux est teintee pour suivre une ligne longue a l'oeil. */
-.rig-table tbody tr:nth-child(even) td { background: var(--rig-zebre); }
-.rig-table tbody tr:hover td { background: var(--rig-survol-ligne); color: var(--rig-texte); }
+/* Plus de zebrure (24/11/2026) : le filet fin suffit a suivre une ligne de 32 px. Le survol est un
+   voile du texte du theme, leger sur toute surface (page ou carte), dans les cinq themes. */
+.rig-table tbody tr:hover td { background: color-mix(in srgb, var(--rig-texte) 5%, transparent); color: var(--rig-texte); }
+/* La ligne choisie : fond d'accent leger et filet d'accent a gauche, comme la ligne ouverte de la maquette. */
+.rig-table tbody tr.rig-ligne--valide td,
+.rig-table tbody tr.rig-ligne--valide:hover td { background: color-mix(in srgb, var(--rig-or) 12%, transparent); color: var(--rig-texte); }
+.rig-table tbody tr.rig-ligne--valide td:first-child { box-shadow: inset 3px 0 0 var(--rig-or); }
 .rig-table__mono { font-family: var(--rig-font-mono); font-size: 11px; }
 .rig-table__centre { text-align: center; }
 .rig-table__vide {
@@ -1773,10 +1785,11 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 
 /* Une arrivee sans demande rattachee ne mene nulle part : la ligne ne doit
    pas faire croire au contraire. */
-.rig-table__ligne--inerte { cursor: default; }
-.rig-table__ligne--inerte:hover td { background: transparent; color: var(--rig-texte-2); }
-/* Une ligne non cliquable garde quand meme sa zebrure au survol. */
-.rig-table tbody tr.rig-table__ligne--inerte:nth-child(even):hover td { background: var(--rig-zebre); }
+/* Aussi precis que les regles generales (.rig-table tbody tr, .rig-table tbody tr:hover td), sinon elles
+   l'emportent : avant le 24/11/2026, la main s'affichait sur une ligne inerte, et seule la zebrure des lignes
+   paires masquait leur survol -- les impaires s'allumaient. */
+.rig-table tbody tr.rig-table__ligne--inerte { cursor: default; }
+.rig-table tbody tr.rig-table__ligne--inerte:hover td { background: transparent; color: var(--rig-texte-2); }
 .rig-table__sans { color: var(--rig-texte-3); font-style: italic; font-family: var(--rig-font); }
 
 /* ============================================================
