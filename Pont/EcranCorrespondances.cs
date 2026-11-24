@@ -48,7 +48,7 @@ public static class StatutsCorrespondance
 
 /// <summary>
 /// Pont de l'ecran « Ancienne touche, nouvelle touche » (web/src/ecrans/EcranCorrespondances.tsx), SOC-027 : ecran NEUF,
-/// « a maquetter » (Configurer › Mon poste). Il donne, pour chaque raccourci clavier de la V2, la touche ou le geste qui
+/// « a maquetter » (Configurer › Prendre en main la V3). Il donne, pour chaque raccourci clavier de la V2, la touche ou le geste qui
 /// le remplace dans la V3, ecran par ecran ; il se cherche et s'imprime. Sur un ecran de la V3, « ? » montre les lignes
 /// de cet ecran avec l'ancienne touche a cote (CA03, web/src/ecrans/EcranCorrespondances.tsx, AideTouchesEcran).
 ///

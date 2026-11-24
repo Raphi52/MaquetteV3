@@ -51,10 +51,12 @@ var reunions = entrees.Where(e => e.Membres.Length > 0).DistinctBy(e => e.Code).
 var casAiguillage = Regex.Matches(aiguillage, @"case '([A-Z_0-9]+)':").Select(m => m.Groups[1].Value).ToHashSet();
 Exiger(libelleDuCode.Count >= 150,
     $"le menu expose ses procedures ({libelleDuCode.Count} codes atteignables, dont {libelleDuCode.Count - codesMenu.Count} reunis ; {entrees.Count} entrees affichees)");
-// Mesure du 24/11/2026 : 152 entrees affichees avant, 107 apres. Ce qui reste a part est un ecran
-// porte en React (sa propre logique), ou une procedure vue par d'autres metiers que ses voisines.
-Exiger(reunions.Count >= 25 && entrees.Count <= 110,
-    $"le menu est resserre : {reunions.Count} ecrans reunissent plusieurs procedures, {entrees.Count} entrees affichees (152 avant le 24/11/2026)");
+// Mesure du 24/11/2026 (conv-2142) : 170 entrees affichees avant, 107 apres la premiere passe, 99 apres
+// la seconde. Ce qui reste a part est un ecran porte en React (sa propre logique), ou une procedure vue
+// par d'autres metiers que ses voisines. Le plafond tient le resserrement : un ecran de plus au menu se
+// reunit d'abord a ses voisins, ou ce plafond se discute.
+Exiger(reunions.Count >= 30 && entrees.Count <= 100,
+    $"le menu est resserre : {reunions.Count} ecrans reunissent plusieurs procedures, {entrees.Count} entrees affichees (170 avant le 24/11/2026)");
 
 // L'aiguillage monte le descripteur par sa branche par defaut, et seulement la.
 Exiger(aiguillage.Contains("import { EcranGenere } from '../ecrans/EcranGenere'")
@@ -94,6 +96,10 @@ foreach (var d in descripteurs.Where(d => d.Membres.Length > 0))
         if (parcours is null) { defauts.Add($"la ligne « {l.Nom} » n'appartient a aucune procedure reunie"); continue; }
         if (l.Faites.Any(k => k < 0 || k >= parcours.Marches.Length))
             defauts.Add($"la ligne « {l.Nom} » franchit une marche hors de l'escalier de sa procedure");
+        // L'ancien groupe passe en tete de la precision UNE fois (CatalogueGenere.AvecAncienGroupe).
+        var morceaux = l.Precisions.Split(" · ");
+        if (morceaux.Length > 1 && morceaux[0] == morceaux[1])
+            defauts.Add($"la ligne « {l.Nom} » repete son groupe : « {l.Precisions} »");
     }
     // Le meme metier pour l'ecran et pour chacune de ses procedures : un agent ne voit jamais, dans un
     // ecran reuni, la liste d'une procedure que son profil lui cache.

@@ -73,8 +73,18 @@ public static class CatalogueGenere
                                                .DistinctBy(e => e.Code)],
             Groupes = [.. membres.Select(m => m.Titre)],
             Marches = [],
-            Lignes = [.. membres.SelectMany(m => m.Lignes.Select(l => l with { Groupe = m.Titre, Precisions = $"{l.Groupe} · {l.Precisions}" }))],
+            Lignes = [.. membres.SelectMany(m => m.Lignes.Select(l => l with { Groupe = m.Titre, Precisions = AvecAncienGroupe(l) }))],
             Membres = membres,
         };
+    }
+
+    /// <summary>La precision d'une ligne reunie : son ancien groupe en tete, pour ne pas le perdre.
+    /// Beaucoup de procedures le portent DEJA en tete de leur precision (Cabinets : « Salles fixes ·
+    /// enregistree ») -- le repeter afficherait « Salles fixes · Salles fixes » (vu le 24/11/2026).</summary>
+    private static string AvecAncienGroupe(LigneEcran l)
+    {
+        if (string.IsNullOrEmpty(l.Groupe) || l.Precisions.StartsWith(l.Groupe, StringComparison.Ordinal))
+            return l.Precisions;
+        return string.IsNullOrEmpty(l.Precisions) ? l.Groupe : $"{l.Groupe} · {l.Precisions}";
     }
 }

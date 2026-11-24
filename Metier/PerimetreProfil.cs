@@ -102,9 +102,9 @@ public static class PerimetreProfil
         ["SYNTHESE_DEFAIRE"] = Jud, ["SYNTHESE_PC_EN_MASSE"] = Jud,
         ["SYNTHESE_DECISIONS"] = Jud, ["SYNTHESE_PREPARER_AUDIENCE"] = Jud,
         ["SYNTHESE_APRES_AUDIENCE"] = Jud, ["SYNTHESE_FICHES_ACTEURS"] = Jud,
-        ["SYNTHESE_EDI_AVOCATS"] = Jud,
+        ["SYNTHESE_EDI_AVOCATS"] = Jud, ["SYNTHESE_REGLAGES_JUD"] = Jud,
         ["SYNTHESE_IP"] = JudEnd,
-        ["SYNTHESE_TABLES"] = RcsJud
+        ["SYNTHESE_TABLES"] = RcsJud, ["SYNTHESE_MATERIEL"] = RcsJud
     };
 
     /// <summary>Cet ecran est-il dans le perimetre de ces domaines ? Un ecran

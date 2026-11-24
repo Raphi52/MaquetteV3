@@ -181,21 +181,20 @@ public static class MenuAccueil
                     new("Debiteurs multiples",    "plusieurs debiteurs sur une PC",     "PROC_DEBITEURS_MULTIPLES")
                 ])
             ]),
-            new("Rediger et signer",
+            // Un seul verbe pour ecrire : les decisions et les courriers (« Rediger et signer » et
+            // « Editer un courrier » jusqu'au 24/11/2026 ; le premier n'avait plus que deux ecrans).
+            new("Rediger et editer",
             [
                 new("Redaction",              "ecrire une decision",                "PROC_REDA"),
-                new("Redaction en masse",     "rediger un lot de decisions",        "PROC_REDA_MASSE"),
-                new("Signer et diffuser les decisions", "destinataires, signature, occultations, impression", "SYNTHESE_DECISIONS",
+                new("Produire les decisions", "lots, destinataires, signature, occultations, impression", "SYNTHESE_DECISIONS",
                 [
+                    new("Redaction en masse",     "rediger un lot de decisions",        "PROC_REDA_MASSE"),
                     new("Destinataires",          "a qui part la decision",             "PROC_DEST_REDA"),
                     new("Signature electronique", "signer les decisions",               "PROC_SIGNJUD"),
                     new("Ordonnances a signer",   "la pile a signer",                   "PROC_ORDOSIGN"),
                     new("Occultations",           "masquer avant diffusion",            "PROC_DJ_OCCULTATIONS"),
                     new("Impression legale",      "jugements en masse",                 "PROC_IMPLEG")
-                ])
-            ]),
-            new("Editer un courrier",
-            [
+                ]),
                 new("Courriers divers",       "les lettres types du greffe",        "PROC_COURRIER_DIVERS"),
                 new("Courriers en masse",     "un courrier pour un lot",            "PROC_COURRIERM"),
                 new("Retoucher un document",  "pivoter, numeroter les pages",       "SYNTHESE_RETOUCHER",
@@ -206,9 +205,9 @@ public static class MenuAccueil
             ]),
             new("Envoyer",
             [
-                new("Transmission",           "envoyer un document dematerialise",  "PROC_TRANSDOC"),
-                new("Recommandes et retours", "bordereaux, accuses, courriers NPAI", "SYNTHESE_RECOMMANDES",
+                new("Envois et retours",      "transmission, recommandes, accuses, NPAI", "SYNTHESE_RECOMMANDES",
                 [
+                    new("Transmission",           "envoyer un document dematerialise",  "PROC_TRANSDOC"),
                     new("Bordereaux LR",          "recommandes du jour",                "PROC_BORDLR"),
                     new("Retours LRAR",           "accuses de reception",               "PROC_RETOURLRAR"),
                     new("Courriers revenus NPAI", "n'habite pas a l'adresse indiquee",  "PROC_TRAITEMENTNPAI")
@@ -219,16 +218,16 @@ public static class MenuAccueil
                     new("Publications BODACC",    "gerer les annonces",                 "PROC_GESTBOD"),
                     new("Surveillance BODACC",    "rejets et annonces en attente",      "PROC_SURVBOD")
                 ]),
-                new("Impressions et editions", "files, editions differees, relances, suivi", "SYNTHESE_IMPRESSIONS",
+                new("Impressions et exports", "files, editions differees, relances, suivi, Excel", "SYNTHESE_IMPRESSIONS",
                 [
                     new("File d'impression",      "ce qui attend l'imprimante",         "PROC_PAPERCUT"),
                     new("File des editions",      "ce qui attend d'etre emis",          "PROC_POOLEDITION"),
                     new("Editions differees",     "ce qui partira plus tard",           "PROC_EDT_DIFF"),
                     new("Suivi d'impression",     "ce qui est sorti",                   "PROC_SUIVI_IMPRESSION"),
                     new("Relancer un fichier",    "edition bloquee",                    "PROC_RELANCEFILE"),
-                    new("Relancer un lot",        "lot d'impression bloque",            "PROC_RELANCELOT")
-                ]),
-                new("Export Excel",           "sortir une liste",                   "PROC_LISTEEXCEL")
+                    new("Relancer un lot",        "lot d'impression bloque",            "PROC_RELANCELOT"),
+                    new("Export Excel",           "sortir une liste",                   "PROC_LISTEEXCEL")
+                ])
             ])
         ]),
         new("Surveiller", "surv", "!",
@@ -368,13 +367,13 @@ public static class MenuAccueil
             [
                 new("Clients",                "comptes et fiches",                  "PROC_GCLIENT"),
                 new("Fiche client",           "le detail d'un client",              "PROC_FCLIENT"),
-                new("Tiers payeurs",          "qui regle a la place du client",     "PROC_GESTTIERSPAYEURS"),
                 new("Non-inscrits",           "creer une personne hors registre",   "PROC_CNI")
             ]),
+            // « Ancienne touche, nouvelle touche » n'est plus ici : elle etait aussi deux lignes
+            // plus bas (« Prendre en main la V3 »), dans le MEME metier -- un doublon a l'oeil.
             new("Mon poste",
             [
                 new("Mon accueil",            "tuiles et alertes",                  "PROC_ACCUEIL_PARAM"),
-                new("Ancienne touche, nouvelle touche", "les raccourcis de l'ancien RIG", "PROC_TOUCHES"),
                 new("Actualites",             "les messages de l'accueil",          "PROC_ACTUALITES"),
                 new("Dates de travail",       "la date du greffe",                  "PROC_GESTDATE"),
                 new("Comptes des agents",     "qui ouvre RIG, et avec quels droits", "PROC_UTILISATEUR"),
@@ -397,16 +396,18 @@ public static class MenuAccueil
                     new("Tables de reference",    "les codes du greffe",                "PROC_GTABREF"),
                     new("Natures de document",    "typologie de la GED",                "PROC_GED_NATURE_DOC")
                 ]),
-                new("Cabinets",               "les salles d'audience",              "PROC_CABINET"),
-                new("Codes chefs IP",         "parametrage des injonctions",        "PROC_PARAM_IP"),
-                new("Bornes d'accueil",       "les kiosques KBIS",                  "PROC_BORNE"),
+                new("Reglages du judiciaire", "salles d'audience, codes chefs IP, modeles de decision", "SYNTHESE_REGLAGES_JUD",
+                [
+                    new("Cabinets",               "les salles d'audience",              "PROC_CABINET"),
+                    new("Codes chefs IP",         "parametrage des injonctions",        "PROC_PARAM_IP"),
+                    new("Modeles de redaction",   "maquettes des decisions",            "PROC_REDAA")
+                ]),
                 new("Compteurs de numeros",   "rendre un numero donne par erreur",  "PROC_COMPTEURS_NUM"),
                 new("Reglages du greffe",     "les parametres propres au greffe",   "PROC_REGLAGES_GREFFE")
             ]),
             new("Modeles et envois",
             [
                 new("Modeles d'edition",      "la forme des courriers",             "PROC_EDIT_MAQUETTE"),
-                new("Modeles de redaction",   "maquettes des decisions",            "PROC_REDAA"),
                 new("Sceaux",                 "elements de fusion",                 "PROC_SCEAU"),
                 new("Messagerie",             "les envois automatiques",            "PROC_GESTEMAIL"),
                 new("Courriels envoyes",      "la trace de chaque envoi",           "PROC_MAIL_LOT1")
@@ -414,9 +415,13 @@ public static class MenuAccueil
             new("Argent et exports",
             [
                 new("Banques",                "les comptes du greffe",              "PROC_GESTBANQ"),
-                // Non reunis : les modes de paiement sont vus par tous, Expresso est ferme a
-                // l'endettement (Metier/PerimetreProfil.cs) -- un ecran reuni ne melange pas les metiers.
-                new("Modes de paiement",      "les moyens acceptes",                "PROC_GESTMODEPAIEMENT"),
+                // Expresso reste a part : il est ferme a l'endettement, les paiements sont vus par
+                // tous (Metier/PerimetreProfil.cs) -- un ecran reuni ne melange pas les metiers.
+                new("Paiements",              "modes acceptes, tiers payeurs",      "SYNTHESE_PAIEMENTS",
+                [
+                    new("Modes de paiement",      "les moyens acceptes",                "PROC_GESTMODEPAIEMENT"),
+                    new("Tiers payeurs",          "qui regle a la place du client",     "PROC_GESTTIERSPAYEURS")
+                ]),
                 new("Facturation Expresso",   "parametrage de la facturation",      "PROC_PARAMEXPRESSO"),
                 new("Listes Excel",           "parametrage des exports",            "PROC_PARAM_LISTEEXCEL")
             ]),
@@ -435,7 +440,11 @@ public static class MenuAccueil
                     new("EDI RPJC inscriptions",  "demandes d'inscription des avocats", "PROC_EDI_RPJC_INS"),
                     new("EDI RPJC renvois",       "demandes de renvoi d'audience",      "PROC_EDI_RPJC_REN")
                 ]),
-                new("Imprimantes du greffe",  "lots, bacs et pilotes",              "PROC_IMP_WIN"),
+                new("Bornes et imprimantes",  "kiosques KBIS, lots, bacs et pilotes", "SYNTHESE_MATERIEL",
+                [
+                    new("Bornes d'accueil",       "les kiosques KBIS",                  "PROC_BORNE"),
+                    new("Imprimantes du greffe",  "lots, bacs et pilotes",              "PROC_IMP_WIN")
+                ]),
                 new("Supervision",            "greffes, traitements, erreurs (Amitel)", "PROC_SUPERVISION")
             ])
         ])

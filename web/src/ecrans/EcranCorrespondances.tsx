@@ -1,5 +1,5 @@
 // Ecran « Ancienne touche, nouvelle touche » : « a maquetter » dans le carnet (SOC-027 T02), menu Configurer ›
-// Mon poste. Sans origine RIG v2 : la fiche n'existait pas dans l'ancien RIG ; elle est construite a partir de ses
+// Prendre en main la V3. Sans origine RIG v2 : la fiche n'existait pas dans l'ancien RIG ; elle est construite a partir de ses
 // procedures (inventaire outille des touches de son code, Pont/InventaireTouchesV2.cs) et du menu de la maquette.
 //
 // Pour chaque raccourci de la V2, l'ecran ou il agissait, ce qu'il faisait, et dans la V3 : la nouvelle touche, ou le

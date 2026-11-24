@@ -6,7 +6,7 @@ Ce que l'agent trouve dans le menu de gauche de la V3, rangé comme le menu (ges
 « dans la V3 » : l'écran est construit ; « a venir » : l'entrée est au menu, son écran arrive avec son domaine.
 Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est le même écran, l'agent le reconnaît.
 
-## RCS — 24 entrée(s) propres au métier
+## RCS — 23 entrée(s) propres au métier
 
 | Geste › verbe | Entrée du menu | Ce qu'on y trouve | Procédure V2 | Écran |
 |---|---|---|---|---|
@@ -26,16 +26,15 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Facturer > Facturer | Paiements INPI | reversements, formalites en attente — réunit : Reversements INPI (`PROC_INPIPAY`), Formalites INPI (`PROC_GINPI`) | — | a venir |
 | Configurer > Les clients | Non-inscrits | creer une personne hors registre | `PROC_CNI` | a venir |
 | Configurer > Referentiels | Tables et natures de document | codes du greffe, typologie de la GED — réunit : Tables de reference (`PROC_GTABREF`), Natures de document (`PROC_GED_NATURE_DOC`) | — | a venir |
-| Configurer > Referentiels | Bornes d'accueil | les kiosques KBIS | `PROC_BORNE` | a venir |
 | Configurer > Modeles et envois | Messagerie | les envois automatiques | `PROC_GESTEMAIL` | dans la V3 |
 | Configurer > Argent et exports | Banques | les comptes du greffe | `PROC_GESTBANQ` | dans la V3 |
 | Configurer > Argent et exports | Facturation Expresso | parametrage de la facturation | `PROC_PARAMEXPRESSO` | a venir |
 | Configurer > Argent et exports | Listes Excel | parametrage des exports | `PROC_PARAM_LISTEEXCEL` | a venir |
 | Configurer > Outils | Requetes metier | executer une requete preparee | `PROC_REQUETES` | a venir |
 | Configurer > Outils | Formalites dematerialisees | analyse IA, retours CFE-NET — réunit : Analyse IA (`PROC_IA`), Retours CFE-NET (`PROC_CFENET_RET`) | — | a venir |
-| Configurer > Outils | Imprimantes du greffe | lots, bacs et pilotes | `PROC_IMP_WIN` | a venir |
+| Configurer > Outils | Bornes et imprimantes | kiosques KBIS, lots, bacs et pilotes — réunit : Bornes d'accueil (`PROC_BORNE`), Imprimantes du greffe (`PROC_IMP_WIN`) | — | a venir |
 
-## Judiciaire — 37 entrée(s) propres au métier
+## Judiciaire — 33 entrée(s) propres au métier
 
 | Geste › verbe | Entrée du menu | Ce qu'on y trouve | Procédure V2 | Écran |
 |---|---|---|---|---|
@@ -49,9 +48,8 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Modifier > L'affaire | Corriger une affaire judiciaire | instance, PC, mots directeurs, repertoire, parties — réunit : Instance judiciaire (`PROC_MJUD`), Procedure collective (`PROC_MPC`), Mots directeurs (`PROC_MDJUD`), Repertoire (`PROC_MODIF_REPER`), Parties d'une instance (`PROC_PARTIES`) | — | a venir |
 | Modifier > L'affaire | Defaire une affaire | liens entre PC, suppression, liberation — réunit : Liens entre PC (`PROC_XLIEN`), Supprimer une instance (`PROC_XXAFF`), Liberer une affaire (`PROC_LIBAFFAIRE`) | — | a venir |
 | Modifier > L'affaire | Modifier un lot de PC | juge-commissaire, organes, debiteurs — réunit : Changer le juge-commissaire (`PROC_CHM`), Changer les organes (`PROC_CHORGANESENMASSE`), Debiteurs multiples (`PROC_DEBITEURS_MULTIPLES`) | — | a venir |
-| Modifier > Rediger et signer | Redaction | ecrire une decision | `PROC_REDA` | dans la V3 |
-| Modifier > Rediger et signer | Redaction en masse | rediger un lot de decisions | `PROC_REDA_MASSE` | a venir |
-| Modifier > Rediger et signer | Signer et diffuser les decisions | destinataires, signature, occultations, impression — réunit : Destinataires (`PROC_DEST_REDA`), Signature electronique (`PROC_SIGNJUD`), Ordonnances a signer (`PROC_ORDOSIGN`), Occultations (`PROC_DJ_OCCULTATIONS`), Impression legale (`PROC_IMPLEG`) | — | a venir |
+| Modifier > Rediger et editer | Redaction | ecrire une decision | `PROC_REDA` | dans la V3 |
+| Modifier > Rediger et editer | Produire les decisions | lots, destinataires, signature, occultations, impression — réunit : Redaction en masse (`PROC_REDA_MASSE`), Destinataires (`PROC_DEST_REDA`), Signature electronique (`PROC_SIGNJUD`), Ordonnances a signer (`PROC_ORDOSIGN`), Occultations (`PROC_DJ_OCCULTATIONS`), Impression legale (`PROC_IMPLEG`) | — | a venir |
 | Surveiller > Les audiences | Roles et cabinets | organiser les audiences a venir | `PROC_GESTAUDS` | dans la V3 |
 | Surveiller > Les audiences | Audiences | les dates qui approchent | `PROC_AUDIENCE` | dans la V3 |
 | Surveiller > Les audiences | Preparer l'audience | composition, plumitif, convocations, chambres — réunit : Composition (`PROC_COMPO`), Preparation d'audience (`PROC_PREAUD`), Convocations (`PROC_GCONV`), Mise au point chambres (`PROC_MPCS`) | — | a venir |
@@ -65,17 +63,14 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Configurer > Les acteurs | Experts | qui designer, qui a deja siege | `PROC_EXPERT` | dans la V3 |
 | Configurer > Les acteurs | Mandataires et destinataires | mandataires, destinataires institutionnels, rapprocher, remplacer — réunit : Mandataires (`PROC_MANDATAIRE`), Destinataires institutionnels (`PROC_GDEST_INST`), Rapprocher des acteurs (`PROC_RAPPACTEUR`), Remplacer un acteur (`PROC_SUPP_ACTEUR_JUD`) | — | a venir |
 | Configurer > Referentiels | Tables et natures de document | codes du greffe, typologie de la GED — réunit : Tables de reference (`PROC_GTABREF`), Natures de document (`PROC_GED_NATURE_DOC`) | — | a venir |
-| Configurer > Referentiels | Cabinets | les salles d'audience | `PROC_CABINET` | a venir |
-| Configurer > Referentiels | Codes chefs IP | parametrage des injonctions | `PROC_PARAM_IP` | a venir |
-| Configurer > Referentiels | Bornes d'accueil | les kiosques KBIS | `PROC_BORNE` | a venir |
-| Configurer > Modeles et envois | Modeles de redaction | maquettes des decisions | `PROC_REDAA` | a venir |
+| Configurer > Referentiels | Reglages du judiciaire | salles d'audience, codes chefs IP, modeles de decision — réunit : Cabinets (`PROC_CABINET`), Codes chefs IP (`PROC_PARAM_IP`), Modeles de redaction (`PROC_REDAA`) | — | a venir |
 | Configurer > Modeles et envois | Messagerie | les envois automatiques | `PROC_GESTEMAIL` | dans la V3 |
 | Configurer > Argent et exports | Banques | les comptes du greffe | `PROC_GESTBANQ` | dans la V3 |
 | Configurer > Argent et exports | Facturation Expresso | parametrage de la facturation | `PROC_PARAMEXPRESSO` | a venir |
 | Configurer > Argent et exports | Listes Excel | parametrage des exports | `PROC_PARAM_LISTEEXCEL` | a venir |
 | Configurer > Outils | Requetes metier | executer une requete preparee | `PROC_REQUETES` | a venir |
 | Configurer > Outils | Echanges avec les avocats | RPVA et RPJC : inscriptions, renvois, conciliation — réunit : EDI RPVA (`PROC_EDI_RPVAINS`), EDI RPJC (`PROC_EDI_RPJC_TRCNC`), EDI RPJC inscriptions (`PROC_EDI_RPJC_INS`), EDI RPJC renvois (`PROC_EDI_RPJC_REN`) | — | a venir |
-| Configurer > Outils | Imprimantes du greffe | lots, bacs et pilotes | `PROC_IMP_WIN` | a venir |
+| Configurer > Outils | Bornes et imprimantes | kiosques KBIS, lots, bacs et pilotes — réunit : Bornes d'accueil (`PROC_BORNE`), Imprimantes du greffe (`PROC_IMP_WIN`) | — | a venir |
 
 ## Endettement (injonctions, creances) — 6 entrée(s) propres au métier
 
@@ -88,7 +83,7 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Surveiller > Les instances | Suivi des injonctions de payer | IP en attente, preventions — réunit : Injonctions de payer (`PROC_SURVIP`), Suivi des preventions (`PROC_IPSUIVI`) | — | a venir |
 | Facturer > Facturer | Creances | declarer, corriger, integrer, representer — réunit : Ajouter une creance (`PROC_ADDCREANCE`), Modifier une creance (`PROC_MODCREANCE`), Integrer des creances (`PROC_INTEGCREANCE`), Representation (`PROC_CREANREP`) | — | a venir |
 
-## Tous les métiers — 54 entrée(s) communes (courrier, documents, comptabilité, réglages)
+## Tous les métiers — 50 entrée(s) communes (courrier, documents, comptabilité, réglages)
 
 | Geste › verbe | Entrée du menu | Ce qu'on y trouve | Procédure V2 | Écran |
 |---|---|---|---|---|
@@ -103,14 +98,12 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Trouver > Les documents | Coffre-fort | les pieces mises a l'abri | `PROC_COFFRE_FORT` | dans la V3 |
 | Trouver > Chiffres et fichiers exterieurs | Encaissements | retrouver un reglement | `PROC_RECHENC` | a venir |
 | Trouver > Chiffres et fichiers exterieurs | Fichiers et echanges exterieurs | FNIG, FIBEN, notifications, tribunal digital — réunit : Interdits de gerer (`PROC_VFNIG`), Demandes FNIG (`PROC_FNIG`), FIBEN (`PROC_FIBEN`), Notifications (`PROC_VNOTIF`), Tribunal digital (`PROC_VTRID`) | — | a venir |
-| Modifier > Editer un courrier | Courriers divers | les lettres types du greffe | `PROC_COURRIER_DIVERS` | dans la V3 |
-| Modifier > Editer un courrier | Courriers en masse | un courrier pour un lot | `PROC_COURRIERM` | a venir |
-| Modifier > Editer un courrier | Retoucher un document | pivoter, numeroter les pages — réunit : Pivoter des pages (`PROC_PDF_WRITER`), Documents ocerises (`PROC_NUM`) | — | a venir |
-| Modifier > Envoyer | Transmission | envoyer un document dematerialise | `PROC_TRANSDOC` | a venir |
-| Modifier > Envoyer | Recommandes et retours | bordereaux, accuses, courriers NPAI — réunit : Bordereaux LR (`PROC_BORDLR`), Retours LRAR (`PROC_RETOURLRAR`), Courriers revenus NPAI (`PROC_TRAITEMENTNPAI`) | — | a venir |
+| Modifier > Rediger et editer | Courriers divers | les lettres types du greffe | `PROC_COURRIER_DIVERS` | dans la V3 |
+| Modifier > Rediger et editer | Courriers en masse | un courrier pour un lot | `PROC_COURRIERM` | a venir |
+| Modifier > Rediger et editer | Retoucher un document | pivoter, numeroter les pages — réunit : Pivoter des pages (`PROC_PDF_WRITER`), Documents ocerises (`PROC_NUM`) | — | a venir |
+| Modifier > Envoyer | Envois et retours | transmission, recommandes, accuses, NPAI — réunit : Transmission (`PROC_TRANSDOC`), Bordereaux LR (`PROC_BORDLR`), Retours LRAR (`PROC_RETOURLRAR`), Courriers revenus NPAI (`PROC_TRAITEMENTNPAI`) | — | a venir |
 | Modifier > Envoyer | Publications JAL et BODACC | envois, annonces, rejets — réunit : Envoi JAL / BODACC (`PROC_ENV_JAL`), Publications BODACC (`PROC_GESTBOD`), Surveillance BODACC (`PROC_SURVBOD`) | — | a venir |
-| Modifier > Envoyer | Impressions et editions | files, editions differees, relances, suivi — réunit : File d'impression (`PROC_PAPERCUT`), File des editions (`PROC_POOLEDITION`), Editions differees (`PROC_EDT_DIFF`), Suivi d'impression (`PROC_SUIVI_IMPRESSION`), Relancer un fichier (`PROC_RELANCEFILE`), Relancer un lot (`PROC_RELANCELOT`) | — | a venir |
-| Modifier > Envoyer | Export Excel | sortir une liste | `PROC_LISTEEXCEL` | a venir |
+| Modifier > Envoyer | Impressions et exports | files, editions differees, relances, suivi, Excel — réunit : File d'impression (`PROC_PAPERCUT`), File des editions (`PROC_POOLEDITION`), Editions differees (`PROC_EDT_DIFF`), Suivi d'impression (`PROC_SUIVI_IMPRESSION`), Relancer un fichier (`PROC_RELANCEFILE`), Relancer un lot (`PROC_RELANCELOT`), Export Excel (`PROC_LISTEEXCEL`) | — | a venir |
 | Surveiller > Les instances | Lots | les lots en cours | `PROC_GESTLOT` | a venir |
 | Surveiller > Les echanges et l'ancien RIG | Fiches en conflit | modifiees dans les deux RIG | `PROC_FICHES_CONFLIT` | dans la V3 |
 | Surveiller > Les echanges et l'ancien RIG | Historique de l'ancien RIG | affaires des deux RIG, anciens numeros | `PROC_HISTORIQUE_ANCIEN_RIG` | dans la V3 |
@@ -129,9 +122,7 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Facturer > Encaisser et tenir les comptes | Certification NF525 | journal et grands totaux signes | `PROC_CERTIF` | dans la V3 |
 | Configurer > Les clients | Clients | comptes et fiches | `PROC_GCLIENT` | dans la V3 |
 | Configurer > Les clients | Fiche client | le detail d'un client | `PROC_FCLIENT` | dans la V3 |
-| Configurer > Les clients | Tiers payeurs | qui regle a la place du client | `PROC_GESTTIERSPAYEURS` | a venir |
 | Configurer > Mon poste | Mon accueil | tuiles et alertes | `PROC_ACCUEIL_PARAM` | dans la V3 |
-| Configurer > Mon poste | Ancienne touche, nouvelle touche | les raccourcis de l'ancien RIG | `PROC_TOUCHES` | dans la V3 |
 | Configurer > Mon poste | Actualites | les messages de l'accueil | `PROC_ACTUALITES` | dans la V3 |
 | Configurer > Mon poste | Dates de travail | la date du greffe | `PROC_GESTDATE` | a venir |
 | Configurer > Mon poste | Comptes des agents | qui ouvre RIG, et avec quels droits | `PROC_UTILISATEUR` | dans la V3 |
@@ -144,5 +135,5 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Configurer > Modeles et envois | Modeles d'edition | la forme des courriers | `PROC_EDIT_MAQUETTE` | dans la V3 |
 | Configurer > Modeles et envois | Sceaux | elements de fusion | `PROC_SCEAU` | a venir |
 | Configurer > Modeles et envois | Courriels envoyes | la trace de chaque envoi | `PROC_MAIL_LOT1` | dans la V3 |
-| Configurer > Argent et exports | Modes de paiement | les moyens acceptes | `PROC_GESTMODEPAIEMENT` | a venir |
+| Configurer > Argent et exports | Paiements | modes acceptes, tiers payeurs — réunit : Modes de paiement (`PROC_GESTMODEPAIEMENT`), Tiers payeurs (`PROC_GESTTIERSPAYEURS`) | — | a venir |
 | Configurer > Outils | Supervision | greffes, traitements, erreurs (Amitel) | `PROC_SUPERVISION` | dans la V3 |
