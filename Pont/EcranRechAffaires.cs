@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace RigV3Desktop.Pont;
 
 /// <summary>
@@ -8,15 +10,21 @@ namespace RigV3Desktop.Pont;
 public sealed record NatureAffaire(string Code, string Nom);
 
 /// <summary>Les criteres saisis a gauche de l'ecran (memes noms que l'ancien @code).</summary>
+/// <param name="CritSoldeMin">Le solde doit DEPASSER ce montant (« 100 », « 100,50 ») ; vide ou illisible, aucun
+/// filtre. Ajoute pour la vue « Solde > 100 € » (listes modernes, lot 1, 24/11/2026) ; en dernier et facultatif,
+/// les criteres ecrits avant lui restent valides.</param>
 public sealed record CriteresAffaires(string CritNumero, string CritLibelle, string CritType, string CritNature,
                                       string CritIdInstance, string CritRole, string CritCodeAffaire,
                                       string CritNom, string CritEtat, DateOnly? CritSaisineDu,
-                                      DateOnly? CritSaisineAu);
+                                      DateOnly? CritSaisineAu, string? CritSoldeMin = null);
 
 /// <summary>Une ligne de la grille, dates et solde deja mis en forme comme Blazor les affichait.</summary>
+/// <param name="SoldeValeur">Le solde en nombre : l'ecran en fait les totaux, la carte « Solde total » et la
+/// mini-barre. Le texte <paramref name="Solde"/> suit la culture du poste, il ne se relit pas en nombre.</param>
 public sealed record LigneAffaire(string Numero, string IdInstance, string Role, string CodeAffaire,
                                   string Nature, string NomNature, string Libelle, string Nom, string Etat,
-                                  string Siren, string Type, string Saisine, string Creation, string Solde);
+                                  string Siren, string Type, string Saisine, string Creation, string Solde,
+                                  decimal SoldeValeur);
 
 /// <summary>L'instance choisie pour la suppression XXAFF.</summary>
 public sealed record AffaireChoisie(string Numero, string IdInstance, string Role);
@@ -133,7 +141,7 @@ public static class EcranRechAffaires
                     a.Numero, a.IdInstance, a.Role, a.CodeAffaire, a.Nature, NomNature(a.Nature),
                     a.Libelle, a.Nom, a.Etat, a.Siren, a.Type,
                     a.Saisine.ToString("dd/MM/yyyy"), a.Creation.ToString("dd/MM/yyyy"),
-                    a.Solde.ToString("N2")))
+                    a.Solde.ToString("N2"), a.Solde))
                 .ToArray(),
             string.Join(", ", Natures
                 .Select(n => new { n.Nom, Nb = trouvees.Count(a => a.Nature == n.Code) })
@@ -144,6 +152,15 @@ public static class EcranRechAffaires
             choisie is null ? null : new AffaireChoisie(choisie.Numero, choisie.IdInstance, choisie.Role));
     }
 
+    /// <summary>
+    /// Le nombre d'affaires de chaque vue enregistree (puces « Toutes 15 », « Solde > 100 € 4 »… des listes
+    /// modernes) : une vue est un jeu de criteres, comptee sur le MEME filtre que la grille.
+    /// fix-ok: ajout du lot 1 des listes modernes (critere de solde, solde en nombre, compte des vues) en plusieurs pas, pas un correctif.
+    /// </summary>
+    [JSInvokable("EcranRechAffaires.Compter")]
+    public static int[] Compter(CriteresAffaires[] vues)
+        => vues.Select(c => Trouvees(c, null, true).Length).ToArray();
+
     /// <summary>Vrai tant qu'aucun critere n'est pose : le tableau vide ne veut
     /// alors RIEN dire, et proposer d'ouvrir un dossier serait du bruit.</summary>
     private static bool AucunCritere(CriteresAffaires c)
@@ -151,7 +168,18 @@ public static class EcranRechAffaires
         && string.IsNullOrEmpty(c.CritType) && string.IsNullOrEmpty(c.CritNature)
         && string.IsNullOrWhiteSpace(c.CritIdInstance) && string.IsNullOrWhiteSpace(c.CritRole)
         && string.IsNullOrWhiteSpace(c.CritCodeAffaire) && string.IsNullOrWhiteSpace(c.CritNom)
-        && string.IsNullOrEmpty(c.CritEtat) && c.CritSaisineDu is null && c.CritSaisineAu is null;
+        && string.IsNullOrEmpty(c.CritEtat) && c.CritSaisineDu is null && c.CritSaisineAu is null
+        && Montant(c.CritSoldeMin) is null;
+
+    /// <summary>Un montant saisi a la francaise (« 1 379,30 », « 100 € ») ou a l'anglaise (« 100.5 ») ;
+    /// null s'il est vide ou ne se lit pas.</summary>
+    private static decimal? Montant(string? texte)
+    {
+        if (string.IsNullOrWhiteSpace(texte)) return null;
+        var t = new string(texte.Where(ch => !char.IsWhiteSpace(ch) && ch != '€').ToArray()).Replace(',', '.');
+        return decimal.TryParse(t, NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingSign,
+                                CultureInfo.InvariantCulture, out var m) ? m : null;
+    }
 
     /// <summary>Le SIREN reellement cherche : il se saisit dans « Libelle ou
     /// SIREN » (le meme champ sert aux deux), donc on ne le reprend que s'il
@@ -196,6 +224,7 @@ public static class EcranRechAffaires
         if (!string.IsNullOrEmpty(c.CritEtat)) q = q.Where(a => a.Etat == c.CritEtat);
         if (c.CritSaisineDu is { } du) q = q.Where(a => DateOnly.FromDateTime(a.Saisine) >= du);
         if (c.CritSaisineAu is { } au) q = q.Where(a => DateOnly.FromDateTime(a.Saisine) <= au);
+        if (Montant(c.CritSoldeMin) is { } soldeMin) q = q.Where(a => a.Solde > soldeMin);
         // Sans clic sur un en-tete, la grille reste rangee du plus recent au
         // plus ancien : c'est l'ordre attendu a l'ouverture.
         if (CleTri is null) return q.OrderByDescending(a => a.Creation).ToArray();
