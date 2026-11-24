@@ -15,11 +15,9 @@
 //   - noAffaire pre-remplit le critere et lance la recherche (tuile « Mes
 //     affaires recentes »).
 //
-// Porte depuis Components/Ecrans/EcranRechAffaires.razor (lot 3) : meme
-// balisage, memes classes CSS. Le fonds d'affaires, le filtre et le TRI (ordre
-// des chaines .NET) sont faits par Pont/EcranRechAffaires.cs ; ici restent les
-// criteres saisis, la colonne de tri choisie, la selection et la suppression
-// simulee. La coquille .razor monte cet ecran et recoit ouvrir / ouvrirUnDossier.
+// Porte depuis Components/Ecrans/EcranRechAffaires.razor (lot 3). Le fonds d'affaires, le filtre et le TRI
+// (ordre des chaines .NET) sont faits par Pont/EcranRechAffaires.cs ; ici restent les criteres saisis, la
+// colonne de tri choisie, la selection et la suppression simulee.
 //
 // L'ANCIEN RIG (SOC-014, SOC-015 ; lot 3 de la phase 2, Pont/AncienRig.cs) : une affaire creee avant le
 // passage du greffe a la V3 porte la mention « traitee dans la V2 » ; choisie, elle propose « Ouvrir dans
@@ -28,12 +26,26 @@
 // visionneuse : la consulter dans la V3 reste permis. L'aiguillage est demande au pont quand la LISTE des
 // numeros change (pas a chaque tri) ; s'il ne repond pas, l'ecran reste tel qu'avant ce lot.
 // Lot 11 (REC-010 ; SOC-015 CA01 laisse ouvert par le lot 3, decision du chef) : le bloc propose aussi « Voir son historique
-// (lecture seule) » -- ses affaires et demandes lues par le pont de l'historique (Pont/EcranHistoriqueV2.cs). fix-ok: ajout en
-// quatre petits pas (import, etat, remise a zero a la selection, bouton), pas un correctif.
+// (lecture seule) » -- ses affaires et demandes lues par le pont de l'historique (Pont/EcranHistoriqueV2.cs).
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, /draft conv-2132, plan des listes modernes, lot 1) : la colonne
+// des resultats prend les briques de composants/ListeModerne.tsx. Tete (synthese, « Aller a une affaire… »
+// Ctrl K qui filtre la liste affichee, Entree ouvre l'affaire si une seule reste), trois cartes qui POSENT les
+// criteres existants (nature, etat « En cours », domaine), des vues = jeux de criteres (dont « Solde > 100 € »,
+// critere critSoldeMin ajoute au pont), « Trier » sur les 13 cles du pont, export CSV. Le tableau passe a UNE
+// ligne par affaire (Affaire, Nature, Etat, Saisine, Solde) ; les six autres colonnes sont dans la ligne
+// depliee par le chevron, avec Ouvrir et Historique. Les criteres de gauche, la selection, le double-clic
+// (visionneuse), le bloc « Ancien RIG » et la suppression XXAFF ne changent pas.
+// « + Nouvelle vue » garde ses vues pour la SESSION (module, pas de reglage) : accueil.json n'a aucun magasin
+// de reglages d'ecran ou les poser (AccueilEtat.cs, 24/11/2026).
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { EnteteTriable } from '../composants/EnteteTriable'
+import {
+  CartesChiffrees, CelluleChevron, CelluleIdentite, ChoixTri, EnteteListe, LigneDetail, ListeModerne, MenuLigne, MontantBarre,
+  Pastille, PiedListe, PointEtat, VuesListe, exporterCsv, montant, type ActionLigne, type Teinte,
+} from '../composants/ListeModerne'
 import { dateSaisie } from '../saisie'
 import { toucheDeRecherche } from '../plan/clavier'
 import type { VueEcranHistorique } from './EcranHistoriqueV2'
@@ -59,6 +71,8 @@ export interface LigneAffaire {
   creation: string
   /** Le solde deja mis en forme (« 142,50 »), comme le ToString("N2") de Blazor. */
   solde: string
+  /** Le meme solde en nombre : totaux, carte « Solde total », mini-barre. */
+  soldeValeur: number
 }
 
 export interface AffaireChoisie {
@@ -116,7 +130,7 @@ export interface ProprietesEcranRechAffaires {
   ouvrirUnDossier: (siren: string) => void
 }
 
-/** Les colonnes de la grille : libelle affiche et cle de tri comprise par le pont. */
+/** Les cles de tri comprises par le pont, avec leur libelle : la liste « Trier » et l'export CSV. */
 const Colonnes: ReadonlyArray<readonly [libelle: string, cle: string]> = [
   ['N° Affaire', 'Numero'],
   ['Id instance', 'IdInstance'],
@@ -133,6 +147,92 @@ const Colonnes: ReadonlyArray<readonly [libelle: string, cle: string]> = [
   ['Solde', 'Solde'],
 ]
 
+/** Les colonnes du tableau a une ligne : chevron, Affaire, Nature, Etat, Saisine, Solde, menu. */
+const NbColonnes = 7
+
+/** Les criteres de gauche, tels que saisis (dates au format du champ). Une vue en est un jeu complet. */
+export interface CriteresSaisis {
+  critNumero: string
+  critLibelle: string
+  critType: string
+  critNature: string
+  critIdInstance: string
+  critRole: string
+  critCodeAffaire: string
+  critNom: string
+  critEtat: string
+  critSaisineDu: string
+  critSaisineAu: string
+  critSoldeMin: string
+}
+
+const SansCritere: CriteresSaisis = {
+  critNumero: '', critLibelle: '', critType: '', critNature: '', critIdInstance: '', critRole: '',
+  critCodeAffaire: '', critNom: '', critEtat: '', critSaisineDu: '', critSaisineAu: '', critSoldeMin: '',
+}
+
+/** Ce que le pont recoit : les dates vides deviennent null (Pont/EcranRechAffaires.cs, CriteresAffaires). */
+function pourLePont(c: CriteresSaisis) {
+  return {
+    critNumero: c.critNumero, critLibelle: c.critLibelle, critType: c.critType, critNature: c.critNature,
+    critIdInstance: c.critIdInstance, critRole: c.critRole, critCodeAffaire: c.critCodeAffaire,
+    critNom: c.critNom, critEtat: c.critEtat, critSaisineDu: dateSaisie(c.critSaisineDu),
+    critSaisineAu: dateSaisie(c.critSaisineAu), critSoldeMin: c.critSoldeMin,
+  }
+}
+
+function memesCriteres(a: CriteresSaisis, b: CriteresSaisis): boolean {
+  return (Object.keys(SansCritere) as (keyof CriteresSaisis)[]).every((k) => a[k] === b[k])
+}
+
+/** Une vue enregistree : un nom et un jeu complet de criteres. */
+export interface VueEnregistree {
+  cle: string
+  libelle: string
+  criteres: CriteresSaisis
+}
+
+/** Les vues de la maquette, toujours la. */
+export const VuesPrereglees: VueEnregistree[] = [
+  { cle: 'toutes', libelle: 'Toutes', criteres: SansCritere },
+  { cle: 'collectives-en-cours', libelle: 'Proc. collectives en cours',
+    criteres: { ...SansCritere, critNature: 'collective', critEtat: 'En cours' } },
+  { cle: 'solde-100', libelle: 'Solde > 100 €', criteres: { ...SansCritere, critSoldeMin: '100' } },
+  { cle: 'cloturees', libelle: 'Cloturees', criteres: { ...SansCritere, critEtat: 'Cloturee' } },
+]
+
+/** Les vues ajoutees par « + Nouvelle vue » pendant la session : elles survivent a la fermeture de l'onglet,
+ *  pas au redemarrage (aucun reglage ne les porte). */
+const VuesDeLaSession: VueEnregistree[] = []
+
+/** Pour les tests : repartir d'une session sans vue ajoutee. */
+export function oublierVuesDeLaSession(): void {
+  VuesDeLaSession.length = 0
+}
+
+const TeinteNature: Record<string, Teinte> = { instance: 'bleu', collective: 'orange', prevention: 'ardoise', mesure: 'vert' }
+const TeinteEtat: Record<string, Teinte> = { 'En cours': 'bleu', Radiee: 'rouge', Cloturee: 'gris' }
+
+/** L'objet de l'affaire : son libelle avant « - » (« Modification - SCI DU PARC » -> « Modification »). */
+export function objetDe(affaire: Pick<LigneAffaire, 'libelle' | 'nom'>): string {
+  const tiret = affaire.libelle.indexOf(' - ')
+  const objet = tiret >= 0 ? affaire.libelle.slice(0, tiret) : affaire.libelle
+  return objet === affaire.nom ? '' : objet
+}
+
+function normaliser(texte: string): string {
+  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+/** L'historique d'une affaire, en une phrase (pont de l'historique de l'ancien RIG). */
+function texteHistorique(h: VueEcranHistorique, numero: string): string {
+  return h.historique
+    ? `${h.historique.titre ?? numero} : ` + (h.historique.affaires.length === 0 ? 'aucune affaire trouvée'
+        : h.historique.affaires.map((a) => `${a.libelle ?? a.id} (${a.marque}, ${a.etat}, ${a.demandes.length} demande(s) : `
+            + a.demandes.map((d) => `${d.numero ?? d.id} ${d.etatLibelle}`).join(', ') + ')').join(' ; '))
+    : h.message ?? ''
+}
+
 export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: ProprietesEcranRechAffaires) {
   // Le critere n'est pose qu'a l'OUVERTURE : ensuite l'utilisateur est maitre
   // de ses criteres, un nouveau rendu ne doit pas les ecraser.
@@ -147,8 +247,32 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
   const [critNom, setCritNom] = useState('')
   const [critSaisineDu, setCritSaisineDu] = useState('')
   const [critSaisineAu, setCritSaisineAu] = useState('')
+  const [critSoldeMin, setCritSoldeMin] = useState('')
+
+  const criteres: CriteresSaisis = {
+    critNumero, critLibelle, critType, critNature, critIdInstance, critRole, critCodeAffaire,
+    critNom, critEtat, critSaisineDu, critSaisineAu, critSoldeMin,
+  }
+
+  /** Pose un jeu complet de criteres : une vue choisie. */
+  function poserCriteres(c: CriteresSaisis) {
+    setCritNumero(c.critNumero)
+    setCritLibelle(c.critLibelle)
+    setCritType(c.critType)
+    setCritNature(c.critNature)
+    setCritIdInstance(c.critIdInstance)
+    setCritRole(c.critRole)
+    setCritCodeAffaire(c.critCodeAffaire)
+    setCritNom(c.critNom)
+    setCritEtat(c.critEtat)
+    setCritSaisineDu(c.critSaisineDu)
+    setCritSaisineAu(c.critSaisineAu)
+    setCritSoldeMin(c.critSoldeMin)
+  }
 
   const [selection, setSelection] = useState<string | null>(null)
+  // La ligne depliee par son chevron (une a la fois).
+  const [ouverte, setOuverte] = useState<string | null>(null)
   const [libererNumeros, setLibererNumeros] = useState(true)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -162,16 +286,43 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
 
   useEffect(() => {
     let perime = false
-    void appeler<VueAffaires>('EcranRechAffaires.Trouver', {
+    void appeler<VueAffaires>('EcranRechAffaires.Trouver', pourLePont({
       critNumero, critLibelle, critType, critNature, critIdInstance, critRole, critCodeAffaire,
-      critNom, critEtat, critSaisineDu: dateSaisie(critSaisineDu), critSaisineAu: dateSaisie(critSaisineAu),
-    }, cleTri, triAscendant, selection).then((v) => { if (!perime) setVue(v) })
+      critNom, critEtat, critSaisineDu, critSaisineAu, critSoldeMin,
+    }), cleTri, triAscendant, selection).then((v) => { if (!perime) setVue(v) })
     return () => { perime = true }
   }, [critNumero, critLibelle, critType, critNature, critIdInstance, critRole, critCodeAffaire,
-      critNom, critEtat, critSaisineDu, critSaisineAu, cleTri, triAscendant, selection])
+      critNom, critEtat, critSaisineDu, critSaisineAu, critSoldeMin, cleTri, triAscendant, selection])
 
   const trouvees = vue?.lignes ?? []
   const choisie = vue?.choisie ?? null
+
+  // « Aller a une affaire… » (Ctrl K) : filtre la liste AFFICHEE, sans toucher aux criteres du pont.
+  const [filtreRapide, setFiltreRapide] = useState('')
+  const cherche = normaliser(filtreRapide.trim())
+  const affichees = cherche === '' ? trouvees : trouvees.filter((a) => normaliser(
+    [a.numero, a.nom, a.libelle, a.siren, a.siren.replace(/\s/g, ''), a.idInstance, a.role, a.codeAffaire].join(' ')).includes(cherche))
+
+  // Les vues : celles de la maquette, puis celles de la session ; leur compte vient du pont.
+  const [vuesAjoutees, setVuesAjoutees] = useState<VueEnregistree[]>(() => [...VuesDeLaSession])
+  const vues = [...VuesPrereglees, ...vuesAjoutees]
+  const [comptes, setComptes] = useState<number[] | null>(null)
+  const cleVues = JSON.stringify(vues.map((v) => v.criteres))
+  useEffect(() => {
+    let perime = false
+    const jeux = (JSON.parse(cleVues) as CriteresSaisis[]).map(pourLePont)
+    appeler<number[]>('EcranRechAffaires.Compter', jeux).then(
+      (c) => { if (!perime) setComptes(c) },
+      // Sans reponse, les puces restent sans compte.
+      () => { if (!perime) setComptes(null) })
+    return () => { perime = true }
+  }, [cleVues])
+  const vueActive = vues.find((v) => memesCriteres(v.criteres, criteres))?.cle ?? null
+  function enregistrerVue(nom: string) {
+    const nouvelle: VueEnregistree = { cle: `session-${VuesDeLaSession.length + 1}`, libelle: nom, criteres }
+    VuesDeLaSession.push(nouvelle)
+    setVuesAjoutees([...VuesDeLaSession])
+  }
 
   // Le logiciel de chaque affaire affichee, par numero. La cle est l'ENSEMBLE des numeros : un tri ne change
   // rien, donc ne redemande rien.
@@ -181,6 +332,15 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
   const [historique, setHistorique] = useState<VueEcranHistorique | null>(null)
   function voirHistorique(numero: string) {
     void appeler<VueEcranHistorique>('EcranRechAffaires.HistoriqueAncienne', numero).then((v) => setHistorique(v), () => setHistorique(null))
+  }
+  // « Historique » de la ligne depliee : le meme pont, pour toute affaire (il lit les deux logiciels), dit dans la ligne.
+  const [historiqueLigne, setHistoriqueLigne] = useState<{ numero: string; texte: string } | null>(null)
+  function voirHistoriqueLigne(numero: string) {
+    setOuverte(numero)
+    setHistoriqueLigne({ numero, texte: 'Lecture de l\'historique…' })
+    void appeler<VueEcranHistorique>('EcranRechAffaires.HistoriqueAncienne', numero).then(
+      (v) => setHistoriqueLigne({ numero, texte: texteHistorique(v, numero) }),
+      (e: unknown) => setHistoriqueLigne({ numero, texte: `L'historique n'a pas pu etre lu : ${e instanceof Error ? e.message : String(e)}` }))
   }
   const cleNumeros = [...new Set(trouvees.map((a) => a.numero))].sort().join('\n')
   useEffect(() => {
@@ -216,17 +376,7 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
   }
 
   function vider() {
-    setCritNumero('')
-    setCritLibelle('')
-    setCritType('')
-    setCritNature('')
-    setCritIdInstance('')
-    setCritRole('')
-    setCritCodeAffaire('')
-    setCritNom('')
-    setCritEtat('')
-    setCritSaisineDu('')
-    setCritSaisineAu('')
+    poserCriteres(SansCritere)
     setSelection(null)
     setMessage(null)
   }
@@ -245,6 +395,24 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
     }
     setMessage(`Instance ${choisie.idInstance} (${choisie.numero}) : suppression simulee`
       + (libererNumeros ? ' — numeros metiers liberes.' : ' — numeros metiers conserves.'))
+  }
+
+  function choisirLigne(numero: string) {
+    setSelection(numero); setAncienRig(null); setHistorique(null)
+  }
+
+  // Les chiffres de la tete, des cartes et du pied : sur la liste AFFICHEE.
+  const enCours = affichees.filter((a) => a.etat === 'En cours').length
+  const soldeTotal = affichees.reduce((s, a) => s + a.soldeValeur, 0)
+  const soldeMax = affichees.reduce((m, a) => Math.max(m, a.soldeValeur), 0)
+  const parType = (type: string) => affichees.filter((a) => a.type === type).length
+  const natures = vue?.natures ?? []
+  const basculer = (actuel: string, valeur: string, poser: (v: string) => void) => () => poser(actuel === valeur ? '' : valeur)
+
+  function exporter() {
+    exporterCsv('affaires.csv', Colonnes.map(([libelle]) => libelle), affichees.map((a) => [
+      a.numero, a.idInstance, a.role, a.codeAffaire, a.nomNature, a.libelle, a.nom, a.etat, a.siren, a.type,
+      a.saisine, a.creation, a.solde]))
   }
 
   return (
@@ -269,7 +437,7 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
           <span className="rig-saisie-champ__libelle">Nature</span>
           <select className="rig-saisie-champ__saisie" value={critNature} onChange={(e) => setCritNature(e.target.value)}>
             <option value="">Toutes</option>
-            {(vue?.natures ?? []).map((n) => (
+            {natures.map((n) => (
               <option key={n.code} value={n.code}>{n.nom}</option>
             ))}
           </select>
@@ -282,6 +450,12 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
             <option value="RCS">RCS</option>
             <option value="JUD">Judiciaire</option>
           </select>
+        </label>
+
+        <label className="rig-saisie-champ">
+          <span className="rig-saisie-champ__libelle">Solde superieur a (€)</span>
+          <input className="rig-saisie-champ__saisie" inputMode="decimal" placeholder="ex. 100"
+                 value={critSoldeMin} onChange={(e) => setCritSoldeMin(e.target.value)} />
         </label>
 
         <div className="rig-criteres__bloc">
@@ -345,61 +519,115 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Affaires</div>
-          <span className="rig-resultats-proc__compte">
-            {/* Memes noeuds de texte que Razor (« Resultats ( », le nombre, « ) — », le
-                resume) : un seul noeud deplacait le lissage des lettres de quelques
-                pixels a la comparaison des captures. */}
-            {vue && <>{'\n                Resultats ('}{trouvees.length}{') —\n                '}{vue.resume}</>}
-          </span>
-        </div>
+      <ListeModerne etiquette="Affaires">
+        <EnteteListe titre="Affaires" detail={vue?.resume}
+                     synthese={vue && <>{affichees.length}{affichees.length > 1 ? ' resultats · ' : ' resultat · '}<b>{enCours}</b>
+                       {' en cours · solde '}<b>{montant(soldeTotal)}</b></>}
+                     filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a une affaire…',
+                               valider: () => { if (affichees.length === 1) ouvrir(affichees[0]!.numero) } }} />
+
+        {vue && (
+          <CartesChiffrees cartes={[
+            { cle: 'solde', titre: 'Solde total', valeur: montant(soldeTotal), legende: true,
+              ...(critNature !== '' ? { choisir: () => setCritNature(''), indication: 'Toutes les natures' } : {}),
+              segments: natures.map((n) => ({
+                cle: n.code, libelle: n.nom.split(' ')[0] ?? n.nom, teinte: TeinteNature[n.code] ?? 'gris',
+                valeur: affichees.filter((a) => a.nature === n.code).reduce((s, a) => s + a.soldeValeur, 0),
+                texte: montant(affichees.filter((a) => a.nature === n.code).reduce((s, a) => s + a.soldeValeur, 0)),
+                actif: critNature === n.code, choisir: basculer(critNature, n.code, setCritNature),
+              })) },
+            { cle: 'en-cours', titre: 'En cours', valeur: enCours, complement: `sur ${affichees.length}`,
+              anneau: { part: enCours, total: affichees.length, teinte: 'bleu' },
+              actif: critEtat === 'En cours', choisir: basculer(critEtat, 'En cours', setCritEtat),
+              indication: critEtat === 'En cours' ? 'Tous les etats' : 'Seulement les affaires en cours' },
+            { cle: 'domaine', titre: 'Domaine', valeur: <>RCS {parType('RCS')} <small>·</small> JUD {parType('JUD')}</>,
+              ...(critType !== '' ? { choisir: () => setCritType(''), indication: 'Tous les domaines' } : {}),
+              segments: [
+                { cle: 'RCS', libelle: 'RCS', valeur: parType('RCS'), teinte: 'bleu', actif: critType === 'RCS',
+                  choisir: basculer(critType, 'RCS', setCritType) },
+                { cle: 'JUD', libelle: 'JUD', valeur: parType('JUD'), teinte: 'ardoise', actif: critType === 'JUD',
+                  choisir: basculer(critType, 'JUD', setCritType) },
+              ] },
+          ]} />
+        )}
+
+        <VuesListe vues={vues.map((v, i) => ({ cle: v.cle, libelle: v.libelle, compte: comptes?.[i] }))} active={vueActive}
+                   choisir={(cle) => { const v = vues.find((x) => x.cle === cle); if (v) poserCriteres(v.criteres) }}
+                   enregistrer={enregistrerVue}>
+          <ChoixTri cles={Colonnes} cleActive={cleTri} ascendant={triAscendant} origine="Plus recentes"
+                    choisir={(cle) => { setCleTri(cle); setTriAscendant(true) }} inverser={() => setTriAscendant(!triAscendant)} />
+          <button type="button" className="rig-lm-outil" disabled={affichees.length === 0} onClick={exporter}>Exporter</button>
+        </VuesListe>
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup>
+              <col style={{ width: 30 }} /><col /><col style={{ width: '21%' }} /><col style={{ width: '13%' }} />
+              <col style={{ width: '13%' }} /><col style={{ width: '18%' }} /><col style={{ width: 34 }} />
+            </colgroup>
             <thead>
               <tr>
-                {Colonnes.map(([libelle, cle]) => (
-                  <EnteteTriable key={cle} libelle={libelle} cle={cle} cleActive={cleTri}
-                                 ascendant={triAscendant} trier={basculerTri} />
-                ))}
+                <th aria-label="Deplier"></th>
+                <EnteteTriable libelle="Affaire" cle="Nom" cleActive={cleTri} ascendant={triAscendant} trier={basculerTri} />
+                <EnteteTriable libelle="Nature" cle="Nature" cleActive={cleTri} ascendant={triAscendant} trier={basculerTri} />
+                <EnteteTriable libelle="Etat" cle="Etat" cleActive={cleTri} ascendant={triAscendant} trier={basculerTri} />
+                <EnteteTriable libelle="Saisine" cle="Saisine" cleActive={cleTri} ascendant={triAscendant} trier={basculerTri} />
+                <EnteteTriable libelle="Solde" cle="Solde" classe="rig-lm-droite" cleActive={cleTri} ascendant={triAscendant} trier={basculerTri} />
+                <th aria-label="Actions"></th>
               </tr>
             </thead>
             <tbody>
-              {trouvees.map((affaire, i) => (
-                <tr key={`${i}:${affaire.numero}`}
-                    className={affaire.numero === selection ? 'rig-ligne--valide' : undefined}
-                    onClick={() => { setSelection(affaire.numero); setAncienRig(null); setHistorique(null) }}
-                    onDoubleClick={() => ouvrir(affaire.numero)} style={{ cursor: 'pointer' }}>
-                  <td className="rig-table__mono">
-                    {affaire.numero}
-                    {aiguillage[affaire.numero]?.logiciel === 'V2' && (
-                      <span className="rig-badge" title={aiguillage[affaire.numero]!.motif}
-                            style={{ marginLeft: 'var(--rig-esp-2)', whiteSpace: 'nowrap' }}>traitee dans la V2</span>
-                    )}
-                  </td>
-                  <td className="rig-table__mono">{affaire.idInstance}</td>
-                  <td className="rig-table__mono">{affaire.role}</td>
-                  <td className="rig-table__mono">{affaire.codeAffaire}</td>
-                  <td>
-                    <span className={`rig-nature rig-nature--${affaire.nature}`}>
-                      <span className="rig-nature__filet"></span>
-                      <span className="rig-nature__nom">{affaire.nomNature}</span>
-                    </span>
-                  </td>
-                  <td>{affaire.libelle}</td>
-                  <td>{affaire.nom}</td>
-                  <td>{affaire.etat}</td>
-                  <td className="rig-table__mono">{affaire.siren}</td>
-                  <td>{affaire.type}</td>
-                  <td className="rig-table__mono">{affaire.saisine}</td>
-                  <td className="rig-table__mono">{affaire.creation}</td>
-                  <td className="rig-table__mono">{affaire.solde} €</td>
-                </tr>
-              ))}
+              {affichees.map((affaire, i) => {
+                const v2 = aiguillage[affaire.numero]?.logiciel === 'V2' ? aiguillage[affaire.numero]! : null
+                const estOuverte = ouverte === affaire.numero
+                const objet = objetDe(affaire)
+                const actions: ActionLigne[] = [
+                  { libelle: 'Ouvrir', fort: true, agir: () => ouvrir(affaire.numero) },
+                  { libelle: 'Historique', agir: () => voirHistoriqueLigne(affaire.numero) },
+                ]
+                const classes = [affaire.numero === selection ? 'rig-ligne--valide' : '', estOuverte ? 'rig-lm-ouverte' : ''].filter(Boolean).join(' ')
+                return (
+                  <Fragment key={`${i}:${affaire.numero}`}>
+                  <tr className={classes || undefined}
+                      onClick={() => choisirLigne(affaire.numero)}
+                      onDoubleClick={() => ouvrir(affaire.numero)}>
+                    <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : affaire.numero)} />
+                    <CelluleIdentite nom={affaire.nom} titre={`${affaire.nom} — ${affaire.libelle} · ${affaire.numero}`}
+                                     objet={<>{objet}{objet !== '' ? ' · ' : ''}<span>{affaire.numero}</span></>}
+                                     apres={v2 && <span className="rig-badge" title={v2.motif} style={{ whiteSpace: 'nowrap' }}>traitee dans la V2</span>} />
+                    <td title={affaire.nomNature}><Pastille teinte={TeinteNature[affaire.nature] ?? 'gris'}>{affaire.nomNature}</Pastille></td>
+                    <td title={affaire.etat}><PointEtat teinte={TeinteEtat[affaire.etat] ?? 'gris'}>{affaire.etat}</PointEtat></td>
+                    <td>{affaire.saisine}</td>
+                    <td className="rig-lm-droite" title={`${affaire.solde} €`}>
+                      <MontantBarre valeur={affaire.soldeValeur} max={soldeMax} texte={`${affaire.solde} €`} />
+                    </td>
+                    <td className="rig-lm-cellule-menu">
+                      <MenuLigne libelle={`Actions de l'affaire ${affaire.numero}`} actions={[
+                        ...actions,
+                        { libelle: estOuverte ? 'Replier la ligne' : 'Deplier la ligne', agir: () => setOuverte(estOuverte ? null : affaire.numero) },
+                        ...(v2 ? [{ libelle: 'Ouvrir dans l\'ancien RIG', agir: () => { choisirLigne(affaire.numero); ouvrirDansAncienRig(affaire.numero) } }] : []),
+                      ]} />
+                    </td>
+                  </tr>
+                  {estOuverte && (
+                    <LigneDetail colonnes={NbColonnes} actions={actions} champs={[
+                      { libelle: 'Id instance', valeur: affaire.idInstance },
+                      { libelle: 'N° de role', valeur: affaire.role },
+                      { libelle: 'Code affaire', valeur: affaire.codeAffaire },
+                      { libelle: 'SIREN', valeur: affaire.siren },
+                      { libelle: 'Domaine', valeur: affaire.type },
+                      { libelle: 'Date creation', valeur: affaire.creation },
+                    ]}>
+                      {historiqueLigne?.numero === affaire.numero && (
+                        <div className="rig-lm-detail__compte" role="status" aria-label="Historique de l'affaire">{historiqueLigne.texte}</div>
+                      )}
+                    </LigneDetail>
+                  )}
+                  </Fragment>
+                )
+              })}
               {vue && trouvees.length === 0 && (
-                <tr><td colSpan={13} className="rig-table__vide">
+                <tr><td colSpan={NbColonnes} className="rig-table__vide">
                   {vue.aucunCritere ? (
                     'Saisissez au moins un critere, puis lancez la recherche.'
                   ) : (
@@ -421,6 +649,11 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
                       </div>
                     </>
                   )}
+                </td></tr>
+              )}
+              {trouvees.length > 0 && affichees.length === 0 && (
+                <tr><td colSpan={NbColonnes} className="rig-table__vide">
+                  {`Aucune des ${trouvees.length} affaires ne contient « ${filtreRapide.trim()} ».`}
                 </td></tr>
               )}
             </tbody>
@@ -449,11 +682,7 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
             )}
             {historique !== null && (
               <span className="rig-resultats-proc__compte" role="status" aria-label="Historique de l'ancienne affaire">
-                {historique.historique
-                  ? `${historique.historique.titre ?? choisieV2?.numero ?? ''} : ` + (historique.historique.affaires.length === 0 ? 'aucune affaire trouvée'
-                      : historique.historique.affaires.map((a) => `${a.libelle ?? a.id} (${a.marque}, ${a.etat}, ${a.demandes.length} demande(s) : `
-                          + a.demandes.map((d) => `${d.numero ?? d.id} ${d.etatLibelle}`).join(', ') + ')').join(' ; '))
-                  : historique.message}
+                {texteHistorique(historique, choisieV2?.numero ?? '')}
               </span>
             )}
             {ancienRig !== null && (
@@ -485,12 +714,12 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
           )}
         </div>
 
-        <div className="rig-resultats-proc__entete">
-          <span className="rig-resultats-proc__compte">
-            Double-clic sur une ligne pour ouvrir l'affaire dans la visionneuse.
-          </span>
-        </div>
-      </section>
+        <PiedListe aide="Double-clic sur une ligne pour ouvrir l'affaire dans la visionneuse.">
+          <span><b>{affichees.length}</b>{affichees.length > 1 ? ' affaires affichees' : ' affaire affichee'}</span>
+          <span>Solde <b>{montant(soldeTotal)}</b></span>
+          <span>En cours <b>{enCours}</b></span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }

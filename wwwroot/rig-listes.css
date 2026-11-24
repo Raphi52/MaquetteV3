@@ -1,0 +1,329 @@
+/* ============================================================
+   LISTES MODERNES « Tout reuni » (24/11/2026, /draft conv-2132, plan des listes modernes, lot 1).
+
+   Les briques de web/src/composants/ListeModerne.tsx : tete de liste, cartes chiffrees, puces de
+   vues, outils, cellule d'identite (avatar d'initiales), pastille, point d'etat, mini-barre de
+   montant, chevron et ligne depliee, menu « … », pied de totaux. Maquette :
+   Documents\Autowin\draft-listes-modernes\propositions-mix.json, propositions[0] (classes ro-*).
+
+   Le tableau lui-meme (en-tetes, 32 px, filet, survol, ligne choisie) est le .rig-table commun de
+   rig-accueil.css : toutes les listes en profitent, celles du socle comme les autres.
+
+   COULEURS : par jetons seulement. La surface, le texte, les bords et l'accent sont ceux de la
+   charte (rig-charte.css) ; les TEINTES de classement (natures, etats, segments, avatars) n'existent
+   pas dans la charte : elles sont declarees ICI, par theme, sous --rig-liste-*. Une teinte a trois
+   valeurs : le point (et le segment, la barre), le fond d'une pastille, le texte d'une pastille.
+   Le sombre (theme par defaut, comme dans la charte) les eclaircit ; les quatre themes a fond clair
+   (clair, violet, orange, argile) partagent les valeurs du jour de la maquette.
+   ============================================================ */
+
+:root,
+[data-rig-theme="sombre"] {
+  --rig-liste-bleu: #60A5FA;    --rig-liste-bleu-fond: rgba(59, 130, 246, .18);   --rig-liste-bleu-texte: #93C5FD;
+  --rig-liste-orange: #FB923C;  --rig-liste-orange-fond: rgba(249, 115, 22, .18); --rig-liste-orange-texte: #FDBA74;
+  --rig-liste-ardoise: #94A3B8; --rig-liste-ardoise-fond: rgba(148, 163, 184, .16); --rig-liste-ardoise-texte: #CBD5E1;
+  --rig-liste-vert: #34D399;    --rig-liste-vert-fond: rgba(16, 185, 129, .16);   --rig-liste-vert-texte: #6EE7B7;
+  --rig-liste-rouge: #F87171;   --rig-liste-rouge-fond: rgba(248, 113, 113, .16); --rig-liste-rouge-texte: #FCA5A5;
+  --rig-liste-violet: #A78BFA;  --rig-liste-violet-fond: rgba(167, 139, 250, .16); --rig-liste-violet-texte: #C4B5FD;
+  --rig-liste-gris: #A1A1AA;    --rig-liste-gris-fond: rgba(161, 161, 170, .14);  --rig-liste-gris-texte: #D4D4D8;
+  /* Avatars : aplats vifs sous des initiales blanches, les memes de jour comme de nuit (maquette). */
+  --rig-liste-avatar-texte: #FFFFFF;
+  --rig-liste-avatar-1: #0D9488;
+  --rig-liste-avatar-2: #2563EB;
+  --rig-liste-avatar-3: #EA580C;
+  --rig-liste-avatar-4: #DC2626;
+  --rig-liste-avatar-5: #4F46E5;
+  --rig-liste-avatar-6: #7C3AED;
+  --rig-liste-avatar-7: #DB2777;
+  --rig-liste-avatar-8: #0891B2;
+}
+
+[data-rig-theme="clair"],
+[data-rig-theme="violet"],
+[data-rig-theme="orange"],
+[data-rig-theme="argile"] {
+  --rig-liste-bleu: #2563EB;    --rig-liste-bleu-fond: rgba(59, 130, 246, .10);   --rig-liste-bleu-texte: #1D4ED8;
+  --rig-liste-orange: #F97316;  --rig-liste-orange-fond: rgba(249, 115, 22, .12); --rig-liste-orange-texte: #C2410C;
+  --rig-liste-ardoise: #64748B; --rig-liste-ardoise-fond: rgba(100, 116, 139, .13); --rig-liste-ardoise-texte: #475569;
+  --rig-liste-vert: #10B981;    --rig-liste-vert-fond: rgba(16, 185, 129, .12);   --rig-liste-vert-texte: #047857;
+  --rig-liste-rouge: #DC2626;   --rig-liste-rouge-fond: rgba(220, 38, 38, .10);   --rig-liste-rouge-texte: #B91C1C;
+  --rig-liste-violet: #7C3AED;  --rig-liste-violet-fond: rgba(124, 58, 237, .10); --rig-liste-violet-texte: #6D28D9;
+  --rig-liste-gris: #71717A;    --rig-liste-gris-fond: rgba(113, 113, 122, .12);  --rig-liste-gris-texte: #52525B;
+}
+
+/* Une teinte posee sur un element : ses enfants lisent --rig-lm-teinte(-fond, -texte). */
+.rig-lm-t-bleu    { --rig-lm-teinte: var(--rig-liste-bleu);    --rig-lm-teinte-fond: var(--rig-liste-bleu-fond);    --rig-lm-teinte-texte: var(--rig-liste-bleu-texte); }
+.rig-lm-t-orange  { --rig-lm-teinte: var(--rig-liste-orange);  --rig-lm-teinte-fond: var(--rig-liste-orange-fond);  --rig-lm-teinte-texte: var(--rig-liste-orange-texte); }
+.rig-lm-t-ardoise { --rig-lm-teinte: var(--rig-liste-ardoise); --rig-lm-teinte-fond: var(--rig-liste-ardoise-fond); --rig-lm-teinte-texte: var(--rig-liste-ardoise-texte); }
+.rig-lm-t-vert    { --rig-lm-teinte: var(--rig-liste-vert);    --rig-lm-teinte-fond: var(--rig-liste-vert-fond);    --rig-lm-teinte-texte: var(--rig-liste-vert-texte); }
+.rig-lm-t-rouge   { --rig-lm-teinte: var(--rig-liste-rouge);   --rig-lm-teinte-fond: var(--rig-liste-rouge-fond);   --rig-lm-teinte-texte: var(--rig-liste-rouge-texte); }
+.rig-lm-t-violet  { --rig-lm-teinte: var(--rig-liste-violet);  --rig-lm-teinte-fond: var(--rig-liste-violet-fond);  --rig-lm-teinte-texte: var(--rig-liste-violet-texte); }
+.rig-lm-t-gris    { --rig-lm-teinte: var(--rig-liste-gris);    --rig-lm-teinte-fond: var(--rig-liste-gris-fond);    --rig-lm-teinte-texte: var(--rig-liste-gris-texte); }
+
+/* ---------- Le cadre : une carte de surface dans la colonne des resultats ---------- */
+.rig-lm {
+  margin: var(--rig-esp-3);
+  background: var(--rig-surface);
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--rig-bord-faible);
+  overflow: hidden;
+  font-size: 12.5px;
+  color: var(--rig-texte);
+}
+.rig-lm .rig-table thead th { background: var(--rig-surface); }
+
+/* ---------- Tete : titre, synthese, « Aller a… Ctrl K » ---------- */
+.rig-lm-tete {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+  padding: 12px 14px 10px;
+  flex: none;
+}
+.rig-lm-tete__textes { min-width: 0; }
+.rig-lm-titre {
+  font-size: 18px; font-weight: 700; letter-spacing: -.01em; line-height: 1.2;
+  color: var(--rig-texte);
+}
+.rig-lm-synthese { font-size: 12.5px; color: var(--rig-texte-3); margin-top: 2px; }
+.rig-lm-synthese b { color: var(--rig-texte); font-weight: 600; }
+.rig-lm-cherche {
+  display: flex; align-items: center; gap: 8px;
+  height: 28px; padding: 0 6px 0 10px;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--rig-bord);
+  background: var(--rig-surface);
+  flex: 0 1 230px; min-width: 150px;
+}
+.rig-lm-cherche:focus-within { box-shadow: inset 0 0 0 1px var(--rig-focus); }
+.rig-lm-cherche__saisie {
+  flex: 1 1 auto; min-width: 0;
+  border: 0; outline: 0; background: transparent;
+  font: 12px var(--rig-font); color: var(--rig-texte);
+}
+.rig-lm-cherche__saisie::placeholder { color: var(--rig-texte-3); }
+.rig-lm-touche {
+  flex: none;
+  font-size: 10.5px; color: var(--rig-texte-3);
+  padding: 1px 5px; border-radius: 4px;
+  box-shadow: inset 0 0 0 1px var(--rig-bord);
+}
+
+/* ---------- Cartes chiffrees ---------- */
+.rig-lm-cartes {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 0 14px 12px;
+  flex: none;
+}
+.rig-lm-carte {
+  flex: 1 1 150px; min-width: 0;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px var(--rig-bord);
+  padding: 9px 12px;
+}
+.rig-lm-carte--cliquable { cursor: pointer; }
+.rig-lm-carte--cliquable:hover { background: color-mix(in srgb, var(--rig-texte) 3%, transparent); }
+.rig-lm-carte--active { box-shadow: inset 0 0 0 1.5px var(--rig-or); background: color-mix(in srgb, var(--rig-or) 8%, transparent); }
+.rig-lm-carte:focus-visible { outline: 2px solid var(--rig-focus); outline-offset: 1px; }
+.rig-lm-carte__titre { font-size: 11.5px; color: var(--rig-texte-3); }
+.rig-lm-carte__ligne { display: flex; align-items: center; gap: 10px; }
+.rig-lm-carte__valeur {
+  font-size: 19px; font-weight: 700; line-height: 1.25; color: var(--rig-texte);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rig-lm-carte__valeur small { font-size: 12px; font-weight: 500; color: var(--rig-texte-3); }
+.rig-lm-carte__barre { display: flex; gap: 2px; height: 7px; margin-top: 6px; }
+.rig-lm-segment {
+  min-width: 3px; height: 7px; padding: 0; border: 0; border-radius: 2px;
+  background: var(--rig-lm-teinte); cursor: pointer;
+}
+.rig-lm-segment:hover { opacity: .8; }
+.rig-lm-segment--actif { box-shadow: 0 0 0 1.5px var(--rig-surface), 0 0 0 3px var(--rig-lm-teinte); }
+.rig-lm-legende { display: flex; gap: 2px 8px; flex-wrap: wrap; margin-top: 5px; }
+.rig-lm-legende__entree {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 0 3px; margin: 0 -3px; border: 0; border-radius: 4px; background: transparent;
+  font: 10.5px var(--rig-font); color: var(--rig-texte-3); cursor: pointer; white-space: nowrap;
+}
+.rig-lm-legende__entree:disabled { cursor: default; }
+.rig-lm-legende__entree:not(:disabled):hover { color: var(--rig-texte); }
+.rig-lm-legende__entree--active { color: var(--rig-texte); font-weight: 600; box-shadow: inset 0 0 0 1px var(--rig-bord); }
+.rig-lm-legende__entree i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--rig-lm-teinte); }
+.rig-lm-anneau { width: 38px; height: 38px; flex: 0 0 38px; }
+.rig-lm-anneau__fond { fill: none; stroke: var(--rig-bord-faible); stroke-width: 4.5; }
+.rig-lm-anneau__plein { fill: none; stroke: var(--rig-lm-teinte); stroke-width: 4.5; stroke-linecap: round; }
+
+/* ---------- Vues enregistrees et outils ---------- */
+.rig-lm-barre {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; flex-wrap: wrap;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--rig-bord-faible);
+  flex: none;
+}
+.rig-lm-vues { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 7px 0; }
+.rig-lm-vue {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 24px; padding: 0 10px;
+  border: 0; border-radius: 12px; background: transparent;
+  box-shadow: inset 0 0 0 1px var(--rig-bord);
+  font: 12px var(--rig-font); color: var(--rig-texte-2);
+  white-space: nowrap; cursor: pointer;
+}
+.rig-lm-vue:hover { color: var(--rig-texte); }
+.rig-lm-vue__compte { color: var(--rig-texte-3); font-size: 11px; }
+.rig-lm-vue--active { background: var(--rig-texte); color: var(--rig-surface); box-shadow: none; }
+.rig-lm-vue--active:hover { color: var(--rig-surface); }
+.rig-lm-vue--active .rig-lm-vue__compte { color: var(--rig-surface); }
+.rig-lm-vue--plus { color: var(--rig-texte-3); }
+.rig-lm-vue--nom { width: 180px; cursor: text; outline: 0; box-shadow: inset 0 0 0 1px var(--rig-focus); color: var(--rig-texte); }
+.rig-lm-outils { display: flex; align-items: center; gap: 6px; padding: 5px 0; }
+.rig-lm-outil {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 26px; padding: 0 9px;
+  border: 0; border-radius: 7px;
+  box-shadow: inset 0 0 0 1px var(--rig-bord);
+  background: var(--rig-surface);
+  font: 12px var(--rig-font); color: var(--rig-texte);
+  white-space: nowrap; cursor: pointer;
+}
+.rig-lm-outil:hover { background: color-mix(in srgb, var(--rig-texte) 5%, var(--rig-surface)); }
+.rig-lm-outil:disabled { color: var(--rig-texte-3); cursor: default; }
+.rig-lm-outil--fort { background: var(--rig-texte); color: var(--rig-surface); box-shadow: none; font-weight: 600; }
+.rig-lm-outil--fort:hover { background: var(--rig-texte-2); }
+.rig-lm-outil--tri { padding: 0 2px 0 9px; gap: 2px; cursor: default; }
+.rig-lm-outil__tri { display: inline-flex; align-items: center; gap: 5px; }
+.rig-lm-outil__tri em { font-style: normal; color: var(--rig-texte-3); }
+.rig-lm-outil__tri select {
+  border: 0; outline: 0; background: transparent;
+  font: 12px var(--rig-font); color: var(--rig-texte); cursor: pointer;
+  max-width: 130px;
+}
+.rig-lm-outil__sens {
+  border: 0; background: transparent; padding: 0 5px; height: 22px; border-radius: 5px;
+  font-size: 9px; color: var(--rig-texte-3); cursor: pointer;
+}
+.rig-lm-outil__sens:not(:disabled):hover { color: var(--rig-texte); background: color-mix(in srgb, var(--rig-texte) 6%, transparent); }
+.rig-lm-outil__sens:disabled { opacity: .4; cursor: default; }
+
+/* ---------- Le tableau du socle ---------- */
+.rig-lm-table { table-layout: fixed; }
+.rig-lm-table tbody td { max-width: none; }
+.rig-lm-table th.rig-lm-droite,
+.rig-lm-table td.rig-lm-droite { text-align: right; }
+.rig-table tbody td.rig-lm-cellule-chevron { padding: 0 0 0 6px; overflow: visible; }
+.rig-lm-chevron {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; padding: 0; border: 0; border-radius: 5px; background: transparent; cursor: pointer;
+}
+.rig-lm-chevron:hover { background: color-mix(in srgb, var(--rig-texte) 8%, transparent); }
+.rig-lm-chevron svg { width: 12px; height: 12px; fill: none; stroke: var(--rig-texte-3); stroke-width: 1.7; }
+
+.rig-lm-identite { display: flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; }
+.rig-lm-avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 20px; width: 20px; height: 20px; border-radius: 50%;
+  color: var(--rig-liste-avatar-texte);
+  font-size: 9px; font-weight: 700; letter-spacing: .02em;
+}
+.rig-lm-avatar--1 { background: var(--rig-liste-avatar-1); }
+.rig-lm-avatar--2 { background: var(--rig-liste-avatar-2); }
+.rig-lm-avatar--3 { background: var(--rig-liste-avatar-3); }
+.rig-lm-avatar--4 { background: var(--rig-liste-avatar-4); }
+.rig-lm-avatar--5 { background: var(--rig-liste-avatar-5); }
+.rig-lm-avatar--6 { background: var(--rig-liste-avatar-6); }
+.rig-lm-avatar--7 { background: var(--rig-liste-avatar-7); }
+.rig-lm-avatar--8 { background: var(--rig-liste-avatar-8); }
+/* L'objet cede d'abord, le nom jamais en dessous de sa largeur tant qu'il tient dans 70 % de la cellule.
+   Un nom simplement « moins retractable » (flex-shrink faible) perdait une fraction de pixel et s'affichait
+   coupe (« AMIENS BILLAR… », capture du 24/11/2026) : il ne retrecit plus du tout, sa limite est max-width. */
+.rig-lm-identite__nom {
+  flex: 0 0 auto; max-width: 70%;
+  font-weight: 600; color: var(--rig-texte);
+  overflow: hidden; text-overflow: ellipsis;
+}
+.rig-lm-identite__objet {
+  flex: 0 1 auto; min-width: 0;
+  color: var(--rig-texte-3);
+  overflow: hidden; text-overflow: ellipsis;
+}
+/* Un badge dans la cellule (« traitee dans la V2 ») : compact, dans la police du texte, jamais coupe. */
+.rig-lm-identite .rig-badge {
+  flex: none;
+  font: 10.5px var(--rig-font); letter-spacing: normal;
+  padding: 1px 7px; border-radius: 10px;
+}
+
+.rig-lm-pastille {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 20px; padding: 0 8px; border-radius: 6px;
+  max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: 11.5px; font-weight: 500; vertical-align: middle;
+  background: var(--rig-lm-teinte-fond); color: var(--rig-lm-teinte-texte);
+}
+.rig-lm-pastille i { flex: 0 0 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.rig-lm-etat {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; color: var(--rig-texte-2); vertical-align: middle;
+}
+.rig-lm-etat i { flex: 0 0 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--rig-lm-teinte); }
+
+.rig-lm-montant { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.rig-lm-montant__barre {
+  display: flex; flex: 0 1 54px; height: 5px; border-radius: 3px; overflow: hidden;
+  background: var(--rig-bord-faible);
+}
+.rig-lm-montant__barre b { background: var(--rig-or); border-radius: 3px; }
+.rig-lm-montant__texte { font-weight: 600; color: var(--rig-texte); }
+.rig-lm-montant__texte--zero { font-weight: 400; color: var(--rig-texte-3); }
+
+.rig-table tbody td.rig-lm-cellule-menu { padding: 0 4px 0 0; text-align: center; overflow: visible; }
+.rig-lm-menu {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 22px; padding: 0; border: 0; border-radius: 5px; background: transparent; cursor: pointer;
+}
+.rig-lm-menu:hover, .rig-lm-menu[aria-expanded="true"] { background: color-mix(in srgb, var(--rig-texte) 8%, transparent); }
+.rig-lm-menu svg { width: 16px; height: 16px; fill: var(--rig-texte-3); }
+.rig-lm-menu__liste {
+  position: fixed; z-index: 200;
+  display: flex; flex-direction: column; min-width: 190px;
+  padding: 4px; border-radius: 8px;
+  background: var(--rig-surface);
+  box-shadow: inset 0 0 0 1px var(--rig-bord), var(--rig-ombre);
+}
+.rig-lm-menu__action {
+  text-align: left; padding: 6px 10px; border: 0; border-radius: 5px; background: transparent;
+  font: 12.5px var(--rig-font); color: var(--rig-texte); cursor: pointer; white-space: nowrap;
+}
+.rig-lm-menu__action:hover, .rig-lm-menu__action:focus-visible { background: color-mix(in srgb, var(--rig-texte) 7%, transparent); outline: 0; }
+.rig-lm-menu__action:disabled { color: var(--rig-texte-3); cursor: default; background: transparent; }
+
+/* ---------- La ligne ouverte et sa ligne depliee : fond d'accent leger, filet d'accent a gauche ---------- */
+.rig-table tbody tr.rig-lm-ouverte td,
+.rig-table tbody tr.rig-lm-ouverte:hover td { background: color-mix(in srgb, var(--rig-or) 12%, transparent); border-bottom-color: transparent; }
+.rig-table tbody tr.rig-lm-ouverte td:first-child { box-shadow: inset 3px 0 0 var(--rig-or); }
+.rig-table tbody tr.rig-lm-ouverte .rig-lm-chevron svg { stroke: var(--rig-accent); }
+.rig-table tbody tr.rig-lm-detail { cursor: default; }
+.rig-table tbody tr.rig-lm-detail td,
+.rig-table tbody tr.rig-lm-detail:hover td {
+  height: auto; padding: 2px 12px 12px 40px;
+  white-space: normal; overflow: visible;
+  background: color-mix(in srgb, var(--rig-or) 12%, transparent);
+  box-shadow: inset 3px 0 0 var(--rig-or);
+  color: var(--rig-texte);
+}
+.rig-lm-detail__champs { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+.rig-lm-champ__libelle { display: block; font-size: 11px; color: var(--rig-texte-3); }
+.rig-lm-champ__valeur { font-size: 12.5px; color: var(--rig-texte); }
+.rig-lm-detail__actions { display: flex; gap: 6px; margin-top: 10px; }
+.rig-lm-detail__compte { margin-top: 8px; font-size: 12px; color: var(--rig-texte-2); }
+
+/* ---------- Pied de totaux ---------- */
+.rig-lm-pied {
+  display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+  padding: 9px 16px;
+  font-size: 12px; color: var(--rig-texte-3);
+  border-top: 1px solid var(--rig-bord-faible);
+  flex: none;
+}
+.rig-lm-pied b { color: var(--rig-texte); font-weight: 600; }
+.rig-lm-pied__aide { margin-left: auto; font-size: 11.5px; }
