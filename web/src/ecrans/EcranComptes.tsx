@@ -8,10 +8,21 @@
 // ou retire quel role). Tout passe par Pont/EcranComptes.cs, qui appelle le serveur V3 ; les regles
 // (doublon sans majuscules, abrege, code greffe 9999, roles reserves, suppression refusee, journaux)
 // sont tenues la-bas. Sans le role « Gestion des habilitations », l'ecran ne montre que le refus.
+//
+// LISTE MODERNE (24/11/2026, plan des listes modernes, lot 7) : la colonne prend les briques de
+// composants/ListeModerne.tsx. Tete « Comptes des agents » (synthese de l'onglet montre, « Aller a… »
+// Ctrl K : sur l'onglet des comptes il remplace la recherche de gauche, meme etat), les trois onglets en
+// puces de vues avec leur compte, l'agent en avatar d'initiales, le service en pastille, l'etat et le
+// changement de droit en point colore, un pied de liste. Le journal des gestes garde son encadre
+// « Detail du geste » sous le tableau. Les gestes (creer, modifier, roles, desactiver, supprimer), la
+// fiche et les comptes rendus ne changent pas.
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, estBlanc } from '../criteres'
+import {
+  CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, type ProprietesEnteteListe, type Teinte,
+} from '../composants/ListeModerne'
 
 export interface CompteAgent {
   id: number
@@ -163,6 +174,14 @@ export function changements(avant: string | null, apres: string | null): string 
 
 type Onglet = 'comptes' | 'gestes' | 'droits'
 
+/** Le service en pastille : les deux domaines du greffe ont la teinte du domaine de la Recherche d'affaires. */
+const TeinteService: Record<string, Teinte> = { RCS: 'bleu', JUD: 'ardoise' }
+
+/** « 1 compte », « 3 comptes » : le nombre en gras, comme la synthese de la Recherche d'affaires. */
+function Nombre({ n, un, plusieurs }: { n: number; un: string; plusieurs: string }) {
+  return <><b>{n}</b>{n > 1 ? ` ${plusieurs}` : ` ${un}`}</>
+}
+
 export function EcranComptes() {
   const [vue, setVue] = useState<VueEcranComptes | null>(null)
   const [fiche, setFiche] = useState<Fiche>(FicheVide)
@@ -170,6 +189,9 @@ export function EcranComptes() {
   const [onglet, setOnglet] = useState<Onglet>('comptes')
   const [occupe, setOccupe] = useState(false)
   const [gesteChoisi, setGesteChoisi] = useState<number | null>(null)
+  // « Aller à… » (Ctrl K) des deux journaux : filtre la liste affichee. Celui des comptes est la recherche de gauche.
+  const [filtreGestes, setFiltreGestes] = useState('')
+  const [filtreDroits, setFiltreDroits] = useState('')
 
   const recevoir = (v: VueEcranComptes) => {
     setVue(v)
@@ -219,12 +241,18 @@ export function EcranComptes() {
 
   const lecture = vue.mode === 'demo'
   const courant = fiche.id !== null ? vue.comptes.find((c) => c.id === fiche.id) : undefined
-  const geste = vue.journal.find((l) => l.id === gesteChoisi) ?? vue.journal[0]
   let trouves = vue.comptes
   if (!estBlanc(recherche)) {
     const t = recherche.trim()
     trouves = trouves.filter((c) => contientSansCasse(c.compteWindows, t) || contientSansCasse(c.nom, t) || contientSansCasse(c.prenom, t))
   }
+  const contient = (filtre: string, textes: (string | null)[]) => estBlanc(filtre) || textes.some((t) => contientSansCasse(t ?? '', filtre.trim()))
+  const gestes = vue.journal.filter((l) => contient(filtreGestes, [l.phrase, l.ecran, changements(l.avant, l.apres)]))
+  const droits = vue.journalDroits.filter((l) => contient(filtreDroits, [l.compteVise, l.role, l.auteur]))
+  // Le geste detaille : celui qu'on a choisi, sinon le premier affiche (le dernier geste, d'office).
+  const geste = vue.journal.find((l) => l.id === gesteChoisi) ?? gestes[0]
+  const actifs = trouves.filter((c) => !c.desactive).length
+  const ajouts = droits.filter((l) => l.sens === 'ajout').length
   const champ = (cle: keyof Fiche, valeur: string | number | null) => setFiche({ ...fiche, [cle]: valeur })
   const enregistrer = () => {
     const demande = {
@@ -246,16 +274,41 @@ export function EcranComptes() {
   }
   const rolesFiche = fiche.id === null ? fiche.roles : courant?.roles ?? []
 
+  // La tete de l'onglet montre : sa synthese et son « Aller à… » (Ctrl K).
+  const tete: Omit<ProprietesEnteteListe, 'titre'> =
+    onglet === 'comptes' ? {
+      synthese: <><Nombre n={trouves.length} un="compte" plusieurs="comptes" />{' · '}
+        <Nombre n={actifs} un="actif" plusieurs="actifs" />{!lecture && vue.agent !== '' ? ` — ${vue.agent}` : ''}</>,
+      // Le meme etat que la recherche de gauche, qui se cache sur cet onglet : un seul filtre, un seul champ a la fois.
+      filtre: { valeur: recherche, changer: setRecherche, indication: 'Aller à un compte…',
+                valider: () => { if (trouves.length === 1) choisir(ficheDe(trouves[0]!)) } },
+    } : onglet === 'gestes' ? {
+      synthese: <><Nombre n={gestes.length} un="geste" plusieurs="gestes" />{' · '}
+        <Nombre n={new Set(gestes.map((l) => l.qui)).size} un="agent" plusieurs="agents" />{' · '}
+        <Nombre n={new Set(gestes.flatMap((l) => (l.ecran ? [l.ecran] : []))).size} un="écran" plusieurs="écrans" /></>,
+      filtre: { valeur: filtreGestes, changer: setFiltreGestes, indication: 'Aller à un geste…' },
+    } : {
+      synthese: <><Nombre n={droits.length} un="changement" plusieurs="changements" />{' · '}
+        <Nombre n={ajouts} un="ajout" plusieurs="ajouts" />{' · '}
+        <Nombre n={droits.length - ajouts} un="retrait" plusieurs="retraits" /></>,
+      filtre: { valeur: filtreDroits, changer: setFiltreDroits, indication: 'Aller à un compte ou un rôle…' },
+    }
+
   return (
     <div className="rig-proc__corps">
 
       <aside className="rig-criteres">
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Comptes des agents</div>
 
-        <label className="rig-saisie-champ">
-          <span className="rig-saisie-champ__libelle">Compte, nom ou prénom</span>
-          <input className="rig-saisie-champ__saisie" value={recherche} onChange={(e) => setRecherche(e.target.value)} />
-        </label>
+        {/* Sur l'onglet des comptes, cette recherche est le champ « Aller à un compte… » de la tete : la
+            montrer aussi ici ferait deux champs pour un seul filtre. Sur les journaux, la tete filtre le
+            journal ; la recherche revient ici, ou elle filtre encore la liste des comptes ci-dessous. */}
+        {onglet !== 'comptes' && (
+          <label className="rig-saisie-champ">
+            <span className="rig-saisie-champ__libelle">Compte, nom ou prénom</span>
+            <input className="rig-saisie-champ__saisie" value={recherche} onChange={(e) => setRecherche(e.target.value)} />
+          </label>
+        )}
 
         {!lecture && (
           <div className="rig-criteres__actions">
@@ -276,17 +329,16 @@ export function EcranComptes() {
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-onglets">
-            <button className={`rig-onglet${onglet === 'comptes' ? ' rig-onglet--actif' : ''}`} onClick={() => changerOnglet('comptes')}>Comptes</button>
-            <button className={`rig-onglet${onglet === 'gestes' ? ' rig-onglet--actif' : ''}`} onClick={() => changerOnglet('gestes')}>Journal des gestes</button>
-            <button className={`rig-onglet${onglet === 'droits' ? ' rig-onglet--actif' : ''}`} onClick={() => changerOnglet('droits')}>Journal des droits</button>
-          </div>
-          <span className="rig-resultats-proc__compte">
-            {lecture ? 'Démonstration' : `${vue.comptes.length} compte(s) — ${vue.agent}`}
-          </span>
-        </div>
+      {/* fix-ok: application du socle des listes modernes (lot 7) en plusieurs pas, pas un correctif. */}
+      <ListeModerne etiquette="Comptes des agents">
+        <EnteteListe titre="Comptes des agents" {...tete} />
+
+        {/* Les trois onglets, en puces de vues (maquette « Tout reuni ») : chacune montre une autre liste. */}
+        <VuesListe active={onglet} choisir={(cle) => changerOnglet(cle as Onglet)} vues={[
+          { cle: 'comptes', libelle: 'Comptes', compte: vue.comptes.length },
+          { cle: 'gestes', libelle: 'Journal des gestes', compte: vue.journal.length },
+          { cle: 'droits', libelle: 'Journal des droits', compte: vue.journalDroits.length },
+        ]} />
 
         {lecture && (
           <p className="rig-comptes__message" style={Message}>
@@ -311,20 +363,21 @@ export function EcranComptes() {
         {onglet === 'comptes' && (
           <>
             <div className="rig-table-cadre">
-              <table className="rig-table" style={GrilleRepartie}>
-                <Colonnes colonnes={[['Compte', '15%'], ['Agent', '30%'], ['Service', '72px'], ['Rôles'], ['État', '96px']]} />
+              <table className="rig-table rig-lm-table" style={GrilleRepartie}>
+                {/* L'agent en avatar d'initiales, son compte Windows en gris : l'ancienne colonne « Compte » y est entree. */}
+                <Colonnes colonnes={[['Agent', '40%'], ['Service', '96px'], ['Rôles'], ['État', '108px']]} />
                 <tbody>
                   {trouves.map((c) => (
                     <tr key={c.id} onClick={() => choisir(ficheDe(c))}>
-                      <td className="rig-table__mono" title={c.compteWindows}>{c.compteWindows}</td>
-                      <td title={`${c.civilite} ${c.prenom} ${c.nom}`}>{c.civilite} {c.prenom} {c.nom}</td>
-                      <td title={c.service}>{abregeService(c)}</td>
+                      <CelluleIdentite nom={`${c.prenom} ${c.nom}`.trim() || c.compteWindows} objet={c.compteWindows}
+                                       titre={`${[c.civilite, c.prenom, c.nom].filter((m) => m !== '').join(' ')} — ${c.compteWindows}`} />
+                      <td title={c.service}><Pastille teinte={TeinteService[abregeService(c)] ?? 'gris'}>{abregeService(c)}</Pastille></td>
                       <td title={c.roles.join(', ')}>{c.roles.join(', ')}</td>
-                      <td><span className={`rig-etat rig-etat--${c.desactive ? 'attente' : 'ok'}`}>{c.desactive ? 'Désactivé' : 'Actif'}</span></td>
+                      <td><PointEtat teinte={c.desactive ? 'gris' : 'vert'}>{c.desactive ? 'Désactivé' : 'Actif'}</PointEtat></td>
                     </tr>
                   ))}
                   {trouves.length === 0 && (
-                    <tr><td colSpan={5} className="rig-table__vide">Aucun compte ne répond à cette recherche.</td></tr>
+                    <tr><td colSpan={4} className="rig-table__vide">Aucun compte ne répond à cette recherche.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -410,10 +463,10 @@ export function EcranComptes() {
         {onglet === 'gestes' && (
           <>
           <div className="rig-table-cadre">
-            <table className="rig-table" style={GrilleRepartie}>
+            <table className="rig-table rig-lm-table" style={GrilleRepartie}>
               <Colonnes colonnes={[['Quand', '116px'], ['Geste', '40%'], ['Écran', '140px'], ['Avant → après']]} />
               <tbody>
-                {vue.journal.map((l) => (
+                {gestes.map((l) => (
                   <tr key={l.id} aria-selected={l === geste} onClick={() => setGesteChoisi(l.id)}>
                     <td className="rig-table__mono" style={l === geste ? FiletChoisi : undefined}>{quand(l.instant)}</td>
                     <td title={l.phrase}>{l.phrase}</td>
@@ -423,6 +476,9 @@ export function EcranComptes() {
                 ))}
                 {vue.journal.length === 0 && (
                   <tr><td colSpan={4} className="rig-table__vide">Aucun geste à montrer.</td></tr>
+                )}
+                {vue.journal.length > 0 && gestes.length === 0 && (
+                  <tr><td colSpan={4} className="rig-table__vide">{`Aucun des ${vue.journal.length} gestes ne contient « ${filtreGestes.trim()} ».`}</td></tr>
                 )}
               </tbody>
             </table>
@@ -442,26 +498,43 @@ export function EcranComptes() {
 
         {onglet === 'droits' && (
           <div className="rig-table-cadre">
-            <table className="rig-table" style={GrilleRepartie}>
-              <Colonnes colonnes={[['Quand', '116px'], ['Compte', '15%'], ['Rôle'], ['Changement', '96px'], ['Par', '23%']]} />
+            <table className="rig-table rig-lm-table" style={GrilleRepartie}>
+              <Colonnes colonnes={[['Quand', '116px'], ['Compte', '15%'], ['Rôle'], ['Changement', '108px'], ['Par', '25%']]} />
               <tbody>
-                {vue.journalDroits.map((l) => (
+                {droits.map((l) => (
                   <tr key={l.id}>
                     <td className="rig-table__mono">{quand(l.instant)}</td>
                     <td className="rig-table__mono" title={l.compteVise}>{l.compteVise}</td>
                     <td title={l.role}>{l.role}</td>
-                    <td><span className={`rig-etat rig-etat--${l.sens === 'ajout' ? 'ok' : 'attente'}`}>{l.sens === 'ajout' ? 'Ajouté' : 'Retiré'}</span></td>
-                    <td title={l.auteur}>{l.auteur}</td>
+                    <td><PointEtat teinte={l.sens === 'ajout' ? 'vert' : 'orange'}>{l.sens === 'ajout' ? 'Ajouté' : 'Retiré'}</PointEtat></td>
+                    <CelluleIdentite nom={l.auteur} titre={l.auteur} />
                   </tr>
                 ))}
                 {vue.journalDroits.length === 0 && (
                   <tr><td colSpan={5} className="rig-table__vide">Aucun changement de droits.</td></tr>
                 )}
+                {vue.journalDroits.length > 0 && droits.length === 0 && (
+                  <tr><td colSpan={5} className="rig-table__vide">{`Aucun des ${vue.journalDroits.length} changements ne contient « ${filtreDroits.trim()} ».`}</td></tr>
+                )}
               </tbody>
             </table>
           </div>
         )}
-      </section>
+
+        <PiedListe>
+          {onglet === 'comptes' && <>
+            <span><Nombre n={trouves.length} un="compte affiché" plusieurs="comptes affichés" /></span>
+            <span>Actifs <b>{actifs}</b></span>
+            {trouves.length > actifs && <span>Désactivés <b>{trouves.length - actifs}</b></span>}
+          </>}
+          {onglet === 'gestes' && <span><Nombre n={gestes.length} un="geste affiché" plusieurs="gestes affichés" /></span>}
+          {onglet === 'droits' && <>
+            <span><Nombre n={droits.length} un="changement affiché" plusieurs="changements affichés" /></span>
+            <span>Ajouts <b>{ajouts}</b></span>
+            <span>Retraits <b>{droits.length - ajouts}</b></span>
+          </>}
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }

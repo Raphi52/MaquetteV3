@@ -5,11 +5,18 @@
 // decision Q2), utilisation, et qui l'a modifie et quand (CA07). La modification passe par la route du lot 9,
 // reservee a la regle V2 de la fiche du greffe ; un refus s'affiche avec le motif du serveur. Tout passe par
 // Pont/EcranReglages.cs.
+//
+// LISTE MODERNE (24/11/2026, plan des listes modernes, lot 7) : la liste prend les briques de
+// composants/ListeModerne.tsx. Le champ « Code, libellé ou valeur » devient le champ de la tete (Ctrl K
+// y pose le curseur ; meme filtre, Entree choisit le reglage reste seul), l'agent qui a modifie en avatar
+// d'initiales, un pied. La modification (gauche), le choix d'une ligne et les comptes rendus ne changent pas.
+// fix-ok: application du socle des listes modernes en plusieurs pas, pas un correctif.
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, estBlanc } from '../criteres'
 import { quand } from './EcranComptes'
+import { CelluleIdentite, EnteteListe, ListeModerne, PiedListe } from '../composants/ListeModerne'
 
 export interface ReglageGreffe {
   code: string
@@ -90,6 +97,7 @@ export function EcranReglages() {
     setVue((v) => (v && v.message ? { ...v, message: null, echec: false } : v))
   }
   const change = courant !== undefined && valeur !== (courant.valeur ?? '')
+  const modifies = trouves.filter((r) => r.dateModif !== null).length
 
   const enregistrer = async () => {
     if (!courant) return
@@ -125,13 +133,12 @@ export function EcranReglages() {
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Réglages du greffe</div>
-          <span className="rig-resultats-proc__compte">
-            {lecture ? 'Démonstration' : `${vue.reglages.length} réglage(s) — greffe ${vue.greffe ?? ''}`}
-          </span>
-        </div>
+      <ListeModerne etiquette="Réglages du greffe">
+        <EnteteListe titre="Réglages du greffe"
+                     synthese={<><b>{trouves.length}</b>{trouves.length > 1 ? ' réglages · ' : ' réglage · '}<b>{modifies}</b>
+                       {modifies > 1 ? ' modifiés' : ' modifié'}{lecture ? ' · Démonstration' : ` · greffe ${vue.greffe ?? ''}`}</>}
+                     filtre={{ valeur: recherche, changer: setRecherche, indication: 'Code, libellé ou valeur',
+                               valider: () => { if (trouves.length === 1) choisir(trouves[0]!) } }} />
 
         {lecture && (
           <p style={Message}>
@@ -146,15 +153,10 @@ export function EcranReglages() {
           </p>
         )}
 
-        <label className="rig-saisie-champ" style={{ margin: 'var(--rig-esp-2) var(--rig-esp-3)' }}>
-          <span className="rig-saisie-champ__libelle">Code, libellé ou valeur</span>
-          <input className="rig-saisie-champ__saisie" value={recherche} onChange={(e) => setRecherche(e.target.value)} />
-        </label>
-
         <div className="rig-table-cadre">
-          <table className="rig-table" style={GrilleRepartie}>
+          <table className="rig-table rig-lm-table" style={GrilleRepartie}>
             <colgroup>
-              <col style={{ width: '30%' }} /><col /><col style={{ width: '120px' }} /><col style={{ width: '150px' }} /><col style={{ width: '120px' }} />
+              <col style={{ width: '30%' }} /><col /><col style={{ width: '120px' }} /><col style={{ width: '170px' }} /><col style={{ width: '120px' }} />
             </colgroup>
             <thead>
               <tr>{['Code', 'Libellé', 'Valeur', 'Modifié par', 'Le'].map((t) => <th key={t} title={t} style={Coupe}>{t}</th>)}</tr>
@@ -165,7 +167,9 @@ export function EcranReglages() {
                   <td className="rig-table__mono" title={r.code} style={Coupe}>{r.code}</td>
                   <td title={r.libelle} style={Coupe}>{r.libelle}</td>
                   <td className="rig-table__mono" title={r.valeur ?? ''} style={Coupe}>{r.valeur ?? '—'}</td>
-                  <td title={r.auteurModif ?? ''} style={Coupe}>{r.auteurModif ?? '—'}</td>
+                  {r.auteurModif
+                    ? <CelluleIdentite nom={r.auteurModif} titre={r.auteurModif} />
+                    : <td>—</td>}
                   <td>{r.dateModif ? quand(r.dateModif) : '—'}</td>
                 </tr>
               ))}
@@ -175,7 +179,12 @@ export function EcranReglages() {
             </tbody>
           </table>
         </div>
-      </section>
+
+        <PiedListe>
+          <span><b>{trouves.length}</b>{trouves.length > 1 ? ' réglages affichés' : ' réglage affiché'}</span>
+          <span>Modifiés <b>{modifies}</b></span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }

@@ -5,6 +5,10 @@ import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
 
+const espaces = (t: string | null | undefined) => (t ?? '').replace(/\s/g, ' ')
+/** La phrase sous le titre de la liste (EnteteListe), une fois l'ecran charge. */
+const synthese = async () => espaces((await screen.findByText((_, el) => el?.className === 'rig-lm-synthese')).textContent)
+
 // Les regles (droit de modifier, auteur et date poses, journal, 404 sur un reglage absent) vivent dans le serveur
 // et sont prouvees par tests/SocleGreffesCheck. Ici : l'ecran montre les reglages et remonte chaque modification.
 function reglage(partiel: Partial<ReglageGreffe> = {}): ReglageGreffe {
@@ -27,7 +31,7 @@ describe('EcranReglages', () => {
   it('SOC-003 CA07 : chaque reglage montre qui l\'a modifie et quand ; la valeur reste le texte de la V2', async () => {
     installerFauxPont({ 'EcranReglages.Ouvrir': () => vue() })
     render(<EcranReglages />)
-    expect(await screen.findByText('2 réglage(s) — greffe 3801')).toBeTruthy()
+    expect(await synthese()).toBe('2 réglages · 1 modifié · greffe 3801')
     const lignes = screen.getAllByRole('row').slice(1)
     expect(lignes[0]!.textContent).toContain('INTRANET\\responsable')
     expect(lignes[0]!.textContent).toContain('19/11/2026')
@@ -44,7 +48,7 @@ describe('EcranReglages', () => {
         reglages: [reglage({ valeur: 'D', auteurModif: 'raphael.vilain' })] }),
     })
     render(<EcranReglages />)
-    await screen.findByText('2 réglage(s) — greffe 3801')
+    expect(await synthese()).toBe('2 réglages · 1 modifié · greffe 3801')
     const bouton = screen.getByRole('button', { name: 'Enregistrer' }) as HTMLButtonElement
     expect(bouton.disabled).toBe(true)
     fireEvent.click(screen.getAllByRole('row')[1]!)
@@ -59,11 +63,11 @@ describe('EcranReglages', () => {
   it('une valeur videe part comme null (la V2 permet un reglage NULL)', async () => {
     const pont = installerFauxPont({ 'EcranReglages.Ouvrir': () => vue(), 'EcranReglages.Modifier': () => vue() })
     render(<EcranReglages />)
-    await screen.findByText('2 réglage(s) — greffe 3801')
+    expect(await synthese()).toBe('2 réglages · 1 modifié · greffe 3801')
     fireEvent.click(screen.getAllByRole('row')[1]!)
     fireEvent.change(screen.getByLabelText('Valeur'), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
-    await screen.findByText('2 réglage(s) — greffe 3801')
+    expect(await synthese()).toBe('2 réglages · 1 modifié · greffe 3801')
     expect(pont.appels).toHaveBeenCalledWith('EcranReglages.Modifier', 'EXPRESSO_LC_ORDRE_NUM', null)
   })
 
@@ -74,7 +78,7 @@ describe('EcranReglages', () => {
         message: 'Modification refusee : le compte agent n\'a pas le droit de modifier le greffe (il faut etre administrateur d\'Amitel...).' }),
     })
     render(<EcranReglages />)
-    await screen.findByText('2 réglage(s) — greffe 3801')
+    expect(await synthese()).toBe('2 réglages · 1 modifié · greffe 3801')
     fireEvent.click(screen.getAllByRole('row')[1]!)
     fireEvent.change(screen.getByLabelText('Valeur'), { target: { value: 'D' } })
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
@@ -85,7 +89,9 @@ describe('EcranReglages', () => {
   it('sans serveur : les reglages de demonstration, en lecture seule', async () => {
     installerFauxPont({ 'EcranReglages.Ouvrir': () => vue({ mode: 'demo', greffe: null }) })
     render(<EcranReglages />)
-    expect(await screen.findAllByText('Démonstration')).toHaveLength(2)
+    // fix-ok: le compteur « Démonstration » de l'entete est devenu la fin de la synthese (lot 7 des listes modernes).
+    expect(await screen.findAllByText('Démonstration')).toHaveLength(1)
+    expect(await synthese()).toBe('2 réglages · 1 modifié · Démonstration')
     fireEvent.click(screen.getAllByRole('row')[1]!)
     expect((screen.getByLabelText('Valeur') as HTMLTextAreaElement).disabled).toBe(true)
     expect((screen.getByRole('button', { name: 'Enregistrer' }) as HTMLButtonElement).disabled).toBe(true)
@@ -101,11 +107,35 @@ describe('EcranReglages', () => {
   it('cherche par code, libelle ou valeur', async () => {
     installerFauxPont({ 'EcranReglages.Ouvrir': () => vue() })
     render(<EcranReglages />)
-    await screen.findByText('2 réglage(s) — greffe 3801')
+    expect(await synthese()).toBe('2 réglages · 1 modifié · greffe 3801')
     fireEvent.change(screen.getByLabelText('Code, libellé ou valeur'), { target: { value: 'true' } })
     const lignes = screen.getAllByRole('row').slice(1)
     expect(lignes).toHaveLength(1)
     expect(lignes[0]!.textContent).toContain('PROC_RELCLI_ultCheckBoxLettre')
     expect(trace(null, null)).toBe('jamais')
+  })
+
+  it('liste moderne : Ctrl K pose le curseur dans la recherche, Entree choisit le reglage reste seul ; auteur en avatar, pied', async () => {
+    installerFauxPont({ 'EcranReglages.Ouvrir': () => vue() })
+    const { container } = render(<EcranReglages />)
+    await synthese()
+    expect(screen.getByText('Réglages du greffe', { selector: '.rig-lm-titre' })).toBeTruthy()
+    const lignes = screen.getAllByRole('row').slice(1)
+    // L'agent qui a modifie en avatar d'initiales ; un reglage jamais modifie garde son tiret.
+    expect(lignes[0]!.querySelector('.rig-lm-identite__nom')!.textContent).toBe('INTRANET\\responsable')
+    expect(lignes[0]!.querySelector('.rig-lm-avatar')!.textContent).toBe('IR')
+    expect(lignes[1]!.querySelector('.rig-lm-avatar')).toBeNull()
+    expect(lignes[1]!.querySelectorAll('td')[3]!.textContent).toBe('—')
+    expect(espaces(container.querySelector('.rig-lm-pied')!.textContent)).toBe('2 réglages affichés' + 'Modifiés 1')
+
+    const champ = screen.getByLabelText('Code, libellé ou valeur')
+    const touche = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true, cancelable: true })
+    window.dispatchEvent(touche)
+    expect(touche.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(champ)
+    fireEvent.change(champ, { target: { value: 'expresso' } })
+    expect(await synthese()).toBe('1 réglage · 1 modifié · greffe 3801')
+    fireEvent.keyDown(champ, { key: 'Enter' })
+    expect(screen.getByText('Utilisation : RIG_FACTU_EXPRESSO : Lettres_chèques')).toBeTruthy()
   })
 })
