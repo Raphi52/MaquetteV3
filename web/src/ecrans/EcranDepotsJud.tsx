@@ -31,7 +31,7 @@ import { appeler } from '../pont'
 import { contientSansCasse, dateCourte, estBlanc } from '../criteres'
 import {
   CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille, PiedListe, PointEtat,
-  type ActionLigne, type Teinte,
+  teinteStatut, type ActionLigne, type Teinte,
 } from '../composants/ListeModerne'
 import type { ContexteDossierVue } from '../plan/types'
 
@@ -71,8 +71,7 @@ const Lignes: Instance[] = [
   { numero: '2024J00507', denomination: 'SCI DU MOULIN', nature: 'Redressement judiciaire', chambre: '3e', ouverture: '2024-06-12', dernierEvenement: 'Cloture', etat: 'Close', statut: 'ok', aFacturer: false, dossier: '2025B00044' },
 ]
 
-/** Le point d'etat suit le statut de l'instance ; la pastille, la nature de la procedure. */
-const TeinteStatut: Record<string, Teinte> = { action: 'bleu', attente: 'orange', alerte: 'rouge', ok: 'vert' }
+/** Le point d'etat suit le statut de l'instance (teinteStatut du socle) ; la pastille, la nature de la procedure. */
 const TeinteNature: Record<string, Teinte> = { 'Redressement judiciaire': 'orange', 'Liquidation judiciaire': 'rouge', Sauvegarde: 'vert' }
 
 /** Les colonnes du tableau a une ligne : chevron, Instance, Nature, Date d'ouverture, Dernier evenement, Etat, menu. */
@@ -192,7 +191,7 @@ export function EcranDepotsJud({ ouvrirDossier, dossier = null }: ProprietesEcra
                     <td title={inst.nature}><Pastille teinte={TeinteNature[inst.nature] ?? 'gris'}>{inst.nature}</Pastille></td>
                     <td className="rig-table__mono">{dateCourte(inst.ouverture)}</td>
                     <td title={inst.dernierEvenement}>{inst.dernierEvenement}</td>
-                    <td title={inst.etat}><PointEtat teinte={TeinteStatut[inst.statut] ?? 'gris'}>{inst.etat}</PointEtat></td>
+                    <td title={inst.etat}><PointEtat teinte={teinteStatut(inst.statut)}>{inst.etat}</PointEtat></td>
                     <td className="rig-lm-cellule-menu">
                       <MenuLigne libelle={`Actions de l'instance ${inst.numero}`} actions={[
                         ...actions,

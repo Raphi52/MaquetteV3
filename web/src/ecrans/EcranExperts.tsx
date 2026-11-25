@@ -144,7 +144,8 @@ export function EcranExperts() {
                      filtre={{ valeur: recherche, changer: setRecherche, indication: 'Aller a un expert…',
                                valider: () => { if (trouves.length === 1) setSelection(trouves[0]!) } }} />
 
-        <VuesListe vues={VuesExperts.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer(recherche, critQualif, v.actifsSeuls).length }))}
+        <VuesListe etiquette="Vues des experts"
+                   vues={VuesExperts.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer(recherche, critQualif, v.actifsSeuls).length }))}
                    active={VuesExperts.find((v) => v.actifsSeuls === actifsSeuls)?.cle ?? null}
                    choisir={(cle) => { const v = VuesExperts.find((x) => x.cle === cle); if (v) setActifsSeuls(v.actifsSeuls) }} />
 
@@ -245,8 +246,8 @@ export function EcranExperts() {
             </div>
 
             {/* Les deux listes de mesures de la v2 (OpeMesureActif / OpeMesureInactif) : des puces comptees a la
-                place des onglets. */}
-            <VuesListe vues={[
+                place des onglets ; leur groupe porte son nom, distinct de celui des experts. */}
+            <VuesListe etiquette="Vues des mesures" vues={[
                          { cle: 'en-cours', libelle: 'Mesures en cours', compte: mesuresDe(true).length },
                          { cle: 'terminees', libelle: 'Mesures terminees', compte: mesuresDe(false).length },
                        ]}

@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 // Milliers : montant() (ListeModerne.tsx) les separe par l'espace insecable U+00A0, ecrite \u00a0 ici.
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { EcranCloture, oublierVuesDeLaSession } from './EcranCloture'
+import { EcranCloture } from './EcranCloture'
+import { oublierVuesDeSession } from '../composants/ListeModerne'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 import { contexteDossier } from '../test/dossier'
 
-afterEach(() => { cleanup(); retirerFauxPont(); oublierVuesDeLaSession() })
+afterEach(() => { cleanup(); retirerFauxPont(); oublierVuesDeSession() })
 
 // Valeurs attendues : celles de l'ecran Blazor (EcranCloture.razor), JeuDemo.Aujourdhui = 09/09/2026 :
 // seule la limite d'examen du 05/09/2026 (SAS TRANSPORTS MARNE) est depassee.

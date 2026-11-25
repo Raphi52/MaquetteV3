@@ -35,7 +35,7 @@ import { useState } from 'react'
 import { dateCourte } from '../criteres'
 import { euros } from '../format'
 import {
-  CartesChiffrees, CelluleIdentite, EnteteListe, ListeModerne, MontantBarre, PiedListe, PointEtat, VuesListe, montant,
+  CartesChiffrees, CelluleIdentite, EnteteListe, ListeModerne, MontantBarre, PiedListe, PointEtat, VuesListe, montant, normaliser,
 } from '../composants/ListeModerne'
 
 interface FicheCli {
@@ -109,10 +109,6 @@ const Contacts: Contact[] = [
   { abrege: 'BLANC', nom: 'Sophie BLANC', fonction: 'Administratrice', tel: '03 26 40 55 01', mail: 's.blanc@exemple.fr', principal: true },
   { abrege: 'DUPONT', nom: 'Marc DUPONT', fonction: 'Avocat', tel: '03 26 77 43 09', mail: 'm.dupont@exemple.fr', principal: true },
 ]
-
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-}
 
 export function EcranFicheClient() {
   const [abrege, setAbrege] = useState('LEROY')

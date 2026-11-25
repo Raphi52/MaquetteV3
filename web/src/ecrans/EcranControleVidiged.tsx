@@ -18,7 +18,7 @@
 import { Fragment, useState } from 'react'
 import { contientSansCasse, dateCourte, distinctsTries, entierLisible, estBlanc } from '../criteres'
 import {
-  CelluleChevron, EnteteListe, LigneDetail, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, type Teinte,
+  CelluleChevron, EnteteListe, LigneDetail, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, useVuesDeSession, type Teinte, type VueEnregistree,
 } from '../composants/ListeModerne'
 
 interface ArchiveVidi {
@@ -73,28 +73,14 @@ function filtrer(c: CriteresVidiged, recherche = ''): ArchiveVidi[] {
   return q
 }
 
-interface VueVidiged {
-  cle: string
-  libelle: string
-  criteres: CriteresVidiged
-}
-
 const Types = distinctsTries(Archives.map((a) => a.type))
 
 /** Les vues toujours la : toutes, sans support CD, puis une par type d'archive (les deux criteres de l'ecran). */
-const VuesPrereglees: VueVidiged[] = [
+const VuesPrereglees: VueEnregistree<CriteresVidiged>[] = [
   { cle: 'toutes', libelle: 'Toutes', criteres: SansCritere },
   { cle: 'sans-cd', libelle: 'Sans support CD', criteres: { ...SansCritere, sansCd: true } },
   ...Types.map((t) => ({ cle: `type:${t}`, libelle: t, criteres: { ...SansCritere, critType: t } })),
 ]
-
-/** Les vues ajoutees par « + Nouvelle vue » : elles vivent le temps de la session (aucun reglage ne les porte). */
-const VuesDeLaSession: VueVidiged[] = []
-
-/** Pour les tests : repartir d'une session sans vue ajoutee. */
-export function oublierVuesDeLaSession(): void {
-  VuesDeLaSession.length = 0
-}
 
 /** Un type d'archive garde sa teinte : elle suit son rang dans la liste des types. */
 const TeintesType: Teinte[] = ['ardoise', 'bleu', 'violet', 'vert', 'orange']
@@ -129,13 +115,7 @@ export function EcranControleVidiged() {
     setAu(c.au)
     setSansCd(c.sansCd)
   }
-  const [vuesAjoutees, setVuesAjoutees] = useState<VueVidiged[]>(() => [...VuesDeLaSession])
-  const vues = [...VuesPrereglees, ...vuesAjoutees]
-  const vueActive = vues.find((v) => memesCriteres(v.criteres, criteres))?.cle ?? null
-  function enregistrerVue(nom: string) {
-    VuesDeLaSession.push({ cle: `session-${VuesDeLaSession.length + 1}`, libelle: nom, criteres })
-    setVuesAjoutees([...VuesDeLaSession])
-  }
+  const { vues, active: vueActive, enregistrer: enregistrerVue } = useVuesDeSession('ControleVidiged', VuesPrereglees, criteres, memesCriteres)
 
   const filtrees = filtrer(criteres, recherche)
 

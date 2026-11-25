@@ -24,7 +24,7 @@ import { dateSaisie, useNombreSaisi } from '../saisie'
 import type { ContexteDossierVue } from '../plan/types'
 import {
   CartesChiffrees, CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille,
-  PiedListe, PointEtat, VuesListe, exporterCsv, type ActionLigne, type Teinte,
+  PiedListe, PointEtat, VuesListe, exporterCsv, normaliser, useVuesDeSession, type ActionLigne, type Teinte, type VueEnregistree,
 } from '../composants/ListeModerne'
 
 export interface LigneDemande {
@@ -97,28 +97,13 @@ function memesCriteres(a: CriteresDemandes, b: CriteresDemandes): boolean {
     && [...a.critEtats].sort().join('|') === [...b.critEtats].sort().join('|')
 }
 
-/** Une vue enregistree : un nom et un jeu complet de criteres. */
-export interface VueDemandesEnregistree {
-  cle: string
-  libelle: string
-  criteres: CriteresDemandes
-}
-
 /** Les vues toujours la : les criteres d'etat de l'ecran, preposes. */
-export const VuesPrereglees: VueDemandesEnregistree[] = [
+export const VuesPrereglees: VueEnregistree<CriteresDemandes>[] = [
   { cle: 'toutes', libelle: 'Toutes', criteres: SansCritere },
   { cle: 'en-cours', libelle: 'En cours', criteres: { ...SansCritere, critEnCours: true } },
   { cle: 'alerte', libelle: 'En alerte', criteres: { ...SansCritere, critAlerte: true } },
   { cle: 'validees', libelle: 'Validees', criteres: { ...SansCritere, critEtats: ['Validee'] } },
 ]
-
-/** Les vues ajoutees par « + Nouvelle vue » : elles vivent le temps de la session (aucun reglage ne les porte). */
-const VuesDeLaSession: VueDemandesEnregistree[] = []
-
-/** Pour les tests : repartir d'une session sans vue ajoutee. */
-export function oublierVuesDeLaSession(): void {
-  VuesDeLaSession.length = 0
-}
 
 /** La teinte d'un etat de demande (JeuDemo.EtatsDemande) : la meme dans la ligne et dans la carte des etats. */
 const TeinteEtat: Record<string, Teinte> = { 'En saisie': 'bleu', 'En controle': 'orange', Validee: 'vert', Rejetee: 'rouge' }
@@ -146,14 +131,6 @@ export function identiteDemande(nom: string): { societe: string; objet: string }
 
 /** Les colonnes du tableau a une ligne : chevron, Demande, Traitement, Etat, Creation, Utilisateur, menu. */
 const NbColonnes = 7
-
-/**
- * « Aller a… » compare sans casse ni accents, comme la Recherche d'affaires : « démande » trouve « Demande ».
- * fix-ok: contientSansCasse (criteres.ts) garde les accents ; test « Aller a une demande… » rouge sur « démande d2 », vert ici.
- */
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-}
 
 export function EcranDemandes({ valides, ouvrir, dossier = null }: ProprietesEcranDemandes) {
   // Ouvert depuis une affaire : ses demandes, cherchees par son numero dans le
@@ -208,8 +185,7 @@ export function EcranDemandes({ valides, ouvrir, dossier = null }: ProprietesEcr
 
   // Les vues : les preposees, puis celles de la session. Leur compte est demande au pont, critere par critere,
   // avec la meme limite d'affichage : c'est le nombre de lignes que la vue MONTRERAIT.
-  const [vuesAjoutees, setVuesAjoutees] = useState<VueDemandesEnregistree[]>(() => [...VuesDeLaSession])
-  const vues = [...VuesPrereglees, ...vuesAjoutees]
+  const { vues, active: vueActive, enregistrer: enregistrerVue } = useVuesDeSession('Demandes', VuesPrereglees, criteres, memesCriteres)
   const [comptes, setComptes] = useState<number[] | null>(null)
   const cleVues = JSON.stringify(vues.map((v) => v.criteres))
   useEffect(() => {
@@ -222,11 +198,6 @@ export function EcranDemandes({ valides, ouvrir, dossier = null }: ProprietesEcr
       () => { if (!perime) setComptes(null) })
     return () => { perime = true }
   }, [cleVues, clefValides, topMax.valeur])
-  const vueActive = vues.find((v) => memesCriteres(v.criteres, criteres))?.cle ?? null
-  function enregistrerVue(nom: string) {
-    VuesDeLaSession.push({ cle: `session-${VuesDeLaSession.length + 1}`, libelle: nom, criteres })
-    setVuesAjoutees([...VuesDeLaSession])
-  }
 
   function basculerEtat(etat: string) {
     setCritEtats((avant) => (avant.includes(etat) ? avant.filter((e) => e !== etat) : [...avant, etat]))

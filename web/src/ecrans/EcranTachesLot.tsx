@@ -29,7 +29,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { appeler } from '../pont'
 import { Saisie } from '../session'
-import { CelluleIdentite, EnteteListe, ListeModerne, PiedListe, PointEtat } from '../composants/ListeModerne'
+import { CelluleIdentite, EnteteListe, ListeModerne, PiedListe, PointEtat, normaliser } from '../composants/ListeModerne'
 
 export interface LotVue {
   code: string
@@ -106,10 +106,6 @@ function useVueDeLot(session: string, version: number): [VueTachesLot | null, (g
   }, [session])
 
   return [vue, geste]
-}
-
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
 
 export function EcranTachesLot({ session, version }: ProprietesEcranTachesLot) {

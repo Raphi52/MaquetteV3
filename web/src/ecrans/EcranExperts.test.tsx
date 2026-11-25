@@ -41,11 +41,11 @@ describe('EcranExperts', () => {
 
   it('les mesures terminees, les inactifs et le filtre de qualite', () => {
     const { container } = render(<EcranExperts />)
-    const [, mesures] = screen.getAllByRole('group', { name: 'Vues' })
-    expect([...mesures!.querySelectorAll('.rig-lm-vue')].map((v) => espaces(v.textContent))).toEqual(['Mesures en cours 1', 'Mesures terminees 1'])
+    const mesures = screen.getByRole('group', { name: 'Vues des mesures' })
+    expect([...mesures.querySelectorAll('.rig-lm-vue')].map((v) => espaces(v.textContent))).toEqual(['Mesures en cours 1', 'Mesures terminees 1'])
     fireEvent.click(screen.getByText('Mesures terminees'))
     expect(lignes(container, 1).map((l) => l[0])).toEqual(['M-2024-0503'])
-    expect(within(mesures!).getByRole('button', { name: 'Mesures terminees 1' }).getAttribute('aria-pressed')).toBe('true')
+    expect(within(mesures).getByRole('button', { name: 'Mesures terminees 1' }).getAttribute('aria-pressed')).toBe('true')
 
     fireEvent.click(screen.getByRole('button', { name: 'Experts actifs uniquement' }))
     expect(synthese(container)).toBe('3 experts · 2 actifs · 3 qualites')
@@ -66,10 +66,10 @@ describe('EcranExperts', () => {
   it('les vues posent « Experts actifs uniquement » ; « Aller a un expert… » (Ctrl K) est la recherche nom/abrege, Entree choisit l\'expert reste seul', () => {
     const { container } = render(<EcranExperts />)
     expect(screen.queryByLabelText('Nom, abrege')).toBeNull()
-    const [experts] = screen.getAllByRole('group', { name: 'Vues' })
-    expect([...experts!.querySelectorAll('.rig-lm-vue')].map((v) => [espaces(v.textContent), v.getAttribute('aria-pressed')]))
+    const experts = screen.getByRole('group', { name: 'Vues des experts' })
+    expect([...experts.querySelectorAll('.rig-lm-vue')].map((v) => [espaces(v.textContent), v.getAttribute('aria-pressed')]))
       .toEqual([['Actifs 2', 'true'], ['Tous 3', 'false']])
-    fireEvent.click(within(experts!).getByRole('button', { name: 'Tous 3' }))
+    fireEvent.click(within(experts).getByRole('button', { name: 'Tous 3' }))
     expect(screen.getByRole('button', { name: 'Experts actifs uniquement' }).className).toBe('rig-bascule')
     expect(synthese(container)).toBe('3 experts · 2 actifs · 3 qualites')
 
@@ -80,7 +80,7 @@ describe('EcranExperts', () => {
     expect(document.activeElement).toBe(champ)
     fireEvent.change(champ, { target: { value: '  bernard ' } })
     expect(lignes(container).map((l) => l[0])).toEqual(['ROUX'])
-    expect([...experts!.querySelectorAll('.rig-lm-vue')].map((v) => espaces(v.textContent))).toEqual(['Actifs 0', 'Tous 1'])
+    expect([...experts.querySelectorAll('.rig-lm-vue')].map((v) => espaces(v.textContent))).toEqual(['Actifs 0', 'Tous 1'])
     fireEvent.keyDown(champ, { key: 'Enter' })
     expect(choisi(container)).toBe('ROUX')
     fireEvent.change(champ, { target: { value: 'noel' } })

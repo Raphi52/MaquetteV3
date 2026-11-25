@@ -20,7 +20,7 @@ import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { dateSaisie, useNombreSaisi } from '../saisie'
 import {
-  CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille, PiedListe, PointEtat, VuesListe,
+  CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille, PiedListe, PointEtat, VuesListe, normaliser,
   type ActionLigne, type Teinte,
 } from '../composants/ListeModerne'
 
@@ -79,14 +79,6 @@ export function teinteCategorie(libelle: string): Teinte {
 
 /** Les colonnes du tableau a une ligne : chevron, Acte, Categorie, Date de depot, Demat., Anomalies, menu. */
 const NbColonnes = 7
-
-/**
- * « Aller a… » compare sans casse ni accents, comme la Recherche d'affaires : « procès » trouve « Proces-verbal ».
- * Le normaliser() de RechAffaires n'est pas exporte du socle (manque note au plan, lot 6) : recopie locale.
- */
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-}
 
 export function EcranActes({ ouvrirDossier }: ProprietesEcranActes) {
   const [critActeCritere, setCritActeCritere] = useState('')

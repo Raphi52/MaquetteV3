@@ -30,7 +30,7 @@
 import { Fragment, useState } from 'react'
 import { distinctsTries, entierLisible } from '../criteres'
 import {
-  CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe,
+  CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, normaliser,
   type Teinte,
 } from '../composants/ListeModerne'
 
@@ -116,14 +116,6 @@ const TeinteClassement: Record<string, Teinte> = { Renvoi: 'orange', 'Mise en de
 
 /** Les colonnes du tableau a une ligne : chevron, Jour, Date, Heure, Type, Juge ou Section, Type de classement. */
 const NbColonnes = 7
-
-/**
- * « Aller a… » compare sans casse ni accents, comme la Recherche d'affaires : « procédure » trouve « Audience de procedure ».
- * Le normaliser() de RechAffaires n'est pas exporte du socle (manque note au plan, lot 6) : recopie locale.
- */
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-}
 
 export function EcranGestionAudiences() {
   const [modeCabinet, setModeCabinet] = useState(true)

@@ -34,18 +34,17 @@
 // LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 4) : les articles prennent les
 // briques de composants/ListeModerne.tsx. Tete (nombre d'articles, total TTC, reste a encaisser), trois cartes :
 // Total TTC (retenus / retires, le clic filtre), Encaisse (anneau sur le total), BODACC · INPI · Autre (le clic
-// montre les articles qui portent ces frais). Une ligne par article (Code, Libelle, Quantite, Etat, Montant TTC
-// avec sa mini-barre, Commentaire) ; prix UHT, TVA, BODACC, INPI et Autre sont dans la ligne depliee par le chevron.
-// Pas de CelluleIdentite : un article n'est ni un client, ni une entreprise, ni un dossier (pas d'avatar). Le
-// libelle reste une cellule simple : recopier ici les classes rig-lm-identite du socle serait une copie locale
-// (decision du plan, lot 4, 24/11 21:20) ; une cellule d'identite sans avatar est un manque du socle (lot 8).
+// montre les articles qui portent ces frais). Une ligne par article (Article, Quantite, Etat, Montant TTC avec sa
+// mini-barre, Commentaire) ; prix UHT, TVA, BODACC, INPI et Autre sont dans la ligne depliee par le chevron.
+// Un article n'est ni un client, ni une entreprise, ni un dossier : sa cellule est la CelluleIdentite du socle SANS
+// avatar (lot 8), le libelle en gras et le code en gris -- les anciennes colonnes Code et Libelle, reunies.
 // Le clic sur un article le retire du total ou l'y remet, comme avant ; l'encaissement ne change pas.
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { centimes, euros, nombre } from '../format'
 import {
-  CartesChiffrees, CelluleChevron, EnteteListe, LigneDetail, ListeModerne, MenuLigne, MontantBarre, PiedListe, PointEtat,
+  CartesChiffrees, CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MenuLigne, MontantBarre, PiedListe, PointEtat,
   montant, type ActionLigne,
 } from '../composants/ListeModerne'
 import { PourLeDossier } from '../composants/PourLeDossier'
@@ -171,8 +170,8 @@ const FicheVide: FicheClient = { nom: '', abrege: '', typeClient: '', adresse: '
 /** Les filtres des cartes : articles retenus ou retires, articles qui portent un frais. */
 type FiltreArticles = 'retenus' | 'retires' | 'bodacc' | 'inpi' | 'autre'
 
-/** Les colonnes du tableau : chevron, Code, Libelle, Quantite, Etat, Montant TTC, Commentaire, menu. */
-const NbColonnes = 8
+/** Les colonnes du tableau : chevron, Article (libelle et code), Quantite, Etat, Montant TTC, Commentaire, menu. */
+const NbColonnes = 7
 
 /** La demande d'une affaire, telle que Pont/EcranFactures.cs (DemandeDe) la rend. */
 interface DemandeFacturee {
@@ -425,14 +424,13 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
         <div className="rig-table-cadre">
           <table className="rig-table rig-lm-table">
             <colgroup>
-              <col style={{ width: 30 }} /><col style={{ width: '10%' }} /><col /><col style={{ width: '9%' }} />
+              <col style={{ width: 30 }} /><col /><col style={{ width: '9%' }} />
               <col style={{ width: '12%' }} /><col style={{ width: '18%' }} /><col style={{ width: '20%' }} /><col style={{ width: 34 }} />
             </colgroup>
             <thead>
               <tr>
                 <th aria-label="Deplier"></th>
-                <th>Code</th>
-                <th>Libelle</th>
+                <th>Article</th>
                 <th className="rig-table__centre">Quantite</th>
                 <th>Etat</th>
                 <th className="rig-lm-droite">Montant TTC</th>
@@ -455,8 +453,7 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
                   <Fragment key={art.code}>
                   <tr className={classes || undefined} onClick={() => basculer(art.code)}>
                     <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : art.code)} />
-                    <td className="rig-table__mono">{art.code}</td>
-                    <td title={art.libelle}>{art.libelle}</td>
+                    <CelluleIdentite avatar={false} nom={art.libelle} objet={art.code} titre={`${art.libelle} · ${art.code}`} />
                     <td className="rig-table__centre">{art.quantite}</td>
                     <td><PointEtat teinte={retire ? 'gris' : 'vert'}>{retire ? 'Retire' : 'Retenu'}</PointEtat></td>
                     <td className="rig-lm-droite" title={montant(art.ttc)}>
@@ -534,7 +531,9 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
             <textarea className="rig-saisie-champ__saisie" rows={2} value={commentaire}
                       onChange={(e) => setCommentaire(e.target.value)}></textarea>
           </label>
-          <span className={`rig-etat rig-etat--${reste <= 0 ? 'ok' : 'attente'}`}>
+          {/* alignSelf : le bloc est une colonne flex qui ETIRE ses enfants ; la pastille courait sur toute la largeur
+              de la carte (capture orange a 900x700, lot 8 des listes modernes ; meme correction qu'Experts au lot 2). */}
+          <span className={`rig-etat rig-etat--${reste <= 0 ? 'ok' : 'attente'}`} style={{ alignSelf: 'flex-start' }}>
             {reste <= 0 ? 'Facture soldee' : `Solde restant ${euros(reste)} EUR`}
           </span>
         </div>}

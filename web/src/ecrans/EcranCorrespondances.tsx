@@ -55,17 +55,17 @@ export interface VueEcranCorrespondances {
   retoursBeta: RetourBeta[]
 }
 
-/** Le libelle de chaque statut, et sa teinte (classes rig-etat de la charte). */
-export const STATUTS: Record<LigneCorrespondance['statut'], { libelle: string; teinte: string }> = {
-  identique: { libelle: 'Même touche', teinte: 'ok' },
-  'nouvelle-touche': { libelle: 'Nouvelle touche', teinte: 'action' },
-  geste: { libelle: 'Par un geste', teinte: 'attente' },
-  supprimee: { libelle: 'Supprimée', teinte: 'alerte' },
-  'a-venir': { libelle: 'Écran à venir', teinte: '' },
-  nouveau: { libelle: 'Nouveau dans la V3', teinte: 'action' },
+/** Le libelle de chaque statut. */
+export const STATUTS: Record<LigneCorrespondance['statut'], { libelle: string }> = {
+  identique: { libelle: 'Même touche' },
+  'nouvelle-touche': { libelle: 'Nouvelle touche' },
+  geste: { libelle: 'Par un geste' },
+  supprimee: { libelle: 'Supprimée' },
+  'a-venir': { libelle: 'Écran à venir' },
+  nouveau: { libelle: 'Nouveau dans la V3' },
 }
 
-/** La teinte du point d'etat de chaque statut, dans la fiche (palette des listes, rig-listes.css). */
+/** La teinte du point d'etat de chaque statut, dans la fiche et dans l'aide « ? » (palette des listes, rig-listes.css). */
 export const TEINTES_STATUT: Record<LigneCorrespondance['statut'], Teinte> = {
   identique: 'vert', 'nouvelle-touche': 'bleu', geste: 'orange', supprimee: 'rouge', 'a-venir': 'gris', nouveau: 'violet',
 }
@@ -89,11 +89,9 @@ export const RETOUR_A_LA_LIGNE = [
   '.rig-table.rig-fiche-touches { min-width: 900px; }',
   '.rig-table.rig-fiche-touches thead th, .rig-table.rig-fiche-touches tbody td {'
     + ' white-space: normal; overflow: visible; text-overflow: clip; max-width: none; overflow-wrap: break-word; vertical-align: top; }',
+  // Un point d'etat revenu a la ligne (« Nouveau dans la / V3 ») garde son point face a la PREMIERE ligne : c'est la
+  // regle du socle (.rig-lm-etat, rig-listes.css), et non plus un contournement de cet ecran (lot 8 des listes modernes).
   '.rig-table.rig-fiche-touches .rig-lm-etat, .rig-table.rig-fiche-touches .rig-bouton { white-space: normal; text-align: left; }',
-  // Un point d'etat revenu a la ligne (« Nouveau dans la / V3 ») garde son point face a la PREMIERE ligne, pas entre les deux
-  // (capture orange du 24/11/2026, lot 5 des listes modernes).
-  '.rig-table.rig-fiche-touches .rig-lm-etat { align-items: flex-start; }',
-  '.rig-table.rig-fiche-touches .rig-lm-etat i { margin-top: calc((1lh - 7px) / 2); }',
   '@media print { .rig-criteres { display: none; } }',
 ].join('\n')
 
@@ -114,8 +112,7 @@ function Touche({ t }: { t: string | null }) {
 }
 
 function Statut({ s }: { s: LigneCorrespondance['statut'] }) {
-  const { libelle, teinte } = STATUTS[s]
-  return <span className={teinte ? `rig-etat rig-etat--${teinte}` : 'rig-etat'}>{libelle}</span>
+  return <PointEtat teinte={TEINTES_STATUT[s]}>{STATUTS[s].libelle}</PointEtat>
 }
 
 export interface ProprietesEcranCorrespondances {

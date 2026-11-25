@@ -28,7 +28,7 @@ import { useState, type CSSProperties } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, estBlanc } from '../criteres'
 import { toucheDeRecherche } from '../plan/clavier'
-import { CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat } from '../composants/ListeModerne'
+import { CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, teinteStatut } from '../composants/ListeModerne'
 import { quand } from './EcranComptes'
 
 export interface LienDemandeVue {
@@ -192,10 +192,11 @@ export function date(instant: string | null): string {
   return instant ? quand(instant) : '—'
 }
 
-/** La marque d'un logiciel : l'ancien RIG en attente (on y va pour agir), la V3 en vert. */
+/** La marque d'un logiciel, en pastille comme dans la liste des affaires : l'ancien RIG en attente (on y va pour agir),
+ *  la V3 en vert (teinteStatut du socle). */
 export function Logiciel({ logiciel, texte }: { logiciel: string; texte?: string }) {
   const ancien = logiciel !== 'V3'
-  return <span className={`rig-etat rig-etat--${ancien ? 'attente' : 'ok'}`}>{texte ?? (ancien ? 'Ancien RIG' : 'V3')}</span>
+  return <Pastille teinte={teinteStatut(ancien ? 'attente' : 'ok')}>{texte ?? (ancien ? 'Ancien RIG' : 'V3')}</Pastille>
 }
 
 /** Un lien entre demandes : « bloquée par D2607903046 (ancien RIG, qualifiée) ». */
@@ -214,7 +215,7 @@ function TableDemandes({ demandes, ouvrir }: { demandes: DemandeHistorique[]; ou
             <td style={Coupe} title={d.type ?? undefined}>{d.numero ?? d.id}</td>
             <td>
               <div style={Coupe} title={d.libelle ?? undefined}>{d.libelle ?? '—'}</div>
-              {d.bloquee && <div style={Aide} role="note"><span className="rig-etat rig-etat--alerte">Bloquée</span> {d.texteBlocage}</div>}
+              {d.bloquee && <div style={Aide} role="note"><PointEtat teinte={teinteStatut('alerte')}>Bloquée</PointEtat> {d.texteBlocage}</div>}
               {d.liens.map((l, i) => (
                 <div key={i} style={Aide}>
                   <button className="rig-bouton" style={Lien} onClick={() => ouvrir(l.idDemande)}
@@ -387,7 +388,7 @@ export function EcranHistoriqueV2() {
                         <tr key={`${e.sens}${e.id}`}>
                           <td>{e.sens}</td><td style={Coupe}>{e.codeEdi}</td>
                           <td style={Coupe} title={`État ${e.etat} de la base des échanges`}>
-                            {e.enErreur ? <span className="rig-etat rig-etat--alerte">{e.etatLibelle}</span> : e.etatLibelle}
+                            {e.enErreur ? <PointEtat teinte={teinteStatut('alerte')}>{e.etatLibelle}</PointEtat> : e.etatLibelle}
                           </td>
                           <td>{date(e.le)}</td>
                           <td>

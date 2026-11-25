@@ -61,16 +61,29 @@
 .rig-lm-t-gris    { --rig-lm-teinte: var(--rig-liste-gris);    --rig-lm-teinte-fond: var(--rig-liste-gris-fond);    --rig-lm-teinte-texte: var(--rig-liste-gris-texte); }
 
 /* ---------- Le cadre : une carte de surface dans la colonne des resultats ---------- */
+/* overflow:auto et non hidden : les deux coupent aux coins arrondis, mais ce qui depasse de la carte (une fiche, le
+   bloc XXAFF, le pied, quand la fenetre est basse) se fait DEFILER au lieu de disparaitre. En hidden, a 900x700, le
+   pied de la Recherche d'affaires etait a 1236 px pour une carte finie a 688, et rien ne defilait (mesure du lot 7). */
 .rig-lm {
   margin: var(--rig-esp-3);
   background: var(--rig-surface);
   border-radius: 12px;
   box-shadow: inset 0 0 0 1px var(--rig-bord-faible);
-  overflow: hidden;
+  overflow: auto;
   font-size: 12.5px;
   color: var(--rig-texte);
 }
 .rig-lm .rig-table thead th { background: var(--rig-surface); }
+
+/* Fenetre etroite : le corps de l'ecran empile ses blocs et c'est LUI, et lui seul, qui defile (rig-accueil.css,
+   @media 1100px). La carte y prend la hauteur de tout son contenu, grille et pied compris, au lieu des 300 px
+   plancher de .rig-proc__corps > .rig-resultats-proc.
+   fix-ok: la grille n'y borne PAS sa hauteur. Bornee a 70vh, elle defilait dans la colonne qui defile : colonne
+   descendue, son en-tete collant restait au haut de SA zone, coupe par le bord de la colonne et pose sur la
+   premiere ligne (capture 900x700 de la Recherche d'affaires, relecture du lot 8). */
+@media (max-width: 1100px) {
+  .rig-proc__corps > .rig-resultats-proc.rig-lm { flex: 1 0 auto; }
+}
 
 /* ---------- Tete : titre, synthese, « Aller a… Ctrl K » ---------- */
 .rig-lm-tete {
@@ -114,8 +127,10 @@
   padding: 0 14px 12px;
   flex: none;
 }
+/* min-width:min-content : une carte ne retrecit pas sous son chiffre, elle passe a la ligne (flex-wrap) ; en
+   min-width:0, Encaissements coupait son montant en fenetre etroite (« 200,00 … », vu par le chef du plan). */
 .rig-lm-carte {
-  flex: 1 1 150px; min-width: 0;
+  flex: 1 1 150px; min-width: min-content;
   border-radius: 10px;
   box-shadow: inset 0 0 0 1px var(--rig-bord);
   padding: 9px 12px;
@@ -253,19 +268,30 @@
   padding: 1px 7px; border-radius: 10px;
 }
 
+/* Un bloc EN LIGNE et non un inline-flex : text-overflow n'agit que sur le texte d'un bloc, un conteneur flex
+   coupait net (« Recommanc », « Actes nume », captures orange du lot 3). Le point se centre par vertical-align. */
 .rig-lm-pastille {
-  display: inline-flex; align-items: center; gap: 5px;
-  height: 20px; padding: 0 8px; border-radius: 6px;
-  max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  display: inline-block;
+  height: 20px; line-height: 20px; padding: 0 8px; border-radius: 6px;
+  max-width: 100%; box-sizing: border-box;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   font-size: 11.5px; font-weight: 500; vertical-align: middle;
   background: var(--rig-lm-teinte-fond); color: var(--rig-lm-teinte-texte);
 }
-.rig-lm-pastille i { flex: 0 0 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.rig-lm-pastille i {
+  display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%;
+  vertical-align: middle; background: currentColor;
+}
+/* Le point face a la PREMIERE ligne : un etat revenu a la ligne (« Nouveau dans la / V3 », fiche des
+   correspondances) le centrait entre les deux (capture orange du lot 5). Sur une ligne, il reste au milieu. */
 .rig-lm-etat {
-  display: inline-flex; align-items: center; gap: 6px;
+  display: inline-flex; align-items: flex-start; gap: 6px;
   font-size: 12.5px; color: var(--rig-texte-2); vertical-align: middle;
 }
-.rig-lm-etat i { flex: 0 0 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--rig-lm-teinte); }
+.rig-lm-etat i {
+  flex: 0 0 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--rig-lm-teinte);
+  margin-top: calc((1lh - 7px) / 2);
+}
 
 .rig-lm-montant { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .rig-lm-montant__barre {

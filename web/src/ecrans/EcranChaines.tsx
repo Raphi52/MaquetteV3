@@ -24,7 +24,7 @@ import { appeler } from '../pont'
 import { toucheDeRecherche } from '../plan/clavier'
 import { quand } from './EcranComptes'
 import {
-  CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MontantBarre, Pastille, PiedListe, PointEtat, VuesListe,
+  CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MontantBarre, Pastille, PiedListe, PointEtat, VuesListe, normaliser,
   type Teinte,
 } from '../composants/ListeModerne'
 
@@ -156,10 +156,6 @@ const TitreOnglet: Record<Onglet, string> = {
 
 /** Les colonnes des grands totaux : chevron, Cloture, Periode, Total, Cumul perpetuel, Pieces. */
 const NbColonnesTotaux = 6
-
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-}
 
 export function EcranChaines() {
   const [vue, setVue] = useState<VueEcranChaines | null>(null)

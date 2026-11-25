@@ -28,7 +28,7 @@
 import { Fragment, useState } from 'react'
 import { contientSansCasse, dateCourte, distinctsTries, entierLisible, estBlanc } from '../criteres'
 import {
-  CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, PiedListe, PointEtat, VuesListe, type Teinte,
+  CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, PiedListe, PointEtat, VuesListe, teinteStatut,
 } from '../composants/ListeModerne'
 
 interface DepotCoffre {
@@ -79,9 +79,6 @@ const Natures = ['Archive', 'Audience', 'Erreur', 'GED judiciaire', 'Message', '
 const Coffres = distinctsTries(Depots.map((d) => d.coffre))
 
 const jour = (d: string | null) => (d === null ? '' : dateCourte(d))
-
-/** L'etat d'un depot en couleur : transmis, a envoyer, en erreur. */
-const TeinteStatut: Record<string, Teinte> = { ok: 'vert', attente: 'orange', alerte: 'rouge' }
 
 /** Colonnes : chevron, Destinataire, Etat, Date envoi infogreffe, Code de depot, Erreur. */
 const NbColonnes = 6
@@ -243,7 +240,7 @@ export function EcranCoffreFort() {
                     <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : dep.code)} />
                     <CelluleIdentite nom={dep.destinataire} objet={`${dep.code} · ${dep.abrege}`}
                                      titre={`${dep.destinataire} — ${dep.code} · ${dep.abrege}`} />
-                    <td><PointEtat teinte={TeinteStatut[dep.statut] ?? 'gris'}>{dep.etat}</PointEtat></td>
+                    <td><PointEtat teinte={teinteStatut(dep.statut)}>{dep.etat}</PointEtat></td>
                     <td className="rig-table__mono">{jour(dep.envoiInfogreffe)}</td>
                     <td className="rig-table__mono">{dep.codeDepot}</td>
                     <td title={dep.erreur}>{dep.erreur}</td>

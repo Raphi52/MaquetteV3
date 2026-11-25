@@ -27,7 +27,7 @@ import { appeler } from '../pont'
 import { centimes, euros } from '../format'
 import { PourLeDossier } from '../composants/PourLeDossier'
 import {
-  CartesChiffrees, CelluleIdentite, EnteteListe, ListeModerne, MontantBarre, PiedListe, PointEtat, montant as texteMontant, type Teinte,
+  CartesChiffrees, CelluleIdentite, EnteteListe, ListeModerne, MontantBarre, PiedListe, PointEtat, montant as texteMontant, normaliser, type Teinte,
 } from '../composants/ListeModerne'
 import type { ContexteDossierVue } from '../plan/types'
 
@@ -57,10 +57,6 @@ const EncaissementRepris: string | null = 'E-2026-0447 du 02/09/2026'
 
 /** Le numero de l'affaire d'une ventilation (« 2026B00811 — Immatriculation » -> « 2026B00811 »). */
 const numeroAffaire = (l: Ventilation): string => l.affaire.split(' — ')[0] ?? ''
-
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-}
 
 /** Les teintes de la carte « Montants par client », dans l'ordre d'apparition des clients. */
 const TeintesClients: readonly Teinte[] = ['bleu', 'violet', 'orange', 'vert', 'ardoise', 'rouge']

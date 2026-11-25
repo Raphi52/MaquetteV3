@@ -25,6 +25,15 @@
 //     <PiedListe aide>…totaux…</PiedListe>
 //   </ListeModerne>
 // Une liste sans affaire (factures, comptes…) prend les briques dont elle a besoin, pas toutes.
+//
+// Les outils communs, a prendre ICI plutot qu'a recopier dans l'ecran (lot 8 du plan : chaque ecran les recopiait) ;
+// fix-ok: chaque manque a ete mesure par un lot (civilite « Mme LEROY » -> ML au lot 2, 17 copies de normaliser, 6 de vues).
+//   normaliser(texte)                    cle sans casse ni accents du filtre « Aller a… »
+//   useVuesDeSession(ecran, prereglees, criteres, memes)   vues de la session : { vues, active, enregistrer }
+//   teinteStatut('ok' | 'alerte' | 'action' | 'attente')   la teinte du PointEtat d'un statut de la charte (rig-etat--*)
+//   montant(valeur, { devise, decimales })                  « 1 379,30 € » ; « 50 000 CHF » avec { devise: 'CHF', decimales: 0 }
+//   <CelluleIdentite avatar={false} />   une ligne sans personne ni dossier (article de facture) : nom et objet seuls
+//   <VuesListe etiquette="Vues des mesures" />              un second groupe de puces dans la meme liste
 
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import { EcranVisible } from '../plan/visibilite'
@@ -53,28 +62,58 @@ export function ListeModerne({ etiquette, children }: { etiquette?: string | und
 
 // ---------------------------------------------------------------- outils de texte
 
-/**
- * Un montant en euros, a la francaise : « 1 379,30 € ». Le separateur des milliers est une espace
- * insecable NORMALE (U+00A0) : celle de toLocaleString('fr-FR') est l'espace FINE (U+202F), quasi
- * invisible a 12 px -- la synthese et le pied lisaient « 1379,30 » quand la carte lisait « 1 379,30 »
- * (captures du lot 1, conv-2135).
- */
-export function montant(valeur: number): string {
-  const nombre = valeur.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  return `${nombre.replace(/\u202f/g, '\u00a0')} €`
+export interface FormeMontant {
+  /** Ce qui suit le nombre : « € » (l'euro) par defaut ; un code de monnaie (« CHF », « USD », « EUR ») s'ecrit tel quel. */
+  devise?: string | undefined
+  /** Le nombre de decimales : 2 par defaut, 0 pour un capital. */
+  decimales?: number | undefined
 }
 
-// Ni une forme juridique ni un mot de liaison ne donnent une initiale : « SCI DU PARC » -> « P »,
-// « BATIPRO SARL » -> « B », « COMPTOIR DU NORD » -> « CN » (les avatars de la maquette).
+/**
+ * Un montant a la francaise : « 1 379,30 € » ; avec une devise, « 50 000 CHF » (capital de l'Ouverture de dossier,
+ * dans la monnaie que rend le pont). Le separateur des milliers est une espace insecable NORMALE (U+00A0) : celle de
+ * toLocaleString('fr-FR') est l'espace FINE (U+202F), quasi invisible a 12 px -- la synthese et le pied lisaient
+ * « 1379,30 » quand la carte lisait « 1 379,30 » (captures du lot 1, conv-2135).
+ */
+export function montant(valeur: number, { devise = '€', decimales = 2 }: FormeMontant = {}): string {
+  const nombre = valeur.toLocaleString('fr-FR', { minimumFractionDigits: decimales, maximumFractionDigits: decimales })
+  return `${nombre.replace(/\u202f/g, '\u00a0')} ${devise}`
+}
+
+/**
+ * Un texte sans casse ni accents : la cle de comparaison du filtre « Aller a… » (« dépôt » trouve « Depot au guichet »,
+ * « CLOTUREE » trouve « Clôturée »). contientSansCasse (criteres.ts) garde, elle, les accents.
+ */
+export function normaliser(texte: string): string {
+  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+// Ni une forme juridique, ni un mot de liaison, ni une civilite ne donnent une initiale : « SCI DU PARC » -> « P »,
+// « BATIPRO SARL » -> « B », « COMPTOIR DU NORD » -> « CN » (les avatars de la maquette) ; « Mme LEROY » -> « L »,
+// « M. DUVAL » -> « D » (juges et experts, capture du lot 2). Les mots se comparent sans accents : « Maître » = MAITRE.
 const MotsSansInitiale = new Set(['SA', 'SAS', 'SASU', 'SARL', 'EURL', 'SCI', 'SNC', 'SCP', 'SCM', 'SELARL', 'SELAS', 'EI', 'EIRL',
-  'DU', 'DE', 'DES', 'LA', 'LE', 'LES', 'ET', 'D', 'L', 'AU', 'AUX', '&'])
+  'DU', 'DE', 'DES', 'LA', 'LE', 'LES', 'ET', 'D', 'L', 'AU', 'AUX', '&',
+  'M', 'MME', 'MLLE', 'ME', 'MAITRE', 'DR'])
 
 /** Les initiales de l'avatar : la premiere lettre des deux premiers mots qui comptent. */
 export function initiales(nom: string): string {
-  const mots = nom.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  const mots = normaliser(nom).toUpperCase()
     .split(/[^A-Z0-9&]+/).filter((m) => m.length > 0)
   const utiles = mots.filter((m) => !MotsSansInitiale.has(m))
   return (utiles.length > 0 ? utiles : mots).slice(0, 2).map((m) => m[0]).join('') || '?'
+}
+
+/** Les statuts de la charte : les classes rig-etat--* (ok, alerte, action, attente). */
+export type StatutCharte = 'ok' | 'alerte' | 'action' | 'attente'
+
+const TeinteDuStatut: Record<StatutCharte, Teinte> = { ok: 'vert', alerte: 'rouge', action: 'bleu', attente: 'orange' }
+
+/**
+ * La teinte de liste d'un statut de la charte, pour un PointEtat : ok vert, alerte rouge, action bleu, attente orange ;
+ * tout autre statut (vide, inconnu) en gris. Une seule table pour tous les ecrans (lot 6 : cinq la recopiaient).
+ */
+export function teinteStatut(statut: string | null | undefined): Teinte {
+  return statut !== null && statut !== undefined && Object.hasOwn(TeinteDuStatut, statut) ? TeinteDuStatut[statut as StatutCharte] : 'gris'
 }
 
 /** Nombre de teintes d'avatar declarees dans rig-listes.css (--rig-liste-avatar-1 a -8). */
@@ -112,13 +151,15 @@ export interface ProprietesEnteteListe {
  * Titre, synthese et champ de filtre rapide. Ctrl K pose le curseur dans le champ : ecoute a la
  * CAPTURE avec preventDefault, comme Commandes web, pour passer avant la palette de l'application
  * (Application.tsx), et seulement quand l'ecran est MONTRE (plan/visibilite.ts) -- un onglet cache
- * volerait sinon la touche a l'ecran visible.
+ * volerait sinon la touche a l'ecran visible. L'ecoute est posee A L'AFFICHAGE (useLayoutEffect) : posee par un
+ * effet differe, une frappe arrivee entre l'affichage du champ et cet effet n'etait pas prise (rouge intermittent
+ * d'EcranSupervision.test.tsx sous charge, reproduit par le test « des que le champ est affiche »).
  */
 export function EnteteListe({ titre, synthese, detail, filtre }: ProprietesEnteteListe) {
   const visible = useContext(EcranVisible)
   const champ = useRef<HTMLInputElement>(null)
   const avecFiltre = filtre !== undefined
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!visible || !avecFiltre) return
     const surTouche = (e: globalThis.KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'k' || !champ.current) return
@@ -263,6 +304,9 @@ export interface VueListe {
 }
 
 export interface ProprietesVuesListe {
+  /** Le nom du groupe de puces pour un lecteur d'ecran : « Vues » par defaut. Deux groupes d'une meme liste
+   *  (experts et mesures) doivent porter chacun le leur. */
+  etiquette?: string | undefined
   vues: VueListe[]
   /** La vue dont les criteres sont ceux de l'ecran, ou null (criteres a la main). */
   active: string | null
@@ -274,7 +318,7 @@ export interface ProprietesVuesListe {
 }
 
 /** Les puces de vues a la place des onglets, et les outils de la liste. */
-export function VuesListe({ vues, active, choisir, enregistrer, children }: ProprietesVuesListe) {
+export function VuesListe({ etiquette = 'Vues', vues, active, choisir, enregistrer, children }: ProprietesVuesListe) {
   const [nommer, setNommer] = useState(false)
   const [nom, setNom] = useState('')
   function valider() {
@@ -285,7 +329,7 @@ export function VuesListe({ vues, active, choisir, enregistrer, children }: Prop
   }
   return (
     <div className="rig-lm-barre">
-      <div className="rig-lm-vues" role="group" aria-label="Vues">
+      <div className="rig-lm-vues" role="group" aria-label={etiquette}>
         {vues.map((v) => (
           <button key={v.cle} type="button" aria-pressed={v.cle === active}
                   className={`rig-lm-vue${v.cle === active ? ' rig-lm-vue--active' : ''}`} onClick={() => choisir(v.cle)}>
@@ -307,6 +351,55 @@ export function VuesListe({ vues, active, choisir, enregistrer, children }: Prop
       {children !== undefined && <div className="rig-lm-outils">{children}</div>}
     </div>
   )
+}
+
+/** Une vue enregistree d'un ecran : un nom et un jeu complet de ses criteres. */
+export interface VueEnregistree<C> {
+  cle: string
+  libelle: string
+  criteres: C
+}
+
+/** Ce que rend useVuesDeSession : les vues a montrer, celle des criteres courants, et « + Nouvelle vue ». */
+export interface VuesDeSession<C> {
+  /** Les vues prereglees de l'ecran, puis celles ajoutees pendant la session. */
+  vues: VueEnregistree<C>[]
+  /** La cle de la vue dont les criteres sont les criteres courants, ou null (criteres a la main). */
+  active: string | null
+  /** « + Nouvelle vue » : enregistre les criteres courants sous ce nom. */
+  enregistrer: (nom: string) => void
+}
+
+// Les vues ajoutees par « + Nouvelle vue », par ecran, pour la SESSION : un tableau de module survit a la fermeture
+// de l'onglet, pas au redemarrage (aucun reglage d'ecran ne les porte, decision du lot 1 du plan).
+const VuesDeLaSession = new Map<string, readonly VueEnregistree<unknown>[]>()
+
+/**
+ * Les vues d'un ecran : ses vues prereglees, puis celles enregistrees pendant la session (cles session-1, session-2…).
+ * ecran = le nom qui range ses vues (celui du fichier : « RechAffaires ») ; memes = « ces deux jeux de criteres sont
+ * les memes », pour reconnaitre la vue active. Les criteres enregistres sont ceux du rendu courant, tels quels :
+ * l'ecran les tient en etat React (jamais modifies en place), ils ne bougent plus ensuite.
+ */
+export function useVuesDeSession<C>(ecran: string, prereglees: readonly VueEnregistree<C>[], criteres: C,
+                                    memes: (a: C, b: C) => boolean): VuesDeSession<C> {
+  const lire = () => (VuesDeLaSession.get(ecran) ?? []) as readonly VueEnregistree<C>[]
+  const [ajoutees, setAjoutees] = useState(lire)
+  const vues = [...prereglees, ...ajoutees]
+  return {
+    vues,
+    active: vues.find((v) => memes(v.criteres, criteres))?.cle ?? null,
+    enregistrer(nom: string) {
+      const deja = lire()
+      const suite = [...deja, { cle: `session-${deja.length + 1}`, libelle: nom, criteres }]
+      VuesDeLaSession.set(ecran, suite)
+      setAjoutees(suite)
+    },
+  }
+}
+
+/** Pour les tests : repartir d'une session sans vue ajoutee, sur tous les ecrans. */
+export function oublierVuesDeSession(): void {
+  VuesDeLaSession.clear()
 }
 
 export interface ProprietesChoixTri {
@@ -367,6 +460,9 @@ export function exporterCsv(nomFichier: string, entetes: readonly string[], lign
 export interface ProprietesCelluleIdentite {
   /** Le nom, en gras ; il donne l'avatar. */
   nom: string
+  /** L'avatar d'initiales (oui par defaut) ; false pour une ligne dont le sujet n'est ni une personne, ni une
+   *  societe, ni un dossier (un article de facture) : nom et objet seuls. */
+  avatar?: boolean | undefined
   /** En gris apres le nom : « Modification · 004176 ». */
   objet?: ReactNode
   /** Apres l'objet, jamais coupe : un badge. */
@@ -376,11 +472,11 @@ export interface ProprietesCelluleIdentite {
 }
 
 /** La cellule « qui » : avatar rond d'initiales (teinte stable tiree du nom), nom en gras, objet en gris. */
-export function CelluleIdentite({ nom, objet, apres, titre }: ProprietesCelluleIdentite) {
+export function CelluleIdentite({ nom, objet, apres, titre, avatar = true }: ProprietesCelluleIdentite) {
   return (
     <td title={titre}>
       <div className="rig-lm-identite">
-        <span className={`rig-lm-avatar rig-lm-avatar--${rangAvatar(nom)}`} aria-hidden="true">{initiales(nom)}</span>
+        {avatar && <span className={`rig-lm-avatar rig-lm-avatar--${rangAvatar(nom)}`} aria-hidden="true">{initiales(nom)}</span>}
         <b className="rig-lm-identite__nom">{nom}</b>
         {objet !== undefined && <span className="rig-lm-identite__objet">{objet}</span>}
         {apres}
@@ -389,7 +485,11 @@ export function CelluleIdentite({ nom, objet, apres, titre }: ProprietesCelluleI
   )
 }
 
-/** Une nature (ou tout classement) en pastille coloree. */
+/**
+ * Une nature (ou tout classement) en pastille coloree. Un libelle trop long finit par « … » ; le texte entier se lit
+ * au survol par le title de la cellule, que l'ecran pose (il y met souvent plus que la pastille : le service entier
+ * derriere son abrege, dans Comptes).
+ */
 export function Pastille({ teinte, children, titre }: { teinte: Teinte; children: ReactNode; titre?: string | undefined }) {
   return <span className={`rig-lm-pastille rig-lm-t-${teinte}`} title={titre}><i />{children}</span>
 }

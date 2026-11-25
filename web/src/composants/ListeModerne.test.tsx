@@ -1,13 +1,68 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
+import { createRoot } from 'react-dom/client'
 import {
   CartesChiffrees, CelluleChevron, CelluleIdentite, ChoixTri, EnteteListe, LigneDetail, ListeModerne, MenuLigne, MontantBarre,
-  Pastille, PiedListe, PointEtat, TeintesAvatar, VuesListe, initiales, montant, rangAvatar, texteCsv,
+  Pastille, PiedListe, PointEtat, TeintesAvatar, VuesListe, initiales, montant, normaliser, oublierVuesDeSession, rangAvatar,
+  teinteStatut, texteCsv, useVuesDeSession, type VuesDeSession,
 } from './ListeModerne'
 import { EcranVisible } from '../plan/visibilite'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
+// La feuille du socle, lue sur le disque : wwwroot/ est hors de la racine de Vite, qui refuse de l'importer en ?raw
+// (et sous jsdom, URL est celle de jsdom, que readFileSync ne prend pas : on passe un chemin).
+const feuille = readFileSync(join(import.meta.dirname, '../../../wwwroot/rig-listes.css'), 'utf8')
+
+// fix-ok: les manques de ce socle ont ete MESURES par les lots 2 a 7 du plan des listes modernes (decisions notees du
+// plan-9386cb20) : chaque test ci-dessous nomme son lot, sa mesure et l'entree qui le ferait echouer sur l'ancien code.
 afterEach(cleanup)
+
+/** Une regle de rig-listes.css : media = le texte de la regle @media qui l'entoure, null hors de toute regle @media. */
+interface Regle { media: string | null; selecteurs: string[]; declarations: Record<string, string> }
+
+/** Les regles de rig-listes.css, dans l'ordre de la feuille, commentaires retires. */
+function regles(): Regle[] {
+  const sortie: Regle[] = []
+  const parcourir = (texte: string, dans: string | null) => {
+    let i = 0
+    for (;;) {
+      const ouvre = texte.indexOf('{', i)
+      if (ouvre < 0) return
+      let profondeur = 1
+      let j = ouvre + 1
+      for (; j < texte.length && profondeur > 0; j++) profondeur += texte[j] === '{' ? 1 : texte[j] === '}' ? -1 : 0
+      const tete = texte.slice(i, ouvre).trim()
+      const corps = texte.slice(ouvre + 1, j - 1)
+      if (tete.startsWith('@media')) parcourir(corps, tete)
+      else {
+        const declarations: Record<string, string> = {}
+        for (const d of corps.split(';')) {
+          const deux = d.indexOf(':')
+          if (deux > 0) declarations[d.slice(0, deux).trim()] = d.slice(deux + 1).trim()
+        }
+        sortie.push({ media: dans, selecteurs: tete.split(',').map((s) => s.trim().replace(/\s+/g, ' ')), declarations })
+      }
+      i = j
+    }
+  }
+  parcourir(feuille.replace(/\/\*[\s\S]*?\*\//g, ''), null)
+  return sortie
+}
+
+/**
+ * Les declarations d'un selecteur de rig-listes.css, dans l'ordre de la feuille (la derniere l'emporte, comme la
+ * cascade a poids egal). media = le texte de la regle @media qui l'entoure, null hors de toute regle @media.
+ * Ce que jsdom ne dessine pas (une hauteur, un alignement) se verifie ainsi sur la feuille elle-meme.
+ */
+function declarations(selecteur: string, media: string | null = null): Record<string, string> {
+  const sortie: Record<string, string> = {}
+  for (const r of regles()) if (r.media === media && r.selecteurs.includes(selecteur)) Object.assign(sortie, r.declarations)
+  return sortie
+}
+
+const ETROIT = '@media (max-width: 1100px)'
 
 /** Une cellule du socle se pose dans une vraie ligne de tableau ; la ligne note ses clics. */
 function dansUneLigne(cellules: ReactNode, surClic = vi.fn(), surDouble = vi.fn()) {
@@ -21,6 +76,32 @@ describe('ListeModerne', () => {
     expect(cadre.tagName).toBe('SECTION')
     expect(cadre.className).toBe('rig-resultats-proc rig-lm')
     expect(cadre.textContent).toBe('contenu')
+  })
+
+  // Lot 7 du plan, mesure a 900x700 : overflow:hidden coupait tout ce qui passait sous la carte (pied a 1236 px,
+  // carte finie a 688, rien ne defilait). Entree qui ferait echouer ce test si la correction etait fausse : une
+  // feuille ou .rig-lm reste en overflow:hidden, ou ou la carte garde la hauteur plancher de 300 px en fenetre etroite.
+  it('le cadre ne coupe rien : coins arrondis gardes, contenu atteignable ; en fenetre etroite, la carte prend sa hauteur', () => {
+    const cadre = declarations('.rig-lm')
+    expect(cadre['border-radius']).toBe('12px')
+    // auto coupe aux coins arrondis comme hidden, mais ce qui depasse se fait defiler au lieu de disparaitre.
+    expect(cadre.overflow).toBe('auto')
+    // Sous 1100 px le corps empile et defile : la carte doit faire la hauteur de son contenu (pied compris),
+    // pas les 300 px de .rig-proc__corps > .rig-resultats-proc.
+    expect(declarations('.rig-proc__corps > .rig-resultats-proc.rig-lm', ETROIT).flex).toBe('1 0 auto')
+  })
+
+  // Relecture du lot 8, capture a 900x700 (d2-rechaff-bas.png) : la grille bornee a 70vh defilait DANS la colonne
+  // qui defile. Colonne descendue, l'en-tete collant de la grille restait colle au haut de SA zone : coupe a moitie
+  // par le bord de la colonne, pose sur la premiere ligne. Entree qui ferait echouer ce test si la correction etait
+  // fausse : une regle de fenetre etroite qui rend a .rig-table-cadre une hauteur bornee (max-height: 70vh, l'ancien
+  // code) ou fixe (height).
+  it('en fenetre etroite, une seule zone defile : la grille ne borne pas sa hauteur dans la colonne', () => {
+    const bornees = regles()
+      .filter((r) => r.media === ETROIT && r.selecteurs.some((s) => s.includes('.rig-table-cadre')))
+      .filter((r) => 'max-height' in r.declarations || 'height' in r.declarations)
+      .map((r) => `${r.selecteurs.join(', ')} { max-height: ${r.declarations['max-height']}; height: ${r.declarations.height} }`)
+    expect(bornees).toEqual([])
   })
 })
 
@@ -38,6 +119,47 @@ describe('outils de texte', () => {
     // Un nom fait SEULEMENT de mots sans initiale en garde quand meme une ; un nom vide, un « ? ».
     expect(initiales('SA')).toBe('S')
     expect(initiales('')).toBe('?')
+  })
+
+  // Lot 2 (capture Gestion des audiences) : « Mme LEROY » donnait ML, « M. DUVAL » MD. Entree qui ferait echouer
+  // ce test si la correction etait fausse : « Mme LEROY » (ou « Maître DUPONT », accent compris).
+  it('initiales : une civilite ne donne pas d\'initiale (juges, experts)', () => {
+    expect(initiales('Mme LEROY')).toBe('L')
+    expect(initiales('M. DUVAL')).toBe('D')
+    expect(initiales('MLLE PETIT Anne')).toBe('PA')
+    expect(initiales('Me MARTIN')).toBe('M')
+    expect(initiales('Maître DUPONT Paul')).toBe('DP')
+    expect(initiales('Dr BERNARD')).toBe('B')
+    // Une civilite seule garde son initiale ; un mot qui COMMENCE comme une civilite reste un mot.
+    expect(initiales('M.')).toBe('M')
+    expect(initiales('MERCIER DRUON')).toBe('MD')
+  })
+
+  // Lot 6 : chaque ecran recopiait le normaliser() de la Recherche d'affaires. Entree qui ferait echouer ce test :
+  // « Clôturée » (accent et casse) contre « cloturee ».
+  it('normaliser : sans casse ni accents, la cle du filtre « Aller a… »', () => {
+    expect(normaliser('Clôturée ÉLAN Dépôt')).toBe('cloturee elan depot')
+    expect(normaliser('Clôturée').includes(normaliser('CLOTUREE'))).toBe(true)
+    expect(normaliser('')).toBe('')
+  })
+
+  // Lot 3 : le capital EUR/CHF/USD de l'Ouverture de dossier se formatait a part. Entree qui ferait echouer ce
+  // test : 50 000 CHF, que l'ancien montant() ecrivait « 50 000,00 € ».
+  it('montant : une autre devise et un nombre de decimales, l\'euro a deux decimales par defaut', () => {
+    expect(montant(50000, { devise: 'CHF', decimales: 0 })).toBe('50 000 CHF')
+    expect(montant(11000, { devise: 'EUR', decimales: 0 })).toBe('11 000 EUR')
+    expect(montant(0.5, { devise: 'USD' })).toBe('0,50 USD')
+    expect(montant(1379.3, {})).toBe('1 379,30 €')
+  })
+
+  // Lot 6 : CoffreFort, DepotsJud, GedJud, Supervision et Verrous recopiaient la meme table. Entree qui ferait
+  // echouer ce test : « attente », qui doit prendre l'orange, et un statut inconnu, qui doit prendre le gris.
+  it('teinteStatut : les statuts de la charte (rig-etat--*) en teinte de liste, gris pour le reste', () => {
+    expect(['ok', 'alerte', 'action', 'attente'].map(teinteStatut)).toEqual(['vert', 'rouge', 'bleu', 'orange'])
+    expect(teinteStatut('')).toBe('gris')
+    expect(teinteStatut(null)).toBe('gris')
+    expect(teinteStatut(undefined)).toBe('gris')
+    expect(teinteStatut('inconnu')).toBe('gris')
   })
 
   it('rangAvatar : une teinte stable par nom, toujours dans la palette declaree', () => {
@@ -98,6 +220,36 @@ describe('EnteteListe', () => {
     expect(document.activeElement).toBe(screen.getByLabelText('Aller a…'))
   })
 
+  // Rouge intermittent d'EcranSupervision.test.tsx dans la suite complete, sous la charge de tests.ps1 (25/11/2026) :
+  // le champ etait affiche, mais l'ecoute de Ctrl K, posee par un effet DIFFERE, ne l'etait pas encore. Ici, Ctrl K
+  // part dans la micro-tache ou le champ apparait, avant tout effet differe. Entree qui ferait echouer ce test :
+  // l'ecoute posee par useEffect (touche non prise).
+  it('Ctrl K est pris des que le champ est affiche, pas un effet differe plus tard', async () => {
+    const drapeau = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean | undefined }
+    const avant = drapeau.IS_REACT_ACT_ENVIRONMENT
+    drapeau.IS_REACT_ACT_ENVIRONMENT = false
+    const hote = document.body.appendChild(document.createElement('div'))
+    const racine = createRoot(hote)
+    try {
+      const pris = await new Promise<boolean>((fini) => {
+        const veille = new MutationObserver(() => {
+          if (!hote.querySelector('input')) return
+          veille.disconnect()
+          const touche = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true, cancelable: true })
+          window.dispatchEvent(touche)
+          fini(touche.defaultPrevented)
+        })
+        veille.observe(hote, { childList: true, subtree: true })
+        racine.render(<EnteteListe titre="Affaires" filtre={{ valeur: '', changer: () => {}, indication: 'Aller a…' }} />)
+      })
+      expect(pris).toBe(true)
+    } finally {
+      racine.unmount()
+      hote.remove()
+      drapeau.IS_REACT_ACT_ENVIRONMENT = avant
+    }
+  })
+
   it('ecran cache (onglet non montre) : Ctrl K n\'est ni pris ni detourne', () => {
     render(<EcranVisible.Provider value={false}>
       <EnteteListe titre="Affaires" filtre={{ valeur: '', changer: vi.fn(), indication: 'Aller a…' }} />
@@ -155,6 +307,13 @@ describe('CartesChiffrees', () => {
     const plein = enCours.querySelector('.rig-lm-anneau__plein')!.getAttribute('stroke-dasharray')!
     expect(Number(plein.split(' ')[0]) / Number(plein.split(' ')[1])).toBeCloseTo(12 / 15, 2)
   })
+
+  // Vu par le chef en fenetre etroite (Encaissements) : une carte retrecie coupait son montant (« 200,00 … »).
+  // Entree qui ferait echouer ce test : une carte restee en min-width:0.
+  it('une carte ne retrecit pas sous son contenu : elle passe a la ligne au lieu de couper son chiffre', () => {
+    expect(declarations('.rig-lm-carte')['min-width']).toBe('min-content')
+    expect(declarations('.rig-lm-cartes')['flex-wrap']).toBe('wrap')
+  })
 })
 
 describe('VuesListe et ChoixTri', () => {
@@ -191,6 +350,17 @@ describe('VuesListe et ChoixTri', () => {
     expect(screen.queryByLabelText('Nom de la nouvelle vue')).toBeNull()
   })
 
+  // Lot 2 (Experts) : deux groupes de puces dans une liste s'appelaient tous deux « Vues ». Entree qui ferait
+  // echouer ce test : etiquette="Vues des mesures", rendue « Vues » par l'ancien composant.
+  it('l\'etiquette nomme le groupe de puces (« Vues » par defaut) : deux groupes d\'une liste se distinguent', () => {
+    render(<>
+      <VuesListe vues={[{ cle: 'a', libelle: 'Actifs' }]} active="a" choisir={vi.fn()} />
+      <VuesListe etiquette="Vues des mesures" vues={[{ cle: 'm', libelle: 'Mesures en cours' }]} active="m" choisir={vi.fn()} />
+    </>)
+    expect(screen.getByRole('group', { name: 'Vues' }).textContent).toBe('Actifs')
+    expect(screen.getByRole('group', { name: 'Vues des mesures' }).textContent).toBe('Mesures en cours')
+  })
+
   it('« Trier » : l\'ordre d\'origine puis les cles de l\'ecran ; le sens s\'inverse seulement sur une cle', () => {
     const choisir = vi.fn()
     const inverser = vi.fn()
@@ -211,6 +381,53 @@ describe('VuesListe et ChoixTri', () => {
   })
 })
 
+describe('useVuesDeSession', () => {
+  afterEach(() => oublierVuesDeSession())
+  interface Criteres { nature: string; soldeMin: string }
+  const memes = (a: Criteres, b: Criteres) => a.nature === b.nature && a.soldeMin === b.soldeMin
+  const prereglees = [{ cle: 'toutes', libelle: 'Toutes', criteres: { nature: '', soldeMin: '' } }]
+  let dernier: VuesDeSession<Criteres> | null = null
+  function Ecran({ ecran, criteres }: { ecran: string; criteres: Criteres }) {
+    dernier = useVuesDeSession(ecran, prereglees, criteres, memes)
+    return <ul>{dernier.vues.map((v) => <li key={v.cle}>{v.libelle}</li>)}</ul>
+  }
+
+  // Lot 3 : six ecrans recopiaient leur tableau de module, son « enregistrer » et son « oublier ». Entree qui
+  // ferait echouer ce test : fermer puis rouvrir l'ecran (la vue doit rester), ou un autre ecran (il ne la voit pas).
+  it('enregistre les criteres courants pour la session : la vue survit a la fermeture de l\'ecran, pas aux autres ecrans', () => {
+    const vue = render(<Ecran ecran="RechAffaires" criteres={{ nature: 'collective', soldeMin: '' }} />)
+    expect(dernier!.active).toBeNull()
+    act(() => dernier!.enregistrer('Mes collectives'))
+    expect(dernier!.vues.map((v) => v.cle)).toEqual(['toutes', 'session-1'])
+    expect(dernier!.vues[1]!.criteres).toEqual({ nature: 'collective', soldeMin: '' })
+    // Les criteres courants sont ceux de la vue enregistree : elle est la vue active.
+    expect(dernier!.active).toBe('session-1')
+
+    // Fermer l'onglet puis le rouvrir : la vue est toujours la (tableau de module), avec sa cle.
+    vue.unmount()
+    render(<Ecran ecran="RechAffaires" criteres={{ nature: '', soldeMin: '' }} />)
+    expect(screen.getAllByRole('listitem').map((l) => l.textContent)).toEqual(['Toutes', 'Mes collectives'])
+    expect(dernier!.active).toBe('toutes')
+    act(() => dernier!.enregistrer('Deuxieme'))
+    expect(dernier!.vues.map((v) => v.cle)).toEqual(['toutes', 'session-1', 'session-2'])
+
+    // Un autre ecran a ses propres vues.
+    cleanup()
+    render(<Ecran ecran="Demandes" criteres={{ nature: '', soldeMin: '' }} />)
+    expect(dernier!.vues.map((v) => v.cle)).toEqual(['toutes'])
+  })
+
+  it('oublierVuesDeSession repart d\'une session sans vue ajoutee (les tests des ecrans s\'en servent)', () => {
+    const premier = render(<Ecran ecran="Clients" criteres={{ nature: 'x', soldeMin: '' }} />)
+    act(() => dernier!.enregistrer('X'))
+    premier.unmount()
+    oublierVuesDeSession()
+    render(<Ecran ecran="Clients" criteres={{ nature: 'x', soldeMin: '' }} />)
+    expect(dernier!.vues.map((v) => v.cle)).toEqual(['toutes'])
+  })
+
+})
+
 describe('cellules du tableau', () => {
   it('identite, pastille, point d\'etat : avatar d\'initiales a teinte stable, nom gras, objet gris', () => {
     const { container } = dansUneLigne(<>
@@ -226,6 +443,35 @@ describe('cellules du tableau', () => {
     expect(container.querySelector('td')!.title).toBe('tout')
     expect(screen.getByText('Procedure collective').className).toBe('rig-lm-pastille rig-lm-t-orange')
     expect(screen.getByText('Radiee').className).toBe('rig-lm-etat rig-lm-t-rouge')
+  })
+
+  // Lot 4 (Factures) : un article de facture n'est ni un client ni un dossier, il n'a pas d'avatar ; l'ecran
+  // ecrivait la cellule a la main. Entree qui ferait echouer ce test : avatar={false}, ignore par l'ancien composant.
+  it('CelluleIdentite sans avatar : nom en gras et objet en gris, sans rond d\'initiales', () => {
+    const { container } = dansUneLigne(<CelluleIdentite avatar={false} nom="Frais de greffe" objet="FG01" titre="FG01 Frais de greffe" />)
+    expect(container.querySelector('.rig-lm-avatar')).toBeNull()
+    expect(screen.getByText('Frais de greffe').className).toBe('rig-lm-identite__nom')
+    expect(screen.getByText('FG01').className).toBe('rig-lm-identite__objet')
+    expect(container.querySelector('td')!.title).toBe('FG01 Frais de greffe')
+  })
+
+  // Lot 5 (Correspondances, capture orange) : un etat revenu a la ligne centrait son point ENTRE les deux lignes.
+  // Entree qui ferait echouer ce test : une feuille ou .rig-lm-etat reste en align-items:center.
+  it('PointEtat : le point face a la PREMIERE ligne quand le texte revient a la ligne', () => {
+    expect(declarations('.rig-lm-etat')['align-items']).toBe('flex-start')
+    // Le point (7 px) centre dans la hauteur d'une ligne : (1lh - 7px) / 2 au-dessus de lui.
+    expect(declarations('.rig-lm-etat i')['margin-top']).toBe('calc((1lh - 7px) / 2)')
+    expect(declarations('.rig-lm-etat i').height).toBe('7px')
+  })
+
+  // Lot 3 (captures orange) : en inline-flex, text-overflow n'a aucun effet, « Recommande » sortait « Recommanc ».
+  // Entree qui ferait echouer ce test : une pastille restee en display:inline-flex.
+  it('Pastille : un bloc en ligne qui coupe son texte par « … »', () => {
+    const pastille = declarations('.rig-lm-pastille')
+    expect(pastille.display).toBe('inline-block')
+    expect([pastille.overflow, pastille['white-space'], pastille['text-overflow']]).toEqual(['hidden', 'nowrap', 'ellipsis'])
+    // Le point garde son milieu sur celui du texte, sans conteneur flex.
+    expect(declarations('.rig-lm-pastille i')['vertical-align']).toBe('middle')
   })
 
   it('MontantBarre : barre proportionnelle au plus grand, zero gris sans barre', () => {

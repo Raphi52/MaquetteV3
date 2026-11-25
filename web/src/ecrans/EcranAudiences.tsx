@@ -19,7 +19,7 @@ import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { dateCourte } from '../criteres'
 import {
-  CelluleChevron, EnteteListe, LigneDetail, ListeModerne, Pastille, PiedListe, PointEtat, type Teinte,
+  CelluleChevron, EnteteListe, LigneDetail, ListeModerne, Pastille, PiedListe, PointEtat, normaliser, type Teinte,
 } from '../composants/ListeModerne'
 
 export interface AudienceLigne {
@@ -59,14 +59,6 @@ const TeinteType: Record<string, Teinte> = {
 
 /** Les colonnes du tableau a une ligne : chevron, Date, Heure, Type, Chambre, Publique, Affaires. */
 const NbColonnes = 7
-
-/**
- * « Aller a… » compare sans casse ni accents, comme la Recherche d'affaires : « procédure » trouve « Audience de procedure collective ».
- * Le normaliser() de RechAffaires n'est pas exporte du socle (manque note au plan, lot 6) : recopie locale.
- */
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-}
 
 export function EcranAudiences() {
   const [programmees, setProgrammees] = useState<AudienceLigne[]>(Programmees)

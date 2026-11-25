@@ -24,7 +24,7 @@
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { quand } from './EcranComptes'
-import { CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, type Teinte } from '../composants/ListeModerne'
+import { CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, normaliser, type Teinte } from '../composants/ListeModerne'
 
 export interface ChampEcart {
   /** La colonne de la V2 : seulement en infobulle. */
@@ -110,10 +110,6 @@ const TeintesTypes: Teinte[] = ['bleu', 'orange', 'violet', 'vert', 'ardoise', '
 export function nomDeFiche(fiche: string): { nom: string; objet: string } {
   const tiret = fiche.indexOf(' — ')
   return tiret < 0 ? { nom: fiche, objet: '' } : { nom: fiche.slice(tiret + 3), objet: fiche.slice(0, tiret) }
-}
-
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
 
 /** Ou mene la fiche d'un ecart : « dossier:… » ouvre l'affaire, « ecran:… » un ecran ; null, rien. */

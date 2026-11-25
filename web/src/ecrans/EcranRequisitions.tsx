@@ -34,7 +34,7 @@
 import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { EnteteTriable } from '../composants/EnteteTriable'
 import {
-  CelluleChevron, CelluleIdentite, ChoixTri, EnteteListe, LigneDetail, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe,
+  CelluleChevron, CelluleIdentite, ChoixTri, EnteteListe, LigneDetail, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, normaliser,
   type Teinte,
 } from '../composants/ListeModerne'
 import { appeler } from '../pont'
@@ -199,10 +199,6 @@ const TitreVolet: Record<string, string> = { resultats: 'Resultats', panier: 'Pa
 /** L'objet gris d'une societe : « 2001B00042 · 412 345 678 », sans « · » quand l'un des deux manque. */
 function GestionSiren({ gestion, siren }: { gestion: string; siren: string }) {
   return <>{gestion !== '' && <span>{gestion}</span>}{gestion !== '' && siren !== '' && ' · '}{siren}</>
-}
-
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
 
 export interface ProprietesEcranRequisitions {
