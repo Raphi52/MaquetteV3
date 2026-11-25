@@ -1,0 +1,15 @@
+# « Injonctions beneficiaires » (LecteurInjonctionsBeneficiaires) sur le jeu PROC_DBE_INJ.sql. Ordre : a enjoindre
+# (relances restees sans effet), injonctions en cours, puis closes ; la plus recente en tete.
+# « Relance restee sans effet » -> AFaire [] : diligence SDBE en cours, etat relance 2, relance n° 1 dont la date limite
+# est AVANT le jour, dossier non radie, sans injonction (101, 102).
+# « Injonction a suivre » -> Validee : relance IDBE avec instance ; [0,1,2] en cours (103, et 106 meme radie), [0,1,2,3]
+# close (104 regularisee, 105 non regularisee).
+# Ecartes : 107 (diligence SASSOSCI) -- jumeau retenu 101. Les autres jumeaux restent des relances, a l'ecran
+# « Relances beneficiaires » (PROC_DBE_RELANCE.sql) : 1100206 (delai expirant aujourd'hui) et 1100207 (radie) --
+# jumeau retenu 101 ; 1100208 (IDBE sans instance) -- jumeau retenu 103.
+ENJOINDRE ALPHA SARL · SIREN 511 000 101 | Relance du {J-31} · délai expiré le {J-1} | Relance restée sans effet | AFaire | []
+ENJOINDRE BETA SAS · SIREN 511 000 102 | Relance du {J-90} · délai expiré le {J-60} | Relance restée sans effet | AFaire | []
+ENJOINDRE ZETA SAS · SIREN 511 000 106 | Injonction du {J-10} | Injonction à suivre | Validee | [0,1,2]
+ENJOINDRE GAMMA SARL · SIREN 511 000 103 | Injonction du {J-20} | Injonction à suivre | Validee | [0,1,2]
+ENJOINDRE DELTA SAS · SIREN 511 000 104 | Injonction du {J-100} · régularisée le {J-3} | Injonction à suivre | Validee | [0,1,2,3]
+ENJOINDRE EPSILON SARL · SIREN 511 000 105 | Injonction du {J-200} · close sans régularisation | Injonction à suivre | Validee | [0,1,2,3]
