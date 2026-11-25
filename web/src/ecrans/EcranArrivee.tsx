@@ -131,7 +131,7 @@ const NbColonnes = 7
  * fix-ok: contientSansCasse (criteres.ts) garde les accents ; test « Aller a une arrivee… » rouge sur « réf », vert ici.
  */
 function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
 
 export function EcranArrivee({ ouvrirDossier }: ProprietesEcranArrivee) {
