@@ -38,6 +38,9 @@
     <Compile Include="../../Pont/InventaireTouchesV2.cs" Link="Pont/InventaireTouchesV2.cs" />
     <Compile Include="../../Pont/MenuAccueil.cs" Link="Pont/MenuAccueil.cs" />
     <Compile Include="../../Pont/CatalogueEcrans.cs" Link="Pont/CatalogueEcrans.cs" />
+    <!-- Les ecrans generes : une procedure reunie EN ONGLETS par ses formes s'essaie dans son onglet
+         (EcranCorrespondances.EcranV3De -> CatalogueGenere.EnOnglets). Ils ne dependent que du menu. -->
+    <Compile Include="../../Pont/EcransGeneres/*.cs" LinkBase="Pont/EcransGeneres" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />

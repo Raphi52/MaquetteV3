@@ -371,6 +371,20 @@ try
     Agir("paletteAller", new { nature = "ecran", cle = "PROC_GESTTIERSPAYEURS" });
     Exiger(Proc() is { Code: "SYNTHESE_PAIEMENTS", Ecran.Reunis.Actif: "PROC_GESTTIERSPAYEURS" },
         $"« Tiers payeurs » cherche ouvre « Paiements » sur son onglet ({Proc()?.Ecran.Reunis?.Actif ?? "tenu par la page"})");
+
+    // La fiche des touches (Pont/EcranCorrespondances.cs, EcranV3De) suit la meme regle. Elle ne lisait que le drapeau du
+    // menu : la touche Entree du journal de caisse s'essayait dans « Journaux et lettrage » entier (l'onglet deja montre),
+    // et l'aide « ? » de l'onglet, qui demande les touches de l'onglet actif (Procedure.tsx), ne la montrait plus.
+    // Reunie en LISTE, une procedure s'essaie toujours dans l'ecran qui la reunit (le jumeau, Actes bloques).
+    var toucheCaisse = EcranCorrespondances.Fiche.FirstOrDefault(l => l.EcranV2 == "Journal de caisse");
+    Exiger(toucheCaisse is { EcranV3: "PROC_JCAISSE" } && EcranCorrespondances.DeLEcran("PROC_JCAISSE").Contains(toucheCaisse),
+        $"la touche du « Journal de caisse » s'essaie dans SON onglet, et l'aide « ? » de l'onglet la montre (ecran {toucheCaisse?.EcranV3 ?? "aucun"})");
+    Agir("ongletReuni", "PROC_JVENTE");
+    Agir("ouvrirCode", toucheCaisse?.EcranV3);
+    Exiger(Proc() is { Code: "SYNTHESE_JOURNAUX", Ecran.Reunis.Actif: "PROC_JCAISSE" },
+        $"« Essayer » la touche du journal de caisse ouvre « Journaux et lettrage » sur son onglet ({Proc()?.Code}, onglet {Proc()?.Ecran.Reunis?.Actif})");
+    Exiger(EcranCorrespondances.EcranV3De("PROC_ACTRET") == "SYNTHESE_ACTES_BLOQUES",
+        $"une procedure reunie en liste s'essaie dans l'ecran qui la reunit (PROC_ACTRET : {EcranCorrespondances.EcranV3De("PROC_ACTRET")})");
 }
 finally
 {
