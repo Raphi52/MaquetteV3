@@ -5,6 +5,8 @@ import type { ChampEcranVue, DescripteurEcranVue, FormeEcranVue, GestePlan, Lign
 import { Aiguillage } from '../plan/Aiguillage'
 import { proc } from '../test/plan'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
 
@@ -396,7 +398,70 @@ describe('Formes Audience, Document, Operation', () => {
       expect(section(container, 'Pièces envoyées')).toBeNull()
     })
   })
+
+  // Controle final du lot 1 (25/11/2026, capture de l'Analyse IA) : au temps « Confirmer », dont le recapitulatif est
+  // court, les trois temps tombaient au pied de la carte sous un grand vide. La frise horizontale partagee se colle au BAS
+  // de sa carte (.rig-frise--h, margin-top: auto, rig-accueil.css, faite pour l'escalier). Entree qui ferait echouer ce
+  // test : une feuille ou la frise de l'Operation garde ce margin-top: auto.
+  it('Operation : au temps « Confirmer », les trois temps restent en tete, pas colles au pied sous un vide', async () => {
+    const retirer = poserFeuilles()
+    try {
+      const { container, ligne, bouton } = await monter(descripteur({ forme: 'Operation', valider: 'Lancer l’analyse' }))
+      fireEvent.click(ligne('Alpha SARL').querySelector('input[type=checkbox]')!)
+      fireEvent.click(bouton('Suivant'))
+      fireEvent.change(container.querySelector('input[aria-label="Code affaire"]')!, { target: { value: '2026J00201' } })
+      fireEvent.click(bouton('Suivant'))
+      expect(container.querySelector('.rig-eg-recap')).not.toBeNull()
+      expect(cascade(container.querySelector('ol[aria-label="Temps de l’opération"]')!, 'margin-top')).not.toBe('auto')
+      // Le jumeau : la frise horizontale partagee, hors des formes, reste collee au bas de sa carte (reference intacte).
+      const partagee = document.createElement('ol')
+      partagee.className = 'rig-frise rig-frise--h'
+      document.body.appendChild(partagee)
+      expect(cascade(partagee, 'margin-top')).toBe('auto')
+      partagee.remove()
+    } finally { retirer() }
+  })
 })
+
+// jsdom ne dessine rien : ce qu'une capture montrerait (une marge) se calcule sur les feuilles de wwwroot/index.html,
+// posees dans son ordre. wwwroot/ est hors de la racine de Vite, qui refuse de l'importer : lu sur le disque, comme
+// ListeModerne.test.tsx. Le dessin lui-meme se prouve par la capture du bureau cache.
+function poserFeuilles(): () => void {
+  const styles = ['rig-accueil.css', 'rig-listes.css', 'rig-ecrans-generes.css'].map((nom) => {
+    const style = document.createElement('style')
+    style.textContent = readFileSync(join(import.meta.dirname, '../../../wwwroot', nom), 'utf8')
+    document.head.appendChild(style)
+    return style
+  })
+  return () => styles.forEach((s) => s.remove())
+}
+
+/** Specificite d'un selecteur de nos feuilles (id, puis classe / attribut / pseudo-classe, puis type), en un nombre. */
+function specificite(selecteur: string): number {
+  const s = selecteur.replace(/:where\([^()]*\)/g, '').replace(/:(?:not|is)\(([^()]*)\)/g, ' $1')
+  const ids = (s.match(/#[\w-]+/g) ?? []).length
+  const classes = (s.match(/\.[\w-]+|\[[^\]]*\]|:(?!:)[\w-]+/g) ?? []).length
+  const types = (s.replace(/\[[^\]]*\]/g, '').match(/(?:^|[\s>+~])[a-z][\w-]*/gi) ?? []).length
+  return ids * 10000 + classes * 100 + types
+}
+
+/** La valeur que la cascade donne a <propriete> sur <el> : specificite, puis ordre des feuilles (hors @media). */
+function cascade(el: Element, propriete: string): string {
+  let gagnant = { poids: -1, valeur: '' }
+  for (const feuille of [...document.styleSheets]) {
+    for (const regle of [...feuille.cssRules]) {
+      if (!('selectorText' in regle) || !('style' in regle)) continue
+      const valeur = (regle as CSSStyleRule).style.getPropertyValue(propriete)
+      if (!valeur) continue
+      for (const s of (regle as CSSStyleRule).selectorText.split(',')) {
+        let vise = false
+        try { vise = el.matches(s) } catch { /* un pseudo-element (::before) ne vise pas l'element */ }
+        if (vise && specificite(s) >= gagnant.poids) gagnant = { poids: specificite(s), valeur }
+      }
+    }
+  }
+  return gagnant.valeur
+}
 
 // Un ecran reuni EN ONGLETS par ses formes (CatalogueGenere.Reunir) passe par l'aiguillage comme un ecran reuni par le
 // menu : la vue du C# porte ses onglets et l'onglet montre (Pont/PlanTravailVue.cs, VueOngletsReunis), aucun descripteur
