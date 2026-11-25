@@ -151,8 +151,6 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Groupes = ["Nom actuel", "Ancien nom"],
             Sections =
             [
-                Marche("Recherche", "Saisir le nom ou une partie du numéro d'enregistrement. Les deux critères se cumulent.", true,
-                    "Nom du navire", "Numéro d'enregistrement"),
                 Marche("Historique", "Afficher l'historique fait apparaître la colonne « Nom le plus récent ».", false,
                     "Afficher l'historique", "Nom le plus récent"),
                 Marche("Détails", "Consulter le navire sélectionné : numéro d'enregistrement, nom et informations du référentiel bateau.", false,
@@ -163,12 +161,12 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Lignes =
             [
                 Ligne("Le Pélican Alpha", "Numéro d'enregistrement 0001 · immatriculé en 2019", "Nom actuel", "AFaire"),
-                Ligne("L'Étoile Bêta", "Numéro 0002 · immatriculé en 2020", "Nom actuel", "EnCours", 0),
-                Ligne("La Mouette Gamma", "Numéro 0003 · ancien nom : Le Vent d'Ouest", "Ancien nom", "EnCours", 0, 1),
-                Ligne("Le Phare Delta", "Numéro 0004 · immatriculé en 2016", "Nom actuel", "Validee", 0, 3),
+                Ligne("L'Étoile Bêta", "Numéro 0002 · immatriculé en 2020", "Nom actuel", "EnCours"),
+                Ligne("La Mouette Gamma", "Numéro 0003 · ancien nom : Le Vent d'Ouest", "Ancien nom", "EnCours", 0),
+                Ligne("Le Phare Delta", "Numéro 0004 · immatriculé en 2016", "Nom actuel", "Validee", 2),
                 Ligne("Le Pélican Epsilon", "Numéro 0005 · immatriculé en 2011", "Nom actuel", "AFaire"),
-                Ligne("Le Dauphin Zêta", "Numéro 0006 · ancien nom : Le Grand Large", "Ancien nom", "EnCours", 0, 2),
-                Ligne("Le Hérisson Êta", "Numéro 0007 · immatriculé en 2008", "Nom actuel", "Validee", 0, 1, 3),
+                Ligne("Le Dauphin Zêta", "Numéro 0006 · ancien nom : Le Grand Large", "Ancien nom", "EnCours", 1),
+                Ligne("Le Hérisson Êta", "Numéro 0007 · immatriculé en 2008", "Nom actuel", "Validee", 0, 2),
             ],
         },
 
@@ -313,8 +311,6 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Groupes = ["Encaissement ventilé", "Encaissement sans ventilation"],
             Sections =
             [
-                Marche("Critères", "Saisir les critères, qui se cumulent. Une date ne compte que si sa case est cochée.", true,
-                    "Dates", "Mode de paiement", "Banque", "Payeur", "Numéro de remise", "Montant minimum", "Montant maximum", "Affaire"),
                 Marche("Résultats", "Un encaissement par ligne, ses ventilations dessous. Un encaissement sans ventilation réelle s'affiche en rouge.", true,
                     "Encaissement", "Ventilation"),
                 Marche("Affaire", "Double-clic sur une ventilation : ouvre son affaire.", false,
@@ -324,13 +320,13 @@ public sealed class DomaineTrouver : IDomaineEcrans
             ],
             Lignes =
             [
-                Ligne("Encaissement 2026E0101 · Psi Paiement SAS", "Chèque · 1 200,00 € · remise du 03/03/2026", "Encaissement ventilé", "EnCours", 0),
+                Ligne("Encaissement 2026E0101 · Psi Paiement SAS", "Chèque · 1 200,00 € · remise du 03/03/2026", "Encaissement ventilé", "EnCours"),
                 Ligne("Encaissement 2026E0102 · Chi Pêche SARL", "Virement · 850,00 € · sans ventilation", "Encaissement sans ventilation", "AFaire"),
-                Ligne("Encaissement 2026E0103 · Sigma Transports SARL", "Prélèvement · 2 400,00 € · remise du 05/03/2026", "Encaissement ventilé", "Validee", 0, 1, 2),
-                Ligne("Encaissement 2026E0104 · Tau Commerce SAS", "Carte bancaire · 310,00 € · sans ventilation", "Encaissement sans ventilation", "EnCours", 0),
-                Ligne("Encaissement 2026E0105 · Upsilon Import SARL", "Chèque · 95,00 € · ventilé", "Encaissement ventilé", "Validee", 0, 1),
+                Ligne("Encaissement 2026E0103 · Sigma Transports SARL", "Prélèvement · 2 400,00 € · remise du 05/03/2026", "Encaissement ventilé", "Validee", 0, 1),
+                Ligne("Encaissement 2026E0104 · Tau Commerce SAS", "Carte bancaire · 310,00 € · sans ventilation", "Encaissement sans ventilation", "EnCours"),
+                Ligne("Encaissement 2026E0105 · Upsilon Import SARL", "Chèque · 95,00 € · ventilé", "Encaissement ventilé", "Validee", 0),
                 Ligne("Encaissement 2026E0106 · Phi Bâtiment SAS", "Virement · 640,00 € · sans ventilation", "Encaissement sans ventilation", "AFaire"),
-                Ligne("Encaissement 2026E0107 · Rho Habitat SAS", "Prélèvement · 1 050,00 € · remise du 09/03/2026", "Encaissement ventilé", "EnCours", 0),
+                Ligne("Encaissement 2026E0107 · Rho Habitat SAS", "Prélèvement · 1 050,00 € · remise du 09/03/2026", "Encaissement ventilé", "EnCours"),
             ],
         },
 
@@ -346,8 +342,6 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Groupes = ["Article de base", "Article dérivé"],
             Sections =
             [
-                Marche("Critères", "Saisir au moins un critère, qui se cumulent : statut, type, période de tarification, catégorie, code événement.", true,
-                    "Statut", "Type d'article", "Période de tarification", "Catégorie", "Code événement"),
                 Marche("Résultats", "Les articles : code, libellé, montant dans la devise du greffe, et « Cohérent ? ». Au-delà du seuil du greffe (100 par défaut), une alerte demande d'affiner.", true,
                     "Code", "Libellé", "Montant", "Cohérent ?"),
                 Marche("Cohérence", "Justifier une incohérence, la dévalider, ou voir ses raisons. Une justification vaut pour toute la famille de l'article.", true,
@@ -360,11 +354,11 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Lignes =
             [
                 Ligne("Article 0101 · Inscription au greffe", "45,00 € · incohérent", "Article de base", "AFaire"),
-                Ligne("Article 0102 · Modification", "60,00 € · incohérent, en examen", "Article de base", "EnCours", 0, 1),
-                Ligne("Article 0103 · Extrait", "12,50 € · cohérent, rien à justifier", "Article de base", "Validee", 0, 1, 2),
+                Ligne("Article 0102 · Modification", "60,00 € · incohérent, en examen", "Article de base", "EnCours", 0),
+                Ligne("Article 0103 · Extrait", "12,50 € · cohérent, rien à justifier", "Article de base", "Validee", 0, 1),
                 Ligne("Article 0201 · Copie dérivée", "Dérivé de l'article 0101 · 40,00 €", "Article dérivé", "AFaire"),
-                Ligne("Article 0202 · Certificat", "Dérivé de l'article 0103 · 15,00 € · justifié", "Article dérivé", "Validee", 0, 1, 2, 3),
-                Ligne("Article 0104 · Dépôt d'actes", "25,00 € · incohérent, en examen", "Article de base", "EnCours", 0),
+                Ligne("Article 0202 · Certificat", "Dérivé de l'article 0103 · 15,00 € · justifié", "Article dérivé", "Validee", 0, 1, 2),
+                Ligne("Article 0104 · Dépôt d'actes", "25,00 € · incohérent, en examen", "Article de base", "EnCours"),
                 Ligne("Article 0105 · Recherche de pièce", "18,00 € · sans catégorie", "Article de base", "AFaire"),
             ],
         },
@@ -416,8 +410,6 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Groupes = ["Personne trouvée", "Personne inexistante"],
             Sections =
             [
-                Marche("Recherche", "Saisir le nom, le prénom et la date de naissance. Pour une naissance hors de France, la commune n'est pas demandée.", true,
-                    "Nom", "Prénom", "Date de naissance", "Pays de naissance", "Commune de naissance"),
                 Marche("Jugements", "Les jugements de la personne : les actifs d'abord, les plus récents en tête.", true,
                     "Jugements actifs", "Jugements anciens"),
                 Marche("Confirmation", "Une personne absente du registre se confirme avant d'être ajoutée.", false,
@@ -430,12 +422,12 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Lignes =
             [
                 Ligne("Personne 0101", "Né(e) en 1970 · 2 jugements, dont 1 actif", "Personne trouvée", "AFaire"),
-                Ligne("Personne 0102", "Né(e) en 1965 · 1 jugement actif", "Personne trouvée", "EnCours", 0),
-                Ligne("Personne 0103", "Né(e) en 1981 · jugement ancien", "Personne trouvée", "Validee", 0, 1),
-                Ligne("Personne 0104", "Absente du registre · confirmation requise", "Personne inexistante", "EnCours", 0, 2),
+                Ligne("Personne 0102", "Né(e) en 1965 · 1 jugement actif", "Personne trouvée", "EnCours"),
+                Ligne("Personne 0103", "Né(e) en 1981 · jugement ancien", "Personne trouvée", "Validee", 0),
+                Ligne("Personne 0104", "Absente du registre · confirmation requise", "Personne inexistante", "EnCours", 1),
                 Ligne("Personne 0105", "Né(e) à l'étranger en 1977 · 1 jugement actif", "Personne trouvée", "AFaire"),
-                Ligne("Personne 0106", "Né(e) en 1959 · 3 jugements", "Personne trouvée", "Validee", 0, 1, 3),
-                Ligne("Personne 0107", "Absente du registre · ajoutée après confirmation", "Personne inexistante", "Validee", 0, 1, 2),
+                Ligne("Personne 0106", "Né(e) en 1959 · 3 jugements", "Personne trouvée", "Validee", 0, 2),
+                Ligne("Personne 0107", "Absente du registre · ajoutée après confirmation", "Personne inexistante", "Validee", 0, 1),
             ],
         },
 
@@ -484,19 +476,17 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Groupes = ["Émises (RCS)", "Émises (judiciaire)", "Reçues"],
             Sections =
             [
-                Marche("Recherche", "Choisir l'onglet (émises ou reçues) et les filtres : dates, états, greffes. Une alerte peut ouvrir cet écran directement.", true,
-                    "Dates", "États", "Greffes", "Origine"),
                 Marche("Contenu", "Lire la notification. Les colonnes changent selon le service : RCS ou judiciaire.", true,
                     "Identifiant", "Type", "Greffe", "Date d'envoi", "Date de réception"),
             ],
             Lignes =
             [
                 Ligne("Notification 2026-0901 · vers un greffe voisin", "Émise le 02/03/2026", "Émises (RCS)", "AFaire"),
-                Ligne("Notification 2026-0902", "Émise le 03/03/2026", "Émises (RCS)", "EnCours", 0),
-                Ligne("Notification 2026-0903", "Émise le 04/03/2026", "Émises (judiciaire)", "Validee", 0, 1),
+                Ligne("Notification 2026-0902", "Émise le 03/03/2026", "Émises (RCS)", "EnCours"),
+                Ligne("Notification 2026-0903", "Émise le 04/03/2026", "Émises (judiciaire)", "Validee", 0),
                 Ligne("Notification 2026-0904 · d'un greffe voisin", "Reçue le 05/03/2026", "Reçues", "AFaire"),
-                Ligne("Notification 2026-0905", "Reçue le 06/03/2026 · avec alerte", "Reçues", "EnCours", 0),
-                Ligne("Notification 2026-0906", "Reçue le 09/03/2026", "Reçues", "Validee", 0, 1),
+                Ligne("Notification 2026-0905", "Reçue le 06/03/2026 · avec alerte", "Reçues", "EnCours"),
+                Ligne("Notification 2026-0906", "Reçue le 09/03/2026", "Reçues", "Validee", 0),
                 Ligne("Notification 2026-0907", "Émise le 10/03/2026", "Émises (judiciaire)", "AFaire"),
             ],
         },
@@ -513,8 +503,6 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Groupes = ["Documents transmis", "Demandes reçues"],
             Sections =
             [
-                Marche("Critères", "Chercher par date (critère par défaut) ou par type d'entité. Une entité s'ouvre dans son formulaire de recherche.", true,
-                    "Date", "Type d'entité"),
                 Marche("Documents transmis", "Les documents envoyés au tribunal digital, avec leur numéro de rôle et leur compte rendu d'envoi.", true,
                     "Numéro de rôle", "Compte rendu d'envoi"),
                 Marche("Demandes reçues", "Les demandes venues du portail, dans l'onglet à part.", false,
@@ -525,11 +513,11 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Lignes =
             [
                 Ligne("Envoi 2026-1001 · Lambda Conseil SARL", "Rôle 2026J00101 · envoyé le 02/03/2026", "Documents transmis", "AFaire"),
-                Ligne("Envoi 2026-1002 · Mu Logistique SAS", "Rôle 2026J00102 · envoyé le 03/03/2026", "Documents transmis", "EnCours", 0),
-                Ligne("Envoi 2026-1003 · Nu Services SARL", "Rôle 2026J00103 · compte rendu OK", "Documents transmis", "Validee", 0, 1, 3),
+                Ligne("Envoi 2026-1002 · Mu Logistique SAS", "Rôle 2026J00102 · envoyé le 03/03/2026", "Documents transmis", "EnCours"),
+                Ligne("Envoi 2026-1003 · Nu Services SARL", "Rôle 2026J00103 · compte rendu OK", "Documents transmis", "Validee", 0, 2),
                 Ligne("Demande 2026-1004 · Sigma Transports SARL", "Reçue le 04/03/2026 · instance", "Demandes reçues", "AFaire"),
-                Ligne("Demande 2026-1005 · Pi Études SARL", "Reçue le 05/03/2026 · procédure collective", "Demandes reçues", "EnCours", 0),
-                Ligne("Demande 2026-1006 · Rho Habitat SAS", "Reçue le 06/03/2026 · prévention", "Demandes reçues", "Validee", 0, 1, 2),
+                Ligne("Demande 2026-1005 · Pi Études SARL", "Reçue le 05/03/2026 · procédure collective", "Demandes reçues", "EnCours"),
+                Ligne("Demande 2026-1006 · Rho Habitat SAS", "Reçue le 06/03/2026 · prévention", "Demandes reçues", "Validee", 0, 1),
                 Ligne("Envoi 2026-1007 · Tau Commerce SAS", "Rôle 2026J00107 · compte rendu en attente", "Documents transmis", "AFaire"),
             ],
         },
@@ -546,8 +534,6 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Groupes = ["Bénéficiaire en vigueur", "Dossier radié"],
             Sections =
             [
-                Marche("Critères", "Saisir le numéro de dossier, ou le nom, les prénoms et la date de naissance. Les critères se cumulent ; Effacer critères vide la saisie.", true,
-                    "Numéro de dossier", "Nom d'usage", "Nom patronymique", "Prénoms", "Date de naissance", "Dossiers radiés", "Divergences seulement"),
                 Marche("Résultats", "La liste des bénéficiaires. Un double-clic sur un numéro de gestion relance la recherche sur ce dossier ; sur un nom, la recherche sur cette personne.", true,
                     "Numéro de gestion", "Nom", "Prénoms", "Date de naissance"),
                 Marche("Divergence", "Signaler une divergence sur le bénéficiaire sélectionné, par le menu contextuel.", true,
@@ -556,12 +542,12 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Lignes =
             [
                 Ligne("Bénéficiaire 0001 · dossier 2026B00601", "Né(e) en 1970 · en vigueur", "Bénéficiaire en vigueur", "AFaire"),
-                Ligne("Bénéficiaire 0002 · dossier 2026B00602", "Né(e) en 1958 · en vigueur", "Bénéficiaire en vigueur", "EnCours", 0),
-                Ligne("Bénéficiaire 0003 · dossier 2026B00603", "Né(e) en 1982 · divergence à signaler", "Bénéficiaire en vigueur", "Validee", 0, 1, 2),
+                Ligne("Bénéficiaire 0002 · dossier 2026B00602", "Né(e) en 1958 · en vigueur", "Bénéficiaire en vigueur", "EnCours"),
+                Ligne("Bénéficiaire 0003 · dossier 2026B00603", "Né(e) en 1982 · divergence à signaler", "Bénéficiaire en vigueur", "Validee", 0, 1),
                 Ligne("Bénéficiaire 0004 · dossier 2026B00604", "Né(e) en 1975 · dossier radié", "Dossier radié", "AFaire"),
-                Ligne("Bénéficiaire 0005 · dossier 2026B00605", "Né(e) en 1963 · dossier radié", "Dossier radié", "EnCours", 0, 1),
-                Ligne("Bénéficiaire 0006 · dossier 2026B00606", "Né(e) en 1990 · en vigueur", "Bénéficiaire en vigueur", "EnCours", 0),
-                Ligne("Bénéficiaire 0007 · dossier 2026B00607", "Né(e) en 1968 · dossier radié · divergence signalée", "Dossier radié", "Validee", 0, 1, 2),
+                Ligne("Bénéficiaire 0005 · dossier 2026B00605", "Né(e) en 1963 · dossier radié", "Dossier radié", "EnCours", 0),
+                Ligne("Bénéficiaire 0006 · dossier 2026B00606", "Né(e) en 1990 · en vigueur", "Bénéficiaire en vigueur", "EnCours"),
+                Ligne("Bénéficiaire 0007 · dossier 2026B00607", "Né(e) en 1968 · dossier radié · divergence signalée", "Dossier radié", "Validee", 0, 1),
             ],
         },
     ];

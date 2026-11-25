@@ -179,7 +179,10 @@ foreach (var d in descripteurs.Where(d => d.Membres.Length == 0))
             defauts.Add($"la ligne « {l.Nom} » franchit une partie hors de l'ecran, ou deux fois la meme");
         if (l.Valeurs.Length > d.Colonnes.Length)
             defauts.Add($"la ligne « {l.Nom} » a {l.Valeurs.Length} cellules pour {d.Colonnes.Length} colonnes");
-        // Une ligne est coherente avec ses marches : c'est ce que le geste Valider suppose.
+        // Une ligne est coherente avec ses ETAPES : c'est ce que le bouton final d'une Saisie suppose. Les sections d'une
+        // autre forme ne se franchissent pas -- la fiche s'ouvre entiere, aucune forme ne lit Faites (lot 1, 25/11/2026) :
+        // retirer la recherche d'une fiche laissait « en cours sans marche » des lignes dont elle etait la seule faite.
+        if (d.Marches.Length == 0) continue;
         if (l.Etat == "AFaire" && l.Faites.Length > 0)
             defauts.Add($"la ligne « {l.Nom} » est a faire et a pourtant des marches franchies");
         if (l.Etat == "EnCours" && l.Faites.Length == 0)
@@ -350,6 +353,24 @@ try
     // Un ecran qui n'est pas reuni en onglets n'en porte pas.
     Agir("ouvrirCode", "PROC_MMA");
     Exiger(Proc() is { Code: "SYNTHESE_CORRIGER_RCS", Ecran.Reunis: null }, "un ecran reuni en liste ne porte pas d'onglets");
+
+    // Un ecran reuni en onglets PAR SES FORMES (CatalogueGenere.Reunir, EnOnglets du descripteur : Journaux et lettrage
+    // y met des etats, une saisie et un lettrage) suit la meme regle. Avant le 25/11/2026, son onglet se tenait dans la
+    // page et partait toujours du premier : « Livre de repertoire » cherche montrait le journal de caisse (objection
+    // du controle final, lot 1 du plan « RIG v3 100 % fonctionnel »). Sa vue porte les onglets -- aucun descripteur de
+    // liste, qui laisserait la page choisir --, chacun le descripteur de sa procedure.
+    Agir("ouvrirCode", "PROC_JLR");
+    Exiger(Proc() is { Code: "SYNTHESE_JOURNAUX", Ecran: { Descripteur: null, Reunis: { Actif: "PROC_JLR" } j } }
+           && j.Onglets.Select(o => o.Code).SequenceEqual(["PROC_JCAISSE", "PROC_JVENTE", "PROC_JLR", "PROC_VLETTRAGE"])
+           && j.Onglets.All(o => o.Descripteur?.Code == o.Code),
+        $"« Livre de repertoire » ouvert par son code montre SON onglet dans « Journaux et lettrage » ({Proc()?.Code}, onglet {Proc()?.Ecran.Reunis?.Actif ?? "tenu par la page"})");
+    Agir("ongletReuni", "PROC_VLETTRAGE");
+    Exiger(Proc()?.Ecran.Reunis?.Actif == "PROC_VLETTRAGE", "un onglet choisi dans un ecran reuni par ses formes reste montre");
+    Agir("paletteOuvrir");
+    Agir("paletteTexte", "Tiers payeurs");
+    Agir("paletteAller", new { nature = "ecran", cle = "PROC_GESTTIERSPAYEURS" });
+    Exiger(Proc() is { Code: "SYNTHESE_PAIEMENTS", Ecran.Reunis.Actif: "PROC_GESTTIERSPAYEURS" },
+        $"« Tiers payeurs » cherche ouvre « Paiements » sur son onglet ({Proc()?.Ecran.Reunis?.Actif ?? "tenu par la page"})");
 }
 finally
 {
@@ -377,6 +398,16 @@ Exiger(sourcesFormes.All(s => !s.Contains("Terminer l’étape") && !s.Contains(
 // Tout geste sans ecrivain le dit : la phrase exacte, posee une fois, que chaque forme reprend.
 Exiger(formesCommun.Contains("export const DEMONSTRATION = 'Démonstration : rien n’est enregistré'"),
     "les gestes disent « Demonstration : rien n'est enregistre » tant qu'aucun ecrivain n'existe (formes/commun.tsx)");
+
+// La section qui refait la recherche de RIG v2 : titree comme elle, ou OBLIGATOIRE et faite des seuls criteres de l'ecran
+// (l'escalier ne passait pas sans avoir retrouve l'objet). fix-ok: mesure (banc rouge, 11 echecs) -- sans « obligatoire »,
+// la regle prenait pour une recherche « Banques et modes » de PROC_PARAMEXPRESSO, facultative : l'association des modes de
+// paiement a leur banque, qu'on modifie (proc_paramexpresso.md:6, MODE_PAIEMENT_BANQUE), dont l'ecran a tire ses criteres.
+static bool RefaitLaRecherche(DescripteurEcran d, MarcheEcran s)
+{
+    var saisis = s.Champs.Where(c => c.Type != TypeChamp.Tableau).Select(c => c.Libelle).ToList();
+    return s.Titre is "Critères" or "Recherche" || (s.Obligatoire && saisis.Count > 0 && saisis.All(d.Criteres.Contains));
+}
 
 var ParForme = descripteurs.Where(d => d.Membres.Length == 0).GroupBy(d => d.Forme).ToDictionary(g => g.Key, g => g.Count());
 Note("formes des ecrans d'une procedure : " + string.Join(", ", ParForme.OrderBy(p => p.Key).Select(p => $"{p.Key} {p.Value}")));
@@ -408,6 +439,13 @@ foreach (var d in descripteurs)
                 when d.Sections.Length == 0:
                 defauts.Add($"une forme {d.Forme} sans section"); break;
         }
+        // Une Fiche ou une Consultation s'ouvre sur un objet que la liste a DEJA retrouve (panneau des criteres, resultats) :
+        // aucune section n'y refait la recherche de RIG v2 -- titree « Criteres » ou « Recherche », ou dont tous les champs
+        // saisis sont des criteres de l'ecran. Sinon la fiche redemande l'objet ouvert (« Corriger une affaire » montrait
+        // une section « Instance » : numero de role et nom courant, vides ; controle final du lot 1, 25/11/2026).
+        if (d.Forme is FormeEcran.Fiche or FormeEcran.Consultation)
+            foreach (var s in d.Sections.Where(s => RefaitLaRecherche(d, s)))
+                defauts.Add($"la section « {s.Titre} » refait la recherche que la liste a deja faite (criteres : {string.Join(", ", d.Criteres)})");
         // Une liste n'a ses valeurs que pour les colonnes : jamais plus.
         foreach (var c in d.Colonnes.Concat(d.Parametres).Concat(d.Parties.SelectMany(s => s.Champs)))
             if ((c.Type == TypeChamp.Liste) != (c.Options.Length > 0))

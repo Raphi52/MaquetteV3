@@ -1057,7 +1057,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private Proc EcranQuiReunit(Proc proc)
     {
         if (Pont.MenuAccueil.SyntheseDe(proc.Code) is not { } reunion) return proc;
-        if (reunion.EnOnglets) OngletDesReunions[reunion.Code] = proc.Code;
+        if (EcransGeneres.CatalogueGenere.EnOnglets(reunion)) OngletDesReunions[reunion.Code] = proc.Code;
         return new Proc(reunion.Code, reunion.Libelle);
     }
 
@@ -1069,7 +1069,7 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     /// quand l'ecran est redessine. Un code qui n'est pas une procedure reunie en onglets est ignore.</summary>
     private void ChoisirOngletReuni(string code)
     {
-        if (Pont.MenuAccueil.SyntheseDe(code) is { EnOnglets: true } reunion) OngletDesReunions[reunion.Code] = code;
+        if (Pont.MenuAccueil.SyntheseDe(code) is { } reunion && EcransGeneres.CatalogueGenere.EnOnglets(reunion)) OngletDesReunions[reunion.Code] = code;
     }
 
     /// <summary>L'entree de menu qui porte un code, ou null.</summary>

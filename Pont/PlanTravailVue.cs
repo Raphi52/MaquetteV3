@@ -314,6 +314,7 @@ public sealed partial class SessionPlanTravail
     {
         if (ProcOuverte is not { } p) return null;
 
+        var reunis = VueOngletsReunis(p.Code);
         return new ProcVue(p.Code, p.Libelle,
             new EcranProcVue(
                 JeuDemo.Demandes.Select(d => d.Dossier).Distinct().Where(EstValide).ToArray(),
@@ -322,14 +323,17 @@ public sealed partial class SessionPlanTravail
                 MotifNonMaquette(p.Code),
                 p.Code == CodePageRecherche ? VuePageRecherche() : null,
                 ContexteDeLEcran(p.Code),
-                CatalogueGenere.Descripteur(p.Code),
-                VueOngletsReunis(p.Code)));
+                // Un ecran en onglets ne porte que ses onglets : un descripteur de liste a cote laisserait la page
+                // choisir l'onglet (CatalogueGenere.EnOnglets).
+                reunis is null ? CatalogueGenere.Descripteur(p.Code) : null,
+                reunis));
     }
 
     /// <summary>Les onglets d'un ecran reuni EN ONGLETS, null pour tout autre ecran.</summary>
     private OngletsReunisVue? VueOngletsReunis(string code)
     {
-        if (Pont.MenuAccueil.Toutes.FirstOrDefault(e => e.Code == code) is not { EnOnglets: true } reunion) return null;
+        if (Pont.MenuAccueil.Toutes.FirstOrDefault(e => e.Code == code) is not { Membres.Length: > 0 } reunion
+            || !CatalogueGenere.EnOnglets(reunion)) return null;
         return new OngletsReunisVue(
             [.. reunion.Membres.Select(m => new OngletReuniVue(m.Code, m.Libelle, CatalogueGenere.Descripteur(m.Code)))],
             OngletDesReunions.GetValueOrDefault(code) ?? reunion.Membres[0].Code);

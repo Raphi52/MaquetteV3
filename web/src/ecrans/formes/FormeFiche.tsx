@@ -1,7 +1,10 @@
 // FORME « FICHE » : corriger un objet existant (une affaire, un dossier, une creance). On le RETROUVE (criteres et
 // resultats), puis on le corrige dans un formulaire par sections aux vrais champs (texte, date, liste, case), et on
-// Enregistre ou on Annule. A l'enregistrement, les controles de la fiche RIG v2 : une section obligatoire doit avoir au
-// moins un champ rempli. Une ligne figee (verrouillee par un autre utilisateur...) s'ouvre en lecture seule.
+// Enregistre ou on Annule. Un champ laisse vide garde la valeur de la base : une section obligatoire ne manque donc
+// jamais ici. La regle de la creation (Saisie, « au moins un champ rempli ») n'y vaut pas : appliquee a une fiche, elle
+// redemandait l'objet deja ouvert (« Corriger une affaire » : « Instance est obligatoire », controle final du lot 1,
+// 25/11/2026). Les controles propres a chaque fiche RIG v2 viendront avec son ecrivain. Une ligne figee (verrouillee
+// par un autre utilisateur...) s'ouvre en lecture seule.
 // Ecran reuni : chaque ligne s'ouvre sur les sections de SA procedure.
 
 import { useState } from 'react'
@@ -9,8 +12,7 @@ import { EnteteListe, ListeModerne, PiedListe, PointEtat } from '../../composant
 import type { DescripteurEcranVue } from '../../plan/types'
 import { Resultats } from './Resultats'
 import {
-  Annonce, DEMONSTRATION, Sections, etatDe, figee, manquantes, parcoursDe, refus, teinteEtat, useAnnonce, useLignes,
-  type Saisies,
+  Annonce, Sections, etatDe, figee, parcoursDe, refus, sectionFaite, teinteEtat, useAnnonce, useLignes, type Saisies,
 } from './commun'
 
 export function FormeFiche({ d }: { d: DescripteurEcranVue }) {
@@ -30,9 +32,8 @@ export function FormeFiche({ d }: { d: DescripteurEcranVue }) {
   const lecture = figee(sel.etat)
   const fermer = () => { poserOuverte(null); poserSaisies({}); annoncer(null) }
   const enregistrer = () => {
-    const manque = manquantes(p.sections, saisies)
-    if (manque.length > 0) {
-      annoncer(`Contrôle de la fiche RIG v2 : « ${manque.join(' », « ')} » ${manque.length > 1 ? 'sont obligatoires' : 'est obligatoire'}. ${DEMONSTRATION}.`)
+    if (!p.sections.some((s) => sectionFaite(s, saisies))) {
+      annoncer(refus('Enregistrer', `: aucun champ n’est modifié, « ${sel.nom} » garde les valeurs de la base`))
       return
     }
     annoncer(refus('Enregistrer', `: « ${sel.nom} » n’est pas modifiée dans la base, la fiche reste ouverte`))

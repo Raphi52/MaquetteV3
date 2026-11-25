@@ -1,7 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { EcranGenere, type VueLignesEcran } from './EcranGenere'
-import type { ChampEcranVue, DescripteurEcranVue, FormeEcranVue, LigneEcranVue, TypeChampVue } from '../plan/types'
+import type { ChampEcranVue, DescripteurEcranVue, FormeEcranVue, GestePlan, LigneEcranVue, TypeChampVue } from '../plan/types'
+import { Aiguillage } from '../plan/Aiguillage'
+import { proc } from '../test/plan'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
@@ -172,11 +174,15 @@ describe('Forme Fiche : retrouver, corriger, Enregistrer', () => {
     sansEscalier(container)
   })
 
-  it('Enregistrer : les controles de la fiche RIG v2, puis « Demonstration » ; la fiche reste ouverte', async () => {
+  // Une fiche CORRIGE un objet qui existe : un champ laisse vide garde la valeur de la base (le pied le dit). Une section
+  // obligatoire n'y manque donc jamais -- la regle de la creation (Saisie) la redemandait : « Corriger une affaire »
+  // ouverte sur une affaire repondait « Instance est obligatoire » (controle final du lot 1, 25/11/2026).
+  it('Enregistrer : un champ vide garde la valeur de la base, rien n’est redemande ; puis « Demonstration »', async () => {
     const { container, ligne, bouton, annonce } = await monter(descripteur({ forme: 'Fiche' }))
     fireEvent.click(ligne('Alpha SARL'))
     fireEvent.click(bouton('Enregistrer'))
-    expect(annonce()).toBe('Contrôle de la fiche RIG v2 : « Instance » est obligatoire. Démonstration : rien n’est enregistré.')
+    expect(annonce()).toBe('Démonstration : rien n’est enregistré — « Enregistrer » : aucun champ n’est modifié, « Alpha SARL » garde les valeurs de la base.')
+    expect(annonce()).not.toContain('obligatoire')
     fireEvent.change(container.querySelector('input[aria-label="Code affaire"]')!, { target: { value: '2026J00201' } })
     fireEvent.click(bouton('Enregistrer'))
     expect(annonce()).toBe('Démonstration : rien n’est enregistré — « Enregistrer » : « Alpha SARL » n’est pas modifiée dans la base, la fiche reste ouverte.')
@@ -331,18 +337,27 @@ describe('Formes Audience, Document, Operation', () => {
   })
 })
 
+// Un ecran reuni EN ONGLETS par ses formes (CatalogueGenere.Reunir) passe par l'aiguillage comme un ecran reuni par le
+// menu : la vue du C# porte ses onglets et l'onglet montre (Pont/PlanTravailVue.cs, VueOngletsReunis), aucun descripteur
+// de liste. Avant le 25/11/2026 l'onglet se tenait ici et partait du premier : « Livre de repertoire » cherche montrait
+// le journal de caisse (controle final du lot 1).
 describe('Ecran reuni en onglets : un onglet par procedure, chacune dans sa forme', () => {
-  it('les onglets portent le titre des procedures ; changer d’onglet monte la forme de l’autre', async () => {
+  it('l’onglet demande par le C# est montre dans sa forme ; un clic renvoie l’onglet au C#', async () => {
     const d = reuni('File', true)
-    d.membres = [descripteur({ forme: 'Fiche', titre: 'Corriger' }), { ...d.membres[1]!, forme: 'File' }]
-    const pont = installerFauxPont({ 'EcranGenere.Lignes': (code: unknown) => vueExemple(d.membres.find((m) => m.code === code) ?? d) })
-    const { container } = render(<EcranGenere descripteur={d} />)
+    const [corriger, relances] = [descripteur({ forme: 'Fiche', titre: 'Corriger' }), { ...d.membres[1]!, forme: 'File' as const }]
+    const pont = installerFauxPont({ 'EcranGenere.Lignes': (code: unknown) => vueExemple([corriger, relances].find((m) => m.code === code) ?? d) })
+    const plan = vi.fn<GestePlan>()
+    const vue = proc({ code: d.code, libelle: d.titre, ecran: { ...proc().ecran, descripteur: null, reunis: {
+      onglets: [{ code: corriger.code, libelle: 'Corriger', descripteur: corriger }, { code: relances.code, libelle: 'Relances', descripteur: relances }],
+      actif: relances.code } } })
+    const { container } = render(<Aiguillage proc={vue} plan={plan} />)
     await waitFor(() => expect(container.querySelector('.rig-eg-note')).not.toBeNull())
-    expect([...container.querySelectorAll('[role=tab]')].map((t) => t.textContent)).toEqual(['Corriger', 'Relances'])
-    expect(container.querySelector('[data-forme]')!.getAttribute('data-forme')).toBe('Fiche')
-    fireEvent.click([...container.querySelectorAll('[role=tab]')][1]!)
-    await waitFor(() => expect(container.querySelector('[role=tabpanel]:not([hidden]) [data-forme]')!.getAttribute('data-forme')).toBe('File'))
+    expect([...container.querySelectorAll('[role=tab]')].map((t) => [t.textContent, t.getAttribute('aria-selected')]))
+      .toEqual([['Corriger', 'false'], ['Relances', 'true']])
+    expect(container.querySelector('[role=tabpanel]:not([hidden]) [data-forme]')!.getAttribute('data-forme')).toBe('File')
     expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Lignes', 'RELANCE_TEST')
+    fireEvent.click([...container.querySelectorAll('[role=tab]')][0]!)
+    expect(plan).toHaveBeenCalledWith('ongletReuni', 'ECRAN_TEST')
   })
 })
 

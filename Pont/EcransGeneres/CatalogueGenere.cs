@@ -33,6 +33,13 @@ public static class CatalogueGenere
     /// <summary>Le descripteur d'une procedure, ou nul : son ecran reste « a venir ».</summary>
     public static DescripteurEcran? Descripteur(string code) => _parCode.GetValueOrDefault(code);
 
+    /// <summary>Un ecran reuni montre-t-il ses procedures en onglets ? Le menu le decide pour les ecrans faits a la main
+    /// (EntreeMenu.EnOnglets), leurs formes pour les ecrans generes (Reunir, DescripteurEcran.EnOnglets). Les deux
+    /// passent par la meme vue (Pont/PlanTravailVue.cs, VueOngletsReunis) : la session tient l'onglet montre et ouvre
+    /// celui de la procedure demandee. Le descripteur seul le laissait a la page, qui partait du premier : « Livre de
+    /// repertoire » cherche montrait le journal de caisse (controle final du lot 1, 25/11/2026).</summary>
+    public static bool EnOnglets(EntreeMenu reunion) => reunion.EnOnglets || Descripteur(reunion.Code) is { EnOnglets: true };
+
     private static Dictionary<string, DescripteurEcran> Charger()
     {
         var parCode = new Dictionary<string, DescripteurEcran>();

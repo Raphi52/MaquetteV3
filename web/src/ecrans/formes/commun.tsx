@@ -142,7 +142,8 @@ export const sectionFaite = (s: MarcheEcranVue, saisies: Saisies) => s.champs.so
 
 /**
  * Les controles de la fiche RIG v2 a l'enregistrement : chaque section OBLIGATOIRE de la fiche (« Obligatoire pour
- * valider ») doit avoir au moins un champ rempli. Rend les titres des sections qui manquent.
+ * valider ») doit avoir au moins un champ rempli. Rend les titres des sections qui manquent. Pour ce qu'on CREE (Saisie)
+ * ou qu'on ENGAGE (Operation) ; pas pour une Fiche, ou un champ vide garde la valeur de la base (FormeFiche).
  */
 export function manquantes(sections: MarcheEcranVue[], saisies: Saisies): string[] {
   return sections.filter((s) => s.obligatoire && saisissable(s) && !sectionFaite(s, saisies)).map((s) => s.titre)

@@ -35,8 +35,6 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Groupes = ["Au fond", "En référé"],
             Sections =
             [
-                Marche("Instance", "Recherche par numéro de rôle. L'instance est verrouillée pour la modification : tenue par un autre utilisateur, elle reste en lecture seule.", true,
-                    "Numéro de rôle", "Nom courant"),
                 Marche("Parties", "Demandeurs, défendeurs et intervenants, chacun dans sa propre étape.", false,
                     Champ.Tableau("Demandeurs"), Champ.Tableau("Défendeurs"), Champ.Tableau("Intervenants")),
                 Marche("Appels d'affaire", "Dernier appel passé, prochain appel et liste complète.", false,
@@ -53,13 +51,13 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Lignes =
             [
                 Ligne("Alpha Services SARL c/ Bêta Industrie SAS", "Rôle 2026J00201 · modification de la partie", "Au fond", "AFaire"),
-                Ligne("Gamma Conseil SARL c/ Delta Transports SAS", "Rôle 2026J00202 · appels à compléter", "Au fond", "EnCours", 0, 1),
-                Ligne("Epsilon Habitat SARL c/ Zêta Commerce SAS", "Rôle 2026J00203 · référé en cours", "En référé", "EnCours", 0),
-                Ligne("Êta Boulangerie SARL c/ Thêta Import SAS", "Rôle 2026J00204 · référé enregistré", "En référé", "Validee", 0, 2, 3),
-                Ligne("Iota Études SARL c/ Kappa Négoce SAS", "Rôle 2026J00205 · décision rendue", "Au fond", "Validee", 0, 2, 4, 6),
+                Ligne("Gamma Conseil SARL c/ Delta Transports SAS", "Rôle 2026J00202 · appels à compléter", "Au fond", "EnCours", 0),
+                Ligne("Epsilon Habitat SARL c/ Zêta Commerce SAS", "Rôle 2026J00203 · référé en cours", "En référé", "EnCours"),
+                Ligne("Êta Boulangerie SARL c/ Thêta Import SAS", "Rôle 2026J00204 · référé enregistré", "En référé", "Validee", 1, 2),
+                Ligne("Iota Études SARL c/ Kappa Négoce SAS", "Rôle 2026J00205 · décision rendue", "Au fond", "Validee", 1, 3, 5),
                 Ligne("Lambda Pêche SARL c/ Mu Logistique SAS", "Rôle 2026J00206 · verrouillée par un autre utilisateur", "Au fond", "EnAttente"),
                 Ligne("Nu Paiement SAS c/ Xi Entrepôts SARL", "Rôle 2026J00207 · référé", "En référé", "AFaire"),
-                Ligne("Omicron Bâtiment SARL c/ Pi Services SAS", "Rôle 2026J00208 · événements futurs", "Au fond", "EnCours", 0, 3),
+                Ligne("Omicron Bâtiment SARL c/ Pi Services SAS", "Rôle 2026J00208 · événements futurs", "Au fond", "EnCours", 2),
             ],
         },
 
@@ -125,8 +123,6 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Groupes = ["Inscriptions maritimes", "Autres inscriptions"],
             Sections =
             [
-                Marche("Inscription", "Lecture seule : l'inscription est vérifiée avant toute modification.", true,
-                    "Numéro d'inscription", "Débiteur", "Créancier"),
                 Marche("Mention en marge", "Obligatoire pour valider. Si l'inscription n'a pas encore de mention, une mention vierge est proposée pour guider la saisie.", true,
                     Champ.Zone("Mention marginale"), "Date de la mention"),
                 Marche("Bateau", "Données du bateau, pour une inscription maritime seulement.", false,
@@ -141,14 +137,14 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Lignes =
             [
                 Ligne("Alpha Services SARL", "Inscription 2026-0401 · modification de mention", "Autres inscriptions", "AFaire"),
-                Ligne("Bêta Navigation SAS", "Inscription 2026-0402 · bateau", "Inscriptions maritimes", "EnCours", 0, 1),
+                Ligne("Bêta Navigation SAS", "Inscription 2026-0402 · bateau", "Inscriptions maritimes", "EnCours", 0),
                 Ligne("Gamma Conseil SARL", "Inscription 2026-0403 · réclamée le 05/03/2026", "Autres inscriptions", "EnAttente"),
-                Ligne("Delta Transports SAS", "Inscription 2026-0404 · validée le 06/03/2026", "Autres inscriptions", "Validee", 0, 1, 3, 5),
+                Ligne("Delta Transports SAS", "Inscription 2026-0404 · validée le 06/03/2026", "Autres inscriptions", "Validee", 0, 2, 4),
                 Ligne("Epsilon Habitat SARL", "Inscription 2026-0405 · refusée le 09/03/2026", "Autres inscriptions", "Rejetee"),
                 Ligne("Zêta Pêche SAS", "Inscription 2026-0406 · bateau de pêche", "Inscriptions maritimes", "AFaire"),
-                Ligne("Êta Boulangerie SARL", "Inscription 2026-0407 · en attente de la décision", "Autres inscriptions", "EnCours", 0),
+                Ligne("Êta Boulangerie SARL", "Inscription 2026-0407 · en attente de la décision", "Autres inscriptions", "EnCours"),
                 Ligne("Thêta Import SAS", "Inscription 2026-0408 · mise en attente le 10/03/2026", "Autres inscriptions", "EnAttente"),
-                Ligne("Iota Yachting SAS", "Inscription 2026-0409 · bateau · validée", "Inscriptions maritimes", "Validee", 0, 1, 2, 5),
+                Ligne("Iota Yachting SAS", "Inscription 2026-0409 · bateau · validée", "Inscriptions maritimes", "Validee", 0, 1, 4),
             ],
         },
 
@@ -238,8 +234,6 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Groupes = ["Mandataires", "Avocats", "Représentants"],
             Sections =
             [
-                Marche("Recherche", "Recherche plein texte sur l'abrégé et la désignation. « Actifs seulement » masque les répertoriés inactifs.", true,
-                    "Abrégé", "Désignation"),
                 Marche("Fiche", "Abrégé et désignation obligatoires ; l'abrégé est unique dans le greffe. Une adresse mail mal formée n'est qu'un avertissement. Suppression bloquée si l'abrégé sert à un code affaire.", true,
                     "Abrégé", "Désignation", "Adresse mail", "Civilité"),
                 Marche("Civilité des parties", "Applique la civilité du répertorié aux parties cochées.", false,
@@ -248,13 +242,13 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Lignes =
             [
                 Ligne("MAND-ALPHA", "Alpha Mandats SELARL · actif", "Mandataires", "AFaire"),
-                Ligne("MAND-BETA", "Bêta Administrateurs SARL · actif", "Mandataires", "EnCours", 0),
-                Ligne("AVOC-GAMMA", "Cabinet Gamma Avocats · actif", "Avocats", "EnCours", 0, 1),
+                Ligne("MAND-BETA", "Bêta Administrateurs SARL · actif", "Mandataires", "EnCours"),
+                Ligne("AVOC-GAMMA", "Cabinet Gamma Avocats · actif", "Avocats", "EnCours", 0),
                 Ligne("AVOC-DELTA", "Cabinet Delta Avocats · inactif", "Avocats", "AFaire"),
-                Ligne("REPR-EPSILON", "Représentant Epsilon · actif", "Représentants", "Validee", 0, 1, 2),
-                Ligne("REPR-ZETA", "Représentant Zêta · actif", "Représentants", "Validee", 0, 1),
+                Ligne("REPR-EPSILON", "Représentant Epsilon · actif", "Représentants", "Validee", 0, 1),
+                Ligne("REPR-ZETA", "Représentant Zêta · actif", "Représentants", "Validee", 0),
                 Ligne("MAND-ETA", "Mandataire Êta · actif", "Mandataires", "AFaire"),
-                Ligne("AVOC-THETA", "Cabinet Thêta Avocats · actif", "Avocats", "EnCours", 0, 1),
+                Ligne("AVOC-THETA", "Cabinet Thêta Avocats · actif", "Avocats", "EnCours", 0),
             ],
         },
 

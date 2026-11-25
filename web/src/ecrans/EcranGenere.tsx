@@ -9,17 +9,17 @@
 // Operation. Les listes y reprennent le socle des listes modernes (composants/ListeModerne.tsx).
 //
 // Un ecran REUNI (descripteur.membres, 24/11/2026) met plusieurs procedures dans une seule liste quand elles ont la
-// meme forme et une liste commune (File, Consultation, Fiche, Operation, Document) ; sinon (descripteur.enOnglets) il
-// pose un onglet par procedure, chacune dans SA forme (EcranOnglets, le meme que pour les ecrans faits a la main).
+// meme forme et une liste commune (File, Consultation, Fiche, Operation, Document). Sinon (descripteur.enOnglets) il
+// n'arrive pas ici : la vue du C# porte ses onglets (Pont/PlanTravailVue.cs, VueOngletsReunis) et l'aiguillage pose un
+// onglet par procedure, chacune dans SA forme (EcranOnglets, le meme que pour les ecrans faits a la main) ; le C# tient
+// l'onglet montre, celui de la procedure demandee (« Livre de repertoire » cherche montre son onglet, pas le premier).
 //
 // LES LIGNES : demandees au pont a l'ouverture (EcranGenere.Lignes, Pont/EcranGenere.cs ; formes/commun.tsx). Branche
 // sur le serveur, l'ecran montre les lignes de la base du greffe ; sans serveur, sans lecteur ou en panne, les lignes
 // d'exemple du descripteur, marquees « exemple ». LES GESTES ne font rien tant qu'aucun ecrivain n'existe, et le disent :
 // « Demonstration : rien n'est enregistre ».
 
-import { useState } from 'react'
 import type { DescripteurEcranVue } from '../plan/types'
-import { EcranOnglets } from './EcranOnglets'
 import { FormeAudience } from './formes/FormeAudience'
 import { FormeConsultation } from './formes/FormeConsultation'
 import { FormeDocument } from './formes/FormeDocument'
@@ -37,7 +37,6 @@ export interface ProprietesEcranGenere {
 }
 
 export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
-  if (d.enOnglets) return <EcranGenereEnOnglets d={d} />
   return <Forme d={d} />
 }
 
@@ -54,15 +53,4 @@ function Forme({ d }: { d: DescripteurEcranVue }) {
     case 'Document': return <FormeDocument key={d.code} d={d} />
     case 'Operation': return <FormeOperation key={d.code} d={d} />
   }
-}
-
-/** Un ecran reuni dont les procedures n'ont pas de liste commune : un onglet par procedure, dans sa forme. L'onglet
- * montre se tient ici (aucun geste au C# : le descripteur porte deja les procedures). */
-function EcranGenereEnOnglets({ d }: { d: DescripteurEcranVue }) {
-  const [actif, poserActif] = useState(d.membres[0]?.code ?? '')
-  return (
-    <EcranOnglets titre={d.titre} onglets={d.membres.map((m) => ({ code: m.code, libelle: m.titre }))}
-                  actif={actif} choisir={poserActif}
-                  ecran={(code) => { const m = d.membres.find((x) => x.code === code); return m ? <Forme d={m} /> : null }} />
-  )
 }
