@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Banc des ECRANS GENERES BRANCHES SUR LA BASE (plan « ecrans retrouves branches sur la base », lot 1,
+       24/11/2026) : les lecteurs du serveur (Serveur/Socle/EcransGeneres/) sur des donnees controlees, la route
+       par le vrai serveur en memoire, et le pont de l'ecran (Pont/EcranGenere.cs) contre ce serveur.
+       net10.0-windows + reference a l'application : chaque lecteur est verifie contre le DESCRIPTEUR de sa
+       procedure (Pont/EcransGeneres/), groupes, etats et marches. Il lui faut le SQL Server de developpement :
+       docker compose up -d. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>EcransGeneresBaseCheck</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <ProjectReference Include="../../RigV3Desktop.csproj" />
+    <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
+    <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
+    <ProjectReference Include="../../Contrats/RigV3.Contrats.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
+  </ItemGroup>
+
+</Project>

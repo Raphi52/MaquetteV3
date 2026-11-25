@@ -16,7 +16,10 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 // Le contenu est FONDE sur la fiche RIG v2 de la procedure (proc_<code>.md, « Detail
 // OPE » faisant foi) : les etapes sont les marches, les regles sont les consignes, les
 // controles de validation sont les messages. Les lignes sont une demonstration
-// ANONYME (noms fictifs), jamais de donnees reelles.
+// ANONYME (noms fictifs), jamais de donnees reelles. Branche sur le serveur, l'ecran les
+// remplace par celles de la base du greffe quand la procedure a un lecteur
+// (Serveur/Socle/EcransGeneres/LecteurEcran.cs, pont : Pont/EcranGenere.cs) ; sinon il les
+// garde, marquees « exemple ».
 //
 // Conventions que l'ecran et le banc tests/EcransGeneresCheck tiennent :
 //   - trois etats portent les gestes : AFaire, EnCours, Validee (EtatsEcran.Trois) ;
