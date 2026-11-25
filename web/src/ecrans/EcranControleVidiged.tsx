@@ -201,7 +201,7 @@ export function EcranControleVidiged() {
       </aside>
 
       <ListeModerne etiquette="Archives">
-        <EnteteListe titre="Archives"
+        <EnteteListe titre="Resultats"
                      synthese={<>{filtrees.length}{' archive(s) — '}{pageCourante.length}{' affichee(s) · '}<b>{sansSupport}</b>{' sans CD'}</>}
                      filtre={{ valeur: recherche, changer: setRecherche, indication: 'Aller a une archive…' }} />
 
