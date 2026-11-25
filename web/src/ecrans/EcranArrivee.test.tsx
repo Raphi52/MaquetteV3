@@ -57,6 +57,9 @@ describe('EcranArrivee en liste moderne', () => {
     expect(rattachee!.querySelector('.rig-lm-identite__nom')!.textContent).toBe('SCI DU PARC')
     expect(rattachee!.querySelector('.rig-lm-identite__objet')!.textContent).toBe('IMMAT · A1')
     expect(rattachee!.querySelector('.rig-lm-pastille')!.className).toBe('rig-lm-pastille rig-lm-t-bleu')
+    // Une pastille coupee se lit entiere au survol (capture orange du 25/11 : « Recoi », « Taxi-(… »).
+    // Faux si : la cellule du mode n'a pas d'infobulle, ou porte autre chose que le libelle affiche.
+    expect(rattachee!.querySelector('.rig-lm-pastille')!.closest('td')!.getAttribute('title')).toBe('Poste')
     expect(rattachee!.querySelector('.rig-lm-etat')!.textContent).toBe('faite')
     expect(sans!.querySelector('.rig-lm-etat')!.className).toBe('rig-lm-etat rig-lm-t-orange')
     expect(sans!.querySelector('.rig-lm-etat')!.textContent).toBe('a faire')

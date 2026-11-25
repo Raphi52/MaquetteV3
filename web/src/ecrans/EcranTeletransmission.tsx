@@ -167,7 +167,7 @@ export function EcranTeletransmission({ ouvrirDossier, dossier = null }: Proprie
                     title={f.numDemande.length > 0 ? `Ouvrir l'affaire ${f.numDemande}` : 'Aucune affaire rattachee'}>
                   <CelluleIdentite nom={f.nom}
                                    objet={<>{f.references}{f.references !== '' ? ' · ' : ''}<span>{f.numero}</span></>} />
-                  <td><Pastille teinte={teinteModeArrivee(f.modeLisible)}>{f.modeLisible}</Pastille></td>
+                  <td title={f.modeLisible}><Pastille teinte={teinteModeArrivee(f.modeLisible)}>{f.modeLisible}</Pastille></td>
                   <td className="rig-table__mono">{f.numDemande}</td>
                   <td>{f.numerise ? <PointEtat teinte="vert">oui</PointEtat> : <PointEtat teinte="orange">non</PointEtat>}</td>
                   <td className="rig-table__mono">{f.horodatage}</td>

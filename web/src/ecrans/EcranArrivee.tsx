@@ -362,7 +362,7 @@ export function EcranArrivee({ ouvrirDossier }: ProprietesEcranArrivee) {
                     <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : cle)} />
                     <CelluleIdentite nom={a.nom}
                                      objet={<>{a.typeDemande}{a.typeDemande !== '' ? ' · ' : ''}<span>{a.numero}</span></>} />
-                    <td><Pastille teinte={teinteModeArrivee(a.modeLisible)}>{a.modeLisible}</Pastille></td>
+                    <td title={a.modeLisible}><Pastille teinte={teinteModeArrivee(a.modeLisible)}>{a.modeLisible}</Pastille></td>
                     <td className="rig-table__mono">
                       {liee ? a.numDemande : <span className="rig-table__sans">non rattachee</span>}
                     </td>
