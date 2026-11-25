@@ -24,7 +24,6 @@
 // pas un jeu de criteres), une ligne par depot (avatar et destinataire, code · abrege ; etat en point colore),
 // les six dates de suivi, le coffre et le type de decision dans la ligne depliee. Aucun montant : pas de carte.
 // Le clic qui montre l'historique, la ligne en alerte et les autres criteres ne changent pas.
-// fix-ok: application du socle des listes (lot 4) en plusieurs pas, pas un correctif.
 
 import { Fragment, useState } from 'react'
 import { contientSansCasse, dateCourte, distinctsTries, entierLisible, estBlanc } from '../criteres'

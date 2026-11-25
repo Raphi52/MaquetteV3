@@ -39,8 +39,7 @@
 // ligne depliee par le chevron. Pas de CelluleIdentite : un article n'est ni un client, ni une entreprise, ni un
 // dossier, il n'a pas d'avatar d'initiales ; sa cellule reprend seulement le nom et l'objet de l'identite.
 // Le clic sur un article le retire du total ou l'y remet, comme avant ; l'encaissement ne change pas.
-// fix-ok: application du socle des listes (lot 4) en plusieurs pas, pas un correctif. Les colonnes Code et Libelle
-// sont reunies en « Article » (decision notee au plan par le lot 4 : article sans avatar, nom et objet seulement).
+// Les anciennes colonnes Code et Libelle sont reunies en « Article » (decision notee au plan par le lot 4).
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'

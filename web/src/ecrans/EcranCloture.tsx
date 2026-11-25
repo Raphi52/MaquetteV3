@@ -30,7 +30,6 @@
 // classement en pastille ; limite en point rouge si depassee ; forfait avec sa mini-barre), heures, courrier,
 // dirigeants, liquidateurs, huissier et ville dans la ligne depliee. « Enrolement / requete » : 6 colonnes, N Role
 // et N PC sous le defendeur. Criteres, clic qui ouvre le dossier et ligne en alerte ne changent pas.
-// fix-ok: application du socle des listes (lot 4) en plusieurs pas, pas un correctif.
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'

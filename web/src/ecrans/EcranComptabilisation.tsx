@@ -20,7 +20,6 @@
 // sur un mode filtre les remis), Non remis en banque (anneau, le clic filtre). Une ligne par remis : remis en
 // point (vert, ou orange « non remis »), mode en pastille, montant avec sa mini-barre ; pied de totaux. Choisir
 // une autre journee enleve le filtre. Les journees, « Ce qui reste » et les quatre traitements ne changent pas.
-// fix-ok: application du socle des listes (lot 4) en plusieurs pas, pas un correctif.
 
 import { useState } from 'react'
 import { dateCourte } from '../criteres'

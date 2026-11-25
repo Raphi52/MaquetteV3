@@ -20,7 +20,6 @@ const solde = (c: HTMLElement) => c.querySelector('section > .rig-criteres__bloc
 /** Les cellules de chaque ligne d'article affichee (hors lignes depliees). */
 const lignes = (c: HTMLElement) =>
   [...c.querySelectorAll('tbody tr:not(.rig-lm-detail)')].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent))
-// fix-ok: decision du plan (lot 4) appliquee en plusieurs pas -- l'article en libelle gras + code gris, sans avatar ; pas un correctif.
 /** Le code de chaque article affiche, en gris sous son libelle (la ligne « Aucun article… » n'en a pas). */
 const codes = (c: HTMLElement) => [...c.querySelectorAll('tbody .rig-lm-identite__objet')].map((o) => o.textContent)
 

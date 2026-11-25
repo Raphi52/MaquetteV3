@@ -12,7 +12,6 @@
 // composants/ListeModerne.tsx -- tete, une ligne par banque (avatar, designation, code), modes de paiement en
 // pastilles, pied. Ni montant, ni critere d'etat, ni plus de quelques banques par greffe : pas de carte, pas de
 // vue, pas de « Aller a… ». Le clic qui montre la fiche ne change pas.
-// fix-ok: application du socle des listes (lot 4) en plusieurs pas, pas un correctif.
 
 import { useState } from 'react'
 import { contientSansCasse, estBlanc } from '../criteres'
