@@ -91,7 +91,10 @@
 /* La saisie en etapes : la frise a gauche, l'etape a droite (motif .rig-saisie de rig-accueil.css). */
 .rig-eg-saisie { border-top: 1px solid var(--rig-bord-faible); }
 .rig-eg-etape { display: flex; flex-direction: column; min-width: 0; }
-.rig-eg-temps { padding: 4px 14px; border-bottom: 1px solid var(--rig-bord-faible); }
+/* Les trois temps d'une Operation, en tete. La frise horizontale partagee se colle au BAS de sa carte (margin-top: auto,
+   rig-accueil.css, faite pour l'escalier) : au temps « Confirmer », dont le recapitulatif est court, elle tombait au
+   pied de la carte sous un grand vide (capture de l'Analyse IA, 25/11/2026). Deux classes pour passer devant elle. */
+.rig-frise.rig-eg-temps { margin-top: 0; padding: 4px 14px; border-bottom: 1px solid var(--rig-bord-faible); }
 
 /* La grille editable d'un referentiel : la ligne en cours de modification porte ses champs. */
 .rig-eg-grille td .rig-saisie-champ__saisie { padding: 3px 6px; font-size: 12px; }
