@@ -38,6 +38,8 @@ export interface VueLignesEcran {
   lignes: LigneEcranVue[]
   /** Les groupes dont les lignes sont des exemples du descripteur. */
   exemples: string[]
+  /** Les groupes branches sur la base mais sans aucune ligne : ils restent affiches, avec « Aucune ligne ». */
+  vides?: string[]
 }
 
 /** Les trois etats qui portent les gestes : le descripteur les nomme ainsi (EcransGeneresCheck le verifie). */
@@ -141,9 +143,12 @@ export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
     .map((l, i) => ({ ...l, i }))
     .filter((l) => (etatChoisi === null || l.etat === etatChoisi)
       && (recherche === '' || [l.nom, l.precisions, l.groupe].some((c) => contientSansCasse(c, recherche))))
+  // Un groupe branche mais vide reste a l'ecran (sinon l'agent croit la fonction absente) ; filtre ou recherche
+  // actifs, il s'efface comme tout groupe sans ligne.
+  const vides = etatChoisi === null && recherche === '' ? vue?.vides ?? [] : []
   const groupes = d.groupes
     .map((titre) => ({ titre, lignes: visibles.filter((l) => l.groupe === titre) }))
-    .filter((g) => g.lignes.length > 0)
+    .filter((g) => g.lignes.length > 0 || vides.includes(g.titre))
   // fix-ok: test rouge mesure (tuile '2' au lieu de '1') : la tuile comptait `lignes`, exemples compris.
   // Les chiffres sont le travail REEL du greffe : en mode mixte, les groupes encore en exemple (noms fictifs)
   // restent affiches et etiquetes, mais n'entrent ni dans les tuiles ni dans le compteur (qui les dit a part).
@@ -225,13 +230,13 @@ export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
             </span>
           </div>
 
-          {visibles.length === 0 ? (
+          {visibles.length === 0 && groupes.length === 0 ? (
             <div className="rig-tcw__vide">
               {vue === null ? 'Lecture des lignes…'
                 : lignes.length === 0 ? `Aucune ligne dans la base du greffe${vue.greffe ? ` ${vue.greffe}` : ''}.`
                 : 'Rien ne correspond à la recherche.'}
             </div>
-          ) : sel === null ? (
+          ) : visibles.length > 0 && sel === null ? (
             <div className="rig-tcw__invite">Sélectionnez une ligne pour la traiter.</div>
           ) : null}
 
@@ -254,6 +259,9 @@ export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
                   </button>
                   <div className="rig-tcw__groupe-corps" inert={replie}>
                     <div className="rig-tcw__groupe-lignes">
+                      {g.lignes.length === 0 && (
+                        <div className="rig-tcw__vide-groupe">Aucune ligne dans la base du greffe{vue?.greffe ? ` ${vue.greffe}` : ''}.</div>
+                      )}
                       {g.lignes.map((l) => (
                         <button key={l.i} className={`rig-tcw__cmd rig-tcw__rang-${d.rang} ${ouverte === l.i ? 'rig-tcw__cmd--active' : ''}`}
                                 style={{ '--tcw-ordre': l.i } as CSSProperties}

@@ -250,6 +250,26 @@ describe('EcranGenere : lignes de la base ou exemples', () => {
     expect(groupes.map((g) => g.querySelector('.rig-tcw__exemple') !== null)).toEqual([false, true])
   })
 
+  it('un groupe branche mais sans ligne reste visible, avec son titre, sans « exemple », et dit « Aucune ligne »', async () => {
+    const d = reuni()
+    const reelle = { nom: 'HKO DUPRAT SARL · SIREN 412 000 001', precisions: 'Fond · reçu le 02/03/2026', groupe: 'Ecran test', etat: 'AFaire', faites: [] }
+    const { container, noms } = await monter(d, { mode: 'base', message: null, greffe: '3801', lignes: [reelle], exemples: [], vides: ['Relances'] })
+    expect(noms()).toEqual(['HKO DUPRAT SARL · SIREN 412 000 001'])
+    const groupes = [...container.querySelectorAll('.rig-tcw__groupe')]
+    expect(groupes.map((g) => g.querySelector('.rig-tcw__groupe-titre')!.textContent)).toEqual(['Ecran test', 'Relances'])
+    expect(groupes[1]!.querySelector('.rig-tcw__groupe-nombre')!.textContent).toBe('0')
+    expect(groupes[1]!.querySelector('.rig-tcw__vide-groupe')!.textContent).toBe('Aucune ligne dans la base du greffe 3801.')
+    expect(container.querySelectorAll('.rig-tcw__exemple')).toHaveLength(0)
+  })
+
+  it('un groupe vide disparait quand une recherche ou un etat filtre la liste', async () => {
+    const d = reuni()
+    const reelle = { nom: 'HKO DUPRAT SARL · SIREN 412 000 001', precisions: 'Fond · reçu le 02/03/2026', groupe: 'Ecran test', etat: 'AFaire', faites: [] }
+    const { container } = await monter(d, { mode: 'base', message: null, greffe: '3801', lignes: [reelle], exemples: [], vides: ['Relances'] })
+    fireEvent.change(container.querySelector('input')!, { target: { value: 'HKO' } })
+    expect(container.querySelectorAll('.rig-tcw__groupe')).toHaveLength(1)
+  })
+
   it('en mode mixte, les tuiles et le compteur ne comptent que les lignes de la base, pas les exemples', async () => {
     const d = reuni()
     const reelle = { nom: 'HKO DUPRAT SARL · SIREN 412 000 001', precisions: 'Fond · reçu le 02/03/2026', groupe: 'Ecran test', etat: 'AFaire', faites: [] }

@@ -3602,7 +3602,7 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
    couleur du bouton, sans son cadre ; souligne au survol. */
 .rig-tcw__nouvelle { white-space: nowrap; border-color: transparent; padding-left: 0; padding-right: 0; font-weight: 600; }
 .rig-tcw__nouvelle:hover { background: transparent; text-decoration: underline; }
-.rig-tcw__vide, .rig-tcw__invite { color: var(--rig-texte-3); padding: var(--rig-esp-2) var(--rig-esp-4); }
+.rig-tcw__vide, .rig-tcw__vide-groupe, .rig-tcw__invite { color: var(--rig-texte-3); padding: var(--rig-esp-2) var(--rig-esp-4); }
 .rig-tcw__lignes { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 
 /* --- Accordeon (/draft du 19/11/2026, conv-2024 : proposition 5, palette

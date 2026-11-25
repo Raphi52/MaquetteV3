@@ -16,7 +16,9 @@ namespace RigV3Desktop.Pont;
 /// <param name="Lignes">Les lignes, dans l'ordre d'affichage.</param>
 /// <param name="Exemples">Les groupes dont les lignes sont des EXEMPLES du descripteur (noms fictifs) : l'ecran les
 /// marque « exemple ».</param>
-public sealed record VueLignesEcran(string Mode, string? Message, string? Greffe, LigneEcran[] Lignes, string[] Exemples);
+/// <param name="Vides">Les groupes BRANCHES sur la base mais sans aucune ligne (ecran reuni : le titre de la procedure) :
+/// l'ecran les garde, avec « Aucune ligne dans la base du greffe », au lieu de les laisser disparaitre.</param>
+public sealed record VueLignesEcran(string Mode, string? Message, string? Greffe, LigneEcran[] Lignes, string[] Exemples, string[] Vides);
 
 /// <summary>
 /// Pont des lignes d'un ecran genere (web/src/ecrans/EcranGenere.tsx). Le descripteur (Pont/EcransGeneres/) donne la
@@ -55,6 +57,7 @@ public static class EcranGenere
 
         var lignes = new List<LigneEcran>();
         var exemples = new List<string>();
+        var vides = new List<string>();
         var plafonds = new List<string>();
         foreach (var (p, l) in procedures.Zip(lues))
         {
@@ -62,18 +65,19 @@ public static class EcranGenere
                 ? [.. l.Lignes.Select(x => new LigneEcran(x.Nom, x.Precisions, x.Groupe, x.Etat, x.Faites))]
                 : p.Lignes;
             if (!l.Branchee) exemples.AddRange(reuni ? [p.Titre] : p.Groupes);
+            else if (l.Total == 0 && siennes.Length == 0) vides.Add(p.Titre);
             else if (l.Total > l.Lignes.Length)
                 plafonds.Add($"{(reuni ? p.Titre + " : l" : "L")}es {l.Lignes.Length} premières lignes sur {l.Total}");
             lignes.AddRange(reuni ? siennes.Select(x => CatalogueGenere.LigneReunie(p, x)) : siennes);
         }
         var mode = exemples.Count == 0 ? "base" : lues.Any(l => l.Branchee) ? "mixte" : "exemple";
         return new VueLignesEcran(mode, plafonds.Count == 0 ? null : string.Join(" ; ", plafonds) + ".", greffe,
-                                  [.. lignes], [.. exemples]);
+                                  [.. lignes], [.. exemples], [.. vides]);
     }
 
     /// <summary>Les lignes d'exemple du descripteur, tous ses groupes marques « exemple ».</summary>
     private static VueLignesEcran Exemples(DescripteurEcran d, string mode, string? greffe, string? message)
-        => new(mode, message, greffe, d.Lignes, d.Groupes);
+        => new(mode, message, greffe, d.Lignes, d.Groupes, []);
 
     /// <summary>Pourquoi le serveur n'a pas rendu les lignes, en mots d'agent.</summary>
     private static string Motif(Exception e, ClientServeur serveur, string greffe)

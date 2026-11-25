@@ -355,6 +355,15 @@ var reuniRof = CatalogueGenere.Tous.First(d => d.Membres.Any(m => m.Code == "PRO
 var mixteRof = await EcranGenere.LignesAsync(client, Greffe, reuniRof.Code);
 Exiger(mixteRof.Mode == "mixte" && mixteRof.Lignes.Count(l => l.Groupe == CatalogueGenere.Descripteur("PROC_ROFSURVEILLANCES")!.Titre) == 10,
     $"pont, ecran reuni « {reuniRof.Titre} » : les 10 radiations d'office de la base dans leur groupe");
+// Un groupe BRANCHE mais sans aucune ligne (la copie de dev n'en garde que 200 par table) ne disparait pas : la vue le
+// porte dans Vides, l'ecran le montre avec « Aucune ligne ». Serveur factice : DCA vide, les autres procedures sans lecteur.
+using var videHandler = new RepondeurVide(descripteurDca.Code);
+var clientVide = new ClientServeur(new Uri("http://localhost/"), videHandler);
+var reuniVide = await EcranGenere.LignesAsync(clientVide, Greffe, reuniDca.Code);
+Exiger(reuniVide.Vides.SequenceEqual([descripteurDca.Titre]) && !reuniVide.Exemples.Contains(descripteurDca.Titre)
+       && reuniVide.Lignes.All(l => l.Groupe != descripteurDca.Titre) && reuniVide.Exemples.SequenceEqual(autres.Select(m => m.Titre)),
+    $"pont, ecran reuni, procedure branchee SANS ligne : « {descripteurDca.Titre} » est dans Vides, pas dans Exemples ({string.Join(", ", reuniVide.Vides)})");
+Exiger(base_.Vides.Length == 0 && mixte.Vides.Length == 0, "pont : une procedure qui a des lignes n'est jamais dans Vides");
 var panne = await EcranGenere.LignesAsync(client, GreffeAbsent, "PROC_DCA");
 Exiger(panne.Mode == "erreur" && panne.Lignes.SequenceEqual(descripteurDca.Lignes) && panne.Message?.Contains(GreffeAbsent) == true,
     $"pont, greffe absent (404) : les exemples restent, marques, avec le motif du serveur ({panne.Message})");
@@ -424,3 +433,14 @@ await app.StopAsync();
 Console.WriteLine();
 Console.WriteLine(echecs.Count == 0 ? "EcransGeneresBaseCheck : VERT" : $"EcransGeneresBaseCheck : ROUGE ({echecs.Count} echec(s))");
 return echecs.Count == 0 ? 0 : 1;
+
+/// <summary>Un serveur factice : la procedure <c>vide</c> est branchee et sans ligne, toute autre n'a pas de lecteur.</summary>
+sealed class RepondeurVide(string vide) : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage requete, CancellationToken jeton)
+    {
+        var code = requete.RequestUri!.AbsolutePath.Split('/')[^2];
+        var corps = new LignesEcran(code, code == vide, [], 0, 200);
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(corps, options: new JsonSerializerOptions(JsonSerializerDefaults.Web)) });
+    }
+}
