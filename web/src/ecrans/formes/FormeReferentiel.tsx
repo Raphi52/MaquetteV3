@@ -67,11 +67,9 @@ export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
     ? ': la ligne n’est pas ajoutée à la table' : ': la ligne n’est pas modifiée dans la table'))
   const annuler = () => { poserEdition(null); annoncer(null) }
 
-  // fix-ok: modifier() ouvre une ligne sans cellules en cellules(d, l) = [nom, '', ...] et la ligne en modification ne
-  // montrait plus ses precisions (test « garde ses precisions visibles en lecture », rouge avant ce bloc).
-  // Une ligne sans cellules (sansValeurs) s'ouvre en [nom, '', ...] : rien ne se devine de ses precisions, qui restent
-  // donc affichees en lecture sous les champs, avec la raison (controle final du lot 1 : sur « Mandataires », Abrege et
-  // SIREN s'ouvraient vides et les precisions ne se voyaient plus nulle part pendant la modification).
+  // fix-ok: modifier() ouvre une ligne sans cellules (sansValeurs) en cellules(d, l) = [nom, '', ...] ; rien ne se devine
+  // de ses precisions, qui restent donc affichees en lecture sous les champs, avec la raison (sur « Mandataires », Abrege
+  // et SIREN s'ouvraient vides et les precisions ne se voyaient plus nulle part ; test « garde ses precisions visibles »).
   const ligneEnEdition = (cle: number | 'nouvelle', l?: LigneTenue) => edition && edition.cle === cle && (
     <Fragment key={`edition-${cle}`}>
       <tr className="rig-eg-ligne--edition">
