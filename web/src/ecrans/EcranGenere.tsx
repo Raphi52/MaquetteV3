@@ -218,10 +218,10 @@ export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
            style={{ '--tcw-duree': `${DureeBascule}ms` } as CSSProperties}>
         <section className="rig-tcw__liste" aria-label={d.sujet}>
           <div className="rig-tcw__liste-entete">
-            <span className="rig-tcw__compteur" title={`${visiblesReelles} ${d.sujet}${visiblesExemple > 0 ? `, + ${visiblesExemple} en exemple` : ''}`}>
+            <span className="rig-tcw__compteur" title={`${visiblesReelles} ${d.sujet}${visiblesExemple > 0 ? ` · ${visiblesExemple} en exemple` : ''}`}>
               <b className="rig-tcw__compteur-nombre">{visiblesReelles}</b>
               <span className="rig-tcw__compteur-detail">{d.sujet}</span>
-              {visiblesExemple > 0 && <span className="rig-tcw__compteur-detail rig-tcw__compteur-exemple">+ {visiblesExemple} en exemple</span>}
+              {visiblesExemple > 0 && <span className="rig-tcw__compteur-detail rig-tcw__compteur-exemple">· {visiblesExemple} en exemple</span>}
             </span>
           </div>
 

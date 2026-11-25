@@ -257,7 +257,7 @@ describe('EcranGenere : lignes de la base ou exemples', () => {
     const { container } = await monter(d, { mode: 'mixte', message: null, greffe: '3801', lignes: [reelle, ...exemple], exemples: ['Relances'] })
     expect(container.querySelector('.rig-tcw__tuile .rig-chiffre__valeur')!.textContent).toBe('1')
     expect(container.querySelector('.rig-tcw__compteur-nombre')!.textContent).toBe('1')
-    expect(container.querySelector('.rig-tcw__compteur-exemple')!.textContent).toBe('+ 1 en exemple')
+    expect(container.querySelector('.rig-tcw__compteur-exemple')!.textContent).toBe('· 1 en exemple')
     // Le groupe d'exemple reste visible et etiquete (provenance + titre du groupe).
     expect(container.querySelectorAll('.rig-tcw__exemple')).toHaveLength(2)
   })
