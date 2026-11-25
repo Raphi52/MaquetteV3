@@ -427,17 +427,18 @@ public sealed class DomaineFacturer : IDomaineEcrans
             [
                 Marche("Critères", "Période et catégories de client, toutes cochées par défaut. Si PC est coché, filtres d'état (clôturé, ouvert, en attente) et de type (sauvegarde, RJ, LIJI, plan de sauvegarde, plan de redressement, CIA, CEP). Rien ne se calcule avant Rechercher.", true,
                     "Période", "Catégorie de client", "État PC", "Type PC"),
-                Marche("Résultat", "Totaux par client : facturé, payé et restant, par poste (HT, TVA, BODACC, INPI, débours). Consultation seulement : aucune écriture de lettrage.", true,
-                    "Facturé", "Payé", "Restant"),
+                // L'etape « Resultat » de V2 EST la grille des totaux par client, que l'Etat affiche (Colonnes) : la section qui
+                // la repetait est retiree (controle final du lot 1, 25/11/2026). Reste a lire pour le lot 13 : la grille V2
+                // detaille facture et paye par poste, HT, TVA, BODACC, INPI, debours (proc_vlettrage.md:113, :125).
             ],
             Lignes =
             [
-                Ligne("Client compte 01", $"Facturé {Euros(425_000)} · payé {Euros(425_000)}", "Compte hors PC", "Validee", 0, 1) with { Valeurs = ["Client compte 01", "4250.00", "4250.00", "0.00"] },
+                Ligne("Client compte 01", $"Facturé {Euros(425_000)} · payé {Euros(425_000)}", "Compte hors PC", "Validee", 0) with { Valeurs = ["Client compte 01", "4250.00", "4250.00", "0.00"] },
                 Ligne("Client compte 02", $"Facturé {Euros(98_000)} · payé {Euros(50_000)}", "Compte hors PC", "EnCours", 0) with { Valeurs = ["Client compte 02", "980.00", "500.00", "480.00"] },
                 Ligne("Client divers 01", $"Facturé {Euros(31_000)} · payé {Euros(0)}", "Divers", "AFaire") with { Valeurs = ["Client divers 01", "310.00", "0.00", "310.00"] },
-                Ligne("Client divers 02", $"Facturé {Euros(112_000)} · payé {Euros(112_000)}", "Divers", "Validee", 0, 1) with { Valeurs = ["Client divers 02", "1120.00", "1120.00", "0.00"] },
+                Ligne("Client divers 02", $"Facturé {Euros(112_000)} · payé {Euros(112_000)}", "Divers", "Validee", 0) with { Valeurs = ["Client divers 02", "1120.00", "1120.00", "0.00"] },
                 Ligne("Client PC 01", $"Facturé {Euros(1_640_000)} · payé {Euros(200_000)}", "PC", "EnCours", 0) with { Valeurs = ["Client PC 01", "16400.00", "2000.00", "14400.00"] },
-                Ligne("Client PC 02", $"Facturé {Euros(790_000)} · payé {Euros(790_000)}", "PC", "Validee", 0, 1) with { Valeurs = ["Client PC 02", "7900.00", "7900.00", "0.00"] },
+                Ligne("Client PC 02", $"Facturé {Euros(790_000)} · payé {Euros(790_000)}", "PC", "Validee", 0) with { Valeurs = ["Client PC 02", "7900.00", "7900.00", "0.00"] },
                 Ligne("Client PC 03", $"Facturé {Euros(264_000)} · payé {Euros(0)}", "PC", "AFaire") with { Valeurs = ["Client PC 03", "2640.00", "0.00", "2640.00"] },
             ],
         },

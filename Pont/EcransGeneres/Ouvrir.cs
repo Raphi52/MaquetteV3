@@ -195,9 +195,9 @@ public sealed class DomaineOuvrir : IDomaineEcrans
                 // obligatoires (Designer.cs:112 et :101) ; sans demandeur, une ligne vide est creee.
                 Marche("Demandeurs", "Les demandeurs de l'instance de la mesure ; sans demandeur, une ligne vide est créée.", true,
                     Champ.Tableau("Demandeurs")),
-                Marche("Défendeurs", "Les défendeurs de l'instance ; l'étape reste vide s'il n'y en a pas.", true,
+                Marche("Défendeurs", "Les défendeurs de l'instance ; la liste reste vide s'il n'y en a pas.", true,
                     Champ.Tableau("Défendeurs")),
-                Marche("Intervenants", "Les intervenants de l'instance ; l'étape reste vide s'il n'y en a pas.", false,
+                Marche("Intervenants", "Les intervenants de l'instance ; la liste reste vide s'il n'y en a pas.", false,
                     Champ.Tableau("Intervenants")),
                 // Deux etapes d'evenements, pas trois : les expires sont affiches avec les futurs (proc_mesin.md:247).
                 Marche("Événements survenus", "Événements de procédure déjà survenus ; une ligne vide est offerte s'il n'y en a aucun.", false,

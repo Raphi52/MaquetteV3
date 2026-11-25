@@ -504,7 +504,9 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             [
                 Marche("Recherche", "Les rejets se filtrent par numéro de dossier, numéro de dépôt, plage de dates et type de date. À l'ouverture, la liste se remplit seule sur les critères par défaut (200 résultats).", true,
                     "Numéro de dossier", "Numéro de dépôt", "Date du", "Date au", "Type de date"),
-                Marche("Résultats", "Grille des rejets. Le menu de la ligne renvoie l'acte à Infogreffe, copie la ligne ou l'ouvre dans la GED.", true,
+                // Le menu de la ligne (proc_actrej.md, OPE_RESULTATS). La section s'appelait « Resultats » et repetait la grille
+                // que la file affiche deja (controle final du lot 1, 25/11/2026) : elle ne garde que ce menu.
+                Marche("Menu de la ligne", "Le menu de la ligne renvoie l'acte à Infogreffe, copie la ligne ou l'ouvre dans la GED.", true,
                     "Renvoyer à Infogreffe", "Copier", "Voir dans la GED"),
                 Marche("Renvoi", "Le renvoi remet l'acte en file d'envoi : il quitte la liste au prochain rafraîchissement.", true,
                     "Acte renvoyé", "Confirmation"),

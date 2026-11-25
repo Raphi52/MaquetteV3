@@ -514,6 +514,20 @@ Exiger(parCode.GetValueOrDefault("PROC_IA") is { Forme: FormeEcran.Operation, Ob
        && ia.Sections.SelectMany(s => s.Champs).All(c => c.Type == TypeChamp.Tableau)
        && parCode.GetValueOrDefault("SYNTHESE_FORMALITES_DEMAT") is { EnOnglets: true },
     "« Analyse IA » est une Operation sur UNE liasse recue par son numero : lancement (rien a saisir), puis resultat ; son ecran reuni passe en onglets");
+// Une section est une PARTIE de l'objet ouvert, jamais la liste qui l'a trouve : chaque forme montre deja ses lignes (liste,
+// tableau, file). Une section titree « Resultat(s) » repetait cette liste dans la fiche, ou dans le detail d'une ligne
+// (controle final du lot 1, 25/11/2026 : Trouver.cs PROC_REGJUD, PROC_RECHENC, PROC_TARIFS, PROC_BEN, Surveiller.cs PROC_ACTREJ).
+// Le jumeau accepte : une section qui nomme ce qu'elle porte (« Resultat par affaire » d'une audience, Surveiller.cs).
+// fix-ok: mesure (banc rouge avant correctif, .autowin/tmp/eg-rouge.log) -- 8 sections titrees « Resultat(s) » dans
+// 8 descripteurs (ACTREJ, BEN, CFENET_RET, RECHENC, REGJUD, REQUETES, TARIFS, VLETTRAGE) ; ce fichier n'est edite ici
+// que pour cette regle (les controles MESIN et IA viennent du commit repris a54c0e4).
+foreach (var d in descripteurs.Where(d => d.Membres.Length == 0))
+    foreach (var s in d.Parties.Where(s => s.Titre is "Résultat" or "Résultats"))
+        Exiger(false, $"{d.Code} : la section « {s.Titre} » repete la liste que la forme {d.Forme} affiche deja");
+Exiger(descripteurs.All(d => d.Parties.All(s => s.Titre is not ("Résultat" or "Résultats"))),
+    "aucune section ne repete la liste de resultats de sa forme (titree « Resultat » ou « Resultats »)");
+Exiger(descripteurs.Any(d => d.Parties.Any(s => s.Titre == "Résultat par affaire")),
+    "une section qui nomme ce qu'elle porte (« Resultat par affaire ») reste admise");
 // Deux files de traitement sont rangees sous Trouver : les bilans rejetes a renvoyer, les demandes FNIG a envoyer.
 string[] filesSousTrouver = ["PROC_REJETS_BILANS", "PROC_FNIG"];
 Exiger(descripteurs.Where(d => d.Membres.Length == 0 && MenuAccueil.VerbeDe(d.Code)?.Titre == "Trouver")

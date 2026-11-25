@@ -105,7 +105,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_REGJUD", Titre = "Registres judiciaires", Sujet = "lignes de registre", Rang = 4,
             Forme = FormeEcran.Etat,
             Parametres = [Champ.Periode("Dates d'acte"), Champ.Periode("Dates de saisine"), Champ.Periode("Dates d'enrôlement"), "Type d'instance"],
-            // Colonnes : la section Resultats ci-dessous (les champs de la grille V2).
+            // Colonnes : les champs de la grille V2. Ils formaient une section « Resultats », retiree : elle repetait le
+            // tableau que l'Etat affiche (controle final du lot 1, 25/11/2026).
             Colonnes = ["Rôle", Champ.Date("Date d'acte"), "Numéro au répertoire", "Nature", "Chambre", Champ.Date("Date de décision"), "Type de décision", "Ressort"],
             Gestes = ["Aperçu", "Impression"],
             Recherche = "Filtrer les lignes du registre : rôle, nature, chambre…",
@@ -118,8 +119,6 @@ public sealed class DomaineTrouver : IDomaineEcrans
             [
                 Marche("Critères", "Saisir au moins un critère pour compter les lignes : dates d'acte, de saisine ou d'enrôlement, type d'instance.", true,
                     "Dates d'acte", "Dates de saisine", "Dates d'enrôlement", "Type d'instance"),
-                Marche("Résultats", "Les lignes trouvées, avec leur compte. Colonnes : date d'acte, numéro au répertoire général, rôle, nature, chambre, date et type de décision, ressort.", true,
-                    "Date d'acte", "Numéro au répertoire", "Rôle", "Nature", "Chambre", "Date de décision", "Type de décision", "Ressort"),
                 Marche("Ventilation", "Ventiler les résultats par type d'instance, avec le nombre d'instances de chaque type.", false,
                     "Type d'instance", "Nombre d'instances"),
                 Marche("Sélection", "Cocher les lignes à imprimer seulement, pour ne sortir qu'une partie du registre.", false,
@@ -131,10 +130,10 @@ public sealed class DomaineTrouver : IDomaineEcrans
             [
                 Ligne("Rôle 2026J00201 · Pi Études SARL c/ Rho Habitat SAS", "Acte du 03/03/2026 · n° 1201 · chambre commerciale", "Répertoire général", "AFaire"),
                 Ligne("Rôle 2026J00202 · Sigma Transports SARL c/ Tau Commerce SAS", "Acte du 04/03/2026 · n° 1202", "Répertoire général", "EnCours", 0),
-                Ligne("Rôle 2026J00203 · Upsilon Import SARL c/ Phi Bâtiment SAS", "Acte du 05/03/2026 · n° 1203", "Répertoire général", "Validee", 0, 1, 4),
+                Ligne("Rôle 2026J00203 · Upsilon Import SARL c/ Phi Bâtiment SAS", "Acte du 05/03/2026 · n° 1203", "Répertoire général", "Validee", 0, 3),
                 Ligne("Injonction 2026IP0301 · Chi Pêche SARL", "Décision du 06/03/2026", "Injonctions de payer", "AFaire"),
-                Ligne("Injonction 2026IP0302 · Psi Paiement SAS", "Décision du 09/03/2026", "Injonctions de payer", "EnCours", 0, 1),
-                Ligne("Ordonnance 2026OP0401 · Omega Conseil SAS", "Ordonnance du 10/03/2026", "Ordonnances du président", "Validee", 0, 1, 4),
+                Ligne("Injonction 2026IP0302 · Psi Paiement SAS", "Décision du 09/03/2026", "Injonctions de payer", "EnCours", 0),
+                Ligne("Ordonnance 2026OP0401 · Omega Conseil SAS", "Ordonnance du 10/03/2026", "Ordonnances du président", "Validee", 0, 3),
                 Ligne("Ordonnance 2026OP0402 · Kappa Négoce SARL", "Ordonnance du 11/03/2026", "Ordonnances du président", "AFaire"),
             ],
         },
@@ -311,7 +310,7 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Groupes = ["Encaissement ventilé", "Encaissement sans ventilation"],
             Sections =
             [
-                Marche("Résultats", "Un encaissement par ligne, ses ventilations dessous. Un encaissement sans ventilation réelle s'affiche en rouge.", true,
+                Marche("Encaissement", "L'encaissement, et ses ventilations dessous. Sans ventilation réelle, il s'affiche en rouge.", true,
                     "Encaissement", "Ventilation"),
                 Marche("Affaire", "Double-clic sur une ventilation : ouvre son affaire.", false,
                     "Affaire ouverte"),
@@ -342,7 +341,9 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Groupes = ["Article de base", "Article dérivé"],
             Sections =
             [
-                Marche("Résultats", "Les articles : code, libellé, montant dans la devise du greffe, et « Cohérent ? ». Au-delà du seuil du greffe (100 par défaut), une alerte demande d'affiner.", true,
+                // L'article ouvert (la section s'appelait « Resultats » : elle repetait la liste ; controle final du lot 1).
+                // Seuil : proc_tarifs.md:150 (par utilisateur, 100 par defaut, confirmation avant de charger).
+                Marche("Article", "Code, libellé, montant dans la devise du greffe, et « Cohérent ? ». Une recherche qui dépasse le seuil de l'utilisateur (100 articles par défaut) demande confirmation avant de charger.", true,
                     "Code", "Libellé", "Montant", "Cohérent ?"),
                 Marche("Cohérence", "Justifier une incohérence, la dévalider, ou voir ses raisons. Une justification vaut pour toute la famille de l'article.", true,
                     "Raisons de l'incohérence", "Justification"),
@@ -534,7 +535,7 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Groupes = ["Bénéficiaire en vigueur", "Dossier radié"],
             Sections =
             [
-                Marche("Résultats", "La liste des bénéficiaires. Un double-clic sur un numéro de gestion relance la recherche sur ce dossier ; sur un nom, la recherche sur cette personne.", true,
+                Marche("Bénéficiaire", "Numéro de gestion du dossier, nom, prénoms, date de naissance. Un double-clic sur le numéro de gestion relance la recherche sur ce dossier ; sur le nom, sur cette personne.", true,
                     "Numéro de gestion", "Nom", "Prénoms", "Date de naissance"),
                 Marche("Divergence", "Signaler une divergence sur le bénéficiaire sélectionné, par le menu contextuel.", true,
                     "Identifiant de divergence"),

@@ -35,7 +35,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Groupes = ["Au fond", "En référé"],
             Sections =
             [
-                Marche("Parties", "Demandeurs, défendeurs et intervenants, chacun dans sa propre étape.", false,
+                Marche("Parties", "Demandeurs, défendeurs et intervenants, chacun dans sa liste.", false,
                     Champ.Tableau("Demandeurs"), Champ.Tableau("Défendeurs"), Champ.Tableau("Intervenants")),
                 Marche("Appels d'affaire", "Dernier appel passé, prochain appel et liste complète.", false,
                     Champ.Date("Dernier appel"), Champ.Date("Prochain appel"), Champ.Tableau("Liste des appels")),
@@ -43,7 +43,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
                     Champ.Tableau("Décisions judiciaires"), "Chef de demande", Champ.Zone("Réponse du défendeur")),
                 Marche("Événements", "Événements survenus, puis événements futurs.", false,
                     Champ.Tableau("Événements survenus"), Champ.Tableau("Événements futurs")),
-                Marche("Facturation", "Ne facture pas par défaut : l'étape n'apparaît que si le paramétrage le demande.", false,
+                Marche("Facturation", "Ne facture pas par défaut : la section n'apparaît que si le paramétrage le demande.", false,
                     Champ.Tableau("Articles")),
                 Marche("Notes et calendrier", "Note sur l'instance, calendrier de la procédure, coffre-fort et Tribunal digital.", false,
                     "Note sur l'instance", Champ.Tableau("Calendrier de procédure"), Champ.Tableau("Coffre-fort")),

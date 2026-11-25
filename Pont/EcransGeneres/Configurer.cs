@@ -655,7 +655,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
                     ["Critères"]),
                 new MarcheEcran("Exécution", "La requête est exécutée après le contrôle de sécurité du garde-fou SQL.", true,
                     ["Exécuter"]),
-                new MarcheEcran("Résultat", "Le résultat s'affiche en grille.", false,
+                // La grille de la requete executee, pas la liste des requetes que l'Etat affiche : titree pour ce qu'elle porte
+                // (« Resultat » se lisait comme la liste de l'ecran ; controle final du lot 1, 25/11/2026).
+                new MarcheEcran("Résultat de la requête", "Le résultat de la requête s'affiche en grille.", false,
                     ["Lignes du résultat"]),
             ],
             Lignes =
@@ -747,8 +749,8 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             [
                 new MarcheEcran("Recherche", "La recherche se fait par période et par critères : rejet, traitement, masquage, date de retour.", true,
                     ["Période", "Rejets", "Date de retour"]),
-                new MarcheEcran("Résultat", "La grille liste les retours. Un menu contextuel donne les gestes sur la ligne.", true,
-                    ["Liste des retours"]),
+                // Une section « Resultat » (la grille des retours) repetait la liste de la file, retiree (controle final du
+                // lot 1, 25/11/2026) ; les gestes du menu de la ligne sont dans « Traitement ».
                 new MarcheEcran("Corrections du greffe", "Les corrections déjà faites par le greffe s'affichent si la case est cochée.", false,
                     ["Corrections"]),
                 new MarcheEcran("Traitement", "Traiter, rejeter ou masquer le retour ; le dossier part ensuite vers la GED.", true,
@@ -757,11 +759,11 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Lignes =
             [
                 new LigneEcran("Retour 2026-0101", "Rejets · à traiter", "Rejets", "AFaire", []),
-                new LigneEcran("Retour 2026-0102", "Rejets · rejeté", "Rejets", "Validee", [0, 1, 2, 3]),
-                new LigneEcran("Retour 2026-0103", "Retours à traiter · en cours", "Retours à traiter", "EnCours", [0, 1]),
+                new LigneEcran("Retour 2026-0102", "Rejets · rejeté", "Rejets", "Validee", [0, 1, 2]),
+                new LigneEcran("Retour 2026-0103", "Retours à traiter · en cours", "Retours à traiter", "EnCours", [0]),
                 new LigneEcran("Retour 2026-0104", "Retours à traiter · à traiter", "Retours à traiter", "AFaire", []),
-                new LigneEcran("Retour 2026-0105", "Retours traités · traité", "Retours traités", "Validee", [0, 1, 2, 3]),
-                new LigneEcran("Retour 2026-0106", "Retours traités · corrigé par le greffe", "Retours traités", "Validee", [0, 1, 2, 3]),
+                new LigneEcran("Retour 2026-0105", "Retours traités · traité", "Retours traités", "Validee", [0, 1, 2]),
+                new LigneEcran("Retour 2026-0106", "Retours traités · corrigé par le greffe", "Retours traités", "Validee", [0, 1, 2]),
                 new LigneEcran("Retour 2026-0107", "Retours à traiter · masqué", "Retours à traiter", "EnCours", [0]),
             ],
         },
