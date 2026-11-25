@@ -18,11 +18,12 @@
 // depots de demonstration l'ont suivi ici.
 //
 // LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 4) : la liste prend les briques de
-// composants/ListeModerne.tsx. Tete (compte, depots en erreur, « Aller a un depot… » Ctrl K), les onglets
+// composants/ListeModerne.tsx. Tete (compte, depots en erreur, « Aller a un depot… » Ctrl K -- ce champ EST le
+// critere « Code ou destinataire » de gauche, meme etat : un seul champ pour un seul filtre), les onglets
 // « A transmettre / Deja transmis » deviennent des puces comptees (sans « + Nouvelle vue » : ce sont deux listes,
 // pas un jeu de criteres), une ligne par depot (avatar et destinataire, code · abrege ; etat en point colore),
 // les six dates de suivi, le coffre et le type de decision dans la ligne depliee. Aucun montant : pas de carte.
-// Le clic qui montre l'historique, la ligne en alerte et les criteres ne changent pas.
+// Le clic qui montre l'historique, la ligne en alerte et les autres criteres ne changent pas.
 // fix-ok: application du socle des listes (lot 4) en plusieurs pas, pas un correctif.
 
 import { Fragment, useState } from 'react'
@@ -89,10 +90,6 @@ const NbColonnes = 6
 /** Un depot est « a transmettre » s'il n'est jamais parti ou s'il est en erreur (l'onglet de l'ecran). */
 const aTransmettreLe = (d: DepotCoffre) => d.envoiInfogreffe === null || d.erreur !== ''
 
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-}
-
 export function EcranCoffreFort() {
   const [recherche, setRecherche] = useState('')
   const [coffre, setCoffre] = useState('')
@@ -138,24 +135,13 @@ export function EcranCoffreFort() {
 
   const trouves = filtrer(aTransmettre)
   const s = selection
-
-  // « Aller a un depot… » (Ctrl K) : filtre la liste AFFICHEE, sans toucher aux criteres.
-  const [filtreRapide, setFiltreRapide] = useState('')
-  const cherche = normaliser(filtreRapide.trim())
-  const affiches = cherche === '' ? trouves : trouves.filter((d) => normaliser(
-    [d.code, d.abrege, d.destinataire, d.coffre, d.codeDepot, d.erreur].join(' ')).includes(cherche))
-  const enErreur = affiches.filter((d) => d.erreur !== '').length
+  const enErreur = trouves.filter((d) => d.erreur !== '').length
 
   return (
     <div className="rig-proc__corps">
 
       <aside className="rig-criteres">
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Criteres de recherche</div>
-
-        <label className="rig-saisie-champ">
-          <span className="rig-saisie-champ__libelle">Code ou destinataire</span>
-          <input className="rig-saisie-champ__saisie" value={recherche} onChange={(e) => setRecherche(e.target.value)} />
-        </label>
 
         <label className="rig-saisie-champ">
           <span className="rig-saisie-champ__libelle">Nom du coffre</span>
@@ -221,10 +207,10 @@ export function EcranCoffreFort() {
 
       <ListeModerne etiquette="Depots">
         <EnteteListe titre="Depots"
-                     synthese={<>{affiches.length}{affiches.length > 1 ? ' depots ' : ' depot '}
+                     synthese={<>{trouves.length}{trouves.length > 1 ? ' depots ' : ' depot '}
                        {aTransmettre ? 'a transmettre' : 'deja transmis'}{' · '}<b>{enErreur}</b>{' en erreur'}</>}
-                     filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a un depot…',
-                               valider: () => { if (affiches.length === 1) setSelection(affiches[0]!) } }} />
+                     filtre={{ valeur: recherche, changer: setRecherche, indication: 'Aller a un depot…',
+                               valider: () => { if (trouves.length === 1) setSelection(trouves[0]!) } }} />
 
         {/* Les deux onglets de l'ecran, en puces comptees (decision du lot 7 : onglets de listes differentes). */}
         <VuesListe vues={[
@@ -249,7 +235,7 @@ export function EcranCoffreFort() {
               </tr>
             </thead>
             <tbody>
-              {affiches.map((dep) => {
+              {trouves.map((dep) => {
                 const estOuverte = ouverte === dep.code
                 const classes = [dep.erreur === '' ? '' : 'rig-table__ligne--alerte', estOuverte ? 'rig-lm-ouverte' : ''].filter(Boolean).join(' ')
                 return (
@@ -281,11 +267,6 @@ export function EcranCoffreFort() {
               {trouves.length === 0 && (
                 <tr><td colSpan={NbColonnes} className="rig-table__vide">Aucun depot ne repond a ces criteres.</td></tr>
               )}
-              {trouves.length > 0 && affiches.length === 0 && (
-                <tr><td colSpan={NbColonnes} className="rig-table__vide">
-                  {`Aucun des ${trouves.length} depots ne contient « ${filtreRapide.trim()} ».`}
-                </td></tr>
-              )}
             </tbody>
           </table>
         </div>
@@ -300,7 +281,7 @@ export function EcranCoffreFort() {
         )}
 
         <PiedListe aide="Clic sur un depot pour voir son historique.">
-          <span><b>{affiches.length}</b>{affiches.length > 1 ? ' depots affiches' : ' depot affiche'}</span>
+          <span><b>{trouves.length}</b>{trouves.length > 1 ? ' depots affiches' : ' depot affiche'}</span>
           <span>En erreur <b>{enErreur}</b></span>
         </PiedListe>
       </ListeModerne>

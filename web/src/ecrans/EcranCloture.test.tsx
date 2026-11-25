@@ -38,6 +38,7 @@ describe('EcranCloture', () => {
     expect(alertes(container)[0]!.querySelector('.rig-lm-etat')!.className).toBe('rig-lm-etat rig-lm-t-rouge')
     expect(container.querySelector('tbody tr .rig-lm-etat')!.className).toBe('rig-lm-etat rig-lm-t-vert')
     expect(container.querySelector('.rig-lm-pied')!.textContent).toContain('Limite depassee 1')
+    expect(container.querySelector('.rig-lm-pied')!.textContent).toContain('5 affaires affichees')
   })
 
   it('le chevron deplie les colonnes secondaires de v2 sans ouvrir le dossier ; « Ouvrir le dossier » l\'ouvre', () => {
@@ -71,7 +72,7 @@ describe('EcranCloture', () => {
     expect(entetes(container)).toEqual(['Defendeur', 'Demandeur', 'Acte de saisine', 'Audience', 'Depot', 'Facturation'])
     expect(lignes(container)[0]).toEqual([
       'BDSARL BOULANGERIE DUVAL2024/00318 · PC-2024-0118', 'Me LEROY', 'Assignation', '15/09/2026', '04/03/2026', 'Facturee'])
-    fireEvent.change(screen.getByLabelText('Affaire'), { target: { value: 'zzz' } })
+    fireEvent.change(screen.getByLabelText('Aller a une affaire…'), { target: { value: 'zzz' } })
     expect(container.querySelector('.rig-table__vide')!.getAttribute('colspan')).toBe('6')
   })
 
@@ -121,16 +122,29 @@ describe('EcranCloture', () => {
     expect(numerosPc(second.container)).toEqual(['PC-2022-0876'])
   })
 
-  it('« Aller a une affaire… » filtre la liste affichee sans toucher aux criteres ; Entree ouvre le dossier reste seul', () => {
+  it('« Aller a une affaire… » EST le critere « Affaire » (nom ou n de role) : un seul champ, il compte et pose les vues ; Entree ouvre le dossier reste seul', () => {
     const { container, ouvrirDossier } = ouvrir()
-    const champ = screen.getByLabelText('Aller a une affaire…')
+    // Un seul champ pour un seul filtre : plus de champ « Affaire » a gauche.
+    expect(screen.queryByLabelText('Affaire')).toBeNull()
+    const champ = screen.getByLabelText('Aller a une affaire…') as HTMLInputElement
     fireEvent.change(champ, { target: { value: 'moulin' } })
     expect(numerosPc(container)).toEqual(['PC-2025-0044'])
-    expect((screen.getByLabelText('Affaire') as HTMLInputElement).value).toBe('')
+    // La tete et le pied comptent la liste filtree, pas les cinq.
+    expect(resultat(container)).toBe('1 affaire sur 5 · 0 a facturer · forfaits 380,00 €')
+    expect(container.querySelector('.rig-lm-pied')!.textContent).toContain('1 affaire affichee')
+    // C'est un critere : la vue « Toutes » n'est plus la vue posee.
+    expect(container.querySelector('.rig-lm-vue--active')).toBeNull()
     fireEvent.keyDown(champ, { key: 'Enter' })
     expect(ouvrirDossier).toHaveBeenCalledWith('2025B00044')
+    // Le n de role, comme le critere d'avant.
+    fireEvent.change(champ, { target: { value: '2024/00318' } })
+    expect(numerosPc(container)).toEqual(['PC-2024-0118'])
     fireEvent.change(champ, { target: { value: 'zzz' } })
-    expect(container.querySelector('.rig-table__vide')!.textContent).toBe('Aucune des 5 affaires ne contient « zzz ».')
+    expect(container.querySelector('.rig-table__vide')!.textContent).toBe('Aucune affaire ne repond a ces criteres.')
+    // « Effacer » le vide comme les autres criteres, et la vue « Toutes » revient.
+    fireEvent.click(screen.getByRole('button', { name: 'Effacer' }))
+    expect(champ.value).toBe('')
+    expect(screen.getByRole('button', { name: /^Toutes/ }).getAttribute('aria-pressed')).toBe('true')
   })
 })
 
@@ -146,7 +160,7 @@ describe('EcranCloture ouvert depuis une affaire', () => {
     const { container } = rendre(contexteDossier({ numero: '2025B00044', nom: 'SCI DU MOULIN' }))
     expect(resultat(container)).toBe('1 affaire sur 5 · 0 a facturer · forfaits 380,00 €')
     expect(lignes(container)[0]![1]).toBe('MSCI DU MOULINPC-2025-0044 · 3e')
-    expect((screen.getByLabelText('Affaire') as HTMLInputElement).value).toBe('SCI DU MOULIN')
+    expect((screen.getByLabelText('Aller a une affaire…') as HTMLInputElement).value).toBe('SCI DU MOULIN')
   })
 
   it('une affaire sans procedure le dit ; sans affaire, les cinq', () => {
@@ -157,6 +171,6 @@ describe('EcranCloture ouvert depuis une affaire', () => {
 
     const sans = rendre(null)
     expect(resultat(sans.container)).toBe('5 affaires sur 5 · 3 a facturer · forfaits 2\u00a0350,00 €')
-    expect((screen.getByLabelText('Affaire') as HTMLInputElement).value).toBe('')
+    expect((screen.getByLabelText('Aller a une affaire…') as HTMLInputElement).value).toBe('')
   })
 })

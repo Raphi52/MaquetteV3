@@ -65,7 +65,14 @@ internal static class Programme
             }
         }
 
-        Exiger(codes.Count > 100, $"le menu de gauche est bien parcouru ({codes.Count} entrees)");
+        // « Bien parcouru » = le parcours par reflexion retrouve TOUS les ecrans que le menu
+        // affiche, compte tenu par le menu lui-meme (MomentMenu.NombreEcrans). Le seuil fixe
+        // « > 100 » d'avant cassait des que le menu reunit des procedures dans un ecran de
+        // synthese (99 ecrans le 24/11/2026, b44f2e4) : il mesurait la taille du menu, pas le
+        // parcours. Le plancher de 50 garde l'alerte d'un menu vide ou d'un champ mal lu.
+        var affiches = RigV3Desktop.Pont.MenuAccueil.Moments.Sum(m => m.NombreEcrans);
+        Exiger(codes.Count == affiches && codes.Count > 50,
+            $"le menu de gauche est bien parcouru ({codes.Count} entrees lues, {affiches} affichees)");
 
         var muettes = new List<string>();
         foreach (var (code, libelle) in codes.DistinctBy(c => c.Code))
