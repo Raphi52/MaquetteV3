@@ -26,8 +26,8 @@ using RigV3Desktop.Pont.EcransGeneres;
 //   3. le PONT (Pont/EcranGenere.cs) contre ce serveur : vraies lignes, exemples sans serveur ou sans greffe, ecran
 //      reuni « mixte », motif d'une panne ; et, apres les jeux (3b), l'ecran reuni entierement branche en « base » ;
 //   4. TOUT lecteur trouve (ceux des lots suivants compris) contre le DESCRIPTEUR de sa procedure : groupes et etats
-//      au mot pres, rangs de marches, regle des ecrans generes (AFaire aucune marche, EnCours au moins une, Validee
-//      toutes les obligatoires), et au moins une ligne sur le banc.
+//      au mot pres ; pour une Saisie (seule forme a etapes), rangs de marches et regle des etapes (AFaire aucune
+//      marche, EnCours au moins une, Validee toutes les obligatoires) ; et au moins une ligne sur le banc.
 //
 // BRANCHER UN ECRAN DE PLUS (lots suivants) : son lecteur (un fichier, mode d'emploi en tete de LecteurEcran.cs), et
 // dans tests/EcransGeneresBaseCheck/Jeux/ deux fichiers neufs, aucune ligne de ce Program.cs a modifier :
@@ -424,14 +424,17 @@ foreach (var (code, lecteur) in lecteurs.ParProcedure.OrderBy(p => p.Key, String
     }
     Exiger(lues.Lignes.Count > 0, $"{code} : au moins une ligne sur le banc ({lues.Lignes.Count}) -- sinon le lecteur n'est pas essaye");
     var etats = d.Etats.Select(e => e.Code).ToHashSet();
-    // Les parties que comptent les Faites : les etapes d'une Saisie, les sections des autres formes (lot 1 du plan
-    // « RIG v3 100 % fonctionnel », 25/11/2026 : seule la Saisie garde des etapes, Descripteur.cs, Parties).
-    var obligatoires = d.Parties.Select((m, k) => (m, k)).Where(x => x.m.Obligatoire).Select(x => x.k).ToArray();
+    // Les Faites ne comptent que les ETAPES d'une Saisie, seule forme qui en garde (lot 1 du plan « RIG v3 100 %
+    // fonctionnel », 25/11/2026) : les sections d'une autre forme ne se franchissent pas, aucune forme ne lit Faites --
+    // la meme regle qu'EcransGeneresCheck. Mesure : la recherche retiree des sections de PROC_VTRID, son lecteur
+    // (Faites [0, 1, 3], comptes sur l'ancien escalier) sortait ici en rouge sans que l'ecran change.
+    var etapes = d.Marches.Length > 0;
+    var obligatoires = d.Marches.Select((m, k) => (m, k)).Where(x => x.m.Obligatoire).Select(x => x.k).ToArray();
     var fautes = lues.Lignes.Where(l =>
             !d.Groupes.Contains(l.Groupe) || !etats.Contains(l.Etat)
-            || l.Faites.Distinct().Count() != l.Faites.Length || l.Faites.Any(k => k < 0 || k >= d.Parties.Length)
-            || (l.Etat == "AFaire" && l.Faites.Length > 0) || (l.Etat == "EnCours" && l.Faites.Length == 0)
-            || (l.Etat == "Validee" && obligatoires.Except(l.Faites).Any()))
+            || (etapes && (l.Faites.Distinct().Count() != l.Faites.Length || l.Faites.Any(k => k < 0 || k >= d.Marches.Length)
+                           || (l.Etat == "AFaire" && l.Faites.Length > 0) || (l.Etat == "EnCours" && l.Faites.Length == 0)
+                           || (l.Etat == "Validee" && obligatoires.Except(l.Faites).Any()))))
         .Select(Texte).ToList();
     Exiger(fautes.Count == 0, $"{code} : chaque ligne a un groupe et un etat du descripteur, des marches de l'ecran, et suit la regle " +
         $"AFaire / EnCours / Validee ({lues.Lignes.Count} lignes{(fautes.Count > 0 ? " ; fautives : " + string.Join(" // ", fautes) : "")})");
