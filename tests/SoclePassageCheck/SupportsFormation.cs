@@ -40,7 +40,14 @@ internal static class SupportsFormation
     private static string LigneTableau(Ligne l)
         => $"| {l.Chemin} | {l.Entree.Libelle} | {l.Entree.Detail}"
          + (l.Entree.Membres.Length == 0 ? "" : $" — réunit : {string.Join(", ", l.Entree.Membres.Select(m => $"{m.Libelle} (`{m.Code}`)"))}")
-         + $" | {(l.Entree.Membres.Length == 0 ? $"`{l.Entree.Code}`" : "—")} | {(Portes.Contains(l.Entree.Code) ? "dans la V3" : "a venir")} |";
+         + $" | {(l.Entree.Membres.Length == 0 ? $"`{l.Entree.Code}`" : "—")} | {Etat(l.Entree)} |";
+
+    // Un ecran reuni EN ONGLETS (25/11/2026) montre les ecrans de ses procedures tels quels : construit quand ils le
+    // sont tous, en partie quand certains seulement le sont. Un ecran reuni en liste est generique : a venir.
+    private static string Etat(EntreeMenu e)
+        => Portes.Contains(e.Code) || (e.EnOnglets && e.Membres.All(m => Portes.Contains(m.Code))) ? "dans la V3"
+         : e.EnOnglets && e.Membres.Any(m => Portes.Contains(m.Code)) ? "en partie"
+         : "a venir";
 
     public static string EcransParMetier()
     {
@@ -48,7 +55,8 @@ internal static class SupportsFormation
         s.AppendLine(Genere).AppendLine();
         s.AppendLine("# Les écrans de la V3, métier par métier (SOC-026)").AppendLine();
         s.AppendLine("Ce que l'agent trouve dans le menu de gauche de la V3, rangé comme le menu (geste › verbe), pour son métier.");
-        s.AppendLine("« dans la V3 » : l'écran est construit ; « a venir » : l'entrée est au menu, son écran arrive avec son domaine.");
+        s.AppendLine("« dans la V3 » : l'écran est construit ; « a venir » : l'entrée est au menu, son écran arrive avec son domaine ;");
+        s.AppendLine("« en partie » : un écran à onglets dont une partie des onglets est déjà construite.");
         s.AppendLine("Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est le même écran, l'agent le reconnaît.").AppendLine();
         foreach (var (domaine, nom) in Metiers)
         {

@@ -428,8 +428,9 @@ try
            && deRequi.Any(l => l.AncienneTouche == "F1" && l.NouvelleTouche == "?"),
         $"SOC-027 CA03 : l'aide d'un ecran (Requisitions) donne ses touches avec l'ancienne touche a cote, F1 → « ? » ({deRequi.Length} lignes)");
     var procedure = File.ReadAllText(Path.Combine(racine, "web", "src", "plan", "Procedure.tsx"));
-    Exiger(procedure.Contains("<AideTouchesEcran code={proc.code} actif={!cachee} />"),
-        "SOC-027 CA03 : chaque ecran de procedure ecoute « ? » quand il est visible (Procedure.tsx ; vitest joue la touche)");
+    // Un ecran reuni en onglets (EntreeMenu.EnOnglets) montre les touches de l'onglet affiche ; tout autre ecran, les siennes.
+    Exiger(procedure.Contains("<AideTouchesEcran code={proc.ecran.reunis?.actif ?? proc.code} actif={!cachee} />"),
+        "SOC-027 CA03 : chaque ecran de procedure ecoute « ? » quand il est visible, celui de l'onglet montre s'il est reuni en onglets (Procedure.tsx ; vitest joue la touche)");
 
     // CA04 — chaque ligne mene a un ecran qui existe, et la touche annoncee y fait ce que dit la fiche.
     var aiguillage = File.ReadAllText(Path.Combine(racine, "web", "src", "plan", "Aiguillage.tsx"));

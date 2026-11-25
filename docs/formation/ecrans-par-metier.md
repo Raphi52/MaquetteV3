@@ -3,7 +3,8 @@
 # Les écrans de la V3, métier par métier (SOC-026)
 
 Ce que l'agent trouve dans le menu de gauche de la V3, rangé comme le menu (geste › verbe), pour son métier.
-« dans la V3 » : l'écran est construit ; « a venir » : l'entrée est au menu, son écran arrive avec son domaine.
+« dans la V3 » : l'écran est construit ; « a venir » : l'entrée est au menu, son écran arrive avec son domaine ;
+« en partie » : un écran à onglets dont une partie des onglets est déjà construite.
 Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est le même écran, l'agent le reconnaît.
 
 ## RCS — 23 entrée(s) propres au métier
@@ -24,7 +25,7 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Surveiller > Relancer | Divergences BEN | alertes de coherence | `PROC_DBEN_ALERT` | a venir |
 | Terminer >  | Édition interne d'un Kbis | extrait Kbis a usage interne | `PROC_XEX` | a venir |
 | Facturer > Facturer | Paiements INPI | reversements, formalites en attente — réunit : Reversements INPI (`PROC_INPIPAY`), Formalites INPI (`PROC_GINPI`) | — | a venir |
-| Configurer > Les clients | Non-inscrits | creer une personne hors registre | `PROC_CNI` | a venir |
+| Configurer > Les acteurs et les clients | Non-inscrits | creer une personne hors registre | `PROC_CNI` | a venir |
 | Configurer > Referentiels | Tables et natures de document | codes du greffe, typologie de la GED — réunit : Tables de reference (`PROC_GTABREF`), Natures de document (`PROC_GED_NATURE_DOC`) | — | a venir |
 | Configurer > Modeles et envois | Messagerie | les envois automatiques | `PROC_GESTEMAIL` | dans la V3 |
 | Configurer > Argent et exports | Banques | les comptes du greffe | `PROC_GESTBANQ` | dans la V3 |
@@ -59,9 +60,9 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Surveiller > Les echanges et l'ancien RIG | Suivi dematerialisation | ce qui est parti au JAL/BODACC | `PROC_SDEMATJUD` | a venir |
 | Surveiller > Chiffres | Statistiques cour d'appel | ce qui remonte a la CA | `PROC_STATCA` | a venir |
 | Facturer > Facturer | Creances | declarer, corriger, integrer, representer — réunit : Ajouter une creance (`PROC_ADDCREANCE`), Modifier une creance (`PROC_MODCREANCE`), Integrer des creances (`PROC_INTEGCREANCE`), Representation (`PROC_CREANREP`) | — | a venir |
-| Configurer > Les acteurs | Acteurs judiciaires | juges, parquet, intervenants | `PROC_ACTEUR_JUD` | dans la V3 |
-| Configurer > Les acteurs | Experts | qui designer, qui a deja siege | `PROC_EXPERT` | dans la V3 |
-| Configurer > Les acteurs | Mandataires et destinataires | mandataires, destinataires institutionnels, rapprocher, remplacer — réunit : Mandataires (`PROC_MANDATAIRE`), Destinataires institutionnels (`PROC_GDEST_INST`), Rapprocher des acteurs (`PROC_RAPPACTEUR`), Remplacer un acteur (`PROC_SUPP_ACTEUR_JUD`) | — | a venir |
+| Configurer > Les acteurs et les clients | Acteurs judiciaires | juges, parquet, intervenants | `PROC_ACTEUR_JUD` | dans la V3 |
+| Configurer > Les acteurs et les clients | Experts | qui designer, qui a deja siege | `PROC_EXPERT` | dans la V3 |
+| Configurer > Les acteurs et les clients | Mandataires et destinataires | mandataires, destinataires institutionnels, rapprocher, remplacer — réunit : Mandataires (`PROC_MANDATAIRE`), Destinataires institutionnels (`PROC_GDEST_INST`), Rapprocher des acteurs (`PROC_RAPPACTEUR`), Remplacer un acteur (`PROC_SUPP_ACTEUR_JUD`) | — | a venir |
 | Configurer > Referentiels | Tables et natures de document | codes du greffe, typologie de la GED — réunit : Tables de reference (`PROC_GTABREF`), Natures de document (`PROC_GED_NATURE_DOC`) | — | a venir |
 | Configurer > Referentiels | Reglages du judiciaire | salles d'audience, codes chefs IP, modeles de decision — réunit : Cabinets (`PROC_CABINET`), Codes chefs IP (`PROC_PARAM_IP`), Modeles de redaction (`PROC_REDAA`) | — | a venir |
 | Configurer > Modeles et envois | Messagerie | les envois automatiques | `PROC_GESTEMAIL` | dans la V3 |
@@ -83,7 +84,7 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Surveiller > Les instances | Suivi des injonctions de payer | IP en attente, preventions — réunit : Injonctions de payer (`PROC_SURVIP`), Suivi des preventions (`PROC_IPSUIVI`) | — | a venir |
 | Facturer > Facturer | Creances | declarer, corriger, integrer, representer — réunit : Ajouter une creance (`PROC_ADDCREANCE`), Modifier une creance (`PROC_MODCREANCE`), Integrer des creances (`PROC_INTEGCREANCE`), Representation (`PROC_CREANREP`) | — | a venir |
 
-## Tous les métiers — 50 entrée(s) communes (courrier, documents, comptabilité, réglages)
+## Tous les métiers — 45 entrée(s) communes (courrier, documents, comptabilité, réglages)
 
 | Geste › verbe | Entrée du menu | Ce qu'on y trouve | Procédure V2 | Écran |
 |---|---|---|---|---|
@@ -92,10 +93,7 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Ouvrir > Recevoir | Requisitions | commander des documents | `PROC_REQUI` | dans la V3 |
 | Trouver > Une affaire | Mes affaires | tout ce qui m'est confie | `PROC_RECHAFF` | dans la V3 |
 | Trouver > Les documents | Chercher et lire une piece | la GED, un PDF, une image — réunit : Documents (`PROC_RECHERCHE_GED`), Voir un PDF (`PROC_PDF`), Voir une image (`PROC_IMAGE`) | — | a venir |
-| Trouver > Les documents | Documents de l'affaire | la GED de l'affaire | `PROC_DOC_DEMAT` | dans la V3 |
-| Trouver > Les documents | Actes numerises | ce que le scanner a produit | `PROC_ACTES_NUM` | dans la V3 |
-| Trouver > Les documents | Controle des scans | verifier avant de valider | `PROC_CONTROLE_VIDIGED` | dans la V3 |
-| Trouver > Les documents | Coffre-fort | les pieces mises a l'abri | `PROC_COFFRE_FORT` | dans la V3 |
+| Trouver > Les documents | Documents numerises | de l'affaire, scannes, a controler, au coffre-fort — réunit : Documents de l'affaire (`PROC_DOC_DEMAT`), Actes numerises (`PROC_ACTES_NUM`), Controle des scans (`PROC_CONTROLE_VIDIGED`), Coffre-fort (`PROC_COFFRE_FORT`) | — | dans la V3 |
 | Trouver > Chiffres et fichiers exterieurs | Encaissements | retrouver un reglement | `PROC_RECHENC` | a venir |
 | Trouver > Chiffres et fichiers exterieurs | Fichiers et echanges exterieurs | FNIG, FIBEN, notifications, tribunal digital — réunit : Interdits de gerer (`PROC_VFNIG`), Demandes FNIG (`PROC_FNIG`), FIBEN (`PROC_FIBEN`), Notifications (`PROC_VNOTIF`), Tribunal digital (`PROC_VTRID`) | — | a venir |
 | Modifier > Rediger et editer | Courriers divers | les lettres types du greffe | `PROC_COURRIER_DIVERS` | dans la V3 |
@@ -107,8 +105,7 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Surveiller > Les instances | Lots | les lots en cours | `PROC_GESTLOT` | a venir |
 | Surveiller > Les echanges et l'ancien RIG | Fiches en conflit | modifiees dans les deux RIG | `PROC_FICHES_CONFLIT` | dans la V3 |
 | Surveiller > Les echanges et l'ancien RIG | Historique de l'ancien RIG | affaires des deux RIG, anciens numeros | `PROC_HISTORIQUE_ANCIEN_RIG` | dans la V3 |
-| Surveiller > Chiffres | Statistiques | les chiffres du greffe | `PROC_STAT` | dans la V3 |
-| Surveiller > Chiffres | Pilotage | tableaux de bord | `PROC_XPILOTAGE` | a venir |
+| Surveiller > Chiffres | Statistiques et pilotage | les chiffres du greffe, les tableaux de bord — réunit : Statistiques (`PROC_STAT`), Pilotage (`PROC_XPILOTAGE`) | — | en partie |
 | Surveiller > Chiffres | Numeros manquants | le registre chronologique | `PROC_NUMEROS_MANQUANTS` | dans la V3 |
 | Terminer >  | Cloture | fermer une affaire terminee | `PROC_CLOT` | dans la V3 |
 | Terminer >  | Archivage | archiver ou radier | `PROC_ARCHIRAD` | dans la V3 |
@@ -120,8 +117,7 @@ Le code entre guillemets inversés est celui de la procédure de RIG V2 : c'est 
 | Facturer > Encaisser et tenir les comptes | Journaux et lettrage | caisse, ventes, repertoire, lettrage — réunit : Journal de caisse (`PROC_JCAISSE`), Journal de vente (`PROC_JVENTE`), Livre de repertoire (`PROC_JLR`), Lettrage (`PROC_VLETTRAGE`) | — | a venir |
 | Facturer > Encaisser et tenir les comptes | Figer les ecritures | comptabiliser la journee | `PROC_COMPTABILISATION` | dans la V3 |
 | Facturer > Encaisser et tenir les comptes | Certification NF525 | journal et grands totaux signes | `PROC_CERTIF` | dans la V3 |
-| Configurer > Les clients | Clients | comptes et fiches | `PROC_GCLIENT` | dans la V3 |
-| Configurer > Les clients | Fiche client | le detail d'un client | `PROC_FCLIENT` | dans la V3 |
+| Configurer > Les acteurs et les clients | Comptes clients | la liste des clients, la fiche d'un client — réunit : Clients (`PROC_GCLIENT`), Fiche client (`PROC_FCLIENT`) | — | dans la V3 |
 | Configurer > Mon poste | Mon accueil | tuiles et alertes | `PROC_ACCUEIL_PARAM` | dans la V3 |
 | Configurer > Mon poste | Actualites | les messages de l'accueil | `PROC_ACTUALITES` | dans la V3 |
 | Configurer > Mon poste | Dates de travail | la date du greffe | `PROC_GESTDATE` | a venir |

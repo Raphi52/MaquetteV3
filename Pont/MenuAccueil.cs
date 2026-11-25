@@ -24,6 +24,13 @@ namespace RigV3Desktop.Pont;
 // Regle tenue par tests/EcransGeneresCheck : on ne reunit que des procedures vues
 // par les MEMES metiers (Metier/PerimetreProfil.cs) -- un ecran reuni ne montre
 // jamais a un agent une liste qu'il ne verrait pas seule.
+//
+// ECRANS REUNIS EN ONGLETS (25/11/2026, conv-2147). Un ecran fait a la main en React
+// a sa propre logique : il ne se fond pas dans une liste. Le MEME Reunit les rassemble,
+// avec EnOnglets : un onglet par procedure, chacun montre SON ecran d'origine, monte
+// tel quel (web/src/ecrans/EcranOnglets.tsx). Code, nom, metier, ouverture par le code
+// d'une procedure reunie : les memes regles que l'ecran de synthese, l'onglet de la
+// procedure demandee en plus (Pont/PlanTravail.cs, EcranQuiReunit).
 // ============================================================
 
 /// <summary>Une entree du panneau de gauche, nommee par le BESOIN et non par
@@ -31,8 +38,10 @@ namespace RigV3Desktop.Pont;
 /// cherche pas « PROC_ARRIVEE », il cherche le courrier arrive ce matin.
 /// <paramref name="Detail"/> dit ce qu'on y trouve, pour qu'on n'ait pas a
 /// ouvrir pour savoir. <paramref name="Reunit"/> : les procedures que cet ecran
-/// reunit (ecran de synthese), null pour un ecran d'une seule procedure.</summary>
-public sealed record EntreeMenu(string Libelle, string Detail, string Code, EntreeMenu[]? Reunit = null)
+/// reunit (ecran de synthese), null pour un ecran d'une seule procedure.
+/// <paramref name="EnOnglets"/> : les procedures reunies gardent chacune leur
+/// ecran, un onglet chacune, au lieu d'une liste commune.</summary>
+public sealed record EntreeMenu(string Libelle, string Detail, string Code, EntreeMenu[]? Reunit = null, bool EnOnglets = false)
 {
     /// <summary>Les procedures reunies, vide pour un ecran simple.</summary>
     public EntreeMenu[] Membres => Reunit ?? [];
@@ -124,11 +133,15 @@ public static class MenuAccueil
                     new("Voir un PDF",            "lire une piece",                     "PROC_PDF"),
                     new("Voir une image",         "image ou PDF multi-pages",           "PROC_IMAGE")
                 ]),
-                new("Documents de l'affaire", "la GED de l'affaire",                "PROC_DOC_DEMAT"),
-                new("Documents judiciaires",  "la GED du judiciaire",               "PROC_GEDJUD"),
-                new("Actes numerises",        "ce que le scanner a produit",        "PROC_ACTES_NUM"),
-                new("Controle des scans",     "verifier avant de valider",          "PROC_CONTROLE_VIDIGED"),
-                new("Coffre-fort",            "les pieces mises a l'abri",          "PROC_COFFRE_FORT")
+                // Vus par tous les metiers : les documents judiciaires (reserves au judiciaire) restent a part.
+                new("Documents numerises",    "de l'affaire, scannes, a controler, au coffre-fort", "SYNTHESE_DOCUMENTS_NUMERISES",
+                [
+                    new("Documents de l'affaire", "la GED de l'affaire",                "PROC_DOC_DEMAT"),
+                    new("Actes numerises",        "ce que le scanner a produit",        "PROC_ACTES_NUM"),
+                    new("Controle des scans",     "verifier avant de valider",          "PROC_CONTROLE_VIDIGED"),
+                    new("Coffre-fort",            "les pieces mises a l'abri",          "PROC_COFFRE_FORT")
+                ], EnOnglets: true),
+                new("Documents judiciaires",  "la GED du judiciaire",               "PROC_GEDJUD")
             ]),
             new("Chiffres et fichiers exterieurs",
             [
@@ -286,11 +299,15 @@ public static class MenuAccueil
                 new("Fiches en conflit",      "modifiees dans les deux RIG",        "PROC_FICHES_CONFLIT"),
                 new("Historique de l'ancien RIG", "affaires des deux RIG, anciens numeros", "PROC_HISTORIQUE_ANCIEN_RIG")
             ]),
+            // Les statistiques de la cour d'appel sont reservees au judiciaire : elles restent a part.
             new("Chiffres",
             [
-                new("Statistiques",           "les chiffres du greffe",             "PROC_STAT"),
+                new("Statistiques et pilotage", "les chiffres du greffe, les tableaux de bord", "SYNTHESE_STATISTIQUES",
+                [
+                    new("Statistiques",           "les chiffres du greffe",             "PROC_STAT"),
+                    new("Pilotage",               "tableaux de bord",                   "PROC_XPILOTAGE")
+                ], EnOnglets: true),
                 new("Statistiques cour d'appel", "ce qui remonte a la CA",          "PROC_STATCA"),
-                new("Pilotage",               "tableaux de bord",                   "PROC_XPILOTAGE"),
                 new("Numeros manquants",      "le registre chronologique",          "PROC_NUMEROS_MANQUANTS")
             ])
         ]),
@@ -351,7 +368,9 @@ public static class MenuAccueil
         ]),
         new("Configurer", "reg", "@",
         [
-            new("Les acteurs",
+            // « Les clients » n'avait plus que deux ecrans une fois les clients reunis (25/11/2026) : sous
+            // trois, un verbe ne merite pas son titre (tests/MenuGestesCheck), ses lignes remontent ici.
+            new("Les acteurs et les clients",
             [
                 new("Acteurs judiciaires",    "juges, parquet, intervenants",       "PROC_ACTEUR_JUD"),
                 new("Experts",                "qui designer, qui a deja siege",     "PROC_EXPERT"),
@@ -361,12 +380,13 @@ public static class MenuAccueil
                     new("Destinataires institutionnels", "parquet, administrations, coffre-fort", "PROC_GDEST_INST"),
                     new("Rapprocher des acteurs", "fusionner deux fiches",              "PROC_RAPPACTEUR"),
                     new("Remplacer un acteur",    "substituer dans les instances",      "PROC_SUPP_ACTEUR_JUD")
-                ])
-            ]),
-            new("Les clients",
-            [
-                new("Clients",                "comptes et fiches",                  "PROC_GCLIENT"),
-                new("Fiche client",           "le detail d'un client",              "PROC_FCLIENT"),
+                ]),
+                // Les non-inscrits sont des personnes du registre (RCS seul) : ils restent a part des clients.
+                new("Comptes clients",        "la liste des clients, la fiche d'un client", "SYNTHESE_CLIENTS",
+                [
+                    new("Clients",                "comptes et fiches",                  "PROC_GCLIENT"),
+                    new("Fiche client",           "le detail d'un client",              "PROC_FCLIENT")
+                ], EnOnglets: true),
                 new("Non-inscrits",           "creer une personne hors registre",   "PROC_CNI")
             ]),
             // « Ancienne touche, nouvelle touche » n'est plus ici : elle etait aussi deux lignes

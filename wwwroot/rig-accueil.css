@@ -1515,6 +1515,26 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
   min-height: 0;
 }
 
+/* L'ECRAN REUNI EN ONGLETS (web/src/ecrans/EcranOnglets.tsx, 25/11/2026) : la barre des
+   onglets, puis l'ecran d'origine de l'onglet montre. Son panneau refait la colonne souple de
+   .rig-proc : l'ecran y prend la place restante comme s'il etait seul. Un panneau cache garde
+   son ecran monte ; display:flex l'emporterait sur l'attribut hidden, d'ou la regle [hidden]. */
+.rig-reunis { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.rig-reunis__onglets {
+  flex: none; display: flex; gap: 2px; padding: 6px 12px;
+  border-bottom: 1px solid var(--rig-bord); background: var(--rig-fond);
+}
+.rig-reunis__onglet {
+  padding: 5px 14px; border: 0; border-radius: 999px; background: transparent; cursor: pointer;
+  font: 13px var(--rig-font); color: var(--rig-texte-3); white-space: nowrap;
+}
+.rig-reunis__onglet:hover { color: var(--rig-texte); background: var(--rig-fond-2); }
+.rig-reunis__onglet--actif, .rig-reunis__onglet--actif:hover {
+  background: var(--rig-or); color: var(--rig-or-texte); font-weight: 600;
+}
+.rig-reunis__panneau { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.rig-reunis__panneau[hidden] { display: none; }
+
 /* Ecran PROC_REQUI : une bande pleine largeur au-dessus des deux colonnes,
    pour les commandes web arrivees par EDI (fiche 275). */
 .rig-proc__corps--cmdweb {

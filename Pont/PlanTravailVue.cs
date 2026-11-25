@@ -64,9 +64,21 @@ public sealed record ProcVue(string Code, string Libelle, EcranProcVue Ecran);
 /// web/src/ecrans/EcranGenere.tsx ; null pour une procedure sans descripteur (EcranNonMaquette).
 /// fix-ok: sans ce champ, l'aiguillage React ne recevait jamais de descripteur : EcranProcVue n'en
 /// portait aucun (mesure : un seul constructeur, VueProc), donc EcranGenere ne pouvait pas etre monte.</param>
+/// <param name="Reunis">Un ecran REUNI EN ONGLETS (Pont/MenuAccueil.cs, EntreeMenu.EnOnglets), monte par
+/// web/src/ecrans/EcranOnglets.tsx ; null pour tout autre ecran.</param>
 public sealed record EcranProcVue(string[] Valides, string? SirenDemande, string CleOuverture,
                                   SessionEcranVue? Lot, string? Motif, PaletteVue? Recherche,
-                                  ContexteDossierVue? Dossier, DescripteurEcran? Descripteur);
+                                  ContexteDossierVue? Dossier, DescripteurEcran? Descripteur,
+                                  OngletsReunisVue? Reunis);
+
+/// <summary>Les onglets d'un ecran reuni : une procedure chacun, dans l'ordre du menu.</summary>
+/// <param name="Actif">Le code de la procedure montree : celle demandee par son code (recherche, favori,
+/// affaire) ou choisie dans l'ecran, sinon la premiere.</param>
+public sealed record OngletsReunisVue(OngletReuniVue[] Onglets, string Actif);
+
+/// <summary>Un onglet : la procedure, son nom au menu, et son descripteur quand son ecran est generique
+/// (Pont/EcransGeneres/) -- un ecran fait a la main n'en a pas, l'aiguillage le monte par son code.</summary>
+public sealed record OngletReuniVue(string Code, string Libelle, DescripteurEcran? Descripteur);
 
 /// <summary>Le contexte d'une affaire transmis a l'ecran ouvert pour elle.</summary>
 /// <param name="Nom">La denomination (fiche sommaire), sinon l'objet de l'affaire.</param>
@@ -310,7 +322,17 @@ public sealed partial class SessionPlanTravail
                 MotifNonMaquette(p.Code),
                 p.Code == CodePageRecherche ? VuePageRecherche() : null,
                 ContexteDeLEcran(p.Code),
-                CatalogueGenere.Descripteur(p.Code)));
+                CatalogueGenere.Descripteur(p.Code),
+                VueOngletsReunis(p.Code)));
+    }
+
+    /// <summary>Les onglets d'un ecran reuni EN ONGLETS, null pour tout autre ecran.</summary>
+    private OngletsReunisVue? VueOngletsReunis(string code)
+    {
+        if (Pont.MenuAccueil.Toutes.FirstOrDefault(e => e.Code == code) is not { EnOnglets: true } reunion) return null;
+        return new OngletsReunisVue(
+            [.. reunion.Membres.Select(m => new OngletReuniVue(m.Code, m.Libelle, CatalogueGenere.Descripteur(m.Code)))],
+            OngletDesReunions.GetValueOrDefault(code) ?? reunion.Membres[0].Code);
     }
 
     // ---- Taches en lot : la session que Components/Ecrans/EcranTachesLot.razor ouvrait ----
@@ -759,6 +781,7 @@ public sealed partial class SessionPlanTravail
 
             // ---- Ecran de procedure et ouvertures demandees par les ecrans ----
             case "ouvrirCode": OuvrirCode(Texte(valeur)); break;
+            case "ongletReuni": ChoisirOngletReuni(Texte(valeur)); break;
             case "ouvrirNumero": OuvrirParNumero(Texte(valeur)); break;
             case "ouvrirUnDossier": OuvrirUnDossierPour(Texte(valeur)); break;
 

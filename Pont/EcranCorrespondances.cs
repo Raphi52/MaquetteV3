@@ -207,8 +207,9 @@ public static class EcranCorrespondances
     {
         var ecran = EcransRemplaces.TryGetValue(procedureV2, out var remplace) ? remplace
                   : CatalogueEcrans.Nom(procedureV2).Length > 0 ? procedureV2 : null;
-        // Une procedure reunie s'essaie dans l'ecran qui la reunit : c'est la qu'on la trouve au menu.
-        return ecran is null ? null : MenuAccueil.SyntheseDe(ecran)?.Code ?? ecran;
+        // Une procedure reunie en LISTE s'essaie dans l'ecran qui la reunit : c'est la qu'on la trouve au menu. Reunie
+        // EN ONGLETS, elle garde son ecran (son onglet), et son code ouvre l'ecran reuni sur cet onglet.
+        return ecran is null ? null : MenuAccueil.SyntheseDe(ecran) is { EnOnglets: false } reunion ? reunion.Code : ecran;
     }
 
     /// <summary>L'ecran existe-t-il deja dans la V3 (maquette) ? Les pages (accueil, dossier, recherche) toujours.</summary>

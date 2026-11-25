@@ -143,6 +143,20 @@ export interface EcranProcVue {
   dossier: ContexteDossierVue | null
   /** Le descripteur d'un ecran generique (Pont/EcransGeneres/), monte par EcranGenere ; null : ecran « a venir ». */
   descripteur: DescripteurEcranVue | null
+  /** Un ecran REUNI EN ONGLETS (Pont/MenuAccueil.cs, EntreeMenu.EnOnglets), monte par EcranOnglets ; null sinon. */
+  reunis: OngletsReunisVue | null
+}
+/** Les onglets d'un ecran reuni, un par procedure, dans l'ordre du menu. */
+export interface OngletsReunisVue {
+  onglets: OngletReuniVue[]
+  /** Le code de la procedure montree : demandee par son code, ou choisie dans l'ecran. */
+  actif: string
+}
+/** Un onglet : sa procedure, son nom au menu, son descripteur quand son ecran est generique. */
+export interface OngletReuniVue {
+  code: string
+  libelle: string
+  descripteur: DescripteurEcranVue | null
 }
 /** Le contexte d'une affaire transmis a l'ecran ouvert pour elle (Pont/PlanTravailActions.cs). */
 export interface ContexteDossierVue {

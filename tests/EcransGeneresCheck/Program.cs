@@ -20,7 +20,10 @@ using RigV3Desktop.Pont.EcransGeneres;
 //   6. les ECRANS REUNIS (24/11/2026, conv-2142 : « on groupe ce qui peut l'etre ») : chaque
 //      entree du menu qui reunit des procedures a un descripteur fabrique de LEURS descripteurs
 //      (un groupe chacune, leurs lignes, leurs marches), et ne melange jamais des procedures que
-//      des metiers differents voient (Metier/PerimetreProfil.cs).
+//      des metiers differents voient (Metier/PerimetreProfil.cs) ;
+//   7. les ECRANS REUNIS EN ONGLETS (25/11/2026, conv-2147 : les ecrans faits a la main en React,
+//      EntreeMenu.EnOnglets) : chaque procedure y garde SON ecran, un onglet chacune, sous la meme
+//      regle du metier ; ouverte par son code (la recherche), elle mene a l'ecran reuni, sur SON onglet.
 
 var echecs = new List<string>();
 void Exiger(bool ok, string quoi)
@@ -48,15 +51,19 @@ var codesMenu = entrees.Select(e => e.Code).Distinct().ToList();
 // Une procedure reunie garde son nom et son code : le menu la porte, sous l'ecran qui la reunit.
 var libelleDuCode = MenuAccueil.Toutes.GroupBy(e => e.Code).ToDictionary(g => g.Key, g => g.First().Libelle);
 var reunions = entrees.Where(e => e.Membres.Length > 0).DistinctBy(e => e.Code).ToList();
+// Les ecrans reunis en LISTE (un descripteur fabrique, sections 2 et 6) et ceux EN ONGLETS (section 7).
+var enListe = reunions.Where(e => !e.EnOnglets).ToList();
+var enOnglets = reunions.Where(e => e.EnOnglets).ToList();
 var casAiguillage = Regex.Matches(aiguillage, @"case '([A-Z_0-9]+)':").Select(m => m.Groups[1].Value).ToHashSet();
 Exiger(libelleDuCode.Count >= 150,
     $"le menu expose ses procedures ({libelleDuCode.Count} codes atteignables, dont {libelleDuCode.Count - codesMenu.Count} reunis ; {entrees.Count} entrees affichees)");
 // Mesure du 24/11/2026 (conv-2142) : 170 entrees affichees avant, 107 apres la premiere passe, 99 apres
-// la seconde. Ce qui reste a part est un ecran porte en React (sa propre logique), ou une procedure vue
-// par d'autres metiers que ses voisines. Le plafond tient le resserrement : un ecran de plus au menu se
-// reunit d'abord a ses voisins, ou ce plafond se discute.
-Exiger(reunions.Count >= 30 && entrees.Count <= 100,
-    $"le menu est resserre : {reunions.Count} ecrans reunissent plusieurs procedures, {entrees.Count} entrees affichees (170 avant le 24/11/2026)");
+// la seconde. Le 25/11/2026 (conv-2147), les ecrans portes en React d'un meme metier sont reunis en
+// onglets : 94. Ce qui reste a part est une procedure vue par d'autres metiers que ses voisines. Le
+// plafond tient le resserrement : un ecran de plus au menu se reunit d'abord a ses voisins, ou ce
+// plafond se discute.
+Exiger(reunions.Count >= 33 && entrees.Count <= 95,
+    $"le menu est resserre : {reunions.Count} ecrans reunissent plusieurs procedures ({enOnglets.Count} en onglets), {entrees.Count} entrees affichees (170 avant le 24/11/2026)");
 
 // L'aiguillage monte le descripteur par sa branche par defaut, et seulement la.
 Exiger(aiguillage.Contains("import { EcranGenere } from '../ecrans/EcranGenere'")
@@ -111,11 +118,13 @@ foreach (var d in descripteurs.Where(d => d.Membres.Length > 0))
     foreach (var defaut in defauts) Exiger(false, $"{d.Code} : {defaut}");
 }
 
-// Chaque procedure reunie a son descripteur, et n'est reunie qu'une fois (sinon deux ecrans se la disputent).
+// Chaque procedure reunie EN LISTE a son descripteur, et toute procedure n'est reunie qu'une fois (sinon deux
+// ecrans se la disputent). Celles reunies en onglets gardent leur ecran : section 7.
 var reunies = reunions.SelectMany(e => e.Membres.Select(m => (Reunion: e.Code, m.Code))).ToList();
-var sansDescripteur = reunies.Where(r => !parCode.TryGetValue(r.Code, out var x) || x.Membres.Length > 0).ToList();
+var reuniesEnListe = enListe.SelectMany(e => e.Membres.Select(m => (Reunion: e.Code, m.Code))).ToList();
+var sansDescripteur = reuniesEnListe.Where(r => !parCode.TryGetValue(r.Code, out var x) || x.Membres.Length > 0).ToList();
 Exiger(sansDescripteur.Count == 0,
-    $"chaque procedure reunie a son propre descripteur ({reunies.Count} procedures dans {reunions.Count} ecrans)"
+    $"chaque procedure reunie en liste a son propre descripteur ({reuniesEnListe.Count} procedures dans {enListe.Count} ecrans)"
     + (sansDescripteur.Count == 0 ? "" : $" ; sans : {string.Join(", ", sansDescripteur.Select(r => $"{r.Code} dans {r.Reunion}"))}"));
 var deuxFois = reunies.GroupBy(r => r.Code).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
 Exiger(deuxFois.Count == 0 && !reunies.Any(r => codesMenu.Contains(r.Code)),
@@ -224,7 +233,8 @@ Exiger(reunions.FirstOrDefault(e => e.Code == "PROC_CREANCE") is { } creances
        && creances.Membres.Select(m => m.Code).SequenceEqual(["PROC_ADDCREANCE", "PROC_MODCREANCE", "PROC_INTEGCREANCE", "PROC_CREANREP"]),
     "PROC_CREANCE, conteneur vide de RIG v2, reunit les quatre procedures des creances");
 
-var sansEcran = codesMenu.Where(c => !casAiguillage.Contains(c) && !parCode.ContainsKey(c)).ToList();
+// Un ecran reuni en onglets n'a ni cas ni descripteur : l'ecran a onglets le porte (section 7 le verifie).
+var sansEcran = codesMenu.Where(c => !casAiguillage.Contains(c) && !parCode.ContainsKey(c) && enOnglets.All(e => e.Code != c)).ToList();
 var tolerees = 0;
 foreach (var code in sansEcran)
 {
@@ -234,6 +244,102 @@ foreach (var code in sansEcran)
         Note($"{code} sans ecran, tolere : {exceptions[code]}");
     }
     else Exiger(false, $"{code} ({libelleDuCode[code]}) : entree du menu sans ecran ni descripteur");
+}
+
+// ============================================================ 7. LES ECRANS REUNIS EN ONGLETS
+// fix-ok: cause mesuree (25/11/2026, conv-2147) -- les sections 2 et 6 exigeaient un descripteur de chaque
+// procedure reunie : un ecran fait a la main n'en a pas, les ecrans reunis en onglets ont donc leurs propres regles ici.
+
+// L'aiguillage les monte AVANT son switch (un ecran reuni n'a pas de cas a lui), la vue de procedure porte leurs onglets.
+var avantSwitch = aiguillage.IndexOf("if (ecran.reunis)", StringComparison.Ordinal);
+Exiger(aiguillage.Contains("import { EcranOnglets } from '../ecrans/EcranOnglets'") && avantSwitch >= 0
+       && avantSwitch < aiguillage.IndexOf("switch (proc.code)", StringComparison.Ordinal) && aiguillage.Contains("<EcranOnglets "),
+    "l'aiguillage monte EcranOnglets pour un ecran reuni en onglets, avant d'aiguiller par code");
+Exiger(planTravailVue.Contains("VueOngletsReunis(p.Code)"), "la vue de procedure (Pont/PlanTravailVue.cs) porte les onglets de l'ecran reuni");
+
+// Le metier d'un ecran : ses domaines (Metier/PerimetreProfil.cs), vide s'il est transverse.
+string MetiersDe(string code) => string.Join(",", PerimetreProfil.Reserve(code).OrderBy(x => x, StringComparer.Ordinal));
+foreach (var e in enOnglets)
+{
+    var defauts = new List<string>();
+    if (e.Membres.Length < 2) defauts.Add("un ecran reuni a au moins deux onglets");
+    if (parCode.ContainsKey(e.Code)) defauts.Add("il a un descripteur de liste : ses onglets seraient morts");
+    if (casAiguillage.Contains(e.Code)) defauts.Add("un cas de l'aiguillage le doublonne : ses onglets seraient morts");
+    // Chaque onglet monte l'ecran de SA procedure : fait a la main (un cas de l'aiguillage), ou generique (son descripteur).
+    foreach (var m in e.Membres.Where(m => !casAiguillage.Contains(m.Code) && !(parCode.TryGetValue(m.Code, out var d) && d.Membres.Length == 0)))
+        defauts.Add($"l'onglet {m.Code} ({m.Libelle}) n'a pas d'ecran a monter");
+    // Des ecrans tous generiques se reunissent en une liste commune (section 6) : les onglets sont pour les ecrans
+    // faits a la main, qui ont leur propre logique.
+    if (!e.Membres.Any(m => casAiguillage.Contains(m.Code)))
+        defauts.Add("aucun onglet n'est un ecran fait a la main : une liste commune les reunit (EnOnglets a retirer)");
+    // Meme regle du metier que les ecrans reunis en liste : aucun onglet qu'un agent ne verrait pas seul.
+    foreach (var m in e.Membres.Where(m => MetiersDe(m.Code) != MetiersDe(e.Code)))
+        defauts.Add($"{m.Code} est vu par [{MetiersDe(m.Code)}], l'ecran qui le reunit par [{MetiersDe(e.Code)}]");
+    if (defauts.Count == 0)
+        Exiger(true, $"{e.Code} ({e.Libelle}) : {e.Membres.Length} onglets ({string.Join(", ", e.Membres.Select(m => m.Libelle))}), metier [{MetiersDe(e.Code)}]");
+    foreach (var defaut in defauts) Exiger(false, $"{e.Code} : {defaut}");
+}
+
+// Les trois familles du 25/11/2026 (conv-2147). Leurs voisines reservees a un metier restent a part : les documents
+// judiciaires et les statistiques de la cour d'appel (judiciaire), les non-inscrits (RCS).
+var familles = new Dictionary<string, string[]>
+{
+    ["SYNTHESE_DOCUMENTS_NUMERISES"] = ["PROC_DOC_DEMAT", "PROC_ACTES_NUM", "PROC_CONTROLE_VIDIGED", "PROC_COFFRE_FORT"],
+    ["SYNTHESE_CLIENTS"] = ["PROC_GCLIENT", "PROC_FCLIENT"],
+    ["SYNTHESE_STATISTIQUES"] = ["PROC_STAT", "PROC_XPILOTAGE"],
+};
+foreach (var (code, membres) in familles)
+    Exiger(enOnglets.FirstOrDefault(e => e.Code == code) is { } r && r.Membres.Select(m => m.Code).SequenceEqual(membres),
+        $"{code} reunit en onglets {string.Join(", ", membres)}");
+Exiger(new[] { "PROC_GEDJUD", "PROC_STATCA", "PROC_CNI" }.All(c => codesMenu.Contains(c) && MenuAccueil.SyntheseDe(c) is null),
+    "les documents judiciaires, les statistiques de la cour d'appel et les non-inscrits gardent leur entree au menu");
+
+// Le chemin de l'utilisateur, joue sur la session comme la page le remonte (SessionPlanTravail.Agir) : « Fiche client »
+// cherchee ouvre l'ecran reuni des clients, sur SON onglet. Bac a sable : JAMAIS l'etat reel de l'utilisateur.
+var etatAvant = Environment.GetEnvironmentVariable("RIGV3_ETAT");
+var etatBanc = Path.Combine(Path.GetTempPath(), "rigv3-ecransgeneres-" + Guid.NewGuid().ToString("N") + ".json");
+Environment.SetEnvironmentVariable("RIGV3_ETAT", etatBanc);
+try
+{
+    var session = new SessionPlanTravail(null, null);
+    session.Initialiser();
+    void Agir(string geste, object? valeur = null) => session.Agir(geste, JsonSerializer.SerializeToElement(valeur));
+    ProcVue? Proc() => session.Vue().Proc;
+
+    Agir("paletteOuvrir");
+    Agir("paletteTexte", "Fiche client");
+    Exiger(session.Vue().Palette?.Ecrans.FirstOrDefault() is { Code: "PROC_FCLIENT" },
+        "la recherche trouve « Fiche client » par son nom, en tete des ecrans");
+    Agir("paletteAller", new { nature = "ecran", cle = "PROC_FCLIENT" });
+    Exiger(Proc() is { Code: "SYNTHESE_CLIENTS", Libelle: "Comptes clients" } p && p.Ecran.Descripteur is null
+           && p.Ecran.Reunis is { Actif: "PROC_FCLIENT" } r && r.Onglets.Select(o => o.Code).SequenceEqual(["PROC_GCLIENT", "PROC_FCLIENT"]),
+        $"« Fiche client » cherchee ouvre l'ecran reuni des clients, onglet « Fiche client » actif ({Proc()?.Code}, {Proc()?.Ecran.Reunis?.Actif})");
+    Exiger(session.Vue().Onglets?.Count(o => o.Code is "SYNTHESE_CLIENTS" or "PROC_GCLIENT" or "PROC_FCLIENT") == 1,
+        "un seul onglet du haut pour l'ecran reuni, pas un par procedure");
+
+    // Un onglet choisi dans l'ecran est retenu ; un code qui n'est pas un onglet (une procedure reunie en LISTE) est ignore.
+    Agir("ongletReuni", "PROC_GCLIENT");
+    Exiger(Proc()?.Ecran.Reunis?.Actif == "PROC_GCLIENT", "un onglet choisi dans l'ecran reste montre quand il est redessine");
+    Agir("ongletReuni", "PROC_MMA");
+    Exiger(Proc()?.Ecran.Reunis?.Actif == "PROC_GCLIENT", "un code hors des onglets ne change pas l'onglet montre");
+
+    // Par son code d'ailleurs (favori, onglet retenu, alerte : le geste ouvrirCode) : son onglet aussi.
+    Agir("ouvrirCode", "PROC_FCLIENT");
+    Exiger(Proc() is { Code: "SYNTHESE_CLIENTS", Ecran.Reunis.Actif: "PROC_FCLIENT" }, "« Fiche client » ouverte par son code active son onglet");
+
+    // Par l'entree du menu : le premier onglet ; un onglet generique porte SON descripteur, l'ecran fait a la main aucun.
+    Agir("ouvrirCode", "SYNTHESE_STATISTIQUES");
+    Exiger(Proc() is { Code: "SYNTHESE_STATISTIQUES", Ecran.Reunis: { Actif: "PROC_STAT" } s }
+           && s.Onglets[0].Descripteur is null && s.Onglets[1].Descripteur?.Code == "PROC_XPILOTAGE",
+        "l'entree « Statistiques et pilotage » ouvre le premier onglet ; Pilotage porte son descripteur, Statistiques aucun");
+    // Un ecran qui n'est pas reuni en onglets n'en porte pas.
+    Agir("ouvrirCode", "PROC_MMA");
+    Exiger(Proc() is { Code: "SYNTHESE_CORRIGER_RCS", Ecran.Reunis: null }, "un ecran reuni en liste ne porte pas d'onglets");
+}
+finally
+{
+    Environment.SetEnvironmentVariable("RIGV3_ETAT", etatAvant);
+    try { File.Delete(etatBanc); } catch (IOException) { }
 }
 
 // Le compte par verbe du menu : ce que l'utilisateur voit, verbe par verbe.

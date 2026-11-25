@@ -1050,9 +1050,27 @@ public sealed partial class SessionPlanTravail : IAsyncDisposable
     private IEnumerable<Pont.EntreeMenu> EntreesDuMenu => Pont.MenuAccueil.Toutes;
 
     /// <summary>Une procedure REUNIE (Pont/MenuAccueil.cs, EntreeMenu.Reunit) s'ouvre dans l'ecran
-    /// qui la reunit : un seul onglet pour les relances, pas six. Les autres passent telles quelles.</summary>
-    private static Proc EcranQuiReunit(Proc proc)
-        => Pont.MenuAccueil.SyntheseDe(proc.Code) is { } reunion ? new Proc(reunion.Code, reunion.Libelle) : proc;
+    /// qui la reunit : un seul onglet pour les relances, pas six. Les autres passent telles quelles.
+    /// Un ecran reuni EN ONGLETS s'ouvre sur l'onglet de la procedure demandee (« Fiche client »
+    /// cherchee montre la fiche, pas la liste des clients) : c'est ici que toutes les ouvertures
+    /// par code passent -- menu, recherche, favori, onglet retenu, affaire.</summary>
+    private Proc EcranQuiReunit(Proc proc)
+    {
+        if (Pont.MenuAccueil.SyntheseDe(proc.Code) is not { } reunion) return proc;
+        if (reunion.EnOnglets) OngletDesReunions[reunion.Code] = proc.Code;
+        return new Proc(reunion.Code, reunion.Libelle);
+    }
+
+    /// <summary>L'onglet montre par chaque ecran reuni EN ONGLETS (code de l'ecran -> code de sa
+    /// procedure) : la derniere demandee, ou la derniere choisie dans l'ecran. Absent : la premiere.</summary>
+    private readonly Dictionary<string, string> OngletDesReunions = new(StringComparer.Ordinal);
+
+    /// <summary>Un onglet choisi dans un ecran reuni (geste « ongletReuni ») : il reste montre
+    /// quand l'ecran est redessine. Un code qui n'est pas une procedure reunie en onglets est ignore.</summary>
+    private void ChoisirOngletReuni(string code)
+    {
+        if (Pont.MenuAccueil.SyntheseDe(code) is { EnOnglets: true } reunion) OngletDesReunions[reunion.Code] = code;
+    }
 
     /// <summary>L'entree de menu qui porte un code, ou null.</summary>
     private Pont.EntreeMenu? EntreeDeCode(string code)
