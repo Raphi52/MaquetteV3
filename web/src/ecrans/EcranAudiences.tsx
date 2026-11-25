@@ -7,10 +7,20 @@
 // Porte depuis Components/Ecrans/EcranAudiences.razor (lot 5) : meme balisage,
 // memes classes CSS. La date proposee (JeuDemo.Aujourdhui + 7 jours) vient de
 // Pont/EcranAudiences.cs ; le reste etait declare dans l'ecran et l'a suivi.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 2) : la liste des audiences
+// programmees prend les briques de composants/ListeModerne.tsx. Tete (synthese, « Aller a une audience… »
+// Ctrl K qui filtre la liste affichee), une ligne par audience (Date, Heure, Type en pastille, Chambre,
+// Publique en point d'etat, Affaires) ; Section et « Publiee sur le web » sont dans la ligne depliee. Ni vues
+// ni cartes : l'ecran n'a aucun critere sur cette liste. Ni menu ni action de ligne : la liste n'en avait pas.
+// La creation d'une audience ne change pas.
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { dateCourte } from '../criteres'
+import {
+  CelluleChevron, EnteteListe, LigneDetail, ListeModerne, Pastille, PiedListe, PointEtat, type Teinte,
+} from '../composants/ListeModerne'
 
 export interface AudienceLigne {
   /** aaaa-mm-jj */
@@ -41,6 +51,22 @@ const Programmees: AudienceLigne[] = [
 // heure illisible (champ efface) ne remet pas l'heure a zero.
 const heureLisible = (texte: string): string | null =>
   /^\d{2}:\d{2}(:\d{2})?$/.test(texte) ? texte.slice(0, 5) : null
+
+const TeinteType: Record<string, Teinte> = {
+  'Audience de procedure collective': 'orange', 'Audience de reference': 'ardoise', 'Audience de plaidoirie': 'bleu',
+  'Audience de conciliation': 'vert', 'Audience du juge-commissaire': 'violet',
+}
+
+/** Les colonnes du tableau a une ligne : chevron, Date, Heure, Type, Chambre, Publique, Affaires. */
+const NbColonnes = 7
+
+/**
+ * « Aller a… » compare sans casse ni accents, comme la Recherche d'affaires : « procédure » trouve « Audience de procedure collective ».
+ * Le normaliser() de RechAffaires n'est pas exporte du socle (manque note au plan, lot 6) : recopie locale.
+ */
+function normaliser(texte: string): string {
+  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
 
 export function EcranAudiences() {
   const [programmees, setProgrammees] = useState<AudienceLigne[]>(Programmees)
@@ -86,6 +112,19 @@ export function EcranAudiences() {
     // List.Sort par date ; a date egale, l'ordre d'arrivee est garde.
     setProgrammees((avant) => [...avant, neuve].sort((x, y) => x.date.localeCompare(y.date)))
   }
+
+  // La ligne depliee par son chevron (une a la fois) : l'audience elle-meme, son rang change a chaque creation.
+  const [ouverte, setOuverte] = useState<AudienceLigne | null>(null)
+
+  // « Aller a une audience… » (Ctrl K) : filtre la liste AFFICHEE.
+  const [filtreRapide, setFiltreRapide] = useState('')
+  const cherche = filtreRapide.trim()
+  const affichees = cherche === '' ? programmees
+    : programmees.filter((a) => normaliser([dateCourte(a.date), a.heure, a.type, a.chambre, a.section].join(' ')).includes(normaliser(cherche)))
+
+  // Les chiffres de la tete et du pied : sur la liste AFFICHEE.
+  const publiques = affichees.filter((a) => a.publique).length
+  const affaires = affichees.reduce((n, a) => n + a.nbAffaires, 0)
 
   return (
     <div className="rig-proc__corps">
@@ -161,43 +200,67 @@ export function EcranAudiences() {
         </span>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Audiences programmees</div>
-          <span className="rig-resultats-proc__compte">{programmees.length} audience(s)</span>
-        </div>
+      <ListeModerne etiquette="Audiences programmees">
+        <EnteteListe titre="Audiences programmees"
+                     synthese={<>{affichees.length}{affichees.length > 1 ? ' audiences · ' : ' audience · '}<b>{publiques}</b>
+                       {publiques > 1 ? ' publiques · ' : ' publique · '}<b>{affaires}</b>{affaires > 1 ? ' affaires' : ' affaire'}</>}
+                     filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a une audience…' }} />
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup>
+              <col style={{ width: 30 }} /><col style={{ width: '15%' }} /><col style={{ width: '13%' }} /><col />
+              <col style={{ width: '11%' }} /><col style={{ width: '12%' }} /><col style={{ width: '11%' }} />
+            </colgroup>
             <thead>
               <tr>
+                <th aria-label="Deplier"></th>
                 <th>Date d'audience</th>
                 <th>Heure de debut</th>
                 <th>Type d'audience</th>
                 <th>Chambre</th>
-                <th>Section</th>
-                <th className="rig-table__centre">Publique</th>
-                <th className="rig-table__centre">Web</th>
-                <th className="rig-table__centre">Affaires</th>
+                <th>Publique</th>
+                <th className="rig-lm-droite">Affaires</th>
               </tr>
             </thead>
             <tbody>
-              {programmees.map((a, i) => (
-                <tr key={i}>
-                  <td className="rig-table__mono">{dateCourte(a.date)}</td>
-                  <td className="rig-table__mono">{a.heure}</td>
-                  <td>{a.type}</td>
-                  <td className="rig-table__mono">{a.chambre}</td>
-                  <td className="rig-table__mono">{a.section}</td>
-                  <td className="rig-table__centre">{a.publique ? 'oui' : ''}</td>
-                  <td className="rig-table__centre">{a.web ? 'oui' : ''}</td>
-                  <td className="rig-table__centre">{a.nbAffaires}</td>
-                </tr>
-              ))}
+              {affichees.map((a, i) => {
+                const estOuverte = ouverte === a
+                return (
+                  <Fragment key={i}>
+                  <tr className={estOuverte ? 'rig-lm-ouverte' : undefined}>
+                    <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : a)} />
+                    <td className="rig-table__mono">{dateCourte(a.date)}</td>
+                    <td className="rig-table__mono">{a.heure}</td>
+                    <td title={a.type}><Pastille teinte={TeinteType[a.type] ?? 'gris'}>{a.type}</Pastille></td>
+                    <td className="rig-table__mono">{a.chambre}</td>
+                    <td><PointEtat teinte={a.publique ? 'vert' : 'gris'}>{a.publique ? 'oui' : 'non'}</PointEtat></td>
+                    <td className="rig-lm-droite">{a.nbAffaires}</td>
+                  </tr>
+                  {estOuverte && (
+                    <LigneDetail colonnes={NbColonnes} champs={[
+                      { libelle: 'Section', valeur: a.section },
+                      { libelle: 'Publiee sur le web', valeur: a.web ? 'oui' : '' },
+                    ]} />
+                  )}
+                  </Fragment>
+                )
+              })}
+              {programmees.length > 0 && affichees.length === 0 && (
+                <tr><td colSpan={NbColonnes} className="rig-table__vide">
+                  {`Aucune des ${programmees.length} audiences ne contient « ${cherche} ».`}
+                </td></tr>
+              )}
             </tbody>
           </table>
         </div>
-      </section>
+
+        <PiedListe>
+          <span><b>{affichees.length}</b>{affichees.length > 1 ? ' audiences affichees' : ' audience affichee'}</span>
+          <span>Publiques <b>{publiques}</b></span>
+          <span>Affaires <b>{affaires}</b></span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }

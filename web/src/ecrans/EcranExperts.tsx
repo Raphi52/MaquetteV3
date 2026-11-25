@@ -13,9 +13,19 @@
 // Porte depuis Components/Ecrans/EcranExperts.razor (lot 4) : meme balisage,
 // memes classes CSS. L'ecran ne lisait rien dans Metier/ : ses experts et
 // leurs mesures de demonstration l'ont suivi ici.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 2) : la liste des experts prend les
+// briques de composants/ListeModerne.tsx. Tete (synthese, « Aller a un expert… » Ctrl K, Entree choisit l'expert
+// reste seul), vues = la bascule « Experts actifs uniquement » prereglee, avatar + nom + qualite, Actif en point
+// d'etat, pied. Ses cinq colonnes v2 tiennent sur la ligne : pas de ligne depliee. Les mesures de l'expert
+// choisi : puces de vues comptees a la place des onglets, avatar du participant.
+// « Aller a un expert… » EST la recherche v2 (TextRecherche, ancien champ « Nom, abrege » : meme etat, memes
+// colonnes cherchees) : la liste est filtree ici, sans pont, deux champs auraient fait le meme filtre (decision
+// du plan, lot 7). La fiche d'edition n'est pas une liste : inchangee, comme la selection et les autres filtres.
 
 import { useState } from 'react'
 import { contientSansCasse, distinctsTries, estBlanc } from '../criteres'
+import { CelluleIdentite, EnteteListe, ListeModerne, PiedListe, PointEtat, VuesListe } from '../composants/ListeModerne'
 
 interface Expert {
   abrege: string
@@ -60,33 +70,46 @@ const Mesures: MesureExpert[] = [
 
 const Qualifs = distinctsTries(Experts.map((e) => e.qualif))
 
+/** Le filtre de la recherche (texte, qualite, actifs) : la liste, et le compte de chaque vue. */
+function filtrer(recherche: string, critQualif: string, actifsSeuls: boolean): Expert[] {
+  let q = Experts
+  if (!estBlanc(recherche)) {
+    const t = recherche.trim()
+    q = q.filter((e) => contientSansCasse(e.nom, t) || contientSansCasse(e.abrege, t))
+  }
+  if (critQualif !== '') q = q.filter((e) => e.qualif === critQualif)
+  if (actifsSeuls) q = q.filter((e) => e.actif)
+  return q
+}
+
+/** Les vues : la bascule « Experts actifs uniquement », prereglee. */
+export const VuesExperts: ReadonlyArray<{ cle: string; libelle: string; actifsSeuls: boolean }> = [
+  { cle: 'actifs', libelle: 'Actifs', actifsSeuls: true },
+  { cle: 'tous', libelle: 'Tous', actifsSeuls: false },
+]
+
 export function EcranExperts() {
+  // La recherche v2 (TextRecherche) : le champ « Aller a un expert… » de la tete.
   const [recherche, setRecherche] = useState('')
   const [critQualif, setCritQualif] = useState('')
   const [actifsSeuls, setActifsSeuls] = useState(true)
   const [mesuresActives, setMesuresActives] = useState(true)
   const [selection, setSelection] = useState<Expert | null>(Experts[0]!)
 
-  let trouves = Experts
-  if (!estBlanc(recherche)) {
-    const t = recherche.trim()
-    trouves = trouves.filter((e) => contientSansCasse(e.nom, t) || contientSansCasse(e.abrege, t))
-  }
-  if (critQualif !== '') trouves = trouves.filter((e) => e.qualif === critQualif)
-  if (actifsSeuls) trouves = trouves.filter((e) => e.actif)
+  const trouves = filtrer(recherche, critQualif, actifsSeuls)
+
+  const actifs = trouves.filter((ex) => ex.actif).length
+  const qualites = distinctsTries(trouves.map((ex) => ex.qualif)).length
+
   const e = selection
-  const mesures = e ? Mesures.filter((m) => m.expert === e.abrege && m.enCours === mesuresActives) : []
+  const mesuresDe = (enCours: boolean) => (e ? Mesures.filter((m) => m.expert === e.abrege && m.enCours === enCours) : [])
+  const mesures = mesuresDe(mesuresActives)
 
   return (
     <div className="rig-proc__corps">
 
       <aside className="rig-criteres">
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Recherche d'un expert</div>
-
-        <label className="rig-saisie-champ">
-          <span className="rig-saisie-champ__libelle">Nom, abrege</span>
-          <input className="rig-saisie-champ__saisie" value={recherche} onChange={(ev) => setRecherche(ev.target.value)} />
-        </label>
 
         <label className="rig-saisie-champ">
           <span className="rig-saisie-champ__libelle">Qualite / profession</span>
@@ -104,7 +127,7 @@ export function EcranExperts() {
 
       </aside>
 
-      <section className="rig-resultats-proc">
+      <ListeModerne etiquette="Experts">
         {/* Liste de recherche : les CINQ colonnes de DataListviewExpert en RIG v2
             (Recherche/OPE_RECHERCHE_EXPERT.cs, appels AddColumns) --
               Abrege   EXPRT_ABREGE
@@ -115,13 +138,22 @@ export function EcranExperts() {
             Elles ne tenaient pas dans la colonne de criteres (320px) : la liste
             occupe donc le haut du plan de travail, comme en v2 ou la recherche
             precede l'edition. */}
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Liste des experts</div>
-          <span className="rig-resultats-proc__compte">{trouves.length} expert(s)</span>
-        </div>
+        <EnteteListe titre="Liste des experts"
+                     synthese={<>{trouves.length}{trouves.length > 1 ? ' experts · ' : ' expert · '}<b>{actifs}</b>
+                       {actifs > 1 ? ' actifs · ' : ' actif · '}<b>{qualites}</b>{qualites > 1 ? ' qualites' : ' qualite'}</>}
+                     filtre={{ valeur: recherche, changer: setRecherche, indication: 'Aller a un expert…',
+                               valider: () => { if (trouves.length === 1) setSelection(trouves[0]!) } }} />
+
+        <VuesListe vues={VuesExperts.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer(recherche, critQualif, v.actifsSeuls).length }))}
+                   active={VuesExperts.find((v) => v.actifsSeuls === actifsSeuls)?.cle ?? null}
+                   choisir={(cle) => { const v = VuesExperts.find((x) => x.cle === cle); if (v) setActifsSeuls(v.actifsSeuls) }} />
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup>
+              <col style={{ width: '13%' }} /><col style={{ width: '9%' }} /><col /><col style={{ width: '24%' }} />
+              <col style={{ width: '11%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>Abrege</th>
@@ -137,11 +169,9 @@ export function EcranExperts() {
                     style={selection?.abrege === ex.abrege ? { boxShadow: 'inset 3px 0 0 0 var(--rig-focus)' } : undefined}>
                   <td className="rig-table__mono">{ex.abrege}</td>
                   <td>{ex.civilite}</td>
-                  <td>{ex.nom}</td>
-                  <td>{ex.mail}</td>
-                  <td className="rig-table__centre">
-                    <span className={`rig-etat rig-etat--${ex.actif ? 'ok' : 'attente'}`}>{ex.actif ? 'Actif' : 'Inactif'}</span>
-                  </td>
+                  <CelluleIdentite nom={ex.nom} objet={ex.qualif} titre={`${ex.nom} · ${ex.qualif}`} />
+                  <td title={ex.mail}>{ex.mail}</td>
+                  <td><PointEtat teinte={ex.actif ? 'vert' : 'gris'}>{ex.actif ? 'Actif' : 'Inactif'}</PointEtat></td>
                 </tr>
               ))}
               {trouves.length === 0 && (
@@ -150,6 +180,11 @@ export function EcranExperts() {
             </tbody>
           </table>
         </div>
+
+        <PiedListe>
+          <span><b>{trouves.length}</b>{trouves.length > 1 ? ' experts affiches' : ' expert affiche'}</span>
+          <span>Actifs <b>{actifs}</b></span>
+        </PiedListe>
 
         <div className="rig-resultats-proc__entete">
           <div className="rig-kicker">Edition d'un expert</div>
@@ -202,17 +237,21 @@ export function EcranExperts() {
                 <span className="rig-saisie-champ__libelle">E-mail</span>
                 <input className="rig-saisie-champ__saisie" value={e.mail} readOnly />
               </label>
-              <span className={`rig-etat rig-etat--${e.actif ? 'ok' : 'attente'}`}>{e.actif ? 'Actif' : 'Inactif'}</span>
+              {/* alignSelf : le bloc est une colonne flex qui ETIRE ses enfants ; la pastille courait sur toute la
+                  largeur de la fiche (capture orange du lot 2 des listes modernes). */}
+              <span className={`rig-etat rig-etat--${e.actif ? 'ok' : 'attente'}`} style={{ alignSelf: 'flex-start' }}>
+                {e.actif ? 'Actif' : 'Inactif'}
+              </span>
             </div>
 
-            <div className="rig-resultats-proc__entete">
-              <div className="rig-onglets">
-                <button className={`rig-onglet${mesuresActives ? ' rig-onglet--actif' : ''}`}
-                        onClick={() => setMesuresActives(true)}>Mesures en cours</button>
-                <button className={`rig-onglet${!mesuresActives ? ' rig-onglet--actif' : ''}`}
-                        onClick={() => setMesuresActives(false)}>Mesures terminees</button>
-              </div>
-            </div>
+            {/* Les deux listes de mesures de la v2 (OpeMesureActif / OpeMesureInactif) : des puces comptees a la
+                place des onglets. */}
+            <VuesListe vues={[
+                         { cle: 'en-cours', libelle: 'Mesures en cours', compte: mesuresDe(true).length },
+                         { cle: 'terminees', libelle: 'Mesures terminees', compte: mesuresDe(false).length },
+                       ]}
+                       active={mesuresActives ? 'en-cours' : 'terminees'}
+                       choisir={(cle) => setMesuresActives(cle === 'en-cours')} />
 
             <div className="rig-table-cadre">
               <table className="rig-table">
@@ -231,7 +270,7 @@ export function EcranExperts() {
                     <tr key={m.numMesure}>
                       <td className="rig-table__mono">{m.numMesure}</td>
                       <td>{m.civilite}</td>
-                      <td>{m.nomParticipant}</td>
+                      <CelluleIdentite nom={m.nomParticipant} titre={m.nomParticipant} />
                       <td>{m.complementNom}</td>
                       <td>{m.qualifProf}</td>
                       <td>{m.adresse}</td>
@@ -249,7 +288,7 @@ export function EcranExperts() {
             Choisissez un expert dans la liste de gauche.
           </div>
         )}
-      </section>
+      </ListeModerne>
     </div>
   )
 }

@@ -7,10 +7,22 @@
 // Porte depuis Components/Ecrans/EcranActes.razor (lot 3) : meme balisage,
 // memes classes CSS. Le filtre est fait par Pont/EcranActes.cs sur
 // JeuDemo.Actes ; la coquille .razor monte cet ecran et recoit ouvrirDossier.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 2) : la colonne des resultats prend
+// les briques de composants/ListeModerne.tsx. Tete (synthese, « Aller a un acte… » Ctrl K qui filtre la liste
+// affichee), vues = les deux bascules existantes prereglees (« Avec anomalie seulement », « Lister actes non
+// numerisables » ; sans compte : il viendrait d'un appel au pont par vue). Le tableau passe a une ligne par acte
+// (Acte, Categorie en pastille, Date de depot, Demat. et Anomalies en point d'etat) ; les huit autres colonnes
+// de DataGridviewActes sont dans la ligne depliee, avec « Ouvrir le dossier ». Criteres, clic qui ouvre le
+// dossier, acte non numerisable inerte : inchanges.
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { dateSaisie, useNombreSaisi } from '../saisie'
+import {
+  CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille, PiedListe, PointEtat, VuesListe,
+  type ActionLigne, type Teinte,
+} from '../composants/ListeModerne'
 
 export interface OptionActes {
   code: string
@@ -44,6 +56,38 @@ export interface ProprietesEcranActes {
   ouvrirDossier: (numero: string) => void
 }
 
+/**
+ * Les vues : les deux bascules de gauche, prereglees. Le type de depot et le texte saisis restent. La vue de
+ * depart s'appelle « Numerises », pas « Tous » : le pont MASQUE les actes non numerisables tant que « Lister actes
+ * non numerisables » n'est pas cochee (Pont/EcranActes.cs, regle v2).
+ */
+export const VuesActes: ReadonlyArray<{ cle: string; libelle: string; nonNumerisables: boolean; anomalies: boolean }> = [
+  { cle: 'numerises', libelle: 'Numerises', nonNumerisables: false, anomalies: false },
+  { cle: 'anomalies', libelle: 'Avec anomalie', nonNumerisables: false, anomalies: true },
+  { cle: 'non-numerisables', libelle: 'Avec non numerisables', nonNumerisables: true, anomalies: false },
+]
+
+/** La teinte de la categorie de depot (dbo.CATEGORIE_DEPOT), par famille : actes, comptes, le reste. */
+export function teinteCategorie(libelle: string): Teinte {
+  const l = libelle.toLowerCase()
+  if (l.includes('comptes')) return 'vert'
+  if (l.includes('actes')) return 'bleu'
+  if (l.includes('beneficiaire')) return 'violet'
+  if (l.includes('ordonnance')) return 'ardoise'
+  return 'gris'
+}
+
+/** Les colonnes du tableau a une ligne : chevron, Acte, Categorie, Date de depot, Demat., Anomalies, menu. */
+const NbColonnes = 7
+
+/**
+ * « Aller a… » compare sans casse ni accents, comme la Recherche d'affaires : « procès » trouve « Proces-verbal ».
+ * Le normaliser() de RechAffaires n'est pas exporte du socle (manque note au plan, lot 6) : recopie locale.
+ */
+function normaliser(texte: string): string {
+  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
 export function EcranActes({ ouvrirDossier }: ProprietesEcranActes) {
   const [critActeCritere, setCritActeCritere] = useState('')
   const [critAbrege, setCritAbrege] = useState('')
@@ -55,6 +99,8 @@ export function EcranActes({ ouvrirDossier }: ProprietesEcranActes) {
   const topMax = useNombreSaisi(50)
   // null tant que le pont n'a pas repondu : ni ligne ni « aucun acte ».
   const [vue, setVue] = useState<VueActes | null>(null)
+  // La ligne depliee par son chevron (une a la fois), par son rang.
+  const [ouverte, setOuverte] = useState<number | null>(null)
 
   useEffect(() => {
     let perime = false
@@ -67,6 +113,16 @@ export function EcranActes({ ouvrirDossier }: ProprietesEcranActes) {
   }, [critActeCritere, critAbrege, critTypeDepot, critDu, critAu, critNonNumerisables, critAnomalies, topMax.valeur])
 
   const trouves = vue?.lignes ?? []
+
+  // « Aller a un acte… » (Ctrl K) : filtre la liste AFFICHEE, sans redemander au pont.
+  const [filtreRapide, setFiltreRapide] = useState('')
+  const cherche = filtreRapide.trim()
+  const affiches = cherche === '' ? trouves
+    : trouves.filter((a) => normaliser([a.dossier, a.depot, a.denomination, a.abrege, a.description].join(' ')).includes(normaliser(cherche)))
+
+  // Les chiffres de la tete et du pied : sur la liste AFFICHEE.
+  const sansImage = affiches.filter((a) => !a.demat).length
+  const anomalies = affiches.filter((a) => a.anomalie !== '').length
 
   /**
    * Un acte numerise mene au dossier qui le porte. Un acte NON
@@ -155,76 +211,106 @@ export function EcranActes({ ouvrirDossier }: ProprietesEcranActes) {
         </div>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Actes numerises</div>
-          <span className="rig-resultats-proc__compte">
-            {/* Memes morceaux de texte que Razor (chaque nombre, puis son libelle) :
-                une seule chaine decalait le lissage des lettres (web/README.md). */}
-            {vue && <>
-              {trouves.length}{' affiche(s) · '}
-              {trouves.filter((a) => !a.demat).length}{' sans image · '}
-              {trouves.filter((a) => a.anomalie !== '').length}{' anomalie(s)'}
-            </>}
-          </span>
-        </div>
+      <ListeModerne etiquette="Actes numerises">
+        {/* Un morceau de texte par nombre, puis son libelle, comme Razor : une seule chaine decalait le lissage
+            des lettres (web/README.md). */}
+        <EnteteListe titre="Actes numerises"
+                     synthese={vue && <>{affiches.length}{affiches.length > 1 ? ' actes · ' : ' acte · '}<b>{sansImage}</b>
+                       {' sans image · '}<b>{anomalies}</b>{anomalies > 1 ? ' anomalies' : ' anomalie'}</>}
+                     filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a un acte…',
+                               valider: () => { if (affiches.length === 1) ouvrir(affiches[0]!) } }} />
+
+        <VuesListe vues={VuesActes.map((v) => ({ cle: v.cle, libelle: v.libelle }))}
+                   active={VuesActes.find((v) => v.nonNumerisables === critNonNumerisables && v.anomalies === critAnomalies)?.cle ?? null}
+                   choisir={(cle) => {
+                     const v = VuesActes.find((x) => x.cle === cle)
+                     if (v) { setCritNonNumerisables(v.nonNumerisables); setCritAnomalies(v.anomalies) }
+                   }} />
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup>
+              <col style={{ width: 30 }} /><col /><col style={{ width: '20%' }} /><col style={{ width: '12%' }} />
+              <col style={{ width: '9%' }} /><col style={{ width: '18%' }} /><col style={{ width: 34 }} />
+            </colgroup>
             <thead>
               <tr>
-                <th className="rig-table__centre">N</th>
-                <th>N Dossier</th>
-                <th>N Depot</th>
-                <th>Denomination</th>
+                <th aria-label="Deplier"></th>
+                <th>Acte</th>
                 <th>Categorie de depot</th>
-                <th>Abrege</th>
-                <th>Description</th>
                 <th>Date de depot</th>
-                <th>Date de l acte</th>
-                <th>Date de cloture</th>
-                <th className="rig-table__centre">Confid.</th>
-                <th className="rig-table__centre">Demat.</th>
+                <th>Demat.</th>
                 <th>Anomalies</th>
+                <th aria-label="Actions"></th>
               </tr>
             </thead>
             <tbody>
-              {trouves.map((a, i) => {
-                const classe = [a.anomalie === '' ? '' : 'rig-table__ligne--alerte', a.numerisable ? '' : 'rig-table__ligne--inerte']
-                  .filter((c) => c !== '').join(' ')
+              {affiches.map((a, i) => {
+                const estOuverte = ouverte === a.rang
+                const classe = [a.anomalie === '' ? '' : 'rig-table__ligne--alerte', a.numerisable ? '' : 'rig-table__ligne--inerte',
+                                estOuverte ? 'rig-lm-ouverte' : ''].filter((c) => c !== '').join(' ')
+                const actions: ActionLigne[] = [
+                  { libelle: 'Ouvrir le dossier', fort: true, desactive: !a.numerisable, agir: () => ouvrir(a) },
+                ]
                 return (
-                  <tr key={`${i}:${a.rang}`} className={classe || undefined}
+                  <Fragment key={`${i}:${a.rang}`}>
+                  <tr className={classe || undefined}
                       title={a.numerisable ? `Ouvrir le dossier ${a.dossier}` : `Acte non numerisable : ${a.anomalie}`}
                       onClick={() => ouvrir(a)}>
-                    <td className="rig-table__centre rig-table__mono">{a.rang}</td>
-                    <td className="rig-table__mono">{a.dossier}</td>
-                    <td className="rig-table__mono">{a.depot}</td>
-                    <td>{a.denomination}</td>
-                    <td><span className="rig-etat">{a.categorieLisible}</span></td>
-                    <td className="rig-table__mono">{a.abrege}</td>
-                    <td>{a.description}</td>
+                    <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : a.rang)} />
+                    <CelluleIdentite nom={a.denomination}
+                                     objet={<>{a.abrege}{' · '}<span>{a.dossier}</span>{' · '}<span>{a.depot}</span></>} />
+                    <td title={a.categorieLisible}><Pastille teinte={teinteCategorie(a.categorieLisible)}>{a.categorieLisible}</Pastille></td>
                     <td className="rig-table__mono">{a.depose}</td>
-                    <td className="rig-table__mono">{a.acte}</td>
-                    <td className="rig-table__mono">{a.cloture}</td>
-                    <td className="rig-table__centre">{a.confidentiel ? 'oui' : ''}</td>
-                    <td className="rig-table__centre">{a.demat ? 'oui' : ''}</td>
-                    <td>
-                      {a.anomalie === '' ? <span className="rig-table__sans">aucune</span> : a.anomalie}
+                    <td><PointEtat teinte={a.demat ? 'vert' : 'gris'}>{a.demat ? 'oui' : 'non'}</PointEtat></td>
+                    <td title={a.anomalie}>
+                      {a.anomalie === '' ? <span className="rig-table__sans">aucune</span>
+                        : <PointEtat teinte="rouge">{a.anomalie}</PointEtat>}
+                    </td>
+                    <td className="rig-lm-cellule-menu">
+                      <MenuLigne libelle={`Actions de l'acte ${a.depot}`} actions={[
+                        ...actions,
+                        { libelle: estOuverte ? 'Replier la ligne' : 'Deplier la ligne', agir: () => setOuverte(estOuverte ? null : a.rang) },
+                      ]} />
                     </td>
                   </tr>
+                  {estOuverte && (
+                    <LigneDetail colonnes={NbColonnes} actions={actions} champs={[
+                      { libelle: 'N', valeur: String(a.rang) },
+                      { libelle: 'N Dossier', valeur: a.dossier },
+                      { libelle: 'N Depot', valeur: a.depot },
+                      { libelle: 'Abrege', valeur: a.abrege },
+                      { libelle: 'Description', valeur: a.description },
+                      { libelle: 'Date de l acte', valeur: a.acte },
+                      { libelle: 'Date de cloture', valeur: a.cloture },
+                      { libelle: 'Confid.', valeur: a.confidentiel ? 'oui' : '' },
+                    ]} />
+                  )}
+                  </Fragment>
                 )
               })}
               {vue && trouves.length === 0 && (
                 <tr>
-                  <td colSpan={13} className="rig-table__vide">
+                  <td colSpan={NbColonnes} className="rig-table__vide">
                     Aucun acte ne repond a ces criteres.
                   </td>
                 </tr>
               )}
+              {trouves.length > 0 && affiches.length === 0 && (
+                <tr><td colSpan={NbColonnes} className="rig-table__vide">
+                  {`Aucun des ${trouves.length} actes ne contient « ${cherche} ».`}
+                </td></tr>
+              )}
             </tbody>
           </table>
         </div>
-      </section>
+
+        <PiedListe>
+          <span><b>{affiches.length}</b>{affiches.length > 1 ? ' actes affiches' : ' acte affiche'}</span>
+          <span>Sans image <b>{sansImage}</b></span>
+          <span>Anomalies <b>{anomalies}</b></span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }
