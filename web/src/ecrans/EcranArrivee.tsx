@@ -21,7 +21,7 @@ import { appeler } from '../pont'
 import { dateSaisie, useNombreSaisi } from '../saisie'
 import {
   CartesChiffrees, CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille,
-  PiedListe, PointEtat, VuesListe, exporterCsv, type ActionLigne, type Teinte,
+  PiedListe, PointEtat, VuesListe, exporterCsv, normaliser, useVuesDeSession, type ActionLigne, type Teinte, type VueEnregistree,
 } from '../composants/ListeModerne'
 
 export interface OptionArrivee {
@@ -88,28 +88,13 @@ function memesCriteres(a: CriteresArrivee, b: CriteresArrivee): boolean {
   return (Object.keys(SansCritere) as (keyof CriteresArrivee)[]).every((k) => a[k] === b[k])
 }
 
-/** Une vue enregistree : un nom et un jeu complet de criteres. */
-export interface VueArriveeEnregistree {
-  cle: string
-  libelle: string
-  criteres: CriteresArrivee
-}
-
 /** Les vues toujours la : les criteres de l'ecran, preposes. */
-export const VuesPrereglees: VueArriveeEnregistree[] = [
+export const VuesPrereglees: VueEnregistree<CriteresArrivee>[] = [
   { cle: 'toutes', libelle: 'Toutes', criteres: SansCritere },
   { cle: 'a-numeriser', libelle: 'Reste a numeriser', criteres: { ...SansCritere, critNonNumerise: true } },
   { cle: 'paiement', libelle: 'Paiement joint', criteres: { ...SansCritere, critPaiement: true } },
   { cle: 'edi', libelle: 'Teletransmises', criteres: { ...SansCritere, critMode: 'EDI' } },
 ]
-
-/** Les vues ajoutees par « + Nouvelle vue » : elles vivent le temps de la session (aucun reglage ne les porte). */
-const VuesDeLaSession: VueArriveeEnregistree[] = []
-
-/** Pour les tests : repartir d'une session sans vue ajoutee. */
-export function oublierVuesDeLaSession(): void {
-  VuesDeLaSession.length = 0
-}
 
 /** La teinte d'un mode d'arrivee (libelles de dbo.MODE_ARRIVEE) ; l'ecran des teletransmissions la reprend. */
 export function teinteModeArrivee(libelle: string): Teinte {
@@ -125,14 +110,6 @@ export function teinteModeArrivee(libelle: string): Teinte {
 
 /** Les colonnes du tableau a une ligne : chevron, Expediteur, Mode, N Demande, Numerisation, Date et heure, menu. */
 const NbColonnes = 7
-
-/**
- * « Aller a… » compare sans casse ni accents, comme la Recherche d'affaires : « réf » trouve « REF ».
- * fix-ok: contientSansCasse (criteres.ts) garde les accents ; test « Aller a une arrivee… » rouge sur « réf », vert ici.
- */
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-}
 
 export function EcranArrivee({ ouvrirDossier }: ProprietesEcranArrivee) {
   const [critNumArrivee, setCritNumArrivee] = useState('')
@@ -185,8 +162,7 @@ export function EcranArrivee({ ouvrirDossier }: ProprietesEcranArrivee) {
 
   // Les vues : les preposees, puis celles de la session. Leur compte est demande au pont, critere par critere,
   // avec la meme limite d'affichage : c'est le nombre de lignes que la vue MONTRERAIT.
-  const [vuesAjoutees, setVuesAjoutees] = useState<VueArriveeEnregistree[]>(() => [...VuesDeLaSession])
-  const vues = [...VuesPrereglees, ...vuesAjoutees]
+  const { vues, active: vueActive, enregistrer: enregistrerVue } = useVuesDeSession('Arrivee', VuesPrereglees, criteres, memesCriteres)
   const [comptes, setComptes] = useState<number[] | null>(null)
   const cleVues = JSON.stringify(vues.map((v) => v.criteres))
   useEffect(() => {
@@ -198,11 +174,6 @@ export function EcranArrivee({ ouvrirDossier }: ProprietesEcranArrivee) {
       () => { if (!perime) setComptes(null) })
     return () => { perime = true }
   }, [cleVues, topMax.valeur])
-  const vueActive = vues.find((v) => memesCriteres(v.criteres, criteres))?.cle ?? null
-  function enregistrerVue(nom: string) {
-    VuesDeLaSession.push({ cle: `session-${VuesDeLaSession.length + 1}`, libelle: nom, criteres })
-    setVuesAjoutees([...VuesDeLaSession])
-  }
 
   /**
    * Une arrivee mene a SA demande. Toutes n en ont pas : un pli peut

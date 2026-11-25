@@ -14,7 +14,7 @@
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import type { ContexteDossierVue } from '../plan/types'
-import { CelluleIdentite, EnteteListe, ListeModerne, PiedListe, PointEtat, type Teinte } from '../composants/ListeModerne'
+import { CelluleIdentite, EnteteListe, ListeModerne, PiedListe, PointEtat, normaliser, teinteStatut } from '../composants/ListeModerne'
 
 export interface LigneVerrou {
   dossier: string
@@ -42,17 +42,10 @@ export interface ProprietesEcranVerrous {
   dossier?: ContexteDossierVue | null
 }
 
-/** La teinte du point d'etat, tiree du statut de la demande (les rig-etat--* de la charte). */
-const TeinteStatut: Record<string, Teinte> = { alerte: 'rouge', attente: 'orange', action: 'bleu', ok: 'vert' }
-
 /** « Depot de bilan - TRANSNORD SA » : la societe (apres « - ») et l'objet (avant). */
 export function societeEtObjet(nom: string): { societe: string; objet: string } {
   const tiret = nom.indexOf(' - ')
   return tiret < 0 ? { societe: nom, objet: '' } : { societe: nom.slice(tiret + 3), objet: nom.slice(0, tiret) }
-}
-
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
 
 export function EcranVerrous({ ouvrirDossier, dossier = null }: ProprietesEcranVerrous) {
@@ -154,7 +147,7 @@ export function EcranVerrous({ ouvrirDossier, dossier = null }: ProprietesEcranV
                       title={`Ouvrir l'affaire ${v.dossier}`}>
                     <CelluleIdentite nom={societe} titre={`${v.nom} · ${v.dossier}`}
                                      objet={<>{objet}{objet !== '' ? ' · ' : ''}<span>{v.dossier}</span></>} />
-                    <td title={v.etat}><PointEtat teinte={TeinteStatut[v.statut] ?? 'gris'}>{v.etat}</PointEtat></td>
+                    <td title={v.etat}><PointEtat teinte={teinteStatut(v.statut)}>{v.etat}</PointEtat></td>
                     <td title={v.utilisateur}>{v.utilisateur}</td>
                     <td className="rig-lm-droite rig-table__mono">{v.age} j</td>
                   </tr>

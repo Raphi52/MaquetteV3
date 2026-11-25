@@ -17,7 +17,7 @@
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import type { ContexteDossierVue } from '../plan/types'
-import { CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe } from '../composants/ListeModerne'
+import { CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, normaliser } from '../composants/ListeModerne'
 import { teinteModeArrivee } from './EcranArrivee'
 
 export interface LigneFlux {
@@ -48,14 +48,6 @@ const Modes: ReadonlyArray<readonly [code: string, libelle: string]> = [['EDI', 
 
 /** Les colonnes du tableau : Emetteur, Mode, Demande, Numerise, Recu le. */
 const NbColonnes = 5
-
-/**
- * « Aller a… » compare sans casse ni accents, comme la Recherche d'affaires : « infogréffe » trouve « INFOGREFFE ».
- * fix-ok: contientSansCasse (criteres.ts) garde les accents ; test « Aller a un flux… » rouge sur « infogréffe », vert ici.
- */
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-}
 
 export function EcranTeletransmission({ ouvrirDossier, dossier = null }: ProprietesEcranTeletransmission) {
   const [mode, setMode] = useState('EDI')

@@ -36,7 +36,7 @@ import { appeler } from '../pont'
 import { contientSansCasse, dateCourte, distinctsTries, estBlanc } from '../criteres'
 import {
   CartesChiffrees, CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MenuLigne, MontantBarre, Pastille,
-  PiedListe, PointEtat, VuesListe, montant, type ActionLigne, type Teinte,
+  PiedListe, PointEtat, VuesListe, montant, useVuesDeSession, type ActionLigne, type Teinte, type VueEnregistree,
 } from '../composants/ListeModerne'
 import type { ContexteDossierVue } from '../plan/types'
 
@@ -128,28 +128,13 @@ const memesCriteres = (a: CriteresCloture, b: CriteresCloture) =>
   a.critAffaire === b.critAffaire && a.critChambre === b.critChambre && a.critDu === b.critDu && a.critAu === b.critAu
   && a.critAFacturer === b.critAFacturer && a.critExamenDepasse === b.critExamenDepasse && memeEnsemble(a.critTypes, b.critTypes)
 
-/** Une vue enregistree : un nom et un jeu complet de criteres. */
-export interface VueCloture {
-  cle: string
-  libelle: string
-  criteres: CriteresCloture
-}
-
 /** Les vues toujours la : les criteres de facturation, d'examen et de classement de l'ecran. */
-export const VuesPrereglees: VueCloture[] = [
+export const VuesPrereglees: VueEnregistree<CriteresCloture>[] = [
   { cle: 'toutes', libelle: 'Toutes', criteres: SansCritere },
   { cle: 'a-facturer', libelle: 'A facturer', criteres: { ...SansCritere, critAFacturer: true } },
   { cle: 'examen-depasse', libelle: 'Limite d\'examen depassee', criteres: { ...SansCritere, critExamenDepasse: true } },
   { cle: 'insuffisance', libelle: 'Insuffisance d\'actif', criteres: { ...SansCritere, critTypes: new Set(['Insuffisance d\'actif']) } },
 ]
-
-/** Les vues ajoutees par « + Nouvelle vue » pendant la session (aucun reglage ne les porte, decision du lot 1). */
-const VuesDeLaSession: VueCloture[] = []
-
-/** Pour les tests : repartir d'une session sans vue ajoutee. */
-export function oublierVuesDeLaSession(): void {
-  VuesDeLaSession.length = 0
-}
 
 /** Colonnes de « Selection PC » : chevron, Affaire, Audience, Classement, Limite, A facturer, Forfait, menu. */
 const NbColonnesSelection = 8
@@ -213,13 +198,7 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
 
   const trouvees = filtrer(criteres, aujourdhui)
 
-  const [vuesAjoutees, setVuesAjoutees] = useState<VueCloture[]>(() => [...VuesDeLaSession])
-  const vues = [...VuesPrereglees, ...vuesAjoutees]
-  const vueActive = vues.find((v) => memesCriteres(v.criteres, criteres))?.cle ?? null
-  function enregistrerVue(nom: string) {
-    VuesDeLaSession.push({ cle: `session-${VuesDeLaSession.length + 1}`, libelle: nom, criteres: { ...criteres, critTypes: new Set(critTypes) } })
-    setVuesAjoutees([...VuesDeLaSession])
-  }
+  const { vues, active: vueActive, enregistrer: enregistrerVue } = useVuesDeSession('Cloture', VuesPrereglees, criteres, memesCriteres)
 
   // Les chiffres de la tete, des cartes et du pied : sur la liste affichee.
   const forfaits = trouvees.reduce((s, l) => s + forfaitDe(l), 0)

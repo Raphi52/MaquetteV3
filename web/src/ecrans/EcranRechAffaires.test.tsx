@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { EcranRechAffaires, VuesPrereglees, objetDe, oublierVuesDeLaSession, type LigneAffaire, type VueAffaires } from './EcranRechAffaires'
+import { EcranRechAffaires, VuesPrereglees, objetDe, type LigneAffaire, type VueAffaires } from './EcranRechAffaires'
+import { oublierVuesDeSession } from '../composants/ListeModerne'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 import { morceaux } from '../test/morceaux'
 
-afterEach(() => { cleanup(); retirerFauxPont(); oublierVuesDeLaSession() })
+afterEach(() => { cleanup(); retirerFauxPont(); oublierVuesDeSession() })
 
 // Le fonds d'affaires, le filtre et le tri sont faits par Pont/EcranRechAffaires.cs,
 // executes par tests/TriCheck, OuvertureCheck et GedCheck. Ici : l'ecran affiche

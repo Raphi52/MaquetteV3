@@ -23,7 +23,7 @@
 import { useState } from 'react'
 import { contientSansCasse, estBlanc } from '../criteres'
 import {
-  CartesChiffrees, CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, type Teinte,
+  CartesChiffrees, CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, useVuesDeSession, type Teinte, type VueEnregistree,
 } from '../composants/ListeModerne'
 
 interface ClientRcs {
@@ -88,28 +88,13 @@ const memeEnsemble = (a: ReadonlySet<string>, b: ReadonlySet<string>) => a.size 
 const memesCriteres = (a: CriteresClients, b: CriteresClients) =>
   a.motCle === b.motCle && memeEnsemble(a.statuts, b.statuts) && memeEnsemble(a.types, b.types)
 
-/** Une vue enregistree : un nom et un jeu complet de criteres. */
-export interface VueClients {
-  cle: string
-  libelle: string
-  criteres: CriteresClients
-}
-
 /** Les vues toujours la : les criteres de statut et de type de l'ecran. */
-export const VuesPrereglees: VueClients[] = [
+export const VuesPrereglees: VueEnregistree<CriteresClients>[] = [
   { cle: 'tous', libelle: 'Tous', criteres: SansCritere },
   { cle: 'actifs', libelle: 'Actifs', criteres: { ...SansCritere, statuts: new Set(['Actif']) } },
   { cle: 'bloques-sommeil', libelle: 'Bloques ou en sommeil', criteres: { ...SansCritere, statuts: new Set(['Bloque', 'En sommeil']) } },
   { cle: 'en-compte', libelle: 'En compte', criteres: { ...SansCritere, types: new Set(['En compte']) } },
 ]
-
-/** Les vues ajoutees par « + Nouvelle vue » pendant la session (aucun reglage ne les porte, decision du lot 1). */
-const VuesDeLaSession: VueClients[] = []
-
-/** Pour les tests : repartir d'une session sans vue ajoutee. */
-export function oublierVuesDeLaSession(): void {
-  VuesDeLaSession.length = 0
-}
 
 export function EcranClients({ selectionner }: ProprietesEcranClients) {
   const [motCle, setMotCle] = useState('')
@@ -129,14 +114,7 @@ export function EcranClients({ selectionner }: ProprietesEcranClients) {
 
   const trouves = filtrer(criteres)
 
-  const [vuesAjoutees, setVuesAjoutees] = useState<VueClients[]>(() => [...VuesDeLaSession])
-  const vues = [...VuesPrereglees, ...vuesAjoutees]
-  const vueActive = vues.find((v) => memesCriteres(v.criteres, criteres))?.cle ?? null
-  function enregistrerVue(nom: string) {
-    VuesDeLaSession.push({ cle: `session-${VuesDeLaSession.length + 1}`, libelle: nom,
-                           criteres: { motCle, statuts: new Set(critStatuts), types: new Set(critTypes) } })
-    setVuesAjoutees([...VuesDeLaSession])
-  }
+  const { vues, active: vueActive, enregistrer: enregistrerVue } = useVuesDeSession('Clients', VuesPrereglees, criteres, memesCriteres)
 
   const actifs = trouves.filter((c) => c.statut === 'Actif').length
   const parType = (t: string) => trouves.filter((c) => c.type === t).length

@@ -13,7 +13,7 @@
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { quand } from './EcranComptes'
-import { EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, type Teinte } from '../composants/ListeModerne'
+import { EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, normaliser, type Teinte } from '../composants/ListeModerne'
 
 export interface NumeroManquant {
   serie: string
@@ -43,14 +43,6 @@ const TeintesSerie: Teinte[] = ['ardoise', 'bleu', 'violet', 'vert', 'orange']
 const TeinteOrigine: Record<string, Teinte> = { V2: 'ardoise', V3: 'bleu' }
 
 const NbColonnes = 6
-
-/**
- * « Aller a… » compare sans casse ni accents, comme la Recherche d'affaires : « abandonnee » trouve « abandonnée ».
- * fix-ok: contientSansCasse (criteres.ts) garde les accents ; test « Aller à un numéro… » rouge sur « abandonnee », vert ici.
- */
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-}
 
 export function EcranManquants() {
   const [vue, setVue] = useState<VueEcranManquants | null>(null)

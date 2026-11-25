@@ -25,7 +25,7 @@
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { dateSaisie, decimalLisible, useNombreSaisi } from '../saisie'
-import { CelluleIdentite, EnteteListe, ListeModerne, MontantBarre, Pastille, PiedListe, type Teinte } from '../composants/ListeModerne'
+import { CelluleIdentite, EnteteListe, ListeModerne, MontantBarre, Pastille, PiedListe, montant, normaliser, type Teinte } from '../composants/ListeModerne'
 
 export interface LigneDossierOuvert {
   numero: string
@@ -82,21 +82,8 @@ export function valeurCapital(capital: string): number {
   return chiffres === '' ? 0 : Number(chiffres)
 }
 
-/** Un nombre entier a la francaise, l'espace des milliers lisible (meme choix que montant() du socle). */
-function entier(valeur: number): string {
-  return valeur.toLocaleString('fr-FR', { maximumFractionDigits: 0 }).replace(/\u202f/g, '\u00a0')
-}
-
 /** Les colonnes du tableau : Dossier, Forme, Origine, Immatriculation, Capital. */
 const NbColonnes = 5
-
-/**
- * « Aller a… » compare sans casse ni accents, comme la Recherche d'affaires : « dépôt » trouve « Depot au guichet ».
- * fix-ok: contientSansCasse (criteres.ts) garde les accents ; test « Aller a un dossier… » rouge sur « dépôt », vert ici.
- */
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-}
 
 export function EcranOuvertureDossier({ sirenDemande }: ProprietesEcranOuvertureDossier) {
   const [origine, setOrigine] = useState(Origines[0]!)
@@ -166,7 +153,9 @@ export function EcranOuvertureDossier({ sirenDemande }: ProprietesEcranOuverture
   const monnaies = [...new Set(affiches.map((d) => d.monnaie))]
   const capitalMax = (monnaie: string) => affiches.filter((d) => d.monnaie === monnaie).reduce((m, d) => Math.max(m, valeurCapital(d.capital)), 0)
   const capitalTotal = (monnaie: string) => affiches.filter((d) => d.monnaie === monnaie).reduce((s, d) => s + valeurCapital(d.capital), 0)
-  const totaux = monnaies.map((m) => `${entier(capitalTotal(m))} ${m}`).join(' · ')
+  // Un capital s'ecrit sans decimales, dans sa monnaie : « 50 000 CHF » (montant() du socle).
+  const capitalEcrit = (m: string) => montant(capitalTotal(m), { devise: m, decimales: 0 })
+  const totaux = monnaies.map(capitalEcrit).join(' · ')
 
   return (
     <div className="rig-proc__corps">
@@ -323,7 +312,7 @@ export function EcranOuvertureDossier({ sirenDemande }: ProprietesEcranOuverture
         {ouverts && (
           <PiedListe>
             <span><b>{affiches.length}</b>{affiches.length > 1 ? ' dossiers ouverts' : ' dossier ouvert'}</span>
-            {monnaies.map((m) => <span key={m}>Capital <b>{`${entier(capitalTotal(m))} ${m}`}</b></span>)}
+            {monnaies.map((m) => <span key={m}>Capital <b>{capitalEcrit(m)}</b></span>)}
           </PiedListe>
         )}
       </ListeModerne>

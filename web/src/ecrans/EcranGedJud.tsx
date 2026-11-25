@@ -30,7 +30,7 @@ import { Fragment, useState } from 'react'
 import { contientSansCasse, dateCourte, distinctsTries, estBlanc } from '../criteres'
 import {
   CartesChiffrees, CelluleChevron, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille, PiedListe,
-  PointEtat, VuesListe, type ActionLigne, type Teinte,
+  PointEtat, VuesListe, teinteStatut, type ActionLigne, type Teinte,
 } from '../composants/ListeModerne'
 import type { ContexteDossierVue } from '../plan/types'
 
@@ -97,9 +97,8 @@ export const VuesDocuments: ReadonlyArray<{ cle: string; libelle: string; criter
   { cle: 'sans-decision', libelle: 'Non lies a une decision', criteres: { ...SansEtat, sansDecision: true } },
 ]
 
-/** Les etats du critere, dans son ordre. Le point d'etat d'une ligne suit le statut du document. */
+/** Les etats du critere, dans son ordre. Le point d'etat d'une ligne suit le statut du document (teinteStatut du socle). */
 const Etats = ['Brouillon', 'Signe', 'Notifie']
-const TeinteStatut: Record<string, Teinte> = { ok: 'vert', action: 'bleu', attente: 'orange', alerte: 'rouge' }
 const TeinteEtat: Record<string, Teinte> = { Brouillon: 'orange', Signe: 'bleu', Notifie: 'vert' }
 const TeinteNature: Record<string, Teinte> = { Jugement: 'bleu', Ordonnance: 'violet', Copie: 'gris' }
 
@@ -301,7 +300,7 @@ export function EcranGedJud({ ouvrirDossier, dossier = null }: ProprietesEcranGe
                     <td title={doc.nature}><Pastille teinte={TeinteNature[doc.nature] ?? 'gris'}>{doc.nature}</Pastille></td>
                     <td className="rig-table__mono">{doc.dateDecision ? dateCourte(doc.dateDecision) : ''}</td>
                     <td className="rig-lm-droite">{doc.nbLies}</td>
-                    <td title={doc.etat}><PointEtat teinte={TeinteStatut[doc.statut] ?? 'gris'}>{doc.etat}</PointEtat></td>
+                    <td title={doc.etat}><PointEtat teinte={teinteStatut(doc.statut)}>{doc.etat}</PointEtat></td>
                     <td className="rig-lm-cellule-menu">
                       <MenuLigne libelle={`Actions du document ${doc.instance}`} actions={[
                         ...actions,

@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { EcranControleVidiged, oublierVuesDeLaSession } from './EcranControleVidiged'
+import { EcranControleVidiged } from './EcranControleVidiged'
+import { oublierVuesDeSession } from '../composants/ListeModerne'
 
-afterEach(() => { cleanup(); oublierVuesDeLaSession() })
+afterEach(() => { cleanup(); oublierVuesDeSession() })
 
 const compte = (c: HTMLElement) => c.querySelector('.rig-lm-synthese')!.textContent
 const page = () => screen.getByText(/^Page /).textContent

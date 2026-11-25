@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { EcranDemandes, identiteDemande, oublierVuesDeLaSession, type LigneDemande, type VueDemandes } from './EcranDemandes'
+import { EcranDemandes, identiteDemande, type LigneDemande, type VueDemandes } from './EcranDemandes'
+import { oublierVuesDeSession } from '../composants/ListeModerne'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 import { contexteDossier } from '../test/dossier'
 
-afterEach(() => { cleanup(); retirerFauxPont(); oublierVuesDeLaSession() })
+afterEach(() => { cleanup(); retirerFauxPont(); oublierVuesDeSession() })
 
 // Le filtre et l'etat AFFICHE (la validation au controle final prime) sont
 // calcules par Pont/EcranDemandes.cs, execute par tests/SaisieCheck. Ici : la

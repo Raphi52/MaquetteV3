@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { EcranArrivee, oublierVuesDeLaSession, type LigneArrivee, type VueArrivee } from './EcranArrivee'
+import { EcranArrivee, type LigneArrivee, type VueArrivee } from './EcranArrivee'
+import { oublierVuesDeSession } from '../composants/ListeModerne'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
-afterEach(() => { cleanup(); retirerFauxPont(); oublierVuesDeLaSession() })
+afterEach(() => { cleanup(); retirerFauxPont(); oublierVuesDeSession() })
 
 // Le filtre vit dans Pont/EcranArrivee.cs (execute par tests/SaisieCheck et
 // SimuEdiCheck). Ici : une arrivee mene a SA demande, une arrivee sans demande

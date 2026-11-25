@@ -44,7 +44,7 @@ import { appeler } from '../pont'
 import { EnteteTriable } from '../composants/EnteteTriable'
 import {
   CartesChiffrees, CelluleChevron, CelluleIdentite, ChoixTri, EnteteListe, LigneDetail, ListeModerne, MenuLigne, MontantBarre,
-  Pastille, PiedListe, PointEtat, VuesListe, exporterCsv, montant, type ActionLigne, type Teinte,
+  Pastille, PiedListe, PointEtat, VuesListe, exporterCsv, montant, normaliser, useVuesDeSession, type ActionLigne, type Teinte, type VueEnregistree,
 } from '../composants/ListeModerne'
 import { dateSaisie } from '../saisie'
 import { toucheDeRecherche } from '../plan/clavier'
@@ -185,30 +185,14 @@ function memesCriteres(a: CriteresSaisis, b: CriteresSaisis): boolean {
   return (Object.keys(SansCritere) as (keyof CriteresSaisis)[]).every((k) => a[k] === b[k])
 }
 
-/** Une vue enregistree : un nom et un jeu complet de criteres. */
-export interface VueEnregistree {
-  cle: string
-  libelle: string
-  criteres: CriteresSaisis
-}
-
 /** Les vues de la maquette, toujours la. */
-export const VuesPrereglees: VueEnregistree[] = [
+export const VuesPrereglees: VueEnregistree<CriteresSaisis>[] = [
   { cle: 'toutes', libelle: 'Toutes', criteres: SansCritere },
   { cle: 'collectives-en-cours', libelle: 'Proc. collectives en cours',
     criteres: { ...SansCritere, critNature: 'collective', critEtat: 'En cours' } },
   { cle: 'solde-100', libelle: 'Solde > 100 €', criteres: { ...SansCritere, critSoldeMin: '100' } },
   { cle: 'cloturees', libelle: 'Cloturees', criteres: { ...SansCritere, critEtat: 'Cloturee' } },
 ]
-
-/** Les vues ajoutees par « + Nouvelle vue » pendant la session : elles survivent a la fermeture de l'onglet,
- *  pas au redemarrage (aucun reglage ne les porte). */
-const VuesDeLaSession: VueEnregistree[] = []
-
-/** Pour les tests : repartir d'une session sans vue ajoutee. */
-export function oublierVuesDeLaSession(): void {
-  VuesDeLaSession.length = 0
-}
 
 const TeinteNature: Record<string, Teinte> = { instance: 'bleu', collective: 'orange', prevention: 'ardoise', mesure: 'vert' }
 const TeinteEtat: Record<string, Teinte> = { 'En cours': 'bleu', Radiee: 'rouge', Cloturee: 'gris' }
@@ -218,10 +202,6 @@ export function objetDe(affaire: Pick<LigneAffaire, 'libelle' | 'nom'>): string 
   const tiret = affaire.libelle.indexOf(' - ')
   const objet = tiret >= 0 ? affaire.libelle.slice(0, tiret) : affaire.libelle
   return objet === affaire.nom ? '' : objet
-}
-
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
 
 /** L'historique d'une affaire, en une phrase (pont de l'historique de l'ancien RIG). */
@@ -304,8 +284,7 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
     [a.numero, a.nom, a.libelle, a.siren, a.siren.replace(/\s/g, ''), a.idInstance, a.role, a.codeAffaire].join(' ')).includes(cherche))
 
   // Les vues : celles de la maquette, puis celles de la session ; leur compte vient du pont.
-  const [vuesAjoutees, setVuesAjoutees] = useState<VueEnregistree[]>(() => [...VuesDeLaSession])
-  const vues = [...VuesPrereglees, ...vuesAjoutees]
+  const { vues, active: vueActive, enregistrer: enregistrerVue } = useVuesDeSession('RechAffaires', VuesPrereglees, criteres, memesCriteres)
   const [comptes, setComptes] = useState<number[] | null>(null)
   const cleVues = JSON.stringify(vues.map((v) => v.criteres))
   useEffect(() => {
@@ -317,12 +296,6 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
       () => { if (!perime) setComptes(null) })
     return () => { perime = true }
   }, [cleVues])
-  const vueActive = vues.find((v) => memesCriteres(v.criteres, criteres))?.cle ?? null
-  function enregistrerVue(nom: string) {
-    const nouvelle: VueEnregistree = { cle: `session-${VuesDeLaSession.length + 1}`, libelle: nom, criteres }
-    VuesDeLaSession.push(nouvelle)
-    setVuesAjoutees([...VuesDeLaSession])
-  }
 
   // Le logiciel de chaque affaire affichee, par numero. La cle est l'ENSEMBLE des numeros : un tri ne change
   // rien, donc ne redemande rien.

@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { EcranClients, oublierVuesDeLaSession } from './EcranClients'
+import { EcranClients } from './EcranClients'
+import { oublierVuesDeSession } from '../composants/ListeModerne'
 
-afterEach(() => { cleanup(); oublierVuesDeLaSession() })
+afterEach(() => { cleanup(); oublierVuesDeSession() })
 
 // Valeurs attendues : celles de l'ecran Blazor (EcranClients.razor, 6 clients de demonstration).
 const lignes = (c: HTMLElement) =>

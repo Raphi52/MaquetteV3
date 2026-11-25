@@ -116,10 +116,10 @@ describe('EcranHistoriqueV2', () => {
     // L'etat en clair, l'echec marque avec son message : « 7 » seul ne dit pas a l'agent que l'envoi a echoue (refus du 22/11/2026).
     const [envoi, reception] = within(echanges).getAllByRole('row').slice(1)
     const etatEnvoi = within(envoi!).getByText("Erreur d'intégration")
-    expect(etatEnvoi.className).toContain('rig-etat--alerte')
+    expect(etatEnvoi.className).toBe('rig-lm-etat rig-lm-t-rouge')
     expect(envoi!.textContent).toContain('Pièce jointe absente')
     expect(envoi!.textContent).not.toMatch(/(^|\D)7(\D|$)/)
-    expect(within(reception!).getByText('Intégré avec succès').className).not.toContain('rig-etat--alerte')
+    expect(within(reception!).getByText('Intégré avec succès').className).not.toContain('rig-lm-t-rouge')
     expect(document.body.querySelector('button.rig-bouton--fort')?.textContent).toBe('Rechercher')
   })
 
@@ -139,6 +139,9 @@ describe('EcranHistoriqueV2', () => {
     const lignes = within(arrivee).getAllByRole('row').slice(1)
     expect(lignes[0]!.textContent).toContain('V3')
     expect(lignes[1]!.textContent).toContain('Ancien RIG')
+    // Le logiciel en pastille, teintee comme dans la liste des affaires : la V3 en vert, l'ancien RIG en orange.
+    expect([lignes[0]!, lignes[1]!].map((l) => l.querySelector('.rig-lm-pastille')!.className))
+      .toEqual(['rig-lm-pastille rig-lm-t-vert', 'rig-lm-pastille rig-lm-t-orange'])
   })
 
   it('REC-009 CA01, CA02 : un ancien numéro mène à la fiche RIG, son numéro Infogreffe compris', async () => {

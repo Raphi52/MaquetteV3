@@ -26,7 +26,7 @@ import { contientSansCasse, estBlanc } from '../criteres'
 import { quand } from './EcranComptes'
 import {
   CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe,
-  type Teinte,
+  teinteStatut, type Teinte,
 } from '../composants/ListeModerne'
 
 export interface EtatGreffe {
@@ -157,16 +157,15 @@ const LibellesRegles: Record<string, string> = {
   'echec-numerotation': 'Échec de numérotation',
 }
 
-/** La teinte du point d'etat, tiree de la classe d'etat de la charte (rig-etat--*) que rendent pastilleSante et pastilleTraitement. */
-const TeinteClasse: Record<string, Teinte> = { ok: 'vert', alerte: 'rouge', action: 'bleu', attente: 'orange' }
 const TeinteRegle: Record<string, Teinte> = {
   'traitement-en-erreur': 'rouge', 'file-bloquee': 'orange', 'base-injoignable': 'violet', 'migrations-en-retard': 'ardoise',
   'echec-numerotation': 'bleu',
 }
 const TeinteNiveau: Record<ErreurTechnique['niveau'], Teinte> = { grave: 'rouge', erreur: 'orange', avertissement: 'ardoise' }
 
+/** Le point d'etat d'une classe de la charte (rig-etat--*), celle que rendent pastilleSante et pastilleTraitement. */
 function Etat({ p }: { p: { classe: string; libelle: string } }) {
-  return <PointEtat teinte={TeinteClasse[p.classe] ?? 'gris'}>{p.libelle}</PointEtat>
+  return <PointEtat teinte={teinteStatut(p.classe)}>{p.libelle}</PointEtat>
 }
 
 /** Un compte (login) en avatar + nom ; sans compte, un tiret. */

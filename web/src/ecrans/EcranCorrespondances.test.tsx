@@ -72,9 +72,9 @@ describe('EcranCorrespondances', () => {
     expect(container.querySelector('style')!.textContent).toBe(RETOUR_A_LA_LIGNE)
     expect(RETOUR_A_LA_LIGNE).toMatch(/\.rig-table\.rig-fiche-touches thead th, \.rig-table\.rig-fiche-touches tbody td \{ white-space: normal; overflow: visible; text-overflow: clip; max-width: none;/)
     expect(RETOUR_A_LA_LIGNE).toMatch(/\.rig-fiche-touches \.rig-lm-etat, \.rig-table\.rig-fiche-touches \.rig-bouton \{ white-space: normal;/)
-    // Revenu a la ligne, le point d'etat reste face a la premiere ligne (capture orange du 24/11/2026).
-    expect(RETOUR_A_LA_LIGNE).toMatch(/\.rig-fiche-touches \.rig-lm-etat \{ align-items: flex-start; \}/)
-    expect(RETOUR_A_LA_LIGNE).toMatch(/\.rig-fiche-touches \.rig-lm-etat i \{ margin-top: calc\(\(1lh - 7px\) \/ 2\); \}/)
+    // Revenu a la ligne, le point d'etat reste face a la premiere ligne (capture orange du 24/11/2026) : c'est la regle
+    // du socle (ListeModerne.test.tsx, « PointEtat : le point face a la PREMIERE ligne »), l'ecran ne la recopie plus.
+    expect(RETOUR_A_LA_LIGNE).not.toMatch(/rig-lm-etat( i)? \{ (align-items|margin-top)/)
     expect(screen.getByText('Nouveau dans la V3', { selector: '.rig-fiche-touches td > span' }).className).toBe('rig-lm-etat rig-lm-t-violet')
   })
 
@@ -166,6 +166,16 @@ describe('AideTouchesEcran', () => {
     expect(cellules[1]!.textContent).toBe('F7')
     fireEvent.keyDown(document.body, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('une touche sans remplacante dit son statut en point colore, comme la fiche (plus de pastille rig-etat)', async () => {
+    installerFauxPont({ 'EcranCorrespondances.DeLEcran': () => [ligne({ nouvelleTouche: null, statut: 'supprimee' })] })
+    render(<AideTouchesEcran code="CODE_REQUI" actif />)
+    fireEvent.keyDown(document.body, { key: '?' })
+    const aide = await screen.findByRole('dialog', { name: 'Touches de cet écran' })
+    const statut = aide.querySelector('tbody tr td')!.firstElementChild!
+    expect([statut.textContent, statut.className]).toEqual(['Supprimée', 'rig-lm-etat rig-lm-t-rouge'])
+    expect(aide.querySelector('.rig-etat')).toBeNull()
   })
 
   // L'aide s'ouvre a la reponse du pont (une promesse), pas pendant la frappe : son ecoute d'Echap ne doit pas
