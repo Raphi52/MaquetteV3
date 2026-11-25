@@ -82,6 +82,16 @@ un onglet que tu ouvres pour vérifier réapparaît chez lui au prochain démarr
 Mesuré le 2026-11-20 (conv-2041) : avec la variable, l'affaire 004151 ouverte sur
 le bureau caché est écrite dans la copie, et le fichier de l'utilisateur ne bouge pas.
 
+**Avec les données de dev, `RIGV3_ETAT` ne suffit plus.** Branchée au serveur
+(`RIGV3_SERVEUR`), l'app relit les préférences de l'agent sur le serveur et y renvoie
+chaque changement d'onglet (`Pont/PreferencesServeur.cs`). Les onglets que tu ouvres
+reviennent donc chez l'utilisateur, puisque son app utilise le même agent. Après
+`donnees-dev.ps1`, lance l'app au nom d'un AUTRE agent de la copie :
+`$env:RIGV3_COMPTE = "<compteWindows>"`, choisi dans `GET /socle/3801/comptes`
+(en-tête `X-RigV3-Compte`). Mesuré le 2026-11-25 (plan-03880acb, lot 3) : les
+préférences de l'agent de l'utilisateur sont restées identiques. Sinon, referme
+l'onglet ouvert et remets l'onglet actif d'origine avant de fermer.
+
 Puis **lis l'image**. Un code de sortie non nul du lanceur (4 = l'app est morte,
 3 = aucune fenêtre, 1 = échec) est une erreur de ton tour : lis `erreur` et
 `journalWindows`, corrige, relance — ne bascule pas sur l'écran de l'utilisateur.
