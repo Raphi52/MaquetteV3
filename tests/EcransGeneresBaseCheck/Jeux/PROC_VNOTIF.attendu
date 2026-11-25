@@ -1,0 +1,23 @@
+# « Notifications » (LecteurNotifications) sur le jeu PROC_VNOTIF.sql : la recherche que la V2 lance a l'ouverture de
+# chaque onglet -- du jour moins 30 a 0 h au jour a 24 h, etats coches (emises 2, 5, 8 ; recues 1, 8), tous greffes,
+# tous services. Groupes dans l'ordre : emises RCS, emises judiciaires, recues ; dans un groupe, la date de reception
+# croissante (NULL d'abord), puis le numero.
+# Etat : emise a envoyer (2) -> EnCours [0] ; emise refusee (5) ou en erreur (8), recue en attente (1) ou en erreur (8)
+# -> AFaire [].
+# Ecartees, chacune avec son jumeau retenu :
+#   1400104 envoyee (3) et 1400106 validee (6)   -- 1400101 (8), 1400103 (5) : etats non coches a l'ouverture ;
+#   1400105 generee le jour moins 31 a 23 h       -- 1400103, le jour moins 30 a 0 h ;
+#   1400109 generee le lendemain a 0 h            -- 1400102, le jour meme a 23 h ;
+#   1400107 sans action (INNER JOIN ACTION_RCS)   -- 1400101 ;
+#   1400204 cloturee (10), 1400205 jour moins 40  -- 1400201, 1400202 ;
+#   1400303 traitee (2), 1400304 jour moins 31    -- 1400301, 1400305.
+# 1400301 : le numero de gestion du dossier de sa demande (2020B40401) l'emporte sur celui de la notification (1999B00001).
+Notification 1400101 · EDITION ALPHA SARL | 2020 B 40401 · type MTS · vers le greffe 2602 · générée le {J-1} · Erreur envoi · Greffe destinataire injoignable | Émises (RCS) | AFaire | []
+Notification 1400102 · EDITION ALPHA SARL | 2020 B 40401 · type MR2 · vers le greffe 3802 · générée le {J+0} · A envoyer | Émises (RCS) | EnCours | [0]
+Notification 1400103 · EDITION BETA SAS | 2020 B 40402 · type MTS · vers le greffe 6901 · générée le {J-30} · envoyée le {J-29} · Refusé Greffe | Émises (RCS) | AFaire | []
+Notification 1400201 · EDITION BETA SAS | 2020 B 40402 · PC 2026P00211 · type PCL · vers le greffe 5602 · générée le {J-3} · Erreur envoi · Code greffe inconnu | Émises (judiciaire) | AFaire | []
+Notification 1400202 · NOTIF NON INSCRIT SARL | N2026000221 · PC 2026P00212 · type PCL · vers le greffe 3402 · générée le {J-5} · A envoyer | Émises (judiciaire) | EnCours | [0]
+Notification 1400203 · NOTIFBANC Paul | N2026000222 · PC 2026P00213 · type PCS · vers le greffe 3402 · générée le {J-10} · envoyée le {J-10} · Refusé Greffe | Émises (judiciaire) | AFaire | []
+Notification 1400305 | reçue le {J-30} · En Attente | Reçues | AFaire | []
+Notification 1400301 · EDITION ALPHA SARL | 2020 B 40401 · type RCS · du greffe 6901 · reçue le {J-2} · En Attente | Reçues | AFaire | []
+Notification 1400302 | 2025 B 00999 · type PCL · du greffe 3802 · reçue le {J-1} · Erreur envoi | Reçues | AFaire | []

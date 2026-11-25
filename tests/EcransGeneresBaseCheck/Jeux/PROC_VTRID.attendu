@@ -1,0 +1,20 @@
+# « Tribunal digital » (LecteurTribunalDigital) sur le jeu PROC_VTRID.sql : les deux recherches de la V2 a leurs criteres
+# pre-remplis. « Documents transmis » : envoyes du jour moins 7 a 0 h au jour a 24 h, une ligne par envoi avec sa premiere
+# edition, la plus recente creee en tete. « Demandes reçues » : en attente seulement, toutes dates, la plus recente en tete.
+# Etat d'un envoi : erreur ou etat 8 / 9 -> AFaire [] ; sans compte rendu -> EnCours [0] ; compte rendu OK (4) -> Validee
+# [0,1,3] ; autre compte rendu -> Validee [0,1]. Toute demande recue de la liste -> AFaire [].
+# Ecartes, chacun avec son jumeau retenu :
+#   1400407 envoye le jour moins 8 a 23 h      -- 1400404, le jour moins 7 a 0 h ;
+#   1400408 envoye le lendemain a 0 h          -- 1400405, le jour meme a 23 h ;
+#   1400409 sans edition, 1400410 edition absente de DEMANDE_EDITION, 1400411 pas encore envoye -- 1400402 ;
+#   1400503 acceptee, 1400504 refusee          -- 1400501, en attente.
+# 1400401 a deux editions (200414 puis 200411) : une seule ligne, la premiere ; triee sur la creation de 200414, pas de 200411.
+Envoi E1400402 · Certificat de non-faillite | Rôle 2026J00402 · Maître Banc · envoyé le {J-1} · accusé de réception le {J-1} · compte rendu en attente | Documents transmis | EnCours | [0]
+Envoi E1400403 · Lettre de relance | Rôle 2026J00403 · EDITION ALPHA SARL · envoyé le {J-3} · en erreur : Erreur SES : numéro de rôle inconnu | Documents transmis | AFaire | []
+Envoi E1400401 · Extrait Kbis | Rôle 2026J00401 · EDITION ALPHA SARL · envoyé le {J-2} · compte rendu OK le {J-1} | Documents transmis | Validee | [0,1,3]
+Envoi n° 1400404 · Extrait Kbis | Rôle 2026J00404 · Maître Banc · envoyé le {J-7} · erreur d'envoi | Documents transmis | AFaire | []
+Envoi E1400405 · Accusé de dépôt | Rôle 2026J00405 · EDITION ALPHA SARL · envoyé le {J+0} · compte rendu en attente | Documents transmis | EnCours | [0]
+Envoi E1400406 · Certificat | Rôle 2026J00406 · EDITION BETA SAS · envoyé le {J-4} · compte rendu le {J-1} | Documents transmis | Validee | [0,1]
+Demande 26001400501 | Reçue le {J-1} · Requête au juge commissaire · en attente de traitement | Demandes reçues | AFaire | []
+Demande 26001400505 | Reçue le {J-5} · TD_NOUVEAU · en attente de traitement | Demandes reçues | AFaire | []
+Demande 25001400502 · Rôle 2025J00502 | Reçue le {J-400} · Assignation · en erreur : Erreur SES : pièce illisible · en attente de traitement | Demandes reçues | AFaire | []
