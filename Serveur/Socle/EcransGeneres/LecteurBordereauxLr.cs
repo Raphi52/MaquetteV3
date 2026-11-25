@@ -13,10 +13,23 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// demande du processus, DEMANDE.DMND_CODE_PROSS = 'BORDLR' (27 dans RIG_DEV, toutes validees, de 2010 a 2019, lu le
 /// 25/11/2026), et l'edition du bordereau, une DEMANDE_EDITION rattachee a cette demande (DMNED_ID_DMND : GenererEdition
 /// recoit Processus.demande.DMND_ID_DMND_DEMANDE, OPE_BORDLR_AVEC_AR.cs:68, OPE_BORDLR_SANS_AR.cs:63), libellee
-/// « Bordereau LRAR-n » ou « Bordereau LR-n ». Les demandes BORDLR sont donc le registre des bordereaux : la liste de cet
-/// ecran -- comme les retours saisis pour LecteurRetoursLrar, sur le meme ecran reuni. Dans la base V3, DEMANDE et
-/// DEMANDE_EDITION sont les tables V2 telles quelles (v2.*). La fiche du Brain (reference/proc/proc_bordlr.md) ne decrit
+/// « Bordereau LRAR-n » ou « Bordereau LR-n ». Les demandes BORDLR sont donc la trace de ce que CET ecran a edite, et la
+/// liste qu'il montre -- comme les retours saisis pour LecteurRetoursLrar, sur le meme ecran reuni. Dans la base V3, DEMANDE
+/// et DEMANDE_EDITION sont les tables V2 telles quelles (v2.*). La fiche du Brain (reference/proc/proc_bordlr.md) ne decrit
 /// aucune liste.
+///
+/// CE QUI N'EST PAS LU : les autres bordereaux de recommandes. RIG_DEV compte 15 804 editions libellees « bordereau LR... »
+/// (lu le 25/11/2026) ; 21 seulement sont rattachees a une demande BORDLR. Les 15 783 autres n'ont aucune demande
+/// (DMNED_ID_DMND vide) : 15 781 « bordereau LRAR », du 06/09/2007 au 24/03/2026, et 2 « bordereau LR » du 25/05/2009,
+/// maquette BORDLRAR_LOT2 (2 en 3801_BORDLRAR), lot d'impression DMNED_LOT = « LRAR_<utilisateur> », « LRAR » ou « LR ».
+/// Ce sont les bordereaux des lots de recommandes imprimes, pas ceux de cet ecran, qui rattache toujours son edition a sa
+/// demande (OPE_BORDLR_AVEC_AR.cs:68, OPE_BORDLR_SANS_AR.cs:63). Le code qui les cree n'est pas dans
+/// D:\RigApplication\Source (cherche : « BORDLRAR », « bordereau LRAR », CreateDemandeEditionByParametreGeneration) ;
+/// l'edition en lot traite bien un bordereau LRAR comme une ligne de document (TableauEditionLot1.cs:2676-2679). Ils ne
+/// sont pas lus ici : ils figurent deja dans la « File des editions », qui lit toute DEMANDE_EDITION
+/// (LecteurFileEditions.cs, requete), et un jeu de test ne peut pas en poser (PROC_POOLEDITION.sql l. 5-6).
+/// fix-ok: ce commentaire disait « registre des bordereaux » ; sqlcmd sur RIG_DEV (25/11/2026) a mesure 15 783 editions de
+/// bordereau hors demande BORDLR, d'ou le paragraphe ci-dessus.
 ///
 /// FILTRES : DMND_CODE_PROSS = 'BORDLR' ; pas les demandes supprimees (etat X, Demande.eEtatDemande,
 /// Outils\DLL\RigMetier\Demande\Demande.cs:21-42). Une ligne par edition de la demande (une validation peut editer les
@@ -28,7 +41,7 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// « bordereau LRAR-1 ») : « Bordereau LR-n » -> « Sans accuse de reception » ; tout autre -> « Avec accuse de reception ».
 /// Une demande sans edition ne dit pas son type : elle va dans « Avec accuse de reception », le bordereau que la V2 propose
 /// toujours (l'etape sans AR est masquee des que la numerotation LRN a demarre, PROC_BORDLR.cs:74-79 et
-/// ETP_BORDLR_SANS_AR.cs:28-33) et le seul edite dans RIG_DEV (21 editions sur 21) ; ses precisions disent que le type
+/// ETP_BORDLR_SANS_AR.cs:28-33) et le seul que cet ecran ait edite dans RIG_DEV (ses 21 editions) ; ses precisions disent que le type
 /// est inconnu.
 ///
 /// REGLE D'ETAT (marches du descripteur : 0 Periode, 1 Utilisateur, 2 Bordereau avec AR, 3 Bordereau sans AR, 4 Edition) :
