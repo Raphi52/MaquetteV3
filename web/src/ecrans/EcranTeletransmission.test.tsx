@@ -54,6 +54,9 @@ describe('EcranTeletransmission en liste moderne', () => {
     expect(premiere.querySelector('.rig-lm-identite__nom')!.textContent).toBe('INFOGREFFE')
     expect(premiere.querySelector('.rig-lm-identite__objet')!.textContent).toBe('R1 · A7')
     expect(premiere.querySelector('.rig-lm-pastille')!.className).toBe('rig-lm-pastille rig-lm-t-violet')
+    // Une pastille coupee se lit entiere au survol (capture orange du 25/11 sur le Courrier arrive, memes modes).
+    // Faux si : la cellule du mode n'a pas d'infobulle, ou porte autre chose que le libelle affiche.
+    expect(premiere.querySelector('.rig-lm-pastille')!.closest('td')!.getAttribute('title')).toBe('Edi')
     expect(premiere.querySelector('.rig-lm-etat')!.className).toBe('rig-lm-etat rig-lm-t-orange')
     expect(premiere.querySelector('.rig-lm-etat')!.textContent).toBe('non')
     expect(container.querySelector('.rig-lm-pied')!.textContent)
