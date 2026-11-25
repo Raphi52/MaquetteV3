@@ -28,7 +28,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///
 /// GROUPES : l'onglet -- « Documents transmis », « Demandes reçues ».
 ///
-/// REGLE D'ETAT (marches du descripteur : 0 Criteres, 1 Documents transmis, 2 Demandes recues, 3 Preuve et dossier).
+/// REGLE D'ETAT (sections du descripteur : 0 Documents transmis, 1 Demandes recues, 2 Preuve et dossier -- la recherche
+/// « Criteres » de la V2 est le panneau des criteres depuis le lot 1 du plan-676a4b19, qui l'a retiree des sections).
 /// TDE_ETAT suit le flux EDI TRID : 2 pret a envoyer (Edi\...\EdiFluxTRID\TRIDEdiSortantDETD.cs:85), 3 envoye
 /// (TRIDEdiSortant.cs:136), 8 erreur d'envoi (:138), 4 compte rendu OK et 9 compte rendu KO, son erreur dans
 /// TDE_ERREUR_SES (TRIDEdiEntrantCR.cs:223-241) ; la date du compte rendu est TDE_DATE_CR.
@@ -36,8 +37,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///                                -> AFaire « Non traité » : la V2 l'ecrit en rouge (DataGridViewDocTransmis.cs:129-131) ;
 ///   envoi sans compte rendu      -> EnCours « En cours » : envoye, le compte rendu attendu, en orange (l. 136-138) (0) ;
 ///   compte rendu OK (etat 4)     -> Validee « Traité » : la preuve de depot se telecharge (IsCompteRenduOk,
-///                                   RigMetier\JUDICIAIRE\TribunalDigitalEnvoi.cs:14 ; OPE_RESULTAT_DOCUMENTS_TRANSMIS) (0, 1, 3) ;
-///   autre compte rendu           -> Validee « Traité », sans la preuve (0, 1) ;
+///                                   RigMetier\JUDICIAIRE\TribunalDigitalEnvoi.cs:14 ; OPE_RESULTAT_DOCUMENTS_TRANSMIS) (0, 2) ;
+///   autre compte rendu           -> Validee « Traité », sans la preuve (0) ;
 ///   demande recue (en attente)   -> AFaire « Non traité » : pas encore acceptee ni refusee dans RIG, en orange
 ///                                   (DataGridViewDemandesRecus.cs:232-234). Les acceptees et refusees, decochees a
 ///                                   l'ouverture, n'entrent pas dans la liste.
@@ -109,8 +110,8 @@ internal sealed class LecteurTribunalDigital : ILecteurEcran
             : compteRendu.Length == 0
                 ? ("EnCours", [0], FormeLigne.Joindre(accuse.Length > 0 ? $"accusé de réception le {accuse}" : null, "compte rendu en attente"))
             : etat == "4"
-                ? ("Validee", [0, 1, 3], $"compte rendu OK le {compteRendu}")
-                : ("Validee", [0, 1], $"compte rendu le {compteRendu}");
+                ? ("Validee", [0, 2], $"compte rendu OK le {compteRendu}")
+                : ("Validee", [0], $"compte rendu le {compteRendu}");
 
         var numero = FormeLigne.Texte(r, "Numero");
         var affaire = FormeLigne.Texte(r, "Affaire");
