@@ -41,8 +41,10 @@ public static class CatalogueGenere
             }
         }
 
+        // Un ecran reuni EN ONGLETS n'a pas de liste commune : chaque onglet monte l'ecran de sa
+        // procedure (web/src/ecrans/EcranOnglets.tsx), avec le descripteur de celle-ci s'il en a un.
         foreach (var entree in MenuAccueil.Moments.SelectMany(m => m.Sous).SelectMany(s => s.Entrees)
-                                                  .Where(e => e.Membres.Length > 0).DistinctBy(e => e.Code))
+                                                  .Where(e => e.Membres.Length > 0 && !e.EnOnglets).DistinctBy(e => e.Code))
         {
             if (!parCode.TryAdd(entree.Code, Reunir(entree, parCode)))
                 throw new InvalidOperationException($"{entree.Code} est a la fois decrit et reuni par le menu.");

@@ -60,6 +60,7 @@ import { EcranCourriels } from '../ecrans/EcranCourriels'
 import { EcranCertificat } from '../ecrans/EcranCertificat'
 import { EcranNonMaquette } from '../ecrans/EcranNonMaquette'
 import { EcranGenere } from '../ecrans/EcranGenere'
+import { EcranOnglets } from '../ecrans/EcranOnglets'
 import { EcranOuvertureDossier } from '../ecrans/EcranOuvertureDossier'
 import { EcranParametresAccueil } from '../ecrans/EcranParametresAccueil'
 import { EcranRechAffaires } from '../ecrans/EcranRechAffaires'
@@ -86,6 +87,19 @@ export function Aiguillage({ proc, plan }: ProprietesAiguillage) {
   // L'affaire d'ou l'ecran a ete ouvert, et sa cle de montage (voir l'en-tete).
   const dossier = ecran.dossier
   const cle = dossier?.numero
+  // Un ecran REUNI EN ONGLETS (Pont/MenuAccueil.cs, EntreeMenu.EnOnglets) : chaque onglet monte
+  // l'ecran d'origine de sa procedure par CET aiguillage, avec le contexte de l'ecran reuni (son
+  // affaire) et son propre descripteur s'il est generique.
+  if (ecran.reunis) {
+    const { onglets, actif } = ecran.reunis
+    const ecranDe = (code: string) => {
+      const o = onglets.find((x) => x.code === code)
+      return o && <Aiguillage proc={{ code: o.code, libelle: o.libelle, ecran: { ...ecran, descripteur: o.descripteur, reunis: null } }}
+                              plan={plan} />
+    }
+    return <EcranOnglets key={proc.code} titre={proc.libelle} onglets={onglets} actif={actif}
+                         choisir={(code) => plan('ongletReuni', code)} ecran={ecranDe} />
+  }
   switch (proc.code) {
     case 'PROC_ACTES_NUM':
       return <EcranActes ouvrirDossier={ouvrirParNumero} />

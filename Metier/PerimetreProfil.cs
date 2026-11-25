@@ -94,6 +94,10 @@ public static class PerimetreProfil
         // ---- Les ECRANS REUNIS (Pont/MenuAccueil.cs, EntreeMenu.Reunit) : le
         // metier de leurs procedures, qui est le meme pour toutes (tests/
         // EcransGeneresCheck le verifie). Un ecran reuni transverse n'est pas ici.
+        // Les trois ecrans reunis EN ONGLETS du 25/11/2026 (conv-2147) sont transverses, comme
+        // chacune de leurs procedures : SYNTHESE_DOCUMENTS_NUMERISES, SYNTHESE_CLIENTS et
+        // SYNTHESE_STATISTIQUES. Leurs voisines reservees a un metier restent a part au menu :
+        // PROC_GEDJUD et PROC_STATCA (judiciaire), PROC_CNI (RCS).
         ["SYNTHESE_DEPOTS_REGISTRE"] = Rcs, ["SYNTHESE_CHIFFRES_RCS"] = Rcs,
         ["SYNTHESE_CORRIGER_RCS"] = Rcs, ["SYNTHESE_INPI"] = Rcs, ["SYNTHESE_FORMALITES_DEMAT"] = Rcs,
         ["SYNTHESE_RELANCES"] = RcsEnd, ["SYNTHESE_ACTES_BLOQUES"] = RcsEnd,
