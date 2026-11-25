@@ -1,0 +1,14 @@
+# « Courriers revenus NPAI » (LecteurCourriersNpai) sur le jeu PROC_TRAITEMENTNPAI.sql : les demandes du processus NPAI,
+# l'action ouverte (Q) et tout autre etat d'abord, puis les traitees (V) ; le plus recent en tete dans chaque bloc.
+# Traitee : [0,1,2], plus l'impression (3) pour une action qui imprime (SiegeLR, DiriLS ; pas Enreg).
+# Groupe « Relances de comptes annuels » quand le courrier d'origine est une relance SDCA (200317 en direct, 200318 et
+# 200313 par la chaine 200313 -> 200318 -> 200328) ou que la demande porte des exercices (200312, LstIdExer) ; sinon
+# « Formalites » (200311 : surveillance SASSOSCI, le leurre 200331 « SiegeLR=2003110 » n'est pas sa note ; 200316 sans dossier).
+# Ecartees, chacune avec sa jumelle retenue : 200314 abandonnee X (jumelle 200313), 200315 autre processus (jumelle 200311) ;
+# les demandes d'origine (SASSOSCI, SDCA) ne sont pas des lignes.
+NPAI GAMMA SARL · 2020 B 30303 | LRAR au siège de la société · courrier d'origine : Surveillances des dépôts de comptes annuels · commencé le {J+0} · demande n° 26000200313 | Relances de comptes annuels | EnCours | [0,1]
+NPAI - MOF - SANS DOSSIER | Mention d'Office de cessation · commencé le {J-4} · demande n° 26000200316 · état « A » de l'ancien RIG | Formalités | EnCours | [0]
+NPAI BETA SAS · 2020 B 30302 | Enregistrement du NPAI · traité le {J-2} · demande n° 26000200312 | Relances de comptes annuels | Validee | [0,1,2]
+NPAI GAMMA SARL · 2020 B 30303 | Lettre simple aux dirigeants · courrier d'origine : Surveillances des dépôts de comptes annuels · traité le {J-3} · demande n° 26000200318 | Relances de comptes annuels | Validee | [0,1,2,3]
+NPAI ETA SARL · 2020 B 30307 | Lettre simple aux dirigeants · courrier d'origine : Surveillances des dépôts de comptes annuels · traité le {J-6} · demande n° 26000200317 | Relances de comptes annuels | Validee | [0,1,2,3]
+NPAI ALPHA SARL · 2020 B 30301 | LRAR au siège de la société · courrier d'origine : Surveillance SCI sans Associés · traité le {J-10} · demande n° 26000200311 | Formalités | Validee | [0,1,2,3]

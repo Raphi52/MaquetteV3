@@ -1,0 +1,7 @@
+# « Actes web non transmis » (LecteurActesWebNonTransmis) sur le jeu PROC_ACTREJ_CMD_WEB.sql : la commande la plus
+# recente en tete, une ligne par acte, toute ligne « A transmettre » (AFaire, aucune marche).
+# Ecartes, chacun avec son jumeau retenu : 200113 range dans la GED (jumeau 200112, meme depot), 200114 sans commande
+# web (jumeau 200111), 200115 depot sans action (jumeau 200111). 200112 n'apparait qu'une fois malgre les deux actions
+# de son depot.
+ACTES WEB ALPHA SARL · 2020 B 10101 | Dépôt W200121 · Statuts mis à jour · SIREN 512 000 101 · commande du {J+0} | Commandes du jour | AFaire | []
+ACTES WEB BETA SAS · 2020 B 10102 | Dépôt W200122 · Procès-verbal d'assemblée · SIREN 512 000 102 · commande du {J-1} | Commandes plus anciennes | AFaire | []
