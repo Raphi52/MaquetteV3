@@ -1,0 +1,13 @@
+# « Demandes FNIG » (LecteurDemandesFnig) sur le jeu PROC_FNIG.sql : toutes les demandes (la V2 ouvre sans aucun
+# critere), la plus recente (numero le plus haut) en tete.
+# Etat : Envoye -> Validee [0,1,3] ; Erreur -> Rejetee [0,1,3] ; ADesactiver -> EnAttente [0,1] ; AEnvoyer -> EnCours [0,1] ;
+# sans etat -> AFaire []. La marche 2 (entreprises) s'ajoute avec au moins une entreprise renseignee.
+# Groupe : le type de demande ; sans type, « Ajout ».
+# Aucune demande n'est ecartee. L'entreprise vide de 300304 ne compte pas (jumeau : 300301 et ses deux entreprises).
+FNIGBANC Gilles | jugement du {J-15} · envoi refusé | Modification | Rejetee | [0,1,3]
+FNIGBANC Fanny | à valider | Ajout | AFaire | []
+FNIGBANC Emma | jugement du {J-400} · SIREN 512 300 314 · désactivation à envoyer | Désactivation | EnAttente | [0,1,2]
+FNIGBANC David | jugement du {J-20} · à envoyer au FNIG | Modification | EnCours | [0,1]
+FNIGBANC Chloé | jugement du {J-25} · envoi refusé : Date de naissance absente | Ajout | Rejetee | [0,1,3]
+FNIGBANC Bruno | jugement du {J-28} · envoyée le {J-2} | Ajout | Validee | [0,1,3]
+FNIGBANC Alice | jugement du {J-30} · interdiction jusqu'au {A+5} · FNIG ALPHA SARL et 1 autre(s) · envoyée le {J-3} | Ajout | Validee | [0,1,2,3]
