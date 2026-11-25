@@ -10,7 +10,7 @@
 //
 // Un ecran REUNI (descripteur.membres, 24/11/2026) met plusieurs procedures dans une seule
 // liste : un groupe par procedure, et chaque ligne suit le PARCOURS de la sienne -- ses
-// marches, son bouton, le nom de son etat. Les tuiles comptent tout l'ecran.
+// marches, son bouton, le nom de son etat. Les tuiles comptent tout l'ecran, sauf, en mode mixte, les groupes en exemple (chiffres reels seulement).
 //
 // LES LIGNES (plan « ecrans retrouves branches sur la base », 24/11/2026) : demandees au pont a
 // l'ouverture (EcranGenere.Lignes, Pont/EcranGenere.cs). Branche sur le serveur, l'ecran montre les
@@ -144,7 +144,14 @@ export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
   const groupes = d.groupes
     .map((titre) => ({ titre, lignes: visibles.filter((l) => l.groupe === titre) }))
     .filter((g) => g.lignes.length > 0)
-  const tuiles = d.etats.map((e) => ({ ...e, nombre: lignes.filter((l) => l.etat === e.code).length }))
+  // fix-ok: test rouge mesure (tuile '2' au lieu de '1') : la tuile comptait `lignes`, exemples compris.
+  // Les chiffres sont le travail REEL du greffe : en mode mixte, les groupes encore en exemple (noms fictifs)
+  // restent affiches et etiquetes, mais n'entrent ni dans les tuiles ni dans le compteur (qui les dit a part).
+  const enExemple = (l: { groupe: string }) => vue?.mode === 'mixte' && vue.exemples.includes(l.groupe)
+  const comptees = lignes.filter((l) => !enExemple(l))
+  const tuiles = d.etats.map((e) => ({ ...e, nombre: comptees.filter((l) => l.etat === e.code).length }))
+  const visiblesReelles = visibles.filter((l) => !enExemple(l)).length
+  const visiblesExemple = visibles.length - visiblesReelles
   // Le nom d'un etat sur une LIGNE est celui de sa procedure (« A relancer ») ; les tuiles gardent
   // celui de l'ecran (« A traiter »), commun a toutes les procedures reunies.
   const etatDe = (groupe: string, code: string) =>
@@ -195,7 +202,7 @@ export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
                   onClick={() => poserEtatChoisi(etatChoisi === t.code ? null : t.code)}>
             <span className="rig-chiffre__anneau" aria-hidden="true">
               <span className="rig-chiffre__cercle rig-chiffre__cercle--jauge"
-                    style={{ '--rig-anneau-cible': part(t.nombre, lignes.length) } as CSSProperties}></span>
+                    style={{ '--rig-anneau-cible': part(t.nombre, comptees.length) } as CSSProperties}></span>
               <span className="rig-chiffre__rond">{ICONES[t.icone]}</span>
             </span>
             <span className="rig-chiffre__texte">
@@ -211,9 +218,10 @@ export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
            style={{ '--tcw-duree': `${DureeBascule}ms` } as CSSProperties}>
         <section className="rig-tcw__liste" aria-label={d.sujet}>
           <div className="rig-tcw__liste-entete">
-            <span className="rig-tcw__compteur" title={`${visibles.length} ${d.sujet}`}>
-              <b className="rig-tcw__compteur-nombre">{visibles.length}</b>
+            <span className="rig-tcw__compteur" title={`${visiblesReelles} ${d.sujet}${visiblesExemple > 0 ? `, + ${visiblesExemple} en exemple` : ''}`}>
+              <b className="rig-tcw__compteur-nombre">{visiblesReelles}</b>
               <span className="rig-tcw__compteur-detail">{d.sujet}</span>
+              {visiblesExemple > 0 && <span className="rig-tcw__compteur-detail rig-tcw__compteur-exemple">+ {visiblesExemple} en exemple</span>}
             </span>
           </div>
 

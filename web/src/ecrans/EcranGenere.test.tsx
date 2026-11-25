@@ -250,6 +250,18 @@ describe('EcranGenere : lignes de la base ou exemples', () => {
     expect(groupes.map((g) => g.querySelector('.rig-tcw__exemple') !== null)).toEqual([false, true])
   })
 
+  it('en mode mixte, les tuiles et le compteur ne comptent que les lignes de la base, pas les exemples', async () => {
+    const d = reuni()
+    const reelle = { nom: 'HKO DUPRAT SARL · SIREN 412 000 001', precisions: 'Fond · reçu le 02/03/2026', groupe: 'Ecran test', etat: 'AFaire', faites: [] }
+    const exemple = d.lignes.filter((l) => l.groupe === 'Relances') // 1 ligne fictive, a l'etat AFaire
+    const { container } = await monter(d, { mode: 'mixte', message: null, greffe: '3801', lignes: [reelle, ...exemple], exemples: ['Relances'] })
+    expect(container.querySelector('.rig-tcw__tuile .rig-chiffre__valeur')!.textContent).toBe('1')
+    expect(container.querySelector('.rig-tcw__compteur-nombre')!.textContent).toBe('1')
+    expect(container.querySelector('.rig-tcw__compteur-exemple')!.textContent).toBe('+ 1 en exemple')
+    // Le groupe d'exemple reste visible et etiquete (provenance + titre du groupe).
+    expect(container.querySelectorAll('.rig-tcw__exemple')).toHaveLength(2)
+  })
+
   it('un redessin de la racine (descripteur neuf, meme procedure) ne relit pas la base et garde la ligne ouverte', async () => {
     const d = descripteur()
     const { container, pont, rendu, ligne } = await monter(d, { mode: 'base', message: null, greffe: '3801', lignes: lignesDeLaBase, exemples: [] })
