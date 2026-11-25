@@ -73,10 +73,16 @@ public static class CatalogueGenere
                                                .DistinctBy(e => e.Code)],
             Groupes = [.. membres.Select(m => m.Titre)],
             Marches = [],
-            Lignes = [.. membres.SelectMany(m => m.Lignes.Select(l => l with { Groupe = m.Titre, Precisions = AvecAncienGroupe(l) }))],
+            Lignes = [.. membres.SelectMany(m => m.Lignes.Select(l => LigneReunie(m, l)))],
             Membres = membres,
         };
     }
+
+    /// <summary>Une ligne de la procedure <paramref name="membre"/> dans l'ecran qui la reunit : son groupe devient la
+    /// procedure, son ancien groupe passe en tete de sa precision. Les lignes lues dans la base y passent aussi
+    /// (Pont/EcranGenere.cs), pour qu'elles se rangent comme les exemples qu'elles remplacent.</summary>
+    public static LigneEcran LigneReunie(DescripteurEcran membre, LigneEcran l)
+        => l with { Groupe = membre.Titre, Precisions = AvecAncienGroupe(l) };
 
     /// <summary>La precision d'une ligne reunie : son ancien groupe en tete, pour ne pas le perdre.
     /// Beaucoup de procedures le portent DEJA en tete de leur precision (Cabinets : « Salles fixes ·

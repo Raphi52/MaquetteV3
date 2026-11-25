@@ -11,15 +11,33 @@
 // Un ecran REUNI (descripteur.membres, 24/11/2026) met plusieurs procedures dans une seule
 // liste : un groupe par procedure, et chaque ligne suit le PARCOURS de la sienne -- ses
 // marches, son bouton, le nom de son etat. Les tuiles comptent tout l'ecran.
+//
+// LES LIGNES (plan « ecrans retrouves branches sur la base », 24/11/2026) : demandees au pont a
+// l'ouverture (EcranGenere.Lignes, Pont/EcranGenere.cs). Branche sur le serveur, l'ecran montre les
+// lignes de la base du greffe, lues par le lecteur de chaque procedure ; sans serveur, sans lecteur ou
+// en panne, les lignes d'exemple du descripteur, marquees « exemple » (noms fictifs). Rien n'est
+// affiche avant la reponse : jamais un nom fictif sous un ecran branche.
 
 import { useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { contientSansCasse } from '../criteres'
+import { appeler } from '../pont'
 import { EcranVisible } from '../plan/visibilite'
-import type { DescripteurEcranVue, MarcheEcranVue } from '../plan/types'
+import type { DescripteurEcranVue, LigneEcranVue, MarcheEcranVue } from '../plan/types'
 import { DureeBascule } from './EcranCommandesWeb'
 
 export interface ProprietesEcranGenere {
   descripteur: DescripteurEcranVue
+}
+
+/** Les lignes que le pont rend (Pont/EcranGenere.cs, VueLignesEcran). */
+export interface VueLignesEcran {
+  /** base : tout vient de la base ; mixte : certains groupes restent en exemple ; exemple ; erreur (exemples + motif). */
+  mode: 'base' | 'mixte' | 'exemple' | 'erreur'
+  message: string | null
+  greffe: string | null
+  lignes: LigneEcranVue[]
+  /** Les groupes dont les lignes sont des exemples du descripteur. */
+  exemples: string[]
 }
 
 /** Les trois etats qui portent les gestes : le descripteur les nomme ainsi (EcransGeneresCheck le verifie). */
@@ -67,7 +85,9 @@ function parcoursDe(d: DescripteurEcranVue, groupe: string): DescripteurEcranVue
 const part = (nombre: number, total: number) => (total === 0 ? 0 : Math.round((nombre * 100) / total))
 
 export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
-  const [lignes, poserLignes] = useState<LigneTenue[]>(() => d.lignes.map((l) => ({ ...l })))
+  // null tant que le pont n'a pas repondu : la liste attend, elle ne montre pas les exemples d'abord.
+  const [vue, poserVue] = useState<VueLignesEcran | null>(null)
+  const [lignes, poserLignes] = useState<LigneTenue[]>([])
   const [texte, poserTexte] = useState('')
   const [etatChoisi, poserEtatChoisi] = useState<string | null>(null)
   const [plies, poserPlies] = useState<ReadonlySet<string>>(() => new Set())
@@ -76,6 +96,24 @@ export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
   const [bascule, poserBascule] = useState(false)
   const pilule = useRef<HTMLDivElement>(null)
   const visible = useContext(EcranVisible)
+
+  // Les lignes de l'ecran : celles de la base, ou les exemples. Un appel qui echoue (pont absent, erreur du C#)
+  // laisse les exemples, marques comme tels : l'ecran n'est jamais vide sans le dire. Lues UNE fois par
+  // procedure ([d.code]) : chaque redessin de la racine renvoie un descripteur neuf (meme contenu), qui ne doit
+  // ni relire la base ni refermer la ligne ouverte.
+  useEffect(() => {
+    let vivant = true
+    const recevoir = (v: VueLignesEcran) => {
+      if (!vivant) return
+      poserVue(v)
+      poserLignes(v.lignes.map((l) => ({ ...l, faites: [...l.faites] })))
+      poserOuverte(null)
+    }
+    appeler<VueLignesEcran>('EcranGenere.Lignes', d.code).then(recevoir, () => recevoir({
+      mode: 'erreur', message: 'Les lignes de la base n’ont pas pu être lues.', greffe: null, lignes: d.lignes, exemples: d.groupes,
+    }))
+    return () => { vivant = false }
+  }, [d.code])
 
   useEffect(() => {
     if (!bascule) return
@@ -147,6 +185,7 @@ export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
         </div>
       </div>
       <p className="rig-tcw__discret">Critères : {d.criteres.join(' · ')}</p>
+      {vue && <Provenance vue={vue} />}
 
       {/* Une tuile chiffree par etat : elle FILTRE la liste ; la tuile choisie porte l'anneau d'or. */}
       <div className="rig-tcw__tuiles" aria-label={d.sujet}>
@@ -179,7 +218,11 @@ export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
           </div>
 
           {visibles.length === 0 ? (
-            <div className="rig-tcw__vide">Rien ne correspond à la recherche.</div>
+            <div className="rig-tcw__vide">
+              {vue === null ? 'Lecture des lignes…'
+                : lignes.length === 0 ? `Aucune ligne dans la base du greffe${vue.greffe ? ` ${vue.greffe}` : ''}.`
+                : 'Rien ne correspond à la recherche.'}
+            </div>
           ) : sel === null ? (
             <div className="rig-tcw__invite">Sélectionnez une ligne pour la traiter.</div>
           ) : null}
@@ -192,7 +235,12 @@ export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
                   <button className="rig-tcw__groupe-tete" aria-expanded={!replie} onClick={() => basculerPlie(g.titre)}>
                     <svg className="rig-tcw__chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" /></svg>
                     <span className="rig-tcw__groupe-repere"></span>
-                    <span className="rig-tcw__groupe-titre">{g.titre}</span>
+                    {/* Ecran reuni dont cette procedure n'a pas encore de lecteur : ses lignes restent fictives. La
+                        mention est DANS le titre : fix-ok: mesure sur la capture du bureau cache (donnees de dev) -- en
+                        5e enfant de la grille a 4 colonnes de l'en-tete, elle tombait sur une rangee neuve, rognee. */}
+                    <span className="rig-tcw__groupe-titre">
+                      {g.titre}{vue?.mode === 'mixte' && vue.exemples.includes(g.titre) && <> <Exemple /></>}
+                    </span>
                     <span className="rig-tcw__groupe-nombre">{g.lignes.length}</span>
                     {replie && <span className="rig-tcw__groupe-resume">{g.lignes.map((l) => l.nom).join(' · ')}</span>}
                   </button>
@@ -227,6 +275,29 @@ export function EcranGenere({ descripteur: d }: ProprietesEcranGenere) {
         )}
       </div>
     </div>
+  )
+}
+
+/** La mention « exemple » : des lignes du descripteur, aux noms fictifs. */
+function Exemple() {
+  return <span className="rig-tcw__pastille rig-tcw__pastille--accent rig-tcw__exemple">exemple</span>
+}
+
+/** D'ou viennent les lignes : la base du greffe, ou des exemples (avec la raison et le plafond s'il y en a). */
+function Provenance({ vue }: { vue: VueLignesEcran }) {
+  const suite = vue.message ? ` ${vue.message}` : ''
+  if (vue.mode === 'base' || vue.mode === 'mixte') {
+    return (
+      <p className="rig-tcw__discret rig-tcw__provenance" role="note">
+        Lignes de la base du greffe {vue.greffe}
+        {vue.mode === 'mixte' && <>, sauf les groupes marqués <Exemple /></>}.{suite}
+      </p>
+    )
+  }
+  return (
+    <p className="rig-tcw__discret rig-tcw__provenance" role="note">
+      <Exemple /> Lignes d’exemple : noms fictifs, aucun dossier réel.{suite}
+    </p>
   )
 }
 
