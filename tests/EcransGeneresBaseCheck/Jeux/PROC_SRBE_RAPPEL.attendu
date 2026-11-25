@@ -1,0 +1,12 @@
+# « Rappels RBE » (LecteurRappelsRbe) sur le jeu PROC_SRBE_RAPPEL.sql : les demandes SRBE, SRBE_RAPPEL et SRBE_OLD
+# d'un dossier, hors supprimees. Ordre : a envoyer (A, Q, R), en cours, puis generees ; la plus recente en tete.
+# Groupe : immatriculation avant le 01/08/2017 -> Rappel (501, 503 la veille du seuil) ; le 01/08/2017 ou apres ->
+# Relance 1 (502 le jour meme, 504, 505).
+# Etat : A/Q/R -> AFaire [] ; V/T -> Validee [0,1,2] (date de validation) ; autre (I) -> EnCours [0,1].
+# Ecartes : 1100516 (X) -- jumeau retenu 1100513 (Q) ; 1100517 (processus RDBE) -- jumeau retenu 1100511 (SRBE) ;
+# 1100518 (sans dossier) -- jumeau retenu 1100511.
+RBE GAMMA SARL · 2018 B 00503 | Immatriculée le 31/07/2017 · rappel à envoyer depuis le {J-2} | Rappel | AFaire | []
+RBE DELTA SAS · 2018 B 00504 | Immatriculée le 15/03/2019 · relance 1 commencée le {J-5} | Relance 1 | EnCours | [0,1]
+RBE BETA SAS · 2018 B 00502 | Immatriculée le 01/08/2017 · relance 1 générée le {J-380} | Relance 1 | Validee | [0,1,2]
+RBE ALPHA SARL · 2018 B 00501 | Immatriculée le 10/05/2016 · rappel généré le {J-400} | Rappel | Validee | [0,1,2]
+RBE EPSILON SARL · 2018 B 00505 | Immatriculée le 01/01/2020 · relance 1 générée le {J-499} | Relance 1 | Validee | [0,1,2]

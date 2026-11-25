@@ -24,7 +24,7 @@ using RigV3Desktop.Pont.EcransGeneres;
 //   2. la ROUTE par le vrai serveur en memoire : agent admis dans le greffe, 401 / 404 / 503 sans repli, procedure
 //      sans lecteur = Branchee faux ;
 //   3. le PONT (Pont/EcranGenere.cs) contre ce serveur : vraies lignes, exemples sans serveur ou sans greffe, ecran
-//      reuni « mixte », motif d'une panne ;
+//      reuni « mixte », motif d'une panne ; et, apres les jeux (3b), l'ecran reuni entierement branche en « base » ;
 //   4. TOUT lecteur trouve (ceux des lots suivants compris) contre le DESCRIPTEUR de sa procedure : groupes et etats
 //      au mot pres, rangs de marches, regle des ecrans generes (AFaire aucune marche, EnCours au moins une, Validee
 //      toutes les obligatoires), et au moins une ligne sur le banc.
@@ -351,10 +351,6 @@ Exiger(mixte.Mode == "mixte" && mixte.Exemples.SequenceEqual(autres.Select(m => 
        && autres.All(m => mixte.Lignes.Count(l => l.Groupe == m.Titre) == m.Lignes.Length),
     $"pont, ecran reuni « {reuniDca.Titre} » : les 8 lignes de la base dans le groupe « {descripteurDca.Titre} » (ancien groupe en tete), " +
     $"les autres procedures ({string.Join(", ", autres.Select(m => m.Titre))}) en exemple");
-var reuniRof = CatalogueGenere.Tous.First(d => d.Membres.Any(m => m.Code == "PROC_ROFSURVEILLANCES"));
-var mixteRof = await EcranGenere.LignesAsync(client, Greffe, reuniRof.Code);
-Exiger(mixteRof.Mode == "mixte" && mixteRof.Lignes.Count(l => l.Groupe == CatalogueGenere.Descripteur("PROC_ROFSURVEILLANCES")!.Titre) == 10,
-    $"pont, ecran reuni « {reuniRof.Titre} » : les 10 radiations d'office de la base dans leur groupe");
 // Un groupe BRANCHE mais sans aucune ligne (la copie de dev n'en garde que 200 par table) ne disparait pas : la vue le
 // porte dans Vides, l'ecran le montre avec « Aucune ligne ». Serveur factice : DCA vide, les autres procedures sans lecteur.
 using var videHandler = new RepondeurVide(descripteurDca.Code);
@@ -399,6 +395,18 @@ foreach (var jeu in jeux)
     Comparer(lues.Lignes, attendues, $"{code} : les lignes de {Path.GetFileName(fichier)}, dans l'ordre");
     Exiger(lues.Total == attendues.Length, $"{code} : total = {attendues.Length} lignes attendues ({lues.Total})");
 }
+// L'ecran reuni des radiations d'office (« Relances et injonctions ») a TOUS ses membres branches depuis le lot 1 du plan
+// plan-f7ba4de2 : lu APRES les jeux, parce que les lecteurs des relances et injonctions lisent des colonnes que seuls
+// leurs jeux ajoutent aux tables du banc. Le mode « mixte » reste controle plus haut par l'ecran reuni de PROC_DCA.
+// fix-ok: mesure le 25/11/2026 (lot 1, plan-f7ba4de2) -- a l'ancien emplacement (section 3, avant les jeux) le banc rendait
+// ROUGE, 1 echec, ce controle : l'ecran n'est plus « mixte » (ses 6 membres ont un lecteur) et ces lecteurs echouent
+// sur les colonnes que leurs jeux n'ont pas encore ajoutees. Deplacement accorde par le chef (msg-04572c8e).
+var reuniRof = CatalogueGenere.Tous.First(d => d.Membres.Any(m => m.Code == "PROC_ROFSURVEILLANCES"));
+var baseRof = await EcranGenere.LignesAsync(client, Greffe, reuniRof.Code);
+Exiger(baseRof.Mode == "base" && baseRof.Exemples.Length == 0
+       && baseRof.Lignes.Count(l => l.Groupe == CatalogueGenere.Descripteur("PROC_ROFSURVEILLANCES")!.Titre) == 10,
+    $"pont, ecran reuni « {reuniRof.Titre} » (tous ses membres branches) : mode base, aucun exemple, les 10 radiations " +
+    $"d'office de la base dans leur groupe (mode {baseRof.Mode}, exemples : {string.Join(", ", baseRof.Exemples)})");
 
 // ============================================================ 4. TOUT LECTEUR CONTRE LE DESCRIPTEUR DE SA PROCEDURE
 
