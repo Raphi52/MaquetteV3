@@ -24,6 +24,7 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_DCA", Titre = "Comptes annuels", Sujet = "dépôts de comptes annuels",
+            Forme = FormeEcran.Saisie,
             Recherche = "Rechercher un dossier RCS, un numéro de gestion, un SIREN…",
             Criteres = ["Numéro de gestion ou SIREN", "Exercice", "Origine : guichet, INPI, CREFO"],
             Valider = "Valider le dépôt", // proc_dca.md, FORM_DCA : bouton VALIDER, état Validee (dépôt accepté).
@@ -63,13 +64,14 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_ROFSURVEILLANCES", Titre = "Radiations d'office", Sujet = "dossiers à radier d'office",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier, un numéro de gestion, un SIREN…",
             Criteres = ["Surveillance", "Date d'expiration de la relance", "Exclure les dossiers provoquant une notification"],
             Valider = "Éditer la lettre au procureur", // FrmProcROFSurveillances.Designer.cs : « Lettre au Procureur ».
             Rang = 5,
             Etats = EtatsEcran.Trois("À radier", "En cours", "Lettre éditée"),
             Groupes = ["Dissolution par survenance du terme", "Dissolution depuis plus de trois ans", "Sans activité"],
-            Marches =
+            Sections =
             [
                 Marche("Surveillance", "La surveillance choisie liste les dossiers dont la relance a expiré, sans procédure collective ni cessation : dissolution par survenance du terme (S123-124), dissolution depuis plus de trois ans (S123-131), sans activité.", true,
                     "Surveillance", "Date d'expiration de la relance", "Ordre de tri"),
@@ -97,13 +99,14 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_ACTREJ_CMD_WEB", Titre = "Actes web non transmis", Sujet = "actes commandés par le web",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier, un SIREN, un numéro de dépôt…",
             Criteres = ["N° dossier", "Siren", "Date de la commande"],
             Valider = "Envoyer au VGED", // OPE_RES.Designer.cs : tsmiSendToVged « Envoyer au VGED ».
             Rang = 5,
             Etats = [.. EtatsEcran.Trois("À transmettre", "En cours", "Transmis"), new EtatEcran("Rejetee", "Annulé", "rejetee")],
             Groupes = ["Commandes du jour", "Commandes plus anciennes"],
-            Marches =
+            Sections =
             [
                 Marche("Acte", "L'acte est déposé mais pas encore dans la GED : la commande web l'attend. La liste montre le dossier, le SIREN, la dénomination, le dépôt et la date de la commande.", true,
                     "N° dossier", "Siren", "Dénomination", "N° dépôt"),
@@ -131,13 +134,14 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_REJETSKBISXML", Titre = "Kbis XML rejetes", Sujet = "Kbis XML en erreur",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier, une erreur…",
             Criteres = ["Types d'erreur : bloquantes, avertissements, informations", "Dossiers : vivants, radiés", "Historiques"],
             Valider = "Extrait Kbis", // FrmRejetsKbisXml.Designer.cs : « Extrait &Kbis », « Afficher à l'écran l'extrait kbis du kbis sélectionné ».
             Rang = 5,
             Etats = EtatsEcran.Trois("À examiner", "En cours", "Examiné"),
             Groupes = ["Bloquantes", "Avertissements", "Informations"],
-            Marches =
+            Sections =
             [
                 Marche("Rejet", "Chaque Kbis XML transmis revient avec ses erreurs, classées bloquantes, avertissements ou informations, avec ses dates de transmission et de retour.", true,
                     "Gestion", "Date de transmission", "Date de retour", "Erreur"),
@@ -164,13 +168,14 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_EDI_RPJC_INS", Titre = "EDI RPJC inscriptions", Sujet = "demandes d'inscription",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un avocat, un CNBF, une structure…",
             Criteres = ["État de la demande", "Cnbf", "Date du traitement"],
             Valider = "Traiter la demande", // FORM_EDI_RPJC_INS.Designer.cs : « &Traiter la demande ».
             Rang = 7,
             Etats = [.. EtatsEcran.Trois("En attente", "En cours", "Traitée"), new EtatEcran("Rejetee", "Rejetée", "rejetee")],
             Groupes = ["Avocat seul", "Avocat et structure"],
-            Marches =
+            Sections =
             [
                 Marche("Demande", "Choisir la demande à traiter. Ouverte par un autre agent, elle est refusée : « Cette demande d'inscription est en cours de traitement par l'utilisateur … » ; traitée entre-temps, il faut recharger la liste.", true,
                     "Auteur de la demande", "Adresse de l'auteur", "Cnbf"),
@@ -198,6 +203,7 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_EDI_RPJC_REN", Titre = "EDI RPJC renvois", Sujet = "demandes de renvoi",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une affaire, un avocat, une audience…",
             Criteres = ["En attente", "Traitées : audience initiale du … au …", "200 demandes au plus"],
             Valider = "Valider", // proc_edi_rpjc_ren.md : DoSauver -> OPE_INFO_DEMANDE.Valider().
@@ -205,7 +211,7 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
             Etats = [.. EtatsEcran.Trois("En attente", "En cours", "Acceptée"),
                      new EtatEcran("Rejetee", "Rejetée par le greffe", "rejetee"), new EtatEcran("EnAttente", "Rejet Extelia", "en-attente")],
             Groupes = ["À traiter", "Traitées", "Rejets Extelia"],
-            Marches =
+            Sections =
             [
                 Marche("Demande", "La demande s'ouvre à votre nom : un autre agent qui la traite est nommé, et une demande traitée entre-temps demande de rafraîchir la recherche.", true,
                     "Affaire", "Parties représentées", "Motif de renvoi"),
@@ -234,6 +240,7 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_FNIG", Titre = "Demandes FNIG", Sujet = "demandes FNIG",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une personne, une entreprise, un jugement…",
             Criteres = ["État : à envoyer, envoyée, en erreur, à désactiver", "Date du jugement", "Demande d'une autre juridiction"],
             Valider = "Valider", // proc_fnig.md, OPE_EDITION : VALIDER, apres « Êtes vous sur de vouloir envoyer la demande au FNIG? ».
@@ -241,7 +248,7 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
             Etats = [.. EtatsEcran.Trois("Nouvelle demande", "En saisie", "Envoyée"),
                      new EtatEcran("Rejetee", "En erreur", "rejetee"), new EtatEcran("EnAttente", "À désactiver", "en-attente")],
             Groupes = ["Ajout", "Modification", "Désactivation"],
-            Marches =
+            Sections =
             [
                 Marche("Personne", "La personne interdite de gérer : nom, prénoms, date et lieu de naissance.", true,
                     "Nom", "Prénoms", "Date de naissance", "Lieu de naissance"),
@@ -269,13 +276,15 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_GDEST_INST", Titre = "Destinataires institutionnels", Sujet = "destinataires institutionnels",
+            Forme = FormeEcran.Referentiel,
+            Colonnes = ["Nom", "Code", "Type", "Adresse", "Adresse courriel"],
             Recherche = "Rechercher un code, un nom, un type…",
             Criteres = ["Code", "Nom", "Type"],
             Valider = "Valider", // frmListeDestInst.cs : « Vous devez annuler ou valider les modifications ».
             Rang = 7,
             Etats = [.. EtatsEcran.Trois("À compléter", "En saisie", "Enregistré"), new EtatEcran("EnAttente", "Inactif", "en-attente")],
             Groupes = ["Parquet et juridictions", "Administrations", "Organismes"],
-            Marches =
+            Sections =
             [
                 Marche("Identité", "Le code, le nom, l'adresse et le type sont obligatoires ; un code déjà pris est refusé : « Le code saisi existe déjà ».", true,
                     "Code", "Nom", "Type", "Adresse"),
@@ -302,13 +311,14 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_POOLEDITION", Titre = "File des editions", Sujet = "demandes d'édition",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une demande, un dossier, un destinataire…",
             Criteres = ["Dossier (ou demande)", "Date de création", "Inclure les demandes supprimées"],
             Valider = "Imprimer", // PoolEdition, etape IMPRESSION : « Imprimer : ».
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À émettre", "En cours", "Émise"), new EtatEcran("Rejetee", "Supprimée", "rejetee")],
             Groupes = ["Courrier", "Courriel", "File différée"],
-            Marches =
+            Sections =
             [
                 Marche("Demande", "La demande d'édition se retrouve par son dossier ou son numéro ; sans critère, la recherche est refusée : « Vous devez saisir des critères de recherche ».", true,
                     "Dossier (ou demande)", "Date de création", "Date d'émission"),
@@ -338,13 +348,14 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_TRAITEMENTNPAI", Titre = "Courriers revenus NPAI", Sujet = "courriers revenus",
+            Forme = FormeEcran.File,
             Recherche = "Flasher un code Data ou saisir un numéro de demande…",
             Criteres = ["Code Data", "Numéro de demande"],
             Valider = "Valider", // FrmActionsNPAI.Designer.cs : « Valider ».
             Rang = 2,
             Etats = EtatsEcran.Trois("À traiter", "En cours", "Traité"),
             Groupes = ["Formalités", "Relances de comptes annuels"],
-            Marches =
+            Sections =
             [
                 Marche("Courrier", "Flasher le code Data du courrier revenu, ou saisir le numéro de sa demande.", true,
                     "Code Data", "Numéro de demande"),
@@ -371,13 +382,15 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_IMP_WIN", Titre = "Imprimantes du greffe", Sujet = "imprimantes",
+            Forme = FormeEcran.Referentiel,
+            Colonnes = ["Nom", "Pilote", "Port", "Bac", "Type de papier", "Code OMR"],
             Recherche = "Rechercher une imprimante, un pilote, un bac…",
             Criteres = ["Imprimantes du serveur", "Imprimantes absentes en base", "Imprimantes absentes du serveur"],
             Valider = "Modifier", // PROC_IMP_WIN : boutons « Ajouter une nouvelle imprimante », « Modifier », « Supprimer ».
             Rang = 7,
             Etats = [.. EtatsEcran.Trois("À paramétrer", "En cours", "Paramétrée"), new EtatEcran("EnAttente", "Absente du serveur", "en-attente")],
             Groupes = ["Lot 1", "Lot 2", "Autres imprimantes"],
-            Marches =
+            Sections =
             [
                 Marche("Imprimante", "Ajouter une imprimante du serveur, ou supprimer celle qui n'y est plus. Un pilote différent du serveur est signalé : « Les drivers sont différents ».", true,
                     "Nom", "Pilote", "Port"),
@@ -402,7 +415,7 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
         },
     ];
 
-    private static MarcheEcran Marche(string titre, string consigne, bool obligatoire, params string[] champs) =>
+    private static MarcheEcran Marche(string titre, string consigne, bool obligatoire, params ChampEcran[] champs) =>
         new(titre, consigne, obligatoire, champs);
 
     private static LigneEcran Ligne(string nom, string precisions, string groupe, string etat, params int[] faites) =>

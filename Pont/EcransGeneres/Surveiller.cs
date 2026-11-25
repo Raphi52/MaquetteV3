@@ -35,13 +35,15 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_COMPO", Titre = "Composition", Sujet = "audiences et cabinets",
+            Forme = FormeEcran.Audience,
+            Parametres = ["Audience ou cabinet", Champ.Date("Date de l'audience"), Champ.Case("Mode référé")],
             Recherche = "Rechercher une audience, un cabinet, une date…",
             Criteres = ["Audience ou cabinet", "Date de l'audience", "Mode référé"],
             Valider = "Valider", // Bouton VALIDER de la barre d'automate (proc_sdematjud.md, « Etat des boutons ») ; controles : proc_compo.md, ETP_COMPO_AUDIENCE.
             Rang = 5,
             Etats = EtatsEcran.Trois("À composer", "En cours", "Composée"),
             Groupes = ["Audiences", "Cabinets"],
-            Marches =
+            Sections =
             [
                 Marche("Audience", "Une audience ou un cabinet est choisi avant toute saisie ; sans audience, le sélecteur s'ouvre. Une composition liée à des appels d'affaire ne se supprime pas.", true,
                     "Audience ou cabinet", "Date de l'audience"),
@@ -66,13 +68,15 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_PREAUD", Titre = "Preparation d'audience", Sujet = "plumitifs",
+            Forme = FormeEcran.Audience,
+            Parametres = ["Audience", "Cabinet", Champ.Liste("Mode", "Audience", "Procédures collectives", "Cabinet")],
             Recherche = "Rechercher une audience ou un cabinet…",
             Criteres = ["Audience ou cabinet", "Dates de l'audience", "Mode : audience, procédures collectives ou cabinet"],
             Valider = "Générer le plumitif", // proc_preaud.md, Logique métier : « Génération du plumitif (LancerPlumitif) ».
             Rang = 5,
             Etats = EtatsEcran.Trois("À préparer", "En préparation", "Plumitif prêt"),
             Groupes = ["Audiences", "Procédures collectives", "Cabinets"],
-            Marches =
+            Sections =
             [
                 Marche("Audience", "Une ou plusieurs audiences se choisissent. Une audience déjà chargée n'est pas ajoutée une seconde fois.", true,
                     "Audience", "Cabinet"),
@@ -100,13 +104,15 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_GCONV", Titre = "Convocations", Sujet = "instances à citer",
+            Forme = FormeEcran.Audience,
+            Parametres = ["Audience cabinet", Champ.Date("Date de l'audience"), "Huissier"],
             Recherche = "Rechercher une audience cabinet, une instance, un huissier…",
             Criteres = ["Audience cabinet", "Instance ou numéro de rôle", "Huissier", "État de la LRAR"],
             Valider = "Citer par huissier", // proc_gconv.md, Rôle : « Gérer les citations et significations par huissier (LRAR) ».
             Rang = 5,
             Etats = [.. EtatsEcran.Trois("À citer", "En cours", "Citée"), new EtatEcran("Rejetee", "NPAI", "rejetee")],
             Groupes = ["Citations à envoyer", "NPAI à reprendre"],
-            Marches =
+            Sections =
             [
                 Marche("Audience cabinet", "Une seule audience cabinet à la fois, choisie par le sélecteur. Une audience déjà chargée est refusée.", true,
                     "Audience cabinet", "Date de l'audience"),
@@ -136,13 +142,15 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_MPCS", Titre = "Mise au point chambres", Sujet = "affaires d'audience",
+            Forme = FormeEcran.Audience,
+            Parametres = ["Audience cabinet", "Numéro de rôle"],
             Recherche = "Rechercher une affaire, un appel, un numéro de rôle…",
             Criteres = ["Appels d'affaires", "Audience cabinet", "Numéro de rôle"],
             Valider = "Valider la décision", // proc_mpcs.md : « ValidationSauver — Clôture et génération finale ».
             Rang = 5,
             Etats = EtatsEcran.Trois("À juger", "En cours", "Décision validée"),
             Groupes = ["Affaires en lot", "Affaire unique"],
-            Marches =
+            Sections =
             [
                 Marche("Affaires", "En lot, les affaires cochées se traitent ensemble. Les instances se verrouillent à l'ouverture et se libèrent à la sortie, même annulée.", true,
                     "Affaires sélectionnées", "Numéro de minute"),
@@ -174,13 +182,15 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_RETAUD", Titre = "Retour d'audience", Sujet = "affaires d'audience",
+            Forme = FormeEcran.Audience,
+            Parametres = ["Audience", "Cabinet"],
             Recherche = "Rechercher une affaire, un numéro de rôle, une partie…",
             Criteres = ["Audience ou cabinet", "Affaires à traiter", "Prononcés à traiter", "Publicités en attente"],
             Valider = "Saisir les décisions", // proc_retaud.md, Rôle : « saisir les décisions par affaire ».
             Rang = 5,
             Etats = [.. EtatsEcran.Trois("À saisir", "En cours", "Résultat saisi"), new EtatEcran("EnAttente", "Publicité en attente", "en-attente")],
             Groupes = ["Affaires à traiter", "Prononcés à traiter", "Publicités en attente"],
-            Marches =
+            Sections =
             [
                 Marche("Audience", "Une audience ou un cabinet se choisit ; la liste de ses affaires s'affiche.", true,
                     "Audience", "Cabinet"),
@@ -208,13 +218,15 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_LISTE_DELIBERES", Titre = "Deliberes", Sujet = "délibérés",
+            Forme = FormeEcran.Audience,
+            Parametres = [Champ.Date("Date de l'audience de délibéré"), "Chambre ou section"],
             Recherche = "Rechercher un délibéré, une affaire, un numéro de rôle…",
             Criteres = ["Date de l'audience de délibéré", "Chambre ou section", "Numéro de rôle"],
             Valider = "Saisir les décisions", // Pas de fiche : libellé de PROC_RETAUD (proc_retaud.md, Rôle), procédure voisine.
             Rang = 5,
             Etats = EtatsEcran.Trois("À rendre", "En cours", "Rendu"),
             Groupes = ["Délibérés à rendre", "Délibérés depuis plus de deux mois"],
-            Marches =
+            Sections =
             [
                 Marche("Affaire", "L'affaire se retrouve par son numéro de rôle, comme au retour d'audience.", true,
                     "Numéro de rôle", "Parties"),
@@ -240,13 +252,17 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_TAXESETTOURS", Titre = "Taxes et tours de role", Sujet = "éditions",
+            Forme = FormeEcran.Etat,
+            Parametres = [Champ.Periode("Période"), Champ.Liste("Type d'édition", "Tours", "Acomptes", "Taxes")],
+            Colonnes = ["Édition"],
+            Gestes = ["Éditer"],
             Recherche = "Rechercher une édition, une période…",
             Criteres = ["Date de début", "Date de fin", "Type d'édition : tours, acomptes, taxes"],
             Valider = "Éditer", // proc_taxesettours.md, Détail OPE : « l'unique action est Éditer ».
             Rang = 5,
             Etats = EtatsEcran.Trois("À éditer", "En cours", "Éditée"),
             Groupes = ["Tours de rôle", "Acomptes", "Taxes"],
-            Marches =
+            Sections =
             [
                 Marche("Période", "Date de début et date de fin. Sans date de début, l'édition est refusée. Par défaut : du 1er janvier de l'année en cours à aujourd'hui.", true,
                     "Date de début", "Date de fin"),
@@ -270,13 +286,14 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_DCA_RELANCE", Titre = "Relances comptes annuels", Sujet = "dossiers RCS en retard",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier RCS, un numéro de gestion, un SIREN…",
             Criteres = ["Numéro de gestion ou SIREN", "Exercices non déposés", "Réponse : réclamation, refus, dépôt tardif"],
             Valider = "Valider", // proc_dca_relance.md, Cycle de vie : « Validation -> PreparerDemandes() -> éditions courrier relance ».
             Rang = 5,
             Etats = EtatsEcran.Trois("À relancer", "En cours", "Relancé"),
             Groupes = ["Sans réponse", "Réclamation", "Refus", "Dépôt tardif"],
-            Marches =
+            Sections =
             [
                 Marche("Dossier RCS", "Le dossier se retrouve par son numéro de gestion ou par son SIREN.", true,
                     "Numéro de gestion", "SIREN"),
@@ -305,13 +322,14 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_DCA_INJ", Titre = "Injonctions comptes annuels", Sujet = "dépôts de comptes annuels",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier RCS, un numéro de gestion, un SIREN…",
             Criteres = ["Numéro de gestion ou SIREN", "Exercices non déposés", "Origine : papier ou dématérialisé"],
             Valider = "Valider le dépôt", // proc_dca_inj.md, Rôle : « valide le dépôt ».
             Rang = 5,
             Etats = [.. EtatsEcran.Trois("À traiter", "En cours", "Déposée"), new EtatEcran("Rejetee", "Refusée", "rejetee")],
             Groupes = ["Dépôts dématérialisés", "Dépôts papier", "Réclamations et refus"],
-            Marches =
+            Sections =
             [
                 Marche("Dossier RCS", "Le dossier se charge en premier, par numéro de gestion ou par SIREN.", true,
                     "Numéro de gestion", "SIREN"),
@@ -342,13 +360,14 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_DBE_RELANCE", Titre = "Relances beneficiaires", Sujet = "entreprises en retard de déclaration",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une entreprise, un numéro de gestion, un SIREN…",
             Criteres = ["Numéro de gestion ou SIREN", "Déclaration DBE (bénéficiaires effectifs) non faite ou incomplète", "Mode d'envoi : LRAR ou notification électronique"],
             Valider = "Générer les courriers de relance", // proc_dbe_relance.md, Contexte : « Il peut générer des courriers de relance LRAR ou des notifications électroniques ».
             Rang = 5,
             Etats = EtatsEcran.Trois("À relancer", "En cours", "Relancée"),
             Groupes = ["DBE non déposée", "DBE incomplète"],
-            Marches =
+            Sections =
             [
                 Marche("Entreprise", "Le dossier RCS se retrouve par son numéro de gestion ou son SIREN.", true,
                     "Numéro de gestion", "SIREN"),
@@ -375,13 +394,14 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_DBE_INJ", Titre = "Injonctions beneficiaires", Sujet = "injonctions DBE",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une entreprise, une relance, un numéro de gestion…",
             Criteres = ["Numéro de gestion ou SIREN", "Relance DBE restée sans effet"],
             Valider = "Générer les injonctions", // proc_dbe_inj.md, Contexte : « le suivi et la génération de ces injonctions ».
             Rang = 5,
             Etats = EtatsEcran.Trois("À enjoindre", "En cours", "Injonction émise"),
             Groupes = ["Relance restée sans effet", "Injonction à suivre"],
-            Marches =
+            Sections =
             [
                 Marche("Entreprise", "Le dossier RCS se retrouve par son numéro de gestion ou son SIREN.", true,
                     "Numéro de gestion", "SIREN"),
@@ -406,13 +426,14 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_SRBE_RAPPEL", Titre = "Rappels RBE", Sujet = "dossiers RCS",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier, une date d'immatriculation, un numéro de gestion…",
             Criteres = ["Date d'immatriculation : avant, à partir de, ou intervalle", "Numéros de gestion, de à"],
             Valider = "Éditer les courriers", // proc_srbe_rappel.md, FORM_SRBE_RAPPEL : « AddButton(EDITION) — le bouton ÉDITION (générer les courriers) ».
             Rang = 5,
             Etats = EtatsEcran.Trois("À envoyer", "En cours", "Courrier généré"),
             Groupes = ["Rappel", "Relance 1"],
-            Marches =
+            Sections =
             [
                 Marche("Critères", "Date d'immatriculation (avant, à partir de, ou intervalle) et plage de numéros de gestion. Entrée ou F7 lancent la recherche.", true,
                     "Date d'immatriculation", "Numéros de gestion"),
@@ -439,13 +460,14 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_ACTRET", Titre = "Retention d'actes", Sujet = "dépôts",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un dépôt ou un numéro de dossier…",
             Criteres = ["Numéro de dépôt", "Numéro de dossier", "Anomalies sur les pièces"],
             Valider = "Renvoyer à Infogreffe", // proc_actret.md, OPE_RESULTATS, menu contextuel : « Renvoyer à Infogreffe ».
             Rang = 5,
             Etats = EtatsEcran.Trois("En rétention", "Prêt à renvoyer", "Renvoyé"),
             Groupes = ["Comptes annuels", "Pièce à ne pas envoyer"],
-            Marches =
+            Sections =
             [
                 Marche("Recherche", "Numéro de dépôt, numéro de dossier, anomalies sur les pièces. Entrée, F5 ou F7 lancent la recherche.", true,
                     "Numéro de dépôt", "Numéro de dossier", "Anomalies"),
@@ -471,13 +493,14 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_ACTREJ", Titre = "Actes rejetes", Sujet = "actes rejetés",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un acte rejeté, un dépôt, un numéro de dossier…",
             Criteres = ["Numéro de dossier", "Numéro de dépôt", "Plage de dates et type de date", "Nombre de résultats (200 par défaut)"],
             Valider = "Renvoyer à Infogreffe", // proc_actrej.md, OPE_RESULTATS, menu contextuel : « Renvoyer à Infogreffe ».
             Rang = 5,
             Etats = [.. EtatsEcran.Trois("Rejeté", "Renvoi lancé", "Renvoyé"), new EtatEcran("Rejetee", "Annulé (Amitel)", "rejetee")],
             Groupes = ["Rejets Infogreffe"],
-            Marches =
+            Sections =
             [
                 Marche("Recherche", "Les rejets se filtrent par numéro de dossier, numéro de dépôt, plage de dates et type de date. À l'ouverture, la liste se remplit seule sur les critères par défaut (200 résultats).", true,
                     "Numéro de dossier", "Numéro de dépôt", "Date du", "Date au", "Type de date"),
@@ -506,13 +529,14 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // Fondé sur la source (formulaire FORM_DBEN_ALERT.cs) : la fiche proc_dben_alert.md n'a
             // pas d'étape, elle est en lecture seule. Les lignes sont une démonstration anonyme.
             Code = "PROC_DBEN_ALERT", Titre = "Divergences BEN", Sujet = "divergences BEN ouvertes",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier, un demandeur…",
             Criteres = ["Numéro de dossier", "Demandeur", "Date de début", "Date de fin", "Exclure les dossiers radiés"],
             Valider = "Visualiser le signalement", // OPE_DIVERGENCES.Designer.cs:97 ; même action au double-clic (OPE_DIVERGENCES.cs:115-117). FORM_DBEN_ALERT.cs:13 masque VALIDER.
             Rang = 5,
             Etats = EtatsEcran.Trois("À visualiser", "En cours", "Visualisée"),
             Groupes = ["Dossiers actifs", "Dossiers radiés"],
-            Marches =
+            Sections =
             [
                 Marche("Signalement", "Visualiser le signalement ouvre la divergence dans l'écran de dépôt des bénéficiaires effectifs. Ce tableau de bord ne modifie rien : il est en lecture seule.", true,
                     "Numéro de gestion", "Demandeur", "Détail des divergences"),
@@ -534,13 +558,14 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_SURVIP", Titre = "Injonctions de payer", Sujet = "injonctions de payer",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une injonction, un numéro de rôle, un demandeur…",
             Criteres = ["Juge", "Greffier", "Titre exécutoire", "Non avenue", "Caducité", "Certificat de non-opposition"],
             Valider = "Appliquer les traitements", // proc_survip.md, Rôle : « Appliquer les traitements : Titre exécutoire, Caducité, IP Non avenue, Certificat de non-opposition ».
             Rang = 5,
             Etats = EtatsEcran.Trois("À traiter", "En cours", "Traitée"),
             Groupes = ["Titre exécutoire", "Caducité", "Non avenue", "Certificat de non-opposition"],
-            Marches =
+            Sections =
             [
                 Marche("Recherche", "Au moins un type de traitement coché. Seules les injonctions non européennes sont retenues. Pour le titre exécutoire, seules les décisions antérieures au 1er mars 2022 le sont.", true,
                     "Juge", "Greffier", "Types de traitement"),
@@ -568,6 +593,7 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_IPSUIVI", Titre = "Suivi des preventions", Sujet = "instances de prévention",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une prévention, un débiteur…",
             Criteres = ["Débiteur", "Numéro de gestion", "État de traitement"],
             Valider = "Clôturer", // proc_ipsuivi.md, ConfigurerBoutonsTransition : « [Cloturer] -> Cloture ».
@@ -576,7 +602,7 @@ public sealed class DomaineSurveiller : IDomaineEcrans
                      new EtatEcran("Rejetee", "Rejetée", "rejetee"),
                      new EtatEcran("EnAttente", "Suspendue ou transférée", "en-attente")],
             Groupes = ["À prendre en charge", "En suivi", "Suspendues ou transférées", "Clôturées ou rejetées"],
-            Marches =
+            Sections =
             [
                 Marche("Prise en charge", "Une prévention non traitée passe en suivi. Un rejet se fait par « Rejeter », avec un commentaire obligatoire.", true,
                     "Prise en charge", "Commentaire"),
@@ -606,13 +632,14 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_SURVMES", Titre = "Mesures", Sujet = "mesures",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une mesure, un type d'événement, un numéro de dossier…",
             Criteres = ["Type d'affaire", "État de la mesure", "Type d'événement de procédure"],
             Valider = "Éditer les documents Word", // proc_survmes.md, Rôle : « Éditer des documents Word (AmiOffice2010) sur les mesures cochées ».
             Rang = 5,
             Etats = [.. EtatsEcran.Trois("À traiter", "En cours", "Traitée"), new EtatEcran("Rejetee", "Code expiré", "rejetee")],
             Groupes = ["Mesures à traiter", "Codes expirés"],
-            Marches =
+            Sections =
             [
                 Marche("Recherche", "Les mesures se cherchent selon les critères. Une mesure dont le code d'événement est expiré est décochée, grisée et en rouge.", true,
                     "Type d'affaire", "État"),
@@ -638,13 +665,15 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_GESTLOT", Titre = "Lots", Sujet = "lots",
+            Forme = FormeEcran.Referentiel,
+            Colonnes = ["Nom du lot", "Imprimante", Champ.Case("Impression automatique"), "Heure d'impression", Champ.Case("Lot actif"), Champ.Case("Lot direct")],
             Recherche = "Rechercher un lot par son nom…",
             Criteres = ["Nom du lot", "Lot actif"],
             Valider = "Valider le lot", // proc_gestlot.md, OPE_AJOUT : « _valider() », séquence transactionnelle.
             Rang = 5,
             Etats = EtatsEcran.Trois("À compléter", "En cours", "Enregistré"),
             Groupes = ["Lots actifs", "Lots inactifs"],
-            Marches =
+            Sections =
             [
                 Marche("Nom", "Nom obligatoire et unique : un nom déjà pris est refusé. Renommer reporte le nouveau nom sur les groupes d'impression.", true,
                     "Nom du lot"),
@@ -673,6 +702,7 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_SURVBOD", Titre = "Surveillance BODACC", Sujet = "annonces",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une annonce, un numéro de gestion…",
             // La fiche décrit la recherche comme un stub : les critères affichés sont les colonnes de la grille.
             Criteres = ["Numéro de gestion RCS", "Type d'annonce (A, B ou C)", "Date de publication prévue"],
@@ -680,7 +710,7 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Rang = 5,
             Etats = EtatsEcran.Trois("À corriger", "En cours", "Corrigée"),
             Groupes = ["Annonces A", "Annonces B", "Annonces C"],
-            Marches =
+            Sections =
             [
                 Marche("Rejet", "Les rejets de publication s'affichent par numéro de gestion RCS et numéro chronologique du dépôt.", true,
                     "Numéro de gestion", "Numéro chronologique du dépôt"),
@@ -704,13 +734,14 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_SDEMATJUD", Titre = "Suivi dematerialisation", Sujet = "décisions transmises",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une décision, un numéro d'affaire…",
             Criteres = ["Type de date : décision, envoi EDI ou parution", "Dates du et au (par défaut : le dernier mois)", "Journal destinataire (JAL)", "Numéro d'affaire"],
             Valider = "Valider", // proc_sdematjud.md, Etat des boutons par onglet : « VALIDER » (onglet JAL).
             Rang = 5,
             Etats = [.. EtatsEcran.Trois("À envoyer", "En préparation", "Envoyée"), new EtatEcran("EnAttente", "En attente de parution", "en-attente")],
             Groupes = ["JAL (journal d'annonces légales)", "BODACC"],
-            Marches =
+            Sections =
             [
                 Marche("Critères", "Type de date (décision, envoi EDI ou parution) et plage de dates. Par défaut : les décisions du dernier mois.", true,
                     "Type de date", "Date du", "Date au"),
@@ -738,13 +769,14 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_SUIVI_IMPRESSION", Titre = "Suivi d'impression", Sujet = "travaux d'impression",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un travail, un lot, une imprimante…",
             Criteres = ["Imprimante", "Titre du lot ou du document", "Période"],
             Valider = "Imprimer", // Pas de fiche : libellé de PROC_PAPERCUT (proc_papercut.md, actions de la vue globale : « Imprimer »).
             Rang = 5,
             Etats = [.. EtatsEcran.Trois("En attente", "En cours", "Imprimé"), new EtatEcran("Rejetee", "Vidé de la file", "rejetee")],
             Groupes = ["En attente d'impression", "Imprimés"],
-            Marches =
+            Sections =
             [
                 Marche("Imprimante", "La vue se fait par imprimante : travaux en attente et feuilles.", true,
                     "Imprimante", "Nombre de travaux", "Nombre de feuilles"),
@@ -770,13 +802,14 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_RELANCEFILE", Titre = "Relancer un fichier", Sujet = "groupes d'édition",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une file, un groupe, une date…",
             Criteres = ["File d'édition", "Date de début (par défaut : aujourd'hui à 7 h)", "Date de fin", "Numéro de groupe"],
             Valider = "Relancer", // proc_relancefile.md, OPE_EDITGRP : « édition + RELANCE ».
             Rang = 5,
             Etats = EtatsEcran.Trois("À relancer", "En cours", "Relancé"),
             Groupes = ["Groupes en erreur", "Groupes en traitement", "Groupes émis"],
-            Marches =
+            Sections =
             [
                 Marche("File", "Une file d'édition se choisit ; ses groupes s'affichent pour la période.", true,
                     "File d'édition"),
@@ -804,13 +837,14 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_RELANCELOT", Titre = "Relancer un lot", Sujet = "lots d'impression",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un lot, un groupe, une édition…",
             Criteres = ["Nom du lot", "Numéro de groupe", "Édition"],
             Valider = "Valider", // proc_relancelot.md, OPE_EDITGRP : boutons « Valider / Annuler » (actifs si modifié).
             Rang = 5,
             Etats = EtatsEcran.Trois("À imprimer", "En cours", "Imprimé"),
             Groupes = ["Groupes à imprimer", "Groupes en cours", "Groupes figés"],
-            Marches =
+            Sections =
             [
                 Marche("Lot", "Le lot se choisit par son nom ; ses groupes d'impression se listent.", true,
                     "Nom du lot"),
@@ -839,13 +873,17 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_STATCA", Titre = "Statistiques cour d'appel", Sujet = "affaires",
+            Forme = FormeEcran.Etat,
+            Parametres = [Champ.Periode("Période"), Champ.Liste("Catégorie", "Contentieux", "Sauvegarde et redressement", "Référés commerciaux", "Injonctions de payer")],
+            Colonnes = ["Affaire"],
+            Gestes = ["Générer", "Word"],
             Recherche = "Rechercher une affaire, un rôle…",
             Criteres = ["Période du", "Période au (par défaut : le mois précédent)", "Catégorie : contentieux, sauvegarde, référés, injonctions"],
             Valider = "Générer", // proc_statca.md, Particularités de configuration : le bouton APERCU est renommé « Générer ».
             Rang = 5,
             Etats = EtatsEcran.Trois("À générer", "En cours", "Généré"),
             Groupes = ["Contentieux", "Sauvegarde et redressement", "Référés commerciaux", "Injonctions de payer"],
-            Marches =
+            Sections =
             [
                 Marche("Période", "Par défaut : le mois précédent. La fin ne peut pas précéder le début.", true,
                     "Période du", "Période au"),
@@ -874,13 +912,17 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_XPILOTAGE", Titre = "Pilotage", Sujet = "tableaux de bord",
+            Forme = FormeEcran.Etat,
+            Parametres = [Champ.Date("Date minimale"), Champ.Date("Date maximale"), Champ.Liste("Feuille", "RCS", "Judiciaire")],
+            Colonnes = ["Cellule", "Requête"],
+            Gestes = ["Générer le tableau Excel"],
             Recherche = "Rechercher un indicateur, une feuille…",
             Criteres = ["Date minimale", "Date maximale", "Feuille : RCS ou judiciaire"],
             Valider = "Générer le tableau Excel", // proc_xpilotage.md, Rôle réel : « générateur de tableau de pilotage statistique Excel ».
             Rang = 5,
             Etats = EtatsEcran.Trois("À générer", "En cours", "Généré"),
             Groupes = ["Feuille RCS", "Feuille judiciaire"],
-            Marches =
+            Sections =
             [
                 Marche("Période", "Les dates minimale et maximale sont substituées dans chaque requête.", true,
                     "Date minimale", "Date maximale"),
@@ -904,7 +946,7 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         },
     ];
 
-    private static MarcheEcran Marche(string titre, string consigne, bool obligatoire, params string[] champs) =>
+    private static MarcheEcran Marche(string titre, string consigne, bool obligatoire, params ChampEcran[] champs) =>
         new(titre, consigne, obligatoire, champs);
 
     private static LigneEcran Ligne(string nom, string precisions, string groupe, string etat, params int[] faites) =>

@@ -12,3 +12,102 @@
 .rig-tcw__scene--ouverte .rig-tcw__liste .rig-tcw__rang-3 { --tcw-teinte-lue: color-mix(in srgb, var(--rig-verbe-terminer) 40%, var(--rig-rail-melange)); }
 .rig-tcw__scene--ouverte .rig-tcw__liste .rig-tcw__rang-6 { --tcw-teinte-lue: color-mix(in srgb, var(--rig-verbe-facturer) 40%, var(--rig-rail-melange)); }
 .rig-tcw__scene--ouverte .rig-tcw__liste .rig-tcw__rang-7 { --tcw-teinte-lue: color-mix(in srgb, var(--rig-verbe-configurer) 40%, var(--rig-rail-melange)); }
+
+/* ============================================================
+   LES FORMES D'ECRAN GENERE (web/src/ecrans/formes/, plan « RIG v3 100 % fonctionnel », lot 1, 25/11/2026).
+   Chaque forme pose une liste moderne (rig-listes.css) dans le corps de l'ecran (.rig-proc__corps) ; ces regles
+   n'ajoutent que ce que la liste moderne n'a pas : la barre des gestes en lot, les sections d'une fiche, la grille
+   editable, la visionneuse, les totaux. Couleurs par jetons du theme seulement.
+   ============================================================ */
+
+/* Sans panneau de criteres (File, Referentiel, Document, Saisie), la liste prend toute la largeur : la grille du corps
+   (320 px + reste, rig-accueil.css) mettait sinon la carte dans la colonne des criteres. */
+.rig-proc__corps.rig-eg:not(:has(> .rig-criteres)) { grid-template-columns: minmax(0, 1fr); }
+/* La saisie empile son formulaire et la liste des saisies du greffe : le corps defile. */
+.rig-proc__corps.rig-eg[data-forme="Saisie"] { display: flex; flex-direction: column; overflow-y: auto; }
+.rig-proc__corps.rig-eg[data-forme="Saisie"] > .rig-lm { flex: none; }
+
+/* Une note discrete (provenance, groupes vides, fiche figee) et le compte rendu d'un geste. */
+.rig-eg-note { margin: 0 14px 8px; font-size: 12px; color: var(--rig-texte-3); }
+.rig-eg-annonce {
+  margin: 4px 14px 8px; padding: 7px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--rig-or) 12%, var(--rig-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rig-or) 45%, transparent);
+  font-size: 12.5px; color: var(--rig-texte);
+}
+.rig-eg-espace { flex: 1 1 auto; }
+
+/* La barre des gestes en lot (File, Audience) : le compte des cochees, puis les gestes de la fiche. */
+.rig-eg-lot { padding: 6px 14px; flex-wrap: wrap; }
+.rig-eg-lot__compte { font-size: 12px; color: var(--rig-texte-3); margin-right: 4px; }
+.rig-eg-lot__compte b { color: var(--rig-texte); }
+
+/* La table des lignes : case a cocher, ligne ouvrable, ligne ouverte. */
+.rig-eg-table th.rig-eg-case-cellule, .rig-eg-table td.rig-eg-case-cellule { text-align: center; padding-left: 8px; padding-right: 0; }
+.rig-eg-table tr.rig-eg-ligne--ouvrable { cursor: pointer; }
+.rig-eg-table tr.rig-eg-ligne--ouvrable:hover td { background: color-mix(in srgb, var(--rig-texte) 3%, transparent); }
+.rig-eg-table tr.rig-eg-ligne--ouverte td { background: color-mix(in srgb, var(--rig-or) 9%, transparent); }
+.rig-eg-detail td { white-space: normal; background: color-mix(in srgb, var(--rig-texte) 2%, transparent); }
+.rig-eg-regles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 16px; padding: 6px 4px; }
+.rig-eg-regles .rig-lm-champ__valeur { white-space: normal; color: var(--rig-texte-2); }
+
+/* Les sections d'une fiche (Fiche, Consultation, Saisie, Operation) : une carte par section, ses champs en grille. */
+.rig-eg-sections { display: flex; flex-direction: column; gap: 10px; padding: 4px 14px 12px; }
+.rig-eg-section {
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px var(--rig-bord-faible);
+  padding: 10px 12px;
+}
+.rig-eg-section__tete { display: flex; align-items: center; gap: 8px; }
+.rig-eg-section__titre { font-weight: 600; font-size: 13px; color: var(--rig-texte); }
+.rig-eg-section__consigne { margin: 3px 0 8px; font-size: 12px; color: var(--rig-texte-3); }
+.rig-eg-champs { max-width: none; gap: 8px 14px; }
+.rig-eg-periode { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--rig-texte-3); }
+.rig-eg-periode .rig-saisie-champ__saisie { flex: 1 1 0; min-width: 0; }
+.rig-eg-case { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--rig-texte-2); }
+.rig-eg-tableau {
+  padding: 6px 10px; border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--rig-bord-faible);
+  font-size: 11.5px; color: var(--rig-texte-3);
+}
+/* La fiche en lecture : libelle a gauche, valeur a droite. */
+.rig-eg-lecture { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 16px; margin: 0; }
+.rig-eg-lecture__champ { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px dashed var(--rig-bord-faible); }
+.rig-eg-lecture dt { font-size: 11.5px; color: var(--rig-texte-3); }
+.rig-eg-lecture dd { margin: 0; font-size: 12.5px; color: var(--rig-texte); text-align: right; }
+
+/* La saisie en etapes : la frise a gauche, l'etape a droite (motif .rig-saisie de rig-accueil.css). */
+.rig-eg-saisie { border-top: 1px solid var(--rig-bord-faible); }
+.rig-eg-etape { display: flex; flex-direction: column; min-width: 0; }
+.rig-eg-temps { padding: 4px 14px; border-bottom: 1px solid var(--rig-bord-faible); }
+
+/* La grille editable d'un referentiel : la ligne en cours de modification porte ses champs. */
+.rig-eg-grille td .rig-saisie-champ__saisie { padding: 3px 6px; font-size: 12px; }
+.rig-eg-grille tr.rig-eg-ligne--edition td { background: color-mix(in srgb, var(--rig-or) 8%, transparent); overflow: visible; }
+.rig-eg-edition-actions { display: flex; gap: 4px; justify-content: flex-end; }
+
+/* Les totaux d'un etat, au pied : par groupe, puis le total general en gras. */
+.rig-eg-totaux { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; }
+.rig-eg-total { font-weight: 600; }
+
+/* La visionneuse : les documents a gauche, la page a droite. */
+.rig-eg-visionneuse { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 10px; padding: 0 0 12px; }
+.rig-eg-visionneuse__vue { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding-right: 14px; }
+.rig-eg-page {
+  align-self: center;
+  width: min(100%, 320px); aspect-ratio: 210 / 297;
+  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px;
+  padding: 16px; text-align: center;
+  background: var(--rig-surface);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--rig-texte) 18%, transparent), inset 0 0 0 1px var(--rig-bord-faible);
+  transition: transform .2s ease;
+}
+.rig-eg-page__titre { font-size: 13px; }
+.rig-eg-page__detail { font-size: 12px; color: var(--rig-texte-3); }
+.rig-eg-page__vide { font-size: 11.5px; color: var(--rig-texte-3); }
+@media (max-width: 1100px) { .rig-eg-visionneuse { grid-template-columns: minmax(0, 1fr); } }
+
+/* Le recapitulatif d'une operation avant confirmation. */
+.rig-eg-recap { padding: 6px 14px 10px; font-size: 12.5px; }
+.rig-eg-recap ul { margin: 4px 0 8px; padding-left: 18px; }

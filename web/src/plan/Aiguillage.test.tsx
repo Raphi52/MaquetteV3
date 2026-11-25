@@ -40,8 +40,9 @@ describe('Aiguillage des ecrans de procedure', () => {
 
   // Un ecran generique (Pont/EcransGeneres/) : la procedure sans ecran a part porte son descripteur.
   it('une procedure dont le descripteur est porte monte EcranGenere ; sans descripteur, elle reste a venir', () => {
-    const descripteur = { code: 'ECRAN_TEST', titre: 'Ecran test', sujet: 'dossiers', recherche: '', criteres: [],
-      valider: 'Valider', rang: 1, etats: [], groupes: [], marches: [], lignes: [], membres: [] }
+    const descripteur = { code: 'ECRAN_TEST', titre: 'Ecran test', forme: 'File' as const, sujet: 'dossiers', recherche: '', criteres: [],
+      valider: 'Valider', rang: 1, etats: [], groupes: [], marches: [], sections: [], colonnes: [], parametres: [], gestes: [],
+      lignes: [], membres: [], enOnglets: false }
     expect(aiguiller('ECRAN_TEST', { ...proc().ecran, descripteur }).el!.type).toBe(EcranGenere)
     expect(aiguiller('ECRAN_TEST').el!.type).toBe(EcranNonMaquette)
   })

@@ -65,8 +65,9 @@ describe('EcranOnglets, monte par l\'aiguillage', () => {
   })
 
   it('un onglet generique monte EcranGenere avec SON descripteur ; l\'affaire de l\'ecran reuni passe aux onglets', () => {
-    const descripteur: DescripteurEcranVue = { code: 'PILOTAGE', titre: 'Pilotage', sujet: 'tableaux de bord', recherche: '',
-      criteres: [], valider: 'Valider', rang: 1, etats: [], groupes: [], marches: [], lignes: [], membres: [] }
+    const descripteur: DescripteurEcranVue = { code: 'PILOTAGE', titre: 'Pilotage', forme: 'Etat', sujet: 'tableaux de bord', recherche: '',
+      criteres: [], valider: 'Valider', rang: 1, etats: [], groupes: [], marches: [], sections: [], colonnes: [], parametres: [],
+      gestes: [], lignes: [], membres: [], enOnglets: false }
     const dossier = contexteDossier()
     const vue = reunion({ onglets: [{ code: 'PROC_STAT', libelle: 'Statistiques', descripteur: null },
                                    { code: 'PROC_XPILOTAGE', libelle: 'Pilotage', descripteur }], actif: 'PROC_XPILOTAGE' }, { dossier })

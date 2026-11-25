@@ -24,13 +24,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_REDA_MASSE", Titre = "Redaction en masse", Sujet = "décisions judiciaires",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une décision, un numéro de rôle, une partie…",
             Criteres = ["Numéro de rôle", "Type de décision", "État de rédaction"],
             Valider = "Valider le lot",
             Rang = 2,
             Etats = EtatsEcran.Trois("À traiter", "En cours", "Minute imprimée"),
             Groupes = ["Jugements", "Ordonnances"],
-            Marches =
+            Sections =
             [
                 Marche("Dates d'audience", "Délibéré et prononcé renseignés : sans les deux, la décision ne se traite pas. Une date peut être calculée d'après les prochaines audiences ; l'annulation du calcul restaure la date d'origine.", true,
                     "Date de délibéré", "Date de prononcé"),
@@ -61,20 +62,21 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_DEST_REDA", Titre = "Destinataires", Sujet = "destinataires",
+            Forme = FormeEcran.Fiche,
             Recherche = "Rechercher un destinataire, une partie, un mandataire…",
             Criteres = ["Partie", "Mandataire", "Destinataire divers"],
             Valider = "Enregistrer les destinataires",
             Rang = 2,
             Etats = EtatsEcran.Trois("À compléter", "En cours", "Enregistré"),
             Groupes = ["Parties", "Mandataires", "Destinataires divers"],
-            Marches =
+            Sections =
             [
                 Marche("Édition du jugement", "Chaque destinataire reçoit une édition : grosse (G), copie (C), expédition (E) ou lettre de notification (L). Sans aucune, la ligne est notée X.", true,
-                    "Édition", "Grosse", "Copie", "Expédition", "Lettre de notification"),
+                    "Édition", Champ.Case("Grosse"), Champ.Case("Copie"), Champ.Case("Expédition"), Champ.Case("Lettre de notification")),
                 Marche("Date de délivrance des grosses", "Obligatoire pour continuer : sans elle, l'enregistrement avertit, et les autres opérations du processus restent verrouillées.", true,
                     "Date de délivrance des grosses"),
                 Marche("Suppléments", "Nombre de grosses, de copies et d'expéditions en plus, saisi à la main.", false,
-                    "Grosses supplémentaires", "Copies supplémentaires", "Expéditions supplémentaires"),
+                    Champ.Nombre("Grosses supplémentaires"), Champ.Nombre("Copies supplémentaires"), Champ.Nombre("Expéditions supplémentaires")),
                 Marche("Destinataire divers", "Ajout manuel d'un destinataire. Seuls les destinataires divers se suppriment ; ceux de l'instance restent en lecture seule.", false,
                     "Destinataire divers", "Désignation"),
             ],
@@ -94,13 +96,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_SIGNJUD", Titre = "Signature electronique", Sujet = "décisions à signer",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une décision, un numéro de rôle, un juge…",
             Criteres = ["Juge", "Greffier", "État de signature"],
             Valider = "Lancer la signature",
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À envoyer", "Envoyée au juge", "Signée"), new EtatEcran("EnAttente", "À corriger", "en-attente"), new EtatEcran("Rejetee", "En erreur", "rejetee")],
             Groupes = ["Pour le juge", "Pour le greffier"],
-            Marches =
+            Sections =
             [
                 Marche("Contrôle de la décision", "Juge, greffier, une seule édition et date prévue renseignés, sans erreur bloquante. Une décision en erreur ne se coche pas.", true,
                     "Juge", "Greffier", "Édition", "Date prévue"),
@@ -129,13 +132,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_ORDOSIGN", Titre = "Ordonnances a signer", Sujet = "ordonnances à signer",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une instance, un numéro de rôle, une affaire…",
             Criteres = ["Type de recherche", "Date de décision", "Copies à imprimer"],
             Valider = "Signer la sélection",
             Rang = 2,
             Etats = EtatsEcran.Trois("À dater", "En cours", "Signée"),
             Groupes = ["Opposition", "Injonctions", "Juge commis"],
-            Marches =
+            Sections =
             [
                 Marche("Décision rendue", "Cocher la décision rendue : une décision non rendue reste dans la liste à signer.", true,
                     "Décision rendue"),
@@ -164,24 +168,24 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_DJ_OCCULTATIONS", Titre = "Occultations", Sujet = "décisions",
+            Forme = FormeEcran.Fiche,
             Recherche = "Rechercher une décision, un numéro de rôle…",
             Criteres = ["Catégories d'occultation", "Mots à masquer", "Mots à conserver"],
             Valider = "Enregistrer les occultations",
             Rang = 2,
             Etats = EtatsEcran.Trois("À occulter", "En cours", "Validées"),
             Groupes = ["Jugements", "Ordonnances"],
-            Marches =
+            Sections =
             [
                 Marche("Décision", "La décision est chargée. Sans décision, l'écran affiche seulement un message : rien à saisir.", true,
                     "Numéro de rôle", "Type de décision"),
                 Marche("Catégories", "Les cases d'occultation sont pré-cochées selon le paramétrage du greffe ; chaque case s'ajuste à la main.", true,
-                    "Catégories d'occultation (12 cases)"),
+                    Champ.Tableau("Catégories d'occultation (12 cases)")),
                 Marche("Mots à masquer", "Un mot ajouté est masqué. Unicité globale, sans tenir compte de la casse : un mot ne peut pas être à la fois à masquer et à conserver.", false,
                     "Mot à masquer"),
                 Marche("Mots à conserver", "Un mot à conserver est gardé tel quel. Un mot retiré est barré et disparaît à l'enregistrement.", false,
                     "Mot à conserver"),
-                Marche("Enregistrement", "Enregistre les occultations, la décision et la centralisation de l'instance. Un mot saisi sans clic sur Ajouter reste un avertissement, sans bloquer.", true,
-                    "Enregistrement"),
+                Marche("Enregistrement", "Enregistre les occultations, la décision et la centralisation de l'instance. Un mot saisi sans clic sur Ajouter reste un avertissement, sans bloquer.", true),
             ],
             Lignes =
             [
@@ -199,13 +203,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_IMPLEG", Titre = "Impression legale", Sujet = "décisions d'une audience",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une décision, un numéro de rôle, un nom…",
             Criteres = ["Audience de cabinet", "Type de décision", "Numéro de minute"],
             Valider = "Imprimer la sélection",
             Rang = 2,
             Etats = EtatsEcran.Trois("À numéroter", "Numérotée", "Imprimée"),
             Groupes = ["Jugements d'expulsion", "Autres décisions"],
-            Marches =
+            Sections =
             [
                 Marche("Numéro de minute", "Une décision sans numéro ne s'imprime pas : le bouton Générer les numéros attribue ceux qui manquent, dans la série des jugements d'expulsion.", true,
                     "Numéro de minute", "Numéro de répertoire"),
@@ -232,13 +237,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_COURRIERM", Titre = "Courriers en masse", Sujet = "instances, procédures et mesures",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une instance, une procédure, un numéro…",
             Criteres = ["Instance", "Procédure", "Prévention", "Mesure"],
             Valider = "Générer les courriers",
             Rang = 2,
             Etats = EtatsEcran.Trois("À courrier", "En cours", "Générés"),
             Groupes = ["Instances", "Procédures", "Préventions", "Mesures"],
-            Marches =
+            Sections =
             [
                 Marche("Volet", "Un seul volet à la fois : instance, procédure, prévention ou mesure. Le volet change la recherche et le résultat.", true,
                     "Volet"),
@@ -265,13 +271,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_EDT_DIFF", Titre = "Editions differees", Sujet = "lots d'éditions",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un document, un destinataire, un utilisateur…",
             Criteres = ["Date d'ouverture du lot", "Imprimante", "Nombre de documents"],
             Valider = "Clôturer le lot",
             Rang = 2,
             Etats = EtatsEcran.Trois("À clôturer", "En préparation", "Clôturé"),
             Groupes = ["Agent A", "Agent B"],
-            Marches =
+            Sections =
             [
                 Marche("Imprimante", "Imprimante obligatoire pour clôturer : sans elle, le lot ne se ferme pas. Une imprimante interne de test est signalée, sans blocage.", true,
                     "Imprimante"),
@@ -296,13 +303,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_PDF_WRITER", Titre = "Pivoter des pages", Sujet = "pages",
+            Forme = FormeEcran.Document,
             Recherche = "Rechercher une page, une plage (ex. 1-3, 5)…",
             Criteres = ["Pages cochées", "Plage de pages", "Sens de rotation"],
             Valider = "Enregistrer le PDF",
             Rang = 2,
             Etats = EtatsEcran.Trois("À pivoter", "Pivotée", "Enregistrée"),
             Groupes = ["Pages 1 à 4", "Pages 5 à 8"],
-            Marches =
+            Sections =
             [
                 Marche("Fichier source", "Le fichier PDF source doit exister. Absent, l'écran reste ouvert mais inutilisable.", true,
                     "Fichier source"),
@@ -329,13 +337,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_NUM", Titre = "Documents ocerises", Sujet = "documents océrisés",
+            Forme = FormeEcran.Document,
             Recherche = "Rechercher un document, un titre, une date…",
             Criteres = ["Format (PDF ou TIF)", "Titre", "Nombre de pages"],
             Valider = "Enregistrer une copie",
             Rang = 2,
             Etats = EtatsEcran.Trois("À vérifier", "En cours", "Enregistré"),
             Groupes = ["PDF", "TIF"],
-            Marches =
+            Sections =
             [
                 Marche("Document", "Le document est ouvert ; son format, PDF ou TIF, décide de l'éditeur utilisé.", true,
                     "Format", "Nombre de pages"),
@@ -366,13 +375,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_TRANSDOC", Titre = "Transmission", Sujet = "documents dématérialisés",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un document, un numéro de rôle, un SIREN…",
             Criteres = ["Tribunal digital", "Coffre-fort numérique", "Numéro d'affaire"],
             Valider = "Enregistrer les modifications",
             Rang = 2,
             Etats = EtatsEcran.Trois("À transmettre", "Numéro saisi", "Enregistré"),
             Groupes = ["Tribunal digital", "Coffre-fort numérique"],
-            Marches =
+            Sections =
             [
                 Marche("Numéro d'affaire", "Saisi dans la colonne éditable. Actualiser enregistre les modifications avant de recharger la liste.", true,
                     "Numéro d'affaire"),
@@ -398,13 +408,17 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_BORDLR", Titre = "Bordereaux LR", Sujet = "lettres recommandées",
+            Forme = FormeEcran.Etat,
+            Parametres = [Champ.Periode("Période"), "Utilisateur", Champ.Case("Mes recommandés"), Champ.Liste("Avec ou sans AR", "Avec AR", "Sans AR")],
+            Colonnes = ["Bordereau", Champ.Nombre("Nombre de plis")],
+            Gestes = ["Éditer le bordereau"],
             Recherche = "Rechercher un bordereau, un utilisateur, une période…",
             Criteres = ["Période (dates et heures)", "Utilisateur", "Avec ou sans AR"],
             Valider = "Éditer le bordereau",
             Rang = 2,
             Etats = EtatsEcran.Trois("À préparer", "En cours", "Édité"),
             Groupes = ["Avec accusé de réception", "Sans accusé de réception"],
-            Marches =
+            Sections =
             [
                 Marche("Période", "Date et heure de début, date et heure de fin. Sans heure, la plage couvre les journées entières. La date de début doit précéder la date de fin.", true,
                     "Date de début", "Heure de début", "Date de fin", "Heure de fin"),
@@ -433,13 +447,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_RETOURLRAR", Titre = "Retours LRAR", Sujet = "retours de recommandés",
+            Forme = FormeEcran.File,
             Recherche = "Scanner ou saisir le code-barre d'un pli…",
             Criteres = ["Code-barre du pli", "Numéro LRAR", "Date de réception"],
             Valider = "Enregistrer le retour",
             Rang = 2,
             Etats = EtatsEcran.Trois("À saisir", "En cours", "Retour enregistré"),
             Groupes = ["Reçus", "NPAI, refusés ou incomplets", "Non réclamés", "Non envoyés"],
-            Marches =
+            Sections =
             [
                 Marche("Pli scanné", "Le code-barre retrouve l'événement et la demande d'origine. L'arborescence entité, événement, recommandé s'affiche.", true,
                     "Code-barre", "Numéro LRAR"),
@@ -467,13 +482,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_ENV_JAL", Titre = "Envoi JAL / BODACC", Sujet = "annonces légales",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une annonce, un bordereau, une facture…",
             Criteres = ["Période d'envoi", "Destinataire (JAL)", "Numéro de bordereau"],
             Valider = "Générer le bordereau",
             Rang = 2,
             Etats = EtatsEcran.Trois("À envoyer", "Bordereau généré", "Envoyée"),
             Groupes = ["Procédures collectives", "Préventions"],
-            Marches =
+            Sections =
             [
                 Marche("Période", "Dates pré-remplies d'après le paramétrage du greffe (JAL ou BODACC). Une recherche par numéro de bordereau ou de facture remplace les dates.", true,
                     "Date de début", "Date de fin"),
@@ -500,13 +516,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_GESTBOD", Titre = "Publications BODACC", Sujet = "annonces BODACC",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une annonce, un numéro de parution, une date…",
             Criteres = ["Date d'EP", "Date de parution", "Numéro de parution"],
             Valider = "Valider la sélection",
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À traiter", "Vérifiée", "Certifiée"), new EtatEcran("EnAttente", "À renvoyer", "en-attente")],
             Groupes = ["Certificats de parution", "Rejets", "Contrôles non conformes"],
-            Marches =
+            Sections =
             [
                 Marche("Mode et critère", "Mode : certificats, rejets, mise à jour des rejets ou contrôles non conformes. Critère de date : date d'EP, de parution ou d'envoi, ou numéro de parution. La date de fin ne peut pas précéder la date de début.", true,
                     "Mode", "Critère", "Date du", "Date au"),
@@ -533,13 +550,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_PAPERCUT", Titre = "File d'impression", Sujet = "travaux d'impression",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une imprimante…",
             Criteres = ["Imprimante", "Utilisateur", "Nombre de feuilles"],
             Valider = "Imprimer la file",
             Rang = 2,
             Etats = EtatsEcran.Trois("En attente", "En cours", "Imprimée"),
             Groupes = ["Greffe", "Accueil"],
-            Marches =
+            Sections =
             [
                 Marche("Imprimante", "Une imprimante par ligne. Sans nom d'imprimante ou d'utilisateur, l'action est refusée.", true,
                     "Imprimante", "Utilisateur"),
@@ -563,13 +581,17 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_LISTEEXCEL", Titre = "Export Excel", Sujet = "listes d'instances",
+            Forme = FormeEcran.Etat,
+            Parametres = ["Type de liste", Champ.Periode("Période"), "Code d'acte", "Nature d'affaire"],
+            Colonnes = ["Liste", Champ.Nombre("Nombre de lignes")],
+            Gestes = ["Lancer l'export Excel"],
             Recherche = "Rechercher un type de liste…",
             Criteres = ["Type de liste", "Période", "Colonnes à exporter"],
             Valider = "Lancer l'export Excel",
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À compter", "Comptée", "Exportée"), new EtatEcran("EnAttente", "Bloquée : trop de lignes", "en-attente")],
             Groupes = ["Instances", "Groupements", "Affaires et citations"],
-            Marches =
+            Sections =
             [
                 Marche("Type de liste", "Le type fixe les critères proposés : instances enrôlées, avec ou sans décision, avec événement passé ou futur, groupements, affaires sans décision définitive, citations signifiées.", true,
                     "Type de liste"),
@@ -596,7 +618,7 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         },
     ];
 
-    private static MarcheEcran Marche(string titre, string consigne, bool obligatoire, params string[] champs) =>
+    private static MarcheEcran Marche(string titre, string consigne, bool obligatoire, params ChampEcran[] champs) =>
         new(titre, consigne, obligatoire, champs);
 
     private static LigneEcran Ligne(string nom, string precisions, string groupe, string etat, params int[] faites) =>

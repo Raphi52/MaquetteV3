@@ -17,6 +17,14 @@ public static class CatalogueGenere
     /// s'initialisent dans l'ordre du texte, et Charger() le lit.</summary>
     public static readonly EtatEcran[] EtatsReunis = EtatsEcran.Trois("À traiter", "En cours", "Terminé");
 
+    /// <summary>Les formes dont plusieurs procedures se reunissent en UNE liste : chaque ligne est un objet, que l'ecran
+    /// coche ou ouvre dans SA procedure (ses sections, ses gestes, son bouton). Les autres formes ont leurs propres
+    /// colonnes (Referentiel, Etat), parametres (Etat, Audience) ou etapes (Saisie) : une liste commune les melangerait,
+    /// elles passent en onglets (25/11/2026, plan « RIG v3 100 % fonctionnel », lot 1). Declare AVANT _parCode, comme
+    /// EtatsReunis : Reunir() le lit pendant Charger().</summary>
+    public static readonly FormeEcran[] FormesEnListe =
+        [FormeEcran.File, FormeEcran.Consultation, FormeEcran.Fiche, FormeEcran.Operation, FormeEcran.Document];
+
     private static readonly Dictionary<string, DescripteurEcran> _parCode = Charger();
 
     /// <summary>Tous les descripteurs, dans l'ordre de decouverte (les ecrans reunis en dernier).</summary>
@@ -61,10 +69,16 @@ public static class CatalogueGenere
             .Select(m => parCode.GetValueOrDefault(m.Code)
                          ?? throw new InvalidOperationException($"{entree.Code} reunit {m.Code}, qui n'a pas de descripteur."))
             .ToArray();
+        // La forme : celle des procedures quand elles en ont une seule et qu'elle se reunit en liste ; sinon un onglet
+        // par procedure, chacune dans la sienne (l'ecran s'ouvre sur le premier).
+        var formes = membres.Select(m => m.Forme).Distinct().ToArray();
+        var enListe = formes.Length == 1 && FormesEnListe.Contains(formes[0]);
         return new DescripteurEcran
         {
             Code = entree.Code,
             Titre = entree.Libelle,
+            Forme = enListe ? formes[0] : membres[0].Forme,
+            EnOnglets = !enListe,
             Sujet = "lignes",
             Recherche = "Rechercher un nom, un numéro, une procédure…",
             Criteres = [.. membres.SelectMany(m => m.Criteres).Distinct().Take(6)],
@@ -74,7 +88,6 @@ public static class CatalogueGenere
                                                .Where(e => EtatsReunis.All(r => r.Code != e.Code))
                                                .DistinctBy(e => e.Code)],
             Groupes = [.. membres.Select(m => m.Titre)],
-            Marches = [],
             Lignes = [.. membres.SelectMany(m => m.Lignes.Select(l => LigneReunie(m, l)))],
             Membres = membres,
         };

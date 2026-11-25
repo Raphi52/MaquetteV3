@@ -23,7 +23,10 @@ using RigV3Desktop.Pont.EcransGeneres;
 //      des metiers differents voient (Metier/PerimetreProfil.cs) ;
 //   7. les ECRANS REUNIS EN ONGLETS (25/11/2026, conv-2147 : les ecrans faits a la main en React,
 //      EntreeMenu.EnOnglets) : chaque procedure y garde SON ecran, un onglet chacune, sous la meme
-//      regle du metier ; ouverte par son code (la recherche), elle mene a l'ecran reuni, sur SON onglet.
+//      regle du metier ; ouverte par son code (la recherche), elle mene a l'ecran reuni, sur SON onglet ;
+//   8. LES FORMES (25/11/2026, plan « RIG v3 100 % fonctionnel », lot 1) : tout descripteur a une forme ; seules Saisie
+//      et Operation ont des etapes ; une Fiche a des champs editables ; un Referentiel a des colonnes ; un Etat, des
+//      parametres et des colonnes ; un ecran reuni prend la forme de ses procedures ou passe en onglets.
 
 var echecs = new List<string>();
 void Exiger(bool ok, string quoi)
@@ -37,6 +40,8 @@ var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../.
 string Lire(string relatif) => File.ReadAllText(Path.Combine(racine, relatif));
 var aiguillage = Lire("web/src/plan/Aiguillage.tsx");
 var ecranGenere = Lire("web/src/ecrans/EcranGenere.tsx");
+// Les formes (25/11/2026) : EcranGenere.tsx aiguille, formes/commun.tsx porte les etats et le refus des gestes.
+var formesCommun = Lire("web/src/ecrans/formes/commun.tsx");
 var planTravailVue = Lire("Pont/PlanTravailVue.cs");
 var css = Lire("wwwroot/rig-accueil.css");
 // Les teintes 2, 3, 6, 7 vivent dans rig-ecrans-generes.css (la reference ne se modifie pas) ;
@@ -71,7 +76,7 @@ Exiger(aiguillage.Contains("import { EcranGenere } from '../ecrans/EcranGenere'"
     "l'aiguillage monte EcranGenere avec le descripteur porte par la procedure");
 // Les trois etats qui portent les gestes ont le meme nom cote ecran et cote descripteur.
 foreach (var etat in new[] { "AFaire", "EnCours", "Validee" })
-    Exiger(ecranGenere.Contains($"'{etat}'"), $"EcranGenere.tsx connait l'etat « {etat} » que portent les descripteurs");
+    Exiger(formesCommun.Contains($"'{etat}'"), $"les formes (formes/commun.tsx) connaissent l'etat « {etat} » que portent les descripteurs");
 // La vue de procedure porte le descripteur.
 Exiger(planTravailVue.Contains("CatalogueGenere.Descripteur(p.Code)"),
     "la vue de procedure (Pont/PlanTravailVue.cs) porte le descripteur de la procedure ouverte");
@@ -92,7 +97,7 @@ foreach (var d in descripteurs.Where(d => d.Membres.Length > 0))
     if (!d.Membres.Select(m => m.Code).SequenceEqual(entree.Membres.Select(m => m.Code)))
         defauts.Add("ses procedures ne sont pas celles que le menu reunit, dans le meme ordre");
     if (!d.Groupes.SequenceEqual(d.Membres.Select(m => m.Titre))) defauts.Add("un groupe par procedure, a son titre, est attendu");
-    if (d.Marches.Length != 0) defauts.Add("un ecran reuni n'a pas de marches propres : chaque ligne suit celles de sa procedure");
+    if (d.Parties.Length != 0) defauts.Add("un ecran reuni n'a ni etapes ni sections propres : chaque ligne suit celles de sa procedure");
     if (d.Lignes.Length != d.Membres.Sum(m => m.Lignes.Length)) defauts.Add("ses lignes ne sont pas exactement celles de ses procedures");
     if (casAiguillage.Contains(d.Code)) defauts.Add("un cas de l'aiguillage le doublonne : le descripteur serait mort");
     foreach (var etat in new[] { "AFaire", "EnCours", "Validee" })
@@ -101,8 +106,8 @@ foreach (var d in descripteurs.Where(d => d.Membres.Length > 0))
     {
         var parcours = d.Membres.FirstOrDefault(m => m.Titre == l.Groupe);
         if (parcours is null) { defauts.Add($"la ligne « {l.Nom} » n'appartient a aucune procedure reunie"); continue; }
-        if (l.Faites.Any(k => k < 0 || k >= parcours.Marches.Length))
-            defauts.Add($"la ligne « {l.Nom} » franchit une marche hors de l'escalier de sa procedure");
+        if (l.Faites.Any(k => k < 0 || k >= parcours.Parties.Length))
+            defauts.Add($"la ligne « {l.Nom} » franchit une partie hors de celles de sa procedure");
         // L'ancien groupe passe en tete de la precision UNE fois (CatalogueGenere.AvecAncienGroupe).
         var morceaux = l.Precisions.Split(" · ");
         if (morceaux.Length > 1 && morceaux[0] == morceaux[1])
@@ -156,19 +161,24 @@ foreach (var d in descripteurs.Where(d => d.Membres.Length == 0))
     // de grille, cf. Surveiller.cs), des lignes de demonstration et des actions (etapes + bouton final).
     if (d.Criteres.Length == 0 || d.Criteres.Any(c => string.IsNullOrWhiteSpace(c)))
         defauts.Add("aucune colonne : la grille n'affiche aucun critere");
-    if (d.Marches.Length == 0 || string.IsNullOrWhiteSpace(d.Valider))
-        defauts.Add("aucune action : pas d'etape a franchir, ou pas de bouton final");
+    // fix-ok: cause mesuree (25/11/2026, capture de Raphael sur « Corriger une affaire ») -- cette regle exigeait des
+    // marches de TOUT descripteur (« aucune action : pas d'etape a franchir ») : le banc imposait l'escalier partout.
+    // Un descripteur a maintenant des parties (etapes d'une Saisie, sections des autres formes) ; la forme, section 8.
+    if (d.Parties.Length == 0 || string.IsNullOrWhiteSpace(d.Valider))
+        defauts.Add("aucune partie (ni etape ni section), ou pas de bouton final");
     if (d.Groupes.Length == 0) defauts.Add("aucun groupe");
     if (d.Lignes.Length == 0) defauts.Add("aucune ligne de demonstration");
     else if (d.Lignes.Length < 6 || d.Lignes.Length > 15)
         defauts.Add($"{d.Lignes.Length} lignes de demonstration (6 a 15 attendues)");
-    var obligatoires = Enumerable.Range(0, d.Marches.Length).Where(k => d.Marches[k].Obligatoire).ToList();
+    var obligatoires = Enumerable.Range(0, d.Parties.Length).Where(k => d.Parties[k].Obligatoire).ToList();
     foreach (var l in d.Lignes)
     {
         if (!d.Groupes.Contains(l.Groupe)) defauts.Add($"la ligne « {l.Nom} » est dans le groupe absent « {l.Groupe} »");
         if (!etats.Contains(l.Etat)) defauts.Add($"la ligne « {l.Nom} » est dans l'etat absent « {l.Etat} »");
-        if (l.Faites.Any(k => k < 0 || k >= d.Marches.Length) || l.Faites.Distinct().Count() != l.Faites.Length)
-            defauts.Add($"la ligne « {l.Nom} » franchit une marche hors de l'escalier, ou deux fois la meme");
+        if (l.Faites.Any(k => k < 0 || k >= d.Parties.Length) || l.Faites.Distinct().Count() != l.Faites.Length)
+            defauts.Add($"la ligne « {l.Nom} » franchit une partie hors de l'ecran, ou deux fois la meme");
+        if (l.Valeurs.Length > d.Colonnes.Length)
+            defauts.Add($"la ligne « {l.Nom} » a {l.Valeurs.Length} cellules pour {d.Colonnes.Length} colonnes");
         // Une ligne est coherente avec ses marches : c'est ce que le geste Valider suppose.
         if (l.Etat == "AFaire" && l.Faites.Length > 0)
             defauts.Add($"la ligne « {l.Nom} » est a faire et a pourtant des marches franchies");
@@ -180,13 +190,14 @@ foreach (var d in descripteurs.Where(d => d.Membres.Length == 0))
 
     // Rien d'interne n'atteint l'ecran : ni titre, ni libelle, ni texte de ligne ou de marche.
     var textes = new List<string> { d.Titre, d.Sujet, d.Recherche, d.Valider }
-        .Concat(d.Criteres).Concat(d.Groupes).Concat(d.Etats.Select(e => e.Libelle))
-        .Concat(d.Marches.SelectMany(m => new[] { m.Titre, m.Consigne }.Concat(m.Champs)))
-        .Concat(d.Lignes.SelectMany(l => new[] { l.Nom, l.Precisions }));
+        .Concat(d.Criteres).Concat(d.Groupes).Concat(d.Etats.Select(e => e.Libelle)).Concat(d.Gestes)
+        .Concat(d.Parties.SelectMany(m => new[] { m.Titre, m.Consigne }.Concat(m.Champs.SelectMany(c => c.Options.Prepend(c.Libelle)))))
+        .Concat(d.Colonnes.Concat(d.Parametres).SelectMany(c => c.Options.Prepend(c.Libelle)))
+        .Concat(d.Lignes.SelectMany(l => new[] { l.Nom, l.Precisions }.Concat(l.Valeurs)));
     if (textes.Any(t => t.Contains("PROC_"))) defauts.Add("un code interne (PROC_) est affiche a l'ecran");
 
     if (defauts.Count == 0)
-        Exiger(true, $"{d.Code} ({d.Titre}) : sain, {d.Lignes.Length} lignes, {d.Marches.Length} marches, {d.Groupes.Length} groupes");
+        Exiger(true, $"{d.Code} ({d.Titre}) : sain, forme {d.Forme}, {d.Lignes.Length} lignes, {d.Marches.Length} etapes, {d.Sections.Length} sections, {d.Groupes.Length} groupes");
     foreach (var defaut in defauts) Exiger(false, $"{d.Code} : {defaut}");
 }
 
@@ -201,8 +212,12 @@ if (descripteurs.Count > 0)
 {
     var json = JsonSerializer.Serialize(descripteurs[0], new JsonSerializerOptions(JsonSerializerDefaults.Web));
     foreach (var cle in new[] { "code", "titre", "sujet", "recherche", "criteres", "valider", "rang", "etats",
-                                "groupes", "marches", "lignes", "icone", "obligatoire", "faites", "membres" })
+                                "groupes", "marches", "lignes", "icone", "obligatoire", "faites", "membres",
+                                "forme", "sections", "colonnes", "parametres", "gestes", "enOnglets", "libelle", "type", "options", "valeurs" })
         Exiger(json.Contains($"\"{cle}\":"), $"le descripteur sort en JSON avec la cle « {cle} »");
+    // La forme et le type d'un champ sortent en TEXTE (les noms que web/src/plan/types.ts attend), pas en nombre.
+    Exiger(Regex.IsMatch(json, "\"forme\":\"" + descripteurs[0].Forme + "\"") && Regex.IsMatch(json, "\"type\":\"[A-Z][a-z]+\""),
+        $"la forme et le type des champs sortent en texte (« forme »:« {descripteurs[0].Forme} »)");
 }
 
 // ============================================================ 3. ZERO ENTREE SANS ECRAN (strict)
@@ -341,6 +356,94 @@ finally
     Environment.SetEnvironmentVariable("RIGV3_ETAT", etatAvant);
     try { File.Delete(etatBanc); } catch (IOException) { }
 }
+
+// ============================================================ 8. LES FORMES (plan « RIG v3 100 % fonctionnel », lot 1, 25/11/2026)
+// Chaque ecran a l'interface de sa fonction (Descripteur.cs, FormeEcran) au lieu d'un escalier unique. Ce que la
+// compilation ne dit pas : la forme est la bonne pour ce que l'ecran porte, et l'ecran sait la monter.
+
+var formesReact = Enum.GetValues<FormeEcran>();
+foreach (var f in formesReact)
+{
+    var fichier = $"web/src/ecrans/formes/Forme{f}.tsx";
+    Exiger(File.Exists(Path.Combine(racine, fichier)) && Lire(fichier).Contains($"export function Forme{f}(")
+           && ecranGenere.Contains($"case '{f}': return <Forme{f} "),
+        $"la forme {f} a son composant ({fichier}) et l'aiguilleur EcranGenere.tsx le monte");
+}
+// L'escalier n'existe plus : ni « Terminer l'etape », ni compteur n/m sur un bouton final, dans aucune forme.
+var sourcesFormes = Directory.GetFiles(Path.Combine(racine, "web/src/ecrans/formes"), "*.tsx").Where(p => !p.EndsWith(".test.tsx"))
+    .Select(File.ReadAllText).Append(ecranGenere).ToList();
+Exiger(sourcesFormes.All(s => !s.Contains("Terminer l’étape") && !s.Contains("Terminer l'étape") && !s.Contains("rig-tcw__valider-compte")),
+    "aucune forme ne pose l'escalier (« Terminer l'etape », Valider n/m)");
+// Tout geste sans ecrivain le dit : la phrase exacte, posee une fois, que chaque forme reprend.
+Exiger(formesCommun.Contains("export const DEMONSTRATION = 'Démonstration : rien n’est enregistré'"),
+    "les gestes disent « Demonstration : rien n'est enregistre » tant qu'aucun ecrivain n'existe (formes/commun.tsx)");
+
+var ParForme = descripteurs.Where(d => d.Membres.Length == 0).GroupBy(d => d.Forme).ToDictionary(g => g.Key, g => g.Count());
+Note("formes des ecrans d'une procedure : " + string.Join(", ", ParForme.OrderBy(p => p.Key).Select(p => $"{p.Key} {p.Value}")));
+foreach (var d in descripteurs)
+{
+    var defauts = new List<string>();
+    var reuni = d.Membres.Length > 0;
+    if (!Enum.IsDefined(d.Forme)) defauts.Add($"forme inconnue ({(int)d.Forme})");
+    // Seule une Saisie (et une Operation, en trois temps au plus) a des ETAPES : les autres posent des sections.
+    if (d.Marches.Length > 0 && d.Forme is not (FormeEcran.Saisie or FormeEcran.Operation))
+        defauts.Add($"forme {d.Forme} avec {d.Marches.Length} etapes : seules Saisie et Operation ont des etapes");
+    if (d.Forme == FormeEcran.Operation && d.Marches.Length > 3) defauts.Add($"une Operation a {d.Marches.Length} etapes (3 au plus)");
+    if (d.Marches.Length > 0 && d.Sections.Length > 0) defauts.Add("des etapes ET des sections : l'un ou l'autre");
+    if (!reuni)
+    {
+        switch (d.Forme)
+        {
+            case FormeEcran.Saisie when d.Marches.Length == 0:
+                defauts.Add("une Saisie sans etape"); break;
+            case FormeEcran.Fiche when !d.Sections.SelectMany(s => s.Champs).Any(c => c.Type != TypeChamp.Tableau):
+                defauts.Add("une Fiche sans champ editable (texte, date, liste, case...)"); break;
+            case FormeEcran.Referentiel when d.Colonnes.Length == 0:
+                defauts.Add("un Referentiel sans colonne"); break;
+            case FormeEcran.Etat when d.Colonnes.Length == 0 || d.Parametres.Length == 0:
+                defauts.Add("un Etat sans parametre ou sans colonne"); break;
+            case FormeEcran.Audience when d.Parametres.Length == 0:
+                defauts.Add("une Audience sans choix de l'audience (parametres)"); break;
+            case FormeEcran.File or FormeEcran.Consultation or FormeEcran.Fiche or FormeEcran.Document or FormeEcran.Operation
+                when d.Sections.Length == 0:
+                defauts.Add($"une forme {d.Forme} sans section"); break;
+        }
+        // Une liste n'a ses valeurs que pour les colonnes : jamais plus.
+        foreach (var c in d.Colonnes.Concat(d.Parametres).Concat(d.Parties.SelectMany(s => s.Champs)))
+            if ((c.Type == TypeChamp.Liste) != (c.Options.Length > 0))
+                defauts.Add($"le champ « {c.Libelle} » : une liste a ses valeurs, et seule une liste en a");
+    }
+    else
+    {
+        // Un ecran reuni prend la forme de ses procedures quand elles se reunissent en une liste ; sinon, des onglets.
+        var formes = d.Membres.Select(m => m.Forme).Distinct().ToArray();
+        var listeCommune = formes.Length == 1 && CatalogueGenere.FormesEnListe.Contains(formes[0]);
+        if (d.EnOnglets == listeCommune) defauts.Add($"reunit des formes [{string.Join(", ", formes)}] : EnOnglets devrait valoir {!listeCommune}");
+        if (listeCommune && d.Forme != formes[0]) defauts.Add($"forme {d.Forme} au lieu de celle de ses procedures ({formes[0]})");
+    }
+    if (defauts.Count == 0)
+        Exiger(true, $"{d.Code} : forme {d.Forme}{(d.EnOnglets ? $" en onglets ({string.Join(", ", d.Membres.Select(m => m.Forme))})" : "")}");
+    foreach (var defaut in defauts) Exiger(false, $"{d.Code} : {defaut}");
+}
+
+// Les ecrans de la reception du lot (critere du chef) : chacun a la forme de sa fonction.
+Exiger(parCode.GetValueOrDefault("SYNTHESE_CORRIGER_JUD") is { Forme: FormeEcran.Fiche, EnOnglets: false } cj
+       && cj.Membres.All(m => m.Sections.SelectMany(s => s.Champs).Any(c => c.Type is TypeChamp.Texte or TypeChamp.Date or TypeChamp.Liste or TypeChamp.Case)),
+    "« Corriger une affaire judiciaire » est une Fiche (liste commune), chaque procedure a des champs editables");
+Exiger(parCode.GetValueOrDefault("SYNTHESE_RELANCES") is { Forme: FormeEcran.File, EnOnglets: false },
+    "« Relances et injonctions » est une File de travail");
+Exiger(parCode.GetValueOrDefault("SYNTHESE_PAIEMENTS") is { EnOnglets: true } pai
+       && pai.Membres.FirstOrDefault(m => m.Code == "PROC_GESTMODEPAIEMENT") is { Forme: FormeEcran.Referentiel, Colonnes.Length: > 0 },
+    "« Modes de paiement » est un Referentiel (grille), dans l'ecran Paiements en onglets");
+Exiger(parCode.GetValueOrDefault("PROC_JCAISSE") is { Forme: FormeEcran.Etat } jc
+       && jc.Parametres.Any(p => p.Type == TypeChamp.Periode) && jc.Colonnes.Any(c => c.Type == TypeChamp.Montant)
+       && jc.Lignes.All(l => l.Valeurs.Length == jc.Colonnes.Length),
+    "« Journal de caisse » est un Etat : une periode, une colonne montant a totaliser, ses cellules d'exemple");
+// Deux files de traitement sont rangees sous Trouver : les bilans rejetes a renvoyer, les demandes FNIG a envoyer.
+string[] filesSousTrouver = ["PROC_REJETS_BILANS", "PROC_FNIG"];
+Exiger(descripteurs.Where(d => d.Membres.Length == 0 && MenuAccueil.VerbeDe(d.Code)?.Titre == "Trouver")
+                   .All(d => d.Forme is not FormeEcran.File || filesSousTrouver.Contains(d.Code)),
+    "les ecrans « Trouver » sont des consultations, etats ou visionneuses (hors " + string.Join(", ", filesSousTrouver) + ")");
 
 // Le compte par verbe du menu : ce que l'utilisateur voit, verbe par verbe.
 foreach (var verbe in MenuAccueil.Moments)

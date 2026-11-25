@@ -172,6 +172,8 @@ export interface ContexteDossierVue {
 export interface DescripteurEcranVue {
   code: string
   titre: string
+  /** La forme d'interface (Pont/EcransGeneres/Descripteur.cs, FormeEcran) : le composant de web/src/ecrans/formes/. */
+  forme: FormeEcranVue
   sujet: string
   recherche: string
   criteres: string[]
@@ -180,16 +182,35 @@ export interface DescripteurEcranVue {
   rang: number
   etats: EtatEcranVue[]
   groupes: string[]
+  /** Les ETAPES, dans l'ordre : la forme Saisie seule. */
   marches: MarcheEcranVue[]
+  /** Les SECTIONS : les parties de l'objet, sans ordre a franchir (toutes les autres formes). */
+  sections: MarcheEcranVue[]
+  /** La grille d'un Referentiel, le tableau de resultats d'un Etat. */
+  colonnes: ChampEcranVue[]
+  /** La periode d'un Etat, la date et la chambre d'une Audience. */
+  parametres: ChampEcranVue[]
+  /** Les gestes nommes par la fiche RIG v2 ; vide : le bouton « valider » seul. */
+  gestes: string[]
   lignes: LigneEcranVue[]
   /** Un ecran REUNI : les procedures qu'il reunit, une par groupe (titre = groupe). Chaque ligne
-   * suit les marches et le bouton de SA procedure ; vide pour l'ecran d'une seule procedure. */
+   * suit les parties et le bouton de SA procedure ; vide pour l'ecran d'une seule procedure. */
   membres: DescripteurEcranVue[]
+  /** Ecran reuni sans liste commune : un onglet par procedure, chacune dans sa forme. */
+  enOnglets: boolean
 }
+/** Les formes d'ecran, aux noms de FormeEcran (C#). */
+export type FormeEcranVue = 'File' | 'Consultation' | 'Fiche' | 'Saisie' | 'Referentiel' | 'Etat' | 'Audience' | 'Document' | 'Operation'
+/** Les types de champ, aux noms de TypeChamp (C#). */
+export type TypeChampVue = 'Texte' | 'Zone' | 'Date' | 'Periode' | 'Nombre' | 'Montant' | 'Case' | 'Liste' | 'Tableau'
+/** Un champ de la fiche RIG v2 : son libelle, son type, les valeurs d'une liste. */
+export interface ChampEcranVue { libelle: string; type: TypeChampVue; options: string[] }
 /** Une tuile : son code (AFaire, EnCours, Validee, EnAttente, Rejetee) et son icone de l'accueil. */
 export interface EtatEcranVue { code: string; libelle: string; icone: string }
-export interface MarcheEcranVue { titre: string; consigne: string; obligatoire: boolean; champs: string[] }
-export interface LigneEcranVue { nom: string; precisions: string; groupe: string; etat: string; faites: number[] }
+/** Une etape (Saisie) ou une section (les autres formes). */
+export interface MarcheEcranVue { titre: string; consigne: string; obligatoire: boolean; champs: ChampEcranVue[] }
+/** Une ligne ; valeurs : ses cellules dans l'ordre des colonnes (Referentiel, Etat), vide si le descripteur n'en donne pas. */
+export interface LigneEcranVue { nom: string; precisions: string; groupe: string; etat: string; faites: number[]; valeurs?: string[] }
 
 // ---- La visionneuse d'affaire ----
 export interface DossierVue {

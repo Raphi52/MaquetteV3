@@ -15,6 +15,7 @@ public sealed class DomaineOuvrir : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_XAFF", Titre = "Nouvelle instance", Sujet = "instances judiciaires",
+            Forme = FormeEcran.Saisie,
             Recherche = "Rechercher une instance, un numéro de rôle, une partie…",
             Criteres = ["Numéro de rôle", "Type d'instance", "Mode référé (PR)"],
             Valider = "Enregistrer l'instance",
@@ -49,6 +50,7 @@ public sealed class DomaineOuvrir : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_NF", Titre = "Nouvelle formalite", Sujet = "procédures collectives",
+            Forme = FormeEcran.Saisie,
             Recherche = "Rechercher un débiteur, un SIREN, une procédure…",
             Criteres = ["SIREN du débiteur", "Type de procédure", "Date du jugement"],
             Valider = "Ouvrir la procédure",
@@ -83,6 +85,7 @@ public sealed class DomaineOuvrir : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_NPC", Titre = "Nouvelle proc. collective", Sujet = "procédures et préventions",
+            Forme = FormeEcran.Saisie,
             Recherche = "Rechercher une procédure, un débiteur, une notification…",
             Criteres = ["Mode (PC ou prévention)", "Notification CFEC", "Débiteur"],
             Valider = "Enregistrer la procédure",
@@ -123,6 +126,7 @@ public sealed class DomaineOuvrir : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_IPE", Titre = "Injonction de payer", Sujet = "injonctions de payer",
+            Forme = FormeEcran.Saisie,
             Recherche = "Rechercher une demande, un demandeur, un défendeur…",
             Criteres = ["Demandeur", "Défendeur", "Date de la demande"],
             Valider = "Enregistrer l'injonction",
@@ -163,6 +167,7 @@ public sealed class DomaineOuvrir : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_MESIN", Titre = "Mesure provisoire", Sujet = "mesures provisoires",
+            Forme = FormeEcran.Saisie,
             Recherche = "Rechercher une mesure, une instance, une partie…",
             Criteres = ["Instance", "Partie", "Date de la mesure"],
             Valider = "Enregistrer la mesure",
@@ -198,12 +203,13 @@ public sealed class DomaineOuvrir : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_JOIN", Titre = "Jonction d'instances", Sujet = "jonctions d'instances",
+            Forme = FormeEcran.Operation,
             Recherche = "Rechercher l'instance mère : numéro de rôle, parties…",
             Criteres = ["Numéro de rôle", "Parties", "Date d'enrôlement"],
             Valider = "Enregistrer la jonction",
             Etats = EtatsEcran.Trois("À joindre", "En cours", "Jointe"),
             Groupes = ["Mère 2026J00301", "Mère 2026J00302", "Mère 2026J00303"],
-            Marches =
+            Sections =
             [
                 Marche("Instance mère", "Recherche de la mère. Mère et filles sont verrouillées avant la jonction, pour éviter les modifications concurrentes.", true,
                     "Numéro de rôle"),
@@ -233,6 +239,7 @@ public sealed class DomaineOuvrir : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_CORDJRCS", Titre = "Ordonnance d'enrolement", Sujet = "ordonnances d'enrôlement",
+            Forme = FormeEcran.Saisie,
             Recherche = "Rechercher un dossier RCS, un non-inscrit, un code affaire…",
             Criteres = ["Dossier RCS ou non-inscrit", "Code affaire", "Date de saisine"],
             Valider = "Enregistrer l'ordonnance",
@@ -269,6 +276,7 @@ public sealed class DomaineOuvrir : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_DAS", Titre = "Depots d'actes RCS", Sujet = "dépôts d'actes",
+            Forme = FormeEcran.Saisie,
             Recherche = "Rechercher un dossier RCS, un numéro de gestion, un acte…",
             Criteres = ["Dossier RCS ou non-inscrit", "Date de dépôt", "Type d'acte"],
             Valider = "Enregistrer le dépôt",
@@ -306,6 +314,7 @@ public sealed class DomaineOuvrir : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_DEP", Titre = "Depots d'evenement PC", Sujet = "dépôts d'événement",
+            Forme = FormeEcran.Saisie,
             Recherche = "Rechercher une procédure collective ou une prévention…",
             Criteres = ["Numéro de procédure", "Débiteur", "Date de l'événement"],
             Valider = "Enregistrer le dépôt",
@@ -339,6 +348,7 @@ public sealed class DomaineOuvrir : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_DEPPCM", Titre = "Depots PC en masse", Sujet = "numéros de PC du lot",
+            Forme = FormeEcran.Saisie,
             Recherche = "Rechercher un numéro de PC dans le lot…",
             Criteres = ["Numéro de PC", "Code événement", "Date de l'événement"],
             Valider = "Valider le dépôt",
@@ -371,6 +381,7 @@ public sealed class DomaineOuvrir : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_DASBEN", Titre = "Depots beneficiaires", Sujet = "dépôts de bénéficiaires effectifs",
+            Forme = FormeEcran.Saisie,
             Recherche = "Rechercher une entreprise, un numéro de gestion…",
             Criteres = ["Entreprise (RCS ou non-inscrit)", "Date de dépôt", "Code événement"],
             Valider = "Enregistrer le dépôt",
@@ -404,7 +415,7 @@ public sealed class DomaineOuvrir : IDomaineEcrans
         },
     ];
 
-    private static MarcheEcran Marche(string titre, string consigne, bool obligatoire, params string[] champs) =>
+    private static MarcheEcran Marche(string titre, string consigne, bool obligatoire, params ChampEcran[] champs) =>
         new(titre, consigne, obligatoire, champs);
 
     private static LigneEcran Ligne(string nom, string precisions, string groupe, string etat, params int[] faites) =>

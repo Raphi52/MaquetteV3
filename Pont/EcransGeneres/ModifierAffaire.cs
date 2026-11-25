@@ -25,6 +25,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_MJUD", Titre = "Instance judiciaire", Sujet = "instances judiciaires",
+            Forme = FormeEcran.Fiche,
             Recherche = "Rechercher une instance, un numéro de rôle, un nom…",
             Criteres = ["Numéro de rôle", "Nom courant"],
             // Valider : la fiche decrit une etape de validation (l.31 « Afficher post-validation », l.209 « après validation ») sans nommer le bouton ; boutons cites l.298-305 : GED, LANCER REDA, POOL_EDIT, INTERROMPRE. A confirmer.
@@ -32,22 +33,22 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À modifier", "En cours", "Modifiée"), new EtatEcran("EnAttente", "Verrouillée", "en-attente")],
             Groupes = ["Au fond", "En référé"],
-            Marches =
+            Sections =
             [
                 Marche("Instance", "Recherche par numéro de rôle. L'instance est verrouillée pour la modification : tenue par un autre utilisateur, elle reste en lecture seule.", true,
                     "Numéro de rôle", "Nom courant"),
                 Marche("Parties", "Demandeurs, défendeurs et intervenants, chacun dans sa propre étape.", false,
-                    "Demandeurs", "Défendeurs", "Intervenants"),
+                    Champ.Tableau("Demandeurs"), Champ.Tableau("Défendeurs"), Champ.Tableau("Intervenants")),
                 Marche("Appels d'affaire", "Dernier appel passé, prochain appel et liste complète.", false,
-                    "Dernier appel", "Prochain appel", "Liste des appels"),
+                    Champ.Date("Dernier appel"), Champ.Date("Prochain appel"), Champ.Tableau("Liste des appels")),
                 Marche("Décision et chef de demande", "Décisions judiciaires rendues, chef de demande et réponse du défendeur.", false,
-                    "Décisions judiciaires", "Chef de demande", "Réponse du défendeur"),
+                    Champ.Tableau("Décisions judiciaires"), "Chef de demande", Champ.Zone("Réponse du défendeur")),
                 Marche("Événements", "Événements survenus, puis événements futurs.", false,
-                    "Événements survenus", "Événements futurs"),
+                    Champ.Tableau("Événements survenus"), Champ.Tableau("Événements futurs")),
                 Marche("Facturation", "Ne facture pas par défaut : l'étape n'apparaît que si le paramétrage le demande.", false,
-                    "Articles"),
+                    Champ.Tableau("Articles")),
                 Marche("Notes et calendrier", "Note sur l'instance, calendrier de la procédure, coffre-fort et Tribunal digital.", false,
-                    "Note sur l'instance", "Calendrier de procédure", "Coffre-fort"),
+                    "Note sur l'instance", Champ.Tableau("Calendrier de procédure"), Champ.Tableau("Coffre-fort")),
             ],
             Lignes =
             [
@@ -65,6 +66,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_MPC", Titre = "Procedure collective", Sujet = "procédures collectives et préventions",
+            Forme = FormeEcran.Fiche,
             Recherche = "Rechercher une PC, un débiteur, un numéro de prévention…",
             Criteres = ["Numéro de PC ou de prévention", "Instance liée", "Débiteur"],
             // Valider : fiche l.127, « Le bouton VALIDER est surchargé » (DoValider, l.130-136).
@@ -74,24 +76,24 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
                      new EtatEcran("EnAttente", "Verrouillée", "en-attente"),
                      new EtatEcran("Rejetee", "Notification refusée", "rejetee")],
             Groupes = ["Procédure collective (PC)", "Prévention (PRV)"],
-            Marches =
+            Sections =
             [
                 Marche("Entité judiciaire", "Recherche de la PC, ou de l'instance qui y est liée. Verrouillée par un autre utilisateur, l'entité reste en lecture seule.", true,
                     "Numéro de PC", "Instance liée"),
                 Marche("Procédure", "Données de la PC, ou de la prévention selon le mode d'entrée. Les dates clés se renseignent ici.", true,
-                    "Dates clés", "Mode (PC ou prévention)"),
+                    Champ.Tableau("Dates clés"), Champ.Liste("Mode (PC ou prévention)", "PC", "Prévention")),
                 Marche("Organes", "Organes de la PC ou de la prévention, et les organes en fin de mission.", false,
-                    "Organes de la procédure", "Fin de mission"),
+                    Champ.Tableau("Organes de la procédure"), Champ.Tableau("Fin de mission")),
                 Marche("Parties et appels", "Parties de l'instance liée, appels d'affaire, décision judiciaire, chef de demande et réponse du défendeur.", false,
-                    "Parties", "Appels d'affaire", "Décision judiciaire", "Chef de demande", "Réponse du défendeur"),
+                    Champ.Tableau("Parties"), Champ.Tableau("Appels d'affaire"), Champ.Tableau("Décision judiciaire"), "Chef de demande", Champ.Zone("Réponse du défendeur")),
                 Marche("Événements", "Événements de l'instance et de la PC ou de la prévention.", false,
-                    "Événements de l'instance", "Événements de la procédure"),
+                    Champ.Tableau("Événements de l'instance"), Champ.Tableau("Événements de la procédure")),
                 Marche("Établissement et chiffres", "Établissement, dirigeants, chiffres économiques et éléments actifs (mode PC seulement).", false,
-                    "Établissement", "Dirigeants", "Chiffres économiques", "Éléments actifs"),
+                    "Établissement", Champ.Tableau("Dirigeants"), Champ.Tableau("Chiffres économiques"), Champ.Tableau("Éléments actifs")),
                 Marche("Notification", "Notification dématérialisée : elle s'accepte ou se refuse, sans mise en attente. Refusée, la demande est refusée.", false,
-                    "Accepter", "Refuser"),
+                    Champ.Liste("Notification", "Accepter", "Refuser")),
                 Marche("Facturation", "Au forfait, pas de facturation ligne à ligne. Sinon, les articles suivent le paramétrage de la PC.", false,
-                    "Articles"),
+                    Champ.Tableau("Articles")),
             ],
             Lignes =
             [
@@ -109,6 +111,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_MMA", Titre = "Mentions en marge", Sujet = "mentions en marge d'inscriptions",
+            Forme = FormeEcran.Fiche,
             Recherche = "Rechercher une inscription, un débiteur, un créancier…",
             Criteres = ["Numéro d'inscription", "Débiteur", "Créancier"],
             // Valider : fiche l.4 (« Validée (acceptation) ») et l.195 (« on ne peut pas valider un MMA sans saisir une mention ») ; Réclamer, Refuser, Attendre : l.22-23 et l.189.
@@ -120,20 +123,20 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
                      new EtatEcran("EnAttente", "En attente", "en-attente"),
                      new EtatEcran("Rejetee", "Refusée", "rejetee")],
             Groupes = ["Inscriptions maritimes", "Autres inscriptions"],
-            Marches =
+            Sections =
             [
                 Marche("Inscription", "Lecture seule : l'inscription est vérifiée avant toute modification.", true,
                     "Numéro d'inscription", "Débiteur", "Créancier"),
                 Marche("Mention en marge", "Obligatoire pour valider. Si l'inscription n'a pas encore de mention, une mention vierge est proposée pour guider la saisie.", true,
-                    "Mention marginale", "Date de la mention"),
+                    Champ.Zone("Mention marginale"), "Date de la mention"),
                 Marche("Bateau", "Données du bateau, pour une inscription maritime seulement.", false,
-                    "Données du bateau"),
+                    Champ.Tableau("Données du bateau")),
                 Marche("Débiteurs et biens", "Débiteurs et biens concernés par l'inscription.", false,
-                    "Débiteurs", "Biens concernés"),
+                    Champ.Tableau("Débiteurs"), Champ.Tableau("Biens concernés")),
                 Marche("Créance et facturation", "Créance ou endettement. Le certificat est facturé automatiquement pour certains types d'inscription ; les frais postaux s'affichent en saisie.", false,
-                    "Créance ou endettement", "Facturation", "Frais postaux"),
+                    "Créance ou endettement", Champ.Tableau("Facturation"), Champ.Montant("Frais postaux")),
                 Marche("Décision", "Valider accepte la mention. Réclamer demande une correction au déposant. Refuser rejette la demande. Attendre la met en attente.", true,
-                    "Valider", "Réclamer", "Refuser", "Attendre"),
+                    Champ.Liste("Décision", "Valider", "Réclamer", "Refuser", "Attendre")),
             ],
             Lignes =
             [
@@ -152,6 +155,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_MDIL", Titre = "Diligences RCS", Sujet = "diligences de dossiers RCS",
+            Forme = FormeEcran.Fiche,
             Recherche = "Rechercher un dossier RCS, une diligence, une relance…",
             Criteres = ["Numéro de dossier RCS", "Nature de la diligence", "État de la relance"],
             // Modifier : la fiche ne nomme ni validation ni sauvegarde ; l'action citee est « modifier » (l.1, l.133 « seulement modifier les existantes »). A confirmer.
@@ -159,7 +163,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À modifier", "En cours", "Modifiée"), new EtatEcran("EnAttente", "Sans diligence", "en-attente")],
             Groupes = ["Avec relance", "Sans relance"],
-            Marches =
+            Sections =
             [
                 Marche("Diligence", "Modification seulement : aucune diligence ne se crée. Un dossier sans diligence reste en lecture seule, avec un avertissement.", true,
                     "Origine de l'information", "Nature de la diligence", "Motif de la diligence"),
@@ -168,9 +172,9 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
                 Marche("Régularisation", "Date prévue ou effective de régularisation, et valeur attendue : montant, document, etc.", false,
                     "Date de régularisation", "Valeur attendue"),
                 Marche("Paramètres", "Visible seulement si la nature de la diligence a ses propres paramètres.", false,
-                    "Paramètres de la nature"),
+                    Champ.Tableau("Paramètres de la nature")),
                 Marche("Relances", "Chaque diligence peut avoir plusieurs relances, gérées une à une.", false,
-                    "Relances de la diligence"),
+                    Champ.Tableau("Relances de la diligence")),
             ],
             Lignes =
             [
@@ -187,6 +191,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_MDJUD", Titre = "Mots directeurs", Sujet = "affaires judiciaires",
+            Forme = FormeEcran.Fiche,
             Recherche = "Rechercher une affaire, un numéro de rôle, un mot directeur…",
             Criteres = ["Numéro de rôle, de PC ou de prévention", "Nom courant", "Famille d'affaire"],
             // Valider : la fiche decrit une validation avant sauvegarde (l.4 « valide leur format avant sauvegarde », l.210 « APRES la validation (DoVerifier) ») ; aucun libelle de bouton nomme.
@@ -196,14 +201,14 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             // mots, normalisee a l'enregistrement. La grille de codes n'est qu'une legende.
             Etats = EtatsEcran.Trois("À compléter", "En cours", "Enregistrés"),
             Groupes = ["Instances", "Procédures collectives", "Préventions"],
-            Marches =
+            Sections =
             [
                 Marche("Affaire", "Recherche de l'instance, de la PC ou de la prévention. Le numéro et le nom courant s'affichent en lecture.", true,
                     "Numéro de l'affaire", "Nom courant"),
                 Marche("Mots directeurs", "Une seule chaîne de mots, séparés par des espaces. Chaque mot commence par un code de deux lettres propre à la famille, et compte au moins trois caractères.", true,
                     "Mots directeurs"),
                 Marche("Contrôle", "Un mot nouveau au préfixe inconnu bloque l'enregistrement. Un mot déjà enregistré au préfixe inconnu ne donne qu'un avertissement.", true,
-                    "Préfixes reconnus"),
+                    Champ.Tableau("Préfixes reconnus")),
                 Marche("Enregistrement", "Espaces réduits ; chaque mot purement alphabétique de plus de deux lettres : deux premières lettres en majuscules, le reste en minuscules.", true,
                     "Chaîne normalisée"),
             ],
@@ -223,6 +228,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_MODIF_REPER", Titre = "Repertoire", Sujet = "répertoriés",
+            Forme = FormeEcran.Fiche,
             Recherche = "Rechercher un répertorié, un abrégé, une désignation…",
             Criteres = ["Abrégé", "Désignation", "Répertoriés actifs seulement"],
             // Valider : fiche l.260 (« Yes ⇒ Valider() »), l.287 (cascade transactionnelle), l.322 (civilité des parties cochées) ; le VALIDER global est désarmé (l.244).
@@ -230,14 +236,14 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Rang = 2,
             Etats = EtatsEcran.Trois("À corriger", "En cours", "Enregistré"),
             Groupes = ["Mandataires", "Avocats", "Représentants"],
-            Marches =
+            Sections =
             [
                 Marche("Recherche", "Recherche plein texte sur l'abrégé et la désignation. « Actifs seulement » masque les répertoriés inactifs.", true,
                     "Abrégé", "Désignation"),
                 Marche("Fiche", "Abrégé et désignation obligatoires ; l'abrégé est unique dans le greffe. Une adresse mail mal formée n'est qu'un avertissement. Suppression bloquée si l'abrégé sert à un code affaire.", true,
                     "Abrégé", "Désignation", "Adresse mail", "Civilité"),
                 Marche("Civilité des parties", "Applique la civilité du répertorié aux parties cochées.", false,
-                    "Parties liées", "Civilité"),
+                    Champ.Tableau("Parties liées"), "Civilité"),
             ],
             Lignes =
             [
@@ -255,6 +261,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_PARTIES", Titre = "Parties d'une instance", Sujet = "parties d'instances",
+            Forme = FormeEcran.Fiche,
             Recherche = "Rechercher une partie, une instance, un répertorié…",
             Criteres = ["Numéro de rôle de l'instance", "Qualité de la partie", "Aide juridictionnelle"],
             // Valider : fiche l.133 (« Regles de validation (DoVerifier) ») et l.174 (« declencher la sauvegarde de l'instance ») ; aucun libelle de bouton nomme.
@@ -262,14 +269,14 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Rang = 2,
             Etats = EtatsEcran.Trois("À compléter", "En cours", "Enregistrée"),
             Groupes = ["Demandeurs", "Défendeurs", "Intervenants"],
-            Marches =
+            Sections =
             [
                 Marche("Identité", "Nom et adresse de la partie. Une partie vide est créée si la liste est vide : une ligne est toujours à remplir.", true,
                     "Nom", "Adresse"),
                 Marche("Mandataire et répertorié", "Mandataire, et répertorié qui le désigne si la partie figure au répertoire.", false,
-                    "Mandataire", "Répertorié"),
+                    "Mandataire", Champ.Case("Répertorié")),
                 Marche("Aide juridictionnelle", "Case AJ cochée : il faut choisir Partielle ou Totale, sinon l'enregistrement est refusé.", false,
-                    "Aide juridictionnelle", "Partielle", "Totale"),
+                    Champ.Case("Aide juridictionnelle"), Champ.Case("Partielle"), Champ.Case("Totale")),
             ],
             Lignes =
             [
@@ -288,6 +295,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_BE", Titre = "Beneficiaires d'un dossier", Sujet = "bénéficiaires effectifs",
+            Forme = FormeEcran.Fiche,
             Recherche = "Rechercher un bénéficiaire, un dossier RCS…",
             Criteres = ["Dossier RCS", "Nom du bénéficiaire", "Type de déclaration"],
             // Valider : fiche l.430-431, bouton Valider (masqué en consultation) ; DoSauve l.425.
@@ -295,14 +303,14 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À déclarer", "En cours", "Déclaré"), new EtatEcran("EnAttente", "Consultation seule", "en-attente")],
             Groupes = ["Déclaration standard", "Placement collectif"],
-            Marches =
+            Sections =
             [
                 Marche("Identité", "Patronyme, prénoms de l'état civil et date de naissance sont obligatoires.", true,
                     "Civilité", "Patronyme", "Prénoms (état civil)", "Nom d'usage", "Date de naissance", "Département de naissance"),
                 Marche("Modalités de contrôle", "Les champs changent selon le type de déclaration du dossier : le placement collectif en ajoute sept.", true,
-                    "Modalités selon la déclaration"),
+                    Champ.Tableau("Modalités selon la déclaration")),
                 Marche("Acte déposé", "Visualise l'acte déposé, et les données brutes renvoyées par le service de déclaration.", false,
-                    "Acte déposé", "Données de déclaration"),
+                    "Acte déposé", Champ.Tableau("Données de déclaration")),
             ],
             Lignes =
             [
@@ -320,6 +328,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_XLIEN", Titre = "Liens entre PC", Sujet = "instances à relier",
+            Forme = FormeEcran.Operation,
             Recherche = "Rechercher une instance, un numéro de rôle, une PC…",
             Criteres = ["Numéro de rôle", "Numéro de PC ou de prévention", "Type de lien"],
             // Valider : fiche l.93 (« se ferme automatiquement après validation ») ; l.135 : seule l'Instance est sauvée.
@@ -327,7 +336,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À rattacher", "En cours", "Rattachée"), new EtatEcran("EnAttente", "Verrouillée", "en-attente")],
             Groupes = ["Vers une PC", "Vers une prévention"],
-            Marches =
+            Sections =
             [
                 Marche("Instance", "Recherche de l'instance, verrouillée pour la demande. Déjà ouverte ailleurs, elle reste verrouillée et l'écran ne passe pas en saisie.", true,
                     "Numéro de rôle", "Numéro métier"),
@@ -351,6 +360,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_XXAFF", Titre = "Supprimer une instance", Sujet = "instances à supprimer",
+            Forme = FormeEcran.Operation,
             Recherche = "Rechercher une instance, un numéro d'instance…",
             Criteres = ["Numéro d'instance", "Nom courant", "Date de saisine"],
             // Valider : fiche l.126, OnButtonClick ne traite que VALIDER ; l.155, avertissement « Corriger / Valider ».
@@ -360,7 +370,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             // restitution des numeros metiers qu'elle consommait (la fiche disait « saisie rapide »).
             Etats = EtatsEcran.Trois("À supprimer", "En cours", "Supprimée"),
             Groupes = ["Numéros à libérer", "Sans numéro à libérer"],
-            Marches =
+            Sections =
             [
                 Marche("Instance", "Recherche de l'instance à supprimer, puis lecture seule de sa fiche. Rien n'est supprimé avant la validation.", true,
                     "Numéro d'instance", "Nom courant"),
@@ -387,6 +397,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_LIBAFFAIRE", Titre = "Liberer une affaire", Sujet = "affaires verrouillées",
+            Forme = FormeEcran.Operation,
             // La fiche cite un filtre texte que le code n'a pas : la pilule ne filtre ici que la
             // liste affichée, comme sur tous les écrans du plan.
             Recherche = "Rechercher une affaire ou un utilisateur…",
@@ -396,7 +407,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Rang = 2,
             Etats = EtatsEcran.Trois("Verrouillée", "Sélectionnée", "Libérée"),
             Groupes = ["Avec une demande", "Sans demande"],
-            Marches =
+            Sections =
             [
                 Marche("Sélection", "Cocher les affaires à libérer. Le titre compte les affaires encore verrouillées.", true,
                     "Case à cocher"),
@@ -419,6 +430,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_CHM", Titre = "Changer le juge-commissaire", Sujet = "procédures collectives",
+            Forme = FormeEcran.Operation,
             Recherche = "Rechercher une PC, un juge, un numéro de PC…",
             Criteres = ["Juge à remplacer", "Statut titulaire ou suppléant", "Code affaire"],
             // Valider : fiche l.141, barre Modifier / Annuler / Valider ; l.40, DoSauver.
@@ -426,7 +438,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À traiter", "En cours", "Changée"), new EtatEcran("Rejetee", "Bloquée", "rejetee")],
             Groupes = ["Au forfait", "Hors forfait"],
-            Marches =
+            Sections =
             [
                 Marche("Paramètres", "Lecture seule par défaut. Seuls le code affaire et le mode de facturation sont enregistrés.", true,
                     "Code affaire", "Mode de facturation"),
@@ -458,6 +470,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_CHORGANESENMASSE", Titre = "Changer les organes", Sujet = "procédures collectives par juge",
+            Forme = FormeEcran.Operation,
             Recherche = "Rechercher une PC par juge-commissaire…",
             Criteres = ["Juge principal", "Juge secondaire", "Statut recherché"],
             // Valider : pas de VALIDER (masqué, l.41 et l.113) ; le geste final cité est « Changer le juge » (l.199, ultButtonChangerJuge), qui n'affiche qu'un récapitulatif (l.100).
@@ -465,7 +478,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Rang = 2,
             Etats = EtatsEcran.Trois("À examiner", "En cours", "Récapitulée"),
             Groupes = ["Juge titulaire", "Juge suppléant"],
-            Marches =
+            Sections =
             [
                 Marche("Recherche", "Le juge principal est le seul critère requis : sans lui, un message demande d'en choisir un. Statut titulaire ou suppléant.", true,
                     "Juge principal", "Juge secondaire", "Statut recherché"),
@@ -494,6 +507,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_DEBITEURS_MULTIPLES", Titre = "Debiteurs multiples", Sujet = "débiteurs de procédures collectives",
+            Forme = FormeEcran.Fiche,
             Recherche = "Rechercher une procédure, un débiteur, un SIREN…",
             Criteres = ["Numéro de PC", "Débiteur principal", "Registre des métiers"],
             // Valider : fiche l.176 (« 9. Validation ») et l.131 (« se ferme après validation »).
@@ -501,16 +515,16 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À compléter", "En cours", "Enregistré"), new EtatEcran("EnAttente", "Principal (lecture)", "en-attente")],
             Groupes = ["Débiteur principal", "Débiteurs additionnels"],
-            Marches =
+            Sections =
             [
                 Marche("Entreprise", "L'entreprise se choisit d'abord : tant qu'elle manque, le nom et l'adresse restent masqués. Le débiteur principal se modifie ailleurs : ici, il est en lecture seule.", true,
                     "Entreprise"),
                 Marche("Identité", "Nom et adresse. Pour une extension : date d'extension et lien avec le débiteur principal.", true,
                     "Nom", "Adresse", "Date d'extension", "Lien avec le principal"),
                 Marche("Registre des métiers", "Visible si l'entreprise est inscrite. Numéro, département et organisme ne s'affichent que si la case est cochée.", false,
-                    "Inscrit au registre des métiers", "Numéro", "Département", "Organisme dépendant"),
+                    Champ.Case("Inscrit au registre des métiers"), "Numéro", "Département", "Organisme dépendant"),
                 Marche("Enregistrement", "À la validation, le nom de l'affaire et les établissements et dirigeants de la PC sont mis à jour.", true,
-                    "Nom de l'affaire", "Établissements et dirigeants"),
+                    "Nom de l'affaire", Champ.Tableau("Établissements et dirigeants")),
             ],
             Lignes =
             [
@@ -526,7 +540,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
         },
     ];
 
-    private static MarcheEcran Marche(string titre, string consigne, bool obligatoire, params string[] champs) =>
+    private static MarcheEcran Marche(string titre, string consigne, bool obligatoire, params ChampEcran[] champs) =>
         new(titre, consigne, obligatoire, champs);
 
     private static LigneEcran Ligne(string nom, string precisions, string groupe, string etat, params int[] faites) =>

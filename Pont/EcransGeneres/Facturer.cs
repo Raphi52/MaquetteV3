@@ -17,6 +17,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_FACTREEDIT", Titre = "Refacturation", Sujet = "factures émises",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une facture, un numéro, un montant…",
             Criteres = ["Client", "Période de facturation (du, au)"],
             // Bouton cité par la fiche (proc_factreedit.md) : « VALIDER/QUITTER par défaut ».
@@ -24,7 +25,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Rang = 6,
             Etats = EtatsEcran.Trois("À rééditer", "Choisie", "Rééditée"),
             Groupes = ["Factures émises"],
-            Marches =
+            Sections =
             [
                 Marche("Critères", "Un client et une période. Si l'ouverture fournit les trois paramètres, la liste s'affiche directement ; sinon Suivant passe à la liste. Sans client, la liste ne s'ouvre pas.", true,
                     "Client", "Période du", "Période au"),
@@ -46,6 +47,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_RELCLI", Titre = "Releve de compte", Sujet = "comptes clients",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un client, un compte…",
             Criteres = ["Statut du compte (actifs par défaut)", "Type de compte (standard et greffes par défaut)", "Solde minimum (seuil du greffe)"],
             // Action citée par la fiche (proc_relcli.md) : « valider les soldes mensuels ».
@@ -53,7 +55,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Rang = 6,
             Etats = EtatsEcran.Trois("À éditer", "Relevé édité", "Soldes validés"),
             Groupes = ["Standard", "Greffes"],
-            Marches =
+            Sections =
             [
                 Marche("Critères", "Statut, type de compte et solde minimum, celui du greffe par défaut. Rien n'est calculé avant Rechercher.", true,
                     "Statut", "Type de compte", "Solde minimum"),
@@ -79,6 +81,8 @@ public sealed class DomaineFacturer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_ARTICLE", Titre = "Articles tarifaires", Sujet = "articles tarifaires",
+            Forme = FormeEcran.Referentiel,
+            Colonnes = ["Libellé", "Code de l'article", "Type d'article", "Période de validité", Champ.Montant("Prix HT")],
             Recherche = "Rechercher un article, un code, une période…",
             Criteres = ["Période de validité", "Type : article principal ou titre composé", "Catégorie de ventilation"],
             // Action citée par la fiche (proc_article.md) : « la transaction de sauvegarde ».
@@ -86,7 +90,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Rang = 6,
             Etats = EtatsEcran.Trois("À compléter", "En cours de saisie", "Enregistré"),
             Groupes = ["Articles principaux", "Titres composés"],
-            Marches =
+            Sections =
             [
                 Marche("Identification", "Le type, principal ou titre, verrouille le reste du formulaire. Le code de l'article est unique : un code orphelin est repris, il n'est pas recréé.", true,
                     "Type d'article", "Code de l'article", "Libellé"),
@@ -114,6 +118,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_INPIPAY", Titre = "Reversements INPI", Sujet = "reversements INPI",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un reversement, un identifiant de paiement…",
             Criteres = ["Période de réception", "Identifiant de paiement", "État : à valider, validé ou rejeté"],
             // Bouton cité par la fiche (proc_inpipay.md) : « bouton valider » (OPE_VALIDATION).
@@ -121,7 +126,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Rang = 6,
             Etats = [.. EtatsEcran.Trois("À valider", "En cours de validation", "Validé"), new EtatEcran("Rejetee", "Rejeté", "rejetee")],
             Groupes = ["Virements INPI"],
-            Marches =
+            Sections =
             [
                 Marche("Recherche", "Période de réception, identifiant de paiement et état. Seuls les reversements du greffe courant sont affichés.", true,
                     "Période", "Identifiant de paiement", "État"),
@@ -154,6 +159,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_GINPI", Titre = "Formalites INPI", Sujet = "formalités INPI",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une affaire, un montant, un paiement…",
             Criteres = ["Période (date de début et de fin)", "Critères de paiement (cumulables)", "Non soldées uniquement"],
             // Action citée par la fiche (proc_ginpi.md) : menu contextuel « Régulariser l'anomalie ».
@@ -161,7 +167,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Rang = 6,
             Etats = EtatsEcran.Trois("À traiter", "Anomalie à régulariser", "Soldée"),
             Groupes = ["Formalités payantes", "Formalités gratuites"],
-            Marches =
+            Sections =
             [
                 Marche("Recherche", "Période et critères de paiement, cumulables. La recherche part au bouton Rechercher. L'export Excel n'est proposé qu'après un résultat.", true,
                     "Période", "Critères de paiement", "Non soldées uniquement"),
@@ -185,6 +191,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_REJET", Titre = "Rejets d'encaissement", Sujet = "encaissements rejetés",
+            Forme = FormeEcran.Operation,
             Recherche = "Rechercher un encaissement, un numéro de titre…",
             Criteres = ["Encaissement d'origine", "Motif du rejet", "Destinataire de la lettre"],
             // Action citée par la fiche (proc_rejet.md) : « DoValider » (enregistrement puis clôture).
@@ -192,7 +199,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Rang = 6,
             Etats = EtatsEcran.Trois("À rédiger", "Motif saisi", "Lettre émise"),
             Groupes = ["Chèques rejetés", "Titres impayés"],
-            Marches =
+            Sections =
             [
                 Marche("Encaissement rejeté", "Lecture seule : numéro de titre, date, montant, payeur et banque, repris de l'encaissement.", true,
                     "Numéro de titre", "Date", "Montant", "Payeur", "Banque"),
@@ -220,6 +227,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_REMBANQ", Titre = "Remise en banque", Sujet = "encaissements à remettre",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un encaissement, un mode de paiement, un numéro de remis…",
             Criteres = ["Période (du, au) : un seul mois", "Utilisateurs (tous par défaut)", "Mode de paiement"],
             // Action citée par la fiche (proc_rembanq.md) : « Générer un bordereau de remise en banque ».
@@ -227,7 +235,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Rang = 6,
             Etats = EtatsEcran.Trois("À remettre", "Sélectionné", "Remis en banque"),
             Groupes = ["Chèque", "Carte bancaire", "Espèces"],
-            Marches =
+            Sections =
             [
                 Marche("Période et utilisateurs", "Une période dans un seul mois : sinon le bordereau est refusé. Les utilisateurs se cochent ; changer la période remet la sélection à tous.", true,
                     "Date de début", "Date de fin", "Utilisateurs"),
@@ -255,6 +263,11 @@ public sealed class DomaineFacturer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_EDCHQEMIS", Titre = "Cheques emis", Sujet = "remboursements émis",
+            Forme = FormeEcran.Etat,
+            // Les deux cases et la periode : proc_edchqemis.md:81-89 (criteres de requete, jamais sauvegardes).
+            Parametres = [Champ.Periode("Période"), Champ.Case("Trop-perçus"), Champ.Case("Notifications")],
+            Colonnes = ["Remboursement", Champ.Montant("Montant")],
+            Gestes = ["Voir"],
             Recherche = "Rechercher un remboursement, une période…",
             Criteres = ["Période (du, au) : aujourd'hui par défaut", "Trop-perçus", "Notifications"],
             // Bouton cité par la fiche (proc_edchqemis.md) : « un seul bouton, VOIR ».
@@ -262,7 +275,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Rang = 6,
             Etats = EtatsEcran.Trois("À contrôler", "En contrôle", "Contrôlé"),
             Groupes = ["Trop-perçus", "Notifications"],
-            Marches =
+            Sections =
             [
                 Marche("Période et origine", "Dates du et au, aujourd'hui par défaut. Trop-perçus et notifications se cochent ensemble ou seuls ; sans case cochée, rien à voir.", true,
                     "Date de début", "Date de fin", "Trop-perçus", "Notifications"),
@@ -271,12 +284,12 @@ public sealed class DomaineFacturer : IDomaineEcrans
             ],
             Lignes =
             [
-                Ligne("Remboursement 2026-0041", $"Trop-perçu · {Euros(31_000)}", "Trop-perçus", "Validee", 0, 1),
-                Ligne("Remboursement 2026-0044", $"Trop-perçu · {Euros(7_720)}", "Trop-perçus", "EnCours", 0),
-                Ligne("Remboursement 2026-0047", $"Notification · {Euros(150_000)} · Gamma Conseil SARL", "Notifications", "AFaire"),
-                Ligne("Remboursement 2026-0052", $"Notification · {Euros(41_500)} · Delta Transports SAS", "Notifications", "EnCours", 0),
-                Ligne("Remboursement 2026-0055", $"Trop-perçu · {Euros(92_000)}", "Trop-perçus", "AFaire"),
-                Ligne("Remboursement 2026-0061", $"Notification · {Euros(6_600)}", "Notifications", "Validee", 0, 1),
+                Ligne("Remboursement 2026-0041", $"Trop-perçu · {Euros(31_000)}", "Trop-perçus", "Validee", 0, 1) with { Valeurs = ["Remboursement 2026-0041", "310.00"] },
+                Ligne("Remboursement 2026-0044", $"Trop-perçu · {Euros(7_720)}", "Trop-perçus", "EnCours", 0) with { Valeurs = ["Remboursement 2026-0044", "77.20"] },
+                Ligne("Remboursement 2026-0047", $"Notification · {Euros(150_000)} · Gamma Conseil SARL", "Notifications", "AFaire") with { Valeurs = ["Remboursement 2026-0047", "1500.00"] },
+                Ligne("Remboursement 2026-0052", $"Notification · {Euros(41_500)} · Delta Transports SAS", "Notifications", "EnCours", 0) with { Valeurs = ["Remboursement 2026-0052", "415.00"] },
+                Ligne("Remboursement 2026-0055", $"Trop-perçu · {Euros(92_000)}", "Trop-perçus", "AFaire") with { Valeurs = ["Remboursement 2026-0055", "920.00"] },
+                Ligne("Remboursement 2026-0061", $"Notification · {Euros(6_600)}", "Notifications", "Validee", 0, 1) with { Valeurs = ["Remboursement 2026-0061", "66.00"] },
             ],
         },
 
@@ -285,6 +298,12 @@ public sealed class DomaineFacturer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_JCAISSE", Titre = "Journal de caisse", Sujet = "encaissements",
+            Forme = FormeEcran.Etat,
+            // Parametres : OPE_CRITERESGENERAUX et le tri a 4 options d'OPE_METHODETRI (proc_jcaisse.md, Detail OPE).
+            // Colonnes : les champs reportes dans le journal (proc_jcaisse.md:322) ; un seul geste, EDITER (:208).
+            Parametres = [Champ.Periode("Période"), "Caissier", "Modes de paiement", Champ.Liste("Tri", "Par mode de paiement", "Par utilisateur", "Par montant", "Par date")],
+            Colonnes = ["Encaissement", Champ.Date("Date"), "Payeur", "Mode de paiement", "Numéro de titre", "Caissier", Champ.Montant("Montant")],
+            Gestes = ["Éditer"],
             Recherche = "Rechercher un encaissement, une référence, un client…",
             Criteres = ["Période (du, au), 31 jours au plus conseillés", "Caissier (tous par défaut)", "Modes de paiement"],
             // Bouton cité par la fiche (proc_jcaisse.md, Détail OPE) : « sur clic EDITER ».
@@ -292,7 +311,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Rang = 6,
             Etats = EtatsEcran.Trois("À éditer", "Critères choisis", "Journal édité"),
             Groupes = ["Espèces", "Chèque", "Carte bancaire", "Virement"],
-            Marches =
+            Sections =
             [
                 Marche("Critères généraux", "La date de fin ne précède pas la date de début. Au-delà de 31 jours, un avertissement signale un affichage possiblement lent. Seuls les encaissements du greffe courant sont retenus.", true,
                     "Date de début", "Date de fin", "Caissier", "Modes de paiement"),
@@ -301,13 +320,13 @@ public sealed class DomaineFacturer : IDomaineEcrans
             ],
             Lignes =
             [
-                Ligne("Encaissement 0312-01", $"Espèces · {Euros(18_000)} · caissier de démonstration A", "Espèces", "Validee", 0, 1),
-                Ligne("Encaissement 0312-02", $"Espèces · {Euros(4_250)} · caissier de démonstration B", "Espèces", "AFaire"),
-                Ligne("Encaissement 0312-03", $"Chèque n° 0046120 · {Euros(95_000)}", "Chèque", "EnCours", 0),
-                Ligne("Encaissement 0312-04", $"Carte bancaire · {Euros(32_000)}", "Carte bancaire", "Validee", 0, 1),
-                Ligne("Encaissement 0313-01", $"Virement · {Euros(241_000)}", "Virement", "AFaire"),
-                Ligne("Encaissement 0313-02", $"Chèque n° 0046124 · {Euros(12_800)}", "Chèque", "EnCours", 0),
-                Ligne("Encaissement 0313-03", $"Carte bancaire · {Euros(6_400)}", "Carte bancaire", "AFaire"),
+                Ligne("Encaissement 0312-01", $"Espèces · {Euros(18_000)} · caissier de démonstration A", "Espèces", "Validee", 0, 1) with { Valeurs = ["Encaissement 0312-01", "2026-03-12", "", "Espèces", "", "caissier de démonstration A", "180.00"] },
+                Ligne("Encaissement 0312-02", $"Espèces · {Euros(4_250)} · caissier de démonstration B", "Espèces", "AFaire") with { Valeurs = ["Encaissement 0312-02", "2026-03-12", "", "Espèces", "", "caissier de démonstration B", "42.50"] },
+                Ligne("Encaissement 0312-03", $"Chèque n° 0046120 · {Euros(95_000)}", "Chèque", "EnCours", 0) with { Valeurs = ["Encaissement 0312-03", "2026-03-12", "", "Chèque", "0046120", "", "950.00"] },
+                Ligne("Encaissement 0312-04", $"Carte bancaire · {Euros(32_000)}", "Carte bancaire", "Validee", 0, 1) with { Valeurs = ["Encaissement 0312-04", "2026-03-12", "", "Carte bancaire", "", "", "320.00"] },
+                Ligne("Encaissement 0313-01", $"Virement · {Euros(241_000)}", "Virement", "AFaire") with { Valeurs = ["Encaissement 0313-01", "2026-03-13", "", "Virement", "", "", "2410.00"] },
+                Ligne("Encaissement 0313-02", $"Chèque n° 0046124 · {Euros(12_800)}", "Chèque", "EnCours", 0) with { Valeurs = ["Encaissement 0313-02", "2026-03-13", "", "Chèque", "0046124", "", "128.00"] },
+                Ligne("Encaissement 0313-03", $"Carte bancaire · {Euros(6_400)}", "Carte bancaire", "AFaire") with { Valeurs = ["Encaissement 0313-03", "2026-03-13", "", "Carte bancaire", "", "", "64.00"] },
             ],
         },
 
@@ -316,6 +335,11 @@ public sealed class DomaineFacturer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_JVENTE", Titre = "Journal de vente", Sujet = "ventes du greffe",
+            Forme = FormeEcran.Etat,
+            Parametres = [Champ.Periode("Période"), "Utilisateurs", "Clients", "Articles", "TVA", "Factures", "Type d'édition", "Tri"],
+            // Colonnes : la vente et son montant (role, proc_jvente.md:6 : « les ventes réalisées »).
+            Colonnes = ["Vente", Champ.Montant("Montant")],
+            Gestes = ["Éditer"],
             Recherche = "Rechercher une vente, un adjudicataire, une référence…",
             Criteres = ["Période et utilisateurs", "Clients, articles, TVA et factures", "Type d'édition et tri"],
             // Bouton cité par la fiche (proc_jvente.md, Détail OPE) : « uniquement sur EDITER ».
@@ -323,7 +347,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Rang = 6,
             Etats = EtatsEcran.Trois("À éditer", "Critères choisis", "Journal édité"),
             Groupes = ["Criée judiciaire", "Vente aux enchères"],
-            Marches =
+            Sections =
             [
                 Marche("Généraux", "Dates et utilisateurs. Seules les ventes du greffe courant sont retenues, et seules les affaires de nature « vente » paramétrée.", true,
                     "Date de début", "Date de fin", "Utilisateurs"),
@@ -336,13 +360,13 @@ public sealed class DomaineFacturer : IDomaineEcrans
             ],
             Lignes =
             [
-                Ligne("Criée du 03/03/2026, lot 12", $"Adjudicataire de démonstration A · {Euros(1_450_000)}", "Criée judiciaire", "Validee", 0, 1, 2, 3),
-                Ligne("Criée du 10/03/2026, lot 3", $"Adjudicataire de démonstration B · {Euros(320_000)}", "Criée judiciaire", "EnCours", 0),
-                Ligne("Vente aux enchères 2026-07", $"Adjudicataire de démonstration C · {Euros(890_000)}", "Vente aux enchères", "AFaire"),
-                Ligne("Vente aux enchères 2026-09", $"Mise à prix {Euros(100_000)}", "Vente aux enchères", "EnCours", 0, 1),
-                Ligne("Criée du 17/03/2026, lot 5", $"Adjudication {Euros(2_200_000)}", "Criée judiciaire", "AFaire"),
-                Ligne("Vente aux enchères 2026-11", $"Adjudication {Euros(64_000)}", "Vente aux enchères", "Validee", 0, 1, 2, 3),
-                Ligne("Criée du 24/03/2026, lot 8", $"Adjudication {Euros(476_000)}", "Criée judiciaire", "AFaire"),
+                Ligne("Criée du 03/03/2026, lot 12", $"Adjudicataire de démonstration A · {Euros(1_450_000)}", "Criée judiciaire", "Validee", 0, 1, 2, 3) with { Valeurs = ["Criée du 03/03/2026, lot 12", "14500.00"] },
+                Ligne("Criée du 10/03/2026, lot 3", $"Adjudicataire de démonstration B · {Euros(320_000)}", "Criée judiciaire", "EnCours", 0) with { Valeurs = ["Criée du 10/03/2026, lot 3", "3200.00"] },
+                Ligne("Vente aux enchères 2026-07", $"Adjudicataire de démonstration C · {Euros(890_000)}", "Vente aux enchères", "AFaire") with { Valeurs = ["Vente aux enchères 2026-07", "8900.00"] },
+                Ligne("Vente aux enchères 2026-09", $"Mise à prix {Euros(100_000)}", "Vente aux enchères", "EnCours", 0, 1) with { Valeurs = ["Vente aux enchères 2026-09", "1000.00"] },
+                Ligne("Criée du 17/03/2026, lot 5", $"Adjudication {Euros(2_200_000)}", "Criée judiciaire", "AFaire") with { Valeurs = ["Criée du 17/03/2026, lot 5", "22000.00"] },
+                Ligne("Vente aux enchères 2026-11", $"Adjudication {Euros(64_000)}", "Vente aux enchères", "Validee", 0, 1, 2, 3) with { Valeurs = ["Vente aux enchères 2026-11", "640.00"] },
+                Ligne("Criée du 24/03/2026, lot 8", $"Adjudication {Euros(476_000)}", "Criée judiciaire", "AFaire") with { Valeurs = ["Criée du 24/03/2026, lot 8", "4760.00"] },
             ],
         },
 
@@ -352,6 +376,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_JLR", Titre = "Livre de repertoire", Sujet = "destinataires de lettres",
+            Forme = FormeEcran.Saisie,
             Recherche = "Rechercher un destinataire, une adresse…",
             Criteres = ["Désignation du destinataire", "Adresse (3 lignes au plus)", "Nombre d'exemplaires"],
             // Bouton cité par la fiche (proc_jlr.md, Détail OPE) : « Configurer l'édition ».
@@ -386,6 +411,11 @@ public sealed class DomaineFacturer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_VLETTRAGE", Titre = "Lettrage", Sujet = "clients",
+            Forme = FormeEcran.Etat,
+            // Un ecran de consultation d'agregats (proc_vlettrage.md:46,57) : criteres, Rechercher, tableau de totaux.
+            Parametres = [Champ.Periode("Période"), Champ.Liste("Catégorie de client", "Compte", "Divers", "PC"), "État PC", "Type PC"],
+            Colonnes = ["Client", Champ.Montant("Facturé"), Champ.Montant("Payé"), Champ.Montant("Restant")],
+            Gestes = ["Rechercher"],
             Recherche = "Rechercher un client, un compte…",
             Criteres = ["Période", "Catégorie de client (compte, divers, PC)", "Filtres PC : état et type, si PC est coché"],
             // Bouton cité par la fiche (proc_vlettrage.md) : « bouton Rechercher ». Aucun geste de validation n'est cité.
@@ -393,7 +423,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Rang = 6,
             Etats = EtatsEcran.Trois("À vérifier", "En vérification", "Vérifié"),
             Groupes = ["Compte hors PC", "Divers", "PC"],
-            Marches =
+            Sections =
             [
                 Marche("Critères", "Période et catégories de client, toutes cochées par défaut. Si PC est coché, filtres d'état (clôturé, ouvert, en attente) et de type (sauvegarde, RJ, LIJI, plan de sauvegarde, plan de redressement, CIA, CEP). Rien ne se calcule avant Rechercher.", true,
                     "Période", "Catégorie de client", "État PC", "Type PC"),
@@ -402,13 +432,13 @@ public sealed class DomaineFacturer : IDomaineEcrans
             ],
             Lignes =
             [
-                Ligne("Client compte 01", $"Facturé {Euros(425_000)} · payé {Euros(425_000)}", "Compte hors PC", "Validee", 0, 1),
-                Ligne("Client compte 02", $"Facturé {Euros(98_000)} · payé {Euros(50_000)}", "Compte hors PC", "EnCours", 0),
-                Ligne("Client divers 01", $"Facturé {Euros(31_000)} · payé {Euros(0)}", "Divers", "AFaire"),
-                Ligne("Client divers 02", $"Facturé {Euros(112_000)} · payé {Euros(112_000)}", "Divers", "Validee", 0, 1),
-                Ligne("Client PC 01", $"Facturé {Euros(1_640_000)} · payé {Euros(200_000)}", "PC", "EnCours", 0),
-                Ligne("Client PC 02", $"Facturé {Euros(790_000)} · payé {Euros(790_000)}", "PC", "Validee", 0, 1),
-                Ligne("Client PC 03", $"Facturé {Euros(264_000)} · payé {Euros(0)}", "PC", "AFaire"),
+                Ligne("Client compte 01", $"Facturé {Euros(425_000)} · payé {Euros(425_000)}", "Compte hors PC", "Validee", 0, 1) with { Valeurs = ["Client compte 01", "4250.00", "4250.00", "0.00"] },
+                Ligne("Client compte 02", $"Facturé {Euros(98_000)} · payé {Euros(50_000)}", "Compte hors PC", "EnCours", 0) with { Valeurs = ["Client compte 02", "980.00", "500.00", "480.00"] },
+                Ligne("Client divers 01", $"Facturé {Euros(31_000)} · payé {Euros(0)}", "Divers", "AFaire") with { Valeurs = ["Client divers 01", "310.00", "0.00", "310.00"] },
+                Ligne("Client divers 02", $"Facturé {Euros(112_000)} · payé {Euros(112_000)}", "Divers", "Validee", 0, 1) with { Valeurs = ["Client divers 02", "1120.00", "1120.00", "0.00"] },
+                Ligne("Client PC 01", $"Facturé {Euros(1_640_000)} · payé {Euros(200_000)}", "PC", "EnCours", 0) with { Valeurs = ["Client PC 01", "16400.00", "2000.00", "14400.00"] },
+                Ligne("Client PC 02", $"Facturé {Euros(790_000)} · payé {Euros(790_000)}", "PC", "Validee", 0, 1) with { Valeurs = ["Client PC 02", "7900.00", "7900.00", "0.00"] },
+                Ligne("Client PC 03", $"Facturé {Euros(264_000)} · payé {Euros(0)}", "PC", "AFaire") with { Valeurs = ["Client PC 03", "2640.00", "0.00", "2640.00"] },
             ],
         },
 
@@ -423,6 +453,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_ADDCREANCE", Titre = "Ajouter une creance", Sujet = "créances transitoires",
+            Forme = FormeEcran.Saisie,
             // Recherche : « débiteur » (OPE_CREANCE.cs:112, CRTRA_NOM_DEBITEUR) ; le formulaire n'a pas de recherche, c'est la barre de l'écran.
             Recherche = "Rechercher une créance ou un débiteur…",
             // Critères : le mode et les dates que le formulaire saisit (PROC_ADDCREANCE.cs:50-57 ; OPE_CREANCE.cs:339-350).
@@ -471,6 +502,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_MODCREANCE", Titre = "Modifier une creance", Sujet = "procédures collectives",
+            Forme = FormeEcran.Fiche,
             Recherche = "Rechercher une procédure, un numéro, un nom d'affaire…",
             Criteres = ["Numéro de la procédure", "Nom de l'affaire", "Période d'ouverture"],
             // Bouton cité par la fiche (proc_modcreance.md) : « Valider -> Sauvegarder ».
@@ -478,16 +510,16 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Rang = 6,
             Etats = [.. EtatsEcran.Trois("À modifier", "En saisie", "Modifiée"), new EtatEcran("EnAttente", "Verrouillée par un autre", "en-attente")],
             Groupes = ["Sauvegarde", "Redressement judiciaire (RJ)", "Liquidation judiciaire (LIJI)"],
-            Marches =
+            Sections =
             [
                 Marche("Procédure collective", "Recherche, puis sélection : la procédure est verrouillée. Si un autre utilisateur la tient, un avertissement le nomme et la fiche s'ouvre en lecture seule.", true,
                     "Numéro", "Nom de l'affaire", "Période d'ouverture"),
                 Marche("Créances", "Créances, créanciers, débiteurs et état de la procédure. Seules les créances modifiées sont enregistrées.", true,
-                    "Créances", "Créanciers", "Débiteurs", "État de la procédure"),
+                    Champ.Tableau("Créances"), Champ.Tableau("Créanciers"), Champ.Tableau("Débiteurs"), "État de la procédure"),
                 Marche("Contrôle", "Montant zéro ou plus, date de déclaration renseignée, rang et priorité cohérents. Un verrou perdu entre-temps bloque l'enregistrement.", true,
                     "Montant", "Date de déclaration", "Rang"),
                 Marche("Enregistrement", "Enregistre chaque créance modifiée, recalcule les totaux si besoin, puis libère le verrou. La saisie reste ouverte pour une autre procédure.", true,
-                    "Totaux"),
+                    Champ.Tableau("Totaux")),
             ],
             Lignes =
             [
@@ -505,6 +537,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_INTEGCREANCE", Titre = "Integrer des creances", Sujet = "créances à intégrer",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une créance, un créancier, un numéro de procédure…",
             Criteres = ["Nature : admission, contestation ou défaut de réponse", "Procédure collective (une seule par intégration)", "Fichier de créances"],
             // Bouton cité par la fiche (proc_integcreance.md, Boutons) : INTEGRER_SELECTIONNEES.
@@ -512,7 +545,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Rang = 6,
             Etats = [.. EtatsEcran.Trois("À intégrer", "Vérifiée", "Intégrée"), new EtatEcran("Rejetee", "En erreur", "rejetee")],
             Groupes = ["Admissions", "Contestations", "Défauts de réponse"],
-            Marches =
+            Sections =
             [
                 Marche("Import du fichier", "Un fichier de créances, venu d'un cabinet de mandataires, pour une seule procédure collective. Il alimente les créances en attente d'intégration.", true,
                     "Fichier", "Procédure collective"),
@@ -538,6 +571,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_CREANREP", Titre = "Representation", Sujet = "procédures collectives",
+            Forme = FormeEcran.Operation,
             Recherche = "Rechercher une procédure, un créancier, un représentant…",
             Criteres = ["Procédure collective", "Créancier", "Représentant désigné"],
             // Action citée par la fiche (proc_creanrep.md, Rôle) : « désignation du représentant des créanciers ».
@@ -545,7 +579,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Rang = 6,
             Etats = EtatsEcran.Trois("À désigner", "Représentant choisi", "Désigné"),
             Groupes = ["Représentant des créanciers"],
-            Marches =
+            Sections =
             [
                 Marche("Procédure", "La procédure dont les créanciers sont à représenter, choisie dans la liste.", true,
                     "Procédure", "Créanciers"),
@@ -570,6 +604,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_XEX", Titre = "Édition interne d'un Kbis", Sujet = "dossiers RCS",
+            Forme = FormeEcran.Operation,
             Recherche = "Rechercher un dossier RCS, un numéro de gestion…",
             Criteres = ["Numéro de gestion du dossier RCS"],
             // Action citée par la fiche (proc_xex.md, Détail OPE) : « Edition interne d'un Kbis ».
@@ -577,7 +612,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Rang = 3,
             Etats = EtatsEcran.Trois("À rechercher", "Dossier choisi", "Kbis édité"),
             Groupes = ["Dossiers RCS"],
-            Marches =
+            Sections =
             [
                 Marche("Dossier RCS", "Recherche par numéro de gestion ; le numéro d'identification n'est pas admis ici. Un dossier doit être choisi avant de valider.", true,
                     "Numéro de gestion", "Désignation"),
@@ -597,7 +632,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
         },
     ];
 
-    private static MarcheEcran Marche(string titre, string consigne, bool obligatoire, params string[] champs) =>
+    private static MarcheEcran Marche(string titre, string consigne, bool obligatoire, params ChampEcran[] champs) =>
         new(titre, consigne, obligatoire, champs);
 
     private static LigneEcran Ligne(string nom, string precisions, string groupe, string etat, params int[] faites) =>

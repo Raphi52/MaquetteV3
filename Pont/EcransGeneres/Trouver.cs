@@ -32,13 +32,14 @@ public sealed class DomaineTrouver : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_VDOSSIER", Titre = "Dossier RCS", Sujet = "dossiers RCS", Rang = 4,
+            Forme = FormeEcran.Consultation,
             Recherche = "Rechercher un dossier : numéro, SIREN, dépôt, inscription…",
             Criteres = ["Numéro : dossier, SIREN, dépôt, inscription, liaison, chrono ou non-inscrit", "Numéro d'inscription privilège"],
             // Valider : proc_vdossier.md:378 (barre « Valider/Annuler » de l'étape de choix du dossier) et :397 (VALIDER → _Valider).
             Valider = "Valider",
             Etats = EtatsEcran.Trois("À consulter", "En consultation", "Consulté"),
             Groupes = ["Dossier RCS", "Non-inscrit", "Demande"],
-            Marches =
+            Sections =
             [
                 Marche("Numéro", "Saisir un numéro de demande, un SIREN, un dossier, une liaison, un dépôt, une inscription, un chrono de formalité ou un non-inscrit. Un numéro de 9 caractères est traité comme un SIREN : la recherche d'entreprise s'ouvre.", true,
                     "Numéro", "Inscription privilège"),
@@ -67,13 +68,14 @@ public sealed class DomaineTrouver : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_VJUD", Titre = "Dossier judiciaire", Sujet = "dossiers judiciaires", Rang = 4,
+            Forme = FormeEcran.Consultation,
             Recherche = "Rechercher une instance, une procédure collective ou une prévention…",
             Criteres = ["Type d'entité : instance, procédure collective ou prévention", "Entité recherchée"],
             // Valider : proc_vjud.md:172 et :176 (bouton MODIFIER ; visible avec POOL_EDIT si le dossier est une entité judiciaire).
             Valider = "Modifier",
             Etats = EtatsEcran.Trois("À consulter", "En consultation", "Consultée"),
             Groupes = ["Instance", "Procédure collective", "Prévention"],
-            Marches =
+            Sections =
             [
                 Marche("Entité", "Choisir le type d'entité et la retrouver. Une entité déjà chargée s'affiche sans étape de recherche.", true,
                     "Type d'entité", "Entité recherchée"),
@@ -101,13 +103,18 @@ public sealed class DomaineTrouver : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_REGJUD", Titre = "Registres judiciaires", Sujet = "lignes de registre", Rang = 4,
+            Forme = FormeEcran.Etat,
+            Parametres = [Champ.Periode("Dates d'acte"), Champ.Periode("Dates de saisine"), Champ.Periode("Dates d'enrôlement"), "Type d'instance"],
+            // Colonnes : la section Resultats ci-dessous (les champs de la grille V2).
+            Colonnes = ["Rôle", Champ.Date("Date d'acte"), "Numéro au répertoire", "Nature", "Chambre", Champ.Date("Date de décision"), "Type de décision", "Ressort"],
+            Gestes = ["Aperçu", "Impression"],
             Recherche = "Filtrer les lignes du registre : rôle, nature, chambre…",
             Criteres = ["Date d'acte", "Date de saisine", "Date d'enrôlement", "Type d'instance"],
             // Valider : proc_regjud.md:271 et :347 (bouton VALIDER de la barre : édition du registre, actif s'il y a des lignes).
             Valider = "Valider",
             Etats = EtatsEcran.Trois("À filtrer", "Sélection en cours", "Imprimé"),
             Groupes = ["Répertoire général", "Injonctions de payer", "Ordonnances du président"],
-            Marches =
+            Sections =
             [
                 Marche("Critères", "Saisir au moins un critère pour compter les lignes : dates d'acte, de saisine ou d'enrôlement, type d'instance.", true,
                     "Dates d'acte", "Dates de saisine", "Dates d'enrôlement", "Type d'instance"),
@@ -135,13 +142,14 @@ public sealed class DomaineTrouver : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_RECHERCHE_BATEAU", Titre = "Navires", Sujet = "navires", Rang = 4,
+            Forme = FormeEcran.Consultation,
             Recherche = "Rechercher un navire : nom ou numéro d'enregistrement…",
             Criteres = ["Nom du navire (recherche dans le texte)", "Numéro d'enregistrement (une partie suffit)", "Afficher l'historique des noms"],
             // Valider : proc_recherche_bateau.md:64 et :148 (VALIDER toujours visible) ; renvoie la liste à l'écran appelant (:72).
             Valider = "Valider",
             Etats = EtatsEcran.Trois("À chercher", "Sélection en cours", "Renvoyée"),
             Groupes = ["Nom actuel", "Ancien nom"],
-            Marches =
+            Sections =
             [
                 Marche("Recherche", "Saisir le nom ou une partie du numéro d'enregistrement. Les deux critères se cumulent.", true,
                     "Nom du navire", "Numéro d'enregistrement"),
@@ -167,13 +175,14 @@ public sealed class DomaineTrouver : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_RECHERCHE_GED", Titre = "Documents", Sujet = "documents", Rang = 4,
+            Forme = FormeEcran.Consultation,
             Recherche = "Rechercher un document : numéro interne ou login d'extraction…",
             Criteres = ["Catégorie : maquettes, éléments de fusion, documents d'édition, factures, documents SIREN, orphelins", "Numéro interne du document", "Login d'extraction"],
             // Valider : proc_recherche_ged.md:115 (« Archiver » : IMPORT (Archiver) → _Archiver(), section « Actions toolbar »).
             Valider = "Archiver",
             Etats = EtatsEcran.Trois("À traiter", "En cours", "Traité"),
             Groupes = ["Maquettes", "Éléments de fusion", "Documents d'édition", "Factures", "Documents SIREN", "Orphelins"],
-            Marches =
+            Sections =
             [
                 Marche("Catégorie", "Choisir une catégorie, ou chercher par numéro interne ou login d'extraction. Le résultat est limité à 100 lignes, sans pagination.", true,
                     "Catégorie", "Numéro interne", "Login d'extraction"),
@@ -199,13 +208,14 @@ public sealed class DomaineTrouver : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_PDF", Titre = "Voir un PDF", Sujet = "pièces PDF", Rang = 4,
+            Forme = FormeEcran.Document,
             Recherche = "Rechercher une pièce à lire…",
             Criteres = ["Fichier PDF unique, ou dossier de PDF", "Pièces non lues affichées en gras", "Alerte à la fermeture si une pièce n'est pas lue"],
             // Valider : proc_pdf.md:110 (« Imprimer tout », impression de masse du mode dossier, :203) ; VALIDER (ligne 106) n'est jamais visible.
             Valider = "Imprimer tout",
             Etats = EtatsEcran.Trois("Non lu", "En lecture", "Lu"),
             Groupes = ["Pièce unique", "Dossier de pièces"],
-            Marches =
+            Sections =
             [
                 Marche("Ouverture", "Ouvrir le PDF. Un dossier de PDF liste ses fichiers ; s'il n'en contient qu'un, il s'ouvre directement.", true,
                     "Fichier", "Dossier"),
@@ -229,6 +239,7 @@ public sealed class DomaineTrouver : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_IMAGE", Titre = "Voir une image", Sujet = "fichiers à afficher", Rang = 4,
+            Forme = FormeEcran.Document,
             Recherche = "Rechercher un fichier à afficher…",
             Criteres = ["Fichier : chemin absolu d'une image ou d'un PDF (paramètre Filename)", "Titre de la fenêtre, facultatif (paramètre Titre)"],
             // Voir une image n'a pas de VALIDER (proc_image.md:85, :105) : son bouton final est l'action APERCU, à confirmer.
@@ -237,7 +248,7 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Valider = "Ajuster à la fenêtre",
             Etats = EtatsEcran.Trois("À ouvrir", "Ouverte", "Affichée"),
             Groupes = ["PDF multi-pages", "TIFF multi-pages", "Image à page unique"],
-            Marches =
+            Sections =
             [
                 Marche("Ouverture", "Charger le fichier passé en paramètre : une image ou un PDF, chemin absolu. Sans fichier, la fenêtre reste vide ; sans titre, elle prend « Aperçu du fichier » et le nom du fichier.", true,
                     "Fichier", "Titre"),
@@ -261,13 +272,14 @@ public sealed class DomaineTrouver : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_VCHIFFRES", Titre = "Chiffres d'un dossier", Sujet = "exercices", Rang = 4,
+            Forme = FormeEcran.Consultation,
             Recherche = "Rechercher un dossier RCS : numéro ou SIREN…",
             Criteres = ["Dossier RCS : numéro ou SIREN", "Exercices sans chiffres clés (réglage du greffe)"],
             // Valider : proc_vchiffres.md:254 (bouton EXPORT « Exporter le contenu des chiffres seuils au format PDF », visible en phase Saisie).
             Valider = "Exporter",
             Etats = EtatsEcran.Trois("À consulter", "En cours", "PDF généré"),
             Groupes = ["Bilans déposés", "Exercices sans chiffres"],
-            Marches =
+            Sections =
             [
                 Marche("Dossier", "Le dossier RCS, passé à l'écran ou recherché à la main. Sans dossier, l'écran s'ouvre en recherche manuelle.", true,
                     "Dossier RCS"),
@@ -292,13 +304,14 @@ public sealed class DomaineTrouver : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_RECHENC", Titre = "Encaissements", Sujet = "encaissements", Rang = 4,
+            Forme = FormeEcran.Consultation,
             Recherche = "Rechercher un encaissement : client, remise, banque, commentaire…",
             Criteres = ["Dates de début et de fin (à cocher pour les activer)", "Mode de paiement", "Banque", "Payeur ou tiers payeur", "Numéro de remise", "Montant minimum et maximum", "Affaire"],
             // Valider : proc_rechenc.md:351 (« EXPORT → export Excel », action nommée « Export Excel » en :209) ; bouton toujours visible (:346).
             Valider = "Export Excel",
             Etats = EtatsEcran.Trois("À contrôler", "En contrôle", "Contrôlé"),
             Groupes = ["Encaissement ventilé", "Encaissement sans ventilation"],
-            Marches =
+            Sections =
             [
                 Marche("Critères", "Saisir les critères, qui se cumulent. Une date ne compte que si sa case est cochée.", true,
                     "Dates", "Mode de paiement", "Banque", "Payeur", "Numéro de remise", "Montant minimum", "Montant maximum", "Affaire"),
@@ -324,13 +337,14 @@ public sealed class DomaineTrouver : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_TARIFS", Titre = "Tarifs", Sujet = "articles tarifaires", Rang = 4,
+            Forme = FormeEcran.Consultation,
             Recherche = "Filtrer les articles : code, libellé…",
             Criteres = ["Statut : actif, inactif ou tous", "Type d'article", "Période de tarification", "Catégorie d'article", "Code événement (affiche sa colonne)"],
             // Valider : proc_tarifs.md:186 (« Justifier » du menu contextuel d'une ligne incohérente) ; VALIDER masqué (:215).
             Valider = "Justifier",
             Etats = EtatsEcran.Trois("À justifier", "En cours", "Justifié"),
             Groupes = ["Article de base", "Article dérivé"],
-            Marches =
+            Sections =
             [
                 Marche("Critères", "Saisir au moins un critère, qui se cumulent : statut, type, période de tarification, catégorie, code événement.", true,
                     "Statut", "Type d'article", "Période de tarification", "Catégorie", "Code événement"),
@@ -358,13 +372,14 @@ public sealed class DomaineTrouver : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_REJETS_BILANS", Titre = "Bilans en rejet", Sujet = "bilans en rejet", Rang = 4,
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un bilan : SIREN, numéro de gestion ou numéro de dépôt…",
             Criteres = ["SIREN, numéro de gestion ou numéro de dépôt", "Codes motifs de rejet (plusieurs possibles)"],
             // Valider : proc_rejets_bilans.md:208 (bouton « Envoyer vers XDCA », actif si la grille a des lignes, :398).
             Valider = "Envoyer vers XDCA",
             Etats = EtatsEcran.Trois("Rejeté", "En correction", "Corrigé"),
             Groupes = ["Rejet Infogreffe", "Rejet INPI"],
-            Marches =
+            Sections =
             [
                 Marche("Recherche", "Saisir un SIREN, un numéro de gestion ou un numéro de dépôt, et choisir les codes motifs. Sans motif choisi, tous les motifs sont montrés.", true,
                     "Numéro", "Codes motifs de rejet"),
@@ -392,13 +407,14 @@ public sealed class DomaineTrouver : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_VFNIG", Titre = "Interdits de gerer", Sujet = "personnes", Rang = 4,
+            Forme = FormeEcran.Consultation,
             Recherche = "Rechercher une personne : nom, prénom, date de naissance…",
             Criteres = ["Nom", "Prénom", "Date de naissance", "Pays de naissance (France par défaut)", "Commune de naissance (si France)"],
             // Valider : proc_vfnig.md:32 et :449 (bouton « Editer les résultats », actif dès qu'une ligne est sélectionnée, :171).
             Valider = "Editer les résultats",
             Etats = EtatsEcran.Trois("À vérifier", "En cours", "Vérifiée"),
             Groupes = ["Personne trouvée", "Personne inexistante"],
-            Marches =
+            Sections =
             [
                 Marche("Recherche", "Saisir le nom, le prénom et la date de naissance. Pour une naissance hors de France, la commune n'est pas demandée.", true,
                     "Nom", "Prénom", "Date de naissance", "Pays de naissance", "Commune de naissance"),
@@ -426,13 +442,17 @@ public sealed class DomaineTrouver : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_FIBEN", Titre = "FIBEN", Sujet = "relevés", Rang = 4,
+            Forme = FormeEcran.Etat,
+            Parametres = ["Mois", "Trimestre", Champ.Nombre("Année")],
+            Colonnes = ["Relevé", "Volumes par greffe"],
+            Gestes = ["Générer"],
             Recherche = "Rechercher un relevé : mois ou trimestre…",
             Criteres = ["Mois (transmission FIBEN, mensuelle)", "Trimestre et année (relevé BODACC, trimestriel)", "Tarifs unitaires"],
             // Valider : proc_fiben.md:10-11 et :60-61 (bouton « Générer » de chaque opération).
             Valider = "Générer",
             Etats = EtatsEcran.Trois("À générer", "En cours", "Généré"),
             Groupes = ["Transmission FIBEN", "Relevé BODACC"],
-            Marches =
+            Sections =
             [
                 Marche("Période", "Choisir le mois de la transmission FIBEN, ou le trimestre et l'année du relevé BODACC.", true,
                     "Mois", "Trimestre", "Année"),
@@ -455,13 +475,14 @@ public sealed class DomaineTrouver : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_VNOTIF", Titre = "Notifications", Sujet = "notifications", Rang = 4,
+            Forme = FormeEcran.Consultation,
             Recherche = "Rechercher une notification : greffe, date, état…",
             Criteres = ["Dates", "États", "Greffes", "Origine (alerte)"],
             // Valider : proc_vnotif.md:249 et :262 (barre « Rechercher / Effacer », bouton « Rechercher »).
             Valider = "Rechercher",
             Etats = EtatsEcran.Trois("À traiter", "En cours", "Traitée"),
             Groupes = ["Émises (RCS)", "Émises (judiciaire)", "Reçues"],
-            Marches =
+            Sections =
             [
                 Marche("Recherche", "Choisir l'onglet (émises ou reçues) et les filtres : dates, états, greffes. Une alerte peut ouvrir cet écran directement.", true,
                     "Dates", "États", "Greffes", "Origine"),
@@ -483,13 +504,14 @@ public sealed class DomaineTrouver : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_VTRID", Titre = "Tribunal digital", Sujet = "échanges avec le tribunal digital", Rang = 4,
+            Forme = FormeEcran.Consultation,
             Recherche = "Rechercher un envoi ou une demande…",
             Criteres = ["Date (critère par défaut)", "Type d'entité : instance, procédure collective, mesure, prévention"],
             // Valider : proc_vtrid.md:234 (bouton « Envoyer vers VJUD », actif selon la sélection).
             Valider = "Envoyer vers VJUD",
             Etats = EtatsEcran.Trois("Non traité", "En cours", "Traité"),
             Groupes = ["Documents transmis", "Demandes reçues"],
-            Marches =
+            Sections =
             [
                 Marche("Critères", "Chercher par date (critère par défaut) ou par type d'entité. Une entité s'ouvre dans son formulaire de recherche.", true,
                     "Date", "Type d'entité"),
@@ -515,13 +537,14 @@ public sealed class DomaineTrouver : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_BEN", Titre = "Rechercher un beneficiaire", Sujet = "bénéficiaires effectifs", Rang = 4,
+            Forme = FormeEcran.Consultation,
             Recherche = "Rechercher un bénéficiaire : nom, prénom, numéro de dossier…",
             Criteres = ["Numéro de dossier", "Nom d'usage", "Nom patronymique", "Prénoms", "Date de naissance", "Dossiers radiés", "Divergences seulement"],
             // Valider : proc_ben.md:321 (bouton de colonne « Signaler », « Visualiser » si une divergence existe).
             Valider = "Signaler",
             Etats = EtatsEcran.Trois("À examiner", "En cours", "Divergence signalée"),
             Groupes = ["Bénéficiaire en vigueur", "Dossier radié"],
-            Marches =
+            Sections =
             [
                 Marche("Critères", "Saisir le numéro de dossier, ou le nom, les prénoms et la date de naissance. Les critères se cumulent ; Effacer critères vide la saisie.", true,
                     "Numéro de dossier", "Nom d'usage", "Nom patronymique", "Prénoms", "Date de naissance", "Dossiers radiés", "Divergences seulement"),
@@ -543,7 +566,7 @@ public sealed class DomaineTrouver : IDomaineEcrans
         },
     ];
 
-    private static MarcheEcran Marche(string titre, string consigne, bool obligatoire, params string[] champs) =>
+    private static MarcheEcran Marche(string titre, string consigne, bool obligatoire, params ChampEcran[] champs) =>
         new(titre, consigne, obligatoire, champs);
 
     private static LigneEcran Ligne(string nom, string precisions, string groupe, string etat, params int[] faites) =>

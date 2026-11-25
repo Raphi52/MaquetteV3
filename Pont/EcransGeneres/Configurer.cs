@@ -24,6 +24,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_MANDATAIRE", Titre = "Mandataires", Sujet = "mandataires",
+            Forme = FormeEcran.Referentiel,
+            // Colonnes : les champs des sections ci-dessous (fiche, Identite, Abrege, Adresse, Qualification).
+            Colonnes = ["Désignation", "Civilité", "Abrégé", "SIREN", "Courriel", "Qualification", Champ.Case("Actif")],
             Recherche = "Rechercher un mandataire, un abrégé, un SIREN…",
             Criteres = ["Désignation", "Abrégé", "SIREN"],
             // Bouton final cite par la fiche v2 : DoSauve : Mandataire.Sauve (proc_mandataire.md, Detail OPE)
@@ -31,7 +34,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À compléter", "En saisie", "Enregistré"),
             Groupes = ["Personne physique", "Personne morale"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Identité", "La civilité et la désignation sont obligatoires. Un SIREN saisi interroge Infogreffe : la fiche se remplit si le service répond.", true,
                     ["Civilité", "Désignation", "SIREN"]),
@@ -60,6 +63,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_RAPPACTEUR", Titre = "Rapprocher des acteurs", Sujet = "acteurs à fusionner",
+            Forme = FormeEcran.Operation,
             Recherche = "Rechercher un acteur à garder…",
             Criteres = ["Type d'acteur", "Acteur à garder", "Acteurs à supprimer"],
             // Bouton final cite par la fiche v2 : _Valider, sauvegarde apres confirmation (proc_rappacteur.md, Detail OPE)
@@ -67,7 +71,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À choisir", "En cours", "Fusionné"),
             Groupes = ["Juges", "Mandataires", "Mandataires PC"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Type d'acteur", "Un seul type à la fois : juges, mandataires ou mandataires PC. Changer de type vide la sélection.", true,
                     ["Type d'acteur"]),
@@ -98,6 +102,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_SUPP_ACTEUR_JUD", Titre = "Remplacer un acteur", Sujet = "acteurs à remplacer",
+            Forme = FormeEcran.Operation,
             Recherche = "Rechercher un acteur à remplacer…",
             Criteres = ["Type d'acteur", "Acteur remplacé", "Remplaçant"],
             // Bouton final cite par la fiche v2 : bouton Valider (proc_supp_acteur_jud.md, Detail OPE)
@@ -105,7 +110,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À choisir", "En cours", "Remplacé"),
             Groupes = ["Magistrats et greffe", "Mandataires PC", "Intervenants PC"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Type d'acteur", "Juge, parquetier, greffier assermenté, mandataire PC, intervenant PC ou expert : le type fixe les contrôles.", true,
                     ["Type d'acteur"]),
@@ -134,6 +139,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_GESTTIERSPAYEURS", Titre = "Tiers payeurs", Sujet = "tiers payeurs",
+            Forme = FormeEcran.Referentiel,
+            // Colonnes : les champs des sections ci-dessous (Abrege, Identite, Adresse).
+            Colonnes = ["Désignation", "Abrégé", "Mandataire rattaché", "Code postal", "Ville"],
             Recherche = "Rechercher un tiers payeur, un abrégé, une ville…",
             Criteres = ["Abrégé", "Désignation", "Ville"],
             // Bouton final cite par la fiche v2 : VALIDER (proc_gesttierspayeurs.md, Detail OPE)
@@ -141,7 +149,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À compléter", "En saisie", "Enregistré"),
             Groupes = ["Payeur principal", "Autre payeur"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Abrégé", "Obligatoire, 10 caractères au plus, unique dans le greffe : « L'abrégé saisi existe déjà ». « DEBITEUR » est réservé : « L'abrégé débiteur n'est pas valable ». Les abrégés réservés par le greffe sont en lecture seule.", true,
                     ["Abrégé"]),
@@ -167,6 +175,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_CNI", Titre = "Non-inscrits", Sujet = "non-inscrits",
+            Forme = FormeEcran.Saisie,
             Recherche = "Rechercher une personne hors registre, un nom, un SIREN…",
             Criteres = ["Type de non-inscrit", "Personne physique ou morale", "SIREN"],
             // Bouton final cite par la fiche v2 : VALIDER, visible en phase Saisie (proc_cni.md, Detail OPE)
@@ -203,6 +212,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_GESTDATE", Titre = "Dates de travail", Sujet = "dates de travail",
+            Forme = FormeEcran.Referentiel,
+            // Colonnes : la categorie (critere) et les champs des sections ci-dessous.
+            Colonnes = ["Catégorie de date", "Date de travail", "Date de fraîcheur", Champ.Case("Mode automatique")],
             Recherche = "Rechercher une catégorie de date…",
             Criteres = ["Catégorie de date", "Date de travail", "Date de fraîcheur"],
             // Bouton final cite par la fiche v2 : bouton VALIDER (proc_gestdate.md, Detail OPE)
@@ -210,7 +222,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À vérifier", "Modifiée", "Enregistrée"),
             Groupes = ["Dates d'endettement", "Autres catégories"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Date de travail", "Une date postérieure à aujourd'hui est une erreur bloquante. Si la date change, l'ancienne est archivée.", true,
                     ["Date de travail", "Mode automatique"]),
@@ -236,6 +248,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_WIKI", Titre = "Aide du greffe", Sujet = "articles d'aide",
+            Forme = FormeEcran.Document,
             Recherche = "Rechercher un article, un mot-clé…",
             Criteres = ["Catégorie", "Auteur", "Titre"],
             // Bouton final cite par la fiche v2 : VALIDER (proc_wiki.md, Detail OPE)
@@ -243,7 +256,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À rédiger", "En rédaction", "Publié"),
             Groupes = ["Exploitation", "Développement", "Foire aux questions"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Titre et catégorie", "Le titre et la catégorie rangent l'article sous sa rubrique du wiki.", true,
                     ["Titre", "Catégorie"]),
@@ -269,6 +282,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_WEB_BROWSER", Titre = "Page web interne", Sujet = "pages web",
+            Forme = FormeEcran.Document,
             Recherche = "Rechercher une page, une adresse…",
             Criteres = ["Adresse (URL)", "Site interne ou externe", "Mode détaché"],
             // Bouton final cite par la fiche v2 : VALIDER (proc_web_browser.md, Detail OPE)
@@ -276,7 +290,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À ouvrir", "En cours", "Ouverte"),
             Groupes = ["Sites internes", "Sites externes"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Adresse", "L'adresse est le seul paramètre : une adresse vide n'ouvre rien.", true,
                     ["Adresse"]),
@@ -299,6 +313,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_GTABREF", Titre = "Tables de reference", Sujet = "codes de référence",
+            Forme = FormeEcran.Referentiel,
+            // Colonnes : la valeur de la table, son code, sa table, son verrou (sections ci-dessous).
+            Colonnes = ["Libellé", "Code", "Table", Champ.Case("Verrou")],
             Recherche = "Rechercher un code, un libellé, une table…",
             Criteres = ["Table", "Code", "Libellé"],
             // Bouton final cite par la fiche v2 : VALIDER (proc_gtabref.md, Detail OPE)
@@ -306,7 +323,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À compléter", "En cours", "Enregistré"),
             Groupes = ["Procédures collectives", "Actes et natures", "Annonces et juridictions"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Table", "Le code est choisi dans la table de référence voulue ; chaque table a ses propres champs.", true,
                     ["Table"]),
@@ -335,6 +352,8 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_GED_NATURE_DOC", Titre = "Natures de document", Sujet = "natures de document",
+            Forme = FormeEcran.Referentiel,
+            Colonnes = ["Libellé", "Code"],
             Recherche = "Rechercher une nature de document…",
             Criteres = ["Libellé", "Code"],
             // Bouton final cite par la fiche v2 : post-validation (proc_ged_nature_doc.md, logique metier)
@@ -342,7 +361,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À compléter", "En cours", "Enregistrée"),
             Groupes = ["Décisions", "Pièces et actes"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Libellé", "Le libellé est obligatoire : il sert à classer les documents de la GED.", true,
                     ["Libellé"]),
@@ -365,6 +384,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_CABINET", Titre = "Cabinets", Sujet = "cabinets",
+            Forme = FormeEcran.Referentiel,
+            // Colonnes : le cabinet (la salle) et les champs des sections ci-dessous.
+            Colonnes = ["Cabinet", "Type de cabinet", "Code cabinet", "Date d'audience", "Heure d'audience", "Juge", "Greffier", Champ.Case("Classement admis")],
             Recherche = "Rechercher un cabinet, une date d'audience…",
             Criteres = ["Date d'audience", "Type de cabinet", "Juge"],
             // Bouton final cite par la fiche v2 : DoSauve(cnx, futurEtat) (proc_cabinet.md, Detail OPE)
@@ -372,7 +394,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À saisir", "En saisie", "Enregistré"),
             Groupes = ["Salles fixes", "Salles ponctuelles"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Audience", "La date et l'heure d'audience sont obligatoires. Un doublon à la même date et à la même heure est refusé.", true,
                     ["Date d'audience", "Heure d'audience"]),
@@ -400,6 +422,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_PARAM_IP", Titre = "Codes chefs IP", Sujet = "codes chefs",
+            Forme = FormeEcran.Referentiel,
+            // Colonnes : les criteres de la fiche (code chef, prefixe IP, ordre).
+            Colonnes = ["Code chef", "Préfixe IP", Champ.Nombre("Ordre")],
             Recherche = "Rechercher un code chef…",
             Criteres = ["Code chef", "Préfixe IP", "Ordre"],
             // Bouton final cite par la fiche v2 : DoSauveAfterOperation (proc_param_ip.md, Detail OPE)
@@ -407,7 +432,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À compléter", "En cours", "Enregistrée"),
             Groupes = ["Codes IP proposables", "Autres codes"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Ajout", "Seuls les codes chefs commençant par IP sont proposés. Un code déjà dans la liste est refusé ; un code qui ne se résout pas n'est pas ajouté.", true,
                     ["Code chef"]),
@@ -431,6 +456,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_BORNE", Titre = "Bornes d'accueil", Sujet = "essais de bornes",
+            Forme = FormeEcran.Operation,
             Recherche = "Rechercher un essai, un article, une borne…",
             Criteres = ["Article", "Dossier de test", "Journal"],
             // Bouton final cite par la fiche v2 : VALIDER (proc_borne.md, Detail OPE)
@@ -438,7 +464,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À lancer", "En cours", "Terminé"),
             Groupes = ["Calcul de prix", "Commandes de test", "Journal"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Article", "Calcul du prix d'un article de la borne. Lecture seule : rien n'est écrit dans RIG.", true,
                     ["Article", "Prix calculé"]),
@@ -463,6 +489,8 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_REDAA", Titre = "Modeles de redaction", Sujet = "modèles de décision",
+            Forme = FormeEcran.Referentiel,
+            Colonnes = ["Nom du modèle", "Maquette", "Sections"],
             Recherche = "Rechercher un modèle, une maquette, une section…",
             Criteres = ["Modèle", "Maquette", "Section"],
             // Bouton final cite par la fiche v2 : bouton VALIDER (proc_redaa.md, Detail OPE)
@@ -470,7 +498,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À compléter", "En cours", "Enregistré"),
             Groupes = ["Modèles et maquettes", "Sections et glossaire", "Jugements"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Modèle", "Le modèle est recherché puis édité. Le mode d'ouverture choisit les onglets affichés.", true,
                     ["Nom du modèle"]),
@@ -498,6 +526,8 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_SCEAU", Titre = "Sceaux", Sujet = "sceaux",
+            Forme = FormeEcran.Referentiel,
+            Colonnes = ["Référence", "Hauteur maximale", "Image", "Dernière version"],
             Recherche = "Rechercher un sceau, une référence…",
             Criteres = ["Référence", "Hauteur maximale", "Image"],
             // Bouton final cite par la fiche v2 : VALIDER, ANNULER_ROUGE (proc_sceau.md, Detail OPE)
@@ -505,7 +535,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À compléter", "En saisie", "Enregistré"),
             Groupes = ["Hauteur de 24 mm", "Autre hauteur"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Référence", "La référence est unique : un doublon est refusé avant l'enregistrement.", true,
                     ["Référence"]),
@@ -531,6 +561,10 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_GESTMODEPAIEMENT", Titre = "Modes de paiement", Sujet = "modes de paiement",
+            Forme = FormeEcran.Referentiel,
+            // Colonnes : la grille de la V2 (Code, Libelle, Actif : proc_gestmodepaiement.md:244) et le detail
+            // qu'elle ouvre (Type :173, Banque :183, edition du remis), modifiables en ligne.
+            Colonnes = ["Code", "Libellé", "Type", "Banque", Champ.Case("Actif"), Champ.Case("Édition du remis visible")],
             Recherche = "Rechercher un mode de paiement, un code, une banque…",
             Criteres = ["Code", "Libellé", "Type"],
             // Bouton final cite par la fiche v2 : VALIDER (proc_gestmodepaiement.md, Detail OPE)
@@ -538,7 +572,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À compléter", "En saisie", "Enregistré"),
             Groupes = ["Espèces et chèque", "Virement et carte"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Code", "Le code (5 caractères au plus) est obligatoire et unique. Il se verrouille dès qu'un encaissement ou un procès-verbal utilise le mode.", true,
                     ["Code"]),
@@ -551,21 +585,24 @@ public sealed class DomaineConfigurer : IDomaineEcrans
                 new MarcheEcran("Suppression", "Un mode qui a déjà servi à un encaissement ne peut pas être supprimé.", false,
                     ["Supprimer"]),
             ],
+            // Les cellules, dans l'ordre des colonnes : le code d'un mode n'est pas cite par la fiche (vide, « — ») ; le type
+            // « VI » du virement l'est (:190) ; actif par defaut (:260). Le libelle est celui de la ligne.
             Lignes =
             [
-                new LigneEcran("Espèces", "Espèces et chèque · enregistré", "Espèces et chèque", "Validee", [0, 1, 2, 3]),
-                new LigneEcran("Chèque bancaire", "Espèces et chèque · enregistré", "Espèces et chèque", "Validee", [0, 1, 2]),
-                new LigneEcran("Chèque de banque", "Espèces et chèque · libellé à saisir", "Espèces et chèque", "EnCours", [0]),
-                new LigneEcran("Mode déjà encaissé", "Espèces et chèque · code et type verrouillés", "Espèces et chèque", "EnCours", [0, 1, 2]),
-                new LigneEcran("Virement", "Virement et carte · enregistré", "Virement et carte", "Validee", [0, 1, 2, 3]),
-                new LigneEcran("Carte bancaire", "Virement et carte · type à choisir", "Virement et carte", "EnCours", [0, 1]),
-                new LigneEcran("Prélèvement", "Virement et carte · à compléter", "Virement et carte", "AFaire", []),
+                new LigneEcran("Espèces", "Espèces et chèque · enregistré", "Espèces et chèque", "Validee", [0, 1, 2, 3]) { Valeurs = ["", "Espèces", "", "", "oui", ""] },
+                new LigneEcran("Chèque bancaire", "Espèces et chèque · enregistré", "Espèces et chèque", "Validee", [0, 1, 2]) { Valeurs = ["", "Chèque bancaire", "", "", "oui", ""] },
+                new LigneEcran("Chèque de banque", "Espèces et chèque · libellé à saisir", "Espèces et chèque", "EnCours", [0]) { Valeurs = ["", "Chèque de banque", "", "", "oui", ""] },
+                new LigneEcran("Mode déjà encaissé", "Espèces et chèque · code et type verrouillés", "Espèces et chèque", "EnCours", [0, 1, 2]) { Valeurs = ["", "Mode déjà encaissé", "", "", "oui", ""] },
+                new LigneEcran("Virement", "Virement et carte · enregistré", "Virement et carte", "Validee", [0, 1, 2, 3]) { Valeurs = ["", "Virement", "VI", "", "oui", ""] },
+                new LigneEcran("Carte bancaire", "Virement et carte · type à choisir", "Virement et carte", "EnCours", [0, 1]) { Valeurs = ["", "Carte bancaire", "", "", "oui", ""] },
+                new LigneEcran("Prélèvement", "Virement et carte · à compléter", "Virement et carte", "AFaire", []) { Valeurs = ["", "Prélèvement", "", "", "oui", ""] },
             ],
         },
 
         new DescripteurEcran
         {
             Code = "PROC_PARAMEXPRESSO", Titre = "Facturation Expresso", Sujet = "paramètres de facturation",
+            Forme = FormeEcran.Fiche,
             Recherche = "Rechercher un paramètre de facturation…",
             Criteres = ["Paramètre", "Banque", "Mode de paiement"],
             // Bouton final cite par la fiche v2 : DoValider (proc_paramexpresso.md, Detail OPE)
@@ -573,7 +610,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À renseigner", "En cours", "Enregistré"),
             Groupes = ["Paramètres généraux", "Pied de page", "Comptabilité"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Paramètres généraux", "Les paramètres généraux de la facturation.", true,
                     ["Paramètre", "Valeur"]),
@@ -582,7 +619,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
                 new MarcheEcran("Pied de page", "Le pied de page des factures : chaque ligne est un paramètre ; la source de l'adresse peut être basculée.", false,
                     ["Ligne du pied de page", "Source de l'adresse"]),
                 new MarcheEcran("Enregistrement", "Enregistrer écrit tous les paramètres ensemble et laisse une trace.", true,
-                    ["Enregistrer"]),
+                    []),
             ],
             Lignes =
             [
@@ -599,6 +636,10 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_REQUETES", Titre = "Requetes metier", Sujet = "requêtes",
+            Forme = FormeEcran.Etat,
+            Parametres = ["Requête", "Critères"],
+            Colonnes = ["Requête"],
+            Gestes = ["Exécuter"],
             Recherche = "Rechercher une requête préparée…",
             Criteres = ["Requête", "Critère", "Résultat"],
             // Bouton final cite par la fiche v2 : DoValider de la saisie de requete (proc_requetes.md, Detail OPE)
@@ -606,7 +647,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À lancer", "En cours", "Exécutée"),
             Groupes = ["Requêtes préparées", "Requêtes à critères"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Requête", "La requête est choisie dans la liste des requêtes préparées ; sa description s'affiche.", true,
                     ["Requête"]),
@@ -632,6 +673,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_IA", Titre = "Analyse IA", Sujet = "liasses analysées",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une liasse, un numéro de liasse…",
             Criteres = ["Numéro de liasse", "Type de liasse", "Indice de confiance"],
             // Bouton final cite par la fiche v2 : VALIDER (proc_ia.md, Detail OPE)
@@ -639,7 +681,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À analyser", "En cours", "Analysée"),
             Groupes = ["Liasses CFE", "Liasses DCA", "Liasses DAS"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Liasse", "Le numéro de liasse est requis pour lancer l'analyse. Le lancement n'est proposé que s'il n'existe pas encore de réponse.", true,
                     ["Numéro de liasse"]),
@@ -665,6 +707,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_CFENET_RET", Titre = "Retours CFE-NET", Sujet = "retours",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier, un numéro de retour…",
             Criteres = ["Période", "Rejets", "Corrections du greffe"],
             // Bouton final cite par la fiche v2 : VALIDER (proc_cfenet_ret.md, Detail OPE)
@@ -672,7 +715,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À traiter", "En cours", "Traité"),
             Groupes = ["Rejets", "Retours à traiter", "Retours traités"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Recherche", "La recherche se fait par période et par critères : rejet, traitement, masquage, date de retour.", true,
                     ["Période", "Rejets", "Date de retour"]),
@@ -698,6 +741,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_EDI_RPVAINS", Titre = "EDI RPVA", Sujet = "demandes d'inscription",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une demande, un numéro CNBF…",
             Criteres = ["Numéro CNBF", "Demandeur", "État de la demande"],
             // Bouton final cite par la fiche v2 : VALIDER (proc_edi_rpvains.md, Detail OPE)
@@ -705,7 +749,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("En attente", "En cours", "Traitée"),
             Groupes = ["Personnes physiques", "Structures"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Demande", "Recherche des demandes d'inscription reçues par le réseau RPVA. Une demande déjà traitée ne se traite plus.", true,
                     ["Demandeur", "Numéro CNBF", "État"]),
@@ -733,6 +777,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_EDI_RPJC_TRCNC", Titre = "EDI RPJC", Sujet = "affaires RPJC",
+            Forme = FormeEcran.File,
             Recherche = "Rechercher une affaire, un numéro de dossier…",
             Criteres = ["Numéro d'affaire", "Mandataire", "État de traitement"],
             // Bouton final cite par la fiche v2 : VALIDER (proc_edi_rpjc_trcnc.md, Detail OPE)
@@ -740,7 +785,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À traiter", "En cours", "Traitée"),
             Groupes = ["À traiter", "En cours", "Historique"],
-            Marches =
+            Sections =
             [
                 new MarcheEcran("Visualisation", "Les documents doivent être visualisés avant le traitement, sauf choix explicite de l'utilisateur sur les documents non vus.", true,
                     ["Documents", "Visualisation"]),
