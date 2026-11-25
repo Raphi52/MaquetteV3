@@ -1566,15 +1566,17 @@ table.rig-editions tbody tr:hover td { background: var(--rig-fond-2); }
 }
 /* Ses champs et ses boutons reprennent ceux de la liste : la saisie « Aller a… » (.rig-lm-cherche) et les outils
    (.rig-lm-outil, .rig-lm-outil--fort pour Rechercher). La bordure reste une vraie bordure : les etats refuse et a
-   renseigner (.rig-saisie-champ--refuse, --manque) la recolorent ou la pointillent. */
-.rig-criteres .rig-saisie-champ__libelle { font-size: 11.5px; color: var(--rig-texte-3); }
-.rig-criteres .rig-saisie-champ__saisie {
+   renseigner (.rig-saisie-champ--refuse, --manque) la recolorent ou la pointillent.
+   Les champs poses DANS la carte de la liste (.rig-lm : bloc Encaissement de Factures, fiches et formulaires sous la
+   grille) suivent la meme regle : ils gardaient la saisie grise de base, gris sur blanc (capture du 25/11/2026). */
+.rig-criteres .rig-saisie-champ__libelle, .rig-lm .rig-saisie-champ__libelle { font-size: 11.5px; color: var(--rig-texte-3); }
+.rig-criteres .rig-saisie-champ__saisie, .rig-lm .rig-saisie-champ__saisie {
   background: var(--rig-surface);
   border-radius: 8px;
   font-size: 12.5px;
   padding: 6px 10px;
 }
-.rig-criteres .rig-saisie-champ__saisie::placeholder { color: var(--rig-texte-3); }
+.rig-criteres .rig-saisie-champ__saisie::placeholder, .rig-lm .rig-saisie-champ__saisie::placeholder { color: var(--rig-texte-3); }
 .rig-criteres .rig-bouton {
   border-color: var(--rig-bord);
   border-radius: 7px;

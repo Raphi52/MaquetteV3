@@ -106,6 +106,17 @@ describe('ListeModerne', () => {
     expect(declarations('.rig-criteres .rig-saisie-champ__saisie', null, feuilleEcrans).background).toBe('var(--rig-surface)')
   })
 
+  // Capture du 25/11/2026 (Factures) : le bloc Encaissement, pose DANS la carte de la liste, gardait la saisie grise de
+  // base (.rig-saisie-champ__saisie, fond --rig-fond-2) sous un panneau de criteres passe au blanc. Entree qui ferait
+  // echouer ce test : une feuille ou les champs de .rig-lm n'ont pas exactement le libelle et la saisie des criteres.
+  it('les champs poses dans la liste ont le meme style que ceux des criteres', () => {
+    for (const element of ['.rig-saisie-champ__saisie', '.rig-saisie-champ__libelle']) {
+      const criteres = declarations(`.rig-criteres ${element}`, null, feuilleEcrans)
+      expect(Object.keys(criteres).length).toBeGreaterThan(0)
+      expect({ element, style: declarations(`.rig-lm ${element}`, null, feuilleEcrans) }).toEqual({ element, style: criteres })
+    }
+  })
+
   // Relecture du lot 8, capture a 900x700 (d2-rechaff-bas.png) : la grille bornee a 70vh defilait DANS la colonne
   // qui defile. Colonne descendue, l'en-tete collant de la grille restait colle au haut de SA zone : coupe a moitie
   // par le bord de la colonne, pose sur la premiere ligne. Entree qui ferait echouer ce test si la correction etait
