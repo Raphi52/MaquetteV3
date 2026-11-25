@@ -75,13 +75,14 @@
 }
 .rig-lm .rig-table thead th { background: var(--rig-surface); }
 
-/* Fenetre etroite : le corps de l'ecran empile ses blocs et c'est LUI qui defile (rig-accueil.css, @media 1100px).
-   La carte y prend la hauteur de tout son contenu, pied compris, au lieu des 300 px plancher de
-   .rig-proc__corps > .rig-resultats-proc ; la grille seule reste bornee et defile dans son cadre, pour qu'une
-   longue liste ne repousse pas le pied a des milliers de pixels. */
+/* Fenetre etroite : le corps de l'ecran empile ses blocs et c'est LUI, et lui seul, qui defile (rig-accueil.css,
+   @media 1100px). La carte y prend la hauteur de tout son contenu, grille et pied compris, au lieu des 300 px
+   plancher de .rig-proc__corps > .rig-resultats-proc.
+   fix-ok: la grille n'y borne PAS sa hauteur. Bornee a 70vh, elle defilait dans la colonne qui defile : colonne
+   descendue, son en-tete collant restait au haut de SA zone, coupe par le bord de la colonne et pose sur la
+   premiere ligne (capture 900x700 de la Recherche d'affaires, relecture du lot 8). */
 @media (max-width: 1100px) {
   .rig-proc__corps > .rig-resultats-proc.rig-lm { flex: 1 0 auto; }
-  .rig-proc__corps > .rig-resultats-proc.rig-lm .rig-table-cadre { max-height: 70vh; }
 }
 
 /* ---------- Tete : titre, synthese, « Aller a… Ctrl K » ---------- */

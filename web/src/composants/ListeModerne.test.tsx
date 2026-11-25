@@ -19,13 +19,12 @@ const feuille = readFileSync(join(import.meta.dirname, '../../../wwwroot/rig-lis
 // plan-9386cb20) : chaque test ci-dessous nomme son lot, sa mesure et l'entree qui le ferait echouer sur l'ancien code.
 afterEach(cleanup)
 
-/**
- * Les declarations d'un selecteur de rig-listes.css, dans l'ordre de la feuille (la derniere l'emporte, comme la
- * cascade a poids egal). media = le texte de la regle @media qui l'entoure, null hors de toute regle @media.
- * Ce que jsdom ne dessine pas (une hauteur, un alignement) se verifie ainsi sur la feuille elle-meme.
- */
-function declarations(selecteur: string, media: string | null = null): Record<string, string> {
-  const sortie: Record<string, string> = {}
+/** Une regle de rig-listes.css : media = le texte de la regle @media qui l'entoure, null hors de toute regle @media. */
+interface Regle { media: string | null; selecteurs: string[]; declarations: Record<string, string> }
+
+/** Les regles de rig-listes.css, dans l'ordre de la feuille, commentaires retires. */
+function regles(): Regle[] {
+  const sortie: Regle[] = []
   const parcourir = (texte: string, dans: string | null) => {
     let i = 0
     for (;;) {
@@ -37,11 +36,13 @@ function declarations(selecteur: string, media: string | null = null): Record<st
       const tete = texte.slice(i, ouvre).trim()
       const corps = texte.slice(ouvre + 1, j - 1)
       if (tete.startsWith('@media')) parcourir(corps, tete)
-      else if (dans === media && tete.split(',').map((s) => s.trim().replace(/\s+/g, ' ')).includes(selecteur)) {
+      else {
+        const declarations: Record<string, string> = {}
         for (const d of corps.split(';')) {
           const deux = d.indexOf(':')
-          if (deux > 0) sortie[d.slice(0, deux).trim()] = d.slice(deux + 1).trim()
+          if (deux > 0) declarations[d.slice(0, deux).trim()] = d.slice(deux + 1).trim()
         }
+        sortie.push({ media: dans, selecteurs: tete.split(',').map((s) => s.trim().replace(/\s+/g, ' ')), declarations })
       }
       i = j
     }
@@ -49,6 +50,19 @@ function declarations(selecteur: string, media: string | null = null): Record<st
   parcourir(feuille.replace(/\/\*[\s\S]*?\*\//g, ''), null)
   return sortie
 }
+
+/**
+ * Les declarations d'un selecteur de rig-listes.css, dans l'ordre de la feuille (la derniere l'emporte, comme la
+ * cascade a poids egal). media = le texte de la regle @media qui l'entoure, null hors de toute regle @media.
+ * Ce que jsdom ne dessine pas (une hauteur, un alignement) se verifie ainsi sur la feuille elle-meme.
+ */
+function declarations(selecteur: string, media: string | null = null): Record<string, string> {
+  const sortie: Record<string, string> = {}
+  for (const r of regles()) if (r.media === media && r.selecteurs.includes(selecteur)) Object.assign(sortie, r.declarations)
+  return sortie
+}
+
+const ETROIT = '@media (max-width: 1100px)'
 
 /** Une cellule du socle se pose dans une vraie ligne de tableau ; la ligne note ses clics. */
 function dansUneLigne(cellules: ReactNode, surClic = vi.fn(), surDouble = vi.fn()) {
@@ -73,10 +87,21 @@ describe('ListeModerne', () => {
     // auto coupe aux coins arrondis comme hidden, mais ce qui depasse se fait defiler au lieu de disparaitre.
     expect(cadre.overflow).toBe('auto')
     // Sous 1100 px le corps empile et defile : la carte doit faire la hauteur de son contenu (pied compris),
-    // pas les 300 px de .rig-proc__corps > .rig-resultats-proc ; la grille, elle, garde une hauteur bornee.
-    const etroit = '@media (max-width: 1100px)'
-    expect(declarations('.rig-proc__corps > .rig-resultats-proc.rig-lm', etroit).flex).toBe('1 0 auto')
-    expect(declarations('.rig-proc__corps > .rig-resultats-proc.rig-lm .rig-table-cadre', etroit)['max-height']).toBe('70vh')
+    // pas les 300 px de .rig-proc__corps > .rig-resultats-proc.
+    expect(declarations('.rig-proc__corps > .rig-resultats-proc.rig-lm', ETROIT).flex).toBe('1 0 auto')
+  })
+
+  // Relecture du lot 8, capture a 900x700 (d2-rechaff-bas.png) : la grille bornee a 70vh defilait DANS la colonne
+  // qui defile. Colonne descendue, l'en-tete collant de la grille restait colle au haut de SA zone : coupe a moitie
+  // par le bord de la colonne, pose sur la premiere ligne. Entree qui ferait echouer ce test si la correction etait
+  // fausse : une regle de fenetre etroite qui rend a .rig-table-cadre une hauteur bornee (max-height: 70vh, l'ancien
+  // code) ou fixe (height).
+  it('en fenetre etroite, une seule zone defile : la grille ne borne pas sa hauteur dans la colonne', () => {
+    const bornees = regles()
+      .filter((r) => r.media === ETROIT && r.selecteurs.some((s) => s.includes('.rig-table-cadre')))
+      .filter((r) => 'max-height' in r.declarations || 'height' in r.declarations)
+      .map((r) => `${r.selecteurs.join(', ')} { max-height: ${r.declarations['max-height']}; height: ${r.declarations.height} }`)
+    expect(bornees).toEqual([])
   })
 })
 
