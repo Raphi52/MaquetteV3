@@ -14,6 +14,8 @@ import { join } from 'node:path'
 // La feuille du socle, lue sur le disque : wwwroot/ est hors de la racine de Vite, qui refuse de l'importer en ?raw
 // (et sous jsdom, URL est celle de jsdom, que readFileSync ne prend pas : on passe un chemin).
 const feuille = readFileSync(join(import.meta.dirname, '../../../wwwroot/rig-listes.css'), 'utf8')
+// La feuille des ecrans, ou vit le panneau des criteres qui se pose a cote de la liste.
+const feuilleEcrans = readFileSync(join(import.meta.dirname, '../../../wwwroot/rig-accueil.css'), 'utf8')
 
 // fix-ok: les manques de ce socle ont ete MESURES par les lots 2 a 7 du plan des listes modernes (decisions notees du
 // plan-9386cb20) : chaque test ci-dessous nomme son lot, sa mesure et l'entree qui le ferait echouer sur l'ancien code.
@@ -22,8 +24,8 @@ afterEach(cleanup)
 /** Une regle de rig-listes.css : media = le texte de la regle @media qui l'entoure, null hors de toute regle @media. */
 interface Regle { media: string | null; selecteurs: string[]; declarations: Record<string, string> }
 
-/** Les regles de rig-listes.css, dans l'ordre de la feuille, commentaires retires. */
-function regles(): Regle[] {
+/** Les regles d'une feuille (rig-listes.css par defaut), dans l'ordre de la feuille, commentaires retires. */
+function regles(texteFeuille: string = feuille): Regle[] {
   const sortie: Regle[] = []
   const parcourir = (texte: string, dans: string | null) => {
     let i = 0
@@ -47,7 +49,7 @@ function regles(): Regle[] {
       i = j
     }
   }
-  parcourir(feuille.replace(/\/\*[\s\S]*?\*\//g, ''), null)
+  parcourir(texteFeuille.replace(/\/\*[\s\S]*?\*\//g, ''), null)
   return sortie
 }
 
@@ -56,9 +58,9 @@ function regles(): Regle[] {
  * cascade a poids egal). media = le texte de la regle @media qui l'entoure, null hors de toute regle @media.
  * Ce que jsdom ne dessine pas (une hauteur, un alignement) se verifie ainsi sur la feuille elle-meme.
  */
-function declarations(selecteur: string, media: string | null = null): Record<string, string> {
+function declarations(selecteur: string, media: string | null = null, texteFeuille: string = feuille): Record<string, string> {
   const sortie: Record<string, string> = {}
-  for (const r of regles()) if (r.media === media && r.selecteurs.includes(selecteur)) Object.assign(sortie, r.declarations)
+  for (const r of regles(texteFeuille)) if (r.media === media && r.selecteurs.includes(selecteur)) Object.assign(sortie, r.declarations)
   return sortie
 }
 
@@ -89,6 +91,19 @@ describe('ListeModerne', () => {
     // Sous 1100 px le corps empile et defile : la carte doit faire la hauteur de son contenu (pied compris),
     // pas les 300 px de .rig-proc__corps > .rig-resultats-proc.
     expect(declarations('.rig-proc__corps > .rig-resultats-proc.rig-lm', ETROIT).flex).toBe('1 0 auto')
+  })
+
+  // Capture du 25/11/2026 (Recherche d'affaires) : les criteres de gauche restaient a meme le fond gris, champs gris
+  // sur gris, a cote de la liste blanche. Entree qui ferait echouer ce test : une feuille ou .rig-criteres n'a pas le
+  // fond, les coins ou le filet de .rig-lm (l'ancien code n'avait qu'un filet a droite, sans fond ni coins).
+  it('les criteres de gauche sont la meme carte que la liste : fond, coins et filet identiques', () => {
+    const liste = declarations('.rig-lm')
+    const criteres = declarations('.rig-criteres', null, feuilleEcrans)
+    for (const propriete of ['background', 'border-radius', 'box-shadow']) {
+      expect({ propriete, valeur: criteres[propriete] }).toEqual({ propriete, valeur: liste[propriete] })
+    }
+    // Leurs champs sont blancs sur blanc, pas le gris du fond de l'ecran.
+    expect(declarations('.rig-criteres .rig-saisie-champ__saisie', null, feuilleEcrans).background).toBe('var(--rig-surface)')
   })
 
   // Relecture du lot 8, capture a 900x700 (d2-rechaff-bas.png) : la grille bornee a 70vh defilait DANS la colonne
