@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 // ============================================================
 // LES LANCEURS SUR LES DONNEES DE DEVELOPPEMENT (2026-11-24, conv-2122 ; docs/reconstruction/architecture.md,
@@ -141,13 +142,71 @@ finally
     }
 }
 
+// 5. Le serveur survit a la session qui l'a lance (2026-11-25, conv-2155). Relance a 10h39 depuis une session d'agent
+// Autowin (un Job Windows qui tue ses processus a sa fermeture), il est mort a 10h48 avec elle : l'ancien deja arrete,
+// le port 5080 est reste vide. Le banc rejoue ce cas. Start-HorsSession, lue dans donnees-dev.ps1, est appelee par un
+// PowerShell que le banc a mis dans SON Job. Le banc termine ce Job, puis regarde si le processus lance vit encore et
+// s'il a recu ses variables. Les entrees qui font tomber ce controle : un lancement par Start-Process (enfant de
+// l'appelant, donc dans son Job : il meurt) ; un lancement par WMI qui ne recopie pas l'environnement de l'appelant
+// (Win32_ProcessStartup.EnvironmentVariables REMPLACE tout le bloc : ni PATH ni dotnet).
+var session = Path.Combine(Path.GetTempPath(), "rigv3-banc-session-" + Guid.NewGuid().ToString("N")[..8]);
+Directory.CreateDirectory(session);
+var lance = 0;
+try
+{
+    var trace = Path.Combine(session, "variables.txt");
+    var harnaisSession = Path.Combine(session, "harnais.ps1");
+    File.WriteAllText(harnaisSession, """
+        param([string]$Script, [string]$Trace)
+        $arbre = [System.Management.Automation.Language.Parser]::ParseFile($Script, [ref]$null, [ref]$null)
+        foreach ($f in $arbre.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)) {
+            if ($f.Name -eq 'Start-HorsSession') { . ([scriptblock]::Create($f.Extent.Text)) }
+        }
+        $null = [Console]::In.ReadLine()   # le banc a mis ce processus dans son Job
+        $env:RIGV3_BANC_APPELANT = 'heritee'
+        $p = Start-HorsSession 'cmd.exe' "/c `"echo %RIGV3_BANC_SESSION% %RIGV3_BANC_APPELANT%>`"$Trace`"& ping -n 120 127.0.0.1 >nul`"" $env:TEMP @{ RIGV3_BANC_SESSION = 'transmise' }
+        "fuite=$env:RIGV3_BANC_SESSION"
+        "pid=$p"
+        $null = [Console]::In.ReadLine()   # jusqu'a la fin du Job
+        """);
+    var lancement = new ProcessStartInfo("powershell.exe")
+        { RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+    foreach (var a in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", harnaisSession, "-Script", Path.Combine(racine, "donnees-dev.ps1"), "-Trace", trace })
+        lancement.ArgumentList.Add(a);
+    var job = Job.Creer();
+    using var appelant = Process.Start(lancement)!;
+    _ = appelant.StandardError.ReadToEndAsync();
+    Exiger(Job.Ajouter(job, appelant), "le PowerShell qui appelle Start-HorsSession est dans le Job du banc (la session qui va se fermer)");
+    appelant.StandardInput.WriteLine();
+    var lignes = new List<string>();
+    var lecture = Task.Run(() => { for (string? l; (l = appelant.StandardOutput.ReadLine()) != null;) { lignes.Add(l); if (l.StartsWith("pid=")) return; } });
+    var lu = lecture.Wait(TimeSpan.FromSeconds(60));
+    _ = int.TryParse(lignes.FirstOrDefault(l => l.StartsWith("pid="))?[4..], out lance);
+    Job.Terminer(job);   // la session se ferme : tout ce qui est dans son Job meurt
+    appelant.WaitForExit(10_000);
+    await Task.Delay(1500);
+    bool Vit(int id) { try { using var p = Process.GetProcessById(id); return !p.HasExited && p.ProcessName.Equals("cmd", StringComparison.OrdinalIgnoreCase); } catch (ArgumentException) { return false; } }
+    Exiger(lu && lance > 0 && Vit(lance),
+        $"donnees-dev.ps1, Start-HorsSession : le processus lance (pid {lance}) vit encore apres la fin de la session qui l'a lance");
+    var recu = File.Exists(trace) ? File.ReadAllText(trace).Trim() : "(aucune trace)";
+    Exiger(recu == "transmise heritee",
+        $"donnees-dev.ps1, Start-HorsSession : le processus lance recoit ses variables ET l'environnement de l'appelant (lu : « {recu} »)");
+    var fuite = lignes.FirstOrDefault(l => l.StartsWith("fuite="))?[6..];
+    Exiger(fuite == "", $"donnees-dev.ps1, Start-HorsSession : l'appelant ne garde pas les variables du serveur (lu : « {fuite ?? "absent"} ») -- l'app n'herite pas de la chaine sa");
+}
+finally
+{
+    if (lance > 0) { try { using var p = Process.GetProcessById(lance); if (p.ProcessName.Equals("cmd", StringComparison.OrdinalIgnoreCase)) p.Kill(entireProcessTree: true); } catch (ArgumentException) { } }
+    try { Directory.Delete(session, recursive: true); } catch (IOException) { }
+}
+
 // Reconstruire D'ABORD dans un dossier neuf (la dll du serveur en cours est verrouillee), arreter l'ancien ENSUITE,
 // demarrer le neuf enfin : la coupure ne dure que le demarrage.
 var texteDonnees = File.ReadAllText(Path.Combine(racine, "donnees-dev.ps1"));
 var debutRelance = texteDonnees.IndexOf("function Start-ServeurDev", StringComparison.Ordinal);
 var relance = debutRelance < 0 ? "" : texteDonnees[debutRelance..texteDonnees.IndexOf("\n}", debutRelance, StringComparison.Ordinal)];
 var (construction, arret, demarrage) = (relance.IndexOf("& dotnet build", StringComparison.Ordinal),
-    relance.IndexOf("Stop-ServeurDev", StringComparison.Ordinal), relance.IndexOf("Start-Process", StringComparison.Ordinal));
+    relance.IndexOf("Stop-ServeurDev", StringComparison.Ordinal), relance.IndexOf("Start-HorsSession", StringComparison.Ordinal));
 Exiger(construction > 0 && arret > construction && demarrage > arret,
     $"donnees-dev.ps1, Start-ServeurDev : construction dans un dossier neuf (caractere {construction}), PUIS arret de l'ancien ({arret}), PUIS demarrage ({demarrage})");
 
@@ -166,4 +225,16 @@ static async Task<(int Code, string Sortie)> LancerAsync(string exe, string[] ar
     try { await p.WaitForExitAsync(fin.Token); }
     catch (OperationCanceledException) { p.Kill(entireProcessTree: true); return (-1, $"delai de {delai.TotalSeconds} s depasse"); }
     return (p.ExitCode, (await sortie + await erreur).Trim());
+}
+
+// Un Job Windows, comme celui d'une session d'agent Autowin : le terminer tue tous les processus qu'il contient.
+static class Job
+{
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern IntPtr CreateJobObject(IntPtr attributs, string? nom);
+    [DllImport("kernel32.dll", SetLastError = true)] static extern bool AssignProcessToJobObject(IntPtr job, IntPtr processus);
+    [DllImport("kernel32.dll", SetLastError = true)] static extern bool TerminateJobObject(IntPtr job, uint code);
+    [DllImport("kernel32.dll", SetLastError = true)] static extern bool CloseHandle(IntPtr h);
+    public static IntPtr Creer() => CreateJobObject(IntPtr.Zero, null);
+    public static bool Ajouter(IntPtr job, Process p) => AssignProcessToJobObject(job, p.Handle);
+    public static void Terminer(IntPtr job) { TerminateJobObject(job, 1); CloseHandle(job); }
 }

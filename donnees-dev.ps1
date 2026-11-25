@@ -21,7 +21,9 @@
 #
 # Le serveur tourne depuis sa PROPRE sortie (%LOCALAPPDATA%\RigV3\serveur-dev-<date>) : il ne
 # verrouille ni Serveur\bin ni bin\Debug, que les bancs et l'app recompilent. Il reste
-# lance apres ce script ; -Arreter l'arrete, lui seul (pid note a son lancement, chemin verifie).
+# lance apres ce script, et apres la session qui l'a appele : lance par WMI, il n'est pas dans
+# son Job (une session d'agent Autowin en est un, qui tue ses processus a sa fermeture).
+# -Arreter l'arrete, lui seul (pid note a son lancement, chemin verifie).
 # Un second appel le reprend tel quel si son code est a jour, et le RELANCE s'il a ete construit
 # sur un code serveur plus ancien que celui du depot (2026-11-25 : sinon les ecrans branches par
 # les autres fils restaient sur leurs exemples) : le commit apres "+" dans la version de /sante
@@ -161,6 +163,27 @@ if ($LASTEXITCODE -ne 0) { throw "Les donnees de developpement ne sont pas prete
 $d = Get-Content $fichierDonnees -Raw | ConvertFrom-Json
 
 # --- 3. Le serveur V3 sur la base commune ------------------------------------------------
+# Lance $Programme $Arguments dans $Dossier, fenetre cachee, HORS de la session qui appelle ce script, avec
+# l'environnement de CE processus plus $Variables (que CE processus ne garde pas). Rend le pid du processus lance.
+# Par WMI (Win32_Process.Create), le processus a pour parent le service WMI : il n'entre pas dans le Job de l'appelant.
+# fix-ok: lance par Start-Process, le serveur etait l'enfant de l'appelant, donc dans son Job ; une session d'agent
+# Autowin est un Job qui tue ses processus a sa fermeture : relance a 10h39 le 2026-11-25 (conv-2155), il est mort a
+# 10h48 avec elle, l'ancien deja arrete, le port 5080 vide. Banc LanceursCheck : rouge par Start-Process, vert ainsi.
+# Win32_ProcessStartup.EnvironmentVariables REMPLACE tout le bloc (mesure : 4 variables, sans Path) : il est recopie.
+function Start-HorsSession([string]$Programme, [string]$Arguments, [string]$Dossier, [hashtable]$Variables = @{}) {
+    $bloc = @{}   # insensible a la casse, comme l'environnement de Windows
+    foreach ($v in Get-ChildItem Env:) { $bloc[$v.Name] = $v.Value }
+    foreach ($k in $Variables.Keys) { $bloc[$k] = $Variables[$k] }
+    $noms = [string[]]@($bloc.Keys)
+    [Array]::Sort($noms, [StringComparer]::OrdinalIgnoreCase)   # l'ordre d'un bloc d'environnement Windows
+    $startup = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{
+        ShowWindow = [uint16]0; EnvironmentVariables = [string[]]@($noms | ForEach-Object { "$_=$($bloc[$_])" }) }
+    $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+        CommandLine = "`"$((Get-Command $Programme).Source)`" $Arguments"; CurrentDirectory = $Dossier; ProcessStartupInformation = $startup }
+    if ($r.ReturnValue -ne 0) { throw "Lancement de $Programme refuse par Win32_Process.Create (code $($r.ReturnValue))." }
+    return [int]$r.ProcessId
+}
+
 # Construit le serveur dans un dossier NEUF (celui du serveur en cours est verrouille par sa dll), PUIS arrete
 # l'ancien (le notre seul : Stop-ServeurDev), PUIS demarre le neuf : la coupure ne dure que son demarrage.
 # Rend $null si la compilation echoue : l'ancien serveur, pas encore arrete, reste alors en service.
@@ -174,28 +197,21 @@ function Start-ServeurDev {
     $ancien = Get-ServeurDev
     Stop-ServeurDev
     $coupe = Get-Date
-    $sauve = @{}
-    $env_serveur = @{
+    $env_serveur = @{   # pour le serveur seul : l'app n'herite pas de la chaine sa
         'ConnectionStrings__RigV3'  = "Server=$($d.serveur);Database=$($d.commune);User ID=sa;Password=$mdp;TrustServerCertificate=True"
         'Greffes__Authentification' = "User ID=sa;Password=$mdp;TrustServerCertificate=True"   # serveur et base : au catalogue
         'ASPNETCORE_ENVIRONMENT'    = 'Development'                                           # RIGV3_COMPTE ecoute
     }
-    foreach ($k in $env_serveur.Keys) { $sauve[$k] = [Environment]::GetEnvironmentVariable($k); [Environment]::SetEnvironmentVariable($k, $env_serveur[$k]) }
-    # Par cmd, SANS -RedirectStandardOutput : avec, le serveur herite des canaux de CE processus et un appelant qui lit la
+    # Par cmd, qui ecrit le journal : le serveur ne tient pas les canaux de CE processus, sinon un appelant qui lit la
     # sortie du script (pipe, Tee-Object, un lanceur) attend la fin du serveur, c'est-a-dire jamais (mesure le 2026-11-24 :
-    # 14 s bloquees sur un processus de 15 s, 0 s par cmd). L'environnement, lui, passe.
+    # 14 s bloquees sur un processus de 15 s, 0 s par cmd).
     $journal = Join-Path $reglages 'serveur-dev.log'
-    try {
-        $cmd = Start-Process cmd.exe -ArgumentList '/c', "`"dotnet `"$dll`" --urls $adresse 1>`"$journal`" 2>`"$journal.err`"`"" `
-            -WorkingDirectory $neuf -WindowStyle Hidden -PassThru
-    } finally {
-        foreach ($k in $sauve.Keys) { [Environment]::SetEnvironmentVariable($k, $sauve[$k]) }   # l'app n'herite pas de la chaine sa
-    }
+    $pidCmd = Start-HorsSession 'cmd.exe' "/c `"dotnet `"$dll`" --urls $adresse 1>`"$journal`" 2>`"$journal.err`"`"" $neuf $env_serveur
     $p = $null
     $sante = $null
     for ($i = 0; $i -lt 60; $i++) {
         if (-not $p) {   # le serveur : le dotnet que ce cmd vient de lancer
-            $enfant = Get-CimInstance Win32_Process -Filter "ParentProcessId=$($cmd.Id) AND Name='dotnet.exe'" -ErrorAction SilentlyContinue | Select-Object -First 1
+            $enfant = Get-CimInstance Win32_Process -Filter "ParentProcessId=$pidCmd AND Name='dotnet.exe'" -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($enfant) {
                 $p = Get-Process -Id $enfant.ProcessId -ErrorAction SilentlyContinue
                 @{ pid = $enfant.ProcessId; port = $Port; base = $d.commune; dll = $dll; lanceLe = (Get-Date).ToString('s') } |
@@ -203,7 +219,7 @@ function Start-ServeurDev {
             }
         }
         $sante = Get-Sante
-        if ($sante -or $cmd.HasExited) { break }
+        if ($sante -or -not (Get-Process -Id $pidCmd -ErrorAction SilentlyContinue)) { break }
         Start-Sleep -Milliseconds 500
     }
     if (-not $sante -or $sante.etat -ne 'ok') {

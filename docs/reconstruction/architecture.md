@@ -133,11 +133,23 @@ Banc : `.\tests.ps1 Lanceurs` (les deux fonctions du script jouées sur un dép�
 commit inconnu, git absent → illisible ; contre-épreuves faites : comparaison sur tout le dépôt, références non
 suivies, fichiers de la racine oubliés, ancien serveur arrêté avant la compilation → rouge à chaque fois).
 
-**Branchée, l'app renvoie les préférences de l'agent au serveur** (SOC-013, `Pont/PreferencesServeur.cs`) : à
-l'ouverture, elle relit ses onglets dans la base, et chaque onglet ouvert y repart. Sur un bureau caché, `RIGV3_ETAT`
-protège donc le fichier de l'utilisateur, **pas** ses onglets : ceux de l'agent de la copie sont les siens. Un onglet
-ouvert pour une capture se referme, et l'onglet actif d'origine se reprend, avant de fermer l'app (vérifié le 25/11 :
-`GET /socle/3801/preferences` identique avant et après).
+**Le serveur survit à la session qui l'a lancé.** Il est lancé par WMI (`Win32_Process.Create`, fonction
+`Start-HorsSession` du script) : son parent est le service WMI, pas le PowerShell appelant. Lancé par `Start-Process`,
+il était l'enfant de l'appelant, donc dans son Job Windows. Or une session d'agent Autowin est un Job qui tue ses
+processus à sa fermeture : le 25/11, le serveur relancé à 10h39 depuis une session d'agent est mort à 10h48 avec elle,
+l'ancien déjà arrêté, et le port 5080 est resté vide. L'environnement du script est recopié en entier, avec les
+variables du serveur en plus : `Win32_ProcessStartup.EnvironmentVariables` remplace tout le bloc (mesuré : sans
+recopie, 4 variables, ni `Path` ni `dotnet`). Banc : `.\tests.ps1 Lanceurs` met l'appelant dans un Job, le termine,
+puis exige que le processus lancé vive encore et ait reçu ses variables (rouge par `Start-Process`, rouge par WMI sans
+recopie de l'environnement).
+
+**Branchée, l'app renvoie les préférences de l'agent au serveur** (SOC-013, `Pont/PreferencesServeur.cs:12-18`) : à
+l'ouverture, elle relit ses onglets dans la base et les pose dans `accueil.json`, et chaque réglage changé y repart.
+Sur un bureau caché, `RIGV3_ETAT` protège donc le fichier de l'utilisateur, **pas** ses onglets : ceux de l'agent de
+la copie sont les siens. Pour une capture, lancer l'app avec le `RIGV3_COMPTE` d'un **autre** agent admis et sans
+préférences (liste : `GET /socle/3801/comptes` ; parade du lot 3, 25/11). À défaut, refermer l'onglet ouvert et
+reprendre l'onglet actif d'origine avant de fermer l'app (vérifié le 25/11 : `GET /socle/3801/preferences` identique
+avant et après).
 
 Les noms des trois bases et de l'agent : `%LOCALAPPDATA%\RigV3\donnees-dev.json` ; journal du serveur :
 `serveur-dev.log` à côté. Une préparation refaite supprime l'ancien jeu **après** sa réussite (un échec laisse
@@ -148,9 +160,9 @@ Ce que ces données ne donnent pas : les écrans qui n'ont pas encore de partie 
 facturation… : phase 3) restent sur leur démonstration ; hors socle, la copie est réduite (200 premières lignes par
 table et leurs parents), pas le volume de RIG_DEV.
 
-Le serveur est lancé par `cmd`, sans redirection côté PowerShell : redirigé, il héritait des canaux du script, et un
-appelant qui lisait sa sortie (pipe, `Tee-Object`, un lanceur) attendait la fin du serveur, c'est-à-dire jamais
-(mesuré le 2026-11-24).
+Le serveur est lancé par `cmd`, qui écrit son journal, sans redirection côté PowerShell : redirigé, il héritait des
+canaux du script, et un appelant qui lisait sa sortie (pipe, `Tee-Object`, un lanceur) attendait la fin du serveur,
+c'est-à-dire jamais (mesuré le 2026-11-24).
 
 Les bancs : `.\tests.ps1 ServeurCheck` (ou `.\tests.ps1` pour tous). Sans `docker compose up -d`, un banc
 qui a besoin de la base est **rouge** et le dit (il attend 90 s que SQL Server démarre, puis abandonne).
