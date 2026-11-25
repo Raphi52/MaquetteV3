@@ -291,6 +291,8 @@ export interface ProprietesTableLignes {
   lignes: LigneTenue[]
   /** Toutes les lignes de l'ecran : pour dire « aucune ligne » ou « rien ne correspond ». */
   total: number
+  /** Une recherche, un etat ou un critere filtre la liste : les groupes vides se cachent alors. */
+  filtre?: boolean | undefined
   /** Les cases a cocher (File, Audience, Operation) ; absent, pas de case. */
   cases?: { cochees: ReadonlySet<number>; basculer: (i: number) => void; toutes: (cocher: boolean) => void } | undefined
   /** Le detail d'une ligne depliee (chevron) ; absent, pas de chevron. */
@@ -304,7 +306,7 @@ export interface ProprietesTableLignes {
 }
 
 /** La table des lignes d'un ecran genere : identite (nom, precisions), procedure ou groupe, etat. */
-export function TableLignes({ d, vue, lignes, total, cases, detail, ouvrir, ouverte, actions }: ProprietesTableLignes) {
+export function TableLignes({ d, vue, lignes, total, filtre = false, cases, detail, ouvrir, ouverte, actions }: ProprietesTableLignes) {
   const [depliees, poserDepliees] = useState<ReadonlySet<number>>(() => new Set())
   const avecGroupe = d.groupes.length > 1
   const nbColonnes = (cases ? 1 : 0) + (detail ? 1 : 0) + 2 + (avecGroupe ? 1 : 0) + (actions ? 1 : 0)
@@ -315,6 +317,49 @@ export function TableLignes({ d, vue, lignes, total, cases, detail, ouvrir, ouve
     if (!apres.delete(i)) apres.add(i)
     return apres
   })
+  const aucuneLigne = `Aucune ligne dans la base du greffe${vue?.greffe ? ` ${vue.greffe}` : ''}.`
+  const videTable = (
+    <tr>
+      <td colSpan={nbColonnes} className="rig-table__vide">
+        {vue === null ? 'Lecture des lignes…' : total === 0 ? aucuneLigne : 'Rien ne correspond à la recherche.'}
+      </td>
+    </tr>
+  )
+  const rangee = (l: LigneTenue) => {
+    const etat = etatDe(d, l)
+    const ouverteIci = depliees.has(l.i)
+    return [
+      <tr key={l.i} className={[ouvrir ? 'rig-eg-ligne--ouvrable' : '', ouverte === l.i ? 'rig-eg-ligne--ouverte' : ''].join(' ').trim() || undefined}
+          aria-current={ouverte === l.i ? 'true' : undefined} onClick={ouvrir ? () => ouvrir(l) : undefined}>
+        {cases && (
+          <td className="rig-eg-case-cellule" onClick={(e) => e.stopPropagation()}>
+            <input type="checkbox" aria-label={`Cocher ${l.nom}`} checked={cases.cochees.has(l.i)} disabled={figee(l.etat)}
+                   title={figee(l.etat) ? `Ligne figée (${etat?.libelle ?? l.etat}) : aucun geste` : undefined}
+                   onChange={() => cases.basculer(l.i)} />
+          </td>
+        )}
+        {detail && <CelluleChevron ouverte={ouverteIci} basculer={() => basculerDepliee(l.i)} />}
+        <CelluleIdentite nom={l.nom} objet={l.precisions} titre={`${l.nom} — ${l.precisions}`} />
+        {avecGroupe && (
+          <td title={l.groupe}>
+            <Pastille teinte={teinteGroupe(d, l.groupe)}>{l.groupe}</Pastille>
+            {enExemple(vue, l) && <> <Exemple /></>}
+          </td>
+        )}
+        <td><PointEtat teinte={teinteEtat(etat)}>{etat?.libelle ?? l.etat}</PointEtat></td>
+        {actions && <td className="rig-lm-cellule-menu"><MenuLigne actions={actions(l)} libelle={`Actions — ${l.nom}`} /></td>}
+      </tr>,
+      detail && ouverteIci ? <tr key={`${l.i}-detail`} className="rig-eg-detail"><td colSpan={nbColonnes}>{detail(l)}</td></tr> : null,
+    ]
+  }
+  // Un ecran REUNI (plusieurs procedures) range ses lignes par procedure, un bloc chacune, titre et nombre en tete. Un
+  // groupe branche sur la base mais sans ligne (vue.vides) reste a l'ecran avec son titre et « Aucune ligne » : un
+  // message unique ne les remplace pas (cas « Envois et retours », 25/11/2026, plan-f7ba4de2 lot 2). Une recherche ou
+  // un etat qui filtre cache les groupes vides.
+  const vides = filtre ? [] : vue?.vides ?? []
+  const groupes = d.membres.length === 0 ? null : [...new Set([...d.groupes, ...lignes.map((l) => l.groupe)])]
+    .map((titre) => ({ titre, lignes: lignes.filter((l) => l.groupe === titre) }))
+    .filter((g) => g.lignes.length > 0 || vides.includes(g.titre))
   return (
     <div className="rig-table-cadre">
       <table className="rig-table rig-lm-table rig-eg-table">
@@ -341,44 +386,24 @@ export function TableLignes({ d, vue, lignes, total, cases, detail, ouvrir, ouve
             {actions && <th aria-label="Actions" />}
           </tr>
         </thead>
-        <tbody>
-          {lignes.map((l) => {
-            const etat = etatDe(d, l)
-            const ouverteIci = depliees.has(l.i)
-            return [
-              <tr key={l.i} className={[ouvrir ? 'rig-eg-ligne--ouvrable' : '', ouverte === l.i ? 'rig-eg-ligne--ouverte' : ''].join(' ').trim() || undefined}
-                  aria-current={ouverte === l.i ? 'true' : undefined} onClick={ouvrir ? () => ouvrir(l) : undefined}>
-                {cases && (
-                  <td className="rig-eg-case-cellule" onClick={(e) => e.stopPropagation()}>
-                    <input type="checkbox" aria-label={`Cocher ${l.nom}`} checked={cases.cochees.has(l.i)} disabled={figee(l.etat)}
-                           title={figee(l.etat) ? `Ligne figée (${etat?.libelle ?? l.etat}) : aucun geste` : undefined}
-                           onChange={() => cases.basculer(l.i)} />
-                  </td>
-                )}
-                {detail && <CelluleChevron ouverte={ouverteIci} basculer={() => basculerDepliee(l.i)} />}
-                <CelluleIdentite nom={l.nom} objet={l.precisions} titre={`${l.nom} — ${l.precisions}`} />
-                {avecGroupe && (
-                  <td title={l.groupe}>
-                    <Pastille teinte={teinteGroupe(d, l.groupe)}>{l.groupe}</Pastille>
-                    {enExemple(vue, l) && <> <Exemple /></>}
-                  </td>
-                )}
-                <td><PointEtat teinte={teinteEtat(etat)}>{etat?.libelle ?? l.etat}</PointEtat></td>
-                {actions && <td className="rig-lm-cellule-menu"><MenuLigne actions={actions(l)} libelle={`Actions — ${l.nom}`} /></td>}
-              </tr>,
-              detail && ouverteIci ? <tr key={`${l.i}-detail`} className="rig-eg-detail"><td colSpan={nbColonnes}>{detail(l)}</td></tr> : null,
-            ]
-          })}
-          {lignes.length === 0 && (
-            <tr>
-              <td colSpan={nbColonnes} className="rig-table__vide">
-                {vue === null ? 'Lecture des lignes…'
-                  : total === 0 ? `Aucune ligne dans la base du greffe${vue.greffe ? ` ${vue.greffe}` : ''}.`
-                  : 'Rien ne correspond à la recherche.'}
-              </td>
+        {groupes === null ? (
+          <tbody>
+            {lignes.flatMap(rangee)}
+            {lignes.length === 0 && videTable}
+          </tbody>
+        ) : groupes.length === 0 ? <tbody>{videTable}</tbody> : groupes.map((g) => (
+          <tbody key={g.titre} className="rig-tcw__groupe rig-eg-groupe">
+            <tr className="rig-eg-groupe__tete">
+              <th colSpan={nbColonnes} scope="colgroup">
+                <span className="rig-tcw__groupe-titre">{g.titre}</span>
+                <span className="rig-tcw__groupe-nombre">{g.lignes.length}</span>
+              </th>
             </tr>
-          )}
-        </tbody>
+            {g.lignes.length > 0 ? g.lignes.flatMap(rangee) : (
+              <tr><td colSpan={nbColonnes} className="rig-tcw__vide-groupe">{aucuneLigne}</td></tr>
+            )}
+          </tbody>
+        ))}
       </table>
     </div>
   )

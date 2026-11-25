@@ -7,7 +7,7 @@ import { useState } from 'react'
 import { EnteteListe, ListeModerne, normaliser, PiedListe } from '../../composants/ListeModerne'
 import type { DescripteurEcranVue } from '../../plan/types'
 import {
-  Annonce, ChampSaisie, GroupesVides, Provenance, TableLignes, figee, gestesDe, refus, synthese, texteLigne,
+  Annonce, ChampSaisie, Provenance, TableLignes, figee, gestesDe, refus, synthese, texteLigne,
   useAnnonce, useLignes, type LigneTenue, type Saisies,
 } from './commun'
 
@@ -55,10 +55,9 @@ export function FormeAudience({ d }: { d: DescripteurEcranVue }) {
           ))}
         </div>
         <Annonce texte={annonce} />
-        <TableLignes d={d} vue={vue} lignes={visibles} total={lignes.length}
+        <TableLignes d={d} vue={vue} lignes={visibles} total={lignes.length} filtre={cherche !== ''}
                      cases={{ cochees, basculer, toutes: (cocher) => poserCochees(cocher ? new Set(visibles.filter((l) => !figee(l.etat)).map((l) => l.i)) : new Set()) }}
                      actions={(l) => gestesDe(d).map((g) => ({ libelle: g, desactive: figee(l.etat), agir: () => jouer(g, [l]) }))} />
-        <GroupesVides vue={vue} />
         <PiedListe aide="Cochez des affaires, puis choisissez le geste.">
           <span><b>{visibles.length}</b> au rôle</span>
         </PiedListe>

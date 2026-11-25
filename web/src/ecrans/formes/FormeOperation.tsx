@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { EnteteListe, ListeModerne, normaliser, PiedListe } from '../../composants/ListeModerne'
 import type { DescripteurEcranVue } from '../../plan/types'
 import {
-  Annonce, DEMONSTRATION, GroupesVides, PanneauCriteres, Provenance, Sections, TableLignes, cleChamp, figee, manquantes,
+  Annonce, DEMONSTRATION, PanneauCriteres, Provenance, Sections, TableLignes, cleChamp, figee, manquantes,
   parcoursDe, passeCriteres, refus, texteLigne, useAnnonce, useLignes, type Saisies,
 } from './commun'
 
@@ -69,11 +69,10 @@ export function FormeOperation({ d }: { d: DescripteurEcranVue }) {
         {temps === 0 && (
           <>
             {vue && <Provenance vue={vue} />}
-            <TableLignes d={d} vue={vue} lignes={visibles} total={lignes.length}
+            <TableLignes d={d} vue={vue} lignes={visibles} total={lignes.length} filtre={cherche !== '' || Object.values(criteres).some((v) => v.trim() !== '')}
                          cases={{ cochees, basculer, toutes: (cocher) => poserCochees(cocher
                            ? new Set(visibles.filter((l) => !figee(l.etat) && (!choisies[0] || l.groupe === choisies[0].groupe)).map((l) => l.i))
                            : new Set()) }} />
-            <GroupesVides vue={vue} />
           </>
         )}
         {temps === 1 && (

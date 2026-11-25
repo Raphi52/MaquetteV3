@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { EnteteListe, ListeModerne, normaliser, PiedListe } from '../../composants/ListeModerne'
 import type { DescripteurEcranVue } from '../../plan/types'
 import {
-  GroupesVides, PanneauCriteres, Provenance, TableLignes, passeCriteres, synthese, texteLigne,
+  PanneauCriteres, Provenance, TableLignes, passeCriteres, synthese, texteLigne,
   type LigneTenue, type Saisies, type VueLignesEcran,
 } from './commun'
 
@@ -27,8 +27,8 @@ export function Resultats({ d, vue, lignes, ouvrir, forme, invite }: {
                      filtre={{ valeur: texte, changer: poserTexte, indication: d.recherche,
                                valider: () => { const premiere = visibles[0]; if (premiere) ouvrir(premiere) } }} />
         {vue && <Provenance vue={vue} />}
-        <TableLignes d={d} vue={vue} lignes={visibles} total={lignes.length} ouvrir={ouvrir} />
-        <GroupesVides vue={vue} />
+        <TableLignes d={d} vue={vue} lignes={visibles} total={lignes.length} ouvrir={ouvrir}
+                     filtre={cherche !== '' || Object.values(criteres).some((v) => v.trim() !== '')} />
         <PiedListe aide={invite}>
           <span><b>{visibles.length}</b> résultat{visibles.length > 1 ? 's' : ''}</span>
         </PiedListe>

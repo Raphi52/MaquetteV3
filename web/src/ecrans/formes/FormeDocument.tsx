@@ -7,7 +7,7 @@ import { useState } from 'react'
 import { EnteteListe, ListeModerne, normaliser } from '../../composants/ListeModerne'
 import type { DescripteurEcranVue } from '../../plan/types'
 import {
-  Annonce, GroupesVides, Provenance, Sections, TableLignes, gestesDe, parcoursDe, refus, synthese, texteLigne,
+  Annonce, Provenance, Sections, TableLignes, gestesDe, parcoursDe, refus, synthese, texteLigne,
   useAnnonce, useLignes,
 } from './commun'
 
@@ -37,9 +37,8 @@ export function FormeDocument({ d }: { d: DescripteurEcranVue }) {
         {vue && <Provenance vue={vue} />}
         <div className="rig-eg-visionneuse">
           <div className="rig-eg-visionneuse__liste">
-            <TableLignes d={d} vue={vue} lignes={visibles} total={lignes.length} ouverte={sel?.i ?? null}
+            <TableLignes d={d} vue={vue} lignes={visibles} total={lignes.length} filtre={cherche !== ''} ouverte={sel?.i ?? null}
                          ouvrir={(l) => { poserOuverte(l.i); poserAngle(0); annoncer(null) }} />
-            <GroupesVides vue={vue} />
           </div>
           <section className="rig-eg-visionneuse__vue" aria-label={sel ? `Document — ${sel.nom}` : 'Document'}>
             <div className="rig-lm-outils" role="toolbar" aria-label="Outils de la visionneuse">

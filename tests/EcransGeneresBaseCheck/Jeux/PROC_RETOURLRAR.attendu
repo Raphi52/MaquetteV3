@@ -1,0 +1,15 @@
+# « Retours LRAR » (LecteurRetoursLrar) sur le jeu PROC_RETOURLRAR.sql : les plis LRAR et LR dont la modalite de retour
+# est saisie ; ceux sans date d'abord, puis la date de reception la plus recente en tete.
+# Etat : modalite et date -> Retour enregistre [0,1,2] ; modalite sans date (1A1200004) -> En cours [0,1] ; plus la remise
+# en emission (3) pour une modalite « pas a gerer » (PAS_ENVOYE, 1A1200006).
+# Groupe : RECEPTION Recus ; NPAI, REFUSE, INCOMPLET et toute modalite hors descripteur (INCONNU, 1A1200010) NPAI, refuses
+# ou incomplets ; NON_RECLAME Non reclames ; PAS_ENVOYE Non envoyes.
+# Ecartes, chacun avec son jumeau retenu 1A1200001 : 1A1200007 sans modalite (accuse pas revenu), 1A1200008 lettre
+# electronique CIPREMIUM_LRAR (retour ecrit par La Poste), 1A1200009 modalite vide.
+Pli 1A1200004 | Incomplet reçu · date non précisée sur l'imprimé | NPAI, refusés ou incomplets | EnCours | [0,1]
+Pli 1A1200001 | Reçu le {J-1} | Reçus | Validee | [0,1,2]
+Pli 1A1200002 | NPAI reçu le {J-2} · renvoyé sous le n° 1A1200011 | NPAI, refusés ou incomplets | Validee | [0,1,2]
+Pli 1A1200003 | Refusé reçu le {J-3} | NPAI, refusés ou incomplets | Validee | [0,1,2]
+Pli 1A1200005 | Non réclamé reçu le {J-4} | Non réclamés | Validee | [0,1,2]
+Pli 1A1200006 | Non envoyé le {J-5} · demandes d'édition remises en file d'émission · LR sans accusé de réception | Non envoyés | Validee | [0,1,2,3]
+Pli 1A1200010 | modalité « INCONNU » de l'ancien RIG · le {J-6} | NPAI, refusés ou incomplets | Validee | [0,1,2]

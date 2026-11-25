@@ -205,7 +205,9 @@ function Start-ServeurDev {
     # Par cmd, qui ecrit le journal : le serveur ne tient pas les canaux de CE processus, sinon un appelant qui lit la
     # sortie du script (pipe, Tee-Object, un lanceur) attend la fin du serveur, c'est-a-dire jamais (mesure le 2026-11-24 :
     # 14 s bloquees sur un processus de 15 s, 0 s par cmd).
-    $journal = Join-Path $reglages 'serveur-dev.log'
+    # Un journal par port, comme la note ($fichierServeur) : le cmd du 5080 tient serveur-dev.log en ecriture tant que
+    # son serveur vit, et le cmd d'un autre port, qui ne pouvait pas y rediriger, mourait sans rien dire (2026-11-25).
+    $journal = Join-Path $reglages $(if ($Port -eq 5080) { 'serveur-dev.log' } else { "serveur-dev-$Port.log" })
     $pidCmd = Start-HorsSession 'cmd.exe' "/c `"dotnet `"$dll`" --urls $adresse 1>`"$journal`" 2>`"$journal.err`"`"" $neuf $env_serveur
     $p = $null
     $sante = $null

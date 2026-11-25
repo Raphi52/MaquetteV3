@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { CartesChiffrees, EnteteListe, ListeModerne, normaliser, PiedListe, type CarteChiffree } from '../../composants/ListeModerne'
 import type { DescripteurEcranVue } from '../../plan/types'
 import {
-  Annonce, GroupesVides, Provenance, TableLignes, enExemple, figee, gestesDe, parcoursDe, refus, synthese, teinteEtat,
+  Annonce, Provenance, TableLignes, enExemple, figee, gestesDe, parcoursDe, refus, synthese, teinteEtat,
   texteLigne, useAnnonce, useLignes, type LigneTenue,
 } from './commun'
 
@@ -72,7 +72,7 @@ export function FormeFile({ d }: { d: DescripteurEcranVue }) {
         </div>
         <Annonce texte={annonce} />
 
-        <TableLignes d={d} vue={vue} lignes={visibles} total={lignes.length}
+        <TableLignes d={d} vue={vue} lignes={visibles} total={lignes.length} filtre={etatChoisi !== null || cherche !== ''}
                      cases={{ cochees, basculer, toutes: (cocher) => poserCochees(cocher ? new Set(visibles.filter((l) => !figee(l.etat)).map((l) => l.i)) : new Set()) }}
                      detail={(l) => {
                        const p = parcoursDe(d, l.groupe)
@@ -88,7 +88,6 @@ export function FormeFile({ d }: { d: DescripteurEcranVue }) {
                        )
                      }}
                      actions={(l) => gestesDe(parcoursDe(d, l.groupe)).map((g) => ({ libelle: g, desactive: figee(l.etat), agir: () => jouer(g, [l]) }))} />
-        <GroupesVides vue={vue} />
         <PiedListe aide="Cochez des lignes, puis choisissez l’action.">
           <span><b>{visibles.length}</b> affichée{visibles.length > 1 ? 's' : ''}</span>
           <span>Cochées <b>{choisies.length}</b></span>

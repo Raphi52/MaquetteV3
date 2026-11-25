@@ -48,6 +48,17 @@
 .rig-eg-table tr.rig-eg-ligne--ouvrable { cursor: pointer; }
 .rig-eg-table tr.rig-eg-ligne--ouvrable:hover td { background: color-mix(in srgb, var(--rig-texte) 3%, transparent); }
 .rig-eg-table tr.rig-eg-ligne--ouverte td { background: color-mix(in srgb, var(--rig-or) 9%, transparent); }
+/* Un ecran reuni : un bloc par procedure, son titre et son nombre en tete ; un groupe vide le dit (commun.tsx, TableLignes). */
+.rig-eg-table .rig-eg-groupe__tete th {
+  text-align: left; padding: 9px 12px 5px; font: 600 12.5px/1.4 var(--rig-font); color: var(--rig-texte-2);
+  background: color-mix(in srgb, var(--rig-texte) 3%, transparent);
+}
+.rig-eg-table .rig-eg-groupe__tete .rig-tcw__groupe-titre { color: inherit; }
+.rig-eg-table .rig-eg-groupe__tete .rig-tcw__groupe-nombre {
+  margin-left: 8px; font: 600 11px/17px var(--rig-font-mono); padding: 0 7px; border-radius: 999px;
+  color: var(--rig-texte-2); background: color-mix(in srgb, var(--rig-texte) 8%, transparent);
+}
+.rig-eg-table td.rig-tcw__vide-groupe { color: var(--rig-texte-3); font-style: normal; }
 .rig-eg-detail td { white-space: normal; background: color-mix(in srgb, var(--rig-texte) 2%, transparent); }
 .rig-eg-regles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 16px; padding: 6px 4px; }
 .rig-eg-regles .rig-lm-champ__valeur { white-space: normal; color: var(--rig-texte-2); }

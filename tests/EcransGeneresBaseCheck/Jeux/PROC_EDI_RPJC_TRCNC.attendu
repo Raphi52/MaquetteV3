@@ -1,0 +1,20 @@
+# « EDI RPJC » (LecteurTraitementRpjc) sur le jeu PROC_EDI_RPJC_TRCNC.sql : les deux grilles de la V2 chargees a
+# l'ouverture (« Affaires a traiter » : etat 1, personne dessus ; « Affaires en cours » : etat 1, un agent dessus ; toutes
+# deux avec un mandataire actif avec abrege et une instance), puis l'historique a ses criteres pre-remplis (traitees A ou R
+# du jour moins 15 jours a 0 h au jour a 24 h, type de document connu).
+# Ordre : a traiter puis en cours par numero ; l'historique, le plus recent en tete.
+# Etat : a traiter -> AFaire [] ; en cours -> EnCours [0,1] ; historique A ou R -> Validee [0,1,2,4], +3 si l'etat est 9
+# (reponse rejetee par Extelia).
+# Ecartes, chacun avec son jumeau retenu : 1300102 mandataire inactif, 1300103 sans abrege, 1300104 role sans instance
+# (jumeau 1300101) ; 1300109 traitee la veille de la borne basse (jumeau 1300108, a la borne) ; 1300114 traitee demain a
+# 0 h (jumeau 1300113, aujourd'hui a 23 h) ; 1300112 type inconnu et 1300115 etat 2 sans decision (jumeau 1300108).
+# L'historique n'exige ni mandataire (1300110, « mandataire non trouvé ») ni instance (1300111, le role seul).
+# 1300101 : une seule ligne malgre deux instances au role, le nom de la premiere. 1300105 : le plus recent des deux
+# mandataires du CNBF 130004 ; trois pieces, leur nombre.
+Rôle 2026F13001 · DELTA SARL c/ EPSILON SAS | Me ALPHA Irène · transmise le {J-3} · CCL13 - Conclusions | À traiter | AFaire | []
+Rôle 2026F13003 · ZETA CONSEIL SAS | Mme DELTA Lina · transmise le {J-1} · 3 pièces | À traiter | AFaire | []
+Rôle 2026F13003 · ZETA CONSEIL SAS | Me ALPHA Irène · transmise le {J-2} · PIE13 - Pièces · verrouillée par agent.trcnc | En cours | EnCours | [0,1]
+Rôle 2026F13001 · DELTA SARL c/ EPSILON SAS | Me ALPHA Irène · transmise le {J-1} · CCL13 - Conclusions · intégrée le {J+0} | Historique | Validee | [0,1,2,4]
+Rôle 2026F13009 | Me ALPHA Irène · transmise le {J-6} · CCL13 - Conclusions · intégrée le {J-5} · réponse rejetée par Extelia le {J-4} | Historique | Validee | [0,1,2,3,4]
+Rôle 2026F13003 · ZETA CONSEIL SAS | mandataire non trouvé (CNBF 130002) · transmise le {J-4} · PIE13 - Pièces · refusée le {J-2} · Pièce illisible | Historique | Validee | [0,1,2,4]
+Rôle 2026F13001 · DELTA SARL c/ EPSILON SAS | Me ALPHA Irène · transmise le {J-20} · CCL13 - Conclusions · intégrée le {J-15} | Historique | Validee | [0,1,2,4]

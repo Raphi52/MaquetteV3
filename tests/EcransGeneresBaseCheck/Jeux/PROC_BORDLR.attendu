@@ -1,0 +1,15 @@
+# « Bordereaux LR » (LecteurBordereauxLr) sur le jeu PROC_BORDLR.sql : les demandes BORDLR non supprimees, une ligne par
+# edition (ici aucune : le jeu ne peut pas en poser, elles entreraient dans PROC_POOLEDITION), la validation (sinon la
+# creation) la plus recente en tete, puis le plus grand numero de demande.
+# Etat : non validee (Q 1200302, I 1200303) -> A preparer [] ; validee sans edition -> En cours [0], la periode.
+# Groupe : sans edition, le type n'est pas connu -> Avec accuse de reception, et les precisions le disent.
+# Utilisateur : le second morceau de « poste/utilisateur[/MOTEUR] » (1200301, 1200302, 1200307) ; un seul morceau, tel quel
+# (1200306) ; absent, pas de mention (1200303). 1200306 n'a pas de date de validation : sa date de creation, pour la
+# date affichee comme pour l'ordre. 1200307 et 1200301 sont validees le meme jour : 1200307 d'abord.
+# Ecartees, chacune avec sa jumelle retenue : 1200304 supprimee X (jumelle 1200302), 1200305 code voisin BORDLRAR
+# (jumelle 1200301).
+Bordereau 26001200302 | commencé le {J-1} · par lesniewski · à valider | Avec accusé de réception | AFaire | []
+Bordereau 26001200307 | validé le {J-3} · par GESA · aucune édition retrouvée, avec ou sans AR inconnu | Avec accusé de réception | EnCours | [0]
+Bordereau 26001200301 | validé le {J-3} · par GESA · aucune édition retrouvée, avec ou sans AR inconnu | Avec accusé de réception | EnCours | [0]
+Bordereau 26001200303 | commencé le {J-10} · à valider | Avec accusé de réception | AFaire | []
+Bordereau 26001200306 | validé le {J-20} · par GPOURADIER · aucune édition retrouvée, avec ou sans AR inconnu | Avec accusé de réception | EnCours | [0]

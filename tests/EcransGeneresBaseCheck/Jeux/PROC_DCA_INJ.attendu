@@ -1,0 +1,18 @@
+# « Injonctions comptes annuels » (LecteurInjonctionsComptesAnnuels) sur le jeu PROC_DCA_INJ.sql : les demandes de
+# depot DCA / DCADEMAT d'un dossier sous injonction DCA (relance IDCA avec instance sur une diligence SDCA), creees le
+# jour de l'injonction (J-30) ou apres, et au plus tard a la regularisation de sa diligence. Ordre : a traiter
+# (A, Q, R), en cours (I...), reclamation (N), puis closes (V, T, O) ; dans chaque bloc la plus recente en tete.
+# Groupe : N ou O -> Reclamations et refus ; sinon DCADEMAT -> Depots dematerialises, DCA -> Depots papier.
+# Etat : A/Q/R -> AFaire [] ; I -> EnCours [0] ; N -> EnCours [0,1,3] ; V/T -> Validee [0,1,2,4] ; O -> Rejetee [0,1,3].
+# Ecartes : 1100318 (depot la veille de l'injonction) -- jumeau retenu 1100317 (le jour meme) ; 1100319 (supprime, X)
+# -- jumeau retenu 1100312 (A) ; 1100320 (processus DAS) -- jumeau retenu 1100311 ; 1100321 (« injonction » sur une
+# diligence SASSOSCI) -- jumeau retenu 1100312 ; 1100458 de PROC_DCA_RELANCE.sql (relance IDCA SANS instance) --
+# jumeau retenu 1100312 (IDCA avec instance) ; 1100322 (depot apres la regularisation de l'injonction de 1100304) --
+# jumeau retenu 1100314 (cree avant).
+INJONCTION BETA SAS · SIREN 511 000 302 | Injonction du {J-30} · reçu le {J-1} | Dépôts papier | AFaire | []
+INJONCTION ALPHA SARL · SIREN 511 000 301 | Injonction du {J-30} · reçu le {J-2} | Dépôts dématérialisés | AFaire | []
+INJONCTION GAMMA SARL · SIREN 511 000 303 | Injonction du {J-30} · reçu le {J-5} | Dépôts papier | EnCours | [0]
+INJONCTION ZETA SAS · SIREN 511 000 306 | Injonction du {J-30} · réclamation du {J-14} | Réclamations et refus | EnCours | [0,1,3]
+INJONCTION DELTA SAS · SIREN 511 000 304 | Injonction du {J-30} · déposé le {J-8} | Dépôts dématérialisés | Validee | [0,1,2,4]
+INJONCTION EPSILON SARL · SIREN 511 000 305 | Injonction du {J-30} · déposé le {J-11} | Dépôts papier | Validee | [0,1,2,4]
+INJONCTION ETA SARL · SIREN 511 000 307 | Injonction du {J-30} · refusé le {J-30} | Réclamations et refus | Rejetee | [0,1,3]

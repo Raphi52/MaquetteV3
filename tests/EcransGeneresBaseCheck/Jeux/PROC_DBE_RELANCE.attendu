@@ -1,0 +1,20 @@
+# « Relances beneficiaires » (LecteurRelancesBeneficiaires) sur le jeu PROC_DBE_RELANCE.sql : une ligne par diligence
+# SDBE qui n'est ni passee a l'injonction ni restee sans effet. Ordre : a relancer, sans courrier, relancees en cours,
+# puis closes ; la derniere relance la plus recente en tete. Toutes « DBE non deposee » (« DBE incomplete » n'a pas de
+# source dans l'ancien RIG : en-tete du lecteur).
+# Etat : etat relance 1/3/5 -> AFaire [] ; aucune relance -> EnCours [0,1] ; relance envoyee -> Validee [0,1,2], + 3 si
+# la diligence est close (204 regularisee, 205 non regularisee).
+# Restent des relances (leurs jumeaux ecartes sont dans PROC_DBE_INJ.sql) : 206 (delai expirant AUJOURD'HUI, la V2
+# compare « avant le jour ») -- jumeau 1100101 (expire hier, a enjoindre) ; 207 (expire, mais dossier radie) -- jumeau
+# 1100101 ; 208 (relance IDBE sans instance) -- jumeau 1100103 (IDBE avec instance, injonction).
+# Ecarte : 209 (diligence SASSOSCI) -- jumeau retenu 201 (SDBE). 210 : etat relance 2 SANS ligne RELANCE_RCS, relancee
+# (l'etat fait foi), sans date : derniere des relancees en cours -- jumeau 203 (etat 0 : en cours).
+BENEF ALPHA SARL · SIREN 511 000 201 | 1re relance à faire | DBE non déposée | AFaire | []
+BENEF GAMMA SARL · SIREN 511 000 203 | aucune relance envoyée | DBE non déposée | EnCours | [0,1]
+BENEF THETA SAS · SIREN 511 000 208 | Relance 2 du {J-5} | DBE non déposée | Validee | [0,1,2]
+BENEF BETA SAS · SIREN 511 000 202 | Relance 1 du {J-10} · limite {J+20} | DBE non déposée | Validee | [0,1,2]
+BENEF ZETA SAS · SIREN 511 000 206 | Relance 1 du {J-30} · limite {J+0} | DBE non déposée | Validee | [0,1,2]
+BENEF ETA SARL · SIREN 511 000 207 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+BENEF KAPPA SAS · SIREN 511 000 210 | 1re relance faite | DBE non déposée | Validee | [0,1,2]
+BENEF DELTA SAS · SIREN 511 000 204 | Relance 1 du {J-40} · limite {J-10} · régularisée le {J-2} | DBE non déposée | Validee | [0,1,2,3]
+BENEF EPSILON SARL · SIREN 511 000 205 | Relance 1 du {J-300} · limite {J-270} · close sans régularisation | DBE non déposée | Validee | [0,1,2,3]
