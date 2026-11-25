@@ -342,7 +342,7 @@ export function EcranDemandes({ valides, ouvrir, dossier = null }: ProprietesEcr
       </aside>
 
       <ListeModerne etiquette="Demandes">
-        <EnteteListe titre="Demandes"
+        <EnteteListe titre="Resultats de la recherche"
                      synthese={vue && <>{affichees.length}{' affichee(s) sur '}{vue.total}{' · '}<b>{enCours}</b>{' en cours · '}
                        <b>{alertes}</b>{' en alerte'}</>}
                      filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a une demande…',

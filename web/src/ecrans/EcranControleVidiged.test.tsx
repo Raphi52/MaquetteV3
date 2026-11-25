@@ -61,6 +61,13 @@ describe('EcranControleVidiged', () => {
 })
 
 describe('EcranControleVidiged en liste moderne', () => {
+  it('la tete garde le nom actuel de la liste, « Resultats », pour titre', () => {
+    // Regle du plan (titre = nom actuel tel quel, decision du lot 5). Faux si : la tete prenait un nom
+    // invente, comme « Archives » dans la premiere version du lot 3.
+    const { container } = render(<EcranControleVidiged />)
+    expect(container.querySelector('.rig-lm-titre')!.textContent).toBe('Resultats')
+  })
+
   it('une ligne par archive : type en pastille, support en point d\'etat ; Date et Taille dans la ligne depliee', () => {
     const { container } = render(<EcranControleVidiged />)
     const [avecCd, , sansCd] = rangees(container)

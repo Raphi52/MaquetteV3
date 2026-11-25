@@ -90,6 +90,15 @@ describe('EcranDemandes', () => {
 })
 
 describe('EcranDemandes en liste moderne', () => {
+  it('la tete garde le nom actuel de la liste, « Resultats de la recherche », pour titre', async () => {
+    // Regle du plan (titre = nom actuel tel quel, decision du lot 5). Faux si : la tete prenait un nom
+    // invente, comme « Demandes » dans la premiere version du lot 3.
+    installerFauxPont({ 'EcranDemandes.Trouver': vue })
+    const { container } = render(<EcranDemandes valides={[]} ouvrir={vi.fn()} />)
+    await screen.findByText('Demande D2')
+    expect(container.querySelector('.rig-lm-titre')!.textContent).toBe('Resultats de la recherche')
+  })
+
   it('« Aller a une demande… » filtre la liste affichee sans toucher aux criteres ; Entree ouvre la seule restante', async () => {
     const pont = installerFauxPont({ 'EcranDemandes.Trouver': vue })
     const ouvrir = vi.fn()
