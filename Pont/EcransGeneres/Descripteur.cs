@@ -217,11 +217,17 @@ public sealed record DescripteurEcran
     /// ses propres colonnes, parametres ou champs) : un onglet par procedure, chacun dans SA forme.</summary>
     public bool EnOnglets { get; init; }
 
-    /// <summary>Une <see cref="FormeEcran.Operation"/> qui vise UN seul objet, celui que la fiche RIG v2 recoit en
-    /// parametre (PROC_IA : UNE liasse, NumeroLiasse, proc_ia.md:192) : en choisir un autre remplace le premier ; ni
-    /// « tout cocher », ni geste sur plusieurs objets. Faux : l'operation peut en viser plusieurs (les filles d'une
+    /// <summary>Une <see cref="FormeEcran.Operation"/> qui vise UN seul objet, celui que la fiche RIG v2 RECOIT en
+    /// parametre d'un autre ecran (PROC_IA : le numero de la liasse affichee par la visionneuse de ses pieces,
+    /// OPE_DOC_DEMAT.cs:818). Aucune liste ou le choisir : il se designe par son numero, dans le seul critere de
+    /// l'ecran. Faux : l'operation se choisit dans une liste et peut viser plusieurs objets (les filles d'une
     /// jonction).</summary>
     public bool ObjetUnique { get; init; }
+
+    /// <summary>Le RESULTAT d'une operation sur un objet unique : les sections que le geste produit, montrees APRES lui
+    /// (2e temps), et des l'ouverture d'un objet deja traite. PROC_IA : lancement puis restitution (proc_ia.md:151-156) ;
+    /// une liasse deja analysee affiche son resultat sans relancer (PROC_IA.cs:60-64). Vide pour toute autre forme.</summary>
+    public MarcheEcran[] Resultat { get; init; } = [];
 
     /// <summary>Les parties que comptent les <see cref="LigneEcran.Faites"/> d'une ligne : les etapes d'une Saisie,
     /// les sections des autres formes. Pas envoye a l'ecran (il les a deja).</summary>

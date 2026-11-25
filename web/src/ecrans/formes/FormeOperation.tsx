@@ -1,22 +1,26 @@
 // FORME « OPERATION » : un geste ponctuel sur un ou quelques objets (supprimer ou liberer une instance, joindre,
 // rapprocher ou remplacer un acteur, changer le juge-commissaire). Trois temps, et pas un de plus : CHOISIR les objets,
 // voir les CONSEQUENCES (les regles de la fiche RIG v2 et ses champs), CONFIRMER par le bouton de la fiche. Ecran
-// reuni : on agit dans UNE procedure a la fois (cocher une ligne d'une autre procedure repart d'elle). Une operation sur
-// UN objet (descripteur.objetUnique : la fiche le recoit en parametre, PROC_IA et sa liasse) n'en garde qu'un : en
-// cocher un autre le remplace, et il n'y a pas de « tout cocher ».
+// reuni : on agit dans UNE procedure a la fois (cocher une ligne d'une autre procedure repart d'elle).
+// Une operation sur UN objet que la fiche RIG v2 RECOIT d'un autre ecran (descripteur.objetUnique : PROC_IA et sa liasse)
+// n'a pas de liste : voir OperationSurUnObjet.
 // La confirmation ne change rien tant qu'aucun ecrivain n'existe : elle le dit.
 
 import { useState } from 'react'
 import { EnteteListe, ListeModerne, normaliser, PiedListe } from '../../composants/ListeModerne'
 import type { DescripteurEcranVue } from '../../plan/types'
 import {
-  Annonce, DEMONSTRATION, PanneauCriteres, Provenance, Sections, TableLignes, cleChamp, figee, manquantes,
-  parcoursDe, passeCriteres, refus, texteLigne, useAnnonce, useLignes, type Saisies,
+  Annonce, ChampSaisie, DEMONSTRATION, Exemple, PanneauCriteres, Provenance, Sections, TableLignes, cleChamp, etatDe,
+  figee, manquantes, parcoursDe, passeCriteres, refus, texteLigne, useAnnonce, useLignes, type Saisies,
 } from './commun'
 
 const Temps = ['Choisir', 'Conséquences', 'Confirmer'] as const
 
 export function FormeOperation({ d }: { d: DescripteurEcranVue }) {
+  return d.objetUnique ? <OperationSurUnObjet d={d} /> : <OperationSurLaListe d={d} />
+}
+
+function OperationSurLaListe({ d }: { d: DescripteurEcranVue }) {
   const { vue, lignes } = useLignes(d)
   const [temps, poserTemps] = useState(0)
   const [texte, poserTexte] = useState('')
@@ -32,8 +36,7 @@ export function FormeOperation({ d }: { d: DescripteurEcranVue }) {
   const basculer = (i: number) => poserCochees((avant) => {
     const ligne = lignes.find((l) => l.i === i)
     const autre = ligne && choisies[0] && ligne.groupe !== choisies[0].groupe
-    const unique = ligne !== undefined && parcoursDe(d, ligne.groupe).objetUnique === true
-    const apres = new Set(autre || (unique && !avant.has(i)) ? [] : avant)
+    const apres = new Set(autre ? [] : avant)
     if (!apres.delete(i)) apres.add(i)
     return apres
   })
@@ -73,10 +76,9 @@ export function FormeOperation({ d }: { d: DescripteurEcranVue }) {
           <>
             {vue && <Provenance vue={vue} />}
             <TableLignes d={d} vue={vue} lignes={visibles} total={lignes.length} filtre={cherche !== '' || Object.values(criteres).some((v) => v.trim() !== '')}
-                         cases={{ cochees, basculer, toutes: (d.membres.length > 0 ? d.membres : [d]).some((m) => m.objetUnique) ? undefined
-                           : (cocher) => poserCochees(cocher
-                             ? new Set(visibles.filter((l) => !figee(l.etat) && (!choisies[0] || l.groupe === choisies[0].groupe)).map((l) => l.i))
-                             : new Set()) }} />
+                         cases={{ cochees, basculer, toutes: (cocher) => poserCochees(cocher
+                           ? new Set(visibles.filter((l) => !figee(l.etat) && (!choisies[0] || l.groupe === choisies[0].groupe)).map((l) => l.i))
+                           : new Set()) }} />
           </>
         )}
         {temps === 1 && (
@@ -101,6 +103,132 @@ export function FormeOperation({ d }: { d: DescripteurEcranVue }) {
                     onClick={() => poserTemps(temps + 1)}>Suivant</button>
           ) : (
             <button type="button" className="rig-lm-outil rig-lm-outil--fort" onClick={confirmer}>{p.valider}</button>
+          )}
+        </PiedListe>
+      </ListeModerne>
+    </div>
+  )
+}
+
+const TempsUnObjet = ['Lancement', 'Résultat'] as const
+
+// Une operation sur UN objet que la fiche RIG v2 RECOIT d'un autre ecran, au lieu de le choisir : PROC_IA est chargee par
+// la visionneuse des pieces d'une liasse, qui lui passe le numero de la liasse affichee (OPE_DOC_DEMAT.cs:818). Aucune
+// liste : l'objet se designe par son numero, dans le seul critere du descripteur. Deux temps (proc_ia.md:151-156) :
+// LANCEMENT -- l'objet, ce que le geste emporte (les sections), le bouton apres confirmation (OPE_IA.cs:66) --, puis
+// RESULTAT (descripteur.resultat), qui n'existe qu'une fois le geste fait. Un objet deja traite s'ouvre sur son resultat
+// et n'a plus de bouton : PROC_IA relit sa reponse sans rappeler le service (PROC_IA.cs:60-64) et cache le lancement des
+// qu'une reponse existe (ETP_ENTETE.cs:36-37). Controle final du lot 1 (25/11/2026) : la liasse se cochait dans une liste,
+// et le resultat et l'avis s'affichaient avant le lancement.
+function OperationSurUnObjet({ d }: { d: DescripteurEcranVue }) {
+  const { vue, lignes } = useLignes(d)
+  const resultat = d.resultat ?? []
+  const critere = d.criteres[0] ?? 'Numéro'
+  const [numero, poserNumero] = useState('')
+  const [temps, poserTemps] = useState(0)
+  const [aConfirmer, poserAConfirmer] = useState(false)
+  const [annonce, annoncer] = useAnnonce()
+
+  const trouver = (texte: string) => {
+    const cherche = normaliser(texte.trim())
+    return cherche === '' ? undefined : lignes.find((l) => normaliser(l.nom) === cherche)
+  }
+  const objet = trouver(numero)
+  const traite = objet !== undefined && figee(objet.etat)
+  const etat = objet ? etatDe(d, objet) : undefined
+  const tempsMontres = resultat.length > 0 ? TempsUnObjet : TempsUnObjet.slice(0, 1)
+  // Un autre numero, un autre objet : deja traite, il s'ouvre sur son resultat.
+  const saisir = (texte: string) => {
+    const autre = trouver(texte)
+    poserNumero(texte)
+    poserTemps(autre && figee(autre.etat) && resultat.length > 0 ? 1 : 0)
+    poserAConfirmer(false)
+    annoncer(null)
+  }
+  const lancer = () => {
+    poserAConfirmer(false)
+    if (objet) annoncer(refus(d.valider, `sur « ${objet.nom} » : rien n’est modifié dans la base`))
+  }
+
+  return (
+    <div className="rig-proc__corps rig-eg" data-forme="Operation">
+      <ListeModerne etiquette={d.titre}>
+        <EnteteListe titre={d.titre} synthese={<>{critere} : <b>{objet?.nom ?? '—'}</b>{etat ? ` · ${etat.libelle}` : ''}</>} />
+        <ol className="rig-frise rig-frise--h rig-eg-temps" aria-label="Temps de l’opération">
+          {tempsMontres.map((t, k) => (
+            <li key={t} className={`rig-frise__pas${k < temps ? ' rig-frise__pas--complet' : ''}${k === temps ? ' rig-frise__pas--courant' : ''}`}>
+              <button type="button" className="rig-frise__bouton" aria-current={k === temps ? 'step' : undefined}
+                      disabled={k > 0 && !traite} onClick={() => poserTemps(k)}>
+                <span className="rig-frise__pastille">{k < temps ? '✓' : k + 1}</span>
+                <span className="rig-frise__libelle">{t}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+        {temps === 0 && (
+          <>
+            <div className="rig-eg-recap">
+              <div className="rig-champs rig-eg-champs">
+                <ChampSaisie champ={{ libelle: critere, type: 'Texte', options: [] }} valeur={numero} changer={saisir} />
+              </div>
+            </div>
+            {vue && (
+              <>
+                <p className="rig-eg-note" role="note">
+                  RIG v2 reçoit ce numéro de l’écran qui l’ouvre ; ici, il se saisit.
+                  {vue.mode !== 'base' && lignes[0] && <> <Exemple /> par exemple « {lignes[0].nom} ».</>}
+                </p>
+                <Provenance vue={vue} />
+              </>
+            )}
+            {numero.trim() !== '' && !objet && (
+              <p className="rig-eg-annonce" role="status">Aucune ligne ne porte le numéro « {numero.trim()} ».</p>
+            )}
+            {objet && (
+              <>
+                <div className="rig-eg-recap" aria-label="Objet de l’opération">
+                  <p><b>{objet.nom}</b> — {objet.precisions}</p>
+                </div>
+                <Sections sections={d.sections} saisies={{}} changer={() => undefined} lecture />
+                {traite ? (
+                  <p className="rig-eg-note" role="note">
+                    {etat?.libelle ?? 'Déjà traité'} : le résultat se relit sans relancer « {d.valider} ».
+                  </p>
+                ) : resultat.length > 0 && (
+                  <p className="rig-eg-note" role="note">
+                    Le résultat ({resultat.map((s) => s.titre).join(', ')}) s’affiche au temps suivant, une fois « {d.valider} » fait.
+                  </p>
+                )}
+                {aConfirmer && (
+                  <div className="rig-eg-recap" role="alertdialog" aria-label="Confirmation">
+                    <p>{d.valider} sur « {objet.nom} » ?</p>
+                    <div className="rig-eg-edition-actions">
+                      <button type="button" className="rig-lm-outil rig-lm-outil--fort" onClick={lancer}>Confirmer</button>
+                      <button type="button" className="rig-lm-outil" onClick={() => poserAConfirmer(false)}>Annuler</button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+        {temps === 1 && objet && (
+          <>
+            <div className="rig-eg-recap" aria-label="Objet de l’opération">
+              <p><b>{objet.nom}</b> — {objet.precisions}</p>
+            </div>
+            <Sections sections={resultat} saisies={{}} changer={() => undefined} lecture />
+          </>
+        )}
+        <Annonce texte={annonce} />
+        <PiedListe>
+          {temps === 1 && <button type="button" className="rig-lm-outil" onClick={() => poserTemps(0)}>Précédent</button>}
+          {temps === 0 && objet && !traite && (
+            <button type="button" className="rig-lm-outil rig-lm-outil--fort" disabled={aConfirmer}
+                    onClick={() => { annoncer(null); poserAConfirmer(true) }}>{d.valider}</button>
+          )}
+          {temps === 0 && traite && resultat.length > 0 && (
+            <button type="button" className="rig-lm-outil rig-lm-outil--fort" onClick={() => poserTemps(1)}>Voir le résultat</button>
           )}
         </PiedListe>
       </ListeModerne>

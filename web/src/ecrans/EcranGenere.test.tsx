@@ -336,28 +336,65 @@ describe('Formes Audience, Document, Operation', () => {
     expect(annonce()).toBe('Démonstration : rien n’est enregistré — « Supprimer l’instance » sur 1 objet : rien n’est modifié dans la base.')
   })
 
-  // PROC_IA (controle final du lot 1, 25/11/2026) : la fiche RIG v2 recoit UNE liasse en parametre (proc_ia.md:192). Une
-  // operation sur un objet unique n'en garde qu'un : cocher une autre ligne remplace la premiere, sans « Tout cocher ».
-  it('Operation sur UN objet : cocher une autre ligne remplace la premiere, pas de « Tout cocher »', async () => {
-    // Deux lignes du MEME groupe : changer de groupe repart deja de zero (une procedure a la fois), ce n'est pas la regle testee.
+  // PROC_IA (controle final du lot 1, 25/11/2026) : la fiche RIG v2 RECOIT une liasse de la visionneuse de ses pieces
+  // (OPE_DOC_DEMAT.cs:818) et se joue en deux temps, lancement puis restitution (proc_ia.md:151-156). Aucune liste : la
+  // liasse se designe par son numero ; le resultat ne vient qu'apres le lancement, et tout de suite pour une liasse deja
+  // analysee, qui n'a plus de bouton (PROC_IA.cs:60-64, ETP_ENTETE.cs:36-37).
+  describe('Operation sur UN objet recu : son numero, le lancement, puis le resultat', () => {
     const lignes = [
-      { nom: 'Liasse 2026-001', precisions: 'CFE', groupe: 'Fond', etat: 'AFaire', faites: [] },
-      { nom: 'Liasse 2026-002', precisions: 'CFE', groupe: 'Fond', etat: 'AFaire', faites: [] },
+      { nom: '2026-001', precisions: 'Liasse CFE · analysée', groupe: 'Fond', etat: 'Validee', faites: [0] },
+      { nom: '2026-002', precisions: 'Liasse CFE · à analyser', groupe: 'Fond', etat: 'AFaire', faites: [] },
     ]
-    const { container, ligne, bouton, annonce } = await monter(descripteur({ forme: 'Operation', valider: 'Lancer l’analyse', objetUnique: true, lignes }))
-    expect(container.querySelector('input[aria-label="Tout cocher"]')).toBeNull()
-    const [premiere, seconde] = ['Liasse 2026-001', 'Liasse 2026-002']
-    fireEvent.click(ligne(premiere).querySelector('input[type=checkbox]')!)
-    fireEvent.click(ligne(seconde).querySelector('input[type=checkbox]')!)
-    expect([...container.querySelectorAll<HTMLInputElement>('tbody input[type=checkbox]')].filter((c) => c.checked)).toHaveLength(1)
-    expect((ligne(seconde).querySelector('input[type=checkbox]') as HTMLInputElement).checked).toBe(true)
-    fireEvent.click(bouton('Suivant'))
-    fireEvent.change(container.querySelector('input[aria-label="Code affaire"]')!, { target: { value: '2026J00201' } })
-    fireEvent.click(bouton('Suivant'))
-    expect(container.querySelector('.rig-eg-recap')!.textContent).toContain(seconde)
-    expect(container.querySelector('.rig-eg-recap')!.textContent).not.toContain(premiere)
-    fireEvent.click(bouton('Lancer l’analyse'))
-    expect(annonce()).toBe('Démonstration : rien n’est enregistré — « Lancer l’analyse » sur 1 objet : rien n’est modifié dans la base.')
+    const ia = () => descripteur({
+      forme: 'Operation', valider: 'Lancer l’analyse', objetUnique: true, criteres: ['Numéro de liasse'], lignes,
+      sections: [{ titre: 'Pièces envoyées', consigne: 'Les PDF partent.', obligatoire: false, champs: [champ('Pièces', 'Tableau')] }],
+      resultat: [{ titre: 'Synthèse', consigne: 'Indice de confiance.', obligatoire: false, champs: [champ('Indice', 'Tableau')] }],
+    })
+    const saisir = (container: HTMLElement, numero: string) =>
+      fireEvent.change(container.querySelector('input[aria-label="Numéro de liasse"]')!, { target: { value: numero } })
+    const section = (container: HTMLElement, titre: string) => container.querySelector(`section[aria-label="${titre}"]`)
+    const temps = (container: HTMLElement, libelle: string) => [...container.querySelectorAll<HTMLButtonElement>('.rig-frise__bouton')]
+      .find((b) => b.querySelector('.rig-frise__libelle')?.textContent === libelle)!
+
+    it('aucune liste : ni ligne ni case a cocher, un seul champ, le numero', async () => {
+      const { container } = await monter(ia())
+      expect(container.querySelector('tbody tr')).toBeNull()
+      expect(container.querySelector('input[type=checkbox]')).toBeNull()
+      expect(container.querySelectorAll('input:not([type=checkbox])')).toHaveLength(1)
+      expect(container.querySelector('input[aria-label="Numéro de liasse"]')).not.toBeNull()
+    })
+
+    it('a analyser : d’abord le lancement, confirme ; le resultat reste ferme', async () => {
+      const { container, bouton, annonce } = await monter(ia())
+      saisir(container, '2026-002')
+      expect(section(container, 'Pièces envoyées')).not.toBeNull()
+      expect(section(container, 'Synthèse')).toBeNull()
+      expect(temps(container, 'Résultat').disabled).toBe(true)
+      fireEvent.click(bouton('Lancer l’analyse'))
+      expect(container.querySelector('[role=alertdialog]')!.textContent).toContain('Lancer l’analyse sur « 2026-002 » ?')
+      expect(annonce()).toBeNull()
+      fireEvent.click(bouton('Confirmer'))
+      expect(annonce()).toBe('Démonstration : rien n’est enregistré — « Lancer l’analyse » sur « 2026-002 » : rien n’est modifié dans la base.')
+      expect(section(container, 'Synthèse')).toBeNull()
+    })
+
+    it('deja analysee : elle s’ouvre sur son resultat, sans bouton de lancement', async () => {
+      const { container, bouton } = await monter(ia())
+      saisir(container, '2026-001')
+      expect(section(container, 'Synthèse')).not.toBeNull()
+      expect(section(container, 'Pièces envoyées')).toBeNull()
+      expect(bouton('Lancer l’analyse')).toBeUndefined()
+      fireEvent.click(bouton('Précédent'))
+      expect(section(container, 'Pièces envoyées')).not.toBeNull()
+      expect(bouton('Lancer l’analyse')).toBeUndefined()
+    })
+
+    it('un numero que rien ne porte le dit, sans rien ouvrir', async () => {
+      const { container, annonce } = await monter(ia())
+      saisir(container, '2026-999')
+      expect(annonce()).toBe('Aucune ligne ne porte le numéro « 2026-999 ».')
+      expect(section(container, 'Pièces envoyées')).toBeNull()
+    })
   })
 })
 

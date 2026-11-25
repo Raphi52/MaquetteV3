@@ -673,50 +673,62 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_IA", Titre = "Analyse IA", Sujet = "liasses analysées",
-            // OPERATION sur UNE liasse, pas une file : PROC_IA recoit son numero de liasse en parametre (proc_ia.md:192,
-            // NumeroLiasse) et se joue en deux temps, lancement puis restitution (:151-156). Le geste est le lancement,
-            // confirme par l'utilisateur (:207, OPE_IA.cs:66). Controle final du lot 1, 25/11/2026 : elle etait une
-            // file de liasses a actions en lot, que la fiche ne decrit pas.
+            // OPERATION sur UNE liasse RECUE, pas une liste : RIG v2 charge PROC_IA dans la visionneuse des pieces d'une
+            // liasse dematerialisee, qui lui passe le numero de la liasse affichee (OPE_DOC_DEMAT.cs:803-825, NumeroLiasse
+            // :818 ; proc_ia.md:192). La V3 n'a pas encore cette visionneuse : le numero se saisit dans le seul critere.
+            // Deux temps (proc_ia.md:151-156) : le lancement, confirme (OPE_IA.cs:66), puis la restitution (Resultat).
+            // Une liasse deja analysee s'ouvre sur son resultat, sans bouton de lancement (PROC_IA.cs:60-64,
+            // ETP_ENTETE.cs:36-37). Controle final du lot 1 (25/11/2026) : une file de liasses, puis une liste a cocher
+            // dont le resultat et l'avis passaient AVANT le lancement.
             Forme = FormeEcran.Operation,
             ObjetUnique = true,
-            Recherche = "Rechercher une liasse par son numéro…",
+            Recherche = "Numéro de la liasse…",
             Criteres = ["Numéro de liasse"],
             // Le bouton de l'operation : « lancer » (proc_ia.md:280-281), apres confirmation (:207). FORM_IA n'a pas de
             // barre d'outils (:303) ; QUITTER et VALIDER n'y sont que desactives pendant l'analyse (:212, :287-288).
             Valider = "Lancer l'analyse",
             Rang = 7,
+            // « En cours » : le temps de la reponse du service, dans la session (OPE_IA.cs:99-100) ; rien ne le garde en
+            // base, ou DMTLCF_REPONSE_IA est vide (a analyser) ou remplie (analysee) -- aucune ligne n'y est donc.
             Etats = EtatsEcran.Trois("À analyser", "En cours", "Analysée"),
             Groupes = ["Liasses CFE", "Liasses DCA", "Liasses DAS"],
+            // Ce que le lancement emporte et fait : ce qui se voit AVANT le bouton.
             Sections =
             [
                 // Ce qui part : proc_ia.md:153 (JSON fonctionnel + PDF), :223-231 (regle de source : derniere regularisation,
                 // sinon la liasse, flux EDI seulement si vide). Service externe : jamais appele (regle du plan).
                 new MarcheEcran("Pièces envoyées", "Les données de la formalité (celles de sa dernière régularisation s'il y en a une, sinon celles de la liasse ; à défaut, celles du flux reçu) et tous ses PDF partent vers le service d'analyse externe. Ici, le service n'est jamais appelé.", false,
                     [Champ.Tableau("Pièces de la formalité")]),
-                // proc_ia.md:287-288 (non bloquante, QUITTER/VALIDER desactives), :216-217 (reponse ecrite dans la liasse),
-                // :279-281 (une liasse deja analysee se relit sans rappel du service).
-                new MarcheEcran("Analyse", "L'analyse tourne sans bloquer l'écran ; Quitter et Valider restent désactivés jusqu'à la réponse, enregistrée dans la liasse. Une liasse déjà analysée se relit sans rappeler le service.", false,
+                // proc_ia.md:287-288 (non bloquante, QUITTER/VALIDER desactives), :216-217 (reponse ecrite dans la liasse).
+                new MarcheEcran("Analyse", "L'analyse tourne sans bloquer l'écran ; Quitter et Valider restent désactivés jusqu'à la réponse, enregistrée dans la liasse.", false,
                     []),
+            ],
+            // La restitution : ce que la reponse du service fait voir, APRES le lancement (proc_ia.md:155-156, toutes les
+            // etapes se masquent tant qu'il n'y a pas de reponse, :315-316).
+            Resultat =
+            [
                 // proc_ia.md:257-258 (resultats par champ, anomalies depliees d'office).
                 new MarcheEcran("Champs vérifiés", "Chaque champ : correspondance, proche, pas de correspondance ou non disponible ; un champ en anomalie s'ouvre d'office.", false,
                     [Champ.Tableau("Champs vérifiés")]),
                 // proc_ia.md:271-275 (synthese, commentaire), :296 (bandes de l'indice de confiance).
                 new MarcheEcran("Synthèse", "Indice de confiance global (faible sous 0,5, moyen sous 0,8, bon sous 0,9, très bon au-delà) et commentaire de synthèse.", false,
                     [Champ.Tableau("Indice de confiance et commentaire")]),
-                // L'avis de l'utilisateur sur les conclusions : OPE_AVIS_USER (proc_ia.md:79, « validation / rejet ») ;
-                // le role du PROC le dit (:5, « valider ou corriger les conclusions »).
-                new MarcheEcran("Avis", "Valider ou rejeter les conclusions de l'analyse.", false,
-                    [Champ.Liste("Avis de l'utilisateur", "Validation", "Rejet")]),
+                // OPE_AVIS_USER.cs:28-31 (« Votre avis nous est precieux », formulaire de retour), :36-44 (son adresse porte
+                // la demande, la liasse et le greffe ; rien sans reponse). Ce n'est pas un choix validation / rejet comme
+                // le dit la table de proc_ia.md:79 : le code gagne. Formulaire externe, jamais ouvert (regle du plan).
+                new MarcheEcran("Votre avis", "Un bouton ouvre le formulaire de retour sur l'analyse, avec le numéro de la demande, celui de la liasse et le nom du greffe. Formulaire externe : jamais ouvert ici.", false,
+                    []),
             ],
+            // Le numero d'une liasse (le nom de la ligne) est ce qui se saisit dans le critere.
             Lignes =
             [
-                new LigneEcran("Liasse CFE 2026-001", "Liasses CFE · analysée", "Liasses CFE", "Validee", [0, 1, 2, 3]),
-                new LigneEcran("Liasse CFE 2026-002", "Liasses CFE · analyse en cours", "Liasses CFE", "EnCours", [0, 1]),
-                new LigneEcran("Liasse CFE 2026-003", "Liasses CFE · à analyser", "Liasses CFE", "AFaire", []),
-                new LigneEcran("Liasse DCA 2026-004", "Liasses DCA · analysée", "Liasses DCA", "Validee", [0, 1, 2, 3]),
-                new LigneEcran("Liasse DCA 2026-005", "Liasses DCA · analyse en cours", "Liasses DCA", "EnCours", [0]),
-                new LigneEcran("Liasse DAS 2026-006", "Liasses DAS · à analyser", "Liasses DAS", "AFaire", []),
-                new LigneEcran("Liasse DAS 2026-007", "Liasses DAS · analysée", "Liasses DAS", "Validee", [0, 1, 2, 3]),
+                new LigneEcran("2026-001", "Liasse CFE · analysée", "Liasses CFE", "Validee", [0, 1]),
+                new LigneEcran("2026-002", "Liasse CFE · à analyser", "Liasses CFE", "AFaire", []),
+                new LigneEcran("2026-003", "Liasse CFE · à analyser", "Liasses CFE", "AFaire", []),
+                new LigneEcran("2026-004", "Liasse DCA · analysée", "Liasses DCA", "Validee", [0, 1]),
+                new LigneEcran("2026-005", "Liasse DCA · à analyser", "Liasses DCA", "AFaire", []),
+                new LigneEcran("2026-006", "Liasse DAS · à analyser", "Liasses DAS", "AFaire", []),
+                new LigneEcran("2026-007", "Liasse DAS · analysée", "Liasses DAS", "Validee", [0, 1]),
             ],
         },
 

@@ -194,7 +194,7 @@ foreach (var d in descripteurs.Where(d => d.Membres.Length == 0))
     // Rien d'interne n'atteint l'ecran : ni titre, ni libelle, ni texte de ligne ou de marche.
     var textes = new List<string> { d.Titre, d.Sujet, d.Recherche, d.Valider }
         .Concat(d.Criteres).Concat(d.Groupes).Concat(d.Etats.Select(e => e.Libelle)).Concat(d.Gestes)
-        .Concat(d.Parties.SelectMany(m => new[] { m.Titre, m.Consigne }.Concat(m.Champs.SelectMany(c => c.Options.Prepend(c.Libelle)))))
+        .Concat(d.Parties.Concat(d.Resultat).SelectMany(m => new[] { m.Titre, m.Consigne }.Concat(m.Champs.SelectMany(c => c.Options.Prepend(c.Libelle)))))
         .Concat(d.Colonnes.Concat(d.Parametres).SelectMany(c => c.Options.Prepend(c.Libelle)))
         .Concat(d.Lignes.SelectMany(l => new[] { l.Nom, l.Precisions }.Concat(l.Valeurs)));
     if (textes.Any(t => t.Contains("PROC_"))) defauts.Add("un code interne (PROC_) est affiche a l'ecran");
@@ -216,7 +216,7 @@ if (descripteurs.Count > 0)
     var json = JsonSerializer.Serialize(descripteurs[0], new JsonSerializerOptions(JsonSerializerDefaults.Web));
     foreach (var cle in new[] { "code", "titre", "sujet", "recherche", "criteres", "valider", "rang", "etats",
                                 "groupes", "marches", "lignes", "icone", "obligatoire", "faites", "membres",
-                                "forme", "sections", "colonnes", "parametres", "gestes", "enOnglets", "objetUnique", "libelle", "type", "options", "valeurs" })
+                                "forme", "sections", "colonnes", "parametres", "gestes", "enOnglets", "objetUnique", "resultat", "libelle", "type", "options", "valeurs" })
         Exiger(json.Contains($"\"{cle}\":"), $"le descripteur sort en JSON avec la cle « {cle} »");
     // La forme et le type d'un champ sortent en TEXTE (les noms que web/src/plan/types.ts attend), pas en nombre.
     Exiger(Regex.IsMatch(json, "\"forme\":\"" + descripteurs[0].Forme + "\"") && Regex.IsMatch(json, "\"type\":\"[A-Z][a-z]+\""),
@@ -421,8 +421,14 @@ foreach (var d in descripteurs)
         defauts.Add($"forme {d.Forme} avec {d.Marches.Length} etapes : seules Saisie et Operation ont des etapes");
     if (d.Forme == FormeEcran.Operation && d.Marches.Length > 3) defauts.Add($"une Operation a {d.Marches.Length} etapes (3 au plus)");
     if (d.Marches.Length > 0 && d.Sections.Length > 0) defauts.Add("des etapes ET des sections : l'un ou l'autre");
-    // Un seul objet a choisir ne vaut que pour une Operation (PROC_IA et sa liasse) : une file se traite en lot.
+    // Un seul objet, RECU par la fiche RIG v2, ne vaut que pour une Operation (PROC_IA et sa liasse) : une file se traite
+    // en lot. Il se designe par son numero, dans le SEUL critere de l'ecran -- aucune liste ou le choisir (controle final
+    // du lot 1, 25/11/2026 : la liasse de PROC_IA se cochait dans une liste de sept).
     if (d.ObjetUnique && d.Forme != FormeEcran.Operation) defauts.Add($"objet unique sur une forme {d.Forme} : seule une Operation en a");
+    if (d.ObjetUnique && d.Criteres.Length != 1)
+        defauts.Add($"objet unique designe par {d.Criteres.Length} criteres : un seul, son numero (la fiche RIG v2 le recoit)");
+    // Le resultat du geste (2e temps, apres lui) n'existe que pour une operation sur un objet unique.
+    if (d.Resultat.Length > 0 && !d.ObjetUnique) defauts.Add("un resultat apres le geste hors d'une Operation sur un objet unique");
     if (!reuni)
     {
         switch (d.Forme)
@@ -449,7 +455,7 @@ foreach (var d in descripteurs)
             foreach (var s in d.Sections.Where(s => RefaitLaRecherche(d, s)))
                 defauts.Add($"la section « {s.Titre} » refait la recherche que la liste a deja faite (criteres : {string.Join(", ", d.Criteres)})");
         // Une liste n'a ses valeurs que pour les colonnes : jamais plus.
-        foreach (var c in d.Colonnes.Concat(d.Parametres).Concat(d.Parties.SelectMany(s => s.Champs)))
+        foreach (var c in d.Colonnes.Concat(d.Parametres).Concat(d.Parties.Concat(d.Resultat).SelectMany(s => s.Champs)))
             if ((c.Type == TypeChamp.Liste) != (c.Options.Length > 0))
                 defauts.Add($"le champ « {c.Libelle} » : une liste a ses valeurs, et seule une liste en a");
     }
@@ -460,6 +466,9 @@ foreach (var d in descripteurs)
         var listeCommune = formes.Length == 1 && CatalogueGenere.FormesEnListe.Contains(formes[0]);
         if (d.EnOnglets == listeCommune) defauts.Add($"reunit des formes [{string.Join(", ", formes)}] : EnOnglets devrait valoir {!listeCommune}");
         if (listeCommune && d.Forme != formes[0]) defauts.Add($"forme {d.Forme} au lieu de celle de ses procedures ({formes[0]})");
+        // Un objet unique se designe par son numero, sans liste : il ne partage pas celle d'un ecran reuni.
+        if (!d.EnOnglets && d.Membres.FirstOrDefault(m => m.ObjetUnique) is { } unique)
+            defauts.Add($"{unique.Code} vise un objet unique, sans liste : son ecran reuni passe en onglets");
     }
     if (defauts.Count == 0)
         Exiger(true, $"{d.Code} : forme {d.Forme}{(d.EnOnglets ? $" en onglets ({string.Join(", ", d.Membres.Select(m => m.Forme))})" : "")}");
@@ -485,9 +494,12 @@ Exiger(parCode.GetValueOrDefault("PROC_JCAISSE") is { Forme: FormeEcran.Etat } j
 Exiger(parCode.GetValueOrDefault("PROC_MESIN") is { Forme: FormeEcran.Fiche, Marches.Length: 0 } mesin
        && mesin.Sections.SelectMany(s => s.Champs).Any(c => c.Type != TypeChamp.Tableau),
     "« Mesure provisoire » est une Fiche (modifier une mesure existante) : des champs editables, aucune etape");
-Exiger(parCode.GetValueOrDefault("PROC_IA") is { Forme: FormeEcran.Operation, ObjetUnique: true, Gestes.Length: 0 }
+// Analyse IA : la liasse est RECUE (OPE_DOC_DEMAT.cs:818), d'abord le lancement -- rien a saisir avant, la V2 ne fait que
+// confirmer (OPE_IA.cs:66) --, ensuite la restitution (Resultat), ou passent les champs verifies, la synthese et l'avis.
+Exiger(parCode.GetValueOrDefault("PROC_IA") is { Forme: FormeEcran.Operation, ObjetUnique: true, Gestes.Length: 0, Criteres.Length: 1, Resultat.Length: > 0 } ia
+       && ia.Sections.SelectMany(s => s.Champs).All(c => c.Type == TypeChamp.Tableau)
        && parCode.GetValueOrDefault("SYNTHESE_FORMALITES_DEMAT") is { EnOnglets: true },
-    "« Analyse IA » est une Operation sur UNE liasse (ni file ni geste en lot) ; son ecran reuni passe en onglets");
+    "« Analyse IA » est une Operation sur UNE liasse recue par son numero : lancement (rien a saisir), puis resultat ; son ecran reuni passe en onglets");
 // Deux files de traitement sont rangees sous Trouver : les bilans rejetes a renvoyer, les demandes FNIG a envoyer.
 string[] filesSousTrouver = ["PROC_REJETS_BILANS", "PROC_FNIG"];
 Exiger(descripteurs.Where(d => d.Membres.Length == 0 && MenuAccueil.VerbeDe(d.Code)?.Titre == "Trouver")
