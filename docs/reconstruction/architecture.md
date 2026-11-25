@@ -111,8 +111,33 @@ appeler `& .\donnees-dev.ps1` dans le même PowerShell avant de la lancer.
 |---|---|---|
 | Bases | `RigV3.Repetition donnees-dev` (`Outils\Repetition\DonneesDev.cs`) | RIG_DEV est **lu** sur `SQL-DEV\DEV` (SELECT seul) ; la copie s'écrit **déjà anonymisée** sur le SQL Docker du poste (SOC-021 : noms, adresses, documents remplacés), réduite à 200 lignes par table et fermée sur ses clés, **sauf** les tables que lisent les reprises du transfert (21 au 24/11 : comptes, droits, réglages, compteurs, catégories, correspondances des anciens numéros), copiées en entier ; elle est transférée dans une base V3 (comptes, droits, réglages, compteurs : les reprises de la phase 1) ; une base commune porte le greffe **3801** au catalogue, base V2 = la copie, base V3 = la base transférée. ~19 min la première fois ; ensuite, quelques secondes (bases retrouvées). |
 | Agent | la même commande | un compte **actif, administrateur d'Amitel**, avec un service et des rôles (les quatre contrôles de SOC-001), qui gère les droits s'il y en a un. Son identifiant est un pseudonyme : ta session Windows n'est pas dans la copie, l'app ouvre donc le greffe par `RIGV3_COMPTE`, que seul un serveur en `Development` écoute. Il est aussi inscrit dans la base commune (routes communes). |
-| Serveur | `donnees-dev.ps1` | compilé dans `%LOCALAPPDATA%\RigV3\serveur-dev` (il ne verrouille ni `Serveur\bin` ni `bin\Debug`), lancé sur `http://127.0.0.1:5080` avec la base commune, l'accès aux bases des greffes par le compte `sa` du Docker, en `Development` ; repris tel quel au lancement suivant ; `-Arreter` l'arrête, lui seul (pid noté, chemin vérifié). |
+| Serveur | `donnees-dev.ps1` | compilé dans un dossier neuf, `%LOCALAPPDATA%\RigV3\serveur-dev-<date>` (il ne verrouille ni `Serveur\bin` ni `bin\Debug`, et la dll du serveur en cours ne bloque pas la compilation suivante), lancé sur `http://127.0.0.1:5080` avec la base commune, l'accès aux bases des greffes par le compte `sa` du Docker, en `Development` ; au lancement suivant, **repris tel quel si son code est à jour, relancé sinon** (paragraphe suivant) ; `-Arreter` l'arrête, lui seul (pid et dll notés dans `serveur-dev.json`, un fichier par port : `serveur-dev-<port>.json` hors 5080). |
 | App | `donnees-dev.ps1` | `RIGV3_SERVEUR`, `RIGV3_COMPTE`, `RIGV3_GREFFES=3801` posées dans le processus PowerShell : `dotnet watch` (via `dev.ps1`) ou l'exe (`-Lancer`) en hérite. |
+
+**Le serveur suit le code du dépôt** (2026-11-25). Avant, un serveur déjà lancé était repris tel quel, même construit
+sur un code d'avant les derniers lots : le 25/11 à 10h25, `/sante` rendait `0b39f4f`, sans le lot 2 (`7feba2c`), et
+les écrans branchés par les lots 2 et 3 restaient sur leurs exemples dans l'app de l'utilisateur. Désormais, à chaque
+appel, le script lit le commit qui suit « + » dans la version de `/sante` (le SDK .NET y inscrit la tête du dépôt à la
+compilation) et le compare au dépôt : `git diff --quiet <commit> HEAD -- Serveur Contrats Base Directory.Build.props …`
+— `Serveur\`, les projets qu'il référence de proche en proche (lus dans les `ProjectReference`), et les fichiers que
+MSBuild lit à la racine. Un écart : il compile dans un dossier neuf, **puis** arrête l'ancien (le sien seul), **puis**
+démarre le neuf, et le dit en une ligne : `Serveur de dev perime (0b39f4f) : relance sur ef44766 (pid 44128, coupure
+1.5 s)` (mesuré le 25/11 : 13 s en tout, 1,5 s sans serveur). Un changement de `web\` (React) ou de l'écran seul ne
+relance rien. Restent tels quels, avec un avertissement : un serveur lancé hors du script (jamais arrêté : l'arrêter
+soi-même, ou `-Port <autre>`) ; une version sans commit, un commit inconnu du dépôt, git absent (serveur repris sans
+vérification) ; une compilation en échec (l'ancien reste en service). La comparaison porte sur `HEAD` : une
+modification non commitée de `Serveur\` ne relance rien (`-Arreter`, puis le script, pour la prendre). Une fois le neuf
+en service, les dossiers des compilations précédentes sont effacés, sauf celui d'un serveur encore lancé (autre port).
+Banc : `.\tests.ps1 Lanceurs` (les deux fonctions du script jouées sur un dépôt git jetable : React et écran seuls →
+à jour ; `Serveur`, `Contrats`, une référence de `Contrats`, `Directory.Build.props` → périmé ; version sans commit,
+commit inconnu, git absent → illisible ; contre-épreuves faites : comparaison sur tout le dépôt, références non
+suivies, fichiers de la racine oubliés, ancien serveur arrêté avant la compilation → rouge à chaque fois).
+
+**Branchée, l'app renvoie les préférences de l'agent au serveur** (SOC-013, `Pont/PreferencesServeur.cs`) : à
+l'ouverture, elle relit ses onglets dans la base, et chaque onglet ouvert y repart. Sur un bureau caché, `RIGV3_ETAT`
+protège donc le fichier de l'utilisateur, **pas** ses onglets : ceux de l'agent de la copie sont les siens. Un onglet
+ouvert pour une capture se referme, et l'onglet actif d'origine se reprend, avant de fermer l'app (vérifié le 25/11 :
+`GET /socle/3801/preferences` identique avant et après).
 
 Les noms des trois bases et de l'agent : `%LOCALAPPDATA%\RigV3\donnees-dev.json` ; journal du serveur :
 `serveur-dev.log` à côté. Une préparation refaite supprime l'ancien jeu **après** sa réussite (un échec laisse
