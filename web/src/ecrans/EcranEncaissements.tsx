@@ -21,7 +21,6 @@
 // sur un client filtre), A ventiler. Une ligne par ventilation (client en avatar et abrege, montant avec sa
 // mini-barre, ventile en point vert), pied de totaux. Le clic qui coche ou decoche une ventilation, la saisie et
 // le compte rendu de ventilation ne changent pas ; les filtres montrent, ils ne cochent rien.
-// fix-ok: application du socle des listes (lot 4) en plusieurs pas, pas un correctif.
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'

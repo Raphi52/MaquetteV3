@@ -30,7 +30,6 @@
 // trois cartes (Solde actuel ; Debits et Credits, dont le clic filtre), debit, credit et solde avec leur
 // mini-barre, pied de totaux. Contacts : avatar, nom et fonction, principal en point vert. La fiche de gauche
 // ne change pas.
-// fix-ok: application du socle des listes (lot 4) en plusieurs pas, pas un correctif.
 
 import { useState } from 'react'
 import { dateCourte } from '../criteres'

@@ -22,14 +22,14 @@
 //
 // LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 4) : la liste prend les briques de
 // composants/ListeModerne.tsx. Les deux etapes restent deux onglets (ce sont deux jeux de colonnes, pas des
-// criteres). Tete (compte, a facturer, total des forfaits, « Aller a une affaire… » Ctrl K, Entree ouvre le
-// dossier reste seul), trois cartes qui POSENT les criteres existants (Forfaits par classement, A facturer,
-// Limite d'examen depassee), des vues = jeux de criteres dont « + Nouvelle vue » pour la session. « Selection
-// PC » : une ligne par affaire (avatar, nom, N PC · chambre ; classement en pastille ; limite en point rouge si
-// depassee ; forfait avec sa mini-barre), heures, courrier, dirigeants, liquidateurs, huissier et ville dans la
-// ligne depliee. « Enrolement / requete » : 6 colonnes, N Role et N PC sous le defendeur. Criteres, clic qui
-// ouvre le dossier et ligne en alerte ne changent pas.
-// fix-ok: application du socle des listes (lot 4) en plusieurs pas, pas un correctif.
+// criteres). Tete (compte, a facturer, total des forfaits, « Aller a une affaire… » Ctrl K, Entree ouvre le dossier
+// reste seul ; ce champ EST le critere « Affaire » de gauche -- nom ou n de role, meme etat, il pose aussi les vues
+// et se remplit depuis une affaire : un seul champ pour un seul filtre), trois cartes qui POSENT les criteres
+// existants (Forfaits par classement, A facturer, Limite d'examen depassee), des vues = jeux de criteres
+// dont « + Nouvelle vue » pour la session. « Selection PC » : une ligne par affaire (avatar, nom, N PC · chambre ;
+// classement en pastille ; limite en point rouge si depassee ; forfait avec sa mini-barre), heures, courrier,
+// dirigeants, liquidateurs, huissier et ville dans la ligne depliee. « Enrolement / requete » : 6 colonnes, N Role
+// et N PC sous le defendeur. Criteres, clic qui ouvre le dossier et ligne en alerte ne changent pas.
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
@@ -151,10 +151,6 @@ export function oublierVuesDeLaSession(): void {
   VuesDeLaSession.length = 0
 }
 
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-}
-
 /** Colonnes de « Selection PC » : chevron, Affaire, Audience, Classement, Limite, A facturer, Forfait, menu. */
 const NbColonnesSelection = 8
 /** Colonnes de « Enrolement / requete » : Defendeur, Demandeur, Acte de saisine, Audience, Depot, Facturation. */
@@ -217,12 +213,6 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
 
   const trouvees = filtrer(criteres, aujourdhui)
 
-  // « Aller a une affaire… » (Ctrl K) : filtre la liste AFFICHEE, sans toucher aux criteres.
-  const [filtreRapide, setFiltreRapide] = useState('')
-  const cherche = normaliser(filtreRapide.trim())
-  const affichees = cherche === '' ? trouvees : trouvees.filter((l) => normaliser(
-    [l.affaire, l.role, l.numPc, l.dossier, l.demandeur, l.defendeur].join(' ')).includes(cherche))
-
   const [vuesAjoutees, setVuesAjoutees] = useState<VueCloture[]>(() => [...VuesDeLaSession])
   const vues = [...VuesPrereglees, ...vuesAjoutees]
   const vueActive = vues.find((v) => memesCriteres(v.criteres, criteres))?.cle ?? null
@@ -231,12 +221,12 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
     setVuesAjoutees([...VuesDeLaSession])
   }
 
-  // Les chiffres de la tete, des cartes et du pied : sur la liste AFFICHEE.
-  const forfaits = affichees.reduce((s, l) => s + forfaitDe(l), 0)
-  const forfaitMax = affichees.reduce((m, l) => Math.max(m, forfaitDe(l)), 0)
-  const aFacturer = affichees.filter((l) => l.aFacturer).length
-  const depassees = affichees.filter(enRetard).length
-  const parClassement = (c: string) => affichees.filter((l) => l.classement === c)
+  // Les chiffres de la tete, des cartes et du pied : sur la liste affichee.
+  const forfaits = trouvees.reduce((s, l) => s + forfaitDe(l), 0)
+  const forfaitMax = trouvees.reduce((m, l) => Math.max(m, forfaitDe(l)), 0)
+  const aFacturer = trouvees.filter((l) => l.aFacturer).length
+  const depassees = trouvees.filter(enRetard).length
+  const parClassement = (c: string) => trouvees.filter((l) => l.classement === c)
   const nbColonnes = etapeSelection ? NbColonnesSelection : NbColonnesEnrolement
 
   return (
@@ -244,12 +234,6 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
 
       <aside className="rig-criteres">
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Criteres d'examen</div>
-
-        <label className="rig-saisie-champ">
-          <span className="rig-saisie-champ__libelle">Affaire</span>
-          <input className="rig-saisie-champ__saisie" placeholder="nom ou n de role"
-                 value={critAffaire} onChange={(e) => setCritAffaire(e.target.value)} />
-        </label>
 
         <label className="rig-saisie-champ">
           <span className="rig-saisie-champ__libelle">Chambre</span>
@@ -311,10 +295,10 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
         </div>
 
         <EnteteListe titre={etapeSelection ? 'Selection des procedures collectives' : 'Enrolement et requete'}
-                     synthese={<>{affichees.length}{affichees.length > 1 ? ' affaires' : ' affaire'}{` sur ${Lignes.length} · `}
+                     synthese={<>{trouvees.length}{trouvees.length > 1 ? ' affaires' : ' affaire'}{` sur ${Lignes.length} · `}
                        <b>{aFacturer}</b>{' a facturer · forfaits '}<b>{montant(forfaits)}</b></>}
-                     filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a une affaire…',
-                               valider: () => { if (affichees.length === 1) ouvrirDossier(affichees[0]!.dossier) } }} />
+                     filtre={{ valeur: critAffaire, changer: setCritAffaire, indication: 'Aller a une affaire…',
+                               valider: () => { if (trouvees.length === 1) ouvrirDossier(trouvees[0]!.dossier) } }} />
 
         <CartesChiffrees cartes={[
           { cle: 'forfaits', titre: 'Forfaits', valeur: montant(forfaits), legende: true,
@@ -324,12 +308,12 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
               return { cle: c, libelle: c, valeur: somme, texte: montant(somme), teinte: TeinteClassement[c] ?? 'gris',
                        actif: critTypes.has(c), choisir: () => basculer(c) }
             }) },
-          { cle: 'a-facturer', titre: 'A facturer', valeur: aFacturer, complement: `sur ${affichees.length}`,
-            anneau: { part: aFacturer, total: affichees.length, teinte: 'orange' },
+          { cle: 'a-facturer', titre: 'A facturer', valeur: aFacturer, complement: `sur ${trouvees.length}`,
+            anneau: { part: aFacturer, total: trouvees.length, teinte: 'orange' },
             actif: critAFacturer, choisir: () => setCritAFacturer(!critAFacturer),
             indication: critAFacturer ? 'Toutes les affaires' : 'Seulement les affaires a facturer' },
-          { cle: 'examen', titre: 'Limite d\'examen depassee', valeur: depassees, complement: `sur ${affichees.length}`,
-            anneau: { part: depassees, total: affichees.length, teinte: 'rouge' },
+          { cle: 'examen', titre: 'Limite d\'examen depassee', valeur: depassees, complement: `sur ${trouvees.length}`,
+            anneau: { part: depassees, total: trouvees.length, teinte: 'rouge' },
             actif: critExamenDepasse, choisir: () => setCritExamenDepasse(!critExamenDepasse),
             indication: critExamenDepasse ? 'Toutes les affaires' : 'Seulement les limites depassees' },
         ]} />
@@ -377,7 +361,7 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
               )}
             </thead>
             <tbody>
-              {affichees.map((ligne) => {
+              {trouvees.map((ligne) => {
                 const retard = enRetard(ligne)
                 const estOuverte = etapeSelection && ouverte === ligne.role
                 const ouvrir: ActionLigne = { libelle: 'Ouvrir le dossier', agir: () => ouvrirDossier(ligne.dossier) }
@@ -434,17 +418,12 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
               {trouvees.length === 0 && (
                 <tr><td colSpan={nbColonnes} className="rig-table__vide">Aucune affaire ne repond a ces criteres.</td></tr>
               )}
-              {trouvees.length > 0 && affichees.length === 0 && (
-                <tr><td colSpan={nbColonnes} className="rig-table__vide">
-                  {`Aucune des ${trouvees.length} affaires ne contient « ${filtreRapide.trim()} ».`}
-                </td></tr>
-              )}
             </tbody>
           </table>
         </div>
 
         <PiedListe aide="Clic sur une ligne pour ouvrir le dossier.">
-          <span><b>{affichees.length}</b>{affichees.length > 1 ? ' affaires affichees' : ' affaire affichee'}</span>
+          <span><b>{trouvees.length}</b>{trouvees.length > 1 ? ' affaires affichees' : ' affaire affichee'}</span>
           <span>Forfaits <b>{montant(forfaits)}</b></span>
           <span>A facturer <b>{aFacturer}</b></span>
           <span>Limite depassee <b>{depassees}</b></span>

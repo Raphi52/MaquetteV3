@@ -13,11 +13,12 @@
 // demonstration l'ont suivi ici. La coquille .razor recoit selectionner.
 //
 // LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 4) : le resultat prend les briques de
-// composants/ListeModerne.tsx. Tete (compte, actifs, « Aller a un client… » Ctrl K qui filtre la liste affichee,
-// Entree choisit le client reste seul), deux cartes qui POSENT les criteres existants (Actifs, Type de client),
+// composants/ListeModerne.tsx. Tete (compte, actifs, « Aller a un client… » Ctrl K, Entree choisit le client reste
+// seul ; ce champ EST le critere « Mot cle » de gauche -- nom, abrege ou compte, meme etat, il pose aussi les vues :
+// un seul champ pour un seul filtre), deux cartes qui POSENT les criteres existants (Actifs, Type de client),
 // des vues = jeux de criteres (statut, type) dont « + Nouvelle vue » pour la session, une ligne par client
-// (avatar, nom, abrege · compte ; statut en point, type en pastille), pied de totaux. Les criteres de gauche et
-// le clic qui remonte l'abrege ne changent pas. Aucun montant dans cette liste : pas de carte en euros.
+// (avatar, nom, abrege · compte ; statut en point, type en pastille), pied de totaux. Les autres criteres de gauche
+// et le clic qui remonte l'abrege ne changent pas. Aucun montant dans cette liste : pas de carte en euros.
 
 import { useState } from 'react'
 import { contientSansCasse, estBlanc } from '../criteres'
@@ -110,10 +111,6 @@ export function oublierVuesDeLaSession(): void {
   VuesDeLaSession.length = 0
 }
 
-function normaliser(texte: string): string {
-  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-}
-
 export function EcranClients({ selectionner }: ProprietesEcranClients) {
   const [motCle, setMotCle] = useState('')
   const [critStatuts, setCritStatuts] = useState<ReadonlySet<string>>(new Set())
@@ -132,12 +129,6 @@ export function EcranClients({ selectionner }: ProprietesEcranClients) {
 
   const trouves = filtrer(criteres)
 
-  // « Aller a un client… » (Ctrl K) : filtre la liste AFFICHEE, sans toucher aux criteres.
-  const [filtreRapide, setFiltreRapide] = useState('')
-  const cherche = normaliser(filtreRapide.trim())
-  const affiches = cherche === '' ? trouves
-    : trouves.filter((c) => normaliser([c.nom, c.abrege, c.compte, String(c.id)].join(' ')).includes(cherche))
-
   const [vuesAjoutees, setVuesAjoutees] = useState<VueClients[]>(() => [...VuesDeLaSession])
   const vues = [...VuesPrereglees, ...vuesAjoutees]
   const vueActive = vues.find((v) => memesCriteres(v.criteres, criteres))?.cle ?? null
@@ -147,20 +138,14 @@ export function EcranClients({ selectionner }: ProprietesEcranClients) {
     setVuesAjoutees([...VuesDeLaSession])
   }
 
-  const actifs = affiches.filter((c) => c.statut === 'Actif').length
-  const parType = (t: string) => affiches.filter((c) => c.type === t).length
+  const actifs = trouves.filter((c) => c.statut === 'Actif').length
+  const parType = (t: string) => trouves.filter((c) => c.type === t).length
 
   return (
     <div className="rig-proc__corps">
 
       <aside className="rig-criteres">
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Criteres de recherche</div>
-
-        <label className="rig-saisie-champ">
-          <span className="rig-saisie-champ__libelle">Mot cle</span>
-          <input className="rig-saisie-champ__saisie" placeholder="nom, abrege ou compte"
-                 value={motCle} onChange={(e) => setMotCle(e.target.value)} />
-        </label>
 
         <div className="rig-criteres__bloc">
           <div className="rig-kicker">Statut du client</div>
@@ -191,17 +176,17 @@ export function EcranClients({ selectionner }: ProprietesEcranClients) {
 
       <ListeModerne etiquette="Resultat">
         <EnteteListe titre="Resultat"
-                     synthese={<>{affiches.length}{affiches.length > 1 ? ' clients' : ' client'}{` sur ${Clients.length} · `}<b>{actifs}</b>
+                     synthese={<>{trouves.length}{trouves.length > 1 ? ' clients' : ' client'}{` sur ${Clients.length} · `}<b>{actifs}</b>
                        {actifs > 1 ? ' actifs' : ' actif'}</>}
-                     filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a un client…',
-                               valider: () => { if (affiches.length === 1) selectionner(affiches[0]!.abrege) } }} />
+                     filtre={{ valeur: motCle, changer: setMotCle, indication: 'Aller a un client…',
+                               valider: () => { if (trouves.length === 1) selectionner(trouves[0]!.abrege) } }} />
 
         <CartesChiffrees cartes={[
-          { cle: 'actifs', titre: 'Actifs', valeur: actifs, complement: `sur ${affiches.length}`,
-            anneau: { part: actifs, total: affiches.length, teinte: 'vert' },
+          { cle: 'actifs', titre: 'Actifs', valeur: actifs, complement: `sur ${trouves.length}`,
+            anneau: { part: actifs, total: trouves.length, teinte: 'vert' },
             actif: critStatuts.has('Actif'), choisir: () => setCritStatuts((avant) => basculer(avant, 'Actif')),
             indication: critStatuts.has('Actif') ? 'Retirer le statut Actif des criteres' : 'Ajouter le statut Actif aux criteres' },
-          { cle: 'types', titre: 'Type de client', valeur: affiches.length, complement: affiches.length > 1 ? 'clients' : 'client',
+          { cle: 'types', titre: 'Type de client', valeur: trouves.length, complement: trouves.length > 1 ? 'clients' : 'client',
             legende: true,
             ...(critTypes.size > 0 ? { choisir: () => setCritTypes(new Set()), indication: 'Tous les types' } : {}),
             segments: Types.map((t) => ({
@@ -229,7 +214,7 @@ export function EcranClients({ selectionner }: ProprietesEcranClients) {
               </tr>
             </thead>
             <tbody>
-              {affiches.map((cli) => (
+              {trouves.map((cli) => (
                 <tr key={cli.id} onClick={() => selectionner(cli.abrege)}>
                   <CelluleIdentite nom={cli.nom} objet={`${cli.abrege} · ${cli.compte}`} titre={`${cli.nom} — ${cli.abrege} · ${cli.compte}`} />
                   <td className="rig-table__mono">{cli.id}</td>
@@ -241,15 +226,12 @@ export function EcranClients({ selectionner }: ProprietesEcranClients) {
               {trouves.length === 0 && (
                 <tr><td colSpan={5} className="rig-table__vide">Aucun client ne repond a ces criteres.</td></tr>
               )}
-              {trouves.length > 0 && affiches.length === 0 && (
-                <tr><td colSpan={5} className="rig-table__vide">{`Aucun des ${trouves.length} clients ne contient « ${filtreRapide.trim()} ».`}</td></tr>
-              )}
             </tbody>
           </table>
         </div>
 
         <PiedListe aide="Clic sur une ligne pour choisir le client.">
-          <span><b>{affiches.length}</b>{affiches.length > 1 ? ' clients affiches' : ' client affiche'}</span>
+          <span><b>{trouves.length}</b>{trouves.length > 1 ? ' clients affiches' : ' client affiche'}</span>
           <span>Actifs <b>{actifs}</b></span>
           <span>Fichier <b>{Clients.length}</b></span>
         </PiedListe>

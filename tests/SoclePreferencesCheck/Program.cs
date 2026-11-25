@@ -458,8 +458,11 @@ try
         .Distinct().Where(code => !pages.Contains(code) && Tsx(code) is not null).ToList();
     var enRetard = ecransRecherche.Where(code => !EcranCorrespondances.EntreeLanceLaRecherche.Contains(code) && entreeRecherche.IsMatch(Tsx(code)!)).ToList();
     Exiger(enRetard.Count == 0, $"SOC-027 CA04 : aucun ecran ne lance la recherche sur Entree sans que la fiche le dise ({string.Join(", ", enRetard)})");
-    // « La liste se filtre au fil de la saisie » : des criteres, aucun bouton qui lance la recherche.
-    var criteres = new Regex(@"<(input|select)\b");
+    // « La liste se filtre au fil de la saisie » : des criteres, aucun bouton qui lance la recherche. Un critere est un champ
+    // ecrit dans l'ecran (<input>, <select>) ou le champ « Aller a… » (Ctrl K) de la tete de liste, que l'ecran demande au
+    // socle par la prop filtre de EnteteListe (web/src/composants/ListeModerne.tsx) : depuis les listes modernes
+    // (25/11/2026), un critere texte qui filtrait sur place DEVIENT ce champ (Gestion clients n'a plus d'<input> a elle).
+    var criteres = new Regex(@"<(input|select)\b|\bfiltre=\{\{");
     foreach (var code in EcranCorrespondances.RechercheAuFilDeLaSaisie)
         Exiger(Tsx(code) is { } t && criteres.IsMatch(t) && !t.Contains("rechercher(", StringComparison.Ordinal),
             $"SOC-027 CA04 : la liste se filtre bien au fil de la saisie sur l'ecran annonce ({CatalogueEcrans.Nom(code)})");

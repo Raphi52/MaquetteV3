@@ -26,10 +26,10 @@ describe('EcranClients', () => {
 
   it('filtre par mot cle (sans casse) et par statut, et « Effacer » remet tout', () => {
     const { container } = render(<EcranClients selectionner={vi.fn()} />)
-    fireEvent.change(screen.getByLabelText('Mot cle'), { target: { value: 'dup' } })
+    fireEvent.change(screen.getByLabelText('Aller a un client…'), { target: { value: 'dup' } })
     expect(abreges(container)).toEqual(['DUPONT'])
 
-    fireEvent.change(screen.getByLabelText('Mot cle'), { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText('Aller a un client…'), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'En sommeil' }))
     expect(screen.getByRole('button', { name: 'En sommeil' }).className).toBe('rig-bascule rig-bascule--actif')
     expect(abreges(container)).toEqual(['PREV51'])
@@ -89,7 +89,7 @@ describe('EcranClients', () => {
     expect(abreges(second.container)).toEqual(['DUPONT'])
   })
 
-  it('« Aller a un client… » filtre la liste affichee sans toucher aux criteres ; Ctrl K y pose le curseur ; Entree choisit le client reste seul', () => {
+  it('« Aller a un client… » EST le critere « Mot cle » (nom, abrege ou compte) : un seul champ, il pose les vues ; Ctrl K y pose le curseur ; Entree choisit le client reste seul', () => {
     const selectionner = vi.fn()
     const { container } = render(<EcranClients selectionner={selectionner} />)
     const champ = screen.getByLabelText('Aller a un client…') as HTMLInputElement
@@ -98,13 +98,24 @@ describe('EcranClients', () => {
     expect(touche.defaultPrevented).toBe(true)
     expect(document.activeElement).toBe(champ)
 
+    // Un seul champ pour un seul filtre : plus de champ « Mot cle » a gauche.
+    expect(screen.queryByLabelText('Mot cle')).toBeNull()
     fireEvent.change(champ, { target: { value: 'compiegne' } })
     expect(abreges(container)).toEqual(['GRFCPY'])
-    expect((screen.getByLabelText('Mot cle') as HTMLInputElement).value).toBe('')
+    expect(container.querySelector('.rig-lm-pied')!.textContent).toContain('1 client affiche')
+    // C'est un critere : la vue « Tous » n'est plus la vue posee.
+    expect(container.querySelector('.rig-lm-vue--active')).toBeNull()
     fireEvent.keyDown(champ, { key: 'Enter' })
     expect(selectionner).toHaveBeenCalledWith('GRFCPY')
+    // Le compte, comme le critere d'avant.
+    fireEvent.change(champ, { target: { value: 'g-000012' } })
+    expect(abreges(container)).toEqual(['GRFCPY'])
 
     fireEvent.change(champ, { target: { value: 'zzz' } })
-    expect(container.querySelector('.rig-table__vide')!.textContent).toBe('Aucun des 6 clients ne contient « zzz ».')
+    expect(container.querySelector('.rig-table__vide')!.textContent).toBe('Aucun client ne repond a ces criteres.')
+    // « Effacer » le vide comme les autres criteres, et la vue « Tous » revient.
+    fireEvent.click(screen.getByRole('button', { name: 'Effacer' }))
+    expect(champ.value).toBe('')
+    expect(screen.getByRole('button', { name: /^Tous/ }).getAttribute('aria-pressed')).toBe('true')
   })
 })

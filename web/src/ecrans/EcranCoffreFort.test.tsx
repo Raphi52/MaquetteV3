@@ -44,7 +44,7 @@ describe('EcranCoffreFort', () => {
     // Chaque puce compte sa liste sous les criteres.
     expect(puce(/^Deja transmis/).textContent).toBe('Deja transmis 1')
     expect(puce(/^A transmettre/).textContent).toBe('A transmettre 0')
-    fireEvent.change(screen.getByLabelText('Code ou destinataire'), { target: { value: 'leroy' } })
+    fireEvent.change(screen.getByLabelText('Aller a un depot…'), { target: { value: 'leroy' } })
     expect(container.querySelector('.rig-table__vide')!.textContent).toBe('Aucun depot ne repond a ces criteres.')
   })
 
@@ -70,13 +70,20 @@ describe('EcranCoffreFort', () => {
     expect(screen.getByText('Historique de CF-2026-0412 (20 ligne(s) au plus)')).toBeTruthy()
   })
 
-  it('« Aller a un depot… » filtre la liste affichee ; Entree choisit le depot reste seul', () => {
+  it('« Aller a un depot… » EST le critere « Code ou destinataire » : un seul champ, les puces le comptent ; Entree choisit le depot reste seul', () => {
     const { container } = render(<EcranCoffreFort />)
+    // Un seul champ pour un seul filtre : plus de champ « Code ou destinataire » a gauche.
+    expect(screen.queryByLabelText('Code ou destinataire')).toBeNull()
     const champ = screen.getByLabelText('Aller a un depot…')
     fireEvent.change(champ, { target: { value: 'petit' } })
     expect(codes(container)).toEqual(['CF-2026-0610'])
-    expect((screen.getByLabelText('Code ou destinataire') as HTMLInputElement).value).toBe('')
+    // C'est un critere : chaque puce compte sa liste sous lui (Me PETIT n'a rien de deja transmis).
+    expect(puce(/^Deja transmis/).textContent).toBe('Deja transmis 0')
+    expect(puce(/^A transmettre/).textContent).toBe('A transmettre 1')
     fireEvent.keyDown(champ, { key: 'Enter' })
     expect(screen.getByText('Historique de CF-2026-0610 (20 ligne(s) au plus)')).toBeTruthy()
+    // Le code du depot, comme le critere d'avant.
+    fireEvent.change(champ, { target: { value: 'cf-2026-0603' } })
+    expect(codes(container)).toEqual(['CF-2026-0603'])
   })
 })

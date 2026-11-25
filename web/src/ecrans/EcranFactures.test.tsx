@@ -20,6 +20,8 @@ const solde = (c: HTMLElement) => c.querySelector('section > .rig-criteres__bloc
 /** Les cellules de chaque ligne d'article affichee (hors lignes depliees). */
 const lignes = (c: HTMLElement) =>
   [...c.querySelectorAll('tbody tr:not(.rig-lm-detail)')].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent))
+/** Le code de chaque article affiche, en gris sous son libelle (la ligne « Aucun article… » n'en a pas). */
+const codes = (c: HTMLElement) => [...c.querySelectorAll('tbody .rig-lm-identite__objet')].map((o) => o.textContent)
 
 describe('EcranFactures', () => {
   it('affiche le total et le reste comme l\'ecran Blazor', async () => {
@@ -32,9 +34,17 @@ describe('EcranFactures', () => {
 
   it('ecrit les colonnes de la grille a la francaise ; les secondaires sont dans la ligne depliee', () => {
     const { container } = ouvrir()
-    // Chevron, Code, Libelle, Quantite, Etat, Montant TTC, Commentaire, menu.
-    expect(lignes(container)[0]).toEqual(['', 'IMM01', 'Immatriculation societe', '1', 'Retenu', '194,85 €', '', ''])
-    expect(lignes(container)[1]![6]).toBe('Changement de gerant')
+    // Chevron, Article (libelle en gras, code en gris), Quantite, Etat, Montant TTC, Commentaire, menu.
+    expect([...container.querySelectorAll('thead th')].map((th) => th.textContent))
+      .toEqual(['', 'Article', 'Quantite', 'Etat', 'Montant TTC', 'Commentaire', ''])
+    expect(lignes(container)[0]).toEqual(['', 'Immatriculation societeIMM01', '1', 'Retenu', '194,85 €', '', ''])
+    const article = container.querySelector('tbody tr')!.querySelectorAll('td')[1]!
+    expect(article.querySelector('.rig-lm-identite__nom')!.textContent).toBe('Immatriculation societe')
+    expect(article.querySelector('.rig-lm-identite__objet')!.textContent).toBe('IMM01')
+    expect(article.getAttribute('title')).toBe('Immatriculation societe · IMM01')
+    // Un article n'est ni un client ni un dossier : pas d'avatar d'initiales.
+    expect(container.querySelector('tbody .rig-lm-avatar')).toBeNull()
+    expect(lignes(container)[1]![5]).toBe('Changement de gerant')
     fireEvent.click(screen.getAllByRole('button', { name: 'Deplier la ligne' })[0]!)
     expect([...container.querySelectorAll('.rig-lm-champ')].map((c) => c.textContent))
       .toEqual(['Prix UHT37,45', 'Taux TVA20,0 %', 'BODACC105,90', 'INPI0,00', 'Autre0,00'])
@@ -73,7 +83,7 @@ describe('EcranFactures', () => {
     expect(cartes()).toEqual(['458,63 €', '200,00 € sur 458,63 €', '236,60 €'])
     // BODACC : IMM01 et MOD02 seulement (105,90 + 108,00).
     fireEvent.click(screen.getByRole('button', { name: 'BODACC 213,90 €', pressed: false }))
-    expect(lignes(container).map((l) => l[1])).toEqual(['IMM01', 'MOD02'])
+    expect(codes(container)).toEqual(['IMM01', 'MOD02'])
     expect(container.querySelector('.rig-lm-pied')!.textContent).toContain('2 articles affiches')
     // Le total ne bouge pas : le filtre montre, il ne retire rien.
     expect(compte(container)).toBe('5 articles · total TTC 458,63 € · reste a encaisser 258,63 €')
@@ -83,7 +93,7 @@ describe('EcranFactures', () => {
     // Retires : l'article retire, seul ; la carte « Total TTC » enleve le filtre.
     fireEvent.click(screen.getByText('DIV05').closest('tr')!)
     fireEvent.click(screen.getByRole('button', { name: 'Retires 14,64 €', pressed: false }))
-    expect(lignes(container).map((l) => l[1])).toEqual(['DIV05'])
+    expect(codes(container)).toEqual(['DIV05'])
     fireEvent.click(screen.getByRole('button', { name: /^Total TTC/ }))
     expect(lignes(container)).toHaveLength(5)
   })
@@ -210,7 +220,7 @@ describe('EcranFactures ouvert depuis une affaire', () => {
   it('004182, une immatriculation : l\'article d\'immatriculation du tarif, sa demande, son client', async () => {
     const { container, pont } = ouvrirPour(AmiensBillards)
     expect(lignes(container)).toEqual([
-      ['', 'IMM01', 'Immatriculation societe', '1', 'Retenu', '194,85 €', '', ''],
+      ['', 'Immatriculation societeIMM01', '1', 'Retenu', '194,85 €', '', ''],
     ])
     await waitFor(() => expect(valeur('N de demande')).toBe('004182'))
     expect(pont.appels).toHaveBeenCalledWith('EcranFactures.DemandeDe', '004182')
@@ -254,7 +264,7 @@ describe('EcranFactures ouvert depuis une affaire', () => {
   it('une modification : l\'article de modification, sans le commentaire de la demo', async () => {
     const { container } = ouvrirPour(contexteDossier())
     expect(lignes(container)).toEqual([
-      ['', 'MOD02', 'Modification statutaire', '1', 'Retenu', '162,72 €', '', ''],
+      ['', 'Modification statutaireMOD02', '1', 'Retenu', '162,72 €', '', ''],
     ])
     fireEvent.click(screen.getByRole('button', { name: 'Deplier la ligne' }))
     expect([...container.querySelectorAll('.rig-lm-champ')].map((c) => c.textContent))
