@@ -1,0 +1,8 @@
+# « Kbis XML rejetes » (LecteurKbisXmlRejetes) sur le jeu PROC_REJETSKBISXML.sql. Cases a l'ouverture par les reglages :
+# bloquantes (absent -> oui), avertissements (« 1 »), vivants (absent -> oui), PAS les radies (« OUI » n'est pas « 1 »).
+# Ordre de la V2 : vivants, bloquantes d'abord, retour le plus recent. Toute ligne « A examiner » (AFaire).
+# Ecartes, chacun avec son jumeau retenu : 200213 ancien Kbis (jumeau 200211), 200214 dossier radie (jumeau 200211),
+# 200215 information et 200216 historique (jumeau 200212), 200217 rejet annule.
+KBIS ETA SARL · 2020 B 20207 | Transmis le {J-2} · retour du {J-2} · Le numéro SIRET(NIC) de l'établissement n'est pas valide. | Bloquantes | AFaire | []
+KBIS ALPHA SARL · 2020 B 20201 | Transmis le {J-5} · retour du {J-5} · La date doit-être obligatoirement inférieure à la date du jour. | Bloquantes | AFaire | []
+KBIS BETA SAS · 2020 B 20202 | Transmis le {J-3} · retour du {J-3} · Le NIC existe déjà sur un autre établissement de ce dossier. | Avertissements | AFaire | []

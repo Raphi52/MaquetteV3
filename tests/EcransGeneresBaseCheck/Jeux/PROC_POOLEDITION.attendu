@@ -1,0 +1,16 @@
+# « File des editions » (LecteurFileEditions) sur le jeu PROC_POOLEDITION.sql : toutes les demandes d'edition, la plus
+# recente creee en tete (V2 : « order by dmned_date_creation desc »).
+# Etat par phase : I a emettre [] ; C, CZ [0,1] ; GT, P [0,1,2] ; E emise [0,1,2,3] ; IZ et code inconnu [0].
+# Groupe : Courriel (mode d'envoi 512 ou courriel envoye), sinon File differee (DMNED_LOT), sinon Courrier.
+# Une edition sans date de creation vient en dernier et ne dit pas « creee le » (200410).
+EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Accusé de dépôt · à EDITION ALPHA SARL · créée le {J+0} | Courrier | AFaire | []
+EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Certificat de non-faillite · à Maître Banc · créée le {J-1} | Courriel | EnCours | [0,1]
+EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Lettre de relance · à EDITION ALPHA SARL · créée le {J-2} · file « LRAR » | File différée | EnCours | [0,1,2]
+EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Extrait Kbis · à EDITION ALPHA SARL · créée le {J-3} | Courrier | EnCours | [0,1,2]
+EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Extrait Kbis · à Maître Banc · émise le {J-4} | Courriel | Validee | [0,1,2,3]
+EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Accusé de dépôt · à EDITION ALPHA SARL · créée le {J-5} · en erreur : Adresse du destinataire absente | Courrier | EnCours | [0,1]
+EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Accusé de dépôt · à EDITION ALPHA SARL · créée le {J-6} · en erreur | Courrier | EnCours | [0]
+EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Accusé de dépôt · à EDITION ALPHA SARL · créée le {J-7} · phase « Q » de l'ancien RIG | Courrier | EnCours | [0]
+EDITION BETA SAS · 2020 B 40402 · demande 26000200422 | Certificat · à EDITION BETA SAS · émise le {J-8} | Courrier | Validee | [0,1,2,3]
+édition n° 200420 | Statistique nantissement · émise le {J-9} | Courrier | Validee | [0,1,2,3]
+édition n° 200410 | Courrier libre · à EDITION SANS DATE | Courrier | EnCours | [0,1]
