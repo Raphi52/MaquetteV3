@@ -121,4 +121,22 @@ describe('EcranArrivee en liste moderne', () => {
     fireEvent.click(carte('Paiement joint'))
     await waitFor(() => expect(pont.appels.mock.lastCall![1]).toMatchObject({ critPaiement: true }))
   })
+
+  it('chaque mode courant de dbo.MODE_ARRIVEE a sa propre teinte de pastille ; « Autre » reste gris', async () => {
+    // Libelles lus dans dbo.MODE_ARRIVEE (Metier/JeuDemo.cs, ModesArrivee), tels que le pont les rend
+    // en modeLisible. Faux si : deux modes partagent une teinte (« Recommande » vert comme « Accueil »),
+    // ou un libelle n'est plus reconnu et tombe au gris (« e-Mail » ecrit « E-mail »).
+    const courants = ['Accueil', 'Poste', 'Recommande', 'Edi', 'e-Mail']
+    installerFauxPont({ 'EcranArrivee.Trouver': (): VueArrivee => ({
+      modes: [], total: courants.length + 1, aNumeriser: 0,
+      lignes: [...courants, 'Autre'].map((m, i) => ({ ...ligne(`A${i}`, '', true), modeLisible: m })),
+    }) })
+    const { container } = render(<EcranArrivee ouvrirDossier={vi.fn()} />)
+    await screen.findByText('A5')
+    const teintes = rangees(container).map((r) => r.querySelector('.rig-lm-pastille')!.className)
+    const [autre] = teintes.splice(courants.length)
+    expect(teintes).not.toContain('rig-lm-pastille rig-lm-t-gris')
+    expect(new Set(teintes).size).toBe(courants.length)
+    expect(autre).toBe('rig-lm-pastille rig-lm-t-gris')
+  })
 })
