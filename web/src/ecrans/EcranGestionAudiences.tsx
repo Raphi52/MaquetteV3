@@ -19,9 +19,20 @@
 // Porte depuis Components/Ecrans/EcranGestionAudiences.razor (lot 5) : meme
 // balisage, memes classes CSS. L'ecran ne lisait rien dans Metier/ : ses
 // audiences de demonstration et ses filtres sont ici, sans pont.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 2) : la liste prend les briques de
+// composants/ListeModerne.tsx. Tete (synthese, « Aller a une audience… » Ctrl K qui filtre la liste affichee),
+// vues = le critere « Type d'audience » preregle, une ligne par audience (Jour, Date, Heure, Type en pastille,
+// Juge ou Section, Type de classement en point d'etat). Les sept autres colonnes de la v2 (Code de cabinet,
+// Greffier, Public, suppression, Web) sont dans la ligne depliee ; Greffier n'y figure qu'en recherche par
+// cabinets, comme la colonne v2. Ni menu ni action de ligne : la liste n'en avait pas. Criteres inchanges.
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { distinctsTries, entierLisible } from '../criteres'
+import {
+  CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe,
+  type Teinte,
+} from '../composants/ListeModerne'
 
 interface Audience {
   jour: string
@@ -64,6 +75,56 @@ const jourIso = (texte: string): string => {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : '0001-01-01'
 }
 
+/** Les criteres de recherche, tels que saisis (la borne maximum, derniere valeur lisible). */
+interface CriteresGestion {
+  dateDebut: string
+  dateFin: string
+  critType: string
+  critChambre: string
+  critSection: string
+  critJuge: string
+  critTypeCabinet: string
+  critCodeCabinet: string
+  critClassement: string
+  maxResultats: number
+}
+
+/** Le filtre de OPE_RECHERCHE_GESTAUDS, borne au nombre maximum : la liste, et le compte de chaque vue. */
+function filtrer(c: CriteresGestion): Audience[] {
+  let q = Audiences
+  if (c.critType !== '') q = q.filter((x) => x.type === c.critType)
+  if (c.critChambre !== '') q = q.filter((x) => x.chambre === c.critChambre)
+  if (c.critSection !== '') q = q.filter((x) => x.section === c.critSection)
+  if (c.critJuge !== '') q = q.filter((x) => x.juge === c.critJuge)
+  if (c.critTypeCabinet !== '') q = q.filter((x) => x.typeCabinet === c.critTypeCabinet)
+  if (c.critCodeCabinet !== '') q = q.filter((x) => x.codeCabinet === c.critCodeCabinet)
+  if (c.critClassement !== '') q = q.filter((x) => x.typeClassement === c.critClassement)
+  if (c.dateDebut !== '') q = q.filter((x) => jourIso(x.date) >= c.dateDebut)
+  if (c.dateFin !== '') q = q.filter((x) => jourIso(x.date) <= c.dateFin)
+  return q.slice(0, Math.max(1, c.maxResultats))
+}
+
+/** Les vues : « Toutes », puis chaque type d'audience (le critere « Type d'audience » preregle). */
+const Types = distinctsTries(Audiences.map((x) => x.type))
+export const VuesAudiences: ReadonlyArray<{ cle: string; libelle: string; critType: string }> = [
+  { cle: 'toutes', libelle: 'Toutes', critType: '' },
+  ...Types.map((t) => ({ cle: t, libelle: t, critType: t })),
+]
+
+const TeinteType: Record<string, Teinte> = { 'Audience de procedure': 'orange', 'Audience publique': 'bleu', 'Cabinet du juge': 'violet' }
+const TeinteClassement: Record<string, Teinte> = { Renvoi: 'orange', 'Mise en delibere': 'bleu', Radiation: 'rouge', Clos: 'gris' }
+
+/** Les colonnes du tableau a une ligne : chevron, Jour, Date, Heure, Type, Juge ou Section, Type de classement. */
+const NbColonnes = 7
+
+/**
+ * « Aller a… » compare sans casse ni accents, comme la Recherche d'affaires : « procédure » trouve « Audience de procedure ».
+ * Le normaliser() de RechAffaires n'est pas exporte du socle (manque note au plan, lot 6) : recopie locale.
+ */
+function normaliser(texte: string): string {
+  return texte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
 export function EcranGestionAudiences() {
   const [modeCabinet, setModeCabinet] = useState(true)
   const [dateDebut, setDateDebut] = useState('')
@@ -85,17 +146,23 @@ export function EcranGestionAudiences() {
     if (n !== null) setMaxResultats(n)
   }
 
-  let q = Audiences
-  if (critType !== '') q = q.filter((x) => x.type === critType)
-  if (critChambre !== '') q = q.filter((x) => x.chambre === critChambre)
-  if (critSection !== '') q = q.filter((x) => x.section === critSection)
-  if (critJuge !== '') q = q.filter((x) => x.juge === critJuge)
-  if (critTypeCabinet !== '') q = q.filter((x) => x.typeCabinet === critTypeCabinet)
-  if (critCodeCabinet !== '') q = q.filter((x) => x.codeCabinet === critCodeCabinet)
-  if (critClassement !== '') q = q.filter((x) => x.typeClassement === critClassement)
-  if (dateDebut !== '') q = q.filter((x) => jourIso(x.date) >= dateDebut)
-  if (dateFin !== '') q = q.filter((x) => jourIso(x.date) <= dateFin)
-  const trouvees = q.slice(0, Math.max(1, maxResultats))
+  const criteres: CriteresGestion = {
+    dateDebut, dateFin, critType, critChambre, critSection, critJuge, critTypeCabinet, critCodeCabinet, critClassement, maxResultats,
+  }
+  const trouvees = filtrer(criteres)
+
+  // La ligne depliee par son chevron (une a la fois) : l'audience elle-meme.
+  const [ouverte, setOuverte] = useState<Audience | null>(null)
+
+  // « Aller a une audience… » (Ctrl K) : filtre la liste AFFICHEE, sans toucher aux criteres.
+  const [filtreRapide, setFiltreRapide] = useState('')
+  const cherche = filtreRapide.trim()
+  const affichees = cherche === '' ? trouvees : trouvees.filter((x) => normaliser(
+    [x.jour, x.date, x.heure, x.type, x.codeCabinet, x.juge, x.section, x.greffier, x.typeClassement].join(' ')).includes(normaliser(cherche)))
+
+  // Les chiffres de la tete et du pied : sur la liste AFFICHEE.
+  const publiques = affichees.filter((x) => x.public).length
+  const supprimees = affichees.filter((x) => x.auteurSuppression !== '').length
 
   return (
     <div className="rig-proc__corps">
@@ -189,59 +256,85 @@ export function EcranGestionAudiences() {
         </label>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Audiences trouvees</div>
-          <span className="rig-resultats-proc__compte">{trouvees.length} sur {maxResultats} maximum</span>
-        </div>
+      <ListeModerne etiquette="Audiences trouvees">
+        <EnteteListe titre="Audiences trouvees"
+                     synthese={<>{affichees.length}{' sur '}{maxResultats}{' maximum · '}<b>{publiques}</b>
+                       {publiques > 1 ? ' publiques · ' : ' publique · '}<b>{supprimees}</b>{supprimees > 1 ? ' supprimees' : ' supprimee'}</>}
+                     filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a une audience…' }} />
+
+        <VuesListe vues={VuesAudiences.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer({ ...criteres, critType: v.critType }).length }))}
+                   active={VuesAudiences.find((v) => v.critType === critType)?.cle ?? null}
+                   choisir={(cle) => { const v = VuesAudiences.find((x) => x.cle === cle); if (v) setCritType(v.critType) }} />
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup>
+              <col style={{ width: 30 }} /><col style={{ width: '10%' }} /><col style={{ width: '12%' }} /><col style={{ width: '8%' }} />
+              <col /><col style={{ width: '20%' }} /><col style={{ width: '18%' }} />
+            </colgroup>
             <thead>
               <tr>
+                <th aria-label="Deplier"></th>
                 <th>Jour</th>
                 <th>Date</th>
                 <th>Heure</th>
                 <th>Type</th>
-                <th>Code de cabinet</th>
                 {/* Une seule colonne en v2, dont le titre change avec le mode. */}
                 <th>{modeCabinet ? 'Juge' : 'Section'}</th>
-                {modeCabinet && <th>Greffier</th>}
                 <th>Type de classement</th>
-                <th>Public</th>
-                <th>Auteur suppression</th>
-                <th>Date suppression</th>
-                <th>Envoi suppression Infogreffe</th>
-                <th>Web (non dispo.)</th>
               </tr>
             </thead>
             <tbody>
-              {trouvees.map((x, i) => (
-                <tr key={i}>
-                  <td>{x.jour}</td>
-                  <td className="rig-table__mono">{x.date}</td>
-                  <td className="rig-table__mono">{x.heure}</td>
-                  <td>{x.type}</td>
-                  <td className="rig-table__mono">{vide(x.codeCabinet)}</td>
-                  <td>{modeCabinet ? x.juge : x.section}</td>
-                  {modeCabinet && <td>{vide(x.greffier)}</td>}
-                  <td>{x.typeClassement}</td>
-                  <td className="rig-table__centre">{x.public ? 'Oui' : 'Non'}</td>
-                  <td>{vide(x.auteurSuppression)}</td>
-                  <td className="rig-table__mono">{vide(x.dateSuppression)}</td>
-                  <td className="rig-table__centre">{vide(x.envoiSuppression)}</td>
-                  <td className="rig-table__centre rig-table__sans">non dispo.</td>
-                </tr>
-              ))}
+              {affichees.map((x, i) => {
+                const estOuverte = ouverte === x
+                return (
+                  <Fragment key={i}>
+                  <tr className={estOuverte ? 'rig-lm-ouverte' : undefined}>
+                    <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : x)} />
+                    <td>{x.jour}</td>
+                    <td className="rig-table__mono">{x.date}</td>
+                    <td className="rig-table__mono">{x.heure}</td>
+                    <td title={x.type}><Pastille teinte={TeinteType[x.type] ?? 'gris'}>{x.type}</Pastille></td>
+                    {modeCabinet ? <CelluleIdentite nom={x.juge} titre={x.juge} /> : <td>{x.section}</td>}
+                    <td title={x.typeClassement}>
+                      <PointEtat teinte={TeinteClassement[x.typeClassement] ?? 'gris'}>{x.typeClassement}</PointEtat>
+                    </td>
+                  </tr>
+                  {estOuverte && (
+                    <LigneDetail colonnes={NbColonnes} champs={[
+                      { libelle: 'Code de cabinet', valeur: vide(x.codeCabinet) },
+                      // La colonne « Greffier » n'existe en v2 qu'en recherche par cabinets.
+                      ...(modeCabinet ? [{ libelle: 'Greffier', valeur: vide(x.greffier) }] : []),
+                      { libelle: 'Public', valeur: x.public ? 'Oui' : 'Non' },
+                      { libelle: 'Auteur suppression', valeur: vide(x.auteurSuppression) },
+                      { libelle: 'Date suppression', valeur: vide(x.dateSuppression) },
+                      { libelle: 'Envoi suppression Infogreffe', valeur: vide(x.envoiSuppression) },
+                      { libelle: 'Web (non dispo.)', valeur: <span className="rig-table__sans">non dispo.</span> },
+                    ]} />
+                  )}
+                  </Fragment>
+                )
+              })}
               {trouvees.length === 0 && (
                 <tr className="rig-table__ligne--inerte">
-                  <td colSpan={13} className="rig-table__vide">Aucune audience ne repond a ces criteres.</td>
+                  <td colSpan={NbColonnes} className="rig-table__vide">Aucune audience ne repond a ces criteres.</td>
                 </tr>
+              )}
+              {trouvees.length > 0 && affichees.length === 0 && (
+                <tr className="rig-table__ligne--inerte"><td colSpan={NbColonnes} className="rig-table__vide">
+                  {`Aucune des ${trouvees.length} audiences ne contient « ${cherche} ».`}
+                </td></tr>
               )}
             </tbody>
           </table>
         </div>
-      </section>
+
+        <PiedListe>
+          <span><b>{affichees.length}</b>{affichees.length > 1 ? ' audiences affichees' : ' audience affichee'}</span>
+          <span>Publiques <b>{publiques}</b></span>
+          <span>Supprimees <b>{supprimees}</b></span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }

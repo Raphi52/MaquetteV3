@@ -9,9 +9,24 @@
 // balisage, memes classes CSS. L'ecran ne lisait rien dans Metier/ : ses
 // enrolements de demonstration et ses filtres sont ici, sans pont. La
 // coquille .razor monte cet ecran et recoit ouvrirDossier.
+//
+// LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 2) : la colonne des resultats prend
+// les briques de composants/ListeModerne.tsx. Tete (synthese, « Aller a une affaire… » Ctrl K, Entree choisit
+// l'affaire restee seule), trois cartes qui POSENT les criteres d'etat existants (traitement, « Rejets
+// uniquement », dematerialisation), des vues = jeux de ces criteres d'etat. Le tableau passe a une ligne par
+// affaire (Affaire, Etat demat., Etat traitement, Date creation, Pieces) ; Type de rejet, Date traitement,
+// dossier et anomalies sont dans la ligne depliee, avec « Visualiser la piece » et « le XML ».
+// « Aller a une affaire… » EST l'ancien critere « Affaire / dossier » (meme etat, memes colonnes cherchees :
+// numero d'affaire, denomination) : la liste est filtree ici, sans pont, deux champs auraient fait le meme
+// filtre (decision du plan, lot 7). Les autres criteres, le clic qui montre le detail, ses boutons et le XML
+// ne changent pas.
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { contientSansCasse, dateCourte, distinctsTries, estBlanc } from '../criteres'
+import {
+  CartesChiffrees, CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille, PiedListe,
+  PointEtat, VuesListe, type ActionLigne, type Teinte,
+} from '../composants/ListeModerne'
 import type { ContexteDossierVue } from '../plan/types'
 
 interface DossierJud {
@@ -45,8 +60,51 @@ export interface ProprietesEcranConsultationJud {
   dossier?: ContexteDossierVue | null
 }
 
+/** Les criteres de gauche, tels que saisis. */
+interface CriteresConsultation {
+  critTexte: string
+  critDemat: string
+  critTraitement: string
+  critCreationDu: string
+  critTraitementAu: string
+  rejetsSeuls: boolean
+}
+
+/** Le filtre des criteres de gauche : la liste, et le compte de chaque vue. */
+function filtrer(c: CriteresConsultation): DossierJud[] {
+  let q = Dossiers
+  if (!estBlanc(c.critTexte)) {
+    const t = c.critTexte.trim()
+    q = q.filter((d) => contientSansCasse(d.affaire, t) || contientSansCasse(d.denomination, t))
+  }
+  if (c.critDemat !== '') q = q.filter((d) => d.etatDemat === c.critDemat)
+  if (c.critTraitement !== '') q = q.filter((d) => d.etatTraitement === c.critTraitement)
+  if (c.critCreationDu !== '') q = q.filter((d) => d.creation >= c.critCreationDu)
+  if (c.critTraitementAu !== '') q = q.filter((d) => d.traitement !== null && d.traitement <= c.critTraitementAu)
+  if (c.rejetsSeuls) q = q.filter((d) => d.etatTraitement === 'Rejete')
+  return q
+}
+
+/** Une vue pose les criteres d'ETAT de l'ecran ; le texte et les dates saisis restent. */
+type CriteresEtat = Pick<CriteresConsultation, 'critDemat' | 'critTraitement' | 'rejetsSeuls'>
+const SansEtat: CriteresEtat = { critDemat: '', critTraitement: '', rejetsSeuls: false }
+
+export const VuesEnrolements: ReadonlyArray<{ cle: string; libelle: string; criteres: CriteresEtat }> = [
+  { cle: 'toutes', libelle: 'Toutes', criteres: SansEtat },
+  { cle: 'en-attente', libelle: 'En attente', criteres: { ...SansEtat, critTraitement: 'En attente' } },
+  { cle: 'rejets', libelle: 'Rejets', criteres: { ...SansEtat, rejetsSeuls: true } },
+  { cle: 'non-demat', libelle: 'Non dematerialisees', criteres: { ...SansEtat, critDemat: 'Non demat.' } },
+]
+
+const TeinteDemat: Record<string, Teinte> = { Dematerialise: 'bleu', Partiel: 'orange', 'Non demat.': 'gris' }
+const TeinteTraitement: Record<string, Teinte> = { Traite: 'vert', 'En attente': 'orange', Rejete: 'rouge' }
+
+/** Les colonnes du tableau a une ligne : chevron, Affaire, Etat demat., Etat traitement, Date creation, Pieces, menu. */
+const NbColonnes = 7
+
 export function EcranConsultationJud({ ouvrirDossier, dossier = null }: ProprietesEcranConsultationJud) {
-  // Ouvert depuis une affaire : cherchee par son numero dans « Affaire / dossier ».
+  // « Aller a une affaire… » de la tete (l'ancien critere « Affaire / dossier ») : ouvert depuis une affaire,
+  // elle y est cherchee par son numero.
   const [critTexte, setCritTexte] = useState(dossier?.numero ?? '')
   const [critDemat, setCritDemat] = useState('')
   const [critTraitement, setCritTraitement] = useState('')
@@ -55,18 +113,33 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
   const [rejetsSeuls, setRejetsSeuls] = useState(false)
   const [xmlOuvert, setXmlOuvert] = useState(false)
   const [selection, setSelection] = useState<DossierJud | null>(null)
+  // La ligne depliee par son chevron (une a la fois).
+  const [ouverte, setOuverte] = useState<string | null>(null)
 
-  let q = Dossiers
-  if (!estBlanc(critTexte)) {
-    const t = critTexte.trim()
-    q = q.filter((d) => contientSansCasse(d.affaire, t) || contientSansCasse(d.denomination, t))
+  const criteres: CriteresConsultation = { critTexte, critDemat, critTraitement, critCreationDu, critTraitementAu, rejetsSeuls }
+  const trouves = filtrer(criteres)
+
+  function poserEtat(c: CriteresEtat) {
+    setCritDemat(c.critDemat)
+    setCritTraitement(c.critTraitement)
+    setRejetsSeuls(c.rejetsSeuls)
   }
-  if (critDemat !== '') q = q.filter((d) => d.etatDemat === critDemat)
-  if (critTraitement !== '') q = q.filter((d) => d.etatTraitement === critTraitement)
-  if (critCreationDu !== '') q = q.filter((d) => d.creation >= critCreationDu)
-  if (critTraitementAu !== '') q = q.filter((d) => d.traitement !== null && d.traitement <= critTraitementAu)
-  if (rejetsSeuls) q = q.filter((d) => d.etatTraitement === 'Rejete')
-  const trouves = q
+  const vueActive = VuesEnrolements.find((v) => v.criteres.critDemat === critDemat
+    && v.criteres.critTraitement === critTraitement && v.criteres.rejetsSeuls === rejetsSeuls)?.cle ?? null
+
+  // Les chiffres de la tete, des cartes et du pied : sur la liste affichee.
+  const parTraitement = (e: string) => trouves.filter((d) => d.etatTraitement === e).length
+  const parDemat = (e: string) => trouves.filter((d) => d.etatDemat === e).length
+  const enAttente = parTraitement('En attente')
+  const rejets = parTraitement('Rejete')
+  const pieces = trouves.reduce((n, d) => n + d.nbPieces, 0)
+  const basculer = (actuel: string, valeur: string, poser: (v: string) => void) => () => poser(actuel === valeur ? '' : valeur)
+
+  /** « Visualiser le XML » d'une ligne : la choisit et montre son XML dans le detail. */
+  function voirXml(dos: DossierJud) {
+    setSelection(dos)
+    setXmlOuvert(true)
+  }
 
   const s = selection
 
@@ -75,11 +148,6 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
 
       <aside className="rig-criteres">
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Criteres de consultation</div>
-
-        <label className="rig-saisie-champ">
-          <span className="rig-saisie-champ__libelle">Affaire / dossier</span>
-          <input className="rig-saisie-champ__saisie" value={critTexte} onChange={(e) => setCritTexte(e.target.value)} />
-        </label>
 
         <label className="rig-saisie-champ">
           <span className="rig-saisie-champ__libelle">Etat de dematerialisation</span>
@@ -118,42 +186,95 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
         </button>
       </aside>
 
-      <section className="rig-resultats-proc">
-        <div className="rig-resultats-proc__entete">
-          <div className="rig-kicker">Enrolements</div>
-          <span className="rig-resultats-proc__compte">{trouves.length} affaire(s)</span>
-        </div>
+      <ListeModerne etiquette="Enrolements">
+        <EnteteListe titre="Enrolements"
+                     synthese={<>{trouves.length}{trouves.length > 1 ? ' affaires · ' : ' affaire · '}<b>{enAttente}</b>
+                       {' en attente · '}<b>{rejets}</b>{rejets > 1 ? ' rejets' : ' rejet'}</>}
+                     filtre={{ valeur: critTexte, changer: setCritTexte, indication: 'Aller a une affaire…',
+                               valider: () => { if (trouves.length === 1) setSelection(trouves[0]!) } }} />
+
+        <CartesChiffrees cartes={[
+          { cle: 'traitement', titre: 'Etat de traitement', valeur: trouves.length,
+            complement: trouves.length > 1 ? 'affaires' : 'affaire', legende: true,
+            ...(critTraitement !== '' ? { choisir: () => setCritTraitement(''), indication: 'Tous les etats de traitement' } : {}),
+            segments: distinctsTries(Dossiers.map((d) => d.etatTraitement)).map((e) => ({
+              cle: e, libelle: e, valeur: parTraitement(e), texte: String(parTraitement(e)), teinte: TeinteTraitement[e] ?? 'gris',
+              actif: critTraitement === e, choisir: basculer(critTraitement, e, setCritTraitement),
+            })) },
+          { cle: 'rejets', titre: 'Rejets', valeur: rejets, complement: `sur ${trouves.length}`,
+            anneau: { part: rejets, total: trouves.length, teinte: 'rouge' },
+            actif: rejetsSeuls, choisir: () => setRejetsSeuls(!rejetsSeuls),
+            indication: rejetsSeuls ? 'Toutes les affaires' : 'Seulement les rejets' },
+          { cle: 'demat', titre: 'Dematerialisation', valeur: parDemat('Dematerialise'), complement: `sur ${trouves.length}`,
+            legende: true,
+            ...(critDemat !== '' ? { choisir: () => setCritDemat(''), indication: 'Tous les etats de dematerialisation' } : {}),
+            segments: distinctsTries(Dossiers.map((d) => d.etatDemat)).map((e) => ({
+              cle: e, libelle: e, valeur: parDemat(e), texte: String(parDemat(e)), teinte: TeinteDemat[e] ?? 'gris',
+              actif: critDemat === e, choisir: basculer(critDemat, e, setCritDemat),
+            })) },
+        ]} />
+
+        <VuesListe vues={VuesEnrolements.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer({ ...criteres, ...v.criteres }).length }))}
+                   active={vueActive}
+                   choisir={(cle) => { const v = VuesEnrolements.find((x) => x.cle === cle); if (v) poserEtat(v.criteres) }} />
 
         <div className="rig-table-cadre">
-          <table className="rig-table">
+          <table className="rig-table rig-lm-table">
+            <colgroup>
+              <col style={{ width: 30 }} /><col /><col style={{ width: '17%' }} /><col style={{ width: '17%' }} />
+              <col style={{ width: '14%' }} /><col style={{ width: '10%' }} /><col style={{ width: 34 }} />
+            </colgroup>
             <thead>
               <tr>
-                <th>N Affaire</th>
-                <th>Denomination</th>
+                <th aria-label="Deplier"></th>
+                <th>Affaire</th>
                 <th>Etat demat.</th>
                 <th>Etat traitement</th>
-                <th>Type de rejet</th>
                 <th>Date creation</th>
-                <th>Date traitement</th>
-                <th className="rig-table__centre">Nb pieces</th>
+                <th className="rig-lm-droite">Pieces</th>
+                <th aria-label="Actions"></th>
               </tr>
             </thead>
             <tbody>
-              {trouves.map((dos) => (
-                <tr key={dos.affaire} className={dos.etatTraitement === 'Rejete' ? 'rig-table__ligne--alerte' : ''}
-                    onClick={() => setSelection(dos)}>
-                  <td className="rig-table__mono">{dos.affaire}</td>
-                  <td>{dos.denomination}</td>
-                  <td>{dos.etatDemat}</td>
-                  <td>{dos.etatTraitement}</td>
-                  <td>{dos.typeRejet}</td>
-                  <td className="rig-table__mono">{dateCourte(dos.creation)}</td>
-                  <td className="rig-table__mono">{dos.traitement ? dateCourte(dos.traitement) : ''}</td>
-                  <td className="rig-table__centre">{dos.nbPieces}</td>
-                </tr>
-              ))}
+              {trouves.map((dos) => {
+                const estOuverte = ouverte === dos.affaire
+                const actions: ActionLigne[] = [
+                  { libelle: 'Visualiser la piece', fort: true, agir: () => ouvrirDossier(dos.dossier) },
+                  { libelle: 'Visualiser le XML', agir: () => voirXml(dos) },
+                ]
+                const classes = [dos.etatTraitement === 'Rejete' ? 'rig-table__ligne--alerte' : '', estOuverte ? 'rig-lm-ouverte' : '']
+                  .filter(Boolean).join(' ')
+                return (
+                  <Fragment key={dos.affaire}>
+                  <tr className={classes || undefined} onClick={() => setSelection(dos)}>
+                    <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : dos.affaire)} />
+                    <CelluleIdentite nom={dos.denomination} objet={dos.affaire} titre={`${dos.denomination} · ${dos.affaire}`} />
+                    <td title={dos.etatDemat}><Pastille teinte={TeinteDemat[dos.etatDemat] ?? 'gris'}>{dos.etatDemat}</Pastille></td>
+                    <td title={dos.etatTraitement}>
+                      <PointEtat teinte={TeinteTraitement[dos.etatTraitement] ?? 'gris'}>{dos.etatTraitement}</PointEtat>
+                    </td>
+                    <td className="rig-table__mono">{dateCourte(dos.creation)}</td>
+                    <td className="rig-lm-droite">{dos.nbPieces}</td>
+                    <td className="rig-lm-cellule-menu">
+                      <MenuLigne libelle={`Actions de l'affaire ${dos.affaire}`} actions={[
+                        ...actions,
+                        { libelle: estOuverte ? 'Replier la ligne' : 'Deplier la ligne', agir: () => setOuverte(estOuverte ? null : dos.affaire) },
+                      ]} />
+                    </td>
+                  </tr>
+                  {estOuverte && (
+                    <LigneDetail colonnes={NbColonnes} actions={actions} champs={[
+                      { libelle: 'Type de rejet', valeur: dos.typeRejet },
+                      { libelle: 'Date traitement', valeur: dos.traitement ? dateCourte(dos.traitement) : '' },
+                      { libelle: 'Dossier', valeur: dos.dossier },
+                      { libelle: 'Anomalies', valeur: dos.anomalies },
+                    ]} />
+                  )}
+                  </Fragment>
+                )
+              })}
               {trouves.length === 0 && (
-                <tr><td colSpan={8} className="rig-table__vide">Aucune affaire ne repond a ces criteres.</td></tr>
+                <tr><td colSpan={NbColonnes} className="rig-table__vide">Aucune affaire ne repond a ces criteres.</td></tr>
               )}
             </tbody>
           </table>
@@ -177,7 +298,13 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
             {xmlOuvert && <pre className="rig-code">{s.xml}</pre>}
           </div>
         )}
-      </section>
+
+        <PiedListe>
+          <span><b>{trouves.length}</b>{trouves.length > 1 ? ' affaires affichees' : ' affaire affichee'}</span>
+          <span>Pieces <b>{pieces}</b></span>
+          <span>En attente <b>{enAttente}</b></span>
+        </PiedListe>
+      </ListeModerne>
     </div>
   )
 }
