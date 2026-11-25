@@ -1,0 +1,16 @@
+# « EDI RPJC inscriptions » (LecteurInscriptionsRpjc) sur le jeu PROC_EDI_RPJC_INS.sql : la liste de la V2 avec ses deux
+# cases cochees (« En attente » = etat 1, « Traites » = etat <> 1, sans date). Les demandes en attente d'abord, dans
+# l'ordre de leur numero ; puis les traitees, la plus recemment traitee en tete.
+# Etat : A -> Validee [0,2] (+1 avec une structure) ; R -> Rejetee [0,3] ; sans decision, ouverte -> EnCours [0] ;
+# sans decision, personne -> AFaire []. Groupe « Avocat et structure » par le Cnbf de la structure seul (300102, 300103) :
+# un SIREN sans ce Cnbf reste « Avocat seul » (300104, jumeau de 300103).
+# Ecarte : 300106, sans etat (ni = '1' ni <> '1' en SQL) -- jumeau retenu 300101 (etat 1).
+# 300107 (etat 9, rejete par Extelia) garde sa decision A. 300108 : denomination seule, date de creation faute de
+# date de demande.
+ARDOISE Irène | Cnbf 300001 · reçue le {J-2} | Avocat seul | AFaire | []
+BELIER Simon · CABINET KAPPA AVOCATS | Cnbf 300002 · structure Cnbf 300902 · ouverte par agent.banc | Avocat et structure | EnCours | [0]
+MU JURIS | Cnbf 300008 · reçue le {J-1} | Avocat seul | AFaire | []
+CHANTELLE Olga | Cnbf 300003 · structure Cnbf 300903 · inscrite le {J-1} | Avocat et structure | Validee | [0,1,2]
+DORVAL Théo · LAMBDA CONSEIL | Cnbf 300004 · modification · inscrite le {J-3} | Avocat seul | Validee | [0,2]
+ECORCE Lina | Cnbf 300005 · rejetée le {J-5} · Cnbf inconnu du barreau | Avocat seul | Rejetee | [0,3]
+GRES Rose | Cnbf 300007 · inscrite le {J-10} · réponse rejetée par Extelia | Avocat seul | Validee | [0,2]
