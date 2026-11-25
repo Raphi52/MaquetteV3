@@ -35,6 +35,9 @@ describe('EcranComptabilisation', () => {
     expect([...container.querySelectorAll('tbody .rig-lm-etat')].map((e) => e.className.split(' ')[1]))
       .toEqual(['rig-lm-t-vert', 'rig-lm-t-vert', 'rig-lm-t-orange'])
     expect(container.querySelector('tbody .rig-lm-pastille')!.className).toBe('rig-lm-pastille rig-lm-t-bleu')
+    // Une pastille trop longue est coupee sans « … » (decision du plan, lot 3) : le mode entier est au survol de sa cellule.
+    expect([...container.querySelectorAll('tbody .rig-lm-pastille')].map((p) => p.closest('td')!.getAttribute('title')))
+      .toEqual(['Cheque', 'Virement', 'Carte bancaire'])
     expect(container.querySelector('.rig-lm-pied')!.textContent)
       .toBe('3 remis affiche(s)Encaissements 15Total 3\u00a0812,40 €Non remis 222,00 €')
   })

@@ -395,7 +395,7 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
                         <CelluleIdentite nom={ligne.defendeur} objet={`${ligne.role} · ${ligne.numPc}`}
                                          titre={`${ligne.defendeur} — role ${ligne.role} · ${ligne.numPc}`} />
                         <td title={ligne.demandeur}>{ligne.demandeur}</td>
-                        <td><Pastille teinte={TeinteSaisine[ligne.acteSaisine] ?? 'gris'}>{ligne.acteSaisine}</Pastille></td>
+                        <td title={ligne.acteSaisine}><Pastille teinte={TeinteSaisine[ligne.acteSaisine] ?? 'gris'}>{ligne.acteSaisine}</Pastille></td>
                         <td className="rig-table__mono">{dateCourte(ligne.audience)}</td>
                         <td className="rig-table__mono">{dateCourte(ligne.depot)}</td>
                         <td><PointEtat teinte={TeinteFacturation[ligne.facturation] ?? 'gris'}>{ligne.facturation}</PointEtat></td>

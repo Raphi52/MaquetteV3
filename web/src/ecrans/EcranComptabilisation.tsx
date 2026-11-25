@@ -178,7 +178,7 @@ export function EcranComptabilisation() {
                   <td>
                     <PointEtat teinte={r.numeroRemis === 0 ? 'orange' : 'vert'}>{r.numeroRemis === 0 ? 'non remis' : r.numeroRemis}</PointEtat>
                   </td>
-                  <td><Pastille teinte={TeinteMode[r.modePaiement] ?? 'gris'}>{r.modePaiement}</Pastille></td>
+                  <td title={r.modePaiement}><Pastille teinte={TeinteMode[r.modePaiement] ?? 'gris'}>{r.modePaiement}</Pastille></td>
                   <td className="rig-table__centre">{r.nbEncaissement}</td>
                   <td className="rig-lm-droite" title={montant(r.sommeEncaissement / 100)}>
                     <MontantBarre valeur={r.sommeEncaissement} max={montantMax} texte={montant(r.sommeEncaissement / 100)} />

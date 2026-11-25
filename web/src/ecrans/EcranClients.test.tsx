@@ -21,6 +21,8 @@ describe('EcranClients', () => {
     expect(screen.getByText('Bloque', { selector: 'span.rig-lm-etat' }).className).toBe('rig-lm-etat rig-lm-t-rouge')
     expect(screen.getByText('Actif', { selector: 'tbody tr:first-child span.rig-lm-etat' }).className).toBe('rig-lm-etat rig-lm-t-vert')
     expect(container.querySelector('tbody tr:nth-child(4) .rig-lm-pastille')!.className).toBe('rig-lm-pastille rig-lm-t-vert')
+    // Une pastille trop longue est coupee sans « … » (decision du plan, lot 3) : le type entier est au survol de sa cellule.
+    expect(container.querySelector('tbody tr:first-child .rig-lm-pastille')!.closest('td')!.getAttribute('title')).toBe('En compte')
     expect(container.querySelector('.rig-lm-pied')!.textContent).toContain('6 clients affiches')
   })
 

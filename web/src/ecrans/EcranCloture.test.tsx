@@ -72,6 +72,8 @@ describe('EcranCloture', () => {
     expect(entetes(container)).toEqual(['Defendeur', 'Demandeur', 'Acte de saisine', 'Audience', 'Depot', 'Facturation'])
     expect(lignes(container)[0]).toEqual([
       'BDSARL BOULANGERIE DUVAL2024/00318 · PC-2024-0118', 'Me LEROY', 'Assignation', '15/09/2026', '04/03/2026', 'Facturee'])
+    // Une pastille trop longue est coupee sans « … » (decision du plan, lot 3) : l'acte entier est au survol de sa cellule.
+    expect(container.querySelector('tbody .rig-lm-pastille')!.closest('td')!.getAttribute('title')).toBe('Assignation')
     fireEvent.change(screen.getByLabelText('Aller a une affaire…'), { target: { value: 'zzz' } })
     expect(container.querySelector('.rig-table__vide')!.getAttribute('colspan')).toBe('6')
   })

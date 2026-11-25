@@ -34,12 +34,12 @@
 // LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 4) : les articles prennent les
 // briques de composants/ListeModerne.tsx. Tete (nombre d'articles, total TTC, reste a encaisser), trois cartes :
 // Total TTC (retenus / retires, le clic filtre), Encaisse (anneau sur le total), BODACC · INPI · Autre (le clic
-// montre les articles qui portent ces frais). Une ligne par article (Article = libelle en gras et code en gris,
-// Quantite, Etat, Montant TTC avec sa mini-barre, Commentaire) ; prix UHT, TVA, BODACC, INPI et Autre sont dans la
-// ligne depliee par le chevron. Pas de CelluleIdentite : un article n'est ni un client, ni une entreprise, ni un
-// dossier, il n'a pas d'avatar d'initiales ; sa cellule reprend seulement le nom et l'objet de l'identite.
+// montre les articles qui portent ces frais). Une ligne par article (Code, Libelle, Quantite, Etat, Montant TTC
+// avec sa mini-barre, Commentaire) ; prix UHT, TVA, BODACC, INPI et Autre sont dans la ligne depliee par le chevron.
+// Pas de CelluleIdentite : un article n'est ni un client, ni une entreprise, ni un dossier (pas d'avatar). Le
+// libelle reste une cellule simple : recopier ici les classes rig-lm-identite du socle serait une copie locale
+// (decision du plan, lot 4, 24/11 21:20) ; une cellule d'identite sans avatar est un manque du socle (lot 8).
 // Le clic sur un article le retire du total ou l'y remet, comme avant ; l'encaissement ne change pas.
-// Les anciennes colonnes Code et Libelle sont reunies en « Article » (decision notee au plan par le lot 4).
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
@@ -171,8 +171,8 @@ const FicheVide: FicheClient = { nom: '', abrege: '', typeClient: '', adresse: '
 /** Les filtres des cartes : articles retenus ou retires, articles qui portent un frais. */
 type FiltreArticles = 'retenus' | 'retires' | 'bodacc' | 'inpi' | 'autre'
 
-/** Les colonnes du tableau : chevron, Article, Quantite, Etat, Montant TTC, Commentaire, menu. */
-const NbColonnes = 7
+/** Les colonnes du tableau : chevron, Code, Libelle, Quantite, Etat, Montant TTC, Commentaire, menu. */
+const NbColonnes = 8
 
 /** La demande d'une affaire, telle que Pont/EcranFactures.cs (DemandeDe) la rend. */
 interface DemandeFacturee {
@@ -425,13 +425,14 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
         <div className="rig-table-cadre">
           <table className="rig-table rig-lm-table">
             <colgroup>
-              <col style={{ width: 30 }} /><col /><col style={{ width: '9%' }} />
-              <col style={{ width: '12%' }} /><col style={{ width: '18%' }} /><col style={{ width: '22%' }} /><col style={{ width: 34 }} />
+              <col style={{ width: 30 }} /><col style={{ width: '10%' }} /><col /><col style={{ width: '9%' }} />
+              <col style={{ width: '12%' }} /><col style={{ width: '18%' }} /><col style={{ width: '20%' }} /><col style={{ width: 34 }} />
             </colgroup>
             <thead>
               <tr>
                 <th aria-label="Deplier"></th>
-                <th>Article</th>
+                <th>Code</th>
+                <th>Libelle</th>
                 <th className="rig-table__centre">Quantite</th>
                 <th>Etat</th>
                 <th className="rig-lm-droite">Montant TTC</th>
@@ -454,12 +455,8 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
                   <Fragment key={art.code}>
                   <tr className={classes || undefined} onClick={() => basculer(art.code)}>
                     <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : art.code)} />
-                    <td title={`${art.libelle} · ${art.code}`}>
-                      <div className="rig-lm-identite">
-                        <b className="rig-lm-identite__nom">{art.libelle}</b>
-                        <span className="rig-lm-identite__objet">{art.code}</span>
-                      </div>
-                    </td>
+                    <td className="rig-table__mono">{art.code}</td>
+                    <td title={art.libelle}>{art.libelle}</td>
                     <td className="rig-table__centre">{art.quantite}</td>
                     <td><PointEtat teinte={retire ? 'gris' : 'vert'}>{retire ? 'Retire' : 'Retenu'}</PointEtat></td>
                     <td className="rig-lm-droite" title={montant(art.ttc)}>

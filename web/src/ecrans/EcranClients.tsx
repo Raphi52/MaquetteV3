@@ -220,7 +220,7 @@ export function EcranClients({ selectionner }: ProprietesEcranClients) {
                   <td className="rig-table__mono">{cli.id}</td>
                   <td title={cli.groupe}>{cli.groupe}</td>
                   <td><PointEtat teinte={TeinteStatut[cli.statut] ?? 'gris'}>{cli.statut}</PointEtat></td>
-                  <td><Pastille teinte={TeinteType[cli.type] ?? 'gris'}>{cli.type}</Pastille></td>
+                  <td title={cli.type}><Pastille teinte={TeinteType[cli.type] ?? 'gris'}>{cli.type}</Pastille></td>
                 </tr>
               ))}
               {trouves.length === 0 && (
