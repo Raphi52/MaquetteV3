@@ -167,36 +167,56 @@ public sealed class DomaineOuvrir : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_MESIN", Titre = "Mesure provisoire", Sujet = "mesures provisoires",
-            Forme = FormeEcran.Saisie,
-            Recherche = "Rechercher une mesure, une instance, une partie…",
-            Criteres = ["Instance", "Partie", "Date de la mesure"],
-            Valider = "Enregistrer la mesure",
-            Etats = EtatsEcran.Trois("À saisir", "En cours", "Enregistrée"),
+            // FICHE, pas Saisie : PROC_MESIN modifie une mesure qui EXISTE (proc_mesin.md:19 « ID de la mesure a
+            // modifier », :177 verrou avant toute modification, :211 MetierCreateAffaire = false ; titre de la fenetre
+            // « Modification de mesure », :256). On la retrouve, on la verrouille, on passe en Saisie (:221-226).
+            // Controle final du lot 1, 25/11/2026 : elle etait rangee en Saisie d'apres le menu, pas d'apres la fiche.
+            Forme = FormeEcran.Fiche,
+            Recherche = "Rechercher une mesure ou une instance…",
+            // Le seul critere de l'etape de recherche V2 : OPE_MESURE_RECHERCHE.Designer.cs:81.
+            Criteres = ["N° de la mesure ou instance"],
+            // Valider : le bouton du moteur (Processus), la fiche n'en nomme pas d'autre (:209 aucun DoVerifier ni DoSauve).
+            Valider = "Valider",
+            Etats = [.. EtatsEcran.Trois("À modifier", "En cours", "Modifiée"), new EtatEcran("EnAttente", "Verrouillée", "en-attente")],
             Groupes = ["Mise en état", "Référé"],
-            Marches =
+            Sections =
             [
-                Marche("Mesure", "Verrouillée avant toute modification : si un autre utilisateur la tient, un message s'affiche et la saisie ne s'ouvre pas.", true,
-                    "Nature de la mesure", "Date"),
-                Marche("Parties", "Demandeur, défendeur et intervenants de la mesure.", true,
-                    "Demandeur", "Défendeur", "Intervenants"),
-                Marche("Événements survenus", "Événements de procédure déjà survenus.", false,
-                    "Événements survenus"),
-                Marche("Événements futurs", "Événements planifiés.", false,
-                    "Événements futurs"),
-                Marche("Événements expirés", "Délais dépassés sans réalisation.", false,
-                    "Événements expirés"),
-                Marche("Facturation", "Articles du code MESIN, fixé dans le plugin.", true,
-                    "Articles MESIN"),
+                // Les champs de l'etape « Mesure » (ETP_MESURE) : OPE_MESURE.Designer.cs:92-208. N° de mesure et
+                // Ouverture y sont en lecture seule (:91, :112) ; Type de mesure obligatoire (:100), liste des types du
+                // greffe (OPE_MESURE.cs:49, MSINS_TYPE_MESURE).
+                // Verrou a l'ouverture ; s'il echoue, la mesure reste en lecture seule (proc_mesin.md:225, :228).
+                Marche("Mesure", "Verrouillée à l'ouverture : tenue par un autre utilisateur, elle reste en lecture seule. N° de mesure et date d'ouverture ne se modifient pas ; le type de mesure est obligatoire.", true,
+                    "Type de mesure", Champ.Date("Classement sans suite"), Champ.Date("Caducité"),
+                    Champ.Date("Limite de dépôt du rapport"), Champ.Date("Dépôt du rapport"), Champ.Date("Prévision de dépôt du rapport"),
+                    Champ.Montant("Coût prévu de l'expertise"),
+                    Champ.Date("Limite de dépôt de l'état des diligences"), Champ.Date("Dépôt de l'état des diligences"),
+                    Champ.Zone("Informations")),
+                // Parties : celles de l'instance de la mesure (proc_mesin.md:243-245). Demandeurs et defendeurs
+                // obligatoires (Designer.cs:112 et :101) ; sans demandeur, une ligne vide est creee.
+                Marche("Demandeurs", "Les demandeurs de l'instance de la mesure ; sans demandeur, une ligne vide est créée.", true,
+                    Champ.Tableau("Demandeurs")),
+                Marche("Défendeurs", "Les défendeurs de l'instance ; l'étape reste vide s'il n'y en a pas.", true,
+                    Champ.Tableau("Défendeurs")),
+                Marche("Intervenants", "Les intervenants de l'instance ; l'étape reste vide s'il n'y en a pas.", false,
+                    Champ.Tableau("Intervenants")),
+                // Deux etapes d'evenements, pas trois : les expires sont affiches avec les futurs (proc_mesin.md:247).
+                Marche("Événements survenus", "Événements de procédure déjà survenus ; une ligne vide est offerte s'il n'y en a aucun.", false,
+                    Champ.Tableau("Événements survenus")),
+                Marche("Événements futurs et expirés", "Événements à venir, et ceux dont le délai est dépassé, dans la même liste.", false,
+                    Champ.Tableau("Événements futurs et expirés")),
+                // Le type de facturation MESIN, fixe dans le code (proc_mesin.md:248).
+                Marche("Facturation", "Les articles des mesures provisoires (type de facturation MESIN).", false,
+                    Champ.Tableau("Articles MESIN")),
             ],
             Lignes =
             [
                 Ligne("Alpha Services SARL c/ Bêta Industrie SAS", "Mesure du 02/03/2026 · instance 2026J00201", "Mise en état", "AFaire"),
                 Ligne("Gamma Conseil SARL c/ Delta Transports SAS", "Mesure du 03/03/2026 · instance 2026J00202", "Mise en état", "EnCours", 0, 1),
-                Ligne("Epsilon Habitat SARL c/ Zêta Commerce SAS", "Mesure du 05/03/2026 · instance 2026J00203", "Mise en état", "Validee", 0, 1, 2, 5),
+                Ligne("Epsilon Habitat SARL c/ Zêta Commerce SAS", "Mesure du 05/03/2026 · instance 2026J00203", "Mise en état", "Validee", 0, 1, 2, 4),
                 Ligne("Êta Boulangerie SARL c/ Thêta Import SAS", "Mesure en référé du 06/03/2026", "Référé", "AFaire"),
-                Ligne("Iota Études SARL c/ Kappa Négoce SAS", "Mesure en référé du 09/03/2026", "Référé", "EnCours", 0),
-                Ligne("Lambda Pêche SARL c/ Mu Logistique SAS", "Mesure en référé du 10/03/2026", "Référé", "Validee", 0, 1, 5),
-                Ligne("Nu Paiement SAS c/ Xi Entrepôts SARL", "Mesure du 12/03/2026 · instance 2026J00207", "Mise en état", "AFaire"),
+                Ligne("Iota Études SARL c/ Kappa Négoce SAS", "Mesure en référé du 09/03/2026 · verrouillée par un autre utilisateur", "Référé", "EnAttente"),
+                Ligne("Lambda Pêche SARL c/ Mu Logistique SAS", "Mesure en référé du 10/03/2026", "Référé", "Validee", 0, 1, 2, 6),
+                Ligne("Nu Paiement SAS c/ Xi Entrepôts SARL", "Mesure du 12/03/2026 · instance 2026J00207", "Mise en état", "EnCours", 0),
             ],
         },
 

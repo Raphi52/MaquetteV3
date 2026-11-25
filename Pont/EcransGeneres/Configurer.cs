@@ -673,24 +673,40 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_IA", Titre = "Analyse IA", Sujet = "liasses analysées",
-            Forme = FormeEcran.File,
-            Recherche = "Rechercher une liasse, un numéro de liasse…",
-            Criteres = ["Numéro de liasse", "Type de liasse", "Indice de confiance"],
-            // Bouton final cite par la fiche v2 : VALIDER (proc_ia.md, Detail OPE)
-            Valider = "Valider",
+            // OPERATION sur UNE liasse, pas une file : PROC_IA recoit son numero de liasse en parametre (proc_ia.md:192,
+            // NumeroLiasse) et se joue en deux temps, lancement puis restitution (:151-156). Le geste est le lancement,
+            // confirme par l'utilisateur (:207, OPE_IA.cs:66). Controle final du lot 1, 25/11/2026 : elle etait une
+            // file de liasses a actions en lot, que la fiche ne decrit pas.
+            Forme = FormeEcran.Operation,
+            ObjetUnique = true,
+            Recherche = "Rechercher une liasse par son numéro…",
+            Criteres = ["Numéro de liasse"],
+            // Le bouton de l'operation : « lancer » (proc_ia.md:280-281), apres confirmation (:207). FORM_IA n'a pas de
+            // barre d'outils (:303) ; QUITTER et VALIDER n'y sont que desactives pendant l'analyse (:212, :287-288).
+            Valider = "Lancer l'analyse",
             Rang = 7,
             Etats = EtatsEcran.Trois("À analyser", "En cours", "Analysée"),
             Groupes = ["Liasses CFE", "Liasses DCA", "Liasses DAS"],
             Sections =
             [
-                new MarcheEcran("Liasse", "Le numéro de liasse est requis pour lancer l'analyse. Le lancement n'est proposé que s'il n'existe pas encore de réponse.", true,
-                    ["Numéro de liasse"]),
-                new MarcheEcran("Analyse", "L'analyse tourne sans bloquer l'écran : pendant ce temps, Quitter est verrouillé.", true,
-                    ["Lancer l'analyse"]),
-                new MarcheEcran("Champs vérifiés", "Chaque champ est comparé : correspondance, non-correspondance, proche ou non disponible.", true,
-                    ["Champs vérifiés", "Correspondances", "Non-correspondances", "Proches", "Non disponibles"]),
-                new MarcheEcran("Synthèse", "L'indice de confiance global et le commentaire de synthèse. La réanalyse n'appelle pas le service : la réponse enregistrée est rechargée.", false,
-                    ["Indice de confiance", "Commentaire"]),
+                // Ce qui part : proc_ia.md:153 (JSON fonctionnel + PDF), :223-231 (regle de source : derniere regularisation,
+                // sinon la liasse, flux EDI seulement si vide). Service externe : jamais appele (regle du plan).
+                new MarcheEcran("Pièces envoyées", "Les données de la formalité (celles de sa dernière régularisation s'il y en a une, sinon celles de la liasse ; à défaut, celles du flux reçu) et tous ses PDF partent vers le service d'analyse externe. Ici, le service n'est jamais appelé.", false,
+                    [Champ.Tableau("Pièces de la formalité")]),
+                // proc_ia.md:287-288 (non bloquante, QUITTER/VALIDER desactives), :216-217 (reponse ecrite dans la liasse),
+                // :279-281 (une liasse deja analysee se relit sans rappel du service).
+                new MarcheEcran("Analyse", "L'analyse tourne sans bloquer l'écran ; Quitter et Valider restent désactivés jusqu'à la réponse, enregistrée dans la liasse. Une liasse déjà analysée se relit sans rappeler le service.", false,
+                    []),
+                // proc_ia.md:257-258 (resultats par champ, anomalies depliees d'office).
+                new MarcheEcran("Champs vérifiés", "Chaque champ : correspondance, proche, pas de correspondance ou non disponible ; un champ en anomalie s'ouvre d'office.", false,
+                    [Champ.Tableau("Champs vérifiés")]),
+                // proc_ia.md:271-275 (synthese, commentaire), :296 (bandes de l'indice de confiance).
+                new MarcheEcran("Synthèse", "Indice de confiance global (faible sous 0,5, moyen sous 0,8, bon sous 0,9, très bon au-delà) et commentaire de synthèse.", false,
+                    [Champ.Tableau("Indice de confiance et commentaire")]),
+                // L'avis de l'utilisateur sur les conclusions : OPE_AVIS_USER (proc_ia.md:79, « validation / rejet ») ;
+                // le role du PROC le dit (:5, « valider ou corriger les conclusions »).
+                new MarcheEcran("Avis", "Valider ou rejeter les conclusions de l'analyse.", false,
+                    [Champ.Liste("Avis de l'utilisateur", "Validation", "Rejet")]),
             ],
             Lignes =
             [
@@ -698,7 +714,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
                 new LigneEcran("Liasse CFE 2026-002", "Liasses CFE · analyse en cours", "Liasses CFE", "EnCours", [0, 1]),
                 new LigneEcran("Liasse CFE 2026-003", "Liasses CFE · à analyser", "Liasses CFE", "AFaire", []),
                 new LigneEcran("Liasse DCA 2026-004", "Liasses DCA · analysée", "Liasses DCA", "Validee", [0, 1, 2, 3]),
-                new LigneEcran("Liasse DCA 2026-005", "Liasses DCA · numéro à saisir", "Liasses DCA", "EnCours", [0]),
+                new LigneEcran("Liasse DCA 2026-005", "Liasses DCA · analyse en cours", "Liasses DCA", "EnCours", [0]),
                 new LigneEcran("Liasse DAS 2026-006", "Liasses DAS · à analyser", "Liasses DAS", "AFaire", []),
                 new LigneEcran("Liasse DAS 2026-007", "Liasses DAS · analysée", "Liasses DAS", "Validee", [0, 1, 2, 3]),
             ],

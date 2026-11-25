@@ -198,6 +198,9 @@ export interface DescripteurEcranVue {
   membres: DescripteurEcranVue[]
   /** Ecran reuni sans liste commune : un onglet par procedure, chacune dans sa forme. */
   enOnglets: boolean
+  /** Une Operation qui vise UN seul objet (la fiche RIG v2 le recoit en parametre) : en choisir un autre remplace le
+   * premier, ni « tout cocher » ni geste sur plusieurs. */
+  objetUnique?: boolean
 }
 /** Les formes d'ecran, aux noms de FormeEcran (C#). */
 export type FormeEcranVue = 'File' | 'Consultation' | 'Fiche' | 'Saisie' | 'Referentiel' | 'Etat' | 'Audience' | 'Document' | 'Operation'

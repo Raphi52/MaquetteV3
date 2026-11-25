@@ -1,7 +1,9 @@
 // FORME « OPERATION » : un geste ponctuel sur un ou quelques objets (supprimer ou liberer une instance, joindre,
 // rapprocher ou remplacer un acteur, changer le juge-commissaire). Trois temps, et pas un de plus : CHOISIR les objets,
 // voir les CONSEQUENCES (les regles de la fiche RIG v2 et ses champs), CONFIRMER par le bouton de la fiche. Ecran
-// reuni : on agit dans UNE procedure a la fois (cocher une ligne d'une autre procedure repart d'elle).
+// reuni : on agit dans UNE procedure a la fois (cocher une ligne d'une autre procedure repart d'elle). Une operation sur
+// UN objet (descripteur.objetUnique : la fiche le recoit en parametre, PROC_IA et sa liasse) n'en garde qu'un : en
+// cocher un autre le remplace, et il n'y a pas de « tout cocher ».
 // La confirmation ne change rien tant qu'aucun ecrivain n'existe : elle le dit.
 
 import { useState } from 'react'
@@ -30,7 +32,8 @@ export function FormeOperation({ d }: { d: DescripteurEcranVue }) {
   const basculer = (i: number) => poserCochees((avant) => {
     const ligne = lignes.find((l) => l.i === i)
     const autre = ligne && choisies[0] && ligne.groupe !== choisies[0].groupe
-    const apres = new Set(autre ? [] : avant)
+    const unique = ligne !== undefined && parcoursDe(d, ligne.groupe).objetUnique === true
+    const apres = new Set(autre || (unique && !avant.has(i)) ? [] : avant)
     if (!apres.delete(i)) apres.add(i)
     return apres
   })
@@ -70,9 +73,10 @@ export function FormeOperation({ d }: { d: DescripteurEcranVue }) {
           <>
             {vue && <Provenance vue={vue} />}
             <TableLignes d={d} vue={vue} lignes={visibles} total={lignes.length} filtre={cherche !== '' || Object.values(criteres).some((v) => v.trim() !== '')}
-                         cases={{ cochees, basculer, toutes: (cocher) => poserCochees(cocher
-                           ? new Set(visibles.filter((l) => !figee(l.etat) && (!choisies[0] || l.groupe === choisies[0].groupe)).map((l) => l.i))
-                           : new Set()) }} />
+                         cases={{ cochees, basculer, toutes: (d.membres.length > 0 ? d.membres : [d]).some((m) => m.objetUnique) ? undefined
+                           : (cocher) => poserCochees(cocher
+                             ? new Set(visibles.filter((l) => !figee(l.etat) && (!choisies[0] || l.groupe === choisies[0].groupe)).map((l) => l.i))
+                             : new Set()) }} />
           </>
         )}
         {temps === 1 && (

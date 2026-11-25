@@ -216,7 +216,7 @@ if (descripteurs.Count > 0)
     var json = JsonSerializer.Serialize(descripteurs[0], new JsonSerializerOptions(JsonSerializerDefaults.Web));
     foreach (var cle in new[] { "code", "titre", "sujet", "recherche", "criteres", "valider", "rang", "etats",
                                 "groupes", "marches", "lignes", "icone", "obligatoire", "faites", "membres",
-                                "forme", "sections", "colonnes", "parametres", "gestes", "enOnglets", "libelle", "type", "options", "valeurs" })
+                                "forme", "sections", "colonnes", "parametres", "gestes", "enOnglets", "objetUnique", "libelle", "type", "options", "valeurs" })
         Exiger(json.Contains($"\"{cle}\":"), $"le descripteur sort en JSON avec la cle « {cle} »");
     // La forme et le type d'un champ sortent en TEXTE (les noms que web/src/plan/types.ts attend), pas en nombre.
     Exiger(Regex.IsMatch(json, "\"forme\":\"" + descripteurs[0].Forme + "\"") && Regex.IsMatch(json, "\"type\":\"[A-Z][a-z]+\""),
@@ -421,6 +421,8 @@ foreach (var d in descripteurs)
         defauts.Add($"forme {d.Forme} avec {d.Marches.Length} etapes : seules Saisie et Operation ont des etapes");
     if (d.Forme == FormeEcran.Operation && d.Marches.Length > 3) defauts.Add($"une Operation a {d.Marches.Length} etapes (3 au plus)");
     if (d.Marches.Length > 0 && d.Sections.Length > 0) defauts.Add("des etapes ET des sections : l'un ou l'autre");
+    // Un seul objet a choisir ne vaut que pour une Operation (PROC_IA et sa liasse) : une file se traite en lot.
+    if (d.ObjetUnique && d.Forme != FormeEcran.Operation) defauts.Add($"objet unique sur une forme {d.Forme} : seule une Operation en a");
     if (!reuni)
     {
         switch (d.Forme)
@@ -477,6 +479,15 @@ Exiger(parCode.GetValueOrDefault("PROC_JCAISSE") is { Forme: FormeEcran.Etat } j
        && jc.Parametres.Any(p => p.Type == TypeChamp.Periode) && jc.Colonnes.Any(c => c.Type == TypeChamp.Montant)
        && jc.Lignes.All(l => l.Valeurs.Length == jc.Colonnes.Length),
     "« Journal de caisse » est un Etat : une periode, une colonne montant a totaliser, ses cellules d'exemple");
+// Les deux formes tranchees par le chef apres le controle final du lot 1 (25/11/2026), d'apres leur fiche RIG v2 :
+// « Mesure provisoire » modifie une mesure qui EXISTE (proc_mesin.md:19, :177, :211) ; « Analyse IA » lance l'analyse
+// d'UNE liasse recue en parametre (proc_ia.md:192), en deux temps (:151-156) -- ni file, ni geste en lot.
+Exiger(parCode.GetValueOrDefault("PROC_MESIN") is { Forme: FormeEcran.Fiche, Marches.Length: 0 } mesin
+       && mesin.Sections.SelectMany(s => s.Champs).Any(c => c.Type != TypeChamp.Tableau),
+    "« Mesure provisoire » est une Fiche (modifier une mesure existante) : des champs editables, aucune etape");
+Exiger(parCode.GetValueOrDefault("PROC_IA") is { Forme: FormeEcran.Operation, ObjetUnique: true, Gestes.Length: 0 }
+       && parCode.GetValueOrDefault("SYNTHESE_FORMALITES_DEMAT") is { EnOnglets: true },
+    "« Analyse IA » est une Operation sur UNE liasse (ni file ni geste en lot) ; son ecran reuni passe en onglets");
 // Deux files de traitement sont rangees sous Trouver : les bilans rejetes a renvoyer, les demandes FNIG a envoyer.
 string[] filesSousTrouver = ["PROC_REJETS_BILANS", "PROC_FNIG"];
 Exiger(descripteurs.Where(d => d.Membres.Length == 0 && MenuAccueil.VerbeDe(d.Code)?.Titre == "Trouver")

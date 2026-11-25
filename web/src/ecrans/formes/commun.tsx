@@ -293,8 +293,9 @@ export interface ProprietesTableLignes {
   total: number
   /** Une recherche, un etat ou un critere filtre la liste : les groupes vides se cachent alors. */
   filtre?: boolean | undefined
-  /** Les cases a cocher (File, Audience, Operation) ; absent, pas de case. */
-  cases?: { cochees: ReadonlySet<number>; basculer: (i: number) => void; toutes: (cocher: boolean) => void } | undefined
+  /** Les cases a cocher (File, Audience, Operation) ; absent, pas de case. Sans « toutes », une seule ligne se choisit
+   * (Operation sur UN objet) : pas de case « Tout cocher ». */
+  cases?: { cochees: ReadonlySet<number>; basculer: (i: number) => void; toutes?: ((cocher: boolean) => void) | undefined } | undefined
   /** Le detail d'une ligne depliee (chevron) ; absent, pas de chevron. */
   detail?: ((l: LigneTenue) => ReactNode) | undefined
   /** Clic sur la ligne : l'ouvrir (Fiche, Consultation, Document). */
@@ -375,8 +376,10 @@ export function TableLignes({ d, vue, lignes, total, filtre = false, cases, deta
           <tr>
             {cases && (
               <th className="rig-eg-case-cellule">
-                <input type="checkbox" aria-label="Tout cocher" checked={toutesCochees} disabled={cochables.length === 0}
-                       onChange={(e) => cases.toutes(e.target.checked)} />
+                {cases.toutes && (
+                  <input type="checkbox" aria-label="Tout cocher" checked={toutesCochees} disabled={cochables.length === 0}
+                         onChange={(e) => cases.toutes?.(e.target.checked)} />
+                )}
               </th>
             )}
             {detail && <th aria-label="Déplier" />}

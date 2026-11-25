@@ -217,6 +217,12 @@ public sealed record DescripteurEcran
     /// ses propres colonnes, parametres ou champs) : un onglet par procedure, chacun dans SA forme.</summary>
     public bool EnOnglets { get; init; }
 
+    /// <summary>Une <see cref="FormeEcran.Operation"/> qui vise UN seul objet, celui que la fiche RIG v2 recoit en
+    /// parametre (PROC_IA : UNE liasse, NumeroLiasse, proc_ia.md:192) : en choisir un autre remplace le premier ; ni
+    /// « tout cocher », ni geste sur plusieurs objets. Faux : l'operation peut en viser plusieurs (les filles d'une
+    /// jonction).</summary>
+    public bool ObjetUnique { get; init; }
+
     /// <summary>Les parties que comptent les <see cref="LigneEcran.Faites"/> d'une ligne : les etapes d'une Saisie,
     /// les sections des autres formes. Pas envoye a l'ecran (il les a deja).</summary>
     [JsonIgnore]

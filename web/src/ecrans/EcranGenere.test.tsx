@@ -335,6 +335,30 @@ describe('Formes Audience, Document, Operation', () => {
     fireEvent.click(bouton('Supprimer l’instance'))
     expect(annonce()).toBe('Démonstration : rien n’est enregistré — « Supprimer l’instance » sur 1 objet : rien n’est modifié dans la base.')
   })
+
+  // PROC_IA (controle final du lot 1, 25/11/2026) : la fiche RIG v2 recoit UNE liasse en parametre (proc_ia.md:192). Une
+  // operation sur un objet unique n'en garde qu'un : cocher une autre ligne remplace la premiere, sans « Tout cocher ».
+  it('Operation sur UN objet : cocher une autre ligne remplace la premiere, pas de « Tout cocher »', async () => {
+    // Deux lignes du MEME groupe : changer de groupe repart deja de zero (une procedure a la fois), ce n'est pas la regle testee.
+    const lignes = [
+      { nom: 'Liasse 2026-001', precisions: 'CFE', groupe: 'Fond', etat: 'AFaire', faites: [] },
+      { nom: 'Liasse 2026-002', precisions: 'CFE', groupe: 'Fond', etat: 'AFaire', faites: [] },
+    ]
+    const { container, ligne, bouton, annonce } = await monter(descripteur({ forme: 'Operation', valider: 'Lancer l’analyse', objetUnique: true, lignes }))
+    expect(container.querySelector('input[aria-label="Tout cocher"]')).toBeNull()
+    const [premiere, seconde] = ['Liasse 2026-001', 'Liasse 2026-002']
+    fireEvent.click(ligne(premiere).querySelector('input[type=checkbox]')!)
+    fireEvent.click(ligne(seconde).querySelector('input[type=checkbox]')!)
+    expect([...container.querySelectorAll<HTMLInputElement>('tbody input[type=checkbox]')].filter((c) => c.checked)).toHaveLength(1)
+    expect((ligne(seconde).querySelector('input[type=checkbox]') as HTMLInputElement).checked).toBe(true)
+    fireEvent.click(bouton('Suivant'))
+    fireEvent.change(container.querySelector('input[aria-label="Code affaire"]')!, { target: { value: '2026J00201' } })
+    fireEvent.click(bouton('Suivant'))
+    expect(container.querySelector('.rig-eg-recap')!.textContent).toContain(seconde)
+    expect(container.querySelector('.rig-eg-recap')!.textContent).not.toContain(premiere)
+    fireEvent.click(bouton('Lancer l’analyse'))
+    expect(annonce()).toBe('Démonstration : rien n’est enregistré — « Lancer l’analyse » sur 1 objet : rien n’est modifié dans la base.')
+  })
 })
 
 // Un ecran reuni EN ONGLETS par ses formes (CatalogueGenere.Reunir) passe par l'aiguillage comme un ecran reuni par le
