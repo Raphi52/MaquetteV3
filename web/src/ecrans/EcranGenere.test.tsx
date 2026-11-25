@@ -247,14 +247,31 @@ describe('Forme Referentiel : une grille editable', () => {
     forme: 'Referentiel', colonnes: [champ('Code'), champ('Libellé'), champ('Actif', 'Case')],
     lignes: [
       { nom: 'Espèces', precisions: '', groupe: 'Fond', etat: 'Validee', faites: [0], valeurs: ['ESP', 'Espèces', 'oui'] },
-      { nom: 'Chèque', precisions: '', groupe: 'Fond', etat: 'Validee', faites: [0] },
+      { nom: 'Chèque', precisions: 'CHQ · remise en banque', groupe: 'Fond', etat: 'Validee', faites: [0] },
     ],
   })
-  it('les colonnes de la fiche, les cellules de chaque ligne (sans valeurs : le nom en premiere colonne)', async () => {
+  it('les colonnes de la fiche, les cellules de chaque ligne (sans valeurs : le nom, puis ses precisions)', async () => {
     const { container } = await monter(ref())
     expect([...container.querySelectorAll('thead th')].map((t) => t.textContent)).toEqual(['Code', 'Libellé', 'Actif', ''])
-    const rangees = [...container.querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('td')].slice(0, 3).map((td) => td.textContent))
-    expect(rangees).toEqual([['ESP', 'Espèces', 'Oui'], ['Chèque', '—', '—']])
+    const rangees = [...container.querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('td')].slice(0, -1).map((td) => td.textContent))
+    expect(rangees).toEqual([['ESP', 'Espèces', 'Oui'], ['Chèque', 'CHQ · remise en banque']])
+  })
+  // Controle final du lot 1 (25/11/2026, conv-2142 msg-878e557c) : les lecteurs de la base (Serveur/Socle/EcransGeneres/
+  // Lecteur*.cs) ne rendent que nom, precisions, groupe et etat (Contrats/EcransGeneres/LignesEcran.cs, LigneLue) ; le
+  // pont les recopie avec des valeurs vides (Pont/EcranGenere.cs). « Mandataires » branche sur la base montrait le nom
+  // puis « — » partout : l'abrege, le SIREN et le CNBF, visibles avant les formes, ne restaient qu'au survol.
+  it('une ligne lue dans la base (sans cellules) montre son nom puis ses precisions, jamais des colonnes de « — »', async () => {
+    const d = descripteur({ forme: 'Referentiel', colonnes: [champ('Désignation'), champ('Abrégé'), champ('SIREN'), champ('Actif', 'Case')] })
+    const lue = { nom: 'Me Irène Ardoise', precisions: 'abrégé ARD · SIREN 412 000 001 · CNBF 7788', groupe: 'Fond', etat: 'Validee', faites: [0], valeurs: [] }
+    const { container } = await monter(d, vueExemple(d, { mode: 'base', greffe: '3801', lignes: [lue], exemples: [] }))
+    const cases = [...container.querySelector('tbody tr')!.querySelectorAll('td')].slice(0, -1)
+    expect(cases.map((td) => td.textContent)).toEqual(['Me Irène Ardoise', 'abrégé ARD · SIREN 412 000 001 · CNBF 7788'])
+    expect(cases[1]!.colSpan).toBe(3)
+    // Une seule colonne : les precisions suivent le nom dans la meme case.
+    const seule = descripteur({ forme: 'Referentiel', colonnes: [champ('Désignation')] })
+    cleanup()
+    const r = await monter(seule, vueExemple(seule, { mode: 'base', greffe: '3801', lignes: [lue], exemples: [] }))
+    expect(r.container.querySelector('tbody tr td')!.textContent).toBe('Me Irène Ardoise abrégé ARD · SIREN 412 000 001 · CNBF 7788')
   })
   it('Ajouter ouvre une ligne de champs ; Enregistrer dit « Demonstration » et la ligne reste a l’ecran', async () => {
     const { container, bouton, annonce } = await monter(ref())
@@ -303,6 +320,16 @@ describe('Forme Etat : parametres, tableau, totaux', () => {
     const { bouton, annonce } = await monter(etat())
     fireEvent.click(bouton('Éditer'))
     expect(annonce()).toBe('Démonstration : rien n’est enregistré — « Éditer » : aucun état n’est produit (3 lignes à l’écran).')
+  })
+  // Le meme defaut sur un Etat branche sur la base (« Bordereaux de lettres recommandées », LecteurBordereauxLr.cs).
+  it('une ligne lue dans la base (sans cellules) montre son nom puis ses precisions, et le total reste « — »', async () => {
+    const d = etat()
+    const lue = { nom: 'Bordereau 2026-014', precisions: 'édité le 03/03/2026 · 12 plis', groupe: 'Espèces', etat: 'Validee', faites: [], valeurs: [] }
+    const { container } = await monter(d, vueExemple(d, { mode: 'base', greffe: '3801', lignes: [lue], exemples: [] }))
+    const cases = [...container.querySelector('tbody tr')!.querySelectorAll('td')]
+    expect(cases.map((td) => td.textContent)).toEqual(['Bordereau 2026-014', 'édité le 03/03/2026 · 12 plis'])
+    expect(cases[1]!.colSpan).toBe(2)
+    expect(pied(container)).toContain('Total montant —')
   })
 })
 

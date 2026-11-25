@@ -249,7 +249,8 @@ public sealed record MarcheEcran(string Titre, string Consigne, bool Obligatoire
 public sealed record LigneEcran(string Nom, string Precisions, string Groupe, string Etat, int[] Faites)
 {
     /// <summary>Les cellules de la ligne, dans l'ordre des <see cref="DescripteurEcran.Colonnes"/> (Referentiel, Etat) ;
-    /// vide : la premiere colonne porte le nom, les autres restent a lire dans la base. Un montant s'ecrit en
+    /// vide (toute ligne lue dans la base, LigneLue) : le nom dans la premiere colonne, ses precisions sur les autres
+    /// (web/src/ecrans/formes/FormeReferentiel.tsx, CasesSansValeurs). Un montant s'ecrit en
     /// nombre invariant (« 180.00 »).</summary>
     public string[] Valeurs { get; init; } = [];
 }

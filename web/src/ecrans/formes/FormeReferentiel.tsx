@@ -5,10 +5,10 @@
 
 import { useState } from 'react'
 import { EnteteListe, ListeModerne, MenuLigne, montant, normaliser, PiedListe, VuesListe } from '../../composants/ListeModerne'
-import type { ChampEcranVue, DescripteurEcranVue } from '../../plan/types'
+import type { ChampEcranVue, DescripteurEcranVue, LigneEcranVue } from '../../plan/types'
 import {
   Annonce, ChampSaisie, GroupesVides, Provenance, enExemple, Exemple, nombreDe, refus, synthese, texteLigne,
-  useAnnonce, useLignes, type LigneTenue,
+  useAnnonce, useLignes, type LigneTenue, type VueLignesEcran,
 } from './commun'
 
 const Tous = '\u0000tous'
@@ -16,6 +16,30 @@ const Tous = '\u0000tous'
 /** Les cellules d'une ligne dans l'ordre des colonnes ; sans valeurs, la premiere colonne porte le nom. */
 export const cellules = (d: DescripteurEcranVue, l: LigneTenue): string[] =>
   d.colonnes.map((_, k) => l.valeurs?.[k] ?? (k === 0 ? l.nom : ''))
+
+/**
+ * Une ligne SANS cellules : celles que lisent les lecteurs de la base (Serveur/Socle/EcransGeneres/Lecteur*.cs), qui
+ * ne rendent que nom, precisions, groupe et etat (Contrats/EcransGeneres/LignesEcran.cs, LigneLue ; le pont envoie
+ * des valeurs vides), et les exemples qui n'en ont pas (Mandataires). Ce qui la distingue (abrege, SIREN, CNBF...)
+ * est dans ses precisions : etalees sous les colonnes, jamais remplacees par des « — » (controle final du lot 1,
+ * 25/11/2026 : « Mandataires » sur la base montrait le nom puis des « — » partout).
+ */
+export const sansValeurs = (l: LigneEcranVue) => !l.valeurs?.length
+
+/** Les cases d'une ligne sans cellules : le nom dans la premiere colonne, les precisions sur toutes les autres. */
+export function CasesSansValeurs({ d, vue, l }: { d: DescripteurEcranVue; vue: VueLignesEcran | null; l: LigneTenue }) {
+  const precisions = l.precisions === '' ? '—' : l.precisions
+  return (
+    <>
+      <td title={`${l.nom} — ${l.precisions}`}>
+        <b>{l.nom}</b>
+        {d.colonnes.length === 1 && <> <span className="rig-eg-precisions">{precisions}</span></>}
+        {enExemple(vue, l) && <> <Exemple /></>}
+      </td>
+      {d.colonnes.length > 1 && <td colSpan={d.colonnes.length - 1} className="rig-eg-precisions">{precisions}</td>}
+    </>
+  )
+}
 
 /** Une cellule lue : une case en Oui / Non, un montant a la francaise, le reste tel quel (vide : « — »). */
 export function lisible(c: ChampEcranVue, valeur: string): string {
@@ -82,7 +106,7 @@ export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
               {ligneEnEdition('nouvelle')}
               {visibles.map((l) => ligneEnEdition(l.i) || (
                 <tr key={l.i} onDoubleClick={() => modifier(l)}>
-                  {cellules(d, l).map((v, k) => {
+                  {sansValeurs(l) ? <CasesSansValeurs d={d} vue={vue} l={l} /> : cellules(d, l).map((v, k) => {
                     const c = d.colonnes[k]!
                     return (
                       <td key={c.libelle} title={k === 0 ? `${l.nom} — ${l.precisions}` : v}

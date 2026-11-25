@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { EnteteListe, ListeModerne, montant, normaliser, PiedListe, VuesListe } from '../../composants/ListeModerne'
 import { dateCourte } from '../../criteres'
 import type { DescripteurEcranVue } from '../../plan/types'
-import { cellules, lisible } from './FormeReferentiel'
+import { CasesSansValeurs, cellules, lisible, sansValeurs } from './FormeReferentiel'
 import {
   Annonce, ChampSaisie, GroupesVides, Provenance, enExemple, Exemple, gestesDe, nombreDe, refus, synthese, texteLigne,
   useAnnonce, useLignes, type Saisies,
@@ -78,7 +78,7 @@ export function FormeEtat({ d }: { d: DescripteurEcranVue }) {
             <tbody>
               {visibles.map((l) => (
                 <tr key={l.i}>
-                  {cellules(d, l).map((v, k) => {
+                  {sansValeurs(l) ? <CasesSansValeurs d={d} vue={vue} l={l} /> : cellules(d, l).map((v, k) => {
                     const c = d.colonnes[k]!
                     return (
                       <td key={c.libelle} title={k === 0 ? `${l.nom} — ${l.precisions}` : v}

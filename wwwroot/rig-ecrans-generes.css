@@ -59,6 +59,9 @@
   color: var(--rig-texte-2); background: color-mix(in srgb, var(--rig-texte) 8%, transparent);
 }
 .rig-eg-table td.rig-tcw__vide-groupe { color: var(--rig-texte-3); font-style: normal; }
+/* Les precisions d'une ligne lue sans cellules (FormeReferentiel.tsx, CasesSansValeurs), etalees sous les colonnes :
+   en gris, comme l'objet d'une cellule d'identite (.rig-lm-identite__objet, rig-listes.css). */
+.rig-eg-table .rig-eg-precisions { color: var(--rig-texte-3); }
 .rig-eg-detail td { white-space: normal; background: color-mix(in srgb, var(--rig-texte) 2%, transparent); }
 .rig-eg-regles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 16px; padding: 6px 4px; }
 .rig-eg-regles .rig-lm-champ__valeur { white-space: normal; color: var(--rig-texte-2); }
