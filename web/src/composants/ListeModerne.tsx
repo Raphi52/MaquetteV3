@@ -34,8 +34,16 @@
 //   montant(valeur, { devise, decimales })                  « 1 379,30 € » ; « 50 000 CHF » avec { devise: 'CHF', decimales: 0 }
 //   <CelluleIdentite avatar={false} />   une ligne sans personne ni dossier (article de facture) : nom et objet seuls
 //   <VuesListe etiquette="Vues des mesures" />              un second groupe de puces dans la meme liste
+//
+// Le panneau de criteres (aside.rig-criteres, frere de <ListeModerne> dans .rig-proc__corps) est REPLIE par defaut :
+// la tete de la liste porte un bouton « Criteres » qui le rouvre (demande du 25/11/2026, conv-2132 : la maquette
+// « Tout reuni » n'a pas de panneau, la liste y prend toute la largeur). Rien a faire dans l'ecran : le cadre trouve
+// son panneau tout seul. Le choix vaut pour la session et tous les ecrans ; oublierRepliCriteres() le remet (tests).
 
-import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
+import {
+  createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore,
+  type CSSProperties, type KeyboardEvent, type ReactNode,
+} from 'react'
 import { EcranVisible } from '../plan/visibilite'
 
 /** Les teintes de la palette des listes, declarees par theme dans rig-listes.css (--rig-liste-<teinte>). */
@@ -52,12 +60,88 @@ export interface ActionLigne {
 
 // ---------------------------------------------------------------- le cadre
 
+// Le panneau de criteres replie ou ouvert : UN choix pour la session et tous les ecrans (ouvert sur la Recherche
+// d'affaires, il l'est aussi sur les Demandes ouvertes ensuite). Replie au depart, comme la maquette.
+let criteresReplies = true
+const abonnesRepli = new Set<() => void>()
+function changerRepliCriteres(replie: boolean) {
+  criteresReplies = replie
+  for (const prevenir of abonnesRepli) prevenir()
+}
+function useCriteresReplies(): boolean {
+  return useSyncExternalStore(
+    (prevenir) => { abonnesRepli.add(prevenir); return () => { abonnesRepli.delete(prevenir) } },
+    () => criteresReplies)
+}
+/** Remet le panneau replie, comme au demarrage (tests). */
+export function oublierRepliCriteres() { changerRepliCriteres(true) }
+
+/** Ce que la tete de liste sait du panneau de criteres de son ecran ; null = l'ecran n'en a pas. */
+interface PanneauCriteres {
+  replie: boolean
+  /** Les criteres remplis : un filtre cache par le repli ne doit pas passer inapercu. */
+  actifs: number
+  basculer: () => void
+}
+const ContexteCriteres = createContext<PanneauCriteres | null>(null)
+
+// La valeur de depart d'un champ du panneau : vide pour une saisie de texte ou de date (« ex. 55339 » n'est qu'une
+// indication), la valeur affichee au premier regard pour le reste (« Nombre maxi 50 », « Toutes », une bascule).
+const departs = new WeakMap<Element, string>()
+function etatChamp(champ: Element): string {
+  if (champ instanceof HTMLInputElement) return champ.type === 'checkbox' || champ.type === 'radio' ? String(champ.checked) : champ.value
+  if (champ instanceof HTMLSelectElement || champ instanceof HTMLTextAreaElement) return champ.value
+  return String(champ.classList.contains('rig-bascule--actif'))
+}
+function compterCriteres(panneau: HTMLElement): number {
+  let actifs = 0
+  for (const champ of panneau.querySelectorAll('input, select, textarea, button.rig-bascule')) {
+    if (!departs.has(champ)) {
+      const texte = champ instanceof HTMLTextAreaElement
+        || (champ instanceof HTMLInputElement && ['text', 'search', 'date', 'email', 'tel', ''].includes(champ.type))
+      departs.set(champ, texte ? '' : etatChamp(champ))
+    }
+    if (etatChamp(champ) !== departs.get(champ)) actifs++
+  }
+  return actifs
+}
+
 /**
  * Le cadre d'une liste moderne : la colonne des resultats en carte de surface (.rig-lm), a cote du panneau
  * de criteres. C'est aussi le composant qui donne son nom au fichier (regle de web/src : registre iles.ts).
+ * Il trouve le panneau de criteres de son ecran (son frere aside.rig-criteres) et le replie : la feuille
+ * (rig-listes.css) le cache et donne alors toute la largeur a la liste ; le bouton de la tete le rouvre.
  */
 export function ListeModerne({ etiquette, children }: { etiquette?: string | undefined; children?: ReactNode }) {
-  return <section className="rig-resultats-proc rig-lm" aria-label={etiquette}>{children}</section>
+  const cadre = useRef<HTMLElement>(null)
+  const [panneau, setPanneau] = useState<HTMLElement | null>(null)
+  const [actifs, setActifs] = useState(0)
+  const replie = useCriteresReplies()
+  // A chaque rendu de l'ecran (un critere change = un rendu) : le panneau est-il la, et combien de criteres remplis ?
+  useLayoutEffect(() => {
+    const trouve = cadre.current?.parentElement?.querySelector<HTMLElement>(':scope > .rig-criteres') ?? null
+    if (trouve !== panneau) setPanneau(trouve)
+    const compte = trouve ? compterCriteres(trouve) : 0
+    if (compte !== actifs) setActifs(compte)
+  })
+  // Et a chaque frappe dans le panneau, meme d'un champ que l'ecran ne suit pas.
+  useEffect(() => {
+    if (!panneau) return
+    const recompter = () => setActifs(compterCriteres(panneau))
+    panneau.addEventListener('input', recompter)
+    panneau.addEventListener('change', recompter)
+    return () => {
+      panneau.removeEventListener('input', recompter)
+      panneau.removeEventListener('change', recompter)
+    }
+  }, [panneau])
+  const etat: PanneauCriteres | null = panneau && { replie, actifs, basculer: () => changerRepliCriteres(!replie) }
+  return (
+    <section ref={cadre} className={`rig-resultats-proc rig-lm${etat?.replie ? ' rig-lm--criteres-replies' : ''}`}
+             aria-label={etiquette}>
+      <ContexteCriteres.Provider value={etat}>{children}</ContexteCriteres.Provider>
+    </section>
+  )
 }
 
 // ---------------------------------------------------------------- outils de texte
@@ -157,6 +241,7 @@ export interface ProprietesEnteteListe {
  */
 export function EnteteListe({ titre, synthese, detail, filtre }: ProprietesEnteteListe) {
   const visible = useContext(EcranVisible)
+  const panneau = useContext(ContexteCriteres)
   const champ = useRef<HTMLInputElement>(null)
   const avecFiltre = filtre !== undefined
   useLayoutEffect(() => {
@@ -180,6 +265,15 @@ export function EnteteListe({ titre, synthese, detail, filtre }: ProprietesEntet
 
   return (
     <div className="rig-lm-tete">
+      {panneau && (
+        <button type="button" className={`rig-lm-outil rig-lm-criteres${panneau.replie ? '' : ' rig-lm-criteres--ouvert'}`}
+                aria-expanded={!panneau.replie} onClick={panneau.basculer}
+                title={panneau.replie ? 'Afficher les criteres de recherche' : 'Replier les criteres : la liste prend toute la largeur'}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="2" /><path d="M6 2.5v11" /></svg>
+          Criteres
+          {panneau.actifs > 0 && <span className="rig-lm-criteres__compte">{panneau.actifs}</span>}
+        </button>
+      )}
       <div className="rig-lm-tete__textes">
         <div className="rig-lm-titre">{titre}</div>
         {synthese !== undefined && <div className="rig-lm-synthese" title={detail}>{synthese}</div>}

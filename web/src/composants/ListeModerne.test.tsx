@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client'
 import {
   CartesChiffrees, CelluleChevron, CelluleIdentite, ChoixTri, EnteteListe, LigneDetail, ListeModerne, MenuLigne, MontantBarre,
   Pastille, PiedListe, PointEtat, TeintesAvatar, VuesListe, initiales, montant, normaliser, oublierVuesDeSession, rangAvatar,
-  teinteStatut, texteCsv, useVuesDeSession, type VuesDeSession,
+  oublierRepliCriteres, teinteStatut, texteCsv, useVuesDeSession, type VuesDeSession,
 } from './ListeModerne'
 import { EcranVisible } from '../plan/visibilite'
 import { readFileSync } from 'node:fs'
@@ -550,5 +550,75 @@ describe('cellules du tableau', () => {
     const { container } = render(<PiedListe aide="Double-clic…"><span><b>15</b> affaires</span></PiedListe>)
     expect(container.querySelector('.rig-lm-pied')!.textContent).toBe('15 affairesDouble-clic…')
     expect(screen.getByText('Double-clic…').className).toBe('rig-lm-pied__aide')
+  })
+})
+
+// Demande du 25/11/2026 (conv-2132) : « replie le panneau de criteres des listes derriere un bouton, pour que la liste
+// prenne toute la largeur comme sur la maquette » (la maquette « Tout reuni » n'a pas de panneau a gauche).
+describe('panneau de criteres replie derriere un bouton', () => {
+  afterEach(() => { act(() => oublierRepliCriteres()) })
+
+  /** Un ecran comme les vrais : le panneau de criteres et la liste, freres dans le corps de l'ecran. */
+  function Ecran({ avecPanneau = true, children }: { avecPanneau?: boolean; children?: ReactNode }) {
+    return (
+      <div className="rig-proc__corps">
+        {avecPanneau && (
+          <aside className="rig-criteres">
+            <input aria-label="N° Affaire" />
+            <select aria-label="Nature" defaultValue=""><option value="">Toutes</option><option value="c">Collective</option></select>
+            <input aria-label="Nombre maxi" type="number" defaultValue="50" />
+          </aside>
+        )}
+        <ListeModerne etiquette="Affaires"><EnteteListe titre="Affaires" />{children}</ListeModerne>
+      </div>
+    )
+  }
+  const bouton = () => screen.queryByRole('button', { name: /Criteres/ })
+  const cadre = (c: HTMLElement) => c.querySelector('section.rig-lm')!
+
+  it('sans panneau de criteres a cote, aucun bouton : la liste est deja pleine largeur', () => {
+    const { container } = render(<Ecran avecPanneau={false} />)
+    expect(bouton()).toBeNull()
+    expect(cadre(container).classList.contains('rig-lm--criteres-replies')).toBe(false)
+  })
+
+  it('replie par defaut, comme la maquette ; un clic l\'ouvre, un second le replie', () => {
+    const { container } = render(<Ecran />)
+    expect(bouton()!.getAttribute('aria-expanded')).toBe('false')
+    expect(cadre(container).classList.contains('rig-lm--criteres-replies')).toBe(true)
+    fireEvent.click(bouton()!)
+    expect(bouton()!.getAttribute('aria-expanded')).toBe('true')
+    expect(cadre(container).classList.contains('rig-lm--criteres-replies')).toBe(false)
+    fireEvent.click(bouton()!)
+    expect(cadre(container).classList.contains('rig-lm--criteres-replies')).toBe(true)
+  })
+
+  it('le choix vaut pour toute la session : un autre ecran ouvert ensuite garde le panneau ouvert', () => {
+    const premier = render(<Ecran />)
+    fireEvent.click(bouton()!)
+    premier.unmount()
+    const { container } = render(<Ecran />)
+    expect(bouton()!.getAttribute('aria-expanded')).toBe('true')
+    expect(cadre(container).classList.contains('rig-lm--criteres-replies')).toBe(false)
+  })
+
+  it('le bouton compte les criteres remplis : un filtre cache ne passe pas inapercu', () => {
+    render(<Ecran />)
+    expect(bouton()!.textContent).toBe('Criteres')
+    fireEvent.change(screen.getByLabelText('N° Affaire'), { target: { value: '004176' } })
+    fireEvent.change(screen.getByLabelText('Nature'), { target: { value: 'c' } })
+    expect(bouton()!.textContent).toBe('Criteres2')
+    // Une valeur par defaut (Nombre maxi 50) n'est pas un critere rempli ; remise a vide, le compte redescend.
+    fireEvent.change(screen.getByLabelText('N° Affaire'), { target: { value: '' } })
+    expect(bouton()!.textContent).toBe('Criteres1')
+  })
+
+  it('la feuille cache le panneau et donne toute la largeur a la liste quand il est replie', () => {
+    const regle = (selecteur: string) => {
+      const i = feuille.indexOf(selecteur + ' {')
+      return i < 0 ? '' : feuille.slice(i, feuille.indexOf('}', i))
+    }
+    expect(regle('.rig-proc__corps:has(> .rig-lm--criteres-replies) > .rig-criteres')).toMatch(/display:\s*none/)
+    expect(regle('.rig-proc__corps:has(> .rig-lm--criteres-replies)')).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/)
   })
 })

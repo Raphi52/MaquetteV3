@@ -92,7 +92,28 @@
   padding: 12px 14px 10px;
   flex: none;
 }
-.rig-lm-tete__textes { min-width: 0; }
+/* Les textes prennent la place libre : le bouton « Criteres » (quand il y en a un) reste a gauche, le champ a droite. */
+.rig-lm-tete__textes { min-width: 0; flex: 1 1 auto; }
+
+/* ---------- Panneau de criteres replie (demande du 25/11/2026, conv-2132) ----------
+   La maquette « Tout reuni » n'a pas de panneau : replie, il disparait et la liste prend TOUTE la largeur du corps
+   de l'ecran (grille 320px + reste de rig-accueil.css ramenee a une colonne ; en fenetre etroite, le corps empile
+   ses blocs et le panneau n'y est simplement plus). Le cadre pose la classe, le bouton de la tete la retire. */
+.rig-proc__corps:has(> .rig-lm--criteres-replies) { grid-template-columns: minmax(0, 1fr); }
+.rig-proc__corps:has(> .rig-lm--criteres-replies) > .rig-criteres { display: none; }
+.rig-lm-criteres { flex: none; }
+.rig-lm-criteres svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.rig-lm-criteres--ouvert {
+  background: color-mix(in srgb, var(--rig-focus) 12%, var(--rig-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rig-focus) 50%, transparent);
+}
+.rig-lm-criteres__compte {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box;
+  border-radius: 8px;
+  background: var(--rig-texte); color: var(--rig-surface);
+  font-size: 10.5px; font-weight: 700;
+}
 .rig-lm-titre {
   font-size: 18px; font-weight: 700; letter-spacing: -.01em; line-height: 1.2;
   color: var(--rig-texte);
