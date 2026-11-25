@@ -262,6 +262,18 @@ describe('EcranGenere : lignes de la base ou exemples', () => {
     expect(container.querySelectorAll('.rig-tcw__exemple')).toHaveLength(0)
   })
 
+  // Cas vu le 25/11/2026 (plan-f7ba4de2, lot 2) : « Envois et retours », ses 4 procedures branchees et vides sur la
+  // copie de dev. Chaque groupe reste a l'ecran avec son titre, aucun message unique ne les remplace.
+  it('tous les groupes branches et vides : chacun reste visible avec « Aucune ligne », sans message unique', async () => {
+    const d = reuni()
+    const { container } = await monter(d, { mode: 'base', message: null, greffe: '3801', lignes: [], exemples: [], vides: ['Ecran test', 'Relances'] })
+    const groupes = [...container.querySelectorAll('.rig-tcw__groupe')]
+    expect(groupes.map((g) => g.querySelector('.rig-tcw__groupe-titre')!.textContent)).toEqual(['Ecran test', 'Relances'])
+    expect(groupes.map((g) => g.querySelector('.rig-tcw__vide-groupe')?.textContent)).toEqual(
+      ['Aucune ligne dans la base du greffe 3801.', 'Aucune ligne dans la base du greffe 3801.'])
+    expect(container.querySelector('.rig-tcw__vide')).toBeNull()
+  })
+
   it('un groupe vide disparait quand une recherche ou un etat filtre la liste', async () => {
     const d = reuni()
     const reelle = { nom: 'HKO DUPRAT SARL · SIREN 412 000 001', precisions: 'Fond · reçu le 02/03/2026', groupe: 'Ecran test', etat: 'AFaire', faites: [] }
