@@ -1,0 +1,11 @@
+# « EDI RPVA » (LecteurInscriptionsRpva) sur les demandes du jeu PROC_EDI_RPJC_INS.sql (meme table v2.DEMAT_RPJC_INS ;
+# PROC_EDI_RPVAINS.sql n'en pose aucune, voir son en-tete). La liste de la V2 a l'ouverture : « En attente » seule
+# (RPJCI_ETAT = '1'), par date de traitement decroissante (toutes vides ici), puis par numero de demande.
+# Etat : ouverte par un agent -> EnCours [0,1] ; personne -> AFaire []. Groupe « Structures » par le Cnbf de la
+# structure seul (300102) ; jumeau 300101, sans ce Cnbf : « Personnes physiques ».
+# Ecartes, jumeau retenu 300101 (etat 1) : 300103 et 300105 (etat 2, acceptee / refusee), 300104 (etat 4), 300107
+# (etat 9) -- la case « Traites » est decochee a l'ouverture ; 300106 (sans etat).
+# 300108 : sans nom ni prenom, la denomination ; sans date de demande, pas de « reçue le ».
+ARDOISE Irène | Cnbf 300001 · reçue le {J-2} | Personnes physiques | AFaire | []
+BELIER Simon | Cnbf 300002 · structure Cnbf 300902 · ouverte par agent.banc | Structures | EnCours | [0,1]
+MU JURIS | Cnbf 300008 | Personnes physiques | AFaire | []
