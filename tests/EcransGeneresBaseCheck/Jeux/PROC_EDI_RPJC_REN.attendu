@@ -1,0 +1,17 @@
+# « EDI RPJC renvois » (LecteurRenvoisRpjc) sur le jeu PROC_EDI_RPJC_REN.sql : la liste de la V2 avec ses deux cases
+# cochees aux dates pre-remplies (« En attente » = etat 1 ; « Traites » = etat <> 1 et audience initiale du jour moins un
+# mois a 0 h au jour a 24 h), plus tous les rejets Extelia (etat 9) du bouton « REJET DOCAPOST ».
+# Ordre : a traiter, rejets Extelia, traitees ; la demande la plus recente en tete dans chaque bloc.
+# Etat : etat 9 -> EnAttente [0,1,2,3] (decision prise) ; A -> Validee [0,1,2,3] ; R -> Rejetee [0,1,2,3] ; sans decision,
+# ouverte -> EnCours [0] (+1 avocat retrouve) ; sans decision, personne -> AFaire [].
+# Ecartes, chacun avec son jumeau retenu : 300205 audience la veille de la borne basse (jumeau 300204, a la borne) ;
+# 300207 audience demain a 0 h (jumeau 300206, aujourd'hui a 23 h) ; 300209 sans etat (jumeau 300210, meme audience).
+# Le nom de l'affaire : la premiere instance du role (300261, pas 300262) ; le role seul sans instance (2026F30002).
+# L'avocat : l'actif des deux mandataires du CNBF 300013 ; « avocat non trouvé » pour 300099.
+Rôle 2026F30003 · GAMMA CONSEIL SARL | BETA Simon · audience initiale du {J+5} · ouverte par agent.s | À traiter | EnCours | [0,1]
+Rôle 2026F30002 | avocat non trouvé (CNBF 300099) · audience initiale du {J+12} · ouverte par agent.r | À traiter | EnCours | [0]
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J+10} · renvoi demandé au {J+40} | À traiter | AFaire | []
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {M-6} · rejet Extelia du {J-20} | Rejets Extelia | EnAttente | [0,1,2,3]
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J-3} · renvoi accepté le {J-4} | Traitées | Validee | [0,1,2,3]
+Rôle 2026F30003 · GAMMA CONSEIL SARL | ALPHA Irène · audience initiale du {J+0} · rejeté le {J-2} · Motif sans date de prononcé | Traitées | Rejetee | [0,1,2,3]
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {M-1} · renvoi accepté le {J-40} | Traitées | Validee | [0,1,2,3]

@@ -1,0 +1,16 @@
+# « Destinataires institutionnels » (LecteurDestinatairesInstitutionnels) sur le jeu PROC_GDEST_INST.sql : tous les
+# destinataires (la V2 ouvre sans critere), dans l'ordre de leur code.
+# Etat : inactif -> EnAttente ; identite complete (code, nom, type, adresse) -> Validee ; incomplete avec une autre marche
+# -> EnCours ; incomplete sans rien -> AFaire. Marches : 0 identite, 1 courrier (civilite developpee ou formule),
+# 2 courriel ou coffre-fort.
+# Groupe : PROC -> « Parquet et juridictions » ; DDFP, DESTPR -> « Administrations » ; CC, BOD et un type inconnu (ZZB3)
+# -> « Organismes ».
+# Aucun destinataire n'est ecarte. Jumeaux de la regle d'etat : B3NOADR (sans adresse, EnCours) et B3PARQ (avec, Validee) ;
+# B3VIDE (sans adresse ni rien, AFaire) et B3NOADR ; B3INACT (inactif, EnAttente) et B3URSSAF (actif, Validee).
+Notaires du ressort | B3AUTRE · ZZB3 · coffre-fort COFFRE_NOTAIRES | Organismes | Validee | [0,2]
+Direction des finances publiques | B3DDFP · Directeur départemental finances · courriel | Administrations | Validee | [0,2]
+Bodacc | B3INACT · Bodacc | Organismes | EnAttente | [0]
+Cour d'appel | B3NOADR · Procureur · adresse à compléter | Parquet et juridictions | EnCours | [1]
+Parquet du tribunal judiciaire | B3PARQ · Procureur · coffre-fort COFFRE_PARQUET depuis le {J-100} | Parquet et juridictions | Validee | [0,1,2]
+Urssaf | B3URSSAF · Enquête prévention | Administrations | Validee | [0]
+Chambre de commerce | B3VIDE · Chambre de Commerce · adresse à compléter | Organismes | AFaire | []
