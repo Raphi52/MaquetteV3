@@ -3,7 +3,7 @@
 // modifier en ligne (les cellules deviennent des champs), supprimer. Tant qu'aucun ecrivain n'existe, Enregistrer et
 // Supprimer le disent et ne changent rien : la ligne en cours de modification reste ouverte, marquee non enregistree.
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { EnteteListe, ListeModerne, MenuLigne, montant, normaliser, PiedListe, VuesListe } from '../../composants/ListeModerne'
 import type { ChampEcranVue, DescripteurEcranVue, LigneEcranVue } from '../../plan/types'
 import {
@@ -67,18 +67,33 @@ export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
     ? ': la ligne n’est pas ajoutée à la table' : ': la ligne n’est pas modifiée dans la table'))
   const annuler = () => { poserEdition(null); annoncer(null) }
 
-  const ligneEnEdition = (cle: number | 'nouvelle') => edition && edition.cle === cle && (
-    <tr key={`edition-${cle}`} className="rig-eg-ligne--edition">
-      {d.colonnes.map((c, k) => (
-        <td key={c.libelle}>
-          <ChampSaisie champ={c} valeur={edition.valeurs[k] ?? ''} changer={(v) => changer(k, v)} compact />
+  // fix-ok: modifier() ouvre une ligne sans cellules en cellules(d, l) = [nom, '', ...] et la ligne en modification ne
+  // montrait plus ses precisions (test « garde ses precisions visibles en lecture », rouge avant ce bloc).
+  // Une ligne sans cellules (sansValeurs) s'ouvre en [nom, '', ...] : rien ne se devine de ses precisions, qui restent
+  // donc affichees en lecture sous les champs, avec la raison (controle final du lot 1 : sur « Mandataires », Abrege et
+  // SIREN s'ouvraient vides et les precisions ne se voyaient plus nulle part pendant la modification).
+  const ligneEnEdition = (cle: number | 'nouvelle', l?: LigneTenue) => edition && edition.cle === cle && (
+    <Fragment key={`edition-${cle}`}>
+      <tr className="rig-eg-ligne--edition">
+        {d.colonnes.map((c, k) => (
+          <td key={c.libelle}>
+            <ChampSaisie champ={c} valeur={edition.valeurs[k] ?? ''} changer={(v) => changer(k, v)} compact />
+          </td>
+        ))}
+        <td className="rig-eg-edition-actions">
+          <button type="button" className="rig-lm-outil rig-lm-outil--fort" onClick={enregistrer}>Enregistrer</button>
+          <button type="button" className="rig-lm-outil" onClick={annuler}>Annuler</button>
         </td>
-      ))}
-      <td className="rig-eg-edition-actions">
-        <button type="button" className="rig-lm-outil rig-lm-outil--fort" onClick={enregistrer}>Enregistrer</button>
-        <button type="button" className="rig-lm-outil" onClick={annuler}>Annuler</button>
-      </td>
-    </tr>
+      </tr>
+      {l && sansValeurs(l) && (
+        <tr className="rig-eg-ligne--edition rig-eg-edition-lu">
+          <td colSpan={nbColonnes}>
+            Précisions de la ligne : <span className="rig-eg-precisions">{l.precisions === '' ? '—' : l.precisions}</span>
+            {' '}— les colonnes de cette ligne ne sont pas encore lues une à une : seul son nom est repris dans les champs.
+          </td>
+        </tr>
+      )}
+    </Fragment>
   )
 
   return (
@@ -104,7 +119,7 @@ export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
             </thead>
             <tbody>
               {ligneEnEdition('nouvelle')}
-              {visibles.map((l) => ligneEnEdition(l.i) || (
+              {visibles.map((l) => ligneEnEdition(l.i, l) || (
                 <tr key={l.i} onDoubleClick={() => modifier(l)}>
                   {sansValeurs(l) ? <CasesSansValeurs d={d} vue={vue} l={l} /> : cellules(d, l).map((v, k) => {
                     const c = d.colonnes[k]!

@@ -289,6 +289,24 @@ describe('Forme Referentiel : une grille editable', () => {
     const { container } = await monter(ref())
     fireEvent.doubleClick(container.querySelector('tbody tr')!)
     expect([...container.querySelectorAll('tr.rig-eg-ligne--edition input[type=text]')].map((i) => (i as HTMLInputElement).value)).toEqual(['ESP', 'Espèces'])
+    // Ses cellules sont dans les champs : aucun rappel de precisions.
+    expect(container.querySelector('tr.rig-eg-edition-lu')).toBeNull()
+  })
+  // Controle final du lot 1 (25/11/2026, 4e passage) : une ligne lue sans cellules, ouverte en modification (double-clic
+  // ou menu « Modifier »), s'ouvrait en [nom, '', ...] : sur « Mandataires », Abrege et SIREN vides, et ses precisions
+  // ne se voyaient plus nulle part. Elles restent affichees, en lecture, sous les champs.
+  it('une ligne lue dans la base, ouverte en modification, garde ses precisions visibles en lecture', async () => {
+    const d = descripteur({ forme: 'Referentiel', colonnes: [champ('Désignation'), champ('Abrégé'), champ('SIREN')] })
+    const lue = { nom: 'Me Irène Ardoise', precisions: 'abrégé ARD · SIREN 412 000 001 · CNBF 7788', groupe: 'Fond', etat: 'Validee', faites: [0], valeurs: [] }
+    const { container, bouton } = await monter(d, vueExemple(d, { mode: 'base', greffe: '3801', lignes: [lue], exemples: [] }))
+    fireEvent.doubleClick(container.querySelector('tbody tr')!)
+    expect((container.querySelector('tr.rig-eg-ligne--edition input') as HTMLInputElement).value).toBe('Me Irène Ardoise')
+    const lu = container.querySelector('tr.rig-eg-edition-lu')
+    expect(lu?.textContent).toContain('abrégé ARD · SIREN 412 000 001 · CNBF 7788')
+    expect(lu?.textContent).toContain('pas encore lues une à une')
+    expect(lu?.querySelector('input')).toBeNull()
+    fireEvent.click(bouton('Annuler'))
+    expect(container.querySelector('tr.rig-eg-edition-lu')).toBeNull()
   })
 })
 

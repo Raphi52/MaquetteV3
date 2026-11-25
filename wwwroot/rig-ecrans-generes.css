@@ -102,6 +102,8 @@
 /* La grille editable d'un referentiel : la ligne en cours de modification porte ses champs. */
 .rig-eg-grille td .rig-saisie-champ__saisie { padding: 3px 6px; font-size: 12px; }
 .rig-eg-grille tr.rig-eg-ligne--edition td { background: color-mix(in srgb, var(--rig-or) 8%, transparent); overflow: visible; }
+/* Sous une ligne lue sans cellules mise en modification : ses precisions, en lecture, sur toute la largeur. */
+.rig-eg-grille tr.rig-eg-edition-lu td { white-space: normal; color: var(--rig-texte-2); font-size: 12px; }
 .rig-eg-edition-actions { display: flex; gap: 4px; justify-content: flex-end; }
 
 /* Les totaux d'un etat, au pied : par groupe, puis le total general en gras. */
