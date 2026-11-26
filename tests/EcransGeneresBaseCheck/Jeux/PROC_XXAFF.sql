@@ -3,7 +3,8 @@
 -- SQL-DEV\DEV, lu le 26/11/2026), creees si absentes (seules les colonnes lues ou ecrites), completees sinon ; lignes par
 -- sp_executesql. La liste montre aussi les instances des autres jeux dont le type est dans la recherche de XXAFF (dont celles
 -- de PROC_JOIN.sql) ; PROC_XXAFF.attendu dit pourquoi chacune est bloquee ou non.
--- NUMERO_METIER : JRMDE 2026, structure « ALC » (annee sur 4, lettre M, chrono sur 5) -- dbo.VerifTypeMetier la lit.
+-- Le compteur JRMDE 2026 (num.Compteur, la V3 de NUMERO_METIER) : structure « ALC » (annee sur 4, lettre M, chrono sur 5) --
+-- dbo.VerifTypeMetier le lit.
 -- Les instances JRMDE (code MDE14 de PROC_JOIN.sql), hors de « Instance judiciaire » :
 --   1400351 XXAFF ALPHA : supprimable (le jumeau accepte de chaque refus), avec une ligne dans chaque table que DeleteCascade
 --           efface (Instance.cs:4237-4670) -- sauf PARTIE, DILIGENCE_RCS, RELANCE_RCS, DEMAT_*, WEB_DEMANDE, qu'un autre ecran
@@ -15,10 +16,6 @@
 --   1400355 XXAFF EPSILON : role 2025, saisie en 2026 -> annee incoherente ;
 --   1400356 XXAFF ZETA : role « 2026X... » (lettre X, la structure attend M) -> numero non conforme ;
 --   1400357 XXAFF ETA : une decision dont le jugement a un document (REDA) et sa mesure -> bloquee.
-IF OBJECT_ID(N'v2.NUMERO_METIER') IS NULL
-    CREATE TABLE v2.NUMERO_METIER (NMMTR_ID_NMMTR int NOT NULL PRIMARY KEY, NMMTR_TYPE_METIER varchar(5) NOT NULL,
-        NMMTR_STRUCTURE_NUMERO varchar(16) NOT NULL, NMMTR_CODE_GREFFE varchar(5) NULL, NMMTR_ANNEE int NOT NULL, NMMTR_CODAGE_ANNEE tinyint NOT NULL,
-        NMMTR_LETTRE_CATEGORIE varchar(16) NULL, NMMTR_TAILLE_CHRONO smallint NOT NULL, NMMTR_QUANTIEME smallint NULL, NMMTR_SEPARATEUR varchar(5) NULL);
 IF OBJECT_ID(N'v2.DOSSIER_JUDICIAIRE') IS NULL
     CREATE TABLE v2.DOSSIER_JUDICIAIRE (DSJUD_ID_DSJUD int NOT NULL PRIMARY KEY, DSJUD_NUM_DOSSIER varchar(11) NOT NULL, DSJUD_NOM_DOSSIER varchar(max) NOT NULL);
 IF OBJECT_ID(N'v2.VIDIGED_INDEX') IS NULL
@@ -97,8 +94,7 @@ IF COL_LENGTH('v2.DEMANDE', 'DMND_NOM') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_
 IF COL_LENGTH('v2.DEMANDE', 'DMND_LES_NUMEROS') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_LES_NUMEROS varchar(255) NULL;
 
 EXEC sp_executesql N'
-INSERT INTO v2.NUMERO_METIER (NMMTR_ID_NMMTR, NMMTR_TYPE_METIER, NMMTR_STRUCTURE_NUMERO, NMMTR_CODE_GREFFE, NMMTR_ANNEE, NMMTR_CODAGE_ANNEE,
-    NMMTR_LETTRE_CATEGORIE, NMMTR_TAILLE_CHRONO) VALUES (1400341, ''JRMDE'', ''ALC'', NULL, 2026, 4, ''M'', 5);
+INSERT INTO num.Compteur (Type, Annee, Structure, CodageAnnee, Lettre, TailleChrono) VALUES (''JRMDE'', 2026, ''ALC'', 4, ''M'', 5);
 INSERT INTO v2.DOSSIER_JUDICIAIRE (DSJUD_ID_DSJUD, DSJUD_NUM_DOSSIER, DSJUD_NOM_DOSSIER) VALUES (1400451, ''26DJ14451'', ''DOSSIER XXAFF ALPHA'');
 INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_NOM_COURANT, INSTN_CODE_AFFAIRE, INSTN_DATE_SAISINE_GREFFE, INSTN_NUM_REP_GENERAL,
     INSTN_ID_DSJUD, INSTN_ID_AFFRE, INSTN_TOP_EXPERIAN) VALUES

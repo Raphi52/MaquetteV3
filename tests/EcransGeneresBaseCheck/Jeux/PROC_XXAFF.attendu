@@ -4,7 +4,7 @@
 # X, la structure ALC attend M ; jumeau 1400351), 1400357 jugement en REDA et sa mesure, 1400353 decision au repertoire + facture +
 # provision, 1400352 document en GED, 1400355 annee de saisine incoherente avec le role, 1400302 mere ET fille d'une jonction,
 # 1400306 jointe, 1400303 mere ; jumeaux acceptes : 1400351 (decision et mesure SANS type, hors de ListeDecisionJudiciaire), 1400301,
-# 1400307, 1400401. Les BANC (PROC_MJUD.sql) sont conformes : aucune ligne de NUMERO_METIER pour leur type et leur annee.
+# 1400307, 1400401. Les BANC (PROC_MJUD.sql) sont conformes : aucun compteur (num.Compteur) pour leur type et leur annee.
 XXAFF ZETA | Rôle 2026X14356 · saisi le 06/03/2026 · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
 GAMMA BANC c/ DELTA BANC | Rôle 2026R12002 · saisi le 10/01/2026 · bloquée par la demande 26012000002 | En référé | EnAttente | []
 XXAFF ETA | Rôle 2026M14357 · saisi le 07/03/2026 · 2 raisons de RIG v2 l'empêchent | Au fond | Rejetee | []

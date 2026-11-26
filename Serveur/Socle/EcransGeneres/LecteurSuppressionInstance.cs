@@ -59,7 +59,7 @@ internal sealed class LecteurSuppressionInstance : IRechercheEcran, IFicheEcran
     /// (Instance.cs:4136-4229). Les decisions sont celles de ListeDecisionJudiciaire, type renseigne (Instance.cs:1674) ; leurs
     /// documents, DOCUMENT_DOSSIER.DCMDS_VALEUR_ID_METIER (DecisionJudiciaire.cs:1237) ; leur GED, VIDIGED_INDEX.VGIDX_ID_DCJDC
     /// (VidigedIndex.cs:216). Le controle du numero (VerifierCoherenceNumero, Instance.cs) appelle dbo.VerifTypeMetier, une
-    /// fonction de la base V2 absente de la base V3 : la V3 la refait (NumeroConforme) sur la ligne de NUMERO_METIER qu'elle lit.
+    /// fonction de la base V2 absente de la base V3 : la V3 la refait (NumeroConforme) sur le compteur num.Compteur qu'elle lit.
     /// </summary>
     internal static readonly string Diagnostic = """
         i.INSTN_ID_INSTN AS Id, i.INSTN_NUM_ROLE AS Role, i.INSTN_NOM_COURANT AS NomCourant, i.INSTN_NUM_REP_GENERAL AS RepGeneral,
@@ -99,13 +99,18 @@ internal sealed class LecteurSuppressionInstance : IRechercheEcran, IFicheEcran
         CASE WHEN EXISTS (SELECT 1 FROM v2.CREANCE_PC AS cr WHERE cr.CRNPC_ID_CRNPC = i.INSTN_ID_CRNPC) THEN 1 ELSE 0 END AS Creance
         """;
 
-    /// <summary>Les jointures du diagnostic : code affaire, ligne de NUMERO_METIER du type et de l'annee de saisine (la derniere
-    /// ecrite si plusieurs : dbo.VerifTypeMetier en lit une sans ordre), dossier judiciaire, mere.</summary>
+    /// <summary>Les jointures du diagnostic : code affaire, compteur du type et de l'annee de saisine (le dernier ecrit si
+    /// plusieurs : dbo.VerifTypeMetier en lit un sans ordre), dossier judiciaire, mere. Le compteur : la V3 tient NUMERO_METIER
+    /// dans num.Compteur (Base\migrations\NUM-001_compteurs.sql, reprise NUM-005, ReprisesPhase1.cs:176) -- lu sous les noms de
+    /// RIG v2 ; son quantieme est Jour, 0 sans quantieme (NMMTR_QUANTIEME NULL).</summary>
     internal const string Jointures = """
         JOIN v2.CODE_AFFAIRE AS ca ON ca.R_CODEAFFAIR_VALEUR = i.INSTN_CODE_AFFAIRE
-        OUTER APPLY (SELECT TOP (1) n.* FROM v2.NUMERO_METIER AS n
-                     WHERE n.NMMTR_TYPE_METIER = ca.R_CODEAFFAIR_TYPE_NUM_ROLE AND n.NMMTR_ANNEE = YEAR(i.INSTN_DATE_SAISINE_GREFFE)
-                     ORDER BY n.NMMTR_ID_NMMTR DESC) AS nm
+        OUTER APPLY (SELECT TOP (1) c.Id AS NMMTR_ID_NMMTR, c.Structure AS NMMTR_STRUCTURE_NUMERO, c.Separateur AS NMMTR_SEPARATEUR,
+                            NULLIF(c.Jour, 0) AS NMMTR_QUANTIEME, c.Lettre AS NMMTR_LETTRE_CATEGORIE, c.TailleChrono AS NMMTR_TAILLE_CHRONO,
+                            c.CodageAnnee AS NMMTR_CODAGE_ANNEE, c.CodeGreffe AS NMMTR_CODE_GREFFE
+                     FROM num.Compteur AS c
+                     WHERE c.Type = ca.R_CODEAFFAIR_TYPE_NUM_ROLE AND c.Annee = YEAR(i.INSTN_DATE_SAISINE_GREFFE)
+                     ORDER BY c.Id DESC) AS nm
         LEFT JOIN v2.DOSSIER_JUDICIAIRE AS dsj ON dsj.DSJUD_ID_DSJUD = i.INSTN_ID_DSJUD
         LEFT JOIN v2.INSTANCE AS m ON m.INSTN_ID_INSTN = i.INSTN_ID_INSTN_INSTANCE_PRINCIPA
         """;
