@@ -47,7 +47,7 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///
 /// GROUPE. « DBE non deposee » : la relance de la V2 vise une entreprise sans depot ni formalite de beneficiaires
 /// (la requete RSURV / 1 ci-dessus). Rien dans l'ancien RIG ne distingue une declaration INCOMPLETE (motif de diligence
-/// toujours « NP » non pertinent, MOTIF_DILIGENCE de RIG_DEV) : le groupe « DBE incomplete » du descripteur reste vide.
+/// toujours « NP » non pertinent, MOTIF_DILIGENCE de RIG_DEV) : le descripteur n'a que ce groupe (lot 8, 26/11/2026).
 ///
 /// REGLE D'ETAT :
 ///   dossier a relancer (ci-dessus)                   -> AFaire  « A relancer » : aucune marche ;
@@ -69,7 +69,7 @@ internal sealed class LecteurRelancesBeneficiaires : IRechercheEcran
 {
     public string Procedure => "PROC_DBE_RELANCE";
 
-    /// <summary>Le groupe du descripteur, au mot pres (« DBE incomplete » n'a pas de source : voir l'en-tete).</summary>
+    /// <summary>Le groupe du descripteur, au mot pres (le seul : voir l'en-tete).</summary>
     internal const string NonDeposee = "DBE non déposée";
 
     /// <summary>Le prefixe de l'Id d'un dossier a relancer (l'Id d'une diligence est son numero seul).</summary>

@@ -8,6 +8,9 @@ MDIL ALPHA SARL · SIREN 513 130 001 | Dossier RCS 2027 B 13001 · Alerte immatr
 # Les 50 lignes suivantes sont les diligences des autres jeux, que MDIL lit aussi (aucun filtre de nature ni d'etat dans la V2) :
 # PROC_DCA_RELANCE (RELANCE ..., dont les 4 jumeaux du lot 8 : RELANCE SIGMA a OMICRON), PROC_DCA_INJ (INJONCTION ...), PROC_DBE_RELANCE (BENEF ...), PROC_DBE_INJ (ENJOINDRE ...) et
 # Program.cs (BANC ROF ..., radiations d'office). Un jeu qui ajoute des diligences ajoute ses lignes ici.
+# Lot 8 (relance 1 des comptes annuels, PROC_DCA_RELANCE.sql) : deux diligences SDCA sans action, lues par leur exercice.
+R1 KAPPA SAS · SIREN 518 005 510 | Dossier RCS 2026 B 18510 · SDCA · non relancée | Sans relance | AFaire | []
+R1 BETA SNC · SIREN 518 005 502 | Dossier RCS 2026 B 18502 · SDCA · non relancée | Sans relance | AFaire | []
 RELANCE SIGMA SARL · SIREN 518 004 404 | Dossier RCS 2026 B 18404 · SDCA · 2 relances | Avec relance | AFaire | []
 RELANCE RHO SAS · SIREN 518 004 403 | Dossier RCS 2026 B 18403 · SDCA · 1 relance | Avec relance | AFaire | []
 RELANCE PI SARL · SIREN 518 004 402 | Dossier RCS 2026 B 18402 · SDCA · 1 relance | Avec relance | AFaire | []

@@ -6,9 +6,10 @@ using static RigV3.Serveur.Socle.EcransGeneres.LecteurRelancesComptesAnnuels;
 namespace RigV3.Serveur.Socle.EcransGeneres;
 
 /// <summary>
-/// « Relances comptes annuels » (PROC_DCA_RELANCE) : « Valider » envoie la relance SUIVANTE (2 ou 3) des diligences cochees
-/// dont la relance precedente est echue. Mode d'emploi : EcrivainEcran.cs ; la liste et la regle « A relancer » :
-/// LecteurRelancesComptesAnnuels.cs. Plan « RIG v3 100 % fonctionnel », lot 8, 26/11/2026.
+/// « Relances comptes annuels » (PROC_DCA_RELANCE) : « Valider » envoie la relance 1 des dossiers coches (lignes « A relancer »
+/// d'Id « dossier:<id> ») et la relance SUIVANTE (2 ou 3) des diligences cochees dont la relance precedente est echue. Mode
+/// d'emploi : EcrivainEcran.cs ; la liste et la regle « A relancer » : LecteurRelancesComptesAnnuels.cs. Plan « RIG v3 100 %
+/// fonctionnel », lot 8, 26/11/2026.
 ///
 /// SOURCE (ancien RIG) : le moteur de relance qui tourne, PROC_RSURV (SURVEILLANCES\PROC_RSURV\PROC_RSURV.cs), branche SDCA
 /// d'une relance N >= 2 (Sauvegarder, l. 79-131), ses courriers (GenererLesEditionsRelance, l. 320-380) et la cloture de ses
@@ -18,10 +19,28 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///
 /// CONTROLES, dans l'ordre, avant toute ecriture :
 ///   1. au plus 1500 relances a la fois (DoVerifier, PROC_RSURV.cs:53-57), au message de RIG v2 ;
-///   2. chaque ligne cochee est une diligence SDCA dont la relance suivante est DUE (la regle du lecteur, relue dans la
-///      transaction). RIG v2 ne propose pas les autres (ses requetes ne les selectionnent pas) : la V3 refuse, sans rien ecrire ;
+///   2. chaque ligne cochee est un dossier dont des exercices sont dans la recherche de la relance 1, ou une diligence SDCA dont
+///      la relance suivante est DUE (les regles du lecteur, relues dans la transaction). RIG v2 ne propose pas les autres (ses
+///      requetes ne les selectionnent pas) : la V3 refuse, sans rien ecrire ;
 ///   3. la relance N n'existe pas deja sur la diligence : RIG v2 l'avertit au message cite (PROC_RSURV.cs:121-122) et ne la
 ///      cree pas ; la V3 refuse avec ce message, sans rien ecrire.
+///
+/// CE QUI S'ECRIT POUR LA RELANCE 1, par dossier coche (Sauvegarder, branche SDCA, NumRelance 1, l. 79-131) :
+///   - rec.ActionRegistre : l'action SDCA du dossier -- la seule action SDCA d'etat « 2 » qu'il a deja (DossierRCS.
+///     ActionsRcsSDCAEtat2, DossierRCS.cs:1635-1640), sinon une neuve (ActionRcs.CreateActionRcs, l. 91 : code processus « SDCA »,
+///     arrivee du jour, numero RA1, etat info « 1 », etat « 2 ») ; la meme pour tous les exercices du dossier (« un autre exercice
+///     du dossier peut deja avoir ete relance et on a donc deja pu creer l'action RCS SDCA », l. 88) ;
+///   - v2.DILIGENCE_RCS : UNE diligence par exercice (DiligenceRcs.CreateDiligenceRcs("G", "SDCA", "NP", "1", "2"), l. 86) :
+///     origine « G », motif « NP », en cours, etat relance « 2 » (l. 110), etat EDI « 1 » (l. 113) ; l'exercice la porte
+///     (exer.CreerDiligence : EXRCC_ID_DLGRC) ;
+///   - v2.RELANCE_RCS : sa relance 1 (l. 123-125) : auteur « 3 » (greffe, l. 93), intervenant « 1 », type = le reglage
+///     TypeRelance, « S » sans reglage, date limite = aujourd'hui + DelaiRelance (« Mois=1 » dans RIG_DEV), non facturee ;
+///   - v2.EXERCICE : EXRCC_DATE_RELANCE = aujourd'hui, EXRCC_ETAT_DCA = « 22 » (l. 128-129) ;
+///   - v2.DEMANDE : la demande RSURV validee du dossier, « Relance 1 SDCA (clotures) : designation », portant l'action, parametres
+///     LstIdExer, NumRelance=1, NatureDiligence, IdDiligenceRcs (la derniere diligence creee, l. 207-209) ; le courrier
+///     (CodeParamEdition de la relance 1 : LOT2_RGDCA dans RIG_DEV), comme pour les relances suivantes ci-dessous.
+///   Un exercice deja lie a une diligence (close, ou en cours sans relance) en recoit une neuve, et RIG v2 l'avertit (l. 82-85) :
+///   la V3 ajoute son avertissement au message, au mot pres.
 ///
 /// CE QUI S'ECRIT, par diligence (la relance N = son etat relance / 2 + 1) :
 ///   - v2.DILIGENCE_RCS : DLGRC_ETAT_RELANCE = N x 2 (l. 110) et DLGRC_ETAT_EDI « 1 » (eEtatRelance.AEnvoyer, l. 113 ;
@@ -84,6 +103,30 @@ internal sealed class EcrivainRelancesComptesAnnuels : IEcrivainEcran
 
     private const string RelanceExistante = "SELECT COUNT(*) FROM v2.RELANCE_RCS WHERE RLCRC_ID_DLGRC = @id AND RLCRC_NUM_ORDRE = @num";
 
+    // Le dossier coche pour la relance 1, et ses exercices dans la recherche de la relance 1 (la regle du lecteur).
+    private const string DossierRelance1 = """
+        SELECT s.Id, s.NumeroGestion, s.Siren, e.Civilite, e.Denomination
+        FROM rec.DossierRcs AS s LEFT JOIN rec.Entreprise AS e ON e.Id = s.IdEntreprise
+        WHERE s.Id = @id
+        """;
+
+    private const string ExercicesRelance1 = $"""
+        SELECT xd.EXRCC_ID_EXRCC, xd.EXRCC_DATE_CLOTURE, xd.EXRCC_ID_DLGRC
+        FROM v2.EXERCICE AS xd JOIN rec.DossierRcs AS s ON s.Id = xd.EXRCC_ID_DSRCS
+        WHERE s.Id = @id AND {ExerciceRelance1Sql}
+        ORDER BY xd.EXRCC_DATE_CLOTURE, xd.EXRCC_ID_EXRCC
+        """;
+
+    // L'action SDCA d'etat « 2 » du dossier, s'il n'en a qu'une (DossierRCS.ActionsRcsSDCAEtat2, DossierRCS.cs:1635-1640).
+    private const string ActionSdca = """
+        SELECT MIN(a.Id) AS Id, COUNT(*) AS Nombre FROM rec.ActionRegistre AS a
+        WHERE a.IdDossier = @id AND a.CodeProcessus = 'SDCA' AND a.EtatAction = '2'
+        """;
+
+    /// <summary>Un dossier coche pour la relance 1 : son nom a l'ecran, la designation de RIG v2, ses exercices trouves.</summary>
+    private sealed record DossierR1(int IdDossier, string NumeroGestion, string Nom, string Designation,
+                                    List<(int Id, DateTime Cloture, int? Diligence)> Exercices);
+
     // Nom : la ligne de l'ecran (designation et SIREN) ; Designation : celle de RIG v2, civilite et denomination
     // (DossierRCS.DesignationShortAvecCivilite), dans le nom de la demande et le destinataire du courrier.
     private sealed record Ligne(int Id, string EtatRelance, int IdAction, int IdDossier, string NumeroGestion, string Nom, string Designation, int Relance);
@@ -96,10 +139,29 @@ internal sealed class EcrivainRelancesComptesAnnuels : IEcrivainEcran
         if (ids.Length > RelancesMax) return IssueGeste.Refuser(MessageVolume);
         var jour = geste.Maintenant.Date;
 
-        // 2. et 3. Chaque diligence : relance due, et pas deja faite.
+        // 2. et 3. Chaque ligne : un dossier de la relance 1, ou une diligence dont la relance est due et pas deja faite.
         var lignes = new List<(Ligne L, List<(int Id, DateTime Cloture)> Exercices)>();
+        var dossiers = new List<DossierR1>();
         foreach (var id in ids)
         {
+            if (id.StartsWith(PrefixeDossier, StringComparison.Ordinal))
+            {
+                if (!int.TryParse(id[PrefixeDossier.Length..], NumberStyles.None, CultureInfo.InvariantCulture, out var idDossier))
+                    return IssueGeste.Refuser($"Relance introuvable dans la base du greffe ({id}).");
+                DossierR1? d = null;
+                await using (var r = await geste.LireAsync(DossierRelance1, ct, new SqlParameter("@id", idDossier)))
+                    if (await r.ReadAsync(ct))
+                        d = new DossierR1(idDossier, FormeLigne.Texte(r, "NumeroGestion"), FormeRelance.NomDossier(r),
+                                          string.Join(' ', new[] { FormeLigne.Texte(r, "Civilite"), FormeLigne.Texte(r, "Denomination") }.Where(x => x.Length > 0)), []);
+                if (d is null) return IssueGeste.Refuser($"Relance introuvable dans la base du greffe ({id}).");
+                await using (var r = await geste.LireAsync(ExercicesRelance1, ct, new SqlParameter("@id", idDossier), Jour(jour)))
+                    while (await r.ReadAsync(ct))
+                        d.Exercices.Add(((int)r["EXRCC_ID_EXRCC"], (DateTime)r["EXRCC_DATE_CLOTURE"], r["EXRCC_ID_DLGRC"] is int g ? g : null));
+                if (d.Exercices.Count == 0)
+                    return IssueGeste.Refuser($"{d.Nom} : aucune relance n'est due (aucun exercice du dossier n'est dans la recherche de la relance 1).");
+                dossiers.Add(d);
+                continue;
+            }
             if (!int.TryParse(id, NumberStyles.None, CultureInfo.InvariantCulture, out var idDiligence))
                 return IssueGeste.Refuser($"Relance introuvable dans la base du greffe ({id}).");
             Ligne? l = null;
@@ -123,11 +185,79 @@ internal sealed class EcrivainRelancesComptesAnnuels : IEcrivainEcran
         }
 
         // La demande du lot (PROC_RDCA.cs:115-119), validee avec ses filles (PROC_RSURV.cs:245-247).
-        var lot = await RelancesRsurv.DemandeAsync(geste, null, $"Relance des DCA - {lignes.Count} occurence(s)", null, null, null, null, ct);
+        var lot = await RelancesRsurv.DemandeAsync(geste, null, $"Relance des DCA - {lignes.Count + dossiers.Count} occurence(s)", null, null, null, null, ct);
         if (lot.Refus is not null) return IssueGeste.Refuser(lot.Refus);
 
         var traces = new List<TraceGeste>();
         var courriers = new List<string>();
+        var faites = new List<int>();
+        var idsFaits = new List<string>();
+        var avertissements = new List<string>();
+
+        // La relance 1 des dossiers coches (PROC_RSURV.cs:79-131, NumRelance 1).
+        if (dossiers.Count > 0)
+        {
+            var reglages1 = await RelancesRsurv.ReglagesAsync(geste, "SDCA", 1, ct);
+            var limite1 = RelancesRsurv.Limite(reglages1.Delai, jour);
+            foreach (var d in dossiers)
+            {
+                int action;
+                var (actionExistante, nombre) = (0, 0);
+                await using (var r = await geste.LireAsync(ActionSdca, ct, new SqlParameter("@id", d.IdDossier)))
+                    if (await r.ReadAsync(ct)) (actionExistante, nombre) = (r["Id"] is int a ? a : 0, (int)r["Nombre"]);
+                string? arrivee = null;
+                if (nombre == 1) action = actionExistante;
+                else
+                {
+                    var (numero, refusArrivee) = await CreationV2.NumeroAsync(geste, "RA1", jour.Year, ct);
+                    if (numero is null) return IssueGeste.Refuser(refusArrivee!);
+                    arrivee = numero;
+                    action = await geste.InsererAsync("rec.ActionRegistre", "Id", new Dictionary<string, object?>
+                    {
+                        ["IdDossier"] = d.IdDossier, ["NumeroArrivee"] = numero, ["DateArrivee"] = jour, ["CodeProcessus"] = "SDCA",
+                        ["EtatInfo"] = "1", ["EtatAction"] = "2", ["SurNotification"] = false,
+                    }, ct);
+                }
+                var derniere = 0;
+                foreach (var (idExercice, cloture, diligenceAvant) in d.Exercices)
+                {
+                    if (diligenceAvant is not null)
+                        avertissements.Add($"L'exercice {FormeLigne.Date(cloture)} du dossier {d.NumeroGestion} est déjà lié à une diligence.");
+                    derniere = await geste.InsererAsync("v2.DILIGENCE_RCS", "DLGRC_ID_DLGRC", new Dictionary<string, object?>
+                    {
+                        ["DLGRC_ID_ACTRC"] = action, ["DLGRC_ORIGINE_INFO"] = "G", ["DLGRC_NATURE_DILIGENCE"] = "SDCA", ["DLGRC_MOTIF_DILIGENCE"] = "NP",
+                        ["DLGRC_ETAT_DILIGENCE"] = "1", ["DLGRC_ETAT_RELANCE"] = "2", ["DLGRC_ETAT_EDI"] = "1",
+                    }, ct);
+                    await geste.InsererAsync("v2.RELANCE_RCS", "RLCRC_ID_RLCRC", new Dictionary<string, object?>
+                    {
+                        ["RLCRC_ID_DLGRC"] = derniere, ["RLCRC_NUM_ORDRE"] = (short)1, ["RLCRC_AUTEUR"] = "3", ["RLCRC_INTERVENANT"] = "1",
+                        ["RLCRC_DATE_RELANCE"] = jour, ["RLCRC_TYPE_RELANCE"] = reglages1.Type, ["RLCRC_DATE_LIMITE"] = limite1, ["RLCRC_FACTURE"] = false,
+                    }, ct);
+                    await geste.EcrireAsync("""
+                        UPDATE v2.EXERCICE SET EXRCC_ID_DLGRC = @dlg, EXRCC_DATE_RELANCE = @jour, EXRCC_ETAT_DCA = '22' WHERE EXRCC_ID_EXRCC = @id
+                        """, ct, new SqlParameter("@dlg", derniere), new SqlParameter("@jour", jour), new SqlParameter("@id", idExercice));
+                    idsFaits.Add(derniere.ToString(CultureInfo.InvariantCulture));
+                }
+                var clotures = $" ({string.Join(",", d.Exercices.Select(x => FormeLigne.Date(x.Cloture)))})";
+                var parametres = $"LstIdExer={string.Concat(d.Exercices.Select(x => x.Id.ToString(CultureInfo.InvariantCulture) + ","))};"
+                               + $"NumRelance=1;NatureDiligence=SDCA;IdDiligenceRcs={derniere}";
+                var fille = await RelancesRsurv.DemandeAsync(geste, d.IdDossier, $"Relance 1 SDCA{clotures} : {d.Designation}", d.NumeroGestion, lot.Id,
+                                                             parametres, action, ct);
+                if (fille.Refus is not null) return IssueGeste.Refuser(fille.Refus);
+                var courrier = await RelancesRsurv.CourrierAsync(geste, fille.Id!.Value, d.IdDossier, d.Designation, "SDCA", reglages1, ct);
+                if (courrier is not null) courriers.Add(courrier);
+                faites.Add(1);
+                traces.Add(new TraceGeste("dossier", $"le dossier {d.NumeroGestion}", d.IdDossier.ToString(CultureInfo.InvariantCulture), "a cree", null,
+                    new Dictionary<string, string>
+                    {
+                        ["Relance"] = $"relance 1 du {FormeLigne.Date(jour)}{(limite1 is { } l1 ? $", limite {FormeLigne.Date(l1)}" : "")}",
+                        ["Exercices"] = string.Join(", ", d.Exercices.Select(x => FormeLigne.Date(x.Cloture))),
+                        ["Action"] = arrivee is null ? $"action SDCA {action} reprise" : $"arrivée {arrivee}", ["Demande"] = fille.Numero!,
+                        ["Courrier"] = courrier ?? "aucun : pas de paramètre d'édition",
+                    }));
+            }
+        }
+
         foreach (var (l, exercices) in lignes)
         {
             var reglages = await RelancesRsurv.ReglagesAsync(geste, "SDCA", l.Relance, ct);
@@ -163,8 +293,10 @@ internal sealed class EcrivainRelancesComptesAnnuels : IEcrivainEcran
                 }));
         }
 
-        return IssueGeste.Ecrit(Message(lignes.Select(x => x.L.Relance), courriers),
-                                [.. lignes.Select(x => x.L.Id.ToString(CultureInfo.InvariantCulture))], [.. traces]);
+        faites.AddRange(lignes.Select(x => x.L.Relance));
+        idsFaits.AddRange(lignes.Select(x => x.L.Id.ToString(CultureInfo.InvariantCulture)));
+        var message = Message(faites, courriers);
+        return IssueGeste.Ecrit(avertissements.Count == 0 ? message : $"{message} {string.Join(" ", avertissements)}", [.. idsFaits], [.. traces]);
     }
 
     /// <summary>« Relances 2 et 3 faites pour 2 dossiers : 2 courriers « … », « … » en file d'édition. »</summary>

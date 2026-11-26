@@ -417,8 +417,9 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             ],
         },
 
-        // DBE : fiche courte (« source non trouvée »). Étapes calquées sur la relance DCA :
-        // à confirmer par le chef avant la livraison.
+        // DBE : la fiche proc_dbe_relance.md est courte (« Contexte métier probable ») ; ce descripteur suit le code qui tourne,
+        // le moteur PROC_RSURV nature SDBE (lot 8, 26/11/2026). Un seul groupe : rien dans l'ancien RIG ne distingue une
+        // déclaration « incomplète » (motif de diligence toujours « NP », MOTIF_DILIGENCE de RIG_DEV ; LecteurRelancesBeneficiaires.cs).
         new DescripteurEcran
         {
             // Lot 8 (26/11/2026) : lue et relancee dans la base -- LecteurRelancesBeneficiaires.cs, EcrivainRelancesBeneficiaires.cs.
@@ -428,19 +429,20 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Code = "PROC_DBE_RELANCE", Titre = "Relances beneficiaires", Sujet = "entreprises en retard de déclaration",
             Forme = FormeEcran.File,
             Recherche = "Rechercher une entreprise, un numéro de gestion, un SIREN…",
-            Criteres = ["Numéro de gestion ou SIREN", "Déclaration DBE (bénéficiaires effectifs) non faite ou incomplète", "Mode d'envoi : LRAR ou notification électronique"],
-            Valider = "Générer les courriers de relance", // proc_dbe_relance.md, Contexte : « Il peut générer des courriers de relance LRAR ou des notifications électroniques ».
+            // Le critere de la recherche de RIG v2 (numero de gestion ou liste de SIREN, NatureDiligence.parametre.cs:643-651).
+            Criteres = ["Numéro de gestion ou SIREN"],
+            Valider = "Générer les courriers de relance", // la relance 1 de PROC_RSURV : action, diligence, relance et courrier (PROC_RSURV.cs:159-166, :320-380).
             Rang = 5,
             Etats = EtatsEcran.Trois("À relancer", "En cours", "Relancée"),
-            Groupes = ["DBE non déposée", "DBE incomplète"],
+            Groupes = ["DBE non déposée"],
             Sections =
             [
                 Marche("Entreprise", "Le dossier RCS se retrouve par son numéro de gestion ou son SIREN.", true,
                     "Numéro de gestion", "SIREN"),
-                Marche("Déclaration", "Entreprise sans déclaration DBE, ou dont la déclaration est incomplète.", true,
+                Marche("Déclaration", "Entreprise sans dépôt ni formalité de bénéficiaires effectifs (requête de relance SDBE de RIG v2).", true,
                     "Déclaration DBE", "Date limite"),
-                Marche("Courrier", "Relance par lettre recommandée (LRAR) ou notification électronique.", true,
-                    "Mode d'envoi", "Courrier de relance"),
+                Marche("Courrier", "Le courrier de la relance part en file d'édition quand son paramètre d'édition existe dans la base du greffe.", true,
+                    "Courrier de relance"),
                 Marche("Suivi", "Si la relance reste sans effet, l'injonction DBE prend la suite.", false,
                     "Réponse", "Injonction DBE"),
             ],
@@ -449,9 +451,6 @@ public sealed class DomaineSurveiller : IDomaineEcrans
                 Ligne("Alpha Services SARL · SIREN 900 220 001", "DBE non déposée · relance à envoyer", "DBE non déposée", "AFaire"),
                 Ligne("Bêta Industrie SAS · SIREN 900 220 002", "DBE non déposée · courrier préparé", "DBE non déposée", "EnCours", 0, 1),
                 Ligne("Gamma Conseil SARL · SIREN 900 220 003", "Relance LRAR envoyée", "DBE non déposée", "Validee", 0, 1, 2),
-                Ligne("Delta Transports SAS · SIREN 900 220 004", "DBE incomplète · relance à envoyer", "DBE incomplète", "AFaire"),
-                Ligne("Epsilon Habitat SARL · SIREN 900 220 005", "DBE incomplète · notification envoyée", "DBE incomplète", "Validee", 0, 1, 2, 3),
-                Ligne("Zêta Commerce SAS · SIREN 900 220 006", "DBE incomplète · relance en cours", "DBE incomplète", "EnCours", 0),
                 Ligne("Êta Boulangerie SARL · SIREN 900 220 007", "DBE non déposée · déjà relancée", "DBE non déposée", "Validee", 0, 1, 2),
             ],
         },

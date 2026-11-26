@@ -218,3 +218,95 @@ INSERT INTO v2.NATURE_DILIGENCE_PARAM (NADIP_ID_NADIP, NADIP_NATURE_DILIGENCE, N
 INSERT INTO v2.PARAMETRE_EDITION (PRMED_CODE, PRMED_LIBELLE, PRMED_RECTO_VERSO, PRMED_AFFICHER_AVANT_IMPRESSION, PRMED_CODE_CFECP) VALUES
     (''LOT2_MDDCA'', ''Relance Greffe MD DCA'', 1, 0, NULL), (''LOT2_APDCA'', ''Relance Greffe AP DCA'', 1, 0, NULL);',
     N'@aujourdhui datetime', @aujourdhui;
+-- ---------------------------------------------------------------- LA RELANCE 1 (lot 8, 26/11/2026 ; identifiants 18005xx) :
+-- les exercices JAMAIS relances, recherche SDCA / RSURV / 1 de RIG_DEV et enveloppe du moteur aux criteres par defaut
+-- (LecteurRelancesComptesAnnuels.ExerciceRelance1Sql). Colonnes et types de RIG_DEV (INFORMATION_SCHEMA.COLUMNS de SQL-DEV\DEV,
+-- lu le 26/11/2026), seulement celles que la requete lit ; NULL quand la table a deja des lignes d'autres jeux. EXRCC_ID_DSRCS :
+-- a l'identique de PROC_MDIL.sql (qui passe apres ce jeu). Les tables INSCRIT_PM, FORME_JURIDIQUE_UTI, CODE_MENTION et
+-- DILIGENCE_RCS_EXCLUE sont deja creees par PROC_BE.sql et PROC_DBE_RELANCE.sql (avant ce jeu, ordre des noms).
+IF COL_LENGTH('v2.EXERCICE', 'EXRCC_ID_DSRCS') IS NULL ALTER TABLE v2.EXERCICE ADD EXRCC_ID_DSRCS int NULL;
+IF COL_LENGTH('v2.FORME_JURIDIQUE_UTI', 'R_FORMEJURID_DCA_OBLIGATOIRE') IS NULL
+    ALTER TABLE v2.FORME_JURIDIQUE_UTI ADD R_FORMEJURID_DCA_OBLIGATOIRE varchar(1) NULL;
+IF COL_LENGTH('v2.CODE_SOLUTION', 'R_CODESOLUTI_SURVEILLANCE_DCA') IS NULL ALTER TABLE v2.CODE_SOLUTION ADD R_CODESOLUTI_SURVEILLANCE_DCA bit NULL;
+IF COL_LENGTH('v2.CODE_CLOTURE', 'R_CODECLOTUR_SURVEILLANCE_DCA') IS NULL ALTER TABLE v2.CODE_CLOTURE ADD R_CODECLOTUR_SURVEILLANCE_DCA bit NULL;
+IF COL_LENGTH('v2.DILIGENCE_RCS_EXCLUE', 'DLGEX_ID_EXRCC') IS NULL ALTER TABLE v2.DILIGENCE_RCS_EXCLUE ADD DLGEX_ID_EXRCC int NULL;
+IF OBJECT_ID(N'v2.DIRIGEANT') IS NULL
+    CREATE TABLE v2.DIRIGEANT (DRGNT_ID_DRGNT int NOT NULL PRIMARY KEY, DRGNT_ID_DSRCS int NULL, DRGNT_NUM_ORDRE int NOT NULL,
+        DRGNT_SUPPRIME bit NOT NULL, DRGNT_FONCTION_DIRIGEANT varchar(5) NOT NULL);
+IF OBJECT_ID(N'v2.DIRIGEANT_PP') IS NULL CREATE TABLE v2.DIRIGEANT_PP (DRGPP_ID_DRGPP int NOT NULL PRIMARY KEY, DRGPP_ID_DRGNT int NULL);
+IF OBJECT_ID(N'v2.DIRIGEANT_PM') IS NULL
+    CREATE TABLE v2.DIRIGEANT_PM (DRGPM_ID_DRGPM int NOT NULL PRIMARY KEY, DRGPM_ID_DRGNT int NULL, DRGPM_FORME_JURIDIQUE_UTI varchar(10) NULL);
+
+-- Les dossiers. Retenus : 501 (B1, forme juridique a depot obligatoire « 1 »), 502 (D1, forme « 3 » dont le seul associe
+-- ASNC est une personne morale de forme « 1 » ; deux exercices, celui de 2023 deja lie a une diligence close : RIG v2
+-- l'avertit), 511 (deux exercices, celui de 2024 exclu de la nature SDCA : seul celui de 2023 reste). Ecartes, chacun avec
+-- son jumeau retenu :
+--   503 forme « 3 » avec un associe ASNC personne physique -- jumeau 502 ; 504 forme « 0 » (jamais) -- jumeau 501 ;
+--   505 type C1 (TypeDossier « B,D ») -- jumeaux 501 (B1) et 502 (D1) ; 506 exercice depose -- jumeau 501 ;
+--   507 limite de depot le jour meme (« < aujourd'hui ») -- jumeau 501 (limite passee) ; 508 etat DCA « 22 » (deja relance)
+--   -- jumeau 501 (« 00 ») ; 509 demande DCA en attente (W) -- jumeau 501 ; 510 exercice porte par une diligence SDCA en cours
+--   deja relancee (etat relance 2) -- jumeau 502 (diligence close) ; 512 societe dissoute -- jumeau 501.
+SET IDENTITY_INSERT rec.Entreprise ON;
+INSERT INTO rec.Entreprise (Id, Siren, Civilite, Denomination, EtatInfo, FicheSommaire)
+SELECT v.Id, '518005' + RIGHT(CAST(v.Id AS varchar(7)), 3), '', v.Nom, 'C', 0
+FROM (VALUES (1800501, N'R1 ALPHA SAS'), (1800502, N'R1 BETA SNC'), (1800503, N'R1 GAMMA SNC'), (1800504, N'R1 DELTA SCI'),
+             (1800505, N'R1 EPSILON SAS'), (1800506, N'R1 ZETA SAS'), (1800507, N'R1 ETA SAS'), (1800508, N'R1 THETA SAS'),
+             (1800509, N'R1 IOTA SAS'), (1800510, N'R1 KAPPA SAS'), (1800511, N'R1 LAMBDA SAS'), (1800512, N'R1 MU SAS')) AS v (Id, Nom);
+SET IDENTITY_INSERT rec.Entreprise OFF;
+SET IDENTITY_INSERT rec.DossierRcs ON;
+INSERT INTO rec.DossierRcs (Id, IdEntreprise, TypeRcs, NumeroGestion, Siren, DateImmatriculation, MotifImmatriculation,
+    ProvisoirementSans, CompteurMaj, DateMaj, EtatDossier, EtatInfo, InscritRegistreMetiers, ModificationInterne,
+    SirenProvisoire, Accre, AutoEntrepreneur, Eirl, AutoEntrepreneurRegularise)
+SELECT v.Id, v.Id, v.TypeRcs, '2026B18' + RIGHT(CAST(v.Id AS varchar(7)), 3), '518005' + RIGHT(CAST(v.Id AS varchar(7)), 3), '20180101',
+       'C', 0, 0, '20180101', 'A', 'C', 0, 0, 0, 0, 0, 0, 0
+FROM (VALUES (1800501, 'B1'), (1800502, 'D1'), (1800503, 'B1'), (1800504, 'B1'), (1800505, 'C1'), (1800506, 'B1'), (1800507, 'B1'),
+             (1800508, 'B1'), (1800509, 'B1'), (1800510, 'B1'), (1800511, 'B1'), (1800512, 'B1')) AS v (Id, TypeRcs);
+SET IDENTITY_INSERT rec.DossierRcs OFF;
+
+EXEC sp_executesql N'
+-- Formes juridiques (R_FORMEJURID_DCA_OBLIGATOIRE : 0 jamais, 1 toujours, 3 selon les associes) ; TYPE_BEN NULL : ces dossiers
+-- n''entrent pas dans la relance des beneficiaires (qui exige TYPE_BEN <> 0).
+INSERT INTO v2.FORME_JURIDIQUE_UTI (R_FORMEJURID_VALEUR, R_FORMEJURID_TYPE_BEN, R_FORMEJURID_DCA_OBLIGATOIRE) VALUES
+    (''D18A'', NULL, ''1''), (''D18S'', NULL, ''3''), (''D18Z'', NULL, ''0'');
+INSERT INTO v2.INSCRIT_PM (INSPM_ID_DSRCS, INSPM_FORME_JURIDIQUE_UTI, INSPM_DATE_DISSOLUTION)
+SELECT v.Id, v.Fj, CASE WHEN v.Id = 1800512 THEN DATEADD(MONTH, -3, @aujourdhui) END
+FROM (VALUES (1800501, ''D18A''), (1800502, ''D18S''), (1800503, ''D18S''), (1800504, ''D18Z''), (1800505, ''D18A''), (1800506, ''D18A''),
+             (1800507, ''D18A''), (1800508, ''D18A''), (1800509, ''D18A''), (1800510, ''D18A''), (1800511, ''D18A''), (1800512, ''D18A'')) AS v (Id, Fj);
+-- Les associes : 502 a un ASNC personne morale de forme « 1 » (relancable), 503 un ASNC personne physique (pas de relance).
+INSERT INTO v2.DIRIGEANT (DRGNT_ID_DRGNT, DRGNT_ID_DSRCS, DRGNT_NUM_ORDRE, DRGNT_SUPPRIME, DRGNT_FONCTION_DIRIGEANT) VALUES
+    (1800582, 1800502, 1, 0, ''ASNC''), (1800583, 1800503, 1, 0, ''ASNC'');
+INSERT INTO v2.DIRIGEANT_PM (DRGPM_ID_DRGPM, DRGPM_ID_DRGNT, DRGPM_FORME_JURIDIQUE_UTI) VALUES (1800582, 1800582, ''D18A'');
+INSERT INTO v2.DIRIGEANT_PP (DRGPP_ID_DRGPP, DRGPP_ID_DRGNT) VALUES (1800583, 1800583);
+-- La diligence close de l''exercice 2023 de 502 (etat 8) et la diligence en cours deja relancee de 510 (etat relance 2), sans action :
+-- elles ne sont pas des lignes de cet ecran (il lit le dossier par l''action), l''ecran « Diligences » les lit par l''exercice.
+INSERT INTO v2.DILIGENCE_RCS (DLGRC_ID_DLGRC, DLGRC_ID_ACTRC, DLGRC_NATURE_DILIGENCE, DLGRC_ETAT_DILIGENCE, DLGRC_ETAT_RELANCE) VALUES
+    (1800562, NULL, ''SDCA'', ''8'', ''2''), (1800560, NULL, ''SDCA'', ''1'', ''2'');
+INSERT INTO v2.EXERCICE (EXRCC_ID_EXRCC, EXRCC_DATE_CLOTURE, EXRCC_ID_DSRCS, EXRCC_ID_DLGRC, EXRCC_ID_DMND_RECLA, EXRCC_DEPOSE,
+    EXRCC_NON_APPROBATION_COMPTES, EXRCC_LIMITE_DEPOT, EXRCC_ETAT_DCA) VALUES
+    (1800541, ''20241231'', 1800501, NULL, NULL, 0, 0, DATEADD(DAY, -200, @aujourdhui), ''00''),
+    (1800542, ''20231231'', 1800502, 1800562, NULL, 0, 0, DATEADD(DAY, -560, @aujourdhui), ''00''),
+    (1800552, ''20241231'', 1800502, NULL, NULL, 0, 0, DATEADD(DAY, -200, @aujourdhui), ''00''),
+    (1800543, ''20241231'', 1800503, NULL, NULL, 0, 0, DATEADD(DAY, -200, @aujourdhui), ''00''),
+    (1800544, ''20241231'', 1800504, NULL, NULL, 0, 0, DATEADD(DAY, -200, @aujourdhui), ''00''),
+    (1800545, ''20241231'', 1800505, NULL, NULL, 0, 0, DATEADD(DAY, -200, @aujourdhui), ''00''),
+    (1800546, ''20241231'', 1800506, NULL, NULL, 1, 0, DATEADD(DAY, -200, @aujourdhui), ''00''),
+    (1800547, ''20241231'', 1800507, NULL, NULL, 0, 0, @aujourdhui, ''00''),
+    (1800548, ''20241231'', 1800508, NULL, NULL, 0, 0, DATEADD(DAY, -200, @aujourdhui), ''22''),
+    (1800549, ''20241231'', 1800509, NULL, NULL, 0, 0, DATEADD(DAY, -200, @aujourdhui), ''00''),
+    (1800550, ''20241231'', 1800510, 1800560, NULL, 0, 0, DATEADD(DAY, -200, @aujourdhui), ''00''),
+    (1800551, ''20241231'', 1800511, NULL, NULL, 0, 0, DATEADD(DAY, -200, @aujourdhui), ''00''),
+    (1800553, ''20231231'', 1800511, NULL, NULL, 0, 0, DATEADD(DAY, -560, @aujourdhui), ''00''),
+    (1800554, ''20241231'', 1800512, NULL, NULL, 0, 0, DATEADD(DAY, -200, @aujourdhui), ''00'');
+INSERT INTO v2.DEMANDE (DMND_ID_DMND, DMND_ID_DSRCS, DMND_NUM_DEMANDE, DMND_ETAT_DEMANDE, DMND_CODE_PROSS, DMND_DATE_CREATION) VALUES
+    (1800559, 1800509, ''2601800559'', ''W'', ''DCA'', DATEADD(DAY, -2, @aujourdhui));
+INSERT INTO v2.DILIGENCE_RCS_EXCLUE (DLGEX_ID_DLGEX, DLGEX_ID_DSRCS, DLGEX_NATURE_DILIGENCE, DLGEX_ID_EXRCC) VALUES
+    (1800561, 1800511, ''SDCA'', 1800551);
+-- Les reglages de RIG_DEV de la relance 1 SDCA (NATURE_DILIGENCE_PARAM ids 2, 3, 12) et son parametre d''edition (PARAMETRE_EDITION
+-- LOT2_RGDCA « Relance Greffe RG DCA », recto verso, FUSION_RIG), lus le 26/11/2026.
+INSERT INTO v2.NATURE_DILIGENCE_PARAM (NADIP_ID_NADIP, NADIP_NATURE_DILIGENCE, NADIP_CODE_PROCESSUS, NADIP_NUM_ORDRE,
+    NADIP_CODE_PARAM, NADIP_VALEUR_PARAM) VALUES
+    (1800571, ''SDCA'', ''RSURV'', 1, ''CodeParamEdition'', ''LOT2_RGDCA''), (1800572, ''SDCA'', ''RSURV'', 1, ''DelaiRelance'', ''Mois=1''),
+    (1800573, ''SDCA'', ''RSURV'', 1, ''FileImpression'', ''AMIRCSRBE'');
+INSERT INTO v2.PARAMETRE_EDITION (PRMED_CODE, PRMED_LIBELLE, PRMED_RECTO_VERSO, PRMED_AFFICHER_AVANT_IMPRESSION, PRMED_CODE_CFECP,
+    PRMED_TYPE_GENERATION) VALUES (''LOT2_RGDCA'', ''Relance Greffe RG DCA'', 1, 0, NULL, ''FUSION_RIG'');',
+    N'@aujourdhui datetime', @aujourdhui;
