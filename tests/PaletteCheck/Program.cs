@@ -120,7 +120,7 @@ internal static class Programme
         var l = p.Travail.Single(t => t.Numero == "004151");
         Exiger(l is { AMoi: true, Attribuable: false, Qui.Initiales: "RV" } && Nombre("moi") == 1,
             "« Me l'attribuer » confie la demande au login courant ; « A moi » la compte");
-        var ecran = EcranDemandes.Trouver(new CriteresDemandes("004151", "", "", null, null, [], false, false, 100), []);
+        var ecran = EcranDemandes.Exemple(new CriteresDemandes("004151", "", "", null, null, [], false, false, 100), []);
         Exiger(ecran.Lignes.Single().Utilisateur == "R. VILAIN",
             "l'ecran Demandes montre le nouvel agent : une seule liste de demandes");
         Agir("paletteAttribuer", new { numero = "004151", signature = "X. INCONNU" });
