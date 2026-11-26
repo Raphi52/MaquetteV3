@@ -1,0 +1,48 @@
+# Les gestes de EcrivainNouvelleInstance (« Nouvelle instance », PROC_XAFF), joues par la route POST sur les instances de PROC_MJUD.sql
+# (XAFF n'en ajoute pas : PROC_XAFF.sql). Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). Un refus n'ecrit
+# rien ; chaque refus a son jumeau accepte : le bloc 5, sur 1200005 (libre, aucune autre demande ne la tient).
+
+# 1. 1200002 tenue par une demande EN COURS sur le sequenceur 2J (VerrouDemandeV2) : refusee, au message de RIG v2.
+geste: Enregistrer
+ids: 1200002
+valeur: Corriger l'instance › Date première audience = 2026-02-10
+resultat: refuse
+message: Instance bloquée (26012000002), demande "En cours" : MJUD par M. AUTRE BANC
+---
+# 2. Le code affaire ne se corrige pas dans la V3 : sa revalidation de la nature et de l'acte (OPE_CORRECT_INSTANCE.cs:46-93) n'est
+#    pas reprise. Jumeau : bloc 5, un champ que la V3 enregistre.
+geste: Enregistrer
+ids: 1200005
+valeur: Corriger l'instance › Code affaire = REF12
+resultat: refuse
+message: « Corriger l'instance › Code affaire » ne se modifie pas sur l'instance 2026J12005 dans la V3.
+---
+# 3. La date d'enrolement videe : obligatoire (DateDateEnrolement.MetierObligatoire, OPE_CORRECT_INSTANCE.Designer.cs:102).
+geste: Enregistrer
+ids: 1200005
+valeur: Corriger l'instance › Date d'enrôlement =
+resultat: refuse
+message: « Date d'enrôlement » est obligatoire.
+---
+# 4. Une delivrance absente de la table DELIVRANCE (la liste de ComboDelivranceActe). Jumeau : bloc 5, D12 (PROC_MJUD.sql).
+geste: Enregistrer
+ids: 1200005
+valeur: Corriger l'instance › Délivrance de l'acte = ZZ
+resultat: refuse
+message: « Délivrance de l'acte » : « ZZ » n'est pas une délivrance de la table DELIVRANCE.
+---
+# 5. Corrigee : la premiere audience, la delivrance et le texte de l'acte ; la fiche relit les valeurs, et comme Instance.Sauve la
+#    date de mise a jour Infogreffe est posee (elle etait vide).
+geste: Enregistrer
+ids: 1200005
+valeur: Corriger l'instance › Date première audience = 2026-02-10
+valeur: Corriger l'instance › Délivrance de l'acte = D12
+valeur: Corriger l'instance › Texte sur l'acte introductif = Texte du banc, lot 5
+resultat: fait
+message: Instance 2026J12005 corrigée dans la base du greffe : « Date première audience », « Délivrance de l'acte », « Texte sur l'acte introductif ».
+fiche: 1200005
+Corriger l'instance › Date première audience = 2026-02-10
+Corriger l'instance › Délivrance de l'acte = D12
+Corriger l'instance › Texte sur l'acte introductif = Texte du banc, lot 5
+Corriger l'instance › Date d'enrôlement = 2026-01-15
+controle: SELECT COUNT(*) FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1200005 AND INSTN_DATE_MAJ_INFOG IS NOT NULL AND INSTN_NUMERO_SOURCE IS NOT NULL => 1

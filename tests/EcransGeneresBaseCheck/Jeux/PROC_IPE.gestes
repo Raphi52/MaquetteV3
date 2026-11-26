@@ -1,0 +1,114 @@
+# Les gestes de EcrivainInjonctionsDePayer (« Injonction de payer », PROC_IPE), joues dans l'ordre par la route POST, sur les
+# lignes de PROC_IPE.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). Un refus n'ecrit rien (lignes et
+# journal inchanges, verifie par le banc) ; chaque refus a son jumeau accepte : le bloc 6, qui cree.
+
+# 1. Le defendeur sans designation : obligatoire (txtDesignation.MetierObligatoire, OPE_PARTIE.Designer.cs). Jumeau : bloc 6.
+geste: Creer
+valeur: Instance › Code affaire = IP15
+valeur: Instance › Nature affaire = N12
+valeur: Instance › Nature particulière de l'affaire = 0A
+valeur: Instance › Acte de saisine = R15
+valeur: Instance › Date de l'acte = 2026-11-02
+valeur: Instance › Saisine tribunal = 2026-11-02
+valeur: Demandeur › Civilité = PM
+valeur: Demandeur › Désignation = IPE NOUVEAU DEMANDEUR
+valeur: Défendeur › Civilité = M.
+resultat: refuse
+message: « Défendeur › Désignation » est obligatoire.
+---
+# 2. Un code affaire de contentieux (type 07) : RIG v2 ne propose a IPE que les codes de type IP (OPE_INSTANCE.cs:1663-1664).
+#    Jumeau : bloc 6, IP15.
+geste: Creer
+valeur: Instance › Code affaire = CT15
+valeur: Instance › Nature affaire = N12
+valeur: Instance › Nature particulière de l'affaire = 0A
+valeur: Instance › Acte de saisine = R15
+valeur: Instance › Date de l'acte = 2026-11-02
+valeur: Instance › Saisine tribunal = 2026-11-02
+valeur: Demandeur › Civilité = PM
+valeur: Demandeur › Désignation = IPE NOUVEAU DEMANDEUR
+valeur: Défendeur › Civilité = M.
+valeur: Défendeur › Désignation = IPE NOUVEAU DEFENDEUR
+resultat: refuse
+message: Le code affaire « CT15 » n'est pas proposé pour une injonction de payer (type d'instance IP).
+---
+# 3. Une requete (ISO 02) sans date de l'acte : obligatoire (ultDateActe.MetierObligatoire, OPE_INSTANCE.Designer.cs). Jumeau :
+#    bloc 6, la date saisie.
+geste: Creer
+valeur: Instance › Code affaire = IP15
+valeur: Instance › Nature affaire = N12
+valeur: Instance › Nature particulière de l'affaire = 0A
+valeur: Instance › Acte de saisine = R15
+valeur: Instance › Saisine tribunal = 2026-11-02
+valeur: Demandeur › Civilité = PM
+valeur: Demandeur › Désignation = IPE NOUVEAU DEMANDEUR
+valeur: Défendeur › Civilité = M.
+valeur: Défendeur › Désignation = IPE NOUVEAU DEFENDEUR
+resultat: refuse
+message: « Instance › Date de l'acte » est obligatoire.
+---
+# 4. L'acte le lendemain de la saisine : refuse (VerifierDates, OPE_INSTANCE.cs:1346-1348). Jumeau : bloc 6, le meme jour.
+geste: Creer
+valeur: Instance › Code affaire = IP15
+valeur: Instance › Nature affaire = N12
+valeur: Instance › Nature particulière de l'affaire = 0A
+valeur: Instance › Acte de saisine = R15
+valeur: Instance › Date de l'acte = 2026-11-03
+valeur: Instance › Saisine tribunal = 2026-11-02
+valeur: Demandeur › Civilité = PM
+valeur: Demandeur › Désignation = IPE NOUVEAU DEMANDEUR
+valeur: Défendeur › Civilité = M.
+valeur: Défendeur › Désignation = IPE NOUVEAU DEFENDEUR
+resultat: refuse
+message: La date de l'acte doit être inférieure ou égale à la date de saisine du Tribunal.
+---
+# 5. Un code IP dont la serie de numeros n'a pas de compteur : num.Attribuer refuse, APRES le numero de la demande -- tout est
+#    annule dans la transaction du geste : aucune demande ecrite, et le numero DMD pris avec elle (NUM-001 CA03). Jumeau : bloc 6.
+geste: Creer
+valeur: Instance › Code affaire = IPX15
+valeur: Instance › Nature affaire = N12
+valeur: Instance › Nature particulière de l'affaire = 0A
+valeur: Instance › Acte de saisine = R15
+valeur: Instance › Date de l'acte = 2026-11-02
+valeur: Instance › Saisine tribunal = 2026-11-02
+valeur: Demandeur › Civilité = PM
+valeur: Demandeur › Désignation = IPE NOUVEAU DEMANDEUR
+valeur: Défendeur › Civilité = M.
+valeur: Défendeur › Désignation = IPE NOUVEAU DEFENDEUR
+resultat: refuse
+message: Numérotation JRX15 2026 : Type de numéro inconnu : « JRX15 ». (code -2).
+controle: SELECT COUNT(*) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'IPE' AND DMND_ID_DMND > 1500108 => 0
+---
+# 6. Creee : l'instance NUMEROTEE dans la serie du code affaire (JRI15, annee de la saisine : 2026IP00001) et au repertoire
+#    general (JGAFF : 2026000001), ses deux parties DOIP / FOIP, le nom courant « demandeur # défendeur », la demande IPE
+#    interrompue (I) rattachee a l'instance (DOSSIER_DEMANDE 2J) avec ses numeros. La liste la relit « En cours », trois marches.
+geste: Creer
+valeur: Instance › Code affaire = IP15
+valeur: Instance › Nature affaire = N12
+valeur: Instance › Nature particulière de l'affaire = 0A
+valeur: Instance › Acte de saisine = R15
+valeur: Instance › Date de l'acte = 2026-11-02
+valeur: Instance › Saisine tribunal = 2026-11-02
+valeur: Demandeur › Civilité = PM
+valeur: Demandeur › Désignation = IPE NOUVEAU DEMANDEUR
+valeur: Demandeur › N° de Siren = 412 150 001
+valeur: Défendeur › Civilité = M.
+valeur: Défendeur › Désignation = IPE NOUVEAU DEFENDEUR
+resultat: fait
+message: Injonction de payer 2026IP00001 créée dans la base du greffe (répertoire général 2026000001) ; sa demande reste interrompue : la décision préparée, la facture et les éditions ne sont pas reprises par la V3, reprendre la demande dans RIG v2.
+lignes:
+IPE NOUVEAU DEMANDEUR # IPE NOUVEAU DEFENDEUR | Rôle 2026IP00001 · saisine du 02/11/2026 · interrompue | Saisie directe | EnCours | [0,1,2]
+Demande D2615000107 | demande D2615000107 | Saisie directe | AFaire | []
+IPE ETA | Rôle 2026IP15305 · saisine du 06/03/2026 · interrompue | Saisie directe | EnCours | [0,1]
+Demande D2615000104 | demande D2615000104 | Tribunal digital | EnAttente | []
+IPE EPSILON # IPE ZETA | Rôle 2026IP15303 · saisine du 04/03/2026 | Tribunal digital | Rejetee | [0,1,2]
+IPE GAMMA # IPE DELTA | Rôle 2026IP15302 · saisine du 03/03/2026 | Tribunal digital | Validee | [0,1,2,3]
+IPE ALPHA # IPE BETA | Rôle 2026IP15301 · saisine du 02/03/2026 | Saisie directe | Validee | [0,1,2,3]
+controle: SELECT Chrono FROM num.Compteur WHERE Type = 'JRI15' AND Annee = 2026 => 1
+controle: SELECT INSTN_NUM_REP_GENERAL FROM v2.INSTANCE WHERE INSTN_NUM_ROLE = '2026IP00001' => 2026000001
+controle: SELECT INSTN_TYPE_INSTANCE + INSTN_ETAT_INSTANCE + INSTN_ETAT_INFO + INSTN_NAT_AFF_PART FROM v2.INSTANCE WHERE INSTN_NUM_ROLE = '2026IP00001' => IP010A
+controle: SELECT COUNT(*) FROM v2.PARTIE AS p JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = p.PRT_ID_INSTN WHERE i.INSTN_NUM_ROLE = '2026IP00001' AND p.PRT_QUALIF_PARTIE IN ('DOIP', 'FOIP') AND p.PRT_EDITION_JUGEMENT = 'D' => 2
+controle: SELECT PRT_SIREN FROM v2.PARTIE AS p JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = p.PRT_ID_INSTN WHERE i.INSTN_NUM_ROLE = '2026IP00001' AND p.PRT_QUALIF_PARTIE = 'DOIP' => 412150001
+controle: SELECT d.DMND_CODE_PROSS + d.DMND_ETAT_DEMANDE + ' ' + d.DMND_LES_NUMEROS FROM v2.DEMANDE AS d WHERE d.DMND_NUM_INDICATIF = '2026IP00001' => IPEI 2026IP00001 2026000001
+controle: SELECT COUNT(*) FROM v2.DOSSIER_DEMANDE AS dd JOIN v2.INSTANCE AS i ON dd.DSSDM_VALEUR_SEQUENCEUR = CONVERT(varchar(100), i.INSTN_ID_INSTN) WHERE dd.DSSDM_CODE_SEQUENCEUR = '2J' AND i.INSTN_NUM_ROLE = '2026IP00001' => 1
+controle: SELECT COUNT(*) FROM v2.INSTANCE AS i JOIN v2.DEMANDE AS d ON d.DMND_ID_AFFRE = i.INSTN_ID_AFFRE JOIN v2.AFFAIRE AS a ON a.AFFRE_ID_AFFRE = i.INSTN_ID_AFFRE WHERE i.INSTN_NUM_ROLE = '2026IP00001' => 1

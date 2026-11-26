@@ -1,0 +1,59 @@
+# Les gestes de EcrivainOrdonnancesEnrolement (« Ordonnance d'enrôlement », PROC_CORDJRCS), par la route POST, sur les lignes de
+# PROC_CORDJRCS.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). Un refus n'ecrit rien ; chaque refus
+# a son jumeau accepte : le bloc 3, qui cree. Les controles communs a IPE (obligatoires, dates, numerotation) : PROC_IPE.gestes.
+
+# 1. Un code affaire d'injonction (type IP) : la liste de RIG v2 ne propose a CORDJRCS que le type RC (OPE_INSTANCE.cs:1649-1650).
+#    Jumeau : bloc 3, RC15.
+geste: Creer
+valeur: Instance › Code affaire = IPR15
+valeur: Instance › Nature affaire = N12
+valeur: Instance › Nature particulière de l'affaire = 0A
+valeur: Instance › Acte de saisine = S15
+valeur: Instance › Date de l'acte = 2026-11-02
+valeur: Instance › Saisine tribunal = 2026-11-02
+valeur: Demandeur › Civilité = PM
+valeur: Demandeur › Désignation = ORD NOUVEAU DEMANDEUR
+valeur: Défendeur › Civilité = PM
+valeur: Défendeur › Désignation = ORD NOUVEAU DEFENDEUR
+resultat: refuse
+message: Le code affaire « IPR15 » n'est pas proposé pour une ordonnance d'enrôlement (type d'instance RC).
+---
+# 2. Le demandeur sans civilite : obligatoire (cboCivilite.MetierObligatoire, OPE_PARTIE.Designer.cs). Jumeau : bloc 3.
+geste: Creer
+valeur: Instance › Code affaire = RC15
+valeur: Instance › Nature affaire = N12
+valeur: Instance › Nature particulière de l'affaire = 0A
+valeur: Instance › Acte de saisine = S15
+valeur: Instance › Date de l'acte = 2026-11-02
+valeur: Instance › Saisine tribunal = 2026-11-02
+valeur: Demandeur › Désignation = ORD NOUVEAU DEMANDEUR
+valeur: Défendeur › Civilité = PM
+valeur: Défendeur › Désignation = ORD NOUVEAU DEFENDEUR
+resultat: refuse
+message: « Demandeur › Civilité » est obligatoire.
+---
+# 3. Creee : l'instance NUMEROTEE dans la serie du code affaire (JRR15, annee de la saisine : 2026RC00001), sans repertoire
+#    general (RC15 n'en a pas), ses deux parties D / F, la demande CORDJRCS interrompue rattachee a l'instance (2J).
+geste: Creer
+valeur: Instance › Code affaire = RC15
+valeur: Instance › Nature affaire = N12
+valeur: Instance › Nature particulière de l'affaire = 0A
+valeur: Instance › Acte de saisine = S15
+valeur: Instance › Date de l'acte = 2026-11-02
+valeur: Instance › Saisine tribunal = 2026-11-02
+valeur: Demandeur › Civilité = PM
+valeur: Demandeur › Désignation = ORD NOUVEAU DEMANDEUR
+valeur: Défendeur › Civilité = PM
+valeur: Défendeur › Désignation = ORD NOUVEAU DEFENDEUR
+resultat: fait
+message: Ordonnance d'enrôlement 2026RC00001 créée dans la base du greffe (répertoire général —) ; sa demande reste interrompue : la décision, la mise à jour du dossier RCS, la facture et les éditions ne sont pas reprises par la V3, reprendre la demande dans RIG v2.
+lignes:
+ORD NOUVEAU DEMANDEUR # ORD NOUVEAU DEFENDEUR | Rôle 2026RC00001 · saisine du 02/11/2026 · interrompue | Enrôlement sur requête | EnCours | [0,1,2]
+Demande D2615000504 | demande D2615000504 · interrompue | Enrôlement sur requête | AFaire | []
+ORD EPSILON | Rôle 2026RC15703 · saisine du 04/03/2026 | Réclamation | EnCours | [0]
+ORD GAMMA # ORD DELTA | Rôle 2026RC15702 · saisine du 03/03/2026 | Refus | EnCours | [0,1,2]
+ORD ALPHA # ORD BETA | Rôle 2026RC15701 · saisine du 02/03/2026 | Enrôlement sur requête | Validee | [0,1,2,3]
+controle: SELECT Chrono FROM num.Compteur WHERE Type = 'JRR15' AND Annee = 2026 => 1
+controle: SELECT COUNT(*) FROM v2.PARTIE AS p JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = p.PRT_ID_INSTN WHERE i.INSTN_NUM_ROLE = '2026RC00001' AND p.PRT_QUALIF_PARTIE IN ('D', 'F') => 2
+controle: SELECT d.DMND_CODE_PROSS + d.DMND_ETAT_DEMANDE + ' ' + d.DMND_LES_NUMEROS FROM v2.DEMANDE AS d WHERE d.DMND_NUM_INDICATIF = '2026RC00001' => CORDJRCSI 2026RC00001
+controle: SELECT COUNT(*) FROM v2.INSTANCE WHERE INSTN_NUM_ROLE = '2026RC00001' AND INSTN_NUM_REP_GENERAL IS NULL AND INSTN_TYPE_INSTANCE = 'RC' => 1
