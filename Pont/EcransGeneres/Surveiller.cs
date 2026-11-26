@@ -421,11 +421,10 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         // à confirmer par le chef avant la livraison.
         new DescripteurEcran
         {
-            // Lot 8 (26/11/2026) : lue dans la base (LecteurRelancesBeneficiaires.cs) ; le geste N'EST PAS BRANCHE. RIG v2 relance
-            // les dossiers SANS diligence choisis par la requete de reglage NATURE_DILIGENCE_PARAM SDBE / RSURV / 1 (SqlSelect de
-            // RIG_DEV, lue le 26/11/2026) et leur CREE une diligence (moteur PROC_RSURV, relance 1). Toutes les tables qu'elle lit sont
-            // dans la base V3 (INSCRIT_PM, FORME_JURIDIQUE_UTI, ETABLISSEMENT, PAYS, EVENEMENT_RCS... : verifie le meme jour) : le
-            // geste est faisable, il reste a faire, avec la relance 1 des comptes annuels (meme moteur).
+            // Lot 8 (26/11/2026) : lue et relancee dans la base -- LecteurRelancesBeneficiaires.cs, EcrivainRelancesBeneficiaires.cs.
+            // RIG v2 relance les dossiers SANS diligence choisis par la requete de reglage NATURE_DILIGENCE_PARAM SDBE / RSURV / 1
+            // (SqlSelect de RIG_DEV, traduite dans le lecteur) et leur CREE action, diligence et relance 1 (moteur PROC_RSURV) : les
+            // lignes « À relancer » sont ces dossiers, « Générer les courriers de relance » les relance.
             Code = "PROC_DBE_RELANCE", Titre = "Relances beneficiaires", Sujet = "entreprises en retard de déclaration",
             Forme = FormeEcran.File,
             Recherche = "Rechercher une entreprise, un numéro de gestion, un SIREN…",

@@ -60,8 +60,12 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///                                                       (8 ou 9 : DiligenceRcs.cs:506-508 la clot regularisee).
 /// Ordre : a relancer (dossier croissant), en cours, relancees en cours, puis closes ; la relance la plus recente en tete.
 /// Id : « dossier:<id du dossier> » pour un dossier a relancer, l'id de la diligence sinon.
+///
+/// RECHERCHE (IRechercheEcran) : le critere « Numéro de gestion ou SIREN » du descripteur, celui de la recherche de RIG v2
+/// (numero de gestion ou liste de SIREN, NatureDiligence.parametre.cs:643-651), et le champ de recherche (denomination, SIREN
+/// ou numero de gestion, blancs retires) : sur les dossiers a relancer comme sur les diligences.
 /// </summary>
-internal sealed class LecteurRelancesBeneficiaires : ILecteurEcran
+internal sealed class LecteurRelancesBeneficiaires : IRechercheEcran
 {
     public string Procedure => "PROC_DBE_RELANCE";
 
@@ -70,6 +74,11 @@ internal sealed class LecteurRelancesBeneficiaires : ILecteurEcran
 
     /// <summary>Le prefixe de l'Id d'un dossier a relancer (l'Id d'une diligence est son numero seul).</summary>
     internal const string PrefixeDossier = "dossier:";
+
+    /// <summary>Le critere du descripteur que la base cherche, au mot pres.</summary>
+    internal const string CritereDossier = "Numéro de gestion ou SIREN";
+
+    public IReadOnlyCollection<string> Criteres { get; } = [CritereDossier];
 
     /// <summary>
     /// Le dossier s (rec.DossierRcs) est a relancer pour ses beneficiaires (relance 1) : la requete SDBE / RSURV / 1 de RIG_DEV
@@ -133,7 +142,7 @@ internal sealed class LecteurRelancesBeneficiaires : ILecteurEcran
                    CAST(NULL AS datetime) AS RLCRC_DATE_RELANCE, CAST(NULL AS datetime) AS RLCRC_DATE_LIMITE
             FROM rec.DossierRcs AS s
             LEFT JOIN rec.Entreprise AS e ON e.Id = s.IdEntreprise
-            WHERE {DossierARelancerSql}
+            WHERE {DossierARelancerSql} /*recherche*/
             UNION ALL
             SELECT CASE WHEN NOT {FormeRelance.EnvoyeeSql} THEN 1 WHEN g.DLGRC_ETAT_DILIGENCE = '1' THEN 2 ELSE 3 END,
                    NULL, g.DLGRC_ID_DLGRC, g.DLGRC_ETAT_DILIGENCE, g.DLGRC_ETAT_RELANCE, g.DLGRC_DATE_REGULARISATION,
@@ -147,14 +156,36 @@ internal sealed class LecteurRelancesBeneficiaires : ILecteurEcran
             WHERE g.DLGRC_NATURE_DILIGENCE = 'SDBE'
               AND NOT EXISTS (SELECT 1 FROM v2.RELANCE_RCS AS i WHERE i.RLCRC_ID_DLGRC = g.DLGRC_ID_DLGRC
                               AND i.RLCRC_TYPE_RELANCE = 'IDBE' AND i.RLCRC_ID_INSTN IS NOT NULL)
-              AND NOT ({LecteurInjonctionsBeneficiaires.RelanceSansEffet})
+              AND NOT ({LecteurInjonctionsBeneficiaires.RelanceSansEffet}) /*recherche*/
         ) AS l
         ORDER BY l.Rang, l.IdDossierARelancer, l.RLCRC_DATE_RELANCE DESC, l.DLGRC_ID_DLGRC DESC
         """;
 
     public Task<LignesLues> LireAsync(SqlConnection baseGreffe, DateTime aujourdhui, int plafond, CancellationToken ct)
-        => LectureEcran.LireAsync(baseGreffe, Requete, Ligne, ct,
+        => LectureEcran.LireAsync(baseGreffe, Requete.Replace("/*recherche*/", "", StringComparison.Ordinal), Ligne, ct,
             new SqlParameter("@plafond", plafond), new SqlParameter("@aujourdhui", System.Data.SqlDbType.DateTime) { Value = aujourdhui.Date });
+
+    public Task<LignesLues> ChercherAsync(SqlConnection baseGreffe, RechercheEcran recherche, DateTime aujourdhui, int plafond, CancellationToken ct)
+    {
+        var filtres = new List<string>();
+        var parametres = new List<SqlParameter>
+        {
+            new("@plafond", plafond), new("@aujourdhui", System.Data.SqlDbType.DateTime) { Value = aujourdhui.Date },
+        };
+        if (!string.IsNullOrWhiteSpace(recherche.Texte))
+        {
+            filtres.Add("(e.Denomination LIKE @texte OR s.Siren LIKE @texteNumero OR s.NumeroGestion LIKE @texteNumero)");
+            parametres.Add(new SqlParameter("@texte", FormeLigne.Contient(recherche.Texte)));
+            parametres.Add(new SqlParameter("@texteNumero", FormeLigne.Contient(recherche.Texte.Replace(" ", "", StringComparison.Ordinal))));
+        }
+        if (recherche.Critere(CritereDossier) is { } dossier)
+        {
+            filtres.Add("(s.NumeroGestion = @dossier OR s.Siren = @dossier)");
+            parametres.Add(new SqlParameter("@dossier", dossier.Replace(" ", "", StringComparison.Ordinal)));
+        }
+        var sql = Requete.Replace("/*recherche*/", filtres.Count == 0 ? "" : " AND " + string.Join(" AND ", filtres), StringComparison.Ordinal);
+        return LectureEcran.LireAsync(baseGreffe, sql, Ligne, ct, [.. parametres]);
+    }
 
     private static LigneLue Ligne(SqlDataReader r)
     {
