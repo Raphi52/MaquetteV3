@@ -1,0 +1,58 @@
+# « Relancer un fichier » (EcrivainTraitementsEdition) : les boutons d'OPE_EDITGRP de RIG v2 (PROC_RELANCEFILE\ETP_EDITGRP_\
+# OPE_EDITGRP.cs). « Tout réimprimer » n'est actif que sur un groupe clos (:205). Lignes du jeu : PROC_RELANCEFILE.sql et .attendu.
+
+# Refus : un groupe ouvert (1900911) coche avec un groupe clos (1900917) -- rien n'est ecrit, pas meme pour 1900917.
+# Jumeau accepte : bloc 7, 1900917 seul.
+geste: Agir Tout réimprimer
+ids: 1900917,1900911
+resultat: refuse
+message: Le groupe 1900911 de la file BANC9 RCS est ouvert : RIG v2 ne réimprime qu'un groupe clôturé.
+---
+# Refus : TRTED_CLOTURE pose sans date de cloture n'est pas clos pour RIG v2 (IsCloture, TraitementEdition.cs:487-490).
+# Jumeau accepte : bloc 7, 1900917 a sa date de cloture.
+geste: Agir Tout réimprimer
+ids: 1900913
+resultat: refuse
+message: Le groupe 1900913 de la file BANC9 RCS est ouvert : RIG v2 ne réimprime qu'un groupe clôturé.
+---
+# Refus : un groupe de la file Amitel, que l'agent du greffe ne voit pas (ETP_LISTVIEW_\OPE_RECHERCHELOT.cs:38). Jumeau : bloc 7.
+geste: Agir Tout réimprimer
+ids: 1900914
+resultat: refuse
+message: Groupe d'édition introuvable dans la base du greffe (1900914).
+---
+# Refus : un groupe clos dont aucune edition n'est imprimee par RIG v2 (LGEDT_IMPRIMER = 0, OPE_EDITGRP.cs:295-297) : rien a remettre.
+# Jumeau accepte : bloc 7, 1900917 a une edition que RIG v2 imprime.
+geste: Agir Tout réimprimer
+ids: 1900918
+resultat: refuse
+message: Le groupe 1900918 de la file BANC9 RCS n'a aucune édition à imprimer : rien n'est remis à imprimer.
+---
+# Refus : « Relancer via editrcs » lance le programme externe editrcs (_relancer, OPE_EDITGRP.cs:237-240) : jamais lance par la V3,
+# donc sans jumeau accepte.
+geste: Agir Relancer via editrcs
+ids: 1900911
+resultat: refuse
+message: « Relancer via editrcs » lance le programme editrcs de RIG v2 : la V3 ne lance aucun programme externe, rien n'est relancé.
+---
+# Refus : « Cloturer le groupe » (TraitementEdition.Cloturer) n'est pas encore repris : dit, sans rien ecrire ; sans jumeau accepte.
+geste: Agir Cloturer le groupe
+ids: 1900911
+resultat: refuse
+message: « Cloturer le groupe » n'est pas encore repris par la V3 : rien n'est écrit.
+---
+# « Tout réimprimer » (_basculerEtatP(true), :290-322) : l'edition 1900971, que RIG v2 imprime, redevient « non imprimee »
+# (SetEstNonImprime), n'est plus differee et part sur l'imprimante du groupe ; 1900972 (LGEDT_IMPRIMER = 0) ne bouge pas.
+geste: Agir Tout réimprimer
+ids: 1900917
+resultat: fait
+message: 1 édition remise à imprimer (1 demande). Les documents ne sont ni générés ni envoyés à l'impression : rien ne sort du poste.
+lignes:
+File BANC9 RCS · groupe 1900917 | 2 éditions · 1 non imprimée · ouvert le {J-3} · clôturé le {J-3} · transmission finie · Imprimante 1er étage | Groupes clôturés | EnCours | []
+File BANC9 RCS · groupe 1900911 | 0 édition · ouvert le {J-1} · Imprimante 1er étage | Groupes ouverts | AFaire | []
+File BANC9 RCS · groupe 1900913 | 0 édition · ouvert le {J-2} · Imprimante 1er étage | Groupes ouverts | AFaire | []
+File BANC9 RCS · groupe 1900918 | 1 édition · ouvert le {J-2} · clôturé le {J-2} · en transmission · Imprimante 1er étage | Groupes clôturés | EnCours | []
+File Courriers du banc 9 · groupe 1900916 | 0 édition · ouvert le {J-4} | Groupes ouverts | AFaire | []
+File Courriers du banc 9 · groupe 1900915 | 0 édition · ouvert le {J-1} | Groupes ouverts | AFaire | []
+controle: SELECT LGEDT_ETAT_EDT + '/' + LGEDT_ETAT + '/' + CASE WHEN LGEDT_DATE_EDT IS NULL THEN 'sans date' ELSE 'date' END + '/' + CAST(LGEDT_DIFFERE AS varchar(1)) + '/' + LGEDT_DESTINATION_PHYSIQUE FROM v2.LIGNE_EDITION WHERE LGEDT_ID_LGEDT = 1900971 => I/0/sans date/0/Imprimante 1er étage
+controle: SELECT LGEDT_ETAT_EDT + '/' + LGEDT_ETAT + '/' + CASE WHEN LGEDT_DATE_EDT IS NULL THEN 'sans date' ELSE 'date' END + '/' + CAST(LGEDT_DIFFERE AS varchar(1)) + '/' + LGEDT_DESTINATION_PHYSIQUE FROM v2.LIGNE_EDITION WHERE LGEDT_ID_LGEDT = 1900972 => E/1/date/1/Différée
