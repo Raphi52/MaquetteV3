@@ -32,7 +32,9 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 //      EnCours = au moins une, Validee = toutes les marches obligatoires. La regle qui donne l'etat d'une
 //      ligne est ECRITE et commentee dans le lecteur (quelle colonne, quelle valeur, quel etat) ;
 //   5. au plus `plafond` lignes, dans l'ordre d'affichage ; Total = toutes les lignes qui repondent aux
-//      filtres (COUNT(*) OVER () dans la meme requete) ;
+//      filtres (COUNT(*) OVER () dans la meme requete). Un lecteur dont chaque groupe est une liste a lui (des
+//      registres distincts) plafonne chaque groupe et rend LignesLues.TotalParGroupe : un groupe long ne masque
+//      plus les autres (lot 6 du plan « RIG v3 100 % fonctionnel », LecteurRegistresJudiciaires.cs) ;
 //   6. le banc tests/EcransGeneresBaseCheck verifie TOUT lecteur trouve contre son descripteur (groupes,
 //      etats, marches, regle des Faites). Pour ses filtres et sa regle d'etat, deux fichiers neufs dans
 //      tests/EcransGeneresBaseCheck/Jeux/ : <PROCEDURE>.sql (les lignes controlees) et <PROCEDURE>.attendu
@@ -95,7 +97,16 @@ public interface IFicheEcran : ILecteurEcran
 }
 
 /// <summary>Ce qu'un lecteur rend : ses lignes (plafonnees) et le nombre de lignes de la base qui repondent.</summary>
-public sealed record LignesLues(IReadOnlyList<LigneLue> Lignes, int Total);
+public sealed record LignesLues(IReadOnlyList<LigneLue> Lignes, int Total)
+{
+    /// <summary>
+    /// Pour un lecteur dont CHAQUE groupe est une liste a lui (les trois registres de PROC_REGJUD) : le plafond vaut par
+    /// groupe, et voici le total de chaque groupe dans la base (Total en est la somme). Le pont dit alors quel groupe est
+    /// coupe, et lui seul (un registre complet reste imprimable a cote d'un registre coupe). Null : un plafond pour toute
+    /// la procedure (point 5 du mode d'emploi).
+    /// </summary>
+    public IReadOnlyDictionary<string, int>? TotalParGroupe { get; init; }
+}
 
 /// <summary>Les lecteurs trouves dans le serveur, par procedure.</summary>
 public sealed class LecteursEcrans(IReadOnlyDictionary<string, ILecteurEcran> parProcedure)

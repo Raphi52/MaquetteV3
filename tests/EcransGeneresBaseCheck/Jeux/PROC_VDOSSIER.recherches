@@ -1,0 +1,44 @@
+# Les recherches de LecteurDossierRcs (PROC_VDOSSIER) dans la base : l'entree par numero de la V2 (OPE_ENTREE_VGED_NUMERO), la
+# recherche d'entreprise par nom, l'entree par inscription de privilege. Format : en tete de Program.cs du banc.
+# Le numero de gestion, saisi avec ses blancs : un dossier hors de la liste de depart (mis a jour la veille) se retrouve.
+critere: Numéro = 2016 B 61004
+lignes:
+VDOSSIER VEILLE SARL | Dossier RCS 2016 B 61004 · SIREN 516 010 004 · immatriculé le 04/03/2016 | Dossier RCS | AFaire | []
+---
+# Le numero d'un depot : le dossier de son action RCS.
+critere: Numéro = l6d1022
+lignes:
+VDOSSIER DU JOUR SARL | Dossier RCS 2016 B 61001 · SIREN 516 010 001 · immatriculé le 01/03/2016 | Dossier RCS | AFaire | []
+---
+# Le numero d'une demande : le dossier de la demande, dans le groupe « Demande ».
+critere: Numéro = 26001601071
+lignes:
+VDOSSIER DU JOUR SARL | Demande 26001601071 · Dossier RCS 2016 B 61001 · SIREN 516 010 001 · immatriculé le 01/03/2016 | Demande | AFaire | []
+---
+# Le numero d'un non-inscrit.
+critere: Numéro = N2016001061
+lignes:
+VDOSSIER NON INSCRIT SARL | Non-inscrit N2016001061 · SIREN 516 010 061 | Non-inscrit | AFaire | []
+---
+# Le numero d'une inscription de privilege : les dossiers des entreprises de ses debiteurs (DEBITEUR_END).
+critere: Inscription privilège = 2025N01041
+lignes:
+VDOSSIER DU JOUR SARL | Dossier RCS 2016 B 61001 · SIREN 516 010 001 · immatriculé le 01/03/2016 | Dossier RCS | AFaire | []
+---
+# La denomination (la recherche d'entreprise de la V2) : les dossiers, puis le non-inscrit.
+critere: Dénomination = vdossier
+lignes:
+VDOSSIER DU JOUR SARL | Dossier RCS 2016 B 61001 · SIREN 516 010 001 · immatriculé le 01/03/2016 | Dossier RCS | AFaire | []
+VDOSSIER EN SOMMEIL SAS | Dossier RCS 2016 B 61002 · SIREN 516 010 002 · immatriculé le 02/03/2016 · sans activité | Dossier RCS | EnCours | []
+VDOSSIER RADIE SARL | Dossier RCS 2016 B 61003 · SIREN 516 010 003 · immatriculé le 03/03/2016 · radié le 01/01/2026 | Dossier RCS | Validee | []
+VDOSSIER VEILLE SARL | Dossier RCS 2016 B 61004 · SIREN 516 010 004 · immatriculé le 04/03/2016 | Dossier RCS | AFaire | []
+VDOSSIER DEMAIN SARL | Dossier RCS 2016 B 61005 · SIREN 516 010 005 · immatriculé le 05/03/2016 | Dossier RCS | AFaire | []
+VDOSSIER NON INSCRIT SARL | Non-inscrit N2016001061 · SIREN 516 010 061 | Non-inscrit | AFaire | []
+---
+# Le champ de recherche : le numero OU le nom ; un numero inconnu ne rend rien.
+texte: en sommeil
+lignes:
+VDOSSIER EN SOMMEIL SAS | Dossier RCS 2016 B 61002 · SIREN 516 010 002 · immatriculé le 02/03/2016 · sans activité | Dossier RCS | EnCours | []
+---
+critere: Numéro = 2099B99999
+lignes:

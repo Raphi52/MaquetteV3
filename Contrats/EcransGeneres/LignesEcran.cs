@@ -116,4 +116,8 @@ public sealed record LignesEcran(string Procedure, bool Branchee, LigneLue[] Lig
     /// <summary>Vrai : le lecteur de la procedure sait chercher dans la base (IRechercheEcran) ; l'ecran y envoie sa
     /// recherche (<see cref="RoutesEcransGeneres.ParamTexte"/>, <see cref="RoutesEcransGeneres.ParamCritere"/>).</summary>
     public bool Chercheur { get; init; }
+
+    /// <summary>Le total de CHAQUE groupe dans la base, quand le plafond vaut par groupe (des registres distincts) :
+    /// <see cref="Total"/> en est la somme. Null : un plafond pour toute la procedure.</summary>
+    public Dictionary<string, int>? TotalParGroupe { get; init; }
 }

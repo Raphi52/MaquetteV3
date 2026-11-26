@@ -1,0 +1,53 @@
+# Recherches de « Registres judiciaires » (LecteurRegistresJudiciaires.ChercherAsync), lot 6 du plan-676a4b19, sur PROC_REGJUD.sql.
+# Les criteres de RIG v2, cherches dans la base : les trois dates sur les trois registres (GENERAL.cs:84-130, IP.cs:53-88,
+# ORDO.cs:58-93), deux bornes -> BETWEEN, une seule -> egale ; le type d'instance sur le seul repertoire general (GENERAL.cs:107-116).
+# Chaque refus a son jumeau accepte, de l'autre cote de la meme borne.
+#
+# Dates d'acte du 01/03 au 02/03/2025 : les instances 1601201 (acte 01/03) et 1601202 (acte 02/03) ; ecartees l'IP (acte 10/02) et
+# l'ordonnance (acte 15/01), hors periode.
+critere: Dates d'acte = 2025-03-01|2025-03-02
+lignes:
+Rôle 2026R01202 · REGJUD DEUX | acte du 06/03/2025 · n° 1202 · NAT-ISO · décision prévue le 15/03/2025 | Répertoire général | EnCours | []
+Rôle 2026R01201 · REGJUD UN | acte du 05/03/2025 · n° 1201 · NAT-ISO · décision du 20/03/2025 · Jugement banc · Premier ressort banc | Répertoire général | Validee | []
+---
+# UNE seule borne : la date d'acte EGALE a ce jour (« = CONVERT(DATETIME, ...) », GENERAL.cs:87-92) -- 1601202 (acte 02/03), jumelle
+# du bloc precedent, est ecartee.
+critere: Dates d'acte = 2025-03-01|
+lignes:
+Rôle 2026R01201 · REGJUD UN | acte du 05/03/2025 · n° 1201 · NAT-ISO · décision du 20/03/2025 · Jugement banc · Premier ressort banc | Répertoire général | Validee | []
+---
+# Dates d'enrolement du 11/02 au 06/03/2025 : 1601201 (enrolee le 06/03, la borne) et la decision de l'IP (enrolee le 11/02, l'autre
+# borne) ; ecartees 1601202 (enrolee le 07/03, lendemain de la borne) et l'ordonnance (enrolee le 16/01).
+critere: Dates d'enrôlement = 2025-02-11|2025-03-06
+lignes:
+Rôle 2026R01201 · REGJUD UN | acte du 05/03/2025 · n° 1201 · NAT-ISO · décision du 20/03/2025 · Jugement banc · Premier ressort banc | Répertoire général | Validee | []
+Rôle 2026R01206 · REGJUD IP | acte du 10/02/2025 · minute 301 · décision du 12/02/2025 · Jugement banc | Injonctions de payer | Validee | []
+---
+# Dates de saisine du 06/03 au 07/03/2025 : 1601203 et 1601202 ; ecartee 1601201 (saisi le 05/03, veille de la borne). L'IP et
+# l'ordonnance n'ont pas de date de saisine : ecartees.
+critere: Dates de saisine = 2025-03-06|2025-03-07
+lignes:
+Rôle 2026R01203 · REGJUD TROIS | acte du 07/03/2025 · n° 1203 · NAT-ISO · sans décision | Répertoire général | AFaire | []
+Rôle 2026R01202 · REGJUD DEUX | acte du 06/03/2025 · n° 1202 · NAT-ISO · décision prévue le 15/03/2025 | Répertoire général | EnCours | []
+---
+# Type d'instance « R » : au repertoire general, les roles « %R[0-9]% » (les trois 2026R0120x) ; ecartee 1990J20001 (PROC_NF.sql, role
+# en J). Les registres des IP et des ordonnances n'ont pas ce critere dans la V2 : ils restent entiers.
+critere: Type d'instance = R
+lignes:
+Rôle 2026R01203 · REGJUD TROIS | acte du 07/03/2025 · n° 1203 · NAT-ISO · sans décision | Répertoire général | AFaire | []
+Rôle 2026R01202 · REGJUD DEUX | acte du 06/03/2025 · n° 1202 · NAT-ISO · décision prévue le 15/03/2025 | Répertoire général | EnCours | []
+Rôle 2026R01201 · REGJUD UN | acte du 05/03/2025 · n° 1201 · NAT-ISO · décision du 20/03/2025 · Jugement banc · Premier ressort banc | Répertoire général | Validee | []
+Rôle 2026R01206 · REGJUD IP | acte du 10/02/2025 · minute 301 · décision du 12/02/2025 · Jugement banc | Injonctions de payer | Validee | []
+Rôle 2026R01207 · REGJUD ORDO | acte du 15/01/2025 · Nature banc · sans décision | Ordonnances du président | AFaire | []
+---
+# Jumeau : type « J » -- seul 1990J20001 au repertoire general ; les autres registres, entiers.
+critere: Type d'instance = J
+lignes:
+Rôle 1990J20001 · NF CREANCIER # NF ALPHA SA | acte du 15/01/1990 · n° 1990020001 · sans décision | Répertoire général | AFaire | []
+Rôle 2026R01206 · REGJUD IP | acte du 10/02/2025 · minute 301 · décision du 12/02/2025 · Jugement banc | Injonctions de payer | Validee | []
+Rôle 2026R01207 · REGJUD ORDO | acte du 15/01/2025 · Nature banc · sans décision | Ordonnances du président | AFaire | []
+---
+# Le texte : le role ou le nom de l'affaire, sur les trois registres.
+texte: REGJUD UN
+lignes:
+Rôle 2026R01201 · REGJUD UN | acte du 05/03/2025 · n° 1201 · NAT-ISO · décision du 20/03/2025 · Jugement banc · Premier ressort banc | Répertoire général | Validee | []

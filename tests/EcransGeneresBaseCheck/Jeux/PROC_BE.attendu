@@ -5,3 +5,5 @@
 ROSSI Luca (15/06/1990) | Dossier RCS 2027 B 14002 · BE PLACEMENT SICAV | Placement collectif | AFaire | []
 DUPONT Jean Marc (01/02/1980) | Dossier RCS 2027 B 14001 · BE ALPHA SAS | Déclaration standard | AFaire | []
 MARTIN Anne (03/11/1975) | Dossier RCS 2027 B 14001 · BE ALPHA SAS | Déclaration standard | AFaire | []
+# Lot 6 du plan-676a4b19 : le beneficiaire du dossier radie de PROC_BEN.sql (cet ecran liste tout beneficiaire non partant).
+BENRADIE Anne (15/06/1975) | Dossier RCS 2016 B 60102 · BEN RADIEE SAS | Déclaration standard | AFaire | []

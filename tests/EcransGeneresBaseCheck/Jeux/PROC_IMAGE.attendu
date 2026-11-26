@@ -1,0 +1,9 @@
+# « Voir une image » (LecteurImagesGed) sur les jeux PROC_IMAGE.sql, PROC_PDF.sql et PROC_RECHERCHE_GED.sql : les documents de
+# GED_RIG dont l'extension (sans casse) est une image -- tif, tiff, png, jpg, jpeg, bmp, gif --, le plus recemment archive en
+# tete. Groupe : « TIFF » (tif, tiff) ou « Image ». Etat : aucun octet (GDRG_FICHIER et GDRG_FICHIER_PDF vides) -> AFaire ;
+# extrait (GDRG_LOGIN_NT_EXTRACTION) -> EnCours ; sinon Validee.
+# Ecartes : L6-IMG-04 (doc) -- jumeau L6-IMG-02 (png) ; les PDF de PROC_PDF.sql et les documents de PROC_RECHERCHE_GED.sql
+# (html, docx, pdf, xml, zip).
+courrier-scanne.png | Document L6-IMG-02 · PNG · 4 octets · archivé le 11/03/2025 · extrait par agent.banc | Image | EnCours | []
+bilan-numerise.tif | Document L6-IMG-01 · TIF · 3 pages · 2 Ko · archivé le 10/03/2025 | TIFF | Validee | []
+Document L6-IMG-03 | Document L6-IMG-03 · JPEG · 1 page · archivé le 09/03/2025 · aucun fichier dans la GED | Image | AFaire | []

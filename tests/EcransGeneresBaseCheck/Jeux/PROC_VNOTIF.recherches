@@ -1,0 +1,21 @@
+# Les recherches de LecteurNotifications (PROC_VNOTIF) dans la base (lot 6 du plan-676a4b19). Format : en tete de Program.cs du
+# banc. Les lignes cherchees sont a date fixe (1606110, 1606306) : une ligne datee du jour du banc ne s'ecrit pas ici.
+# L'etat, par son libelle, remplace les etats coches a l'ouverture : une notification envoyee se retrouve (EnCours).
+critere: Date de début = 01/03/2025
+critere: Date de fin = 31/03/2025
+critere: État = envoy
+lignes:
+Notification 1606110 · EDITION ALPHA SARL | 2020 B 40401 · type MTS · vers le greffe 2602 · générée le 10/03/2025 · envoyée le 10/03/2025 · Envoyé | Émises (RCS) | EnCours | [0]
+---
+# Jumeau : les memes dates sans l'etat -- les etats d'ouverture (emises 2, 5, 8 ; recues 1, 8) ne la retiennent pas.
+critere: Date de début = 01/03/2025
+critere: Date de fin = 31/03/2025
+critere: Greffe = 2602
+lignes:
+---
+# Une recue traitee par le greffe : Validee.
+critere: Date de début = 01/03/2025
+critere: Date de fin = 31/03/2025
+critere: État = traité
+lignes:
+Notification 1606306 | 2025 B 00306 · type RCS · du greffe 6901 · reçue le 15/03/2025 · Traité Greffe | Reçues | Validee | [0]

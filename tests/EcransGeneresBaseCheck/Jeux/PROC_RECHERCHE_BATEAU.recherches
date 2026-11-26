@@ -1,0 +1,22 @@
+# Les recherches de LecteurNavires (PROC_RECHERCHE_BATEAU) dans la base. Format : en tete de Program.cs du banc.
+# « Afficher l'historique » coche : l'ancien nom entre, avec son nom le plus recent ; les inscriptions comptees sont celles du
+# BATEAU (1600503 n'en a aucune a lui).
+critere: Numéro d'enregistrement = 600502
+critere: Afficher l'historique = oui
+lignes:
+L6 ANCIEN NOM | Numéro d'enregistrement 600502 · nom le plus récent : L6 NOUVEAU NOM · 1 inscription | Ancien nom | EnCours | []
+L6 NOUVEAU NOM | Numéro d'enregistrement 600502 · aucune inscription | Nom actuel | AFaire | []
+---
+# Jumeau : la meme recherche sans la case -- le nom actuel seul, avec les inscriptions de tout son numero.
+critere: Numéro d'enregistrement = 600502
+lignes:
+L6 NOUVEAU NOM | Numéro d'enregistrement 600502 · 1 inscription | Nom actuel | Validee | []
+---
+# Le nom : la recherche de la V2 porte sur « numero nom » ; une partie suffit.
+critere: Nom du navire = pelican
+lignes:
+L6 PELICAN | Numéro d'enregistrement 600501 · port BR · 2 inscriptions | Nom actuel | Validee | []
+---
+# Le champ de recherche : un navire qui n'en est pas un (une barge) ne se trouve pas.
+texte: barge
+lignes:

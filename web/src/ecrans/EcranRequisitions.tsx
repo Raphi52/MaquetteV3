@@ -30,6 +30,11 @@
 //     double-clic). Panier : meme identite ; pied de liste sous chacun. Le volet Articles est un formulaire, pas une
 //     liste : il ne change pas.
 // fix-ok: application du socle des listes en plusieurs editions (lot 6), pas un correctif a l'aveugle.
+//
+// LA BASE DU GREFFE (plan « RIG v3 100 % fonctionnel », lot 6, 26/11/2026, marche du lot 17) : « Rechercher » lit les dossiers
+// de la base (Pont/EcranRequisitionsBase.cs → Serveur/Socle/EcransMain/LectureEntreprisesRequi.cs, la requete de « Dossier RCS »)
+// par raison sociale, SIREN et adresse du siege ; une note dit ce que la recherche ne reprend pas encore du moteur de RIG v2. Les
+// commandes web restent la demonstration, marquee « exemple ». Sans serveur, toute la demonstration ; en panne, le motif.
 
 import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { EnteteTriable } from '../composants/EnteteTriable'
@@ -38,6 +43,8 @@ import {
   type Teinte,
 } from '../composants/ListeModerne'
 import { appeler } from '../pont'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
+import { Exemple } from './formes/commun'
 import { Saisie, useSession, type PontDeSession } from '../session'
 import type { ContexteDossierVue } from '../plan/types'
 import { toucheDeRecherche } from '../plan/clavier'
@@ -160,6 +167,10 @@ export interface VueRequisitions {
   limiteRetenue: number
   panier: LignePanierRequi[]
   articles: ArticlesRequi | null
+  /** D'ou viennent les entreprises trouvees (Pont/EcranRequisitionsBase.cs) ; absent : la demonstration d'avant le lot 6. */
+  modeResultats?: ModeLecture
+  /** En base : ce que la recherche reprend ou non de RIG v2 ; en panne : le motif. */
+  messageResultats?: string | null
 }
 
 const pont: PontDeSession<VueRequisitions> = {
@@ -264,6 +275,9 @@ export function EcranRequisitions({ dossier = null }: ProprietesEcranRequisition
       <section className="rig-cmdweb">
         <EnteteListe titre="Commandes web a traiter"
                      synthese={<><b>{vue.nbATraiter}</b>{' a traiter · '}{vue.commandesWeb.length}{' affichee(s)'}</>} />
+        {/* Lot 6 du plan « RIG v3 100 % fonctionnel » : les commandes web restent la demonstration (elles se lisent avec
+            l'ecran « Commandes web », hors de ce lot) ; seule la recherche des entreprises lit la base du greffe. */}
+        <p className="rig-eg-note" role="note"><Exemple /> Commandes web de démonstration : elles ne sont pas encore lues dans la base du greffe.</p>
         <VuesListe vues={[{ cle: 'toutes', libelle: 'Toutes' }, { cle: 'a-traiter', libelle: 'A traiter', compte: vue.nbATraiter }]}
                    active={vue.masquerTraitees ? 'a-traiter' : 'toutes'}
                    choisir={(cle) => { if ((cle === 'a-traiter') !== vue.masquerTraitees) geste('MasquerTraitees') }}>
@@ -427,6 +441,12 @@ export function EcranRequisitions({ dossier = null }: ProprietesEcranRequisition
         <EnteteListe titre={TitreVolet[vue.volet] ?? 'Resultats'} synthese={vue.compteur}
                      filtre={vue.volet === 'resultats'
                        ? { valeur: rapide, changer: setRapide, indication: 'Aller a une societe…' } : undefined} />
+        {vue.volet === 'resultats' && vue.aRecherche && (
+          <>
+            <ProvenanceEcran mode={vue.modeResultats} message={vue.messageResultats} quoi="Entreprises" />
+            {vue.modeResultats === 'serveur' && vue.messageResultats && <p className="rig-eg-note" role="note">{vue.messageResultats}</p>}
+          </>
+        )}
         <VuesListe vues={[
                      { cle: 'resultats', libelle: 'Resultats', compte: vue.aRecherche ? vue.trouvees.length : undefined },
                      { cle: 'panier', libelle: 'Panier', compte: vue.nbPanier },

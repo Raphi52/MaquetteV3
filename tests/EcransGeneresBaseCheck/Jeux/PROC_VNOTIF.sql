@@ -69,7 +69,9 @@ INSERT INTO v2.NOTIFICATION_RCS_XML (NTFXML_ID_NTFXML, NTFXML_ID_ACTRC, NTFXML_T
     -- ECARTEE : sans action (la V2 joint ACTION_RCS) -- jumeau retenu 1400101
     (1400107, NULL, 'MTS', '2602', '8', DATEADD(DAY, -1, @aujourdhui), NULL, NULL, NULL),
     -- ECARTEE : generee le lendemain a 0 h -- jumeau retenu 1400102 (le jour meme a 23 h)
-    (1400109, 1400111, 'MR2', '3802', '2', DATEADD(DAY, 1, @aujourdhui), NULL, NULL, NULL);
+    (1400109, 1400111, 'MR2', '3802', '2', DATEADD(DAY, 1, @aujourdhui), NULL, NULL, NULL),
+    -- lot 6 (plan-676a4b19), pour la RECHERCHE (PROC_VNOTIF.recherches) : envoyee (3) le 10/03/2025, hors de l'ouverture
+    (1606110, 1400111, 'MTS', '2602', '3', '20250310', NULL, '20250310', NULL);
 
 -- Les procedures collectives et les non-inscrits des notifications judiciaires. Leurs colonnes viennent peut-etre d'etre
 -- ajoutees ci-dessus : l'insertion est compilee a part (sp_executesql), comme PROC_EDI_RPJC_TRCNC.sql.
@@ -109,4 +111,6 @@ INSERT INTO v2.DEMAT_NOTIF (DMTNTF_ID_DMTNTF, DMTNTF_DATE_CREATION, DMTNTF_ETAT_
     (1400305, DATEADD(DAY, -30, @aujourdhui), '1', NULL, NULL, NULL, NULL, NULL),
     -- ECARTEES : traitee par le greffe (2) -- jumeau retenu 1400301 (1) ; creee le jour moins 31 a 23 h -- jumeau 1400305
     (1400303, DATEADD(HOUR, -40, @aujourdhui), '2', NULL, '2025B00303', NULL, '6901', 'RCS'),
-    (1400304, DATEADD(HOUR, -721, @aujourdhui), '1', NULL, '2025B00304', NULL, '6901', 'RCS');
+    (1400304, DATEADD(HOUR, -721, @aujourdhui), '1', NULL, '2025B00304', NULL, '6901', 'RCS'),
+    -- lot 6, pour la RECHERCHE : traitee par le greffe (2) le 15/03/2025, hors de l'ouverture
+    (1606306, '20250315', '2', NULL, '2025B00306', NULL, '6901', 'RCS');

@@ -27,6 +27,12 @@ public sealed record VueLignesEcran(string Mode, string? Message, string? Greffe
     /// <summary>Vrai : au moins une procedure de l'ecran cherche dans la base ; l'ecran y envoie sa recherche
     /// (EcranGenere.Chercher). Faux : l'ecran filtre les lignes qu'il a.</summary>
     public bool Recherche { get; init; }
+
+    /// <summary>Les groupes dont les lignes s'arretent au plafond du serveur (la base en a plus : Message dit combien). Un
+    /// geste sur « les lignes affichees » n'y porte pas sur tout le groupe : FormeEtat refuse d'imprimer une liste coupee
+    /// (RIG v2 imprime le registre entier, OPE_RESULTATS.cs:65-73 ; lot 6 du plan « RIG v3 100 % fonctionnel »). Quand le
+    /// lecteur plafonne chaque groupe (LignesEcran.TotalParGroupe), seuls les groupes coupes y sont.</summary>
+    public string[] Plafonnees { get; init; } = [];
 }
 
 /// <summary>La fiche d'une ligne, telle que l'ecran l'ouvre.</summary>
@@ -96,6 +102,7 @@ public static class EcranGenere
         var vides = new List<string>();
         var cherchees = new List<string>();
         var plafonds = new List<string>();
+        var plafonnees = new List<string>();
         foreach (var (p, l) in procedures.Zip(lues))
         {
             LigneEcran[] siennes = l.Branchee
@@ -103,15 +110,29 @@ public static class EcranGenere
                 : p.Lignes;
             if (!l.Branchee) exemples.AddRange(reuni ? [p.Titre] : p.Groupes);
             else if (l.Total == 0 && siennes.Length == 0) vides.Add(p.Titre);
+            else if (!reuni && l.TotalParGroupe is { } parGroupe)
+            {
+                // Un plafond par groupe (des registres distincts) : seul le groupe dont la base a plus de lignes est coupe.
+                foreach (var g in p.Groupes)
+                {
+                    var lus = l.Lignes.Count(x => x.Groupe == g);
+                    if (parGroupe.GetValueOrDefault(g) <= lus) continue;
+                    plafonds.Add($"{g} : les {lus} premières lignes sur {parGroupe[g]}");
+                    plafonnees.Add(g);
+                }
+            }
             else if (l.Total > l.Lignes.Length)
+            {
                 plafonds.Add($"{(reuni ? p.Titre + " : l" : "L")}es {l.Lignes.Length} premières lignes sur {l.Total}");
+                plafonnees.AddRange(reuni ? [p.Titre] : p.Groupes);
+            }
             if (l.Cherchee) cherchees.AddRange(reuni ? [p.Titre] : p.Groupes);
             lignes.AddRange(reuni ? siennes.Select(x => CatalogueGenere.LigneReunie(p, x)) : siennes);
         }
         var mode = exemples.Count == 0 ? "base" : lues.Any(l => l.Branchee) ? "mixte" : "exemple";
         return new VueLignesEcran(mode, plafonds.Count == 0 ? null : string.Join(" ; ", plafonds) + ".", greffe,
                                   [.. lignes], [.. exemples], [.. vides])
-               { Cherchees = [.. cherchees], Recherche = lues.Any(l => l.Chercheur) };
+               { Cherchees = [.. cherchees], Recherche = lues.Any(l => l.Chercheur), Plafonnees = [.. plafonnees] };
     }
 
     /// <summary>La fiche <paramref name="id"/> de la procedure du groupe <paramref name="groupe"/> de l'ecran <paramref name="code"/>.</summary>

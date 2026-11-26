@@ -817,6 +817,91 @@ describe('socle fonctionnel : recherche et fiche sur Referentiel, Audience et Op
     ({ mode: 'base', message: null, fiche: { procedure: 'ECRAN_TEST', id, nom, lectureSeule: false, motif: null, sections, ...partiel } })
   const filtreTexte = (container: HTMLElement) => container.querySelector('input.rig-lm-cherche__saisie') as HTMLInputElement
 
+  // Lot 6 du plan « RIG v3 100 % fonctionnel » : le geste d'un Etat part a l'ecrivain (l'impression des registres judiciaires),
+  // un envoi par groupe, avec les lignes affichees du groupe.
+  describe('Etat', () => {
+    const registres = descripteur({
+      forme: 'Etat', titre: 'Registres', gestes: ['Impression'], groupes: ['Répertoire général', 'Injonctions de payer'],
+      colonnes: [champ('Rôle'), champ("Date d'acte", 'Date')],
+    })
+    const ligne = (id: string, groupe: string): LigneEcranVue => ({ nom: `Rôle ${id}`, precisions: '', groupe, etat: 'Validee', faites: [], id })
+    it("lu en base, « Impression » envoie les lignes affichees a l'ecrivain, un envoi par registre, et dit ce qui est ecrit", async () => {
+      const pont = installerFauxPont({
+        'EcranGenere.Lignes': () => base([ligne('G-1', 'Répertoire général'), ligne('G-2', 'Répertoire général'), ligne('I-7', 'Injonctions de payer')]),
+        'EcranGenere.Geste': (_c: unknown, groupe: unknown) => ({ fait: true, message: `${String(groupe)} : placé dans la file des éditions.`, sansEcrivain: false, ids: ['9'] }),
+      })
+      const { container } = render(<EcranGenere descripteur={registres} />)
+      const o = outils(container)
+      await waitFor(() => expect(container.querySelectorAll('tbody tr')).toHaveLength(3))
+      fireEvent.click(o.bouton('Impression'))
+      await waitFor(() => expect(o.annonce()).toBe('Répertoire général : Répertoire général : placé dans la file des éditions. Injonctions de payer : Injonctions de payer : placé dans la file des éditions.'))
+      expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Geste', 'ECRAN_TEST', 'Répertoire général', 'Agir', 'Impression', ['G-1', 'G-2'], {})
+      expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Geste', 'ECRAN_TEST', 'Injonctions de payer', 'Agir', 'Impression', ['I-7'], {})
+    })
+
+    // RIG v2 imprime le registre ENTIER avec le total de sa requete (OPE_RESULTATS.cs:35-39 et :65-73, « ALL » ;
+    // OPE_REGISTRE_GENERAL.cs:221) : une liste coupee au plafond du serveur n'est pas le registre, son titre compterait faux.
+    it('liste coupee au plafond : « Impression » refuse et ne part pas, le message dit pourquoi', async () => {
+      const pont = installerFauxPont({
+        'EcranGenere.Lignes': () => base([ligne('G-1', 'Répertoire général'), ligne('G-2', 'Répertoire général'), ligne('I-7', 'Injonctions de payer')],
+          { message: 'Les 3 premières lignes sur 1194.', plafonnees: ['Répertoire général', 'Injonctions de payer'] }),
+        'EcranGenere.Geste': () => ({ fait: true, message: 'placé dans la file des éditions.', sansEcrivain: false, ids: ['9'] }),
+      })
+      const { container } = render(<EcranGenere descripteur={registres} />)
+      const o = outils(container)
+      await waitFor(() => expect(container.querySelectorAll('tbody tr')).toHaveLength(3))
+      fireEvent.click(o.bouton('Impression'))
+      await waitFor(() => expect(container.querySelector('.rig-eg-annonce[role="alert"]')?.textContent)
+        .toBe('Refus « Impression » : la liste est coupée (Les 3 premières lignes sur 1194.). RIG v2 imprime toutes les lignes ; '
+              + 'RIG v3 ne lit que celles-ci, la période et le filtre ne portent que sur elles : rien n’est enregistré.'))
+      expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranGenere.Geste')).toHaveLength(0)
+    })
+
+    // Controle final du lot 6 (26/11/2026) : l'Etat ne cherchait pas dans la base, et la periode ne filtrait que les lignes
+    // chargees. Quand le lecteur cherche (vue.recherche), les PARAMETRES partent a la base -- les criteres de RIG v2, qui relance
+    // sa requete a chaque saisie (proc_regjud.md:156-160) -- et la periode ne refiltre pas ce que la base a choisi.
+    const parametres = descripteur({
+      forme: 'Etat', titre: 'Registres', gestes: ['Impression'], groupes: ['Répertoire général', 'Injonctions de payer'],
+      colonnes: [champ('Rôle'), champ("Date d'acte", 'Date')], parametres: [champ("Dates d'acte", 'Periode')],
+    })
+    it('lecteur qui cherche : les parametres cherchent dans la base, la periode ne refiltre pas ses lignes', async () => {
+      // La date d'acte de la V2 (INSTN_DATE_ACTE) n'est pas la date montree (la saisine) : une ligne choisie par la base peut
+      // montrer une date hors de la periode saisie.
+      const trouvee: LigneEcranVue = { ...ligne('G-9', 'Répertoire général'), valeurs: ['2025R00009', '2025-03-05'] }
+      const pont = installerFauxPont({
+        'EcranGenere.Lignes': () => base([ligne('G-1', 'Répertoire général')], { recherche: true }),
+        'EcranGenere.Chercher': () => base([trouvee], { recherche: true, cherchees: ['Répertoire général', 'Injonctions de payer'] }),
+      })
+      const { container } = render(<EcranGenere descripteur={parametres} />)
+      await waitFor(() => expect(container.querySelectorAll('tbody tr')).toHaveLength(1))
+      expect(container.textContent).toContain('La recherche et les critères cherchent aussi dans la base du greffe.')
+      fireEvent.change(container.querySelector('aside input[aria-label="Dates d\'acte : du"]')!, { target: { value: '2025-03-10' } })
+      await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Chercher', 'ECRAN_TEST', '', { "Dates d'acte": '2025-03-10|' }))
+      await waitFor(() => expect(container.querySelector('tbody tr td')?.textContent).toBe('2025R00009'))
+    })
+
+    it('lecteur qui cherche, registre coupe : le refus propose de resserrer les parametres ; un registre complet s’imprime par son onglet', async () => {
+      const pont = installerFauxPont({
+        'EcranGenere.Lignes': () => base([ligne('G-1', 'Répertoire général'), ligne('I-7', 'Injonctions de payer')],
+          { recherche: true, message: 'Répertoire général : les 1 premières lignes sur 1194.', plafonnees: ['Répertoire général'] }),
+        'EcranGenere.Geste': () => ({ fait: true, message: 'Registre des 1 décisions des IP : placé dans la file des éditions.', sansEcrivain: false, ids: ['9'] }),
+      })
+      const { container } = render(<EcranGenere descripteur={parametres} />)
+      const o = outils(container)
+      await waitFor(() => expect(container.querySelectorAll('tbody tr')).toHaveLength(2))
+      fireEvent.click(o.bouton('Impression'))
+      await waitFor(() => expect(container.querySelector('.rig-eg-annonce[role="alert"]')?.textContent)
+        .toBe('Refus « Impression » : la liste est coupée (Répertoire général : les 1 premières lignes sur 1194.). RIG v2 imprime toutes '
+              + 'les lignes ; resserrez les paramètres, qui cherchent dans la base, pour qu’elles soient toutes à l’écran : rien n’est enregistré.'))
+      expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranGenere.Geste')).toHaveLength(0)
+      // Jumeau : l'onglet du registre complet n'envoie que ses lignes, et part.
+      fireEvent.click([...container.querySelectorAll('button.rig-lm-vue')].find((b) => b.textContent?.startsWith('Injonctions de payer'))!)
+      fireEvent.click(o.bouton('Impression'))
+      await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Geste', 'ECRAN_TEST', 'Injonctions de payer', 'Agir', 'Impression', ['I-7'], {}))
+      expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranGenere.Geste')).toHaveLength(1)
+    })
+  })
+
   describe('Referentiel', () => {
     const ref = descripteur({
       forme: 'Referentiel', titre: 'Modes de paiement', groupes: ['Fond'],

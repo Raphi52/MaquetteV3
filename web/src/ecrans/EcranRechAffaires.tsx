@@ -38,9 +38,17 @@
 // (visionneuse), le bloc « Ancien RIG » et la suppression XXAFF ne changent pas.
 // « + Nouvelle vue » garde ses vues pour la SESSION (module, pas de reglage) : accueil.json n'a aucun magasin
 // de reglages d'ecran ou les poser (AccueilEtat.cs, 24/11/2026).
+//
+// LA BASE DU GREFFE (plan « RIG v3 100 % fonctionnel », lot 6, 26/11/2026, marche du lot 17) : « EcranRechAffaires.Trouver » et
+// « .Compter » sont servis par Pont/EcranRechAffairesBase.cs → Serveur/Socle/EcransMain/LectureAffaires.cs : la base cherche
+// les affaires (AFFAIRE) par numero (d'affaire, de demande, de facture), libelle ou SIREN, et par leur instance ; solde de la V2
+// (ventilations moins articles utilises), demandes et factures dans la ligne depliee. Type, nature, etat, solde minimal et tri
+// restent ceux du pont. Sans critere, RIG v2 ne cherche rien : aucune ligne ; une note dit ce que la liste montre. Sans serveur,
+// la demonstration, marquee « exemple » ; en panne, le motif et aucune ligne.
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { EnteteTriable } from '../composants/EnteteTriable'
 import {
   CartesChiffrees, CelluleChevron, CelluleIdentite, ChoixTri, EnteteListe, LigneDetail, ListeModerne, MenuLigne, MontantBarre,
@@ -73,6 +81,9 @@ export interface LigneAffaire {
   solde: string
   /** Le meme solde en nombre : totaux, carte « Solde total », mini-barre. */
   soldeValeur: number
+  /** Lues en base (lot 6) : les numeros des demandes et de leurs factures, joints par « ; » (grille de PROC_RECHAFF). */
+  demandes?: string
+  factures?: string
 }
 
 export interface AffaireChoisie {
@@ -90,6 +101,10 @@ export interface VueAffaires {
   aucunCritere: boolean
   sirenCherche: string
   choisie: AffaireChoisie | null
+  /** D'ou viennent les lignes (Pont/LectureEcranMain.cs) ; absent : la demonstration d'avant le lot 6. */
+  mode?: ModeLecture
+  /** En base : ce que la liste montre au juste ; en panne : le motif. */
+  message?: string | null
 }
 
 /** Le logiciel d'une affaire, dit par l'aiguillage (Pont/AncienRig.cs, LigneAiguillee). */
@@ -285,12 +300,13 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
 
   // Les vues : celles de la maquette, puis celles de la session ; leur compte vient du pont.
   const { vues, active: vueActive, enregistrer: enregistrerVue } = useVuesDeSession('RechAffaires', VuesPrereglees, criteres, memesCriteres)
-  const [comptes, setComptes] = useState<number[] | null>(null)
+  // Un compte null (lu en base, vue sans critere cherche) : la puce n'en montre aucun.
+  const [comptes, setComptes] = useState<(number | null)[] | null>(null)
   const cleVues = JSON.stringify(vues.map((v) => v.criteres))
   useEffect(() => {
     let perime = false
     const jeux = (JSON.parse(cleVues) as CriteresSaisis[]).map(pourLePont)
-    appeler<number[]>('EcranRechAffaires.Compter', jeux).then(
+    appeler<(number | null)[]>('EcranRechAffaires.Compter', jeux).then(
       (c) => { if (!perime) setComptes(c) },
       // Sans reponse, les puces restent sans compte.
       () => { if (!perime) setComptes(null) })
@@ -499,6 +515,9 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
                      filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a une affaire…',
                                valider: () => { if (affichees.length === 1) ouvrir(affichees[0]!.numero) } }} />
 
+        {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Affaires" />}
+        {vue?.mode === 'serveur' && vue.message && <p className="rig-eg-note" role="note">{vue.message}</p>}
+
         {vue && (
           <CartesChiffrees cartes={[
             { cle: 'solde', titre: 'Solde total', valeur: montant(soldeTotal), legende: true,
@@ -524,7 +543,7 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
           ]} />
         )}
 
-        <VuesListe vues={vues.map((v, i) => ({ cle: v.cle, libelle: v.libelle, compte: comptes?.[i] }))} active={vueActive}
+        <VuesListe vues={vues.map((v, i) => ({ cle: v.cle, libelle: v.libelle, compte: comptes?.[i] ?? undefined }))} active={vueActive}
                    choisir={(cle) => { const v = vues.find((x) => x.cle === cle); if (v) poserCriteres(v.criteres) }}
                    enregistrer={enregistrerVue}>
           <ChoixTri cles={Colonnes} cleActive={cleTri} ascendant={triAscendant} origine="Plus recentes"
@@ -590,6 +609,8 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
                       { libelle: 'SIREN', valeur: affaire.siren },
                       { libelle: 'Domaine', valeur: affaire.type },
                       { libelle: 'Date creation', valeur: affaire.creation },
+                      ...(affaire.demandes ? [{ libelle: 'Demandes', valeur: affaire.demandes }] : []),
+                      ...(affaire.factures ? [{ libelle: 'Factures', valeur: affaire.factures }] : []),
                     ]}>
                       {historiqueLigne?.numero === affaire.numero && (
                         <div className="rig-lm-detail__compte" role="status" aria-label="Historique de l'affaire">{historiqueLigne.texte}</div>

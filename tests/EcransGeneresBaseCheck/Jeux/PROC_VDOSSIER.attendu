@@ -1,0 +1,10 @@
+# « Dossier RCS » (LecteurDossierRcs) sur le jeu PROC_VDOSSIER.sql : la liste de depart de la V3 (RIG v2 ouvre sur la saisie du
+# numero, sans liste) -- les dossiers mis a jour le jour du banc, de 0 h a 24 h --, par numero de gestion.
+# Etat : radie -> Validee ; provisoirement sans activite ou en cessation -> EnCours ; sinon AFaire.
+# Ecartes, chacun avec son jumeau retenu :
+#   1601004 mis a jour la veille a 23 h -- 1601002, le jour a 0 h ;
+#   1601005 mis a jour le lendemain a 0 h -- 1601001, le jour a 10 h.
+# Les non-inscrits et les demandes ne sont pas dans la liste de depart : PROC_VDOSSIER.recherches les retrouve.
+VDOSSIER DU JOUR SARL | Dossier RCS 2016 B 61001 · SIREN 516 010 001 · immatriculé le 01/03/2016 | Dossier RCS | AFaire | []
+VDOSSIER EN SOMMEIL SAS | Dossier RCS 2016 B 61002 · SIREN 516 010 002 · immatriculé le 02/03/2016 · sans activité | Dossier RCS | EnCours | []
+VDOSSIER RADIE SARL | Dossier RCS 2016 B 61003 · SIREN 516 010 003 · immatriculé le 03/03/2016 · radié le 01/01/2026 | Dossier RCS | Validee | []

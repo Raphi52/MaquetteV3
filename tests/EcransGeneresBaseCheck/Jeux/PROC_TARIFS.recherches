@@ -1,0 +1,33 @@
+# Les recherches de LecteurTarifs (PROC_TARIFS) dans la base. Format : en tete de Program.cs du banc.
+# « Statut = tous » leve le filtre du statut : l'article en sommeil entre (EnCours) ; le type reste TI (son defaut).
+critere: Statut = tous
+lignes:
+Article L6TI01 · Inscription banc | 25,50 € HT · type TI · catégorie Aucune · incohérence justifiée | Article de base | Validee | []
+Article L6TI03 · Copie banc | 10,00 € HT · type TI · en sommeil · catégorie Aucune | Article de base | EnCours | []
+Article L6TI04 · Inscription derivee | 0,00 € HT · type TI · catégorie Aucune · incohérence justifiée | Article dérivé | Validee | []
+Article L6TI05 · Recherche banc | 22,00 € HT · type TI · catégorie L6 RCS · codes événement E1, E2 | Article de base | AFaire | []
+---
+# Le type d'article : les principaux, a leur prix unitaire.
+critere: Type d'article = PR
+lignes:
+Article L6PR01 · Principal un | 10,00 € HT · type PR · catégorie Aucune | Article de base | AFaire | []
+Article L6PR02 · Principal deux | 5,50 € HT · type PR · catégorie Aucune | Article de base | AFaire | []
+---
+# Le code evenement (LIKE), et « * » : tout article qui en a un.
+critere: Code événement = E2
+lignes:
+Article L6TI05 · Recherche banc | 22,00 € HT · type TI · catégorie L6 RCS · codes événement E1, E2 | Article de base | AFaire | []
+---
+critere: Code événement = *
+lignes:
+Article L6TI05 · Recherche banc | 22,00 € HT · type TI · catégorie L6 RCS · codes événement E1, E2 | Article de base | AFaire | []
+---
+# La categorie, a son libelle.
+critere: Catégorie d'article = rcs
+lignes:
+Article L6TI05 · Recherche banc | 22,00 € HT · type TI · catégorie L6 RCS · codes événement E1, E2 | Article de base | AFaire | []
+---
+# Le champ de recherche : le code ou le libelle.
+texte: derivee
+lignes:
+Article L6TI04 · Inscription derivee | 0,00 € HT · type TI · catégorie Aucune · incohérence justifiée | Article dérivé | Validee | []

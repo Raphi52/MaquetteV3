@@ -1,0 +1,9 @@
+# « Voir un PDF » (LecteurPiecesPdf) sur les jeux PROC_IMAGE.sql, PROC_PDF.sql et PROC_RECHERCHE_GED.sql : les documents de GED_RIG
+# d'extension « pdf » (sans casse, blancs retires), le plus recemment archive en tete. Etat : aucun octet -> AFaire ; extrait ->
+# EnCours ; sinon Validee (L6-PDF-02 n'a que sa version PDF, GDRG_FICHIER_PDF : il est Disponible).
+# Ecartes : les images de PROC_IMAGE.sql, et les documents non PDF de PROC_RECHERCHE_GED.sql -- jumeaux retenus ci-dessous.
+# L6-GED-03 (pdf, extrait) vient de PROC_RECHERCHE_GED.sql : la visionneuse le liste aussi.
+jugement-annexe.pdf | Document L6-PDF-01 · PDF · 12 pages · 4 octets · archivé le 20/03/2025 | PDF archivé | Validee | []
+statuts.pdf | Document L6-PDF-02 · PDF · 8 pages · archivé le 18/03/2025 | PDF archivé | Validee | []
+pv-assemblee.pdf | Document L6-PDF-03 · PDF · archivé le 17/03/2025 · aucun fichier dans la GED | PDF archivé | AFaire | []
+attestation-depot.pdf | Document L6-GED-03 · PDF · archivé le 03/03/2025 · extrait par agent.banc | PDF archivé | EnCours | []

@@ -24,7 +24,7 @@ public sealed record CriteresAffaires(string CritNumero, string CritLibelle, str
 public sealed record LigneAffaire(string Numero, string IdInstance, string Role, string CodeAffaire,
                                   string Nature, string NomNature, string Libelle, string Nom, string Etat,
                                   string Siren, string Type, string Saisine, string Creation, string Solde,
-                                  decimal SoldeValeur);
+                                  decimal SoldeValeur, string Demandes = "", string Factures = "");
 
 /// <summary>L'instance choisie pour la suppression XXAFF.</summary>
 public sealed record AffaireChoisie(string Numero, string IdInstance, string Role);
@@ -34,9 +34,11 @@ public sealed record AffaireChoisie(string Numero, string IdInstance, string Rol
 /// <param name="AucunCritere">Aucun critere pose : le tableau vide ne veut alors RIEN dire.</param>
 /// <param name="SirenCherche">Le SIREN a immatriculer si la recherche reste vide, sinon « ».</param>
 /// <param name="Choisie">L'affaire selectionnee, cherchee dans TOUT le fonds (filtre ou pas).</param>
+/// <param name="Mode">D'ou viennent les lignes (Pont/LectureEcranMain.cs) ; <paramref name="Message"/> : en base, ce que la
+/// liste montre au juste, en panne, le motif (lot 6 du plan « RIG v3 100 % fonctionnel »).</param>
 public sealed record VueAffaires(NatureAffaire[] Natures, string[] Etats, LigneAffaire[] Lignes,
                                  string Resume, bool AucunCritere, string SirenCherche,
-                                 AffaireChoisie? Choisie);
+                                 AffaireChoisie? Choisie, string Mode = "demo", string? Message = null);
 
 /// <summary>
 /// Pont de l'ecran PROC_RECHAFF (web/src/ecrans/EcranRechAffaires.tsx) : la
@@ -50,12 +52,13 @@ public sealed record VueAffaires(NatureAffaire[] Natures, string[] Etats, LigneA
 /// poste) : le refaire en JavaScript rangerait autrement les noms accentues.
 /// Metier/ n'est pas modifie.
 /// </summary>
-public static class EcranRechAffaires
+public static partial class EcranRechAffaires
 {
+    /// <summary>Une affaire du fonds : la demonstration, ou une affaire lue en base (EcranRechAffairesBase.cs).</summary>
     private sealed record Affaire(string Numero, string Libelle, string Siren, string Type,
                                   string Nature, DateTime Creation, decimal Solde,
                                   string IdInstance, string Role, string CodeAffaire,
-                                  string Nom, string Etat, DateTime Saisine);
+                                  string Nom, string Etat, DateTime Saisine, string Demandes = "", string Factures = "");
 
     private static readonly NatureAffaire[] Natures =
     [
@@ -126,13 +129,20 @@ public static class EcranRechAffaires
     /// Pont/AncienRig.cs). Ce fichier reste sans dependance : GedCheck, OuvertureCheck et TriCheck le compilent seul.</summary>
     public static DateTime? CreationDe(string numero) => Affaires.FirstOrDefault(a => a.Numero == numero)?.Creation;
 
+    /// <summary>La DEMONSTRATION (le fonds de ce fichier) ; l'ecran l'appelle par EcranRechAffairesBase.cs
+    /// (« EcranRechAffaires.Trouver »), les bancs GedCheck, OuvertureCheck et TriCheck l'executent directement.</summary>
     /// <param name="cleTri">La colonne cliquee ; null = ordre d'origine (du plus recent au plus ancien).</param>
     /// <param name="selection">Le numero de la ligne selectionnee, ou null.</param>
-    [JSInvokable("EcranRechAffaires.Trouver")]
     public static VueAffaires Trouver(CriteresAffaires criteres, string? cleTri, bool ascendant, string? selection)
+        => Construire(Affaires, criteres, criteres, cleTri, ascendant, selection);
+
+    /// <summary>La vue sur le fonds <paramref name="fonds"/> : <paramref name="filtre"/> filtre et trie en memoire,
+    /// <paramref name="criteres"/> (ceux saisis) disent s'il n'y a aucun critere et quel SIREN est cherche.</summary>
+    private static VueAffaires Construire(Affaire[] fonds, CriteresAffaires criteres, CriteresAffaires filtre, string? cleTri,
+                                          bool ascendant, string? selection)
     {
-        var trouvees = Trouvees(criteres, cleTri, ascendant);
-        var choisie = Affaires.FirstOrDefault(a => a.Numero == selection);
+        var trouvees = Trouvees(fonds, filtre, cleTri, ascendant);
+        var choisie = fonds.FirstOrDefault(a => a.Numero == selection);
 
         return new VueAffaires(
             Natures,
@@ -140,8 +150,9 @@ public static class EcranRechAffaires
             trouvees.Select(a => new LigneAffaire(
                     a.Numero, a.IdInstance, a.Role, a.CodeAffaire, a.Nature, NomNature(a.Nature),
                     a.Libelle, a.Nom, a.Etat, a.Siren, a.Type,
-                    a.Saisine.ToString("dd/MM/yyyy"), a.Creation.ToString("dd/MM/yyyy"),
-                    a.Solde.ToString("N2"), a.Solde))
+                    a.Saisine == DateTime.MinValue ? "" : a.Saisine.ToString("dd/MM/yyyy"),
+                    a.Creation == DateTime.MinValue ? "" : a.Creation.ToString("dd/MM/yyyy"),
+                    a.Solde.ToString("N2"), a.Solde, a.Demandes, a.Factures))
                 .ToArray(),
             string.Join(", ", Natures
                 .Select(n => new { n.Nom, Nb = trouvees.Count(a => a.Nature == n.Code) })
@@ -157,9 +168,8 @@ public static class EcranRechAffaires
     /// modernes) : une vue est un jeu de criteres, comptee sur le MEME filtre que la grille.
     /// fix-ok: ajout du lot 1 des listes modernes (critere de solde, solde en nombre, compte des vues) en plusieurs pas, pas un correctif.
     /// </summary>
-    [JSInvokable("EcranRechAffaires.Compter")]
     public static int[] Compter(CriteresAffaires[] vues)
-        => vues.Select(c => Trouvees(c, null, true).Length).ToArray();
+        => vues.Select(c => Trouvees(Affaires, c, null, true).Length).ToArray();
 
     /// <summary>Vrai tant qu'aucun critere n'est pose : le tableau vide ne veut
     /// alors RIEN dire, et proposer d'ouvrir un dossier serait du bruit.</summary>
@@ -195,9 +205,9 @@ public static class EcranRechAffaires
         return string.Empty;
     }
 
-    private static Affaire[] Trouvees(CriteresAffaires c, string? CleTri, bool TriAscendant)
+    private static Affaire[] Trouvees(IEnumerable<Affaire> fonds, CriteresAffaires c, string? CleTri, bool TriAscendant)
     {
-        IEnumerable<Affaire> q = Affaires;
+        IEnumerable<Affaire> q = fonds;
         if (!string.IsNullOrWhiteSpace(c.CritNumero))
             q = q.Where(a => a.Numero.Contains(c.CritNumero.Trim(), StringComparison.OrdinalIgnoreCase));
         if (!string.IsNullOrWhiteSpace(c.CritLibelle))

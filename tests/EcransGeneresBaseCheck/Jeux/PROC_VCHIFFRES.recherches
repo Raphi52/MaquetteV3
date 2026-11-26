@@ -1,0 +1,17 @@
+# Les recherches de LecteurChiffresDossier (PROC_VCHIFFRES) dans la base. Format : en tete de Program.cs du banc.
+# Le dossier RCS, par son numero de gestion (blancs retires) : sa grille entiere, meme sans exercice chiffre.
+critere: Dossier RCS = 2016 B 60902
+lignes:
+Exercice clos le 31/12/2024 · CHIFFRES SANS SAS | dossier 2016 B 60902 · sans chiffres clés | Exercices sans chiffres | AFaire | []
+---
+# Le meme par son SIREN.
+critere: Dossier RCS = 516 009 002
+lignes:
+Exercice clos le 31/12/2024 · CHIFFRES SANS SAS | dossier 2016 B 60902 · sans chiffres clés | Exercices sans chiffres | AFaire | []
+---
+# La denomination (LIKE).
+critere: Dénomination = chiffres alpha
+lignes:
+Exercice clos le 31/12/2024 · CHIFFRES ALPHA SARL | dossier 2016 B 60901 · CA 120 000,00 € · résultat 15 000,00 € · 4 salariés | Bilans déposés | Validee | []
+Exercice clos le 31/12/2023 · CHIFFRES ALPHA SARL | dossier 2016 B 60901 · CA 98 000,00 € · résultat -2 500,00 € · 1 salarié · bilan rejeté | Bilans déposés | EnCours | []
+Exercice clos le 31/12/2022 · CHIFFRES ALPHA SARL | dossier 2016 B 60901 · sans chiffres clés | Exercices sans chiffres | AFaire | []

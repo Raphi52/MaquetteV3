@@ -1,0 +1,32 @@
+# Les recherches de LecteurRechercheBeneficiaires (PROC_BEN) dans la base. Format : en tete de Program.cs du banc. Jouees avant
+# les gestes de PROC_BE.gestes (qui renomment 1314102).
+# Le numero de dossier (DSSRC_NUM_GESTION, blancs retires) : ses beneficiaires et la divergence en attente.
+critere: Numéro de dossier = 2027 B 14001
+lignes:
+Dupont jean marc | dossier 2027 B 14001 · né(e) le 01/02/1980 | Bénéficiaire en vigueur | AFaire | []
+MARTIN Anne | dossier 2027 B 14001 · né(e) le 03/11/1975 | Bénéficiaire en vigueur | AFaire | []
+MARTIN Anne | dossier 2027 B 14001 · né(e) le 03/11/1975 · divergence du 01/11/2026 en attente de la société · Banque Banc | Bénéficiaire en vigueur | Validee | []
+---
+# Le SIREN cherche le meme dossier (DSSRC_NUM_GESTION OU DSSRC_SIREN, OPE_RESULTATS_BEN.cs:142-145) ; le nom patronymique en LIKE.
+critere: Numéro de dossier = 513140001
+critere: Nom patronymique = martin
+lignes:
+MARTIN Anne | dossier 2027 B 14001 · né(e) le 03/11/1975 | Bénéficiaire en vigueur | AFaire | []
+MARTIN Anne | dossier 2027 B 14001 · né(e) le 03/11/1975 · divergence du 01/11/2026 en attente de la société · Banque Banc | Bénéficiaire en vigueur | Validee | []
+---
+# Un dossier radie ne se trouve qu'avec « Dossiers radiés » coche (jumeau : la meme recherche sans la case ne rend rien).
+critere: Nom patronymique = BENRADIE
+lignes:
+---
+critere: Nom patronymique = BENRADIE
+critere: Dossiers radiés = oui
+lignes:
+BENRADIE Anne | dossier 2016 B 60102 · né(e) le 15/06/1975 · dossier radié | Dossier radié | AFaire | []
+---
+# La date de naissance, saisie comme a l'ecran ; une date illisible ne retrouve personne.
+critere: Date de naissance = 15/06/1990
+lignes:
+ROSSI Luca | dossier 2027 B 14002 · né(e) le 15/06/1990 | Bénéficiaire en vigueur | AFaire | []
+---
+critere: Date de naissance = demain
+lignes:

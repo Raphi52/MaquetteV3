@@ -417,3 +417,40 @@ describe('EcranRechAffaires', () => {
     }
   })
 })
+
+// La base du greffe (lot 6 du plan « RIG v3 100 % fonctionnel ») : Pont/EcranRechAffairesBase.cs rend le mode, une note, et les
+// demandes et factures de chaque affaire (grille de PROC_RECHAFF), montrees dans la ligne depliee.
+describe('EcranRechAffaires lue en base', () => {
+  it('la note dit ce que la liste montre ; demandes et factures dans la ligne depliee ; aucune mention « exemple »', async () => {
+    const note = "Base du greffe : les affaires trouvées par leur numéro (ou celui d'une demande, d'une facture), leur libellé ou SIREN, ou leur instance. Sans critère, RIG v2 ne cherche rien."
+    installerFauxPont({
+      'EcranRechAffaires.Trouver': (c: unknown, k: unknown, a: unknown, sel: unknown) => ({
+        ...vue(c, k, a, sel), mode: 'serveur', message: note,
+        lignes: [ligne('1642001', 'instance', { demandes: 'D1642101 ; D1642102', factures: 'F1642101' })],
+      }),
+      'EcranRechAffaires.Compter': (vues: unknown) => (vues as unknown[]).map(() => 1),
+      'EcranRechAffaires.Aiguiller': () => ({ mode: 'serveur', greffe: '3801', passage: null, message: null, affaires: [] }),
+    })
+    const { container } = render(<EcranRechAffaires ouvrir={vi.fn()} ouvrirUnDossier={vi.fn()} />)
+    await screen.findByText(/resultat ·/)
+    expect(screen.getByRole('note').textContent).toBe(note)
+    expect(container.textContent).not.toMatch(/exemple/i)
+    fireEvent.click(within(container.querySelector('tbody tr')!).getByRole('button', { name: 'Deplier la ligne' }))
+    const champs = [...container.querySelectorAll('.rig-lm-detail .rig-lm-champ')].map((c) => [
+      c.querySelector('.rig-lm-champ__libelle')!.textContent, c.querySelector('.rig-lm-champ__valeur')!.textContent])
+    expect(champs.slice(-2)).toEqual([['Demandes', 'D1642101 ; D1642102'], ['Factures', 'F1642101']])
+  })
+
+  it('base en panne : le motif en alerte, aucune ligne', async () => {
+    installerFauxPont({
+      'EcranRechAffaires.Trouver': (c: unknown, k: unknown, a: unknown, sel: unknown) => ({
+        ...vue(c, k, a, sel), lignes: [], resume: '', mode: 'erreur', message: 'La base du greffe 3801 ne répond pas.',
+      }),
+      'EcranRechAffaires.Compter': (vues: unknown) => (vues as unknown[]).map(() => 0),
+      'EcranRechAffaires.Aiguiller': () => ({ mode: 'serveur', greffe: '3801', passage: null, message: null, affaires: [] }),
+    })
+    const { container } = render(<EcranRechAffaires ouvrir={vi.fn()} ouvrirUnDossier={vi.fn()} />)
+    expect((await screen.findByRole('alert')).textContent).toMatch(/La base du greffe 3801 ne répond pas/)
+    expect(container.querySelectorAll('tbody tr .rig-lm-identite')).toHaveLength(0)
+  })
+})

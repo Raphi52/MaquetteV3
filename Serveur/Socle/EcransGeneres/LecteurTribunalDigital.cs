@@ -43,7 +43,10 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///                                   (DataGridViewDemandesRecus.cs:232-234). Les acceptees et refusees, decochees a
 ///                                   l'ouverture, n'entrent pas dans la liste.
 /// </summary>
-internal sealed class LecteurTribunalDigital : ILecteurEcran
+// fix-ok: la cause des editions de ce fichier par le lot 6 (plan-676a4b19) -- la liste ne se cherchait pas et ne s'ouvrait pas
+// (ILecteurEcran seul) ; le filtre des demandes en attente et les filtres de chaque onglet sont devenus des marques remplacees,
+// pour que la recherche les remplace sans changer la liste d'ouverture (jeu PROC_VTRID.attendu inchange).
+internal sealed class LecteurTribunalDigital : IRechercheEcran, IFicheEcran
 {
     public string Procedure => "PROC_VTRID";
 
@@ -77,21 +80,130 @@ internal sealed class LecteurTribunalDigital : ILecteurEcran
                            JOIN v2.DEMANDE_EDITION AS de ON de.DMNED_ID_DMNED = x.DETD_ID_DMNED
                            WHERE x.DETD_ID_TDE = t.TDE_ID_TDE
                            ORDER BY x.DETD_ID_DETD) AS p
-              WHERE t.TDE_DATE_ENVOI >= @debut AND t.TDE_DATE_ENVOI < @finExclue
+              WHERE t.TDE_DATE_ENVOI >= @debut AND t.TDE_DATE_ENVOI < @finExclue /*envoi*/
               UNION ALL
-              SELECT 1, c.DTDCREFO_ID_DTDCREFO, c.DTDCREFO_NUM_CREFO, c.DTDCREFO_NUM_AFFAIRE, NULL, NULL, NULL, NULL,
+              SELECT 1, c.DTDCREFO_ID_DTDCREFO, c.DTDCREFO_NUM_CREFO, c.DTDCREFO_NUM_AFFAIRE, NULL, NULL, NULL, c.DTDCREFO_ETAT_TRAITEMENT_RIG,
                      LEFT(c.DTDCREFO_ERREUR_SES, 160), NULL, NULL, c.DTDCREFO_DATE_CREATION, c.DTDCREFO_TYPE_FORMALITE
               FROM v2.DEMAT_TRIBUNAL_DIGITAL_CREFO AS c
-              WHERE c.DTDCREFO_ETAT_TRAITEMENT_RIG IS NULL) AS l
+              WHERE /*etat-demande*/ /*demande*/) AS l
         ORDER BY l.Bloc, l.DateTri DESC, l.Identifiant DESC
         """;
 
+    // Les demandes recues en attente, seules cochees a l'ouverture (en tete du fichier).
+    private const string EnAttente = "c.DTDCREFO_ETAT_TRAITEMENT_RIG IS NULL";
+
     public Task<LignesLues> LireAsync(SqlConnection baseGreffe, DateTime aujourdhui, int plafond, CancellationToken ct)
-        => LectureEcran.LireAsync(baseGreffe, Requete, Ligne, ct,
+        => LectureEcran.LireAsync(baseGreffe, Assembler(EnAttente, "", ""), Ligne, ct,
             new SqlParameter("@plafond", plafond),
             // Du jour moins 7 jours a 0 h au jour a 24 h (en tete du fichier) : « < lendemain 0 h » vaut « <= 23:59:59.998 ».
             new SqlParameter("@debut", System.Data.SqlDbType.DateTime) { Value = aujourdhui.Date.AddDays(-7) },
             new SqlParameter("@finExclue", System.Data.SqlDbType.DateTime) { Value = aujourdhui.Date.AddDays(1) });
+
+    private static string Assembler(string etatDemande, string envoi, string demande)
+        => Requete.Replace("/*etat-demande*/", etatDemande, StringComparison.Ordinal).Replace("/*envoi*/", envoi, StringComparison.Ordinal)
+                  .Replace("/*demande*/", demande, StringComparison.Ordinal);
+
+    // ------------------------------------------------------------------ LA RECHERCHE (plan « RIG v3 100 % fonctionnel », lot 6)
+
+    internal const string CritereDebut = "Date de début", CritereFin = "Date de fin", CritereRole = "Numéro de rôle",
+                          CritereTraitees = "Demandes traitées";
+
+    /// <summary>
+    /// Les criteres de chaque onglet de la V2, saisis a la place de leur valeur d'ouverture : « Date de début » / « Date de fin »
+    /// (la date d'envoi des documents transmis, critere DATE, OPE_RECHERCHE_DOCUMENTS_TRANSMIS.cs:235-236 ; la date de reception
+    /// des demandes, OPE_DATES_DEMANDES_RECUES), « Numéro de rôle » (le numero d'affaire, LIKE), « Demandes traitées » (oui : les
+    /// demandes acceptees ou refusees entrent aussi, les cases decochees a l'ouverture, OPE_RECHERCHE_DEMANDES_RECUES.cs:79-81).
+    /// Le champ de recherche cherche le numero d'envoi ou de demande, le role ou le libelle du document.
+    /// </summary>
+    public IReadOnlyCollection<string> Criteres { get; } = [CritereDebut, CritereFin, CritereRole, CritereTraitees];
+
+    public Task<LignesLues> ChercherAsync(SqlConnection baseGreffe, RechercheEcran recherche, DateTime aujourdhui, int plafond, CancellationToken ct)
+    {
+        var parametres = new List<SqlParameter> { new("@plafond", plafond) };
+        var debut = CriteresConsultation.Date(recherche.Critere(CritereDebut));
+        var fin = CriteresConsultation.Date(recherche.Critere(CritereFin));
+        parametres.Add(new SqlParameter("@debut", System.Data.SqlDbType.DateTime) { Value = debut ?? aujourdhui.Date.AddDays(-7) });
+        parametres.Add(new SqlParameter("@finExclue", System.Data.SqlDbType.DateTime) { Value = (fin ?? aujourdhui.Date).AddDays(1) });
+        var etat = CriteresConsultation.OuiNon(recherche.Critere(CritereTraitees)) == true ? "1 = 1" : EnAttente;
+        var (envoi, demande) = ("", "");
+        // Les demandes n'ont pas de date a l'ouverture ; une date saisie les borne sur leur reception.
+        if (debut is not null) demande += " AND c.DTDCREFO_DATE_CREATION >= @debut";
+        if (fin is not null) demande += " AND c.DTDCREFO_DATE_CREATION < @finExclue";
+        if (recherche.Critere(CritereRole) is { } role)
+        {
+            envoi += " AND REPLACE(t.TDE_NUM_AFFAIRE, ' ', '') LIKE @role";
+            demande += " AND REPLACE(c.DTDCREFO_NUM_AFFAIRE, ' ', '') LIKE @role";
+            parametres.Add(new SqlParameter("@role", FormeLigne.Contient(CriteresConsultation.Numero(role))));
+        }
+        if (!string.IsNullOrWhiteSpace(recherche.Texte))
+        {
+            envoi += " AND (t.TDE_NUMEROS_ENVOI LIKE @texte OR t.TDE_NUM_AFFAIRE LIKE @texte OR p.DMNED_LIBELLE_DOCUMENT LIKE @texte)";
+            demande += " AND (c.DTDCREFO_NUM_CREFO LIKE @texte OR c.DTDCREFO_NUM_AFFAIRE LIKE @texte)";
+            parametres.Add(new SqlParameter("@texte", FormeLigne.Contient(recherche.Texte)));
+        }
+        return LectureEcran.LireAsync(baseGreffe, Assembler(etat, envoi, demande), Ligne, ct, [.. parametres]);
+    }
+
+    // ------------------------------------------------------------------ LA FICHE (lot 6)
+
+    internal const string SectionEnvoi = "Documents transmis", SectionDemande = "Demandes reçues";
+
+    internal const string ChampNumeroEnvoi = "Numéro de l'envoi", ChampRole = "Numéro de rôle", ChampDocument = "Document",
+                          ChampDestinataire = "Destinataire", ChampDateEnvoi = "Date d'envoi", ChampCompteRendu = "Compte rendu d'envoi",
+                          ChampDemande = "Demande", ChampFormalite = "Type de formalité", ChampRecue = "Reçue le", ChampErreur = "Erreur";
+
+    private const string FicheEnvoi = """
+        SELECT t.TDE_ID_TDE, t.TDE_NUMEROS_ENVOI, t.TDE_NUM_AFFAIRE, t.TDE_DATE_ENVOI, t.TDE_DATE_CR, t.TDE_ETAT, t.TDE_ERREUR_SES,
+               p.DMNED_LIBELLE_DOCUMENT, p.DMNED_DESIGNATION_DESTINATAIRE
+        FROM v2.TRIBUNAL_DIGITAL_ENVOI AS t
+        OUTER APPLY (SELECT TOP (1) de.DMNED_LIBELLE_DOCUMENT, de.DMNED_DESIGNATION_DESTINATAIRE
+                     FROM v2.DEMANDE_EDITION_TRIBUNAL_DIGITAL AS x
+                     JOIN v2.DEMANDE_EDITION AS de ON de.DMNED_ID_DMNED = x.DETD_ID_DMNED
+                     WHERE x.DETD_ID_TDE = t.TDE_ID_TDE ORDER BY x.DETD_ID_DETD) AS p
+        WHERE t.TDE_ID_TDE = @id
+        """;
+
+    private const string FicheDemande = """
+        SELECT c.DTDCREFO_NUM_CREFO, c.DTDCREFO_NUM_AFFAIRE, c.DTDCREFO_TYPE_FORMALITE, c.DTDCREFO_DATE_CREATION, c.DTDCREFO_ERREUR_SES
+        FROM v2.DEMAT_TRIBUNAL_DIGITAL_CREFO AS c WHERE c.DTDCREFO_ID_DTDCREFO = @id
+        """;
+
+    public async Task<FicheEcran?> LireFicheAsync(SqlConnection baseGreffe, string id, DateTime maintenant, CancellationToken ct)
+    {
+        if (id.Length < 3 || id[1] != '-' || id[0] is not ('T' or 'C') || CriteresConsultation.Entier(id[2..]) is not { } n) return null;
+        var envoi = id[0] == 'T';
+        await using var r = await RigV3.Serveur.Socle.Greffes.LectureV2.LireAsync(baseGreffe, envoi ? FicheEnvoi : FicheDemande, ct,
+            new SqlParameter("@id", n));
+        if (!await r.ReadAsync(ct)) return null;
+        if (envoi)
+        {
+            var numero = FormeLigne.Texte(r, "TDE_NUMEROS_ENVOI");
+            var compteRendu = FormeLigne.Joindre(
+                FormeLigne.DateDe(r, "TDE_DATE_CR") is { } cr ? $"le {FormeLigne.Date(cr)}" : "en attente",
+                FormeLigne.Texte(r, "TDE_ETAT") == "4" ? "OK" : null, PremiereLigne(FormeLigne.Texte(r, "TDE_ERREUR_SES")));
+            return new FicheEcran(Procedure, id, numero.Length > 0 ? $"Envoi {numero}" : $"Envoi n° {n}",
+            [
+                new SectionFiche(SectionEnvoi,
+                [
+                    new(ChampNumeroEnvoi, numero), new(ChampRole, FormeLigne.Texte(r, "TDE_NUM_AFFAIRE")),
+                    new(ChampDocument, FormeLigne.Texte(r, "DMNED_LIBELLE_DOCUMENT")),
+                    new(ChampDestinataire, FormeLigne.Texte(r, "DMNED_DESIGNATION_DESTINATAIRE")),
+                    new(ChampDateEnvoi, FormeLigne.DateFiche(FormeLigne.DateDe(r, "TDE_DATE_ENVOI"))), new(ChampCompteRendu, compteRendu),
+                ]),
+            ]);
+        }
+        var formalite = FormeLigne.Texte(r, "DTDCREFO_TYPE_FORMALITE");
+        return new FicheEcran(Procedure, id, $"Demande {FormeLigne.Texte(r, "DTDCREFO_NUM_CREFO")}",
+        [
+            new SectionFiche(SectionDemande,
+            [
+                new(ChampDemande, FormeLigne.Texte(r, "DTDCREFO_NUM_CREFO")), new(ChampRole, FormeLigne.Texte(r, "DTDCREFO_NUM_AFFAIRE")),
+                new(ChampFormalite, Formalites.TryGetValue(formalite, out var libelle) ? libelle : formalite),
+                new(ChampRecue, FormeLigne.DateFiche(FormeLigne.DateDe(r, "DTDCREFO_DATE_CREATION"))),
+                new(ChampErreur, PremiereLigne(FormeLigne.Texte(r, "DTDCREFO_ERREUR_SES"))),
+            ]),
+        ]);
+    }
 
     private static LigneLue Ligne(SqlDataReader r)
         => Convert.ToInt32(r["Bloc"]) == 0 ? Envoi(r) : Demande(r);
@@ -124,7 +236,7 @@ internal sealed class LecteurTribunalDigital : ILecteurEcran
             FormeLigne.Texte(r, "Destinataire"),
             envoye.Length > 0 ? $"envoyé le {envoye}" : null,
             regle.Statut);
-        return new LigneLue(nom, precisions, Groupes[0], regle.Etat, regle.Faites);
+        return new LigneLue(nom, precisions, Groupes[0], regle.Etat, regle.Faites) { Id = $"T-{FormeLigne.Texte(r, "Identifiant")}" };
     }
 
     private static LigneLue Demande(SqlDataReader r)
@@ -133,14 +245,20 @@ internal sealed class LecteurTribunalDigital : ILecteurEcran
         var recue = FormeLigne.Date(FormeLigne.DateDe(r, "DateTri"));
         var formalite = FormeLigne.Texte(r, "Formalite");
         var erreur = PremiereLigne(FormeLigne.Texte(r, "Erreur"));
+        // L'etat de traitement RIG : vide a l'ouverture (en attente) ; « A » acceptee, « R » refusee, que seule la recherche
+        // « Demandes traitées » fait entrer (lot 6) -- elles sont alors « Traité ».
+        var traitement = FormeLigne.Texte(r, "Etat");
         var nom = FormeLigne.Joindre($"Demande {FormeLigne.Texte(r, "Numero")}", affaire.Length > 0 ? $"Rôle {affaire}" : null);
         var precisions = FormeLigne.Joindre(
             recue.Length > 0 ? $"Reçue le {recue}" : null,
             Formalites.TryGetValue(formalite, out var libelle) ? libelle : formalite,
             erreur.Length > 0 ? $"en erreur : {erreur}" : null,
-            "en attente de traitement");
-        // La regle d'etat (en tete du fichier) : toute demande de la liste attend le greffe.
-        return new LigneLue(nom, precisions, Groupes[1], "AFaire", []);
+            traitement switch { "" => "en attente de traitement", "A" => "acceptée", "R" => "refusée", var t => $"traitée ({t})" });
+        // La regle d'etat (en tete du fichier) : une demande en attente attend le greffe ; une demande traitee l'est.
+        return new LigneLue(nom, precisions, Groupes[1], traitement.Length == 0 ? "AFaire" : "Validee", [])
+        {
+            Id = $"C-{FormeLigne.Texte(r, "Identifiant")}",
+        };
     }
 
     /// <summary>Une erreur SES tient parfois sur plusieurs lignes (TRIDEdiEntrantCR.cs:236-241) : la premiere.</summary>

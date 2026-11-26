@@ -42,7 +42,10 @@ internal sealed class ModuleEcransGeneres : IModuleServeur
                     ? await ((IRechercheEcran)lecteur).ChercherAsync(cn, recherche, DateTime.Now, Plafond, ct)
                     : await lecteur.LireAsync(cn, DateTime.Now, Plafond, ct);
                 return Results.Ok(new LignesEcran(procedure, true, [.. lues.Lignes], lues.Total, Plafond)
-                                  { Cherchee = cherche, Chercheur = lecteur is IRechercheEcran });
+                                  {
+                                      Cherchee = cherche, Chercheur = lecteur is IRechercheEcran,
+                                      TotalParGroupe = lues.TotalParGroupe?.ToDictionary(StringComparer.Ordinal),
+                                  });
             });
         }).RequireAuthorization(PolitiquesSocle.AgentAdmis);
 

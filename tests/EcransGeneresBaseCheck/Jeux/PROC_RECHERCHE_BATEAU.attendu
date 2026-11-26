@@ -1,0 +1,10 @@
+# « Navires » (LecteurNavires) sur le jeu PROC_RECHERCHE_BATEAU.sql : la grille que la V2 peuple des l'ouverture -- les seuls
+# navires (BTEAU_IS_NAVIRE), « Afficher l'historique » decoche : les noms actuels seuls (BTEAU_IS_LAST), tries par nom.
+# Les inscriptions comptees, historique decoche : celles de tout le numero d'enregistrement (1600503 compte celle de son ancien nom).
+# Etat : aucune inscription -> AFaire ; des inscriptions, nom actuel -> Validee.
+# Ecartes, chacun avec son jumeau retenu :
+#   1600504 n'est pas un navire       -- 1600501 ;
+#   1600502 ancien nom (historique decoche) -- 1600503, son nom actuel ; PROC_RECHERCHE_BATEAU.recherches le montre avec la case.
+L6 NOUVEAU NOM | Numéro d'enregistrement 600502 · 1 inscription | Nom actuel | Validee | []
+L6 PELICAN | Numéro d'enregistrement 600501 · port BR · 2 inscriptions | Nom actuel | Validee | []
+L6 SANS INSCRIPTION | Numéro d'enregistrement 600505 · aucune inscription | Nom actuel | AFaire | []

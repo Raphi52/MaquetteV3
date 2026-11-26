@@ -21,8 +21,13 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 //   - « Interdits de gerer » et « Rechercher un beneficiaire » sont repris tels quels du menu, sans
 //     accent : tests/EcransGeneresCheck exige l'egalite du titre avec le libelle du menu.
 //   - Voir une image (PROC_IMAGE) : la fiche decrit un visualiseur passif, sans etat ni validation
-//     (proc_image.md:101-105). Ses etats et la marche « Ajustement » sont de maquette ; son bouton
-//     final est APERCU, a confirmer.
+//     (proc_image.md:101-105). Son bouton final est APERCU, a confirmer.
+//
+// BRANCHES SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 6, 26/11/2026) : quinze de ces seize ecrans ont leur
+// lecteur (Serveur/Socle/EcransGeneres/Lecteur*.cs, nomme dans un commentaire de chaque descripteur) ; leurs criteres, leurs
+// sections, leurs groupes et leurs etats sont ceux que ce lecteur lit et cherche, chacun cite sur sa ligne de fiche V2. Les
+// lignes ci-dessous restent la demonstration, montree sans serveur. « Interdits de gerer » n'a pas de lecteur : RIG v2
+// interroge le service web du FNIG, pas la base du greffe.
 
 // fix-ok: cause mesurée — 14 des 16 « Valider » de la version committée (HEAD d242adc) n'existaient pas dans leur fiche (gestes de maquette) ; chacun est cité sur sa ligne de fiche. PROC_IMAGE, lui, restait sans écran (banc EcransGeneres -Detail, liste « sans ecran ni descripteur ») : descripteur ajouté (contrôle : 16/16).
 public sealed class DomaineTrouver : IDomaineEcrans
@@ -33,35 +38,35 @@ public sealed class DomaineTrouver : IDomaineEcrans
         {
             Code = "PROC_VDOSSIER", Titre = "Dossier RCS", Sujet = "dossiers RCS", Rang = 4,
             Forme = FormeEcran.Consultation,
-            Recherche = "Rechercher un dossier : numéro, SIREN, dépôt, inscription…",
-            Criteres = ["Numéro : dossier, SIREN, dépôt, inscription, liaison, chrono ou non-inscrit", "Numéro d'inscription privilège"],
+            // Lecteur : Serveur/Socle/EcransGeneres/LecteurDossierRcs.cs (lot 6, plan-676a4b19). Critères : l'entrée par numéro
+            // (proc_vdossier.md:314-347), la recherche d'entreprise par nom (OPE_ENTREE_VGED_NUMERO.cs:76-107) et l'entrée par
+            // inscription de privilège (proc_vdossier.md:349-369).
+            Recherche = "Rechercher un dossier : numéro, SIREN, dépôt, demande, non-inscrit ou nom…",
+            Criteres = ["Numéro", "Dénomination", "Inscription privilège"],
             // Valider : proc_vdossier.md:378 (barre « Valider/Annuler » de l'étape de choix du dossier) et :397 (VALIDER → _Valider).
             Valider = "Valider",
-            Etats = EtatsEcran.Trois("À consulter", "En consultation", "Consulté"),
+            // États : les colonnes de DOSSIER_RCS (radiation, provisoirement sans activité, cessation) -- règle en tête du lecteur.
+            Etats = EtatsEcran.Trois("Actif", "Sans activité", "Radié"),
             Groupes = ["Dossier RCS", "Non-inscrit", "Demande"],
             Sections =
             [
-                Marche("Numéro", "Saisir un numéro de demande, un SIREN, un dossier, une liaison, un dépôt, une inscription, un chrono de formalité ou un non-inscrit. Un numéro de 9 caractères est traité comme un SIREN : la recherche d'entreprise s'ouvre.", true,
-                    "Numéro", "Inscription privilège"),
-                Marche("Choix du dossier", "Quand l'inscription a plusieurs dossiers, en choisir un dans la liste (double-clic ou Entrée). Annuler revient à la saisie.", false,
-                    "Dossier retenu"),
-                Marche("Identité", "La fiche du dossier : dénomination, SIREN, dates d'immatriculation et de radiation, adresse, code NAF, personne morale.", true,
-                    "Dénomination", "SIREN", "Date d'immatriculation", "Date de radiation", "Adresse", "Code NAF", "Personne morale"),
-                Marche("Documents", "L'arbre des documents, du plus récent au plus ancien : actes, bilans, formalités, signalements BE, inscriptions privilèges, surveillance, réquisition, pièces jointes.", true,
-                    "Actes", "Bilans", "Formalités", "Signalements BE", "Inscriptions privilèges", "Surveillance", "Réquisition", "Pièces jointes"),
-                Marche("Actions", "Ouvrir ou imprimer un document, importer une pièce jointe avec son bordereau, envoyer par courriel. Une pièce jointe ne se supprime qu'après confirmation.", false,
-                    "Ouvrir", "Imprimer", "Importer", "Envoyer par courriel", "Supprimer une pièce jointe", "Kbis", "Kbis BE", "Kbis historique", "Synthèse RNE"),
+                // Identité : les colonnes de la grille de choix du dossier (OPE_SELECT_DOSSIERRCS, proc_vdossier.md:383-387).
+                Marche("Identité", "La fiche du dossier : dénomination, numéro de gestion, SIREN, dates d'immatriculation et de radiation, adresse, code NAF, personne morale.", true,
+                    "Dénomination", "Numéro de gestion", "SIREN", "Date d'immatriculation", "Date de radiation", "Adresse", "Code NAF", Champ.Case("Personne morale")),
+                // Documents : l'arbre de OPE_VGED, pour ce que la V3 en lit (actes, bilans, formalités, inscriptions, bénéficiaires).
+                Marche("Documents", "Les documents du dossier, du plus récent au plus ancien : actes, bilans, formalités, inscriptions de privilège, bénéficiaires effectifs déclarés.", true,
+                    Champ.Tableau("Actes"), Champ.Tableau("Bilans"), Champ.Tableau("Formalités"), Champ.Tableau("Inscriptions privilèges"), Champ.Tableau("Signalements BE")),
             ],
             Lignes =
             [
-                Ligne("Lambda Conseil SARL", "Dossier RCS 2026B00601 · inscrit le 02/03/2026", "Dossier RCS", "AFaire"),
-                Ligne("Mu Logistique SAS", "Dossier RCS 2026B00602 · inscrit le 03/03/2026", "Dossier RCS", "EnCours", 0, 2),
-                Ligne("Nu Services SARL", "Dossier RCS 2026B00603 · inscrit le 04/03/2026", "Dossier RCS", "Validee", 0, 2, 3),
-                Ligne("Xi Entrepôts SAS", "Non-inscrit · dépôt du 05/03/2026", "Non-inscrit", "AFaire"),
-                Ligne("Pi Études SARL", "Non-inscrit · dépôt du 06/03/2026", "Non-inscrit", "EnCours", 0),
-                Ligne("Rho Habitat SAS", "Demande · bordereau de réquisition du 09/03/2026", "Demande", "Validee", 0, 2, 3, 4),
-                Ligne("Sigma Transports SARL", "Dossier RCS 2026B00607 · deux dossiers pour cette inscription", "Dossier RCS", "AFaire"),
-                Ligne("Tau Commerce SAS", "Dossier RCS 2026B00608 · inscrit le 12/03/2026", "Dossier RCS", "EnCours", 0, 1),
+                Ligne("Lambda Conseil SARL", "Dossier RCS 2026 B 00601 · immatriculé le 02/03/2026", "Dossier RCS", "AFaire"),
+                Ligne("Mu Logistique SAS", "Dossier RCS 2026 B 00602 · immatriculé le 03/03/2026 · sans activité", "Dossier RCS", "EnCours"),
+                Ligne("Nu Services SARL", "Dossier RCS 2026 B 00603 · radié le 04/03/2026", "Dossier RCS", "Validee"),
+                Ligne("Xi Entrepôts SAS", "Non-inscrit N2026000005", "Non-inscrit", "AFaire"),
+                Ligne("Pi Études SARL", "Non-inscrit N2026000006 · radié le 06/03/2026", "Non-inscrit", "Validee"),
+                Ligne("Rho Habitat SAS", "Demande 26000000709 · Dossier RCS 2026 B 00609", "Demande", "AFaire"),
+                Ligne("Sigma Transports SARL", "Dossier RCS 2026 B 00607 · SIREN 900 300 007", "Dossier RCS", "AFaire"),
+                Ligne("Tau Commerce SAS", "Dossier RCS 2026 B 00608 · immatriculé le 12/03/2026", "Dossier RCS", "AFaire"),
             ],
         },
 
@@ -69,34 +74,35 @@ public sealed class DomaineTrouver : IDomaineEcrans
         {
             Code = "PROC_VJUD", Titre = "Dossier judiciaire", Sujet = "dossiers judiciaires", Rang = 4,
             Forme = FormeEcran.Consultation,
-            Recherche = "Rechercher une instance, une procédure collective ou une prévention…",
-            Criteres = ["Type d'entité : instance, procédure collective ou prévention", "Entité recherchée"],
+            // Lecteur : Serveur/Socle/EcransGeneres/LecteurDossierJudiciaire.cs (lot 6). Critères : la recherche d'entité judiciaire
+            // (ETP_ENTITE_JUD_RECHERCHE, proc_vjud.md:111-119).
+            Recherche = "Rechercher une instance, une procédure collective ou une prévention : numéro ou nom…",
+            Criteres = ["Type d'entité", "Numéro", "Nom"],
             // Valider : proc_vjud.md:172 et :176 (bouton MODIFIER ; visible avec POOL_EDIT si le dossier est une entité judiciaire).
             Valider = "Modifier",
-            Etats = EtatsEcran.Trois("À consulter", "En consultation", "Consultée"),
+            // États : les événements de l'affaire (étapes « Événements survenus / futurs ») -- règle en tête du lecteur.
+            Etats = EtatsEcran.Trois("Sans événement", "Événement à venir", "Événements survenus"),
             Groupes = ["Instance", "Procédure collective", "Prévention"],
             Sections =
             [
-                Marche("Entité", "Choisir le type d'entité et la retrouver. Une entité déjà chargée s'affiche sans étape de recherche.", true,
-                    "Type d'entité", "Entité recherchée"),
-                Marche("Informations", "La fiche de l'entité : instance, procédure collective ou prévention. Lecture seule.", true,
-                    "Informations principales"),
-                Marche("Parties", "Les parties de l'entité : demandeurs, défendeurs, intervenants, débiteurs multiples.", true,
-                    "Demandeurs", "Défendeurs", "Intervenants", "Débiteurs multiples"),
-                Marche("Audiences et décisions", "Les audiences, les appels, les décisions judiciaires et le chef de demande.", false,
-                    "Audiences", "Appels", "Décisions judiciaires", "Chef de demande"),
+                Marche("Informations", "La fiche de l'entité : numéro, nom de l'affaire, code affaire, dates. Lecture seule.", true,
+                    "Numéro", "Nom de l'affaire", "Code affaire", "Date d'ouverture", "Date de l'acte", "Procédure collective rattachée"),
+                Marche("Parties", "Les parties de l'instance : leur qualité et leur désignation.", false,
+                    Champ.Tableau("Parties de l'affaire")),
+                Marche("Audiences et décisions", "Les décisions judiciaires de l'instance, rendues ou prévues.", false,
+                    Champ.Tableau("Décisions judiciaires")),
                 Marche("Événements", "Les événements survenus, puis les événements futurs.", false,
-                    "Événements survenus", "Événements futurs"),
+                    Champ.Tableau("Événements survenus"), Champ.Tableau("Événements futurs")),
             ],
             Lignes =
             [
-                Ligne("Rôle 2026J00101 · Omega Conseil SAS c/ Kappa Négoce SARL", "Instance · mode référé", "Instance", "AFaire"),
-                Ligne("Rôle 2026J00102 · Iota Bois SAS c/ Thêta Import SARL", "Instance · au fond", "Instance", "EnCours", 0),
-                Ligne("Rôle 2026J00103 · Chi Pêche SARL c/ Psi Paiement SAS", "Instance · audiences à venir", "Instance", "Validee", 0, 1, 2, 3),
-                Ligne("Lambda Conseil SARL", "Procédure collective · débiteur unique", "Procédure collective", "AFaire"),
-                Ligne("Mu Logistique SAS", "Procédure collective · débiteurs multiples", "Procédure collective", "EnCours", 0, 1),
-                Ligne("Nu Services SARL", "Prévention · mode référé", "Prévention", "Validee", 0, 1, 2),
-                Ligne("Xi Entrepôts SAS", "Prévention · consultation seule", "Prévention", "AFaire"),
+                Ligne("Rôle 2026J00101 · Omega Conseil SAS c/ Kappa Négoce SARL", "Instance · enrôlée le 02/03/2026 · aucun événement", "Instance", "AFaire"),
+                Ligne("Rôle 2026J00102 · Iota Bois SAS c/ Thêta Import SARL", "Instance · 1 événement à venir", "Instance", "EnCours"),
+                Ligne("Rôle 2026J00103 · Chi Pêche SARL c/ Psi Paiement SAS", "Instance · 3 événements survenus", "Instance", "Validee"),
+                Ligne("PC 2026P00104 · Lambda Conseil SARL", "Procédure collective · ouverte le 05/03/2026 · aucun événement", "Procédure collective", "AFaire"),
+                Ligne("PC 2026P00105 · Mu Logistique SAS", "Procédure collective · 2 événements à venir", "Procédure collective", "EnCours"),
+                Ligne("Prévention 2026R00106 · Nu Services SARL", "Prévention · 1 événement survenu", "Prévention", "Validee"),
+                Ligne("Prévention 2026R00107 · Xi Entrepôts SAS", "Prévention · aucun événement", "Prévention", "AFaire"),
             ],
         },
 
@@ -104,16 +110,23 @@ public sealed class DomaineTrouver : IDomaineEcrans
         {
             Code = "PROC_REGJUD", Titre = "Registres judiciaires", Sujet = "lignes de registre", Rang = 4,
             Forme = FormeEcran.Etat,
-            Parametres = [Champ.Periode("Dates d'acte"), Champ.Periode("Dates de saisine"), Champ.Periode("Dates d'enrôlement"), "Type d'instance"],
+            // Parametres : les criteres de la V2, cherches DANS la base (LecteurRegistresJudiciaires.cs) ; les types d'instance
+            // sont ceux que le repertoire general propose (OPE_REGISTRE_GENERAL.cs:41-56), un a la fois en V3.
+            Parametres = [Champ.Periode("Dates d'acte"), Champ.Periode("Dates de saisine"), Champ.Periode("Dates d'enrôlement"),
+                Champ.Liste("Type d'instance", "J", "F", "R", "JC", "OP", "IP", "LS", "PP", "DD", "MD", "RC", "RA")],
             // Colonnes : les champs de la grille V2. Ils formaient une section « Resultats », retiree : elle repetait le
-            // tableau que l'Etat affiche (controle final du lot 1, 25/11/2026).
+            // tableau que l'Etat affiche (controle final du lot 1, 25/11/2026). Lecteur : LecteurRegistresJudiciaires.cs (lot 6).
             Colonnes = ["Rôle", Champ.Date("Date d'acte"), "Numéro au répertoire", "Nature", "Chambre", Champ.Date("Date de décision"), "Type de décision", "Ressort"],
+            // « Impression » = VALIDER de RIG v2 : une demande d'édition par registre dans la file des éditions
+            // (EcrivainRegistresJudiciaires.cs, OPE_REGISTRE_ABSTRACT.cs:113-126) ; « Aperçu » (l'état Crystal) est refusé, dit.
             Gestes = ["Aperçu", "Impression"],
-            Recherche = "Filtrer les lignes du registre : rôle, nature, chambre…",
-            Criteres = ["Date d'acte", "Date de saisine", "Date d'enrôlement", "Type d'instance"],
+            Recherche = "Chercher dans le registre : rôle ou nom de l'affaire…",
+            // Les criteres sont les Parametres, au libelle pres : c'est ce que l'Etat envoie a la base.
+            Criteres = ["Dates d'acte", "Dates de saisine", "Dates d'enrôlement", "Type d'instance"],
             // Valider : proc_regjud.md:271 et :347 (bouton VALIDER de la barre : édition du registre, actif s'il y a des lignes).
             Valider = "Valider",
-            Etats = EtatsEcran.Trois("À filtrer", "Sélection en cours", "Imprimé"),
+            // États : la décision de la ligne (DECISION_JUDICIAIRE) -- règle en tête du lecteur.
+            Etats = EtatsEcran.Trois("Sans décision", "Décision prévue", "Décision rendue"),
             Groupes = ["Répertoire général", "Injonctions de payer", "Ordonnances du président"],
             Sections =
             [
@@ -128,13 +141,13 @@ public sealed class DomaineTrouver : IDomaineEcrans
             ],
             Lignes =
             [
-                Ligne("Rôle 2026J00201 · Pi Études SARL c/ Rho Habitat SAS", "Acte du 03/03/2026 · n° 1201 · chambre commerciale", "Répertoire général", "AFaire"),
-                Ligne("Rôle 2026J00202 · Sigma Transports SARL c/ Tau Commerce SAS", "Acte du 04/03/2026 · n° 1202", "Répertoire général", "EnCours", 0),
-                Ligne("Rôle 2026J00203 · Upsilon Import SARL c/ Phi Bâtiment SAS", "Acte du 05/03/2026 · n° 1203", "Répertoire général", "Validee", 0, 3),
-                Ligne("Injonction 2026IP0301 · Chi Pêche SARL", "Décision du 06/03/2026", "Injonctions de payer", "AFaire"),
-                Ligne("Injonction 2026IP0302 · Psi Paiement SAS", "Décision du 09/03/2026", "Injonctions de payer", "EnCours", 0),
-                Ligne("Ordonnance 2026OP0401 · Omega Conseil SAS", "Ordonnance du 10/03/2026", "Ordonnances du président", "Validee", 0, 3),
-                Ligne("Ordonnance 2026OP0402 · Kappa Négoce SARL", "Ordonnance du 11/03/2026", "Ordonnances du président", "AFaire"),
+                Ligne("Rôle 2026J00201 · Pi Études SARL c/ Rho Habitat SAS", "acte du 03/03/2026 · n° 1201 · chambre 1 · sans décision", "Répertoire général", "AFaire"),
+                Ligne("Rôle 2026J00202 · Sigma Transports SARL c/ Tau Commerce SAS", "acte du 04/03/2026 · n° 1202 · décision prévue le 30/03/2026", "Répertoire général", "EnCours"),
+                Ligne("Rôle 2026J00203 · Upsilon Import SARL c/ Phi Bâtiment SAS", "acte du 05/03/2026 · n° 1203 · décision du 20/03/2026", "Répertoire général", "Validee"),
+                Ligne("Rôle 2026IP0301 · Chi Pêche SARL", "minute 301 · décision du 06/03/2026", "Injonctions de payer", "Validee"),
+                Ligne("Rôle 2026IP0302 · Psi Paiement SAS", "minute 302 · décision prévue le 09/03/2026", "Injonctions de payer", "EnCours"),
+                Ligne("Rôle 2026OP0401 · Omega Conseil SAS", "acte du 10/03/2026 · décision du 10/03/2026", "Ordonnances du président", "Validee"),
+                Ligne("Rôle 2026OP0402 · Kappa Négoce SARL", "acte du 11/03/2026 · sans décision", "Ordonnances du président", "AFaire"),
             ],
         },
 
@@ -142,30 +155,32 @@ public sealed class DomaineTrouver : IDomaineEcrans
         {
             Code = "PROC_RECHERCHE_BATEAU", Titre = "Navires", Sujet = "navires", Rang = 4,
             Forme = FormeEcran.Consultation,
+            // Lecteur : Serveur/Socle/EcransGeneres/LecteurNavires.cs (lot 6). Critères : OPE_RECHERCHE_BATEAU.Rechercher
+            // (proc_recherche_bateau.md:158-198) -- le nom, le numéro d'enregistrement, la case « Afficher l'historique » (oui).
             Recherche = "Rechercher un navire : nom ou numéro d'enregistrement…",
-            Criteres = ["Nom du navire (recherche dans le texte)", "Numéro d'enregistrement (une partie suffit)", "Afficher l'historique des noms"],
+            Criteres = ["Nom du navire", "Numéro d'enregistrement", "Afficher l'historique"],
             // Valider : proc_recherche_bateau.md:64 et :148 (VALIDER toujours visible) ; renvoie la liste à l'écran appelant (:72).
             Valider = "Valider",
-            Etats = EtatsEcran.Trois("À chercher", "Sélection en cours", "Renvoyée"),
+            // États : les inscriptions du navire (la colonne NbInscriptions de la V2) -- règle en tête du lecteur.
+            Etats = EtatsEcran.Trois("Sans inscription", "Inscrit sous un ancien nom", "Inscrit"),
             Groupes = ["Nom actuel", "Ancien nom"],
             Sections =
             [
-                Marche("Historique", "Afficher l'historique fait apparaître la colonne « Nom le plus récent ».", false,
-                    "Afficher l'historique", "Nom le plus récent"),
-                Marche("Détails", "Consulter le navire sélectionné : numéro d'enregistrement, nom et informations du référentiel bateau.", false,
-                    "Numéro d'enregistrement", "Nom du navire", "Informations du référentiel"),
-                Marche("Sélection", "Cocher les navires à retenir. Valider renvoie la liste à l'écran appelant.", true,
-                    "Navires retenus"),
+                Marche("Détails", "Le navire : numéro d'enregistrement, nom, nom le plus récent, port, immatriculation, propriétaire et caractéristiques du référentiel bateau.", true,
+                    "Numéro d'enregistrement", "Nom du navire", "Nom le plus récent", "Port (quartier maritime)", "Date d'immatriculation",
+                    "Lieu d'immatriculation", "Propriétaire", "Numéro OMI", "Longueur", "Jauge", "Nationalité"),
+                Marche("Inscriptions", "Les inscriptions du navire, la plus récente en tête (l'info-bulle de la V2).", false,
+                    Champ.Tableau("Inscriptions du navire")),
             ],
             Lignes =
             [
-                Ligne("Le Pélican Alpha", "Numéro d'enregistrement 0001 · immatriculé en 2019", "Nom actuel", "AFaire"),
-                Ligne("L'Étoile Bêta", "Numéro 0002 · immatriculé en 2020", "Nom actuel", "EnCours"),
-                Ligne("La Mouette Gamma", "Numéro 0003 · ancien nom : Le Vent d'Ouest", "Ancien nom", "EnCours", 0),
-                Ligne("Le Phare Delta", "Numéro 0004 · immatriculé en 2016", "Nom actuel", "Validee", 2),
-                Ligne("Le Pélican Epsilon", "Numéro 0005 · immatriculé en 2011", "Nom actuel", "AFaire"),
-                Ligne("Le Dauphin Zêta", "Numéro 0006 · ancien nom : Le Grand Large", "Ancien nom", "EnCours", 1),
-                Ligne("Le Hérisson Êta", "Numéro 0007 · immatriculé en 2008", "Nom actuel", "Validee", 0, 2),
+                Ligne("Le Pélican Alpha", "Numéro d'enregistrement 0001 · port 01 · aucune inscription", "Nom actuel", "AFaire"),
+                Ligne("L'Étoile Bêta", "Numéro d'enregistrement 0002 · port 02 · 2 inscriptions", "Nom actuel", "Validee"),
+                Ligne("La Mouette Gamma", "Numéro d'enregistrement 0003 · nom le plus récent : Le Vent d'Ouest · 1 inscription", "Ancien nom", "EnCours"),
+                Ligne("Le Phare Delta", "Numéro d'enregistrement 0004 · 1 inscription", "Nom actuel", "Validee"),
+                Ligne("Le Pélican Epsilon", "Numéro d'enregistrement 0005 · aucune inscription", "Nom actuel", "AFaire"),
+                Ligne("Le Dauphin Zêta", "Numéro d'enregistrement 0006 · nom le plus récent : Le Grand Large · aucune inscription", "Ancien nom", "AFaire"),
+                Ligne("Le Hérisson Êta", "Numéro d'enregistrement 0007 · 3 inscriptions", "Nom actuel", "Validee"),
             ],
         },
 
@@ -173,32 +188,31 @@ public sealed class DomaineTrouver : IDomaineEcrans
         {
             Code = "PROC_RECHERCHE_GED", Titre = "Documents", Sujet = "documents", Rang = 4,
             Forme = FormeEcran.Consultation,
-            Recherche = "Rechercher un document : numéro interne ou login d'extraction…",
-            Criteres = ["Catégorie : maquettes, éléments de fusion, documents d'édition, factures, documents SIREN, orphelins", "Numéro interne du document", "Login d'extraction"],
+            // Lecteur : Serveur/Socle/EcransGeneres/LecteurDocumentsGed.cs, catégories DocumentsGed.cs (lot 6). Critères : la
+            // catégorie de l'arbre (OPE_GED.cs:48-72), le numéro GED (ult_TbxNumGed, :446) et le login d'extraction (:456).
+            Recherche = "Rechercher un document : numéro, nom de fichier ou libellé…",
+            Criteres = ["Catégorie", "Numéro du document", "Login d'extraction"],
             // Valider : proc_recherche_ged.md:115 (« Archiver » : IMPORT (Archiver) → _Archiver(), section « Actions toolbar »).
             Valider = "Archiver",
-            Etats = EtatsEcran.Trois("À traiter", "En cours", "Traité"),
-            Groupes = ["Maquettes", "Éléments de fusion", "Documents d'édition", "Factures", "Documents SIREN", "Orphelins"],
+            // États : la référence et l'extraction du document (GED_RIG) -- règle en tête du lecteur.
+            Etats = EtatsEcran.Trois("Orphelin", "Extrait", "Archivé"),
+            Groupes = ["Sans référence", "Éléments de fusion", "Maquettes", "Documents d'édition", "Documents REDA", "Factures", "Documents SIREN", "Orphelins", "Autres documents"],
             Sections =
             [
-                Marche("Catégorie", "Choisir une catégorie, ou chercher par numéro interne ou login d'extraction. Le résultat est limité à 100 lignes, sans pagination.", true,
-                    "Catégorie", "Numéro interne", "Login d'extraction"),
-                Marche("Propriétés", "Consulter les propriétés du document sélectionné : catégorie, dernière version.", false,
-                    "Numéro interne", "Catégorie", "Dernière version"),
-                Marche("Extraction", "Récupérer la dernière version dans un répertoire, ou annuler une extraction.", false,
-                    "Répertoire de destination", "Annuler l'extraction"),
-                Marche("Archivage et suppression", "Archiver ou supprimer les documents sélectionnés, plusieurs à la fois.", true,
-                    "Archiver", "Supprimer"),
+                Marche("Propriétés", "Le document : numéro, catégorie, libellé, fichier, référence, archivage, taille et pages. Le résultat est limité à 100 lignes dans RIG v2, sans pagination.", true,
+                    "Numéro du document", "Catégorie", "Libellé", "Nom du fichier", "Extension", "Référence", "Date d'archivage", "Archivé par", "Taille", "Nombre de pages"),
+                Marche("Extraction", "Qui a extrait le document, quand, et dans quel répertoire. Un document extrait est réservé jusqu'à son archivage.", false,
+                    "Login d'extraction", "Date d'extraction", "Répertoire d'extraction"),
             ],
             Lignes =
             [
-                Ligne("Maquette de fiche client", "Document 0004521 · maquette HTML", "Maquettes", "AFaire"),
-                Ligne("Élément de fusion : lettre de rappel", "Document 0004522", "Éléments de fusion", "EnCours", 0),
-                Ligne("Attestation de dépôt 2026-0310", "Document 0004523 · extrait avec le login ext2026", "Documents d'édition", "Validee", 0, 1, 3),
-                Ligne("Facture 2026-00815", "Document 0004524", "Factures", "EnCours", 0, 1),
-                Ligne("Document SIREN 0004525", "Document rattaché à une entreprise", "Documents SIREN", "AFaire"),
-                Ligne("Pièce orpheline 0004526", "Référence externe supprimée", "Orphelins", "EnCours", 0, 2),
-                Ligne("Extrait d'édition 0004527", "Édition du 12/03/2026", "Documents d'édition", "Validee", 0, 2, 3),
+                Ligne("FICHE_CLIENT (RIG)", "Document 0004521 · HTML · archivé le 02/03/2026", "Maquettes", "Validee"),
+                Ligne("LETTRE_RAPPEL", "Document 0004522 · DOCX · archivé le 03/03/2026 · extrait par ext2026", "Éléments de fusion", "EnCours"),
+                Ligne("Attestation de dépôt", "Document 0004523 · PDF · archivé le 04/03/2026", "Documents d'édition", "Validee"),
+                Ligne("Facture 2026-00815", "Document 0004524 · XML · archivé le 05/03/2026", "Factures", "Validee"),
+                Ligne("Liaison 26000000525", "Document 0004525 · XML · archivé le 06/03/2026", "Documents SIREN", "Validee"),
+                Ligne("piece-0004526.pdf", "Document 0004526 · PDF · référence supprimée (MAQUETTE.MQTT_NUM_DOCUMENT)", "Orphelins", "AFaire"),
+                Ligne("import-0004527.zip", "Document 0004527 · ZIP · archivé le 12/03/2026", "Sans référence", "Validee"),
             ],
         },
 
@@ -206,12 +220,15 @@ public sealed class DomaineTrouver : IDomaineEcrans
         {
             Code = "PROC_PDF", Titre = "Voir un PDF", Sujet = "pièces PDF", Rang = 4,
             Forme = FormeEcran.Document,
+            // Lecteur : Serveur/Socle/EcransGeneres/LecteurPiecesGed.cs (lot 6) : les PDF de la GED du greffe (GED_RIG). RIG v2
+            // reçoit un chemin de fichier (proc_pdf.md:31-40) ; le document réel d'un greffe est dans sa GED, octets compris.
             Recherche = "Rechercher une pièce à lire…",
             Criteres = ["Fichier PDF unique, ou dossier de PDF", "Pièces non lues affichées en gras", "Alerte à la fermeture si une pièce n'est pas lue"],
             // Valider : proc_pdf.md:110 (« Imprimer tout », impression de masse du mode dossier, :203) ; VALIDER (ligne 106) n'est jamais visible.
             Valider = "Imprimer tout",
-            Etats = EtatsEcran.Trois("Non lu", "En lecture", "Lu"),
-            Groupes = ["Pièce unique", "Dossier de pièces"],
+            // États : le fichier dans la GED (octets, extraction) -- règle en tête du lecteur.
+            Etats = EtatsEcran.Trois("Fichier absent", "Extrait", "Disponible"),
+            Groupes = ["PDF archivé"],
             Sections =
             [
                 Marche("Ouverture", "Ouvrir le PDF. Un dossier de PDF liste ses fichiers ; s'il n'en contient qu'un, il s'ouvre directement.", true,
@@ -223,13 +240,12 @@ public sealed class DomaineTrouver : IDomaineEcrans
             ],
             Lignes =
             [
-                Ligne("Courrier du greffe 2026-0412", "PDF · 4 pages", "Pièce unique", "AFaire"),
-                Ligne("Jugement annexé 2026-0413", "PDF · 12 pages", "Pièce unique", "EnCours", 0),
-                Ligne("Bilan 2025 (dossier de 3 PDF)", "Dossier · 3 fichiers, 1 lu", "Dossier de pièces", "EnCours", 0),
-                Ligne("Statuts de la société Alpha", "PDF · 8 pages", "Pièce unique", "Validee", 0, 1),
-                Ligne("Procès-verbal d'assemblée (dossier de 2 PDF)", "Dossier · 2 fichiers", "Dossier de pièces", "AFaire"),
-                Ligne("Pouvoir de représentation 2026-0420", "PDF · 2 pages", "Pièce unique", "Validee", 0, 1, 2),
-                Ligne("Attestation de régularité 2026-0421", "PDF · 1 page", "Pièce unique", "EnCours", 0),
+                Ligne("courrier-2026-0412.pdf", "Document 0004412 · PDF · 4 pages · archivé le 02/03/2026", "PDF archivé", "Validee"),
+                Ligne("jugement-2026-0413.pdf", "Document 0004413 · PDF · 12 pages · archivé le 03/03/2026", "PDF archivé", "Validee"),
+                Ligne("bilan-2025.pdf", "Document 0004414 · PDF · 3 pages · extrait par ext2026", "PDF archivé", "EnCours"),
+                Ligne("statuts-alpha.pdf", "Document 0004415 · PDF · 8 pages · archivé le 05/03/2026", "PDF archivé", "Validee"),
+                Ligne("pv-assemblee.pdf", "Document 0004416 · PDF · aucun fichier dans la GED", "PDF archivé", "AFaire"),
+                Ligne("pouvoir-2026-0420.pdf", "Document 0004420 · PDF · 2 pages · archivé le 09/03/2026", "PDF archivé", "Validee"),
             ],
         },
 
@@ -237,14 +253,17 @@ public sealed class DomaineTrouver : IDomaineEcrans
         {
             Code = "PROC_IMAGE", Titre = "Voir une image", Sujet = "fichiers à afficher", Rang = 4,
             Forme = FormeEcran.Document,
+            // Lecteur : Serveur/Socle/EcransGeneres/LecteurPiecesGed.cs (lot 6) : les images de la GED du greffe (GED_RIG ; tif,
+            // tiff, png, jpg, jpeg, bmp, gif). RIG v2 reçoit un chemin de fichier (proc_image.md:24-28).
             Recherche = "Rechercher un fichier à afficher…",
             Criteres = ["Fichier : chemin absolu d'une image ou d'un PDF (paramètre Filename)", "Titre de la fenêtre, facultatif (paramètre Titre)"],
             // Voir une image n'a pas de VALIDER (proc_image.md:85, :105) : son bouton final est l'action APERCU, à confirmer.
             // La table :59 dit « miniatures » ; le Détail OPE (:21, :158) corrige : ajuster à la fenêtre, sans miniatures.
             // Valider : proc_image.md:158 (« ajuster à la fenêtre », action APERCU ; :156 « réajuste l'image »).
             Valider = "Ajuster à la fenêtre",
-            Etats = EtatsEcran.Trois("À ouvrir", "Ouverte", "Affichée"),
-            Groupes = ["PDF multi-pages", "TIFF multi-pages", "Image à page unique"],
+            // États : le fichier dans la GED (octets, extraction) -- règle en tête du lecteur.
+            Etats = EtatsEcran.Trois("Fichier absent", "Extrait", "Disponible"),
+            Groupes = ["TIFF", "Image"],
             Sections =
             [
                 Marche("Ouverture", "Charger le fichier passé en paramètre : une image ou un PDF, chemin absolu. Sans fichier, la fenêtre reste vide ; sans titre, elle prend « Aperçu du fichier » et le nom du fichier.", true,
@@ -256,13 +275,12 @@ public sealed class DomaineTrouver : IDomaineEcrans
             ],
             Lignes =
             [
-                Ligne("Courrier scanné 2026-0501", "PNG · page unique", "Image à page unique", "AFaire"),
-                Ligne("Plan de situation 2026-0502", "JPEG · page unique", "Image à page unique", "Validee", 0, 2),
-                Ligne("Jugement annexé 2026-0503", "PDF · 12 pages", "PDF multi-pages", "EnCours", 0),
-                Ligne("Statuts de la société Gamma", "PDF · 8 pages", "PDF multi-pages", "Validee", 0, 1, 2),
-                Ligne("Bilan 2025 numérisé", "TIFF · 6 pages", "TIFF multi-pages", "AFaire"),
-                Ligne("Procès-verbal 2026-0504", "TIFF · 3 pages", "TIFF multi-pages", "EnCours", 0, 1),
-                Ligne("Attestation 2026-0505", "BMP · page unique", "Image à page unique", "EnCours", 0),
+                Ligne("courrier-scanne-0501.png", "Document 0004501 · PNG · archivé le 02/03/2026", "Image", "Validee"),
+                Ligne("plan-situation-0502.jpg", "Document 0004502 · JPG · archivé le 03/03/2026", "Image", "Validee"),
+                Ligne("bilan-2025-numerise.tif", "Document 0004503 · TIF · 6 pages · archivé le 04/03/2026", "TIFF", "Validee"),
+                Ligne("pv-0504.tiff", "Document 0004504 · TIFF · 3 pages · extrait par ext2026", "TIFF", "EnCours"),
+                Ligne("attestation-0505.bmp", "Document 0004505 · BMP · aucun fichier dans la GED", "Image", "AFaire"),
+                Ligne("logo-greffe.gif", "Document 0004506 · GIF · archivé le 09/03/2026", "Image", "Validee"),
             ],
         },
 
@@ -270,31 +288,32 @@ public sealed class DomaineTrouver : IDomaineEcrans
         {
             Code = "PROC_VCHIFFRES", Titre = "Chiffres d'un dossier", Sujet = "exercices", Rang = 4,
             Forme = FormeEcran.Consultation,
-            Recherche = "Rechercher un dossier RCS : numéro ou SIREN…",
-            Criteres = ["Dossier RCS : numéro ou SIREN", "Exercices sans chiffres clés (réglage du greffe)"],
+            // Lecteur : Serveur/Socle/EcransGeneres/LecteurChiffresDossier.cs (lot 6). Critère : le dossier RCS passé à l'écran
+            // (idDossier, proc_vchiffres.md:5), retrouvé par son numéro de gestion, son SIREN ou sa dénomination.
+            Recherche = "Rechercher un dossier RCS : numéro, SIREN ou dénomination…",
+            Criteres = ["Dossier RCS", "Dénomination"],
             // Valider : proc_vchiffres.md:254 (bouton EXPORT « Exporter le contenu des chiffres seuils au format PDF », visible en phase Saisie).
             Valider = "Exporter",
-            Etats = EtatsEcran.Trois("À consulter", "En cours", "PDF généré"),
+            // États : les chiffres seuils de l'exercice et le rejet de son bilan (proc_vchiffres.md:206) -- règle en tête du lecteur.
+            Etats = EtatsEcran.Trois("Sans chiffres", "Bilan rejeté", "Chiffres connus"),
             Groupes = ["Bilans déposés", "Exercices sans chiffres"],
             Sections =
             [
-                Marche("Dossier", "Le dossier RCS, passé à l'écran ou recherché à la main. Sans dossier, l'écran s'ouvre en recherche manuelle.", true,
-                    "Dossier RCS"),
-                Marche("Chiffres seuils", "La grille des chiffres seuils par exercice, tirés des bilans déposés. Lecture seule.", true,
-                    "Chiffre d'affaires", "Résultat", "Actif", "Capital", "Effectif"),
-                Marche("Actes de l'exercice", "Les actes et dépôts de bilan rattachés à l'exercice choisi.", false,
-                    "Actes déposés", "Dépôt du bilan"),
-                Marche("Export PDF", "Exporter le PDF des chiffres seuils, en brouillon.", true,
-                    "Édition PDF"),
+                Marche("Dossier", "Le dossier RCS de l'exercice.", false,
+                    "Dossier RCS", "Dénomination"),
+                Marche("Chiffres seuils", "Les chiffres seuils de l'exercice, tirés du bilan déposé. Lecture seule.", true,
+                    "Date de clôture", "Durée (mois)", "Monnaie", "Chiffre d'affaires", "Résultat", "Actif", "Capital", "Capitaux propres", Champ.Nombre("Effectif")),
+                Marche("Actes de l'exercice", "Les pièces des dépôts de bilan rattachés à l'exercice, et leur motif de rejet.", false,
+                    Champ.Tableau("Actes déposés")),
             ],
             Lignes =
             [
-                Ligne("Exercice 2025", "Bilan déposé · clôture au 31/12/2025", "Bilans déposés", "AFaire"),
-                Ligne("Exercice 2024", "Bilan déposé · clôture au 31/12/2024", "Bilans déposés", "EnCours", 0, 1),
-                Ligne("Exercice 2023", "Bilan déposé · clôture au 31/12/2023", "Bilans déposés", "Validee", 0, 1, 3),
-                Ligne("Exercice 2022", "Sans chiffres clés · clôture au 31/12/2022", "Exercices sans chiffres", "AFaire"),
-                Ligne("Exercice 2021", "Sans chiffres clés · clôture au 31/12/2021", "Exercices sans chiffres", "EnCours", 0),
-                Ligne("Exercice 2020", "Bilan déposé · clôture au 31/12/2020", "Bilans déposés", "Validee", 0, 1, 2, 3),
+                Ligne("Exercice clos le 31/12/2025 · Lambda Conseil SARL", "dossier 2026 B 00601 · CA 120 000,00 € · 4 salariés", "Bilans déposés", "Validee"),
+                Ligne("Exercice clos le 31/12/2024 · Lambda Conseil SARL", "dossier 2026 B 00601 · CA 98 000,00 € · bilan rejeté", "Bilans déposés", "EnCours"),
+                Ligne("Exercice clos le 31/12/2023 · Lambda Conseil SARL", "dossier 2026 B 00601 · sans chiffres clés", "Exercices sans chiffres", "AFaire"),
+                Ligne("Exercice clos le 31/12/2025 · Mu Logistique SAS", "dossier 2026 B 00602 · CA 1 200 000,00 € · 18 salariés", "Bilans déposés", "Validee"),
+                Ligne("Exercice clos le 31/12/2024 · Mu Logistique SAS", "dossier 2026 B 00602 · sans chiffres clés", "Exercices sans chiffres", "AFaire"),
+                Ligne("Exercice clos le 30/06/2025 · Nu Services SARL", "dossier 2026 B 00603 · CA 45 000,00 € · 1 salarié", "Bilans déposés", "Validee"),
             ],
         },
 
@@ -302,30 +321,33 @@ public sealed class DomaineTrouver : IDomaineEcrans
         {
             Code = "PROC_RECHENC", Titre = "Encaissements", Sujet = "encaissements", Rang = 4,
             Forme = FormeEcran.Consultation,
-            Recherche = "Rechercher un encaissement : client, remise, banque, commentaire…",
-            Criteres = ["Dates de début et de fin (à cocher pour les activer)", "Mode de paiement", "Banque", "Payeur ou tiers payeur", "Numéro de remise", "Montant minimum et maximum", "Affaire"],
+            // Lecteur : Serveur/Socle/EcransGeneres/LecteurEncaissements.cs (lot 6). Critères : OPE_CRITERES.GetValues (tableau de
+            // proc_rechenc.md:278-294) ; les dates se tapent « 31/12/2025 », les montants « 1 200,50 ».
+            Recherche = "Rechercher un encaissement : titre, payeur, banque, commentaire, client…",
+            Criteres = ["Date de début", "Date de fin", "Numéro de titre", "Mode de paiement", "Banque", "Payeur", "Numéro de remise", "Commentaire",
+                        "Abrégé client", "Nom du client", "Montant minimum", "Montant maximum", "Affaire"],
             // Valider : proc_rechenc.md:351 (« EXPORT → export Excel », action nommée « Export Excel » en :209) ; bouton toujours visible (:346).
             Valider = "Export Excel",
-            Etats = EtatsEcran.Trois("À contrôler", "En contrôle", "Contrôlé"),
+            // États : la mise en rouge d'un encaissement non ventilé (OPE_RESULTAT, proc_rechenc.md:327) -- règle en tête du lecteur.
+            Etats = EtatsEcran.Trois("Sans ventilation", "En cours", "Ventilé"),
             Groupes = ["Encaissement ventilé", "Encaissement sans ventilation"],
             Sections =
             [
-                Marche("Encaissement", "L'encaissement, et ses ventilations dessous. Sans ventilation réelle, il s'affiche en rouge.", true,
-                    "Encaissement", "Ventilation"),
-                Marche("Affaire", "Double-clic sur une ventilation : ouvre son affaire.", false,
-                    "Affaire ouverte"),
-                Marche("Export", "Exporter les lignes à plat, une par ventilation, vers un tableur. L'export peut être interrompu.", false,
-                    "Fichier du tableur"),
+                Marche("Encaissement", "L'encaissement : titre, date, montant, mode de paiement, banque, payeur, remise, commentaire, agent, comptabilisation.", true,
+                    "Numéro de titre", "Date d'encaissement", "Montant", "Mode de paiement", "Banque", "Payeur", "Numéro de remise", "Commentaire",
+                    "Saisi par", "Date de comptabilisation"),
+                Marche("Ventilations", "Ses ventilations : client, tiers payeur, affaire, montant ventilé. Sans ventilation réelle, la V2 l'affiche en rouge.", true,
+                    Champ.Tableau("Ventilations")),
             ],
             Lignes =
             [
-                Ligne("Encaissement 2026E0101 · Psi Paiement SAS", "Chèque · 1 200,00 € · remise du 03/03/2026", "Encaissement ventilé", "EnCours"),
-                Ligne("Encaissement 2026E0102 · Chi Pêche SARL", "Virement · 850,00 € · sans ventilation", "Encaissement sans ventilation", "AFaire"),
-                Ligne("Encaissement 2026E0103 · Sigma Transports SARL", "Prélèvement · 2 400,00 € · remise du 05/03/2026", "Encaissement ventilé", "Validee", 0, 1),
-                Ligne("Encaissement 2026E0104 · Tau Commerce SAS", "Carte bancaire · 310,00 € · sans ventilation", "Encaissement sans ventilation", "EnCours"),
-                Ligne("Encaissement 2026E0105 · Upsilon Import SARL", "Chèque · 95,00 € · ventilé", "Encaissement ventilé", "Validee", 0),
-                Ligne("Encaissement 2026E0106 · Phi Bâtiment SAS", "Virement · 640,00 € · sans ventilation", "Encaissement sans ventilation", "AFaire"),
-                Ligne("Encaissement 2026E0107 · Rho Habitat SAS", "Prélèvement · 1 050,00 € · remise du 09/03/2026", "Encaissement ventilé", "EnCours"),
+                Ligne("Encaissement 2026E0101 · Psi Paiement SAS", "Chèque · 1 200,00 € · le 03/03/2026 · ventilé 1 200,00 €", "Encaissement ventilé", "Validee"),
+                Ligne("Encaissement 2026E0102 · Chi Pêche SARL", "Virement · 850,00 € · le 04/03/2026 · sans ventilation", "Encaissement sans ventilation", "AFaire"),
+                Ligne("Encaissement 2026E0103 · Sigma Transports SARL", "Prélèvement · 2 400,00 € · le 05/03/2026 · ventilé 2 400,00 €", "Encaissement ventilé", "Validee"),
+                Ligne("Encaissement 2026E0104 · Tau Commerce SAS", "Carte bancaire · 310,00 € · le 06/03/2026 · sans ventilation", "Encaissement sans ventilation", "AFaire"),
+                Ligne("Encaissement 2026E0105 · Upsilon Import SARL", "Chèque · 95,00 € · le 09/03/2026 · ventilé 95,00 €", "Encaissement ventilé", "Validee"),
+                Ligne("Encaissement 2026E0106 · Phi Bâtiment SAS", "Virement · 640,00 € · le 10/03/2026 · sans ventilation", "Encaissement sans ventilation", "AFaire"),
+                Ligne("Encaissement 2026E0107 · Rho Habitat SAS", "Prélèvement · 1 050,00 € · le 11/03/2026 · ventilé 1 050,00 €", "Encaissement ventilé", "Validee"),
             ],
         },
 
@@ -333,34 +355,35 @@ public sealed class DomaineTrouver : IDomaineEcrans
         {
             Code = "PROC_TARIFS", Titre = "Tarifs", Sujet = "articles tarifaires", Rang = 4,
             Forme = FormeEcran.Consultation,
+            // Lecteur : Serveur/Socle/EcransGeneres/LecteurTarifs.cs (lot 6). Critères : BuildWhereClause
+            // (PROC_TARIFS\DataAccess\ArticleSearchQueries.cs:91-134) ; statut et type gardent leur défaut V2 (actif, titre)
+            // tant qu'ils ne sont pas saisis, « tous » lève le filtre ; « * » en code événement : tout article qui en a un.
             Recherche = "Filtrer les articles : code, libellé…",
-            Criteres = ["Statut : actif, inactif ou tous", "Type d'article", "Période de tarification", "Catégorie d'article", "Code événement (affiche sa colonne)"],
+            Criteres = ["Statut", "Type d'article", "Catégorie d'article", "Code événement"],
             // Valider : proc_tarifs.md:186 (« Justifier » du menu contextuel d'une ligne incohérente) ; VALIDER masqué (:215).
             Valider = "Justifier",
-            Etats = EtatsEcran.Trois("À justifier", "En cours", "Justifié"),
+            // États : le statut de l'article et la justification de sa famille -- règle en tête du lecteur.
+            Etats = EtatsEcran.Trois("Actif", "En sommeil", "Incohérence justifiée"),
             Groupes = ["Article de base", "Article dérivé"],
             Sections =
             [
                 // L'article ouvert (la section s'appelait « Resultats » : elle repetait la liste ; controle final du lot 1).
-                // Seuil : proc_tarifs.md:150 (par utilisateur, 100 par defaut, confirmation avant de charger).
-                Marche("Article", "Code, libellé, montant dans la devise du greffe, et « Cohérent ? ». Une recherche qui dépasse le seuil de l'utilisateur (100 articles par défaut) demande confirmation avant de charger.", true,
-                    "Code", "Libellé", "Montant", "Cohérent ?"),
-                Marche("Cohérence", "Justifier une incohérence, la dévalider, ou voir ses raisons. Une justification vaut pour toute la famille de l'article.", true,
-                    "Raisons de l'incohérence", "Justification"),
-                Marche("Dérivation", "Dupliquer un article en famille dérivée. Refusé pour un article déjà dérivé. Le nouveau code est distinct et tient en 18 caractères au plus.", false,
-                    "Code de l'article dérivé"),
-                Marche("Catégorie en masse", "Réaffecter une catégorie aux articles cochés, familles comprises, après confirmation.", false,
-                    "Catégorie cible"),
+                Marche("Article", "Code, libellé, montant hors taxe dans la devise du greffe (la somme de ses composants pour un titre), type, statut, catégorie, codes événement.", true,
+                    "Code", "Libellé", "Montant HT", "Type", "Statut", "Catégorie", "Date d'application", "Codes événement"),
+                Marche("Composition", "Les articles principaux qui composent un titre, avec leur quantité et leur prix.", false,
+                    Champ.Tableau("Articles composants")),
+                Marche("Cohérence", "La famille de l'article et la date de sa justification. Une justification vaut pour toute la famille de l'article.", false,
+                    "Famille", "Date de justification"),
             ],
             Lignes =
             [
-                Ligne("Article 0101 · Inscription au greffe", "45,00 € · incohérent", "Article de base", "AFaire"),
-                Ligne("Article 0102 · Modification", "60,00 € · incohérent, en examen", "Article de base", "EnCours", 0),
-                Ligne("Article 0103 · Extrait", "12,50 € · cohérent, rien à justifier", "Article de base", "Validee", 0, 1),
-                Ligne("Article 0201 · Copie dérivée", "Dérivé de l'article 0101 · 40,00 €", "Article dérivé", "AFaire"),
-                Ligne("Article 0202 · Certificat", "Dérivé de l'article 0103 · 15,00 € · justifié", "Article dérivé", "Validee", 0, 1, 2),
-                Ligne("Article 0104 · Dépôt d'actes", "25,00 € · incohérent, en examen", "Article de base", "EnCours"),
-                Ligne("Article 0105 · Recherche de pièce", "18,00 € · sans catégorie", "Article de base", "AFaire"),
+                Ligne("Article 0101 · Inscription au greffe", "45,00 € HT · type TI · catégorie Aucune", "Article de base", "AFaire"),
+                Ligne("Article 0102 · Modification", "60,00 € HT · type TI · catégorie RCS · incohérence justifiée", "Article de base", "Validee"),
+                Ligne("Article 0103 · Extrait", "12,50 € HT · type TI · en sommeil", "Article de base", "EnCours"),
+                Ligne("Article 0201 · Copie dérivée", "40,00 € HT · type TI · catégorie RCS", "Article dérivé", "AFaire"),
+                Ligne("Article 0202 · Certificat", "15,00 € HT · type TI · incohérence justifiée", "Article dérivé", "Validee"),
+                Ligne("Article 0104 · Dépôt d'actes", "25,00 € HT · type TI · codes événement 01, 02", "Article de base", "AFaire"),
+                Ligne("Article 0105 · Recherche de pièce", "18,00 € HT · type TI · catégorie Aucune", "Article de base", "AFaire"),
             ],
         },
 
@@ -368,12 +391,16 @@ public sealed class DomaineTrouver : IDomaineEcrans
         {
             Code = "PROC_REJETS_BILANS", Titre = "Bilans en rejet", Sujet = "bilans en rejet", Rang = 4,
             Forme = FormeEcran.File,
+            // Lecteur : Serveur/Socle/EcransGeneres/LecteurBilansRejetes.cs (lot 6) : la requête de OPE_REJETS_BILANS
+            // (proc_rejets_bilans.md:80-96) et ses codes de rejet par défaut (ChiffresSeuils.GetCodesMotifsRejet).
             Recherche = "Rechercher un bilan : SIREN, numéro de gestion ou numéro de dépôt…",
             Criteres = ["SIREN, numéro de gestion ou numéro de dépôt", "Codes motifs de rejet (plusieurs possibles)"],
             // Valider : proc_rejets_bilans.md:208 (bouton « Envoyer vers XDCA », actif si la grille a des lignes, :398).
             Valider = "Envoyer vers XDCA",
+            // États : une correction XDCA en cours sur l'action du bilan -- règle en tête du lecteur.
             Etats = EtatsEcran.Trois("Rejeté", "En correction", "Corrigé"),
-            Groupes = ["Rejet Infogreffe", "Rejet INPI"],
+            // Groupes : ChiffresSeuils.IsRenvoiToInfogreffeAllowed (ChiffresSeuils.cs:226-237).
+            Groupes = ["Renvoi possible", "Rejet de fond"],
             Sections =
             [
                 Marche("Recherche", "Saisir un SIREN, un numéro de gestion ou un numéro de dépôt, et choisir les codes motifs. Sans motif choisi, tous les motifs sont montrés.", true,
@@ -389,13 +416,13 @@ public sealed class DomaineTrouver : IDomaineEcrans
             ],
             Lignes =
             [
-                Ligne("Bilan 2025 · Omega Conseil SAS", "Dépôt 2026-0701 · motif A", "Rejet Infogreffe", "AFaire"),
-                Ligne("Bilan 2025 · Iota Bois SAS", "Dépôt 2026-0702 · motif B", "Rejet Infogreffe", "EnCours", 0),
-                Ligne("Bilan 2024 · Thêta Import SARL", "Dépôt 2026-0703 · motif C", "Rejet INPI", "Validee", 0, 1, 2, 4),
-                Ligne("Bilan 2024 · Mu Logistique SAS", "Dépôt 2026-0704 · motif A", "Rejet INPI", "EnCours", 0, 1),
-                Ligne("Bilan 2023 · Nu Services SARL", "Dépôt 2026-0705 · motif B", "Rejet Infogreffe", "AFaire"),
-                Ligne("Bilan 2023 · Xi Entrepôts SAS", "Dépôt 2026-0706 · motif A", "Rejet INPI", "Validee", 0, 1, 2, 3),
-                Ligne("Bilan 2025 · Tau Commerce SAS", "Dépôt 2026-0707 · motif C", "Rejet Infogreffe", "EnCours", 0),
+                Ligne("Bilan 2025 · Omega Conseil SAS", "dossier 2026 B 00701 · dépôt 2026-0701 · motif 3 · bilan incomplet", "Renvoi possible", "AFaire"),
+                Ligne("Bilan 2025 · Iota Bois SAS", "dossier 2026 B 00702 · dépôt 2026-0702 · motif 7 · correction XDCA en cours", "Renvoi possible", "EnCours"),
+                Ligne("Bilan 2024 · Thêta Import SARL", "dossier 2026 B 00703 · dépôt 2026-0703 · motif 10", "Rejet de fond", "AFaire"),
+                Ligne("Bilan 2024 · Mu Logistique SAS", "dossier 2026 B 00704 · dépôt 2026-0704 · motif 16 · correction XDCA en cours", "Rejet de fond", "EnCours"),
+                Ligne("Bilan 2023 · Nu Services SARL", "dossier 2026 B 00705 · dépôt 2026-0705 · motif C7", "Renvoi possible", "AFaire"),
+                Ligne("Bilan 2023 · Xi Entrepôts SAS", "dossier 2026 B 00706 · dépôt 2026-0706 · motif 17", "Rejet de fond", "AFaire"),
+                Ligne("Bilan 2025 · Tau Commerce SAS", "dossier 2026 B 00707 · dépôt 2026-0707 · motif E7", "Renvoi possible", "AFaire"),
             ],
         },
 
@@ -405,6 +432,9 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Forme = FormeEcran.Consultation,
             Recherche = "Rechercher une personne : nom, prénom, date de naissance…",
             Criteres = ["Nom", "Prénom", "Date de naissance", "Pays de naissance (France par défaut)", "Commune de naissance (si France)"],
+            // Sans lecteur (lot 6, plan-676a4b19) : RIG v2 n'interroge pas la base du greffe mais le service web du FNIG
+            // (FnigService.GetPersonneJugementsJud, adresse GRF_URL_FNIG du greffe : proc_vfnig.md:5-15), qu'aucun écran de la V3
+            // n'appelle. L'écran garde ses lignes d'exemple, étiquetées comme telles.
             // Valider : proc_vfnig.md:32 et :449 (bouton « Editer les résultats », actif dès qu'une ligne est sélectionnée, :171).
             Valider = "Editer les résultats",
             Etats = EtatsEcran.Trois("À vérifier", "En cours", "Vérifiée"),
@@ -436,14 +466,19 @@ public sealed class DomaineTrouver : IDomaineEcrans
         {
             Code = "PROC_FIBEN", Titre = "FIBEN", Sujet = "relevés", Rang = 4,
             Forme = FormeEcran.Etat,
-            Parametres = ["Mois", "Trimestre", Champ.Nombre("Année")],
-            Colonnes = ["Relevé", "Volumes par greffe"],
+            // Lecteur : Serveur/Socle/EcransGeneres/LecteurReleveFiben.cs (lot 6) : les volumes transmis par le greffe de la base,
+            // un mois (FIBEN) ou un trimestre (BODACC) par ligne (ReleveFIBEN.cs:181-210, ReleveBODACC.cs:244-267). La période de
+            // la V2 (un mois ; un trimestre et une année) filtre ici les lignes par leur début.
+            Parametres = [Champ.Periode("Période")],
+            Colonnes = [Champ.Date("Début de période"), "Relevé", Champ.Nombre("Avis RCS"), Champ.Nombre("Avis PC créés"), Champ.Nombre("Avis PC annulés"),
+                        Champ.Nombre("Annonces A"), Champ.Nombre("Annonces B"), Champ.Nombre("Annonces C"), Champ.Nombre("Annonces P")],
             Gestes = ["Générer"],
             Recherche = "Rechercher un relevé : mois ou trimestre…",
             Criteres = ["Mois (transmission FIBEN, mensuelle)", "Trimestre et année (relevé BODACC, trimestriel)", "Tarifs unitaires"],
             // Valider : proc_fiben.md:10-11 et :60-61 (bouton « Générer » de chaque opération).
             Valider = "Générer",
-            Etats = EtatsEcran.Trois("À générer", "En cours", "Généré"),
+            // États : la période et aujourd'hui -- règle en tête du lecteur.
+            Etats = EtatsEcran.Trois("À venir", "Période en cours", "Période close"),
             Groupes = ["Transmission FIBEN", "Relevé BODACC"],
             Sections =
             [
@@ -456,12 +491,12 @@ public sealed class DomaineTrouver : IDomaineEcrans
             ],
             Lignes =
             [
-                Ligne("Transmission FIBEN · janvier 2026", "Avis RCS et PC · mensuelle", "Transmission FIBEN", "Validee", 0, 1, 2),
-                Ligne("Transmission FIBEN · février 2026", "Avis RCS et PC · mensuelle", "Transmission FIBEN", "EnCours", 0),
-                Ligne("Transmission FIBEN · mars 2026", "Avis RCS et PC · mensuelle", "Transmission FIBEN", "AFaire"),
-                Ligne("Relevé BODACC · 4e trimestre 2025", "Annonces A, B, C et P · trimestriel", "Relevé BODACC", "Validee", 0, 1, 2),
-                Ligne("Relevé BODACC · 1er trimestre 2026", "Annonces A, B, C et P · trimestriel", "Relevé BODACC", "EnCours", 0, 1),
-                Ligne("Relevé BODACC · 2e trimestre 2026", "Annonces A, B, C et P · trimestriel", "Relevé BODACC", "AFaire"),
+                Ligne("Transmission FIBEN · janvier 2026", "12 avis RCS · 3 avis PC créés · 0 annulés", "Transmission FIBEN", "Validee"),
+                Ligne("Transmission FIBEN · février 2026", "9 avis RCS · 1 avis PC créés · 1 annulés", "Transmission FIBEN", "Validee"),
+                Ligne("Transmission FIBEN · mars 2026", "4 avis RCS · 0 avis PC créés · 0 annulés", "Transmission FIBEN", "EnCours"),
+                Ligne("Relevé BODACC · 4e trimestre 2025", "A 14 · B 22 · C 5 · P 2", "Relevé BODACC", "Validee"),
+                Ligne("Relevé BODACC · 1er trimestre 2026", "A 6 · B 11 · C 2 · P 0", "Relevé BODACC", "EnCours"),
+                Ligne("Relevé BODACC · 3e trimestre 2025", "A 10 · B 18 · C 4 · P 1", "Relevé BODACC", "Validee"),
             ],
         },
 
@@ -469,16 +504,18 @@ public sealed class DomaineTrouver : IDomaineEcrans
         {
             Code = "PROC_VNOTIF", Titre = "Notifications", Sujet = "notifications", Rang = 4,
             Forme = FormeEcran.Consultation,
-            Recherche = "Rechercher une notification : greffe, date, état…",
-            Criteres = ["Dates", "États", "Greffes", "Origine (alerte)"],
+            // Lecteur : Serveur/Socle/EcransGeneres/LecteurNotifications.cs ; recherche et fiche ajoutées au lot 6. Critères :
+            // Commun\OPE_DATES, OPE_ETAT, OPE_GREFFES de la V2 (les dates se tapent « 31/12/2025 », l'état par son libellé).
+            Recherche = "Rechercher une notification : numéro, dénomination, numéro de gestion…",
+            Criteres = ["Date de début", "Date de fin", "État", "Greffe"],
             // Valider : proc_vnotif.md:249 et :262 (barre « Rechercher / Effacer », bouton « Rechercher »).
             Valider = "Rechercher",
             Etats = EtatsEcran.Trois("À traiter", "En cours", "Traitée"),
             Groupes = ["Émises (RCS)", "Émises (judiciaire)", "Reçues"],
             Sections =
             [
-                Marche("Contenu", "Lire la notification. Les colonnes changent selon le service : RCS ou judiciaire.", true,
-                    "Identifiant", "Type", "Greffe", "Date d'envoi", "Date de réception"),
+                Marche("Contenu", "Lire la notification : son greffe, ses dates, le dossier qu'elle vise, son état et le motif d'un rejet.", true,
+                    "Identifiant", "Type", "Greffe", "Date d'envoi", "Date de réception", "Dossier", "État", "Motif de rejet"),
             ],
             Lignes =
             [
@@ -496,18 +533,20 @@ public sealed class DomaineTrouver : IDomaineEcrans
         {
             Code = "PROC_VTRID", Titre = "Tribunal digital", Sujet = "échanges avec le tribunal digital", Rang = 4,
             Forme = FormeEcran.Consultation,
-            Recherche = "Rechercher un envoi ou une demande…",
-            Criteres = ["Date (critère par défaut)", "Type d'entité : instance, procédure collective, mesure, prévention"],
+            // Lecteur : Serveur/Socle/EcransGeneres/LecteurTribunalDigital.cs ; recherche et fiche ajoutées au lot 6. Critères :
+            // ceux des deux onglets de la V2 (OPE_RECHERCHE_DOCUMENTS_TRANSMIS, OPE_RECHERCHE_DEMANDES_RECUES).
+            Recherche = "Rechercher un envoi ou une demande : numéro, rôle, document…",
+            Criteres = ["Date de début", "Date de fin", "Numéro de rôle", "Demandes traitées"],
             // Valider : proc_vtrid.md:234 (bouton « Envoyer vers VJUD », actif selon la sélection).
             Valider = "Envoyer vers VJUD",
             Etats = EtatsEcran.Trois("Non traité", "En cours", "Traité"),
             Groupes = ["Documents transmis", "Demandes reçues"],
             Sections =
             [
-                Marche("Documents transmis", "Les documents envoyés au tribunal digital, avec leur numéro de rôle et leur compte rendu d'envoi.", true,
-                    "Numéro de rôle", "Compte rendu d'envoi"),
-                Marche("Demandes reçues", "Les demandes venues du portail, dans l'onglet à part.", false,
-                    "Demande"),
+                Marche("Documents transmis", "Le document envoyé au tribunal digital, avec son numéro de rôle et son compte rendu d'envoi.", true,
+                    "Numéro de l'envoi", "Numéro de rôle", "Document", "Destinataire", "Date d'envoi", "Compte rendu d'envoi"),
+                Marche("Demandes reçues", "La demande venue du portail, dans l'onglet à part.", false,
+                    "Demande", "Numéro de rôle", "Type de formalité", Champ.Date("Reçue le"), "Erreur"),
                 Marche("Preuve et dossier", "Télécharger la preuve de dépôt, si le compte rendu est OK, ou ouvrir l'affaire dans le dossier judiciaire.", false,
                     "Preuve de dépôt", "Dossier judiciaire"),
             ],
@@ -527,28 +566,32 @@ public sealed class DomaineTrouver : IDomaineEcrans
         {
             Code = "PROC_BEN", Titre = "Rechercher un beneficiaire", Sujet = "bénéficiaires effectifs", Rang = 4,
             Forme = FormeEcran.Consultation,
+            // Lecteur : Serveur/Socle/EcransGeneres/LecteurRechercheBeneficiaires.cs (lot 6). Critères :
+            // OPE_RESULTATS_BEN._BuildRequete (OPE_RESULTATS_BEN.cs:140-163) ; « Dossiers radiés » : oui pour les montrer.
+            // Non repris : « Divergences seulement », une case que la V2 ne lit jamais (proc_ben.md:315-317).
             Recherche = "Rechercher un bénéficiaire : nom, prénom, numéro de dossier…",
-            Criteres = ["Numéro de dossier", "Nom d'usage", "Nom patronymique", "Prénoms", "Date de naissance", "Dossiers radiés", "Divergences seulement"],
+            Criteres = ["Numéro de dossier", "Nom d'usage", "Nom patronymique", "Prénoms", "Date de naissance", "Dossiers radiés"],
             // Valider : proc_ben.md:321 (bouton de colonne « Signaler », « Visualiser » si une divergence existe).
             Valider = "Signaler",
-            Etats = EtatsEcran.Trois("À examiner", "En cours", "Divergence signalée"),
+            // États : le libellé du bouton de la ligne (Search(), OPE_RESULTATS_BEN.cs:198-203) -- règle en tête du lecteur.
+            Etats = EtatsEcran.Trois("Sans divergence", "En cours", "Divergence en attente"),
             Groupes = ["Bénéficiaire en vigueur", "Dossier radié"],
             Sections =
             [
-                Marche("Bénéficiaire", "Numéro de gestion du dossier, nom, prénoms, date de naissance. Un double-clic sur le numéro de gestion relance la recherche sur ce dossier ; sur le nom, sur cette personne.", true,
-                    "Numéro de gestion", "Nom", "Prénoms", "Date de naissance"),
-                Marche("Divergence", "Signaler une divergence sur le bénéficiaire sélectionné, par le menu contextuel.", true,
-                    "Identifiant de divergence"),
+                Marche("Bénéficiaire", "Numéro de gestion du dossier, nom, prénoms, dates de naissance et d'effet.", true,
+                    "Numéro de gestion", "SIREN", "Nom", "Prénoms", "Date de naissance", "Date d'effet"),
+                Marche("Divergence", "Les divergences en attente de la société sur ce bénéficiaire. Signaler une divergence ouvre, dans RIG v2, l'écran de déclaration des divergences.", false,
+                    Champ.Tableau("Divergences en attente")),
             ],
             Lignes =
             [
-                Ligne("Bénéficiaire 0001 · dossier 2026B00601", "Né(e) en 1970 · en vigueur", "Bénéficiaire en vigueur", "AFaire"),
-                Ligne("Bénéficiaire 0002 · dossier 2026B00602", "Né(e) en 1958 · en vigueur", "Bénéficiaire en vigueur", "EnCours"),
-                Ligne("Bénéficiaire 0003 · dossier 2026B00603", "Né(e) en 1982 · divergence à signaler", "Bénéficiaire en vigueur", "Validee", 0, 1),
-                Ligne("Bénéficiaire 0004 · dossier 2026B00604", "Né(e) en 1975 · dossier radié", "Dossier radié", "AFaire"),
-                Ligne("Bénéficiaire 0005 · dossier 2026B00605", "Né(e) en 1963 · dossier radié", "Dossier radié", "EnCours", 0),
-                Ligne("Bénéficiaire 0006 · dossier 2026B00606", "Né(e) en 1990 · en vigueur", "Bénéficiaire en vigueur", "EnCours"),
-                Ligne("Bénéficiaire 0007 · dossier 2026B00607", "Né(e) en 1968 · dossier radié · divergence signalée", "Dossier radié", "Validee", 0, 1),
+                Ligne("DUPONT Jean", "dossier 2026 B 00601 · né(e) le 01/02/1970", "Bénéficiaire en vigueur", "AFaire"),
+                Ligne("MARTIN Anne", "dossier 2026 B 00602 · né(e) le 03/11/1958", "Bénéficiaire en vigueur", "AFaire"),
+                Ligne("MARTIN Anne", "dossier 2026 B 00602 · divergence du 05/03/2026 en attente de la société", "Bénéficiaire en vigueur", "Validee"),
+                Ligne("ROSSI Luca", "dossier 2026 B 00604 · né(e) le 15/06/1975 · dossier radié", "Dossier radié", "AFaire"),
+                Ligne("BERNARD Paul", "dossier 2026 B 00605 · né(e) le 21/09/1963 · dossier radié", "Dossier radié", "AFaire"),
+                Ligne("PETIT Claire", "dossier 2026 B 00606 · né(e) le 30/04/1990", "Bénéficiaire en vigueur", "AFaire"),
+                Ligne("PETIT Claire", "dossier 2026 B 00606 · divergence du 08/03/2026 en attente de la société", "Bénéficiaire en vigueur", "Validee"),
             ],
         },
     ];

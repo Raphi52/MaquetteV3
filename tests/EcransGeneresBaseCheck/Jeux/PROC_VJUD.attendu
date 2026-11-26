@@ -1,0 +1,8 @@
+# « Dossier judiciaire » (LecteurDossierJudiciaire) sur le jeu PROC_VJUD.sql : la liste de depart de la V3 (RIG v2 ouvre sur la
+# recherche) -- les instances enrolees le jour du banc, les PC et preventions ouvertes ce jour --, par numero decroissant.
+# Etat : aucun evenement -> AFaire ; un evenement attendu (sans date) -> EnCours ; tous survenus -> Validee.
+# Ecartees, chacune avec son jumeau retenu : 1601104 enrolee un autre jour, 1601105 jamais enrolee -- 1601101 ; elles se
+# retrouvent par PROC_VJUD.recherches. Aucune PC ni prevention des autres jeux n'est ouverte le jour du banc.
+Rôle 2026V01103 · VJUD TROIS | Instance · code affaire VJ16 · enrôlée le {J+0} · 2 événements survenus | Instance | Validee | []
+Rôle 2026V01102 · VJUD DEUX | Instance · code affaire VJ16 · enrôlée le {J+0} · 1 événement à venir | Instance | EnCours | []
+Rôle 2026V01101 · VJUD UN | Instance · code affaire VJ16 · enrôlée le {J+0} · aucun événement | Instance | AFaire | []

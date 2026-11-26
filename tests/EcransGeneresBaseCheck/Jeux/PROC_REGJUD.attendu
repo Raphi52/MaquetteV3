@@ -1,0 +1,17 @@
+# « Registres judiciaires » (LecteurRegistresJudiciaires) sur le jeu PROC_REGJUD.sql : les trois registres, dans cet ordre --
+# repertoire general (instances ayant un numero au repertoire et une nature), decisions des injonctions de payer (decisions des
+# instances IP dont le type existe), ordonnances du president (instances RP ayant une nature) --, chacun par date d'acte
+# decroissante (la saisine pour le repertoire general, comme la V2).
+# Etat : la decision retenue (hors avant-dire-droit, au plus tard aujourd'hui) rendue -> Validee ; prevue -> EnCours ; aucune -> AFaire.
+# Ecartees, chacune avec sa jumelle retenue :
+#   1601204 sans numero au repertoire, 1601205 sans nature   -- 1601201 ;
+#   decision 1601213 avant-dire-droit (1601203 reste, sans décision) -- 1601211 ;
+#   decision 1601222 d'un type inconnu                        -- 1601221 ;
+#   1601208 ordonnance sans nature                            -- 1601207.
+Rôle 2026R01203 · REGJUD TROIS | acte du 07/03/2025 · n° 1203 · NAT-ISO · sans décision | Répertoire général | AFaire | []
+Rôle 2026R01202 · REGJUD DEUX | acte du 06/03/2025 · n° 1202 · NAT-ISO · décision prévue le 15/03/2025 | Répertoire général | EnCours | []
+Rôle 2026R01201 · REGJUD UN | acte du 05/03/2025 · n° 1201 · NAT-ISO · décision du 20/03/2025 · Jugement banc · Premier ressort banc | Répertoire général | Validee | []
+# L'instance 1990J20001 de PROC_NF.sql (numero au repertoire, nature sans code ISO) est au repertoire general : la V2 la liste aussi.
+Rôle 1990J20001 · NF CREANCIER # NF ALPHA SA | acte du 15/01/1990 · n° 1990020001 · sans décision | Répertoire général | AFaire | []
+Rôle 2026R01206 · REGJUD IP | acte du 10/02/2025 · minute 301 · décision du 12/02/2025 · Jugement banc | Injonctions de payer | Validee | []
+Rôle 2026R01207 · REGJUD ORDO | acte du 15/01/2025 · Nature banc · sans décision | Ordonnances du président | AFaire | []

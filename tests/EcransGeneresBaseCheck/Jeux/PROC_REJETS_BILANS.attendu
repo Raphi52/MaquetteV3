@@ -1,0 +1,12 @@
+# « Bilans en rejet » (LecteurBilansRejetes) sur le jeu PROC_REJETS_BILANS.sql : les pieces des depots d'un exercice dont le code
+# de rejet est l'un des codes par defaut de la V2 (3, 7, 10, 16, 17, C7, D7, E7) et dont la saisie s'est terminee apres la date
+# de debut du greffe (VDCAREJ_DATE_DEBUT, 01/03/2025), tries par date de depot decroissante, puis numero de gestion decroissant.
+# Groupe : motif qui permet le renvoi a Infogreffe (3, 7, A7-E7) -> « Renvoi possible », sinon « Rejet de fond ».
+# Etat : une demande XDCA en cours sur l'action du bilan -> EnCours ; sinon AFaire (1600744 : sa correction est validee).
+# Ecartes, chacun avec son jumeau retenu :
+#   1600743 motif 1 (pas un rejet)             -- 1600741 (motif 3) ;
+#   1600746 saisie terminee le 28/02/2025      -- 1600744 (le 01/03/2025, la borne) ;
+#   1600745 depot sans exercice (INNER JOIN)   -- 1600741.
+Bilan 2024 · REJ BETA SAS | dossier 2016 B 60702 · SIREN 516 007 002 · dépôt L6D0722 du 05/04/2025 · clôture au 31/12/2024 · motif 10 · Actif nul · correction XDCA en cours | Rejet de fond | EnCours | []
+Bilan 2024 · REJ ALPHA SAS | dossier 2016 B 60701 · SIREN 516 007 001 · dépôt L6D0721 du 02/04/2025 · clôture au 31/12/2024 · motif 3 · Bilan incomplet | Renvoi possible | AFaire | []
+Bilan 2023 · REJ ALPHA SAS | dossier 2016 B 60701 · SIREN 516 007 001 · dépôt L6D0723 du 01/03/2025 · clôture au 31/12/2023 · motif C7 · Pages illisibles | Renvoi possible | AFaire | []

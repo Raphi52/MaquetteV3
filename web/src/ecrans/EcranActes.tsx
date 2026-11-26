@@ -15,9 +15,16 @@
 // (Acte, Categorie en pastille, Date de depot, Demat. et Anomalies en point d'etat) ; les huit autres colonnes
 // de DataGridviewActes sont dans la ligne depliee, avec « Ouvrir le dossier ». Criteres, clic qui ouvre le
 // dossier, acte non numerisable inerte : inchanges.
+//
+// LA BASE DU GREFFE (plan « RIG v3 100 % fonctionnel », lot 6, 26/11/2026, marche du lot 17) : « EcranActes.Trouver » est
+// servi par Pont/EcranActesBase.cs → Serveur/Socle/EcransMain/LectureActes.cs, la requete du mode Acte de RIG v2 : les actes
+// deposes depuis 2014 pas encore ranges dans la GED, criteres envoyes a la base. Une note le dit au-dessus de la liste (le
+// titre reste celui du menu) ; « Avec anomalie seulement » vise les bilans, que la base V3 ne porte pas : la note le dit.
+// Sans serveur, la demonstration du pont, marquee « exemple » ; en panne, le motif et aucune ligne.
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { dateSaisie, useNombreSaisi } from '../saisie'
 import {
   CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille, PiedListe, PointEtat, VuesListe, normaliser,
@@ -49,6 +56,11 @@ export interface LigneActe {
 export interface VueActes {
   categories: OptionActes[]
   lignes: LigneActe[]
+  /** D'ou viennent les lignes (Pont/LectureEcranMain.cs) ; absent : la demonstration d'avant le lot 6. */
+  mode?: ModeLecture
+  /** En base : ce que la liste montre au juste ; en panne : le motif. */
+  message?: string | null
+  total?: number
 }
 
 export interface ProprietesEcranActes {
@@ -211,6 +223,9 @@ export function EcranActes({ ouvrirDossier }: ProprietesEcranActes) {
                        {' sans image · '}<b>{anomalies}</b>{anomalies > 1 ? ' anomalies' : ' anomalie'}</>}
                      filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a un acte…',
                                valider: () => { if (affiches.length === 1) ouvrir(affiches[0]!) } }} />
+
+        {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Actes" />}
+        {vue?.mode === 'serveur' && vue.message && <p className="rig-eg-note" role="note">{vue.message}</p>}
 
         <VuesListe vues={VuesActes.map((v) => ({ cle: v.cle, libelle: v.libelle }))}
                    active={VuesActes.find((v) => v.nonNumerisables === critNonNumerisables && v.anomalies === critAnomalies)?.cle ?? null}

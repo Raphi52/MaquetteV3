@@ -1,0 +1,12 @@
+# « Rechercher un beneficiaire » (LecteurRechercheBeneficiaires) sur les jeux PROC_BE.sql et PROC_BEN.sql : la recherche que la V2
+# lance sans critere -- les beneficiaires non supprimes des dossiers non radies (bloc 1), et leurs divergences en attente de la
+# societe (bloc 2), tries par dossier (BENEF_ID_DSRCS), puis beneficiaire, sa ligne avant celle de sa divergence.
+# Etat : ligne d'une divergence en attente -> Validee [] ; ligne du beneficiaire -> AFaire [].
+# Ecartes, chacun avec son jumeau retenu :
+#   1314104 supprime (BENEF_SUPPRIME, PROC_BE.sql)       -- 1314101 ;
+#   1600114 d'un dossier radie (case « Dossiers radiés ») -- 1314101 (dossier en vigueur) ; PROC_BEN.recherches le retrouve ;
+#   divergence 1600132 traitee (DIVER_STATUS 1)          -- 1600131, en attente (0).
+Dupont jean marc | dossier 2027 B 14001 · né(e) le 01/02/1980 | Bénéficiaire en vigueur | AFaire | []
+MARTIN Anne | dossier 2027 B 14001 · né(e) le 03/11/1975 | Bénéficiaire en vigueur | AFaire | []
+MARTIN Anne | dossier 2027 B 14001 · né(e) le 03/11/1975 · divergence du 01/11/2026 en attente de la société · Banque Banc | Bénéficiaire en vigueur | Validee | []
+ROSSI Luca | dossier 2027 B 14002 · né(e) le 15/06/1990 | Bénéficiaire en vigueur | AFaire | []

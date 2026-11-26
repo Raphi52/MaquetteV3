@@ -385,6 +385,22 @@ Exiger(reuniVide.Vides.SequenceEqual([descripteurDca.Titre]) && !reuniVide.Exemp
        && reuniVide.Lignes.All(l => l.Groupe != descripteurDca.Titre) && reuniVide.Exemples.SequenceEqual(autres.Select(m => m.Titre)),
     $"pont, ecran reuni, procedure branchee SANS ligne : « {descripteurDca.Titre} » est dans Vides, pas dans Exemples ({string.Join(", ", reuniVide.Vides)})");
 Exiger(base_.Vides.Length == 0, "pont : une procedure qui a des lignes n'est jamais dans Vides");
+// Une liste COUPEE au plafond du serveur (la base a plus de lignes) : le pont en nomme les groupes dans Plafonnees, et
+// FormeEtat refuse alors d'imprimer -- RIG v2 imprime le registre entier (OPE_RESULTATS.cs:65-73 ; lot 6 du plan-676a4b19).
+using var plafondHandler = new RepondeurPlafond();
+var coupee = await EcranGenere.LignesAsync(new ClientServeur(new Uri("http://localhost/"), plafondHandler), Greffe, "PROC_REGJUD");
+Exiger(coupee.Mode == "base" && coupee.Plafonnees.SequenceEqual(CatalogueGenere.Descripteur("PROC_REGJUD")!.Groupes)
+       && coupee.Message == "Les 1 premières lignes sur 1194.",
+    $"pont, liste coupee au plafond : tous les groupes de la procedure dans Plafonnees, le message dit combien ({string.Join(", ", coupee.Plafonnees)} ; {coupee.Message})");
+Exiger(base_.Plafonnees.Length == 0, "pont : une liste complete n'a aucun groupe coupe");
+// Un lecteur qui plafonne CHAQUE groupe (LignesEcran.TotalParGroupe : les trois registres de PROC_REGJUD) : seul le groupe dont la
+// base a plus de lignes est coupe -- un registre complet reste imprimable a cote (controle final du lot 6, 26/11/2026).
+using var parGroupeHandler = new RepondeurPlafond(new Dictionary<string, int>
+    { ["Répertoire général"] = 1194, ["Injonctions de payer"] = 1, ["Ordonnances du président"] = 0 });
+var coupeeParGroupe = await EcranGenere.LignesAsync(new ClientServeur(new Uri("http://localhost/"), parGroupeHandler), Greffe, "PROC_REGJUD");
+Exiger(coupeeParGroupe.Mode == "base" && coupeeParGroupe.Plafonnees.SequenceEqual(["Répertoire général"])
+       && coupeeParGroupe.Message == "Répertoire général : les 1 premières lignes sur 1194.",
+    $"pont, plafond par groupe : seul le registre coupe est dans Plafonnees, le message le nomme ({string.Join(", ", coupeeParGroupe.Plafonnees)} ; {coupeeParGroupe.Message})");
 var panne = await EcranGenere.LignesAsync(client, GreffeAbsent, "PROC_DCA");
 Exiger(panne.Mode == "erreur" && panne.Lignes.SequenceEqual(descripteurDca.Lignes) && panne.Message?.Contains(GreffeAbsent) == true,
     $"pont, greffe absent (404) : les exemples restent, marques, avec le motif du serveur ({panne.Message})");
@@ -420,6 +436,25 @@ foreach (var jeu in jeux)
     Comparer(lues.Lignes, attendues, $"{code} : les lignes de {Path.GetFileName(fichier)}, dans l'ordre");
     Exiger(lues.Total == attendues.Length, $"{code} : total = {attendues.Length} lignes attendues ({lues.Total})");
 }
+// « Registres judiciaires » : UN PLAFOND PAR REGISTRE (LecteurRegistresJudiciaires.cs, en tete). fix-ok: mesure au controle final
+// du lot 6 (26/11/2026) -- un plafond commun, trie registre par registre, ne rendait que le repertoire general des qu'il atteignait le
+// plafond (capture 14 : « Injonctions de payer 0 », « Ordonnances du président 0 »). Plafond 1 : la premiere ligne de CHAQUE
+// registre, et le total de chacun ; par la route et le pont, une liste complete n'a aucun registre coupe.
+var groupesRegjud = CatalogueGenere.Descripteur("PROC_REGJUD")!.Groupes;
+var registresComplets = await Lire("PROC_REGJUD");
+var registresPlafond1 = await Lire("PROC_REGJUD", plafond: 1);
+var lignesParRegistre = registresComplets.Lignes.GroupBy(l => l.Groupe).ToDictionary(g => g.Key, g => g.Count());
+Exiger(groupesRegjud.All(lignesParRegistre.ContainsKey) && lignesParRegistre.Values.Any(n => n > 1)
+       && registresPlafond1.Lignes.Select(Texte).SequenceEqual(registresComplets.Lignes.GroupBy(l => l.Groupe).Select(g => Texte(g.First())))
+       && registresPlafond1.Total == registresComplets.Total && registresPlafond1.TotalParGroupe is { } totauxRegjud
+       && groupesRegjud.All(g => totauxRegjud.GetValueOrDefault(g) == lignesParRegistre[g]),
+    $"PROC_REGJUD, plafond 1 : la premiere ligne de chaque registre et le total de chacun ({string.Join(", ", registresPlafond1.Lignes.Select(l => l.Groupe))} ; " +
+    $"totaux {string.Join(", ", registresPlafond1.TotalParGroupe?.Select(t => $"{t.Key} {t.Value}") ?? [])})");
+var vueRegistres = await EcranGenere.LignesAsync(client, Greffe, "PROC_REGJUD");
+Exiger(vueRegistres.Mode == "base" && vueRegistres.Plafonnees.Length == 0 && vueRegistres.Message is null
+       && vueRegistres.Lignes.Length == registresComplets.Lignes.Count,
+    $"pont, PROC_REGJUD par la route : registres complets, aucun registre coupe ({string.Join(", ", vueRegistres.Plafonnees)} ; {vueRegistres.Message})");
+
 // L'ecran reuni des radiations d'office (« Relances et injonctions ») a TOUS ses membres branches depuis le lot 1 du plan
 // plan-f7ba4de2 : lu APRES les jeux, parce que les lecteurs des relances et injonctions lisent des colonnes que seuls
 // leurs jeux ajoutent aux tables du banc. Le mode « mixte » reste controle plus haut par l'ecran reuni de PROC_DCA.
@@ -556,6 +591,30 @@ foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(String
         }
     }
 }
+
+// « Registres judiciaires » SANS le reglage d'edition REP_GENERAL (EcrivainRegistresJudiciaires.cs, en tete) : la V2 ne cree alors
+// AUCUNE demande pour le repertoire general (DemandeEdition.cs:2582-2584, OPE_REGISTRE_ABSTRACT.cs:120). Le reglage du jeu
+// (PROC_REGJUD.sql, joue avec lui dans PROC_REGJUD.gestes bloc 3) est efface. Refus : le repertoire general seul, rien d'ecrit ;
+// jumeau accepte : envoye avec une decision des IP, les IP partent seuls et le message dit pourquoi le repertoire n'est pas imprime.
+await Sql("DELETE FROM v2.PARAMETRE_EDITION WHERE PRMED_CODE = 'REP_GENERAL'");
+const string SansReglageRepGeneral = "Le répertoire général n'est pas imprimé : le réglage d'édition REP_GENERAL n'existe pas dans ce greffe, et RIG v2 ne crée alors aucune demande.";
+var demandesAvantRegjud = await Valeur("SELECT COUNT(*) FROM v2.DEMANDE_EDITION");
+var journalAvantRegjud = await Valeur("SELECT COUNT(*) FROM soc.Journal");
+var reponseSansReglage = await http.PostAsJsonAsync(RoutesEcransGeneres.GestesPour(Greffe, "PROC_REGJUD"),
+    new GesteEcran(TypeGeste.Agir, ["G-1601201"], new Dictionary<string, string>()) { Nom = "Impression" }, json);
+var sansReglage = await reponseSansReglage.Content.ReadFromJsonAsync<ResultatGeste>(json);
+Exiger(reponseSansReglage.StatusCode == HttpStatusCode.UnprocessableEntity && sansReglage is { Fait: false } && sansReglage.Message == SansReglageRepGeneral
+       && await Valeur("SELECT COUNT(*) FROM v2.DEMANDE_EDITION") == demandesAvantRegjud
+       && await Valeur("SELECT COUNT(*) FROM soc.Journal") == journalAvantRegjud,
+    $"PROC_REGJUD, Impression du repertoire general SANS reglage REP_GENERAL : refus, aucune demande ni trace ({(int)reponseSansReglage.StatusCode} « {sansReglage?.Message} »)");
+var reponseMixte = await http.PostAsJsonAsync(RoutesEcransGeneres.GestesPour(Greffe, "PROC_REGJUD"),
+    new GesteEcran(TypeGeste.Agir, ["G-1601201", "I-1601221"], new Dictionary<string, string>()) { Nom = "Impression" }, json);
+var mixte = await reponseMixte.Content.ReadFromJsonAsync<ResultatGeste>(json);
+Exiger(reponseMixte.StatusCode == HttpStatusCode.OK && mixte is { Fait: true }
+       && mixte.Message == "Registre des 1 décisions des IP : placé dans la file des éditions. " + SansReglageRepGeneral
+       && int.Parse(await Valeur("SELECT COUNT(*) FROM v2.DEMANDE_EDITION")) == int.Parse(demandesAvantRegjud) + 1
+       && await Valeur("SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Répertoire général des 1 instances enrôlées'") == "0",
+    $"PROC_REGJUD, jumeau : repertoire general et IP sans reglage -- seule la demande des IP est creee, le message le dit ({(int)reponseMixte.StatusCode} « {mixte?.Message} »)");
 
 // Le PONT (Pont/EcranGenere.cs) : un geste sans serveur est une demonstration ; sur une ligne de l'ecran reuni
 // « Corriger une affaire judiciaire », la fiche, la recherche et un refus de RIG v2 passent par lui.
@@ -767,6 +826,22 @@ static class Blocs
 }
 
 /// <summary>Un serveur factice : la procedure <c>vide</c> est branchee et sans ligne, toute autre n'a pas de lecteur.</summary>
+/// <summary>Un serveur factice qui rend UNE ligne sur 1194 (liste coupee au plafond) pour toute procedure ; avec
+/// <paramref name="parGroupe"/>, une ligne au repertoire general et une aux IP, et le total de chaque groupe.</summary>
+sealed class RepondeurPlafond(Dictionary<string, int>? parGroupe = null) : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage requete, CancellationToken jeton)
+    {
+        var code = requete.RequestUri!.AbsolutePath.Split('/')[^2];
+        var corps = parGroupe is null
+            ? new LignesEcran(code, true, [new LigneLue("2026J00001", "", "Registre Général", "Validee", []) { Id = "G-1" }], 1194, 1)
+            : new LignesEcran(code, true, [new LigneLue("2026J00001", "", "Répertoire général", "Validee", []) { Id = "G-1" },
+                                           new LigneLue("2026IP0007", "", "Injonctions de payer", "Validee", []) { Id = "I-7" }],
+                              parGroupe.Values.Sum(), 1) { TotalParGroupe = parGroupe };
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(corps, options: new JsonSerializerOptions(JsonSerializerDefaults.Web)) });
+    }
+}
+
 sealed class RepondeurVide(string vide) : HttpMessageHandler
 {
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage requete, CancellationToken jeton)

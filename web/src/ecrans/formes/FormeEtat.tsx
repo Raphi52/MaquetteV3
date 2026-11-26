@@ -1,36 +1,47 @@
 // FORME « ETAT » : un journal, un livre, une statistique, un export. Les PARAMETRES de la fiche RIG v2 (la periode...)
 // dans le panneau de gauche, le TABLEAU de resultats aux colonnes de la fiche, et ses TOTAUX au pied : chaque colonne
 // montant ou nombre est totalisee, par groupe (le mode de paiement d'un journal de caisse) puis en tout. Les gestes de la
-// fiche (Editer, Generer, Exporter...) ne produisent rien tant qu'aucun ecrivain n'existe : ils le disent.
-// La periode filtre le tableau sur sa premiere colonne date, quand il en a une.
+// fiche (Editer, Generer, Exporter...) partent a l'ecrivain de la procedure (type Agir, son nom, les lignes AFFICHEES, un envoi
+// par groupe : un registre, un mode de paiement) quand les lignes viennent de la base ; sans ecrivain, ou sur des exemples, ils
+// ne produisent rien et le disent (plan « RIG v3 100 % fonctionnel », lot 6 : l'impression des registres judiciaires).
+// Une liste COUPEE au plafond du serveur (vue.plafonnees) n'est pas le registre : RIG v2 imprime le registre entier avec le
+// total de sa requete (OPE_RESULTATS.cs:35-39, :65-73 ; OPE_REGISTRE_GENERAL.cs:221) -- le geste est refuse, rien ne part.
+// LA BASE (lot 6) : quand le lecteur sait chercher (vue.recherche), le texte et les PARAMETRES (au libelle du descripteur)
+// cherchent dans la base (useRecherche, comme une Audience : un parametre ne se lit pas dans une ligne) -- les criteres de
+// RIG v2, qui relance sa requete a chaque saisie (proc_regjud.md:156-160) ; resserres, ils levent la coupure. Sinon, la periode
+// et le filtre ne portent que sur les lignes chargees : ils ne levent pas la coupure, le message ne les propose donc pas, et
+// la periode filtre le tableau sur sa premiere colonne date, quand il en a une.
 
 import { useState } from 'react'
-import { EnteteListe, ListeModerne, montant, normaliser, PiedListe, VuesListe } from '../../composants/ListeModerne'
+import { EnteteListe, ListeModerne, montant, PiedListe, VuesListe } from '../../composants/ListeModerne'
 import { dateCourte } from '../../criteres'
 import type { DescripteurEcranVue } from '../../plan/types'
 import { CasesSansValeurs, cellules, lisible, sansValeurs } from './FormeReferentiel'
 import {
-  Annonce, ChampSaisie, GroupesVides, Provenance, enExemple, Exemple, gestesDe, nombreDe, refus, synthese, texteLigne,
-  useAnnonce, useLignes, type Saisies,
+  Annonce, ChampSaisie, GroupesVides, NoteRecherche, Provenance, enExemple, Exemple, gestesDe, nombreDe, refus, synthese,
+  useAnnonce, useGesteEnLot, useLignes, useRecherche, type Saisies,
 } from './commun'
 
 const Tous = '\u0000tous'
 
 export function FormeEtat({ d }: { d: DescripteurEcranVue }) {
-  const { vue, lignes } = useLignes(d)
+  const lues = useLignes(d)
+  const { vue, lignes } = lues
   const [parametres, poserParametres] = useState<Saisies>({})
   const [texte, poserTexte] = useState('')
   const [groupe, poserGroupe] = useState(Tous)
   const [annonce, annoncer] = useAnnonce()
+  const enLot = useGesteEnLot(d, vue, annoncer)
 
   // La periode (premier parametre de type Periode) borne la premiere colonne date du tableau.
   const periode = d.parametres.find((p) => p.type === 'Periode')
   const [du = '', au = ''] = (periode ? parametres[periode.libelle] ?? '' : '').split('|')
   const colonneDate = d.colonnes.findIndex((c) => c.type === 'Date')
-  const cherche = normaliser(texte.trim())
-  const visibles = lignes.filter((l) => {
+  // Le texte filtre ici les lignes que la base n'a pas cherchees ; les parametres partent a la base si elle cherche.
+  const { visibles: trouvees, enBase } = useRecherche(lues, texte, parametres, false)
+  const visibles = trouvees.filter((l) => {
     if (groupe !== Tous && l.groupe !== groupe) return false
-    if (cherche !== '' && !normaliser(texteLigne(l)).includes(cherche)) return false
+    if (enBase) return true
     const jour = colonneDate >= 0 ? cellules(d, l)[colonneDate] ?? '' : ''
     return jour === '' || ((du === '' || jour >= du) && (au === '' || jour <= au))
   })
@@ -61,12 +72,19 @@ export function FormeEtat({ d }: { d: DescripteurEcranVue }) {
         <EnteteListe titre={d.titre} synthese={<>{synthese(d, vue, lignes)}{du || au ? <> · du {du ? dateCourte(du) : '…'} au {au ? dateCourte(au) : '…'}</> : null}</>}
                      filtre={{ valeur: texte, changer: poserTexte, indication: d.recherche }} />
         {vue && <Provenance vue={vue} />}
+        <NoteRecherche enBase={enBase} />
         <VuesListe vues={[{ cle: Tous, libelle: 'Tout', compte: lignes.length },
                           ...d.groupes.map((g) => ({ cle: g, libelle: g, compte: lignes.filter((l) => l.groupe === g).length }))]}
                    active={groupe} choisir={poserGroupe}>
           {gestesDe(d).map((g, k) => (
             <button key={g} type="button" className={`rig-lm-outil${k === 0 ? ' rig-lm-outil--fort' : ''}`}
-                    onClick={() => annoncer(refus(g, `: aucun état n’est produit (${visibles.length} ligne${visibles.length > 1 ? 's' : ''} à l’écran)`))}>{g}</button>
+                    onClick={() => (visibles.some((l) => vue?.plafonnees?.includes(l.groupe))
+                      ? annoncer({ refus: `« ${g} » : la liste est coupée (${vue?.message ?? ''}). RIG v2 imprime toutes les lignes ; `
+                                        + (enBase
+                                          ? 'resserrez les paramètres, qui cherchent dans la base, pour qu’elles soient toutes à l’écran : rien n’est enregistré.'
+                                          : 'RIG v3 ne lit que celles-ci, la période et le filtre ne portent que sur elles : rien n’est enregistré.') })
+                      : void enLot('Agir', g, visibles, {},
+                          (n) => refus(g, `: aucun état n’est produit (${n} ligne${n > 1 ? 's' : ''} à l’écran)`)))}>{g}</button>
           ))}
         </VuesListe>
         <Annonce texte={annonce} />

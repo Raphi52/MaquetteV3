@@ -135,4 +135,22 @@ describe('EcranActes', () => {
     expect(teinteCategorie('Ordonnance de prorogation')).toBe('ardoise')
     expect(teinteCategorie('Autre')).toBe('gris')
   })
+
+  // La base du greffe (lot 6 du plan « RIG v3 100 % fonctionnel ») : Pont/EcranActesBase.cs rend le mode et une note.
+  it('lue en base : la note dit ce que la liste montre, aucune mention « exemple »', async () => {
+    const note = 'Base du greffe : les actes déposés depuis 2014 qui ne sont pas encore rangés dans la GED (« Actes non numérisés ou manquants » de RIG v2).'
+    installerFauxPont({ 'EcranActes.Trouver': () => ({ ...vue({ critNonNumerisables: false }), mode: 'serveur', message: note, total: 1 }) })
+    const { container } = render(<EcranActes ouvrirDossier={vi.fn()} />)
+    await screen.findByText('D1')
+    expect(screen.getByRole('note').textContent).toBe(note)
+    expect(container.textContent).not.toMatch(/exemple/i)
+  })
+
+  it('base en panne : le motif en alerte, aucune ligne', async () => {
+    installerFauxPont({ 'EcranActes.Trouver': () => ({ categories: [], lignes: [], mode: 'erreur', message: 'La base du greffe 3801 ne répond pas.', total: 0 }) })
+    const { container } = render(<EcranActes ouvrirDossier={vi.fn()} />)
+    expect((await screen.findByRole('alert')).textContent).toMatch(/La base du greffe 3801 ne répond pas/)
+    expect(screen.getByText('Aucun acte ne repond a ces criteres.')).toBeTruthy()
+    expect(rangees(container)).toHaveLength(1)
+  })
 })

@@ -1,0 +1,12 @@
+# « Encaissements » (LecteurEncaissements) sur le jeu PROC_RECHENC.sql : la liste a l'ouverture, aux criteres pre-remplis de la
+# V2 -- les encaissements du jour, de 0 h a 24 h --, une ligne par ventilation, tries par date decroissante, montant, titre.
+# Etat : ventilation non nulle -> Validee « Ventilé » ; aucune ventilation, ou une ventilation a 0 -> AFaire (rouge dans la V2).
+# Ecartes, chacun avec son jumeau retenu :
+#   1600406 la veille a 23 h   -- 1600403, le jour a 0 h ;
+#   1600407 le lendemain a 0 h -- 1600401, le jour a 10 h ;
+#   1600404 et 1600405 (mars 2025) : retrouves par PROC_RECHENC.recherches.
+# 1600401 a deux ventilations : deux lignes ; la seconde, d'un tiers payeur, n'a ni client ni affaire. Une remise -1 ne s'affiche pas.
+Encaissement L6CHQ001 · PAYEUR ALPHA | Chèque · 1 200,00 € · le {J+0} · BANQUE BANC · remise 12 · ventilé 1 000,00 € · client L6ALPHA · CLI ALPHA · affaire 1600431 | Encaissement ventilé | Validee | []
+Encaissement L6CHQ001 · PAYEUR ALPHA | Chèque · 1 200,00 € · le {J+0} · BANQUE BANC · remise 12 · ventilé 200,00 € | Encaissement ventilé | Validee | []
+Encaissement L6VIR002 · PAYEUR BETA | Virement · 850,00 € · le {J+0} · sans ventilation | Encaissement sans ventilation | AFaire | []
+Encaissement n° 1600403 · L6GAMMA · CLI GAMMA | ESP · 50,00 € · le {J+0} · sans ventilation | Encaissement sans ventilation | AFaire | []

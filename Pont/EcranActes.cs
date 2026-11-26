@@ -14,8 +14,9 @@ public sealed record LigneActe(int Rang, string Dossier, string Depot, string De
                                string Depose, string Acte, string Cloture, bool Confidentiel,
                                bool Demat, string Anomalie, bool Numerisable);
 
-/// <summary>Ce que l'ecran affiche : la liste des categories et la grille.</summary>
-public sealed record VueActes(OptionActes[] Categories, LigneActe[] Lignes);
+/// <summary>Ce que l'ecran affiche : la liste des categories et la grille ; d'ou elle vient (Pont/LectureEcranMain.cs), son
+/// total et une remarque sur ce que la base ne porte pas (lot 6 du plan « RIG v3 100 % fonctionnel »).</summary>
+public sealed record VueActes(OptionActes[] Categories, LigneActe[] Lignes, string Mode = "demo", string? Message = null, int Total = 0);
 
 /// <summary>
 /// Pont de l'ecran PROC_ACTES_NUM (web/src/ecrans/EcranActes.tsx) : les actes
@@ -26,9 +27,10 @@ public sealed record VueActes(OptionActes[] Categories, LigneActe[] Lignes);
 /// sont masques tant que la case « Lister actes non numerisables » n'est pas
 /// cochee. Metier/ n'est pas modifie.
 /// </summary>
-public static class EcranActes
+public static partial class EcranActes
 {
-    [JSInvokable("EcranActes.Trouver")]
+    /// <summary>La DEMONSTRATION (JeuDemo.Actes), rendue sans serveur et marquee « exemple » ; l'ecran l'appelle par
+    /// EcranActesBase.cs (« EcranActes.Trouver »), tests/SaisieCheck l'execute directement.</summary>
     public static VueActes Trouver(CriteresActes criteres)
         => new(JeuDemo.CategoriesDepot.Select(c => new OptionActes(c.Code, c.Libelle)).ToArray(),
                Trouves(criteres)
