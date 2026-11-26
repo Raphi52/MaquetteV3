@@ -929,8 +929,9 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // Les groupes (traitements d'édition) des files d'édition (proc_relancefile.md, Détail OPE) : lus par
             // Serveur/Socle/EcransGeneres/LecteurTraitementsEdition.cs (lot 9). Les boutons d'OPE_EDITGRP.cs:44-48 : RELANCER
             // « Relancer via editrcs », FIGER « Cloturer le groupe », IMPRIMER_AUTRE « Tout réimprimer » : joués par
-            // EcrivainTraitementsEdition.cs -- « Tout réimprimer » remet les éditions du groupe à imprimer dans la base ; les deux
-            // autres sont refusés avec leur raison (programme externe ; clôture pas encore reprise).
+            // EcrivainTraitementsEdition.cs -- « Tout réimprimer » remet les éditions du groupe à imprimer dans la base,
+            // « Cloturer le groupe » clôt un groupe ouvert et ouvre le suivant de sa file (TraitementEdition.Cloturer) ;
+            // « Relancer via editrcs » est refusé (un programme externe, jamais lancé).
             Recherche = "Rechercher une file, un groupe, une date…",
             Criteres = ["File d'édition", "Date de début (par défaut : aujourd'hui à 7 h)", "Date de fin", "Numéro de groupe"],
             Valider = "Relancer via editrcs", // OPE_EDITGRP.cs:44-48, _relancer (:237-240).
