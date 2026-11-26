@@ -161,9 +161,14 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Forme = FormeEcran.Audience,
             // RIG v2 ouvre MPCS du retour d'audience sur les affaires PC cochées (OPE_LIST_APPEL_AFFAIRE.cs:1409-1412) : même audience,
             // mêmes paramètres. Lecteur : Serveur/Socle/EcransGeneres/LecteurMiseAuPointChambres.cs (lot 7). « Valider la décision »
-            // valide en lot (mode MultiInstance) : le résultat sur chaque appel, une décision du type saisi sur chaque instance
-            // (EcrivainMiseAuPointChambres.cs ; PROC_MPCS.cs:1197-1248).
-            Parametres = [Champ.Date("Date de l'audience"), "Chambre", "Résultat", "Type de décision", Champ.Date("Date prévue")],
+            // valide en lot (mode MultiInstance), dans l'ordre de ApplyModifications (PROC_MPCS.cs:1204-1251) : la composition (son
+            // numéro dans l'audience), le résultat, le prochain appel (audience du jour saisi, type de classement), une décision du
+            // type saisi et sa mesure liée (EcrivainMiseAuPointChambres.cs).
+            // fix-ok: second contrôle du lot 7 (26/11/2026) -- ces descripteurs n'avaient pas les paramètres des écritures et recherches
+            // de RIG v2 désormais branchées (composition et prochain appel, PROC_MPCS.cs:1204-1238 ; cases des types, Designer :491-522) ;
+            // une cause, portée par un remplacement par descripteur (MPCS, Délibérés, Taxes), aucun autre descripteur touché.
+            Parametres = [Champ.Date("Date de l'audience"), "Chambre", Champ.Nombre("Composition"), "Résultat", Champ.Date("Prochaine audience"),
+                          "Type de classement", "Type de décision", Champ.Date("Date prévue")],
             Recherche = "Rechercher une affaire, un appel, un numéro de rôle…",
             Criteres = ["Date de l'audience", "Chambre"],
             Valider = "Valider la décision", // proc_mpcs.md : « ValidationSauver — Clôture et génération finale ».
@@ -248,14 +253,15 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         {
             Code = "PROC_LISTE_DELIBERES", Titre = "Deliberes", Sujet = "délibérés",
             // Un ÉTAT, pas une audience : RIG v2 n'a pas de fiche, mais son code (Source\Judiciaire\Exe\PROC_LISTE_DELIBERES\
-            // frmListeDelibere.cs) est une liste en lecture seule, éditée en Word, sans aucune écriture (lot 7). Lecteur :
-            // Serveur/Socle/EcransGeneres/LecteurListeDeliberes.cs.
+            // frmListeDelibere.cs) est une liste en lecture seule, éditée en Word, sans aucune écriture (lot 7). Lecteur, qui cherche
+            // dans la base avec ces paramètres : Serveur/Socle/EcransGeneres/LecteurListeDeliberes.cs.
             // fix-ok: lot 7, mesure par grep -- l'edition scriptee de ce descripteur avait colle deux lignes de commentaire (une
             // barre oblique inverse en fin de ligne lue comme une continuation) ; les deux lignes sont separees, rien d'autre ne change.
             Forme = FormeEcran.Etat,
-            // Les critères de recherche de frmListeDelibere.Designer.cs (:400-577).
+            // Les critères de recherche de frmListeDelibere.Designer.cs (:400-577) : les types d'instance sont trois cases, comme
+            // chkbContentieux, chkbProcedureCollective et chkbRefere (:491-522).
             Parametres = [Champ.Date("Délibérés au"), Champ.Nombre("Durée du délibéré en jours"),
-                          Champ.Liste("Type d'instance", "Contentieux", "Procédures collectives", "Référés"), "Juge de l'instance",
+                          Champ.Case("Contentieux"), Champ.Case("Procédures Collectives"), Champ.Case("Référés"), "Juge de l'instance",
                           Champ.Date("Date d'enrôlement min")],
             // Les colonnes de la grille (frmListeDelibere.Designer.cs:126-200).
             Colonnes = ["N° rôle", "N° joints", "Nom de l'affaire", Champ.Date("Date du délibéré"), "Code plumitif", "Durée du délibéré",
@@ -263,15 +269,16 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // La barre d'outils (frmListeDelibere.cs:55-61) : « Editer le résultat » (Word), « Délibérés repoussés non rendus » (Excel).
             Gestes = ["Editer le résultat", "Délibérés repoussés non rendus"],
             Recherche = "Rechercher un délibéré, une affaire, un numéro de rôle…",
-            Criteres = ["Délibérés au", "Durée du délibéré en jours", "Type d'instance", "Juge de l'instance", "Date d'enrôlement min"],
+            Criteres = ["Délibérés au", "Durée du délibéré en jours", "Contentieux", "Procédures Collectives", "Référés", "Juge de l'instance",
+                        "Date d'enrôlement min"],
             Valider = "Editer le résultat", // frmListeDelibere.cs:57 : TypeButtonRigToolBar.EDITER, texte « Editer le résultat ».
             Rang = 5,
             Etats = EtatsEcran.Trois("À rendre", "En cours", "Rendu"),
             Groupes = ["Délibérés non rendus"],
             Sections =
             [
-                Marche("Recherche", "Les affaires en délibéré depuis au moins la durée (60 jours par défaut), à la date de référence (le dernier jour du mois précédent par défaut), sans décision depuis le délibéré. Contentieux coché par défaut ; au moins un type d'instance.", true,
-                    "Délibérés au", "Durée du délibéré en jours", "Type d'instance"),
+                Marche("Recherche", "Les affaires en délibéré depuis au moins la durée (60 jours par défaut), à la date de référence (le dernier jour du mois précédent par défaut), sans décision depuis le délibéré. Sans type coché, le contentieux (la case cochée par défaut de RIG v2).", true,
+                    "Délibérés au", "Durée du délibéré en jours", "Contentieux", "Procédures Collectives", "Référés"),
                 Marche("Édition", "Le résultat s'édite en Word, colonnes au choix ; les délibérés repoussés non rendus s'exportent en Excel.", false,
                     "Editer le résultat", "Délibérés repoussés non rendus"),
             ],
@@ -298,7 +305,8 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // Une ÉDITION pure : RIG v2 n'écrit rien, il produit trois états Crystal en lecture seule (proc_taxesettours.md:112-118,
             // le Détail OPE fait foi). Le tableau EST leur contenu, lu dans la base : les tours de rôle des mandataires (4D_TOURS.rpt)
             // et leurs acomptes et taxes (4D_TAXES_ACOMPTES.rpt), sur la période par défaut de RIG v2 (du 1er janvier à aujourd'hui,
-            // OPE_PERIODE.cs:31-32). Lecteur : Serveur/Socle/EcransGeneres/LecteurTaxesEtTours.cs (lot 7).
+            // OPE_PERIODE.cs:31-32), ou celle des paramètres saisis, que le lecteur cherche dans la base avec les cases cochées.
+            // Lecteur : Serveur/Socle/EcransGeneres/LecteurTaxesEtTours.cs (lot 7).
             Forme = FormeEcran.Etat,
             // OPE_PERIODE (deux dates) et OPE_TYPE_EDITION (trois cases), proc_taxesettours.md:144-150.
             Parametres = [Champ.Date("Date de début"), Champ.Date("Date de fin"), Champ.Case("Tours"), Champ.Case("Acomptes"), Champ.Case("Taxes")],

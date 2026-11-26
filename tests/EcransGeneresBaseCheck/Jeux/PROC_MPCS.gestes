@@ -41,11 +41,12 @@ valeur: Résultat = M17P
 resultat: refuse
 message: Certaines instances sont bloquées, décochez-les pour travailler sur les autres : Instance bloquée (D2617058010), demande "En cours" : RETAUD par BANC MPCS
 ---
-# 6. Ni résultat ni type de décision : rien à valider. Jumeau : bloc 12 (les deux saisis).
+# 6. Rien de saisi (ni résultat, ni composition, ni prochain appel, ni type de décision) : rien à valider. Jumeaux : blocs 12
+#    (résultat et décision), 17 (composition seule), 25 (prochain appel seul).
 geste: Decider Valider la décision
 ids: 1705521
 resultat: refuse
-message: Saisissez un « Résultat » ou un « Type de décision » : rien n'est à valider.
+message: Saisissez un « Résultat », une « Composition », une « Prochaine audience » ou un « Type de décision » : rien n'est à valider.
 ---
 # 7. Un code plumitif hors saisie (la liste du résultat ne le propose pas). Jumeau : bloc 12 (M17P en saisie).
 geste: Decider Valider la décision
@@ -113,3 +114,112 @@ resultat: fait
 message: Résultat M17N posé sur 1 affaire ; aucune décision ajoutée (déjà délibérées).
 controle: SELECT CONCAT(APPAF_CODE_PLUMITIF, ':', APPAF_ETAT_RETOUR) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF = 1705526 => M17N:M
 controle: SELECT COUNT(*) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_INSTN = 1705026 => 1
+---
+# SECOND CONTRÔLE DU LOT 7 : la composition, le prochain appel et la mesure liée, dans l'ordre de ApplyModifications
+# (PROC_MPCS.cs:1204-1251). Données : fin de PROC_MPCS.sql (septembre et octobre 2001, une audience à venir en 2099).
+
+# 15. Une composition qui n'est pas un numéro : RIG v2 la choisit dans la liste des compositions de l'audience, dont le synonyme
+#     est le numéro d'ordre (OPE_RESULTAT de PROC_MJUDS, :314-340). Jumeau : bloc 17 (« 1 »).
+geste: Decider Valider la décision
+ids: 1705531
+valeur: Composition = deux
+resultat: refuse
+message: « Composition » se désigne par son numéro dans l'audience : « deux » n'en est pas un.
+---
+# 16. La composition n° 2 : l'audience de 2026P17531 l'a, celle de 2026P17532 non (une seule composition) : la liste de RIG v2 ne
+#     la propose pas pour cette audience. Rien n'est écrit, même sur la première. Jumeau : bloc 17 (n° 1, que les deux ont).
+geste: Decider Valider la décision
+ids: 1705531,1705532
+valeur: Composition = 2
+resultat: refuse
+message: L'audience du rôle 2026P17532 n'a pas de composition n° 2.
+---
+# 17. La composition n° 1 sur deux audiences : chaque appel reçoit celle de SON audience (AffectComposition, :1547-1555 :
+#     APPAF_ID_CMAUD), 1705131 et 1705133 ; aucun résultat, l'appel reste non traité.
+geste: Decider Valider la décision
+ids: 1705531,1705532
+valeur: Composition = 1
+resultat: fait
+message: Composition n° 1 posée sur 2 affaires.
+controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, ':', APPAF_ID_CMAUD, ':', ISNULL(APPAF_CODE_PLUMITIF, '-'), ':', APPAF_ETAT_RETOUR), ',') WITHIN GROUP (ORDER BY APPAF_ID_APPAF) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF IN (1705531, 1705532) => 1705531:1705131:-:A,1705532:1705133:-:A
+---
+# 18. Une prochaine audience qui n'est pas une date. Jumeau : bloc 25.
+geste: Decider Valider la décision
+ids: 1705531
+valeur: Prochaine audience = pas une date
+valeur: Type de classement = TM17
+resultat: refuse
+message: « Prochaine audience » n'est pas une date : « pas une date ».
+---
+# 19. Une prochaine audience sans type de classement : APPAF_TYPE_CLASSEMENT est NOT NULL (APPEL_AFFAIRE.sql:7), RIG v2 le saisit
+#     avec l'appel (OPE_APP_AFFAIRE). Jumeau : bloc 25.
+geste: Decider Valider la décision
+ids: 1705531
+valeur: Prochaine audience = 2001-10-17
+resultat: refuse
+message: « Type de classement » est obligatoire pour le prochain appel (APPEL_AFFAIRE.APPAF_TYPE_CLASSEMENT).
+---
+# 20. Un type de classement absent de la base du greffe (la liste de OPE_APP_AFFAIRE lit TYPE_CLASSEMENT). Jumeau : bloc 25 (TM17).
+geste: Decider Valider la décision
+ids: 1705531
+valeur: Prochaine audience = 2001-10-17
+valeur: Type de classement = TM17X
+resultat: refuse
+message: Le type de classement « TM17X » n'est pas dans la base du greffe.
+---
+# 21. Un type de classement sans prochaine audience : il se rapporte à l'appel. Jumeau : bloc 25.
+geste: Decider Valider la décision
+ids: 1705531
+valeur: Type de classement = TM17
+resultat: refuse
+message: « Type de classement » se rapporte au prochain appel : saisissez aussi la « Prochaine audience ».
+---
+# 22. Aucune audience le 19/10/2001. Jumeau : bloc 25 (le 17/10/2001, une seule audience).
+geste: Decider Valider la décision
+ids: 1705531
+valeur: Prochaine audience = 2001-10-19
+valeur: Type de classement = TM17
+resultat: refuse
+message: Aucune audience le 19/10/2001 dans la base du greffe.
+---
+# 23. Deux audiences le 18/10/2001 : RIG v2 en fait choisir une dans la liste (OPE_APP_AFFAIRE.SelectAudienceOuCabinet), la V3 ne
+#     sait pas encore la désigner autrement que par sa date. Jumeau : bloc 25.
+geste: Decider Valider la décision
+ids: 1705531
+valeur: Prochaine audience = 2001-10-18
+valeur: Type de classement = TM17
+resultat: refuse
+message: Plusieurs audiences le 18/10/2001 : la V3 ne sait pas encore choisir laquelle.
+---
+# 24. La seule instance cochée a déjà un appel à une audience à venir (le 15/02/2099) : RIG v2 ne lui en ajoute pas
+#     (PROC_MPCS.cs:1234), il n'y a rien à écrire. Jumeau : bloc 25 (une instance sans appel à venir).
+geste: Decider Valider la décision
+ids: 1705533
+valeur: Prochaine audience = 2001-10-17
+valeur: Type de classement = TM17
+resultat: refuse
+message: Chaque affaire cochée a déjà un appel à une audience à venir : aucun prochain appel n'est ajouté.
+---
+# 25. Le prochain appel sur deux instances : 2026P17531 n'a pas d'appel à venir et reçoit un appel neuf à l'audience du
+#     17/10/2001 (AffectAppelAffaireDirect, :1698-1703 : 2e appel de l'instance, classement TM17, état de retour « A », sans
+#     composition) ; 2026P17533, déjà appelée le 15/02/2099, n'en reçoit pas.
+geste: Decider Valider la décision
+ids: 1705531,1705533
+valeur: Prochaine audience = 2001-10-17
+valeur: Type de classement = TM17
+resultat: fait
+message: 1 prochain appel à l'Audience du 17/10/2001 à 09:00 - Chambre Chambre PC libre (M17B), 1 déjà appelée à une audience à venir.
+controle: SELECT COUNT(*) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN = 1705031 AND APPAF_ID_ADNC = 1705124 AND APPAF_NUM_ORDRE = 2 AND APPAF_TYPE_CLASSEMENT = 'TM17' AND APPAF_ETAT_RETOUR = 'A' AND APPAF_ETAT_PREPARATION = '0' AND APPAF_ID_CMAUD IS NULL AND APPAF_CODE_PLUMITIF IS NULL => 1
+controle: SELECT COUNT(*) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN = 1705033 => 2
+---
+# 26. Un type de décision qui porte une mesure liée (T17M -> EXP17) : la décision et une MESURE de ce type, jointe à l'instance et
+#     à la décision, numéro d'ordre 1, numéro source neuf (AffectDecisionJudiciaire, :1617-1627 ; Mesure.CreateMesure,
+#     Mesure.cs:488-496 ; DecisionJudiciaire.Sauve, :1594-1598). Jumeau : bloc 12 (T17, sans mesure liée : aucune mesure).
+geste: Decider Valider la décision
+ids: 1705534
+valeur: Résultat = M17P
+valeur: Type de décision = T17M
+resultat: fait
+message: Résultat M17P posé sur 1 affaire ; 1 décision T17M créée avec sa mesure EXP17.
+controle: SELECT STRING_AGG(CONCAT(m.MSINS_ID_INSTN, ':', m.MSINS_NUM_ORDRE, ':', m.MSINS_TYPE_MESURE, ':', CASE WHEN LEN(m.MSINS_NUMERO_SOURCE) = 36 THEN 'guid' ELSE '-' END, ':', d.DCJDC_TYPE_DECISION), ',') FROM v2.MESURE AS m JOIN v2.DECISION_JUDICIAIRE AS d ON d.DCJDC_ID_DCJDC = m.MSINS_ID_DCJDC WHERE m.MSINS_ID_INSTN = 1705034 => 1705034:1:EXP17:guid:T17M
+controle: SELECT COUNT(*) FROM v2.MESURE WHERE MSINS_ID_INSTN IN (1705021, 1705022) => 0

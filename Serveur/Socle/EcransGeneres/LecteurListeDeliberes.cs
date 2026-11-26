@@ -24,13 +24,22 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     delibere, sinon la date de la derniere audience, :207-236), juge de l'instance, localisation. ORDRE : role decroissant (:170).
 /// Une ligne, un etat « À rendre » (AFaire) : la liste ne retient que des deliberes non rendus.
 ///
-/// CE QUE LA V3 NE REPREND PAS : les parametres de la recherche (date, duree, types, juge, enrolement minimale) ne partent pas a la
-/// base -- ce lecteur ne cherche pas (il n'est pas IRechercheEcran) ; la forme Etat, elle, envoie le texte et les parametres a un
-/// lecteur qui cherche depuis le lot 6 (web/src/ecrans/formes/FormeEtat.tsx:9-13) : la liste est celle des valeurs par defaut de RIG v2 ;
-/// « Editer le résultat » (un document Word, AfficherWord, :263-322) et « Délibérés repoussés non rendus » (un classeur Excel,
-/// _GenererExcelDeliberer, :482-503) produisent un fichier sur le poste : la V3 n'a pas encore d'edition de ce genre.
+/// LA RECHERCHE (IRechercheEcran : la forme Etat envoie le texte et les parametres a la base, web/src/ecrans/formes/FormeEtat.tsx:9-13) :
+/// les criteres de RIG v2, qui relance sa requete (NewTraitement, :154-262) :
+///   - « Délibérés au » : la date de reference (dtpReference, :161-171) ; vide = le dernier jour du mois precedent (:61-63) ;
+///   - « Durée du délibéré en jours » (txtDureeDelib, :176) ; vide = 60. Une duree qui n'est pas un entier : RIG v2 refuse de
+///     chercher (« La durée du délibéré est incorrect, veuillez la corriger », :90-94) -- la V3 ne rend aucune ligne ;
+///   - les types d'instance, trois cases comme RIG v2 (chkbContentieux « 07 », chkbProcedureCollective « 08 », chkbRefere « 09 »,
+///     Designer :491-521 ; TypeInstanceGenererSQL, :352-372) : les cases cochees ; aucune cochee = Contentieux, la case cochee par
+///     defaut de RIG v2 (Designer :513) -- les cases de la V3 partent decochees, RIG v2 refuse « aucun type » (:96-99) ;
+///   - « Juge de l'instance » (rcboJuge, :173-175) : le juge ACTIF de ce libelle (« NOM Prenom », la liste de RIG v2, :67) ;
+///   - « Date d'enrôlement min » (dtpEnrolement, :176-178) : enrolee ce jour ou apres ;
+///   - le texte : le numero de role ou le nom de l'affaire.
+///
+/// CE QUE LA V3 NE REPREND PAS : « Editer le résultat » (un document Word, AfficherWord, :263-322) et « Délibérés repoussés non rendus »
+/// (un classeur Excel, _GenererExcelDeliberer, :482-503) produisent un fichier sur le poste : la V3 n'a pas encore d'edition de ce genre.
 /// </summary>
-internal sealed class LecteurListeDeliberes : ILecteurEcran
+internal sealed class LecteurListeDeliberes : IRechercheEcran
 {
     public string Procedure => "PROC_LISTE_DELIBERES";
 
@@ -40,7 +49,16 @@ internal sealed class LecteurListeDeliberes : ILecteurEcran
     /// <summary>Les valeurs par defaut de RIG v2 (frmListeDelibere.Designer.cs:513-521, :557).</summary>
     internal const int DureeParDefaut = 60;
 
-    internal const string TypesParDefaut = "('07')";
+    /// <summary>Les parametres du descripteur (Surveiller.cs), au mot pres : les libelles de frmListeDelibere.Designer.cs.</summary>
+    internal const string CritereReference = "Délibérés au", CritereDuree = "Durée du délibéré en jours", CritereContentieux = "Contentieux",
+                          CriterePc = "Procédures Collectives", CritereRefere = "Référés", CritereJuge = "Juge de l'instance",
+                          CritereEnrolement = "Date d'enrôlement min";
+
+    /// <summary>Les cases des types d'instance et leur code (Tag, Designer :491, :505, :521).</summary>
+    private static readonly (string Case, string Type)[] Types = [(CritereContentieux, "07"), (CriterePc, "08"), (CritereRefere, "09")];
+
+    public IReadOnlyCollection<string> Criteres { get; } =
+        [CritereReference, CritereDuree, CritereContentieux, CriterePc, CritereRefere, CritereJuge, CritereEnrolement];
 
     // La date de delibere d'une instance (getDerniereDateDelib, :139-144), au plus tard a @ref.
     private const string DateDelib = """
@@ -72,19 +90,41 @@ internal sealed class LecteurListeDeliberes : ILecteurEcran
                      FROM v2.DECISION_JUDICIAIRE AS x JOIN v2.TYPE_DECISION AS td ON td.R_TYPEDECISI_VALEUR = x.DCJDC_TYPE_DECISION
                      WHERE x.DCJDC_ID_INSTN = i.INSTN_ID_INSTN AND ISNULL(x.DCJDC_DATE, x.DCJDC_DATE_PREVUE) >= d.DateDelib
                      ORDER BY ISNULL(x.DCJDC_DATE, x.DCJDC_DATE_PREVUE)) AS dj
-        WHERE i.INSTN_TYPE_INSTANCE IN {{TypesParDefaut}} AND i.INSTN_DATE_ENROLEMENT <= @ref AND d.DateDelib IS NOT NULL
+        WHERE i.INSTN_TYPE_INSTANCE IN (/*types*/) AND i.INSTN_DATE_ENROLEMENT <= @ref AND d.DateDelib IS NOT NULL
           AND NOT EXISTS (SELECT 1 FROM v2.DECISION_JUDICIAIRE AS x WHERE x.DCJDC_ID_INSTN = i.INSTN_ID_INSTN
                           AND ISNULL(x.DCJDC_DATE, x.DCJDC_DATE_PREVUE) >= d.DateDelib AND ISNULL(x.DCJDC_DATE, x.DCJDC_DATE_PREVUE) < @ref)
-          AND DATEDIFF(day, d.DateDelib, @ref) >= @duree
+          AND DATEDIFF(day, d.DateDelib, @ref) >= @duree /*filtres*/
         ORDER BY i.INSTN_NUM_ROLE DESC, i.INSTN_ID_INSTN DESC
         """;
 
     public Task<LignesLues> LireAsync(SqlConnection baseGreffe, DateTime aujourdhui, int plafond, CancellationToken ct)
+        => ChercherAsync(baseGreffe, new RechercheEcran(null, new Dictionary<string, string>()), aujourdhui, plafond, ct);
+
+    // fix-ok: second controle du lot 7 (26/11/2026) -- les criteres de frmListeDelibere.cs (:161-178) n'atteignaient pas la base : ce
+    // lecteur n'etait pas IRechercheEcran, alors que la forme Etat envoie ses parametres a un lecteur qui cherche (FormeEtat.tsx:9-13).
+    // Une seule cause, portee par trois remplacements (en-tete et criteres, requete parametree, recherche).
+    public Task<LignesLues> ChercherAsync(SqlConnection baseGreffe, RechercheEcran recherche, DateTime aujourdhui, int plafond, CancellationToken ct)
     {
-        // Le dernier jour du mois precedent (frmListeDelibere.cs:61-63).
-        var reference = new DateTime(aujourdhui.Year, aujourdhui.Month, 1).AddDays(-1);
-        return LectureEcran.LireAsync(baseGreffe, Requete, Ligne, ct,
-            new SqlParameter("@plafond", plafond), new SqlParameter("@ref", reference), new SqlParameter("@duree", DureeParDefaut));
+        // La date de reference : saisie, sinon le dernier jour du mois precedent (frmListeDelibere.cs:61-63).
+        var reference = CriteresConsultation.Date(recherche.Critere(CritereReference)) ?? new DateTime(aujourdhui.Year, aujourdhui.Month, 1).AddDays(-1);
+        var duree = DureeParDefaut;
+        // Une duree illisible : RIG v2 ne cherche pas (:90-94).
+        if (recherche.Critere(CritereDuree) is { } saisie && !int.TryParse(saisie, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out duree))
+            return Task.FromResult(new LignesLues([], 0));
+        var types = Types.Where(t => recherche.Critere(t.Case) == "oui").Select(t => t.Type).DefaultIfEmpty("07").ToList();
+        var filtres = new FiltresRecherche();
+        if (!string.IsNullOrWhiteSpace(recherche.Texte))
+            filtres.Ajouter("i.INSTN_NUM_ROLE LIKE @texte OR i.INSTN_NOM_COURANT LIKE @texte", ("@texte", FormeLigne.Contient(recherche.Texte)));
+        if (recherche.Critere(CritereJuge) is { } juge)
+            filtres.Ajouter("i.INSTN_ID_JUG IN (SELECT JUG_ID_JUG FROM v2.JUGE WHERE JUG_ACTIF = 1 AND JUG_NOM + ISNULL(' ' + JUG_PRENOM, '') = @juge)",
+                            ("@juge", juge));
+        if (CriteresConsultation.Date(recherche.Critere(CritereEnrolement)) is { } enrolement)
+            filtres.Ajouter("i.INSTN_DATE_ENROLEMENT >= @enrolement", ("@enrolement", enrolement.Date));
+        var sql = Requete.Replace("/*types*/", string.Join(", ", types.Select((_, k) => $"@type{k}")), StringComparison.Ordinal)
+                         .Replace("/*filtres*/", filtres.EnSuite, StringComparison.Ordinal);
+        return LectureEcran.LireAsync(baseGreffe, sql, Ligne, ct, filtres.Parametres(
+            [new SqlParameter("@plafond", plafond), new SqlParameter("@ref", reference.Date), new SqlParameter("@duree", duree),
+             .. types.Select((t, k) => new SqlParameter($"@type{k}", t))]));
     }
 
     private static LigneLue Ligne(SqlDataReader r)

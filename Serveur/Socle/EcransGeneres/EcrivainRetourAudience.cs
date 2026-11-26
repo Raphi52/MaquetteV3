@@ -32,8 +32,16 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// s'ecrit (GetDecisionJudiciaireSaisie, PROC_MJUDS.cs:1322-1330 : etape visible ET type saisi). Pour un code qui l'ouvre, un
 /// « Type de décision » de la liste de saisie (la meme operation que la mise au point des chambres, OPE_DECISION_JUDICIAIRE_MJUDS)
 /// cree, sur chaque instance dont l'appel n'a pas deja une decision deliberee (:1189), une DECISION_JUDICIAIRE neuve avec sa
-/// « Date prévue » : AffectDecisionJudiciaireDirect (PROC_MJUDS.cs:1587-1593), ecrite par EcrivainMiseAuPointChambres.CreerDecisionAsync.
+/// « Date prévue » : AffectDecisionJudiciaireDirect (PROC_MJUDS.cs:1587-1593), ecrite par EcrivainMiseAuPointChambres.CreerDecisionAsync,
+/// avec la MESURE du type lie au type de decision quand il en porte un (AffectDecisionJudiciaire et GetMesureSaisie,
+/// PROC_MJUDS.cs:1499-1509, :1365-1373 ; R_TYPEDECISI_TYPE_MESURE_LIE, OPE_DECISION_JUDICIAIRE_MJUDS.cs:487-494).
 /// Mesure du 26/11/2026 (SQL-DEV\DEV, RIG_DEV) : aucun des 250 codes de renvoi n'y est prononce ni delibere, l'etape n'y est jamais ouverte.
+/// LE VERROU (« Renvoyer » seulement) : PROC_MJUDS verrouille chaque instance a son ouverture (PROC_MJUDS.cs:210, LockInstances
+/// :959-1034) ; une instance tenue par une autre demande est refusee aux messages de RIG v2 (:1014-1027), ceux de la mise au point
+/// des chambres (EcrivainMiseAuPointChambres.RefusVerrouAsync). « Marquer » ecrit sans PROC_MJUDS, depuis la grille
+/// (OPE_LIST_APPEL_AFFAIRE.cs:2217-2279) : RIG v2 n'y verrouille rien.
+/// L'APPEL A VENIR : le prochain appel ne s'ajoute qu'a une instance qui n'a pas deja un appel a une audience a venir
+/// (AUDNC_DATE > aujourd'hui, PROC_MJUDS.cs:1176-1182) ; les autres recoivent le resultat, sans nouvel appel.
 ///
 /// CONTROLE COMMUN (CanDoActions, OPE_LIST_APPEL_AFFAIRE.cs:1356-1369) : sur une audience passee (IsAudiencePassee, :1343-1349),
 /// « actions possibles uniquement si l'audience comporte des compositions » (:1586), quand sa chambre l'impose
@@ -46,8 +54,9 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     (AffectEvenementProcedure, PROC_MJUDS.cs:1210) : aucun ecrivain V3 ne porte encore ce calcul. Pour « Marquer », RIG v2 ne
 ///     l'enregistre pas : seuls l'appel et l'evenement survenu sont sauves (OPE_LIST_APPEL_AFFAIRE.cs:2254, :2263-2268), et
 ///     EvenementProcedure.Sauve (:2218-) ne sauve pas les evenements lies. Le texte de l'evenement (ConstructionTexte) non plus ;
-///   - la mesure associee a la decision (GetMesureSaisie, PROC_MJUDS.cs:1365-1373) et le calendrier de procedure : leurs etapes ne
-///     sont pas portees (comme a la mise au point des chambres) ;
+///   - le CALENDRIER de procedure (PROC_MJUDS.cs:1163-1174 ; AffectCalendrier, :1461-1497) : RIG v2 recopie la LISTE des etapes que
+///     l'agent a saisies (GetEtapesCalendrierSaisies, :1313-), une operation par etape. Un ecran genere ne saisit pas de sous-liste
+///     (web/src/ecrans/formes/commun.tsx:374) : sans cette saisie, il n'y a pas de calendrier a ecrire ;
 ///   - les EDITIONS (GenererLesDemandesEdition, PROC_MJUDS.cs:1257-1284) : celle de la decision (DecisionJudiciaire.CreateDemandeEdition)
 ///     et celles des evenements (EvenementProcedure.CreateDemandeEdition, EvenementProcedure.cs:2607, puis GetAllEditions, :2801 :
 ///     maquettes CEP_EDITION du code et destinataires de l'instance). La V3 sait ecrire une demande d'edition a parametre connu
@@ -133,7 +142,9 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
     {
         if (appels.FirstOrDefault(a => a.CodePlumitif is not null) is { } traite)
             return IssueGeste.Refuser($"Le rôle {traite.Role} a déjà le résultat {traite.CodePlumitif} : seules les affaires non traitées se renvoient.");
-        var saisi = geste.Demande.Valeurs.TryGetValue(ParametreResultat, out var r) ? r.Trim() : "";
+        // Le verrou des instances a l'ouverture de PROC_MJUDS (PROC_MJUDS.cs:210, :959-1034), avant toute saisie.
+        if (await EcrivainMiseAuPointChambres.RefusVerrouAsync(geste, appels.Select(a => a.IdInstance), ct) is { } verrou) return IssueGeste.Refuser(verrou);
+        var saisi =geste.Demande.Valeurs.TryGetValue(ParametreResultat, out var r) ? r.Trim() : "";
         if (saisi.Length == 0) return IssueGeste.Refuser($"« {ParametreResultat} » est obligatoire : le code plumitif du renvoi.");
         if (await LireCodeAsync(geste, saisi, ct, saisieSeulement: true) is not { } code)
             return IssueGeste.Refuser($"Le code plumitif « {saisi} » n'est pas utilisable en saisie dans la base du greffe.");
@@ -145,9 +156,13 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
         // fix-ok: controle du lot 7 (26/11/2026) -- « Renvoyer » n'ecrivait jamais la decision que PROC_MJUDS ecrit en lot
         // (PROC_MJUDS.cs:1186-1193, :1322-1330) quand le code ouvre l'etape decision (OPE_RESULTAT.cs:472-473) ; une seule cause,
         // portee par plusieurs remplacements (en-tete, parametres, code plumitif, ecriture).
+        // fix-ok: second controle du lot 7 (26/11/2026) -- « Renvoyer » sautait deux controles de PROC_MJUDS lus dans le code V2 : le
+        // verrou des instances (:210, :959-1034) et l'appel deja a venir (:1176-1182) ; et la mesure liee au type de decision
+        // (:1499-1509) ; une cause par remplacement (verrou, boucle d'ecriture, aides partagees avec la mise au point des chambres).
         var saisiType = geste.Demande.Valeurs.TryGetValue(ParametreType, out var t) ? t.Trim() : "";
         var saisiDatePrevue = geste.Demande.Valeurs.TryGetValue(ParametreDatePrevue, out var dp) ? dp.Trim() : "";
         DateTime? datePrevue = null;
+        string? mesureLiee = null;
         if (saisiType.Length > 0)
         {
             if (!code.OuvreDecision)
@@ -157,6 +172,7 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
                 return IssueGeste.Refuser($"Le type de décision « {saisiType} » n'est pas utilisable en saisie dans la base du greffe.");
             if (saisiDatePrevue.Length > 0 && (datePrevue = AudiencesV2.Date(saisiDatePrevue)) is null)
                 return IssueGeste.Refuser($"« {ParametreDatePrevue} » n'est pas une date : « {saisiDatePrevue} ».");
+            mesureLiee = await EcrivainMiseAuPointChambres.MesureLieeAsync(geste, saisiType, ct);
         }
         else if (saisiDatePrevue.Length > 0)
             return IssueGeste.Refuser($"« {ParametreDatePrevue} » se rapporte à la décision : saisissez aussi le « {ParametreType} ».");
@@ -182,23 +198,32 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
         var traces = new List<TraceGeste>();
         var ids = new List<string>();
         var decisions = 0;
+        var dejaAppelees = new List<string>();
         foreach (var a in appels)
         {
             traces.Add(await PoserResultatAsync(geste, a, code, ct));
             ids.Add(a.Id.ToString(CultureInfo.InvariantCulture));
-            if (idProchaine is { } adnc) traces.Add(await ProchainAppelAsync(geste, a, adnc, libelleProchaine!, code.TypeClassement!, ct));
+            // Le prochain appel, sauf a une instance deja appelee a une audience a venir (PROC_MJUDS.cs:1176-1182).
+            if (idProchaine is { } adnc)
+            {
+                if (await AppelAVenirAsync(geste, a.IdInstance, ct)) dejaAppelees.Add(a.Role);
+                else traces.Add(await ProchainAppelAsync(geste, a, adnc, libelleProchaine!, code.TypeClassement!, ct));
+            }
             // Pas de seconde decision sur un appel deja delibere (DecisionsJudiciairesDeliberés, PROC_MJUDS.cs:1189).
             if (saisiType.Length > 0 && await DelibereesAsync(geste, a.Id, ct) == 0)
             {
-                traces.Add(await EcrivainMiseAuPointChambres.CreerDecisionAsync(geste, a.IdInstance, a.Role, saisiType, datePrevue, ct));
+                traces.AddRange(await EcrivainMiseAuPointChambres.CreerDecisionAsync(geste, a.IdInstance, a.Role, saisiType, datePrevue, mesureLiee, ct));
                 decisions++;
             }
         }
         var n = appels.Count;
         var message = $"{n} affaire{(n > 1 ? "s" : "")} renvoyée{(n > 1 ? "s" : "")} ({code.Code})" + (libelleProchaine is null ? "" : $" à l'{libelleProchaine}");
+        if (dejaAppelees.Count > 0)
+            message += $" ; sans nouvel appel, déjà appelée{(dejaAppelees.Count > 1 ? "s" : "")} à une audience à venir : {string.Join(", ", dejaAppelees)}";
         if (saisiType.Length > 0)
             message += decisions == 0 ? " ; aucune décision ajoutée (déjà délibérées)"
                 : $" ; {decisions} décision{(decisions > 1 ? "s" : "")} {saisiType} créée{(decisions > 1 ? "s" : "")}"
+                  + (mesureLiee is null ? "" : $" avec sa mesure {mesureLiee}")
                   + (decisions < n ? $", {n - decisions} déjà délibérée{(n - decisions > 1 ? "s" : "")}" : "");
         return IssueGeste.Ecrit(message + ".", [.. ids], [.. traces]);
     }
@@ -213,8 +238,20 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
         return r.GetInt32(0);
     }
 
+    /// <summary>L'instance a-t-elle deja un appel a une audience a venir (« AUDNC_DATE &gt; DateTime.Today », PROC_MJUDS.cs:1180 et
+    /// PROC_MPCS.cs:1234) ? Le jour vient du geste (<see cref="GesteEnCours.Maintenant"/>), jamais de GETDATE().</summary>
+    internal static async Task<bool> AppelAVenirAsync(GesteEnCours geste, int idInstance, CancellationToken ct)
+    {
+        await using var r = await geste.LireAsync("""
+            SELECT COUNT(*) FROM v2.APPEL_AFFAIRE AS aa JOIN v2.AUDIENCE_CABINET AS a ON a.AUDNC_ID_ADNC = aa.APPAF_ID_ADNC
+            WHERE aa.APPAF_ID_INSTN = @i AND a.AUDNC_DATE > @aujourdhui
+            """, ct, new SqlParameter("@i", idInstance), new SqlParameter("@aujourdhui", geste.Maintenant.Date));
+        await r.ReadAsync(ct);
+        return r.GetInt32(0) > 0;
+    }
+
     /// <summary>Les audiences (ou cabinets) du jour, de la chambre donnee s'il y en a une : id et libelle.</summary>
-    private static async Task<List<(int Id, string Libelle)>> AudiencesDuJourAsync(GesteEnCours geste, DateTime jour, bool audience, string? chambre,
+    internal static async Task<List<(int Id, string Libelle)>> AudiencesDuJourAsync(GesteEnCours geste, DateTime jour, bool audience, string? chambre,
                                                                                    CancellationToken ct)
     {
         var trouvees = new List<(int, string)>();
@@ -246,14 +283,22 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
             ordre = Convert.ToInt32(r["Appels"], CultureInfo.InvariantCulture) + 1;
             if (Convert.ToInt32(r["Compositions"], CultureInfo.InvariantCulture) == 1) composition = Convert.ToInt32(r["Composition"], CultureInfo.InvariantCulture);
         }
+        return await InsererAppelAsync(geste, a.IdInstance, a.Role, ordre, idAudience, composition, typeClassement, libelle, ct);
+    }
+
+    /// <summary>Ecrit un appel d'affaire neuf a venir, etat de retour « A » : celui du renvoi (AppelAffaire.CreateAppelAffaire) et
+    /// celui de la mise au point des chambres (PROC_MPCS.cs:285-290), chacun avec son numero d'ordre et sa composition.</summary>
+    internal static async Task<TraceGeste> InsererAppelAsync(GesteEnCours geste, int idInstance, string role, int ordre, int idAudience,
+                                                             int? composition, string typeClassement, string libelle, CancellationToken ct)
+    {
         var id = await geste.InsererAsync("v2.APPEL_AFFAIRE", "APPAF_ID_APPAF", new Dictionary<string, object?>
         {
-            ["APPAF_ID_INSTN"] = a.IdInstance, ["APPAF_NUM_ORDRE"] = (short)ordre, ["APPAF_ID_ADNC"] = idAudience, ["APPAF_ID_CMAUD"] = composition,
+            ["APPAF_ID_INSTN"] = idInstance, ["APPAF_NUM_ORDRE"] = (short)ordre, ["APPAF_ID_ADNC"] = idAudience, ["APPAF_ID_CMAUD"] = composition,
             ["APPAF_TYPE_CLASSEMENT"] = typeClassement, ["APPAF_ETAT_RETOUR"] = "A",
             ["APPAF_ETAT_PREPARATION"] = "0",   // DEFAULT ((0)) de RIG_DEV (APPEL_AFFAIRE.sql), que la copie de dev ne porte pas
         }, ct);
-        return new TraceGeste("affaire", $"l'appel du rôle {a.Role} à l'{libelle}", id.ToString(CultureInfo.InvariantCulture), "a cree", null,
-                              new { Instance = a.Role, Audience = libelle, TypeClassement = typeClassement, NumOrdre = ordre });
+        return new TraceGeste("affaire", $"l'appel du rôle {role} à l'{libelle}", id.ToString(CultureInfo.InvariantCulture), "a cree", null,
+                              new { Instance = role, Audience = libelle, TypeClassement = typeClassement, NumOrdre = ordre });
     }
 
     // ------------------------------------------------------------------ LE RESULTAT D'UN APPEL

@@ -1,0 +1,46 @@
+# Les recherches de LecteurTaxesEtTours (« Taxes et tours de rôle », PROC_TAXESETTOURS) : la période d'OPE_PERIODE et les trois
+# cases d'OPE_TYPE_EDITION (proc_taxesettours.md:144-150), un état par case cochée (OPE_RECHERCHE.cs:61-75). Données : les chiffres
+# de mars 2001 en fin de PROC_TAXESETTOURS.sql. Sans critère, la liste est celle de PROC_TAXESETTOURS.attendu.
+
+# 1. Mars 2001, acomptes et taxes : les deux bornes sont retenues (le 01/03 et le 31/03), le 28/02 et le 01/04 écartés
+#    (ACHFF_DATE BETWEEN, PlumitifPcTaxes.cs:132-154). La période saisie se dit par ses dates.
+critere: Date de début = 2001-03-01
+critere: Date de fin = 2001-03-31
+critere: Acomptes = oui
+critere: Taxes = oui
+lignes:
+BETA ADMINISTRATEUR SCP | ADJ 12,50 € · du 01/03/2001 au 31/03/2001 | Acomptes | Validee | []
+ALPHA MANDATAIRE SELARL | MDJ 40,00 € · du 01/03/2001 au 31/03/2001 | Taxes | Validee | []
+---
+# 2. La même période, la case Acomptes seule : l'état des taxes n'est pas produit (jumeau : bloc 1).
+critere: Date de début = 2001-03-01
+critere: Date de fin = 2001-03-31
+critere: Acomptes = oui
+lignes:
+BETA ADMINISTRATEUR SCP | ADJ 12,50 € · du 01/03/2001 au 31/03/2001 | Acomptes | Validee | []
+---
+# 3. La même période, la case Tours seule : aucun tour de rôle en mars 2001 (jumeau : bloc 5, les tours de la période par défaut).
+critere: Date de début = 2001-03-01
+critere: Date de fin = 2001-03-31
+critere: Tours = oui
+lignes:
+---
+# 4. Un début après la fin : RIG v2 refuse d'éditer (« La date de début doit être inférieure à la date de fin »,
+#    OPE_RECHERCHE.cs:50-51), rien n'est rendu. Jumeau : bloc 1.
+critere: Date de début = 2001-04-01
+critere: Date de fin = 2001-03-01
+lignes:
+---
+# 5. La case Tours seule sur la période par défaut (dates vides : du 1er janvier à aujourd'hui, OPE_PERIODE.cs:31-32).
+critere: Tours = oui
+lignes:
+ALPHA MANDATAIRE SELARL (MA17) | LIQ · tour N 0 · tour 1 0 · tour 2 0 · tour 3 0 · tour 4 1 · du 1er janvier à aujourd'hui | Tours de rôle | Validee | []
+ALPHA MANDATAIRE SELARL (MA17) | MDJ · tour N 0 · tour 1 1 · tour 2 0 · tour 3 0 · tour 4 0 · du 1er janvier à aujourd'hui | Tours de rôle | Validee | []
+BETA ADMINISTRATEUR SCP (AD17) | ADJ · tour N 0 · tour 1 1 · tour 2 0 · tour 3 0 · tour 4 0 · du 1er janvier à aujourd'hui | Tours de rôle | Validee | []
+---
+# 6. Le texte : le nom du mandataire, sur mars 2001 (seul BETA reste).
+texte: BETA
+critere: Date de début = 2001-03-01
+critere: Date de fin = 2001-03-31
+lignes:
+BETA ADMINISTRATEUR SCP | ADJ 12,50 € · du 01/03/2001 au 31/03/2001 | Acomptes | Validee | []
