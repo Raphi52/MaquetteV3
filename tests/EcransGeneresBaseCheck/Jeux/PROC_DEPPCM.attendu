@@ -1,0 +1,6 @@
+# « Dépôts PC en masse » (PROC_DEPPCM) : les demandes DEPPCM portees par une PC (les dossiers du lot), la plus recente d'abord.
+# Ecartees : 1510420, la demande du lot, sans PC -- jumeau retenu : 1510421, sa fille ; 1510423 supprimee (X) -- jumeau retenu :
+# 1510422, meme PC. Groupe unique « Comptes annuels ». Etats : V → Validee (0 Numéro de PC, 1 Événement, 3 Dépôt) ; sinon En
+# cours, le numero de PC lu.
+CHM DELTA | PC 1990P14104 · qualifiée | Comptes annuels | EnCours | [0]
+CHM BETA | PC 1990P14102 | Comptes annuels | Validee | [0,1,3]

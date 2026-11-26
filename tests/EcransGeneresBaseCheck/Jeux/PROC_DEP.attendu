@@ -1,0 +1,7 @@
+# « Dépôts d'événement PC » (PROC_DEP) : les demandes DEPPC et DEPPR, la plus recente d'abord. Ecartee : 1510324 supprimee (X) --
+# jumeau retenu : 1510321 validee, meme PC. Groupes : DEPPR ou une demande portee en 2R → « Prévention », sinon « Procédure
+# collective ». Etats : V → Validee (0 Procédure, 2 Événement survenu, 4 Facturation) ; W → EnAttente, la procedure lue ; I sans
+# dossier → AFaire.
+Demande D1515100323 | demande D1515100323 · interrompu | Procédure collective | AFaire | []
+PRV DEP ALPHA | Prévention 2027V15301 · en attente | Prévention | EnAttente | [0]
+CHM DELTA | Procédure 1990P14104 | Procédure collective | Validee | [0,2,4]

@@ -1,0 +1,87 @@
+# Les gestes de EcrivainDepotsActes (« Dépôts d'actes RCS », PROC_DAS), joues dans l'ordre par la route POST, sur les lignes de
+# PROC_DAS.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). Un refus n'ecrit rien (lignes et
+# journal inchanges, verifie par le banc) ; chaque refus a son jumeau accepte : les blocs 5 et 6, qui enregistrent.
+
+# 1. Sans piece : obligatoire (ultAbregePiece.MetierObligatoire, proc_das.md:339). Jumeau : bloc 5, la piece PV15.
+geste: Creer
+valeur: Dossier › N° de gestion ou de non-inscrit = 1990A15101
+valeur: Dépôt › Date de dépôt = 2026-11-02
+valeur: Évènement RCS › Code de l'évènement = MOD15
+valeur: Actes déposés › Date de l'acte = 2026-10-15
+resultat: refuse
+message: « Actes déposés › Pièce » est obligatoire.
+---
+# 2. Un numero qui ne designe ni dossier ni non-inscrit : l'etape de recherche ne trouve rien (PROC_DAS.cs:409-414). Jumeau :
+#    bloc 5, le dossier 1990A15101.
+geste: Creer
+valeur: Dossier › N° de gestion ou de non-inscrit = 1990A99999
+valeur: Dépôt › Date de dépôt = 2026-11-02
+valeur: Évènement RCS › Code de l'évènement = MOD15
+valeur: Actes déposés › Pièce = PV15
+valeur: Actes déposés › Date de l'acte = 2026-10-15
+resultat: refuse
+message: Aucun dossier RCS ni non-inscrit ne porte le numéro « 1990A99999 » dans la base du greffe.
+---
+# 3. NACO porte un exercice social (ETP_DEPOT.cs:486-494) que la V3 ne reprend pas. Jumeau : bloc 5, MOD15.
+geste: Creer
+valeur: Dossier › N° de gestion ou de non-inscrit = 1990A15101
+valeur: Dépôt › Date de dépôt = 2026-11-02
+valeur: Évènement RCS › Code de l'évènement = NACO
+valeur: Actes déposés › Pièce = PV15
+valeur: Actes déposés › Date de l'acte = 2026-10-15
+resultat: refuse
+message: Le code « NACO » modifie l'exercice social du dossier (non-approbation des comptes ou date de clôture, règle de RIG v2) : l'exercice n'est pas repris par la V3, déposer dans RIG v2.
+---
+# 4. Une piece hors de la liste de l'etape (v2.ABREGE_PIECE). Jumeau : bloc 5, PV15.
+geste: Creer
+valeur: Dossier › N° de gestion ou de non-inscrit = 1990A15101
+valeur: Dépôt › Date de dépôt = 2026-11-02
+valeur: Évènement RCS › Code de l'évènement = MOD15
+valeur: Actes déposés › Pièce = ZZ15
+valeur: Actes déposés › Date de l'acte = 2026-10-15
+resultat: refuse
+message: Pièce inconnue dans la base du greffe : « ZZ15 ».
+---
+# 5. Enregistre sur le dossier d'une personne physique (A1) : depot categorie D, serie RD2 de l'annee du depot (ETP_DEPOT.cs:541-545),
+#    sans envoi INPI ; arrivee RA1 ; l'action validee (etat 2, saisie reprise 2) ; l'evenement objet du depot ; l'acte d'ordre 1 ;
+#    la demande DAS validee, numeros = le depot. La liste la relit en tete, « Enregistré ».
+geste: Creer
+valeur: Dossier › N° de gestion ou de non-inscrit = 1990A15101
+valeur: Dépôt › Date de dépôt = 2026-11-02
+valeur: Dépôt › Date d'arrivée = 2026-11-02
+valeur: Évènement RCS › Code de l'évènement = MOD15
+valeur: Évènement RCS › Date d'effet = 2026-10-30
+valeur: Actes déposés › Pièce = PV15
+valeur: Actes déposés › Date de l'acte = 2026-10-15
+resultat: fait
+message: Dépôt 2026D000001 enregistré dans la base du greffe pour M. DAS ALPHA Jean (1990A15101), arrivée 2026000001 ; la facture, les éditions et l'annonce BODACC ne sont pas reprises par la V3.
+lignes:
+M. DAS ALPHA Jean | Dossier RCS 1990A15101 · dépôt 2026D000001 du 02/11/2026 | Dossier RCS | Validee | [0,1,2,3,5]
+Demande D1515100123 | demande D1515100123 · interrompu | Dossier RCS | AFaire | []
+DAS NI BETA SAS | Non-inscrit NI15111 · refusé | Non-inscrit | Rejetee | [0]
+M. DAS ALPHA Jean | Dossier RCS 1990A15101 · dépôt 1990D15141 du 01/03/1990 | Dossier RCS | Validee | [0,1,2,3,5]
+Demande 2601100320 | demande 2601100320 | Dossier RCS | EnCours | [0]
+controle: SELECT p.DPTRC_CATEGORIE_DEPOT + '|' + CONVERT(varchar(1), p.DPTRC_ENVOI_INPI) + '|' + CONVERT(varchar(1), p.DPTRC_GRATUIT) + '|' + a.NumeroArrivee + '|' + a.CodeProcessus + a.EtatAction + a.EtatInfo + '|' + CONVERT(varchar(10), a.IdDossier) FROM v2.DEPOT_RCS AS p JOIN rec.ActionRegistre AS a ON a.IdDepot = p.DPTRC_ID_DPTRC WHERE p.DPTRC_NUM_DEPOT = '2026D000001' => D|0|0|2026000001|DAS22|1510101
+controle: SELECT d.DMND_CODE_PROSS + d.DMND_ETAT_DEMANDE + '|' + d.DMND_LES_NUMEROS + '|' + CONVERT(varchar(10), d.DMND_ID_DSRCS) FROM v2.DEMANDE AS d JOIN rec.ActionRegistre AS a ON a.Id = d.DMND_ID_ACTRC JOIN v2.DEPOT_RCS AS p ON p.DPTRC_ID_DPTRC = a.IdDepot WHERE p.DPTRC_NUM_DEPOT = '2026D000001' => DASV|2026D000001|1510101
+controle: SELECT e.EVNRC_CODE_EVENEMENT_RCS + '|' + CONVERT(varchar(1), e.EVNRC_OBJET_DEPOT) + '|' + CONVERT(varchar(8), e.EVNRC_DATE_EFFET, 112) FROM v2.EVENEMENT_RCS AS e JOIN rec.ActionRegistre AS a ON a.Id = e.EVNRC_ID_ACTRC JOIN v2.DEPOT_RCS AS p ON p.DPTRC_ID_DPTRC = a.IdDepot WHERE p.DPTRC_NUM_DEPOT = '2026D000001' => MOD15|1|20261030
+controle: SELECT ad.ACTDP_ABREGE_PIECE + '|' + CONVERT(varchar(10), ad.ACTDP_NUM_ORDRE) + '|' + CONVERT(varchar(8), ad.ACTDP_DATE, 112) FROM v2.ACTE_DEPOSE AS ad JOIN v2.DEPOT_RCS AS p ON p.DPTRC_ID_DPTRC = ad.ACTDP_ID_DPTRC WHERE p.DPTRC_NUM_DEPOT = '2026D000001' => PV15|1|20261015
+---
+# 6. Enregistre sur le non-inscrit d'une personne morale (B1) : depot categorie A, serie RD1 (ETP_DEPOT.cs:531-540) ; la demande
+#    porte le non-inscrit (DMND_ID_AUTRE, :446-449) et se range sous « Non-inscrit ».
+geste: Creer
+valeur: Dossier › N° de gestion ou de non-inscrit = NI15111
+valeur: Dépôt › Date de dépôt = 2026-11-03
+valeur: Dépôt › Date d'arrivée = 2026-11-03
+valeur: Évènement RCS › Code de l'évènement = MOD15
+valeur: Actes déposés › Pièce = PV15
+valeur: Actes déposés › Date de l'acte = 2026-10-20
+resultat: fait
+message: Dépôt 2026000001 enregistré dans la base du greffe pour DAS NI BETA SAS (NI15111), arrivée 2026000002 ; la facture, les éditions et l'annonce BODACC ne sont pas reprises par la V3.
+lignes:
+DAS NI BETA SAS | Non-inscrit NI15111 · dépôt 2026000001 du 03/11/2026 | Non-inscrit | Validee | [0,1,2,3,5]
+M. DAS ALPHA Jean | Dossier RCS 1990A15101 · dépôt 2026D000001 du 02/11/2026 | Dossier RCS | Validee | [0,1,2,3,5]
+Demande D1515100123 | demande D1515100123 · interrompu | Dossier RCS | AFaire | []
+DAS NI BETA SAS | Non-inscrit NI15111 · refusé | Non-inscrit | Rejetee | [0]
+M. DAS ALPHA Jean | Dossier RCS 1990A15101 · dépôt 1990D15141 du 01/03/1990 | Dossier RCS | Validee | [0,1,2,3,5]
+Demande 2601100320 | demande 2601100320 | Dossier RCS | EnCours | [0]
+controle: SELECT p.DPTRC_CATEGORIE_DEPOT + '|' + a.NumeroArrivee + '|' + CONVERT(varchar(10), a.IdNonInscrit) + '|' + CONVERT(varchar(10), d.DMND_ID_AUTRE) + '|' + d.DMND_NUM_INDICATIF FROM v2.DEPOT_RCS AS p JOIN rec.ActionRegistre AS a ON a.IdDepot = p.DPTRC_ID_DPTRC JOIN v2.DEMANDE AS d ON d.DMND_ID_ACTRC = a.Id WHERE p.DPTRC_NUM_DEPOT = '2026000001' AND d.DMND_CODE_PROSS = 'DAS' => A|2026000002|1510111|1510111|NI15111

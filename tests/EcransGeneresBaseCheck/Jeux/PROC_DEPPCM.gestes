@@ -1,0 +1,42 @@
+# Les gestes de EcrivainDepotsPcEnMasse (« Dépôts PC en masse », PROC_DEPPCM), joues dans l'ordre par la route POST, APRES ceux
+# de PROC_DEP.gestes (ordre des noms) : le premier numero JD15S est le leur, d'ou DP1500002 ici. Un refus n'ecrit rien ;
+# chaque refus a son jumeau accepte : le bloc 4, qui cree.
+
+# 1. Sans numero de PC : « PC manquante » (_VerifierNumPcNull, PROC_DEPPCM.cs:110-123), pour l'etape unique. Jumeau : bloc 4.
+geste: Creer
+valeur: Événement › Code événement = D15SAI
+valeur: Événement › Date = 2026-11-04
+resultat: refuse
+message: PC manquante : Veuillez saisir un numéro de PC pour l'étape 1/1.
+---
+# 2. Une PC que la base ne porte pas. Jumeau : bloc 4, 1990P14102.
+geste: Creer
+valeur: Numéro de PC › Numéro de PC = 1990P99999
+valeur: Événement › Code événement = D15SAI
+valeur: Événement › Date = 2026-11-04
+resultat: refuse
+message: Aucune procédure collective ne porte le numéro « 1990P99999 » dans la base du greffe.
+---
+# 3. Un code sans depot PC (MetierDepotPcObligatoire, ETP_DEPPCM.cs:49 ; ULT_COMBO_CODE_EVE_PRO.cs:79). Jumeau : bloc 4, D15SAI.
+geste: Creer
+valeur: Numéro de PC › Numéro de PC = 1990P14102
+valeur: Événement › Code événement = D15SANS
+valeur: Événement › Date = 2026-11-04
+resultat: refuse
+message: Le code « D15SANS » n'est pas un événement avec dépôt PC dans la base du greffe (seuls ces codes sont proposés, le dépôt étant obligatoire).
+---
+# 4. Cree sur CHM BETA : la demande du lot (DEPPCM validee), sa fille sur la PC (2P, DMND_ID_DMND_MERE = le lot, validee :
+#    CloturerDemande, OPE_ENTITE_JUD_RECHERCHE_DEPPCM.cs:379-386), l'evenement survenu et le depot numerote. La liste relit la
+#    fille en tete ; le lot, sans PC, n'est pas une ligne.
+geste: Creer
+valeur: Numéro de PC › Numéro de PC = 1990P14102
+valeur: Événement › Code événement = D15SAI
+valeur: Événement › Date = 2026-11-04
+resultat: fait
+message: Dépôt DP1500002 créé dans la base du greffe pour la PC 1990P14102 (D15SAI du 04/11/2026) ; la facture, la liste des dépôts créés et le certificat de dépôt ne sont pas repris par la V3.
+lignes:
+CHM BETA | PC 1990P14102 | Comptes annuels | Validee | [0,1,3]
+CHM DELTA | PC 1990P14104 · qualifiée | Comptes annuels | EnCours | [0]
+CHM BETA | PC 1990P14102 | Comptes annuels | Validee | [0,1,3]
+controle: SELECT m.DMND_CODE_PROSS + m.DMND_ETAT_DEMANDE + '|' + f.DMND_CODE_PROSS + f.DMND_ETAT_DEMANDE + '|' + f.DMND_NUM_INDICATIF FROM v2.DEMANDE AS f JOIN v2.DEMANDE AS m ON m.DMND_ID_DMND = f.DMND_ID_DMND_MERE JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_ID_DMND = f.DMND_ID_DMND WHERE dd.DSSDM_CODE_SEQUENCEUR = '2P' AND dd.DSSDM_VALEUR_SEQUENCEUR = '1400102' AND f.DMND_ID_DMND > 1510423 => DEPPCMV|DEPPCMV|1990P14102
+controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + CONVERT(varchar(8), e.EVNPR_DATE, 112) + '|' + CONVERT(varchar(10), e.EVNPR_ID_PRCLL) + '|' + p.DPTPC_CATEGORIE_DEPOT FROM v2.DEPOT_PC AS p JOIN v2.EVENEMENT_PROCEDURE AS e ON e.EVNPR_ID_EVNPR = p.DPTPC_ID_EVNPR WHERE p.DPTPC_NUM_DEPOT = 'DP1500002' => D15SAI|20261104|1400102|S15

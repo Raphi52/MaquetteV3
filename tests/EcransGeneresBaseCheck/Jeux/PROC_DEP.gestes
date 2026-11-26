@@ -1,0 +1,54 @@
+# Les gestes de EcrivainDepotsEvenementPc (« Dépôts d'événement PC », PROC_DEP), joues dans l'ordre par la route POST, sur les
+# lignes de PROC_DEP.sql et les PC de PROC_CHM.sql et PROC_MPC.sql. Un refus n'ecrit rien ; chaque refus a son jumeau
+# accepte : le bloc 5, qui enregistre.
+
+# 1. Sans date de l'evenement : obligatoire (OPE_EVENEMENT). Jumeau : bloc 5.
+geste: Creer
+valeur: Procédure › Numéro de procédure = 1990P14104
+valeur: Événement survenu › Code de l'événement = D15SAI
+resultat: refuse
+message: « Événement survenu › Date » est obligatoire.
+---
+# 2. Une PC que la base ne porte pas. Jumeau : bloc 5, 1990P14104.
+geste: Creer
+valeur: Procédure › Numéro de procédure = 1990P99999
+valeur: Événement survenu › Code de l'événement = D15SAI
+valeur: Événement survenu › Date = 2026-11-02
+resultat: refuse
+message: Aucune procédure collective ne porte le numéro « 1990P99999 » dans la base du greffe.
+---
+# 3. MPC ALPHA est tenue par la demande MPC en cours 27016000001 : RIG v2 l'ouvre en lecture seule (procedureCollective.Lock,
+#    PROC_DEPPC.cs:45-53), au message du verrou (Demande.cs:1315). Jumeau : bloc 5, CHM DELTA, libre.
+geste: Creer
+valeur: Procédure › Numéro de procédure = 2027P16101
+valeur: Événement survenu › Code de l'événement = D15SAI
+valeur: Événement survenu › Date = 2026-11-02
+resultat: refuse
+message: Procédure collective bloquée (27016000001), demande "En cours" : MPC par M. AUTRE BANC
+---
+# 4. Un code sans depot PC : la liste ne le propose pas (ULT_COMBO_CODE_EVE_PRO.cs:79). Jumeau : bloc 5, D15SAI.
+geste: Creer
+valeur: Procédure › Numéro de procédure = 1990P14104
+valeur: Événement survenu › Code de l'événement = D15SANS
+valeur: Événement survenu › Date = 2026-11-02
+resultat: refuse
+message: Le code « D15SANS » n'est pas un événement avec dépôt PC dans la base du greffe (seuls ces codes sont proposés, le dépôt étant obligatoire).
+---
+# 5. Enregistre sur CHM DELTA : la demande DEPPC validee sur la PC (2P, nom et numeros de la PC) ; l'evenement survenu D15SAI,
+#    type 1, piece numerisee (le code le demande pour une PC) ; les trois evenements de la PC renumerotes, l'a venir d'abord
+#    puis par date ; le depot de categorie S15 numerote dans JD15S, etat info 1. La liste la relit en tete.
+geste: Creer
+valeur: Procédure › Numéro de procédure = 1990P14104
+valeur: Événement survenu › Code de l'événement = D15SAI
+valeur: Événement survenu › Date = 2026-11-02
+resultat: fait
+message: Dépôt DP1500001 enregistré dans la base du greffe sur la procédure 1990P14104 (D15SAI du 02/11/2026) ; la facture, le certificat de dépôt et les éditions ne sont pas repris par la V3.
+lignes:
+CHM DELTA | Procédure 1990P14104 | Procédure collective | Validee | [0,2,4]
+Demande D1515100323 | demande D1515100323 · interrompu | Procédure collective | AFaire | []
+PRV DEP ALPHA | Prévention 2027V15301 · en attente | Prévention | EnAttente | [0]
+CHM DELTA | Procédure 1990P14104 | Procédure collective | Validee | [0,2,4]
+controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + CONVERT(varchar(1), e.EVNPR_SURVENU) + CONVERT(varchar(1), e.EVNPR_DELAI_EXPIRE) + '|' + e.EVNPR_TYPE_EVE_PRO + '|' + CONVERT(varchar(1), e.EVNPR_AVEC_PIECE_NUMERISE) + e.EVNPR_NATURE_DOC_GED + '|' + CONVERT(varchar(8), e.EVNPR_DATE, 112) + '|' + CONVERT(varchar(10), e.EVNPR_ID_PRCLL) FROM v2.DEPOT_PC AS p JOIN v2.EVENEMENT_PROCEDURE AS e ON e.EVNPR_ID_EVNPR = p.DPTPC_ID_EVNPR WHERE p.DPTPC_NUM_DEPOT = 'DP1500001' => D15SAI|10|1|1NAT15|20261102|1400104
+controle: SELECT STRING_AGG(EVNPR_CODE_EVE_PRO + ':' + CONVERT(varchar(5), EVNPR_NUM_ORDRE), ',') WITHIN GROUP (ORDER BY EVNPR_NUM_ORDRE) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_PRCLL = 1400104 => D15FUT:1,D15OLD:2,D15SAI:3
+controle: SELECT p.DPTPC_CATEGORIE_DEPOT + '|' + p.DPTPC_ETAT_INFO + '|' + CONVERT(varchar(1), p.DPTPC_TOP_EXPERIAN) + '|' + CASE WHEN CONVERT(date, p.DPTPC_DATE) = CONVERT(date, GETDATE()) THEN 'jour' ELSE 'autre' END FROM v2.DEPOT_PC AS p WHERE p.DPTPC_NUM_DEPOT = 'DP1500001' => S15|1|0|jour
+controle: SELECT d.DMND_CODE_PROSS + d.DMND_ETAT_DEMANDE + '|' + d.DMND_NUM_INDICATIF + '|' + d.DMND_LES_NUMEROS + '|' + d.DMND_NOM FROM v2.DEMANDE AS d JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_ID_DMND = d.DMND_ID_DMND WHERE dd.DSSDM_CODE_SEQUENCEUR = '2P' AND dd.DSSDM_VALEUR_SEQUENCEUR = '1400104' AND d.DMND_CODE_PROSS = 'DEPPC' AND d.DMND_ID_DMND > 1510324 => DEPPCV|1990P14104|1990P14104|CHM DELTA

@@ -370,14 +370,12 @@ Exiger(base_.Mode == "base" && base_.Greffe == Greffe && base_.Exemples.Length =
        && base_.Lignes.Select(l => l.Nom).SequenceEqual(dca.Lignes.Select(l => l.Nom)) && !base_.Lignes.Any(l => nomsExemple.Contains(l.Nom)),
     $"pont branche : les {base_.Lignes.Length} lignes de la base, aucun nom fictif d'un descripteur, aucun groupe en exemple");
 var reuniDca = CatalogueGenere.Tous.First(d => d.Membres.Any(m => m.Code == "PROC_DCA"));
-var mixte = await EcranGenere.LignesAsync(client, Greffe, reuniDca.Code);
 var autres = reuniDca.Membres.Where(m => m.Code != "PROC_DCA").ToArray();
-Exiger(mixte.Mode == "mixte" && mixte.Exemples.SequenceEqual(autres.Select(m => m.Titre))
-       && mixte.Lignes.Count(l => l.Groupe == descripteurDca.Titre) == 8
-       && mixte.Lignes.First(l => l.Groupe == descripteurDca.Titre).Precisions == $"{Guichet} · reçu le {D(jour.AddDays(-1))}"
-       && autres.All(m => mixte.Lignes.Count(l => l.Groupe == m.Titre) == m.Lignes.Length),
-    $"pont, ecran reuni « {reuniDca.Titre} » : les 8 lignes de la base dans le groupe « {descripteurDca.Titre} » (ancien groupe en tete), " +
-    $"les autres procedures ({string.Join(", ", autres.Select(m => m.Titre))}) en exemple");
+// L'ecran reuni « Dépôts au registre » (DCA, DAS, DASBEN) a TOUS ses membres branches depuis le lot 5 du plan plan-676a4b19 :
+// il est lu en base APRES les jeux (section 3b, plus bas), comme celui des radiations d'office. Le mode « mixte » (un membre
+// branche, les autres en exemple) reste controle ci-dessous par le serveur factice : DCA branche, les autres sans lecteur.
+// fix-ok: mesure le 26/11/2026 (lot 5) -- ici, avant les jeux, le banc rendait ROUGE ce controle : le lecteur de DAS
+// echoue (SQL 207, colonne inconnue) sur des colonnes de v2.DEMANDE que seul son jeu ajoute, et l'ecran n'est plus mixte.
 // Un groupe BRANCHE mais sans aucune ligne (la copie de dev n'en garde que 200 par table) ne disparait pas : la vue le
 // porte dans Vides, l'ecran le montre avec « Aucune ligne ». Serveur factice : DCA vide, les autres procedures sans lecteur.
 using var videHandler = new RepondeurVide(descripteurDca.Code);
@@ -386,7 +384,7 @@ var reuniVide = await EcranGenere.LignesAsync(clientVide, Greffe, reuniDca.Code)
 Exiger(reuniVide.Vides.SequenceEqual([descripteurDca.Titre]) && !reuniVide.Exemples.Contains(descripteurDca.Titre)
        && reuniVide.Lignes.All(l => l.Groupe != descripteurDca.Titre) && reuniVide.Exemples.SequenceEqual(autres.Select(m => m.Titre)),
     $"pont, ecran reuni, procedure branchee SANS ligne : « {descripteurDca.Titre} » est dans Vides, pas dans Exemples ({string.Join(", ", reuniVide.Vides)})");
-Exiger(base_.Vides.Length == 0 && mixte.Vides.Length == 0, "pont : une procedure qui a des lignes n'est jamais dans Vides");
+Exiger(base_.Vides.Length == 0, "pont : une procedure qui a des lignes n'est jamais dans Vides");
 var panne = await EcranGenere.LignesAsync(client, GreffeAbsent, "PROC_DCA");
 Exiger(panne.Mode == "erreur" && panne.Lignes.SequenceEqual(descripteurDca.Lignes) && panne.Message?.Contains(GreffeAbsent) == true,
     $"pont, greffe absent (404) : les exemples restent, marques, avec le motif du serveur ({panne.Message})");
@@ -434,6 +432,16 @@ Exiger(baseRof.Mode == "base" && baseRof.Exemples.Length == 0
        && baseRof.Lignes.Count(l => l.Groupe == CatalogueGenere.Descripteur("PROC_ROFSURVEILLANCES")!.Titre) == 10,
     $"pont, ecran reuni « {reuniRof.Titre} » (tous ses membres branches) : mode base, aucun exemple, les 10 radiations " +
     $"d'office de la base dans leur groupe (mode {baseRof.Mode}, exemples : {string.Join(", ", baseRof.Exemples)})");
+// « Dépôts au registre » : DCA, DAS et DASBEN branches (lot 5 du plan plan-676a4b19) -- mode base, aucun exemple, chaque
+// groupe porte exactement autant de lignes que le lecteur de son membre en rend.
+var lignesDepots = new Dictionary<string, int>(StringComparer.Ordinal);
+foreach (var m in reuniDca.Membres) lignesDepots[m.Titre] = (await Lire(m.Code)).Lignes.Count;
+var baseDepots = await EcranGenere.LignesAsync(client, Greffe, reuniDca.Code);
+Exiger(baseDepots.Mode == "base" && baseDepots.Exemples.Length == 0 && baseDepots.Message is null
+       && reuniDca.Membres.All(m => baseDepots.Lignes.Count(l => l.Groupe == m.Titre) == lignesDepots[m.Titre]),
+    $"pont, ecran reuni « {reuniDca.Titre} » (tous ses membres branches) : mode base, aucun exemple, chaque groupe a les lignes " +
+    $"de son lecteur ({string.Join(", ", lignesDepots.Select(p => $"{p.Key} {p.Value}"))} ; mode {baseDepots.Mode}, exemples : " +
+    $"{string.Join(", ", baseDepots.Exemples)})");
 
 // ============================================================ 3c. LE SOCLE FONCTIONNEL : RECHERCHES, GESTES (en-tete, 5 et 6)
 

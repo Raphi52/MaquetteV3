@@ -334,6 +334,13 @@ public sealed class DomaineOuvrir : IDomaineEcrans
             ],
         },
 
+        // PROC_DAS (lot 5 du plan « RIG v3 100 % fonctionnel », 26/11/2026) : les etapes de PROC_DAS (ETP_RCS, puis ETP_DEPOT et
+        // ses OPE_DEPOT / OPE_EVENEMENT / OPE_ACTE_DEPOSE, la facturation, ETP_RECLAM_REFUS : fiche proc_das.md:270-345), leurs
+        // obligatoires MetierObligatoire (ultDateDepot :303, ultCboCodeEvenement :325, ultAbregePiece et ultDateActe :339).
+        // Creer ecrit un depot VALIDE (EcrivainDepotsActes.cs) ; LecteurDepotsActes.cs lit les saisies.
+        // fix-ok: mesure le 26/11/2026 (lot 5) -- les descripteurs des quatre depots n'avaient pas l'etape qui designe le dossier
+        // ou la PC, sans laquelle RIG v2 ne valide rien, et DAS inversait ses articles de refus et de reclamation (fiche :224) ;
+        // le banc des ecrans controle chaque marche et chaque etat lus contre ce descripteur.
         new DescripteurEcran
         {
             Code = "PROC_DAS", Titre = "Depots d'actes RCS", Sujet = "dépôts d'actes",
@@ -345,16 +352,18 @@ public sealed class DomaineOuvrir : IDomaineEcrans
             Groupes = ["Dossier RCS", "Non-inscrit"],
             Marches =
             [
-                Marche("Dépôt", "Dates de dépôt et d'arrivée, dépôt gratuit INPI. Le dépôt est vérifié en entier avant validation.", true,
-                    "Date de dépôt", "Date d'arrivée", "Dépôt gratuit INPI"),
-                Marche("Évènement RCS", "Code de l'évènement obligatoire. Changer de code supprime les actes déposés de l'ancien code.", true,
-                    "Code de l'évènement", "Date d'effet", "Texte"),
-                Marche("Actes déposés", "Pièce obligatoire et date d'acte obligatoire ; la description se calcule seule.", true,
-                    "Pièce", "Date de l'acte", "Description"),
-                Marche("Comptes annuels", "Selon l'évènement : la case de non-approbation des comptes doit être cochée, ou la date de clôture modifiée.", false,
-                    "Non-approbation des comptes", "Date de clôture"),
-                Marche("Facturation", "Article 21-RCDASRET si le dépôt est retenu, 21-RCDASREJ s'il est rejeté.", true,
-                    "Article de facturation"),
+                Marche("Dossier", "Le dossier RCS par son numéro de gestion, ou le non-inscrit par son numéro : sans lui, rien ne se valide.", true,
+                    "N° de gestion ou de non-inscrit"),
+                Marche("Dépôt", "Date de dépôt obligatoire ; la date d'arrivée est celle du jour si elle est vide. Le numéro de dépôt suit le type RCS du dossier.", true,
+                    Champ.Date("Date de dépôt"), Champ.Date("Date d'arrivée"), Champ.Case("Dépôt gratuit INPI")),
+                Marche("Évènement RCS", "Code de l'évènement obligatoire. Un code qui modifie l'exercice social (NACO, PEEXE, PEXE, EXER) reste à RIG v2.", true,
+                    "Code de l'évènement", Champ.Date("Date d'effet"), "Texte"),
+                Marche("Actes déposés", "Pièce obligatoire et date d'acte obligatoire.", true,
+                    "Pièce", Champ.Date("Date de l'acte"), "Description"),
+                Marche("Comptes annuels", "Selon l'évènement : la case de non-approbation des comptes doit être cochée, ou la date de clôture modifiée. Non repris par la V3.", false,
+                    Champ.Case("Non-approbation des comptes"), Champ.Date("Date de clôture")),
+                Marche("Facturation", "Articles du dépôt ; un refus (21-RCDASRET) ou une réclamation (21-RCDASREJ) non facturés sont repris. Non reprise par la V3 : le dépôt est validé sans facture.", true,
+                    Champ.Tableau("Articles de facturation")),
                 Marche("Refus ou réclamation", "La lettre de refus ou la lettre de réclamation est éditée selon le cas.", false,
                     "Lettre de refus", "Lettre de réclamation"),
             ],
@@ -362,12 +371,12 @@ public sealed class DomaineOuvrir : IDomaineEcrans
             [
                 Ligne("Alpha Services SARL", "Dossier RCS 2026B00501 · dépôt du 02/03/2026", "Dossier RCS", "AFaire"),
                 Ligne("Bêta Industrie SAS", "Dossier RCS 2026B00502 · dépôt du 03/03/2026", "Dossier RCS", "EnCours", 0, 1),
-                Ligne("Gamma Conseil SARL", "Dossier RCS 2026B00503 · dépôt du 04/03/2026", "Dossier RCS", "Validee", 0, 1, 2, 4),
-                Ligne("Delta Transports SAS", "Dossier RCS 2026B00504 · refusé", "Dossier RCS", "Rejetee"),
+                Ligne("Gamma Conseil SARL", "Dossier RCS 2026B00503 · dépôt du 04/03/2026", "Dossier RCS", "Validee", 0, 1, 2, 3, 5),
+                Ligne("Delta Transports SAS", "Dossier RCS 2026B00504 · refusé", "Dossier RCS", "Rejetee", 0),
                 Ligne("Epsilon Habitat SARL", "Dossier RCS 2026B00505 · dépôt du 06/03/2026", "Dossier RCS", "EnCours", 0, 1, 2),
                 Ligne("Zêta Commerce SAS", "Non-inscrit · dépôt du 09/03/2026", "Non-inscrit", "AFaire"),
-                Ligne("Êta Boulangerie SARL", "Non-inscrit · dépôt du 10/03/2026", "Non-inscrit", "EnCours", 0, 1, 2, 4),
-                Ligne("Thêta Import SAS", "Non-inscrit · dépôt du 11/03/2026", "Non-inscrit", "Validee", 0, 1, 2, 4),
+                Ligne("Êta Boulangerie SARL", "Non-inscrit · dépôt du 10/03/2026", "Non-inscrit", "EnCours", 0, 1, 2, 3),
+                Ligne("Thêta Import SAS", "Non-inscrit · dépôt du 11/03/2026", "Non-inscrit", "Validee", 0, 1, 2, 3, 5),
                 Ligne("Iota Études SARL", "Dossier RCS 2026B00510 · dépôt du 12/03/2026", "Dossier RCS", "AFaire"),
             ],
         },
@@ -383,16 +392,18 @@ public sealed class DomaineOuvrir : IDomaineEcrans
             Groupes = ["Procédure collective", "Prévention"],
             Marches =
             [
-                Marche("Procédure", "Verrouillée pour la saisie : si un autre utilisateur la tient, elle s'ouvre en lecture seule.", true,
+                // Lot 5 (26/11/2026) : la PC par son numero, verrouillee (PROC_DEPPC.cs:41-58) ; codes avec depot PC
+                // (ULT_COMBO_CODE_EVE_PRO.cs:79). Creer : EcrivainDepotsEvenementPc.cs ; la liste : LecteurDepotsEvenementPc.cs.
+                Marche("Procédure", "Verrouillée pour la saisie : si un autre utilisateur la tient, elle s'ouvre en lecture seule. Le dépôt sur une prévention reste à RIG v2.", true,
                     "Numéro de procédure"),
                 Marche("Organes et dirigeants", "Organes de la procédure et dirigeants.", false,
                     "Organes", "Dirigeants"),
-                Marche("Événement survenu", "Un dépôt PC est obligatoire sur chaque événement survenu.", true,
-                    "Code de l'événement", "Date", "Dépôt PC"),
+                Marche("Événement survenu", "Un dépôt PC est obligatoire sur chaque événement survenu : seuls les codes avec dépôt PC sont proposés ; le numéro de dépôt est attribué à l'enregistrement.", true,
+                    "Code de l'événement", Champ.Date("Date")),
                 Marche("Événement à venir", "Ce qui doit encore se passer, selon le calendrier.", false,
                     "Événement à venir"),
-                Marche("Facturation", "Forfait selon le paramètre de la procédure. Une prévention est toujours gratuite.", true,
-                    "Articles"),
+                Marche("Facturation", "Forfait selon le paramètre de la procédure. Une prévention est toujours gratuite. Non reprise par la V3.", true,
+                    Champ.Tableau("Articles")),
             ],
             Lignes =
             [
@@ -419,12 +430,13 @@ public sealed class DomaineOuvrir : IDomaineEcrans
             [
                 Marche("Numéro de PC", "Obligatoire : une étape sans numéro bloque la validation (« PC manquante »).", true,
                     "Numéro de PC"),
-                Marche("Événement", "Code de l'événement et date.", true,
-                    "Code événement", "Date"),
-                Marche("Doublon", "Même numéro, même code et même date : un avertissement, non bloquant.", false,
+                // Lot 5 (26/11/2026) : codes avec depot PC (ETP_DEPPCM.cs:49). Creer : EcrivainDepotsPcEnMasse.cs, une etape par geste.
+                Marche("Événement", "Code de l'événement (avec dépôt PC) et date.", true,
+                    "Code événement", Champ.Date("Date")),
+                Marche("Doublon", "Même numéro, même code et même date entre deux étapes du lot : refusé à la validation.", false,
                     "Contrôle de doublon"),
-                Marche("Dépôt", "À la validation, la demande fille est créée et rattachée à la demande du lot.", true,
-                    "Dépôt RCS créé"),
+                Marche("Dépôt", "À la validation, la demande fille est créée et rattachée à la demande du lot ; le dépôt est numéroté. La facture de chaque PC n'est pas reprise par la V3.", true,
+                    "Dépôt créé"),
             ],
             Lignes =
             [
@@ -454,10 +466,12 @@ public sealed class DomaineOuvrir : IDomaineEcrans
                     "Entreprise", "Mode"),
                 Marche("Fiche entreprise", "Identité et adresse, en lecture seule.", false,
                     "Identité", "Adresse"),
-                Marche("Actes", "Dates, code événement et montants. Les codes proposés sont ceux qui vont avec l'historique BEN du dossier.", true,
-                    "Date d'arrivée", "Date de dépôt", "Code événement", "Montant"),
+                // Lot 5 (26/11/2026) : obligatoires de OPE_ACTES.Designer.cs:80, :91, :135 et OPE_ACTE_DEPOSE.Designer.cs:69, :78 ;
+                // codes selon l'historique BEN (OPE_ACTES.cs:33-55). Creer : EcrivainDepotsBeneficiaires.cs.
+                Marche("Actes", "Dates, code événement et montants. Les codes proposés vont avec l'historique BEN du dossier : BENM si un BEN est déjà déposé, sinon BENH (immatriculé avant le 01/08/2017) ou BEN. Le montant va à la facture, non reprise par la V3.", true,
+                    Champ.Date("Date d'arrivée"), Champ.Date("Date de dépôt"), "Code événement", Champ.Montant("Montant")),
                 Marche("Acte déposé", "L'acte et sa date.", true,
-                    "Acte", "Date de l'acte"),
+                    "Acte", Champ.Date("Date de l'acte")),
                 Marche("Pièces", "Pièces dématérialisées, rattachées au dépôt.", false,
                     "Pièces"),
                 Marche("Numérotation", "Numéro attribué à la validation ; la saisie repart ensuite pour un autre dépôt.", false,
