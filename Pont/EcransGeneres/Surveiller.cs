@@ -342,7 +342,8 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             // Lot 8 (26/11/2026) : lue et relancee dans la base -- LecteurRelancesComptesAnnuels.cs, EcrivainRelancesComptesAnnuels.cs
-            // (« Valider » : la relance suivante des diligences dont la relance precedente est echue, moteur PROC_RSURV de RIG v2).
+            // (« Valider » : la relance 1 des dossiers que la recherche SDCA / RSURV / 1 de RIG v2 propose, et la relance suivante des
+            // diligences dont la relance precedente est echue ; moteur PROC_RSURV de RIG v2).
             Code = "PROC_DCA_RELANCE", Titre = "Relances comptes annuels", Sujet = "dossiers RCS en retard",
             Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier RCS, un numéro de gestion, un SIREN…",
@@ -379,10 +380,18 @@ public sealed class DomaineSurveiller : IDomaineEcrans
 
         new DescripteurEcran
         {
-            // Lot 8 (26/11/2026) : lue dans la base (LecteurInjonctionsComptesAnnuels.cs) ; le geste N'EST PAS BRANCHE. L'injonction de RIG v2 passe par
-            // le moteur PROC_ISURV (SURVEILLANCES\PROC_ISURV\PROC_ISURV.cs) : instance creee (l. 252), evenement futur « date limite »
-            // (l. 423), editions (l. 437, 468), numeros de role et de repertoire JGAFF (l. 494, 499), restitues en cas d'erreur
-            // (l. 739-781) -- une transaction sur plusieurs objets, a faire dans un lot a elle. L'ecran dit « Demonstration ».
+            // Lot 8 (26/11/2026) : lue dans la base (LecteurInjonctionsComptesAnnuels.cs) ; le geste N'EST PAS BRANCHE, l'ecran dit
+            // « Demonstration ». Le menu de RIG v2 (RIG_DEV, PROCESSUS_ET_FONCTIONALITE, lu le 26/11/2026) : « INJDCA » ouvre
+            // PROC_SDCA.dll / FORM_INJDCA, dont la classe PROC_INJDCA herite de PROC_SURVEILLANCE_INJ, ABSENTE des sources (grep : 0
+            // occurrence), et PROC_SDCA ne compile plus (Source\CompilationFull\PowerShell\buildErrors.txt:116). L'injonction qui tourne
+            // est « ISURV » (PROC_ISURV.dll, Injonctions des surveillances) : par dossier, une instance, ses trois parties, le chef de
+            // demande, l'appel au cabinet choisi, la decision et ses evenements, les numeros de role et JGAFF, la facture, la relance
+            // IDCA de l'exercice, les editions (PROC_ISURV.cs:244-475, 488-646). Il exige des SAISIES (etape « Cabinet et decision »,
+            // obligatoire : cabinet de liquidation d'astreinte, type de classement, juge, greffier, date prevue ;
+            // ETP_CABINET_DECISION.cs:24-28, OPE_DECISION_JUDICIAIRE.Designer.cs:78-117) qu'une file ne transmet pas encore
+            // (FormeFile.tsx envoie un geste sans valeur), et ses lignes « a enjoindre » (relance 1 echue, NumRelance = NbRelancesMax + 1,
+            // CriteresRechercheSurveillance.cs:612-614) ne sont pas encore lues ici : la liste montre les depots qui ont suivi une
+            // injonction. Aucune table ne manque ; c'est le volume (ISURV, l'etape et RigMetier), a faire dans un lot a lui.
             Code = "PROC_DCA_INJ", Titre = "Injonctions comptes annuels", Sujet = "dépôts de comptes annuels",
             Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier RCS, un numéro de gestion, un SIREN…",
@@ -451,6 +460,8 @@ public sealed class DomaineSurveiller : IDomaineEcrans
                 Ligne("Alpha Services SARL · SIREN 900 220 001", "DBE non déposée · relance à envoyer", "DBE non déposée", "AFaire"),
                 Ligne("Bêta Industrie SAS · SIREN 900 220 002", "DBE non déposée · courrier préparé", "DBE non déposée", "EnCours", 0, 1),
                 Ligne("Gamma Conseil SARL · SIREN 900 220 003", "Relance LRAR envoyée", "DBE non déposée", "Validee", 0, 1, 2),
+                Ligne("Delta Transports SAS · SIREN 900 220 004", "DBE non déposée · relance à envoyer", "DBE non déposée", "AFaire"),
+                Ligne("Zêta Commerce SAS · SIREN 900 220 006", "DBE non déposée · relance en cours", "DBE non déposée", "EnCours", 0),
                 Ligne("Êta Boulangerie SARL · SIREN 900 220 007", "DBE non déposée · déjà relancée", "DBE non déposée", "Validee", 0, 1, 2),
             ],
         },
@@ -458,10 +469,11 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         // DBE : fiche courte (« source non trouvée »). Injonction : à confirmer par le chef.
         new DescripteurEcran
         {
-            // Lot 8 (26/11/2026) : lue dans la base (LecteurInjonctionsBeneficiaires.cs) ; le geste N'EST PAS BRANCHE. L'injonction de RIG v2 passe par
-            // le moteur PROC_ISURV (SURVEILLANCES\PROC_ISURV\PROC_ISURV.cs) : instance creee (l. 252), evenement futur « date limite »
-            // (l. 423), editions (l. 437, 468), numeros de role et de repertoire JGAFF (l. 494, 499), restitues en cas d'erreur
-            // (l. 739-781) -- une transaction sur plusieurs objets, a faire dans un lot a elle. L'ecran dit « Demonstration ».
+            // Lot 8 (26/11/2026) : lue dans la base (LecteurInjonctionsBeneficiaires.cs) ; le geste N'EST PAS BRANCHE, l'ecran dit
+            // « Demonstration ». « IDBE » (PROC_SRBE.dll / FORM_IDBE) est masque du menu de RIG v2 (PROCF_VISIBLE_DANS_MENU 0, RIG_DEV
+            // lu le 26/11/2026) et sa classe herite de PROC_SURVEILLANCE_INJ, absente des sources ; l'injonction qui tourne est « ISURV »,
+            // nature SDBE (PROC_ISURV.cs:244-475 ; reglages SDBE / ISURV de RIG_DEV : code affaire INJRBE, decision OPRBEINJAA). Meme
+            // besoin que PROC_DCA_INJ : les saisies de l'etape « Cabinet et decision », qu'une file ne transmet pas encore.
             Code = "PROC_DBE_INJ", Titre = "Injonctions beneficiaires", Sujet = "injonctions DBE",
             Forme = FormeEcran.File,
             Recherche = "Rechercher une entreprise, une relance, un numéro de gestion…",
@@ -494,9 +506,13 @@ public sealed class DomaineSurveiller : IDomaineEcrans
 
         new DescripteurEcran
         {
-            // Lot 8 (26/11/2026) : lue dans la base (LecteurRappelsRbe.cs) ; le geste N'EST PAS BRANCHE : la recherche des dossiers a
-            // rappeler de RIG v2 ne compile plus (Source\CompilationFull\PowerShelluildErrors.txt:110), et le courrier « Relance RBE »
-            // passe par le moteur PROC_ISURV (PROC_ISURV.cs:685), comme les injonctions.
+            // Lot 8 (26/11/2026) : lue dans la base (LecteurRappelsRbe.cs) ; pas d'ecrivain, l'ecran dit « Demonstration ». Le geste de
+            // RIG v2 (« Édition » : une demande SRBE validee et son courrier par dossier, PROC_SRBE_RAPPEL.cs:109-203) porte sur les
+            // dossiers de SA recherche, qui n'existe plus : ses trois requetes (DossierRCS.GetNRBEPourRappel, ...PourRelance,
+            // ...PourRappelOuRelance, OPE_RECHERCHE_CRITERES.cs:153-162) sont absentes de RigMetier (grep : 0 occurrence), le projet ne
+            // compile plus (Source\CompilationFull\PowerShell\buildErrors.txt:110) et le traitement « SRBE » est masque du menu
+            // (PROCF_VISIBLE_DANS_MENU 0, RIG_DEV lu le 26/11/2026). Les lignes de cet ecran sont les demandes SRBE passees ; RIG v2 n'a
+            // aucun geste sur elles. La relance des beneficiaires qui tourne est PROC_DBE_RELANCE (PROC_RSURV, nature SDBE), branchee.
             Code = "PROC_SRBE_RAPPEL", Titre = "Rappels RBE", Sujet = "dossiers RCS",
             Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier, une date d'immatriculation, un numéro de gestion…",
