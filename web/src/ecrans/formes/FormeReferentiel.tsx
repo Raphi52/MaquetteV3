@@ -1,14 +1,16 @@
 // FORME « REFERENTIEL » : une table de reglage (modes de paiement, mandataires, cabinets, articles tarifaires,
 // destinataires, imprimantes...). Une GRILLE editable aux colonnes de la fiche RIG v2 : rechercher, ajouter une ligne,
-// modifier en ligne (les cellules deviennent des champs), supprimer. Tant qu'aucun ecrivain n'existe, Enregistrer et
-// Supprimer le disent et ne changent rien : la ligne en cours de modification reste ouverte, marquee non enregistree.
+// modifier en ligne (les cellules deviennent des champs), supprimer. Ajouter, Enregistrer et Supprimer vont a l'ecrivain
+// de la procedure (types Ajouter, Modifier, Supprimer ; les cellules par libelle de colonne) ; ecrit, la table est relue
+// (plan « RIG v3 100 % fonctionnel », lot 2). Sans ecrivain, ils le disent et ne changent rien : la ligne en cours de
+// modification reste ouverte, marquee non enregistree.
 
 import { Fragment, useState } from 'react'
 import { EnteteListe, ListeModerne, MenuLigne, montant, normaliser, PiedListe, VuesListe } from '../../composants/ListeModerne'
 import type { ChampEcranVue, DescripteurEcranVue, LigneEcranVue } from '../../plan/types'
 import {
   Annonce, ChampSaisie, GroupesVides, Provenance, enExemple, Exemple, nombreDe, refus, synthese, texteLigne,
-  useAnnonce, useLignes, type LigneTenue, type VueLignesEcran,
+  useAnnonce, useGeste, useLignes, type LigneTenue, type VueLignesEcran,
 } from './commun'
 
 const Tous = '\u0000tous'
@@ -50,7 +52,7 @@ export function lisible(c: ChampEcranVue, valeur: string): string {
 }
 
 export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
-  const { vue, lignes } = useLignes(d)
+  const { vue, lignes, relire } = useLignes(d)
   const [texte, poserTexte] = useState('')
   const [groupe, poserGroupe] = useState(Tous)
   // La ligne en cours de modification (son rang, ou « nouvelle ») et ses valeurs saisies.
@@ -63,8 +65,19 @@ export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
   const nbColonnes = d.colonnes.length + 1
   const modifier = (l: LigneTenue) => { poserEdition({ cle: l.i, valeurs: cellules(d, l) }); annoncer(null) }
   const changer = (k: number, v: string) => poserEdition((e) => e && { ...e, valeurs: e.valeurs.map((x, j) => (j === k ? v : x)) })
-  const enregistrer = () => annoncer(refus('Enregistrer', edition?.cle === 'nouvelle'
-    ? ': la ligne n’est pas ajoutée à la table' : ': la ligne n’est pas modifiée dans la table'))
+  const jouer = useGeste(d, vue, annoncer)
+  const parColonne = (valeurs: string[]) => Object.fromEntries(d.colonnes.map((c, k) => [c.libelle, valeurs[k] ?? '']))
+  const enregistrer = () => {
+    if (!edition) return
+    const ligne = edition.cle === 'nouvelle' ? undefined : lignes.find((l) => l.i === edition.cle)
+    void jouer(ligne
+      ? { type: 'Modifier', groupe: ligne.groupe, ids: [ligne.id], valeurs: parColonne(edition.valeurs) }
+      : { type: 'Ajouter', groupe: groupe !== Tous ? groupe : d.groupes[0] ?? d.titre, ids: [], valeurs: parColonne(edition.valeurs) },
+    refus('Enregistrer', ligne ? ': la ligne n’est pas modifiée dans la table' : ': la ligne n’est pas ajoutée à la table'),
+    () => { poserEdition(null); relire() })
+  }
+  const supprimer = (l: LigneTenue) => void jouer({ type: 'Supprimer', groupe: l.groupe, ids: [l.id], valeurs: {} },
+    refus('Supprimer', `: « ${l.nom} » reste dans la table`), relire)
   const annuler = () => { poserEdition(null); annoncer(null) }
 
   // fix-ok: modifier() ouvre une ligne sans cellules (sansValeurs) en cellules(d, l) = [nom, '', ...] ; rien ne se devine
@@ -132,7 +145,7 @@ export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
                   <td className="rig-lm-cellule-menu">
                     <MenuLigne libelle={`Actions — ${l.nom}`} actions={[
                       { libelle: 'Modifier', agir: () => modifier(l) },
-                      { libelle: 'Supprimer', agir: () => annoncer(refus('Supprimer', `: « ${l.nom} » reste dans la table`)) },
+                      { libelle: 'Supprimer', agir: () => supprimer(l) },
                     ]} />
                   </td>
                 </tr>

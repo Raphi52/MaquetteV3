@@ -253,6 +253,10 @@ public sealed record LigneEcran(string Nom, string Precisions, string Groupe, st
     /// (web/src/ecrans/formes/FormeReferentiel.tsx, CasesSansValeurs). Un montant s'ecrit en
     /// nombre invariant (« 180.00 »).</summary>
     public string[] Valeurs { get; init; } = [];
+
+    /// <summary>L'identifiant de l'objet dans la base du greffe (LigneLue.Id, plan « RIG v3 100 % fonctionnel », lot 2) :
+    /// sa fiche et ses gestes le visent (Pont/EcranGenere.cs). Null pour une ligne d'exemple : rien ne s'y ecrit.</summary>
+    public string? Id { get; init; }
 }
 
 /// <summary>Un domaine = un verbe du menu, dans son fichier de Pont/EcransGeneres/.

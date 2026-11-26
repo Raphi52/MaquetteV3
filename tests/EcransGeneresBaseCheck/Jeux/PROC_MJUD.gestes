@@ -1,0 +1,100 @@
+# Les gestes de EcrivainInstanceJudiciaire (« Instance judiciaire », PROC_MJUD), joues dans l'ordre par la route POST, sur
+# les lignes de PROC_MJUD.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). Un refus n'ecrit
+# rien (le banc verifie lignes et journal inchanges) ; chaque refus a son jumeau accepte (meme borne, autre cote).
+
+# 1. Verrouillee par une demande EN COURS sur le sequenceur 2J (VerrouDemandeV2 ; Demande.cs:1290-1315) : refusee, au
+#    message que RIG v2 affiche (OPE_SELECT_ENTITE_JUDICIAIRE.cs:122). Jumeau accepte : bloc 8 (1200001, libre).
+geste: Enregistrer
+ids: 1200002
+valeur: Instance › Saisine tribunal = 2026-01-12
+resultat: refuse
+message: Instance bloquée (26012000002), demande "En cours" : MJUD par M. AUTRE BANC
+---
+# 2. En reclamation (N, pas en cours) : verrouillee aussi, « en » devant l'etat (Demande.cs:1309-1311).
+geste: Enregistrer
+ids: 1200008
+valeur: Instance › Saisine tribunal = 2026-01-12
+resultat: refuse
+message: Instance bloquée (26012000008), demande en "Réclamation" : MJUD par M. AUTRE BANC
+---
+# 3. Un champ grise en modification (code affaire, OPE_INSTANCE.cs:1681-1685) : refuse.
+geste: Enregistrer
+ids: 1200001
+valeur: Instance › Code affaire = REF12
+resultat: refuse
+message: « Instance › Code affaire » ne se modifie pas sur l'instance 2026J12001 dans RIG v2.
+---
+# 4. Saisine du tribunal le lendemain de l'enrolement (15/01/2026) : refusee (OPE_INSTANCE.cs:1342-1344). Jumeau accepte :
+#    bloc 8, le jour meme.
+geste: Enregistrer
+ids: 1200001
+valeur: Instance › Saisine tribunal = 2026-01-16
+resultat: refuse
+message: La date de saisine du Tribunal doit être inférieure ou égale à la date d'enrôlement.
+---
+# 5. Saisine vide : obligatoire (DateSaisine.MetierObligatoire, OPE_INSTANCE.Designer.cs:180).
+geste: Enregistrer
+ids: 1200001
+valeur: Instance › Saisine tribunal =
+resultat: refuse
+message: « Saisine tribunal » est obligatoire.
+---
+# 6. Assignation : la date de l'acte controlee est celle du defendeur (01/02/2026, OPE_INSTANCE.cs:1326-1329), apres une
+#    saisine au 20/01 : refusee (OPE_INSTANCE.cs:1346-1348). Jumeau accepte : bloc 9, saisine au 01/02.
+geste: Enregistrer
+ids: 1200007
+valeur: Instance › Saisine tribunal = 2026-01-20
+resultat: refuse
+message: La date de l'acte doit être inférieure ou égale à la date de saisine du Tribunal.
+---
+# 7. Assignation : la date de l'acte ne se saisit pas sur l'instance (Instance.cs:3343-3346, OPE_INSTANCE.cs:1704).
+geste: Enregistrer
+ids: 1200007
+valeur: Instance › Date de l'acte = 2026-01-30
+resultat: refuse
+message: « Instance › Date de l'acte » ne se modifie pas sur l'instance 2026I12007 dans RIG v2.
+---
+# 8. Enregistree : la saisine au jour de l'enrolement (la borne du bloc 4, acceptee) et une note (type 07,
+#    OPE_INSTANCE.cs:1717). La liste la relit « Modifiée » (le journal des gestes porte le geste), la fiche relit les
+#    valeurs ; comme Instance.Sauve, la date de mise a jour Infogreffe est posee (la derniere datait de 2020) et le numero
+#    source aussi (un GUID de 36 caracteres).
+geste: Enregistrer
+ids: 1200001
+valeur: Instance › Saisine tribunal = 2026-01-15
+valeur: Instance › Note sur l'affaire = Note du banc, lot 2
+resultat: fait
+message: Instance 2026J12001 enregistrée dans la base du greffe : « Saisine tribunal », « Note sur l'affaire ».
+lignes:
+GAMMA BANC c/ DELTA BANC | Rôle 2026R12002 · Nature du banc · enrôlée le 15/01/2026 · bloquée par la demande 26012000002 | En référé | EnAttente | []
+THETA BANC | Rôle 2026J12008 · Nature du banc · enrôlée le 15/01/2026 · bloquée par la demande 26012000008 | Au fond | EnAttente | []
+ZETA BANC | Rôle 2026J12006 · Nature du banc · enrôlée le 15/01/2026 | Au fond | AFaire | []
+ETA BANC | Rôle 2026J12005 · Nature du banc · enrôlée le 15/01/2026 | Au fond | AFaire | []
+EPSILON BANC | Rôle 2026J12003 · Nature du banc · enrôlée le 15/01/2026 | Au fond | Validee | []
+ALPHA BANC c/ BETA BANC | Rôle 2026J12001 · Nature du banc · enrôlée le 15/01/2026 | Au fond | Validee | []
+IOTA BANC c/ KAPPA BANC | Rôle 2026I12007 · Nature du banc · enrôlée le 10/02/2026 | Au fond | AFaire | []
+fiche: 1200001
+Instance › Saisine tribunal = 2026-01-15
+Instance › Note sur l'affaire = Note du banc, lot 2
+Instance › Date de l'acte = 2026-01-05
+controle: SELECT COUNT(*) FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1200001 AND INSTN_DATE_MAJ_INFOG > '20250101' AND LEN(INSTN_NUMERO_SOURCE) = 36 => 1
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Instance judiciaire' AND IdObjet = '1200001' AND Famille = 'affaire' AND Verbe = 'a modifie' => 1
+---
+# 9. Le jumeau du bloc 6 : saisine au 01/02, egale a l'acte du defendeur ; et la case IP Europeenne (type IP,
+#    OPE_INSTANCE.cs:1746). Le numero source deja pose ne change pas.
+geste: Enregistrer
+ids: 1200007
+valeur: Instance › Saisine tribunal = 2026-02-01
+valeur: Instance › IP Européenne = oui
+resultat: fait
+message: Instance 2026I12007 enregistrée dans la base du greffe : « Saisine tribunal », « IP Européenne ».
+fiche: 1200007
+Instance › IP Européenne = oui
+Instance › Saisine tribunal = 2026-02-01
+controle: SELECT INSTN_NUMERO_SOURCE FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1200007 => SOURCE-1200007
+---
+# 10. La meme valeur que la base : rien a enregistrer, rien de trace.
+geste: Enregistrer
+ids: 1200007
+valeur: Instance › IP Européenne = oui
+resultat: refuse
+message: Aucun champ n'est modifié : l'instance 2026I12007 garde ses valeurs.

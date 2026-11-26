@@ -215,7 +215,7 @@ export interface EtatEcranVue { code: string; libelle: string; icone: string }
 /** Une etape (Saisie) ou une section (les autres formes). */
 export interface MarcheEcranVue { titre: string; consigne: string; obligatoire: boolean; champs: ChampEcranVue[] }
 /** Une ligne ; valeurs : ses cellules dans l'ordre des colonnes (Referentiel, Etat), vide si le descripteur n'en donne pas. */
-export interface LigneEcranVue { nom: string; precisions: string; groupe: string; etat: string; faites: number[]; valeurs?: string[] }
+export interface LigneEcranVue { nom: string; precisions: string; groupe: string; etat: string; faites: number[]; valeurs?: string[]; id?: string | null }
 
 // ---- La visionneuse d'affaire ----
 export interface DossierVue {

@@ -656,3 +656,143 @@ describe('EcranGenere : lignes de la base ou exemples', () => {
     expect(container.querySelector('.rig-lm-titre')!.textContent).toBe('HKO DUPRAT SARL · SIREN 412 000 001')
   })
 })
+
+// LE SOCLE FONCTIONNEL (plan « RIG v3 100 % fonctionnel », lot 2, 26/11/2026) : une ligne de la base (avec son id) ouvre
+// SA fiche lue, Enregistrer n'envoie que les champs changes a l'ecrivain, puis l'ecran relit fiche et lignes ; un refus de
+// RIG v2 garde la saisie avec son message ; une instance verrouillee s'ouvre en lecture seule avec le message de RIG v2 ;
+// sans ecrivain, la demonstration. Le faux pont joue le C# (Pont/EcranGenere.cs).
+describe('socle fonctionnel : fiche lue, geste ecrit puis relu', () => {
+  const instance: DescripteurEcranVue = descripteur({
+    forme: 'Fiche', titre: 'Instance judiciaire', groupes: ['Au fond'],
+    sections: [
+      { titre: 'Instance', consigne: '', obligatoire: false,
+        champs: [champ('Numéro de rôle'), champ('Saisine tribunal', 'Date'), champ('Note sur l’affaire', 'Zone')] },
+      { titre: 'Parties', consigne: '', obligatoire: false, champs: [champ('Demandeurs', 'Tableau')] },
+      { titre: 'Facturation', consigne: '', obligatoire: false, champs: [champ('Articles', 'Tableau')] },
+    ],
+  })
+  const ligneBase = (): LigneEcranVue =>
+    ({ nom: 'DUPONT c/ MARTIN', precisions: 'Rôle 2026J01201', groupe: 'Au fond', etat: 'AFaire', faites: [], id: '1200001' })
+  const fiche = (saisine: string, partiel: Record<string, unknown> = {}) => ({
+    mode: 'base', message: null,
+    fiche: {
+      procedure: 'ECRAN_TEST', id: '1200001', nom: 'DUPONT c/ MARTIN', lectureSeule: false, motif: null,
+      sections: [
+        { titre: 'Instance', champs: [
+          { libelle: 'Numéro de rôle', valeur: '2026J01201', modifiable: false, colonnes: [], lignes: [] },
+          { libelle: 'Saisine tribunal', valeur: saisine, modifiable: true, colonnes: [], lignes: [] },
+          { libelle: 'Note sur l’affaire', valeur: '', modifiable: false, colonnes: [], lignes: [] },
+        ] },
+        { titre: 'Parties', champs: [
+          { libelle: 'Demandeurs', valeur: '', modifiable: false, colonnes: ['Désignation'], lignes: [['M. DUPONT']] },
+        ] },
+      ],
+      ...partiel,
+    },
+  })
+
+  async function ouvrir(reponses: Record<string, (...args: unknown[]) => unknown>) {
+    const pont = installerFauxPont({
+      'EcranGenere.Lignes': () => ({ mode: 'base', message: null, greffe: '3801', lignes: [ligneBase()], exemples: [] }),
+      ...reponses,
+    })
+    const rendu = render(<EcranGenere descripteur={instance} />)
+    const o = outils(rendu.container)
+    await waitFor(() => expect(o.noms()).toEqual(['DUPONT c/ MARTIN']))
+    fireEvent.click(o.ligne('DUPONT c/ MARTIN'))
+    await waitFor(() => expect(rendu.container.textContent).toContain('Fiche lue dans la base du greffe 3801.'))
+    return { ...o, pont }
+  }
+  const saisine = (container: HTMLElement) => container.querySelector('input[aria-label="Saisine tribunal"]') as HTMLInputElement | null
+
+  it('la fiche lue : chaque champ porte sa valeur, seul le champ que l’ecrivain enregistre se saisit, un champ non lu le dit', async () => {
+    const { container, pont } = await ouvrir({ 'EcranGenere.Fiche': () => fiche('2026-03-10') })
+    expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Fiche', 'ECRAN_TEST', 'Au fond', '1200001')
+    expect(saisine(container)!.value).toBe('2026-03-10')
+    expect(container.querySelector('input[aria-label="Numéro de rôle"]')).toBeNull()
+    expect(container.querySelector('[aria-label="Numéro de rôle"]')!.textContent).toBe('2026J01201')
+    expect(container.querySelector('table[aria-label="Demandeurs"]')!.textContent).toContain('M. DUPONT')
+    expect(container.querySelector('section[aria-label="Facturation"]')!.textContent).toContain('Non lu dans la base par la V3')
+  })
+
+  it('Enregistrer n’envoie que le champ change ; ecrit, la fiche et les lignes sont relues dans la base', async () => {
+    let enBase = '2026-03-10'
+    const { container, pont, bouton, annonce } = await ouvrir({
+      'EcranGenere.Fiche': () => fiche(enBase),
+      'EcranGenere.Geste': (...args: unknown[]) => {
+        enBase = (args[5] as Record<string, string>)['Instance › Saisine tribunal']!
+        return { fait: true, message: 'Instance 2026J01201 enregistrée dans la base du greffe : « Saisine tribunal ».', sansEcrivain: false, ids: ['1200001'] }
+      },
+    })
+    fireEvent.change(saisine(container)!, { target: { value: '2026-02-01' } })
+    fireEvent.click(bouton('Enregistrer'))
+    await waitFor(() => expect(annonce()).toBe('Instance 2026J01201 enregistrée dans la base du greffe : « Saisine tribunal ».'))
+    expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Geste', 'ECRAN_TEST', 'Au fond', 'Enregistrer', null, ['1200001'],
+      { 'Instance › Saisine tribunal': '2026-02-01' })
+    await waitFor(() => expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranGenere.Fiche')).toHaveLength(2))
+    expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranGenere.Lignes')).toHaveLength(2)
+    await waitFor(() => expect(saisine(container)!.value).toBe('2026-02-01'))
+  })
+
+  it('un controle de RIG v2 refuse : son message, la saisie reste, rien n’est relu', async () => {
+    const motif = 'La date de saisine du Tribunal doit être inférieure ou égale à la date d’enrôlement.'
+    const { container, pont, bouton, annonce } = await ouvrir({
+      'EcranGenere.Fiche': () => fiche('2026-03-10'),
+      'EcranGenere.Geste': () => ({ fait: false, message: motif, sansEcrivain: false, ids: [] }),
+    })
+    fireEvent.change(saisine(container)!, { target: { value: '2027-01-01' } })
+    fireEvent.click(bouton('Enregistrer'))
+    await waitFor(() => expect(annonce()).toBe(motif))
+    expect(saisine(container)!.value).toBe('2027-01-01')
+    expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranGenere.Lignes')).toHaveLength(1)
+  })
+
+  it('sans ecrivain : la demonstration, jamais un faux succes', async () => {
+    const { container, bouton, annonce } = await ouvrir({
+      'EcranGenere.Fiche': () => fiche('2026-03-10'),
+      'EcranGenere.Geste': () => ({ fait: false, message: 'Aucun écrivain', sansEcrivain: true, ids: [] }),
+    })
+    fireEvent.change(saisine(container)!, { target: { value: '2026-02-01' } })
+    fireEvent.click(bouton('Enregistrer'))
+    await waitFor(() => expect(annonce()).toBe('Démonstration : rien n’est enregistré — « Enregistrer » : « DUPONT c/ MARTIN » n’est pas modifiée dans la base, la fiche reste ouverte.'))
+  })
+
+  it('une instance verrouillee par un autre utilisateur s’ouvre en lecture seule, avec le message de RIG v2', async () => {
+    const motif = 'Instance bloquée (26001200001), demande "En cours" : MJUD par M. AUTRE'
+    const { container, bouton } = await ouvrir({ 'EcranGenere.Fiche': () => fiche('2026-03-10', { lectureSeule: true, motif }) })
+    expect(container.textContent).toContain(`Fiche en lecture seule : ${motif}.`)
+    expect(saisine(container)).toBeNull()
+    expect(bouton('Enregistrer').disabled).toBe(true)
+  })
+
+  // Mesure sur le bureau cache (26/11/2026) : apres Enregistrer, la ligne relue passe « Modifiée » (Validee) ; la fiche se
+  // rouvrait figee, alors que RIG v2 remodifie une instance. Fiche lue : la base decide (seul son verrou fige).
+  it('une ligne « Modifiée » dont la fiche est libre dans la base reste modifiable', async () => {
+    installerFauxPont({
+      'EcranGenere.Lignes': () => ({ mode: 'base', message: null, greffe: '3801', lignes: [{ ...ligneBase(), etat: 'Validee' }], exemples: [] }),
+      'EcranGenere.Fiche': () => fiche('2026-03-10'),
+    })
+    const rendu = render(<EcranGenere descripteur={instance} />)
+    const o = outils(rendu.container)
+    await waitFor(() => expect(o.noms()).toEqual(['DUPONT c/ MARTIN']))
+    fireEvent.click(o.ligne('DUPONT c/ MARTIN'))
+    await waitFor(() => expect(saisine(rendu.container)).not.toBeNull())
+    expect(o.bouton('Enregistrer').disabled).toBe(false)
+    expect(rendu.container.textContent).not.toContain('Fiche figée')
+  })
+
+  it('la recherche part dans la base quand le lecteur sait chercher ; ses lignes ne sont pas refiltrees a l’ecran', async () => {
+    const trouvee: LigneEcranVue = { nom: 'SANS LE MOT', precisions: 'Rôle 2026J09999', groupe: 'Au fond', etat: 'AFaire', faites: [], id: '1200099' }
+    const pont = installerFauxPont({
+      'EcranGenere.Lignes': () => ({ mode: 'base', message: null, greffe: '3801', lignes: [ligneBase()], exemples: [], recherche: true }),
+      'EcranGenere.Chercher': () => ({ mode: 'base', message: null, greffe: '3801', lignes: [trouvee], exemples: [], recherche: true, cherchees: ['Au fond'] }),
+    })
+    const { container } = render(<EcranGenere descripteur={instance} />)
+    const o = outils(container)
+    await waitFor(() => expect(o.noms()).toEqual(['DUPONT c/ MARTIN']))
+    expect(container.textContent).toContain('La recherche et les critères cherchent aussi dans la base du greffe.')
+    fireEvent.change(container.querySelector('input[aria-label="Numéro"]')!, { target: { value: '9999' } })
+    await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Chercher', 'ECRAN_TEST', '', { 'Numéro': '9999' }))
+    await waitFor(() => expect(o.noms()).toEqual(['SANS LE MOT']))
+  })
+})

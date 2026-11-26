@@ -5,11 +5,16 @@
 // la lecture des lignes au pont, la provenance (base du greffe ou exemple), le champ type, et le refus honnete des
 // gestes. Les listes reprennent le socle des listes modernes (composants/ListeModerne.tsx, wwwroot/rig-listes.css).
 //
-// LES GESTES (regle du plan) : tant qu'aucun ecrivain n'existe (le lot 2 les branche), un geste ne change RIEN et le
-// dit : « Demonstration : rien n'est enregistre ». Jamais un faux succes : une ligne ne change pas d'etat, une saisie
-// reste a l'ecran, marquee non enregistree.
+// LES GESTES (regle du plan) : un geste passe par useGeste, qui l'envoie au pont (EcranGenere.Geste) quand la ligne vient
+// de la base (elle porte son id) ; l'ecrivain de la procedure l'ecrit dans la base du greffe (Serveur/Socle/EcransGeneres/
+// EcrivainEcran.cs), puis l'ecran RELIT ses lignes et dit ce qui est fait. Un controle de RIG v2 qui refuse : son message,
+// rien n'a change. Sans ecrivain, sans serveur, ou sur une ligne d'exemple : « Demonstration : rien n'est enregistre ».
+// Jamais un faux succes : une ligne ne change pas d'etat, une saisie reste a l'ecran, marquee non enregistree.
+// LA FICHE d'une ligne de la base se lit au pont (useFiche, EcranGenere.Fiche) : ses champs portent leur valeur, et ceux
+// que l'ecrivain sait enregistrer seuls se saisissent (Sections, prop fiche). LA RECHERCHE va dans la base quand le
+// lecteur sait chercher (useLignes().chercher, EcranGenere.Chercher) ; sinon l'ecran filtre ce qu'il a.
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { appeler } from '../../pont'
 import {
   CelluleChevron, CelluleIdentite, MenuLigne, Pastille, PointEtat, normaliser, type ActionLigne, type Teinte,
@@ -27,7 +32,34 @@ export interface VueLignesEcran {
   exemples: string[]
   /** Les groupes branches sur la base mais sans aucune ligne : ils restent affiches, avec « Aucune ligne ». */
   vides?: string[]
+  /** Les groupes dont les lignes ont ete CHERCHEES dans la base pour la recherche en cours : l'ecran ne les refiltre pas. */
+  cherchees?: string[]
+  /** Vrai : au moins une procedure de l'ecran cherche dans la base (la recherche y part, EcranGenere.Chercher). */
+  recherche?: boolean
 }
+
+/** Une recherche : le texte du champ et les criteres remplis. */
+export interface RechercheVue { texte: string; criteres: Saisies }
+
+/** Une recherche qui ne filtre rien. */
+const rechercheVide = (r: RechercheVue | null) => r === null || (r.texte.trim() === '' && Object.values(r.criteres).every((v) => v.trim() === ''))
+
+/** Deux recherches identiques (les lignes cherchees pour l'une valent pour l'autre). */
+export const memeRecherche = (a: RechercheVue | null, b: RechercheVue | null) =>
+  (rechercheVide(a) && rechercheVide(b)) || JSON.stringify(a) === JSON.stringify(b)
+
+/** Un champ d'une fiche lue (Contrats/EcransGeneres/FicheEcran.cs) : sa valeur, s'il se saisit, sa sous-liste. */
+export interface ChampFicheVue { libelle: string; valeur: string; modifiable: boolean; colonnes: string[]; lignes: string[][] }
+export interface SectionFicheVue { titre: string; champs: ChampFicheVue[] }
+/** Une fiche lue dans la base : ses sections aux titres du descripteur ; en lecture seule avec le motif de RIG v2. */
+export interface FicheVue { procedure: string; id: string; nom: string; sections: SectionFicheVue[]; lectureSeule: boolean; motif: string | null }
+/** Ce que le pont rend pour une fiche (Pont/EcranGenere.cs, VueFicheEcran). */
+export interface VueFicheEcran { mode: 'base' | 'exemple' | 'erreur'; message: string | null; fiche: FicheVue | null }
+
+/** Les types de geste (Contrats/EcransGeneres/GesteEcran.cs, TypeGeste). */
+export type TypeGesteVue = 'Enregistrer' | 'Creer' | 'Ajouter' | 'Modifier' | 'Supprimer' | 'Agir' | 'Confirmer' | 'Decider'
+/** Ce que le geste a donne (ResultatGeste). */
+export interface ResultatGesteVue { fait: boolean; message: string; sansEcrivain: boolean; ids: string[] }
 
 /** Les trois etats qui portent les gestes : le descripteur les nomme ainsi (EcransGeneresCheck le verifie). */
 export const AFAIRE = 'AFaire'
@@ -49,17 +81,134 @@ export const figee = (etat: string) => etat !== AFAIRE && etat !== ENCOURS
  * redessin de la racine renvoie un descripteur neuf (meme contenu), qui ne doit ni relire la base ni refermer la ligne
  * ouverte. null tant que le pont n'a pas repondu : rien n'est affiche avant, jamais un nom fictif sous un ecran branche.
  */
-export function useLignes(d: DescripteurEcranVue): { vue: VueLignesEcran | null; lignes: LigneTenue[] } {
+export function useLignes(d: DescripteurEcranVue): {
+  vue: VueLignesEcran | null; lignes: LigneTenue[]
+  /** Relit les lignes (apres un geste ecrit), pour la recherche en cours. */
+  relire: () => void
+  /** Cherche dans la base (si un lecteur de l'ecran sait chercher) ; une recherche vide revient a la liste de travail. */
+  chercher: (r: RechercheVue) => void
+  /** La recherche dont viennent les lignes cherchees (vue.cherchees) ; null : aucune. */
+  cherchee: RechercheVue | null
+} {
   const [vue, poserVue] = useState<VueLignesEcran | null>(null)
+  const [cherchee, poserCherchee] = useState<RechercheVue | null>(null)
+  const vivant = useRef(true)
+  const enCours = useRef<RechercheVue | null>(null)
   useEffect(() => {
-    let vivant = true
-    const recevoir = (v: VueLignesEcran) => { if (vivant) poserVue(v) }
+    vivant.current = true
+    const recevoir = (v: VueLignesEcran) => { if (vivant.current) poserVue(v) }
     appeler<VueLignesEcran>('EcranGenere.Lignes', d.code).then(recevoir, () => recevoir({
       mode: 'erreur', message: 'Les lignes de la base n’ont pas pu être lues.', greffe: null, lignes: d.lignes, exemples: d.groupes,
     }))
-    return () => { vivant = false }
+    return () => { vivant.current = false }
   }, [d.code])
-  return { vue, lignes: (vue?.lignes ?? []).map((l, i) => ({ ...l, i })) }
+  // Une relecture qui echoue garde les lignes deja a l'ecran (jamais remplacees par des exemples en cours de travail).
+  const lire = useCallback((r: RechercheVue | null) => {
+    const appel = rechercheVide(r)
+      ? appeler<VueLignesEcran>('EcranGenere.Lignes', d.code)
+      : appeler<VueLignesEcran>('EcranGenere.Chercher', d.code, r!.texte, r!.criteres)
+    appel.then((v) => { if (vivant.current && enCours.current === r) { poserVue(v); poserCherchee(rechercheVide(r) ? null : r) } }, () => {})
+  }, [d.code])
+  const relire = useCallback(() => lire(enCours.current), [lire])
+  const chercher = useCallback((r: RechercheVue) => {
+    if (memeRecherche(enCours.current, r)) return
+    enCours.current = r
+    lire(r)
+  }, [lire])
+  return { vue, lignes: (vue?.lignes ?? []).map((l, i) => ({ ...l, i })), relire, chercher, cherchee }
+}
+
+/** La ligne vient-elle de la base (son groupe est branche, et elle porte l'identifiant de son objet) ? */
+export const deLaBase = (vue: VueLignesEcran | null, l: { groupe: string; id?: string | null | undefined }) =>
+  vue !== null && (vue.mode === 'base' || vue.mode === 'mixte') && !vue.exemples.includes(l.groupe) && !!l.id
+
+/**
+ * La fiche de la ligne ouverte, lue dans la base (EcranGenere.Fiche) ; null tant qu'elle n'est pas lue, ou pour une ligne
+ * d'exemple (l'ecran garde alors ses champs vides). Relue par relire() apres un enregistrement.
+ */
+export function useFiche(d: DescripteurEcranVue, l: LigneTenue | undefined, vue: VueLignesEcran | null): {
+  fiche: VueFicheEcran | null; relire: () => void
+} {
+  const [fiche, poserFiche] = useState<VueFicheEcran | null>(null)
+  const [tour, poserTour] = useState(0)
+  const cle = l && deLaBase(vue, l) ? `${l.groupe}\u0000${l.id}` : null
+  useEffect(() => {
+    poserFiche(null)
+    if (cle === null || !l) return
+    let vivant = true
+    appeler<VueFicheEcran>('EcranGenere.Fiche', d.code, l.groupe, l.id).then(
+      (v) => { if (vivant) poserFiche(v) },
+      () => { if (vivant) poserFiche({ mode: 'erreur', message: 'La fiche n’a pas pu être lue dans la base du greffe.', fiche: null }) })
+    return () => { vivant = false }
+    // l : sa cle suffit (un redessin rend une ligne neuve de meme cle, qui ne relit pas la fiche).
+  }, [d.code, cle, tour])
+  return { fiche, relire: () => poserTour((t) => t + 1) }
+}
+
+/** Un geste demande par une forme : son type, son nom (File, Audience), le groupe (la procedure) et les objets vises. */
+export interface DemandeGeste {
+  type: TypeGesteVue; nom?: string | undefined; groupe: string; ids: (string | null | undefined)[]; valeurs: Saisies
+}
+
+/**
+ * Joue un geste : au pont si la ligne vient de la base, sinon la phrase de demonstration, AUSSITOT (sans attendre).
+ * Ecrit : le message de l'ecrivain, puis apres() (relire les lignes, la fiche). Refuse : le message de RIG v2. Sans
+ * ecrivain ou pont en panne : la demonstration. Rend le resultat, null s'il n'est pas alle au serveur.
+ */
+export function useGeste(d: DescripteurEcranVue, vue: VueLignesEcran | null, annoncer: (texte: string | null) => void) {
+  return async (g: DemandeGeste, demonstration: string, apres?: () => void): Promise<ResultatGesteVue | null> => {
+    if (!versLaBase(vue, g)) { annoncer(demonstration); return null }
+    const r = await envoyerGeste(d, g)
+    annoncer(r === null || r.sansEcrivain ? demonstration : r.message)
+    if (r?.fait) apres?.()
+    return r
+  }
+}
+
+/** Le geste peut-il aller a la base : des objets lus dans la base, ou une creation dans un groupe branche. */
+function versLaBase(vue: VueLignesEcran | null, g: DemandeGeste): boolean {
+  if (g.type === 'Creer' || g.type === 'Ajouter')
+    return vue !== null && (vue.mode === 'base' || vue.mode === 'mixte') && !vue.exemples.includes(g.groupe)
+  return g.ids.length > 0 && g.ids.every((id) => deLaBase(vue, { groupe: g.groupe, id }))
+}
+
+/** Le geste envoye au pont (EcranGenere.Geste) ; null si le pont n'a pas repondu (la demonstration vaut alors). */
+async function envoyerGeste(d: DescripteurEcranVue, g: DemandeGeste): Promise<ResultatGesteVue | null> {
+  try {
+    return await appeler<ResultatGesteVue>('EcranGenere.Geste', d.code, g.groupe, g.type, g.nom ?? null, g.ids, g.valeurs)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Un geste EN LOT sur des lignes cochees (File, Audience, Operation) : un envoi par procedure (un ecran reuni en melange),
+ * chacune a son ecrivain. Aucune ligne de la base : la demonstration, aussitot. Sinon chaque procedure dit ce qu'elle a
+ * fait (ou sa demonstration) ; apres() si l'une a ecrit.
+ */
+export function useGesteEnLot(d: DescripteurEcranVue, vue: VueLignesEcran | null, annoncer: (texte: string | null) => void) {
+  const jouer = useGeste(d, vue, annoncer)
+  return async (type: TypeGesteVue, nom: string, visees: LigneTenue[], valeurs: Saisies, demonstration: (n: number) => string,
+                apres?: () => void): Promise<void> => {
+    const groupes = [...new Set(visees.map((l) => l.groupe))]
+    if (groupes.length <= 1) {
+      await jouer({ type, nom, groupe: groupes[0] ?? d.titre, ids: visees.map((l) => l.id), valeurs }, demonstration(visees.length), apres)
+      return
+    }
+    const demande = (g: string): DemandeGeste =>
+      ({ type, nom, groupe: g, ids: visees.filter((l) => l.groupe === g).map((l) => l.id), valeurs })
+    if (!groupes.some((g) => versLaBase(vue, demande(g)))) { annoncer(demonstration(visees.length)); return }
+    const textes: string[] = []
+    let ecrit = false
+    for (const g of groupes) {
+      const n = visees.filter((l) => l.groupe === g).length
+      const r = versLaBase(vue, demande(g)) ? await envoyerGeste(d, demande(g)) : null
+      textes.push(`${g} : ${r === null || r.sansEcrivain ? demonstration(n) : r.message}`)
+      ecrit ||= r?.fait === true
+    }
+    annoncer(textes.join(' '))
+    if (ecrit) apres?.()
+  }
 }
 
 /** La procedure d'une ligne : celle de son groupe dans un ecran reuni, sinon l'ecran lui-meme. */
@@ -210,10 +359,68 @@ export function ChampSaisie({ champ, valeur, changer, lecture = false, compact =
   )
 }
 
-/** Les sections d'une fiche : en formulaire (saisies), ou en lecture (lecture = vrai, valeurs « — »). */
-export function Sections({ sections, saisies, changer, lecture = false }: {
+/** Le champ lu d'une fiche, a la section et au libelle du descripteur ; undefined si la V3 ne le lit pas. */
+export const champLu = (fiche: FicheVue | null | undefined, section: string, libelle: string) =>
+  fiche?.sections.find((s) => s.titre === section)?.champs.find((c) => c.libelle === libelle)
+
+/** Une valeur lue, comme l'agent l'ecrit : une date en jj/mm/aaaa, une case en Oui, le vide en « — ». */
+const lue = (c: ChampEcranVue, valeur: string) =>
+  valeur === '' ? '—'
+    : c.type === 'Case' ? (valeur === 'oui' ? 'Oui' : 'Non')
+      : c.type === 'Date' && /^\d{4}-\d{2}-\d{2}$/.test(valeur) ? valeur.split('-').reverse().join('/') : valeur
+
+/** Une sous-liste lue avec l'objet (Tableau) : ses colonnes et ses lignes. */
+function TableauLu({ champ }: { champ: ChampFicheVue }) {
+  if (champ.lignes.length === 0) return <div className="rig-eg-tableau" role="note">Aucune ligne dans la base du greffe.</div>
+  return (
+    <table className="rig-table rig-eg-tableau-lu" aria-label={champ.libelle}>
+      <thead><tr>{champ.colonnes.map((c) => <th key={c}>{c}</th>)}</tr></thead>
+      <tbody>{champ.lignes.map((l, k) => <tr key={k}>{l.map((v, j) => <td key={j}>{v === '' ? '—' : v}</td>)}</tr>)}</tbody>
+    </table>
+  )
+}
+
+/** Ce que dit un champ que la V3 ne lit pas encore dans la base (il n'est pas dans la fiche). */
+export const NON_LU = 'Non lu dans la base par la V3'
+
+/**
+ * Les sections d'une fiche : en formulaire (saisies), ou en lecture (lecture = vrai). Avec la fiche LUE (fiche) : chaque
+ * champ porte sa valeur de la base ; seuls ceux que l'ecrivain sait enregistrer se saisissent ; un champ absent de la
+ * fiche le dit (NON_LU). Sans fiche (ligne d'exemple) : les champs vides, comme avant.
+ */
+export function Sections({ sections, saisies, changer, lecture = false, fiche = null }: {
   sections: MarcheEcranVue[]; saisies: Saisies; changer: (cle: string, valeur: string) => void; lecture?: boolean
+  fiche?: FicheVue | null
 }) {
+  if (fiche) {
+    return (
+      <div className="rig-eg-sections">
+        {sections.map((s) => (
+          <section key={s.titre} className="rig-eg-section" aria-label={s.titre}>
+            <header className="rig-eg-section__tete"><span className="rig-eg-section__titre">{s.titre}</span></header>
+            <p className="rig-eg-section__consigne">{s.consigne}</p>
+            <div className="rig-champs rig-eg-champs">
+              {s.champs.map((c) => {
+                const lu = champLu(fiche, s.titre, c.libelle)
+                const cle = cleChamp(s.titre, c.libelle)
+                if (c.type === 'Tableau' || lecture || !lu?.modifiable) {
+                  return (
+                    <div key={c.libelle} className={`rig-saisie-champ rig-eg-lu${c.type === 'Tableau' || c.type === 'Zone' ? ' rig-saisie-champ--pleine' : ''}`}>
+                      <span className="rig-saisie-champ__libelle">{c.libelle}</span>
+                      {!lu ? <span className="rig-eg-non-lu">{NON_LU}</span>
+                        : c.type === 'Tableau' ? <TableauLu champ={lu} />
+                          : <span className="rig-eg-lu__valeur" aria-label={c.libelle}>{lue(c, lu.valeur)}</span>}
+                    </div>
+                  )
+                }
+                return <ChampSaisie key={c.libelle} champ={c} valeur={saisies[cle] ?? lu.valeur} changer={(v) => changer(cle, v)} />
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
+    )
+  }
   return (
     <div className="rig-eg-sections">
       {sections.map((s) => (

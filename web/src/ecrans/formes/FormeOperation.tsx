@@ -4,14 +4,15 @@
 // reuni : on agit dans UNE procedure a la fois (cocher une ligne d'une autre procedure repart d'elle).
 // Une operation sur UN objet que la fiche RIG v2 RECOIT d'un autre ecran (descripteur.objetUnique : PROC_IA et sa liasse)
 // n'a pas de liste : voir OperationSurUnObjet.
-// La confirmation ne change rien tant qu'aucun ecrivain n'existe : elle le dit.
+// Confirmer va a l'ecrivain de la procedure (type Confirmer, les objets choisis, les champs remplis) ; fait, la liste est
+// relue (plan « RIG v3 100 % fonctionnel », lot 2). Sans ecrivain, la confirmation ne change rien et le dit.
 
 import { useState } from 'react'
 import { EnteteListe, ListeModerne, normaliser, PiedListe } from '../../composants/ListeModerne'
 import type { DescripteurEcranVue } from '../../plan/types'
 import {
   Annonce, ChampSaisie, DEMONSTRATION, Exemple, PanneauCriteres, Provenance, Sections, TableLignes, cleChamp, etatDe,
-  figee, manquantes, parcoursDe, passeCriteres, refus, texteLigne, useAnnonce, useLignes, type Saisies,
+  figee, manquantes, parcoursDe, passeCriteres, refus, texteLigne, useAnnonce, useGeste, useLignes, type Saisies,
 } from './commun'
 
 const Temps = ['Choisir', 'Conséquences', 'Confirmer'] as const
@@ -21,13 +22,14 @@ export function FormeOperation({ d }: { d: DescripteurEcranVue }) {
 }
 
 function OperationSurLaListe({ d }: { d: DescripteurEcranVue }) {
-  const { vue, lignes } = useLignes(d)
+  const { vue, lignes, relire } = useLignes(d)
   const [temps, poserTemps] = useState(0)
   const [texte, poserTexte] = useState('')
   const [criteres, poserCriteres] = useState<Saisies>({})
   const [cochees, poserCochees] = useState<ReadonlySet<number>>(() => new Set())
   const [saisies, poserSaisies] = useState<Saisies>({})
   const [annonce, annoncer] = useAnnonce()
+  const jouer = useGeste(d, vue, annoncer)
 
   const cherche = normaliser(texte.trim())
   const visibles = lignes.filter((l) => passeCriteres(l, criteres) && (cherche === '' || normaliser(texteLigne(l)).includes(cherche)))
@@ -47,7 +49,10 @@ function OperationSurLaListe({ d }: { d: DescripteurEcranVue }) {
       annoncer(`Contrôle de la fiche RIG v2 : « ${manque.join(' », « ')} » ${manque.length > 1 ? 'sont obligatoires' : 'est obligatoire'}. ${DEMONSTRATION}.`)
       return
     }
-    annoncer(refus(p.valider, `sur ${choisies.length} objet${choisies.length > 1 ? 's' : ''} : rien n’est modifié dans la base`))
+    const remplies = Object.fromEntries(Object.entries(saisies).filter(([, v]) => v.trim() !== ''))
+    void jouer({ type: 'Confirmer', nom: p.valider, groupe: choisies[0]?.groupe ?? p.titre, ids: choisies.map((l) => l.id), valeurs: remplies },
+      refus(p.valider, `sur ${choisies.length} objet${choisies.length > 1 ? 's' : ''} : rien n’est modifié dans la base`),
+      () => { poserCochees(new Set()); poserSaisies({}); poserTemps(0); relire() })
   }
   const remplis = p.sections.flatMap((s) => s.champs.map((c) => ({ c, v: saisies[cleChamp(s.titre, c.libelle)] ?? '' })))
     .filter(({ v }) => v.trim() !== '')
@@ -121,13 +126,14 @@ const TempsUnObjet = ['Lancement', 'Résultat'] as const
 // qu'une reponse existe (ETP_ENTETE.cs:36-37). Controle final du lot 1 (25/11/2026) : la liasse se cochait dans une liste,
 // et le resultat et l'avis s'affichaient avant le lancement.
 function OperationSurUnObjet({ d }: { d: DescripteurEcranVue }) {
-  const { vue, lignes } = useLignes(d)
+  const { vue, lignes, relire } = useLignes(d)
   const resultat = d.resultat ?? []
   const critere = d.criteres[0] ?? 'Numéro'
   const [numero, poserNumero] = useState('')
   const [temps, poserTemps] = useState(0)
   const [aConfirmer, poserAConfirmer] = useState(false)
   const [annonce, annoncer] = useAnnonce()
+  const jouer = useGeste(d, vue, annoncer)
 
   const trouver = (texte: string) => {
     const cherche = normaliser(texte.trim())
@@ -147,7 +153,8 @@ function OperationSurUnObjet({ d }: { d: DescripteurEcranVue }) {
   }
   const lancer = () => {
     poserAConfirmer(false)
-    if (objet) annoncer(refus(d.valider, `sur « ${objet.nom} » : rien n’est modifié dans la base`))
+    if (objet) void jouer({ type: 'Confirmer', nom: d.valider, groupe: objet.groupe, ids: [objet.id], valeurs: {} },
+      refus(d.valider, `sur « ${objet.nom} » : rien n’est modifié dans la base`), relire)
   }
 
   return (

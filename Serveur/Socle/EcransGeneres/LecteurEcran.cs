@@ -41,6 +41,20 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 // La route (ModuleEcransGeneres) exige un agent admis dans le greffe, comme la lecture des compteurs
 // (RoutesCompteur.Compteurs) : le menu filtre deja les ecrans par profil (Metier/PerimetreProfil.cs). Un
 // droit par procedure (fonction V2) n'est pas encore exige : a decider avec le referent Socle.
+//
+// CHERCHER ET OUVRIR UNE FICHE (plan « RIG v3 100 % fonctionnel », lot 2, 26/11/2026) -- deux capacites de plus, sur la
+// MEME classe que le lecteur (un fichier par procedure, toujours) :
+//   7. IRechercheEcran : ChercherAsync applique DANS LA BASE le texte du champ de recherche et les criteres remplis
+//      (RechercheEcran : libelles du descripteur, au mot pres, declares dans Criteres). Les filtres de la liste de
+//      LireAsync restent ; la recherche s'y AJOUTE. Chaque critere cite sa source V2 (la recherche de l'ancien RIG). Un
+//      texte se cherche en LIKE parametre (FormeLigne.Contient, jamais concatene) ; sans recherche, la route appelle
+//      LireAsync ;
+//   8. IFicheEcran : LireFicheAsync lit UN objet, par l'Id que ses lignes portent (LigneLue.Id : posez-le), et rend ses
+//      sections aux titres et libelles du DESCRIPTEUR (format des valeurs : Contrats/EcransGeneres/FicheEcran.cs). Un
+//      champ que l'ecrivain sait enregistrer est Modifiable. Un objet que RIG v2 tient verrouille s'ouvre LectureSeule,
+//      avec le message de RIG v2 (VerrouDemandeV2.cs) ;
+//   9. le banc verifie que les criteres declares et les sections et champs rendus existent dans le descripteur, et que
+//      chaque ligne d'un jeu qui porte un Id ouvre sa fiche. Les gestes : EcrivainEcran.cs.
 // ============================================================
 
 /// <summary>Le lecteur des lignes d'UNE procedure (un fichier par procedure, trouve par reflexion).</summary>
@@ -52,6 +66,24 @@ public interface ILecteurEcran
     /// <summary>Les lignes de la base V3 du greffe <paramref name="baseGreffe"/>, au plus <paramref name="plafond"/>.</summary>
     /// <param name="aujourdhui">La date du jour (le GETDATE() de la V2) : fixee par un banc, maintenant sinon.</param>
     Task<LignesLues> LireAsync(SqlConnection baseGreffe, DateTime aujourdhui, int plafond, CancellationToken ct);
+}
+
+/// <summary>Un lecteur qui CHERCHE dans la base (point 7 du mode d'emploi) : la meme classe que son lecteur.</summary>
+public interface IRechercheEcran : ILecteurEcran
+{
+    /// <summary>Les criteres du descripteur que la base sait chercher, au libelle pres ; le texte se cherche toujours.</summary>
+    IReadOnlyCollection<string> Criteres { get; }
+
+    /// <summary>Les lignes de <see cref="ILecteurEcran.LireAsync"/> qui repondent EN PLUS a <paramref name="recherche"/>.</summary>
+    Task<LignesLues> ChercherAsync(SqlConnection baseGreffe, RechercheEcran recherche, DateTime aujourdhui, int plafond, CancellationToken ct);
+}
+
+/// <summary>Un lecteur qui OUVRE une fiche (point 8 du mode d'emploi) : la meme classe que son lecteur.</summary>
+public interface IFicheEcran : ILecteurEcran
+{
+    /// <summary>La fiche de l'objet <paramref name="id"/> (<see cref="LigneLue.Id"/>) ; null si rien ne le porte.</summary>
+    /// <param name="maintenant">L'instant du jour (une audience passee ou future) : fixe par un banc, maintenant sinon.</param>
+    Task<FicheEcran?> LireFicheAsync(SqlConnection baseGreffe, string id, DateTime maintenant, CancellationToken ct);
 }
 
 /// <summary>Ce qu'un lecteur rend : ses lignes (plafonnees) et le nombre de lignes de la base qui repondent.</summary>
@@ -117,6 +149,17 @@ public static partial class FormeLigne
 
     /// <summary>La date d'une colonne (null si NULL).</summary>
     public static DateTime? DateDe(SqlDataReader r, string colonne) => r[colonne] is DateTime d ? d : null;
+
+    /// <summary>Une date au format d'un champ date de l'ecran et d'une fiche (« 2026-03-31 ») ; vide sans date.</summary>
+    public static string DateFiche(DateTime? d) => d is { } v ? v.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "";
+
+    /// <summary>Une case de fiche : « oui » cochee, « » sinon (le format de l'ecran).</summary>
+    public static string Case(bool? coche) => coche == true ? "oui" : "";
+
+    /// <summary>Un motif LIKE qui cherche <paramref name="texte"/> tel quel : ses caracteres speciaux (%, _, [) echappes.</summary>
+    public static string Contient(string texte)
+        => "%" + texte.Trim().Replace("[", "[[]", StringComparison.Ordinal).Replace("%", "[%]", StringComparison.Ordinal)
+                          .Replace("_", "[_]", StringComparison.Ordinal) + "%";
 
     [GeneratedRegex(@"^(\d{4})([A-Z])(\d{5})$")]
     private static partial Regex FormeGestion();

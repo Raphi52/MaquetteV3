@@ -1,0 +1,12 @@
+# « Instance judiciaire » (PROC_MJUD) : les instances des types de role de MJUD, par numero de role decroissant
+# (FormRechercheInstance.cs:633). Ecartee : 1200004, prevention (JRPR, le mode MODIPR) -- jumeau retenu : 1200001, JRCT.
+# Etats : verrouillee (EnAttente) quand une AUTRE demande tient l'instance sur le sequenceur 2J, en cours ou en W/I/N
+# (1200002 en cours ; 1200008 en reclamation N) -- jumeaux libres : 1200005 (W, mais sequenceur 2PC), 1200006 (X, pas en
+# cours) ; modifiee (Validee) apres une demande MJUD validee (1200003) ; a modifier (AFaire) sinon.
+GAMMA BANC c/ DELTA BANC | Rôle 2026R12002 · Nature du banc · enrôlée le 15/01/2026 · bloquée par la demande 26012000002 | En référé | EnAttente | []
+THETA BANC | Rôle 2026J12008 · Nature du banc · enrôlée le 15/01/2026 · bloquée par la demande 26012000008 | Au fond | EnAttente | []
+ZETA BANC | Rôle 2026J12006 · Nature du banc · enrôlée le 15/01/2026 | Au fond | AFaire | []
+ETA BANC | Rôle 2026J12005 · Nature du banc · enrôlée le 15/01/2026 | Au fond | AFaire | []
+EPSILON BANC | Rôle 2026J12003 · Nature du banc · enrôlée le 15/01/2026 | Au fond | Validee | []
+ALPHA BANC c/ BETA BANC | Rôle 2026J12001 · Nature du banc · enrôlée le 15/01/2026 | Au fond | AFaire | []
+IOTA BANC c/ KAPPA BANC | Rôle 2026I12007 · Nature du banc · enrôlée le 10/02/2026 | Au fond | AFaire | []

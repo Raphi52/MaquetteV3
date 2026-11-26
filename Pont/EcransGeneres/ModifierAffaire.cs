@@ -35,6 +35,13 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Groupes = ["Au fond", "En référé"],
             Sections =
             [
+                // L'etape « Instance » de MJUD (OPE_INSTANCE, PROC_MJUD.Designer.cs:235-242), ses champs aux titres V2
+                // (OPE_INSTANCE.Designer.cs:149-461). Lue et enregistree dans la base (plan « RIG v3 100 % fonctionnel », lot 2) :
+                // ce qui se modifie et ses controles, Serveur/Socle/EcransGeneres/EcrivainInstanceJudiciaire.cs.
+                Marche("Instance", "Code affaire, nature et acte de saisine ne se modifient pas (zones grisées en modification) ; la saisine du tribunal et la date de l'acte ne dépassent pas l'enrôlement.", false,
+                    Champ.Texte("Numéro de rôle"), Champ.Texte("Nom courant"), Champ.Texte("Code affaire"), Champ.Texte("Nature affaire"),
+                    Champ.Texte("Acte de saisine"), Champ.Date("Date de l'acte"), Champ.Date("Saisine tribunal"), Champ.Date("Enrôlement"),
+                    Champ.Texte("Délivrance de l'acte de saisine"), Champ.Case("IP Européenne"), Champ.Zone("Note sur l'affaire")),
                 Marche("Parties", "Demandeurs, défendeurs et intervenants, chacun dans sa liste.", false,
                     Champ.Tableau("Demandeurs"), Champ.Tableau("Défendeurs"), Champ.Tableau("Intervenants")),
                 Marche("Appels d'affaire", "Dernier appel passé, prochain appel et liste complète.", false,

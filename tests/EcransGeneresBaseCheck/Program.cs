@@ -42,6 +42,30 @@ using RigV3Desktop.Pont.EcransGeneres;
 //     ignorees : y dire pourquoi chaque refus est refuse. Chaque refus a son jumeau accepte (meme borne, autre cote).
 // Puis la section 4 controle tout lecteur contre son descripteur.
 //
+// LE SOCLE FONCTIONNEL (plan « RIG v3 100 % fonctionnel », lot 2, 26/11/2026) : la recherche, la fiche et les GESTES. Le
+// banc trouve aussi les ECRIVAINS (EcrivainEcran.cs) et les joue par la route POST, au nom de l'agent du banc :
+//   5. le socle : la garde d'ecriture (v2.* et rec.* seulement), la route des gestes (401, 404, sans ecrivain =
+//      Demonstration), le pont (geste, fiche, recherche, ecran reuni) ;
+//   6. pour BRANCHER LES GESTES D'UN ECRAN, a cote de ses jeux de lecture, deux fichiers neufs (aucune ligne d'ici) :
+//      - <PROCEDURE>.gestes (obligatoire pour tout ecrivain) : des BLOCS separes par une ligne « --- », joues dans l'ordre,
+//        APRES tous les .sql et .attendu. Dans un bloc (# et lignes vides ignores) :
+//          geste: <TypeGeste> [<nom du geste>]      Enregistrer, Creer, Ajouter, Modifier, Supprimer, Agir Relancer...
+//          ids: <id>,<id>                           les LigneLue.Id vises (vide pour Creer / Ajouter)
+//          valeur: <cle> = <valeur>                 une par valeur saisie ; cle « Section › Libelle » ou colonne
+//          resultat: fait | refuse | sans-ecrivain
+//          message: <texte exact>                   ce que l'ecran affichera (le message de RIG v2 pour un refus)
+//          lignes:                                  facultatif (fait) : puis TOUTES les lignes relues, format .attendu
+//          fiche: <id>                              facultatif : puis des « Section › Libelle = valeur » que la fiche relue porte
+//          controle: <SELECT d'une valeur> => <attendu>   facultatif : ce que RIG v2 ecrit en plus (dates, etats...)
+//        Un refus est verifie SANS ECRITURE : lignes relues identiques, journal des gestes inchange. Un geste fait ajoute au
+//        moins une ligne au journal des gestes. Chaque refus a son jumeau accepte, dit en commentaire ;
+//      - <PROCEDURE>.recherches (pour un lecteur qui cherche, IRechercheEcran) : des blocs « texte: », « critere: <Libelle> =
+//        <valeur> » (repetable), puis « lignes: » et les lignes attendues, format .attendu (aucune : la recherche ne rend rien).
+//        Jouees apres les .attendu, avant les .gestes ;
+//   7. section 4 : tout ecrivain a un descripteur, un jeu .gestes, et des types de geste de sa forme ; tout lecteur qui
+//      cherche declare des criteres du descripteur ; toute fiche lue (les trois premieres lignes qui portent un Id) a des
+//      sections et des champs du descripteur, et n'a de champ modifiable que si la procedure a un ecrivain Enregistrer.
+//
 // Il lui faut le SQL Server de developpement : « docker compose up -d » a la racine du depot.
 
 var racine = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
@@ -408,6 +432,149 @@ Exiger(baseRof.Mode == "base" && baseRof.Exemples.Length == 0
     $"pont, ecran reuni « {reuniRof.Titre} » (tous ses membres branches) : mode base, aucun exemple, les 10 radiations " +
     $"d'office de la base dans leur groupe (mode {baseRof.Mode}, exemples : {string.Join(", ", baseRof.Exemples)})");
 
+// ============================================================ 3c. LE SOCLE FONCTIONNEL : RECHERCHES, GESTES (en-tete, 5 et 6)
+
+// La garde d'ecriture : seules v2.* et rec.* de la base du greffe (chaque refus a son jumeau accepte).
+bool Ecrit(string sql) { try { GesteEnCours.ExigerEcritureV2(sql); return true; } catch (InvalidOperationException) { return false; } }
+Exiger(Ecrit("UPDATE v2.INSTANCE SET INSTN_NOTE_AUDIENCE = @n WHERE INSTN_ID_INSTN = @id") && !Ecrit("UPDATE soc.Compte SET Nom = @n WHERE Id = @id")
+       && Ecrit("INSERT INTO rec.DossierRcs (Id) VALUES (@id)") && !Ecrit("DELETE FROM dbo.INSTANCE WHERE INSTN_ID_INSTN = @id")
+       && Ecrit("MERGE INTO v2.PARTIE AS p USING (SELECT 1 AS x) AS s ON 1 = 0 WHEN MATCHED THEN UPDATE SET PRT_NOM = @n;")
+       && !Ecrit("DROP TABLE v2.INSTANCE") && !Ecrit("SELECT 1"),
+    "socle : un ecrivain n'ecrit que v2.* et rec.* (UPDATE v2 / rec accepte, soc et dbo refuses, MERGE v2 accepte, DROP et SELECT refuses)");
+
+var ecrivains = EcrivainsEcrans.Decouvrir(typeof(ServeurRig).Assembly);
+Exiger(ecrivains.ParProcedure.ContainsKey("PROC_MJUD"),
+    $"les ecrivains sont trouves par reflexion, sans liste : {string.Join(", ", ecrivains.ParProcedure.Keys.Order())}");
+
+// La route des gestes : sans session 401, greffe absent 404, procedure sans ecrivain = Demonstration (rien d'ecrit).
+var gesteVide = new GesteEcran(TypeGeste.Agir, ["1"], new Dictionary<string, string>()) { Nom = "Relancer" };
+var gesteAnonyme = await anonyme.PostAsJsonAsync(RoutesEcransGeneres.GestesPour(Greffe, "PROC_MJUD"), gesteVide, json);
+var gesteAbsent = await http.PostAsJsonAsync(RoutesEcransGeneres.GestesPour(GreffeAbsent, "PROC_MJUD"), gesteVide, json);
+var sansEcrivain = await (await http.PostAsJsonAsync(RoutesEcransGeneres.GestesPour(Greffe, "PROC_SANS_ECRIVAIN"), gesteVide, json))
+    .Content.ReadFromJsonAsync<ResultatGeste>(json);
+var typeAbsent = await (await http.PostAsJsonAsync(RoutesEcransGeneres.GestesPour(Greffe, "PROC_MJUD"), gesteVide, json))
+    .Content.ReadFromJsonAsync<ResultatGeste>(json);
+Exiger(gesteAnonyme.StatusCode == HttpStatusCode.Unauthorized && gesteAbsent.StatusCode == HttpStatusCode.NotFound
+       && sansEcrivain is { Fait: false, SansEcrivain: true } && typeAbsent is { Fait: false, SansEcrivain: true },
+    $"route des gestes : sans session 401 ({(int)gesteAnonyme.StatusCode}), greffe absent 404 ({(int)gesteAbsent.StatusCode}), " +
+    $"sans ecrivain ou geste non ecrit = Demonstration ({sansEcrivain?.Message} / {typeAbsent?.Message})");
+
+var dossierJeux = Path.Combine(racine, "tests", "EcransGeneresBaseCheck", "Jeux");
+async Task<string> Valeur(string sql)
+{
+    await using var cn = new SqlConnection(greffe.Connexion);
+    await cn.OpenAsync();
+    await using var cmd = new SqlCommand(sql, cn);
+    return Convert.ToString(await cmd.ExecuteScalarAsync(), System.Globalization.CultureInfo.InvariantCulture) ?? "";
+}
+
+// Les RECHERCHES (<PROCEDURE>.recherches), avant les gestes.
+foreach (var fichier in Directory.GetFiles(dossierJeux, "*.recherches").Order(StringComparer.Ordinal))
+{
+    var code = Path.GetFileNameWithoutExtension(fichier);
+    if (lecteurs.ParProcedure.GetValueOrDefault(code) is not IRechercheEcran chercheur)
+    {
+        Exiger(false, $"jeu {code}.recherches : aucun lecteur qui cherche (IRechercheEcran) pour cette procedure");
+        continue;
+    }
+    var rang = 0;
+    foreach (var bloc in Blocs.Lire(File.ReadAllLines(fichier)))
+    {
+        rang++;
+        var recherche = new RechercheEcran(bloc.Texte, bloc.Criteres);
+        await using var cn = new SqlConnection(greffe.Connexion);
+        await cn.OpenAsync();
+        var lues = await chercheur.ChercherAsync(cn, recherche, jour, 200, CancellationToken.None);
+        Comparer(lues.Lignes, [.. bloc.Lignes ?? []], $"{code}.recherches bloc {rang} (texte « {bloc.Texte} », criteres {string.Join(", ", bloc.Criteres.Select(c => $"{c.Key} = {c.Value}"))})");
+        Exiger(lues.Total == (bloc.Lignes?.Count ?? 0), $"{code}.recherches bloc {rang} : total = {bloc.Lignes?.Count ?? 0} ({lues.Total})");
+    }
+    // La meme recherche par la route : Cherchee, Chercheur ; sans recherche : Chercheur seul.
+    var premier = Blocs.Lire(File.ReadAllLines(fichier)).First();
+    var parRouteCherchee = await http.GetFromJsonAsync<LignesEcran>(RoutesEcransGeneres.Pour(Greffe, code, new RechercheEcran(premier.Texte, premier.Criteres)), json);
+    var parRouteSans = await http.GetFromJsonAsync<LignesEcran>(RoutesEcransGeneres.Pour(Greffe, code), json);
+    Exiger(parRouteCherchee is { Cherchee: true, Chercheur: true } && parRouteCherchee.Lignes.Select(Texte).SequenceEqual(premier.Lignes ?? [])
+           && parRouteSans is { Cherchee: false, Chercheur: true },
+        $"{code} : la recherche passe par la route (texte et criteres en parametres d'adresse), Cherchee ; sans recherche, la liste de travail");
+}
+
+// Les GESTES (<PROCEDURE>.gestes), joues par la route POST, dans l'ordre.
+foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(StringComparer.Ordinal))
+{
+    var code = Path.GetFileNameWithoutExtension(fichier);
+    if (!ecrivains.ParProcedure.ContainsKey(code)) { Exiger(false, $"jeu {code}.gestes : aucun ecrivain pour cette procedure"); continue; }
+    var rang = 0;
+    foreach (var bloc in Blocs.Lire(File.ReadAllLines(fichier)))
+    {
+        rang++;
+        var quoi = $"{code}.gestes bloc {rang} ({bloc.Geste?.Type} {string.Join(",", bloc.Geste?.Ids ?? [])})";
+        if (bloc.Geste is null || bloc.Resultat is null) { Exiger(false, $"{quoi} : « geste: » et « resultat: » sont obligatoires"); continue; }
+        var avant = (await Lire(code)).Lignes.Select(Texte).ToArray();
+        var journalAvant = await Valeur("SELECT COUNT(*) FROM soc.Journal");
+        var reponse = await http.PostAsJsonAsync(RoutesEcransGeneres.GestesPour(Greffe, code), bloc.Geste, json);
+        var r = await reponse.Content.ReadFromJsonAsync<ResultatGeste>(json);
+        var obtenu = r is null ? "illisible" : r.SansEcrivain ? "sans-ecrivain" : r.Fait ? "fait" : "refuse";
+        var statut = obtenu == "refuse" ? HttpStatusCode.UnprocessableEntity : HttpStatusCode.OK;
+        Exiger(obtenu == bloc.Resultat && reponse.StatusCode == statut && (bloc.Message is null || r?.Message == bloc.Message),
+            $"{quoi} : {bloc.Resultat} « {bloc.Message} » (obtenu {obtenu} {(int)reponse.StatusCode} « {r?.Message} »)");
+        var apres = (await Lire(code)).Lignes;
+        var journalApres = await Valeur("SELECT COUNT(*) FROM soc.Journal");
+        if (bloc.Resultat == "fait")
+        {
+            Exiger(int.Parse(journalApres) > int.Parse(journalAvant), $"{quoi} : trace au journal des gestes ({journalAvant} -> {journalApres})");
+            if (bloc.Lignes is not null) Comparer(apres, [.. bloc.Lignes], $"{quoi} : les lignes relues dans la base apres le geste");
+        }
+        else
+            Exiger(journalApres == journalAvant && apres.Select(Texte).SequenceEqual(avant),
+                $"{quoi} : refuse, RIEN d'ecrit (lignes relues identiques, journal des gestes inchange : {journalAvant} -> {journalApres})");
+        if (bloc.Fiche is { } ficheId)
+        {
+            await using var cn = new SqlConnection(greffe.Connexion);
+            await cn.OpenAsync();
+            var fiche = lecteurs.ParProcedure.GetValueOrDefault(code) is IFicheEcran f ? await f.LireFicheAsync(cn, ficheId, DateTime.Now, CancellationToken.None) : null;
+            foreach (var (cle, attendue) in bloc.ValeursFiche)
+            {
+                var lue = fiche?.Sections.SelectMany(s => s.Champs.Select(c => (Cle: GesteEcran.Cle(s.Titre, c.Libelle), c.Valeur)))
+                    .FirstOrDefault(c => c.Cle == cle).Valeur;
+                Exiger(lue == attendue, $"{quoi} : la fiche {ficheId} relue porte « {cle} » = « {attendue} » (lue : « {lue ?? "absent"} »)");
+            }
+        }
+        foreach (var (sql, attendue) in bloc.Controles)
+        {
+            var lue = await Valeur(sql);
+            Exiger(lue == attendue, $"{quoi} : controle « {sql} » = {attendue} (lu : {lue})");
+        }
+    }
+}
+
+// Le PONT (Pont/EcranGenere.cs) : un geste sans serveur est une demonstration ; sur une ligne de l'ecran reuni
+// « Corriger une affaire judiciaire », la fiche, la recherche et un refus de RIG v2 passent par lui.
+var corriger = CatalogueGenere.Tous.First(d => d.Membres.Any(m => m.Code == "PROC_MJUD"));
+var titreMjud = CatalogueGenere.Descripteur("PROC_MJUD")!.Titre;
+var gesteDemo = await EcranGenere.GesteAsync(null, null, corriger.Code, titreMjud,
+    new GesteEcran(TypeGeste.Enregistrer, ["1200001"], new Dictionary<string, string> { ["Instance › Saisine tribunal"] = "2026-01-14" }));
+var gesteExemple = await EcranGenere.GesteAsync(client, Greffe, corriger.Code, titreMjud,
+    new GesteEcran(TypeGeste.Enregistrer, [""], new Dictionary<string, string>()));
+var gesteVerrou = await EcranGenere.GesteAsync(client, Greffe, corriger.Code, titreMjud,
+    new GesteEcran(TypeGeste.Enregistrer, ["1200002"], new Dictionary<string, string> { ["Instance › Saisine tribunal"] = "2026-01-12" }));
+Exiger(gesteDemo is { Fait: false, SansEcrivain: true } && gesteDemo.Message.StartsWith(EcranGenere.Demonstration, StringComparison.Ordinal)
+       && gesteExemple is { Fait: false, SansEcrivain: true }
+       && gesteVerrou is { Fait: false, SansEcrivain: false } && gesteVerrou.Message.StartsWith("Instance bloquée (26012000002)", StringComparison.Ordinal),
+    $"pont, gestes : sans serveur « {gesteDemo.Message} » ; ligne d'exemple « {gesteExemple.Message} » ; instance verrouillee : « {gesteVerrou.Message} »");
+var ficheParPont = await EcranGenere.FicheAsync(client, Greffe, corriger.Code, titreMjud, "1200001");
+var ficheVerrouParPont = await EcranGenere.FicheAsync(client, Greffe, corriger.Code, titreMjud, "1200002");
+var ficheExemple = await EcranGenere.FicheAsync(client, Greffe, corriger.Code, CatalogueGenere.Descripteur("PROC_MPC")!.Titre, "1");
+Exiger(ficheParPont is { Mode: "base", Fiche: { LectureSeule: false } } && ficheParPont.Fiche.Nom == "ALPHA BANC c/ BETA BANC"
+       && ficheVerrouParPont.Fiche is { LectureSeule: true, Motif: { } motif } && motif.StartsWith("Instance bloquée", StringComparison.Ordinal)
+       && ficheExemple.Mode == "exemple",
+    $"pont, fiches : une instance lue dans la base ({ficheParPont.Mode}), une verrouillee en lecture seule avec le message de RIG v2 " +
+    $"({ficheVerrouParPont.Fiche?.Motif}), une procedure sans lecteur de fiche en exemple ({ficheExemple.Message})");
+var chercheeParPont = await EcranGenere.LignesAsync(client, Greffe, corriger.Code, new RechercheEcran("12003", new Dictionary<string, string>()));
+Exiger(chercheeParPont.Recherche && chercheeParPont.Cherchees.SequenceEqual([titreMjud])
+       && chercheeParPont.Lignes.Where(l => l.Groupe == titreMjud).Select(l => l.Nom).SequenceEqual(["EPSILON BANC"])
+       && chercheeParPont.Lignes.Where(l => l.Groupe == titreMjud).All(l => l.Id is not null),
+    $"pont, ecran reuni « {corriger.Titre} » : la recherche part dans la base pour « {titreMjud} » seul (Cherchees : " +
+    $"{string.Join(", ", chercheeParPont.Cherchees)}), ses lignes portent leur Id");
+
 // ============================================================ 4. TOUT LECTEUR CONTRE LE DESCRIPTEUR DE SA PROCEDURE
 
 foreach (var (code, lecteur) in lecteurs.ParProcedure.OrderBy(p => p.Key, StringComparer.Ordinal))
@@ -440,12 +607,139 @@ foreach (var (code, lecteur) in lecteurs.ParProcedure.OrderBy(p => p.Key, String
         $"AFaire / EnCours / Validee ({lues.Lignes.Count} lignes{(fautes.Count > 0 ? " ; fautives : " + string.Join(" // ", fautes) : "")})");
     var couverts = lues.Lignes.Select(l => l.Etat).Distinct().Order().ToArray();
     Console.WriteLine($"NOTE : {code} : etats couverts par le banc : {string.Join(", ", couverts)}");
+
+    // Le socle fonctionnel (en-tete, 7) : les criteres cherches sont ceux du descripteur ; une fiche lue a ses sections
+    // et ses champs, et n'a de champ modifiable que si un ecrivain l'enregistre.
+    if (lecteur is IRechercheEcran chercheur)
+        Exiger(chercheur.Criteres.All(d.Criteres.Contains),
+            $"{code} : les criteres cherches dans la base ({string.Join(", ", chercheur.Criteres)}) sont ceux du descripteur ({string.Join(", ", d.Criteres)})");
+    if (lecteur is IFicheEcran fiches)
+    {
+        var avecId = lues.Lignes.Where(l => l.Id is not null).Take(3).ToList();
+        Exiger(avecId.Count > 0, $"{code} : lit des fiches, et ses lignes du banc portent leur Id ({avecId.Count})");
+        var enregistre = ecrivains.ParProcedure.GetValueOrDefault(code)?.Gestes.Contains(TypeGeste.Enregistrer) == true;
+        foreach (var l in avecId)
+        {
+            await using var cn = new SqlConnection(greffe.Connexion);
+            await cn.OpenAsync();
+            var f = await fiches.LireFicheAsync(cn, l.Id!, DateTime.Now, CancellationToken.None);
+            var horsDescripteur = f?.Sections.SelectMany(s => d.Sections.FirstOrDefault(x => x.Titre == s.Titre) is { } section
+                    ? s.Champs.Where(c => section.Champs.FirstOrDefault(x => x.Libelle == c.Libelle) is not { } champ
+                                          || (champ.Type == TypeChamp.Tableau) != (c.Colonnes.Length > 0)
+                                          || (c.Modifiable && (!enregistre || champ.Type == TypeChamp.Tableau)))
+                               .Select(c => $"{s.Titre} › {c.Libelle}")
+                    : [$"section « {s.Titre} »"]).ToList();
+            Exiger(f is not null && horsDescripteur!.Count == 0,
+                $"{code} : la fiche {l.Id} ({l.Nom}) a les sections et champs du descripteur, ses sous-listes en colonnes, et un " +
+                $"champ modifiable seulement s'il s'enregistre{(horsDescripteur is { Count: > 0 } ? " ; fautifs : " + string.Join(", ", horsDescripteur) : "")}");
+        }
+    }
+}
+
+// Tout ECRIVAIN : un descripteur d'une procedure, un jeu .gestes, et des gestes de sa forme (en-tete, 7).
+var GestesDeLaForme = new Dictionary<FormeEcran, TypeGeste[]>
+{
+    [FormeEcran.Fiche] = [TypeGeste.Enregistrer], [FormeEcran.Saisie] = [TypeGeste.Creer],
+    [FormeEcran.Referentiel] = [TypeGeste.Ajouter, TypeGeste.Modifier, TypeGeste.Supprimer], [FormeEcran.File] = [TypeGeste.Agir],
+    [FormeEcran.Consultation] = [TypeGeste.Agir], [FormeEcran.Etat] = [TypeGeste.Agir], [FormeEcran.Document] = [TypeGeste.Agir],
+    [FormeEcran.Operation] = [TypeGeste.Confirmer], [FormeEcran.Audience] = [TypeGeste.Decider],
+};
+foreach (var (code, ecrivain) in ecrivains.ParProcedure.OrderBy(p => p.Key, StringComparer.Ordinal))
+{
+    var d = CatalogueGenere.Descripteur(code);
+    Exiger(d is { Membres.Length: 0 } && ecrivain.Gestes.Count > 0 && ecrivain.Gestes.All(GestesDeLaForme[d.Forme].Contains),
+        $"{code} : son ecrivain ({ecrivain.GetType().Name}) ecrit une procedure qui a son descripteur, des gestes de sa forme " +
+        $"{d?.Forme} ({string.Join(", ", ecrivain.Gestes)})");
+    Exiger(File.Exists(Path.Combine(dossierJeux, code + ".gestes")),
+        $"{code} : son ecrivain a son jeu tests/EcransGeneresBaseCheck/Jeux/{code}.gestes (en-tete, 6)");
 }
 
 await app.StopAsync();
 Console.WriteLine();
 Console.WriteLine(echecs.Count == 0 ? "EcransGeneresBaseCheck : VERT" : $"EcransGeneresBaseCheck : ROUGE ({echecs.Count} echec(s))");
 return echecs.Count == 0 ? 0 : 1;
+
+/// <summary>Un bloc d'un jeu .gestes ou .recherches (format : en-tete, 6).</summary>
+sealed class Bloc
+{
+    public GesteEcran? Geste { get; set; }
+    public string? Resultat { get; set; }
+    public string? Message { get; set; }
+    public List<string>? Lignes { get; set; }
+    public string? Fiche { get; set; }
+    public List<(string Cle, string Valeur)> ValeursFiche { get; } = [];
+    public List<(string Sql, string Attendu)> Controles { get; } = [];
+    public string? Texte { get; set; }
+    public Dictionary<string, string> Criteres { get; } = new(StringComparer.Ordinal);
+}
+
+/// <summary>La lecture des jeux .gestes et .recherches : des blocs separes par « --- », des lignes « cle: valeur ».</summary>
+static class Blocs
+{
+    private static readonly string[] Cles = ["geste:", "ids:", "valeur:", "resultat:", "message:", "lignes:", "fiche:", "controle:", "texte:", "critere:"];
+
+    /// <summary>« cle = valeur » (le premier « = » precede d'un blanc ; une valeur vide est permise).</summary>
+    private static (string, string) Paire(string texte)
+    {
+        var i = texte.IndexOf(" =", StringComparison.Ordinal);
+        return i < 0 ? (texte.Trim(), "") : (texte[..i].Trim(), texte[(i + 2)..].Trim());
+    }
+
+    public static List<Bloc> Lire(string[] lignes)
+    {
+        var blocs = new List<Bloc>();
+        var b = new Bloc();
+        string? suite = null;   // « lignes » ou « fiche » : les lignes qui suivent leur appartiennent
+        TypeGeste type = default;
+        string? nom = null;
+        var ids = new List<string>();
+        var valeurs = new Dictionary<string, string>(StringComparer.Ordinal);
+        void Clore()
+        {
+            if (b.Resultat is not null) b.Geste = new GesteEcran(type, [.. ids], new Dictionary<string, string>(valeurs)) { Nom = nom };
+            if (b.Resultat is not null || b.Lignes is not null || b.Texte is not null || b.Criteres.Count > 0) blocs.Add(b);
+            b = new Bloc(); suite = null; nom = null; ids.Clear(); valeurs.Clear();
+        }
+        foreach (var brute in lignes)
+        {
+            var l = brute.Trim();
+            if (l.Length == 0 || l.StartsWith('#')) continue;
+            if (l == "---") { Clore(); continue; }
+            var cle = Cles.FirstOrDefault(c => l.StartsWith(c, StringComparison.Ordinal));
+            if (cle is null)
+            {
+                if (suite == "lignes") b.Lignes!.Add(l);
+                else if (suite == "fiche") b.ValeursFiche.Add(Paire(l));
+                else throw new InvalidOperationException($"Ligne hors bloc : « {l} »");
+                continue;
+            }
+            var v = l[cle.Length..].Trim();
+            suite = null;
+            switch (cle)
+            {
+                case "geste:":
+                    var mots = v.Split(' ', 2);
+                    type = Enum.Parse<TypeGeste>(mots[0]);
+                    nom = mots.Length > 1 ? mots[1] : null;
+                    break;
+                case "ids:": ids.AddRange(v.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)); break;
+                case "valeur:": var (k, x) = Paire(v); valeurs[k] = x; break;
+                case "resultat:": b.Resultat = v; break;
+                case "message:": b.Message = v; break;
+                case "lignes:": b.Lignes = []; suite = "lignes"; break;
+                case "fiche:": b.Fiche = v; suite = "fiche"; break;
+                case "controle:":
+                    var i = v.LastIndexOf(" => ", StringComparison.Ordinal);
+                    b.Controles.Add((v[..i].Trim(), v[(i + 4)..].Trim()));
+                    break;
+                case "texte:": b.Texte = v; break;
+                case "critere:": var (c, y) = Paire(v); b.Criteres[c] = y; break;
+            }
+        }
+        Clore();
+        return blocs;
+    }
+}
 
 /// <summary>Un serveur factice : la procedure <c>vide</c> est branchee et sans ligne, toute autre n'a pas de lecteur.</summary>
 sealed class RepondeurVide(string vide) : HttpMessageHandler

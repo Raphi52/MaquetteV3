@@ -1,18 +1,19 @@
 // FORME « AUDIENCE » : composition, preparation, convocations, retour d'audience, deliberes. On CHOISIT l'audience
 // (ses parametres de la fiche RIG v2 : la date, la chambre ou le cabinet), on voit les affaires au role, et on joue le
-// geste de la fiche (decision, renvoi, convocation...) sur les affaires cochees, ou sur une affaire par son menu. Les
-// gestes ne changent rien tant qu'aucun ecrivain n'existe : ils le disent.
+// geste de la fiche (decision, renvoi, convocation...) sur les affaires cochees, ou sur une affaire par son menu. Le geste
+// va a l'ecrivain de la procedure (type Decider, son nom, les parametres de l'audience) ; ecrit, le role est relu (plan
+// « RIG v3 100 % fonctionnel », lot 2). Sans ecrivain, il ne change rien et le dit.
 
 import { useState } from 'react'
 import { EnteteListe, ListeModerne, normaliser, PiedListe } from '../../composants/ListeModerne'
 import type { DescripteurEcranVue } from '../../plan/types'
 import {
   Annonce, ChampSaisie, Provenance, TableLignes, figee, gestesDe, refus, synthese, texteLigne,
-  useAnnonce, useLignes, type LigneTenue, type Saisies,
+  useAnnonce, useGesteEnLot, useLignes, type LigneTenue, type Saisies,
 } from './commun'
 
 export function FormeAudience({ d }: { d: DescripteurEcranVue }) {
-  const { vue, lignes } = useLignes(d)
+  const { vue, lignes, relire } = useLignes(d)
   const [audience, poserAudience] = useState<Saisies>({})
   const [texte, poserTexte] = useState('')
   const [cochees, poserCochees] = useState<ReadonlySet<number>>(() => new Set())
@@ -22,8 +23,10 @@ export function FormeAudience({ d }: { d: DescripteurEcranVue }) {
   const visibles = lignes.filter((l) => cherche === '' || normaliser(texteLigne(l)).includes(cherche))
   const choisies = lignes.filter((l) => cochees.has(l.i))
   const choix = d.parametres.map((p) => audience[p.libelle] ?? '').filter((v) => v.trim() !== '')
-  const jouer = (geste: string, visees: LigneTenue[]) =>
-    annoncer(refus(geste, `sur ${visees.length} affaire${visees.length > 1 ? 's' : ''} : le rôle n’est pas modifié`))
+  const enLot = useGesteEnLot(d, vue, annoncer)
+  const jouer = (geste: string, visees: LigneTenue[]) => void enLot('Decider', geste, visees, audience,
+    (n) => refus(geste, `sur ${n} affaire${n > 1 ? 's' : ''} : le rôle n’est pas modifié`),
+    () => { poserCochees(new Set()); relire() })
   const basculer = (i: number) => poserCochees((avant) => {
     const apres = new Set(avant)
     if (!apres.delete(i)) apres.add(i)

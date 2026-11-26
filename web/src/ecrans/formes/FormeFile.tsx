@@ -9,11 +9,13 @@ import { CartesChiffrees, EnteteListe, ListeModerne, normaliser, PiedListe, type
 import type { DescripteurEcranVue } from '../../plan/types'
 import {
   Annonce, Provenance, TableLignes, enExemple, figee, gestesDe, parcoursDe, refus, synthese, teinteEtat,
-  texteLigne, useAnnonce, useLignes, type LigneTenue,
+  texteLigne, useAnnonce, useGesteEnLot, useLignes, type LigneTenue,
 } from './commun'
 
+// Les gestes en lot vont a l'ecrivain de la procedure (type Agir, son nom), un envoi par procedure : ecrits, la file est
+// relue et les cases decochees (plan « RIG v3 100 % fonctionnel », lot 2) ; sinon « Demonstration ».
 export function FormeFile({ d }: { d: DescripteurEcranVue }) {
-  const { vue, lignes } = useLignes(d)
+  const { vue, lignes, relire } = useLignes(d)
   const [texte, poserTexte] = useState('')
   const [etatChoisi, poserEtatChoisi] = useState<string | null>(null)
   const [cochees, poserCochees] = useState<ReadonlySet<number>>(() => new Set())
@@ -39,8 +41,10 @@ export function FormeFile({ d }: { d: DescripteurEcranVue }) {
   const gestes = [...new Set(procedures.flatMap(gestesDe))]
   const choisies = lignes.filter((l) => cochees.has(l.i))
   const portee = (geste: string) => choisies.filter((l) => gestesDe(parcoursDe(d, l.groupe)).includes(geste))
-  const jouer = (geste: string, visees: LigneTenue[]) =>
-    annoncer(refus(geste, `sur ${visees.length} ligne${visees.length > 1 ? 's' : ''} : aucune n’est modifiée dans la base`))
+  const enLot = useGesteEnLot(d, vue, annoncer)
+  const jouer = (geste: string, visees: LigneTenue[]) => void enLot('Agir', geste, visees, {},
+    (n) => refus(geste, `sur ${n} ligne${n > 1 ? 's' : ''} : aucune n’est modifiée dans la base`),
+    () => { poserCochees(new Set()); relire() })
   const basculer = (i: number) => poserCochees((avant) => {
     const apres = new Set(avant)
     if (!apres.delete(i)) apres.add(i)

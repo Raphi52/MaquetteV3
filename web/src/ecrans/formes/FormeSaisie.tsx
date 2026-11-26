@@ -2,21 +2,24 @@
 // d'etapes y est legitime -- la fiche RIG v2 cree en plusieurs ecrans --, mais chaque etape porte de VRAIS champs
 // (texte, date, liste, case), pas des puces, et on la parcourt librement par la frise. Creer controle les etapes
 // obligatoires de la fiche. Sous le formulaire, les saisies du greffe (les lignes) en liste moderne.
+// Creer va a l'ecrivain de la procedure (type Creer, les champs remplis) ; cree, la saisie se vide et la liste est relue
+// (plan « RIG v3 100 % fonctionnel », lot 2). Sans ecrivain ou sans serveur : « Demonstration », la saisie reste.
 
 import { useState } from 'react'
 import { EnteteListe, ListeModerne, PiedListe } from '../../composants/ListeModerne'
 import type { DescripteurEcranVue } from '../../plan/types'
 import {
   Annonce, DEMONSTRATION, Provenance, Sections, TableLignes, manquantes, partiesDe, refus, saisissable, sectionFaite,
-  useAnnonce, useLignes, type Saisies,
+  useAnnonce, useGeste, useLignes, type Saisies,
 } from './commun'
 
 export function FormeSaisie({ d }: { d: DescripteurEcranVue }) {
-  const { vue, lignes } = useLignes(d)
+  const { vue, lignes, relire } = useLignes(d)
   const etapes = partiesDe(d)
   const [courante, poserCourante] = useState(0)
   const [saisies, poserSaisies] = useState<Saisies>({})
   const [annonce, annoncer] = useAnnonce()
+  const jouer = useGeste(d, vue, annoncer)
   const etape = etapes[courante]
 
   const creer = () => {
@@ -27,7 +30,10 @@ export function FormeSaisie({ d }: { d: DescripteurEcranVue }) {
       annoncer(`Contrôle de la fiche RIG v2 : « ${manque.join(' », « ')} » ${manque.length > 1 ? 'sont obligatoires' : 'est obligatoire'}. ${DEMONSTRATION}.`)
       return
     }
-    annoncer(refus('Créer', ': rien n’est créé dans la base, la saisie reste à l’écran'))
+    const remplies = Object.fromEntries(Object.entries(saisies).filter(([, v]) => v.trim() !== ''))
+    void jouer({ type: 'Creer', groupe: d.groupes[0] ?? d.titre, ids: [], valeurs: remplies },
+      refus('Créer', ': rien n’est créé dans la base, la saisie reste à l’écran'),
+      () => { poserSaisies({}); poserCourante(0); relire() })
   }
 
   return (

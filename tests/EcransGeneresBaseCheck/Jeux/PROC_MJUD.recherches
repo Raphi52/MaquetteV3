@@ -1,0 +1,33 @@
+# Les recherches de LecteurInstanceJudiciaire (IRechercheEcran), jouees sur les lignes de PROC_MJUD.sql AVANT les gestes.
+# Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). La recherche s'AJOUTE aux filtres de la liste.
+
+# 1. Le champ de recherche trouve un numero de role (FormRechercheInstance.cs:425, txtNumRole).
+texte: 12003
+lignes:
+EPSILON BANC | Rôle 2026J12003 · Nature du banc · enrôlée le 15/01/2026 | Au fond | Validee | []
+---
+# 2. ... ou un nom courant (txtNomCourant, :426), sans casse.
+texte: banc c/
+lignes:
+GAMMA BANC c/ DELTA BANC | Rôle 2026R12002 · Nature du banc · enrôlée le 15/01/2026 · bloquée par la demande 26012000002 | En référé | EnAttente | []
+ALPHA BANC c/ BETA BANC | Rôle 2026J12001 · Nature du banc · enrôlée le 15/01/2026 | Au fond | AFaire | []
+IOTA BANC c/ KAPPA BANC | Rôle 2026I12007 · Nature du banc · enrôlée le 10/02/2026 | Au fond | AFaire | []
+---
+# 3. Le critere « Numéro de rôle », blancs retires comme FormateNumRole (:996).
+critere: Numéro de rôle = 2026 J 1200
+lignes:
+THETA BANC | Rôle 2026J12008 · Nature du banc · enrôlée le 15/01/2026 · bloquée par la demande 26012000008 | Au fond | EnAttente | []
+ZETA BANC | Rôle 2026J12006 · Nature du banc · enrôlée le 15/01/2026 | Au fond | AFaire | []
+ETA BANC | Rôle 2026J12005 · Nature du banc · enrôlée le 15/01/2026 | Au fond | AFaire | []
+EPSILON BANC | Rôle 2026J12003 · Nature du banc · enrôlée le 15/01/2026 | Au fond | Validee | []
+ALPHA BANC c/ BETA BANC | Rôle 2026J12001 · Nature du banc · enrôlée le 15/01/2026 | Au fond | AFaire | []
+---
+# 4. Deux criteres : les deux a la fois.
+critere: Numéro de rôle = 2026J
+critere: Nom courant = zeta
+lignes:
+ZETA BANC | Rôle 2026J12006 · Nature du banc · enrôlée le 15/01/2026 | Au fond | AFaire | []
+---
+# 5. Une instance de prevention (JRPR) reste hors de MJUD, meme cherchee par son numero.
+texte: 2026P12004
+lignes:
