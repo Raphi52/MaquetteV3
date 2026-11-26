@@ -1,0 +1,30 @@
+# « Statistiques cour d'appel » (LecteurStatistiquesCourAppel.ChercherAsync) : le tableau recalcule dans la base sur la periode
+# saisie (« Période », du|au), cellule par cellule : categorie, B en cours au debut, C nouvelles, D terminees, E jugements ADD,
+# F stock = (B + C) - (D + E), G deliberes de plus de deux mois, H decisions a delivrer (OPE_GENERER.cs:182-607). Les lignes et
+# leurs jumeaux refuses sont dits dans PROC_STATCA.sql.
+
+# Mars 1971 : les affaires du jeu, et elles seules.
+critere: Période = 1971-03-01|1971-03-31
+lignes:
+contentieux général | Activité commerciale du 01/03/1971 au 31/03/1971 | Activité commerciale | Validee | [] | valeurs: contentieux général ; 5 ; 1 ; 2 ; 1 ; 3 ; 1 ; 1
+affaires de procédure collective | Activité commerciale du 01/03/1971 au 31/03/1971 · Nb redressement judiciaire : 0 · Nb liquidations (LIJI ou LJ) : 0 · Nb clôtures pour insuffisance d'actif : 0 · Nb clôtures pour extinction du passif : 0 | Activité commerciale | Validee | [] | valeurs: affaires de procédure collective ; 0 ; 1 ; 0 ; 0 ; 1 ; 0 ; 1
+référés commerciaux | Activité commerciale du 01/03/1971 au 31/03/1971 | Activité commerciale | Validee | [] | valeurs: référés commerciaux ; 1 ; 0 ; 0 ; 0 ; 1 ; 0 ; 1
+injonctions de payer | Activité commerciale du 01/03/1971 au 31/03/1971 | Activité commerciale | Validee | [] | valeurs: injonctions de payer ; 0 ; 1 ; 0 ; 0 ; 1 ; 0 ; 0
+---
+# Avril 1971 : J04 entre (C), les affaires de mars restent en cours sauf J03 et J08, terminees en mars (et J02, avant) ; le sursis
+# de J05 ne termine pas l'affaire (B). Les decisions de mars ne sont plus dans la periode (D, E, G a 0) ; H ne depend pas de la
+# periode (enrolee au plus tard a la fin, sans decision). Jumeau de mars : la meme regle, une autre borne.
+critere: Période = 1971-04-01|1971-04-30
+lignes:
+contentieux général | Activité commerciale du 01/04/1971 au 30/04/1971 | Activité commerciale | Validee | [] | valeurs: contentieux général ; 4 ; 1 ; 0 ; 0 ; 5 ; 0 ; 1
+affaires de procédure collective | Activité commerciale du 01/04/1971 au 30/04/1971 · Nb redressement judiciaire : 0 · Nb liquidations (LIJI ou LJ) : 0 · Nb clôtures pour insuffisance d'actif : 0 · Nb clôtures pour extinction du passif : 0 | Activité commerciale | Validee | [] | valeurs: affaires de procédure collective ; 1 ; 0 ; 0 ; 0 ; 1 ; 0 ; 1
+référés commerciaux | Activité commerciale du 01/04/1971 au 30/04/1971 | Activité commerciale | Validee | [] | valeurs: référés commerciaux ; 1 ; 0 ; 0 ; 0 ; 1 ; 0 ; 1
+injonctions de payer | Activité commerciale du 01/04/1971 au 30/04/1971 | Activité commerciale | Validee | [] | valeurs: injonctions de payer ; 1 ; 0 ; 0 ; 0 ; 1 ; 0 ; 0
+---
+# Refus de RIG v2 : un debut apres la fin (LoadData, OPE_RECHERCHE.cs:85-88) -- rien n'est calcule ; jumeau accepte : bloc 1.
+critere: Période = 1971-04-01|1971-03-31
+lignes:
+---
+# Refus de RIG v2 : une fin apres aujourd'hui (OPE_RECHERCHE.cs:89-92) ; jumeau accepte : bloc 1, une fin passee.
+critere: Période = 1971-03-01|2999-03-31
+lignes:

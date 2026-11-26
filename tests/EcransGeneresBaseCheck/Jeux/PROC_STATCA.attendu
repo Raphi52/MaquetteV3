@@ -1,0 +1,9 @@
+# « Statistiques cour d'appel » (LecteurStatistiquesCourAppel), periode par defaut : le mois precedent complet (InitDate,
+# OPE_RECHERCHE.cs:37-58), du {D-1} au {F-1}. Ses chiffres comptent TOUTES les instances du banc (celles des autres jeux, aux dates
+# relatives au jour du banc, qui changent de mois avec lui) : ils ne sont donc pas compares ici (pas de champ « valeurs: »), mais
+# dans PROC_STATCA.recherches, sur mars 1971 que seul PROC_STATCA.sql remplit. Les compteurs des procedures collectives (2e ligne)
+# ne comptent que les procedures « non exterieures » (PRCLL_EXTERIEUR = 0) : les jeux du banc n'en posent aucune.
+contentieux général | Activité commerciale du {D-1} au {F-1} | Activité commerciale | Validee | []
+affaires de procédure collective | Activité commerciale du {D-1} au {F-1} · Nb redressement judiciaire : 0 · Nb liquidations (LIJI ou LJ) : 0 · Nb clôtures pour insuffisance d'actif : 0 · Nb clôtures pour extinction du passif : 0 | Activité commerciale | Validee | []
+référés commerciaux | Activité commerciale du {D-1} au {F-1} | Activité commerciale | Validee | []
+injonctions de payer | Activité commerciale du {D-1} au {F-1} | Activité commerciale | Validee | []
