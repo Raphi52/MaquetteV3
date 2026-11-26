@@ -20,6 +20,13 @@
 // retard, vient de Pont/EcranBodacc.cs ; le reste etait declare dans l'ecran
 // et l'a suivi. La coquille .razor monte cet ecran et recoit ouvrirDossier.
 //
+// BASE DU GREFFE (plan « RIG v3 100 % fonctionnel », lot 17, 26/11/2026) : branche au serveur, les annonces sont celles de
+// la base du greffe, sur la periode de recherche de RIG v2 (Pont/EcranBodacc.cs, Annonces ; requete, colonnes et partage
+// « a envoyer / deja envoye » cites dans Serveur/Socle/EcransMain/LectureBodacc.cs), et la date du jour est la vraie ;
+// sans serveur, les annonces declarees ici s'affichent marquees « exemple » (ProvenanceEcran). Les criteres filtrent les
+// annonces lues, sur place, comme avant ; « Num bordereau » et « Num facture », qui ne filtraient rien, filtrent comme
+// RIG v2 (egalite, OPE_RECH_BOD.cs:242-243). La mise en page ne change pas.
+//
 // LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 3) : les annonces prennent les briques
 // de composants/ListeModerne.tsx. Les deux onglets v2 deviennent les deux puces de vues (« BODACC a envoyer »,
 // « BODACC deja envoye », avec leur compte) ; la tete fait la synthese (retards, parutions), le type d'annonce
@@ -40,6 +47,7 @@ import {
   CelluleChevron, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille, PiedListe, PointEtat,
   VuesListe, type ActionLigne, type Teinte,
 } from '../composants/ListeModerne'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 
 interface Annonce {
   numAnnonce: string
@@ -67,7 +75,20 @@ const Lignes: Annonce[] = [
   { numAnnonce: 'A2026-1151', numPc: '', typeAnnonce: 'Depot des comptes', codeEvePro: 'DCA', dateEvePro: '2026-08-14', prevueEnvoi: '2026-08-20', envoi: '2026-08-20', numParution: '2026-172', parution: '2026-08-26', numBord: 'BD-2610', numFact: 'FA-45121', texte: 'Depot des comptes 2025', dossier: '2011B00512', transmission: '2026-08-21' },
 ]
 
-/** Les annonces de l'ecran, que la palette Ctrl K cherche aussi (composants/Palette.tsx). */
+/** Ce que le pont rend (Pont/EcranBodacc.cs, VueBodacc). */
+export interface VueBodacc {
+  mode: ModeLecture
+  message: string | null
+  /** Les annonces de la base (mode « serveur ») ; vide sinon. */
+  annonces: Annonce[]
+  total: number
+  /** La date du jour (aaaa-mm-jj) qui dit si une annonce a envoyer est en retard. */
+  aujourdhui: string
+  /** La periode de recherche de RIG v2 (« du 01/01/2026 au 26/11/2026 ») ; vide en demonstration. */
+  periode: string
+}
+
+/** Les annonces d'EXEMPLE de l'ecran (sans serveur), que la palette Ctrl K cherche aussi (composants/Palette.tsx). */
 export { Lignes as AnnoncesBodacc, type Annonce as AnnonceBodacc }
 
 const date = (d: string | null): string => (d === null ? '' : dateCourte(d))
@@ -97,24 +118,28 @@ export function EcranBodacc({ ouvrirDossier, dossier = null }: ProprietesEcranBo
   const [critType, setCritType] = useState('')
   const [critDu, setCritDu] = useState('')
   const [critAu, setCritAu] = useState('')
-  // null tant que le pont n'a pas repondu : sans elle, on ne sait pas quelle
-  // annonce est en retard, et les lignes attendent plutot que de le taire.
-  const [aujourdhui, setAujourdhui] = useState<string | null>(null)
+  // null tant que le pont n'a pas repondu : sans la date du jour, on ne sait pas
+  // quelle annonce est en retard, et les lignes attendent plutot que de le taire.
+  const [vue, setVue] = useState<VueBodacc | null>(null)
 
   useEffect(() => {
     let perime = false
-    void appeler<string>('EcranBodacc.DateDuJour').then((d) => { if (!perime) setAujourdhui(d) })
+    void appeler<VueBodacc>('EcranBodacc.Annonces').then((v) => { if (!perime) setVue(v) })
     return () => { perime = true }
   }, [])
+  const aujourdhui = vue?.aujourdhui ?? null
+  // La base en mode « serveur », les exemples en demonstration ; rien quand la base n'a pas repondu.
+  const annonces: Annonce[] = vue === null ? [] : vue.mode === 'serveur' ? vue.annonces : vue.mode === 'demo' ? Lignes : []
 
   function effacer() {
     setCritTexte(''); setCritType('')
     setCritDu(''); setCritAu('')
+    setCritNumBord(''); setCritNumFact('')
   }
 
   /** Les annonces d'un onglet (a envoyer ou deja envoye) qui repondent aux criteres de gauche. */
   function filtrees(onglet: boolean): Annonce[] {
-    let q = Lignes.filter((l) => (l.envoi === null) === onglet)
+    let q = annonces.filter((l) => (l.envoi === null) === onglet)
     if (!estBlanc(critTexte)) {
       const t = critTexte.trim()
       q = q.filter((l) => contientSansCasse(l.numAnnonce, t) || contientSansCasse(l.dossier, t))
@@ -122,6 +147,8 @@ export function EcranBodacc({ ouvrirDossier, dossier = null }: ProprietesEcranBo
     if (critType !== '') q = q.filter((l) => l.typeAnnonce === critType)
     if (critDu !== '') q = q.filter((l) => l.prevueEnvoi >= critDu)
     if (critAu !== '') q = q.filter((l) => l.prevueEnvoi <= critAu)
+    if (!estBlanc(critNumBord)) q = q.filter((l) => l.numBord === critNumBord.trim())
+    if (!estBlanc(critNumFact)) q = q.filter((l) => l.numFact === critNumFact.trim())
     return q
   }
   const trouvees = filtrees(aEnvoyer)
@@ -130,6 +157,8 @@ export function EcranBodacc({ ouvrirDossier, dossier = null }: ProprietesEcranBo
 
   const enRetard = aujourdhui === null ? 0 : trouvees.filter((l) => aEnvoyer && l.prevueEnvoi < aujourdhui).length
   const parues = trouvees.filter((l) => l.parution !== null).length
+  // En base, la periode de recherche de RIG v2 (envois de l'annee, ou depuis le reglage BODACC_JUD_DATE).
+  const periode = vue?.periode ? ` · envoi ${vue.periode}` : ''
 
   return (
     <div className="rig-proc__corps">
@@ -141,7 +170,7 @@ export function EcranBodacc({ ouvrirDossier, dossier = null }: ProprietesEcranBo
           <span className="rig-saisie-champ__libelle">Type d'annonce</span>
           <select className="rig-saisie-champ__saisie" value={critType} onChange={(e) => setCritType(e.target.value)}>
             <option value="">Tous</option>
-            {distinctsTries(Lignes.map((l) => l.typeAnnonce)).map((t) => <option key={t} value={t}>{t}</option>)}
+            {distinctsTries(annonces.map((l) => l.typeAnnonce)).map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </label>
 
@@ -178,9 +207,11 @@ export function EcranBodacc({ ouvrirDossier, dossier = null }: ProprietesEcranBo
       <ListeModerne etiquette="Annonces BODACC">
         <EnteteListe titre="Annonces BODACC"
                      synthese={aujourdhui === null ? undefined : (aEnvoyer
-                       ? <>{trouvees.length}{' annonce(s) a envoyer · '}<b>{enRetard}</b>{' en retard'}</>
-                       : <>{trouvees.length}{' annonce(s) envoyee(s) · '}<b>{parues}</b>{' parue(s)'}</>)}
+                       ? <>{trouvees.length}{' annonce(s) a envoyer · '}<b>{enRetard}</b>{' en retard'}{periode}</>
+                       : <>{trouvees.length}{' annonce(s) envoyee(s) · '}<b>{parues}</b>{' parue(s)'}{periode}</>)}
                      filtre={{ valeur: critTexte, changer: setCritTexte, indication: 'Aller a une annonce…' }} />
+
+        {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Annonces" />}
 
         {/* Les deux onglets v2 : une puce par grille, avec le nombre d'annonces qu'elle montre pour ces criteres. */}
         <VuesListe vues={[

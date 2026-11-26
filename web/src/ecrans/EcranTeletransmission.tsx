@@ -1,7 +1,9 @@
 // Ecran PROC_TELETRANS : le suivi des flux TELETRANSMIS (EDI) recus au
 // greffe. Destination de l'alerte « Teletransmission » de l'accueil. Les lignes
-// viennent du courrier arrive (JeuDemo, table ARRIVEE), calculees par
+// viennent du courrier arrive (table ARRIVEE), calculees par
 // Pont/EcranTeletransmission.cs : un flux EDI est une arrivee de mode « EDI ».
+// Branche au serveur (plan « RIG v3 100 % fonctionnel », lot 17, 26/11/2026), le courrier est celui de la base du greffe
+// (Pont/EcranTeletransmissionBase.cs) ; sans serveur, JeuDemo s'affiche marque « exemple » (ProvenanceEcran).
 //
 // Porte depuis Components/Ecrans/EcranTeletransmission.razor (lot 3) : meme
 // balisage, memes classes CSS. La coquille .razor monte cet ecran et recoit
@@ -19,6 +21,7 @@ import { appeler } from '../pont'
 import type { ContexteDossierVue } from '../plan/types'
 import { CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, normaliser } from '../composants/ListeModerne'
 import { teinteModeArrivee } from './EcranArrivee'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 
 export interface LigneFlux {
   numero: string
@@ -34,6 +37,9 @@ export interface VueTeletransmission {
   flux: LigneFlux[]
   /** « dernier flux : 09/09/2026 09:12 », ou le conseil quand rien n'est arrive. */
   dernier: string
+  /** D'ou viennent les lignes (Pont/LectureEcranMain.cs) ; le motif d'une panne. */
+  mode?: ModeLecture
+  message?: string | null
 }
 
 export interface ProprietesEcranTeletransmission {
@@ -139,6 +145,8 @@ export function EcranTeletransmission({ ouvrirDossier, dossier = null }: Proprie
                      synthese={vue && <>{affiches.length}{' flux · '}<b>{aNumeriser}</b>{' a numeriser · '}<b>{sansDemande}</b>{' sans demande'}</>}
                      filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a un flux…',
                                valider: () => { if (affiches.length === 1) aller(affiches[0]!) } }} />
+
+        {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Flux" />}
 
         <VuesListe vues={Modes.map(([code, libelle]) => {
                      const liste = fluxParMode?.[code]

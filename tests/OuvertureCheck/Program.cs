@@ -152,14 +152,14 @@ Exiger(inconnu.Lignes.Length == 0 && !inconnu.AucunCritere && inconnu.SirenCherc
     "un SIREN inconnu laisse la recherche vide et le SIREN cherche est retenu, sans espaces");
 Exiger(RigV3Desktop.Pont.EcranRechAffaires.Trouver(Criteres("SOCIETE 512"), null, true, null).SirenCherche == "",
     "un libelle qui n'est pas un SIREN n'est pas propose a l'immatriculation");
-var ouvertPont = RigV3Desktop.Pont.EcranOuvertureDossier.Ouvrir(new RigV3Desktop.Pont.FicheOuverture(
+var ouvertPont = RigV3Desktop.Pont.EcranOuvertureDossier.OuvrirExemple(new RigV3Desktop.Pont.FicheOuverture(
     "Guichet unique (INPI)", inconnu.SirenCherche, new DateOnly(2026, 9, 9), "SOCIETE Z", "SAS", 1000m, "EUR"));
 Exiger(!ouvertPont.Bloquant && ouvertPont.Ouverts.Any(o => o.Siren == "512345678"),
     "l'ecran d'ouverture ouvre le dossier pour ce SIREN");
 var retrouve = RigV3Desktop.Pont.EcranRechAffaires.Trouver(Criteres("512 345 678"), null, true, null);
 Exiger(retrouve.Lignes.Length == 1 && retrouve.Lignes[0].Nom == "SOCIETE Z",
     "la recherche d'affaires retrouve aussitot le dossier ouvert");
-Exiger(RigV3Desktop.Pont.EcranOuvertureDossier.Ouvrir(new RigV3Desktop.Pont.FicheOuverture(
+Exiger(RigV3Desktop.Pont.EcranOuvertureDossier.OuvrirExemple(new RigV3Desktop.Pont.FicheOuverture(
            "Guichet unique (INPI)", "512345678", null, "SOCIETE Z BIS", "SAS", 1000m, "EUR")) is { Bloquant: true } refus
        && refus.Message.StartsWith("Ce SIREN a deja un dossier ouvert"),
     "l'ecran d'ouverture refuse un second dossier pour le meme SIREN, et le dit");

@@ -13,22 +13,28 @@ public sealed record LigneArrivee(string Numero, string Horodatage, string ModeL
                                   string References, string Case, bool PaiementJoint, string NumDemande,
                                   string TypeDemande, string Utilisateur, bool Numerise, bool Attestation);
 
-/// <summary>Ce que l'ecran affiche : la liste des modes, la grille et ses comptes.</summary>
-public sealed record VueArrivee(OptionArrivee[] Modes, LigneArrivee[] Lignes, int Total, int ANumeriser);
+/// <summary>Ce que l'ecran affiche : la liste des modes, la grille et ses comptes.
+/// <paramref name="Mode"/> : « serveur » (base du greffe), « demo » (sans serveur : l'ecran marque « exemple »), ou
+/// « sans-greffe », « refuse », « erreur » avec leur <paramref name="Message"/> et aucune ligne (Pont/LectureEcranMain.cs).</summary>
+public sealed record VueArrivee(OptionArrivee[] Modes, LigneArrivee[] Lignes, int Total, int ANumeriser,
+                                string Mode = "demo", string? Message = null);
 
 /// <summary>
 /// Pont de l'ecran PROC_ARRIVEE (web/src/ecrans/EcranArrivee.tsx) : le courrier
-/// arrive. Les lignes sont celles de JeuDemo.Arrivees -- l'ecran n'a pas sa
-/// copie : c'est la meme liste que lisent la simulation EDI et l'accueil.
+/// arrive. Branche au serveur, l'ecran lit la base du greffe (EcranArriveeBase.cs,
+/// plan « RIG v3 100 % fonctionnel », lot 17) ; SANS serveur, il lit ici
+/// JeuDemo.Arrivees -- l'ecran n'a pas sa copie : c'est la meme liste que lisent
+/// la simulation EDI et l'accueil -- et la marque « exemple ». Ce fichier se
+/// compile seul dans SaisieCheck et SimuEdiCheck (Exemple).
 ///
 /// Le filtre vivait dans le @code d'EcranArrivee.razor (propriete Trouvees) ; il
 /// est recopie ici a l'identique, dans le meme ordre et avec les memes
 /// comparaisons .NET (OrdinalIgnoreCase). Metier/ n'est pas modifie.
 /// </summary>
-public static class EcranArrivee
+public static partial class EcranArrivee
 {
-    [JSInvokable("EcranArrivee.Trouver")]
-    public static VueArrivee Trouver(CriteresArrivee criteres)
+    /// <summary>La demonstration : les arrivees de JeuDemo qui repondent aux criteres.</summary>
+    public static VueArrivee Exemple(CriteresArrivee criteres)
     {
         var trouvees = Trouvees(criteres);
         return new VueArrivee(

@@ -144,3 +144,33 @@ describe('EcranArrivee en liste moderne', () => {
     expect(autre).toBe('rig-lm-pastille rig-lm-t-gris')
   })
 })
+
+// D'ou vient le courrier (plan « RIG v3 100 % fonctionnel », lot 17) : la base du greffe sans mention, la demonstration
+// marquee « exemple », une panne dite sans aucune ligne (Pont/LectureEcranMain.cs).
+describe('EcranArrivee et la base du greffe', () => {
+  const exemple = (c: HTMLElement) => c.querySelector('.rig-tcw__exemple')
+
+  it('un courrier lu en base : aucune mention « exemple »', async () => {
+    installerFauxPont({ 'EcranArrivee.Trouver': (): VueArrivee => ({ ...vue(), mode: 'serveur', message: null }) })
+    const { container } = render(<EcranArrivee ouvrirDossier={vi.fn()} />)
+    await waitFor(() => expect(rangees(container)).toHaveLength(2))
+    expect(exemple(container)).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('la demonstration (sans serveur) porte la mention « exemple »', async () => {
+    installerFauxPont({ 'EcranArrivee.Trouver': (): VueArrivee => ({ ...vue(), mode: 'demo', message: null }) })
+    const { container } = render(<EcranArrivee ouvrirDossier={vi.fn()} />)
+    await waitFor(() => expect(exemple(container)?.textContent).toBe('exemple'))
+  })
+
+  it('une base qui ne repond pas : son motif, et aucune arrivee', async () => {
+    installerFauxPont({ 'EcranArrivee.Trouver': (): VueArrivee => ({
+      modes: [], lignes: [], total: 0, aNumeriser: 0, mode: 'erreur',
+      message: 'La base du greffe 3801 ne répond pas.' }) })
+    const { container } = render(<EcranArrivee ouvrirDossier={vi.fn()} />)
+    expect((await screen.findByRole('alert')).textContent).toBe('Base injoignable La base du greffe 3801 ne répond pas.')
+    expect(container.querySelectorAll('tbody tr .rig-lm-identite')).toHaveLength(0)
+    expect(exemple(container)).toBeNull()
+  })
+})

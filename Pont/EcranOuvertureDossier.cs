@@ -6,7 +6,11 @@ public sealed record LigneDossierOuvert(string Numero, string Siren, string Deno
 
 /// <summary>Ce que l'ecran montre a l'ouverture : la date proposee et le tableau des dossiers ouverts.</summary>
 /// <param name="Aujourdhui">La date d'immatriculation proposee, au format d'un champ date (aaaa-mm-jj).</param>
-public sealed record VueOuverture(string Aujourdhui, LigneDossierOuvert[] Ouverts);
+/// <param name="Mode">« serveur » (le tableau vient de la base du greffe), « demo » (sans serveur : l'ecran marque
+/// « exemple »), ou « sans-greffe », « refuse », « erreur » avec leur <paramref name="Message"/> (Pont/LectureEcranMain.cs).</param>
+/// <param name="Total">Le nombre de dossiers du greffe (en base) ; celui du tableau en demonstration.</param>
+public sealed record VueOuverture(string Aujourdhui, LigneDossierOuvert[] Ouverts, string Mode = "demo", string? Message = null,
+                                  int Total = 0);
 
 /// <summary>La fiche saisie a gauche (les champs que l'ouverture enregistre).</summary>
 public sealed record FicheOuverture(string Origine, string Siren, DateOnly? DateImmat, string Denomination,
@@ -26,15 +30,23 @@ public sealed record ResultatOuverture(string Message, bool Bloquant, LigneDossi
 /// d'EcranOuvertureDossier.razor ; ils sont recopies ici a l'identique. Le
 /// dossier rejoint le registre PARTAGE (Metier/AffairesOuvertes.cs), celui que
 /// la recherche d'affaires et la visionneuse interrogent. Metier/ n'est pas modifie.
+///
+/// Ce registre est celui de la DEMONSTRATION : branche au serveur, l'ecran lit les
+/// dossiers de la base du greffe et n'ouvre rien (EcranOuvertureDossierBase.cs, plan
+/// « RIG v3 100 % fonctionnel », lot 17). Ce fichier se compile seul dans OuvertureCheck,
+/// qui execute la demonstration (VueExemple, OuvrirExemple).
 /// </summary>
-public static class EcranOuvertureDossier
+public static partial class EcranOuvertureDossier
 {
-    [JSInvokable("EcranOuvertureDossier.Vue")]
-    public static VueOuverture Vue()
-        => new(JeuDemo.Aujourdhui.ToString("yyyy-MM-dd"), Ouverts());
+    /// <summary>La demonstration : la date du jeu et les dossiers du registre partage.</summary>
+    public static VueOuverture VueExemple()
+    {
+        var ouverts = Ouverts();
+        return new(JeuDemo.Aujourdhui.ToString("yyyy-MM-dd"), ouverts, Total: ouverts.Length);
+    }
 
-    [JSInvokable("EcranOuvertureDossier.Ouvrir")]
-    public static ResultatOuverture Ouvrir(FicheOuverture fiche)
+    /// <summary>La demonstration : ouvrir le dossier dans le registre partage, avec les controles de l'ecran.</summary>
+    public static ResultatOuverture OuvrirExemple(FicheOuverture fiche)
     {
         // Un SIREN est fait de neuf chiffres ; les espaces de saisie sont admis.
         var sirenNormalise = new string((fiche.Siren ?? string.Empty).Where(char.IsDigit).ToArray());

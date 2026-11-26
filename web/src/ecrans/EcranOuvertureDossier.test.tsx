@@ -95,3 +95,37 @@ describe('EcranOuvertureDossier en liste moderne', () => {
       .toEqual([1000, 1000, 1000, 0, 0])
   })
 })
+
+// Branche au serveur (plan « RIG v3 100 % fonctionnel », lot 17) : les dossiers de la base du greffe, sans capital ni
+// origine lus (cellules vides, aucun faux zero), et « Ouvrir » qui n'ecrit pas et le dit ; sans serveur, « exemple ».
+describe('EcranOuvertureDossier et la base du greffe', () => {
+  const exemple = () => document.querySelector('.rig-tcw__exemple')
+  const lu: LigneDossierOuvert = {
+    numero: '2019B00411', siren: '412000411', denomination: 'ALPHA BASE SARL', forme: 'SARL', immatriculation: '12/03/2019',
+    capital: '', monnaie: '', origine: '',
+  }
+  const refus = 'Rien n’est enregistré : dans RIG v2, un dossier RCS naît d’une formalité d’immatriculation, pas de cet écran.'
+
+  it('des dossiers de la base : ni mention « exemple », ni capital invente ; « Ouvrir » refuse et garde la fiche', async () => {
+    installerFauxPont({
+      'EcranOuvertureDossier.Vue': (): VueOuverture => ({ aujourdhui: '2026-11-26', ouverts: [lu], mode: 'serveur', message: null }),
+      'EcranOuvertureDossier.Ouvrir': (): ResultatOuverture => ({ message: refus, bloquant: true, ouverts: [lu] }),
+    })
+    render(<EcranOuvertureDossier sirenDemande="512345678" />)
+    await screen.findByText('ALPHA BASE SARL')
+    expect(exemple()).toBeNull()
+    expect(synthese()).toBe('1 dossier(s)')
+    const cellules = [...document.querySelectorAll('tbody tr td')]
+    expect(cellules[2]!.textContent).toBe('')
+    expect(cellules[4]!.textContent).toBe('')
+    fireEvent.click(screen.getByRole('button', { name: /Ouvrir le dossier/ }))
+    await screen.findByText(refus)
+    expect((screen.getByLabelText('N° SIREN') as HTMLInputElement).value).toBe('512345678')
+  })
+
+  it('la demonstration (sans serveur) porte la mention « exemple »', async () => {
+    installerFauxPont({ 'EcranOuvertureDossier.Vue': (): VueOuverture => ({ aujourdhui: '2026-09-09', ouverts: [ouvert], mode: 'demo', message: null }) })
+    render(<EcranOuvertureDossier />)
+    await waitFor(() => expect(exemple()?.textContent).toBe('exemple'))
+  })
+})

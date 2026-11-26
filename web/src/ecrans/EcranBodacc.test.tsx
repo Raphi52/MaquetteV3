@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { EcranBodacc } from './EcranBodacc'
+import { EcranBodacc, type VueBodacc } from './EcranBodacc'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 import { contexteDossier } from '../test/dossier'
 
@@ -8,8 +8,10 @@ afterEach(() => { cleanup(); retirerFauxPont() })
 
 // JeuDemo.Aujourdhui = 09/09/2026 : les annonces prevues le 08/09 et le 04/09
 // sont en retard, celle du 09/09 ne l'est pas (capture Blazor du 18/11/2026).
+// Sans serveur, le pont rend le mode « demo » et la date du jeu : l'ecran montre ses annonces d'exemple (Pont/EcranBodacc.cs).
+const Demonstration: VueBodacc = { mode: 'demo', message: null, annonces: [], total: 0, aujourdhui: '2026-09-09', periode: '' }
 function ouvrir(ouvrirDossier = vi.fn()) {
-  installerFauxPont({ 'EcranBodacc.DateDuJour': () => '2026-09-09' })
+  installerFauxPont({ 'EcranBodacc.Annonces': () => Demonstration })
   return { ouvrirDossier, ...render(<EcranBodacc ouvrirDossier={ouvrirDossier} />) }
 }
 
@@ -43,7 +45,7 @@ describe('EcranBodacc', () => {
   })
 
   it('n\'affiche aucune ligne tant que la date du jour n\'est pas connue', () => {
-    installerFauxPont({ 'EcranBodacc.DateDuJour': () => new Promise<string>(() => {}) })
+    installerFauxPont({ 'EcranBodacc.Annonces': () => new Promise<VueBodacc>(() => {}) })
     const { container } = render(<EcranBodacc ouvrirDossier={vi.fn()} />)
     expect(container.querySelectorAll('tbody tr')).toHaveLength(0)
     expect(screen.queryByText('Aucune annonce ne repond a ces criteres.')).toBeNull()
@@ -92,8 +94,9 @@ describe('EcranBodacc', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Effacer' }))
     expect(compte(container)).toBe('3 annonce(s) a envoyer · 2 en retard')
     expect((champ() as HTMLInputElement).value).toBe('')
-    // Comme dans Blazor, « Effacer » ne touche pas aux numeros de bordereau et de facture.
-    expect((screen.getByLabelText('Num bordereau') as HTMLInputElement).value).toBe('BD')
+    // Depuis le lot 17 (RIG v3 100 % fonctionnel), bordereau et facture FILTRENT comme RIG v2 (OPE_RECH_BOD.cs:242-243) :
+    // « Effacer » les vide aussi, sinon un filtre resterait actif sans se voir. (Avant, inertes, ils restaient remplis.)
+    expect((screen.getByLabelText('Num bordereau') as HTMLInputElement).value).toBe('')
   })
 
   it('une annonce cliquee remonte son dossier', async () => {
@@ -107,7 +110,7 @@ describe('EcranBodacc', () => {
 // « Num annonce / dossier », devenu le champ « Aller a… » de la tete (plan « Vue du dossier », lot 2).
 describe('EcranBodacc ouvert depuis une affaire', () => {
   const rendre = (dossier: ReturnType<typeof contexteDossier> | null) => {
-    installerFauxPont({ 'EcranBodacc.DateDuJour': () => '2026-09-09' })
+    installerFauxPont({ 'EcranBodacc.Annonces': () => Demonstration })
     return render(<EcranBodacc ouvrirDossier={vi.fn()} dossier={dossier} />)
   }
 
@@ -129,5 +132,60 @@ describe('EcranBodacc ouvert depuis une affaire', () => {
     expect(await screen.findByText('Immatriculation SARL LES TILLEULS')).toBeTruthy()
     expect(compte(sans.container)).toBe('3 annonce(s) a envoyer · 2 en retard')
     expect((champ() as HTMLInputElement).value).toBe('')
+  })
+})
+
+// Branche au serveur (plan « RIG v3 100 % fonctionnel », lot 17) : les annonces de la base du greffe, la vraie date du jour,
+// la periode de recherche de RIG v2 ; sans serveur, la mention « exemple » ; une panne, son motif et aucune ligne.
+describe('EcranBodacc et la base du greffe', () => {
+  const lue = {
+    numAnnonce: '2026-0042', numPc: '2025P00031', typeAnnonce: 'Création', codeEvePro: 'OJRJ', dateEvePro: '2026-11-02',
+    prevueEnvoi: '2026-11-20', envoi: null, numParution: '', parution: null, numBord: '', numFact: '', texte: 'Ouverture RJ BASE',
+    dossier: '2019B00411', transmission: null,
+  }
+  const envoyee = { ...lue, numAnnonce: '2026-0007', texte: 'Cloture BASE', prevueEnvoi: '2026-03-02', envoi: '2026-03-02', numBord: 'B26-7', numFact: 'F26-9' }
+  const Base: VueBodacc = { mode: 'serveur', message: null, annonces: [lue, envoyee], total: 2, aujourdhui: '2026-11-26', periode: 'du 01/01/2026 au 26/11/2026' }
+
+  it('montre les annonces de la base, pas les exemples, sans la mention « exemple »', async () => {
+    installerFauxPont({ 'EcranBodacc.Annonces': () => Base })
+    const { container } = render(<EcranBodacc ouvrirDossier={vi.fn()} />)
+    expect(await screen.findByText('Ouverture RJ BASE')).toBeTruthy()
+    expect(screen.queryByText('Immatriculation SARL LES TILLEULS')).toBeNull()
+    expect(container.querySelector('.rig-tcw__exemple')).toBeNull()
+    // Prevue le 20/11, au 26/11 : en retard.
+    expect(compte(container)).toBe('1 annonce(s) a envoyer · 1 en retard · envoi du 01/01/2026 au 26/11/2026')
+    expect(puce('BODACC deja envoye').textContent).toBe('BODACC deja envoye 1')
+  })
+
+  it('« Num bordereau » et « Num facture » filtrent comme RIG v2 (egalite) ; « Effacer » les vide', async () => {
+    installerFauxPont({ 'EcranBodacc.Annonces': () => Base })
+    const { container } = render(<EcranBodacc ouvrirDossier={vi.fn()} />)
+    await screen.findByText('Ouverture RJ BASE')
+    fireEvent.click(puce('BODACC deja envoye'))
+    const bordereau = screen.getByRole('textbox', { name: 'Num bordereau' })
+    fireEvent.change(bordereau, { target: { value: 'B26' } })
+    expect(screen.queryByText('Cloture BASE')).toBeNull()
+    fireEvent.change(bordereau, { target: { value: ' B26-7 ' } })
+    expect(screen.getByText('Cloture BASE')).toBeTruthy()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Num facture' }), { target: { value: 'F26-8' } })
+    expect(screen.queryByText('Cloture BASE')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Effacer' }))
+    expect((bordereau as HTMLInputElement).value).toBe('')
+    expect(screen.getByText('Cloture BASE')).toBeTruthy()
+    expect(container.querySelector('.rig-tcw__exemple')).toBeNull()
+  })
+
+  it('sans serveur, les annonces de demonstration portent la mention « exemple »', async () => {
+    const { container } = ouvrir()
+    await screen.findByText('Immatriculation SARL LES TILLEULS')
+    expect(container.querySelector('.rig-tcw__exemple')!.textContent).toBe('exemple')
+  })
+
+  it('une base qui ne repond pas : son motif, et aucune annonce d’exemple a la place', async () => {
+    installerFauxPont({ 'EcranBodacc.Annonces': (): VueBodacc => ({ ...Base, mode: 'erreur', message: 'La base du greffe 3801 ne répond pas.', annonces: [], periode: '' }) })
+    const { container } = render(<EcranBodacc ouvrirDossier={vi.fn()} />)
+    expect((await screen.findByRole('alert')).textContent).toContain('La base du greffe 3801 ne répond pas.')
+    expect(screen.queryByText('Immatriculation SARL LES TILLEULS')).toBeNull()
+    expect(rangees(container).map((r) => r.textContent)).toEqual(['Aucune annonce ne repond a ces criteres.'])
   })
 })

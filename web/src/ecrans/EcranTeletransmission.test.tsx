@@ -126,3 +126,34 @@ describe('EcranTeletransmission ouvert depuis une affaire', () => {
     expect(screen.queryByRole('button', { name: /seulement$/ })).toBeNull()
   })
 })
+
+// D'ou viennent les flux (plan « RIG v3 100 % fonctionnel », lot 17) : la base du greffe sans mention, la demonstration
+// marquee « exemple », une panne dite sans aucun flux (Pont/LectureEcranMain.cs).
+describe('EcranTeletransmission et la base du greffe', () => {
+  const exemple = (c: HTMLElement) => c.querySelector('.rig-tcw__exemple')
+
+  it('des flux lus en base : aucune mention « exemple »', async () => {
+    installerFauxPont({ 'EcranTeletransmission.Flux': (m: unknown): VueTeletransmission => ({ ...vue(m), mode: 'serveur', message: null }) })
+    const { container } = render(<EcranTeletransmission ouvrirDossier={vi.fn()} />)
+    await screen.findByText('Canal au vert')
+    expect(exemple(container)).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('la demonstration (sans serveur) porte la mention « exemple »', async () => {
+    installerFauxPont({ 'EcranTeletransmission.Flux': (m: unknown): VueTeletransmission => ({ ...vue(m), mode: 'demo', message: null }) })
+    const { container } = render(<EcranTeletransmission ouvrirDossier={vi.fn()} />)
+    await screen.findByText('Canal au vert')
+    expect(exemple(container)!.textContent).toBe('exemple')
+  })
+
+  it('aucun greffe ouvert : le motif, et aucun flux', async () => {
+    installerFauxPont({ 'EcranTeletransmission.Flux': (): VueTeletransmission => ({
+      flux: [], dernier: 'verifier le connecteur du greffe', mode: 'sans-greffe',
+      message: 'Aucun greffe n’est ouvert dans cette session.' }) })
+    const { container } = render(<EcranTeletransmission ouvrirDossier={vi.fn()} />)
+    expect((await screen.findByRole('alert')).textContent).toBe('Aucun greffe ouvert Aucun greffe n’est ouvert dans cette session.')
+    expect(screen.queryByText('Canal au vert')).toBeNull()
+    expect(exemple(container)).toBeNull()
+  })
+})

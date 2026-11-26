@@ -16,14 +16,19 @@ public sealed record LigneDemande(string Numero, string Nom, string Dossier, str
                                   string TraitementLibelle);
 
 /// <summary>Ce que l'ecran affiche : les listes de choix, la grille et le total connu.
-/// <paramref name="LibellesTraitements"/> nomme chaque traitement, dans l'ordre des codes.</summary>
+/// <paramref name="LibellesTraitements"/> nomme chaque traitement, dans l'ordre des codes.
+/// <paramref name="Mode"/> : « serveur » (base du greffe), « demo » (sans serveur : l'ecran marque « exemple »), ou
+/// « sans-greffe », « refuse », « erreur » avec leur <paramref name="Message"/> et aucune ligne (Pont/LectureEcranMain.cs).</summary>
 public sealed record VueDemandes(string[] Traitements, string[] Etats, LigneDemande[] Lignes, int Total,
-                                 string[] LibellesTraitements);
+                                 string[] LibellesTraitements, string Mode = "demo", string? Message = null);
 
 /// <summary>
 /// Pont de l'ecran PROC_DEMANDE (web/src/ecrans/EcranDemandes.tsx) : les demandes
-/// recues, lues dans JeuDemo.Demandes -- la meme liste que la simulation EDI et
-/// l'accueil.
+/// recues. Branche au serveur, l'ecran lit la base du greffe (EcranDemandesBase.cs,
+/// plan « RIG v3 100 % fonctionnel », lot 17) ; SANS serveur, il lit ici la
+/// demonstration JeuDemo.Demandes -- la meme liste que la simulation EDI et
+/// l'accueil -- et la marque « exemple ». Ce fichier se compile seul dans
+/// SaisieCheck et SimuEdiCheck, qui executent la demonstration (Exemple).
 ///
 /// Le filtre et l'affichage de l'etat vivaient dans le @code et le balisage
 /// d'EcranDemandes.razor ; ils sont recopies ici a l'identique. La coquille ne
@@ -32,10 +37,10 @@ public sealed record VueDemandes(string[] Traitements, string[] Etats, LigneDema
 /// et ce pont repond « valide » pour exactement ces dossiers-la.
 /// Metier/ n'est pas modifie.
 /// </summary>
-public static class EcranDemandes
+public static partial class EcranDemandes
 {
-    [JSInvokable("EcranDemandes.Trouver")]
-    public static VueDemandes Trouver(CriteresDemandes criteres, string[] valides)
+    /// <summary>La demonstration : les demandes de JeuDemo qui repondent aux criteres.</summary>
+    public static VueDemandes Exemple(CriteresDemandes criteres, string[] valides)
     {
         var dossiersValides = new HashSet<string>(valides ?? []);
         bool EstValide(string dossier) => dossiersValides.Contains(dossier);

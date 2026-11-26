@@ -8,6 +8,10 @@
 // memes classes CSS. Le filtre est fait par Pont/EcranArrivee.cs sur
 // JeuDemo.Arrivees ; la coquille .razor monte cet ecran et recoit ouvrirDossier.
 //
+// BASE DU GREFFE (plan « RIG v3 100 % fonctionnel », lot 17, 26/11/2026) : branche au serveur, le pont lit le courrier dans
+// la base du greffe (Pont/EcranArriveeBase.cs, colonnes de RIG v2 citees dans Serveur/Socle/EcransMain/LectureArrivees.cs) ;
+// sans serveur, JeuDemo s'affiche marque « exemple » (ProvenanceEcran). La mise en page ne change pas.
+//
 // LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 3) : les resultats prennent les briques
 // de composants/ListeModerne.tsx. Tete (synthese, « Aller a une arrivee… » Ctrl K qui filtre la liste affichee,
 // Entree ouvre la demande si une seule arrivee reste), trois cartes qui POSENT les criteres existants (mode
@@ -23,6 +27,7 @@ import {
   CartesChiffrees, CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille,
   PiedListe, PointEtat, VuesListe, exporterCsv, normaliser, useVuesDeSession, type ActionLigne, type Teinte, type VueEnregistree,
 } from '../composants/ListeModerne'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 
 export interface OptionArrivee {
   code: string
@@ -50,6 +55,9 @@ export interface VueArrivee {
   /** Toutes les arrivees connues, filtre ou pas. */
   total: number
   aNumeriser: number
+  /** D'ou viennent les lignes (Pont/LectureEcranMain.cs) ; le motif d'une panne. */
+  mode?: ModeLecture
+  message?: string | null
 }
 
 export interface ProprietesEcranArrivee {
@@ -300,6 +308,8 @@ export function EcranArrivee({ ouvrirDossier }: ProprietesEcranArrivee) {
                        <b>{avecPaiement}</b>{' avec paiement'}</>}
                      filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a une arrivee…',
                                valider: () => { if (affichees.length === 1) ouvrir(affichees[0]!) } }} />
+
+        {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Arrivées" />}
 
         {vue && (
           <CartesChiffrees cartes={[

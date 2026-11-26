@@ -9,6 +9,10 @@
 // La coquille .razor passe la liste des dossiers valides (sa fonction EstValide
 // ne traverse pas vers React) et recoit ouvrir.
 //
+// BASE DU GREFFE (plan « RIG v3 100 % fonctionnel », lot 17, 26/11/2026) : branche au serveur, le pont lit les demandes
+// dans la base du greffe (Pont/EcranDemandesBase.cs, filtres de RIG v2 cites dans Serveur/Socle/EcransMain/LectureDemandes.cs) ;
+// sans serveur, JeuDemo s'affiche marque « exemple » (ProvenanceEcran). La mise en page ne change pas.
+//
 // LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 3) : les resultats prennent les briques
 // de composants/ListeModerne.tsx. Tete (synthese, « Aller a une demande… » Ctrl K qui filtre la liste affichee,
 // Entree ouvre le dossier si une seule demande reste), trois cartes qui POSENT les criteres existants (etats,
@@ -26,6 +30,7 @@ import {
   CartesChiffrees, CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille,
   PiedListe, PointEtat, VuesListe, exporterCsv, normaliser, useVuesDeSession, type ActionLigne, type Teinte, type VueEnregistree,
 } from '../composants/ListeModerne'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 
 export interface LigneDemande {
   numero: string
@@ -55,6 +60,9 @@ export interface VueDemandes {
   total: number
   /** Le nom de chaque traitement, dans l'ordre des codes : ce que la liste montre. */
   libellesTraitements: string[]
+  /** D'ou viennent les lignes (Pont/LectureEcranMain.cs) ; le motif d'une panne. */
+  mode?: ModeLecture
+  message?: string | null
 }
 
 export interface ProprietesEcranDemandes {
@@ -105,8 +113,19 @@ export const VuesPrereglees: VueEnregistree<CriteresDemandes>[] = [
   { cle: 'validees', libelle: 'Validees', criteres: { ...SansCritere, critEtats: ['Validee'] } },
 ]
 
-/** La teinte d'un etat de demande (JeuDemo.EtatsDemande) : la meme dans la ligne et dans la carte des etats. */
-const TeinteEtat: Record<string, Teinte> = { 'En saisie': 'bleu', 'En controle': 'orange', Validee: 'vert', Rejetee: 'rouge' }
+/**
+ * La teinte d'un etat de demande : la meme dans la ligne et dans la carte des etats. Les cles sont les libelles sans casse
+ * ni accents (normaliser) : la demonstration ecrit « Validee » (JeuDemo.EtatsDemande), la base « Validée » (ETAT_DEMANDE).
+ */
+const TeinteEtat: Record<string, Teinte> = { 'en saisie': 'bleu', 'en controle': 'orange', validee: 'vert', rejetee: 'rouge' }
+const teinteDEtat = (etat: string): Teinte => TeinteEtat[normaliser(etat)] ?? 'gris'
+
+/** Les vues preposees, la vue « Validees » sur le libelle de l'etat valide tel que le pont le rend (« Validée » en base). */
+function vuesPreposees(etats: readonly string[]): VueEnregistree<CriteresDemandes>[] {
+  const validee = etats.find((e) => normaliser(e) === 'validee')
+  return validee === undefined ? VuesPrereglees
+    : VuesPrereglees.map((v) => (v.cle === 'validees' ? { ...v, criteres: { ...v.criteres, critEtats: [validee] } } : v))
+}
 
 /**
  * La teinte de chaque traitement connu, une par traitement et dans le sens de la Recherche d'affaires (judiciaire
@@ -185,7 +204,7 @@ export function EcranDemandes({ valides, ouvrir, dossier = null }: ProprietesEcr
 
   // Les vues : les preposees, puis celles de la session. Leur compte est demande au pont, critere par critere,
   // avec la meme limite d'affichage : c'est le nombre de lignes que la vue MONTRERAIT.
-  const { vues, active: vueActive, enregistrer: enregistrerVue } = useVuesDeSession('Demandes', VuesPrereglees, criteres, memesCriteres)
+  const { vues, active: vueActive, enregistrer: enregistrerVue } = useVuesDeSession('Demandes', vuesPreposees(vue?.etats ?? []), criteres, memesCriteres)
   const [comptes, setComptes] = useState<number[] | null>(null)
   const cleVues = JSON.stringify(vues.map((v) => v.criteres))
   useEffect(() => {
@@ -319,12 +338,14 @@ export function EcranDemandes({ valides, ouvrir, dossier = null }: ProprietesEcr
                      filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a une demande…',
                                valider: () => { if (affichees.length === 1) ouvrir(affichees[0]!.dossier) } }} />
 
+        {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Demandes" />}
+
         {vue && (
           <CartesChiffrees cartes={[
             { cle: 'etats', titre: 'Etats', valeur: affichees.length, complement: affichees.length > 1 ? 'demandes' : 'demande', legende: true,
               ...(critEtats.length > 0 ? { choisir: () => setCritEtats([]), indication: 'Tous les etats' } : {}),
               segments: etats.map((e) => ({
-                cle: e, libelle: e, teinte: TeinteEtat[e] ?? 'gris',
+                cle: e, libelle: e, teinte: teinteDEtat(e),
                 valeur: affichees.filter((d) => d.etat === e).length,
                 texte: String(affichees.filter((d) => d.etat === e).length),
                 actif: critEtats.includes(e), choisir: () => basculerEtat(e),
@@ -377,7 +398,7 @@ export function EcranDemandes({ valides, ouvrir, dossier = null }: ProprietesEcr
                     <CelluleIdentite nom={societe} titre={`${dem.nom} · ${dem.numero}`}
                                      objet={<>{objet}{objet !== '' ? ' · ' : ''}<span>{dem.numero}</span></>} />
                     <td title={dem.traitementLibelle}><Pastille teinte={teinteTraitement(dem)}>{dem.traitementLibelle}</Pastille></td>
-                    <td title={dem.etat}><PointEtat teinte={TeinteEtat[dem.etat] ?? 'gris'}>{dem.etat}</PointEtat></td>
+                    <td title={dem.etat}><PointEtat teinte={teinteDEtat(dem.etat)}>{dem.etat}</PointEtat></td>
                     <td className="rig-table__mono">{dem.creation}</td>
                     <td title={dem.utilisateur}>{dem.utilisateur}</td>
                     <td className="rig-lm-cellule-menu">

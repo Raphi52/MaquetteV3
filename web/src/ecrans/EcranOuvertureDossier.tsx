@@ -15,6 +15,12 @@
 // (Metier/AffairesOuvertes.cs, conserve dans accueil.json). La coquille .razor
 // passe sirenDemande, pose quand on arrive d'une recherche restee vide.
 //
+// BASE DU GREFFE (plan « RIG v3 100 % fonctionnel », lot 17, 26/11/2026) : branche au serveur, le tableau montre les
+// derniers dossiers RCS de la base du greffe (Pont/EcranOuvertureDossierBase.cs, Serveur/Socle/EcransMain/
+// LectureDossiersOuverts.cs) et « Ouvrir » n'ecrit pas (aucune ecriture RIG v2 a reproduire) : le pont le dit, la fiche
+// reste. Le capital, la monnaie et l'origine ne sont pas des colonnes de ces fiches : leurs cellules restent vides, sans
+// faux zero. Sans serveur, le registre de demonstration s'affiche marque « exemple » (ProvenanceEcran).
+//
 // LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 3) : la liste des dossiers ouverts
 // prend les briques de composants/ListeModerne.tsx. Tete (synthese : nombre, capital ; « Aller a un dossier… »
 // Ctrl K, le registre grandit a chaque ouverture), une ligne par dossier : la denomination avec son avatar, le
@@ -26,6 +32,7 @@ import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { dateSaisie, decimalLisible, useNombreSaisi } from '../saisie'
 import { CelluleIdentite, EnteteListe, ListeModerne, MontantBarre, Pastille, PiedListe, montant, normaliser, type Teinte } from '../composants/ListeModerne'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 
 export interface LigneDossierOuvert {
   numero: string
@@ -43,6 +50,9 @@ export interface VueOuverture {
   /** La date d'immatriculation proposee (aaaa-mm-jj). */
   aujourdhui: string
   ouverts: LigneDossierOuvert[]
+  /** D'ou viennent les lignes (Pont/LectureEcranMain.cs) ; le motif d'une panne. */
+  mode?: ModeLecture
+  message?: string | null
 }
 
 export interface ResultatOuverture {
@@ -104,6 +114,7 @@ export function EcranOuvertureDossier({ sirenDemande }: ProprietesEcranOuverture
   const [bloquant, setBloquant] = useState(false)
   // null tant que le pont n'a pas repondu : ni ligne ni « aucun dossier ouvert ».
   const [ouverts, setOuverts] = useState<LigneDossierOuvert[] | null>(null)
+  const [provenance, setProvenance] = useState<{ mode: ModeLecture | undefined; message: string | null | undefined } | null>(null)
   // « Aller a un dossier… » (Ctrl K) : filtre la liste AFFICHEE.
   const [filtreRapide, setFiltreRapide] = useState('')
 
@@ -113,6 +124,7 @@ export function EcranOuvertureDossier({ sirenDemande }: ProprietesEcranOuverture
       if (perime) return
       setDateImmat((avant) => avant ?? v.aujourdhui)
       setOuverts(v.ouverts)
+      setProvenance({ mode: v.mode, message: v.message })
     })
     return () => { perime = true }
   }, [])
@@ -150,7 +162,8 @@ export function EcranOuvertureDossier({ sirenDemande }: ProprietesEcranOuverture
   const affiches = cherche === '' ? tous : tous.filter((d) => normaliser(
     [d.numero, d.siren, d.denomination, d.forme, d.origine].join(' ')).includes(chercheNormal))
   // Le capital se compare et s'additionne dans sa monnaie : une barre EUR ne se mesure pas a un capital CHF.
-  const monnaies = [...new Set(affiches.map((d) => d.monnaie))]
+  // Un capital non lu (dossier de la base : cellule vide) ne compte ni dans les totaux ni dans les barres.
+  const monnaies = [...new Set(affiches.filter((d) => d.capital !== '').map((d) => d.monnaie))]
   const capitalMax = (monnaie: string) => affiches.filter((d) => d.monnaie === monnaie).reduce((m, d) => Math.max(m, valeurCapital(d.capital)), 0)
   const capitalTotal = (monnaie: string) => affiches.filter((d) => d.monnaie === monnaie).reduce((s, d) => s + valeurCapital(d.capital), 0)
   // Un capital s'ecrit sans decimales, dans sa monnaie : « 50 000 CHF » (montant() du socle).
@@ -264,8 +277,10 @@ export function EcranOuvertureDossier({ sirenDemande }: ProprietesEcranOuverture
 
       <ListeModerne etiquette="Dossiers ouverts">
         <EnteteListe titre="Dossiers ouverts"
-                     synthese={ouverts ? <>{affiches.length}{' dossier(s)'}{affiches.length > 0 ? ` · capital ${totaux}` : ''}</> : undefined}
+                     synthese={ouverts ? <>{affiches.length}{' dossier(s)'}{monnaies.length > 0 ? ` · capital ${totaux}` : ''}</> : undefined}
                      filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a un dossier…' }} />
+
+        {provenance && <ProvenanceEcran mode={provenance.mode} message={provenance.message} quoi="Dossiers" />}
 
         <div className="rig-table-cadre">
           <table className="rig-table rig-lm-table">
@@ -288,11 +303,13 @@ export function EcranOuvertureDossier({ sirenDemande }: ProprietesEcranOuverture
                   <CelluleIdentite nom={d.denomination} titre={`${d.denomination} · ${d.numero} · SIREN ${d.siren}`}
                                    objet={<><span>{d.numero}</span>{' · SIREN '}{d.siren}</>} />
                   <td><Pastille teinte={TeinteForme[d.forme] ?? 'gris'}>{d.forme}</Pastille></td>
-                  <td title={d.origine}><Pastille teinte={TeinteOrigine[d.origine] ?? 'gris'}>{d.origine}</Pastille></td>
+                  <td title={d.origine}>{d.origine !== '' && <Pastille teinte={TeinteOrigine[d.origine] ?? 'gris'}>{d.origine}</Pastille>}</td>
                   <td className="rig-table__mono">{d.immatriculation}</td>
-                  <td className="rig-lm-droite" title={`${d.capital} ${d.monnaie}`}>
-                    <MontantBarre valeur={valeurCapital(d.capital)} max={capitalMax(d.monnaie)} texte={`${d.capital} ${d.monnaie}`} />
-                  </td>
+                  {d.capital === '' ? <td className="rig-lm-droite" /> : (
+                    <td className="rig-lm-droite" title={`${d.capital} ${d.monnaie}`}>
+                      <MontantBarre valeur={valeurCapital(d.capital)} max={capitalMax(d.monnaie)} texte={`${d.capital} ${d.monnaie}`} />
+                    </td>
+                  )}
                 </tr>
               ))}
               {ouverts && ouverts.length === 0 && (

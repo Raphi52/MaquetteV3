@@ -236,21 +236,21 @@ var tsxActes = LireDepot("web/src/ecrans/EcranActes.tsx");
 RigV3Desktop.Pont.CriteresDemandes CritDemandes(string[] etats, bool enCours = false)
     => new("", "", "", null, null, etats, false, enCours, 500);
 var demandeEnCours = JeuDemo.Demandes.First(d => d.EnCours);
-var grilleValide = RigV3Desktop.Pont.EcranDemandes.Trouver(CritDemandes([]), [demandeEnCours.Dossier]);
+var grilleValide = RigV3Desktop.Pont.EcranDemandes.Exemple(CritDemandes([]), [demandeEnCours.Dossier]);
 
 Exiger(Regex.IsMatch(pontDemandes, @"valide \? ""Validee""")
        && grilleValide.Lignes.Where(l => l.Dossier == demandeEnCours.Dossier).All(l => l.Etat == "Validee" && l.Statut == "ok"),
     "la grille de resultats affiche Validee pour un dossier valide");
 Exiger(Regex.IsMatch(pontDemandes, @"!valide && dem\.EnCours")
        && grilleValide.Lignes.Where(l => l.Dossier == demandeEnCours.Dossier).All(l => !l.EnCours)
-       && RigV3Desktop.Pont.EcranDemandes.Trouver(CritDemandes([], enCours: true), [demandeEnCours.Dossier])
+       && RigV3Desktop.Pont.EcranDemandes.Exemple(CritDemandes([], enCours: true), [demandeEnCours.Dossier])
               .Lignes.All(l => l.Dossier != demandeEnCours.Dossier),
     "un dossier valide n est plus compte en cours dans la grille");
 // La tuile « Ma file » a ete RETIREE de l accueil le 17/09/2026 a la demande de
 // l utilisateur : l assertion qui gardait son appel a EstValide n a plus d objet.
 // Le meme invariant reste garde ci-dessus sur la grille de resultats.
 Exiger(pontDemandes.Contains("CritEtats.Contains(EtatReel(d))")
-       && RigV3Desktop.Pont.EcranDemandes.Trouver(CritDemandes(["Validee"]), [demandeEnCours.Dossier])
+       && RigV3Desktop.Pont.EcranDemandes.Exemple(CritDemandes(["Validee"]), [demandeEnCours.Dossier])
               .Lignes.Any(l => l.Dossier == demandeEnCours.Dossier),
     "le filtre par etat suit la validation, sinon il raterait les dossiers valides");
 
@@ -267,7 +267,7 @@ foreach (var mode in new[] { "Accueil", "e-Mail", "Edi", "Fax", "Poste", "Recomm
     Exiger(sources.Contains(mode), $"le mode d arrivee « {mode} » est celui de dbo.MODE_ARRIVEE");
 }
 // --- 7. Une arrivee mene a SA demande, sauf quand il n y en a pas
-var courrierSaisie = RigV3Desktop.Pont.EcranArrivee.Trouver(
+var courrierSaisie = RigV3Desktop.Pont.EcranArrivee.Exemple(
     new("", "", "", "", "", null, null, false, false, 500)).Lignes;
 Exiger(tsxArrivee.Contains("ouvrirDossier(a.numDemande)")
        && aiguillage.Contains("<EcranArrivee ouvrirDossier={ouvrirParNumero} />")

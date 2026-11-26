@@ -239,3 +239,47 @@ describe('EcranDemandes ouvert depuis une affaire', () => {
     expect((screen.getByLabelText('Demande') as HTMLInputElement).value).toBe('')
   })
 })
+
+// D'ou viennent les demandes (plan « RIG v3 100 % fonctionnel », lot 17) : la base du greffe sans mention, la
+// demonstration marquee « exemple », une panne dite sans aucune ligne (Pont/LectureEcranMain.cs).
+describe('EcranDemandes et la base du greffe', () => {
+  const exemple = (c: HTMLElement) => c.querySelector('.rig-tcw__exemple')
+
+  it('des demandes lues en base : aucune mention « exemple »', async () => {
+    installerFauxPont({ 'EcranDemandes.Trouver': (c: unknown, v: unknown): VueDemandes => ({ ...vue(c, v), mode: 'serveur', message: null }) })
+    const { container } = render(<EcranDemandes valides={[]} ouvrir={vi.fn()} />)
+    await screen.findByText('D1')
+    expect(exemple(container)).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('la demonstration (sans serveur) porte la mention « exemple »', async () => {
+    installerFauxPont({ 'EcranDemandes.Trouver': (c: unknown, v: unknown): VueDemandes => ({ ...vue(c, v), mode: 'demo', message: null }) })
+    const { container } = render(<EcranDemandes valides={[]} ouvrir={vi.fn()} />)
+    await screen.findByText('D1')
+    expect(exemple(container)!.textContent).toBe('exemple')
+  })
+
+  it('les libelles de la base (« Validée ») : la vue « Validees » les coche, la teinte verte les suit', async () => {
+    const enBase = (c: unknown, v: unknown): VueDemandes => {
+      const lignes = vue(c, v).lignes.map((l) => ({ ...l, etat: 'Validée' }))
+      return { ...vue(c, v), etats: ['Arrivée', 'Validée'], lignes, mode: 'serveur', message: null }
+    }
+    const pont = installerFauxPont({ 'EcranDemandes.Trouver': enBase })
+    const { container } = render(<EcranDemandes valides={[]} ouvrir={vi.fn()} />)
+    await screen.findByText('D1')
+    expect(rangees(container)[0]!.querySelector('.rig-lm-etat')!.className).toBe('rig-lm-etat rig-lm-t-vert')
+    fireEvent.click(screen.getByRole('button', { name: /^Validees/ }))
+    await waitFor(() => expect(criteresAppeles(pont.appels.mock.calls).some((c) => c.critEtats.join('|') === 'Validée')).toBe(true))
+  })
+
+  it('un acces refuse : son motif, et aucune demande', async () => {
+    installerFauxPont({ 'EcranDemandes.Trouver': (): VueDemandes => ({
+      traitements: [], etats: [], lignes: [], total: 0, libellesTraitements: [], mode: 'refuse',
+      message: 'Vous n’avez pas accès aux données du greffe 3801.' }) })
+    const { container } = render(<EcranDemandes valides={[]} ouvrir={vi.fn()} />)
+    expect((await screen.findByRole('alert')).textContent).toBe('Accès refusé Vous n’avez pas accès aux données du greffe 3801.')
+    expect(rangees(container).map((r) => r.textContent)).toEqual(['Aucune demande ne repond a ces criteres.'])
+    expect(exemple(container)).toBeNull()
+  })
+})

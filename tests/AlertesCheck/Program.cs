@@ -413,11 +413,14 @@ Exiger(avecMoi.Detenteurs.Sum(d => d.Nombre) == avecMoi.Lignes.Length
 
 // --- 2 quater. L'ecran des teletransmissions, PORTE EN REACT (lot 3, 19/11/2026).
 // Meme principe que les verrous : la chaine aiguillage -> ecran React -> pont C#,
-// et le calcul des flux (Pont/EcranTeletransmission.cs) EXECUTE ici.
+// et le calcul des flux (Pont/EcranTeletransmission.cs) EXECUTE ici. Depuis le lot 17 du plan « RIG v3 100 %
+// fonctionnel » (26/11/2026), l'entree de l'ecran (EcranTeletransmissionBase.cs) lit la base du greffe quand un serveur
+// est branche ; ce banc execute la demonstration (Exemple), celle de l'ecran sans serveur.
 var cheminTsxTeletrans = Path.Combine(racine, "web/src/ecrans/EcranTeletransmission.tsx");
 Exiger(File.Exists(cheminTsxTeletrans), "l'ecran React des teletransmissions existe (web/src/ecrans/EcranTeletransmission.tsx)");
 var tsxTeletrans = File.Exists(cheminTsxTeletrans) ? File.ReadAllText(cheminTsxTeletrans) : string.Empty;
 var pontTeletrans = File.ReadAllText(Path.Combine(racine, "Pont/EcranTeletransmission.cs"));
+var entreeTeletrans = File.ReadAllText(Path.Combine(racine, "Pont/EcranTeletransmissionBase.cs"));
 Exiger(Regex.IsMatch(aiguillage, @"<EcranTeletransmission\b"),
     "l'aiguillage du plan de travail monte l'ecran React EcranTeletransmission");
 Exiger(tsxTeletrans.Contains("ouvrirDossier: (numero: string) => void")
@@ -426,14 +429,15 @@ Exiger(tsxTeletrans.Contains("ouvrirDossier: (numero: string) => void")
 Exiger(Regex.IsMatch(aiguillage, @"<EcranTeletransmission\b[^>]*\souvrirDossier=\{ouvrirParNumero\}"),
     "le plan de travail ouvre toujours l'affaire du flux clique");
 Exiger(tsxTeletrans.Contains("appeler<VueTeletransmission>('EcranTeletransmission.Flux', mode)")
-       && pontTeletrans.Contains("[JSInvokable(\"EcranTeletransmission.Flux\")]"),
+       && entreeTeletrans.Contains("[JSInvokable(\"EcranTeletransmission.Flux\")]")
+       && entreeTeletrans.Contains("return Exemple(mode)"),
     "l'ecran React demande ses flux au pont, pour le mode choisi");
 Exiger(Regex.IsMatch(tsxTeletrans, @"if \(f\.numDemande\.trim\(\) === ''\) return\s+ouvrirDossier\(f\.numDemande\)"),
     "un flux sans demande rattachee ne mene nulle part");
 Exiger(pontTeletrans.Contains("JeuDemo.Arrivees"),
     "les flux viennent du courrier arrive, pas d'une liste a part");
 
-var fluxEdi = RigV3Desktop.Pont.EcranTeletransmission.Flux("EDI");
+var fluxEdi = RigV3Desktop.Pont.EcranTeletransmission.Exemple("EDI");
 Exiger(fluxEdi.Flux.Length > 0 && fluxEdi.Flux.Length == JeuDemo.Arrivees.Count(x => x.Mode == "EDI"),
     $"le mode EDI montre exactement les arrivees EDI ({fluxEdi.Flux.Length})");
 Exiger(fluxEdi.Flux.All(f => f.ModeLisible == "Edi"), "chaque flux EDI est lisible « Edi »");
@@ -443,9 +447,9 @@ Exiger(fluxEdi.Flux.Zip(fluxEdi.Flux.Skip(1)).All(p =>
     "le flux le plus recent vient en tete");
 Exiger(fluxEdi.Dernier == "dernier flux : " + fluxEdi.Flux[0].Horodatage,
     "l'etat du canal date le dernier flux recu");
-Exiger(RigV3Desktop.Pont.EcranTeletransmission.Flux("TOUS").Flux.Length == JeuDemo.Arrivees.Length,
+Exiger(RigV3Desktop.Pont.EcranTeletransmission.Exemple("TOUS").Flux.Length == JeuDemo.Arrivees.Length,
     "« Tous les modes » montre tout le courrier arrive");
-Exiger(RigV3Desktop.Pont.EcranTeletransmission.Flux("MODE-ABSENT") is { Flux.Length: 0, Dernier: "verifier le connecteur du greffe" },
+Exiger(RigV3Desktop.Pont.EcranTeletransmission.Exemple("MODE-ABSENT") is { Flux.Length: 0, Dernier: "verifier le connecteur du greffe" },
     "sans flux, l'ecran conseille de verifier le connecteur au lieu de rester muet");
 
 // La vue branche le clic, et ne garde plus de liste d'alertes en dur.

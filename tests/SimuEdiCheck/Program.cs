@@ -49,7 +49,7 @@ Exiger(JeuDemo.Arrivees[0].References == SimulationEdi.Message.Fichier,
 var ecranArrivee = File.ReadAllText(Path.Combine(racine, "Pont/EcranArrivee.cs"));
 Exiger(ecranArrivee.Contains("JeuDemo.Arrivees"),
     "l ecran du courrier lit bien cette liste, il n a pas sa copie");
-var courrier = RigV3Desktop.Pont.EcranArrivee.Trouver(
+var courrier = RigV3Desktop.Pont.EcranArrivee.Exemple(
     new("", "", "", "", "", null, null, false, false, 50));
 Exiger(courrier.Lignes.Length > 0 && courrier.Lignes[0].References == SimulationEdi.Message.Fichier
        && courrier.Lignes[0].ModeLisible == "Edi" && courrier.Lignes[0].NumDemande == dossier,
@@ -66,7 +66,7 @@ Exiger(demande?.Siren == SimulationEdi.Message.Siren,
 var ecranDemandes = File.ReadAllText(Path.Combine(racine, "Pont/EcranDemandes.cs"));
 Exiger(ecranDemandes.Contains("JeuDemo.Demandes"),
     "l ecran des demandes lit bien cette liste");
-var fileDuJour = RigV3Desktop.Pont.EcranDemandes.Trouver(
+var fileDuJour = RigV3Desktop.Pont.EcranDemandes.Exemple(
     new("", "", "", null, null, [], false, true, 50), []);
 Exiger(fileDuJour.Lignes.Any(l => l.Dossier == dossier && l.EnCours && l.Siren == SimulationEdi.Message.Siren),
     "l ecran des demandes, filtre « en cours », montre la demande ouverte par le flux");
