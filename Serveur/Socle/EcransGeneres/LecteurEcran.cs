@@ -48,11 +48,19 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 //      (RechercheEcran : libelles du descripteur, au mot pres, declares dans Criteres). Les filtres de la liste de
 //      LireAsync restent ; la recherche s'y AJOUTE. Chaque critere cite sa source V2 (la recherche de l'ancien RIG). Un
 //      texte se cherche en LIKE parametre (FormeLigne.Contient, jamais concatene) ; sans recherche, la route appelle
-//      LireAsync ;
+//      LireAsync. L'ECRAN EST DEJA BRANCHE pour les cinq formes qui retrouvent (web/src/ecrans/formes/commun.tsx,
+//      useRecherche) : Consultation, Fiche et Operation envoient le texte et leurs Criteres, un Referentiel son texte, une
+//      Audience son texte et ses Parametres (date, chambre : declares eux aussi dans Criteres), une Operation sur UN objet
+//      son numero (son seul critere) ;
 //   8. IFicheEcran : LireFicheAsync lit UN objet, par l'Id que ses lignes portent (LigneLue.Id : posez-le), et rend ses
 //      sections aux titres et libelles du DESCRIPTEUR (format des valeurs : Contrats/EcransGeneres/FicheEcran.cs). Un
 //      champ que l'ecrivain sait enregistrer est Modifiable. Un objet que RIG v2 tient verrouille s'ouvre LectureSeule,
-//      avec le message de RIG v2 (VerrouDemandeV2.cs) ;
+//      avec le message de RIG v2 (VerrouDemandeV2.cs). L'ecran la lit DEJA, selon sa forme : Fiche (le formulaire),
+//      Consultation (en lecture), Referentiel (la ligne ouverte en modification : chaque colonne prend le champ de MEME
+//      libelle, la fiche entiere se lit dessous), Audience et Operation (la ligne depliee ; sur UN objet, ses sections et
+//      son Resultat, que la fiche peut aussi porter). fix-ok: mesure par le controle final du lot 2 (26/11/2026) -- ce
+//      mode d'emploi promettait recherche et fiche alors que Referentiel, Audience et Operation n'appelaient ni
+//      EcranGenere.Chercher ni EcranGenere.Fiche ; branches depuis, 7 tests d'EcranGenere.test.tsx le tiennent ;
 //   9. le banc verifie que les criteres declares et les sections et champs rendus existent dans le descripteur, et que
 //      chaque ligne d'un jeu qui porte un Id ouvre sa fiche. Les gestes : EcrivainEcran.cs.
 // ============================================================

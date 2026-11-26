@@ -7,6 +7,8 @@ namespace RigV3.Contrats.EcransGeneres;
 // serveur (Serveur/Socle/EcransGeneres/Ecrivain<Sujet>.cs, mode d'emploi en tete d'EcrivainEcran.cs), qui l'ecrit dans
 // la base V3 du greffe en une transaction, apres les controles de RIG v2. Refuse : rien n'est ecrit, le motif est le
 // message de RIG v2. Sans ecrivain : rien n'est ecrit, et la reponse le dit (« Demonstration »).
+// fix-ok: mesure (26/11/2026) -- la grille d'un Referentiel lit maintenant la fiche de sa ligne ; elle n'envoie a Modifier
+// que les colonnes changees (FormeReferentiel.tsx, test « Modifier n'envoie que la colonne changee ») : documente ici.
 
 /// <summary>Le type d'un geste : un par forme d'ecran qui ecrit.</summary>
 [JsonConverter(typeof(JsonStringEnumConverter<TypeGeste>))]
@@ -18,7 +20,8 @@ public enum TypeGeste
     Creer,
     /// <summary>Referentiel : ajouter une ligne a la table (Ids vide), ses cellules par colonne.</summary>
     Ajouter,
-    /// <summary>Referentiel : modifier une ligne (Ids = [son id]), ses cellules par colonne.</summary>
+    /// <summary>Referentiel : modifier une ligne (Ids = [son id]), ses cellules CHANGEES par colonne (une colonne absente
+    /// garde la valeur de la base, comme <see cref="Enregistrer"/>).</summary>
     Modifier,
     /// <summary>Referentiel : supprimer une ligne (Ids = [son id]).</summary>
     Supprimer,
@@ -35,8 +38,9 @@ public enum TypeGeste
 /// <param name="Type">Ce que la forme fait.</param>
 /// <param name="Ids">Les objets vises (<see cref="LigneLue.Id"/>) ; vide pour une creation ou un ajout.</param>
 /// <param name="Valeurs">Les valeurs SAISIES, au format de FicheEcran.cs : cle « Section › Libelle » pour un champ de
-/// section (Fiche, Saisie, Operation), le libelle de la colonne (Referentiel) ou du parametre (Audience). Une Fiche n'envoie
-/// que les champs modifies : un champ absent garde la valeur de la base.</param>
+/// section (Fiche, Saisie, Operation), le libelle de la colonne (Referentiel) ou du parametre (Audience). Une Fiche
+/// (Enregistrer) et un Referentiel (Modifier) n'envoient que les champs modifies : un champ absent garde la valeur de la
+/// base.</param>
 public sealed record GesteEcran(TypeGeste Type, string[] Ids, IReadOnlyDictionary<string, string> Valeurs)
 {
     /// <summary>Le geste que la fiche RIG v2 nomme (« Relancer », « Renvoyer ») : Agir, Decider, Confirmer ; null sinon.</summary>

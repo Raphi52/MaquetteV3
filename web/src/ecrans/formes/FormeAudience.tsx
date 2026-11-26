@@ -3,24 +3,27 @@
 // geste de la fiche (decision, renvoi, convocation...) sur les affaires cochees, ou sur une affaire par son menu. Le geste
 // va a l'ecrivain de la procedure (type Decider, son nom, les parametres de l'audience) ; ecrit, le role est relu (plan
 // « RIG v3 100 % fonctionnel », lot 2). Sans ecrivain, il ne change rien et le dit.
+// LA BASE (lot 2) : quand le lecteur sait chercher, le texte et les parametres de l'audience (au libelle du descripteur)
+// choisissent le role DANS la base (useRecherche) ; une affaire se deplie sur SA fiche lue, en lecture (FicheLue).
 
 import { useState } from 'react'
-import { EnteteListe, ListeModerne, normaliser, PiedListe } from '../../composants/ListeModerne'
+import { EnteteListe, ListeModerne, PiedListe } from '../../composants/ListeModerne'
 import type { DescripteurEcranVue } from '../../plan/types'
 import {
-  Annonce, ChampSaisie, Provenance, TableLignes, figee, gestesDe, refus, synthese, texteLigne,
-  useAnnonce, useGesteEnLot, useLignes, type LigneTenue, type Saisies,
+  Annonce, ChampSaisie, FicheLue, NoteRecherche, Provenance, TableLignes, figee, gestesDe, refus, synthese,
+  useAnnonce, useGesteEnLot, useLignes, useRecherche, type LigneTenue, type Saisies,
 } from './commun'
 
 export function FormeAudience({ d }: { d: DescripteurEcranVue }) {
-  const { vue, lignes, relire } = useLignes(d)
+  const lues = useLignes(d)
+  const { vue, lignes, relire } = lues
   const [audience, poserAudience] = useState<Saisies>({})
   const [texte, poserTexte] = useState('')
   const [cochees, poserCochees] = useState<ReadonlySet<number>>(() => new Set())
   const [annonce, annoncer] = useAnnonce()
 
-  const cherche = normaliser(texte.trim())
-  const visibles = lignes.filter((l) => cherche === '' || normaliser(texteLigne(l)).includes(cherche))
+  // Les parametres choisissent le role dans la base ; a l'ecran, seul le texte filtre (une date ne se lit pas dans une ligne).
+  const { visibles, enBase, filtre } = useRecherche(lues, texte, audience, false)
   const choisies = lignes.filter((l) => cochees.has(l.i))
   const choix = d.parametres.map((p) => audience[p.libelle] ?? '').filter((v) => v.trim() !== '')
   const enLot = useGesteEnLot(d, vue, annoncer)
@@ -50,6 +53,7 @@ export function FormeAudience({ d }: { d: DescripteurEcranVue }) {
                      synthese={<>{synthese(d, vue, lignes)}{choix.length > 0 ? ` · audience ${choix.join(' · ')}` : ' · choisissez l’audience'}</>}
                      filtre={{ valeur: texte, changer: poserTexte, indication: d.recherche }} />
         {vue && <Provenance vue={vue} />}
+        <NoteRecherche enBase={enBase} />
         <div className="rig-lm-outils rig-eg-lot" role="toolbar" aria-label="Gestes sur les affaires cochées">
           <span className="rig-eg-lot__compte"><b>{choisies.length}</b> cochée{choisies.length > 1 ? 's' : ''}</span>
           {gestesDe(d).map((g, k) => (
@@ -58,7 +62,8 @@ export function FormeAudience({ d }: { d: DescripteurEcranVue }) {
           ))}
         </div>
         <Annonce texte={annonce} />
-        <TableLignes d={d} vue={vue} lignes={visibles} total={lignes.length} filtre={cherche !== ''}
+        <TableLignes d={d} vue={vue} lignes={visibles} total={lignes.length} filtre={filtre}
+                     detail={(l) => <FicheLue d={d} l={l} vue={vue} />}
                      cases={{ cochees, basculer, toutes: (cocher) => poserCochees(cocher ? new Set(visibles.filter((l) => !figee(l.etat)).map((l) => l.i)) : new Set()) }}
                      actions={(l) => gestesDe(d).map((g) => ({ libelle: g, desactive: figee(l.etat), agir: () => jouer(g, [l]) }))} />
         <PiedListe aide="Cochez des affaires, puis choisissez le geste.">

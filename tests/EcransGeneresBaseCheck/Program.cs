@@ -63,8 +63,11 @@ using RigV3Desktop.Pont.EcransGeneres;
 //        <valeur> » (repetable), puis « lignes: » et les lignes attendues, format .attendu (aucune : la recherche ne rend rien).
 //        Jouees apres les .attendu, avant les .gestes ;
 //   7. section 4 : tout ecrivain a un descripteur, un jeu .gestes, et des types de geste de sa forme ; tout lecteur qui
-//      cherche declare des criteres du descripteur ; toute fiche lue (les trois premieres lignes qui portent un Id) a des
-//      sections et des champs du descripteur, et n'a de champ modifiable que si la procedure a un ecrivain Enregistrer.
+//      cherche declare des criteres du descripteur (ses Criteres, ou les Parametres d'une Audience : la date, la chambre
+//      que l'ecran envoie) ; toute fiche lue (les trois premieres lignes qui portent un Id) a des sections et des champs du
+//      descripteur (ses Sections, ou son Resultat pour une Operation), et n'a de champ modifiable que si la procedure a un
+//      ecrivain qui l'enregistre (Enregistrer pour une Fiche, Modifier pour un Referentiel, dont la grille saisit les
+//      colonnes de meme libelle).
 //
 // Il lui faut le SQL Server de developpement : « docker compose up -d » a la racine du depot.
 
@@ -608,22 +611,28 @@ foreach (var (code, lecteur) in lecteurs.ParProcedure.OrderBy(p => p.Key, String
     var couverts = lues.Lignes.Select(l => l.Etat).Distinct().Order().ToArray();
     Console.WriteLine($"NOTE : {code} : etats couverts par le banc : {string.Join(", ", couverts)}");
 
-    // Le socle fonctionnel (en-tete, 7) : les criteres cherches sont ceux du descripteur ; une fiche lue a ses sections
-    // et ses champs, et n'a de champ modifiable que si un ecrivain l'enregistre.
+    // Le socle fonctionnel (en-tete, 7) : les criteres cherches sont ceux que l'ecran envoie (les criteres, ou les
+    // parametres d'une audience : FormeAudience, useRecherche) ; une fiche lue a ses sections et ses champs (le resultat
+    // d'une operation compris), et n'a de champ modifiable que si un ecrivain l'enregistre (Enregistrer ou Modifier).
     if (lecteur is IRechercheEcran chercheur)
-        Exiger(chercheur.Criteres.All(d.Criteres.Contains),
-            $"{code} : les criteres cherches dans la base ({string.Join(", ", chercheur.Criteres)}) sont ceux du descripteur ({string.Join(", ", d.Criteres)})");
+    {
+        var envoyes = d.Criteres.Concat(d.Forme == FormeEcran.Audience ? d.Parametres.Select(p => p.Libelle) : []).ToArray();
+        Exiger(chercheur.Criteres.All(envoyes.Contains),
+            $"{code} : les criteres cherches dans la base ({string.Join(", ", chercheur.Criteres)}) sont ceux que l'ecran envoie ({string.Join(", ", envoyes)})");
+    }
     if (lecteur is IFicheEcran fiches)
     {
         var avecId = lues.Lignes.Where(l => l.Id is not null).Take(3).ToList();
         Exiger(avecId.Count > 0, $"{code} : lit des fiches, et ses lignes du banc portent leur Id ({avecId.Count})");
-        var enregistre = ecrivains.ParProcedure.GetValueOrDefault(code)?.Gestes.Contains(TypeGeste.Enregistrer) == true;
+        var gestes = ecrivains.ParProcedure.GetValueOrDefault(code)?.Gestes ?? [];
+        var enregistre = gestes.Contains(TypeGeste.Enregistrer) || gestes.Contains(TypeGeste.Modifier);
+        var sectionsLues = d.Sections.Concat(d.Resultat).ToArray();
         foreach (var l in avecId)
         {
             await using var cn = new SqlConnection(greffe.Connexion);
             await cn.OpenAsync();
             var f = await fiches.LireFicheAsync(cn, l.Id!, DateTime.Now, CancellationToken.None);
-            var horsDescripteur = f?.Sections.SelectMany(s => d.Sections.FirstOrDefault(x => x.Titre == s.Titre) is { } section
+            var horsDescripteur = f?.Sections.SelectMany(s => sectionsLues.FirstOrDefault(x => x.Titre == s.Titre) is { } section
                     ? s.Champs.Where(c => section.Champs.FirstOrDefault(x => x.Libelle == c.Libelle) is not { } champ
                                           || (champ.Type == TypeChamp.Tableau) != (c.Colonnes.Length > 0)
                                           || (c.Modifiable && (!enregistre || champ.Type == TypeChamp.Tableau)))

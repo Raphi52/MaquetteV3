@@ -796,3 +796,155 @@ describe('socle fonctionnel : fiche lue, geste ecrit puis relu', () => {
     await waitFor(() => expect(o.noms()).toEqual(['SANS LE MOT']))
   })
 })
+
+// LES CINQ FORMES (controle final du lot 2, 26/11/2026) : la recherche dans la base et la fiche lue n'etaient branchees
+// que sur Consultation et Fiche ; Referentiel, Audience et Operation filtraient leurs lignes deja lues et ne lisaient
+// aucune fiche. Un lot d'ecran (audiences, referentiels...) qui pose IRechercheEcran / IFicheEcran sur son lecteur doit
+// voir son ecran chercher et lire, sans toucher aux formes. fix-ok: mesure (26/11/2026) -- les trois formes remises a
+// leur version d'avant (commit 14f3478), ces 7 tests sortent rouges (7 failed | 59 passed) ; branchees, 66/66.
+describe('socle fonctionnel : recherche et fiche sur Referentiel, Audience et Operation', () => {
+  const base = (lignes: LigneEcranVue[], partiel: Partial<VueLignesEcran> = {}): VueLignesEcran =>
+    ({ mode: 'base', message: null, greffe: '3801', lignes, exemples: [], ...partiel })
+  const lu = (libelle: string, valeur: string, modifiable = false) => ({ libelle, valeur, modifiable, colonnes: [], lignes: [] })
+  const ficheDe = (id: string, nom: string, sections: { titre: string; champs: ReturnType<typeof lu>[] }[], partiel: Record<string, unknown> = {}) =>
+    ({ mode: 'base', message: null, fiche: { procedure: 'ECRAN_TEST', id, nom, lectureSeule: false, motif: null, sections, ...partiel } })
+  const filtreTexte = (container: HTMLElement) => container.querySelector('input.rig-lm-cherche__saisie') as HTMLInputElement
+
+  describe('Referentiel', () => {
+    const ref = descripteur({
+      forme: 'Referentiel', titre: 'Modes de paiement', groupes: ['Fond'],
+      colonnes: [champ('Code'), champ('Libellé'), champ('Actif', 'Case')],
+      sections: [{ titre: 'Mode', consigne: '', obligatoire: false, champs: [champ('Code'), champ('Libellé'), champ('Actif', 'Case'), champ('Compte comptable')] }],
+    })
+    const cheque: LigneEcranVue = { nom: 'Chèque', precisions: 'CHQ', groupe: 'Fond', etat: 'Validee', faites: [], id: '1200501' }
+    const fiche = (partiel: Record<string, unknown> = {}) => ficheDe('1200501', 'Chèque',
+      [{ titre: 'Mode', champs: [lu('Code', 'CHQ'), lu('Libellé', 'Chèque', true), lu('Actif', 'oui', true), lu('Compte comptable', '512000')] }], partiel)
+    const edition = (container: HTMLElement) => container.querySelector('tr.rig-eg-ligne--edition:not(.rig-eg-edition-lu)')!
+
+    it('une ligne de la base ouverte en modification lit sa fiche ; Modifier n’envoie que la colonne changee, puis relit', async () => {
+      const pont = installerFauxPont({
+        'EcranGenere.Lignes': () => base([cheque]),
+        'EcranGenere.Fiche': () => fiche(),
+        'EcranGenere.Geste': () => ({ fait: true, message: 'Mode « Chèque » modifié dans la base du greffe.', sansEcrivain: false, ids: ['1200501'] }),
+      })
+      const { container } = render(<EcranGenere descripteur={ref} />)
+      const o = outils(container)
+      await waitFor(() => expect(container.querySelector('tbody tr td')?.textContent).toBe('Chèque'))
+      fireEvent.doubleClick(container.querySelector('tbody tr')!)
+      await waitFor(() => expect((edition(container).querySelector('input[aria-label="Libellé"]') as HTMLInputElement).value).toBe('Chèque'))
+      expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Fiche', 'ECRAN_TEST', 'Fond', '1200501')
+      // Code ne s'enregistre pas : lu, pas saisi ; la fiche entiere se lit dessous (Compte comptable, hors colonnes).
+      expect(edition(container).querySelector('input[aria-label="Code"]')).toBeNull()
+      expect(edition(container).querySelector('[aria-label="Code"]')!.textContent).toBe('CHQ')
+      expect(container.querySelector('tr.rig-eg-edition-lu')!.textContent).toContain('512000')
+      fireEvent.change(edition(container).querySelector('input[aria-label="Libellé"]')!, { target: { value: 'Chèque bancaire' } })
+      fireEvent.click(o.bouton('Enregistrer'))
+      await waitFor(() => expect(o.annonce()).toBe('Mode « Chèque » modifié dans la base du greffe.'))
+      expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Geste', 'ECRAN_TEST', 'Fond', 'Modifier', null, ['1200501'], { 'Libellé': 'Chèque bancaire' })
+      expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranGenere.Lignes')).toHaveLength(2)
+    })
+
+    it('une ligne que RIG v2 verrouille : lecture seule, son message, Enregistrer grise', async () => {
+      installerFauxPont({ 'EcranGenere.Lignes': () => base([cheque]), 'EcranGenere.Fiche': () => fiche({ lectureSeule: true, motif: 'Mode utilisé par une demande en cours' }) })
+      const { container } = render(<EcranGenere descripteur={ref} />)
+      const o = outils(container)
+      await waitFor(() => expect(container.querySelector('tbody tr td')?.textContent).toBe('Chèque'))
+      fireEvent.doubleClick(container.querySelector('tbody tr')!)
+      await waitFor(() => expect(container.textContent).toContain('Ligne en lecture seule : Mode utilisé par une demande en cours.'))
+      expect(edition(container).querySelector('input')).toBeNull()
+      expect(o.bouton('Enregistrer').disabled).toBe(true)
+    })
+
+    it('la recherche part dans la base quand le lecteur sait chercher ; ses lignes ne sont pas refiltrees', async () => {
+      const virement: LigneEcranVue = { nom: 'Virement', precisions: 'VIR', groupe: 'Fond', etat: 'Validee', faites: [], id: '1200502' }
+      const pont = installerFauxPont({
+        'EcranGenere.Lignes': () => base([cheque], { recherche: true }),
+        'EcranGenere.Chercher': () => base([virement], { recherche: true, cherchees: ['Fond'] }),
+      })
+      const { container } = render(<EcranGenere descripteur={ref} />)
+      await waitFor(() => expect(container.querySelector('tbody tr td')?.textContent).toBe('Chèque'))
+      expect(container.textContent).toContain('La recherche et les critères cherchent aussi dans la base du greffe.')
+      fireEvent.change(filtreTexte(container), { target: { value: 'compte 512' } })
+      await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Chercher', 'ECRAN_TEST', 'compte 512', {}))
+      await waitFor(() => expect(container.querySelector('tbody tr td')?.textContent).toBe('Virement'))
+    })
+  })
+
+  describe('Audience', () => {
+    const aud = descripteur({
+      forme: 'Audience', titre: 'Retour d’audience', groupes: ['Fond'], gestes: ['Renvoyer'],
+      parametres: [champ('Date d’audience', 'Date'), champ('Chambre')],
+    })
+    const affaire: LigneEcranVue = { nom: 'DUPONT c/ MARTIN', precisions: 'Rôle 2026J01201', groupe: 'Fond', etat: 'AFaire', faites: [], id: '1200601' }
+
+    it('les parametres de l’audience et le texte choisissent le role dans la base', async () => {
+      const autre: LigneEcranVue = { ...affaire, nom: 'ALPHA c/ BETA', id: '1200602' }
+      const pont = installerFauxPont({
+        'EcranGenere.Lignes': () => base([affaire], { recherche: true }),
+        'EcranGenere.Chercher': () => base([autre], { recherche: true, cherchees: ['Fond'] }),
+      })
+      const { container } = render(<EcranGenere descripteur={aud} />)
+      const o = outils(container)
+      await waitFor(() => expect(o.noms()).toEqual(['DUPONT c/ MARTIN']))
+      fireEvent.change(container.querySelector('aside input[aria-label="Date d’audience"]')!, { target: { value: '2026-03-10' } })
+      await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Chercher', 'ECRAN_TEST', '', { 'Date d’audience': '2026-03-10' }))
+      // La date ne se lit pas dans la ligne : la base a choisi, l'ecran ne la refiltre pas.
+      await waitFor(() => expect(o.noms()).toEqual(['ALPHA c/ BETA']))
+    })
+
+    it('une affaire se deplie sur sa fiche lue', async () => {
+      const pont = installerFauxPont({
+        'EcranGenere.Lignes': () => base([affaire]),
+        'EcranGenere.Fiche': () => ficheDe('1200601', 'DUPONT c/ MARTIN', [{ titre: 'Instance', champs: [lu('Code affaire', '2026J01201')] }]),
+      })
+      const { container, } = render(<EcranGenere descripteur={aud} />)
+      const o = outils(container)
+      await waitFor(() => expect(o.noms()).toEqual(['DUPONT c/ MARTIN']))
+      fireEvent.click(o.ligne('DUPONT c/ MARTIN').querySelector('button[aria-label="Deplier la ligne"]')!)
+      await waitFor(() => expect(container.querySelector('.rig-eg-detail [aria-label="Code affaire"]')?.textContent).toBe('2026J01201'))
+      expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Fiche', 'ECRAN_TEST', 'Fond', '1200601')
+      expect(container.querySelector('.rig-eg-detail section[aria-label="Parties"]')!.textContent).toContain('Non lu dans la base par la V3')
+    })
+  })
+
+  describe('Operation', () => {
+    const op = descripteur({ forme: 'Operation', titre: 'Supprimer une instance', groupes: ['Fond'], valider: 'Supprimer l’instance' })
+    const instance: LigneEcranVue = { nom: 'DUPONT c/ MARTIN', precisions: 'Rôle 2026J01201', groupe: 'Fond', etat: 'AFaire', faites: [], id: '1200701' }
+
+    it('la liste cherche dans la base, et un objet se deplie sur sa fiche lue', async () => {
+      const trouvee: LigneEcranVue = { ...instance, nom: 'SANS LE MOT', id: '1200702' }
+      const pont = installerFauxPont({
+        'EcranGenere.Lignes': () => base([instance], { recherche: true }),
+        'EcranGenere.Chercher': () => base([trouvee], { recherche: true, cherchees: ['Fond'] }),
+        'EcranGenere.Fiche': () => ficheDe('1200702', 'SANS LE MOT', [{ titre: 'Instance', champs: [lu('Code affaire', '2026J09999')] }]),
+      })
+      const { container } = render(<EcranGenere descripteur={op} />)
+      const o = outils(container)
+      await waitFor(() => expect(o.noms()).toEqual(['DUPONT c/ MARTIN']))
+      fireEvent.change(container.querySelector('aside input[aria-label="Numéro"]')!, { target: { value: '9999' } })
+      await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Chercher', 'ECRAN_TEST', '', { 'Numéro': '9999' }))
+      await waitFor(() => expect(o.noms()).toEqual(['SANS LE MOT']))
+      fireEvent.click(o.ligne('SANS LE MOT').querySelector('button[aria-label="Deplier la ligne"]')!)
+      await waitFor(() => expect(container.querySelector('.rig-eg-detail [aria-label="Code affaire"]')?.textContent).toBe('2026J09999'))
+    })
+
+    it('sur UN objet : son numero se cherche dans la base, hors des lignes deja lues, et sa fiche lue s’affiche', async () => {
+      const ia = descripteur({
+        forme: 'Operation', valider: 'Lancer l’analyse', objetUnique: true, criteres: ['Numéro de liasse'], groupes: ['Fond'],
+        sections: [{ titre: 'Liasse', consigne: '', obligatoire: false, champs: [champ('Forme juridique')] }],
+      })
+      const lointaine: LigneEcranVue = { nom: '2026-777', precisions: 'Liasse CFE', groupe: 'Fond', etat: 'AFaire', faites: [], id: '1200777' }
+      const pont = installerFauxPont({
+        'EcranGenere.Lignes': () => base([{ ...lointaine, nom: '2026-001', id: '1200701' }], { recherche: true }),
+        'EcranGenere.Chercher': () => base([lointaine], { recherche: true, cherchees: ['Fond'] }),
+        'EcranGenere.Fiche': () => ficheDe('1200777', '2026-777', [{ titre: 'Liasse', champs: [lu('Forme juridique', 'SARL')] }]),
+      })
+      const { container } = render(<EcranGenere descripteur={ia} />)
+      await waitFor(() => expect(container.querySelector('input[aria-label="Numéro de liasse"]')).not.toBeNull())
+      fireEvent.change(container.querySelector('input[aria-label="Numéro de liasse"]')!, { target: { value: '2026-777' } })
+      await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Chercher', 'ECRAN_TEST', '', { 'Numéro de liasse': '2026-777' }))
+      await waitFor(() => expect(container.querySelector('[aria-label="Forme juridique"]')?.textContent).toBe('SARL'))
+      expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Fiche', 'ECRAN_TEST', 'Fond', '1200777')
+    })
+  })
+})

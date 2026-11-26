@@ -118,6 +118,50 @@ export function useLignes(d: DescripteurEcranVue): {
   return { vue, lignes: (vue?.lignes ?? []).map((l, i) => ({ ...l, i })), relire, chercher, cherchee }
 }
 
+/** Ce que useLignes rend : les lignes, relire, chercher. */
+export type LignesTenues = ReturnType<typeof useLignes>
+
+/** Le delai entre la derniere frappe et la recherche dans la base. */
+export const DELAI_RECHERCHE = 350
+
+/**
+ * LA RECHERCHE d'une forme (Consultation, Fiche, Referentiel, Audience, Operation), la meme pour toutes : quand un lecteur
+ * de l'ecran sait chercher (vue.recherche), le texte et les criteres partent au serveur un instant apres la frappe
+ * (useLignes().chercher, EcranGenere.Chercher) ; les lignes cherchees pour CETTE recherche (vue.cherchees) ne sont pas
+ * refiltrees a l'ecran -- la base a choisi. Les autres groupes, et tout l'ecran sans lecteur qui cherche, se filtrent ICI :
+ * le texte, et chaque critere rempli qui doit se lire dans la ligne (sauf criteresALEcran = faux : les parametres d'une
+ * audience, une date ou une chambre, choisissent le role dans la base mais ne se lisent pas dans le texte d'une ligne).
+ * fix-ok: mesure par le controle final du lot 2 (26/11/2026) -- la recherche en base vivait dans Resultats.tsx seul ;
+ * FormeReferentiel.tsx:114, FormeAudience.tsx:51 et FormeOperation filtraient seulement les lignes deja lues, sans
+ * jamais appeler chercher : elle est donc ici, commune aux cinq formes.
+ */
+export function useRecherche(lues: LignesTenues, texte: string, criteres: Saisies, criteresALEcran = true): {
+  /** Les lignes a montrer. */
+  visibles: LigneTenue[]
+  /** Vrai : la recherche part aussi dans la base. */
+  enBase: boolean
+  /** Une recherche ou un critere filtre la liste. */
+  filtre: boolean
+} {
+  const { vue, lignes, chercher, cherchee } = lues
+  const enBase = vue?.recherche === true
+  useEffect(() => {
+    if (!enBase) return
+    const minuterie = setTimeout(() => chercher({ texte, criteres }), DELAI_RECHERCHE)
+    return () => clearTimeout(minuterie)
+  }, [enBase, texte, criteres, chercher])
+  const cherche = normaliser(texte.trim())
+  const dejaCherchees = memeRecherche(cherchee, { texte, criteres }) ? vue?.cherchees ?? [] : []
+  const visibles = lignes.filter((l) => dejaCherchees.includes(l.groupe)
+    || ((!criteresALEcran || passeCriteres(l, criteres)) && (cherche === '' || normaliser(texteLigne(l)).includes(cherche))))
+  return { visibles, enBase, filtre: cherche !== '' || Object.values(criteres).some((v) => v.trim() !== '') }
+}
+
+/** Ce que dit un ecran dont la recherche part aussi dans la base. */
+export function NoteRecherche({ enBase }: { enBase: boolean }) {
+  return enBase ? <p className="rig-eg-note" role="note">La recherche et les critères cherchent aussi dans la base du greffe.</p> : null
+}
+
 /** La ligne vient-elle de la base (son groupe est branche, et elle porte l'identifiant de son objet) ? */
 export const deLaBase = (vue: VueLignesEcran | null, l: { groupe: string; id?: string | null | undefined }) =>
   vue !== null && (vue.mode === 'base' || vue.mode === 'mixte') && !vue.exemples.includes(l.groupe) && !!l.id
@@ -143,6 +187,25 @@ export function useFiche(d: DescripteurEcranVue, l: LigneTenue | undefined, vue:
     // l : sa cle suffit (un redessin rend une ligne neuve de meme cle, qui ne relit pas la fiche).
   }, [d.code, cle, tour])
   return { fiche, relire: () => poserTour((t) => t + 1) }
+}
+
+/**
+ * LA FICHE LUE d'une ligne, en lecture, par sections de SA procedure : le detail deplie d'une affaire au role (Audience),
+ * d'un objet a choisir (Operation). Une ligne d'exemple montre ses sections sans valeurs, comme avant le lot 2.
+ */
+export function FicheLue({ d, l, vue, sections }: {
+  d: DescripteurEcranVue; l: LigneTenue; vue: VueLignesEcran | null
+  /** Les sections montrees ; par defaut, celles de la procedure de la ligne. */
+  sections?: MarcheEcranVue[] | undefined
+}) {
+  const { fiche } = useFiche(d, l, vue)
+  return (
+    <>
+      {fiche && fiche.mode !== 'base' && fiche.message && <p className="rig-eg-note" role="note">{fiche.message}</p>}
+      {fiche?.fiche?.lectureSeule && fiche.fiche.motif && <p className="rig-eg-note" role="note">Verrouillé : {fiche.fiche.motif}.</p>}
+      <Sections sections={sections ?? parcoursDe(d, l.groupe).sections} saisies={{}} changer={() => {}} lecture fiche={fiche?.fiche ?? null} />
+    </>
+  )
 }
 
 /** Un geste demande par une forme : son type, son nom (File, Audience), le groupe (la procedure) et les objets vises. */

@@ -6,13 +6,19 @@
 // n'a pas de liste : voir OperationSurUnObjet.
 // Confirmer va a l'ecrivain de la procedure (type Confirmer, les objets choisis, les champs remplis) ; fait, la liste est
 // relue (plan « RIG v3 100 % fonctionnel », lot 2). Sans ecrivain, la confirmation ne change rien et le dit.
+// LA BASE (lot 2) : quand le lecteur sait chercher, le texte et les criteres cherchent dans la base (useRecherche) -- un
+// objet sur UN numero aussi, qui n'est donc pas limite aux lignes deja lues ; un objet se deplie (ou s'ouvre, sur UN
+// objet) sur SA fiche lue, en lecture (FicheLue, useFiche). fix-ok: mesure par le controle final du lot 2 (26/11/2026) --
+// les deux operations filtraient seulement les lignes deja lues (passeCriteres/texteLigne a l'ecran, jamais chercher) et
+// montraient leurs sections sans valeurs : aucun appel a EcranGenere.Chercher ni EcranGenere.Fiche ne partait.
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { EnteteListe, ListeModerne, normaliser, PiedListe } from '../../composants/ListeModerne'
 import type { DescripteurEcranVue } from '../../plan/types'
 import {
-  Annonce, ChampSaisie, DEMONSTRATION, Exemple, PanneauCriteres, Provenance, Sections, TableLignes, cleChamp, etatDe,
-  figee, manquantes, parcoursDe, passeCriteres, refus, texteLigne, useAnnonce, useGeste, useLignes, type Saisies,
+  Annonce, ChampSaisie, DEMONSTRATION, Exemple, FicheLue, NoteRecherche, PanneauCriteres, Provenance, Sections,
+  TableLignes, cleChamp, etatDe, figee, manquantes, parcoursDe, refus, useAnnonce, useFiche, useGeste, useLignes,
+  useRecherche, type Saisies,
 } from './commun'
 
 const Temps = ['Choisir', 'Conséquences', 'Confirmer'] as const
@@ -22,7 +28,8 @@ export function FormeOperation({ d }: { d: DescripteurEcranVue }) {
 }
 
 function OperationSurLaListe({ d }: { d: DescripteurEcranVue }) {
-  const { vue, lignes, relire } = useLignes(d)
+  const lues = useLignes(d)
+  const { vue, lignes, relire } = lues
   const [temps, poserTemps] = useState(0)
   const [texte, poserTexte] = useState('')
   const [criteres, poserCriteres] = useState<Saisies>({})
@@ -31,8 +38,7 @@ function OperationSurLaListe({ d }: { d: DescripteurEcranVue }) {
   const [annonce, annoncer] = useAnnonce()
   const jouer = useGeste(d, vue, annoncer)
 
-  const cherche = normaliser(texte.trim())
-  const visibles = lignes.filter((l) => passeCriteres(l, criteres) && (cherche === '' || normaliser(texteLigne(l)).includes(cherche)))
+  const { visibles, enBase, filtre } = useRecherche(lues, texte, criteres)
   const choisies = lignes.filter((l) => cochees.has(l.i))
   const p = choisies[0] ? parcoursDe(d, choisies[0].groupe) : d.membres[0] ?? d
   const basculer = (i: number) => poserCochees((avant) => {
@@ -80,7 +86,9 @@ function OperationSurLaListe({ d }: { d: DescripteurEcranVue }) {
         {temps === 0 && (
           <>
             {vue && <Provenance vue={vue} />}
-            <TableLignes d={d} vue={vue} lignes={visibles} total={lignes.length} filtre={cherche !== '' || Object.values(criteres).some((v) => v.trim() !== '')}
+            <NoteRecherche enBase={enBase} />
+            <TableLignes d={d} vue={vue} lignes={visibles} total={lignes.length} filtre={filtre}
+                         detail={(l) => <FicheLue d={d} l={l} vue={vue} />}
                          cases={{ cochees, basculer, toutes: (cocher) => poserCochees(cocher
                            ? new Set(visibles.filter((l) => !figee(l.etat) && (!choisies[0] || l.groupe === choisies[0].groupe)).map((l) => l.i))
                            : new Set()) }} />
@@ -126,7 +134,8 @@ const TempsUnObjet = ['Lancement', 'Résultat'] as const
 // qu'une reponse existe (ETP_ENTETE.cs:36-37). Controle final du lot 1 (25/11/2026) : la liasse se cochait dans une liste,
 // et le resultat et l'avis s'affichaient avant le lancement.
 function OperationSurUnObjet({ d }: { d: DescripteurEcranVue }) {
-  const { vue, lignes, relire } = useLignes(d)
+  const lues = useLignes(d)
+  const { vue, lignes, relire } = lues
   const resultat = d.resultat ?? []
   const critere = d.criteres[0] ?? 'Numéro'
   const [numero, poserNumero] = useState('')
@@ -139,7 +148,11 @@ function OperationSurUnObjet({ d }: { d: DescripteurEcranVue }) {
     const cherche = normaliser(texte.trim())
     return cherche === '' ? undefined : lignes.find((l) => normaliser(l.nom) === cherche)
   }
+  // Le numero cherche aussi dans la base (son seul critere) : l'objet n'a pas a etre parmi les lignes deja lues.
+  const parNumero = useMemo(() => ({ [critere]: numero }), [critere, numero])
+  const { enBase } = useRecherche(lues, '', parNumero)
   const objet = trouver(numero)
+  const { fiche } = useFiche(d, objet, vue)
   const traite = objet !== undefined && figee(objet.etat)
   const etat = objet ? etatDe(d, objet) : undefined
   const tempsMontres = resultat.length > 0 ? TempsUnObjet : TempsUnObjet.slice(0, 1)
@@ -151,6 +164,12 @@ function OperationSurUnObjet({ d }: { d: DescripteurEcranVue }) {
     poserAConfirmer(false)
     annoncer(null)
   }
+  // Un objet trouve PLUS TARD, par la recherche dans la base, s'ouvre comme s'il avait ete la a la frappe.
+  const cleObjet = objet ? `${objet.groupe}\u0000${objet.nom}` : ''
+  useEffect(() => {
+    if (objet && figee(objet.etat) && resultat.length > 0) poserTemps(1)
+    // objet : sa cle suffit (une relecture apres le geste ne doit pas changer de temps).
+  }, [cleObjet])
   const lancer = () => {
     poserAConfirmer(false)
     if (objet) void jouer({ type: 'Confirmer', nom: d.valider, groupe: objet.groupe, ids: [objet.id], valeurs: {} },
@@ -186,6 +205,7 @@ function OperationSurUnObjet({ d }: { d: DescripteurEcranVue }) {
                   {vue.mode !== 'base' && lignes[0] && <> <Exemple /> par exemple « {lignes[0].nom} ».</>}
                 </p>
                 <Provenance vue={vue} />
+                <NoteRecherche enBase={enBase} />
               </>
             )}
             {numero.trim() !== '' && !objet && (
@@ -196,7 +216,8 @@ function OperationSurUnObjet({ d }: { d: DescripteurEcranVue }) {
                 <div className="rig-eg-recap" aria-label="Objet de l’opération">
                   <p><b>{objet.nom}</b> — {objet.precisions}</p>
                 </div>
-                <Sections sections={d.sections} saisies={{}} changer={() => undefined} lecture />
+                {fiche && fiche.mode !== 'base' && fiche.message && <p className="rig-eg-note" role="note">{fiche.message}</p>}
+                <Sections sections={d.sections} saisies={{}} changer={() => undefined} lecture fiche={fiche?.fiche ?? null} />
                 {traite ? (
                   <p className="rig-eg-note" role="note">
                     {etat?.libelle ?? 'Déjà traité'} : le résultat se relit sans relancer « {d.valider} ».
@@ -224,7 +245,7 @@ function OperationSurUnObjet({ d }: { d: DescripteurEcranVue }) {
             <div className="rig-eg-recap" aria-label="Objet de l’opération">
               <p><b>{objet.nom}</b> — {objet.precisions}</p>
             </div>
-            <Sections sections={resultat} saisies={{}} changer={() => undefined} lecture />
+            <Sections sections={resultat} saisies={{}} changer={() => undefined} lecture fiche={fiche?.fiche ?? null} />
           </>
         )}
         <Annonce texte={annonce} />
