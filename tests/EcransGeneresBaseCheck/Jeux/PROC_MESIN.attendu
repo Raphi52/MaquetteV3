@@ -1,0 +1,10 @@
+# « Mesure provisoire » (PROC_MESIN) : toutes les mesures, la plus recente d'abord (MSINS_ID_MSINS decroissant), dont les deux de
+# PROC_XXAFF.sql (sans type). Groupes : type EXP* = Expertise (OPE_MESURE.cs:149), sinon Autre mesure. Etats : tenue par une demande
+# sur le sequenceur 2F -> EnAttente (1500902) ; une demande MESIN validee sur 2F -> Validee (1500903) ; sinon AFaire -- jumeau 1500901.
+# 1500904 n'a pas d'instance : nommee par son numero.
+Mesure n° 2026M15904 | Mesure 2026M15904 · Autre mesure du banc lot 5 | Autre mesure | AFaire | []
+MESIN DELTA | Mesure 2026M15903 · Expertise du banc lot 5 · ouverte le 04/03/2026 · instance 2026IP15913 | Expertise | Validee | []
+MESIN GAMMA | Mesure 2026M15902 · Expertise du banc lot 5 · ouverte le 03/03/2026 · instance 2026IP15912 · bloquée par la demande D2615000941 | Expertise | EnAttente | []
+MESIN ALPHA # MESIN BETA | Mesure 2026M15901 · Autre mesure du banc lot 5 · ouverte le 02/03/2026 · instance 2026IP15911 | Autre mesure | AFaire | []
+XXAFF ETA | Mesure M14397 · instance 2026M14357 | Autre mesure | AFaire | []
+XXAFF ALPHA | Mesure M14366 · instance 2026M14351 | Autre mesure | AFaire | []
