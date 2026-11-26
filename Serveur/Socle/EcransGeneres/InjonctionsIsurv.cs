@@ -69,7 +69,11 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// l'adresse d'un siege etranger, d'un dossier de type 2 ou d'une personne physique (premier etablissement du ressort,
 /// DossierRCS.cs:874-892) ; les mots directeurs de l'instance (:666) ; la ligne de rapport general (:614-622) ; le recapitulatif Word
 /// des injonctions (_EditionRecapitulativeInjonction, :742-824) ; la relance RDBE d'un vieux dossier SRBE sans diligence (:682-707) :
-/// les lignes de l'ecran ont toutes leur diligence.
+/// les lignes de l'ecran ont toutes leur diligence ; la CREATION d'un cabinet depuis la fenetre de recherche des cabinets
+/// (ParamCreationAudCab = true, OPE_CABINET_INJONCTION.cs:33) -- le cabinet doit deja exister dans AUDIENCE_CABINET. Mesure le
+/// 26/11/2026 : RIG_DEV n'a AUCUN cabinet a venir (AUDNC_AUDIENCE 0, date >= aujourd'hui : 0), la copie de dev non plus (ses cabinets
+/// s'arretent en 2004) ; sur ces donnees, l'injonction se refuse au controle du cabinet, et se prouve par le banc
+/// (PROC_DBE_INJ.gestes, PROC_DCA_INJ.gestes).
 /// </summary>
 internal static class InjonctionsIsurv
 {
