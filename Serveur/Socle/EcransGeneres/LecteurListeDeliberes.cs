@@ -25,7 +25,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// Une ligne, un etat « À rendre » (AFaire) : la liste ne retient que des deliberes non rendus.
 ///
 /// CE QUE LA V3 NE REPREND PAS : les parametres de la recherche (date, duree, types, juge, enrolement minimale) ne partent pas a la
-/// base -- la forme Etat ne cherche pas (web/src/ecrans/formes/FormeEtat.tsx) : la liste est celle des valeurs par defaut de RIG v2 ;
+/// base -- ce lecteur ne cherche pas (il n'est pas IRechercheEcran) ; la forme Etat, elle, envoie le texte et les parametres a un
+/// lecteur qui cherche depuis le lot 6 (web/src/ecrans/formes/FormeEtat.tsx:9-13) : la liste est celle des valeurs par defaut de RIG v2 ;
 /// « Editer le résultat » (un document Word, AfficherWord, :263-322) et « Délibérés repoussés non rendus » (un classeur Excel,
 /// _GenererExcelDeliberer, :482-503) produisent un fichier sur le poste : la V3 n'a pas encore d'edition de ce genre.
 /// </summary>

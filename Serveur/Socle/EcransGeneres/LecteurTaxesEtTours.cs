@@ -12,8 +12,9 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// « RIG v3 100 % fonctionnel », lot 7, 26/11/2026.
 ///
 /// SOURCE (ancien RIG ; proc_taxesettours.md, le Detail OPE fait foi : un processus d'EDITION pure, il n'ecrit rien) :
-///   - LA PERIODE : du 1er janvier de l'annee en cours a aujourd'hui (OPE_PERIODE.InitDate, OPE_PERIODE.cs:31-32). La forme Etat ne
-///     renvoie pas ses parametres a la base : la liste est celle de la periode par defaut, dite dans chaque ligne ;
+///   - LA PERIODE : du 1er janvier de l'annee en cours a aujourd'hui (OPE_PERIODE.InitDate, OPE_PERIODE.cs:31-32). Ce lecteur ne
+///     cherche pas (il n'est pas IRechercheEcran ; la forme Etat enverrait la periode saisie a un lecteur qui cherche, FormeEtat.tsx:9-13) :
+///     la liste est celle de la periode par defaut, dite dans chaque ligne ;
 ///   - ACOMPTES ET TAXES (PlumitifPcTaxes.GetReqTaxes, PlumitifPcTaxes.cs:132-154) : la somme de AUTRE_CHIFFRE.ACHFF_MONTANT de la
 ///     periode (ACHFF_DATE), par fonction (ACHFF_FONCTION_PC) et par mandataire (MANDATAIRE_PC par son abrege, nom + complement),
 ///     des codes chiffre R_CODECHIFFR_ACOMPTE = 1 (acomptes) ou R_CODECHIFFR_TAXE = 1 (taxes) ; une ligne par mandataire, les
