@@ -185,6 +185,18 @@ async Task<LignesLues> Lire(string procedure, int plafond = 200, DateTime? aujou
     return await lecteurs.ParProcedure[procedure].LireAsync(cn, aujourdhui ?? jour, plafond, CancellationToken.None);
 }
 string Texte(LigneLue l) => $"{l.Nom} | {l.Precisions} | {l.Groupe} | {l.Etat} | [{string.Join(",", l.Faites)}]";
+// Une date relative au jour du banc ({J-5}, {M-16}, {A+1} : jours, mois, annees), dans une ligne attendue d'un .attendu ou
+// d'un bloc « lignes: » d'un .gestes (lot 8 : une relance relue porte sa date et sa date limite).
+// fix-ok: lu le 26/11/2026 (lot 8) -- les lignes « lignes: » d'un .gestes etaient comparees brutes (Comparer(apres,
+// bloc.Lignes)), sans le remplacement {J-n} que seuls les .attendu recevaient : une ligne datee ne pouvait pas y etre ecrite.
+// fix-ok: mesure le 26/11/2026 (lot 8, PROC_IPSUIVI.recherches) -- meme defaut pour les lignes d'un .recherches (bloc et route) :
+// une IP trouvee par son numero porte les dates de ses actes ; elles recoivent maintenant le meme remplacement.
+string Dates(string ligne) => System.Text.RegularExpressions.Regex.Replace(ligne, @"\{([JMA])([+-]\d+)\}", m =>
+{
+    var n = int.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+    return D(m.Groups[1].Value switch { "J" => jour.AddDays(n), "M" => jour.AddMonths(n), _ => jour.AddYears(n) });
+});
+
 void Comparer(IReadOnlyList<LigneLue> lues, string[] attendues, string quoi)
 {
     var obtenues = lues.Select(Texte).ToArray();
@@ -426,11 +438,7 @@ foreach (var jeu in jeux)
     if (!lecteurs.ParProcedure.ContainsKey(code)) { Exiger(false, $"jeu {code} : aucun lecteur pour cette procedure"); continue; }
     var attendues = File.ReadAllLines(fichier)
         .Where(l => l.Trim() is { Length: > 0 } t && !t.StartsWith('#'))
-        .Select(l => System.Text.RegularExpressions.Regex.Replace(l.Trim(), @"\{([JMA])([+-]\d+)\}", m =>
-        {
-            var n = int.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
-            return D(m.Groups[1].Value switch { "J" => jour.AddDays(n), "M" => jour.AddMonths(n), _ => jour.AddYears(n) });
-        }))
+        .Select(l => Dates(l.Trim()))
         .ToArray();
     var lues = await Lire(code);
     Comparer(lues.Lignes, attendues, $"{code} : les lignes de {Path.GetFileName(fichier)}, dans l'ordre");
@@ -531,14 +539,14 @@ foreach (var fichier in Directory.GetFiles(dossierJeux, "*.recherches").Order(St
         await using var cn = new SqlConnection(greffe.Connexion);
         await cn.OpenAsync();
         var lues = await chercheur.ChercherAsync(cn, recherche, jour, 200, CancellationToken.None);
-        Comparer(lues.Lignes, [.. bloc.Lignes ?? []], $"{code}.recherches bloc {rang} (texte « {bloc.Texte} », criteres {string.Join(", ", bloc.Criteres.Select(c => $"{c.Key} = {c.Value}"))})");
+        Comparer(lues.Lignes, [.. (bloc.Lignes ?? []).Select(Dates)], $"{code}.recherches bloc {rang} (texte « {bloc.Texte} », criteres {string.Join(", ", bloc.Criteres.Select(c => $"{c.Key} = {c.Value}"))})");
         Exiger(lues.Total == (bloc.Lignes?.Count ?? 0), $"{code}.recherches bloc {rang} : total = {bloc.Lignes?.Count ?? 0} ({lues.Total})");
     }
     // La meme recherche par la route : Cherchee, Chercheur ; sans recherche : Chercheur seul.
     var premier = Blocs.Lire(File.ReadAllLines(fichier)).First();
     var parRouteCherchee = await http.GetFromJsonAsync<LignesEcran>(RoutesEcransGeneres.Pour(Greffe, code, new RechercheEcran(premier.Texte, premier.Criteres)), json);
     var parRouteSans = await http.GetFromJsonAsync<LignesEcran>(RoutesEcransGeneres.Pour(Greffe, code), json);
-    Exiger(parRouteCherchee is { Cherchee: true, Chercheur: true } && parRouteCherchee.Lignes.Select(Texte).SequenceEqual(premier.Lignes ?? [])
+    Exiger(parRouteCherchee is { Cherchee: true, Chercheur: true } && parRouteCherchee.Lignes.Select(Texte).SequenceEqual((premier.Lignes ?? []).Select(Dates))
            && parRouteSans is { Cherchee: false, Chercheur: true },
         $"{code} : la recherche passe par la route (texte et criteres en parametres d'adresse), Cherchee ; sans recherche, la liste de travail");
 }
@@ -567,7 +575,7 @@ foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(String
         if (bloc.Resultat == "fait")
         {
             Exiger(int.Parse(journalApres) > int.Parse(journalAvant), $"{quoi} : trace au journal des gestes ({journalAvant} -> {journalApres})");
-            if (bloc.Lignes is not null) Comparer(apres, [.. bloc.Lignes], $"{quoi} : les lignes relues dans la base apres le geste");
+            if (bloc.Lignes is not null) Comparer(apres, [.. bloc.Lignes.Select(Dates)], $"{quoi} : les lignes relues dans la base apres le geste");
         }
         else
             Exiger(journalApres == journalAvant && apres.Select(Texte).SequenceEqual(avant),

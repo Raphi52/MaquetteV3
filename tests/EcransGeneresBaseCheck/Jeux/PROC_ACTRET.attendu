@@ -1,0 +1,9 @@
+# « Retention d'actes » (LecteurRetentionActes), jeu PROC_ACTRET.sql : les depots confidentiels de comptes annuels dont les
+# pieces attendues ne sont pas toutes pretes. Ordre de la V2 : la confidentialite (« Bilan » avant « Compte de resultat »), puis
+# le numero de depot decroissant.
+# Ecartes : 1801114 (bilan et declaration prets : plus retenu -- jumeau 1801111), 1801116 (depot remplace), 1801117 (categorie
+# hors comptes annuels), 1801118 (aucune piece prete -- jumeau 1801112), 1801119 (ni bilan ni resultat confidentiels).
+RETENTION ALPHA SARL · 2026 B 81101 | Dépôt T1801113 du {J-3} · Bilan : Numérisé · Déclaration de confidentialité : Numérisée  (marquée à ne pas envoyer) · Compte de résultat : NC | Bilan | EnCours | []
+RETENTION ALPHA SARL · 2026 B 81101 | Dépôt T1801112 du {J-2} · Bilan : Numérisé · Déclaration de confidentialité : Non numérisée · Compte de résultat : NC | Bilan | AFaire | []
+RETENTION ALPHA SARL · 2026 B 81101 | Dépôt T1801111 du {J-1} · Bilan : Numérisé · Déclaration de confidentialité : Absente du dépôt · Compte de résultat : NC | Bilan | AFaire | []
+RETENTION BETA SAS · 2026 B 81102 | Dépôt T1801115 du {J-5} · Bilan : Numérisé · Déclaration de confidentialité : Numérisée · Compte de résultat : Absent du dépôt | Compte de résultat | AFaire | []

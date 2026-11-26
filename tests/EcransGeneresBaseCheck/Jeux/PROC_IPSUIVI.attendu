@@ -1,0 +1,31 @@
+# « Suivi des preventions » (LecteurSuiviIp) : TOUTES les instances de type IP de la base, la plus recente en tete -- la V2 ouvre
+# n'importe quelle IP par son numero. Ecartee : 1801504 (instance J, au fond).
+# Jeu PROC_IPSUIVI.sql : 1801503 close (desistement survenu), 1801502 signifiee (opposition EXPIREE : sa date maxi ; provision
+# survenue), 1801501 rien de signifie (signification seulement attendue ; ordonnance prevue : sa date prevue).
+IP 2026IP81503 · SUIVI IP TAU | signification {J-90} | Injonctions de payer | Validee | []
+IP 2026IP81502 · SUIVI IP SIGMA | ordonnance du {J-50} · signification {J-40} · opposition {J-10} · provision {J-8} | Injonctions de payer | EnCours | []
+IP 2026IP81501 · SUIVI IP OMEGA | ordonnance du {J-7} | Injonctions de payer | AFaire | []
+# Les IP de PROC_SURVIP.sql : 1801409 a sa signification EXPIREE (date maxi affichee, rien de survenu : a signifier) ; 1801404 a
+# une consignation survenue ; 1801401 est signifiee, avec ses parties.
+IP 2026IP81409 · IP SIGNIFICATION EXPIREE | signification {J-3} | Injonctions de payer | AFaire | []
+IP 2026IP81408 · IP EUROPEENNE |  | Injonctions de payer | AFaire | []
+IP 2026IP81407 · IP CERTIFICAT ZETA |  | Injonctions de payer | AFaire | []
+IP 2026IP81406 · IP CERTIFICAT A VENIR |  | Injonctions de payer | AFaire | []
+IP 2026IP81405 · IP CADUCITE EPSILON |  | Injonctions de payer | AFaire | []
+IP 2026IP81404 · IP CONSIGNEE | provision {J-2} | Injonctions de payer | AFaire | []
+IP 2026IP81403 · IP NON AVENUE GAMMA | ordonnance du {J-60} | Injonctions de payer | AFaire | []
+IP 2026IP81402 · IP TITRE APRES 2022 | ordonnance du 01/06/2023 | Injonctions de payer | AFaire | []
+IP 2026IP81401 · CREANCIER ALPHA c/ DEBITEUR BETA | ordonnance du 01/06/2021 · signification {J-40} | Injonctions de payer | EnCours | []
+# Les IP des jeux d'autres lots (PROC_RETAUD.sql, PROC_REGJUD.sql, PROC_MESIN.sql, PROC_IPE.sql, PROC_MJUD.sql), sans
+# evenement de suivi : a signifier.
+IP 2026I17013 · INJONCTION AUD |  | Injonctions de payer | AFaire | []
+IP 2026R01206 · REGJUD IP | ordonnance du 12/02/2025 | Injonctions de payer | AFaire | []
+IP 2026IP15913 · MESIN DELTA |  | Injonctions de payer | AFaire | []
+IP 2026IP15912 · MESIN GAMMA |  | Injonctions de payer | AFaire | []
+IP 2026IP15911 · MESIN ALPHA c/ MESIN BETA |  | Injonctions de payer | AFaire | []
+IP 2026IP15306 · IPE THETA |  | Injonctions de payer | AFaire | []
+IP 2026IP15305 · IPE ETA |  | Injonctions de payer | AFaire | []
+IP 2026IP15303 · IPE EPSILON # IPE ZETA |  | Injonctions de payer | AFaire | []
+IP 2026IP15302 · IPE GAMMA # IPE DELTA |  | Injonctions de payer | AFaire | []
+IP 2026IP15301 · IPE ALPHA # IPE BETA |  | Injonctions de payer | AFaire | []
+IP 2026I12007 · IOTA BANC c/ KAPPA BANC |  | Injonctions de payer | AFaire | []

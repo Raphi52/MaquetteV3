@@ -161,6 +161,15 @@ describe('Forme File : une file de travail', () => {
     fireEvent.click(bouton('Relancer'))
     expect(annonce()).toContain('« Relancer » sur 1 ligne')
   })
+
+  it('une action grisee dit pourquoi : rien de coche, ou les lignes cochees sont d’une procedure qui ne la porte pas', async () => {
+    const { bouton, ligne } = await monter(reuni())
+    expect(bouton('Imprimer').title).toBe('Cochez au moins une ligne')
+    fireEvent.click(ligne('Alpha SARL').querySelector('input[type=checkbox]')!)
+    expect(bouton('Imprimer').disabled).toBe(true)
+    expect(bouton('Imprimer').title).toBe('« Imprimer » ne s’applique pas aux lignes cochées : il ne vaut que pour « Relances »')
+    expect(bouton('Relancer').title).toBe('')
+  })
 })
 
 describe('Forme Fiche : retrouver, corriger, Enregistrer', () => {
