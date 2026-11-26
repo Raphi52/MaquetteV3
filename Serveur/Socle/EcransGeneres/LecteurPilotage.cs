@@ -22,16 +22,24 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   - la valeur lue est la colonne NB de la premiere ligne, ecrite si non nulle (:290-292) ; une requete en erreur n'arrete pas
 ///     le tableau, son libelle est signale (:306-308).
 /// Les jetons deviennent des PARAMETRES SQL (RIG v2 les concatene en texte, culture du poste : 🐞 de la fiche), et les tables de
-/// la requete, ecrites sans schema, sont lues dans v2.* de la base V3 (la copie de l'ancien RIG).
+/// la requete, ecrites sans schema, sont lues dans v2.* de la base V3 (la copie de l'ancien RIG). Une table reprise en fiche rec.*
+/// (DOSSIER_RCS -> rec.DossierRcs, ACTION_RCS -> rec.ActionRegistre, CLIENT -> rec.Client, CATEGORIE -> rec.TypeDemande... :
+/// Serveur/Recopie/FichesV3.cs) est lue SOUS SES NOMS V2, par la correspondance colonne par colonne que la recopie tient deja
+/// (RegleRecopie.Correspondance, la meme lecture « AS » ses noms V2 que FichesRecopiees.cs) : la requete de RIG v2 reste telle
+/// quelle, seule sa table devient « (SELECT x.[NumeroGestion] AS [DSSRC_NUM_GESTION], ... FROM rec.DossierRcs AS x) ». La cle
+/// V2 n'y est que si la fiche garde l'identifiant de la V2 (copiee par le transfert : CATEGORIE, UTILISATEUR ont celui de la V3).
+/// ENCAISS (TraiterEncaiss, :365-407) : chaque ligne de la requete est un client ; un client « C » (compte) compte son
+/// emolument, un client divers le reste de sa ventilation sur l'affaire apres ses debours, plafonne a l'emolument (:380-401).
 /// GROUPE : « Feuille RCS » (1), « Feuille judiciaire » (2) ; une autre feuille n'est pas generee (garde :273). ORDRE : feuille,
 /// ligne, colonne (RIG v2 n'en a pas : PilotageRequetes.cs:33 sans ORDER BY). ETAT : « Calculé » (Validee) ou « Non calculé »
 /// (Rejetee), la cause dans la colonne Calcul.
 ///
-/// CE QUE LA V3 NE CALCULE PAS, nomme dans la colonne Calcul de la ligne : une requete qui lit une table reprise en fiche rec.*
-/// (DOSSIER_RCS -> rec.DossierRcs, ACTION_RCS, CLIENT, CATEGORIE, INSCRIPTION... : Serveur/Recopie/FichesV3.cs) ou absente de la
-/// base V3 -- la requete de RIG v2 ne la trouve pas, et la traduire serait une autre requete ; une requete qui n'est pas un SELECT
-/// seul (« declare ... ») -- LectureV2 la refuse ; le traitement « ENCAISS » (TraiterEncaiss, :365-407, un calcul ligne par ligne
-/// sur les clients et les debours). Le classeur Excel (le modele XPILOTAGE.XLT, les feuilles, ARCHIVES) et la Demande XPILOTAGE
+/// CE QUE LA V3 NE CALCULE PAS, nomme dans la colonne Calcul de la ligne : une requete qui lit une table absente de la base V3,
+/// ou une colonne d'une fiche que la V3 n'a pas reprise (propre a la V2, ou traduite d'une base a l'autre : l'agent d'un client)
+/// -- nommees ; une requete qui n'est pas un SELECT seul (« declare ... ») -- LectureV2 la refuse. fix-ok: mesure au controle
+/// final du lot 9 (27/11/2026) -- 56 cellules RCS sur 91 restaient « non calcule » parce que la V3 refusait toute table reprise
+/// en fiche, alors que FichesV3.cs donne la correspondance de chacune de leurs colonnes ; ENCAISS (7 cellules) n'etait pas
+/// repris. Le classeur Excel (le modele XPILOTAGE.XLT, les feuilles, ARCHIVES) et la Demande XPILOTAGE
 /// du travail de fond (:108-121) ne sont pas produits : la V3 n'a pas encore d'edition de ce genre.
 /// </summary>
 internal sealed partial class LecteurPilotage : IRechercheEcran
@@ -83,6 +91,13 @@ internal sealed partial class LecteurPilotage : IRechercheEcran
         return CalculerAsync(baseGreffe, debut, fin, feuille, string.IsNullOrWhiteSpace(recherche.Texte) ? null : recherche.Texte, plafond, ct);
     }
 
+    /// <summary>La requete d'un client divers dans ENCAISS (TraiterEncaiss, OPE_GENERER.cs:385-387), ses identifiants en
+    /// parametres (RIG v2 les concatene).</summary>
+    private const string RequeteEncaiss =
+        "select (select sum(venti_montant) from ventilation where venti_id_clien = @client and venti_id_affre = @affaire) as MontantVentil, " +
+        "sum(artut_montant_inpi + artut_montant_bodacc + artut_montant_autre) as MontantDebours from article_utilise " +
+        "where artut_id_clien = @client and artut_id_affre = @affaire";
+
     private sealed record Cellule(int Id, string Feuille, int? Ligne, int? Colonne, string Libelle, string Traitement, string Sql);
 
     private async Task<LignesLues> CalculerAsync(SqlConnection baseGreffe, DateTime debut, DateTime fin, string? feuille, string? texte,
@@ -113,7 +128,7 @@ internal sealed partial class LecteurPilotage : IRechercheEcran
             var groupe = c.Feuille == "1" ? FeuilleRcs : FeuilleJudiciaire;
             var nom = c.Libelle.Length > 0 ? c.Libelle : $"Cellule {c.Ligne}, {c.Colonne}";
             var place = $"ligne {c.Ligne} · colonne {c.Colonne}";
-            var cause = Cause(c, tables, out var sql);
+            var cause = Cause(c, tables, out var sql, out var sqlEncaiss);
             if (cause is not null)
             {
                 lignes.Add(new LigneLue(nom, $"non calculé : {cause}", groupe, "Rejetee", [])
@@ -122,13 +137,13 @@ internal sealed partial class LecteurPilotage : IRechercheEcran
                 });
                 continue;
             }
-            var (valeur, erreur, lue) = await NbAsync(baseGreffe, sql!, debut, finJour, ct);
+            var (valeur, erreur, lue) = await ValeurAsync(baseGreffe, sql!, sqlEncaiss, debut, finJour, ct);
             // L'annee precedente : sauf « PASANNEEPREC » quand une ligne a ete lue (:297-300, :310).
             string n1;
             if (c.Traitement == "PASANNEEPREC" && lue) n1 = "sans objet";
             else
             {
-                var (v1, e1, _) = await NbAsync(baseGreffe, sql!, debutN1, finN1, ct);
+                var (v1, e1, _) = await ValeurAsync(baseGreffe, sql!, sqlEncaiss, debutN1, finN1, ct);
                 n1 = e1 is not null ? "erreur" : v1;
                 erreur ??= e1;
             }
@@ -148,33 +163,137 @@ internal sealed partial class LecteurPilotage : IRechercheEcran
     }
 
     /// <summary>
-    /// Pourquoi la requete ne se calcule pas dans la base V3 (null : elle se calcule), et sinon la requete aux tables v2.* : une
-    /// table de FROM / JOIN qui n'est pas dans v2.* (reprise en fiche rec.*, ou absente), une requete qui n'est pas un SELECT seul,
-    /// le traitement ENCAISS.
+    /// Pourquoi la requete ne se calcule pas dans la base V3 (null : elle se calcule), et sinon la requete traduite : une table
+    /// absente, une colonne de fiche non reprise, une requete qui n'est pas un SELECT seul ; pour ENCAISS, la requete d'un client
+    /// divers aussi.
     /// </summary>
-    private static string? Cause(Cellule c, HashSet<string> tablesV2, out string? sql)
+    private static string? Cause(Cellule c, HashSet<string> tablesV2, out string? sql, out string? sqlEncaiss)
     {
-        sql = null;
-        if (c.Traitement == "ENCAISS") return "calcul d'encaissement ligne par ligne (TraiterEncaiss) non repris";
-        var manquantes = new List<string>();
-        var traduite = TableDeLaRequete().Replace(c.Sql, m =>
-        {
-            var table = m.Groups["table"].Value;
-            if (tablesV2.Contains(table)) return $"{m.Groups["mot"].Value} v2.{table}";
-            manquantes.Add(table.ToUpperInvariant());
-            return m.Value;
-        });
-        if (manquantes.Count > 0)
-        {
-            var noms = manquantes.Distinct().Select(t => ReglesFichesV3.Fiches.FirstOrDefault(f => string.Equals(f.Recopie.TableV2, t, StringComparison.OrdinalIgnoreCase)) is { } f
-                ? $"{t} (reprise en {f.Recopie.TableV3})" : $"{t} (absente de la base V3)");
-            return $"la requête de RIG v2 lit {string.Join(", ", noms)}";
-        }
+        sql = sqlEncaiss = null;
+        if (Traduire(c.Sql, tablesV2, out var traduite) is { } cause) return cause;
         try { LectureV2.ExigerLecture(traduite); }
         catch (InvalidOperationException) { return "la requête de RIG v2 n'est pas un SELECT seul"; }
+        if (c.Traitement == "ENCAISS")
+        {
+            if (Traduire(RequeteEncaiss, tablesV2, out var encaiss) is { } causeEncaiss)
+                return $"calcul d'encaissement (TraiterEncaiss) : {causeEncaiss}";
+            sqlEncaiss = encaiss;
+        }
         sql = traduite;
         return null;
     }
+
+    /// <summary>
+    /// La requete de RIG v2 sur la base V3 : chaque table de FROM / JOIN lue dans v2.*, ou sous ses noms V2 si elle est reprise
+    /// en fiche (VueV2) ; la cause (null : tout se lit) nomme les tables absentes et les colonnes de fiche non reprises.
+    /// </summary>
+    internal static string? Traduire(string requete, HashSet<string> tablesV2, out string traduite)
+    {
+        var absentes = new List<string>();
+        var fiches = new Dictionary<string, FicheV3>(StringComparer.OrdinalIgnoreCase);
+        traduite = TableDeLaRequete().Replace(requete, m =>
+        {
+            var (mot, table, indication) = (m.Groups["mot"].Value, m.Groups["table"].Value, m.Groups["indication"].Value);
+            if (tablesV2.Contains(table)) return $"{mot} v2.{table}{indication}";
+            if (FicheDe(table) is { } f)
+            {
+                fiches[table] = f;
+                // Une table derivee veut un alias : celui de la requete s'il suit, sinon le nom de la table (les colonnes
+                // qualifiees « DOSSIER_RCS.DSSRC_... » restent justes). L'indication (NOLOCK) passe dedans : une table derivee
+                // n'en prend pas.
+                var suite = AliasQuiSuit().Match(requete, m.Index + m.Length);
+                var alias = suite.Success && !MotsApresTable.Contains(suite.Groups["alias"].Value);
+                return $"{mot} {VueV2(f, indication)}{(alias ? "" : $" AS {table}")}";
+            }
+            absentes.Add(table.ToUpperInvariant());
+            return m.Value;
+        });
+        var causes = absentes.Distinct().Select(t => $"{t} (absente de la base V3)").ToList();
+        foreach (var (_, f) in fiches)
+        {
+            var lues = ColonnesV2(f);
+            var premiere = f.Recopie.Correspondance![0].V2;
+            var prefixe = premiere[..(premiere.IndexOf('_') + 1)];
+            var manquantes = Regex.Matches(requete, $@"\b{Regex.Escape(prefixe)}\w+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+                .Select(x => x.Value.ToUpperInvariant()).Distinct().Where(col => !lues.ContainsKey(col)).ToList();
+            if (manquantes.Count > 0)
+                causes.Add($"{string.Join(", ", manquantes)} de {f.Recopie.TableV2} (colonne non reprise dans {f.Recopie.TableV3})");
+        }
+        return causes.Count == 0 ? null : $"la requête de RIG v2 lit {string.Join(", ", causes)}";
+    }
+
+    private static FicheV3? FicheDe(string tableV2)
+        => ReglesFichesV3.Fiches.FirstOrDefault(f => f.Recopie.Correspondance is not null
+                                                    && string.Equals(f.Recopie.TableV2, tableV2, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Les colonnes de la fiche lues sous leur nom V2 (nom V2 -> nom V3) : la correspondance sans les colonnes
+    /// traduites (un agent, un service : leur valeur n'est pas celle de la V2), et la cle quand la fiche garde celle de la V2 --
+    /// copiee par le transfert, dont la regle la nomme en dernier (FicheV3.Transfert).</summary>
+    private static Dictionary<string, string> ColonnesV2(FicheV3 f)
+    {
+        var colonnes = f.Recopie.Correspondance!.Where(c => c.Traduction is null)
+            .ToDictionary(c => c.V2.ToUpperInvariant(), c => c.V3, StringComparer.OrdinalIgnoreCase);
+        if (f.CopieeParLeTransfert) colonnes[f.Transfert.Colonnes[^1].ToUpperInvariant()] = f.Recopie.CleV3 ?? "Id";
+        return colonnes;
+    }
+
+    /// <summary>La fiche rec.* lue sous ses noms V2 : « (SELECT x.[NumeroGestion] AS [DSSRC_NUM_GESTION], ... FROM rec.DossierRcs AS x) ».</summary>
+    private static string VueV2(FicheV3 f, string indication)
+        => $"(SELECT {string.Join(", ", ColonnesV2(f).Select(c => $"x.[{c.Value}] AS [{c.Key}]"))} FROM {f.Recopie.TableV3} AS x{indication})";
+
+    private static readonly HashSet<string> MotsApresTable = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "WHERE", "INNER", "LEFT", "RIGHT", "FULL", "CROSS", "OUTER", "JOIN", "ON", "GROUP", "ORDER", "HAVING", "UNION", "EXCEPT",
+        "INTERSECT", "WITH", "OPTION",
+    };
+
+    /// <summary>La valeur de la cellule : la colonne NB (NbAsync), ou le calcul ENCAISS si sa requete de client divers est donnee.</summary>
+    private static Task<(string Valeur, string? Erreur, bool Lue)> ValeurAsync(SqlConnection baseGreffe, string sql, string? sqlEncaiss,
+                                                                             DateTime debut, DateTime fin, CancellationToken ct)
+        => sqlEncaiss is null ? NbAsync(baseGreffe, sql, debut, fin, ct) : EncaissAsync(baseGreffe, sql, sqlEncaiss, debut, fin, ct);
+
+    /// <summary>
+    /// ENCAISS (TraiterEncaiss, OPE_GENERER.cs:365-407), sur toutes les lignes de la requete : un client « C » ajoute son
+    /// emolument (:381-382) ; un client divers, le reste de sa ventilation sur l'affaire apres ses debours, s'il est positif et
+    /// au plus l'emolument (:384-400). Aucune ligne : la cellule reste vide (:289, rien n'est ecrit).
+    /// </summary>
+    private static async Task<(string Valeur, string? Erreur, bool Lue)> EncaissAsync(SqlConnection baseGreffe, string sql, string sqlEncaiss,
+                                                                                    DateTime debut, DateTime fin, CancellationToken ct)
+    {
+        try
+        {
+            var clients = new List<(string Type, double Emolument, object Client, object Affaire)>();
+            await using (var r = await LectureV2.LireAsync(baseGreffe, sql, ct,
+                             new SqlParameter("@DateMin", System.Data.SqlDbType.DateTime) { Value = debut },
+                             new SqlParameter("@DateMax", System.Data.SqlDbType.DateTime) { Value = fin }))
+            {
+                // Les colonnes que TraiterEncaiss lit (:381-387) : sans l'une d'elles, RIG v2 tombe en erreur (:306-308).
+                var noms = Enumerable.Range(0, r.FieldCount).Select(r.GetName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                if (ColonnesEncaiss.FirstOrDefault(c => !noms.Contains(c)) is { } absente) return ("", $"pas de colonne {absente}", false);
+                while (await r.ReadAsync(ct))
+                    clients.Add((FormeLigne.Texte(r, "CLIEN_TYPE"), Flottant(r["MontantEmol"]), r["IdClient"], r["IdAffre"]));
+            }
+            if (clients.Count == 0) return ("", null, false);
+            double resultat = 0;
+            foreach (var (type, emolument, client, affaire) in clients)
+            {
+                if (type == "C") { resultat += emolument; continue; }
+                await using var r = await LectureV2.LireAsync(baseGreffe, sqlEncaiss, ct, new SqlParameter("@client", client), new SqlParameter("@affaire", affaire));
+                if (!await r.ReadAsync(ct)) continue;
+                var reste = Flottant(r["MontantVentil"]) - Flottant(r["MontantDebours"]);
+                if (reste > 0) resultat += Math.Min(reste, emolument);
+            }
+            return (Nombre(resultat), null, true);
+        }
+        catch (SqlException e)
+        {
+            return ("", e.Message, false);
+        }
+    }
+
+    private static readonly string[] ColonnesEncaiss = ["CLIEN_TYPE", "MontantEmol", "IdClient", "IdAffre"];
+
+    private static double Flottant(object v) => v is DBNull or null ? 0 : Convert.ToDouble(v, CultureInfo.InvariantCulture);
 
     /// <summary>La colonne NB de la premiere ligne (OPE_GENERER.cs:290-292) : (valeur, erreur, une ligne lue).</summary>
     private static async Task<(string Valeur, string? Erreur, bool Lue)> NbAsync(SqlConnection baseGreffe, string sql, DateTime debut, DateTime fin,
@@ -204,7 +323,12 @@ internal sealed partial class LecteurPilotage : IRechercheEcran
         _ => Convert.ToString(v, CultureInfo.InvariantCulture) ?? "",
     };
 
-    // Une table d'une clause FROM ou JOIN, ecrite sans schema ou en dbo (« FROM DOSSIER_RCS », « JOIN [dbo].[INSTANCE] »).
-    [GeneratedRegex(@"\b(?<mot>FROM|JOIN)\s+(?:\[?dbo\]?\.)?\[?(?<table>[A-Za-z_][A-Za-z0-9_]*)\]?(?![\w.(])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    // Une table d'une clause FROM ou JOIN, ecrite sans schema ou en dbo (« FROM DOSSIER_RCS », « JOIN [dbo].[INSTANCE] »), et
+    // son indication de verrou (« ARTICLE_UTILISE WITH (nolock) », les requetes ENCAISS).
+    [GeneratedRegex(@"\b(?<mot>FROM|JOIN)\s+(?:\[?dbo\]?\.)?\[?(?<table>[A-Za-z_][A-Za-z0-9_]*)\]?(?![\w.(])(?<indication>\s+WITH\s*\(\s*NOLOCK\s*\))?", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex TableDeLaRequete();
+
+    // Ce qui suit une table : son alias (« DOSSIER_RCS d », « CLIENT AS c ») ou un mot de la requete (WHERE, INNER...).
+    [GeneratedRegex(@"\G\s+(?:AS\s+)?(?<alias>[A-Za-z_]\w*)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex AliasQuiSuit();
 }
