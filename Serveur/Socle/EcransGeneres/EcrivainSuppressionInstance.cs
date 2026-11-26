@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Data.SqlClient;
 using RigV3.Contrats.EcransGeneres;
+using RigV3.Contrats.Numerotation;
 using RigV3.Serveur.Socle.Greffes;
 using static RigV3.Serveur.Socle.EcransGeneres.LecteurSuppressionInstance;
 
@@ -22,9 +23,12 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// message de RIG v2 (« La suppression est impossible pour la ou les raison(s) suivante(s) : », ETP_INSTANCE_SUMMARY.cs:46).
 ///
 /// LES NUMEROS : RIG v2 les restitue si la case « Libérer le numéro d'instance » est cochee (Numerotation.Restituer, procedure
-/// RESTITUER_NUMERO, OPE_INSTANCE_LIBERER_NUM_METIER.cs:101-113). Dans la V3, les numeros sont tenus par num.Restituer
-/// (Base\migrations\NUM-001_compteurs.sql), hors des tables v2.* et rec.* qu'un ecran genere ecrit (EcrivainEcran.cs, point 3) :
-/// la V3 ne les rend pas. Case cochee : refus, rien n'est supprime ; case decochee : RIG v2 supprime sans rendre, apres son
+/// RESTITUER_NUMERO, OPE_INSTANCE_LIBERER_NUM_METIER.cs:101-108) : chaque numero de la liste (repertoire general JGAFF, le
+/// role, le dossier judiciaire JRDSJ s'il n'a plus d'autre instance -- LecteurSuppressionInstance.NumerosALiberer), annee =
+/// celle de la saisine (:63-64), explication « XXAFF: suppression instance <role> » (:105). Dans la V3 : num.Restituer, l'entree
+/// typee du socle (GesteEnCours.RestituerNumeroAsync, EcrivainEcran.cs), dans la transaction du geste (lot 5, ordre du chef
+/// msg-d0ef0cdc). RIG v2 ne lit pas le resultat de la restitution : un numero refuse (type sans compteur, numero jamais donne)
+/// n'empeche pas la suppression ; la V3 dit l'issue de chacun. Case decochee : RIG v2 supprime sans rendre, apres son
 /// avertissement (« Attention vous avez choisi de ne pas libérer les numéros... », :96-98), que le message reprend.
 /// NON REPRIS (nomme) : le courriel envoye a chaque suppression (SendMail, :112, :120-156 -- service externe, jamais appele : le
 /// message le dit) ; la demande XXAFF de RIG v2, une trace sans facture (MetierFacture = false, PROC_XXAFF.cs:25) que le journal
@@ -213,9 +217,7 @@ internal sealed class EcrivainSuppressionInstance : IEcrivainEcran
         // les raisons s'y suivent, chacune ouverte par son tiret.
         if (raisons.Count > 0)
             return IssueGeste.Refuser("La suppression est impossible pour la ou les raison(s) suivante(s) : " + string.Join(" ", raisons.Select(x => x.Trim())));
-        if (geste.Valeur(SectionNumeros, ChampLiberer) == "oui")
-            return IssueGeste.Refuser($"La V3 ne rend pas les numéros de l'instance {role} (RIG v2 les restitue par RESTITUER_NUMERO ; la V3 les tient " +
-                                      $"hors des tables qu'un écran écrit) : décocher « {ChampLiberer} » pour la supprimer sans les rendre, comme RIG v2 le permet après son avertissement.");
+        var liberer = geste.Valeur(SectionNumeros, ChampLiberer) == "oui";
 
         // DeleteCascade, dans son ordre.
         var presentes = await TablesPresentesAsync(geste.Base, geste.Transaction, ct);
@@ -235,17 +237,29 @@ internal sealed class EcrivainSuppressionInstance : IEcrivainEcran
         if (!effacees.Any(e => e.Table == "INSTANCE"))
             throw new InvalidOperationException($"Instance {n} : la ligne de v2.INSTANCE n'a pas ete supprimee.");
 
+        // Les numeros : rendus un a un si la case est cochee (OPE_INSTANCE_LIBERER_NUM_METIER.cs:101-108), l'issue de chacun dite.
         var liees = effacees.Where(e => e.Table != "INSTANCE").Sum(e => e.Lignes);
-        var rendus = string.Join(", ", numeros.Where(x => x.Numero.Length > 0).Select(x => $"{x.Type} {x.Numero}"));
+        var aRendre = numeros.Where(x => x.Numero.Length > 0).ToList();
+        var rendus = string.Join(", ", aRendre.Select(x => $"{x.Type} {x.Numero}"));
+        var issues = new List<string>();
+        if (liberer)
+            foreach (var (type, numero) in aRendre)
+            {
+                var res = await geste.RestituerNumeroAsync(new DemandeRestitution(type, numero, $"XXAFF: suppression instance {role}", annee), ct);
+                issues.Add(res.Code >= 0 ? $"{type} {numero} {res.Issue}" : $"{type} {numero} non rendu ({res.Issue ?? "compteur occupé"})");
+            }
+        var numerosTexte = liberer
+            ? $"Numéros (année {annee}) : {string.Join(", ", issues)}. "
+            : $"Numéros non rendus ({rendus}, année {annee}) : « Attention vous avez choisi de ne pas libérer les numéros. » ";
         return IssueGeste.Ecrit(
             $"Instance {role} supprimée de la base du greffe ({liees} ligne{(liees > 1 ? "s" : "")} liée{(liees > 1 ? "s" : "")} effacée{(liees > 1 ? "s" : "")} ou mise{(liees > 1 ? "s" : "")} à jour). " +
-            $"Numéros non rendus ({rendus}, année {annee}) : « Attention vous avez choisi de ne pas libérer les numéros. » " +
-            "Le courriel de suppression de RIG v2 n'est pas envoyé par la V3.",
+            numerosTexte + "Le courriel de suppression de RIG v2 n'est pas envoyé par la V3.",
             [id],
             new TraceGeste("affaire", $"l'instance {role}", id, "a supprime",
                 new
                 {
                     Role = role, Nom = nom, Numeros = numeros.Select(x => $"{x.Type} {x.Numero}").ToArray(), Annee = annee,
+                    Liberes = issues.ToArray(),
                     Lignes = effacees.Select(e => $"{e.Table} : {e.Lignes}").ToArray(),
                 }, null));
     }

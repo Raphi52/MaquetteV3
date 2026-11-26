@@ -50,14 +50,19 @@ ids: 1400302
 resultat: refuse
 message: La suppression est impossible pour la ou les raison(s) suivante(s) : - L'instance que vous voulez supprimer est liée à une autre instance. -> Vous devez casser ce lien pour supprimer l'instance en lancant le processus JOIN sur le numéro de rôle 1990J14303. - L'instance que vous voulez supprimer est l'instance principale d'une (ou plusieurs) autre(s) instance(s). -> Vous devez casser ce lien pour supprimer l'instance en lancant le processus JOIN sur le (ou les) numéro(s) de rôle 1990J14306.
 ---
-# 9. « Libérer le numéro d'instance » coche : la V3 ne rend pas les numeros. Jumeau : bloc 10 (case decochee).
+# 9. « Libérer le numéro d'instance » coche (par defaut dans RIG v2, OPE_INSTANCE_LIBERER_NUM_METIER.cs:47) : apres la
+#    suppression, chaque numero est rendu par num.Restituer (Numerotation.Restituer, :101-108), annee de la saisine (:63-64),
+#    explication « XXAFF: suppression instance <role> » (:105). L'instance NF BETA (1520002, PROC_NF.sql ; sa PC ouverte par
+#    PROC_NF.gestes) : pas de repertoire general ni de dossier judiciaire, son role JRPC 1990J20002 est rendu au compteur JRPC
+#    1990 de PROC_NF.sql (restitution active). Joue en fin de banc : aucun jeu ne relit cette instance apres. Jumeau : bloc 10
+#    (case decochee, rien n'est rendu).
 geste: Confirmer Valider
-ids: 1400351
+ids: 1520002
 valeur: Numéros à libérer › Libérer le numéro d'instance = oui
-resultat: refuse
-message: La V3 ne rend pas les numéros de l'instance 2026M14351 (RIG v2 les restitue par RESTITUER_NUMERO ; la V3 les tient hors des tables qu'un écran écrit) : décocher « Libérer le numéro d'instance » pour la supprimer sans les rendre, comme RIG v2 le permet après son avertissement.
-fiche: 1400351
-Numéros à libérer › Libérer le numéro d'instance = oui
+resultat: fait
+message: Instance 1990J20002 supprimée de la base du greffe (3 lignes liées effacées ou mises à jour). Numéros (année 1990) : JRPC 1990J20002 rendu. Le courriel de suppression de RIG v2 n'est pas envoyé par la V3.
+controle: SELECT COUNT(*) FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1520002 => 0
+controle: SELECT r.Numero + '|' + CONVERT(varchar(5), r.Annee) + '|' + r.Explication FROM num.NumeroRendu AS r WHERE r.Serie = 'JRPC' AND r.Numero = '1990J20002' => 1990J20002|1990|XXAFF: suppression instance 1990J20002
 ---
 # 10. La suppression (DeleteCascade, Instance.cs:4237-4670) : l'instance, une ligne de chaque table liee, son dossier judiciaire
 #     orphelin, la PREMIERE correspondance Oracle seulement, le lien du document signe a NULL ; les demandes 2J renommees, la
@@ -82,7 +87,6 @@ ALPHA BANC c/ BETA BANC | Rôle 2026J12001 · saisi le 15/01/2026 | Au fond | AF
 IOTA BANC c/ KAPPA BANC | Rôle 2026I12007 · saisi le 01/02/2026 | Au fond | AFaire | []
 XXAFF EPSILON | Rôle 2025M14355 · saisi le 05/03/2026 · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
 JOIN MERE | Rôle 1990M14401 · saisi le 10/01/1990 | Au fond | AFaire | []
-NF BETA Paul | Rôle 1990J20002 · saisi le 15/01/1990 | Au fond | AFaire | []
 NF CREANCIER # NF ALPHA SA | Rôle 1990J20001 · saisi le 15/01/1990 | Au fond | AFaire | []
 XLIEN ETA | Rôle 1990J14306 · saisi le 15/01/1990 | Au fond | AFaire | []
 XLIEN ZETA | Rôle 1990J14306 · saisi le 15/01/1990 · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []

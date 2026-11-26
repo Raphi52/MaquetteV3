@@ -40,12 +40,15 @@ IF COL_LENGTH('v2.DEMANDE', 'DMND_NUM_INDICATIF') IS NULL ALTER TABLE v2.DEMANDE
 IF COL_LENGTH('v2.DEMANDE', 'DMND_LES_NUMEROS') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_LES_NUMEROS varchar(128) NULL;
 
 -- Les compteurs (num.Compteur, NUM-001) s'ils manquent : JPC (PC du ressort : structure ALC, lettre RJ, chrono sur 4, comme
--- RIG_DEV 2026RJ0242 et Pont/EcranCompteurs.cs:151) et DMD (demandes).
+-- RIG_DEV 2026RJ0242 et Pont/EcranCompteurs.cs:151) et DMD (demandes) ; JRPC 1990, qui a donne les roles 1990J20001-2 (chrono
+-- 20002, restitution active) : PROC_XXAFF.gestes bloc 9 y rend le role de NF BETA en la supprimant.
 EXEC sp_executesql N'
 IF NOT EXISTS (SELECT 1 FROM num.Compteur WHERE Type = ''JPC'')
     INSERT INTO num.Compteur (Type, Annee, Structure, CodageAnnee, Lettre, TailleChrono, Debut) VALUES (''JPC'', 2026, ''ALC'', 4, ''RJ'', 4, 1);
 IF NOT EXISTS (SELECT 1 FROM num.Compteur WHERE Type = ''DMD'')
-    INSERT INTO num.Compteur (Type, Annee, Structure, CodageAnnee, Lettre, TailleChrono, Debut) VALUES (''DMD'', 2026, ''LAQC'', 2, ''D'', 5, 1);';
+    INSERT INTO num.Compteur (Type, Annee, Structure, CodageAnnee, Lettre, TailleChrono, Debut) VALUES (''DMD'', 2026, ''LAQC'', 2, ''D'', 5, 1);
+INSERT INTO num.Compteur (Type, Annee, Structure, CodageAnnee, Lettre, TailleChrono, Debut, Chrono, GestionRendus)
+    VALUES (''JRPC'', 1990, ''ALC'', 4, ''J'', 5, 1, 20002, 1);';
 
 -- Les references : le code affaire PC15 (serie JRPC, type d'instance 08, comme FOU7 de RIG_DEV) ; la nature N15 d'origine ISO 08
 -- (ouverture, comme 40A de RIG_DEV) ; les actes 15C (auteur de la saisine 2 = creancier : le DEFENDEUR est le debiteur) et 15D

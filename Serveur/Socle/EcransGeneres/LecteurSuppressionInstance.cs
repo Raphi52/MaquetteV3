@@ -350,7 +350,7 @@ internal sealed class LecteurSuppressionInstance : IRechercheEcran, IFicheEcran
             }]),
             new SectionFiche(SectionNumeros,
             [
-                // Cochee par defaut dans RIG v2 (OPE_INSTANCE_LIBERER_NUM_METIER.cs:47) ; la V3 ne rend pas les numeros (geste).
+                // Cochee par defaut dans RIG v2 (OPE_INSTANCE_LIBERER_NUM_METIER.cs:47)  ; le geste les rend par num.Restituer (EcrivainSuppressionInstance).
                 new(ChampLiberer, "oui"),
                 new(ChampNumeros, "") { Colonnes = ["Type", "Numéro", "Année"], Lignes = [.. numeros.Select(x => new[] { x.Type, x.Numero, annee.ToString(CultureInfo.InvariantCulture) })] },
             ]),
