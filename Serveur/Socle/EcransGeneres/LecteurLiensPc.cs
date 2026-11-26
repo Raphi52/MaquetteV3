@@ -217,6 +217,8 @@ internal sealed class LecteurLiensPc : IRechercheEcran, IFicheEcran
         return new FicheEcran(Procedure, id, i.NomCourant.Length > 0 ? i.NomCourant : $"Instance n° {i.Role}",
         [
             new SectionFiche(SectionLien, [new(ChampPc, i.NumPc), new(ChampPrevention, i.NumPrv)]),
+            // Une case du geste, pas une colonne de la base : rien a lire, vide (sans elle, l'apercu dit « non lu »).
+            new SectionFiche(SectionDetachement, [new(ChampDetacher, "")]),
             new SectionFiche(SectionEntite,
                 [new(ChampEntite, "") { Colonnes = ["Numéro", "Nom de l'affaire", "Ouverture", "Solution", "Clôture"], Lignes = [.. lignes] }]),
         ])
