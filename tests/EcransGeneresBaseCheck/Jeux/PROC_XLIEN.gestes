@@ -2,6 +2,7 @@
 # PROC_JOIN.sql et les PC de PROC_CHM.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs. Un refus n'ecrit rien ;
 # chaque refus a son jumeau accepte (meme borne, autre cote).
 # 1. Instance tenue par une demande en cours sur 2J (instance.Lock, PROC_XLIENPC.cs:51). Jumeau : bloc 10 (1400301, libre).
+# Lot 8 (27/11/2026) : « Juge », role 2026OP00001, est l'opposition que PROC_SURVIP.gestes (joue avant, ordre des noms) enrole sur une IP caduque : une instance RP sans PC, que ces lignes relisent aussi.
 geste: Confirmer Valider
 ids: PC-1400305
 valeur: Lien › Procédure collective = 1990P14102
@@ -72,6 +73,7 @@ valeur: Lien › Procédure collective = 1990 P 14102
 resultat: fait
 message: L'instance 1990J14301 est rattachée à la PC 1990P14102.
 lignes:
+Juge | Rôle 2026OP00001 · sans PC | Vers une PC | AFaire | []
 THETA BANC | Rôle 2026J12008 · sans PC · bloquée par la demande 26012000008 | Vers une PC | EnAttente | []
 ZETA BANC | Rôle 2026J12006 · sans PC | Vers une PC | AFaire | []
 ETA BANC | Rôle 2026J12005 · sans PC | Vers une PC | AFaire | []
@@ -88,6 +90,7 @@ XLIEN ALPHA | Rôle 1990J14301 · PC 1990P14102 | Vers une PC | EnCours | []
 TAU SANS MD | Rôle 2026P13103 · sans prévention | Vers une prévention | AFaire | []
 OMEGA MD INSTANCE | Rôle 2026P13101 · sans prévention | Vers une prévention | AFaire | []
 PREVENTION BANC | Rôle 2026P12004 · sans prévention | Vers une prévention | AFaire | []
+Juge | Rôle 2026OP00001 · sans prévention | Vers une prévention | AFaire | []
 SIGMA MD INSTANCE | Rôle 2026M13102 · sans prévention | Vers une prévention | AFaire | []
 XLIEN DELTA | Rôle 1990R14304 · sans prévention | Vers une prévention | AFaire | []
 XLIEN ETA | Rôle 1990J14306 · PC 1990P14101 | Vers une prévention | Rejetee | []
@@ -104,6 +107,7 @@ valeur: Détachement › Détacher le lien = oui
 resultat: fait
 message: L'instance 1990J14302 est détachée de la PC 1990P14101.
 lignes:
+Juge | Rôle 2026OP00001 · sans PC | Vers une PC | AFaire | []
 THETA BANC | Rôle 2026J12008 · sans PC · bloquée par la demande 26012000008 | Vers une PC | EnAttente | []
 ZETA BANC | Rôle 2026J12006 · sans PC | Vers une PC | AFaire | []
 ETA BANC | Rôle 2026J12005 · sans PC | Vers une PC | AFaire | []
@@ -120,6 +124,7 @@ XLIEN ALPHA | Rôle 1990J14301 · PC 1990P14102 | Vers une PC | EnCours | []
 TAU SANS MD | Rôle 2026P13103 · sans prévention | Vers une prévention | AFaire | []
 OMEGA MD INSTANCE | Rôle 2026P13101 · sans prévention | Vers une prévention | AFaire | []
 PREVENTION BANC | Rôle 2026P12004 · sans prévention | Vers une prévention | AFaire | []
+Juge | Rôle 2026OP00001 · sans prévention | Vers une prévention | AFaire | []
 SIGMA MD INSTANCE | Rôle 2026M13102 · sans prévention | Vers une prévention | AFaire | []
 XLIEN DELTA | Rôle 1990R14304 · sans prévention | Vers une prévention | AFaire | []
 XLIEN ETA | Rôle 1990J14306 · PC 1990P14101 | Vers une prévention | Rejetee | []
@@ -133,6 +138,7 @@ valeur: Lien › Prévention = 1990V14201
 resultat: fait
 message: L'instance 1990R14304 est rattachée à la prévention 1990V14201.
 lignes:
+Juge | Rôle 2026OP00001 · sans PC | Vers une PC | AFaire | []
 THETA BANC | Rôle 2026J12008 · sans PC · bloquée par la demande 26012000008 | Vers une PC | EnAttente | []
 ZETA BANC | Rôle 2026J12006 · sans PC | Vers une PC | AFaire | []
 ETA BANC | Rôle 2026J12005 · sans PC | Vers une PC | AFaire | []
@@ -149,6 +155,7 @@ XLIEN ALPHA | Rôle 1990J14301 · PC 1990P14102 | Vers une PC | EnCours | []
 TAU SANS MD | Rôle 2026P13103 · sans prévention | Vers une prévention | AFaire | []
 OMEGA MD INSTANCE | Rôle 2026P13101 · sans prévention | Vers une prévention | AFaire | []
 PREVENTION BANC | Rôle 2026P12004 · sans prévention | Vers une prévention | AFaire | []
+Juge | Rôle 2026OP00001 · sans prévention | Vers une prévention | AFaire | []
 SIGMA MD INSTANCE | Rôle 2026M13102 · sans prévention | Vers une prévention | AFaire | []
 XLIEN DELTA | Rôle 1990R14304 · prévention 1990V14201 | Vers une prévention | EnCours | []
 XLIEN ETA | Rôle 1990J14306 · PC 1990P14101 | Vers une prévention | Rejetee | []

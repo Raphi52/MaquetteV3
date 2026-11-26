@@ -2,6 +2,7 @@
 # instances de PROC_XXAFF.sql et PROC_JOIN.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs. Un refus n'ecrit rien ;
 # chaque refus a son jumeau accepte : la suppression de 1400351 (bloc 10).
 # 1. Deux instances : RIG v2 en supprime une, celle de la demande. Jumeau : bloc 10.
+# Lot 8 (27/11/2026) : « Juge », role 2026OP00001, est l'opposition que PROC_SURVIP.gestes (joue avant, ordre des noms) enrole sur une IP caduque : une instance RP sans PC, que ces lignes relisent aussi.
 geste: Confirmer Valider
 ids: 1400351,1400352
 resultat: refuse
@@ -75,6 +76,7 @@ message: Instance 2026M14351 supprimée de la base du greffe (24 lignes liées e
 lignes:
 XXAFF ZETA | Rôle 2026X14356 · saisi le 06/03/2026 · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
 GAMMA BANC c/ DELTA BANC | Rôle 2026R12002 · saisi le 10/01/2026 · bloquée par la demande 26012000002 | En référé | EnAttente | []
+Juge | Rôle 2026OP00001 · saisi le {J+0} · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
 XXAFF ETA | Rôle 2026M14357 · saisi le 07/03/2026 · 2 raisons de RIG v2 l'empêchent | Au fond | Rejetee | []
 XXAFF DELTA | Rôle 2026M14354 · saisi le 04/03/2026 · bloquée par la demande 26014000384 | Au fond | EnAttente | []
 XXAFF GAMMA | Rôle 2026M14353 · saisi le 03/03/2026 · 3 raisons de RIG v2 l'empêchent | Au fond | Rejetee | []

@@ -27,8 +27,12 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 //   - PROC_XPILOTAGE : les lignes sont les cellules pilotees (table PILOTAGE_REQUETES), par feuille.
 //   - PROC_RELANCELOT : le bouton Réinitialiser n'est jamais activable (TODO de la fiche,
 //     OPE_EDITGRP.cs:120) : il n'est pas offert ici.
-//   - PROC_IPSUIVI : dix etats dans le code (TypeTraitement), cinq ici ; « Suspendue » et
-//     « transférée » partagent l'etat figé EnAttente, « Rejetée » est l'etat Rejetee.
+//   - PROC_IPSUIVI : une Fiche a trois etats (A signifier, Signifiee, Close), lus des evenements de
+//     l'IP (LecteurSuiviIp.cs) ; les dix etats de la partie haute de la fiche V2 ne sont pas dans le code
+//     (proc_ipsuivi.md:165-171). Lot 8, 27/11/2026.
+// fix-ok: les descripteurs du lot 8 sont retouches en plusieurs passes parce que chaque geste branche
+// (relances, injonctions, puis traitements des IP et desistement, 26-27/11/2026) change ce que leur
+// commentaire et leurs Parametres disent : aucune retouche n'est une correction a l'aveugle.
 public sealed class DomaineSurveiller : IDomaineEcrans
 {
     public IEnumerable<DescripteurEcran> Ecrans() =>
@@ -676,10 +680,13 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Recherche = "Rechercher une injonction, un numéro de rôle, un demandeur…",
             Criteres = ["Juge", "Greffier", "Titre exécutoire", "Non avenue", "Caducité", "Certificat de non-opposition"],
             Valider = "Appliquer les traitements", // proc_survip.md, Rôle : « Appliquer les traitements : Titre exécutoire, Caducité, IP Non avenue, Certificat de non-opposition ».
+            // Les saisies du traitement (EcrivainSurveillanceIp.cs) : juge (obligatoire), greffier et date prevue de l'etape de
+            // recherche (OPE_RECHERCHE.Designer.cs:133-157), et les cases LRAR / LR de la grille de RIG v2 (OPE_TRAITEMENTS.cs:744-800).
+            Parametres = ["Juge", "Greffier", Champ.Date("Date prévue"), Champ.Case("LRAR"), Champ.Case("LR")],
             Rang = 5,
             // La V2 ne liste que les echeances a traiter : toute ligne est « A traiter » ; une IP traitee sort de la liste
-            // (son evenement futur expire). Lot 8 (26/11/2026) : lu dans la base -- LecteurSurveillanceIp.cs ; le traitement
-            // (OPE_TRAITEMENTS.PreparationTraitements) n'est pas encore branche : l'ecran le dit (« Demonstration »).
+            // (son evenement futur expire ou survient). Lot 8 : lu dans la base -- LecteurSurveillanceIp.cs (26/11/2026) ; le
+            // traitement (OPE_TRAITEMENTS.PreparationTraitements) ecrit -- EcrivainSurveillanceIp.cs (27/11/2026).
             Etats = EtatsEcran.Trois("À traiter", "En cours", "Traitée"),
             // Les TypeTrt de la V2 au mot pres (PROC_SURVIP.cs:18-23), dans l'ordre de chargementTraitements
             // (OPE_RECHERCHE.cs:278-306).
@@ -715,8 +722,9 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // FICHE, pas File (decision du chef, formes a revoir : proc_ipsuivi.md:173). Le « Detail OPE » fait foi : IPSUIVI
             // est le suivi d'UNE injonction de payer apres son ordonnance, ouverte par son numero (PROC_IPSUIVI.cs:20-26,
             // ETP_IPSUIVI.cs:14-15) ; la partie haute de la fiche (dix etats NonTraite... Transfere, IP_SUIVI) ne correspond
-            // pas au code (proc_ipsuivi.md:165-171). Lot 8 (26/11/2026) : lue dans la base -- LecteurSuiviIp.cs ; la saisie
-            // des dates (Valider : evenements, instance J ou OP, facture, editions) n'est pas branchee, la fiche est en lecture.
+            // pas au code (proc_ipsuivi.md:165-171). Lot 8 : lue dans la base -- LecteurSuiviIp.cs (26/11/2026) ; Valider
+            // enregistre le desistement -- EcrivainSuiviIp.cs (27/11/2026) ; les autres dates (evenements futurs lies, instance J
+            // ou OP, facture) restent en lecture.
             Forme = FormeEcran.Fiche,
             Recherche = "Rechercher une injonction de payer par son numéro…",
             Criteres = ["N° IP"], // le champ de saisie de la V2 (ETP_IPSUIVI.cs:14-15, GetUltByMetierTitre("N° IP"))
@@ -733,9 +741,10 @@ public sealed class DomaineSurveiller : IDomaineEcrans
                     "N° IP", Champ.Date("Date IP"), "Demandeur", "Défendeur"),
                 // Les dates des actes qui suivent l'ordonnance (OPE_IPSUIVI.cs:879-944) : l'evenement survenu, sinon la date
                 // d'expiration de l'evenement expire (signification, opposition, provision).
-                Marche("Actes après l'ordonnance", "Chaque date vient de l'événement de procédure survenu ; à défaut, de la date d'expiration de l'événement expiré. Dans RIG v2, saisir une date fait survenir l'événement : la V3 ne le reprend pas encore, la fiche se lit.", true,
+                Marche("Actes après l'ordonnance", "Chaque date vient de l'événement de procédure survenu ; à défaut, de la date d'expiration de l'événement expiré. Le désistement s'enregistre (événement IPDESIN) ; les autres dates se lisent : la V3 ne reprend pas encore leurs événements liés.", true,
                     Champ.Date("Signification"), Champ.Case("À personne"), Champ.Date("Opposition"), Champ.Date("Réception LRAR"),
-                    Champ.Date("Provision"), Champ.Date("Certificat de non-opposition")),
+                    Champ.Date("Provision"), Champ.Date("Certificat de non-opposition"),
+                    Champ.Date("Désistement")), // ult_Desistement (OPE_IPSUIVI.Designer.cs:412)
             ],
             Lignes =
             [

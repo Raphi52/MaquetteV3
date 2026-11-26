@@ -284,3 +284,43 @@ SET IDENTITY_INSERT rec.DossierRcs OFF;
 SET IDENTITY_INSERT rec.ActionRegistre ON;
 INSERT INTO rec.ActionRegistre (Id, IdDossier, IdDepot, CodeProcessus, EtatInfo, EtatAction, SurNotification) VALUES (1800101, 1800101, NULL, 'RDBE', 'C', 'V', 0);
 SET IDENTITY_INSERT rec.ActionRegistre OFF;
+
+-- Les exclusions de la recherche ISURV SDBE (LecteurInjonctionsBeneficiaires.ExclusionsIsurv, SqlSelect de RIG_DEV relu le
+-- 27/11/2026) : l'inscription PM non cotee, de forme juridique a declaration de beneficiaires. 1100101, 1100102 et 1800101 la
+-- portent (forme SAI18, TYPE_BEN 1) ; 1800102 (societe COTEE) et 1800103 (forme SNB18, TYPE_BEN 0) ont une relance 1 echue
+-- comme 1100101 mais sont ecartes -- jumeau 1100101. Leur diligence reste a « Relances beneficiaires », « Relancee »
+-- (PROC_DBE_RELANCE.attendu). FORME_JURIDIQUE_UTI est creee a l'identique de PROC_DBE_RELANCE.sql (plus loin dans l'ordre).
+-- Les autres exclusions (siege dans l'UE, depot ou formalite BEN, demandes DAS en cours, instance OPINJRBE) lisent des tables
+-- que d'autres ecrans lisent sans filtre : la requete les porte, ce jeu ne les fait pas varier (meme regle que PROC_DBE_RELANCE.sql).
+IF COL_LENGTH('v2.INSCRIT_PM', 'INSPM_FORME_JURIDIQUE_UTI') IS NULL ALTER TABLE v2.INSCRIT_PM ADD INSPM_FORME_JURIDIQUE_UTI varchar(10) NULL;
+IF COL_LENGTH('v2.INSCRIT_PM', 'INSPM_SOCI_COTEE') IS NULL ALTER TABLE v2.INSCRIT_PM ADD INSPM_SOCI_COTEE bit NULL;
+IF OBJECT_ID(N'v2.FORME_JURIDIQUE_UTI') IS NULL
+    CREATE TABLE v2.FORME_JURIDIQUE_UTI (R_FORMEJURID_VALEUR varchar(10) NOT NULL PRIMARY KEY, R_FORMEJURID_TYPE_BEN int NULL);
+SET IDENTITY_INSERT rec.Entreprise ON;
+INSERT INTO rec.Entreprise (Id, Siren, Civilite, Denomination, EtatInfo, FicheSommaire) VALUES
+    (1800102, '518000102', '', N'ENJOINDRE COTEE SA', 'C', 0), (1800103, '518000103', '', N'ENJOINDRE SANS BEN', 'C', 0);
+SET IDENTITY_INSERT rec.Entreprise OFF;
+SET IDENTITY_INSERT rec.DossierRcs ON;
+INSERT INTO rec.DossierRcs (Id, IdEntreprise, TypeRcs, NumeroGestion, Siren, DateImmatriculation, MotifImmatriculation,
+    ProvisoirementSans, CompteurMaj, DateMaj, EtatDossier, EtatInfo, InscritRegistreMetiers, ModificationInterne,
+    SirenProvisoire, Accre, AutoEntrepreneur, Eirl, AutoEntrepreneurRegularise)
+SELECT v.Id, v.Id, 'B1', '2018B8' + RIGHT(CAST(v.Id AS varchar(7)), 4), '51800' + RIGHT(CAST(v.Id AS varchar(7)), 4), '20180101', 'C', 0, 0,
+       '20180101', 'A', 'C', 0, 0, 0, 0, 0, 0, 0
+FROM (VALUES (1800102), (1800103)) AS v (Id);
+SET IDENTITY_INSERT rec.DossierRcs OFF;
+SET IDENTITY_INSERT rec.ActionRegistre ON;
+INSERT INTO rec.ActionRegistre (Id, IdDossier, IdDepot, CodeProcessus, EtatInfo, EtatAction, SurNotification) VALUES
+    (1800102, 1800102, NULL, 'RDBE', 'C', 'V', 0), (1800103, 1800103, NULL, 'RDBE', 'C', 'V', 0);
+SET IDENTITY_INSERT rec.ActionRegistre OFF;
+EXEC sp_executesql N'
+INSERT INTO v2.FORME_JURIDIQUE_UTI (R_FORMEJURID_VALEUR, R_FORMEJURID_TYPE_BEN) VALUES (''SAI18'', 1), (''SNB18'', 0);
+INSERT INTO v2.INSCRIT_PM (INSPM_ID_DSRCS, INSPM_FORME_JURIDIQUE_UTI, INSPM_SOCI_COTEE)
+SELECT v.Id, CASE WHEN v.Id = 1800103 THEN ''SNB18'' ELSE ''SAI18'' END, CASE WHEN v.Id = 1800102 THEN 1 ELSE 0 END
+FROM (VALUES (1100101), (1100102), (1800101), (1800102), (1800103)) AS v (Id);
+INSERT INTO v2.DILIGENCE_RCS (DLGRC_ID_DLGRC, DLGRC_ID_ACTRC, DLGRC_NATURE_DILIGENCE, DLGRC_ETAT_DILIGENCE, DLGRC_ETAT_RELANCE) VALUES
+    (1800102, 1800102, ''SDBE'', ''1'', ''2''), (1800103, 1800103, ''SDBE'', ''1'', ''2'');
+INSERT INTO v2.RELANCE_RCS (RLCRC_ID_RLCRC, RLCRC_ID_DLGRC, RLCRC_NUM_ORDRE, RLCRC_DATE_RELANCE, RLCRC_DATE_LIMITE, RLCRC_TYPE_RELANCE,
+    RLCRC_ID_INSTN, RLCRC_FACTURE) VALUES
+    (1800122, 1800102, 1, DATEADD(DAY, -31, @aujourdhui), DATEADD(DAY, -1, @aujourdhui), ''S'', NULL, 0),
+    (1800123, 1800103, 1, DATEADD(DAY, -31, @aujourdhui), DATEADD(DAY, -1, @aujourdhui), ''S'', NULL, 0);',
+    N'@aujourdhui datetime', @aujourdhui;

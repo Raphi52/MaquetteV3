@@ -52,7 +52,26 @@ valeur: Date du cabinet = 2099-01-15
 valeur: Cabinet = CB18
 valeur: Date prévue = 2099-01-15
 resultat: refuse
-message: ENJOINDRE GAMMA SARL · SIREN 511 000 103 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, s'enjoint).
+message: ENJOINDRE GAMMA SARL · SIREN 511 000 103 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).
+---
+# 6b. Refus : 1800102, relance 1 echue comme 1100101, mais societe COTEE -- la recherche ISURV SDBE de RIG v2 l'ecarte
+#     (INSPM_SOCI_COTEE = 0, LecteurInjonctionsBeneficiaires.ExclusionsIsurv) ; 1800103 de meme, forme juridique sans declaration
+#     de beneficiaires (R_FORMEJURID_TYPE_BEN 0). Jumeau accepte : bloc 7 (1100101, non cotee, forme SAI18).
+geste: Agir Générer les injonctions
+ids: 1800102
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: ENJOINDRE COTEE SA · SIREN 518 000 102 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).
+---
+geste: Agir Générer les injonctions
+ids: 1800103
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: ENJOINDRE SANS BEN · SIREN 518 000 103 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).
 ---
 # 7. FAIT, en lot sur 2 lignes : 1100101 et 1100102, cabinet du 15/01/2099 chambre CB18 -- juge, greffier et type de classement
 #    (CJ, seul admis) recopies du cabinet --, heure d'appel 09:45, ordonnance prevue le 15/01/2099. Une instance INJ18 par dossier
@@ -94,4 +113,4 @@ valeur: Date du cabinet = 2099-01-15
 valeur: Cabinet = CB18
 valeur: Date prévue = 2099-01-15
 resultat: refuse
-message: ENJOINDRE ALPHA SARL · SIREN 511 000 101 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, s'enjoint).
+message: ENJOINDRE ALPHA SARL · SIREN 511 000 101 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).

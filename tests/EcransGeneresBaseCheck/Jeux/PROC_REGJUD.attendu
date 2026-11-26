@@ -14,4 +14,10 @@ Rôle 2026R01201 · REGJUD UN | acte du 05/03/2025 · n° 1201 · NAT-ISO · dé
 # L'instance 1990J20001 de PROC_NF.sql (numero au repertoire, nature sans code ISO) est au repertoire general : la V2 la liste aussi.
 Rôle 1990J20001 · NF CREANCIER # NF ALPHA SA | acte du 15/01/1990 · n° 1990020001 · sans décision | Répertoire général | AFaire | []
 Rôle 2026R01206 · REGJUD IP | acte du 10/02/2025 · minute 301 · décision du 12/02/2025 · Jugement banc | Injonctions de payer | Validee | []
+# Lot 8 (27/11/2026) : les IP du desistement (PROC_IPSUIVI.sql), une ordonnance typee chacune : la V2 les liste aussi.
+Rôle 2026IP81601 · DESISTER OK | décision du {J-20} · Ordonnance IP acceptee lot 8 | Injonctions de payer | Validee | []
+Rôle 2026IP81602 · DESISTER EUROPE | décision du {J-20} · Ordonnance IP acceptee lot 8 | Injonctions de payer | Validee | []
+Rôle 2026IP81603 · DESISTER REJETEE | décision du {J-20} · Ordonnance IP rejetee lot 8 | Injonctions de payer | Validee | []
+Rôle 2026IP81604 · DESISTER SANS FUTUR | décision du {J-20} · Ordonnance IP acceptee lot 8 | Injonctions de payer | Validee | []
+Rôle 2026IP81605 · DESISTER NON SIGNEE | décision prévue le {J-5} · Ordonnance IP acceptee lot 8 | Injonctions de payer | EnCours | []
 Rôle 2026R01207 · REGJUD ORDO | acte du 15/01/2025 · Nature banc · sans décision | Ordonnances du président | AFaire | []

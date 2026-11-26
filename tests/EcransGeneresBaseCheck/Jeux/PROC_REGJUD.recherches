@@ -38,6 +38,12 @@ Rôle 2026R01203 · REGJUD TROIS | acte du 07/03/2025 · n° 1203 · NAT-ISO · 
 Rôle 2026R01202 · REGJUD DEUX | acte du 06/03/2025 · n° 1202 · NAT-ISO · décision prévue le 15/03/2025 | Répertoire général | EnCours | []
 Rôle 2026R01201 · REGJUD UN | acte du 05/03/2025 · n° 1201 · NAT-ISO · décision du 20/03/2025 · Jugement banc · Premier ressort banc | Répertoire général | Validee | []
 Rôle 2026R01206 · REGJUD IP | acte du 10/02/2025 · minute 301 · décision du 12/02/2025 · Jugement banc | Injonctions de payer | Validee | []
+# Lot 8 : les IP du desistement (PROC_IPSUIVI.sql) ; le type d'instance ne filtre que le repertoire general.
+Rôle 2026IP81601 · DESISTER OK | décision du {J-20} · Ordonnance IP acceptee lot 8 | Injonctions de payer | Validee | []
+Rôle 2026IP81602 · DESISTER EUROPE | décision du {J-20} · Ordonnance IP acceptee lot 8 | Injonctions de payer | Validee | []
+Rôle 2026IP81603 · DESISTER REJETEE | décision du {J-20} · Ordonnance IP rejetee lot 8 | Injonctions de payer | Validee | []
+Rôle 2026IP81604 · DESISTER SANS FUTUR | décision du {J-20} · Ordonnance IP acceptee lot 8 | Injonctions de payer | Validee | []
+Rôle 2026IP81605 · DESISTER NON SIGNEE | décision prévue le {J-5} · Ordonnance IP acceptee lot 8 | Injonctions de payer | EnCours | []
 Rôle 2026R01207 · REGJUD ORDO | acte du 15/01/2025 · Nature banc · sans décision | Ordonnances du président | AFaire | []
 ---
 # Jumeau : type « J » -- seul 1990J20001 au repertoire general ; les autres registres, entiers.
@@ -45,6 +51,12 @@ critere: Type d'instance = J
 lignes:
 Rôle 1990J20001 · NF CREANCIER # NF ALPHA SA | acte du 15/01/1990 · n° 1990020001 · sans décision | Répertoire général | AFaire | []
 Rôle 2026R01206 · REGJUD IP | acte du 10/02/2025 · minute 301 · décision du 12/02/2025 · Jugement banc | Injonctions de payer | Validee | []
+# Lot 8 : les IP du desistement (PROC_IPSUIVI.sql).
+Rôle 2026IP81601 · DESISTER OK | décision du {J-20} · Ordonnance IP acceptee lot 8 | Injonctions de payer | Validee | []
+Rôle 2026IP81602 · DESISTER EUROPE | décision du {J-20} · Ordonnance IP acceptee lot 8 | Injonctions de payer | Validee | []
+Rôle 2026IP81603 · DESISTER REJETEE | décision du {J-20} · Ordonnance IP rejetee lot 8 | Injonctions de payer | Validee | []
+Rôle 2026IP81604 · DESISTER SANS FUTUR | décision du {J-20} · Ordonnance IP acceptee lot 8 | Injonctions de payer | Validee | []
+Rôle 2026IP81605 · DESISTER NON SIGNEE | décision prévue le {J-5} · Ordonnance IP acceptee lot 8 | Injonctions de payer | EnCours | []
 Rôle 2026R01207 · REGJUD ORDO | acte du 15/01/2025 · Nature banc · sans décision | Ordonnances du président | AFaire | []
 ---
 # Le texte : le role ou le nom de l'affaire, sur les trois registres.

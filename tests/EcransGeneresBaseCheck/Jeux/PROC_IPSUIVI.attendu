@@ -2,11 +2,18 @@
 # n'importe quelle IP par son numero. Ecartee : 1801504 (instance J, au fond).
 # Jeu PROC_IPSUIVI.sql : 1801503 close (desistement survenu), 1801502 signifiee (opposition EXPIREE : sa date maxi ; provision
 # survenue), 1801501 rien de signifie (signification seulement attendue ; ordonnance prevue : sa date prevue).
+# 1801601 a 1801605 : les IP du desistement (PROC_IPSUIVI.sql, EcrivainSuiviIp, 27/11/2026), les plus recentes en tete.
+IP 2026IP81605 · DESISTER NON SIGNEE | ordonnance du {J-5} | Injonctions de payer | AFaire | []
+IP 2026IP81604 · DESISTER SANS FUTUR | ordonnance du {J-20} | Injonctions de payer | AFaire | []
+IP 2026IP81603 · DESISTER REJETEE | ordonnance du {J-20} | Injonctions de payer | AFaire | []
+IP 2026IP81602 · DESISTER EUROPE | ordonnance du {J-20} | Injonctions de payer | AFaire | []
+IP 2026IP81601 · DESISTER OK | ordonnance du {J-20} | Injonctions de payer | AFaire | []
 IP 2026IP81503 · SUIVI IP TAU | signification {J-90} | Injonctions de payer | Validee | []
 IP 2026IP81502 · SUIVI IP SIGMA | ordonnance du {J-50} · signification {J-40} · opposition {J-10} · provision {J-8} | Injonctions de payer | EnCours | []
 IP 2026IP81501 · SUIVI IP OMEGA | ordonnance du {J-7} | Injonctions de payer | AFaire | []
 # Les IP de PROC_SURVIP.sql : 1801409 a sa signification EXPIREE (date maxi affichee, rien de survenu : a signifier) ; 1801404 a
 # une consignation survenue ; 1801401 est signifiee, avec ses parties.
+IP 2026IP81410 · IP TITRE OMEGA |  | Injonctions de payer | AFaire | []
 IP 2026IP81409 · IP SIGNIFICATION EXPIREE | signification {J-3} | Injonctions de payer | AFaire | []
 IP 2026IP81408 · IP EUROPEENNE |  | Injonctions de payer | AFaire | []
 IP 2026IP81407 · IP CERTIFICAT ZETA |  | Injonctions de payer | AFaire | []

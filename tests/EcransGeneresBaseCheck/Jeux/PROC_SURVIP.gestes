@@ -1,0 +1,88 @@
+# « Injonctions de payer » (PROC_SURVIP) : « Appliquer les traitements » (EcrivainSurveillanceIp = PreparationTraitements,
+# OPE_TRAITEMENTS.cs:585-905). Les lignes : PROC_SURVIP.attendu ; les references (juge JIP18, codes affaire IPCADSO / IPNAVSO,
+# codes d'evenement et leurs codes « expire », reglage IPCNAV de la non avenue, compteurs JROP / JRDSJ) : PROC_SURVIP.sql. Les saisies
+# sont les Parametres du descripteur, par leur libelle. Lot 8 du plan « RIG v3 100 % fonctionnel », 27/11/2026.
+
+# 1. Refus : pas de juge -- cboJuge est obligatoire (OPE_RECHERCHE.Designer.cs:133). Jumeau accepte : bloc 5 (JIP18).
+geste: Agir Appliquer les traitements
+ids: 1801472
+resultat: refuse
+message: « Juge » est obligatoire.
+---
+# 2. Refus : le juge JIN18 est inactif. Jumeau accepte : bloc 5 (JIP18, actif).
+geste: Agir Appliquer les traitements
+ids: 1801472
+valeur: Juge = JIN18
+resultat: refuse
+message: Le juge « JIN18 » n'est pas utilisable en saisie dans la base du greffe (abrégé inconnu, en double ou inactif).
+---
+# 3. Refus : aucune ligne cochee, au message de DoVerifier (OPE_TRAITEMENTS.cs:507). Jumeau accepte : bloc 5.
+geste: Agir Appliquer les traitements
+valeur: Juge = JIP18
+resultat: refuse
+message: Vous devez sélectionner au moins une IP à traiter
+---
+# 4. Refus : 1801481, la signification attendue de 1801409, est deja EXPIREE -- l'evenement n'est plus futur (OPE_TRAITEMENTS.cs:847).
+#    C'est la seule ligne : rien n'est traite, le geste est refuse avec l'erreur de RIG v2. Jumeau accepte : bloc 5 (1801474, futur).
+geste: Agir Appliquer les traitements
+ids: 1801481
+valeur: Juge = JIP18
+resultat: refuse
+message: L'évènement futur n'existe plus. Impossible de traiter l'instance 2026IP81409. Problème de récupération
+---
+# 5. FAIT, en lot sur 2 lignes, case LRAR cochee : 1801472 (titre executoire de 1801401 : IOIP expire, IPEXECUT + « LR » = IPEXECUTLR
+#    survenu du jour, lie a IOIP par son numero source) et 1801474 (non avenue de 1801403 : le reglage IPCNAV, + « LR » = IPCNAVLR).
+#    Une demande SURVIP validee par IP, liee a l'instance (2J). Les deux lignes sortent de la liste.
+geste: Agir Appliquer les traitements
+ids: 1801472,1801474
+valeur: Juge = JIP18
+valeur: LRAR = oui
+resultat: fait
+message: Traitements appliqués à 2 injonctions de payer : IP 2026IP81401 en titre exécutoire · événement IPEXECUTLR ; IP 2026IP81403 non avenue · événement IPCNAVLR. Non repris par la V3 : les éditions des événements, la réédition de l'ordonnance en titre exécutoire (fichier de la GED) et les mots directeurs des oppositions.
+lignes:
+IP 2026IP81410 · IP TITRE OMEGA | échéance du {J-7} dépassée | Titre exécutoire | AFaire | []
+IP 2026IP81405 · IP CADUCITE EPSILON | échéance du {J-2} dépassée | Caducité | AFaire | []
+IP 2026IP81407 · IP CERTIFICAT ZETA | échéance du {J-4} dépassée | Certif. non opposition | AFaire | []
+controle: SELECT CAST(CAST(EVNPR_DELAI_EXPIRE AS int) AS varchar(1)) + CAST(CAST(EVNPR_SURVENU AS int) AS varchar(1)) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_EVNPR = 1801472 => 10
+controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + e.EVNPR_NUMERO_SOURCE_EP_LIE + '|' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) + '|' + CASE WHEN e.EVNPR_DATE = CAST(GETDATE() AS date) THEN 'jour' ELSE 'autre' END FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801401 AND e.EVNPR_CODE_EVE_PRO LIKE 'IPEXECUT%' => IPEXECUTLR|SRC-1801472|1|jour
+controle: SELECT STRING_AGG(e.EVNPR_CODE_EVE_PRO, ',') FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801403 AND e.EVNPR_SURVENU = 1 => IPCNAVLR
+controle: SELECT COUNT(*) FROM v2.DEMANDE AS d JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_ID_DMND = d.DMND_ID_DMND AND dd.DSSDM_CODE_SEQUENCEUR = '2J' WHERE d.DMND_CODE_PROSS = 'SURVIP' AND d.DMND_ETAT_DEMANDE = 'V' AND dd.DSSDM_VALEUR_SEQUENCEUR IN ('1801401', '1801403') => 2
+controle: SELECT COUNT(*) FROM v2.INSTANCE WHERE INSTN_ID_INSTN_INSTANCE_PRINCIPA IN (1801401, 1801403) => 0
+---
+# 6. Refus : rejouer 1801472 -- son opposition attendue a expire au bloc 5 : plus de ligne a traiter. Jumeau accepte : bloc 5.
+geste: Agir Appliquer les traitements
+ids: 1801472
+valeur: Juge = JIP18
+resultat: refuse
+message: L'évènement futur n'existe plus. Impossible de traiter l'instance 2026IP81401. Problème de récupération
+---
+# 7. Refus : la caducite de 1801405 enrole une OP, dont le demandeur est le juge par son statut -- JSS18 n'a pas de statut : RIG v2
+#    ne peut pas creer l'OP (Instance.cs:3446-3450), la ligne n'est pas traitee. Jumeau accepte : bloc 8 (JIP18, statut « Juge »).
+geste: Agir Appliquer les traitements
+ids: 1801477
+valeur: Juge = JSS18
+resultat: refuse
+message: Problème à la création de l'OP pour l'instance 2026IP81405.
+---
+# 8. FAIT, en lot sur 2 lignes, LRAR coche (sans effet ici) : 1801477 (caducite de 1801405, pas de reglage : une OP IPCADSO est
+#    enrolee -- role JROP, repertoire JGAFF, dossier judiciaire JRDSJ « Inconnu » (l'IP n'a pas de partie), le juge en demandeur,
+#    jointe a l'IP ; decision IPCAD prevue le 15/01/2099, juge et greffier ; ordonnance « Ordonnance de caducite 2026IP81405 » ; la
+#    demande OPE validee ; puis IPCONSOPOS expire avec son code « expire » IPCAD, la case LRAR etant grisee sur une ligne qui enrole)
+#    et 1801479 (certificat de 1801407 : IPCERTNOPP survient du jour). Reste 1801410, jamais traitee.
+geste: Agir Appliquer les traitements
+ids: 1801477,1801479
+valeur: Juge = JIP18
+valeur: Date prévue = 2099-01-15
+valeur: LRAR = oui
+resultat: fait
+message: Traitements appliqués à 2 injonctions de payer : IP 2026IP81405 caduque · événement IPCAD · opposition 2026OP00001 enrôlée ; IP 2026IP81407 certificat de non-opposition · événement IPCERTNOPP ; ordonnance « Ordonnance de caducite 2026IP81405 » en file d'édition. Non repris par la V3 : les éditions des événements, la réédition de l'ordonnance en titre exécutoire (fichier de la GED) et les mots directeurs des oppositions.
+lignes:
+IP 2026IP81410 · IP TITRE OMEGA | échéance du {J-7} dépassée | Titre exécutoire | AFaire | []
+controle: SELECT i.INSTN_CODE_AFFAIRE + '|' + i.INSTN_TYPE_INSTANCE + '|' + i.INSTN_NATURE_AFFAIRE + '|' + i.INSTN_CODE_ACTE_PROCE + '|' + LEFT(i.INSTN_NUM_ROLE, 6) + '|' + CASE WHEN i.INSTN_NUM_REP_GENERAL IS NULL THEN 'sans' ELSE 'rep' END + '|' + CASE WHEN i.INSTN_DATE_JONCTION = CAST(GETDATE() AS date) THEN 'jointe' ELSE 'non' END FROM v2.INSTANCE AS i WHERE i.INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1801405 => IPCADSO|RP|OPCAD|SO|2026OP|rep|jointe
+controle: SELECT STRING_AGG(p.PRT_QUALIF_PARTIE + ':' + p.PRT_DESIGNATION + ':' + p.PRT_CIVILITE, ' / ') FROM v2.PARTIE AS p JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = p.PRT_ID_INSTN WHERE i.INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1801405 => D:Juge:PM
+controle: SELECT d.DSJUD_NOM_DOSSIER FROM v2.DOSSIER_JUDICIAIRE AS d JOIN v2.INSTANCE AS i ON i.INSTN_ID_DSJUD = d.DSJUD_ID_DSJUD WHERE i.INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1801405 => Inconnu
+controle: SELECT dj.DCJDC_TYPE_DECISION + '|' + CAST(dj.DCJDC_ID_JUG AS varchar(10)) + '|' + CONVERT(varchar(10), dj.DCJDC_DATE_PREVUE, 103) + '|' + dj.DCJDC_ETAT_ARCHIVAGE FROM v2.DECISION_JUDICIAIRE AS dj JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = dj.DCJDC_ID_INSTN WHERE i.INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1801405 => IPCAD|1801701|15/01/2099|0
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_CODE_ENTITE_SOURCE = 'DECI_JUDICIAIRE' AND DMNED_LIBELLE_DOCUMENT = 'Ordonnance de caducite 2026IP81405' => 1
+controle: SELECT d.DMND_ETAT_DEMANDE + '|' + LEFT(d.DMND_LES_NUMEROS, 18) FROM v2.DEMANDE AS d JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_ID_DMND = d.DMND_ID_DMND AND dd.DSSDM_CODE_SEQUENCEUR = '2J' JOIN v2.INSTANCE AS i ON CAST(i.INSTN_ID_INSTN AS varchar(10)) = dd.DSSDM_VALEUR_SEQUENCEUR WHERE d.DMND_CODE_PROSS = 'OPE' AND i.INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1801405 => V|2026IP81405 2026OP
+controle: SELECT STRING_AGG(e.EVNPR_CODE_EVE_PRO + ':' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) + CAST(CAST(e.EVNPR_DELAI_EXPIRE AS int) AS varchar(1)), ',') WITHIN GROUP (ORDER BY e.EVNPR_ID_EVNPR) FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801405 => IPCONSOPOS:01,IPCAD:10
+controle: SELECT CAST(CAST(EVNPR_SURVENU AS int) AS varchar(1)) + '|' + CASE WHEN EVNPR_DATE = CAST(GETDATE() AS date) THEN 'jour' ELSE 'autre' END + '|' + ISNULL(CONVERT(varchar(10), EVNPR_DATE_MAXI, 103), 'sans') FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_EVNPR = 1801479 => 1|jour|sans

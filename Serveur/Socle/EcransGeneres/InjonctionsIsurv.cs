@@ -229,7 +229,7 @@ internal static class InjonctionsIsurv
 
     // La meme lecture qu'EcrivainComposition.PersonneAsync (privee, dans le fichier du lot 7 encore en cours dans un autre fil le
     // 26/11/2026) : abrege non vide, utilisable en saisie, porte par une seule personne. A reunir quand le lot 7 est integre.
-    private static async Task<int?> PersonneAsync(GesteEnCours geste, string table, string colonneId, string colonneAbrege, string colonneActif,
+    internal static async Task<int?> PersonneAsync(GesteEnCours geste, string table, string colonneId, string colonneAbrege, string colonneActif,
                                                  string abrege, CancellationToken ct)
     {
         await using var r = await geste.LireAsync(

@@ -1,0 +1,92 @@
+# « Suivi des preventions » (PROC_IPSUIVI) : « Valider » enregistre le desistement d'une injonction de payer (EcrivainSuiviIp =
+# le traitement IPDesistement d'OPE_IPSUIVI.cs:1762-1772 et les alertes de Remplir_IP, :976-1055). Les IP : PROC_IPSUIVI.sql (18015xx,
+# 18016xx). La date saisie est litterale (15/01/2099 : jamais avant la date de l'IP). Lot 8 du plan « RIG v3 100 % fonctionnel », 27/11/2026.
+
+# 1. Refus : une autre date que le desistement -- la V3 ne reprend pas encore la signification (evenements futurs lies). Jumeau
+#    accepte : bloc 9 (le desistement seul).
+geste: Enregistrer
+ids: 1801601
+valeur: Actes après l'ordonnance › Signification = 2099-01-15
+resultat: refuse
+message: « Actes après l'ordonnance › Signification » : la V3 ne reprend pas encore cette saisie de RIG v2 (événements futurs liés, instance J ou OP, facture) ; seul le désistement s'enregistre.
+---
+# 2. Refus : 1801503 a deja son desistement (IPDESIN survenu), au message de RIG v2 (:983). Jumeau accepte : bloc 9 (1801601, sans).
+geste: Enregistrer
+ids: 1801503
+valeur: Actes après l'ordonnance › Désistement = 2099-01-15
+resultat: refuse
+message: Désistement IP, traitement impossible en IPSUIVI vous devez aller en MJUD.
+---
+# 3. Refus : IP europeenne (:991). Jumeau accepte : bloc 9 (1801601, non europeenne).
+geste: Enregistrer
+ids: 1801602
+valeur: Actes après l'ordonnance › Désistement = 2099-01-15
+resultat: refuse
+message: Injonction de payer européenne, traitement impossible en IPSUIVI vous devez aller en MJUD.
+---
+# 4. Refus : ordonnance d'un type rejete (IsAccepter faux, :998). Jumeau accepte : bloc 9 (IPACC18, accepte).
+geste: Enregistrer
+ids: 1801603
+valeur: Actes après l'ordonnance › Désistement = 2099-01-15
+resultat: refuse
+message: IP rejetée, traitement impossible en IPSUIVI vous devez aller en MJUD.
+---
+# 5. Refus : 1801501, ordonnance sans type de decision -- IsAccepter est faux sans type (DecisionJudiciaireExtentions.cs:18-24).
+#    Jumeau accepte : bloc 9.
+geste: Enregistrer
+ids: 1801501
+valeur: Actes après l'ordonnance › Désistement = 2099-01-15
+resultat: refuse
+message: IP rejetée, traitement impossible en IPSUIVI vous devez aller en MJUD.
+---
+# 6. Refus : ordonnance rendue, mais plus aucun evenement futur -- la case « Désistement » n'est pas offerte (:1024-1029). Jumeau
+#    accepte : bloc 9 (1801601, une signification attendue) ; et bloc 10 (1801605 : decision sans date, desistement offert sans futur).
+geste: Enregistrer
+ids: 1801604
+valeur: Actes après l'ordonnance › Désistement = 2099-01-15
+resultat: refuse
+message: Aucun évènement futur : RIG v2 n'offre pas le désistement sur cette IP (OPE_IPSUIVI.cs:1024-1029).
+---
+# 7. Refus : la date precede celle de l'IP (l'ordonnance de 1801601, il y a 20 jours) : « Date incorrect » (:1765-1766). Jumeau
+#    accepte : bloc 9 (15/01/2099).
+geste: Enregistrer
+ids: 1801601
+valeur: Actes après l'ordonnance › Désistement = 2001-01-01
+resultat: refuse
+message: Date incorrect
+---
+# 8. Refus : la date est vide. Jumeau accepte : bloc 9.
+geste: Enregistrer
+ids: 1801601
+valeur: Actes après l'ordonnance › Désistement =
+resultat: refuse
+message: « Actes après l'ordonnance › Désistement » est obligatoire.
+---
+# 9. FAIT : le desistement de 1801601 au 15/01/2099. L'evenement IPDESIN survient a cette date, la note de l'instance recoit
+#    « Désistement », une demande IPSUIVI validee est liee a l'IP (2J). Relue : la fiche porte la date, la ligne passe « Close ».
+geste: Enregistrer
+ids: 1801601
+valeur: Actes après l'ordonnance › Désistement = 2099-01-15
+resultat: fait
+message: Désistement du 15/01/2099 enregistré sur l'IP 2026IP81601 (événement IPDESIN). Non repris par la V3 : les éditions de l'événement et le tableau récapitulatif.
+fiche: 1801601
+Actes après l'ordonnance › Désistement = 2099-01-15
+controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + CONVERT(varchar(10), e.EVNPR_DATE, 103) + '|' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801601 AND e.EVNPR_CODE_EVE_PRO = 'IPDESIN' => IPDESIN|15/01/2099|1
+controle: SELECT INSTN_NOTE_AUDIENCE FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1801601 => Relance faite Désistement
+controle: SELECT d.DMND_ETAT_DEMANDE + '|' + d.DMND_NUM_INDICATIF + '|' + d.DMND_NOM FROM v2.DEMANDE AS d JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_ID_DMND = d.DMND_ID_DMND AND dd.DSSDM_CODE_SEQUENCEUR = '2J' AND dd.DSSDM_VALEUR_SEQUENCEUR = '1801601' WHERE d.DMND_CODE_PROSS = 'IPSUIVI' => V|2026IP81601|DESISTER OK
+---
+# 10. FAIT : 1801605, decision prevue sans date rendue (pas passee par ORDOSIGN) et sans evenement futur -- RIG v2 ne laisse alors
+#     que le desistement (:1004-1013).
+geste: Enregistrer
+ids: 1801605
+valeur: Actes après l'ordonnance › Désistement = 2099-01-15
+resultat: fait
+message: Désistement du 15/01/2099 enregistré sur l'IP 2026IP81605 (événement IPDESIN). Non repris par la V3 : les éditions de l'événement et le tableau récapitulatif.
+controle: SELECT INSTN_NOTE_AUDIENCE FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1801605 => Désistement
+---
+# 11. Refus : rejouer 1801601 -- son desistement est enregistre (bloc 9). Jumeau accepte : bloc 9.
+geste: Enregistrer
+ids: 1801601
+valeur: Actes après l'ordonnance › Désistement = 2099-01-16
+resultat: refuse
+message: Désistement IP, traitement impossible en IPSUIVI vous devez aller en MJUD.

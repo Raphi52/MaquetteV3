@@ -31,12 +31,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// REGLE D'ETAT : toute ligne est « A traiter » (AFaire) -- la V2 ne liste que les echeances a traiter ; une IP traitee voit
 /// son evenement futur expire (PasserEnExpirerEveProFutur*, OPE_TRAITEMENTS.cs:718-820) et sort de la liste.
 ///
-/// GESTES : « Appliquer les traitements » N'EST PAS BRANCHE (pas d'ecrivain). Le traitement de la V2 (PreparationTraitements,
-/// OPE_TRAITEMENTS.cs:585-905 ; fiche proc_survip.md, Detail OPE) est une transaction sur plusieurs objets : verrou d'une demande
-/// SURVIP par instance, expiration de l'evenement futur avec un code « expire » resolu dans CODE_EVE_PRO selon LRAR / LR,
-/// creation d'une instance OP (IPCADSO, IPNAVSO) numerotee (role, repertoire JGAFF, dossier judiciaire JRDSJ) et jointe a
-/// l'IP, demandes d'edition, mot du directeur. Il demande son propre lot ; tant qu'il manque, l'ecran le dit
-/// (« Demonstration »), rien n'est ecrit.
+/// GESTES : « Appliquer les traitements » -- EcrivainSurveillanceIp.cs (lot 8, 27/11/2026) : Id d'une ligne = l'evenement futur
+/// echu (EVNPR_ID_EVNPR, la cellule TrtIdEvePro que PreparationTraitements relit, OPE_TRAITEMENTS.cs:651-653).
 /// </summary>
 internal sealed class LecteurSurveillanceIp : ILecteurEcran
 {
@@ -113,6 +109,7 @@ internal sealed class LecteurSurveillanceIp : ILecteurEcran
                                             signification is null ? null : $"signifiée le {FormeLigne.Date(signification)}",
                                             $"échéance du {FormeLigne.Date(FormeLigne.DateDe(r, "Echeance"))} dépassée");
         // La regle d'etat (en tete du fichier) : toute echeance listee est a traiter.
-        return new LigneLue(nom, precisions, FormeLigne.Texte(r, "Groupe"), "AFaire", []);
+        return new LigneLue(nom, precisions, FormeLigne.Texte(r, "Groupe"), "AFaire", [])
+            { Id = Convert.ToString(r["EVNPR_ID_EVNPR"], System.Globalization.CultureInfo.InvariantCulture) };
     }
 }

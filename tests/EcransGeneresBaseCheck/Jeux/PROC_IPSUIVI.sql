@@ -46,3 +46,37 @@ INSERT INTO v2.EVENEMENT_PROCEDURE (EVNPR_ID_EVNPR, EVNPR_ID_INSTN, EVNPR_NUM_OR
     (1801576, 1801503, 2, ''IPDESIN'', DATEADD(DAY, -30, @aujourdhui), 1, 0, NULL, NULL);
 ',
     N'@aujourdhui datetime', @aujourdhui;
+
+-- LE DESISTEMENT (EcrivainSuiviIp, « Valider », lot 8, 27/11/2026) : cinq IP de plus (18016xx), une par regle de Remplir_IP
+-- (OPE_IPSUIVI.cs:976-1055). Leur ordonnance porte un type de decision : IPACC18 accepte, IPREJ18 rejete (R_TYPEDECISI_ACCEPTE).
+-- Aucune partie (elles entreraient a l'ecran « Parties ») ; aucune n'a d'evenement futur echu (elles n'entrent pas a PROC_SURVIP).
+--   1801601 : ordonnance rendue et acceptee, une signification attendue dans 20 jours : le desistement est offert -- jumeau de tous ;
+--   1801602 : la meme, mais IP europeenne : refusee ;
+--   1801603 : ordonnance de type rejete : « IP rejetée » ;
+--   1801604 : ordonnance acceptee, sans aucun evenement futur : la case n'est pas offerte ;
+--   1801605 : ordonnance acceptee prevue, SANS date rendue : seul le desistement est offert (meme sans evenement futur).
+-- 1801503 (deja desistee, plus haut) et 1801501 (ordonnance sans type : IsAccepter faux) sont refusees aussi.
+IF COL_LENGTH('v2.INSTANCE', 'INSTN_NOTE_AUDIENCE') IS NULL ALTER TABLE v2.INSTANCE ADD INSTN_NOTE_AUDIENCE varchar(max) NULL;
+IF COL_LENGTH('v2.INSTANCE', 'INSTN_ID_AFFRE') IS NULL ALTER TABLE v2.INSTANCE ADD INSTN_ID_AFFRE int NULL;
+IF OBJECT_ID(N'v2.TYPE_DECISION') IS NULL
+    CREATE TABLE v2.TYPE_DECISION (R_TYPEDECISI_VALEUR varchar(10) NOT NULL PRIMARY KEY, R_TYPEDECISI_LIBELLE_ECRAN varchar(100) NOT NULL);
+IF COL_LENGTH('v2.TYPE_DECISION', 'R_TYPEDECISI_ACCEPTE') IS NULL ALTER TABLE v2.TYPE_DECISION ADD R_TYPEDECISI_ACCEPTE bit NULL;
+
+EXEC sp_executesql N'
+INSERT INTO v2.TYPE_DECISION (R_TYPEDECISI_VALEUR, R_TYPEDECISI_LIBELLE_ECRAN, R_TYPEDECISI_ACCEPTE) VALUES
+    (''IPACC18'', ''Ordonnance IP acceptee lot 8'', 1), (''IPREJ18'', ''Ordonnance IP rejetee lot 8'', 0);
+INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_NOM_COURANT, INSTN_TYPE_INSTANCE, INSTN_IP_EUROPEENNE, INSTN_NOTE_AUDIENCE) VALUES
+    (1801601, ''2026IP81601'', N''DESISTER OK'', ''IP'', 0, N''Relance faite''), (1801602, ''2026IP81602'', N''DESISTER EUROPE'', ''IP'', 1, NULL),
+    (1801603, ''2026IP81603'', N''DESISTER REJETEE'', ''IP'', 0, NULL), (1801604, ''2026IP81604'', N''DESISTER SANS FUTUR'', ''IP'', 0, NULL),
+    (1801605, ''2026IP81605'', N''DESISTER NON SIGNEE'', ''IP'', 0, NULL);
+INSERT INTO v2.DECISION_JUDICIAIRE (DCJDC_ID_DCJDC, DCJDC_ID_INSTN, DCJDC_NUM_ORDRE, DCJDC_DATE_PREVUE, DCJDC_DATE, DCJDC_TYPE_DECISION) VALUES
+    (1801651, 1801601, 1, NULL, DATEADD(DAY, -20, @aujourdhui), ''IPACC18''), (1801652, 1801602, 1, NULL, DATEADD(DAY, -20, @aujourdhui), ''IPACC18''),
+    (1801653, 1801603, 1, NULL, DATEADD(DAY, -20, @aujourdhui), ''IPREJ18''), (1801654, 1801604, 1, NULL, DATEADD(DAY, -20, @aujourdhui), ''IPACC18''),
+    (1801655, 1801605, 1, DATEADD(DAY, -5, @aujourdhui), NULL, ''IPACC18'');
+INSERT INTO v2.EVENEMENT_PROCEDURE (EVNPR_ID_EVNPR, EVNPR_ID_INSTN, EVNPR_NUM_ORDRE, EVNPR_CODE_EVE_PRO, EVNPR_DATE, EVNPR_SURVENU,
+    EVNPR_DELAI_EXPIRE, EVNPR_DATE_MAXI, EVNPR_SIGNIF_A_PERSONNE) VALUES
+    (1801671, 1801601, 1, ''IPSIGNIF'', NULL, 0, 0, DATEADD(DAY, 20, @aujourdhui), NULL),
+    (1801672, 1801602, 1, ''IPSIGNIF'', NULL, 0, 0, DATEADD(DAY, 20, @aujourdhui), NULL),
+    (1801673, 1801603, 1, ''IPSIGNIF'', NULL, 0, 0, DATEADD(DAY, 20, @aujourdhui), NULL);
+',
+    N'@aujourdhui datetime', @aujourdhui;

@@ -19,7 +19,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// CONTROLES, dans l'ordre, avant toute ecriture (un refus n'ecrit rien) :
 ///   1. au moins une ligne cochee : « Aucun élément selectionné » (Verifier, PROC_ISURV.cs:221-223) ;
 ///   2. les reglages ISURV SDBE et l'etape « Cabinet et decision » (InjonctionsIsurv.PreparerAsync) ;
-///   3. chaque ligne est une diligence SDBE dont la relance est restee sans effet (la regle du lecteur, RelanceSansEffet, relue dans
+///   3. chaque ligne est une diligence SDBE dont la relance est restee sans effet, sur un dossier que la recherche ISURV retient
+///      (ExclusionsIsurv : societe non cotee, forme a beneficiaires...) -- la regle du lecteur, RelanceSansEffet, relue dans
 ///      la transaction) : une injonction deja emise n'est pas renouvelee (le test des injonctions de la recherche ISURV,
 ///      NatureDiligence.parametre.cs:846-853) ;
 ///   4. chaque dossier a son intervenant (InjonctionsIsurv.DossierAsync).
@@ -68,7 +69,7 @@ internal sealed class EcrivainInjonctionsBeneficiaires : IEcrivainEcran
                 }
             if (idDossier is null) return IssueGeste.Refuser($"Diligence introuvable dans la base du greffe ({id}).");
             if (!aEnjoindre)
-                return IssueGeste.Refuser($"{nom} : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, s'enjoint).");
+                return IssueGeste.Refuser($"{nom} : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).");
             var (dossier, refusDossier) = await InjonctionsIsurv.DossierAsync(geste, idDossier.Value, ct);
             if (dossier is null) return IssueGeste.Refuser(refusDossier!);
             lignes.Add((dossier, idDiligence));

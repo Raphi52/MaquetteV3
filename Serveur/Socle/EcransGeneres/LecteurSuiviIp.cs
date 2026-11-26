@@ -38,9 +38,9 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   sinon une signification survenue                 -> EnCours « Signifiee » ;
 ///   sinon                                            -> AFaire  « A signifier ».
 ///
-/// GESTES : la saisie des dates N'EST PAS BRANCHEE (pas d'ecrivain, la fiche reste en lecture). Valider, dans la V2, fait
-/// survenir ou expirer des evenements de procedure, cree au besoin une instance J ou OP numerotee, facture (OPE_FACTU_GLOBAL)
-/// et edite (proc_ipsuivi.md, Detail OPE §4-§7) : un lot a lui seul.
+/// GESTES : « Valider » enregistre le DESISTEMENT (EcrivainSuiviIp.cs, lot 8, 27/11/2026) ; les autres dates de la V2
+/// (signification, opposition, LRAR, provision, certificat) font survenir ou expirer des evenements, calculent leurs
+/// evenements futurs lies, creent une instance J ou OP et facturent : la V3 ne les reprend pas encore, elles restent en lecture.
 /// </summary>
 internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
 {
@@ -49,7 +49,7 @@ internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
     /// <summary>Le groupe, les sections et les champs du descripteur, au mot pres.</summary>
     internal const string Groupe = "Injonctions de payer";
     internal const string SectionIp = "Injonction de payer", SectionActes = "Actes après l'ordonnance";
-    internal const string CritereNumero = "N° IP";
+    internal const string CritereNumero = "N° IP", ChampDesistement = "Désistement";
 
     public IReadOnlyCollection<string> Criteres { get; } = [CritereNumero];
 
@@ -78,6 +78,7 @@ internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
         {Dernier(Ar, "e.EVNPR_DATE", Survenu)} AS ReceptionLrar,
         COALESCE({Dernier(Conso, "e.EVNPR_DATE", Survenu)}, {Dernier(Conso, DateExpiree, Expire)}) AS Provision,
         {Dernier(Certif, "e.EVNPR_DATE", Survenu)} AS Certificat,
+        {Dernier("'IPDESIN'", "e.EVNPR_DATE", Survenu)} AS Desistement,
         CASE WHEN EXISTS (SELECT 1 FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = i.INSTN_ID_INSTN AND e.EVNPR_SURVENU = 1
                           AND (e.EVNPR_CODE_EVE_PRO IN ('ICAUSEFIN','IDESIN','IPDESIN','IEXECU','INAORDO','IPNAV','ICADUORDO','IPCAD')
                                OR e.EVNPR_CODE_EVE_PRO LIKE 'IPEXECUT%' OR e.EVNPR_CODE_EVE_PRO LIKE 'IPCNAV%'
@@ -140,6 +141,9 @@ internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
                 new ChampFiche("Signification", D("Signification")), new ChampFiche("À personne", FormeLigne.Case(r["APersonne"] as bool?)),
                 new ChampFiche("Opposition", D("Opposition")), new ChampFiche("Réception LRAR", D("ReceptionLrar")),
                 new ChampFiche("Provision", D("Provision")), new ChampFiche("Certificat de non-opposition", D("Certificat")),
+                // Le desistement (ult_Desistement, OPE_IPSUIVI.cs:978-981) : la date du dernier IPDESIN survenu ; modifiable tant
+                // qu'il n'y en a pas -- l'ecrivain refuse les autres cas aux messages de RIG v2 (EcrivainSuiviIp.cs).
+                new ChampFiche(ChampDesistement, D("Desistement")) { Modifiable = FormeLigne.DateDe(r, "Desistement") is null },
             ]),
         ]);
     }

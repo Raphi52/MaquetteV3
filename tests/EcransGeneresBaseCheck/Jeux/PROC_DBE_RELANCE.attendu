@@ -28,6 +28,9 @@ BENEF ALPHA SARL · SIREN 511 000 201 | 1re relance à faire | DBE non déposée
 BENEF THETA SAS · SIREN 511 000 208 | Relance 2 du {J-5} | DBE non déposée | Validee | [0,1,2]
 BENEF BETA SAS · SIREN 511 000 202 | Relance 1 du {J-10} · limite {J+20} | DBE non déposée | Validee | [0,1,2]
 BENEF ZETA SAS · SIREN 511 000 206 | Relance 1 du {J-30} · limite {J+0} | DBE non déposée | Validee | [0,1,2]
+# Lot 8 (27/11/2026) : 1800102 et 1800103 (PROC_DBE_INJ.sql), relance echue mais ecartes de l'injonction (societe cotee, forme sans beneficiaires) : leur relance reste ici.
+ENJOINDRE SANS BEN · SIREN 518 000 103 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE COTEE SA · SIREN 518 000 102 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
 BENEF ETA SARL · SIREN 511 000 207 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
 BENEF KAPPA SAS · SIREN 511 000 210 | 1re relance faite | DBE non déposée | Validee | [0,1,2]
 BENEF DELTA SAS · SIREN 511 000 204 | Relance 1 du {J-40} · limite {J-10} · régularisée le {J-2} | DBE non déposée | Validee | [0,1,2,3]
