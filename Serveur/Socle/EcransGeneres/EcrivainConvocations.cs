@@ -93,7 +93,7 @@ internal sealed class EcrivainConvocations : IEcrivainEcran
         var traces = new List<TraceGeste>();
         foreach (var l in lignes)
         {
-            var idEvenement = await EcrivainRetourAudience.EvenementSurvenuAsync(geste, l.IdInstance, code, geste.Maintenant.Date, ct);
+            var idEvenement = (await EvenementsProcedureV2.SurvenuAsync(geste, l.IdInstance, code, geste.Maintenant.Date, avecFutur: false, ct)).IdSurvenu;
             traces.Add(new TraceGeste("affaire", $"la citation du rôle {l.Role}", idEvenement.ToString(CultureInfo.InvariantCulture), "a cree", null,
                 new { Instance = l.Role, Evenement = code, Date = geste.Maintenant.Date, Huissier = huissier }));
         }

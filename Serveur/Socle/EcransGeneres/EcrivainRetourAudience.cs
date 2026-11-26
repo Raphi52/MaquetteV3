@@ -36,6 +36,11 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// avec la MESURE du type lie au type de decision quand il en porte un (AffectDecisionJudiciaire et GetMesureSaisie,
 /// PROC_MJUDS.cs:1499-1509, :1365-1373 ; R_TYPEDECISI_TYPE_MESURE_LIE, OPE_DECISION_JUDICIAIRE_MJUDS.cs:487-494).
 /// Mesure du 26/11/2026 (SQL-DEV\DEV, RIG_DEV) : aucun des 250 codes de renvoi n'y est prononce ni delibere, l'etape n'y est jamais ouverte.
+/// L'EVENEMENT DU CODE au renvoi : PROC_MJUDS cree l'evenement survenu du code a la date de l'audience (OPE_RESULTAT.cs:857-908) et,
+/// par lui, son evenement FUTUR lie (OPE_EVENEMENT.cs:1587-1608), puis les copie sur chaque instance (AffectEvenementProcedure,
+/// PROC_MJUDS.cs:1210, :1557-1576) : les deux sont ecrits par EvenementsProcedureV2.SurvenuAsync (calcul des dates en tete de
+/// EvenementsProcedureV2.cs). Mesure du 26/11/2026 (RIG_DEV) : 246 des 250 codes de renvoi portent un evenement, aucun de ces evenements n'a de code
+/// futur -- sur la copie de dev, un renvoi n'ecrit donc que le survenu ; le futur se prouve au banc (PROC_RETAUD.gestes).
 /// LE VERROU (« Renvoyer » seulement) : PROC_MJUDS verrouille chaque instance a son ouverture (PROC_MJUDS.cs:210, LockInstances
 /// :959-1034) ; une instance tenue par une autre demande est refusee aux messages de RIG v2 (:1014-1027), ceux de la mise au point
 /// des chambres (EcrivainMiseAuPointChambres.RefusVerrouAsync). « Marquer » ecrit sans PROC_MJUDS, depuis la grille
@@ -49,11 +54,10 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///
 /// CE QUE LA V3 NE REPREND PAS (nomme, rien en silence, avec la raison) :
 ///   - la demande V2 de PROC_MJUDS (creee et validee d'un coup, sans facture pour un renvoi) : le journal des gestes la remplace ;
-///   - au RENVOI, l'evenement FUTUR lie a l'evenement du code (creationEvenementFutur, EvenementProcedure.cs:1769-1806 : code
-///     R_CODEEVEPRO_CODE_EVE_PRO_FUTUR, dates en mois, jours ou semaines, Outils.cs:520-) que PROC_MJUDS enregistre
-///     (AffectEvenementProcedure, PROC_MJUDS.cs:1210) : aucun ecrivain V3 ne porte encore ce calcul. Pour « Marquer », RIG v2 ne
-///     l'enregistre pas : seuls l'appel et l'evenement survenu sont sauves (OPE_LIST_APPEL_AFFAIRE.cs:2254, :2263-2268), et
-///     EvenementProcedure.Sauve (:2218-) ne sauve pas les evenements lies. Le texte de l'evenement (ConstructionTexte) non plus ;
+///   - pour « Marquer », l'evenement FUTUR lie a l'evenement du code : RIG v2 le calcule en memoire (AddEvenementProcedureSurvenu,
+///     IEntiteJudiciaire.cs:132-151, :144) mais ne l'enregistre pas -- seuls l'appel et l'evenement survenu sont sauves
+///     (OPE_LIST_APPEL_AFFAIRE.cs:2254, :2263-2268), et EvenementProcedure.Sauve (:2218-) ne sauve pas les evenements lies. Le texte
+///     de l'evenement (ConstructionTexte) non plus (EvenementsProcedureV2.cs) ;
 ///   - le CALENDRIER de procedure (PROC_MJUDS.cs:1163-1174 ; AffectCalendrier, :1461-1497) : RIG v2 recopie la LISTE des etapes que
 ///     l'agent a saisies (GetEtapesCalendrierSaisies, :1313-), une operation par etape. Un ecran genere ne saisit pas de sous-liste
 ///     (web/src/ecrans/formes/commun.tsx:374) : sans cette saisie, il n'y a pas de calendrier a ecrire ;
@@ -126,7 +130,7 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
         {
             var code = j.Compatibles.Contains(Traduit(a.TypeInstance)) ? j : o.Compatibles.Contains(Traduit(a.TypeInstance)) ? o : null;
             if (code is null) { ignores.Add(a.Role); continue; }
-            traces.Add(await PoserResultatAsync(geste, a, code, ct));
+            traces.Add(await PoserResultatAsync(geste, a, code, avecFutur: false, ct));
             ids.Add(a.Id.ToString(CultureInfo.InvariantCulture));
         }
         if (traces.Count == 0)
@@ -159,6 +163,9 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
         // fix-ok: second controle du lot 7 (26/11/2026) -- « Renvoyer » sautait deux controles de PROC_MJUDS lus dans le code V2 : le
         // verrou des instances (:210, :959-1034) et l'appel deja a venir (:1176-1182) ; et la mesure liee au type de decision
         // (:1499-1509) ; une cause par remplacement (verrou, boucle d'ecriture, aides partagees avec la mise au point des chambres).
+        // fix-ok: relance du lot 7 (27/11/2026) -- « Renvoyer » n'ecrivait pas l'evenement FUTUR lie que PROC_MJUDS copie avec le
+        // survenu (PROC_MJUDS.cs:1557-1576) ; mesure : PROC_RETAUD.gestes, blocs R17E et R17D rouges (3 echecs) avec avecFutur: false,
+        // verts avec avecFutur: true. Calcul ecrit une fois dans EvenementsProcedureV2.cs (en-tete, appel, trace).
         var saisiType = geste.Demande.Valeurs.TryGetValue(ParametreType, out var t) ? t.Trim() : "";
         var saisiDatePrevue = geste.Demande.Valeurs.TryGetValue(ParametreDatePrevue, out var dp) ? dp.Trim() : "";
         DateTime? datePrevue = null;
@@ -201,7 +208,7 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
         var dejaAppelees = new List<string>();
         foreach (var a in appels)
         {
-            traces.Add(await PoserResultatAsync(geste, a, code, ct));
+            traces.Add(await PoserResultatAsync(geste, a, code, avecFutur: true, ct));
             ids.Add(a.Id.ToString(CultureInfo.InvariantCulture));
             // Le prochain appel, sauf a une instance deja appelee a une audience a venir (PROC_MJUDS.cs:1176-1182).
             if (idProchaine is { } adnc)
@@ -303,51 +310,19 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
 
     // ------------------------------------------------------------------ LE RESULTAT D'UN APPEL
 
-    /// <summary>Pose le resultat <paramref name="code"/> sur l'appel (code plumitif, etat de retour) et l'evenement du code.</summary>
-    private static async Task<TraceGeste> PoserResultatAsync(GesteEnCours geste, Appel a, CodePlumitif code, CancellationToken ct)
+    /// <summary>Pose le resultat <paramref name="code"/> sur l'appel (code plumitif, etat de retour) et l'evenement du code, date de
+    /// l'audience ; avec <paramref name="avecFutur"/> (le renvoi, PROC_MJUDS), aussi son evenement futur lie (EvenementsProcedureV2).</summary>
+    private static async Task<TraceGeste> PoserResultatAsync(GesteEnCours geste, Appel a, CodePlumitif code, bool avecFutur, CancellationToken ct)
     {
         var etat = code.Prononce ? "P" : "M";
         await geste.EcrireAsync("UPDATE v2.APPEL_AFFAIRE SET APPAF_CODE_PLUMITIF = @code, APPAF_ETAT_RETOUR = @etat WHERE APPAF_ID_APPAF = @id", ct,
             new SqlParameter("@code", code.Code), new SqlParameter("@etat", etat), new SqlParameter("@id", a.Id));
-        int? evenement = null;
-        if (code.CodeEvePro is { } eve) evenement = await EvenementSurvenuAsync(geste, a.IdInstance, eve, a.DateAudience?.Date, ct);
+        EvenementsProcedureV2.Ecrits? evenement = null;
+        if (code.CodeEvePro is { } eve) evenement = await EvenementsProcedureV2.SurvenuAsync(geste, a.IdInstance, eve, a.DateAudience?.Date, avecFutur, ct);
         return new TraceGeste("affaire", $"l'appel du rôle {a.Role}", a.Id.ToString(CultureInfo.InvariantCulture), "a modifie",
             new { Resultat = a.CodePlumitif, EtatRetour = a.EtatRetour },
-            new { Resultat = code.Code, EtatRetour = etat, Evenement = code.CodeEvePro, IdEvenement = evenement });
-    }
-
-    /// <summary>Un evenement de procedure SURVENU sur l'instance, a la date donnee : celui du code plumitif, date de l'audience
-    /// (OPE_LIST_APPEL_AFFAIRE.cs:2253-2270), ou la citation de PROC_GCONV, date du jour (OPE_CITATIONS.cs:245) --
-    /// EvenementProcedure.CreateEvenementProcedure (EvenementProcedure.cs:1721-1757).</summary>
-    internal static async Task<int> EvenementSurvenuAsync(GesteEnCours geste, int idInstance, string codeEve, DateTime? date, CancellationToken ct)
-    {
-        string? type = null, nature = null, deposant = null;
-        var piece = false;
-        await using (var r = await geste.LireAsync("""
-            SELECT R_CODEEVEPRO_TYPE_EVE_PRO, CONVERT(bit, ISNULL(R_CODEEVEPRO_AVEC_PIECE_NUMERISE_INSMES, 0)) AS Piece,
-                   R_CODEEVEPRO_NATURE_DOC_GED, R_CODEEVEPRO_TYPE_DEPOSANT_GED
-            FROM v2.CODE_EVE_PRO WHERE R_CODEEVEPRO_VALEUR = @c
-            """, ct, new SqlParameter("@c", codeEve)))
-            if (await r.ReadAsync(ct))
-            {
-                type = FormeLigne.Texte(r, "R_CODEEVEPRO_TYPE_EVE_PRO") is { Length: > 0 } t ? t[..1] : null;
-                piece = r["Piece"] is true;
-                nature = FormeLigne.Texte(r, "R_CODEEVEPRO_NATURE_DOC_GED") is { Length: > 0 } n ? n : null;
-                deposant = FormeLigne.Texte(r, "R_CODEEVEPRO_TYPE_DEPOSANT_GED") is { Length: > 0 } dp ? dp : null;
-            }
-        int rang;
-        await using (var r = await geste.LireAsync("SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = @i", ct, new SqlParameter("@i", idInstance)))
-        {
-            await r.ReadAsync(ct);
-            rang = r.GetInt32(0) + 1;
-        }
-        return await CreationV2.InsererAsync(geste, "v2.EVENEMENT_PROCEDURE", "EVNPR_ID_EVNPR", new Dictionary<string, object?>
-        {
-            ["EVNPR_ID_INSTN"] = idInstance, ["EVNPR_CODE_EVE_PRO"] = codeEve, ["EVNPR_DATE"] = date, ["EVNPR_SURVENU"] = true,
-            ["EVNPR_DELAI_EXPIRE"] = false, ["EVNPR_NUMERO_SOURCE"] = Guid.NewGuid().ToString().ToUpperInvariant(), ["EVNPR_TYPE_EVE_PRO"] = type,
-            ["EVNPR_NUM_ORDRE"] = (short)rang, ["EVNPR_AVEC_PIECE_NUMERISE"] = piece,
-            ["EVNPR_NATURE_DOC_GED"] = piece ? nature : null, ["EVNPR_TYPE_DEPOSANT_GED"] = piece ? deposant : null,
-        }, ct);
+            new { Resultat = code.Code, EtatRetour = etat, Evenement = code.CodeEvePro, IdEvenement = evenement?.IdSurvenu,
+                  EvenementFutur = evenement?.CodeFutur, IdEvenementFutur = evenement?.IdFutur });
     }
 
     // ------------------------------------------------------------------ LECTURES
