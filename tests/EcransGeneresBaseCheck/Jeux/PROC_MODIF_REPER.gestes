@@ -67,7 +67,7 @@ ids: 1315004
 valeur: Fiche › Désignation = Delta Assiste SARL
 resultat: fait
 message: Répertorié REP-DELTA enregistré dans la base du greffe : « Désignation ».
-controle: SELECT COUNT(*) FROM v2.REPERTORIE WHERE PRTRP_ID_PRTRP = 1315004 AND PRTRP_ID_CLIEN = 55 AND PRTRP_TEXTE_ASSISTANCE IS NOT NULL => 1
+controle: SELECT COUNT(*) FROM v2.REPERTORIE WHERE PRTRP_ID_PRTRP = 1315004 AND PRTRP_ID_CLIEN = 1316601 AND PRTRP_TEXTE_ASSISTANCE IS NOT NULL => 1
 ---
 # 7. Les memes valeurs que la base : rien a enregistrer.
 geste: Enregistrer
@@ -89,3 +89,103 @@ ids: 1315999
 valeur: Fiche › Désignation = X
 resultat: refuse
 message: Répertorié introuvable dans la base du greffe (1315999).
+---
+# 10. Le client sous un mode avec representant (RA) : RIG v2 masque la zone (GestionModePresentation,
+#     OPE_EDITION_MODIF_REPER.cs:336-338). Jumeau accepte : bloc 14, le client sous le mode EP.
+geste: Enregistrer
+ids: 1315001
+valeur: Fiche › Client = MPCDIV
+resultat: refuse
+message: Le client ne se saisit pas avec ce mode de présentation : RIG v2 ne l'affiche que pour un mode sans représentant.
+---
+# 11. Le mandataire postulant sous un mode sans representant (EA) : RIG v2 masque l'ope_postulant (:343-346).
+#     Jumeau accepte : bloc 12, le mandataire sous RA.
+geste: Enregistrer
+ids: 1315004
+valeur: Fiche › Mandataire postulant = ARD15
+resultat: refuse
+message: Le mandataire postulant ne se saisit pas avec ce mode de présentation : RIG v2 ne l'affiche que pour un mode avec représentant.
+---
+# 12. Le mandataire postulant de 1315001 (RA), par son abrege : PRTRP_ID_MNDTR_POS (OPE_POSTULANT._ChangerMandataire, :158-164).
+geste: Enregistrer
+ids: 1315001
+valeur: Fiche › Mandataire postulant = ARD15
+resultat: fait
+message: Répertorié REP-OMEGA enregistré dans la base du greffe : « Mandataire postulant ».
+fiche: 1315001
+Fiche › Mode présentation = RA
+Fiche › Mandataire postulant = ARD15
+controle: SELECT PRTRP_ID_MNDTR_POS FROM v2.REPERTORIE WHERE PRTRP_ID_PRTRP = 1315001 => 1500101
+---
+# 13. Un abrege qu'aucun mandataire ne porte : rien n'est devine. Jumeau accepte : bloc 12.
+geste: Enregistrer
+ids: 1315001
+valeur: Fiche › Mandataire postulant = ZZZ99
+resultat: refuse
+message: Aucun mandataire unique du greffe n'a l'abrégé « ZZZ99 ».
+---
+# 14. Le mode passe de RA a EP (present en personne) avec un client : Valider (:215-219) efface le mandataire postulant du
+#     bloc 12, le client s'enregistre. Le jumeau du bloc 10.
+geste: Enregistrer
+ids: 1315001
+valeur: Fiche › Mode présentation = EP
+valeur: Fiche › Client = MPCDIV
+resultat: fait
+message: Répertorié REP-OMEGA enregistré dans la base du greffe : « Mode présentation », « Client ».
+fiche: 1315001
+Fiche › Mode présentation = EP
+Fiche › Client = MPCDIV
+Fiche › Nom client = CLIENT DIVERS MPC
+controle: SELECT COUNT(*) FROM v2.REPERTORIE WHERE PRTRP_ID_PRTRP = 1315001 AND PRTRP_MODE_PRESENTATION = 'EP' AND PRTRP_ID_CLIEN = 1316601 AND PRTRP_ID_MNDTR_POS IS NULL => 1
+---
+# 15. Un mode que la liste de RIG v2 ne propose plus en saisie (R, R_MODEPRESEN_UTILISABLE_SAISIE = 0 dans RIG_DEV).
+#     Jumeau accepte : bloc 14 (EP, utilisable).
+geste: Enregistrer
+ids: 1315002
+valeur: Fiche › Mode présentation = R
+resultat: refuse
+message: Le mode de présentation « R » n'est pas dans la liste des modes utilisables du greffe.
+---
+# 16. Le mode EA sans texte d'assistance : la zone est alors obligatoire (:350). Jumeau accepte : bloc 17.
+geste: Enregistrer
+ids: 1315002
+valeur: Fiche › Mode présentation = EA
+resultat: refuse
+message: « Texte assistance » est obligatoire.
+---
+# 17. Le mode EA avec son texte d'assistance.
+geste: Enregistrer
+ids: 1315002
+valeur: Fiche › Mode présentation = EA
+valeur: Fiche › Texte assistance = assisté par W
+resultat: fait
+message: Répertorié REP-BETA enregistré dans la base du greffe : « Mode présentation », « Texte assistance ».
+controle: SELECT COUNT(*) FROM v2.REPERTORIE WHERE PRTRP_ID_PRTRP = 1315002 AND PRTRP_MODE_PRESENTATION = 'EA' AND CONVERT(nvarchar(max), PRTRP_TEXTE_ASSISTANCE) = N'assisté par W' => 1
+---
+# 18. Un abrege qu'aucun client ne porte. Jumeau accepte : bloc 14.
+geste: Enregistrer
+ids: 1315004
+valeur: Fiche › Client = NOPE13
+resultat: refuse
+message: Aucun client unique du greffe n'a l'abrégé « NOPE13 ».
+---
+# 19. L'adresse se choisit dans la recherche d'adresse de RIG v2 (Ult_Adresse.cs:283-301), pas dans la fiche.
+#     Jumeau : bloc 20, l'adresse lue.
+geste: Enregistrer
+ids: 1315004
+valeur: Fiche › Adresse = 1 rue Autre
+resultat: refuse
+message: L'adresse d'un répertorié se choisit dans la recherche d'adresse de RIG v2, que la V3 n'a pas encore : elle ne se modifie pas dans la fiche.
+---
+# 20. Le texte d'assistance de 1315004 (EA) ; la fiche relue porte son adresse (rec.Adresse 1312501) et son client.
+geste: Enregistrer
+ids: 1315004
+valeur: Fiche › Texte assistance = assiste par Z et Y
+resultat: fait
+message: Répertorié REP-DELTA enregistré dans la base du greffe : « Texte assistance ».
+fiche: 1315004
+Fiche › Adresse = 12 rue du Banc · 75001 PARIS
+Fiche › Mode présentation = EA
+Fiche › Client = MPCDIV
+Fiche › Nom client = CLIENT DIVERS MPC
+Fiche › Texte assistance = assiste par Z et Y

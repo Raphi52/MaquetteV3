@@ -76,3 +76,54 @@ ids: 1314104
 valeur: Identité › Nom d'usage = X
 resultat: refuse
 message: Bénéficiaire introuvable dans la base du greffe (1314104).
+---
+# 9. Le lieu de naissance vide : obligatoire (la commune en France, OPE_IDENTITE.cs:99 ; le lieu etranger, Designer :134).
+#    Jumeau accepte : bloc 11.
+geste: Enregistrer
+ids: 1314101
+valeur: Identité › Lieu de naissance =
+resultat: refuse
+message: « Lieu de naissance » est obligatoire.
+---
+# 10. Ne a Nice (06) avec le departement 75 saisi : la commune retrouvee n'est pas du departement (OPE_IDENTITE.cs:79-84).
+#     Jumeau accepte : bloc 11, le departement non saisi.
+geste: Enregistrer
+ids: 1314101
+valeur: Identité › Lieu de naissance = Nice
+valeur: Identité › Département de naissance = 75
+resultat: refuse
+message: Le département 75 n'est pas compatible avec la commune NICE.
+---
+# 11. « Nice » seul : retrouvee sans accent ni casse, elle s'enregistre sous son nom de la table et remplit le departement
+#     (_SetDepartement, OPE_IDENTITE.cs:118-121, :132-139).
+geste: Enregistrer
+ids: 1314101
+valeur: Identité › Lieu de naissance = Nice
+resultat: fait
+message: Bénéficiaire DUPONT Jean Marc du dossier 2027 B 14001 enregistré dans la base du greffe : « Département de naissance », « Lieu de naissance ».
+fiche: 1314101
+Identité › Département de naissance = 06
+Identité › Lieu de naissance = NICE
+controle: SELECT BENEF_DEPARTEMENT_NAISS + '/' + BENEF_LIEU_NAISSANCE FROM v2.BENEFICIAIRE_EFFECTIF WHERE BENEF_ID_BENEF = 1314101 => 06/NICE
+---
+# 12. Deux « Saint-Denis » : le departement saisi (974) departage les homonymes (ULT_COMBO_COMMUNE_NAISSANCE.cs:67-73) ; le
+#     tiret devient un espace (:86-88).
+geste: Enregistrer
+ids: 1314101
+valeur: Identité › Lieu de naissance = Saint-Denis
+valeur: Identité › Département de naissance = 974
+resultat: fait
+message: Bénéficiaire DUPONT Jean Marc du dossier 2027 B 14001 enregistré dans la base du greffe : « Département de naissance », « Lieu de naissance ».
+controle: SELECT BENEF_DEPARTEMENT_NAISS + '/' + BENEF_LIEU_NAISSANCE FROM v2.BENEFICIAIRE_EFFECTIF WHERE BENEF_ID_BENEF = 1314101 => 974/SAINT DENIS
+---
+# 13. Ne a l'etranger : le lieu est un texte libre, sans recherche de commune (ultLieuNaissanceEtranger, OPE_IDENTITE.cs:126-128).
+geste: Enregistrer
+ids: 1314103
+valeur: Identité › Pays de naissance = ITA
+valeur: Identité › Département de naissance =
+valeur: Identité › Lieu de naissance = Turin
+resultat: fait
+message: Bénéficiaire ROSSI Luca du dossier 2027 B 14002 enregistré dans la base du greffe : « Département de naissance », « Pays de naissance », « Lieu de naissance ».
+fiche: 1314103
+Identité › Pays de naissance = ITA
+Identité › Lieu de naissance = Turin

@@ -33,7 +33,9 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// beneficiaire, la denomination ou le numero du dossier.
 ///
 /// FICHE (IFicheEcran) : Identité, les zones d'OPE_IDENTITE (OPE_IDENTITE.cs:52-60, titres du Designer :89-176) que le
-/// descripteur porte, et le pays de naissance (obligatoire, Designer :144, lu par les controles du departement). Non lus :
+/// descripteur porte, le pays de naissance (obligatoire, Designer :144, lu par les controles du departement) et le lieu de
+/// naissance (BENEF_LIEU_NAISSANCE : la commune si le pays est la France, le lieu etranger sinon, deux zones titrees « Lieu de
+/// naissance » qui ecrivent la meme colonne, Designer :135, :185 ; OPE_IDENTITE.cs:65-66, :118-128). Non lus :
 /// les modalites de controle (masque genere par type de declaration, OPE_MC.cs:131-193), l'acte depose (GED VidiGED) et les
 /// donnees DIBE (service externe) -- ces sections restent absentes de la fiche.
 ///
@@ -54,7 +56,7 @@ internal sealed class LecteurBeneficiairesDossier : IRechercheEcran, IFicheEcran
 
     internal const string ChampCivilite = "Civilité", ChampPatronyme = "Patronyme", ChampPrenoms = "Prénoms (état civil)",
                           ChampNomUsage = "Nom d'usage", ChampNaissance = "Date de naissance", ChampDepartement = "Département de naissance",
-                          ChampPays = "Pays de naissance";
+                          ChampPays = "Pays de naissance", ChampLieu = "Lieu de naissance";
 
     public IReadOnlyCollection<string> Criteres { get; } = [CritereDossier, CritereNom, CritereType];
 
@@ -162,7 +164,7 @@ internal sealed class LecteurBeneficiairesDossier : IRechercheEcran, IFicheEcran
     {
         var sql = $"""
             SELECT b.BENEF_CIVILITE, b.BENEF_PATRONYME, b.BENEF_PRENOM_ETAT_CIVIL, b.BENEF_NOM_USAGE, b.BENEF_DATE_NAISSANCE,
-                   b.BENEF_DEPARTEMENT_NAISS, b.BENEF_PAYS, s.NumeroGestion
+                   b.BENEF_DEPARTEMENT_NAISS, b.BENEF_PAYS, b.BENEF_LIEU_NAISSANCE, s.NumeroGestion
             FROM v2.BENEFICIAIRE_EFFECTIF AS b {(tx is null ? "" : "WITH (UPDLOCK, HOLDLOCK)")}
             {Dossier}
             WHERE b.BENEF_ID_BENEF = @id AND b.BENEF_SUPPRIME = 0
@@ -180,6 +182,7 @@ internal sealed class LecteurBeneficiairesDossier : IRechercheEcran, IFicheEcran
             [ChampPrenoms] = FormeLigne.Texte(r, "BENEF_PRENOM_ETAT_CIVIL"), [ChampNomUsage] = FormeLigne.Texte(r, "BENEF_NOM_USAGE"),
             [ChampNaissance] = FormeLigne.DateFiche(FormeLigne.DateDe(r, "BENEF_DATE_NAISSANCE")),
             [ChampDepartement] = FormeLigne.Texte(r, "BENEF_DEPARTEMENT_NAISS"), [ChampPays] = pays.Length == 0 ? "FRA" : pays,
+            [ChampLieu] = FormeLigne.Texte(r, "BENEF_LIEU_NAISSANCE"),
         });
     }
 
@@ -189,7 +192,7 @@ internal sealed class LecteurBeneficiairesDossier : IRechercheEcran, IFicheEcran
         if (await LireBeneficiaireAsync(baseGreffe, null, n, ct) is not { } b) return null;
         return new FicheEcran(Procedure, id, b.Nom,
         [
-            new SectionFiche(SectionIdentite, [.. new[] { ChampCivilite, ChampPatronyme, ChampPrenoms, ChampNomUsage, ChampNaissance, ChampDepartement, ChampPays }
+            new SectionFiche(SectionIdentite, [.. new[] { ChampCivilite, ChampPatronyme, ChampPrenoms, ChampNomUsage, ChampNaissance, ChampDepartement, ChampPays, ChampLieu }
                 .Select(c => new ChampFiche(c, b.Valeurs[c]) { Modifiable = true })]),
         ]);
     }

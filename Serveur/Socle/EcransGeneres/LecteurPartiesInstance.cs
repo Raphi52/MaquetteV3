@@ -167,14 +167,21 @@ internal sealed class LecteurPartiesInstance : IRechercheEcran, IFicheEcran
         cmd.Parameters.AddWithValue("@id", id);
         await using var r = await cmd.ExecuteReaderAsync(ct);
         if (!await r.ReadAsync(ct)) return null;
+        return new PartieLue(id, Convert.ToInt32(r["PRT_ID_INSTN"], CultureInfo.InvariantCulture), FormeLigne.Texte(r, "INSTN_NUM_ROLE"),
+            FormeLigne.Texte(r, "PRT_QUALIF_PARTIE"), Nom(FormeLigne.Texte(r, "PRT_CIVILITE"), FormeLigne.Texte(r, "PRT_DESIGNATION")),
+            AdresseLue(r), FormeLigne.Joindre(FormeLigne.Texte(r, "MNDTR_ABREGE"), FormeLigne.Texte(r, "MNDTR_NOM")),
+            r["PRT_ID_PRTRP"] is not DBNull, r["PRT_AIDE_JURIDIC_TOTALE"] is true, r["PRT_AIDE_JURIDIC_PARTIELLE"] is true,
+            FormeLigne.Texte(r, "PRT_AIDE_JURIDIC_NUM")) { Designation = FormeLigne.Texte(r, "PRT_DESIGNATION") };
+    }
+
+    /// <summary>L'adresse partagee (rec.Adresse, l'ADRESSE_BASE de la V2) d'une ligne lue avec les colonnes NumeroVoie,
+    /// ComplementNumero, TypeVoie, NomVoie, CodePostal et Localite : la voie puis la ville. Lue aussi par LecteurRepertoire.</summary>
+    internal static string AdresseLue(SqlDataReader r)
+    {
         var voie = string.Join(" ", new[] { "NumeroVoie", "ComplementNumero", "TypeVoie", "NomVoie" }
             .Select(c => FormeLigne.Texte(r, c)).Where(t => t.Length > 0));
         var ville = string.Join(" ", new[] { "CodePostal", "Localite" }.Select(c => FormeLigne.Texte(r, c)).Where(t => t.Length > 0));
-        return new PartieLue(id, Convert.ToInt32(r["PRT_ID_INSTN"], CultureInfo.InvariantCulture), FormeLigne.Texte(r, "INSTN_NUM_ROLE"),
-            FormeLigne.Texte(r, "PRT_QUALIF_PARTIE"), Nom(FormeLigne.Texte(r, "PRT_CIVILITE"), FormeLigne.Texte(r, "PRT_DESIGNATION")),
-            FormeLigne.Joindre(voie, ville), FormeLigne.Joindre(FormeLigne.Texte(r, "MNDTR_ABREGE"), FormeLigne.Texte(r, "MNDTR_NOM")),
-            r["PRT_ID_PRTRP"] is not DBNull, r["PRT_AIDE_JURIDIC_TOTALE"] is true, r["PRT_AIDE_JURIDIC_PARTIELLE"] is true,
-            FormeLigne.Texte(r, "PRT_AIDE_JURIDIC_NUM")) { Designation = FormeLigne.Texte(r, "PRT_DESIGNATION") };
+        return FormeLigne.Joindre(voie, ville);
     }
 
     public async Task<FicheEcran?> LireFicheAsync(SqlConnection baseGreffe, string id, DateTime maintenant, CancellationToken ct)

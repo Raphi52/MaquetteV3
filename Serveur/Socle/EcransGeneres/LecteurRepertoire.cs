@@ -31,7 +31,10 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// (PRTRP_ABREGE + " " + PRTRP_DESIGNATION, :153) ; la V3 les cherche en LIKE (la V2 en plein texte en memoire, :273) ;
 /// « Répertoriés actifs seulement » (« oui ») garde les actifs (:278-281). Le champ de recherche cherche l'un OU l'autre.
 ///
-/// FICHE (IFicheEcran) : Fiche (abrege, designation, adresse mail, civilite, actif : OPE_EDITION_MODIF_REPER.cs:405-420),
+/// FICHE (IFicheEcran) : Fiche (abrege, designation, adresse mail, civilite, actif, adresse, mode de presentation, client et
+/// son nom, texte d'assistance : OPE_EDITION_MODIF_REPER.cs:401-420 ; mandataire postulant : ope_postulant, OPE_POSTULANT.cs:67 --
+/// l'adresse est la fiche reprise rec.Adresse, le client rec.Client, comme LecteurPartiesInstance ; le client et le
+/// mandataire par leur abrege, la valeur que l'on saisit pour les changer),
 /// Civilité des parties (les parties liees, PartieRepertorie.GetPartiesParRepertorieAvecNumeroAffaire, PartieRepertorie.cs:52-61,
 /// colonnes de DataGridViewEditionParties.cs:23-54 ; la civilite que la V2 leur appliquerait, celle du repertorie, :67-68).
 ///
@@ -52,6 +55,15 @@ internal sealed class LecteurRepertoire : IRechercheEcran, IFicheEcran
 
     internal const string ChampAbrege = "Abrégé", ChampDesignation = "Désignation", ChampMail = "Adresse mail", ChampCivilite = "Civilité",
                           ChampActif = "Actif", ChampParties = "Parties liées";
+
+    // Titres du Designer de la V2 (OPE_EDITION_MODIF_REPER.Designer.cs:123, :141, :264, :275, :285) ; le mandataire postulant est
+    // l'ope_postulant (Designer :291-299, « Mandataire répertorié » dans OPE_MANDATAIRE.designer.cs:211).
+    internal const string ChampAdresse = "Adresse", ChampMode = "Mode présentation", ChampClient = "Client", ChampNomClient = "Nom client",
+                          ChampAssistance = "Texte assistance", ChampMandataire = "Mandataire postulant";
+
+    /// <summary>Les champs de la section « Fiche », dans l'ordre du descripteur ; l'adresse et le nom du client se lisent seulement.</summary>
+    internal static readonly string[] ChampsFiche = [ChampAbrege, ChampDesignation, ChampMail, ChampCivilite, ChampActif, ChampAdresse, ChampMode,
+                                                     ChampClient, ChampNomClient, ChampAssistance, ChampMandataire];
 
     public IReadOnlyCollection<string> Criteres { get; } = [CritereAbrege, CritereDesignation, CritereActifs];
 
@@ -121,8 +133,14 @@ internal sealed class LecteurRepertoire : IRechercheEcran, IFicheEcran
     internal static async Task<RepertorieLu?> LireRepertorieAsync(SqlConnection cn, SqlTransaction? tx, int id, CancellationToken ct)
     {
         var sql = $"""
-            SELECT PRTRP_ABREGE, PRTRP_DESIGNATION, PRTRP_ADRESSE_MAIL, PRTRP_CIVILITE, PRTRP_ACTIF
-            FROM v2.REPERTORIE {(tx is null ? "" : "WITH (UPDLOCK, HOLDLOCK)")} WHERE PRTRP_ID_PRTRP = @id
+            SELECT r.PRTRP_ABREGE, r.PRTRP_DESIGNATION, r.PRTRP_ADRESSE_MAIL, r.PRTRP_CIVILITE, r.PRTRP_ACTIF, r.PRTRP_MODE_PRESENTATION,
+                   r.PRTRP_TEXTE_ASSISTANCE, c.Abrege AS ClientAbrege, c.Nom AS ClientNom, m.MNDTR_ABREGE, m.MNDTR_NOM,
+                   ad.NumeroVoie, ad.ComplementNumero, ad.TypeVoie, ad.NomVoie, ad.CodePostal, ad.Localite
+            FROM v2.REPERTORIE AS r {(tx is null ? "" : "WITH (UPDLOCK, HOLDLOCK)")}
+            LEFT JOIN rec.Client AS c ON c.Id = r.PRTRP_ID_CLIEN
+            LEFT JOIN v2.MANDATAIRE AS m ON m.MNDTR_ID_MNDTR = r.PRTRP_ID_MNDTR_POS
+            LEFT JOIN rec.Adresse AS ad ON ad.Id = r.PRTRP_ID_ADRBS
+            WHERE r.PRTRP_ID_PRTRP = @id
             """;
         LectureV2.ExigerLecture(sql);
         await using var cmd = new SqlCommand(sql, cn, tx);
@@ -134,6 +152,11 @@ internal sealed class LecteurRepertoire : IRechercheEcran, IFicheEcran
             [ChampAbrege] = FormeLigne.Texte(r, "PRTRP_ABREGE"), [ChampDesignation] = FormeLigne.Texte(r, "PRTRP_DESIGNATION"),
             [ChampMail] = FormeLigne.Texte(r, "PRTRP_ADRESSE_MAIL"), [ChampCivilite] = FormeLigne.Texte(r, "PRTRP_CIVILITE"),
             [ChampActif] = FormeLigne.Case(r["PRTRP_ACTIF"] is true),
+            [ChampAdresse] = LecteurPartiesInstance.AdresseLue(r), [ChampMode] = FormeLigne.Texte(r, "PRTRP_MODE_PRESENTATION"),
+            [ChampClient] = FormeLigne.Texte(r, "ClientAbrege"), [ChampNomClient] = FormeLigne.Texte(r, "ClientNom"),
+            [ChampAssistance] = FormeLigne.Texte(r, "PRTRP_TEXTE_ASSISTANCE"),
+            // Un mandataire sans abrege se nomme par son nom (la liste de la V2 le montre, OPE_MANDATAIRE.cs:515-519).
+            [ChampMandataire] = FormeLigne.Texte(r, "MNDTR_ABREGE") is { Length: > 0 } abrege ? abrege : FormeLigne.Texte(r, "MNDTR_NOM"),
         });
     }
 
@@ -153,8 +176,7 @@ internal sealed class LecteurRepertoire : IRechercheEcran, IFicheEcran
         return new FicheEcran(Procedure, id, rep.Valeurs[ChampAbrege],
         [
             new SectionFiche(SectionRepertorie,
-                [.. new[] { ChampAbrege, ChampDesignation, ChampMail, ChampCivilite, ChampActif }
-                    .Select(c => new ChampFiche(c, rep.Valeurs[c]) { Modifiable = true })]),
+                [.. ChampsFiche.Select(c => new ChampFiche(c, rep.Valeurs[c]) { Modifiable = c is not (ChampAdresse or ChampNomClient) })]),
             new SectionFiche(SectionParties,
             [
                 new(ChampParties, "") { Colonnes = ["Numéro affaire", "Civilité", "Qualifiant", "Nom partie"], Lignes = [.. parties] },

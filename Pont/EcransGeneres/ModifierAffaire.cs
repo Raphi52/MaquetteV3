@@ -261,8 +261,14 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             [
                 // Obligatoires et controle cites par le « Detail OPE » : abrege et civilite (MetierObligatoire), abrege unique
                 // (DoVerifier :66-79) ; pas de controle de la designation ni du format de l'adresse mail dans le code.
-                Marche("Fiche", "Abrégé et civilité obligatoires ; l'abrégé est unique dans le greffe. Un abrégé changé est reporté sur les parties liées et sur les codes affaire qui le portent.", true,
-                    "Abrégé", "Désignation", "Adresse mail", "Civilité", Champ.Case("Actif")),
+                // Adresse, mode de presentation, client, texte d'assistance et mandataire postulant : les zones de
+                // OPE_EDITION_MODIF_REPER.cs:401-420 et son ope_postulant (Designer :291-299), titres du Designer ; le mode decide
+                // lesquelles s'affichent (GestionModePresentation :327-370). L'adresse se lit seulement (EcrivainRepertoire.cs dit pourquoi).
+                // fix-ok: mesure le 26/11/2026 -- au commit 167e9e4 la Fiche n'avait que 5 des zones que Valider enregistre
+                // (:208-226) : le client, le mandataire et le texte d'assistance etaient effaces par le mode sans pouvoir etre saisis.
+                Marche("Fiche", "Abrégé et civilité obligatoires ; l'abrégé est unique dans le greffe. Un abrégé changé est reporté sur les parties liées et sur les codes affaire qui le portent. Le mode de présentation décide du reste : représenté, un mandataire postulant ; sinon, un client ; assisté, un texte d'assistance obligatoire.", true,
+                    "Abrégé", "Désignation", "Adresse mail", "Civilité", Champ.Case("Actif"), Champ.Zone("Adresse"), "Mode présentation", "Client",
+                    "Nom client", Champ.Zone("Texte assistance"), "Mandataire postulant"),
                 Marche("Civilité des parties", "Applique la civilité du répertorié aux parties cochées.", false,
                     Champ.Tableau("Parties liées"), "Civilité"),
             ],
@@ -330,11 +336,14 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Sections =
             [
                 // Le pays de naissance (ultPaysNaissance, obligatoire, OPE_IDENTITE.Designer.cs:144) : les controles du departement
-                // le lisent (OPE_IDENTITE.cs:71-93). Lu et enregistre dans la base (lot 3) : LecteurBeneficiairesDossier.cs,
-                // EcrivainBeneficiairesDossier.cs.
-                Marche("Identité", "Patronyme, prénoms de l'état civil, date et pays de naissance sont obligatoires ; né en France, le département l'est aussi, et seulement dans ce cas.", true,
+                // le lisent (OPE_IDENTITE.cs:71-93). Le lieu de naissance (BENEF_LIEU_NAISSANCE) : la commune en France, le lieu
+                // etranger sinon, deux zones « Lieu de naissance » de la V2 sur la meme colonne (OPE_IDENTITE.Designer.cs:135, :185).
+                // fix-ok: mesure le 26/11/2026 -- au commit 167e9e4 l'Identité n'avait pas le lieu de naissance que OPE_IDENTITE lie
+                // (OPE_IDENTITE.cs:65-66, :118-128) : le controle commune / departement (:75-86) n'avait rien a controler.
+                // Lu et enregistre dans la base (lot 3) : LecteurBeneficiairesDossier.cs, EcrivainBeneficiairesDossier.cs.
+                Marche("Identité", "Patronyme, prénoms de l'état civil, date, pays et lieu de naissance sont obligatoires ; né en France, le département l'est aussi, et seulement dans ce cas. Une commune retrouvée remplit le département, qui doit être le sien.", true,
                     "Civilité", "Patronyme", "Prénoms (état civil)", "Nom d'usage", Champ.Date("Date de naissance"), "Département de naissance",
-                    "Pays de naissance"),
+                    "Pays de naissance", "Lieu de naissance"),
                 Marche("Modalités de contrôle", "Les champs changent selon le type de déclaration du dossier : le placement collectif en ajoute sept.", true,
                     Champ.Tableau("Modalités selon la déclaration")),
                 Marche("Acte déposé", "Visualise l'acte déposé, et les données brutes renvoyées par le service de déclaration.", false,

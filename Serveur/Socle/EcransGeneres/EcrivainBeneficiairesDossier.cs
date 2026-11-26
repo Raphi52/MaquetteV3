@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using Microsoft.Data.SqlClient;
 using RigV3.Contrats.EcransGeneres;
 using static RigV3.Serveur.Socle.EcransGeneres.LecteurBeneficiairesDossier;
@@ -15,17 +16,25 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// CONTROLES DE RIG v2, dans l'ordre, avant toute ecriture (un refus n'ecrit rien) :
 ///   1. le beneficiaire existe et n'est pas partant (sinon « Bénéficiaire introuvable ») ; seuls les champs de l'identite ;
 ///   2. obligatoires (MetierObligatoire, OPE_IDENTITE.Designer.cs:89, :107, :125, :144) : patronyme, prenoms de l'etat civil,
-///      date de naissance, pays de naissance ;
-///   3. DoVerifier (OPE_IDENTITE.cs:71-93), sur les valeurs saisies : pays « FRA » et departement vide -> « La saisie du
-///      département est obligatoire quand le pays de naissance est France » ; pays renseigne autre que « FRA » et
+///      date de naissance, pays de naissance ; et le lieu de naissance, l'une ou l'autre de ses deux zones (la commune en
+///      France, OPE_IDENTITE.cs:99 ; le lieu etranger, Designer :134 et OPE_IDENTITE.cs:113) ;
+///   3. la commune de naissance (pays « FRA », lieu renseigne) : RIG v2 la retrouve dans COMMUNE par son nom
+///      (ULT_COMBO_COMMUNE_NAISSANCE._GetIdValeurFind, :52-76 : R_COMMUNE_COMMUNE, sans accents, tirets ni apostrophes,
+///      AmiString.NoAccentPourCompareSql ; plusieurs homonymes -> la ville sans arrondissement 75000/69000/13000, sinon celle
+///      du departement saisi). Saisie et retrouvee, elle s'enregistre sous son nom de la table (OPE_IDENTITE.cs:118-121) et,
+///      le departement non saisi, le remplit (_SetDepartement, :132-139). Introuvable : le texte saisi s'enregistre tel quel
+///      (:122-124), sans controle de compatibilite -- comme RIG v2, qui ne controle qu'une commune retrouvee (:75-78) ;
+///   4. DoVerifier (OPE_IDENTITE.cs:71-93), sur les valeurs saisies : pays « FRA » et departement vide -> « La saisie du
+///      département est obligatoire quand le pays de naissance est France » ; commune retrouvee d'un autre departement ->
+///      « Le département 75 n'est pas compatible avec la commune NICE » (:79-84) ; pays renseigne autre que « FRA » et
 ///      departement saisi -> « Le département ne doit pas être renseigné quand le pays de naissance n'est pas France » ;
-///   4. la taille des colonnes (RIG_DEV : civilite 10, patronyme, prenoms et nom d'usage 100, departement 3, pays 50) et la date.
+///   5. la taille des colonnes (RIG_DEV : civilite 10, patronyme, prenoms et nom d'usage 100, departement 3, pays 50, lieu de
+///      naissance 50) et la date.
 ///
 /// CE QUI S'ECRIT (v2.BENEFICIAIRE_EFFECTIF) : les colonnes des champs modifies ; un pays vide a l'ouverture vaut « FRA »
 /// (OPE_IDENTITE.cs:62-64) et s'enregistre ainsi. Trace : famille « dossier », « a modifie », avant et apres.
 ///
-/// NON REPRIS (nommes) : la compatibilite departement / commune de naissance (OPE_IDENTITE.cs:75-86), la commune n'etant pas
-/// un champ du descripteur ; la mise a jour du Kbis XML apres validation (ETP_LIST_BE._MajKbisXml, ETP_LIST.cs:63) ; la
+/// NON REPRIS (nommes) : la mise a jour du Kbis XML apres validation (ETP_LIST_BE._MajKbisXml, ETP_LIST.cs:63) ; la
 /// demande BE (« Modification bénéficiaire effectif … », non facturee : PROC_BE.Designer.cs:89), une trace remplacee par le
 /// journal des gestes ; l'ajout et la suppression d'un beneficiaire (modes AddBe et ListBe), qu'une Fiche ne fait pas.
 ///
@@ -55,7 +64,7 @@ internal sealed class EcrivainBeneficiairesDossier : IEcrivainEcran
         (ChampCivilite, "BENEF_CIVILITE", 10, false), (ChampPatronyme, "BENEF_PATRONYME", 100, true),
         (ChampPrenoms, "BENEF_PRENOM_ETAT_CIVIL", 100, true), (ChampNomUsage, "BENEF_NOM_USAGE", 100, false),
         (ChampNaissance, "BENEF_DATE_NAISSANCE", 0, true), (ChampDepartement, "BENEF_DEPARTEMENT_NAISS", 3, false),
-        (ChampPays, "BENEF_PAYS", 50, true),
+        (ChampPays, "BENEF_PAYS", 50, true), (ChampLieu, "BENEF_LIEU_NAISSANCE", 50, true),
     ];
 
     public async Task<IssueGeste> JouerAsync(GesteEnCours geste, CancellationToken ct)
@@ -74,7 +83,7 @@ internal sealed class EcrivainBeneficiairesDossier : IEcrivainEcran
         var valeurs = new Dictionary<string, string>(b.Valeurs, StringComparer.Ordinal);
         foreach (var (champ, valeur) in saisis) valeurs[champ] = valeur;
 
-        // 2. et 4. Obligatoires, tailles, date.
+        // 2. et 5. Obligatoires, tailles, date.
         foreach (var (champ, _, taille, obligatoire) in Colonnes.Where(c => saisis.ContainsKey(c.Champ)))
         {
             var v = saisis[champ];
@@ -84,9 +93,21 @@ internal sealed class EcrivainBeneficiairesDossier : IEcrivainEcran
                 return IssueGeste.Refuser($"« {champ} » : date illisible ({v}).");
         }
 
-        // 3. DoVerifier (OPE_IDENTITE.cs:71-93), sur les valeurs saisies.
+        // 3. La commune de naissance, retrouvee comme la liste de RIG v2 ; saisie, elle prend son nom de la table et remplit le
+        //    departement non saisi (OPE_IDENTITE.cs:118-121, :132-139).
+        var commune = valeurs[ChampPays] == "FRA" && valeurs[ChampLieu].Length > 0
+            ? await CommuneAsync(geste, valeurs[ChampLieu], valeurs[ChampDepartement], ct) : null;
+        if (commune is { } saisie && saisis.ContainsKey(ChampLieu))
+        {
+            saisis[ChampLieu] = valeurs[ChampLieu] = saisie.Nom;
+            if (!saisis.ContainsKey(ChampDepartement)) saisis[ChampDepartement] = valeurs[ChampDepartement] = saisie.Departement;
+        }
+
+        // 4. DoVerifier (OPE_IDENTITE.cs:71-93), sur les valeurs saisies.
         if (valeurs[ChampPays] == "FRA" && valeurs[ChampDepartement].Length == 0)
             return IssueGeste.Refuser("La saisie du département est obligatoire quand le pays de naissance est France.");
+        if (commune is { } retrouvee && valeurs[ChampDepartement].Length > 0 && retrouvee.Departement != valeurs[ChampDepartement])
+            return IssueGeste.Refuser($"Le département {valeurs[ChampDepartement]} n'est pas compatible avec la commune {retrouvee.Nom}.");
         if (valeurs[ChampPays] is { Length: > 0 } pays && pays != "FRA" && valeurs[ChampDepartement].Length > 0)
             return IssueGeste.Refuser("Le département ne doit pas être renseigné quand le pays de naissance n'est pas France.");
 
@@ -116,5 +137,45 @@ internal sealed class EcrivainBeneficiairesDossier : IEcrivainEcran
                                 $"{string.Join(", ", Colonnes.Where(c => changes.ContainsKey(c.Champ)).Select(c => $"« {c.Champ} »"))}.",
             [id], new TraceGeste("dossier", $"le bénéficiaire effectif {nom} du dossier {b.Dossier}", id, "a modifie",
                 changes.Keys.ToDictionary(c => c, c => b.Valeurs[c]), changes));
+    }
+
+    /// <summary>Une commune de la table COMMUNE de RIG v2 : son nom (R_COMMUNE_COMMUNE) et son departement.</summary>
+    private sealed record Commune(string Nom, string Departement);
+
+    /// <summary>La commune nommee <paramref name="lieu"/>, retrouvee comme ULT_COMBO_COMMUNE_NAISSANCE._GetIdValeurFind (:52-76) ;
+    /// null si aucune, ou si les homonymes ne se departagent pas.</summary>
+    private static async Task<Commune?> CommuneAsync(GesteEnCours geste, string lieu, string departement, CancellationToken ct)
+    {
+        var trouvees = new List<(Commune Commune, string CodePostal)>();
+        await using (var r = await geste.LireAsync("""
+            SELECT R_COMMUNE_COMMUNE, R_COMMUNE_CODE_POSTAL, R_COMMUNE_DEPARTEMENT FROM v2.COMMUNE
+            WHERE UPPER(R_COMMUNE_COMMUNE) = UPPER(@nom) ORDER BY R_COMMUNE_ID_COMMN
+            """, ct, new SqlParameter("@nom", NomCommune(lieu))))
+            while (await r.ReadAsync(ct))
+                trouvees.Add((new Commune(FormeLigne.Texte(r, "R_COMMUNE_COMMUNE"), FormeLigne.Texte(r, "R_COMMUNE_DEPARTEMENT")),
+                              FormeLigne.Texte(r, "R_COMMUNE_CODE_POSTAL")));
+        if (trouvees.Count == 1) return trouvees[0].Commune;
+        if (trouvees.Count == 0) return null;
+        // Plusieurs : la ville sans arrondissement (MetierAllowVilleSansArrond, OPE_IDENTITE.cs:44 ; :59-64), puis le
+        // departement saisi (« #departement » dans le texte de recherche, :67-73).
+        if (trouvees.Where(t => t.CodePostal is "69000" or "75000" or "13000").ToList() is [var ville]) return ville.Commune;
+        if (departement.Length > 0 && trouvees.Where(t => t.Commune.Departement.StartsWith(departement, StringComparison.Ordinal)).ToList() is [var duDepartement])
+            return duDepartement.Commune;
+        return null;
+    }
+
+    /// <summary>Le nom compare a R_COMMUNE_COMMUNE, ecrit comme RIG v2 l'ecrit (ULT_COMBO_COMMUNE_NAISSANCE.cs:86-88) : sans
+    /// accents (AmiString.NoAccentPourCompareSql, :442-456 : lettres et chiffres gardes, le reste en espace), tirets et
+    /// apostrophes en espaces.</summary>
+    internal static string NomCommune(string lieu)
+    {
+        var nom = new StringBuilder(lieu.Length);
+        foreach (var c in lieu.Normalize(NormalizationForm.FormD))
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.NonSpacingMark) continue;
+            if (c is '\u0153' or '\u0152') nom.Append("oe");
+            else nom.Append(char.IsAsciiLetterOrDigit(c) || c == '\u00B0' ? char.ToLowerInvariant(c) : ' ');
+        }
+        return nom.ToString().Trim();
     }
 }
