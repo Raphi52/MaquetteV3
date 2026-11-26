@@ -119,9 +119,10 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Forme = FormeEcran.Audience,
             // Le cabinet : la recherche de RIG v2, type cabinet, fenêtre INTERV_AUD_DATE_*_PREAUD (OPE_CITATIONS.cs:157-167) ; ses
             // instances et leur LRAR (:46-95). Lecteur : Serveur/Socle/EcransGeneres/LecteurConvocations.cs (lot 7). « Citer par
-            // huissier » enregistre la citation des instances cochées (EcrivainConvocations.cs ; OPE_CITATIONS.cs:241-332) ; ses
-            // éditions (citation, copie conforme, KBIS) et sa facture ne sont pas faites.
-            Parametres = [Champ.Date("Date de l'audience"), "Huissier"],
+            // huissier » enregistre la citation des instances cochées et met ses éditions dans la file, avec le KBIS si sa case est
+            // cochée (CheckBoxEditerKbis, OPE_CITATIONS.cs:436) (EcrivainConvocations.cs ; OPE_CITATIONS.cs:241-459) ; la copie conforme
+            // (GED) et la facture ne sont pas faites.
+            Parametres = [Champ.Date("Date de l'audience"), "Huissier", Champ.Case("Éditer le Kbis")],
             Recherche = "Rechercher une instance, un numéro de rôle, un dossier, une LRAR…",
             Criteres = ["Date de l'audience"],
             Valider = "Citer par huissier", // proc_gconv.md, Rôle : « Gérer les citations et significations par huissier (LRAR) ».
