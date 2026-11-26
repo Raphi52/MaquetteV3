@@ -122,3 +122,95 @@ resultat: fait
 message: 1 affaire renvoyée (R17S).
 controle: SELECT APPAF_CODE_PLUMITIF + '/' + APPAF_ETAT_RETOUR FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF = 1700517 => R17S/M
 controle: SELECT COUNT(*) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN = 1700017 => 1
+---
+# 15. Un « Type de décision » sur un renvoi simple (R17S) : RIG v2 masque et vide l'étape décision (OPE_RESULTAT.cs:472-473,
+#     :488-497), aucune décision ne s'écrit. Jumeau : bloc 19 (R17P, renvoi prononcé).
+geste: Decider Renvoyer
+ids: 1700519
+valeur: Résultat = R17S
+valeur: Type de décision = JGT17R
+resultat: refuse
+message: Le code plumitif « R17S » n'ouvre pas la décision judiciaire : RIG v2 ne la saisit au renvoi que pour un code prononcé ou délibéré.
+---
+# 16. Un type de décision hors de la liste de saisie (OPE_DECISION_JUDICIAIRE_MJUDS). Jumeau : bloc 19 (JGT17R).
+geste: Decider Renvoyer
+ids: 1700519
+valeur: Résultat = R17P
+valeur: Type de décision = JGT17X
+resultat: refuse
+message: Le type de décision « JGT17X » n'est pas utilisable en saisie dans la base du greffe.
+---
+# 17. Une date prévue qui n'est pas une date. Jumeau : bloc 19.
+geste: Decider Renvoyer
+ids: 1700519
+valeur: Résultat = R17P
+valeur: Type de décision = JGT17R
+valeur: Date prévue = pas une date
+resultat: refuse
+message: « Date prévue » n'est pas une date : « pas une date ».
+---
+# 18. Une date prévue sans type de décision : elle appartient à la décision. Jumeau : bloc 19.
+geste: Decider Renvoyer
+ids: 1700519
+valeur: Résultat = R17P
+valeur: Date prévue = 2001-04-19
+resultat: refuse
+message: « Date prévue » se rapporte à la décision : saisissez aussi le « Type de décision ».
+---
+# 19. Le renvoi prononcé et sa décision (PROC_MJUDS.cs:1186-1193 ; AffectDecisionJudiciaireDirect, :1587-1593) : résultat R17P,
+#     état de retour « P » (code prononcé) ; une décision JGT17R neuve sur 2026J17019 (1re de l'instance, date prévue, catégorie
+#     « I », numéro source neuf, non délibérée) ; aucune sur 2026J17020, dont l'appel a déjà une décision délibérée (:1189). Pas
+#     de prochain appel : R17P n'est ni « avec audience » ni « avec cabinet ».
+geste: Decider Renvoyer
+ids: 1700519,1700520
+valeur: Résultat = R17P
+valeur: Type de décision = JGT17R
+valeur: Date prévue = 2001-04-19
+resultat: fait
+message: 2 affaires renvoyées (R17P) ; 1 décision JGT17R créée, 1 déjà délibérée.
+controle: SELECT APPAF_CODE_PLUMITIF + '/' + APPAF_ETAT_RETOUR FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF = 1700519 => R17P/P
+controle: SELECT APPAF_CODE_PLUMITIF + '/' + APPAF_ETAT_RETOUR FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF = 1700520 => R17P/P
+controle: SELECT COUNT(*) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_INSTN = 1700019 AND DCJDC_TYPE_DECISION = 'JGT17R' AND DCJDC_DATE_PREVUE = '20010419' AND DCJDC_NUM_ORDRE = 1 AND DCJDC_CAT_DECISION = 'I' AND LEN(DCJDC_NUMERO_SOURCE) = 36 AND DCJDC_ID_APPAF_DELIBERER IS NULL AND DCJDC_ETAT_VALIDITE = '0' AND DCJDC_REDIGEE_GREFFE = 1 => 1
+controle: SELECT COUNT(*) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_INSTN = 1700020 => 1
+controle: SELECT COUNT(*) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN IN (1700019, 1700020) => 2
+---
+# SECOND CONTRÔLE DU LOT 7 : les contrôles de PROC_MJUDS que « Renvoyer » sautait. Données : fin de PROC_RETAUD.sql.
+
+# 20. La seule instance cochée est tenue par une demande en cours : PROC_MJUDS verrouille chaque instance à son ouverture
+#     (PROC_MJUDS.cs:210, LockInstances :959-1034) et refuse au message de :1014-1019. Jumeau : bloc 22 (instances libres).
+geste: Decider Renvoyer
+ids: 1700521
+valeur: Résultat = R17S
+resultat: refuse
+message: Toutes les instances sélectionnées sont bloquées : Instance bloquée (D2617008010), demande "En cours" : MPCS par BANC RETAUD
+---
+# 21. Une instance tenue parmi deux : RIG v2 propose de continuer sur les autres (:1020-1027), la V3 refuse et la nomme. Jumeau : bloc 22.
+geste: Decider Renvoyer
+ids: 1700521,1700523
+valeur: Résultat = R17S
+resultat: refuse
+message: Certaines instances sont bloquées, décochez-les pour travailler sur les autres : Instance bloquée (D2617008010), demande "En cours" : MPCS par BANC RETAUD
+---
+# 22. Le renvoi R17 de deux instances libres : 2026J17023 reçoit l'appel neuf à l'audience C17B du 16/03/2001 (2e appel, TC17,
+#     sans composition : l'audience n'en a pas) ; 2026J17022, déjà appelée le 15/01/2099, reçoit le résultat SANS nouvel appel
+#     (PROC_MJUDS.cs:1176-1182). Jumeaux accepté des blocs 20, 21 (instances tenues) et 13 (sans appel à venir).
+geste: Decider Renvoyer
+ids: 1700522,1700523
+valeur: Résultat = R17
+valeur: Prochaine audience = 2001-03-16
+resultat: fait
+message: 2 affaires renvoyées (R17) à l'Audience du 16/03/2001 à 14:00 - Chambre Sans composition (C17B) ; sans nouvel appel, déjà appelée à une audience à venir : 2026J17022.
+controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, ':', APPAF_CODE_PLUMITIF, ':', APPAF_ETAT_RETOUR), ',') WITHIN GROUP (ORDER BY APPAF_ID_APPAF) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF IN (1700522, 1700523) => 1700522:R17:M,1700523:R17:M
+controle: SELECT COUNT(*) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN = 1700023 AND APPAF_ID_ADNC = 1700113 AND APPAF_NUM_ORDRE = 2 AND APPAF_TYPE_CLASSEMENT = 'TC17' AND APPAF_ETAT_RETOUR = 'A' AND APPAF_ID_CMAUD IS NULL AND APPAF_CODE_PLUMITIF IS NULL => 1
+controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, ':', APPAF_ID_ADNC), ',') WITHIN GROUP (ORDER BY APPAF_ID_APPAF) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN = 1700022 => 1700522:1700117,1700525:1700118
+---
+# 23. Le renvoi prononcé avec un type de décision qui porte une mesure liée (JGT17M -> EXR17) : la décision et sa MESURE
+#     (AffectDecisionJudiciaire et GetMesureSaisie, PROC_MJUDS.cs:1499-1509, :1365-1373). Jumeau : bloc 19 (JGT17R, sans mesure).
+geste: Decider Renvoyer
+ids: 1700524
+valeur: Résultat = R17P
+valeur: Type de décision = JGT17M
+resultat: fait
+message: 1 affaire renvoyée (R17P) ; 1 décision JGT17M créée avec sa mesure EXR17.
+controle: SELECT STRING_AGG(CONCAT(m.MSINS_ID_INSTN, ':', m.MSINS_NUM_ORDRE, ':', m.MSINS_TYPE_MESURE, ':', CASE WHEN LEN(m.MSINS_NUMERO_SOURCE) = 36 THEN 'guid' ELSE '-' END, ':', d.DCJDC_TYPE_DECISION), ',') FROM v2.MESURE AS m JOIN v2.DECISION_JUDICIAIRE AS d ON d.DCJDC_ID_DCJDC = m.MSINS_ID_DCJDC WHERE m.MSINS_ID_INSTN = 1700024 => 1700024:1:EXR17:guid:JGT17M
+controle: SELECT COUNT(*) FROM v2.MESURE WHERE MSINS_ID_INSTN = 1700019 => 0

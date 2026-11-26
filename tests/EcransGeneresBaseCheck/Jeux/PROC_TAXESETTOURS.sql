@@ -64,3 +64,12 @@ INSERT INTO v2.AUTRE_CHIFFRE (ACHFF_ID_ACHFF, ACHFF_CODE_CHIFFRE, ACHFF_ABREGE_O
     (1707803, ''TX17'', ''MA17'', ''LIQ'', @an1, 30), (1707804, ''TX17'', ''MA17'', ''LIQ'', @avant, 999),
     (1707805, ''NX17'', ''MA17'', ''MDJ'', @aujourdhui, 500), (1707806, ''AC17'', ''AD17'', ''ADJ'', @aujourdhui, 75.25),
     (1707807, ''TX17'', ''AD17'', ''CEP'', @aujourdhui, 10);', N'@aujourdhui datetime', @aujourdhui;
+
+-- SECOND CONTROLE DU LOT 7 (26/11/2026) : la periode et les cases saisies (OPE_PERIODE, OPE_TYPE_EDITION) partent a la base
+-- (PROC_TAXESETTOURS.recherches). Des chiffres a des dates FIXES de mars 2001, loin de la periode par defaut : MA17 MDJ 40 le
+-- 01/03/2001 (borne de debut retenue ; jumeau ecarte : LIQ 7 le 28/02/2001), AD17 ADJ 12,50 d'acompte le 31/03/2001 (borne de
+-- fin retenue ; jumeau ecarte : CEP 8 le 01/04/2001).
+EXEC sp_executesql N'
+INSERT INTO v2.AUTRE_CHIFFRE (ACHFF_ID_ACHFF, ACHFF_CODE_CHIFFRE, ACHFF_ABREGE_ORGANE, ACHFF_FONCTION_PC, ACHFF_DATE, ACHFF_MONTANT) VALUES
+    (1707811, ''TX17'', ''MA17'', ''MDJ'', ''20010301'', 40), (1707812, ''TX17'', ''MA17'', ''LIQ'', ''20010228'', 7),
+    (1707813, ''AC17'', ''AD17'', ''ADJ'', ''20010331'', 12.50), (1707814, ''TX17'', ''AD17'', ''CEP'', ''20010401'', 8);';

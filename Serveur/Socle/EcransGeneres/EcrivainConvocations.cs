@@ -22,13 +22,19 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     procedure SURVENU au code de citation, date du jour (EvenementProcedure.CreateEvenementProcedure(..., true, false,
 ///     DateTime.Today ...), :245), ajoute a l'instance (numero d'ordre = nombre d'evenements + 1, Instance.cs:594-596).
 ///
-/// CE QUE LA V3 NE REPREND PAS (nomme, rien en silence) : les EDITIONS -- citation (destinataire huissier), copie conforme de
-/// l'ordonnance, KBIS, facture (GenererLesEditions, :335-484) : elles passent par le moteur d'editions de RIG v2
-/// (EvenementProcedure.CreateDemandeEdition, EvenementProcedure.cs:2607 -> GetAllEditions, :2801 : CEP_EDITION, PARAM_EDITION,
-/// destinataires LR / LRAR, lots), que la V3 n'a pas : aucune demande d'edition n'est creee ; la FACTURE de la diligence
-/// (GenererFacture, :214-238 : articles de l'evenement, client des parties) et ses controles (dossier RCS, premier dirigeant,
-/// :286-304), qui ne gardent qu'elle ; l'avertissement « copie de l'ordonnance » (index VIDIGED, :274-284) ; la demande
-/// « GCONV instance <role> » creee puis validee (:495-499, :330) : le journal des gestes la remplace, la facture n'etant pas faite.
+/// CE QUE LA V3 NE REPREND PAS (nomme, rien en silence, avec la raison) :
+///   - les EDITIONS (GenererLesEditions, :334-492) : RIG v2 les tire de l'evenement de citation (:359 ->
+///     EvenementProcedure.CreateDemandeEdition, EvenementProcedure.cs:2607, puis GetAllEditions, :2801 : maquettes CEP_EDITION du
+///     code et destinataires de l'instance, DestinatairesEditionsLot2XML.cs) ; la copie de l'ordonnance (piece VIDIGED, :397-433) et
+///     le KBIS (case cochee, :436-457) ne se creent qu'A L'INTERIEUR de la boucle sur ces editions (:365). La V3 sait ecrire une
+///     demande d'edition a parametre connu (v2.DEMANDE_EDITION : EcrivainRelancesComptesAnnuels, EcrivainRegistresJudiciaires),
+///     pas calculer les editions d'un evenement : aucune demande n'est creee ;
+///   - la FACTURE de la diligence (GenererFacture, :214-238 ; :461-489) : elle facture les articles de l'evenement
+///     (EvenementProcedure.CreateArticles, EvenementProcedure.cs:2443), que la V3 ne calcule pas ; ses controles (dossier RCS,
+///     premier dirigeant, :286-304) ne gardent qu'elle ;
+///   - l'avertissement « copie de l'ordonnance » (index VIDIGED, :274-284), qui n'annonce que l'edition de la copie ;
+///   - la demande « GCONV instance <role> » creee puis validee (:495-499, :330) : le journal des gestes la remplace, la facture
+///     n'etant pas faite.
 /// </summary>
 internal sealed class EcrivainConvocations : IEcrivainEcran
 {
@@ -40,6 +46,16 @@ internal sealed class EcrivainConvocations : IEcrivainEcran
 
     /// <summary>Le geste (le Valider du descripteur, Surveiller.cs) et son parametre, au mot pres.</summary>
     internal const string Citer = "Citer par huissier", ParametreHuissier = "Huissier";
+
+    /// <summary>Ce que RIG v2 produit aussi a la citation (GenererLesEditions, OPE_CITATIONS.cs:334-492 ; GenererFacture, :214-238) et
+    /// que la V3 ne fait pas (voir l'en-tete) : le message du geste le dit a l'agent, une citation enregistree n'est pas une citation
+    /// envoyee.</summary>
+    // fix-ok: controle du lot 7 (26/11) -- la raison donnee (« pas de moteur d'editions ») etait fausse : la V3 ecrit deja des
+    // demandes d'edition (EcrivainRelancesComptesAnnuels.cs:284). Ce qui manque est le calcul des editions et des articles de
+    // l'evenement de citation (EvenementProcedure.cs:2607, :2801, :2443) ; le Kbis n'est edite que si sa case est cochee (:437).
+    internal const string EditionsNonProduites =
+        "La citation à l'huissier, la copie de l'ordonnance, le Kbis (s'il est demandé) et la facture ne sont pas produits : RIG v2 les tire "
+        + "des éditions et des articles paramétrés pour l'événement de citation, que RIG v3 ne calcule pas encore.";
 
     private sealed record Ligne(int IdInstance, string Role, string? TypeDate);
 
@@ -82,7 +98,7 @@ internal sealed class EcrivainConvocations : IEcrivainEcran
                 new { Instance = l.Role, Evenement = code, Date = geste.Maintenant.Date, Huissier = huissier }));
         }
         var n = lignes.Count;
-        return IssueGeste.Ecrit($"{n} citation{(n > 1 ? "s" : "")} par huissier enregistrée{(n > 1 ? "s" : "")} ({huissier}).",
+        return IssueGeste.Ecrit($"{n} citation{(n > 1 ? "s" : "")} par huissier enregistrée{(n > 1 ? "s" : "")} ({huissier}). {EditionsNonProduites}",
                                 [.. d.Ids], [.. traces]);
     }
 

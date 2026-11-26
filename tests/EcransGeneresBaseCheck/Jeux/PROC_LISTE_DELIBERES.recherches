@@ -1,0 +1,54 @@
+# Les recherches de LecteurListeDeliberes (« Délibérés », PROC_LISTE_DELIBERES) : les critères de frmListeDelibere.cs (:161-178),
+# que RIG v2 relance dans sa requête (NewTraitement, :154-262). Les lignes du jeu PROC_LISTE_DELIBERES.sql sont posées par rapport à
+# la référence par défaut (le dernier jour du mois précédent) : les dates saisies ici sont FIXES et loin de ces lignes. Sans
+# critère, la liste est celle de PROC_LISTE_DELIBERES.attendu (DELIB D, DELIB A).
+
+# 1. Les cases Contentieux et Procédures Collectives (TypeInstanceGenererSQL, :352-372) : la PC 2026P17105 s'ajoute (écartée par
+#    défaut, Contentieux seul). Rôle décroissant (:170).
+critere: Contentieux = oui
+critere: Procédures Collectives = oui
+lignes:
+DELIB PC | Rôle 2026P17105 · 90 jours de délibéré | Délibérés non rendus | AFaire | []
+DELIB D | Rôle 2026J17104 · 90 jours de délibéré | Délibérés non rendus | AFaire | []
+DELIB A | Rôle 2026J17101 · 60 jours de délibéré · juge JUGEDELIB Anne | Délibérés non rendus | AFaire | []
+---
+# 2. Référés seul : aucun référé en délibéré (jumeau : bloc 1, les cases cochées font la liste).
+critere: Référés = oui
+lignes:
+---
+# 3. Le juge de l'instance, par son libellé « NOM Prénom » (la liste de RIG v2, rcboJuge, :67, :173-175).
+critere: Juge de l'instance = JUGEDELIB Anne
+lignes:
+DELIB A | Rôle 2026J17101 · 60 jours de délibéré · juge JUGEDELIB Anne | Délibérés non rendus | AFaire | []
+---
+# 4. Un libellé qui n'est pas celui d'un juge actif (le nom seul) : rien (jumeau : bloc 3).
+critere: Juge de l'instance = JUGEDELIB
+lignes:
+---
+# 5. La durée : 90 jours, borne retenue pour DELIB D (90 jours), DELIB A écartée (60 jours ; :176, DATEDIFF >= durée).
+critere: Durée du délibéré en jours = 90
+lignes:
+DELIB D | Rôle 2026J17104 · 90 jours de délibéré | Délibérés non rendus | AFaire | []
+---
+# 6. Une durée qui n'est pas un entier : RIG v2 refuse de chercher (« La durée du délibéré est incorrect », :90-94). Jumeau : bloc 5.
+critere: Durée du délibéré en jours = soixante
+lignes:
+---
+# 7. L'enrôlement minimal : une date avant tout le jeu garde la liste par défaut...
+critere: Date d'enrôlement min = 2000-01-01
+lignes:
+DELIB D | Rôle 2026J17104 · 90 jours de délibéré | Délibérés non rendus | AFaire | []
+DELIB A | Rôle 2026J17101 · 60 jours de délibéré · juge JUGEDELIB Anne | Délibérés non rendus | AFaire | []
+---
+# 8. ... une date après tout le jeu l'écarte (jumeau : bloc 7).
+critere: Date d'enrôlement min = 2099-01-01
+lignes:
+---
+# 9. La date de référence : au 01/01/2000, aucun délibéré n'est encore tenu (dtpReference, :161-171 ; jumeau : la liste par défaut).
+critere: Délibérés au = 2000-01-01
+lignes:
+---
+# 10. Le texte : le numéro de rôle (ou le nom de l'affaire).
+texte: 2026J17104
+lignes:
+DELIB D | Rôle 2026J17104 · 90 jours de délibéré | Délibérés non rendus | AFaire | []

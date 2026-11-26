@@ -21,7 +21,7 @@ message: Audience du 03/10/2001 à 09:00 - Chambre Numérotation simple (P17S) :
 geste: Decider Valider
 ids: 1703120
 resultat: fait
-message: Numéros d'appel attribués : 4 affaires sur 1 audience.
+message: Numéros d'appel attribués : 4 affaires sur 1 audience. Le plumitif n'est pas généré : RIG v3 n'a pas l'état Crystal qui le produit dans RIG v2.
 controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, '=', APPAF_NUM_APPEL), ',') WITHIN GROUP (ORDER BY APPAF_NUM_APPEL) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_ADNC = 1703120 => 1703523=01_001,1703522=01_002,1703524=02_001,1703521=02_002
 controle: SELECT CAST(AUDNC_NUM_APPEL_ATTRIB AS int) FROM v2.AUDIENCE_CABINET WHERE AUDNC_ID_ADNC = 1703120 => 1
 ---
@@ -30,7 +30,7 @@ controle: SELECT CAST(AUDNC_NUM_APPEL_ATTRIB AS int) FROM v2.AUDIENCE_CABINET WH
 geste: Decider Valider
 ids: 1703121,1703124
 resultat: fait
-message: Numéros d'appel attribués : 5 affaires sur 2 audiences.
+message: Numéros d'appel attribués : 5 affaires sur 2 audiences. Le plumitif n'est pas généré : RIG v3 n'a pas l'état Crystal qui le produit dans RIG v2.
 controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, '=', APPAF_NUM_APPEL), ',') WITHIN GROUP (ORDER BY APPAF_ID_ADNC, APPAF_NUM_APPEL) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_ADNC IN (1703121, 1703124) => 1703532=01_001,1703531=01_002,1703533=01_003,1703562=01_001,1703561=01_002
 ---
 # 5. Le jumeau du bloc 2 : « Recalculer les n° d'appel » coché, l'ordre se refait (rôles décroissants) et les numéros avec.
@@ -38,7 +38,7 @@ geste: Decider Valider
 ids: 1703122
 valeur: Recalculer les n° d'appel = oui
 resultat: fait
-message: Numéros d'appel attribués : 2 affaires sur 1 audience.
+message: Numéros d'appel attribués : 2 affaires sur 1 audience. Le plumitif n'est pas généré : RIG v3 n'a pas l'état Crystal qui le produit dans RIG v2.
 controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, '=', APPAF_NUM_APPEL), ',') WITHIN GROUP (ORDER BY APPAF_NUM_APPEL) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_ADNC = 1703122 => 1703542=01_001,1703541=01_002
 ---
 # 6. Numéros attribués mais un appel sans numéro, sans recalcul (DoPreparerSauvegarde, OPE_EDIT_PLUMITIF.cs:291-300) : l'ordre des
@@ -46,5 +46,5 @@ controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, '=', APPAF_NUM_APPEL), ',') W
 geste: Decider Valider
 ids: 1703123
 resultat: fait
-message: Numéros d'appel attribués : 3 affaires sur 1 audience.
+message: Numéros d'appel attribués : 3 affaires sur 1 audience. Le plumitif n'est pas généré : RIG v3 n'a pas l'état Crystal qui le produit dans RIG v2.
 controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, '=', APPAF_NUM_APPEL), ',') WITHIN GROUP (ORDER BY APPAF_NUM_APPEL) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_ADNC = 1703123 => 1703552=01_001,1703551=01_002,1703553=01_003
