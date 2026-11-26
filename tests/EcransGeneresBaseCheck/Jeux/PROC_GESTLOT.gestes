@@ -1,0 +1,135 @@
+# « Lots » (EcrivainLots) : Ajouter, Modifier (renommer compris), Supprimer, comme OPE_AJOUT de RIG v2 (PROC_GESTLOT\Fenetres\
+# OPE_AJOUT.cs). Lignes du jeu : PROC_GESTLOT.sql et .attendu ; les groupes du lot renomme : PROC_RELANCELOT.sql.
+
+# Refus : nom absent (DoVerifier, OPE_AJOUT.cs:167-169, au message de RIG v2). Jumeau accepte : bloc 5, nom saisi.
+geste: Ajouter
+valeur: Imprimante = Imprimante 3e étage
+resultat: refuse
+message: Le nom du lot doit être renseigné
+---
+# Refus : un nom deja pris (OPE_AJOUT.cs:170-172). Jumeau accepte : bloc 5, BANC9_NOUVEAU est libre.
+geste: Ajouter
+valeur: Nom du lot = BANC9_COURRIERS
+resultat: refuse
+message: Un lot existant porte ce nom.
+---
+# Refus : « Lot direct » coche a la creation -- la case est en lecture seule dans RIG v2 (OPE_AJOUT.cs:148). Jumeau accepte : bloc 5,
+# la case non cochee.
+geste: Ajouter
+valeur: Nom du lot = BANC9_NOUVEAU
+valeur: Lot direct = oui
+resultat: refuse
+message: La case « Lot direct » ne se saisit pas : RIG v2 la tient en lecture seule (un seul lot direct, posé par la file directe).
+---
+# Refus : une heure qui n'en est pas une (l'ULT heure de RIG v2 ne la laisse pas saisir). Jumeau accepte : bloc 5, 07:45.
+geste: Ajouter
+valeur: Nom du lot = BANC9_NOUVEAU
+valeur: Heure d'impression = 25h
+resultat: refuse
+message: L'heure d'impression « 25h » n'est pas une heure (HH:MM).
+---
+# La creation : actif d'office (OPE_AJOUT.cs:143), non direct, l'heure sur la date du jour (:208), les valeurs de Lot.CreateLot.
+geste: Ajouter
+valeur: Nom du lot = BANC9_NOUVEAU
+valeur: Imprimante = Imprimante 3e étage
+valeur: Impression automatique = oui
+valeur: Heure d'impression = 07:45
+resultat: fait
+message: Lot « BANC9_NOUVEAU » créé.
+lignes:
+AMI_BANC9 | imprimante Imprimante Amitel · actif | Lots actifs | Validee | []
+BANC9_ANCIEN_DIRECT | imprimante Imprimante accueil · inactif · lot direct | Lots inactifs | Validee | []
+BANC9_COURRIERS | imprimante Imprimante 1er étage · impression automatique à 08:30 · actif | Lots actifs | Validee | []
+BANC9_DIRECT | imprimante Imprimante accueil · actif · lot direct | Lots actifs | Validee | []
+BANC9_INACTIF | sans imprimante · inactif | Lots inactifs | Validee | []
+BANC9_NOUVEAU | imprimante Imprimante 3e étage · impression automatique à 07:45 · actif | Lots actifs | Validee | []
+BANC9_RELANCES | imprimante Imprimante 2e étage · actif | Lots actifs | Validee | []
+controle: SELECT CAST(LOT_ACTIF AS varchar(1)) + '/' + CAST(LOT_DIRECT AS varchar(1)) + '/' + CONVERT(varchar(5), LOT_HEURE_IMPRESSION_AUTO, 108) + '/' + CAST(LOT_TRI_AUTO AS varchar(1)) + '/' + CAST(LOT_VISIBLE_EDTDIFF AS varchar(1)) FROM v2.LOT WHERE LOT_NOM = 'BANC9_NOUVEAU' => 1/0/07:45/0/0
+controle: SELECT CASE WHEN CAST(LOT_HEURE_IMPRESSION_AUTO AS date) = CAST(GETDATE() AS date) THEN 'du jour' ELSE 'autre' END FROM v2.LOT WHERE LOT_NOM = 'BANC9_NOUVEAU' => du jour
+---
+# Refus : renommer vers un nom deja pris (OPE_AJOUT.cs:170-172, « Renomme »). Jumeau accepte : bloc 8, BANC9_RAPPELS est libre.
+geste: Modifier
+ids: BANC9_RELANCES
+valeur: Nom du lot = BANC9_COURRIERS
+resultat: refuse
+message: Un lot existant porte ce nom.
+---
+# Refus : un lot qui n'est pas dans la table. Jumeau accepte : bloc 8.
+geste: Modifier
+ids: BANC9_ABSENT
+valeur: Imprimante = Imprimante 3e étage
+resultat: refuse
+message: Lot introuvable dans la base du greffe (BANC9_ABSENT).
+---
+# Le renommage (OPE_AJOUT.cs:229-244) : le lot au nouveau nom, ses deux groupes d'impression (BANC9-G04, BANC9-G05 de
+# PROC_RELANCELOT.sql) le suivent, l'ancien lot est supprime.
+geste: Modifier
+ids: BANC9_RELANCES
+valeur: Nom du lot = BANC9_RAPPELS
+resultat: fait
+message: Lot « BANC9_RELANCES » renommé « BANC9_RAPPELS » : ses groupes d'impression le suivent.
+lignes:
+AMI_BANC9 | imprimante Imprimante Amitel · actif | Lots actifs | Validee | []
+BANC9_ANCIEN_DIRECT | imprimante Imprimante accueil · inactif · lot direct | Lots inactifs | Validee | []
+BANC9_COURRIERS | imprimante Imprimante 1er étage · impression automatique à 08:30 · actif | Lots actifs | Validee | []
+BANC9_DIRECT | imprimante Imprimante accueil · actif · lot direct | Lots actifs | Validee | []
+BANC9_INACTIF | sans imprimante · inactif | Lots inactifs | Validee | []
+BANC9_NOUVEAU | imprimante Imprimante 3e étage · impression automatique à 07:45 · actif | Lots actifs | Validee | []
+BANC9_RAPPELS | imprimante Imprimante 2e étage · actif | Lots actifs | Validee | []
+controle: SELECT COUNT(*) FROM v2.GROUPE_IMPRESSION WHERE GPIMP_NOM_LOT = 'BANC9_RAPPELS' => 2
+controle: SELECT COUNT(*) FROM v2.GROUPE_IMPRESSION WHERE GPIMP_NOM_LOT = 'BANC9_RELANCES' => 0
+controle: SELECT COUNT(*) FROM v2.LOT WHERE LOT_NOM = 'BANC9_RELANCES' => 0
+---
+# Refus : changer la case « Lot direct » d'un lot existant (lecture seule, OPE_AJOUT.cs:148). Jumeau accepte : bloc 10, le lot
+# direct enregistre sans toucher la case.
+geste: Modifier
+ids: BANC9_COURRIERS
+valeur: Lot direct = oui
+resultat: refuse
+message: La case « Lot direct » ne se saisit pas : RIG v2 la tient en lecture seule (un seul lot direct, posé par la file directe).
+---
+# Un lot direct enregistre retire « direct » a tout autre lot (un seul lot direct, OPE_AJOUT.cs:246-253) : BANC9_ANCIEN_DIRECT.
+geste: Modifier
+ids: BANC9_DIRECT
+valeur: Imprimante = Imprimante hall
+resultat: fait
+message: Lot « BANC9_DIRECT » modifié. L'autre lot direct n'est plus direct.
+lignes:
+AMI_BANC9 | imprimante Imprimante Amitel · actif | Lots actifs | Validee | []
+BANC9_ANCIEN_DIRECT | imprimante Imprimante accueil · inactif | Lots inactifs | Validee | []
+BANC9_COURRIERS | imprimante Imprimante 1er étage · impression automatique à 08:30 · actif | Lots actifs | Validee | []
+BANC9_DIRECT | imprimante Imprimante hall · actif · lot direct | Lots actifs | Validee | []
+BANC9_INACTIF | sans imprimante · inactif | Lots inactifs | Validee | []
+BANC9_NOUVEAU | imprimante Imprimante 3e étage · impression automatique à 07:45 · actif | Lots actifs | Validee | []
+BANC9_RAPPELS | imprimante Imprimante 2e étage · actif | Lots actifs | Validee | []
+controle: SELECT COUNT(*) FROM v2.LOT WHERE LOT_DIRECT = 1 => 1
+---
+# Decocher l'impression automatique : la colonne seule change.
+geste: Modifier
+ids: BANC9_NOUVEAU
+valeur: Impression automatique =
+resultat: fait
+message: Lot « BANC9_NOUVEAU » modifié.
+controle: SELECT CAST(LOT_IMPRESSION_AUTO AS varchar(1)) + '/' + CAST(LOT_ACTIF AS varchar(1)) + '/' + LOT_NOM_IMPRIMANTE FROM v2.LOT WHERE LOT_NOM = 'BANC9_NOUVEAU' => 0/1/Imprimante 3e étage
+---
+# Refus : supprimer un lot qui n'est pas dans la table. Jumeau accepte : bloc 13.
+geste: Supprimer
+ids: BANC9_ABSENT
+resultat: refuse
+message: Lot introuvable dans la base du greffe (BANC9_ABSENT).
+---
+# La suppression par un agent du greffe (l'agent du banc n'est pas Amitel) : le lot est DESACTIVE (OPE_AJOUT.cs:316-320), il
+# reste dans la table, parmi les inactifs.
+geste: Supprimer
+ids: BANC9_COURRIERS
+resultat: fait
+message: Lot « BANC9_COURRIERS » désactivé : RIG v2 ne supprime pas un lot pour un agent du greffe.
+lignes:
+AMI_BANC9 | imprimante Imprimante Amitel · actif | Lots actifs | Validee | []
+BANC9_ANCIEN_DIRECT | imprimante Imprimante accueil · inactif | Lots inactifs | Validee | []
+BANC9_COURRIERS | imprimante Imprimante 1er étage · impression automatique à 08:30 · inactif | Lots inactifs | Validee | []
+BANC9_DIRECT | imprimante Imprimante hall · actif · lot direct | Lots actifs | Validee | []
+BANC9_INACTIF | sans imprimante · inactif | Lots inactifs | Validee | []
+BANC9_NOUVEAU | imprimante Imprimante 3e étage · actif | Lots actifs | Validee | []
+BANC9_RAPPELS | imprimante Imprimante 2e étage · actif | Lots actifs | Validee | []
+controle: SELECT COUNT(*) FROM v2.LOT WHERE LOT_NOM = 'BANC9_COURRIERS' AND LOT_ACTIF = 0 => 1

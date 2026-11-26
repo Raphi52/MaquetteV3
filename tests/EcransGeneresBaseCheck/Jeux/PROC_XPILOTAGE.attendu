@@ -1,0 +1,14 @@
+# « Pilotage » (LecteurPilotage) sur PROC_XPILOTAGE.sql, periode par defaut (le mois precedent du jour du banc) : une ligne par
+# cellule, feuille puis ligne puis colonne ; 1900606 (feuille 3) et 1900607 (requete vide) ne sont pas generees.
+# Groupes du banc : P01 et P02 (le dernier jour a 23 h : la fin portee a 23:59:59) dans le mois precedent, P04 un an plus tot ;
+# P03 (1er du mois courant) et P05 (veille du mois precedent) hors periode. PASANNEEPREC : pas d'annee precedente (une ligne lue).
+# Les requetes que la V3 ne calcule pas disent pourquoi : tables reprises en fiches rec.*, table absente, requete qui n'est pas
+# un SELECT seul, traitement ENCAISS ; une requete en erreur garde son message (:306-308).
+Groupes du banc | période 2 · un an plus tôt 1 | Feuille RCS | Validee | []
+Immatriculations du banc | non calculé : la requête de RIG v2 lit DOSSIER_RCS (reprise en rec.DossierRcs), ACTION_RCS (reprise en rec.ActionRegistre) | Feuille RCS | Rejetee | []
+Encaissements du banc | non calculé : calcul d'encaissement ligne par ligne (TraiterEncaiss) non repris | Feuille RCS | Rejetee | []
+Division du banc | période erreur · un an plus tôt erreur · requête de RIG v2 en erreur : Divide by zero error encountered. | Feuille RCS | Rejetee | []
+Valeur nulle du banc | période vide · un an plus tôt vide | Feuille RCS | Validee | []
+Groupes du banc sans année précédente | période 2 · un an plus tôt sans objet | Feuille judiciaire | Validee | []
+Requête déclarée du banc | non calculé : la requête de RIG v2 n'est pas un SELECT seul | Feuille judiciaire | Rejetee | []
+Table absente du banc | non calculé : la requête de RIG v2 lit TABLE_ABSENTE_BANC9 (absente de la base V3) | Feuille judiciaire | Rejetee | []

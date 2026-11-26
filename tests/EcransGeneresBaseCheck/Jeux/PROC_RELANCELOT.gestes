@@ -1,0 +1,69 @@
+# « Relancer un lot » (EcrivainGroupesImpression) : les boutons d'OPE_EDITGRP de RIG v2 (PROC_RELANCELOT\ETP_EDITGRP_\
+# OPE_EDITGRP.cs), actifs selon la phase du groupe (:109-128). Lignes du jeu : PROC_RELANCELOT.sql et .attendu. Joue APRES
+# PROC_GESTLOT.gestes : le lot BANC9_RELANCES y est renomme BANC9_RAPPELS, ses groupes G04 et G05 le suivent.
+# fix-ok: numeros de bloc des jumeaux recales (relu le 26/11/2026 : le refus « Réinitialiser » est le bloc 4, l'impression de G01
+# le bloc 5, la cloture de G03 le bloc 7) -- les commentaires nommaient les blocs d'avant cet ajout.
+
+# Refus : « Imprimer » sur un groupe initial (IMPRIMER n'est actif qu'en E ou PZ, :117-125). Jumeau accepte : bloc 5, G01 emis.
+geste: Agir Imprimer
+ids: BANC9-G03
+resultat: refuse
+message: Le groupe BANC9-G03 du lot BANC9_COURRIERS est « Initial » : RIG v2 n'imprime qu'un groupe émis ou en erreur.
+---
+# Refus : « Figer » sur un groupe emis (FIGER n'est actif qu'en I, :116) ; G03, coche avec lui, n'est pas fige non plus.
+# Jumeau accepte : bloc 7, G03 seul.
+geste: Agir Figer le groupe
+ids: BANC9-G01,BANC9-G03
+resultat: refuse
+message: Le groupe BANC9-G01 du lot BANC9_COURRIERS est « Emis » : RIG v2 ne fige qu'un groupe « Initial ».
+---
+# Refus : un groupe de la file Amitel, que l'agent du greffe ne voit pas (OPE_RECHERCHELOT.cs:38-39). Jumeau accepte : bloc 5.
+geste: Agir Imprimer
+ids: BANC9-G07
+resultat: refuse
+message: Groupe d'impression introuvable dans la base du greffe (BANC9-G07).
+---
+# Refus : « Réinitialiser » n'est jamais actif dans RIG v2 (phase IZ inexistante pour un groupe, :120-126) : il n'est pas offert.
+# Jumeau accepte : bloc 5, un geste du descripteur.
+geste: Agir Réinitialiser
+ids: BANC9-G08
+resultat: refuse
+message: Geste inconnu de l'écran « Relancer un lot » : Réinitialiser.
+---
+# « Imprimer » (_basculerEtatP(false), :170-209) : le groupe emis passe pret a imprimer (P) ; son edition garde sa phase ; le
+# message au service d'impression n'est pas envoye.
+geste: Agir Imprimer
+ids: BANC9-G01
+resultat: fait
+message: Le groupe est remis à imprimer (prêt à l'émission). Le message au service d'impression n'est pas envoyé : rien ne sort du poste.
+lignes:
+Lot BANC9_COURRIERS · groupe BANC9-G03 | Initial · 0 édition · ouvert le {J-1} · Imprimante 1er étage | Groupes intermédiaires | EnCours | []
+Lot BANC9_RAPPELS · groupe BANC9-G04 | Erreur · 2 éditions · ouvert le {J-2} · Imprimante 2e étage | Groupes en erreur | AFaire | []
+Lot BANC9_COURRIERS · groupe BANC9-G01 | Prêt à l'émission · 1 édition · ouvert le {J-3} · fini le {J-3} · Imprimante 1er étage | Groupes intermédiaires | EnAttente | []
+Lot BANC9_RAPPELS · groupe BANC9-G05 | Prêt à l'émission · 0 édition · ouvert le {J-4} · Imprimante 2e étage | Groupes intermédiaires | EnAttente | []
+Lot BANC9_DIRECT · groupe BANC9-G06 | En cours d'émission · 0 édition · ouvert le {J-5} · Imprimante accueil | Groupes en traitement | EnAttente | []
+Lot BANC9_DIRECT · groupe BANC9-G08 | Erreur · 0 édition · ouvert le {J-6} · Imprimante accueil | Groupes en erreur | Rejetee | []
+controle: SELECT GPIMP_PHASE_TRAITEMENT FROM v2.GROUPE_IMPRESSION WHERE GPIMP_NUM_GROUPE = 'BANC9-G01' => P
+controle: SELECT DMNED_PHASE_TRAITEMENT FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMNED = 1900401 => E
+---
+# « Tout réimprimer » (_basculerEtatP(true)) : les deux editions du groupe en erreur, puis le groupe, passent a P.
+geste: Agir Tout réimprimer
+ids: BANC9-G04
+resultat: fait
+message: Le groupe est remis à imprimer avec 2 éditions (prêt à l'émission).
+controle: SELECT GPIMP_PHASE_TRAITEMENT FROM v2.GROUPE_IMPRESSION WHERE GPIMP_NUM_GROUPE = 'BANC9-G04' => P
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_NUM_GROUPE = 'BANC9-G04' AND DMNED_PHASE_TRAITEMENT = 'P' => 2
+---
+# « Figer le groupe » (_cloturer, :231-260) : la date de fin posee, le groupe initial passe a P (pas a E) pour l'impression finale.
+geste: Agir Figer le groupe
+ids: BANC9-G03
+resultat: fait
+message: Le groupe est figé : prêt à l'émission pour l'impression finale.
+lignes:
+Lot BANC9_COURRIERS · groupe BANC9-G03 | Prêt à l'émission · 0 édition · ouvert le {J-1} · fini le {J+0} · Imprimante 1er étage | Groupes intermédiaires | EnAttente | []
+Lot BANC9_RAPPELS · groupe BANC9-G04 | Prêt à l'émission · 2 éditions · ouvert le {J-2} · Imprimante 2e étage | Groupes intermédiaires | EnAttente | []
+Lot BANC9_COURRIERS · groupe BANC9-G01 | Prêt à l'émission · 1 édition · ouvert le {J-3} · fini le {J-3} · Imprimante 1er étage | Groupes intermédiaires | EnAttente | []
+Lot BANC9_RAPPELS · groupe BANC9-G05 | Prêt à l'émission · 0 édition · ouvert le {J-4} · Imprimante 2e étage | Groupes intermédiaires | EnAttente | []
+Lot BANC9_DIRECT · groupe BANC9-G06 | En cours d'émission · 0 édition · ouvert le {J-5} · Imprimante accueil | Groupes en traitement | EnAttente | []
+Lot BANC9_DIRECT · groupe BANC9-G08 | Erreur · 0 édition · ouvert le {J-6} · Imprimante accueil | Groupes en erreur | Rejetee | []
+controle: SELECT GPIMP_PHASE_TRAITEMENT + '/' + CASE WHEN GPIMP_DATE_FIN IS NULL THEN 'sans fin' ELSE 'fin posée' END FROM v2.GROUPE_IMPRESSION WHERE GPIMP_NUM_GROUPE = 'BANC9-G03' => P/fin posée

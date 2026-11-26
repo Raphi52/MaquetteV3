@@ -1,0 +1,11 @@
+# « Relancer un lot » (LecteurGroupesImpression) sur PROC_RELANCELOT.sql : les groupes des lots, le plus recent ouvert en tete
+# (« order by gpimp_date_debut desc »). Ecartes : BANC9-G02 (emis, aucune edition), BANC9-G07 (file Amitel AMI_BANC9), BANC9-G09
+# (lot absent de la table LOT).
+# Groupe : la case de recherche de RIG v2 de la phase (E emis ; I, P intermediaires ; PT traitement ; IZ, PZ erreur).
+# Etat : les boutons actifs dans RIG v2 -- E, PZ « À réimprimer » ; I « À figer » ; P, PT « Prêt à l'émission » ; IZ « Erreur sans reprise ».
+Lot BANC9_COURRIERS · groupe BANC9-G03 | Initial · 0 édition · ouvert le {J-1} · Imprimante 1er étage | Groupes intermédiaires | EnCours | []
+Lot BANC9_RELANCES · groupe BANC9-G04 | Erreur · 2 éditions · ouvert le {J-2} · Imprimante 2e étage | Groupes en erreur | AFaire | []
+Lot BANC9_COURRIERS · groupe BANC9-G01 | Emis · 1 édition · ouvert le {J-3} · fini le {J-3} · Imprimante 1er étage | Groupes émis | AFaire | []
+Lot BANC9_RELANCES · groupe BANC9-G05 | Prêt à l'émission · 0 édition · ouvert le {J-4} · Imprimante 2e étage | Groupes intermédiaires | EnAttente | []
+Lot BANC9_DIRECT · groupe BANC9-G06 | En cours d'émission · 0 édition · ouvert le {J-5} · Imprimante accueil | Groupes en traitement | EnAttente | []
+Lot BANC9_DIRECT · groupe BANC9-G08 | Erreur · 0 édition · ouvert le {J-6} · Imprimante accueil | Groupes en erreur | Rejetee | []

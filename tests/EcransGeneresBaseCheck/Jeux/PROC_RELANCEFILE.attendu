@@ -1,0 +1,8 @@
+# « Relancer un fichier » (LecteurTraitementsEdition) sur PROC_RELANCEFILE.sql : les groupes des files (FLEDT_NUM_ORDRE), dans une
+# file « TRTED_FIN_TRANSMISSION desc, TRTED_ID_TRTED ». Ecartes : 1900912 (clos et vide), 1900914 (file Amitel).
+# 1900913 a TRTED_CLOTURE sans date de cloture : pas clos pour RIG v2 (IsCloture) -- ouvert. 1900916 a fini sa transmission sans
+# etre clos : ouvert, avant 1900915 dans sa file.
+File BANC9 RCS · groupe 1900911 | 0 édition · ouvert le {J-1} · Imprimante 1er étage | Groupes ouverts | AFaire | []
+File BANC9 RCS · groupe 1900913 | 0 édition · ouvert le {J-2} · Imprimante 1er étage | Groupes ouverts | AFaire | []
+File Courriers du banc 9 · groupe 1900916 | 0 édition · ouvert le {J-4} | Groupes ouverts | AFaire | []
+File Courriers du banc 9 · groupe 1900915 | 0 édition · ouvert le {J-1} | Groupes ouverts | AFaire | []

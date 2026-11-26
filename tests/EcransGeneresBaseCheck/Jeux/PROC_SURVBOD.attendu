@@ -1,0 +1,7 @@
+# « Surveillance BODACC » (LecteurRejetsBodacc) sur PROC_SURVBOD.sql : les annonces au controle qualite non verifie, publiees du
+# 01/01/2008 a aujourd'hui, d'un bordereau de la liste de RIG v2 ; ordre « Chrono, BDCCR_DATE_PUBLICITE » (sans chrono : par date).
+# Ecartees : 1900802 (sans remarque), 1900803 (verifiee), 1900804 (2007), 1900806 (demain), 1900808 (type sans bordereau).
+# Aucune n'est rattachee a un dossier RCS : « Sans dossier RCS » (Rejetee), le bouton Modifier de RIG v2 est masque.
+Annonce B9A du 01/01/2008 | Annonce de 2008 · sans dossier RCS : pas de correction | Rejets du contrôle qualité | Rejetee | []
+Annonce B9A du {J-10} | Adresse du siège incomplète · sans dossier RCS : pas de correction | Rejets du contrôle qualité | Rejetee | []
+Annonce B9A du {J+0} | Annonce du jour · sans dossier RCS : pas de correction | Rejets du contrôle qualité | Rejetee | []
