@@ -39,6 +39,8 @@ internal sealed class EcrivainDepotsBeneficiaires : IEcrivainEcran
     internal const string ChampEntreprise = "Entreprise", ChampDateArrivee = "Date d'arrivée", ChampDateDepot = "Date de dépôt",
                           ChampCode = "Code événement", ChampActe = "Acte", ChampDateActe = "Date de l'acte";
 
+    // fix-ok: mesure le 26/11/2026 (lot 5) -- les numeros de ligne V2 cites venaient d'un extrait sans lignes vides ; relus par
+    // grep -n dans PROC_DASBEN\ETP_DEPOT\ETP_DEPOT.cs (le texte est a la ligne 80, le non-inscrit de la demande aux lignes 92-95).
     /// <summary>Le texte de l'evenement RCS d'un depot de beneficiaires (PROC_DASBEN\ETP_DEPOT\ETP_DEPOT.cs:80).</summary>
     internal const string TexteEvenement = "Dépôt modificatif ou complémentaire relatif au bénéficiaire effectif";
 
