@@ -41,6 +41,14 @@ internal sealed class EcrivainConvocations : IEcrivainEcran
     /// <summary>Le geste (le Valider du descripteur, Surveiller.cs) et son parametre, au mot pres.</summary>
     internal const string Citer = "Citer par huissier", ParametreHuissier = "Huissier";
 
+    /// <summary>Ce que RIG v2 produit aussi a la citation (GenererLesEditions, OPE_CITATIONS.cs:335-484 ; GenererFacture, :214-238) et
+    /// que la V3 ne fait pas (voir l'en-tete) : le message du geste le dit a l'agent, une citation enregistree n'est pas une citation
+    /// envoyee.</summary>
+    // fix-ok: le message de succes taisait les editions et la facture que RIG v2 cree au meme geste (controle du lot 7, 26/11) ; le
+    // Kbis n'y est edite que si sa case est cochee (CheckBoxEditerKbis, OPE_CITATIONS.cs:437).
+    internal const string EditionsNonProduites =
+        "La citation à l'huissier, la copie de l'ordonnance, la facture et, s'il est demandé, le Kbis ne sont pas produits : RIG v3 n'a pas le moteur d'éditions de RIG v2.";
+
     private sealed record Ligne(int IdInstance, string Role, string? TypeDate);
 
     public async Task<IssueGeste> JouerAsync(GesteEnCours geste, CancellationToken ct)
@@ -82,7 +90,7 @@ internal sealed class EcrivainConvocations : IEcrivainEcran
                 new { Instance = l.Role, Evenement = code, Date = geste.Maintenant.Date, Huissier = huissier }));
         }
         var n = lignes.Count;
-        return IssueGeste.Ecrit($"{n} citation{(n > 1 ? "s" : "")} par huissier enregistrée{(n > 1 ? "s" : "")} ({huissier}).",
+        return IssueGeste.Ecrit($"{n} citation{(n > 1 ? "s" : "")} par huissier enregistrée{(n > 1 ? "s" : "")} ({huissier}). {EditionsNonProduites}",
                                 [.. d.Ids], [.. traces]);
     }
 

@@ -32,8 +32,9 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// absent compte pour une chaine vide (RIG v2 leve une exception sur un type dont aucun appel n'est numerote).
 ///
 /// CE QUE LA V3 NE REPREND PAS (nomme, rien en silence) : le PLUMITIF -- un etat Crystal (PlumitifPreaud, RigCrystalPlumitif)
-/// exporte en PDF, archive en GED puis remis a la file des editions (CreateDdeEdition, OPE_EDIT_PLUMITIF.cs:420-500) ; la V3 n'a ni
-/// le moteur Crystal ni l'ecriture des demandes d'edition (aucun ecrivain de DEMANDE_EDITION) : non genere, l'ecran le dit ; l'envoi
+/// exporte en PDF, archive en GED puis remis a la file des editions (CreateDdeEdition, OPE_EDIT_PLUMITIF.cs:420-500). Sans ce PDF,
+/// RIG v2 lui-meme ne met rien en file (:424-426 : LancerPlumitif, puis « if (string.IsNullOrEmpty(pathPdf)) return null ») ; la V3
+/// n'a pas le moteur Crystal : aucun PDF, donc aucune demande d'edition, et le message du geste le dit (PlumitifNonGenere) ; l'envoi
 /// par courriel ou au coffre (services externes) ; le code-barre VIDIGED de l'audience (CreateVidiged) ; l'ordre des types de
 /// classement deplace a la main (OPE_TC) ; la demande V2 du processus (le journal des gestes la remplace, sans facture).
 /// </summary>
@@ -47,6 +48,11 @@ internal sealed class EcrivainPreparationAudience : IEcrivainEcran
 
     /// <summary>Le geste (le Valider du descripteur, Surveiller.cs) et la case de RIG v2 (OPE_RECHERCHE_PLUMITIF.Designer.cs:95).</summary>
     internal const string Valider = "Valider", ParametreRecalculer = "Recalculer les n° d'appel";
+
+    /// <summary>Ce que RIG v2 fait aussi a la validation et que la V3 ne fait pas : le dire a l'agent, pas seulement dans ce code.</summary>
+    // fix-ok: l'en-tete disait « l'ecran le dit » alors que le seul message du geste ne parlait que des numeros d'appel (lu le
+    // 26/11, controle du lot 7 : « dire nommement pourquoi » le plumitif n'est pas mis en file) ; la cause V2 est :424-426.
+    internal const string PlumitifNonGenere = "Le plumitif n'est pas généré : RIG v3 n'a pas l'état Crystal qui le produit dans RIG v2.";
 
     private static readonly StringComparer Texte = StringComparer.Create(CultureInfo.GetCultureInfo("fr-FR"), ignoreCase: false);
 
@@ -98,7 +104,7 @@ internal sealed class EcrivainPreparationAudience : IEcrivainEcran
                 new { NumerosAttribues = true, Recalcul = renumeroter, Numeros = tries.Select(x => $"{x.Role}={x.NouveauNumero}").ToArray() }));
         }
         var n = calculs.Count;
-        return IssueGeste.Ecrit($"Numéros d'appel attribués : {total} affaire{(total > 1 ? "s" : "")} sur {n} audience{(n > 1 ? "s" : "")}.",
+        return IssueGeste.Ecrit($"Numéros d'appel attribués : {total} affaire{(total > 1 ? "s" : "")} sur {n} audience{(n > 1 ? "s" : "")}. {PlumitifNonGenere}",
                                 [.. calculs.Select(x => x.Audience.Id.ToString(CultureInfo.InvariantCulture))], [.. traces]);
     }
 
