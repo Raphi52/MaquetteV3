@@ -30,7 +30,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   relance restee sans effet          -> AFaire  « A enjoindre » : aucune marche ;
 ///   injonction, diligence en cours (1) -> Validee « Injonction emise » : entreprise, relance, injonction (0, 1, 2) ;
 ///   injonction, diligence close (8, 9) -> Validee « Injonction emise » : et le suivi (3), clos.
-/// L'etat « En cours » n'a pas de source : la V2 cree l'instance et la relance d'injonction d'un seul geste.
+/// L'etat « En cours » n'a pas de source : la V2 cree l'instance et la relance d'injonction d'un seul geste
+/// (EcrivainInjonctionsBeneficiaires.cs, moteur InjonctionsIsurv.cs).
 /// Ordre : a enjoindre, injonctions en cours, puis closes ; la plus recente en tete.
 /// </summary>
 internal sealed class LecteurInjonctionsBeneficiaires : ILecteurEcran
@@ -54,7 +55,7 @@ internal sealed class LecteurInjonctionsBeneficiaires : ILecteurEcran
 
     private const string Requete = $"""
         SELECT TOP (@plafond) CAST(CASE WHEN j.RLCRC_DATE_RELANCE IS NULL THEN 0 ELSE 1 END AS bit) AS Injonction,
-               g.DLGRC_ETAT_DILIGENCE, g.DLGRC_DATE_REGULARISATION,
+               g.DLGRC_ID_DLGRC, g.DLGRC_ETAT_DILIGENCE, g.DLGRC_DATE_REGULARISATION,
                COALESCE(j.RLCRC_DATE_RELANCE, r.RLCRC_DATE_RELANCE) AS DateRelance, r.RLCRC_DATE_LIMITE AS DateLimite,
                s.NumeroGestion, s.Siren, e.Denomination, COUNT(*) OVER () AS Total
         FROM v2.DILIGENCE_RCS AS g
@@ -88,7 +89,9 @@ internal sealed class LecteurInjonctionsBeneficiaires : ILecteurEcran
                   _ => null,
               })
             : $"Relance du {date} · délai expiré le {FormeLigne.Date(FormeLigne.DateDe(r, "DateLimite"))}";
-        return new LigneLue(FormeRelance.NomDossier(r), precisions, injonction ? ASuivre : SansEffet, etat, faites);
+        // Id = la diligence SDBE : l'injonction s'ecrit sur elle (EcrivainInjonctionsBeneficiaires, CreerRelanceInjonctionDBE).
+        return new LigneLue(FormeRelance.NomDossier(r), precisions, injonction ? ASuivre : SansEffet, etat, faites)
+            { Id = Convert.ToString(r["DLGRC_ID_DLGRC"], System.Globalization.CultureInfo.InvariantCulture) };
     }
 
     /// <summary>La regle d'etat (en tete du fichier) : etat du descripteur et marches franchies.</summary>

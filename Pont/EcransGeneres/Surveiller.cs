@@ -13,8 +13,8 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 //     frmListeDelibere.cs) : un Etat en lecture seule, aligne dessus au lot 7 (plan-676a4b19).
 //   - PROC_SUIVI_IMPRESSION n'a pas de fiche : appuye sur PROC_PAPERCUT (file d'impression),
 //     seule procedure voisine documentee. A confirmer par le chef.
-//   - PROC_DBE_RELANCE et PROC_DBE_INJ ont une fiche courte (« source non trouvee ») : leurs
-//     etapes sont calquees sur la relance DCA (PROC_DCA_RELANCE). A confirmer.
+//   - PROC_DBE_RELANCE et PROC_DBE_INJ ont une fiche courte (« source non trouvee ») : ils suivent le
+//     code qui tourne, les moteurs PROC_RSURV et PROC_ISURV, nature SDBE (lot 8, 26/11/2026).
 //   - PROC_DBEN_ALERT : fiche sans étape (lecture seule), fondé sur le formulaire FORM_DBEN_ALERT.cs
 //     (VALIDER, VERIFIER, INTERROMPRE masqués, lignes 12-14) : une seule marche, « Visualiser le
 //     signalement » (OPE_DIVERGENCES.Designer.cs:97). La tuile « En cours » reste vide : la source
@@ -394,49 +394,45 @@ public sealed class DomaineSurveiller : IDomaineEcrans
 
         new DescripteurEcran
         {
-            // Lot 8 (26/11/2026) : lue dans la base (LecteurInjonctionsComptesAnnuels.cs) ; le geste N'EST PAS BRANCHE, l'ecran dit
-            // « Demonstration ». Le menu de RIG v2 (RIG_DEV, PROCESSUS_ET_FONCTIONALITE, lu le 26/11/2026) : « INJDCA » ouvre
-            // PROC_SDCA.dll / FORM_INJDCA, dont la classe PROC_INJDCA herite de PROC_SURVEILLANCE_INJ, ABSENTE des sources (grep : 0
-            // occurrence), et PROC_SDCA ne compile plus (Source\CompilationFull\PowerShell\buildErrors.txt:116). L'injonction qui tourne
-            // est « ISURV » (PROC_ISURV.dll, Injonctions des surveillances) : par dossier, une instance, ses trois parties, le chef de
-            // demande, l'appel au cabinet choisi, la decision et ses evenements, les numeros de role et JGAFF, la facture, la relance
-            // IDCA de l'exercice, les editions (PROC_ISURV.cs:244-475, 488-646). Il exige des SAISIES (etape « Cabinet et decision »,
-            // obligatoire : cabinet de liquidation d'astreinte, type de classement, juge, greffier, date prevue ;
-            // ETP_CABINET_DECISION.cs:24-28, OPE_DECISION_JUDICIAIRE.Designer.cs:78-117) qu'une file ne transmet pas encore
-            // (FormeFile.tsx envoie un geste sans valeur), et ses lignes « a enjoindre » (relance 1 echue, NumRelance = NbRelancesMax + 1,
-            // CriteresRechercheSurveillance.cs:612-614) ne sont pas encore lues ici : la liste montre les depots qui ont suivi une
-            // injonction. Aucune table ne manque ; c'est le volume (ISURV, l'etape et RigMetier), a faire dans un lot a lui.
+            // Lot 8 (26/11/2026) : lue et enjointe dans la base -- LecteurInjonctionsComptesAnnuels.cs, EcrivainInjonctionsComptesAnnuels.cs,
+            // moteur InjonctionsIsurv.cs. L'injonction qui tourne est PROC_ISURV (« Injonctions des surveillances », menu ISURV de RIG_DEV),
+            // nature SDCA ; « INJDCA » (PROC_SDCA.dll / FORM_INJDCA), au menu, herite de PROC_SURVEILLANCE_INJ, absente des sources, et son
+            // projet ne compile plus (Source\CompilationFull\PowerShell\buildErrors.txt:116). Les lignes : les dossiers dont la relance 1
+            // est echue (« A traiter »), les injonctions qui attendent leur depot (« En cours »), puis les depots recus depuis une injonction
+            // (la fiche proc_dca_inj.md ; ils se valident a l'ecran des comptes annuels, sans geste ici). Les Parametres sont les saisies de
+            // l'etape obligatoire « Cabinet et decision » (ETP_CABINET_DECISION.cs:24-28), envoyees avec le geste.
             Code = "PROC_DCA_INJ", Titre = "Injonctions comptes annuels", Sujet = "dépôts de comptes annuels",
             Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier RCS, un numéro de gestion, un SIREN…",
             Criteres = ["Numéro de gestion ou SIREN", "Exercices non déposés", "Origine : papier ou dématérialisé"],
-            Valider = "Valider le dépôt", // proc_dca_inj.md, Rôle : « valide le dépôt ».
+            // Le bouton VALIDER de PROC_ISURV (FORM_ISURV.cs:31-37) : « création des instances en cours » (PROC_ISURV.cs:228) ; le meme
+            // libelle que les injonctions beneficiaires (proc_dbe_inj.md, Contexte : « la génération de ces injonctions »), meme moteur.
+            Valider = "Générer les injonctions",
             Rang = 5,
             Etats = [.. EtatsEcran.Trois("À traiter", "En cours", "Déposée"), new EtatEcran("Rejetee", "Refusée", "rejetee")],
-            Groupes = ["Dépôts dématérialisés", "Dépôts papier", "Réclamations et refus"],
+            Groupes = ["Relance restée sans effet", "Injonction à suivre", "Dépôts dématérialisés", "Dépôts papier", "Réclamations et refus"],
+            Parametres = [Champ.Date("Date du cabinet"), "Cabinet", "Heure d'appel", "Type de classement", "Juge", "Greffier", Champ.Date("Date prévue")],
             Sections =
             [
-                Marche("Dossier RCS", "Le dossier se charge en premier, par numéro de gestion ou par SIREN.", true,
-                    "Numéro de gestion", "SIREN"),
-                Marche("Exercices", "Les exercices non déposés sont proposés ; le dépôt porte sur ceux cochés. Un seul exercice de moins de trois ans est coché d'office.", true,
-                    "Exercice non déposé", "Date de clôture", "Date de réception"),
-                Marche("Facturation", "Client, encaissement et frais. Les articles changent selon le canal : démat ou papier.", false,
-                    "Client", "Encaissement", "Frais"),
-                Marche("Réclamation ou refus", "Un motif est saisi pour une réclamation ou un refus.", false,
-                    "Motif", "Date de réception"),
-                Marche("Validation", "Valider le dépôt : la demande passe en récapitulatif, en lecture seule.", true,
-                    "Récapitulatif"),
+                Marche("Dossier RCS", "Les exercices non déposés dont la relance 1 est échue, sans injonction : une injonction par exercice.", true,
+                    "Numéro de gestion", "SIREN", "Exercice non déposé"),
+                Marche("Cabinet et décision", "Le cabinet de liquidation d'astreinte (à venir), le type de classement, puis le juge, le greffier et la date prévue de l'ordonnance. Juge, greffier et type de classement viennent du cabinet s'ils ne sont pas saisis.", true,
+                    "Cabinet", "Type de classement", "Juge", "Greffier", "Date prévue"),
+                Marche("Injonction", "L'instance est créée et numérotée avec ses parties (le président, la société, son dirigeant), l'ordonnance et la relance d'injonction de l'exercice.", true,
+                    "Numéro de rôle", "Ordonnance"),
+                Marche("Dépôt", "Le dépôt reçu après l'injonction se traite à l'écran des comptes annuels : démat ou papier, réclamation ou refus.", false,
+                    "Origine", "Date de réception", "Motif"),
             ],
             Lignes =
             [
-                Ligne("Alpha Services SARL · SIREN 900 210 001", "Dépôt démat reçu · exercice 2025", "Dépôts dématérialisés", "AFaire"),
-                Ligne("Bêta Industrie SAS · SIREN 900 210 002", "Dépôt démat · exercice coché", "Dépôts dématérialisés", "EnCours", 0, 1),
-                Ligne("Gamma Conseil SARL · SIREN 900 210 003", "Dépôt démat validé le 11/03/2026", "Dépôts dématérialisés", "Validee", 0, 1, 2, 4),
-                Ligne("Delta Transports SAS · SIREN 900 210 004", "Dépôt papier · exercice à cocher", "Dépôts papier", "EnCours", 0),
-                Ligne("Epsilon Habitat SARL · SIREN 900 210 005", "Dépôt papier validé le 12/03/2026", "Dépôts papier", "Validee", 0, 1, 4),
-                Ligne("Zêta Commerce SAS · SIREN 900 210 006", "Réclamation reçue le 13/03/2026", "Réclamations et refus", "EnCours", 0, 1, 3),
-                Ligne("Êta Boulangerie SARL · SIREN 900 210 007", "Refus reçu le 14/03/2026", "Réclamations et refus", "Rejetee"),
-                Ligne("Thêta Import SAS · SIREN 900 210 008", "Dépôt démat à valider", "Dépôts dématérialisés", "AFaire"),
+                Ligne("Alpha Services SARL · SIREN 900 210 001", "1 exercice à enjoindre · clôture du 31/12/2024 · relance 1 échue", "Relance restée sans effet", "AFaire"),
+                Ligne("Thêta Import SAS · SIREN 900 210 008", "2 exercices à enjoindre · clôture du 31/12/2024 · relance 1 échue", "Relance restée sans effet", "AFaire"),
+                Ligne("Bêta Industrie SAS · SIREN 900 210 002", "Injonction du 02/03/2026 · rôle 2026OP00012 · clôture du 31/12/2024 · non régularisée", "Injonction à suivre", "EnCours", 0, 1, 2),
+                Ligne("Gamma Conseil SARL · SIREN 900 210 003", "Injonction du 11/02/2026 · déposé le 11/03/2026", "Dépôts dématérialisés", "Validee", 0, 1, 2, 3),
+                Ligne("Delta Transports SAS · SIREN 900 210 004", "Injonction du 05/02/2026 · reçu le 10/03/2026", "Dépôts papier", "AFaire"),
+                Ligne("Epsilon Habitat SARL · SIREN 900 210 005", "Injonction du 05/02/2026 · déposé le 12/03/2026", "Dépôts papier", "Validee", 0, 1, 2, 3),
+                Ligne("Zêta Commerce SAS · SIREN 900 210 006", "Injonction du 01/02/2026 · réclamation du 13/03/2026", "Réclamations et refus", "EnCours", 0, 1, 2, 3),
+                Ligne("Êta Boulangerie SARL · SIREN 900 210 007", "Injonction du 01/02/2026 · refusé le 14/03/2026", "Réclamations et refus", "Rejetee"),
             ],
         },
 
@@ -480,14 +476,14 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             ],
         },
 
-        // DBE : fiche courte (« source non trouvée »). Injonction : à confirmer par le chef.
         new DescripteurEcran
         {
-            // Lot 8 (26/11/2026) : lue dans la base (LecteurInjonctionsBeneficiaires.cs) ; le geste N'EST PAS BRANCHE, l'ecran dit
-            // « Demonstration ». « IDBE » (PROC_SRBE.dll / FORM_IDBE) est masque du menu de RIG v2 (PROCF_VISIBLE_DANS_MENU 0, RIG_DEV
-            // lu le 26/11/2026) et sa classe herite de PROC_SURVEILLANCE_INJ, absente des sources ; l'injonction qui tourne est « ISURV »,
-            // nature SDBE (PROC_ISURV.cs:244-475 ; reglages SDBE / ISURV de RIG_DEV : code affaire INJRBE, decision OPRBEINJAA). Meme
-            // besoin que PROC_DCA_INJ : les saisies de l'etape « Cabinet et decision », qu'une file ne transmet pas encore.
+            // Lot 8 (26/11/2026) : lue et enjointe dans la base -- LecteurInjonctionsBeneficiaires.cs, EcrivainInjonctionsBeneficiaires.cs,
+            // moteur InjonctionsIsurv.cs. La fiche proc_dbe_inj.md est courte (« source non trouvée ») ; « IDBE » (PROC_SRBE.dll / FORM_IDBE)
+            // est masque du menu de RIG v2 (PROCF_VISIBLE_DANS_MENU 0, RIG_DEV lu le 26/11/2026) et herite de PROC_SURVEILLANCE_INJ,
+            // absente des sources ; l'injonction qui tourne est PROC_ISURV, nature SDBE (reglages SDBE / ISURV de RIG_DEV : code affaire
+            // INJRBE, decision OPRBEINJAA). Les Parametres sont les saisies de l'etape obligatoire « Cabinet et decision »
+            // (ETP_CABINET_DECISION.cs:24-28), envoyees avec le geste, les memes que PROC_DCA_INJ.
             Code = "PROC_DBE_INJ", Titre = "Injonctions beneficiaires", Sujet = "injonctions DBE",
             Forme = FormeEcran.File,
             Recherche = "Rechercher une entreprise, une relance, un numéro de gestion…",
@@ -496,25 +492,26 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Rang = 5,
             Etats = EtatsEcran.Trois("À enjoindre", "En cours", "Injonction émise"),
             Groupes = ["Relance restée sans effet", "Injonction à suivre"],
+            Parametres = [Champ.Date("Date du cabinet"), "Cabinet", "Heure d'appel", "Type de classement", "Juge", "Greffier", Champ.Date("Date prévue")],
             Sections =
             [
                 Marche("Entreprise", "Le dossier RCS se retrouve par son numéro de gestion ou son SIREN.", true,
                     "Numéro de gestion", "SIREN"),
                 Marche("Relance", "Une relance DBE doit être restée sans effet dans les délais.", true,
                     "Relance DBE", "Date de la relance"),
-                Marche("Injonction", "L'injonction de déclarer les bénéficiaires effectifs se prépare, puis se génère.", true,
-                    "Texte de l'injonction", "Date d'émission"),
+                Marche("Cabinet et décision", "Le cabinet de liquidation d'astreinte (à venir), le type de classement, puis le juge, le greffier et la date prévue de l'ordonnance. Juge, greffier et type de classement viennent du cabinet s'ils ne sont pas saisis.", true,
+                    "Cabinet", "Type de classement", "Juge", "Greffier", "Date prévue"),
                 Marche("Suivi", "Le suivi de l'injonction reste ouvert tant que la déclaration n'est pas faite.", false,
                     "Suivi"),
             ],
             Lignes =
             [
-                Ligne("Alpha Services SARL · SIREN 900 230 001", "Relance restée sans effet", "Relance restée sans effet", "AFaire"),
-                Ligne("Bêta Industrie SAS · SIREN 900 230 002", "Injonction à générer", "Relance restée sans effet", "EnCours", 0, 1),
-                Ligne("Gamma Conseil SARL · SIREN 900 230 003", "Injonction émise le 09/03/2026", "Injonction à suivre", "Validee", 0, 1, 2),
-                Ligne("Delta Transports SAS · SIREN 900 230 004", "Relance à reprendre", "Relance restée sans effet", "AFaire"),
-                Ligne("Epsilon Habitat SARL · SIREN 900 230 005", "Injonction en préparation", "Injonction à suivre", "EnCours", 0, 1),
-                Ligne("Zêta Commerce SAS · SIREN 900 230 006", "Injonction émise le 12/03/2026", "Injonction à suivre", "Validee", 0, 1, 2),
+                Ligne("Alpha Services SARL · SIREN 900 230 001", "Relance du 02/01/2026 · délai expiré le 02/02/2026", "Relance restée sans effet", "AFaire"),
+                Ligne("Bêta Industrie SAS · SIREN 900 230 002", "Relance du 05/01/2026 · délai expiré le 05/02/2026", "Relance restée sans effet", "AFaire"),
+                Ligne("Gamma Conseil SARL · SIREN 900 230 003", "Injonction du 09/03/2026", "Injonction à suivre", "Validee", 0, 1, 2),
+                Ligne("Delta Transports SAS · SIREN 900 230 004", "Relance du 10/01/2026 · délai expiré le 10/02/2026", "Relance restée sans effet", "AFaire"),
+                Ligne("Epsilon Habitat SARL · SIREN 900 230 005", "Injonction du 11/03/2026 · régularisée le 20/04/2026", "Injonction à suivre", "Validee", 0, 1, 2, 3),
+                Ligne("Zêta Commerce SAS · SIREN 900 230 006", "Injonction du 12/03/2026", "Injonction à suivre", "Validee", 0, 1, 2),
             ],
         },
 

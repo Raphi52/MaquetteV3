@@ -118,7 +118,7 @@ internal sealed class EcrivainRelancesBeneficiaires : IEcrivainEcran
         }
 
         // La demande du lot (PROC_RSURV.cs:225-226), validee avec ses filles (l. 245-247).
-        var lot = await RelancesRsurv.DemandeAsync(geste, null, $"Relances du groupe {await GroupeAsync(geste, ct)} - {lignes.Count} occurence(s)",
+        var lot = await RelancesRsurv.DemandeAsync(geste, null, $"Relances du groupe {await RelancesRsurv.GroupeAsync(geste, Nature, ct)} - {lignes.Count} occurence(s)",
                                                    null, null, null, null, ct);
         if (lot.Refus is not null) return IssueGeste.Refuser(lot.Refus);
 
@@ -170,20 +170,6 @@ internal sealed class EcrivainRelancesBeneficiaires : IEcrivainEcran
     }
 
     private static SqlParameter Jour(DateTime jour) => new("@aujourdhui", System.Data.SqlDbType.DateTime) { Value = jour };
-
-    /// <summary>Le libelle du groupe de la nature SDBE (NATURE_DILIGENCE.R_NATUREDILI_ID_NDILGRP -> NATURE_DILIGENCE_GROUPE :
-    /// « Surveillances Président » dans RIG_DEV) ; la nature elle-meme si la base ne le porte pas.</summary>
-    private static async Task<string> GroupeAsync(GesteEnCours geste, CancellationToken ct)
-    {
-        if (await RelancesRsurv.Scalaire(geste, "SELECT OBJECT_ID(N'v2.NATURE_DILIGENCE_GROUPE')", ct) is DBNull or null
-            || await RelancesRsurv.Scalaire(geste, "SELECT COL_LENGTH('v2.NATURE_DILIGENCE', 'R_NATUREDILI_ID_NDILGRP')", ct) is DBNull or null)
-            return Nature;
-        return await RelancesRsurv.Scalaire(geste, """
-            SELECT gr.NDILGRP_LIBELLE FROM v2.NATURE_DILIGENCE AS n
-            JOIN v2.NATURE_DILIGENCE_GROUPE AS gr ON gr.NDILGRP_ID_NDILGRP = n.R_NATUREDILI_ID_NDILGRP
-            WHERE n.R_NATUREDILI_VALEUR = @nature
-            """, ct, new SqlParameter("@nature", Nature)) is string libelle && libelle.Trim().Length > 0 ? libelle.Trim() : Nature;
-    }
 
     /// <summary>Le reglage EnvoiEdi de la nature (NATURE_DILIGENCE_PARAM, processus RSURV, sans numero) vaut « 1 » (l. 193).</summary>
     private static async Task<bool> EnvoiEdiAsync(GesteEnCours geste, CancellationToken ct)

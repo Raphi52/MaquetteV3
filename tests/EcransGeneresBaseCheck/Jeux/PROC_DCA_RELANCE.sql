@@ -310,3 +310,58 @@ INSERT INTO v2.NATURE_DILIGENCE_PARAM (NADIP_ID_NADIP, NADIP_NATURE_DILIGENCE, N
 INSERT INTO v2.PARAMETRE_EDITION (PRMED_CODE, PRMED_LIBELLE, PRMED_RECTO_VERSO, PRMED_AFFICHER_AVANT_IMPRESSION, PRMED_CODE_CFECP,
     PRMED_TYPE_GENERATION) VALUES (''LOT2_RGDCA'', ''Relance Greffe RG DCA'', 1, 0, NULL, ''FUSION_RIG'');',
     N'@aujourdhui datetime', @aujourdhui;
+
+-- ============================================================ LES DOSSIERS A ENJOINDRE (lot 8, 26/11/2026)
+-- « Injonctions comptes annuels » (LecteurInjonctionsComptesAnnuels, Rang 0) lit la MEME recherche SDCA que la relance 1
+-- (ExerciceRechercheSql : l'injonction ISURV de SDCA n'a pas de requete a elle, NatureDiligence.parametre.cs:620-626) : ses dossiers
+-- sont poses ici, avec la structure de cette recherche (formes juridiques, INSCRIT_PM, exercices...). Le cabinet, les codes et les
+-- reglages ISURV sont dans PROC_DBE_INJ.sql. Ces dossiers sont AUSSI « A relancer » (relance 2 due) a l'ecran des relances, comme
+-- dans RIG v2 : les deux moteurs les proposent ; l'injonction les sort des relances (filtre IDCA). Leurs lignes :
+-- PROC_DCA_INJ.attendu et PROC_DCA_RELANCE.attendu ; leurs diligences : PROC_MDIL.attendu (toutes les diligences).
+--   601 a enjoindre : exercice 2023 non depose, etat DCA « 22 », diligence SDCA en cours, relance 1 faite (etat relance 2) echue
+--       hier, gerant representant legal ;
+--   602 a enjoindre, DEUX exercices (2022 et 2023) sur la meme diligence : deux injonctions (une par exercice, PROC_ISURV.cs:224-233) ;
+--   603 relance 1 echeant AUJOURD'HUI (« < aujourd'hui ») -- ecarte, jumeau 601 ;
+--   604 a enjoindre, mais son seul dirigeant est commissaire aux comptes (pas representant legal) : le geste est refuse -- jumeau 601.
+SET IDENTITY_INSERT rec.Entreprise ON;
+INSERT INTO rec.Entreprise (Id, Siren, Civilite, Denomination, EtatInfo, FicheSommaire)
+SELECT v.Id, '518006' + RIGHT(CAST(v.Id AS varchar(7)), 3), '', v.Nom, 'C', 0
+FROM (VALUES (1800601, N'INJ ALPHA SAS'), (1800602, N'INJ BETA SAS'), (1800603, N'INJ GAMMA SAS'), (1800604, N'INJ DELTA SAS')) AS v (Id, Nom);
+SET IDENTITY_INSERT rec.Entreprise OFF;
+SET IDENTITY_INSERT rec.DossierRcs ON;
+INSERT INTO rec.DossierRcs (Id, IdEntreprise, TypeRcs, NumeroGestion, Siren, DateImmatriculation, MotifImmatriculation,
+    ProvisoirementSans, CompteurMaj, DateMaj, EtatDossier, EtatInfo, InscritRegistreMetiers, ModificationInterne,
+    SirenProvisoire, Accre, AutoEntrepreneur, Eirl, AutoEntrepreneurRegularise)
+SELECT v.Id, v.Id, 'B1', '2026B18' + RIGHT(CAST(v.Id AS varchar(7)), 3), '518006' + RIGHT(CAST(v.Id AS varchar(7)), 3), '20180101',
+       'C', 0, 0, '20180101', 'A', 'C', 0, 0, 0, 0, 0, 0, 0
+FROM (VALUES (1800601), (1800602), (1800603), (1800604)) AS v (Id);
+SET IDENTITY_INSERT rec.DossierRcs OFF;
+SET IDENTITY_INSERT rec.ActionRegistre ON;
+INSERT INTO rec.ActionRegistre (Id, IdDossier, IdDepot, CodeProcessus, EtatInfo, EtatAction, SurNotification)
+SELECT v.Id, v.Id, NULL, 'SDCA', '1', '2', 0 FROM (VALUES (1800601), (1800602), (1800603), (1800604)) AS v (Id);
+SET IDENTITY_INSERT rec.ActionRegistre OFF;
+
+EXEC sp_executesql N'
+INSERT INTO v2.INSCRIT_PM (INSPM_ID_DSRCS, INSPM_FORME_JURIDIQUE_UTI, INSPM_DATE_DISSOLUTION)
+SELECT v.Id, ''D18A'', NULL FROM (VALUES (1800601), (1800602), (1800603), (1800604)) AS v (Id);
+INSERT INTO v2.DILIGENCE_RCS (DLGRC_ID_DLGRC, DLGRC_ID_ACTRC, DLGRC_NATURE_DILIGENCE, DLGRC_ETAT_DILIGENCE, DLGRC_ETAT_RELANCE)
+SELECT v.Id + 60, v.Id, ''SDCA'', ''1'', ''2'' FROM (VALUES (1800601), (1800602), (1800603), (1800604)) AS v (Id);
+INSERT INTO v2.RELANCE_RCS (RLCRC_ID_RLCRC, RLCRC_ID_DLGRC, RLCRC_NUM_ORDRE, RLCRC_DATE_RELANCE, RLCRC_DATE_LIMITE, RLCRC_TYPE_RELANCE,
+    RLCRC_ID_INSTN, RLCRC_FACTURE, RLCRC_AUTEUR, RLCRC_INTERVENANT)
+SELECT v.Id + 80, v.Id + 60, 1, DATEADD(DAY, -31, @aujourdhui), CASE WHEN v.Id = 1800603 THEN @aujourdhui ELSE DATEADD(DAY, -1, @aujourdhui) END,
+       ''S'', NULL, 0, ''3'', ''1''
+FROM (VALUES (1800601), (1800602), (1800603), (1800604)) AS v (Id);
+INSERT INTO v2.EXERCICE (EXRCC_ID_EXRCC, EXRCC_DATE_CLOTURE, EXRCC_ID_DSRCS, EXRCC_ID_DLGRC, EXRCC_ID_DMND_RECLA, EXRCC_DEPOSE,
+    EXRCC_NON_APPROBATION_COMPTES, EXRCC_LIMITE_DEPOT, EXRCC_ETAT_DCA) VALUES
+    (1800641, ''20231231'', 1800601, 1800661, NULL, 0, 0, DATEADD(DAY, -500, @aujourdhui), ''22''),
+    (1800642, ''20221231'', 1800602, 1800662, NULL, 0, 0, DATEADD(DAY, -860, @aujourdhui), ''22''),
+    (1800652, ''20231231'', 1800602, 1800662, NULL, 0, 0, DATEADD(DAY, -500, @aujourdhui), ''22''),
+    (1800643, ''20231231'', 1800603, 1800663, NULL, 0, 0, DATEADD(DAY, -500, @aujourdhui), ''22''),
+    (1800644, ''20231231'', 1800604, 1800664, NULL, 0, 0, DATEADD(DAY, -500, @aujourdhui), ''22'');
+INSERT INTO v2.DIRIGEANT (DRGNT_ID_DRGNT, DRGNT_ID_DSRCS, DRGNT_NUM_ORDRE, DRGNT_SUPPRIME, DRGNT_FONCTION_DIRIGEANT) VALUES
+    (1800681, 1800601, 1, 0, ''GER18''), (1800682, 1800602, 1, 0, ''GER18''), (1800683, 1800603, 1, 0, ''GER18''),
+    (1800684, 1800604, 1, 0, ''CAC18'');
+INSERT INTO v2.DIRIGEANT_PP (DRGPP_ID_DRGPP, DRGPP_ID_DRGNT, DRGPP_CIVILITE, DRGPP_PATRONYME, DRGPP_PRENOM_USAGE) VALUES
+    (1800681, 1800681, ''MR'', ''ALPHAGERANT'', ''Leo''), (1800682, 1800682, ''MME'', ''BETAGERANTE'', ''Ana''),
+    (1800683, 1800683, ''MR'', ''GAMMAGERANT'', ''Max''), (1800684, 1800684, ''MR'', ''DELTAAUDIT'', ''Tom'');',
+    N'@aujourdhui datetime', @aujourdhui;

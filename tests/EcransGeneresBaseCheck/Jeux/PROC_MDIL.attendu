@@ -7,8 +7,14 @@ MDIL BETA SAS · SIREN 513 130 002 | Dossier RCS 2027 B 13002 · Injonction modi
 MDIL ALPHA SARL · SIREN 513 130 001 | Dossier RCS 2027 B 13001 · Alerte immatriculation A principale · En cours du banc lot 3 · 2 relances | Avec relance | AFaire | []
 # Les 50 lignes suivantes sont les diligences des autres jeux, que MDIL lit aussi (aucun filtre de nature ni d'etat dans la V2) :
 # PROC_DCA_RELANCE (RELANCE ..., dont les 4 jumeaux du lot 8 : RELANCE SIGMA a OMICRON), PROC_DCA_INJ (INJONCTION ...), PROC_DBE_RELANCE (BENEF ...), PROC_DBE_INJ (ENJOINDRE ...) et
-# Program.cs (BANC ROF ..., radiations d'office). Un jeu qui ajoute des diligences ajoute ses lignes ici.
+# Program.cs (BANC ROF ..., radiations d'office). Un jeu qui ajoute des diligences ajoute ses lignes ici. Lot 8 (injonctions) :
+# les diligences SDCA des dossiers a enjoindre (INJ ALPHA a DELTA, PROC_DCA_RELANCE.sql) et la diligence SDBE de ENJOINDRE SANS
+# GERANT (PROC_DBE_INJ.sql).
 # Lot 8 (relance 1 des comptes annuels, PROC_DCA_RELANCE.sql) : deux diligences SDCA sans action, lues par leur exercice.
+INJ DELTA SAS · SIREN 518 006 604 | Dossier RCS 2026 B 18604 · SDCA · 1 relance | Avec relance | AFaire | []
+INJ GAMMA SAS · SIREN 518 006 603 | Dossier RCS 2026 B 18603 · SDCA · 1 relance | Avec relance | AFaire | []
+INJ BETA SAS · SIREN 518 006 602 | Dossier RCS 2026 B 18602 · SDCA · 1 relance | Avec relance | AFaire | []
+INJ ALPHA SAS · SIREN 518 006 601 | Dossier RCS 2026 B 18601 · SDCA · 1 relance | Avec relance | AFaire | []
 R1 KAPPA SAS · SIREN 518 005 510 | Dossier RCS 2026 B 18510 · SDCA · non relancée | Sans relance | AFaire | []
 R1 BETA SNC · SIREN 518 005 502 | Dossier RCS 2026 B 18502 · SDCA · non relancée | Sans relance | AFaire | []
 RELANCE SIGMA SARL · SIREN 518 004 404 | Dossier RCS 2026 B 18404 · SDCA · 2 relances | Avec relance | AFaire | []
@@ -18,6 +24,7 @@ RELANCE OMICRON SAS · SIREN 518 004 401 | Dossier RCS 2026 B 18401 · SDCA · 1
 # Les deux diligences SDBE de PROC_DBE_RELANCE.sql (lot 8 : jumeaux de la recherche des dossiers a relancer).
 RBE QUATORZE SAS · SIREN 518 002 214 | Dossier RCS 2026 B 18214 · SDBE · non relancée | Sans relance | AFaire | []
 RBE TREIZE SAS · SIREN 518 002 213 | Dossier RCS 2026 B 18213 · SDBE · non relancée | Sans relance | AFaire | []
+ENJOINDRE SANS GERANT SAS · SIREN 518 000 101 | Dossier RCS 2018 B 80101 · SDBE · 1 relance | Avec relance | AFaire | []
 RELANCE XI SAS · SIREN 511 000 414 | Dossier RCS 2018 B 00414 · SDCA · non relancée | Sans relance | AFaire | []
 RELANCE NU SARL · SIREN 511 000 413 | Dossier RCS 2018 B 00413 · SASSOSCI · non relancée | Sans relance | AFaire | []
 RELANCE MU SAS · SIREN 511 000 412 | Dossier RCS 2018 B 00412 · SDCA · 2 relances | Avec relance | AFaire | []

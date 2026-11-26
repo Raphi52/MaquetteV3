@@ -92,12 +92,14 @@ internal sealed class LecteurRelancesComptesAnnuels : ILecteurEcran
     internal const string PrefixeDossier = "dossier:";
 
     /// <summary>
-    /// L'exercice xd du dossier s (rec.DossierRcs) est dans la recherche de la relance 1 : la requete SDCA / RSURV / 1 de RIG_DEV et
-    /// l'enveloppe du moteur, traduites (en tete du fichier). Parametre : @aujourdhui. L'ecrivain la relit dans la transaction.
+    /// L'exercice xd du dossier s (rec.DossierRcs) est dans la recherche SDCA du moteur, HORS ce qui depend du numero de relance : la
+    /// requete SDCA / RSURV / 1 de RIG_DEV et l'enveloppe du moteur, traduites (en tete du fichier). La relance 1 (ci-dessous) et
+    /// l'injonction (LecteurInjonctionsComptesAnnuels.ExerciceAEnjoindreSql) la lisent toutes deux : l'injonction ISURV de SDCA n'a
+    /// pas de requete a elle et prend celle de la relance 1 (NatureDiligence.parametre.cs:620-626). Parametre : @aujourdhui.
     /// </summary>
-    internal const string ExerciceRelance1Sql = """
+    internal const string ExerciceRechercheSql = """
         xd.EXRCC_ID_DSRCS = s.Id AND xd.EXRCC_DEPOSE = 0 AND ISNULL(xd.EXRCC_NON_APPROBATION_COMPTES, 0) = 0
-        AND xd.EXRCC_ID_DMND_RECLA IS NULL AND xd.EXRCC_LIMITE_DEPOT < @aujourdhui AND xd.EXRCC_ETAT_DCA LIKE '0%'
+        AND xd.EXRCC_ID_DMND_RECLA IS NULL AND xd.EXRCC_LIMITE_DEPOT < @aujourdhui
         AND s.DateRadiation IS NULL AND s.TypeRcs IN ('B1', 'D1') AND s.Eirl = 0 AND s.DateCessation IS NULL AND s.ProvisoirementSans = 0
         AND EXISTS (SELECT 1 FROM v2.INSCRIT_PM AS pm
                     JOIN v2.FORME_JURIDIQUE_UTI AS f1 ON f1.R_FORMEJURID_VALEUR = pm.INSPM_FORME_JURIDIQUE_UTI
@@ -115,8 +117,6 @@ internal sealed class LecteurRelancesComptesAnnuels : ILecteurEcran
                                                       OR (dpm.DRGPM_FORME_JURIDIQUE_UTI IS NOT NULL AND fd.R_FORMEJURID_DCA_OBLIGATOIRE <> '1'))))))
         AND NOT EXISTS (SELECT 1 FROM v2.DEMANDE AS dq WHERE dq.DMND_ID_DSRCS = s.Id
                         AND dq.DMND_CODE_PROSS IN ('DCA', 'DCADEMAT') AND dq.DMND_ETAT_DEMANDE IN ('Q', 'W', 'I', 'N'))
-        AND NOT EXISTS (SELECT 1 FROM v2.DILIGENCE_RCS AS da WHERE da.DLGRC_ID_DLGRC = xd.EXRCC_ID_DLGRC
-                        AND da.DLGRC_NATURE_DILIGENCE = 'SDCA' AND da.DLGRC_ETAT_DILIGENCE = '1' AND TRY_CAST(da.DLGRC_ETAT_RELANCE AS int) > 0)
         AND ((NOT EXISTS (SELECT 1 FROM v2.PROCEDURE_COLLECTIVE AS pc WHERE pc.PRCLL_ID_DSRCS = s.Id)
               AND ISNULL(LTRIM(RTRIM(s.ProcedureCollective)), '') = ''
               AND NOT EXISTS (SELECT 1 FROM v2.MENTION_OBSERVATION AS mo
@@ -133,6 +133,18 @@ internal sealed class LecteurRelancesComptesAnnuels : ILecteurEcran
                                  WHERE pc.PRCLL_ID_DSRCS = s.Id)))
         AND NOT EXISTS (SELECT 1 FROM v2.DILIGENCE_RCS_EXCLUE AS dx WHERE dx.DLGEX_ID_DSRCS = s.Id AND dx.DLGEX_NATURE_DILIGENCE = 'SDCA'
                         AND (dx.DLGEX_ID_EXRCC IS NULL OR dx.DLGEX_ID_EXRCC = xd.EXRCC_ID_EXRCC))
+        """;
+
+    /// <summary>
+    /// L'exercice xd du dossier s est dans la recherche de la relance 1 : la recherche SDCA (ci-dessus), l'etat DCA « 0% »
+    /// (parametre.cs:880) et aucune diligence SDCA en cours deja relancee (testExistenceDiligenceRcsActive, parametre.cs:798-806).
+    /// Parametre : @aujourdhui. L'ecrivain la relit dans la transaction.
+    /// </summary>
+    internal const string ExerciceRelance1Sql = $"""
+        {ExerciceRechercheSql}
+        AND xd.EXRCC_ETAT_DCA LIKE '0%'
+        AND NOT EXISTS (SELECT 1 FROM v2.DILIGENCE_RCS AS da WHERE da.DLGRC_ID_DLGRC = xd.EXRCC_ID_DLGRC
+                        AND da.DLGRC_NATURE_DILIGENCE = 'SDCA' AND da.DLGRC_ETAT_DILIGENCE = '1' AND TRY_CAST(da.DLGRC_ETAT_RELANCE AS int) > 0)
         """;
 
     /// <summary>Un exercice xd de la diligence g a relancer (requetes SDCA / RSURV / 2 et 3 de RIG_DEV : non depose, sans refus

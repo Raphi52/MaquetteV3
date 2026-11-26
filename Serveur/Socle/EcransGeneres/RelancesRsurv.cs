@@ -52,15 +52,16 @@ internal static class RelancesRsurv
 
     /// <summary>Une demande RSURV validee (Demande.CreateDemande puis Cloturer(Validee), PROC_RSURV.cs:344-348 et :245-247) : du
     /// dossier <paramref name="idDossier"/>, ou celle du lot (null) ; <paramref name="idAction"/> = l'action RCS que la demande
-    /// porte (trt.Dmnd.AddActionRcs, l. 163), null sinon.</summary>
+    /// porte (trt.Dmnd.AddActionRcs, l. 163), null sinon. <paramref name="processus"/> : le code de la demande du moteur qui la
+    /// cree -- « RSURV » pour une relance, « ISURV » pour le lot des injonctions (InjonctionsIsurv.cs).</summary>
     internal static async Task<(int? Id, string? Numero, string? Refus)> DemandeAsync(GesteEnCours geste, int? idDossier, string nom, string? indicatif,
-        int? mere, string? parametres, int? idAction, CancellationToken ct)
+        int? mere, string? parametres, int? idAction, CancellationToken ct, string processus = "RSURV")
     {
         var (numero, refus) = await CreationV2.NumeroAsync(geste, "DMD", geste.Maintenant.Year, ct);
         if (numero is null) return (null, null, refus);
         var valeurs = new Dictionary<string, object?>
         {
-            ["DMND_NUM_DEMANDE"] = numero, ["DMND_ETAT_DEMANDE"] = "V", ["DMND_CODE_PROSS"] = "RSURV",
+            ["DMND_NUM_DEMANDE"] = numero, ["DMND_ETAT_DEMANDE"] = "V", ["DMND_CODE_PROSS"] = processus,
             ["DMND_ID_DSRCS"] = idDossier, ["DMND_NOM"] = nom.Length > 255 ? nom[..255] : nom,
             ["DMND_NUM_INDICATIF"] = indicatif, ["DMND_LES_NUMEROS"] = indicatif, ["DMND_ID_DMND_MERE"] = mere,
             ["DMND_TEXTE_PARAMETRE"] = parametres, ["DMND_DATE_CREATION"] = geste.Maintenant, ["DMND_DATE_VALIDATION"] = geste.Maintenant,
@@ -73,10 +74,28 @@ internal static class RelancesRsurv
 
     /// <summary>Le courrier de la relance (v2.DEMANDE_EDITION) du dossier <paramref name="idDossier"/>, si le parametre d'edition
     /// de ses reglages existe ; son libelle (celui du parametre + la nature, PROC_RSURV.cs:366), null sinon.</summary>
-    internal static async Task<string?> CourrierAsync(GesteEnCours geste, int idDemande, int idDossier, string designation, string nature,
+    internal static Task<string?> CourrierAsync(GesteEnCours geste, int idDemande, int idDossier, string designation, string nature,
         Reglages reglages, CancellationToken ct)
+        => reglages.CodeEdition is null
+            ? Task.FromResult<string?>(null)
+            : EditionAsync(geste, idDemande, reglages.CodeEdition, $" {nature}", "DOSSIER_RCS", idDossier.ToString(CultureInfo.InvariantCulture),
+                           reglages.File, designation, ct);
+
+    /// <summary>
+    /// Une demande d'edition (v2.DEMANDE_EDITION) par son parametre d'edition <paramref name="code"/>, comme
+    /// DemandeEdition.CreateDemandeEditionByParametreGeneration (DemandeEdition.cs:2579-2600) : le libelle du parametre (suivi de
+    /// <paramref name="suffixe"/>), son type de generation et son code CFECP, l'entite source <paramref name="entite"/> et son id, la
+    /// file <paramref name="lot"/>. Null si la base n'a pas ce parametre : RIG v2 ne cree alors aucune edition (la fabrique rend null).
+    /// Le courrier d'une relance (RSURV, entite DOSSIER_RCS) et l'ordonnance d'une injonction (ISURV, entite DECI_JUDICIAIRE,
+    /// PROC_ISURV.cs:420-426) passent par ici.
+    /// </summary>
+    // fix-ok: extension mesuree, pas un correctif -- l'injonction ISURV (lot 8, 26/11/2026) ecrit son ordonnance par la meme fabrique
+    // que le courrier de relance (CreateDemandeEditionByParametreGeneration) : la meme ecriture, partagee plutot que recopiee ; idem
+    // pour la demande d'un autre processus (DemandeAsync, « ISURV ») et le libelle du groupe de la nature (GroupeAsync).
+    internal static async Task<string?> EditionAsync(GesteEnCours geste, int idDemande, string code, string suffixe, string entite, string idSource,
+        string? lot, string? designation, CancellationToken ct)
     {
-        if (reglages.CodeEdition is null || await Scalaire(geste, "SELECT OBJECT_ID(N'v2.PARAMETRE_EDITION')", ct) is DBNull or null) return null;
+        if (await Scalaire(geste, "SELECT OBJECT_ID(N'v2.PARAMETRE_EDITION')", ct) is DBNull or null) return null;
         // Les colonnes du parametre que la table du greffe porte (une base de banc n'en a qu'une partie).
         var colonnesParametre = await ColonnesAsync(geste, "v2.PARAMETRE_EDITION", ct);
         string Colonne(string nom) => colonnesParametre.Contains(nom) ? nom : $"NULL AS {nom}";
@@ -85,13 +104,13 @@ internal static class RelancesRsurv
             SELECT PRMED_LIBELLE, PRMED_RECTO_VERSO, PRMED_AFFICHER_AVANT_IMPRESSION, PRMED_CODE_CFECP,
                    {Colonne("PRMED_TYPE_GENERATION")}, {Colonne("PRMED_LISTE")}
             FROM v2.PARAMETRE_EDITION WHERE PRMED_CODE = @code
-            """, ct, new SqlParameter("@code", reglages.CodeEdition)))
+            """, ct, new SqlParameter("@code", code)))
             if (await r.ReadAsync(ct))
                 parametre = (FormeLigne.Texte(r, "PRMED_LIBELLE"), r["PRMED_RECTO_VERSO"] is true, r["PRMED_AFFICHER_AVANT_IMPRESSION"] is true,
                              r["PRMED_CODE_CFECP"] is DBNull ? null : r["PRMED_CODE_CFECP"],
                              TypeGeneration(FormeLigne.Texte(r, "PRMED_TYPE_GENERATION"), FormeLigne.Texte(r, "PRMED_LISTE")));
         if (parametre is not { } p) return null;
-        var libelle = $"{p.Libelle} {nature}";
+        var libelle = $"{p.Libelle}{suffixe}";
         var valeurs = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
             ["DMNED_ID_DMND"] = idDemande, ["DMNED_DATE_CREATION"] = geste.Maintenant, ["DMNED_TYPE_PAPIER"] = "NORMAL",
@@ -100,8 +119,8 @@ internal static class RelancesRsurv
             ["DMNED_NOMBRE_EXEMPLAIRE"] = 1, ["DMNED_IMPRESSION"] = true, ["DMNED_PAPIER_TRAME"] = false, ["DMNED_AGRAFAGE"] = false,
             ["DMNED_RECTO_VERSO"] = p.RectoVerso, ["DMNED_AFF_AVANT_IMPRESSION"] = p.Afficher, ["DMNED_LIBELLE_DOCUMENT"] = libelle,
             ["DMNED_GROUPAGE_AUTOMATIQUE"] = true, ["DMNED_RESUME"] = false, ["DMNED_READ_ONLY"] = false,
-            ["DMNED_CODE_ENTITE_SOURCE"] = "DOSSIER_RCS", ["DMNED_VALEUR_ID_SOURCE"] = idDossier.ToString(CultureInfo.InvariantCulture),
-            ["DMNED_CODE_CFECP"] = p.Cfecp, ["DMNED_LOT"] = reglages.File, ["DMNED_DESIGNATION_DESTINATAIRE"] = designation,
+            ["DMNED_CODE_ENTITE_SOURCE"] = entite, ["DMNED_VALEUR_ID_SOURCE"] = idSource,
+            ["DMNED_CODE_CFECP"] = p.Cfecp, ["DMNED_LOT"] = lot, ["DMNED_DESIGNATION_DESTINATAIRE"] = designation,
             // Le type de generation du parametre (CreateDemandeEditionByParametreGeneration, DemandeEdition.cs:2588-2589).
             ["DMNED_TYPE_GENERATION"] = p.TypeGeneration,
             // Mesure le 26/11/2026 (banc reuni au lot 6 de main, erreur 515 « Cannot insert the value NULL into column
@@ -124,6 +143,21 @@ internal static class RelancesRsurv
         => courriers.Count == 0
             ? "aucun courrier, pas de paramètre d'édition pour cette relance dans la base du greffe."
             : $"{courriers.Count} courrier{(courriers.Count > 1 ? "s" : "")} « {string.Join(" », « ", courriers.Distinct())} » en file d'édition.";
+
+    /// <summary>Le libelle du groupe de la nature <paramref name="nature"/> (NATURE_DILIGENCE.R_NATUREDILI_ID_NDILGRP ->
+    /// NATURE_DILIGENCE_GROUPE : « Surveillances Président » pour SDBE dans RIG_DEV) ; la nature elle-meme si la base ne le porte
+    /// pas. Le nom de la demande du lot d'une relance (PROC_RSURV.cs:225-226) et d'une injonction (PROC_ISURV.cs:651-652).</summary>
+    internal static async Task<string> GroupeAsync(GesteEnCours geste, string nature, CancellationToken ct)
+    {
+        if (await Scalaire(geste, "SELECT OBJECT_ID(N'v2.NATURE_DILIGENCE_GROUPE')", ct) is DBNull or null
+            || await Scalaire(geste, "SELECT COL_LENGTH('v2.NATURE_DILIGENCE', 'R_NATUREDILI_ID_NDILGRP')", ct) is DBNull or null)
+            return nature;
+        return await Scalaire(geste, """
+            SELECT gr.NDILGRP_LIBELLE FROM v2.NATURE_DILIGENCE AS n
+            JOIN v2.NATURE_DILIGENCE_GROUPE AS gr ON gr.NDILGRP_ID_NDILGRP = n.R_NATUREDILI_ID_NDILGRP
+            WHERE n.R_NATUREDILI_VALEUR = @nature
+            """, ct, new SqlParameter("@nature", nature)) is string libelle && libelle.Trim().Length > 0 ? libelle.Trim() : nature;
+    }
 
     /// <summary>Les colonnes de <paramref name="table"/> dans la base du greffe.</summary>
     internal static async Task<HashSet<string>> ColonnesAsync(GesteEnCours geste, string table, CancellationToken ct)
