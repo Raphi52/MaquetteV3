@@ -205,8 +205,11 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Forme = FormeEcran.Audience,
             // L'audience : la recherche de RIG v2 (date, chambre, mode « C » = cabinet ; OPE_INFORMATIONS_AUDIENCE.cs:99-141,
             // PROC_RETAUD.cs:85-87). Le résultat et la prochaine audience : ceux du renvoi saisi en masse (PROC_MJUDS,
-            // OPE_RESULTAT.cs:448-700). Lecteur et gestes : Serveur/Socle/EcransGeneres/LecteurRetourAudience.cs, EcrivainRetourAudience.cs.
-            Parametres = [Champ.Date("Date de l'audience"), "Chambre", Champ.Liste("Mode", "Audience", "Cabinet"), "Résultat", Champ.Date("Prochaine audience")],
+            // OPE_RESULTAT.cs:448-700) ; le type de décision et sa date prévue : l'étape décision du même renvoi, ouverte pour un code
+            // prononcé ou délibéré (OPE_RESULTAT.cs:472-473, OPE_DECISION_JUDICIAIRE_MJUDS). Lecteur et gestes :
+            // Serveur/Socle/EcransGeneres/LecteurRetourAudience.cs, EcrivainRetourAudience.cs.
+            Parametres = [Champ.Date("Date de l'audience"), "Chambre", Champ.Liste("Mode", "Audience", "Cabinet"), "Résultat", Champ.Date("Prochaine audience"),
+                          "Type de décision", Champ.Date("Date prévue")],
             Recherche = "Rechercher une affaire, un numéro de rôle, un nom…",
             Criteres = ["Date de l'audience", "Chambre", "Mode"],
             Valider = "Saisir les décisions", // proc_retaud.md, Rôle : « saisir les décisions par affaire ».

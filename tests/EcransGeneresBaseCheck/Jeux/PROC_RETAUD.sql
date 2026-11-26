@@ -66,8 +66,12 @@ IF COL_LENGTH('v2.EVENEMENT_PROCEDURE', 'EVNPR_TYPE_DEPOSANT_GED') IS NULL ALTER
 
 -- Les references. TC17 classement ordinaire, TC17P prononce. Codes plumitif : J (jugement rendu, CX) et O (ordonnance rendue, PC
 -- et REF), prononces ; J porte l'evenement EV17J. R17 renvoi a l'audience de la meme chambre (« = »), classement TC17 ; R17S
--- renvoi sans prochain appel ; D17 delibere (pas un renvoi) ; R17X renvoi NON utilisable en saisie. Chambres : C17 avec
--- composition obligatoire, C17B sans. La fenetre de recherche : INTERV_AUD_DATE_MIN_RETAUD = 10 (au lieu de 14) ;
+-- renvoi sans prochain appel ; D17 delibere (pas un renvoi) ; R17X renvoi NON utilisable en saisie ; R17P renvoi PRONONCE, sans
+-- prochain appel : il ouvre l'etape decision (OPE_RESULTAT.cs:472-473). Types de decision : JGT17R en saisie, JGT17X hors saisie
+-- (TYPE_DECISION et DECISION_JUDICIAIRE sont creees par les jeux joues avant, leurs colonnes ecrites par PROC_MPCS.sql). Chambres :
+-- C17 avec composition obligatoire, C17B sans.
+-- fix-ok: controle du lot 7 (26/11/2026) -- le jeu n'avait aucun code de renvoi ouvrant l'etape decision ni aucun type de decision :
+-- la decision du renvoi (PROC_MJUDS.cs:1186-1193) n'etait pas jouable ; un seul ajout (codes, types, audience, appels, decision). La fenetre de recherche : INTERV_AUD_DATE_MIN_RETAUD = 10 (au lieu de 14) ;
 -- INTERV_AUD_DATE_MAX_RETAUD absent : 0 par defaut. Les reglages PARAMETRAGE de RIG v2 sont repris dans soc.Reglage (SOC-003).
 EXEC sp_executesql N'
 INSERT INTO v2.TYPE_CLASSEMENT (R_TYPECLASSE_VALEUR, R_TYPECLASSE_LIBELLE_ECRAN, R_TYPECLASSE_PRONONCE) VALUES
@@ -80,7 +84,10 @@ INSERT INTO v2.CODE_PLUMITIF (R_CODEPLUMIT_VALEUR, R_CODEPLUMIT_LIBELLE_ECRAN, R
     (''R17'', ''Renvoi du banc'', 1, NULL, ''1'', ''TC17'', 0, ''='', 1, 0, 1, 1, 0),
     (''R17S'', ''Renvoi sans audience'', 1, NULL, NULL, NULL, 0, NULL, 1, 0, 1, 1, 0),
     (''D17'', ''Délibéré du banc'', 1, NULL, ''1'', ''TC17P'', 0, NULL, 0, 1, 1, 1, 0),
-    (''R17X'', ''Renvoi hors saisie'', 0, NULL, ''1'', ''TC17'', 0, NULL, 1, 0, 1, 1, 0);
+    (''R17X'', ''Renvoi hors saisie'', 0, NULL, ''1'', ''TC17'', 0, NULL, 1, 0, 1, 1, 0),
+    (''R17P'', ''Renvoi prononcé'', 1, NULL, NULL, NULL, 1, NULL, 1, 0, 1, 1, 0);
+INSERT INTO v2.TYPE_DECISION (R_TYPEDECISI_VALEUR, R_TYPEDECISI_LIBELLE_ECRAN, R_TYPEDECISI_UTILISABLE_SAISIE) VALUES
+    (''JGT17R'', ''Jugement de renvoi du banc'', 1), (''JGT17X'', ''Jugement hors saisie du banc'', 0);
 INSERT INTO v2.CHAMBRE (R_CHAMBRE_VALEUR, R_CHAMBRE_LIBELLE_ECRAN, R_CHAMBRE_AVEC_COMPO) VALUES
     (''C17'', ''Première du banc'', 1), (''C17B'', ''Sans composition'', 0);
 INSERT INTO v2.SECTION (R_SECTION_VALEUR, R_SECTION_LIBELLE_ECRAN) VALUES (''S17'', ''Commerciale'');
@@ -99,14 +106,16 @@ INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_NOM_COURANT, INST
     (1700011, ''2026J17011'', ''OMEGA AUD c/ PSI AUD'', ''07''), (1700012, ''2026P17012'', ''PC AUD'', ''08''),
     (1700013, ''2026I17013'', ''INJONCTION AUD'', ''IP''), (1700014, ''2026J17014'', ''RENVOI AUD'', ''07''),
     (1700015, ''2026J17015'', ''TRAITEE AUD'', ''07''), (1700016, ''2026J17016'', ''SANS COMPO AUD'', ''07''),
-    (1700017, ''2026J17017'', ''CHAMBRE LIBRE AUD'', ''07''), (1700018, ''2026J17018'', ''CABINET AUD'', ''07'');';
+    (1700017, ''2026J17017'', ''CHAMBRE LIBRE AUD'', ''07''), (1700018, ''2026J17018'', ''CABINET AUD'', ''07''),
+    (1700019, ''2026J17019'', ''DECISION AUD'', ''07''), (1700020, ''2026J17020'', ''DELIBEREE AUD'', ''07'');';
 
 -- Les audiences de la FENETRE (dates relatives au jour du banc) : 1700101 a J-10 (borne retenue ; jumeau ecarte : 1700102 a
 -- J-11), 1700103 aujourd'hui sans heure, en section (borne retenue ; jumeau ecarte : 1700104 a J+1), 1700105 un CABINET a J-2
 -- (ecarte en mode audience ; retenu par le critere Mode = Cabinet). Puis les audiences FIXES des recherches et des gestes (2001) :
 -- 1700110 le 15/03/2001 composee, 1700111 le 12/04/2001 (cible du renvoi, une composition), 1700112 le 16/03/2001 chambre C17
 -- SANS composition, 1700113 le 16/03/2001 chambre C17B (sans composition, permise), 1700114 et 1700115 le 10/05/2001 (deux
--- audiences le meme jour), 1700116 un cabinet le 15/03/2001.
+-- audiences le meme jour), 1700116 un cabinet le 15/03/2001, 1700117 le 22/03/2001 chambre C17B (renvoi avec decision, hors de
+-- toute recherche).
 EXEC sp_executesql N'
 INSERT INTO v2.AUDIENCE_CABINET (AUDNC_ID_ADNC, AUDNC_AUDIENCE, AUDNC_DATE, AUDNC_HEURE, AUDNC_CHAMBRE, AUDNC_SECTION, AUDNC_ID_JUG) VALUES
     (1700101, 1, DATEADD(day, -10, @aujourdhui), ''09:00'', ''C17'', NULL, NULL),
@@ -117,7 +126,7 @@ INSERT INTO v2.AUDIENCE_CABINET (AUDNC_ID_ADNC, AUDNC_AUDIENCE, AUDNC_DATE, AUDN
     (1700110, 1, ''20010315'', ''09:00'', ''C17'', NULL, NULL), (1700111, 1, ''20010412'', ''09:00'', ''C17'', NULL, NULL),
     (1700112, 1, ''20010316'', ''09:00'', ''C17'', NULL, NULL), (1700113, 1, ''20010316'', ''14:00'', ''C17B'', NULL, NULL),
     (1700114, 1, ''20010510'', ''09:00'', ''C17'', NULL, NULL), (1700115, 1, ''20010510'', ''14:00'', ''C17'', NULL, NULL),
-    (1700116, 0, ''20010315'', ''11:00'', NULL, NULL, 1700301);
+    (1700116, 0, ''20010315'', ''11:00'', NULL, NULL, 1700301), (1700117, 1, ''20010322'', ''09:00'', ''C17B'', NULL, NULL);
 INSERT INTO v2.COMPOSITION (CMPST_ID_CMAUD, CMPST_ID_ADNC, CMPST_NUM_ORDRE, CMPST_ID_GRASS, CMPST_PAR_DEFAUT) VALUES
     (1700201, 1700101, 1, 1700401, 1), (1700203, 1700110, 1, 1700401, 1), (1700204, 1700111, 1, 1700401, 1);', N'@aujourdhui datetime', @aujourdhui;
 
@@ -125,7 +134,8 @@ INSERT INTO v2.COMPOSITION (CMPST_ID_CMAUD, CMPST_ID_ADNC, CMPST_NUM_ORDRE, CMPS
 -- 1700503 non traite, 1700504 traite avec une publicite en attente (prononcer), 1700506 non traite (audience du jour), 1700505
 -- et 1700507 hors fenetre, 1700508 au cabinet. 2001 : 1700511 (CX), 1700512 (PC), 1700513 (IP) prononces non traites, 1700514
 -- non traite non prononce, 1700515 deja traite (J), 1700516 sur l'audience sans composition, 1700517 chambre sans composition,
--- 1700518 au cabinet du 15/03/2001.
+-- 1700518 au cabinet du 15/03/2001, 1700519 et 1700520 (deja deliberee : sa decision 1700701 porte DCJDC_ID_APPAF_DELIBERER)
+-- non traites le 22/03/2001.
 EXEC sp_executesql N'
 INSERT INTO v2.APPEL_AFFAIRE (APPAF_ID_APPAF, APPAF_ID_INSTN, APPAF_NUM_ORDRE, APPAF_ID_ADNC, APPAF_ID_CMAUD, APPAF_TYPE_CLASSEMENT,
     APPAF_NUM_APPEL, APPAF_ETAT_PREPARATION, APPAF_ETAT_RETOUR, APPAF_CODE_PLUMITIF) VALUES
@@ -145,6 +155,10 @@ INSERT INTO v2.APPEL_AFFAIRE (APPAF_ID_APPAF, APPAF_ID_INSTN, APPAF_NUM_ORDRE, A
     (1700515, 1700015, 1, 1700110, 1700203, ''TC17'', ''J_5'', ''0'', ''P'', ''J''),
     (1700516, 1700016, 1, 1700112, NULL, ''TC17P'', ''J_1'', ''0'', ''A'', NULL),
     (1700517, 1700017, 1, 1700113, NULL, ''TC17'', ''J_1'', ''0'', ''A'', NULL),
-    (1700518, 1700018, 1, 1700116, NULL, ''TC17'', NULL, ''0'', ''A'', NULL);
+    (1700518, 1700018, 1, 1700116, NULL, ''TC17'', NULL, ''0'', ''A'', NULL),
+    (1700519, 1700019, 1, 1700117, NULL, ''TC17'', ''J_1'', ''0'', ''A'', NULL),
+    (1700520, 1700020, 1, 1700117, NULL, ''TC17'', ''J_2'', ''0'', ''A'', NULL);
+INSERT INTO v2.DECISION_JUDICIAIRE (DCJDC_ID_DCJDC, DCJDC_ID_INSTN, DCJDC_NUM_ORDRE, DCJDC_TYPE_DECISION, DCJDC_ID_APPAF_DELIBERER) VALUES
+    (1700701, 1700020, 1, ''JGT17R'', 1700520);
 INSERT INTO v2.EVENEMENT_PROCEDURE_EN_ATTENTE (EVNPA_ID_EVNPA, EVNPA_ID_APPAF_DELIBERER, EVNPA_ID_APPAF_PRONONCER, EVNPA_CODE_EVE_PRO)
     VALUES (1700601, NULL, 1700504, ''EV17J'');';

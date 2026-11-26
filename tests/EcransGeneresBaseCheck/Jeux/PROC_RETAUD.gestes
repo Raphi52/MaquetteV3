@@ -122,3 +122,54 @@ resultat: fait
 message: 1 affaire renvoyée (R17S).
 controle: SELECT APPAF_CODE_PLUMITIF + '/' + APPAF_ETAT_RETOUR FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF = 1700517 => R17S/M
 controle: SELECT COUNT(*) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN = 1700017 => 1
+---
+# 15. Un « Type de décision » sur un renvoi simple (R17S) : RIG v2 masque et vide l'étape décision (OPE_RESULTAT.cs:472-473,
+#     :488-497), aucune décision ne s'écrit. Jumeau : bloc 19 (R17P, renvoi prononcé).
+geste: Decider Renvoyer
+ids: 1700519
+valeur: Résultat = R17S
+valeur: Type de décision = JGT17R
+resultat: refuse
+message: Le code plumitif « R17S » n'ouvre pas la décision judiciaire : RIG v2 ne la saisit au renvoi que pour un code prononcé ou délibéré.
+---
+# 16. Un type de décision hors de la liste de saisie (OPE_DECISION_JUDICIAIRE_MJUDS). Jumeau : bloc 19 (JGT17R).
+geste: Decider Renvoyer
+ids: 1700519
+valeur: Résultat = R17P
+valeur: Type de décision = JGT17X
+resultat: refuse
+message: Le type de décision « JGT17X » n'est pas utilisable en saisie dans la base du greffe.
+---
+# 17. Une date prévue qui n'est pas une date. Jumeau : bloc 19.
+geste: Decider Renvoyer
+ids: 1700519
+valeur: Résultat = R17P
+valeur: Type de décision = JGT17R
+valeur: Date prévue = pas une date
+resultat: refuse
+message: « Date prévue » n'est pas une date : « pas une date ».
+---
+# 18. Une date prévue sans type de décision : elle appartient à la décision. Jumeau : bloc 19.
+geste: Decider Renvoyer
+ids: 1700519
+valeur: Résultat = R17P
+valeur: Date prévue = 2001-04-19
+resultat: refuse
+message: « Date prévue » se rapporte à la décision : saisissez aussi le « Type de décision ».
+---
+# 19. Le renvoi prononcé et sa décision (PROC_MJUDS.cs:1186-1193 ; AffectDecisionJudiciaireDirect, :1587-1593) : résultat R17P,
+#     état de retour « P » (code prononcé) ; une décision JGT17R neuve sur 2026J17019 (1re de l'instance, date prévue, catégorie
+#     « I », numéro source neuf, non délibérée) ; aucune sur 2026J17020, dont l'appel a déjà une décision délibérée (:1189). Pas
+#     de prochain appel : R17P n'est ni « avec audience » ni « avec cabinet ».
+geste: Decider Renvoyer
+ids: 1700519,1700520
+valeur: Résultat = R17P
+valeur: Type de décision = JGT17R
+valeur: Date prévue = 2001-04-19
+resultat: fait
+message: 2 affaires renvoyées (R17P) ; 1 décision JGT17R créée, 1 déjà délibérée.
+controle: SELECT APPAF_CODE_PLUMITIF + '/' + APPAF_ETAT_RETOUR FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF = 1700519 => R17P/P
+controle: SELECT APPAF_CODE_PLUMITIF + '/' + APPAF_ETAT_RETOUR FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF = 1700520 => R17P/P
+controle: SELECT COUNT(*) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_INSTN = 1700019 AND DCJDC_TYPE_DECISION = 'JGT17R' AND DCJDC_DATE_PREVUE = '20010419' AND DCJDC_NUM_ORDRE = 1 AND DCJDC_CAT_DECISION = 'I' AND LEN(DCJDC_NUMERO_SOURCE) = 36 AND DCJDC_ID_APPAF_DELIBERER IS NULL AND DCJDC_ETAT_VALIDITE = '0' AND DCJDC_REDIGEE_GREFFE = 1 => 1
+controle: SELECT COUNT(*) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_INSTN = 1700020 => 1
+controle: SELECT COUNT(*) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN IN (1700019, 1700020) => 2

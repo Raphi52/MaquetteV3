@@ -31,9 +31,13 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   - LA DEMANDE : creee par instance a l'ouverture et validee a la sauvegarde (ValidationSauver, PROC_MPCS.cs:769-772), sans
 ///     facture en lot (MetierFacture = false, proc_mpcs.md:42) : le journal des gestes la remplace (decision du chef).
 ///
-/// CE QUE LA V3 NE REPREND PAS (nomme, rien en silence) : la composition choisie dans le resultat (AffectComposition) et le
-/// calendrier de procedure ; le prochain appel saisi en lot (AffectProchainAppel) ; les mesures associees a la decision ; la
-/// numerotation des minutes, reservee aux instances de juge-commissaire (EJC_GenererNumeroMinute, :830-870 : aucune PC) ; le
+/// CE QUE LA V3 NE REPREND PAS (nomme, rien en silence, avec la raison) : la composition choisie dans le resultat
+/// (AffectComposition, :1204-1208) -- RIG v2 la prend dans la liste des compositions de l'audience, et une liste de descripteur a
+/// des choix fixes (Champ.Liste, Pont/EcransGeneres/Descripteur.cs:148) ; le calendrier de procedure (etape non portee) ; le
+/// prochain appel saisi en lot (AffectProchainAppel, :1231-1238, seulement si l'instance n'a pas d'appel futur) -- non repris par
+/// ce lot, l'ecriture existe (EcrivainRetourAudience, « Renvoyer ») ; la mesure associee a la decision (GetMesureSaisie,
+/// :1474-1490 ; DecisionJudiciaire.AddMesure) -- aucun ecrivain V3 ne cree une mesure (EcrivainMesuresProvisoires ne fait que la
+/// modifier) ; la numerotation des minutes, reservee aux instances de juge-commissaire (EJC_GenererNumeroMinute, :830-870 : aucune PC) ; le
 /// brouillon REDA et le lancement de PROC_REDA (document genere, :918-983) ; les publicites de la « validation avec pub »
 /// (BODACC, JAL : services externes) ; la mise a jour RPVA (UpdateRPVA, service externe) ; la validation d'UNE affaire (mode
 /// SingleInstance : parties, evenements, facturation), qui passe par les ecrans de l'affaire.
@@ -120,7 +124,7 @@ internal sealed class EcrivainMiseAuPointChambres : IEcrivainEcran
             if (code is not null) traces.Add(await PoserResultatAsync(geste, a, code, ct));
             if (saisiType.Length > 0 && a.Deliberees == 0)
             {
-                traces.Add(await CreerDecisionAsync(geste, a, saisiType, datePrevue, ct));
+                traces.Add(await CreerDecisionAsync(geste, a.IdInstance, a.Role, saisiType, datePrevue, ct));
                 decisions++;
             }
         }
@@ -151,19 +155,24 @@ internal sealed class EcrivainMiseAuPointChambres : IEcrivainEcran
             new { Resultat = a.CodePlumitif, EtatRetour = a.EtatRetour }, new { Resultat = code.Code, EtatRetour = etat });
     }
 
-    /// <summary>La decision judiciaire du lot sur l'instance de l'appel (AffectDecisionJudiciaireDirect, PROC_MPCS.cs:1705-1710).</summary>
-    private static async Task<TraceGeste> CreerDecisionAsync(GesteEnCours geste, Appel a, string type, DateTime? datePrevue, CancellationToken ct)
+    /// <summary>La decision judiciaire du lot sur l'instance de l'appel (AffectDecisionJudiciaireDirect, PROC_MPCS.cs:1705-1710) ; la
+    /// meme ecriture sert au renvoi du retour d'audience (PROC_MJUDS.cs:1587-1593, EcrivainRetourAudience).</summary>
+    // fix-ok: controle du lot 7 (26/11/2026) -- le renvoi du retour d'audience doit ecrire la meme decision (PROC_MJUDS.cs:1186-1193) :
+    // cette ecriture est partagee plutot que recopiee ; l'en-tete donne en plus la raison de chaque manque (composition, prochain
+    // appel, mesure), mesuree dans PROC_MPCS.cs et Descripteur.cs:148.
+    internal static async Task<TraceGeste> CreerDecisionAsync(GesteEnCours geste, int idInstance, string role, string type, DateTime? datePrevue,
+                                                              CancellationToken ct)
     {
         int ordre;
         await using (var r = await geste.LireAsync("SELECT ISNULL(MAX(DCJDC_NUM_ORDRE), 0) + 1 FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_INSTN = @i", ct,
-                         new SqlParameter("@i", a.IdInstance)))
+                         new SqlParameter("@i", idInstance)))
         {
             await r.ReadAsync(ct);
             ordre = Math.Max(1, Convert.ToInt32(r.GetValue(0), CultureInfo.InvariantCulture));
         }
         var id = await geste.InsererAsync("v2.DECISION_JUDICIAIRE", "DCJDC_ID_DCJDC", new Dictionary<string, object?>
         {
-            ["DCJDC_ID_INSTN"] = a.IdInstance, ["DCJDC_NUM_ORDRE"] = (short)ordre, ["DCJDC_TYPE_DECISION"] = type, ["DCJDC_DATE_PREVUE"] = datePrevue,
+            ["DCJDC_ID_INSTN"] = idInstance, ["DCJDC_NUM_ORDRE"] = (short)ordre, ["DCJDC_TYPE_DECISION"] = type, ["DCJDC_DATE_PREVUE"] = datePrevue,
             ["DCJDC_NUMERO_SOURCE"] = Guid.NewGuid().ToString().ToUpperInvariant(),
             // Le constructeur de DecisionJudiciaire (DecisionJudiciaire.cs:305-322).
             ["DCJDC_CAT_DECISION"] = "I", ["DCJDC_EXECUTION_PROVISOIRE"] = "0", ["DCJDC_RESSORT"] = "0", ["DCJDC_AVANT_DIRE_DROIT"] = "0",
@@ -172,11 +181,13 @@ internal sealed class EcrivainMiseAuPointChambres : IEcrivainEcran
             ["DCJDC_ETAT_VALIDITE"] = "0", ["DCJDC_POST_DECISION"] = false, ["DCJDC_REDIGEE_GREFFE"] = true, ["DCJDC_AVEC_PIECE_NUMERISE"] = false,
             ["DCJDC_COPIE_EXECUTOIRE_DEMANDEUR"] = false, ["DCJDC_DECISION_PUBLIQUE"] = false, ["DCJDC_DEBAT_PUBLIC"] = false,
         }, ct);
-        return new TraceGeste("affaire", $"la décision du rôle {a.Role}", id.ToString(CultureInfo.InvariantCulture), "a cree", null,
-            new { Instance = a.Role, Type = type, DatePrevue = datePrevue, NumOrdre = ordre });
+        return new TraceGeste("affaire", $"la décision du rôle {role}", id.ToString(CultureInfo.InvariantCulture), "a cree", null,
+            new { Instance = role, Type = type, DatePrevue = datePrevue, NumOrdre = ordre });
     }
 
-    private static async Task<bool> TypeDecisionSaisissableAsync(GesteEnCours geste, string type, CancellationToken ct)
+    /// <summary>Le type est-il dans la liste de saisie (utilisable en saisie) : la liste de OPE_DECISION_JUDICIAIRE_MJUDS, commune a la
+    /// mise au point des chambres et au renvoi du retour d'audience.</summary>
+    internal static async Task<bool> TypeDecisionSaisissableAsync(GesteEnCours geste, string type, CancellationToken ct)
     {
         await using var r = await geste.LireAsync("""
             SELECT COUNT(*) FROM v2.TYPE_DECISION WHERE R_TYPEDECISI_VALEUR = @t AND R_TYPEDECISI_UTILISABLE_SAISIE = 1

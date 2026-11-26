@@ -26,17 +26,34 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// (:655-700) : si le code dit « avec audience » (R_CODEPLUMIT_AVEC_AUDIENCE = 1) ou « avec cabinet » (0), l'audience de la
 /// « Prochaine audience » (date), de la chambre du code (« = » : celle de l'audience en cours), recoit un appel d'affaire neuf :
 /// type de classement du code, etat de retour « A », numero d'ordre = nombre d'appels de l'instance + 1, composition de
-/// l'audience si elle n'en a qu'une (AppelAffaire.CreateAppelAffaire, AppelAffaire.cs:675-702).
+/// l'audience si elle n'en a qu'une (AppelAffaire.CreateAppelAffaire, AppelAffaire.cs:675-702). Puis la DECISION JUDICIAIRE
+/// (ApplyModifications multi, PROC_MJUDS.cs:1186-1193) : RIG v2 n'ouvre l'etape decision que pour un code prononce, delibere ou
+/// delibere repousse (displayDJ, OPE_RESULTAT.cs:472-473) -- un renvoi simple la masque et la vide (:488-497) et aucune decision ne
+/// s'ecrit (GetDecisionJudiciaireSaisie, PROC_MJUDS.cs:1322-1330 : etape visible ET type saisi). Pour un code qui l'ouvre, un
+/// « Type de décision » de la liste de saisie (la meme operation que la mise au point des chambres, OPE_DECISION_JUDICIAIRE_MJUDS)
+/// cree, sur chaque instance dont l'appel n'a pas deja une decision deliberee (:1189), une DECISION_JUDICIAIRE neuve avec sa
+/// « Date prévue » : AffectDecisionJudiciaireDirect (PROC_MJUDS.cs:1587-1593), ecrite par EcrivainMiseAuPointChambres.CreerDecisionAsync.
+/// Mesure du 26/11/2026 (SQL-DEV\DEV, RIG_DEV) : aucun des 250 codes de renvoi n'y est prononce ni delibere, l'etape n'y est jamais ouverte.
 ///
 /// CONTROLE COMMUN (CanDoActions, OPE_LIST_APPEL_AFFAIRE.cs:1356-1369) : sur une audience passee (IsAudiencePassee, :1343-1349),
 /// « actions possibles uniquement si l'audience comporte des compositions » (:1586), quand sa chambre l'impose
 /// (R_CHAMBRE_AVEC_COMPO).
 ///
-/// CE QUE LA V3 NE REPREND PAS (nomme, rien en silence) : la demande V2 de PROC_MJUDS (creee et validee d'un coup, sans
-/// facture pour un renvoi : le journal des gestes la remplace) ; les evenements futurs crees d'office par
-/// AddEvenementProcedureSurvenu et le texte de l'evenement (ConstructionTexte) ; la decision judiciaire, le calendrier de procedure
-/// et la reponse RPVA aux demandes de renvoi (OPE_RESULTAT.cs:627-650, service externe) ; les editions (convocations) ; le
-/// controle des deliberes repousses et son courriel a la hotline (:571-603).
+/// CE QUE LA V3 NE REPREND PAS (nomme, rien en silence, avec la raison) :
+///   - la demande V2 de PROC_MJUDS (creee et validee d'un coup, sans facture pour un renvoi) : le journal des gestes la remplace ;
+///   - au RENVOI, l'evenement FUTUR lie a l'evenement du code (creationEvenementFutur, EvenementProcedure.cs:1769-1806 : code
+///     R_CODEEVEPRO_CODE_EVE_PRO_FUTUR, dates en mois, jours ou semaines, Outils.cs:520-) que PROC_MJUDS enregistre
+///     (AffectEvenementProcedure, PROC_MJUDS.cs:1210) : aucun ecrivain V3 ne porte encore ce calcul. Pour « Marquer », RIG v2 ne
+///     l'enregistre pas : seuls l'appel et l'evenement survenu sont sauves (OPE_LIST_APPEL_AFFAIRE.cs:2254, :2263-2268), et
+///     EvenementProcedure.Sauve (:2218-) ne sauve pas les evenements lies. Le texte de l'evenement (ConstructionTexte) non plus ;
+///   - la mesure associee a la decision (GetMesureSaisie, PROC_MJUDS.cs:1365-1373) et le calendrier de procedure : leurs etapes ne
+///     sont pas portees (comme a la mise au point des chambres) ;
+///   - les EDITIONS (GenererLesDemandesEdition, PROC_MJUDS.cs:1257-1284) : celle de la decision (DecisionJudiciaire.CreateDemandeEdition)
+///     et celles des evenements (EvenementProcedure.CreateDemandeEdition, EvenementProcedure.cs:2607, puis GetAllEditions, :2801 :
+///     maquettes CEP_EDITION du code et destinataires de l'instance). La V3 sait ecrire une demande d'edition a parametre connu
+///     (EcrivainRelancesComptesAnnuels), pas calculer les editions d'un evenement ou d'une decision ;
+///   - la reponse RPVA aux demandes de renvoi (OPE_RESULTAT.cs:627-650) : service externe ; le controle des deliberes repousses et
+///     son courriel a la hotline (:571-603) : courriel externe.
 /// </summary>
 internal sealed class EcrivainRetourAudience : IEcrivainEcran
 {
@@ -50,15 +67,17 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
     internal const string MarquerRendues = "Marquer les décisions comme rendues", Renvoyer = "Renvoyer";
 
     /// <summary>Les parametres du descripteur que « Renvoyer » lit.</summary>
-    internal const string ParametreResultat = "Résultat", ParametreProchaine = "Prochaine audience";
+    internal const string ParametreResultat = "Résultat", ParametreProchaine = "Prochaine audience", ParametreType = "Type de décision",
+                          ParametreDatePrevue = "Date prévue";
 
     /// <summary>Une affaire au role, telle que les gestes la lisent.</summary>
     private sealed record Appel(int Id, int IdInstance, string Role, string TypeInstance, string? CodePlumitif, string EtatRetour, bool Prononce,
                                 int IdAudience, DateTime? DateAudience, string? Heure, string? Chambre, bool AvecCompo, int Compositions);
 
     /// <summary>Un code plumitif et ce que les gestes en lisent.</summary>
-    internal sealed record CodePlumitif(string Code, bool Prononce, bool Renvoi, string? CodeEvePro, string? AvecAudience, string? TypeClassement,
-                                       string? Chambre, HashSet<string> Compatibles);
+    /// <param name="OuvreDecision">Prononce, delibere ou delibere repousse : RIG v2 ouvre l'etape decision (OPE_RESULTAT.cs:472-473).</param>
+    internal sealed record CodePlumitif(string Code, bool Prononce, bool Renvoi, bool OuvreDecision, string? CodeEvePro, string? AvecAudience,
+                                       string? TypeClassement, string? Chambre, HashSet<string> Compatibles);
 
     public async Task<IssueGeste> JouerAsync(GesteEnCours geste, CancellationToken ct)
     {
@@ -122,6 +141,26 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
         if (appels.FirstOrDefault(a => !code.Compatibles.Contains(Traduit(a.TypeInstance))) is { } incompatible)
             return IssueGeste.Refuser($"Le code plumitif « {code.Code} » n'est pas compatible avec le type d'instance du rôle {incompatible.Role}.");
 
+        // La decision judiciaire (voir l'en-tete) : l'etape decision de RIG v2 n'existe que pour un code qui l'ouvre.
+        // fix-ok: controle du lot 7 (26/11/2026) -- « Renvoyer » n'ecrivait jamais la decision que PROC_MJUDS ecrit en lot
+        // (PROC_MJUDS.cs:1186-1193, :1322-1330) quand le code ouvre l'etape decision (OPE_RESULTAT.cs:472-473) ; une seule cause,
+        // portee par plusieurs remplacements (en-tete, parametres, code plumitif, ecriture).
+        var saisiType = geste.Demande.Valeurs.TryGetValue(ParametreType, out var t) ? t.Trim() : "";
+        var saisiDatePrevue = geste.Demande.Valeurs.TryGetValue(ParametreDatePrevue, out var dp) ? dp.Trim() : "";
+        DateTime? datePrevue = null;
+        if (saisiType.Length > 0)
+        {
+            if (!code.OuvreDecision)
+                return IssueGeste.Refuser($"Le code plumitif « {code.Code} » n'ouvre pas la décision judiciaire : RIG v2 ne la saisit au renvoi "
+                                          + "que pour un code prononcé ou délibéré.");
+            if (!await EcrivainMiseAuPointChambres.TypeDecisionSaisissableAsync(geste, saisiType, ct))
+                return IssueGeste.Refuser($"Le type de décision « {saisiType} » n'est pas utilisable en saisie dans la base du greffe.");
+            if (saisiDatePrevue.Length > 0 && (datePrevue = AudiencesV2.Date(saisiDatePrevue)) is null)
+                return IssueGeste.Refuser($"« {ParametreDatePrevue} » n'est pas une date : « {saisiDatePrevue} ».");
+        }
+        else if (saisiDatePrevue.Length > 0)
+            return IssueGeste.Refuser($"« {ParametreDatePrevue} » se rapporte à la décision : saisissez aussi le « {ParametreType} ».");
+
         // Le prochain appel (OPE_RESULTAT.cs:655-700) : seulement pour un code « avec audience » (1) ou « avec cabinet » (0).
         int? idProchaine = null;
         string? libelleProchaine = null;
@@ -142,15 +181,36 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
 
         var traces = new List<TraceGeste>();
         var ids = new List<string>();
+        var decisions = 0;
         foreach (var a in appels)
         {
             traces.Add(await PoserResultatAsync(geste, a, code, ct));
             ids.Add(a.Id.ToString(CultureInfo.InvariantCulture));
             if (idProchaine is { } adnc) traces.Add(await ProchainAppelAsync(geste, a, adnc, libelleProchaine!, code.TypeClassement!, ct));
+            // Pas de seconde decision sur un appel deja delibere (DecisionsJudiciairesDeliberés, PROC_MJUDS.cs:1189).
+            if (saisiType.Length > 0 && await DelibereesAsync(geste, a.Id, ct) == 0)
+            {
+                traces.Add(await EcrivainMiseAuPointChambres.CreerDecisionAsync(geste, a.IdInstance, a.Role, saisiType, datePrevue, ct));
+                decisions++;
+            }
         }
         var n = appels.Count;
-        return IssueGeste.Ecrit($"{n} affaire{(n > 1 ? "s" : "")} renvoyée{(n > 1 ? "s" : "")} ({code.Code})"
-                                + (libelleProchaine is null ? "." : $" à l'{libelleProchaine}."), [.. ids], [.. traces]);
+        var message = $"{n} affaire{(n > 1 ? "s" : "")} renvoyée{(n > 1 ? "s" : "")} ({code.Code})" + (libelleProchaine is null ? "" : $" à l'{libelleProchaine}");
+        if (saisiType.Length > 0)
+            message += decisions == 0 ? " ; aucune décision ajoutée (déjà délibérées)"
+                : $" ; {decisions} décision{(decisions > 1 ? "s" : "")} {saisiType} créée{(decisions > 1 ? "s" : "")}"
+                  + (decisions < n ? $", {n - decisions} déjà délibérée{(n - decisions > 1 ? "s" : "")}" : "");
+        return IssueGeste.Ecrit(message + ".", [.. ids], [.. traces]);
+    }
+
+    /// <summary>Les decisions deja deliberees de l'appel (AppelAffaire.DecisionsJudiciairesDeliberés, AppelAffaire.cs:315-322 :
+    /// DCJDC_ID_APPAF_DELIBERER = l'appel).</summary>
+    private static async Task<int> DelibereesAsync(GesteEnCours geste, int idAppel, CancellationToken ct)
+    {
+        await using var r = await geste.LireAsync("SELECT COUNT(*) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_APPAF_DELIBERER = @a", ct,
+                                                  new SqlParameter("@a", idAppel));
+        await r.ReadAsync(ct);
+        return r.GetInt32(0);
     }
 
     /// <summary>Les audiences (ou cabinets) du jour, de la chambre donnee s'il y en a une : id et libelle.</summary>
@@ -273,7 +333,8 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
     internal static async Task<CodePlumitif?> LireCodeAsync(GesteEnCours geste, string code, CancellationToken ct, bool saisieSeulement = false)
     {
         await using var r = await geste.LireAsync("""
-            SELECT R_CODEPLUMIT_VALEUR, R_CODEPLUMIT_PRONONCE, R_CODEPLUMIT_RENVOI, R_CODEPLUMIT_CODE_EVE_PRO, R_CODEPLUMIT_AVEC_AUDIENCE,
+            SELECT R_CODEPLUMIT_VALEUR, R_CODEPLUMIT_PRONONCE, R_CODEPLUMIT_RENVOI, R_CODEPLUMIT_DELIBERE, R_CODEPLUMIT_DELIBERE_REPOUSSE,
+                   R_CODEPLUMIT_CODE_EVE_PRO, R_CODEPLUMIT_AVEC_AUDIENCE,
                    R_CODEPLUMIT_TYPE_CLASSEMENT, R_CODEPLUMIT_CHAMBRE, R_CODEPLUMIT_UTILISABLE_SAISIE,
                    R_CODEPLUMIT_COMPATIBLE_CX, R_CODEPLUMIT_COMPATIBLE_PC, R_CODEPLUMIT_COMPATIBLE_REF, R_CODEPLUMIT_COMPATIBLE_JC,
                    R_CODEPLUMIT_COMPATIBLE_PRV, R_CODEPLUMIT_COMPATIBLE_OP
@@ -287,8 +348,9 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
         foreach (var (type, colonne) in new[] { ("CX", "R_CODEPLUMIT_COMPATIBLE_CX"), ("PC", "R_CODEPLUMIT_COMPATIBLE_PC"), ("REF", "R_CODEPLUMIT_COMPATIBLE_REF"),
                                                 ("JC", "R_CODEPLUMIT_COMPATIBLE_JC"), ("PRV", "R_CODEPLUMIT_COMPATIBLE_PRV"), ("OP", "R_CODEPLUMIT_COMPATIBLE_OP") })
             if (r[colonne] is true) compatibles.Add(type);
-        return new CodePlumitif(FormeLigne.Texte(r, "R_CODEPLUMIT_VALEUR"), r["R_CODEPLUMIT_PRONONCE"] is true, r["R_CODEPLUMIT_RENVOI"] is true,
-            Opt("R_CODEPLUMIT_CODE_EVE_PRO"), Opt("R_CODEPLUMIT_AVEC_AUDIENCE"), Opt("R_CODEPLUMIT_TYPE_CLASSEMENT"), Opt("R_CODEPLUMIT_CHAMBRE"), compatibles);
+        var prononce = r["R_CODEPLUMIT_PRONONCE"] is true;
+        return new CodePlumitif(FormeLigne.Texte(r, "R_CODEPLUMIT_VALEUR"), prononce, r["R_CODEPLUMIT_RENVOI"] is true,
+            prononce || r["R_CODEPLUMIT_DELIBERE"] is true || r["R_CODEPLUMIT_DELIBERE_REPOUSSE"] is true, Opt("R_CODEPLUMIT_CODE_EVE_PRO"), Opt("R_CODEPLUMIT_AVEC_AUDIENCE"), Opt("R_CODEPLUMIT_TYPE_CLASSEMENT"), Opt("R_CODEPLUMIT_CHAMBRE"), compatibles);
     }
 
     /// <summary>Le type d'instance traduit (Instance.TypeInstanceTraduite, Instance.cs:967-983).</summary>

@@ -37,5 +37,5 @@ geste: Decider Citer par huissier
 ids: 1706011-1706411-1706611-,1706014-1706414-1706614-
 valeur: Huissier = 1706901
 resultat: fait
-message: 2 citations par huissier enregistrées (HUISSIER BANC). La citation à l'huissier, la copie de l'ordonnance, la facture et, s'il est demandé, le Kbis ne sont pas produits : RIG v3 n'a pas le moteur d'éditions de RIG v2.
+message: 2 citations par huissier enregistrées (HUISSIER BANC). La citation à l'huissier, la copie de l'ordonnance, le Kbis (s'il est demandé) et la facture ne sont pas produits : RIG v2 les tire des éditions et des articles paramétrés pour l'événement de citation, que RIG v3 ne calcule pas encore.
 controle: SELECT STRING_AGG(CONCAT(EVNPR_ID_INSTN, ':', EVNPR_NUM_ORDRE, ':', CAST(EVNPR_SURVENU AS int), ':', EVNPR_TYPE_EVE_PRO, ':', CASE WHEN EVNPR_DATE = CAST(GETDATE() AS date) THEN 'jour' ELSE CONVERT(varchar(10), EVNPR_DATE, 23) END), ',') WITHIN GROUP (ORDER BY EVNPR_ID_INSTN) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_CODE_EVE_PRO = 'CITATION' AND EVNPR_ID_INSTN IN (1706011, 1706014) => 1706011:2:1:S:jour,1706014:2:1:S:jour
