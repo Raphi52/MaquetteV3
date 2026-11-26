@@ -1,0 +1,36 @@
+# Les recherches de LecteurMotsDirecteurs (IRechercheEcran), jouees sur les lignes de PROC_MDJUD.sql AVANT les gestes.
+# Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). La recherche s'AJOUTE aux filtres de la liste.
+
+# 1. Le champ de recherche trouve un numero (la zone _ultNumAffaire, OPE_MD.cs:38, :47, :57).
+texte: 13112
+lignes:
+PC MD BETA | PC 2026P13112 · 1 mot directeur | Procédures collectives | Validee | []
+---
+# 2. ... ou un nom (_ultNomAffaire, OPE_MD.cs:40, :49, :59), sans casse.
+texte: md instance
+lignes:
+OMEGA MD INSTANCE | Instance · rôle 2026P13101 · 2 mots directeurs | Instances | Validee | []
+SIGMA MD INSTANCE | Instance · rôle 2026M13102 · chaîne vide | Instances | AFaire | []
+---
+# 3. Le critere « Famille d'affaire », sans accent ni casse (la famille du parametrage de recherche, ETP_RECHERCHE_AFFAIRE.cs:30).
+critere: Famille d'affaire = prev
+lignes:
+MPC PRV GAMMA | Prévention 2027V16201 · 2 mots directeurs | Préventions | Validee | []
+PRV MD GAMMA | Prévention 2026V13121 · 2 mots directeurs | Préventions | Validee | []
+---
+# 4. Le critere de numero, blancs retires comme FormateNumRole : une instance et deux PC du meme prefixe.
+critere: Numéro de rôle, de PC ou de prévention = 2026 P 131
+lignes:
+OMEGA MD INSTANCE | Instance · rôle 2026P13101 · 2 mots directeurs | Instances | Validee | []
+PC MD BETA | PC 2026P13112 · 1 mot directeur | Procédures collectives | Validee | []
+PC MD ALPHA | PC 2026P13111 · 2 mots directeurs | Procédures collectives | Validee | []
+---
+# 5. Deux criteres : les deux a la fois.
+critere: Nom courant = alpha
+critere: Famille d'affaire = procédures
+lignes:
+PC MD ALPHA | PC 2026P13111 · 2 mots directeurs | Procédures collectives | Validee | []
+---
+# 6. Une affaire sans mots directeurs reste hors de la liste, meme cherchee par son nom.
+texte: TAU SANS MD
+lignes:

@@ -1,0 +1,24 @@
+# Les recherches de LecteurRepertoire (IRechercheEcran), jouees sur les lignes de PROC_MODIF_REPER.sql AVANT les gestes.
+# Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). La recherche s'AJOUTE aux filtres de la liste.
+
+# 1. Le champ de recherche : l'abrege OU la designation (l'index de la V2, OPE_RECHERCHE_MODIF_REPER.cs:153).
+texte: conseil
+lignes:
+REP-BETA | Beta Conseil · inactif | Inactifs | AFaire | []
+---
+# 2. Le critere « Abrégé ».
+critere: Abrégé = rep-al
+lignes:
+REP-ALPHA | Cabinet Alpha · alpha@banc.fr · actif | Actifs | AFaire | []
+---
+# 3. « Répertoriés actifs seulement » : les inactifs ecartes (:278-281), avec la designation.
+critere: Désignation = s
+critere: Répertoriés actifs seulement = oui
+lignes:
+REP-DELTA | Delta Assiste · actif | Actifs | AFaire | []
+---
+# 4. ... et son jumeau sans la case : l'inactif revient.
+critere: Désignation = s
+lignes:
+REP-BETA | Beta Conseil · inactif | Inactifs | AFaire | []
+REP-DELTA | Delta Assiste · actif | Actifs | AFaire | []

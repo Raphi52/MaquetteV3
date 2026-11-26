@@ -565,18 +565,26 @@ Exiger(gesteDemo is { Fait: false, SansEcrivain: true } && gesteDemo.Message.Sta
     $"pont, gestes : sans serveur « {gesteDemo.Message} » ; ligne d'exemple « {gesteExemple.Message} » ; instance verrouillee : « {gesteVerrou.Message} »");
 var ficheParPont = await EcranGenere.FicheAsync(client, Greffe, corriger.Code, titreMjud, "1200001");
 var ficheVerrouParPont = await EcranGenere.FicheAsync(client, Greffe, corriger.Code, titreMjud, "1200002");
-var ficheExemple = await EcranGenere.FicheAsync(client, Greffe, corriger.Code, CatalogueGenere.Descripteur("PROC_MPC")!.Titre, "1");
+// fix-ok: mesure le 26/11/2026 (lot 3) -- ce controle visait PROC_MPC de « Corriger une affaire judiciaire », dont les cinq
+// procedures ont depuis leur lecteur de fiche : il prend le premier membre d'un ecran reuni qui n'en a pas, quel que soit le
+// lot qui branche les autres.
+var (reuniSansFiche, sansFiche) = CatalogueGenere.Tous.SelectMany(d => d.Membres.Select(m => (Reuni: d, Membre: m)))
+    .First(x => lecteurs.ParProcedure.GetValueOrDefault(x.Membre.Code) is not IFicheEcran);
+var ficheExemple = await EcranGenere.FicheAsync(client, Greffe, reuniSansFiche.Code, sansFiche.Titre, "1");
 Exiger(ficheParPont is { Mode: "base", Fiche: { LectureSeule: false } } && ficheParPont.Fiche.Nom == "ALPHA BANC c/ BETA BANC"
        && ficheVerrouParPont.Fiche is { LectureSeule: true, Motif: { } motif } && motif.StartsWith("Instance bloquée", StringComparison.Ordinal)
        && ficheExemple.Mode == "exemple",
     $"pont, fiches : une instance lue dans la base ({ficheParPont.Mode}), une verrouillee en lecture seule avec le message de RIG v2 " +
     $"({ficheVerrouParPont.Fiche?.Motif}), une procedure sans lecteur de fiche en exemple ({ficheExemple.Message})");
+// fix-ok: mesure le 26/11/2026 (lot 3) -- ce controle attendait « Instance judiciaire » SEULE dans Cherchees ; les quatre autres
+// procedures de l'ecran reuni cherchent depuis dans la base. Il attend maintenant chaque membre qui a un lecteur qui cherche.
 var chercheeParPont = await EcranGenere.LignesAsync(client, Greffe, corriger.Code, new RechercheEcran("12003", new Dictionary<string, string>()));
-Exiger(chercheeParPont.Recherche && chercheeParPont.Cherchees.SequenceEqual([titreMjud])
+var chercheurs = corriger.Membres.Where(m => lecteurs.ParProcedure.GetValueOrDefault(m.Code) is IRechercheEcran).Select(m => m.Titre).ToArray();
+Exiger(chercheeParPont.Recherche && chercheeParPont.Cherchees.Order().SequenceEqual(chercheurs.Order()) && chercheurs.Contains(titreMjud)
        && chercheeParPont.Lignes.Where(l => l.Groupe == titreMjud).Select(l => l.Nom).SequenceEqual(["EPSILON BANC"])
        && chercheeParPont.Lignes.Where(l => l.Groupe == titreMjud).All(l => l.Id is not null),
-    $"pont, ecran reuni « {corriger.Titre} » : la recherche part dans la base pour « {titreMjud} » seul (Cherchees : " +
-    $"{string.Join(", ", chercheeParPont.Cherchees)}), ses lignes portent leur Id");
+    $"pont, ecran reuni « {corriger.Titre} » : la recherche part dans la base pour chaque procedure qui cherche ({string.Join(", ", chercheurs)} ; " +
+    $"Cherchees : {string.Join(", ", chercheeParPont.Cherchees)}), les lignes de « {titreMjud} » portent leur Id");
 
 // ============================================================ 4. TOUT LECTEUR CONTRE LE DESCRIPTEUR DE SA PROCEDURE
 

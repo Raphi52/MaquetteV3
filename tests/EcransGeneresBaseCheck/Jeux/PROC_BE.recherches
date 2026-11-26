@@ -1,0 +1,28 @@
+# Les recherches de LecteurBeneficiairesDossier (IRechercheEcran), jouees sur les lignes de PROC_BE.sql AVANT les gestes.
+# Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). La recherche s'AJOUTE aux filtres de la liste.
+
+# 1. Le dossier par son numero de gestion, blancs retires.
+critere: Dossier RCS = 2027 B 14001
+lignes:
+DUPONT Jean Marc (01/02/1980) | Dossier RCS 2027 B 14001 · BE ALPHA SAS | Déclaration standard | AFaire | []
+MARTIN Anne (03/11/1975) | Dossier RCS 2027 B 14001 · BE ALPHA SAS | Déclaration standard | AFaire | []
+---
+# 2. Le nom du beneficiaire : patronyme, prenoms ou nom d'usage, sans casse.
+critere: Nom du bénéficiaire = luca
+lignes:
+ROSSI Luca (15/06/1990) | Dossier RCS 2027 B 14002 · BE PLACEMENT SICAV | Placement collectif | AFaire | []
+---
+# 3. Le type de declaration, sans accent ni casse : le placement collectif...
+critere: Type de déclaration = placement
+lignes:
+ROSSI Luca (15/06/1990) | Dossier RCS 2027 B 14002 · BE PLACEMENT SICAV | Placement collectif | AFaire | []
+---
+# 4. ... et son jumeau, la declaration standard.
+critere: Type de déclaration = declaration standard
+lignes:
+DUPONT Jean Marc (01/02/1980) | Dossier RCS 2027 B 14001 · BE ALPHA SAS | Déclaration standard | AFaire | []
+MARTIN Anne (03/11/1975) | Dossier RCS 2027 B 14001 · BE ALPHA SAS | Déclaration standard | AFaire | []
+---
+# 5. Un beneficiaire partant reste hors de la liste, meme cherche par son nom.
+texte: PARTANT
+lignes:

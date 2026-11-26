@@ -1,0 +1,32 @@
+# Les recherches de LecteurProceduresCollectives (IRechercheEcran), jouees sur les lignes de PROC_MPC.sql.
+# Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). La recherche s'AJOUTE aux filtres de la liste.
+
+# 1. Le champ de recherche : le numero OU le nom de l'affaire.
+texte: mpc
+lignes:
+MPC ZETA | PC 2027P16106 · redressement judiciaire · ouverte le 03/03/2026 | Procédure collective (PC) | AFaire | []
+MPC EPSILON | PC 2027P16105 · redressement judiciaire · ouverte le 02/03/2026 | Procédure collective (PC) | AFaire | []
+MPC DELTA | PC 2027P16104 · redressement judiciaire · ouverte le 01/03/2026 | Procédure collective (PC) | AFaire | []
+MPC GAMMA | PC 2027P16103 · 0 · ouverte le 10/02/2026 | Procédure collective (PC) | AFaire | []
+MPC BETA | PC 2027P16102 · liquidation judiciaire après RJ | Procédure collective (PC) | Validee | []
+MPC ALPHA | PC 2027P16101 · redressement judiciaire · ouverte le 10/01/2026 · bloquée par la demande 27016000001 | Procédure collective (PC) | EnAttente | []
+MPC PRV ETA | Prévention 2027V16203 · mandat ad hoc | Prévention (PRV) | AFaire | []
+MPC PRV DELTA | Prévention 2027V16202 · prévention · bloquée par la demande 27016000003 | Prévention (PRV) | EnAttente | []
+MPC PRV GAMMA | Prévention 2027V16201 · prévention · ouverte le 15/01/2026 | Prévention (PRV) | AFaire | []
+---
+# 2. « Instance liée » : la PC d'une instance rattachee (INSTN_ID_PRCLL), blancs du numero de role retires.
+critere: Instance liée = 2027 J 16301
+lignes:
+MPC ALPHA | PC 2027P16101 · redressement judiciaire · ouverte le 10/01/2026 · bloquée par la demande 27016000001 | Procédure collective (PC) | EnAttente | []
+---
+# 3. « Débiteur » : le nom de l'affaire.
+critere: Débiteur = prv gamma
+lignes:
+MPC PRV GAMMA | Prévention 2027V16201 · prévention · ouverte le 15/01/2026 | Prévention (PRV) | AFaire | []
+---
+# 4. Le numero, blancs retires : les trois preventions de ce jeu.
+critere: Numéro de PC ou de prévention = 2027 V
+lignes:
+MPC PRV ETA | Prévention 2027V16203 · mandat ad hoc | Prévention (PRV) | AFaire | []
+MPC PRV DELTA | Prévention 2027V16202 · prévention · bloquée par la demande 27016000003 | Prévention (PRV) | EnAttente | []
+MPC PRV GAMMA | Prévention 2027V16201 · prévention · ouverte le 15/01/2026 | Prévention (PRV) | AFaire | []

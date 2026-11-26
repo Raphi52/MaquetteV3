@@ -1,0 +1,156 @@
+# Les gestes de EcrivainProceduresCollectives (« Procédure collective », PROC_MPC), joues dans l'ordre par la route POST, sur
+# les lignes de PROC_MPC.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). Un refus n'ecrit
+# rien ; chaque refus a son jumeau accepte (meme borne, autre cote).
+
+# 1. PC tenue par une demande MPC en cours sur 2P : RIG v2 n'entre pas en saisie (PROC_MPC.cs:141-151), au message de RIG v2.
+#    Jumeau accepte : bloc 10, la meme date sur 1316106, libre.
+geste: Enregistrer
+ids: P-1316101
+valeur: Procédure › Date de cessation des paiements = 2026-01-20
+resultat: refuse
+message: Procédure collective bloquée (27016000001), demande "En cours" : MPC par M. AUTRE BANC
+---
+# 2. Prevention tenue par une demande MODPR en attente (W) sur 2R. Jumeau accepte : bloc 12, 1316201 (sa demande en attente
+#    vise le sequenceur 2J, pas 2R).
+geste: Enregistrer
+ids: R-1316202
+valeur: Procédure › Date d'ouverture = 2026-01-20
+resultat: refuse
+message: Prévention bloquée (27016000003), demande "En attente" : MODPR par M. AUTRE BANC
+---
+# 3. PC hors forfait, client divers, reglage MPC_TYPE_FACTURATION_CLIENT_DIVERS = « F » : modification facturee
+#    (PROC_MPC.cs:482-500), non reprise. Jumeau accepte : bloc 11, PC hors forfait au reglage « N » (client en compte).
+geste: Enregistrer
+ids: P-1316102
+valeur: Procédure › Date de cessation des paiements = 2026-01-20
+resultat: refuse
+message: La modification de la PC 2027P16102 est facturée dans RIG v2 (PC hors forfait, réglage MPC_TYPE_FACTURATION_CLIENT_DIVERS = « F ») : la V3 ne reprend pas la facturation, elle ne se modifie donc pas ici
+---
+# 4. La date d'ouverture d'une PC relance le forfait dans RIG v2 (OPE_PROCEDURE_COLLECTIVE.cs:141-152, MAJForfait :690-740).
+#    Jumeau accepte : bloc 12, la date d'ouverture d'une prevention.
+geste: Enregistrer
+ids: P-1316106
+valeur: Procédure › Date d'ouverture = 2026-03-04
+resultat: refuse
+message: La date d'ouverture de la PC 2027P16106 ne se modifie pas ici : dans RIG v2, elle recalcule le forfait de la PC, donc sa facturation.
+---
+# 5. La date de cessation n'est pas un champ d'OPE_PREVENTION. Jumeau accepte : bloc 10, la cessation d'une PC.
+geste: Enregistrer
+ids: R-1316201
+valeur: Procédure › Date de cessation des paiements = 2026-01-01
+resultat: refuse
+message: « Procédure › Date de cessation des paiements » ne se modifie pas sur la prévention 2027V16201 dans RIG v2 depuis cette fiche.
+---
+# 6. Une date illisible. Jumeau accepte : bloc 10, au format de l'ecran.
+geste: Enregistrer
+ids: P-1316106
+valeur: Procédure › Date de cessation des paiements = 31/12/2026
+resultat: refuse
+message: « Date de cessation des paiements » : date illisible (31/12/2026).
+---
+# 7. PC sans adresse (OPE_PROCEDURE_COLLECTIVE.cs:867-869). Jumeau accepte : bloc 10 (1316106, adresse posee).
+geste: Enregistrer
+ids: P-1316104
+valeur: Procédure › Date de cessation des paiements = 2026-02-15
+resultat: refuse
+message: L'adresse de la PC n'est pas renseignée. Veuillez saisir au moins un établissement avec une adresse.
+---
+# 8. PC sans entreprise reconnue (OPE_PROCEDURE_COLLECTIVE.cs:870-872). Jumeau accepte : bloc 10 (1316106, entreprise posee).
+geste: Enregistrer
+ids: P-1316105
+valeur: Procédure › Date de cessation des paiements = 2026-02-15
+resultat: refuse
+message: L'entreprise de la PC n'a pas été reconnue. Veuillez vérifier la saisie de l'entreprise ou veuillez contacter AMITEL.
+---
+# 9. Prevention sans dossier RCS ni non-inscrit (OPE_PREVENTION.cs:410-412). Jumeau accepte : bloc 12 (1316201, dossier pose).
+geste: Enregistrer
+ids: R-1316203
+valeur: Procédure › Date d'ouverture = 2026-04-01
+resultat: refuse
+message: L'adresse de la prévention n'est pas renseignée. Veuillez saisir au moins un établissement avec une adresse.
+---
+# 10. PC AU FORFAIT (jamais facturee, PROC_MPC.cs:483-484) : la date de cessation s'ecrit. Comme ProcedureCollective.Sauve :
+#     compteur vide -> 1, date de mise a jour ; registre des metiers et juridiction exterieure gardes (cases cochees), etat info
+#     « 2 » garde, etat et type recalcules identiques (« 1 »). La ligne passe « Modifiée » (journal des gestes).
+geste: Enregistrer
+ids: P-1316106
+valeur: Procédure › Date de cessation des paiements = 2026-02-20
+resultat: fait
+message: PC 2027P16106 enregistrée dans la base du greffe : « Date de cessation des paiements ».
+fiche: P-1316106
+Procédure › Date de cessation des paiements = 2026-02-20
+Procédure › Date d'ouverture = 2026-03-03
+controle: SELECT COUNT(*) FROM v2.PROCEDURE_COLLECTIVE WHERE PRCLL_ID_PRCLL = 1316106 AND PRCLL_DATE_CESS_PAIEMENT = '20260220' AND PRCLL_COMPTEUR_MAJ = 1 AND PRCLL_DATE_MAJ > '20250101' AND PRCLL_DEPARTEMENT_RM = '62' AND PRCLL_NUM_RM = 'RM6' AND PRCLL_JURIDICTION_EXTERIEURE = 'JUREX' AND PRCLL_ETAT_INFO = '2' AND PRCLL_ETAT_PC = '1' AND PRCLL_TYPE_PC = '1' => 1
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Procedure collective' AND IdObjet = 'P-1316106' AND Famille = 'affaire' AND Verbe = 'a modifie' => 1
+---
+# 11. PC hors forfait mais NON facturee (client en compte, reglage « N ») : ecrite. Comme DoPreparerSauvegarde puis Sauve :
+#     registre des metiers et juridiction exterieure vides (cases decochees), etat 9 -> 1 et type 0 -> 1 (recalcules), etat
+#     info 3 -> 2, compteur 4 -> 5, acte vide copie de l'instance de PC 1316303 (MAJActeSaisine).
+geste: Enregistrer
+ids: P-1316103
+valeur: Procédure › Date de cessation des paiements = 2026-01-31
+resultat: fait
+message: PC 2027P16103 enregistrée dans la base du greffe : « Date de cessation des paiements ».
+fiche: P-1316103
+Procédure › Date de cessation des paiements = 2026-01-31
+controle: SELECT COUNT(*) FROM v2.PROCEDURE_COLLECTIVE WHERE PRCLL_ID_PRCLL = 1316103 AND PRCLL_DATE_CESS_PAIEMENT = '20260131' AND PRCLL_ETAT_PC = '1' AND PRCLL_TYPE_PC = '1' AND PRCLL_ETAT_INFO = '2' AND PRCLL_COMPTEUR_MAJ = 5 AND PRCLL_DEPARTEMENT_RM IS NULL AND PRCLL_NUM_RM IS NULL AND PRCLL_RM_DEPENDANT IS NULL AND PRCLL_JURIDICTION_EXTERIEURE IS NULL AND PRCLL_CODE_ACTE_PROCE = 'ASS' AND PRCLL_DATE_ACTE = '20260205' => 1
+---
+# 12. Prevention (jamais facturee, PROC_MPC.cs:501-502) : la date d'ouverture s'ecrit. Comme Prevention.Sauve : compteur 2 -> 3,
+#     date de mise a jour, acte vide copie de la premiere instance 1316302 ; puis les dates de ses mots directeurs
+#     (EnregistrerMotDirecteur) : ouverture, solution vide -> 01/01/1800, cloture. La liste relue : les trois lignes ecrites
+#     (blocs 10 a 12) passent « Modifiée » (journal des gestes) ; 1316103 a son type recalcule (0 -> redressement judiciaire).
+geste: Enregistrer
+ids: R-1316201
+valeur: Procédure › Date d'ouverture = 2026-01-20
+resultat: fait
+message: Prévention 2027V16201 enregistrée dans la base du greffe : « Date d'ouverture ».
+lignes:
+MPC ZETA | PC 2027P16106 · redressement judiciaire · ouverte le 03/03/2026 | Procédure collective (PC) | Validee | []
+MPC EPSILON | PC 2027P16105 · redressement judiciaire · ouverte le 02/03/2026 | Procédure collective (PC) | AFaire | []
+MPC DELTA | PC 2027P16104 · redressement judiciaire · ouverte le 01/03/2026 | Procédure collective (PC) | AFaire | []
+MPC GAMMA | PC 2027P16103 · redressement judiciaire · ouverte le 10/02/2026 | Procédure collective (PC) | Validee | []
+MPC BETA | PC 2027P16102 · liquidation judiciaire après RJ | Procédure collective (PC) | Validee | []
+MPC ALPHA | PC 2027P16101 · redressement judiciaire · ouverte le 10/01/2026 · bloquée par la demande 27016000001 | Procédure collective (PC) | EnAttente | []
+PC MD BETA | PC 2026P13112 | Procédure collective (PC) | AFaire | []
+PC MD ALPHA | PC 2026P13111 | Procédure collective (PC) | AFaire | []
+PC n° 2026P00213 | PC 2026P00213 | Procédure collective (PC) | AFaire | []
+PC n° 2026P00212 | PC 2026P00212 | Procédure collective (PC) | AFaire | []
+PC n° 2026P00211 | PC 2026P00211 | Procédure collective (PC) | AFaire | []
+PC n° 3 |  | Procédure collective (PC) | AFaire | []
+PC n° 2 |  | Procédure collective (PC) | AFaire | []
+PC n° 1 |  | Procédure collective (PC) | AFaire | []
+MPC PRV ETA | Prévention 2027V16203 · mandat ad hoc | Prévention (PRV) | AFaire | []
+MPC PRV DELTA | Prévention 2027V16202 · prévention · bloquée par la demande 27016000003 | Prévention (PRV) | EnAttente | []
+MPC PRV GAMMA | Prévention 2027V16201 · prévention · ouverte le 20/01/2026 | Prévention (PRV) | Validee | []
+PRV MD GAMMA | Prévention 2026V13121 | Prévention (PRV) | AFaire | []
+fiche: R-1316201
+Procédure › Date d'ouverture = 2026-01-20
+controle: SELECT COUNT(*) FROM v2.PREVENTION WHERE PREVE_ID_PREVE = 1316201 AND PREVE_DATE_OUVERTURE = '20260120' AND PREVE_COMPTEUR_MAJ = 3 AND PREVE_DATE_MAJ > '20250101' AND PREVE_CODE_ACTE_PROCE = 'REQ' AND PREVE_DATE_ACTE = '20260112' => 1
+controle: SELECT COUNT(*) FROM v2.RIG_MOTS_DIRECTEUR_PCINST WHERE MDPCI_ID_MDPCI = 1316701 AND MDPCI_PCDATE_OUV = '20260120' AND MDPCI_PCDATE_SOL = '18000101' AND MDPCI_PCDATE_CLOT = '20260630' AND MDPCI_MOTS = 'NV2027V16201 PAgamma' => 1
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Procedure collective' AND IdObjet = 'R-1316201' => 1
+---
+# 13. La date d'ouverture videe (le champ n'est pas obligatoire) : la date des mots directeurs devient le 01/01/1800
+#     (DBDateTime.ValeurNull, DBObject.cs:531, ecrit par ToShortDateString).
+geste: Enregistrer
+ids: R-1316201
+valeur: Procédure › Date d'ouverture =
+resultat: fait
+message: Prévention 2027V16201 enregistrée dans la base du greffe : « Date d'ouverture ».
+fiche: R-1316201
+Procédure › Date d'ouverture =
+controle: SELECT COUNT(*) FROM v2.PREVENTION WHERE PREVE_ID_PREVE = 1316201 AND PREVE_DATE_OUVERTURE IS NULL AND PREVE_COMPTEUR_MAJ = 4 => 1
+controle: SELECT COUNT(*) FROM v2.RIG_MOTS_DIRECTEUR_PCINST WHERE MDPCI_ID_MDPCI = 1316701 AND MDPCI_PCDATE_OUV = '18000101' => 1
+---
+# 14. La meme valeur que la base : rien a enregistrer, rien de trace.
+geste: Enregistrer
+ids: R-1316201
+valeur: Procédure › Date d'ouverture =
+resultat: refuse
+message: Aucun champ n'est modifié : la prévention 2027V16201 garde ses valeurs.
+---
+# 15. Une PC absente de la base.
+geste: Enregistrer
+ids: P-9999999
+valeur: Procédure › Date de cessation des paiements = 2026-01-20
+resultat: refuse
+message: Procédure collective introuvable dans la base du greffe (P-9999999).

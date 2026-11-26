@@ -1,0 +1,86 @@
+# Les gestes de EcrivainMotsDirecteurs (« Mots directeurs », PROC_MDJUD), joues dans l'ordre par la route POST, sur les lignes
+# de PROC_MDJUD.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). Un refus n'ecrit rien (le
+# banc verifie lignes et journal inchanges) ; chaque refus a son jumeau accepte (meme borne, autre cote).
+
+# 1. Un mot de deux caracteres : refuse (OPE_MD.cs:110-111). Jumeau accepte : bloc 6, « NRabc » (trois caracteres et plus).
+geste: Enregistrer
+ids: I-1311002
+valeur: Mots directeurs › Mots directeurs = NR
+resultat: refuse
+message: Le mot 'NR' doit faire au moins 3 caractères.
+---
+# 2. Un mot NOUVEAU au prefixe inconnu pour une instance (« SE » est un code de PC, pas d'instance) : erreur (OPE_MD.cs:114-116).
+#    Jumeau accepte : le meme prefixe sur une PC, bloc 4.
+geste: Enregistrer
+ids: I-1311002
+valeur: Mots directeurs › Mots directeurs = NRabc SE513110002
+resultat: refuse
+message: Le mot 'SE513110002' doit commencer par un code mot directeur existant.
+---
+# 3. Le mot deja enregistre « XYold », ressaisi dans une autre casse : il n'est plus « initial » (comparaison sensible a la
+#    casse, OPE_MD.cs:114) -- erreur. Jumeau accepte : bloc 4, le meme mot dans sa casse.
+geste: Enregistrer
+ids: P-1311102
+valeur: Mots directeurs › Mots directeurs = xyold NPbeta
+resultat: refuse
+message: Le mot 'xyold' doit commencer par un code mot directeur existant.
+---
+# 4. Le mot initial « XYold » ne fait qu'avertir, mais un mot NOUVEAU sans code (« nouveau ») refuse le tout.
+#    Jumeau accepte : bloc 5, le meme mot precede de son code « NA ».
+geste: Enregistrer
+ids: P-1311102
+valeur: Mots directeurs › Mots directeurs = XYold   NPbeta   se513110002 nouveau
+resultat: refuse
+message: Le mot 'nouveau' doit commencer par un code mot directeur existant.
+---
+# 5. Le mot initial au prefixe inconnu n'est qu'un avertissement (OPE_MD.cs:114) : enregistre, l'avertissement rappele.
+#    « SE » est un code de PC (CodeMotsDirecteurs.cs:43). La chaine est normalisee (OPE_MD.cs:78-85) : blancs reduits ; un mot
+#    qui porte un chiffre reste tel quel (« se513110002 »), comme dans la V2.
+geste: Enregistrer
+ids: P-1311102
+valeur: Mots directeurs › Mots directeurs = XYold   NPbeta   se513110002 NAnouveau
+resultat: fait
+message: Mots directeurs de la PC 2026P13112 enregistrés dans la base du greffe. Avertissement : Le mot 'XYold' doit commencer par un code mot directeur existant.
+fiche: P-1311102
+Mots directeurs › Mots directeurs = XYold NPbeta se513110002 NAnouveau
+Enregistrement › Chaîne normalisée = XYold NPbeta se513110002 NAnouveau
+controle: SELECT MDPCI_MOTS FROM v2.RIG_MOTS_DIRECTEUR_PCINST WHERE MDPCI_ID_MDPCI = 1311512 => XYold NPbeta se513110002 NAnouveau
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Mots directeurs' AND IdObjet = 'P-1311102' AND Famille = 'affaire' AND Verbe = 'a modifie' => 1
+---
+# 6. La chaine vide de 1311002 remplie : blancs reduits, casse normalisee (« nrabc » -> « NRabc », « fnDUPONT » -> « FNdupont »).
+#    La ligne passe « Enregistrés ».
+geste: Enregistrer
+ids: I-1311002
+valeur: Mots directeurs › Mots directeurs = nrabc   fnDUPONT SI513110002
+resultat: fait
+message: Mots directeurs de l'instance 2026M13102 enregistrés dans la base du greffe.
+lignes:
+OMEGA MD INSTANCE | Instance · rôle 2026P13101 · 2 mots directeurs | Instances | Validee | []
+SIGMA MD INSTANCE | Instance · rôle 2026M13102 · 3 mots directeurs | Instances | Validee | []
+PC MD BETA | PC 2026P13112 · 4 mots directeurs | Procédures collectives | Validee | []
+PC MD ALPHA | PC 2026P13111 · 2 mots directeurs | Procédures collectives | Validee | []
+MPC PRV GAMMA | Prévention 2027V16201 · 2 mots directeurs | Préventions | Validee | []
+PRV MD GAMMA | Prévention 2026V13121 · 2 mots directeurs | Préventions | Validee | []
+fiche: I-1311002
+Mots directeurs › Mots directeurs = NRabc FNdupont SI513110002
+---
+# 7. La meme chaine, une fois normalisee : rien a enregistrer, rien de trace.
+geste: Enregistrer
+ids: I-1311002
+valeur: Mots directeurs › Mots directeurs = NRABC fndupont SI513110002
+resultat: refuse
+message: Aucun champ n'est modifié : l'instance 2026M13102 garde ses mots directeurs.
+---
+# 8. Le numero et le nom de l'affaire sont en lecture (OPE_MD.cs:38-40).
+geste: Enregistrer
+ids: R-1311201
+valeur: Affaire › Nom courant = AUTRE NOM
+resultat: refuse
+message: « Affaire › Nom courant » ne se modifie pas dans les mots directeurs de RIG v2.
+---
+# 9. Une affaire sans enregistrement de mots directeurs : hors de l'ecran. Jumeau accepte : bloc 6 (1311002, la sienne existe).
+geste: Enregistrer
+ids: I-1311003
+valeur: Mots directeurs › Mots directeurs = NRtau
+resultat: refuse
+message: Affaire introuvable dans la base du greffe (I-1311003).

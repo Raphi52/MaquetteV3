@@ -1,0 +1,25 @@
+# « Procédure collective » (PROC_MPC) : toutes les PC puis toutes les preventions (« ProcedureCollective=* »,
+# PROC_MPC.Designer.cs:453 ; « Prevention=* », PROC_MPC.cs:74), numero decroissant (sans numero : en dernier, par identifiant).
+# Etats : verrouillee (EnAttente) par une autre demande en cours ou W/I/N sur 2P / 2R -- 1316101 (en cours, 2P) et 1316202
+# (W, 2R) ; jumeau libre : 1316201 (W, mais sur 2J) ; modifiee (Validee) apres une demande MPC validee (1316102).
+# Les autres lignes viennent des autres jeux : PC MD ALPHA / BETA et PRV MD GAMMA (PROC_MDJUD.sql), 2026P002xx (PROC_VNOTIF.sql),
+# et les trois PC sans numero ni nom de Program.cs (section 2, radiations d'office).
+# Le type en clair (TYPE_PC, TYPE_PRV) ; « 0 » (1316103) n'a pas de libelle dans ce jeu : le code reste.
+MPC ZETA | PC 2027P16106 · redressement judiciaire · ouverte le 03/03/2026 | Procédure collective (PC) | AFaire | []
+MPC EPSILON | PC 2027P16105 · redressement judiciaire · ouverte le 02/03/2026 | Procédure collective (PC) | AFaire | []
+MPC DELTA | PC 2027P16104 · redressement judiciaire · ouverte le 01/03/2026 | Procédure collective (PC) | AFaire | []
+MPC GAMMA | PC 2027P16103 · 0 · ouverte le 10/02/2026 | Procédure collective (PC) | AFaire | []
+MPC BETA | PC 2027P16102 · liquidation judiciaire après RJ | Procédure collective (PC) | Validee | []
+MPC ALPHA | PC 2027P16101 · redressement judiciaire · ouverte le 10/01/2026 · bloquée par la demande 27016000001 | Procédure collective (PC) | EnAttente | []
+PC MD BETA | PC 2026P13112 | Procédure collective (PC) | AFaire | []
+PC MD ALPHA | PC 2026P13111 | Procédure collective (PC) | AFaire | []
+PC n° 2026P00213 | PC 2026P00213 | Procédure collective (PC) | AFaire | []
+PC n° 2026P00212 | PC 2026P00212 | Procédure collective (PC) | AFaire | []
+PC n° 2026P00211 | PC 2026P00211 | Procédure collective (PC) | AFaire | []
+PC n° 3 |  | Procédure collective (PC) | AFaire | []
+PC n° 2 |  | Procédure collective (PC) | AFaire | []
+PC n° 1 |  | Procédure collective (PC) | AFaire | []
+MPC PRV ETA | Prévention 2027V16203 · mandat ad hoc | Prévention (PRV) | AFaire | []
+MPC PRV DELTA | Prévention 2027V16202 · prévention · bloquée par la demande 27016000003 | Prévention (PRV) | EnAttente | []
+MPC PRV GAMMA | Prévention 2027V16201 · prévention · ouverte le 15/01/2026 | Prévention (PRV) | AFaire | []
+PRV MD GAMMA | Prévention 2026V13121 | Prévention (PRV) | AFaire | []

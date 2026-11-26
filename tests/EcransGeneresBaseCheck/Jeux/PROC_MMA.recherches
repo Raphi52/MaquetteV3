@@ -1,0 +1,20 @@
+# Les recherches de LecteurMentionsEnMarge (IRechercheEcran), jouees sur les lignes de PROC_MMA.sql.
+# Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). La recherche s'AJOUTE aux filtres de la liste.
+
+# 1. Le champ de recherche : le numero d'inscription.
+texte: 13702
+lignes:
+MMA sur l'inscription 2026-13702 | Inscription 2026-13702 · N · demande du 09/03/2026 · refus | Inscriptions maritimes | Rejetee | []
+MMA sur l'inscription 2026-13702 | Inscription 2026-13702 · N · demande du 07/03/2026 · arrivée | Inscriptions maritimes | AFaire | []
+---
+# 2. ... ou le nom de la demande.
+texte: validée
+lignes:
+MMA sur l'inscription 2026-13701 - Validée | Inscription 2026-13701 · V · demande du 10/03/2026 · validée | Autres inscriptions | Validee | []
+---
+# 3. Le critere « Numéro d'inscription ».
+critere: Numéro d'inscription = 2026-13701
+lignes:
+MMA sur l'inscription 2026-13701 - Validée | Inscription 2026-13701 · V · demande du 10/03/2026 · validée | Autres inscriptions | Validee | []
+MMA sur l'inscription 2026-13701 | Inscription 2026-13701 · V · demande du 08/03/2026 · réclamation | Autres inscriptions | EnAttente | []
+MMA sur l'inscription 2026-13701 | Inscription 2026-13701 · V · demande du 06/03/2026 · qualifiée | Autres inscriptions | EnCours | []

@@ -1,0 +1,227 @@
+# Les gestes de EcrivainPartiesInstance (« Parties d'une instance », PROC_PARTIES), joues dans l'ordre par la route POST, sur
+# les lignes de PROC_PARTIES.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). Un refus n'ecrit
+# rien ; chaque refus a son jumeau accepte (meme borne, autre cote).
+
+# 1. Case AJ cochee sans choisir Partielle ni Totale : refuse (PROC_PARTIES.cs:189-200 ; OPE_PARTIE.cs:218-224).
+#    Jumeau accepte : bloc 5, la meme case avec Totale.
+geste: Enregistrer
+ids: 1312101
+valeur: Aide juridictionnelle › Aide juridictionnelle = oui
+resultat: refuse
+message: Lorsque la case Aide juridictionnelle est cochée, il faut choisir entre AJ Partielle et AJ Totale.
+---
+# 2. Partielle ET Totale (AJ totale deja posee, Partielle cochee en plus) : le meme refus (Partielle == Totale).
+geste: Enregistrer
+ids: 1312102
+valeur: Aide juridictionnelle › Partielle = oui
+resultat: refuse
+message: Lorsque la case Aide juridictionnelle est cochée, il faut choisir entre AJ Partielle et AJ Totale.
+---
+# 3. Totale sans la case AJ : RIG v2 la masque (OPE_PARTIE.cs:1540-1550). Jumeau accepte : bloc 5 (la case AJ cochee).
+geste: Enregistrer
+ids: 1312101
+valeur: Aide juridictionnelle › Totale = oui
+resultat: refuse
+message: « Totale » ne se saisit que si la case « Aide juridictionnelle » est cochée (RIG v2 la masque sinon).
+---
+# 4. Un numero d'AJ de 31 caracteres : la colonne en tient 30 (PRT_AIDE_JURIDIC_NUM). Jumeau accepte : bloc 5, 30 caracteres.
+geste: Enregistrer
+ids: 1312102
+valeur: Aide juridictionnelle › Numéro d'AJ = AJ-2026-00000000000000000000001
+resultat: refuse
+message: « Numéro d'AJ » : 30 caractères au plus (31 saisis).
+---
+# 5. Enregistree : AJ totale et son numero (30 caracteres). Comme Partie.Sauve (Partie.cs:1409-1415) : mode de presentation
+#    « A » (il etait vide), numero source pose (36 caracteres), PRT_NOM = designation ; et comme Instance.Sauve
+#    (Instance.cs:3903-3906) : la date de mise a jour Infogreffe de l'instance (2020) est posee. La ligne passe « Enregistrée ».
+geste: Enregistrer
+ids: 1312101
+valeur: Aide juridictionnelle › Aide juridictionnelle = oui
+valeur: Aide juridictionnelle › Totale = oui
+valeur: Aide juridictionnelle › Numéro d'AJ = AJ-2026-0000000000000000000001
+resultat: fait
+message: Partie ALPHA PARTIES SARL (instance 2026Z13201) enregistrée dans la base du greffe : « Aide juridictionnelle », « Totale », « Numéro d'AJ ».
+lignes:
+ALPHA PARTIES SARL | Demandeur · instance 2026Z13201 · AJ totale | Demandeurs | Validee | []
+M. BETA Paul | Demandeur · instance 2026Z13201 · AJ totale · répertorié | Demandeurs | AFaire | []
+EPSILON IP | Demandeur · instance 2026Z13201 | Demandeurs | AFaire | []
+Mme GAMMA Lucie | Défendeur · instance 2026Z13201 · AJ partielle | Défendeurs | AFaire | []
+DELTA INTERVENANT SAS | Intervenant · instance 2026Z13201 | Intervenants | AFaire | []
+OMICRON DISTRIBUTION | Demandeur · instance 2026Y13205 | Demandeurs | AFaire | []
+CHI SA | Demandeur · instance 2026Y13204 | Demandeurs | AFaire | []
+PHI SARL | Défendeur · instance 2026Y13204 | Défendeurs | AFaire | []
+PSI CONSEIL | Demandeur · instance 2026Y13203 | Demandeurs | AFaire | []
+Mme TAU Anne | Défendeur · instance 2026Y13203 | Défendeurs | AFaire | []
+LAMBDA BAIL | Demandeur · instance 2026Y13202 | Demandeurs | AFaire | []
+MU BOULANGERIE | Défendeur · instance 2026Y13202 | Défendeurs | AFaire | []
+ALPHA BANC SARL | Demandeur · instance 2026J12001 | Demandeurs | AFaire | []
+M. BETA Jean | Défendeur · instance 2026J12001 | Défendeurs | AFaire | []
+KAPPA BANC SAS | Défendeur · instance 2026I12007 | Défendeurs | AFaire | []
+fiche: 1312101
+Aide juridictionnelle › Aide juridictionnelle = oui
+Aide juridictionnelle › Totale = oui
+Aide juridictionnelle › Partielle =
+Aide juridictionnelle › Numéro d'AJ = AJ-2026-0000000000000000000001
+Identité › Adresse = 12 rue du Banc · 75001 PARIS
+controle: SELECT COUNT(*) FROM v2.PARTIE WHERE PRT_ID_PRT = 1312101 AND PRT_MODE_PRESENTATION = 'A' AND LEN(PRT_NUMERO_SOURCE) = 36 AND PRT_NOM = PRT_DESIGNATION => 1
+controle: SELECT COUNT(*) FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1312001 AND INSTN_DATE_MAJ_INFOG > '20250101' AND LEN(INSTN_NUMERO_SOURCE) = 36 => 1
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Parties d''une instance' AND IdObjet = '1312101' AND Famille = 'affaire' AND Verbe = 'a modifie' => 1
+---
+# 6. La case AJ decochee : numero vide, Partielle et Totale decochees (SauvegardeAideJuridictionnelle, OPE_PARTIE.cs:226-232).
+#    La partie recoit son numero source (il etait vide). fix-ok: relu le 26/11/2026 -- le premier jet controlait ici le numero
+#    source de 1312102, partie que ce geste ne touche pas : controle sans objet, remplace par celui de la partie ecrite.
+geste: Enregistrer
+ids: 1312103
+valeur: Aide juridictionnelle › Aide juridictionnelle =
+resultat: fait
+message: Partie Mme GAMMA Lucie (instance 2026Z13201) enregistrée dans la base du greffe : « Aide juridictionnelle », « Partielle », « Numéro d'AJ ».
+fiche: 1312103
+Aide juridictionnelle › Aide juridictionnelle =
+Aide juridictionnelle › Partielle =
+Aide juridictionnelle › Numéro d'AJ =
+controle: SELECT COUNT(*) FROM v2.PARTIE WHERE PRT_ID_PRT = 1312103 AND PRT_AIDE_JURIDIC_NUM IS NULL AND PRT_AIDE_JURIDIC_PARTIELLE = 0 AND PRT_AIDE_JURIDIC_TOTALE = 0 => 1
+controle: SELECT LEN(PRT_NUMERO_SOURCE) FROM v2.PARTIE WHERE PRT_ID_PRT = 1312103 => 36
+---
+# 7. Les memes valeurs que la base : rien a enregistrer, rien de trace.
+geste: Enregistrer
+ids: 1312102
+valeur: Aide juridictionnelle › Totale = oui
+resultat: refuse
+message: Aucun champ n'est modifié : la partie M. BETA Paul garde ses valeurs.
+---
+# 8. L'adresse ne se modifie pas depuis cet ecran (fiche reprise rec.Adresse, lue en une ligne : EcrivainPartiesInstance.cs).
+#    Jumeau accepte : bloc 12, le nom de la meme section.
+geste: Enregistrer
+ids: 1312104
+valeur: Identité › Adresse = 1 rue Autre
+resultat: refuse
+message: « Identité › Adresse » ne se modifie pas dans les parties de RIG v2 depuis cet écran.
+---
+# 9. Une partie sans designation est hors de la liste (Instance.cs:1253). Jumeau accepte : bloc 6 (1312103, meme instance).
+geste: Enregistrer
+ids: 1312105
+valeur: Aide juridictionnelle › Aide juridictionnelle =
+resultat: refuse
+message: Partie introuvable dans la base du greffe (1312105).
+---
+# 10. Le nom vide : obligatoire (txtDesignation.MetierObligatoire, OPE_PARTIE.Designer.cs:175). Jumeau accepte : bloc 12.
+geste: Enregistrer
+ids: 1312101
+valeur: Identité › Nom =
+resultat: refuse
+message: « Nom » est obligatoire.
+---
+# 11. Un nom de 513 caracteres : PRT_DESIGNATION en tient 512. Jumeau accepte : bloc 13, 512 caracteres.
+geste: Enregistrer
+ids: 1312101
+valeur: Identité › Nom = YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY
+resultat: refuse
+message: « Nom » : 512 caractères au plus (513 saisis).
+---
+# 12. Le premier demandeur renomme : PRT_DESIGNATION et PRT_NOM (Partie.Sauve, Partie.cs:1415) ; le nom courant de l'instance,
+#     calcule par RIG v2 (« ALPHA PARTIES SARL # GAMMA Lucie »), est recalcule (MAJNomInstance -> RefreshNomInstance,
+#     Instance.cs:880-902) ; une seconde trace pour l'instance.
+geste: Enregistrer
+ids: 1312101
+valeur: Identité › Nom = ALPHA PARTIES SAS
+resultat: fait
+message: Partie ALPHA PARTIES SARL (instance 2026Z13201) enregistrée dans la base du greffe : « Nom ».
+lignes:
+ALPHA PARTIES SAS | Demandeur · instance 2026Z13201 · AJ totale | Demandeurs | Validee | []
+M. BETA Paul | Demandeur · instance 2026Z13201 · AJ totale · répertorié | Demandeurs | AFaire | []
+EPSILON IP | Demandeur · instance 2026Z13201 | Demandeurs | AFaire | []
+Mme GAMMA Lucie | Défendeur · instance 2026Z13201 | Défendeurs | Validee | []
+DELTA INTERVENANT SAS | Intervenant · instance 2026Z13201 | Intervenants | AFaire | []
+OMICRON DISTRIBUTION | Demandeur · instance 2026Y13205 | Demandeurs | AFaire | []
+CHI SA | Demandeur · instance 2026Y13204 | Demandeurs | AFaire | []
+PHI SARL | Défendeur · instance 2026Y13204 | Défendeurs | AFaire | []
+PSI CONSEIL | Demandeur · instance 2026Y13203 | Demandeurs | AFaire | []
+Mme TAU Anne | Défendeur · instance 2026Y13203 | Défendeurs | AFaire | []
+LAMBDA BAIL | Demandeur · instance 2026Y13202 | Demandeurs | AFaire | []
+MU BOULANGERIE | Défendeur · instance 2026Y13202 | Défendeurs | AFaire | []
+ALPHA BANC SARL | Demandeur · instance 2026J12001 | Demandeurs | AFaire | []
+M. BETA Jean | Défendeur · instance 2026J12001 | Défendeurs | AFaire | []
+KAPPA BANC SAS | Défendeur · instance 2026I12007 | Défendeurs | AFaire | []
+fiche: 1312101
+Identité › Nom = ALPHA PARTIES SAS
+controle: SELECT COUNT(*) FROM v2.PARTIE WHERE PRT_ID_PRT = 1312101 AND PRT_DESIGNATION = 'ALPHA PARTIES SAS' AND PRT_NOM = 'ALPHA PARTIES SAS' => 1
+controle: SELECT INSTN_NOM_COURANT FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1312001 => ALPHA PARTIES SAS # GAMMA Lucie
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Parties d''une instance' AND IdObjet = '1312001' AND Verbe = 'a modifie' => 1
+---
+# 13. Un nom de 512 caracteres (la borne) : accepte ; le nom courant est tronque a 250 caracteres, le demandeur cede la place
+#     au defendeur (_GetNomInstance, Instance.cs:941-959 : 236 + « # » + 11).
+geste: Enregistrer
+ids: 1312101
+valeur: Identité › Nom = ALPHA XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+resultat: fait
+message: Partie ALPHA PARTIES SAS (instance 2026Z13201) enregistrée dans la base du greffe : « Nom ».
+controle: SELECT LEN(PRT_DESIGNATION) FROM v2.PARTIE WHERE PRT_ID_PRT = 1312101 => 512
+controle: SELECT INSTN_NOM_COURANT FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1312001 => ALPHA XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX # GAMMA Lucie
+---
+# 14. Une partie qui n'est pas la premiere de sa qualite renommee : le nom courant de l'instance ne change pas (RefreshNomInstance,
+#     Instance.cs:894-896), aucune trace pour l'instance.
+geste: Enregistrer
+ids: 1312102
+valeur: Identité › Nom = BETA Paulin
+resultat: fait
+message: Partie M. BETA Paul (instance 2026Z13201) enregistrée dans la base du greffe : « Nom ».
+fiche: 1312102
+Identité › Nom = BETA Paulin
+controle: SELECT INSTN_NOM_COURANT FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1312001 => ALPHA XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX # GAMMA Lucie
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Parties d''une instance' AND IdObjet = '1312001' => 2
+---
+# 15. Nom d'instance RETOUCHE, sans « # » (« Societe LAMBDA BAIL » au lieu du calcul « LAMBDA BAIL # MU BOULANGERIE ») : le
+#     demandeur renomme, seul son ancien nom est remplace dans le morceau (RefreshNomInstance, Instance.cs:906-908), puis
+#     _GetNomInstance (Instance.cs:920) recolle le defendeur courant : « Societe » est garde ET le defendeur revient. Jumeaux :
+#     bloc 12 (nom calcule, ecrase) et bloc 18 (plus d'un « # », garde tel quel).
+geste: Enregistrer
+ids: 1312111
+valeur: Identité › Nom = LAMBDA BAIL SAS
+resultat: fait
+message: Partie LAMBDA BAIL (instance 2026Y13202) enregistrée dans la base du greffe : « Nom ».
+fiche: 1312111
+Identité › Nom = LAMBDA BAIL SAS
+controle: SELECT INSTN_NOM_COURANT FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1312002 => Société LAMBDA BAIL SAS # MU BOULANGERIE
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Parties d''une instance' AND IdObjet = '1312002' AND Verbe = 'a modifie' => 1
+---
+# 16. Nom RETOUCHE avec un « # » (« Ste PSI CONSEIL # TAU Anne et autres ») : le demandeur renomme dans le premier morceau,
+#     le second garde « et autres » (Instance.cs:909-916).
+geste: Enregistrer
+ids: 1312121
+valeur: Identité › Nom = PSI CONSEIL GROUPE
+resultat: fait
+message: Partie PSI CONSEIL (instance 2026Y13203) enregistrée dans la base du greffe : « Nom ».
+controle: SELECT INSTN_NOM_COURANT FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1312003 => Sté PSI CONSEIL GROUPE # TAU Anne et autres
+---
+# 17. ... puis le defendeur de la meme instance renomme : remplace dans le second morceau (Instance.cs:914-916), « Ste » et
+#     « et autres » gardes. Deux traces pour l'instance (blocs 16 et 17).
+geste: Enregistrer
+ids: 1312122
+valeur: Identité › Nom = TAU Annie
+resultat: fait
+message: Partie Mme TAU Anne (instance 2026Y13203) enregistrée dans la base du greffe : « Nom ».
+fiche: 1312122
+Identité › Nom = TAU Annie
+controle: SELECT INSTN_NOM_COURANT FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1312003 => Sté PSI CONSEIL GROUPE # TAU Annie et autres
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Parties d''une instance' AND IdObjet = '1312003' AND Verbe = 'a modifie' => 2
+---
+# 18. Nom RETOUCHE avec deux « # » (« CHI SA # PHI SARL # RHO », 1 instance sur RIG_DEV) : RIG v2 rend le nom tel quel
+#     (Instance.cs:917-918). La partie est enregistree, l'instance n'a aucune trace.
+geste: Enregistrer
+ids: 1312131
+valeur: Identité › Nom = CHI SAS
+resultat: fait
+message: Partie CHI SA (instance 2026Y13204) enregistrée dans la base du greffe : « Nom ».
+controle: SELECT COUNT(*) FROM v2.PARTIE WHERE PRT_ID_PRT = 1312131 AND PRT_DESIGNATION = 'CHI SAS' => 1
+controle: SELECT INSTN_NOM_COURANT FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1312004 => CHI SA # PHI SARL # RHO
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Parties d''une instance' AND IdObjet = '1312004' => 0
+---
+# 19. Nom RACCOURCI a la main (« OMICRON » pour « OMICRON DISTRIBUTION ») : l'ancien nom est coupe a la longueur du morceau
+#     (oldDesignationDemandeur.Left(7), Instance.cs:908 ; Left, AmiString.cs:1399-1403) avant d'etre cherche, donc trouve et
+#     remplace par le nom entier. Sans cette coupe, « OMICRON DISTRIBUTION » ne serait pas trouve et le nom resterait « OMICRON ».
+geste: Enregistrer
+ids: 1312141
+valeur: Identité › Nom = OMICRON DISTRIBUTION SA
+resultat: fait
+message: Partie OMICRON DISTRIBUTION (instance 2026Y13205) enregistrée dans la base du greffe : « Nom ».
+controle: SELECT INSTN_NOM_COURANT FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1312005 => OMICRON DISTRIBUTION SA

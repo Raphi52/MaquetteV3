@@ -1,0 +1,21 @@
+# « Parties d'une instance » (PROC_PARTIES) : les parties montrees par Instance.ListeParties (une designation, une qualite D, F
+# ou I : Instance.cs:1232-1282), par numero de role decroissant, puis demandeurs, defendeurs, intervenants, puis numero d'ordre.
+# Ecartees : 1312105 (sans designation) -- jumeau retenu 1312103 ; 1312107 (qualite vide) -- jumeau retenu 1312101.
+# 1312106 « DOIP » est un demandeur (premiere lettre). Les trois dernieres lignes sont les parties de PROC_MJUD.sql : PROC_PARTIES
+# ne filtre pas le type de l'instance. Etat « À compléter » (AFaire) tant que cet ecran ne les a pas enregistrees.
+# Les roles 2026Y1320x sont les instances au nom retouche de PROC_PARTIES.sql (gestes 15 a 19).
+ALPHA PARTIES SARL | Demandeur · instance 2026Z13201 | Demandeurs | AFaire | []
+M. BETA Paul | Demandeur · instance 2026Z13201 · AJ totale · répertorié | Demandeurs | AFaire | []
+EPSILON IP | Demandeur · instance 2026Z13201 | Demandeurs | AFaire | []
+Mme GAMMA Lucie | Défendeur · instance 2026Z13201 · AJ partielle | Défendeurs | AFaire | []
+DELTA INTERVENANT SAS | Intervenant · instance 2026Z13201 | Intervenants | AFaire | []
+OMICRON DISTRIBUTION | Demandeur · instance 2026Y13205 | Demandeurs | AFaire | []
+CHI SA | Demandeur · instance 2026Y13204 | Demandeurs | AFaire | []
+PHI SARL | Défendeur · instance 2026Y13204 | Défendeurs | AFaire | []
+PSI CONSEIL | Demandeur · instance 2026Y13203 | Demandeurs | AFaire | []
+Mme TAU Anne | Défendeur · instance 2026Y13203 | Défendeurs | AFaire | []
+LAMBDA BAIL | Demandeur · instance 2026Y13202 | Demandeurs | AFaire | []
+MU BOULANGERIE | Défendeur · instance 2026Y13202 | Défendeurs | AFaire | []
+ALPHA BANC SARL | Demandeur · instance 2026J12001 | Demandeurs | AFaire | []
+M. BETA Jean | Défendeur · instance 2026J12001 | Défendeurs | AFaire | []
+KAPPA BANC SAS | Défendeur · instance 2026I12007 | Défendeurs | AFaire | []

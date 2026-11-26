@@ -1,0 +1,11 @@
+# « Mots directeurs » (PROC_MDJUD) : les affaires des deux variantes (MDJUD et MDJUDPR, ETP_RECHERCHE_AFFAIRE.cs:26-31) qui ont
+# leur enregistrement de mots directeurs, par famille (instances, PC, preventions) puis numero decroissant.
+# Ecartees : 1311003 (sans enregistrement) et 1311004 (type JRXX, hors des deux variantes) -- jumeau retenu : 1311001.
+# Etats : « Enregistrés » (Validee) chaine non vide ; « À compléter » (AFaire) chaine vide (1311002).
+# MPC PRV GAMMA : la prevention 1316201 de PROC_MPC.sql, dont la date d'ouverture met a jour les mots directeurs.
+OMEGA MD INSTANCE | Instance · rôle 2026P13101 · 2 mots directeurs | Instances | Validee | []
+SIGMA MD INSTANCE | Instance · rôle 2026M13102 · chaîne vide | Instances | AFaire | []
+PC MD BETA | PC 2026P13112 · 1 mot directeur | Procédures collectives | Validee | []
+PC MD ALPHA | PC 2026P13111 · 2 mots directeurs | Procédures collectives | Validee | []
+MPC PRV GAMMA | Prévention 2027V16201 · 2 mots directeurs | Préventions | Validee | []
+PRV MD GAMMA | Prévention 2026V13121 · 2 mots directeurs | Préventions | Validee | []

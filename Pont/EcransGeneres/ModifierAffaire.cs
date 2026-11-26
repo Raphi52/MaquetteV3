@@ -18,6 +18,10 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 // vit dans wwwroot/rig-ecrans-generes.css (lot 9), que tests/EcransGeneresCheck lit aussi.
 //
 // Les lignes sont une demonstration ANONYME (noms fictifs).
+//
+// fix-ok: lot 3 du plan « RIG v3 100 % fonctionnel » (26/11/2026), cinq descripteurs alignes sur le code V2 lu, chacun a sa
+// ligne citee la ou il change : un champ que la fiche V2 porte et que le descripteur oubliait (numero d'AJ, pays de
+// naissance, case Actif), un type mal pose (dates, zones), des groupes sans source (Repertoire).
 public sealed class DomaineModifierAffaire : IDomaineEcrans
 {
     public IEnumerable<DescripteurEcran> Ecrans() =>
@@ -85,8 +89,12 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             [
                 Marche("Entité judiciaire", "Recherche de la PC, ou de l'instance qui y est liée. Verrouillée par un autre utilisateur, l'entité reste en lecture seule.", true,
                     "Numéro de PC", "Instance liée"),
+                // La date d'ouverture (ultDateOuverture : OPE_PROCEDURE_COLLECTIVE.cs:196, OPE_PREVENTION.cs:86) et celle de
+                // cessation des paiements (ultDateCessationPaiement, OPE_PROCEDURE_COLLECTIVE.cs:202) ont leur champ ; lues et
+                // enregistrees sans facture (lot 3) : LecteurProceduresCollectives.cs, EcrivainProceduresCollectives.cs.
                 Marche("Procédure", "Données de la PC, ou de la prévention selon le mode d'entrée. Les dates clés se renseignent ici.", true,
-                    Champ.Tableau("Dates clés"), Champ.Liste("Mode (PC ou prévention)", "PC", "Prévention")),
+                    Champ.Tableau("Dates clés"), Champ.Date("Date d'ouverture"), Champ.Date("Date de cessation des paiements"),
+                    Champ.Liste("Mode (PC ou prévention)", "PC", "Prévention")),
                 Marche("Organes", "Organes de la PC ou de la prévention, et les organes en fin de mission.", false,
                     Champ.Tableau("Organes de la procédure"), Champ.Tableau("Fin de mission")),
                 Marche("Parties et appels", "Parties de l'instance liée, appels d'affaire, décision judiciaire, chef de demande et réponse du défendeur.", false,
@@ -172,8 +180,11 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
                     "Origine de l'information", "Nature de la diligence", "Motif de la diligence"),
                 Marche("État", "État courant de la diligence et de sa relance.", true,
                     "État de la diligence", "État de la relance"),
+                // Lue et enregistree dans la base (plan « RIG v3 100 % fonctionnel », lot 3) : Serveur/Socle/EcransGeneres/
+                // LecteurDiligencesRcs.cs et EcrivainDiligencesRcs.cs. Date et zone : les controles de OPE_DILIGENCE_RCS
+                // (ultDateRegularisation, ultValeurAttendue texte libre, OPE_DILIGENCE_RCS.Designer.cs:134, :166).
                 Marche("Régularisation", "Date prévue ou effective de régularisation, et valeur attendue : montant, document, etc.", false,
-                    "Date de régularisation", "Valeur attendue"),
+                    Champ.Date("Date de régularisation"), Champ.Zone("Valeur attendue")),
                 Marche("Paramètres", "Visible seulement si la nature de la diligence a ses propres paramètres.", false,
                     Champ.Tableau("Paramètres de la nature")),
                 Marche("Relances", "Chaque diligence peut avoir plusieurs relances, gérées une à une.", false,
@@ -208,8 +219,10 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             [
                 Marche("Affaire", "Recherche de l'instance, de la PC ou de la prévention. Le numéro et le nom courant s'affichent en lecture.", true,
                     "Numéro de l'affaire", "Nom courant"),
+                // La chaine est une zone de plusieurs lignes (_ultTextMotsDirecteurs, Ult_TextMultiLine, OPE_MD.Designer.cs:29) ;
+                // lue et enregistree dans la base (lot 3) : LecteurMotsDirecteurs.cs, EcrivainMotsDirecteurs.cs.
                 Marche("Mots directeurs", "Une seule chaîne de mots, séparés par des espaces. Chaque mot commence par un code de deux lettres propre à la famille, et compte au moins trois caractères.", true,
-                    "Mots directeurs"),
+                    Champ.Zone("Mots directeurs")),
                 Marche("Contrôle", "Un mot nouveau au préfixe inconnu bloque l'enregistrement. Un mot déjà enregistré au préfixe inconnu ne donne qu'un avertissement.", true,
                     Champ.Tableau("Préfixes reconnus")),
                 Marche("Enregistrement", "Espaces réduits ; chaque mot purement alphabétique de plus de deux lettres : deux premières lettres en majuscules, le reste en minuscules.", true,
@@ -238,24 +251,31 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Valider = "Valider",
             Rang = 2,
             Etats = EtatsEcran.Trois("À corriger", "En cours", "Enregistré"),
-            Groupes = ["Mandataires", "Avocats", "Représentants"],
+            // Forme revue au lot 3 (note du chef) : elle reste Fiche -- la V2 modifie UN repertorie dans sa fiche sous la liste
+            // (OPE_EDITION_MODIF_REPER, proc_modif_reper.md:238), et « Corriger une affaire judiciaire » est une liste commune
+            // de Fiches. Groupes alignes sur la V2 : la liste ne distingue que les actifs (case « actifs uniquement »,
+            // OPE_RECHERCHE_MODIF_REPER.cs:278-281) ; « Mandataires / Avocats / Représentants » n'avait pas de source.
+            // Lu et enregistre dans la base : LecteurRepertoire.cs, EcrivainRepertoire.cs.
+            Groupes = ["Actifs", "Inactifs"],
             Sections =
             [
-                Marche("Fiche", "Abrégé et désignation obligatoires ; l'abrégé est unique dans le greffe. Une adresse mail mal formée n'est qu'un avertissement. Suppression bloquée si l'abrégé sert à un code affaire.", true,
-                    "Abrégé", "Désignation", "Adresse mail", "Civilité"),
+                // Obligatoires et controle cites par le « Detail OPE » : abrege et civilite (MetierObligatoire), abrege unique
+                // (DoVerifier :66-79) ; pas de controle de la designation ni du format de l'adresse mail dans le code.
+                Marche("Fiche", "Abrégé et civilité obligatoires ; l'abrégé est unique dans le greffe. Un abrégé changé est reporté sur les parties liées et sur les codes affaire qui le portent.", true,
+                    "Abrégé", "Désignation", "Adresse mail", "Civilité", Champ.Case("Actif")),
                 Marche("Civilité des parties", "Applique la civilité du répertorié aux parties cochées.", false,
                     Champ.Tableau("Parties liées"), "Civilité"),
             ],
             Lignes =
             [
-                Ligne("MAND-ALPHA", "Alpha Mandats SELARL · actif", "Mandataires", "AFaire"),
-                Ligne("MAND-BETA", "Bêta Administrateurs SARL · actif", "Mandataires", "EnCours"),
-                Ligne("AVOC-GAMMA", "Cabinet Gamma Avocats · actif", "Avocats", "EnCours", 0),
-                Ligne("AVOC-DELTA", "Cabinet Delta Avocats · inactif", "Avocats", "AFaire"),
-                Ligne("REPR-EPSILON", "Représentant Epsilon · actif", "Représentants", "Validee", 0, 1),
-                Ligne("REPR-ZETA", "Représentant Zêta · actif", "Représentants", "Validee", 0),
-                Ligne("MAND-ETA", "Mandataire Êta · actif", "Mandataires", "AFaire"),
-                Ligne("AVOC-THETA", "Cabinet Thêta Avocats · actif", "Avocats", "EnCours", 0),
+                Ligne("MAND-ALPHA", "Alpha Mandats SELARL · actif", "Actifs", "AFaire"),
+                Ligne("MAND-BETA", "Bêta Administrateurs SARL · actif", "Actifs", "EnCours"),
+                Ligne("AVOC-GAMMA", "Cabinet Gamma Avocats · actif", "Actifs", "EnCours", 0),
+                Ligne("AVOC-DELTA", "Cabinet Delta Avocats · inactif", "Inactifs", "AFaire"),
+                Ligne("REPR-EPSILON", "Représentant Epsilon · actif", "Actifs", "Validee", 0, 1),
+                Ligne("REPR-ZETA", "Représentant Zêta · actif", "Actifs", "Validee", 0),
+                Ligne("MAND-ETA", "Mandataire Êta · inactif", "Inactifs", "AFaire"),
+                Ligne("AVOC-THETA", "Cabinet Thêta Avocats · actif", "Actifs", "EnCours", 0),
             ],
         },
 
@@ -276,8 +296,11 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
                     "Nom", "Adresse"),
                 Marche("Mandataire et répertorié", "Mandataire, et répertorié qui le désigne si la partie figure au répertoire.", false,
                     "Mandataire", Champ.Case("Répertorié")),
+                // Le numero d'AJ (ultTextNumeroAJ -> PRT_AIDE_JURIDIC_NUM, OPE_PARTIE.cs:390), affiche avec les deux cases quand la
+                // case AJ est cochee (:1540-1550). Lu et enregistre dans la base (lot 3) : LecteurPartiesInstance.cs,
+                // EcrivainPartiesInstance.cs.
                 Marche("Aide juridictionnelle", "Case AJ cochée : il faut choisir Partielle ou Totale, sinon l'enregistrement est refusé.", false,
-                    Champ.Case("Aide juridictionnelle"), Champ.Case("Partielle"), Champ.Case("Totale")),
+                    Champ.Case("Aide juridictionnelle"), Champ.Case("Partielle"), Champ.Case("Totale"), Champ.Texte("Numéro d'AJ")),
             ],
             Lignes =
             [
@@ -306,8 +329,12 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             Groupes = ["Déclaration standard", "Placement collectif"],
             Sections =
             [
-                Marche("Identité", "Patronyme, prénoms de l'état civil et date de naissance sont obligatoires.", true,
-                    "Civilité", "Patronyme", "Prénoms (état civil)", "Nom d'usage", "Date de naissance", "Département de naissance"),
+                // Le pays de naissance (ultPaysNaissance, obligatoire, OPE_IDENTITE.Designer.cs:144) : les controles du departement
+                // le lisent (OPE_IDENTITE.cs:71-93). Lu et enregistre dans la base (lot 3) : LecteurBeneficiairesDossier.cs,
+                // EcrivainBeneficiairesDossier.cs.
+                Marche("Identité", "Patronyme, prénoms de l'état civil, date et pays de naissance sont obligatoires ; né en France, le département l'est aussi, et seulement dans ce cas.", true,
+                    "Civilité", "Patronyme", "Prénoms (état civil)", "Nom d'usage", Champ.Date("Date de naissance"), "Département de naissance",
+                    "Pays de naissance"),
                 Marche("Modalités de contrôle", "Les champs changent selon le type de déclaration du dossier : le placement collectif en ajoute sept.", true,
                     Champ.Tableau("Modalités selon la déclaration")),
                 Marche("Acte déposé", "Visualise l'acte déposé, et les données brutes renvoyées par le service de déclaration.", false,

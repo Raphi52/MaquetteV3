@@ -1,0 +1,7 @@
+# « Répertoire » (PROC_MODIF_REPER) : tous les repertories (Repertorie.GetAllRepertorie, OPE_RECHERCHE_MODIF_REPER.cs:180), par
+# abrege (:181). Groupes : « Actifs » / « Inactifs » (PRTRP_ACTIF, case « actifs uniquement », :278-281). Etat « À corriger »
+# (AFaire) tant que cet ecran ne les a pas enregistres.
+REP-ALPHA | Cabinet Alpha · alpha@banc.fr · actif | Actifs | AFaire | []
+REP-BETA | Beta Conseil · inactif | Inactifs | AFaire | []
+REP-DELTA | Delta Assiste · actif | Actifs | AFaire | []
+REP-GAMMA | Gamma · actif | Actifs | AFaire | []

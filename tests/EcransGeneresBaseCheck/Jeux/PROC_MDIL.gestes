@@ -1,0 +1,78 @@
+# Les gestes de EcrivainDiligencesRcs (« Diligences RCS », PROC_MDIL), joues dans l'ordre par la route POST, sur les lignes de
+# PROC_MDIL.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). Un refus n'ecrit rien ; chaque
+# refus a son jumeau accepte (meme borne, autre cote).
+
+# 1. La nature videe : obligatoire (ultComboNatureDiligence.MetierObligatoire, OPE_DILIGENCE_RCS.Designer.cs:96).
+#    Jumeau accepte : bloc 4, une nature saisie.
+geste: Enregistrer
+ids: 1313101
+valeur: Diligence › Nature de la diligence =
+resultat: refuse
+message: « Nature de la diligence » est obligatoire.
+---
+# 2. Un motif de 6 caracteres : la colonne en tient 5 (DLGRC_MOTIF_DILIGENCE). Jumeau accepte : bloc 4, 5 caracteres.
+geste: Enregistrer
+ids: 1313101
+valeur: Diligence › Motif de la diligence = ABCDEF
+resultat: refuse
+message: « Motif de la diligence » : 5 caractères au plus (6 saisis).
+---
+# 3. Une date de regularisation qui n'existe pas.
+geste: Enregistrer
+ids: 1313101
+valeur: Régularisation › Date de régularisation = 2026-02-31
+resultat: refuse
+message: « Date de régularisation » : date illisible (2026-02-31).
+---
+# 4. Enregistree : nature, motif (5 caracteres), date et valeur attendue. Les listes acceptent une valeur hors referentiel
+#    (MetierValeurInexistanteErreur = false) : « ABCDE » n'est pas un motif de MOTIF_DILIGENCE.
+geste: Enregistrer
+ids: 1313101
+valeur: Diligence › Nature de la diligence = RIMBS
+valeur: Diligence › Motif de la diligence = ABCDE
+valeur: Régularisation › Date de régularisation = 2026-03-31
+valeur: Régularisation › Valeur attendue = Deux extraits Kbis
+resultat: fait
+message: Diligence RIMBS du dossier 2027 B 13001 enregistrée dans la base du greffe : « Nature de la diligence », « Motif de la diligence », « Date de régularisation », « Valeur attendue ».
+fiche: 1313101
+Diligence › Nature de la diligence = RIMBS
+Diligence › Motif de la diligence = ABCDE
+Diligence › Origine de l'information = GRF
+Régularisation › Date de régularisation = 2026-03-31
+Régularisation › Valeur attendue = Deux extraits Kbis
+controle: SELECT COUNT(*) FROM v2.DILIGENCE_RCS WHERE DLGRC_ID_DLGRC = 1313101 AND DLGRC_NATURE_DILIGENCE = 'RIMBS' AND DLGRC_DATE_REGULARISATION = '20260331' => 1
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Diligences RCS' AND IdObjet = '1313101' AND Famille = 'dossier' AND Verbe = 'a modifie' => 1
+---
+# 5. Les etats et l'origine, puis la date videe (une date n'est pas obligatoire).
+geste: Enregistrer
+ids: 1313102
+valeur: État › État de la diligence = 9
+valeur: Diligence › Origine de l'information = TRB
+valeur: Régularisation › Date de régularisation =
+resultat: fait
+message: Diligence JMOAP du dossier 2027 B 13002 enregistrée dans la base du greffe : « Origine de l'information », « État de la diligence », « Date de régularisation ».
+fiche: 1313102
+État › État de la diligence = 9
+Régularisation › Date de régularisation =
+controle: SELECT COUNT(*) FROM v2.DILIGENCE_RCS WHERE DLGRC_ID_DLGRC = 1313102 AND DLGRC_DATE_REGULARISATION IS NULL AND DLGRC_ORIGINE_INFO = 'TRB' => 1
+---
+# 6. Les relances sont une sous-liste en lecture.
+geste: Enregistrer
+ids: 1313101
+valeur: Relances › Relances de la diligence = 3
+resultat: refuse
+message: « Relances › Relances de la diligence » ne se modifie pas dans une diligence de RIG v2.
+---
+# 7. Les memes valeurs que la base : rien a enregistrer.
+geste: Enregistrer
+ids: 1313101
+valeur: Diligence › Nature de la diligence = RIMBS
+resultat: refuse
+message: Aucun champ n'est modifié : la diligence RIMBS du dossier 2027 B 13001 garde ses valeurs.
+---
+# 8. Une diligence sans dossier est hors de l'ecran. Jumeau accepte : bloc 4 (1313101, son action a un dossier).
+geste: Enregistrer
+ids: 1313103
+valeur: Diligence › Nature de la diligence = RIMBS
+resultat: refuse
+message: Diligence introuvable dans la base du greffe (1313103).

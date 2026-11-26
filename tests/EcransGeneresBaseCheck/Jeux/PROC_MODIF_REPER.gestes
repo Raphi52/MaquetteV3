@@ -1,0 +1,91 @@
+# Les gestes de EcrivainRepertoire (« Répertoire », PROC_MODIF_REPER), joues dans l'ordre par la route POST, sur les lignes de
+# PROC_MODIF_REPER.sql (et la partie 1312102 de PROC_PARTIES.sql, liee a 1315001). Format : en tete de
+# tests/EcransGeneresBaseCheck/Program.cs (section 3c). Un refus n'ecrit rien ; chaque refus a son jumeau accepte.
+
+# 1. L'abrege vide : obligatoire (TextAbrege.MetierObligatoire, OPE_EDITION_MODIF_REPER.Designer.cs:304). Jumeau accepte : bloc 4.
+geste: Enregistrer
+ids: 1315001
+valeur: Fiche › Abrégé =
+resultat: refuse
+message: « Abrégé » est obligatoire.
+---
+# 2. Un abrege de 17 caracteres : la colonne en tient 16 (PRTRP_ABREGE). Jumeau accepte : bloc 4, 9 caracteres.
+geste: Enregistrer
+ids: 1315001
+valeur: Fiche › Abrégé = REP-ALPHA-1234567
+resultat: refuse
+message: « Abrégé » : 16 caractères au plus (17 saisis).
+---
+# 3. L'abrege d'un AUTRE repertorie : refuse (DoVerifier, OPE_EDITION_MODIF_REPER.cs:67-77). Jumeau accepte : bloc 4, un abrege libre.
+geste: Enregistrer
+ids: 1315003
+valeur: Fiche › Abrégé = REP-BETA
+resultat: refuse
+message: Un répertorié avec cet abrégé existe déjà. L'abrégé doit être unique.
+---
+# 4. Enregistre : abrege et adresse mail. Comme Valider (:208-280) : represente par avocat (RA) -> le client est efface, et le
+#    texte d'assistance que RA ne demande pas ; l'abrege est reporte sur la partie liee (Partie.UpdatePartiesRepertorie) et sur
+#    le code affaire qui le portait (CODE_AFFAIRE.UpdateAbregeDemandeur).
+geste: Enregistrer
+ids: 1315001
+valeur: Fiche › Abrégé = REP-OMEGA
+valeur: Fiche › Adresse mail = omega@banc.fr
+resultat: fait
+message: Répertorié REP-OMEGA enregistré dans la base du greffe : « Abrégé », « Adresse mail ».
+lignes:
+REP-BETA | Beta Conseil · inactif | Inactifs | AFaire | []
+REP-DELTA | Delta Assiste · actif | Actifs | AFaire | []
+REP-GAMMA | Gamma · actif | Actifs | AFaire | []
+REP-OMEGA | Cabinet Alpha · omega@banc.fr · actif | Actifs | Validee | []
+fiche: 1315001
+Fiche › Abrégé = REP-OMEGA
+Fiche › Adresse mail = omega@banc.fr
+Civilité des parties › Civilité = Me
+controle: SELECT PRT_ABREGE FROM v2.PARTIE WHERE PRT_ID_PRT = 1312102 => REP-OMEGA
+controle: SELECT R_CODEAFFAIR_ABREGE_DEMANDEUR FROM v2.CODE_AFFAIRE WHERE R_CODEAFFAIR_VALEUR = 'RP13' => REP-OMEGA
+controle: SELECT COUNT(*) FROM v2.REPERTORIE WHERE PRTRP_ID_PRTRP = 1315001 AND PRTRP_ID_CLIEN IS NULL AND PRTRP_TEXTE_ASSISTANCE IS NULL => 1
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Repertoire' AND IdObjet = '1315001' AND Famille = 'reglage' AND Verbe = 'a modifie' => 1
+---
+# 5. Civilite et activite : sans mode de presentation, client et texte d'assistance sont effaces (:220-226). Desactive, la
+#    ligne passe dans « Inactifs ».
+geste: Enregistrer
+ids: 1315003
+valeur: Fiche › Civilité = M.
+valeur: Fiche › Actif =
+resultat: fait
+message: Répertorié REP-GAMMA enregistré dans la base du greffe : « Civilité », « Actif ».
+lignes:
+REP-BETA | Beta Conseil · inactif | Inactifs | AFaire | []
+REP-DELTA | Delta Assiste · actif | Actifs | AFaire | []
+REP-GAMMA | Gamma · inactif | Inactifs | Validee | []
+REP-OMEGA | Cabinet Alpha · omega@banc.fr · actif | Actifs | Validee | []
+controle: SELECT COUNT(*) FROM v2.REPERTORIE WHERE PRTRP_ID_PRTRP = 1315003 AND PRTRP_ID_CLIEN IS NULL AND PRTRP_TEXTE_ASSISTANCE IS NULL AND PRTRP_ACTIF = 0 => 1
+---
+# 6. Le jumeau des blocs 4 et 5 : en personne et assiste (EA), le client et le texte d'assistance restent.
+geste: Enregistrer
+ids: 1315004
+valeur: Fiche › Désignation = Delta Assiste SARL
+resultat: fait
+message: Répertorié REP-DELTA enregistré dans la base du greffe : « Désignation ».
+controle: SELECT COUNT(*) FROM v2.REPERTORIE WHERE PRTRP_ID_PRTRP = 1315004 AND PRTRP_ID_CLIEN = 55 AND PRTRP_TEXTE_ASSISTANCE IS NOT NULL => 1
+---
+# 7. Les memes valeurs que la base : rien a enregistrer.
+geste: Enregistrer
+ids: 1315002
+valeur: Fiche › Désignation = Beta Conseil
+resultat: refuse
+message: Aucun champ n'est modifié : le répertorié REP-BETA garde ses valeurs.
+---
+# 8. La civilite appliquee aux parties cochees (OPE_EDITION_PARTIES) ne passe pas par la fiche.
+geste: Enregistrer
+ids: 1315002
+valeur: Civilité des parties › Civilité = Mme
+resultat: refuse
+message: « Civilité des parties › Civilité » ne se modifie pas dans la fiche d'un répertorié de RIG v2.
+---
+# 9. Un repertorie qui n'existe pas.
+geste: Enregistrer
+ids: 1315999
+valeur: Fiche › Désignation = X
+resultat: refuse
+message: Répertorié introuvable dans la base du greffe (1315999).

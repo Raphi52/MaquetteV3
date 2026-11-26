@@ -1,0 +1,77 @@
+# Les gestes de EcrivainBeneficiairesDossier (« Bénéficiaires d'un dossier », PROC_BE), joues dans l'ordre par la route POST,
+# sur les lignes de PROC_BE.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). Un refus n'ecrit
+# rien ; chaque refus a son jumeau accepte (meme borne, autre cote).
+
+# 1. Le patronyme vide : obligatoire (ultPatronyme.MetierObligatoire, OPE_IDENTITE.Designer.cs:89). Jumeau accepte : bloc 4.
+geste: Enregistrer
+ids: 1314101
+valeur: Identité › Patronyme =
+resultat: refuse
+message: « Patronyme » est obligatoire.
+---
+# 2. Ne en France (le pays vide s'ouvre sur « FRA ») sans departement : refuse (OPE_IDENTITE.cs:72-74).
+#    Jumeau accepte : bloc 4, le departement saisi.
+geste: Enregistrer
+ids: 1314102
+valeur: Identité › Nom d'usage = MARTIN-DURAND
+resultat: refuse
+message: La saisie du département est obligatoire quand le pays de naissance est France.
+---
+# 3. Ne en Italie avec un departement : refuse (OPE_IDENTITE.cs:88-93). Jumeau accepte : bloc 5, le pays passe en France.
+geste: Enregistrer
+ids: 1314103
+valeur: Identité › Département de naissance = 75
+resultat: refuse
+message: Le département ne doit pas être renseigné quand le pays de naissance n'est pas France.
+---
+# 4. Enregistre : nom d'usage et departement. Le pays, vide dans la base et affiche « FRA », s'enregistre ainsi
+#    (OPE_IDENTITE.cs:62-64). La ligne passe « Déclaré ».
+geste: Enregistrer
+ids: 1314102
+valeur: Identité › Nom d'usage = MARTIN-DURAND
+valeur: Identité › Département de naissance = 69
+resultat: fait
+message: Bénéficiaire MARTIN Anne du dossier 2027 B 14001 enregistré dans la base du greffe : « Nom d'usage », « Département de naissance ».
+lignes:
+ROSSI Luca (15/06/1990) | Dossier RCS 2027 B 14002 · BE PLACEMENT SICAV | Placement collectif | AFaire | []
+DUPONT Jean Marc (01/02/1980) | Dossier RCS 2027 B 14001 · BE ALPHA SAS | Déclaration standard | AFaire | []
+MARTIN Anne (03/11/1975) | Dossier RCS 2027 B 14001 · BE ALPHA SAS | Déclaration standard | Validee | []
+fiche: 1314102
+Identité › Nom d'usage = MARTIN-DURAND
+Identité › Département de naissance = 69
+Identité › Pays de naissance = FRA
+controle: SELECT BENEF_PAYS FROM v2.BENEFICIAIRE_EFFECTIF WHERE BENEF_ID_BENEF = 1314102 => FRA
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Beneficiaires d''un dossier' AND IdObjet = '1314102' AND Famille = 'dossier' AND Verbe = 'a modifie' => 1
+---
+# 5. Le jumeau du bloc 3 : le pays passe en France avec le departement ; la date de naissance aussi.
+geste: Enregistrer
+ids: 1314103
+valeur: Identité › Pays de naissance = FRA
+valeur: Identité › Département de naissance = 06
+valeur: Identité › Date de naissance = 1990-06-16
+resultat: fait
+message: Bénéficiaire ROSSI Luca du dossier 2027 B 14002 enregistré dans la base du greffe : « Date de naissance », « Département de naissance », « Pays de naissance ».
+fiche: 1314103
+Identité › Date de naissance = 1990-06-16
+Identité › Pays de naissance = FRA
+---
+# 6. Une date de naissance illisible.
+geste: Enregistrer
+ids: 1314101
+valeur: Identité › Date de naissance = 1980-02-30
+resultat: refuse
+message: « Date de naissance » : date illisible (1980-02-30).
+---
+# 7. Les memes valeurs que la base : rien a enregistrer.
+geste: Enregistrer
+ids: 1314101
+valeur: Identité › Département de naissance = 75
+resultat: refuse
+message: Aucun champ n'est modifié : le bénéficiaire DUPONT Jean Marc garde ses valeurs.
+---
+# 8. Un beneficiaire partant est hors de l'ecran. Jumeau accepte : bloc 4 (1314102, du meme dossier).
+geste: Enregistrer
+ids: 1314104
+valeur: Identité › Nom d'usage = X
+resultat: refuse
+message: Bénéficiaire introuvable dans la base du greffe (1314104).

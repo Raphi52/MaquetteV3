@@ -1,0 +1,7 @@
+# « Bénéficiaires d'un dossier » (PROC_BE) : les beneficiaires non partants (DossierRCS.BeneficiairesNonPartant,
+# DossierRCS.cs:1832-1836), par numero de gestion decroissant puis patronyme (OPEGS.cs:66). Titre comme la V2 :
+# « PATRONYME Prénoms (jj/mm/aaaa) » (BeHelper.cs:126-138). Ecarte : 1314104 (partant) -- jumeau retenu : 1314101.
+# Groupes : « Placement collectif » (forme juridique de type 3) / « Déclaration standard ».
+ROSSI Luca (15/06/1990) | Dossier RCS 2027 B 14002 · BE PLACEMENT SICAV | Placement collectif | AFaire | []
+DUPONT Jean Marc (01/02/1980) | Dossier RCS 2027 B 14001 · BE ALPHA SAS | Déclaration standard | AFaire | []
+MARTIN Anne (03/11/1975) | Dossier RCS 2027 B 14001 · BE ALPHA SAS | Déclaration standard | AFaire | []

@@ -1,0 +1,28 @@
+# Les recherches de LecteurDiligencesRcs (IRechercheEcran), jouees sur les lignes de PROC_MDIL.sql AVANT les gestes.
+# Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). La recherche s'AJOUTE aux filtres de la liste.
+
+# 1. Le numero de dossier, blancs retires.
+critere: Numéro de dossier RCS = 2027 B 13002
+lignes:
+MDIL BETA SAS · SIREN 513 130 002 | Dossier RCS 2027 B 13002 · Injonction modification A principal · En cours du banc lot 3 · non relancée | Sans relance | AFaire | []
+---
+# 2. La nature par son libelle (NATURE_DILIGENCE), sans casse.
+critere: Nature de la diligence = alerte immatriculation
+lignes:
+MDIL ALPHA SARL · SIREN 513 130 001 | Dossier RCS 2027 B 13001 · Alerte immatriculation A principale · En cours du banc lot 3 · 2 relances | Avec relance | AFaire | []
+---
+# 3. L'etat de la relance par son libelle (ETAT_RELANCE).
+critere: État de la relance = relance du banc
+lignes:
+MDIL ALPHA SARL · SIREN 513 130 001 | Dossier RCS 2027 B 13001 · Alerte immatriculation A principale · En cours du banc lot 3 · 2 relances | Avec relance | AFaire | []
+---
+# 4. Le champ de recherche trouve la denomination du dossier.
+texte: mdil
+lignes:
+MDIL BETA SAS · SIREN 513 130 002 | Dossier RCS 2027 B 13002 · Injonction modification A principal · En cours du banc lot 3 · non relancée | Sans relance | AFaire | []
+MDIL ALPHA SARL · SIREN 513 130 001 | Dossier RCS 2027 B 13001 · Alerte immatriculation A principale · En cours du banc lot 3 · 2 relances | Avec relance | AFaire | []
+---
+# 5. Une nature cherchee par son code, avec le dossier : les deux a la fois (aucune).
+critere: Nature de la diligence = JMOAP
+critere: Numéro de dossier RCS = 2027B13001
+lignes:

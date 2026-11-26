@@ -1,0 +1,40 @@
+# Les recherches de LecteurPartiesInstance (IRechercheEcran), jouees sur les lignes de PROC_PARTIES.sql AVANT les gestes.
+# Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). La recherche s'AJOUTE aux filtres de la liste.
+
+# 1. Le champ de recherche trouve une designation, sans casse.
+texte: gamma
+lignes:
+Mme GAMMA Lucie | Défendeur · instance 2026Z13201 · AJ partielle | Défendeurs | AFaire | []
+---
+# 2. Le critere de numero de role, blancs retires (FormateNumRole, FormRechercheInstance.cs:996) : les parties de l'instance.
+critere: Numéro de rôle de l'instance = 2026 Z 132
+lignes:
+ALPHA PARTIES SARL | Demandeur · instance 2026Z13201 | Demandeurs | AFaire | []
+M. BETA Paul | Demandeur · instance 2026Z13201 · AJ totale · répertorié | Demandeurs | AFaire | []
+EPSILON IP | Demandeur · instance 2026Z13201 | Demandeurs | AFaire | []
+Mme GAMMA Lucie | Défendeur · instance 2026Z13201 · AJ partielle | Défendeurs | AFaire | []
+DELTA INTERVENANT SAS | Intervenant · instance 2026Z13201 | Intervenants | AFaire | []
+---
+# 3. La qualite, sans accent ni casse (l'etape de la partie, PROC_PARTIES.Designer.cs:27-29), avec l'instance.
+critere: Numéro de rôle de l'instance = 2026Z13201
+critere: Qualité de la partie = defend
+lignes:
+Mme GAMMA Lucie | Défendeur · instance 2026Z13201 · AJ partielle | Défendeurs | AFaire | []
+---
+# 4. L'aide juridictionnelle « oui » : totale ou partielle (la case AJ, OPE_PARTIE.cs:421-428).
+critere: Aide juridictionnelle = oui
+lignes:
+M. BETA Paul | Demandeur · instance 2026Z13201 · AJ totale · répertorié | Demandeurs | AFaire | []
+Mme GAMMA Lucie | Défendeur · instance 2026Z13201 · AJ partielle | Défendeurs | AFaire | []
+---
+# 5. ... et son jumeau « non », sur la meme instance.
+critere: Numéro de rôle de l'instance = 2026Z13201
+critere: Aide juridictionnelle = non
+lignes:
+ALPHA PARTIES SARL | Demandeur · instance 2026Z13201 | Demandeurs | AFaire | []
+EPSILON IP | Demandeur · instance 2026Z13201 | Demandeurs | AFaire | []
+DELTA INTERVENANT SAS | Intervenant · instance 2026Z13201 | Intervenants | AFaire | []
+---
+# 6. Une partie a la qualite vide reste hors de la liste, meme cherchee par son nom.
+texte: ZETA VIDE
+lignes:

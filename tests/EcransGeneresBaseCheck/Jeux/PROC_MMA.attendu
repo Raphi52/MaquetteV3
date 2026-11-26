@@ -1,0 +1,9 @@
+# « Mentions en marge » (PROC_MMA) : les demandes du processus MMA rattachees a leur inscription (PROC_MMA.cs:56-58), par date
+# de creation decroissante. Ecartees : 1317106 (processus MJUD) et 1317107 (sans inscription) -- jumeau retenu : 1317101.
+# Etats : V -> Validée, O -> Refusée, N -> En attente (la reclamation), A -> À traiter, en cours de saisie -> En cours.
+# Groupes : « Inscriptions maritimes » (un bateau, 1317002) / « Autres inscriptions ».
+MMA sur l'inscription 2026-13701 - Validée | Inscription 2026-13701 · V · demande du 10/03/2026 · validée | Autres inscriptions | Validee | []
+MMA sur l'inscription 2026-13702 | Inscription 2026-13702 · N · demande du 09/03/2026 · refus | Inscriptions maritimes | Rejetee | []
+MMA sur l'inscription 2026-13701 | Inscription 2026-13701 · V · demande du 08/03/2026 · réclamation | Autres inscriptions | EnAttente | []
+MMA sur l'inscription 2026-13702 | Inscription 2026-13702 · N · demande du 07/03/2026 · arrivée | Inscriptions maritimes | AFaire | []
+MMA sur l'inscription 2026-13701 | Inscription 2026-13701 · V · demande du 06/03/2026 · qualifiée | Autres inscriptions | EnCours | []
