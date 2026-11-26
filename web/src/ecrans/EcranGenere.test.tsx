@@ -170,6 +170,23 @@ describe('Forme File : une file de travail', () => {
     expect(bouton('Imprimer').title).toBe('« Imprimer » ne s’applique pas aux lignes cochées : il ne vaut que pour « Relances »')
     expect(bouton('Relancer').title).toBe('')
   })
+
+  // Lot 8 (26/11/2026), mesure sur le bureau cache : une relance faite sortait des 200 lignes lues, et la recherche, qui ne
+  // filtrait que ces lignes, ne la retrouvait pas. Comme les autres formes (useRecherche) : le texte part dans la base.
+  it('la recherche part dans la base quand un lecteur de la file sait chercher ; ses lignes cherchees ne sont pas refiltrees', async () => {
+    const trouvee: LigneEcranVue = { nom: 'SANS LE MOT', precisions: 'Relance 1 du 26/11/2026', groupe: 'Fond', etat: 'Validee', faites: [0], id: '164779' }
+    const pont = installerFauxPont({
+      'EcranGenere.Lignes': () => ({ mode: 'base', message: null, greffe: '3801', lignes: lignesDeLaBase, exemples: [], recherche: true }),
+      'EcranGenere.Chercher': () => ({ mode: 'base', message: null, greffe: '3801', lignes: [trouvee], exemples: [], recherche: true, cherchees: ['Fond'] }),
+    })
+    const { container } = render(<EcranGenere descripteur={descripteur()} />)
+    const o = outils(container)
+    await waitFor(() => expect(o.noms()).toHaveLength(2))
+    expect(container.textContent).toContain('La recherche et les critères cherchent aussi dans la base du greffe.')
+    fireEvent.change(container.querySelector('.rig-lm-cherche__saisie')!, { target: { value: 'bunbon' } })
+    await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Chercher', 'ECRAN_TEST', 'bunbon', {}))
+    await waitFor(() => expect(o.noms()).toEqual(['SANS LE MOT']))
+  })
 })
 
 describe('Forme Fiche : retrouver, corriger, Enregistrer', () => {
