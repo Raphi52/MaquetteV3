@@ -1,0 +1,10 @@
+# « Lots » (LecteurLots) sur PROC_GESTLOT.sql : TOUS les lots, par nom (Lot.GetListeLot, « order by lot_nom ») -- la file
+# Amitel AMI_BANC9 comprise (GESTLOT ne l'ecarte pas ; « Relancer un lot » si). Groupe : actif ou inactif (LOT_ACTIF).
+# Etat : tout lot de la table est « Enregistré ». L'heure n'est dite que si l'impression automatique est cochee (l'ULT heure
+# n'est visible que la case cochee, OPE_AJOUT.cs:150) : BANC9_RELANCES a une heure, sans impression automatique.
+AMI_BANC9 | imprimante Imprimante Amitel · actif | Lots actifs | Validee | []
+BANC9_ANCIEN_DIRECT | imprimante Imprimante accueil · inactif · lot direct | Lots inactifs | Validee | []
+BANC9_COURRIERS | imprimante Imprimante 1er étage · impression automatique à 08:30 · actif | Lots actifs | Validee | []
+BANC9_DIRECT | imprimante Imprimante accueil · actif · lot direct | Lots actifs | Validee | []
+BANC9_INACTIF | sans imprimante · inactif | Lots inactifs | Validee | []
+BANC9_RELANCES | imprimante Imprimante 2e étage · actif | Lots actifs | Validee | []

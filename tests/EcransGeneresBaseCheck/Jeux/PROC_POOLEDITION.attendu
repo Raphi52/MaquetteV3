@@ -25,4 +25,11 @@ EDITION BETA SAS · 2020 B 40402 · demande 26000200422 | Certificat · à EDITI
 édition n° 1706413 | Convocation · à CONVOC NPAI SARL · émise le 02/07/2001 | Courrier | Validee | [0,1,2,3]
 édition n° 1706412 | Convocation · à CONVOC CITEE SAS · émise le 01/07/2001 | Courrier | Validee | [0,1,2,3]
 édition n° 1706411 | Convocation · à CONVOC A CITER SARL · émise le 01/07/2001 | Courrier | Validee | [0,1,2,3]
+# Les éditions des groupes d'impression de PROC_RELANCELOT.sql (1900401-1900405, lot 9), sans date de création : avant 200410,
+# par numéro décroissant.
+édition n° 1900405 | Courrier sans lot du banc 9 | Courrier | Validee | [0,1,2,3]
+édition n° 1900404 | Courrier Amitel du banc 9 | Courrier | Validee | [0,1,2,3]
+édition n° 1900403 | Relance du banc 9 | Courrier | Validee | [0,1,2,3]
+édition n° 1900402 | Relance du banc 9 · en erreur | Courrier | EnCours | [0,1,2]
+édition n° 1900401 | Courrier du banc 9 | Courrier | Validee | [0,1,2,3]
 édition n° 200410 | Courrier libre · à EDITION SANS DATE | Courrier | EnCours | [0,1]

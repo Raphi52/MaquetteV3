@@ -11,19 +11,20 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 // Cas a connaitre, dits ici plutot que tus :
 //   - PROC_LISTE_DELIBERES n'a pas de fiche, mais son code V2 existe (Source\Judiciaire\Exe\PROC_LISTE_DELIBERES\
 //     frmListeDelibere.cs) : un Etat en lecture seule, aligne dessus au lot 7 (plan-676a4b19).
-//   - PROC_SUIVI_IMPRESSION n'a pas de fiche : appuye sur PROC_PAPERCUT (file d'impression),
-//     seule procedure voisine documentee. A confirmer par le chef.
+//   - PROC_SUIVI_IMPRESSION n'a pas de fiche, mais son code existe (Source\Outils\Exe\Processus\
+//     PROC_SUIVI_IMPRESSION) : il lit TRAVAIL_IMPRESSION, de la base commune du service d'impression, absente
+//     de la base V3 du greffe -- l'ecran reste en exemple (lot 9). Libelles appuyes sur PROC_PAPERCUT.
 //   - PROC_DBE_RELANCE et PROC_DBE_INJ ont une fiche courte (« source non trouvee ») : leurs
 //     etapes sont calquees sur la relance DCA (PROC_DCA_RELANCE). A confirmer.
 //   - PROC_DBEN_ALERT : fiche sans étape (lecture seule), fondé sur le formulaire FORM_DBEN_ALERT.cs
 //     (VALIDER, VERIFIER, INTERROMPRE masqués, lignes 12-14) : une seule marche, « Visualiser le
 //     signalement » (OPE_DIVERGENCES.Designer.cs:97). La tuile « En cours » reste vide : la source
 //     n'a pas d'état intermédiaire. A confirmer par le chef.
-//   - PROC_STATCA : la fiche decrit un tableau a lignes fixes ; les lignes de demonstration
-//     sont des affaires classees par motif de role (J, F, R, IP), comme le fait le calcul.
-//   - PROC_SURVBOD : la recherche est un stub dans la fiche ; les criteres affiches sont les
-//     colonnes de la grille.
-//   - PROC_XPILOTAGE : les lignes sont les cellules pilotees, par feuille (RCS, judiciaire).
+//   - PROC_STATCA : le tableau a lignes fixes de la fiche -- une ligne par categorie de role (J, F, R,
+//     IP), ses sept colonnes calculees dans la base (lot 9, LecteurStatistiquesCourAppel.cs).
+//   - PROC_SURVBOD : la « requete principale » du haut de la fiche est inventee (le Detail OPE le dit) ;
+//     la vraie (OPE_REJETS_BODACC.cs:12-32) est celle de LecteurRejetsBodacc.cs (lot 9).
+//   - PROC_XPILOTAGE : les lignes sont les cellules pilotees (table PILOTAGE_REQUETES), par feuille.
 //   - PROC_RELANCELOT : le bouton Réinitialiser n'est jamais activable (TODO de la fiche,
 //     OPE_EDITGRP.cs:120) : il n'est pas offert ici.
 //   - PROC_IPSUIVI : dix etats dans le code (TypeTraitement), cinq ici ; « Suspendue » et
@@ -740,32 +741,39 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         {
             Code = "PROC_SURVMES", Titre = "Mesures", Sujet = "mesures",
             Forme = FormeEcran.File,
-            Recherche = "Rechercher une mesure, un type d'événement, un numéro de dossier…",
-            Criteres = ["Type d'affaire", "État de la mesure", "Type d'événement de procédure"],
-            Valider = "Éditer les documents Word", // proc_survmes.md, Rôle : « Éditer des documents Word (AmiOffice2010) sur les mesures cochées ».
+            // La file des échéances de mesures (proc_survmes.md, Détail OPE) : lue dans la base par
+            // Serveur/Socle/EcransGeneres/LecteurSurveillanceMesures.cs (lot 9). Les boutons de FORM_SURVMES.cs:20-29 :
+            // VALIDER (l'expiration des événements, OPE_AFFICHAGE_MES.cs:83-136), « Editer les lignes cochées », « Editer tout ».
+            // Sans écrivain : le moteur des événements de procédure de RIG v2 n'est pas dans la V3 (LecteurSurveillanceMesures.cs).
+            Recherche = "Rechercher une mesure, un rôle, un code d'événement…",
+            Criteres = ["Délai supplémentaire (jours)", "Événements expirables seulement"], // OPE_RECHERCHE_MES.cs:49-55.
+            Valider = "Valider", // FORM_SURVMES.cs : le bouton VALIDER du processus (DoVerifier puis expiration, OPE_AFFICHAGE_MES.cs:83).
+            Gestes = ["Valider", "Editer les lignes cochées", "Editer tout"], // FORM_SURVMES.cs:23-29.
             Rang = 5,
-            Etats = [.. EtatsEcran.Trois("À traiter", "En cours", "Traitée"), new EtatEcran("Rejetee", "Code expiré", "rejetee")],
-            Groupes = ["Mesures à traiter", "Codes expirés"],
+            Etats = [.. EtatsEcran.Trois("À traiter", "En cours", "Traitée"), new EtatEcran("Rejetee", "Sans code d'expiration", "rejetee")],
+            Groupes = ["Mesures à traiter", "Sans code d'expiration"],
             Sections =
             [
-                Marche("Recherche", "Les mesures se cherchent selon les critères. Une mesure dont le code d'événement est expiré est décochée, grisée et en rouge.", true,
-                    "Type d'affaire", "État"),
-                Marche("Événements de procédure", "Cocher un code d'événement coche toutes les mesures correspondantes.", false,
+                Marche("Recherche", "Les événements ni survenus ni expirés des mesures actives (ni rapport déposé, ni sans suite, ni caduques), arrivés à échéance : date maximale, sinon minimale, sinon fixe, au plus aujourd'hui moins le délai supplémentaire.", true,
+                    "Délai supplémentaire (jours)", Champ.Case("Événements expirables seulement")),
+                Marche("Événements de procédure", "Cocher un code d'événement coche toutes les mesures qui le portent. Un code sans code d'expiration est décoché, grisé et en rouge.", false,
                     "Code d'événement"),
-                Marche("Cochage", "Cocher une mesure la recharge, pose son verrou métier et met à jour le compteur « cochés ».", true,
+                Marche("Cochage", "Cocher une mesure la recharge ; une mesure déjà verrouillée par une autre demande se décoche.", true,
                     "Mesure cochée", "Compteur"),
-                Marche("Éditions Word", "Documents Word édités sur les mesures cochées. Quitter le tableau de vérification annule les demandes.", true,
-                    "Document Word", "Annulation"),
+                Marche("Validation", "Valider fait expirer l'événement de chaque ligne cochée et crée l'événement survenu, sous une demande par mesure.", true,
+                    "Valider"),
+                Marche("Éditions Word", "Un aperçu Word des lignes cochées, ou de toutes les lignes affichées.", false,
+                    "Editer les lignes cochées", "Editer tout"),
             ],
             Lignes =
             [
-                Ligne("Mesure 2026 M 0101 · Alpha Services SARL", "Événement à venir · à cocher", "Mesures à traiter", "AFaire"),
-                Ligne("Mesure 2026 M 0102 · Bêta Industrie SAS", "Mesure cochée · compteur à jour", "Mesures à traiter", "EnCours", 0, 2),
-                Ligne("Mesure 2026 M 0103 · Gamma Conseil SARL", "Éditée en Word", "Mesures à traiter", "Validee", 0, 2, 3),
-                Ligne("Mesure 2026 M 0104 · Delta Transports SAS", "Code d'événement à cocher", "Mesures à traiter", "EnCours", 0, 1),
-                Ligne("Mesure 2026 M 0105 · Epsilon Habitat SARL", "Code d'événement expiré", "Codes expirés", "Rejetee"),
-                Ligne("Mesure 2026 M 0106 · Zêta Commerce SAS", "Code d'événement expiré", "Codes expirés", "Rejetee"),
-                Ligne("Mesure 2026 M 0107 · Êta Boulangerie SARL", "Mesure à cocher", "Mesures à traiter", "AFaire"),
+                Ligne("Mesure 2026M00107 · Alpha Services SARL", "rôle 2026J00101 · RAPP Dépôt du rapport · échéance 02/03/2026", "Mesures à traiter", "AFaire"),
+                Ligne("Mesure 2026M00106 · Bêta Industrie SAS", "rôle 2026J00102 · CONS Consignation · échéance 05/03/2026", "Mesures à traiter", "AFaire"),
+                Ligne("Mesure 2026M00105 · Gamma Conseil SARL", "rôle 2026J00103 · RAPP Dépôt du rapport · échéance 09/03/2026", "Mesures à traiter", "AFaire"),
+                Ligne("Mesure 2026M00104 · Delta Transports SAS", "rôle 2026J00104 · OBS Observations · échéance 10/03/2026 · sans code d'expiration", "Sans code d'expiration", "Rejetee"),
+                Ligne("Mesure 2026M00103 · Epsilon Habitat SARL", "rôle 2026J00105 · CONS Consignation · échéance 11/03/2026", "Mesures à traiter", "AFaire"),
+                Ligne("Mesure 2026M00102 · Zêta Commerce SAS", "rôle 2026J00106 · OBS Observations · échéance 12/03/2026 · sans code d'expiration", "Sans code d'expiration", "Rejetee"),
+                Ligne("Mesure 2026M00101 · Êta Boulangerie SARL", "rôle 2026J00107 · RAPP Dépôt du rapport · échéance 13/03/2026", "Mesures à traiter", "AFaire"),
             ],
         },
 
@@ -773,8 +781,11 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         {
             Code = "PROC_GESTLOT", Titre = "Lots", Sujet = "lots",
             Forme = FormeEcran.Referentiel,
+            // La table des lots d'impression (proc_gestlot.md, Détail OPE ; OPE_AJOUT.cs) : lue par
+            // Serveur/Socle/EcransGeneres/LecteurLots.cs, écrite par EcrivainLots.cs (lot 9) -- Ajouter, Modifier (renommer
+            // compris : les groupes d'impression suivent), Supprimer (un agent du greffe désactive le lot).
             Colonnes = ["Nom du lot", "Imprimante", Champ.Case("Impression automatique"), "Heure d'impression", Champ.Case("Lot actif"), Champ.Case("Lot direct")],
-            Recherche = "Rechercher un lot par son nom…",
+            Recherche = "Rechercher un lot par son nom ou son imprimante…", // OPE_RECHERCHE.cs:62-64 : nom + imprimante.
             Criteres = ["Nom du lot", "Lot actif"],
             Valider = "Valider le lot", // proc_gestlot.md, OPE_AJOUT : « _valider() », séquence transactionnelle.
             Rang = 5,
@@ -782,26 +793,26 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Groupes = ["Lots actifs", "Lots inactifs"],
             Sections =
             [
-                Marche("Nom", "Nom obligatoire et unique : un nom déjà pris est refusé. Renommer reporte le nouveau nom sur les groupes d'impression.", true,
+                Marche("Nom", "Nom obligatoire et unique : un nom déjà pris est refusé. Renommer reporte le nouveau nom sur les groupes d'impression de l'ancien lot.", true,
                     "Nom du lot"),
-                Marche("Imprimante", "Imprimante du lot. Si elle change, le groupe d'impression en cours peut reprendre cette imprimante.", false,
-                    "Imprimante", "Impression supplémentaire"),
-                Marche("Impression", "Impression automatique à l'heure choisie, et tri automatique. Un seul lot peut être direct.", false,
-                    "Impression automatique", "Heure d'impression", "Tri automatique"),
-                Marche("Activation", "Un lot créé est actif d'office. Un lot direct est unique : l'activer désactive l'autre lot direct.", true,
-                    "Lot actif", "Lot direct"),
-                Marche("Enregistrement", "Enregistrer écrit le lot ; une création ou un renommage actualise la liste.", true,
-                    "Enregistrer"),
+                Marche("Imprimante", "Imprimante du lot. RIG v2 propose alors de l'associer au groupe d'impression actif ; RIG v3 ne pose pas la question.", false,
+                    "Imprimante"),
+                Marche("Impression", "Impression automatique à l'heure choisie.", false,
+                    Champ.Case("Impression automatique"), "Heure d'impression"),
+                Marche("Activation", "Un lot créé est actif d'office. La case « Lot direct » ne se saisit pas : un seul lot est direct, et l'enregistrer retire « direct » aux autres.", true,
+                    Champ.Case("Lot actif"), Champ.Case("Lot direct")),
+                Marche("Suppression", "Supprimer un lot le désactive pour un agent du greffe ; la suppression définitive, avec ses groupes, est réservée à Amitel.", false,
+                    "Supprimer"),
             ],
             Lignes =
             [
-                Ligne("Lot relances mars", "Nouveau lot · nom à saisir", "Lots actifs", "AFaire"),
-                Ligne("Lot édition audiences", "Imprimante choisie · impression auto", "Lots actifs", "EnCours", 0, 1),
-                Ligne("Lot impression directe", "Lot direct · enregistré", "Lots actifs", "Validee", 0, 3, 4),
-                Ligne("Lot relances DBE", "Nom saisi · activation à confirmer", "Lots actifs", "EnCours", 0),
-                Ligne("Lot archives 2025", "Lot inactif · enregistré", "Lots inactifs", "Validee", 0, 3, 4),
-                Ligne("Lot tri mensuel", "Nouveau lot · impression auto à régler", "Lots actifs", "AFaire"),
-                Ligne("Lot relances LRAR", "Lot actif · tri auto", "Lots actifs", "EnCours", 0, 3),
+                Ligne("Lot relances mars", "imprimante Imprimante du 2e étage · actif", "Lots actifs", "Validee"),
+                Ligne("Lot édition audiences", "imprimante Imprimante du 1er étage · impression automatique à 08:30 · actif", "Lots actifs", "Validee"),
+                Ligne("Lot impression directe", "imprimante Imprimante de l'accueil · actif · lot direct", "Lots actifs", "Validee"),
+                Ligne("Lot relances DBE", "imprimante Imprimante du 2e étage · actif", "Lots actifs", "Validee"),
+                Ligne("Lot archives 2025", "imprimante Imprimante du 2e étage · inactif", "Lots inactifs", "Validee"),
+                Ligne("Lot tri mensuel", "sans imprimante · actif", "Lots actifs", "Validee"),
+                Ligne("Lot relances LRAR", "imprimante Imprimante du 1er étage · impression automatique à 18:00 · actif", "Lots actifs", "Validee"),
             ],
         },
 
@@ -810,31 +821,34 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         {
             Code = "PROC_SURVBOD", Titre = "Surveillance BODACC", Sujet = "annonces",
             Forme = FormeEcran.File,
+            // Le contrôle qualité des annonces BODACC (proc_survbod.md, Détail OPE : la vraie requête est
+            // OPE_REJETS_BODACC.cs:12-32) : lu par Serveur/Socle/EcransGeneres/LecteurRejetsBodacc.cs (lot 9). Sans écrivain :
+            // « Modifier » ouvre le processus VB6 XACTION, Word et Imprimer produisent un document (LecteurRejetsBodacc.cs).
             Recherche = "Rechercher une annonce, un numéro de gestion…",
-            // La fiche décrit la recherche comme un stub : les critères affichés sont les colonnes de la grille.
-            Criteres = ["Numéro de gestion RCS", "Type d'annonce (A, B ou C)", "Date de publication prévue"],
-            Valider = "Modifier l'annonce", // proc_survbod.md, Colonnes / Boutons : « MODIFIER (XACTION) » lance le processus XACTION pour l'annonce sélectionnée.
+            Criteres = ["Numéro de gestion RCS", "Numéro chronologique", "Date de publication", "Type d'annonce"], // colonnes de la grille, DataGridViewResultats.cs.
+            Valider = "Modifier l'annonce", // Le bouton « M » de la ligne (colXaction) et le double clic : LaunchXAction, OPE_REJETS_BODACC.cs:82-95.
+            Gestes = ["Modifier l'annonce", "Word", "Imprimer"], // FORM_SURVBOD._InitToolbar : WORD, IMPRIMER (MODIFIER y est masqué).
             Rang = 5,
-            Etats = EtatsEcran.Trois("À corriger", "En cours", "Corrigée"),
-            Groupes = ["Annonces A", "Annonces B", "Annonces C"],
+            Etats = [.. EtatsEcran.Trois("À corriger", "En cours", "Corrigée"), new EtatEcran("Rejetee", "Sans dossier RCS", "rejetee")],
+            Groupes = ["Rejets du contrôle qualité"],
             Sections =
             [
-                Marche("Rejet", "Les rejets de publication s'affichent par numéro de gestion RCS et numéro chronologique du dépôt.", true,
-                    "Numéro de gestion", "Numéro chronologique du dépôt"),
-                Marche("Correction", "« Modifier » lance la correction de l'annonce sélectionnée. Une annonce non inscrite ne se sélectionne pas.", true,
+                Marche("Contrôle qualité", "Les annonces publiées depuis 2008, d'un bordereau AP, ANU, AU, B, BR ou C, dont le contrôle qualité porte une remarque non vérifiée.", true,
+                    "Numéro de gestion RCS", "Numéro chronologique", "Remarque du contrôle qualité"),
+                Marche("Correction", "« Modifier » lance la correction de l'annonce d'un dossier RCS. Une annonce sans dossier RCS (un non-inscrit) ne se corrige pas d'ici.", true,
                     "Annonce", "Action corrective liée"),
-                Marche("Envoi", "Export Word des rejets sélectionnés, ou impression.", false,
-                    "Export Word", "Impression"),
+                Marche("Envoi", "Export Word des annonces cochées, ou impression.", false,
+                    "Word", "Imprimer"),
             ],
             Lignes =
             [
-                Ligne("Annonce 2026 B 0201 · Alpha Services SARL", "Rejet du 02/03/2026", "Annonces A", "AFaire"),
-                Ligne("Annonce 2026 B 0202 · Bêta Industrie SAS", "Rejet repris · correction à lancer", "Annonces B", "EnCours", 0),
-                Ligne("Annonce 2026 B 0203 · Gamma Conseil SARL", "Correction lancée", "Annonces C", "EnCours", 0, 1),
-                Ligne("Annonce 2026 B 0204 · Delta Transports SAS", "Corrigée et exportée", "Annonces A", "Validee", 0, 1, 2),
-                Ligne("Annonce 2026 B 0205 · Epsilon Habitat SARL", "Non inscrite · non sélectionnable", "Annonces B", "AFaire"),
-                Ligne("Annonce 2026 B 0206 · Zêta Commerce SAS", "Corrigée", "Annonces C", "Validee", 0, 1),
-                Ligne("Annonce 2026 B 0207 · Êta Boulangerie SARL", "Rejet à corriger", "Annonces A", "AFaire"),
+                Ligne("Annonce A0001 du 02/03/2026 · 2026 B 00201", "chrono 2026000201 · Adresse du siège incomplète", "Rejets du contrôle qualité", "AFaire"),
+                Ligne("Annonce A0003 du 03/03/2026 · 2026 B 00202", "chrono 2026000202 · Capital non renseigné", "Rejets du contrôle qualité", "AFaire"),
+                Ligne("Annonce A0010 du 04/03/2026 · 2026 B 00203", "chrono 2026000203 · Activité absente", "Rejets du contrôle qualité", "AFaire"),
+                Ligne("Annonce A0002 du 05/03/2026 · non-inscrit 2026N00004", "chrono D2026000204 · Nom commercial incomplet · sans dossier RCS : pas de correction", "Rejets du contrôle qualité", "Rejetee"),
+                Ligne("Annonce A0001 du 06/03/2026 · 2026 B 00205", "chrono 2026000205 · Date d'effet absente", "Rejets du contrôle qualité", "AFaire"),
+                Ligne("Annonce A0020 du 09/03/2026 · 2026 B 00206", "chrono 2026000206 · Dirigeant sans date de naissance", "Rejets du contrôle qualité", "AFaire"),
+                Ligne("Annonce A0004 du 10/03/2026 · non-inscrit 2026N00007", "chrono D2026000207 · Enseigne incomplète · sans dossier RCS : pas de correction", "Rejets du contrôle qualité", "Rejetee"),
             ],
         },
 
@@ -871,8 +885,10 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             ],
         },
 
-        // PROC_SUIVI_IMPRESSION n'a pas de fiche RIG v2 : appuyé sur PROC_PAPERCUT (file
-        // d'impression, fiche présente). « Ce qui est sorti » = les travaux imprimés. À confirmer.
+        // PROC_SUIVI_IMPRESSION n'a pas de fiche RIG v2, mais son code existe (Source\Outils\Exe\Processus\PROC_SUIVI_IMPRESSION :
+        // OPE_RECHERCHE.cs:160-207 lit TRAVAIL_IMPRESSION, BASE_COMMON_TRAVAIL_IMPRESSION de la base COMMUNE du service
+        // d'impression). Cette table n'est pas dans la base du greffe (absente de RIG_DEV, lu le 26/11/2026) ni dans la base V3 :
+        // l'écran reste sur ses lignes d'exemple, étiquetées (lot 9). Libellés appuyés sur PROC_PAPERCUT (file d'impression).
         new DescripteurEcran
         {
             Code = "PROC_SUIVI_IMPRESSION", Titre = "Suivi d'impression", Sujet = "travaux d'impression",
@@ -910,34 +926,39 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         {
             Code = "PROC_RELANCEFILE", Titre = "Relancer un fichier", Sujet = "groupes d'édition",
             Forme = FormeEcran.File,
+            // Les groupes (traitements d'édition) des files d'édition (proc_relancefile.md, Détail OPE) : lus par
+            // Serveur/Socle/EcransGeneres/LecteurTraitementsEdition.cs (lot 9). Les boutons d'OPE_EDITGRP.cs:44-48 : RELANCER
+            // « Relancer via editrcs », FIGER « Cloturer le groupe », IMPRIMER_AUTRE « Tout réimprimer » ; sans écrivain
+            // (LecteurTraitementsEdition.cs dit pourquoi).
             Recherche = "Rechercher une file, un groupe, une date…",
             Criteres = ["File d'édition", "Date de début (par défaut : aujourd'hui à 7 h)", "Date de fin", "Numéro de groupe"],
-            Valider = "Relancer", // proc_relancefile.md, OPE_EDITGRP : « édition + RELANCE ».
+            Valider = "Relancer via editrcs", // OPE_EDITGRP.cs:44-48, _relancer (:237-240).
+            Gestes = ["Relancer via editrcs", "Cloturer le groupe", "Tout réimprimer"],
             Rang = 5,
-            Etats = EtatsEcran.Trois("À relancer", "En cours", "Relancé"),
-            Groupes = ["Groupes en erreur", "Groupes en traitement", "Groupes émis"],
+            Etats = EtatsEcran.Trois("Ouvert", "Clôturé, en transmission", "Transmis"),
+            Groupes = ["Groupes ouverts", "Groupes clôturés"],
             Sections =
             [
-                Marche("File", "Une file d'édition se choisit ; ses groupes s'affichent pour la période.", true,
+                Marche("File", "Une file d'édition se choisit ; ses groupes s'affichent pour la période. Les files Amitel ne se montrent qu'à Amitel.", true,
                     "File d'édition"),
                 Marche("Période", "Date de début et date de fin. La fin ne peut pas précéder le début.", true,
                     "Date de début", "Date de fin"),
-                Marche("Groupe", "Le groupe choisi montre sa date d'ouverture et sa date de clôture. Une date d'ouverture vide prend l'instant présent.", true,
+                Marche("Groupe", "Le groupe montre sa date d'ouverture et sa date de clôture. Un groupe clôturé et vide n'est pas affiché.", true,
                     "Numéro de groupe", "Date d'ouverture", "Date de clôture"),
                 Marche("Éditions", "Les éditions du groupe se listent, avec leur état.", false,
                     "Édition", "État"),
-                Marche("Relance", "Relancer les éditions en attente du groupe. Le journal des traitements suit l'avancement.", true,
-                    "Relancer", "Journal"),
+                Marche("Relance", "Un groupe ouvert se clôture (une imprimante est obligatoire) ou se relance ; un groupe clôturé se réimprime.", true,
+                    "Relancer via editrcs", "Cloturer le groupe", "Tout réimprimer"),
             ],
             Lignes =
             [
-                Ligne("Groupe 2026 0501 · file des convocations", "Erreur d'édition · 3 éditions", "Groupes en erreur", "AFaire"),
-                Ligne("Groupe 2026 0502 · file des plumitifs", "Erreur · relance à lancer", "Groupes en erreur", "EnCours", 0, 1),
-                Ligne("Groupe 2026 0503 · file des courriers", "Erreur relancée", "Groupes en erreur", "Validee", 0, 1, 2, 4),
-                Ligne("Groupe 2026 0504 · file des LRAR", "En traitement depuis 7 h", "Groupes en traitement", "EnCours", 0, 1, 2),
-                Ligne("Groupe 2026 0505 · file des bordereaux", "En traitement · éditions listées", "Groupes en traitement", "EnCours", 0),
-                Ligne("Groupe 2026 0506 · file des statistiques", "Émis le 10/03/2026", "Groupes émis", "AFaire"),
-                Ligne("Groupe 2026 0507 · file des ordonnances", "Émis · relance à lancer", "Groupes émis", "EnCours", 0, 1),
+                Ligne("File RCS interne · groupe 501", "3 éditions · ouvert le 10/03/2026 · Imprimante du 2e étage", "Groupes ouverts", "AFaire"),
+                Ligne("File RCS interne · groupe 502", "12 éditions · ouvert le 09/03/2026 · clôturé le 09/03/2026 · transmission finie", "Groupes clôturés", "Validee"),
+                Ligne("File RCS autre · groupe 503", "1 édition · ouvert le 10/03/2026 · Imprimante du 1er étage", "Groupes ouverts", "AFaire"),
+                Ligne("File RCS autre · groupe 504", "4 éditions · ouvert le 08/03/2026 · clôturé le 08/03/2026 · en transmission", "Groupes clôturés", "EnCours"),
+                Ligne("File Info légal · groupe 505", "0 édition · ouvert le 10/03/2026", "Groupes ouverts", "AFaire"),
+                Ligne("File Info légal · groupe 506", "7 éditions · ouvert le 06/03/2026 · clôturé le 07/03/2026 · transmission finie", "Groupes clôturés", "Validee"),
+                Ligne("File RCS toque · groupe 507", "2 éditions · ouvert le 05/03/2026 · clôturé le 05/03/2026 · en transmission", "Groupes clôturés", "EnCours"),
             ],
         },
 
@@ -945,34 +966,44 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         {
             Code = "PROC_RELANCELOT", Titre = "Relancer un lot", Sujet = "lots d'impression",
             Forme = FormeEcran.File,
-            Recherche = "Rechercher un lot, un groupe, une édition…",
-            Criteres = ["Nom du lot", "Numéro de groupe", "Édition"],
-            Valider = "Valider", // proc_relancelot.md, OPE_EDITGRP : boutons « Valider / Annuler » (actifs si modifié).
+            // Les groupes d'impression des lots (proc_relancelot.md, Détail OPE) : lus par
+            // Serveur/Socle/EcransGeneres/LecteurGroupesImpression.cs, relancés par EcrivainGroupesImpression.cs (lot 9) -- les
+            // boutons d'OPE_EDITGRP.cs:109-128, actifs selon la phase : IMPRIMER, IMPRIMER_AUTRE (« Tout réimprimer »), FIGER.
+            // L'état du groupe change dans la base ; le message au service d'impression n'est pas envoyé.
+            Recherche = "Rechercher un lot, un groupe…",
+            Criteres = ["Nom du lot", "Numéro de groupe ou nom de l'imprimante", "Date de début", "Date de fin"], // OPE_RECHERCHE.Designer.cs:90-197.
+            Valider = "Imprimer", // OPE_EDITGRP.cs:144-146 : IMPRIMER -> _basculerEtatP(false).
+            Gestes = ["Imprimer", "Tout réimprimer", "Figer le groupe"], // OPE_EDITGRP.cs:141-149.
             Rang = 5,
-            Etats = EtatsEcran.Trois("À imprimer", "En cours", "Imprimé"),
-            Groupes = ["Groupes à imprimer", "Groupes en cours", "Groupes figés"],
+            Etats =
+            [
+                new EtatEcran("AFaire", "À réimprimer", "a-traiter"), new EtatEcran("EnCours", "À figer", "saisie-manuelle"),
+                new EtatEcran("Validee", "Imprimé", "validee"), new EtatEcran("EnAttente", "Prêt à l'émission", "en-attente"),
+                new EtatEcran("Rejetee", "Erreur sans reprise", "rejetee"),
+            ],
+            Groupes = ["Groupes émis", "Groupes intermédiaires", "Groupes en traitement", "Groupes en erreur"],
             Sections =
             [
-                Marche("Lot", "Le lot se choisit par son nom ; ses groupes d'impression se listent.", true,
+                Marche("Lot", "Le lot se choisit par son nom ; ses groupes d'impression se listent. Un groupe émis sans édition n'est pas affiché.", true,
                     "Nom du lot"),
-                Marche("Groupe", "Le groupe porte son numéro, ses dates d'ouverture et de fin, et sa file. Un groupe figé ne se modifie plus.", true,
-                    "Numéro de groupe", "Date d'ouverture", "Date de fin", "File"),
+                Marche("Groupe", "Le groupe porte son numéro, ses dates de début et de fin, son imprimante et sa phase. La phase ne se saisit pas : seuls les boutons la changent.", true,
+                    "Numéro de groupe", "Date de début", "Date de fin", "Imprimante"),
                 Marche("Éditions", "La liste des éditions du groupe s'affiche avec son état.", false,
                     "Édition", "État"),
-                Marche("Impression", "Imprimer, ou tout réimprimer selon l'état du groupe. Relancer les éditions manquantes lance un traitement en arrière-plan.", true,
-                    "Imprimer", "Tout réimprimer", "Relancer les éditions manquantes"),
-                Marche("Figer", "Figer clôt le groupe, possible seulement avant son impression. Pour un utilisateur Amitel, un choix sur les demandes d'édition du groupe est proposé.", false,
+                Marche("Impression", "Un groupe émis ou en erreur se remet à imprimer : « Imprimer » le groupe seul, « Tout réimprimer » avec toutes ses éditions.", true,
+                    "Imprimer", "Tout réimprimer"),
+                Marche("Figer", "Figer clôt un groupe initial : sa date de fin est posée et il passe prêt à l'émission pour l'impression finale.", false,
                     "Figer le groupe"),
             ],
             Lignes =
             [
-                Ligne("Lot relances mars · groupe 2026 0601", "Groupe émis · rien à imprimer", "Groupes à imprimer", "AFaire"),
-                Ligne("Lot relances mars · groupe 2026 0602", "Éditions manquantes à relancer", "Groupes à imprimer", "EnCours", 0, 1),
-                Ligne("Lot audiences · groupe 2026 0603", "Imprimé", "Groupes à imprimer", "Validee", 0, 1, 3),
-                Ligne("Lot audiences · groupe 2026 0604", "Impression en cours", "Groupes en cours", "EnCours", 0, 1),
-                Ligne("Lot courriers · groupe 2026 0605", "Groupe figé", "Groupes figés", "Validee", 0, 1, 3, 4),
-                Ligne("Lot courriers · groupe 2026 0606", "Groupe figé · éditions listées", "Groupes figés", "Validee", 0, 1, 3),
-                Ligne("Lot divers · groupe 2026 0607", "Nouveau groupe à ouvrir", "Groupes à imprimer", "AFaire"),
+                Ligne("Lot relances mars · groupe 2026-0601", "Emis · 3 éditions · ouvert le 09/03/2026 · fini le 09/03/2026 · Imprimante du 2e étage", "Groupes émis", "AFaire"),
+                Ligne("Lot relances mars · groupe 2026-0602", "Initial · 2 éditions · ouvert le 10/03/2026 · Imprimante du 2e étage", "Groupes intermédiaires", "EnCours"),
+                Ligne("Lot audiences · groupe 2026-0603", "Prêt à l'émission · 5 éditions · ouvert le 10/03/2026 · Imprimante du 1er étage", "Groupes intermédiaires", "EnAttente"),
+                Ligne("Lot audiences · groupe 2026-0604", "En cours d'émission · 4 éditions · ouvert le 10/03/2026 · Imprimante du 1er étage", "Groupes en traitement", "EnAttente"),
+                Ligne("Lot courriers · groupe 2026-0605", "Erreur · 1 édition · ouvert le 08/03/2026 · Imprimante de l'accueil", "Groupes en erreur", "AFaire"),
+                Ligne("Lot courriers · groupe 2026-0606", "Emis · 6 éditions · ouvert le 07/03/2026 · fini le 07/03/2026 · Imprimante de l'accueil", "Groupes émis", "AFaire"),
+                Ligne("Lot divers · groupe 2026-0607", "Initial · 0 édition · ouvert le 10/03/2026", "Groupes intermédiaires", "EnCours"),
             ],
         },
 
@@ -981,38 +1012,48 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         {
             Code = "PROC_STATCA", Titre = "Statistiques cour d'appel", Sujet = "affaires",
             Forme = FormeEcran.Etat,
-            Parametres = [Champ.Periode("Période"), Champ.Liste("Catégorie", "Contentieux", "Sauvegarde et redressement", "Référés commerciaux", "Injonctions de payer")],
-            Colonnes = ["Affaire"],
-            Gestes = ["Générer", "Word"],
-            Recherche = "Rechercher une affaire, un rôle…",
-            Criteres = ["Période du", "Période au (par défaut : le mois précédent)", "Catégorie : contentieux, sauvegarde, référés, injonctions"],
-            Valider = "Générer", // proc_statca.md, Particularités de configuration : le bouton APERCU est renommé « Générer ».
+            // Le tableau « Activité commerciale » de RIG v2 (proc_statca.md, Détail OPE ; OPE_GENERER.cs:132-593), calculé dans
+            // la base par Serveur/Socle/EcransGeneres/LecteurStatistiquesCourAppel.cs (lot 9) : quatre catégories (le numéro de
+            // rôle J, F, R, IP), sept colonnes aux en-têtes de la grille V2 (:48-81) ; le pied totalise, comme la ligne « totaux ».
+            // La période cherche dans la base ; « Word » (PrintWord) n'a pas d'édition dans la V3.
+            Parametres = [Champ.Periode("Période")],
+            Colonnes =
+            [
+                "Catégorie", Champ.Nombre("affaires en cours en début de période"), Champ.Nombre("affaires nouvelles"),
+                Champ.Nombre("affaires terminées"), Champ.Nombre("jugements ADD"), Champ.Nombre("dossier en cours en fin de mois - stock"),
+                Champ.Nombre("indicateurs spécifiques délibérés de plus de 2 mois (pour les décisions rendues dans la période)"),
+                Champ.Nombre("indicateurs spécifiques décision à délivrer ou à mettre en forme"),
+            ],
+            Gestes = ["Word"], // OPE_RECHERCHE.cs:32-34 : WORD ; « Générer » (APERCU) est ici le calcul de la période.
+            Recherche = "Rechercher une catégorie…",
+            Criteres = ["Période"], // OPE_RECHERCHE : la période du et au, par défaut le mois précédent (InitDate, :37-64).
+            Valider = "Générer", // proc_statca.md : le bouton APERCU est renommé « Générer » (OPE_RECHERCHE.cs:33).
             Rang = 5,
             Etats = EtatsEcran.Trois("À générer", "En cours", "Généré"),
-            Groupes = ["Contentieux", "Sauvegarde et redressement", "Référés commerciaux", "Injonctions de payer"],
+            Groupes = ["Activité commerciale"],
             Sections =
             [
-                Marche("Période", "Par défaut : le mois précédent. La fin ne peut pas précéder le début.", true,
-                    "Période du", "Période au"),
-                Marche("Affaires enrôlées", "Affaires en cours au début de la période, et affaires nouvelles enrôlées pendant la période.", true,
+                Marche("Période", "Par défaut : le mois précédent. Le début ne peut pas suivre la fin, ni l'un ni l'autre dépasser aujourd'hui.", true,
+                    "Période"),
+                Marche("Affaires enrôlées", "Affaires en cours au début de la période (sans décision terminante), et affaires nouvelles enrôlées pendant la période.", true,
                     "En cours au début", "Nouvelles"),
                 Marche("Décisions", "Affaires terminées hors avant-dire-droit, et jugements avant-dire-droit (expertise, sursis à statuer).", true,
                     "Terminées hors avant-dire-droit", "Jugements avant-dire-droit"),
-                Marche("Stock et délibérés", "Stock de fin de mois : en cours et nouvelles, moins terminées et avant-dire-droit. Délibérés de plus de deux mois.", false,
+                Marche("Stock et délibérés", "Stock de fin de mois : en cours et nouvelles, moins terminées et avant-dire-droit. Délibérés de plus de deux mois, sauf injonctions de payer.", false,
                     "Stock de fin de mois", "Délibérés de plus de deux mois"),
-                Marche("Décisions à délivrer", "Affaires au plumitif « décision » sans décision saisie.", false,
-                    "Décisions à délivrer"),
+                Marche("Procédures collectives", "Redressements, liquidations, clôtures pour insuffisance d'actif et pour extinction du passif de la période.", false,
+                    "Nb redressement judiciaire", "Nb liquidations (LIJI ou LJ)", "Nb clôtures pour insuffisance d'actif", "Nb clôtures pour extinction du passif"),
                 Marche("Export Word", "Export Word du tableau généré.", false,
                     "Word"),
             ],
             Lignes =
             [
-                Ligne("Rôle 2026J00701 · Alpha Services SARL", "Contentieux · nouvelle affaire", "Contentieux", "AFaire"),
-                Ligne("Rôle 2026J00702 · Bêta Industrie SAS", "Contentieux · décision terminante", "Contentieux", "Validee", 0, 1, 2),
-                Ligne("Rôle 2026F00703 · Gamma Conseil SARL", "Sauvegarde · en cours", "Sauvegarde et redressement", "EnCours", 0),
-                Ligne("Rôle 2026R00704 · Delta Transports SAS", "Référé · avant-dire-droit", "Référés commerciaux", "EnCours", 0, 1),
-                Ligne("Rôle 2026IP00705 · Epsilon Habitat SARL", "Injonction de payer · décision à délivrer", "Injonctions de payer", "AFaire"),
-                Ligne("Rôle 2026J00706 · Zêta Commerce SAS", "Contentieux · délibéré de plus de deux mois", "Contentieux", "Validee", 0, 1, 2, 3),
+                Ligne("contentieux général", "Activité commerciale du 01/02/2026 au 28/02/2026", "Activité commerciale", "Validee") with { Valeurs = ["contentieux général", "182", "14", "11", "3", "182", "1", "2"] },
+                Ligne("affaires de procédure collective", "Activité commerciale du 01/02/2026 au 28/02/2026", "Activité commerciale", "Validee") with { Valeurs = ["affaires de procédure collective", "96", "9", "6", "1", "98", "0", "1"] },
+                Ligne("référés commerciaux", "Activité commerciale du 01/02/2026 au 28/02/2026", "Activité commerciale", "Validee") with { Valeurs = ["référés commerciaux", "12", "7", "8", "0", "11", "0", "0"] },
+                Ligne("injonctions de payer", "Activité commerciale du 01/02/2026 au 28/02/2026", "Activité commerciale", "Validee") with { Valeurs = ["injonctions de payer", "40", "22", "19", "0", "43", "0", "0"] },
+                Ligne("contentieux général", "Activité commerciale du 01/01/2026 au 31/01/2026", "Activité commerciale", "Validee") with { Valeurs = ["contentieux général", "179", "16", "13", "0", "182", "2", "1"] },
+                Ligne("affaires de procédure collective", "Activité commerciale du 01/01/2026 au 31/01/2026", "Activité commerciale", "Validee") with { Valeurs = ["affaires de procédure collective", "94", "8", "5", "1", "96", "0", "0"] },
             ],
         },
 
@@ -1020,35 +1061,39 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         {
             Code = "PROC_XPILOTAGE", Titre = "Pilotage", Sujet = "tableaux de bord",
             Forme = FormeEcran.Etat,
+            // Le tableau de pilotage de RIG v2 (proc_xpilotage.md, Détail OPE ; OPE_GENERER.cs) : une ligne par cellule de la table
+            // PILOTAGE_REQUETES, sa requête calculée dans la base sur la période et un an plus tôt, par
+            // Serveur/Socle/EcransGeneres/LecteurPilotage.cs (lot 9). Une requête qui lit une table reprise en fiche, ou un
+            // calcul d'encaissement, est « Non calculé » avec sa cause. Le classeur Excel et les archives n'ont pas d'édition V3.
             Parametres = [Champ.Date("Date minimale"), Champ.Date("Date maximale"), Champ.Liste("Feuille", "RCS", "Judiciaire")],
-            Colonnes = ["Cellule", "Requête"],
-            Gestes = ["Générer le tableau Excel"],
-            Recherche = "Rechercher un indicateur, une feuille…",
-            Criteres = ["Date minimale", "Date maximale", "Feuille : RCS ou judiciaire"],
-            Valider = "Générer le tableau Excel", // proc_xpilotage.md, Rôle réel : « générateur de tableau de pilotage statistique Excel ».
+            Colonnes = ["Indicateur", "Cellule", "Valeur sur la période", "Valeur un an plus tôt", "Calcul"],
+            Gestes = ["Visualiser", "Archives"], // OPE_GENERER.cs:74 : APERCU renommé « Visualiser » (le classeur Excel) ; ARCHIVES (:416-425).
+            Recherche = "Rechercher un indicateur…",
+            Criteres = ["Date minimale", "Date maximale", "Feuille"], // OPE_GENERER : la période (par défaut le mois précédent, :123-143), les cases RCS et JUD.
+            Valider = "Visualiser", // OPE_GENERER.cs:74.
             Rang = 5,
-            Etats = EtatsEcran.Trois("À générer", "En cours", "Généré"),
+            Etats = [.. EtatsEcran.Trois("À calculer", "En cours", "Calculé"), new EtatEcran("Rejetee", "Non calculé", "rejetee")],
             Groupes = ["Feuille RCS", "Feuille judiciaire"],
             Sections =
             [
-                Marche("Période", "Les dates minimale et maximale sont substituées dans chaque requête.", true,
+                Marche("Période", "Les dates minimale et maximale remplacent @DateMin et @DateMax dans chaque requête ; la même période un an plus tôt donne la colonne voisine. Par défaut : le mois précédent.", true,
                     "Date minimale", "Date maximale"),
-                Marche("Requêtes", "Chaque requête de pilotage écrit son résultat dans la cellule qui lui est assignée, sur sa feuille.", true,
+                Marche("Requêtes", "Chaque requête de pilotage écrit son résultat dans la cellule qui lui est assignée, sur sa feuille. Une requête en erreur n'arrête pas le tableau.", true,
                     "Requête", "Cellule"),
-                Marche("Encaissements", "Les requêtes d'encaissement se calculent ligne par ligne.", false,
+                Marche("Encaissements", "Les requêtes d'encaissement se calculent ligne par ligne, plafonnées à l'encaissé net des débours.", false,
                     "Encaissements"),
                 Marche("Archives", "Le bouton Archives ouvre les tableaux générés précédemment.", false,
                     "Archives"),
             ],
             Lignes =
             [
-                Ligne("Feuille RCS · ligne 3 · colonne 2", "Requête à lancer", "Feuille RCS", "AFaire"),
-                Ligne("Feuille RCS · ligne 4 · colonne 2", "Résultat écrit", "Feuille RCS", "Validee", 0, 1),
-                Ligne("Feuille RCS · ligne 5 · colonne 2", "Encaissement calculé", "Feuille RCS", "EnCours", 0, 2),
-                Ligne("Feuille RCS · ligne 6 · colonne 2", "Requête à lancer", "Feuille RCS", "AFaire"),
-                Ligne("Feuille judiciaire · ligne 3 · colonne 2", "Résultat écrit", "Feuille judiciaire", "Validee", 0, 1),
-                Ligne("Feuille judiciaire · ligne 4 · colonne 2", "Requête en cours", "Feuille judiciaire", "EnCours", 0),
-                Ligne("Feuille judiciaire · ligne 5 · colonne 2", "Requête à lancer", "Feuille judiciaire", "AFaire"),
+                Ligne("Immat PP", "calculé du 01/02/2026 au 28/02/2026", "Feuille RCS", "Validee") with { Valeurs = ["Immat PP", "ligne 7 · colonne 2", "41", "38", "calculé du 01/02/2026 au 28/02/2026"] },
+                Ligne("Immat PM Com", "calculé du 01/02/2026 au 28/02/2026", "Feuille RCS", "Validee") with { Valeurs = ["Immat PM Com", "ligne 8 · colonne 2", "57", "61", "calculé du 01/02/2026 au 28/02/2026"] },
+                Ligne("Délai moyen CCI", "calculé du 01/02/2026 au 28/02/2026", "Feuille RCS", "Validee") with { Valeurs = ["Délai moyen CCI", "ligne 7 · colonne 6", "2,5", "3,1", "calculé du 01/02/2026 au 28/02/2026"] },
+                Ligne("Encaissements inscriptions", "non calculé : calcul d'encaissement ligne par ligne (TraiterEncaiss) non repris", "Feuille RCS", "Rejetee") with { Valeurs = ["Encaissements inscriptions", "ligne 28 · colonne 6", "", "", "non calculé : calcul d'encaissement ligne par ligne (TraiterEncaiss) non repris"] },
+                Ligne("Ordonnances IP", "calculé du 01/02/2026 au 28/02/2026", "Feuille judiciaire", "Validee") with { Valeurs = ["Ordonnances IP", "ligne 7 · colonne 2", "14", "12", "calculé du 01/02/2026 au 28/02/2026"] },
+                Ligne("Oppositions - IP", "calculé du 01/02/2026 au 28/02/2026", "Feuille judiciaire", "Validee") with { Valeurs = ["Oppositions - IP", "ligne 8 · colonne 2", "11", "15", "calculé du 01/02/2026 au 28/02/2026"] },
+                Ligne("RJ en LJ - Conversions", "calculé du 01/02/2026 au 28/02/2026", "Feuille judiciaire", "Validee") with { Valeurs = ["RJ en LJ - Conversions", "ligne 8 · colonne 10", "9", "7", "calculé du 01/02/2026 au 28/02/2026"] },
             ],
         },
     ];

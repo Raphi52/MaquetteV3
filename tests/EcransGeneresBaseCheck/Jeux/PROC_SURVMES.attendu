@@ -1,0 +1,6 @@
+# « Mesures » (LecteurSurveillanceMesures) sur PROC_SURVMES.sql : les evenements echus de la mesure 1500902 (PROC_MESIN.sql),
+# ordre numero de mesure decroissant puis evenement. Ecartes : 1900704 (echeance demain), 1900705 (survenu), 1900706 (delai expire),
+# 1900707 (MAXI demain l'emporte sur MINI hier). 1900702 n'a pas de code d'expiration : « Sans code d'expiration » (Rejetee).
+Mesure 2026M15902 | BANC9EXP Échéance du banc 9 · échéance {J-1} | Mesures à traiter | AFaire | []
+Mesure 2026M15902 | BANC9OBS Observation du banc 9 · échéance {J-2} · sans code d'expiration | Sans code d'expiration | Rejetee | []
+Mesure 2026M15902 | BANC9EXP Échéance du banc 9 · échéance {J+0} | Mesures à traiter | AFaire | []

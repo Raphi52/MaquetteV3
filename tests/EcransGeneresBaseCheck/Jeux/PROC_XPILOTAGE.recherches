@@ -1,0 +1,32 @@
+# « Pilotage » (LecteurPilotage.ChercherAsync) : la periode et la feuille choisies dans les parametres de l'ecran, recalculees
+# dans la base (les cases RCS / JUD et les dates de OPE_GENERER.cs:156-174) ; le texte filtre les libelles.
+
+# Le texte seul : la periode par defaut.
+texte: sans année
+lignes:
+Groupes du banc sans année précédente | période 2 · un an plus tôt sans objet | Feuille judiciaire | Validee | []
+---
+# La feuille RCS seule (case JUD decochee, :259-260) : la cellule de la feuille judiciaire n'est pas generee ; jumeau : bloc 1.
+texte: Groupes du banc
+critere: Feuille = RCS
+lignes:
+Groupes du banc | période 2 · un an plus tôt 1 | Feuille RCS | Validee | []
+---
+# Une autre periode : janvier 2000, ou aucun groupe du banc n'est ouvert -- les chiffres sont recalcules (0), l'annee precedente
+# aussi.
+texte: Groupes du banc
+critere: Date minimale = 2000-01-01
+critere: Date maximale = 2000-01-31
+lignes:
+Groupes du banc | période 0 · un an plus tôt 0 | Feuille RCS | Validee | []
+Groupes du banc sans année précédente | période 0 · un an plus tôt sans objet | Feuille judiciaire | Validee | []
+---
+# Refus de RIG v2 : un debut apres la fin (GenererDocument, :159-160) -- rien n'est calcule ; jumeau accepte : bloc 3.
+critere: Date minimale = 2000-02-01
+critere: Date maximale = 2000-01-31
+lignes:
+---
+# Refus de RIG v2 : une fin apres aujourd'hui (:161-162) ; jumeau accepte : bloc 3, une fin passee.
+critere: Date minimale = 2000-01-01
+critere: Date maximale = 2999-01-31
+lignes:
