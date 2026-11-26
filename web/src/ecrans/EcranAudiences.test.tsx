@@ -1,15 +1,32 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { EcranAudiences } from './EcranAudiences'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
 
-// Valeurs attendues : celles de la capture de l'ecran Blazor (18/11/2026) :
-// date proposee 16/09/2026 (JeuDemo.Aujourdhui + 7), 3 audiences programmees.
-function ouvrir() {
-  const pont = installerFauxPont({ 'EcranAudiences.DateProposee': () => '2026-09-16' })
-  return { pont, ...render(<EcranAudiences />) }
+// La demonstration du pont (Pont/EcranAudiences.cs, Exemple) telle qu'il la serialise : les trois audiences et les listes que
+// l'ecran declarait (capture de l'ecran Blazor, 18/11/2026) ; date proposee 16/09/2026 (JeuDemo.Aujourdhui + 7).
+const exemple = {
+  mode: 'demo', message: null, total: 3,
+  lignes: [
+    { date: '2026-09-15', heure: '09:00', type: 'Audience de procedure collective', chambre: '1re', section: 'A', publique: true, web: true, nbAffaires: 14 },
+    { date: '2026-09-22', heure: '10:15', type: 'Audience du juge-commissaire', chambre: '1re', section: 'A', publique: false, web: false, nbAffaires: 6 },
+    { date: '2026-09-29', heure: '14:00', type: 'Audience de plaidoirie', chambre: '2e', section: 'B', publique: true, web: true, nbAffaires: 9 },
+  ],
+  types: ['Audience de procedure collective', 'Audience de reference', 'Audience de plaidoirie', 'Audience de conciliation', 'Audience du juge-commissaire'],
+  chambres: ['1re', '2e', '3e'], sections: ['A', 'B', 'C'],
+  classements: ['Insuffisance d\'actif', 'Extinction du passif', 'Conversion en liquidation', 'Report'],
+}
+
+/** L'ecran monte, une fois la date proposee et la vue du pont arrivees. */
+async function ouvrir(vue: unknown = exemple) {
+  const pont = installerFauxPont({ 'EcranAudiences.DateProposee': () => '2026-09-16', 'EcranAudiences.Vue': () => vue })
+  const rendu = render(<EcranAudiences />)
+  await screen.findByDisplayValue('2026-09-16')
+  await vi.waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranAudiences.Vue'))
+  await vi.waitFor(() => expect(rendu.container.querySelector('.rig-eg-note')).not.toBeNull())
+  return { pont, ...rendu }
 }
 
 const espaces = (t: string | null | undefined) => (t ?? '').replace(/\s/g, ' ')
@@ -26,8 +43,8 @@ function deplier(rangee: HTMLTableRowElement): string[][] {
 
 describe('EcranAudiences', () => {
   it('affiche les audiences programmees et la date proposee par le pont', async () => {
-    const { container, pont } = ouvrir()
-    expect(await screen.findByDisplayValue('2026-09-16')).toBeTruthy()
+    const { container, pont } = await ouvrir()
+    expect(screen.getByDisplayValue('2026-09-16')).toBeTruthy()
     expect(pont.appels).toHaveBeenCalledWith('EcranAudiences.DateProposee')
     expect(container.querySelector('.rig-lm-titre')!.textContent).toBe('Audiences programmees')
     expect(synthese(container)).toBe('3 audiences · 2 publiques · 29 affaires')
@@ -47,10 +64,12 @@ describe('EcranAudiences', () => {
     // Le @bind d'un TimeOnly ecrivait « HH:mm:ss ».
     expect((container.querySelector('input[type="time"]') as HTMLInputElement).value).toBe('09:00:00')
     expect(screen.getByText('Envoi de mail actif').className).toBe('rig-etat rig-etat--ok')
+    // Sans serveur, la demonstration est dite.
+    expect(screen.getByRole('note').textContent).toContain('Audiences de démonstration')
   })
 
-  it('les bascules s\'allument et s\'eteignent : publique allumee, classement admis par defaut', () => {
-    ouvrir()
+  it('les bascules s\'allument et s\'eteignent : publique allumee, classement admis par defaut', async () => {
+    await ouvrir()
     const publique = screen.getByRole('button', { name: 'Audience publique' })
     const web = screen.getByRole('button', { name: 'Publiee sur le web' })
     expect(publique.className).toBe('rig-bascule rig-bascule--actif')
@@ -63,29 +82,58 @@ describe('EcranAudiences', () => {
     expect(screen.getByRole('button', { name: 'Report' }).className).toBe('rig-bascule rig-bascule--actif')
   })
 
-  it('« Creer l\'audience » ajoute la saisie, rangee par date, sans affaire', async () => {
-    const { container } = ouvrir()
-    await screen.findByDisplayValue('2026-09-16')
+  it('« Creer l\'audience » n\'ajoute rien et le dit : sans serveur, la demonstration', async () => {
+    const { container } = await ouvrir()
     fireEvent.change(container.querySelector('input[type="time"]')!, { target: { value: '14:30' } })
     fireEvent.change(screen.getByLabelText('Chambre'), { target: { value: '3e' } })
     fireEvent.click(screen.getByRole('button', { name: 'Creer l\'audience' }))
 
-    expect(synthese(container)).toBe('4 audiences · 3 publiques · 29 affaires')
-    expect(lignes(container)[1]).toEqual(['', '16/09/2026', '14:30', 'Audience de procedure collective', '3e', 'oui', '0'])
-    expect(deplier(rangees(container)[1]!)).toEqual([['Section', 'A'], ['Publiee sur le web', '—']])
+    expect(screen.getByRole('status').textContent).toBe('Démonstration : rien n\'est enregistré.')
+    expect(synthese(container)).toBe('3 audiences · 2 publiques · 29 affaires')
+  })
+
+  it('branche a la base : ses listes et ses audiences, aucune mention d\'exemple ; « Creer » dit que rien n\'est enregistre', async () => {
+    const pont = installerFauxPont({
+      'EcranAudiences.DateProposee': () => '2026-09-16',
+      'EcranAudiences.Vue': () => ({
+        mode: 'serveur', message: null, total: 1,
+        lignes: [{ date: '2026-12-01', heure: '14:00', type: 'Audience contentieuse', chambre: 'Chambre 1', section: '', publique: true, web: false, nbAffaires: 3 }],
+        types: ['Audience contentieuse'], chambres: ['Chambre 1'], sections: [], classements: ['Renvoi'],
+      }),
+    })
+    const { container } = render(<EcranAudiences />)
+    await vi.waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranAudiences.Vue'))
+    await vi.waitFor(() => expect(lignes(container)).toEqual([['', '01/12/2026', '14:00', 'Audience contentieuse', 'Chambre 1', 'oui', '3']]))
+    expect(screen.queryByRole('note')).toBeNull()
+    expect([...(screen.getByLabelText('Chambre') as HTMLSelectElement).options].map((o) => o.value)).toEqual(['Chambre 1'])
+    expect(screen.getByRole('button', { name: 'Renvoi' }).className).toBe('rig-bascule rig-bascule--actif')
+    await screen.findByDisplayValue('2026-09-16')
+    fireEvent.click(screen.getByRole('button', { name: 'Creer l\'audience' }))
+    expect(screen.getByRole('status').textContent).toContain('n\'est pas enregistrée')
+    expect(synthese(container)).toBe('1 audience · 1 publique · 3 affaires')
+  })
+
+  it('base injoignable : le motif, aucune audience ni liste', async () => {
+    const pont = installerFauxPont({
+      'EcranAudiences.DateProposee': () => '2026-09-16',
+      'EcranAudiences.Vue': () => ({ mode: 'erreur', message: 'Le serveur ne répond pas.', total: 0, lignes: [], types: [], chambres: [], sections: [], classements: [] }),
+    })
+    const { container } = render(<EcranAudiences />)
+    await vi.waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranAudiences.Vue'))
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas.')
+    expect(synthese(container)).toBe('0 audience · 0 publique · 0 affaire')
+    expect((screen.getByLabelText('Chambre') as HTMLSelectElement).options).toHaveLength(0)
   })
 
   it('sans date d\'audience, rien n\'est cree', async () => {
-    const { container } = ouvrir()
-    await screen.findByDisplayValue('2026-09-16')
+    const { container } = await ouvrir()
     fireEvent.change(container.querySelector('input[type="date"]')!, { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'Creer l\'audience' }))
     expect(synthese(container)).toBe('3 audiences · 2 publiques · 29 affaires')
   })
 
   it('« Aller a une audience… » (Ctrl K) filtre la liste affichee', async () => {
-    const { container } = ouvrir()
-    await screen.findByDisplayValue('2026-09-16')
+    const { container } = await ouvrir()
     const champ = screen.getByLabelText('Aller a une audience…')
     const touche = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true, cancelable: true })
     window.dispatchEvent(touche)

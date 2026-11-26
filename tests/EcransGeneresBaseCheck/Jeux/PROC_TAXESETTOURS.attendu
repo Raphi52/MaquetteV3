@@ -1,0 +1,15 @@
+# « Taxes et tours de rôle » (PROC_TAXESETTOURS) : le contenu des trois états de RIG v2 pour la période par défaut, du 1er janvier
+# au jour du banc (OPE_PERIODE.cs:31-32). D'abord les tours de rôle, triés par nom « NOM COMPLEMENT (ABREGE) », une ligne par
+# mandataire et fonction dont un tour est non nul (PlumitifPcTours.cs:84-117) ; puis les acomptes, puis les taxes, par mandataire.
+# Tours : MA17 liquidateur de 1316105 le 1er janvier (borne retenue ; jumeau écarté : MDJ de 1316106 le 31 décembre d'avant),
+# 20 salariés et CA 5 000 = tour 4 ; MA17 mandataire de 1316104 (10 salariés, CA 300) = tour 1 ; AD17 administrateur de 1316104
+# (CA 300) = tour 1 des conditions ADJ. Écartée : AD17 commissaire à l'exécution du plan (CEP, hors des fonctions des tours,
+# Tours.cs:158 ; jumeau : ADJ).
+# Acomptes et taxes : la somme par fonction (MDJ 100 + 20) ; écartés : la taxe du 31 décembre d'avant (jumeau : celle du 1er janvier)
+# et le chiffre NX17 (ni taxe ni acompte ; jumeau : TX17).
+ALPHA MANDATAIRE SELARL (MA17) | LIQ · tour N 0 · tour 1 0 · tour 2 0 · tour 3 0 · tour 4 1 · du 1er janvier à aujourd'hui | Tours de rôle | Validee | []
+ALPHA MANDATAIRE SELARL (MA17) | MDJ · tour N 0 · tour 1 1 · tour 2 0 · tour 3 0 · tour 4 0 · du 1er janvier à aujourd'hui | Tours de rôle | Validee | []
+BETA ADMINISTRATEUR SCP (AD17) | ADJ · tour N 0 · tour 1 1 · tour 2 0 · tour 3 0 · tour 4 0 · du 1er janvier à aujourd'hui | Tours de rôle | Validee | []
+BETA ADMINISTRATEUR SCP | ADJ 75,25 € · du 1er janvier à aujourd'hui | Acomptes | Validee | []
+ALPHA MANDATAIRE SELARL | LIQ 30,00 € · MDJ 120,00 € · du 1er janvier à aujourd'hui | Taxes | Validee | []
+BETA ADMINISTRATEUR SCP | CEP 10,00 € · du 1er janvier à aujourd'hui | Taxes | Validee | []

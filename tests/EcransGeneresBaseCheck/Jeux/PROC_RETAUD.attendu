@@ -1,0 +1,17 @@
+# « Retour d'audience » (PROC_RETAUD) sans recherche : les affaires au rôle des audiences de la fenêtre de RIG v2,
+# [jour - INTERV_AUD_DATE_MIN_RETAUD ; jour + INTERV_AUD_DATE_MAX_RETAUD] (OPE_INFORMATIONS_AUDIENCE.cs:107-114), ici [J-10 ; J]
+# (le jeu pose MIN = 10 ; MAX absent = 0). Écartées : 1700505 (audience à J-11, jumeau retenu 1700501 à J-10), 1700507 et 1700509
+# (audience à J+1, jumeau retenu 1700506 aujourd'hui), 1700508 (cabinet : le mode par défaut est l'audience, PROC_RETAUD.cs:85-87),
+# les audiences de 2001 (hors fenêtre). Ordre : audience (date, heure), numéro d'appel, rôle.
+# Groupes (FiltreAffichage, OPE_LIST_APPEL_AFFAIRE.cs:553-598) : 1700501 non traité et prononcé (TC17P) -> « Prononcés à traiter » ;
+# 1700503 non traité -> « Affaires à traiter » ; 1700502 traité -> « Affaires traitées » ; 1700504 traité avec une publicité en
+# attente -> « Publicités en attente ». Le prochain appel de 1700501 : son appel à J+1 (OPE_LIST_APPEL_AFFAIRE.cs:582).
+ALPHA AUD c/ BETA AUD | Rôle 2026J17001 · appel n° TC17P 1 · Audience du {J-10} à 09:00 - Chambre Première du banc (C17) · résultat à saisir · prochain appel le {J+1} | Prononcés à traiter | AFaire | []
+GAMMA AUD | Rôle 2026J17002 · appel n° TC17 2 · Audience du {J-10} à 09:00 - Chambre Première du banc (C17) · résultat R17S | Affaires traitées | Validee | []
+DELTA AUD | Rôle 2026J17003 · appel n° TC17 3 · Audience du {J-10} à 09:00 - Chambre Première du banc (C17) · résultat à saisir | Affaires à traiter | AFaire | []
+EPSILON AUD | Rôle 2026J17004 · appel n° TC17P 4 · Audience du {J-10} à 09:00 - Chambre Première du banc (C17) · résultat J | Publicités en attente | EnAttente | []
+# Les deux affaires que le jeu PROC_MPCS pose sur cette audience (une PC à traiter, une PC traitée).
+PC MPCS AUD | Rôle 2026P17501 · appel n° TC17 5 · Audience du {J-10} à 09:00 - Chambre Première du banc (C17) · résultat à saisir | Affaires à traiter | AFaire | []
+PC TRAITEE AUD | Rôle 2026P17502 · appel n° TC17P 6 · Audience du {J-10} à 09:00 - Chambre Première du banc (C17) · résultat J | Affaires traitées | Validee | []
+# L'audience du jour, sans heure, en section : son libellé prend la section avant la chambre (AudienceCabinet.cs:1122-1126).
+ZETA AUD | Rôle 2026J17005 · Audience du {J+0} à  - Section Commerciale (S17) · résultat à saisir | Affaires à traiter | AFaire | []

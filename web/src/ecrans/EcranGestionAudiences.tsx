@@ -26,8 +26,16 @@
 // Juge ou Section, Type de classement en point d'etat). Les sept autres colonnes de la v2 (Code de cabinet,
 // Greffier, Public, suppression, Web) sont dans la ligne depliee ; Greffier n'y figure qu'en recherche par
 // cabinets, comme la colonne v2. Ni menu ni action de ligne : la liste n'en avait pas. Criteres inchanges.
+//
+// LA BASE DU GREFFE (plan « RIG v3 100 % fonctionnel », lot 7, 26/11/2026, marche du lot 17) : les lignes viennent du pont
+// (Pont/EcranGestionAudiencesBase.cs → Serveur/Socle/EcransMain/LectureGestionAudiences.cs) : les audiences et cabinets
+// SUPPRIMES (AUDIENCE_CABINET_SUPPRIMEE), comme PROC_GESTAUDS ; la bascule « Recherche par cabinets » choisit le mode de RIG v2
+// (AUDNCS_AUDIENCE). Sans serveur, les cinq audiences de demonstration du pont (sans mode : la bascule ne les filtre pas),
+// marquees « exemple » (ProvenanceEcran) ; en panne, le motif et aucune ligne. Les criteres filtrent a l'ecran, inchanges.
 
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
+import { appeler } from '../pont'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { distinctsTries, entierLisible } from '../criteres'
 import {
   CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, normaliser,
@@ -51,21 +59,17 @@ interface Audience {
   auteurSuppression: string
   dateSuppression: string
   envoiSuppression: string
+  /** Le mode de RIG v2 (cabinet ou audience) d'une ligne lue en base ; absent dans la demonstration. */
+  cabinet?: boolean | null
 }
 
-const a = (jour: string, date: string, heure: string, type: string, codeCabinet: string, typeCabinet: string,
-           juge: string, section: string, chambre: string, greffier: string, typeClassement: string,
-           pub: boolean, auteurSuppression: string, dateSuppression: string, envoiSuppression: string): Audience =>
-  ({ jour, date, heure, type, codeCabinet, typeCabinet, juge, section, chambre, greffier, typeClassement,
-     public: pub, auteurSuppression, dateSuppression, envoiSuppression })
-
-const Audiences: Audience[] = [
-  a('Lundi',    '14/09/2026', '09h00', 'Audience de procedure', 'CAB-01', 'Cabinet du president',  'Mme LEROY', '1re section', '1re chambre', 'M. PETIT',  'Renvoi',           true,  '',        '',           ''),
-  a('Lundi',    '14/09/2026', '10h30', 'Audience publique',     'CAB-01', 'Cabinet du president',  'Mme LEROY', '1re section', '1re chambre', 'M. PETIT',  'Mise en delibere', true,  '',        '',           ''),
-  a('Mardi',    '15/09/2026', '14h00', 'Cabinet du juge',       'CAB-03', 'Cabinet du rapporteur', 'M. DUVAL',  '2e section',  '2e chambre',  'Mme FAURE', 'Renvoi',           false, '',        '',           ''),
-  a('Jeudi',    '17/09/2026', '09h30', 'Audience publique',     '',       '',                      'M. DUVAL',  '2e section',  '2e chambre',  '',          'Radiation',        true,  'rvilain', '02/09/2026', 'Envoye'),
-  a('Vendredi', '18/09/2026', '11h00', 'Audience de procedure', 'CAB-02', 'Cabinet du president',  'Mme LEROY', '3e section',  '1re chambre', 'M. PETIT',  'Clos',             true,  '',        '',           ''),
-]
+/** Ce que le pont rend (Pont/EcranGestionAudiences.cs, VueGestionAudiences). */
+interface VueGestionAudiences {
+  lignes: Audience[]
+  mode?: ModeLecture
+  message?: string | null
+  total: number
+}
 
 const vide = (valeur: string): string => (valeur === '' ? '—' : valeur)
 
@@ -89,9 +93,10 @@ interface CriteresGestion {
   maxResultats: number
 }
 
-/** Le filtre de OPE_RECHERCHE_GESTAUDS, borne au nombre maximum : la liste, et le compte de chaque vue. */
-function filtrer(c: CriteresGestion): Audience[] {
-  let q = Audiences
+/** Le filtre de OPE_RECHERCHE_GESTAUDS, borne au nombre maximum : la liste, et le compte de chaque vue. Le mode (cabinet ou
+ *  audience, AUDNCS_AUDIENCE) ne filtre que les lignes lues en base, qui le portent. */
+function filtrer(source: Audience[], modeCabinet: boolean, c: CriteresGestion): Audience[] {
+  let q = source.filter((x) => x.cabinet === undefined || x.cabinet === null || x.cabinet === modeCabinet)
   if (c.critType !== '') q = q.filter((x) => x.type === c.critType)
   if (c.critChambre !== '') q = q.filter((x) => x.chambre === c.critChambre)
   if (c.critSection !== '') q = q.filter((x) => x.section === c.critSection)
@@ -104,11 +109,10 @@ function filtrer(c: CriteresGestion): Audience[] {
   return q.slice(0, Math.max(1, c.maxResultats))
 }
 
-/** Les vues : « Toutes », puis chaque type d'audience (le critere « Type d'audience » preregle). */
-const Types = distinctsTries(Audiences.map((x) => x.type))
-export const VuesAudiences: ReadonlyArray<{ cle: string; libelle: string; critType: string }> = [
+/** Les vues : « Toutes », puis chaque type d'audience des lignes (le critere « Type d'audience » preregle). */
+const vuesDe = (source: Audience[]): ReadonlyArray<{ cle: string; libelle: string; critType: string }> => [
   { cle: 'toutes', libelle: 'Toutes', critType: '' },
-  ...Types.map((t) => ({ cle: t, libelle: t, critType: t })),
+  ...distinctsTries(source.map((x) => x.type)).map((t) => ({ cle: t, libelle: t, critType: t })),
 ]
 
 const TeinteType: Record<string, Teinte> = { 'Audience de procedure': 'orange', 'Audience publique': 'bleu', 'Cabinet du juge': 'violet' }
@@ -138,10 +142,21 @@ export function EcranGestionAudiences() {
     if (n !== null) setMaxResultats(n)
   }
 
+  // null tant que le pont n'a pas repondu : aucune ligne, jamais la demonstration a la place de la base.
+  const [vue, setVue] = useState<VueGestionAudiences | null>(null)
+  useEffect(() => {
+    let perime = false
+    void appeler<VueGestionAudiences>('EcranGestionAudiences.Vue').then((v) => { if (!perime) setVue(v) })
+    return () => { perime = true }
+  }, [])
+  const Audiences = vue?.lignes ?? []
+  const VuesAudiences = vuesDe(Audiences)
+
   const criteres: CriteresGestion = {
     dateDebut, dateFin, critType, critChambre, critSection, critJuge, critTypeCabinet, critCodeCabinet, critClassement, maxResultats,
   }
-  const trouvees = filtrer(criteres)
+  const filtrerIci = (c: CriteresGestion) => filtrer(Audiences, modeCabinet, c)
+  const trouvees = filtrerIci(criteres)
 
   // La ligne depliee par son chevron (une a la fois) : l'audience elle-meme.
   const [ouverte, setOuverte] = useState<Audience | null>(null)
@@ -254,7 +269,9 @@ export function EcranGestionAudiences() {
                        {publiques > 1 ? ' publiques · ' : ' publique · '}<b>{supprimees}</b>{supprimees > 1 ? ' supprimees' : ' supprimee'}</>}
                      filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a une audience…' }} />
 
-        <VuesListe vues={VuesAudiences.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer({ ...criteres, critType: v.critType }).length }))}
+        {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Audiences" />}
+
+        <VuesListe vues={VuesAudiences.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrerIci({ ...criteres, critType: v.critType }).length }))}
                    active={VuesAudiences.find((v) => v.critType === critType)?.cle ?? null}
                    choisir={(cle) => { const v = VuesAudiences.find((x) => x.cle === cle); if (v) setCritType(v.critType) }} />
 

@@ -1,0 +1,18 @@
+# Les recherches de LecteurConvocations : le jour du cabinet (la recherche de RIG v2 où l'on change les dates) et le texte.
+# Dates fixes (2001) : ces lignes ne prennent pas de date relative. Format : en tête de tests/EcransGeneresBaseCheck/Program.cs.
+
+# 1. Le jour remplace la fenêtre : le cabinet du 01/08/2001 et son instance à citer.
+critere: Date de l'audience = 2001-08-01
+lignes:
+CONVOC RECHERCHE SARL | Rôle 2026J17610 · LRAR 1A170600020 du 06/07/2001 · Cabinet du 01/08/2001 à 10:00 - | Citations à envoyer | AFaire | []
+---
+# 2. Le champ de recherche cherche dans le numéro de rôle (jumeau : bloc 1, sans texte) ; un autre rôle ne rend rien (bloc 3).
+texte: 2026J17610
+critere: Date de l'audience = 2001-08-01
+lignes:
+CONVOC RECHERCHE SARL | Rôle 2026J17610 · LRAR 1A170600020 du 06/07/2001 · Cabinet du 01/08/2001 à 10:00 - | Citations à envoyer | AFaire | []
+---
+# 3. Un rôle qui n'est pas à ce cabinet.
+texte: 2026J17601
+critere: Date de l'audience = 2001-08-01
+lignes:

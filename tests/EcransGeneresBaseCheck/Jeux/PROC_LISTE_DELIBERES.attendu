@@ -1,0 +1,9 @@
+# « Délibérés » (PROC_LISTE_DELIBERES) aux valeurs par défaut de RIG v2 (frmListeDelibere.cs) : référence = dernier jour du mois
+# précédent, durée 60 jours, contentieux (07) seul ; numéro de rôle décroissant (:170).
+# Retenues : 1701004 (délibéré 90 jours avant ; sa décision n'est que PRÉVUE après la référence -- jumeau écarté 1701003, décision
+# rendue avant la référence, :145-151) ; 1701001 (délibéré 60 jours avant, borne retenue -- jumeau écarté 1701002, 59 jours, :176).
+# Écartées : 1701005 (procédure collective, type non coché par défaut ; jumeau 1701001), 1701006 (délibéré REPOUSSÉ seul, :141 ;
+# jumeau 1701001), 1701007 (enrôlée après la référence, :162), 1701008 (délibéré après la référence, :143), 1701009 (sans délibéré :
+# la jointe de 1701001, qui la montre dans « N° joints »).
+DELIB D | Rôle 2026J17104 · 90 jours de délibéré | Délibérés non rendus | AFaire | []
+DELIB A | Rôle 2026J17101 · 60 jours de délibéré · juge JUGEDELIB Anne | Délibérés non rendus | AFaire | []

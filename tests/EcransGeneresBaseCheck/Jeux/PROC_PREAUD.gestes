@@ -1,0 +1,50 @@
+# Les gestes de EcrivainPreparationAudience (« Préparation d'audience », PROC_PREAUD) : « Valider » attribue les numéros d'appel,
+# joué par la route POST sur les audiences d'octobre 2001 de PROC_PREAUD.sql (hors de la fenêtre : les lignes relues sans
+# recherche ne bougent pas, les écritures se contrôlent par « controle: »). Format : en tête de tests/EcransGeneresBaseCheck/Program.cs.
+# Un refus n'écrit rien ; chaque refus a son jumeau accepté.
+
+# 1. Une audience absente de la base. Jumeau : bloc 3.
+geste: Decider Valider
+ids: 1703999
+resultat: refuse
+message: L'audience « 1703999 » n'est pas dans la base du greffe.
+---
+# 2. Numéros déjà attribués, tous présents, case « Recalculer » non cochée : rien ne change, le message de RIG v2
+#    (OPE_RECHERCHE_PLUMITIF.cs:36, :38). Jumeau : bloc 5 (case cochée).
+geste: Decider Valider
+ids: 1703122
+resultat: refuse
+message: Audience du 03/10/2001 à 09:00 - Chambre Numérotation simple (P17S) : Les numéros d'appel ont déjà été attribués. Vous pouvez cependant relancer le calcul en cochant la case appropriée.
+---
+# 3. Numéros non attribués, chambre « par type de classement » (AudienceCabinet.cs:1592-1631) : TP2 (hors types admis) avant TP1
+#    (admis), l'heure d'appel 08:30 avant l'heure de l'audience, puis les rôles croissants ; préfixe par type, l'audience marquée.
+geste: Decider Valider
+ids: 1703120
+resultat: fait
+message: Numéros d'appel attribués : 4 affaires sur 1 audience.
+controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, '=', APPAF_NUM_APPEL), ',') WITHIN GROUP (ORDER BY APPAF_NUM_APPEL) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_ADNC = 1703120 => 1703523=01_001,1703522=01_002,1703524=02_001,1703521=02_002
+controle: SELECT CAST(AUDNC_NUM_APPEL_ATTRIB AS int) FROM v2.AUDIENCE_CABINET WHERE AUDNC_ID_ADNC = 1703120 => 1
+---
+# 4. Une audience « sans type, rôles décroissants » et un cabinet (son code cabinet : sans type, croissant), ensemble. L'instance
+#    dont l'instance principale est au rôle de la même audience se range sous le rôle de celle-ci (Instance.cs:1033-1040).
+geste: Decider Valider
+ids: 1703121,1703124
+resultat: fait
+message: Numéros d'appel attribués : 5 affaires sur 2 audiences.
+controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, '=', APPAF_NUM_APPEL), ',') WITHIN GROUP (ORDER BY APPAF_ID_ADNC, APPAF_NUM_APPEL) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_ADNC IN (1703121, 1703124) => 1703532=01_001,1703531=01_002,1703533=01_003,1703562=01_001,1703561=01_002
+---
+# 5. Le jumeau du bloc 2 : « Recalculer les n° d'appel » coché, l'ordre se refait (rôles décroissants) et les numéros avec.
+geste: Decider Valider
+ids: 1703122
+valeur: Recalculer les n° d'appel = oui
+resultat: fait
+message: Numéros d'appel attribués : 2 affaires sur 1 audience.
+controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, '=', APPAF_NUM_APPEL), ',') WITHIN GROUP (ORDER BY APPAF_NUM_APPEL) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_ADNC = 1703122 => 1703542=01_001,1703541=01_002
+---
+# 6. Numéros attribués mais un appel sans numéro, sans recalcul (DoPreparerSauvegarde, OPE_EDIT_PLUMITIF.cs:291-300) : l'ordre des
+#    numéros existants est gardé, l'appel sans numéro passe dernier (« 0021 », AudienceCabinet.cs:1660-1667).
+geste: Decider Valider
+ids: 1703123
+resultat: fait
+message: Numéros d'appel attribués : 3 affaires sur 1 audience.
+controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, '=', APPAF_NUM_APPEL), ',') WITHIN GROUP (ORDER BY APPAF_NUM_APPEL) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_ADNC = 1703123 => 1703552=01_001,1703551=01_002,1703553=01_003

@@ -1,0 +1,5 @@
+# « Mise au point chambres » (PROC_MPCS) sans recherche : les affaires du rôle du retour d'audience (fenêtre INTERV_AUD_DATE_*_RETAUD,
+# ici [J-10 ; J], posée par PROC_RETAUD.sql) qui portent une procédure collective et ne sont pas traitées -- celles sur lesquelles
+# RIG v2 ouvre MPCS (OPE_LIST_APPEL_AFFAIRE.cs:1409-1412). Écartées : 1705002 (PC déjà traitée ; jumeau 1705001), les affaires sans
+# PC des autres jeux (PROC_RETAUD : 1700501 a 1700506 ; jumeau 1705001). Sans ligne dans PROCEDURE_COLLECTIVE, pas de numéro de PC.
+PC MPCS AUD | Rôle 2026P17501 · appel n° TC17 5 · Audience du {J-10} à 09:00 - Chambre Première du banc (C17) | Procédures collectives à l'audience | AFaire | []

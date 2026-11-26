@@ -1,0 +1,18 @@
+# Les recherches de LecteurPreparationAudience : le jour, le mode (A / P / C, proc_preaud.md:21-23). Dates fixes (2001).
+
+# 1. Le jour, en mode audience par défaut : l'audience du 01/06/2001 (le cabinet du même jour est écarté ; jumeau : bloc 2).
+critere: Date de l'audience = 2001-06-01
+lignes:
+Audience du 01/06/2001 à 09:00 - Chambre Préparation du banc (C17E) | 0 affaire au rôle · numéros d'appel attribués | Audiences | EnCours | []
+---
+# 2. Mode C (cabinet) : le cabinet du même jour, au nom de son juge (AudienceCabinet.cs:1108-1115).
+critere: Date de l'audience = 2001-06-01
+critere: Mode = Cabinet
+lignes:
+Cabinet du 01/06/2001 à 10:00 - JUGEPREP Eve | 1 affaire au rôle · numéros d'appel à attribuer | Cabinets | AFaire | []
+---
+# 3. Mode P (procédures collectives) : il cherche des audiences, comme le mode A (ETP.cs:54-62).
+critere: Date de l'audience = 2001-06-01
+critere: Mode = Procédures collectives
+lignes:
+Audience du 01/06/2001 à 09:00 - Chambre Préparation du banc (C17E) | 0 affaire au rôle · numéros d'appel attribués | Audiences | EnCours | []

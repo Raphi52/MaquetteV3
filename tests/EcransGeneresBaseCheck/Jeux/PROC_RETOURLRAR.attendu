@@ -6,6 +6,8 @@
 # ou incomplets ; NON_RECLAME Non reclames ; PAS_ENVOYE Non envoyes.
 # Ecartes, chacun avec son jumeau retenu 1A1200001 : 1A1200007 sans modalite (accuse pas revenu), 1A1200008 lettre
 # electronique CIPREMIUM_LRAR (retour ecrit par La Poste), 1A1200009 modalite vide.
+# Les LRAR de PROC_GCONV.sql revenues (1A170600015 reçue, 1A170600013 NPAI, le 09/07/2001) entrent aussi dans cet écran ;
+# celles sans retour (TYPE_DATE vide) n'y entrent pas.
 Pli 1A1200004 | Incomplet reçu · date non précisée sur l'imprimé | NPAI, refusés ou incomplets | EnCours | [0,1]
 Pli 1A1200001 | Reçu le {J-1} | Reçus | Validee | [0,1,2]
 Pli 1A1200002 | NPAI reçu le {J-2} · renvoyé sous le n° 1A1200011 | NPAI, refusés ou incomplets | Validee | [0,1,2]
@@ -13,3 +15,5 @@ Pli 1A1200003 | Refusé reçu le {J-3} | NPAI, refusés ou incomplets | Validee 
 Pli 1A1200005 | Non réclamé reçu le {J-4} | Non réclamés | Validee | [0,1,2]
 Pli 1A1200006 | Non envoyé le {J-5} · demandes d'édition remises en file d'émission · LR sans accusé de réception | Non envoyés | Validee | [0,1,2,3]
 Pli 1A1200010 | modalité « INCONNU » de l'ancien RIG · le {J-6} | NPAI, refusés ou incomplets | Validee | [0,1,2]
+Pli 1A170600015 | Reçu le 09/07/2001 | Reçus | Validee | [0,1,2]
+Pli 1A170600013 | NPAI reçu le 09/07/2001 | NPAI, refusés ou incomplets | Validee | [0,1,2]

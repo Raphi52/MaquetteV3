@@ -24,7 +24,8 @@ using RigV3Desktop.Pont;
 //   3. les PONTS des cinq ecrans contre ce serveur (mode « serveur », lignes de la base, aucune de JeuDemo), sans serveur
 //      (mode « demo » : JeuDemo, que l'ecran marque « exemple »), sans greffe et en panne (le motif, AUCUNE ligne) ; et le
 //      geste « Ouvrir un dossier » branche : refuse, rien d'ecrit ;
-//   4. (lot 5) « Dépôts judiciaires » : sa lecture, sa route et son pont, sur la meme marche.
+//   4. (lot 5) « Dépôts judiciaires » : sa lecture, sa route et son pont, sur la meme marche ;
+//   5. (lot 7) « Créer une audience » et « Gestion des audiences » : leurs lectures, routes et ponts, sur la meme marche.
 // Identifiants des jeux : a partir de 2 700 000 ((10 + 17) x 100 000, regle du plan). Il lui faut le SQL Server de
 // developpement : « docker compose up -d » a la racine du depot.
 
@@ -490,6 +491,108 @@ Exiger(depBase is { Mode: "serveur", Total: 2 } && depBase.Lignes[1] is { Etat: 
 Exiger((await EcranDepotsJud.VueAsync(null, null)) is { Mode: "demo", Lignes.Length: 4 }, "pont Depots judiciaires sans serveur : la demonstration, mode « demo »");
 Exiger((await EcranDepotsJud.VueAsync(client, GreffeAbsent)) is { Mode: "erreur", Lignes.Length: 0, Message: not null },
     "pont Depots judiciaires, greffe absent : le motif, AUCUNE ligne");
+
+// ============================================================ 5. AUDIENCES (LectureAudiences.cs, LectureGestionAudiences.cs, lot 7)
+// « Créer une audience » (PROC_AUDIENCE) : les listes de saisie (valeurs *_UTILISABLE_SAISIE, types d'AUDIENCE seuls,
+// OPE_CREATION_AUDIENCE.cs:30-36) et les audiences a venir (AUDNC_AUDIENCE = 1, du jour et apres, affaires au role).
+// « Gestion des audiences » (PROC_GESTAUDS) : AUDIENCE_CABINET_SUPPRIMEE, cabinets et audiences, date puis heure
+// (OPE_RECHERCHE_GESTAUDS.cs:170, :285-290, :352-357). Identifiants 1 790 0xx (lot 7 : 1 700 000 a 1 799 999).
+await Sql("""
+    CREATE TABLE v2.TYPE_AUD_CAB (R_TYPEAUDCAB_VALEUR varchar(5) NOT NULL PRIMARY KEY, R_TYPEAUDCAB_LIBELLE_ECRAN varchar(35) NOT NULL,
+        R_TYPEAUDCAB_UTILISABLE_SAISIE bit NOT NULL, R_TYPEAUDCAB_AUDIENCE bit NOT NULL);
+    CREATE TABLE v2.CHAMBRE (R_CHAMBRE_VALEUR varchar(5) NOT NULL PRIMARY KEY, R_CHAMBRE_LIBELLE_ECRAN varchar(35) NOT NULL, R_CHAMBRE_UTILISABLE_SAISIE bit NOT NULL);
+    CREATE TABLE v2.SECTION (R_SECTION_VALEUR varchar(10) NOT NULL PRIMARY KEY, R_SECTION_LIBELLE_ECRAN varchar(35) NOT NULL, R_SECTION_UTILISABLE_SAISIE bit NOT NULL);
+    CREATE TABLE v2.TYPE_CLASSEMENT (R_TYPECLASSE_VALEUR varchar(5) NOT NULL PRIMARY KEY, R_TYPECLASSE_LIBELLE_ECRAN varchar(35) NOT NULL,
+        R_TYPECLASSE_UTILISABLE_SAISIE bit NOT NULL);
+    CREATE TABLE v2.CODE_CABINET (R_CODECABINE_VALEUR varchar(10) NOT NULL PRIMARY KEY, R_CODECABINE_LIBELLE_ECRAN varchar(35) NOT NULL);
+    CREATE TABLE v2.JUGE (JUG_ID_JUG int NOT NULL PRIMARY KEY, JUG_ABREGE varchar(16) NULL, JUG_CIVILITE varchar(7) NOT NULL, JUG_NOM varchar(35) NOT NULL,
+        JUG_PRENOM varchar(20) NULL);
+    CREATE TABLE v2.GREFFIER_ASSERMENTE (GRASS_ID_GRASS int NOT NULL PRIMARY KEY, GRASS_ABREGE varchar(16) NOT NULL, GRASS_CIVILITE varchar(7) NOT NULL,
+        GRASS_NOM varchar(35) NOT NULL, GRASS_PRENOM varchar(20) NULL);
+    CREATE TABLE v2.AUDIENCE_CABINET (AUDNC_ID_ADNC int NOT NULL PRIMARY KEY, AUDNC_AUDIENCE bit NOT NULL, AUDNC_TYPE_AUD_CAB varchar(5) NOT NULL,
+        AUDNC_DATE datetime NULL, AUDNC_HEURE varchar(5) NULL, AUDNC_PUBLIQUE bit NOT NULL, AUDNC_CHAMBRE varchar(5) NULL, AUDNC_SECTION varchar(10) NULL,
+        AUDNC_NON_DISPONIBLE_WEB bit NOT NULL);
+    CREATE TABLE v2.APPEL_AFFAIRE (APPAF_ID_APPAF int NOT NULL PRIMARY KEY, APPAF_ID_ADNC int NULL);
+    CREATE TABLE v2.AUDIENCE_CABINET_SUPPRIMEE (AUDNCS_ID_AUDNCS int NOT NULL PRIMARY KEY, AUDNCS_ID_AUDNC int NOT NULL, AUDNCS_AUDIENCE bit NOT NULL,
+        AUDNCS_TYPE_AUD_CAB varchar(5) NOT NULL, AUDNCS_TYPE_CLASSEMENT_ADMIS varchar(128) NULL, AUDNCS_DATE datetime NULL, AUDNCS_HEURE varchar(5) NULL,
+        AUDNCS_PUBLIQUE bit NOT NULL, AUDNCS_CHAMBRE varchar(5) NULL, AUDNCS_SECTION varchar(10) NULL, AUDNCS_ID_JUG int NULL, AUDNCS_ID_GRASS int NULL,
+        AUDNCS_CODE_CABINET varchar(10) NULL, AUDNCS_NON_DISPONIBLE_WEB bit NOT NULL, AUDNCS_DATE_DIFFUSION datetime NULL,
+        AUDNCS_AUTEUR_SUPPRESSION varchar(255) NOT NULL, AUDNCS_DATE_SUPPRESSION datetime NOT NULL);
+    """);
+// Listes : un type de CABINET (R_TYPEAUDCAB_AUDIENCE = 0) et une valeur non utilisable en saisie, ecartes (jumeaux des retenus).
+// Audiences : 1790001 aujourd'hui (borne : retenue, 2 affaires), 1790002 dans 10 jours (non disponible web), 1790003 hier (ecartee),
+// 1790004 un CABINET dans 5 jours (ecarte), 1790005 dans 10 jours a 08:30 (avant 1790002 : l'heure ordonne a date egale).
+await Sql("""
+    INSERT INTO v2.TYPE_AUD_CAB VALUES ('AC79', 'Audience contentieuse 79', 1, 1), ('AX79', 'Audience hors saisie 79', 0, 1), ('CB79', 'Cabinet 79', 1, 0);
+    INSERT INTO v2.CHAMBRE VALUES ('C179', 'Chambre un 79', 1), ('C979', 'Chambre close 79', 0);
+    INSERT INTO v2.SECTION VALUES ('S179', 'Section un 79', 1), ('S979', 'Section close 79', 0);
+    INSERT INTO v2.TYPE_CLASSEMENT VALUES ('RE79', 'Renvoi 79', 1), ('XX79', 'Classement clos 79', 0);
+    INSERT INTO v2.CODE_CABINET VALUES ('CAB79', 'Cabinet du banc 79');
+    INSERT INTO v2.JUGE VALUES (1790201, 'JB79', 'M.', 'MARTIN', 'Paul'), (1790202, 'JV79', 'Mme', '', NULL);
+    INSERT INTO v2.GREFFIER_ASSERMENTE VALUES (1790301, 'GB79', 'Mme', 'DURAND', 'Anne');
+    """);
+await Sql("""
+    INSERT INTO v2.AUDIENCE_CABINET VALUES
+        (1790001, 1, 'AC79', @j0, '14:00', 1, 'C179', 'S179', 0),
+        (1790002, 1, 'AC79', @j10, '09:00', 0, 'C179', NULL, 1),
+        (1790003, 1, 'AC79', @jm1, '09:00', 1, 'C179', 'S179', 0),
+        (1790004, 0, 'CB79', @j5, '10:00', 0, NULL, NULL, 0),
+        (1790005, 1, 'AC79', @j10, '08:30', 1, 'C179', 'S179', 0);
+    INSERT INTO v2.APPEL_AFFAIRE VALUES (1790101, 1790001), (1790102, 1790001), (1790103, 1790003);
+    INSERT INTO v2.AUDIENCE_CABINET_SUPPRIMEE (AUDNCS_ID_AUDNCS, AUDNCS_ID_AUDNC, AUDNCS_AUDIENCE, AUDNCS_TYPE_AUD_CAB, AUDNCS_TYPE_CLASSEMENT_ADMIS,
+        AUDNCS_DATE, AUDNCS_HEURE, AUDNCS_PUBLIQUE, AUDNCS_CHAMBRE, AUDNCS_SECTION, AUDNCS_ID_JUG, AUDNCS_ID_GRASS, AUDNCS_CODE_CABINET,
+        AUDNCS_NON_DISPONIBLE_WEB, AUDNCS_DATE_DIFFUSION, AUDNCS_AUTEUR_SUPPRESSION, AUDNCS_DATE_SUPPRESSION) VALUES
+        (1790401, 1790091, 1, 'AC79', 'RE79', '20260305', '14:00', 1, 'C179', 'S179', NULL, NULL, NULL, 1, '20260307', 'agent.y', '20260306'),
+        (1790402, 1790092, 0, 'CB79', NULL, '20260303', '09:00', 0, NULL, NULL, 1790201, 1790301, 'CAB79', 0, NULL, 'agent.x', '20260304'),
+        (1790403, 1790093, 0, 'CB79', NULL, '20260303', '08:00', 0, NULL, NULL, 1790202, NULL, NULL, 0, NULL, 'agent.z', '20260304');
+    """, ("@j0", jour), ("@j10", jour.AddDays(10)), ("@jm1", jour.AddDays(-1)), ("@j5", jour.AddDays(5)));
+await using (var cn = new SqlConnection(greffe.Connexion))
+{
+    await cn.OpenAsync();
+    var aud = await LectureAudiences.LireAsync(cn, jour, CancellationToken.None);
+    Exiger(aud.Total == 3 && aud.Lignes.Select(a => (a.Date, a.Heure)).SequenceEqual([(jour, "14:00"), (jour.AddDays(10), "08:30"), (jour.AddDays(10), "09:00")]),
+        $"audiences a venir : du jour (borne retenue) et apres, la veille et le cabinet ecartes, date puis heure ({string.Join(",", aud.Lignes.Select(a => a.Heure))})");
+    Exiger(aud.Lignes[0] is { Type: "Audience contentieuse 79", Chambre: "Chambre un 79", Section: "Section un 79", Publique: true, NonDisponibleWeb: false, Affaires: 2 }
+           && aud.Lignes[2] is { Publique: false, NonDisponibleWeb: true, Affaires: 0, Section: "" },
+        "audiences a venir : libelles du type, de la chambre et de la section ; affaires au role (APPEL_AFFAIRE) ; publique et non disponible web");
+    Exiger(aud.Types.SequenceEqual(["Audience contentieuse 79"]) && aud.Chambres.SequenceEqual(["Chambre un 79"]) && aud.Sections.SequenceEqual(["Section un 79"])
+           && aud.Classements.SequenceEqual(["Renvoi 79"]),
+        "listes de la creation : utilisables en saisie seulement, types d'AUDIENCE seuls (le cabinet ecarte)");
+    var un = await LectureAudiences.LireAsync(cn, jour, CancellationToken.None, plafond: 1);
+    Exiger(un.Lignes.Length == 1 && un.Total == 3, $"audiences a venir : plafond 1 -> une ligne, total 3 ({un.Total})");
+
+    var sup = await LectureGestionAudiences.LireAsync(cn, CancellationToken.None);
+    Exiger(sup.Total == 3 && sup.Lignes.Select(s => s.Heure).SequenceEqual(["08:00", "09:00", "14:00"]),
+        $"audiences supprimees : cabinets ET audiences, date puis heure ({string.Join(",", sup.Lignes.Select(s => s.Heure))})");
+    Exiger(sup.Lignes[1] is { Cabinet: true, CodeCabinet: "CAB79 - Cabinet du banc 79", Juge: "JB79 - M. MARTIN Paul", Greffier: "GB79 - Mme DURAND Anne", AuteurSuppression: "agent.x" }
+           && sup.Lignes[0] is { Cabinet: true, Juge: "", Greffier: "", CodeCabinet: "" },
+        "audiences supprimees, cabinet : « code - libelle », juge et greffier « abrege - civilite nom prenom » ; sans nom, vides (OPE_RECHERCHE_GESTAUDS.cs:279-323)");
+    Exiger(sup.Lignes[2] is { Cabinet: false, Chambre: "C179 - Chambre un 79", Section: "S179", TypeClassement: "RE79", Publique: true, NonDisponibleWeb: true }
+           && sup.Lignes[2].DateDiffusion == new DateTime(2026, 3, 7) && sup.Lignes[2].DateSuppression == new DateTime(2026, 3, 6),
+        "audiences supprimees, audience : chambre « code - libelle », section, classement admis, date de diffusion et de suppression");
+}
+var audRoute = await http.GetFromJsonAsync<AudiencesProgrammeesLues>(RoutesEcransMain.Pour(RoutesAudiences.Programmees, Greffe), json);
+Exiger(audRoute is { Total: 3 } && audRoute.Lignes[0].Affaires == 2, "route des audiences : les audiences a venir de la lecture");
+var supRoute = await http.GetFromJsonAsync<AudiencesSupprimeesLues>(RoutesEcransMain.Pour(RoutesGestionAudiences.Supprimees, Greffe), json);
+Exiger(supRoute is { Total: 3 }, "route des audiences supprimees : les lignes de la lecture");
+Exiger((await http.GetAsync(RoutesEcransMain.Pour(RoutesAudiences.Programmees, GreffeAbsent))).StatusCode == HttpStatusCode.NotFound
+       && (await http.GetAsync(RoutesEcransMain.Pour(RoutesGestionAudiences.Supprimees, GreffeAbsent))).StatusCode == HttpStatusCode.NotFound,
+    "routes des audiences : greffe absent -> 404, sans repli");
+var audBase = await EcranAudiences.VueAsync(client, Greffe);
+Exiger(audBase is { Mode: "serveur", Total: 3 } && audBase.Lignes[0] is { Type: "Audience contentieuse 79", Publique: true, Web: true, NbAffaires: 2 }
+       && audBase.Lignes[0].Date == jour.ToString("yyyy-MM-dd") && audBase.Lignes[2] is { Web: false }
+       && audBase.Chambres.SequenceEqual(["Chambre un 79"]) && !audBase.Types.Intersect(EcranAudiences.Exemple().Types).Any(),
+    "pont Creer une audience branche : les audiences et listes de la base (aucune de la demonstration), « publiee sur le web » = non « non disponible web »");
+Exiger((await EcranAudiences.VueAsync(null, null)) is { Mode: "demo", Lignes.Length: 3 }, "pont Creer une audience sans serveur : la demonstration, mode « demo »");
+Exiger((await EcranAudiences.VueAsync(client, GreffeAbsent)) is { Mode: "erreur", Lignes.Length: 0, Types.Length: 0, Message: not null },
+    "pont Creer une audience, greffe absent : le motif, AUCUNE ligne ni liste");
+var gesBase = await EcranGestionAudiences.VueAsync(client, Greffe);
+Exiger(gesBase is { Mode: "serveur", Total: 3 } && gesBase.Lignes[1] is { Jour: "Mardi", Date: "03/03/2026", Cabinet: true, TypeCabinet: "CB79", Juge: "JB79 - M. MARTIN Paul" }
+       && gesBase.Lignes[2] is { Jour: "Jeudi", Cabinet: false, TypeCabinet: "", DateSuppression: "06/03/2026", EnvoiSuppression: "07/03/2026" },
+    "pont Gestion des audiences branche : jour en francais, mode de RIG v2 porte par chaque ligne, dates jj/mm/aaaa");
+Exiger((await EcranGestionAudiences.VueAsync(null, null)) is { Mode: "demo", Lignes.Length: 5 }, "pont Gestion des audiences sans serveur : la demonstration, mode « demo »");
+Exiger((await EcranGestionAudiences.VueAsync(client, GreffeAbsent)) is { Mode: "erreur", Lignes.Length: 0, Message: not null },
+    "pont Gestion des audiences, greffe absent : le motif, AUCUNE ligne");
 
 Console.WriteLine();
 if (echecs.Count == 0) { Console.WriteLine("Ecrans faits main branches sur la base : VERT."); return 0; }

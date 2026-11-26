@@ -14,9 +14,16 @@
 // Publique en point d'etat, Affaires) ; Section et « Publiee sur le web » sont dans la ligne depliee. Ni vues
 // ni cartes : l'ecran n'a aucun critere sur cette liste. Ni menu ni action de ligne : la liste n'en avait pas.
 // La creation d'une audience ne change pas.
+//
+// LA BASE DU GREFFE (plan « RIG v3 100 % fonctionnel », lot 7, 26/11/2026, marche du lot 17) : les listes de la creation (types
+// d'audience, chambres, sections, types de classement) et les audiences a venir viennent du pont (Pont/EcranAudiencesBase.cs →
+// Serveur/Socle/EcransMain/LectureAudiences.cs). Sans serveur, la demonstration du pont, marquee « exemple » (ProvenanceEcran) ;
+// en panne, le motif et aucune ligne. « Creer l'audience » n'ecrit rien (aucune ecriture d'audience branchee) : il le dit, et
+// n'ajoute plus de ligne a la liste -- une ligne ajoutee a l'ecran seul aurait ete un faux succes.
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { dateCourte } from '../criteres'
 import {
   CelluleChevron, EnteteListe, LigneDetail, ListeModerne, Pastille, PiedListe, PointEtat, normaliser, type Teinte,
@@ -34,18 +41,17 @@ export interface AudienceLigne {
   nbAffaires: number
 }
 
-const TypesAudience = [
-  'Audience de procedure collective', 'Audience de reference', 'Audience de plaidoirie',
-  'Audience de conciliation', 'Audience du juge-commissaire',
-]
-
-const Classements = ['Insuffisance d\'actif', 'Extinction du passif', 'Conversion en liquidation', 'Report']
-
-const Programmees: AudienceLigne[] = [
-  { date: '2026-09-15', heure: '09:00', type: 'Audience de procedure collective', chambre: '1re', section: 'A', publique: true, web: true, nbAffaires: 14 },
-  { date: '2026-09-22', heure: '10:15', type: 'Audience du juge-commissaire', chambre: '1re', section: 'A', publique: false, web: false, nbAffaires: 6 },
-  { date: '2026-09-29', heure: '14:00', type: 'Audience de plaidoirie', chambre: '2e', section: 'B', publique: true, web: true, nbAffaires: 9 },
-]
+/** Ce que le pont rend (Pont/EcranAudiences.cs, VueAudiences). */
+interface VueAudiences {
+  lignes: AudienceLigne[]
+  types: string[]
+  chambres: string[]
+  sections: string[]
+  classements: string[]
+  mode?: ModeLecture
+  message?: string | null
+  total: number
+}
 
 // Le @bind d'un TimeOnly ecrit « HH:mm:ss » dans <input type="time"> ; une
 // heure illisible (champ efface) ne remet pas l'heure a zero.
@@ -61,23 +67,37 @@ const TeinteType: Record<string, Teinte> = {
 const NbColonnes = 7
 
 export function EcranAudiences() {
-  const [programmees, setProgrammees] = useState<AudienceLigne[]>(Programmees)
+  // null tant que le pont n'a pas repondu : aucune ligne ni liste, jamais la demonstration a la place de la base.
+  const [vue, setVue] = useState<VueAudiences | null>(null)
+  const programmees = vue?.lignes ?? []
+  const TypesAudience = vue?.types ?? []
+  const Classements = vue?.classements ?? []
   // null tant que le pont n'a pas repondu (ou une fois la date effacee).
   const [dateAudience, setDateAudience] = useState<string | null>(null)
   const [heureTexte, setHeureTexte] = useState('09:00:00')
   const [heure, setHeure] = useState('09:00')
-  const [typeAudience, setTypeAudience] = useState(TypesAudience[0]!)
-  const [chambre, setChambre] = useState('1re')
-  const [section, setSection] = useState('A')
+  // Les choix partent sur la premiere valeur de chaque liste, une fois les listes arrivees.
+  const [typeAudience, setTypeAudience] = useState('')
+  const [chambre, setChambre] = useState('')
+  const [section, setSection] = useState('')
   const [publique, setPublique] = useState(true)
   const [choixWeb, setChoixWeb] = useState(false)
   const mailActif = true
-  const [admis, setAdmis] = useState<ReadonlySet<string>>(new Set(['Insuffisance d\'actif']))
+  const [admis, setAdmis] = useState<ReadonlySet<string>>(new Set())
+  const [annonce, setAnnonce] = useState('')
 
   useEffect(() => {
     let perime = false
     void appeler<string>('EcranAudiences.DateProposee')
       .then((d) => { if (!perime) setDateAudience((avant) => avant ?? d) })
+    void appeler<VueAudiences>('EcranAudiences.Vue').then((v) => {
+      if (perime) return
+      setVue(v)
+      setTypeAudience((avant) => avant || (v.types[0] ?? ''))
+      setChambre((avant) => avant || (v.chambres[0] ?? ''))
+      setSection((avant) => avant || (v.sections[0] ?? ''))
+      setAdmis((avant) => (avant.size > 0 || v.classements.length === 0 ? avant : new Set([v.classements[0]!])))
+    })
     return () => { perime = true }
   }, [])
 
@@ -95,14 +115,12 @@ export function EcranAudiences() {
     })
   }
 
+  // Aucune ecriture d'audience n'est branchee : le geste le dit, rien ne s'ajoute a la liste (jamais un faux succes).
   function creer() {
     if (!dateAudience) return
-    const neuve: AudienceLigne = {
-      date: dateAudience, heure, type: typeAudience, chambre, section,
-      publique, web: choixWeb, nbAffaires: 0,
-    }
-    // List.Sort par date ; a date egale, l'ordre d'arrivee est garde.
-    setProgrammees((avant) => [...avant, neuve].sort((x, y) => x.date.localeCompare(y.date)))
+    setAnnonce(vue?.mode === 'serveur'
+      ? `La création d'une audience n'est pas encore branchée sur la base du greffe : l'audience du ${dateCourte(dateAudience)} à ${heure} n'est pas enregistrée.`
+      : 'Démonstration : rien n\'est enregistré.')
   }
 
   // La ligne depliee par son chevron (une a la fois) : l'audience elle-meme, son rang change a chaque creation.
@@ -149,13 +167,13 @@ export function EcranAudiences() {
           <label className="rig-saisie-champ">
             <span className="rig-saisie-champ__libelle">Chambre</span>
             <select className="rig-saisie-champ__saisie" value={chambre} onChange={(e) => setChambre(e.target.value)}>
-              <option>1re</option><option>2e</option><option>3e</option>
+              {(vue?.chambres ?? []).map((c) => <option key={c}>{c}</option>)}
             </select>
           </label>
           <label className="rig-saisie-champ">
             <span className="rig-saisie-champ__libelle">Section</span>
             <select className="rig-saisie-champ__saisie" value={section} onChange={(e) => setSection(e.target.value)}>
-              <option>A</option><option>B</option><option>C</option>
+              {(vue?.sections ?? []).map((s) => <option key={s}>{s}</option>)}
             </select>
           </label>
         </div>
@@ -187,6 +205,8 @@ export function EcranAudiences() {
         <div className="rig-criteres__actions">
           <button className="rig-bouton rig-bouton--fort" onClick={creer}>Creer l'audience</button>
         </div>
+        {/* fix-ok: la classe d'annonce du socle est rig-eg-annonce (formes/commun.tsx:343) ; « rig-annonce » n'existe pas. */}
+        {annonce !== '' && <p className="rig-eg-annonce" role="status">{annonce}</p>}
         <span className={`rig-etat rig-etat--${mailActif ? 'ok' : 'attente'}`}>
           {mailActif ? 'Envoi de mail actif' : 'Envoi de mail inactif'}
         </span>
@@ -197,6 +217,8 @@ export function EcranAudiences() {
                      synthese={<>{affichees.length}{affichees.length > 1 ? ' audiences · ' : ' audience · '}<b>{publiques}</b>
                        {publiques > 1 ? ' publiques · ' : ' publique · '}<b>{affaires}</b>{affaires > 1 ? ' affaires' : ' affaire'}</>}
                      filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a une audience…' }} />
+
+        {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Audiences" />}
 
         <div className="rig-table-cadre">
           <table className="rig-table rig-lm-table">

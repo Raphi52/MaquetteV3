@@ -3,6 +3,8 @@
 # Etat par phase : I a emettre [] ; C, CZ [0,1] ; GT, P [0,1,2] ; E emise [0,1,2,3] ; IZ et code inconnu [0].
 # Groupe : Courriel (mode d'envoi 512 ou courriel envoye), sinon File differee (DMNED_LOT), sinon Courrier.
 # Une edition sans date de creation vient en dernier et ne dit pas « creee le » (200410).
+# Les convocations LRAR de PROC_GCONV.sql (1706411-1706420, émises E, courrier, 2001) : cet écran lit TOUTE demande d'édition,
+# elles y entrent, entre les éditions datées du banc et celle sans date.
 EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Accusé de dépôt · à EDITION ALPHA SARL · créée le {J+0} | Courrier | AFaire | []
 EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Certificat de non-faillite · à Maître Banc · créée le {J-1} | Courriel | EnCours | [0,1]
 EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Lettre de relance · à EDITION ALPHA SARL · créée le {J-2} · file « LRAR » | File différée | EnCours | [0,1,2]
@@ -13,4 +15,14 @@ EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Accusé de dépôt �
 EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Accusé de dépôt · à EDITION ALPHA SARL · créée le {J-7} · phase « Q » de l'ancien RIG | Courrier | EnCours | [0]
 EDITION BETA SAS · 2020 B 40402 · demande 26000200422 | Certificat · à EDITION BETA SAS · émise le {J-8} | Courrier | Validee | [0,1,2,3]
 édition n° 200420 | Statistique nantissement · émise le {J-9} | Courrier | Validee | [0,1,2,3]
+édition n° 1706420 | Convocation · à CONVOC RECHERCHE SARL · émise le 06/07/2001 | Courrier | Validee | [0,1,2,3]
+édition n° 1706419 | Convocation · à CONVOC AUTRE SOURCE · émise le 05/07/2001 | Courrier | Validee | [0,1,2,3]
+édition n° 1706418 | Convocation · à CONVOC SANS RELANCE · émise le 05/07/2001 | Courrier | Validee | [0,1,2,3]
+édition n° 1706417 | Convocation · à CONVOC AUDIENCE · émise le 05/07/2001 | Courrier | Validee | [0,1,2,3]
+édition n° 1706416 | Convocation · à CONVOC J PLUS 4 · émise le 05/07/2001 | Courrier | Validee | [0,1,2,3]
+édition n° 1706415 | Convocation · à CONVOC RECUE SARL · émise le 04/07/2001 | Courrier | Validee | [0,1,2,3]
+édition n° 1706414 | Convocation · à CONVOC SANS RETOUR SA · émise le 03/07/2001 | Courrier | Validee | [0,1,2,3]
+édition n° 1706413 | Convocation · à CONVOC NPAI SARL · émise le 02/07/2001 | Courrier | Validee | [0,1,2,3]
+édition n° 1706412 | Convocation · à CONVOC CITEE SAS · émise le 01/07/2001 | Courrier | Validee | [0,1,2,3]
+édition n° 1706411 | Convocation · à CONVOC A CITER SARL · émise le 01/07/2001 | Courrier | Validee | [0,1,2,3]
 édition n° 200410 | Courrier libre · à EDITION SANS DATE | Courrier | EnCours | [0,1]

@@ -1,0 +1,12 @@
+# « Convocations » (PROC_GCONV) sans recherche : les instances des CABINETS de la fenêtre INTERV_AUD_DATE_*_PREAUD (OPE_CITATIONS.cs:
+# 157-167 ; [J-3 ; J+3] par défaut, [J-30 ; J-25] sur le banc : PROC_PREAUD.sql pose ces réglages) qui ont une
+# LRAR de convocation et une relance RCS (:46-67), par cabinet, puis numéro de rôle.
+# Écartés : le cabinet de J-24 et celui de J-31 (jumeaux des bornes J-25 et J-28 retenues), l'audience de J-28 (type cabinet), 1706018
+# sans relance RCS, 1706019 dont la demande d'édition n'a pas l'événement pour source.
+# États (:91-95) : NPAI ou réception = Reçue ou NPAI (Rejetee) ; citation existante = Citée (Validee) ; solution de citation sur la
+# LRAR = À citer (AFaire) ; sinon Sans retour (EnCours).
+CONVOC A CITER SARL | Rôle 2026J17601 · LRAR 1A170600011 du 01/07/2001 · Cabinet du {J-28} à 10:00 - | Citations à envoyer | AFaire | []
+CONVOC CITEE SAS | Rôle 2026J17602 · LRAR 1A170600012 du 01/07/2001 · citée le 10/07/2001 · signification : Signifiée à personne · Cabinet du {J-28} à 10:00 - | Citées | Validee | []
+CONVOC NPAI SARL | Rôle 2026J17603 · LRAR 1A170600013 du 02/07/2001 · retour : NPAI reçu le · Cabinet du {J-28} à 10:00 - | Reçues ou NPAI | Rejetee | []
+CONVOC SANS RETOUR SA | Rôle 2026J17604 · LRAR 1A170600014 du 03/07/2001 · Cabinet du {J-28} à 10:00 - | LRAR sans retour | EnCours | []
+CONVOC RECUE SARL | Rôle 2026J17605 · LRAR 1A170600015 du 04/07/2001 · retour : Reçu le · Cabinet du {J-25} à 11:00 - | Reçues ou NPAI | Rejetee | []

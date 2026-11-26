@@ -1,0 +1,11 @@
+# Les recherches de LecteurMiseAuPointChambres : le jour et la chambre de l'audience, comme le retour d'audience. Dates fixes (2001).
+
+# 1. Le jour remplace la fenêtre.
+critere: Date de l'audience = 2001-07-02
+lignes:
+PC RECHERCHE AUD | Rôle 2026P17511 · appel n° TC17 1 · Audience du 02/07/2001 à 09:00 - Chambre Première du banc (C17) | Procédures collectives à l'audience | AFaire | []
+---
+# 2. Une autre chambre : rien (jumeau : bloc 1).
+critere: Date de l'audience = 2001-07-02
+critere: Chambre = C17B
+lignes:

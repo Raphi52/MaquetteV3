@@ -1,0 +1,41 @@
+# Les gestes de EcrivainConvocations (« Convocations », PROC_GCONV) : « Citer par huissier », joué par la route POST sur les lignes
+# du cabinet 1706101 de PROC_GCONV.sql (identifiant de ligne : instance-demande d'édition-relance-exercice, LecteurConvocations.cs).
+# Format : en tête de tests/EcransGeneresBaseCheck/Program.cs. Un refus n'écrit rien ; chaque refus a son jumeau accepté (bloc 5).
+# Le refus « maquette sans destinataire huissier » se prouve sur la copie de dev (aucune maquette CITATION n'y a de « H ») : ce jeu
+# pose la maquette, il ne peut pas la retirer d'un bloc à l'autre.
+
+# 1. Une LRAR revenue NPAI : la ligne est grisée, non cochable (OPE_CITATIONS.cs:94-95). Jumeau : bloc 5 (LRAR sans retour).
+geste: Decider Citer par huissier
+ids: 1706013-1706413-1706613-
+valeur: Huissier = 1706901
+resultat: refuse
+message: La LRAR de l'instance 2026J17603 est revenue (NPAI) : sa ligne est grisée, elle ne se cite pas.
+---
+# 2. Sans huissier (Verifier, OPE_CITATIONS.cs:270-272). Jumeau : bloc 5.
+geste: Decider Citer par huissier
+ids: 1706011-1706411-1706611-
+resultat: refuse
+message: La saisie de l'huissier est obligatoire pour l'instance 2026J17601
+---
+# 3. Une instance cochée deux fois (doublons de numéro de rôle, :307-320). Jumeau : bloc 5 (chaque instance une fois).
+geste: Decider Citer par huissier
+ids: 1706011-1706411-1706611-,1706011-1706411-1706611-
+valeur: Huissier = 1706901
+resultat: refuse
+message: L'instance suivante 2026J17601 a été cochée plusieurs fois.
+---
+# 4. Un huissier absent de la base : la liste de RIG v2 ne le proposerait pas. Jumeau : bloc 5 (l'intervenant 1706901).
+geste: Decider Citer par huissier
+ids: 1706011-1706411-1706611-
+valeur: Huissier = 1706999
+resultat: refuse
+message: L'huissier « 1706999 » n'est pas dans la base du greffe.
+---
+# 5. Deux instances : une citation SURVENUE au code CITATION, datée du jour, numéro d'ordre = événements de l'instance + 1
+#    (OPE_CITATIONS.cs:245, Instance.cs:594-596). 1706011 devient « Citée » ; 1706014 (sans retour de LRAR) aussi.
+geste: Decider Citer par huissier
+ids: 1706011-1706411-1706611-,1706014-1706414-1706614-
+valeur: Huissier = 1706901
+resultat: fait
+message: 2 citations par huissier enregistrées (HUISSIER BANC).
+controle: SELECT STRING_AGG(CONCAT(EVNPR_ID_INSTN, ':', EVNPR_NUM_ORDRE, ':', CAST(EVNPR_SURVENU AS int), ':', EVNPR_TYPE_EVE_PRO, ':', CASE WHEN EVNPR_DATE = CAST(GETDATE() AS date) THEN 'jour' ELSE CONVERT(varchar(10), EVNPR_DATE, 23) END), ',') WITHIN GROUP (ORDER BY EVNPR_ID_INSTN) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_CODE_EVE_PRO = 'CITATION' AND EVNPR_ID_INSTN IN (1706011, 1706014) => 1706011:2:1:S:jour,1706014:2:1:S:jour

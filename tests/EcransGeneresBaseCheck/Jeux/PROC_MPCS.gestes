@@ -1,0 +1,115 @@
+# Les gestes de EcrivainMiseAuPointChambres (« Mise au point chambres », PROC_MPCS) : « Valider la décision » en lot, joué par la
+# route POST sur les audiences de septembre 2001 de PROC_MPCS.sql (hors de la fenêtre du rôle : les lignes relues sans recherche ne
+# bougent pas, les écritures se contrôlent par « controle: »). Format : en tête de tests/EcransGeneresBaseCheck/Program.cs. Un
+# refus n'écrit rien ; chaque refus a son jumeau accepté (blocs 12 et 14).
+
+# 1. Une affaire sans procédure collective : PROC_MPCS ne s'ouvre que sur des PC non traitées (OPE_LIST_APPEL_AFFAIRE.cs:1409-1412).
+#    Jumeau : bloc 12 (deux PC non traitées).
+geste: Decider Valider la décision
+ids: 1705524
+valeur: Résultat = M17P
+resultat: refuse
+message: Le rôle 2026J17524 n'est pas une affaire de procédure collective non traitée : la mise au point des chambres ne s'ouvre que sur elles.
+---
+# 2. Une PC déjà traitée (résultat M17P) : même règle d'ouverture. Jumeau : bloc 12.
+geste: Decider Valider la décision
+ids: 1705525
+valeur: Résultat = M17P
+resultat: refuse
+message: Le rôle 2026P17525 n'est pas une affaire de procédure collective non traitée : la mise au point des chambres ne s'ouvre que sur elles.
+---
+# 3. Audience passée, chambre à composition obligatoire, sans composition (CanDoActions, OPE_LIST_APPEL_AFFAIRE.cs:1356-1369, :1586).
+#    Jumeau : bloc 12 (audience de la chambre M17B, sans composition obligatoire).
+geste: Decider Valider la décision
+ids: 1705527
+valeur: Résultat = M17P
+resultat: refuse
+message: Audience passée sans composition (rôle 2026P17527) : actions possibles uniquement si l'audience comporte des compositions.
+---
+# 4. La seule instance cochée est tenue par une demande en cours (LockInstances, PROC_MPCS.cs:1047-1052). Jumeau : bloc 12.
+geste: Decider Valider la décision
+ids: 1705523
+valeur: Résultat = M17P
+resultat: refuse
+message: Toutes les instances sélectionnées sont bloquées : Instance bloquée (D2617058010), demande "En cours" : RETAUD par BANC MPCS
+---
+# 5. Une instance tenue parmi deux : RIG v2 demande s'il faut continuer sur les autres (:1053-1058), la V3 refuse et la nomme.
+#    Jumeau : bloc 12 (aucune instance tenue).
+geste: Decider Valider la décision
+ids: 1705521,1705523
+valeur: Résultat = M17P
+resultat: refuse
+message: Certaines instances sont bloquées, décochez-les pour travailler sur les autres : Instance bloquée (D2617058010), demande "En cours" : RETAUD par BANC MPCS
+---
+# 6. Ni résultat ni type de décision : rien à valider. Jumeau : bloc 12 (les deux saisis).
+geste: Decider Valider la décision
+ids: 1705521
+resultat: refuse
+message: Saisissez un « Résultat » ou un « Type de décision » : rien n'est à valider.
+---
+# 7. Un code plumitif hors saisie (la liste du résultat ne le propose pas). Jumeau : bloc 12 (M17P en saisie).
+geste: Decider Valider la décision
+ids: 1705521
+valeur: Résultat = M17X
+resultat: refuse
+message: Le code plumitif « M17X » n'est pas utilisable en saisie dans la base du greffe.
+---
+# 8. Un code qui ne convient pas aux PC (CODE_PLUMITIF.EstCompatibleInstance, CODE_PLUMITIF.cs:76-97). Jumeau : bloc 12.
+geste: Decider Valider la décision
+ids: 1705521
+valeur: Résultat = M17C
+resultat: refuse
+message: Le code plumitif « M17C » n'est pas compatible avec le type d'instance du rôle 2026P17521.
+---
+# 9. Un type de décision hors saisie. Jumeau : bloc 12 (T17).
+geste: Decider Valider la décision
+ids: 1705521
+valeur: Type de décision = T17X
+resultat: refuse
+message: Le type de décision « T17X » n'est pas utilisable en saisie dans la base du greffe.
+---
+# 10. Une date prévue sans type de décision : elle se rapporte à la décision. Jumeau : bloc 12 (type et date).
+geste: Decider Valider la décision
+ids: 1705521
+valeur: Résultat = M17P
+valeur: Date prévue = 2001-10-01
+resultat: refuse
+message: « Date prévue » se rapporte à la décision : saisissez aussi le « Type de décision ».
+---
+# 11. Une date prévue illisible. Jumeau : bloc 12.
+geste: Decider Valider la décision
+ids: 1705521
+valeur: Type de décision = T17
+valeur: Date prévue = 32/13/2001
+resultat: refuse
+message: « Date prévue » n'est pas une date : « 32/13/2001 ».
+---
+# 12. Deux PC non traitées : le résultat M17P (prononcé : état de retour P) sur chaque appel, une décision T17 neuve sur chaque
+#     instance, numéro d'ordre = le plus grand + 1 (1 ; 4 après la décision d'ordre 3), catégorie I, rédigée au greffe, numéro source.
+geste: Decider Valider la décision
+ids: 1705521,1705522
+valeur: Résultat = M17P
+valeur: Type de décision = T17
+valeur: Date prévue = 2001-10-01
+resultat: fait
+message: Résultat M17P posé sur 2 affaires ; 2 décisions T17 créées.
+controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, ':', APPAF_CODE_PLUMITIF, ':', APPAF_ETAT_RETOUR), ',') WITHIN GROUP (ORDER BY APPAF_ID_APPAF) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF IN (1705521, 1705522) => 1705521:M17P:P,1705522:M17P:P
+controle: SELECT STRING_AGG(CONCAT(DCJDC_ID_INSTN, ':', DCJDC_NUM_ORDRE, ':', DCJDC_TYPE_DECISION, ':', CONVERT(varchar(10), DCJDC_DATE_PREVUE, 23), ':', DCJDC_CAT_DECISION, ':', CAST(DCJDC_REDIGEE_GREFFE AS int), ':', DCJDC_ETAT_REDACTION, ':', CASE WHEN LEN(DCJDC_NUMERO_SOURCE) = 36 THEN 'guid' ELSE '-' END), ',') WITHIN GROUP (ORDER BY DCJDC_ID_INSTN, DCJDC_NUM_ORDRE) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_INSTN IN (1705021, 1705022) AND DCJDC_ID_DCJDC <> 1705402 => 1705021:1:T17:2001-10-01:I:1:0:guid,1705022:4:T17:2001-10-01:I:1:0:guid
+---
+# 13. Une PC dont l'appel a déjà une décision délibérée, type de décision seul : RIG v2 n'en ajoute pas (PROC_MPCS.cs:1240), il
+#     n'y a alors rien à écrire. Jumeau : bloc 14 (avec un résultat).
+geste: Decider Valider la décision
+ids: 1705526
+valeur: Type de décision = T17
+resultat: refuse
+message: Chaque affaire cochée a déjà une décision délibérée : aucune décision « T17 » n'est ajoutée.
+---
+# 14. La même avec le résultat M17N (non prononcé : état de retour M) : le résultat se pose, la décision délibérée reste seule.
+geste: Decider Valider la décision
+ids: 1705526
+valeur: Résultat = M17N
+valeur: Type de décision = T17
+resultat: fait
+message: Résultat M17N posé sur 1 affaire ; aucune décision ajoutée (déjà délibérées).
+controle: SELECT CONCAT(APPAF_CODE_PLUMITIF, ':', APPAF_ETAT_RETOUR) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF = 1705526 => M17N:M
+controle: SELECT COUNT(*) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_INSTN = 1705026 => 1

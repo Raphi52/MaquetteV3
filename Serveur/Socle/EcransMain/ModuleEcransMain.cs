@@ -37,6 +37,14 @@ internal sealed class ModuleEcransMain : IModuleServeur
         routes.MapGet(RoutesDepotsJud.Instances, (string greffe, CatalogueGreffes c, CancellationToken ct)
             => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureDepotsJud.LireAsync(cn, ct))))
             .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+
+        // Lot 7 : « Créer une audience » (LectureAudiences.cs) et « Gestion des audiences » (LectureGestionAudiences.cs).
+        routes.MapGet(RoutesAudiences.Programmees, (string greffe, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureAudiences.LireAsync(cn, DateTime.Now, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        routes.MapGet(RoutesGestionAudiences.Supprimees, (string greffe, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureGestionAudiences.LireAsync(cn, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
     }
 
     /// <summary><paramref name="faire"/> sur la base V3 du greffe ; 404 / 503 de la politique si elle ne s'ouvre plus.</summary>

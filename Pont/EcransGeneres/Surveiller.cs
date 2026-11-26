@@ -9,8 +9,8 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 // fix-ok: PROC_DBEN_ALERT rétabli (décision chef msg-8810ae9e, 14:01 : fiche sans étape mais formulaire présent, fondé sur la source) ; mesuré : 26 descripteurs, 26 codes, Valider cité par la source (OPE_DIVERGENCES.Designer.cs:97) ; libellés Valider cités (msg-ce7b47f9), en-tête « ANONYME » restauré.
 //
 // Cas a connaitre, dits ici plutot que tus :
-//   - PROC_LISTE_DELIBERES n'a pas de fiche : appuye sur PROC_RETAUD (ce qui reste a rendre
-//     apres l'audience) et PROC_MPCS (decision DELIBERE). A confirmer par le chef.
+//   - PROC_LISTE_DELIBERES n'a pas de fiche, mais son code V2 existe (Source\Judiciaire\Exe\PROC_LISTE_DELIBERES\
+//     frmListeDelibere.cs) : un Etat en lecture seule, aligne dessus au lot 7 (plan-676a4b19).
 //   - PROC_SUIVI_IMPRESSION n'a pas de fiche : appuye sur PROC_PAPERCUT (file d'impression),
 //     seule procedure voisine documentee. A confirmer par le chef.
 //   - PROC_DBE_RELANCE et PROC_DBE_INJ ont une fiche courte (« source non trouvee ») : leurs
@@ -36,13 +36,17 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         {
             Code = "PROC_COMPO", Titre = "Composition", Sujet = "audiences et cabinets",
             Forme = FormeEcran.Audience,
-            Parametres = ["Audience ou cabinet", Champ.Date("Date de l'audience"), Champ.Case("Mode référé")],
-            Recherche = "Rechercher une audience, un cabinet, une date…",
-            Criteres = ["Audience ou cabinet", "Date de l'audience", "Mode référé"],
+            // L'audience : la recherche de RIG v2, type audience, [J+1 ; J+15] (PROC_COMPO.cs:134-149) ; un cabinet n'a pas de
+            // composition. Lecteur : Serveur/Socle/EcransGeneres/LecteurComposition.cs (lot 7). « Valider » enregistre la
+            // composition de l'audience cochée : juges (abrégés, le premier préside), greffier, parquetier, tels que les listes
+            // ULT_COMBO_* de RIG v2 les nomment (EcrivainComposition.cs ; ETP_COMPO_AUDIENCE.cs:100-141, :240-257).
+            Parametres = [Champ.Date("Date de l'audience"), "Chambre", "Juges", "Greffier", "Parquetier"],
+            Recherche = "Rechercher une audience, une chambre…",
+            Criteres = ["Date de l'audience", "Chambre"],
             Valider = "Valider", // Bouton VALIDER de la barre d'automate (proc_sdematjud.md, « Etat des boutons ») ; controles : proc_compo.md, ETP_COMPO_AUDIENCE.
             Rang = 5,
             Etats = EtatsEcran.Trois("À composer", "En cours", "Composée"),
-            Groupes = ["Audiences", "Cabinets"],
+            Groupes = ["Audiences"],
             Sections =
             [
                 Marche("Audience", "Une audience ou un cabinet est choisi avant toute saisie ; sans audience, le sélecteur s'ouvre. Une composition liée à des appels d'affaire ne se supprime pas.", true,
@@ -59,8 +63,8 @@ public sealed class DomaineSurveiller : IDomaineEcrans
                 Ligne("Audience du 10/03/2026 · 1re chambre", "Trois juges proposés d'office · greffier à désigner", "Audiences", "AFaire"),
                 Ligne("Audience du 10/03/2026 · 2e chambre", "Composition saisie · invitations à envoyer", "Audiences", "EnCours", 0, 1),
                 Ligne("Audience du 11/03/2026 · référé", "Composition enregistrée", "Audiences", "Validee", 0, 1, 2),
-                Ligne("Cabinet du 12/03/2026 · juge des référés", "Composition à compléter", "Cabinets", "EnCours", 0),
-                Ligne("Cabinet du 13/03/2026 · juge commis", "Aucune composition", "Cabinets", "AFaire"),
+                Ligne("Audience du 12/03/2026 · juge des référés", "Composition à compléter", "Audiences", "EnCours", 0),
+                Ligne("Audience du 13/03/2026 · 4e chambre", "Aucune composition", "Audiences", "AFaire"),
                 Ligne("Audience du 16/03/2026 · 3e chambre", "Composition enregistrée · invitations envoyées", "Audiences", "Validee", 0, 1, 2, 4),
             ],
         },
@@ -69,13 +73,20 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         {
             Code = "PROC_PREAUD", Titre = "Preparation d'audience", Sujet = "plumitifs",
             Forme = FormeEcran.Audience,
-            Parametres = ["Audience", "Cabinet", Champ.Liste("Mode", "Audience", "Procédures collectives", "Cabinet")],
+            // Le mode A / P / C (proc_preaud.md:21-23 ; A et P cherchent des audiences, C des cabinets, ETP.cs:54-62) et la date.
+            // Lecteur : Serveur/Socle/EcransGeneres/LecteurPreparationAudience.cs (lot 7). « Valider » attribue les numéros d'appel des
+            // audiences cochées (EcrivainPreparationAudience.cs) ; le plumitif (état Crystal, file des éditions) n'est pas généré.
+            Parametres = [Champ.Date("Date de l'audience"), "Chambre", Champ.Liste("Mode", "Audience", "Procédures collectives", "Cabinet"),
+                          Champ.Case("Recalculer les n° d'appel")],
             Recherche = "Rechercher une audience ou un cabinet…",
-            Criteres = ["Audience ou cabinet", "Dates de l'audience", "Mode : audience, procédures collectives ou cabinet"],
-            Valider = "Générer le plumitif", // proc_preaud.md, Logique métier : « Génération du plumitif (LancerPlumitif) ».
+            Criteres = ["Date de l'audience", "Chambre", "Mode"],
+            // Le VALIDER de la barre d'automate (FORM_PREAUD ne masque qu'INTERROMPRE) : « Le calcul sera exécuté automatiquement à la
+            // validation » (OPE_RECHERCHE_PLUMITIF.cs:39).
+            Valider = "Valider",
             Rang = 5,
             Etats = EtatsEcran.Trois("À préparer", "En préparation", "Plumitif prêt"),
-            Groupes = ["Audiences", "Procédures collectives", "Cabinets"],
+            // Le mode P (procédures collectives) est un mode de l'écran, pas une sorte d'audience : ses audiences sont des audiences.
+            Groupes = ["Audiences", "Cabinets"],
             Sections =
             [
                 Marche("Audience", "Une ou plusieurs audiences se choisissent. Une audience déjà chargée n'est pas ajoutée une seconde fois.", true,
@@ -94,8 +105,8 @@ public sealed class DomaineSurveiller : IDomaineEcrans
                 Ligne("Audience du 09/03/2026 · 1re chambre", "Plumitif généré · 42 affaires", "Audiences", "Validee", 0, 1, 4),
                 Ligne("Audience du 10/03/2026 · 2e chambre", "Ordre des affaires à revoir", "Audiences", "EnCours", 0),
                 Ligne("Audience du 11/03/2026 · 3e chambre", "Destinataires à choisir", "Audiences", "EnCours", 0, 1),
-                Ligne("Audience du 13/03/2026 · procédures collectives", "Ordre des affaires à établir", "Procédures collectives", "AFaire"),
-                Ligne("Audience du 16/03/2026 · procédures collectives", "Ordre validé · génération à lancer", "Procédures collectives", "EnCours", 0, 1),
+                Ligne("Audience du 13/03/2026 · procédures collectives", "Ordre des affaires à établir", "Audiences", "AFaire"),
+                Ligne("Audience du 16/03/2026 · procédures collectives", "Ordre validé · génération à lancer", "Audiences", "EnCours", 0, 1),
                 Ligne("Cabinet du 12/03/2026 · juge des référés", "Plumitif à générer", "Cabinets", "AFaire"),
                 Ligne("Cabinet du 13/03/2026 · juge commis", "Envoyé aux juges", "Cabinets", "Validee", 0, 1, 2, 4),
             ],
@@ -105,13 +116,18 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         {
             Code = "PROC_GCONV", Titre = "Convocations", Sujet = "instances à citer",
             Forme = FormeEcran.Audience,
-            Parametres = ["Audience cabinet", Champ.Date("Date de l'audience"), "Huissier"],
-            Recherche = "Rechercher une audience cabinet, une instance, un huissier…",
-            Criteres = ["Audience cabinet", "Instance ou numéro de rôle", "Huissier", "État de la LRAR"],
+            // Le cabinet : la recherche de RIG v2, type cabinet, fenêtre INTERV_AUD_DATE_*_PREAUD (OPE_CITATIONS.cs:157-167) ; ses
+            // instances et leur LRAR (:46-95). Lecteur : Serveur/Socle/EcransGeneres/LecteurConvocations.cs (lot 7). « Citer par
+            // huissier » enregistre la citation des instances cochées (EcrivainConvocations.cs ; OPE_CITATIONS.cs:241-332) ; ses
+            // éditions (citation, copie conforme, KBIS) et sa facture ne sont pas faites.
+            Parametres = [Champ.Date("Date de l'audience"), "Huissier"],
+            Recherche = "Rechercher une instance, un numéro de rôle, un dossier, une LRAR…",
+            Criteres = ["Date de l'audience"],
             Valider = "Citer par huissier", // proc_gconv.md, Rôle : « Gérer les citations et significations par huissier (LRAR) ».
             Rang = 5,
-            Etats = [.. EtatsEcran.Trois("À citer", "En cours", "Citée"), new EtatEcran("Rejetee", "NPAI", "rejetee")],
-            Groupes = ["Citations à envoyer", "NPAI à reprendre"],
+            // Les nœuds de l'arbre V2 (OPE_CITATIONS.cs:91-95) : coché d'office, grisé (réception, NPAI), déjà cité, sans retour.
+            Etats = [.. EtatsEcran.Trois("À citer", "Sans retour", "Citée"), new EtatEcran("Rejetee", "Reçue ou NPAI", "rejetee")],
+            Groupes = ["Citations à envoyer", "Citées", "LRAR sans retour", "Reçues ou NPAI"],
             Sections =
             [
                 Marche("Audience cabinet", "Une seule audience cabinet à la fois, choisie par le sélecteur. Une audience déjà chargée est refusée.", true,
@@ -130,12 +146,12 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Lignes =
             [
                 Ligne("Instance 2026J00201 · Alpha Services SARL", "LRAR avec solution de citation · pas encore citée", "Citations à envoyer", "AFaire"),
-                Ligne("Instance 2026J00202 · Bêta Industrie SAS", "Huissier choisi · édition à lancer", "Citations à envoyer", "EnCours", 0, 1, 2),
-                Ligne("Instance 2026J00203 · Gamma Conseil SARL", "Instance cochée · huissier à choisir", "Citations à envoyer", "EnCours", 0, 1),
-                Ligne("Instance 2026J00204 · Delta Transports SAS", "Citation envoyée le 04/03/2026", "Citations à envoyer", "Validee", 0, 1, 2, 4),
-                Ligne("Instance 2026J00205 · Epsilon Habitat SARL", "LRAR revenue NPAI le 05/03/2026", "NPAI à reprendre", "Rejetee"),
-                Ligne("Instance 2026J00206 · Êta Boulangerie SARL", "Citation à relancer", "Citations à envoyer", "AFaire"),
-                Ligne("Instance 2026J00207 · Thêta Import SAS", "LRAR NPAI le 06/03/2026 · à reprendre", "NPAI à reprendre", "Rejetee"),
+                Ligne("Instance 2026J00202 · Bêta Industrie SAS", "LRAR avec solution de citation · pas encore citée", "Citations à envoyer", "AFaire"),
+                Ligne("Instance 2026J00203 · Gamma Conseil SARL", "LRAR envoyée le 02/03/2026 · pas de retour", "LRAR sans retour", "EnCours"),
+                Ligne("Instance 2026J00204 · Delta Transports SAS", "Citée le 04/03/2026", "Citées", "Validee"),
+                Ligne("Instance 2026J00205 · Epsilon Habitat SARL", "LRAR revenue NPAI le 05/03/2026", "Reçues ou NPAI", "Rejetee"),
+                Ligne("Instance 2026J00206 · Êta Boulangerie SARL", "LRAR reçue le 05/03/2026", "Reçues ou NPAI", "Rejetee"),
+                Ligne("Instance 2026J00207 · Thêta Import SAS", "LRAR envoyée le 03/03/2026 · pas de retour", "LRAR sans retour", "EnCours"),
             ],
         },
 
@@ -143,13 +159,17 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         {
             Code = "PROC_MPCS", Titre = "Mise au point chambres", Sujet = "affaires d'audience",
             Forme = FormeEcran.Audience,
-            Parametres = ["Audience cabinet", "Numéro de rôle"],
+            // RIG v2 ouvre MPCS du retour d'audience sur les affaires PC cochées (OPE_LIST_APPEL_AFFAIRE.cs:1409-1412) : même audience,
+            // mêmes paramètres. Lecteur : Serveur/Socle/EcransGeneres/LecteurMiseAuPointChambres.cs (lot 7). « Valider la décision »
+            // valide en lot (mode MultiInstance) : le résultat sur chaque appel, une décision du type saisi sur chaque instance
+            // (EcrivainMiseAuPointChambres.cs ; PROC_MPCS.cs:1197-1248).
+            Parametres = [Champ.Date("Date de l'audience"), "Chambre", "Résultat", "Type de décision", Champ.Date("Date prévue")],
             Recherche = "Rechercher une affaire, un appel, un numéro de rôle…",
-            Criteres = ["Appels d'affaires", "Audience cabinet", "Numéro de rôle"],
+            Criteres = ["Date de l'audience", "Chambre"],
             Valider = "Valider la décision", // proc_mpcs.md : « ValidationSauver — Clôture et génération finale ».
             Rang = 5,
             Etats = EtatsEcran.Trois("À juger", "En cours", "Décision validée"),
-            Groupes = ["Affaires en lot", "Affaire unique"],
+            Groupes = ["Procédures collectives à l'audience"],
             Sections =
             [
                 Marche("Affaires", "En lot, les affaires cochées se traitent ensemble. Les instances se verrouillent à l'ouverture et se libèrent à la sortie, même annulée.", true,
@@ -169,13 +189,13 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             ],
             Lignes =
             [
-                Ligne("Affaire 2026J00301 · Alpha Services SARL c/ Bêta Industrie SAS", "Lot · décision réutilisée", "Affaires en lot", "Validee", 0, 3),
-                Ligne("Affaire 2026J00302 · Gamma Conseil SARL c/ Delta Transports SAS", "Lot · nouvelle décision à créer", "Affaires en lot", "EnCours", 0),
-                Ligne("Affaire 2026J00303 · Epsilon Habitat SARL c/ Zêta Commerce SAS", "Lot · à juger", "Affaires en lot", "AFaire"),
-                Ligne("Affaire 2026J00304 · Êta Boulangerie SARL", "Affaire unique · instance ouverte", "Affaire unique", "EnCours", 0, 1),
-                Ligne("Affaire 2026J00305 · Thêta Import SAS", "Affaire unique · décision validée", "Affaire unique", "Validee", 0, 1, 3, 4),
-                Ligne("Affaire 2026J00306 · Iota Études SARL", "Affaire unique · à juger", "Affaire unique", "AFaire"),
-                Ligne("Affaire 2026J00307 · Kappa Négoce SAS", "Affaire unique · décision à saisir", "Affaire unique", "EnCours", 0, 3),
+                Ligne("Affaire 2026J00301 · Alpha Services SARL c/ Bêta Industrie SAS", "Lot · décision réutilisée", "Procédures collectives à l'audience", "Validee", 0, 3),
+                Ligne("Affaire 2026J00302 · Gamma Conseil SARL c/ Delta Transports SAS", "Lot · nouvelle décision à créer", "Procédures collectives à l'audience", "EnCours", 0),
+                Ligne("Affaire 2026J00303 · Epsilon Habitat SARL c/ Zêta Commerce SAS", "Lot · à juger", "Procédures collectives à l'audience", "AFaire"),
+                Ligne("Affaire 2026J00304 · Êta Boulangerie SARL", "Affaire unique · instance ouverte", "Procédures collectives à l'audience", "EnCours", 0, 1),
+                Ligne("Affaire 2026J00305 · Thêta Import SAS", "Affaire unique · décision validée", "Procédures collectives à l'audience", "Validee", 0, 1, 3, 4),
+                Ligne("Affaire 2026J00306 · Iota Études SARL", "Affaire unique · à juger", "Procédures collectives à l'audience", "AFaire"),
+                Ligne("Affaire 2026J00307 · Kappa Négoce SAS", "Affaire unique · décision à saisir", "Procédures collectives à l'audience", "EnCours", 0, 3),
             ],
         },
 
@@ -183,13 +203,19 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         {
             Code = "PROC_RETAUD", Titre = "Retour d'audience", Sujet = "affaires d'audience",
             Forme = FormeEcran.Audience,
-            Parametres = ["Audience", "Cabinet"],
-            Recherche = "Rechercher une affaire, un numéro de rôle, une partie…",
-            Criteres = ["Audience ou cabinet", "Affaires à traiter", "Prononcés à traiter", "Publicités en attente"],
+            // L'audience : la recherche de RIG v2 (date, chambre, mode « C » = cabinet ; OPE_INFORMATIONS_AUDIENCE.cs:99-141,
+            // PROC_RETAUD.cs:85-87). Le résultat et la prochaine audience : ceux du renvoi saisi en masse (PROC_MJUDS,
+            // OPE_RESULTAT.cs:448-700). Lecteur et gestes : Serveur/Socle/EcransGeneres/LecteurRetourAudience.cs, EcrivainRetourAudience.cs.
+            Parametres = [Champ.Date("Date de l'audience"), "Chambre", Champ.Liste("Mode", "Audience", "Cabinet"), "Résultat", Champ.Date("Prochaine audience")],
+            Recherche = "Rechercher une affaire, un numéro de rôle, un nom…",
+            Criteres = ["Date de l'audience", "Chambre", "Mode"],
             Valider = "Saisir les décisions", // proc_retaud.md, Rôle : « saisir les décisions par affaire ».
+            // Le menu de la grille (OPE_LIST_APPEL_AFFAIRE.cs:380, « Marquer les décisions comme rendues ») et le renvoi (PROC_MJUDS).
+            Gestes = ["Marquer les décisions comme rendues", "Renvoyer"],
             Rang = 5,
             Etats = [.. EtatsEcran.Trois("À saisir", "En cours", "Résultat saisi"), new EtatEcran("EnAttente", "Publicité en attente", "en-attente")],
-            Groupes = ["Affaires à traiter", "Prononcés à traiter", "Publicités en attente"],
+            // Les filtres de la grille (FiltreAffichage, OPE_LIST_APPEL_AFFAIRE.cs:553-598) ; « tous » montre aussi les traitées.
+            Groupes = ["Affaires à traiter", "Prononcés à traiter", "Affaires traitées", "Publicités en attente"],
             Sections =
             [
                 Marche("Audience", "Une audience ou un cabinet se choisit ; la liste de ses affaires s'affiche.", true,
@@ -218,67 +244,97 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_LISTE_DELIBERES", Titre = "Deliberes", Sujet = "délibérés",
-            Forme = FormeEcran.Audience,
-            Parametres = [Champ.Date("Date de l'audience de délibéré"), "Chambre ou section"],
+            // Un ÉTAT, pas une audience : RIG v2 n'a pas de fiche, mais son code (Source\Judiciaire\Exe\PROC_LISTE_DELIBERES\
+            // frmListeDelibere.cs) est une liste en lecture seule, éditée en Word, sans aucune écriture (lot 7). Lecteur :
+            // Serveur/Socle/EcransGeneres/LecteurListeDeliberes.cs.
+            // fix-ok: lot 7, mesure par grep -- l'edition scriptee de ce descripteur avait colle deux lignes de commentaire (une
+            // barre oblique inverse en fin de ligne lue comme une continuation) ; les deux lignes sont separees, rien d'autre ne change.
+            Forme = FormeEcran.Etat,
+            // Les critères de recherche de frmListeDelibere.Designer.cs (:400-577).
+            Parametres = [Champ.Date("Délibérés au"), Champ.Nombre("Durée du délibéré en jours"),
+                          Champ.Liste("Type d'instance", "Contentieux", "Procédures collectives", "Référés"), "Juge de l'instance",
+                          Champ.Date("Date d'enrôlement min")],
+            // Les colonnes de la grille (frmListeDelibere.Designer.cs:126-200).
+            Colonnes = ["N° rôle", "N° joints", "Nom de l'affaire", Champ.Date("Date du délibéré"), "Code plumitif", "Durée du délibéré",
+                        "Type de décision prévue", Champ.Date("Date prévue"), "Juge", "Localisation"],
+            // La barre d'outils (frmListeDelibere.cs:55-61) : « Editer le résultat » (Word), « Délibérés repoussés non rendus » (Excel).
+            Gestes = ["Editer le résultat", "Délibérés repoussés non rendus"],
             Recherche = "Rechercher un délibéré, une affaire, un numéro de rôle…",
-            Criteres = ["Date de l'audience de délibéré", "Chambre ou section", "Numéro de rôle"],
-            Valider = "Saisir les décisions", // Pas de fiche : libellé de PROC_RETAUD (proc_retaud.md, Rôle), procédure voisine.
+            Criteres = ["Délibérés au", "Durée du délibéré en jours", "Type d'instance", "Juge de l'instance", "Date d'enrôlement min"],
+            Valider = "Editer le résultat", // frmListeDelibere.cs:57 : TypeButtonRigToolBar.EDITER, texte « Editer le résultat ».
             Rang = 5,
             Etats = EtatsEcran.Trois("À rendre", "En cours", "Rendu"),
-            Groupes = ["Délibérés à rendre", "Délibérés depuis plus de deux mois"],
+            Groupes = ["Délibérés non rendus"],
             Sections =
             [
-                Marche("Affaire", "L'affaire se retrouve par son numéro de rôle, comme au retour d'audience.", true,
-                    "Numéro de rôle", "Parties"),
-                Marche("Date du délibéré", "La date de l'audience de délibéré est reprise ; l'écart avec le prononcé se calcule.", true,
-                    "Audience de délibéré", "Date de prononcé prévue"),
-                Marche("Prononcé", "Le prononcé se saisit comme au retour d'audience : décision, date et minute.", true,
-                    "Décision", "Date de prononcé", "Numéro de minute"),
-                Marche("Rédaction", "Pour une décision qui se rédige, un brouillon de rédaction est créé.", false,
-                    "Modèle de rédaction", "Brouillon"),
+                Marche("Recherche", "Les affaires en délibéré depuis au moins la durée (60 jours par défaut), à la date de référence (le dernier jour du mois précédent par défaut), sans décision depuis le délibéré. Contentieux coché par défaut ; au moins un type d'instance.", true,
+                    "Délibérés au", "Durée du délibéré en jours", "Type d'instance"),
+                Marche("Édition", "Le résultat s'édite en Word, colonnes au choix ; les délibérés repoussés non rendus s'exportent en Excel.", false,
+                    "Editer le résultat", "Délibérés repoussés non rendus"),
             ],
             Lignes =
             [
-                Ligne("Alpha Services SARL c/ Bêta Industrie SAS", "Délibéré du 02/02/2026 · prononcé à saisir", "Délibérés à rendre", "AFaire"),
-                Ligne("Gamma Conseil SARL c/ Delta Transports SAS", "Délibéré du 05/02/2026 · date de prononcé fixée", "Délibérés à rendre", "EnCours", 0, 1),
-                Ligne("Epsilon Habitat SARL c/ Zêta Commerce SAS", "Délibéré du 09/02/2026 · prononcé saisi", "Délibérés à rendre", "Validee", 0, 1, 2),
-                Ligne("Kappa Négoce SAS", "Délibéré du 20/02/2026 · rédaction à lancer", "Délibérés à rendre", "EnCours", 0, 1, 2),
-                Ligne("Êta Boulangerie SARL", "Délibéré du 12/01/2026 · plus de deux mois", "Délibérés depuis plus de deux mois", "AFaire"),
-                Ligne("Thêta Import SAS", "Délibéré du 08/01/2026 · plus de deux mois", "Délibérés depuis plus de deux mois", "EnCours", 0),
-                Ligne("Iota Études SARL", "Délibéré du 15/01/2026 · rendu", "Délibérés depuis plus de deux mois", "Validee", 0, 1, 2),
+                Ligne("Alpha Services SARL c/ Bêta Industrie SAS", "Délibéré du 02/02/2026 · 89 jours", "Délibérés non rendus", "AFaire") with
+                    { Valeurs = ["2026J00101", "", "Alpha Services SARL c/ Bêta Industrie SAS", "2026-02-02", "DEL", "89", "JGT", "2026-03-02", "DUPONT Jean", ""] },
+                Ligne("Gamma Conseil SARL c/ Delta Transports SAS", "Délibéré du 05/02/2026 · 86 jours", "Délibérés non rendus", "AFaire") with
+                    { Valeurs = ["2026J00102", "2026J00103", "Gamma Conseil SARL c/ Delta Transports SAS", "2026-02-05", "DEL", "86", "", "2026-02-05", "MARTIN Paul", ""] },
+                Ligne("Kappa Négoce SAS", "Délibéré du 12/01/2026 · 110 jours", "Délibérés non rendus", "AFaire") with
+                    { Valeurs = ["2025J00950", "", "Kappa Négoce SAS", "2026-01-12", "DEL", "110", "ORD", "2026-02-09", "DUPONT Jean", "Cabinet 2"] },
+                Ligne("Êta Boulangerie SARL", "Délibéré du 08/01/2026 · 114 jours", "Délibérés non rendus", "AFaire") with
+                    { Valeurs = ["2025J00930", "", "Êta Boulangerie SARL", "2026-01-08", "DEL", "114", "", "2026-01-08", "", ""] },
+                Ligne("Thêta Import SAS", "Délibéré du 15/12/2025 · 138 jours", "Délibérés non rendus", "AFaire") with
+                    { Valeurs = ["2025J00880", "", "Thêta Import SAS", "2025-12-15", "DEL", "138", "JGT", "2026-01-15", "MARTIN Paul", ""] },
+                Ligne("Iota Études SARL", "Délibéré du 01/12/2025 · 152 jours", "Délibérés non rendus", "AFaire") with
+                    { Valeurs = ["2025J00860", "", "Iota Études SARL", "2025-12-01", "DEL", "152", "", "2025-12-01", "", ""] },
             ],
         },
 
         new DescripteurEcran
         {
             Code = "PROC_TAXESETTOURS", Titre = "Taxes et tours de role", Sujet = "éditions",
+            // Une ÉDITION pure : RIG v2 n'écrit rien, il produit trois états Crystal en lecture seule (proc_taxesettours.md:112-118,
+            // le Détail OPE fait foi). Le tableau EST leur contenu, lu dans la base : les tours de rôle des mandataires (4D_TOURS.rpt)
+            // et leurs acomptes et taxes (4D_TAXES_ACOMPTES.rpt), sur la période par défaut de RIG v2 (du 1er janvier à aujourd'hui,
+            // OPE_PERIODE.cs:31-32). Lecteur : Serveur/Socle/EcransGeneres/LecteurTaxesEtTours.cs (lot 7).
             Forme = FormeEcran.Etat,
-            Parametres = [Champ.Periode("Période"), Champ.Liste("Type d'édition", "Tours", "Acomptes", "Taxes")],
-            Colonnes = ["Édition"],
+            // OPE_PERIODE (deux dates) et OPE_TYPE_EDITION (trois cases), proc_taxesettours.md:144-150.
+            Parametres = [Champ.Date("Date de début"), Champ.Date("Date de fin"), Champ.Case("Tours"), Champ.Case("Acomptes"), Champ.Case("Taxes")],
+            // Les champs des deux états : TOURS (FONCTION, ABREGE_ORGANE, TOUR_N à TOUR_4, PlumitifPcTours.cs:39-57) et TAXES_ACOMPTES
+            // (NOM, MONTANT_ADJ, _CEP, _LIQ, _MDJ, PlumitifPcTaxes.cs:43-52).
+            Colonnes = ["Mandataire", "Fonction", Champ.Nombre("Tour N"), Champ.Nombre("Tour 1"), Champ.Nombre("Tour 2"), Champ.Nombre("Tour 3"),
+                        Champ.Nombre("Tour 4"), Champ.Montant("ADJ"), Champ.Montant("CEP"), Champ.Montant("LIQ"), Champ.Montant("MDJ")],
             Gestes = ["Éditer"],
-            Recherche = "Rechercher une édition, une période…",
-            Criteres = ["Date de début", "Date de fin", "Type d'édition : tours, acomptes, taxes"],
-            Valider = "Éditer", // proc_taxesettours.md, Détail OPE : « l'unique action est Éditer ».
+            Recherche = "Rechercher un mandataire…",
+            Criteres = ["Date de début", "Date de fin", "Tours", "Acomptes", "Taxes"],
+            Valider = "Éditer", // proc_taxesettours.md, Détail OPE : « l'unique action est Éditer » (OPE_RECHERCHE.Designer.cs:77-78).
             Rang = 5,
             Etats = EtatsEcran.Trois("À éditer", "En cours", "Éditée"),
             Groupes = ["Tours de rôle", "Acomptes", "Taxes"],
             Sections =
             [
-                Marche("Période", "Date de début et date de fin. Sans date de début, l'édition est refusée. Par défaut : du 1er janvier de l'année en cours à aujourd'hui.", true,
+                Marche("Période", "Du 1er janvier de l'année en cours à aujourd'hui par défaut. Sans date de début, l'édition est refusée ; la date de fin est facultative (le jour de début seul) ; le début ne dépasse pas la fin.", true,
                     "Date de début", "Date de fin"),
-                Marche("Type d'édition", "Au moins une case : tours, acomptes ou taxes. Sans case cochée, le bouton Éditer reste désactivé.", true,
+                Marche("Type d'édition", "Au moins une case : tours, acomptes ou taxes ; un état par case cochée. Sans case cochée, Éditer reste désactivé.", true,
                     "Tours", "Acomptes", "Taxes"),
-                Marche("Édition", "Un état pour les tours de rôle, un état pour les acomptes et taxes, pour le greffe de la session.", true,
-                    "Tours de rôle", "Acomptes et taxes"),
+                Marche("Tours de rôle", "Par mandataire et fonction (administrateur, liquidateur, mandataire judiciaire), le nombre de PC désignées dans la période pour chaque tour, selon les conditions du greffe.", false,
+                    "Tour N", "Tour 1", "Tour 2", "Tour 3", "Tour 4"),
+                Marche("Acomptes et taxes", "Par mandataire, la somme des montants de la période, par fonction.", false,
+                    "ADJ", "CEP", "LIQ", "MDJ"),
             ],
             Lignes =
             [
-                Ligne("Tours de rôle · janvier 2026", "Du 01/01/2026 au 31/01/2026", "Tours de rôle", "Validee", 0, 1, 2),
-                Ligne("Tours de rôle · février 2026", "Période à compléter", "Tours de rôle", "AFaire"),
-                Ligne("Acomptes · janvier 2026", "Du 01/01/2026 au 31/01/2026 · édition en cours", "Acomptes", "EnCours", 0, 1),
-                Ligne("Acomptes · février 2026", "Période à compléter", "Acomptes", "AFaire"),
-                Ligne("Taxes · janvier 2026", "Du 01/01/2026 au 31/01/2026", "Taxes", "Validee", 0, 1, 2),
-                Ligne("Taxes · février 2026", "Édition en cours", "Taxes", "EnCours", 0),
+                Ligne("DURAND MANDATAIRE SELARL (MD01)", "MDJ · tour 1 : 2 · tour 4 : 1", "Tours de rôle", "Validee") with
+                    { Valeurs = ["DURAND MANDATAIRE SELARL (MD01)", "MDJ", "0", "2", "0", "0", "1", "", "", "", ""] },
+                Ligne("DURAND MANDATAIRE SELARL (MD01)", "LIQ · tour 3 : 1", "Tours de rôle", "Validee") with
+                    { Valeurs = ["DURAND MANDATAIRE SELARL (MD01)", "LIQ", "0", "0", "0", "1", "0", "", "", "", ""] },
+                Ligne("MARTIN ADMINISTRATEUR SCP (AJ02)", "ADJ · tour 2 : 1", "Tours de rôle", "Validee") with
+                    { Valeurs = ["MARTIN ADMINISTRATEUR SCP (AJ02)", "ADJ", "0", "0", "1", "0", "0", "", "", "", ""] },
+                Ligne("MARTIN ADMINISTRATEUR SCP", "ADJ 1 200,00 €", "Acomptes", "Validee") with
+                    { Valeurs = ["MARTIN ADMINISTRATEUR SCP", "", "", "", "", "", "", "1200.00", "", "", ""] },
+                Ligne("DURAND MANDATAIRE SELARL", "LIQ 350,00 € · MDJ 820,00 €", "Taxes", "Validee") with
+                    { Valeurs = ["DURAND MANDATAIRE SELARL", "", "", "", "", "", "", "", "", "350.00", "820.00"] },
+                Ligne("MARTIN ADMINISTRATEUR SCP", "CEP 140,00 €", "Taxes", "Validee") with
+                    { Valeurs = ["MARTIN ADMINISTRATEUR SCP", "", "", "", "", "", "", "", "140.00", "", ""] },
             ],
         },
 

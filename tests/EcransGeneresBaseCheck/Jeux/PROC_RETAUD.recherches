@@ -1,0 +1,47 @@
+# Les recherches de LecteurRetourAudience (IRechercheEcran) : les paramètres de l'audience (date, chambre, mode), comme la
+# recherche d'audience de RIG v2 où l'on change les dates (OPE_INFORMATIONS_AUDIENCE.cs:99-141). Format : en tête de
+# tests/EcransGeneresBaseCheck/Program.cs. Dates fixes (2001) : ces lignes ne prennent pas de date relative.
+
+# 1. Le jour de l'audience remplace la fenêtre : l'audience du 15/03/2001, ses cinq affaires (le cabinet du même jour est écarté :
+#    mode audience par défaut ; jumeau retenu au bloc 2).
+critere: Date de l'audience = 2001-03-15
+lignes:
+OMEGA AUD c/ PSI AUD | Rôle 2026J17011 · appel n° TC17P 1 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat à saisir | Prononcés à traiter | AFaire | []
+PC AUD | Rôle 2026P17012 · appel n° TC17P 2 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat à saisir | Prononcés à traiter | AFaire | []
+INJONCTION AUD | Rôle 2026I17013 · appel n° TC17P 3 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat à saisir | Prononcés à traiter | AFaire | []
+RENVOI AUD | Rôle 2026J17014 · appel n° TC17 4 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat à saisir | Affaires à traiter | AFaire | []
+TRAITEE AUD | Rôle 2026J17015 · appel n° TC17 5 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat J | Affaires traitées | Validee | []
+---
+# 2. Le mode « Cabinet » (« C », PROC_RETAUD.cs:85-87) : le cabinet du même jour, libellé au nom du juge (AudienceCabinet.cs:1108-1115).
+critere: Date de l'audience = 2001-03-15
+critere: Mode = Cabinet
+lignes:
+CABINET AUD | Rôle 2026J17018 · Cabinet du 15/03/2001 à 11:00 - JUGEBANC Paul · résultat à saisir | Affaires à traiter | AFaire | []
+---
+# 3. Deux audiences le 16/03/2001, dans l'ordre des heures.
+critere: Date de l'audience = 2001-03-16
+lignes:
+SANS COMPO AUD | Rôle 2026J17016 · appel n° TC17P 1 · Audience du 16/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat à saisir | Prononcés à traiter | AFaire | []
+CHAMBRE LIBRE AUD | Rôle 2026J17017 · appel n° TC17 1 · Audience du 16/03/2001 à 14:00 - Chambre Sans composition (C17B) · résultat à saisir | Affaires à traiter | AFaire | []
+---
+# 4. La chambre, par son code : l'une des deux (jumeau : bloc 3, sans chambre, les deux).
+critere: Date de l'audience = 2001-03-16
+critere: Chambre = C17B
+lignes:
+CHAMBRE LIBRE AUD | Rôle 2026J17017 · appel n° TC17 1 · Audience du 16/03/2001 à 14:00 - Chambre Sans composition (C17B) · résultat à saisir | Affaires à traiter | AFaire | []
+---
+# 5. ... ou par son libellé, sans casse.
+critere: Date de l'audience = 2001-03-16
+critere: Chambre = première
+lignes:
+SANS COMPO AUD | Rôle 2026J17016 · appel n° TC17P 1 · Audience du 16/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat à saisir | Prononcés à traiter | AFaire | []
+---
+# 6. Le champ de recherche (rôle ou nom courant) s'ajoute à l'audience choisie.
+texte: omega
+critere: Date de l'audience = 2001-03-15
+lignes:
+OMEGA AUD c/ PSI AUD | Rôle 2026J17011 · appel n° TC17P 1 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat à saisir | Prononcés à traiter | AFaire | []
+---
+# 7. Un jour sans audience : rien.
+critere: Date de l'audience = 2001-03-17
+lignes:

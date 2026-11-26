@@ -1,5 +1,13 @@
 namespace RigV3Desktop.Pont;
 
+/// <summary>Une audience a venir de l'ecran (« AudienceLigne » dans web/src/ecrans/EcranAudiences.tsx) ; date = aaaa-mm-jj.</summary>
+public sealed record LigneAudience(string Date, string Heure, string Type, string Chambre, string Section, bool Publique, bool Web, int NbAffaires);
+
+/// <summary>Ce que l'ecran montre : les audiences a venir, les listes de la creation, d'ou elles viennent (Pont/LectureEcranMain.cs)
+/// et le total des audiences.</summary>
+public sealed record VueAudiences(LigneAudience[] Lignes, string[] Types, string[] Chambres, string[] Sections, string[] Classements,
+                                  string Mode = "demo", string? Message = null, int Total = 0);
+
 /// <summary>
 /// Pont de l'ecran PROC_AUDIENCE (web/src/ecrans/EcranAudiences.tsx).
 ///
@@ -8,11 +16,26 @@ namespace RigV3Desktop.Pont;
 /// (une semaine plus tard). Ses types d'audience, ses classements et ses
 /// audiences programmees etaient declares dans le .razor lui-meme : ils ont
 /// suivi l'ecran dans le .tsx (web/README.md, « ce qui passe par le pont »).
+///
+/// Lot 7 du plan « RIG v3 100 % fonctionnel » (26/11/2026) : listes et audiences viennent du pont (EcranAudiencesBase.cs, la base
+/// du greffe) ; celles-ci sont la DEMONSTRATION, rendue sans serveur et marquee « exemple » a l'ecran.
 /// </summary>
-public static class EcranAudiences
+public static partial class EcranAudiences
 {
     /// <summary>JeuDemo.Aujourdhui + 7 jours, au format d'un &lt;input type="date"&gt; (aaaa-mm-jj).</summary>
     [JSInvokable("EcranAudiences.DateProposee")]
     public static string DateProposee() =>
         JeuDemo.Aujourdhui.AddDays(7).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>Les listes et les trois audiences de demonstration (celles que l'ecran declarait), sans serveur.</summary>
+    public static VueAudiences Exemple() => new(
+    [
+        new("2026-09-15", "09:00", "Audience de procedure collective", "1re", "A", true, true, 14),
+        new("2026-09-22", "10:15", "Audience du juge-commissaire", "1re", "A", false, false, 6),
+        new("2026-09-29", "14:00", "Audience de plaidoirie", "2e", "B", true, true, 9),
+    ],
+    ["Audience de procedure collective", "Audience de reference", "Audience de plaidoirie", "Audience de conciliation", "Audience du juge-commissaire"],
+    ["1re", "2e", "3e"], ["A", "B", "C"],
+    ["Insuffisance d'actif", "Extinction du passif", "Conversion en liquidation", "Report"],
+    LectureEcransMain.Demo, null, 3);
 }

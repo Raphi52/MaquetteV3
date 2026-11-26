@@ -1,0 +1,123 @@
+# Les gestes de EcrivainComposition (« Composition », PROC_COMPO), joués dans l'ordre par la route POST sur les audiences de
+# juillet 2001 de PROC_COMPO.sql (hors de la fenêtre [J+1 ; J+15] : les lignes relues sans recherche ne bougent pas, les écritures
+# se contrôlent par « controle: »). Format : en tête de tests/EcransGeneresBaseCheck/Program.cs. Un refus n'écrit rien ; chaque
+# refus a son jumeau accepté (blocs 13 et 14).
+
+# 1. Sans juge : « Un juge est requis au minimum » (ETP_COMPO_AUDIENCE.cs:119-126). Jumeau : bloc 13.
+geste: Decider Valider
+ids: 1702120
+valeur: Greffier = G17A
+resultat: refuse
+message: Un juge est requis au minimum
+---
+# 2. Le même juge deux fois (ETP_COMPO_AUDIENCE.cs:100-113). Jumeau : bloc 13 (deux juges distincts).
+geste: Decider Valider
+ids: 1702120
+valeur: Juges = J17A, J17A
+valeur: Greffier = G17A
+resultat: refuse
+message: Un juge a été sélectionné 2 fois pour une composition
+---
+# 3. Un juge inactif : la liste ULT_COMBO_JUGE ne le propose pas en saisie (JUG_ACTIF, Juge.cs:88). Jumeau : bloc 13 (J17A actif).
+geste: Decider Valider
+ids: 1702120
+valeur: Juges = J17A, J17X
+valeur: Greffier = G17A
+resultat: refuse
+message: Le juge « J17X » n'est pas utilisable en saisie dans la base du greffe (abrégé inconnu, en double ou inactif).
+---
+# 4. Un abrégé porté par deux juges : la V3 ne choisit pas à la place de l'agent. Jumeau : bloc 13 (abrégés uniques).
+geste: Decider Valider
+ids: 1702120
+valeur: Juges = J17D
+valeur: Greffier = G17A
+resultat: refuse
+message: Le juge « J17D » n'est pas utilisable en saisie dans la base du greffe (abrégé inconnu, en double ou inactif).
+---
+# 5. Sans greffier : « Le greffier est obligatoire » (ETP_COMPO_AUDIENCE.cs:130-141). Jumeau : bloc 13.
+geste: Decider Valider
+ids: 1702120
+valeur: Juges = J17A
+resultat: refuse
+message: Le greffier est obligatoire
+---
+# 6. Deux greffiers : un seul par composition (ETP_COMPO_AUDIENCE.cs:249-250). Jumeau : bloc 14 (G17B seul).
+geste: Decider Valider
+ids: 1702120
+valeur: Juges = J17A
+valeur: Greffier = G17A, G17B
+resultat: refuse
+message: Une composition n'a qu'un greffier.
+---
+# 7. Un greffier inactif (GRASS_ACTIF, ULT_COMBO_GREFFIER.cs:22). Jumeau : bloc 13 (G17A actif).
+geste: Decider Valider
+ids: 1702120
+valeur: Juges = J17A
+valeur: Greffier = G17X
+resultat: refuse
+message: Le greffier « G17X » n'est pas utilisable en saisie dans la base du greffe (abrégé inconnu, en double ou inactif).
+---
+# 8. Un parquetier inactif (PRQTR_ACTIF, ULT_COMBO_PARQUETIER.cs:22). Jumeaux : bloc 13 (P17A actif), bloc 14 (sans parquetier).
+geste: Decider Valider
+ids: 1702120
+valeur: Juges = J17A
+valeur: Greffier = G17A
+valeur: Parquetier = P17X
+resultat: refuse
+message: Le parquetier « P17X » n'est pas utilisable en saisie dans la base du greffe (abrégé inconnu, en double ou inactif).
+---
+# 9. Deux audiences cochées : RIG v2 n'en compose qu'une (ParamMultiSelect = false, PROC_COMPO.cs:146). Jumeau : bloc 13.
+geste: Decider Valider
+ids: 1702120,1702121
+valeur: Juges = J17A
+valeur: Greffier = G17A
+resultat: refuse
+message: Une seule audience se compose à la fois.
+---
+# 10. Un cabinet n'a pas de composition (PROC_COMPO.cs:134 ; proc_retaud.md:406). Jumeau : bloc 13 (une audience).
+geste: Decider Valider
+ids: 1702122
+valeur: Juges = J17A
+valeur: Greffier = G17A
+resultat: refuse
+message: Un cabinet n'a pas de composition : seules les audiences se composent.
+---
+# 11. Une audience à deux compositions : la V3 ne choisit pas laquelle modifier. Jumeau : bloc 14 (une seule composition).
+geste: Decider Valider
+ids: 1702123
+valeur: Juges = J17A
+valeur: Greffier = G17A
+resultat: refuse
+message: Cette audience a 2 compositions : la V3 ne sait pas encore les distinguer.
+---
+# 12. Une audience absente de la base. Jumeau : bloc 13.
+geste: Decider Valider
+ids: 1702999
+valeur: Juges = J17A
+valeur: Greffier = G17A
+resultat: refuse
+message: L'audience « 1702999 » n'est pas dans la base du greffe.
+---
+# 13. Créer la composition d'une audience qui n'en a pas : numéro 1, par défaut (AudienceCabinet.cs:1338-1350, Composition.cs:359),
+#     greffier et parquetier ; les siégeants dans l'ordre saisi, « PAU » puis « JAU » (Composition.cs:365-379).
+geste: Decider Valider
+ids: 1702120
+valeur: Juges = J17A, J17B
+valeur: Greffier = G17A
+valeur: Parquetier = P17A
+resultat: fait
+message: Composition enregistrée : 2 juges, greffier G17A, parquetier P17A.
+controle: SELECT COUNT(*) FROM v2.COMPOSITION WHERE CMPST_ID_ADNC = 1702120 AND CMPST_NUM_ORDRE = 1 AND CMPST_PAR_DEFAUT = 1 AND CMPST_ID_GRASS = 1702511 AND CMPST_ID_PRQTR = 1702701 => 1
+controle: SELECT COUNT(*) FROM v2.COMPOSITION WHERE CMPST_ID_ADNC = 1702120 => 1
+controle: SELECT STRING_AGG(CONCAT(s.SGR_ID_JUG, ':', s.SGR_NUM_ORDRE, ':', s.SGR_TITRE_SIEGEANT), ',') WITHIN GROUP (ORDER BY s.SGR_NUM_ORDRE) FROM v2.SIEGER AS s JOIN v2.COMPOSITION AS c ON c.CMPST_ID_CMAUD = s.SGR_ID_CMAUD WHERE c.CMPST_ID_ADNC = 1702120 => 1702311:1:PAU,1702312:2:JAU
+---
+# 14. Modifier la seule composition d'une audience : renumérotée 1 et par défaut, nouveau greffier, plus de parquetier ; les
+#     siégeants existants gardent leur ligne (ETP_COMPO_AUDIENCE.cs:314) dans le nouvel ordre, le troisième, de trop, est supprimé.
+geste: Decider Valider
+ids: 1702121
+valeur: Juges = J17C, J17A
+valeur: Greffier = G17B
+resultat: fait
+message: Composition enregistrée : 2 juges, greffier G17B.
+controle: SELECT CONCAT(CMPST_NUM_ORDRE, ':', CAST(CMPST_PAR_DEFAUT AS int), ':', CMPST_ID_GRASS, ':', ISNULL(CAST(CMPST_ID_PRQTR AS varchar(10)), '-')) FROM v2.COMPOSITION WHERE CMPST_ID_CMAUD = 1702204 => 1:1:1702512:-
+controle: SELECT STRING_AGG(CONCAT(SGR_ID_SGR, ':', SGR_ID_JUG, ':', SGR_NUM_ORDRE, ':', SGR_TITRE_SIEGEANT), ',') WITHIN GROUP (ORDER BY SGR_NUM_ORDRE) FROM v2.SIEGER WHERE SGR_ID_CMAUD = 1702204 => 1702601:1702313:1:PAU,1702602:1702311:2:JAU

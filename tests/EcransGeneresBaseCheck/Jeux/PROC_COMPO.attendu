@@ -1,0 +1,9 @@
+# « Composition » (PROC_COMPO) sans recherche : les AUDIENCES de [J+1 ; J+15] (PROC_COMPO.cs:134-140), par date et heure.
+# Écartées : 1702105 (aujourd'hui) et 1702106 (J+16), jumeaux des bornes retenues 1702101 (J+1) et 1702102 (J+15) ; 1702104 (un
+# cabinet : la composition est celle d'une audience). L'audience à J+1 du jeu PROC_RETAUD (1700104, deux affaires, sans
+# composition) est dans la fenêtre : elle est listée.
+# États : aucune composition = À composer (AFaire) ; une composition sans juge = En cours (EnCours) ; sinon Composée (Validee).
+Audience du {J+1} à 09:00 - Chambre Première du banc (C17) | 2 affaires au rôle · aucune composition | Audiences | AFaire | []
+Audience du {J+1} à 09:00 - Chambre Composition du banc (C17C) | 1 affaire au rôle · aucune composition | Audiences | AFaire | []
+Audience du {J+5} à 09:00 - Chambre Autre du banc (C17D) | 0 affaire au rôle · 1 composition · 0 juge | Audiences | EnCours | []
+Audience du {J+15} à 14:00 - Chambre Composition du banc (C17C) | 0 affaire au rôle · 1 composition · 1 juge | Audiences | Validee | []

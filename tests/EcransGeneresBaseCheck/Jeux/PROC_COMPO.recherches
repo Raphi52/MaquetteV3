@@ -1,0 +1,20 @@
+# Les recherches de LecteurComposition : le jour de l'audience (la recherche de RIG v2 où l'on change les dates) et la chambre.
+# Dates fixes (2001) : ces lignes ne prennent pas de date relative. Format : en tête de tests/EcransGeneresBaseCheck/Program.cs.
+
+# 1. Le jour remplace la fenêtre : les deux audiences du 05/06/2001, par heure.
+critere: Date de l'audience = 2001-06-05
+lignes:
+Audience du 05/06/2001 à 09:00 - Chambre Composition du banc (C17C) | 1 affaire au rôle · 1 composition · 1 juge | Audiences | Validee | []
+Audience du 05/06/2001 à 14:00 - Chambre Autre du banc (C17D) | 0 affaire au rôle · aucune composition | Audiences | AFaire | []
+---
+# 2. La chambre, par son code (jumeau : bloc 1, sans chambre).
+critere: Date de l'audience = 2001-06-05
+critere: Chambre = C17D
+lignes:
+Audience du 05/06/2001 à 14:00 - Chambre Autre du banc (C17D) | 0 affaire au rôle · aucune composition | Audiences | AFaire | []
+---
+# 3. Le champ de recherche cherche dans le libellé de l'audience.
+texte: composition du
+critere: Date de l'audience = 2001-06-05
+lignes:
+Audience du 05/06/2001 à 09:00 - Chambre Composition du banc (C17C) | 1 affaire au rôle · 1 composition · 1 juge | Audiences | Validee | []

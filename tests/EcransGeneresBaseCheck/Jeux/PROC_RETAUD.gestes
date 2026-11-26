@@ -1,0 +1,124 @@
+# Les gestes de EcrivainRetourAudience (« Retour d'audience », PROC_RETAUD), joués dans l'ordre par la route POST sur les
+# affaires des audiences de 2001 de PROC_RETAUD.sql (hors de la fenêtre : les lignes relues sans recherche ne bougent pas, les
+# écritures se contrôlent par « controle: »). Format : en tête de tests/EcransGeneresBaseCheck/Program.cs. Un refus n'écrit rien ;
+# chaque refus a son jumeau accepté.
+
+# 1. « Marquer les décisions comme rendues » sur un appel non prononcé (TC17) : le menu est grisé (OPE_LIST_APPEL_AFFAIRE.cs:2222,
+#    :1948). Jumeau : bloc 5 (prononcés non traités).
+geste: Decider Marquer les décisions comme rendues
+ids: 1700514
+resultat: refuse
+message: « Marquer les décisions comme rendues » ne s'applique qu'aux prononcés non encore traités : le rôle 2026J17014 n'est pas un prononcé.
+---
+# 2. ... ni sur un appel déjà traité (IsTraite, AppelAffaire.cs:736-739). Jumeau : bloc 5.
+geste: Decider Marquer les décisions comme rendues
+ids: 1700515
+resultat: refuse
+message: « Marquer les décisions comme rendues » ne s'applique qu'aux prononcés non encore traités : le rôle 2026J17015 a déjà le résultat J.
+---
+# 3. Audience passée sans composition, chambre qui l'impose (CanDoActions, OPE_LIST_APPEL_AFFAIRE.cs:1356-1369, :1586). Jumeaux :
+#    bloc 5 (audience composée) et bloc 14 (chambre C17B, sans composition obligatoire).
+geste: Decider Marquer les décisions comme rendues
+ids: 1700516
+resultat: refuse
+message: Audience passée sans composition (rôle 2026J17016) : actions possibles uniquement si l'audience comporte des compositions.
+---
+# 4. Une injonction de payer : ni J ni O ne lui est compatible (CODE_PLUMITIF.cs:84-85). Jumeau : bloc 5.
+geste: Decider Marquer les décisions comme rendues
+ids: 1700513
+resultat: refuse
+message: Ni « J » ni « O » n'est compatible avec le type d'instance de : 2026I17013.
+---
+# 5. Un contentieux (CX : J) et une procédure collective (PC : O), état de retour « P » (codes prononcés) ; J porte l'événement
+#    EV17J, survenu à la date de l'audience, 1er de l'instance (OPE_LIST_APPEL_AFFAIRE.cs:2229-2270).
+geste: Decider Marquer les décisions comme rendues
+ids: 1700511,1700512
+resultat: fait
+message: 2 décisions marquées comme rendues.
+controle: SELECT APPAF_CODE_PLUMITIF + '/' + APPAF_ETAT_RETOUR FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF = 1700511 => J/P
+controle: SELECT APPAF_CODE_PLUMITIF + '/' + APPAF_ETAT_RETOUR FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF = 1700512 => O/P
+controle: SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 1700011 AND EVNPR_CODE_EVE_PRO = 'EV17J' AND EVNPR_SURVENU = 1 AND EVNPR_DELAI_EXPIRE = 0 AND EVNPR_DATE = '20010315' AND EVNPR_TYPE_EVE_PRO = 'S' AND EVNPR_NUM_ORDRE = 1 AND LEN(EVNPR_NUMERO_SOURCE) = 36 => 1
+controle: SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 1700012 => 0
+---
+# 6. « Renvoyer » une affaire déjà traitée : PROC_MJUDS ne s'ouvre que sur des affaires non traitées (OPE_LIST_APPEL_AFFAIRE.cs:1915,
+#    :1919). Jumeau : bloc 13.
+geste: Decider Renvoyer
+ids: 1700515
+valeur: Résultat = R17
+valeur: Prochaine audience = 2001-04-12
+resultat: refuse
+message: Le rôle 2026J17015 a déjà le résultat J : seules les affaires non traitées se renvoient.
+---
+# 7. Sans résultat. Jumeau : bloc 13.
+geste: Decider Renvoyer
+ids: 1700514
+resultat: refuse
+message: « Résultat » est obligatoire : le code plumitif du renvoi.
+---
+# 8. Un code qui n'est pas un renvoi (D17, délibéré : R_CODEPLUMIT_RENVOI = 0, OPE_RESULTAT.cs:478). Jumeau : bloc 13 (R17).
+geste: Decider Renvoyer
+ids: 1700514
+valeur: Résultat = D17
+valeur: Prochaine audience = 2001-04-12
+resultat: refuse
+message: Le code plumitif « D17 » n'est pas un renvoi.
+---
+# 9. Un renvoi non utilisable en saisie (la liste des résultats de RIG v2 ne le propose pas). Jumeau : bloc 13.
+geste: Decider Renvoyer
+ids: 1700514
+valeur: Résultat = R17X
+valeur: Prochaine audience = 2001-04-12
+resultat: refuse
+message: Le code plumitif « R17X » n'est pas utilisable en saisie dans la base du greffe.
+---
+# 10. Un renvoi incompatible avec une injonction de payer (EstCompatibleInstance). Jumeau : bloc 13 (contentieux).
+geste: Decider Renvoyer
+ids: 1700513
+valeur: Résultat = R17
+valeur: Prochaine audience = 2001-04-12
+resultat: refuse
+message: Le code plumitif « R17 » n'est pas compatible avec le type d'instance du rôle 2026I17013.
+---
+# 11. Code « avec audience » sans date du prochain appel (OPE_RESULTAT.cs:663-700). Jumeau : bloc 13.
+geste: Decider Renvoyer
+ids: 1700514
+valeur: Résultat = R17
+resultat: refuse
+message: « Prochaine audience » est obligatoire pour le code « R17 » : la date de l'audience de renvoi.
+---
+# 12a. Aucune audience de la chambre (« = » : C17, celle de l'audience en cours) ce jour-là. Jumeau : bloc 13 (le 12/04/2001).
+geste: Decider Renvoyer
+ids: 1700514
+valeur: Résultat = R17
+valeur: Prochaine audience = 2001-04-13
+resultat: refuse
+message: Aucune audience le 13/04/2001 pour la chambre C17 dans la base du greffe.
+---
+# 12b. Deux audiences de la chambre ce jour-là. Jumeau : bloc 13 (une seule).
+geste: Decider Renvoyer
+ids: 1700514
+valeur: Résultat = R17
+valeur: Prochaine audience = 2001-05-10
+resultat: refuse
+message: Plusieurs audiences le 10/05/2001 pour la chambre C17 : la V3 ne sait pas encore choisir laquelle.
+---
+# 13. Le renvoi : résultat R17, état de retour « M » (non prononcé), et un appel neuf à l'audience du 12/04/2001 -- classement du
+#     code (TC17), état de retour « A », 2e appel de l'instance, la seule composition de l'audience (AppelAffaire.cs:675-702).
+geste: Decider Renvoyer
+ids: 1700514
+valeur: Résultat = R17
+valeur: Prochaine audience = 2001-04-12
+resultat: fait
+message: 1 affaire renvoyée (R17) à l'Audience du 12/04/2001 à 09:00 - Chambre Première du banc (C17).
+controle: SELECT APPAF_CODE_PLUMITIF + '/' + APPAF_ETAT_RETOUR FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF = 1700514 => R17/M
+controle: SELECT COUNT(*) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN = 1700014 AND APPAF_ID_ADNC = 1700111 AND APPAF_NUM_ORDRE = 2 AND APPAF_TYPE_CLASSEMENT = 'TC17' AND APPAF_ETAT_RETOUR = 'A' AND APPAF_ETAT_PREPARATION = '0' AND APPAF_ID_CMAUD = 1700204 AND APPAF_CODE_PLUMITIF IS NULL => 1
+---
+# 14. Un renvoi sans prochain appel (R17S : ni audience ni cabinet), sur une audience passée sans composition mais dont la chambre
+#     ne l'impose pas (C17B : jumeau accepté du bloc 3).
+geste: Decider Renvoyer
+ids: 1700517
+valeur: Résultat = R17S
+resultat: fait
+message: 1 affaire renvoyée (R17S).
+controle: SELECT APPAF_CODE_PLUMITIF + '/' + APPAF_ETAT_RETOUR FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF = 1700517 => R17S/M
+controle: SELECT COUNT(*) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN = 1700017 => 1

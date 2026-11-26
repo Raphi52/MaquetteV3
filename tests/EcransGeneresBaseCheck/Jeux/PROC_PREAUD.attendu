@@ -1,0 +1,9 @@
+# « Préparation d'audience » (PROC_PREAUD) sans recherche, mode A (audience) : les audiences de la fenêtre lue dans les réglages du
+# greffe (ETP.cs:54-71), ici [J-30 ; J-25] (le jeu pose 30 et -25), par date et heure. Écartées : 1703102 (J-31) et 1703104 (J-24),
+# jumeaux des bornes retenues ; 1703105 (un cabinet : mode C seulement, jumeau retenu au bloc 2 de PROC_PREAUD.recherches).
+# L'audience 1706105 du jeu PROC_GCONV (J-28, une affaire, sans chambre : le jumeau « type cabinet » des Convocations) est dans
+# cette fenêtre : elle est listée.
+# États : numéros d'appel non attribués = À préparer (AFaire, OPE_REC.cs:103-106) ; attribués = En préparation (EnCours).
+Audience du {J-30} à 09:00 - Chambre Préparation du banc (C17E) | 1 affaire au rôle · numéros d'appel à attribuer | Audiences | AFaire | []
+Audience du {J-28} à 10:00 - | 1 affaire au rôle · numéros d'appel à attribuer | Audiences | AFaire | []
+Audience du {J-25} à 14:00 - Chambre Préparation du banc (C17E) | 0 affaire au rôle · numéros d'appel attribués | Audiences | EnCours | []
