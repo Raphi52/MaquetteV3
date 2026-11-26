@@ -1,0 +1,7 @@
+# « Nouvelle formalité » (PROC_NF) : les demandes NF, la plus recente d'abord, une seule famille. Ecartee : 1520204 supprimee
+# (X) -- jumeau retenu : 1520201, meme processus. Etats : V → Validee (0 Instance, 1 Procédure collective) ; une demande liee a
+# une instance (2J) → EnCours, l'instance lue ; sans lien → AFaire, aucune marche. La PC de l'instance se dit par son numero
+# (1400307 est rattachee a la PC 1990P14101 de PROC_CHM.sql).
+Demande D1520200203 | demande D1520200203 | Nouvelle formalité (NF) | AFaire | []
+NF INTERROMPUE | Instance 1990J20009 · interrompue | Nouvelle formalité (NF) | EnCours | [0]
+NF OUVERTE | Instance 1990J14306 · PC 1990P14101 | Nouvelle formalité (NF) | Validee | [0,1]

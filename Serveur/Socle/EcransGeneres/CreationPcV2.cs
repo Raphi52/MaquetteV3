@@ -7,7 +7,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 
 /// <summary>
 /// CREER UNE PROCEDURE COLLECTIVE COMME RIG v2 (plan « RIG v3 100 % fonctionnel », lot 5, 26/11/2026) : le debiteur, le numero
-/// de PC, le client « compte PC » et la ligne v2.PROCEDURE_COLLECTIVE. Ecrivain : EcrivainNouvellesProcedures.cs (PROC_NPC).
+/// de PC, le client « compte PC » et la ligne v2.PROCEDURE_COLLECTIVE. Ecrivains : EcrivainNouvellesProcedures.cs (PROC_NPC, PC
+/// exterieure) et EcrivainNouvellesFormalites.cs (PROC_NF, PC ouverte sur une instance : InstancePortee).
 ///
 /// SOURCE (ancien RIG) :
 ///   - LE DEBITEUR : un dossier RCS (rec.DossierRcs, numero de gestion) ou, a defaut, un non-inscrit (v2.NON_INSCRIT) -- la
@@ -72,20 +73,36 @@ internal static class CreationPcV2
     /// entreprise manque (PRCLL_ID_RPRTR est obligatoire).
     /// </summary>
     internal static async Task<Debiteur?> DebiteurAsync(GesteEnCours geste, string numero, CancellationToken ct)
+        => await DossierAsync(geste, "d.NumeroGestion = @n", numero, ct) ?? await NonInscritAsync(geste, "n.NINSC_NUM_NON_INSCRIT = @n", numero, ct);
+
+    /// <summary>
+    /// Le debiteur que porte une PARTIE d'instance (PROC_NF, PROC_NF.cs:74-75) : son dossier RCS (PRT_ID_DSRCS, l'identifiant V2
+    /// que rec.DossierRcs garde en Id) s'il en a un, sinon son non-inscrit (PRT_ID_NINSC) ; null si ni l'un ni l'autre, ou si
+    /// l'entreprise manque.
+    /// </summary>
+    internal static async Task<Debiteur?> DebiteurDePartieAsync(GesteEnCours geste, int? idDossier, int? idNonInscrit, CancellationToken ct)
+        => idDossier is { } d ? await DossierAsync(geste, "d.Id = @n", d, ct)
+         : idNonInscrit is { } n ? await NonInscritAsync(geste, "n.NINSC_ID_NINSC = @n", n, ct)
+         : null;
+
+    private static async Task<Debiteur?> DossierAsync(GesteEnCours geste, string filtre, object valeur, CancellationToken ct)
     {
-        await using (var r = await geste.LireAsync("""
+        await using var r = await geste.LireAsync($"""
             SELECT TOP (1) d.Id, d.NumeroGestion, e.Id AS IdEntreprise, e.Civilite, e.Denomination, e.IdAdresse
             FROM rec.DossierRcs AS d JOIN rec.Entreprise AS e ON e.Id = d.IdEntreprise
-            WHERE d.NumeroGestion = @n ORDER BY d.Id
-            """, ct, new SqlParameter("@n", numero)))
-            if (await r.ReadAsync(ct)) return Lire(r, true, "Id", "NumeroGestion");
-        await using (var r = await geste.LireAsync("""
+            WHERE {filtre} ORDER BY d.Id
+            """, ct, new SqlParameter("@n", valeur));
+        return await r.ReadAsync(ct) ? Lire(r, true, "Id", "NumeroGestion") : null;
+    }
+
+    private static async Task<Debiteur?> NonInscritAsync(GesteEnCours geste, string filtre, object valeur, CancellationToken ct)
+    {
+        await using var r = await geste.LireAsync($"""
             SELECT TOP (1) n.NINSC_ID_NINSC, n.NINSC_NUM_NON_INSCRIT, e.Id AS IdEntreprise, e.Civilite, e.Denomination, e.IdAdresse
             FROM v2.NON_INSCRIT AS n JOIN rec.Entreprise AS e ON e.Id = n.NINSC_ID_RPRTR
-            WHERE n.NINSC_NUM_NON_INSCRIT = @n ORDER BY n.NINSC_ID_NINSC
-            """, ct, new SqlParameter("@n", numero)))
-            if (await r.ReadAsync(ct)) return Lire(r, false, "NINSC_ID_NINSC", "NINSC_NUM_NON_INSCRIT");
-        return null;
+            WHERE {filtre} ORDER BY n.NINSC_ID_NINSC
+            """, ct, new SqlParameter("@n", valeur));
+        return await r.ReadAsync(ct) ? Lire(r, false, "NINSC_ID_NINSC", "NINSC_NUM_NON_INSCRIT") : null;
     }
 
     private static Debiteur Lire(SqlDataReader r, bool estDossier, string colonneId, string colonneNumero)
@@ -110,7 +127,7 @@ internal static class CreationPcV2
     /// annule tout).
     /// </summary>
     internal static async Task<(PcCreee? Pc, string? Refus)> CreerAsync(GesteEnCours geste, string codeProcessus, PcSaisie s,
-                                                                        CancellationToken ct)
+                                                                        CancellationToken ct, InstancePortee? instance = null)
     {
         // L'adresse du client a facturer, avant toute ecriture (Client.cs:958-963).
         if (s.Debiteur.IdAdresse is not { } idAdresse)
@@ -149,10 +166,25 @@ internal static class CreationPcV2
         if (s.Nature is { } n4 && s.Date is { } d4) valeurs[n4.Colonne] = d4.Date;
         var id = await InsererAsync(geste, "v2.PROCEDURE_COLLECTIVE", "PRCLL_ID_PRCLL", valeurs, ct);
 
-        await RattacherAsync(geste, demande, s.NomAffaire, numero ?? "", numero ?? "", DepotsPcV2.SequenceurPc,
-            id.ToString(CultureInfo.InvariantCulture), ct);
+        if (instance is null)
+            await RattacherAsync(geste, demande, s.NomAffaire, numero ?? "", numero ?? "", DepotsPcV2.SequenceurPc,
+                id.ToString(CultureInfo.InvariantCulture), ct);
+        else
+        {
+            // PROC_NF : la demande est celle de l'INSTANCE (MetierBase) -- nom courant (Instance.NomDemande, Instance.cs:440-443),
+            // indicatif = numero de role, numeros = « role repertoire » (Demande_NumIndicatif / Demande_LesNumeros, Instance.cs:420-436,
+            // poses a la selection, PROC_NF.cs:52-53, avant que l'instance ait sa PC) ; son verrou sur l'instance (2J, Lock,
+            // ISqlLockable.cs:17-19 → SetOldLock) ; puis le setter Instance.procedureCollective ecrit INSTN_ID_PRCLL (Instance.cs:1075-1085).
+            await RattacherAsync(geste, demande, instance.NomCourant, instance.Role, $"{instance.Role} {instance.Repertoire}".Trim(),
+                VerrouDemandeV2.SequenceurInstance, instance.Id.ToString(CultureInfo.InvariantCulture), ct);
+            await geste.EcrireAsync("UPDATE v2.INSTANCE SET INSTN_ID_PRCLL = @pc WHERE INSTN_ID_INSTN = @i", ct,
+                new SqlParameter("@pc", id), new SqlParameter("@i", instance.Id));
+        }
         return (new PcCreee(id, numero, idClient, abrege, existant is not null, demande), null);
     }
+
+    /// <summary>L'instance qui recoit la PC creee (PROC_NF) : son id, son numero de role, son repertoire general, son nom courant.</summary>
+    internal sealed record InstancePortee(int Id, string Role, string Repertoire, string NomCourant);
 
     /// <summary>Le client « compte PC » de Client.CreateClientCompteFromEntreprise (Client.cs:907-975) et son adresse par defaut.</summary>
     private static async Task<int> CreerClientAsync(GesteEnCours geste, Debiteur d, string abrege, string numeroDemande, int idAdresse,

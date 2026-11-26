@@ -1,0 +1,97 @@
+# Les gestes de EcrivainNouvellesFormalites (« Nouvelle formalité », PROC_NF), joues dans l'ordre par la route POST, sur les
+# instances de PROC_NF.sql et de PROC_JOIN.sql (sans les ecrire), le compteur JPC et les debiteurs de PROC_NF.sql. Un refus
+# n'ecrit rien ; chaque refus a son jumeau accepte : les blocs 8 (dossier RCS du defendeur, ouverture) et 10 (non-inscrit du
+# demandeur, sans date).
+
+# 1. Sans numero de role (etape « Instance », MetierObligatoire, PROC_NF.Designer.cs:270). Jumeau : bloc 8.
+geste: Creer
+valeur: Procédure collective › Nom de l'affaire = NF ALPHA SA
+resultat: refuse
+message: « Instance › Numéro de rôle » est obligatoire.
+---
+# 2. Sans nom de l'affaire (ultTBNomAffaire, MetierObligatoire, OPE_PROCEDURE_COLLECTIVE.Designer.cs:185). Jumeau : bloc 8.
+geste: Creer
+valeur: Instance › Numéro de rôle = 1990J20001
+resultat: refuse
+message: « Procédure collective › Nom de l'affaire » est obligatoire.
+---
+# 3. Une instance hors des series de la recherche (JRPR ; MetierParamNumMetiers « Instance=JRCT,JRPC », PROC_NF.Designer.cs:305).
+#    Jumeau : bloc 8, serie JRPC.
+geste: Creer
+valeur: Instance › Numéro de rôle = 1990R14304
+valeur: Procédure collective › Nom de l'affaire = XLIEN DELTA
+resultat: refuse
+message: Aucune instance des séries JRCT ou JRPC ne porte le numéro « 1990R14304 » dans la base du greffe.
+---
+# 4. Une instance deja rattachee a une PC (MetierAllowPcNullOnInstance=2, OPE_ENTITE_JUD_RECHERCHE.cs:300-301). Jumeau : bloc 8.
+geste: Creer
+valeur: Instance › Numéro de rôle = 1990J14302
+valeur: Procédure collective › Nom de l'affaire = XLIEN BETA
+resultat: refuse
+message: Une PC est rattachée à l'instance.
+---
+# 5. Une instance tenue par une demande en cours (le verrou de RIG v2, PROC_NF.cs:55-61). Jumeau : bloc 8, instance libre.
+geste: Creer
+valeur: Instance › Numéro de rôle = 1990J14305
+valeur: Procédure collective › Nom de l'affaire = XLIEN EPSILON
+resultat: refuse
+message: Instance bloquée (26014000901), demande "En cours" : MJUD par M. AUTRE BANC
+---
+# 6. Une instance sans debiteur : ni type d'ouverture, ni nature d'origine 08, ni acte (Partie.cs:252-292) ; RIG v2 creerait une
+#    PC sans entreprise, que la sauvegarde refuse (PROC_NF.cs:76, proc_nf.md:218). Jumeaux : blocs 8 (defendeur) et 10 (demandeur).
+geste: Creer
+valeur: Instance › Numéro de rôle = 1990J14301
+valeur: Procédure collective › Nom de l'affaire = XLIEN ALPHA
+resultat: refuse
+message: Aucun débiteur dans l'instance 1990J14301 (une ouverture de procédure dont l'acte de saisine désigne le débiteur parmi les parties) : la procédure collective ne peut pas être créée.
+---
+# 7. Une nature sans date : on ne sait pas quelle date de la PC le jugement remplit. Jumeaux : bloc 8 (les deux), bloc 10 (aucune).
+geste: Creer
+valeur: Instance › Numéro de rôle = 1990J20001
+valeur: Procédure collective › Nom de l'affaire = NF ALPHA SA
+valeur: Procédure collective › Nature = Ouverture (redressement ou liquidation)
+resultat: refuse
+message: « Procédure collective › Nature » et « Date du jugement » vont ensemble : la nature dit quelle date de la procédure le jugement remplit.
+---
+# 8. Ouverte sur l'instance 1990J20001 (acte 15C, auteur de la saisine 2 : le DEFENDEUR est le debiteur, son dossier 1990B20101),
+#    jugement d'ouverture du 10/03/2026 : PC 2026RJ0001 (JPC, annee du jugement), etat 1 et type 1 (ouverture apres 1986), non
+#    exterieure ; client compte PC 26RJ0001 ; l'instance porte la PC ; la demande NF validee au nom de l'instance, indicatif =
+#    son role, numeros = role et repertoire, liee a l'instance (2J).
+geste: Creer
+valeur: Instance › Numéro de rôle = 1990J20001
+valeur: Procédure collective › Nom de l'affaire = NF ALPHA SA
+valeur: Procédure collective › Nature = Ouverture (redressement ou liquidation)
+valeur: Procédure collective › Date du jugement = 2026-03-10
+resultat: fait
+message: Procédure collective 2026RJ0001 ouverte sur l'instance 1990J20001 dans la base du greffe pour NF ALPHA SA (1990B20101), client compte PC 26RJ0001 créé ; la facture, les éditions, les établissements, dirigeants et organes ne sont pas repris par la V3.
+controle: SELECT p.PRCLL_ETAT_PC + '|' + p.PRCLL_TYPE_PC + '|' + p.PRCLL_ETAT_INFO + '|' + CONVERT(varchar(1), p.PRCLL_EXTERIEUR) + '|' + CONVERT(varchar(8), p.PRCLL_DATE_OUVERTURE, 112) + '|' + CONVERT(varchar(10), p.PRCLL_ID_DSRCS) + '|' + CONVERT(varchar(10), p.PRCLL_ID_RPRTR) + '|' + p.PRCLL_NOM_AFFAIRE FROM v2.PROCEDURE_COLLECTIVE AS p WHERE p.PRCLL_NUM_PC = '2026RJ0001' => 1|1|1|0|20260310|1520101|1520101|NF ALPHA SA
+controle: SELECT i.INSTN_NUM_ROLE FROM v2.INSTANCE AS i JOIN v2.PROCEDURE_COLLECTIVE AS p ON p.PRCLL_ID_PRCLL = i.INSTN_ID_PRCLL WHERE p.PRCLL_NUM_PC = '2026RJ0001' => 1990J20001
+controle: SELECT c.Nom + '|' + c.Groupe + '|' + CONVERT(varchar(1), c.EstComptePc) FROM v2.PROCEDURE_COLLECTIVE AS p JOIN rec.Client AS c ON c.Id = p.PRCLL_ID_CLIEN WHERE p.PRCLL_NUM_PC = '2026RJ0001' AND c.Abrege = '26RJ0001' => NF ALPHA SA|PC|1
+controle: SELECT d.DMND_CODE_PROSS + d.DMND_ETAT_DEMANDE + '|' + d.DMND_NUM_INDICATIF + '|' + d.DMND_LES_NUMEROS + '|' + d.DMND_NOM FROM v2.DEMANDE AS d JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_ID_DMND = d.DMND_ID_DMND AND dd.DSSDM_CODE_SEQUENCEUR = '2J' AND dd.DSSDM_VALEUR_SEQUENCEUR = '1520001' WHERE d.DMND_CODE_PROSS = 'NF' => NFV|1990J20001|1990J20001 1990020001|NF CREANCIER # NF ALPHA SA
+lignes:
+NF CREANCIER # NF ALPHA SA | Instance 1990J20001 · PC 2026RJ0001 | Nouvelle formalité (NF) | Validee | [0,1]
+Demande D1520200203 | demande D1520200203 | Nouvelle formalité (NF) | AFaire | []
+NF INTERROMPUE | Instance 1990J20009 · interrompue | Nouvelle formalité (NF) | EnCours | [0]
+NF OUVERTE | Instance 1990J14306 · PC 1990P14101 | Nouvelle formalité (NF) | Validee | [0,1]
+---
+# 9. La meme instance une seconde fois : elle porte maintenant sa PC (le lien ecrit au bloc 8), la recherche la refuse.
+geste: Creer
+valeur: Instance › Numéro de rôle = 1990J20001
+valeur: Procédure collective › Nom de l'affaire = NF ALPHA SA
+resultat: refuse
+message: Une PC est rattachée à l'instance.
+---
+# 10. Ouverte sur l'instance 1990J20002 (acte 15D, auteur 1 : le DEMANDEUR est le debiteur, son non-inscrit NI20102), sans date
+#     de jugement : la PC s'enregistre sans numero (etat N, type 0, PROC_NF.cs:77), avec son client compte PC.
+geste: Creer
+valeur: Instance › Numéro de rôle = 1990J20002
+valeur: Procédure collective › Nom de l'affaire = NF BETA
+resultat: fait
+message: Procédure collective ouverte sans numéro (aucune date de jugement) sur l'instance 1990J20002 dans la base du greffe pour NF BETA (NI20102), client compte PC créé ; la facture, les éditions, les établissements, dirigeants et organes ne sont pas repris par la V3.
+controle: SELECT p.PRCLL_ETAT_PC + '|' + p.PRCLL_TYPE_PC + '|' + CONVERT(varchar(1), p.PRCLL_EXTERIEUR) + '|' + CONVERT(varchar(10), p.PRCLL_ID_NINSC) + '|' + CONVERT(varchar(10), p.PRCLL_ID_RPRTR) + '|' + CASE WHEN p.PRCLL_NUM_PC IS NULL THEN 'sans numero' ELSE p.PRCLL_NUM_PC END FROM v2.PROCEDURE_COLLECTIVE AS p JOIN v2.INSTANCE AS i ON i.INSTN_ID_PRCLL = p.PRCLL_ID_PRCLL WHERE i.INSTN_ID_INSTN = 1520002 => N|0|0|1520102|1520102|sans numero
+lignes:
+NF BETA Paul | Instance 1990J20002 · PC sans numéro | Nouvelle formalité (NF) | Validee | [0,1]
+NF CREANCIER # NF ALPHA SA | Instance 1990J20001 · PC 2026RJ0001 | Nouvelle formalité (NF) | Validee | [0,1]
+Demande D1520200203 | demande D1520200203 | Nouvelle formalité (NF) | AFaire | []
+NF INTERROMPUE | Instance 1990J20009 · interrompue | Nouvelle formalité (NF) | EnCours | [0]
+NF OUVERTE | Instance 1990J14306 · PC 1990P14101 | Nouvelle formalité (NF) | Validee | [0,1]

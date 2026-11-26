@@ -59,38 +59,49 @@ public sealed class DomaineOuvrir : IDomaineEcrans
             ],
         },
 
+        // PROC_NF (lot 5 du plan « RIG v3 100 % fonctionnel », 26/11/2026) : OUVRE la procedure collective d'une INSTANCE existante
+        // (MetierBase = Instance, PROC_NF.cs:18 ; titre « Création d'une PC », FORM_NF.Designer.cs:53). L'instance se designe par son
+        // numero de role, series JRCT et JRPC, sans PC rattachee (etape de recherche, PROC_NF.Designer.cs:303-305) ; la PC prend le
+        // debiteur de l'instance (PROC_NF.cs:73-77). Etapes obligatoires de PROC_NF.Designer.cs : Instance (:270), Demandeurs (:259),
+        // Défendeurs (:248) -- ces deux-la, RIG v2 les remplit avec les parties de l'instance (PROC_NF.cs:83-94) ; le nom de
+        // l'affaire de l'etape PC (OPE_PROCEDURE_COLLECTIVE.Designer.cs:185). Creer : EcrivainNouvellesFormalites.cs ; la liste :
+        // LecteurNouvellesFormalites.cs (demandes NF).
         new DescripteurEcran
         {
             Code = "PROC_NF", Titre = "Nouvelle formalite", Sujet = "procédures collectives",
             Forme = FormeEcran.Saisie,
-            Recherche = "Rechercher un débiteur, un SIREN, une procédure…",
-            Criteres = ["SIREN du débiteur", "Type de procédure", "Date du jugement"],
+            Recherche = "Rechercher une instance, une procédure…",
+            Criteres = ["Numéro de rôle", "Numéro de PC"],
             Valider = "Ouvrir la procédure",
             Etats = EtatsEcran.Trois("À ouvrir", "En cours", "Ouverte"),
-            Groupes = ["Redressement et liquidation (RC)", "Prévention (IP)", "Autres procédures"],
+            Groupes = ["Nouvelle formalité (NF)"],
             Marches =
             [
-                Marche("Débiteur", "Le premier débiteur fournit la procédure : son dossier RCS, ou son non-inscrit à défaut. Au moins un débiteur est requis ; sans l'un ni l'autre, la création échoue.", true,
-                    "Premier débiteur", "Dossier RCS ou non-inscrit"),
-                Marche("Instance", "Parties, appels, décision et événements. Une prévention n'a ni intervenants, ni appels, ni chef de demande.", true,
-                    "Demandeurs", "Défendeurs", "Décision", "Événements"),
-                Marche("Procédure collective", "Organes de procédure, dirigeants, établissements et chiffres.", true,
+                Marche("Instance", "L'instance des séries JRCT ou JRPC, par son numéro de rôle ; une instance qui a déjà une procédure collective est refusée, une instance tenue par une autre demande reste en lecture seule. La procédure prend le débiteur de l'instance : son dossier RCS, ou son non-inscrit à défaut.", true,
+                    "Numéro de rôle"),
+                Marche("Procédure collective", "Le nom de l'affaire est obligatoire. La date du jugement donne l'année du numéro de PC attribué à l'enregistrement ; sans date, la procédure s'ouvre sans numéro, comme dans RIG v2.", true,
+                    "Nom de l'affaire",
+                    Champ.Liste("Nature", "Ouverture (redressement ou liquidation)", "Sauvegarde", "Rétablissement professionnel", "Traitement de sortie de crise"),
+                    Champ.Date("Date du jugement")),
+                Marche("Parties de l'instance", "Demandeurs, défendeurs et intervenants : RIG v2 les reprend de l'instance (pas d'intervenant pour une injonction ni une ordonnance RCS). La V3 ne les modifie pas ici.", false,
+                    "Demandeurs", "Défendeurs", "Intervenants"),
+                Marche("Instance : suite", "Appels, décision, chef de demande et événements de l'instance. Non repris par la V3.", false,
+                    "Appels", "Décision", "Chef de demande", "Événements"),
+                Marche("Organes et dirigeants", "Organes, dirigeants, établissements et chiffres de la procédure. Non repris par la V3.", false,
                     "Organes de procédure", "Dirigeants", "Établissements", "Chiffres"),
                 Marche("Note", "N'apparaît que si la procédure a une note.", false,
                     "Note sur la procédure"),
-                Marche("Facturation", "Forfait, ou articles ligne par ligne : le paramètre de la procédure décide.", true,
-                    "Articles"),
+                Marche("Facturation", "Articles NF, sauf procédure au forfait. Non reprise par la V3.", false,
+                    Champ.Tableau("Articles")),
             ],
             Lignes =
             [
-                Ligne("Alpha Services SARL", "SIREN 900 100 001 · redressement judiciaire · jugement du 02/03/2026", "Redressement et liquidation (RC)", "AFaire"),
-                Ligne("Bêta Industrie SAS", "SIREN 900 100 002 · liquidation judiciaire · jugement du 05/03/2026", "Redressement et liquidation (RC)", "EnCours", 0, 1),
-                Ligne("Gamma Conseil SARL", "Non-inscrit · redressement judiciaire · jugement du 06/03/2026", "Redressement et liquidation (RC)", "EnCours", 0),
-                Ligne("Delta Transports SAS", "SIREN 900 100 004 · sauvegarde · jugement du 10/03/2026", "Autres procédures", "Validee", 0, 1, 2, 4),
-                Ligne("Epsilon Habitat SARL", "SIREN 900 100 005 · prévention", "Prévention (IP)", "AFaire"),
-                Ligne("Zêta Commerce SAS", "SIREN 900 100 006 · prévention", "Prévention (IP)", "EnCours", 0, 1),
-                Ligne("Êta Boulangerie SARL", "SIREN 900 100 007 · redressement judiciaire · jugement du 13/03/2026", "Autres procédures", "AFaire"),
-                Ligne("Thêta Import SAS", "SIREN 900 100 008 · liquidation judiciaire · jugement du 16/03/2026", "Redressement et liquidation (RC)", "Validee", 0, 1, 2, 4),
+                Ligne("Alpha Services SARL # Bêta Industrie SAS", "Instance 2026J00101 · PC 2026RJ0101", "Nouvelle formalité (NF)", "Validee", 0, 1),
+                Ligne("Gamma Conseil SARL # Delta Transports SAS", "Instance 2026J00102 · interrompue", "Nouvelle formalité (NF)", "EnCours", 0),
+                Ligne("Epsilon Habitat SARL # Zêta Commerce SAS", "Instance 2026J00103 · PC sans numéro", "Nouvelle formalité (NF)", "Validee", 0, 1),
+                Ligne("Demande D2633000104", "demande D2633000104", "Nouvelle formalité (NF)", "AFaire"),
+                Ligne("Êta Boulangerie SARL # Thêta Import SAS", "Instance 2026J00105 · PC 2026RJ0105", "Nouvelle formalité (NF)", "Validee", 0, 1),
+                Ligne("Iota Études SARL # Kappa Négoce SAS", "Instance 2026J00106", "Nouvelle formalité (NF)", "EnCours", 0),
             ],
         },
 
