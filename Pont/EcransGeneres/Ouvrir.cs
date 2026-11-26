@@ -105,11 +105,18 @@ public sealed class DomaineOuvrir : IDomaineEcrans
             Groupes = ["Procédure collective (PC)", "Prévention (PRV)"],
             Marches =
             [
-                Marche("Procédure", "Saisie de la procédure, marquée extérieure. En mode prévention, c'est l'étape prévention qui s'ouvre.", true,
-                    "Nature", "Date du jugement", "Débiteur"),
+                // Lot 5 (26/11/2026) : la PC exterieure de PROC_NPC (PROC_NPC.cs:51-53), saisie par l'etape « Procédure
+                // collective » (OPE_PROCEDURE_COLLECTIVE.Designer.cs : Nom de l'affaire :185 et Juridiction extérieure :592
+                // obligatoires ; les quatre dates, OPE_PROCEDURE_COLLECTIVE.cs:194-197 → Nature) ; « Organes » n'est pas une etape obligatoire de PROC_NPC
+                // (PROC_NPC.Designer.cs : seules Facturation :50 et la notification :194 le sont). Creer :
+                // EcrivainNouvellesProcedures.cs (numero JPCEX, client compte PC) ; la liste : LecteurNouvellesProcedures.cs.
+                Marche("Procédure", "Saisie de la procédure, marquée extérieure. Le débiteur est un dossier RCS ou un non-inscrit. La date du jugement donne l'année du numéro attribué à l'enregistrement ; sans date, la procédure s'enregistre sans numéro, comme dans RIG v2. En mode prévention, c'est l'étape prévention qui s'ouvre (reste à RIG v2).", true,
+                    "Débiteur", "Nom de l'affaire",
+                    Champ.Liste("Nature", "Ouverture (redressement ou liquidation)", "Sauvegarde", "Rétablissement professionnel", "Traitement de sortie de crise"),
+                    Champ.Date("Date du jugement"), "Juridiction extérieure"),
                 Marche("Établissement", "Établissement de la procédure.", false,
                     "Établissement principal"),
-                Marche("Organes", "Organes de la procédure.", true,
+                Marche("Organes", "Organes de la procédure.", false,
                     "Administrateur", "Mandataire", "Juge-commissaire"),
                 Marche("Dirigeants", "Dirigeants de la procédure.", false,
                     "Dirigeant", "Qualité"),
@@ -117,10 +124,10 @@ public sealed class DomaineOuvrir : IDomaineEcrans
                     "Chiffre d'affaires", "Effectif"),
                 Marche("Événements", "Événements survenus, puis événements à venir.", false,
                     "Événements survenus", "Événements à venir"),
-                Marche("Notification CFEC", "Notification dématérialisée. Acceptée, elle ouvre la suite ; refusée, elle fait refuser la demande et seule cette étape reste visible.", true,
+                Marche("Notification CFEC", "Notification dématérialisée, visible seulement pour une notification reçue. Acceptée, elle ouvre la suite ; refusée, elle fait refuser la demande et seule cette étape reste visible. La V3 ne reçoit pas les notifications CFEC.", false,
                     "Accepter", "Refuser"),
-                Marche("Facturation", "Facturation de la procédure, selon son paramètre.", true,
-                    "Articles"),
+                Marche("Facturation", "Facturation de la procédure, selon son paramètre. Non reprise par la V3.", true,
+                    Champ.Tableau("Articles")),
             ],
             Lignes =
             [
