@@ -928,14 +928,15 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Forme = FormeEcran.File,
             // Les groupes (traitements d'édition) des files d'édition (proc_relancefile.md, Détail OPE) : lus par
             // Serveur/Socle/EcransGeneres/LecteurTraitementsEdition.cs (lot 9). Les boutons d'OPE_EDITGRP.cs:44-48 : RELANCER
-            // « Relancer via editrcs », FIGER « Cloturer le groupe », IMPRIMER_AUTRE « Tout réimprimer » ; sans écrivain
-            // (LecteurTraitementsEdition.cs dit pourquoi).
+            // « Relancer via editrcs », FIGER « Cloturer le groupe », IMPRIMER_AUTRE « Tout réimprimer » : joués par
+            // EcrivainTraitementsEdition.cs -- « Tout réimprimer » remet les éditions du groupe à imprimer dans la base ; les deux
+            // autres sont refusés avec leur raison (programme externe ; clôture pas encore reprise).
             Recherche = "Rechercher une file, un groupe, une date…",
             Criteres = ["File d'édition", "Date de début (par défaut : aujourd'hui à 7 h)", "Date de fin", "Numéro de groupe"],
             Valider = "Relancer via editrcs", // OPE_EDITGRP.cs:44-48, _relancer (:237-240).
             Gestes = ["Relancer via editrcs", "Cloturer le groupe", "Tout réimprimer"],
             Rang = 5,
-            Etats = EtatsEcran.Trois("Ouvert", "Clôturé, en transmission", "Transmis"),
+            Etats = EtatsEcran.Trois("Ouvert", "Clôturé", "Clôturé sans édition"), // un groupe clos se réimprime, transmis ou non (OPE_EDITGRP.cs:205)
             Groupes = ["Groupes ouverts", "Groupes clôturés"],
             Sections =
             [
@@ -953,11 +954,11 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Lignes =
             [
                 Ligne("File RCS interne · groupe 501", "3 éditions · ouvert le 10/03/2026 · Imprimante du 2e étage", "Groupes ouverts", "AFaire"),
-                Ligne("File RCS interne · groupe 502", "12 éditions · ouvert le 09/03/2026 · clôturé le 09/03/2026 · transmission finie", "Groupes clôturés", "Validee"),
+                Ligne("File RCS interne · groupe 502", "12 éditions · ouvert le 09/03/2026 · clôturé le 09/03/2026 · transmission finie", "Groupes clôturés", "EnCours"),
                 Ligne("File RCS autre · groupe 503", "1 édition · ouvert le 10/03/2026 · Imprimante du 1er étage", "Groupes ouverts", "AFaire"),
                 Ligne("File RCS autre · groupe 504", "4 éditions · ouvert le 08/03/2026 · clôturé le 08/03/2026 · en transmission", "Groupes clôturés", "EnCours"),
                 Ligne("File Info légal · groupe 505", "0 édition · ouvert le 10/03/2026", "Groupes ouverts", "AFaire"),
-                Ligne("File Info légal · groupe 506", "7 éditions · ouvert le 06/03/2026 · clôturé le 07/03/2026 · transmission finie", "Groupes clôturés", "Validee"),
+                Ligne("File Info légal · groupe 506", "7 éditions · ouvert le 06/03/2026 · clôturé le 07/03/2026 · transmission finie", "Groupes clôturés", "EnCours"),
                 Ligne("File RCS toque · groupe 507", "2 éditions · ouvert le 05/03/2026 · clôturé le 05/03/2026 · en transmission", "Groupes clôturés", "EnCours"),
             ],
         },
