@@ -1,0 +1,10 @@
+# Les recherches de LecteurSuppressionInstance (PROC_XXAFF) dans la base. Format : en tete de Program.cs.
+# La date de saisine, au jour pres : 1400351 et 1400352 (02/03/2026).
+critere: Date de saisine = 02/03/2026
+lignes:
+XXAFF BETA | Rôle 2026M14352 · saisi le 02/03/2026 · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
+XXAFF ALPHA | Rôle 2026M14351 · saisi le 02/03/2026 | Au fond | AFaire | []
+---
+# Une date illisible ne retrouve rien.
+critere: Date de saisine = mars
+lignes:

@@ -1,0 +1,26 @@
+# Les recherches de LecteurOrganesPc (PROC_CHORGANESENMASSE) dans la base, sur les PC de PROC_CHM.sql. Format : en tete de Program.cs.
+# Statut suppleant (OPE_RECHERCHE.cs:74-76) : le juge principal tient JCS ; groupe « Juge suppléant ».
+critere: Juge principal = jugedeux
+critere: Statut recherché = suppléant
+lignes:
+CHM ALPHA | PC 1990P14101 · titulaire Mr JUGEUN Jean · suppléant JUGEDEUX · mandataire Me MANDAUN Selarl | Juge suppléant | AFaire | []
+CHM KAPPA | PC 1990P14110 · suppléant JUGEDEUX | Juge suppléant | AFaire | []
+---
+# Juge secondaire, comparaison « égal » par defaut (:92-93) : la PC a AUSSI J2 suppleant.
+critere: Juge principal = jugeun
+critere: Juge secondaire = jugedeux
+lignes:
+CHM ALPHA | PC 1990P14101 · titulaire Mr JUGEUN Jean · suppléant JUGEDEUX · mandataire Me MANDAUN Selarl | Juge titulaire | AFaire | []
+---
+# Comparaison « différent » (:94-95) : les PC de J1 SANS J2 suppleant.
+critere: Juge principal = jugeun
+critere: Juge secondaire = jugedeux
+critere: Comparaison = différent
+lignes:
+CHM BETA | PC 1990P14102 · titulaire Mr JUGEUN Jean | Juge titulaire | AFaire | []
+CHM GAMMA | PC 1990P14103 · titulaire Mr JUGEUN Jean | Juge titulaire | AFaire | []
+CHM DELTA | PC 1990P14104 · titulaire Mr JUGEUN Jean | Juge titulaire | AFaire | []
+CHM EPSILON | PC 1990P14105 · titulaire Mr JUGEUN Jean | Juge titulaire | AFaire | []
+CHM ZETA | PC 1990P14106 · titulaire Mr JUGEUN Jean | Juge titulaire | AFaire | []
+CHM IOTA | PC 1990P14109 · titulaire Mr JUGEUN Jean | Juge titulaire | AFaire | []
+CHM LAMBDA | PC 1990P14111 · titulaire Mr JUGEUN Jean | Juge titulaire | AFaire | []

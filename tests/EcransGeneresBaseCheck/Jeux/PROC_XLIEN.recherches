@@ -1,0 +1,10 @@
+# Les recherches de LecteurLiensPc (PROC_XLIEN) dans la base. Format : en tete de Program.cs.
+# Le numero de l'entite liee : la prevention 1990V14201 (1400303).
+critere: Numéro de PC ou de prévention = 1990 V 14201
+lignes:
+XLIEN GAMMA | Rôle 1990J14303 · prévention 1990V14201 | Vers une PC | Rejetee | []
+---
+critere: Nom courant = xlien eta
+lignes:
+XLIEN ETA | Rôle 1990J14306 · PC 1990P14101 | Vers une PC | EnCours | []
+XLIEN ETA | Rôle 1990J14306 · PC 1990P14101 | Vers une prévention | Rejetee | []

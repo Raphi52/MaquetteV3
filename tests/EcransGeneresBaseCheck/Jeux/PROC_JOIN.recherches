@@ -1,0 +1,13 @@
+# Les recherches de LecteurJonctions (PROC_JOIN) dans la base. Format : en tete de Program.cs.
+critere: Nom courant = join
+lignes:
+JOIN MERE | Rôle 1990M14401 | Sans jonction | AFaire | []
+---
+critere: Numéro de rôle = 1990 J 1430
+lignes:
+XLIEN ETA | Rôle 1990J14306 | Sans jonction | AFaire | []
+XLIEN ZETA | Rôle 1990J14306 · jointe à 1990J14302 | Instance jointe | AFaire | []
+XLIEN EPSILON | Rôle 1990J14305 · bloquée par la demande 26014000901 | Sans jonction | EnAttente | []
+XLIEN GAMMA | Rôle 1990J14303 · 1 instance jointe | Instance principale | AFaire | []
+XLIEN BETA | Rôle 1990J14302 · 1 instance jointe · jointe à 1990J14303 | Instance principale | AFaire | []
+XLIEN ALPHA | Rôle 1990J14301 | Sans jonction | AFaire | []

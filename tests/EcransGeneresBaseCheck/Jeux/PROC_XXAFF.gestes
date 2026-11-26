@@ -1,0 +1,104 @@
+# Les gestes de EcrivainSuppressionInstance (« Supprimer une instance », PROC_XXAFF), joues dans l'ordre par la route POST, sur les
+# instances de PROC_XXAFF.sql et PROC_JOIN.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs. Un refus n'ecrit rien ;
+# chaque refus a son jumeau accepte : la suppression de 1400351 (bloc 10).
+# 1. Deux instances : RIG v2 en supprime une, celle de la demande. Jumeau : bloc 10.
+geste: Confirmer Valider
+ids: 1400351,1400352
+resultat: refuse
+message: Une suppression vise UNE instance (celle de la demande de RIG v2) : cocher une seule instance.
+---
+# 2. Tenue par une demande en cours sur 2J (OPE_SELECT_ENTITE_JUDICIAIRE.cs:122). Jumeau : bloc 10 (1400351, libre).
+geste: Confirmer Valider
+ids: 1400354
+resultat: refuse
+message: Instance bloquée (26014000384), demande "En cours" : MJUD par M. AUTRE BANC
+---
+# 3. Un document en GED (CanDeleteInstance, Instance.cs:4140-4142). Jumeau : bloc 10.
+geste: Confirmer Valider
+ids: 1400352
+resultat: refuse
+message: La suppression est impossible pour la ou les raison(s) suivante(s) : - L'instance que vous voulez supprimer est reliée à un document en GED. -> Vous devez supprimer le lien entre le document et l'instance en GED.
+---
+# 4. Une decision au repertoire sans document, une facture et une provision sur l'affaire (:4145-4146, :4189-4196). Jumeau : bloc
+#    10 (sa decision n'a pas de type, hors de ListeDecisionJudiciaire).
+geste: Confirmer Valider
+ids: 1400353
+resultat: refuse
+message: La suppression est impossible pour la ou les raison(s) suivante(s) : - L'instance que vous voulez supprimer contient une décision judiciaire. -> Vous devez la supprimer en MJUD. - Une ou plusieurs factures sont attachées à l'instance que vous voulez supprimer. -> Veuillez annuler les factures concernées (par un avoir ou en les mettant à zéro) au sein d'Expresso ou contacter le service Hot-line Facturation d'Amitel. - Une ou plusieurs provisions sont attachées à l'instance que vous voulez supprimer. -> Veuillez annuler ou modifier l'encaissement de l'affaire concernée au sein d'Expresso ou contacter le service Hot-line Facturation d'Amitel.
+---
+# 5. Role 2025, saisine 2026 (:4170-4171). Jumeau : bloc 10 (role et saisine en 2026).
+geste: Confirmer Valider
+ids: 1400355
+resultat: refuse
+message: La suppression est impossible pour la ou les raison(s) suivante(s) : - L'année de la date saisine Tribunal n'est pas cohérente avec l'année du numéro de l'instance à supprimer. -> Veuillez contacter Amitel.
+---
+# 6. Numero non conforme a sa structure (dbo.VerifTypeMetier, lettre X au lieu de M). Jumeau : bloc 10 (2026M14351).
+geste: Confirmer Valider
+ids: 1400356
+resultat: refuse
+message: La suppression est impossible pour la ou les raison(s) suivante(s) : - Le numéro de l'instance que vous voulez supprimer n'est pas conforme avec le code affaire saisi.
+---
+# 7. Un jugement genere en REDA (document du dossier) et sa mesure (:4147-4149, :4198-4202). Jumeau : bloc 10.
+geste: Confirmer Valider
+ids: 1400357
+resultat: refuse
+message: La suppression est impossible pour la ou les raison(s) suivante(s) : - L'instance que vous voulez supprimer contient une décision judiciaire dont le jugement est généré en REDA. -> Vous devez supprimer le jugement en REDA et la décision en MJUD. - L'instance que vous voulez supprimer est liée à une (ou plusieurs) mesure(s). -> Vous devez supprimer la (ou les) mesure(s) de numéro(s) M14397.
+---
+# 8. Mere ET fille d'une jonction (:4179-4187). Jumeau : bloc 10 (aucune jonction).
+geste: Confirmer Valider
+ids: 1400302
+resultat: refuse
+message: La suppression est impossible pour la ou les raison(s) suivante(s) : - L'instance que vous voulez supprimer est liée à une autre instance. -> Vous devez casser ce lien pour supprimer l'instance en lancant le processus JOIN sur le numéro de rôle 1990J14303. - L'instance que vous voulez supprimer est l'instance principale d'une (ou plusieurs) autre(s) instance(s). -> Vous devez casser ce lien pour supprimer l'instance en lancant le processus JOIN sur le (ou les) numéro(s) de rôle 1990J14306.
+---
+# 9. « Libérer le numéro d'instance » coche : la V3 ne rend pas les numeros. Jumeau : bloc 10 (case decochee).
+geste: Confirmer Valider
+ids: 1400351
+valeur: Numéros à libérer › Libérer le numéro d'instance = oui
+resultat: refuse
+message: La V3 ne rend pas les numéros de l'instance 2026M14351 (RIG v2 les restitue par RESTITUER_NUMERO ; la V3 les tient hors des tables qu'un écran écrit) : décocher « Libérer le numéro d'instance » pour la supprimer sans les rendre, comme RIG v2 le permet après son avertissement.
+fiche: 1400351
+Numéros à libérer › Libérer le numéro d'instance = oui
+---
+# 10. La suppression (DeleteCascade, Instance.cs:4237-4670) : l'instance, une ligne de chaque table liee, son dossier judiciaire
+#     orphelin, la PREMIERE correspondance Oracle seulement, le lien du document signe a NULL ; les demandes 2J renommees, la
+#     validee passe « Supprimée » (X), la facturee et celle liee a une PC (2P) gardent leur etat. Les dates de saisine de ALPHA et
+#     IOTA BANC sont celles que PROC_MJUD.gestes a enregistrees avant.
+geste: Confirmer Valider
+ids: 1400351
+resultat: fait
+message: Instance 2026M14351 supprimée de la base du greffe (24 lignes liées effacées ou mises à jour). Numéros non rendus (JGAFF RG14351, JRMDE 2026M14351, JRDSJ 26DJ14451, année 2026) : « Attention vous avez choisi de ne pas libérer les numéros. » Le courriel de suppression de RIG v2 n'est pas envoyé par la V3.
+lignes:
+XXAFF ZETA | Rôle 2026X14356 · saisi le 06/03/2026 · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
+GAMMA BANC c/ DELTA BANC | Rôle 2026R12002 · saisi le 10/01/2026 · bloquée par la demande 26012000002 | En référé | EnAttente | []
+XXAFF ETA | Rôle 2026M14357 · saisi le 07/03/2026 · 2 raisons de RIG v2 l'empêchent | Au fond | Rejetee | []
+XXAFF DELTA | Rôle 2026M14354 · saisi le 04/03/2026 · bloquée par la demande 26014000384 | Au fond | EnAttente | []
+XXAFF GAMMA | Rôle 2026M14353 · saisi le 03/03/2026 · 3 raisons de RIG v2 l'empêchent | Au fond | Rejetee | []
+XXAFF BETA | Rôle 2026M14352 · saisi le 02/03/2026 · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
+THETA BANC | Rôle 2026J12008 · saisi le 10/01/2026 · bloquée par la demande 26012000008 | Au fond | EnAttente | []
+ZETA BANC | Rôle 2026J12006 · saisi le 10/01/2026 | Au fond | AFaire | []
+ETA BANC | Rôle 2026J12005 · saisi le 10/01/2026 | Au fond | AFaire | []
+EPSILON BANC | Rôle 2026J12003 · saisi le 10/01/2026 | Au fond | AFaire | []
+ALPHA BANC c/ BETA BANC | Rôle 2026J12001 · saisi le 15/01/2026 | Au fond | AFaire | []
+IOTA BANC c/ KAPPA BANC | Rôle 2026I12007 · saisi le 01/02/2026 | Au fond | AFaire | []
+XXAFF EPSILON | Rôle 2025M14355 · saisi le 05/03/2026 · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
+JOIN MERE | Rôle 1990M14401 · saisi le 10/01/1990 | Au fond | AFaire | []
+XLIEN ETA | Rôle 1990J14306 · saisi le 15/01/1990 | Au fond | AFaire | []
+XLIEN ZETA | Rôle 1990J14306 · saisi le 15/01/1990 · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
+XLIEN EPSILON | Rôle 1990J14305 · saisi le 15/01/1990 · bloquée par la demande 26014000901 | Au fond | EnAttente | []
+XLIEN GAMMA | Rôle 1990J14303 · saisi le 15/01/1990 · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
+XLIEN BETA | Rôle 1990J14302 · saisi le 15/01/1990 · 2 raisons de RIG v2 l'empêchent | Au fond | Rejetee | []
+XLIEN ALPHA | Rôle 1990J14301 · saisi le 15/01/1990 | Au fond | AFaire | []
+controle: SELECT COUNT(*) FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1400351 => 0
+controle: SELECT (SELECT COUNT(*) FROM v2.ETAPE_CALENDRIER WHERE ETPCA_ID_INSTN = 1400351) + (SELECT COUNT(*) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN = 1400351) + (SELECT COUNT(*) FROM v2.NOTE_PROCEDURE WHERE NTPRC_ID_INSTN = 1400351) + (SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 1400351) + (SELECT COUNT(*) FROM v2.CHEF_DEMANDE WHERE CHFDM_ID_INSTN = 1400351) + (SELECT COUNT(*) FROM v2.INSTANCE_JUGE WHERE JUGIN_ID_INSTN = 1400351) + (SELECT COUNT(*) FROM v2.MESURE WHERE MSINS_ID_INSTN = 1400351) => 0
+controle: SELECT (SELECT COUNT(*) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_DCJDC = 1400363) + (SELECT COUNT(*) FROM v2.VOIE_RECOURS WHERE VRCRS_ID_VRCRS = 1400364) + (SELECT COUNT(*) FROM v2.CHEF_DECISION WHERE CHDCS_ID_CHFDC = 1400370) + (SELECT COUNT(*) FROM v2.RIG_MOTS_DIRECTEUR_DATE_AUDIENCE WHERE MDAUD_ID_MDAUD = 1400377) + (SELECT COUNT(*) FROM v2.DOSSIER_JUDICIAIRE WHERE DSJUD_ID_DSJUD = 1400451) => 0
+controle: SELECT COUNT(*) FROM v2.OODRIVE_DOCUMENT_SIGNE WHERE OODDS_ID_OODDS = 1400365 AND OODDS_ID_DCJDC IS NULL => 1
+controle: SELECT COUNT(*) FROM v2.CORRESP_ORACLE_RIG WHERE ORARI_ID_RIG = 1400351 AND ORARI_ID_ORARI = 1400372 => 1
+controle: SELECT DMND_ETAT_DEMANDE + '|' + DMND_NOM + '|' + ISNULL(DMND_LES_NUMEROS, '') FROM v2.DEMANDE WHERE DMND_ID_DMND = 1400381 => X|Instance  supprimée : Demande alpha|RG14351
+controle: SELECT DMND_ETAT_DEMANDE + '|' + DMND_NOM + '|' + ISNULL(DMND_LES_NUMEROS, '') FROM v2.DEMANDE WHERE DMND_ID_DMND = 1400382 => V|Instance  supprimée : Demande facturée|
+controle: SELECT DMND_ETAT_DEMANDE + '|' + DMND_NOM FROM v2.DEMANDE WHERE DMND_ID_DMND = 1400383 => V|Instance  supprimée : Demande PC
+---
+# 11. Une instance qui n'est plus dans la base. Jumeau : bloc 10.
+geste: Confirmer Valider
+ids: 1400351
+resultat: refuse
+message: Instance introuvable dans la base du greffe (1400351).

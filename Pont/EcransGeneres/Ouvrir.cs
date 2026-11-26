@@ -220,39 +220,50 @@ public sealed class DomaineOuvrir : IDomaineEcrans
             ],
         },
 
+        // PROC_JOIN (lot 4 du plan « RIG v3 100 % fonctionnel », 26/11/2026) : aligne sur le « Detail OPE » de proc_join.md, qui
+        // fait foi -- l'objet est la MERE (PROC_JOIN.cs:13), la fille se designe par son numero de role, UNE a la fois ; le lien
+        // est porte par la fille (INSTN_ID_INSTN_INSTANCE_PRINCIPA, date et type de jonction). Il n'y a ni evenement JONCTION ni
+        // controle de greffe (la fiche d'origine les inventait). LecteurJonctions.cs, EcrivainJonctions.cs.
         new DescripteurEcran
         {
             Code = "PROC_JOIN", Titre = "Jonction d'instances", Sujet = "jonctions d'instances",
             Forme = FormeEcran.Operation,
-            Recherche = "Rechercher l'instance mère : numéro de rôle, parties…",
-            Criteres = ["Numéro de rôle", "Parties", "Date d'enrôlement"],
+            Recherche = "Rechercher l'instance mère : numéro de rôle, nom courant…",
+            // La recherche d'instance de RIG v2 (FormRechercheInstance.cs:425-426).
+            Criteres = ["Numéro de rôle", "Nom courant"],
             Valider = "Enregistrer la jonction",
-            Etats = EtatsEcran.Trois("À joindre", "En cours", "Jointe"),
-            Groupes = ["Mère 2026J00301", "Mère 2026J00302", "Mère 2026J00303"],
+            // Une mere tenue par une autre demande n'entre pas en saisie (instance.Lock, PROC_JOIN.cs:49). « En cours » et « Jointe »
+            // n'ont pas de ligne : le lien est porte par la fille, la mere reste « Libre ».
+            Etats = [.. EtatsEcran.Trois("Libre", "En cours", "Jointe"), new EtatEcran("EnAttente", "Verrouillée", "en-attente")],
+            Groupes = ["Instance principale", "Instance jointe", "Sans jonction"],
             Sections =
             [
-                Marche("Instance mère", "Recherche de la mère. Mère et filles sont verrouillées avant la jonction, pour éviter les modifications concurrentes.", true,
-                    "Numéro de rôle"),
-                Marche("Instances filles", "Les filles sont choisies une à une, puis contrôlées.", true,
-                    "Instances à joindre"),
-                Marche("Déjà jointe", "Une instance déjà jointe ne se rejoint pas : la détacher de sa mère d'abord.", true,
-                    "Contrôle de jonction"),
-                Marche("Boucle", "Une instance ne se joint pas à elle-même, ni à l'une de ses ancêtres : la jonction circulaire est interdite.", true,
-                    "Contrôle de boucle"),
-                Marche("Même greffe", "Les instances de greffes différents ne se joignent pas.", true,
-                    "Contrôle de greffe"),
-                Marche("Événement de jonction", "La jonction laisse un événement JONCTION dans l'historique de la mère.", false,
-                    "Événement JONCTION"),
+                // OPE_RECAP_INST.cs:27-39.
+                Marche("Instance mère", "L'instance cochée est la mère : elle n'est jamais modifiée, seule la fille porte le lien.", false,
+                    Champ.Tableau("Récapitulatif de la mère")),
+                // OPE_JONCTION_FILLES.cs:53-77 (la fille par son numero), :84-116 (deja jointe, boucle), :163-195 (les dates) ;
+                // types : table TYPE_JONCTION (RIG_DEV, ULT_COMBO_TYPE_JONCTION).
+                Marche("Instance fille", "La fille se désigne par son numéro de rôle. La date de jonction est obligatoire, jamais avant la date de l'acte de la fille ni de la mère. Une instance ne se joint ni à elle-même, ni deux fois, ni en boucle.", true,
+                    "Numéro de rôle de la fille",
+                    Champ.Liste("Type de jonction", "Jonction complète", "Jonction double enrolement", "Jonction informations et documents",
+                        "Jonction LOIP", "dupliquer les parties sans joindre", "Jonction de rapprochement", "Jonction de rapprochement plumitif"),
+                    Champ.Date("Date de jonction")),
+                // BtnDisjoindre, OPE_JONCTION_FILLES.cs:141-146, :156-159.
+                Marche("Disjonction", "Détache de la mère la fille dont le numéro est saisi : son lien, sa date et son type de jonction sont effacés.", false,
+                    Champ.Case("Disjoindre la fille")),
+                // Les filles que SetPhase pre-charge (PROC_JOIN.cs:71-72).
+                Marche("Instances jointes", "Les filles déjà jointes à cette mère, avec leur type et leur date de jonction.", false,
+                    Champ.Tableau("Filles jointes")),
             ],
             Lignes =
             [
-                Ligne("Alpha Services SARL c/ Bêta Industrie SAS", "Rôle 2026J00311 · à joindre", "Mère 2026J00301", "AFaire"),
-                Ligne("Gamma Conseil SARL c/ Delta Transports SAS", "Rôle 2026J00312 · en contrôle", "Mère 2026J00301", "EnCours", 0, 1, 2),
-                Ligne("Epsilon Habitat SARL c/ Zêta Commerce SAS", "Rôle 2026J00313 · jointe le 04/03/2026", "Mère 2026J00301", "Validee", 0, 1, 2, 3, 4, 5),
-                Ligne("Êta Boulangerie SARL c/ Thêta Import SAS", "Rôle 2026J00321 · à joindre", "Mère 2026J00302", "AFaire"),
-                Ligne("Iota Études SARL c/ Kappa Négoce SAS", "Rôle 2026J00322 · en contrôle", "Mère 2026J00302", "EnCours", 0, 1),
-                Ligne("Lambda Pêche SARL c/ Mu Logistique SAS", "Rôle 2026J00331 · à joindre", "Mère 2026J00303", "AFaire"),
-                Ligne("Nu Paiement SAS c/ Xi Entrepôts SARL", "Rôle 2026J00332 · jointe le 09/03/2026", "Mère 2026J00303", "Validee", 0, 1, 2, 3, 4),
+                Ligne("Alpha Services SARL c/ Bêta Industrie SAS", "Rôle 2026J00301 · 2 instances jointes", "Instance principale", "AFaire"),
+                Ligne("Gamma Conseil SARL c/ Delta Transports SAS", "Rôle 2026J00311 · jointe à 2026J00301", "Instance jointe", "AFaire"),
+                Ligne("Epsilon Habitat SARL c/ Zêta Commerce SAS", "Rôle 2026J00312 · jointe à 2026J00301", "Instance jointe", "AFaire"),
+                Ligne("Êta Boulangerie SARL c/ Thêta Import SAS", "Rôle 2026J00321", "Sans jonction", "AFaire"),
+                Ligne("Iota Études SARL c/ Kappa Négoce SAS", "Rôle 2026J00322 · bloquée par une autre demande", "Sans jonction", "EnAttente"),
+                Ligne("Lambda Pêche SARL c/ Mu Logistique SAS", "Rôle 2026J00331 · 1 instance jointe", "Instance principale", "AFaire"),
+                Ligne("Nu Paiement SAS c/ Xi Entrepôts SARL", "Rôle 2026J00332 · jointe à 2026J00331", "Instance jointe", "AFaire"),
             ],
         },
 

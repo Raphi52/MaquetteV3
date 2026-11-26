@@ -1,0 +1,24 @@
+-- Jeu de LecteurDebiteursMultiples et EcrivainDebiteursMultiples (« Débiteurs multiples », PROC_DEBITEURS_MULTIPLES), lot 4 du
+-- plan « RIG v3 100 % fonctionnel » (plan-676a4b19). Identifiants 14xx xxx. Tables aux types de RIG_DEV (lu le 26/11/2026).
+-- La liste montre le debiteur principal de CHAQUE PC du banc (celles des autres jeux comprises, PROC_DEBITEURS_MULTIPLES.attendu
+-- les cite) puis ses extensions. Gestes : PROC_DEBITEURS_MULTIPLES.gestes.
+IF OBJECT_ID(N'v2.DEBITEUR_AUTRE') IS NULL
+    CREATE TABLE v2.DEBITEUR_AUTRE (DBTAT_ID_DBTAT int NOT NULL PRIMARY KEY, DBTAT_ID_PRCLL int NOT NULL, DBTAT_ID_NINSC int NULL,
+        DBTAT_ID_DSRCS int NULL, DBTAT_ID_RPRTR int NOT NULL, DBTAT_NUM_ORDRE int NOT NULL, DBTAT_NOM_DEBITEUR varchar(250) NOT NULL,
+        DBTAT_ID_ADRBS int NOT NULL, DBTAT_DATE_EXTENSION datetime NOT NULL, DBTAT_LIEN_PRINCIPALE varchar(3) NULL,
+        DBTAT_INSCRIT_REGISTRE_METIER bit NOT NULL, DBTAT_NUM_RM varchar(10) NULL, DBTAT_DEPARTEMENT_RM varchar(3) NULL,
+        DBTAT_RM_DEPENDANT varchar(10) NULL);
+IF OBJECT_ID(N'v2.LIEN_PRINCIPALE') IS NULL
+    CREATE TABLE v2.LIEN_PRINCIPALE (R_LIENPRINCI_VALEUR varchar(3) NOT NULL PRIMARY KEY, R_LIENPRINCI_LIBELLE_ECRAN varchar(35) NOT NULL);
+-- Trois valeurs de LIEN_PRINCIPALE de RIG_DEV (libelles au mot pres).
+INSERT INTO v2.LIEN_PRINCIPALE (R_LIENPRINCI_VALEUR, R_LIENPRINCI_LIBELLE_ECRAN) VALUES
+    ('EXT', 'Extension'), ('SCI', 'société civile immobilière'), ('GRO', 'société du même groupe');
+-- La PC 1400101 (PROC_CHM.sql) : son debiteur principal nomme (PRCLL_NOM_DEBITEUR_PRINCIPAL, sinon le nom de l'affaire,
+-- OPE_DEBITEUR.cs:92-94) et deux extensions : 1400801 (lien EXT, pas au registre des metiers), 1400802 (lien SCI, inscrite au
+-- RM 59, registre dependant RM59).
+EXEC sp_executesql N'
+UPDATE v2.PROCEDURE_COLLECTIVE SET PRCLL_NOM_DEBITEUR_PRINCIPAL = ''ALPHA PRINCIPAL'' WHERE PRCLL_ID_PRCLL = 1400101;
+INSERT INTO v2.DEBITEUR_AUTRE (DBTAT_ID_DBTAT, DBTAT_ID_PRCLL, DBTAT_ID_RPRTR, DBTAT_NUM_ORDRE, DBTAT_NOM_DEBITEUR, DBTAT_ID_ADRBS,
+    DBTAT_DATE_EXTENSION, DBTAT_LIEN_PRINCIPALE, DBTAT_INSCRIT_REGISTRE_METIER, DBTAT_NUM_RM, DBTAT_DEPARTEMENT_RM, DBTAT_RM_DEPENDANT) VALUES
+    (1400801, 1400101, 1, 1, ''EXT UN'', 1, ''20260105'', ''EXT'', 0, NULL, NULL, NULL),
+    (1400802, 1400101, 1, 2, ''EXT DEUX'', 1, ''20260106'', ''SCI'', 1, ''RM14'', ''59'', ''RM59'');';

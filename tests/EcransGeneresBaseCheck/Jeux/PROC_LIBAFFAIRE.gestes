@@ -1,0 +1,23 @@
+# Les gestes de EcrivainAffairesVerrouillees (« Libérer une affaire », PROC_LIBAFFAIRE), joues dans l'ordre par la route POST, sur
+# les lignes de PROC_LIBAFFAIRE.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs. RIG v2 n'a aucun controle
+# (OPE_LISTAFFAIRE.UpdateUser) : seuls refusent un identifiant absent et une affaire deja liberee.
+# 1. Un identifiant que la base ne porte pas. Jumeau accepte : bloc 2.
+geste: Confirmer Traiter
+ids: abc
+resultat: refuse
+message: Affaire introuvable dans la base du greffe (abc).
+---
+# 2. TRAITER libere 1400851 : AFFRE_ID_UTLST_EN_COURS a NULL (OPE_LISTAFFAIRE.cs:79) ; l'affaire sort de la liste (:85).
+geste: Confirmer Traiter
+ids: 1400851
+resultat: fait
+message: Affaire n° 1400851 libérée dans la base du greffe (elle était tenue par MR Lib ALPHA).
+lignes:
+Affaire n° 1400852 | LIB BETA · verrouillée par MME Lise BETA | Sans demande | AFaire | []
+controle: SELECT COUNT(*) FROM v2.AFFAIRE WHERE AFFRE_ID_AFFRE = 1400851 AND AFFRE_ID_UTLST_EN_COURS IS NULL AND AFFRE_LIBELLE = 'LIB ALPHA' => 1
+---
+# 3. La meme affaire, deja liberee (une liste lue avant le bloc 2) : rien a ecrire. Jumeau accepte : bloc 2.
+geste: Confirmer Traiter
+ids: 1400851
+resultat: refuse
+message: Rien à libérer : les affaires cochées ne sont plus verrouillées (la liste a changé depuis sa lecture).

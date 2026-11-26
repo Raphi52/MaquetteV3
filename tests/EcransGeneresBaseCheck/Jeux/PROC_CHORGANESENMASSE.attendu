@@ -1,0 +1,13 @@
+# « Changer les organes » (PROC_CHORGANESENMASSE) : sans juge choisi, la recherche de RIG v2 (OPE_RECHERCHE.cs:65-111) pour
+# tout juge titulaire en mission (JCT, JC), PC non cloturees, sans jointure au client, par numero de PC.
+# Ecartees : 1400107 (cloturee ; jumeau 1400106), 1400108 (fin de mission ; jumeau 1400102), 1400110 (suppleant seul).
+# Gardee : 1400109 (sans client, que CHM ecarte). Juges : dbo.ListeJuge JCT (civilite, nom, prenom) et JCS (nom seul) ;
+# mandataire en mission de 1400101 (celui de 1400102 est en fin de mission).
+CHM ALPHA | PC 1990P14101 · titulaire Mr JUGEUN Jean · suppléant JUGEDEUX · mandataire Me MANDAUN Selarl | Juge titulaire | AFaire | []
+CHM BETA | PC 1990P14102 · titulaire Mr JUGEUN Jean | Juge titulaire | AFaire | []
+CHM GAMMA | PC 1990P14103 · titulaire Mr JUGEUN Jean | Juge titulaire | AFaire | []
+CHM DELTA | PC 1990P14104 · titulaire Mr JUGEUN Jean | Juge titulaire | AFaire | []
+CHM EPSILON | PC 1990P14105 · titulaire Mr JUGEUN Jean | Juge titulaire | AFaire | []
+CHM ZETA | PC 1990P14106 · titulaire Mr JUGEUN Jean | Juge titulaire | AFaire | []
+CHM IOTA | PC 1990P14109 · titulaire Mr JUGEUN Jean | Juge titulaire | AFaire | []
+CHM LAMBDA | PC 1990P14111 · titulaire Mr JUGEUN Jean | Juge titulaire | AFaire | []

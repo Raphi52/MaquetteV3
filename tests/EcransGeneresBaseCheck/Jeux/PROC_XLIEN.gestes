@@ -1,0 +1,150 @@
+# Les gestes de EcrivainLiensPc (« Liens entre PC », PROC_XLIEN), joues dans l'ordre par la route POST, sur les instances de
+# PROC_JOIN.sql et les PC de PROC_CHM.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs. Un refus n'ecrit rien ;
+# chaque refus a son jumeau accepte (meme borne, autre cote).
+# 1. Instance tenue par une demande en cours sur 2J (instance.Lock, PROC_XLIENPC.cs:51). Jumeau : bloc 10 (1400301, libre).
+geste: Confirmer Valider
+ids: PC-1400305
+valeur: Lien › Procédure collective = 1990P14102
+resultat: refuse
+message: Instance bloquée (26014000901), demande "En cours" : MJUD par M. AUTRE BANC
+---
+# 2. Instance liee a une prevention, dans XLIENPC : RIG v2 renvoie a XLIENPR (PROC_XLIENPC.cs:46-48). Jumeau : bloc 10.
+geste: Confirmer Valider
+ids: PC-1400303
+valeur: Lien › Procédure collective = 1990P14102
+resultat: refuse
+message: L’instance sélectionnée est liée à une prévention, vous devez aller en XLIENPR pour supprimer le lien avec la prévention.
+---
+# 3. Instance liee a une PC, dans XLIENPR (PROC_XLIENPR.cs:41-43). Jumeau : bloc 12 (1400304, sans PC).
+geste: Confirmer Valider
+ids: PR-1400307
+valeur: Lien › Prévention = 1990V14201
+resultat: refuse
+message: L’instance sélectionnée est liée à une procédure collective, vous devez aller en XLIENPC pour supprimer le lien avec la procédure collective
+---
+# 4. Le champ de l'autre type. Jumeau : bloc 10 (le champ du groupe).
+geste: Confirmer Valider
+ids: PC-1400301
+valeur: Lien › Prévention = 1990V14201
+resultat: refuse
+message: « Lien › Prévention » ne s'applique pas à l'instance 1990J14301 : elle est dans « Vers une PC ».
+---
+# 5. Rien de saisi. Jumeau : bloc 10.
+geste: Confirmer Valider
+ids: PC-1400301
+resultat: refuse
+message: Rien à enregistrer : saisir le numéro de la procédure collective (« Lien › Procédure collective ») ou cocher « Détacher le lien ».
+---
+# 6. Un numero ET la case. Jumeaux : blocs 10 (numero) et 11 (case).
+geste: Confirmer Valider
+ids: PC-1400301
+valeur: Lien › Procédure collective = 1990P14102
+valeur: Détachement › Détacher le lien = oui
+resultat: refuse
+message: Saisir un numéro de procédure collective OU cocher « Détacher le lien », pas les deux.
+---
+# 7. Detacher une instance sans PC (SupprimerLienPc ne fait rien, OPE_XLIENPC_INSTANCE.cs:141). Jumeau : bloc 11 (1400302, liee).
+geste: Confirmer Valider
+ids: PC-1400301
+valeur: Détachement › Détacher le lien = oui
+resultat: refuse
+message: L'instance 1990J14301 n'est rattachée à aucune procédure collective : rien à détacher.
+---
+# 8. Aucun PC ne porte ce numero (ProcColl null, OPE_XLIENPC_INSTANCE.cs:21-28). Jumeau : bloc 10.
+geste: Confirmer Valider
+ids: PC-1400301
+valeur: Lien › Procédure collective = 1990P19999
+resultat: refuse
+message: Aucune procédure collective ne porte le numéro 1990P19999 : rien n'est rattaché.
+---
+# 9. La PC deja liee. Jumeau : bloc 10 (une autre PC).
+geste: Confirmer Valider
+ids: PC-1400302
+valeur: Lien › Procédure collective = 1990 P 14101
+resultat: refuse
+message: L'instance 1990J14302 est déjà rattachée à la procédure collective 1990P14101 : rien ne change.
+---
+# 10. Rattacher 1400301 a la PC 1990P14102 (numero saisi avec des blancs) : INSTN_ID_PRCLL, puis Instance.Sauve (GUID source, date
+#     de mise a jour Infogreffe). La ligne passe « Rattachée ».
+geste: Confirmer Valider
+ids: PC-1400301
+valeur: Lien › Procédure collective = 1990 P 14102
+resultat: fait
+message: L'instance 1990J14301 est rattachée à la PC 1990P14102.
+lignes:
+THETA BANC | Rôle 2026J12008 · sans PC · bloquée par la demande 26012000008 | Vers une PC | EnAttente | []
+ZETA BANC | Rôle 2026J12006 · sans PC | Vers une PC | AFaire | []
+ETA BANC | Rôle 2026J12005 · sans PC | Vers une PC | AFaire | []
+EPSILON BANC | Rôle 2026J12003 · sans PC | Vers une PC | AFaire | []
+ALPHA BANC c/ BETA BANC | Rôle 2026J12001 · sans PC | Vers une PC | AFaire | []
+XLIEN ETA | Rôle 1990J14306 · PC 1990P14101 | Vers une PC | EnCours | []
+XLIEN ZETA | Rôle 1990J14306 · sans PC | Vers une PC | AFaire | []
+XLIEN EPSILON | Rôle 1990J14305 · sans PC · bloquée par la demande 26014000901 | Vers une PC | EnAttente | []
+XLIEN GAMMA | Rôle 1990J14303 · prévention 1990V14201 | Vers une PC | Rejetee | []
+XLIEN BETA | Rôle 1990J14302 · PC 1990P14101 | Vers une PC | EnCours | []
+XLIEN ALPHA | Rôle 1990J14301 · PC 1990P14102 | Vers une PC | EnCours | []
+TAU SANS MD | Rôle 2026P13103 · sans prévention | Vers une prévention | AFaire | []
+OMEGA MD INSTANCE | Rôle 2026P13101 · sans prévention | Vers une prévention | AFaire | []
+PREVENTION BANC | Rôle 2026P12004 · sans prévention | Vers une prévention | AFaire | []
+SIGMA MD INSTANCE | Rôle 2026M13102 · sans prévention | Vers une prévention | AFaire | []
+XLIEN DELTA | Rôle 1990R14304 · sans prévention | Vers une prévention | AFaire | []
+XLIEN ETA | Rôle 1990J14306 · PC 1990P14101 | Vers une prévention | Rejetee | []
+XLIEN ZETA | Rôle 1990J14306 · sans prévention | Vers une prévention | AFaire | []
+fiche: PC-1400301
+Lien › Procédure collective = 1990P14102
+controle: SELECT COUNT(*) FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1400301 AND INSTN_ID_PRCLL = 1400102 AND INSTN_ID_PREVE IS NULL AND INSTN_NUMERO_SOURCE IS NOT NULL AND INSTN_DATE_MAJ_INFOG IS NOT NULL => 1
+controle: SELECT COUNT(*) FROM v2.PROCEDURE_COLLECTIVE WHERE PRCLL_ID_PRCLL = 1400102 AND PRCLL_NOM_AFFAIRE = 'CHM BETA' => 1
+---
+# 11. Detacher 1400302 de sa PC : la colonne a NULL (SupprimerLienPc, OPE_XLIENPC_INSTANCE.cs:140-149).
+geste: Confirmer Valider
+ids: PC-1400302
+valeur: Détachement › Détacher le lien = oui
+resultat: fait
+message: L'instance 1990J14302 est détachée de la PC 1990P14101.
+lignes:
+THETA BANC | Rôle 2026J12008 · sans PC · bloquée par la demande 26012000008 | Vers une PC | EnAttente | []
+ZETA BANC | Rôle 2026J12006 · sans PC | Vers une PC | AFaire | []
+ETA BANC | Rôle 2026J12005 · sans PC | Vers une PC | AFaire | []
+EPSILON BANC | Rôle 2026J12003 · sans PC | Vers une PC | AFaire | []
+ALPHA BANC c/ BETA BANC | Rôle 2026J12001 · sans PC | Vers une PC | AFaire | []
+XLIEN ETA | Rôle 1990J14306 · PC 1990P14101 | Vers une PC | EnCours | []
+XLIEN ZETA | Rôle 1990J14306 · sans PC | Vers une PC | AFaire | []
+XLIEN EPSILON | Rôle 1990J14305 · sans PC · bloquée par la demande 26014000901 | Vers une PC | EnAttente | []
+XLIEN GAMMA | Rôle 1990J14303 · prévention 1990V14201 | Vers une PC | Rejetee | []
+XLIEN BETA | Rôle 1990J14302 · sans PC | Vers une PC | AFaire | []
+XLIEN ALPHA | Rôle 1990J14301 · PC 1990P14102 | Vers une PC | EnCours | []
+TAU SANS MD | Rôle 2026P13103 · sans prévention | Vers une prévention | AFaire | []
+OMEGA MD INSTANCE | Rôle 2026P13101 · sans prévention | Vers une prévention | AFaire | []
+PREVENTION BANC | Rôle 2026P12004 · sans prévention | Vers une prévention | AFaire | []
+SIGMA MD INSTANCE | Rôle 2026M13102 · sans prévention | Vers une prévention | AFaire | []
+XLIEN DELTA | Rôle 1990R14304 · sans prévention | Vers une prévention | AFaire | []
+XLIEN ETA | Rôle 1990J14306 · PC 1990P14101 | Vers une prévention | Rejetee | []
+XLIEN ZETA | Rôle 1990J14306 · sans prévention | Vers une prévention | AFaire | []
+controle: SELECT COUNT(*) FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1400302 AND INSTN_ID_PRCLL IS NULL AND INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1400303 => 1
+---
+# 12. Rattacher 1400304 (JRPR) a la prevention 1990V14201 : INSTN_ID_PREVE (_ChangementPRV, OPE_XLIENPR_INSTANCE.cs:129).
+geste: Confirmer Valider
+ids: PR-1400304
+valeur: Lien › Prévention = 1990V14201
+resultat: fait
+message: L'instance 1990R14304 est rattachée à la prévention 1990V14201.
+lignes:
+THETA BANC | Rôle 2026J12008 · sans PC · bloquée par la demande 26012000008 | Vers une PC | EnAttente | []
+ZETA BANC | Rôle 2026J12006 · sans PC | Vers une PC | AFaire | []
+ETA BANC | Rôle 2026J12005 · sans PC | Vers une PC | AFaire | []
+EPSILON BANC | Rôle 2026J12003 · sans PC | Vers une PC | AFaire | []
+ALPHA BANC c/ BETA BANC | Rôle 2026J12001 · sans PC | Vers une PC | AFaire | []
+XLIEN ETA | Rôle 1990J14306 · PC 1990P14101 | Vers une PC | EnCours | []
+XLIEN ZETA | Rôle 1990J14306 · sans PC | Vers une PC | AFaire | []
+XLIEN EPSILON | Rôle 1990J14305 · sans PC · bloquée par la demande 26014000901 | Vers une PC | EnAttente | []
+XLIEN GAMMA | Rôle 1990J14303 · prévention 1990V14201 | Vers une PC | Rejetee | []
+XLIEN BETA | Rôle 1990J14302 · sans PC | Vers une PC | AFaire | []
+XLIEN ALPHA | Rôle 1990J14301 · PC 1990P14102 | Vers une PC | EnCours | []
+TAU SANS MD | Rôle 2026P13103 · sans prévention | Vers une prévention | AFaire | []
+OMEGA MD INSTANCE | Rôle 2026P13101 · sans prévention | Vers une prévention | AFaire | []
+PREVENTION BANC | Rôle 2026P12004 · sans prévention | Vers une prévention | AFaire | []
+SIGMA MD INSTANCE | Rôle 2026M13102 · sans prévention | Vers une prévention | AFaire | []
+XLIEN DELTA | Rôle 1990R14304 · prévention 1990V14201 | Vers une prévention | EnCours | []
+XLIEN ETA | Rôle 1990J14306 · PC 1990P14101 | Vers une prévention | Rejetee | []
+XLIEN ZETA | Rôle 1990J14306 · sans prévention | Vers une prévention | AFaire | []
+controle: SELECT COUNT(*) FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1400304 AND INSTN_ID_PREVE = 1400201 AND INSTN_ID_PRCLL IS NULL => 1

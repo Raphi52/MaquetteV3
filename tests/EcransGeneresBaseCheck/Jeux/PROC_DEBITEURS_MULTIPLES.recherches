@@ -1,0 +1,11 @@
+# Les recherches de LecteurDebiteursMultiples (PROC_DEBITEURS_MULTIPLES) dans la base. Format : en tete de Program.cs.
+# Le nom d'une extension retrouve sa PC entiere : le principal et ses deux extensions.
+critere: Débiteur = ext deux
+lignes:
+ALPHA PRINCIPAL | PC 1990P14101 · débiteur principal · 2 extensions | Débiteur principal | EnAttente | []
+EXT UN | PC 1990P14101 · Extension · étendue le 05/01/2026 | Débiteurs additionnels | Validee | []
+EXT DEUX | PC 1990P14101 · société civile immobilière · étendue le 06/01/2026 | Débiteurs additionnels | Validee | []
+---
+critere: Numéro de PC = 1990 P 14110
+lignes:
+CHM KAPPA | PC 1990P14110 · débiteur principal · sans extension | Débiteur principal | EnAttente | []

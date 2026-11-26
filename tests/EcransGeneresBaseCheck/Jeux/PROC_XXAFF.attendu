@@ -1,0 +1,28 @@
+# « Supprimer une instance » (PROC_XXAFF) : les instances de la recherche de XXAFF (JRCT, JRIP, JRJC, JROP, JRPC, JRREF, JRDD,
+# JRMDE, JRORC), role decroissant ; JRPR et JRMC n'y sont pas (OMEGA MD, XLIEN DELTA...). Etats : verrouillee (demande en cours
+# sur 2J) ; bloquee quand Instance.CanDeleteInstance refuse, le nombre de raisons en precision -- 1400356 numero non conforme (lettre
+# X, la structure ALC attend M ; jumeau 1400351), 1400357 jugement en REDA et sa mesure, 1400353 decision au repertoire + facture +
+# provision, 1400352 document en GED, 1400355 annee de saisine incoherente avec le role, 1400302 mere ET fille d'une jonction,
+# 1400306 jointe, 1400303 mere ; jumeaux acceptes : 1400351 (decision et mesure SANS type, hors de ListeDecisionJudiciaire), 1400301,
+# 1400307, 1400401. Les BANC (PROC_MJUD.sql) sont conformes : aucune ligne de NUMERO_METIER pour leur type et leur annee.
+XXAFF ZETA | Rôle 2026X14356 · saisi le 06/03/2026 · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
+GAMMA BANC c/ DELTA BANC | Rôle 2026R12002 · saisi le 10/01/2026 · bloquée par la demande 26012000002 | En référé | EnAttente | []
+XXAFF ETA | Rôle 2026M14357 · saisi le 07/03/2026 · 2 raisons de RIG v2 l'empêchent | Au fond | Rejetee | []
+XXAFF DELTA | Rôle 2026M14354 · saisi le 04/03/2026 · bloquée par la demande 26014000384 | Au fond | EnAttente | []
+XXAFF GAMMA | Rôle 2026M14353 · saisi le 03/03/2026 · 3 raisons de RIG v2 l'empêchent | Au fond | Rejetee | []
+XXAFF BETA | Rôle 2026M14352 · saisi le 02/03/2026 · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
+XXAFF ALPHA | Rôle 2026M14351 · saisi le 02/03/2026 | Au fond | AFaire | []
+THETA BANC | Rôle 2026J12008 · saisi le 10/01/2026 · bloquée par la demande 26012000008 | Au fond | EnAttente | []
+ZETA BANC | Rôle 2026J12006 · saisi le 10/01/2026 | Au fond | AFaire | []
+ETA BANC | Rôle 2026J12005 · saisi le 10/01/2026 | Au fond | AFaire | []
+EPSILON BANC | Rôle 2026J12003 · saisi le 10/01/2026 | Au fond | AFaire | []
+ALPHA BANC c/ BETA BANC | Rôle 2026J12001 · saisi le 10/01/2026 | Au fond | AFaire | []
+IOTA BANC c/ KAPPA BANC | Rôle 2026I12007 · saisi le 05/02/2026 | Au fond | AFaire | []
+XXAFF EPSILON | Rôle 2025M14355 · saisi le 05/03/2026 · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
+JOIN MERE | Rôle 1990M14401 · saisi le 10/01/1990 | Au fond | AFaire | []
+XLIEN ETA | Rôle 1990J14306 · saisi le 15/01/1990 | Au fond | AFaire | []
+XLIEN ZETA | Rôle 1990J14306 · saisi le 15/01/1990 · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
+XLIEN EPSILON | Rôle 1990J14305 · saisi le 15/01/1990 · bloquée par la demande 26014000901 | Au fond | EnAttente | []
+XLIEN GAMMA | Rôle 1990J14303 · saisi le 15/01/1990 · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
+XLIEN BETA | Rôle 1990J14302 · saisi le 15/01/1990 · 2 raisons de RIG v2 l'empêchent | Au fond | Rejetee | []
+XLIEN ALPHA | Rôle 1990J14301 · saisi le 15/01/1990 | Au fond | AFaire | []

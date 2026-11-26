@@ -1,0 +1,117 @@
+# Les gestes de EcrivainDebiteursMultiples (« Débiteurs multiples », PROC_DEBITEURS_MULTIPLES), joues dans l'ordre par la route
+# POST, sur les extensions 1400801 et 1400802 de la PC 1400101 (PROC_DEBITEURS_MULTIPLES.sql). Format : en tete de
+# tests/EcransGeneresBaseCheck/Program.cs. Un refus n'ecrit rien ; chaque refus a son jumeau accepte.
+# 1. Le debiteur principal : en lecture dans cet ecran (MAJAffichage, OPE_DEBITEUR.cs:140-150). Jumeau : bloc 8 (une extension).
+geste: Enregistrer
+ids: P-1400101
+valeur: Identité › Date d'extension = 2026-01-07
+resultat: refuse
+message: Fiche en lecture seule : le débiteur principal se lit ici sans se modifier : RIG v2 n'y laisse changer que son nom, qui réécrit le nom de l'affaire, ce que la V3 ne reprend pas.
+---
+# 2. Le nom vient de l'entreprise : non repris (il reecrit le nom de l'affaire). Jumeau : bloc 8 (date et lien).
+geste: Enregistrer
+ids: D-1400801
+valeur: Identité › Nom du débiteur = AUTRE NOM
+resultat: refuse
+message: « Identité › Nom du débiteur » ne se modifie pas sur le débiteur EXT UN de la PC 1990P14101 dans cet écran.
+---
+# 3. Une date illisible. Jumeau : bloc 8, au format de l'ecran.
+geste: Enregistrer
+ids: D-1400801
+valeur: Identité › Date d'extension = 07/01/2026
+resultat: refuse
+message: « Date d'extension » : date illisible (07/01/2026).
+---
+# 4. Un lien absent de LIEN_PRINCIPALE (ULT_COMBO_LIEN_PRINCIPALE.cs:18). Jumeau : bloc 8.
+geste: Enregistrer
+ids: D-1400801
+valeur: Identité › Lien débiteur principal = cousin
+resultat: refuse
+message: « Lien débiteur principal » : « cousin » n'est pas un lien de la table LIEN_PRINCIPALE du greffe.
+---
+# 5. Inscrite au RM sans departement (obligatoire des que la case est cochee, OPE_DEBITEUR.Designer.cs:184). Jumeau : bloc 9.
+geste: Enregistrer
+ids: D-1400801
+valeur: Registre des métiers › Inscrit au RM = oui
+resultat: refuse
+message: « Département immat. RM » est obligatoire.
+---
+# 6. Un departement de plus de 3 caracteres (DBTAT_DEPARTEMENT_RM varchar(3)). Jumeau : bloc 9 (« 62 »).
+geste: Enregistrer
+ids: D-1400801
+valeur: Registre des métiers › Inscrit au RM = oui
+valeur: Registre des métiers › Département immat. RM = 5962
+resultat: refuse
+message: « Département immat. RM » : 3 caractères au plus.
+---
+# 7. Un RM dependant qui n'est pas de type RM (DESTINATAIRE_INSTITUTIONNEL, OPE_DEBITEUR.cs:82-83). Jumeau : bloc 10 (vide).
+geste: Enregistrer
+ids: D-1400802
+valeur: Registre des métiers › RM dépendant = B3PARQ
+resultat: refuse
+message: « RM dépendant » : « B3PARQ » n'est pas un registre des métiers du greffe (DESTINATAIRE_INSTITUTIONNEL).
+---
+# 8. La date d'extension et le lien de 1400801 : DBTAT_DATE_EXTENSION, DBTAT_LIEN_PRINCIPALE = GRO (la valeur du libelle).
+geste: Enregistrer
+ids: D-1400801
+valeur: Identité › Date d'extension = 2026-01-07
+valeur: Identité › Lien débiteur principal = société du même groupe
+resultat: fait
+message: Débiteur EXT UN (PC 1990P14101) enregistré dans la base du greffe : « Date d'extension », « Lien débiteur principal ».
+lignes:
+MPC ZETA | PC 2027P16106 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+MPC EPSILON | PC 2027P16105 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+MPC DELTA | PC 2027P16104 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+MPC GAMMA | PC 2027P16103 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+MPC BETA | PC 2027P16102 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+MPC ALPHA | PC 2027P16101 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+PC MD BETA | PC 2026P13112 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+PC MD ALPHA | PC 2026P13111 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+PC n° 2026P00213 | PC 2026P00213 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+PC n° 2026P00212 | PC 2026P00212 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+PC n° 2026P00211 | PC 2026P00211 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+CHM LAMBDA | PC 1990P14111 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+CHM KAPPA | PC 1990P14110 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+CHM IOTA | PC 1990P14109 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+CHM THETA | PC 1990P14108 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+CHM ETA | PC 1990P14107 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+CHM ZETA | PC 1990P14106 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+CHM EPSILON | PC 1990P14105 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+CHM DELTA | PC 1990P14104 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+CHM GAMMA | PC 1990P14103 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+CHM BETA | PC 1990P14102 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+ALPHA PRINCIPAL | PC 1990P14101 · débiteur principal · 2 extensions | Débiteur principal | EnAttente | []
+EXT UN | PC 1990P14101 · société du même groupe · étendue le 07/01/2026 | Débiteurs additionnels | Validee | []
+EXT DEUX | PC 1990P14101 · société civile immobilière · étendue le 06/01/2026 | Débiteurs additionnels | Validee | []
+PC n° 3 | débiteur principal · sans extension | Débiteur principal | EnAttente | []
+PC n° 2 | débiteur principal · sans extension | Débiteur principal | EnAttente | []
+PC n° 1 | débiteur principal · sans extension | Débiteur principal | EnAttente | []
+fiche: D-1400801
+Identité › Lien débiteur principal = société du même groupe
+Identité › Date d'extension = 2026-01-07
+controle: SELECT COUNT(*) FROM v2.DEBITEUR_AUTRE WHERE DBTAT_ID_DBTAT = 1400801 AND DBTAT_LIEN_PRINCIPALE = 'GRO' AND DBTAT_DATE_EXTENSION = '20260107' AND DBTAT_NOM_DEBITEUR = 'EXT UN' => 1
+---
+# 9. 1400801 inscrite au RM, departement 62.
+geste: Enregistrer
+ids: D-1400801
+valeur: Registre des métiers › Inscrit au RM = oui
+valeur: Registre des métiers › Département immat. RM = 62
+resultat: fait
+message: Débiteur EXT UN (PC 1990P14101) enregistré dans la base du greffe : « Inscrit au RM », « Département immat. RM ».
+controle: SELECT COUNT(*) FROM v2.DEBITEUR_AUTRE WHERE DBTAT_ID_DBTAT = 1400801 AND DBTAT_INSCRIT_REGISTRE_METIER = 1 AND DBTAT_DEPARTEMENT_RM = '62' => 1
+---
+# 10. 1400802 decochee du RM et sans RM dependant : le departement reste (RIG v2 le masque sans l'effacer, MAJAffichage :151-153).
+geste: Enregistrer
+ids: D-1400802
+valeur: Registre des métiers › Inscrit au RM = 
+valeur: Registre des métiers › RM dépendant = 
+resultat: fait
+message: Débiteur EXT DEUX (PC 1990P14101) enregistré dans la base du greffe : « Inscrit au RM », « RM dépendant ».
+controle: SELECT COUNT(*) FROM v2.DEBITEUR_AUTRE WHERE DBTAT_ID_DBTAT = 1400802 AND DBTAT_INSCRIT_REGISTRE_METIER = 0 AND DBTAT_RM_DEPENDANT IS NULL AND DBTAT_DEPARTEMENT_RM = '59' => 1
+---
+# 11. Les memes valeurs : rien a ecrire. Jumeau : bloc 8.
+geste: Enregistrer
+ids: D-1400801
+valeur: Identité › Date d'extension = 2026-01-07
+resultat: refuse
+message: Aucun champ n'est modifié : le débiteur EXT UN de la PC 1990P14101 garde ses valeurs.

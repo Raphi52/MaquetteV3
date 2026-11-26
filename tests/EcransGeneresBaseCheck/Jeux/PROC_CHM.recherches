@@ -1,0 +1,21 @@
+# Les recherches de LecteurChangementJuge (PROC_CHM) dans la base, sur les PC de PROC_CHM.sql. Format : en tete de Program.cs.
+# Le juge a remplacer SUPPLEANT (JCS, MetierChangementJuge.cs:196-198) : 1400101 et 1400110 (que la recherche titulaire ecarte).
+critere: Juge à remplacer = jugedeux
+critere: Statut titulaire ou suppléant = suppléant
+lignes:
+CHM ALPHA | PC 1990P14101 · titulaire Mr JUGEUN Jean · suppléant Mme JUGEDEUX Paule | Hors forfait | AFaire | []
+CHM KAPPA | PC 1990P14110 · suppléant Mme JUGEDEUX Paule | Au forfait | AFaire | []
+---
+# Le juge de l'autre fonction (andAutreJuge, :203-205) : seule 1400101 a J2 suppleant.
+critere: Juge à remplacer = jugeun
+critere: Juge de l'autre fonction = jugedeux
+lignes:
+CHM ALPHA | PC 1990P14101 · titulaire Mr JUGEUN Jean · suppléant Mme JUGEDEUX Paule | Hors forfait | AFaire | []
+---
+texte: zeta
+lignes:
+CHM ZETA | PC 1990P14106 · titulaire Mr JUGEUN Jean · Le juge à remplacer est présent plusieurs fois dans la PC | Au forfait | Rejetee | []
+---
+# Un juge que la base n'a pas : rien.
+critere: Juge à remplacer = inconnu
+lignes:

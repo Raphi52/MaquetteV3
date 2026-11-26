@@ -1,0 +1,241 @@
+# Les gestes de EcrivainJonctions (« Jonction d'instances », PROC_JOIN), joues dans l'ordre par la route POST, sur les instances de
+# PROC_JOIN.sql : la mere 1400401 (date de l'acte 10/01/1990), la fille 1400301 (01/02/1990), la chaine 1400303 <- 1400302 <- 1400306.
+# Format : en tete de tests/EcransGeneresBaseCheck/Program.cs. Un refus n'ecrit rien ; chaque refus a son jumeau accepte.
+# Le dernier bloc disjoint la fille : les jeux qui suivent (XLIEN, XXAFF) retrouvent l'etat de PROC_JOIN.sql.
+# 1. Deux meres : RIG v2 n'en a qu'une (MetierBase, PROC_JOIN.cs:13). Jumeau : bloc 15.
+geste: Confirmer Enregistrer la jonction
+ids: 1400401,1400301
+valeur: Instance fille › Numéro de rôle de la fille = 1990J14301
+valeur: Instance fille › Date de jonction = 1990-02-01
+resultat: refuse
+message: Une jonction se fait sur UNE instance mère : cocher une seule instance.
+---
+# 2. Mere tenue par une demande en cours sur 2J (instance.Lock, PROC_JOIN.cs:49). Jumeau : bloc 15 (1400401, libre).
+geste: Confirmer Enregistrer la jonction
+ids: 1400305
+valeur: Instance fille › Numéro de rôle de la fille = 1990J14301
+valeur: Instance fille › Date de jonction = 1990-02-01
+resultat: refuse
+message: Instance bloquée (26014000901), demande "En cours" : MJUD par M. AUTRE BANC
+---
+# 3. Sans fille. Jumeau : bloc 15.
+geste: Confirmer Enregistrer la jonction
+ids: 1400401
+resultat: refuse
+message: « Numéro de rôle de la fille » est obligatoire.
+---
+# 4. Aucune fille de la recherche ne porte ce numero (OPE_JONCTION_FILLES.cs:60). Jumeau : bloc 15.
+geste: Confirmer Enregistrer la jonction
+ids: 1400401
+valeur: Instance fille › Numéro de rôle de la fille = 1990J19999
+valeur: Instance fille › Date de jonction = 1990-02-01
+resultat: refuse
+message: Aucune instance trouvée portant ce numéro.
+---
+# 5. Deux instances portent ce numero (1400306 et 1400307, OPE_JONCTION_FILLES.cs:59). Jumeau : bloc 15 (un seul porteur).
+geste: Confirmer Enregistrer la jonction
+ids: 1400401
+valeur: Instance fille › Numéro de rôle de la fille = 1990J14306
+valeur: Instance fille › Date de jonction = 1990-02-01
+resultat: refuse
+message: Plusieurs instances correspondent à ce numéro. Effectuer une recherche pour charger l'instance souhaitée.
+---
+# 6. La fille est la mere (SetInstance, OPE_JONCTION_FILLES.cs:71-72). Jumeau : bloc 15.
+geste: Confirmer Enregistrer la jonction
+ids: 1400301
+valeur: Instance fille › Numéro de rôle de la fille = 1990J14301
+valeur: Instance fille › Date de jonction = 1990-02-01
+resultat: refuse
+message: Vous ne pouvez pas joindre une instance sur elle même.
+---
+# 7. La fille est deja jointe a une AUTRE mere (_VerifierDejaJointe, :85-90). Jumeau : bloc 15 (fille libre).
+geste: Confirmer Enregistrer la jonction
+ids: 1400401
+valeur: Instance fille › Numéro de rôle de la fille = 1990 J 14302
+valeur: Instance fille › Date de jonction = 1990-02-01
+resultat: refuse
+message: Cette instance est déjà jointe à l'instance 1990J14303
+---
+# 8. La mere 1400306 est jointe ; la fille 1400303 est son ancetre (1400306 <- 1400302 <- 1400303) : _PossedeAncetreInstance
+#    (:93-98). Jumeau : bloc 15 (la mere 1400401 n'est pas jointe).
+geste: Confirmer Enregistrer la jonction
+ids: 1400306
+valeur: Instance fille › Numéro de rôle de la fille = 1990J14303
+valeur: Instance fille › Date de jonction = 1990-02-01
+resultat: refuse
+message: Cette instance est déjà liée à l'instance principale. ( 1990J14303 : 1990J14306)
+---
+# 9. Un type sans date : l'avertissement de RIG v2 (DoVerifier, :166-174), rien n'est sauve. Jumeau : bloc 15 (type et date).
+geste: Confirmer Enregistrer la jonction
+ids: 1400401
+valeur: Instance fille › Numéro de rôle de la fille = 1990J14301
+valeur: Instance fille › Type de jonction = Jonction complète
+resultat: refuse
+message: Attention, vous avez valorisé un type de jonction mais pas de date. Si vous continuez, la jonction ne sera pas sauvegardée.
+---
+# 10. Sans date (DateJonction.MetierObligatoire). Jumeau : bloc 16 (une date, sans type).
+geste: Confirmer Enregistrer la jonction
+ids: 1400401
+valeur: Instance fille › Numéro de rôle de la fille = 1990J14301
+resultat: refuse
+message: « Date de jonction » est obligatoire.
+---
+# 11. Une date illisible. Jumeau : bloc 15, au format de l'ecran.
+geste: Confirmer Enregistrer la jonction
+ids: 1400401
+valeur: Instance fille › Numéro de rôle de la fille = 1990J14301
+valeur: Instance fille › Date de jonction = 01/02/1990
+resultat: refuse
+message: « Date de jonction » : date illisible (01/02/1990).
+---
+# 12. Avant la date de l'acte de la fille (01/02/1990, DoVerifier :175-183). Jumeau : bloc 15, le 01/02/1990 meme.
+geste: Confirmer Enregistrer la jonction
+ids: 1400401
+valeur: Instance fille › Numéro de rôle de la fille = 1990J14301
+valeur: Instance fille › Date de jonction = 1990-01-20
+resultat: refuse
+message: La date de saisine de l'instance n°1990J14301 est supérieur à la date de jonction 20/01/1990.
+---
+# 13. Avant la date de l'acte de la mere (10/01/1990, :184-193) ; 1400305 n'a pas de date d'acte. Jumeau : bloc 15.
+geste: Confirmer Enregistrer la jonction
+ids: 1400401
+valeur: Instance fille › Numéro de rôle de la fille = 1990J14305
+valeur: Instance fille › Date de jonction = 1990-01-05
+resultat: refuse
+message: La date de saisine de l'instance n°1990M14401 est supérieur à la date de jonction 05/01/1990.
+---
+# 14. Un type que TYPE_JONCTION n'a pas. Jumeau : bloc 15.
+geste: Confirmer Enregistrer la jonction
+ids: 1400401
+valeur: Instance fille › Numéro de rôle de la fille = 1990J14301
+valeur: Instance fille › Type de jonction = Jonction lunaire
+valeur: Instance fille › Date de jonction = 1990-02-01
+resultat: refuse
+message: « Type de jonction » : « Jonction lunaire » n'est pas un type de jonction du greffe.
+---
+# 15. La jonction (DoSauver, :153-155) : la FILLE porte la mere, la date et le type (valeur C) ; la mere n'est pas ecrite.
+geste: Confirmer Enregistrer la jonction
+ids: 1400401
+valeur: Instance fille › Numéro de rôle de la fille = 1990J14301
+valeur: Instance fille › Type de jonction = Jonction complète
+valeur: Instance fille › Date de jonction = 1990-02-01
+resultat: fait
+message: Instance 1990J14301 jointe à l'instance 1990M14401 le 01/02/1990 (Jonction complète) dans la base du greffe.
+lignes:
+XXAFF ZETA | Rôle 2026X14356 | Sans jonction | AFaire | []
+GAMMA BANC c/ DELTA BANC | Rôle 2026R12002 · bloquée par la demande 26012000002 | Sans jonction | EnAttente | []
+TAU SANS MD | Rôle 2026P13103 | Sans jonction | AFaire | []
+OMEGA MD INSTANCE | Rôle 2026P13101 | Sans jonction | AFaire | []
+PREVENTION BANC | Rôle 2026P12004 | Sans jonction | AFaire | []
+XXAFF ETA | Rôle 2026M14357 | Sans jonction | AFaire | []
+XXAFF DELTA | Rôle 2026M14354 · bloquée par la demande 26014000384 | Sans jonction | EnAttente | []
+XXAFF GAMMA | Rôle 2026M14353 | Sans jonction | AFaire | []
+XXAFF BETA | Rôle 2026M14352 | Sans jonction | AFaire | []
+XXAFF ALPHA | Rôle 2026M14351 | Sans jonction | AFaire | []
+SIGMA MD INSTANCE | Rôle 2026M13102 | Sans jonction | AFaire | []
+THETA BANC | Rôle 2026J12008 · bloquée par la demande 26012000008 | Sans jonction | EnAttente | []
+ZETA BANC | Rôle 2026J12006 | Sans jonction | AFaire | []
+ETA BANC | Rôle 2026J12005 | Sans jonction | AFaire | []
+EPSILON BANC | Rôle 2026J12003 | Sans jonction | AFaire | []
+ALPHA BANC c/ BETA BANC | Rôle 2026J12001 | Sans jonction | AFaire | []
+IOTA BANC c/ KAPPA BANC | Rôle 2026I12007 | Sans jonction | AFaire | []
+XXAFF EPSILON | Rôle 2025M14355 | Sans jonction | AFaire | []
+XLIEN DELTA | Rôle 1990R14304 | Sans jonction | AFaire | []
+JOIN MERE | Rôle 1990M14401 · 1 instance jointe | Instance principale | AFaire | []
+XLIEN ETA | Rôle 1990J14306 | Sans jonction | AFaire | []
+XLIEN ZETA | Rôle 1990J14306 · jointe à 1990J14302 | Instance jointe | AFaire | []
+XLIEN EPSILON | Rôle 1990J14305 · bloquée par la demande 26014000901 | Sans jonction | EnAttente | []
+XLIEN GAMMA | Rôle 1990J14303 · 1 instance jointe | Instance principale | AFaire | []
+XLIEN BETA | Rôle 1990J14302 · 1 instance jointe · jointe à 1990J14303 | Instance principale | AFaire | []
+XLIEN ALPHA | Rôle 1990J14301 · jointe à 1990M14401 | Instance jointe | AFaire | []
+controle: SELECT COUNT(*) FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1400301 AND INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1400401 AND INSTN_TYPE_JONCTION = 'C' AND INSTN_DATE_JONCTION = '19900201' AND INSTN_NUMERO_SOURCE IS NOT NULL => 1
+controle: SELECT COUNT(*) FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1400401 AND INSTN_ID_INSTN_INSTANCE_PRINCIPA IS NULL AND INSTN_NUMERO_SOURCE IS NULL => 1
+---
+# 16. La fille deja jointe A CETTE mere se rouvre (SetPhase la pre-charge, PROC_JOIN.cs:71-72) : une autre date, sans type.
+geste: Confirmer Enregistrer la jonction
+ids: 1400401
+valeur: Instance fille › Numéro de rôle de la fille = 1990J14301
+valeur: Instance fille › Date de jonction = 1990-02-02
+resultat: fait
+message: Instance 1990J14301 jointe à l'instance 1990M14401 le 02/02/1990 dans la base du greffe.
+lignes:
+XXAFF ZETA | Rôle 2026X14356 | Sans jonction | AFaire | []
+GAMMA BANC c/ DELTA BANC | Rôle 2026R12002 · bloquée par la demande 26012000002 | Sans jonction | EnAttente | []
+TAU SANS MD | Rôle 2026P13103 | Sans jonction | AFaire | []
+OMEGA MD INSTANCE | Rôle 2026P13101 | Sans jonction | AFaire | []
+PREVENTION BANC | Rôle 2026P12004 | Sans jonction | AFaire | []
+XXAFF ETA | Rôle 2026M14357 | Sans jonction | AFaire | []
+XXAFF DELTA | Rôle 2026M14354 · bloquée par la demande 26014000384 | Sans jonction | EnAttente | []
+XXAFF GAMMA | Rôle 2026M14353 | Sans jonction | AFaire | []
+XXAFF BETA | Rôle 2026M14352 | Sans jonction | AFaire | []
+XXAFF ALPHA | Rôle 2026M14351 | Sans jonction | AFaire | []
+SIGMA MD INSTANCE | Rôle 2026M13102 | Sans jonction | AFaire | []
+THETA BANC | Rôle 2026J12008 · bloquée par la demande 26012000008 | Sans jonction | EnAttente | []
+ZETA BANC | Rôle 2026J12006 | Sans jonction | AFaire | []
+ETA BANC | Rôle 2026J12005 | Sans jonction | AFaire | []
+EPSILON BANC | Rôle 2026J12003 | Sans jonction | AFaire | []
+ALPHA BANC c/ BETA BANC | Rôle 2026J12001 | Sans jonction | AFaire | []
+IOTA BANC c/ KAPPA BANC | Rôle 2026I12007 | Sans jonction | AFaire | []
+XXAFF EPSILON | Rôle 2025M14355 | Sans jonction | AFaire | []
+XLIEN DELTA | Rôle 1990R14304 | Sans jonction | AFaire | []
+JOIN MERE | Rôle 1990M14401 · 1 instance jointe | Instance principale | AFaire | []
+XLIEN ETA | Rôle 1990J14306 | Sans jonction | AFaire | []
+XLIEN ZETA | Rôle 1990J14306 · jointe à 1990J14302 | Instance jointe | AFaire | []
+XLIEN EPSILON | Rôle 1990J14305 · bloquée par la demande 26014000901 | Sans jonction | EnAttente | []
+XLIEN GAMMA | Rôle 1990J14303 · 1 instance jointe | Instance principale | AFaire | []
+XLIEN BETA | Rôle 1990J14302 · 1 instance jointe · jointe à 1990J14303 | Instance principale | AFaire | []
+XLIEN ALPHA | Rôle 1990J14301 · jointe à 1990M14401 | Instance jointe | AFaire | []
+controle: SELECT COUNT(*) FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1400301 AND INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1400401 AND INSTN_TYPE_JONCTION IS NULL AND INSTN_DATE_JONCTION = '19900202' => 1
+---
+# 17. Disjoindre une fille qui n'est pas jointe a cette mere (le bouton n'existe que sur une fille jointe, :134). Jumeau : bloc 19.
+geste: Confirmer Enregistrer la jonction
+ids: 1400401
+valeur: Instance fille › Numéro de rôle de la fille = 1990J14305
+valeur: Disjonction › Disjoindre la fille = oui
+resultat: refuse
+message: L'instance 1990J14305 n'est pas jointe à l'instance 1990M14401 : rien à disjoindre.
+---
+# 18. Disjoindre ET dater. Jumeaux : blocs 16 (dater) et 19 (disjoindre).
+geste: Confirmer Enregistrer la jonction
+ids: 1400401
+valeur: Instance fille › Numéro de rôle de la fille = 1990J14301
+valeur: Disjonction › Disjoindre la fille = oui
+valeur: Instance fille › Date de jonction = 1990-02-03
+resultat: refuse
+message: Cocher « Disjoindre la fille » OU saisir la date et le type de jonction, pas les deux.
+---
+# 19. La disjonction (BtnDisjoindre, :141-146 ; DoSauver sans date, :156-159) : les trois colonnes de la fille a NULL.
+geste: Confirmer Enregistrer la jonction
+ids: 1400401
+valeur: Instance fille › Numéro de rôle de la fille = 1990J14301
+valeur: Disjonction › Disjoindre la fille = oui
+resultat: fait
+message: Instance 1990J14301 disjointe de l'instance 1990M14401 dans la base du greffe.
+lignes:
+XXAFF ZETA | Rôle 2026X14356 | Sans jonction | AFaire | []
+GAMMA BANC c/ DELTA BANC | Rôle 2026R12002 · bloquée par la demande 26012000002 | Sans jonction | EnAttente | []
+TAU SANS MD | Rôle 2026P13103 | Sans jonction | AFaire | []
+OMEGA MD INSTANCE | Rôle 2026P13101 | Sans jonction | AFaire | []
+PREVENTION BANC | Rôle 2026P12004 | Sans jonction | AFaire | []
+XXAFF ETA | Rôle 2026M14357 | Sans jonction | AFaire | []
+XXAFF DELTA | Rôle 2026M14354 · bloquée par la demande 26014000384 | Sans jonction | EnAttente | []
+XXAFF GAMMA | Rôle 2026M14353 | Sans jonction | AFaire | []
+XXAFF BETA | Rôle 2026M14352 | Sans jonction | AFaire | []
+XXAFF ALPHA | Rôle 2026M14351 | Sans jonction | AFaire | []
+SIGMA MD INSTANCE | Rôle 2026M13102 | Sans jonction | AFaire | []
+THETA BANC | Rôle 2026J12008 · bloquée par la demande 26012000008 | Sans jonction | EnAttente | []
+ZETA BANC | Rôle 2026J12006 | Sans jonction | AFaire | []
+ETA BANC | Rôle 2026J12005 | Sans jonction | AFaire | []
+EPSILON BANC | Rôle 2026J12003 | Sans jonction | AFaire | []
+ALPHA BANC c/ BETA BANC | Rôle 2026J12001 | Sans jonction | AFaire | []
+IOTA BANC c/ KAPPA BANC | Rôle 2026I12007 | Sans jonction | AFaire | []
+XXAFF EPSILON | Rôle 2025M14355 | Sans jonction | AFaire | []
+XLIEN DELTA | Rôle 1990R14304 | Sans jonction | AFaire | []
+JOIN MERE | Rôle 1990M14401 | Sans jonction | AFaire | []
+XLIEN ETA | Rôle 1990J14306 | Sans jonction | AFaire | []
+XLIEN ZETA | Rôle 1990J14306 · jointe à 1990J14302 | Instance jointe | AFaire | []
+XLIEN EPSILON | Rôle 1990J14305 · bloquée par la demande 26014000901 | Sans jonction | EnAttente | []
+XLIEN GAMMA | Rôle 1990J14303 · 1 instance jointe | Instance principale | AFaire | []
+XLIEN BETA | Rôle 1990J14302 · 1 instance jointe · jointe à 1990J14303 | Instance principale | AFaire | []
+XLIEN ALPHA | Rôle 1990J14301 | Sans jonction | AFaire | []
+controle: SELECT COUNT(*) FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1400301 AND INSTN_ID_INSTN_INSTANCE_PRINCIPA IS NULL AND INSTN_TYPE_JONCTION IS NULL AND INSTN_DATE_JONCTION IS NULL => 1

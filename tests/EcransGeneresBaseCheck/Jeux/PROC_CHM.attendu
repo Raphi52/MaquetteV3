@@ -1,0 +1,16 @@
+# « Changer le juge-commissaire » (PROC_CHM) : sans juge choisi, la recherche de RIG v2 pour tout juge TITULAIRE en mission
+# (JCT, JC ; MetierChangementJuge.cs:190-200), PC jointe a son client (INNER JOIN CLIENT), par numero de PC.
+# Ecartees : 1400108 (J1 en fin de mission ; jumeau 1400102), 1400109 (sans client ; jumeau 1400102), 1400110 (J2 suppleant
+# seul : la fonction par defaut est titulaire ; PROC_CHM.recherches la retrouve en « suppléant »).
+# Etats (ChangementJugeCommissairePc.UpdateErreursMetier) : bloquees -- exterieure (1400103 ; jumeau 1400102), client en sommeil
+# hors forfait (1400104 ; jumeau 1400101, client actif), juge present deux fois (1400106 ; jumeau 1400102), client pas en compte de
+# PC hors forfait (1400111 ; jumeau 1400101) ; en attente : un changement de J1 sans ordonnance signee (1400105 ; jumeau 1400102,
+# dont le changement est signe). Une PC au forfait echappe aux controles du client (1400102, client divers).
+CHM ALPHA | PC 1990P14101 · titulaire Mr JUGEUN Jean · suppléant Mme JUGEDEUX Paule | Hors forfait | AFaire | []
+CHM BETA | PC 1990P14102 · titulaire Mr JUGEUN Jean | Au forfait | AFaire | []
+CHM GAMMA | PC 1990P14103 · titulaire Mr JUGEUN Jean · La PC est extérieure | Au forfait | Rejetee | []
+CHM DELTA | PC 1990P14104 · titulaire Mr JUGEUN Jean · Le client de la PC est en sommeil | Hors forfait | Rejetee | []
+CHM EPSILON | PC 1990P14105 · titulaire Mr JUGEUN Jean · changement de juge déjà en attente | Au forfait | EnAttente | []
+CHM ZETA | PC 1990P14106 · titulaire Mr JUGEUN Jean · Le juge à remplacer est présent plusieurs fois dans la PC | Au forfait | Rejetee | []
+CHM ETA | PC 1990P14107 · titulaire Mr JUGEUN Jean | Au forfait | AFaire | []
+CHM LAMBDA | PC 1990P14111 · titulaire Mr JUGEUN Jean · Le client n'est pas un client en compte de PC | Hors forfait | Rejetee | []

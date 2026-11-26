@@ -1,0 +1,24 @@
+# « Liens entre PC » (PROC_XLIEN) : les instances de la recherche de XLIENPC (JROP, JRCT, JRPC, JRJC) puis celles de XLIENPR
+# (JRPR, JRMC, JROP), role decroissant ; une instance JROP a une ligne dans chaque groupe (1400306, 1400307).
+# Les BANC (PROC_MJUD.sql, JRCT) et MD (PROC_MDJUD.sql, JRPR / JRMC) viennent des autres jeux ; IOTA BANC (JRIP) et GAMMA BANC
+# (JRREF) ne sont dans aucune des deux recherches.
+# Etats : verrouillee (demande en cours sur 2J : THETA BANC, 1400305) ; liee a l'autre type (1400303, prevention, dans « Vers une PC » ;
+# 1400307, PC, dans « Vers une prévention ») ; rattachee (1400302, 1400307 dans « Vers une PC ») ; a rattacher sinon.
+THETA BANC | Rôle 2026J12008 · sans PC · bloquée par la demande 26012000008 | Vers une PC | EnAttente | []
+ZETA BANC | Rôle 2026J12006 · sans PC | Vers une PC | AFaire | []
+ETA BANC | Rôle 2026J12005 · sans PC | Vers une PC | AFaire | []
+EPSILON BANC | Rôle 2026J12003 · sans PC | Vers une PC | AFaire | []
+ALPHA BANC c/ BETA BANC | Rôle 2026J12001 · sans PC | Vers une PC | AFaire | []
+XLIEN ETA | Rôle 1990J14306 · PC 1990P14101 | Vers une PC | EnCours | []
+XLIEN ZETA | Rôle 1990J14306 · sans PC | Vers une PC | AFaire | []
+XLIEN EPSILON | Rôle 1990J14305 · sans PC · bloquée par la demande 26014000901 | Vers une PC | EnAttente | []
+XLIEN GAMMA | Rôle 1990J14303 · prévention 1990V14201 | Vers une PC | Rejetee | []
+XLIEN BETA | Rôle 1990J14302 · PC 1990P14101 | Vers une PC | EnCours | []
+XLIEN ALPHA | Rôle 1990J14301 · sans PC | Vers une PC | AFaire | []
+TAU SANS MD | Rôle 2026P13103 · sans prévention | Vers une prévention | AFaire | []
+OMEGA MD INSTANCE | Rôle 2026P13101 · sans prévention | Vers une prévention | AFaire | []
+PREVENTION BANC | Rôle 2026P12004 · sans prévention | Vers une prévention | AFaire | []
+SIGMA MD INSTANCE | Rôle 2026M13102 · sans prévention | Vers une prévention | AFaire | []
+XLIEN DELTA | Rôle 1990R14304 · sans prévention | Vers une prévention | AFaire | []
+XLIEN ETA | Rôle 1990J14306 · PC 1990P14101 | Vers une prévention | Rejetee | []
+XLIEN ZETA | Rôle 1990J14306 · sans prévention | Vers une prévention | AFaire | []

@@ -1,0 +1,5 @@
+# « Libérer une affaire » (PROC_LIBAFFAIRE) : les affaires dont AFFRE_ID_UTLST_EN_COURS est pose, l'utilisateur retrouve dans
+# soc.Compte (IdV2), par numero d'affaire (OPE_LISTAFFAIRE.cs:41-44). Ecartees : 1400853 (libre ; jumeau 1400851), 1400854
+# (utilisateur inconnu de la V3, INNER JOIN ; jumeau 1400852). Groupe : demandes de l'affaire (« N1, N2 ») ou non.
+Affaire n° 1400851 | LIB ALPHA · verrouillée par MR Lib ALPHA · demandes 26014000861, 26014000862 | Avec une demande | AFaire | []
+Affaire n° 1400852 | LIB BETA · verrouillée par MME Lise BETA | Sans demande | AFaire | []
