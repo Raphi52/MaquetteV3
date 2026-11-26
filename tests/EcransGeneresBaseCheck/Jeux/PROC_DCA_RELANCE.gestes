@@ -52,6 +52,8 @@ controle: SELECT DMND_ETAT_DEMANDE + '/' + DMND_NOM FROM v2.DEMANDE WHERE DMND_C
 controle: SELECT DMND_TEXTE_PARAMETRE FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'RSURV' AND DMND_ID_DSRCS = 1100404 => LstIdExer=1100444,;NumRelance=3;NatureDiligence=SDCA;IdDiligenceRcs=1100404
 controle: SELECT COUNT(*) FROM v2.DEMANDE AS m WHERE m.DMND_CODE_PROSS = 'RSURV' AND m.DMND_ETAT_DEMANDE = 'V' AND m.DMND_NOM = 'Relance des DCA - 2 occurence(s)' AND (SELECT COUNT(*) FROM v2.DEMANDE AS f WHERE f.DMND_ID_DMND_MERE = m.DMND_ID_DMND) = 2 => 1
 controle: SELECT de.DMNED_LIBELLE_DOCUMENT + '/' + de.DMNED_PHASE_TRAITEMENT + '/' + ISNULL(de.DMNED_LOT, '') FROM v2.DEMANDE_EDITION AS de JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = de.DMNED_ID_DMND WHERE d.DMND_ID_DSRCS = 1100404 AND d.DMND_CODE_PROSS = 'RSURV' => Relance Greffe AP DCA SDCA/C/AMIRCSRBE
+# La demande du dossier porte l'action RCS de sa diligence (trt.Dmnd.AddActionRcs, PROC_RSURV.cs:115).
+controle: SELECT CAST(d.DMND_ID_ACTRC AS varchar(10)) FROM v2.DEMANDE AS d WHERE d.DMND_CODE_PROSS = 'RSURV' AND d.DMND_ID_DSRCS = 1100403 => 1100403
 ---
 # Rejoue la relance de 403 : elle n'est plus due (sa relance 2 est du jour, limite {J+15}) -- refusee, rien d'ecrit.
 geste: Agir Valider
