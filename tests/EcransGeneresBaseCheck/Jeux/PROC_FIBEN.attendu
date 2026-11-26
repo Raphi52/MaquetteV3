@@ -1,0 +1,13 @@
+# « FIBEN » (LecteurReleveFiben) sur le jeu PROC_FIBEN.sql : une ligne par mois qui a une transmission FIBEN (EDI_BDF_RCS par
+# DBDRC_DATE_ENVOI, EDI_BDF par EDIBDF_DATE_INSERTION_DANS_FICHIER), puis une par trimestre qui a une annonce BODACC ; le plus
+# recent en tete dans chaque groupe. Periodes passees : Validee « Période close ». (Une periode du mois en cours serait EnCours :
+# son libelle depend du jour du banc, que le format .attendu n'ecrit pas -- regle couverte par le code, LecteurReleveFiben.)
+# Comptes, chacun avec son jumeau :
+#   mars 2025 : 2 avis RCS -- 1600203 « REGUL » et 1600204 sans avis ne comptent pas (jumeau 1600201) ; 2 PC crees, 1 annule,
+#               1600214 (action M) compte pour rien ;
+#   1600206 jamais envoye (sans date) : aucun mois -- jumeau 1600205 (avril) ;
+#   BODACC : « a1 » compte en A (UPPER(LEFT(type, 1))) ; 1600226-1600228 (type, cout ou type d'annonce vides) ne comptent pas.
+Transmission FIBEN · avril 2025 | 1 avis RCS · 0 avis PC créés · 0 annulés | Transmission FIBEN | Validee | []
+Transmission FIBEN · mars 2025 | 2 avis RCS · 2 avis PC créés · 1 annulés | Transmission FIBEN | Validee | []
+Relevé BODACC · 2e trimestre 2025 | A 0 · B 1 · C 0 · P 0 | Relevé BODACC | Validee | []
+Relevé BODACC · 1er trimestre 2025 | A 2 · B 1 · C 0 · P 1 | Relevé BODACC | Validee | []

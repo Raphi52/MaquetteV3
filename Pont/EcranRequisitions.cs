@@ -48,7 +48,8 @@ public sealed record VueRequisitions(string Session,
                                      CriteresRequi Criteres, bool RaisonSocialeInvalide,
                                      string Volet, int NbPanier, string Compteur, string Message,
                                      LigneEntrepriseRequi[] Trouvees, bool ARecherche, bool Interrompue,
-                                     int LimiteRetenue, LignePanierRequi[] Panier, ArticlesRequi? Articles);
+                                     int LimiteRetenue, LignePanierRequi[] Panier, ArticlesRequi? Articles,
+                                     string ModeResultats = "demo", string? MessageResultats = null);
 
 /// <summary>
 /// Pont de l'ecran PROC_REQUI (web/src/ecrans/EcranRequisitions.tsx) : requisitions
@@ -72,7 +73,22 @@ public static class EcranRequisitions
         return session.Vue(Sessions.Ouvrir(session));
     }
 
+    /// <summary>Un geste de l'ecran. « Rechercher » lit d'abord les entreprises dans la base du greffe quand un serveur est
+    /// branche (EcranRequisitionsBase.cs, lot 6 du plan « RIG v3 100 % fonctionnel ») ; sans serveur, la demonstration.</summary>
     [JSInvokable("EcranRequisitions.Agir")]
+    public static Task<VueRequisitions> AgirAsync(string session, string geste, JsonElement valeur)
+        => AgirAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, session, geste, valeur);
+
+    /// <summary>Le geste avec le serveur et le greffe donnes (null serveur : la demonstration) : tests/EcransMainBaseCheck.</summary>
+    public static async Task<VueRequisitions> AgirAsync(ClientServeur? serveur, string? greffe, string session, string geste, JsonElement valeur)
+    {
+        var s = Sessions.Lire(session);
+        if (geste == "Rechercher") await s.ChargerDeLaBaseAsync(serveur, greffe);
+        s.Agir(geste, valeur);
+        return s.Vue(session);
+    }
+
+    /// <summary>Le geste sur la demonstration seule (sans lecture en base) : tests/RequiCheck le joue directement.</summary>
     public static VueRequisitions Agir(string session, string geste, JsonElement valeur)
     {
         var s = Sessions.Lire(session);
@@ -91,7 +107,7 @@ public static class EcranRequisitions
 /// (un geste de l'ecran = l'appel de la methode que le .razor branchait) et
 /// <see cref="Vue"/> (ce que le balisage lisait, mis a plat pour React).
 /// </summary>
-public sealed class SessionRequisitions
+public sealed partial class SessionRequisitions
 {
     // ---- Criteres (OPE_REQUI_RECHERCHE : proprietes d acces aux criteres) ----
     private string CritRaisonSociale = string.Empty;
@@ -219,20 +235,24 @@ public sealed class SessionRequisitions
             return;
         }
 
-        IEnumerable<EntrepriseRequi> q = JeuDemo.EntreprisesRequi;
+        // Lues en base (EcranRequisitionsBase.cs) : la base a deja applique les criteres qu'elle cherche.
+        IEnumerable<EntrepriseRequi> q = FondsBase ?? JeuDemo.EntreprisesRequi;
 
-        if (Filtre(CritRaisonSociale)) q = q.Where(s => Contient(s.Designation, CritRaisonSociale));
-        if (Filtre(CritSiren))
+        if (FondsBase is null)
         {
-            var t = CritSiren.Replace(" ", string.Empty);
-            q = q.Where(s => s.Siren.Replace(" ", string.Empty).Contains(t, StringComparison.OrdinalIgnoreCase));
+            if (Filtre(CritRaisonSociale)) q = q.Where(s => Contient(s.Designation, CritRaisonSociale));
+            if (Filtre(CritSiren))
+            {
+                var t = CritSiren.Replace(" ", string.Empty);
+                q = q.Where(s => s.Siren.Replace(" ", string.Empty).Contains(t, StringComparison.OrdinalIgnoreCase));
+            }
+            if (Filtre(CritDirigeant)) q = q.Where(s => Contient(s.Dirigeant, CritDirigeant));
+            if (Filtre(CritActivite)) q = q.Where(s => Contient(s.Activite, CritActivite));
+            if (Filtre(CritNumVoie)) q = q.Where(s => Contient(s.Adresse, CritNumVoie));
+            if (Filtre(CritAdresse)) q = q.Where(s => Contient(s.Adresse, CritAdresse));
+            if (Filtre(CritCodePostal)) q = q.Where(s => Contient(s.CodePostal, CritCodePostal));
+            if (Filtre(CritVille)) q = q.Where(s => Contient(s.Ville, CritVille));
         }
-        if (Filtre(CritDirigeant)) q = q.Where(s => Contient(s.Dirigeant, CritDirigeant));
-        if (Filtre(CritActivite)) q = q.Where(s => Contient(s.Activite, CritActivite));
-        if (Filtre(CritNumVoie)) q = q.Where(s => Contient(s.Adresse, CritNumVoie));
-        if (Filtre(CritAdresse)) q = q.Where(s => Contient(s.Adresse, CritAdresse));
-        if (Filtre(CritCodePostal)) q = q.Where(s => Contient(s.CodePostal, CritCodePostal));
-        if (Filtre(CritVille)) q = q.Where(s => Contient(s.Ville, CritVille));
 
         // « Tous les etablissements » decoche : seul le siege remonte.
         if (!CritTousEtb) q = q.Where(s => s.TypeAdresse != "Etablissement");
@@ -242,7 +262,7 @@ public sealed class SessionRequisitions
         LimiteRetenue = Limite;
         var toutes = q.ToArray();
         Trouvees = toutes.Take(LimiteRetenue).ToArray();
-        Interrompue = toutes.Length > LimiteRetenue;
+        Interrompue = (FondsBase is null ? toutes.Length : TotalBase) > LimiteRetenue;
         ARecherche = true;
         Volet = "resultats";
     }
@@ -678,6 +698,6 @@ public sealed class SessionRequisitions
                               CritCodePostal, CritVille, CritPhonetique, CritEtendre, CritTousEtb, CritSupprCompris,
                               CritGuichet, CritLimiteDossiers),
             RaisonSocialeInvalide, Volet, Panier.Count, Compteur, Message,
-            trouvees, ARecherche, Interrompue, LimiteRetenue, panier, articles);
+            trouvees, ARecherche, Interrompue, LimiteRetenue, panier, articles, ModeResultats, MessageResultats);
     }
 }

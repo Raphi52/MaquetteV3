@@ -18,4 +18,7 @@ LAMBDA BAIL | Demandeur · instance 2026Y13202 | Demandeurs | AFaire | []
 MU BOULANGERIE | Défendeur · instance 2026Y13202 | Défendeurs | AFaire | []
 ALPHA BANC SARL | Demandeur · instance 2026J12001 | Demandeurs | AFaire | []
 M. BETA Jean | Défendeur · instance 2026J12001 | Défendeurs | AFaire | []
+# Les deux parties de l'injonction de payer 2026IP81401 de PROC_SURVIP.sql (lot 8 : son demandeur et son defendeur).
+CREANCIER ALPHA | Demandeur · instance 2026IP81401 | Demandeurs | AFaire | []
+DEBITEUR BETA | Défendeur · instance 2026IP81401 | Défendeurs | AFaire | []
 KAPPA BANC SAS | Défendeur · instance 2026I12007 | Défendeurs | AFaire | []

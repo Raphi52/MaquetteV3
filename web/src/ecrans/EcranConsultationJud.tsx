@@ -20,14 +20,26 @@
 // numero d'affaire, denomination) : la liste est filtree ici, sans pont, deux champs auraient fait le meme
 // filtre (decision du plan, lot 7). Les autres criteres, le clic qui montre le detail, ses boutons et le XML
 // ne changent pas.
+//
+// LA BASE DU GREFFE (plan « RIG v3 100 % fonctionnel », lot 6, 26/11/2026, marche du lot 17) : les enrolements viennent du
+// pont (Pont/EcranConsultationJudBase.cs → Serveur/Socle/EcransMain/LectureConsultationJud.cs), DEMAT_RPJC_ENR de la base :
+// etat du flux et traitement aux libelles de RIG v2 (eDematEtat ; Accepté / Refusé / En attente), type et motif de rejet,
+// dates, role de l'instance creee a l'acceptation. « Visualiser le XML » lit le flux RPJCE_FLUX de l'enrolement A LA DEMANDE
+// (EcranConsultationJud.Xml, par son id), comme la V2 qui l'ecrit dans un fichier et l'ouvre (PROC_CJUD.cs:437-455). Le nombre
+// de pieces (flux entrant de la base EDI du greffe) et les anomalies (que la V2 calcule en lisant le XML pour creer l'instance,
+// PROC_CJUD.cs:461) ne sont pas lus : l'ecran le dit au lieu d'afficher 0. Sans serveur, les quatre enrolements de demonstration du pont,
+// marques « exemple » (ProvenanceEcran) ; en panne, le motif et aucune ligne. La vue « Non dematerialisees » est retiree :
+// aucun etat de RIG v2 ne la porte (DematEtat.cs:13-49).
 
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
+import { appeler } from '../pont'
 import { contientSansCasse, dateCourte, distinctsTries, estBlanc } from '../criteres'
 import {
   CartesChiffrees, CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille, PiedListe,
   PointEtat, VuesListe, type ActionLigne, type Teinte,
 } from '../composants/ListeModerne'
 import type { ContexteDossierVue } from '../plan/types'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 
 interface DossierJud {
   affaire: string
@@ -39,19 +51,28 @@ interface DossierJud {
   creation: string
   /** aaaa-mm-jj, null tant que l'affaire n'est pas traitee */
   traitement: string | null
-  nbPieces: number
-  anomalies: string
+  /** null : non lu par RIG v3 (flux entrant de la base EDI du greffe). */
+  nbPieces: number | null
+  /** null : non lues par RIG v3 (la V2 les calcule en lisant le XML pour creer l'instance). */
+  anomalies: string | null
   motifRejet: string
-  xml: string
+  /** null : un enrolement de la base, dont le XML se lit a la demande par son id. */
+  xml: string | null
   dossier: string
+  /** L'enrolement dans la base du greffe (RPJCE_ID_RPJCE) ; absent pour la demonstration, qui porte son XML. */
+  id?: string | null
 }
 
-const Dossiers: DossierJud[] = [
-  { affaire: '2026J00121', denomination: 'SARL BOULANGERIE DUVAL', etatDemat: 'Dematerialise', etatTraitement: 'Traite', typeRejet: '', creation: '2026-03-04', traitement: '2026-03-06', nbPieces: 12, anomalies: '', motifRejet: '', xml: '<enrolement num="2026J00121" />', dossier: '2024B00318' },
-  { affaire: '2026J00134', denomination: 'SAS TRANSPORTS MARNE', etatDemat: 'Partiel', etatTraitement: 'En attente', typeRejet: '', creation: '2026-05-19', traitement: null, nbPieces: 5, anomalies: 'Piece 3 illisible', motifRejet: '', xml: '<enrolement num="2026J00134" />', dossier: '2024B00407' },
-  { affaire: '2026J00140', denomination: 'EURL COIFFURE MARIE', etatDemat: 'Dematerialise', etatTraitement: 'Rejete', typeRejet: 'Piece manquante', creation: '2026-06-02', traitement: '2026-06-03', nbPieces: 3, anomalies: 'Acte de saisine absent du depot', motifRejet: 'Dossier incomplet', xml: '<enrolement num="2026J00140" />', dossier: '2023B01120' },
-  { affaire: '2026J00155', denomination: 'SCI DU MOULIN', etatDemat: 'Non demat.', etatTraitement: 'En attente', typeRejet: '', creation: '2026-07-21', traitement: null, nbPieces: 0, anomalies: 'Aucun flux recu', motifRejet: '', xml: '', dossier: '2025B00044' },
-]
+/** Le XML d'un enrolement lu a la demande (Pont/EcranConsultationJud.cs, XmlConsultationJud). */
+interface XmlConsultationJud { mode: string; xml: string | null; message: string | null }
+
+/** Ce que le pont rend (Pont/EcranConsultationJud.cs, VueConsultationJud). */
+interface VueConsultationJud {
+  lignes: DossierJud[]
+  mode?: ModeLecture
+  message?: string | null
+  total: number
+}
 
 export interface ProprietesEcranConsultationJud {
   /** Remonte le NUMERO de dossier de la piece : l'ecran ne connait pas la visionneuse. */
@@ -71,8 +92,8 @@ interface CriteresConsultation {
 }
 
 /** Le filtre des criteres de gauche : la liste, et le compte de chaque vue. */
-function filtrer(c: CriteresConsultation): DossierJud[] {
-  let q = Dossiers
+function filtrer(source: DossierJud[], c: CriteresConsultation): DossierJud[] {
+  let q = source
   if (!estBlanc(c.critTexte)) {
     const t = c.critTexte.trim()
     q = q.filter((d) => contientSansCasse(d.affaire, t) || contientSansCasse(d.denomination, t))
@@ -81,7 +102,7 @@ function filtrer(c: CriteresConsultation): DossierJud[] {
   if (c.critTraitement !== '') q = q.filter((d) => d.etatTraitement === c.critTraitement)
   if (c.critCreationDu !== '') q = q.filter((d) => d.creation >= c.critCreationDu)
   if (c.critTraitementAu !== '') q = q.filter((d) => d.traitement !== null && d.traitement <= c.critTraitementAu)
-  if (c.rejetsSeuls) q = q.filter((d) => d.etatTraitement === 'Rejete')
+  if (c.rejetsSeuls) q = q.filter((d) => d.etatTraitement === 'Refusé')
   return q
 }
 
@@ -93,11 +114,19 @@ export const VuesEnrolements: ReadonlyArray<{ cle: string; libelle: string; crit
   { cle: 'toutes', libelle: 'Toutes', criteres: SansEtat },
   { cle: 'en-attente', libelle: 'En attente', criteres: { ...SansEtat, critTraitement: 'En attente' } },
   { cle: 'rejets', libelle: 'Rejets', criteres: { ...SansEtat, rejetsSeuls: true } },
-  { cle: 'non-demat', libelle: 'Non dematerialisees', criteres: { ...SansEtat, critDemat: 'Non demat.' } },
 ]
 
-const TeinteDemat: Record<string, Teinte> = { Dematerialise: 'bleu', Partiel: 'orange', 'Non demat.': 'gris' }
-const TeinteTraitement: Record<string, Teinte> = { Traite: 'vert', 'En attente': 'orange', Rejete: 'rouge' }
+/** Les etats du flux de RIG v2 (eDematEtat) : l'aller et le retour avec Docapost. */
+const TeinteDemat: Record<string, Teinte> = {
+  'Intégré avec succès': 'bleu', 'Traité par le greffe': 'bleu', Envoyé: 'bleu', Validé: 'vert',
+  "Erreur d'envoi": 'orange', Rejeté: 'rouge', 'Ne pas envoyer': 'gris',
+}
+const TeinteTraitement: Record<string, Teinte> = { Accepté: 'vert', 'En attente': 'orange', Refusé: 'rouge' }
+
+/** Ce que RIG v3 ne lit pas : les pieces (flux entrant de la base EDI du greffe, OPE_CJUDINFOG.cs:106-113) et les anomalies
+ *  (Instance.CreateInstanceFromXmlRPJCEnr, PROC_CJUD.cs:461). */
+const NonLu = 'Non lu par RIG v3 : la V2 le compte dans le flux entrant de la base EDI du greffe'
+const AnomaliesNonLues = 'Non lu par RIG v3 : la V2 les calcule en lisant le XML pour créer l’instance'
 
 /** Les colonnes du tableau a une ligne : chevron, Affaire, Etat demat., Etat traitement, Date creation, Pieces, menu. */
 const NbColonnes = 7
@@ -112,12 +141,23 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
   const [critTraitementAu, setCritTraitementAu] = useState('')
   const [rejetsSeuls, setRejetsSeuls] = useState(false)
   const [xmlOuvert, setXmlOuvert] = useState(false)
+  // Le XML lu a la demande pour l'enrolement choisi (id), ou ce qui dit pourquoi il n'y en a pas.
+  const [xmlLu, setXmlLu] = useState<{ id: string; texte: string } | null>(null)
   const [selection, setSelection] = useState<DossierJud | null>(null)
   // La ligne depliee par son chevron (une a la fois).
   const [ouverte, setOuverte] = useState<string | null>(null)
+  // null tant que le pont n'a pas repondu : aucune ligne, jamais la demonstration a la place de la base.
+  const [vue, setVue] = useState<VueConsultationJud | null>(null)
 
+  useEffect(() => {
+    let perime = false
+    void appeler<VueConsultationJud>('EcranConsultationJud.Vue').then((v) => { if (!perime) setVue(v) })
+    return () => { perime = true }
+  }, [])
+
+  const source = vue?.lignes ?? []
   const criteres: CriteresConsultation = { critTexte, critDemat, critTraitement, critCreationDu, critTraitementAu, rejetsSeuls }
-  const trouves = filtrer(criteres)
+  const trouves = filtrer(source, criteres)
 
   function poserEtat(c: CriteresEtat) {
     setCritDemat(c.critDemat)
@@ -131,8 +171,10 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
   const parTraitement = (e: string) => trouves.filter((d) => d.etatTraitement === e).length
   const parDemat = (e: string) => trouves.filter((d) => d.etatDemat === e).length
   const enAttente = parTraitement('En attente')
-  const rejets = parTraitement('Rejete')
-  const pieces = trouves.reduce((n, d) => n + d.nbPieces, 0)
+  const rejets = parTraitement('Refusé')
+  // Les pieces ne se comptent que si elles sont lues (null : base EDI du greffe, non lue par RIG v3).
+  const piecesLues = trouves.every((d) => d.nbPieces !== null)
+  const pieces = trouves.reduce((n, d) => n + (d.nbPieces ?? 0), 0)
   const basculer = (actuel: string, valeur: string, poser: (v: string) => void) => () => poser(actuel === valeur ? '' : valeur)
 
   /** « Visualiser le XML » d'une ligne : la choisit et montre son XML dans le detail. */
@@ -142,6 +184,16 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
   }
 
   const s = selection
+
+  // « Visualiser le XML » sur un enrolement de la base : son flux se lit au pont, une fois par enrolement choisi.
+  const idXml = xmlOuvert && s && s.xml === null && s.id ? s.id : null
+  useEffect(() => {
+    if (idXml === null) return
+    let perime = false
+    void appeler<XmlConsultationJud>('EcranConsultationJud.Xml', idXml)
+      .then((r) => { if (!perime) setXmlLu({ id: idXml, texte: r.xml ?? r.message ?? '' }) })
+    return () => { perime = true }
+  }, [idXml])
 
   return (
     <div className="rig-proc__corps">
@@ -153,7 +205,7 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
           <span className="rig-saisie-champ__libelle">Etat de dematerialisation</span>
           <select className="rig-saisie-champ__saisie" value={critDemat} onChange={(e) => setCritDemat(e.target.value)}>
             <option value="">Tous</option>
-            {distinctsTries(Dossiers.map((d) => d.etatDemat)).map((e) => <option key={e} value={e}>{e}</option>)}
+            {distinctsTries(source.map((d) => d.etatDemat)).map((e) => <option key={e} value={e}>{e}</option>)}
           </select>
         </label>
 
@@ -161,7 +213,7 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
           <span className="rig-saisie-champ__libelle">Etat de traitement</span>
           <select className="rig-saisie-champ__saisie" value={critTraitement} onChange={(e) => setCritTraitement(e.target.value)}>
             <option value="">Tous</option>
-            {distinctsTries(Dossiers.map((d) => d.etatTraitement)).map((e) => <option key={e} value={e}>{e}</option>)}
+            {distinctsTries(source.map((d) => d.etatTraitement)).map((e) => <option key={e} value={e}>{e}</option>)}
           </select>
         </label>
 
@@ -193,11 +245,13 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
                      filtre={{ valeur: critTexte, changer: setCritTexte, indication: 'Aller a une affaire…',
                                valider: () => { if (trouves.length === 1) setSelection(trouves[0]!) } }} />
 
+        {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Enrôlements" />}
+
         <CartesChiffrees cartes={[
           { cle: 'traitement', titre: 'Etat de traitement', valeur: trouves.length,
             complement: trouves.length > 1 ? 'affaires' : 'affaire', legende: true,
             ...(critTraitement !== '' ? { choisir: () => setCritTraitement(''), indication: 'Tous les etats de traitement' } : {}),
-            segments: distinctsTries(Dossiers.map((d) => d.etatTraitement)).map((e) => ({
+            segments: distinctsTries(source.map((d) => d.etatTraitement)).map((e) => ({
               cle: e, libelle: e, valeur: parTraitement(e), texte: String(parTraitement(e)), teinte: TeinteTraitement[e] ?? 'gris',
               actif: critTraitement === e, choisir: basculer(critTraitement, e, setCritTraitement),
             })) },
@@ -205,16 +259,16 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
             anneau: { part: rejets, total: trouves.length, teinte: 'rouge' },
             actif: rejetsSeuls, choisir: () => setRejetsSeuls(!rejetsSeuls),
             indication: rejetsSeuls ? 'Toutes les affaires' : 'Seulement les rejets' },
-          { cle: 'demat', titre: 'Dematerialisation', valeur: parDemat('Dematerialise'), complement: `sur ${trouves.length}`,
+          { cle: 'demat', titre: 'Dematerialisation', valeur: parDemat('Validé'), complement: `${parDemat('Validé') > 1 ? 'validés' : 'validé'} sur ${trouves.length}`,
             legende: true,
             ...(critDemat !== '' ? { choisir: () => setCritDemat(''), indication: 'Tous les etats de dematerialisation' } : {}),
-            segments: distinctsTries(Dossiers.map((d) => d.etatDemat)).map((e) => ({
+            segments: distinctsTries(source.map((d) => d.etatDemat)).map((e) => ({
               cle: e, libelle: e, valeur: parDemat(e), texte: String(parDemat(e)), teinte: TeinteDemat[e] ?? 'gris',
               actif: critDemat === e, choisir: basculer(critDemat, e, setCritDemat),
             })) },
         ]} />
 
-        <VuesListe vues={VuesEnrolements.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer({ ...criteres, ...v.criteres }).length }))}
+        <VuesListe vues={VuesEnrolements.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer(source, { ...criteres, ...v.criteres }).length }))}
                    active={vueActive}
                    choisir={(cle) => { const v = VuesEnrolements.find((x) => x.cle === cle); if (v) poserEtat(v.criteres) }} />
 
@@ -242,7 +296,7 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
                   { libelle: 'Visualiser la piece', fort: true, agir: () => ouvrirDossier(dos.dossier) },
                   { libelle: 'Visualiser le XML', agir: () => voirXml(dos) },
                 ]
-                const classes = [dos.etatTraitement === 'Rejete' ? 'rig-table__ligne--alerte' : '', estOuverte ? 'rig-lm-ouverte' : '']
+                const classes = [dos.etatTraitement === 'Refusé' ? 'rig-table__ligne--alerte' : '', estOuverte ? 'rig-lm-ouverte' : '']
                   .filter(Boolean).join(' ')
                 return (
                   <Fragment key={dos.affaire}>
@@ -254,7 +308,7 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
                       <PointEtat teinte={TeinteTraitement[dos.etatTraitement] ?? 'gris'}>{dos.etatTraitement}</PointEtat>
                     </td>
                     <td className="rig-table__mono">{dateCourte(dos.creation)}</td>
-                    <td className="rig-lm-droite">{dos.nbPieces}</td>
+                    <td className="rig-lm-droite" title={dos.nbPieces === null ? NonLu : undefined}>{dos.nbPieces ?? '—'}</td>
                     <td className="rig-lm-cellule-menu">
                       <MenuLigne libelle={`Actions de l'affaire ${dos.affaire}`} actions={[
                         ...actions,
@@ -267,7 +321,7 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
                       { libelle: 'Type de rejet', valeur: dos.typeRejet },
                       { libelle: 'Date traitement', valeur: dos.traitement ? dateCourte(dos.traitement) : '' },
                       { libelle: 'Dossier', valeur: dos.dossier },
-                      { libelle: 'Anomalies', valeur: dos.anomalies },
+                      { libelle: 'Anomalies', valeur: dos.anomalies ?? AnomaliesNonLues },
                     ]} />
                   )}
                   </Fragment>
@@ -285,7 +339,7 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
             <div className="rig-kicker">Detail de {s.affaire}</div>
             <label className="rig-saisie-champ">
               <span className="rig-saisie-champ__libelle">Anomalies</span>
-              <textarea className="rig-saisie-champ__saisie" rows={3} readOnly value={s.anomalies} />
+              <textarea className="rig-saisie-champ__saisie" rows={3} readOnly value={s.anomalies ?? AnomaliesNonLues} />
             </label>
             <label className="rig-saisie-champ">
               <span className="rig-saisie-champ__libelle">Motif de rejet</span>
@@ -295,13 +349,13 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
               <button className="rig-bouton" onClick={() => ouvrirDossier(s.dossier)}>Visualiser la piece</button>{' '}
               <button className="rig-bouton rig-bouton--plat" onClick={() => setXmlOuvert(!xmlOuvert)}>Visualiser le XML</button>
             </div>
-            {xmlOuvert && <pre className="rig-code">{s.xml}</pre>}
+            {xmlOuvert && <pre className="rig-code">{s.xml ?? (xmlLu !== null && xmlLu.id === s.id ? xmlLu.texte : 'Lecture du XML…')}</pre>}
           </div>
         )}
 
         <PiedListe>
           <span><b>{trouves.length}</b>{trouves.length > 1 ? ' affaires affichees' : ' affaire affichee'}</span>
-          <span>Pieces <b>{pieces}</b></span>
+          <span>Pieces <b>{piecesLues ? pieces : '—'}</b></span>
           <span>En attente <b>{enAttente}</b></span>
         </PiedListe>
       </ListeModerne>

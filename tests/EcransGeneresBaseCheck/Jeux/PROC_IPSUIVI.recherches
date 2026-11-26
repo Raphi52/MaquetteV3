@@ -1,0 +1,15 @@
+# « Suivi des preventions » (LecteurSuiviIp) : l'IP s'ouvre par son numero, le champ « N° IP » de la V2 (ETP_IPSUIVI.cs:14-15).
+# Lignes du jeu : PROC_IPSUIVI.sql.
+critere: N° IP = 81502
+lignes:
+IP 2026IP81502 · SUIVI IP SIGMA | ordonnance du {J-50} · signification {J-40} · opposition {J-10} · provision {J-8} | Injonctions de payer | EnCours | []
+---
+# Le texte cherche aussi le nom courant ; une instance au fond (type J) ne sort jamais, meme si son nom repond.
+texte: SUIVI IP
+lignes:
+IP 2026IP81503 · SUIVI IP TAU | signification {J-90} | Injonctions de payer | Validee | []
+IP 2026IP81502 · SUIVI IP SIGMA | ordonnance du {J-50} · signification {J-40} · opposition {J-10} · provision {J-8} | Injonctions de payer | EnCours | []
+IP 2026IP81501 · SUIVI IP OMEGA | ordonnance du {J-7} | Injonctions de payer | AFaire | []
+---
+critere: N° IP = 99999
+lignes:

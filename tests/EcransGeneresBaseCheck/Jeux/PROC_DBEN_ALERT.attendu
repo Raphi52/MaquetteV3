@@ -1,0 +1,7 @@
+# « Divergences BEN » (LecteurDivergencesBen), jeu PROC_DBEN_ALERT.sql : les divergences ouvertes (DIVER_STATUS 0), la plus
+# ancienne en tete, avec leurs references « code (libelle) ».
+# Ecartees : 1801313 (traitee, statut 1 -- jumeau 1801311), 1801314 (dossier absent : INNER JOIN de la V2).
+# La divergence ouverte 1600131 de PROC_BEN.sql (sa reference 1 n'existe pas : pas de detail), la plus ancienne.
+BE ALPHA SAS · 2027 B 14001 | Divergence du 01/11/2026 · demandeur Banque Banc | Dossiers actifs | AFaire | []
+DIVERGENCES ALPHA SARL · 2026 B 81301 | Divergence du {J-10} · demandeur GREFFE DE TEST · DIV18A (Bénéficiaire absent), DIV18B (Date de naissance différente) | Dossiers actifs | AFaire | []
+DIVERGENCES BETA SAS · 2026 B 81302 | Divergence du {J-5} · demandeur INPI · DIV18B (Date de naissance différente) · radié le {J-30} | Dossiers radiés | AFaire | []

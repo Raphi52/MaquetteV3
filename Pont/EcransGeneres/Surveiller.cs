@@ -344,6 +344,8 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         // ---- Relancer
         new DescripteurEcran
         {
+            // Lot 8 (26/11/2026) : lue et relancee dans la base -- LecteurRelancesComptesAnnuels.cs, EcrivainRelancesComptesAnnuels.cs
+            // (« Valider » : la relance suivante des diligences dont la relance precedente est echue, moteur PROC_RSURV de RIG v2).
             Code = "PROC_DCA_RELANCE", Titre = "Relances comptes annuels", Sujet = "dossiers RCS en retard",
             Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier RCS, un numéro de gestion, un SIREN…",
@@ -380,6 +382,10 @@ public sealed class DomaineSurveiller : IDomaineEcrans
 
         new DescripteurEcran
         {
+            // Lot 8 (26/11/2026) : lue dans la base (LecteurInjonctionsComptesAnnuels.cs) ; le geste N'EST PAS BRANCHE. L'injonction de RIG v2 passe par
+            // le moteur PROC_ISURV (SURVEILLANCES\PROC_ISURV\PROC_ISURV.cs) : instance creee (l. 252), evenement futur « date limite »
+            // (l. 423), editions (l. 437, 468), numeros de role et de repertoire JGAFF (l. 494, 499), restitues en cas d'erreur
+            // (l. 739-781) -- une transaction sur plusieurs objets, a faire dans un lot a elle. L'ecran dit « Demonstration ».
             Code = "PROC_DCA_INJ", Titre = "Injonctions comptes annuels", Sujet = "dépôts de comptes annuels",
             Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier RCS, un numéro de gestion, un SIREN…",
@@ -418,6 +424,11 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         // à confirmer par le chef avant la livraison.
         new DescripteurEcran
         {
+            // Lot 8 (26/11/2026) : lue dans la base (LecteurRelancesBeneficiaires.cs) ; le geste N'EST PAS BRANCHE. RIG v2 relance
+            // les dossiers SANS diligence choisis par la requete de reglage NATURE_DILIGENCE_PARAM SDBE / RSURV / 1 (SqlSelect de
+            // RIG_DEV, lue le 26/11/2026) et leur CREE une diligence (moteur PROC_RSURV, relance 1). Toutes les tables qu'elle lit sont
+            // dans la base V3 (INSCRIT_PM, FORME_JURIDIQUE_UTI, ETABLISSEMENT, PAYS, EVENEMENT_RCS... : verifie le meme jour) : le
+            // geste est faisable, il reste a faire, avec la relance 1 des comptes annuels (meme moteur).
             Code = "PROC_DBE_RELANCE", Titre = "Relances beneficiaires", Sujet = "entreprises en retard de déclaration",
             Forme = FormeEcran.File,
             Recherche = "Rechercher une entreprise, un numéro de gestion, un SIREN…",
@@ -452,6 +463,10 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         // DBE : fiche courte (« source non trouvée »). Injonction : à confirmer par le chef.
         new DescripteurEcran
         {
+            // Lot 8 (26/11/2026) : lue dans la base (LecteurInjonctionsBeneficiaires.cs) ; le geste N'EST PAS BRANCHE. L'injonction de RIG v2 passe par
+            // le moteur PROC_ISURV (SURVEILLANCES\PROC_ISURV\PROC_ISURV.cs) : instance creee (l. 252), evenement futur « date limite »
+            // (l. 423), editions (l. 437, 468), numeros de role et de repertoire JGAFF (l. 494, 499), restitues en cas d'erreur
+            // (l. 739-781) -- une transaction sur plusieurs objets, a faire dans un lot a elle. L'ecran dit « Demonstration ».
             Code = "PROC_DBE_INJ", Titre = "Injonctions beneficiaires", Sujet = "injonctions DBE",
             Forme = FormeEcran.File,
             Recherche = "Rechercher une entreprise, une relance, un numéro de gestion…",
@@ -484,6 +499,9 @@ public sealed class DomaineSurveiller : IDomaineEcrans
 
         new DescripteurEcran
         {
+            // Lot 8 (26/11/2026) : lue dans la base (LecteurRappelsRbe.cs) ; le geste N'EST PAS BRANCHE : la recherche des dossiers a
+            // rappeler de RIG v2 ne compile plus (Source\CompilationFull\PowerShelluildErrors.txt:110), et le courrier « Relance RBE »
+            // passe par le moteur PROC_ISURV (PROC_ISURV.cs:685), comme les injonctions.
             Code = "PROC_SRBE_RAPPEL", Titre = "Rappels RBE", Sujet = "dossiers RCS",
             Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier, une date d'immatriculation, un numéro de gestion…",
@@ -522,30 +540,35 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Forme = FormeEcran.File,
             Recherche = "Rechercher un dépôt ou un numéro de dossier…",
             Criteres = ["Numéro de dépôt", "Numéro de dossier", "Anomalies sur les pièces"],
-            Valider = "Renvoyer à Infogreffe", // proc_actret.md, OPE_RESULTATS, menu contextuel : « Renvoyer à Infogreffe ».
+            // Le menu de la ligne de la V2 offre « Renvoyer à Infogreffe », mais son geste ne fait RIEN : le corps de
+            // _RenvoyerAInfogreffe est en commentaire (PROC_ACTRET\RESULTATS\OPE_RESULTATS.cs:89-97). Aucun écrivain, donc :
+            // l'écran le dit (« Démonstration »). Lot 8 (26/11/2026) : lu dans la base -- LecteurRetentionActes.cs.
+            Valider = "Renvoyer à Infogreffe",
             Rang = 5,
-            Etats = EtatsEcran.Trois("En rétention", "Prêt à renvoyer", "Renvoyé"),
-            Groupes = ["Comptes annuels", "Pièce à ne pas envoyer"],
+            // Les trois anomalies que la recherche V2 filtre (Metier.cs:191-205) : piece absente ou non numerisee, piece marquee
+            // a ne pas envoyer ; « Pieces completes » ne sort jamais de la liste V2 (tuile a 0).
+            Etats = EtatsEcran.Trois("Pièce manquante", "Pièce à ne pas envoyer", "Pièces complètes"),
+            // La confidentialite du depot, premiere colonne et cle de tri de la grille V2 (Metier.cs:8-14, :109).
+            Groupes = ["Bilan", "Compte de résultat"],
             Sections =
             [
                 Marche("Recherche", "Numéro de dépôt, numéro de dossier, anomalies sur les pièces. Entrée, F5 ou F7 lancent la recherche.", true,
                     "Numéro de dépôt", "Numéro de dossier", "Anomalies"),
                 Marche("Pièces", "Bilan (BILA), déclaration de confidentialité (CONFI), compte de résultat (RESUL) : un dépôt est complet quand ses pièces attendues sont numérisées.", true,
                     "Bilan", "Déclaration de confidentialité", "Compte de résultat"),
-                Marche("Renvoi", "Renvoi à Infogreffe depuis la grille, pour les actes sélectionnés. L'acte quitte la rétention.", true,
+                Marche("Renvoi", "Le renvoi à Infogreffe du menu de la ligne ne fait rien dans RIG v2 (son code est en commentaire) : un dépôt quitte la rétention quand ses pièces attendues sont prêtes.", true,
                     "Actes à renvoyer", "Confirmation"),
                 Marche("Consultation", "Voir le dépôt ou le dossier dans la GED depuis le menu de la ligne.", false,
                     "Dépôt", "Dossier"),
             ],
             Lignes =
             [
-                Ligne("Dépôt 2026-0101 · Alpha Services SARL", "Bilan non numérisé · en rétention", "Comptes annuels", "AFaire"),
-                Ligne("Dépôt 2026-0102 · Bêta Industrie SAS", "Bilan numérisé · compte de résultat à compléter", "Comptes annuels", "EnCours", 0, 1),
-                Ligne("Dépôt 2026-0103 · Gamma Conseil SARL", "Pièces complètes · renvoi à faire", "Comptes annuels", "EnCours", 0, 1),
-                Ligne("Dépôt 2026-0104 · Delta Transports SAS", "Renvoyé le 10/03/2026", "Comptes annuels", "Validee", 0, 1, 2),
-                Ligne("Dépôt 2026-0105 · Epsilon Habitat SARL", "Pièce marquée « à ne pas envoyer »", "Pièce à ne pas envoyer", "AFaire"),
-                Ligne("Dépôt 2026-0106 · Zêta Commerce SAS", "Pièce absente · en rétention", "Comptes annuels", "AFaire"),
-                Ligne("Dépôt 2026-0107 · Êta Boulangerie SARL", "Renvoyé le 11/03/2026", "Comptes annuels", "Validee", 0, 1, 2),
+                Ligne("Alpha Services SARL · 2024 B 00101", "Dépôt 2026-0101 · Bilan : Non numérisé · Déclaration de confidentialité : Numérisée · Compte de résultat : NC", "Bilan", "AFaire"),
+                Ligne("Bêta Industrie SAS · 2024 B 00102", "Dépôt 2026-0102 · Bilan : Numérisé · Déclaration de confidentialité : Absente du dépôt · Compte de résultat : NC", "Bilan", "AFaire"),
+                Ligne("Gamma Conseil SARL · 2024 B 00103", "Dépôt 2026-0103 · Bilan : Numérisé  (marqué à ne pas envoyer) · Déclaration de confidentialité : Numérisée", "Bilan", "EnCours"),
+                Ligne("Delta Transports SAS · 2024 B 00104", "Dépôt 2026-0104 · Bilan : Numérisé · Compte de résultat : Non numérisé", "Compte de résultat", "AFaire"),
+                Ligne("Epsilon Habitat SARL · 2024 B 00105", "Dépôt 2026-0105 · Compte de résultat : Numérisé  (marqué à ne pas envoyer)", "Compte de résultat", "EnCours"),
+                Ligne("Zêta Commerce SAS · 2024 B 00106", "Dépôt 2026-0106 · Compte de résultat : Absent du dépôt", "Compte de résultat", "AFaire"),
             ],
         },
 
@@ -556,7 +579,12 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Recherche = "Rechercher un acte rejeté, un dépôt, un numéro de dossier…",
             Criteres = ["Numéro de dossier", "Numéro de dépôt", "Plage de dates et type de date", "Nombre de résultats (200 par défaut)"],
             Valider = "Renvoyer à Infogreffe", // proc_actrej.md, OPE_RESULTATS, menu contextuel : « Renvoyer à Infogreffe ».
+            // Les deux gestes du menu de la ligne (PROC_ACTREJ\RESULTATS\OPE_RESULTATS.cs:68-89) ; l'annulation n'est offerte
+            // qu'a un utilisateur Amitel (l. 38-41). Lot 8 (26/11/2026) : LecteurActesRejetes.cs, EcrivainActesRejetes.cs.
+            Gestes = ["Renvoyer à Infogreffe", "Annuler le rejet"],
             Rang = 5,
+            // La liste V2 ne montre que l'etat GEIDE 9 (MetierActRejets.cs:81) : toute ligne est « Rejete » ; les deux gestes
+            // la font sortir de la liste (etat 1 renvoye, 99 annule). Les autres tuiles restent a 0.
             Etats = [.. EtatsEcran.Trois("Rejeté", "Renvoi lancé", "Renvoyé"), new EtatEcran("Rejetee", "Annulé (Amitel)", "rejetee")],
             Groupes = ["Rejets Infogreffe"],
             Sections =
@@ -595,7 +623,11 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Criteres = ["Numéro de dossier", "Demandeur", "Date de début", "Date de fin", "Exclure les dossiers radiés"],
             Valider = "Visualiser le signalement", // OPE_DIVERGENCES.Designer.cs:97 ; même action au double-clic (OPE_DIVERGENCES.cs:115-117). FORM_DBEN_ALERT.cs:13 masque VALIDER.
             Rang = 5,
-            Etats = EtatsEcran.Trois("À visualiser", "En cours", "Visualisée"),
+            // La V2 ne liste QUE les divergences ouvertes (DIVER_STATUS = 0, PROC_DBEN_ALERT.cs:60) et n'a pas d'etat
+            // « visualisee » : toute ligne est « Ouverte ». Les deux autres tuiles restent a 0 (une divergence traitee sort de
+            // la liste). Lot 8 (26/11/2026) : lu dans la base -- LecteurDivergencesBen.cs ; « Visualiser » ouvre un autre
+            // ecran (PROC_DBEN) et n'ecrit rien : pas d'ecrivain.
+            Etats = EtatsEcran.Trois("Ouverte", "En cours", "Traitée"),
             Groupes = ["Dossiers actifs", "Dossiers radiés"],
             Sections =
             [
@@ -605,13 +637,11 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Lignes =
             [
                 Ligne("Dossier 2026-0412 · divergence du 02/03/2026", "Demandeur A · 2 libellés de divergence", "Dossiers actifs", "AFaire"),
-                Ligne("Dossier 2026-0415 · divergence du 03/03/2026", "Demandeur B · 1 libellé de divergence", "Dossiers actifs", "Validee", 0),
+                Ligne("Dossier 2026-0415 · divergence du 03/03/2026", "Demandeur B · 1 libellé de divergence", "Dossiers actifs", "AFaire"),
                 Ligne("Dossier 2026-0419 · divergence du 05/03/2026", "Demandeur C · 3 libellés de divergence", "Dossiers actifs", "AFaire"),
-                Ligne("Dossier 2026-0422 · divergence du 06/03/2026", "Demandeur A · 1 libellé de divergence", "Dossiers actifs", "Validee", 0),
                 Ligne("Dossier 2026-0430 · divergence du 09/03/2026", "Demandeur D · 2 libellés de divergence", "Dossiers actifs", "AFaire"),
                 Ligne("Dossier 2025-1187 · divergence du 12/11/2025", "Demandeur E · 1 libellé de divergence", "Dossiers radiés", "AFaire"),
-                Ligne("Dossier 2025-1190 · divergence du 14/11/2025", "Demandeur F · 2 libellés de divergence", "Dossiers radiés", "Validee", 0),
-                Ligne("Dossier 2025-1203 · divergence du 20/11/2025", "Demandeur B · 1 libellé de divergence", "Dossiers radiés", "Validee", 0),
+                Ligne("Dossier 2025-1190 · divergence du 14/11/2025", "Demandeur F · 2 libellés de divergence", "Dossiers radiés", "AFaire"),
             ],
         },
 
@@ -624,8 +654,13 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Criteres = ["Juge", "Greffier", "Titre exécutoire", "Non avenue", "Caducité", "Certificat de non-opposition"],
             Valider = "Appliquer les traitements", // proc_survip.md, Rôle : « Appliquer les traitements : Titre exécutoire, Caducité, IP Non avenue, Certificat de non-opposition ».
             Rang = 5,
+            // La V2 ne liste que les echeances a traiter : toute ligne est « A traiter » ; une IP traitee sort de la liste
+            // (son evenement futur expire). Lot 8 (26/11/2026) : lu dans la base -- LecteurSurveillanceIp.cs ; le traitement
+            // (OPE_TRAITEMENTS.PreparationTraitements) n'est pas encore branche : l'ecran le dit (« Demonstration »).
             Etats = EtatsEcran.Trois("À traiter", "En cours", "Traitée"),
-            Groupes = ["Titre exécutoire", "Caducité", "Non avenue", "Certificat de non-opposition"],
+            // Les TypeTrt de la V2 au mot pres (PROC_SURVIP.cs:18-23), dans l'ordre de chargementTraitements
+            // (OPE_RECHERCHE.cs:278-306).
+            Groupes = ["Titre exécutoire", "IP Non avenue", "Caducité", "Certif. non opposition"],
             Sections =
             [
                 Marche("Recherche", "Au moins un type de traitement coché. Seules les injonctions non européennes sont retenues. Pour le titre exécutoire, seules les décisions antérieures au 1er mars 2022 le sont.", true,
@@ -645,48 +680,48 @@ public sealed class DomaineSurveiller : IDomaineEcrans
                 Ligne("Gamma Conseil SARL c/ Delta Transports SAS", "Titre exécutoire · numéros attribués", "Titre exécutoire", "EnCours", 0, 2),
                 Ligne("Epsilon Habitat SARL c/ Zêta Commerce SAS", "Titre exécutoire · traité", "Titre exécutoire", "Validee", 0, 2, 3),
                 Ligne("Êta Boulangerie SARL c/ Thêta Import SAS", "Caducité · consignation échue", "Caducité", "AFaire"),
-                Ligne("Iota Études SARL c/ Kappa Négoce SAS", "Non avenue · signification échue", "Non avenue", "EnCours", 0),
-                Ligne("Lambda Pêche SARL c/ Mu Logistique SAS", "Certificat de non-opposition · échéance passée", "Certificat de non-opposition", "AFaire"),
+                Ligne("Iota Études SARL c/ Kappa Négoce SAS", "Non avenue · signification échue", "IP Non avenue", "EnCours", 0),
+                Ligne("Lambda Pêche SARL c/ Mu Logistique SAS", "Certificat de non-opposition · échéance passée", "Certif. non opposition", "AFaire"),
                 Ligne("Nu Paiement SAS c/ Xi Entrepôts SARL", "Caducité · traitée", "Caducité", "Validee", 0, 2),
             ],
         },
 
         new DescripteurEcran
         {
-            Code = "PROC_IPSUIVI", Titre = "Suivi des preventions", Sujet = "instances de prévention",
-            Forme = FormeEcran.File,
-            Recherche = "Rechercher une prévention, un débiteur…",
-            Criteres = ["Débiteur", "Numéro de gestion", "État de traitement"],
-            Valider = "Clôturer", // proc_ipsuivi.md, ConfigurerBoutonsTransition : « [Cloturer] -> Cloture ».
+            Code = "PROC_IPSUIVI", Titre = "Suivi des preventions", Sujet = "injonctions de payer",
+            // FICHE, pas File (decision du chef, formes a revoir : proc_ipsuivi.md:173). Le « Detail OPE » fait foi : IPSUIVI
+            // est le suivi d'UNE injonction de payer apres son ordonnance, ouverte par son numero (PROC_IPSUIVI.cs:20-26,
+            // ETP_IPSUIVI.cs:14-15) ; la partie haute de la fiche (dix etats NonTraite... Transfere, IP_SUIVI) ne correspond
+            // pas au code (proc_ipsuivi.md:165-171). Lot 8 (26/11/2026) : lue dans la base -- LecteurSuiviIp.cs ; la saisie
+            // des dates (Valider : evenements, instance J ou OP, facture, editions) n'est pas branchee, la fiche est en lecture.
+            Forme = FormeEcran.Fiche,
+            Recherche = "Rechercher une injonction de payer par son numéro…",
+            Criteres = ["N° IP"], // le champ de saisie de la V2 (ETP_IPSUIVI.cs:14-15, GetUltByMetierTitre("N° IP"))
+            Valider = "Valider", // la barre de l'OPE (OPE_IPSUIVI.cs:493-516, bouton VALIDER)
             Rang = 5,
-            Etats = [.. EtatsEcran.Trois("Non traitée", "En suivi", "Clôturée"),
-                     new EtatEcran("Rejetee", "Rejetée", "rejetee"),
-                     new EtatEcran("EnAttente", "Suspendue ou transférée", "en-attente")],
-            Groupes = ["À prendre en charge", "En suivi", "Suspendues ou transférées", "Clôturées ou rejetées"],
+            // Les evenements survenus de l'IP (EvenementProcedure.cs:585-604) : rien de signifie, signifiee, close (fin,
+            // executoire, non avenue ou caducite).
+            Etats = EtatsEcran.Trois("À signifier", "Signifiée", "Close"),
+            Groupes = ["Injonctions de payer"],
             Sections =
             [
-                Marche("Prise en charge", "Une prévention non traitée passe en suivi. Un rejet se fait par « Rejeter », avec un commentaire obligatoire.", true,
-                    "Prise en charge", "Commentaire"),
-                Marche("Convocation et contact", "Le débiteur est convoqué, puis le contact est confirmé.", false,
-                    "Convocation", "Contact confirmé"),
-                Marche("Mandat ou régularisation", "Un mandataire est désigné, ou la situation est régularisée.", true,
-                    "Mandataire", "Régularisation"),
-                Marche("Clôture", "La clôture est un état final : plus aucune transition après.", true,
-                    "Clôture"),
-                Marche("Historique", "Chaque changement d'état est gardé dans l'historique, qui ne se modifie pas.", false,
-                    "Historique"),
+                // L'IP chargee (OPE_IPSUIVI.cs:845-858) : numero, date de l'ordonnance (1re decision, ou sa date prevue), parties.
+                Marche("Injonction de payer", "L'injonction s'ouvre par son numéro. La date IP est celle de l'ordonnance (ou sa date prévue).", true,
+                    "N° IP", Champ.Date("Date IP"), "Demandeur", "Défendeur"),
+                // Les dates des actes qui suivent l'ordonnance (OPE_IPSUIVI.cs:879-944) : l'evenement survenu, sinon la date
+                // d'expiration de l'evenement expire (signification, opposition, provision).
+                Marche("Actes après l'ordonnance", "Chaque date vient de l'événement de procédure survenu ; à défaut, de la date d'expiration de l'événement expiré. Dans RIG v2, saisir une date fait survenir l'événement : la V3 ne le reprend pas encore, la fiche se lit.", true,
+                    Champ.Date("Signification"), Champ.Case("À personne"), Champ.Date("Opposition"), Champ.Date("Réception LRAR"),
+                    Champ.Date("Provision"), Champ.Date("Certificat de non-opposition")),
             ],
             Lignes =
             [
-                Ligne("Débiteur 2026 P 0101 · Alpha Services SARL", "Prévention non traitée", "À prendre en charge", "AFaire"),
-                Ligne("Débiteur 2026 P 0102 · Bêta Industrie SAS", "Convoquée le 05/03/2026", "En suivi", "EnCours", 0, 1),
-                Ligne("Débiteur 2026 P 0103 · Gamma Conseil SARL", "Contactée · mandataire à désigner", "En suivi", "EnCours", 0, 1),
-                Ligne("Débiteur 2026 P 0104 · Delta Transports SAS", "Mandataire désigné", "En suivi", "EnCours", 0, 1, 2),
-                Ligne("Débiteur 2026 P 0105 · Epsilon Habitat SARL", "Suspendue le 03/03/2026", "Suspendues ou transférées", "EnAttente", 0),
-                Ligne("Débiteur 2026 P 0106 · Zêta Commerce SAS", "Clôturée le 09/03/2026", "Clôturées ou rejetées", "Validee", 0, 2, 3),
-                Ligne("Débiteur 2026 P 0107 · Êta Boulangerie SARL", "Rejetée sans suite", "Clôturées ou rejetées", "Rejetee"),
-                Ligne("Débiteur 2026 P 0108 · Thêta Import SAS", "Transférée à un autre greffe", "Suspendues ou transférées", "EnAttente"),
-                Ligne("Débiteur 2026 P 0109 · Iota Études SARL", "Nouvelle prévention reçue", "À prendre en charge", "AFaire"),
+                Ligne("IP 2026 IP 0101 · Alpha Services SARL c/ Bêta Industrie SAS", "ordonnance du 02/03/2026", "Injonctions de payer", "AFaire"),
+                Ligne("IP 2026 IP 0102 · Gamma Conseil SARL c/ Delta Transports SAS", "ordonnance du 03/02/2026 · signification 20/02/2026", "Injonctions de payer", "EnCours"),
+                Ligne("IP 2026 IP 0103 · Epsilon Habitat SARL c/ Zêta Commerce SAS", "ordonnance du 05/01/2026 · signification 12/01/2026 · opposition 30/01/2026", "Injonctions de payer", "EnCours"),
+                Ligne("IP 2025 IP 0904 · Êta Boulangerie SARL c/ Thêta Import SAS", "ordonnance du 10/09/2025 · signification 18/09/2025", "Injonctions de payer", "Validee"),
+                Ligne("IP 2026 IP 0105 · Iota Études SARL c/ Kappa Négoce SAS", "ordonnance du 09/03/2026", "Injonctions de payer", "AFaire"),
+                Ligne("IP 2025 IP 0806 · Lambda Pêche SARL c/ Mu Logistique SAS", "ordonnance du 01/08/2025 · signification 08/08/2025 · provision 01/09/2025", "Injonctions de payer", "Validee"),
             ],
         },
 

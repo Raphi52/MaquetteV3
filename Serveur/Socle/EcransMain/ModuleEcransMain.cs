@@ -45,6 +45,33 @@ internal sealed class ModuleEcransMain : IModuleServeur
         routes.MapGet(RoutesGestionAudiences.Supprimees, (string greffe, CatalogueGreffes c, CancellationToken ct)
             => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureGestionAudiences.LireAsync(cn, ct))))
             .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+
+        // fix-ok: pas un correctif -- le lot 6 du plan-676a4b19 ajoute une route par ecran fait main branche (consultation
+        // judiciaire, actes, affaires, requisitions), une edition par ecran ; chacune prouvee par EcransMainBaseCheck. Puis
+        // la route du XML : le controle final a mesure que RPJCE_FLUX est dans DEMAT_RPJC_ENR (DEMAT_RPJC_ENR.sql:15), que
+        // l'ecran disait « non relu » a tort.
+        // Lot 6 : « Consultation judiciaire » (LectureConsultationJud.cs).
+        routes.MapGet(RoutesConsultationJud.Enrolements, (string greffe, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureConsultationJud.LireAsync(cn, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        routes.MapGet(RoutesConsultationJud.Xml, (string greffe, int id, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureConsultationJud.LireXmlAsync(cn, id, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+
+        // Lot 6 : « Actes » (LectureActes.cs) ; « aujourd'hui - 2 jours » se compte au jour du serveur.
+        routes.MapPost(RoutesActes.Actes, (string greffe, RechercheActes recherche, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureActes.LireAsync(cn, recherche, DateTime.Today, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+
+        // Lot 6 : « Recherche d'affaires » (LectureAffaires.cs).
+        routes.MapPost(RoutesAffaires.Affaires, (string greffe, RechercheAffaires recherche, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureAffaires.LireAsync(cn, recherche, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+
+        // Lot 6 : « Réquisitions », la recherche des entreprises (LectureEntreprisesRequi.cs).
+        routes.MapPost(RoutesRequisitions.Entreprises, (string greffe, RechercheEntreprises recherche, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureEntreprisesRequi.LireAsync(cn, recherche, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
     }
 
     /// <summary><paramref name="faire"/> sur la base V3 du greffe ; 404 / 503 de la politique si elle ne s'ouvre plus.</summary>

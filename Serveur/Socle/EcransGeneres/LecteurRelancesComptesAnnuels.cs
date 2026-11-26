@@ -5,22 +5,38 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 
 /// <summary>
 /// « Relances comptes annuels » (PROC_DCA_RELANCE) : les dossiers relances pour n'avoir pas depose leurs comptes
-/// annuels. Mode d'emploi des lecteurs : LecteurEcran.cs.
+/// annuels. Mode d'emploi des lecteurs : LecteurEcran.cs ; le geste de relance : EcrivainRelancesComptesAnnuels.cs.
 ///
-/// SOURCE (ancien RIG). La fiche proc_dca_relance.md (Brain, reference/proc) nomme la classe : PROC_RDCA
-/// (D:\RigApplication\Source\RIG\DLL\Processus\SURVEILLANCES\PROC_SDCA\PROC_DCA_RELANCE\PROC_RDCA.cs). Relancer un
-/// dossier y cree UNE diligence de nature « SDCA » (etat diligence « 1 », etat relance « 2 », l. 47), rattachee a une
-/// action du dossier (l. 49-53) et aux exercices relances (exer.CreerDiligence, l. 91 : EXERCICE.EXRCC_ID_DLGRC), puis
-/// une relance RELANCE_RCS par courrier (l. 93-97) : n° 1 lettre simple « S » (limite + 1 mois, l. 55-58), n° 2 mise en
-/// demeure « SMD » (etat relance 4, l. 66-71), n° 3 avis au parquet « APRQ » (etat relance 6, l. 72-78). Une ligne de
-/// l'ecran = une diligence SDCA (le dossier relance), son dossier par l'action (DLGRC_ID_ACTRC -> rec.ActionRegistre ->
-/// rec.DossierRcs, Serveur/Recopie/FichesV3.cs).
+/// SOURCE (ancien RIG). La relance qui TOURNE aujourd'hui est le moteur generique des surveillances : PROC_RSURV
+/// (D:\RigApplication\Source\RIG\DLL\Processus\SURVEILLANCES\PROC_RSURV\PROC_RSURV.cs), regle par nature de diligence dans
+/// NATURE_DILIGENCE_PARAM (nature SDCA, processus RSURV). La classe que la fiche proc_dca_relance.md nomme, PROC_RDCA
+/// (SURVEILLANCES\PROC_SDCA\PROC_DCA_RELANCE\PROC_RDCA.cs), ne compile plus dans l'ancien RIG (PROC_SDCA.csproj,
+/// Source\CompilationFull\PowerShell\buildErrors.txt:116 ; sa classe mere PROC_SURVEILLANCE_REL est absente des sources) :
+/// elle ne sert ici qu'a nommer les courriers. Relancer un dossier y cree UNE diligence de nature « SDCA » (etat diligence
+/// « 1 », etat relance « 2 »), rattachee a une action du dossier et aux exercices relances (EXERCICE.EXRCC_ID_DLGRC), puis
+/// une relance RELANCE_RCS par courrier. Une ligne de l'ecran = une diligence SDCA (le dossier relance), son dossier par
+/// l'action (DLGRC_ID_ACTRC -> rec.ActionRegistre -> rec.DossierRcs, Serveur/Recopie/FichesV3.cs) ; Id = DLGRC_ID_DLGRC.
 ///
 /// FILTRES. Nature SDCA. Une diligence passee a l'injonction (une relance « IDCA » portant une instance : le test de
 /// l'ancien RIG, PROC_DCA.cs:2092 HasOneInjonction) n'est plus une relance : elle est a l'ecran « Injonctions comptes
-/// annuels ». Les exercices jamais relances (le premier envoi que la V2 cherche par la requete parametree
-/// NATURE_DILIGENCE_PARAM SDCA / RSURV / 1 : forme juridique, dirigeants, procedures collectives) ne sont pas encore
-/// repris : ils n'ont pas de diligence.
+/// annuels ». Les exercices JAMAIS relances (la relance 1, requete NATURE_DILIGENCE_PARAM SDCA / RSURV / 1 de RIG_DEV : forme
+/// juridique, dirigeants ASNC/ASSO, fenetre des NbDernierExercARelancer derniers exercices) ne sont pas repris : ils n'ont
+/// pas de diligence, et la relance 1 CREE la diligence (une ecriture que ce lot ne fait pas). fix-ok: mesure le 26/11/2026
+/// (lot 8) -- ce commentaire disait FORME_JURIDIQUE_UTI et DIRIGEANT_PP/PM absentes de la base V3 : elles y sont (v2.*,
+/// OBJECT_ID sur la copie de dev) ; la relance 1 est faisable, elle reste a faire.
+///
+/// A RELANCER (la relance suivante est due) : la requete de la relance 2 et de la relance 3 de RIG_DEV
+/// (NATURE_DILIGENCE_PARAM SDCA / RSURV / 2 et 3, SqlSelect, lu le 26/11/2026) et la jointure du moteur
+/// (NatureDiligence.parametre.cs:768-797, :879-884) : diligence en cours (DLGRC_ETAT_DILIGENCE 1), relance N faite
+/// (DLGRC_ETAT_RELANCE 2 pour N = 1, 4 pour N = 2), relance N dont la date limite est passee (RLCRC_DATE_LIMITE <
+/// aujourd'hui) ; un exercice de la diligence non depose (EXRCC_DEPOSE 0), sans refus d'approbation
+/// (EXRCC_NON_APPROBATION_COMPTES 0), sans reclamation (EXRCC_ID_DMND_RECLA), dont la limite de depot est passee et dont
+/// l'etat DCA commence par l'etat relance (EXRCC_ETAT_DCA « 2% », « 4% ») ; aucune demande DCA ou DCADEMAT qualifiee, en
+/// attente, interrompue ou en reclamation (Q, W, I, N) sur le dossier ; dossier non radie (rec.DossierRcs.DateRadiation, la
+/// DSSRC_DATE_RADIATION de RIG v2). La relance due est N + 1 (2 ou 3 : RIG_DEV n'a pas de requete de relance 4 en SDCA).
+/// NON REPRIS de ces requetes (nomme, a faire) : les filtres de forme juridique et de dirigeants (v2.FORME_JURIDIQUE_UTI,
+/// v2.DIRIGEANT_PP/PM sont dans la base V3 : la liste peut montrer une diligence que RIG v2 ecarterait), le type de dossier
+/// (parametre TypeDossier) et la fenetre de NbDernierExercARelancer exercices.
 ///
 /// GROUPE (la reponse au courrier, la premiere qui s'applique) :
 ///   diligence close regularisee (DLGRC_ETAT_DILIGENCE « 9 ») -> « Depot tardif » : les comptes ont ete deposes apres
@@ -31,15 +47,15 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///
 /// REGLE D'ETAT (DLGRC_ETAT_DILIGENCE : 1 en cours, 8 clos non regularise, 9 clos regularise ; DLGRC_ETAT_RELANCE :
 /// valeurs de ETAT_RELANCE, 1/3/5 « A faire ... », 2/4/6/8 « ... faite » -- RIG_DEV, lu le 25/11/2026) :
-///   en cours, etat relance 1, 3 ou 5          -> AFaire  « A relancer » : aucune marche ;
-///   aucune relance envoyee, ou en cours avec reclamation -> EnCours « En cours » : dossier, exercices (0, 1), plus
-///                                                ce qui est fait ;
-///   relance envoyee (en cours ou close)       -> Validee « Relance » : dossier, exercices, courrier (0, 1, 3) ;
-/// une relance est « envoyee » si la diligence en a une (RELANCE_RCS) OU si son etat relance le dit (2, 4, 6, 8 :
-/// « ... faite ») -- la copie de dev ne garde que 200 lignes de RELANCE_RCS, l'etat de la diligence fait foi ;
-/// et dans tous les cas hors AFaire : facturation (2) si une relance est facturee (RLCRC_FACTURE), reponse (4) si le
-/// groupe n'est pas « Sans reponse ». Ordre : a relancer, en cours, relances en cours, puis closes ; la relance la
-/// plus recente en tete.
+///   relance suivante due (ci-dessus)                    -> AFaire  « A relancer » ;
+///   aucune relance envoyee, ou en cours avec reclamation -> EnCours « En cours » ;
+///   relance envoyee (en cours ou close)                 -> Validee « Relance ».
+/// Les etats relance 1, 3 et 5 (« A faire ... ») ne sont pas « a relancer » : aucune requete de relance de RIG v2 ne les
+/// selectionne (elles lisent 2 et 4) ; leur libelle reste dans les precisions. Une relance est « envoyee » si la diligence
+/// en a une (RELANCE_RCS) OU si son etat relance le dit (2, 4, 6, 8) -- la copie de dev ne garde que 200 lignes de
+/// RELANCE_RCS, l'etat de la diligence fait foi. Faites (forme File : l'ecran ne les lit pas) : dossier et exercices (0, 1),
+/// facturation (2) si une relance est facturee (RLCRC_FACTURE), courrier (3) si envoyee, reponse (4) hors « Sans reponse ».
+/// Ordre : a relancer, en cours, relances en cours, puis closes ; la relance la plus recente en tete.
 /// </summary>
 internal sealed class LecteurRelancesComptesAnnuels : ILecteurEcran
 {
@@ -48,12 +64,33 @@ internal sealed class LecteurRelancesComptesAnnuels : ILecteurEcran
     /// <summary>Les groupes du descripteur, au mot pres.</summary>
     internal const string SansReponse = "Sans réponse", Reclamation = "Réclamation", Refus = "Refus", DepotTardif = "Dépôt tardif";
 
+    /// <summary>Un exercice xd de la diligence g a relancer (requetes SDCA / RSURV / 2 et 3 de RIG_DEV : non depose, sans refus
+    /// d'approbation ni reclamation, limite de depot passee, etat DCA de la relance faite). Parametre : @aujourdhui.</summary>
+    internal const string ExerciceARelancerSql = """
+        xd.EXRCC_DEPOSE = 0 AND ISNULL(xd.EXRCC_NON_APPROBATION_COMPTES, 0) = 0 AND xd.EXRCC_ID_DMND_RECLA IS NULL
+        AND xd.EXRCC_LIMITE_DEPOT < @aujourdhui AND xd.EXRCC_ETAT_DCA LIKE g.DLGRC_ETAT_RELANCE + '%'
+        """;
+
+    /// <summary>
+    /// La relance DUE d'une diligence g de dossier s (2 ou 3), NULL sinon : la regle « A relancer » en tete du fichier
+    /// (requetes SDCA / RSURV / 2 et 3 de RIG_DEV). Parametre : @aujourdhui. L'ecrivain la relit dans la transaction du geste.
+    /// </summary>
+    internal const string RelanceDueSql = $"""
+        CASE WHEN g.DLGRC_ETAT_DILIGENCE = '1' AND g.DLGRC_ETAT_RELANCE IN ('2', '4') AND s.DateRadiation IS NULL
+                  AND EXISTS (SELECT 1 FROM v2.RELANCE_RCS AS p WHERE p.RLCRC_ID_DLGRC = g.DLGRC_ID_DLGRC
+                              AND p.RLCRC_NUM_ORDRE = CAST(g.DLGRC_ETAT_RELANCE AS int) / 2 AND p.RLCRC_DATE_LIMITE < @aujourdhui)
+                  AND EXISTS (SELECT 1 FROM v2.EXERCICE AS xd WHERE xd.EXRCC_ID_DLGRC = g.DLGRC_ID_DLGRC AND {ExerciceARelancerSql})
+                  AND NOT EXISTS (SELECT 1 FROM v2.DEMANDE AS dq WHERE dq.DMND_ID_DSRCS = s.Id
+                                  AND dq.DMND_CODE_PROSS IN ('DCA', 'DCADEMAT') AND dq.DMND_ETAT_DEMANDE IN ('Q', 'W', 'I', 'N'))
+             THEN CAST(g.DLGRC_ETAT_RELANCE AS int) / 2 + 1 END
+        """;
+
     private const string Requete = $"""
         SELECT TOP (@plafond)
-               g.DLGRC_ETAT_DILIGENCE, g.DLGRC_ETAT_RELANCE, g.DLGRC_DATE_REGULARISATION,
+               g.DLGRC_ID_DLGRC, g.DLGRC_ETAT_DILIGENCE, g.DLGRC_ETAT_RELANCE, g.DLGRC_DATE_REGULARISATION,
                s.NumeroGestion, s.Siren, e.Denomination,
                der.RLCRC_NUM_ORDRE, der.RLCRC_TYPE_RELANCE, der.RLCRC_DATE_RELANCE, der.RLCRC_DATE_LIMITE,
-               x.Exercices, x.Cloture, x.Reclamation, f.Facturee, o.DateRefus,
+               x.Exercices, x.Cloture, x.Reclamation, f.Facturee, o.DateRefus, du.RelanceDue,
                COUNT(*) OVER () AS Total
         FROM v2.DILIGENCE_RCS AS g
         JOIN rec.ActionRegistre AS a ON a.Id = g.DLGRC_ID_ACTRC
@@ -67,10 +104,11 @@ internal sealed class LecteurRelancesComptesAnnuels : ILecteurEcran
                      WHERE d.DMND_ID_DSRCS = s.Id AND d.DMND_CODE_PROSS IN ('DCA', 'DCADEMAT') AND d.DMND_ETAT_DEMANDE = 'O'
                        AND d.DMND_DATE_CREATION >= (SELECT MIN(r1.RLCRC_DATE_RELANCE) FROM v2.RELANCE_RCS AS r1
                                                      WHERE r1.RLCRC_ID_DLGRC = g.DLGRC_ID_DLGRC)) AS o
+        CROSS APPLY (SELECT {RelanceDueSql} AS RelanceDue) AS du
         WHERE g.DLGRC_NATURE_DILIGENCE = 'SDCA'
           AND NOT EXISTS (SELECT 1 FROM v2.RELANCE_RCS AS i WHERE i.RLCRC_ID_DLGRC = g.DLGRC_ID_DLGRC
                           AND i.RLCRC_TYPE_RELANCE = 'IDCA' AND i.RLCRC_ID_INSTN IS NOT NULL)
-        ORDER BY CASE WHEN g.DLGRC_ETAT_DILIGENCE = '1' AND g.DLGRC_ETAT_RELANCE IN ('1', '3', '5') THEN 0
+        ORDER BY CASE WHEN du.RelanceDue IS NOT NULL THEN 0
                       WHEN NOT {FormeRelance.EnvoyeeSql} OR (g.DLGRC_ETAT_DILIGENCE = '1' AND x.Reclamation IS NOT NULL) THEN 1
                       WHEN g.DLGRC_ETAT_DILIGENCE = '1' THEN 2
                       ELSE 3 END,
@@ -78,7 +116,8 @@ internal sealed class LecteurRelancesComptesAnnuels : ILecteurEcran
         """;
 
     public Task<LignesLues> LireAsync(SqlConnection baseGreffe, DateTime aujourdhui, int plafond, CancellationToken ct)
-        => LectureEcran.LireAsync(baseGreffe, Requete, Ligne, ct, new SqlParameter("@plafond", plafond));
+        => LectureEcran.LireAsync(baseGreffe, Requete, Ligne, ct, new SqlParameter("@plafond", plafond),
+                                  new SqlParameter("@aujourdhui", System.Data.SqlDbType.DateTime) { Value = aujourdhui.Date });
 
     private static LigneLue Ligne(SqlDataReader r)
     {
@@ -87,8 +126,9 @@ internal sealed class LecteurRelancesComptesAnnuels : ILecteurEcran
         var envoyee = FormeRelance.Envoyee(r, etatRelance);
         var dateRefus = FormeLigne.DateDe(r, "DateRefus");
         var reclamation = r["Reclamation"] is not DBNull;
+        var due = r["RelanceDue"] is int n ? n : (int?)null;
         var groupe = etatDiligence == "9" ? DepotTardif : reclamation ? Reclamation : dateRefus is not null ? Refus : SansReponse;
-        var (etat, faites) = Etat(etatDiligence, etatRelance, envoyee, groupe, facturee: r["Facturee"] is int f && f == 1);
+        var (etat, faites) = Etat(due, etatDiligence, envoyee, groupe, facturee: r["Facturee"] is int f && f == 1);
 
         var reponse = groupe switch
         {
@@ -97,16 +137,22 @@ internal sealed class LecteurRelancesComptesAnnuels : ILecteurEcran
             Refus => $"refus du {FormeLigne.Date(dateRefus)}",
             _ => etatDiligence == "8" ? "close sans régularisation" : null,
         };
+        // Un etat relance « A faire ... » (1, 3, 5) d'une diligence en cours se libelle tel quel (FormeRelance.Relance, AFaire) ;
+        // sinon la derniere relance envoyee.
+        var relance = etatDiligence == "1" && etatRelance is "1" or "3" or "5"
+            ? FormeRelance.Relance(r, etatRelance, "AFaire")
+            : FormeRelance.Relance(r, etatRelance, "Validee");
         return new LigneLue(FormeRelance.NomDossier(r),
-                            FormeLigne.Joindre(Exercices(r), FormeRelance.Relance(r, etatRelance, etat), reponse),
-                            groupe, etat, faites);
+                            FormeLigne.Joindre(Exercices(r), due is { } d ? $"Relance {d} due" : null, relance, reponse),
+                            groupe, etat, faites)
+        { Id = FormeLigne.Texte(r, "DLGRC_ID_DLGRC") };
     }
 
-    /// <summary>La regle d'etat (en tete du fichier) : etat du descripteur et marches franchies.</summary>
-    internal static (string Etat, int[] Faites) Etat(string etatDiligence, string etatRelance, bool envoyee, string groupe, bool facturee)
+    /// <summary>La regle d'etat (en tete du fichier) : etat du descripteur et parties franchies.</summary>
+    internal static (string Etat, int[] Faites) Etat(int? relanceDue, string etatDiligence, bool envoyee, string groupe, bool facturee)
     {
+        if (relanceDue is not null) return ("AFaire", []);
         var enCours = etatDiligence == "1";
-        if (enCours && etatRelance is "1" or "3" or "5") return ("AFaire", []);
         var faites = new List<int> { 0, 1 };
         if (facturee) faites.Add(2);
         if (envoyee) faites.Add(3);
@@ -127,6 +173,7 @@ internal sealed class LecteurRelancesComptesAnnuels : ILecteurEcran
         };
     }
 }
+
 
 /// <summary>
 /// Les morceaux communs aux lecteurs de l'ecran reuni « Relances et injonctions » (relances et injonctions des comptes

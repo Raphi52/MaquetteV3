@@ -1,0 +1,8 @@
+# « Chiffres d'un dossier » (LecteurChiffresDossier) sur le jeu PROC_VCHIFFRES.sql : la grille de chaque dossier qui a au moins un
+# exercice chiffre -- ses exercices chiffres et, le reglage SHOW_EXERCICES_SANS_CHIFFRES_CLES etant vrai par defaut, ceux sans
+# chiffres --, par dossier puis date de cloture decroissante.
+# Etat : sans chiffres seuils -> AFaire ; chiffre, un bilan de l'exercice rejete -> EnCours ; chiffre -> Validee.
+# Ecarte : le dossier 1600902 (aucun exercice chiffre) -- jumeau retenu 1600901 ; PROC_VCHIFFRES.recherches le retrouve.
+Exercice clos le 31/12/2024 · CHIFFRES ALPHA SARL | dossier 2016 B 60901 · CA 120 000,00 € · résultat 15 000,00 € · 4 salariés | Bilans déposés | Validee | []
+Exercice clos le 31/12/2023 · CHIFFRES ALPHA SARL | dossier 2016 B 60901 · CA 98 000,00 € · résultat -2 500,00 € · 1 salarié · bilan rejeté | Bilans déposés | EnCours | []
+Exercice clos le 31/12/2022 · CHIFFRES ALPHA SARL | dossier 2016 B 60901 · sans chiffres clés | Exercices sans chiffres | AFaire | []

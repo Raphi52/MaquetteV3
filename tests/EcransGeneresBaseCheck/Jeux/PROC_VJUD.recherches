@@ -1,0 +1,22 @@
+# Les recherches de LecteurDossierJudiciaire (PROC_VJUD) dans la base : la recherche d'entite judiciaire de la V2. Format : en
+# tete de Program.cs du banc.
+# Le numero de role, avec ses blancs : une instance hors de la liste de depart.
+critere: Numéro = 2026 V 01104
+lignes:
+Rôle 2026V01104 · VJUD QUATRE | Instance · code affaire VJ16 · enrôlée le 01/01/2025 · aucun événement | Instance | AFaire | []
+---
+# Le type d'entite ecarte les autres blocs (jumeau : la meme recherche sur une prevention ne rend rien).
+critere: Type d'entité = Prévention
+critere: Numéro = 2026V01104
+lignes:
+---
+# Une procedure collective, par son numero (celle de PROC_VNOTIF.sql).
+critere: Type d'entité = Procédure collective
+critere: Numéro = 2026P00211
+lignes:
+PC 2026P00211 | Procédure collective · aucun événement | Procédure collective | AFaire | []
+---
+# Le nom de l'affaire.
+critere: Nom = vjud cinq
+lignes:
+Rôle 2026V01105 · VJUD CINQ | Instance · code affaire VJ16 · aucun événement | Instance | AFaire | []

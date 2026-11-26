@@ -41,6 +41,11 @@ export function FormeFile({ d }: { d: DescripteurEcranVue }) {
   const gestes = [...new Set(procedures.flatMap(gestesDe))]
   const choisies = lignes.filter((l) => cochees.has(l.i))
   const portee = (geste: string) => choisies.filter((l) => gestesDe(parcoursDe(d, l.groupe)).includes(geste))
+  // Pourquoi une action est grisee : rien de coche, ou des lignes cochees d'une procedure qui ne porte pas ce geste (ecran
+  // reuni : « Imprimer » ne vaut que pour les procedures qui le nomment).
+  const pourquoiGrise = (geste: string) => choisies.length === 0
+    ? 'Cochez au moins une ligne'
+    : `« ${geste} » ne s’applique pas aux lignes cochées : il ne vaut que pour ${procedures.filter((p) => gestesDe(p).includes(geste)).map((p) => `« ${p.titre} »`).join(', ')}`
   const enLot = useGesteEnLot(d, vue, annoncer)
   const jouer = (geste: string, visees: LigneTenue[]) => void enLot('Agir', geste, visees, {},
     (n) => refus(geste, `sur ${n} ligne${n > 1 ? 's' : ''} : aucune n’est modifiée dans la base`),
@@ -67,7 +72,7 @@ export function FormeFile({ d }: { d: DescripteurEcranVue }) {
             return (
               <button key={g} type="button" className={`rig-lm-outil${k === 0 ? ' rig-lm-outil--fort' : ''}`}
                       disabled={visees.length === 0} onClick={() => jouer(g, visees)}
-                      title={visees.length === 0 ? 'Cochez au moins une ligne' : undefined}>{g}</button>
+                      title={visees.length === 0 ? pourquoiGrise(g) : undefined}>{g}</button>
             )
           })}
           {choisies.length > 0 && (

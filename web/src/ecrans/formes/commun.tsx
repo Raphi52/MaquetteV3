@@ -36,6 +36,8 @@ export interface VueLignesEcran {
   cherchees?: string[]
   /** Vrai : au moins une procedure de l'ecran cherche dans la base (la recherche y part, EcranGenere.Chercher). */
   recherche?: boolean
+  /** Les groupes dont les lignes s'arretent au plafond du serveur (message dit combien) : FormeEtat n'imprime pas une liste coupee. */
+  plafonnees?: string[]
 }
 
 /** Une recherche : le texte du champ et les criteres remplis. */

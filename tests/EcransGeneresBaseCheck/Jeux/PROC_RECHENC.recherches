@@ -1,0 +1,31 @@
+# Les recherches de LecteurEncaissements (PROC_RECHENC) dans la base. Format : en tete de Program.cs du banc. Les dates sont
+# fixes (mars 2025) : une ligne datee du jour du banc ne s'ecrit pas dans ce format.
+# Les deux dates : de 0 h a 24 h -- le 10/03 a 14 h retenu, le 11/03 a 0 h ecarte (jumeau).
+critere: Date de début = 10/03/2025
+critere: Date de fin = 10/03/2025
+lignes:
+Encaissement L6CHQ004 · PAYEUR DELTA | Chèque · 300,00 € · le 10/03/2025 · BANQUE DELTA · remise 7 · ventilé 300,00 € · client L6DELTA · CLI DELTA · affaire 1600432 | Encaissement ventilé | Validee | []
+---
+# Le numero de titre, une partie suffit (LIKE).
+critere: Numéro de titre = L6REM
+lignes:
+Encaissement L6REM005 · PAYEUR OMEGA | Virement · 1 500,00 € · le 11/03/2025 · sans ventilation | Encaissement sans ventilation | AFaire | []
+---
+# L'abrege du client de la ventilation (CLIEN_ABREGE).
+critere: Abrégé client = l6delta
+lignes:
+Encaissement L6CHQ004 · PAYEUR DELTA | Chèque · 300,00 € · le 10/03/2025 · BANQUE DELTA · remise 7 · ventilé 300,00 € · client L6DELTA · CLI DELTA · affaire 1600432 | Encaissement ventilé | Validee | []
+---
+# Le montant minimum, saisi « 1 400 » : 1 500 retenu, 1 200 (le jour) ecarte.
+critere: Montant minimum = 1 400
+lignes:
+Encaissement L6REM005 · PAYEUR OMEGA | Virement · 1 500,00 € · le 11/03/2025 · sans ventilation | Encaissement sans ventilation | AFaire | []
+---
+# Un montant illisible ne retrouve rien.
+critere: Montant maximum = abc
+lignes:
+---
+# Le champ de recherche : le payeur.
+texte: omega
+lignes:
+Encaissement L6REM005 · PAYEUR OMEGA | Virement · 1 500,00 € · le 11/03/2025 · sans ventilation | Encaissement sans ventilation | AFaire | []

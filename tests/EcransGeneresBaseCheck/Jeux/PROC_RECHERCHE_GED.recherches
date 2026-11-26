@@ -1,0 +1,25 @@
+# Les recherches de LecteurDocumentsGed (PROC_RECHERCHE_GED) dans la base. Format : en tete de Program.cs du banc.
+# La categorie de l'arbre de la V2, a son libelle (sans casse).
+critere: Catégorie = orphelins
+lignes:
+attestation-depot.pdf | Document L6-GED-03 · PDF · archivé le 03/03/2025 · extrait par agent.banc le 04/03/2025 · référence supprimée (DEMANDE_EDITION.DMNED_NUM_DOCUMENT_EDITION) | Orphelins | AFaire | []
+facture.xml | Document L6-GED-05 · XML · archivé le 07/03/2025 · référence supprimée (FACTURE.FACTU_NUMERO_GED_DONNEES_XML) | Orphelins | AFaire | []
+---
+# Le numero GED : recherche EXACTE (ult_TbxNumGed, OPE_GED.cs:446) -- jumeau : une partie du numero ne rend rien.
+critere: Numéro du document = L6-GED-04
+lignes:
+Liaison 26000000525 | Document L6-GED-04 · XML · archivé le 06/03/2025 | Documents SIREN | Validee | []
+---
+critere: Numéro du document = L6-GED
+lignes:
+---
+# Le login d'extraction en LIKE (OPE_GED.cs:456) : tous ses documents, pas seulement le premier comme la V2.
+critere: Login d'extraction = agent
+lignes:
+courrier-scanne.png | Document L6-IMG-02 · PNG · archivé le 11/03/2025 · extrait par agent.banc le 12/03/2025 | Sans référence | EnCours | []
+attestation-depot.pdf | Document L6-GED-03 · PDF · archivé le 03/03/2025 · extrait par agent.banc le 04/03/2025 · référence supprimée (DEMANDE_EDITION.DMNED_NUM_DOCUMENT_EDITION) | Orphelins | AFaire | []
+---
+# Le champ de recherche : le numero, le nom de fichier ou le libelle.
+texte: rappel
+lignes:
+L6_LETTRE_RAPPEL | Document L6-GED-02 · DOCX · archivé le 01/03/2025 · extrait par ext2026 le 05/03/2025 | Éléments de fusion | EnCours | []

@@ -1,0 +1,6 @@
+# « Actes rejetes » (LecteurActesRejetes), jeu PROC_ACTREJ.sql : les actes a l'etat GEIDE 9, compte rendu le plus recent en tete.
+# Ecartes : 1801233 (deja renvoye, etat 1 -- jumeau 1801232), 1801234 (rejet annule, etat 99 -- jumeau 1801231), 1801235 (depot
+# sans action, donc sans dossier).
+ACTES REJETES BETA SAS · 2026 B 81202 | Dépôt R1801212 · Statuts mis à jour · envoyé le {J-4} · rejeté le {J-2} · Pièce illisible | Rejets Infogreffe | AFaire | []
+ACTES REJETES ALPHA SARL · 2026 B 81201 | Dépôt R1801211 · Bilan des comptes annuels · envoyé le {J-10} · rejeté le {J-5} · Format de fichier refusé | Rejets Infogreffe | AFaire | []
+ACTES REJETES ALPHA SARL · 2026 B 81201 | Dépôt R1801211 · Procès-verbal d'assemblée · envoyé le {J-21} · rejeté le {J-20} | Rejets Infogreffe | AFaire | []

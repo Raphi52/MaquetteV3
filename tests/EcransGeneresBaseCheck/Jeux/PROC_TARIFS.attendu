@@ -1,0 +1,12 @@
+# « Tarifs » (LecteurTarifs) sur le jeu PROC_TARIFS.sql : la derniere version de chaque article (par code greffe), aux criteres
+# par defaut de la V2 -- statut actif (A), type titre (TI), toutes categories --, triee par code. Le prix d'un titre est la somme
+# quantite x prix de ses principaux (1600801 : 2 x 10,00 + 1 x 5,50 ; 1600805 : 4 x 5,50).
+# Groupe : un article correspondance d'un autre (ARTICLE_CORRESP) -> « Article dérivé ». Etat : sa famille a une incoherence
+# justifiee -> Validee ; en sommeil -> EnCours ; sinon AFaire.
+# Ecartes, chacun avec son jumeau retenu :
+#   1600802 version plus ancienne de L6TI01   -- 1600801 ;
+#   1600803 en sommeil (S)                   -- 1600801 (A) ; PROC_TARIFS.recherches le retrouve ;
+#   1600811, 1600812 principaux (PR)         -- 1600801 (TI) ; idem.
+Article L6TI01 · Inscription banc | 25,50 € HT · type TI · catégorie Aucune · incohérence justifiée | Article de base | Validee | []
+Article L6TI04 · Inscription derivee | 0,00 € HT · type TI · catégorie Aucune · incohérence justifiée | Article dérivé | Validee | []
+Article L6TI05 · Recherche banc | 22,00 € HT · type TI · catégorie L6 RCS · codes événement E1, E2 | Article de base | AFaire | []

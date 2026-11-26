@@ -26,6 +26,12 @@ using RigV3Desktop.Pont;
 //      geste « Ouvrir un dossier » branche : refuse, rien d'ecrit ;
 //   4. (lot 5) « Dépôts judiciaires » : sa lecture, sa route et son pont, sur la meme marche ;
 //   5. (lot 7) « Créer une audience » et « Gestion des audiences » : leurs lectures, routes et ponts, sur la meme marche.
+//   6. (lot 6) « Consultation judiciaire », « Actes », « Recherche d'affaires » et « Réquisitions », de meme.
+// fix-ok: pas un correctif -- le lot 6 du plan-676a4b19 ajoute une section par ecran branche (6 a 9), une edition par ecran ;
+//   chaque section est prouvee par un defaut reinjecte (plancher 2014 des actes retire : 3 echecs, 26/11/2026).
+//   Cause mesuree de l'edition suivante (section 9) : le pont posait NbInscriptions = 0 et ProcedureCollective = false en dur
+//   (EcranRequisitionsBase.cs:75, objection du controle final) ; la lecture les tire maintenant des regles de la V2. Et la
+//   section 6 lit le XML : RPJCE_FLUX est une colonne de DEMAT_RPJC_ENR (DEMAT_RPJC_ENR.sql:15), l'ecran le disait non relu.
 // Identifiants des jeux : a partir de 2 700 000 ((10 + 17) x 100 000, regle du plan). Il lui faut le SQL Server de
 // developpement : « docker compose up -d » a la racine du depot.
 
@@ -593,6 +599,406 @@ Exiger(gesBase is { Mode: "serveur", Total: 3 } && gesBase.Lignes[1] is { Jour: 
 Exiger((await EcranGestionAudiences.VueAsync(null, null)) is { Mode: "demo", Lignes.Length: 5 }, "pont Gestion des audiences sans serveur : la demonstration, mode « demo »");
 Exiger((await EcranGestionAudiences.VueAsync(client, GreffeAbsent)) is { Mode: "erreur", Lignes.Length: 0, Message: not null },
     "pont Gestion des audiences, greffe absent : le motif, AUCUNE ligne");
+
+// ============================================================ 6. CONSULTATION JUDICIAIRE (LectureConsultationJud.cs, lot 6)
+// « Consultation judiciaire » (PROC_CJUD, mode CJUDINFOG), branchee au lot 6 du plan : les enrolements RPJC (DEMAT_RPJC_ENR),
+// etat du flux au libelle de eDematEtat (DematEtat.cs:17-47), traitement A / R / vide (ULT_COMBO_ACCEPTE_REFUSE.cs:20-21),
+// role de l'instance creee a l'acceptation, du plus recent au plus ancien. Identifiants 1 640 0xx (lot 6 : 1 600 000 a
+// 1 699 999). Joue apres les sections 4 et 5 : ses instances et demandes n'y entrent pas (autres tables lues).
+await Sql("""
+    CREATE TABLE v2.DEMAT_RPJC_ENR (RPJCE_ID_RPJCE int NOT NULL PRIMARY KEY, RPJCE_DATE_CREATION datetime NULL, RPJCE_ETAT varchar(2) NULL,
+        RPJCE_ETAT_TRAITEMENT_RIG varchar(2) NULL, RPJCE_DATE_TRAITEMENT_RIG datetime NULL, RPJCE_TYPE_REJET_RIG varchar(100) NULL,
+        RPJCE_MOTIF_REJET_RIG varchar(max) NULL, RPJCE_REFERENCE_DEMANDE varchar(10) NULL, RPJCE_ID_DMND int NULL, RPJCE_ID_INSTN int NULL);
+    INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_NOM_COURANT) VALUES (1640101, '2026J64001', 'ENROLE ALPHA');
+    INSERT INTO v2.DEMANDE (DMND_ID_DMND, DMND_NUM_DEMANDE, DMND_ETAT_DEMANDE, DMND_EN_COURS, DMND_CODE_PROSS) VALUES (1640201, 'D1640201', 'V', 0, 'CJUD');
+    -- 1640001 : accepte, valide par Docapost (4), instance et demande ; 1640002 : integre (1), pas encore traite (jumeau de
+    -- 1640001 : ni instance ni demande, sa reference RPVA) ; 1640003 : refuse, rejete (9), le plus ancien ; 1640004 : un etat
+    -- hors de eDematEtat (77), montre tel quel.
+    INSERT INTO v2.DEMAT_RPJC_ENR VALUES
+        (1640001, '20260302 10:00', '4', 'A', '20260303', NULL, NULL, 'R164001', 1640201, 1640101),
+        (1640002, '20260303 09:00', '1', NULL, NULL, NULL, NULL, 'R164002', NULL, NULL),
+        (1640003, '20260301 08:00', '9', 'R', '20260302', 'Pièce manquante', 'Dossier incomplet', 'R164003', NULL, NULL),
+        (1640004, '20260228 08:00', '77', NULL, NULL, NULL, NULL, 'R164004', NULL, NULL);
+    """);
+await using (var cn = new SqlConnection(greffe.Connexion))
+{
+    await cn.OpenAsync();
+    var enr = await LectureConsultationJud.LireAsync(cn, CancellationToken.None);
+    Exiger(enr.Total == 4 && enr.Lignes.Select(e => e.Id).SequenceEqual([1640002, 1640001, 1640003, 1640004]),
+        $"consultation judiciaire : tous les enrolements, du plus recent au plus ancien ({string.Join(",", enr.Lignes.Select(e => e.Id))})");
+    Exiger(enr.Lignes[1] is { Role: "2026J64001", Denomination: "ENROLE ALPHA", EtatDemat: "Validé", EtatTraitement: "Accepté", Demande: "D1640201", Reference: "R164001" }
+           && enr.Lignes[1].Traitement == new DateTime(2026, 3, 3),
+        "consultation judiciaire : accepte (A), valide (4), le role et le nom de l'instance, la demande RIG");
+    Exiger(enr.Lignes[0] is { Role: "", Denomination: "", EtatDemat: "Intégré avec succès", EtatTraitement: "En attente", Demande: "" } && enr.Lignes[0].Traitement is null,
+        "consultation judiciaire : pas encore traite -> « En attente », sans instance ni demande");
+    Exiger(enr.Lignes[2] is { EtatDemat: "Rejeté", EtatTraitement: "Refusé", TypeRejet: "Pièce manquante", MotifRejet: "Dossier incomplet" }
+           && enr.Lignes[3].EtatDemat == "77",
+        "consultation judiciaire : refuse (R) avec type et motif ; un etat hors eDematEtat reste son code");
+    var un = await LectureConsultationJud.LireAsync(cn, CancellationToken.None, plafond: 1);
+    Exiger(un.Lignes.Length == 1 && un.Total == 4, $"consultation judiciaire : plafond 1 -> une ligne, total 4 ({un.Total})");
+}
+var enrRoute = await http.GetFromJsonAsync<EnrolementsLus>(RoutesEcransMain.Pour(RoutesConsultationJud.Enrolements, Greffe), json);
+Exiger(enrRoute is { Total: 4 } && enrRoute.Lignes[0].Id == 1640002, "route de la consultation judiciaire : les lignes de la lecture");
+Exiger((await http.GetAsync(RoutesEcransMain.Pour(RoutesConsultationJud.Enrolements, GreffeAbsent))).StatusCode == HttpStatusCode.NotFound,
+    "route de la consultation judiciaire : greffe absent -> 404, sans repli");
+var cjBase = await EcranConsultationJud.VueAsync(client, Greffe);
+Exiger(cjBase is { Mode: "serveur", Total: 4 }
+       && cjBase.Lignes[1] is { Affaire: "2026J64001", Denomination: "ENROLE ALPHA", Dossier: "2026J64001", Creation: "2026-03-02", Traitement: "2026-03-03", NbPieces: null, Anomalies: null, Xml: null }
+       && cjBase.Lignes[0] is { Affaire: "R164002", Denomination: "Référence RPVA R164002", Dossier: "", Traitement: null }
+       && !cjBase.Lignes.Any(l => EcranConsultationJud.Exemple().Lignes.Any(e => e.Affaire == l.Affaire)),
+    "pont Consultation judiciaire branche : les enrolements de la base (aucun de la demonstration), la reference RPVA tant qu'il n'y a pas d'instance, pieces / anomalies / XML non lus (null)");
+Exiger(cjBase.Lignes[1].Id == "1640001" && EcranConsultationJud.Exemple().Lignes.All(l => l.Id is null && l.Xml is not null),
+    "pont Consultation judiciaire : chaque enrolement de la base porte son id (le XML se lit par lui) ; la demonstration porte son XML, sans id");
+// « Visualiser le XML » (ult_ButtonvisuXML) : RPJCE_FLUX de l'enrolement, lu a la demande (PROC_CJUD.cs:437-455), en UTF-8
+// (accents gardes). Jumeaux : un enrolement sans flux (null, dit) ; un enrolement absent (Existe faux, dit).
+const string FluxBanc = "<demandeEnrolement><referenceDemande>R164001</referenceDemande><demandeur>Société Écluse</demandeur></demandeEnrolement>";
+await Sql("ALTER TABLE v2.DEMAT_RPJC_ENR ADD RPJCE_FLUX varbinary(max) NULL;");
+await Sql("UPDATE v2.DEMAT_RPJC_ENR SET RPJCE_FLUX = @flux WHERE RPJCE_ID_RPJCE = 1640001;", ("@flux", System.Text.Encoding.UTF8.GetBytes(FluxBanc)));
+await using (var cn = new SqlConnection(greffe.Connexion))
+{
+    await cn.OpenAsync();
+    Exiger(await LectureConsultationJud.LireXmlAsync(cn, 1640001, CancellationToken.None) == new FluxEnrolementLu(1640001, true, FluxBanc)
+           && await LectureConsultationJud.LireXmlAsync(cn, 1640002, CancellationToken.None) == new FluxEnrolementLu(1640002, true, null)
+           && await LectureConsultationJud.LireXmlAsync(cn, 1649999, CancellationToken.None) == new FluxEnrolementLu(1649999, false, null),
+        "consultation judiciaire, XML : le flux de l'enrolement en UTF-8 ; sans flux, null ; absent, Existe faux");
+}
+Exiger(await http.GetFromJsonAsync<FluxEnrolementLu>(RoutesConsultationJud.XmlPour(Greffe, 1640001), json) == new FluxEnrolementLu(1640001, true, FluxBanc),
+    "route du XML de la consultation judiciaire : le flux de la lecture");
+Exiger((await EcranConsultationJud.XmlAsync(client, Greffe, "1640001")) == new XmlConsultationJud("serveur", FluxBanc, null)
+       && (await EcranConsultationJud.XmlAsync(client, Greffe, "1640002")) == new XmlConsultationJud("serveur", null, EcranConsultationJud.SansFlux)
+       && (await EcranConsultationJud.XmlAsync(client, Greffe, "1649999")) == new XmlConsultationJud("serveur", null, EcranConsultationJud.Disparu)
+       && (await EcranConsultationJud.XmlAsync(client, Greffe, "abc")) is { Xml: null, Message: EcranConsultationJud.Disparu }
+       && (await EcranConsultationJud.XmlAsync(client, GreffeAbsent, "1640001")) is { Mode: "erreur", Xml: null, Message: not null },
+    "pont Consultation judiciaire, « Visualiser le XML » : le flux ; sans flux, absent ou id illisible, il le dit ; greffe absent, le motif");
+Exiger((await EcranConsultationJud.VueAsync(null, null)) is { Mode: "demo", Lignes.Length: 4 }, "pont Consultation judiciaire sans serveur : la demonstration, mode « demo »");
+Exiger((await EcranConsultationJud.VueAsync(client, GreffeAbsent)) is { Mode: "erreur", Lignes.Length: 0, Message: not null },
+    "pont Consultation judiciaire, greffe absent : le motif, AUCUNE ligne");
+
+// ============================================================ 7. ACTES (LectureActes.cs, lot 6)
+// « Actes » (PROC_ACTES_NUM, mode Acte) : les actes deposes depuis 2014 et jusqu'a aujourd'hui - 2 jours, hors comptes annuels,
+// pas encore dans la GED (ACTDP_GUID_VIDIGED vide), OPE_RESULTAT.cs:393-431 ; criteres de ChargerDonnees (:450-541). Chaque
+// refus a son jumeau retenu (1641031). Identifiants 1 641 0xx.
+await Sql("""
+    ALTER TABLE v2.DEMANDE ADD DMND_ID_ACTRC int NULL;
+    CREATE TABLE v2.DEMAT_DCA (DMTDCA_ID_DMTDCA int NOT NULL PRIMARY KEY, DMTDCA_ID_DMND int NULL);
+    CREATE TABLE v2.CATEGORIE_DEPOT (R_CATEGORIED_VALEUR varchar(16) NOT NULL PRIMARY KEY, R_CATEGORIED_LIBELLE_ECRAN varchar(35) NULL,
+        R_CATEGORIED_COMPTES_ANNUEL bit NULL);
+    CREATE TABLE v2.ABREGE_PIECE (R_ABREGEPIEC_VALEUR varchar(16) NOT NULL PRIMARY KEY, R_ABREGEPIEC_SYNONYME varchar(16) NULL,
+        R_ABREGEPIEC_DEVELOPPE_EDIT varchar(256) NULL);
+    CREATE TABLE v2.DEPOT_RCS (DPTRC_ID_DPTRC int NOT NULL PRIMARY KEY, DPTRC_NUM_DEPOT varchar(12) NOT NULL, DPTRC_DATE datetime NULL,
+        DPTRC_CATEGORIE_DEPOT varchar(16) NULL);
+    CREATE TABLE v2.ACTE_DEPOSE (ACTDP_ID_ACDPS int NOT NULL PRIMARY KEY, ACTDP_ID_DPTRC int NULL, ACTDP_ABREGE_PIECE varchar(16) NOT NULL,
+        ACTDP_NUM_ORDRE int NULL, ACTDP_DESCRIPTION varchar(256) NULL, ACTDP_DATE datetime NULL, ACTDP_SANS_DOCUMENT bit NULL,
+        ACTDP_GUID_VIDIGED uniqueidentifier NULL);
+    INSERT INTO v2.CATEGORIE_DEPOT VALUES ('A64', 'Depots actes banc', 0), ('B64', 'Comptes banc', 1), ('C64', 'Ordonnances banc', NULL);
+    INSERT INTO v2.ABREGE_PIECE VALUES ('PV64', 'PVAG', 'Proces-verbal du banc'), ('ST64', 'STAT', 'Statuts du banc');
+    SET IDENTITY_INSERT rec.Entreprise ON;
+    INSERT INTO rec.Entreprise (Id, Siren, Civilite, Denomination, EtatInfo, FicheSommaire) VALUES (1641001, '516410001', '', N'ACTES ALPHA SAS', 'C', 0);
+    SET IDENTITY_INSERT rec.Entreprise OFF;
+    SET IDENTITY_INSERT rec.DossierRcs ON;
+    INSERT INTO rec.DossierRcs (Id, IdEntreprise, TypeRcs, NumeroGestion, Siren, DateImmatriculation, MotifImmatriculation,
+        ProvisoirementSans, CompteurMaj, DateMaj, EtatDossier, EtatInfo, InscritRegistreMetiers, ModificationInterne,
+        SirenProvisoire, Accre, AutoEntrepreneur, Eirl, AutoEntrepreneurRegularise) VALUES
+        (1641001, 1641001, 'B1', '2010B64101', '516410001', '20100101', 'C', 0, 0, '20100101', 'A', 'C', 0, 0, 0, 0, 0, 0, 0);
+    SET IDENTITY_INSERT rec.DossierRcs OFF;
+    SET IDENTITY_INSERT rec.ActionRegistre ON;
+    INSERT INTO rec.ActionRegistre (Id, IdDossier, IdDepot, CodeProcessus, EtatInfo, EtatAction, SurNotification) VALUES
+        (1641011, 1641001, 1641021, 'BANCACT', 'C', 'V', 0), (1641012, 1641001, 1641022, 'BANCACT', 'C', 'V', 0),
+        (1641013, 1641001, 1641023, 'BANCACT', 'C', 'V', 0), (1641014, 1641001, 1641024, 'BANCACT', 'C', 'V', 0),
+        (1641015, 1641001, 1641025, 'BANCACT', 'C', 'V', 0);
+    SET IDENTITY_INSERT rec.ActionRegistre OFF;
+    """);
+// 1641021 depose le 04/05/2020 (retenu) ; 1641022 en 2013 (sous le plancher de 2014, retrouve par son numero) ; 1641023 en
+// categorie de comptes annuels ; 1641024 hier (apres « aujourd'hui - 2 jours ») ; 1641025 en 2021, son acte sans document.
+await Sql("""
+    INSERT INTO v2.DEPOT_RCS VALUES (1641021, 'D641021', '20200504 10:00', 'A64'), (1641022, 'D641022', '20130601', 'A64'),
+        (1641023, 'D641023', '20200601', 'B64'), (1641024, 'D641024', @hier, 'A64'), (1641025, 'D641025', '20210101', 'C64');
+    INSERT INTO v2.ACTE_DEPOSE VALUES
+        (1641031, 1641021, 'PV64', 1, NULL, '20200430', 0, NULL),
+        (1641032, 1641021, 'ST64', 2, 'Statuts mis a jour', '20200430', 0, NEWID()),
+        (1641033, 1641022, 'PV64', 1, 'PV de 2013', '20130530', 0, NULL),
+        (1641034, 1641023, 'PV64', 1, NULL, '20200530', 0, NULL),
+        (1641035, 1641024, 'PV64', 1, NULL, @hier, 0, NULL),
+        (1641036, 1641025, 'ST64', 1, NULL, '20201230', 1, NULL);
+    INSERT INTO v2.DEMANDE (DMND_ID_DMND, DMND_NUM_DEMANDE, DMND_ETAT_DEMANDE, DMND_EN_COURS, DMND_CODE_PROSS, DMND_ID_ACTRC) VALUES
+        (1641041, 'D1641041', 'V', 0, 'DAS', 1641011);
+    INSERT INTO v2.DEMAT_DAS (DMTDAS_ID_DMTDAS, DMTDAS_ID_DMND) VALUES (1641051, 1641041);
+    """, ("@hier", jour.AddDays(-1)));
+RechercheActes Actes(string numero = "", string[]? abreges = null, string categorie = "", DateTime? du = null, DateTime? au = null,
+                     bool sansDocument = false, int plafond = 50) => new(numero, abreges ?? [], categorie, du, au, sansDocument, plafond);
+await using (var cn = new SqlConnection(greffe.Connexion))
+{
+    await cn.OpenAsync();
+    async Task<int[]> Ids(RechercheActes r) => [.. (await LectureActes.LireAsync(cn, r, jour, CancellationToken.None)).Lignes.Select(a => a.Id)];
+    var actes = await LectureActes.LireAsync(cn, Actes(), jour, CancellationToken.None);
+    Exiger(actes.Total == 1 && actes.Lignes.Select(a => a.Id).SequenceEqual([1641031]),
+        $"actes : seul l'acte de 2020 hors GED et hors comptes annuels (2013, GED, comptes annuels, hier, sans document ecartes) ({string.Join(",", actes.Lignes.Select(a => a.Id))})");
+    Exiger(actes.Lignes[0] is { NumeroGestion: "2010B64101", NumeroDepot: "D641021", Designation: "ACTES ALPHA SAS", Categorie: "A64",
+                                CategorieLibelle: "Depots actes banc", Abrege: "PVAG", Description: "Proces-verbal du banc", Demat: true, SansDocument: false }
+           && actes.Lignes[0].DateDepot == new DateTime(2020, 5, 4, 10, 0, 0) && actes.Lignes[0].DateActe == new DateTime(2020, 4, 30),
+        "actes : designation, abrege (synonyme), description de l'abrege a defaut, demat (un flux DAS sur l'action)");
+    Exiger(actes.Categories.Select(k => k.Code).SequenceEqual(["A64", "C64"]),
+        $"actes : les categories hors comptes annuels, par libelle ({string.Join(",", actes.Categories.Select(k => k.Code))})");
+    Exiger((await Ids(Actes(numero: "D641022"))).SequenceEqual([1641033]),
+        "actes : un numero leve le plancher de 2014 a 1954 (OPE_RESULTAT.cs:500-501)");
+    var parGestion = await LectureActes.LireAsync(cn, Actes(numero: "2010B641"), jour, CancellationToken.None);
+    Exiger(parGestion.Total == 2 && parGestion.Lignes.Select(a => a.Id).SequenceEqual([1641033, 1641031]),
+        "actes : le numero de gestion LIKE %n%, depots de 2013 et 2020, par date de depot");
+    var unSeul = await LectureActes.LireAsync(cn, Actes(numero: "2010B641", plafond: 1), jour, CancellationToken.None);
+    Exiger(unSeul.Lignes.Length == 1 && unSeul.Total == 2, $"actes : plafond 1 -> une ligne, total 2 ({unSeul.Total})");
+    Exiger((await Ids(Actes(sansDocument: true))).SequenceEqual([1641036]),
+        "actes : « Lister actes non numerisables » -> ACTDP_SANS_DOCUMENT = 1 seuls (la case remplace la liste)");
+    Exiger((await Ids(Actes(abreges: ["STAT"]))).Length == 0 && (await Ids(Actes(abreges: ["PVAG", "STAT"]))).SequenceEqual([1641031]),
+        "actes : abreges coches -> R_ABREGEPIEC_SYNONYME IN (...)");
+    Exiger((await Ids(Actes(du: new DateTime(2020, 5, 5)))).Length == 0 && (await Ids(Actes(au: new DateTime(2020, 5, 4)))).SequenceEqual([1641031]),
+        "actes : periode de depot, bornes incluses (CONVERT(date, DPTRC_DATE))");
+    Exiger((await Ids(Actes(categorie: "C64"))).Length == 0 && (await Ids(Actes(categorie: "A64"))).SequenceEqual([1641031]),
+        "actes : la categorie choisie filtre DPTRC_CATEGORIE_DEPOT");
+}
+var actesRoute = await http.PostAsJsonAsync(RoutesEcransMain.Pour(RoutesActes.Actes, Greffe), Actes(), json);
+var actesLus = await actesRoute.Content.ReadFromJsonAsync<ActesLus>(json);
+Exiger(actesLus is { Total: 1 } && actesLus.Lignes[0].Id == 1641031, "route des actes : les lignes de la lecture");
+Exiger((await http.PostAsJsonAsync(RoutesEcransMain.Pour(RoutesActes.Actes, GreffeAbsent), Actes(), json)).StatusCode == HttpStatusCode.NotFound,
+    "route des actes : greffe absent -> 404, sans repli");
+CriteresActes CritActes(bool sansDocument = false, bool anomalies = false) => new("", "", "", null, null, sansDocument, anomalies, 50);
+var acBase = await EcranActes.TrouverAsync(client, Greffe, CritActes());
+Exiger(acBase is { Mode: "serveur", Total: 1, Message: EcranActes.NoteBase }
+       && acBase.Lignes[0] is { Rang: 1, Dossier: "2010B64101", Depot: "D641021", Denomination: "ACTES ALPHA SAS", CategorieLisible: "Depots actes banc",
+                                Abrege: "PVAG", Depose: "04/05/2020", Acte: "30/04/2020", Cloture: "", Demat: true, Anomalie: "", Numerisable: true }
+       && acBase.Categories.Length == 2,
+    "pont Actes branche : les actes de la base, la note dit ce que la liste montre");
+var acSansDoc = await EcranActes.TrouverAsync(client, Greffe, CritActes(sansDocument: true));
+Exiger(acSansDoc.Lignes is [{ Depot: "D641025", Numerisable: false }], "pont Actes : la case « non numerisables » part a la base");
+Exiger((await EcranActes.TrouverAsync(client, Greffe, CritActes(anomalies: true))) is { Mode: "serveur", Lignes.Length: 0, Message: EcranActes.NoteAnomalies },
+    "pont Actes : « Avec anomalie seulement » -> aucune ligne, la note nomme le mode Bilan non lu");
+Exiger((await EcranActes.TrouverAsync(null, null, CritActes())) is { Mode: "demo", Lignes.Length: > 0 }, "pont Actes sans serveur : la demonstration, mode « demo »");
+Exiger((await EcranActes.TrouverAsync(client, GreffeAbsent, CritActes())) is { Mode: "erreur", Lignes.Length: 0, Message: not null },
+    "pont Actes, greffe absent : le motif, AUCUNE ligne");
+
+// ============================================================ 8. RECHERCHE D'AFFAIRES (LectureAffaires.cs, lot 6)
+// « Recherche d'affaires » (PROC_RECHAFF) : AFFAIRE par son numero, celui d'une demande ou d'une facture (OPE_CRITERES.cs:30-126),
+// solde de Affaire.GetSolde (ventilations - articles utilises, Affaire.cs:318-335), demandes et factures jointes ; ajouts de la V3 :
+// libelle ou SIREN, instance rattachee (role sans blancs, comme PROC_VJUD). Sans critere : rien. Identifiants 1 642 0xx.
+// La colonne ajoutee doit exister avant que le lot qui l'ecrit soit compile : un appel a part.
+await Sql("ALTER TABLE v2.INSTANCE ADD INSTN_DATE_SAISINE_GREFFE datetime NULL");
+await Sql("""
+    CREATE TABLE v2.AFFAIRE (AFFRE_ID_AFFRE int NOT NULL PRIMARY KEY, AFFRE_LIBELLE varchar(255) NULL, AFFRE_DATE_CREATION datetime NULL);
+    CREATE TABLE v2.VENTILATION (VENTI_ID_VENTI int NOT NULL PRIMARY KEY, VENTI_ID_AFFRE int NULL, VENTI_MONTANT money NULL);
+    CREATE TABLE v2.ARTICLE_UTILISE (ARTUT_ID_ARTUT int NOT NULL PRIMARY KEY, ARTUT_ID_AFFRE int NULL, ARTUT_MONTANT_TTC money NULL);
+    INSERT INTO v2.AFFAIRE VALUES (1642001, 'Immatriculation - AFF ALPHA', '20260201'), (1642002, 'Assignation - AFF BETA', '20260301'),
+        (1642003, 'Autre - AFF GAMMA', '20260115');
+    -- 1642001 : une demande sur le dossier RCS 1641001 (section 7), facturee ; ventile 100,00, articles 142,50 -> solde -42,50.
+    -- 1642002 : une instance (role 2026J64201), une demande sans facture ; solde 0. 1642003 : rien.
+    INSERT INTO v2.DEMANDE (DMND_ID_DMND, DMND_NUM_DEMANDE, DMND_ETAT_DEMANDE, DMND_EN_COURS, DMND_CODE_PROSS, DMND_ID_AFFRE, DMND_ID_DSRCS) VALUES
+        (1642101, 'D1642101', 'V', 0, 'IMMAT', 1642001, 1641001), (1642102, 'D1642102', 'V', 0, 'CJUD', 1642002, NULL);
+    INSERT INTO v2.FACTURE (FACTU_NUMERO_FACTURE, FACTU_NUM_DEMANDE) VALUES ('F1642101', 'D1642101');
+    INSERT INTO v2.VENTILATION VALUES (1642301, 1642001, 60.00), (1642302, 1642001, 40.00);
+    INSERT INTO v2.ARTICLE_UTILISE VALUES (1642401, 1642001, 142.50);
+    INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_NOM_COURANT, INSTN_CODE_AFFAIRE, INSTN_ID_AFFRE, INSTN_DATE_SAISINE_GREFFE)
+        VALUES (1642201, '2026J64201', 'AFF BETA SARL', 'CT64', 1642002, '20260227');
+    """);
+RechercheAffaires Affaires(string numero = "", string libelle = "", string idInstance = "", string role = "", string code = "", string nom = "",
+                           DateTime? du = null, DateTime? au = null) => new(numero, libelle, idInstance, role, code, nom, du, au, 200);
+await using (var cn = new SqlConnection(greffe.Connexion))
+{
+    await cn.OpenAsync();
+    async Task<int[]> Ids(RechercheAffaires r) => [.. (await LectureAffaires.LireAsync(cn, r, CancellationToken.None)).Lignes.Select(a => a.Id)];
+    Exiger((await Ids(Affaires())).Length == 0, "affaires : sans aucun critere, rien (SearchQuery vide, OPE_CRITERES.cs:48)");
+    var alpha = await LectureAffaires.LireAsync(cn, Affaires(numero: "1642001"), CancellationToken.None);
+    Exiger(alpha.Total == 1 && alpha.Lignes[0] is { Id: 1642001, Libelle: "Immatriculation - AFF ALPHA", Solde: -42.50m, Demandes: "D1642101",
+                                                      Factures: "F1642101", Siren: "516410001", AvecDossierRcs: true, IdInstance: "", Role: "" }
+           && alpha.Lignes[0].Creation == new DateTime(2026, 2, 1),
+        "affaires : par numero d'affaire ; solde = ventilations - articles (Affaire.cs:318-335), demandes, factures, SIREN du dossier");
+    Exiger((await Ids(Affaires(numero: "D1642102"))).SequenceEqual([1642002]) && (await Ids(Affaires(numero: "F1642101"))).SequenceEqual([1642001])
+           && (await Ids(Affaires(numero: "1642999"))).Length == 0,
+        "affaires : le numero d'une demande ou d'une facture trouve son affaire ; un numero inconnu, rien");
+    Exiger((await Ids(Affaires(libelle: "AFF"))).SequenceEqual([1642002, 1642001, 1642003]) && (await Ids(Affaires(libelle: "516 410 001"))).SequenceEqual([1642001]),
+        "affaires : libelle contient, ou SIREN du dossier ; de la plus recente a la plus ancienne");
+    var beta = await LectureAffaires.LireAsync(cn, Affaires(role: "2026 J 64201"), CancellationToken.None);
+    Exiger(beta.Lignes is [{ Id: 1642002, IdInstance: "1642201", Role: "2026J64201", CodeAffaire: "CT64", Nom: "AFF BETA SARL", Solde: 0m, Factures: "" }]
+           && beta.Lignes[0].Saisine == new DateTime(2026, 2, 27) && (await Ids(Affaires(role: "2026J64202"))).Length == 0,
+        "affaires : le role de l'instance, blancs retires (comme PROC_VJUD) ; un autre role, rien");
+    Exiger((await Ids(Affaires(nom: "BETA"))).SequenceEqual([1642002]) && (await Ids(Affaires(code: "CT64"))).SequenceEqual([1642002])
+           && (await Ids(Affaires(idInstance: "1642201"))).SequenceEqual([1642002]) && (await Ids(Affaires(idInstance: "abc"))).Length == 0,
+        "affaires : nom courant, code affaire et id de l'instance ; un id illisible ne trouve rien");
+    Exiger((await Ids(Affaires(du: new DateTime(2026, 2, 28)))).Length == 0 && (await Ids(Affaires(au: new DateTime(2026, 2, 27)))).SequenceEqual([1642002]),
+        "affaires : periode de saisine de l'instance, bornes incluses");
+}
+var affRoute = await http.PostAsJsonAsync(RoutesEcransMain.Pour(RoutesAffaires.Affaires, Greffe), Affaires(libelle: "AFF"), json);
+Exiger((await affRoute.Content.ReadFromJsonAsync<AffairesLues>(json)) is { Total: 3 }, "route des affaires : les lignes de la lecture");
+Exiger((await http.PostAsJsonAsync(RoutesEcransMain.Pour(RoutesAffaires.Affaires, GreffeAbsent), Affaires(), json)).StatusCode == HttpStatusCode.NotFound,
+    "route des affaires : greffe absent -> 404, sans repli");
+CriteresAffaires CritAff(string numero = "", string libelle = "", string type = "", string etat = "", string nom = "")
+    => new(numero, libelle, type, "", "", "", "", nom, etat, null, null);
+var affBase = await EcranRechAffaires.TrouverAsync(client, Greffe, CritAff(numero: "1642001"), null, true, "1642001");
+Exiger(affBase is { Mode: "serveur", Message: EcranRechAffaires.NoteBase, AucunCritere: false, Choisie.Numero: "1642001" }
+       && affBase.Lignes is [{ Numero: "1642001", Type: "RCS", Siren: "516 410 001", SoldeValeur: -42.50m, Creation: "01/02/2026", Saisine: "",
+                               Demandes: "D1642101", Factures: "F1642101", Nature: "", Etat: "" }],
+    "pont Recherche d'affaires branche : l'affaire de la base, type RCS (demande sur un dossier), la note");
+Exiger((await EcranRechAffaires.TrouverAsync(client, Greffe, CritAff(nom: "BETA", type: "JUD"), null, true, null)).Lignes is [{ Numero: "1642002", Nature: "instance", Role: "2026J64201" }]
+       && (await EcranRechAffaires.TrouverAsync(client, Greffe, CritAff(nom: "BETA", type: "RCS"), null, true, null)).Lignes.Length == 0,
+    "pont Recherche d'affaires : le type se filtre en memoire sur les affaires lues (JUD avec instance)");
+Exiger((await EcranRechAffaires.TrouverAsync(client, Greffe, CritAff(libelle: "AFF", etat: "En cours"), null, true, null)).Lignes.Length == 0,
+    "pont Recherche d'affaires : AFFAIRE n'a pas d'etat -> le critere « Etat » ne trouve rien en base");
+Exiger((await EcranRechAffaires.TrouverAsync(client, Greffe, CritAff(), null, true, null)) is { Mode: "serveur", AucunCritere: true, Lignes.Length: 0 },
+    "pont Recherche d'affaires : sans critere, aucune ligne (comme RIG v2)");
+Exiger((await EcranRechAffaires.CompterAsync(client, Greffe, [CritAff(libelle: "AFF"), CritAff(libelle: "AFF", type: "JUD"), CritAff(type: "JUD")]))
+       .SequenceEqual([3, 1, null]),
+    "pont Recherche d'affaires : le compte des vues sur la base ; une vue sans critere cherche n'a pas de compte (null, jamais un faux 0)");
+Exiger((await EcranRechAffaires.TrouverAsync(null, null, CritAff(), null, true, null)) is { Mode: "demo", Lignes.Length: > 0 },
+    "pont Recherche d'affaires sans serveur : la demonstration, mode « demo »");
+Exiger((await EcranRechAffaires.TrouverAsync(client, GreffeAbsent, CritAff(numero: "1"), null, true, null)) is { Mode: "erreur", Lignes.Length: 0, Message: not null },
+    "pont Recherche d'affaires, greffe absent : le motif, AUCUNE ligne");
+
+// ============================================================ 9. REQUISITIONS (LectureEntreprisesRequi.cs, lot 6)
+// « Réquisitions » (PROC_REQUI), la recherche des entreprises (OPE_REQUI_RECHERCHE.cs:140-256 de la branche 275) sur la requete de
+// « Dossier RCS » : designation contient, SIREN egal, adresse du siege ; « Inclure les supprimes » ; limite 50..500. Identifiants
+// 1 643 0xx (et le dossier 1641001 de la section 7, sans adresse).
+await Sql("""
+    SET IDENTITY_INSERT rec.Adresse ON;
+    INSERT INTO rec.Adresse (Id, NumeroVoie, TypeVoie, NomVoie, CodePostal, Localite, EtatInfo) VALUES
+        (1643001, '12', 'RUE', 'DES BANCS', '80000', 'AMIENS', 'C'), (1643002, '4', 'AV', 'DU PARC', '80480', 'DURY', 'C');
+    SET IDENTITY_INSERT rec.Adresse OFF;
+    SET IDENTITY_INSERT rec.Entreprise ON;
+    INSERT INTO rec.Entreprise (Id, Siren, Civilite, Denomination, Patronyme, Prenom, FormeJuridique, IdAdresse, EtatInfo, FicheSommaire) VALUES
+        (1643001, '516430001', '', N'REQUI ALPHA SARL', NULL, NULL, 'SARL', 1643001, 'C', 0),
+        (1643002, '516430002', '', N'', N'BANCPP', N'Paul', NULL, 1643002, 'C', 0),
+        (1643003, '516430003', '', N'REQUI RADIEE SA', NULL, NULL, 'SA', 1643001, 'C', 0);
+    SET IDENTITY_INSERT rec.Entreprise OFF;
+    SET IDENTITY_INSERT rec.DossierRcs ON;
+    INSERT INTO rec.DossierRcs (Id, IdEntreprise, TypeRcs, NumeroGestion, Siren, DateImmatriculation, MotifImmatriculation,
+        ProvisoirementSans, CompteurMaj, DateMaj, EtatDossier, EtatInfo, InscritRegistreMetiers, ModificationInterne,
+        SirenProvisoire, Accre, AutoEntrepreneur, Eirl, AutoEntrepreneurRegularise, DateRadiation) VALUES
+        (1643001, 1643001, 'B1', '2011B64301', '516430001', '20110101', 'C', 0, 0, '20110101', 'A', 'C', 0, 0, 0, 0, 0, 0, 0, NULL),
+        (1643002, 1643002, 'A1', '2011A64302', '516430002', '20110101', 'C', 0, 0, '20110101', 'A', 'C', 0, 0, 0, 0, 0, 0, 0, NULL),
+        (1643003, 1643003, 'B1', '2011B64303', '516430003', '20110101', 'C', 0, 0, '20110101', 'A', 'C', 0, 0, 0, 0, 0, 0, 0, '20200101');
+    SET IDENTITY_INSERT rec.DossierRcs OFF;
+    """);
+// Le nombre d'inscriptions (RechercheDossier.NombreInscription, RechercheDossier.cs:127-165) a la date de fraicheur du domaine
+// ENDETT (30/06/2026 ici : une inscription diffusee apres ne compte pas, meme si elle l'est avant aujourd'hui), et la procedure
+// collective qui bloque le certificat de non-faillite (VerifSiPC « ENTR », OPE_REQUI_RESULTATS.cs:579-616) : chaque regle et
+// son jumeau. Identifiants 1 643 1xx. L'ALTER passe seul : la colonne ajoutee n'existe pas a la compilation du meme lot SQL.
+await Sql("""
+    ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_ID_RPRTR int NULL, PRCLL_NON_DIFFUSABLE bit NULL, PRCLL_ID_NINSC int NULL,
+        PRCLL_ETAT_PC varchar(1) NULL, PRCLL_CODE_CLOTURE varchar(5) NULL;
+    CREATE TABLE v2.CODE_CLOTURE (R_CODECLOTUR_VALEUR varchar(5) NOT NULL PRIMARY KEY, R_CODECLOTUR_ARRET_DIFF_INFO bit NULL);
+    CREATE TABLE v2.DEBITEUR_END (DBEND_ID_DBEND int NOT NULL PRIMARY KEY, DBEND_ID_RPRTR int NULL, DBEND_ID_INSCR int NULL, DBEND_ID_ADRBS int NULL);
+    CREATE TABLE v2.RADIATION_TOTALE (RDTTL_ID_RDTTL int NOT NULL PRIMARY KEY, RDTTL_ID_INSCR int NULL, RDTTL_DATE_RADIATION datetime NULL);
+    CREATE TABLE v2.DATE_TRAVAIL (DTTRV_CODE_DATE_TRAVAIL varchar(10) NOT NULL PRIMARY KEY, DTTRV_DATE_FRAICHEUR datetime NULL);
+    """);
+await Sql("""
+    INSERT INTO v2.DATE_TRAVAIL VALUES ('WBANC', '20260630');
+    SET IDENTITY_INSERT rec.TypeDemande ON;
+    INSERT INTO rec.TypeDemande (Id, Reference, Niveau, CodeDateTravail, LibelleEcran, CreationDossier, AffichageTous, DistributionAuto,
+        AffichageDistribution, PrioriteGroupe, RegistreArrivee) VALUES (1643101, 'ENDETT', 1, 'WBANC', 'Endettement banc', 0, 0, 0, 0, 0, 0);
+    SET IDENTITY_INSERT rec.TypeDemande OFF;
+    SET IDENTITY_INSERT rec.Entreprise ON;
+    INSERT INTO rec.Entreprise (Id, Siren, Civilite, Denomination, Patronyme, Prenom, FormeJuridique, IdAdresse, EtatInfo, FicheSommaire) VALUES
+        (1643104, '516430004', '', N'PCBANC DEUX PC', NULL, NULL, 'SA', NULL, 'C', 0),
+        (1643105, '516430005', '', N'PCBANC NON DIFFUSABLE', NULL, NULL, 'SA', NULL, 'C', 0),
+        (1643106, '516430006', '', N'PCBANC CLOTURE ARRET', NULL, NULL, 'SA', NULL, 'C', 0),
+        (1643107, '516430007', '', N'PCBANC ETAT N', NULL, NULL, 'SA', NULL, 'C', 0),
+        (1643108, '516430008', '', N'PCBANC NON DIFFUSABLE NI', NULL, NULL, 'SA', NULL, 'C', 0);
+    SET IDENTITY_INSERT rec.Entreprise OFF;
+    SET IDENTITY_INSERT rec.DossierRcs ON;
+    INSERT INTO rec.DossierRcs (Id, IdEntreprise, TypeRcs, NumeroGestion, Siren, DateImmatriculation, MotifImmatriculation,
+        ProvisoirementSans, CompteurMaj, DateMaj, EtatDossier, EtatInfo, InscritRegistreMetiers, ModificationInterne,
+        SirenProvisoire, Accre, AutoEntrepreneur, Eirl, AutoEntrepreneurRegularise, DateRadiation) VALUES
+        (1643104, 1643104, 'B1', '2011B64304', '516430004', '20110101', 'C', 0, 0, '20110101', 'A', 'C', 0, 0, 0, 0, 0, 0, 0, NULL),
+        (1643105, 1643105, 'B1', '2011B64305', '516430005', '20110101', 'C', 0, 0, '20110101', 'A', 'C', 0, 0, 0, 0, 0, 0, 0, NULL),
+        (1643106, 1643106, 'B1', '2011B64306', '516430006', '20110101', 'C', 0, 0, '20110101', 'A', 'C', 0, 0, 0, 0, 0, 0, 0, NULL),
+        (1643107, 1643107, 'B1', '2011B64307', '516430007', '20110101', 'C', 0, 0, '20110101', 'A', 'C', 0, 0, 0, 0, 0, 0, 0, NULL),
+        (1643108, 1643108, 'B1', '2011B64308', '516430008', '20110101', 'C', 0, 0, '20110101', 'A', 'C', 0, 0, 0, 0, 0, 0, 0, NULL);
+    SET IDENTITY_INSERT rec.DossierRcs OFF;
+    -- REQUI ALPHA SARL (1643001, siege 1643001) : 101 sans peremption, 102 perimee plus tard, 106 radiee APRES la fraicheur
+    -- comptent (3) ; 103 diffusee apres la fraicheur, 104 perimee avant, 105 radiee avant, 107 a une autre adresse, non.
+    -- PCBANC DEUX PC (1643104, sans adresse) : 108, a n'importe quelle adresse, compte (1).
+    SET IDENTITY_INSERT rec.Inscription ON;
+    INSERT INTO rec.Inscription (Id, NumeroInscription, TypeInscription, ParTransfert, DateInscription, DatePeremption, Renouvelable,
+        EtatInfo, DateDiffusion) VALUES
+        (1643101, 'B64310101', 'PRIV', 0, '20260101', NULL, 0, 'C', '20260101'),
+        (1643102, 'B64310102', 'PRIV', 0, '20260101', '20300101', 0, 'C', '20260101'),
+        (1643103, 'B64310103', 'PRIV', 0, '20260101', NULL, 0, 'C', '20260801'),
+        (1643104, 'B64310104', 'PRIV', 0, '20250101', '20260301', 0, 'C', '20250101'),
+        (1643105, 'B64310105', 'PRIV', 0, '20260101', NULL, 0, 'C', '20260101'),
+        (1643106, 'B64310106', 'PRIV', 0, '20260101', NULL, 0, 'C', '20260101'),
+        (1643107, 'B64310107', 'PRIV', 0, '20260101', NULL, 0, 'C', '20260101'),
+        (1643108, 'B64310108', 'PRIV', 0, '20260101', NULL, 0, 'C', '20260101');
+    SET IDENTITY_INSERT rec.Inscription OFF;
+    INSERT INTO v2.DEBITEUR_END VALUES (1643101, 1643001, 1643101, 1643001), (1643102, 1643001, 1643102, 1643001),
+        (1643103, 1643001, 1643103, 1643001), (1643104, 1643001, 1643104, 1643001), (1643105, 1643001, 1643105, 1643001),
+        (1643106, 1643001, 1643106, 1643001), (1643107, 1643001, 1643107, 1643002), (1643108, 1643104, 1643108, 1643001);
+    INSERT INTO v2.RADIATION_TOTALE VALUES (1643105, 1643105, '20260501'), (1643106, 1643106, '20260901');
+    -- PC : REQUI ALPHA SARL une PC diffusable (bloque) ; DEUX PC deux PC non diffusables (bloque : « 2 PC ») ; NON DIFFUSABLE
+    -- sans non-inscrit, CLOTURE ARRET (arret de diffusion), ETAT N : ne bloquent pas ; NON DIFFUSABLE NI (avec non-inscrit) bloque.
+    INSERT INTO v2.CODE_CLOTURE VALUES ('CLBAN', 1);
+    INSERT INTO v2.PROCEDURE_COLLECTIVE (PRCLL_ID_PRCLL, PRCLL_ID_DSRCS, PRCLL_NUM_PC, PRCLL_ID_RPRTR, PRCLL_NON_DIFFUSABLE, PRCLL_ID_NINSC,
+        PRCLL_ETAT_PC, PRCLL_CODE_CLOTURE) VALUES
+        (1643101, 1643001, '2026P64301', 1643001, 0, NULL, 'O', NULL),
+        (1643102, 1643104, '2026P64302', 1643104, 1, NULL, 'O', NULL), (1643103, 1643104, '2026P64303', 1643104, 1, NULL, 'O', NULL),
+        (1643104, 1643105, '2026P64304', 1643105, 1, NULL, 'O', NULL),
+        (1643105, 1643106, '2026P64305', 1643106, 0, NULL, 'O', 'CLBAN'),
+        (1643106, 1643107, '2026P64306', 1643107, 0, NULL, 'N', NULL),
+        (1643107, 1643108, '2026P64307', 1643108, 1, 1643001, 'O', NULL);
+    """);
+RechercheEntreprises Requi(string raison = "", string siren = "", string numVoie = "", string adresse = "", string cp = "", string ville = "",
+                           bool radies = false, int limite = 50) => new(raison, siren, numVoie, adresse, cp, ville, radies, limite);
+await using (var cn = new SqlConnection(greffe.Connexion))
+{
+    await cn.OpenAsync();
+    async Task<int[]> Ids(RechercheEntreprises r) => [.. (await LectureEntreprisesRequi.LireAsync(cn, r, CancellationToken.None)).Lignes.Select(e => e.Id)];
+    Exiger((await Ids(Requi())).Length == 0, "requisitions : aucun critere cherchable, rien");
+    var requi = await LectureEntreprisesRequi.LireAsync(cn, Requi(raison: "REQUI"), CancellationToken.None);
+    Exiger(requi.Total == 1 && requi.Lignes is [{ Id: 1643001, Siren: "516430001", Gestion: "2011B64301", Designation: "REQUI ALPHA SARL", Personne: "PM",
+                                                   FormeJuridique: "SARL", Adresse: "12 RUE DES BANCS", CodePostal: "80000", Ville: "AMIENS", Radie: false }],
+        $"requisitions : la designation contient la raison sociale ; le radie ecarte, la personne physique non concernee ({string.Join(",", requi.Lignes.Select(e => e.Id))})");
+    Exiger((await Ids(Requi(raison: "REQUI", radies: true))).SequenceEqual([1643001, 1643003]),
+        "requisitions : « Inclure les supprimes » ajoute le radie (ordre de la designation)");
+    var pp = await LectureEntreprisesRequi.LireAsync(cn, Requi(siren: "516 430 002"), CancellationToken.None);
+    Exiger(pp.Lignes is [{ Id: 1643002, Designation: "BANCPP Paul", Personne: "PP" }] && (await Ids(Requi(siren: "51643000"))).Length == 0,
+        "requisitions : SIREN egal, blancs retires (un SIREN partiel ne trouve rien) ; une personne physique par son nom et prenom");
+    Exiger(requi.Lignes is [{ NbInscriptions: 3, ProcedureCollective: true }] && pp.Lignes is [{ NbInscriptions: 0, ProcedureCollective: false }],
+        "requisitions : nombre d'inscriptions a la date de fraicheur ENDETT (3 : ni diffusee apres, ni perimee ni radiee avant, ni a "
+        + $"une autre adresse) et PC diffusable qui bloque ; sans inscription ni PC : 0, aucune ({requi.Lignes.FirstOrDefault()}, {pp.Lignes.FirstOrDefault()})");
+    var pcs = (await LectureEntreprisesRequi.LireAsync(cn, Requi(raison: "PCBANC"), CancellationToken.None)).Lignes
+        .ToDictionary(e => e.Designation, e => (e.NbInscriptions, e.ProcedureCollective));
+    Exiger(pcs.Count == 5 && pcs["PCBANC DEUX PC"] == (1, true) && pcs["PCBANC NON DIFFUSABLE"] == (0, false)
+           && pcs["PCBANC CLOTURE ARRET"] == (0, false) && pcs["PCBANC ETAT N"] == (0, false) && pcs["PCBANC NON DIFFUSABLE NI"] == (0, true),
+        "requisitions, VerifSiPC « ENTR » : deux PC bloquent ; une PC non diffusable sans non-inscrit, a code de cloture qui arrete la "
+        + "diffusion ou a l'etat N ne bloque pas, non diffusable AVEC non-inscrit bloque ; sans adresse, les inscriptions a toute adresse ("
+        + string.Join("; ", pcs.Select(kv => $"{kv.Key}={kv.Value}")) + ")");
+    Exiger((await Ids(Requi(cp: "804"))).SequenceEqual([1643002]) && (await Ids(Requi(ville: "amien"))).SequenceEqual([1643001])
+           && (await Ids(Requi(adresse: "BANCS", numVoie: "12"))).SequenceEqual([1643001]) && (await Ids(Requi(adresse: "BANCS", numVoie: "13"))).Length == 0,
+        "requisitions : adresse du siege -- code postal commence par, ville et voie contiennent, numero de voie egal");
+}
+Exiger((await (await http.PostAsJsonAsync(RoutesEcransMain.Pour(RoutesRequisitions.Entreprises, Greffe), Requi(raison: "REQUI"), json))
+        .Content.ReadFromJsonAsync<EntreprisesLues>(json)) is { Total: 1 }, "route des requisitions : les lignes de la lecture");
+Exiger((await http.PostAsJsonAsync(RoutesEcransMain.Pour(RoutesRequisitions.Entreprises, GreffeAbsent), Requi(raison: "X"), json)).StatusCode == HttpStatusCode.NotFound,
+    "route des requisitions : greffe absent -> 404, sans repli");
+// La session de l'ecran, comme React la joue : un critere saisi, puis « Rechercher » (lit la base avant de ranger).
+var rq = EcranRequisitions.Ouvrir();
+async Task<VueRequisitions> GesteRequi(ClientServeur? serveur, string? code, string geste, object? valeur = null)
+    => rq = await EcranRequisitions.AgirAsync(serveur, code, rq.Session, geste, JsonSerializer.SerializeToElement(valeur));
+await GesteRequi(client, Greffe, "Critere", new { champ = "CritRaisonSociale", valeur = "REQUI" });
+await GesteRequi(client, Greffe, "Rechercher");
+Exiger(rq is { ModeResultats: "serveur", MessageResultats: SessionRequisitions.NoteBase, ARecherche: true, Interrompue: false }
+       && rq.Trouvees is [{ Id: "1643001", Siren: "516 430 001", Gestion: "2011B64301", Designation: "REQUI ALPHA SARL", TypeAdresse: "Siege",
+                            Adresse: "12 RUE DES BANCS, 80000 AMIENS", Type: "PM", Radie: false, NbInscriptions: 3 }]
+       && rq.Trouvees[0].Infobulle.Contains("Procedure collective en cours"),
+    "pont Requisitions branche : « Rechercher » lit les dossiers de la base (inscriptions et PC lues), la note dit ce qui n'est pas repris");
+await GesteRequi(client, Greffe, "Critere", new { champ = "CritRaisonSociale", valeur = "" });
+await GesteRequi(client, Greffe, "Critere", new { champ = "CritDirigeant", valeur = "DUPONT" });
+await GesteRequi(client, Greffe, "Rechercher");
+Exiger(rq is { ModeResultats: "serveur", MessageResultats: SessionRequisitions.NoteNonCherches, Trouvees.Length: 0 },
+    "pont Requisitions : le dirigeant seul n'est pas cherche en base, la note le dit (aucune ligne)");
+await GesteRequi(client, GreffeAbsent, "Critere", new { champ = "CritRaisonSociale", valeur = "REQUI" });
+await GesteRequi(client, GreffeAbsent, "Critere", new { champ = "CritDirigeant", valeur = "" });
+await GesteRequi(client, GreffeAbsent, "Rechercher");
+Exiger(rq is { ModeResultats: "erreur", MessageResultats: not null, Trouvees.Length: 0 }, "pont Requisitions, greffe absent : le motif, AUCUNE ligne");
+await GesteRequi(null, null, "Critere", new { champ = "CritRaisonSociale", valeur = "AMIENS" });
+await GesteRequi(null, null, "Rechercher");
+Exiger(rq is { ModeResultats: "demo", Trouvees.Length: > 0 }, "pont Requisitions sans serveur : la demonstration");
+EcranRequisitions.Fermer(rq.Session);
 
 Console.WriteLine();
 if (echecs.Count == 0) { Console.WriteLine("Ecrans faits main branches sur la base : VERT."); return 0; }

@@ -1,0 +1,28 @@
+# « Actes rejetes » (EcrivainActesRejetes) : les deux gestes du menu de la ligne de RIG v2 (PROC_ACTREJ\RESULTATS\
+# OPE_RESULTATS.cs:112-130). Lignes du jeu : PROC_ACTREJ.sql et .attendu.
+
+# Refus : « Annuler le rejet » est reserve a l'equipe Amitel (OPE_RESULTATS.cs:38-41) ; l'agent du banc ne l'est pas. Jumeau
+# accepte : aucun sur ce banc -- son agent n'est pas Amitel, et le rendre Amitel changerait l'agent de tous les autres jeux.
+# L'ecriture de l'annulation (etat 99) suit celle du renvoi, a la valeur pres (EcrivainActesRejetes.cs).
+geste: Agir Annuler le rejet
+ids: 1801231
+resultat: refuse
+message: L'annulation d'un rejet est réservée à l'équipe Amitel.
+---
+# Refus : 1801233 n'est plus rejete (deja renvoye, etat 1) ; la V2 ne l'aurait pas dans sa grille. Rien n'est ecrit, pas meme
+# pour 1801232 coche avec lui. Jumeau accepte : 1801232, bloc 3.
+geste: Agir Renvoyer à Infogreffe
+ids: 1801232,1801233
+resultat: refuse
+message: L'acte 1801233 du dépôt R1801212 n'est plus rejeté : il a déjà été renvoyé ou annulé.
+---
+# Le renvoi en lot sur DEUX actes : ils repassent a l'etat 1 (Prepare), image a transferer, et quittent la liste relue ;
+# 1801236, non coche, y reste.
+geste: Agir Renvoyer à Infogreffe
+ids: 1801231,1801232
+resultat: fait
+message: 2 actes déposés renvoyés à Infogreffe : ils repartent dans la file d'envoi.
+lignes:
+ACTES REJETES ALPHA SARL · 2026 B 81201 | Dépôt R1801211 · Procès-verbal d'assemblée · envoyé le {J-21} · rejeté le {J-20} | Rejets Infogreffe | AFaire | []
+controle: SELECT ACTDP_EDI_INFOGREFFE_Etat_GEIDE + '/' + CAST(ACTDP_EDI_INFOGREFFE_Image_ATransferer AS varchar(1)) FROM v2.ACTE_DEPOSE WHERE ACTDP_ID_ACDPS = 1801231 => 1/1
+controle: SELECT ACTDP_EDI_INFOGREFFE_Etat_GEIDE + '/' + CAST(ACTDP_EDI_INFOGREFFE_Image_ATransferer AS varchar(1)) FROM v2.ACTE_DEPOSE WHERE ACTDP_ID_ACDPS = 1801232 => 1/1

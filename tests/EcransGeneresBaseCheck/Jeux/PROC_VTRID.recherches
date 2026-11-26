@@ -1,0 +1,16 @@
+# Les recherches de LecteurTribunalDigital (PROC_VTRID) dans la base (lot 6 du plan-676a4b19). Format : en tete de Program.cs du
+# banc. Les lignes cherchees sont a date fixe (1606412, 1606506) : une ligne datee du jour du banc ne s'ecrit pas ici.
+# Les dates d'envoi remplacent celles de l'ouverture (jour moins 7 a aujourd'hui) : un envoi de mars 2025 se retrouve.
+critere: Date de début = 12/03/2025
+critere: Date de fin = 12/03/2025
+lignes:
+Envoi E1606412 · Certificat | Rôle 2025J00412 · EDITION BETA SAS · envoyé le 12/03/2025 · compte rendu OK le 13/03/2025 | Documents transmis | Validee | [0,2]
+---
+# Une demande acceptee n'entre qu'avec « Demandes traitées » (jumeau : la meme recherche sans la case ne rend rien).
+critere: Numéro de rôle = 2025J00506
+critere: Demandes traitées = oui
+lignes:
+Demande 25001606506 · Rôle 2025J00506 | Reçue le 11/03/2025 · Assignation · acceptée | Demandes reçues | Validee | []
+---
+critere: Numéro de rôle = 2025J00506
+lignes:

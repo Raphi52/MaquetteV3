@@ -1,0 +1,43 @@
+# Gestes de « Registres judiciaires » (EcrivainRegistresJudiciaires.cs), lot 6 du plan-676a4b19, sur le jeu PROC_REGJUD.sql.
+# « Impression » = VALIDER de RIG v2 (OPE_REGISTRE_ABSTRACT.cs:113-126) : une demande d'edition par registre dans la file des
+# editions, valeurs de DemandeEdition.CreateDemandeEdition (DemandeEdition.cs:536-560) et du registre (GENERAL.cs, IP.cs, ORDO.cs).
+# Les lignes des registres ne changent pas (aucune persistance SQL de la V2) : aucun « lignes: » apres un geste fait.
+#
+# Refus 1 : « Aperçu » n'ecrit rien dans la V2 (etat Crystal) -- jumeau accepte : le meme registre en « Impression » (bloc 3).
+geste: Agir Aperçu
+ids: G-1601201
+resultat: refuse
+message: « Aperçu » affiche l'état Crystal du registre, que RIG v3 ne génère pas : « Impression » le place dans la file des éditions.
+---
+# Refus 2 : une ligne disparue de la base (1609999 n'est pas une instance) -- jumeau accepte : bloc 3, lignes toutes presentes.
+geste: Agir Impression
+ids: G-1601201,G-1609999
+resultat: refuse
+message: Une ligne du registre n'existe plus dans la base du greffe : relisez le registre.
+---
+# Le repertoire general, deux lignes : UNE demande d'edition PAR LE REGLAGE REP_GENERAL du jeu (CreateDemandeEditionByParametreGeneration,
+# DemandeEdition.cs:2579-2598) -- sa maquette, son processus, son groupe, son nombre d'exemplaires et sa nature Tribunal digital
+# recopies --, FUSION_CRYSTAL_NET (OPE_REGISTRE_GENERAL.cs:236), titre au nombre de lignes, etape « Registre Général », sans demande
+# V2 (DMNED_ID_DMND vide : la trace est le journal des gestes), imprimee, ni apercu ni courriel. Sans reglage, la V2 ne cree rien :
+# ce cas (le refus, et le jumeau ou les IP partent seuls) est joue par Program.cs apres les gestes, le reglage efface.
+geste: Agir Impression
+ids: G-1601201,G-1601202
+resultat: fait
+message: Répertoire général des 2 instances enrôlées : placé dans la file des éditions.
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Répertoire général des 2 instances enrôlées' AND DMNED_TYPE_GENERATION = 'FUSION_CRYSTAL_NET' AND DMNED_LIBELLE_SOURCE = N'Registre Général' AND DMNED_ID_DMND IS NULL => 1
+controle: SELECT CONCAT(DMNED_CODE_MAQUETTE, '|', DMNED_CODE_PROCESSUS, '|', DMNED_NUM_GROUPE, '|', DMNED_TRIBUNAL_DIGITAL_NATURE_DOC, '|', ISNULL(DMNED_CODE_CFECP, '-'), '|', ISNULL(DMNED_CODE_ENTITE_SOURCE, '-'), '|', CAST(DMNED_READ_ONLY AS int)) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Répertoire général des 2 instances enrôlées' => LOT2_REP_GEN|PROC_REGJUD|RegGeneral16|RJ16TD|-|-|0
+controle: SELECT CONCAT(DMNED_MEDIA, '|', DMNED_ETAT_EMISSION, '|', DMNED_PHASE_TRAITEMENT, '|', DMNED_TYPE_PAPIER, '|', DMNED_NOMBRE_EXEMPLAIRE, '|', CAST(DMNED_IMPRESSION AS int), CAST(DMNED_AFF_AVANT_IMPRESSION AS int), CAST(DMNED_ENVOI_PAR_MAIL AS int), CAST(DMNED_GROUPAGE_AUTOMATIQUE AS int)) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Répertoire général des 2 instances enrôlées' => IMPR|N|C|NORMAL|2|1001
+---
+# Le registre des decisions des IP (la decision 1601221) : maquette LOT2_REG_DECISION_IP, groupe RegDecisionIP, FUSION_CRYSTAL.
+geste: Agir Impression
+ids: I-1601221
+resultat: fait
+message: Registre des 1 décisions des IP : placé dans la file des éditions.
+controle: SELECT CONCAT(DMNED_CODE_MAQUETTE, '|', DMNED_NUM_GROUPE, '|', DMNED_TYPE_GENERATION, '|', DMNED_LIBELLE_SOURCE) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Registre des 1 décisions des IP' => LOT2_REG_DECISION_IP|RegDecisionIP|FUSION_CRYSTAL|Registre des Décisions des IP
+---
+# Les ordonnances du president (l'instance RP 1601207) : maquette LOT2_REG_INSTANCES, groupe RegInstances.
+geste: Agir Impression
+ids: O-1601207
+resultat: fait
+message: Liste des 1 Ordonnances : placé dans la file des éditions.
+controle: SELECT CONCAT(DMNED_CODE_MAQUETTE, '|', DMNED_NUM_GROUPE, '|', DMNED_TYPE_GENERATION, '|', DMNED_LIBELLE_SOURCE) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Liste des 1 Ordonnances' => LOT2_REG_INSTANCES|RegInstances|FUSION_CRYSTAL|Registre des Ordonnances du Président
