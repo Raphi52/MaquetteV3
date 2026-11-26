@@ -1,0 +1,65 @@
+# Les gestes de EcrivainMesuresProvisoires (« Mesure provisoire », PROC_MESIN), joues par la route POST sur les mesures de
+# PROC_MESIN.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). Un refus n'ecrit rien ; chaque refus a
+# son jumeau accepte : le bloc 6, sur 1500901 (libre).
+
+# 1. 1500902 tenue par une demande EN COURS sur le sequenceur 2F (Mesure.Sequenceur, Mesure.cs:941) : refusee, au message de RIG v2.
+geste: Enregistrer
+ids: 1500902
+valeur: Mesure › Caducité = 2026-09-30
+resultat: refuse
+message: Mesure bloquée (D2615000941), demande "En cours" : MESIN par M. AUTRE MESIN
+---
+# 2. La date de depot du rapport : dans RIG v2 elle ajoute un evenement de procedure (OPE_MESURE.cs:118-126), non repris -- en
+#    lecture dans la V3. Jumeau : bloc 6, des champs que la V3 enregistre.
+geste: Enregistrer
+ids: 1500901
+valeur: Mesure › Dépôt du rapport = 2026-05-15
+resultat: refuse
+message: « Mesure › Dépôt du rapport » ne se modifie pas sur la mesure 2026M15901 dans la V3.
+---
+# 3. Le type de mesure vide : obligatoire (ultComboTypeMesure.MetierObligatoire, OPE_MESURE.Designer.cs:100). Jumeau : bloc 6.
+geste: Enregistrer
+ids: 1500901
+valeur: Mesure › Type de mesure =
+resultat: refuse
+message: « Type de mesure » est obligatoire.
+---
+# 4. Un type absent de TYPE_MESURE (la liste de ultComboTypeMesure). Jumeau : bloc 6, EXP15.
+geste: Enregistrer
+ids: 1500901
+valeur: Mesure › Type de mesure = ZZZ
+resultat: refuse
+message: « Type de mesure » : « ZZZ » n'est pas un type de mesure de la table TYPE_MESURE.
+---
+# 5. Un cout qui n'est pas un entier (MSINS_COUT_PREV_EXPERTISE int, MESURE.cs:280). Jumeau : bloc 6, 1500.
+geste: Enregistrer
+ids: 1500901
+valeur: Mesure › Coût prévu de l'expertise = mille
+resultat: refuse
+message: « Coût prévu de l'expertise » : montant illisible (mille).
+---
+# 6. Modifiee : le type (EXP15 : la mesure passe au groupe Expertise), la caducite, le cout et les informations ; la fiche relit les
+#    valeurs, la liste la relit « Modifiée » (geste au journal) ; MSINS_NUMERO_SOURCE est pose.
+geste: Enregistrer
+ids: 1500901
+valeur: Mesure › Type de mesure = EXP15
+valeur: Mesure › Caducité = 2026-09-30
+valeur: Mesure › Coût prévu de l'expertise = 1500
+valeur: Mesure › Informations = Mesure du banc, lot 5
+resultat: fait
+message: Mesure 2026M15901 modifiée dans la base du greffe : « Type de mesure », « Caducité », « Coût prévu de l'expertise », « Informations ».
+lignes:
+Mesure n° 2026M15904 | Mesure 2026M15904 · Autre mesure du banc lot 5 | Autre mesure | AFaire | []
+MESIN DELTA | Mesure 2026M15903 · Expertise du banc lot 5 · ouverte le 04/03/2026 · instance 2026IP15913 | Expertise | Validee | []
+MESIN GAMMA | Mesure 2026M15902 · Expertise du banc lot 5 · ouverte le 03/03/2026 · instance 2026IP15912 · bloquée par la demande D2615000941 | Expertise | EnAttente | []
+MESIN ALPHA # MESIN BETA | Mesure 2026M15901 · Expertise du banc lot 5 · ouverte le 02/03/2026 · instance 2026IP15911 | Expertise | Validee | []
+XXAFF ETA | Mesure M14397 · instance 2026M14357 | Autre mesure | AFaire | []
+XXAFF ALPHA | Mesure M14366 · instance 2026M14351 | Autre mesure | AFaire | []
+fiche: 1500901
+Mesure › Type de mesure = EXP15
+Mesure › Caducité = 2026-09-30
+Mesure › Coût prévu de l'expertise = 1500
+Mesure › Informations = Mesure du banc, lot 5
+Mesure › Limite de dépôt du rapport = 2026-06-01
+Mesure › Ouverture = 2026-03-02
+controle: SELECT COUNT(*) FROM v2.MESURE WHERE MSINS_ID_MSINS = 1500901 AND MSINS_NUMERO_SOURCE IS NOT NULL => 1

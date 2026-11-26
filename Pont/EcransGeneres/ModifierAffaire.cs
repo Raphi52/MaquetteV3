@@ -428,7 +428,7 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
                 Marche("Résumé", "L'instance choisie, en lecture : rien n'est supprimé avant la validation.", false,
                     Champ.Tableau("Résumé de l'instance")),
                 // OPE_INSTANCE_LIBERER_NUM_METIER.cs:44-65 (la liste), :96-98 (l'avertissement), :101-113 (la restitution).
-                Marche("Numéros à libérer", "RIG v2 rend les numéros de l'instance quand la case est cochée (elle l'est par défaut). La V3 ne les rend pas : case décochée, l'instance est supprimée sans rendre ses numéros, comme RIG v2 le permet après son avertissement.", false,
+                Marche("Numéros à libérer", "RIG v2 rend les numéros de l'instance quand la case est cochée (elle l'est par défaut). La V3 aussi, et dit ce qu'il advient de chacun. Case décochée, l'instance est supprimée sans rendre ses numéros, après l'avertissement de RIG v2.", false,
                     Champ.Case("Libérer le numéro d'instance"), Champ.Tableau("Numéros de l'instance")),
                 // Instance.CanDeleteInstance, Instance.cs:4136-4229.
                 Marche("Contrôles", "Ce qui empêche la suppression dans RIG v2 : document en GED, décision judiciaire, dépôt, jonction, facture, provision, mesure, créance PC, numéro non conforme. Une seule raison suffit à la bloquer.", false,

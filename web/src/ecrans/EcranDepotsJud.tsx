@@ -19,12 +19,18 @@
 // LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 2) : la colonne des resultats prend
 // les briques de composants/ListeModerne.tsx. Tete (le titre reste celui de l'etape, synthese, « Aller a une
 // instance… » Ctrl K, Entree ouvre le dossier de l'instance restee seule), tableau a une ligne par instance
-// (Instance, Nature, Date d'ouverture, Dernier evenement, Etat) ; chambre, « A facturer » et dossier sont dans la
+// (Instance, Nature, Enrolement, Dernier evenement, Etat) ; chambre, « A facturer » et dossier sont dans la
 // ligne depliee, avec « Ouvrir le dossier ». Ni vues ni cartes : l'ecran n'a pas de critere d'etat (les etapes
 // sont l'enchainement de la v2, pas un filtre d'etat).
 // « Aller a une instance… » EST l'ancien critere « N d'instance » (meme etat, numero d'instance cherche) : la
 // liste est filtree ici, sans pont, deux champs auraient fait le meme filtre (decision du plan, lot 7).
 // « Denomination » reste un critere a part, comme en v2. Etapes, evenement et clic qui ouvre le dossier : inchanges.
+//
+// LA BASE DU GREFFE (plan « RIG v3 100 % fonctionnel », lot 5, 26/11/2026, marche du lot 17) : les instances viennent du
+// pont (Pont/EcranDepotsJudBase.cs → Serveur/Socle/EcransMain/LectureDepotsJud.cs) : la serie JROP de la recherche de
+// PROC_DEPOTJUD, date d'enrolement, dernier evenement survenu, « A facturer » quand aucun client (PROC_DEPOTJUD.cs:58-64),
+// « En cours » quand une demande la tient. Sans serveur, les quatre instances de demonstration du pont, marquees
+// « exemple » (ProvenanceEcran) ; en panne, le motif et aucune ligne. La mise en page ne change pas.
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
@@ -34,6 +40,7 @@ import {
   teinteStatut, type ActionLigne, type Teinte,
 } from '../composants/ListeModerne'
 import type { ContexteDossierVue } from '../plan/types'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 
 interface Etape {
   code: string
@@ -64,12 +71,13 @@ const Etapes: Etape[] = [
   { code: 'ETP_POST_VAL_INSTANCE', libelle: 'Recapitulatif instance' },
 ]
 
-const Lignes: Instance[] = [
-  { numero: '2026J00121', denomination: 'SARL BOULANGERIE DUVAL', nature: 'Redressement judiciaire', chambre: '1re', ouverture: '2026-03-04', dernierEvenement: 'Jugement d\'ouverture', etat: 'En cours', statut: 'action', aFacturer: true, dossier: '2024B00318' },
-  { numero: '2026J00134', denomination: 'SAS TRANSPORTS MARNE', nature: 'Liquidation judiciaire', chambre: '2e', ouverture: '2026-05-19', dernierEvenement: 'Designation d\'expert', etat: 'En cours', statut: 'attente', aFacturer: false, dossier: '2024B00407' },
-  { numero: '2025J00088', denomination: 'EURL COIFFURE MARIE', nature: 'Sauvegarde', chambre: '1re', ouverture: '2025-11-02', dernierEvenement: 'Ordonnance', etat: 'Suspendue', statut: 'alerte', aFacturer: true, dossier: '2023B01120' },
-  { numero: '2024J00507', denomination: 'SCI DU MOULIN', nature: 'Redressement judiciaire', chambre: '3e', ouverture: '2024-06-12', dernierEvenement: 'Cloture', etat: 'Close', statut: 'ok', aFacturer: false, dossier: '2025B00044' },
-]
+/** Ce que le pont rend (Pont/EcranDepotsJud.cs, VueDepotsJud). */
+interface VueDepotsJud {
+  lignes: Instance[]
+  mode?: ModeLecture
+  message?: string | null
+  total: number
+}
 
 /** Le point d'etat suit le statut de l'instance (teinteStatut du socle) ; la pastille, la nature de la procedure. */
 const TeinteNature: Record<string, Teinte> = { 'Redressement judiciaire': 'orange', 'Liquidation judiciaire': 'rouge', Sauvegarde: 'vert' }
@@ -95,6 +103,14 @@ export function EcranDepotsJud({ ouvrirDossier, dossier = null }: ProprietesEcra
   const [dateEvenement, setDateEvenement] = useState<string | null>(null)
   // La ligne depliee par son chevron (une a la fois).
   const [ouverte, setOuverte] = useState<string | null>(null)
+  // null tant que le pont n'a pas repondu : aucune ligne, jamais la demonstration a la place de la base.
+  const [vue, setVue] = useState<VueDepotsJud | null>(null)
+
+  useEffect(() => {
+    let perime = false
+    void appeler<VueDepotsJud>('EcranDepotsJud.Vue').then((v) => { if (!perime) setVue(v) })
+    return () => { perime = true }
+  }, [])
 
   useEffect(() => {
     let perime = false
@@ -103,7 +119,7 @@ export function EcranDepotsJud({ ouvrirDossier, dossier = null }: ProprietesEcra
     return () => { perime = true }
   }, [])
 
-  let q = Lignes
+  let q = vue?.lignes ?? []
   if (!estBlanc(numInstance)) q = q.filter((l) => contientSansCasse(l.numero, numInstance.trim()))
   if (!estBlanc(denomination)) q = q.filter((l) => contientSansCasse(l.denomination, denomination.trim()))
   if (etapeCourante === 'ETP_FACTU_GESTCOM') q = q.filter((l) => l.aFacturer)
@@ -143,6 +159,8 @@ export function EcranDepotsJud({ ouvrirDossier, dossier = null }: ProprietesEcra
                      filtre={{ valeur: numInstance, changer: setNumInstance, indication: 'Aller a une instance…',
                                valider: () => { if (trouvees.length === 1) ouvrirDossier(trouvees[0]!.dossier) } }} />
 
+        {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Instances" />}
+
         {etapeCourante === 'ETP_EVENEMENT_SURVENU' && (
           <div className="rig-criteres__bloc" style={{ padding: 'var(--rig-esp-3)' }}>
             <label className="rig-saisie-champ">
@@ -173,7 +191,7 @@ export function EcranDepotsJud({ ouvrirDossier, dossier = null }: ProprietesEcra
                 <th aria-label="Deplier"></th>
                 <th>Instance</th>
                 <th>Nature</th>
-                <th>Date d'ouverture</th>
+                <th>Enrolement</th>
                 <th>Dernier evenement</th>
                 <th>Etat</th>
                 <th aria-label="Actions"></th>

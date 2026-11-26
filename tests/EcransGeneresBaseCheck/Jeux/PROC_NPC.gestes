@@ -1,0 +1,110 @@
+# Les gestes de EcrivainNouvellesProcedures (« Nouvelle proc. collective », PROC_NPC), joues dans l'ordre par la route POST,
+# sur les debiteurs, la juridiction, le compteur JPCEX et le client de PROC_NPC.sql. Un refus n'ecrit rien ; chaque refus a son
+# jumeau accepte : les blocs 8 (dossier, sauvegarde), 9 (non-inscrit, ouverture) et 10 (sans date).
+
+# 1. Sans debiteur : la PC n'aurait pas d'entreprise (PRCLL_ID_RPRTR, NOT NULL sur RIG_DEV). Jumeau : bloc 8.
+geste: Creer
+valeur: Procédure › Nom de l'affaire = NPC ALPHA SAS
+valeur: Procédure › Juridiction extérieure = J15EX
+resultat: refuse
+message: « Procédure › Débiteur » est obligatoire.
+---
+# 2. Sans nom de l'affaire (ultTBNomAffaire, MetierObligatoire, OPE_PROCEDURE_COLLECTIVE.Designer.cs:185). Jumeau : bloc 8.
+geste: Creer
+valeur: Procédure › Débiteur = 1990B16101
+valeur: Procédure › Juridiction extérieure = J15EX
+resultat: refuse
+message: « Procédure › Nom de l'affaire » est obligatoire.
+---
+# 3. Sans juridiction exterieure (ultCBJuridictionExterieure, MetierObligatoire, :592 ; visible : la PC est exterieure).
+#    Jumeau : bloc 8.
+geste: Creer
+valeur: Procédure › Débiteur = 1990B16101
+valeur: Procédure › Nom de l'affaire = NPC ALPHA SAS
+resultat: refuse
+message: « Procédure › Juridiction extérieure » est obligatoire.
+---
+# 4. Une nature sans date : on ne sait pas quelle date de la PC le jugement remplit. Jumeaux : bloc 8 (les deux), bloc 10 (aucune).
+geste: Creer
+valeur: Procédure › Débiteur = 1990B16101
+valeur: Procédure › Nom de l'affaire = NPC ALPHA SAS
+valeur: Procédure › Nature = Sauvegarde
+valeur: Procédure › Juridiction extérieure = J15EX
+resultat: refuse
+message: « Procédure › Nature » et « Date du jugement » vont ensemble : la nature dit quelle date de la procédure le jugement remplit.
+---
+# 5. Un debiteur que la base ne porte pas (ni dossier RCS, ni non-inscrit). Jumeaux : bloc 8 (dossier), bloc 9 (non-inscrit).
+geste: Creer
+valeur: Procédure › Débiteur = 1990B99999
+valeur: Procédure › Nom de l'affaire = NPC ALPHA SAS
+valeur: Procédure › Juridiction extérieure = J15EX
+resultat: refuse
+message: Aucun dossier RCS ni non-inscrit ne porte le numéro « 1990B99999 » dans la base du greffe (ou son entreprise manque).
+---
+# 6. Une juridiction hors de la liste (ULT_COMBO_JURIDICTION_EXTERIEURE.cs:17). Jumeau : bloc 8, J15EX.
+geste: Creer
+valeur: Procédure › Débiteur = 1990B16101
+valeur: Procédure › Nom de l'affaire = NPC ALPHA SAS
+valeur: Procédure › Juridiction extérieure = J99XX
+resultat: refuse
+message: La juridiction extérieure « J99XX » n'existe pas dans la base du greffe.
+---
+# 7. L'entreprise du debiteur n'a pas d'adresse : pas de client a facturer (Client.cs:958-963). Rien d'ecrit, aucun numero
+#    consomme (le bloc 8 recoit 2026EX0001). Jumeau : bloc 8, entreprise avec adresse.
+geste: Creer
+valeur: Procédure › Débiteur = 1990B16104
+valeur: Procédure › Nom de l'affaire = NPC DELTA SARL
+valeur: Procédure › Nature = Sauvegarde
+valeur: Procédure › Date du jugement = 2026-03-10
+valeur: Procédure › Juridiction extérieure = J15EX
+resultat: refuse
+message: Impossible de trouver l'adresse du client à facturer.
+---
+# 8. Enregistre sur le dossier d'une personne morale, en sauvegarde : PC exterieure 2026EX0001 (JPCEX, annee du jugement),
+#    etat et type 10, etat info 1, compteur 1, numero source GUID ; client compte PC cree (abrege 26EX0001, nom = la
+#    designation d'une PM, groupe PC, type C, compte 41100199, CH, statut A) ; son adresse par defaut, type P, avec le libelle
+#    du type de voie, la BP et le CEDEX ; la demande NPC validee sur la PC (2P, nom et numeros).
+geste: Creer
+valeur: Procédure › Débiteur = 1990B16101
+valeur: Procédure › Nom de l'affaire = NPC ALPHA SAS
+valeur: Procédure › Nature = Sauvegarde
+valeur: Procédure › Date du jugement = 2026-03-10
+valeur: Procédure › Juridiction extérieure = J15EX
+resultat: fait
+message: Procédure collective extérieure 2026EX0001 enregistrée dans la base du greffe pour NPC ALPHA SAS (1990B16101, juridiction J15EX), client compte PC 26EX0001 créé ; la facture, les éditions, les établissements, dirigeants et organes ne sont pas repris par la V3.
+controle: SELECT p.PRCLL_ETAT_PC + '|' + p.PRCLL_TYPE_PC + '|' + p.PRCLL_ETAT_INFO + '|' + CONVERT(varchar(1), p.PRCLL_EXTERIEUR) + '|' + p.PRCLL_JURIDICTION_EXTERIEURE + '|' + CONVERT(varchar(8), p.PRCLL_DATE_SAUVEGARDE, 112) + '|' + CONVERT(varchar(10), p.PRCLL_ID_DSRCS) + '|' + CONVERT(varchar(10), p.PRCLL_ID_RPRTR) + '|' + CONVERT(varchar(5), p.PRCLL_COMPTEUR_MAJ) + '|' + CONVERT(varchar(5), LEN(p.PRCLL_NUMERO_SOURCE)) + '|' + p.PRCLL_NOM_AFFAIRE FROM v2.PROCEDURE_COLLECTIVE AS p WHERE p.PRCLL_NUM_PC = '2026EX0001' => 10|10|1|1|J15EX|20260310|1516101|1516101|1|36|NPC ALPHA SAS
+controle: SELECT c.Nom + '|' + c.Type + '|' + c.Groupe + '|' + c.NumeroCompte + '|' + c.ModePaiement + '|' + c.Statut + '|' + CONVERT(varchar(1), c.EstComptePc) + CONVERT(varchar(1), c.EstCompteWeb) + CONVERT(varchar(1), c.AssujettiTva) + CONVERT(varchar(1), c.ReleveFacture) + '|' + CASE WHEN c.BlocNotes = N'Client crée automatiquement dans la demande ' + d.DMND_NUM_DEMANDE THEN 'note de la demande' ELSE c.BlocNotes END FROM v2.PROCEDURE_COLLECTIVE AS p JOIN rec.Client AS c ON c.Id = p.PRCLL_ID_CLIEN JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_CODE_SEQUENCEUR = '2P' AND dd.DSSDM_VALEUR_SEQUENCEUR = CONVERT(varchar(10), p.PRCLL_ID_PRCLL) JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = dd.DSSDM_ID_DMND WHERE p.PRCLL_NUM_PC = '2026EX0001' AND c.Abrege = '26EX0001' => NPC ALPHA SAS|C|PC|41100199|CH|A|1011|note de la demande
+controle: SELECT a.LigneAdresse + '|' + a.Localite + '|' + a.CodePostal + '|' + a.Pays + '|' + a.TypeAdresse + '|' + CONVERT(varchar(1), a.ParDefaut) + '|' + CONVERT(varchar(10), a.IdAdresse) FROM rec.ClientAdresse AS a JOIN rec.Client AS c ON c.Id = a.IdClient WHERE c.Abrege = '26EX0001' => 12 B rue du banc des Essais BP 15|PARIS CEDEX 15|75015|FR|P|1|1516111
+controle: SELECT d.DMND_CODE_PROSS + d.DMND_ETAT_DEMANDE + '|' + d.DMND_NUM_INDICATIF + '|' + d.DMND_LES_NUMEROS + '|' + d.DMND_NOM FROM v2.PROCEDURE_COLLECTIVE AS p JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_CODE_SEQUENCEUR = '2P' AND dd.DSSDM_VALEUR_SEQUENCEUR = CONVERT(varchar(10), p.PRCLL_ID_PRCLL) JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = dd.DSSDM_ID_DMND WHERE p.PRCLL_NUM_PC = '2026EX0001' => NPCV|2026EX0001|2026EX0001|NPC ALPHA SAS
+---
+# 9. Enregistre sur un non-inscrit, a l'ouverture : 2026EX0002 ; un client porte deja l'abrege 26EX0002 : la PC prend CE
+#    client, aucun client ni adresse cree (OPE_PROCEDURE_COLLECTIVE.cs:1101-1102) ; etat et type 1 (recupEtatPC, recupTypePC).
+geste: Creer
+valeur: Procédure › Débiteur = NI16102
+valeur: Procédure › Nom de l'affaire = NPC BETA
+valeur: Procédure › Nature = Ouverture (redressement ou liquidation)
+valeur: Procédure › Date du jugement = 2026-04-01
+valeur: Procédure › Juridiction extérieure = J15EX
+resultat: fait
+message: Procédure collective extérieure 2026EX0002 enregistrée dans la base du greffe pour NPC BETA (NI16102, juridiction J15EX), client existant 26EX0002 ; la facture, les éditions, les établissements, dirigeants et organes ne sont pas repris par la V3.
+controle: SELECT CONVERT(varchar(10), p.PRCLL_ID_CLIEN) + '|' + CONVERT(varchar(10), p.PRCLL_ID_NINSC) + '|' + ISNULL(CONVERT(varchar(10), p.PRCLL_ID_DSRCS), '-') + '|' + p.PRCLL_ETAT_PC + '|' + p.PRCLL_TYPE_PC + '|' + CONVERT(varchar(8), p.PRCLL_DATE_OUVERTURE, 112) + '|' + CONVERT(varchar(10), p.PRCLL_ID_RPRTR) FROM v2.PROCEDURE_COLLECTIVE AS p WHERE p.PRCLL_NUM_PC = '2026EX0002' => 1516201|1516102|-|1|1|20260401|1516102
+controle: SELECT CONVERT(varchar(5), (SELECT COUNT(*) FROM rec.Client WHERE Abrege = '26EX0002')) + '|' + CONVERT(varchar(5), (SELECT COUNT(*) FROM rec.ClientAdresse WHERE IdClient = 1516201)) => 1|0
+---
+# 10. Enregistre sans date de jugement, sur le dossier d'une personne physique : pas de numero (OPE_PROCEDURE_COLLECTIVE.cs:1094),
+#     etat N et type 0 ; le client garde l'abrege tire du numero de demande (Client.cs:936-940), son nom porte la civilite ;
+#     adresse sans voie : « . » (ClientAdresse.cs:40). La liste relit les trois creations en tete.
+geste: Creer
+valeur: Procédure › Débiteur = 1990A16103
+valeur: Procédure › Nom de l'affaire = NPC GAMMA
+valeur: Procédure › Juridiction extérieure = J15EX
+resultat: fait
+message: Procédure collective extérieure enregistrée sans numéro (aucune date de jugement) dans la base du greffe pour NPC GAMMA (1990A16103, juridiction J15EX), client compte PC créé ; la facture, les éditions, les établissements, dirigeants et organes ne sont pas repris par la V3.
+lignes:
+NPC GAMMA | Procédure sans numéro | Procédure collective (PC) | Validee | [0,7]
+NPC BETA | Procédure 2026EX0002 | Procédure collective (PC) | Validee | [0,7]
+NPC ALPHA SAS | Procédure 2026EX0001 | Procédure collective (PC) | Validee | [0,7]
+NPC SANS NUMERO | Procédure sans numéro | Procédure collective (PC) | Validee | [0,7]
+NPR INTERROMPUE | Prévention 2026V16123 · interrompue | Prévention (PRV) | EnCours | [0]
+NPC REFUSEE | demande D1516100122 · refusée | Procédure collective (PC) | Rejetee | [6]
+NPC ENREGISTREE | Procédure 2025EX0076 | Procédure collective (PC) | Validee | [0,7]
+controle: SELECT p.PRCLL_ETAT_PC + '|' + p.PRCLL_TYPE_PC + '|' + ISNULL(p.PRCLL_NUM_PC, 'sans') + '|' + CASE WHEN COALESCE(p.PRCLL_DATE_OUVERTURE, p.PRCLL_DATE_SAUVEGARDE, p.PRCLL_DATE_RETABL_PROF, p.PRCLL_DATE_TRAITEMENT_SORTIE_CRISE) IS NULL THEN 'sans date' ELSE 'date' END + '|' + c.Nom + '|' + CASE WHEN c.Abrege = RIGHT(d.DMND_NUM_DEMANDE, 8) THEN 'abrege de la demande' ELSE c.Abrege END + '|' + a.LigneAdresse + '|' + a.Localite FROM v2.PROCEDURE_COLLECTIVE AS p JOIN rec.Client AS c ON c.Id = p.PRCLL_ID_CLIEN JOIN rec.ClientAdresse AS a ON a.IdClient = c.Id JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_CODE_SEQUENCEUR = '2P' AND dd.DSSDM_VALEUR_SEQUENCEUR = CONVERT(varchar(10), p.PRCLL_ID_PRCLL) JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = dd.DSSDM_ID_DMND WHERE p.PRCLL_ID_DSRCS = 1516103 => N|0|sans|sans date|MME NPC GAMMA Anne|abrege de la demande|.|MARSEILLE

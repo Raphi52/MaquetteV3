@@ -54,8 +54,14 @@ PSI CONSEIL | Demandeur · instance 2026Y13203 | Demandeurs | AFaire | []
 Mme TAU Anne | Défendeur · instance 2026Y13203 | Défendeurs | AFaire | []
 LAMBDA BAIL | Demandeur · instance 2026Y13202 | Demandeurs | AFaire | []
 MU BOULANGERIE | Défendeur · instance 2026Y13202 | Défendeurs | AFaire | []
+# Les deux parties de l'ordonnance d'enrôlement que PROC_CORDJRCS.gestes (joue avant) cree, instance 2026RC00001 (lot 5).
+ORD NOUVEAU DEMANDEUR | Demandeur · instance 2026RC00001 | Demandeurs | AFaire | []
+ORD NOUVEAU DEFENDEUR | Défendeur · instance 2026RC00001 | Défendeurs | AFaire | []
 ALPHA BANC SARL | Demandeur · instance 2026J12001 | Demandeurs | AFaire | []
 M. BETA Jean | Défendeur · instance 2026J12001 | Défendeurs | AFaire | []
+# Les deux parties de l'injonction de payer que PROC_IPE.gestes (joue avant) cree, instance 2026IP00001 (lot 5).
+IPE NOUVEAU DEMANDEUR | Demandeur · instance 2026IP00001 | Demandeurs | AFaire | []
+M. IPE NOUVEAU DEFENDEUR | Défendeur · instance 2026IP00001 | Défendeurs | AFaire | []
 KAPPA BANC SAS | Défendeur · instance 2026I12007 | Défendeurs | AFaire | []
 fiche: 1312101
 Aide juridictionnelle › Aide juridictionnelle = oui
@@ -139,8 +145,14 @@ PSI CONSEIL | Demandeur · instance 2026Y13203 | Demandeurs | AFaire | []
 Mme TAU Anne | Défendeur · instance 2026Y13203 | Défendeurs | AFaire | []
 LAMBDA BAIL | Demandeur · instance 2026Y13202 | Demandeurs | AFaire | []
 MU BOULANGERIE | Défendeur · instance 2026Y13202 | Défendeurs | AFaire | []
+# Les deux parties de l'ordonnance d'enrôlement que PROC_CORDJRCS.gestes (joue avant) cree, instance 2026RC00001 (lot 5).
+ORD NOUVEAU DEMANDEUR | Demandeur · instance 2026RC00001 | Demandeurs | AFaire | []
+ORD NOUVEAU DEFENDEUR | Défendeur · instance 2026RC00001 | Défendeurs | AFaire | []
 ALPHA BANC SARL | Demandeur · instance 2026J12001 | Demandeurs | AFaire | []
 M. BETA Jean | Défendeur · instance 2026J12001 | Défendeurs | AFaire | []
+# Les deux parties de l'injonction de payer que PROC_IPE.gestes (joue avant) cree, instance 2026IP00001 (lot 5).
+IPE NOUVEAU DEMANDEUR | Demandeur · instance 2026IP00001 | Demandeurs | AFaire | []
+M. IPE NOUVEAU DEFENDEUR | Défendeur · instance 2026IP00001 | Défendeurs | AFaire | []
 KAPPA BANC SAS | Défendeur · instance 2026I12007 | Défendeurs | AFaire | []
 fiche: 1312101
 Identité › Nom = ALPHA PARTIES SAS

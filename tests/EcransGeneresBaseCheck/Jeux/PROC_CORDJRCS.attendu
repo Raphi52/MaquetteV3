@@ -1,0 +1,8 @@
+# « Ordonnance d'enrôlement » (PROC_CORDJRCS) : les demandes CORDJRCS, la plus recente d'abord. Ecartee : 1500505 supprimee (X) --
+# jumeau retenu : 1500504 interrompue. Groupes : refus (O) -> Refus ; reclamation (N) -> Réclamation ; les autres -> Enrôlement sur
+# requête. Etats : V -> Validee (les quatre marches obligatoires) ; sinon marches lues (instance 0, demandeur D 1, defendeur F 2,
+# decision 3) : aucune -> AFaire, sinon EnCours.
+Demande D2615000504 | demande D2615000504 · interrompue | Enrôlement sur requête | AFaire | []
+ORD EPSILON | Rôle 2026RC15703 · saisine du 04/03/2026 | Réclamation | EnCours | [0]
+ORD GAMMA # ORD DELTA | Rôle 2026RC15702 · saisine du 03/03/2026 | Refus | EnCours | [0,1,2]
+ORD ALPHA # ORD BETA | Rôle 2026RC15701 · saisine du 02/03/2026 | Enrôlement sur requête | Validee | [0,1,2,3]

@@ -1,0 +1,29 @@
+# « Nouvelle instance » (PROC_XAFF) : toutes les instances des types de numero de role de XAFF (JROP, JRIP, JRCT, JRPC, JRREF, JRJC,
+# JRMDE, JRORC), celles des AUTRES jeux (PROC_XAFF.sql n'en ajoute pas), par numero de role decroissant (FormRechercheInstance.cs:633).
+# Ecartees : la prevention 2026P12004 (JRPR, mode PR) -- jumeau retenu : 2026J12003 (JRCT) ; les injonctions de PROC_IPE.sql
+# (serie du banc JRI15, hors liste) -- jumeau retenu : 2026I12007 (JRIP). Etats : bloquee par une autre demande 2J (VerrouDemandeV2)
+# -> EnAttente ; corrigee par une demande XAFF validee ou un geste de cet ecran -> Validee (aucune avant les gestes) ; AFaire sinon.
+# Groupe : JRREF -> Référé, les autres -> Fond.
+XXAFF ZETA | Rôle 2026X14356 · Mesure du banc lot 4 | Fond | AFaire | []
+GAMMA BANC c/ DELTA BANC | Rôle 2026R12002 · Référé du banc · enrôlée le 15/01/2026 · bloquée par la demande 26012000002 | Référé | EnAttente | []
+XXAFF ETA | Rôle 2026M14357 · Mesure du banc lot 4 | Fond | AFaire | []
+XXAFF DELTA | Rôle 2026M14354 · Mesure du banc lot 4 · bloquée par la demande 26014000384 | Fond | EnAttente | []
+XXAFF GAMMA | Rôle 2026M14353 · Mesure du banc lot 4 | Fond | AFaire | []
+XXAFF BETA | Rôle 2026M14352 · Mesure du banc lot 4 | Fond | AFaire | []
+XXAFF ALPHA | Rôle 2026M14351 · Mesure du banc lot 4 | Fond | AFaire | []
+THETA BANC | Rôle 2026J12008 · Contentieux du banc · enrôlée le 15/01/2026 · bloquée par la demande 26012000008 | Fond | EnAttente | []
+ZETA BANC | Rôle 2026J12006 · Contentieux du banc · enrôlée le 15/01/2026 | Fond | AFaire | []
+ETA BANC | Rôle 2026J12005 · Contentieux du banc · enrôlée le 15/01/2026 | Fond | AFaire | []
+EPSILON BANC | Rôle 2026J12003 · Contentieux du banc · enrôlée le 15/01/2026 | Fond | AFaire | []
+ALPHA BANC c/ BETA BANC | Rôle 2026J12001 · Contentieux du banc · enrôlée le 15/01/2026 | Fond | AFaire | []
+IOTA BANC c/ KAPPA BANC | Rôle 2026I12007 · Injonction du banc · enrôlée le 10/02/2026 | Fond | AFaire | []
+XXAFF EPSILON | Rôle 2025M14355 · Mesure du banc lot 4 | Fond | AFaire | []
+JOIN MERE | Rôle 1990M14401 · Mesure du banc lot 4 | Fond | AFaire | []
+NF BETA Paul | Rôle 1990J20002 · Ouverture du banc lot 5 | Fond | AFaire | []
+NF CREANCIER # NF ALPHA SA | Rôle 1990J20001 · Ouverture du banc lot 5 | Fond | AFaire | []
+XLIEN ETA | Rôle 1990J14306 · Opposition du banc lot 4 | Fond | AFaire | []
+XLIEN ZETA | Rôle 1990J14306 · Opposition du banc lot 4 | Fond | AFaire | []
+XLIEN EPSILON | Rôle 1990J14305 · Contentieux du banc lot 4 · bloquée par la demande 26014000901 | Fond | EnAttente | []
+XLIEN GAMMA | Rôle 1990J14303 · Contentieux du banc lot 4 | Fond | AFaire | []
+XLIEN BETA | Rôle 1990J14302 · Contentieux du banc lot 4 | Fond | AFaire | []
+XLIEN ALPHA | Rôle 1990J14301 · Contentieux du banc lot 4 | Fond | AFaire | []

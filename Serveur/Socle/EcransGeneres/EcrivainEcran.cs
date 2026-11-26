@@ -2,6 +2,8 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using Microsoft.Data.SqlClient;
 using RigV3.Contrats.EcransGeneres;
+using RigV3.Contrats.Numerotation;
+using RigV3.Serveur.Numerotation.Compteur;
 using RigV3.Serveur.Socle.Comptes;
 using RigV3.Serveur.Socle.Greffes;
 
@@ -27,7 +29,13 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 //   3. JouerAsync recoit le geste en cours (GesteEnCours) : la base V3 du greffe DEJA ouverte, et UNE transaction
 //      ouverte par le socle. L'ecrivain lit par geste.LireAsync / ValeurAsync et ecrit par geste.EcrireAsync, qui
 //      REFUSE toute ecriture hors des tables de l'ancien RIG recopiees (v2.*) et des fiches reprises (rec.*) : jamais
-//      soc.*, jamais une autre base. Un UPDATE nomme sa table (« UPDATE v2.INSTANCE SET ... »), sans alias ;
+//      soc.*, jamais une autre base. Un UPDATE nomme sa table (« UPDATE v2.INSTANCE SET ... »), sans alias. Une ligne
+//      NEUVE passe par geste.InsererAsync (table v2.* ou rec.*, rend son identifiant : l'IDENTITY de la base, ou MAX + 1
+//      sous verrou dans une table qui n'en a pas). Un NUMERO (role, depot, PC, demande...) passe par
+//      geste.AttribuerNumeroAsync, et un numero rendu par geste.RestituerNumeroAsync : les programmes num.Attribuer et
+//      num.Restituer de la base V3 (Base\migrations\NUM-001_compteurs.sql), les SEULS appels de programme permis, dans la
+//      transaction du geste (Serveur/Numerotation/Compteur/DistributeurNumeros.cs) -- un geste annule ne consomme aucun
+//      numero (plan « RIG v3 100 % fonctionnel », lot 5, 26/11/2026). Aucun EXEC libre ;
 //   4. les CONTROLES de RIG v2 passent AVANT toute ecriture, chacun cite (fichier:ligne du code V2 ou fiche
 //      proc_<code>.md), son message AU MOT PRES de la V2. Un controle qui refuse rend IssueGeste.Refuser(message) : le
 //      socle annule la transaction, RIEN n'est ecrit, l'ecran affiche le message. L'objet verrouille par RIG v2
@@ -95,7 +103,8 @@ public abstract record IssueGeste
 /// Le geste en cours, tel que le socle le donne a l'ecrivain : la base V3 du greffe ouverte, la transaction du geste, la
 /// demande de l'ecran, l'agent et l'instant. Lire et ecrire passent par ici (mode d'emploi, point 3).
 /// </summary>
-public sealed partial class GesteEnCours(SqlConnection baseGreffe, SqlTransaction transaction, GesteEcran demande, Appelant agent, DateTime maintenant)
+public sealed partial class GesteEnCours(SqlConnection baseGreffe, SqlTransaction transaction, GesteEcran demande, Appelant agent, DateTime maintenant,
+                                         DistributeurNumeros numeros)
 {
     /// <summary>La base V3 du greffe de l'adresse (jamais une autre).</summary>
     public SqlConnection Base { get; } = baseGreffe;
@@ -138,6 +147,68 @@ public sealed partial class GesteEnCours(SqlConnection baseGreffe, SqlTransactio
         return await cmd.ExecuteNonQueryAsync(ct);
     }
 
+    /// <summary>
+    /// Ajoute UNE ligne a <paramref name="table"/> (v2.* ou rec.*) avec <paramref name="valeurs"/> (colonne -> valeur, null =
+    /// NULL) et rend son identifiant <paramref name="colonneId"/>. La base V3 du greffe recopie l'IDENTITY de RIG_DEV sur les
+    /// cles des tables V2 (INSTANCE, PARTIE, PROCEDURE_COLLECTIVE...) : la base donne l'id, comme a la V2. Une table qui n'en a
+    /// pas (DEMANDE dans RIG_DEV, ou les tables que creent les jeux des bancs) recoit MAX + 1, lu sous verrou (UPDLOCK,
+    /// HOLDLOCK) dans la transaction du geste : deux gestes au meme instant passent l'un apres l'autre.
+    /// </summary>
+    public async Task<int> InsererAsync(string table, string colonneId, IReadOnlyDictionary<string, object?> valeurs, CancellationToken ct)
+    {
+        if (!TableEcrite().IsMatch(table) || !Identifiant().IsMatch(colonneId) || valeurs.Keys.Any(c => !Identifiant().IsMatch(c)))
+            throw new InvalidOperationException($"Geste refuse par le socle : insertion illisible dans « {table} » ({colonneId}, {string.Join(", ", valeurs.Keys)}).");
+        await using (var lu = await LireAsync("SELECT COLUMNPROPERTY(OBJECT_ID(@t), @c, 'IsIdentity')", ct,
+                         new SqlParameter("@t", table), new SqlParameter("@c", colonneId)))
+        {
+            if (!await lu.ReadAsync(ct) || lu.IsDBNull(0))
+                throw new InvalidOperationException($"Geste refuse par le socle : la colonne {table}.{colonneId} n'existe pas dans la base du greffe.");
+            if (lu.GetInt32(0) == 1)
+            {
+                await lu.CloseAsync();
+                return Convert.ToInt32(await Scalaire(
+                    $"INSERT INTO {table} ({string.Join(", ", valeurs.Keys)}) OUTPUT inserted.{colonneId} VALUES ({Marques(valeurs)})", valeurs, ct),
+                    System.Globalization.CultureInfo.InvariantCulture);
+            }
+        }
+        int id;
+        await using (var max = await LireAsync($"SELECT ISNULL(MAX({colonneId}), 0) + 1 FROM {table} WITH (UPDLOCK, HOLDLOCK)", ct))
+        {
+            await max.ReadAsync(ct);
+            id = Convert.ToInt32(max.GetValue(0), System.Globalization.CultureInfo.InvariantCulture);
+        }
+        var avecId = new Dictionary<string, object?>(valeurs) { [colonneId] = id };
+        await Scalaire($"INSERT INTO {table} ({string.Join(", ", avecId.Keys)}) VALUES ({Marques(avecId)})", avecId, ct);
+        return id;
+    }
+
+    private static string Marques(IReadOnlyDictionary<string, object?> valeurs) => string.Join(", ", valeurs.Keys.Select(c => "@" + c));
+
+    private async Task<object?> Scalaire(string sql, IReadOnlyDictionary<string, object?> valeurs, CancellationToken ct)
+    {
+        ExigerEcritureV2(sql);
+        await using var cmd = new SqlCommand(sql, Base, Transaction) { CommandTimeout = 120 };
+        foreach (var (colonne, valeur) in valeurs) cmd.Parameters.AddWithValue("@" + colonne, valeur ?? DBNull.Value);
+        return await cmd.ExecuteScalarAsync(ct);
+    }
+
+    /// <summary>
+    /// Le numero suivant de la serie <see cref="DemandeNumero.Type"/> (num.Attribuer de la base V3, NUM-001), DANS la
+    /// transaction du geste, au nom de l'agent : un geste refuse ou annule ne consomme aucun numero (NUM-001 CA03). Un code
+    /// autre que <see cref="CodesNumerotation.Ok"/> (type inconnu, serie pleine) est rendu tel quel : a l'ecrivain d'en faire
+    /// un refus lisible (son message est <see cref="NumeroAttribue.Message"/>).
+    /// </summary>
+    // fix-ok: mesure le 26/11/2026 (lot 5) -- ExigerEcritureV2 refuse EXEC (MotDeStructure), donc aucun geste ne pouvait
+    // numeroter (EcrivainSuppressionInstance.cs refusait la case « Libérer » pour cette raison) ; et la base de dev porte
+    // l'IDENTITY de RIG_DEV sur v2.INSTANCE.INSTN_ID_INSTN alors que les jeux des bancs la creent sans : InsererAsync sert
+    // les deux. Ces deux entrees typees sont la seule porte, pas un EXEC libre.
+    public Task<NumeroAttribue> AttribuerNumeroAsync(DemandeNumero demande, CancellationToken ct)
+        => numeros.AttribuerAsync(Base, Transaction, demande, Agent.CompteWindows, null, ct);
+
+    /// <summary>Rendre un numero donne (num.Restituer, NUM-004), dans la transaction du geste, au nom de l'agent.</summary>
+    public Task<ResultatRestitution> RestituerNumeroAsync(DemandeRestitution demande, CancellationToken ct)
+        => numeros.RestituerAsync(Base, Transaction, demande, Agent.CompteWindows, null, ct);
+
     /// <summary>Leve si <paramref name="sql"/> ecrit ailleurs que dans v2.* ou rec.*, ou change la structure de la base.</summary>
     public static void ExigerEcritureV2(string sql)
     {
@@ -150,6 +221,12 @@ public sealed partial class GesteEnCours(SqlConnection baseGreffe, SqlTransactio
         if (interdites.Count > 0)
             throw new InvalidOperationException($"Geste refuse par le socle : un ecran genere n'ecrit que v2.* et rec.* de la base du greffe (ecrit : {string.Join(", ", interdites)}).");
     }
+
+    [GeneratedRegex(@"^(v2|rec)\.[A-Za-z0-9_]+$", RegexOptions.CultureInvariant)]
+    private static partial Regex TableEcrite();
+
+    [GeneratedRegex(@"^[A-Za-z0-9_]+$", RegexOptions.CultureInvariant)]
+    private static partial Regex Identifiant();
 
     // « UPDATE SET » (la branche WHEN MATCHED d'un MERGE) n'est pas une table : sa cible est celle du MERGE INTO.
     [GeneratedRegex(@"\b(?:INSERT\s+INTO|UPDATE(?!\s+SET\b)|DELETE\s+FROM|MERGE\s+INTO)\s+(?<table>[\[\]\w]+(?:\.[\[\]\w]+)*)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
@@ -191,13 +268,13 @@ public sealed class EcrivainsEcrans(IReadOnlyDictionary<string, IEcrivainEcran> 
     /// <paramref name="agent"/>, puis validee. La route et le banc passent tous deux par ici.
     /// </summary>
     public static async Task<ResultatGeste> JouerAsync(IEcrivainEcran ecrivain, SqlConnection baseGreffe, GesteEcran demande, Appelant agent,
-                                                       DateTime maintenant, CancellationToken ct)
+                                                       DateTime maintenant, DistributeurNumeros numeros, CancellationToken ct)
     {
         await using var tx = (SqlTransaction)await baseGreffe.BeginTransactionAsync(ct);
         IssueGeste issue;
         try
         {
-            issue = await ecrivain.JouerAsync(new GesteEnCours(baseGreffe, tx, demande, agent, maintenant), ct);
+            issue = await ecrivain.JouerAsync(new GesteEnCours(baseGreffe, tx, demande, agent, maintenant, numeros), ct);
             if (issue is IssueGeste.Fait fait)
             {
                 if (fait.Traces.Length == 0)

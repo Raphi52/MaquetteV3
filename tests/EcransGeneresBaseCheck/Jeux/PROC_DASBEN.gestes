@@ -1,0 +1,72 @@
+# Les gestes de EcrivainDepotsBeneficiaires (« Dépôts bénéficiaires », PROC_DASBEN), joues dans l'ordre par la route POST, sur
+# les lignes de PROC_DASBEN.sql, APRES ceux de PROC_DAS.gestes (ordre des noms) : les deux premieres arrivees RA1 de 2026 sont
+# les leurs, d'ou 2026000003 et 2026000004 ici. Un refus n'ecrit rien ; chaque refus a son jumeau accepte (blocs 4 et 5).
+
+# 1. Sans date d'arrivee : obligatoire (ultDateArrivee.MetierObligatoire, OPE_ACTES.Designer.cs:91). Jumeau : bloc 4.
+geste: Creer
+valeur: Entreprise › Entreprise = NI15212
+valeur: Actes › Date de dépôt = 2026-11-02
+valeur: Actes › Code événement = BEN
+valeur: Acte déposé › Acte = BEN
+valeur: Acte déposé › Date de l'acte = 2026-10-28
+resultat: refuse
+message: « Actes › Date d'arrivée » est obligatoire.
+---
+# 2. Le dossier a deja un BEN depose : RIG v2 ne lui propose que BENM (DossierRCS.GetCodeEvenementDASBEN, DossierRCS.cs:2502 ;
+#    OPE_ACTES.cs:43-45). Jumeau : bloc 5, BENM sur le meme dossier ; et bloc 4, BEN sur un non-inscrit sans historique.
+geste: Creer
+valeur: Entreprise › Entreprise = 2010B15201
+valeur: Actes › Date d'arrivée = 2026-11-02
+valeur: Actes › Date de dépôt = 2026-11-02
+valeur: Actes › Code événement = BEN
+valeur: Acte déposé › Acte = BEN
+valeur: Acte déposé › Date de l'acte = 2026-10-28
+resultat: refuse
+message: Le code événement « BEN » n'est pas proposé pour DASBEN ALPHA SARL (2010B15201) : BENM.
+---
+# 3. Un acte hors de la liste (v2.ABREGE_PIECE). Jumeau : bloc 4, BEN.
+geste: Creer
+valeur: Entreprise › Entreprise = NI15212
+valeur: Actes › Date d'arrivée = 2026-11-02
+valeur: Actes › Date de dépôt = 2026-11-02
+valeur: Actes › Code événement = BEN
+valeur: Acte déposé › Acte = ZZ15
+valeur: Acte déposé › Date de l'acte = 2026-10-28
+resultat: refuse
+message: Acte inconnu dans la base du greffe : « ZZ15 ».
+---
+# 4. Enregistre sur le non-inscrit GAMMA (sans historique BEN : les codes « 1099 ») : depot RDB categorie N, saisie simplifiee,
+#    etat VAX 0101, gratuit pour le code BEN (PROC_DASBEN.cs:1062-1077) ; l'evenement au texte du BEN (ETP_DEPOT.cs:80).
+geste: Creer
+valeur: Entreprise › Entreprise = NI15212
+valeur: Actes › Date d'arrivée = 2026-11-02
+valeur: Actes › Date de dépôt = 2026-11-02
+valeur: Actes › Code événement = BEN
+valeur: Acte déposé › Acte = BEN
+valeur: Acte déposé › Date de l'acte = 2026-10-28
+resultat: fait
+message: Dépôt 2026B000001 enregistré dans la base du greffe pour DASBEN NI GAMMA SAS (NI15212), arrivée 2026000003 ; la facture, les éditions et les pièces dématérialisées ne sont pas reprises par la V3.
+lignes:
+DASBEN NI GAMMA SAS | Non-inscrit NI15212 · dépôt 2026B000001 du 02/11/2026 | Non-inscrit | Validee | [0,2,3,5]
+DASBEN NI GAMMA SAS | Non-inscrit NI15212 · interrompu | Non-inscrit | EnCours | [0]
+DASBEN ALPHA SARL | Dossier RCS 2010B15201 · dépôt 2019B000001 du 01/06/2019 | Dossier RCS | Validee | [0,2,3,5]
+controle: SELECT p.DPTRC_CATEGORIE_DEPOT + '|' + CONVERT(varchar(1), p.DPTRC_GRATUIT) + CONVERT(varchar(1), p.DPTRC_SAISIE_SIMPLIFIEE) + CONVERT(varchar(1), p.DPTRC_ENVOI_INPI) + CONVERT(varchar(1), p.DPTRC_NUMERISE) + '|' + p.DPTRC_ETAT_VAX + '|' + a.CodeProcessus + '|' + CONVERT(varchar(10), a.IdNonInscrit) FROM v2.DEPOT_RCS AS p JOIN rec.ActionRegistre AS a ON a.IdDepot = p.DPTRC_ID_DPTRC WHERE p.DPTRC_NUM_DEPOT = '2026B000001' => N|1100|0101|DASBEN|1510212
+controle: SELECT e.EVNRC_CODE_EVENEMENT_RCS + '|' + e.EVNRC_TEXTE_EVENEMENT FROM v2.EVENEMENT_RCS AS e JOIN rec.ActionRegistre AS a ON a.Id = e.EVNRC_ID_ACTRC JOIN v2.DEPOT_RCS AS p ON p.DPTRC_ID_DPTRC = a.IdDepot WHERE p.DPTRC_NUM_DEPOT = '2026B000001' => BEN|Dépôt modificatif ou complémentaire relatif au bénéficiaire effectif
+controle: SELECT d.DMND_CODE_PROSS + d.DMND_ETAT_DEMANDE + '|' + d.DMND_LES_NUMEROS FROM v2.DEMANDE AS d JOIN rec.ActionRegistre AS a ON a.Id = d.DMND_ID_ACTRC JOIN v2.DEPOT_RCS AS p ON p.DPTRC_ID_DPTRC = a.IdDepot WHERE p.DPTRC_NUM_DEPOT = '2026B000001' => DASBENV|2026B000001
+---
+# 5. Enregistre sur le dossier, en BENM (le seul code propose) : non gratuit (seul BEN l'est).
+geste: Creer
+valeur: Entreprise › Entreprise = 2010B15201
+valeur: Actes › Date d'arrivée = 2026-11-03
+valeur: Actes › Date de dépôt = 2026-11-03
+valeur: Actes › Code événement = BENM
+valeur: Acte déposé › Acte = BEN
+valeur: Acte déposé › Date de l'acte = 2026-10-29
+resultat: fait
+message: Dépôt 2026B000002 enregistré dans la base du greffe pour DASBEN ALPHA SARL (2010B15201), arrivée 2026000004 ; la facture, les éditions et les pièces dématérialisées ne sont pas reprises par la V3.
+lignes:
+DASBEN ALPHA SARL | Dossier RCS 2010B15201 · dépôt 2026B000002 du 03/11/2026 | Dossier RCS | Validee | [0,2,3,5]
+DASBEN NI GAMMA SAS | Non-inscrit NI15212 · dépôt 2026B000001 du 02/11/2026 | Non-inscrit | Validee | [0,2,3,5]
+DASBEN NI GAMMA SAS | Non-inscrit NI15212 · interrompu | Non-inscrit | EnCours | [0]
+DASBEN ALPHA SARL | Dossier RCS 2010B15201 · dépôt 2019B000001 du 01/06/2019 | Dossier RCS | Validee | [0,2,3,5]
+controle: SELECT CONVERT(varchar(1), p.DPTRC_GRATUIT) + '|' + CONVERT(varchar(10), a.IdDossier) FROM v2.DEPOT_RCS AS p JOIN rec.ActionRegistre AS a ON a.IdDepot = p.DPTRC_ID_DPTRC WHERE p.DPTRC_NUM_DEPOT = '2026B000002' => 0|1510201

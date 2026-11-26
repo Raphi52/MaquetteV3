@@ -1,0 +1,16 @@
+# Les recherches de LecteurMesuresProvisoires (IRechercheEcran). Format : en tete de tests/EcransGeneresBaseCheck/Program.cs
+# (section 3c). Le seul critere de RIG v2 : « N° de la mesure ou instance » (OPE_MESURE_RECHERCHE.Designer.cs:80).
+
+# 1. Le numero de mesure, blancs retires (OPE_MESURE_RECHERCHE.cs:76-83).
+texte: 2026M 15901
+lignes:
+MESIN ALPHA # MESIN BETA | Mesure 2026M15901 · Autre mesure du banc lot 5 · ouverte le 02/03/2026 · instance 2026IP15911 | Autre mesure | AFaire | []
+---
+# 2. Le numero de role de l'instance de la mesure (Instance=* : la mesure de l'instance, OPE_MESURE_RECHERCHE.cs:76-83). Jumeau : bloc 1.
+critere: N° de la mesure ou instance = 2026IP15912
+lignes:
+MESIN GAMMA | Mesure 2026M15902 · Expertise du banc lot 5 · ouverte le 03/03/2026 · instance 2026IP15912 · bloquée par la demande D2615000941 | Expertise | EnAttente | []
+---
+# 3. Un numero qu'aucune mesure ni instance ne porte : rien. Jumeau : bloc 1.
+texte: 2026M99999
+lignes:

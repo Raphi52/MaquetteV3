@@ -32,6 +32,11 @@ internal sealed class ModuleEcransMain : IModuleServeur
         routes.MapGet(RoutesEcransMain.DossiersOuverts, (string greffe, CatalogueGreffes c, CancellationToken ct)
             => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureDossiersOuverts.LireAsync(cn, ct))))
             .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+
+        // Lot 5 : « Dépôts judiciaires » (LectureDepotsJud.cs).
+        routes.MapGet(RoutesDepotsJud.Instances, (string greffe, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureDepotsJud.LireAsync(cn, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
     }
 
     /// <summary><paramref name="faire"/> sur la base V3 du greffe ; 404 / 503 de la politique si elle ne s'ouvre plus.</summary>

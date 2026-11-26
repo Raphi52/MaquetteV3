@@ -1,0 +1,10 @@
+# « Injonction de payer » (PROC_IPE) : les demandes IPE et IPE_TRIDIG, la plus recente d'abord. Ecartees : 1500106 supprimee (X)
+# -- jumeau retenu : 1500105 interrompue (I) ; 1500108 une demande MJUD -- jumeau retenu : 1500101 (IPE). Groupes : IPE = saisie
+# directe, IPE_TRIDIG = tribunal digital. Etats : V -> Validee (les quatre marches obligatoires) ; O -> Rejetee ; W -> EnAttente ;
+# I ou en cours -> marches lues (instance 0, demandeur DOIP 1, defendeur FOIP 2, decision 3) : EnCours, AFaire sans aucune.
+Demande D2615000107 | demande D2615000107 | Saisie directe | AFaire | []
+IPE ETA | Rôle 2026IP15305 · saisine du 06/03/2026 · interrompue | Saisie directe | EnCours | [0,1]
+Demande D2615000104 | demande D2615000104 | Tribunal digital | EnAttente | []
+IPE EPSILON # IPE ZETA | Rôle 2026IP15303 · saisine du 04/03/2026 | Tribunal digital | Rejetee | [0,1,2]
+IPE GAMMA # IPE DELTA | Rôle 2026IP15302 · saisine du 03/03/2026 | Tribunal digital | Validee | [0,1,2,3]
+IPE ALPHA # IPE BETA | Rôle 2026IP15301 · saisine du 02/03/2026 | Saisie directe | Validee | [0,1,2,3]

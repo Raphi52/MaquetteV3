@@ -1,0 +1,8 @@
+# « Nouvelle proc. collective » (PROC_NPC) : les demandes NPC et NPR, la plus recente d'abord. Ecartee : 1516124 supprimee (X)
+# -- jumeau retenu : 1516122, meme processus. Groupes : NPR ou une demande portee en 2R → « Prévention (PRV) », sinon
+# « Procédure collective (PC) ». Etats : V → Validee (0 Procédure, 7 Facturation) ; O → Rejetee (6 Notification CFEC) ; I
+# portee par sa prevention → EnCours, la procedure lue. Une PC enregistree sans numero se dit « sans numéro ».
+NPC SANS NUMERO | Procédure sans numéro | Procédure collective (PC) | Validee | [0,7]
+NPR INTERROMPUE | Prévention 2026V16123 · interrompue | Prévention (PRV) | EnCours | [0]
+NPC REFUSEE | demande D1516100122 · refusée | Procédure collective (PC) | Rejetee | [6]
+NPC ENREGISTREE | Procédure 2025EX0076 | Procédure collective (PC) | Validee | [0,7]

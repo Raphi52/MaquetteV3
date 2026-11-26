@@ -1,0 +1,113 @@
+-- Jeu de LecteurNouvellesFormalites et EcrivainNouvellesFormalites (« Nouvelle formalité », PROC_NF), lot 5 du plan
+-- « RIG v3 100 % fonctionnel » (plan-676a4b19). Identifiants 1 520 0xx a 1 520 2xx (lot 5 : 1 500 000 a 1 599 999). Ce qui est
+-- retenu ou ecarte, et pourquoi : PROC_NF.attendu ; les gestes : PROC_NF.gestes.
+-- Les tables, aux types de RIG_DEV (INFORMATION_SCHEMA.COLUMNS de SQL-DEV\DEV, lu le 26/11/2026) ; joue apres PROC_DAS, PROC_IPE,
+-- PROC_JOIN et PROC_MJUD (ordre des noms) qui creent INSTANCE, PARTIE, CODE_AFFAIRE, CODE_ACTE_PROCE, NATURE_AFFAIRE, NON_INSCRIT,
+-- et AVANT PROC_NPC : les colonnes de PC de ce lot sont ajoutees ici, aux memes types, nullables (des lignes d'autres jeux n'en
+-- ont pas). PROC_NPC.sql les retrouve (IF COL_LENGTH).
+IF COL_LENGTH('v2.PARTIE', 'PRT_ID_DSRCS') IS NULL ALTER TABLE v2.PARTIE ADD PRT_ID_DSRCS int NULL;
+IF COL_LENGTH('v2.PARTIE', 'PRT_ID_NINSC') IS NULL ALTER TABLE v2.PARTIE ADD PRT_ID_NINSC int NULL;
+IF COL_LENGTH('v2.NATURE_AFFAIRE', 'R_NATUREAFFA_ORIGINE_ISO') IS NULL ALTER TABLE v2.NATURE_AFFAIRE ADD R_NATUREAFFA_ORIGINE_ISO varchar(2) NULL;
+IF COL_LENGTH('v2.CODE_ACTE_PROCE', 'R_CODEACTEPR_AUTEUR_SAISINE') IS NULL ALTER TABLE v2.CODE_ACTE_PROCE ADD R_CODEACTEPR_AUTEUR_SAISINE varchar(1) NULL;
+IF OBJECT_ID(N'v2.NON_INSCRIT') IS NULL
+    CREATE TABLE v2.NON_INSCRIT (NINSC_ID_NINSC int NOT NULL PRIMARY KEY);
+IF COL_LENGTH('v2.NON_INSCRIT', 'NINSC_NUM_NON_INSCRIT') IS NULL ALTER TABLE v2.NON_INSCRIT ADD NINSC_NUM_NON_INSCRIT varchar(11) NULL;
+IF COL_LENGTH('v2.NON_INSCRIT', 'NINSC_ID_RPRTR') IS NULL ALTER TABLE v2.NON_INSCRIT ADD NINSC_ID_RPRTR int NULL;
+IF OBJECT_ID(N'v2.TYPE_VOIE') IS NULL
+    CREATE TABLE v2.TYPE_VOIE (R_TYPEVOIE_VALEUR varchar(4) NOT NULL PRIMARY KEY, R_TYPEVOIE_LIBELLE_ECRAN varchar(35) NOT NULL);
+IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_NUM_PC') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_NUM_PC varchar(10) NULL;
+IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_NOM_AFFAIRE') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_NOM_AFFAIRE varchar(max) NULL;
+IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_TYPE_PC') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_TYPE_PC varchar(5) NULL;
+IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_ETAT_PC') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_ETAT_PC varchar(5) NULL;
+IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_ETAT_INFO') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_ETAT_INFO varchar(1) NULL;
+IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_DATE_OUVERTURE') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_DATE_OUVERTURE datetime NULL;
+IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_DATE_SAUVEGARDE') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_DATE_SAUVEGARDE datetime NULL;
+IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_DATE_RETABL_PROF') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_DATE_RETABL_PROF datetime NULL;
+IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_DATE_TRAITEMENT_SORTIE_CRISE') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_DATE_TRAITEMENT_SORTIE_CRISE datetime NULL;
+IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_ID_CLIEN') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_ID_CLIEN int NULL;
+IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_ID_RPRTR') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_ID_RPRTR int NULL;
+IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_ID_NINSC') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_ID_NINSC int NULL;
+IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_EXTERIEUR') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_EXTERIEUR bit NULL;
+IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_JURIDICTION_EXTERIEURE') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_JURIDICTION_EXTERIEURE varchar(10) NULL;
+IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_DATE_MAJ') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_DATE_MAJ datetime NULL;
+IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_COMPTEUR_MAJ') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_COMPTEUR_MAJ smallint NULL;
+IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_NUMERO_SOURCE') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_NUMERO_SOURCE varchar(36) NULL;
+IF COL_LENGTH('v2.DEMANDE', 'DMND_EN_COURS') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_EN_COURS bit NULL;
+IF COL_LENGTH('v2.DEMANDE', 'DMND_NOM_UTILISATEUR') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_NOM_UTILISATEUR varchar(255) NULL;
+IF COL_LENGTH('v2.DEMANDE', 'DMND_ID_AFFRE') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_ID_AFFRE int NULL;
+IF COL_LENGTH('v2.DEMANDE', 'DMND_NOM') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_NOM varchar(255) NULL;
+IF COL_LENGTH('v2.DEMANDE', 'DMND_NUM_INDICATIF') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_NUM_INDICATIF varchar(14) NULL;
+IF COL_LENGTH('v2.DEMANDE', 'DMND_LES_NUMEROS') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_LES_NUMEROS varchar(128) NULL;
+
+-- Les compteurs (num.Compteur, NUM-001) s'ils manquent : JPC (PC du ressort : structure ALC, lettre RJ, chrono sur 4, comme
+-- RIG_DEV 2026RJ0242 et Pont/EcranCompteurs.cs:151) et DMD (demandes) ; JRPC 1990, qui a donne les roles 1990J20001-2 (chrono
+-- 20002, restitution active) : PROC_XXAFF.gestes bloc 9 y rend le role de NF BETA en la supprimant.
+EXEC sp_executesql N'
+IF NOT EXISTS (SELECT 1 FROM num.Compteur WHERE Type = ''JPC'')
+    INSERT INTO num.Compteur (Type, Annee, Structure, CodageAnnee, Lettre, TailleChrono, Debut) VALUES (''JPC'', 2026, ''ALC'', 4, ''RJ'', 4, 1);
+IF NOT EXISTS (SELECT 1 FROM num.Compteur WHERE Type = ''DMD'')
+    INSERT INTO num.Compteur (Type, Annee, Structure, CodageAnnee, Lettre, TailleChrono, Debut) VALUES (''DMD'', 2026, ''LAQC'', 2, ''D'', 5, 1);
+INSERT INTO num.Compteur (Type, Annee, Structure, CodageAnnee, Lettre, TailleChrono, Debut, Chrono, GestionRendus)
+    VALUES (''JRPC'', 1990, ''ALC'', 4, ''J'', 5, 1, 20002, 1);';
+
+-- Les references : le code affaire PC15 (serie JRPC, type d'instance 08, comme FOU7 de RIG_DEV) ; la nature N15 d'origine ISO 08
+-- (ouverture, comme 40A de RIG_DEV) ; les actes 15C (auteur de la saisine 2 = creancier : le DEFENDEUR est le debiteur) et 15D
+-- (auteur 1 = debiteur : le DEMANDEUR l'est), comme ASS et AOJ de RIG_DEV.
+EXEC sp_executesql N'
+INSERT INTO v2.CODE_AFFAIRE (R_CODEAFFAIR_VALEUR, R_CODEAFFAIR_LIBELLE_ECRAN, R_CODEAFFAIR_TYPE_NUM_ROLE, R_CODEAFFAIR_TYPE_INSTANCE) VALUES
+    (''PC15'', ''Ouverture du banc lot 5'', ''JRPC'', ''08'');
+INSERT INTO v2.NATURE_AFFAIRE (R_NATUREAFFA_VALEUR, R_NATUREAFFA_LIBELLE_ECRAN, R_NATUREAFFA_ORIGINE_ISO) VALUES (''N15'', ''demande de RJ du banc'', ''08'');
+INSERT INTO v2.CODE_ACTE_PROCE (R_CODEACTEPR_VALEUR, R_CODEACTEPR_LIBELLE_ECRAN, R_CODEACTEPR_ISO, R_CODEACTEPR_AUTEUR_SAISINE) VALUES
+    (''15C'', ''Assignation du banc'', ''ASS'', ''2''), (''15D'', ''Déclaration du banc'', ''DEC'', ''1'');';
+
+-- Les debiteurs : A, dossier RCS d'une personne morale avec adresse ; B, non-inscrit d'une personne physique avec adresse.
+SET IDENTITY_INSERT rec.Adresse ON;
+INSERT INTO rec.Adresse (Id, NumeroVoie, ComplementNumero, TypeVoie, NomVoie, CodePostal, Localite, Pays, BoitePostale, Cedex, EtatInfo) VALUES
+    (1520111, '5', NULL, NULL, 'Place du Banc', '38000', 'GRENOBLE', 'FR', NULL, NULL, 'C'),
+    (1520112, '8', NULL, NULL, 'Allée des Essais', '73000', 'CHAMBERY', NULL, NULL, NULL, 'C');
+SET IDENTITY_INSERT rec.Adresse OFF;
+SET IDENTITY_INSERT rec.Entreprise ON;
+INSERT INTO rec.Entreprise (Id, IdAdresse, Siren, Civilite, Denomination, Patronyme, Prenom, EtatInfo, FicheSommaire) VALUES
+    (1520101, 1520111, NULL, 'PM', N'NF ALPHA SA', NULL, NULL, 'C', 0),
+    (1520102, 1520112, NULL, 'M.', N'NF BETA Paul', N'NF BETA', N'Paul', 'C', 0);
+SET IDENTITY_INSERT rec.Entreprise OFF;
+SET IDENTITY_INSERT rec.DossierRcs ON;
+INSERT INTO rec.DossierRcs (Id, IdEntreprise, TypeRcs, NumeroGestion, Siren, DateImmatriculation, MotifImmatriculation,
+    ProvisoirementSans, CompteurMaj, DateMaj, EtatDossier, EtatInfo, InscritRegistreMetiers, ModificationInterne,
+    SirenProvisoire, Accre, AutoEntrepreneur, Eirl, AutoEntrepreneurRegularise) VALUES
+    (1520101, 1520101, 'B1', '1990B20101', NULL, '19900101', 'C', 0, 0, '19900101', 'A', 'C', 0, 0, 0, 0, 0, 0, 0);
+SET IDENTITY_INSERT rec.DossierRcs OFF;
+EXEC sp_executesql N'
+INSERT INTO v2.NON_INSCRIT (NINSC_ID_NINSC, NINSC_NUM_NON_INSCRIT, NINSC_ID_RPRTR) VALUES (1520102, ''NI20102'', 1520102);';
+
+-- Les instances d'ouverture (serie JRPC, role 1990 : elles se rangent apres celles des autres jeux, role decroissant), sans PC :
+--   1520001 NF ALPHA : acte 15C, le DEFENDEUR (F) porte le dossier 1990B20101 -- la PC numerotee de PROC_NF.gestes ;
+--   1520002 NF BETA : acte 15D, le DEMANDEUR (D) porte le non-inscrit NI20102 -- la PC sans numero.
+-- Leurs parties n'ont pas de designation : elles n'entrent pas dans « Parties de l'instance » (PROC_PARTIES). Serie JRPC
+-- oblige (la recherche de NF n'en connait pas d'autre), elles entrent dans les ecrans qui lisent toutes les instances JRPC :
+-- leurs deux lignes sont ajoutees a PROC_JOIN, PROC_MJUD, PROC_XAFF, PROC_XLIEN et PROC_XXAFF (.attendu, et les « lignes: »
+-- de leurs .gestes ; apres PROC_NF.gestes, XLIEN les lit rattachees a leur PC).
+-- Les refus reprennent des instances de PROC_JOIN.sql, sans les ecrire : 1400301 (JRPC, sans type ni nature : pas de
+-- debiteur), 1400302 (JRPC, rattachee a la PC 1400101), 1400305 (JRPC, tenue par une demande en cours), 1400304 (JRPR, hors
+-- des series de la recherche).
+EXEC sp_executesql N'
+INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_NUM_REP_GENERAL, INSTN_NOM_COURANT, INSTN_CODE_AFFAIRE, INSTN_TYPE_INSTANCE,
+    INSTN_NATURE_AFFAIRE, INSTN_CODE_ACTE_PROCE, INSTN_DATE_ACTE, INSTN_DATE_SAISINE_GREFFE, INSTN_ID_PRCLL, INSTN_TOP_EXPERIAN) VALUES
+    (1520001, ''1990J20001'', ''1990020001'', ''NF CREANCIER # NF ALPHA SA'', ''PC15'', ''08'', ''N15'', ''15C'', ''19900201'', ''19900115'', NULL, 0),
+    (1520002, ''1990J20002'', NULL, ''NF BETA Paul'', ''PC15'', ''08'', ''N15'', ''15D'', ''19900201'', ''19900115'', NULL, 0);
+INSERT INTO v2.PARTIE (PRT_ID_PRT, PRT_ID_INSTN, PRT_NUM_ORDRE, PRT_CIVILITE, PRT_DESIGNATION, PRT_QUALIF_PARTIE, PRT_ID_DSRCS, PRT_ID_NINSC) VALUES
+    (1520011, 1520001, 1, ''PM'', NULL, ''D'', NULL, NULL),
+    (1520012, 1520001, 1, ''PM'', NULL, ''F'', 1520101, NULL),
+    (1520021, 1520002, 1, ''M.'', NULL, ''D'', NULL, 1520102);';
+
+-- Les saisies NF : une ouverte (V, sur l'instance 1400307 en 2J -- rattachee a la PC 1400101 par PROC_JOIN.sql ; une demande
+-- validee ne verrouille pas), une interrompue (I, liee en 2J a l'identifiant 1520009 qu'aucune instance ne porte : elle ne
+-- verrouille donc aucune instance d'un autre jeu), une a ouvrir (W, sans instance) ; ecartee : supprimee (X).
+EXEC sp_executesql N'
+INSERT INTO v2.DEMANDE (DMND_ID_DMND, DMND_NUM_DEMANDE, DMND_ETAT_DEMANDE, DMND_CODE_PROSS, DMND_EN_COURS, DMND_NOM, DMND_NUM_INDICATIF) VALUES
+    (1520201, ''D1520200201'', ''V'', ''NF'', 0, ''NF OUVERTE'', ''1990J14306''),
+    (1520202, ''D1520200202'', ''I'', ''NF'', 0, ''NF INTERROMPUE'', ''1990J20009''),
+    (1520203, ''D1520200203'', ''W'', ''NF'', 0, NULL, NULL),
+    (1520204, ''D1520200204'', ''X'', ''NF'', 0, ''NF SUPPRIMEE'', NULL);
+INSERT INTO v2.DOSSIER_DEMANDE (DSSDM_ID_DSSDM, DSSDM_ID_DMND, DSSDM_CODE_SEQUENCEUR, DSSDM_VALEUR_SEQUENCEUR) VALUES
+    (1520251, 1520201, ''2J'', ''1400307''), (1520252, 1520202, ''2J'', ''1520009'');';

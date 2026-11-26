@@ -23,7 +23,8 @@ using RigV3Desktop.Pont;
 //   2. les ROUTES par le vrai serveur en memoire : agent admis dans le greffe, 401 / 404 / 503 sans repli ;
 //   3. les PONTS des cinq ecrans contre ce serveur (mode « serveur », lignes de la base, aucune de JeuDemo), sans serveur
 //      (mode « demo » : JeuDemo, que l'ecran marque « exemple »), sans greffe et en panne (le motif, AUCUNE ligne) ; et le
-//      geste « Ouvrir un dossier » branche : refuse, rien d'ecrit.
+//      geste « Ouvrir un dossier » branche : refuse, rien d'ecrit ;
+//   4. (lot 5) « Dépôts judiciaires » : sa lecture, sa route et son pont, sur la meme marche.
 // Identifiants des jeux : a partir de 2 700 000 ((10 + 17) x 100 000, regle du plan). Il lui faut le SQL Server de
 // developpement : « docker compose up -d » a la racine du depot.
 
@@ -427,6 +428,68 @@ Exiger((await EcranOuvertureDossier.VueAsync(null, null)) is { Mode: "demo" }, "
 var ouvPanne = await EcranOuvertureDossier.OuvrirAsync(client, GreffeMuet, new FicheOuverture("", "512700099", null, "X", "SAS", 1m, "EUR"));
 Exiger(ouvPanne is { Bloquant: true, Ouverts.Length: 0 } && ouvPanne.Message != EcranOuvertureDossier.SansEcritureV2,
     $"pont Ouvrir un dossier, base muette : le motif de la panne, pas le refus d'ecriture ({ouvPanne.Message})");
+
+// ============================================================ 4. DEPOTS JUDICIAIRES (LectureDepotsJud.cs, lot 5)
+// « Dépôts judiciaires » (PROC_DEPOTJUD), branche au lot 5 du plan : la serie JROP de la recherche (PROC_DEPOTJUD.Designer.cs:121),
+// le dernier evenement SURVENU, « a facturer » sans client sur les factures des demandes de l'affaire (PROC_DEPOTJUD.cs:58-64),
+// la demande qui tient l'instance (2J, en cours ou W/I/N). Joue en dernier : ses demandes n'entrent dans aucun controle
+// precedent. Identifiants 1 530 0xx (lot 5 : 1 500 000 a 1 599 999).
+await Sql("""
+    ALTER TABLE v2.DEMANDE ADD DMND_ID_AFFRE int NULL;
+    ALTER TABLE v2.EVENEMENT_PROCEDURE ADD EVNPR_ID_INSTN int NULL, EVNPR_SURVENU bit NULL;
+    CREATE TABLE v2.DOSSIER_DEMANDE (DSSDM_ID_DSSDM int NOT NULL PRIMARY KEY, DSSDM_ID_DMND int NOT NULL,
+        DSSDM_CODE_SEQUENCEUR varchar(20) NOT NULL, DSSDM_VALEUR_SEQUENCEUR varchar(100) NULL);
+    CREATE TABLE v2.CODE_AFFAIRE (R_CODEAFFAIR_VALEUR varchar(10) NOT NULL PRIMARY KEY, R_CODEAFFAIR_TYPE_NUM_ROLE varchar(5) NULL);
+    CREATE TABLE v2.NATURE_AFFAIRE (R_NATUREAFFA_VALEUR varchar(10) NOT NULL PRIMARY KEY, R_NATUREAFFA_LIBELLE_ECRAN varchar(75) NULL);
+    CREATE TABLE v2.CODE_EVE_PRO (R_CODEEVEPRO_VALEUR varchar(10) NOT NULL PRIMARY KEY, R_CODEEVEPRO_LIBELLE_ECRAN varchar(70) NULL);
+    CREATE TABLE v2.INSTANCE (INSTN_ID_INSTN int NOT NULL PRIMARY KEY, INSTN_NUM_ROLE varchar(11) NULL, INSTN_NOM_COURANT varchar(250) NULL,
+        INSTN_CODE_AFFAIRE varchar(10) NULL, INSTN_NATURE_AFFAIRE varchar(10) NULL, INSTN_DATE_ENROLEMENT datetime NULL, INSTN_ID_AFFRE int NULL);
+    """);
+// 1530001 (JROP) : une facture a un client sur une demande de son affaire, deux evenements survenus et un a venir plus recent ;
+// 1530002 (JROP) : une facture SANS client (jumeau : a facturer), tenue par une demande en cours, sans nature ni evenement ;
+// 1530003 (JRCT) : hors de la serie de la recherche (jumeau de 1530001, meme affaire).
+await Sql("""
+    INSERT INTO v2.CODE_AFFAIRE VALUES ('OP53', 'JROP'), ('CT53', 'JRCT');
+    INSERT INTO v2.NATURE_AFFAIRE VALUES ('N53', 'Opposition du banc');
+    INSERT INTO v2.CODE_EVE_PRO VALUES ('JUG53', 'Jugement du banc'), ('ASS53', 'Assignation du banc');
+    INSERT INTO v2.INSTANCE VALUES
+        (1530001, '2026J53001', 'DEPOT ALPHA # DEPOT BETA', 'OP53', 'N53', '20260203', 1530101),
+        (1530002, '2026J53002', 'DEPOT GAMMA', 'OP53', NULL, '20260204', 1530102),
+        (1530003, '2026J53003', 'DEPOT HORS SERIE', 'CT53', 'N53', '20260205', 1530101);
+    INSERT INTO v2.EVENEMENT_PROCEDURE (EVNPR_ID_EVNPR, EVNPR_ID_INSTN, EVNPR_CODE_EVE_PRO, EVNPR_DATE, EVNPR_SURVENU) VALUES
+        (1530011, 1530001, 'ASS53', '20260201', 1), (1530012, 1530001, 'JUG53', '20260205', 1), (1530013, 1530001, 'ASS53', '20260301', 0);
+    INSERT INTO v2.DEMANDE (DMND_ID_DMND, DMND_NUM_DEMANDE, DMND_ETAT_DEMANDE, DMND_EN_COURS, DMND_CODE_PROSS, DMND_ID_AFFRE) VALUES
+        (1530201, 'D1530201', 'V', 0, 'MJUD', 1530101), (1530202, 'D1530202', 'V', 0, 'MJUD', 1530102),
+        (1530203, 'D1530203', 'Q', 1, 'MJUD', NULL);
+    INSERT INTO v2.FACTURE (FACTU_NUMERO_FACTURE, FACTU_NUM_DEMANDE, FACTU_ID_CLIEN) VALUES ('F1530201', 'D1530201', 2700001), ('F1530202', 'D1530202', NULL);
+    INSERT INTO v2.DOSSIER_DEMANDE VALUES (1530251, 1530203, '2J', '1530002');
+    """);
+await using (var cn = new SqlConnection(greffe.Connexion))
+{
+    await cn.OpenAsync();
+    var depots = await LectureDepotsJud.LireAsync(cn, CancellationToken.None);
+    Exiger(depots.Total == 2 && depots.Lignes.Select(d => d.Numero).SequenceEqual(["2026J53002", "2026J53001"]),
+        $"depots judiciaires : la serie JROP seule (2026J53003, JRCT, ecartee), role decroissant ({string.Join(",", depots.Lignes.Select(d => d.Numero))})");
+    Exiger(depots.Lignes[1] is { Denomination: "DEPOT ALPHA # DEPOT BETA", Nature: "Opposition du banc", DernierEvenement: "Jugement du banc", DemandeEnCours: "", AFacturer: false }
+           && depots.Lignes[1].DateEvenement == new DateTime(2026, 2, 5) && depots.Lignes[1].Enrolement == new DateTime(2026, 2, 3),
+        "depots judiciaires : le dernier evenement SURVENU (pas celui a venir), la nature par son libelle ; une facture a un client : rien a facturer");
+    Exiger(depots.Lignes[0] is { Nature: "", DernierEvenement: "", DemandeEnCours: "D1530203", AFacturer: true } && depots.Lignes[0].DateEvenement is null,
+        "depots judiciaires : facture sans client -> a facturer (PROC_DEPOTJUD.cs:58-64) ; la demande en cours qui la tient (2J)");
+    var un = await LectureDepotsJud.LireAsync(cn, CancellationToken.None, plafond: 1);
+    Exiger(un.Lignes.Length == 1 && un.Total == 2, $"depots judiciaires : plafond 1 -> une ligne, total 2 ({un.Total})");
+}
+var depotsRoute = await http.GetFromJsonAsync<InstancesDepotLues>(RoutesEcransMain.Pour(RoutesDepotsJud.Instances, Greffe), json);
+Exiger(depotsRoute is { Total: 2 } && depotsRoute.Lignes[0].Numero == "2026J53002", "route des depots judiciaires : les lignes de la lecture");
+Exiger((await http.GetAsync(RoutesEcransMain.Pour(RoutesDepotsJud.Instances, GreffeAbsent))).StatusCode == HttpStatusCode.NotFound,
+    "route des depots judiciaires : greffe absent -> 404, sans repli");
+var depBase = await EcranDepotsJud.VueAsync(client, Greffe);
+Exiger(depBase is { Mode: "serveur", Total: 2 } && depBase.Lignes[1] is { Etat: "Libre", Statut: "ok", Ouverture: "2026-02-03", DernierEvenement: "Jugement du banc (05/02/2026)", Dossier: "2026J53001", Chambre: "", AFacturer: false }
+       && depBase.Lignes[0] is { Etat: "En cours", Statut: "attente", AFacturer: true }
+       && !depBase.Lignes.Any(l => EcranDepotsJud.Exemple().Lignes.Any(e => e.Numero == l.Numero)),
+    "pont Depots judiciaires branche : les instances de la base (aucune de la demonstration), « En cours » si une demande la tient, le dossier = l'instance");
+Exiger((await EcranDepotsJud.VueAsync(null, null)) is { Mode: "demo", Lignes.Length: 4 }, "pont Depots judiciaires sans serveur : la demonstration, mode « demo »");
+Exiger((await EcranDepotsJud.VueAsync(client, GreffeAbsent)) is { Mode: "erreur", Lignes.Length: 0, Message: not null },
+    "pont Depots judiciaires, greffe absent : le motif, AUCUNE ligne");
 
 Console.WriteLine();
 if (echecs.Count == 0) { Console.WriteLine("Ecrans faits main branches sur la base : VERT."); return 0; }

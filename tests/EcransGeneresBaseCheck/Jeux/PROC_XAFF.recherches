@@ -1,0 +1,21 @@
+# Les recherches de LecteurNouvelleInstance (IRechercheEcran), jouees sur les instances des autres jeux (PROC_XAFF.sql n'en ajoute
+# pas) AVANT les gestes. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). La recherche s'AJOUTE au filtre de la
+# liste (types de numero de role de XAFF).
+
+# 1. Le champ de recherche trouve un numero de role (FormRechercheInstance.cs:425, txtNumRole).
+texte: 12005
+lignes:
+ETA BANC | Rôle 2026J12005 · Contentieux du banc · enrôlée le 15/01/2026 | Fond | AFaire | []
+---
+# 2. Une instance de prevention (JRPR, le mode PR de XAFF, sans entree au menu) reste hors de la liste, meme cherchee par son
+#    numero -- jumeau retenu : bloc 1, une instance JRCT.
+texte: 2026P12004
+lignes:
+---
+# 3. Le critere « Nom courant », sans casse : « eta banc » est dans THETA, ZETA, ETA et « ALPHA BANC c/ BETA BANC ».
+critere: Nom courant = eta banc
+lignes:
+THETA BANC | Rôle 2026J12008 · Contentieux du banc · enrôlée le 15/01/2026 · bloquée par la demande 26012000008 | Fond | EnAttente | []
+ZETA BANC | Rôle 2026J12006 · Contentieux du banc · enrôlée le 15/01/2026 | Fond | AFaire | []
+ETA BANC | Rôle 2026J12005 · Contentieux du banc · enrôlée le 15/01/2026 | Fond | AFaire | []
+ALPHA BANC c/ BETA BANC | Rôle 2026J12001 · Contentieux du banc · enrôlée le 15/01/2026 | Fond | AFaire | []

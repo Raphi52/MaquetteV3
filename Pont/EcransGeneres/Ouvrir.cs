@@ -12,73 +12,96 @@ public sealed class DomaineOuvrir : IDomaineEcrans
 {
     public IEnumerable<DescripteurEcran> Ecrans() =>
     [
+        // PROC_XAFF (lot 5 du plan « RIG v3 100 % fonctionnel », 26/11/2026) : FICHE, pas Saisie. Malgre son libelle de menu,
+        // RIG v2 n'y cree pas d'instance : l'etape d'entree retrouve une instance EXISTANTE par son numero de role
+        // (ETP_INSTANCE_RECHERCHE, MetierParamNumMetiers « Instance=JROP, JRIP, JRCT, JRPC, JRREF, JRJC, JRMDE, JRORC »,
+        // PROC_XAFF.Designer.cs), la seule etape propre au PROC la corrige (ETP_CORRECT_INSTANCE, obligatoire), et
+        // MetierCreateAffaire = false. La creation numerotee est dans PROC_IPE et PROC_CORDJRCS. LecteurNouvelleInstance.cs,
+        // EcrivainNouvelleInstance.cs. fix-ok: mesure le 26/11/2026 (lot 5) -- OPE_INSTANCE_RECHERCHE.cs:155-180 ne fait que
+        // charger une instance existante (txtNumeroMetier -> Instance.GetInstancesByNumRole) : la forme Saisie promettait une
+        // creation que RIG v2 n'a pas ; IPE et CORDJRCS, eux, creent par l'etape Instance (OPE_INSTANCE.CallPrepSauve).
         new DescripteurEcran
         {
             Code = "PROC_XAFF", Titre = "Nouvelle instance", Sujet = "instances judiciaires",
-            Forme = FormeEcran.Saisie,
-            Recherche = "Rechercher une instance, un numéro de rôle, une partie…",
-            Criteres = ["Numéro de rôle", "Type d'instance", "Mode référé (PR)"],
-            Valider = "Enregistrer l'instance",
-            Etats = EtatsEcran.Trois("À saisir", "En saisie", "Enregistrée"),
+            Forme = FormeEcran.Fiche,
+            Recherche = "Rechercher une instance : numéro de rôle, nom courant…",
+            // La recherche d'instance de RIG v2 (FormRechercheInstance.cs:425-426).
+            Criteres = ["Numéro de rôle", "Nom courant"],
+            Valider = "Valider",
+            Etats = [.. EtatsEcran.Trois("À corriger", "En cours", "Corrigée"), new EtatEcran("EnAttente", "Verrouillée", "en-attente")],
             Groupes = ["Référé", "Fond"],
-            Marches =
+            Sections =
             [
-                Marche("Instance", "Le code affaire revalide la nature et l'acte de saisine : une valeur devenue incompatible est effacée, et l'utilisateur est prévenu.", true,
-                    "Code affaire", "Nature affaire", "Acte de saisine", "Date d'enrôlement", "Date de saisine du tribunal"),
-                Marche("Parties", "Au moins un demandeur et un défendeur : une ligne vierge est créée si la liste est vide. Pas d'intervenant pour une injonction de payer.", true,
-                    "Demandeurs", "Défendeurs", "Intervenants"),
-                Marche("Calendrier et appels", "Calendrier des audiences, appels passés et appels à venir.", false,
-                    "Calendrier", "Appels passés", "Appels à venir"),
-                Marche("Décision et chef de demande", "Décisions judiciaires rendues. Le chef de demande reste unique tant qu'aucune décision ne lui est rattachée.", false,
-                    "Décisions judiciaires", "Chef de demande"),
-                Marche("Événements", "Événements survenus, puis événements futurs ; les expirés y figurent aussi.", false,
-                    "Événements survenus", "Événements futurs"),
+                // OPE_CORRECT_INSTANCE.cs:33-43, titres et obligatoires de son Designer (:91-185). Code affaire, natures et acte se
+                // lisent : leur revalidation contre le code affaire (:46-93) n'est pas reprise par la V3.
+                Marche("Corriger l'instance", "Date d'enrôlement et date de saisine du tribunal obligatoires. Le code affaire, les natures et l'acte de saisine se lisent : RIG v2 les revalide contre les listes du code affaire, règle que la V3 ne reprend pas encore.", true,
+                    "Numéro de rôle", "Code affaire", "Nature de l'affaire", "Nature particulière de l'affaire", "Acte de saisine",
+                    Champ.Date("Date d'enrôlement"), Champ.Date("Date saisine tribunal"), Champ.Date("Date première audience"), "Nom courant",
+                    Champ.Date("Date acte introductif"), "Délivrance de l'acte", Champ.Zone("Texte sur l'acte introductif")),
+                // Les sous-listes que SetPhase charge (PROC_XAFF.cs:76-155) ; pas d'intervenant pour une IP (:97-103).
+                Marche("Parties", "Demandeurs, défendeurs et intervenants de l'instance (pas d'intervenant pour une injonction de payer).", false,
+                    Champ.Tableau("Demandeurs"), Champ.Tableau("Défendeurs"), Champ.Tableau("Intervenants")),
+                Marche("Appels de l'affaire", "Les appels de l'affaire, par date d'audience.", false,
+                    Champ.Tableau("Appels de l'affaire")),
+                Marche("Décisions judiciaires", "Les décisions rendues ou prévues.", false,
+                    Champ.Tableau("Décisions judiciaires")),
+                Marche("Événements", "Événements survenus, puis futurs et expirés dans la même liste.", false,
+                    Champ.Tableau("Événements survenus"), Champ.Tableau("Événements futurs et expirés")),
             ],
             Lignes =
             [
-                Ligne("Alpha Services SARL c/ Bêta Industrie SAS", "Rôle 2026J00101 · enrôlée le 03/03/2026", "Fond", "AFaire"),
-                Ligne("Gamma Conseil SARL c/ Delta Transports SAS", "Rôle 2026J00102 · enrôlée le 04/03/2026", "Fond", "EnCours", 0),
-                Ligne("Epsilon Habitat SARL c/ Zêta Commerce SAS", "Rôle 2026J00103 · mode référé", "Référé", "EnCours", 0, 1),
-                Ligne("Êta Boulangerie SARL c/ Thêta Import SAS", "Rôle 2026J00104 · mode référé", "Référé", "Validee", 0, 1, 3),
-                Ligne("Iota Études SARL c/ Kappa Négoce SAS", "Rôle 2026J00105 · enrôlée le 07/03/2026", "Fond", "Validee", 0, 1, 3, 4),
-                Ligne("Lambda Pêche SARL c/ Mu Logistique SAS", "Rôle 2026J00106 · enrôlée le 09/03/2026", "Fond", "AFaire"),
-                Ligne("Nu Paiement SAS c/ Xi Entrepôts SARL", "Rôle 2026J00107 · mode référé", "Référé", "EnCours", 0),
-                Ligne("Omicron Bâtiment SARL c/ Pi Services SAS", "Rôle 2026J00108 · enrôlée le 12/03/2026", "Fond", "AFaire"),
+                Ligne("Alpha Services SARL # Bêta Industrie SAS", "Rôle 2026J00101 · enrôlée le 03/03/2026", "Fond", "AFaire"),
+                Ligne("Gamma Conseil SARL # Delta Transports SAS", "Rôle 2026J00102 · enrôlée le 04/03/2026", "Fond", "Validee"),
+                Ligne("Epsilon Habitat SARL # Zêta Commerce SAS", "Rôle 2026R00103 · bloquée par une autre demande", "Référé", "EnAttente"),
+                Ligne("Êta Boulangerie SARL # Thêta Import SAS", "Rôle 2026R00104 · enrôlée le 06/03/2026", "Référé", "AFaire"),
+                Ligne("Iota Études SARL # Kappa Négoce SAS", "Rôle 2026IP00105 · enrôlée le 07/03/2026", "Fond", "AFaire"),
+                Ligne("Lambda Pêche SARL # Mu Logistique SAS", "Rôle 2026J00106 · enrôlée le 09/03/2026", "Fond", "Validee"),
             ],
         },
 
+        // PROC_NF (lot 5 du plan « RIG v3 100 % fonctionnel », 26/11/2026) : OUVRE la procedure collective d'une INSTANCE existante
+        // (MetierBase = Instance, PROC_NF.cs:18 ; titre « Création d'une PC », FORM_NF.Designer.cs:53). L'instance se designe par son
+        // numero de role, series JRCT et JRPC, sans PC rattachee (etape de recherche, PROC_NF.Designer.cs:303-305) ; la PC prend le
+        // debiteur de l'instance (PROC_NF.cs:73-77). Etapes obligatoires de PROC_NF.Designer.cs : Instance (:270), Demandeurs (:259),
+        // Défendeurs (:248) -- ces deux-la, RIG v2 les remplit avec les parties de l'instance (PROC_NF.cs:83-94) ; le nom de
+        // l'affaire de l'etape PC (OPE_PROCEDURE_COLLECTIVE.Designer.cs:185). Creer : EcrivainNouvellesFormalites.cs ; la liste :
+        // LecteurNouvellesFormalites.cs (demandes NF).
         new DescripteurEcran
         {
             Code = "PROC_NF", Titre = "Nouvelle formalite", Sujet = "procédures collectives",
             Forme = FormeEcran.Saisie,
-            Recherche = "Rechercher un débiteur, un SIREN, une procédure…",
-            Criteres = ["SIREN du débiteur", "Type de procédure", "Date du jugement"],
+            Recherche = "Rechercher une instance, une procédure…",
+            Criteres = ["Numéro de rôle", "Numéro de PC"],
             Valider = "Ouvrir la procédure",
             Etats = EtatsEcran.Trois("À ouvrir", "En cours", "Ouverte"),
-            Groupes = ["Redressement et liquidation (RC)", "Prévention (IP)", "Autres procédures"],
+            Groupes = ["Nouvelle formalité (NF)"],
             Marches =
             [
-                Marche("Débiteur", "Le premier débiteur fournit la procédure : son dossier RCS, ou son non-inscrit à défaut. Au moins un débiteur est requis ; sans l'un ni l'autre, la création échoue.", true,
-                    "Premier débiteur", "Dossier RCS ou non-inscrit"),
-                Marche("Instance", "Parties, appels, décision et événements. Une prévention n'a ni intervenants, ni appels, ni chef de demande.", true,
-                    "Demandeurs", "Défendeurs", "Décision", "Événements"),
-                Marche("Procédure collective", "Organes de procédure, dirigeants, établissements et chiffres.", true,
+                Marche("Instance", "L'instance des séries JRCT ou JRPC, par son numéro de rôle ; une instance qui a déjà une procédure collective est refusée, une instance tenue par une autre demande reste en lecture seule. La procédure prend le débiteur de l'instance : son dossier RCS, ou son non-inscrit à défaut.", true,
+                    "Numéro de rôle"),
+                Marche("Procédure collective", "Le nom de l'affaire est obligatoire. La date du jugement donne l'année du numéro de PC attribué à l'enregistrement ; sans date, la procédure s'ouvre sans numéro, comme dans RIG v2.", true,
+                    "Nom de l'affaire",
+                    Champ.Liste("Nature", "Ouverture (redressement ou liquidation)", "Sauvegarde", "Rétablissement professionnel", "Traitement de sortie de crise"),
+                    Champ.Date("Date du jugement")),
+                Marche("Parties de l'instance", "Demandeurs, défendeurs et intervenants : RIG v2 les reprend de l'instance (pas d'intervenant pour une injonction ni une ordonnance RCS). La V3 ne les modifie pas ici.", false,
+                    "Demandeurs", "Défendeurs", "Intervenants"),
+                Marche("Instance : suite", "Appels, décision, chef de demande et événements de l'instance. Non repris par la V3.", false,
+                    "Appels", "Décision", "Chef de demande", "Événements"),
+                Marche("Organes et dirigeants", "Organes, dirigeants, établissements et chiffres de la procédure. Non repris par la V3.", false,
                     "Organes de procédure", "Dirigeants", "Établissements", "Chiffres"),
                 Marche("Note", "N'apparaît que si la procédure a une note.", false,
                     "Note sur la procédure"),
-                Marche("Facturation", "Forfait, ou articles ligne par ligne : le paramètre de la procédure décide.", true,
-                    "Articles"),
+                Marche("Facturation", "Articles NF, sauf procédure au forfait. Non reprise par la V3.", false,
+                    Champ.Tableau("Articles")),
             ],
             Lignes =
             [
-                Ligne("Alpha Services SARL", "SIREN 900 100 001 · redressement judiciaire · jugement du 02/03/2026", "Redressement et liquidation (RC)", "AFaire"),
-                Ligne("Bêta Industrie SAS", "SIREN 900 100 002 · liquidation judiciaire · jugement du 05/03/2026", "Redressement et liquidation (RC)", "EnCours", 0, 1),
-                Ligne("Gamma Conseil SARL", "Non-inscrit · redressement judiciaire · jugement du 06/03/2026", "Redressement et liquidation (RC)", "EnCours", 0),
-                Ligne("Delta Transports SAS", "SIREN 900 100 004 · sauvegarde · jugement du 10/03/2026", "Autres procédures", "Validee", 0, 1, 2, 4),
-                Ligne("Epsilon Habitat SARL", "SIREN 900 100 005 · prévention", "Prévention (IP)", "AFaire"),
-                Ligne("Zêta Commerce SAS", "SIREN 900 100 006 · prévention", "Prévention (IP)", "EnCours", 0, 1),
-                Ligne("Êta Boulangerie SARL", "SIREN 900 100 007 · redressement judiciaire · jugement du 13/03/2026", "Autres procédures", "AFaire"),
-                Ligne("Thêta Import SAS", "SIREN 900 100 008 · liquidation judiciaire · jugement du 16/03/2026", "Redressement et liquidation (RC)", "Validee", 0, 1, 2, 4),
+                Ligne("Alpha Services SARL # Bêta Industrie SAS", "Instance 2026J00101 · PC 2026RJ0101", "Nouvelle formalité (NF)", "Validee", 0, 1),
+                Ligne("Gamma Conseil SARL # Delta Transports SAS", "Instance 2026J00102 · interrompue", "Nouvelle formalité (NF)", "EnCours", 0),
+                Ligne("Epsilon Habitat SARL # Zêta Commerce SAS", "Instance 2026J00103 · PC sans numéro", "Nouvelle formalité (NF)", "Validee", 0, 1),
+                Ligne("Demande D2633000104", "demande D2633000104", "Nouvelle formalité (NF)", "AFaire"),
+                Ligne("Êta Boulangerie SARL # Thêta Import SAS", "Instance 2026J00105 · PC 2026RJ0105", "Nouvelle formalité (NF)", "Validee", 0, 1),
+                Ligne("Iota Études SARL # Kappa Négoce SAS", "Instance 2026J00106", "Nouvelle formalité (NF)", "EnCours", 0),
             ],
         },
 
@@ -93,11 +116,18 @@ public sealed class DomaineOuvrir : IDomaineEcrans
             Groupes = ["Procédure collective (PC)", "Prévention (PRV)"],
             Marches =
             [
-                Marche("Procédure", "Saisie de la procédure, marquée extérieure. En mode prévention, c'est l'étape prévention qui s'ouvre.", true,
-                    "Nature", "Date du jugement", "Débiteur"),
+                // Lot 5 (26/11/2026) : la PC exterieure de PROC_NPC (PROC_NPC.cs:51-53), saisie par l'etape « Procédure
+                // collective » (OPE_PROCEDURE_COLLECTIVE.Designer.cs : Nom de l'affaire :185 et Juridiction extérieure :592
+                // obligatoires ; les quatre dates, OPE_PROCEDURE_COLLECTIVE.cs:194-197 → Nature) ; « Organes » n'est pas une etape obligatoire de PROC_NPC
+                // (PROC_NPC.Designer.cs : seules Facturation :50 et la notification :194 le sont). Creer :
+                // EcrivainNouvellesProcedures.cs (numero JPCEX, client compte PC) ; la liste : LecteurNouvellesProcedures.cs.
+                Marche("Procédure", "Saisie de la procédure, marquée extérieure. Le débiteur est un dossier RCS ou un non-inscrit. La date du jugement donne l'année du numéro attribué à l'enregistrement ; sans date, la procédure s'enregistre sans numéro, comme dans RIG v2. En mode prévention, c'est l'étape prévention qui s'ouvre (reste à RIG v2).", true,
+                    "Débiteur", "Nom de l'affaire",
+                    Champ.Liste("Nature", "Ouverture (redressement ou liquidation)", "Sauvegarde", "Rétablissement professionnel", "Traitement de sortie de crise"),
+                    Champ.Date("Date du jugement"), "Juridiction extérieure"),
                 Marche("Établissement", "Établissement de la procédure.", false,
                     "Établissement principal"),
-                Marche("Organes", "Organes de la procédure.", true,
+                Marche("Organes", "Organes de la procédure.", false,
                     "Administrateur", "Mandataire", "Juge-commissaire"),
                 Marche("Dirigeants", "Dirigeants de la procédure.", false,
                     "Dirigeant", "Qualité"),
@@ -105,10 +135,10 @@ public sealed class DomaineOuvrir : IDomaineEcrans
                     "Chiffre d'affaires", "Effectif"),
                 Marche("Événements", "Événements survenus, puis événements à venir.", false,
                     "Événements survenus", "Événements à venir"),
-                Marche("Notification CFEC", "Notification dématérialisée. Acceptée, elle ouvre la suite ; refusée, elle fait refuser la demande et seule cette étape reste visible.", true,
+                Marche("Notification CFEC", "Notification dématérialisée, visible seulement pour une notification reçue. Acceptée, elle ouvre la suite ; refusée, elle fait refuser la demande et seule cette étape reste visible. La V3 ne reçoit pas les notifications CFEC.", false,
                     "Accepter", "Refuser"),
-                Marche("Facturation", "Facturation de la procédure, selon son paramètre.", true,
-                    "Articles"),
+                Marche("Facturation", "Facturation de la procédure, selon son paramètre. Non reprise par la V3.", true,
+                    Champ.Tableau("Articles")),
             ],
             Lignes =
             [
@@ -123,6 +153,10 @@ public sealed class DomaineOuvrir : IDomaineEcrans
             ],
         },
 
+        // PROC_IPE (lot 5 du plan « RIG v3 100 % fonctionnel », 26/11/2026) : les etapes de PROC_IPE.Designer.cs:26-37, leurs
+        // champs obligatoires lus dans leurs Designer (OPE_INSTANCE, OPE_PARTIE : MetierObligatoire). Creer ecrit l'instance
+        // NUMEROTEE, ses deux parties et sa demande, laissee interrompue : decision, facture et editions restent a RIG v2
+        // (EcrivainInjonctionsDePayer.cs, qui les nomme). LecteurInjonctionsDePayer.cs lit les saisies.
         new DescripteurEcran
         {
             Code = "PROC_IPE", Titre = "Injonction de payer", Sujet = "injonctions de payer",
@@ -130,37 +164,44 @@ public sealed class DomaineOuvrir : IDomaineEcrans
             Recherche = "Rechercher une demande, un demandeur, un défendeur…",
             Criteres = ["Demandeur", "Défendeur", "Date de la demande"],
             Valider = "Enregistrer l'injonction",
-            Etats = [.. EtatsEcran.Trois("À saisir", "En cours", "Enregistrée"), new EtatEcran("EnAttente", "En attente du tribunal", "en-attente")],
+            // Refus (O) : le chemin refus de PROC_IPE (PROC_IPE.cs:261-277), l'etat « Refus » de ETAT_DEMANDE.
+            Etats = [.. EtatsEcran.Trois("À saisir", "En cours", "Enregistrée"), new EtatEcran("EnAttente", "En attente du tribunal", "en-attente"),
+                     new EtatEcran("Rejetee", "Refusée", "rejetee")],
             Groupes = ["Saisie directe", "Tribunal digital"],
             Marches =
             [
-                Marche("Demande", "En-tête de la demande, masquable. En circuit dématérialisé, le tribunal digital s'affiche une fois la formalité créée.", false,
-                    "Date de la demande", "Tribunal"),
-                Marche("Instance", "Créée vide dès l'ouverture : une instance quittée sans validation reste orpheline, à nettoyer.", true,
-                    "Code affaire", "Date d'enrôlement"),
-                Marche("Demandeur", "Au moins un demandeur, jusqu'à 250.", true,
-                    "Demandeur"),
-                Marche("Défendeur", "Au moins un défendeur. Un KBis ou une attestation de non-inscription est édité selon qu'il est inscrit.", true,
-                    "Défendeur", "Inscription au registre"),
-                Marche("Décision", "Décision préparée dès la saisie.", true,
-                    "Décision préparée", "Chef de demande"),
-                Marche("Facturation", "IPREQ, puis IPREQSUP par partie au-delà de la première.", true,
-                    "IPREQ", "IPREQSUP"),
-                Marche("Réclamation ou refus", "IPREQREFUS pour une ordonnance de refus, JRECLAM pour une réclamation.", false,
-                    "IPREQREFUS", "JRECLAM"),
-                Marche("Note", "Note libre sur la demande.", false,
-                    "Note"),
+                // ETP_INSTANCE obligatoire (PROC_IPE.Designer.cs:111-120) ; codes affaire de type IP (OPE_INSTANCE.cs:1663-1664) ;
+                // enrolement = maintenant (PROC_IPE.cs:155).
+                Marche("Instance", "Codes affaire d'injonction de payer (type IP). La date d'enrôlement est celle du jour ; le numéro de rôle et le répertoire général sont attribués à la création. La date de l'acte n'est pas saisie pour une assignation.", true,
+                    "Code affaire", "Nature affaire", "Nature particulière de l'affaire", "Acte de saisine", Champ.Date("Date de l'acte"),
+                    Champ.Date("Saisine tribunal"), "Note sur l'affaire"),
+                // ETP_DEMANDEUR / ETP_DEFENDEUR obligatoires (:87-107), un de chaque a la creation (PROC_IPE.cs:158-168).
+                Marche("Demandeur", "Un demandeur à la création ; civilité et désignation obligatoires.", true,
+                    "Civilité", "Désignation", "N° de Siren"),
+                Marche("Défendeur", "Un défendeur à la création ; civilité et désignation obligatoires.", true,
+                    "Civilité", "Désignation", "N° de Siren"),
+                // ETP_PREP_DECISION obligatoire (:77-83) : non ecrite par la V3, la demande reste interrompue.
+                Marche("Décision", "Décision préparée dès la saisie dans RIG v2 (type, avant dire droit, ressort, contradictoire, exécution provisoire). Non reprise par la V3 : la demande reste interrompue, à reprendre dans RIG v2.", true,
+                    Champ.Tableau("Décision préparée")),
+                // Etape unique (PROC_IPE.Designer.cs:63-72).
+                Marche("Chef de demande", "Étape unique : un seul chef de demande.", false,
+                    Champ.Tableau("Chef de demande")),
+                Marche("Événements survenus", "Événements de l'instance.", false,
+                    Champ.Tableau("Événements survenus")),
+                Marche("Facturation", "IPREQ, puis IPREQSUP par partie facturée au-delà de la première. Non reprise par la V3.", false,
+                    Champ.Tableau("Articles IPREQ et IPREQSUP")),
+                Marche("Réclamation ou refus", "IPREQREFUS pour une ordonnance de refus, JRECLAM par réclamation attendue.", false,
+                    Champ.Tableau("IPREQREFUS et JRECLAM")),
             ],
             Lignes =
             [
-                Ligne("Alpha Services SARL c/ Bêta Industrie SAS", "Demande reçue le 02/03/2026", "Saisie directe", "AFaire"),
-                Ligne("Gamma Conseil SARL c/ Delta Transports SAS", "Demande du 03/03/2026 · deux défendeurs", "Saisie directe", "EnCours", 0, 1, 2),
-                Ligne("Epsilon Habitat SARL c/ Zêta Commerce SAS", "Demande du 04/03/2026", "Saisie directe", "Validee", 0, 1, 2, 3, 4, 5),
-                Ligne("Êta Boulangerie SARL c/ Thêta Import SAS", "Tribunal digital · flux du 05/03/2026", "Tribunal digital", "EnAttente"),
-                Ligne("Iota Études SARL c/ Kappa Négoce SAS", "Tribunal digital · flux du 06/03/2026", "Tribunal digital", "EnCours", 0, 1, 2),
-                Ligne("Lambda Pêche SARL c/ Mu Logistique SAS", "Demande du 09/03/2026", "Saisie directe", "AFaire"),
-                Ligne("Nu Paiement SAS c/ Xi Entrepôts SARL", "Demande du 10/03/2026 · réclamation", "Saisie directe", "EnCours", 0, 1, 2, 3, 4, 5, 6),
-                Ligne("Omicron Bâtiment SARL c/ Pi Services SAS", "Tribunal digital · flux du 11/03/2026", "Tribunal digital", "AFaire"),
+                Ligne("Alpha Services SARL # Bêta Industrie SAS", "Demande D2600000101 · saisine du 02/03/2026", "Saisie directe", "AFaire"),
+                Ligne("Gamma Conseil SARL # Delta Transports SAS", "Rôle 2026IP00102 · saisine du 03/03/2026 · interrompue", "Saisie directe", "EnCours", 0, 1, 2),
+                Ligne("Epsilon Habitat SARL # Zêta Commerce SAS", "Rôle 2026IP00103 · saisine du 04/03/2026", "Saisie directe", "Validee", 0, 1, 2, 3),
+                Ligne("Êta Boulangerie SARL # Thêta Import SAS", "Tribunal digital · flux du 05/03/2026", "Tribunal digital", "EnAttente"),
+                Ligne("Iota Études SARL # Kappa Négoce SAS", "Rôle 2026IP00105 · flux du 06/03/2026", "Tribunal digital", "Validee", 0, 1, 2, 3),
+                Ligne("Lambda Pêche SARL # Mu Logistique SAS", "Tribunal digital · flux du 09/03/2026 · refusée", "Tribunal digital", "Rejetee"),
+                Ligne("Nu Paiement SAS # Xi Entrepôts SARL", "Rôle 2026IP00107 · saisine du 10/03/2026 · interrompue", "Saisie directe", "EnCours", 0, 1),
             ],
         },
 
@@ -171,52 +212,55 @@ public sealed class DomaineOuvrir : IDomaineEcrans
             // modifier », :177 verrou avant toute modification, :211 MetierCreateAffaire = false ; titre de la fenetre
             // « Modification de mesure », :256). On la retrouve, on la verrouille, on passe en Saisie (:221-226).
             // Controle final du lot 1, 25/11/2026 : elle etait rangee en Saisie d'apres le menu, pas d'apres la fiche.
+            // Lot 5 (26/11/2026) : lue et enregistree dans la base -- LecteurMesuresProvisoires.cs, EcrivainMesuresProvisoires.cs.
             Forme = FormeEcran.Fiche,
             Recherche = "Rechercher une mesure ou une instance…",
-            // Le seul critere de l'etape de recherche V2 : OPE_MESURE_RECHERCHE.Designer.cs:81.
+            // Le seul critere de l'etape de recherche V2 : OPE_MESURE_RECHERCHE.Designer.cs:80 (« Instance=*;Mesure=*; »).
             Criteres = ["N° de la mesure ou instance"],
             // Valider : le bouton du moteur (Processus), la fiche n'en nomme pas d'autre (:209 aucun DoVerifier ni DoSauve).
             Valider = "Valider",
             Etats = [.. EtatsEcran.Trois("À modifier", "En cours", "Modifiée"), new EtatEcran("EnAttente", "Verrouillée", "en-attente")],
-            Groupes = ["Mise en état", "Référé"],
+            // Les types EXP* (expertise) a part, la distinction que fait OPE_MESURE.GetCodeEvePro (OPE_MESURE.cs:149).
+            Groupes = ["Expertise", "Autre mesure"],
             Sections =
             [
-                // Les champs de l'etape « Mesure » (ETP_MESURE) : OPE_MESURE.Designer.cs:92-208. N° de mesure et
-                // Ouverture y sont en lecture seule (:91, :112) ; Type de mesure obligatoire (:100), liste des types du
-                // greffe (OPE_MESURE.cs:49, MSINS_TYPE_MESURE).
+                // Les champs de l'etape « Mesure » (ETP_MESURE) : OPE_MESURE.cs:45-63, titres de OPE_MESURE.Designer.cs:92-208.
+                // N° de mesure et Ouverture en lecture seule (:91, :112) ; Type de mesure obligatoire (:100), liste des types
+                // du greffe (TYPE_MESURE). Les quatre dates de rapport et de diligences ajoutent un evenement de procedure dans
+                // RIG v2 (OPE_MESURE.cs:95-142) : en lecture dans la V3, qui ne reprend pas encore cette regle.
                 // Verrou a l'ouverture ; s'il echoue, la mesure reste en lecture seule (proc_mesin.md:225, :228).
-                Marche("Mesure", "Verrouillée à l'ouverture : tenue par un autre utilisateur, elle reste en lecture seule. N° de mesure et date d'ouverture ne se modifient pas ; le type de mesure est obligatoire.", true,
-                    "Type de mesure", Champ.Date("Classement sans suite"), Champ.Date("Caducité"),
+                Marche("Mesure", "Verrouillée à l'ouverture : tenue par un autre utilisateur, elle reste en lecture seule. N° de mesure et date d'ouverture ne se modifient pas ; le type de mesure est obligatoire. Les dates de rapport et de diligences se lisent : dans RIG v2 elles ajoutent un événement de procédure, règle que la V3 ne reprend pas encore.", true,
+                    "N° de mesure", "Type de mesure", Champ.Date("Ouverture"), Champ.Date("Classement sans suite"), Champ.Date("Caducité"),
                     Champ.Date("Limite de dépôt du rapport"), Champ.Date("Dépôt du rapport"), Champ.Date("Prévision de dépôt du rapport"),
                     Champ.Montant("Coût prévu de l'expertise"),
                     Champ.Date("Limite de dépôt de l'état des diligences"), Champ.Date("Dépôt de l'état des diligences"),
                     Champ.Zone("Informations")),
                 // Parties : celles de l'instance de la mesure (proc_mesin.md:243-245). Demandeurs et defendeurs
                 // obligatoires (Designer.cs:112 et :101) ; sans demandeur, une ligne vide est creee.
-                Marche("Demandeurs", "Les demandeurs de l'instance de la mesure ; sans demandeur, une ligne vide est créée.", true,
+                Marche("Demandeurs", "Les demandeurs de l'instance de la mesure.", true,
                     Champ.Tableau("Demandeurs")),
                 Marche("Défendeurs", "Les défendeurs de l'instance ; la liste reste vide s'il n'y en a pas.", true,
                     Champ.Tableau("Défendeurs")),
                 Marche("Intervenants", "Les intervenants de l'instance ; la liste reste vide s'il n'y en a pas.", false,
                     Champ.Tableau("Intervenants")),
                 // Deux etapes d'evenements, pas trois : les expires sont affiches avec les futurs (proc_mesin.md:247).
-                Marche("Événements survenus", "Événements de procédure déjà survenus ; une ligne vide est offerte s'il n'y en a aucun.", false,
+                Marche("Événements survenus", "Événements de procédure de la mesure déjà survenus.", false,
                     Champ.Tableau("Événements survenus")),
                 Marche("Événements futurs et expirés", "Événements à venir, et ceux dont le délai est dépassé, dans la même liste.", false,
                     Champ.Tableau("Événements futurs et expirés")),
-                // Le type de facturation MESIN, fixe dans le code (proc_mesin.md:248).
-                Marche("Facturation", "Les articles des mesures provisoires (type de facturation MESIN).", false,
+                // Le type de facturation MESIN, fixe dans le code (proc_mesin.md:248) : non lu par la V3.
+                Marche("Facturation", "Les articles des mesures provisoires (type de facturation MESIN). Non repris par la V3.", false,
                     Champ.Tableau("Articles MESIN")),
             ],
             Lignes =
             [
-                Ligne("Alpha Services SARL c/ Bêta Industrie SAS", "Mesure du 02/03/2026 · instance 2026J00201", "Mise en état", "AFaire"),
-                Ligne("Gamma Conseil SARL c/ Delta Transports SAS", "Mesure du 03/03/2026 · instance 2026J00202", "Mise en état", "EnCours", 0, 1),
-                Ligne("Epsilon Habitat SARL c/ Zêta Commerce SAS", "Mesure du 05/03/2026 · instance 2026J00203", "Mise en état", "Validee", 0, 1, 2, 4),
-                Ligne("Êta Boulangerie SARL c/ Thêta Import SAS", "Mesure en référé du 06/03/2026", "Référé", "AFaire"),
-                Ligne("Iota Études SARL c/ Kappa Négoce SAS", "Mesure en référé du 09/03/2026 · verrouillée par un autre utilisateur", "Référé", "EnAttente"),
-                Ligne("Lambda Pêche SARL c/ Mu Logistique SAS", "Mesure en référé du 10/03/2026", "Référé", "Validee", 0, 1, 2, 6),
-                Ligne("Nu Paiement SAS c/ Xi Entrepôts SARL", "Mesure du 12/03/2026 · instance 2026J00207", "Mise en état", "EnCours", 0),
+                Ligne("Alpha Services SARL c/ Bêta Industrie SAS", "Mesure du 02/03/2026 · instance 2026J00201", "Expertise", "AFaire"),
+                Ligne("Gamma Conseil SARL c/ Delta Transports SAS", "Mesure du 03/03/2026 · instance 2026J00202", "Expertise", "EnCours", 0, 1),
+                Ligne("Epsilon Habitat SARL c/ Zêta Commerce SAS", "Mesure du 05/03/2026 · instance 2026J00203", "Expertise", "Validee", 0, 1, 2, 4),
+                Ligne("Êta Boulangerie SARL c/ Thêta Import SAS", "Mesure en référé du 06/03/2026", "Autre mesure", "AFaire"),
+                Ligne("Iota Études SARL c/ Kappa Négoce SAS", "Mesure en référé du 09/03/2026 · verrouillée par un autre utilisateur", "Autre mesure", "EnAttente"),
+                Ligne("Lambda Pêche SARL c/ Mu Logistique SAS", "Mesure en référé du 10/03/2026", "Autre mesure", "Validee", 0, 1, 2, 6),
+                Ligne("Nu Paiement SAS c/ Xi Entrepôts SARL", "Mesure du 12/03/2026 · instance 2026J00207", "Expertise", "EnCours", 0),
             ],
         },
 
@@ -276,34 +320,45 @@ public sealed class DomaineOuvrir : IDomaineEcrans
             Valider = "Enregistrer l'ordonnance",
             Etats = EtatsEcran.Trois("À rédiger", "En cours", "Enregistrée"),
             Groupes = ["Enrôlement sur requête", "Refus", "Réclamation"],
+            // Lot 5 du plan « RIG v3 100 % fonctionnel » (26/11/2026) : les etapes de PROC_CORDJRCS.DoInitObject (fiche
+            // proc_cordjrcs.md, Detail OPE :254-279) et les obligatoires de leurs Designer (OPE_INSTANCE, OPE_PARTIE). Creer ecrit
+            // l'instance NUMEROTEE, ses deux parties et sa demande, laissee interrompue (EcrivainOrdonnancesEnrolement.cs).
             Marches =
             [
-                Marche("Facturation", "Préfixe d'émolument selon la date de saisine (origine, 16-, 18-). Les articles 801 et 806 sont des frais postaux, pas des émoluments.", true,
-                    "Émoluments", "Frais postaux"),
-                Marche("Instance", "Instance créée vide : les champs trop longs sont tronqués automatiquement.", true,
-                    "Code affaire", "Date de saisine"),
-                Marche("Demandeur", "Partie créée à l'ouverture.", true,
-                    "Demandeur"),
-                Marche("Défendeur", "Partie créée à l'ouverture.", true,
-                    "Défendeur"),
-                Marche("Décision", "La décision judiciaire est créée à la validation ; le dossier RCS ou le non-inscrit est mis à jour.", true,
-                    "Date de l'ordonnance", "Nature de la décision"),
+                // Codes affaire de type RC (OPE_INSTANCE.cs:1649-1650) ; enrolement = maintenant (PROC_CORDJRCS.cs:214) ; troncature
+                // automatique des champs trop longs (Instance.TronquageAuto, :183).
+                Marche("Instance", "Codes affaire des ordonnances RCS (type RC). La date d'enrôlement est celle du jour ; le numéro de rôle est attribué à la création. Les champs trop longs sont tronqués.", true,
+                    "Code affaire", "Nature affaire", "Nature particulière de l'affaire", "Acte de saisine", Champ.Date("Date de l'acte"),
+                    Champ.Date("Saisine tribunal"), "Note sur l'affaire"),
+                Marche("Demandeur", "Partie créée à l'ouverture ; civilité et désignation obligatoires.", true,
+                    "Civilité", "Désignation", "N° de Siren"),
+                Marche("Défendeur", "Partie créée à l'ouverture ; civilité et désignation obligatoires.", true,
+                    "Civilité", "Désignation", "N° de Siren"),
+                Marche("Décision", "La décision judiciaire est créée à la validation ; le dossier RCS ou le non-inscrit est mis à jour. Non reprise par la V3 : la demande reste interrompue, à reprendre dans RIG v2.", true,
+                    Champ.Tableau("Décision")),
                 Marche("Chef de demande", "Qualification juridique de la demande.", false,
-                    "Chef de demande"),
+                    Champ.Tableau("Chef de demande")),
+                Marche("Facturation", "Préfixe d'émolument selon la date de saisine (origine, 16-, 18-). Les articles 801 et 806 sont des frais postaux, pas des émoluments. Non reprise par la V3.", false,
+                    Champ.Tableau("Émoluments et frais postaux")),
             ],
             Lignes =
             [
-                Ligne("Alpha Services SARL", "Dossier RCS 2026B00401 · saisine du 02/03/2026", "Enrôlement sur requête", "AFaire"),
-                Ligne("Bêta Industrie SAS", "Dossier RCS 2026B00402 · saisine du 04/03/2026", "Enrôlement sur requête", "EnCours", 0, 1),
-                Ligne("Gamma Conseil SARL", "Non-inscrit · saisine du 05/03/2026", "Enrôlement sur requête", "Validee", 0, 1, 2, 3, 4),
-                Ligne("Delta Transports SAS", "Dossier RCS 2026B00405 · refus", "Refus", "AFaire"),
-                Ligne("Epsilon Habitat SARL", "Dossier RCS 2026B00406 · refus", "Refus", "EnCours", 0, 1, 2),
-                Ligne("Zêta Commerce SAS", "Dossier RCS 2026B00407 · refus", "Refus", "Validee", 0, 1, 2, 3, 4),
-                Ligne("Êta Boulangerie SARL", "Non-inscrit · réclamation du 09/03/2026", "Réclamation", "EnCours", 0, 1, 2, 3),
-                Ligne("Thêta Import SAS", "Dossier RCS 2026B00409 · réclamation", "Réclamation", "AFaire"),
+                Ligne("Alpha Services SARL # Bêta Industrie SAS", "Demande D2600000401 · saisine du 02/03/2026", "Enrôlement sur requête", "AFaire"),
+                Ligne("Gamma Conseil SARL # Delta Transports SAS", "Rôle 2026RC00402 · saisine du 04/03/2026 · interrompue", "Enrôlement sur requête", "EnCours", 0, 1, 2),
+                Ligne("Epsilon Habitat SARL # Zêta Commerce SAS", "Rôle 2026RC00403 · saisine du 05/03/2026", "Enrôlement sur requête", "Validee", 0, 1, 2, 3),
+                Ligne("Êta Boulangerie SARL # Thêta Import SAS", "Rôle 2026RC00404 · saisine du 06/03/2026", "Refus", "Validee", 0, 1, 2, 3),
+                Ligne("Iota Études SARL # Kappa Négoce SAS", "Rôle 2026RC00405 · saisine du 09/03/2026", "Réclamation", "EnCours", 0, 1),
+                Ligne("Lambda Pêche SARL # Mu Logistique SAS", "Rôle 2026RC00406 · saisine du 10/03/2026", "Enrôlement sur requête", "Validee", 0, 1, 2, 3),
             ],
         },
 
+        // PROC_DAS (lot 5 du plan « RIG v3 100 % fonctionnel », 26/11/2026) : les etapes de PROC_DAS (ETP_RCS, puis ETP_DEPOT et
+        // ses OPE_DEPOT / OPE_EVENEMENT / OPE_ACTE_DEPOSE, la facturation, ETP_RECLAM_REFUS : fiche proc_das.md:270-345), leurs
+        // obligatoires MetierObligatoire (ultDateDepot :303, ultCboCodeEvenement :325, ultAbregePiece et ultDateActe :339).
+        // Creer ecrit un depot VALIDE (EcrivainDepotsActes.cs) ; LecteurDepotsActes.cs lit les saisies.
+        // fix-ok: mesure le 26/11/2026 (lot 5) -- les descripteurs des quatre depots n'avaient pas l'etape qui designe le dossier
+        // ou la PC, sans laquelle RIG v2 ne valide rien, et DAS inversait ses articles de refus et de reclamation (fiche :224) ;
+        // le banc des ecrans controle chaque marche et chaque etat lus contre ce descripteur.
         new DescripteurEcran
         {
             Code = "PROC_DAS", Titre = "Depots d'actes RCS", Sujet = "dépôts d'actes",
@@ -315,16 +370,18 @@ public sealed class DomaineOuvrir : IDomaineEcrans
             Groupes = ["Dossier RCS", "Non-inscrit"],
             Marches =
             [
-                Marche("Dépôt", "Dates de dépôt et d'arrivée, dépôt gratuit INPI. Le dépôt est vérifié en entier avant validation.", true,
-                    "Date de dépôt", "Date d'arrivée", "Dépôt gratuit INPI"),
-                Marche("Évènement RCS", "Code de l'évènement obligatoire. Changer de code supprime les actes déposés de l'ancien code.", true,
-                    "Code de l'évènement", "Date d'effet", "Texte"),
-                Marche("Actes déposés", "Pièce obligatoire et date d'acte obligatoire ; la description se calcule seule.", true,
-                    "Pièce", "Date de l'acte", "Description"),
-                Marche("Comptes annuels", "Selon l'évènement : la case de non-approbation des comptes doit être cochée, ou la date de clôture modifiée.", false,
-                    "Non-approbation des comptes", "Date de clôture"),
-                Marche("Facturation", "Article 21-RCDASRET si le dépôt est retenu, 21-RCDASREJ s'il est rejeté.", true,
-                    "Article de facturation"),
+                Marche("Dossier", "Le dossier RCS par son numéro de gestion, ou le non-inscrit par son numéro : sans lui, rien ne se valide.", true,
+                    "N° de gestion ou de non-inscrit"),
+                Marche("Dépôt", "Date de dépôt obligatoire ; la date d'arrivée est celle du jour si elle est vide. Le numéro de dépôt suit le type RCS du dossier.", true,
+                    Champ.Date("Date de dépôt"), Champ.Date("Date d'arrivée"), Champ.Case("Dépôt gratuit INPI")),
+                Marche("Évènement RCS", "Code de l'évènement obligatoire. Un code qui modifie l'exercice social (NACO, PEEXE, PEXE, EXER) reste à RIG v2.", true,
+                    "Code de l'évènement", Champ.Date("Date d'effet"), "Texte"),
+                Marche("Actes déposés", "Pièce obligatoire et date d'acte obligatoire.", true,
+                    "Pièce", Champ.Date("Date de l'acte"), "Description"),
+                Marche("Comptes annuels", "Selon l'évènement : la case de non-approbation des comptes doit être cochée, ou la date de clôture modifiée. Non repris par la V3.", false,
+                    Champ.Case("Non-approbation des comptes"), Champ.Date("Date de clôture")),
+                Marche("Facturation", "Articles du dépôt ; un refus (21-RCDASRET) ou une réclamation (21-RCDASREJ) non facturés sont repris. Non reprise par la V3 : le dépôt est validé sans facture.", true,
+                    Champ.Tableau("Articles de facturation")),
                 Marche("Refus ou réclamation", "La lettre de refus ou la lettre de réclamation est éditée selon le cas.", false,
                     "Lettre de refus", "Lettre de réclamation"),
             ],
@@ -332,12 +389,12 @@ public sealed class DomaineOuvrir : IDomaineEcrans
             [
                 Ligne("Alpha Services SARL", "Dossier RCS 2026B00501 · dépôt du 02/03/2026", "Dossier RCS", "AFaire"),
                 Ligne("Bêta Industrie SAS", "Dossier RCS 2026B00502 · dépôt du 03/03/2026", "Dossier RCS", "EnCours", 0, 1),
-                Ligne("Gamma Conseil SARL", "Dossier RCS 2026B00503 · dépôt du 04/03/2026", "Dossier RCS", "Validee", 0, 1, 2, 4),
-                Ligne("Delta Transports SAS", "Dossier RCS 2026B00504 · refusé", "Dossier RCS", "Rejetee"),
+                Ligne("Gamma Conseil SARL", "Dossier RCS 2026B00503 · dépôt du 04/03/2026", "Dossier RCS", "Validee", 0, 1, 2, 3, 5),
+                Ligne("Delta Transports SAS", "Dossier RCS 2026B00504 · refusé", "Dossier RCS", "Rejetee", 0),
                 Ligne("Epsilon Habitat SARL", "Dossier RCS 2026B00505 · dépôt du 06/03/2026", "Dossier RCS", "EnCours", 0, 1, 2),
                 Ligne("Zêta Commerce SAS", "Non-inscrit · dépôt du 09/03/2026", "Non-inscrit", "AFaire"),
-                Ligne("Êta Boulangerie SARL", "Non-inscrit · dépôt du 10/03/2026", "Non-inscrit", "EnCours", 0, 1, 2, 4),
-                Ligne("Thêta Import SAS", "Non-inscrit · dépôt du 11/03/2026", "Non-inscrit", "Validee", 0, 1, 2, 4),
+                Ligne("Êta Boulangerie SARL", "Non-inscrit · dépôt du 10/03/2026", "Non-inscrit", "EnCours", 0, 1, 2, 3),
+                Ligne("Thêta Import SAS", "Non-inscrit · dépôt du 11/03/2026", "Non-inscrit", "Validee", 0, 1, 2, 3, 5),
                 Ligne("Iota Études SARL", "Dossier RCS 2026B00510 · dépôt du 12/03/2026", "Dossier RCS", "AFaire"),
             ],
         },
@@ -353,16 +410,18 @@ public sealed class DomaineOuvrir : IDomaineEcrans
             Groupes = ["Procédure collective", "Prévention"],
             Marches =
             [
-                Marche("Procédure", "Verrouillée pour la saisie : si un autre utilisateur la tient, elle s'ouvre en lecture seule.", true,
+                // Lot 5 (26/11/2026) : la PC par son numero, verrouillee (PROC_DEPPC.cs:41-58) ; codes avec depot PC
+                // (ULT_COMBO_CODE_EVE_PRO.cs:79). Creer : EcrivainDepotsEvenementPc.cs ; la liste : LecteurDepotsEvenementPc.cs.
+                Marche("Procédure", "Verrouillée pour la saisie : si un autre utilisateur la tient, elle s'ouvre en lecture seule. Le dépôt sur une prévention reste à RIG v2.", true,
                     "Numéro de procédure"),
                 Marche("Organes et dirigeants", "Organes de la procédure et dirigeants.", false,
                     "Organes", "Dirigeants"),
-                Marche("Événement survenu", "Un dépôt PC est obligatoire sur chaque événement survenu.", true,
-                    "Code de l'événement", "Date", "Dépôt PC"),
+                Marche("Événement survenu", "Un dépôt PC est obligatoire sur chaque événement survenu : seuls les codes avec dépôt PC sont proposés ; le numéro de dépôt est attribué à l'enregistrement.", true,
+                    "Code de l'événement", Champ.Date("Date")),
                 Marche("Événement à venir", "Ce qui doit encore se passer, selon le calendrier.", false,
                     "Événement à venir"),
-                Marche("Facturation", "Forfait selon le paramètre de la procédure. Une prévention est toujours gratuite.", true,
-                    "Articles"),
+                Marche("Facturation", "Forfait selon le paramètre de la procédure. Une prévention est toujours gratuite. Non reprise par la V3.", true,
+                    Champ.Tableau("Articles")),
             ],
             Lignes =
             [
@@ -389,12 +448,13 @@ public sealed class DomaineOuvrir : IDomaineEcrans
             [
                 Marche("Numéro de PC", "Obligatoire : une étape sans numéro bloque la validation (« PC manquante »).", true,
                     "Numéro de PC"),
-                Marche("Événement", "Code de l'événement et date.", true,
-                    "Code événement", "Date"),
-                Marche("Doublon", "Même numéro, même code et même date : un avertissement, non bloquant.", false,
+                // Lot 5 (26/11/2026) : codes avec depot PC (ETP_DEPPCM.cs:49). Creer : EcrivainDepotsPcEnMasse.cs, une etape par geste.
+                Marche("Événement", "Code de l'événement (avec dépôt PC) et date.", true,
+                    "Code événement", Champ.Date("Date")),
+                Marche("Doublon", "Même numéro, même code et même date entre deux étapes du lot : refusé à la validation.", false,
                     "Contrôle de doublon"),
-                Marche("Dépôt", "À la validation, la demande fille est créée et rattachée à la demande du lot.", true,
-                    "Dépôt RCS créé"),
+                Marche("Dépôt", "À la validation, la demande fille est créée et rattachée à la demande du lot ; le dépôt est numéroté. La facture de chaque PC n'est pas reprise par la V3.", true,
+                    "Dépôt créé"),
             ],
             Lignes =
             [
@@ -424,10 +484,12 @@ public sealed class DomaineOuvrir : IDomaineEcrans
                     "Entreprise", "Mode"),
                 Marche("Fiche entreprise", "Identité et adresse, en lecture seule.", false,
                     "Identité", "Adresse"),
-                Marche("Actes", "Dates, code événement et montants. Les codes proposés sont ceux qui vont avec l'historique BEN du dossier.", true,
-                    "Date d'arrivée", "Date de dépôt", "Code événement", "Montant"),
+                // Lot 5 (26/11/2026) : obligatoires de OPE_ACTES.Designer.cs:80, :91, :135 et OPE_ACTE_DEPOSE.Designer.cs:69, :78 ;
+                // codes selon l'historique BEN (OPE_ACTES.cs:33-55). Creer : EcrivainDepotsBeneficiaires.cs.
+                Marche("Actes", "Dates, code événement et montants. Les codes proposés vont avec l'historique BEN du dossier : BENM si un BEN est déjà déposé, sinon BENH (immatriculé avant le 01/08/2017) ou BEN. Le montant va à la facture, non reprise par la V3.", true,
+                    Champ.Date("Date d'arrivée"), Champ.Date("Date de dépôt"), "Code événement", Champ.Montant("Montant")),
                 Marche("Acte déposé", "L'acte et sa date.", true,
-                    "Acte", "Date de l'acte"),
+                    "Acte", Champ.Date("Date de l'acte")),
                 Marche("Pièces", "Pièces dématérialisées, rattachées au dépôt.", false,
                     "Pièces"),
                 Marche("Numérotation", "Numéro attribué à la validation ; la saisie repart ensuite pour un autre dépôt.", false,

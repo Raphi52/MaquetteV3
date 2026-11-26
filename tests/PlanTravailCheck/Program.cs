@@ -1657,7 +1657,7 @@ internal static class Programme
             // interne (PROC_DEPOTJUD). Il le nomme par l'ecran, comme son onglet. Faux si : le
             // filtre « Processus », qui garde le code pour valeur, ne trouvait plus 004151.
             var tout = new CriteresDemandes("", "", "", null, null, [], false, false, 50);
-            var demandes = EcranDemandes.Trouver(tout, []);
+            var demandes = EcranDemandes.Exemple(tout, []);
             Exiger(demandes.Lignes.Length > 5
                    && demandes.Lignes.All(l => l.TraitementLibelle.Length > 0 && !l.TraitementLibelle.Contains("PROC_"))
                    && demandes.LibellesTraitements.Length == demandes.Traitements.Length
@@ -1665,7 +1665,7 @@ internal static class Programme
                    && demandes.Lignes.First(l => l.Numero == "004151").TraitementLibelle == "Depots judiciaires"
                    && demandes.Lignes.First(l => l.Numero == "004176").TraitementLibelle == "Demandes",
                 $"Demandes : la colonne Traitement et la liste Processus nomment l'ecran, jamais son code ({string.Join(", ", demandes.Lignes.Select(l => l.TraitementLibelle).Distinct())})");
-            var parCode = EcranDemandes.Trouver(tout with { CritProcessus = "PROC_DEPOTJUD" }, []);
+            var parCode = EcranDemandes.Exemple(tout with { CritProcessus = "PROC_DEPOTJUD" }, []);
             Exiger(parCode.Lignes.Select(l => l.Numero).SequenceEqual(new[] { "004151" }),
                 "jumeau : le filtre « Processus » garde le code pour valeur et trouve 004151");
 

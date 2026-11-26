@@ -1,0 +1,10 @@
+# « Dépôts d'actes RCS » (PROC_DAS) : les demandes DAS, la plus recente d'abord. Ecartees : 1510124 supprimee (X) et 1510125
+# terminee (T) -- jumeau retenu : 1510121 validee, meme dossier ; 1510126 une demande DASNI -- jumeau retenu : 1510122 (DAS),
+# meme non-inscrit. Groupes : le non-inscrit (DMND_ID_AUTRE) → « Non-inscrit », sinon « Dossier RCS ». Etats : V → Validee (les
+# cinq marches obligatoires : dossier 0, depot 1, evenement 2, actes 3, facturation 5) ; O → Rejetee, marches lues (le
+# non-inscrit : 0) ; I sans dossier ni depot → AFaire.
+Demande D1515100123 | demande D1515100123 · interrompu | Dossier RCS | AFaire | []
+DAS NI BETA SAS | Non-inscrit NI15111 · refusé | Non-inscrit | Rejetee | [0]
+M. DAS ALPHA Jean | Dossier RCS 1990A15101 · dépôt 1990D15141 du 01/03/1990 | Dossier RCS | Validee | [0,1,2,3,5]
+# 1100320 : une demande DAS que le banc pose lui-meme (section 1a, comptes annuels), ni validee ni refusee, sur un dossier : En cours, le dossier lu.
+Demande 2601100320 | demande 2601100320 | Dossier RCS | EnCours | [0]

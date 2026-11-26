@@ -1,0 +1,6 @@
+# « Dépôts bénéficiaires » (PROC_DASBEN) : les demandes DASBEN, la plus recente d'abord. Ecartee : 1510223 supprimee (X) --
+# jumeau retenu : 1510221 validee, meme dossier. Groupes : le non-inscrit (DMND_ID_AUTRE) → « Non-inscrit », sinon « Dossier
+# RCS ». Etats : V → Validee (obligatoires 0 Entreprise, 2 Actes, 3 Acte déposé, et 5 le numero) ; I sur le non-inscrit, sans
+# depot → En cours, l'entreprise lue (0).
+DASBEN NI GAMMA SAS | Non-inscrit NI15212 · interrompu | Non-inscrit | EnCours | [0]
+DASBEN ALPHA SARL | Dossier RCS 2010B15201 · dépôt 2019B000001 du 01/06/2019 | Dossier RCS | Validee | [0,2,3,5]

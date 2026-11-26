@@ -1,5 +1,6 @@
 using Microsoft.Data.SqlClient;
 using RigV3.Contrats.EcransGeneres;
+using RigV3.Serveur.Numerotation.Compteur;
 using RigV3.Serveur.Socle.Comptes;
 using RigV3.Serveur.Socle.Greffes;
 using RigV3.Serveur.Socle.Identite;
@@ -56,7 +57,8 @@ internal sealed class ModuleEcransGeneres : IModuleServeur
         }).RequireAuthorization(PolitiquesSocle.AgentAdmis);
 
         routes.MapPost(RoutesEcransGeneres.Gestes, async (string greffe, string procedure, GesteEcran geste, HttpContext http, CatalogueGreffes c,
-                                                          EcrivainsEcrans ecrivains, ServiceDroits droits, BaseRig commune, CancellationToken ct) =>
+                                                          EcrivainsEcrans ecrivains, ServiceDroits droits, BaseRig commune,
+                                                          DistributeurNumeros numeros, CancellationToken ct) =>
         {
             if (!ecrivains.ParProcedure.TryGetValue(procedure, out var ecrivain) || !ecrivain.Gestes.Contains(geste.Type))
                 return Results.Ok(new ResultatGeste(false, ecrivain is null
@@ -66,7 +68,7 @@ internal sealed class ModuleEcransGeneres : IModuleServeur
             {
                 var moi = await droits.AppelantAsync(http, commune, cn, ct);
                 if (moi is null) return Results.Json(new { motif = "Agent inconnu dans la base de ce greffe." }, statusCode: StatusCodes.Status403Forbidden);
-                var resultat = await EcrivainsEcrans.JouerAsync(ecrivain, cn, geste, moi, DateTime.Now, ct);
+                var resultat = await EcrivainsEcrans.JouerAsync(ecrivain, cn, geste, moi, DateTime.Now, numeros, ct);
                 return resultat.Fait ? Results.Ok(resultat) : Results.Json(resultat, statusCode: StatusCodes.Status422UnprocessableEntity);
             });
         }).RequireAuthorization(PolitiquesSocle.AgentAdmis);
