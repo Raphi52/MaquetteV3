@@ -15,6 +15,8 @@ describe('EcranStatistiques', () => {
     expect(container.querySelector('.rig-resultats-proc__compte')!.textContent).toBe('5 ligne(s)')
     expect(lignes(container)[0]).toEqual(['Immatriculations', '184', '171', '+13'])
     expect(lignes(container)[1]).toEqual(['Modifications', '412', '438', '-26'])
+    // Lot 9 : ces chiffres ne viennent pas de la base du greffe, l'ecran le dit (mention « exemple »).
+    expect(container.querySelector('[role="note"]')!.textContent).toContain('Chiffres de démonstration')
     // Periode : du 1er janvier a aujourd'hui, date du POSTE (DateTime.Today).
     const annee = new Date().getFullYear()
     expect((screen.getByLabelText('Date de debut') as HTMLInputElement).value).toBe(`${annee}-01-01`)
