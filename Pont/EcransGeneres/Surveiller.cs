@@ -18,8 +18,9 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 //     code qui tourne, les moteurs PROC_RSURV et PROC_ISURV, nature SDBE (lot 8, 26/11/2026).
 //   - PROC_DBEN_ALERT : fiche sans étape (lecture seule), fondé sur le formulaire FORM_DBEN_ALERT.cs
 //     (VALIDER, VERIFIER, INTERROMPRE masqués, lignes 12-14) : une seule marche, « Visualiser le
-//     signalement » (OPE_DIVERGENCES.Designer.cs:97). La tuile « En cours » reste vide : la source
-//     n'a pas d'état intermédiaire. A confirmer par le chef.
+//     signalement » (OPE_DIVERGENCES.Designer.cs:97), qui ouvre un autre écran et n'écrit rien :
+//     lue dans la base (LecteurDivergencesBen.cs, lot 8), sans écrivain. La source n'a pas d'état
+//     intermédiaire (aucune ligne « En cours »).
 //   - PROC_STATCA : le tableau a lignes fixes de la fiche -- une ligne par categorie de role (J, F, R,
 //     IP), ses sept colonnes calculees dans la base (lot 9, LecteurStatistiquesCourAppel.cs).
 //   - PROC_SURVBOD : la « requete principale » du haut de la fiche est inventee (le Detail OPE le dit) ;
