@@ -309,7 +309,7 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Valider = "Éditer", // proc_taxesettours.md, Détail OPE : « l'unique action est Éditer » (OPE_RECHERCHE.Designer.cs:77-78).
             Rang = 5,
             // Aucun état par ligne dans RIG v2 (édition pure) : ces trois états sont ceux que tout descripteur porte
-            // (EcransGeneresCheck/Program.cs:148-150), la forme Etat ne les affiche pas (FormeEtat.tsx) et chaque ligne lue est
+            // (EcransGeneresCheck/Program.cs:150-152), la forme Etat ne les affiche pas (FormeEtat.tsx) et chaque ligne lue est
             // « Validee » : le contenu de l'édition. Les Lignes ci-dessous ne s'affichent que sans serveur, marquées « exemple ».
             Etats = EtatsEcran.Trois("À éditer", "En cours", "Éditée"),
             Groupes = ["Tours de rôle", "Acomptes", "Taxes"],
