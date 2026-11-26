@@ -218,11 +218,11 @@ export interface DemandeGeste {
  * Ecrit : le message de l'ecrivain, puis apres() (relire les lignes, la fiche). Refuse : le message de RIG v2. Sans
  * ecrivain ou pont en panne : la demonstration. Rend le resultat, null s'il n'est pas alle au serveur.
  */
-export function useGeste(d: DescripteurEcranVue, vue: VueLignesEcran | null, annoncer: (texte: string | null) => void) {
+export function useGeste(d: DescripteurEcranVue, vue: VueLignesEcran | null, annoncer: (texte: CompteRendu) => void) {
   return async (g: DemandeGeste, demonstration: string, apres?: () => void): Promise<ResultatGesteVue | null> => {
     if (!versLaBase(vue, g)) { annoncer(demonstration); return null }
     const r = await envoyerGeste(d, g)
-    annoncer(r === null || r.sansEcrivain ? demonstration : r.message)
+    annoncer(r === null || r.sansEcrivain ? demonstration : r.fait ? r.message : { refus: r.message })
     if (r?.fait) apres?.()
     return r
   }
@@ -249,7 +249,7 @@ async function envoyerGeste(d: DescripteurEcranVue, g: DemandeGeste): Promise<Re
  * chacune a son ecrivain. Aucune ligne de la base : la demonstration, aussitot. Sinon chaque procedure dit ce qu'elle a
  * fait (ou sa demonstration) ; apres() si l'une a ecrit.
  */
-export function useGesteEnLot(d: DescripteurEcranVue, vue: VueLignesEcran | null, annoncer: (texte: string | null) => void) {
+export function useGesteEnLot(d: DescripteurEcranVue, vue: VueLignesEcran | null, annoncer: (texte: CompteRendu) => void) {
   const jouer = useGeste(d, vue, annoncer)
   return async (type: TypeGesteVue, nom: string, visees: LigneTenue[], valeurs: Saisies, demonstration: (n: number) => string,
                 apres?: () => void): Promise<void> => {
@@ -328,12 +328,20 @@ export function Provenance({ vue }: { vue: VueLignesEcran }) {
 export const enExemple = (vue: VueLignesEcran | null, l: { groupe: string }) => vue?.mode === 'mixte' && vue.exemples.includes(l.groupe)
 
 /** Le compte rendu d'un geste : ce que l'ecran a fait, ou pourquoi il n'a rien fait. Annonce aux lecteurs d'ecran. */
-export function useAnnonce(): [string | null, (texte: string | null) => void] {
-  return useState<string | null>(null)
+export function useAnnonce(): [CompteRendu, (texte: CompteRendu) => void] {
+  return useState<CompteRendu>(null)
 }
-export function Annonce({ texte }: { texte: string | null }) {
+/**
+ * Ce qu'un geste a dit : du texte (fait, ou demonstration), ou { refus } quand RIG v2 a refuse et que RIEN n'a ete ecrit.
+ * Le refus porte le badge « Refus » et role="alert" (convention de EcranCourriels.tsx, EcranComptes.tsx) ; le reste
+ * garde role="status" : sans cela un refus ressemblait a un succes (lot 2, captures du 26/11/2026).
+ */
+// fix-ok: cause mesuree sur les captures lot2-09/11 : Annonce rendait tout message en <p role="status"> sans distinguer ResultatGesteVue.fait.
+export type CompteRendu =string | { refus: string } | null
+export function Annonce({ texte }: { texte: CompteRendu }) {
   if (texte === null) return null
-  return <p className="rig-eg-annonce" role="status">{texte}</p>
+  if (typeof texte === 'string') return <p className="rig-eg-annonce" role="status">{texte}</p>
+  return <p className="rig-eg-annonce" role="alert"><span className="rig-etat rig-etat--alerte">Refus</span>{' '}{texte.refus}</p>
 }
 
 /** Le refus d'un geste : la phrase de demonstration, le geste et sa portee. */

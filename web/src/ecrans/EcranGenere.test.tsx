@@ -727,6 +727,9 @@ describe('socle fonctionnel : fiche lue, geste ecrit puis relu', () => {
     fireEvent.change(saisine(container)!, { target: { value: '2026-02-01' } })
     fireEvent.click(bouton('Enregistrer'))
     await waitFor(() => expect(annonce()).toBe('Instance 2026J01201 enregistrée dans la base du greffe : « Saisine tribunal ».'))
+    // Le succes garde role="status", sans badge « Refus » (jumeau du refus ci-dessous).
+    expect(container.querySelector('.rig-eg-annonce')!.getAttribute('role')).toBe('status')
+    expect(container.querySelector('.rig-eg-annonce .rig-etat--alerte')).toBeNull()
     expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Geste', 'ECRAN_TEST', 'Au fond', 'Enregistrer', null, ['1200001'],
       { 'Instance › Saisine tribunal': '2026-02-01' })
     await waitFor(() => expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranGenere.Fiche')).toHaveLength(2))
@@ -742,7 +745,11 @@ describe('socle fonctionnel : fiche lue, geste ecrit puis relu', () => {
     })
     fireEvent.change(saisine(container)!, { target: { value: '2027-01-01' } })
     fireEvent.click(bouton('Enregistrer'))
-    await waitFor(() => expect(annonce()).toBe(motif))
+    // Un refus ne ressemble pas a un succes : badge « Refus » et role="alert" (EcranCourriels.tsx, EcranComptes.tsx).
+    await waitFor(() => expect(annonce()).toBe(`Refus ${motif}`))
+    const note = container.querySelector('.rig-eg-annonce')!
+    expect(note.getAttribute('role')).toBe('alert')
+    expect(note.querySelector('.rig-etat.rig-etat--alerte')?.textContent).toBe('Refus')
     expect(saisine(container)!.value).toBe('2027-01-01')
     expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranGenere.Lignes')).toHaveLength(1)
   })
