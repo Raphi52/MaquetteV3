@@ -1459,6 +1459,54 @@ Exiger((await EcranDocDemat.PiecesAsync(null, null)) is { Mode: "demo", Pieces.L
 Exiger((await EcranDocDemat.PiecesAsync(client, GreffeAbsent)) is { Mode: "erreur", Pieces.Length: 0, Message: not null },
     "pont Documents dematerialises, greffe absent : le motif, AUCUNE piece");
 
+// ============================================================ 13. GESTION DES BANQUES (LectureBanques.cs, lot 12)
+// « Gestion des banques » (PROC_GESTBANQ), branchee au lot 12 du plan : BANQUE dans l'ordre de sa cle (Banque.GetListBanque, sans tri,
+// Banque.cs:63-67), ses modes de paiement par leur CODE (MODE_PAIEMENT_BANQUE, Banque.GetListeModePaiementBanque, :32-43). Aucune
+// banque avant cette section. Types : RIG_DEV (SSDT BANQUE.sql, MODE_PAIEMENT_BANQUE.sql). Identifiants du lot 12 : 2 200 000 a 2 299 999.
+await Sql("""
+    CREATE TABLE v2.BANQUE (BANQU_ID_BANQU int NOT NULL PRIMARY KEY, BANQU_CODE varchar(10) NOT NULL, BANQU_NOM varchar(100) NOT NULL,
+        BANQU_LIGNE_ADRESSE varchar(255) NULL, BANQU_SUITE_ADRESSE varchar(255) NULL, BANQU_CODE_POSTAL varchar(32) NULL,
+        BANQU_LOCALITE_POSTALE varchar(255) NULL, BANQU_COMPTE varchar(8) NULL, BANQU_JOURNAL varchar(8) NULL, BANQU_POUR_LC bit NULL,
+        BANQU_LC_COMPTEUR bigint NULL, BANQU_LC_MODELE varchar(60) NULL, BANQU_POUR_LC_NOTIF bit NULL, BANQU_POUR_LC_FOUR bit NULL);
+    CREATE TABLE v2.MODE_PAIEMENT_BANQUE (MODBQ_ID_MODBQ int NOT NULL PRIMARY KEY, MODBQ_MODE_PAIEMENT varchar(8) NOT NULL, MODBQ_ID_BANQU int NOT NULL);
+    -- 2201902 avant 2201901 a l'insertion : l'ordre lu est celui de la cle, pas de l'insertion ni du code (« ZZ » avant « AA »).
+    INSERT INTO v2.BANQUE VALUES
+        (2201902, 'AA12', 'BANQUE SANS MODE', NULL, NULL, NULL, NULL, '512200', NULL, 0, NULL, NULL, 0, 0),
+        (2201901, 'ZZ12', 'BANQUE DU BANC 12', '1 rue du Banc', 'Batiment B', '80000', 'AMIENS', '512100', 'BQ1', 1, 42, 'LC_BANC', 1, 0);
+    -- les modes de 2201901 dans l'ordre du code (VIR insere avant CHQ) ; un mode d'une autre banque ne lui est pas compte.
+    INSERT INTO v2.MODE_PAIEMENT_BANQUE VALUES (2201951, 'VIR', 2201901), (2201952, 'CHQ', 2201901), (2201953, 'ESP', 2201903);
+    """);
+await using (var cn = new SqlConnection(greffe.Connexion))
+{
+    await cn.OpenAsync();
+    var banques = await LectureBanques.LireAsync(cn, CancellationToken.None);
+    Exiger(banques.Lignes.Select(b => b.Id).SequenceEqual([2201901, 2201902]) && banques.Total == 2,
+        $"banques : dans l'ordre de la cle BANQU_ID_BANQU ({string.Join(",", banques.Lignes.Select(b => b.Id))})");
+    Exiger(banques.Lignes[0] is { Code: "ZZ12", Nom: "BANQUE DU BANC 12", LigneAdresse: "1 rue du Banc", SuiteAdresse: "Batiment B", CodePostal: "80000",
+                                  Localite: "AMIENS", Compte: "512100", Journal: "BQ1", ModeleLettreCheque: "LC_BANC", CompteurLettreCheque: 42,
+                                  PourTropPercu: true, PourNotification: true, PourFournisseur: false }
+           && banques.Lignes[0].Modes.SequenceEqual(["CHQ", "VIR"]),
+        "banques : identite, adresse, parametre comptable, lettres cheques ; modes par leur CODE, dans l'ordre du code");
+    Exiger(banques.Lignes[1] is { Code: "AA12", CompteurLettreCheque: null, PourTropPercu: false, LigneAdresse: "" } && banques.Lignes[1].Modes.Length == 0,
+        "banques : une banque sans mode ni adresse se lit, sans mode (ESP est a une autre banque)");
+    var une = await LectureBanques.LireAsync(cn, CancellationToken.None, plafond: 1);
+    Exiger(une.Lignes.Length == 1 && une.Total == 2, $"banques : plafond 1 -> une ligne, total 2 ({une.Total})");
+}
+Exiger((await http.GetFromJsonAsync<BanquesLues>(RoutesEcransMain.Pour(RoutesBanques.Banques, Greffe), json)) is { Total: 2 },
+    "route des banques par le serveur : les banques de la base");
+Exiger((await http.GetAsync(RoutesEcransMain.Pour(RoutesBanques.Banques, GreffeAbsent))).StatusCode == HttpStatusCode.NotFound,
+    "route des banques : greffe absent -> 404, sans repli");
+var banquesPont = await EcranBanques.BanquesAsync(client, Greffe);
+Exiger(banquesPont is { Mode: "serveur", Message: null, Total: 2 }
+       && banquesPont.Banques[0] is { Code: "ZZ12", Designation: "BANQUE DU BANC 12", Adresse: "1 rue du Banc\nBatiment B\n80000 AMIENS", NumLettreCheque: "42",
+                                      MaquetteCheque: "LC_BANC", ChequeTropPercu: true, ChequeNotification: true, ChequeFournisseur: false }
+       && banquesPont.Banques[1] is { Adresse: "", NumLettreCheque: "" },
+    "pont Banques branche : la forme de l'ecran (adresse en lignes, « code postal localite », compteur en texte, vide sans compteur)");
+Exiger((await EcranBanques.BanquesAsync(null, null)) is { Mode: "demo", Banques.Length: 0 },
+    "pont Banques sans serveur : mode « demo », aucune banque (la demonstration reste celle de l'ecran)");
+Exiger((await EcranBanques.BanquesAsync(client, GreffeAbsent)) is { Mode: "erreur", Banques.Length: 0, Message: not null },
+    "pont Banques, greffe absent : le motif, AUCUNE banque");
+
 Console.WriteLine();
 if (echecs.Count == 0) { Console.WriteLine("Ecrans faits main branches sur la base : VERT."); return 0; }
 Console.WriteLine(echecs.Count + " echec(s) : " + string.Join(" | ", echecs));
