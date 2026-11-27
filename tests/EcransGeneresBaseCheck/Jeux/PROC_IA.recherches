@@ -1,0 +1,8 @@
+# La liasse se designe par son numero national, EGAL (GetDematLiasseCfeByNumeroNational, OPE_IA.cs:73) : le seul critere de l'ecran.
+critere: Numéro de liasse = J00025040100
+lignes:
+J00025040100 | formalité INPI · dossier 2026 B 25401 · reçue le 10/03/2026 · analysée | Formalités INPI | Validee | []
+---
+# Un numero partiel ne trouve rien (egalite) -- jumeau : le numero entier, bloc 1.
+critere: Numéro de liasse = J000250401
+lignes:

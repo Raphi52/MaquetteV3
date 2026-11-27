@@ -1,0 +1,127 @@
+# « Modes de paiement » (EcrivainModesPaiement), en grille : « Ajouter », « Modifier », « Supprimer » (OPE_MODEPAIEMENTDETAIL : Valider,
+# l. 204-240 ; Supprimer, l. 246-272 ; ControlsValidation, l. 279-315). Messages de la V2 au mot pres, leurs « \n » en blancs. Lignes du
+# jeu : PROC_GESTMODEPAIEMENT.sql.
+
+# Refus : le code est obligatoire (MetierObligatoire). Jumeau accepte : bloc 6.
+geste: Ajouter
+valeur: Libellé = Prélèvement banc
+valeur: Type = VI
+resultat: refuse
+message: « Code » est obligatoire.
+---
+# Refus : 5 caracteres au plus pour le code (MaxLength 5). Jumeau accepte : bloc 6 (5 caracteres).
+geste: Ajouter
+valeur: Code = L15TROP
+valeur: Libellé = Prélèvement banc
+valeur: Type = VI
+valeur: Banque = L15CIC
+resultat: refuse
+message: « Code » : 5 caractères au plus (L15TROP).
+---
+# Refus cumule de ControlsValidation : code deja porte ET libelle de 5 caracteres (l. 293-301). Jumeau accepte : bloc 6.
+geste: Ajouter
+valeur: Code = L15CH
+valeur: Libellé = Court
+valeur: Type = CH
+valeur: Banque = L15LCL
+resultat: refuse
+message: Erreur à la création : - Le code est déjà utilisé. - Le libellé saisi est trop court. Il doit faire au moins 6 caractères.
+---
+# Refus : un libelle deja porte par un autre mode (GetMODE_PAIEMENTByLibelle, l. 304-306). Jumeau accepte : bloc 6 (libelle libre).
+geste: Ajouter
+valeur: Code = L15NW
+valeur: Libellé = Chèque banc
+valeur: Type = VI
+valeur: Banque = L15CIC
+resultat: refuse
+message: Erreur à la création : - Le libellé est déjà utilisé.
+---
+# Refus : une banque absente de BANQUE (la combo de la V2 ne propose que les banques du greffe et « Aucune », l. 77). Jumeau : bloc 6.
+geste: Ajouter
+valeur: Code = L15NW
+valeur: Libellé = Prélèvement banc
+valeur: Type = VI
+valeur: Banque = INCONNUE
+resultat: refuse
+message: « Banque » : la banque INCONNUE n'existe pas dans la base du greffe.
+---
+# AJOUTE PUIS RELU : actif par defaut (MODE_PAIEMENT.cs:58), « groupe » faux pour un virement (l. 177-181), remis non coche ; Sauve
+# recopie le code dans ISO, synonyme et abrege, le libelle dans les trois libelles d'edition, l'auteur = le nom de l'agent (soc.Compte,
+# « BANC ») ; le lien banque est cree (_getRequete, l. 346).
+geste: Ajouter
+valeur: Code = L15NW
+valeur: Libellé = Prélèvement banc
+valeur: Type = VI
+valeur: Banque = L15CIC
+resultat: fait
+message: Mode de paiement L15NW créé : Prélèvement banc.
+lignes:
+Carte bancaire | code CB · type CB · banque à associer · inactif | Inactifs | EnCours | []
+Chèque | code CH · type CH · banque à associer · inactif | Inactifs | EnCours | []
+Chèque | code CHQ · type CH · banque à associer · inactif | Inactifs | EnCours | []
+Espèce | code ES · type ES · banque à associer · inactif | Inactifs | EnCours | []
+Carte banc | code L15CB · type CB · banque à associer | Actifs | EnCours | []
+Chèque banc | code L15CH · type CH · banque L15LCL | Actifs | Validee | []
+Espèc | code L15ES · type ES · banque L15CIC · libellé trop court | Actifs | AFaire | []
+Prélèvement banc | code L15NW · type VI · banque L15CIC | Actifs | Validee | [] 
+Virement banc | code L15VI · type VI · banque L15LCL · inactif | Inactifs | Validee | []
+Remboursement par chèque | code RBT · type RBT · banque à associer · inactif | Inactifs | EnCours | []
+Régularisation banc | code REG · type REG · sans banque | Actifs | Validee | []
+Virement LCL | code VI · type VI · banque à associer · inactif | Inactifs | EnCours | []
+Virement | code VIR · type CH · banque à associer · inactif | Inactifs | EnCours | []
+fiche: L15NW
+Type et banque › Banque = L15CIC
+Utilisation › Encaissements = aucun : le mode peut être supprimé
+controle: SELECT CONCAT(R_MODEPAIEME_ISO, '/', R_MODEPAIEME_SYNONYME, '/', R_MODEPAIEME_ABREGE_EDIT, '/', R_MODEPAIEME_EXHAUSTIF_EDIT, '/', CAST(R_MODEPAIEME_UTILISABLE_SAISIE AS int), CAST(R_MODEPAIEME_GROUPE AS int), CAST(R_MODEPAIEME_REMIS_VISIBLE AS int), '/', R_MODEPAIEME_AUTEUR_CREATION) FROM v2.MODE_PAIEMENT WHERE R_MODEPAIEME_VALEUR = 'L15NW' => L15NW/L15NW/L15NW/Prélèvement banc/100/BANC
+controle: SELECT MODBQ_ID_BANQU FROM v2.MODE_PAIEMENT_BANQUE WHERE MODBQ_MODE_PAIEMENT = 'L15NW' => 2500102
+---
+# Refus : le code d'un mode enregistre ne change pas dans la grille (la V2 le fait par sauvegarde puis suppression, en comparant un
+# ISO a un code, l. 222-236). Jumeau accepte : bloc 10 (code inchange).
+geste: Modifier
+ids: L15CB
+valeur: Code = L15CX
+resultat: refuse
+message: Le code d'un mode de paiement enregistré ne se change pas ici : RIG v2 le change par une sauvegarde puis une suppression de l'ancien (OPE_MODEPAIEMENTDETAIL.cs:234-235). Supprimez L15CB puis ajoutez L15CX.
+---
+# Refus : le type d'un mode qu'un encaissement porte est verrouille (ControlsUltReadOnly, l. 322-328). Jumeau accepte : bloc 10 (L15CB,
+# sans encaissement, change de type).
+geste: Modifier
+ids: L15CH
+valeur: Type = DIV
+resultat: refuse
+message: Le type du mode L15CH ne se modifie plus : des encaissements l'utilisent (RIG v2 le met en lecture seule).
+---
+# Refus en modification : libelle de 5 caracteres, au titre de la V2 (« Erreur à la création », le meme en modification). Jumeau : bloc 10.
+geste: Modifier
+ids: L15CB
+valeur: Libellé = Carte
+resultat: refuse
+message: Erreur à la création : - Le libellé saisi est trop court. Il doit faire au moins 6 caractères.
+---
+# Modifie : L15CB change de type (CB -> CH), recoit la banque L15LCL (lien cree, _getRequete l. 349-351) et n'est plus actif.
+geste: Modifier
+ids: L15CB
+valeur: Type = CH
+valeur: Banque = L15LCL
+valeur: Actif = non
+resultat: fait
+message: Mode de paiement L15CB enregistré.
+fiche: L15CB
+Type et banque › Type = CH
+Type et banque › Banque = L15LCL
+Options › Actif = 
+controle: SELECT MODBQ_ID_BANQU FROM v2.MODE_PAIEMENT_BANQUE WHERE MODBQ_MODE_PAIEMENT = 'L15CB' => 2500101
+---
+# Refus : un mode qu'un encaissement porte ne se supprime pas (l. 250-251). Jumeau accepte : bloc 12 (L15ES, sans encaissement).
+geste: Supprimer
+ids: L15CH
+resultat: refuse
+message: Ce mode de paiement est actuellement associé à un ou plusieurs encaissements
+---
+# Supprime : le lien banque puis le mode (l. 255-259), « Suppression réussie » (l. 264).
+geste: Supprimer
+ids: L15ES
+resultat: fait
+message: Suppression réussie : le mode de paiement L15ES (Espèc) est supprimé.
+controle: SELECT COUNT(*) FROM v2.MODE_PAIEMENT_BANQUE WHERE MODBQ_MODE_PAIEMENT = 'L15ES' => 0
+controle: SELECT COUNT(*) FROM v2.MODE_PAIEMENT WHERE R_MODEPAIEME_VALEUR = 'L15ES' => 0

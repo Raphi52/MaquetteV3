@@ -1,0 +1,5 @@
+# « Analyse IA » (LecteurAnalyseIa) : les liasses qui portent un numero national INPI, les plus recentes d'abord ; 2500404 (sans
+# numero INPI) est ecartee. Reponse vide ou blanche -> AFaire, remplie -> Validee. Groupe par l'origine (INPI_FORMA_MAJ -> régularisation).
+J00025040300 | régularisation INPI · reçue le 12/03/2026 · à analyser | Régularisations INPI | AFaire | []
+J00025040200 | formalité INPI · reçue le 11/03/2026 · à analyser | Formalités INPI | AFaire | []
+J00025040100 | formalité INPI · dossier 2026 B 25401 · reçue le 10/03/2026 · analysée | Formalités INPI | Validee | []

@@ -1,0 +1,25 @@
+# « Sceaux » (EcrivainSceaux) : « Supprimer » (Edition\OPE_EDITION.Supprimer, l. 174-179) ; la V2 ne refuse jamais, apres sa
+# confirmation. Ajouter et Modifier ne sont pas branches (image a importer et a decoder) : la grille dit « Démonstration ».
+
+# Refus : un element absent de la base. Jumeau accepte : bloc 2.
+geste: Supprimer
+ids: 2599999
+resultat: refuse
+message: Sceau introuvable dans la base du greffe (2599999).
+---
+# Supprime : la ligne ELEMENT_FUSION part ; aucune image en GED a garder ici (sans numero de document).
+geste: Supprimer
+ids: 2500503
+resultat: fait
+message: Sceau L15_SIGNATURE supprimé : les maquettes qui l'utilisent ne le trouveront plus (son image reste dans la GED, comme dans RIG v2).
+lignes:
+L15_LOGO | 273 × 998 mm · image absente de la GED | Autre hauteur | EnCours | []
+L15_SCEAU | 24 × 41 mm · rogné de 2 mm · image absente de la GED | Hauteur de 24 mm | EnCours | []
+L6_LETTRE_RAPPEL | 45 × 50 mm · lettre-rappel.docx · archivé le 01/03/2025 | Autre hauteur | Validee | []
+controle: SELECT COUNT(*) FROM v2.ELEMENT_FUSION WHERE ELMFS_ID_ELMFS = 2500503 => 0
+---
+# Un geste que l'ecrivain ne porte pas (Modifier) : sans ecrivain, « Démonstration », rien d'ecrit.
+geste: Modifier
+ids: 2500501
+valeur: Rogner = 3
+resultat: sans-ecrivain

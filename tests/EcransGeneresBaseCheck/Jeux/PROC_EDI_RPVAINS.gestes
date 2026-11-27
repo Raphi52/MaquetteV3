@@ -1,0 +1,56 @@
+# « EDI RPVA » (EcrivainInscriptionsRpva) : « Refuser » une demande d'inscription, motif saisi (OPE_RESULTAT_EDI_RPVAINS.cs:74-99,
+# DataProcDemandeInscr.Refuse l. 213-229, PROC_TRAITEMENT.cs:161-187). Les demandes : celles de PROC_EDI_RPJC_INS.sql (meme table
+# v2.DEMAT_RPJC_INS ; PROC_EDI_RPVAINS.sql n'en pose aucune). Messages de la V2 au mot pres, leurs « \n » en blancs.
+
+# Refus : le motif est obligatoire (OPE_SAISIE_REJET.Designer.cs:71). Jumeau accepte : bloc 7.
+geste: Agir Refuser
+ids: 300101
+resultat: refuse
+message: « Motif du refus » est obligatoire.
+---
+# Refus : une seule demande a la fois (la V2 ouvre la demande double-cliquee). Jumeau accepte : bloc 7 (une demande).
+geste: Agir Refuser
+ids: 300101,300108
+valeur: Motif du refus = Cnbf inconnu du barreau
+resultat: refuse
+message: Cochez une seule demande : RIG v2 refuse les demandes une à une.
+---
+# Refus : un agent tient la demande (RPJCI_USER_EN_COURS, l. 89-95). Jumeau accepte : bloc 7 (300101, personne dessus).
+geste: Agir Refuser
+ids: 300102
+valeur: Motif du refus = Cnbf inconnu du barreau
+resultat: refuse
+message: Cette demande d'inscription est en cours de traitement par l'utilisateur agent.banc
+---
+# Refus : une demande de modification (RPJCI_TYPE_MAJ = 'M', l. 77-80). Jumeau accepte : bloc 7 (inscription, 'I').
+geste: Agir Refuser
+ids: 300104
+valeur: Motif du refus = Cnbf inconnu du barreau
+resultat: refuse
+message: Cette demande de modification a déjà été traitée. Vous ne pouvez pas re-traiter une demande de modification déjà traitée.
+---
+# Refus : une demande deja refusee, avec son motif (l. 82-85). Jumeau accepte : bloc 7 (jamais traitee).
+geste: Agir Refuser
+ids: 300105
+valeur: Motif du refus = Cnbf inconnu du barreau
+resultat: refuse
+message: Vous ne pouvez pas traiter une demande d'inscription déjà refusée. Cette demande d'inscription a été refusée pour le motif suivant : Cnbf inconnu du barreau
+---
+# Refus : Refuse n'agit que sur l'etat 1 (DataProcDemandeInscr.cs:216) ; 300103 est acceptee (etat 2). Jumeau accepte : bloc 7.
+geste: Agir Refuser
+ids: 300103
+valeur: Motif du refus = Cnbf inconnu du barreau
+resultat: refuse
+message: Echec du traitement.
+---
+# RETRAITEE : 300101 passe a l'etat 2, refusee (R), motif, date et agent ecrits ; elle quitte la liste (seul l'etat 1 y est).
+geste: Agir Refuser
+ids: 300101
+valeur: Motif du refus = Cnbf inconnu du barreau de Paris
+resultat: fait
+message: Demande d'inscription rejetée avec succès.
+lignes:
+BELIER Simon | Cnbf 300002 · structure Cnbf 300902 · ouverte par agent.banc | Structures | EnCours | [0,1]
+MU JURIS | Cnbf 300008 | Personnes physiques | AFaire | []
+controle: SELECT CONCAT(RPJCI_ETAT, '/', RPJCI_ETAT_TRAITEMENT_RIG, '/', RPJCI_MOTIF_TRAITEMENT_RIG, '/', RPJCI_USER_TRAITEMENT_RIG) FROM v2.DEMAT_RPJC_INS WHERE RPJCI_ID_RPJCI = 300101 => 2/R/Cnbf inconnu du barreau de Paris/banc.ecrans
+controle: SELECT CASE WHEN RPJCI_DATE_TRAITEMENT_RIG IS NULL THEN 'sans date' ELSE 'datee' END FROM v2.DEMAT_RPJC_INS WHERE RPJCI_ID_RPJCI = 300101 => datee

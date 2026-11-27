@@ -1,0 +1,9 @@
+# « Sceaux » (LecteurSceaux) : TOUS les elements de fusion (GetAllElementFusion), par nom externe. Entre aussi L6_LETTRE_RAPPEL, pose
+# par PROC_RECHERCHE_GED.sql (colonnes ajoutees a leur defaut RIG_DEV : 45 x 50 mm), dont le document est dans GED_RIG : « Enregistré ».
+# Groupe : 24 mm -> « Hauteur de 24 mm » (L15_SCEAU ; jumeau L15_LOGO). Etat : sans numero -> AFaire (L15_SIGNATURE) ; numero absent
+# de la GED -> EnCours (L15_SCEAU, L15_LOGO) ; document en GED -> Validee (L6_LETTRE_RAPPEL). Les cellules : Nom externe, Fichier,
+# Hauteur max, Largeur max, Rogner, Date archivage.
+L15_LOGO | 273 × 998 mm · image absente de la GED | Autre hauteur | EnCours | []
+L15_SCEAU | 24 × 41 mm · rogné de 2 mm · image absente de la GED | Hauteur de 24 mm | EnCours | []
+L15_SIGNATURE | 24 × 45 mm · sans image | Hauteur de 24 mm | AFaire | []
+L6_LETTRE_RAPPEL | 45 × 50 mm · lettre-rappel.docx · archivé le 01/03/2025 | Autre hauteur | Validee | [] | valeurs: L6_LETTRE_RAPPEL ; lettre-rappel.docx ; 45 ; 50 ; 0 ; 01/03/2025

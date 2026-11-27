@@ -1,0 +1,10 @@
+# La recherche des « Sceaux » : le champ cherche le nom externe ou le fichier (LIKE) ; criteres « Nom externe », « Fichier ».
+texte: rappel
+lignes:
+L6_LETTRE_RAPPEL | 45 × 50 mm · lettre-rappel.docx · archivé le 01/03/2025 | Autre hauteur | Validee | []
+---
+# « Nom externe » contient « L15_S » : le sceau et la signature (L15_LOGO ecarte).
+critere: Nom externe = L15_S
+lignes:
+L15_SCEAU | 24 × 41 mm · rogné de 2 mm · image absente de la GED | Hauteur de 24 mm | EnCours | []
+L15_SIGNATURE | 24 × 45 mm · sans image | Hauteur de 24 mm | AFaire | []

@@ -1,0 +1,15 @@
+# La recherche des « Retours CFE-NET » : le numero saisi, EGAL au numero de gestion, au SIREN ou a un numero de liaison (PSSGC ou
+# PSFCO), PROC_CFENET_RET.cs:100-103 ; les filtres de l'ouverture restent. « 2026 B 25392 » : les deux retours retenus du dossier B.
+texte: 2026 B 25392
+lignes:
+2026 B 25392 | liaison C25030200099 · SIREN 525 003 920 · envoyée le {J-10} · retour reçu le {J-3} · traité par la CCI le {J-2} · Code APE invalide | Erreur fonctionnelle | AFaire | []
+2026 B 25392 | liaison C25030800001 · SIREN 525 003 920 · envoyée le {J-20} · traité par la CCI le {J-4} · Liasse envoyée deux fois | Rejet doublon | AFaire | []
+---
+# Le numero de liaison de la CORRESPONDANCE (PSFCO_NUM_LIAISON) trouve 2500302.
+texte: C25030200099
+lignes:
+2026 B 25392 | liaison C25030200099 · SIREN 525 003 920 · envoyée le {J-10} · retour reçu le {J-3} · traité par la CCI le {J-2} · Code APE invalide | Erreur fonctionnelle | AFaire | []
+---
+# Un morceau de numero ne trouve rien : egalite, pas LIKE (jumeau : le numero entier, bloc 2).
+texte: C250302
+lignes:

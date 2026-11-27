@@ -1,0 +1,9 @@
+# « Retours CFE-NET » (LecteurRetoursCfenet) : la grille de la V2 a l'ouverture (PROC_CFENET_RET.RefreshResultats) -- les erreurs
+# (KoRejetDefinitif, KoRejetDoublon, KoFonctionnel ; KoPdfAbsent au-dela de 2 jours et pas deja numerise), ni corrigees par le greffe
+# ni traitees par Amitel, passage direct CCI ; par date de traitement CCI decroissante. Groupe : le libelle de l'etat dans la grille V2.
+# Ecartes (voir PROC_CFENET_RET.sql) : 2500304 (PDF absent depuis 2 jours), 2500305 (deja numerise), 2500306 (traite), 2500307
+# (corrige par le greffe), 2500309 (traite par Amitel), 2500310 (passage non direct), 2500311 (sans etat).
+2026 B 25391 | liaison C25030100001 · SIREN 525 003 910 · envoyée le {J-10} · retour reçu le {J-2} · traité par la CCI le {J-1} · Rejet definitif CCI | Rejet définitif | AFaire | []
+2026 B 25392 | liaison C25030200099 · SIREN 525 003 920 · envoyée le {J-10} · retour reçu le {J-3} · traité par la CCI le {J-2} · Code APE invalide | Erreur fonctionnelle | AFaire | []
+2026 B 25391 | liaison C25030300001 · SIREN 525 003 910 · envoyée le {J-3} · traité par la CCI le {J-3} | PDF feuillet1 absent | AFaire | []
+2026 B 25392 | liaison C25030800001 · SIREN 525 003 920 · envoyée le {J-20} · traité par la CCI le {J-4} · Liasse envoyée deux fois | Rejet doublon | AFaire | []

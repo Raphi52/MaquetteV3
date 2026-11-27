@@ -1,0 +1,19 @@
+# « Modes de paiement » (LecteurModesPaiement) : TOUS les modes de MODE_PAIEMENT (GetAllMODE_PAIEMENT, OPE_MODEPAIEMENTLIST.cs:53-54),
+# par code. Entrent aussi les modes poses par PROC_JCAISSE.sql (CB, CH, ES, RBT, VI) et PROC_RECHENC.sql (CHQ, VIR), sans lien banque et
+# inactifs (le defaut de RIG_DEV, UTILISABLE_SAISIE 0) : « Banque à associer », groupe « Inactifs ».
+# Groupe : actif -> « Actifs », inactif -> « Inactifs » (L15VI ; jumeau L15CH). Etat : libelle de moins de 6 caracteres -> AFaire
+# (L15ES ; jumeau L15CB) ; banque requise et absente -> EnCours (L15CB ; jumeau L15CH, banque associee) ; code REG, sans banque, et
+# libelle complet -> Validee (REG ; jumeau L15CB). Les cellules : celles de L15CH (Code, Libellé, Type, Banque, Actif, Édition du
+# remis visible, Groupé pour le transfert en comptabilité).
+Carte bancaire | code CB · type CB · banque à associer · inactif | Inactifs | EnCours | []
+Chèque | code CH · type CH · banque à associer · inactif | Inactifs | EnCours | []
+Chèque | code CHQ · type CH · banque à associer · inactif | Inactifs | EnCours | []
+Espèce | code ES · type ES · banque à associer · inactif | Inactifs | EnCours | []
+Carte banc | code L15CB · type CB · banque à associer | Actifs | EnCours | []
+Chèque banc | code L15CH · type CH · banque L15LCL | Actifs | Validee | [] | valeurs: L15CH ; Chèque banc ; CH ; L15LCL ; oui ; oui ; oui
+Espèc | code L15ES · type ES · banque L15CIC · libellé trop court | Actifs | AFaire | []
+Virement banc | code L15VI · type VI · banque L15LCL · inactif | Inactifs | Validee | []
+Remboursement par chèque | code RBT · type RBT · banque à associer · inactif | Inactifs | EnCours | []
+Régularisation banc | code REG · type REG · sans banque | Actifs | Validee | []
+Virement LCL | code VI · type VI · banque à associer · inactif | Inactifs | EnCours | []
+Virement | code VIR · type CH · banque à associer · inactif | Inactifs | EnCours | []

@@ -16,3 +16,9 @@ IF OBJECT_ID(N'v2.DEMAT_RPJC_INS') IS NULL
         RPJCI_NUMERO_CNBF varchar(6) NULL, RPJCI_NOM varchar(50) NULL, RPJCI_PRENOM varchar(50) NULL,
         RPJCI_DENOMINATION varchar(200) NULL, RPJCI_USER_EN_COURS varchar(255) NULL, RPJCI_NUMERO_SIREN varchar(9) NULL,
         RPJCI_NUMERO_CNBF_STRUCTURE varchar(6) NULL);
+
+-- Lot 15 du plan-676a4b19 : le REFUS (EcrivainInscriptionsRpva) ecrit aussi l'agent qui a traite (RPJCI_USER_TRAITEMENT_RIG,
+-- DataProcDemandeInscr.cs:222), colonne de RIG_DEV absente de la table du jeu PROC_EDI_RPJC_INS.sql. Les demandes refusees par
+-- PROC_EDI_RPVAINS.gestes sont celles de ce jeu (300101 a 300108).
+IF COL_LENGTH('v2.DEMAT_RPJC_INS', 'RPJCI_USER_TRAITEMENT_RIG') IS NULL
+    ALTER TABLE v2.DEMAT_RPJC_INS ADD RPJCI_USER_TRAITEMENT_RIG varchar(255) NULL;

@@ -75,6 +75,10 @@ internal sealed class LecteurInscriptionsRpva : ILecteurEcran
             siren.Length > 0 ? $"SIREN {FormeLigne.Siren(siren)}" : null,
             FormeLigne.Texte(r, "RPJCI_TYPE_MAJ") == "M" ? "modification" : null,
             regle.Statut);
-        return new LigneLue(nom, precisions, structure ? Structures : PersonnesPhysiques, regle.Etat, regle.Faites);
+        // Id : la demande (RPJCI_ID_RPJCI), que le refus vise (EcrivainInscriptionsRpva.cs, lot 15 du plan-676a4b19).
+        return new LigneLue(nom, precisions, structure ? Structures : PersonnesPhysiques, regle.Etat, regle.Faites)
+        {
+            Id = FormeLigne.Texte(r, "RPJCI_ID_RPJCI"),
+        };
     }
 }

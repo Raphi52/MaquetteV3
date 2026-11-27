@@ -20,6 +20,14 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 // CNBF de structure et SIREN, pas par abrege ; PROC_RAPPACTEUR n'a ni « Acteurs à supprimer » ni « Confirmation » saisis) : une
 // edition par descripteur, chacune citee la ou elle porte.
 //
+// Lot 15 du plan « RIG v3 100 % fonctionnel » (27/11/2026) : bornes, modeles, sceaux, modes de paiement, Expresso, requetes, IA, wiki,
+// page web, CFE-NET et EDI. fix-ok: mesure le 27/11/2026 en lisant le code V2 -- ces descripteurs portaient les groupes, colonnes et
+// gestes des exemples du lot 7 (« Espèces et chèque » / « Virement et carte » absents de ModePaiementRigDataGridView.cs:15-40 ; les
+// gestes « Traiter / Rejeter / Masquer » de CFE-NET absents d'OPE_RESULTAT.cs, qui n'a que la correction greffe et Amitel ; aucun geste
+// « Refuser » sur EDI RPVA alors que DataProcDemandeInscr.Refuse l'ecrit) : une edition par descripteur, citee la ou elle porte. Les
+// ecrans dont la V2 lit une base absente du greffe (COMMUN_RIG, base WIKI) ou un service externe restent en exemple, la cause nommee
+// dans leur descripteur.
+//
 // PROC_PARAM_LISTEEXCEL n'a PAS de descripteur : sa fiche RIG v2 ne decrit aucune fonction
 // (« Nature reelle du plugin : une coquille, pas une couche OPE »). Un ecran inventerait du
 // contenu, ce que le plan interdit : il reste « a venir » dans le menu, a trancher par le chef.
@@ -261,6 +269,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_WIKI", Titre = "Aide du greffe", Sujet = "articles d'aide",
+            // Lot 15 (27/11/2026) : RESTE EN EXEMPLE, cause nommee -- les articles sont dans la base « WIKI » du Support Desk d'Amitel
+            // (RigGreffe.CodeGreffeWiki_Exploit = "WIKI", RigTools\TOOLS\RigGreffe.cs:44 ; tables WIKI_ARTICLE, WIKI_ARTICLE_CATEGORIE,
+            // WIKI_ARTICLE_FILE, proc_wiki.md:125-131), absente de la base V3 du greffe. Aucun appel reseau externe.
             Forme = FormeEcran.Document,
             Recherche = "Rechercher un article, un mot-clé…",
             Criteres = ["Catégorie", "Auteur", "Titre"],
@@ -295,6 +306,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_WEB_BROWSER", Titre = "Page web interne", Sujet = "pages web",
+            // Lot 15 (27/11/2026) : RESTE EN EXEMPLE, cause nommee -- la V2 ne lit aucune table : elle ouvre l'adresse recue en parametre
+            // (ListeParametresInternes["url"], proc_web_browser.md DoChargerDonnees) dans un navigateur integre. Ouvrir une page est un
+            // appel reseau, que la V3 ne fait pas ici : le geste reste une demonstration.
             Forme = FormeEcran.Document,
             Recherche = "Rechercher une page, une adresse…",
             Criteres = ["Adresse (URL)", "Site interne ou externe", "Mode détaché"],
@@ -469,6 +483,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_BORNE", Titre = "Bornes d'accueil", Sujet = "essais de bornes",
+            // Lot 15 (27/11/2026) : RESTE EN EXEMPLE, cause nommee -- la V2 lit le journal des bornes dans COMMUN_RIG.BORNE_LOG_PARAMETRE
+            // (proc_borne.md:43, :83-95 ; base commune absente de la base V3 du greffe) et pilote les bornes par le service SOAP ServiceKbisSoap
+            // (service externe, jamais appele), sur les seules bases de developpement 9995 / 9999. Rien n'est ecrit dans RIG.
             Forme = FormeEcran.Operation,
             Recherche = "Rechercher un essai, un article, une borne…",
             Criteres = ["Article", "Dossier de test", "Journal"],
@@ -503,36 +520,39 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         {
             Code = "PROC_REDAA", Titre = "Modeles de redaction", Sujet = "modèles de décision",
             Forme = FormeEcran.Referentiel,
-            Colonnes = ["Nom du modèle", "Maquette", "Sections"],
-            Recherche = "Rechercher un modèle, une maquette, une section…",
-            Criteres = ["Modèle", "Maquette", "Section"],
-            // Bouton final cite par la fiche v2 : bouton VALIDER (proc_redaa.md, Detail OPE)
+            // Lot 15 (27/11/2026) : les objets que la V2 administre (OPE_RECH_MODEL_MAQ.cs:84-85 modeles et maquettes REDA,
+            // OPE_RECH_SECTION.cs:92 sections, OPE_RECH_GLOSSAIRE.cs:96 glossaire), lus par LecteurModelesRedaction.cs, un plafond par
+            // groupe. Aucun geste branche (document Word en GED, sections reservees Amitel, glossaire au login de l'agent) : nomme dans le lecteur.
+            Colonnes = ["Code", "Libellé", "Nature", "Utilisation"],
+            Recherche = "Rechercher un modèle, une maquette, une section, un terme…",
+            Criteres = ["Code", "Libellé"],
+            // La V2 masque VALIDER (FORM_REDAA.cs:18-23) : chaque objet s'enregistre par la barre de sa fiche.
             Valider = "Valider",
             Rang = 7,
             Etats = EtatsEcran.Trois("À compléter", "En cours", "Enregistré"),
             Groupes = ["Modèles et maquettes", "Sections et glossaire", "Jugements"],
             Sections =
             [
-                new MarcheEcran("Modèle", "Le modèle est recherché puis édité. Le mode d'ouverture choisit les onglets affichés.", true,
-                    ["Nom du modèle"]),
-                new MarcheEcran("Maquette", "La maquette du document est éditée. Une seule étape est visible à la fois.", true,
-                    ["Maquette"]),
-                new MarcheEcran("Sections", "Les sections réutilisables de la décision.", false,
+                new MarcheEcran("Modèle", "Un modèle de document compose des maquettes, dans l'ordre ; il ne se supprime pas tant qu'il en garde.", true,
+                    ["Code", "Libellé"]),
+                new MarcheEcran("Maquette", "Une maquette REDA est un document Word de la GED ; utilisée par un modèle, elle ne se supprime pas.", true,
+                    ["Nature", "Utilisation"]),
+                new MarcheEcran("Sections", "Les sections réutilisables de la décision (fusion, génération, occurrence, persistance) ; éditées par Amitel seulement.", false,
                     ["Sections"]),
-                new MarcheEcran("Glossaire", "Les termes du glossaire utilisés dans les modèles.", false,
+                new MarcheEcran("Glossaire", "Les termes publics, et les termes privés de l'agent.", false,
                     ["Termes du glossaire"]),
-                new MarcheEcran("Fonctions avancées", "Fonctions avancées de rédaction, dans un onglet à part.", false,
+                new MarcheEcran("Fonctions avancées", "Outils techniques de la rédaction, dans un onglet à part.", false,
                     ["Fonctions avancées"]),
             ],
+            // Les cellules, dans l'ordre des colonnes : des objets anonymes du type de ceux de RIG_DEV.
             Lignes =
             [
-                new LigneEcran("Modèle de jugement ordinaire", "Modèles et maquettes · enregistré", "Modèles et maquettes", "Validee", [0, 1]),
-                new LigneEcran("Modèle d'ordonnance", "Modèles et maquettes · maquette en cours", "Modèles et maquettes", "EnCours", [0]),
-                new LigneEcran("Modèle de référé", "Modèles et maquettes · à compléter", "Modèles et maquettes", "AFaire", []),
-                new LigneEcran("Section « motifs »", "Sections et glossaire · enregistrée", "Sections et glossaire", "Validee", [0, 1, 2]),
-                new LigneEcran("Glossaire des parties", "Sections et glossaire · en cours", "Sections et glossaire", "EnCours", [0, 1]),
-                new LigneEcran("Jugement · administration", "Jugements · à compléter", "Jugements", "AFaire", []),
-                new LigneEcran("Jugement · dispositif", "Jugements · enregistré", "Jugements", "Validee", [0, 1, 3]),
+                new LigneEcran("JGT_ORDINAIRE - Jugement ordinaire", "modèle · 3 maquette(s)", "Modèles et maquettes", "Validee", []) { Valeurs = ["JGT_ORDINAIRE", "Jugement ordinaire", "modèle", "3 maquette(s)"] },
+                new LigneEcran("ORD_REFERE - Ordonnance de référé", "modèle · aucune maquette", "Modèles et maquettes", "AFaire", []) { Valeurs = ["ORD_REFERE", "Ordonnance de référé", "modèle", "aucune maquette"] },
+                new LigneEcran("ENTETE_JGT - Entête de jugement", "maquette REDA · utilisée par 2 modèle(s)", "Modèles et maquettes", "Validee", []) { Valeurs = ["ENTETE_JGT", "Entête de jugement", "maquette REDA", "utilisée par 2 modèle(s)"] },
+                new LigneEcran("DISPOSITIF - Dispositif", "maquette REDA · sans document Word", "Modèles et maquettes", "AFaire", []) { Valeurs = ["DISPOSITIF", "Dispositif", "maquette REDA", "sans document Word"] },
+                new LigneEcran("MOTIFS - Motifs", "section", "Sections et glossaire", "Validee", []) { Valeurs = ["MOTIFS", "Motifs", "section", "—"] },
+                new LigneEcran("PARTIES - Les parties", "glossaire public", "Sections et glossaire", "Validee", []) { Valeurs = ["PARTIES", "Les parties", "glossaire public", "—"] },
             ],
         },
 
@@ -540,34 +560,35 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         {
             Code = "PROC_SCEAU", Titre = "Sceaux", Sujet = "sceaux",
             Forme = FormeEcran.Referentiel,
-            Colonnes = ["Référence", "Hauteur maximale", "Image", "Dernière version"],
-            Recherche = "Rechercher un sceau, une référence…",
-            Criteres = ["Référence", "Hauteur maximale", "Image"],
-            // Bouton final cite par la fiche v2 : VALIDER, ANNULER_ROUGE (proc_sceau.md, Detail OPE)
+            // Lot 15 (27/11/2026) : les colonnes de la liste de la V2 (Recherche\OPE_RECHERCHE.cs InitColumn : fichier, nom externe, hauteur,
+            // largeur, rognage, date d'archivage), lues par LecteurSceaux.cs ; Supprimer seul est branche (EcrivainSceaux.cs) -- ajouter importe
+            // l'image en GED, modifier la hauteur recalcule la largeur sur l'image : non repris, nommes dans l'ecrivain.
+            Colonnes = ["Nom externe", "Fichier", Champ.Nombre("Hauteur max"), Champ.Nombre("Largeur max"), Champ.Nombre("Rogner"), Champ.Texte("Date archivage")],
+            Recherche = "Rechercher un sceau, un fichier…",
+            Criteres = ["Nom externe", "Fichier"],
+            // La V2 masque VALIDER (FORM_SCEAU.cs:25-30) : la fiche du sceau a sa propre barre (Valider, Annuler, Supprimer).
             Valider = "Valider",
             Rang = 7,
-            Etats = EtatsEcran.Trois("À compléter", "En saisie", "Enregistré"),
+            Etats = EtatsEcran.Trois("À compléter", "Image absente de la GED", "Enregistré"),
             Groupes = ["Hauteur de 24 mm", "Autre hauteur"],
             Sections =
             [
-                new MarcheEcran("Référence", "La référence est unique : un doublon est refusé avant l'enregistrement.", true,
-                    ["Référence"]),
-                new MarcheEcran("Dimensions", "La hauteur maximale se saisit ; la largeur est fixe et jamais saisie. La case « dimensions du lot 1 » se coche d'elle-même pour une hauteur de 24 mm.", true,
-                    ["Hauteur maximale", "Dimensions du lot 1"]),
-                new MarcheEcran("Image", "L'image du sceau est archivée dans le dossier GED du sceau. « Récupérer la dernière version » copie la version de travail vers un dossier choisi.", false,
-                    ["Image", "Dernière version"]),
-                new MarcheEcran("Enregistrement", "Valider et Annuler ne s'activent que si la saisie a changé. Annuler rétablit les valeurs enregistrées.", true,
-                    ["Valider", "Annuler"]),
+                new MarcheEcran("Référence", "Le nom externe est la clé du sceau dans les maquettes : unique, il ne change plus une fois enregistré.", true,
+                    ["Nom externe"]),
+                new MarcheEcran("Dimensions", "Hauteur maximale en mm ; la largeur se recalcule sur l'image. « Dimensions du lot 1 » vaut une hauteur de 24 mm.", true,
+                    [Champ.Nombre("Hauteur max"), Champ.Nombre("Largeur max"), Champ.Nombre("Rogner"), Champ.Case("Dimensions du lot 1")]),
+                new MarcheEcran("Image", "L'image est un document de la GED du greffe ; supprimer le sceau la laisse dans la GED.", false,
+                    ["Fichier", Champ.Texte("Date archivage")]),
             ],
+            // Les cellules, dans l'ordre des colonnes : des elements de RIG_DEV (reference, hauteur, largeur, rognage), anonymes.
             Lignes =
             [
-                new LigneEcran("Sceau du greffe", "Hauteur de 24 mm · enregistré", "Hauteur de 24 mm", "Validee", [0, 1, 3]),
-                new LigneEcran("Sceau du président", "Hauteur de 24 mm · image à archiver", "Hauteur de 24 mm", "EnCours", [0, 1]),
-                new LigneEcran("Sceau de la chambre", "Hauteur de 24 mm · à compléter", "Hauteur de 24 mm", "AFaire", []),
-                new LigneEcran("Sceau du tribunal", "Hauteur de 24 mm · en saisie", "Hauteur de 24 mm", "EnCours", [0, 1]),
-                new LigneEcran("Sceau de la section", "Autre hauteur · enregistré", "Autre hauteur", "Validee", [0, 1, 2, 3]),
-                new LigneEcran("Sceau d'annexe", "Autre hauteur · référence à saisir", "Autre hauteur", "EnCours", [0]),
-                new LigneEcran("Sceau de remplacement", "Autre hauteur · à compléter", "Autre hauteur", "AFaire", []),
+                new LigneEcran("SCEAU", "24 × 41 mm · sceau.gif · archivé le 12/03/2024", "Hauteur de 24 mm", "Validee", []) { Valeurs = ["SCEAU", "sceau.gif", "24", "41", "0", "12/03/2024"] },
+                new LigneEcran("SCEAU_SEUL", "24 × 24 mm · sceau-seul.gif · archivé le 12/03/2024", "Hauteur de 24 mm", "Validee", []) { Valeurs = ["SCEAU_SEUL", "sceau-seul.gif", "24", "24", "0", "12/03/2024"] },
+                new LigneEcran("SIGNATURE", "24 × 45 mm · image absente de la GED", "Hauteur de 24 mm", "EnCours", []) { Valeurs = ["SIGNATURE", "", "24", "45", "0", ""] },
+                new LigneEcran("LOGO", "273 × 998 mm · logo.gif · archivé le 02/01/2023", "Autre hauteur", "Validee", []) { Valeurs = ["LOGO", "logo.gif", "273", "998", "0", "02/01/2023"] },
+                new LigneEcran("SIGNJUD_IMAGE", "45 × 50 mm · sans image", "Autre hauteur", "AFaire", []) { Valeurs = ["SIGNJUD_IMAGE", "", "45", "50", "0", ""] },
+                new LigneEcran("SCEAU_GPD", "24 × 0 mm · sceau-gpd.gif · archivé le 05/06/2024", "Hauteur de 24 mm", "Validee", []) { Valeurs = ["SCEAU_GPD", "sceau-gpd.gif", "24", "0", "0", "05/06/2024"] },
             ],
         },
 
@@ -575,40 +596,43 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         {
             Code = "PROC_GESTMODEPAIEMENT", Titre = "Modes de paiement", Sujet = "modes de paiement",
             Forme = FormeEcran.Referentiel,
-            // Colonnes : la grille de la V2 (Code, Libelle, Actif : proc_gestmodepaiement.md:244) et le detail
-            // qu'elle ouvre (Type :173, Banque :183, edition du remis), modifiables en ligne.
-            Colonnes = ["Code", "Libellé", "Type", "Banque", Champ.Case("Actif"), Champ.Case("Édition du remis visible")],
-            Recherche = "Rechercher un mode de paiement, un code, une banque…",
+            // Colonnes : la grille de la V2 (Code, Libelle, Actif : ModePaiementRigDataGridView.cs:15-40) et le detail qu'elle ouvre
+            // (Type, Banque, edition du remis, groupe comptable : OPE_MODEPAIEMENTDETAIL.cs:65-82), modifiables en ligne. Le type est
+            // un code de la combo de la V2 (ULT_COMBO_TYPE_MODE_PAIEMENT.cs:19-25). Lot 15 (27/11/2026) : realigne sur le code V2 que
+            // lisent LecteurModesPaiement.cs et EcrivainModesPaiement.cs -- les groupes « Espèces et chèque » / « Virement et carte »
+            // n'avaient pas de source ; la V2 a une liste unique, dont la colonne « Actif » fait ici les deux groupes.
+            Colonnes = ["Code", "Libellé", Champ.Liste("Type", "CB", "CH", "DIV", "ES", "RBT", "REG", "VI"), "Banque", Champ.Case("Actif"),
+                        Champ.Case("Édition du remis visible"), Champ.Case("Groupé pour le transfert en comptabilité")],
+            Recherche = "Rechercher un mode de paiement, un code, un libellé…",
             Criteres = ["Code", "Libellé", "Type"],
-            // Bouton final cite par la fiche v2 : VALIDER (proc_gestmodepaiement.md, Detail OPE)
+            // La V2 masque VALIDER (FORM_GESTMODEPAIEMENT.cs:16-17) : chaque ligne s'enregistre par la barre de son detail.
             Valider = "Valider",
             Rang = 7,
-            Etats = EtatsEcran.Trois("À compléter", "En saisie", "Enregistré"),
-            Groupes = ["Espèces et chèque", "Virement et carte"],
+            Etats = EtatsEcran.Trois("À compléter", "Banque à associer", "Enregistré"),
+            Groupes = ["Actifs", "Inactifs"],
             Sections =
             [
-                new MarcheEcran("Code", "Le code (5 caractères au plus) est obligatoire et unique. Il se verrouille dès qu'un encaissement ou un procès-verbal utilise le mode.", true,
+                new MarcheEcran("Code", "Obligatoire, 5 caractères au plus et unique. C'est l'identité du mode : il ne se change pas une fois enregistré.", true,
                     ["Code"]),
-                new MarcheEcran("Libellé", "Le libellé est obligatoire, six caractères au moins, et unique.", true,
+                new MarcheEcran("Libellé", "Obligatoire, six caractères au moins, et porté par aucun autre mode.", true,
                     ["Libellé"]),
-                new MarcheEcran("Type et banque", "Le type est obligatoire et se verrouille comme le code. Une banque peut être associée selon le type.", true,
+                new MarcheEcran("Type et banque", "Le type est obligatoire ; il ne change plus dès qu'un encaissement porte le code, ni pour PV. La banque (ou « Aucune ») est demandée, sauf pour le code REG et le mode PV de type DIV.", true,
                     ["Type", "Banque"]),
-                new MarcheEcran("Options", "Actif : utilisable en saisie. « Édition du remis visible » : affiché sur l'édition du remis.", false,
-                    ["Actif", "Édition du remis visible"]),
-                new MarcheEcran("Suppression", "Un mode qui a déjà servi à un encaissement ne peut pas être supprimé.", false,
-                    ["Supprimer"]),
+                new MarcheEcran("Options", "Actif : utilisable en saisie (coché pour un nouveau mode). « Groupé » : décoché d'office pour un remboursement ou un virement.", false,
+                    ["Actif", "Édition du remis visible", "Groupé pour le transfert en comptabilité"]),
+                new MarcheEcran("Utilisation", "Un mode qu'un encaissement porte ne se supprime pas.", false,
+                    ["Encaissements"]),
             ],
-            // Les cellules, dans l'ordre des colonnes : le code d'un mode n'est pas cite par la fiche (vide, « — ») ; le type
-            // « VI » du virement l'est (:190) ; actif par defaut (:260). Le libelle est celui de la ligne.
+            // Les cellules, dans l'ordre des colonnes : des modes de RIG_DEV (code, libelle, type, banque, actif), anonymes.
             Lignes =
             [
-                new LigneEcran("Espèces", "Espèces et chèque · enregistré", "Espèces et chèque", "Validee", [0, 1, 2, 3]) { Valeurs = ["", "Espèces", "", "", "oui", ""] },
-                new LigneEcran("Chèque bancaire", "Espèces et chèque · enregistré", "Espèces et chèque", "Validee", [0, 1, 2]) { Valeurs = ["", "Chèque bancaire", "", "", "oui", ""] },
-                new LigneEcran("Chèque de banque", "Espèces et chèque · libellé à saisir", "Espèces et chèque", "EnCours", [0]) { Valeurs = ["", "Chèque de banque", "", "", "oui", ""] },
-                new LigneEcran("Mode déjà encaissé", "Espèces et chèque · code et type verrouillés", "Espèces et chèque", "EnCours", [0, 1, 2]) { Valeurs = ["", "Mode déjà encaissé", "", "", "oui", ""] },
-                new LigneEcran("Virement", "Virement et carte · enregistré", "Virement et carte", "Validee", [0, 1, 2, 3]) { Valeurs = ["", "Virement", "VI", "", "oui", ""] },
-                new LigneEcran("Carte bancaire", "Virement et carte · type à choisir", "Virement et carte", "EnCours", [0, 1]) { Valeurs = ["", "Carte bancaire", "", "", "oui", ""] },
-                new LigneEcran("Prélèvement", "Virement et carte · à compléter", "Virement et carte", "AFaire", []) { Valeurs = ["", "Prélèvement", "", "", "oui", ""] },
+                new LigneEcran("Carte bancaire", "code CB · type CB · banque LCL", "Actifs", "Validee", []) { Valeurs = ["CB", "Carte bancaire", "CB", "LCL", "oui", "oui", "oui"] },
+                new LigneEcran("Chèque", "code CH · type CH · banque LCL", "Actifs", "Validee", []) { Valeurs = ["CH", "Chèque", "CH", "LCL", "oui", "oui", "oui"] },
+                new LigneEcran("Chèque postal", "code CP · type CH · banque CIC · inactif", "Inactifs", "Validee", []) { Valeurs = ["CP", "Chèque postal", "CH", "CIC", "", "oui", "oui"] },
+                new LigneEcran("Encaissement repris", "code PV · type DIV · sans banque", "Actifs", "Validee", []) { Valeurs = ["PV", "Encaissement repris", "DIV", "", "oui", "", "oui"] },
+                new LigneEcran("Virement LCL", "code VI · type VI · banque LCL", "Actifs", "Validee", []) { Valeurs = ["VI", "Virement LCL", "VI", "LCL", "oui", "oui", ""] },
+                new LigneEcran("Mandat", "code MA · type DIV · banque à associer", "Actifs", "EnCours", []) { Valeurs = ["MA", "Mandat", "DIV", "", "oui", "oui", "oui"] },
+                new LigneEcran("Espèc", "code ES · type ES · banque ESPECE · libellé trop court", "Actifs", "AFaire", []) { Valeurs = ["ES", "Espèc", "ES", "ESPECE", "oui", "oui", "oui"] },
             ],
         },
 
@@ -616,39 +640,47 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         {
             Code = "PROC_PARAMEXPRESSO", Titre = "Facturation Expresso", Sujet = "paramètres de facturation",
             Forme = FormeEcran.Fiche,
+            // Lot 15 (27/11/2026) : un parametre par ligne, lu « PARAMETRAGE d'abord, sinon GREFFE_PARAMETRE » (MetierParametrage.cs:71-92,
+            // repris dans soc.Reglage et soc.ParametreGreffe), puis la banque de chaque mode actif (MetierBanques.cs:38-57) :
+            // LecteurFacturationExpresso.cs. Enregistrer n'est pas branche : ces reglages s'ecrivent par le module des reglages du greffe,
+            // pas par un ecrivain d'ecran genere (v2.* et rec.* seulement) ; l'association mode / banque s'ecrit par « Modes de paiement ».
             Recherche = "Rechercher un paramètre de facturation…",
             Criteres = ["Paramètre", "Banque", "Mode de paiement"],
-            // Bouton final cite par la fiche v2 : DoValider (proc_paramexpresso.md, Detail OPE)
+            // Bouton final cite par la fiche v2 : DoValider (PROC_PARAMEXPRESSO.cs:39-54), VERIFIER masque (FORM_PARAMEXPRESSO.cs:10)
             Valider = "Valider",
             Rang = 7,
             Etats = EtatsEcran.Trois("À renseigner", "En cours", "Enregistré"),
-            Groupes = ["Paramètres généraux", "Pied de page", "Comptabilité"],
+            Groupes = ["Paramètres généraux", "Banques et modes", "Pied de page", "Comptabilité"],
             Sections =
             [
-                new MarcheEcran("Paramètres généraux", "Les paramètres généraux de la facturation.", true,
+                new MarcheEcran("Paramètres généraux", "Rompu, seuils de relance et de remboursement, commentaires obligatoires, relevé client, éditions synthétiques, courriels des relevés.", true,
                     ["Paramètre", "Valeur"]),
-                new MarcheEcran("Banques et modes", "Chaque mode de paiement est associé à sa banque.", false,
+                new MarcheEcran("Banques et modes", "Chaque mode de paiement actif est associé à sa banque, ou à aucune.", false,
                     ["Banque", "Mode de paiement"]),
-                new MarcheEcran("Pied de page", "Le pied de page des factures : chaque ligne est un paramètre ; la source de l'adresse peut être basculée.", false,
+                new MarcheEcran("Pied de page", "Le pied de page des factures : l'adresse vient du code greffe ou du paramètre GRPAR_GREFFE_ADR_COMPLETE.", false,
                     ["Ligne du pied de page", "Source de l'adresse"]),
-                new MarcheEcran("Enregistrement", "Enregistrer écrit tous les paramètres ensemble et laisse une trace.", true,
+                new MarcheEcran("Enregistrement", "Enregistrer écrit les seuls paramètres modifiés et laisse une trace.", true,
                     []),
             ],
+            // Des cles de la V2, aux valeurs anonymes.
             Lignes =
             [
-                new LigneEcran("Taux de TVA par défaut", "Paramètres généraux · enregistré", "Paramètres généraux", "Validee", [0, 3]),
-                new LigneEcran("Compte de vente", "Paramètres généraux · en saisie", "Paramètres généraux", "EnCours", [0]),
-                new LigneEcran("Virement vers banque principale", "Paramètres généraux · association faite", "Paramètres généraux", "Validee", [0, 1, 3]),
-                new LigneEcran("Mention de pied de page", "Pied de page · source d'adresse basculée", "Pied de page", "EnCours", [0, 2]),
-                new LigneEcran("Pied de page des avoirs", "Pied de page · à compléter", "Pied de page", "AFaire", []),
-                new LigneEcran("Grille de déversement", "Comptabilité · lecture seule", "Comptabilité", "Validee", [0, 3]),
-                new LigneEcran("Écritures comptables", "Comptabilité · lecture seule", "Comptabilité", "AFaire", []),
+                new LigneEcran("GRPAR_ROMPU", "0.50 · paramètre du greffe", "Paramètres généraux", "Validee", []),
+                new LigneEcran("EXPRESSO_RELANCE", "15.00 · réglage", "Paramètres généraux", "Validee", []),
+                new LigneEcran("EXPRESSO_RELEVE_MAIL_ENVOI", "non renseigné", "Paramètres généraux", "AFaire", []),
+                new LigneEcran("Mode CH", "banque du mode Chèque · banque LCL", "Banques et modes", "Validee", []),
+                new LigneEcran("Mode REG", "banque du mode Régularisation · aucune banque", "Banques et modes", "AFaire", []),
+                new LigneEcran("EXPRESSO_TYPE_PIED_PAGE", "CODE_GREFFE · réglage", "Pied de page", "Validee", []),
+                new LigneEcran("GRPAR_COMPTA_TYPE_COMPTA", "BNC · paramètre du greffe", "Comptabilité", "Validee", []),
             ],
         },
 
         new DescripteurEcran
         {
             Code = "PROC_REQUETES", Titre = "Requetes metier", Sujet = "requêtes",
+            // Lot 15 (27/11/2026) : RESTE EN EXEMPLE, cause nommee -- le catalogue des requetes est la table REQUETE de COMMUN_RIG (RigTools
+            // SQL\COMMON\REQUETE.cs:13 ; Requete.Delete ecrit sur Common.CodeGreffeBaseCommmunRig, proc_requetes.md:231-232), absente de la
+            // base V3 du greffe. L'execution (SELECT seul, #TOP# exige, RequetesHelper.cs:84-117) attend ce catalogue.
             Forme = FormeEcran.Etat,
             Parametres = ["Requête", "Critères"],
             Colonnes = ["Requête"],
@@ -706,7 +738,10 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             // « En cours » : le temps de la reponse du service, dans la session (OPE_IA.cs:99-100) ; rien ne le garde en
             // base, ou DMTLCF_REPONSE_IA est vide (a analyser) ou remplie (analysee) -- aucune ligne n'y est donc.
             Etats = EtatsEcran.Trois("À analyser", "En cours", "Analysée"),
-            Groupes = ["Liasses CFE", "Liasses DCA", "Liasses DAS"],
+            // Lot 15 (27/11/2026) : la liasse INPI lue dans DEMAT_LIASSE_CFE et sa reponse DMTLCF_REPONSE_IA, LecteurAnalyseIa.cs ; groupes par
+            // l'origine (INPI_FORMA / INPI_FORMA_MAJ) -- « Liasses CFE / DCA / DAS » n'avaient pas de source. Le lancement poste les pieces au
+            // service externe (IA.cs:189-193) : jamais appele, le geste reste une demonstration.
+            Groupes = ["Formalités INPI", "Régularisations INPI"],
             // Ce que le lancement emporte et fait : ce qui se voit AVANT le bouton.
             Sections =
             [
@@ -726,7 +761,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
                 new MarcheEcran("Champs vérifiés", "Chaque champ : correspondance, proche, pas de correspondance ou non disponible ; un champ en anomalie s'ouvre d'office.", false,
                     [Champ.Tableau("Champs vérifiés")]),
                 // proc_ia.md:271-275 (synthese, commentaire), :296 (bandes de l'indice de confiance).
-                new MarcheEcran("Synthèse", "Indice de confiance global (faible sous 0,5, moyen sous 0,8, bon sous 0,9, très bon au-delà) et commentaire de synthèse.", false,
+                new MarcheEcran("Synthèse", "Indice de confiance global (faible sous 0,5, moyen sous 0,8, bon sous 0,9, très bon sous 1, excellent à 1) et commentaire de synthèse.", false,
                     [Champ.Tableau("Indice de confiance et commentaire")]),
                 // OPE_AVIS_USER.cs:28-31 (« Votre avis nous est precieux », formulaire de retour), :36-44 (son adresse porte
                 // la demande, la liasse et le greffe ; rien sans reponse). Ce n'est pas un choix validation / rejet comme
@@ -737,13 +772,12 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             // Le numero d'une liasse (le nom de la ligne) est ce qui se saisit dans le critere.
             Lignes =
             [
-                new LigneEcran("2026-001", "Liasse CFE · analysée", "Liasses CFE", "Validee", [0, 1]),
-                new LigneEcran("2026-002", "Liasse CFE · à analyser", "Liasses CFE", "AFaire", []),
-                new LigneEcran("2026-003", "Liasse CFE · à analyser", "Liasses CFE", "AFaire", []),
-                new LigneEcran("2026-004", "Liasse DCA · analysée", "Liasses DCA", "Validee", [0, 1]),
-                new LigneEcran("2026-005", "Liasse DCA · à analyser", "Liasses DCA", "AFaire", []),
-                new LigneEcran("2026-006", "Liasse DAS · à analyser", "Liasses DAS", "AFaire", []),
-                new LigneEcran("2026-007", "Liasse DAS · analysée", "Liasses DAS", "Validee", [0, 1]),
+                new LigneEcran("J00026001001", "formalité INPI · reçue le 10/03/2026 · analysée", "Formalités INPI", "Validee", []),
+                new LigneEcran("J00026001002", "formalité INPI · reçue le 11/03/2026 · à analyser", "Formalités INPI", "AFaire", []),
+                new LigneEcran("J00026001003", "formalité INPI · reçue le 12/03/2026 · à analyser", "Formalités INPI", "AFaire", []),
+                new LigneEcran("J00026001004", "régularisation INPI · reçue le 13/03/2026 · à analyser", "Régularisations INPI", "AFaire", []),
+                new LigneEcran("J00026001005", "formalité INPI · reçue le 14/03/2026 · analysée", "Formalités INPI", "Validee", []),
+                new LigneEcran("J00026001006", "régularisation INPI · reçue le 15/03/2026 · analysée", "Régularisations INPI", "Validee", []),
             ],
         },
 
@@ -751,33 +785,35 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         {
             Code = "PROC_CFENET_RET", Titre = "Retours CFE-NET", Sujet = "retours",
             Forme = FormeEcran.File,
-            Recherche = "Rechercher un dossier, un numéro de retour…",
-            Criteres = ["Période", "Rejets", "Corrections du greffe"],
-            // Bouton final cite par la fiche v2 : VALIDER (proc_cfenet_ret.md, Detail OPE)
+            // Lot 15 (27/11/2026) : la grille de la V2 a ses criteres d'ouverture (erreurs, ni corrigees ni traitees par Amitel),
+            // LecteurRetoursCfenet.cs ; les deux gestes de son menu de ligne (OPE_RESULTAT.cs:197-245), EcrivainRetoursCfenet.cs. Les gestes
+            // « Traiter / Rejeter / Masquer » d'avant n'avaient pas de source V2.
+            Parametres = [Champ.Zone("Commentaire Amitel")],
+            Gestes = ["Correction greffe", "Correction Amitel"],
+            Recherche = "Numéro de gestion, SIREN ou numéro de liaison…",
+            Criteres = ["Numéro", "Erreurs", "Traités", "Corrections du greffe", "Date retour CCI"],
+            // La V2 masque VALIDER et VERIFIER (FORM_CFENET_RET.cs:14-15) : tout passe par le menu de la ligne.
             Valider = "Valider",
             Rang = 7,
-            Etats = EtatsEcran.Trois("À traiter", "En cours", "Traité"),
-            Groupes = ["Rejets", "Retours à traiter", "Retours traités"],
+            Etats = EtatsEcran.Trois("À traiter", "En cours", "Corrigé par le greffe"),
+            Groupes = ["Rejet définitif", "Rejet doublon", "Erreur fonctionnelle", "PDF feuillet1 absent"],
             Sections =
             [
-                new MarcheEcran("Recherche", "La recherche se fait par période et par critères : rejet, traitement, masquage, date de retour.", true,
-                    ["Période", "Rejets", "Date de retour"]),
-                // Une section « Resultat » (la grille des retours) repetait la liste de la file, retiree (controle final du
-                // lot 1, 25/11/2026) ; les gestes du menu de la ligne sont dans « Traitement ».
-                new MarcheEcran("Corrections du greffe", "Les corrections déjà faites par le greffe s'affichent si la case est cochée.", false,
-                    ["Corrections"]),
-                new MarcheEcran("Traitement", "Traiter, rejeter ou masquer le retour ; le dossier part ensuite vers la GED.", true,
-                    ["Traiter", "Rejeter", "Masquer"]),
+                new MarcheEcran("Recherche", "À l'ouverture : les retours en erreur (le PDF absent seulement après le délai du réglage CFENET_RET_NB_JOURS_PDF_ABSENT, 2 jours par défaut), ni corrigés par le greffe ni traités par Amitel. Le numéro cherche le dossier, le SIREN ou la liaison.", true,
+                    ["Numéro", "Erreurs", "Date retour CCI"]),
+                new MarcheEcran("Correction greffe", "Marque le retour comme traité par le greffe (date et agent) : il quitte la liste. Rejouée sur un retour corrigé, elle retire la correction.", true,
+                    ["Correction greffe"]),
+                new MarcheEcran("Correction Amitel", "Réservée à l'équipe Amitel, avec un commentaire obligatoire.", false,
+                    ["Commentaire Amitel"]),
             ],
             Lignes =
             [
-                new LigneEcran("Retour 2026-0101", "Rejets · à traiter", "Rejets", "AFaire", []),
-                new LigneEcran("Retour 2026-0102", "Rejets · rejeté", "Rejets", "Validee", [0, 1, 2]),
-                new LigneEcran("Retour 2026-0103", "Retours à traiter · en cours", "Retours à traiter", "EnCours", [0]),
-                new LigneEcran("Retour 2026-0104", "Retours à traiter · à traiter", "Retours à traiter", "AFaire", []),
-                new LigneEcran("Retour 2026-0105", "Retours traités · traité", "Retours traités", "Validee", [0, 1, 2]),
-                new LigneEcran("Retour 2026-0106", "Retours traités · corrigé par le greffe", "Retours traités", "Validee", [0, 1, 2]),
-                new LigneEcran("Retour 2026-0107", "Retours à traiter · masqué", "Retours à traiter", "EnCours", [0]),
+                new LigneEcran("2024 B 01011", "liaison C24010100001 · envoyée le 02/03/2026 · traité par la CCI le 05/03/2026 · Rejet définitif", "Rejet définitif", "AFaire", []),
+                new LigneEcran("2024 B 01012", "liaison C24010200001 · envoyée le 03/03/2026 · traité par la CCI le 04/03/2026 · Liasse envoyée deux fois", "Rejet doublon", "AFaire", []),
+                new LigneEcran("2024 B 01013", "liaison C24010300001 · envoyée le 01/03/2026 · Code APE invalide", "Erreur fonctionnelle", "AFaire", []),
+                new LigneEcran("2024 B 01014", "liaison C24010400001 · envoyée le 25/02/2026", "PDF feuillet1 absent", "AFaire", []),
+                new LigneEcran("2024 B 01015", "liaison C24010500001 · envoyée le 20/02/2026 · traité par la CCI le 22/02/2026 · Rejet définitif", "Rejet définitif", "AFaire", []),
+                new LigneEcran("2024 B 01016", "liaison C24010600001 · envoyée le 18/02/2026 · Raison sociale absente", "Erreur fonctionnelle", "AFaire", []),
             ],
         },
 
@@ -785,6 +821,11 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         {
             Code = "PROC_EDI_RPVAINS", Titre = "EDI RPVA", Sujet = "demandes d'inscription",
             Forme = FormeEcran.File,
+            // Lot 15 (27/11/2026) : le refus, seul geste de la V2 que la file porte (EcrivainInscriptionsRpva.cs) -- motif obligatoire
+            // (OPE_SAISIE_REJET.Designer.cs:71), 300 caracteres (RPJCI_MOTIF_TRAITEMENT_RIG). « Traiter » (rattacher les mandataires
+            // candidats) est un parcours en plusieurs fenetres de la V2, non repris : nomme dans l'ecrivain.
+            Parametres = [Champ.Zone("Motif du refus")],
+            Gestes = ["Refuser"],
             Recherche = "Rechercher une demande, un numéro CNBF…",
             Criteres = ["Numéro CNBF", "Demandeur", "État de la demande"],
             // Bouton final cite par la fiche v2 : VALIDER (proc_edi_rpvains.md, Detail OPE)
@@ -802,8 +843,8 @@ public sealed class DomaineConfigurer : IDomaineEcrans
                     ["Traiter", "Principal", "Désactiver"]),
                 new MarcheEcran("Courriels", "Si des courriels alternatifs existent sur les lignes traitées, une fenêtre propose de les remplacer.", false,
                     ["Remplacement des courriels"]),
-                new MarcheEcran("Refus", "Le refus met la demande à l'état refusée.", false,
-                    ["Refuser"]),
+                new MarcheEcran("Refus", "Le refus, motif saisi, met la demande à l'état refusée : elle quitte la liste. Une demande de modification, déjà refusée ou tenue par un agent ne se refuse pas.", false,
+                    ["Motif du refus"]),
             ],
             Lignes =
             [
@@ -820,6 +861,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_EDI_RPJC_TRCNC", Titre = "EDI RPJC", Sujet = "affaires RPJC",
+            // Lot 15 (27/11/2026) : lu par LecteurTraitementRpjc.cs ; AUCUN GESTE BRANCHE, cause nommee -- integrer ou refuser une
+            // transmission n'est permis qu'apres avoir VISUALISE ses pieces (OPE_AFFAIRE_A_TRAITER.cs:687, une ligne non vue est sautee),
+            // extraites du flux entrant de la base EDI (EDIGREFFE, l. 495-506), absente de la base du greffe ; integrer insere en GED.
             Forme = FormeEcran.File,
             Recherche = "Rechercher une affaire, un numéro de dossier…",
             Criteres = ["Numéro d'affaire", "Mandataire", "État de traitement"],

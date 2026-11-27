@@ -1,0 +1,9 @@
+# La recherche : le code ou le libelle, les « _ » valant des blancs (OPE_RECH_MODEL_MAQ.cs:93, :171) : « l15 libre » trouve L15_LIBRE.
+texte: l15 libre
+lignes:
+L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Modèles et maquettes | Validee | []
+---
+# Le libelle : « banc » sur la section et le glossaire, comme sur les modeles et maquettes.
+texte: motifs
+lignes:
+L15_MOTIFS - Motifs banc | section | Sections et glossaire | Validee | []

@@ -1,0 +1,45 @@
+# « Retours CFE-NET » (EcrivainRetoursCfenet) : « Correction greffe » et « Correction Amitel », le menu de la ligne de la V2
+# (OPE_RESULTAT.cs:136-245). Lignes du jeu : PROC_CFENET_RET.sql.
+
+# Refus : le menu s'ouvre sur une seule ligne (l. 136-195). Jumeau accepte : bloc 4 (un retour).
+geste: Agir Correction greffe
+ids: 2500301,2500302
+resultat: refuse
+message: Cochez un seul retour : RIG v2 ouvre ce menu sur une seule ligne.
+---
+# Refus : la correction Amitel n'est offerte qu'a un utilisateur Amitel (l. 184-192) ; l'agent du banc ne l'est pas. Jumeau accepte :
+# aucun sur ce banc -- le rendre Amitel changerait l'agent de tous les autres jeux (meme choix que PROC_ACTREJ.gestes).
+geste: Agir Correction Amitel
+ids: 2500301
+valeur: Commentaire Amitel = Renvoye a la CCI
+resultat: refuse
+message: La correction Amitel est réservée à l'équipe Amitel.
+---
+# Refus : un retour hors du domaine de la grille (passage non direct, PROC_CFENET_RET.cs:74). Jumeau accepte : bloc 4 (passage direct).
+geste: Agir Correction greffe
+ids: 2500310
+resultat: refuse
+message: Retour CFE-NET introuvable dans la base du greffe (2500310).
+---
+# RETRAITE : 2500301 est marque corrige par le greffe (date, et l'identifiant V2 de l'agent du banc : soc.Compte.IdV2) ; il quitte la liste.
+geste: Agir Correction greffe
+ids: 2500301
+resultat: fait
+message: Retour 2026 B 25391 marqué corrigé par le greffe : il quitte la liste des retours à traiter.
+lignes:
+2026 B 25392 | liaison C25030200099 · SIREN 525 003 920 · envoyée le {J-10} · retour reçu le {J-3} · traité par la CCI le {J-2} · Code APE invalide | Erreur fonctionnelle | AFaire | []
+2026 B 25391 | liaison C25030300001 · SIREN 525 003 910 · envoyée le {J-3} · traité par la CCI le {J-3} | PDF feuillet1 absent | AFaire | []
+2026 B 25392 | liaison C25030800001 · SIREN 525 003 920 · envoyée le {J-20} · traité par la CCI le {J-4} · Liasse envoyée deux fois | Rejet doublon | AFaire | []
+controle: SELECT CONCAT(CASE WHEN x.LIAXML_CFENETRET_COR_GREF_DATE IS NULL THEN 'non' ELSE 'corrige' END, '/', CASE WHEN EXISTS (SELECT 1 FROM soc.Compte AS c WHERE c.CompteWindows = 'banc.ecrans' AND c.IdV2 = x.LIAXML_CFENETRET_COR_GREF_ID_UTLST) THEN 'agent du banc' ELSE 'autre' END) FROM v2.CFE_LIASSE_XML AS x WHERE x.LIAXML_ID_LIAXML = 2500301 => corrige/agent du banc
+---
+# La BASCULE de la V2 (l. 197-208) : 2500307, deja corrige, perd sa correction et revient dans la liste.
+geste: Agir Correction greffe
+ids: 2500307
+resultat: fait
+message: Correction du greffe retirée sur le retour 2026 B 25391.
+lignes:
+2026 B 25392 | liaison C25030200099 · SIREN 525 003 920 · envoyée le {J-10} · retour reçu le {J-3} · traité par la CCI le {J-2} · Code APE invalide | Erreur fonctionnelle | AFaire | []
+2026 B 25391 | liaison C25030300001 · SIREN 525 003 910 · envoyée le {J-3} · traité par la CCI le {J-3} | PDF feuillet1 absent | AFaire | []
+2026 B 25392 | liaison C25030800001 · SIREN 525 003 920 · envoyée le {J-20} · traité par la CCI le {J-4} · Liasse envoyée deux fois | Rejet doublon | AFaire | []
+2026 B 25391 | liaison C25030700001 · SIREN 525 003 910 · envoyée le {J-20} · traité par la CCI le {J-5} · Doublon corrige | Rejet doublon | AFaire | []
+controle: SELECT CASE WHEN LIAXML_CFENETRET_COR_GREF_DATE IS NULL THEN 'non corrige' ELSE 'corrige' END FROM v2.CFE_LIASSE_XML WHERE LIAXML_ID_LIAXML = 2500307 => non corrige
