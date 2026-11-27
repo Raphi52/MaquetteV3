@@ -1764,6 +1764,11 @@ Exiger((await EcranFactures.DemandeDeAsync(client, Greffe, null)) is { Mode: "se
 Exiger(EcranFactures.DateDuJour(client, new DateTime(2026, 11, 27)) == "2026-11-27" && EcranFactures.DateDuJour(null, new DateTime(2026, 11, 27)) != "2026-11-27",
     "date du jour : celle du poste avec un serveur, celle de la demonstration sans");
 
+// ============================================================ 23. LOT 14 : Acteurs, Experts, Clients, Fiche client (Lot14.cs)
+// Apres toutes les autres : ses lignes s'ajoutent aux tables qu'elles lisent (JUGE, FACTURE, VENTILATION…), et ses lectures les
+// reconnaissent par leur numero.
+await new BancLot14((sql, p) => Sql(sql, p), Exiger, greffe.Connexion, client, http, json, Greffe, GreffeAbsent).JouerAsync();
+
 // BASES GARDEES pour une preuve a l'ecran (meme regle que tests/EcransGeneresBaseCheck/Program.cs, lot 12) : avec RIGV3_BANC_GARDER =
 // <fichier>, le banc ecrit dans ce fichier sa base commune, son greffe et son agent, puis attend que ce fichier disparaisse. Un serveur
 // lance a part sur cette base commune (ConnectionStrings__RigV3) sert alors a l'application les lignes des sections ci-dessus (une

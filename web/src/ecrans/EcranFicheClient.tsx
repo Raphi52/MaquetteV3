@@ -30,8 +30,18 @@
 // trois cartes (Solde actuel ; Debits et Credits, dont le clic filtre), debit, credit et solde avec leur
 // mini-barre, pied de totaux. Contacts : avatar, nom et fonction, principal en point vert. La fiche de gauche
 // ne change pas.
+//
+// BRANCHE SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 14, 27/11/2026) : le choix vient de la liste des clients
+// (EcranFicheClient.Clients) et la fiche du pont (Pont/EcranFicheClientBase.cs ; Serveur/Socle/EcransMain/LectureClients.cs, FicheAsync :
+// identification, parametrage, informations, contacts CLIENT_CONTACT et les six derniers soldes CLIENT_SOLDE de PROC_FCLIENT). En base,
+// le compte montre les SOLDES de RIG v2 (date et solde) : Debit et Credit, ajouts de la maquette, y restent a zero ; aucun contact
+// n'est « principal » (RIG v2 n'a pas ce champ). L'ecran n'ecrit rien. Sans serveur, les fiches d'exemple, marquees.
+// check: branchement neuf (lot 14), pas un correctif -- remplacements cibles, prouves par EcranFicheClient.test.tsx (vitest).
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { appeler } from '../pont'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
+import type { VueClients } from './EcranClients'
 import { dateCourte } from '../criteres'
 import { euros } from '../format'
 import {
@@ -89,6 +99,15 @@ interface Contact {
   principal: boolean
 }
 
+/** Ce que rend le pont pour la fiche d'un client (Pont/EcranFicheClientBase.cs, VueFicheClient). */
+export interface VueFicheClient {
+  mode: ModeLecture
+  message: string | null
+  fiche: FicheCli | null
+  mouvements: Mouvement[]
+  contacts: Contact[]
+}
+
 const Fiches: FicheCli[] = [
   { abrege: 'LEROY', nom: 'SELARL LEROY & ASSOCIES', compte: 'C-000142', siren: '412 875 330', adresse: '12 rue du Palais\n51100 Reims', type: 'En compte', etatCompte: 'Ouvert', groupe: 'Mandataires', naissance: '', numPc: '', mail: 'contact@leroy-associes.fr', telPrincipal: '03 26 40 11 22', telPortable: '06 12 45 78 90', modePaiement: 'Prelevement', provision: 150000, releveFacture: true, factuPremiere: '04/01/2019', factuDerniere: '02/09/2026', encaissPremier: '11/01/2019', encaissDernier: '28/08/2026', nbFactures: 412, nbEncaissements: 388, derniereModif: '02/09/2026', synchroInfogreffe: '08/09/2026', notes: 'Releve mensuel, envoi par courriel.' },
   { abrege: 'BLANC', nom: 'CABINET BLANC', compte: 'C-000188', siren: '509 221 004', adresse: '3 place Drouet\n51100 Reims', type: 'En compte', etatCompte: 'Ouvert', groupe: 'Mandataires', naissance: '', numPc: 'PC2026-042', mail: 's.blanc@cabinet-blanc.fr', telPrincipal: '03 26 40 55 01', telPortable: '', modePaiement: 'Virement', provision: 80000, releveFacture: false, factuPremiere: '12/03/2020', factuDerniere: '19/08/2026', encaissPremier: '20/03/2020', encaissDernier: '19/08/2026', nbFactures: 226, nbEncaissements: 210, derniereModif: '19/08/2026', synchroInfogreffe: '08/09/2026', notes: '' },
@@ -111,12 +130,37 @@ const Contacts: Contact[] = [
 ]
 
 export function EcranFicheClient() {
+  // Le client choisi : son abrege en demonstration, son numero (rec.Client.Id) en base.
   const [abrege, setAbrege] = useState('LEROY')
   const [ongletCompte, setOngletCompte] = useState(true)
 
-  const fiche = Fiches.find((f) => f.abrege === abrege)!
-  const mouvementsClient = Mouvements.filter((m) => m.abrege === abrege)
-  const contactsClient = Contacts.filter((c) => c.abrege === abrege)
+  // La liste du choix : celle de l'ecran Clients (EcranFicheClient.Clients, la meme lecture) ; en base, le premier client est choisi au depart.
+  const [liste, setListe] = useState<VueClients | null>(null)
+  useEffect(() => {
+    let perime = false
+    void appeler<VueClients>('EcranFicheClient.Clients').then((v) => {
+      if (perime) return
+      setListe(v)
+      if (v.mode === 'serveur' && v.clients[0]) setAbrege(String(v.clients[0].id))
+    })
+    return () => { perime = true }
+  }, [])
+  const enBase = liste?.mode === 'serveur'
+  // La fiche du client choisi, lue en base (EcranFicheClient.Fiche).
+  const [lue, setLue] = useState<VueFicheClient | null>(null)
+  useEffect(() => {
+    if (!enBase) return
+    let perime = false
+    setLue(null)
+    void appeler<VueFicheClient>('EcranFicheClient.Fiche', Number(abrege)).then((v) => { if (!perime) setLue(v) })
+    return () => { perime = true }
+  }, [enBase, abrege])
+  const choix = enBase ? liste.clients.map((c) => ({ valeur: String(c.id), libelle: `${c.abrege} — ${c.nom}` }))
+    : liste?.mode === 'demo' ? Fiches.map((f) => ({ valeur: f.abrege, libelle: `${f.abrege} — ${f.nom}` })) : []
+  const fiche = enBase ? lue?.fiche ?? undefined : liste?.mode === 'demo' ? Fiches.find((f) => f.abrege === abrege) : undefined
+  const mouvementsClient = enBase ? lue?.mouvements ?? [] : Mouvements.filter((m) => m.abrege === abrege)
+  const contactsClient = enBase ? lue?.contacts ?? [] : Contacts.filter((c) => c.abrege === abrege)
+  const provenance = enBase && lue !== null ? lue : liste
   const solde = mouvementsClient.at(-1)?.solde ?? 0
 
   // Le filtre des cartes (debits ou credits) et « Aller a un mouvement… » (Ctrl K) : ils montrent, ils ne
@@ -135,18 +179,37 @@ export function EcranFicheClient() {
   const euro = (c: number) => montant(c / 100)
   const basculerSens = (sens: 'debit' | 'credit') => () => setFiltreSens(filtreSens === sens ? null : sens)
 
+  const choisir = (
+    <label className="rig-saisie-champ">
+      <span className="rig-saisie-champ__libelle">Choisir un client</span>
+      <select className="rig-saisie-champ__saisie" value={abrege} onChange={(e) => setAbrege(e.target.value)}>
+        {choix.map((c) => <option key={c.valeur} value={c.valeur}>{c.libelle}</option>)}
+      </select>
+    </label>
+  )
+
+  // Avant la reponse du pont, en panne, ou sans client en base : le choix et le motif, aucune fiche.
+  if (fiche === undefined) {
+    return (
+      <div className="rig-proc__corps">
+        <aside className="rig-criteres">
+          <ProvenanceEcran mode={provenance?.mode} message={provenance?.message} quoi="Fiches" />
+          <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Client</div>
+          {choix.length > 0 && choisir}
+          {enBase && liste.clients.length === 0 && <p className="rig-eg-note" role="note">Aucun client en compte dans la base du greffe.</p>}
+        </aside>
+      </div>
+    )
+  }
+
   return (
     <div className="rig-proc__corps">
 
       <aside className="rig-criteres">
+        <ProvenanceEcran mode={provenance?.mode} message={provenance?.message} quoi="Fiches" />
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Client</div>
 
-        <label className="rig-saisie-champ">
-          <span className="rig-saisie-champ__libelle">Choisir un client</span>
-          <select className="rig-saisie-champ__saisie" value={abrege} onChange={(e) => setAbrege(e.target.value)}>
-            {Fiches.map((f) => <option key={f.abrege} value={f.abrege}>{f.abrege} — {f.nom}</option>)}
-          </select>
-        </label>
+        {choisir}
 
         <div className="rig-criteres__bloc">
           <div className="rig-kicker">Entreprise</div>

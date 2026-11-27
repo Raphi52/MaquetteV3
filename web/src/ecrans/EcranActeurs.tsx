@@ -26,8 +26,16 @@
 // Porte depuis Components/Ecrans/EcranActeurs.razor (lot 4) : meme balisage,
 // memes classes CSS. L'ecran ne lisait rien dans Metier/ : ses acteurs de
 // demonstration l'ont suivi ici.
+//
+// BRANCHE SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 14, 27/11/2026) : les acteurs viennent du pont
+// (Pont/EcranActeursBase.cs) -- les six types de RIG v2 lus dans la base du greffe (Serveur/Socle/EcransMain/LectureActeurs.cs),
+// filtres ici comme dans OPE_RECHERCHE_ACTEUR (nom ou abrege, chambre, statut, actifs). L'ecran n'ecrit rien (champs en lecture).
+// Sans serveur, les acteurs d'exemple ci-dessous, marques ; en panne, le motif et aucun acteur.
+// check: branchement neuf (lot 14), pas un correctif -- plusieurs remplacements cibles, prouves par EcranActeurs.test.tsx (vitest).
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { appeler } from '../pont'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { contientSansCasse, dateCourte, distinctsTries, estBlanc } from '../criteres'
 
 interface Acteur {
@@ -54,7 +62,20 @@ interface Acteur {
   type: string
   siren: string
   utilisateur: string
+  /** Lu en base : « type-numero » (deux tables peuvent porter le meme abrege) ; absent en demonstration. */
+  cle?: string
 }
+
+/** Ce que rend le pont (Pont/EcranActeursBase.cs, VueActeurs). */
+export interface VueActeurs {
+  mode: ModeLecture
+  message: string | null
+  /** Les acteurs de la base (mode « serveur ») ; vide sinon. */
+  acteurs: Acteur[]
+  total: number
+}
+
+const cleDe = (a: Acteur) => a.cle ?? a.abrege
 
 // Roles declares dans OPE_EDITION_GJUGE.Designer.cs (RIG v2).
 const RolesJuge = [
@@ -70,7 +91,7 @@ const RolesMandataire = [
   'Commissaire priseur', 'Mandataire conciliation', 'RDC liquidation MDJ',
 ]
 
-const Acteurs: Acteur[] = [
+const Exemples: Acteur[] = [
   { abrege: 'LEROY', civilite: 'Maitre', nom: 'LEROY', prenom: 'Antoine', complementNom: 'Selarl LEROY & associes', adresse: '12 rue du Palais, 51100 Reims', tel: '03 26 40 11 22', fax: '03 26 40 11 23', mail: 'a.leroy@exemple.fr', qualif: 'Mandataire judiciaire', statut: 'En fonction', chambre: '1re', section: 'A', debut: '2018-01-08', fin: null, bureau: 'B-104', nomCoffre: 'COFFRE_LEROY', actif: true, type: 'Mandataire', siren: '402 118 553', utilisateur: '' },
   { abrege: 'BLANC', civilite: 'Maitre', nom: 'BLANC', prenom: 'Sophie', complementNom: '', adresse: '3 place Drouet, 51100 Reims', tel: '03 26 40 55 01', fax: '', mail: 's.blanc@exemple.fr', qualif: 'Administrateur judiciaire', statut: 'En fonction', chambre: '2e', section: 'B', debut: '2020-09-01', fin: null, bureau: 'B-210', nomCoffre: 'COFFRE_BLANC', actif: true, type: 'Mandataire', siren: '517 904 220', utilisateur: '' },
   { abrege: 'PETIT', civilite: 'M.', nom: 'PETIT', prenom: 'Jean', complementNom: '', adresse: '8 av. de Laon, 51100 Reims', tel: '03 26 88 90 12', fax: '', mail: 'j.petit@exemple.fr', qualif: 'Juge consulaire', statut: 'En fonction', chambre: '3e', section: 'A', debut: '2022-04-15', fin: null, bureau: 'A-011', nomCoffre: '', actif: true, type: 'Juge', siren: '', utilisateur: '' },
@@ -78,14 +99,26 @@ const Acteurs: Acteur[] = [
   { abrege: 'MOREAU', civilite: 'Mme', nom: 'MOREAU', prenom: 'Claire', complementNom: '', adresse: '22 rue Chanzy, 51100 Reims', tel: '03 26 77 43 09', fax: '', mail: 'c.moreau@exemple.fr', qualif: 'Expert-comptable', statut: 'Retiree', chambre: '', section: '', debut: '2012-02-01', fin: '2024-12-31', bureau: '', nomCoffre: '', actif: false, type: 'Expert', siren: '', utilisateur: '' },
 ]
 
-const Statuts = distinctsTries(Acteurs.map((a) => a.statut))
-
 export function EcranActeurs() {
   const [recherche, setRecherche] = useState('')
   const [critChambre, setCritChambre] = useState('')
   const [critStatut, setCritStatut] = useState('')
   const [actifsSeuls, setActifsSeuls] = useState(true)
-  const [selection, setSelection] = useState<Acteur | null>(Acteurs[0]!)
+  const [cleChoisie, setCleChoisie] = useState<string | null>(null)
+
+  // La vue du pont : null tant qu'il n'a pas repondu (aucun acteur).
+  const [vue, setVue] = useState<VueActeurs | null>(null)
+  useEffect(() => {
+    let perime = false
+    void appeler<VueActeurs>('EcranActeurs.Acteurs').then((v) => { if (!perime) setVue(v) })
+    return () => { perime = true }
+  }, [])
+  const Acteurs: Acteur[] = vue === null ? [] : vue.mode === 'serveur' ? vue.acteurs : vue.mode === 'demo' ? Exemples : []
+  const Statuts = distinctsTries(Acteurs.map((a) => a.statut).filter((s) => s !== ''))
+  const Chambres = distinctsTries(Acteurs.map((a) => a.chambre).filter((c) => c !== ''))
+  // Le premier acteur est choisi au depart, comme avant le branchement.
+  const selection = Acteurs.find((x) => cleDe(x) === cleChoisie) ?? (cleChoisie === null ? Acteurs[0] ?? null : null)
+  const setSelection = (x: Acteur) => setCleChoisie(cleDe(x))
 
   let trouves = Acteurs
   if (!estBlanc(recherche)) {
@@ -101,6 +134,7 @@ export function EcranActeurs() {
     <div className="rig-proc__corps">
 
       <aside className="rig-criteres">
+        <ProvenanceEcran mode={vue?.mode} message={vue?.message} quoi="Acteurs" />
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Recherche d'un acteur</div>
 
         <label className="rig-saisie-champ">
@@ -113,9 +147,7 @@ export function EcranActeurs() {
             <span className="rig-saisie-champ__libelle">Chambre</span>
             <select className="rig-saisie-champ__saisie" value={critChambre} onChange={(e) => setCritChambre(e.target.value)}>
               <option value="">Toutes</option>
-              <option>1re</option>
-              <option>2e</option>
-              <option>3e</option>
+              {Chambres.map((ch) => <option key={ch}>{ch}</option>)}
             </select>
           </label>
           <label className="rig-saisie-champ">
@@ -136,7 +168,7 @@ export function EcranActeurs() {
         <div className="rig-criteres__bloc">
           <div className="rig-kicker">Resultats ({trouves.length})</div>
           {trouves.map((acteur) => (
-            <button key={acteur.abrege} className={`rig-bascule${selection?.abrege === acteur.abrege ? ' rig-bascule--actif' : ''}`}
+            <button key={cleDe(acteur)} className={`rig-bascule${selection !== null && cleDe(selection) === cleDe(acteur) ? ' rig-bascule--actif' : ''}`}
                     onClick={() => setSelection(acteur)}>
               <span className="rig-bascule__temoin"></span>
               <span>{acteur.abrege} — {acteur.nom}</span>

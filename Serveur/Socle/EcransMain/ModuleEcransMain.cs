@@ -129,6 +129,21 @@ internal sealed class ModuleEcransMain : IModuleServeur
                 ? Results.Ok(await LectureParametresAccueil.LireAsync(cn, moi.Id, moi.EstAdministrateur, moi.EstAmitel, ct))
                 : Results.Json(new { motif = "Agent inconnu dans la base de ce greffe." }, statusCode: StatusCodes.Status403Forbidden)))
             .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        // Lot 14 : Acteurs, Experts, Clients et la fiche d'un client (LectureActeurs/Experts/Clients.cs).
+        routes.MapGet(RoutesActeurs.Acteurs, (string greffe, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureActeurs.LireAsync(cn, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        routes.MapGet(RoutesExperts.Experts, (string greffe, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureExperts.LireAsync(cn, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        routes.MapGet(RoutesClients.Clients, (string greffe, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureClients.LireAsync(cn, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        routes.MapGet(RoutesClients.Fiche, (string greffe, int id, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => await LectureClients.FicheAsync(cn, id, ct) is { } fiche
+                ? Results.Ok(fiche)
+                : Results.Json(new { motif = $"Client {id} introuvable dans la base de ce greffe." }, statusCode: StatusCodes.Status404NotFound)))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
     }
 
     /// <summary><paramref name="faire"/> sur la base V3 du greffe ; 404 / 503 de la politique si elle ne s'ouvre plus.</summary>

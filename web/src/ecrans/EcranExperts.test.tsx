@@ -1,8 +1,19 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { EcranExperts } from './EcranExperts'
+import { EcranExperts, type VueExperts } from './EcranExperts'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); retirerFauxPont() })
+
+// Sans serveur, le pont rend le mode « demo » : l'ecran montre ses experts d'exemple, marques (Pont/EcranExpertsBase.cs).
+const Demo: VueExperts = { mode: 'demo', message: null, experts: [], mesures: [], total: 0 }
+async function ouvrir(v: VueExperts = Demo) {
+  const pont = installerFauxPont({ 'EcranExperts.Experts': () => v })
+  const r = render(<EcranExperts />)
+  await vi.waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranExperts.Experts'))
+  await vi.waitFor(() => expect(r.container.querySelector('.rig-resultats-proc__compte')!.textContent).not.toBe('aucun expert selectionne'))
+  return r
+}
 
 // Valeurs attendues : celles de l'ecran Blazor (EcranExperts.razor) : 3 experts dont 2 actifs,
 // GIRARD choisi au depart.
@@ -15,8 +26,8 @@ const synthese = (c: HTMLElement) => espaces(c.querySelector('.rig-lm-synthese')
 const choisi = (c: HTMLElement) => c.querySelector('.rig-resultats-proc__compte')!.textContent
 
 describe('EcranExperts', () => {
-  it('affiche les experts actifs, la fiche et les mesures en cours de GIRARD', () => {
-    const { container } = render(<EcranExperts />)
+  it('affiche les experts actifs, la fiche et les mesures en cours de GIRARD', async () => {
+    const { container } = await ouvrir()
     expect(container.querySelector('.rig-lm-titre')!.textContent).toBe('Liste des experts')
     expect(synthese(container)).toBe('2 experts · 2 actifs · 2 qualites')
     const experts = [...container.querySelectorAll('table')[0]!.querySelectorAll('tbody tr')]
@@ -39,8 +50,8 @@ describe('EcranExperts', () => {
     expect([...container.querySelector('.rig-lm-pied')!.children].map((el) => espaces(el.textContent))).toEqual(['2 experts affiches', 'Actifs 2'])
   })
 
-  it('les mesures terminees, les inactifs et le filtre de qualite', () => {
-    const { container } = render(<EcranExperts />)
+  it('les mesures terminees, les inactifs et le filtre de qualite', async () => {
+    const { container } = await ouvrir()
     const mesures = screen.getByRole('group', { name: 'Vues des mesures' })
     expect([...mesures.querySelectorAll('.rig-lm-vue')].map((v) => espaces(v.textContent))).toEqual(['Mesures en cours 1', 'Mesures terminees 1'])
     fireEvent.click(screen.getByText('Mesures terminees'))
@@ -63,8 +74,8 @@ describe('EcranExperts', () => {
   // Un seul champ pour un seul filtre (decision du plan des listes, lot 7) : « Aller a un expert… » EST la recherche
   // v2 (ancien « Nom, abrege »). S'il redevenait un second filtre pose sur la liste affichee, le compte des vues
   // (« Tous 1 ») resterait a 3 ; s'il cherchait aussi la qualite, « immobilier » trouverait ROUX.
-  it('les vues posent « Experts actifs uniquement » ; « Aller a un expert… » (Ctrl K) est la recherche nom/abrege, Entree choisit l\'expert reste seul', () => {
-    const { container } = render(<EcranExperts />)
+  it('les vues posent « Experts actifs uniquement » ; « Aller a un expert… » (Ctrl K) est la recherche nom/abrege, Entree choisit l\'expert reste seul', async () => {
+    const { container } = await ouvrir()
     expect(screen.queryByLabelText('Nom, abrege')).toBeNull()
     const experts = screen.getByRole('group', { name: 'Vues des experts' })
     expect([...experts.querySelectorAll('.rig-lm-vue')].map((v) => [espaces(v.textContent), v.getAttribute('aria-pressed')]))
@@ -87,5 +98,19 @@ describe('EcranExperts', () => {
     expect(lignes(container).map((l) => l[0])).toEqual(['NOEL'])
     fireEvent.change(champ, { target: { value: 'immobilier' } })
     expect(screen.getByText('Aucun expert ne repond a ces criteres.')).toBeTruthy()
+  })
+
+  // Branche sur la base (lot 14) : les experts du pont et leurs mesures, rattachees par le numero de l'expert ; aucun exemple.
+  it('en base, les experts lus et leurs mesures par numero ; aucun exemple, aucune note', async () => {
+    const expert = (abrege: string, cle: string) => ({ abrege, civilite: 'MR', nom: abrege + ' Paul', complementNom: '', naissance: '', adresse: '',
+      tel: '', fax: '', mail: '', qualif: 'EC', actif: true, cle })
+    const { container } = await ouvrir({ mode: 'serveur', message: null, total: 2, experts: [expert('EXA', '7'), expert('EXB', '8')],
+      mesures: [{ expert: '8', numMesure: 'M14-1', civilite: 'MR', nomParticipant: 'EXB Paul', complementNom: '', qualifProf: 'EC', adresse: '', enCours: true }] })
+    expect(lignes(container).map((l) => l[0])).toEqual(['EXA', 'EXB'])
+    expect(screen.queryByText(/GIRARD/)).toBeNull()
+    expect(screen.queryByRole('note')).toBeNull()
+    fireEvent.click(container.querySelectorAll('table')[0]!.querySelectorAll('tbody tr')[1]!)
+    expect(choisi(container)).toBe('EXB')
+    expect(screen.getByText('M14-1')).toBeTruthy()
   })
 })
