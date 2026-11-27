@@ -1,0 +1,24 @@
+# « Signature électronique » (PROC_SIGNJUD) sur PROC_SIGNJUD.sql : l'onglet du juge puis celui du greffier, tries par la date de la
+# decision (COALESCE(date, prononce, prevue, delibere), MetierSignJud.cs:450) puis le role.
+# Retenues, onglet juge : 2000301 et 2000302 (sans document REDA, non rendues, type sans redaction : « à envoyer »), 2000303 (« À corriger »),
+# 2000304 et 2000305 (EN_ATTENTE, EN_COURS_JUGE : « Chez le juge »), 2000310 (ERREUR_JUGE : « En erreur »), 2000311 (document REDA a l'etat 3).
+# Onglet greffier : 2000306 et 2000307 (SIGNE_JUGE : « À traiter »), 2000308 (contresignee le jour du banc : « Signée »).
+# Ecartees : 2000309 (contresignee l'an dernier ; jumeau 2000308), 2000312 (document REDA a l'etat 2 ; jumeau 2000311), 2000313 (sans
+# document, type AVEC redaction ; jumeau 2000301).
+# Elles aussi signables d'apres la regle de RIG v2 (MetierSignJud.cs:501-509) : les decisions de PROC_REDA_MASSE.sql 2000802 (type sans
+# redaction, sans document, non rendue), 2000804 (document REDA a l'etat 3), 2000805 et 2000806 (sans document, deux decisions de la meme
+# instance) -- sans juge ni greffier ; les autres de ce jeu ont un document a l'etat 0, 1 ou 2, ou un type avec redaction.
+SIGN A | Rôle 2026SJ20301 · Ordonnance à signer du banc · décision du 10/03/1990 · juge JUGESIGN Paul · greffier GREFFSIGN Marc · à envoyer au juge | Pour le juge | AFaire | []
+SIGN B | Rôle 2026SJ20302 · Ordonnance à signer du banc · décision du 11/03/1990 · juge JUGESANSMAIL Lea · greffier GREFFSIGN Marc · à envoyer au juge | Pour le juge | AFaire | []
+SIGN C | Rôle 2026SJ20303 · Ordonnance à signer du banc · décision du 12/03/1990 · juge JUGESIGN Paul · greffier GREFFSIGN Marc · Le document doit être corrigée · motif : Mauvaise date | Pour le juge | EnCours | []
+SIGN D | Rôle 2026SJ20304 · Ordonnance à signer du banc · décision du 13/03/1990 · juge JUGESIGN Paul · greffier GREFFSIGN Marc · Attente de signature | Pour le juge | EnAttente | []
+SIGN E | Rôle 2026SJ20305 · Ordonnance à signer du banc · décision du 14/03/1990 · juge JUGESIGN Paul · greffier GREFFSIGN Marc · En cours de signature (Oodrive) | Pour le juge | EnAttente | []
+SIGN J | Rôle 2026SJ20310 · Ordonnance à signer du banc · décision du 19/03/1990 · juge JUGESIGN Paul · greffier GREFFSIGN Marc · Erreur de signature juge | Pour le juge | Rejetee | []
+SIGN K | Rôle 2026SJ20311 · Jugement rédigé du banc · décision du 20/03/1990 · juge JUGESIGN Paul · greffier GREFFSIGN Marc · à envoyer au juge | Pour le juge | AFaire | []
+REDA B | Rôle 2026RM20802 · Jugement rédigé du banc · décision du 18/07/1990 · pas de juge · pas de greffier · à envoyer au juge | Pour le juge | AFaire | []
+REDA D | Rôle 2026RM20804 · Jugement rédigé du banc · décision du 18/07/1990 · pas de juge · pas de greffier · à envoyer au juge | Pour le juge | AFaire | []
+REDA E | Rôle 2026RM20805 · Jugement rédigé du banc · décision du 18/07/1990 · pas de juge · pas de greffier · à envoyer au juge | Pour le juge | AFaire | []
+REDA E | Rôle 2026RM20805 · Jugement rédigé du banc · décision du 18/07/1990 · pas de juge · pas de greffier · à envoyer au juge | Pour le juge | AFaire | []
+SIGN F | Rôle 2026SJ20306 · Ordonnance à signer du banc · décision du 15/03/1990 · juge JUGESIGN Paul · greffier GREFFSIGN Marc · Signé par le juge | Pour le greffier | AFaire | []
+SIGN G | Rôle 2026SJ20307 · Ordonnance à signer du banc · décision du 16/03/1990 · juge JUGESIGN Paul · greffier GREFFAUTRE Ines · Signé par le juge | Pour le greffier | AFaire | []
+SIGN H | Rôle 2026SJ20308 · Ordonnance à signer du banc · décision du 17/03/1990 · juge JUGESIGN Paul · greffier GREFFSIGN Marc · Signé par le greffier | Pour le greffier | Validee | []

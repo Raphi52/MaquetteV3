@@ -1,0 +1,15 @@
+# Les recherches de LecteurRedactionEnMasse (IRechercheEcran) : la date de l'audience (le retour d'audience d'ou RIG v2 lance la
+# redaction en masse). Date fixe (18/07/1990, PROC_REDA_MASSE.sql).
+
+# 1. L'audience du 18/07/1990, par appel : la decision prononcee seule a l'appel, etat 0 a 3 (GetDJForRedaMasse, :590-597), et
+#    l'ordonnance sans prononce, type « avec rédaction », de l'instance de l'appel 6 (:600-605). Ecartees : 2000805 et 2000806, prononcees
+#    toutes deux a l'appel 5 (« 1 seul prononcé ») ; jumeau 2000801, seule a l'appel 1.
+critere: Date de l'audience = 1990-07-18
+lignes:
+REDA A | Rôle 2026RM20801 · Jugement rédigé du banc · brouillon · Audience du 18/07/1990 à 09:30 · appel 1 | Jugements | EnCours | []
+REDA B | Rôle 2026RM20802 · Jugement rédigé du banc · projet en révision · Audience du 18/07/1990 à 09:30 · appel 2 | Jugements | EnCours | []
+REDA C | Rôle 2026RM20803 · Jugement rédigé du banc · à créer · Audience du 18/07/1990 à 09:30 · appel 3 | Jugements | AFaire | []
+REDA D | Rôle 2026RM20804 · Jugement rédigé du banc · projet révisé à rendre · minute 9019900001 · Audience du 18/07/1990 à 09:30 · appel 4 | Jugements | Validee | []
+REDA F | Rôle 2026RM20806 · Ordonnance avec rédaction du banc · brouillon · Audience du 18/07/1990 à 09:30 · appel 6 | Ordonnances | EnCours | []
+REDA H | Rôle 2026RM20808 · Jugement rédigé du banc · projet en révision · Audience du 18/07/1990 à 09:30 · appel 7 | Jugements | EnCours | []
+REDA I | Rôle 2026RM20809 · Jugement sans série du banc · brouillon · Audience du 18/07/1990 à 09:30 · appel 8 | Jugements | EnCours | []

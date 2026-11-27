@@ -1,0 +1,52 @@
+# « Occultations » (EcrivainOccultations) : « Enregistrer » les cases et les mots d'une decision (ETP_OCCULTATIONS.DoSauveAfterOperation,
+# :63-70 ; OPE_OCCULTATIONS_MOTS, :69-106). Lignes du jeu : PROC_DJ_OCCULTATIONS.sql et .attendu.
+# fix-ok: une « valeur: » du banc tient sur une ligne et « \n » n'y est pas un retour a la ligne (Program.cs, Paire, :774-778) : un seul mot par liste.
+
+# Refus : une decision absente. Jumeau accepte : bloc 3.
+geste: Enregistrer
+ids: 9999999
+resultat: refuse
+message: Décision introuvable dans la base du greffe (9999999).
+---
+# Refus : « martin » est a la fois a masquer (« Martin ») et a conserver -- l'unicite vaut pour les deux listes, sans la casse (Exsite,
+# DecisionJudiciaireOccultations.cs:85-92 ; message de OPE_OCCULTATIONS_MOTS.cs:82). Jumeau accepte : bloc 3, « Martin » seul.
+geste: Enregistrer
+ids: 2000501
+valeur: Mots à masquer › Mots-clés à masquer = Martin
+valeur: Mots à conserver › Mots-clés à conserver = martin
+resultat: refuse
+message: Le mot est déjà défini dans la liste des mots à masquer
+---
+# Les premieres consignes de 2000503 : les cases par defaut du greffe (DJ_OCCULTATION_PAR_DEFAUT « 0;0;1;1;1;1;1;1;1;0;0;0 », 7 cases),
+# moins « Adresse » decochee, et un mot a masquer ; la centralisation de l'instance mise a jour (Instance.UpdateCentralisation). La
+# decision entre dans la liste sans recherche (consignes saisies).
+geste: Enregistrer
+ids: 2000503
+valeur: Catégories d'occultation › Adresse =
+valeur: Mots à masquer › Mots-clés à masquer = Martin
+resultat: fait
+message: Occultations de la décision du rôle 2026OC20503 enregistrées (6 cases cochées, 1 mot à masquer, 0 à conserver).
+lignes:
+OCCULT C | Rôle 2026OC20503 · du 04/04/1990 · 1 mot à masquer | Jugements | EnCours | []
+OCCULT B | Rôle 2026OC20502 · du 03/04/1990 · cases enregistrées, aucun mot | Ordonnances | EnCours | []
+OCCULT A | Rôle 2026OC20501 · du 02/04/1990 · 1 mot à masquer · 1 mot à conserver | Jugements | EnCours | []
+fiche: 2000503
+Catégories d'occultation › Adresse =
+Catégories d'occultation › Cadastre = oui
+Catégories d'occultation › Intérêt particulier =
+Mots à masquer › Mots-clés à masquer = Martin
+controle: SELECT CASE WHEN INSTN_TOP_EXPERIAN = 0 AND INSTN_DATE_MAJ_INFOG IS NOT NULL THEN 'centralisée' ELSE 'non' END FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 2000503 => centralisée
+---
+# 2000501 : « Dupont » et « Tribunal » retires (supprimes a l'enregistrement, DoDelete), « Secret » ajoute aux mots a masquer. Le banc
+# ne saisit qu'un mot par liste (une valeur tient sur une ligne).
+geste: Enregistrer
+ids: 2000501
+valeur: Mots à masquer › Mots-clés à masquer = Secret
+valeur: Mots à conserver › Mots-clés à conserver =
+resultat: fait
+message: Occultations de la décision du rôle 2026OC20501 enregistrées (2 cases cochées, 1 mot à masquer, 0 à conserver).
+lignes:
+OCCULT C | Rôle 2026OC20503 · du 04/04/1990 · 1 mot à masquer | Jugements | EnCours | []
+OCCULT B | Rôle 2026OC20502 · du 03/04/1990 · cases enregistrées, aucun mot | Ordonnances | EnCours | []
+OCCULT A | Rôle 2026OC20501 · du 02/04/1990 · 1 mot à masquer | Jugements | EnCours | []
+controle: SELECT COUNT(*) FROM v2.DECISION_JUDICIAIRE_OCCULTATIONS_MOTS AS m JOIN v2.DECISION_JUDICIAIRE_OCCULTATIONS AS o ON o.DJOC_ID_DJOC = m.DJOM_ID_DJOC WHERE o.DJOC_ID_DCJDC = 2000501 AND m.DJOM_MOTS IN ('Dupont', 'Tribunal') => 0
