@@ -1,0 +1,21 @@
+# « Envoi JAL / BODACC » (LecteurEnvoiJal) sur le jeu PROC_ENV_JAL.sql, a l'ouverture : la periode que la V2 pre-remplit, du reglage
+# JAL_DATE_DEBUT_ENVOI (J-10 sur le banc) a aujourd'hui, sur la date d'envoi prevue PBLCT_DATE_ENVOI (OPE_RECH_ANNONCES.cs:275-293,
+# :455-459).
+# A ENVOYER d'abord (pas de date d'envoi electronique), dans l'ordre du reglage JAL_ORDER_BY « EXTERIEUR,EVNPR_CODE_EVE_PRO,
+# EVNPR_DATE ASC,NUM » : la prevention (exterieur 0) avant la PC exterieure 1400103, puis le numero de publicite.
+# Bornes, chacune avec son jumeau : 2110313 a J-30 ecartee / 2110315 a J-10 a 0 h retenue (le debut) ; 2110314 demain ecartee /
+# 2110316 aujourd'hui a 18 h retenue (la fin a 24 h).
+PRV 1990V14201 · XLIEN PRV ALPHA | BANC11JAL du {J-15} · envoi prévu le {J-3} · à BANC11K | Préventions | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-2} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-10} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J+0} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+# DEJA ENVOYEES (LigneJal.SQLOrderByAlreadySent : journal, exterieur, code et date d'evenement, numero) : sur le bordereau B11J02
+# transmis (etat XML 3, plus annulable) -> Envoyee ; sur B11J01 genere, pas transmis (annulable, :176-181) -> Bordereau genere ;
+# sans bordereau -> Envoyee.
+PRV 1990V14201 · XLIEN PRV ALPHA | BANC11JAL du {J-15} · envoi prévu le {J-5} · à BANC11J · envoyée le {J-4} · bordereau B11J02 transmis | Préventions | Validee | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-5} · à BANC11J · envoyée le {J-4} · bordereau B11J01, annulable · procédure extérieure | Procédures collectives | EnCours | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-6} · à BANC11J · envoyée le {J-5} · procédure extérieure | Procédures collectives | Validee | []
+# EVENEMENT SUPPRIME (GetJalsEPSupprime, :409-437) : 2110331 sans evenement, retrouvee par 2110332 qui la suit, dans la periode.
+# Ecartee : 2110333, meme cas hors periode (J-30) -- jumeau 2110331. Les publicites qui les suivent (2110332, 2110334, J+40) sont
+# hors periode elles-memes.
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-7} · à BANC11J · envoyée le {J-6} · procédure extérieure · évènement de procédure supprimé | Procédures collectives | Validee | []
