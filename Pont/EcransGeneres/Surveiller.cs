@@ -729,9 +729,10 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // est le suivi d'UNE injonction de payer apres son ordonnance, ouverte par son numero (PROC_IPSUIVI.cs:20-26,
             // ETP_IPSUIVI.cs:14-15) ; la partie haute de la fiche (dix etats NonTraite... Transfere, IP_SUIVI) ne correspond
             // pas au code (proc_ipsuivi.md:165-171). Lot 8 : lue dans la base -- LecteurSuiviIp.cs (26/11/2026) ; Valider
-            // enregistre la date saisie (desistement, signification, certificat, opposition, LRAR), l'evenement attendu survient,
-            // son suivant est cree, ses editions partent -- EcrivainSuiviIp.cs (27/11/2026). La provision (enrolement au fond,
-            // facture) n'est pas reprise : refusee en le disant.
+            // enregistre la date saisie (desistement, signification, certificat, opposition, LRAR, provision) ou le 2e executoire :
+            // l'evenement attendu survient (ou expire hors delai : non-avenue, caducite), son suivant est cree, l'opposition est
+            // enrolee au fond (TIP1) ou une OP de caducite ouverte, les editions partent -- EcrivainSuiviIp.cs (27/11/2026). La
+            // facture de la provision (facultative dans RIG v2) n'est pas reprise.
             Forme = FormeEcran.Fiche,
             Recherche = "Rechercher une injonction de payer par son numéro…",
             Criteres = ["N° IP"], // le champ de saisie de la V2 (ETP_IPSUIVI.cs:14-15, GetUltByMetierTitre("N° IP"))
@@ -748,10 +749,15 @@ public sealed class DomaineSurveiller : IDomaineEcrans
                     "N° IP", Champ.Date("Date IP"), "Demandeur", "Défendeur"),
                 // Les dates des actes qui suivent l'ordonnance (OPE_IPSUIVI.cs:879-944) : l'evenement survenu, sinon la date
                 // d'expiration de l'evenement expire (signification, opposition, provision).
-                Marche("Actes après l'ordonnance", "Chaque date vient de l'événement de procédure survenu ; à défaut, de la date d'expiration de l'événement expiré. Une date à la fois (sauf signification et certificat) : l'événement attendu survient, le suivant est créé, ses éditions partent. La provision se saisit dans RIG v2 (enrôlement au fond et facture).", true,
+                Marche("Actes après l'ordonnance", "Chaque date vient de l'événement de procédure survenu ; à défaut, de la date d'expiration de l'événement expiré. Une date à la fois (sauf signification et certificat) : l'événement attendu survient, le suivant est créé, ses éditions partent. La provision reçue à temps enrôle l'opposition au fond ; après sa date prévue, elle est caduque.", true,
                     Champ.Date("Signification"), Champ.Case("À personne"), Champ.Date("Opposition"), Champ.Date("Réception LRAR"),
                     Champ.Date("Provision"), Champ.Date("Certificat de non-opposition"),
                     Champ.Date("Désistement")), // ult_Desistement (OPE_IPSUIVI.Designer.cs:412)
+                // Les cases et zones montrees a cote des dates (MetierTitre d'OPE_IPSUIVI.Designer.cs : :516, :455/:309, :289, :400,
+                // :564, :372, :359, :350) ; leurs regles : en tete de LecteurSuiviIp.cs.
+                Marche("Options du traitement", "Dans les délais : garder une provision reçue après sa date prévue. Enrôlement : enrôler l'opposition au fond (sans juridiction extérieure). Enrôler une OP : ouvrir l'opposition de caducité, avec son juge. Envoi en LRAR ou en LR : la lettre de l'événement créé. 2ème exécut. : le second exécutoire.", false,
+                    Champ.Case("Dans les délais"), Champ.Case("Envoi en LRAR"), Champ.Case("Envoi en LR"), Champ.Case("Enrôlement"),
+                    Champ.Case("Enrôler une OP"), Champ.Case("2ème exécut."), "Juge", "Greffier", Champ.Date("Date Prévue")),
             ],
             Lignes =
             [

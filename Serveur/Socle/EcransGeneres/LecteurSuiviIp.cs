@@ -39,10 +39,18 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   sinon                                            -> AFaire  « A signifier ».
 ///
 /// GESTES : « Valider » enregistre la date saisie -- desistement, signification (et « à personne »), certificat de
-/// non-opposition, opposition, reception de la LRAR -- comme RIG v2 (EcrivainSuiviIp.cs, lot 8, 27/11/2026). La fiche ne rend
-/// modifiables que les dates que RIG v2 laisse saisir sur CETTE IP (ZonesModifiables : les grisages de Remplir_IP,
-/// OPE_IPSUIVI.cs:976-1125) ; l'etat de l'IP (EtatIp) est le meme pour la fiche et pour l'ecrivain. La PROVISION reste a saisir
-/// dans RIG v2 (enrolement de l'opposition au fond et facture, en tete d'EcrivainSuiviIp.cs) : la V3 la refuse en le disant.
+/// non-opposition, opposition, reception de la LRAR, PROVISION (enrolement au fond, ou caducite hors delai), 2e executoire --
+/// comme RIG v2 (EcrivainSuiviIp.cs, lot 8, 27/11/2026). La fiche ne rend modifiables que les dates et les cases que RIG v2
+/// laisse saisir sur CETTE IP (ZonesModifiables : les grisages de Remplir_IP, OPE_IPSUIVI.cs:976-1125, et ceux de la saisie de la
+/// provision, :3029-3100) ; l'etat de l'IP (EtatIp) est le meme pour la fiche et pour l'ecrivain.
+///
+/// SECTION « Options du traitement » (les cases et zones que RIG v2 montre a cote des dates ; leur MetierTitre,
+/// OPE_IPSUIVI.Designer.cs, au mot pres) : « Dans les délais » (ult_ForceDateProv, :516 -- garder une provision recue apres sa
+/// date prevue) ; « Envoi en LRAR », « Envoi en LR » (ult_ckProvision_LRAR / _LR, ult_ckSignification_LRAR, ult_ckOpposition_LRAR,
+/// :309-455 : une seule paire ici, puisqu'une seule date passe a la fois -- elle s'applique a la date saisie) ; « Enrôlement »
+/// (ult_EnrolementJ, :289, coche d'office sans juridiction exterieure) ; « Enrôler une OP » (ult_EnrolementOP, :400, coche
+/// d'office) ; « 2ème exécut. » (ult_EditerExecutoire2, :564 -- cochee et grisee si un IPEXECU2 est survenu, :870-879) ; « Juge »,
+/// « Greffier », « Date Prévue » (l'OP de caducite : Rendre_visible_juge, :3064 ; Designer :350-372).
 /// </summary>
 internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
 {
@@ -59,6 +67,24 @@ internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
     internal static readonly string[] ChampsSaisis =
         [ChampSignification, ChampAPersonne, ChampOpposition, ChampAr, ChampProvision, ChampCertificat, ChampDesistement];
 
+    /// <summary>La section des options et ses champs, dans l'ordre de la fiche (MetierTitre d'OPE_IPSUIVI.Designer.cs, en tete).</summary>
+    internal const string SectionOptions = "Options du traitement";
+    internal const string ChampDansLesDelais = "Dans les délais", ChampLrar = "Envoi en LRAR", ChampLr = "Envoi en LR", ChampEnrolement = "Enrôlement",
+                          ChampEnrolerOp = "Enrôler une OP", ChampExecutoire2 = "2ème exécut.", ChampJuge = "Juge", ChampGreffier = "Greffier",
+                          ChampDatePrevue = "Date Prévue";
+
+    internal static readonly string[] ChampsOptions =
+        [ChampDansLesDelais, ChampLrar, ChampLr, ChampEnrolement, ChampEnrolerOp, ChampExecutoire2, ChampJuge, ChampGreffier, ChampDatePrevue];
+
+    /// <summary>controle_date (OPE_IPSUIVI.cs:2658-2668), applique aux dates maxi que Remplir_IP garde (:1057, :1065, :1098) : un
+    /// samedi passe au lundi, un dimanche au lundi.</summary>
+    internal static DateTime? Ouvre(DateTime? d) => d switch
+    {
+        { DayOfWeek: DayOfWeek.Saturday } s => s.AddDays(2),
+        { DayOfWeek: DayOfWeek.Sunday } s => s.AddDays(1),
+        _ => d,
+    };
+
     /// <summary>La date d'application de la reforme des IP (DecisionJudiciaireExtentions.DateReformeIP, :13).</summary>
     internal static readonly DateTime DateReformeIp = new(2022, 3, 1);
 
@@ -71,8 +97,13 @@ internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
         DateTime? DateIp, bool Desiste, bool Fin, string? OppositionEnrolee, int NbFuturs,
         DateTime? Signification, DateTime? MaxiSignification, DateTime? Opposition, bool OppositionSurvenue, DateTime? MaxiOpposition,
         DateTime? ReceptionAr, string? CodeFuturAr, DateTime? Provision, bool ProvisionSurvenue, DateTime? Certificat, bool FuturCertificat,
-        int NbFuturIsigni, int NbFuturIpsignif, int NbFuturIoip, int NbFuturIpopos, int NbFuturAr, int NbFuturConso, int NbFuturCertif)
+        int NbFuturIsigni, int NbFuturIpsignif, int NbFuturIoip, int NbFuturIpopos, int NbFuturAr, int NbFuturConso, int NbFuturCertif,
+        string? CodeFuturConso, DateTime? MaxiProvision, bool PremierExecutoire, bool SecondExecutoire)
     {
+        /// <summary>L'opposition releve d'une juridiction exterieure (ult_Juridiction_Exterieure, OPE_IPSUIVI.cs:862-864 : voie de
+        /// recours I1408 de la 1re decision) : pas d'enrolement au fond, « Dossier à renvoyer à la nouvelle juridiction » (:3086-3092).</summary>
+        internal bool Exterieure { get; init; }
+
         internal bool NouvelleLoiDecision => DateDecision is { } d && d >= DateReformeIp;
         internal bool NouvelleLoi => Accepte && NouvelleLoiDecision;
     }
@@ -108,7 +139,12 @@ internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
                CAST(CASE WHEN {Nb(Survenu, Conso)} > 0 THEN 1 ELSE 0 END AS bit) AS ProvisionSurvenue,
                {Dernier(Certif, "e.EVNPR_DATE", Survenu)} AS Certificat,
                {Nb(Futur, "'ISIGNI'")} AS NbIsigni, {Nb(Futur, "'IPSIGNIF'")} AS NbIpsignif, {Nb(Futur, "'IOIP'")} AS NbIoip,
-               {Nb(Futur, "'IPOPOS'")} AS NbIpopos, {Nb(Futur, Ar)} AS NbAr, {Nb(Futur, Conso)} AS NbConso, {Nb(Futur, Certif)} AS NbCertif
+               {Nb(Futur, "'IPOPOS'")} AS NbIpopos, {Nb(Futur, Ar)} AS NbAr, {Nb(Futur, Conso)} AS NbConso, {Nb(Futur, Certif)} AS NbCertif,
+               {Dernier(Conso, "e.EVNPR_CODE_EVE_PRO", Futur)} AS CodeFuturConso, {Dernier(Conso, DateExpiree, Futur)} AS MaxiProvision,
+               (SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = i.INSTN_ID_INSTN AND {Survenu}
+                AND (e.EVNPR_CODE_EVE_PRO LIKE 'IPEXECUT%' OR e.EVNPR_CODE_EVE_PRO = 'IEXECU')) AS NbExecutoire1,
+               (SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = i.INSTN_ID_INSTN AND {Survenu}
+                AND e.EVNPR_CODE_EVE_PRO LIKE 'IPEXECU2%') AS NbExecutoire2
         FROM v2.INSTANCE AS i{(verrouiller ? " WITH (UPDLOCK, HOLDLOCK)" : "")}
         OUTER APPLY (SELECT TOP (1) d.DCJDC_DATE, d.DCJDC_DATE_PREVUE, d.DCJDC_TYPE_DECISION FROM v2.DECISION_JUDICIAIRE AS d
                      WHERE d.DCJDC_ID_INSTN = i.INSTN_ID_INSTN ORDER BY d.DCJDC_NUM_ORDRE, d.DCJDC_ID_DCJDC) AS dj
@@ -126,10 +162,12 @@ internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
             r["Affaire"] is DBNull ? null : Convert.ToInt32(r["Affaire"], CultureInfo.InvariantCulture), FormeLigne.Texte(r, "Note") is { Length: > 0 } note ? note : null,
             r["Europeenne"] is true, r["Accepte"] is true, decision, decision ?? D("DCJDC_DATE_PREVUE"), r["Desiste"] is true, r["Fin"] is true,
             FormeLigne.Texte(r, "Tip1") is { Length: > 0 } t ? t : null, N("NbFuturs"),
-            D("Signification"), D("MaxiSignification"), D("Opposition"), r["OppositionSurvenue"] is true, D("MaxiOpposition"),
+            D("Signification"), Ouvre(D("MaxiSignification")), D("Opposition"), r["OppositionSurvenue"] is true, Ouvre(D("MaxiOpposition")),
             D("ReceptionAr"), FormeLigne.Texte(r, "CodeFuturAr").Trim() is { Length: > 0 } ca ? ca : null, D("Provision"), r["ProvisionSurvenue"] is true,
             D("Certificat"), N("NbCertif") > 0,
-            N("NbIsigni"), N("NbIpsignif"), N("NbIoip"), N("NbIpopos"), N("NbAr"), N("NbConso"), N("NbCertif"));
+            N("NbIsigni"), N("NbIpsignif"), N("NbIoip"), N("NbIpopos"), N("NbAr"), N("NbConso"), N("NbCertif"),
+            FormeLigne.Texte(r, "CodeFuturConso").Trim() is { Length: > 0 } cc ? cc : null, Ouvre(D("MaxiProvision")),
+            N("NbExecutoire1") > 0, N("NbExecutoire2") > 0);
     }
 
     /// <summary>
@@ -141,6 +179,11 @@ internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
     /// la signification (sans date) ; provision attendue : la provision (sans date), la signification (sans date) ; et, nouvelle loi,
     /// la signification sans date (:1115-1118) et le certificat sans opposition ni certificat, ou attendu sans date (:930-933,
     /// :1105-1108). « À personne » va avec la signification ; le desistement, des qu'un evenement est attendu (:1053).
+    /// LES OPTIONS : « Dans les délais », « Enrôler une OP », le juge, le greffier, la date prevue et « Envoi en LRAR / LR » avec une
+    /// provision saisissable qui a une date prevue (ult_Provision.Tag, :1098 ; :3050-3074) ; « Enrôlement » avec une provision
+    /// saisissable, sans juridiction exterieure (:3093-3096, :3142-3146) ; « Envoi en LRAR / LR » aussi avec une signification de
+    /// l'ancienne loi a date maxi (ult_ckSignification_*) ; « 2ème exécut. » (et « Envoi en LRAR », IPEXECU2LR, :2103) des qu'un 1er
+    /// executoire est survenu pour l'ancienne loi, toujours pour la nouvelle, tant qu'aucun IPEXECU2 n'est survenu (:868-879).
     /// </summary>
     internal static HashSet<string> ZonesModifiables(EtatIp e)
     {
@@ -175,6 +218,13 @@ internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
             if (e.FuturCertificat ? e.Certificat is null : e.Opposition is null && e.Certificat is null) zones.Add(ChampCertificat);
         }
         if (zones.Contains(ChampSignification)) zones.Add(ChampAPersonne);
+        if (zones.Contains(ChampProvision))
+        {
+            if (e.MaxiProvision is not null) zones.UnionWith([ChampDansLesDelais, ChampEnrolerOp, ChampJuge, ChampGreffier, ChampDatePrevue, ChampLrar, ChampLr]);
+            if (!e.Exterieure) zones.Add(ChampEnrolement);
+        }
+        if (zones.Contains(ChampSignification) && !e.NouvelleLoi && e.MaxiSignification is not null) zones.UnionWith([ChampLrar, ChampLr]);
+        if ((e.NouvelleLoi || e.PremierExecutoire) && !e.SecondExecutoire) zones.UnionWith([ChampExecutoire2, ChampLrar]);
         return zones;
     }
 
@@ -263,8 +313,19 @@ internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
             return c;
         }
         HashSet<string> zones = [];
+        EtatIp? etat = null;
         await using (var re = await LectureV2.LireAsync(baseGreffe, RequeteEtat(await Colonnes("v2.INSTANCE"), verrouiller: false), ct, new SqlParameter("@id", n)))
-            if (await re.ReadAsync(ct)) zones = ZonesModifiables(EtatDe(re));
+            if (await re.ReadAsync(ct)) etat = EtatDe(re);
+        if (etat is not null)
+        {
+            var exterieure = false;
+            var colVr = await Colonnes("v2.VOIE_RECOURS");
+            if (colVr.Contains("VRCRS_ID_DCJDC") && colVr.Contains("VRCRS_JURIDICTION_EXTERIEURE"))
+                await using (var rx = await LectureV2.LireAsync(baseGreffe, EditionsEvenement.SqlExterieure, ct, new SqlParameter("@i", n)))
+                    exterieure = await rx.ReadAsync(ct);
+            etat = etat with { Exterieure = exterieure };
+            zones = ZonesModifiables(etat);
+        }
         await using var r = await LectureV2.LireAsync(baseGreffe, UneIp, ct, new SqlParameter("@id", n));
         if (!await r.ReadAsync(ct)) return null;
         var ligne = Ligne(r);
@@ -287,6 +348,17 @@ internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
                 new ChampFiche(ChampCertificat, D("Certificat")) { Modifiable = zones.Contains(ChampCertificat) },
                 // Le desistement (ult_Desistement, OPE_IPSUIVI.cs:978-981) : la date du dernier IPDESIN survenu.
                 new ChampFiche(ChampDesistement, D("Desistement")) { Modifiable = zones.Contains(ChampDesistement) },
+            ]),
+            // Les options, a leur valeur de RIG v2 a l'ouverture : « Enrôlement » et « Enrôler une OP » cochees d'office (:3093, :3066),
+            // « 2ème exécut. » cochee si un IPEXECU2 est survenu (:876) ; les autres vides.
+            new SectionFiche(SectionOptions,
+            [
+                .. ChampsOptions.Select(c => new ChampFiche(c, c switch
+                {
+                    ChampEnrolement or ChampEnrolerOp => zones.Contains(c) ? "oui" : "",
+                    ChampExecutoire2 => etat?.SecondExecutoire == true ? "oui" : "",
+                    _ => "",
+                }) { Modifiable = zones.Contains(c) }),
             ]),
         ]);
     }

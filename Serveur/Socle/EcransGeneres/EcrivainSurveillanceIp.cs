@@ -101,13 +101,13 @@ internal sealed class EcrivainSurveillanceIp : IEcrivainEcran
         _ => null,
     };
 
-    private sealed record Echeance(int IdEvenement, string Code, bool Futur, string? NumeroSource, int IdInstance, string Role, string NomCourant,
+    internal sealed record Echeance(int IdEvenement, string Code, bool Futur, string? NumeroSource, int IdInstance, string Role, string NomCourant,
                                    int? IdAffaire);
 
-    private sealed record CodeOp(string Valeur, string TypeNumRole, string TypeInstance, string ActeSaisine, string Nature, string NatAffPart,
+    internal sealed record CodeOp(string Valeur, string TypeNumRole, string TypeInstance, string ActeSaisine, string Nature, string NatAffPart,
                                  string TypeDecision, string? EvenementsCreation, string? ParametreEdition);
 
-    private sealed record Juge(int Id, string Statut);
+    internal sealed record Juge(int Id, string Statut);
 
     public async Task<IssueGeste> JouerAsync(GesteEnCours geste, CancellationToken ct)
     {
@@ -287,13 +287,13 @@ internal sealed class EcrivainSurveillanceIp : IEcrivainEcran
 
     /// <summary>L'evenement <paramref name="code"/> + <paramref name="suffixe"/> s'il existe dans CODE_EVE_PRO, sinon <paramref name="code"/>
     /// (OPE_TRAITEMENTS.cs:766-772 pour LRAR, :793-799 pour LR).</summary>
-    private static async Task<string> SuffixeAsync(GesteEnCours geste, string code, string suffixe, CancellationToken ct)
+    internal static async Task<string> SuffixeAsync(GesteEnCours geste, string code, string suffixe, CancellationToken ct)
         => await RelancesRsurv.Scalaire(geste, "SELECT R_CODEEVEPRO_VALEUR FROM v2.CODE_EVE_PRO WHERE R_CODEEVEPRO_VALEUR = @c", ct,
                                         new SqlParameter("@c", code + suffixe)) is string s ? s.Trim() : code;
 
     /// <summary>L'evenement futur passe expire ; si <paramref name="code"/> est donne, l'evenement survenu de ce code est cree du jour,
     /// lie a l'expire par son numero source (creationEvenementSurvenuDepuisExpire, EvenementProcedure.cs:1816-1846). Rend le code et l'id crees.</summary>
-    private static async Task<(string? Code, int? Id)> ExpirerAsync(GesteEnCours geste, Echeance e, string? code, HashSet<string> colonnes, CancellationToken ct)
+    internal static async Task<(string? Code, int? Id)> ExpirerAsync(GesteEnCours geste, Echeance e, string? code, HashSet<string> colonnes, CancellationToken ct)
     {
         var source = e.NumeroSource;
         if (source is null && colonnes.Contains("EVNPR_NUMERO_SOURCE")) source = Guid.NewGuid().ToString().ToUpperInvariant();
@@ -310,9 +310,9 @@ internal sealed class EcrivainSurveillanceIp : IEcrivainEcran
 
     /// <summary>Les reglages « si pas enroler OP » (PARAMETRAGE de RIG v2, repris dans soc.Reglage) : le code et ses variantes LRAR / LR
     /// (CODE_EVE_PRO.cs:193-236) ; null si le reglage est vide ou absent (RIG v2 : GetValeurParametrage(code, "") = « »).</summary>
-    private sealed record Reglage(string Code, string Lrar, string Lr);
+    internal sealed record Reglage(string Code, string Lrar, string Lr);
 
-    private static async Task<(Reglage? Caducite, Reglage? NonAvenue)> ReglagesAsync(GesteEnCours geste, CancellationToken ct)
+    internal static async Task<(Reglage? Caducite, Reglage? NonAvenue)> ReglagesAsync(GesteEnCours geste, CancellationToken ct)
     {
         if (await RelancesRsurv.Scalaire(geste, "SELECT OBJECT_ID(N'soc.Reglage')", ct) is DBNull or null) return (null, null);
         async Task<Reglage?> Lire(string cle)
@@ -354,14 +354,14 @@ internal sealed class EcrivainSurveillanceIp : IEcrivainEcran
 
     /// <summary>Le juge saisi et le libelle de son statut (Juge.Statut, Juge.cs:238-242 ; STATUT.R_STATUT_LIBELLE_ECRAN) ; null s'il n'a
     /// pas de statut (RIG v2 ne peut alors pas creer le demandeur de l'OP, Instance.cs:3446-3450).</summary>
-    private static async Task<Juge?> JugeAsync(GesteEnCours geste, int id, CancellationToken ct)
+    internal static async Task<Juge?> JugeAsync(GesteEnCours geste, int id, CancellationToken ct)
         => await RelancesRsurv.Scalaire(geste, """
                SELECT s.R_STATUT_LIBELLE_ECRAN FROM v2.JUGE AS j JOIN v2.STATUT AS s ON s.R_STATUT_VALEUR = j.JUG_STATUT WHERE j.JUG_ID_JUG = @id
                """, ct, new SqlParameter("@id", id)) is string { Length: > 0 } statut ? new Juge(id, statut.Trim()) : null;
 
     /// <summary>Le code affaire de l'OP et ce que CreateInstanceOPSurIP exige (Instance.cs:3403-3420) ; null s'il manque ou est mal
     /// parametre (RIG v2 leve et la ligne n'est pas traitee).</summary>
-    private static async Task<CodeOp?> CodeOpAsync(GesteEnCours geste, string code, CancellationToken ct)
+    internal static async Task<CodeOp?> CodeOpAsync(GesteEnCours geste, string code, CancellationToken ct)
     {
         CodeOp? c = null;
         await using (var r = await geste.LireAsync("""
@@ -383,7 +383,7 @@ internal sealed class EcrivainSurveillanceIp : IEcrivainEcran
     }
 
     // Les colonnes que Partie.DupliquerPartie recopie (Partie.cs:1357-1395), dans son ordre.
-    private static readonly string[] ColonnesPartie =
+    internal static readonly string[] ColonnesPartie =
     [
         "PRT_ID_CLIEN", "PRT_NUM_ORDRE", "PRT_ID_MNDTR_POS", "PRT_ID_MNDTR_PLAI", "PRT_ID_RPRTR", "PRT_ID_PRTRP", "PRT_ID_ADRBS", "PRT_ABREGE",
         "PRT_CIVILITE", "PRT_DESIGNATION", "PRT_NOM", "PRT_PROFESSION", "PRT_FORME_JURIDIQUE_UTI", "PRT_CODE_GREFFE", "PRT_SIREN",
@@ -396,7 +396,7 @@ internal sealed class EcrivainSurveillanceIp : IEcrivainEcran
 
     /// <summary>CreateInstanceOPSurIP puis ValiderInstancesDemandes (en tete du fichier) : l'OP, ses parties, son dossier judiciaire,
     /// ses evenements, sa decision et son ordonnance, et sa demande OPE validee.</summary>
-    private static async Task<((int Id, string Role, string? Ordonnance)? Op, string? Refus)> CreerOpAsync(GesteEnCours geste, Echeance ip, CodeOp code,
+    internal static async Task<((int Id, string Role, string? Ordonnance)? Op, string? Refus)> CreerOpAsync(GesteEnCours geste, Echeance ip, CodeOp code,
         Juge juge, int? idGreffier, DateTime? datePrevue, List<EditionsEvenement.Bilan> bilans, CancellationToken ct)
     {
         var jour = geste.Maintenant.Date;

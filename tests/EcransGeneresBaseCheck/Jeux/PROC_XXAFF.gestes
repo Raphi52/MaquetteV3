@@ -76,11 +76,15 @@ message: Instance 2026M14351 supprimée de la base du greffe (24 lignes liées e
 lignes:
 XXAFF ZETA | Rôle 2026X14356 · saisi le 06/03/2026 · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
 GAMMA BANC c/ DELTA BANC | Rôle 2026R12002 · saisi le 10/01/2026 · bloquée par la demande 26012000002 | En référé | EnAttente | []
-Juge | Rôle 2026OP00001 · saisi le {J+0} · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
+# lot 8 (27/11/2026) : les IP 18019xx de PROC_IPSUIVI.sql et l'instance au fond ou l'OP que PROC_IPSUIVI.gestes cree (provision, caducite)
+Juge | Rôle 2026OP00002 · saisi le {J+0} · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
+Juge # CREANCIER RHO | Rôle 2026OP00001 · saisi le {J+0} · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
 XXAFF ETA | Rôle 2026M14357 · saisi le 07/03/2026 · 2 raisons de RIG v2 l'empêchent | Au fond | Rejetee | []
 XXAFF DELTA | Rôle 2026M14354 · saisi le 04/03/2026 · bloquée par la demande 26014000384 | Au fond | EnAttente | []
 XXAFF GAMMA | Rôle 2026M14353 · saisi le 03/03/2026 · 3 raisons de RIG v2 l'empêchent | Au fond | Rejetee | []
 XXAFF BETA | Rôle 2026M14352 · saisi le 02/03/2026 · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
+# lot 8 (27/11/2026) : les IP 18019xx de PROC_IPSUIVI.sql et l'instance au fond ou l'OP que PROC_IPSUIVI.gestes cree (provision, caducite)
+CREANCIER OMICRON # DEBITEUR OMICRON | Rôle 2026J81901 · saisi le {J+0} · 1 raison de RIG v2 l'empêche | Au fond | Rejetee | []
 THETA BANC | Rôle 2026J12008 · saisi le 10/01/2026 · bloquée par la demande 26012000008 | Au fond | EnAttente | []
 ZETA BANC | Rôle 2026J12006 · saisi le 10/01/2026 | Au fond | AFaire | []
 ETA BANC | Rôle 2026J12005 · saisi le 10/01/2026 | Au fond | AFaire | []

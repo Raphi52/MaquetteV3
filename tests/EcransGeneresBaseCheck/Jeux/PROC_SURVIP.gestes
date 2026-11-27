@@ -77,14 +77,15 @@ message: Problème à la création de l'OP pour l'instance 2026IP81405.
 #    enrolee -- role JROP, repertoire JGAFF, dossier judiciaire JRDSJ « Inconnu » (l'IP n'a pas de partie), le juge en demandeur,
 #    jointe a l'IP ; decision IPCAD prevue le 15/01/2099, juge et greffier ; ordonnance « Ordonnance de caducite 2026IP81405 » ; la
 #    demande OPE validee ; puis IPCONSOPOS expire avec son code « expire » IPCAD, la case LRAR etant grisee sur une ligne qui enrole)
-#    et 1801479 (certificat de 1801407 : IPCERTNOPP survient du jour). Reste 1801410, jamais traitee.
+#    et 1801479 (certificat de 1801407 : IPCERTNOPP survient du jour). Reste 1801410, jamais traitee. Le role de l'OP est 2026OP00002 :
+#    PROC_IPSUIVI.gestes, joue avant, ouvre la 1re OP de la serie JROP (la caducite de 1801901, son bloc 25).
 geste: Agir Appliquer les traitements
 ids: 1801477,1801479
 valeur: Juge = JIP18
 valeur: Date prévue = 2099-01-15
 valeur: LRAR = oui
 resultat: fait
-message: Traitements appliqués à 2 injonctions de payer : IP 2026IP81405 caduque · événement IPCAD · opposition 2026OP00001 enrôlée ; IP 2026IP81407 certificat de non-opposition · événement IPCERTNOPP ; ordonnance « Ordonnance de caducite 2026IP81405 » en file d'édition. 1 édition en file : « Note de caducite » → Document interne. Non repris par la V3 : la réédition de l'ordonnance en titre exécutoire (fichier de la GED) et les mots directeurs des oppositions.
+message: Traitements appliqués à 2 injonctions de payer : IP 2026IP81405 caduque · événement IPCAD · opposition 2026OP00002 enrôlée ; IP 2026IP81407 certificat de non-opposition · événement IPCERTNOPP ; ordonnance « Ordonnance de caducite 2026IP81405 » en file d'édition. 1 édition en file : « Note de caducite » → Document interne. Non repris par la V3 : la réédition de l'ordonnance en titre exécutoire (fichier de la GED) et les mots directeurs des oppositions.
 lignes:
 IP 2026IP81410 · IP TITRE OMEGA | échéance du {J-7} dépassée | Titre exécutoire | AFaire | []
 controle: SELECT i.INSTN_CODE_AFFAIRE + '|' + i.INSTN_TYPE_INSTANCE + '|' + i.INSTN_NATURE_AFFAIRE + '|' + i.INSTN_CODE_ACTE_PROCE + '|' + LEFT(i.INSTN_NUM_ROLE, 6) + '|' + CASE WHEN i.INSTN_NUM_REP_GENERAL IS NULL THEN 'sans' ELSE 'rep' END + '|' + CASE WHEN i.INSTN_DATE_JONCTION = CAST(GETDATE() AS date) THEN 'jointe' ELSE 'non' END FROM v2.INSTANCE AS i WHERE i.INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1801405 => IPCADSO|RP|OPCAD|SO|2026OP|rep|jointe

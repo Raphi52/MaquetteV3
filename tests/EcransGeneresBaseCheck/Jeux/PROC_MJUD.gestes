@@ -66,6 +66,9 @@ resultat: fait
 message: Instance 2026J12001 enregistrée dans la base du greffe : « Saisine tribunal », « Note sur l'affaire ».
 lignes:
 GAMMA BANC c/ DELTA BANC | Rôle 2026R12002 · Nature du banc · enrôlée le 15/01/2026 · bloquée par la demande 26012000002 | En référé | EnAttente | []
+# lot 8 (27/11/2026) : les IP 18019xx de PROC_IPSUIVI.sql et l'instance au fond ou l'OP que PROC_IPSUIVI.gestes cree (provision, caducite)
+Juge # CREANCIER RHO | Rôle 2026OP00001 · enrôlée le {J+0} | Au fond | AFaire | []
+CREANCIER OMICRON # DEBITEUR OMICRON | Rôle 2026J81901 · enrôlée le {J+0} | Au fond | AFaire | []
 THETA BANC | Rôle 2026J12008 · Nature du banc · enrôlée le 15/01/2026 · bloquée par la demande 26012000008 | Au fond | EnAttente | []
 ZETA BANC | Rôle 2026J12006 · Nature du banc · enrôlée le 15/01/2026 | Au fond | AFaire | []
 ETA BANC | Rôle 2026J12005 · Nature du banc · enrôlée le 15/01/2026 | Au fond | AFaire | []

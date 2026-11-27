@@ -28,4 +28,9 @@ Rôle 2026IP81701 · SIGNIFIER OK | décision du {J-20} · Ordonnance IP accepte
 Rôle 2026IP81702 · OPPOSER OK | décision du {J-20} · Ordonnance IP acceptee lot 8 | Injonctions de payer | Validee | []
 Rôle 2026IP81703 · SIGNIFIER ET CERTIFIER | décision du {J-20} · Ordonnance IP acceptee lot 8 | Injonctions de payer | Validee | []
 Rôle 2026IP81704 · OPPOSER TROP TOT | décision du {J-20} · Ordonnance IP acceptee lot 8 | Injonctions de payer | Validee | []
+# lot 8 (27/11/2026) : les IP 18019xx de PROC_IPSUIVI.sql et l'instance au fond ou l'OP que PROC_IPSUIVI.gestes cree (provision, caducite)
+Rôle 2026IP81901 · PROVISION CADUQUE OP | décision du {J-20} · Ordonnance IP acceptee lot 8 | Injonctions de payer | Validee | []
+Rôle 2026IP81902 · PROVISION CADUQUE SANS OP | décision du {J-20} · Ordonnance IP acceptee lot 8 | Injonctions de payer | Validee | []
+Rôle 2026IP81903 · PROVISION FORCEE | décision du {J-20} · Ordonnance IP acceptee lot 8 | Injonctions de payer | Validee | []
+Rôle 2026IP81904 · SECOND EXECUTOIRE | décision du {J-20} · Ordonnance IP acceptee lot 8 | Injonctions de payer | Validee | []
 Rôle 2026R01207 · REGJUD ORDO | acte du 15/01/2025 · Nature banc · sans décision | Ordonnances du président | AFaire | []

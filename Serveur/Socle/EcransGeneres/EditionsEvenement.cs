@@ -27,21 +27,29 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     interne ; D, F, I = les parties de cette qualite ; PO*, PL* = leur mandataire postulant, plaidant ; AV* = le postulant, sinon
 ///     la partie. Les modes LS, LR, LRAR et leurs combinaisons (LSLR, LSLRAR, LRLRAR, LSLRLRAR, RMP) rangent chaque destinataire dans
 ///     la lettre simple, la LR ou la LRAR ;
-///   - une ligne v2.DEMANDE_EDITION PAR DESTINATAIRE (mesure sur RIG_DEV le 27/11/2026 : la demande 7077894 porte 8 lignes
-///     « convocation - LRAR », une par destinataire), dans l'ordre de RIG v2 : LR (libelle « - LR », lot LOT_LR) et son imprime JLR
+///   - une ligne v2.DEMANDE_EDITION PAR DESTINATAIRE et par document (mesure sur RIG_DEV le 27/11/2026 : la demande 7077894 porte,
+///     pour sa convocation, une ligne « convocation - LRAR » et une ligne d'imprime par destinataire -- PART_D BIAELEC, PART_D SEB
+///     AUTO, PART_POD ROUGEOT, PART_F SEB AUTO, DEMANDE_EDITION 4450095 a 4450104), dans l'ordre de RIG v2 : LR (libelle « - LR », lot LOT_LR) et son imprime JLR
 ///     (« - Imprimé LR La Poste »), puis LRAR (« - LRAR », lot LOT_LRAR) et son imprime JLRAR, puis la lettre simple (lot LOT) ;
 ///     l'entite source (CODE_ENTITE_SOURCE de la liste : EVT_PROC = le numero source de l'evenement, INSTANCE = celui de
 ///     l'instance), le destinataire (code PART_..., valeur, designation ; « Document interne » pour DI), le libelle source
 ///     « CODE - jj/mm/aaaa (EP n° N) », les numeros « role repertoire » ; DMNED_PARAMETRE_GENERATION = HAS_OBSERVATION, MODE_ENVOI
 ///     et NUM_DEMANDE, comme les lignes de RIG_DEV (DEMANDE_EDITION 2869398 : « HAS_OBSERVATION="0" MODE_ENVOI="LS"
 ///     NUM_DEMANDE="D2223701138" »).
+///   - L'ADRESSE du destinataire (DMNED_BLOC_ADRESSE_DESTINATAIRE) : celle de la partie (PRT_ID_ADRBS) ou de son mandataire
+///     (MNDTR_ID_ADRBS), comme RecupDestEditLot2FROMInstance (DestinatairesEditionsLot2.cs:1281-1398 : partie.Adresse,
+///     mandatairePostulant.Adresse...) puis EntiteXML.cs:580-581 ; dans la base V3, l'adresse est la fiche rec.Adresse (ADRESSE_BASE,
+///     Recopie/FichesV3.cs). Ses lignes sont celles d'AdresseBase.ReturnAdresseCompleteMinouMaj (ADRESSE\AdresseBase.cs:928-986) :
+///     type special (« Toque », « Case », « Boîte Greffe », « Boîte Ordre » et « n° » valeur), pre-adresse, « numero complement type
+///     de voie nom de voie » (le libelle ecran du type de voie, v2.TYPE_VOIE), « BP boite suite », « code postal localite CEDEX
+///     cedex », le pays s'il n'est pas FRA (v2.PAYS) ; separees par « | » comme sur RIG_DEV (DEMANDE_EDITION 4450095 :
+///     « 7 Rue Eugène Ravanat|38320 EYBENS », 0x...7C...). Sans adresse, ou pour le document interne, la colonne reste vide.
 /// Sans maquette pour le code, aucune edition (RIG v2 rend une liste vide).
 ///
 /// NON REPRIS (rendu dans NonRepris, le message du geste le dit) : une condition autre que NA, NP, AS, IE (opposition devant une
 /// juridiction exterieure, VOIE_RECOURS I1408) et, sur une instance sans procedure collective ni prevention, PM, PP, RC, NI, RM, EX,
 /// LS, L9 -- l'edition n'est pas creee ; un destinataire autre que les parties et leurs mandataires (dirigeants, destinataires
-/// institutionnels, huissier...) et les envois par courriel ou au coffre-fort ; l'adresse des destinataires (bloc adresse :
-/// rec.Adresse non lue, comme les relances) ; le code-barre d'une piece numerisee (_GetEditionsCodeBarre) ; le decoupage des lots
+/// institutionnels, huissier...) et les envois par courriel ou au coffre-fort ; le code-barre d'une piece numerisee (_GetEditionsCodeBarre) ; le decoupage des lots
 /// Amitel ; DMNED_MODE_ENVOI : RIG v2 ne le pose que si MODE_ENVOI_LRAR_ACTIF (RigParametre, absent de la base du greffe : ni
 /// PARAMETRAGE ni table PARAM_VALEUR_BOOL dans RIG_DEV) -- il reste vide, comme sur les lignes de RIG_DEV.
 /// </summary>
@@ -53,7 +61,7 @@ internal static class EditionsEvenement
         internal static readonly Bilan Vide = new([], []);
     }
 
-    private sealed record Destinataire(string Code, string Valeur, string Designation);
+    private sealed record Destinataire(string Code, string Valeur, string Designation, string? Adresse = null);
 
     private const string DocumentInterne = "Document interne";
 
@@ -175,6 +183,9 @@ internal static class EditionsEvenement
                     ligne["DMNED_VALEUR_ID_DESTINATAIRE"] = dest.Valeur.Length > 0 ? dest.Valeur : null;
                     ligne["DMNED_TYPE_DESTINATAIRE"] = "ENTITE";
                     ligne["DMNED_DESIGNATION_DESTINATAIRE"] = dest.Designation;
+                    // fix-ok: mesure le 27/11/2026 (controle final du lot 8) -- les editions de la V3 n'avaient pas d'adresse, celles de
+                    // RIG_DEV l'ont (DEMANDE_EDITION 4450095 : « 7 Rue Eugène Ravanat|38320 EYBENS ») : le bloc adresse vient de rec.Adresse.
+                    ligne["DMNED_BLOC_ADRESSE_DESTINATAIRE"] = dest.Adresse is { Length: > 0 } adresse ? adresse : null;
                     ligne["DMNED_LOT"] = lot.Length == 0 ? null : lotsActifs is null || lotsActifs.Contains(lot) ? lot : "";
                     ligne["DMNED_TYPE_PAPIER"] = L("TYPE_PAPIER") is { Length: > 0 } tp ? tp : "NORMAL";
                     ligne["DMNED_TYPE_GENERATION"] = RelancesRsurv.TypeGeneration(L("TYPE_GENERATION"), "");
@@ -301,13 +312,17 @@ internal static class EditionsEvenement
     {
         var col = await RelancesRsurv.ColonnesAsync(geste, "v2.VOIE_RECOURS", ct);
         if (!col.Contains("VRCRS_ID_DCJDC") || !col.Contains("VRCRS_JURIDICTION_EXTERIEURE")) return false;
-        return await RelancesRsurv.Scalaire(geste, """
-            SELECT TOP (1) 1 FROM v2.VOIE_RECOURS AS v
-            WHERE v.VRCRS_ID_DCJDC = (SELECT TOP (1) d.DCJDC_ID_DCJDC FROM v2.DECISION_JUDICIAIRE AS d WHERE d.DCJDC_ID_INSTN = @i
-                                      ORDER BY d.DCJDC_NUM_ORDRE, d.DCJDC_ID_DCJDC)
-              AND UPPER(v.VRCRS_TYPE_RECOURS) = 'I1408' AND ISNULL(v.VRCRS_JURIDICTION_EXTERIEURE, '') <> ''
-            """, ct, new SqlParameter("@i", idInstance)) is not (null or DBNull);
+        return await RelancesRsurv.Scalaire(geste, SqlExterieure, ct, new SqlParameter("@i", idInstance)) is not (null or DBNull);
     }
+
+    /// <summary>La requete d'<see cref="OppositionExterieureAsync"/> (@i = l'instance), partagee avec la fiche du suivi des preventions
+    /// (ult_Juridiction_Exterieure, OPE_IPSUIVI.cs:862-864, la meme regle) ; a ne lancer que si v2.VOIE_RECOURS porte ses colonnes.</summary>
+    internal const string SqlExterieure = """
+        SELECT TOP (1) 1 FROM v2.VOIE_RECOURS AS v
+        WHERE v.VRCRS_ID_DCJDC = (SELECT TOP (1) d.DCJDC_ID_DCJDC FROM v2.DECISION_JUDICIAIRE AS d WHERE d.DCJDC_ID_INSTN = @i
+                                  ORDER BY d.DCJDC_NUM_ORDRE, d.DCJDC_ID_DCJDC)
+          AND UPPER(v.VRCRS_TYPE_RECOURS) = 'I1408' AND ISNULL(v.VRCRS_JURIDICTION_EXTERIEURE, '') <> ''
+        """;
 
     // ------------------------------------------------------------------ LES DESTINATAIRES
 
@@ -334,17 +349,25 @@ internal static class EditionsEvenement
         var pos = Mandataire("PRT_ID_MNDTR_POS", "mpo");
         var pla = Mandataire("PRT_ID_MNDTR_PLAI", "mpl");
         string M(string alias, string col, bool present) => present ? $"{alias}.{col}" : "CAST(NULL AS varchar(128))";
-        await using var r = await geste.LireAsync($"""
+        // Les adresses (rec.Adresse, la fiche d'ADRESSE_BASE) : leur id ici, leurs lignes apres la lecture (BlocAdresseAsync).
+        var adrMandataire = colMnd.Contains("MNDTR_ID_ADRBS");
+        var adresses = new List<(int Rang, int? Id)>();
+        await using (var r = await geste.LireAsync($"""
             SELECT p.PRT_QUALIF_PARTIE, {Col("PRT_NUMERO_SOURCE")} AS Source, p.PRT_CIVILITE, p.PRT_DESIGNATION, {Abrege("p.PRT_CIVILITE")} AS AbregeP,
+                   {(colPrt.Contains("PRT_ID_ADRBS") ? "p.PRT_ID_ADRBS" : "CAST(NULL AS int)")} AS AdrP,
                    {M("mpo", "MNDTR_ID_MNDTR", pos.Length > 0)} AS IdPo, {M("mpo", "MNDTR_CIVILITE", pos.Length > 0)} AS CivPo, {M("mpo", "MNDTR_NOM", pos.Length > 0)} AS NomPo,
                    {(pos.Length > 0 ? Abrege("mpo.MNDTR_CIVILITE") : "CAST(NULL AS varchar(5))")} AS AbregePo,
+                   {(pos.Length > 0 && adrMandataire ? "mpo.MNDTR_ID_ADRBS" : "CAST(NULL AS int)")} AS AdrPo,
                    {M("mpl", "MNDTR_ID_MNDTR", pla.Length > 0)} AS IdPl, {M("mpl", "MNDTR_CIVILITE", pla.Length > 0)} AS CivPl, {M("mpl", "MNDTR_NOM", pla.Length > 0)} AS NomPl,
-                   {(pla.Length > 0 ? Abrege("mpl.MNDTR_CIVILITE") : "CAST(NULL AS varchar(5))")} AS AbregePl
+                   {(pla.Length > 0 ? Abrege("mpl.MNDTR_CIVILITE") : "CAST(NULL AS varchar(5))")} AS AbregePl,
+                   {(pla.Length > 0 && adrMandataire ? "mpl.MNDTR_ID_ADRBS" : "CAST(NULL AS int)")} AS AdrPl
             FROM v2.PARTIE AS p {pos} {pla}
             WHERE p.PRT_ID_INSTN = @i ORDER BY p.PRT_NUM_ORDRE, p.PRT_ID_PRT
-            """, ct, new SqlParameter("@i", idInstance));
+            """, ct, new SqlParameter("@i", idInstance)))
         while (await r.ReadAsync(ct))
         {
+            int? Adr(string c) => r[c] is DBNull ? null : Convert.ToInt32(r[c], CultureInfo.InvariantCulture);
+            void Ajouter(Destinataire d, int? adresse) { adresses.Add((liste.Count, adresse)); liste.Add(d); }
             var q = FormeLigne.Texte(r, "PRT_QUALIF_PARTIE") is { Length: > 0 } qualif ? qualif[..1] : "";
             var sourcePartie = FormeLigne.Texte(r, "Source");
             // Partie.NomComplet : l'abrege d'edition de la civilite, sauf « », PM et ND.
@@ -357,14 +380,59 @@ internal static class EditionsEvenement
             var idPo = FormeLigne.Texte(r, "IdPo");
             var idPl = FormeLigne.Texte(r, "IdPl");
             var nomPo = NomMandataire(FormeLigne.Texte(r, "CivPo"), FormeLigne.Texte(r, "AbregePo"), FormeLigne.Texte(r, "NomPo"));
-            if (sourcePartie.Length > 0) liste.Add(new Destinataire($"PART_{q}", sourcePartie, nomPartie));
-            if (idPo.Length > 0) liste.Add(new Destinataire($"PART_PO{q}", idPo, nomPo));
+            if (sourcePartie.Length > 0) Ajouter(new Destinataire($"PART_{q}", sourcePartie, nomPartie), Adr("AdrP"));
+            if (idPo.Length > 0) Ajouter(new Destinataire($"PART_PO{q}", idPo, nomPo), Adr("AdrPo"));
             if (idPl.Length > 0)
-                liste.Add(new Destinataire($"PART_PL{q}", idPl, NomMandataire(FormeLigne.Texte(r, "CivPl"), FormeLigne.Texte(r, "AbregePl"), FormeLigne.Texte(r, "NomPl"))));
-            if (idPo.Length > 0) liste.Add(new Destinataire($"PART_AV{q}", idPo, nomPo));
-            else if (sourcePartie.Length > 0) liste.Add(new Destinataire($"PART_AV{q}", sourcePartie, nomPartie));
+                Ajouter(new Destinataire($"PART_PL{q}", idPl, NomMandataire(FormeLigne.Texte(r, "CivPl"), FormeLigne.Texte(r, "AbregePl"), FormeLigne.Texte(r, "NomPl"))), Adr("AdrPl"));
+            if (idPo.Length > 0) Ajouter(new Destinataire($"PART_AV{q}", idPo, nomPo), Adr("AdrPo"));
+            else if (sourcePartie.Length > 0) Ajouter(new Destinataire($"PART_AV{q}", sourcePartie, nomPartie), Adr("AdrP"));
         }
+        foreach (var (rang, id) in adresses)
+            if (id is { } a && await BlocAdresseAsync(geste, a, ct) is { Length: > 0 } bloc)
+                liste[rang] = liste[rang] with { Adresse = bloc };
         return liste;
+    }
+
+    /// <summary>
+    /// Le bloc adresse d'une edition : AdresseBase.ReturnAdresseCompleteMinouMaj(0, false) (ADRESSE\AdresseBase.cs:928-986), lignes
+    /// separees par « | » (AdresseMultiLignesPourEdition, :1087-1092 ; la forme des lignes de RIG_DEV, en tete). Lue dans rec.Adresse ;
+    /// le type de voie par son libelle ecran (v2.TYPE_VOIE, _loadTypeVoie), le pays par le sien (v2.PAYS, _loadPays) s'il n'est pas
+    /// FRA. Vide si la base n'a pas la fiche, ou si l'adresse est introuvable.
+    /// </summary>
+    internal static async Task<string> BlocAdresseAsync(GesteEnCours geste, int idAdresse, CancellationToken ct)
+    {
+        var col = await RelancesRsurv.ColonnesAsync(geste, "rec.Adresse", ct);
+        if (!col.Contains("Id") || !col.Contains("NomVoie")) return "";
+        var colVoie = await RelancesRsurv.ColonnesAsync(geste, "v2.TYPE_VOIE", ct);
+        var colPays = await RelancesRsurv.ColonnesAsync(geste, "v2.PAYS", ct);
+        string A(string c) => col.Contains(c) ? $"a.{c}" : "CAST(NULL AS nvarchar(100))";
+        var typeVoie = colVoie.Contains("R_TYPEVOIE_LIBELLE_ECRAN") && col.Contains("TypeVoie")
+            ? "(SELECT TOP (1) tv.R_TYPEVOIE_LIBELLE_ECRAN FROM v2.TYPE_VOIE AS tv WHERE tv.R_TYPEVOIE_VALEUR = a.TypeVoie)" : "CAST(NULL AS nvarchar(100))";
+        var pays = colPays.Contains("R_PAYS_LIBELLE_ECRAN") && col.Contains("Pays")
+            ? "(SELECT TOP (1) py.R_PAYS_LIBELLE_ECRAN FROM v2.PAYS AS py WHERE py.R_PAYS_VALEUR = a.Pays)" : "CAST(NULL AS nvarchar(100))";
+        await using var r = await geste.LireAsync($"""
+            SELECT {A("TypeSpecial")} AS TypeSpecial, {A("ValeurSpecial")} AS ValeurSpecial, {A("PreAdresse")} AS PreAdresse,
+                   {A("NumeroVoie")} AS NumeroVoie, {A("ComplementNumero")} AS ComplementNumero, {typeVoie} AS TypeVoie, a.NomVoie,
+                   {A("BoitePostale")} AS BoitePostale, {A("SuiteAdresse")} AS SuiteAdresse, {A("CodePostal")} AS CodePostal,
+                   {A("Localite")} AS Localite, {A("Cedex")} AS Cedex, {A("Pays")} AS Pays, {pays} AS LibellePays
+            FROM rec.Adresse AS a WHERE a.Id = @id
+            """, ct, new SqlParameter("@id", idAdresse));
+        if (!await r.ReadAsync(ct)) return "";
+        string T(string c) => FormeLigne.Texte(r, c);
+        var lignes = new List<string>();
+        void Ligne(string texte) { if (texte.Trim().Length > 0) lignes.Add(texte.Trim()); }
+        var special = T("TypeSpecial").Trim() switch { "T" => "Toque", "C" => "Case", "B" => "Boîte Greffe", "O" => "Boîte Ordre", _ => "" };
+        if (special.Length > 0) Ligne(T("ValeurSpecial").Length > 0 ? $"{special} n° {T("ValeurSpecial")}" : special);
+        if (T("PreAdresse").Length > 0) lignes.Add(T("PreAdresse"));
+        Ligne($"{T("NumeroVoie")} {T("ComplementNumero")} {T("TypeVoie")} {T("NomVoie")}");
+        Ligne((T("BoitePostale").Length > 0 ? $"BP {T("BoitePostale")} " : "") + T("SuiteAdresse"));
+        var cedex = T("Cedex");
+        Ligne($"{T("CodePostal")} {T("Localite")} {(cedex.Length > 0 ? "CEDEX " : "")}{(cedex != "." ? cedex : "")}");
+        var codePays = T("Pays").Trim();
+        if (codePays.Length > 0 && codePays != "FRA" && T("LibellePays").Length > 0) lignes.Add(T("LibellePays"));
+        var bloc = string.Join("|", lignes).Trim();
+        while (bloc.Contains("  ", StringComparison.Ordinal)) bloc = bloc.Replace("  ", " ", StringComparison.Ordinal);
+        return bloc;
     }
 
     // Les codes de partie que GetSpecifiquesActeursJudiciaires sait trouver (:173-197), sans les instances de la famille (…J).

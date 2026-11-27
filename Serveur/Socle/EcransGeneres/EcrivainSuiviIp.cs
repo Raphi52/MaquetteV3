@@ -8,17 +8,19 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// <summary>
 /// « Suivi des preventions » (PROC_IPSUIVI) : « Valider » sur la fiche d'UNE injonction de payer (Id = l'instance IP, la cle de
 /// LecteurSuiviIp.cs) enregistre la date saisie -- desistement, signification (et « à personne »), certificat de non-opposition,
-/// opposition, reception de la LRAR -- comme RIG v2 : l'evenement attendu SURVIENT, l'evenement suivant est cree, ses editions
-/// partent en file. Mode d'emploi : EcrivainEcran.cs. Plan « RIG v3 100 % fonctionnel », lot 8, 27/11/2026.
+/// opposition, reception de la LRAR, provision -- ou le 2e executoire, comme RIG v2 : l'evenement attendu SURVIENT (ou EXPIRE hors
+/// delai), l'evenement suivant est cree, l'opposition est enrolee au fond ou une OP de caducite ouverte, les editions partent en
+/// file. Mode d'emploi : EcrivainEcran.cs. Plan « RIG v3 100 % fonctionnel », lot 8, 27/11/2026.
 ///
 /// SOURCE (ancien RIG) : D:\RigApplication\Source\RIG\DLL\Processus\PROC_IPSUIVI\Etape\OPE_IPSUIVI.cs -- le choix du traitement
 /// (_TypeTraitement, :168-226), les dates saisies (ult_Signification_ChangementValeur :2769-2875, ult_Opposition_ChangementValeur
-/// :2877-2935, ult_Certif_Non_Opposition_ChangementValeur :2950-3017), leurs controles (VerifierSaisie, :2696-2766), les
-/// traitements de PreparerObjectsEtEditions (:1762-2140), les grisages du chargement (Remplir_IP, :845-1125, et _VerifierCoherenceIP,
-/// :1149-1160), une seule date par validation (_SetULTsAccessibility, :1196-1250, sauf signification + certificat, :101-103), la
-/// note (:2150) et la demande du processus validee (MajListeDemande, :2492-2520) ; le moteur des evenements de RigMetier
-/// (JUDICIAIRE\EvenementProcedure.cs : PasserEnSurvenuEveProFutur :1968-1997, creationEvenementFutur :1769-1810 ; les delais du
-/// futur, Fonctions diverses\Outils.cs:520-565) ; les editions : EditionsEvenement.cs.
+/// :2877-2935, ult_Certif_Non_Opposition_ChangementValeur :2950-3017, ult_Provision_ChangementValeur :3029-3240), leurs controles
+/// (VerifierSaisie, :2696-2766), les traitements de PreparerObjectsEtEditions (:1762-2140), les grisages du chargement (Remplir_IP,
+/// :845-1125, et _VerifierCoherenceIP, :1149-1160), une seule date par validation (_SetULTsAccessibility, :1196-1250, sauf
+/// signification + certificat, :101-103), la note (:2150) et les demandes validees (MajListeDemande, :2492-2520, :2606-2608) ; le
+/// moteur des evenements de RigMetier (JUDICIAIRE\EvenementProcedure.cs : PasserEnSurvenuEveProFutur :1968-1997,
+/// creationEvenementFutur :1769-1810 ; les delais du futur, Fonctions diverses\Outils.cs:520-565) ; l'OP sur l'IP :
+/// Instance.CreateInstanceOPSurIP (EcrivainSurveillanceIp.CreerOpAsync) ; les editions : EditionsEvenement.cs.
 ///
 /// CONTROLES, dans l'ordre de RIG v2, avant toute ecriture (un refus n'ecrit rien) :
 ///   1. l'instance est une IP de la base (InstanceIP_EnCours n'accepte qu'une IP, :135-143) ; le verrou de RIG v2 (VerrouDemandeV2) ;
@@ -26,8 +28,11 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///      « Date de la décision vide, vous devez aller en ORDOSIGN. » sauf pour le desistement (:1004-1013) ; opposition enrolee (instance
 ///      TIP1 jointe, :1014-1021) ; aucun evenement futur (:1024-1050) ; une IP close (evenement de fin survenu, :1112-1114) ; les
 ///      anomalies de _VerifierCoherenceIP (futurs de l'autre loi, plusieurs futurs du meme type) ;
-///   3. les dates que RIG v2 laisse saisir sur CETTE IP (Modifiable de la fiche, ZonesModifiables) ; une seule a la fois ;
-///   4. les controles de saisie, au mot pres (VerifierSaisie) ; « Date incorrect » pour le desistement (:1764-1767).
+///   3. les dates et les cases que RIG v2 laisse saisir sur CETTE IP (Modifiable de la fiche, ZonesModifiables) ; une seule date a
+///      la fois (le 2e executoire compte comme une date : il est grise des qu'une date est saisie) ;
+///   4. les controles de saisie, au mot pres (VerifierSaisie) ; « Date incorrect » pour le desistement (:1764-1767) ; l'OP de
+///      caducite exige son juge (Juge.GetJuge(Convert.ToInt32(ult_Juge.Valeur)), :2070) et son code affaire IPCADSO, l'enrolement
+///      au fond le code affaire TIP1 (codeAffaireInsJ, :95).
 ///
 /// CE QUI S'ECRIT (loi « nouvelle » = decision acceptee rendue a partir du 01/03/2022, DecisionJudiciaireExtentions.cs:13, :29-34) :
 ///   Desistement   : l'evenement IPDESIN SURVENU a la date (:1768-1770) ; la note « Information » completee de « Désistement »
@@ -35,22 +40,48 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   Signification : l'evenement attendu IPSIGNIF (nouvelle loi) ou ISIGNI SURVIENT a la date, « à personne » pose (cree s'il
 ///                   n'est pas attendu, :2795-2803) ; son evenement suivant est cree (IPCERTNOPP, IOIP...) sauf si une opposition
 ///                   ou un certificat est deja survenu ou un certificat deja attendu (:2809-2822) ;
+///                   ANCIENNE LOI, APRES SA DATE MAXI, sans opposition : l'IP est NON AVENUE (:1836-1873) -- la signification attendue
+///                   EXPIRE ; avec le reglage IP_NONAVENUE_EVT_SI_PAS_ENROLER_OP, l'evenement du reglage (+ « LR » avec « Envoi en
+///                   LRAR », + « R » avec « Envoi en LR ») survient du jour, lie a elle (_CreerEvenementPourEdition, :2176-2190) ;
+///                   sans reglage, son code « expire » (IPNAV ; + « LR » s'il existe et qu'un envoi est coche, :1856-1862). « Enrôler
+///                   une OP » n'est jamais montre pour une signification (seule la provision le rend visible, :3065) : pas d'OP ici.
+///                   NB : dans RIG v2 tel qu'il est, le gestionnaire de saisie (:2790-2819) fait deja survenir la signification
+///                   attendue, et ce traitement (:1820-1822) dereference alors un futur introuvable (NullReferenceException) ; la
+///                   V3 applique la branche ecrite, dans les delais comme hors delai ;
 ///   Certificat    : l'evenement IPCERTNOPP attendu SURVIENT (ou est cree survenu) ; l'opposition IPOPOS attendue EXPIRE
 ///                   (:1887-1910) ;
 ///   Opposition    : l'evenement attendu IPOPOS (nouvelle loi) ou IOIP SURVIENT avec son suivant (IPAROPOS) ; le certificat attendu
-///                   EXPIRE (:2894-2925, :1962-1970) ;
+///                   EXPIRE (:2894-2925, :1962-1970). Apres la date maxi de l'ancienne loi, RIG v2 cherche l'opposition FUTURE a la
+///                   date saisie pour la faire expirer (:1926-1940) : le gestionnaire de saisie l'a deja fait survenir (:2908-2925),
+///                   la recherche ne trouve rien et l'opposition est enregistree comme dans les delais -- la V3 fait de meme ;
 ///   Reception LRAR: l'evenement attendu IAROIP / IPAROPOS SURVIENT, avec son suivant (la provision attendue) si aucune provision
 ///                   n'est survenue (:1981-2024) ;
+///   Provision     : DANS LES DELAIS (au plus la date prevue de la provision attendue, controle_date :2658-2668 ; ou « Dans les
+///                   délais » cochee, :2031) -- sans juridiction exterieure et « Enrôlement » cochee, l'opposition est ENROLEE AU FOND
+///                   (:2033-2052, l'instance preparee :3097-3135) : une affaire et sa demande OIPE validee (nom, indicatif, numeros
+///                   « role J role IP », lien 2J, :2497-2504) ; l'instance du code affaire TIP1 (nature de l'IP, nature particuliere et
+///                   acte du code, acte a la date d'opposition sinon du jour, saisine et enrolement du jour, role de la serie du code
+///                   et repertoire JGAFF, :1556-1561), jointe a l'IP ; ses chefs de demande et ses parties dupliques (demandeurs
+///                   « DOIP », defendeurs « FOIP ») ; ses evenements de creation survenus du jour, et leurs editions sur la demande
+///                   OIPE. Avec une juridiction exterieure, la note recoit « Dossier à renvoyer à la nouvelle juridiction » (:3086-3092).
+///                   Puis la provision attendue (IPCONSOPOS / ICONSOIP) SURVIENT a la date (creee si absente), sans suivant, et ses
+///                   editions ; forcee, la note recoit « Date de provision forcée, malgré Caducité » (:3230-3232) ;
+///                   HORS DELAI : CADUCITE, la note recoit « Caducité » (:3054-3056) -- avec le reglage
+///                   IP_CADUCITE_EVT_SI_PAS_ENROLER_OP, la provision attendue expire et l'evenement du reglage (+ « LR » / + « R »)
+///                   survient (:2082-2090) ; sans reglage et « Enrôler une OP » cochee, l'OP « IPCADSO » est ouverte sur l'IP (juge,
+///                   greffier, date prevue : CreateInstanceOPSurIP, :2060-2078) et la provision expire avec son code « expire »
+///                   (IPCAD) ; decochee, elle expire seulement avec son code « expire » (:2094-2097) ;
+///   2e executoire : « 2ème exécut. » cochee, l'evenement IPEXECU2 (IPEXECU2LR avec « Envoi en LRAR ») survient du jour, avec ses
+///                   editions (:2101-2111). RIG v2 met ce traitement deux fois dans sa liste (:205-208 et :220-223) et cree donc deux
+///                   evenements : la V3 n'en cree qu'un ;
 ///   et toujours : les EDITIONS de l'evenement survenu (CreateDemandeEdition ; EditionsEvenement.cs) et la v2.DEMANDE « IPSUIVI »
 ///   validee, liee a l'IP (2J). Un evenement suivant porte le numero source de celui qui l'a cree (EVNPR_NUMERO_SOURCE_EP_LIE) et
 ///   les dates du code (mois, jours ou semaines de CODE_EVE_PRO apres la date survenue).
 ///
-/// NON REPRIS (refuse en le disant, rien n'est ecrit) : la PROVISION (et la LRAR saisie avec elle) -- dans les delais, RIG v2
-/// enrole l'opposition au fond (instance J « TIP1 », demande OIPE, evenements de creation) et facture la provision ; hors delai, il
-/// constate la caducite (OP « IPCADSO » ou evenement du reglage) (:1981-2100, :3029-3100) ; une signification de l'ancienne loi
-/// apres sa date maxi, sans opposition (non-avenue : OP « IPNAVSO » ou evenement du reglage, :1830-1866) ; une opposition de
-/// l'ancienne loi apres sa date maxi (titre executoire, LRAR / LR, :1926-1966) ; le second executoire (« Editer exécutoire »,
-/// IPExecu) ; la facture du certificat ; les pieces scannees et le code-barre ; le tableau recapitulatif (:2520-2600). Ce que les
+/// NON REPRIS (le message du geste le dit) : la facture (bouton FACTURATION, facultatif, :489-494) et l'encaissement de la provision
+/// (EncaissementProvision) ; l'appel a l'audience de l'instance au fond (opE_APP_AFFAIRE, :3211-3225) et ses mots directeurs
+/// (:1570-1576) ; les mots directeurs de l'OP ; la reedition de l'ordonnance en titre executoire (TrtTitreExecu, :2192-2230 : le
+/// fichier de la GED, service externe) ; les pieces scannees et le code-barre ; le tableau recapitulatif (:2520-2600). Ce que les
 /// editions ne reprennent pas est dit par EditionsEvenement.
 /// </summary>
 internal sealed class EcrivainSuiviIp : IEcrivainEcran
@@ -68,6 +99,10 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
     private const string UneSeuleDate =
         "Une seule date par validation : RIG v2 grise les autres dès qu'une date est saisie (OPE_IPSUIVI.cs:1196-1250), sauf la signification avec le certificat de non-opposition (:101-103).";
 
+    private static readonly string[] Dates = [ChampSignification, ChampOpposition, ChampAr, ChampProvision, ChampCertificat, ChampDesistement];
+
+    private static bool Coche(string v) => v.ToLowerInvariant() is "oui" or "true" or "1";
+
     public async Task<IssueGeste> JouerAsync(GesteEnCours geste, CancellationToken ct)
     {
         // 1. L'IP et le verrou.
@@ -79,19 +114,26 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
         await using (var r = await geste.LireAsync(RequeteEtat(colIns, verrouiller: true), ct, new SqlParameter("@id", n)))
             if (await r.ReadAsync(ct)) etat = EtatDe(r);
         if (etat is null) return IssueGeste.Refuser($"Injonction de payer introuvable dans la base du greffe ({id}).");
+        etat = etat with { Exterieure = await EditionsEvenement.OppositionExterieureAsync(geste, n, ct) };
         if (await VerrouDemandeV2.MotifAsync(geste.Base, geste.Transaction, "Instance", VerrouDemandeV2.SequenceurInstance, id, ct) is { } verrou)
             return IssueGeste.Refuser(verrou);
 
-        // Les saisies : les champs de la section des actes, par libelle.
+        // Les saisies : les champs des actes et des options, par libelle (et la section de chacun, pour les messages).
         var saisies = new Dictionary<string, string>(StringComparer.Ordinal);
+        var sections = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var (cle, valeur) in geste.Demande.Valeurs)
         {
-            var champ = ChampsSaisis.FirstOrDefault(c => GesteEcran.Cle(SectionActes, c) == cle);
+            var (section, champ) = ChampsSaisis.FirstOrDefault(c => GesteEcran.Cle(SectionActes, c) == cle) is { } a ? (SectionActes, a)
+                                 : ChampsOptions.FirstOrDefault(c => GesteEcran.Cle(SectionOptions, c) == cle) is { } o ? (SectionOptions, o)
+                                 : ("", (string?)null);
             if (champ is null) return IssueGeste.Refuser($"« {cle} » n'est pas une date de la fiche que RIG v2 laisse saisir.");
             saisies[champ] = valeur.Trim();
+            sections[champ] = section;
         }
-        var dates = saisies.Keys.Where(c => c != ChampAPersonne).ToList();
-        if (dates.Count == 0)
+        string Saisie(string champ) => saisies.TryGetValue(champ, out var v) ? v : "";
+        var executoire2 = Coche(Saisie(ChampExecutoire2));
+        var dates = saisies.Keys.Where(c => Dates.Contains(c)).ToList();
+        if (dates.Count == 0 && !executoire2)
             return IssueGeste.Refuser(saisies.ContainsKey(ChampAPersonne)
                 ? $"« {ChampAPersonne} » se saisit avec la date de signification (OPE_IPSUIVI.cs:2861-2864)."
                 : "Aucune date saisie.");
@@ -102,7 +144,7 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
         if (etat.Desiste) return IssueGeste.Refuser("Désistement IP, traitement impossible en IPSUIVI vous devez aller en MJUD.");
         if (etat.Europeenne) return IssueGeste.Refuser("Injonction de payer européenne, traitement impossible en IPSUIVI vous devez aller en MJUD.");
         if (!etat.Accepte) return IssueGeste.Refuser("IP rejetée, traitement impossible en IPSUIVI vous devez aller en MJUD.");
-        if (etat.DateDecision is null && dates.Any(c => c != ChampDesistement))
+        if (etat.DateDecision is null && (executoire2 || dates.Any(c => c != ChampDesistement)))
             return IssueGeste.Refuser("Date de la décision vide, vous devez aller en ORDOSIGN.");
         if (etat.DateDecision is not null)
         {
@@ -114,12 +156,13 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
                                           + Environment.NewLine + string.Join(Environment.NewLine, anomalies));
         }
 
-        // 3. Les dates que RIG v2 laisse saisir, une a la fois.
+        // 3. Les dates et les cases que RIG v2 laisse saisir ; une date a la fois.
         var modifiables = ZonesModifiables(etat);
         foreach (var c in saisies.Keys)
             if (!modifiables.Contains(c))
-                return IssueGeste.Refuser($"« {SectionActes} › {c} » n'est pas modifiable sur cette IP : RIG v2 la grise (OPE_IPSUIVI.cs:976-1120).");
-        if (dates.Count > 1 && !(dates.Count == 2 && dates.Contains(ChampSignification) && dates.Contains(ChampCertificat) && etat.NouvelleLoi))
+                return IssueGeste.Refuser($"« {sections[c]} › {c} » n'est pas modifiable sur cette IP : RIG v2 la grise (OPE_IPSUIVI.cs:976-1120).");
+        var traitements = dates.Count + (executoire2 ? 1 : 0);
+        if (traitements > 1 && !(dates.Count == 2 && !executoire2 && dates.Contains(ChampSignification) && dates.Contains(ChampCertificat) && etat.NouvelleLoi))
             return IssueGeste.Refuser(UneSeuleDate);
 
         // 4. Les controles de saisie.
@@ -129,13 +172,16 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
         var dateIp = etat.DateIp?.Date;
         var signification = Lue(ChampSignification) ?? etat.Signification;
         var opposition = Lue(ChampOpposition) ?? etat.Opposition;
+        var lrar = Coche(Saisie(ChampLrar));
+        var lr = !lrar && Coche(Saisie(ChampLr));
         if (Lue(ChampDesistement) is { } desistement && dateIp is { } dip0 && desistement < dip0) return IssueGeste.Refuser(DateIncorrecte);
+        DateTime? nonAvenueApres = null;
         if (Lue(ChampSignification) is { } s)
         {
             if (dateIp is { } dip && s < dip) return IssueGeste.Refuser("La date de signification ne peut pas être inférieure à la date de l'IP");
             if (opposition is { } o && s > o) return IssueGeste.Refuser("La date de signification ne peut pas être supérieure à la date d'opposition");
-            if (!etat.NouvelleLoi && etat.Opposition is null && etat.MaxiSignification is { } maxi && s > maxi)
-                return IssueGeste.Refuser($"Signification après la date maxi ({FormeLigne.Date(maxi)}) : RIG v2 rend l'IP non avenue (OP « IPNAVSO » ou événement du réglage, OPE_IPSUIVI.cs:1830-1866) ; la V3 ne le reprend pas encore ici (« Injonctions de payer » applique la non-avenue à l'échéance).");
+            // _DateSaisieSuperieurDatemaxi(ult_Signification) d'une IP de l'ancienne loi sans opposition (:1823-1836).
+            if (!etat.NouvelleLoi && !etat.OppositionSurvenue && etat.Opposition is null && etat.MaxiSignification is { } maxi && s > maxi) nonAvenueApres = maxi;
         }
         if (Lue(ChampCertificat) is { } cert && dateIp is { } dip2 && cert < dip2)
             return IssueGeste.Refuser("La date du certificat de non opposition ne peut pas être inférieure à la date de l'IP");
@@ -143,8 +189,6 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
         {
             if (dateIp is { } dip && op < dip) return IssueGeste.Refuser("La date de l'opposition ne peut pas être inférieure à la date de l'IP");
             if (signification is { } sg && op < sg) return IssueGeste.Refuser("La date de l'opposition ne peut pas être inférieure à la date de la signification");
-            if (!etat.NouvelleLoi && etat.MaxiOpposition is { } maxi && op > maxi)
-                return IssueGeste.Refuser($"Opposition après la date maxi ({FormeLigne.Date(maxi)}) : RIG v2 traite l'opposition hors délai de l'ancienne loi (titre exécutoire, LRAR ou LR, OPE_IPSUIVI.cs:1926-1966) ; la V3 ne le reprend pas encore.");
         }
         if (Lue(ChampAr) is { } ar)
         {
@@ -152,9 +196,57 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
             if (opposition is { } o && ar < o) return IssueGeste.Refuser("La date de réception du LRAR ne peut pas être inférieur à la date de l'opposition");
             if (etat.Provision is { } pv && ar > pv) return IssueGeste.Refuser("La date de provision ne peut pas être supérieur à la date de réception du LRAR");
         }
-        if (saisies.ContainsKey(ChampProvision))
-            return IssueGeste.Refuser("« Provision » : dans les délais, RIG v2 enrôle l'opposition au fond (instance J « TIP1 », demande OIPE) et facture la provision ; "
-                                      + "hors délai, il constate la caducité (OPE_IPSUIVI.cs:2028-2100, :3029-3100). La V3 ne le reprend pas encore : rien n'est enregistré.");
+
+        // La provision : dans les delais ou caduque, et ce qu'il faut pour l'enrolement au fond ou l'OP de caducite (lu AVANT d'ecrire).
+        var provision = Lue(ChampProvision);
+        var horsDelai = false;
+        CodeTip1? codeJ = null;
+        EcrivainSurveillanceIp.CodeOp? codeOp = null;
+        EcrivainSurveillanceIp.Juge? juge = null;
+        int? idGreffier = null;
+        DateTime? datePrevue = null;
+        var reglages = await EcrivainSurveillanceIp.ReglagesAsync(geste, ct);
+        if (provision is { } dpv)
+        {
+            if (dateIp is { } dip && dpv < dip) return IssueGeste.Refuser("La date de la provision ne peut pas être inférieure à la date de l'IP");
+            if (etat.ReceptionAr is { } ar0 && dpv < ar0) return IssueGeste.Refuser("La date de la provision ne peut pas être inférieure à la date de réception du LRAR");
+            horsDelai = etat.MaxiProvision is { } mp && dpv > mp && !Coche(Saisie(ChampDansLesDelais));
+            // fix-ok: mesure le 27/11/2026 (controle final du lot 8) -- la provision etait refusee « pas encore » alors que RIG v2
+            // l'enregistre (:2028-2100) ; enrolement au fond, caducite, non-avenue et 2e executoire s'ecrivent desormais ici.
+            var enrolerJ = !horsDelai && !etat.Exterieure && (!saisies.ContainsKey(ChampEnrolement) || Coche(Saisie(ChampEnrolement)));
+            if (enrolerJ)
+            {
+                codeJ = await CodeTip1Async(geste, ct);
+                if (codeJ is null)
+                    return IssueGeste.Refuser("Le code affaire « TIP1 » est absent ou incomplet dans la base du greffe (type de numéro de rôle, type d'instance) : RIG v2 y enrôle l'opposition au fond (OPE_IPSUIVI.cs:95, :3098). Rien n'est enregistré.");
+            }
+            if (horsDelai && reglages.Caducite is null && (!saisies.ContainsKey(ChampEnrolerOp) || Coche(Saisie(ChampEnrolerOp))))
+            {
+                if (Saisie(ChampJuge).Length == 0) return IssueGeste.Refuser(CreationV2.Obligatoire($"{SectionOptions} › {ChampJuge}"));
+                var idJuge = await InjonctionsIsurv.PersonneAsync(geste, "v2.JUGE", "JUG_ID_JUG", "JUG_ABREGE", "JUG_ACTIF", Saisie(ChampJuge), ct);
+                if (idJuge is null)
+                    return IssueGeste.Refuser($"Le juge « {Saisie(ChampJuge)} » n'est pas utilisable en saisie dans la base du greffe (abrégé inconnu, en double ou inactif).");
+                if (Saisie(ChampGreffier) is { Length: > 0 } abregeGreffier)
+                {
+                    idGreffier = await InjonctionsIsurv.PersonneAsync(geste, "v2.GREFFIER_ASSERMENTE", "GRASS_ID_GRASS", "GRASS_ABREGE", "GRASS_ACTIF", abregeGreffier, ct);
+                    if (idGreffier is null)
+                        return IssueGeste.Refuser($"Le greffier « {abregeGreffier} » n'est pas utilisable en saisie dans la base du greffe (abrégé inconnu, en double ou inactif).");
+                }
+                if (Saisie(ChampDatePrevue) is { Length: > 0 } dp)
+                {
+                    if (AudiencesV2.Date(dp) is not { } d) return IssueGeste.Refuser($"« {SectionOptions} › {ChampDatePrevue} » : date illisible ({dp}).");
+                    datePrevue = d;
+                }
+                codeOp = await EcrivainSurveillanceIp.CodeOpAsync(geste, "IPCADSO", ct);
+                juge = await EcrivainSurveillanceIp.JugeAsync(geste, idJuge.Value, ct);
+                // Le message enveloppe de RIG v2 quand l'OP ne peut pas etre creee (Instance.cs:3527).
+                if (codeOp is null || juge is null) return IssueGeste.Refuser($"Problème à la création de l'OP pour l'instance {etat.Role}.");
+            }
+        }
+        var codeExecutoire2 = lrar ? "IPEXECU2LR" : "IPEXECU2";
+        if (executoire2 && await RelancesRsurv.Scalaire(geste, "SELECT R_CODEEVEPRO_VALEUR FROM v2.CODE_EVE_PRO WHERE R_CODEEVEPRO_VALEUR = @c", ct,
+                                                         new SqlParameter("@c", codeExecutoire2)) is null or DBNull)
+            return IssueGeste.Refuser($"L'événement « {codeExecutoire2} » est absent des codes d'événement de la base du greffe : RIG v2 le crée pour le 2e exécutoire (OPE_IPSUIVI.cs:2101-2108). Rien n'est enregistré.");
 
         // Les ecritures : la demande d'abord (les editions s'y rattachent), puis chaque date dans l'ordre de _TypeTraitement.
         var (idDemande, numeroDemande, refusDemande) = await EcrivainSurveillanceIp.DemandeInstanceAsync(geste, "IPSUIVI", n, etat.Affaire,
@@ -162,33 +254,49 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
         if (idDemande is null) return IssueGeste.Refuser(refusDemande!);
         var faits = new List<string>();
         var bilans = new List<EditionsEvenement.Bilan>();
+        var nonRepris = new List<string> { "le tableau récapitulatif" };
         var apres = new Dictionary<string, string?> { ["Demande"] = numeroDemande };
+        var note = etat.Note ?? "";
+        void Noter(string texte) { if (!note.Contains(texte, StringComparison.Ordinal)) note = (note + " " + texte).Trim(); }
         async Task Editions(int idEvenement) => bilans.Add(await EditionsEvenement.CreerAsync(geste, idDemande.Value, numeroDemande, idEvenement, ct));
+        var nom = etat.NomCourant ?? etat.Role;
 
         if (Lue(ChampDesistement) is { } dd)
         {
             var idEve = await EcrivainRetourAudience.EvenementSurvenuAsync(geste, n, "IPDESIN", dd, ct);
             await Editions(idEve);
-            var noteAvant = etat.Note ?? "";
-            var noteApres = noteAvant.Contains("Désistement", StringComparison.Ordinal) ? noteAvant : (noteAvant + " Désistement").Trim();
-            if (colIns.Contains("INSTN_NOTE_AUDIENCE") && noteApres != noteAvant)
-                await geste.EcrireAsync("UPDATE v2.INSTANCE SET INSTN_NOTE_AUDIENCE = @note WHERE INSTN_ID_INSTN = @id", ct,
-                    new SqlParameter("@note", noteApres), new SqlParameter("@id", n));
+            Noter("Désistement");
             faits.Add($"désistement du {FormeLigne.Date(dd)} (événement IPDESIN)");
             apres["Desistement"] = FormeLigne.Date(dd);
-            apres["Information"] = noteApres;
         }
-        if (Lue(ChampSignification) is { } ds)
+        if (Lue(ChampSignification) is { } ds && nonAvenueApres is { } maxiSignif)
+        {
+            // Non avenue (:1836-1873) : la signification attendue expire, avec l'evenement du reglage ou son code « expire ».
+            var futur = await FuturAsync(geste, n, "'ISIGNI','IPSIGNIF'", ct);
+            if (futur is null) return IssueGeste.Refuser($"L'évènement futur n'existe plus. Impossible de traiter l'instance {etat.Role}. Problème de récupération");
+            string? code;
+            if (reglages.NonAvenue is { } rg) code = lrar ? rg.Lrar : lr ? rg.Lr : rg.Code;
+            else
+            {
+                code = await CodeExpireAsync(geste, futur.Code, ct);
+                if (code is not null && (lrar || lr) && await EcrivainSurveillanceIp.SuffixeAsync(geste, code, "LR", ct) is var avecLr && avecLr != code) code = avecLr;
+            }
+            var (survenu, idSurvenu) = await EcrivainSurveillanceIp.ExpirerAsync(geste, Echeance(futur, n, etat, nom), code is { Length: > 0 } ? code : null, colEve, ct);
+            if (idSurvenu is { } idS) await Editions(idS);
+            faits.Add($"signification du {FormeLigne.Date(ds)} après sa date maxi ({FormeLigne.Date(maxiSignif)}) : IP non avenue ({futur.Code} expiré{(survenu is null ? "" : $", événement {survenu}")})");
+            apres["NonAvenue"] = survenu ?? $"{futur.Code} expiré";
+        }
+        else if (Lue(ChampSignification) is { } ds2)
         {
             var code = etat.NouvelleLoi ? "IPSIGNIF" : "ISIGNI";
-            var aPersonne = saisies.TryGetValue(ChampAPersonne, out var ap) && ap.ToLowerInvariant() is "oui" or "true" or "1";
+            var aPersonne = Coche(Saisie(ChampAPersonne));
             // Le suivant (le certificat attendu) se cree meme avec le certificat saisi : RIG v2 le cree a la saisie de la signification
             // (:2809-2822), puis le traitement du certificat le fait survenir (:1891-1896).
             var lie = !etat.OppositionSurvenue && etat.Certificat is null && !etat.FuturCertificat;
-            var (idEve, suivant) = await SurvenirAsync(geste, n, code, ds, aPersonne, lie, colEve, ct);
+            var (idEve, suivant) = await SurvenirAsync(geste, n, code, ds2, aPersonne, lie, colEve, ct);
             await Editions(idEve);
-            faits.Add($"signification du {FormeLigne.Date(ds)}{(aPersonne ? " à personne" : "")} (événement {code}{(suivant is null ? "" : $", {suivant} attendu")})");
-            apres["Signification"] = FormeLigne.Date(ds);
+            faits.Add($"signification du {FormeLigne.Date(ds2)}{(aPersonne ? " à personne" : "")} (événement {code}{(suivant is null ? "" : $", {suivant} attendu")})");
+            apres["Signification"] = FormeLigne.Date(ds2);
         }
         if (Lue(ChampCertificat) is { } dc)
         {
@@ -215,8 +323,79 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
             faits.Add($"réception de la LRAR du {FormeLigne.Date(dar)} (événement {code}{(suivant is null ? "" : $", {suivant} attendu")})");
             apres["ReceptionLrar"] = FormeLigne.Date(dar);
         }
+        if (provision is { } dprov && !horsDelai)
+        {
+            // Dans les delais (:2031-2058) : l'enrolement au fond, puis la provision attendue survient.
+            string? enrolee = null;
+            if (codeJ is not null)
+            {
+                var (roleJ, refusJ) = await EnrolerAuFondAsync(geste, n, etat, codeJ, bilans, ct);
+                if (roleJ is null) return IssueGeste.Refuser(refusJ!);
+                enrolee = roleJ;
+                apres["InstanceAuFond"] = roleJ;
+                nonRepris.Add("la facture et l'encaissement de la provision, l'appel à l'audience et les mots directeurs de l'instance au fond");
+            }
+            else if (etat.Exterieure) Noter("Dossier à renvoyer à la nouvelle juridiction");
+            var code = etat.CodeFuturConso ?? "IPCONSOPOS";
+            var (idEve, _) = await SurvenirAsync(geste, n, code, dprov, null, false, colEve, ct);
+            await Editions(idEve);
+            if (etat.MaxiProvision is { } mp && dprov > mp) Noter("Date de provision forcée, malgré Caducité");
+            faits.Add($"provision du {FormeLigne.Date(dprov)} (événement {code}{(enrolee is null ? "" : $" ; opposition enrôlée au fond sous le n° {enrolee}, code affaire TIP1")})");
+            apres["Provision"] = FormeLigne.Date(dprov);
+        }
+        else if (provision is { } dcad)
+        {
+            // Hors delai (:2059-2099) : caducite.
+            Noter("Caducité");
+            var futur = await FuturAsync(geste, n, "'ICONSOIP','IPCONSOPOS'", ct);
+            if (futur is null) return IssueGeste.Refuser($"L'évènement futur n'existe plus. Impossible de traiter l'instance {etat.Role}. Problème de récupération");
+            string? code;
+            string? opRole = null, ordonnance = null;
+            if (reglages.Caducite is { } rg) code = lrar ? rg.Lrar : lr ? rg.Lr : rg.Code;
+            else
+            {
+                if (codeOp is not null)
+                {
+                    var (creee, refusOp) = await EcrivainSurveillanceIp.CreerOpAsync(geste, Echeance(futur, n, etat, nom), codeOp, juge!, idGreffier, datePrevue, bilans, ct);
+                    if (creee is null) return IssueGeste.Refuser(refusOp!);
+                    (opRole, ordonnance) = (creee.Value.Role, creee.Value.Ordonnance);
+                    // Les numeros de sa demande OPE : « role OP role IP » (MajListeDemande, :2508-2515).
+                    await geste.EcrireAsync("""
+                        UPDATE v2.DEMANDE SET DMND_LES_NUMEROS = LEFT(@n, 128)
+                        WHERE DMND_CODE_PROSS = 'OPE' AND DMND_ID_DMND IN (SELECT DSSDM_ID_DMND FROM v2.DOSSIER_DEMANDE
+                                                                           WHERE DSSDM_CODE_SEQUENCEUR = '2J' AND DSSDM_VALEUR_SEQUENCEUR = @op)
+                        """, ct, new SqlParameter("@n", $"{creee.Value.Role} {etat.Role}"),
+                        new SqlParameter("@op", creee.Value.Id.ToString(CultureInfo.InvariantCulture)));
+                    nonRepris.Add("les mots directeurs de l'opposition");
+                    apres["Opposition"] = opRole;
+                }
+                code = await CodeExpireAsync(geste, futur.Code, ct);
+            }
+            var (survenu, idSurvenu) = await EcrivainSurveillanceIp.ExpirerAsync(geste, Echeance(futur, n, etat, nom), code is { Length: > 0 } ? code : null, colEve, ct);
+            if (idSurvenu is { } idS) await Editions(idS);
+            faits.Add($"provision du {FormeLigne.Date(dcad)} après sa date prévue ({FormeLigne.Date(etat.MaxiProvision!.Value)}) : caducité ({futur.Code} expiré{(survenu is null ? "" : $", événement {survenu}")}{(opRole is null ? "" : $", opposition {opRole} enrôlée")})");
+            if (ordonnance is not null) faits.Add($"ordonnance « {ordonnance} » en file d'édition");
+            apres["Caducite"] = survenu ?? $"{futur.Code} expiré";
+        }
+        if (executoire2)
+        {
+            // Le 2e executoire (:2101-2111), une fois.
+            var idEve = await EcrivainRetourAudience.EvenementSurvenuAsync(geste, n, codeExecutoire2, geste.Maintenant.Date, ct);
+            await Editions(idEve);
+            faits.Add($"2e exécutoire (événement {codeExecutoire2})");
+            nonRepris.Add("la réédition de l'ordonnance en titre exécutoire (fichier de la GED)");
+            apres["Executoire2"] = codeExecutoire2;
+        }
 
-        var message = $"Enregistré sur l'IP {etat.Role} : {string.Join(" ; ", faits)}.{EditionsEvenement.Message(bilans)} Non repris par la V3 : le tableau récapitulatif.";
+        // La note « Information » (ult_Information, enregistree dans INSTN_NOTE_AUDIENCE, :2150).
+        if (colIns.Contains("INSTN_NOTE_AUDIENCE") && note != (etat.Note ?? ""))
+        {
+            await geste.EcrireAsync("UPDATE v2.INSTANCE SET INSTN_NOTE_AUDIENCE = @note WHERE INSTN_ID_INSTN = @id", ct,
+                new SqlParameter("@note", note), new SqlParameter("@id", n));
+            apres["Information"] = note;
+        }
+
+        var message = $"Enregistré sur l'IP {etat.Role} : {string.Join(" ; ", faits)}.{EditionsEvenement.Message(bilans)} Non repris par la V3 : {string.Join(", ", nonRepris)}.";
         return IssueGeste.Ecrit(message, [id],
             new TraceGeste("affaire", $"l'injonction de payer {etat.Role}", id, "a modifie",
                 new Dictionary<string, string?> { ["Information"] = etat.Note }, apres));
@@ -238,7 +417,160 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
         return messages;
     }
 
+    // ------------------------------------------------------------------ L'ENROLEMENT AU FOND (TIP1)
+
+    /// <summary>Le code affaire de l'instance au fond (codeAffaireInsJ = CODE_AFFAIRE « TIP1 », OPE_IPSUIVI.cs:95) : ce que
+    /// Instance.CreateInstance et la numerotation lisent (:3098-3107, :1556-1561). Null s'il manque, sans serie ou sans type.</summary>
+    internal sealed record CodeTip1(string TypeNumRole, string TypeInstance, bool Repertoire, string? NatAffPart, string? Acte, string? Creation);
+
+    private static async Task<CodeTip1?> CodeTip1Async(GesteEnCours geste, CancellationToken ct)
+    {
+        var col = await RelancesRsurv.ColonnesAsync(geste, "v2.CODE_AFFAIRE", ct);
+        if (!col.Contains("R_CODEAFFAIR_TYPE_NUM_ROLE") || !col.Contains("R_CODEAFFAIR_TYPE_INSTANCE")) return null;
+        string C(string c) => col.Contains(c) ? c : $"CAST(NULL AS varchar(255)) AS {c}";
+        await using var r = await geste.LireAsync($"""
+            SELECT R_CODEAFFAIR_TYPE_NUM_ROLE, R_CODEAFFAIR_TYPE_INSTANCE, {C("R_CODEAFFAIR_NUM_REPERTOIRE")}, {C("R_CODEAFFAIR_NAT_AFF_PART")},
+                   {C("R_CODEAFFAIR_CODE_ACTE_PRO")}, {C("R_CODEAFFAIR_CODE_EVE_PRO_CREA")}
+            FROM v2.CODE_AFFAIRE WHERE R_CODEAFFAIR_VALEUR = 'TIP1'
+            """, ct);
+        if (!await r.ReadAsync(ct)) return null;
+        string? O(string c) => FormeLigne.Texte(r, c).Trim() is { Length: > 0 } s ? s : null;
+        if (O("R_CODEAFFAIR_TYPE_NUM_ROLE") is not { } num || O("R_CODEAFFAIR_TYPE_INSTANCE") is not { } type) return null;
+        return new CodeTip1(num, type, r["R_CODEAFFAIR_NUM_REPERTOIRE"] is true or 1 or "1", O("R_CODEAFFAIR_NAT_AFF_PART"),
+                            O("R_CODEAFFAIR_CODE_ACTE_PRO"), O("R_CODEAFFAIR_CODE_EVE_PRO_CREA"));
+    }
+
+    /// <summary>
+    /// L'opposition ENROLEE AU FOND (OPE_IPSUIVI.cs:2033-2052, l'instance preparee par ult_Provision_ChangementValeur :3097-3135 et
+    /// numerotee a la validation :1556-1561, sa demande validee :2497-2504 et :2606-2608), en tete du fichier. Rend son role, ou le
+    /// refus de la numerotation.
+    /// </summary>
+    private static async Task<(string? Role, string? Refus)> EnrolerAuFondAsync(GesteEnCours geste, int idIp, EtatIp ip, CodeTip1 code,
+        List<EditionsEvenement.Bilan> bilans, CancellationToken ct)
+    {
+        var jour = geste.Maintenant.Date;
+        var (role, refusRole) = await CreationV2.NumeroAsync(geste, code.TypeNumRole, geste.Maintenant.Year, ct);
+        if (role is null) return (null, refusRole);
+        string? repertoire = null;
+        if (code.Repertoire)
+        {
+            // RIG v2 demande JGAFF sans annee (Numerotation.Generer(.., "JGAFF", 0, ..), :1559) ; la numerotation de la V3 tient ses
+            // series par annee : l'annee en cours, comme l'OP (EcrivainSurveillanceIp.CreerOpAsync).
+            var (rep, refusRep) = await CreationV2.NumeroAsync(geste, "JGAFF", geste.Maintenant.Year, ct);
+            if (rep is null) return (null, refusRep);
+            repertoire = rep;
+        }
+        var colIns = await RelancesRsurv.ColonnesAsync(geste, "v2.INSTANCE", ct);
+        var nature = colIns.Contains("INSTN_NATURE_AFFAIRE")
+            ? await RelancesRsurv.Scalaire(geste, "SELECT INSTN_NATURE_AFFAIRE FROM v2.INSTANCE WHERE INSTN_ID_INSTN = @i", ct, new SqlParameter("@i", idIp)) as string
+            : null;
+
+        // Les parties de l'IP, lues avant d'ecrire : demandeurs (D%) et defendeurs (F%), par ordre (ListePartiesDemandeur / Defendeur).
+        var colPrt = await RelancesRsurv.ColonnesAsync(geste, "v2.PARTIE", ct);
+        var copiees = EcrivainSurveillanceIp.ColonnesPartie.Where(colPrt.Contains).ToArray();
+        var parties = new List<(char Qualite, Dictionary<string, object?> Valeurs)>();
+        await using (var r = await geste.LireAsync($"""
+            SELECT PRT_QUALIF_PARTIE{string.Concat(copiees.Select(c => ", " + c))} FROM v2.PARTIE
+            WHERE PRT_ID_INSTN = @i AND (PRT_QUALIF_PARTIE LIKE 'D%' OR PRT_QUALIF_PARTIE LIKE 'F%') ORDER BY PRT_NUM_ORDRE, PRT_ID_PRT
+            """, ct, new SqlParameter("@i", idIp)))
+            while (await r.ReadAsync(ct))
+            {
+                var v = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                foreach (var c in copiees) v[c] = r[c] is DBNull ? null : r[c];
+                parties.Add((FormeLigne.Texte(r, "PRT_QUALIF_PARTIE")[0], v));
+            }
+        var nomCourant = CreationV2.NomCourant(parties.FirstOrDefault(p => p.Qualite == 'D').Valeurs?["PRT_DESIGNATION"] as string,
+                                               parties.FirstOrDefault(p => p.Qualite == 'F').Valeurs?["PRT_DESIGNATION"] as string);
+
+        // La demande OIPE et son affaire (Affaire.CreateAffaire puis Demande.CreateDemande(false, affaire de la J, ..., "OIPE", "2J"),
+        // :3110-3111, :2037-2039), validee a la fin.
+        var (demande, refusDemande) = await CreationV2.CreerDemandeAsync(geste, "OIPE", "V", ct);
+        if (demande is null) return (null, refusDemande);
+        var instance = new Dictionary<string, object?>
+        {
+            ["INSTN_ID_AFFRE"] = demande.IdAffaire, ["INSTN_CODE_AFFAIRE"] = "TIP1", ["INSTN_NATURE_AFFAIRE"] = nature,
+            ["INSTN_NAT_AFF_PART"] = code.NatAffPart, ["INSTN_CODE_ACTE_PROCE"] = code.Acte, ["INSTN_ETAT_INSTANCE"] = "0", ["INSTN_ETAT_INFO"] = "1",
+            ["INSTN_DATE_SAISINE_GREFFE"] = jour, ["INSTN_DATE_ENROLEMENT"] = jour, ["INSTN_DATE_ACTE"] = ip.Opposition?.Date ?? jour,
+            ["INSTN_TYPE_INSTANCE"] = code.TypeInstance, ["INSTN_NUMERO_SOURCE"] = Guid.NewGuid().ToString().ToUpperInvariant(),
+            ["INSTN_NUM_ROLE"] = role, ["INSTN_NUM_REP_GENERAL"] = repertoire, ["INSTN_NOM_COURANT"] = nomCourant,
+            ["INSTN_ID_INSTN_INSTANCE_PRINCIPA"] = idIp, ["INSTN_DATE_JONCTION"] = jour,
+        };
+        var idJ = await CreationV2.InsererAsync(geste, "v2.INSTANCE", "INSTN_ID_INSTN",
+            instance.Where(v => colIns.Contains(v.Key)).ToDictionary(v => v.Key, v => v.Value), ct);
+
+        // Les chefs de demande de l'IP (ChefDemande.DupliquerChefDemande, :3121-3124).
+        var colChef = await RelancesRsurv.ColonnesAsync(geste, "v2.CHEF_DEMANDE", ct);
+        if (colChef.Contains("CHFDM_ID_INSTN"))
+        {
+            var autres = colChef.Where(c => c is not ("CHFDM_ID_CHFDM" or "CHFDM_ID_INSTN")).ToArray();
+            var chefs = new List<Dictionary<string, object?>>();
+            await using (var r = await geste.LireAsync($"SELECT {string.Join(", ", autres)} FROM v2.CHEF_DEMANDE WHERE CHFDM_ID_INSTN = @i ORDER BY CHFDM_ID_CHFDM",
+                                                       ct, new SqlParameter("@i", idIp)))
+                while (await r.ReadAsync(ct))
+                    chefs.Add(autres.ToDictionary(c => c, c => r[c] is DBNull ? null : r[c], StringComparer.OrdinalIgnoreCase));
+            foreach (var chef in chefs)
+            {
+                chef["CHFDM_ID_INSTN"] = idJ;
+                await CreationV2.InsererAsync(geste, "v2.CHEF_DEMANDE", "CHFDM_ID_CHFDM", chef.Where(c => c.Value is not null).ToDictionary(c => c.Key, c => c.Value), ct);
+            }
+        }
+
+        // Les parties dupliquees (Partie.DupliquerPartie, numero source neuf, Partie.cs:1412) : « DOIP », « FOIP » (:3126-3136).
+        foreach (var (qualite, valeurs) in parties)
+        {
+            var v = new Dictionary<string, object?>(valeurs, StringComparer.OrdinalIgnoreCase)
+            {
+                ["PRT_ID_INSTN"] = idJ, ["PRT_QUALIF_PARTIE"] = qualite == 'D' ? "DOIP" : "FOIP",
+            };
+            if (colPrt.Contains("PRT_NUMERO_SOURCE")) v["PRT_NUMERO_SOURCE"] = Guid.NewGuid().ToString().ToUpperInvariant();
+            await CreationV2.InsererAsync(geste, "v2.PARTIE", "PRT_ID_PRT", v.Where(x => x.Value is not null).ToDictionary(x => x.Key, x => x.Value), ct);
+        }
+
+        // Les evenements de creation du code affaire, survenus du jour, et leurs editions sur la demande OIPE (:2040-2050).
+        foreach (var eve in (code.Creation ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var idEve = await EcrivainRetourAudience.EvenementSurvenuAsync(geste, idJ, eve, jour, ct);
+            bilans.Add(await EditionsEvenement.CreerAsync(geste, demande.Id, demande.Numero, idEve, ct));
+        }
+
+        // La demande validee : nom, indicatif, numeros « role J role IP », lien 2J (MajListeDemande, :2497-2504).
+        await CreationV2.RattacherAsync(geste, demande, nomCourant, role, $"{role} {ip.Role}", VerrouDemandeV2.SequenceurInstance,
+                                        idJ.ToString(CultureInfo.InvariantCulture), ct);
+        await geste.EcrireAsync("UPDATE v2.DEMANDE SET DMND_DATE_VALIDATION = @m WHERE DMND_ID_DMND = @d", ct,
+            new SqlParameter("@m", geste.Maintenant), new SqlParameter("@d", demande.Id));
+        return (role, null);
+    }
+
     // ------------------------------------------------------------------ LES EVENEMENTS
+
+    /// <summary>Un evenement attendu de l'IP parmi <paramref name="codes"/> (le 1er des futurs, ListeEvenementsProcedureFutursSeuls) :
+    /// son id, son code, son numero source.</summary>
+    private sealed record Futur(int Id, string Code, string? Source);
+
+    private static async Task<Futur?> FuturAsync(GesteEnCours geste, int idInstance, string codes, CancellationToken ct)
+    {
+        var colEve = await RelancesRsurv.ColonnesAsync(geste, "v2.EVENEMENT_PROCEDURE", ct);
+        await using var r = await geste.LireAsync($"""
+            SELECT TOP (1) EVNPR_ID_EVNPR, EVNPR_CODE_EVE_PRO,
+                   {(colEve.Contains("EVNPR_NUMERO_SOURCE") ? "EVNPR_NUMERO_SOURCE" : "CAST(NULL AS varchar(40))")} AS Source
+            FROM v2.EVENEMENT_PROCEDURE
+            WHERE EVNPR_ID_INSTN = @i AND EVNPR_CODE_EVE_PRO IN ({codes}) AND ISNULL(EVNPR_SURVENU, 0) = 0 AND ISNULL(EVNPR_DELAI_EXPIRE, 0) = 0
+            ORDER BY EVNPR_NUM_ORDRE, EVNPR_ID_EVNPR
+            """, ct, new SqlParameter("@i", idInstance));
+        if (!await r.ReadAsync(ct)) return null;
+        return new Futur(Convert.ToInt32(r["EVNPR_ID_EVNPR"], CultureInfo.InvariantCulture), FormeLigne.Texte(r, "EVNPR_CODE_EVE_PRO").Trim(),
+                         FormeLigne.Texte(r, "Source") is { Length: > 0 } s ? s : null);
+    }
+
+    /// <summary>L'echeance d'EcrivainSurveillanceIp pour un evenement attendu de cette IP (ExpirerAsync, CreerOpAsync).</summary>
+    private static EcrivainSurveillanceIp.Echeance Echeance(Futur f, int idInstance, EtatIp ip, string nom)
+        => new(f.Id, f.Code, true, f.Source, idInstance, ip.Role, nom, ip.Affaire);
+
+    /// <summary>Le code « expire » d'un code d'evenement (R_CODEEVEPRO_CODE_EVE_PRO_EXPIRE : ISIGNI -> IPNAV, IPCONSOPOS -> IPCAD dans
+    /// RIG_DEV) ; null sans code.</summary>
+    private static async Task<string?> CodeExpireAsync(GesteEnCours geste, string code, CancellationToken ct)
+        => await RelancesRsurv.Scalaire(geste, "SELECT R_CODEEVEPRO_CODE_EVE_PRO_EXPIRE FROM v2.CODE_EVE_PRO WHERE R_CODEEVEPRO_VALEUR = @c", ct,
+                                        new SqlParameter("@c", code)) is string { Length: > 0 } x && x.Trim().Length > 0 ? x.Trim() : null;
 
     /// <summary>L'evenement attendu <paramref name="code"/> de l'instance SURVIENT a <paramref name="date"/> (PasserEnSurvenuEveProFutur,
     /// EvenementProcedure.cs:1968-1997 : dates mini, maxi et fixe effacees, texte a reconstruire) ; sans evenement attendu, il est

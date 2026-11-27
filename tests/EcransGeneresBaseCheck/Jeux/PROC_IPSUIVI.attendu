@@ -4,6 +4,11 @@
 # survenue), 1801501 rien de signifie (signification seulement attendue ; ordonnance prevue : sa date prevue).
 # 1801601 a 1801605 : les IP du desistement (PROC_IPSUIVI.sql, EcrivainSuiviIp, 27/11/2026), les plus recentes en tete.
 # Lot 8 (27/11) : les IP 18017xx de PROC_IPSUIVI.sql (signification, opposition, LRAR, ancienne loi).
+# lot 8 (27/11/2026) : les IP 18019xx de PROC_IPSUIVI.sql et l'instance au fond ou l'OP que PROC_IPSUIVI.gestes cree (provision, caducite)
+IP 2026IP81904 · SECOND EXECUTOIRE | ordonnance du {J-20} | Injonctions de payer | AFaire | []
+IP 2026IP81903 · PROVISION FORCEE | ordonnance du {J-20} · signification {J-15} · opposition {J-10} | Injonctions de payer | EnCours | []
+IP 2026IP81902 · PROVISION CADUQUE SANS OP | ordonnance du {J-20} · signification {J-15} · opposition {J-10} | Injonctions de payer | EnCours | []
+IP 2026IP81901 · CREANCIER RHO c/ DEBITEUR RHO | ordonnance du {J-20} · signification {J-15} · opposition {J-10} | Injonctions de payer | EnCours | []
 IP 2021IP81707 · ANCIENNE LOI A TEMPS | ordonnance du 01/06/2021 | Injonctions de payer | AFaire | []
 IP 2021IP81706 · ANCIENNE LOI HORS DELAI | ordonnance du 01/06/2021 | Injonctions de payer | AFaire | []
 IP 2026IP81704 · OPPOSER TROP TOT | ordonnance du {J-20} · signification 10/01/2099 | Injonctions de payer | EnCours | []
