@@ -599,6 +599,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
                     ["Code", "Libellé"]),
                 new MarcheEcran("Entrée du glossaire", "Le code (fixé une fois enregistré) et le texte associé sont obligatoires, la description facultative. Une entrée privée n'appartient qu'à vous ; une entrée publique ne redevient pas privée. La liste montre le glossaire public.", false,
                     // Le code et la description sont les cellules de la ligne : la section ne porte que ce que la grille n'a pas.
+                    // fix-ok: mesure a l'ecran le 27/11/2026 (bureau cache, « Ajouter » de l'onglet Glossaire) -- deux champs Code et deux
+                    // Libelle : sous une ligne neuve, FormeReferentiel.tsx (sectionsNeuves) montre les champs de SectionsAjout tels quels, sans
+                    // ecarter ceux qui sont deja des colonnes (estColonne ne vaut que pour une ligne modifiee) ; la section ne les nomme plus.
                     [Champ.Zone("Texte associé"), Champ.Case("Privé")]),
                 new MarcheEcran("Fonctions avancées", "Outils techniques de la rédaction, dans un onglet à part.", false,
                     ["Fonctions avancées"]),
