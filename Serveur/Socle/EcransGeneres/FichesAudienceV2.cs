@@ -93,8 +93,11 @@ internal static class FichesAudienceV2
     // (ProcedureCollective.ListeJuges_PCFiltre(fonction, false), ProcedureCollective.cs:2227-2230) : « civilite nom prenom », sans
     // civilite pour ND et PM ; en section sanction (AUDNC_SECTION = « CPC.S » d'une audience qui a une chambre, :69-73), le premier
     // mandataire en mission de la PC dans les fonctions LIQ, RDC, LQJ, MDJ, MJ -- son nom, precede de sa civilite collee quand elle vaut
-    // ND ou PM : c'est le texte de RIG v2 tel quel (:96-100). EN MODE PC (PREAUDPC : « Mode » = Procédures collectives,
-    // PROC_PREAUD.cs:24 ; l'Id de la ligne porte alors LecteurPreparationAudience.SuffixePc), deux colonnes de plus (:57-59, :119-154) :
+    // ND ou PM : c'est le texte de RIG v2 tel quel (:96-100) ; « premier » dans l'ordre de la liste de la PC (ListeMandatairePC_PC,
+    // chargee par GetListeMandataireFromPC, MandatairePC_PC.cs:257 : GRRPC_FONCTION_PC DESC, GRRPC_NUM_ORDRE, GRRPC_ID_GRRPC).
+    // fix-ok: contrôle du lot 7 (27/11/2026) -- la colonne prenait le mandataire du plus petit identifiant (ORDER BY GRRPC_ID_GRRPC), pas
+    // le premier de la liste de RIG v2 ; mesure : PROC_PREAUD.gestes, bloc 8 rouge (« LIQPREMIER » lu au lieu de « MDJRANG1 »).
+    // EN MODE PC (PREAUDPC : « Mode » = Procédures collectives, PROC_PREAUD.cs:24 ; l'Id de la ligne porte alors LecteurPreparationAudience.SuffixePc), deux colonnes de plus (:57-59, :119-154) :
     // « Mandataire Judiciaire » = les organes en mission de la PC de l'instance dans les fonctions MDJ, MJ, LIQ, LQJ, RDC, et
     // « Administrateur Judiciaire » = ceux de la fonction ADJ, dans l'ordre de la liste de la PC (GetListeMandataireFromPC,
     // MandatairePC_PC.cs:257 : GRRPC_FONCTION_PC DESC, GRRPC_NUM_ORDRE, GRRPC_ID_GRRPC) ; chacun « nom complement/ » passe par Trim,
@@ -119,7 +122,7 @@ internal static class FichesAudienceV2
                               FROM v2.GERER_PC AS g JOIN v2.MANDATAIRE_PC AS mp ON mp.MNDPC_ID_MNDPC = g.GRRPC_ID_MNDPC
                               WHERE g.GRRPC_ID_PRCLL = i.INSTN_ID_PRCLL AND g.GRRPC_FONCTION_PC IN ('LIQ', 'RDC', 'LQJ', 'MDJ', 'MJ')
                                 AND g.GRRPC_FIN_MISSION = 0
-                              ORDER BY g.GRRPC_ID_GRRPC)
+                              ORDER BY g.GRRPC_FONCTION_PC DESC, g.GRRPC_NUM_ORDRE, g.GRRPC_ID_GRRPC)
                         ELSE (SELECT TOP (1) CASE WHEN j.JUG_CIVILITE IN ('ND', 'PM') THEN '' ELSE ISNULL(j.JUG_CIVILITE, '') + ' ' END
                                              + j.JUG_NOM + ' ' + ISNULL(j.JUG_PRENOM, '')
                               FROM v2.ETRE_JUGE_COMM AS ej JOIN v2.JUGE AS j ON j.JUG_ID_JUG = ej.ETJCM_ID_JUG

@@ -34,7 +34,13 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// cree, sur chaque instance dont l'appel n'a pas deja une decision deliberee (:1189), une DECISION_JUDICIAIRE neuve avec sa
 /// « Date prévue » : AffectDecisionJudiciaireDirect (PROC_MJUDS.cs:1587-1593), ecrite par EcrivainMiseAuPointChambres.CreerDecisionAsync,
 /// avec la MESURE du type lie au type de decision quand il en porte un (AffectDecisionJudiciaire et GetMesureSaisie,
-/// PROC_MJUDS.cs:1499-1509, :1365-1373 ; R_TYPEDECISI_TYPE_MESURE_LIE, OPE_DECISION_JUDICIAIRE_MJUDS.cs:487-494).
+/// PROC_MJUDS.cs:1499-1509, :1365-1373 ; R_TYPEDECISI_TYPE_MESURE_LIE, OPE_DECISION_JUDICIAIRE_MJUDS.cs:487-494), et son EDITION
+/// (GenererLesDemandesEdition, PROC_MJUDS.cs:1260-1271 ; DecisionJudiciaire.CreateDemandeEdition, DecisionJudiciaire.cs:1656-1678) :
+/// le reglage d'edition du type, ecrit par EcrivainMiseAuPointChambres.EditionDecisionAsync (son en-tete : L'EDITION DE LA DECISION,
+/// meme liste de destinataires), sans code-barre (aucune case a l'ecran ; cachee en lot, OPE_DECISION_JUDICIAIRE_MJUDS.cs:629) ; un type sans reglage, ou
+/// dont le reglage manque, n'en a pas. Elle se rattache a la demande MJUDS de l'instance et passe avant les editions des evenements
+/// (:1272-1281). La decision n'a pas de juge (non saisi a l'ecran) : la regle de signature dematerialisee qui coupe l'impression
+/// (JUG_SIGNATURE_DEMAT_TYPE_INSTANCES, :1265-1267) ne s'applique pas.
 /// Mesure du 26/11/2026 (SQL-DEV\DEV, RIG_DEV) : aucun des 250 codes de renvoi n'y est prononce ni delibere, l'etape n'y est jamais ouverte.
 /// L'EVENEMENT DU CODE au renvoi : PROC_MJUDS cree l'evenement survenu du code a la date de l'audience (OPE_RESULTAT.cs:857-908) et,
 /// par lui, son evenement FUTUR lie (OPE_EVENEMENT.cs:1587-1608), puis les copie sur chaque instance (AffectEvenementProcedure,
@@ -75,10 +81,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   - le CALENDRIER de procedure (PROC_MJUDS.cs:1163-1174 ; AffectCalendrier, :1461-1497) : RIG v2 recopie la LISTE des etapes que
 ///     l'agent a saisies (GetEtapesCalendrierSaisies, :1313-), une operation par etape. Un ecran genere ne saisit pas de sous-liste
 ///     (web/src/ecrans/formes/commun.tsx:374) : sans cette saisie, il n'y a pas de calendrier a ecrire ;
-///   - l'EDITION DE LA DECISION creee au renvoi (GenererLesDemandesEdition, PROC_MJUDS.cs:1261-1271 ; DecisionJudiciaire.
-///     CreateDemandeEdition, DecisionJudiciaire.cs:1640-) : son reglage vient du type de decision et ses destinataires sont tous ceux de
-///     l'instance, parties comprises, que la V3 ne reprend pas. Mesure du 26/11/2026 (RIG_DEV) : aucun code de renvoi n'ouvre la
-///     decision, ce cas n'y arrive pas ;
+///   - le choix d'une maquette pour un type de decision sans reglage d'edition (GetCodeMaquetteSaisi, PROC_MJUDS.cs:1343-1352) : sans
+///     champ a l'ecran, aucune edition, comme RIG v2 quand rien n'est choisi (EcrivainMiseAuPointChambres, meme limite) ;
 ///   - la reponse RPVA aux demandes de renvoi (OPE_RESULTAT.cs:627-650) : service externe ; le controle des deliberes repousses et
 ///     son courriel a la hotline (:571-603) : courriel externe.
 /// </summary>
@@ -234,7 +238,9 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
         var ids = new List<string>();
         var decisions = 0;
         var dejaAppelees = new List<string>();
-        var editions = new List<(string Role, int IdDemande, EditionsEvenementV2.Edition Edition)>();
+        // Rang : 0 l'edition d'une decision, 1 celle d'un evenement -- pour une instance, RIG v2 met les decisions avant les
+        // evenements (GenererLesDemandesEdition, PROC_MJUDS.cs:1260-1270 puis :1272-1281).
+        var editions = new List<(string Role, int Rang, int IdDemande, EditionsEvenementV2.Edition Edition)>();
         foreach (var a in appels)
         {
             var (trace, evenement) = await PoserResultatAsync(geste, a, code, avecFutur: true, ct);
@@ -249,7 +255,9 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
                     return IssueGeste.Refuser(facture);
                 var calcul = await EditionsEvenementV2.CalculerAsync(geste, demande.Instance.Editions, eve, "le renvoi", ct);
                 if (calcul.NonRepris is { } nonRepris) return IssueGeste.Refuser(nonRepris);
-                editions.AddRange(calcul.Editions.Select(e => (a.Role, demande.Id, e)));
+                // Sans groupage automatique, pour les editions des evenements seulement (PROC_MJUDS.cs:1278).
+                foreach (var e in calcul.Editions) e.Colonnes["DMNED_GROUPAGE_AUTOMATIQUE"] = false;
+                editions.AddRange(calcul.Editions.Select(e => (a.Role, 1, demande.Id, e)));
             }
             // Le prochain appel, sauf a une instance deja appelee a une audience a venir (PROC_MJUDS.cs:1176-1182).
             if (idProchaine is { } adnc)
@@ -260,16 +268,22 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
             // Pas de seconde decision sur un appel deja delibere (DecisionsJudiciairesDeliberés, PROC_MJUDS.cs:1189).
             if (saisiType.Length > 0 && await DelibereesAsync(geste, a.Id, ct) == 0)
             {
-                traces.AddRange((await EcrivainMiseAuPointChambres.CreerDecisionAsync(geste, a.IdInstance, a.Role, saisiType, datePrevue, mesureLiee, ct)).Traces);
+                var decision = await EcrivainMiseAuPointChambres.CreerDecisionAsync(geste, a.IdInstance, a.Role, saisiType, datePrevue, mesureLiee, ct);
+                traces.AddRange(decision.Traces);
                 decisions++;
+                // L'edition de la decision (DecisionJudiciaire.CreateDemandeEdition, PROC_MJUDS.cs:1262-1270 : sans code-barre ni
+                // maquette choisie en lot), rattachee a la demande MJUDS de l'instance ; la meme que la mise au point des chambres.
+                if (await EcrivainMiseAuPointChambres.EditionDecisionAsync(geste, saisiType, decision.NumeroSource, ct) is { } edition)
+                    editions.Add((a.Role, 0, demande.Id, edition));
             }
         }
         // Les editions dans la file, instance par instance dans l'ordre des roles (InstanceModifieurs.OrderBy(INSTN_NUM_ROLE),
-        // PROC_MJUDS.cs:1259), sans groupage automatique (:1278).
+        // PROC_MJUDS.cs:1259), la decision avant les evenements (:1260-1281).
+        // fix-ok: contrôle du lot 7 (27/11/2026) -- « Renvoyer » créait la décision sans son édition (GenererLesDemandesEdition,
+        // PROC_MJUDS.cs:1260-1271) ; mesure : PROC_RETAUD.gestes, bloc commenté 31 rouge (« 2 éditions », aucune DECI_JUDICIAIRE).
         var deposees = new Dictionary<int, List<int>>();
-        foreach (var (_, idDemande, e) in editions.OrderBy(x => x.Role, StringComparer.Ordinal))
+        foreach (var (_, _, idDemande, e) in editions.OrderBy(x => x.Role, StringComparer.Ordinal).ThenBy(x => x.Rang))
         {
-            e.Colonnes["DMNED_GROUPAGE_AUTOMATIQUE"] = false;
             var depot = await EditionsEvenementV2.DeposerAsync(geste, idDemande, e, ct);
             if (!deposees.TryGetValue(idDemande, out var liste)) deposees[idDemande] = liste = [];
             liste.Add(depot.Id);

@@ -71,12 +71,15 @@ Ordre des affaires › Affaires dans l'ordre d'appel › 3 = 2026J17673 |  | PRE
 # 8. En SECTION SANCTION (AUDNC_SECTION « CPC.S » d'une audience qui a une chambre, :69-73) : le premier mandataire en mission
 #    parmi LIQ, RDC, LQJ, MDJ, MJ -- l'administrateur ADJ et le MDJ en fin de mission sont écartés, le JCT de la PC aussi --, sa
 #    civilité PM collée à son nom, comme RIG v2 l'écrit (:96-100). Jumeau : bloc 9 (même PC, sans chambre : son JCT).
+#    Le « premier » est celui de la liste de la PC (MandatairePC_PC.cs:257 : fonction décroissante, rang, identifiant) : pour
+#    2026J17678, le MDJ du rang 1 passe avant le MDJ du rang 2 et avant le LIQ, qui a pourtant le plus petit identifiant.
 geste: Decider Valider
 ids: 1703131
 resultat: refuse
 message: Audience du 18/12/2001 à 09:00 - Chambre Numérotation simple (P17S) : Les numéros d'appel ont déjà été attribués. Vous pouvez cependant relancer le calcul en cochant la case appropriée.
 fiche: 1703131
 Ordre des affaires › Affaires dans l'ordre d'appel › 1 = 2026J17674 | PMSELARL LIQUIDA | PREP SANCTION |  |  | 01_001
+Ordre des affaires › Affaires dans l'ordre d'appel › 2 = 2026J17678 | MDJRANG1 | PREP SANCTION ORDRE |  |  | 01_002
 ---
 # 9. Section « CPC.S » mais SANS chambre : RIG v2 ne lit la section que si l'audience a une chambre (audienceCabinet.chambre !=
 #    null, :69-73) -- pas de sanction, le JCT de la même PC (jumeau du bloc 8).
