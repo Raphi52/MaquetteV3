@@ -13,12 +13,18 @@
 // de la couleur de son filet, signature en avatar d'initiales, pied. Sans « Aller a… » : une actualite
 // se retire seule apres 1 a 30 jours (Metier/Actualites.cs), la liste en compte quelques-unes. La
 // redaction (gauche), « Publier » et « Retirer » ne changent pas.
+//
+// SOURCE RIG v2 (27/11/2026, plan « RIG v3 100 % fonctionnel », lot 20) : RIG v2 lit et saisit ses actualites dans la base
+// COMMUNE (COMMUN_RIG.NEWS_RIG, NEWS_RIG_GREFFE : RigAccueil\News\NewsRig.cs:185-204, PROC_RigClientNewsRig), absente de la
+// base V3 du greffe. Une note le dit au-dessus de la liste (vue.sourceV2, Pont/EcranActualites.cs), et les deux actualites
+// de depart semees par l'accueil (DepotActualites.Exemples) portent la mention « exemple ».
 // fix-ok: application du socle des listes modernes en plusieurs pas, pas un correctif.
 
 import { useEffect, useRef, type TextareaHTMLAttributes } from 'react'
 import { appeler } from '../pont'
 import { Saisie, useSession, type PontDeSession, type VueDeSession } from '../session'
 import { CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, type Teinte } from '../composants/ListeModerne'
+import { Exemple } from './formes/commun'
 
 /** La pastille du type : la teinte la plus proche de la couleur de son filet (rig-charte.css, .rig-actualite__type--…).
  *  Le socle n'a pas de dore : Procedure prend l'orange, comme Panne. Le tableau d'avant les montrait deja en deux
@@ -49,6 +55,8 @@ export interface LigneActualite {
   horodatage: string
   /** « dd/MM », ou « — » pour une actualite epinglee. */
   retire: string
+  /** Une des deux actualites de depart (DepotActualites.Exemples) : marquee « exemple ». */
+  exemple?: boolean
 }
 
 export interface VueActualites extends VueDeSession {
@@ -63,6 +71,8 @@ export interface VueActualites extends VueDeSession {
   statutRendu: string
   cheminPartage: string
   liste: LigneActualite[]
+  /** Ou RIG v2 tient ses actualites et pourquoi elles ne sont pas lues (SessionActualites.SourceV2). */
+  sourceV2?: string
 }
 
 const pont: PontDeSession<VueActualites> = {
@@ -166,6 +176,7 @@ export function EcranActualites() {
         <EnteteListe titre="Actualites publiees" detail={vue.cheminPartage}
                      synthese={<><b>{n}</b>{n > 1 ? ' actualites · ' : ' actualite · '}<b>{epinglees}</b>{epinglees > 1 ? ' epinglees · ' : ' epinglee · '}
                        <b>{alertes}</b>{alertes > 1 ? ' alertes' : ' alerte'}</>} />
+        {vue.sourceV2 && <p className="rig-eg-note" role="note">{vue.sourceV2}</p>}
 
         <div className="rig-table-cadre">
           <table className="rig-table rig-lm-table">
@@ -188,7 +199,7 @@ export function EcranActualites() {
               {vue.liste.map((b, i) => (
                 <tr key={i}>
                   <td title={b.libelle}><Pastille teinte={TeinteType[b.filet] ?? 'gris'}>{b.libelle}</Pastille></td>
-                  <td title={b.titre}><b>{b.titre}</b></td>
+                  <td title={b.titre}><b>{b.titre}</b>{b.exemple && <> <Exemple /></>}</td>
                   <td title={b.message}>{b.message}</td>
                   <CelluleIdentite nom={b.auteur} titre={b.auteur} />
                   <td className="rig-table__mono">{b.horodatage}</td>

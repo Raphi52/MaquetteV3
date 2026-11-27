@@ -7,6 +7,10 @@ describe('criteres (gestes communs des ecrans de recherche)', () => {
     expect(dateCourte('2024-11-08')).toBe('08/11/2024')
   })
 
+  it('dateCourte d\'une date absente reste vide (une ligne lue en base sans date d\'audience), jamais « undefined/undefined/ »', () => {
+    expect(dateCourte('')).toBe('')
+  })
+
   it('contientSansCasse ignore la casse comme OrdinalIgnoreCase, pas l\'ordre des lettres', () => {
     expect(contientSansCasse('SARL BOULANGERIE DUVAL', 'boulang')).toBe(true)
     expect(contientSansCasse('2026J00121', 'j001')).toBe(true)

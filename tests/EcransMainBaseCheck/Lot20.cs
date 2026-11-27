@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -5,6 +6,7 @@ using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using RigV3.Contrats.EcransMain;
 using RigV3.Serveur.Socle.EcransMain;
+using RigV3Desktop;
 using RigV3Desktop.Pont;
 
 // Banc du LOT 20 du plan « RIG v3 100 % fonctionnel » (27/11/2026), joue a la fin de Program.cs sur la meme base jetable et le
@@ -14,9 +16,14 @@ using RigV3Desktop.Pont;
 //   C. « Archivage / radiation » (LectureArchivage) : dates, type RCS de RIG v2, liste, « Historique des FORMALITES » ;
 //   D. « Coffre-fort » (LectureCoffreFort) : l'historique DEMAT_CFEC, son ordre et ses couleurs ;
 //   E. « Commandes web » (LectureCommandesWeb) : la lecture, et les gestes qui ecrivent REFUSES, rien d'ecrit ;
-//   F. « Mon accueil » (LectureParametresAccueil) : les reglages RIG v2 de l'agent appelant, et de lui seul.
+//   F. « Mon accueil » (LectureParametresAccueil) : les reglages RIG v2 de l'agent appelant, et de lui seul ;
+//   G. « Actualites » : RIG v2 les tient dans la base COMMUNE (COMMUN_RIG.NEWS_RIG), absente de la base V3 du greffe ; l'ecran
+//      le dit, et ses deux actualites de depart (DepotActualites.Exemples) sont marquees « exemple ».
 // Chaque section : la lecture, la route par le vrai serveur, le pont (base, demonstration, panne).
 // Identifiants : a partir de 3 000 000 ((10 + 20) x 100 000, regle du plan).
+// fix-ok: controles ajoutes apres la relecture du lot 20, chacun vu ROUGE avant sa correction (27/11) : non-opposition en base
+// (l'etape montrait « Certificat non delivre : la date de la commande est posterieure a la date de travail », motif tire de la
+// demonstration), actualites (2 echecs : ni la source COMMUN_RIG.NEWS_RIG, ni la marque « exemple »).
 
 /// <summary>Ce que Program.cs prete au banc du lot 20.</summary>
 internal sealed record BancLot20(Func<string, (string Nom, object? Valeur)[], Task> ExecuterSql, Action<bool, string> Verifier, string Connexion,
@@ -46,6 +53,7 @@ internal sealed record BancLot20(Func<string, (string Nom, object? Valeur)[], Ta
         await CoffreFortAsync();
         await CommandesWebAsync();
         await ParametresAccueilAsync();
+        Actualites();
     }
 
     // ============================================================ A. RECHERCHE BODACC (palette Ctrl K)
@@ -333,6 +341,25 @@ internal sealed record BancLot20(Func<string, (string Nom, object? Valeur)[], Ta
         Exiger(saisie is { Message.Texte: SessionCommandesWeb.SansEcriture } && saisie.Tuiles.Sum(t => t.Nombre) == 2,
             "pont Commandes web branche : la saisie au guichet refuse aussi, aucune commande neuve en memoire");
         EcranCommandesWeb.Fermer(vue.Session);
+
+        // Un certificat de non-opposition (famille 13) : cocher un type lance le controle de delivrance, qui cherche
+        // l'entreprise du SIREN. En base, cette recherche n'est pas reprise : l'etape le dit, au lieu du rejet « aucune
+        // entreprise ne correspond au SIREN » tire des entites de demonstration (TraitementCommandes.Entites).
+        await Sql("""
+            INSERT INTO v2.COMMANDE_WEB VALUES
+                (3000404, '60324-BANC4', '60324-BANC4-1', '20261002 08:30', 13, 'CNO', 'IG', '412700004', 'DELTA BASE SA', NULL, 'A', NULL, NULL);
+            """, []);
+        var cno = await EcranCommandesWeb.OuvrirAsync(Client, Greffe);
+        EcranCommandesWeb.Agir(cno.Session, "Choisir", Valeur(3000404));
+        var coche = EcranCommandesWeb.Agir(cno.Session, "SousType", Valeur(new { valeur = "ReductionCapital", coche = true }));
+        var etapeCno = coche.Panneau?.Etapes.SingleOrDefault(e => e.Nom == "Type de certificat de non-opposition");
+        // Le cadre « Controle de delivrance » dit la MEME raison ; il disait « Cochez un type de certificat », type pourtant coche.
+        Exiger(etapeCno is { Faite: false, Manque: SessionCommandesWeb.SansControleDelivrance }
+               && coche.Panneau?.NonOpposition is { Controle: null, SansControle: SessionCommandesWeb.SansControleDelivrance },
+            "pont Commandes web branche, non-opposition : le controle de delivrance n'est pas joue sur la demonstration ; l'etape dit pourquoi (vu : "
+            + (etapeCno?.Manque ?? "aucune etape") + ")");
+        EcranCommandesWeb.Fermer(cno.Session);
+        await Sql("DELETE FROM v2.COMMANDE_WEB WHERE CMDWB_ID_CMDWB = 3000404;", []);
         var demo = await EcranCommandesWeb.OuvrirAsync(null, null);
         Exiger(demo is { Mode: "demo" } && demo.Tuiles.Sum(t => t.Nombre) > 0,
             "pont Commandes web sans serveur : la demonstration, mode « demo » (tests/CommandesWebCheck la joue)");
@@ -384,6 +411,30 @@ internal sealed record BancLot20(Func<string, (string Nom, object? Valeur)[], Ta
             "pont Mon accueil sans serveur : mode « demo » (l'ecran garde ses reglages d'exemple)");
         Exiger((await EcranParametresAccueil.ReglagesAsync(Client, GreffeAbsent)) is { Mode: "erreur", Message: not null },
             "pont Mon accueil, greffe absent : le motif");
+    }
+
+    // ============================================================ G. ACTUALITES (Pont/EcranActualites.cs)
+    // Rien a lire dans la base du greffe : RIG v2 lit (NewsRig.cs:185-204) et saisit (PROC_RigClientNewsRig, ETP_SAISIE_NEWS.cs:157-160)
+    // ses actualites dans la base commune. Le depot jetable porte les deux exemples de depart ET une actualite redigee.
+    private void Actualites()
+    {
+        var dossier = Directory.CreateTempSubdirectory("rigv3-lot20-actualites-");
+        try
+        {
+            var depot = new DepotActualites { CheminPartage = Path.Combine(dossier.FullName, "partage.json"), CheminCache = Path.Combine(dossier.FullName, "cache.json") };
+            var maintenant = DateTime.Now;
+            Exiger(depot.Ecrire([.. DepotActualites.Exemples(maintenant),
+                                 new Actualite("banc-l20", "Fermeture jeudi", "Le greffe ferme a 16 h.", "attente", "Greffe", maintenant.AddMinutes(-1), null)]),
+                "Actualites : le depot jetable est ecrit");
+            var vue = EcranActualites.Ouvrir(depot);
+            Exiger(vue.SourceV2 == SessionActualites.SourceV2 && vue.SourceV2.Contains("COMMUN_RIG.NEWS_RIG") && vue.SourceV2.Contains("absente de la base V3"),
+                "Actualites : l'ecran nomme la table de RIG v2 (COMMUN_RIG.NEWS_RIG) et pourquoi elle n'est pas lue");
+            Exiger(vue.Liste.Where(l => l.Exemple).Select(l => l.Titre).Order().SequenceEqual(DepotActualites.Exemples(maintenant).Select(a => a.Titre).Order())
+                   && vue.Liste.Single(l => l.Titre == "Fermeture jeudi").Exemple == false,
+                "Actualites : les deux actualites de depart sont marquees « exemple », celle redigee ne l'est pas");
+            EcranActualites.Fermer(vue.Session);
+        }
+        finally { dossier.Delete(recursive: true); }
     }
 
     /// <summary>Le SQL du banc, sur la base du greffe (Program.cs, Sql).</summary>

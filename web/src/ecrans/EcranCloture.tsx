@@ -230,6 +230,9 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
   // Les chiffres de la tete, des cartes et du pied : sur la liste affichee.
   const forfaits = trouvees.reduce((s, l) => s + forfaitDe(l), 0)
   const forfaitMax = trouvees.reduce((m, l) => Math.max(m, forfaitDe(l)), 0)
+  // En base, aucun montant de forfait : la seule donnee est la case « Forfait » de RIG v2 (PRCLL_FORFAIT_FACTURE,
+  // Pont/EcranClotureBase.cs). La tete, la carte et le pied la COMPTENT, au lieu d'un « 0,00 € » qui serait faux.
+  const auForfait = trouvees.filter((l) => l.auForfait === true).length
   const aFacturer = trouvees.filter((l) => l.aFacturer).length
   const depassees = trouvees.filter(enRetard).length
   const parClassement = (c: string) => trouvees.filter((l) => l.classement === c)
@@ -303,11 +306,14 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
 
         <EnteteListe titre={etapeSelection ? 'Selection des procedures collectives' : 'Enrolement et requete'}
                      synthese={<>{trouvees.length}{trouvees.length > 1 ? ' affaires' : ' affaire'}{` sur ${enBase ? vue.total : lignes.length} · `}
-                       <b>{aFacturer}</b>{' a facturer · forfaits '}<b>{montant(forfaits)}</b></>}
+                       <b>{aFacturer}</b>{' a facturer · '}
+                       {enBase ? <><b>{auForfait}</b>{' au forfait'}</> : <>{'forfaits '}<b>{montant(forfaits)}</b></>}</>}
                      filtre={{ valeur: critAffaire, changer: setCritAffaire, indication: 'Aller a une affaire…',
                                valider: () => { if (trouvees.length === 1) ouvrirDossier(trouvees[0]!.dossier) } }} />
 
         <CartesChiffrees cartes={[
+          enBase ? { cle: 'au-forfait', titre: 'Au forfait', valeur: auForfait, complement: `sur ${trouvees.length}`,
+                     anneau: { part: auForfait, total: trouvees.length, teinte: 'ardoise' } } :
           { cle: 'forfaits', titre: 'Forfaits', valeur: montant(forfaits), legende: true,
             ...(critTypes.size > 0 ? { choisir: () => setCritTypes(new Set()), indication: 'Tous les classements' } : {}),
             segments: Classements.map((c) => {
@@ -379,7 +385,7 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
                     {etapeSelection ? (
                       <>
                         <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : ligne.role)} />
-                        <CelluleIdentite nom={ligne.affaire} objet={`${ligne.numPc} · ${ligne.chambre}`}
+                        <CelluleIdentite nom={ligne.affaire} objet={[ligne.numPc, ligne.chambre].filter((t) => t !== '').join(' · ')}
                                          titre={`${ligne.affaire} — ${ligne.numPc} · chambre ${ligne.chambre}`} />
                         <td className="rig-table__mono">{dateCourte(ligne.audience)} {ligne.heureAppel}</td>
                         <td title={ligne.classement}><Pastille teinte={TeinteClassement[ligne.classement] ?? 'gris'}>{ligne.classement}</Pastille></td>
@@ -437,7 +443,7 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
 
         <PiedListe aide="Clic sur une ligne pour ouvrir le dossier.">
           <span><b>{trouvees.length}</b>{trouvees.length > 1 ? ' affaires affichees' : ' affaire affichee'}</span>
-          <span>Forfaits <b>{montant(forfaits)}</b></span>
+          {enBase ? <span>Au forfait <b>{auForfait}</b></span> : <span>Forfaits <b>{montant(forfaits)}</b></span>}
           <span>A facturer <b>{aFacturer}</b></span>
           <span>Limite depassee <b>{depassees}</b></span>
         </PiedListe>
