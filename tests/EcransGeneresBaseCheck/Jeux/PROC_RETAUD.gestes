@@ -9,12 +9,33 @@ geste: Decider Marquer les décisions comme rendues
 ids: 1700514
 resultat: refuse
 message: « Marquer les décisions comme rendues » ne s'applique qu'aux prononcés non encore traités : le rôle 2026J17014 n'est pas un prononcé.
+# La fiche d'une affaire dépliée (FichesAudienceV2.cs ; colonnes de la grille, OPE_LIST_APPEL_AFFAIRE.cs:581-598 ; données : fin de
+# PROC_RETAUD.sql) : 1700504 porte la décision prononcée avec son document (modèle, minute), un solde de 100 - 30 et une publicité en
+# attente. Jumeau : bloc 2 (1700502 : décision sans document, client en compte, aucune publicité).
+# fix-ok: contrôle final du lot 7 (27/11/2026) -- la fiche n'était lue par aucun écran d'audience (ModuleEcransGeneres.cs:55-56) ;
+# ces relectures (blocs 1, 2, 20 et 23) la tiennent, rouges sans IFicheEcran.
+fiche: 1700504
+Résultat par affaire › Résultat = J
+Résultat par affaire › Modèle de jugement = MOD17
+Résultat par affaire › Numéro de minute = 17M0001
+Facturation › Solde = 70.00
+Publicités › Publicité = en attente
+Décision › Procédure collective =
+Audience › Cabinet =
 ---
 # 2. ... ni sur un appel déjà traité (IsTraite, AppelAffaire.cs:736-739). Jumeau : bloc 5.
 geste: Decider Marquer les décisions comme rendues
 ids: 1700515
 resultat: refuse
 message: « Marquer les décisions comme rendues » ne s'applique qu'aux prononcés non encore traités : le rôle 2026J17015 a déjà le résultat J.
+# Jumeau du bloc 1 : la décision prononcée 1700703 sans document (INNER JOIN de :584-586 : ni modèle ni minute) ; un article d'un client
+# en compte (type C) sur l'affaire : pas de solde (:587-589) ; aucune publicité en attente.
+fiche: 1700502
+Résultat par affaire › Résultat = R17S
+Résultat par affaire › Modèle de jugement =
+Résultat par affaire › Numéro de minute =
+Facturation › Solde =
+Publicités › Publicité =
 ---
 # 3. Audience passée sans composition, chambre qui l'impose (CanDoActions, OPE_LIST_APPEL_AFFAIRE.cs:1356-1369, :1586). Jumeaux :
 #    bloc 5 (audience composée) et bloc 14 (chambre C17B, sans composition obligatoire).
@@ -173,6 +194,10 @@ controle: SELECT APPAF_CODE_PLUMITIF + '/' + APPAF_ETAT_RETOUR FROM v2.APPEL_AFF
 controle: SELECT COUNT(*) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_INSTN = 1700019 AND DCJDC_TYPE_DECISION = 'JGT17R' AND DCJDC_DATE_PREVUE = '20010419' AND DCJDC_NUM_ORDRE = 1 AND DCJDC_CAT_DECISION = 'I' AND LEN(DCJDC_NUMERO_SOURCE) = 36 AND DCJDC_ID_APPAF_DELIBERER IS NULL AND DCJDC_ETAT_VALIDITE = '0' AND DCJDC_REDIGEE_GREFFE = 1 => 1
 controle: SELECT COUNT(*) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_INSTN = 1700020 => 1
 controle: SELECT COUNT(*) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN IN (1700019, 1700020) => 2
+# Relu dans la fiche de l'affaire dépliée : le résultat posé ; pas de prochaine audience (R17P n'en crée pas).
+fiche: 1700519
+Résultat par affaire › Résultat = R17P
+Résultat par affaire › Prochaine audience =
 ---
 # SECOND CONTRÔLE DU LOT 7 : les contrôles de PROC_MJUDS que « Renvoyer » sautait. Données : fin de PROC_RETAUD.sql.
 
@@ -203,6 +228,11 @@ message: 2 affaires renvoyées (R17) à l'Audience du 16/03/2001 à 14:00 - Cham
 controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, ':', APPAF_CODE_PLUMITIF, ':', APPAF_ETAT_RETOUR), ',') WITHIN GROUP (ORDER BY APPAF_ID_APPAF) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF IN (1700522, 1700523) => 1700522:R17:M,1700523:R17:M
 controle: SELECT COUNT(*) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN = 1700023 AND APPAF_ID_ADNC = 1700113 AND APPAF_NUM_ORDRE = 2 AND APPAF_TYPE_CLASSEMENT = 'TC17' AND APPAF_ETAT_RETOUR = 'A' AND APPAF_ID_CMAUD IS NULL AND APPAF_CODE_PLUMITIF IS NULL => 1
 controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, ':', APPAF_ID_ADNC), ',') WITHIN GROUP (ORDER BY APPAF_ID_APPAF) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN = 1700022 => 1700522:1700117,1700525:1700118
+# Relu dans la fiche de l'affaire dépliée : le résultat R17 et la prochaine audience de la grille de RIG v2 (la première audience
+# POSTÉRIEURE où l'instance est appelée, OPE_LIST_APPEL_AFFAIRE.cs:581) -- le 15/01/2099.
+fiche: 1700522
+Résultat par affaire › Résultat = R17
+Résultat par affaire › Prochaine audience = 15/01/2099
 ---
 # 23. Le renvoi prononcé avec un type de décision qui porte une mesure liée (JGT17M -> EXR17) : la décision et sa MESURE
 #     (AffectDecisionJudiciaire et GetMesureSaisie, PROC_MJUDS.cs:1499-1509, :1365-1373). Jumeau : bloc 19 (JGT17R, sans mesure).

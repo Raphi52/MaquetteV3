@@ -32,6 +32,15 @@ ids: 1706011-1706411-1706611-
 valeur: Huissier = 1706999
 resultat: refuse
 message: L'huissier « 1706999 » n'est pas dans la base du greffe.
+# La fiche de l'instance dépliée (FichesAudienceV2.cs) avant toute citation : cochée d'office (solution de citation, ni réception
+# ni NPAI, pas de citation : OPE_CITATIONS.cs:91-95), la LRAR du 01/07/2001, aucune édition. Jumeaux : blocs 5 et 7.
+# fix-ok: contrôle final du lot 7 (27/11/2026) -- la fiche n'était lue par aucun écran d'audience (ModuleEcransGeneres.cs:55-56) ;
+# ces relectures (blocs 4, 5 et 7) la tiennent, rouges sans IFicheEcran.
+fiche: 1706011-1706411-1706611-
+Instances › Case cochée = oui
+Instances › Date de LRAR = 2001-07-01
+Éditions › Citation =
+Éditions › KBIS =
 ---
 # 5. Deux instances : une citation SURVENUE au code CITATION, datée du jour, numéro d'ordre = événements de l'instance + 1
 #    (OPE_CITATIONS.cs:245, Instance.cs:594-596). 1706011 devient « Citée » ; 1706014 (sans retour de LRAR) aussi.
@@ -51,6 +60,10 @@ controle: SELECT STRING_AGG(CONCAT(EVNPR_ID_INSTN, ':', EVNPR_NUM_ORDRE, ':', CA
 controle: SELECT STRING_AGG(CONCAT(DMND_NOM, ':', DMND_CODE_PROSS, ':', DMND_ETAT_DEMANDE, ':', DMND_NUM_INDICATIF, ':', ISNULL(CAST(DMND_ID_DSRCS AS varchar(10)), '-'), ':', ISNULL(CAST(DMND_ID_AFFRE AS varchar(10)), '-')), ',') WITHIN GROUP (ORDER BY DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_NOM LIKE 'GCONV instance 2026J176%' => GCONV instance 2026J17601:GCONV:V:2026J17601:-:-,GCONV instance 2026J17604:GCONV:V:2026J17604:1706731:-
 controle: SELECT STRING_AGG(CONCAT(d.DMND_NUM_INDICATIF, '|', de.DMNED_LIBELLE_DOCUMENT, '|', CAST(de.DMNED_ENVOI_AU_COFFRE AS int), CAST(de.DMNED_IMPRESSION AS int), '|', de.DMNED_PHASE_TRAITEMENT, '|', de.DMNED_CODE_ENTITE_SOURCE, '|', CASE WHEN de.DMNED_VALEUR_ID_SOURCE = c.EVNPR_NUMERO_SOURCE THEN 'citation' ELSE de.DMNED_VALEUR_ID_SOURCE END, '|', de.DMNED_CODE_MAQUETTE, '|', de.DMNED_TYPE_GENERATION, '|', ISNULL(de.DMNED_TYPE_DOCUMENT, '-'), '|', de.DMNED_NOMBRE_EXEMPLAIRE, '|', REPLACE(de.DMNED_LIBELLE_SOURCE, CONVERT(varchar(10), GETDATE(), 103), 'jour')), ',') WITHIN GROUP (ORDER BY de.DMNED_ID_DMNED) FROM v2.DEMANDE_EDITION AS de JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = de.DMNED_ID_DMND OUTER APPLY (SELECT TOP (1) e.EVNPR_NUMERO_SOURCE FROM v2.EVENEMENT_PROCEDURE AS e JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = e.EVNPR_ID_INSTN WHERE e.EVNPR_CODE_EVE_PRO = 'CITATION' AND i.INSTN_NUM_ROLE = d.DMND_NUM_INDICATIF ORDER BY e.EVNPR_ID_EVNPR DESC) AS c WHERE d.DMND_NOM LIKE 'GCONV instance 2026J176%' => 2026J17601|LETTRE HUISS 17B|01|C|EVT_PROC|citation|CIT17B|FUSION_RIG|NOTIF|1|CITATION - jour (EP sans n° ordre),2026J17601|LETTRE HUISS 17B - Coffre|11|C|EVT_PROC|citation|CIT17B|FUSION_RIG|NOTIF|1|CITATION - jour (EP sans n° ordre),2026J17604|LETTRE HUISS 17A|01|C|EVT_PROC|citation|CIT17A|FUSION_RIG|-|2|CITATION - jour (EP sans n° ordre),2026J17604|LETTRE HUISS 17A - Coffre|11|C|EVT_PROC|citation|CIT17A|FUSION_RIG|-|2|CITATION - jour (EP sans n° ordre)
 controle: SELECT CONCAT(SUM(CASE WHEN de.DMNED_PARAMETRE_GENERATION LIKE '%PAR_DEFAUT=&quot;1&quot; CODE=&quot;INST_H&quot; VALEUR=&quot;HUISSIER BANC&quot;%' THEN 1 ELSE 0 END), ':', SUM(CASE WHEN de.DMNED_PARAMETRE_GENERATION LIKE '%PAR_DEFAUT=&quot;1&quot; CODE=&quot;INST_H&quot; VALEUR=&quot;H17%' THEN 1 ELSE 0 END), ':', SUM(CASE WHEN de.DMNED_PARAMETRE_GENERATION LIKE '%VALEUR=&quot;H17INA&quot;%' THEN 1 ELSE 0 END)) FROM v2.DEMANDE_EDITION AS de JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = de.DMNED_ID_DMND WHERE d.DMND_NOM LIKE 'GCONV instance 2026J176%' => 4:0:0
+# Relu dans la fiche de 1706011 : citée, elle n'est plus cochée d'office ; pas de KBIS (case non cochée).
+fiche: 1706011-1706411-1706611-
+Instances › Case cochée =
+Éditions › KBIS =
 ---
 # 6. Une maquette que la V3 ne reprend pas (destinataire demandeur « D », EditionsEvenementV2) : 1706012 (nature REF17) a la maquette
 #    CITATION17C (« +NAREF17 », « D,LRAR ») ; rien n'est écrit, ni citation ni édition. Jumeau : bloc 5 (1706011, même cabinet, que
@@ -73,6 +86,10 @@ resultat: fait
 message: 1 citation par huissier enregistrée (H17COF). 4 éditions placées dans la file des éditions. La copie conforme de l'ordonnance et la facture ne sont pas produites : RIG v2 tire la copie de la GED et facture les articles de la citation par son moteur de facturation, que RIG v3 ne reprend pas.
 controle: SELECT STRING_AGG(CONCAT(de.DMNED_LIBELLE_DOCUMENT, '|', CAST(de.DMNED_ENVOI_AU_COFFRE AS int), CAST(de.DMNED_IMPRESSION AS int), '|', de.DMNED_CODE_ENTITE_SOURCE, '|', CASE WHEN de.DMNED_VALEUR_ID_SOURCE = c.EVNPR_NUMERO_SOURCE THEN 'citation' ELSE de.DMNED_VALEUR_ID_SOURCE END, '|', de.DMNED_TYPE_GENERATION, '|', CASE WHEN de.DMNED_PARAMETRE_GENERATION LIKE '%PAR_DEFAUT=&quot;1&quot; CODE=&quot;INST_H&quot; VALEUR=&quot;H17COF&quot;%' THEN 'H17COF' ELSE '-' END, CASE WHEN de.DMNED_PARAMETRE_GENERATION LIKE '%PAR_DEFAUT=&quot;1&quot; CODE=&quot;INST_H&quot; VALEUR=&quot;H17SIM%' OR de.DMNED_PARAMETRE_GENERATION LIKE '%PAR_DEFAUT=&quot;1&quot; CODE=&quot;INST_H&quot; VALEUR=&quot;H17FUT%' THEN '+autre' ELSE '' END), ',') WITHIN GROUP (ORDER BY de.DMNED_ID_DMNED) FROM v2.DEMANDE_EDITION AS de OUTER APPLY (SELECT TOP (1) e.EVNPR_NUMERO_SOURCE FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_CODE_EVE_PRO = 'CITATION' AND e.EVNPR_ID_INSTN = 1706014 ORDER BY e.EVNPR_ID_EVNPR DESC) AS c WHERE de.DMNED_ID_DMND = (SELECT MAX(DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_NOM = 'GCONV instance 2026J17604') => LETTRE HUISS 17A|10|EVT_PROC|citation|FUSION_RIG|-,KBIS|10|DOSSIER_RCS|1706731|RIG_LOT_UN|-,LETTRE HUISS 17A - Coffre|10|EVT_PROC|citation|FUSION_RIG|H17COF,KBIS|10|DOSSIER_RCS|1706731|RIG_LOT_UN|H17COF
 controle: SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_CODE_EVE_PRO = 'CITATION' AND EVNPR_ID_INSTN = 1706014 => 2
+# Relu dans la fiche de 1706014 : les deux KBIS de ce bloc dans la file (source DOSSIER_RCS, demandes « GCONV instance 2026J17604 »).
+fiche: 1706014-1706414-1706614-
+Instances › Case cochée =
+Éditions › KBIS = 2 éditions dans la file des éditions
 ---
 # 8. « Éditer le Kbis » coché sans dossier RCS : RIG v2 lit node.Dossier sans garde (:442) ; son message pour un dossier
 #    introuvable (:301). La relance de 1706011 est sur la diligence 1706701, sans action. Jumeau : bloc 7 (1706014, dossier 1706731).

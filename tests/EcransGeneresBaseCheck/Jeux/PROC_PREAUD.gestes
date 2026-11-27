@@ -24,6 +24,12 @@ resultat: fait
 message: Numéros d'appel attribués : 4 affaires sur 1 audience. Le plumitif n'est pas généré : RIG v3 n'a pas l'état Crystal qui le produit dans RIG v2.
 controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, '=', APPAF_NUM_APPEL), ',') WITHIN GROUP (ORDER BY APPAF_NUM_APPEL) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_ADNC = 1703120 => 1703523=01_001,1703522=01_002,1703524=02_001,1703521=02_002
 controle: SELECT CAST(AUDNC_NUM_APPEL_ATTRIB AS int) FROM v2.AUDIENCE_CABINET WHERE AUDNC_ID_ADNC = 1703120 => 1
+# La fiche de l'audience dépliée (FichesAudienceV2.cs) : une audience, pas un cabinet. L'ordre des affaires y est une sous-liste
+# (N° rôle, Nom, Heure, Type, N° appel : OPE_ORDRE_INSTANCE.cs:50-59), que ce format ne compare pas : les numéros relus sont au
+# contrôle ci-dessus.
+fiche: 1703120
+Audience › Audience = Audience du 01/10/2001 à 09:00 - Chambre Numérotation par type (P17T)
+Audience › Cabinet =
 ---
 # 4. Une audience « sans type, rôles décroissants » et un cabinet (son code cabinet : sans type, croissant), ensemble. L'instance
 #    dont l'instance principale est au rôle de la même audience se range sous le rôle de celle-ci (Instance.cs:1033-1040).

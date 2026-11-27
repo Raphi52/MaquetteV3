@@ -21,9 +21,13 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// LE GESTE : « Valider » attribue les numeros d'appel (EcrivainPreparationAudience.cs). CE QUE LA V3 NE REPREND PAS : la
 /// generation du plumitif (un etat Crystal, LancerPlumitif), son impression et son envoi par courriel ou au coffre.
 /// </summary>
-internal sealed class LecteurPreparationAudience : IRechercheEcran
+internal sealed class LecteurPreparationAudience : IRechercheEcran, IFicheEcran
 {
     public string Procedure => "PROC_PREAUD";
+
+    /// <summary>La fiche de l'audience ou du cabinet deplie (FichesAudienceV2.cs : ses sections, ses sources V2, ce qu'elle ne lit pas).</summary>
+    public Task<FicheEcran?> LireFicheAsync(SqlConnection baseGreffe, string id, DateTime maintenant, CancellationToken ct)
+        => FichesAudienceV2.PreparationAsync(baseGreffe, Procedure, id, ct);
 
     /// <summary>Les groupes du descripteur (Surveiller.cs), au mot pres.</summary>
     internal const string Audiences = "Audiences", Cabinets = "Cabinets";

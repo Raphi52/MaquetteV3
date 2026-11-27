@@ -21,9 +21,13 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// la PC (loi, modalites, forfait, OPE_NOUV_ETAT_PC...) ne se saisit qu'en affaire unique dans RIG v2 : une PC seule se met a
 /// jour par « Procédures collectives » (PROC_MPC).
 /// </summary>
-internal sealed class LecteurMiseAuPointChambres : IRechercheEcran
+internal sealed class LecteurMiseAuPointChambres : IRechercheEcran, IFicheEcran
 {
     public string Procedure => "PROC_MPCS";
+
+    /// <summary>La fiche de l'affaire depliee (FichesAudienceV2.cs : ses sections, ses sources V2, ce qu'elle ne lit pas).</summary>
+    public Task<FicheEcran?> LireFicheAsync(SqlConnection baseGreffe, string id, DateTime maintenant, CancellationToken ct)
+        => FichesAudienceV2.MiseAuPointAsync(baseGreffe, Procedure, id, ct);
 
     /// <summary>Le groupe du descripteur (Surveiller.cs), au mot pres.</summary>
     internal const string Groupe = "Procédures collectives à l'audience";

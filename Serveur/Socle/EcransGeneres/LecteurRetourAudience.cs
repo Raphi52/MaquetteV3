@@ -26,9 +26,13 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   - REGLE D'ETAT : non traite = « À saisir » (AFaire) ; traite = « Résultat saisi » (Validee) ; publicite en attente =
 ///     « Publicité en attente » (EnAttente).
 /// </summary>
-internal sealed class LecteurRetourAudience : IRechercheEcran
+internal sealed class LecteurRetourAudience : IRechercheEcran, IFicheEcran
 {
     public string Procedure => "PROC_RETAUD";
+
+    /// <summary>La fiche de l'affaire depliee (FichesAudienceV2.cs : ses sections, ses sources V2, ce qu'elle ne lit pas).</summary>
+    public Task<FicheEcran?> LireFicheAsync(SqlConnection baseGreffe, string id, DateTime maintenant, CancellationToken ct)
+        => FichesAudienceV2.RetourAsync(baseGreffe, Procedure, id, ct);
 
     /// <summary>Les groupes du descripteur (Surveiller.cs), au mot pres.</summary>
     internal const string ATraiter = "Affaires à traiter", PrononcesATraiter = "Prononcés à traiter", Traitees = "Affaires traitées",
