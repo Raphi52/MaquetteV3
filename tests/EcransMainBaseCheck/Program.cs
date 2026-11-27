@@ -1648,6 +1648,23 @@ Exiger((await EcranFactures.DemandeDeAsync(client, Greffe, null)) is { Mode: "se
 Exiger(EcranFactures.DateDuJour(client, new DateTime(2026, 11, 27)) == "2026-11-27" && EcranFactures.DateDuJour(null, new DateTime(2026, 11, 27)) != "2026-11-27",
     "date du jour : celle du poste avec un serveur, celle de la demonstration sans");
 
+// BASES GARDEES pour une preuve a l'ecran (meme regle que tests/EcransGeneresBaseCheck/Program.cs, lot 12) : avec RIGV3_BANC_GARDER =
+// <fichier>, le banc ecrit dans ce fichier sa base commune, son greffe et son agent, puis attend que ce fichier disparaisse. Un serveur
+// lance a part sur cette base commune (ConnectionStrings__RigV3) sert alors a l'application les lignes des sections ci-dessus (une
+// facture et ses articles, un encaissement, des banques, aux montants que le banc vient de controler). Le fichier supprime, le banc
+// s'arrete (code 3) et SUPPRIME ses bases (await using). Sans la variable : rien ne change.
+// fix-ok: pas un correctif a l'aveugle -- les retouches du lot 12 sur ce banc sont quatre AJOUTS (banques, encaissements et factures
+// d'un dossier, articles de la facture, ce mode), chacun vert ici et rouge sur son defaut reinjecte (modes non filtres : 2 echecs,
+// couple a solde nul garde : 1, client tarife non filtre : 1) ; seule correction : l'adresse d'un client est rec.ClientAdresse
+// (FichesV3.cs:158, CLIENT_ADRESSE), pas rec.Adresse.
+if (Environment.GetEnvironmentVariable("RIGV3_BANC_GARDER") is { Length: > 0 } garde)
+{
+    await File.WriteAllTextAsync(garde, $"commune={commune.Nom}\ngreffe={Greffe}\nbase={greffe.Nom}\nagent={Agent}\nechecs={echecs.Count}\n");
+    Console.WriteLine($"Bases gardees pour une preuve a l'ecran (commune {commune.Nom}, {echecs.Count} echec(s)) : supprimer {garde} pour les rendre.");
+    while (File.Exists(garde)) await Task.Delay(1000);
+    return 3;
+}
+
 Console.WriteLine();
 if (echecs.Count == 0) { Console.WriteLine("Ecrans faits main branches sur la base : VERT."); return 0; }
 Console.WriteLine(echecs.Count + " echec(s) : " + string.Join(" | ", echecs));
