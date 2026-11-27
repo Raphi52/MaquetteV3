@@ -7,7 +7,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// <summary>
 /// Les EDITIONS d'un evenement de procedure d'une INSTANCE, calculees puis mises dans la file des editions (v2.DEMANDE_EDITION)
 /// comme RIG v2, ecrites ici une seule fois pour tous les ecrivains : les Convocations (lot 7, « Citer par huissier ») et les
-/// lots qui en auront besoin (un evenement ecrit par EvenementsProcedureV2). Plan « RIG v3 100 % fonctionnel », lot 7, 27/11/2026.
+/// lots qui en auront besoin (un evenement ecrit par EvenementsProcedureV2) ; « Renvoyer » du Retour d'audience pour l'evenement
+/// du code et son futur (PROC_MJUDS.cs:1273-1281). Plan « RIG v3 100 % fonctionnel », lot 7, 27/11/2026.
 ///
 /// SOURCE (ancien RIG, Source\Outils\DLL\RigMetier\JUDICIAIRE\EvenementProcedure.cs) :
 ///   - CreateDemandeEdition (:2607-2690), branche INSTANCE : les maquettes CEP_EDITION du code de l'evenement de type « I »
@@ -100,10 +101,11 @@ internal static class EditionsEvenementV2
 
     private const string LotsParametres = ";LOT;LOT_LR;LOT_ILR;LOT_LRAR;LOT_ILRAR;";
 
-    /// <summary>Les editions de l'evenement <paramref name="eve"/> de l'instance <paramref name="inst"/> (voir l'en-tete).</summary>
-    internal static async Task<Calcul> CalculerAsync(GesteEnCours geste, Instance inst, Evenement eve, CancellationToken ct)
+    /// <summary>Les editions de l'evenement <paramref name="eve"/> de l'instance <paramref name="inst"/> (voir l'en-tete) ;
+    /// <paramref name="objet"/> nomme le geste dans le refus (« la citation », « le renvoi ») : a faire dans RIG v2.</summary>
+    internal static async Task<Calcul> CalculerAsync(GesteEnCours geste, Instance inst, Evenement eve, string objet, CancellationToken ct)
     {
-        Calcul Refus(string quoi) => new([], $"{quoi} n'est pas repris par RIG v3 : rien n'est enregistré, faire la citation dans RIG v2.");
+        Calcul Refus(string quoi) => new([], $"{quoi} n'est pas repris par RIG v3 : rien n'est enregistré, faire {objet} dans RIG v2.");
 
         // _GetEditionsCodeBarre (:3176) : seulement pour une piece numerisee.
         if (eve.AvecPieceNumerisee) return Refus($"Le code-barre de la pièce numérisée de l'événement {eve.Code}");

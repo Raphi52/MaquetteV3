@@ -86,26 +86,46 @@ internal static class FichesAudienceV2
     // ------------------------------------------------------------------------------------------------------------------------------
     // PROC_PREAUD (une ligne = une audience ou un cabinet, LecteurPreparationAudience.cs). « Audience » ou « Cabinet » selon
     // AUDNC_AUDIENCE (le mode A / P cherche des audiences, C des cabinets, ETP.cs:54-62). L'ordre des affaires : la liste de RIG v2
-    // (PROC_PREAUD\CALCUL_ORDRE\OPE_ORDRE_INSTANCE.cs:50-59 ses colonnes, :67-99 ses valeurs) -- n° de role et nom courant de
+    // (PROC_PREAUD\CALCUL_ORDRE\OPE_ORDRE_INSTANCE.cs:50-59 ses colonnes, :67-117 ses valeurs) -- n° de role, « Juge », nom courant de
     // l'instance, heure d'appel (APPAF_HEURE_APPEL), type de classement, n° d'appel -- dans l'ordre de AudienceCabinet.AppelAffaires
-    // (:36), celui que lit EcrivainPreparationAudience.cs (par APPAF_ID_APPAF). NON RENDUS : la colonne « Juge » (juge-commissaire,
-    // ou mandataire en section sanction : regle de :67-107 non reprise), les colonnes mandataire et administrateur du mode PC
-    // (:119-154) ; « Options », « Destinataires » et « Génération » sont des choix du plumitif, que la V3 ne genere pas.
-    private static readonly string[] ColonnesOrdre = ["N° rôle", "Nom", "Heure", "Type", "N° appel"];
+    // (:36), celui que lit EcrivainPreparationAudience.cs (par APPAF_ID_APPAF). « JUGE » (:69-107) : hors section sanction, le premier
+    // juge-commissaire titulaire (JCT) en mission de la PC de l'instance, sinon le premier juge-commissaire (JC), par numero d'ordre
+    // (ProcedureCollective.ListeJuges_PCFiltre(fonction, false), ProcedureCollective.cs:2227-2230) : « civilite nom prenom », sans
+    // civilite pour ND et PM ; en section sanction (AUDNC_SECTION = « CPC.S » d'une audience qui a une chambre, :69-73), le premier
+    // mandataire en mission de la PC dans les fonctions LIQ, RDC, LQJ, MDJ, MJ -- son nom, precede de sa civilite collee quand elle vaut
+    // ND ou PM : c'est le texte de RIG v2 tel quel (:96-100). NON RENDUS : les colonnes « Mandataire Judiciaire » et « Administrateur
+    // Judiciaire » (:57-59, :119-154) n'existent qu'en mode PC (PREAUDPC, PROC_PREAUD.cs:24) ; la fiche depliee ne recoit que l'audience
+    // (IFicheEcran : l'Id de la ligne), pas le mode de la recherche, et ne peut donc pas savoir qu'elle est ouverte en mode PC ;
+    // « Options », « Destinataires » et « Génération » sont des choix du plumitif, que la V3 ne genere pas.
+    private static readonly string[] ColonnesOrdre = ["N° rôle", "Juge", "Nom", "Heure", "Type", "N° appel"];
 
     internal static async Task<FicheEcran?> PreparationAsync(SqlConnection cn, string procedure, string id, CancellationToken ct)
     {
         if (!Entier(id, out var n) || await AudienceAsync(cn, n, ct) is not { } a) return null;
         var lignes = new List<string[]>();
         await using (var r = await LectureV2.LireAsync(cn, """
-            SELECT i.INSTN_NUM_ROLE, i.INSTN_NOM_COURANT, aa.APPAF_HEURE_APPEL, aa.APPAF_TYPE_CLASSEMENT, aa.APPAF_NUM_APPEL
-            FROM v2.APPEL_AFFAIRE AS aa LEFT JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = aa.APPAF_ID_INSTN
+            SELECT i.INSTN_NUM_ROLE, i.INSTN_NOM_COURANT, aa.APPAF_HEURE_APPEL, aa.APPAF_TYPE_CLASSEMENT, aa.APPAF_NUM_APPEL,
+                   CASE WHEN ch.R_CHAMBRE_VALEUR IS NOT NULL AND a.AUDNC_SECTION = 'CPC.S'
+                        THEN (SELECT TOP (1) CASE WHEN mp.MNDPC_CIVILITE IN ('ND', 'PM') THEN mp.MNDPC_CIVILITE ELSE '' END + ISNULL(mp.MNDPC_NOM, '')
+                              FROM v2.GERER_PC AS g JOIN v2.MANDATAIRE_PC AS mp ON mp.MNDPC_ID_MNDPC = g.GRRPC_ID_MNDPC
+                              WHERE g.GRRPC_ID_PRCLL = i.INSTN_ID_PRCLL AND g.GRRPC_FONCTION_PC IN ('LIQ', 'RDC', 'LQJ', 'MDJ', 'MJ')
+                                AND g.GRRPC_FIN_MISSION = 0
+                              ORDER BY g.GRRPC_ID_GRRPC)
+                        ELSE (SELECT TOP (1) CASE WHEN j.JUG_CIVILITE IN ('ND', 'PM') THEN '' ELSE ISNULL(j.JUG_CIVILITE, '') + ' ' END
+                                             + j.JUG_NOM + ' ' + ISNULL(j.JUG_PRENOM, '')
+                              FROM v2.ETRE_JUGE_COMM AS ej JOIN v2.JUGE AS j ON j.JUG_ID_JUG = ej.ETJCM_ID_JUG
+                              WHERE ej.ETJCM_ID_PRCLL = i.INSTN_ID_PRCLL AND ej.ETJCM_FONCTION_PC IN ('JCT', 'JC') AND ej.ETJCM_FIN_MISSION = 0
+                              ORDER BY CASE ej.ETJCM_FONCTION_PC WHEN 'JCT' THEN 0 ELSE 1 END, ej.ETJCM_NUM_ORDRE) END AS Juge
+            FROM v2.APPEL_AFFAIRE AS aa
+            JOIN v2.AUDIENCE_CABINET AS a ON a.AUDNC_ID_ADNC = aa.APPAF_ID_ADNC
+            LEFT JOIN v2.CHAMBRE AS ch ON ch.R_CHAMBRE_VALEUR = a.AUDNC_CHAMBRE
+            LEFT JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = aa.APPAF_ID_INSTN
             WHERE aa.APPAF_ID_ADNC = @id
             ORDER BY aa.APPAF_ID_APPAF
             """, ct, new SqlParameter("@id", n)))
             while (await r.ReadAsync(ct))
-                lignes.Add([FormeLigne.Texte(r, "INSTN_NUM_ROLE"), FormeLigne.Texte(r, "INSTN_NOM_COURANT"), FormeLigne.Texte(r, "APPAF_HEURE_APPEL"),
-                            FormeLigne.Texte(r, "APPAF_TYPE_CLASSEMENT"), FormeLigne.Texte(r, "APPAF_NUM_APPEL")]);
+                lignes.Add([FormeLigne.Texte(r, "INSTN_NUM_ROLE"), FormeLigne.Texte(r, "Juge"), FormeLigne.Texte(r, "INSTN_NOM_COURANT"),
+                            FormeLigne.Texte(r, "APPAF_HEURE_APPEL"), FormeLigne.Texte(r, "APPAF_TYPE_CLASSEMENT"), FormeLigne.Texte(r, "APPAF_NUM_APPEL")]);
         return new FicheEcran(procedure, id, a.Libelle,
         [
             new SectionFiche("Audience", [new("Audience", a.EstAudience ? a.Libelle : ""), new("Cabinet", a.EstAudience ? "" : a.Libelle)]),

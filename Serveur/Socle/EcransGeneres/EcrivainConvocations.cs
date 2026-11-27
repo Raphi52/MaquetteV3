@@ -131,7 +131,8 @@ internal sealed class EcrivainConvocations : IEcrivainEcran
 
             var ecrits = await EvenementsProcedureV2.SurvenuAsync(geste, l.IdInstance, code, geste.Maintenant.Date, avecFutur: false, ct);
             var calcul = await EditionsEvenementV2.CalculerAsync(geste, l.Instance,
-                new EditionsEvenementV2.Evenement(code, ecrits.NumeroSource, geste.Maintenant.Date, null, await AvecPieceAsync(geste, ecrits.IdSurvenu, ct)), ct);
+                new EditionsEvenementV2.Evenement(code, ecrits.NumeroSource, geste.Maintenant.Date, null, await AvecPieceAsync(geste, ecrits.IdSurvenu, ct)),
+                "la citation", ct);
             if (calcul.NonRepris is { } nonRepris) return IssueGeste.Refuser(nonRepris);
 
             var ids = new List<int>();

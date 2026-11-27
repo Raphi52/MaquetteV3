@@ -276,3 +276,57 @@ valeur: Résultat = R17N
 resultat: fait
 message: 1 affaire renvoyée (R17N).
 controle: SELECT STRING_AGG(CONCAT(EVNPR_NUM_ORDRE, ':', EVNPR_CODE_EVE_PRO, ':', CAST(EVNPR_SURVENU AS int), ':', ISNULL(CONVERT(varchar(10), EVNPR_DATE, 23), '-')), ',') WITHIN GROUP (ORDER BY EVNPR_NUM_ORDRE) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 1700027 => 1:EV17N:1:2001-03-22
+---
+# LA DEMANDE, LA FACTURE ET LES ÉDITIONS DU RENVOI (troisième contrôle du lot 7) : PROC_MJUDS crée une demande MJUDS par instance
+# (LockInstances, PROC_MJUDS.cs:986-1004), facture les articles de l'événement (:744-747) et met dans la file les éditions du survenu
+# et de son futur (GenererLesDemandesEdition, :1273-1281 ; EditionsEvenementV2.cs). Données : fin de PROC_RETAUD.sql.
+
+# 27. R17A : l'édition ED17A de l'événement EV17A vise le demandeur et les parties (« D;POD;F;POF », les destinataires du renvoi RCAB
+#     de RIG_DEV), que RIG v3 ne reprend pas (RecupDestEditLot2FROMInstance) : le renvoi est refusé, rien n'est écrit -- ni l'appel,
+#     ni l'événement, ni la demande. Jumeau : bloc 29 (ED17X vise aussi « D », mais sa condition l'écarte ; ED17V, document interne).
+geste: Decider Renvoyer
+ids: 1700530
+valeur: Résultat = R17A
+resultat: refuse
+message: Le destinataire « D » de l'édition ED17A n'est pas repris par RIG v3 : rien n'est enregistré, faire le renvoi dans RIG v2.
+controle: SELECT CONCAT(ISNULL(APPAF_CODE_PLUMITIF, '-'), '/', APPAF_ETAT_RETOUR) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF = 1700530 => -/A
+controle: SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 1700029 => 0
+controle: SELECT COUNT(*) FROM v2.DOSSIER_DEMANDE WHERE DSSDM_CODE_SEQUENCEUR = '2J' AND DSSDM_VALEUR_SEQUENCEUR = '1700029' => 0
+---
+# 28. R17B : l'événement EV17B porte l'article actif ART17B ; RIG v2 le facture dans la même sauvegarde (tableau de facturation),
+#     RIG v3 n'a pas de moteur de facturation : refusé, rien n'est écrit. Jumeau : bloc 30 (R17C : article en sommeil, article de mesure).
+geste: Decider Renvoyer
+ids: 1700531
+valeur: Résultat = R17B
+resultat: refuse
+message: La facture de l'article ART17B de l'événement EV17B n'est pas reprise par RIG v3 : rien n'est enregistré, faire le renvoi dans RIG v2.
+controle: SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 1700030 => 0
+controle: SELECT COUNT(*) FROM v2.DOSSIER_DEMANDE WHERE DSSDM_CODE_SEQUENCEUR = '2J' AND DSSDM_VALEUR_SEQUENCEUR = '1700030' => 0
+---
+# 29. R17V sur 2026J17028 : la demande MJUDS validée (état V, pas en cours) au nom courant de l'instance, rôle en numéro indicatif,
+#     « rôle répertoire » en numéros, affaire de l'instance ; ses dossiers 2J (l'instance) et 2P (sa PC). Puis le survenu EV17V
+#     (rang 1) et son futur EV17W (rang 2, 10 jours maxi) ; leurs éditions dans la file, rattachées à la demande : ED17V (document
+#     interne seul) et ED17W (« DI »), source EVT_PROC = le numéro source de chaque événement, libellé source « <code> - <date>
+#     (EP n° <rang>) » -- le futur n'a pas de date --, sans groupage automatique (:1278), en phase « C ». ED17X (« D », condition
+#     « +NAZZ17 ») est écartée par sa condition (jumeau accepté du bloc 27).
+geste: Decider Renvoyer
+ids: 1700529
+valeur: Résultat = R17V
+resultat: fait
+message: 1 affaire renvoyée (R17V) ; 2 éditions placées dans la file des éditions.
+controle: SELECT CONCAT(d.DMND_CODE_PROSS, ':', d.DMND_ETAT_DEMANDE, ':', CAST(d.DMND_EN_COURS AS int), ':', d.DMND_NOM, ':', d.DMND_NUM_INDICATIF, ':', d.DMND_LES_NUMEROS, ':', d.DMND_ID_AFFRE) FROM v2.DEMANDE AS d WHERE d.DMND_ID_DMND = (SELECT DSSDM_ID_DMND FROM v2.DOSSIER_DEMANDE WHERE DSSDM_CODE_SEQUENCEUR = '2J' AND DSSDM_VALEUR_SEQUENCEUR = '1700028') => MJUDS:V:0:RENVOI EDITIONS AUD:2026J17028:2026J17028 2001000028:1700953
+controle: SELECT STRING_AGG(CONCAT(DSSDM_CODE_SEQUENCEUR, ':', DSSDM_VALEUR_SEQUENCEUR), ',') WITHIN GROUP (ORDER BY DSSDM_CODE_SEQUENCEUR) FROM v2.DOSSIER_DEMANDE WHERE DSSDM_ID_DMND = (SELECT DSSDM_ID_DMND FROM v2.DOSSIER_DEMANDE WHERE DSSDM_CODE_SEQUENCEUR = '2J' AND DSSDM_VALEUR_SEQUENCEUR = '1700028') => 2J:1700028,2P:1700041
+controle: SELECT STRING_AGG(CONCAT(EVNPR_NUM_ORDRE, ':', EVNPR_CODE_EVE_PRO, ':', CAST(EVNPR_SURVENU AS int), ':', ISNULL(CONVERT(varchar(10), EVNPR_DATE, 23), '-'), ':', ISNULL(CONVERT(varchar(10), EVNPR_DATE_MAXI, 23), '-')), ',') WITHIN GROUP (ORDER BY EVNPR_NUM_ORDRE) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 1700028 => 1:EV17V:1:2001-03-22:-,2:EV17W:0:-:2001-04-01
+controle: SELECT STRING_AGG(CONCAT(e.DMNED_LIBELLE_SOURCE, '|', e.DMNED_LIBELLE_DOCUMENT, '|', e.DMNED_CODE_ENTITE_SOURCE, '|', ev.EVNPR_CODE_EVE_PRO, '|', CAST(e.DMNED_GROUPAGE_AUTOMATIQUE AS int), '|', e.DMNED_PHASE_TRAITEMENT, '|', e.DMNED_TYPE_DOCUMENT), ',') WITHIN GROUP (ORDER BY e.DMNED_ID_DMNED) FROM v2.DEMANDE_EDITION AS e LEFT JOIN v2.EVENEMENT_PROCEDURE AS ev ON ev.EVNPR_ID_INSTN = 1700028 AND ev.EVNPR_NUMERO_SOURCE = e.DMNED_VALEUR_ID_SOURCE WHERE e.DMNED_ID_DMND = (SELECT DSSDM_ID_DMND FROM v2.DOSSIER_DEMANDE WHERE DSSDM_CODE_SEQUENCEUR = '2J' AND DSSDM_VALEUR_SEQUENCEUR = '1700028') => EV17V - 22/03/2001 (EP n° 1)|AVIS DE RENVOI 17V|EVT_PROC|EV17V|0|C|AVIS,EV17W (EP n° 2)|RAPPEL AVIS 17W|EVT_PROC|EV17W|0|C|AVIS
+---
+# 30. R17C sur 2026J17031 : son article ART17C est en sommeil (Article.GetArticle ne lit que les actifs) et ART17B n'y est qu'un
+#     article de MESURE (type « M », listTypeEP d'une instance : « I ») -- rien à facturer, le renvoi s'écrit (jumeau accepté du
+#     bloc 28), sans édition. Sa demande n'a que le dossier 2J ; sans répertoire général, ses numéros sont « rôle » suivi d'un
+#     blanc, comme string.Join(" ", rôle, "") de RIG v2 (11 caractères).
+geste: Decider Renvoyer
+ids: 1700532
+valeur: Résultat = R17C
+resultat: fait
+message: 1 affaire renvoyée (R17C).
+controle: SELECT STRING_AGG(CONCAT(EVNPR_NUM_ORDRE, ':', EVNPR_CODE_EVE_PRO), ',') FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 1700031 => 1:EV17C
+controle: SELECT CONCAT(d.DMND_CODE_PROSS, ':', d.DMND_ETAT_DEMANDE, ':', DATALENGTH(d.DMND_LES_NUMEROS), ':', ISNULL(CAST(d.DMND_ID_AFFRE AS varchar(10)), '-'), ':', (SELECT COUNT(*) FROM v2.DOSSIER_DEMANDE AS x WHERE x.DSSDM_ID_DMND = d.DMND_ID_DMND), ':', (SELECT COUNT(*) FROM v2.DEMANDE_EDITION AS e WHERE e.DMNED_ID_DMND = d.DMND_ID_DMND)) FROM v2.DEMANDE AS d WHERE d.DMND_ID_DMND = (SELECT DSSDM_ID_DMND FROM v2.DOSSIER_DEMANDE WHERE DSSDM_CODE_SEQUENCEUR = '2J' AND DSSDM_VALEUR_SEQUENCEUR = '1700031') => MJUDS:V:11:-:1:0

@@ -33,8 +33,10 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// </summary>
 internal static class EvenementsProcedureV2
 {
-    /// <summary>Ce qui a ete ecrit : le survenu (id, numero source) et, s'il y en a un, le futur lie (id, code).</summary>
-    internal sealed record Ecrits(int IdSurvenu, string NumeroSource, int? IdFutur, string? CodeFutur);
+    /// <summary>Ce qui a ete ecrit : le survenu (id, numero source) et, s'il y en a un, le futur lie (id, code) ; et chacun tel que
+    /// ses editions le lisent (<see cref="EditionsEvenementV2.Evenement"/> : code, numero source, date, rang, piece), survenu d'abord.</summary>
+    internal sealed record Ecrits(int IdSurvenu, string NumeroSource, int? IdFutur, string? CodeFutur,
+                                  IReadOnlyList<EditionsEvenementV2.Evenement> Evenements);
 
     /// <summary>Ecrit l'evenement SURVENU <paramref name="codeEve"/> sur l'instance, a <paramref name="date"/> ; avec
     /// <paramref name="avecFutur"/>, aussi l'evenement futur lie que son code porte (voir l'en-tete).</summary>
@@ -44,25 +46,62 @@ internal static class EvenementsProcedureV2
         var jour = date?.Date;
         var numeroSource = Guid.NewGuid().ToString().ToUpperInvariant();
         var code = await LireCodeAsync(geste, codeEve, avecFutur, ct);
-        var idSurvenu = await InsererAsync(geste, idInstance, codeEve, code, new Dictionary<string, object?>
+        var (idSurvenu, rang, piece) = await InsererAsync(geste, idInstance, codeEve, code, new Dictionary<string, object?>
         {
             ["EVNPR_DATE"] = jour, ["EVNPR_SURVENU"] = true, ["EVNPR_NUMERO_SOURCE"] = numeroSource,
         }, ct);
-        if (!avecFutur || jour is not { } depuis || code?.CodeFutur is not { } codeFutur) return new Ecrits(idSurvenu, numeroSource, null, null);
+        var survenu = new EditionsEvenementV2.Evenement(codeEve, numeroSource, jour, rang, piece);
+        if (!avecFutur || jour is not { } depuis || code?.CodeFutur is not { } codeFutur) return new Ecrits(idSurvenu, numeroSource, null, null, [survenu]);
 
         // AddEvenementProcedureFuturOuExpire : aucune date -> rien ; plusieurs -> fixe, sinon maxi, sinon mini.
         var fixe = Delai(depuis, code.MoisFixe, code.JoursFixe, code.SemainesFixe);
         var maxi = Delai(depuis, code.MoisMaxi, code.JoursMaxi, code.SemainesMaxi);
         var mini = Delai(depuis, code.MoisMini, code.JoursMini, code.SemainesMini);
-        if (fixe is null && maxi is null && mini is null) return new Ecrits(idSurvenu, numeroSource, null, null);
+        if (fixe is null && maxi is null && mini is null) return new Ecrits(idSurvenu, numeroSource, null, null, [survenu]);
         if (fixe is not null) (maxi, mini) = (null, null);
         else if (maxi is not null) mini = null;
-        var idFutur = await InsererAsync(geste, idInstance, codeFutur, await LireCodeAsync(geste, codeFutur, false, ct), new Dictionary<string, object?>
+        var numeroFutur = Guid.NewGuid().ToString().ToUpperInvariant();
+        var (idFutur, rangFutur, pieceFutur) = await InsererAsync(geste, idInstance, codeFutur, await LireCodeAsync(geste, codeFutur, false, ct),
+            new Dictionary<string, object?>
+            {
+                ["EVNPR_SURVENU"] = false, ["EVNPR_NUMERO_SOURCE"] = numeroFutur,
+                ["EVNPR_DATE_FIXE"] = fixe, ["EVNPR_DATE_MAXI"] = maxi, ["EVNPR_DATE_MINI"] = mini, ["EVNPR_NUMERO_SOURCE_EP_LIE"] = numeroSource,
+            }, ct);
+        // Le futur n'a pas de date (EVNPR_DATE) : son libelle source n'en porte pas (EditionLibelleSource, EvenementProcedure.cs:468-475).
+        return new Ecrits(idSurvenu, numeroSource, idFutur, codeFutur, [survenu, new EditionsEvenementV2.Evenement(codeFutur, numeroFutur, null, rangFutur, pieceFutur)]);
+    }
+
+    /// <summary>
+    /// La FACTURE de l'evenement <paramref name="codeEve"/> d'une instance (EvenementProcedure.CreateArticles, EvenementProcedure.cs:
+    /// 2451-2492) : ses articles CEP_ARTICLE de type « I » (listTypeEP d'une instance, :2388-2400), dont la condition est remplie
+    /// (AnalyseCondition, la meme lecture que celle des editions : EditionsEvenementV2.Condition) et dont l'article existe, actif, a la
+    /// date du geste (Article.GetArticle, RigMetier\Facture\Article.cs:185-199). RIG v2 les facture par son tableau de facturation
+    /// dans la meme sauvegarde que le geste (DoGenererLesArticles, PROC_MJUDS.cs:744-747 ; l'annuler annule tout, :774-776). La V3 n'a
+    /// pas de moteur de facturation : rend le refus du geste (<paramref name="objet"/> : « le renvoi »...), null s'il n'y a rien a facturer.
+    /// Mesure du 27/11/2026 (RIG_DEV) : 21 des 250 codes de renvoi utilisables en saisie portent un article (RINT -> JGTJR...).
+    /// </summary>
+    internal static async Task<string?> FactureNonRepriseAsync(GesteEnCours geste, EditionsEvenementV2.Instance inst, string codeEve, string objet,
+                                                               CancellationToken ct)
+    {
+        var articles = new List<(string Article, string Condition)>();
+        await using (var r = await geste.LireAsync("""
+            SELECT CEPAR_CODE_ARTICLE, CEPAR_CONDITION FROM v2.CEP_ARTICLE WHERE CEPAR_CODE_EVE_PRO = @c AND CEPAR_TYPE_EP = 'I'
+            ORDER BY CEPAR_NUM_ORDRE, CEPAR_ID_CEPAR
+            """, ct, new SqlParameter("@c", codeEve)))
+            while (await r.ReadAsync(ct)) articles.Add((FormeLigne.Texte(r, "CEPAR_CODE_ARTICLE"), FormeLigne.Texte(r, "CEPAR_CONDITION")));
+        string Refus(string quoi) => $"{quoi} n'est pas reprise par RIG v3 : rien n'est enregistré, faire {objet} dans RIG v2.";
+        foreach (var (article, condition) in articles)
         {
-            ["EVNPR_SURVENU"] = false, ["EVNPR_NUMERO_SOURCE"] = Guid.NewGuid().ToString().ToUpperInvariant(),
-            ["EVNPR_DATE_FIXE"] = fixe, ["EVNPR_DATE_MAXI"] = maxi, ["EVNPR_DATE_MINI"] = mini, ["EVNPR_NUMERO_SOURCE_EP_LIE"] = numeroSource,
-        }, ct);
-        return new Ecrits(idSurvenu, numeroSource, idFutur, codeFutur);
+            if (EditionsEvenementV2.Condition(condition, inst) is not { } remplie)
+                return Refus($"La condition « {condition.Trim()} » de l'article {article} de l'événement {codeEve}");
+            if (!remplie) continue;
+            await using var a = await geste.LireAsync("""
+                SELECT COUNT(*) FROM v2.ARTICLE WHERE ARTCL_CODE_ARTICLE_RIG = @a AND ARTCL_DATE_APPLICATION <= @maintenant AND ARTCL_STATUT = 'A'
+                """, ct, new SqlParameter("@a", article), new SqlParameter("@maintenant", geste.Maintenant));
+            await a.ReadAsync(ct);
+            if (a.GetInt32(0) > 0) return Refus($"La facture de l'article {article} de l'événement {codeEve}");
+        }
+        return null;
     }
 
     /// <summary>Un delai du code (Outils.cs:495-566) : les mois, sinon les jours, sinon les semaines x 7 ; null sans aucun.</summary>
@@ -103,8 +142,8 @@ internal static class EvenementsProcedureV2
     }
 
     /// <summary>Ajoute l'evenement a l'instance : non expire, numero d'ordre suivant, type et piece numerisee du code
-    /// (CreateEvenementProcedure), plus <paramref name="valeurs"/>.</summary>
-    private static async Task<int> InsererAsync(GesteEnCours geste, int idInstance, string codeEve, Code? code, Dictionary<string, object?> valeurs,
+    /// (CreateEvenementProcedure), plus <paramref name="valeurs"/> ; rend son id, son rang et sa piece numerisee.</summary>
+    private static async Task<(int Id, short Rang, bool Piece)> InsererAsync(GesteEnCours geste, int idInstance, string codeEve, Code? code, Dictionary<string, object?> valeurs,
                                                 CancellationToken ct)
     {
         int rang;
@@ -122,6 +161,6 @@ internal static class EvenementsProcedureV2
         valeurs["EVNPR_AVEC_PIECE_NUMERISE"] = piece;
         valeurs["EVNPR_NATURE_DOC_GED"] = piece ? code!.Nature : null;
         valeurs["EVNPR_TYPE_DEPOSANT_GED"] = piece ? code!.Deposant : null;
-        return await CreationV2.InsererAsync(geste, "v2.EVENEMENT_PROCEDURE", "EVNPR_ID_EVNPR", valeurs, ct);
+        return (await CreationV2.InsererAsync(geste, "v2.EVENEMENT_PROCEDURE", "EVNPR_ID_EVNPR", valeurs, ct), (short)rang, piece);
     }
 }
