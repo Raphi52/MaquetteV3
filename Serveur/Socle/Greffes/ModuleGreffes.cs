@@ -99,6 +99,8 @@ internal sealed class ModuleGreffes : IModuleServeur
         // absent ne se cree pas (404). L'agent est celui que la politique AgentAdmis vient de
         // juger dans la base de CE greffe : DeLAppelantAsync le reprend de la requete.
         // fix-ok: la route ecrivait le compte de la session (« AMITEL\banc.socle », banc rouge du 2026-11-21) au lieu du nom UTLST_NOM de la V2.
+        // fix-ok: pas un correctif -- lot 14 (27/11/2026, ordre du chef msg-cab1a60f) : droit, UPDATE et relecture extraits dans
+        // EcritureReglage.ModifierAsync, appelee aussi par le geste « Codes chefs IP » ; le journal reste ecrit ici, avec l'ecran de la saisie.
         greffes.MapPut(RoutesGreffes.Reglage, async (string greffe, string reglage, SaisieReglage saisie, HttpContext http,
                                                    CatalogueGreffes c, ServiceIdentite identites, ServiceDroits droits, BaseRig b,
                                                    CancellationToken ct) =>
@@ -108,25 +110,18 @@ internal sealed class ModuleGreffes : IModuleServeur
             return await SurBaseV3(c, greffe, ct, async cn =>
             {
                 if (await droits.AppelantAsync(http, b, cn, ct) is not { } moi) return SansAuteur();
-                if (!ServiceDroits.PeutModifierLeGreffe(moi)) return SansLeDroit(moi);
                 await using var tx = (SqlTransaction)await cn.BeginTransactionAsync(ct);
-                if ((await LireReglagesAsync(cn, tx, reglage, ct)).FirstOrDefault() is not { } avant) return ReglageAbsent(greffe, reglage);
-                await using (var cmd = new SqlCommand(
-                    "UPDATE soc.Reglage SET Valeur = @v, AuteurModif = @a, DateModif = GETDATE() WHERE Code = @c;", cn, tx))
+                // Le droit, l'UPDATE et la relecture : EcritureReglage, la seule ecriture d'un reglage (un geste d'ecran l'appelle aussi).
+                switch (await EcritureReglage.ModifierAsync(cn, tx, moi, auteur, reglage, saisie.Valeur, ct))
                 {
-                    cmd.Parameters.Add(new SqlParameter("@v", System.Data.SqlDbType.VarChar, 1000) { Value = (object?)saisie.Valeur ?? DBNull.Value });
-                    // varchar(50) comme PARAM_AUTEUR_MODIF : la V2 coupe aussi ses textes a la taille de la colonne.
-                    cmd.Parameters.Add(new SqlParameter("@a", System.Data.SqlDbType.VarChar, 50) { Value = auteur.Length > 50 ? auteur[..50] : auteur });
-                    cmd.Parameters.Add(new SqlParameter("@c", System.Data.SqlDbType.VarChar, 100) { Value = reglage });
-                    await cmd.ExecuteNonQueryAsync(ct);
+                    case ReglageEcrit.SansLeDroit refus: return Refus(StatusCodes.Status403Forbidden, refus.Motif);
+                    case ReglageEcrit.Modifie ecrit:
+                        var t = ecrit.Trace;
+                        await JournalGestes.EcrireAsync(cn, tx, moi, saisie.Ecran, t.Famille, t.Objet, t.IdObjet, t.Verbe, t.Avant, t.Apres, ct);
+                        await tx.CommitAsync(ct);
+                        return Results.Ok(ecrit.Apres);
+                    default: return ReglageAbsent(greffe, reglage);
                 }
-                var apres = (await LireReglagesAsync(cn, tx, reglage, ct)).Single();
-                // Le code d'un reglage va jusqu'a 58 caracteres dans RIG_DEV (soc.Journal.IdObjet en tient 40) :
-                // il est dans l'objet, ecrit en entier.
-                await JournalGestes.EcrireAsync(cn, tx, moi, saisie.Ecran, FamilleReglage, $"le reglage {apres.Code}", null, "a modifie",
-                    new { valeur = avant.Valeur }, new { valeur = apres.Valeur }, ct);
-                await tx.CommitAsync(ct);
-                return Results.Ok(apres);
             });
         });
 
@@ -171,7 +166,7 @@ internal sealed class ModuleGreffes : IModuleServeur
         catch (SqlException e) when (e.Number is >= 51700 and <= 51704) { return Refus(StatusCodes.Status409Conflict, e.Message); }
     }
 
-    private static async Task<List<ReglageGreffe>> LireReglagesAsync(SqlConnection cn, SqlTransaction? tx, string? code, CancellationToken ct)
+    internal static async Task<List<ReglageGreffe>> LireReglagesAsync(SqlConnection cn, SqlTransaction? tx, string? code, CancellationToken ct)
     {
         await using var cmd = new SqlCommand(
             "SELECT Code, Libelle, Valeur, Utilisation, AuteurCreation, DateCreation, AuteurModif, DateModif FROM soc.Reglage " +
@@ -197,9 +192,11 @@ internal sealed class ModuleGreffes : IModuleServeur
             "Modification refusee : la requete n'a pas d'identite (session Windows), son auteur ne serait pas garde.");
 
     /// <summary>403 : l'agent est admis mais n'a pas le droit de modifier le greffe ; rien n'a ete lu ni ecrit.</summary>
-    private static IResult SansLeDroit(Appelant moi)
-        => Refus(StatusCodes.Status403Forbidden,
-            $"Modification refusee : le compte {moi.CompteWindows} n'a pas le droit de modifier le greffe (il faut etre {ServiceDroits.QuiPeutModifierLeGreffe}).");
+    private static IResult SansLeDroit(Appelant moi) => Refus(StatusCodes.Status403Forbidden, MotifSansLeDroit(moi));
+
+    /// <summary>Pourquoi <paramref name="moi"/> ne modifie pas le greffe (sa fiche, un reglage) : la route et un geste d'ecran le disent pareil.</summary>
+    internal static string MotifSansLeDroit(Appelant moi)
+        => $"Modification refusee : le compte {moi.CompteWindows} n'a pas le droit de modifier le greffe (il faut etre {ServiceDroits.QuiPeutModifierLeGreffe}).";
 
     private static IResult Refus(int statut, string motif) => Results.Json(new RefusGreffe(motif), statusCode: statut);
 }
