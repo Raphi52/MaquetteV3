@@ -1,0 +1,8 @@
+# « Journal de caisse » (LecteurJournalCaisse) sur PROC_JCAISSE.sql : la liste a l'ouverture, la periode par defaut de RIG v2 --
+# aujourd'hui, de 0 h a 24 h --, une ligne par encaissement, triee « par mode de paiement » (le type du mode, puis la date).
+# 2300208 (carte, 0 h : borne basse retenue ; son agent n'est pas repris en V3, l'encaissement reste) puis 2300201 (cheque, 9 h).
+# Ecartes, chacun avec son jumeau retenu : 2300207 la veille a 23 h (2300208) ; 2300209 le lendemain a 0 h (2300201) ; les
+# encaissements du jour des autres jeux (PROC_RECHENC.sql) : leurs ventilations n'ont pas d'affaire de la base, ou leur mode n'existe pas.
+# Les cas de fevrier 2024 (deux ventilations, remboursement, ecartes par les jointures) : PROC_JCAISSE.recherches.
+Encaissement 2300208 | Carte bancaire · 7,77 € · le {J+0} · PAYEUR L13 MINUIT · à comptabiliser | Carte bancaire | AFaire | []
+Encaissement 2300201 | Chèque · 100,10 € · le {J+0} · PAYEUR L13 A · titre L13CHQ1 · BANQUE L13 · caissier Alice CAISSE · à comptabiliser | Chèque | AFaire | []

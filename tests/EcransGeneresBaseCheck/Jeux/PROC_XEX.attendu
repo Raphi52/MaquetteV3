@@ -1,0 +1,4 @@
+# « Édition interne d'un Kbis » (LecteurKbisInterne) sur PROC_XEX.sql : la liste a l'ouverture, les dossiers qui ont deja un Kbis
+# interne (une demande XEX). 2300601 en a une ; 2300602 n'en a pas (sa demande XEXX est d'un autre processus) : ecarte, retrouve par
+# son numero (PROC_XEX.recherches).
+2013B60001 | KBIS INTERNE ALPHA SARL · 523 006 010 · 1 Kbis interne, le dernier le 15/01/2025 | Dossiers RCS | EnCours | []

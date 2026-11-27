@@ -1,0 +1,11 @@
+# « Lettrage » (LecteurLettrage) : la liste a l'ouverture, la periode par defaut de RIG v2 (aujourd'hui), toutes categories. Un client
+# entre s'il a un lettrage du jour, ou une facture / une ventilation comptabilisee du jour non encore lettree.
+#   L13LCC : un lettrage du jour (facture 15, rien de regle) : « Lettré, non soldé » ;
+#   L6ALPHA : la ventilation comptabilisee du jour de PROC_RECHENC.sql (1600411) : « À lettrer » ;
+#   L13VTB : la facture comptabilisee du jour de PROC_JVENTE.sql (L13F002), client divers dont la facture n'a pas de demande : sans
+#   affaire.
+# Ecartes, chacun avec son jumeau retenu : les encaissements du jour non comptabilises de PROC_JCAISSE.sql (L6ALPHA, comptabilise) ; la
+# facture du jour non comptabilisee L13F001 (L13F002).
+L13LCC · LETTRAGE DU JOUR | compte 411L13LCC · facturé 15,00 € · payé 0,00 € · restant 15,00 € · 1 lettrage · lettré, non soldé | Compte hors PC | EnCours | []
+L6ALPHA · CLI ALPHA | compte 411L6ALPHA · facturé 0,00 € · payé 0,00 € · restant 0,00 € · 0 lettrage · 1 élément à lettrer | Compte hors PC | AFaire | []
+L13VTB · CLIENT VENTE B / sans affaire | compte 411L13VTB · facturé 0,00 € · payé 0,00 € · restant 0,00 € · 0 lettrage · 1 élément à lettrer | Divers | AFaire | []

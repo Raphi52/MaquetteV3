@@ -53,3 +53,16 @@ INSERT INTO v2.MANDATAIRE (MNDTR_ID_MNDTR, MNDTR_CIVILITE, MNDTR_NOM, MNDTR_ABRE
     (1500108, ''MR'', '''', ''ZZ15'', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1),
     -- personne morale, une adresse seule : Validee [0,1]
     (1500109, ''PM'', ''NU JURIS SAS'', NULL, NULL, NULL, 1500902, NULL, NULL, NULL, NULL, NULL, NULL, 1);';
+
+-- Lot 14 du plan-676a4b19 (EcrivainMandataires) : la table des qualifications de la profession (QUALIF_PROFESSION de RIG_DEV,
+-- QUALIF_PROFESSION.cs de RigBaseGreffe : R_QUALIFPROF_VALEUR varchar(5), R_QUALIFPROF_LIBELLE_ECRAN varchar(35)), que la grille
+-- controle. Les tables de liaison d'un mandataire (LiaisonsMandataire.cs) sont completees par PROC_RAPPACTEUR.sql, joue apres les
+-- jeux qui les creent (PROC_MODIF_REPER, PROC_ORDOSIGN).
+IF OBJECT_ID(N'v2.QUALIF_PROFESSION') IS NULL
+    CREATE TABLE v2.QUALIF_PROFESSION (R_QUALIFPROF_VALEUR varchar(5) NOT NULL PRIMARY KEY, R_QUALIFPROF_LIBELLE_ECRAN varchar(35) NOT NULL);
+INSERT INTO v2.QUALIF_PROFESSION (R_QUALIFPROF_VALEUR, R_QUALIFPROF_LIBELLE_ECRAN)
+SELECT v, l FROM (VALUES ('AV', 'Avocat'), ('HUI', 'Huissier')) AS t(v, l)
+WHERE NOT EXISTS (SELECT 1 FROM v2.QUALIF_PROFESSION AS q WHERE q.R_QUALIFPROF_VALEUR = t.v);
+-- Les colonnes que l'ecrivain et la fiche lisent en plus (MANDATAIRE.cs de RigBaseGreffe : varchar(6), varchar(36)).
+IF COL_LENGTH('v2.MANDATAIRE', 'MNDTR_NUMERO_CNBF_STRUCTURE') IS NULL ALTER TABLE v2.MANDATAIRE ADD MNDTR_NUMERO_CNBF_STRUCTURE varchar(6) NULL;
+IF COL_LENGTH('v2.MANDATAIRE', 'MNDTR_NUMERO_SOURCE') IS NULL ALTER TABLE v2.MANDATAIRE ADD MNDTR_NUMERO_SOURCE varchar(36) NULL;

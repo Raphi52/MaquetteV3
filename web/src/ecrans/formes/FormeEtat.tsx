@@ -83,8 +83,9 @@ export function FormeEtat({ d }: { d: DescripteurEcranVue }) {
                                         + (enBase
                                           ? 'resserrez les paramètres, qui cherchent dans la base, pour qu’elles soient toutes à l’écran : rien n’est enregistré.'
                                           : 'RIG v3 ne lit que celles-ci, la période et le filtre ne portent que sur elles : rien n’est enregistré.') })
+                      // Ecrit, l'Etat se relit (lot 13 : « Lettrer » change les sommes du lettrage), comme une File.
                       : void enLot('Agir', g, visibles, {},
-                          (n) => refus(g, `: aucun état n’est produit (${n} ligne${n > 1 ? 's' : ''} à l’écran)`)))}>{g}</button>
+                          (n) => refus(g, `: aucun état n’est produit (${n} ligne${n > 1 ? 's' : ''} à l’écran)`), lues.relire))}>{g}</button>
           ))}
         </VuesListe>
         <Annonce texte={annonce} />
