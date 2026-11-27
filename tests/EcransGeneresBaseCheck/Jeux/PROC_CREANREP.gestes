@@ -1,0 +1,73 @@
+# Les gestes de EcrivainRepertoireCreanciers (« Representation », PROC_CREANREP), sur les lignes de PROC_CREANREP.sql. Chaque refus a
+# son jumeau accepte : bloc 4 (ajout complet), bloc 5 (modification).
+# 1. Sans adresse (MetierObligatoire, OPE_CREANREP.Designer.cs).
+geste: Ajouter
+valeur: Code abrégé = L12NEW
+valeur: Civilité = PM
+valeur: Patronyme = NOUVEAU CREANCIER BANC
+resultat: refuse
+message: « Adresse » est obligatoire.
+---
+# 2. Un code abrege deja pris, compare sans la casse (_ControleCodeAbrege, OPE_CREANREP.cs:128-139).
+geste: Ajouter
+valeur: Code abrégé = l12bqa
+valeur: Civilité = PM
+valeur: Patronyme = NOUVEAU CREANCIER BANC
+valeur: Adresse = 9 place du Banc
+resultat: refuse
+message: Le code abrégé l12bqa est déjà utilisé. Merci de saisir une valeur différente.
+---
+# 3. Un patronyme de 129 caracteres (OPE_CREANREP.cs:82-84).
+geste: Ajouter
+valeur: Code abrégé = L12LONG
+valeur: Civilité = PM
+valeur: Patronyme = PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP
+valeur: Adresse = 9 place du Banc
+resultat: refuse
+message: Le patronyme du créancier est trop long. Un maximum de 128 caractères est accepté.
+---
+# 4. L'ajout : le creancier 2203004 (MAX + 1) et son adresse, fiche rec.Adresse neuve (etat info 1, AdresseBase.cs:182).
+geste: Ajouter
+valeur: Code abrégé = L12NEW
+valeur: Civilité = PM
+valeur: Patronyme = NOUVEAU CREANCIER BANC
+valeur: Siren = 912003009
+valeur: Adresse = 9 place du Banc
+valeur: Code postal = 13001
+valeur: Ville = MARSEILLE
+resultat: fait
+message: Créancier L12NEW (NOUVEAU CREANCIER BANC) ajouté au répertoire dans la base du greffe.
+lignes:
+BANQUE BANC ALPHA | L12BQA · 912 003 001 · PARIS | Personnes morales | AFaire | []
+CREDIT BANC BETA | L12CRB | Personnes morales | AFaire | []
+MARTIN BANC | L12MART · DIJON · désactivé | Personnes physiques | EnCours | []
+NOUVEAU CREANCIER BANC | L12NEW · 912 003 009 · MARSEILLE | Personnes morales | AFaire | []
+controle: SELECT COUNT(*) FROM v2.CREANCIER_REPERTO AS c INNER JOIN rec.Adresse AS a ON a.Id = c.CRRPR_ID_ADRBS WHERE c.CRRPR_ID_CRRPR = 2203004 AND c.CRRPR_SUPPRIME = 0 AND a.NomVoie = '9 place du Banc' AND a.CodePostal = '13001' AND a.EtatInfo = '1' => 1
+---
+# 5. Reactiver MARTIN BANC et changer sa ville : CRRPR_SUPPRIME a 0, la localite de SON adresse (2203102).
+geste: Modifier
+ids: 2203002
+valeur: Ville = BEAUNE
+valeur: Désactivé = 
+resultat: fait
+message: Créancier L12MART modifié dans le répertoire de la base du greffe : « Ville », « Désactivé ».
+lignes:
+BANQUE BANC ALPHA | L12BQA · 912 003 001 · PARIS | Personnes morales | AFaire | []
+CREDIT BANC BETA | L12CRB | Personnes morales | AFaire | []
+MARTIN BANC | L12MART · BEAUNE | Personnes physiques | AFaire | []
+NOUVEAU CREANCIER BANC | L12NEW · 912 003 009 · MARSEILLE | Personnes morales | AFaire | []
+controle: SELECT a.Localite FROM v2.CREANCIER_REPERTO AS c INNER JOIN rec.Adresse AS a ON a.Id = c.CRRPR_ID_ADRBS WHERE c.CRRPR_ID_CRRPR = 2203002 AND a.Id = 2203102 AND c.CRRPR_SUPPRIME = 0 => BEAUNE
+---
+# 6. Prendre le code abrege d'un autre creancier.
+geste: Modifier
+ids: 2203003
+valeur: Code abrégé = L12BQA
+resultat: refuse
+message: Le code abrégé L12BQA est déjà utilisé. Merci de saisir une valeur différente.
+---
+# 7. Rien de change.
+geste: Modifier
+ids: 2203001
+valeur: Patronyme = BANQUE BANC ALPHA
+resultat: refuse
+message: Aucune colonne n'est modifiée : le créancier garde les valeurs de la base.

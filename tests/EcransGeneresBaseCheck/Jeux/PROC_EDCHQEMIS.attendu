@@ -1,0 +1,5 @@
+# « Cheques emis » (LecteurChequesEmis) sur PROC_EDCHQEMIS.sql : a l'ouverture, les remboursements (type RBT) du jour, les deux cases
+# cochees (OPE_EDCHQEMIS.cs:34-37), un par encaissement, par identifiant. Ecartes de l'ouverture : 2200703 et 2200705 (juin 2025 :
+# PROC_EDCHQEMIS.recherches), 2200704 (pas un remboursement -- jumeau 2200703 dans les recherches).
+Remboursement RBT12001 | Trop-perçu · 45,00 € · le {J+0} · CLI REMBOURSE · L12RBTC | Trop-perçus | AFaire | [] | valeurs: Remboursement RBT12001 ; 45.00
+Remboursement RBT12002 | Notification · 30,00 € · le {J+0} · BENEFICIAIRE NOTIF · DGREFFE | Notifications | AFaire | [] | valeurs: Remboursement RBT12002 ; 30.00

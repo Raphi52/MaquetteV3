@@ -1,0 +1,7 @@
+# Les gestes de EcrivainReversementsInpi (« Reversements INPI », PROC_INPIPAY). Le rejet est reserve a l'equipe Amitel
+# (OPE_RESULTATS.cs:50-53) ; l'agent du banc ne l'est pas. Jumeau accepte : aucun sur ce banc -- le rendre Amitel changerait l'agent de
+# tous les autres jeux (meme reserve que PROC_ACTREJ.gestes) ; il se joue a l'ecran, sur la copie de developpement (agent Amitel).
+geste: Agir Rejeter
+ids: 2206001
+resultat: refuse
+message: Le rejet d'un fichier de reversements est réservé à l'équipe Amitel.

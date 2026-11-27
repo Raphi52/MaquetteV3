@@ -6,7 +6,20 @@
 #   1600407 le lendemain a 0 h -- 1600401, le jour a 10 h ;
 #   1600404 et 1600405 (mars 2025) : retrouves par PROC_RECHENC.recherches.
 # 1600401 a deux ventilations : deux lignes ; la seconde, d'un tiers payeur, n'a ni client ni affaire. Une remise -1 ne s'affiche pas.
+# Les encaissements R12* sont ceux du jour de PROC_REMBANQ.sql, RBT12* ceux de PROC_EDCHQEMIS.sql (lot 12) : cet ecran montre TOUS les encaissements
+# du jour, sans filtre de mode ; ils s'intercalent par heure (13 h, 12 h 30, 12 h, 11 h, 10 h 30 ; 9 h et 8 h par montant).
+Encaissement R12NEG11 · PAYEUR R12K | Espèces (banc 12) · 25,00 € · le {J+0} · remise -3 · sans ventilation | Encaissement sans ventilation | AFaire | []
+Encaissement R12CB10 · PAYEUR R12J | Carte (banc 12) · 300,00 € · le {J+0} · remise 42 · sans ventilation | Encaissement sans ventilation | AFaire | []
+Encaissement R12CB09 · PAYEUR R12I | Carte (banc 12) · 200,00 € · le {J+0} · remise 41 · sans ventilation | Encaissement sans ventilation | AFaire | []
+Encaissement R12TPE04 · PAYEUR R12D | Terminal sans banque (banc 12) · 33,33 € · le {J+0} · sans ventilation | Encaissement sans ventilation | AFaire | []
+Encaissement R12CB03 · PAYEUR R12C | Carte (banc 12) · 45,00 € · le {J+0} · sans ventilation | Encaissement sans ventilation | AFaire | []
+Encaissement RBT12002 · GREFFE | Remboursement (banc 12) · 30,00 € · le {J+0} · ventilé 30,00 € · client DGREFFE · DIVERS GREFFE · affaire 2209301 | Encaissement ventilé | Validee | []
 Encaissement L6CHQ001 · PAYEUR ALPHA | Chèque · 1 200,00 € · le {J+0} · BANQUE BANC · remise 12 · ventilé 1 000,00 € · client L6ALPHA · CLI ALPHA · affaire 1600431 | Encaissement ventilé | Validee | []
 Encaissement L6CHQ001 · PAYEUR ALPHA | Chèque · 1 200,00 € · le {J+0} · BANQUE BANC · remise 12 · ventilé 200,00 € | Encaissement ventilé | Validee | []
+Encaissement RBT12001 · GREFFE | Remboursement (banc 12) · 45,00 € · le {J+0} · ventilé 45,00 € · client L12RBTC · CLI REMBOURSE · affaire 2209301 | Encaissement ventilé | Validee | []
+Encaissement R12ESP02 · PAYEUR R12B | Espèces (banc 12) · 79,50 € · le {J+0} · sans ventilation | Encaissement sans ventilation | AFaire | []
 Encaissement L6VIR002 · PAYEUR BETA | Virement · 850,00 € · le {J+0} · sans ventilation | Encaissement sans ventilation | AFaire | []
+Encaissement R12NS05 · PAYEUR R12E | Non saisissable (banc 12) · 10,00 € · le {J+0} · sans ventilation | Encaissement sans ventilation | AFaire | []
+Encaissement R12PV06 · PAYEUR R12F | Provision · 15,00 € · le {J+0} · sans ventilation | Encaissement sans ventilation | AFaire | []
+Encaissement R12ESP01 · PAYEUR R12A | Espèces (banc 12) · 120,50 € · le {J+0} · sans ventilation | Encaissement sans ventilation | AFaire | []
 Encaissement n° 1600403 · L6GAMMA · CLI GAMMA | ESP · 50,00 € · le {J+0} · sans ventilation | Encaissement sans ventilation | AFaire | []

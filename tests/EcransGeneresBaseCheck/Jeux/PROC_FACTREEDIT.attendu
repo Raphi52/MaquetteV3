@@ -1,0 +1,5 @@
+# « Refacturation » (LecteurRefacturation) sur PROC_FACTREEDIT.sql : les factures dont une edition FACT a abouti (phase E, P, G ou GT,
+# OPE_REVIEW.cs:81-82), creees jusqu'a aujourd'hui, une ligne par facture, les plus recentes d'abord. Ecartees (jumeaux dans le .sql) :
+# F12E003 (phase A), F12E004 (processus COUR), F12E005 (demain).
+Facture F12E002 | émise le {J-5} · 80,40 € TTC · L12FACT · CLI REFACTURATION | Factures émises | AFaire | [] | valeurs: F12E002 ; {J-5} ; 80.40 ; L12FACT
+Facture F12E001 | émise le {J-10} · 125,00 € TTC · L12FACT · CLI REFACTURATION | Factures émises | AFaire | [] | valeurs: F12E001 ; {J-10} ; 125.00 ; L12FACT

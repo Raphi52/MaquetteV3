@@ -59,6 +59,9 @@ valeur: Identité › Lien débiteur principal = société du même groupe
 resultat: fait
 message: Débiteur EXT UN (PC 1990P14101) enregistré dans la base du greffe : « Date d'extension », « Lien débiteur principal ».
 lignes:
+PC VERROUILLEE GAMMA | PC L12PC0003 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+PC CREANCES BETA | PC L12PC0002 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+PC CREANCES ALPHA | PC L12PC0001 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
 MPC ZETA | PC 2027P16106 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
 MPC EPSILON | PC 2027P16105 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
 MPC DELTA | PC 2027P16104 · débiteur principal · sans extension | Débiteur principal | EnAttente | []

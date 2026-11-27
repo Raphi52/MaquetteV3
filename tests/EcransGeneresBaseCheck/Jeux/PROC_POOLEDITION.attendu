@@ -25,6 +25,13 @@ EDITION BETA SAS · 2020 B 40402 · demande 26000200422 | Certificat · à EDITI
 édition n° 1706413 | Convocation · à CONVOC NPAI SARL · émise le 02/07/2001 | Courrier | Validee | [0,1,2,3]
 édition n° 1706412 | Convocation · à CONVOC CITEE SAS · émise le 01/07/2001 | Courrier | Validee | [0,1,2,3]
 édition n° 1706411 | Convocation · à CONVOC A CITER SARL · émise le 01/07/2001 | Courrier | Validee | [0,1,2,3]
+# Lot 12 : les editions de factures de PROC_FACTREEDIT.sql (2208501-2208506, creees le 01/01/2000, avant celles sans date).
+demande D12FACT005 | Facture F12E005 · émise le 01/01/2000 | Courrier | Validee | [0,1,2,3]
+demande D12FACT004 | Courrier F12E004 · émise le 01/01/2000 | Courrier | Validee | [0,1,2,3]
+demande D12FACT003 | Facture F12E003 · créée le 01/01/2000 · phase « A » de l'ancien RIG | Courrier | EnCours | [0]
+demande D12FACT002 | Facture F12E002 (copie) · créée le 01/01/2000 | Courrier | EnCours | [0,1,2]
+demande D12FACT002 | Facture F12E002 · créée le 01/01/2000 | Courrier | EnCours | [0,1,2]
+demande D12FACT001 | Facture F12E001 · émise le 01/01/2000 | Courrier | Validee | [0,1,2,3]
 # Lot 11 : les plis de PROC_BORDLR.sql (2110001-2110006, émis les 15 et 16/03/2001) et de PROC_RETOURLRAR.sql (2110101-2110105, émis le
 # 20/03/2001), sans date de création : avant ceux du lot 10, par numéro décroissant.
 édition n° 2110105 | Lettre electronique du banc 11 · à RETOUR GAMMA SARL · émise le 20/03/2001 | Courrier | Validee | [0,1,2,3]

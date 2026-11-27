@@ -1,0 +1,6 @@
+# « Representation » (LecteurRepertoireCreanciers) sur PROC_CREANREP.sql : tout le repertoire des creanciers, desactives compris
+# (OPE_SELECTION_CREANREP.cs:11), par code abrege. Pas de filtre : rien d'ecarte. Groupe : civilite PM -> personnes morales.
+# Etat : desactive -> EnCours (il se reactive) ; sinon AFaire. Les cellules suivent les Colonnes du descripteur.
+BANQUE BANC ALPHA | L12BQA · 912 003 001 · PARIS | Personnes morales | AFaire | []
+CREDIT BANC BETA | L12CRB | Personnes morales | AFaire | []
+MARTIN BANC | L12MART · DIJON · désactivé | Personnes physiques | EnCours | [] | valeurs: L12MART ; M. ; MARTIN BANC ; Paul ;  ;  ;  ; 3 rue Haute ; 21000 ; DIJON ; oui

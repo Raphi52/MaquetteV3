@@ -1,0 +1,18 @@
+# Les recherches de LecteurChequesEmis : la periode et les deux cases de OPE_EDCHQEMIS (EmisTropPercus.cs:102-106).
+# 1. Juin 2025, sans case cochee : les deux origines (le defaut de la V2). 2200704 n'est pas un remboursement : ecarte.
+critere: Période = 01/06/2025|30/06/2025
+lignes:
+Remboursement RBT12003 | Trop-perçu · 20,00 € · le 10/06/2025 · CLI REMBOURSE · L12RBTC | Trop-perçus | AFaire | []
+Remboursement RBT12005 | Notification · 25,00 € · le 12/06/2025 · BENEFICIAIRE JUIN · DGREFFE | Notifications | AFaire | []
+---
+# 2. Notifications seule : ENCMT_ORIGINE = 'NTF'.
+critere: Période = 01/06/2025|30/06/2025
+critere: Notifications = oui
+lignes:
+Remboursement RBT12005 | Notification · 25,00 € · le 12/06/2025 · BENEFICIAIRE JUIN · DGREFFE | Notifications | AFaire | []
+---
+# 3. Trop-perçus seule : ENCMT_ORIGINE vide. La borne haute du 10/06 inclut la journee (ToSQL24Heure).
+critere: Période = 01/06/2025|10/06/2025
+critere: Trop-perçus = oui
+lignes:
+Remboursement RBT12003 | Trop-perçu · 20,00 € · le 10/06/2025 · CLI REMBOURSE · L12RBTC | Trop-perçus | AFaire | []

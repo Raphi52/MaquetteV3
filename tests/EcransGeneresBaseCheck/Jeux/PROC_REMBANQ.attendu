@@ -1,0 +1,16 @@
+# « Remise en banque » (LecteurRemiseEnBanque) sur PROC_REMBANQ.sql : les encaissements du jour, de 0 h a 24 h (TreeViewModePaiement.cs:
+# 262-263), des modes utilisables en saisie hors REG et PV (OPE_MODEPAIEMENT.cs:43) ; a remettre (ENCMT_REMIS vide) d'abord, puis
+# les remis du jour (ajout de la V3, en tete du lecteur) ; par libelle de mode, date, identifiant.
+# Ecartes, chacun avec son jumeau retenu :
+#   2201005 (mode non saisissable) et 2201006 (PV)      -- 2201001, meme jour, mode L12ESP ;
+#   2201007 la veille a 23 h 30, 2201008 le lendemain   -- 2201001 (le jour a 8 h), 2201004 (le jour a 11 h) ;
+#   2201011 remis negatif (-3, un brouillon)             -- 2201009 (remis 41) ;
+#   2201013 le mois precedent                            -- 2201001 (ce mois-ci) ; il sert au refus « mois differents ».
+# Les modes CHQ et VIR de PROC_RECHENC.sql n'ont pas la saisie (colonne ajoutee vide) : leurs encaissements n'entrent pas ici.
+# Etat : a remettre -> AFaire ; remis non comptabilise (41) -> EnCours, annulable ; remis comptabilise (42) -> Validee, fige.
+Encaissement R12CB03 | Carte (banc 12) · 45,00 € · le {J+0} · PAYEUR R12C · à remettre | Encaissements de la période | AFaire | []
+Encaissement R12ESP01 | Espèces (banc 12) · 120,50 € · le {J+0} · PAYEUR R12A · à remettre | Encaissements de la période | AFaire | []
+Encaissement R12ESP02 | Espèces (banc 12) · 79,50 € · le {J+0} · PAYEUR R12B · à remettre | Encaissements de la période | AFaire | []
+Encaissement R12TPE04 | Terminal sans banque (banc 12) · 33,33 € · le {J+0} · PAYEUR R12D · à remettre | Encaissements de la période | AFaire | []
+Encaissement R12CB09 | Carte (banc 12) · 200,00 € · le {J+0} · PAYEUR R12I · remis n° 41 | Encaissements de la période | EnCours | [] | valeurs: Encaissement R12CB09 ; Carte (banc 12) ; 200.00 ; 41
+Encaissement R12CB10 | Carte (banc 12) · 300,00 € · le {J+0} · PAYEUR R12J · remis n° 42 | Encaissements de la période | Validee | [] | valeurs: Encaissement R12CB10 ; Carte (banc 12) ; 300.00 ; 42

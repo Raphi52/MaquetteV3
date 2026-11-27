@@ -1,0 +1,91 @@
+# Les gestes de EcrivainAjoutCreance (« Ajouter une créance », PROC_ADDCREANCE), joues dans l'ordre par la route POST, sur les lignes
+# de PROC_ADDCREANCE.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs. Chaque refus a son jumeau accepte : bloc 6,
+# qui porte une PC, un creancier complet et deux montants. Joue AVANT PROC_INTEGCREANCE.gestes et PROC_MODCREANCE.gestes (ordre
+# alphabetique) : la creance ajoutee ici est celle que PROC_MODCREANCE.gestes modifie (« ajoutée puis modifiée »).
+# 1. Sans PC (le parametre IdPC de l'appelant de la V2).
+geste: Creer
+valeur: Créancier › Civilité = SOCIETE
+valeur: Créancier › Désignation = CREANCIER AJOUT G
+valeur: Créancier › Adresse = 1 rue du Banc
+valeur: Montants › Privilégié échu = 1 234,56
+resultat: refuse
+message: « Procédure collective › Numéro de PC » est obligatoire.
+---
+# 2. Sans designation (OPE_CREANCIER.Designer.cs, MetierObligatoire).
+geste: Creer
+valeur: Procédure collective › Numéro de PC = L12PC0001
+valeur: Créancier › Civilité = SOCIETE
+valeur: Créancier › Adresse = 1 rue du Banc
+valeur: Montants › Privilégié échu = 1 234,56
+resultat: refuse
+message: « Créancier › Désignation » est obligatoire.
+---
+# 3. Sans montant (OPE_CREANCE.cs:315-320).
+geste: Creer
+valeur: Procédure collective › Numéro de PC = L12PC0001
+valeur: Créancier › Civilité = SOCIETE
+valeur: Créancier › Désignation = CREANCIER AJOUT G
+valeur: Créancier › Adresse = 1 rue du Banc
+resultat: refuse
+message: Au moins un montant doit être saisi pour cette créance. Veuillez renseigner au moins un montant de créance dans la ou les cases concernées.
+---
+# 4. Une PC que la base n'a pas : l'integration echoue, la V2 supprime la transitoire et leve l'erreur (PROC_ADDCREANCE.cs:401-408).
+geste: Creer
+valeur: Procédure collective › Numéro de PC = L12PCXXXX
+valeur: Créancier › Civilité = SOCIETE
+valeur: Créancier › Désignation = CREANCIER AJOUT G
+valeur: Créancier › Adresse = 1 rue du Banc
+valeur: Montants › Privilégié échu = 1 234,56
+resultat: refuse
+message: Impossible d'intégrer la créance à cause de l'erreur suivante : PC absente en base. Veuillez corriger les problèmes pour pouvoir valider l'ajout de la créance.
+---
+# 5. Une contestation : RIG v2 cree une instance (IntegrationCreances.cs:186-500), la V3 refuse sans rien ecrire.
+geste: Creer
+valeur: Procédure collective › Numéro de PC = L12PC0001
+valeur: Créancier › Civilité = SOCIETE
+valeur: Créancier › Désignation = CREANCIER AJOUT G
+valeur: Créancier › Adresse = 1 rue du Banc
+valeur: Mode › Contestation = oui
+valeur: Montants › Rejeté = 50
+resultat: refuse
+message: Une contestation de créance : RIG v2 crée alors une instance (numéro de rôle, parties, décision, événements), que la V3 ne crée pas encore. Rien n'est enregistré.
+---
+# 6. L'admission : la transitoire 2202108 (MAX + 1), integree aussitot -- creancier PC 2202303, creance PC 2202203, numero d'ordre 2
+# (la PC a deja la creance 2202201), montants copies au centime ; la PC sauvee (compteur 3 -> 4, etat info 4 -> 2).
+geste: Creer
+valeur: Procédure collective › Numéro de PC = L12PC0001
+valeur: Créancier › Civilité = SOCIETE
+valeur: Créancier › Désignation = CREANCIER AJOUT G
+valeur: Créancier › N° SIREN = 912 000 007
+valeur: Créancier › Adresse = 1 rue du Banc
+valeur: Créancier › Code postal = 75001
+valeur: Créancier › Ville = PARIS
+valeur: Montants › Privilégié échu = 1 234,56
+valeur: Montants › Chirographaire échu = 100.10
+valeur: Créance › Nature = Fournitures
+resultat: fait
+message: Créance n° 2 de la PC L12PC0001 ajoutée dans la base du greffe pour CREANCIER AJOUT G (admis 1 334,66 €) ; l'avis d'admission n'est pas édité par la V3.
+lignes:
+CREANCIER AJOUT G | PC L12PC0001 · admis 1 334,66 € · saisie le {J+0} · intégrée le {J+0} | Admission | Validee | [0,1,3,4,6]
+CREANCIER CONTESTE D | PC L12PC0001 · aucun montant admis · rejeté 500,00 € · saisie le {J-1} · à intégrer | Contestation | EnCours | [0,1,2,3,5]
+CREANCIER ERREUR C | PC L12PCXXXX · admis 10,00 € · saisie le {J-2} · erreur : PC absente en base | Admission | EnCours | [0,1,3]
+CREANCIER ATTENTE B | PC L12PC0001 · admis 250,75 € · saisie le {J-2} · à intégrer | Admission | EnCours | [0,1,3,4]
+CREANCIER ANCIEN E | PC L12PC0002 · admis 300,00 € · saisie le {J-2} · à intégrer | Admission | EnCours | [0,1,3]
+CREANCIER INTEGRE A | PC L12PC0001 · admis 1 000,00 € · saisie le {J-3} · intégrée le {J-3} | Admission | Validee | [0,1,3,6]
+Créance transitoire n° 2202107 | sans PC · aucun montant admis · saisie le {J-4} · à intégrer | Admission | AFaire | []
+controle: SELECT CAST(CRNPC_ADMIS_PRIVI_ECHU AS decimal(19,2)) FROM v2.CREANCE_PC WHERE CRNPC_ID_CRNPC = 2202203 AND CRNPC_ID_PRCLL = 2202001 AND CRNPC_NUM_ORDRE = 2 => 1234.56
+controle: SELECT CAST(CRNPC_ADMIS_CHIRO_ECHU AS decimal(19,2)) FROM v2.CREANCE_PC WHERE CRNPC_ID_CRNPC = 2202203 AND CRNPC_ID_CREPC = 2202303 AND CRNPC_MONNAIE = 'EUR' AND CRNPC_NATURE_CREANCE = 'Nature' AND CRNPC_NATURE_CREANCE_ADM = 'Fournitures' AND CRNPC_ETAT_CREANCE = '0' => 100.10
+controle: SELECT COUNT(*) FROM v2.CREANCIER_PC WHERE CREPC_ID_CREPC = 2202303 AND CREPC_NOM = 'CREANCIER AJOUT G' AND CREPC_CIVILITE = 'SOCIETE' AND CREPC_SIREN = '912000007' AND CREPC_MODE_PRESENTATION = 'A' AND CREPC_SUBROGE = 0 => 1
+controle: SELECT CONVERT(varchar(10), PRCLL_COMPTEUR_MAJ) + ' ' + PRCLL_ETAT_INFO FROM v2.PROCEDURE_COLLECTIVE WHERE PRCLL_ID_PRCLL = 2202001 => 4 2
+controle: SELECT COUNT(*) FROM v2.CREANCE_TRANSITOIRE WHERE CRTRA_ID_CRTRA = 2202108 AND CRTRA_DATE_INSERTION_RIG IS NOT NULL AND CRTRA_NOM_FICHIER = 'AMITEL' AND CRTRA_LIGNE_ADRESSE_CR = '1 rue du Banc' AND CRTRA_CP_CR = '75001' => 1
+controle: SELECT COUNT(*) FROM v2.DEMANDE AS d INNER JOIN v2.AFFAIRE AS a ON a.AFFRE_ID_AFFRE = d.DMND_ID_AFFRE WHERE d.DMND_CODE_PROSS = 'INTCREA' AND d.DMND_ETAT_DEMANDE = 'Q' AND d.DMND_NOM = 'Admission créance CREANCIER AJOUT G' AND d.DMND_LES_NUMEROS = 'L12PC0001' AND d.DMND_NUM_INDICATIF = 'L12PC0001' AND a.AFFRE_LIBELLE = 'Intégration auto de créances' => 1
+---
+# 7. Une admission sur la PC ouverte en 2005 (avant le 15/02/2009, EditionAvisPC) : une instance dans RIG v2 -- refusee, rien d'ecrit.
+geste: Creer
+valeur: Procédure collective › Numéro de PC = L12PC0002
+valeur: Créancier › Civilité = SOCIETE
+valeur: Créancier › Désignation = CREANCIER AJOUT H
+valeur: Créancier › Adresse = 2 rue du Banc
+valeur: Montants › Privilégié échu = 10
+resultat: refuse
+message: Une admission sur la PC L12PC0002, ouverte avant le 15/02/2009 (sans avis d'admission) : RIG v2 crée alors une instance (numéro de rôle, parties, décision, événements), que la V3 ne crée pas encore. Rien n'est enregistré.

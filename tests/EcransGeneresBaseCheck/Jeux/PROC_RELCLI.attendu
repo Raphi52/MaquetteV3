@@ -1,0 +1,6 @@
+# « Releve de compte » (LecteurRelevesClients) sur PROC_RELCLI.sql : les comptes Standard et Greffes actifs, au releve de factures, au
+# dernier solde valide, debiteurs au-dela du rompu (1,52 €), par code abrege. Solde courant = dernier solde + ventilations - factures
+# posterieures. Ecartes (jumeaux dans PROC_RELCLI.sql) : 2207203 (sous le rompu), 2207204 (sans releve), 2207205 (en sommeil),
+# 2207206 (compte web), 2207207 (sans solde).
+CLI RELEVE A | L12RELA · compte 411L12RELA · solde débiteur 150,00 € · dernier solde validé le {J-60} : -50,00 € | Standard | AFaire | []
+GREFFE RELEVE G | L12RELG · compte 411L12RELG · solde débiteur 10,00 € · dernier solde validé le {J-60} : -10,00 € | Greffes | AFaire | []

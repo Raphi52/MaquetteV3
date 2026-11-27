@@ -18,6 +18,9 @@ public sealed class DomaineFacturer : IDomaineEcrans
         {
             Code = "PROC_FACTREEDIT", Titre = "Refacturation", Sujet = "factures émises",
             Forme = FormeEcran.File,
+            // Lot 12 (27/11/2026) : la liste de la base, LecteurRefacturation.cs ; les colonnes de la grille V2 (OPE_REVIEW.cs:43-57)
+            // et le client (la V3 liste tous les clients). La réédition (édition) n'est pas reprise : « Valider » reste une démonstration.
+            Colonnes = ["Numéro de facture", "Date de facturation", Champ.Montant("Montant TTC"), "Client"],
             Recherche = "Rechercher une facture, un numéro, un montant…",
             Criteres = ["Client", "Période de facturation (du, au)"],
             // Bouton cité par la fiche (proc_factreedit.md) : « VALIDER/QUITTER par défaut ».
@@ -119,6 +122,10 @@ public sealed class DomaineFacturer : IDomaineEcrans
         {
             Code = "PROC_INPIPAY", Titre = "Reversements INPI", Sujet = "reversements INPI",
             Forme = FormeEcran.File,
+            // Lot 12 (27/11/2026) : la liste et le geste de la base, LecteurReversementsInpi.cs (et son écrivain). Le geste repris :
+            // « Rejeter » (menu de la grille, réservé à Amitel, OPE_RESULTATS.cs:50-101). VALIDER lit le fichier XML de l'INPI et crée
+            // l'encaissement (OPE_VALIDATION.cs:67-205) : non repris par la V3, nommé dans l'écrivain.
+            Gestes = ["Rejeter"],
             Recherche = "Rechercher un reversement, un identifiant de paiement…",
             Criteres = ["Période de réception", "Identifiant de paiement", "État : à valider, validé ou rejeté"],
             // Bouton cité par la fiche (proc_inpipay.md) : « bouton valider » (OPE_VALIDATION).
@@ -160,6 +167,12 @@ public sealed class DomaineFacturer : IDomaineEcrans
         {
             Code = "PROC_GINPI", Titre = "Formalites INPI", Sujet = "formalités INPI",
             Forme = FormeEcran.File,
+            // Lot 12 (27/11/2026) : la liste et le geste de la base, LecteurFormalitesInpi.cs et EcrivainFormalitesInpi.cs ; les colonnes
+            // de la grille V2 (DataGridViewResultat._InitColumns, :45-120), sans le n° de liaison ; l'ouverture : le mois précédent, en
+            // attente de paiement ou paiement partiel (OPE_SAISIE.cs:64-71).
+            Colonnes = ["Affaire", "N° facture", Champ.Montant("Facturé"), Champ.Montant("Prévu INPI"), Champ.Montant("Reçu INPI"), Champ.Montant("Reçu autre"),
+                        Champ.Montant("Solde actuel"), "État"],
+            Gestes = ["Régulariser l'anomalie"],
             Recherche = "Rechercher une affaire, un montant, un paiement…",
             Criteres = ["Période (date de début et de fin)", "Critères de paiement (cumulables)", "Non soldées uniquement"],
             // Action citée par la fiche (proc_ginpi.md) : menu contextuel « Régulariser l'anomalie ».
@@ -188,73 +201,83 @@ public sealed class DomaineFacturer : IDomaineEcrans
             ],
         },
 
+        // Lot 12 (27/11/2026) : la liste et le geste de la base, LecteurRejetsEncaissement.cs et EcrivainRejetsEncaissement.cs.
+        // RIG v2 ouvre le rejet sur UN chèque, depuis la gestion commerciale (MenuEncaissement.cs:156-163, :355-363) : la V3
+        // liste les chèques pour en choisir un. Après le rejet, la V2 supprime l'encaissement non comptabilisé ou l'annule par
+        // un encaissement opposé s'il est comptabilisé (:381-390) : la V3 fait de même, dans la même transaction.
         new DescripteurEcran
         {
-            Code = "PROC_REJET", Titre = "Rejets d'encaissement", Sujet = "encaissements rejetés",
+            Code = "PROC_REJET", Titre = "Rejets d'encaissement", Sujet = "chèques rejetés",
             Forme = FormeEcran.Operation,
-            Recherche = "Rechercher un encaissement, un numéro de titre…",
+            Recherche = "Rechercher un chèque, un payeur, un motif…",
             Criteres = ["Encaissement d'origine", "Motif du rejet", "Destinataire de la lettre"],
             // Action citée par la fiche (proc_rejet.md) : « DoValider » (enregistrement puis clôture).
             Valider = "Valider",
             Rang = 6,
-            Etats = EtatsEcran.Trois("À rédiger", "Motif saisi", "Lettre émise"),
-            Groupes = ["Chèques rejetés", "Titres impayés"],
+            // La liste lue porte « À rejeter » (un chèque) ou « Rejet enregistré » ; le motif se saisit avant de confirmer.
+            Etats = EtatsEcran.Trois("À rejeter", "Motif saisi", "Rejet enregistré"),
+            Groupes = ["Chèques", "Rejets enregistrés"],
             Sections =
             [
-                Marche("Encaissement rejeté", "Lecture seule : numéro de titre, date, montant, payeur et banque, repris de l'encaissement.", true,
-                    "Numéro de titre", "Date", "Montant", "Payeur", "Banque"),
-                Marche("Destinataire", "Contact, adresse et e-mail viennent du client de la première ventilation. Un champ vide ne bloque pas la lettre : il est signalé.", false,
-                    "Contact", "Adresse", "E-mail"),
+                // fix-ok: mesure a l'ecran (banc 9201, 27/11/2026) -- les champs de cette section et de « Suite de l'encaissement » s'affichaient
+                // vides et saisissables, et EcrivainRejetsEncaissement ne lit que Destinataire et Motif : ils se lisent sur la ligne choisie.
+                Marche("Encaissement rejeté", "Le chèque choisi : numéro de titre, date, montant, payeur et banque se lisent sur sa ligne, repris de l'encaissement. Seul un chèque se rejette, jamais une provision.", false),
+                Marche("Destinataire", "Contact, adresse et e-mail viennent du client de la première ventilation s'ils ne sont pas saisis. Un champ vide ne bloque pas la lettre.", false,
+                    "Contact", Champ.Zone("Adresse"), "E-mail"),
                 Marche("Motif", "Le motif est obligatoire : sans motif, le rejet ne s'enregistre pas.", true,
                     "Motif du rejet"),
-                Marche("Lettre de rejet", "La lettre est générée puis archivée en GED ; la demande se clôture à la validation. Si l'enregistrement échoue, le rejet est annulé.", true,
-                    "Lettre", "Archivage GED"),
+                Marche("Suite de l'encaissement", "Non comptabilisé, l'encaissement est supprimé avec ses ventilations ; comptabilisé, il est annulé par un encaissement opposé (mode REG) et des ventilations opposées. La lettre de rejet (édition, GED) n'est pas produite par la V3.", false),
             ],
             Lignes =
             [
-                Ligne("Chèque n° 0045871", $"Rejeté le 05/03/2026 · {Euros(85_000)} · Alpha Services SARL", "Chèques rejetés", "Validee", 0, 1, 2, 3),
-                Ligne("Chèque n° 0045902", $"Rejeté le 09/03/2026 · {Euros(124_000)} · Gamma Conseil SARL", "Chèques rejetés", "EnCours", 0, 1),
-                Ligne("Titre n° 2026-118", $"Impayé le 12/03/2026 · {Euros(41_500)} · Epsilon Habitat SARL", "Titres impayés", "EnCours", 0, 2),
-                Ligne("Titre n° 2026-124", $"Impayé le 16/03/2026 · {Euros(9_900)} · Zêta Commerce SAS", "Titres impayés", "AFaire"),
-                Ligne("Chèque n° 0045944", $"Rejeté le 20/03/2026 · {Euros(211_000)} · Êta Boulangerie SARL", "Chèques rejetés", "AFaire"),
-                Ligne("Chèque n° 0045960", $"Rejeté le 23/03/2026 · {Euros(56_000)} · Thêta Import SAS", "Chèques rejetés", "Validee", 0, 1, 2, 3),
-                Ligne("Titre n° 2026-131", $"Impayé le 27/03/2026 · {Euros(73_000)} · Iota Études SARL", "Titres impayés", "AFaire"),
+                Ligne("Chèque n° 0045871", $"Chèque · {Euros(85_000)} · encaissé le 05/03/2026 · Alpha Services SARL · non comptabilisé", "Chèques", "AFaire"),
+                Ligne("Chèque n° 0045902", $"Chèque · {Euros(124_000)} · encaissé le 09/03/2026 · Gamma Conseil SARL · comptabilisé", "Chèques", "AFaire"),
+                Ligne("Rejet n° 12 · chèque 0045960", $"rejeté le 23/03/2026 · {Euros(56_000)} · Thêta Import SAS · motif : provision insuffisante", "Rejets enregistrés", "Validee"),
+                Ligne("Chèque n° 0045944", $"Chèque · {Euros(211_000)} · encaissé le 20/03/2026 · Êta Boulangerie SARL · non comptabilisé", "Chèques", "AFaire"),
+                Ligne("Chèque n° 0045951", $"Chèque · {Euros(9_900)} · encaissé le 21/03/2026 · Zêta Commerce SAS · comptabilisé", "Chèques", "AFaire"),
+                Ligne("Rejet n° 11 · chèque 0045801", $"rejeté le 02/03/2026 · {Euros(41_500)} · Epsilon Habitat SARL · motif : opposition", "Rejets enregistrés", "Validee"),
             ],
         },
 
         // Garde « mode de paiement sans banque » : le Détail OPE montre qu'elle n'est jamais
         // exécutée dans le code. Elle n'est donc pas reprise comme règle de l'écran.
+        // Lot 12 (27/11/2026) : la liste et les gestes de la base, LecteurRemiseEnBanque.cs et EcrivainRemiseEnBanque.cs.
+        // Le groupe par mode de la V2 (un noeud par mode) devient la colonne « Mode de paiement » : les libellés des
+        // modes sont ceux du greffe (MODE_PAIEMENT), pas une liste fixe. Les gestes : Définitif (« Générer un bordereau »,
+        // OPE_ACTIONS.cs:80-104) et Annuler (OPE_ACTIONS.cs:262-283) ; brouillon et réédition sont des éditions sans écriture.
         new DescripteurEcran
         {
             Code = "PROC_REMBANQ", Titre = "Remise en banque", Sujet = "encaissements à remettre",
             Forme = FormeEcran.File,
+            Colonnes = ["Encaissement", "Mode de paiement", Champ.Montant("Montant"), "Remis"],
+            Gestes = ["Générer un bordereau", "Annuler le remis"],
             Recherche = "Rechercher un encaissement, un mode de paiement, un numéro de remis…",
             Criteres = ["Période (du, au) : un seul mois", "Utilisateurs (tous par défaut)", "Mode de paiement"],
             // Action citée par la fiche (proc_rembanq.md) : « Générer un bordereau de remise en banque ».
             Valider = "Générer un bordereau",
             Rang = 6,
-            Etats = EtatsEcran.Trois("À remettre", "Sélectionné", "Remis en banque"),
-            Groupes = ["Chèque", "Carte bancaire", "Espèces"],
+            // États : à remettre (ENCMT_REMIS vide), remis encore annulable (non comptabilisé), remis comptabilisé.
+            Etats = EtatsEcran.Trois("À remettre", "Remis en banque", "Remis et comptabilisé"),
+            Groupes = ["Encaissements de la période"],
             Sections =
             [
-                Marche("Période et utilisateurs", "Une période dans un seul mois : sinon le bordereau est refusé. Les utilisateurs se cochent ; changer la période remet la sélection à tous.", true,
+                Marche("Période et utilisateurs", "La période du jour, tous les utilisateurs, comme à l'ouverture de RIG v2. Un remis ne mélange pas deux mois : sinon le bordereau est refusé.", true,
                     "Date de début", "Date de fin", "Utilisateurs"),
-                Marche("Encaissements à remettre", "Arbre par mode de paiement. Un encaissement est à remettre tant qu'il n'a pas de numéro de remis. Cocher un mode coche tous ses encaissements.", true,
+                Marche("Encaissements à remettre", "Les encaissements du jour par mode de paiement utilisable en saisie (hors REG et PV). Un encaissement est à remettre tant qu'il n'a pas de numéro de remis.", true,
                     "Mode de paiement", "Encaissement"),
-                Marche("Bordereau", "Brouillon : aperçu, rien n'est enregistré. Définitif : confirmation, puis impression et rattachement des encaissements. Aucun encaissement coché : refusé.", true,
-                    "Brouillon", "Définitif"),
-                Marche("Rééditer ou annuler", "Rééditer reprend un remis à partir de son numéro. Annuler détache les seuls encaissements non comptabilisés, après confirmation.", false,
+                Marche("Bordereau", "Définitif : le numéro de remis suivant, un par mode, et la banque du mode sont posés sur les encaissements cochés. Un mode sans banque reste à remettre. Aucun encaissement coché : refusé.", true,
+                    "Définitif"),
+                Marche("Annuler", "Annuler un remis détache ses seuls encaissements non comptabilisés ; un remis déjà comptabilisé ne s'annule pas.", false,
                     "Numéro de remis", "Annuler"),
             ],
             Lignes =
             [
-                Ligne("Encaissement 2026-0311-07", $"Chèque · {Euros(48_000)} · remis n° 2026-014", "Chèque", "Validee", 0, 1, 2),
-                Ligne("Encaissement 2026-0311-09", $"Chèque · {Euros(112_000)} · remis n° 2026-014", "Chèque", "Validee", 0, 1, 2),
-                Ligne("Encaissement 2026-0312-02", $"Carte bancaire · {Euros(21_500)}", "Carte bancaire", "EnCours", 0, 1),
-                Ligne("Encaissement 2026-0313-05", $"Carte bancaire · {Euros(8_900)}", "Carte bancaire", "AFaire"),
-                Ligne("Encaissement 2026-0314-01", $"Espèces · {Euros(30_000)}", "Espèces", "AFaire"),
-                Ligne("Encaissement 2026-0316-04", $"Espèces · {Euros(4_650)}", "Espèces", "EnCours", 0),
-                Ligne("Encaissement 2026-0318-08", $"Chèque · {Euros(230_000)}", "Chèque", "AFaire"),
+                Ligne("Encaissement 2026-0311-07", $"Chèque · {Euros(48_000)} · remis n° 14", "Encaissements de la période", "Validee") with { Valeurs = ["Encaissement 2026-0311-07", "Chèque", "480.00", "14"] },
+                Ligne("Encaissement 2026-0311-09", $"Chèque · {Euros(112_000)} · remis n° 15", "Encaissements de la période", "EnCours") with { Valeurs = ["Encaissement 2026-0311-09", "Chèque", "1120.00", "15"] },
+                Ligne("Encaissement 2026-0312-02", $"Carte bancaire · {Euros(21_500)} · à remettre", "Encaissements de la période", "AFaire") with { Valeurs = ["Encaissement 2026-0312-02", "Carte bancaire", "215.00", ""] },
+                Ligne("Encaissement 2026-0313-05", $"Carte bancaire · {Euros(8_900)} · à remettre", "Encaissements de la période", "AFaire") with { Valeurs = ["Encaissement 2026-0313-05", "Carte bancaire", "89.00", ""] },
+                Ligne("Encaissement 2026-0314-01", $"Espèces · {Euros(30_000)} · à remettre", "Encaissements de la période", "AFaire") with { Valeurs = ["Encaissement 2026-0314-01", "Espèces", "300.00", ""] },
+                Ligne("Encaissement 2026-0314-02", $"Espèces · {Euros(4_650)} · à remettre", "Encaissements de la période", "AFaire") with { Valeurs = ["Encaissement 2026-0314-02", "Espèces", "46.50", ""] },
             ],
         },
 
@@ -269,7 +292,8 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Colonnes = ["Remboursement", Champ.Montant("Montant")],
             Gestes = ["Voir"],
             Recherche = "Rechercher un remboursement, une période…",
-            Criteres = ["Période (du, au) : aujourd'hui par défaut", "Trop-perçus", "Notifications"],
+            // Les critères cherchés dans la base (LecteurChequesEmis, lot 12) : les libellés des Paramètres, au mot près.
+            Criteres = ["Période", "Trop-perçus", "Notifications"],
             // Bouton cité par la fiche (proc_edchqemis.md) : « un seul bouton, VOIR ».
             Valider = "Voir",
             Rang = 6,
@@ -443,98 +467,110 @@ public sealed class DomaineFacturer : IDomaineEcrans
             ],
         },
 
-        // fiche v2 sans étape ; fondé sur FORM_ADDCREANCE.cs et proc_integcreance.md:251 (sous-processus
-        // ADDCREA, « fiche dédiée requise »). fix-ok: ADDCREANCE retiré à tort au premier passage (la fiche
-        // n'a pas d'étape, mais son formulaire existe) ; rétabli sur décision du chef (14:01).
-        // Sources, sous D:\Sources\RigApplication\Source\RIG\DLL\Processus\PROC_INTEGCREANCE\ADDCREA\ :
-        // FORM_ADDCREANCE.cs:10-11 (le formulaire délègue au processus), FORM_ADDCREANCE.Designer.cs:53
-        // (titre), PROC_ADDCREANCE.cs (modes, paramètres, messages), ETP_CREANCE\OPE_CREANCE.cs (contrôles).
-        // Le formulaire ne déclare aucun bouton : « Valider » reprend le verbe de son action finale
-        // (PROC_ADDCREANCE.cs:405-407), libellé à confirmer à l'écran.
+        // Lot 12 (27/11/2026) : la liste et le geste de la base, LecteurCreancesTransitoires.cs et EcrivainAjoutCreance.cs ;
+        // l'intégration partagée avec « Intégrer des créances » : CreancesPcV2.cs. Sources, sous
+        // D:\RigApplication\Source\RIG\DLL\Processus\PROC_INTEGCREANCE\ADDCREA\ : PROC_ADDCREANCE.cs (création de la créance
+        // transitoire :195-214, sauvegarde et intégration :302-408), ETP_CREANCE\OPE_CREANCE.cs (montants, dates, mode,
+        // contrôles :298-361) et OPE_CREANCE.Designer.cs (libellés), ETP_CREANCIER\OPE_CREANCIER.Designer.cs (civilité,
+        // désignation, adresse obligatoires). Les montants portent les libellés de la grille de « Modifier une créance »
+        // (OPE_ADMISSIONS_DGV_MODCREANCE.cs:182-245) : le formulaire d'ajout les abrège (« Priv. échu »…) et répète « Provisionnel ».
+        // Le formulaire ne déclare aucun bouton : « Valider » reprend le verbe de son action finale (PROC_ADDCREANCE.cs:405-407).
         new DescripteurEcran
         {
             Code = "PROC_ADDCREANCE", Titre = "Ajouter une creance", Sujet = "créances transitoires",
             Forme = FormeEcran.Saisie,
             // Recherche : « débiteur » (OPE_CREANCE.cs:112, CRTRA_NOM_DEBITEUR) ; le formulaire n'a pas de recherche, c'est la barre de l'écran.
             Recherche = "Rechercher une créance ou un débiteur…",
-            // Critères : le mode et les dates que le formulaire saisit (PROC_ADDCREANCE.cs:50-57 ; OPE_CREANCE.cs:339-350).
-            Criteres = ["Mode", "Date de l'acte", "Date de saisine"],
-            // Bouton : verbe de l'action finale du formulaire (PROC_ADDCREANCE.cs:405-407).
+            // Critères : le mode et la date que le formulaire saisit (PROC_ADDCREANCE.cs:50-57 ; OPE_CREANCE.cs:339-350).
+            Criteres = ["Mode", "Date de l'acte"],
             Valider = "Valider",
             Rang = 6,
             // États : « saisi » et « ajout » du formulaire (OPE_CREANCE.cs:311 ; PROC_ADDCREANCE.cs:237, 407).
             Etats = EtatsEcran.Trois("À saisir", "En saisie", "Ajoutée"),
-            // Groupes : les trois modes du formulaire (OPE_CREANCE.cs:284-291).
+            // Groupes : les trois modes de la créance (PROC_ADDCREANCE.cs:203-213).
             Groupes = ["Admission", "Contestation", "Défaut de réponse"],
             Marches =
             [
-                // Mode : admission par défaut ; cases Contestation et Défaut de réponse (PROC_ADDCREANCE.cs:50-57, 124-133).
-                Marche("Mode", "Admission par défaut. Cocher Contestation ou Défaut de réponse change le mode de la créance.", true,
-                    "Contestation", "Défaut de réponse"),
-                // Montants : au moins un montant (OPE_CREANCE.cs:310-312, et 325-327).
+                // La PC : le paramètre IdPC de l'appelant (PROC_ADDCREANCE.cs:129-134) ; sans elle, « PC absente en base ».
+                Marche("Procédure collective", "La procédure collective de la créance, par son numéro.", true,
+                    "Numéro de PC"),
+                // Le créancier : civilité, désignation et adresse obligatoires (OPE_CREANCIER.Designer.cs).
+                Marche("Créancier", "Civilité, désignation et adresse sont obligatoires ; le SIREN et les références se saisissent s'ils sont connus.", true,
+                    "Civilité", "Désignation", "N° SIREN", "Références", "Adresse", "Code postal", "Ville"),
+                // Le mode : admission par défaut ; cases Contestation et Défaut de réponse (PROC_ADDCREANCE.cs:50-57, 203-213).
+                Marche("Mode", "Admission par défaut. Une contestation ou un défaut de réponse crée une instance dans RIG v2 : la V3 ne les intègre pas encore.", false,
+                    Champ.Case("Contestation"), Champ.Case("Défaut de réponse")),
+                // Les montants admis et le rejeté : au moins un (OPE_CREANCE.cs:310-320).
                 Marche("Montants", "Au moins un montant de créance doit être saisi, dans les cases concernées. Sans montant, la validation est bloquée.", true,
-                    "Montants de la créance"),
-                // Dates : saisine au plus tôt à la date de l'acte (OPE_CREANCE.cs:339-341) ; acte obligatoire en contestation (348-350).
-                Marche("Dates", "La date de saisine ne précède pas la date de l'acte. Pour une contestation, la date de l'acte est obligatoire.", false,
-                    "Date de saisine", "Date de l'acte"),
-                // Contestation : montant contesté obligatoire, ou décocher la contestation (OPE_CREANCE.cs:356-358).
-                Marche("Contestation", "Pour une créance contestée, saisir le montant contesté, ou décocher la contestation.", false,
-                    "Montant contesté"),
-                // Validation : action finale ; une intégration en échec nomme le problème (PROC_ADDCREANCE.cs:405-407).
-                Marche("Validation", "Valider ajoute la créance. Si l'intégration échoue, le message nomme le problème et rien n'est ajouté.", true,
-                    "Valider"),
+                    Champ.Montant("Privilégié échu"), Champ.Montant("Privilégié non échu"), Champ.Montant("Privilégié provisionnel"),
+                    Champ.Montant("Chirographaire échu"), Champ.Montant("Chirographaire non échu"), Champ.Montant("Chirographaire provisionnel"),
+                    Champ.Montant("Super privilégié"), Champ.Montant("Rejeté")),
+                // L'état (liste ETAT_CREANCE), la nature admise et les observations (OPE_CREANCE.cs:114-134).
+                Marche("Créance", "L'état est un code de la liste des états de créance du greffe (0 par défaut, 2 pour une contestation).", false,
+                    "Etat", "Nature", Champ.Zone("Observations")),
+                // La date de l'acte introductif (PROC_ADDCREANCE.cs:69-74) ; la date de saisine n'est pas saisie à l'ajout (:246).
+                Marche("Dates", "La date de l'acte introductif, si elle est connue.", false,
+                    Champ.Date("Date acte")),
+                // L'intégration : la créance PC et son créancier, dans la PC (IntegrationCreances.cs:75-539). Elle se lit (marche 7 franchie
+                // = intégrée), elle ne se saisit pas. fix-ok: mesure a l'ecran (banc 9201, 27/11/2026) -- obligatoire avec un champ
+                // « Erreur d'intégration », Créer refusait « « Intégration » est obligatoire » : rien a taper, donc ni champ ni obligation.
+                Marche("Intégration", "Créer ajoute la créance à la procédure collective. Si l'intégration échoue, le message nomme le problème et rien n'est ajouté.", false),
             ],
             Lignes =
             [
-                Ligne("Atelier Delta SARL", $"Montant {Euros(125_000)} · saisie du 12/03/2026", "Admission", "Validee", 0, 1, 2, 4),
-                Ligne("Transports Gamma SAS", $"Montant {Euros(32_000)} · à valider", "Admission", "EnCours", 0, 1),
-                Ligne("Boulangerie Êta SARL", "Aucun montant saisi", "Admission", "AFaire"),
-                Ligne("Bêta Industrie SAS", $"Contestée · acte du 02/02/2026 · montant contesté {Euros(850_000)}", "Contestation", "Validee", 0, 1, 2, 3, 4),
-                Ligne("Zêta Commerce SAS", "Contestée · date de l'acte à saisir", "Contestation", "EnCours", 0, 1, 3),
-                Ligne("Epsilon Habitat SARL", $"Défaut de réponse · montant {Euros(410_000)}", "Défaut de réponse", "Validee", 0, 1, 4),
-                Ligne("Thêta Import SAS", "Défaut de réponse · dates à corriger", "Défaut de réponse", "EnCours", 0, 1, 2),
-                Ligne("Kappa Services SARL", "Aucune saisie", "Admission", "AFaire"),
+                Ligne("Atelier Delta SARL", $"PC 2026/0101 · admis {Euros(125_000)} · saisie le 12/03/2026 · intégrée le 12/03/2026", "Admission", "Validee", 0, 1, 3, 6),
+                Ligne("Transports Gamma SAS", $"PC 2026/0102 · admis {Euros(32_000)} · saisie le 13/03/2026 · erreur : PC absente en base", "Admission", "EnCours", 0, 1, 3),
+                Ligne("Bêta Industrie SAS", $"PC 2026/0107 · rejeté {Euros(850_000)} · saisie le 02/02/2026 · à intégrer", "Contestation", "EnCours", 0, 1, 2, 3, 5),
+                Ligne("Epsilon Habitat SARL", $"PC 2026/0111 · admis {Euros(410_000)} · saisie le 16/03/2026 · à intégrer", "Défaut de réponse", "EnCours", 0, 1, 2, 3),
+                Ligne("Zêta Commerce SAS", $"PC 2026/0101 · admis {Euros(64_000)} · saisie le 18/03/2026 · intégrée le 18/03/2026", "Admission", "Validee", 0, 1, 3, 4, 6),
+                Ligne("Créance transitoire n° 7", "sans PC · aucun montant admis · saisie le 19/03/2026 · à intégrer", "Admission", "AFaire"),
             ],
         },
 
-        // Les étapes, les contrôles de montant et de date, le verrou et l'état « verrouillée par un
-        // autre » (lecture seule) viennent de la fiche : sections « Architecture des étapes »,
-        // « DoVerifier », « DoSauve » et « Règles métier ». La fiche n'a pas de Détail OPE.
+        // Lot 12 (27/11/2026) : la liste, la fiche et le geste de la base, LecteurModificationCreance.cs et
+        // EcrivainModificationCreance.cs. Source : PROC_INTEGCREANCE\MODCREA\ -- la PC choisie et verrouillée
+        // (PROC_MODCREANCE.cs:46-61), l'onglet Admissions : une ligne par créance PC, ses montants admis modifiables dans la
+        // grille (OPE_ADMISSIONS_DGV_MODCREANCE.cs:146-264, :428-441), VALIDER les enregistre (:559-584). La V3 ouvre la fiche
+        // de la ligne. Les onglets Contestations et Défauts de réponse sont des instances : non repris ici.
         new DescripteurEcran
         {
-            Code = "PROC_MODCREANCE", Titre = "Modifier une creance", Sujet = "procédures collectives",
+            Code = "PROC_MODCREANCE", Titre = "Modifier une creance", Sujet = "créances admises",
             Forme = FormeEcran.Fiche,
-            Recherche = "Rechercher une procédure, un numéro, un nom d'affaire…",
-            Criteres = ["Numéro de la procédure", "Nom de l'affaire", "Période d'ouverture"],
+            Recherche = "Rechercher une procédure, un numéro, un créancier…",
+            // Critères de la recherche de PC (OPE_RECHERCHE_PC, proc_modcreance.md « Requêtes SQL »).
+            Criteres = ["Numéro de la procédure", "Nom de l'affaire"],
             // Bouton cité par la fiche (proc_modcreance.md) : « Valider -> Sauvegarder ».
             Valider = "Valider",
             Rang = 6,
-            Etats = [.. EtatsEcran.Trois("À modifier", "En saisie", "Modifiée"), new EtatEcran("EnAttente", "Verrouillée par un autre", "en-attente")],
-            Groupes = ["Sauvegarde", "Redressement judiciaire (RJ)", "Liquidation judiciaire (LIJI)"],
+            // Une créance admise se modifie ; la PC tenue par une autre demande s'ouvre en lecture seule (PROC_MODCREANCE.cs:56-60).
+            // La liste lue porte « Admise » (AFaire) ou « Verrouillée par un autre » ; la fiche ouverte se saisit puis s'enregistre.
+            Etats = [.. EtatsEcran.Trois("Admise", "En saisie", "Modifiée"), new EtatEcran("EnAttente", "Verrouillée par un autre", "en-attente")],
+            Groupes = ["Admissions"],
             Sections =
             [
-                Marche("Procédure collective", "Recherche, puis sélection : la procédure est verrouillée. Si un autre utilisateur la tient, un avertissement le nomme et la fiche s'ouvre en lecture seule.", true,
-                    "Numéro", "Nom de l'affaire", "Période d'ouverture"),
-                Marche("Créances", "Créances, créanciers, débiteurs et état de la procédure. Seules les créances modifiées sont enregistrées.", true,
-                    Champ.Tableau("Créances"), Champ.Tableau("Créanciers"), Champ.Tableau("Débiteurs"), "État de la procédure"),
-                Marche("Contrôle", "Montant zéro ou plus, date de déclaration renseignée, rang et priorité cohérents. Un verrou perdu entre-temps bloque l'enregistrement.", true,
-                    "Montant", "Date de déclaration", "Rang"),
-                Marche("Enregistrement", "Enregistre chaque créance modifiée, recalcule les totaux si besoin, puis libère le verrou. La saisie reste ouverte pour une autre procédure.", true,
-                    Champ.Tableau("Totaux")),
+                Marche("Procédure collective", "La procédure de la créance. Si une autre demande la tient, un avertissement la nomme et la fiche s'ouvre en lecture seule.", true,
+                    "Numéro", "Nom de l'affaire", Champ.Date("Date d'ouverture")),
+                Marche("Créance", "Le créancier et la créance admise, en lecture.", true,
+                    "Créancier", "N° SIREN", "N° d'ordre", "Etat", "Nature"),
+                Marche("Montants admis", "Les montants de la grille Admissions de RIG v2 : seuls ceux qui changent sont enregistrés ; une case vidée efface le montant.", true,
+                    Champ.Montant("Privilégié échu"), Champ.Montant("Privilégié non échu"), Champ.Montant("Privilégié provisionnel"),
+                    Champ.Montant("Chirographaire échu"), Champ.Montant("Chirographaire non échu"), Champ.Montant("Chirographaire provisionnel"),
+                    Champ.Montant("Super privilégié"), Champ.Montant("Rejeté")),
             ],
             Lignes =
             [
-                Ligne("PC 2026-0101, Alpha Services SARL", "2 créances modifiées · 3 créanciers", "Redressement judiciaire (RJ)", "Validee", 0, 1, 2, 3),
-                Ligne("PC 2026-0102, Bêta Industrie SAS", "Verrouillée par un autre utilisateur", "Liquidation judiciaire (LIJI)", "EnAttente"),
-                Ligne("PC 2026-0107, Delta Transports SAS", "Créance à corriger", "Sauvegarde", "EnCours", 0, 1),
-                Ligne("PC 2026-0111, Epsilon Habitat SARL", "Montant à reprendre", "Redressement judiciaire (RJ)", "EnCours", 0),
-                Ligne("PC 2026-0115, Zêta Commerce SAS", "Rang à vérifier", "Liquidation judiciaire (LIJI)", "AFaire"),
-                Ligne("PC 2026-0120, Êta Boulangerie SARL", "Aucune modification", "Redressement judiciaire (RJ)", "AFaire"),
-                Ligne("PC 2026-0124, Thêta Import SAS", "Totaux à recalculer", "Sauvegarde", "Validee", 0, 1, 2, 3),
+                Ligne("PC 2026/0101, créance n° 1", $"Alpha Services SARL · ALPHA SERVICES · admis {Euros(320_000)}", "Admissions", "AFaire"),
+                Ligne("PC 2026/0101, créance n° 2", $"Bêta Industrie SAS · ALPHA SERVICES · admis {Euros(158_000)} · rejeté {Euros(20_000)}", "Admissions", "AFaire"),
+                Ligne("PC 2026/0102, créance n° 1", $"Gamma Conseil SARL · BETA INDUSTRIE · admis {Euros(98_000)} · verrouillée par une autre demande", "Admissions", "EnAttente"),
+                Ligne("PC 2026/0107, créance n° 1", $"Delta Transports SAS · DELTA TRANSPORTS · admis {Euros(41_000)}", "Admissions", "AFaire"),
+                Ligne("PC 2026/0107, créance n° 2", $"Epsilon Habitat SARL · DELTA TRANSPORTS · admis {Euros(12_500)} · rejeté {Euros(2_500)}", "Admissions", "AFaire"),
+                Ligne("PC 2026/0111, créance n° 1", $"Zêta Commerce SAS · EPSILON HABITAT · admis {Euros(230_000)}", "Admissions", "AFaire"),
             ],
         },
 
-        // La fiche a un « Rôle » barré qui renvoie au Détail OPE : le rôle repris est celui du Détail.
+        // Lot 12 (27/11/2026) : la liste et le geste de la base, LecteurIntegrationCreances (EcrivainIntegrationCreances.cs) ;
+        // l'intégration d'une créance : CreancesPcV2.cs. La fiche a un « Rôle » barré qui renvoie au Détail OPE : le rôle repris
+        // est celui du Détail (proc_integcreance.md). La V3 intègre les admissions ; ce qui crée une instance est nommé.
         new DescripteurEcran
         {
             Code = "PROC_INTEGCREANCE", Titre = "Integrer des creances", Sujet = "créances à intégrer",
@@ -544,57 +580,65 @@ public sealed class DomaineFacturer : IDomaineEcrans
             // Bouton cité par la fiche (proc_integcreance.md, Boutons) : INTEGRER_SELECTIONNEES.
             Valider = "Intégrer les créances sélectionnées",
             Rang = 6,
-            Etats = [.. EtatsEcran.Trois("À intégrer", "Vérifiée", "Intégrée"), new EtatEcran("Rejetee", "En erreur", "rejetee")],
+            // Une créance en attente ; en erreur (CRTRA_NATURE_ERREUR), elle se ré-intègre ; intégrée, elle sort de la liste.
+            Etats = EtatsEcran.Trois("À intégrer", "En erreur", "Intégrée"),
             Groupes = ["Admissions", "Contestations", "Défauts de réponse"],
             Sections =
             [
-                Marche("Import du fichier", "Un fichier de créances, venu d'un cabinet de mandataires, pour une seule procédure collective. Il alimente les créances en attente d'intégration.", true,
+                Marche("Import du fichier", "Un fichier de créances, venu d'un cabinet de mandataires, pour une seule procédure collective. Il alimente les créances en attente d'intégration (non repris par la V3 : un fichier du poste).", true,
                     "Fichier", "Procédure collective"),
-                Marche("Vérification", "Statistiques avant intégration et contrôles. Les erreurs, y compris de paramétrage, sont notifiées par courriel.", true,
-                    "Statistiques", "Erreurs"),
-                Marche("Intégration", "Créance par créance : affaire, instance si nécessaire, parties et événements. Une erreur sur une créance n'arrête pas les autres ; le rapport final compte réussites et erreurs.", true,
-                    "Nature", "Instance", "Événements"),
+                Marche("Intégration", "Créance par créance : la créance PC et son créancier dans la PC. Une erreur sur une créance n'arrête pas les autres : elle est notée sur la créance. Contestations et défauts de réponse créent une instance dans RIG v2 : la V3 ne les intègre pas encore.", true,
+                    "Nature", "Erreur"),
             ],
             Lignes =
             [
-                Ligne("Créance Alpha Services SARL", $"Admission · {Euros(320_000)}", "Admissions", "Validee", 0, 1, 2),
-                Ligne("Créance Bêta Industrie SAS", $"Admission · {Euros(1_580_000)}", "Admissions", "EnCours", 0, 1),
-                Ligne("Créance Gamma Conseil SARL", $"Contestation · {Euros(98_000)}", "Contestations", "AFaire"),
-                Ligne("Créance Delta Transports SAS", $"Contestation · {Euros(410_000)}", "Contestations", "Rejetee"),
-                Ligne("Créance Epsilon Habitat SARL", "Défaut de réponse", "Défauts de réponse", "AFaire"),
-                Ligne("Créance Zêta Commerce SAS", $"Défaut de réponse · {Euros(125_000)}", "Défauts de réponse", "EnCours", 0),
-                Ligne("Créance Êta Boulangerie SARL", $"Admission · {Euros(62_000)}", "Admissions", "Validee", 0, 1, 2),
+                Ligne("Alpha Services SARL", $"PC 2026/0101 · admis {Euros(320_000)} · saisie le 12/03/2026 · à intégrer", "Admissions", "AFaire"),
+                Ligne("Bêta Industrie SAS", $"PC 2026/0109 · admis {Euros(1_580_000)} · saisie le 12/03/2026 · erreur : PC absente en base", "Admissions", "EnCours"),
+                Ligne("Gamma Conseil SARL", $"PC 2026/0101 · rejeté {Euros(98_000)} · saisie le 13/03/2026 · à intégrer", "Contestations", "AFaire"),
+                Ligne("Epsilon Habitat SARL", $"PC 2026/0101 · aucun montant admis · saisie le 14/03/2026 · à intégrer", "Défauts de réponse", "AFaire"),
+                Ligne("Zêta Commerce SAS", $"PC 2026/0102 · admis {Euros(125_000)} · saisie le 15/03/2026 · à intégrer", "Admissions", "AFaire"),
+                Ligne("Êta Boulangerie SARL", $"PC 2026/0102 · admis {Euros(62_000)} · saisie le 15/03/2026 · à intégrer", "Admissions", "AFaire"),
             ],
         },
 
-        // La fiche n'a pas de Détail OPE : seuls le rôle et les noms d'étapes des classes
-        // (entrée, sélection du représentant) sont repris. À confirmer par le chef.
+        // Lot 12 (27/11/2026) : le rôle réel, lu dans le code (la fiche proc_creanrep.md n'a qu'un « contexte métier probable ») :
+        // PROC_CREANREP (Processus\Inscriptions\PROC_CREANREP) tient le RÉPERTOIRE DES CRÉANCIERS (CREANCIER_REPERTO) --
+        // sélection d'un créancier, désactivés compris (OPE_SELECTION_CREANREP.cs:11), ou création, puis ses champs
+        // (OPE_CREANREP.cs:51-62) enregistrés (:91-95). Ce n'est pas une désignation de représentant : la forme passe
+        // d'Operation à Referentiel. La liste et les gestes : LecteurRepertoireCreanciers.cs, EcrivainRepertoireCreanciers.cs.
+        // Les colonnes portent les libellés du formulaire (OPE_CREANREP.Designer.cs). Le titre reste celui du menu.
         new DescripteurEcran
         {
-            Code = "PROC_CREANREP", Titre = "Representation", Sujet = "procédures collectives",
-            Forme = FormeEcran.Operation,
-            Recherche = "Rechercher une procédure, un créancier, un représentant…",
-            Criteres = ["Procédure collective", "Créancier", "Représentant désigné"],
-            // Action citée par la fiche (proc_creanrep.md, Rôle) : « désignation du représentant des créanciers ».
-            Valider = "Désigner le représentant",
+            Code = "PROC_CREANREP", Titre = "Representation", Sujet = "créanciers répertoriés",
+            Forme = FormeEcran.Referentiel,
+            Colonnes = ["Code abrégé", "Civilité", "Patronyme", "Prénoms", "Nom d'usage", "Siren", "RCS (Ville)", "Adresse", "Code postal", "Ville",
+                        Champ.Case("Désactivé")],
+            Recherche = "Rechercher un créancier, un code abrégé, un SIREN…",
+            Criteres = ["Créancier répertorié (désactivés compris)"],
+            // Le geste final du formulaire : DoSauve (OPE_CREANREP.cs:91-95).
+            Valider = "Valider",
             Rang = 6,
-            Etats = EtatsEcran.Trois("À désigner", "Représentant choisi", "Désigné"),
-            Groupes = ["Représentant des créanciers"],
+            // La liste lue porte « Actif » ou « Désactivé » (il reste modifiable) ; « Enregistré » est l'issue du geste.
+            Etats = EtatsEcran.Trois("Actif", "Désactivé", "Enregistré"),
+            // Personne morale (civilité « PM ») ou physique (OPE_CREANREP.cs:_RefreshAffichage).
+            Groupes = ["Personnes morales", "Personnes physiques"],
             Sections =
             [
-                Marche("Procédure", "La procédure dont les créanciers sont à représenter, choisie dans la liste.", true,
-                    "Procédure", "Créanciers"),
-                Marche("Sélection du représentant", "Choix du représentant des créanciers de la procédure.", true,
-                    "Représentant", "Créanciers représentés"),
+                Marche("Créancier répertorié", "Code abrégé unique, civilité, patronyme et adresse obligatoires. Une personne morale a la civilité PM ; une personne physique, ses prénoms et son nom d'usage.", true,
+                    "Code abrégé", "Civilité", "Patronyme", "Prénoms", "Nom d'usage", "Siren", "RCS (Ville)"),
+                Marche("Adresse", "La voie, le code postal et la ville du créancier.", true,
+                    "Adresse", "Code postal", "Ville"),
+                Marche("Désactivation", "Un créancier désactivé reste au répertoire et se réactive en décochant la case.", false,
+                    Champ.Case("Désactivé")),
             ],
             Lignes =
             [
-                Ligne("PC 2026-0101, Alpha Services SARL", "Représentant désigné · 2 créanciers", "Représentant des créanciers", "Validee", 0, 1),
-                Ligne("PC 2026-0102, Bêta Industrie SAS", "Aucun représentant", "Représentant des créanciers", "AFaire"),
-                Ligne("PC 2026-0107, Delta Transports SAS", "Représentant choisi, à enregistrer", "Représentant des créanciers", "EnCours", 0),
-                Ligne("PC 2026-0111, Epsilon Habitat SARL", "Aucun représentant", "Représentant des créanciers", "AFaire"),
-                Ligne("PC 2026-0115, Zêta Commerce SAS", "Représentant désigné · 1 créancier", "Représentant des créanciers", "Validee", 0, 1),
-                Ligne("PC 2026-0120, Êta Boulangerie SARL", "Choix en cours", "Représentant des créanciers", "EnCours", 0),
+                Ligne("BANQUE ALPHA", "BQALPHA · 900 300 001 · PARIS", "Personnes morales", "AFaire") with { Valeurs = ["BQALPHA", "PM", "BANQUE ALPHA", "", "", "900300001", "7501", "1 rue de la Paix", "75002", "PARIS", ""] },
+                Ligne("CREDIT BETA", "CRBETA · 900 300 002 · LYON", "Personnes morales", "AFaire") with { Valeurs = ["CRBETA", "PM", "CREDIT BETA", "", "", "900300002", "6901", "2 quai du Rhône", "69002", "LYON", ""] },
+                Ligne("MARTIN", "PMARTIN · désactivé", "Personnes physiques", "EnCours") with { Valeurs = ["PMARTIN", "M.", "MARTIN", "Paul", "", "", "", "3 rue Haute", "21000", "DIJON", "oui"] },
+                Ligne("FINANCE GAMMA", "FIGAMMA · 900 300 003 · LILLE", "Personnes morales", "AFaire") with { Valeurs = ["FIGAMMA", "PM", "FINANCE GAMMA", "", "", "900300003", "5901", "4 place Rihour", "59000", "LILLE", ""] },
+                Ligne("DURAND", "LDURAND · NANTES", "Personnes physiques", "AFaire") with { Valeurs = ["LDURAND", "MME", "DURAND", "Lucie", "MOREAU", "", "", "5 cours Cambronne", "44000", "NANTES", ""] },
+                Ligne("LEASING DELTA", "LEDELTA · 900 300 004 · NICE", "Personnes morales", "AFaire") with { Valeurs = ["LEDELTA", "PM", "LEASING DELTA", "", "", "900300004", "0601", "6 avenue Jean Médecin", "06000", "NICE", ""] },
             ],
         },
 

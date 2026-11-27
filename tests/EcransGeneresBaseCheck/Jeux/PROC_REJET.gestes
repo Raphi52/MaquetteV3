@@ -1,0 +1,79 @@
+# Les gestes de EcrivainRejetsEncaissement (« Rejets d'encaissement », PROC_REJET), sur les lignes de PROC_REJET.sql. Chaque refus a
+# son jumeau accepte : bloc 7 (un cheque non comptabilise, supprime) et bloc 8 (un cheque comptabilise, annule).
+# 1. Aucun encaissement : la V2 ouvre le rejet sur UN encaissement (PROC_REJET.cs:35-39).
+geste: Confirmer Valider
+valeur: Motif › Motif du rejet = Chèque sans provision
+resultat: refuse
+message: Un rejet se fait sur un seul encaissement : RIG v2 l'ouvre depuis l'encaissement choisi.
+---
+# 2. Un encaissement que la base n'a pas (PROC_REJET.cs:43-46).
+geste: Confirmer Valider
+ids: 9999999
+valeur: Motif › Motif du rejet = Chèque sans provision
+resultat: refuse
+message: Encaissement #9999999 manque dans la base de données. Fin d'exécution.
+---
+# 3. Pas un cheque (MenuEncaissement.cs:161).
+geste: Confirmer Valider
+ids: 2204004
+valeur: Motif › Motif du rejet = Chèque sans provision
+resultat: refuse
+message: Cet encaissement n'est pas un chèque
+---
+# 4. Ventile a un client en sommeil (MenuEncaissement.cs:160, :198-201).
+geste: Confirmer Valider
+ids: 2204003
+valeur: Motif › Motif du rejet = Chèque sans provision
+resultat: refuse
+message: Il y a au moins un client ventilé en sommeil
+---
+# 5. Sans motif (OPE_INFORMATIONS_REJET.cs:51-53).
+geste: Confirmer Valider
+ids: 2204001
+resultat: refuse
+message: Le motif de rejet est vide
+---
+# 6. Ventile a une affaire verrouillee : la suppression de l'encaissement est refusee (MenuEncaissement.cs:255-259) ; la V3 refuse
+# tout, le rejet compris (la V2 l'aurait garde sans supprimer l'encaissement).
+geste: Confirmer Valider
+ids: 2204005
+valeur: Motif › Motif du rejet = Chèque sans provision
+resultat: refuse
+message: Impossible de supprimer l'encaissement car l'affaire numéro 2204302 est verouillée par l'utilisateur n° 2204999.
+---
+# 7. Non comptabilise : le rejet 2204402 (destinataire pre-rempli par le client de la premiere ventilation, adresse en lignes « | »),
+# puis l'encaissement 2204001 et sa ventilation SUPPRIMES (MenuEncaissement.cs:381-386, :252-322).
+geste: Confirmer Valider
+ids: 2204001
+valeur: Motif › Motif du rejet = Chèque sans provision
+resultat: fait
+message: Rejet n° 2204402 du chèque J12CHQ01 (150,00 €) enregistré dans la base du greffe ; l'encaissement n° 2204001, non comptabilisé, est supprimé avec sa ventilation. La lettre de rejet n'est pas éditée par la V3.
+lignes:
+Chèque n° J12CHQ03 | Chèque (banc 12) · 40,00 € · encaissé le {J-5} · PAYEUR J12C · BANQUE J12 · non comptabilisé | Chèques | AFaire | []
+Chèque n° J12CHQ05 | Chèque (banc 12) · 25,00 € · encaissé le {J-8} · PAYEUR J12E · BANQUE J12 · non comptabilisé | Chèques | AFaire | []
+Chèque n° J12CHQ02 | Chèque (banc 12) · 80,00 € · encaissé le {J-20} · PAYEUR J12B · BANQUE J12 · comptabilisé | Chèques | AFaire | []
+Rejet n° 2204402 · chèque J12CHQ01 | rejeté le {J+0} · 150,00 € · PAYEUR J12A · motif : Chèque sans provision | Rejets enregistrés | Validee | []
+Rejet n° 2204401 · chèque J12CHQ06 | rejeté le {J-25} · 90,00 € · PAYEUR J12F · motif : Provision insuffisante | Rejets enregistrés | Validee | []
+controle: SELECT ENCRR_CLIENT + ' / ' + ENCRR_CLIENT_EMAIL + ' / ' + ENCRR_CLIENT_ADRESSE + ' / ' + CONVERT(varchar(20), CAST(ENCRR_MONTANT AS decimal(19,2))) FROM v2.ENCAISSEMENT_RECUS_REJETES WHERE ENCRR_ID_ENCRR = 2204402 AND ENCRR_NUM_TITRE = 'J12CHQ01' AND ENCRR_DESIGNATION_BANQUE = 'BANQUE J12' => CLI REJET A / cli.a@banc12.test / 5 rue du Rejet|69001 LYON / 150.00
+controle: SELECT (SELECT COUNT(*) FROM v2.ENCAISSEMENT WHERE ENCMT_ID_ENCMT = 2204001) + (SELECT COUNT(*) FROM v2.VENTILATION WHERE VENTI_ID_ENCMT = 2204001) => 0
+---
+# 8. Comptabilise : le rejet 2204403, puis l'encaissement ANNULE (GCOM_Extensions.AnnulerEncaissement) -- l'encaissement oppose 2204007
+# (REG, -80,00 €, meme titre, payeur, banque, arrivee, GUID), la ventilation du client d'attente passee au client des annulations,
+# deux ventilations opposees. Le solde de l'encaissement et de ses clients tombe a zero.
+geste: Confirmer Valider
+ids: 2204002
+valeur: Destinataire › Contact = M. DUPONT
+valeur: Motif › Motif du rejet = Opposition sur chèque
+resultat: fait
+message: Rejet n° 2204403 du chèque J12CHQ02 (80,00 €) enregistré dans la base du greffe ; l'encaissement n° 2204002, comptabilisé, est annulé par l'encaissement n° 2204007 de -80,00 € et 2 ventilations opposées. La lettre de rejet n'est pas éditée par la V3.
+lignes:
+Chèque n° J12CHQ03 | Chèque (banc 12) · 40,00 € · encaissé le {J-5} · PAYEUR J12C · BANQUE J12 · non comptabilisé | Chèques | AFaire | []
+Chèque n° J12CHQ05 | Chèque (banc 12) · 25,00 € · encaissé le {J-8} · PAYEUR J12E · BANQUE J12 · non comptabilisé | Chèques | AFaire | []
+Rejet n° 2204403 · chèque J12CHQ02 | rejeté le {J+0} · 80,00 € · PAYEUR J12B · motif : Opposition sur chèque | Rejets enregistrés | Validee | []
+Rejet n° 2204402 · chèque J12CHQ01 | rejeté le {J+0} · 150,00 € · PAYEUR J12A · motif : Chèque sans provision | Rejets enregistrés | Validee | []
+Rejet n° 2204401 · chèque J12CHQ06 | rejeté le {J-25} · 90,00 € · PAYEUR J12F · motif : Provision insuffisante | Rejets enregistrés | Validee | []
+controle: SELECT ENCMT_MODE_PAIEMENT + ' ' + CONVERT(varchar(20), CAST(ENCMT_MONTANT AS decimal(19,2))) + ' ' + ENCMT_NUMERO_TITRE + ' ' + ENCMT_GUID + ' ' + CONVERT(varchar(10), ENCMT_ID_ARRV) + ' ' + CASE WHEN ENCMT_COMMENTAIRE = 'Annulation de l''encaissement n° J12CHQ02 du ' + CONVERT(varchar(10), (SELECT o.ENCMT_DATE_ENCAISSEMENT FROM v2.ENCAISSEMENT AS o WHERE o.ENCMT_ID_ENCMT = 2204002), 103) THEN 'commentaire de la V2' ELSE ENCMT_COMMENTAIRE END FROM v2.ENCAISSEMENT WHERE ENCMT_ID_ENCMT = 2204007 AND ENCMT_DATE_COMPTABILISATION IS NULL AND ENCMT_DESIGNATION_PAYEUR = 'PAYEUR J12B' => REG -80.00 J12CHQ02 G12-0002 2204901 commentaire de la V2
+controle: SELECT CAST(SUM(VENTI_MONTANT) AS decimal(19,2)) FROM v2.VENTILATION WHERE VENTI_ID_ENCMT IN (2204002, 2204007) => 0.00
+controle: SELECT CAST(SUM(VENTI_MONTANT) AS decimal(19,2)) FROM v2.VENTILATION WHERE VENTI_ID_ENCMT IN (2204002, 2204007) AND VENTI_ID_CLIEN = 2204201 AND VENTI_ID_AFFRE = 2204301 => 0.00
+controle: SELECT CONVERT(varchar(10), (SELECT VENTI_ID_CLIEN FROM v2.VENTILATION WHERE VENTI_ID_VENTI = 2204103)) + ' ' + CONVERT(varchar(10), (SELECT COUNT(*) FROM v2.VENTILATION WHERE VENTI_ID_ENCMT = 2204007 AND VENTI_ID_CLIEN = 2204204 AND VENTI_MONTANT = -30)) => 2204204 1
+controle: SELECT ENCRR_CLIENT + ' / ' + ENCRR_CLIENT_EMAIL FROM v2.ENCAISSEMENT_RECUS_REJETES WHERE ENCRR_ID_ENCRR = 2204403 => M. DUPONT / cli.a@banc12.test
