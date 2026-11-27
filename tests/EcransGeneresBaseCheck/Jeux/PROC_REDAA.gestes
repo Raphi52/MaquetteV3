@@ -1,0 +1,191 @@
+# « Modèles de rédaction » (EcrivainModelesRedaction), en grille : le GLOSSAIRE s'ajoute, se modifie et se supprime comme dans
+# l'onglet glossaire de la V2 (OPE_EDT_GLOSSAIRE.cs:66-91 ; .Designer.cs:79-100 ; Glossaire.GetAllGlossaireOfUserAndPublic). Lignes :
+# PROC_REDAA.sql (L15_ART public, L15_PRIV prive d'un autre agent, BANC). L'agent du banc : banc.ecrans.
+
+# Refus : un ajout sans la section du glossaire (onglet modeles ou sections) -- modeles et maquettes passent par leur document Word
+# en GED, les sections par Amitel. Jumeau accepte : bloc 6 (ajout dans l'onglet du glossaire, avec son texte).
+geste: Ajouter
+valeur: Code = L15_X
+valeur: Libellé = Autre banc
+resultat: refuse
+message: Seul le glossaire s'ajoute ici, avec son « Texte associé » : un modèle ou une maquette se crée par son document Word en GED, une section par l'équipe Amitel dans RIG v2.
+---
+# Refus : le code est obligatoire (.Designer.cs:79). Jumeau accepte : bloc 6.
+geste: Ajouter
+valeur: Libellé = Sans code
+valeur: Entrée du glossaire › Texte associé = Un texte
+resultat: refuse
+message: « Code » est obligatoire.
+---
+# Refus : le texte associe est obligatoire (.Designer.cs:98). Jumeau accepte : bloc 6.
+geste: Ajouter
+valeur: Code = L15_SANS
+valeur: Entrée du glossaire › Privé = non
+resultat: refuse
+message: « Texte associé » est obligatoire.
+---
+# Refus : un code deja pris (cle primaire GLOSS_CODE_GLOSSAIRE). Jumeau accepte : bloc 6 (code libre).
+geste: Ajouter
+valeur: Code = L15_ART
+valeur: Entrée du glossaire › Texte associé = Un texte
+resultat: refuse
+message: Le code « L15_ART » existe déjà dans le glossaire.
+---
+# Refus : un code de 21 caracteres (GLOSS_CODE_GLOSSAIRE : 20 dans la base du greffe). Jumeau accepte : bloc 6 (8 caracteres).
+geste: Ajouter
+valeur: Code = L15_CODE_TROP_LONG_XY
+valeur: Entrée du glossaire › Texte associé = Un texte
+resultat: refuse
+message: « Code » : 20 caractères au plus.
+---
+# AJOUTEE, publique (GLOSS_PROPRIETAIRE = '*', l. 71) : elle entre dans la liste.
+geste: Ajouter
+valeur: Code = L15_NEUF
+valeur: Libellé = Nouveau banc
+valeur: Entrée du glossaire › Texte associé = Texte du nouveau terme
+resultat: fait
+message: Entrée « L15_NEUF » ajoutée au glossaire public.
+lignes:
+L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles et maquettes | Validee | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles et maquettes | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Modèles et maquettes | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Modèles et maquettes | Validee | []
+L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Modèles et maquettes | Validee | []
+L15_MOTIFS - Motifs banc | section | Sections | Validee | []
+L15_ART - Article banc | glossaire public | Glossaire | Validee | []
+L15_NEUF - Nouveau banc | glossaire public | Glossaire | Validee | []
+controle: SELECT CONCAT(GLOSS_LIBELLE, '/', GLOSS_TEXTE, '/', GLOSS_PROPRIETAIRE) FROM v2.GLOSSAIRE WHERE GLOSS_CODE_GLOSSAIRE = 'L15_NEUF' => Nouveau banc/Texte du nouveau terme/*
+---
+# AJOUTEE, privee (GLOSS_PROPRIETAIRE = le login de l'agent, l. 72) : la liste, qui ne lit que le public, ne la montre pas.
+geste: Ajouter
+valeur: Code = L15_MIEN
+valeur: Entrée du glossaire › Texte associé = Mon texte
+valeur: Entrée du glossaire › Privé = oui
+resultat: fait
+message: Entrée « L15_MIEN » ajoutée à votre glossaire privé : la liste ne montre que le glossaire public.
+controle: SELECT CONCAT(ISNULL(GLOSS_LIBELLE, 'sans libelle'), '/', GLOSS_TEXTE, '/', GLOSS_PROPRIETAIRE) FROM v2.GLOSSAIRE WHERE GLOSS_CODE_GLOSSAIRE = 'L15_MIEN' => sans libelle/Mon texte/banc.ecrans
+---
+# Refus : le code ne se modifie plus (TextCode.MetierReadOnly = !modeCrea, l. 117). Jumeau accepte : bloc 11 (le libelle et le texte).
+geste: Modifier
+ids: glossaire:L15_NEUF
+valeur: Code = L15_AUTRE
+resultat: refuse
+message: Le code ne se modifie pas : RIG v2 le fige une fois l'entrée du glossaire enregistrée.
+---
+# Refus : une entree publique ne redevient pas privee (GrbPublicPrive en lecture, l. 118). Jumeau accepte : bloc 12 (une privee
+# devient publique).
+geste: Modifier
+ids: glossaire:L15_NEUF
+valeur: Entrée du glossaire › Privé = oui
+resultat: refuse
+message: Une entrée publique ne redevient pas privée : RIG v2 fige ce choix une fois l'entrée publique.
+---
+# Refus : rien ne change (la V2 n'active Valider que sur un changement, l. 49-51). Jumeau accepte : bloc 11.
+geste: Modifier
+ids: glossaire:L15_NEUF
+valeur: Libellé = Nouveau banc
+resultat: refuse
+message: Rien à enregistrer : aucune valeur ne change.
+---
+# MODIFIEE : le libelle (la description de la V2) et le texte associe (OPE_EDT_GLOSSAIRE.cs:124-125).
+geste: Modifier
+ids: glossaire:L15_NEUF
+valeur: Libellé = Nouveau banc modifié
+valeur: Entrée du glossaire › Texte associé = Texte modifié
+resultat: fait
+message: Entrée « L15_NEUF » du glossaire enregistrée.
+lignes:
+L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles et maquettes | Validee | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles et maquettes | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Modèles et maquettes | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Modèles et maquettes | Validee | []
+L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Modèles et maquettes | Validee | []
+L15_MOTIFS - Motifs banc | section | Sections | Validee | []
+L15_ART - Article banc | glossaire public | Glossaire | Validee | []
+L15_NEUF - Nouveau banc modifié | glossaire public | Glossaire | Validee | []
+controle: SELECT CONCAT(GLOSS_LIBELLE, '/', GLOSS_TEXTE, '/', GLOSS_PROPRIETAIRE) FROM v2.GLOSSAIRE WHERE GLOSS_CODE_GLOSSAIRE = 'L15_NEUF' => Nouveau banc modifié/Texte modifié/*
+---
+# MODIFIEE : l'entree privee de l'agent devient publique (l. 71) : elle entre dans la liste.
+geste: Modifier
+ids: glossaire:L15_MIEN
+valeur: Entrée du glossaire › Privé = non
+resultat: fait
+message: Entrée « L15_MIEN » du glossaire enregistrée.
+lignes:
+L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles et maquettes | Validee | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles et maquettes | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Modèles et maquettes | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Modèles et maquettes | Validee | []
+L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Modèles et maquettes | Validee | []
+L15_MOTIFS - Motifs banc | section | Sections | Validee | []
+L15_ART - Article banc | glossaire public | Glossaire | Validee | []
+L15_MIEN | glossaire public | Glossaire | Validee | []
+L15_NEUF - Nouveau banc modifié | glossaire public | Glossaire | Validee | []
+controle: SELECT GLOSS_PROPRIETAIRE FROM v2.GLOSSAIRE WHERE GLOSS_CODE_GLOSSAIRE = 'L15_MIEN' => *
+---
+# Refus : l'entree privee d'un AUTRE agent (BANC) n'est pas dans le glossaire de banc.ecrans (Glossaire.cs:64-66). Jumeau accepte :
+# bloc 12 (privee de l'agent).
+geste: Modifier
+ids: glossaire:L15_PRIV
+valeur: Libellé = Pas a moi
+resultat: refuse
+message: Entrée introuvable dans votre glossaire (publique, ou privée à vous) : « L15_PRIV ».
+---
+# Refus : « Nature » est lue (la nature de la ligne). Jumeau accepte : bloc 11 (le libelle).
+geste: Modifier
+ids: glossaire:L15_ART
+valeur: Nature = section
+resultat: refuse
+message: « Nature » se lit, ne se saisit pas.
+---
+# Refus : un modele se modifie avec son document Word en GED (OPE_EDT_MAQ). Jumeau accepte : bloc 11 (une entree du glossaire).
+geste: Modifier
+ids: modele:L15_JGT
+valeur: Libellé = Jugement renomme
+resultat: refuse
+message: Un modèle ou une maquette se modifie et se supprime avec son document Word en GED : RIG v2 le fait dans sa fiche (OPE_EDT_MAQ), pas dans cette grille.
+---
+# Refus : une section ne s'edite que par l'equipe Amitel (OPE_EDT_SECTION.cs:64-72) ; banc.ecrans n'en est pas. Jumeau accepte :
+# bloc 11 (le glossaire, ouvert a tout agent).
+geste: Modifier
+ids: section:L15_MOTIFS
+valeur: Libellé = Motifs renommes
+resultat: refuse
+message: Les sections ne se modifient que par l'équipe Amitel : RIG v2 cache leur barre d'édition aux autres agents.
+---
+# Refus : une maquette se supprime avec son document Word. Jumeau accepte : bloc 18 (une entree du glossaire).
+geste: Supprimer
+ids: maquette:L15_LIBRE
+resultat: refuse
+message: Un modèle ou une maquette se modifie et se supprime avec son document Word en GED : RIG v2 le fait dans sa fiche (OPE_EDT_MAQ), pas dans cette grille.
+---
+# SUPPRIMEE (l. 84-88) : L15_NEUF quitte la liste.
+geste: Supprimer
+ids: glossaire:L15_NEUF
+resultat: fait
+message: Entrée « L15_NEUF » supprimée du glossaire.
+lignes:
+L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles et maquettes | Validee | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles et maquettes | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Modèles et maquettes | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Modèles et maquettes | Validee | []
+L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Modèles et maquettes | Validee | []
+L15_MOTIFS - Motifs banc | section | Sections | Validee | []
+L15_ART - Article banc | glossaire public | Glossaire | Validee | []
+L15_MIEN | glossaire public | Glossaire | Validee | []
+controle: SELECT COUNT(*) FROM v2.GLOSSAIRE WHERE GLOSS_CODE_GLOSSAIRE = 'L15_NEUF' => 0
+---
+# SUPPRIMEE : L15_MIEN aussi ; la liste revient a celle de PROC_REDAA.attendu.
+geste: Supprimer
+ids: glossaire:L15_MIEN
+resultat: fait
+message: Entrée « L15_MIEN » supprimée du glossaire.
+lignes:
+L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles et maquettes | Validee | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles et maquettes | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Modèles et maquettes | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Modèles et maquettes | Validee | []
+L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Modèles et maquettes | Validee | []
+L15_MOTIFS - Motifs banc | section | Sections | Validee | []
+L15_ART - Article banc | glossaire public | Glossaire | Validee | []
+controle: SELECT COUNT(*) FROM v2.GLOSSAIRE WHERE GLOSS_CODE_GLOSSAIRE IN ('L15_MIEN', 'L15_NEUF') => 0

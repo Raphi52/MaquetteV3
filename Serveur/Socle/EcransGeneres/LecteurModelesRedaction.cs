@@ -13,30 +13,38 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   - « Modèles et maquettes » : OPE_RECH_MODEL_MAQ.GetListe charge TOUS les modeles de document (MODELE_DOCUMENT, :85) et toutes les
 ///     maquettes de type « REDA » (MAQUETTE.MQTT_TYPE_MAQUETTE, :84) ; la composition d'un modele (COMPOSITION_MODELE, ordonnee par
 ///     X_CMPMD_INDEX, :137-143) dit ses maquettes, et une maquette utilisee par un modele ne se supprime pas (OPE_EDT_MAQ.cs:153-154) ;
-///   - « Sections et glossaire » : toutes les sections (GetAllSectionMaquette, OPE_RECH_SECTION.cs:92) ; le glossaire PUBLIC
+///   - « Sections » : toutes les sections (GetAllSectionMaquette, OPE_RECH_SECTION.cs:92) ; « Glossaire » : le glossaire PUBLIC
 ///     (GLOSS_PROPRIETAIRE = '*', OPE_EDT_GLOSSAIRE.cs:121-123). La V2 y ajoute les entrees PRIVEES de l'utilisateur courant
-///     (GetAllGlossaireOfUserAndPublic, OPE_RECH_GLOSSAIRE.cs:96) : un lecteur ne connait pas l'agent, elles ne sont pas lues ici ;
+///     (GetAllGlossaireOfUserAndPublic, OPE_RECH_GLOSSAIRE.cs:96) : un lecteur ne connait pas l'agent, elles ne sont pas lues ici
+///     (l'ecrivain, qui le connait, les ajoute, modifie et supprime). Sections et glossaire sont deux onglets de la V2 (ETP_SECTION,
+///     ETP_GLOSSAIRE) : deux groupes ;
 ///   - « Jugements » : l'administration d'un jugement (ETP_XREDA) s'ouvre sur UNE decision recue en parametre, pas sur une liste : le
 ///     groupe reste vide.
 /// Chaque groupe est une liste a lui (un onglet de la V2) : le plafond vaut par groupe (LignesLues.TotalParGroupe), un long catalogue de
 /// modeles ne masque pas les sections. Tri : par nature puis par code (la V2 trie par la recherche plein texte, sans ordre fixe).
 /// RECHERCHE : le champ cherche le code ou le libelle, les « _ » du code valant des blancs (OPE_RECH_MODEL_MAQ.cs:93, :171).
 /// ETAT : un modele sans maquette, une maquette sans document Word -> AFaire « À compléter » ; sinon Validee « Enregistré ».
-/// VALEURS : dans l'ordre des Colonnes (Code, Libellé, Nature, Utilisation).
-/// AUCUN GESTE BRANCHE : creer, dupliquer ou supprimer un modele ou une maquette passe par son document Word en GED (OPE_EDT_MAQ.cs:103-147,
-/// :164-192) ; les sections ne s'editent que par Amitel (OPE_EDT_SECTION.cs:64-71) ; le glossaire public/prive depend du login de
-/// l'agent (OPE_EDT_GLOSSAIRE.cs:66-75). Reste a brancher, nomme au compte rendu du lot.
+/// VALEURS : dans l'ordre des Colonnes (Code, Libellé, Nature, Utilisation). ID : « <nature>:<code> » (modele, maquette, section,
+/// glossaire) ; la FICHE de la ligne : la section de sa nature (« Modèle ou maquette », « Section », « Entrée du glossaire ») ; le texte
+/// associe d'une entree du glossaire s'y modifie (EcrivainModelesRedaction.cs, le glossaire de la V2, OPE_EDT_GLOSSAIRE.cs:66-88).
 /// </summary>
-internal sealed class LecteurModelesRedaction : IRechercheEcran
+internal sealed class LecteurModelesRedaction : IRechercheEcran, IFicheEcran
 {
     public string Procedure => "PROC_REDAA";
 
-    internal const string ModelesMaquettes = "Modèles et maquettes", SectionsGlossaire = "Sections et glossaire", Jugements = "Jugements";
-    private static readonly string[] Groupes = [ModelesMaquettes, SectionsGlossaire, Jugements];
+    internal const string ModelesMaquettes = "Modèles et maquettes", Sections = "Sections", Glossaire = "Glossaire", Jugements = "Jugements";
+    private static readonly string[] Groupes = [ModelesMaquettes, Sections, Glossaire, Jugements];
+
+    /// <summary>Les sections de la fiche (celles du descripteur, Pont/EcransGeneres/Configurer.cs) et leurs champs hors colonnes.</summary>
+    internal const string SectionModele = "Modèle ou maquette", SectionSection = "Section", SectionGlossaire = "Entrée du glossaire",
+        ChampTexte = "Texte associé", ChampPrive = "Privé";
+
+    /// <summary>Le prefixe de l'Id d'une ligne, par nature (1 modele, 2 maquette, 3 section, 4 glossaire).</summary>
+    internal static readonly string[] Prefixes = ["modele:", "maquette:", "section:", "glossaire:"];
 
     public IReadOnlyCollection<string> Criteres { get; } = [];
 
-    // Nature : 1 modele, 2 maquette, 3 section, 4 glossaire ; Bloc : 1 modeles et maquettes, 2 sections et glossaire.
+    // Nature : 1 modele, 2 maquette, 3 section, 4 glossaire ; Bloc : 1 modeles et maquettes, 2 sections, 3 glossaire.
     private const string Requete = """
         SELECT o.* FROM (
             SELECT u.*, ROW_NUMBER() OVER (PARTITION BY u.Bloc ORDER BY u.Nature, u.Code) AS Rang, COUNT(*) OVER (PARTITION BY u.Bloc) AS TotalBloc
@@ -53,7 +61,7 @@ internal sealed class LecteurModelesRedaction : IRechercheEcran
                 UNION ALL
                 SELECT 2, 3, s.SCTMQ_CODE_SECTION_MAQUETTE, s.SCTMQ_LIBELLE, 0, CAST(1 AS bit) FROM v2.SECTION_MAQUETTE AS s
                 UNION ALL
-                SELECT 2, 4, g.GLOSS_CODE_GLOSSAIRE, g.GLOSS_LIBELLE, 0, CAST(1 AS bit) FROM v2.GLOSSAIRE AS g WHERE g.GLOSS_PROPRIETAIRE = '*'
+                SELECT 3, 4, g.GLOSS_CODE_GLOSSAIRE, g.GLOSS_LIBELLE, 0, CAST(1 AS bit) FROM v2.GLOSSAIRE AS g WHERE g.GLOSS_PROPRIETAIRE = '*'
             ) AS u
             WHERE 1 = 1 /*filtres*/
         ) AS o
@@ -70,6 +78,31 @@ internal sealed class LecteurModelesRedaction : IRechercheEcran
         if (!string.IsNullOrWhiteSpace(recherche.Texte))
             f.Ajouter("(REPLACE(u.Code, '_', ' ') LIKE @texte OR u.Libelle LIKE @texte)", ("@texte", FormeLigne.Contient(recherche.Texte.Replace('_', ' '))));
         return Lire(baseGreffe, f, plafond, ct);
+    }
+
+    public async Task<FicheEcran?> LireFicheAsync(SqlConnection baseGreffe, string id, DateTime maintenant, CancellationToken ct)
+    {
+        var nature = Array.FindIndex(Prefixes, p => id.StartsWith(p, StringComparison.Ordinal)) + 1;
+        if (nature == 0) return null;
+        var code = id[Prefixes[nature - 1].Length..];
+        var f = new FiltresRecherche();
+        f.Ajouter("u.Nature = @nature AND u.Code = @code", ("@nature", nature), ("@code", code));
+        if ((await Lire(baseGreffe, f, 1, ct)).Lignes.FirstOrDefault() is not { Valeurs: [var c, var libelle, _, var utilisation] } ligne) return null;
+        if (nature <= 2)
+            return new FicheEcran(Procedure, id, ligne.Nom,
+                [new SectionFiche(SectionModele, [new ChampFiche("Code", c), new ChampFiche("Libellé", libelle), new ChampFiche("Utilisation", utilisation)])]);
+        if (nature == 3)
+            return new FicheEcran(Procedure, id, ligne.Nom, [new SectionFiche(SectionSection, [new ChampFiche("Code", c), new ChampFiche("Libellé", libelle)])]);
+        // Le texte associe : la V2 le lie a la zone de saisie (OPE_EDT_GLOSSAIRE.cs:125) ; la liste ne lit que le public ('*').
+        var texte = "";
+        await using (var r = await LectureV2.LireAsync(baseGreffe,
+                         "SELECT GLOSS_TEXTE FROM v2.GLOSSAIRE WHERE GLOSS_CODE_GLOSSAIRE = @code AND GLOSS_PROPRIETAIRE = '*'", ct, new SqlParameter("@code", code)))
+            if (await r.ReadAsync(ct)) texte = FormeLigne.Texte(r, "GLOSS_TEXTE");
+        return new FicheEcran(Procedure, id, ligne.Nom,
+            [new SectionFiche(SectionGlossaire, [new ChampFiche("Code", c), new ChampFiche("Libellé", libelle),
+                new ChampFiche(ChampTexte, texte) { Modifiable = true },
+                // Public, donc fige : une entree publique ne redevient pas privee (OPE_EDT_GLOSSAIRE.cs:122).
+                new ChampFiche(ChampPrive, FormeLigne.Case(false))])]);
     }
 
     private static async Task<LignesLues> Lire(SqlConnection baseGreffe, FiltresRecherche f, int plafond, CancellationToken ct)
@@ -102,8 +135,9 @@ internal sealed class LecteurModelesRedaction : IRechercheEcran
             _ => ("glossaire public", "", false),
         };
         return new LigneLue(libelle.Length > 0 ? $"{code} - {libelle}" : code, FormeLigne.Joindre(natureMot, utilisation),
-            nature <= 2 ? ModelesMaquettes : SectionsGlossaire, aFaire ? "AFaire" : "Validee", [])
+            nature <= 2 ? ModelesMaquettes : nature == 3 ? Sections : Glossaire, aFaire ? "AFaire" : "Validee", [])
         {
+            Id = Prefixes[nature - 1] + code,
             Valeurs = [code, libelle, natureMot, utilisation],
         };
     }

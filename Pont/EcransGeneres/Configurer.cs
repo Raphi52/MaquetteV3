@@ -572,8 +572,10 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Code = "PROC_REDAA", Titre = "Modeles de redaction", Sujet = "modèles de décision",
             Forme = FormeEcran.Referentiel,
             // Lot 15 (27/11/2026) : les objets que la V2 administre (OPE_RECH_MODEL_MAQ.cs:84-85 modeles et maquettes REDA,
-            // OPE_RECH_SECTION.cs:92 sections, OPE_RECH_GLOSSAIRE.cs:96 glossaire), lus par LecteurModelesRedaction.cs, un plafond par
-            // groupe. Aucun geste branche (document Word en GED, sections reservees Amitel, glossaire au login de l'agent) : nomme dans le lecteur.
+            // OPE_RECH_SECTION.cs:92 sections, OPE_RECH_GLOSSAIRE.cs:96 glossaire : deux onglets, ETP_SECTION et ETP_GLOSSAIRE), lus par
+            // LecteurModelesRedaction.cs, un plafond par groupe. Le GLOSSAIRE s'ajoute, se modifie et se supprime (EcrivainModelesRedaction.cs,
+            // OPE_EDT_GLOSSAIRE.cs:66-91) ; modeles et maquettes passent par leur document Word en GED, les sections par l'equipe Amitel
+            // (OPE_EDT_SECTION.cs:64-72) : refus nommes par l'ecrivain.
             Colonnes = ["Code", "Libellé", "Nature", "Utilisation"],
             Recherche = "Rechercher un modèle, une maquette, une section, un terme…",
             Criteres = ["Code", "Libellé"],
@@ -581,17 +583,22 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Valider = "Valider",
             Rang = 7,
             Etats = EtatsEcran.Trois("À compléter", "En cours", "Enregistré"),
-            Groupes = ["Modèles et maquettes", "Sections et glossaire", "Jugements"],
+            Groupes = ["Modèles et maquettes", "Sections", "Glossaire", "Jugements"],
+            // Sous une ligne ouverte, le formulaire de son onglet de la V2 ; une ligne neuve du glossaire saisit son texte (obligatoire,
+            // OPE_EDT_GLOSSAIRE.Designer.cs:98) et son choix public / prive (l. 118-120).
+            SectionsParGroupe = new Dictionary<string, string[]>
+            {
+                ["Modèles et maquettes"] = ["Modèle ou maquette"], ["Sections"] = ["Section"], ["Glossaire"] = ["Entrée du glossaire"],
+            },
+            SectionsAjout = new Dictionary<string, string[]> { ["Glossaire"] = ["Entrée du glossaire"] },
             Sections =
             [
-                new MarcheEcran("Modèle", "Un modèle de document compose des maquettes, dans l'ordre ; il ne se supprime pas tant qu'il en garde.", true,
+                new MarcheEcran("Modèle ou maquette", "Un modèle de document compose des maquettes, dans l'ordre ; il ne se supprime pas tant qu'il en garde. Une maquette REDA est un document Word de la GED ; utilisée par un modèle, elle ne se supprime pas. Les deux se créent, se modifient et se suppriment avec leur document Word, dans RIG v2.", true,
+                    ["Code", "Libellé", "Utilisation"]),
+                new MarcheEcran("Section", "Les sections réutilisables de la décision (requête SQL, fusion, génération, occurrence, persistance) ; éditées par l'équipe Amitel seulement, dans RIG v2.", false,
                     ["Code", "Libellé"]),
-                new MarcheEcran("Maquette", "Une maquette REDA est un document Word de la GED ; utilisée par un modèle, elle ne se supprime pas.", true,
-                    ["Nature", "Utilisation"]),
-                new MarcheEcran("Sections", "Les sections réutilisables de la décision (fusion, génération, occurrence, persistance) ; éditées par Amitel seulement.", false,
-                    ["Sections"]),
-                new MarcheEcran("Glossaire", "Les termes publics, et les termes privés de l'agent.", false,
-                    ["Termes du glossaire"]),
+                new MarcheEcran("Entrée du glossaire", "Le code (fixé une fois enregistré) et le texte associé sont obligatoires, la description facultative. Une entrée privée n'appartient qu'à vous ; une entrée publique ne redevient pas privée. La liste montre le glossaire public.", false,
+                    ["Code", "Libellé", Champ.Zone("Texte associé"), Champ.Case("Privé")]),
                 new MarcheEcran("Fonctions avancées", "Outils techniques de la rédaction, dans un onglet à part.", false,
                     ["Fonctions avancées"]),
             ],
@@ -602,8 +609,8 @@ public sealed class DomaineConfigurer : IDomaineEcrans
                 new LigneEcran("ORD_REFERE - Ordonnance de référé", "modèle · aucune maquette", "Modèles et maquettes", "AFaire", []) { Valeurs = ["ORD_REFERE", "Ordonnance de référé", "modèle", "aucune maquette"] },
                 new LigneEcran("ENTETE_JGT - Entête de jugement", "maquette REDA · utilisée par 2 modèle(s)", "Modèles et maquettes", "Validee", []) { Valeurs = ["ENTETE_JGT", "Entête de jugement", "maquette REDA", "utilisée par 2 modèle(s)"] },
                 new LigneEcran("DISPOSITIF - Dispositif", "maquette REDA · sans document Word", "Modèles et maquettes", "AFaire", []) { Valeurs = ["DISPOSITIF", "Dispositif", "maquette REDA", "sans document Word"] },
-                new LigneEcran("MOTIFS - Motifs", "section", "Sections et glossaire", "Validee", []) { Valeurs = ["MOTIFS", "Motifs", "section", "—"] },
-                new LigneEcran("PARTIES - Les parties", "glossaire public", "Sections et glossaire", "Validee", []) { Valeurs = ["PARTIES", "Les parties", "glossaire public", "—"] },
+                new LigneEcran("MOTIFS - Motifs", "section", "Sections", "Validee", []) { Valeurs = ["MOTIFS", "Motifs", "section", "—"] },
+                new LigneEcran("PARTIES - Les parties", "glossaire public", "Glossaire", "Validee", []) { Valeurs = ["PARTIES", "Les parties", "glossaire public", "—"] },
             ],
         },
 
