@@ -7,9 +7,12 @@
 # Ecarte : 300106, sans etat (ni = '1' ni <> '1' en SQL) -- jumeau retenu 300101 (etat 1).
 # 300107 (etat 9, rejete par Extelia) garde sa decision A. 300108 : denomination seule, date de creation faute de
 # date de demande.
+# Lot 15 (plan-676a4b19) : VERGER Anne et VIOLETTE Marc sont les demandes 2500101-2500102 de PROC_EDI_RPVAINS.sql (meme table).
 ARDOISE Irène | Cnbf 300001 · reçue le {J-2} | Avocat seul | AFaire | []
 BELIER Simon · CABINET KAPPA AVOCATS | Cnbf 300002 · structure Cnbf 300902 · ouverte par agent.banc | Avocat et structure | EnCours | [0]
 MU JURIS | Cnbf 300008 · reçue le {J-1} | Avocat seul | AFaire | []
+VERGER Anne · CABINET VERGER | Cnbf 250001 · structure Cnbf 250901 · reçue le {J-1} | Avocat et structure | AFaire | []
+VIOLETTE Marc | Cnbf 250002 · reçue le {J-1} | Avocat seul | AFaire | []
 CHANTELLE Olga | Cnbf 300003 · structure Cnbf 300903 · inscrite le {J-1} | Avocat et structure | Validee | [0,1,2]
 DORVAL Théo · LAMBDA CONSEIL | Cnbf 300004 · modification · inscrite le {J-3} | Avocat seul | Validee | [0,2]
 ECORCE Lina | Cnbf 300005 · rejetée le {J-5} · Cnbf inconnu du barreau | Avocat seul | Rejetee | [0,3]

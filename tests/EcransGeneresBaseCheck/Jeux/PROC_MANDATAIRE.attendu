@@ -13,12 +13,15 @@
 # (1500104, marche 3 non franchie) et 1500911 (1500101, franchie) ; 1500108 (designation vide, EnCours) et 1500102 ;
 # 1500107 (inactif, nom qui trie en premier, a la fin) et les actifs ; PM (1500105) et ME (1500101).
 # Les cellules (une par colonne : Désignation, Civilité, Abrégé, SIREN, Courriel, Qualification, Actif) : celles d'ARDOISE.
+# Lot 15 (plan-676a4b19) : VERGER…, MARRON Paul, CABINET VERGER… sont les mandataires 2500101-2500106 de PROC_EDI_RPVAINS.sql.
 ZZ15 | désignation à saisir · abrégé ZZ15 | Personne physique | EnCours | [2]
 ALPHA Irène | civilité à saisir · non répertorié · CNBF 300011 | Personne physique | AFaire | []
 Me ALPHA Irène | abrégé ALP13 · CNBF 130001 | Personne physique | Validee | [0,2]
 Me ANCIEN DELTA | abrégé DEL13A · CNBF 130004 | Personne physique | Validee | [0,2]
 Me ARDOISE Irène | abrégé ARD15 · SIREN 900 500 001 · CNBF 150001 | Personne physique | Validee | [0,1,2,3,4] | valeurs: ARDOISE Irène ; ME ; ARD15 ; 900500001 ; ardoise@exemple.test ; AV ; oui
 BETA Simon | civilité à saisir · non répertorié · CNBF 300013 | Personne physique | AFaire | []
+CABINET VERGER | civilité à saisir · abrégé L15STR · SIREN 512 500 101 | Personne physique | EnCours | [2]
+CABINET VERGER SELARL | civilité à saisir · non répertorié | Personne physique | AFaire | []
 Mme CHANTELLE Olga | non répertorié | Personne physique | Validee | [0]
 M. CNBF Actif | non répertorié · CNBF 240001 | Personne physique | Validee | [0]
 Mme DELTA Lina | abrégé DEL13B · CNBF 130004 | Personne physique | Validee | [0,2]
@@ -29,8 +32,12 @@ EPSILON Marc | civilité à saisir · non répertorié | Personne physique | AFa
 Me GAMMA Olga | non répertorié · CNBF 130003 | Personne physique | Validee | [0]
 KAPPA AVOCATS SELARL | abrégé KAPPA15 · SIREN 900 500 002 | Personne morale | Validee | [0,2]
 LAMBDA CONSEIL | civilité non déterminée · non répertorié | Personne physique | Validee | [0,4]
+MARRON Paul | civilité à saisir · abrégé L15DBL · CNBF 250777 | Personne physique | EnCours | [2]
 NU JURIS SAS | non répertorié | Personne morale | Validee | [0,1]
+VERGER A. | civilité à saisir · non répertorié | Personne physique | AFaire | []
+VERGER Anne | civilité à saisir · abrégé L15VER | Personne physique | EnCours | [1,2]
 M. AARON Paul | abrégé AAR15 · inactif | Personne physique | Validee | [0,2]
 ANCIEN BETA | civilité à saisir · non répertorié · CNBF 300013 · inactif | Personne physique | AFaire | []
 Me BETA Simon | abrégé BET13 · CNBF 130002 · inactif | Personne physique | Validee | [0,2]
 M. INACTIF Garde | non répertorié · inactif | Personne physique | Validee | [0]
+VERGER Anne-Marie | civilité à saisir · abrégé L15DBL · inactif | Personne physique | EnCours | [2]

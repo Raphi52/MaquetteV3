@@ -1,47 +1,251 @@
 # « EDI RPVA » (EcrivainInscriptionsRpva) : « Refuser » une demande d'inscription, motif saisi (OPE_RESULTAT_EDI_RPVAINS.cs:74-99,
-# DataProcDemandeInscr.Refuse l. 213-229, PROC_TRAITEMENT.cs:161-187). Les demandes : celles de PROC_EDI_RPJC_INS.sql (meme table
-# v2.DEMAT_RPJC_INS ; PROC_EDI_RPVAINS.sql n'en pose aucune). Messages de la V2 au mot pres, leurs « \n » en blancs.
+# DataProcDemandeInscr.Refuse l. 213-229, PROC_TRAITEMENT.cs:161-187), et « Traiter la demande » : l'accepter en rattachant des
+# mandataires (RigDataGridViewTraitements.cs:145-273, RigDataGridViewTraitementsStructure.cs:144-197, RigDataGridViewRpvaBase.cs:119-133,
+# AideInstances.cs:44-49). Les demandes refusees : celles de PROC_EDI_RPJC_INS.sql (meme table v2.DEMAT_RPJC_INS) ; la demande
+# acceptee, ses mandataires et ses instances : PROC_EDI_RPVAINS.sql (2500101 et suivants). Messages de la V2 au mot pres, leurs
+# « \n » en blancs.
 
-# Refus : le motif est obligatoire (OPE_SAISIE_REJET.Designer.cs:71). Jumeau accepte : bloc 7.
+# Refus : le motif est obligatoire (OPE_SAISIE_REJET.Designer.cs:71). Jumeau accepte : bloc 28.
 geste: Agir Refuser
 ids: 300101
 resultat: refuse
 message: « Motif du refus » est obligatoire.
 ---
-# Refus : une seule demande a la fois (la V2 ouvre la demande double-cliquee). Jumeau accepte : bloc 7 (une demande).
+# Refus : une seule demande a la fois (la V2 ouvre la demande double-cliquee). Jumeau accepte : bloc 28 (une demande).
 geste: Agir Refuser
 ids: 300101,300108
 valeur: Motif du refus = Cnbf inconnu du barreau
 resultat: refuse
 message: Cochez une seule demande : RIG v2 refuse les demandes une à une.
 ---
-# Refus : un agent tient la demande (RPJCI_USER_EN_COURS, l. 89-95). Jumeau accepte : bloc 7 (300101, personne dessus).
+# Refus : un agent tient la demande (RPJCI_USER_EN_COURS, l. 89-95). Jumeau accepte : bloc 28 (300101, personne dessus).
 geste: Agir Refuser
 ids: 300102
 valeur: Motif du refus = Cnbf inconnu du barreau
 resultat: refuse
 message: Cette demande d'inscription est en cours de traitement par l'utilisateur agent.banc
 ---
-# Refus : une demande de modification (RPJCI_TYPE_MAJ = 'M', l. 77-80). Jumeau accepte : bloc 7 (inscription, 'I').
+# Refus : une demande de modification (RPJCI_TYPE_MAJ = 'M', l. 77-80). Jumeau accepte : bloc 28 (inscription, 'I').
 geste: Agir Refuser
 ids: 300104
 valeur: Motif du refus = Cnbf inconnu du barreau
 resultat: refuse
 message: Cette demande de modification a déjà été traitée. Vous ne pouvez pas re-traiter une demande de modification déjà traitée.
 ---
-# Refus : une demande deja refusee, avec son motif (l. 82-85). Jumeau accepte : bloc 7 (jamais traitee).
+# Refus : une demande deja refusee, avec son motif (l. 82-85). Jumeau accepte : bloc 28 (jamais traitee).
 geste: Agir Refuser
 ids: 300105
 valeur: Motif du refus = Cnbf inconnu du barreau
 resultat: refuse
 message: Vous ne pouvez pas traiter une demande d'inscription déjà refusée. Cette demande d'inscription a été refusée pour le motif suivant : Cnbf inconnu du barreau
 ---
-# Refus : Refuse n'agit que sur l'etat 1 (DataProcDemandeInscr.cs:216) ; 300103 est acceptee (etat 2). Jumeau accepte : bloc 7.
+# Refus : Refuse n'agit que sur l'etat 1 (DataProcDemandeInscr.cs:216) ; 300103 est acceptee (etat 2). Jumeau accepte : bloc 28.
 geste: Agir Refuser
 ids: 300103
 valeur: Motif du refus = Cnbf inconnu du barreau
 resultat: refuse
 message: Echec du traitement.
+---
+# TRAITER (bloc 7 a 27). Refus : aucun mandataire coche (RigDataGridViewTraitements.cs:149-152). Jumeau accepte : bloc 26.
+geste: Agir Traiter la demande
+ids: 2500101
+resultat: refuse
+message: Vous devez sélectionner un mandataire.
+---
+# Refus : une seule demande a la fois. Jumeau accepte : bloc 26 (une demande).
+geste: Agir Traiter la demande
+ids: 2500101,2500102
+valeur: Mandataires traités = L15VER
+valeur: Mandataire principal = L15VER
+resultat: refuse
+message: Cochez une seule demande : RIG v2 traite les demandes une à une.
+---
+# Refus a l'ouverture, comme pour le refus : une demande de modification (l. 77-80). Jumeau accepte : bloc 26 (inscription).
+geste: Agir Traiter la demande
+ids: 300104
+valeur: Mandataires traités = L15VER
+valeur: Mandataire principal = L15VER
+resultat: refuse
+message: Cette demande de modification a déjà été traitée. Vous ne pouvez pas re-traiter une demande de modification déjà traitée.
+---
+# Refus : un abrege qu'aucun mandataire ne porte. Jumeau accepte : bloc 26 (L15VER existe).
+geste: Agir Traiter la demande
+ids: 2500101
+valeur: Mandataires traités = L15INCONNU
+valeur: Mandataire principal = L15INCONNU
+resultat: refuse
+message: Mandataire introuvable dans la base du greffe : « L15INCONNU ».
+---
+# Refus : un abrege que deux mandataires portent (la grille de la V2 les distingue par leur ligne). Jumeau accepte : bloc 26
+# (L15VER, un seul mandataire) ; les deux se nomment par leur numero (blocs 15 et 17).
+geste: Agir Traiter la demande
+ids: 2500101
+valeur: Mandataires traités = L15DBL
+valeur: Mandataire principal = L15VER
+resultat: refuse
+message: L'abrégé « L15DBL » désigne 2 mandataires : nommez-les par leur numéro (2500103, 2500104).
+---
+# Refus : des mandataires a traiter sans principal (l. 177-184). Jumeau accepte : bloc 26 (L15VER principal).
+geste: Agir Traiter la demande
+ids: 2500101
+valeur: Mandataires traités = L15VER
+resultat: refuse
+message: Vous devez cocher un mandataire principal.
+---
+# Refus : deux principaux (l. 186-188). Jumeau accepte : bloc 26 (un seul).
+geste: Agir Traiter la demande
+ids: 2500101
+valeur: Mandataires traités = L15VER, 2500102
+valeur: Mandataire principal = L15VER, 2500102
+resultat: refuse
+message: Vous ne pouvez cocher qu'un seul mandataire principal.
+---
+# Refus : le principal n'est pas coche a traiter (l. 166-168). Jumeau accepte : bloc 26 (L15VER traite et principal).
+geste: Agir Traiter la demande
+ids: 2500101
+valeur: Mandataires traités = 2500102
+valeur: Mandataire principal = L15VER
+resultat: refuse
+message: Le mandataire principal doit être remis à traiter.
+---
+# Refus : le principal est inactif (l. 161-165 ; 2500103, nomme par son numero). Jumeau accepte : bloc 26 (L15VER actif).
+geste: Agir Traiter la demande
+ids: 2500101
+valeur: Mandataires traités = 2500103
+valeur: Mandataire principal = 2500103
+resultat: refuse
+message: Le mandataire principal doit être actif et avec abrégé.
+---
+# Refus : le principal n'a pas d'abrege (meme ligne de la V2 ; 2500102). Jumeau accepte : bloc 26 (L15VER a son abrege).
+geste: Agir Traiter la demande
+ids: 2500101
+valeur: Mandataires traités = 2500102
+valeur: Mandataire principal = 2500102
+resultat: refuse
+message: Le mandataire principal doit être actif et avec abrégé.
+---
+# Refus : 2500104 a deja un AUTRE numero CNBF, la V2 ne le propose pas (DataProcTraitement.cs:77-120). Jumeau accepte : bloc 26
+# (2500102, sans CNBF).
+geste: Agir Traiter la demande
+ids: 2500101
+valeur: Mandataires traités = L15VER, 2500104
+valeur: Mandataire principal = L15VER
+resultat: refuse
+message: MARRON Paul (L15DBL) n'est pas un mandataire que RIG v2 propose pour cette demande : seuls ceux sans numéro CNBF ni CNBF de structure, ou déjà au numéro CNBF de la demande, s'y rattachent.
+---
+# Refus : une structure sur une demande SANS SIREN (300101 : la grille des structures n'existe pas, OPE_TRAITEMENT_RECHERCHE.cs:102-105).
+# Jumeau accepte : bloc 26 (2500101 a son SIREN et son CNBF de structure).
+geste: Agir Traiter la demande
+ids: 300101
+valeur: Mandataires traités = L15VER
+valeur: Mandataire principal = L15VER
+valeur: Structures traitées = 2500106
+resultat: refuse
+message: ATTENTION : Informations incomplètes, le n° CNBF structure est présent mais pas de n° SIREN fourni, il est donc impossible de récupérer les informations de la structure
+---
+# Refus : une structure sur une demande au SIREN sans CNBF de structure (2500102, l. 97-101). Jumeau accepte : bloc 26.
+geste: Agir Traiter la demande
+ids: 2500102
+valeur: Mandataires traités = L15VER
+valeur: Mandataire principal = L15VER
+valeur: Structures traitées = 2500106
+resultat: refuse
+message: ATTENTION : Informations incomplètes, le n° SIREN est présent mais pas de n° CNBF structure fourni
+---
+# Refus : le meme mandataire dans les deux grilles (RigDataGridViewTraitements.cs:193-198). Jumeau accepte : bloc 26 (2500102
+# personne, 2500106 structure).
+geste: Agir Traiter la demande
+ids: 2500101
+valeur: Mandataires traités = L15VER, 2500102
+valeur: Mandataire principal = L15VER
+valeur: Structures traitées = 2500102
+resultat: refuse
+message: Attention ce mandataire est déjà coché dans la liste des mandataires. Vous ne pouvez pas cocher le même mandataire dans les deux listes.
+---
+# Refus : une structure deja principale -- active, abregee, CNBF de structure (RigDataGridViewTraitementsStructure.cs:144-158).
+# Jumeau accepte : bloc 26 (2500106, sans abrege).
+geste: Agir Traiter la demande
+ids: 2500101
+valeur: Mandataires traités = L15VER
+valeur: Mandataire principal = L15VER
+valeur: Structures traitées = L15STR
+resultat: refuse
+message: Ce mandataire est mandataire principal. Vous ne pouvez pas le cocher
+---
+# Refus : une structure qui a un autre CNBF, sans correspondance a la structure (DataProcTraitement.cs:115). Jumeau accepte :
+# bloc 26 (2500106, sans CNBF).
+geste: Agir Traiter la demande
+ids: 2500101
+valeur: Mandataires traités = L15VER
+valeur: Mandataire principal = L15VER
+valeur: Structures traitées = 2500104
+resultat: refuse
+message: MARRON Paul (L15DBL) n'est pas une structure que RIG v2 propose pour cette demande : seules celles sans numéro CNBF ni CNBF de structure, ou dont le numéro CNBF correspond à la structure 250901, s'y rattachent.
+---
+# Refus : L15VER a un AUTRE courriel que le demandeur, la V2 ouvre la liste a cocher (PROC_TRAITEMENT.cs:196-222) ; rien de
+# choisi. Jumeau accepte : bloc 26 (« aucun ») et bloc 27 (le courriel nomme).
+geste: Agir Traiter la demande
+ids: 2500101
+valeur: Mandataires traités = L15VER, 2500102
+valeur: Mandataire principal = L15VER
+valeur: Structures traitées = 2500106
+resultat: refuse
+message: Des mandataires traités ont un autre courriel que celui du demandeur (anne.verger@barreau.test) : verger@ancien.test. Indiquez dans « Courriels remplacés » ceux à remplacer, ou « aucun ».
+---
+# Refus : un courriel qui n'est pas dans cette liste. Jumeau accepte : bloc 27 (verger@ancien.test).
+geste: Agir Traiter la demande
+ids: 2500101
+valeur: Mandataires traités = L15VER, 2500102
+valeur: Mandataire principal = L15VER
+valeur: Structures traitées = 2500106
+valeur: Courriels remplacés = autre@ancien.test
+resultat: refuse
+message: « autre@ancien.test » n'est pas un courriel des mandataires traités (verger@ancien.test).
+---
+# Refus : les deux telephones de 2500102, joints par « ; » (21 caracteres), depassent MNDTR_TELEPHONE (15 dans la base du
+# greffe : la V2 echouerait en base). Jumeau accepte : bloc 26 (2500101, un telephone).
+geste: Agir Traiter la demande
+ids: 2500102
+valeur: Mandataires traités = L15VER
+valeur: Mandataire principal = L15VER
+resultat: refuse
+message: Le téléphone du demandeur (0476250201;0476250202) dépasse les 15 caractères de la fiche du mandataire (MNDTR_TELEPHONE).
+---
+# ACCEPTEE : 2500101 passe a l'etat 2, 'A', date et agent ; L15VER (principal) et 2500102 recoivent CNBF, CNBF de structure,
+# SIREN, telephone et fax du demandeur ; L15VER garde son courriel (« aucun » a remplacer), 2500102 (vide) recoit celui du
+# demandeur et est DESACTIVE (pas principal) ; la structure 2500106 : CNBF vide, CNBF de structure et SIREN ; l'instance
+# 2500101 (parties de 2500102 et 2500106) repasse a recentraliser, 2500102 (partie de 2500104, non traite) ne bouge pas. La
+# demande quitte la liste (seul l'etat 1 y est).
+geste: Agir Traiter la demande
+ids: 2500101
+valeur: Mandataires traités = L15VER, 2500102
+valeur: Mandataire principal = L15VER
+valeur: Structures traitées = 2500106
+valeur: Courriels remplacés = aucun
+resultat: fait
+message: Demande d'inscription de VERGER Anne acceptée
+lignes:
+ARDOISE Irène | Cnbf 300001 · reçue le {J-2} | Personnes physiques | AFaire | []
+BELIER Simon | Cnbf 300002 · structure Cnbf 300902 · ouverte par agent.banc | Structures | EnCours | [0,1]
+MU JURIS | Cnbf 300008 | Personnes physiques | AFaire | []
+VIOLETTE Marc | Cnbf 250002 · SIREN 512 500 102 · reçue le {J-1} | Personnes physiques | AFaire | []
+controle: SELECT CONCAT(RPJCI_ETAT, '/', RPJCI_ETAT_TRAITEMENT_RIG, '/', RPJCI_USER_TRAITEMENT_RIG, '/', CASE WHEN RPJCI_DATE_TRAITEMENT_RIG IS NULL THEN 'sans date' ELSE 'datee' END) FROM v2.DEMAT_RPJC_INS WHERE RPJCI_ID_RPJCI = 2500101 => 2/A/banc.ecrans/datee
+controle: SELECT CONCAT(MNDTR_NUMERO_CNBF, '/', MNDTR_NUMERO_CNBF_STRUCTURE, '/', MNDTR_SIREN, '/', MNDTR_ADRESSE_MAIL, '/', MNDTR_TELEPHONE, '/', MNDTR_FAX, '/', CAST(MNDTR_ACTIF AS int)) FROM v2.MANDATAIRE WHERE MNDTR_ID_MNDTR = 2500101 => 250001/250901/512500101/verger@ancien.test/0476250101/0476250109/1
+controle: SELECT CONCAT(MNDTR_NUMERO_CNBF, '/', MNDTR_NUMERO_CNBF_STRUCTURE, '/', MNDTR_SIREN, '/', MNDTR_ADRESSE_MAIL, '/', MNDTR_TELEPHONE, '/', MNDTR_FAX, '/', CAST(MNDTR_ACTIF AS int)) FROM v2.MANDATAIRE WHERE MNDTR_ID_MNDTR = 2500102 => 250001/250901/512500101/anne.verger@barreau.test/0476250101/0476250109/0
+controle: SELECT CONCAT(CASE WHEN MNDTR_NUMERO_CNBF IS NULL THEN 'sans cnbf' ELSE MNDTR_NUMERO_CNBF END, '/', MNDTR_NUMERO_CNBF_STRUCTURE, '/', MNDTR_SIREN, '/', CAST(MNDTR_ACTIF AS int)) FROM v2.MANDATAIRE WHERE MNDTR_ID_MNDTR = 2500106 => sans cnbf/250901/512500101/1
+controle: SELECT STRING_AGG(CONCAT(INSTN_ID_INSTN, ':', CAST(INSTN_TOP_EXPERIAN AS int), ':', CASE WHEN INSTN_DATE_MAJ_INFOG IS NULL THEN 'sans date' ELSE 'datee' END), ' ') WITHIN GROUP (ORDER BY INSTN_ID_INSTN) FROM v2.INSTANCE WHERE INSTN_ID_INSTN IN (2500101, 2500102) => 2500101:0:datee 2500102:1:sans date
+---
+# ACCEPTEE de nouveau : la V2 rouvre une demande deja acceptee (ni 'M' ni 'R') et la retraite ; la demande, deja a l'etat 2, ne
+# change pas (RigDataGridViewRpvaBase.cs:125) ; le courriel de L15VER, NOMME dans la liste, devient celui du demandeur.
+geste: Agir Traiter la demande
+ids: 2500101
+valeur: Mandataires traités = L15VER
+valeur: Mandataire principal = L15VER
+valeur: Courriels remplacés = verger@ancien.test
+resultat: fait
+message: Demande d'inscription de VERGER Anne acceptée
+controle: SELECT CONCAT(MNDTR_ADRESSE_MAIL, '/', CAST(MNDTR_ACTIF AS int)) FROM v2.MANDATAIRE WHERE MNDTR_ID_MNDTR = 2500101 => anne.verger@barreau.test/1
+controle: SELECT CONCAT(RPJCI_ETAT, '/', RPJCI_ETAT_TRAITEMENT_RIG) FROM v2.DEMAT_RPJC_INS WHERE RPJCI_ID_RPJCI = 2500101 => 2/A
 ---
 # RETRAITEE : 300101 passe a l'etat 2, refusee (R), motif, date et agent ecrits ; elle quitte la liste (seul l'etat 1 y est).
 geste: Agir Refuser
@@ -52,5 +256,6 @@ message: Demande d'inscription rejetée avec succès.
 lignes:
 BELIER Simon | Cnbf 300002 · structure Cnbf 300902 · ouverte par agent.banc | Structures | EnCours | [0,1]
 MU JURIS | Cnbf 300008 | Personnes physiques | AFaire | []
+VIOLETTE Marc | Cnbf 250002 · SIREN 512 500 102 · reçue le {J-1} | Personnes physiques | AFaire | []
 controle: SELECT CONCAT(RPJCI_ETAT, '/', RPJCI_ETAT_TRAITEMENT_RIG, '/', RPJCI_MOTIF_TRAITEMENT_RIG, '/', RPJCI_USER_TRAITEMENT_RIG) FROM v2.DEMAT_RPJC_INS WHERE RPJCI_ID_RPJCI = 300101 => 2/R/Cnbf inconnu du barreau de Paris/banc.ecrans
 controle: SELECT CASE WHEN RPJCI_DATE_TRAITEMENT_RIG IS NULL THEN 'sans date' ELSE 'datee' END FROM v2.DEMAT_RPJC_INS WHERE RPJCI_ID_RPJCI = 300101 => datee

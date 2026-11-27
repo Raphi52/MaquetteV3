@@ -875,11 +875,16 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         {
             Code = "PROC_EDI_RPVAINS", Titre = "EDI RPVA", Sujet = "demandes d'inscription",
             Forme = FormeEcran.File,
-            // Lot 15 (27/11/2026) : le refus, seul geste de la V2 que la file porte (EcrivainInscriptionsRpva.cs) -- motif obligatoire
-            // (OPE_SAISIE_REJET.Designer.cs:71), 300 caracteres (RPJCI_MOTIF_TRAITEMENT_RIG). « Traiter » (rattacher les mandataires
-            // candidats) est un parcours en plusieurs fenetres de la V2, non repris : nomme dans l'ecrivain.
-            Parametres = [Champ.Zone("Motif du refus")],
-            Gestes = ["Refuser"],
+            // Lot 15 (27/11/2026) : les deux gestes de la V2 (EcrivainInscriptionsRpva.cs). « Traiter la demande » (VALIDER renomme,
+            // FORM_TRAITEMENT.cs:37) rattache la demande aux mandataires nommes par leur abrege (les cases « Traiter », « Principal »
+            // et « TraiterStruct » des deux grilles, RigDataGridViewTraitements*.cs) ; « Courriels remplaces » tient la liste
+            // FORM_REMPLACER_EMAILS. « Refuser » : motif obligatoire (OPE_SAISIE_REJET.Designer.cs:71), 300 caracteres.
+            Parametres =
+            [
+                Champ.Texte("Mandataires traités"), Champ.Texte("Mandataire principal"), Champ.Texte("Structures traitées"),
+                Champ.Texte("Courriels remplacés"), Champ.Zone("Motif du refus"),
+            ],
+            Gestes = ["Traiter la demande", "Refuser"],
             Recherche = "Rechercher une demande, un numéro CNBF…",
             Criteres = ["Numéro CNBF", "Demandeur", "État de la demande"],
             // Bouton final cite par la fiche v2 : VALIDER (proc_edi_rpvains.md, Detail OPE)
@@ -893,10 +898,10 @@ public sealed class DomaineConfigurer : IDomaineEcrans
                     ["Demandeur", "Numéro CNBF", "État"]),
                 new MarcheEcran("Infos du demandeur", "Les informations du demandeur s'affichent.", true,
                     ["Identité", "Courriel du demandeur"]),
-                new MarcheEcran("Mandataires candidats", "Les mandataires existants qui correspondent sont cherchés. Cocher « Traiter » leur affecte le numéro CNBF, le SIREN et le courriel du demandeur.", true,
-                    ["Traiter", "Principal", "Désactiver"]),
-                new MarcheEcran("Courriels", "Si des courriels alternatifs existent sur les lignes traitées, une fenêtre propose de les remplacer.", false,
-                    ["Remplacement des courriels"]),
+                new MarcheEcran("Mandataires traités", "Nommez par leur abrégé (ou leur numéro) les mandataires à rattacher, séparés par des virgules : sans numéro CNBF, ou déjà au numéro CNBF de la demande. Ils reçoivent le numéro CNBF, le SIREN, le courriel, les téléphones et fax du demandeur ; un seul principal, actif et avec abrégé, les autres sont désactivés. Une structure ne se rattache que si la demande a un SIREN et un CNBF de structure.", true,
+                    ["Mandataires traités", "Mandataire principal", "Structures traitées"]),
+                new MarcheEcran("Courriels", "Si des mandataires traités ont un autre courriel que le demandeur, nommez ceux à remplacer, ou « aucun » : un courriel vide reçoit toujours celui du demandeur.", false,
+                    ["Courriels remplacés"]),
                 new MarcheEcran("Refus", "Le refus, motif saisi, met la demande à l'état refusée : elle quitte la liste. Une demande de modification, déjà refusée ou tenue par un agent ne se refuse pas.", false,
                     ["Motif du refus"]),
             ],

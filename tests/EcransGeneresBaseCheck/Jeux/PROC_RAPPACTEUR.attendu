@@ -8,6 +8,7 @@
 # Nom : l'abrege d'edition de la civilite puis le nom (dbo.GetCiviliteNomPrenom) ; PM et ND jamais devant le nom (SELARL LIQUIDA) ;
 # un nom vide prend l'abrege (ZZ15).
 # PROC_SUPP_ACTEUR_JUD.sql (lot 14) ajoute les juges J14K, J14X, J14R et les mandataires PC M14K, M14R : la V2 les liste aussi.
+# Lot 15 (plan-676a4b19) : VERGER…, MARRON Paul, CABINET VERGER… sont les mandataires 2500101-2500106 de PROC_EDI_RPVAINS.sql.
 COLLEGE | sans abrégé · actif | Juges | AFaire | []
 M. FUSIONIP Paul | abrégé J14P · actif | Juges | AFaire | []
 Mme FUSIONJUGE Rose | abrégé J14G · actif | Juges | AFaire | []
@@ -49,6 +50,8 @@ Me ANCIEN DELTA | abrégé DEL13A · CNBF 130004 · actif · ne se supprime pas 
 Me ARDOISE Irène | abrégé ARD15 · CNBF 150001 · actif · ne se supprime pas (actif, n° CNBF) | Mandataires | Validee | []
 BETA Simon | sans abrégé · CNBF 300013 · actif · ne se supprime pas (actif, n° CNBF) | Mandataires | Validee | []
 Me BETA Simon | abrégé BET13 · CNBF 130002 · inactif | Mandataires | EnCours | []
+CABINET VERGER | abrégé L15STR · actif | Mandataires | AFaire | []
+CABINET VERGER SELARL | sans abrégé · actif | Mandataires | AFaire | []
 Mme CHANTELLE Olga | sans abrégé · actif | Mandataires | AFaire | []
 M. CNBF Actif | sans abrégé · CNBF 240001 · actif · ne se supprime pas (actif, n° CNBF) | Mandataires | Validee | []
 Mme DELTA Lina | abrégé DEL13B · CNBF 130004 · actif · ne se supprime pas (actif, n° CNBF) | Mandataires | Validee | []
@@ -60,7 +63,11 @@ Me GAMMA Olga | sans abrégé · CNBF 130003 · actif · ne se supprime pas (act
 M. INACTIF Garde | sans abrégé · inactif | Mandataires | EnCours | []
 KAPPA AVOCATS SELARL | abrégé KAPPA15 · actif | Mandataires | AFaire | []
 LAMBDA CONSEIL | sans abrégé · actif | Mandataires | AFaire | []
+MARRON Paul | abrégé L15DBL · CNBF 250777 · actif · ne se supprime pas (actif, n° CNBF) | Mandataires | Validee | []
 NU JURIS SAS | sans abrégé · actif | Mandataires | AFaire | []
+VERGER A. | sans abrégé · actif | Mandataires | AFaire | []
+VERGER Anne | abrégé L15VER · actif | Mandataires | AFaire | []
+VERGER Anne-Marie | abrégé L15DBL · inactif | Mandataires | EnCours | []
 ADMIN SCP | sans abrégé · actif | Mandataires PC | AFaire | []
 ADMINISTRA | sans abrégé · actif | Mandataires PC | AFaire | []
 Me ALPHA MANDATAIRE SELARL | abrégé MA17 · actif | Mandataires PC | AFaire | []

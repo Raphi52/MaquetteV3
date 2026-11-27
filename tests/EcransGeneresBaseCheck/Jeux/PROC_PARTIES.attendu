@@ -4,6 +4,7 @@
 # 1312106 « DOIP » est un demandeur (premiere lettre). Les trois dernieres lignes sont les parties de PROC_MJUD.sql : PROC_PARTIES
 # ne filtre pas le type de l'instance. Etat « À compléter » (AFaire) tant que cet ecran ne les a pas enregistrees.
 # Les roles 2026Y1320x sont les instances au nom retouche de PROC_PARTIES.sql (gestes 15 a 19).
+# Lot 15 (plan-676a4b19) : L15 RPVA UN, DEUX, TROIS sont les parties 2500101-2500103 de PROC_EDI_RPVAINS.sql.
 ALPHA PARTIES SARL | Demandeur · instance 2026Z13201 | Demandeurs | AFaire | []
 M. BETA Paul | Demandeur · instance 2026Z13201 · AJ totale · répertorié | Demandeurs | AFaire | []
 EPSILON IP | Demandeur · instance 2026Z13201 | Demandeurs | AFaire | []
@@ -16,6 +17,9 @@ PSI CONSEIL | Demandeur · instance 2026Y13203 | Demandeurs | AFaire | []
 Mme TAU Anne | Défendeur · instance 2026Y13203 | Défendeurs | AFaire | []
 LAMBDA BAIL | Demandeur · instance 2026Y13202 | Demandeurs | AFaire | []
 MU BOULANGERIE | Défendeur · instance 2026Y13202 | Défendeurs | AFaire | []
+L15 RPVA TROIS | Demandeur · instance 2026R25002 | Demandeurs | AFaire | []
+L15 RPVA UN | Demandeur · instance 2026R25001 | Demandeurs | AFaire | []
+L15 RPVA DEUX | Défendeur · instance 2026R25001 | Défendeurs | AFaire | []
 # Lot 8 (27/11) : les parties de PROC_IPSUIVI.sql (IP 1801701-02) et de PROC_DBE_INJ.sql (instance OPINJRBE 1800108) ; PROC_PARTIES lit toutes les parties.
 ENJOINDRE DEJA OPINJRBE | Défendeur · instance 2026OP81808 | Défendeurs | AFaire | []
 ALPHA BANC SARL | Demandeur · instance 2026J12001 | Demandeurs | AFaire | []
