@@ -9,7 +9,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { EcranGenere, type VueLignesEcran } from '../EcranGenere'
-import type { DescripteurEcranVue, LigneEcranVue } from '../../plan/types'
+import type { ChampEcranVue, DescripteurEcranVue, LigneEcranVue } from '../../plan/types'
 import { installerFauxPont, retirerFauxPont } from '../../test/faux-pont'
 import { NON_LU } from './commun'
 
@@ -111,5 +111,73 @@ describe('Referentiel : les sections d’une ligne selon son groupe (sectionsPar
     await waitFor(() => expect(container.textContent).toContain('Aucune colonne n’est modifiée'))
     expect(pont.appels).not.toHaveBeenCalledWith('EcranGenere.Geste', expect.anything(), expect.anything(), 'Modifier',
       expect.anything(), expect.anything(), expect.anything())
+  })
+})
+
+// Les regles d'affichage de la fiche RIG v2 sous un etat de PC (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:116-119, :135-156) : « Résolution du
+// plan » ne se montre qu'avec « Ouverture », « Code clôture » qu'avec « Résolution du plan », « À sauver » est bloque sous « Mise a jour
+// de la PC ». Controle final du lot 14 (27/11/2026, 4e reprise) : la grille les montrait et les laissait saisir en toutes circonstances.
+const Case = (libelle: string, partiel: Partial<ChampEcranVue> = {}): ChampEcranVue => ({ libelle, type: 'Case', options: [], ...partiel })
+const champsEtat = (regles: boolean): ChampEcranVue[] => [
+  Case('Ouverture'),
+  Case('Résolution du plan', regles ? { visibleSi: 'Ouverture' } : {}),
+  { libelle: 'Code clôture', type: 'Texte', options: [], ...(regles ? { visibleSi: 'Résolution du plan' } : {}) },
+  Case('Mise à jour de la PC'),
+  Case('À sauver', regles ? { bloqueSi: 'Mise à jour de la PC' } : {}),
+]
+const etatDescripteur = (regles: boolean) => parGroupe({
+  sections: [{ titre: SectionEtat, consigne: 'Le formulaire d’un état.', obligatoire: false, champs: champsEtat(regles) }],
+})
+const etat: LigneEcranVue = { nom: 'Redressement', precisions: 'code RJ', groupe: Etats, etat: 'Validee', faites: [], id: 'PC_ETAT|RJ', valeurs: ['RJ', 'Redressement'] }
+const ficheEtat = (valeurs: Record<string, string>) => () => ({
+  mode: 'base', message: null, fiche: {
+    procedure: 'ECRAN_TEST', id: 'PC_ETAT|RJ', nom: 'Redressement', lectureSeule: false, motif: null,
+    sections: [{ titre: SectionEtat, champs: Object.entries(valeurs).map(([libelle, valeur]) => ({ libelle, valeur, modifiable: true, colonnes: [], lignes: [] })) }],
+  },
+})
+async function ouvrirEtat(regles: boolean, valeurs: Record<string, string>) {
+  const pont = installerFauxPont({ 'EcranGenere.Lignes': () => base([etat]), 'EcranGenere.Fiche': ficheEtat(valeurs), 'EcranGenere.Geste': fait })
+  const { container } = render(<EcranGenere descripteur={etatDescripteur(regles)} />)
+  fireEvent.click((await menu(container, 'Redressement'))[0]!)
+  await waitFor(() => expect(sousLaLigne(container)?.querySelector('[aria-label="Ouverture"]')).not.toBeNull())
+  return { pont, container, champ: (libelle: string) => sousLaLigne(container)!.querySelector(`[aria-label="${libelle}"]`) as HTMLInputElement | null }
+}
+
+describe('Sections : les regles d’affichage de la fiche RIG v2 (visibleSi, bloqueSi)', () => {
+  it('décocher « Ouverture » masque et vide « Résolution du plan » puis « Code clôture », envoyés vides', async () => {
+    const { pont, container, champ } = await ouvrirEtat(true, { Ouverture: 'oui', 'Résolution du plan': 'oui', 'Code clôture': 'RESOL', 'Mise à jour de la PC': 'non', 'À sauver': 'oui' })
+    expect(champ('Résolution du plan')?.checked).toBe(true)
+    expect(champ('Code clôture')?.value).toBe('RESOL')
+    fireEvent.click(champ('Ouverture')!)
+    expect(champ('Résolution du plan')).toBeNull()
+    expect(champ('Code clôture')).toBeNull()
+    fireEvent.click(bouton(container, 'Enregistrer')!)
+    await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Geste', 'ECRAN_TEST', Etats, 'Modifier', null, ['PC_ETAT|RJ'],
+      { [`${SectionEtat} › Ouverture`]: '', [`${SectionEtat} › Résolution du plan`]: '', [`${SectionEtat} › Code clôture`]: '' }))
+  })
+
+  it('jumeau : cocher « Ouverture » montre « Résolution du plan », la cocher montre « Code clôture »', async () => {
+    const { champ } = await ouvrirEtat(true, { Ouverture: 'non', 'Résolution du plan': 'non', 'Code clôture': '', 'Mise à jour de la PC': 'non', 'À sauver': 'oui' })
+    expect(champ('Résolution du plan')).toBeNull()
+    fireEvent.click(champ('Ouverture')!)
+    expect(champ('Résolution du plan')?.checked).toBe(false)
+    expect(champ('Code clôture')).toBeNull()
+    fireEvent.click(champ('Résolution du plan')!)
+    expect(champ('Code clôture')).not.toBeNull()
+  })
+
+  it('« À sauver » est bloqué tant que « Mise à jour de la PC » est cochée, et se saisit quand elle se décoche', async () => {
+    const { champ } = await ouvrirEtat(true, { Ouverture: 'non', 'Résolution du plan': 'non', 'Code clôture': '', 'Mise à jour de la PC': 'oui', 'À sauver': 'oui' })
+    expect(champ('À sauver')?.disabled).toBe(true)
+    expect(champ('À sauver')?.checked).toBe(true)
+    fireEvent.click(champ('Mise à jour de la PC')!)
+    expect(champ('À sauver')?.disabled).toBe(false)
+  })
+
+  it('jumeau : sans règle au descripteur, tous les champs se montrent et se saisissent', async () => {
+    const { champ } = await ouvrirEtat(false, { Ouverture: 'non', 'Résolution du plan': 'non', 'Code clôture': '', 'Mise à jour de la PC': 'oui', 'À sauver': 'oui' })
+    expect(champ('Résolution du plan')).not.toBeNull()
+    expect(champ('Code clôture')).not.toBeNull()
+    expect(champ('À sauver')?.disabled).toBe(false)
   })
 })

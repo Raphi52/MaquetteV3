@@ -468,6 +468,14 @@ foreach (var d in descripteurs)
     }
     foreach (var g in d.GroupesModificationSeule.Where(g => !d.Groupes.Contains(g)))
         defauts.Add($"groupe en modification seule « {g} », absent des groupes de l'ecran");
+    // Les regles d'affichage d'un champ (lot 14, 4e reprise : un etat de PC dans Tables de reference) : chacune nomme une CASE de sa
+    // section, autre que lui (sinon la grille ne lit aucune case : le champ resterait masque, ou jamais bloque). fix-ok: une regle
+    // qui nomme autre chose qu'une case de sa section est un champ masque pour toujours -- banc rouge sur une regle « Régime » injectee.
+    foreach (var s in d.Marches.Concat(d.Sections))
+        foreach (var c in s.Champs)
+            foreach (var (regle, cible) in new[] { ("visible si", c.VisibleSi), ("bloque si", c.BloqueSi) })
+                if (cible is not null && (cible == c.Libelle || !s.Champs.Any(x => x.Libelle == cible && x.Type == TypeChamp.Case)))
+                    defauts.Add($"champ « {c.Libelle} » ({s.Titre}) {regle} « {cible} » : pas une case de sa section");
     if (!reuni)
     {
         switch (d.Forme)

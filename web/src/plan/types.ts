@@ -227,7 +227,11 @@ export type FormeEcranVue = 'File' | 'Consultation' | 'Fiche' | 'Saisie' | 'Refe
 /** Les types de champ, aux noms de TypeChamp (C#). */
 export type TypeChampVue = 'Texte' | 'Zone' | 'Date' | 'Periode' | 'Nombre' | 'Montant' | 'Case' | 'Liste' | 'Tableau'
 /** Un champ de la fiche RIG v2 : son libelle, son type, les valeurs d'une liste. */
-export interface ChampEcranVue { libelle: string; type: TypeChampVue; options: string[] }
+/** visibleSi : le champ ne se montre que quand cette case de sa section est cochee (decochee, il se vide) ; bloqueSi : cette
+ * case cochee, il se montre sans se saisir -- les regles d'affichage de la fiche RIG v2 (ChampEcran.VisibleSi / BloqueSi).
+ * fix-ok: controle final du lot 14 (27/11/2026, 4e reprise) -- sans elles, « Résolution du plan », « Code clôture » et « À sauver »
+ * d'un etat de PC s'affichaient et se saisissaient toujours ; ReferentielParGroupe.test.tsx rouge (3 tests) sans la regle. */
+export interface ChampEcranVue { libelle: string; type: TypeChampVue; options: string[]; visibleSi?: string | null; bloqueSi?: string | null }
 /** Une tuile : son code (AFaire, EnCours, Validee, EnAttente, Rejetee) et son icone de l'accueil. */
 export interface EtatEcranVue { code: string; libelle: string; icone: string }
 /** Une etape (Saisie) ou une section (les autres formes). */

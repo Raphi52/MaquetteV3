@@ -102,6 +102,17 @@ public sealed record ChampEcran(string Libelle, TypeChamp Type = TypeChamp.Texte
     /// <summary>Les valeurs d'une <see cref="TypeChamp.Liste"/>, dans l'ordre de la fiche ; vide sinon.</summary>
     public string[] Options { get; init; } = [];
 
+    /// <summary>Un champ que la fiche RIG v2 ne MONTRE que quand une case de SA section est cochee : le libelle de cette case ;
+    /// null sinon. La case decochee, le champ disparait et se vide, comme dans la V2. PROC_GTABREF, un etat de PC : « Résolution du
+    /// plan » sous « Ouverture », « Code clôture » sous « Résolution du plan » (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:135-156).</summary>
+    public string? VisibleSi { get; init; }
+
+    /// <summary>Un champ que la fiche RIG v2 BLOQUE (montre sans le laisser changer) quand une case de SA section est cochee : le
+    /// libelle de cette case ; null sinon. PROC_GTABREF : « À sauver » sous « Mise à jour de la PC » (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:116-119).</summary>
+    // fix-ok: controle final du lot 14 (27/11/2026, 4e reprise) -- la grille montrait et laissait saisir ces trois champs en toutes
+    // circonstances, faute de toute regle d'affichage dans le descripteur ; ReferentielParGroupe.test.tsx est rouge (3 tests) sans elles.
+    public string? BloqueSi { get; init; }
+
     public static implicit operator ChampEcran(string libelle) => new(libelle, Deviner(libelle));
 
     /// <summary>Le type qu'annonce le libelle de la fiche, UNE regle pour tous les ecrans : « Date de fin » est une
