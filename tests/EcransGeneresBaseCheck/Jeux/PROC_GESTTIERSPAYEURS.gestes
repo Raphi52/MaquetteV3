@@ -1,0 +1,94 @@
+# « Tiers payeurs » (EcrivainTiersPayeurs), en grille : « Ajouter », « Modifier », « Supprimer » (OPE_TIERSPAYEURSDETAIL : Valider,
+# l. 188-244 ; Supprimer, l. 249-286). Messages de la V2 au mot pres. Lignes du jeu : PROC_GESTTIERSPAYEURS.sql.
+
+# Refus : l'abrege est obligatoire (MetierObligatoire). Jumeau accepte : bloc 5.
+geste: Ajouter
+valeur: Désignation = TIERS BANC NOUVEAU
+resultat: refuse
+message: « Abrégé » est obligatoire.
+---
+# Refus : l'abrege « débiteur » (DEBITEUR ou DÉBITEUR, toute casse ; l. 197-198). Jumeau accepte : bloc 5.
+geste: Ajouter
+valeur: Abrégé = débiteur
+valeur: Désignation = TIERS BANC NOUVEAU
+resultat: refuse
+message: L'abrégé débiteur n'est pas valable
+---
+# Refus : un abrege deja porte (GetPayeurByAbrege, l. 201-202). Jumeau accepte : bloc 5 (un abrege libre).
+geste: Ajouter
+valeur: Abrégé = L14A
+valeur: Désignation = TIERS BANC NOUVEAU
+resultat: refuse
+message: L'abrégé saisi existe déjà
+---
+# Refus : la designation est obligatoire. Jumeau accepte : bloc 5.
+geste: Ajouter
+valeur: Abrégé = L14N
+resultat: refuse
+message: « Désignation » est obligatoire.
+---
+# Un tiers payeur principal (l. 204), actif ; le code postal saisi « 75-002 » perd son tiret (la liste noire de la V2, l. 296).
+geste: Ajouter
+valeur: Abrégé = L14N
+valeur: Désignation = TIERS BANC NOUVEAU
+valeur: Code postal = 75-002
+valeur: Ville = Paris
+valeur: Actif = oui
+resultat: fait
+message: Tiers payeur L14N créé : TIERS BANC NOUVEAU.
+controle: SELECT CONCAT(PYEUR_CODE_POSTAL, '/', CAST(PYEUR_IS_PRINCIPAL AS int), '/', CAST(PYEUR_IS_ACTIF AS int)) FROM v2.PAYEUR WHERE PYEUR_ABREGE = 'L14N' => 75002/1/1
+---
+# Refus : l'abrege reserve TPG est en lecture seule (l. 76). Jumeau accepte : bloc 9 (L14A, un abrege ordinaire).
+geste: Modifier
+ids: 2400206
+valeur: Abrégé = TPG2
+resultat: refuse
+message: L'abrégé TPG est réservé : il ne se modifie pas (RIG v2 le met en lecture seule).
+---
+# Refus en modification : « débiteur », au message de la V2 en modification (« abregé », l. 222). Jumeau accepte : bloc 9.
+geste: Modifier
+ids: 2400201
+valeur: Abrégé = DEBITEUR
+resultat: refuse
+message: L'abregé débiteur n'est pas valable
+---
+# Refus : l'abrege change vers un abrege deja porte (l. 225-227). Jumeau accepte : bloc 9 (abrege inchange).
+geste: Modifier
+ids: 2400201
+valeur: Abrégé = L14B
+resultat: refuse
+message: L'abrégé saisi existe déjà
+---
+# L14A demenage a Lyon et devient inactif ; la date de creation est reecrite (Payeur.Sauve, Payeur.cs:242-245).
+geste: Modifier
+ids: 2400201
+valeur: Code postal = 69002
+valeur: Ville = Lyon
+valeur: Actif =
+resultat: fait
+message: Tiers payeur L14A enregistré.
+controle: SELECT CONCAT(PYEUR_CODE_POSTAL, '/', PYEUR_LOCALITE_POSTALE, '/', CAST(PYEUR_IS_ACTIF AS int), '/', CASE WHEN PYEUR_DATE_CREATION > '20250101' THEN 'reecrite' ELSE 'ancienne' END) FROM v2.PAYEUR WHERE PYEUR_ID_PYEUR = 2400201 => 69002/Lyon/0/reecrite
+---
+# Refus : L14B a une ventilation -- le message cumule de la V2 (l. 256-269), ses retours a la ligne en blancs. Jumeau accepte : bloc 12.
+geste: Supprimer
+ids: 2400202
+resultat: refuse
+message: Suppression impossible : - Ce payeur est actuellement associé à une ou plusieurs ventilations
+---
+# Refus : un payeur non principal n'est pas dans l'ecran (Payeur.GetPayeursPrincipaux). Jumeau accepte : bloc 12.
+geste: Supprimer
+ids: 2400205
+resultat: refuse
+message: Tiers payeur introuvable dans la base du greffe (2400205).
+---
+# L14D, ni ventilation ni facture : supprime (Payeur.Delete, l. 271) ; « Suppression réussie » (l. 278).
+geste: Supprimer
+ids: 2400204
+resultat: fait
+message: Suppression réussie : le tiers payeur L14D (TIERS BANC INACTIF) est supprimé.
+lignes:
+TIERS BANC ALPHA | abrégé L14A · 69002 Lyon · alpha@exemple.test · inactif | Inactifs | Validee | []
+TIERS BANC BETA | abrégé L14B · adresse à compléter | Actifs | EnCours | []
+L14C | abrégé L14C · 69001 Lyon | Actifs | AFaire | []
+TIERS BANC NOUVEAU | abrégé L14N · 75002 Paris | Actifs | Validee | []
+TRESOR PUBLIC BANC | abrégé TPG · 75001 Paris | Actifs | Validee | []

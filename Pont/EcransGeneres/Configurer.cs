@@ -152,35 +152,36 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         {
             Code = "PROC_GESTTIERSPAYEURS", Titre = "Tiers payeurs", Sujet = "tiers payeurs",
             Forme = FormeEcran.Referentiel,
-            // Colonnes : les champs des sections ci-dessous (Abrege, Identite, Adresse).
-            Colonnes = ["Désignation", "Abrégé", "Mandataire rattaché", "Code postal", "Ville"],
+            // La grille et le detail de la V2 (TiersPayeursRigDataGridView.cs ; OPE_TIERSPAYEURSDETAIL.cs:57-66) : la liste ne montre que
+            // les payeurs principaux (Payeur.GetPayeursPrincipaux), d'ou les groupes actifs / inactifs (PYEUR_IS_ACTIF), pas « autre payeur ».
+            // Lignes : LecteurTiersPayeurs.cs ; gestes : EcrivainTiersPayeurs.cs.
+            Colonnes = ["Abrégé", "Désignation", "Adresse", "Complément", "Code postal", "Ville", "Courriel", Champ.Case("Actif")],
             Recherche = "Rechercher un tiers payeur, un abrégé, une ville…",
             Criteres = ["Abrégé", "Désignation", "Ville"],
             // Bouton final cite par la fiche v2 : VALIDER (proc_gesttierspayeurs.md, Detail OPE)
             Valider = "Valider",
             Rang = 7,
-            Etats = EtatsEcran.Trois("À compléter", "En saisie", "Enregistré"),
-            Groupes = ["Payeur principal", "Autre payeur"],
+            Etats = EtatsEcran.Trois("Sans désignation", "Adresse à compléter", "Enregistré"),
+            Groupes = ["Actifs", "Inactifs"],
             Sections =
             [
-                new MarcheEcran("Abrégé", "Obligatoire, 10 caractères au plus, unique dans le greffe : « L'abrégé saisi existe déjà ». « DEBITEUR » est réservé : « L'abrégé débiteur n'est pas valable ». Les abrégés réservés par le greffe sont en lecture seule.", true,
+                new MarcheEcran("Abrégé", "Obligatoire, 10 caractères au plus, unique : « L'abrégé saisi existe déjà ». « DEBITEUR » est réservé : « L'abrégé débiteur n'est pas valable ». Les abrégés ATTENTE et TPG ne se modifient pas.", true,
                     ["Abrégé"]),
-                new MarcheEcran("Identité", "La désignation est saisie ici. Un mandataire peut être proposé pour pré-remplir la fiche, sur confirmation.", true,
+                new MarcheEcran("Identité", "La désignation est obligatoire. Le mandataire PC rattaché se lit ici.", true,
                     ["Désignation", "Mandataire rattaché"]),
-                new MarcheEcran("Adresse", "Le code postal propose la ville, seulement si la ville est vide. La validation la recalcule si le code postal ou la ville a changé.", false,
-                    ["Adresse", "Code postal", "Ville"]),
-                new MarcheEcran("Enregistrement", "Après enregistrement, l'écran reste en saisie et la liste se rafraîchit. Supprimer n'est possible qu'en modification, après confirmation, et seulement si le tiers payeur n'est lié ni à une ventilation ni à une facture.", true,
-                    ["Enregistrer", "Supprimer"]),
+                new MarcheEcran("Adresse", "L'adresse, son complément, le code postal (nettoyé de ses caractères parasites), la ville et le courriel.", false,
+                    ["Adresse", "Complément", "Code postal", "Ville", "Courriel"]),
+                new MarcheEcran("Enregistrement", "Supprimer n'est possible que si le tiers payeur n'est lié ni à une ventilation ni à une facture : « Suppression impossible ».", true,
+                    [Champ.Case("Actif"), "Utilisations"]),
             ],
             Lignes =
             [
-                new LigneEcran("Tiers Alpha", "Payeur principal · abrégé ALPHA", "Payeur principal", "Validee", [0, 1, 3]),
-                new LigneEcran("Tiers Bêta", "Payeur principal · adresse à compléter", "Payeur principal", "EnCours", [0, 1]),
-                new LigneEcran("Tiers Gamma", "Autre payeur · enregistré", "Autre payeur", "Validee", [0, 1, 2, 3]),
-                new LigneEcran("Tiers Delta", "Autre payeur · en saisie", "Autre payeur", "EnCours", [0]),
-                new LigneEcran("Tiers Épsilon", "Autre payeur · à compléter", "Autre payeur", "AFaire", []),
-                new LigneEcran("Tiers Zêta", "Payeur principal · à compléter", "Payeur principal", "AFaire", []),
-                new LigneEcran("Tiers Êta", "Autre payeur · rattaché à une personne", "Autre payeur", "EnCours", [0, 1]),
+                new LigneEcran("Tiers Alpha", "abrégé ALPHA · 75001 Paris", "Actifs", "Validee", [0, 1, 3]),
+                new LigneEcran("Tiers Bêta", "abrégé BETA · adresse à compléter", "Actifs", "EnCours", [0, 1]),
+                new LigneEcran("Tiers Gamma", "abrégé GAMMA · 69001 Lyon", "Actifs", "Validee", [0, 1, 2, 3]),
+                new LigneEcran("Tiers Delta", "abrégé DELTA · adresse à compléter · inactif", "Inactifs", "EnCours", [0]),
+                new LigneEcran("ÉPSILON", "abrégé ÉPSILON · sans désignation", "Actifs", "AFaire", []),
+                new LigneEcran("Tiers Êta", "abrégé ETA · 13001 Marseille · inactif", "Inactifs", "Validee", [0, 1]),
             ],
         },
 

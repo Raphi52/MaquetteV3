@@ -1,0 +1,10 @@
+# « Tiers payeurs » (LecteurTiersPayeurs) : les payeurs PRINCIPAUX (PYEUR_IS_PRINCIPAL = 1, Payeur.cs:176-179), par abrege. Le payeur
+# de PROC_RECHENC.sql (1600441) n'est pas principal : ecarte, comme 2400205 (jumeau retenu : 2400201).
+# Groupe : actif -> « Actifs », inactif -> « Inactifs » (2400204). Etat : sans designation -> AFaire (2400203) ; ni code postal ni
+# ville -> EnCours (2400202) ; sinon Validee. Les cellules : celles de L14A (Abrégé, Désignation, Adresse, Complément, Code postal,
+# Ville, Courriel, Actif).
+TIERS BANC ALPHA | abrégé L14A · 75001 Paris · alpha@exemple.test | Actifs | Validee | [] | valeurs: L14A ; TIERS BANC ALPHA ; 1 rue du Banc ;  ; 75001 ; Paris ; alpha@exemple.test ; oui
+TIERS BANC BETA | abrégé L14B · adresse à compléter | Actifs | EnCours | []
+L14C | abrégé L14C · 69001 Lyon | Actifs | AFaire | []
+TIERS BANC INACTIF | abrégé L14D · 13001 Marseille · inactif | Inactifs | Validee | []
+TRESOR PUBLIC BANC | abrégé TPG · 75001 Paris | Actifs | Validee | []
