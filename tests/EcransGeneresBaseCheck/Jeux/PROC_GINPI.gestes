@@ -19,5 +19,5 @@ ids: 2205302
 resultat: fait
 message: Anomalie régularisée avec succès. Affaire n° 2205302 : le montant attendu de l'INPI passe de 100,00 € à 40,00 €.
 lignes:
-Affaire n° 2205301 | facture F12G001 · attendu 120,00 € · reçu INPI 0,00 € · solde -120,00 € · En attente de paiement de l'INPI | Formalités payantes | EnCours | []
+Affaire n° 2205301 | facture F12G001 · liaison L12GLIA001 · attendu 120,00 € · reçu INPI 0,00 € · solde -120,00 € · En attente de paiement de l'INPI | Formalités payantes | EnCours | []
 controle: SELECT CAST(AFFRE_INPI_MONTANT_TTC AS decimal(19,2)) FROM v2.AFFAIRE WHERE AFFRE_ID_AFFRE = 2205302 => 40.00

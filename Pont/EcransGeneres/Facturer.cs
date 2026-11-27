@@ -19,7 +19,8 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Code = "PROC_FACTREEDIT", Titre = "Refacturation", Sujet = "factures émises",
             Forme = FormeEcran.File,
             // Lot 12 (27/11/2026) : la liste de la base, LecteurRefacturation.cs ; les colonnes de la grille V2 (OPE_REVIEW.cs:43-57)
-            // et le client (la V3 liste tous les clients). La réédition (édition) n'est pas reprise : « Valider » reste une démonstration.
+            // et le client (la V3 liste tous les clients). La réédition n'écrit que la validation du tableau d'édition (groupe d'impression, LRAR,
+            // historique), qu'aucun lot ne reprend : non branchée, raison dans LecteurRefacturation.cs ; « Valider » n'enregistre rien.
             Colonnes = ["Numéro de facture", "Date de facturation", Champ.Montant("Montant TTC"), "Client"],
             Recherche = "Rechercher une facture, un numéro, un montant…",
             Criteres = ["Client", "Période de facturation (du, au)"],
@@ -131,10 +132,13 @@ public sealed class DomaineFacturer : IDomaineEcrans
         {
             Code = "PROC_INPIPAY", Titre = "Reversements INPI", Sujet = "reversements INPI",
             Forme = FormeEcran.File,
-            // Lot 12 (27/11/2026) : la liste et le geste de la base, LecteurReversementsInpi.cs (et son écrivain). Le geste repris :
-            // « Rejeter » (menu de la grille, réservé à Amitel, OPE_RESULTATS.cs:50-101). VALIDER lit le fichier XML de l'INPI et crée
-            // l'encaissement (OPE_VALIDATION.cs:67-205) : non repris par la V3, nommé dans l'écrivain.
-            Gestes = ["Rejeter"],
+            // Lot 12 (27/11/2026) : la liste, LecteurReversementsInpi.cs ; les deux gestes du menu de la grille, EcrivainReversementsInpi.cs :
+            // « Rejeter » (réservé à Amitel, OPE_RESULTATS.cs:50-101) et « Valider » (OPE_VALIDATION.cs:67-205 : le fichier XML de l'INPI,
+            // déjà dans la base, devient un encaissement et ses ventilations). Les champs du formulaire de validation
+            // (OPE_RELEVE_BANCAIRE.Designer.cs:72-109) se saisissent à côté de la liste et partent avec « Valider ». Les deux gestes, dans
+            // l'ordre du menu (OPE_RESULTATS.cs:46-48) : une file ne montre que ses Gestes (commun.tsx, gestesDe), d'où « Valider » nommé.
+            Gestes = ["Valider", "Rejeter"],
+            Parametres = [Champ.Montant("Montant du virement"), Champ.Texte("Mode de paiement"), Champ.Texte("N° de titre"), Champ.Date("Date sur le relevé")],
             Recherche = "Rechercher un reversement, un identifiant de paiement…",
             Criteres = ["Période de réception", "Identifiant de paiement", "État : à valider, validé ou rejeté"],
             // Bouton cité par la fiche (proc_inpipay.md) : « bouton valider » (OPE_VALIDATION).
@@ -148,8 +152,8 @@ public sealed class DomaineFacturer : IDomaineEcrans
                     "Période", "Identifiant de paiement", "État"),
                 Marche("Fichier de l'INPI", "Le fichier XML de l'INPI donne le total et le détail par numéro national. Un numéro sans demande liée bloque la validation.", true,
                     "Montant total", "Numéro national", "Demande liée"),
-                Marche("Encaissement", "Création de l'encaissement et de ses ventilations, puis passage à « Validé ». Le mode de paiement retenu devient le défaut du greffe.", true,
-                    "Mode de paiement", "Date d'encaissement", "Référence"),
+                Marche("Encaissement", "Le montant du virement doit égaler celui des reversements ; la date sur le relevé, au plus d'un mois. Création de l'encaissement et de ses ventilations, puis passage à « Validé ». Le mode de paiement est proposé par le réglage du greffe (VICB à défaut).", true,
+                    "Montant du virement", "Mode de paiement", "N° de titre", "Date sur le relevé"),
             ],
             Lignes =
             [
@@ -177,9 +181,9 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Code = "PROC_GINPI", Titre = "Formalites INPI", Sujet = "formalités INPI",
             Forme = FormeEcran.File,
             // Lot 12 (27/11/2026) : la liste et le geste de la base, LecteurFormalitesInpi.cs et EcrivainFormalitesInpi.cs ; les colonnes
-            // de la grille V2 (DataGridViewResultat._InitColumns, :45-120), sans le n° de liaison ; l'ouverture : le mois précédent, en
-            // attente de paiement ou paiement partiel (OPE_SAISIE.cs:64-71).
-            Colonnes = ["Affaire", "N° facture", Champ.Montant("Facturé"), Champ.Montant("Prévu INPI"), Champ.Montant("Reçu INPI"), Champ.Montant("Reçu autre"),
+            // de la grille V2 (DataGridViewResultat._InitColumns, :45-120), n° de liaison compris (MetierGinpi.cs:69-74) ; l'ouverture : le
+            // mois précédent, en attente de paiement ou paiement partiel (OPE_SAISIE.cs:64-71). L'export Excel n'écrit rien en base : non repris.
+            Colonnes = ["Affaire", "N° facture", "N° liaison", Champ.Montant("Facturé"), Champ.Montant("Prévu INPI"), Champ.Montant("Reçu INPI"), Champ.Montant("Reçu autre"),
                         Champ.Montant("Solde actuel"), "État"],
             Gestes = ["Régulariser l'anomalie"],
             Recherche = "Rechercher une affaire, un montant, un paiement…",

@@ -1,5 +1,7 @@
 # « Formalites INPI » (LecteurFormalitesInpi) sur PROC_GINPI.sql : les affaires a montant INPI attendu du mois precedent, aux deux
 # criteres coches a l'ouverture (OPE_SAISIE.cs:64-71). Ecartees, chacune avec son jumeau retenu : 2205303 (soldee : 50 attendus, 50
 # recus -- 2205302), 2205304 (facture hors periode -- 2205301), 2205305 (sans montant INPI attendu -- 2205301).
-Affaire n° 2205301 | facture F12G001 · attendu 120,00 € · reçu INPI 0,00 € · solde -120,00 € · En attente de paiement de l'INPI | Formalités payantes | EnCours | [] | valeurs: Affaire n° 2205301 ; F12G001 ; 120.00 ; 120.00 ; 0.00 ; 0.00 ; -120.00 ; En attente de paiement de l'INPI
-Affaire n° 2205302 | facture F12G002 · attendu 100,00 € · reçu INPI 40,00 € · solde -60,00 € · Paiement INPI partiel | Formalités payantes | EnCours | [] | valeurs: Affaire n° 2205302 ; F12G002 ; 100.00 ; 100.00 ; 40.00 ; 0.00 ; -60.00 ; Paiement INPI partiel
+# N° de liaison (MetierGinpi.cs:69-74) : L12GLIA001 par la liasse ; L12GLIA006 par le DAS, la liasse de D12GINPI002 n'ayant pas de numero
+# national (ecartee : son L12GLIA002 n'est pas pris -- jumeau L12GLIA001).
+Affaire n° 2205301 | facture F12G001 · liaison L12GLIA001 · attendu 120,00 € · reçu INPI 0,00 € · solde -120,00 € · En attente de paiement de l'INPI | Formalités payantes | EnCours | [] | valeurs: Affaire n° 2205301 ; F12G001 ; L12GLIA001 ; 120.00 ; 120.00 ; 0.00 ; 0.00 ; -120.00 ; En attente de paiement de l'INPI
+Affaire n° 2205302 | facture F12G002 · liaison L12GLIA006 · attendu 100,00 € · reçu INPI 40,00 € · solde -60,00 € · Paiement INPI partiel | Formalités payantes | EnCours | [] | valeurs: Affaire n° 2205302 ; F12G002 ; L12GLIA006 ; 100.00 ; 100.00 ; 40.00 ; 0.00 ; -60.00 ; Paiement INPI partiel

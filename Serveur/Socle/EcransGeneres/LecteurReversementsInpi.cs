@@ -6,7 +6,7 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 
 /// <summary>
 /// « Reversements INPI » (PROC_INPIPAY) : les fichiers de reversements de l'INPI (v2.INPI_REVERSEMENTS) a valider. Mode d'emploi :
-/// LecteurEcran.cs ; le geste : EcrivainReversementsInpi.cs. Plan « RIG v3 100 % fonctionnel », lot 12, 27/11/2026.
+/// LecteurEcran.cs ; les gestes (Rejeter, Valider) : EcrivainReversementsInpi.cs. Plan « RIG v3 100 % fonctionnel », lot 12, 27/11/2026.
 ///
 /// SOURCE (ancien RIG) : D:\RigApplication\Source\RIG\DLL\Processus\PROC_INPIPAY (le Detail OPE de proc_inpipay.md fait foi ; le corps
 /// de la fiche cite des colonnes inventees) -- la requete Metier.CreerRequete (Metier\Metier.cs:12-60) : INPI_REVERSEMENTS LEFT JOIN
@@ -48,52 +48,5 @@ internal sealed class LecteurReversementsInpi : ILecteurEcran
         {
             Id = Convert.ToString(r["INPIRV_ID_INPIRV"], CultureInfo.InvariantCulture),
         };
-    }
-}
-
-/// <summary>
-/// « Reversements INPI » (PROC_INPIPAY) : REJETER un fichier de reversements (le menu « Rejeter » de la grille). Mode d'emploi :
-/// EcrivainEcran.cs.
-///
-/// SOURCE (ancien RIG) : RESULTATS\OPE_RESULTATS.cs -- le menu n'est visible que pour un utilisateur Amitel (:50-53) et actif que sur
-/// un fichier « A valider » (:69-71) ; confirmation, motif facultatif (:83-101), puis InpiReversements.Rejeter (InpiReversements.cs:
-/// 64-85) : INPIRV_ETAT_TRAITEMENT = 3, INPIRV_DATE_TRAITEMENT = maintenant, le motif ajoute aux commentaires. La V3 rejette sans
-/// motif (une file n'a pas de saisie : la V2 l'accepte, AllowEmptyValue).
-/// NON REPRIS (nomme) : VALIDER un fichier (FORM_VALIDATION, OPE_VALIDATION.DoSauve, VALIDATION\OPE_VALIDATION.cs:67-205) : il lit le
-/// fichier XML de l'INPI (feepaymentdata), retrouve la demande de chaque numero national, cree l'encaissement et ses ventilations
-/// au client de la derniere facture, sur un mode, un titre et une date saisis -- la V3 ne lit pas encore ce fichier.
-/// </summary>
-internal sealed class EcrivainReversementsInpi : IEcrivainEcran
-{
-    public string Procedure => "PROC_INPIPAY";
-    public string Ecran => "Reversements INPI";
-    public IReadOnlyCollection<TypeGeste> Gestes { get; } = [TypeGeste.Agir];
-
-    internal const string MessageAmitel = "Le rejet d'un fichier de reversements est réservé à l'équipe Amitel.";
-
-    public async Task<IssueGeste> JouerAsync(GesteEnCours geste, CancellationToken ct)
-    {
-        if (geste.Demande.Nom != "Rejeter") return IssueGeste.Refuser($"Geste « {geste.Demande.Nom} » : non repris pour les reversements INPI.");
-        if (!geste.Agent.EstAmitel) return IssueGeste.Refuser(MessageAmitel);
-        var ids = geste.Demande.Ids.Select(i => int.TryParse(i, NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? n : 0).Where(n => n > 0).Distinct().ToList();
-        if (ids.Count == 0) return IssueGeste.Refuser("Aucun fichier de reversements coché : rien n'est rejeté.");
-        var traces = new List<TraceGeste>();
-        var rejetes = new List<string>();
-        foreach (var id in ids)
-        {
-            string? paiement = null, etat = null;
-            await using (var r = await geste.LireAsync("SELECT INPIRV_ID_PAYMENT, INPIRV_ETAT_TRAITEMENT FROM v2.INPI_REVERSEMENTS WITH (UPDLOCK, HOLDLOCK) WHERE INPIRV_ID_INPIRV = @id",
-                             ct, new SqlParameter("@id", id)))
-                if (await r.ReadAsync(ct)) { paiement = FormeLigne.Texte(r, "INPIRV_ID_PAYMENT"); etat = FormeLigne.Texte(r, "INPIRV_ETAT_TRAITEMENT"); }
-            if (paiement is null) return IssueGeste.Refuser($"Fichier de reversements introuvable dans la base du greffe ({id}).");
-            if (etat != "1") return IssueGeste.Refuser($"Le fichier de reversements n°{paiement} n'est plus à valider : seul un fichier « A Valider » se rejette.");
-            await geste.EcrireAsync("UPDATE v2.INPI_REVERSEMENTS SET INPIRV_ETAT_TRAITEMENT = '3', INPIRV_DATE_TRAITEMENT = @maintenant WHERE INPIRV_ID_INPIRV = @id", ct,
-                new SqlParameter("@maintenant", geste.Maintenant), new SqlParameter("@id", id));
-            rejetes.Add(paiement);
-            traces.Add(new TraceGeste("encaissement", $"le fichier de reversements INPI n°{paiement}", id.ToString(CultureInfo.InvariantCulture), "a modifie",
-                new { Etat = "A Valider" }, new { Etat = "Rejeté" }));
-        }
-        return IssueGeste.Ecrit($"Fichier{(rejetes.Count > 1 ? "s" : "")} de reversements n°{string.Join(", n°", rejetes)} rejeté{(rejetes.Count > 1 ? "s" : "")} dans la base du greffe.",
-            [.. ids.Select(i => i.ToString(CultureInfo.InvariantCulture))], [.. traces]);
     }
 }

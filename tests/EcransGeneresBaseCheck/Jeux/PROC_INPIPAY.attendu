@@ -1,4 +1,9 @@
 # « Reversements INPI » (LecteurReversementsInpi) sur PROC_INPIPAY.sql : les fichiers « A valider » (le seul etat coche a l'ouverture,
 # OPE_SEARCH_BLOC_1.cs:45-47), par debut d'extraction (Metier.cs:45). Ecartes : 2206003 (valide) et 2206004 (rejete) -- jumeau 2206002.
-Reversement INPI PAY12-001 | extraction du {J-40} au {J-33} · 3 reversements · 245,50 € | Virements INPI | AFaire | []
+# PAY12-005 a PAY12-008 sont les fichiers que « Valider » refuse (PROC_INPIPAY.gestes) : a valider, donc listes.
+Reversement INPI PAY12-001 | extraction du {J-40} au {J-33} · 4 reversements · 245,50 € | Virements INPI | AFaire | []
 Reversement INPI PAY12-002 | extraction du {J-20} au {J-13} · 1 reversement · 80,00 € | Virements INPI | AFaire | []
+Reversement INPI PAY12-005 | extraction du {J-9} au {J-8} · 1 reversement · 30,00 € | Virements INPI | AFaire | []
+Reversement INPI PAY12-006 | extraction du {J-8} au {J-7} · 1 reversement · 25,00 € | Virements INPI | AFaire | []
+Reversement INPI PAY12-007 | extraction du {J-7} au {J-6} · 1 reversement · 50,00 € | Virements INPI | AFaire | []
+Reversement INPI PAY12-008 | extraction du {J-6} au {J-5} · 2 reversements · 15,00 € | Virements INPI | AFaire | []

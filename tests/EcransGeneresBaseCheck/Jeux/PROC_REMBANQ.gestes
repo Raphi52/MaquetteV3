@@ -18,8 +18,11 @@ geste: Agir Générer un bordereau
 ids: 2201003,2201001,2201002,2201004
 resultat: fait
 message: 3 encaissements remis en banque dans la base du greffe : remis n° 43, n° 44 ; le bordereau imprimé (état de la V2) n'est pas produit par la V3. Laissé à remettre, faute de banque pour son mode de paiement : n° 2201004.
+# L'encaissement INPI du jour (PROC_INPIPAY.gestes bloc 15, « Valider » d'un fichier de reversements, mode L12VICB utilisable en saisie,
+# date vide = maintenant) est un encaissement de la journee comme un autre : la remise le liste, a remettre (sans banque pour son mode).
 lignes:
 Encaissement R12TPE04 | Terminal sans banque (banc 12) · 33,33 € · le {J+0} · PAYEUR R12D · à remettre | Encaissements de la période | AFaire | []
+Encaissement VIR12-001-REFERENCE-BANCAIRE-TRE | Virement INPI (banc 12) · 245,50 € · le {J+0} · INPI · à remettre | Encaissements de la période | AFaire | []
 Encaissement R12CB03 | Carte (banc 12) · 45,00 € · le {J+0} · PAYEUR R12C · remis n° 43 | Encaissements de la période | EnCours | [] | valeurs: Encaissement R12CB03 ; Carte (banc 12) ; 45.00 ; 43
 Encaissement R12CB09 | Carte (banc 12) · 200,00 € · le {J+0} · PAYEUR R12I · remis n° 41 | Encaissements de la période | EnCours | [] | valeurs: Encaissement R12CB09 ; Carte (banc 12) ; 200.00 ; 41
 Encaissement R12CB10 | Carte (banc 12) · 300,00 € · le {J+0} · PAYEUR R12J · remis n° 42 | Encaissements de la période | Validee | [] | valeurs: Encaissement R12CB10 ; Carte (banc 12) ; 300.00 ; 42
@@ -56,6 +59,7 @@ lignes:
 Encaissement R12ESP01 | Espèces (banc 12) · 120,50 € · le {J+0} · PAYEUR R12A · à remettre | Encaissements de la période | AFaire | []
 Encaissement R12ESP02 | Espèces (banc 12) · 79,50 € · le {J+0} · PAYEUR R12B · à remettre | Encaissements de la période | AFaire | []
 Encaissement R12TPE04 | Terminal sans banque (banc 12) · 33,33 € · le {J+0} · PAYEUR R12D · à remettre | Encaissements de la période | AFaire | []
+Encaissement VIR12-001-REFERENCE-BANCAIRE-TRE | Virement INPI (banc 12) · 245,50 € · le {J+0} · INPI · à remettre | Encaissements de la période | AFaire | []
 Encaissement R12CB03 | Carte (banc 12) · 45,00 € · le {J+0} · PAYEUR R12C · remis n° 43 | Encaissements de la période | EnCours | []
 Encaissement R12CB09 | Carte (banc 12) · 200,00 € · le {J+0} · PAYEUR R12I · remis n° 41 | Encaissements de la période | EnCours | []
 Encaissement R12CB10 | Carte (banc 12) · 300,00 € · le {J+0} · PAYEUR R12J · remis n° 42 | Encaissements de la période | Validee | []
