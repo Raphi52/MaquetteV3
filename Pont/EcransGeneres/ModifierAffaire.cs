@@ -266,9 +266,14 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
                 // lesquelles s'affichent (GestionModePresentation :327-370). L'adresse se lit seulement (EcrivainRepertoire.cs dit pourquoi).
                 // fix-ok: mesure le 26/11/2026 -- au commit 167e9e4 la Fiche n'avait que 5 des zones que Valider enregistre
                 // (:208-226) : le client, le mandataire et le texte d'assistance etaient effaces par le mode sans pouvoir etre saisis.
-                Marche("Fiche", "Abrégé et civilité obligatoires ; l'abrégé est unique dans le greffe. Un abrégé changé est reporté sur les parties liées et sur les codes affaire qui le portent. Le mode de présentation décide du reste : représenté, un mandataire postulant ; sinon, un client ; assisté, un texte d'assistance obligatoire.", true,
+                // Puis les dix autres zones liees (:401-412), dans l'ordre de saisie de la V2 (TabIndex) : edition jugement,
+                // forme juridique, organe, N° Siren, date de naissance, nationalite, profession, telephone, fax, agissant en
+                // qualite de -- formats et listes de la V2 dans EcrivainRepertoire.cs. Au commit b604f96 elles manquaient.
+                Marche("Fiche", "Abrégé et civilité obligatoires ; l'abrégé est unique dans le greffe. Un abrégé changé est reporté sur les parties liées et sur les codes affaire qui le portent. Le mode de présentation décide du reste : représenté, un mandataire postulant ; sinon, un client ; assisté, un texte d'assistance obligatoire. Le N° Siren a sa clé, le téléphone et le fax un format de numéro français ; édition jugement, forme juridique et nationalité se prennent dans leur liste.", true,
                     "Abrégé", "Désignation", "Adresse mail", "Civilité", Champ.Case("Actif"), Champ.Zone("Adresse"), "Mode présentation", "Client",
-                    "Nom client", Champ.Zone("Texte assistance"), "Mandataire postulant"),
+                    "Nom client", Champ.Zone("Texte assistance"), "Mandataire postulant", "Edition jugement", "Forme juridique",
+                    "Organe représentatif", "N° Siren", Champ.Date("Date de naissance"), "Nationalité", "Profession", "Téléphone", "Fax",
+                    Champ.Zone("Agissant en qualité de")),
                 Marche("Civilité des parties", "Applique la civilité du répertorié aux parties cochées.", false,
                     Champ.Tableau("Parties liées"), "Civilité"),
             ],
@@ -341,9 +346,11 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
                 // fix-ok: mesure le 26/11/2026 -- au commit 167e9e4 l'Identité n'avait pas le lieu de naissance que OPE_IDENTITE lie
                 // (OPE_IDENTITE.cs:65-66, :118-128) : le controle commune / departement (:75-86) n'avait rien a controler.
                 // Lu et enregistre dans la base (lot 3) : LecteurBeneficiairesDossier.cs, EcrivainBeneficiairesDossier.cs.
-                Marche("Identité", "Patronyme, prénoms de l'état civil, date, pays et lieu de naissance sont obligatoires ; né en France, le département l'est aussi, et seulement dans ce cas. Une commune retrouvée remplit le département, qui doit être le sien.", true,
+                // Nationalite (:59, Designer :155) et adresse (:60, Designer :176) : au commit b604f96 elles manquaient ; l'adresse
+                // se lit seulement (EcrivainBeneficiairesDossier.cs dit pourquoi).
+                Marche("Identité", "Patronyme, prénoms de l'état civil, date, pays et lieu de naissance sont obligatoires ; né en France, le département l'est aussi, et seulement dans ce cas. Une commune retrouvée remplit le département, qui doit être le sien. La nationalité se prend dans sa liste.", true,
                     "Civilité", "Patronyme", "Prénoms (état civil)", "Nom d'usage", Champ.Date("Date de naissance"), "Département de naissance",
-                    "Pays de naissance", "Lieu de naissance"),
+                    "Pays de naissance", "Lieu de naissance", "Nationalité", Champ.Zone("Adresse")),
                 Marche("Modalités de contrôle", "Les champs changent selon le type de déclaration du dossier : le placement collectif en ajoute sept.", true,
                     Champ.Tableau("Modalités selon la déclaration")),
                 Marche("Acte déposé", "Visualise l'acte déposé, et les données brutes renvoyées par le service de déclaration.", false,

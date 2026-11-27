@@ -29,7 +29,14 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///      « Le département 75 n'est pas compatible avec la commune NICE » (:79-84) ; pays renseigne autre que « FRA » et
 ///      departement saisi -> « Le département ne doit pas être renseigné quand le pays de naissance n'est pas France » ;
 ///   5. la taille des colonnes (RIG_DEV : civilite 10, patronyme, prenoms et nom d'usage 100, departement 3, pays 50, lieu de
-///      naissance 50) et la date.
+///      naissance 50, nationalite 50) et la date ;
+///   6. la nationalite (facultative, ultNationalite sans MetierObligatoire, Designer :155-156) changee est dans la liste de la
+///      V2 : NATIONALITE, ses valeurs utilisables en saisie (ULT_COMBO_NATIONALITE.cs:15-17 ; comme les listes du Répertoire,
+///      EcrivainRepertoire.UtilisableEnSaisieAsync).
+///
+/// L'ADRESSE SE LIT SEULEMENT : ultAdresse (Ult_Adresse, OPE_IDENTITE.cs:60) ouvre la recherche d'adresse de RIG, un ecran a
+/// part qui rend l'identifiant d'une ADRESSE_BASE partagee (Ult_Adresse.cs:283-301) ; la V3 n'a pas cet ecran (meme raison
+/// que pour le Répertoire, EcrivainRepertoire.cs).
 ///
 /// CE QUI S'ECRIT (v2.BENEFICIAIRE_EFFECTIF) : les colonnes des champs modifies ; un pays vide a l'ouverture vaut « FRA »
 /// (OPE_IDENTITE.cs:62-64) et s'enregistre ainsi. Trace : famille « dossier », « a modifie », avant et apres.
@@ -64,7 +71,7 @@ internal sealed class EcrivainBeneficiairesDossier : IEcrivainEcran
         (ChampCivilite, "BENEF_CIVILITE", 10, false), (ChampPatronyme, "BENEF_PATRONYME", 100, true),
         (ChampPrenoms, "BENEF_PRENOM_ETAT_CIVIL", 100, true), (ChampNomUsage, "BENEF_NOM_USAGE", 100, false),
         (ChampNaissance, "BENEF_DATE_NAISSANCE", 0, true), (ChampDepartement, "BENEF_DEPARTEMENT_NAISS", 3, false),
-        (ChampPays, "BENEF_PAYS", 50, true), (ChampLieu, "BENEF_LIEU_NAISSANCE", 50, true),
+        (ChampPays, "BENEF_PAYS", 50, true), (ChampLieu, "BENEF_LIEU_NAISSANCE", 50, true), (ChampNationalite, "BENEF_NATIONALITE", 50, false),
     ];
 
     public async Task<IssueGeste> JouerAsync(GesteEnCours geste, CancellationToken ct)
@@ -77,7 +84,10 @@ internal sealed class EcrivainBeneficiairesDossier : IEcrivainEcran
         foreach (var (cle, valeur) in geste.Demande.Valeurs)
         {
             var colonne = Colonnes.FirstOrDefault(c => GesteEcran.Cle(SectionIdentite, c.Champ) == cle);
-            if (colonne.Champ is null) return IssueGeste.Refuser($"« {cle} » ne se modifie pas dans l'identité d'un bénéficiaire de RIG v2.");
+            if (colonne.Champ is null)
+                return IssueGeste.Refuser(cle == GesteEcran.Cle(SectionIdentite, ChampAdresse)
+                    ? "L'adresse d'un bénéficiaire se choisit dans la recherche d'adresse de RIG v2, que la V3 n'a pas encore : elle ne se modifie pas dans la fiche."
+                    : $"« {cle} » ne se modifie pas dans l'identité d'un bénéficiaire de RIG v2.");
             saisis[colonne.Champ] = valeur.Trim();
         }
         var valeurs = new Dictionary<string, string>(b.Valeurs, StringComparer.Ordinal);
@@ -113,6 +123,11 @@ internal sealed class EcrivainBeneficiairesDossier : IEcrivainEcran
 
         var changes = saisis.Where(s => b.Valeurs[s.Key] != s.Value).ToDictionary(s => s.Key, s => s.Value, StringComparer.Ordinal);
         if (changes.Count == 0) return IssueGeste.Refuser($"Aucun champ n'est modifié : le bénéficiaire {b.Nom} garde ses valeurs.");
+
+        // 6. La nationalite changee, dans la liste de la V2.
+        if (changes.GetValueOrDefault(ChampNationalite) is { Length: > 0 } nationalite
+            && !await EcrivainRepertoire.UtilisableEnSaisieAsync(geste, "v2.NATIONALITE", "R_NATIONALIT", nationalite, ct))
+            return IssueGeste.Refuser($"« {ChampNationalite} » : « {nationalite} » n'est pas dans la liste des nationalités utilisables du greffe.");
 
         var affectations = new List<string>();
         var parametres = new List<SqlParameter> { new("@id", n) };

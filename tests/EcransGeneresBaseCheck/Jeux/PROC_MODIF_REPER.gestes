@@ -189,3 +189,105 @@ Fiche › Mode présentation = EA
 Fiche › Client = MPCDIV
 Fiche › Nom client = CLIENT DIVERS MPC
 Fiche › Texte assistance = assiste par Z et Y
+---
+# Les dix autres zones de la fiche V2 (OPE_EDITION_MODIF_REPER.cs:401-412), sur 1315003 (REP-GAMMA, sans mode depuis le bloc 5).
+# 21. Un telephone hors du format de RIG v2 (RegEx.TeléphoneFixeOuMobile, RegEx.cs:33 ; ULT_TEXT_TELEPHONE.cs:17-18).
+#     Jumeau accepte : bloc 24, « 01 23 45 67 89 ».
+geste: Enregistrer
+ids: 1315003
+valeur: Fiche › Téléphone = 12 34
+resultat: refuse
+message: « Téléphone » : numéro de téléphone invalide.
+---
+# 22. Un N° Siren dont la cle de Luhn est fausse (Siren.IsValid, Siren.cs:22-35). Jumeau accepte : bloc 24, 131 500 001.
+geste: Enregistrer
+ids: 1315003
+valeur: Fiche › N° Siren = 131500005
+resultat: refuse
+message: Numéro de Siren invalide.
+---
+# 23. Un N° Siren avec une lettre : la zone de RIG v2 ne prend que des chiffres (MetierRegExSaisie « [0-9] », ULT_TEXT_SIREN.cs:84).
+#     Jumeau accepte : bloc 24.
+geste: Enregistrer
+ids: 1315003
+valeur: Fiche › N° Siren = 13150000A
+resultat: refuse
+message: Numéro de Siren invalide.
+---
+# 24. Les dix zones a la fois. Le Siren saisi avec ses blancs (l'affichage de RIG v2, Siren.Format) s'enregistre en neuf
+#     chiffres (Siren.DeFormat), comme RIG_DEV le garde ; le fax au format international (+33).
+geste: Enregistrer
+ids: 1315003
+valeur: Fiche › Edition jugement = E
+valeur: Fiche › Forme juridique = RL
+valeur: Fiche › Organe représentatif = Conseil de surveillance
+valeur: Fiche › N° Siren = 131 500 001
+valeur: Fiche › Date de naissance = 1970-05-04
+valeur: Fiche › Nationalité = FRA
+valeur: Fiche › Profession = Avocat
+valeur: Fiche › Téléphone = 01 23 45 67 89
+valeur: Fiche › Fax = +33 1 23 45 67 80
+valeur: Fiche › Agissant en qualité de = gérant de la société Gamma
+resultat: fait
+message: Répertorié REP-GAMMA enregistré dans la base du greffe : « Edition jugement », « Forme juridique », « Organe représentatif », « N° Siren », « Date de naissance », « Nationalité », « Profession », « Téléphone », « Fax », « Agissant en qualité de ».
+fiche: 1315003
+Fiche › Edition jugement = E
+Fiche › Forme juridique = RL
+Fiche › Organe représentatif = Conseil de surveillance
+Fiche › N° Siren = 131500001
+Fiche › Date de naissance = 1970-05-04
+Fiche › Nationalité = FRA
+Fiche › Profession = Avocat
+Fiche › Téléphone = 01 23 45 67 89
+Fiche › Fax = +33 1 23 45 67 80
+Fiche › Agissant en qualité de = gérant de la société Gamma
+controle: SELECT PRTRP_SIREN FROM v2.REPERTORIE WHERE PRTRP_ID_PRTRP = 1315003 => 131500001
+controle: SELECT CONVERT(varchar(10), PRTRP_DATE_NAISSANCE, 23) FROM v2.REPERTORIE WHERE PRTRP_ID_PRTRP = 1315003 => 1970-05-04
+controle: SELECT CONVERT(nvarchar(max), PRTRP_TEXTE_ESQUALITE) FROM v2.REPERTORIE WHERE PRTRP_ID_PRTRP = 1315003 => gérant de la société Gamma
+---
+# 25. Le meme Siren, saisi avec ses blancs : c'est la valeur de la base, rien a enregistrer.
+geste: Enregistrer
+ids: 1315003
+valeur: Fiche › N° Siren = 131 500 001
+resultat: refuse
+message: Aucun champ n'est modifié : le répertorié REP-GAMMA garde ses valeurs.
+---
+# 26. Une forme juridique que la liste de RIG v2 ne propose plus en saisie (SARL, R_FORMEJURID_UTILISABLE_SAISIE = 0 dans RIG_DEV ;
+#     ULT_COMBO_FORME_JURIDIQUE.cs:32-34). Jumeau accepte : bloc 24 (RL).
+geste: Enregistrer
+ids: 1315003
+valeur: Fiche › Forme juridique = SARL
+resultat: refuse
+message: « Forme juridique » : « SARL » n'est pas dans la liste des formes juridiques utilisables du greffe.
+---
+# 27. Une edition de jugement absente de la liste (ULT_COMBO_EDITION_JUGEMENT.cs:15-17 ; une liste de RIG v2 ne se choisit qu'en
+#     ses valeurs, RigComboListBox.cs:593-596). Jumeau accepte : bloc 24 (E).
+geste: Enregistrer
+ids: 1315003
+valeur: Fiche › Edition jugement = Z
+resultat: refuse
+message: « Edition jugement » : « Z » n'est pas dans la liste des éditions de jugement utilisables du greffe.
+---
+# 28. Une nationalite non utilisable en saisie (ZZZ « autre »). Jumeau accepte : bloc 24 (FRA).
+geste: Enregistrer
+ids: 1315003
+valeur: Fiche › Nationalité = ZZZ
+resultat: refuse
+message: « Nationalité » : « ZZZ » n'est pas dans la liste des nationalités utilisables du greffe.
+---
+# 29. Une date de naissance illisible. Jumeau accepte : bloc 24.
+geste: Enregistrer
+ids: 1315003
+valeur: Fiche › Date de naissance = 1970-02-30
+resultat: refuse
+message: « Date de naissance » : date illisible (1970-02-30).
+---
+# 30. Les zones videes : aucune n'est obligatoire dans RIG v2 (pas de MetierObligatoire au Designer), un Siren vide est valide
+#     (Siren.IsValid, :23).
+geste: Enregistrer
+ids: 1315003
+valeur: Fiche › N° Siren =
+valeur: Fiche › Fax =
+resultat: fait
+message: Répertorié REP-GAMMA enregistré dans la base du greffe : « N° Siren », « Fax ».
+controle: SELECT COUNT(*) FROM v2.REPERTORIE WHERE PRTRP_ID_PRTRP = 1315003 AND PRTRP_SIREN IS NULL AND PRTRP_FAX IS NULL AND PRTRP_TELEPHONE = '01 23 45 67 89' => 1

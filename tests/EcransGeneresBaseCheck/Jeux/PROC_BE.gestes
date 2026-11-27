@@ -127,3 +127,31 @@ message: Bénéficiaire ROSSI Luca du dossier 2027 B 14002 enregistré dans la b
 fiche: 1314103
 Identité › Pays de naissance = ITA
 Identité › Lieu de naissance = Turin
+---
+# 14. Une nationalite que la liste de RIG v2 ne propose plus en saisie (ZZZ « autre », R_NATIONALIT_UTILISABLE_SAISIE = 0 dans
+#     RIG_DEV ; ULT_COMBO_NATIONALITE.cs:15-17). Jumeau accepte : bloc 15 (ITA, utilisable).
+geste: Enregistrer
+ids: 1314101
+valeur: Identité › Nationalité = ZZZ
+resultat: refuse
+message: « Nationalité » : « ZZZ » n'est pas dans la liste des nationalités utilisables du greffe.
+---
+# 15. La nationalite de 1314101 (BENEF_NATIONALITE, OPE_IDENTITE.cs:59) ; la fiche relue porte aussi son adresse (rec.Adresse
+#     1312501, BENEF_ID_ADRBS, :60).
+geste: Enregistrer
+ids: 1314101
+valeur: Identité › Nationalité = ITA
+resultat: fait
+message: Bénéficiaire DUPONT Jean Marc du dossier 2027 B 14001 enregistré dans la base du greffe : « Nationalité ».
+fiche: 1314101
+Identité › Nationalité = ITA
+Identité › Adresse = 12 rue du Banc · 75001 PARIS
+controle: SELECT BENEF_NATIONALITE FROM v2.BENEFICIAIRE_EFFECTIF WHERE BENEF_ID_BENEF = 1314101 => ITA
+---
+# 16. L'adresse se choisit dans la recherche d'adresse de RIG v2 (Ult_Adresse.cs:283-301), pas dans la fiche.
+#     Jumeau : bloc 15, l'adresse lue.
+geste: Enregistrer
+ids: 1314101
+valeur: Identité › Adresse = 1 rue Autre
+resultat: refuse
+message: L'adresse d'un bénéficiaire se choisit dans la recherche d'adresse de RIG v2, que la V3 n'a pas encore : elle ne se modifie pas dans la fiche.

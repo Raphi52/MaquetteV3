@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using Microsoft.Data.SqlClient;
 using RigV3.Contrats.EcransGeneres;
 using static RigV3.Serveur.Socle.EcransGeneres.LecteurRepertoire;
@@ -16,12 +17,26 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   1. le repertorie existe (sinon « Répertorié introuvable ») ; seuls les champs saisissables de la section « Fiche » se
 ///      modifient -- l'adresse se lit seulement (voir plus bas) ;
 ///   2. obligatoires : abrege et civilite (MetierObligatoire, OPE_EDITION_MODIF_REPER.Designer.cs:304, :253) ;
-///   3. la taille des colonnes (RIG_DEV : abrege 16, designation 512, adresse mail 70, civilite 7, mode de presentation 3) ;
+///   3. la taille des colonnes (RIG_DEV : abrege 16, designation 512, adresse mail 70, civilite 7, mode de presentation 3,
+///      edition jugement 5, forme juridique 10, organe 32, nationalite 3, profession 128, telephone et fax 22) ; et le format
+///      des zones qui en ont un dans la V2 (toutes facultatives, aucun MetierObligatoire au Designer) :
+///      - telephone et fax (ULT_TEXT_TELEPHONE, :17-18) : RegEx.TeléphoneFixeOuMobile (RigTools RegEx.cs:33), une erreur
+///        bloquante de Ult_Text_Internal.DoVerifier (:342-362) -> « Numéro de téléphone invalide » ;
+///      - N° Siren (ULT_TEXT_SIREN) : chiffres seuls a la saisie (MetierRegExSaisie « [0-9] », :84), neuf chiffres
+///        (RegEx.Siren, RegEx.cs:27) et la cle de Luhn (Siren.IsValid, RigMetier Numerotation\Siren.cs:22-35 ; la zone garde
+///        le focus tant qu'elle est fausse, :36-46) -> « Numéro de Siren invalide. » ; il s'enregistre sans blancs
+///        (Siren.DeFormat, :60-64), comme RIG_DEV le garde ;
+///      - date de naissance (Ult_Date) : une date ;
 ///   4. DoVerifier (:67-77) : un AUTRE repertorie du greffe porte deja l'abrege -> « Un répertorié avec cet abrégé existe déjà.
 ///      L'abrégé doit être unique. » (la V2 n'a pas d'autre controle : ni designation obligatoire, ni format de l'adresse
 ///      mail, contrairement aux sections anterieures de la fiche, que le « Detail OPE » corrige) ;
 ///   5. le mode de presentation choisi est dans la liste de la V2 : MODE_PRESENTATION, ses modes « utilisables en saisie »
-///      (ULT_COMBO_MODE_PRESENTATION.cs:35-36 -> Outils.makeSqlStandard, SAISIE = R_MODEPRESEN_UTILISABLE_SAISIE) ;
+///      (ULT_COMBO_MODE_PRESENTATION.cs:35-36 -> Outils.makeSqlStandard, SAISIE = R_MODEPRESEN_UTILISABLE_SAISIE) ; de meme
+///      l'edition jugement (EDITION_JUGEMENT, ULT_COMBO_EDITION_JUGEMENT.cs:15-17), la forme juridique (FORME_JURIDIQUE_UTI,
+///      ULT_COMBO_FORME_JURIDIQUE.cs:32-34) et la nationalite (NATIONALITE, ULT_COMBO_NATIONALITE.cs:15-17). La liste de la V2
+///      ne se choisit qu'en ses valeurs (RigComboListBox.cs:593-596, sans saisie libre) et ne propose pas les valeurs non
+///      utilisables en saisie (RigComboBoxObjectMoteurCache.cs:69) ; une valeur deja en base hors liste n'y est qu'un
+///      avertissement (MetierValeurInexistanteErreur = false, Designer :217, :236, :245) : seule une valeur CHANGEE est controlee ;
 ///   6. le mode decide des zones affichees (GestionModePresentation, :327-370) : le client sans representant (:336-338), le
 ///      mandataire postulant avec representant (:340-346), le texte d'assistance avec assistance, alors OBLIGATOIRE (:348-354) ;
 ///      sans mode, aucune (:355-363). Une zone que la V2 masque ne se saisit pas : la V3 le dit au lieu de l'effacer en silence ;
@@ -48,9 +63,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// NON REPRIS (nommes) : la demande de tracabilite MODIFREPER creee et cloturee d'un coup (GestionDemande, :314-318 ; non
 /// facturee, PROC_MODIF_REPER.cs:11-12), remplacee par le journal des gestes ; l'ajout et la suppression d'un repertorie (le
 /// bouton AJOUTER et la barre de l'OPE, :86-152), qu'une Fiche ne fait pas ; la civilite appliquee aux parties cochees
-/// (OPE_EDITION_PARTIES.Valider, :50-86), une Fiche ne cochant pas les lignes d'une sous-liste ; dix autres zones de la fiche
-/// V2, absentes du descripteur (:401, :403-404, :406-412 : agissant en qualite de, fax, telephone, profession, nationalite, date de
-/// naissance, N° Siren, organe representatif, forme juridique, edition jugement).
+/// (OPE_EDITION_PARTIES.Valider, :50-86), une Fiche ne cochant pas les lignes d'une sous-liste. Toutes les zones que
+/// LinkDonnees lie (:401-420) sont dans la fiche ; le portable (PRTRP_PORTABLE) n'en est pas, la V2 ne l'affiche pas.
 /// </summary>
 internal sealed class EcrivainRepertoire : IEcrivainEcran
 {
@@ -68,7 +82,23 @@ internal sealed class EcrivainRepertoire : IEcrivainEcran
         (ChampAbrege, "PRTRP_ABREGE", 16, true), (ChampDesignation, "PRTRP_DESIGNATION", 512, false),
         (ChampMail, "PRTRP_ADRESSE_MAIL", 70, false), (ChampCivilite, "PRTRP_CIVILITE", 7, true), (ChampActif, "PRTRP_ACTIF", 0, false),
         (ChampMode, "PRTRP_MODE_PRESENTATION", 3, false),
+        (ChampEditionJugement, "PRTRP_EDITION_JUGEMENT", 5, false), (ChampFormeJuridique, "PRTRP_FORME_JURIDIQUE_UTI", 10, false),
+        (ChampOrgane, "PRTRP_ORGANE", 32, false), (ChampSiren, "PRTRP_SIREN", 10, false), (ChampNaissance, "PRTRP_DATE_NAISSANCE", 0, false),
+        (ChampNationalite, "PRTRP_NATIONALITE", 3, false), (ChampProfession, "PRTRP_PROFESSION", 128, false),
+        (ChampTelephone, "PRTRP_TELEPHONE", 22, false), (ChampFax, "PRTRP_FAX", 22, false), (ChampQualite, "PRTRP_TEXTE_ESQUALITE", 0, false),
     ];
+
+    /// <summary>Les zones a liste de la V2 : leur table, le prefixe de ses colonnes (Outils.makeSqlStandard : _VALEUR,
+    /// _UTILISABLE_SAISIE) et la liste nommee dans le refus.</summary>
+    private static readonly (string Champ, string Table, string Prefixe, string Liste)[] Listes =
+    [
+        (ChampEditionJugement, "v2.EDITION_JUGEMENT", "R_EDITIONJUG", "des éditions de jugement"),
+        (ChampFormeJuridique, "v2.FORME_JURIDIQUE_UTI", "R_FORMEJURID", "des formes juridiques"),
+        (ChampNationalite, "v2.NATIONALITE", "R_NATIONALIT", "des nationalités"),
+    ];
+
+    /// <summary>RegEx.TeléphoneFixeOuMobile de la V2 (RigTools\TOOLS\RegEx.cs:33), au caractere pres.</summary>
+    private static readonly Regex Telephone = new(@"^((\+|00)33[\s\.]?|0)[1-9]([\s\.]?\d{2}){4}$", RegexOptions.CultureInvariant);
 
     /// <summary>Les champs que le mode de presentation montre ou masque (GestionModePresentation, :327-370).</summary>
     private static readonly string[] SelonLeMode = [ChampClient, ChampAssistance, ChampMandataire];
@@ -90,11 +120,20 @@ internal sealed class EcrivainRepertoire : IEcrivainEcran
             saisis[champ] = valeur.Trim();
         }
 
-        // 2. et 3. Obligatoires, tailles.
+        // 2. et 3. Obligatoires, formats, tailles. Le Siren s'ecrit sans blancs (Siren.DeFormat), la forme que la base garde.
+        if (saisis.TryGetValue(ChampSiren, out var siren))
+        {
+            if (!SirenValide(siren)) return IssueGeste.Refuser("Numéro de Siren invalide.");
+            saisis[ChampSiren] = siren.Replace(" ", "", StringComparison.Ordinal);
+        }
         foreach (var (champ, _, taille, obligatoire) in Colonnes.Where(c => saisis.ContainsKey(c.Champ)))
         {
             var v = saisis[champ];
             if (obligatoire && v.Length == 0) return IssueGeste.Refuser($"« {champ} » est obligatoire.");
+            if (champ is ChampTelephone or ChampFax && v.Length > 0 && !Telephone.IsMatch(v))
+                return IssueGeste.Refuser($"« {champ} » : numéro de téléphone invalide.");
+            if (champ == ChampNaissance && v.Length > 0 && !DateTime.TryParseExact(v, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+                return IssueGeste.Refuser($"« {champ} » : date illisible ({v}).");
             if (taille > 0 && v.Length > taille) return IssueGeste.Refuser($"« {champ} » : {taille} caractères au plus ({v.Length} saisis).");
         }
 
@@ -123,6 +162,9 @@ internal sealed class EcrivainRepertoire : IEcrivainEcran
                     lu = (r["R_MODEPRESEN_SAISIE_REPRESENTANT"] is true, r["R_MODEPRESEN_SAISIE_ASSISTANT"] is true, r["R_MODEPRESEN_UTILISABLE_SAISIE"] is true);
         if (changes.ContainsKey(ChampMode) && mode.Length > 0 && lu is not { Utilisable: true })
             return IssueGeste.Refuser($"Le mode de présentation « {mode} » n'est pas dans la liste des modes utilisables du greffe.");
+        foreach (var (champ, table, prefixe, liste) in Listes)
+            if (changes.GetValueOrDefault(champ) is { Length: > 0 } valeur && !await UtilisableEnSaisieAsync(geste, table, prefixe, valeur, ct))
+                return IssueGeste.Refuser($"« {champ} » : « {valeur} » n'est pas dans la liste {liste} utilisables du greffe.");
 
         // 6. Les zones que le mode montre ; une zone masquee ne se saisit pas, le texte d'assistance montre est obligatoire.
         bool client = lu is { Representant: false }, mandataire = lu is { Representant: true }, assistance = lu is { Assistant: true };
@@ -167,7 +209,8 @@ internal sealed class EcrivainRepertoire : IEcrivainEcran
         {
             affectations.Add($"{colonne} = @{colonne}");
             var v = changes[champ];
-            object valeur = champ == ChampActif ? v == "oui" : v.Length == 0 ? DBNull.Value : v;
+            object valeur = champ == ChampActif ? v == "oui" : v.Length == 0 ? DBNull.Value
+                : champ == ChampNaissance ? DateTime.ParseExact(v, "yyyy-MM-dd", CultureInfo.InvariantCulture) : v;
             parametres.Add(new SqlParameter($"@{colonne}", valeur));
         }
         var touchees = await geste.EcrireAsync($"UPDATE v2.REPERTORIE SET {string.Join(", ", affectations)} WHERE PRTRP_ID_PRTRP = @id", ct, [.. parametres]);
@@ -184,6 +227,35 @@ internal sealed class EcrivainRepertoire : IEcrivainEcran
         var modifies = ChampsFiche.Where(changes.ContainsKey).ToList();
         return IssueGeste.Ecrit($"Répertorié {abrege} enregistré dans la base du greffe : {string.Join(", ", modifies.Select(c => $"« {c} »"))}.",
             [id], new TraceGeste("reglage", $"le répertorié {abrege}", id, "a modifie", modifies.ToDictionary(c => c, c => avant[c]), changes));
+    }
+
+    /// <summary>La valeur <paramref name="valeur"/> est-elle dans la liste de la V2 de <paramref name="table"/>, parmi ses valeurs
+    /// utilisables en saisie (Outils.makeSqlStandard, RigComboBoxObjectMoteurCache.cs:69) ? Lue aussi par
+    /// EcrivainBeneficiairesDossier (la nationalite). <paramref name="table"/> et <paramref name="prefixe"/> sont des constantes
+    /// du code, jamais une saisie.</summary>
+    internal static async Task<bool> UtilisableEnSaisieAsync(GesteEnCours geste, string table, string prefixe, string valeur, CancellationToken ct)
+    {
+        await using var r = await geste.LireAsync($"SELECT COUNT(*) AS N FROM {table} WHERE {prefixe}_VALEUR = @valeur AND {prefixe}_UTILISABLE_SAISIE = 1",
+                                                  ct, new SqlParameter("@valeur", valeur));
+        return await r.ReadAsync(ct) && Convert.ToInt32(r["N"], CultureInfo.InvariantCulture) > 0;
+    }
+
+    /// <summary>Le N° Siren saisi est-il valide pour la V2 ? Vide : oui (Siren.IsValid, :23). Sinon des chiffres seuls -- les
+    /// blancs de l'affichage formate (Siren.Format) mis a part --, neuf (RegEx.Siren), et la cle de Luhn de Siren.IsValid
+    /// (:24-34). (ValiditeSaisie.LuhnValide fait le meme calcul, mais dans le projet de l'application, que le serveur ne
+    /// reference pas.)</summary>
+    internal static bool SirenValide(string saisi)
+    {
+        var chiffres = saisi.Replace(" ", "", StringComparison.Ordinal);
+        if (chiffres.Length == 0) return true;
+        if (chiffres.Length != 9 || !chiffres.All(char.IsAsciiDigit)) return false;
+        var somme = 0;
+        for (var i = 0; i < 9; i++)
+        {
+            var chiffre = chiffres[8 - i] - '0';
+            somme += i % 2 == 1 ? (chiffre * 2 > 9 ? chiffre * 2 - 9 : chiffre * 2) : chiffre;
+        }
+        return somme % 10 == 0;
     }
 
     /// <summary>L'identifiant de la SEULE ligne que <paramref name="sql"/> rend pour cet abrege (une colonne « Id ») ; null si

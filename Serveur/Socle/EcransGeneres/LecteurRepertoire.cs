@@ -32,7 +32,9 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// « Répertoriés actifs seulement » (« oui ») garde les actifs (:278-281). Le champ de recherche cherche l'un OU l'autre.
 ///
 /// FICHE (IFicheEcran) : Fiche (abrege, designation, adresse mail, civilite, actif, adresse, mode de presentation, client et
-/// son nom, texte d'assistance : OPE_EDITION_MODIF_REPER.cs:401-420 ; mandataire postulant : ope_postulant, OPE_POSTULANT.cs:67 --
+/// son nom, texte d'assistance, puis les dix autres zones -- edition jugement, forme juridique, organe representatif, N° Siren,
+/// date de naissance, nationalite, profession, telephone, fax, agissant en qualite de : OPE_EDITION_MODIF_REPER.cs:401-420, dans
+/// l'ordre de saisie de la V2 (TabIndex du Designer) ; mandataire postulant : ope_postulant, OPE_POSTULANT.cs:67 --
 /// l'adresse est la fiche reprise rec.Adresse, le client rec.Client, comme LecteurPartiesInstance ; le client et le
 /// mandataire par leur abrege, la valeur que l'on saisit pour les changer),
 /// Civilité des parties (les parties liees, PartieRepertorie.GetPartiesParRepertorieAvecNumeroAffaire, PartieRepertorie.cs:52-61,
@@ -61,9 +63,19 @@ internal sealed class LecteurRepertoire : IRechercheEcran, IFicheEcran
     internal const string ChampAdresse = "Adresse", ChampMode = "Mode présentation", ChampClient = "Client", ChampNomClient = "Nom client",
                           ChampAssistance = "Texte assistance", ChampMandataire = "Mandataire postulant";
 
+    // Les dix autres zones de la fiche V2, liees a leur colonne par LinkDonnees (OPE_EDITION_MODIF_REPER.cs:401-412) ; titres du
+    // Designer (:244, :235, :149, :226, :158, :216, :166, :200, :191, :174 -- « agissant en qualité de », capitale ajoutee).
+    // fix-ok: mesure le 26/11/2026 -- au commit b604f96 ces dix zones n'etaient ni lues ni enregistrees, alors que Valider
+    // (:236, _rep.Sauve) les ecrit comme les autres.
+    internal const string ChampEditionJugement = "Edition jugement", ChampFormeJuridique = "Forme juridique", ChampOrgane = "Organe représentatif",
+                          ChampSiren = "N° Siren", ChampNaissance = "Date de naissance", ChampNationalite = "Nationalité",
+                          ChampProfession = "Profession", ChampTelephone = "Téléphone", ChampFax = "Fax", ChampQualite = "Agissant en qualité de";
+
     /// <summary>Les champs de la section « Fiche », dans l'ordre du descripteur ; l'adresse et le nom du client se lisent seulement.</summary>
     internal static readonly string[] ChampsFiche = [ChampAbrege, ChampDesignation, ChampMail, ChampCivilite, ChampActif, ChampAdresse, ChampMode,
-                                                     ChampClient, ChampNomClient, ChampAssistance, ChampMandataire];
+                                                     ChampClient, ChampNomClient, ChampAssistance, ChampMandataire, ChampEditionJugement,
+                                                     ChampFormeJuridique, ChampOrgane, ChampSiren, ChampNaissance, ChampNationalite,
+                                                     ChampProfession, ChampTelephone, ChampFax, ChampQualite];
 
     public IReadOnlyCollection<string> Criteres { get; } = [CritereAbrege, CritereDesignation, CritereActifs];
 
@@ -135,7 +147,9 @@ internal sealed class LecteurRepertoire : IRechercheEcran, IFicheEcran
         var sql = $"""
             SELECT r.PRTRP_ABREGE, r.PRTRP_DESIGNATION, r.PRTRP_ADRESSE_MAIL, r.PRTRP_CIVILITE, r.PRTRP_ACTIF, r.PRTRP_MODE_PRESENTATION,
                    r.PRTRP_TEXTE_ASSISTANCE, c.Abrege AS ClientAbrege, c.Nom AS ClientNom, m.MNDTR_ABREGE, m.MNDTR_NOM,
-                   ad.NumeroVoie, ad.ComplementNumero, ad.TypeVoie, ad.NomVoie, ad.CodePostal, ad.Localite
+                   ad.NumeroVoie, ad.ComplementNumero, ad.TypeVoie, ad.NomVoie, ad.CodePostal, ad.Localite,
+                   r.PRTRP_EDITION_JUGEMENT, r.PRTRP_FORME_JURIDIQUE_UTI, r.PRTRP_ORGANE, r.PRTRP_SIREN, r.PRTRP_DATE_NAISSANCE,
+                   r.PRTRP_NATIONALITE, r.PRTRP_PROFESSION, r.PRTRP_TELEPHONE, r.PRTRP_FAX, r.PRTRP_TEXTE_ESQUALITE
             FROM v2.REPERTORIE AS r {(tx is null ? "" : "WITH (UPDLOCK, HOLDLOCK)")}
             LEFT JOIN rec.Client AS c ON c.Id = r.PRTRP_ID_CLIEN
             LEFT JOIN v2.MANDATAIRE AS m ON m.MNDTR_ID_MNDTR = r.PRTRP_ID_MNDTR_POS
@@ -157,6 +171,13 @@ internal sealed class LecteurRepertoire : IRechercheEcran, IFicheEcran
             [ChampAssistance] = FormeLigne.Texte(r, "PRTRP_TEXTE_ASSISTANCE"),
             // Un mandataire sans abrege se nomme par son nom (la liste de la V2 le montre, OPE_MANDATAIRE.cs:515-519).
             [ChampMandataire] = FormeLigne.Texte(r, "MNDTR_ABREGE") is { Length: > 0 } abrege ? abrege : FormeLigne.Texte(r, "MNDTR_NOM"),
+            [ChampEditionJugement] = FormeLigne.Texte(r, "PRTRP_EDITION_JUGEMENT"), [ChampFormeJuridique] = FormeLigne.Texte(r, "PRTRP_FORME_JURIDIQUE_UTI"),
+            // Le Siren tel que la base le garde (9 chiffres, Siren.DeFormat) : la valeur que l'on saisit, comme la V2 a l'entree
+            // dans la zone (ULT_TEXT_SIREN.OnEnter, :73-76).
+            [ChampOrgane] = FormeLigne.Texte(r, "PRTRP_ORGANE"), [ChampSiren] = FormeLigne.Texte(r, "PRTRP_SIREN"),
+            [ChampNaissance] = FormeLigne.DateFiche(FormeLigne.DateDe(r, "PRTRP_DATE_NAISSANCE")), [ChampNationalite] = FormeLigne.Texte(r, "PRTRP_NATIONALITE"),
+            [ChampProfession] = FormeLigne.Texte(r, "PRTRP_PROFESSION"), [ChampTelephone] = FormeLigne.Texte(r, "PRTRP_TELEPHONE"),
+            [ChampFax] = FormeLigne.Texte(r, "PRTRP_FAX"), [ChampQualite] = FormeLigne.Texte(r, "PRTRP_TEXTE_ESQUALITE"),
         });
     }
 
