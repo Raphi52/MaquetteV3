@@ -11,8 +11,12 @@ public sealed record DecisionRedaction(int Id, string Numero, string Affaire, bo
                                        string AvantDireDroit, string Contradictoire, string ExecutionProvisoire, bool DebatsPublics,
                                        bool DecisionPublique, bool MesureInstruction, int Documents, string[] Mesures);
 
-/// <summary>Ce que l'écran affiche : les décisions, et d'où elles viennent (Pont/LectureEcranMain.cs).</summary>
-public sealed record VueRedaction(DecisionRedaction[] Decisions, string Mode = "demo", string? Message = null);
+/// <summary>
+/// Ce que l'écran affiche : les décisions, d'où elles viennent (Pont/LectureEcranMain.cs) et, branché, combien la base en compte
+/// (<paramref name="Total"/>) : la lecture s'arrête au plafond (LectureRedaction.Plafond), l'écran dit alors « n affichées sur
+/// total » au lieu de laisser croire que la liste est complète. 0 : la démonstration ou une panne, rien à dire.
+/// </summary>
+public sealed record VueRedaction(DecisionRedaction[] Decisions, string Mode = "demo", string? Message = null, int Total = 0);
 
 /// <summary>
 /// Pont de l'écran PROC_REDA (web/src/ecrans/EcranRedaction.tsx). Jusqu'au lot 10 du plan « RIG v3 100 % fonctionnel »
