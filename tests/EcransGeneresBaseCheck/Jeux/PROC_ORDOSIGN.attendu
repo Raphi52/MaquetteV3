@@ -1,0 +1,24 @@
+# « Ordonnances à signer » (PROC_ORDOSIGN) sur PROC_ORDOSIGN.sql : une case de la recherche de RIG v2 par groupe, triee par la date prevue
+# puis le role. Retenues : 2000101 (OP), 2000103 (OP verrouillee par la demande en cours 26000200103 : « Demande en cours »), 2000105 (OP
+# rendue le jour du banc : « Signée », la synthese apres signature), 2000117 et 2000118 (OP, pour les refus des gestes), 2000106 (RP avec PC),
+# 2000107 (RP avec PC, code CHJCM_CODE_AFFAIRE), 2000108 (prevention), 2000111 (JC), 2000112 (RC sans relance), 2000114 (code de la
+# nature SDCA), 2000115 (code SDBE, enrolee le 01/05/2021 : la borne ORDOSIGN_DATE_DEBUT_IDBE, retenue), 2000116 (code d'une nature du
+# groupe JugeCommis). Ecartees, chacune avec son jumeau retenu : 2000102 (OP enrolee le 31/12/2020, avant ORDOSIGN_DATE_DEBUT_OP ; jumeau
+# 2000101), 2000104 (rendue l'an dernier ; jumeau 2000105 rendue le jour), 2000109 (prevention enrolee le 31/12/2017, avant
+# ORDOSIGN_DATE_DEBUT_PRV ; jumeau 2000108), 2000113 (RC avec relance RCS, OPE_LISTE_ORDONNANCES.cs:787 ; jumeau 2000112), 2000119 (RP
+# sans code affaire : « <> 'POP20' » ecarte NULL ; jumeau 2000101), 2000120 (code SDBE enrolee le 30/04/2021 ; jumeau 2000115).
+# Le cas « IP » n'a pas de ligne : une instance IP entrerait dans les listes du suivi des IP et des registres (lots 6 et 9) ; son filtre
+# est celui des autres cases (type, borne ORDOSIGN_DATE_DEBUT_IP, sans PC ni prevention).
+ORDO A | Rôle 2026OS20101 · Ordonnance du banc lot 10 · prévue le {J+1} | OP | AFaire | []
+ORDO C | Rôle 2026OS20103 · Ordonnance sans minute du banc · prévue le {J+3} · Instance bloquée (26000200103), demande "En cours" : MJUD par BANC LOT10 | OP | EnAttente | []
+ORDO E | Rôle 2026OS20105 · Ordonnance sans minute du banc · signée le {J+0} | OP | Validee | []
+ORDO Q | Rôle 2026OS20117 · Ordonnance sans minute du banc · prévue le {J+17} | OP | AFaire | []
+ORDO R | Rôle 2026OS20118 · Ordonnance du banc lot 10 · prévue le {J+18} · minute 2501000001 | OP | AFaire | []
+ORDO F | Rôle 2026OS20106 · Ordonnance du banc lot 10 · prévue le {J+6} | OP (liée à une PC) | AFaire | []
+ORDO G | Rôle 2026OS20107 · Ordonnance sans minute du banc · prévue le {J+7} | OP (changement de juge) | AFaire | []
+ORDO H | Rôle 2026OS20108 · Ordonnance sans minute du banc · prévue le {J+8} | Prévention | AFaire | []
+ORDO K | Rôle 2026OS20111 · Ordonnance sans minute du banc · prévue le {J+11} | JC | AFaire | []
+ORDO L | Rôle 2026OS20112 · Ordonnance sans minute du banc · prévue le {J+12} | Juge RCS | AFaire | []
+ORDO N | Rôle 2026OS20114 · Ordonnance sans minute du banc · prévue le {J+14} | Injonction DCA | AFaire | []
+ORDO O | Rôle 2026OS20115 · Ordonnance sans minute du banc · prévue le {J+15} | Injonction RBE | AFaire | []
+ORDO P | Rôle 2026OS20116 · Ordonnance sans minute du banc · prévue le {J+16} | Injonctions juge commis | AFaire | []

@@ -1,0 +1,7 @@
+# « Éditions différées » (PROC_EDT_DIFF) : les lots ouverts (MetierEdtDiff.cs:19-24) sur les lignes que PROC_SIGNJUD.sql pose (voir
+# PROC_EDT_DIFF.sql). Retenus : le groupe BANC10-G01 (sans imprimante : « Imprimante à choisir » ; son edition est « ne pas imprimer ») et
+# BANC9-G07 (PROC_RELANCELOT.sql, imprimante « Imprimante Amitel »), du lot AMI_BANC9 rendu visible. Ecartes : BANC10-G02, sans edition
+# (« having count(DMNED_ID_DMNED) > 0 ») ; jumeau BANC9-G07. Les groupes des lots BANC9_* de PROC_RELANCELOT.sql, dont aucun lot n'est
+# visible des editions differees (LOT_VISIBLE_EDTDIFF = 0, PROC_GESTLOT.sql) ; jumeau : AMI_BANC9, rendu visible. Tri : lot, puis groupe.
+Lot AMI_BANC9 | 1 document · 1 à ne pas imprimer · ouvert le {J-2} · aucune imprimante choisie · groupe BANC10-G01 | Lots ouverts | EnAttente | []
+Lot AMI_BANC9 | 1 document · ouvert le {J-1} · imprimante « Imprimante Amitel » · groupe BANC9-G07 | Lots ouverts | AFaire | []

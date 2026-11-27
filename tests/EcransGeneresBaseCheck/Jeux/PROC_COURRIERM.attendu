@@ -1,0 +1,5 @@
+# « Courriers en masse » (PROC_COURRIERM), sans recherche : les affaires des audiences de la fenetre par defaut de RIG v2
+# (INTERV_AUD_DATE_MIN_PREAUD / _MAX_PREAUD, poses par PROC_PREAUD.sql a 30 et -25 : du jour -30 au jour -25). Les audiences de ce jeu sont
+# de mai 1990, hors fenetre (la recherche par leur date les trouve : PROC_COURRIERM.recherches). Retenue : l'instance de PROC_GCONV.sql
+# appelee a l'audience du jour -28 (la seule de la fenetre qui a un appel d'affaire).
+CONVOC AUDIENCE | Rôle 2026J17607 · Audience du {J-28} à 10:00 | Instances | AFaire | []

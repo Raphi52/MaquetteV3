@@ -1,0 +1,7 @@
+# « Rédaction en masse » (PROC_REDA_MASSE), sans recherche : les decisions des audiences de la fenetre du retour d'audience (J-10 a J,
+# INTERV_AUD_DATE_MIN_RETAUD = 10 pose par PROC_RETAUD.sql), choisies comme OPE_INFORMATIONS_AUDIENCE.GetDJForRedaMasse (:586-608). Retenue :
+# 2000810 (audience du jour -9, brouillon). Les decisions des audiences du retour d'audience (PROC_RETAUD.sql) n'ont pas d'etat de redaction
+# 0 a 3 : ecartees. L'audience du 18/07/1990 de ce jeu est hors fenetre : la recherche par sa date la trouve (PROC_REDA_MASSE.recherches).
+REDA J | Rôle 2026RM20810 · Jugement rédigé du banc · brouillon · Audience du {J-9} à 09:30 · appel 1 | Jugements | EnCours | []
+# La decision 2000706 de PROC_IMPLEG.sql (audience de la veille, minute editee : etat 3, « projet révisé à rendre »).
+IMPLEG F | Rôle 2026IL20706 · Jugement du banc lot 10 · projet révisé à rendre · minute 9016400001 · Audience du {J-1} à 11:00 | Jugements | Validee | []

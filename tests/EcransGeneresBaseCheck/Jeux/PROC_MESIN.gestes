@@ -49,6 +49,7 @@ valeur: Mesure › Informations = Mesure du banc, lot 5
 resultat: fait
 message: Mesure 2026M15901 modifiée dans la base du greffe : « Type de mesure », « Caducité », « Coût prévu de l'expertise », « Informations ».
 lignes:
+IMPLEG A | Mesure 1990X00001 · ouverte le 11/06/1990 · instance 2026IL20701 | Autre mesure | AFaire | []
 Mesure n° 2026M15904 | Mesure 2026M15904 · Autre mesure du banc lot 5 | Autre mesure | AFaire | []
 MESIN DELTA | Mesure 2026M15903 · Expertise du banc lot 5 · ouverte le 04/03/2026 · instance 2026IP15913 | Expertise | Validee | []
 MESIN GAMMA | Mesure 2026M15902 · Expertise du banc lot 5 · ouverte le 03/03/2026 · instance 2026IP15912 · bloquée par la demande D2615000941 | Expertise | EnAttente | []

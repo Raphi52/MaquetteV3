@@ -33,3 +33,8 @@ DEBITEUR SIGMA | Défendeur · instance 2026IP81701 | Défendeurs | AFaire | []
 CREANCIER ALPHA | Demandeur · instance 2026IP81401 | Demandeurs | AFaire | []
 DEBITEUR BETA | Défendeur · instance 2026IP81401 | Défendeurs | AFaire | []
 KAPPA BANC SAS | Défendeur · instance 2026I12007 | Défendeurs | AFaire | []
+# Lot 10 (PROC_DEST_REDA.sql) : les parties des decisions de « Destinataires ».
+STE PARTIE SANS REDA | Demandeur · instance 2026DR20603 | Demandeurs | AFaire | []
+STE PARTIE B SARL | Demandeur · instance 2026DR20602 | Demandeurs | AFaire | []
+STE DEMANDEUR DEST SARL | Demandeur · instance 2026DR20601 | Demandeurs | AFaire | []
+STE DEFENDEUR DEST SAS | Défendeur · instance 2026DR20601 | Défendeurs | AFaire | []

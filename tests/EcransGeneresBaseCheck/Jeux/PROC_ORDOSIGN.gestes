@@ -1,0 +1,70 @@
+# « Ordonnances à signer » (EcrivainOrdonnancesASigner) : « Signer la sélection », les controles de OPE_LISTE_ORDONNANCES.cs dans l'ordre
+# de RIG v2. Lignes du jeu : PROC_ORDOSIGN.sql et .attendu. La date de la decision est celle du jour (le defaut de la cellule DATE_DJ).
+
+# Refus : l'instance 2000103 est tenue par une demande en cours de RIG v2 (_DemandeEnCours, :1597-1602). Jumeau accepte : bloc 6.
+geste: Agir Signer la sélection
+ids: 2000103
+resultat: refuse
+message: Instance bloquée (26000200103), demande "En cours" : MJUD par BANC LOT10
+---
+# Refus : la saisine du greffe de 2000117 est apres le jour (_DoVerifierDate, :1180-1184). Jumeau accepte : bloc 6 (saisie en 2020).
+geste: Agir Signer la sélection
+ids: 2000117
+resultat: refuse
+message: La date de la décision judiciaire doit être comprise entre la date de saisine du greffe (01/01/2099) et la date du jour
+---
+# Refus : 2000118 porte deja la minute 2501000001, du 10/01/2025 : la decision doit etre datee de ce jour-la (_VerifierNumMinute,
+# :1197-1214). Jumeau accepte : bloc 7 (sans minute, elle en recoit une).
+geste: Agir Signer la sélection
+ids: 2000118
+resultat: refuse
+message: Liste des ordonnances à signer - attention, un numéro de minute (2501000001) est déjà attribué, la date de décision doit être le 10/01/2025
+---
+# Refus : un « Juge RCS » (sa signature cree des depots RCS, _DoGenererLignesEditionJugeRCS, que la V3 ne reprend pas). Avec lui, 2000107
+# n'est pas signee non plus. Jumeau accepte : bloc 6, 2000107 seule.
+geste: Agir Signer la sélection
+ids: 2000107,2000112
+resultat: refuse
+message: L'ordonnance du rôle 2026OS20112 est un « Juge RCS » : sa signature crée des dépôts RCS que la V3 ne reprend pas, la signer dans RIG v2.
+---
+# Refus : 2000105 est deja rendue (la liste a signer ne retient que DCJDC_DATE IS NULL). Jumeau accepte : bloc 6.
+geste: Agir Signer la sélection
+ids: 2000105
+resultat: refuse
+---
+# « Signer la sélection » sur 2000107 (type sans serie de minute) : la date du jour posee, aucune minute ; la ligne passe « Signée ».
+geste: Agir Signer la sélection
+ids: 2000107
+resultat: fait
+lignes:
+# lot 8 (27/11/2026) : les ordonnances a signer que PROC_DCA_INJ, PROC_DBE_INJ et PROC_IPSUIVI.gestes (joues avant) creent -- injonctions, OP de caducite
+Juge # CREANCIER RHO | Rôle 2026OP00001 · Ordonnance de caducite · date prévue non renseignée | OP | AFaire | []
+ORDO A | Rôle 2026OS20101 · Ordonnance du banc lot 10 · prévue le {J+1} | OP | AFaire | []
+ORDO C | Rôle 2026OS20103 · Ordonnance sans minute du banc · prévue le {J+3} · Instance bloquée (26000200103), demande "En cours" : MJUD par BANC LOT10 | OP | EnAttente | []
+ORDO E | Rôle 2026OS20105 · Ordonnance sans minute du banc · signée le {J+0} | OP | Validee | []
+ORDO Q | Rôle 2026OS20117 · Ordonnance sans minute du banc · prévue le {J+17} | OP | AFaire | []
+ORDO R | Rôle 2026OS20118 · Ordonnance du banc lot 10 · prévue le {J+18} · minute 2501000001 | OP | AFaire | []
+ORDO F | Rôle 2026OS20106 · Ordonnance du banc lot 10 · prévue le {J+6} | OP (liée à une PC) | AFaire | []
+ORDO G | Rôle 2026OS20107 · Ordonnance sans minute du banc · signée le {J+0} | OP (changement de juge) | Validee | []
+ORDO H | Rôle 2026OS20108 · Ordonnance sans minute du banc · prévue le {J+8} | Prévention | AFaire | []
+ORDO K | Rôle 2026OS20111 · Ordonnance sans minute du banc · prévue le {J+11} | JC | AFaire | []
+ORDO L | Rôle 2026OS20112 · Ordonnance sans minute du banc · prévue le {J+12} | Juge RCS | AFaire | []
+ORDO N | Rôle 2026OS20114 · Ordonnance sans minute du banc · prévue le {J+14} | Injonction DCA | AFaire | []
+# lot 8 (27/11/2026) : les ordonnances a signer que PROC_DCA_INJ, PROC_DBE_INJ et PROC_IPSUIVI.gestes (joues avant) creent -- injonctions, OP de caducite
+Le PRESIDENT DU TRIBUNAL DE COMMERCE DU BANC # INJ ALPHA SAS | Rôle 2026OP00003 · Ordonnance injonction DCA lot 8 · prévue le 15/01/2099 | Injonction DCA | AFaire | []
+Le PRESIDENT DU TRIBUNAL DE COMMERCE DU BANC # INJ BETA SAS | Rôle 2026OP00004 · Ordonnance injonction DCA lot 8 · prévue le 15/01/2099 | Injonction DCA | AFaire | []
+Le PRESIDENT DU TRIBUNAL DE COMMERCE DU BANC # INJ BETA SAS | Rôle 2026OP00005 · Ordonnance injonction DCA lot 8 · prévue le 15/01/2099 | Injonction DCA | AFaire | []
+ORDO O | Rôle 2026OS20115 · Ordonnance sans minute du banc · prévue le {J+15} | Injonction RBE | AFaire | []
+# lot 8 (27/11/2026) : les ordonnances a signer que PROC_DCA_INJ, PROC_DBE_INJ et PROC_IPSUIVI.gestes (joues avant) creent -- injonctions, OP de caducite
+Le PRESIDENT DU TRIBUNAL DE COMMERCE # ENJOINDRE ALPHA SARL | Rôle 2026OP00001 · Ordonnance injonction DBE lot 8 · prévue le 15/01/2099 | Injonction RBE | AFaire | []
+Le PRESIDENT DU TRIBUNAL DE COMMERCE # ENJOINDRE BETA SAS | Rôle 2026OP00002 · Ordonnance injonction DBE lot 8 · prévue le 15/01/2099 | Injonction RBE | AFaire | []
+ORDO P | Rôle 2026OS20116 · Ordonnance sans minute du banc · prévue le {J+16} | Injonctions juge commis | AFaire | []
+controle: SELECT CASE WHEN DCJDC_NUM_REPERTOIRE IS NULL AND CONVERT(date, DCJDC_DATE) = CONVERT(date, GETDATE()) THEN 'rendue sans minute' ELSE 'non' END FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_DCJDC = 2000107 => rendue sans minute
+---
+# « Signer la sélection » sur 2000101 (type a serie JGOSX) : la date du jour et la minute du jour (_DoSauver, :3315-3327 : serie,
+# annee, quantieme ; num.Attribuer, le premier numero du jour : AAQQQ00001).
+geste: Agir Signer la sélection
+ids: 2000101
+resultat: fait
+controle: SELECT CASE WHEN DCJDC_NUM_REPERTOIRE = RIGHT(CONVERT(varchar(4), YEAR(GETDATE())), 2) + RIGHT('00' + CONVERT(varchar(3), DATEPART(dayofyear, GETDATE())), 3) + '00001' AND CONVERT(date, DCJDC_DATE) = CONVERT(date, GETDATE()) THEN 'minute du jour' ELSE ISNULL(DCJDC_NUM_REPERTOIRE, 'sans minute') END FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_DCJDC = 2000101 => minute du jour
+controle: SELECT COUNT(*) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_DCJDC IN (2000103, 2000112, 2000117, 2000118) AND DCJDC_DATE IS NOT NULL => 0

@@ -1,0 +1,67 @@
+# « Courriers en masse » (EcrivainCourriersEnMasse) : « Générer la fiche » et « Générer la seconde édition » (les deux cases de la grille
+# de RIG v2, OPE_RESULTAT_COURRIERM_INSTANCE._GenererLesDemandesEditions, :153-190). Affaires : PROC_COURRIERM.sql ; files et imprimantes :
+# PROC_GESTLOT.sql (BANC9_COURRIERS, BANC9_DIRECT) et PROC_COURRIERM.sql. La liste sans recherche (PROC_COURRIERM.attendu) ne porte pas
+# ces affaires (audiences de 1990) : les demandes creees se controlent dans la base.
+
+# Refus : aucune affaire cochee (DoVerifier, :126-132). Jumeau accepte : bloc 5.
+geste: Decider Générer la fiche
+ids:
+resultat: refuse
+message: Vous devez sélectionner au moins un dossier
+---
+# Refus : une file directe n'est pas proposee par la liste « file ou imprimante » (UltComboUnionFilesEtImprimantes.cs:46-50). Jumeau
+# accepte : bloc 5, la file differee BANC9_COURRIERS.
+geste: Decider Générer la fiche
+ids: I-2000201
+valeur: File différée ou imprimante = BANC9_DIRECT
+resultat: refuse
+message: « BANC9_DIRECT » n'est ni une file différée active ni une imprimante d'édition du greffe.
+---
+# Refus : la fiche d'une procedure (FICHE_PC) n'est pas parametree dans ce greffe (CreateDemandeEditionByParametreGeneration rend null,
+# DemandeEdition.cs:2580-2584). Jumeau accepte : bloc 5, FICHE_INSTANCE.
+geste: Decider Générer la fiche
+ids: P-2000201
+resultat: refuse
+message: Le paramètre d'édition FICHE_PC est absent de la base du greffe : RIG v2 ne crée pas l'édition.
+---
+# Refus : la seconde edition d'une instance est une edition EDIT_INS (MetierProcInstances.RequeteComboBoxEdition, :11), pas une
+# edition des procedures. Jumeau accepte : bloc 6, CONVOC20.
+geste: Decider Générer la seconde édition
+ids: I-2000203
+valeur: Seconde édition = LETTREPC20
+resultat: refuse
+message: « LETTREPC20 » n'est pas une seconde édition des instances (EDIT_INS) dans le paramétrage du greffe.
+---
+# « Générer la fiche » sur deux instances, vers la file differee : une demande COURRIERM validee par instance (sequenceur 2J) et une
+# demande d'edition « fiche instance » creee (phase C) dans la file BANC9_COURRIERS.
+geste: Decider Générer la fiche
+ids: I-2000201,I-2000202
+valeur: File différée ou imprimante = BANC9_COURRIERS
+resultat: fait
+message: 2 courriers (fiche) créés dans la file des éditions (file différée « BANC9_COURRIERS »). Le service d'édition de RIG v2 les produit : la V3 n'imprime rien.
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION AS e JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = e.DMNED_ID_DMND JOIN v2.DOSSIER_DEMANDE AS s ON s.DSSDM_ID_DMND = d.DMND_ID_DMND WHERE d.DMND_CODE_PROSS = 'COURRIERM' AND d.DMND_ETAT_DEMANDE = 'V' AND s.DSSDM_CODE_SEQUENCEUR = '2J' AND s.DSSDM_VALEUR_SEQUENCEUR IN ('2000201', '2000202') AND e.DMNED_LOT = 'BANC9_COURRIERS' AND e.DMNED_LIBELLE_DOCUMENT = 'fiche instance' AND e.DMNED_PHASE_TRAITEMENT = 'C' => 2
+controle: SELECT d.DMND_NUM_INDICATIF + ' / ' + d.DMND_LES_NUMEROS FROM v2.DEMANDE AS d JOIN v2.DOSSIER_DEMANDE AS s ON s.DSSDM_ID_DMND = d.DMND_ID_DMND WHERE d.DMND_CODE_PROSS = 'COURRIERM' AND s.DSSDM_VALEUR_SEQUENCEUR = '2000202' => 2026CM20202 / 2026CM20202 2026PC2020
+---
+# « Générer la seconde édition » vers une imprimante d'edition : le code choisi, son libelle (le parametre d'edition).
+geste: Decider Générer la seconde édition
+ids: I-2000203
+valeur: Seconde édition = CONVOC20
+valeur: File différée ou imprimante = Imprimante banc 10
+resultat: fait
+message: Courrier (« Convocation du banc lot 10 ») créé dans la file des éditions (imprimante « Imprimante banc 10 »). Le service d'édition de RIG v2 les produit : la V3 n'imprime rien.
+controle: SELECT e.DMNED_LIBELLE_DOCUMENT + ' / ' + e.DMNED_IMPRIMANTE + ' / ' + ISNULL(e.DMNED_LOT, 'sans file') FROM v2.DEMANDE_EDITION AS e JOIN v2.DOSSIER_DEMANDE AS s ON s.DSSDM_ID_DMND = e.DMNED_ID_DMND WHERE s.DSSDM_VALEUR_SEQUENCEUR = '2000203' AND s.DSSDM_CODE_SEQUENCEUR = '2J' => Convocation du banc lot 10 / Imprimante banc 10 / sans file
+---
+# Refus : la seconde edition d'une procedure sans code choisi ni reglage LISTEPC_2EDITION (GetSelectionEditionParDefaut, :40-50) : RIG v2
+# ne genere rien (:176). Jumeau accepte : bloc 8.
+geste: Decider Générer la seconde édition
+ids: P-2000201
+resultat: refuse
+message: Aucune seconde édition choisie : RIG v2 ne génère rien sans édition choisie dans la liste.
+---
+# « Générer la seconde édition » d'une procedure (EDIT_PC), sans sortie : la demande sur la PC (sequenceur 2P).
+geste: Decider Générer la seconde édition
+ids: P-2000201
+valeur: Seconde édition = LETTREPC20
+resultat: fait
+message: Courrier (« Lettre procédure du banc lot 10 ») créé dans la file des éditions. Le service d'édition de RIG v2 les produit : la V3 n'imprime rien.
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION AS e JOIN v2.DOSSIER_DEMANDE AS s ON s.DSSDM_ID_DMND = e.DMNED_ID_DMND WHERE s.DSSDM_CODE_SEQUENCEUR = '2P' AND s.DSSDM_VALEUR_SEQUENCEUR = '2000201' AND e.DMNED_CODE_ENTITE_SOURCE = 'PROC_COLL' => 1

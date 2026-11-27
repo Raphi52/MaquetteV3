@@ -1,0 +1,50 @@
+# « Rédaction en masse » (EcrivainRedactionEnMasse) : « Valider au greffe » (la case « Validation greffe » de la grille, OPE_LISTE_DJ_REDA_MASSE ;
+# DocumentREDA.ValidationGreffe -> _AttribuerNumeroMinute). Lignes : PROC_REDA_MASSE.sql ; l'audience du 18/07/1990 est hors de la liste
+# sans recherche (PROC_REDA_MASSE.attendu) : ses decisions se controlent dans la base.
+
+# Refus : aucune decision cochee. Jumeau accepte : bloc 7.
+geste: Decider Valider au greffe
+ids:
+resultat: refuse
+message: Aucune décision cochée : rien n'est validé.
+---
+# Refus : 2000803 est « à créer » (etat 0) : RIG v2 genere d'abord le document (CanCheckValidation, :873-875), ce que la V3 ne reprend pas.
+# Jumeau accepte : bloc 7, 2000801 (brouillon, etat 1).
+geste: Decider Valider au greffe
+ids: 2000803
+resultat: refuse
+message: La décision du rôle 2026RM20803 n'est pas encore générée : la génération du document (modèle REDA, Word) n'est pas reprise par la V3, la générer dans RIG v2.
+---
+# Refus : 2000804 a deja sa minute (etat 3, « révisé à rendre »). Jumeau accepte : bloc 7, 2000801 (etat 1).
+geste: Decider Valider au greffe
+ids: 2000804
+resultat: refuse
+message: La décision du rôle 2026RM20804 a déjà sa minute validée (9019900001).
+---
+# Refus : 2000802 n'a pas de document REDA, donc pas de modele (VerifierSaisie, :1231-1268). Jumeau accepte : bloc 7, 2000801 et son modele.
+geste: Decider Valider au greffe
+ids: 2000802
+resultat: refuse
+message: Veuillez saisir un Modèle de Document pour la(les) décision(s) suivante(s): 2026RM20802
+---
+# Refus : 2000808 n'a pas d'appel du delibere (VerifierSaisie). Jumeau accepte : bloc 7, 2000801 (delibere a l'appel 9).
+geste: Decider Valider au greffe
+ids: 2000808
+resultat: refuse
+message: Veuillez saisir un appel affaire de délibéré et/ou de prononcé pour la(les) décision(s) suivante(s): 2026RM20808
+---
+# Refus : le type de 2000809 n'a pas de serie de minute (_AttribuerNumeroMinute, :1678-1681). Jumeau accepte : bloc 7, le type a serie JGRMX.
+geste: Decider Valider au greffe
+ids: 2000809
+resultat: refuse
+message: Rôle 2026RM20809 : Le type de numérotation métier n'a pu être déterminé
+---
+# « Valider au greffe » 2000801 : date et date prevue = l'audience du prononce (18/07/1990), minute JGRMX 1990 du quantieme 199
+# (« 90 » + « 199 » + « 00001 »), etat 3, diffusion 1, stabilite 2. La liste sans recherche ne change pas (audience hors fenetre).
+geste: Decider Valider au greffe
+ids: 2000801
+resultat: fait
+message: Minute 9019900001 validée au greffe : révisé à rendre. L'impression de la minute n'est pas produite par la V3 (moteur REDA de RIG v2).
+lignes:
+REDA J | Rôle 2026RM20810 · Jugement rédigé du banc · brouillon · Audience du {J-9} à 09:30 · appel 1 | Jugements | EnCours | []
+controle: SELECT DCJDC_NUM_REPERTOIRE + ' / ' + DCJDC_ETAT_REDACTION + DCJDC_ETAT_DIFFUSION + DCJDC_ETAT_STABILITE + ' / ' + CONVERT(varchar(10), DCJDC_DATE, 103) + ' / ' + CONVERT(varchar(10), DCJDC_DATE_PREVUE, 103) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_DCJDC = 2000801 => 9019900001 / 312 / 18/07/1990 / 18/07/1990

@@ -13,7 +13,7 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 //     frmListeDelibere.cs) : un Etat en lecture seule, aligne dessus au lot 7 (plan-676a4b19).
 //   - PROC_SUIVI_IMPRESSION n'a pas de fiche, mais son code existe (Source\Outils\Exe\Processus\
 //     PROC_SUIVI_IMPRESSION) : il lit TRAVAIL_IMPRESSION, de la base commune du service d'impression, absente
-//     de la base V3 du greffe -- l'ecran reste en exemple (lot 9). Libelles appuyes sur PROC_PAPERCUT.
+//     de la base V3 du greffe -- l'ecran reste en exemple (lot 9) ; criteres, colonnes et gestes de ce code.
 //   - PROC_DBE_RELANCE et PROC_DBE_INJ ont une fiche courte (« source non trouvee ») : ils suivent le
 //     code qui tourne, les moteurs PROC_RSURV et PROC_ISURV, nature SDBE (lot 8, 26/11/2026).
 //   - PROC_DBEN_ALERT : fiche sans étape (lecture seule), fondé sur le formulaire FORM_DBEN_ALERT.cs
@@ -777,7 +777,8 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // La file des échéances de mesures (proc_survmes.md, Détail OPE) : lue dans la base par
             // Serveur/Socle/EcransGeneres/LecteurSurveillanceMesures.cs (lot 9). Les boutons de FORM_SURVMES.cs:20-29 :
             // VALIDER (l'expiration des événements, OPE_AFFICHAGE_MES.cs:83-136), « Editer les lignes cochées », « Editer tout ».
-            // Sans écrivain : le moteur des événements de procédure de RIG v2 n'est pas dans la V3 (LecteurSurveillanceMesures.cs).
+            // Joués par Serveur/Socle/EcransGeneres/EcrivainSurveillanceMesures.cs (lot 9, 27/11) : « Valider » fait expirer
+            // l'événement, crée le survenu de son code d'expiration et le futur de celui-ci ; les deux éditions Word sont refusées.
             Recherche = "Rechercher une mesure, un rôle, un code d'événement…",
             Criteres = ["Délai supplémentaire (jours)", "Événements expirables seulement"], // OPE_RECHERCHE_MES.cs:49-55.
             Valider = "Valider", // FORM_SURVMES.cs : le bouton VALIDER du processus (DoVerifier puis expiration, OPE_AFFICHAGE_MES.cs:83).
@@ -793,7 +794,7 @@ public sealed class DomaineSurveiller : IDomaineEcrans
                     "Code d'événement"),
                 Marche("Cochage", "Cocher une mesure la recharge ; une mesure déjà verrouillée par une autre demande se décoche.", true,
                     "Mesure cochée", "Compteur"),
-                Marche("Validation", "Valider fait expirer l'événement de chaque ligne cochée et crée l'événement survenu, sous une demande par mesure.", true,
+                Marche("Validation", "Valider fait expirer l'événement de chaque ligne cochée, crée l'événement survenu de son code d'expiration et le futur qui le suit. Une mesure tenue par une autre demande n'est pas traitée.", true,
                     "Valider"),
                 Marche("Éditions Word", "Un aperçu Word des lignes cochées, ou de toutes les lignes affichées.", false,
                     "Editer les lignes cochées", "Editer tout"),
@@ -891,8 +892,12 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Forme = FormeEcran.File,
             // Les publicités JAL et les annonces BODACC des événements de procédure, les deux onglets de RIG v2 (proc_sdematjud.md,
             // Détail OPE) : lues par Serveur/Socle/EcransGeneres/LecteurSuiviDematerialisation.cs (lot 9), critères par défaut de
-            // RIG v2 (décisions du dernier mois, OPE_DATE_SDEMATJUD.cs:70-75). Aucun écrivain : « Valider » génère des éditions de
-            // pièces numérisées (OPE_RESULTAT_JAL.cs:133-200) et « Éditer les détails » un classeur Excel, que la V3 ne produit pas ;
+            // RIG v2 (décisions du dernier mois, OPE_DATE_SDEMATJUD.cs:70-75). Aucun écrivain : « Valider » imprime les pièces
+            // numérisées cochées (OPE_RESULTAT_JAL.cs:133-200) -- chacune est d'abord COPIÉE de VIDIGED dans la GED RIG
+            // (GedRig.CreateGedRigFromVidiged, DemandeEdition.cs:2625) et sa demande d'édition pointe
+            // sur cette copie (DMNED_NUM_DOCUMENT_EDITION, :2643) ; aucune publicité ne change d'état et la demande par affaire est validée
+            // d'un coup (une trace). Sans copie de document, l'écrire serait une édition sans pièce : la V3 ne l'écrit pas (lot 9,
+            // 27/11). « Éditer les détails » produit un classeur Excel, que la V3 ne produit pas ;
             // « Vérifier » ne contrôle que la sélection avant cette génération. Les trois ne valent que pour l'onglet JAL
             // (PROC_SDEMATJUD.cs:273-276). fix-ok: mesuré au contrôle final du lot 9 (27/11/2026) -- ce descripteur gardait les
             // états inventés par le lot 1 (« À envoyer / En préparation / Envoyée ») et ses exemples ; ses états sont maintenant ceux
@@ -937,37 +942,54 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         // PROC_SUIVI_IMPRESSION n'a pas de fiche RIG v2, mais son code existe (Source\Outils\Exe\Processus\PROC_SUIVI_IMPRESSION :
         // OPE_RECHERCHE.cs:160-207 lit TRAVAIL_IMPRESSION, BASE_COMMON_TRAVAIL_IMPRESSION de la base COMMUNE du service
         // d'impression). Cette table n'est pas dans la base du greffe (absente de RIG_DEV, lu le 26/11/2026) ni dans la base V3 :
-        // l'écran reste sur ses lignes d'exemple, étiquetées (lot 9). Libellés appuyés sur PROC_PAPERCUT (file d'impression).
+        // l'écran reste sur ses lignes d'exemple, étiquetées (lot 9), et aucun geste n'écrit. Aligné sur ce code (lot 9, 27/11) :
+        // critères = MetierTitre d'OPE_RECHERCHE.Designer.cs:110-272 ; colonnes = OPE_RESULTAT.cs:69-149 ; gestes = le menu de la
+        // ligne, OPE_RESULTAT.Designer.cs:109-128 -- « Relancer » et « Relancer sur l'imprimante PS » renvoient le lot au service
+        // d'impression (ClientImpression.ImprimeLot, OPE_RESULTAT.cs:217-232 : jamais appelé d'ici), « Supprimer » détruit la ligne
+        // de TRAVAIL_IMPRESSION (:205-213). États = TRVIMPR_STATUS (EnumStatusTravail, IServiceImpression.cs:121) ; une ligne en
+        // erreur est rouge (_IsEnErreur, OPE_RESULTAT.cs:180-182). Une seule liste, sans groupe (le badge « n impressions »).
+        // fix-ok: mesuré au contrôle final du lot 9 (27/11/2026) -- ce descripteur portait les libellés de PROC_PAPERCUT
+        // (« Imprimer », « Vider la file », critères Imprimante / Titre / Période), absents de ce programme.
         new DescripteurEcran
         {
             Code = "PROC_SUIVI_IMPRESSION", Titre = "Suivi d'impression", Sujet = "travaux d'impression",
             Forme = FormeEcran.File,
-            Recherche = "Rechercher un travail, un lot, une imprimante…",
-            Criteres = ["Imprimante", "Titre du lot ou du document", "Période"],
-            Valider = "Imprimer", // Pas de fiche : libellé de PROC_PAPERCUT (proc_papercut.md, actions de la vue globale : « Imprimer »).
+            Recherche = "Rechercher un travail par son libellé, son imprimante, son programme…",
+            Criteres = ["En erreur", "Imprimante", "Utilisateur", "Programme", "Greffe (Amitel seulement)", "Du (par défaut : aujourd'hui)", "Au",
+                        "Libellé", "Serveur appelant", "Serveur de traitement", "Inclure file édition",
+                        "Afficher : toutes, erreur après le dernier succès, jamais réussies", "Top max. affichage (200 par défaut)"],
+            Valider = "Relancer", // OPE_RESULTAT.Designer.cs:109 (tsmiRelancer) -> _Relancer(null), OPE_RESULTAT.cs:202-204.
+            Gestes = ["Relancer", "Relancer sur l'imprimante PS", "Supprimer"], // OPE_RESULTAT.Designer.cs:109, :116, :128.
             Rang = 5,
-            Etats = [.. EtatsEcran.Trois("En attente", "En cours", "Imprimé"), new EtatEcran("Rejetee", "Vidé de la file", "rejetee")],
-            Groupes = ["En attente d'impression", "Imprimés"],
+            Etats =
+            [
+                new EtatEcran("AFaire", "En attente", "a-traiter"),          // AttenteTraitement, Recuperation, RecuperationReussie, AttenteImpression
+                new EtatEcran("EnCours", "En impression", "saisie-manuelle"), // LancementImpression, Impression
+                new EtatEcran("Validee", "Impression réussie", "validee"),    // ImpressionReussie
+                new EtatEcran("Rejetee", "En erreur", "rejetee"),             // Indetermine, Refuse, RecuperationEchouee, ImpressionEchouee, Annule
+            ],
+            Groupes = ["Impressions"],
             Sections =
             [
-                Marche("Imprimante", "La vue se fait par imprimante : travaux en attente et feuilles.", true,
-                    "Imprimante", "Nombre de travaux", "Nombre de feuilles"),
-                Marche("Travaux", "Les travaux s'affichent avec leur ordre, leur date de création, leur lot et leur titre.", true,
-                    "Ordre d'impression", "Titre du lot", "Titre du document", "Nombre de documents"),
-                Marche("Impression", "Imprimer envoie le travail au service d'impression ; le travail quitte la vue.", true,
-                    "Imprimer", "Réimprimer"),
-                Marche("Vider la file", "Vider supprime les travaux en attente de l'imprimante, pour l'utilisateur courant.", false,
-                    "Vider"),
+                Marche("Critères", "Par défaut : les travaux d'aujourd'hui, 200 au plus. « En erreur » garde les travaux indéterminés, refusés, en échec ou annulés. Le greffe ne se choisit que chez Amitel.", true,
+                    "En erreur", "Imprimante", "Utilisateur", "Programme", "Greffe", "Du", "Au", "Libellé", "Serveur appelant", "Serveur de traitement"),
+                Marche("Affichage", "Toutes les impressions, celles qui ont une erreur après le dernier succès, ou celles qui n'ont jamais réussi. « Inclure file édition » compare les lots entiers (recherche plus longue).", false,
+                    "Afficher", "Inclure file édition", "Top max. affichage"),
+                Marche("Ce que montre une ligne", "Un travail d'impression par ligne ; un travail en erreur est en rouge. Un double clic montre la description XML du lot.", true,
+                    "ID", "Greffe", "Etat", "Date impression", "Libellé", "Erreur", "Imprimante", "Serveur appelant", "Programme appelant",
+                    "Utilisateur", "Serveur de traitement", "Durée", "Nb docs", "Nb pages"),
+                Marche("Relance", "Relancer renvoie le lot au service d'impression, sur son imprimante ou sur l'imprimante PS ; un travail en échec relancé passe « Annule ». Supprimer détruit le travail, après confirmation.", true,
+                    "Relancer", "Relancer sur l'imprimante PS", "Supprimer"),
             ],
             Lignes =
             [
-                Ligne("Travail 2026 P 0401 · Lot audiences de mars", "Imprimante du 2e étage · en attente", "En attente d'impression", "AFaire"),
-                Ligne("Travail 2026 P 0402 · Courriers DCA", "Imprimante du 2e étage · en cours", "En attente d'impression", "EnCours", 0, 1),
-                Ligne("Travail 2026 P 0403 · Plumitif de la 1re chambre", "Imprimé le 10/03/2026", "Imprimés", "Validee", 0, 1, 2),
-                Ligne("Travail 2026 P 0404 · Convocations", "Imprimé le 11/03/2026", "Imprimés", "Validee", 0, 1, 2),
-                Ligne("Travail 2026 P 0405 · Relance LRAR", "Vidé de la file", "En attente d'impression", "Rejetee"),
-                Ligne("Travail 2026 P 0406 · Composition", "Imprimante du rez-de-chaussée · en attente", "En attente d'impression", "AFaire"),
-                Ligne("Travail 2026 P 0407 · Statistiques", "Imprimé le 12/03/2026", "Imprimés", "Validee", 0, 1, 2),
+                Ligne("Travail 10401 · Lot audiences de mars", "greffe 3801 · AttenteImpression · Imprimante du 2e étage · programme Éditions · le 10/03/2026 à 09:12", "Impressions", "AFaire"),
+                Ligne("Travail 10402 · Courriers DCA", "greffe 3801 · Impression · Imprimante du 2e étage · programme Relance DCA · le 10/03/2026 à 09:14", "Impressions", "EnCours"),
+                Ligne("Travail 10403 · Plumitif de la 1re chambre", "greffe 3801 · ImpressionReussie · Imprimante du 1er étage · programme Éditions · 2 docs · 14 pages · 00:00:41", "Impressions", "Validee"),
+                Ligne("Travail 10404 · Convocations", "greffe 3801 · ImpressionReussie · Imprimante du 1er étage · programme Convocations · 6 docs · 6 pages · 00:00:18", "Impressions", "Validee"),
+                Ligne("Travail 10405 · Relance LRAR", "greffe 3801 · ImpressionEchouee · Imprimante du 2e étage · erreur : imprimante hors ligne", "Impressions", "Rejetee"),
+                Ligne("Travail 10406 · Composition", "greffe 3801 · AttenteTraitement · Imprimante du rez-de-chaussée · programme Composition", "Impressions", "AFaire"),
+                Ligne("Travail 10407 · Statistiques", "greffe 3801 · Annule · Imprimante du 1er étage · relancé après un échec", "Impressions", "Rejetee"),
             ],
         },
 
