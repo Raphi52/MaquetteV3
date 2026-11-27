@@ -62,6 +62,12 @@ internal static class EditionsEvenementV2
         public string Email { get; init; } = "";
         public string NomCoffre { get; init; } = "";
         public string Cle { get; init; } = "";
+        /// <summary>PAYS : « FRA » par defaut (le constructeur d'ENTITE, :308) ; ADRBS_PAYS de son adresse quand RIG v2 la lit (un
+        /// mandataire, :1643, vide si la colonne l'est).</summary>
+        public string Pays { get; init; } = "FRA";
+        /// <summary>REFERENCE_DESTINATAIRE (un mandataire : GRRPC_NUMERO_INTERNE, :1647, :2009) ; null : absent, comme le serialiseur de
+        /// RIG v2 omet un attribut nul.</summary>
+        public string? Reference { get; init; }
 
         /// <summary>Le document interne (CreateEntiteXMLDestinataireDocumentInterne, DestinatairesEditionsLot2.cs:136-153).</summary>
         public bool EstDocumentInterne => Code.Length == 0 && Valeur.Length == 0 && Libelle.Length == 0 && Adresse.Length == 0;
@@ -84,6 +90,9 @@ internal static class EditionsEvenementV2
         public string? TypeGeneration { get; init; }
         /// <summary>Le libelle pose APRES les parametres (le KBIS de la citation) ; null : LIBELLE_DOCUMENT.</summary>
         public string? LibelleImpose { get; init; }
+        /// <summary>Vrai : la demande n'a pas de liste LISTE_ENTITE_DESTINATION, comme une edition que RIG v2 cree sans destinataire
+        /// (les listes BODACC de PROC_GESTBOD, OPE_LST_LISTE_REJ.cs:114-119 : EcrivainPublicationsBodacc).</summary>
+        public bool SansListeDestinataires { get; init; }
         public Dictionary<string, object?> Colonnes { get; } = new(StringComparer.OrdinalIgnoreCase);
 
         public string Libelle => LibelleImpose ?? (Parametres.TryGetValue("LIBELLE_DOCUMENT", out var l) ? l : "");
@@ -400,10 +409,8 @@ internal static class EditionsEvenementV2
     internal static async Task<Depot> DeposerAsync(GesteEnCours geste, int idDemande, Edition e, CancellationToken ct)
     {
         var compte = geste.Agent.CompteWindows.Length > 32 ? geste.Agent.CompteWindows[..32] : geste.Agent.CompteWindows;
-        var p = new SortedDictionary<string, string>(e.Parametres, StringComparer.Ordinal)
-        {
-            ["LISTE_ENTITE_DESTINATION"] = ListeXml(e.Destinataires),
-        };
+        var p = new SortedDictionary<string, string>(e.Parametres, StringComparer.Ordinal);
+        if (!e.SansListeDestinataires) p["LISTE_ENTITE_DESTINATION"] = ListeXml(e.Destinataires);
         var valeurs = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
             ["DMNED_DATE_CREATION"] = geste.Maintenant, ["DMNED_TYPE_PAPIER"] = "NORMAL", ["DMNED_MEDIA"] = "IMPR", ["DMNED_ETAT_EMISSION"] = "N",
@@ -484,12 +491,16 @@ internal static class EditionsEvenementV2
     }
 
     /// <summary>La liste des destinataires au format de RIG v2 (LISTE_ENTITES serialisee : un element ENTITE par destinataire, les
-    /// attributs de DestinatairesEditionsLot2.ENTITE, TYPE « ENTITE » et PAYS « FRA » par defaut, :312-317).</summary>
+    /// attributs de DestinatairesEditionsLot2.ENTITE, TYPE « ENTITE » et PAYS « FRA » par defaut, :312-317).
+    /// fix-ok: mesure par le controle final du lot 11 (27/11/2026) -- PAYS etait toujours « FRA » et REFERENCE_DESTINATAIRE jamais
+    /// ecrit, alors que RIG v2 les pose pour un mandataire (DestinatairesEditionsLot2.cs:1643, :1647) : Pays et Reference du
+    /// destinataire, defauts inchanges pour les autres ecrans.</summary>
     internal static string ListeXml(IEnumerable<Destinataire> liste)
         => new XElement("LISTE_ENTITES", liste.Select(e => new XElement("ENTITE",
                 new XAttribute("PAR_DEFAUT", e.ParDefaut), new XAttribute("CODE", e.Code), new XAttribute("VALEUR", e.Valeur),
                 new XAttribute("LIBENTITE", ""), new XAttribute("LIBELLE", e.Libelle), new XAttribute("ADRESSE", e.Adresse),
-                new XAttribute("PAYS", "FRA"), new XAttribute("TYPE", "ENTITE"), new XAttribute("EMAIL", e.Email),
+                new XAttribute("PAYS", e.Pays), new XAttribute("TYPE", "ENTITE"), new XAttribute("EMAIL", e.Email),
+                e.Reference is null ? null : new XAttribute("REFERENCE_DESTINATAIRE", e.Reference),
                 new XAttribute("NOM_COFFRE", e.NomCoffre), new XAttribute("KEY_DESTINATAIRE", e.Cle))))
             .ToString(SaveOptions.DisableFormatting);
 }
