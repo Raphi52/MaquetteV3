@@ -1,5 +1,8 @@
-# « Tables de référence » (EcrivainTablesReference), en grille : « Ajouter », « Modifier », « Supprimer » (OPE_TABLE_REF_BUTTONS_BAR :
-# _Save l. 421-462, _Delete l. 491-512 ; PC_ETAT.CreateEtat ; OPE_AFFICHE_SQLBASE_PC_ETAT.cs:169-215). Lignes : PROC_GTABREF.sql.
+# « Tables de référence » (EcrivainTablesReference), en grille : « Ajouter » (un etat de PC, une zone avec ses champs), « Dupliquer »,
+# « Modifier », « Supprimer » (OPE_TABLE_REF_BUTTONS_BAR : _Dupliquer l. 355-370, _Save l. 421-462, _Delete l. 491-512 ;
+# PC_ETAT.CreateEtat ; OPE_AFFICHE_SQLBASE_PC_ETAT.cs:169-215). Lignes : PROC_GTABREF.sql.
+# fix-ok: mesure par le controle final du lot 14 (27/11/2026) -- « Ajouter une zone » (FactoryHelper.cs:78, NouvelEnregistrement = true)
+# etait refuse et « Dupliquer » (OPE_TABLE_REF_BUTTONS_BAR.cs:335) absent : les blocs « zone » et « copie » ci-dessous les jouent.
 
 # Refus : la table est obligatoire. Jumeau accepte : l'ajout de G14C (table PC_ETAT).
 geste: Ajouter
@@ -16,13 +19,175 @@ valeur: Libellé = TYPE BANC NOUVEAU
 resultat: refuse
 message: RIG v2 ne crée pas d'enregistrement dans TYPE_DEPOT_AJMJ : la table s'ouvre sans « Nouvel enregistrement ».
 ---
-# Refus nomme : une zone exige des champs que la grille ne porte pas. Jumeau accepte : G14C (PC_ETAT).
+# Refus : une zone sans synonyme (MetierObligatoire, SousOPE_ENREGISTREMENT.Designer.cs:102). Jumeau accepte : GZ3, complete (plus bas).
 geste: Ajouter
-valeur: Table = PC_ETAT_ZONE
 valeur: Code = GZ3
-valeur: Libellé = ZONE BANC NOUVELLE
+valeur: Libellé = ZONE BANC CREEE
+valeur: Champs d'une zone › ISO = GZ3
+valeur: Champs d'une zone › Simplifié pour édition = zone creee
+valeur: Champs d'une zone › Développé pour édition = zone creee au banc
+valeur: Champs d'une zone › Table de la zone = PROCEDURE_COLLECTIVE
+valeur: Champs d'une zone › Attribut = PRCLL_DATE_JUGEMENT
+valeur: Champs d'une zone › Type = DATE
+valeur: Champs d'une zone › État = En vigueur pour tout
 resultat: refuse
-message: Une zone se crée avec son synonyme, son code ISO, ses textes d'édition, sa table, son attribut, son type et son état, que la grille ne porte pas : RIG v3 ne la crée pas encore.
+message: « Synonyme » est obligatoire.
+---
+# Refus : un type hors de la liste RIG v2 (PC_ETAT_ZONE.eTypeZone, RigMetier\TableRef\PC_ETAT_ZONE.cs:55-63). Jumeau accepte : GZ3, « date ».
+geste: Ajouter
+valeur: Code = GZ3
+valeur: Libellé = ZONE BANC CREEE
+valeur: Champs d'une zone › Synonyme = GZ3
+valeur: Champs d'une zone › ISO = GZ3
+valeur: Champs d'une zone › Simplifié pour édition = zone creee
+valeur: Champs d'une zone › Développé pour édition = zone creee au banc
+valeur: Champs d'une zone › Table de la zone = PROCEDURE_COLLECTIVE
+valeur: Champs d'une zone › Attribut = PRCLL_DATE_JUGEMENT
+valeur: Champs d'une zone › Type = BOOLEEN
+valeur: Champs d'une zone › État = En vigueur pour tout
+resultat: refuse
+message: « Type » : « BOOLEEN » n'est pas un type de zone de RIG v2 (DATE, DATETIME, HEURE, INT, TEXT, MULTILIGNE, MONTANT).
+---
+# Refus : un etat hors de la liste RIG v2 (eTableRefEtat, TableRefTypes.cs:5-16). Jumeau accepte : GZ3, « En vigueur pour tout ».
+geste: Ajouter
+valeur: Code = GZ3
+valeur: Libellé = ZONE BANC CREEE
+valeur: Champs d'une zone › Synonyme = GZ3
+valeur: Champs d'une zone › ISO = GZ3
+valeur: Champs d'une zone › Simplifié pour édition = zone creee
+valeur: Champs d'une zone › Développé pour édition = zone creee au banc
+valeur: Champs d'une zone › Table de la zone = PROCEDURE_COLLECTIVE
+valeur: Champs d'une zone › Attribut = PRCLL_DATE_JUGEMENT
+valeur: Champs d'une zone › Type = DATE
+valeur: Champs d'une zone › État = Archivé
+resultat: refuse
+message: « État » : « Archivé » n'est pas un état de RIG v2 (En test, En vigueur pour tout, En vigueur si maj après création, Applicable si maj avant archivage, Inactif).
+---
+# Refus : la table et l'attribut de GZ1 (DoVerifier, OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:128-133, son message). Jumeau accepte : GZ3,
+# un autre attribut.
+geste: Ajouter
+valeur: Code = GZ3
+valeur: Libellé = ZONE BANC CREEE
+valeur: Champs d'une zone › Synonyme = GZ3
+valeur: Champs d'une zone › ISO = GZ3
+valeur: Champs d'une zone › Simplifié pour édition = zone creee
+valeur: Champs d'une zone › Développé pour édition = zone creee au banc
+valeur: Champs d'une zone › Table de la zone = PROCEDURE_COLLECTIVE
+valeur: Champs d'une zone › Attribut = PRCLL_DATE
+valeur: Champs d'une zone › Type = DATE
+valeur: Champs d'une zone › État = En vigueur pour tout
+resultat: refuse
+message: Cette zone ne pourra pas être sauvegardée en base de données car un enregistrement ayant les mêmes valeurs de "Table" et d'"Attribut" existe déjà en base de données.
+---
+# Refus : un synonyme de 17 caracteres (varchar(16), RigDatabase\dbo\Tables\PC_ETAT_ZONE.sql). Jumeau accepte : GZ3, 3 caracteres.
+geste: Ajouter
+valeur: Code = GZ3
+valeur: Libellé = ZONE BANC CREEE
+valeur: Champs d'une zone › Synonyme = SYNONYMEDIXSEPTCA
+valeur: Champs d'une zone › ISO = GZ3
+valeur: Champs d'une zone › Simplifié pour édition = zone creee
+valeur: Champs d'une zone › Développé pour édition = zone creee au banc
+valeur: Champs d'une zone › Table de la zone = PROCEDURE_COLLECTIVE
+valeur: Champs d'une zone › Attribut = PRCLL_DATE_JUGEMENT
+valeur: Champs d'une zone › Type = DATE
+valeur: Champs d'une zone › État = En vigueur pour tout
+resultat: refuse
+message: « Synonyme » : 16 caractères au plus.
+---
+# Refus : les champs d'une zone sous une autre table saisie. Jumeau accepte : GZ3, la table vide (celle de ses champs).
+geste: Ajouter
+valeur: Table = PC_ETAT
+valeur: Code = GZ3
+valeur: Libellé = ZONE BANC CREEE
+valeur: Champs d'une zone › Synonyme = GZ3
+valeur: Champs d'une zone › Type = DATE
+resultat: refuse
+message: Les champs d'une zone ne vont qu'à une zone (PC_ETAT_ZONE), pas à PC_ETAT.
+---
+# Une zone creee dans son onglet (Table vide : celle de ses champs), ses champs obligatoires saisis ; le type et l'etat de la liste
+# RIG v2 (l'etat enregistre par son rang), l'abrege laisse vide (NULL) ; creation et modification par l'agent (MiseAJourChampsCreation,
+# SousOPE_HISTORIQUE.cs:59-67 ; MiseAJourChampsModification, OPE_TABLE_REF_BUTTONS_BAR.cs:298) ; saisissable par defaut (Create_PC_Etat_Zone).
+geste: Ajouter
+valeur: Code = GZ3
+valeur: Libellé = ZONE BANC CREEE
+valeur: Champs d'une zone › Synonyme = GZ3
+valeur: Champs d'une zone › ISO = GZ3
+valeur: Champs d'une zone › Abrégé pour édition =
+valeur: Champs d'une zone › Simplifié pour édition = zone creee
+valeur: Champs d'une zone › Développé pour édition = zone creee au banc
+valeur: Champs d'une zone › Table de la zone = PROCEDURE_COLLECTIVE
+valeur: Champs d'une zone › Attribut = PRCLL_DATE_JUGEMENT
+valeur: Champs d'une zone › Type = date
+valeur: Champs d'une zone › État = En vigueur pour tout
+valeur: Champs d'une zone › Date de désactivation = 2030-12-31
+resultat: fait
+message: PC_ETAT_ZONE GZ3 créé : ZONE BANC CREEE.
+controle: SELECT CONCAT(R_PCETATZONE_SYNONYME, '/', R_PCETATZONE_TYPE, '/', R_PCETATZONE_ETAT, '/', R_PCETATZONE_ATTRIBUT, '/', CONVERT(varchar(10), R_PCETATZONE_DATE_DESACTIVATION, 23), '/', ISNULL(R_PCETATZONE_ABREGE_EDIT, 'null'), '/', R_PCETATZONE_AUTEUR_CREATION, '/', R_PCETATZONE_AUTEUR_MODIF, '/', CAST(R_PCETATZONE_UTILISABLE_SAISIE AS int)) FROM v2.PC_ETAT_ZONE WHERE R_PCETATZONE_VALEUR = 'GZ3' => GZ3/DATE/1/PRCLL_DATE_JUGEMENT/2030-12-31/null/BANC Ecrans/BANC Ecrans/1
+---
+# « Dupliquer » (_Dupliquer, OPE_TABLE_REF_BUTTONS_BAR.cs:355-370 ; SQLBase_Handler.Copie) : un Ajouter dont ids porte la ligne copiee.
+# Refus : RIG v2 ne copie pas un type de depot AJMJ (ni « Nouvel enregistrement », ni Copie : SQLBase_Handler.cs:102-104). Jumeau
+# accepte : la copie de G14A.
+geste: Ajouter
+ids: DEMAT_CFEC_AJMJ_TYPE_DEPOT|GT2
+valeur: Code = GT9
+resultat: refuse
+message: RIG v2 ne duplique pas un enregistrement de TYPE_DEPOT_AJMJ : la table n'a ni « Nouvel enregistrement » ni copie.
+---
+# Refus : la copie sans code (la cle n'est pas copiee : ChampsNonDuplicables, PC_ETAT.GtabRef.cs:16-24). Jumeau accepte : G14D.
+geste: Ajouter
+ids: PC_ETAT|G14A
+resultat: refuse
+message: « Code » est obligatoire.
+---
+# Refus : la copie sous un code deja porte. Jumeau accepte : G14D, libre.
+geste: Ajouter
+ids: PC_ETAT|G14A
+valeur: Code = G14N
+resultat: refuse
+message: Un enregistrement nommé G14N existe déjà. Il n'est pas possible de créer un nouvel enregistrement avec ce nom.
+---
+# Refus : une ligne copiee introuvable. Jumeau accepte : G14A, qui existe.
+geste: Ajouter
+ids: PC_ETAT|G14X
+valeur: Code = G14D
+resultat: refuse
+message: Code introuvable dans les tables de référence du greffe (PC_ETAT|G14X).
+---
+# Refus : la copie change de table. Jumeau accepte : G14D, dans la table de la ligne copiee.
+geste: Ajouter
+ids: PC_ETAT|G14A
+valeur: Table = PC_ETAT_ZONE
+valeur: Code = G14D
+resultat: refuse
+message: Un code reste dans sa table (PC_ETAT).
+---
+# La copie de G14A : tous ses champs sauf la cle (ouverture, cloture, regime), son libelle non saisi ; pas ses collections (etats
+# suivants, saisie : Copie ne parcourt que ListeChamps, SQLBase_Handler_PC_Etat.cs:66-77).
+geste: Ajouter
+ids: PC_ETAT|G14A
+valeur: Code = G14D
+resultat: fait
+message: PC_ETAT G14D créé, copie de G14A : ETAT BANC ALPHA.
+controle: SELECT CONCAT(R_PCETAT_LIBELLE_ECRAN, '/', CAST(R_PCETAT_OUVERTURE AS int), CAST(R_PCETAT_CLOTURE AS int), '/', R_PCETAT_MODALITE_REGIME, '/', (SELECT COUNT(*) FROM v2.PC_ETAT_SUIVANT WHERE PETSV_AVANT = 'G14D'), (SELECT COUNT(*) FROM v2.PC_ETAT_SAISIE WHERE PETSA_ETAT = 'G14D')) FROM v2.PC_ETAT WHERE R_PCETAT_VALEUR = 'G14D' => ETAT BANC ALPHA/10/R/00
+---
+# Refus : la copie d'une zone garde sa table et son attribut, deja portes par la zone copiee (DoVerifier, son message). Jumeau
+# accepte : GZ4, un autre attribut.
+geste: Ajouter
+ids: PC_ETAT_ZONE|GZ1
+valeur: Code = GZ4
+resultat: refuse
+message: Cette zone ne pourra pas être sauvegardée en base de données car un enregistrement ayant les mêmes valeurs de "Table" et d'"Attribut" existe déjà en base de données.
+---
+# La copie de GZ1 : ses champs (synonyme, textes, type, etat, table) et sa creation (03/02/2001, BANC ORIGINE : Copie ne les exclut
+# pas), l'attribut et le libelle saisis, la modification par l'agent.
+geste: Ajouter
+ids: PC_ETAT_ZONE|GZ1
+valeur: Code = GZ4
+valeur: Libellé = ZONE BANC COPIEE
+valeur: Champs d'une zone › Attribut = PRCLL_DATE_COPIE
+resultat: fait
+message: PC_ETAT_ZONE GZ4 créé, copie de GZ1 : ZONE BANC COPIEE.
+controle: SELECT CONCAT(R_PCETATZONE_SYNONYME, '/', R_PCETATZONE_SIMPLIFIE_EDIT, '/', R_PCETATZONE_TYPE, '/', R_PCETATZONE_ETAT, '/', R_PCETATZONE_TABLE, '/', R_PCETATZONE_ATTRIBUT, '/', CONVERT(varchar(10), R_PCETATZONE_DATE_CREATION, 23), '/', R_PCETATZONE_AUTEUR_CREATION, '/', R_PCETATZONE_AUTEUR_MODIF) FROM v2.PC_ETAT_ZONE WHERE R_PCETATZONE_VALEUR = 'GZ4' => GZ1/zone citee/DATE/1/PROCEDURE_COLLECTIVE/PRCLL_DATE_COPIE/2001-02-03/BANC ORIGINE/BANC Ecrans
 ---
 # Refus : un code deja porte (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:182-183, la premiere phrase). Jumeau accepte : G14C, libre.
 geste: Ajouter
@@ -131,9 +296,12 @@ resultat: fait
 message: PC_ETAT_ZONE GZ2 supprimé.
 lignes:
 ETAT BANC CREE | code G14C · PC_ETAT | État de la procédure collective | Validee | []
+ETAT BANC ALPHA | code G14D · PC_ETAT | État de la procédure collective | Validee | []
 ETAT BANC HISTO | code G14H · PC_ETAT | État de la procédure collective | Validee | []
 ETAT BANC FIGE | code G14N · PC_ETAT | État de la procédure collective | Validee | []
 G14V | code G14V · PC_ETAT | État de la procédure collective | AFaire | []
 ZONE BANC CITEE | code GZ1 · PC_ETAT_ZONE | Zones à afficher selon l’état de la procédure collective | Validee | []
+ZONE BANC CREEE | code GZ3 · PC_ETAT_ZONE | Zones à afficher selon l’état de la procédure collective | Validee | []
+ZONE BANC COPIEE | code GZ4 · PC_ETAT_ZONE | Zones à afficher selon l’état de la procédure collective | Validee | []
 TYPE BANC CITE | code GT1 · TYPE_DEPOT_AJMJ | Types des dépôts envoyés par les AJMJ | Validee | []
 TYPE BANC RENOMME | code GT2 · TYPE_DEPOT_AJMJ | Types des dépôts envoyés par les AJMJ | Validee | []

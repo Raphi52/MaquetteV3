@@ -57,12 +57,14 @@ INSERT INTO v2.PC_ETAT_DJ_EP (PETDJ_ID_PETDJ, PETDJ_ETAT, PETDJ_MODALITE_PA, PET
 INSERT INTO v2.PC_ETAT_SAISIE (PETSA_ID_PETSA, PETSA_ETAT, PETSA_NUM_ORDRE, PETSA_TYPE_SAISIE, PETSA_PC_ETAT_ZONE) VALUES
     (2400973, ''G14A'', 1, ''DATE'', NULL), (2400974, ''G14H'', 1, ''DATE'', ''GZ1'');
 INSERT INTO v2.PC_ETAT_HISTO (PETHT_ID_PETHT, PETHT_ID_PRCLL, PETHT_DATE_CREATION, PETHT_PCETAT) VALUES (2400975, 2400999, @aujourdhui, ''G14H'');
--- Les zones : GZ1 (citee par la saisie de G14H : suppression refusee), GZ2 (libre : supprimee).
+-- Les zones : GZ1 (citee par la saisie de G14H : suppression refusee ; copiee par « Dupliquer », sa creation du 03/02/2001 par
+-- « BANC ORIGINE » reprise), GZ2 (libre : supprimee). L''etat, le rang de la liste RIG v2 (« 1 » = En vigueur pour tout,
+-- SousOPE_HISTORIQUE.cs:39-47) ; une table et un attribut par zone (UX_R_PCETATZONE_TABLE_R_PCETATZONE_ATTRIBUT, PC_ETAT_ZONE.sql).
 INSERT INTO v2.PC_ETAT_ZONE (R_PCETATZONE_VALEUR, R_PCETATZONE_LIBELLE_ECRAN, R_PCETATZONE_SYNONYME, R_PCETATZONE_ISO, R_PCETATZONE_SIMPLIFIE_EDIT,
-    R_PCETATZONE_DEVELOPPE_EDIT, R_PCETATZONE_DATE_CREATION, R_PCETATZONE_ETAT, R_PCETATZONE_UTILISABLE_SAISIE, R_PCETATZONE_TABLE,
-    R_PCETATZONE_ATTRIBUT, R_PCETATZONE_TYPE) VALUES
-    (''GZ1'', ''ZONE BANC CITEE'', ''GZ1'', ''GZ1'', ''zone citee'', ''zone citee'', @aujourdhui, ''A'', 1, ''PROCEDURE_COLLECTIVE'', ''PRCLL_DATE'', ''DATE''),
-    (''GZ2'', ''ZONE BANC LIBRE'', ''GZ2'', ''GZ2'', ''zone libre'', ''zone libre'', @aujourdhui, ''A'', 1, ''PROCEDURE_COLLECTIVE'', ''PRCLL_DATE'', ''DATE'');
+    R_PCETATZONE_DEVELOPPE_EDIT, R_PCETATZONE_DATE_CREATION, R_PCETATZONE_AUTEUR_CREATION, R_PCETATZONE_ETAT, R_PCETATZONE_UTILISABLE_SAISIE,
+    R_PCETATZONE_TABLE, R_PCETATZONE_ATTRIBUT, R_PCETATZONE_TYPE) VALUES
+    (''GZ1'', ''ZONE BANC CITEE'', ''GZ1'', ''GZ1'', ''zone citee'', ''zone citee'', ''20010203'', ''BANC ORIGINE'', ''1'', 1, ''PROCEDURE_COLLECTIVE'', ''PRCLL_DATE'', ''DATE''),
+    (''GZ2'', ''ZONE BANC LIBRE'', ''GZ2'', ''GZ2'', ''zone libre'', ''zone libre'', @aujourdhui, NULL, ''1'', 1, ''PROCEDURE_COLLECTIVE'', ''PRCLL_DATE_FIN'', ''DATE'');
 -- Les types de depot AJMJ : GT1 (cite par un depot recu : suppression refusee), GT2 (modifie : date et auteur de modification).
 INSERT INTO v2.DEMAT_CFEC_AJMJ_TYPE_DEPOT (CFECAJTD_VALEUR, CFECAJTD_LIBELLE_ECRAN, CFECAJTD_UTILISABLE_SAISIE, CFECAJTD_DATE_CREATION, CFECAJTD_AUTEUR_CREATION) VALUES
     (''GT1'', ''TYPE BANC CITE'', 1, @aujourdhui, ''BANC''), (''GT2'', ''TYPE BANC LIBRE'', 1, @aujourdhui, ''BANC'');

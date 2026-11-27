@@ -446,6 +446,16 @@ foreach (var d in descripteurs)
     // Sans ajout ou sans suppression V2 (lot 14 : Dates de travail, Cabinets) : seule la grille d'un Referentiel les offre.
     if ((!d.Ajout || !d.Suppression) && d.Forme != FormeEcran.Referentiel)
         defauts.Add($"ajout ou suppression retire sur une forme {d.Forme} : seule la grille d'un Referentiel les offre");
+    // « Dupliquer » et les sections saisies sous une ligne neuve (lot 14 : Tables de reference) : la grille d'un Referentiel seule ;
+    // chaque groupe nomme est un groupe de l'ecran, chaque section une de ses sections (sinon la ligne neuve n'en montre aucune).
+    if ((d.Duplication || d.SectionsAjout.Count > 0) && d.Forme != FormeEcran.Referentiel)
+        defauts.Add($"duplication ou sections d'ajout sur une forme {d.Forme} : seule la grille d'un Referentiel les offre");
+    foreach (var (g, titres) in d.SectionsAjout)
+    {
+        if (!d.Groupes.Contains(g)) defauts.Add($"sections d'ajout du groupe « {g} », absent des groupes de l'ecran");
+        foreach (var t in titres.Where(t => d.Sections.All(s => s.Titre != t)))
+            defauts.Add($"section d'ajout « {t} » ({g}) absente des sections de l'ecran");
+    }
     if (!reuni)
     {
         switch (d.Forme)

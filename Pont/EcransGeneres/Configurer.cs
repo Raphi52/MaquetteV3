@@ -324,11 +324,13 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             // Les trois tables que RIG v2 ouvre (OPE_SELECTION_TABLE.cs:17-27 ; NATURE_AFFAIRE, CODE_ACTE_PROCE, JOURNAL_ANNONCES et
             // JURIDICTION_EXTERIEURE y sont en commentaire), une par groupe, sous la description de leur CBO_TableRef (FactoryHelper.cs:66-109).
             // Colonnes : la liste de la V2 (code, libelle, « (! Non saisissable) » : FactoryHelper.cs:4-9) et la table. Lignes :
-            // LecteurTablesReference.cs ; gestes (Modifier ; Ajouter un etat de PC ; Supprimer, refuse quand le code est cite) :
-            // EcrivainTablesReference.cs.
+            // LecteurTablesReference.cs ; gestes (Modifier ; Ajouter un etat de PC, ou une zone avec ses champs ; Dupliquer un etat ou
+            // une zone ; Supprimer, refuse quand le code est cite) : EcrivainTablesReference.cs.
             // fix-ok: mesure au banc le 27/11/2026 -- EcransGeneresBaseCheck « fautifs : Champs de la table > Régime… » (la fiche montrait
             // des champs que les sections ne declaraient pas) et EcransGeneresCheck « 4 lignes de demonstration (6 a 15 attendues) » :
             // une section par table, six exemples.
+            // fix-ok: mesure par le controle final du lot 14 (27/11/2026, reprise) -- la grille n'offrait ni « Ajouter une zone » ni
+            // « Dupliquer » (une ligne neuve n'envoyait que ses colonnes) : Duplication, SectionsAjout, et l'historique d'une zone a part.
             Colonnes = ["Code", "Libellé", "Table", Champ.Case("Utilisable en saisie")],
             Recherche = "Rechercher un code, un libellé, une table…",
             Criteres = ["Table", "Code", "Libellé"],
@@ -337,17 +339,28 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("Libellé à saisir", "Non saisissable", "Utilisable en saisie"),
             Groupes = ["État de la procédure collective", "Zones à afficher selon l’état de la procédure collective", "Types des dépôts envoyés par les AJMJ"],
+            // « Dupliquer » (OPE_TABLE_REF_BUTTONS_BAR.cs:335, 355-370 ; SQLBase_Handler.Copie) et, pour une zone créée ou copiée
+            // dans son onglet, ses champs obligatoires (OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.Designer.cs:78-96).
+            Duplication = true,
+            SectionsAjout = new Dictionary<string, string[]> { ["Zones à afficher selon l’état de la procédure collective"] = ["Champs d'une zone"] },
             Sections =
             [
-                new MarcheEcran("Enregistrement", "Le code ne se renomme pas (en saisir un autre ouvre son enregistrement dans RIG v2) ; le libellé et « Utilisable en saisie » se modifient. Seul un état de procédure collective se crée ici ; un code cité ailleurs ne se supprime pas.", true,
+                new MarcheEcran("Enregistrement", "Le code ne se renomme pas (en saisir un autre ouvre son enregistrement dans RIG v2) ; le libellé et « Utilisable en saisie » se modifient. Un état de procédure collective se crée ici, une zone dans son onglet avec ses champs ; « Dupliquer » copie un état ou une zone sous un autre code ; un code cité ailleurs ne se supprime pas.", true,
                     ["Table", "Code", "Libellé", Champ.Case("Utilisable en saisie")]),
                 // Les autres champs du formulaire de chaque table, en lecture (la fiche d'un code ne montre que la section de sa table).
                 new MarcheEcran("Champs d'un état de PC", "Le formulaire d'un état de procédure collective (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:64-82), en lecture : ses cases s'excluent et ses collections (états suivants, décisions, saisie) se règlent dans RIG v2.", false,
                     ["Régime", "Modalité PA", "Modalité AJ", "Ouverture", "Clôture", "Conversion LJ", "Extension", "Résolution du plan", "Code clôture",
                      "Mise à jour de la PC", "À sauver", "Audience future", "Régime PC (statistiques)", "Code procédure"]),
-                new MarcheEcran("Champs d'une zone", "Le formulaire d'une zone (OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:75-95), en lecture.", false,
-                    ["Synonyme", "ISO", "Abrégé pour édition", "Simplifié pour édition", "Développé pour édition", "Exhaustif pour édition", "Table de la zone",
-                     "Attribut", "Type", "État", "Date de désactivation", "Création", "Modification"]),
+                // Saisis a la creation et a la copie d'une zone (SectionsAjout), lus ensuite : synonyme, ISO, simplifie et developpe,
+                // table, attribut, type et etat sont obligatoires ; le type et l'etat, les listes de RIG v2 (_ChargerComboTypes,
+                // OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:48-55 ; _ChargerComboEtats, SousOPE_HISTORIQUE.cs:39-47).
+                new MarcheEcran("Champs d'une zone", "Le formulaire d'une zone (OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:75-95) : saisi quand la zone se crée ou se copie (synonyme, ISO, textes simplifié et développé, table, attribut, type et état obligatoires ; une table et un attribut déjà portés par une autre zone sont refusés), lu ensuite.", false,
+                    ["Synonyme", "ISO", "Abrégé pour édition", "Simplifié pour édition", Champ.Zone("Développé pour édition"), Champ.Zone("Exhaustif pour édition"),
+                     "Table de la zone", "Attribut", Champ.Liste("Type", "DATE", "DATETIME", "HEURE", "INT", "TEXT", "MULTILIGNE", "MONTANT"),
+                     Champ.Liste("État", "En test", "En vigueur pour tout", "En vigueur si maj après création", "Applicable si maj avant archivage", "Inactif"),
+                     Champ.Date("Date de désactivation")]),
+                new MarcheEcran("Historique d'une zone", "La création et la dernière modification d'une zone (SousOPE_HISTORIQUE), posées par RIG.", false,
+                    ["Création", "Modification"]),
                 new MarcheEcran("Champs d'un type de dépôt", "Le formulaire d'un type de dépôt AJMJ (OPE_AFFICHE_SQLBASE_DEMAT_CFEC_AJMJ_TYPE_DEPOT.cs:44-52), en lecture.", false,
                     ["Évènement de procédure", "Création", "Modification"]),
             ],

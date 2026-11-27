@@ -235,6 +235,21 @@ public sealed record DescripteurEcran
     /// menu de ligne n'offre pas « Supprimer » -- PROC_GESTDATE et PROC_CABINET n'ont aucune suppression.</summary>
     public bool Suppression { get; init; } = true;
 
+    /// <summary>Un <see cref="FormeEcran.Referentiel"/> dont la fiche RIG v2 DUPLIQUE un enregistrement : le menu de ligne offre
+    /// « Dupliquer », qui ouvre une ligne NEUVE pre-remplie des cellules de la ligne copiee, sauf la premiere (la cle, que la
+    /// V2 ne copie pas : ChampsNonDuplicables) ; « Enregistrer » l'envoie en <c>Ajouter</c>, Ids = [la ligne copiee], et
+    /// l'ecrivain recopie le reste. PROC_GTABREF : OPE_TABLE_REF_BUTTONS_BAR._Dupliquer (l. 335, 355-370), puis SetNewMetierBase (l. 247-249) et
+    /// SQLBase_Handler.Copie. Faux par defaut. A distinguer d'un geste de ligne nomme dans <see cref="Gestes"/> (« Dupliquer »
+    /// un document ocerise, lot 11), qui part tel quel a l'ecrivain sans rien saisir.</summary>
+    public bool Duplication { get; init; }
+
+    /// <summary>Un <see cref="FormeEcran.Referentiel"/> : par groupe, les titres des <see cref="Sections"/> dont les champs se
+    /// SAISISSENT sous une ligne neuve de ce groupe (« Ajouter » dans son onglet, ou « Dupliquer » une de ses lignes), envoyes
+    /// sous la cle « Section › Libelle ». PROC_GTABREF : une zone se cree avec ses champs obligatoires, que la grille ne porte
+    /// pas (OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.Designer.cs:78-96, SousOPE_ENREGISTREMENT.Designer.cs:81-111,
+    /// SousOPE_EDITION.Designer.cs:83-92). Vide : une ligne neuve n'a que ses colonnes.</summary>
+    public IReadOnlyDictionary<string, string[]> SectionsAjout { get; init; } = new Dictionary<string, string[]>();
+
     /// <summary>Le RESULTAT d'une operation sur un objet unique : les sections que le geste produit, montrees APRES lui
     /// (2e temps), et des l'ouverture d'un objet deja traite. PROC_IA : lancement puis restitution (proc_ia.md:151-156) ;
     /// une liasse deja analysee affiche son resultat sans relancer (PROC_IA.cs:60-64). Vide pour toute autre forme.</summary>

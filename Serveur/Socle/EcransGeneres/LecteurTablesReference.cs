@@ -153,15 +153,16 @@ internal sealed class LecteurTablesReference : IRechercheEcran, IFicheEcran
                 L("Mise à jour de la PC", V("R_PCETAT_MAJ_PC")), L("À sauver", V("R_PCETAT_ASAUVER")), L("Audience future", V("R_PCETAT_AUD_FUTURE")),
                 L("Régime PC (statistiques)", V("R_PCETAT_REGIME_PC_STATS")), L("Code procédure", V("R_PCETAT_CODE_PROC")),
             ]),
-            // OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:75-95 : enregistrement, edition, table / attribut / type, historique.
+            // OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:75-95 : enregistrement, edition, table / attribut / type ; l'etat par son libelle
+            // de la liste V2 (eTableRefEtat, SousOPE_HISTORIQUE.cs:39-47), la date de desactivation au format d'un champ date :
+            // « Dupliquer » une zone reprend ces valeurs dans ses champs (FormeReferentiel.tsx).
             "PC_ETAT_ZONE" => new("Champs d'une zone",
             [
                 L("Synonyme", V("R_PCETATZONE_SYNONYME")), L("ISO", V("R_PCETATZONE_ISO")), L("Abrégé pour édition", V("R_PCETATZONE_ABREGE_EDIT")),
                 L("Simplifié pour édition", V("R_PCETATZONE_SIMPLIFIE_EDIT")), L("Développé pour édition", V("R_PCETATZONE_DEVELOPPE_EDIT")),
                 L("Exhaustif pour édition", V("R_PCETATZONE_EXHAUSTIF_EDIT")), L("Table de la zone", V("R_PCETATZONE_TABLE")), L("Attribut", V("R_PCETATZONE_ATTRIBUT")),
-                L("Type", V("R_PCETATZONE_TYPE")), L("État", V("R_PCETATZONE_ETAT")), L("Date de désactivation", V("R_PCETATZONE_DATE_DESACTIVATION")),
-                L("Création", FormeLigne.Joindre(V("R_PCETATZONE_DATE_CREATION"), V("R_PCETATZONE_AUTEUR_CREATION"))),
-                L("Modification", FormeLigne.Joindre(V("R_PCETATZONE_DATE_MODIF"), V("R_PCETATZONE_AUTEUR_MODIF"))),
+                L("Type", V("R_PCETATZONE_TYPE")), L("État", EtatZone(V("R_PCETATZONE_ETAT"))),
+                L("Date de désactivation", r["R_PCETATZONE_DATE_DESACTIVATION"] is DateTime fin ? fin.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""),
             ]),
             // OPE_AFFICHE_SQLBASE_DEMAT_CFEC_AJMJ_TYPE_DEPOT.cs:44-52 : evenement de procedure, historique.
             _ => new("Champs d'un type de dépôt",
@@ -171,6 +172,23 @@ internal sealed class LecteurTablesReference : IRechercheEcran, IFicheEcran
                 L("Modification", FormeLigne.Joindre(V("CFECAJTD_DATE_MODIFICATION"), V("CFECAJTD_AUTEUR_MODIFICATION"))),
             ]),
         };
-        return new FicheEcran(Procedure, id, libelle.Length > 0 ? libelle : code, [commun, propre]);
+        // La creation et la derniere modification d'une zone (SousOPE_HISTORIQUE), a part : RIG les pose, la copie ne les saisit pas.
+        SectionFiche[] sections = t.Nom == "PC_ETAT_ZONE"
+            ? [commun, propre, new("Historique d'une zone",
+              [
+                  L("Création", FormeLigne.Joindre(V("R_PCETATZONE_DATE_CREATION"), V("R_PCETATZONE_AUTEUR_CREATION"))),
+                  L("Modification", FormeLigne.Joindre(V("R_PCETATZONE_DATE_MODIF"), V("R_PCETATZONE_AUTEUR_MODIF"))),
+              ])]
+            : [commun, propre];
+        return new FicheEcran(Procedure, id, libelle.Length > 0 ? libelle : code, sections);
     }
+
+    /// <summary>Les etats d'une table de reference, dans l'ordre de la liste RIG v2 : la valeur enregistree est le rang
+    /// (eTableRefEtat, RigMetier\TableRef\TableRefTypes.cs:5-16 ; _ChargerComboEtats, SousOPE_HISTORIQUE.cs:39-47).</summary>
+    internal static readonly string[] EtatsZone =
+        ["En test", "En vigueur pour tout", "En vigueur si maj après création", "Applicable si maj avant archivage", "Inactif"];
+
+    /// <summary>Le libelle d'un etat enregistre (« 1 » -> « En vigueur pour tout ») ; une valeur hors liste reste telle quelle.</summary>
+    internal static string EtatZone(string valeur)
+        => int.TryParse(valeur, NumberStyles.None, CultureInfo.InvariantCulture, out var n) && n < EtatsZone.Length ? EtatsZone[n] : valeur;
 }
