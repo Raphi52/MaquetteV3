@@ -1,0 +1,43 @@
+# « Transmission » (EcrivainTransmissionDocuments) : « Modifier » une ligne de la grille enregistre son numero d'affaire
+# (OPE_LISTE_FLUX_DOC.SauveNumAffaire, :586-622). Lignes : PROC_TRANSDOC.attendu.
+
+# Refus : seule la colonne « Numero d'affaire » est saisissable dans la V2 ; une autre colonne seule n'enregistre rien. Jumeau
+# accepte : bloc 3.
+geste: Modifier
+ids: 1200011
+valeur: SIREN = 900100001
+resultat: refuse
+message: Seul le numéro d'affaire s'enregistre : RIG v2 n'en laisse saisir aucune autre colonne.
+---
+# Refus : 1200013 est integree (V), elle n'est plus dans la grille. Jumeau accepte : bloc 3, 1200011 qualifiee.
+geste: Modifier
+ids: 1200013
+valeur: Numéro d'affaire = 2026F00999
+resultat: refuse
+message: Document introuvable parmi les documents à transmettre : relisez la liste.
+---
+# Numero d'affaire saisi sur 1200011 (tribunal digital, sans numero) : la fiche DEMAT_TRIBUNAL_DIGITAL_CREFO le recoit ; la ligne
+# passe « Numero saisi » et reste dans la grille (la demande reste qualifiee).
+geste: Modifier
+ids: 1200011
+valeur: Numéro d'affaire = 2026F00011
+resultat: fait
+message: Numéro d'affaire 2026F00011 enregistré : Requête TRIDIG ALPHA.
+lignes:
+Requête TRIDIG ALPHA | reçu le {J-7} · affaire 2026F00011 · demande n° 26001200011 | Tribunal digital | EnCours | []
+2024RJ0020 réception dépôt coffre : bord.pdf, COFFRE ALPHA SASU | reçu le {J-5} · Dépôt en matière de procédure collective · affaire 2024RJ0020 · SIREN 852 198 969 · demande n° 26001200021 | Coffre-fort numérique | EnCours | []
+Requête TRIDIG BETA | reçu le {J-5} · affaire 2026F00012 · demande n° 26001200012 | Tribunal digital | EnCours | []
+2019RJ477 réception dépôt coffre : crfm.pdf, COFFRE DEUX FICHES | reçu le {J-3} · Dépôt en matière de procédure collective · affaire 2019RJ477 · SIREN 842 322 810 · demande n° 26001200027 | Coffre-fort numérique | EnCours | []
+réception dépôt coffre : test.pdf, | reçu le {J-2} · Avis (courrier) · numéro d'affaire à saisir · demande n° 26001200022 | Coffre-fort numérique | AFaire | []
+Demande n° 26001200015 | reçu le {J-1} · numéro d'affaire à saisir · demande n° 26001200015 | Tribunal digital | AFaire | []
+fiche: 1200011
+Document › Numéro d'affaire = 2026F00011
+controle: SELECT DTDCREFO_NUM_AFFAIRE FROM v2.DEMAT_TRIBUNAL_DIGITAL_CREFO WHERE DTDCREFO_ID_DTDCREFO = 1200111 => 2026F00011
+---
+# Numero d'affaire du coffre-fort (1200027, deux fiches) : la PREMIERE fiche (1200227) le recoit, la seconde (1200228) ne change pas.
+geste: Modifier
+ids: 1200027
+valeur: Numéro d'affaire = 2019RJ478
+resultat: fait
+message: Numéro d'affaire 2019RJ478 enregistré : 2019RJ477 réception dépôt coffre : crfm.pdf, COFFRE DEUX FICHES.
+controle: SELECT CFECAJ_NUMERO_AFF + ' / ' + ISNULL((SELECT CFECAJ_NUMERO_AFF FROM v2.DEMAT_CFEC_AJMJ WHERE CFECAJ_ID_CFECAJ = 1200228), 'vide') FROM v2.DEMAT_CFEC_AJMJ WHERE CFECAJ_ID_CFECAJ = 1200227 => 2019RJ478 / vide

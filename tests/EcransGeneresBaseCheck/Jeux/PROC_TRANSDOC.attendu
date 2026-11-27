@@ -1,6 +1,6 @@
 # « Transmission » (LecteurTransmissionDocuments) sur le jeu PROC_TRANSDOC.sql : les demandes DOC_TRIDIG et DCOFFRE
 # qualifiees (Q) qui ont leur fiche de document, dans l'ordre d'arrivee (date de la fiche, puis la demande).
-# Etat : numero d'affaire vide ou blanc -> A transmettre [] (1200011, 1200022, 1200015) ; renseigne -> Numero saisi [0].
+# Etat : numero d'affaire vide ou blanc -> A transmettre (1200011, 1200022, 1200015) ; renseigne -> Numero saisi (forme Referentiel, lot 11).
 # Groupe : Tribunal digital (DOC_TRIDIG, fiche DEMAT_TRIBUNAL_DIGITAL_CREFO), Coffre-fort numerique (DCOFFRE, fiche
 # DEMAT_CFEC_AJMJ, avec type de document et SIREN). Une demande sans libelle prend son numero (1200015).
 # 1200027 a deux fiches : une seule ligne, la premiere fiche (1200227, qui porte le numero) ; sa seconde n'en ajoute pas.
@@ -8,8 +8,8 @@
 # 1200023 abandonnee X et 1200024 en traitement T (jumelle 1200021), 1200025 DCOFFRE dont la seule fiche est du tribunal
 # digital (jumelle 1200022), 1200026 autre processus DCOFFRE_GED (jumelle 1200021).
 Requête TRIDIG ALPHA | reçu le {J-7} · numéro d'affaire à saisir · demande n° 26001200011 | Tribunal digital | AFaire | []
-2024RJ0020 réception dépôt coffre : bord.pdf, COFFRE ALPHA SASU | reçu le {J-5} · Dépôt en matière de procédure collective · affaire 2024RJ0020 · SIREN 852 198 969 · demande n° 26001200021 | Coffre-fort numérique | EnCours | [0]
-Requête TRIDIG BETA | reçu le {J-5} · affaire 2026F00012 · demande n° 26001200012 | Tribunal digital | EnCours | [0]
-2019RJ477 réception dépôt coffre : crfm.pdf, COFFRE DEUX FICHES | reçu le {J-3} · Dépôt en matière de procédure collective · affaire 2019RJ477 · SIREN 842 322 810 · demande n° 26001200027 | Coffre-fort numérique | EnCours | [0]
+2024RJ0020 réception dépôt coffre : bord.pdf, COFFRE ALPHA SASU | reçu le {J-5} · Dépôt en matière de procédure collective · affaire 2024RJ0020 · SIREN 852 198 969 · demande n° 26001200021 | Coffre-fort numérique | EnCours | []
+Requête TRIDIG BETA | reçu le {J-5} · affaire 2026F00012 · demande n° 26001200012 | Tribunal digital | EnCours | []
+2019RJ477 réception dépôt coffre : crfm.pdf, COFFRE DEUX FICHES | reçu le {J-3} · Dépôt en matière de procédure collective · affaire 2019RJ477 · SIREN 842 322 810 · demande n° 26001200027 | Coffre-fort numérique | EnCours | []
 réception dépôt coffre : test.pdf, | reçu le {J-2} · Avis (courrier) · numéro d'affaire à saisir · demande n° 26001200022 | Coffre-fort numérique | AFaire | []
 Demande n° 26001200015 | reçu le {J-1} · numéro d'affaire à saisir · demande n° 26001200015 | Tribunal digital | AFaire | []

@@ -1,0 +1,9 @@
+# « Publications BODACC » (LecteurPublicationsBodacc) sur le jeu PROC_GESTBOD.sql : les annonces BODACC rejetees (etat 9) et remises a
+# renvoyer (etat 3), publicites de procedure (type P%), par annonce (la liste des rejets de RIG v2, ouverte sans date).
+# Etat : 9 -> A traiter ; 3 -> A renvoyer. Groupe : Rejets. Sans evenement de procedure, l'annonce se nomme par son numero.
+# Ecartees, chacune avec sa jumelle retenue 2110201 : 2110204 type N (hors P%), 2110205 etat 5 (un certificat : sa liste exige une date).
+# Lot 9 (PROC_SDEMATJUD.sql) : 1908304, rejetee (9) et de type P, sur l'evenement BANC9DMT du jour moins 10, entre aussi.
+Annonce BODACC n° 1908304 | EP BANC9DMT · du {J-10} · rejetée, à rectifier | Rejets | AFaire | []
+Annonce BODACC n° 2110201 | envoyée le 02/04/2001 · annonce n° A2110201 · rejet : Adresse incomplète · rejetée, à rectifier | Rejets | AFaire | []
+Annonce BODACC n° 2110202 | envoyée le 03/04/2001 · rejetée, à rectifier | Rejets | AFaire | []
+Annonce BODACC n° 2110203 | envoyée le 04/04/2001 · annonce n° A2110203 · rejet : Nom tronqué · à renvoyer au prochain envoi | Rejets | EnAttente | []
