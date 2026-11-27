@@ -1,0 +1,90 @@
+# « Natures de document » (EcrivainNaturesDocument), en grille : « Ajouter », « Modifier », « Supprimer » (OPE_GED_NATURE_DOC_EDIT :
+# DoVerifier, l. 229-244 ; _Valider, l. 246-...; Supprimer, l. 115-160). Messages de la V2 au mot pres. Lignes : PROC_GED_NATURE_DOC.sql.
+
+# Refus : un code deja porte par une nature (l. 232-238). Jumeau accepte : bloc 6 (un code libre).
+geste: Ajouter
+valeur: Code = L14A
+valeur: Libellé = NATURE BANC NOUVELLE
+resultat: refuse
+message: Une nature existe déjà avec ce code.
+---
+# Refus : le code est obligatoire (l. 241). Jumeau accepte : bloc 6.
+geste: Ajouter
+valeur: Libellé = NATURE BANC NOUVELLE
+resultat: refuse
+message: Le code de nature est manquant
+---
+# Refus : le libelle est obligatoire (l. 242). Jumeau accepte : bloc 6.
+geste: Ajouter
+valeur: Code = L14N
+resultat: refuse
+message: Le libellé est manquant
+---
+# Refus : une quote dans le code (l. 243). Jumeau accepte : bloc 6 (code sans quote).
+geste: Ajouter
+valeur: Code = L14'Q
+valeur: Libellé = NATURE BANC NOUVELLE
+resultat: refuse
+message: Un code de nature ne peut contenir le caractère quote (')
+---
+# Refus : un type de document hors de WEBS_DOC_REGROUPEMENT (la liste ComboWebsDocRegroupement, l. 225). Jumeau accepte : bloc 6.
+geste: Ajouter
+valeur: Code = L14N
+valeur: Libellé = NATURE BANC NOUVELLE
+valeur: Type de document = Regroupement inconnu
+resultat: refuse
+message: « Type de document » : « Regroupement inconnu » n'est pas un type de document (Regroupement banc, Regroupement deux).
+---
+# Une nature de type NATURE_DOC (l. 250-253), son type de document par son libelle ecran (code L2 ecrit).
+geste: Ajouter
+valeur: Code = L14N
+valeur: Libellé = NATURE BANC NOUVELLE
+valeur: Type de document = Regroupement deux
+resultat: fait
+message: Nature de document L14N créée : NATURE BANC NOUVELLE.
+controle: SELECT CONCAT(VGPRM_TYPE, '/', VGPRM_WEBS_DOC_REGROUPEMENT, '/', VGPRM_LIBELLE) FROM v2.VIDIGED_PARAMETRAGE WHERE VGPRM_CODE = 'L14N' => NATURE_DOC/L2/NATURE BANC NOUVELLE
+---
+# Refus : le code ne se modifie pas en modification (ult_txt_code.MetierReadOnly, l. 202). Jumeau accepte : bloc 9 (le libelle).
+geste: Modifier
+ids: 2400301
+valeur: Code = L14Z
+resultat: refuse
+message: Le code d'une nature ne se modifie pas (L14A) : RIG v2 le met en lecture seule.
+---
+# Refus : le libelle vide en modification (l. 242). Jumeau accepte : bloc 9.
+geste: Modifier
+ids: 2400301
+valeur: Libellé =
+resultat: refuse
+message: Le libellé est manquant
+---
+# L14A change de libelle et de type de document (par son code, L2) ; relue.
+geste: Modifier
+ids: 2400301
+valeur: Libellé = NATURE BANC ALPHA BIS
+valeur: Type de document = L2
+resultat: fait
+message: Nature de document L14A enregistrée.
+fiche: 2400301
+Nature › Libellé = NATURE BANC ALPHA BIS
+Nature › Type de document = Regroupement deux
+Paramétrage GED › Nature Infogreffe = IGA
+---
+# Refus : L14U est citee par un document de la GED (VidigedIndex.GetVidigedIndexParNature, l. 117-119). Jumeau accepte : bloc 12.
+geste: Supprimer
+ids: 2400302
+resultat: refuse
+message: Cette nature de document est déjà associée à un document. Vous ne pouvez pas la supprimer
+---
+# Refus : L14D est la nature par defaut (la ligne de libelle NATURE_DOC de type PARAM_DEFAUT, l. 122-124). Jumeau accepte : bloc 12.
+geste: Supprimer
+ids: 2400303
+resultat: refuse
+message: Cette nature de document est utilisée comme valeur par défaut. Vous ne pouvez pas la supprimer à moins de changer le paramétrage.
+---
+# L14S, sans document ni defaut : supprimee avec sa nature de deposant (l. 129-145).
+geste: Supprimer
+ids: 2400305
+resultat: fait
+message: Suppression réalisée avec succès : la nature L14S (NATURE BANC A SUPPRIMER) est supprimée, avec son type de déposant.
+controle: SELECT CAST(COUNT(*) AS varchar(5)) FROM v2.VIDIGED_PARAMETRAGE WHERE VGPRM_CODE = 'L14S' => 0

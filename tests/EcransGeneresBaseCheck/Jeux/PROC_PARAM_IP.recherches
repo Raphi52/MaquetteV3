@@ -1,0 +1,9 @@
+# « Codes chefs IP » : le texte cherche le code ou le libelle ; « injonction » ecarte RFL14 (jumeau).
+texte: injonction
+lignes:
+IPL14A | INJONCTION BANC A · rang 2 | Codes IP proposables | Validee | []
+IPL14C | INJONCTION BANC C · rang 3 | Codes IP proposables | Validee | []
+---
+critere: Code chef = RF
+lignes:
+RFL14 | REFERE BANC · rang 1 | Autres codes | Validee | []

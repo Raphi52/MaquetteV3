@@ -1,0 +1,98 @@
+# « Cabinets » (EcrivainCabinets), en grille : « Ajouter », « Modifier » (OPE_CREATION_CABINET ; la V2 ne supprime pas de cabinet dans
+# PROC_CABINET). Lignes : PROC_CABINET.sql. Dates fixes (le banc lit ce fichier tel quel).
+
+# Refus : la date d'audience est obligatoire (MetierObligatoire, Designer.cs:86). Jumeau accepte : bloc 7.
+geste: Ajouter
+valeur: Heure d'audience = 09:00
+valeur: Type de cabinet = L14T2
+resultat: refuse
+message: « Date d'audience » est obligatoire.
+---
+# Refus : l'heure se saisit HH:MM (varchar(5)). Jumeau accepte : bloc 7.
+geste: Ajouter
+valeur: Date d'audience = 2099-04-01
+valeur: Heure d'audience = 9h
+valeur: Type de cabinet = L14T2
+resultat: refuse
+message: « Heure d'audience » : une heure HH:MM (9h).
+---
+# Refus : un type hors de la liste TYPE_AUD_CAB. Jumeau accepte : bloc 7.
+geste: Ajouter
+valeur: Date d'audience = 2099-04-01
+valeur: Heure d'audience = 09:00
+valeur: Type de cabinet = XX
+resultat: refuse
+message: « Type de cabinet » : « XX » n'est pas un type de cabinet de la liste.
+---
+# Refus : L14T1 exige un code cabinet (R_TYPEAUDCAB_PARAMETRAGE_CABINET, l. 51-58). Jumeau accepte : bloc 7 (code donne).
+geste: Ajouter
+valeur: Date d'audience = 2099-04-01
+valeur: Heure d'audience = 09:00
+valeur: Type de cabinet = L14T1
+resultat: refuse
+message: « Code cabinet » est obligatoire pour le type L14T1 (RIG v2 l'exige pour ce type).
+---
+# Refus : un juge qui n'existe pas. Jumeau accepte : bloc 7.
+geste: Ajouter
+valeur: Date d'audience = 2099-03-10
+valeur: Heure d'audience = 09:00
+valeur: Type de cabinet = L14T1
+valeur: Code cabinet = L14C1
+valeur: Juge = INCONNU
+resultat: refuse
+message: « Juge » : aucun juge ne porte l'abrégé, le numéro ou le nom « INCONNU ».
+---
+# Refus : le doublon de 2400401 -- meme code, meme date, meme heure, meme juge (GetCabinet, AudienceCabinet.cs:1074-1093 ; l. 79-83).
+# Jumeau accepte : bloc 7 (un autre juge).
+geste: Ajouter
+valeur: Date d'audience = 2099-03-10
+valeur: Heure d'audience = 09:00
+valeur: Type de cabinet = L14T1
+valeur: Code cabinet = L14C1
+valeur: Juge = JUN14
+resultat: refuse
+message: Le cabinet saisi existe déjà. Merci de vérifier votre saisie.
+---
+# Un cabinet cree (AUDNC_AUDIENCE = 0, publique par defaut : CreateCabinet, AudienceCabinet.cs:1277-1290 ; AUDIENCE_CABINET.cs).
+geste: Ajouter
+valeur: Date d'audience = 2099-03-10
+valeur: Heure d'audience = 09:00
+valeur: Type de cabinet = L14T1
+valeur: Code cabinet = L14C1
+valeur: Juge = JDE14
+resultat: fait
+message: Cabinet créé : L14T1 du 10/03/2099 à 09:00.
+controle: SELECT CONCAT(CAST(AUDNC_AUDIENCE AS int), '/', AUDNC_CODE_CABINET, '/', CAST(AUDNC_PUBLIQUE AS int), '/', AUDNC_ETAT_CABINET) FROM v2.AUDIENCE_CABINET WHERE AUDNC_DATE = '20990310' AND AUDNC_ID_JUG = 1400502 => 0/L14C1/1/1
+---
+# Refus : 2400405 a des affaires appelees -- sa date ne se modifie plus (DoInitZoneSaisie, l. 31-34). Jumeau accepte : bloc 10 (l'heure).
+geste: Modifier
+ids: 2400405
+valeur: Date d'audience = 2020-02-04
+resultat: refuse
+message: Ce cabinet a des affaires appelées : sa date, son type et son code ne se modifient plus (RIG v2 les met en lecture seule).
+---
+# Refus : 2400405, affaires appelees et juge actif (JDE14) : le juge ne se modifie plus (l. 35-37). Jumeau accepte : bloc 11 (sans appel).
+geste: Modifier
+ids: 2400405
+valeur: Juge = JUN14
+resultat: refuse
+message: Ce cabinet a des affaires appelées et un juge actif : le juge ne se modifie plus (RIG v2 le met en lecture seule).
+---
+# L'heure reste modifiable sur un cabinet aux affaires appelees.
+geste: Modifier
+ids: 2400405
+valeur: Heure d'audience = 10:00
+resultat: fait
+message: Cabinet du 03/02/2020 à 10:00 enregistré.
+---
+# 2400402, sans affaire appelee : juge et greffier choisis par leur abrege ; relu.
+geste: Modifier
+ids: 2400402
+valeur: Juge = JUN14
+valeur: Greffier = G17A
+resultat: fait
+message: Cabinet du 06/01/2020 à 14:00 enregistré.
+fiche: 2400402
+Juge et greffier › Juge = JUN14
+Juge et greffier › Greffier = G17A
+Type et code › Type de cabinet = L14T2

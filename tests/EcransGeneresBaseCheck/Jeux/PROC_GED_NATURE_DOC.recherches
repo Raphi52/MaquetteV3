@@ -1,0 +1,13 @@
+# « Natures de document » : le texte cherche le code ou le libelle (ConstructFullText, OPE_GED_NATURE_DOC_READONLY.cs:107-112).
+texte: BANC ALPHA
+lignes:
+NATURE BANC ALPHA | code L14A · Regroupement banc · aucun document | Sans document | Validee | []
+---
+# Le critere « Code ».
+critere: Code = L14U
+lignes:
+NATURE BANC UTILISEE | code L14U · 1 document(s) | Associées à un document | Validee | []
+---
+# Le critere « Libellé » : aucune nature ne porte ce mot.
+critere: Libellé = INTROUVABLE
+lignes:
