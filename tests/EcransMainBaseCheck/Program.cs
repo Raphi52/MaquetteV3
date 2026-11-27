@@ -1151,6 +1151,184 @@ Exiger((await EcranRedaction.DecisionsAsync(null, null)) is { Mode: "demo", Deci
 Exiger((await EcranRedaction.DecisionsAsync(client, GreffeAbsent)) is { Mode: "erreur", Decisions.Length: 0, Message: not null },
     "pont Redaction, greffe absent : le motif, AUCUNE decision");
 
+// ============================================================ 12. STATISTIQUES (LectureStatistiques.cs, lot 9)
+// « Statistiques » (PROC_STAT), calcule au lot 9 : les requetes de RIG v2 (Outils\DLLEdition\RigRapport\Jud\Stats) sur une
+// periode ISOLEE, mars 1971, ou aucun autre jeu n'a de ligne. Chaque compte a son jumeau ecarte (hors periode, exterieure,
+// autre motif de role, autre type de decision). Les tables du jeu sont posees ici aux types de RIG_DEV. Identifiants 19110xx.
+await Sql("""
+    IF COL_LENGTH('v2.INSTANCE', 'INSTN_CODE_ACTE_PROCE') IS NULL ALTER TABLE v2.INSTANCE ADD INSTN_CODE_ACTE_PROCE varchar(10) NULL;
+    IF OBJECT_ID(N'v2.DECISION_JUDICIAIRE') IS NULL
+        CREATE TABLE v2.DECISION_JUDICIAIRE (DCJDC_ID_DCJDC int NOT NULL PRIMARY KEY, DCJDC_ID_INSTN int NULL);
+    IF COL_LENGTH('v2.DECISION_JUDICIAIRE', 'DCJDC_TYPE_DECISION') IS NULL ALTER TABLE v2.DECISION_JUDICIAIRE ADD DCJDC_TYPE_DECISION varchar(10) NULL;
+    IF COL_LENGTH('v2.DECISION_JUDICIAIRE', 'DCJDC_ID_APPAF_PRONONCER') IS NULL ALTER TABLE v2.DECISION_JUDICIAIRE ADD DCJDC_ID_APPAF_PRONONCER int NULL;
+    IF COL_LENGTH('v2.DECISION_JUDICIAIRE', 'DCJDC_ID_APPAF_DELIBERER') IS NULL ALTER TABLE v2.DECISION_JUDICIAIRE ADD DCJDC_ID_APPAF_DELIBERER int NULL;
+    IF COL_LENGTH('v2.DECISION_JUDICIAIRE', 'DCJDC_DATE') IS NULL ALTER TABLE v2.DECISION_JUDICIAIRE ADD DCJDC_DATE datetime NULL;
+    IF COL_LENGTH('v2.DECISION_JUDICIAIRE', 'DCJDC_DATE_PREVUE') IS NULL ALTER TABLE v2.DECISION_JUDICIAIRE ADD DCJDC_DATE_PREVUE datetime NULL;
+    IF COL_LENGTH('v2.EVENEMENT_PROCEDURE', 'EVNPR_ID_INSTN') IS NULL ALTER TABLE v2.EVENEMENT_PROCEDURE ADD EVNPR_ID_INSTN int NULL;
+    IF COL_LENGTH('v2.EVENEMENT_PROCEDURE', 'EVNPR_SURVENU') IS NULL ALTER TABLE v2.EVENEMENT_PROCEDURE ADD EVNPR_SURVENU bit NULL;
+    IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_EXTERIEUR') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_EXTERIEUR bit NULL;
+    IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_DATE_OUVERTURE') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_DATE_OUVERTURE datetime NULL;
+    IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_DATE_SAUVEGARDE') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_DATE_SAUVEGARDE datetime NULL;
+    IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_CODE_SOLUTION') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_CODE_SOLUTION varchar(10) NULL;
+    IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_DATE_SOLUTION') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_DATE_SOLUTION datetime NULL;
+    IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_CODE_SOLUTION_2') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_CODE_SOLUTION_2 varchar(10) NULL;
+    IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_DATE_SOLUTION_2') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_DATE_SOLUTION_2 datetime NULL;
+    IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_REGIME_PC') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_REGIME_PC varchar(2) NULL;
+    IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_CODE_CLOTURE') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_CODE_CLOTURE varchar(5) NULL;
+    IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_DATE_CLOTURE') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_DATE_CLOTURE datetime NULL;
+    IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_CODE_ACTE_PROCE') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_CODE_ACTE_PROCE varchar(10) NULL;
+    IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_DATE_RETABL_PROF') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_DATE_RETABL_PROF datetime NULL;
+    IF COL_LENGTH('v2.PROCEDURE_COLLECTIVE', 'PRCLL_DATE_TRAITEMENT_SORTIE_CRISE') IS NULL ALTER TABLE v2.PROCEDURE_COLLECTIVE ADD PRCLL_DATE_TRAITEMENT_SORTIE_CRISE datetime NULL;
+    IF COL_LENGTH('v2.ETABLISSEMENT_PC', 'ETBPC_CODE_NAF') IS NULL ALTER TABLE v2.ETABLISSEMENT_PC ADD ETBPC_CODE_NAF varchar(10) NULL;
+    CREATE TABLE v2.CHIFFRES_PC (CHFPC_ID_CHFPC int NOT NULL PRIMARY KEY, CHFPC_ID_PRCLL int NULL, CHFPC_SALARIES_OUVERTURE int NULL,
+        CHFPC_SALARIES_PLAN int NULL, CHFPC_CHIFFRE_AFFAIRE money NULL, CHFPC_DECLARE_TOTAL money NULL, CHFPC_ACTIF_DECLARE money NULL);
+    CREATE TABLE v2.CODE_ACTE_PROCE (R_CODEACTEPR_VALEUR varchar(10) NOT NULL PRIMARY KEY, R_CODEACTEPR_SYNO_AMITEL varchar(10) NULL);
+    -- CODE_CLOTURE est posee par la section 9 (requisitions) sans son libelle.
+    IF OBJECT_ID(N'v2.CODE_CLOTURE') IS NULL CREATE TABLE v2.CODE_CLOTURE (R_CODECLOTUR_VALEUR varchar(5) NOT NULL PRIMARY KEY);
+    IF COL_LENGTH('v2.CODE_CLOTURE', 'R_CODECLOTUR_LIBELLE_ECRAN') IS NULL ALTER TABLE v2.CODE_CLOTURE ADD R_CODECLOTUR_LIBELLE_ECRAN varchar(70) NULL;
+    CREATE TABLE v2.SOUS_RUBRIQUE_NAF (SRNAF_CODE varchar(10) NOT NULL PRIMARY KEY, SRNAF_LIBELLE varchar(255) NULL);
+    CREATE TABLE v2.EQUIV_NAF (EQNAF_NIV_5 varchar(10) NOT NULL PRIMARY KEY, EQNAF_NIV_1 varchar(10) NULL, EQNAF_NIV_2 varchar(10) NULL,
+        EQNAF_NIV_3 varchar(10) NULL, EQNAF_NIV_4 varchar(10) NULL);
+    """);
+// Instances : 1911001 F et 1911002 J enrolees dans la periode (la fin a 0 h comprise, comme l'ecran V2) ; 1911003 R ; 1911004 J
+// enrolee le 1er avril (jumeau ecarte) ; 1911005 IP ; 1911006 OP ; 1911007 JC (repartitions) ; 1911008 IP enrolee en 1970.
+// Decisions (audience de prononce, MetierStats.cs:190-229) : 1911101 JF sur 1911001, prononce <> delibere -> apres instruction ;
+// 1911102 JF sur 1911002, prononce = delibere -> sur siege ; 1911103 « XX » sur 1911002 -> autres ; 1911104 JF sur 1911001 en
+// avril (jumeau) ; 1911105 sur 1911003 (R) -> refere ; 1911106 sur 1911005, prevue le 12 (sans date rendue) -> IP ; 1911107 sur
+// 1911006 -> ordonnance sur requete ; 1911108 sur 1911007 -> JC. Reglages : ceux de RIG_DEV ('JF','ZIND' et 'JF').
+await Sql("""
+    INSERT INTO soc.Reglage (Code, Libelle, Valeur) VALUES ('STAT_TYPE_DECISION_JUGEMENTS_INSTRUCTION', 'banc', '''JF'',''ZIND'''),
+        ('STAT_TYPE_DECISION_JUGEMENTS_SIEGE', 'banc', '''JF''');
+    INSERT INTO v2.NATURE_AFFAIRE (R_NATUREAFFA_VALEUR, R_NATUREAFFA_LIBELLE_ECRAN)
+        SELECT v, l FROM (VALUES ('9S1', 'Nature banc 9 un'), ('9S2', 'Nature banc 9 deux')) AS n (v, l)
+        WHERE NOT EXISTS (SELECT 1 FROM v2.NATURE_AFFAIRE AS x WHERE x.R_NATUREAFFA_VALEUR = n.v);
+    INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_DATE_ENROLEMENT, INSTN_NATURE_AFFAIRE, INSTN_CODE_ACTE_PROCE) VALUES
+        (1911001, '1971F00001', '19710310', '40a', 'B9ASS'), (1911002, '1971J00002', '19710331', NULL, NULL),
+        (1911003, '1971R00003', '19710315', NULL, NULL), (1911004, '1971J00004', '19710401', NULL, NULL),
+        (1911005, '1971IP0005', '19710305', NULL, NULL), (1911006, '1971OP0006', '19700101', '9S2', NULL),
+        (1911007, '1971JC0007', '19700101', '9S1', NULL), (1911008, '1970IP0008', '19700101', NULL, NULL);
+    INSERT INTO v2.AUDIENCE_CABINET (AUDNC_ID_ADNC, AUDNC_AUDIENCE, AUDNC_TYPE_AUD_CAB, AUDNC_DATE, AUDNC_PUBLIQUE, AUDNC_NON_DISPONIBLE_WEB) VALUES
+        (1911201, 1, 'B9', '19710320', 1, 0), (1911202, 1, 'B9', '19710301', 1, 0), (1911203, 1, 'B9', '19710321', 1, 0),
+        (1911204, 1, 'B9', '19710322', 1, 0), (1911205, 1, 'B9', '19710402', 1, 0), (1911206, 1, 'B9', '19710325', 1, 0);
+    INSERT INTO v2.APPEL_AFFAIRE (APPAF_ID_APPAF, APPAF_ID_ADNC) VALUES
+        (1911301, 1911201), (1911302, 1911202), (1911303, 1911203), (1911304, 1911204), (1911305, 1911205), (1911306, 1911206);
+    INSERT INTO v2.DECISION_JUDICIAIRE (DCJDC_ID_DCJDC, DCJDC_ID_INSTN, DCJDC_TYPE_DECISION, DCJDC_ID_APPAF_PRONONCER, DCJDC_ID_APPAF_DELIBERER,
+        DCJDC_DATE, DCJDC_DATE_PREVUE) VALUES
+        (1911101, 1911001, 'JF', 1911301, 1911302, NULL, NULL), (1911102, 1911002, 'JF', 1911303, 1911303, NULL, NULL),
+        (1911103, 1911002, 'XX', 1911304, 1911302, NULL, NULL), (1911104, 1911001, 'JF', 1911305, 1911302, NULL, NULL),
+        (1911105, 1911003, 'ORD', 1911306, 1911306, NULL, NULL), (1911106, 1911005, NULL, NULL, NULL, NULL, '19710312'),
+        (1911107, 1911006, NULL, NULL, NULL, '19710303', NULL), (1911108, 1911007, NULL, NULL, NULL, '19710305', NULL);
+    """);
+// Procedures collectives (MetierStats.cs:262-587) : 1911401 ouverte le 5 mars, assignation (B9ASS -> ASS) -> RJ ; 1911402
+// liquidation (LIJI) le 10 mars, regime 5 -> LJ et LJ simplifiee ; 1911403 sauvegarde le 8 puis ouverture le 20, saisine du
+// parquet (B9SORP -> SORP) -> sauvegarde et conversion en RJ ; 1911404 EXTERIEURE ouverte le 6 (jumeau de 1911401, ecartee
+// partout) ; 1911405 cession (CS1) le 25 puis LJ en solution 2 le 26 -> plan de cession et conversion en LJ ; 1911406 close le
+// 31 a 15 h -- comptee par les clotures internes (la fin portee a 23:59:59, :606-612), PAS par celles du volet web (la fin a 0 h,
+// _RequeteWebClotListe :1661-1671) ; 1911409 close le 15 (comptee par les deux) ; 1911407 close le 1er avril (jumeau) ; 1911408
+// retablissement professionnel le 12.
+// Chiffres : 1911401 10 salaries, CA 100,50, passif 2000, actif 500 ; 1911402 3 salaries, CA 800 ; 1911403 5 salaries, CA 20,
+// passif 300 ; 1911405 7 salaries repris dans le plan. Etablissements (activites) : 1911401 code NAF 4711A (G « Commerce ») ;
+// 1911402 un code absent d'EQUIV_NAF (« Sans activité ou activité inconnue ») ; 1911403 sans etablissement (ecarte, :215).
+// Evenements : DESRJ sur 1911001 (dessaisissement), ICAUSEFIN et IPEXECUT sur 1911005 ; IPEXECUT sur 1911008 en avril (jumeau).
+await Sql("""
+    INSERT INTO v2.CODE_ACTE_PROCE (R_CODEACTEPR_VALEUR, R_CODEACTEPR_SYNO_AMITEL) VALUES ('B9ASS', 'ASS'), ('B9SORP', 'SORP');
+    INSERT INTO v2.CODE_CLOTURE (R_CODECLOTUR_VALEUR, R_CODECLOTUR_LIBELLE_ECRAN) VALUES ('B9CIA', 'Insuffisance d''actif (banc 9)');
+    INSERT INTO v2.PROCEDURE_COLLECTIVE (PRCLL_ID_PRCLL, PRCLL_NUM_PC, PRCLL_EXTERIEUR, PRCLL_DATE_OUVERTURE, PRCLL_DATE_SAUVEGARDE, PRCLL_CODE_SOLUTION,
+        PRCLL_DATE_SOLUTION, PRCLL_CODE_SOLUTION_2, PRCLL_DATE_SOLUTION_2, PRCLL_REGIME_PC, PRCLL_CODE_CLOTURE, PRCLL_DATE_CLOTURE, PRCLL_CODE_ACTE_PROCE,
+        PRCLL_DATE_RETABL_PROF) VALUES
+        (1911401, '1971P11401', 0, '19710305', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'B9ASS', NULL),
+        (1911402, '1971P11402', 0, '19701201', NULL, 'LIJI', '19710310', NULL, NULL, '5', NULL, NULL, NULL, NULL),
+        (1911403, '1971P11403', 0, '19710320', '19710308', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'B9SORP', NULL),
+        (1911404, '1971P11404', 1, '19710306', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'B9ASS', NULL),
+        (1911405, '1971P11405', 0, '19600101', NULL, 'CS1', '19710325', 'LJ', '19710326', NULL, NULL, NULL, NULL, NULL),
+        (1911406, '1971P11406', 0, '19600101', NULL, NULL, NULL, NULL, NULL, NULL, 'B9CIA', '19710331 15:00', NULL, NULL),
+        (1911407, '1971P11407', 0, '19600101', NULL, NULL, NULL, NULL, NULL, NULL, 'B9CIA', '19710401', NULL, NULL),
+        (1911408, '1971P11408', 0, '19500101', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '19710312'),
+        (1911409, '1971P11409', 0, '19600101', NULL, NULL, NULL, NULL, NULL, NULL, 'B9CIA', '19710315', NULL, NULL);
+    INSERT INTO v2.CHIFFRES_PC (CHFPC_ID_CHFPC, CHFPC_ID_PRCLL, CHFPC_SALARIES_OUVERTURE, CHFPC_SALARIES_PLAN, CHFPC_CHIFFRE_AFFAIRE, CHFPC_DECLARE_TOTAL,
+        CHFPC_ACTIF_DECLARE) VALUES
+        (1911501, 1911401, 10, NULL, 100.50, 2000, 500), (1911502, 1911402, 3, NULL, 800, NULL, NULL),
+        (1911503, 1911403, 5, NULL, 20, 300, NULL), (1911505, 1911405, NULL, 7, NULL, NULL, NULL);
+    INSERT INTO v2.ETABLISSEMENT_PC (ETBPC_ID_ETBPC, ETBPC_ID_PRCLL, ETBPC_NUM_ORDRE, ETBPC_CODE_NAF) VALUES
+        (1911601, 1911401, 1, '4711A'), (1911602, 1911402, 1, 'B9ZZZ');
+    INSERT INTO v2.EQUIV_NAF (EQNAF_NIV_5, EQNAF_NIV_1, EQNAF_NIV_2, EQNAF_NIV_3, EQNAF_NIV_4) VALUES ('4711A', 'G', '47', '47.1', '47.11');
+    INSERT INTO v2.SOUS_RUBRIQUE_NAF (SRNAF_CODE, SRNAF_LIBELLE) VALUES ('G', 'Commerce');
+    INSERT INTO v2.EVENEMENT_PROCEDURE (EVNPR_ID_EVNPR, EVNPR_ID_INSTN, EVNPR_CODE_EVE_PRO, EVNPR_DATE) VALUES
+        (1911701, 1911001, 'DESRJ', '19710311'), (1911702, 1911005, 'ICAUSEFIN', '19710315'), (1911703, 1911005, 'IPEXECUT', '19710316'),
+        (1911704, 1911008, 'IPEXECUT', '19710410');
+    """);
+var mars1971 = (Debut: new DateTime(1971, 3, 1), Fin: new DateTime(1971, 3, 31));
+string Rendu(StatistiquesLues s) => string.Join(" || ", s.Tableaux.Select(t =>
+    $"{t.Titre}{(t.Cause is null ? "" : $" [{t.Cause}]")} : " + string.Join(" ; ", t.Lignes.Select(l => $"{l.Libelle}={string.Join("/", l.Valeurs)}"))));
+await using (var cn = new SqlConnection(greffe.Connexion))
+{
+    await cn.OpenAsync();
+    Task<StatistiquesLues> Volet(string v, string? niveau = null)
+        => LectureStatistiques.LireAsync(cn, new RechercheStatistiques(v, mars1971.Debut, mars1971.Fin, niveau), CancellationToken.None);
+
+    var internes = await Volet(VoletsStatistiques.Internes);
+    var vu = Rendu(internes);
+    Exiger(vu.StartsWith("Statistiques judiciaires : Affaires enrôlées=2 ; Affaires en file R enrôlées=1 ; Affaires en file J enrôlées=1 ; "
+           + "Affaires en file F enrôlées=1 ; Jugements après instruction=1 ; Jugements sur siège=1 ; Autres=1 ; Ordonnances de référé=1 ; "
+           + "Injonctions de payer=1 ; Ordonnances sur requête=1 || ", StringComparison.Ordinal),
+        $"statistiques internes, judiciaires (MetierStats.cs:118-260, reglages 'JF','ZIND' / 'JF') : {vu}");
+    Exiger(vu.Contains("Procédures collectives : Ouvertures de procédures RJ=1 ; Ouvertures de procédures LJ=1 ; Ouvertures de procédures LJ simplifiées=1 ; "
+           + "Ouvertures de sauvegardes=1 ; Conversion de sauvegarde en RJ=1 ; Conversion en LJ=1 ; Plan de cession=1 ; Plans de continuation=0 ; "
+           + "Plans de sauvegarde=0 ; Salariés concernés par les ouvertures de RJ=10 ; Salariés concernés par les ouvertures de LJ=3 ; "
+           + "Salariés concernés par les ouvertures de sauvegarde=5 ; Salariés concernés par les ouvertures (total)=15 ; Salariés repris dans les plans=7 ; "
+           + "Chiffre d'affaires des entreprises=120,5 ; Passif déclaré=2300 ; Actif déclaré=500 ; Assignations en RJ ou LJ=1 ; Dessaisissements=1 ; "
+           + "Déboutés=0 ; Ouvertures de PC par assignation=1 ; Ouvertures de PC par saisine du parquet=1 ; Ouvertures de PC par saisine d'office=0 ; "
+           + "Ouvertures de PC de rétablissement professionnel=1 ; Ouvertures de traitement de sortie de crise=0 ; Plans de traitement de sortie de crise=0 || ",
+               StringComparison.Ordinal),
+        "statistiques internes, procedures collectives (:262-587) : la PC exterieure 1911404 n'est comptee nulle part");
+    Exiger(vu.Contains("Procédures collectives - Clôtures : Insuffisance d'actif (banc 9)=2 || ", StringComparison.Ordinal)
+           && vu.EndsWith("Statistiques IP : Mises au rôle=1 ; Ordonnances IP=1 ; Ordonnances de fin d'instance=1 ; Exécutoires=1 ; Oppositions=0", StringComparison.Ordinal),
+        "statistiques internes : les clotures du 15 et du 31 a 15 h comptees, celle du 1er avril non ; IP (:619-700), l'executoire d'avril ecarte");
+
+    var web = Rendu(await Volet(VoletsStatistiques.Web));
+    Exiger(web.StartsWith("Ouvertures, transformations et plans : Ouvertures RJ=1/0/0/0/0/1/0/0/0/1 ; Ouvertures LJ=0/0/1/0/0/1/0/0/0/1 ; "
+           + "Ouvertures sauvegardes=1/0/0/0/0/1/0/0/0/1 ; Transformations RJ en LJ=1/0/0/0/1/0/0/0/0/1 ; Conversions LJ en LJS=0/0/0/0/0/0/0/0/0/0 ; "
+           + "Plans de continuation=0/0/0/0/0/0/0/0/0/0 ; Plans de cession=1/0/0/0/1/0/0/0/0/1 ; Plans de sauvegarde=0/0/0/0/0/0/0/0/0/0 || "
+           + "Totaux : Total des ouvertures=3 ; Total des transformations et conversions=1 ; Total des plans=1 || "
+           + "Clôtures : Insuffisance d'actif (banc 9)=1/0/0/0/1/0/0/0/0/1 ; Total=/////////1", StringComparison.Ordinal),
+        $"statistiques web (:817-1729) : tranches de CA (sans chiffre : la premiere) et de salaries, totaux, clotures (celle du 31 a 15 h ecartee) : {web}");
+
+    var rep = Rendu(await Volet(VoletsStatistiques.RepartitionsJcOp));
+    Exiger(rep == "Jugements de contentieux (JC) : 9S1 - Nature banc 9 un=1 ; Total=1 || Ordonnances (OP) : 9S2 - Nature banc 9 deux=1 ; Total=1",
+        $"repartitions JC et OP (:704-814) : {rep}");
+
+    var ca = Rendu(await Volet(VoletsStatistiques.ActivitesCa, "1"));
+    Exiger(ca == "Ouvertures par activités et chiffre d'affaires, niveau 1 : =Sans activité ou activité inconnue/0/0/1/0/1 ; G=Commerce/1/0/0/0/1 ; TOTAL=/1/0/1/0/2",
+        $"activites par CA, niveau 1 (MetierStats.Activites.cs) : la PC sans etablissement ecartee : {ca}");
+    var sal = Rendu(await Volet(VoletsStatistiques.ActivitesSalaries, "9"));
+    Exiger(sal == "Ouvertures par activités et nombre de salariés, niveau 1 : =Sans activité ou activité inconnue/0/1/0/0/0/1 ; G=Commerce/0/1/0/0/0/1 ; TOTAL=/0/2/0/0/0/2",
+        $"activites par salaries, un niveau hors 1-4 ramene a 1 (OPE_NIVEAU) : {sal}");
+
+    var semestre = await Volet(VoletsStatistiques.Semestrielles);
+    Exiger(semestre is { NombrePc: "non calculé", Tableaux: [{ Cause: { } cause }] } && cause.Contains("GERER_PC (absente de la base V3)", StringComparison.Ordinal)
+           && cause.Contains("MANDATAIRE_PC (absente de la base V3)", StringComparison.Ordinal),
+        $"semestrielles : les tables des mandataires absentes de cette base sont nommees, rien n'est invente ({Rendu(semestre)})");
+
+    var inversees = await LectureStatistiques.LireAsync(cn, new RechercheStatistiques(VoletsStatistiques.Internes, mars1971.Fin, mars1971.Debut, null), CancellationToken.None);
+    Exiger(inversees is { Refus: LectureStatistiques.DatesInversees, Tableaux.Length: 0 },
+        "statistiques : debut apres la fin -> le message de RIG v2 (OPE_DATES.cs:37-38), rien de calcule");
+    var avril = Rendu(await LectureStatistiques.LireAsync(cn, new RechercheStatistiques(VoletsStatistiques.Internes, new DateTime(1971, 4, 1), new DateTime(1971, 4, 30), null), CancellationToken.None));
+    Exiger(avril.StartsWith("Statistiques judiciaires : Affaires enrôlées=1 ; ", StringComparison.Ordinal) && avril.Contains("Exécutoires=1", StringComparison.Ordinal),
+        $"statistiques internes d'avril 1971 : les jumeaux d'avril y sont (1911004, l'executoire de 1911008) : {avril}");
+}
+var statRoute = await http.PostAsJsonAsync(RoutesEcransMain.Pour(RoutesStatistiques.Statistiques, Greffe),
+    new RechercheStatistiques(VoletsStatistiques.RepartitionsJcOp, mars1971.Debut, mars1971.Fin, null), json);
+var statLue = await statRoute.Content.ReadFromJsonAsync<StatistiquesLues>(json);
+Exiger(statRoute.IsSuccessStatusCode && statLue is { Tableaux: [{ Lignes: [{ Libelle: "9S1 - Nature banc 9 un" }, ..] }, ..] },
+    $"route Statistiques par le serveur : le volet calcule ({(int)statRoute.StatusCode})");
+var statPont = await EcranStatistiques.CalculerAsync(client, Greffe, VoletsStatistiques.RepartitionsJcOp, "1971-03-01", "1971-03-31", null);
+Exiger(statPont is { Mode: "serveur", Tableaux: [{ Lignes: [{ Libelle: "9S1 - Nature banc 9 un", Valeurs: ["1"] }, ..] }, ..] },
+    "pont Statistiques branche : les tableaux de la base, mode « serveur » (aucune mention exemple)");
+Exiger((await EcranStatistiques.CalculerAsync(null, null, VoletsStatistiques.Internes, "1971-03-01", "1971-03-31", null)) is { Mode: "demo", Tableaux.Length: > 0 },
+    "pont Statistiques sans serveur : la demonstration, mode « demo »");
+Exiger((await EcranStatistiques.CalculerAsync(client, GreffeAbsent, VoletsStatistiques.Internes, "1971-03-01", "1971-03-31", null)) is { Mode: "erreur", Tableaux.Length: 0, Message: not null },
+    "pont Statistiques, greffe absent : le motif, AUCUN tableau");
+
 Console.WriteLine();
 if (echecs.Count == 0) { Console.WriteLine("Ecrans faits main branches sur la base : VERT."); return 0; }
 Console.WriteLine(echecs.Count + " echec(s) : " + string.Join(" | ", echecs));
