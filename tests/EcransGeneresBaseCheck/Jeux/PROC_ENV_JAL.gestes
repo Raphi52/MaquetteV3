@@ -1,0 +1,64 @@
+# « Envoi JAL / BODACC » (EcrivainEnvoiJal) : « Generer le bordereau », le mode EDI de RIG v2 (OPE_A_ENVOYER.cs : Generer puis
+# Envoyer) sur les publicites cochees. Publicites et reglages : PROC_ENV_JAL.sql. Sans saisie, la periode du bordereau vaut celle
+# que la V2 pre-remplit : du reglage JAL_DATE_DEBUT_ENVOI (J-10 sur le banc) a aujourd'hui, la fin comprise a 0 h (LigneJal.cs:298).
+
+# Refus : aucune ligne cochee (:197-200). Jumeau accepte : bloc 7.
+geste: Confirmer Générer le bordereau
+ids:
+resultat: refuse
+message: Vous devez sélectionner au moins une ligne pour pouvoir générer.
+---
+# Refus : 2110321 est deja envoyee (bordereau B11J01) ; la V2 ne la propose pas a la generation (OPE_RECH_ANNONCES.cs:451-453).
+# Jumeau accepte : bloc 7, 2110312 a envoyer.
+geste: Confirmer Générer le bordereau
+ids: 2110321
+resultat: refuse
+message: La publicité 2110321 de la procédure 1990P14103 est déjà envoyée : RIG v2 ne propose à la génération que les annonces à envoyer.
+---
+# Refus EDI : 2110334 n'a pas de journal (:216-224). Jumeau accepte : bloc 7, 2110312 au journal BANC11K.
+geste: Confirmer Générer le bordereau
+ids: 2110334
+resultat: refuse
+message: Impossible de générer l'annonce, le nom du JAL n'est pas rempli pour la procédure ci-dessous : 1990P14103 Vous devez allez en MPC pour compléter le nom du destinataire JAL.
+---
+# Refus EDI : deux journaux dans la selection, BANC11J (2110311) et BANC11K (2110312) (:226-229). Jumeau accepte : bloc 7, un seul.
+geste: Confirmer Générer le bordereau
+ids: 2110311,2110312
+resultat: refuse
+message: Impossible de générer les annonces car vous avez plusieurs destinataires JAL dans votre sélection. Vous devez faire un envoi par destinataire JAL.
+---
+# Refus : l'evenement de 2110314 n'a aucune publicite a envoyer prevue dans la periode saisie, l'annee 2000 (GetPubtoEdit, :298 ;
+# :330). Jumeau accepte : bloc 7, la periode par defaut.
+geste: Confirmer Générer le bordereau
+ids: 2110314
+valeur: Période du bordereau › Date de début = 2000-01-01
+valeur: Période du bordereau › Date de fin = 2000-12-31
+resultat: refuse
+message: Aucun élément à éditer. Veuillez modifier vos critères.
+---
+# Refus : cocher 2110311 genere toutes les publicites a envoyer de son evenement dans la periode, donc aussi 2110315 (J-10), dont
+# l'etat est vide (:1139-1145) ; 2110316 (aujourd'hui a 18 h) est apres la fin a 0 h. Rien n'est ecrit, aucun numero RBOE n'est
+# consomme (le bloc 7 recoit BB/0001). Jumeau accepte : bloc 7, 2110312 a l'etat 1.
+geste: Confirmer Générer le bordereau
+ids: 2110311
+resultat: refuse
+message: Problème avec la Publicité d'identifiant 2110315 pour la procédure 1990P14103. L 'état n'est pas 'A envoyer' mais l'annonce n'a pas de numéro de bordereau. Veuillez contacter AMITEL
+---
+# Generation de 2110312 (prevention 1990V14201, BANC11K, J-3) : bordereau BB/0001 de la serie RBOE, une annonce, etat XML 2, le
+# journal ; la publicite est envoyee (EnvoyerJAL, :1094-1150) et passe dans les deja envoyees, apres celles de BANC11J, sur son
+# bordereau genere pas encore transmis (annulable). Le fichier XML n'est pas produit (simule) : BRDRJ_DONNEES_XML vide.
+geste: Confirmer Générer le bordereau
+ids: 2110312
+resultat: fait
+lignes:
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-2} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-10} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J+0} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PRV 1990V14201 · XLIEN PRV ALPHA | BANC11JAL du {J-15} · envoi prévu le {J-5} · à BANC11J · envoyée le {J-4} · bordereau B11J02 transmis | Préventions | Validee | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-5} · à BANC11J · envoyée le {J-4} · bordereau B11J01, annulable · procédure extérieure | Procédures collectives | EnCours | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-6} · à BANC11J · envoyée le {J-5} · procédure extérieure | Procédures collectives | Validee | []
+PRV 1990V14201 · XLIEN PRV ALPHA | BANC11JAL du {J-15} · envoi prévu le {J-3} · à BANC11K · envoyée le {J+0} · bordereau BB/0001, annulable | Préventions | EnCours | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-7} · à BANC11J · envoyée le {J-6} · procédure extérieure · évènement de procédure supprimé | Procédures collectives | Validee | []
+controle: SELECT BRDRJ_NUM_BORDEREAU + '|' + BRDRJ_ETAT_XML + '|' + BRDRJ_DESTINATAIRE + '|' + CAST(BRDRJ_NB_ANNONCES AS varchar(9)) + '|' + CASE WHEN BRDRJ_DONNEES_XML IS NULL THEN 'sans XML' ELSE 'XML' END FROM v2.BORDEREAU_JAL WHERE BRDRJ_NUM_BORDEREAU = 'BB/0001' => BB/0001|2|BANC11K|1|sans XML
+controle: SELECT PBLCT_ETAT_PUBLICITE + PBLCT_ETAT_XML + '|' + PBLCT_NUM_BORDEREAU + '|' + CASE WHEN PBLCT_ID_BRDRJ = (SELECT BRDRJ_ID_BRDRJ FROM v2.BORDEREAU_JAL WHERE BRDRJ_NUM_BORDEREAU = 'BB/0001') THEN 'lie' ELSE 'non lie' END + '|' + CASE WHEN PBLCT_DOC_ENVOI_ELECTRONIQUE LIKE 'Envoi BANC11K du % au %. Le % banc.ecrans BB-0001' THEN 'fichier' ELSE PBLCT_DOC_ENVOI_ELECTRONIQUE END FROM v2.PUBLICITE WHERE PBLCT_ID_PBLCT = 2110312 => 22|BB/0001|lie|fichier
+controle: SELECT CAST(COUNT(*) AS varchar(9)) FROM v2.PUBLICITE WHERE PBLCT_ID_PBLCT IN (2110311, 2110315, 2110316) AND PBLCT_DATE_ENVOI_ELECTRONIQUE IS NULL => 3

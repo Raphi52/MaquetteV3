@@ -42,7 +42,8 @@ PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-6} · à 
 PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-7} · à BANC11J · envoyée le {J-6} · procédure extérieure · évènement de procédure supprimé | Procédures collectives | Validee | []
 ---
 # Une periode saisie remplace celle que la V2 pre-remplit : de 2000 a 2099, toutes les publicites de la PC, celles hors de la
-# periode par defaut comprises (J-30, demain, J+40) ; les evenements supprimes par date d'envoi (J-30 puis J-7).
+# periode par defaut comprises (J-30, demain, J+40) ; les evenements supprimes par date d'envoi (J-30 puis J-7). La seconde J+40,
+# 2110334, n'a pas de journal (PROC_ENV_JAL.sql, cas de refus du .gestes).
 critere: Date de début = 01/01/2000
 critere: Date de fin = 31/12/2099
 critere: Numéro de PC ou PRV = 1990P14103
@@ -53,7 +54,7 @@ PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J+1} · à 
 PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-10} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
 PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J+0} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
 PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J+40} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
-PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J+40} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J+40} · procédure extérieure | Procédures collectives | AFaire | []
 PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-5} · à BANC11J · envoyée le {J-4} · bordereau B11J01, annulable · procédure extérieure | Procédures collectives | EnCours | []
 PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-6} · à BANC11J · envoyée le {J-5} · procédure extérieure | Procédures collectives | Validee | []
 PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-30} · à BANC11J · envoyée le {J-29} · procédure extérieure · évènement de procédure supprimé | Procédures collectives | Validee | []
