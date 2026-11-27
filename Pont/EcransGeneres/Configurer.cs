@@ -692,7 +692,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Code = "PROC_PARAMEXPRESSO", Titre = "Facturation Expresso", Sujet = "paramètres de facturation",
             Forme = FormeEcran.Fiche,
             // Lot 15 (27/11/2026) : un parametre par ligne, lu « PARAMETRAGE d'abord, sinon GREFFE_PARAMETRE » (MetierParametrage.cs:71-92,
-            // repris dans soc.Reglage et soc.ParametreGreffe) -- les 37 cles que lisent les operations de la V2, un groupe par operation --,
+            // repris dans soc.Reglage et soc.ParametreGreffe) -- les 38 cles que lisent les operations de la V2, un groupe par operation --,
             // puis la banque de chaque mode actif (MetierBanques.cs:38-57) : LecteurFacturationExpresso.cs. La fiche d'un parametre ecrit
             // sa valeur (EcrivainFacturationExpresso.cs, MetierParametrage.cs:42-47) pour les seules cles PARAMETRAGE que la V2 ecrit, par
             // l'ecriture partagee d'un reglage (decision du chef, 27/11 ; lot 14, 5e8d50d). Les GRPAR_* (GREFFE_PARAMETRE) se lisent

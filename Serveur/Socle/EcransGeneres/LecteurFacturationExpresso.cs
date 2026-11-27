@@ -23,7 +23,7 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// ce qu'EcrivainFacturationExpresso.cs enregistre. Une colonne GREFFE_PARAMETRE (GRPAR_*) se lit seulement : la decision du chef
 /// (27/11/2026) n'ouvre aux gestes que la valeur d'un reglage existant. La ligne d'un mode (Id « MODE:<code> ») s'ouvre sur sa banque,
 /// en lecture : la meme association s'ecrit par « Modes de paiement » (EcrivainModesPaiement, meme table MODE_PAIEMENT_BANQUE).
-/// fix-ok: pas un correctif -- lecture completee (les 37 cles que les operations V2 lisent, mesurees par grep de GetValue/SetValue dans
+/// fix-ok: pas un correctif -- lecture completee (les 38 cles que les operations V2 lisent, mesurees par grep de GetValue/SetValue dans
 /// PROC_PARAMEXPRESSO le 27/11/2026 ; l'essai precedent n'en lisait que 17) et fiche ajoutee pour l'ecriture partagee d'un reglage
 /// publiee par le lot 14 (5e8d50d, EcritureReglage.cs).
 /// </summary>
