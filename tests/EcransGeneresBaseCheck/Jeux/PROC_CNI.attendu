@@ -1,0 +1,6 @@
+# « Non-inscrits » (LecteurNonInscrits) : les demandes du processus CNI, la plus recente d'abord (PROC_CNI.sql, seul jeu de code CNI).
+# Groupe : le nom ouvert par l'abrege d'une civilite toujours PP (« M. », jumeau « BANC CNI MORALE » sans civilite) -> Personne physique.
+# Etat : validee (V) -> Validee, marches 0 et 2 ; sinon (E) -> EnCours, marche 0, nom « Demande <numero> » sans nom.
+Demande 26D24963 | demande 26D24963 · du {J-1} · saisie interrompue | Personne morale | EnCours | [0]
+BANC CNI MORALE | demande 26D24962 · du {J-2} · non-inscrit créé | Personne morale | Validee | [0,2]
+M. BANCPP Jean | demande 26D24961 · du {J-3} · non-inscrit créé | Personne physique | Validee | [0,2]

@@ -1,0 +1,139 @@
+# « Tables de référence » (EcrivainTablesReference), en grille : « Ajouter », « Modifier », « Supprimer » (OPE_TABLE_REF_BUTTONS_BAR :
+# _Save l. 421-462, _Delete l. 491-512 ; PC_ETAT.CreateEtat ; OPE_AFFICHE_SQLBASE_PC_ETAT.cs:169-215). Lignes : PROC_GTABREF.sql.
+
+# Refus : la table est obligatoire. Jumeau accepte : l'ajout de G14C (table PC_ETAT).
+geste: Ajouter
+valeur: Code = G14C
+valeur: Libellé = ETAT BANC CREE
+resultat: refuse
+message: « Table » est obligatoire.
+---
+# Refus : RIG v2 ne cree pas de type de depot AJMJ (NouvelEnregistrement = false, FactoryHelper.cs:86-88). Jumeau accepte : G14C (PC_ETAT).
+geste: Ajouter
+valeur: Table = TYPE_DEPOT_AJMJ
+valeur: Code = GT3
+valeur: Libellé = TYPE BANC NOUVEAU
+resultat: refuse
+message: RIG v2 ne crée pas d'enregistrement dans TYPE_DEPOT_AJMJ : la table s'ouvre sans « Nouvel enregistrement ».
+---
+# Refus nomme : une zone exige des champs que la grille ne porte pas. Jumeau accepte : G14C (PC_ETAT).
+geste: Ajouter
+valeur: Table = PC_ETAT_ZONE
+valeur: Code = GZ3
+valeur: Libellé = ZONE BANC NOUVELLE
+resultat: refuse
+message: Une zone se crée avec son synonyme, son code ISO, ses textes d'édition, sa table, son attribut, son type et son état, que la grille ne porte pas : RIG v3 ne la crée pas encore.
+---
+# Refus : un code deja porte (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:182-183, la premiere phrase). Jumeau accepte : G14C, libre.
+geste: Ajouter
+valeur: Table = PC_ETAT
+valeur: Code = G14A
+valeur: Libellé = ETAT BANC DOUBLE
+resultat: refuse
+message: Un enregistrement nommé G14A existe déjà. Il n'est pas possible de créer un nouvel enregistrement avec ce nom.
+---
+# Refus : un code de 21 caracteres (DoVerifier, l. 205-215 : 20 au plus). Jumeau accepte : G14C.
+geste: Ajouter
+valeur: Table = PC_ETAT
+valeur: Code = G14ABCDEFGHIJKLMNOPQR
+valeur: Libellé = ETAT BANC LONG
+resultat: refuse
+message: Longueur champ "Valeur" trop grande (20 max).
+---
+# Refus : le libelle est obligatoire. Jumeau accepte : G14C.
+geste: Ajouter
+valeur: Table = PC_ETAT
+valeur: Code = G14C
+resultat: refuse
+message: « Libellé » est obligatoire.
+---
+# Un etat de PC (PC_ETAT.CreateEtat : ouverture et cloture faux, mise a jour de la PC vrai, a sauver vrai), la table par sa description.
+geste: Ajouter
+valeur: Table = État de la procédure collective
+valeur: Code = G14C
+valeur: Libellé = ETAT BANC CREE
+resultat: fait
+message: PC_ETAT G14C créé : ETAT BANC CREE.
+controle: SELECT CONCAT(R_PCETAT_LIBELLE_ECRAN, '/', CAST(R_PCETAT_OUVERTURE AS int), CAST(R_PCETAT_CLOTURE AS int), CAST(R_PCETAT_MAJ_PC AS int), CAST(R_PCETAT_ASAUVER AS int), CAST(R_PCETAT_UTILISABLE_SAISIE AS int)) FROM v2.PC_ETAT WHERE R_PCETAT_VALEUR = 'G14C' => ETAT BANC CREE/00111
+---
+# Refus : un id sans table connue (Id() rend null). Jumeau accepte : les modifications ci-dessous, ids « TABLE|code ».
+geste: Modifier
+ids: TABLE_INCONNUE|G14A
+valeur: Libellé = ETAT BANC PERDU
+resultat: refuse
+message: Code introuvable dans les tables de référence du greffe (TABLE_INCONNUE|G14A).
+---
+# Refus : un code ne se renomme pas (dans RIG v2, saisir un autre code ouvre son enregistrement). Jumeau accepte : le bloc suivant.
+geste: Modifier
+ids: DEMAT_CFEC_AJMJ_TYPE_DEPOT|GT2
+valeur: Code = GT9
+resultat: refuse
+message: Le code GT2 ne se renomme pas : dans RIG v2, saisir un autre code ouvre l'enregistrement de ce code.
+---
+# Le libelle d'un type de depot, avec la date et l'auteur de modification (SousOPE_HISTORIQUE.MiseAJourChampsModification).
+geste: Modifier
+ids: DEMAT_CFEC_AJMJ_TYPE_DEPOT|GT2
+valeur: Libellé = TYPE BANC RENOMME
+resultat: fait
+message: TYPE_DEPOT_AJMJ GT2 enregistré : TYPE BANC RENOMME.
+controle: SELECT CONCAT(CFECAJTD_LIBELLE_ECRAN, '/', CASE WHEN CFECAJTD_DATE_MODIFICATION IS NULL OR CFECAJTD_AUTEUR_MODIFICATION IS NULL THEN 'sans historique' ELSE 'historique pose' END) FROM v2.DEMAT_CFEC_AJMJ_TYPE_DEPOT WHERE CFECAJTD_VALEUR = 'GT2' => TYPE BANC RENOMME/historique pose
+---
+# « Utilisable en saisie » d'un etat fige : il redevient saisissable.
+geste: Modifier
+ids: PC_ETAT|G14N
+valeur: Utilisable en saisie = oui
+resultat: fait
+message: PC_ETAT G14N enregistré : ETAT BANC FIGE.
+controle: SELECT CAST(R_PCETAT_UTILISABLE_SAISIE AS varchar(1)) FROM v2.PC_ETAT WHERE R_PCETAT_VALEUR = 'G14N' => 1
+---
+# Refus : un etat de l'historique d'une PC (cle etrangere PC_ETAT_HISTO, la suppression V2 echoue : _Delete, l. 506). Jumeau accepte : G14A.
+geste: Supprimer
+ids: PC_ETAT|G14H
+resultat: refuse
+message: La suppression de l'enregistrement courant a échoué. Le code G14H est utilisé dans l'historique des états de procédures collectives (1 ligne(s) PC_ETAT_HISTO).
+---
+# Refus : l'etat suivant d'un autre etat (PC_ETAT_SUIVANT.PETSV_APRES). Jumeau accepte : le meme, une fois G14A supprime (plus bas).
+geste: Supprimer
+ids: PC_ETAT|G14B
+resultat: refuse
+message: La suppression de l'enregistrement courant a échoué. Le code G14B est utilisé comme état suivant d'un autre état (1 ligne(s) PC_ETAT_SUIVANT).
+---
+# Refus : une zone de la saisie d'un etat (PC_ETAT_SAISIE.PETSA_PC_ETAT_ZONE). Jumeau accepte : GZ2, que rien ne cite.
+geste: Supprimer
+ids: PC_ETAT_ZONE|GZ1
+resultat: refuse
+message: La suppression de l'enregistrement courant a échoué. Le code GZ1 est utilisé dans la saisie d'un état de procédure collective (1 ligne(s) PC_ETAT_SAISIE).
+---
+# Refus : un type de depot cite par un depot recu (DEMAT_CFEC_AJMJ). Jumeau accepte : GT2 n'est cite par aucun depot (il reste, modifie).
+geste: Supprimer
+ids: DEMAT_CFEC_AJMJ_TYPE_DEPOT|GT1
+resultat: refuse
+message: La suppression de l'enregistrement courant a échoué. Le code GT1 est utilisé par des dépôts reçus des AJMJ (1 ligne(s) DEMAT_CFEC_AJMJ).
+---
+# Un etat et ses collections liees (SQLBase_Handler.Delete(true) : etats suivants, decisions, saisie), puis l'etat.
+geste: Supprimer
+ids: PC_ETAT|G14A
+resultat: fait
+message: PC_ETAT G14A supprimé, avec 1 × PC_ETAT_SUIVANT, 1 × PC_ETAT_DJ_EP, 1 × PC_ETAT_SAISIE.
+controle: SELECT CONCAT((SELECT COUNT(*) FROM v2.PC_ETAT WHERE R_PCETAT_VALEUR = 'G14A'), (SELECT COUNT(*) FROM v2.PC_ETAT_SUIVANT WHERE PETSV_AVANT = 'G14A'), (SELECT COUNT(*) FROM v2.PC_ETAT_DJ_EP WHERE PETDJ_ETAT = 'G14A'), (SELECT COUNT(*) FROM v2.PC_ETAT_SAISIE WHERE PETSA_ETAT = 'G14A'), '/', (SELECT COUNT(*) FROM v2.PC_ETAT_SAISIE WHERE PETSA_ETAT = 'G14H')) => 0000/1
+---
+# Jumeau du refus de G14B : plus aucun etat ne le cite.
+geste: Supprimer
+ids: PC_ETAT|G14B
+resultat: fait
+message: PC_ETAT G14B supprimé.
+controle: SELECT CAST(COUNT(*) AS varchar(5)) FROM v2.PC_ETAT WHERE R_PCETAT_VALEUR = 'G14B' => 0
+---
+# Jumeau du refus de GZ1 : une zone que rien ne cite.
+geste: Supprimer
+ids: PC_ETAT_ZONE|GZ2
+resultat: fait
+message: PC_ETAT_ZONE GZ2 supprimé.
+lignes:
+ETAT BANC CREE | code G14C · PC_ETAT | État de la procédure collective | Validee | []
+ETAT BANC HISTO | code G14H · PC_ETAT | État de la procédure collective | Validee | []
+ETAT BANC FIGE | code G14N · PC_ETAT | État de la procédure collective | Validee | []
+G14V | code G14V · PC_ETAT | État de la procédure collective | AFaire | []
+ZONE BANC CITEE | code GZ1 · PC_ETAT_ZONE | Zones à afficher selon l’état de la procédure collective | Validee | []
+TYPE BANC CITE | code GT1 · TYPE_DEPOT_AJMJ | Types des dépôts envoyés par les AJMJ | Validee | []
+TYPE BANC RENOMME | code GT2 · TYPE_DEPOT_AJMJ | Types des dépôts envoyés par les AJMJ | Validee | []

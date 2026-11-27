@@ -193,31 +193,28 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             // Bouton final cite par la fiche v2 : VALIDER, visible en phase Saisie (proc_cni.md, Detail OPE)
             Valider = "Valider",
             Rang = 7,
+            // Une ligne = une demande CNI (RIG v2 n'a pas de liste : LecteurNonInscrits.cs) ; « Valider » cree le non-inscrit, son
+            // entreprise, son etablissement et la demande, comme OPE_CNI.DoSauve (EcrivainNonInscrits.cs). Les champs et leurs obligations :
+            // OPE_CNI.Designer.cs:97-202 et _Rafraichir (OPE_CNI.cs:253-287).
             Etats = EtatsEcran.Trois("À saisir", "En saisie", "Créé"),
             Groupes = ["Personne physique", "Personne morale"],
             Marches =
             [
-                new MarcheEcran("Type et identité", "Le type (judiciaire, procédure collective, autre) et la civilité décident des champs : personne physique (nom de naissance, prénoms, nom d'usage) ou personne morale (dénomination, forme juridique).", true,
+                new MarcheEcran("Type et identité", "Le type et la civilité sont obligatoires ; la civilité décide de la nature. Personne physique : nom de naissance, prénoms et forme juridique obligatoires, et le nom d'usage pour « MME ». Personne morale : la dénomination. Un SIREN déjà connu du greffe refuse la création.", true,
                     ["Type de non-inscrit", "Civilité", "Nom de naissance", "Prénoms", "Nom d'usage", "Dénomination", "Forme juridique", "SIREN"]),
-                new MarcheEcran("Naissance", "Pour une personne physique : date, département, nationalité et pays de naissance. Le pays est la France par défaut.", false,
-                    ["Date de naissance", "Département", "Nationalité", "Pays de naissance"]),
-                new MarcheEcran("Adresse", "L'adresse est portée par l'établissement principal, créé si besoin. Le domicile se renseigne ici pour une personne physique.", true,
-                    ["Adresse", "Adresse de domicile", "Greffe (hors ressort)"]),
-                new MarcheEcran("Entreprise et établissements", "Une entreprise représentante est créée. Un second établissement est ajouté pour un type judiciaire ou une procédure collective.", false,
-                    ["Entreprise représentante", "Établissement secondaire"]),
-                new MarcheEcran("Enregistrement", "Le numéro de non-inscrit est attribué automatiquement pour l'année de travail. La demande prend le nom de la personne.", true,
-                    ["Numéro de non-inscrit"]),
+                new MarcheEcran("Naissance", "Pour une personne physique : date, département, nationalité et pays de naissance. Le pays est la France (FRA) par défaut.", false,
+                    [Champ.Date("Date de naissance"), "Département", "Nationalité", "Pays de naissance"]),
+                new MarcheEcran("Adresse", "L'adresse de l'établissement est obligatoire. Une entreprise représentante et l'établissement principal sont créés ; un type judiciaire (JUD) ou procédure collective (PCOL) a aussi un établissement « NQS ». Le numéro RGNI est donné pour l'année de la date de travail des non-inscrits.", true,
+                    ["Adresse", "Code postal", "Ville"]),
             ],
             Lignes =
             [
-                new LigneEcran("Mu Dorval", "Personne physique · judiciaire · naissance renseignée", "Personne physique", "Validee", [0, 1, 2, 4]),
-                new LigneEcran("Nu Lacroix", "Personne physique · procédure collective", "Personne physique", "Validee", [0, 2, 3, 4]),
-                new LigneEcran("Xi Pradel", "Personne physique · en saisie", "Personne physique", "EnCours", [0, 2]),
-                new LigneEcran("Omicron Vidal", "Personne physique · à saisir", "Personne physique", "AFaire", []),
-                new LigneEcran("Pi Services SARL", "Personne morale · créée", "Personne morale", "Validee", [0, 2, 3, 4]),
-                new LigneEcran("Rho Logistique SAS", "Personne morale · adresse à saisir", "Personne morale", "EnCours", [0]),
-                new LigneEcran("Sigma Transports", "Personne morale · à saisir", "Personne morale", "AFaire", []),
-                new LigneEcran("Tau Habitat SARL", "Personne morale · en saisie", "Personne morale", "EnCours", [0, 2]),
+                new LigneEcran("MR DORVAL Mu", "demande 2026DMD000101 · du 03/11/2026 · non-inscrit créé", "Personne physique", "Validee", [0, 2]),
+                new LigneEcran("MME LACROIX Nu", "demande 2026DMD000102 · du 05/11/2026 · non-inscrit créé", "Personne physique", "Validee", [0, 2]),
+                new LigneEcran("MR PRADEL Xi", "demande 2026DMD000103 · du 06/11/2026 · saisie interrompue", "Personne physique", "EnCours", [0]),
+                new LigneEcran("PI SERVICES", "demande 2026DMD000104 · du 07/11/2026 · non-inscrit créé", "Personne morale", "Validee", [0, 2]),
+                new LigneEcran("RHO LOGISTIQUE", "demande 2026DMD000105 · du 10/11/2026 · saisie interrompue", "Personne morale", "EnCours", [0]),
+                new LigneEcran("TAU HABITAT", "demande 2026DMD000106 · du 12/11/2026 · non-inscrit créé", "Personne morale", "Validee", [0, 2]),
             ],
         },
 
@@ -324,38 +321,44 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         {
             Code = "PROC_GTABREF", Titre = "Tables de reference", Sujet = "codes de référence",
             Forme = FormeEcran.Referentiel,
-            // Colonnes : la valeur de la table, son code, sa table, son verrou (sections ci-dessous).
-            Colonnes = ["Libellé", "Code", "Table", Champ.Case("Verrou")],
+            // Les trois tables que RIG v2 ouvre (OPE_SELECTION_TABLE.cs:17-27 ; NATURE_AFFAIRE, CODE_ACTE_PROCE, JOURNAL_ANNONCES et
+            // JURIDICTION_EXTERIEURE y sont en commentaire), une par groupe, sous la description de leur CBO_TableRef (FactoryHelper.cs:66-109).
+            // Colonnes : la liste de la V2 (code, libelle, « (! Non saisissable) » : FactoryHelper.cs:4-9) et la table. Lignes :
+            // LecteurTablesReference.cs ; gestes (Modifier ; Ajouter un etat de PC ; Supprimer, refuse quand le code est cite) :
+            // EcrivainTablesReference.cs.
+            // fix-ok: mesure au banc le 27/11/2026 -- EcransGeneresBaseCheck « fautifs : Champs de la table > Régime… » (la fiche montrait
+            // des champs que les sections ne declaraient pas) et EcransGeneresCheck « 4 lignes de demonstration (6 a 15 attendues) » :
+            // une section par table, six exemples.
+            Colonnes = ["Code", "Libellé", "Table", Champ.Case("Utilisable en saisie")],
             Recherche = "Rechercher un code, un libellé, une table…",
             Criteres = ["Table", "Code", "Libellé"],
             // Bouton final cite par la fiche v2 : VALIDER (proc_gtabref.md, Detail OPE)
             Valider = "Valider",
             Rang = 7,
-            Etats = EtatsEcran.Trois("À compléter", "En cours", "Enregistré"),
-            Groupes = ["Procédures collectives", "Actes et natures", "Annonces et juridictions"],
+            Etats = EtatsEcran.Trois("Libellé à saisir", "Non saisissable", "Utilisable en saisie"),
+            Groupes = ["État de la procédure collective", "Zones à afficher selon l’état de la procédure collective", "Types des dépôts envoyés par les AJMJ"],
             Sections =
             [
-                new MarcheEcran("Table", "Le code est choisi dans la table de référence voulue ; chaque table a ses propres champs.", true,
-                    ["Table"]),
-                new MarcheEcran("Code", "La clé (le code) ne peut pas être vide : elle sert de référence aux autres écrans.", true,
-                    ["Code"]),
-                new MarcheEcran("Libellé", "Le libellé et les champs propres à la table sont saisis ici.", true,
-                    ["Libellé", "Champs de la table"]),
-                new MarcheEcran("Copie et verrou", "Dupliquer recopie les champs, sauf ceux qui ne se dupliquent pas. Un enregistrement verrouillé par un autre poste ne se modifie pas.", false,
-                    ["Dupliquer", "Verrou"]),
-                new MarcheEcran("Enregistrement", "Enregistrer écrit le code ; la liste se rafraîchit.", true,
-                    ["Enregistrer"]),
+                new MarcheEcran("Enregistrement", "Le code ne se renomme pas (en saisir un autre ouvre son enregistrement dans RIG v2) ; le libellé et « Utilisable en saisie » se modifient. Seul un état de procédure collective se crée ici ; un code cité ailleurs ne se supprime pas.", true,
+                    ["Table", "Code", "Libellé", Champ.Case("Utilisable en saisie")]),
+                // Les autres champs du formulaire de chaque table, en lecture (la fiche d'un code ne montre que la section de sa table).
+                new MarcheEcran("Champs d'un état de PC", "Le formulaire d'un état de procédure collective (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:64-82), en lecture : ses cases s'excluent et ses collections (états suivants, décisions, saisie) se règlent dans RIG v2.", false,
+                    ["Régime", "Modalité PA", "Modalité AJ", "Ouverture", "Clôture", "Conversion LJ", "Extension", "Résolution du plan", "Code clôture",
+                     "Mise à jour de la PC", "À sauver", "Audience future", "Régime PC (statistiques)", "Code procédure"]),
+                new MarcheEcran("Champs d'une zone", "Le formulaire d'une zone (OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:75-95), en lecture.", false,
+                    ["Synonyme", "ISO", "Abrégé pour édition", "Simplifié pour édition", "Développé pour édition", "Exhaustif pour édition", "Table de la zone",
+                     "Attribut", "Type", "État", "Date de désactivation", "Création", "Modification"]),
+                new MarcheEcran("Champs d'un type de dépôt", "Le formulaire d'un type de dépôt AJMJ (OPE_AFFICHE_SQLBASE_DEMAT_CFEC_AJMJ_TYPE_DEPOT.cs:44-52), en lecture.", false,
+                    ["Évènement de procédure", "Création", "Modification"]),
             ],
             Lignes =
             [
-                new LigneEcran("État « ouvert »", "Procédures collectives · code 01", "Procédures collectives", "Validee", [0, 1, 2, 4]),
-                new LigneEcran("État « clôturé »", "Procédures collectives · code 02", "Procédures collectives", "Validee", [0, 1, 2, 4]),
-                new LigneEcran("État « en attente »", "Procédures collectives · libellé à saisir", "Procédures collectives", "EnCours", [0, 1]),
-                new LigneEcran("Nature « jugement »", "Actes et natures · copie en cours", "Actes et natures", "EnCours", [0, 1, 2]),
-                new LigneEcran("Nature « ordonnance »", "Actes et natures · à compléter", "Actes et natures", "AFaire", []),
-                new LigneEcran("Journal d'annonces légales", "Annonces et juridictions · enregistré", "Annonces et juridictions", "Validee", [0, 1, 2, 4]),
-                new LigneEcran("Juridiction extérieure", "Annonces et juridictions · verrouillée par un autre poste", "Annonces et juridictions", "EnCours", [0]),
-                new LigneEcran("Juridiction de référé", "Annonces et juridictions · à compléter", "Annonces et juridictions", "AFaire", []),
+                new LigneEcran("Ouverture redressement judiciaire", "code ORJ · PC_ETAT", "État de la procédure collective", "Validee", []) { Valeurs = ["ORJ", "Ouverture redressement judiciaire", "PC_ETAT", "oui"] },
+                new LigneEcran("Liquidation judiciaire", "code LJ · PC_ETAT", "État de la procédure collective", "Validee", []) { Valeurs = ["LJ", "Liquidation judiciaire", "PC_ETAT", "oui"] },
+                new LigneEcran("(! Non saisissable) Ancien état", "code ANC · PC_ETAT · non saisissable", "État de la procédure collective", "EnCours", []) { Valeurs = ["ANC", "Ancien état", "PC_ETAT", "non"] },
+                new LigneEcran("Date du jugement", "code DJ · PC_ETAT_ZONE", "Zones à afficher selon l’état de la procédure collective", "Validee", []) { Valeurs = ["DJ", "Date du jugement", "PC_ETAT_ZONE", "oui"] },
+                new LigneEcran("Date de cessation des paiements", "code DCP · PC_ETAT_ZONE", "Zones à afficher selon l’état de la procédure collective", "Validee", []) { Valeurs = ["DCP", "Date de cessation des paiements", "PC_ETAT_ZONE", "oui"] },
+                new LigneEcran("Rapport du mandataire", "code RAP · TYPE_DEPOT_AJMJ", "Types des dépôts envoyés par les AJMJ", "Validee", []) { Valeurs = ["RAP", "Rapport du mandataire", "TYPE_DEPOT_AJMJ", "oui"] },
             ],
         },
 

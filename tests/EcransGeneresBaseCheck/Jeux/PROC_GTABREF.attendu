@@ -1,0 +1,13 @@
+# « Tables de référence » (LecteurTablesReference) : les trois tables que RIG v2 ouvre (OPE_SELECTION_TABLE.cs:17-27), dans cet ordre,
+# chacune par code (FactoryHelper.TEXTE_REQUETE_VALEUR, l. 4-9). Lignes : PROC_GTABREF.sql, seul jeu qui les remplit.
+# Etat : libelle vide -> AFaire (G14V, nom = le code) ; non saisissable -> EnCours et « (! Non saisissable) » devant le nom (G14N ;
+# jumeaux saisissables : les autres) ; sinon Validee. Cellules : Code, Libellé, Table, Utilisable en saisie.
+ETAT BANC ALPHA | code G14A · PC_ETAT | État de la procédure collective | Validee | [] | valeurs: G14A ; ETAT BANC ALPHA ; PC_ETAT ; oui
+ETAT BANC SUIVANT | code G14B · PC_ETAT | État de la procédure collective | Validee | []
+ETAT BANC HISTO | code G14H · PC_ETAT | État de la procédure collective | Validee | []
+(! Non saisissable) ETAT BANC FIGE | code G14N · PC_ETAT · non saisissable | État de la procédure collective | EnCours | [] | valeurs: G14N ; ETAT BANC FIGE ; PC_ETAT ; non
+G14V | code G14V · PC_ETAT | État de la procédure collective | AFaire | []
+ZONE BANC CITEE | code GZ1 · PC_ETAT_ZONE | Zones à afficher selon l’état de la procédure collective | Validee | []
+ZONE BANC LIBRE | code GZ2 · PC_ETAT_ZONE | Zones à afficher selon l’état de la procédure collective | Validee | []
+TYPE BANC CITE | code GT1 · TYPE_DEPOT_AJMJ | Types des dépôts envoyés par les AJMJ | Validee | []
+TYPE BANC LIBRE | code GT2 · TYPE_DEPOT_AJMJ | Types des dépôts envoyés par les AJMJ | Validee | [] | valeurs: GT2 ; TYPE BANC LIBRE ; TYPE_DEPOT_AJMJ ; oui
