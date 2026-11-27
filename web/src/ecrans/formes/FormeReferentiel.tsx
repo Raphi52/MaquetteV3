@@ -85,9 +85,11 @@ export function CasesSansValeurs({ d, vue, l }: { d: DescripteurEcranVue; vue: V
   )
 }
 
-/** Une cellule lue : une case en Oui / Non, un montant a la francaise, le reste tel quel (vide : « — »). */
+/** Une cellule lue : une case en Oui / Non, un montant a la francaise, le reste tel quel (vide : « — »). Une case NON cochee vaut ''
+ * (LecteurEcran.Case cote serveur, la case a cocher de commun.tsx quand on la decoche) : c'est « Non », pas une cellule vide
+ * (ReferentielCaseNon.test.tsx ; lot 14, ordre du chef msg-cab1a60f). */
 export function lisible(c: ChampEcranVue, valeur: string): string {
-  if (c.type === 'Case') return valeur === 'oui' ? 'Oui' : valeur === '' ? '—' : 'Non'
+  if (c.type === 'Case') return valeur === 'oui' ? 'Oui' : 'Non'
   if (c.type === 'Montant') { const n = nombreDe(valeur); return Number.isNaN(n) ? (valeur || '—') : montant(n) }
   if (c.type === 'Date' && /^\d{4}-\d{2}-\d{2}$/.test(valeur)) return valeur.split('-').reverse().join('/')
   return valeur === '' ? '—' : valeur
