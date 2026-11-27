@@ -409,7 +409,7 @@ internal static class EditionsEvenementV2
             ["DMNED_DATE_CREATION"] = geste.Maintenant, ["DMNED_TYPE_PAPIER"] = "NORMAL", ["DMNED_MEDIA"] = "IMPR", ["DMNED_ETAT_EMISSION"] = "N",
             ["DMNED_PHASE_TRAITEMENT"] = "C", ["DMNED_UTILISATEUR"] = compte, ["DMNED_NOMBRE_EXEMPLAIRE"] = (short)1, ["DMNED_IMPRESSION"] = true,
             ["DMNED_PAPIER_TRAME"] = false, ["DMNED_AGRAFAGE"] = false, ["DMNED_RECTO_VERSO"] = false,
-            ["DMNED_TYPE_GENERATION"] = e.TypeGeneration ?? EcrivainRelancesComptesAnnuels.TypeGeneration(p.GetValueOrDefault("TYPE_GENERATION", ""), ""),
+            ["DMNED_TYPE_GENERATION"] = e.TypeGeneration ?? RelancesRsurv.TypeGeneration(p.GetValueOrDefault("TYPE_GENERATION", ""), ""),
             ["DMNED_AFF_AVANT_IMPRESSION"] = false, ["DMNED_INTERLOCUTEUR"] = compte, ["DMNED_LIBELLE_DOCUMENT"] = e.Libelle,
             ["DMNED_GROUPAGE_AUTOMATIQUE"] = true, ["DMNED_RESUME"] = false, ["DMNED_READ_ONLY"] = false, ["DMNED_ID_DMND"] = idDemande,
             ["DMNED_TRIBUNAL_DIGITAL_NATURE_DOC"] = Vide(p.GetValueOrDefault("TRIBUNAL_DIGITAL_NATURE_DOC", "")),

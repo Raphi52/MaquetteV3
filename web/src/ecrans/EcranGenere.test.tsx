@@ -170,6 +170,55 @@ describe('Forme File : une file de travail', () => {
     expect(bouton('Imprimer').title).toBe('« Imprimer » ne s’applique pas aux lignes cochées : il ne vaut que pour « Relances »')
     expect(bouton('Relancer').title).toBe('')
   })
+
+  // Lot 8 (26/11/2026), mesure sur le bureau cache : une relance faite sortait des 200 lignes lues, et la recherche, qui ne
+  // filtrait que ces lignes, ne la retrouvait pas. Comme les autres formes (useRecherche) : le texte part dans la base.
+  it('la recherche part dans la base quand un lecteur de la file sait chercher ; ses lignes cherchees ne sont pas refiltrees', async () => {
+    const trouvee: LigneEcranVue = { nom: 'SANS LE MOT', precisions: 'Relance 1 du 26/11/2026', groupe: 'Fond', etat: 'Validee', faites: [0], id: '164779' }
+    const pont = installerFauxPont({
+      'EcranGenere.Lignes': () => ({ mode: 'base', message: null, greffe: '3801', lignes: lignesDeLaBase, exemples: [], recherche: true }),
+      'EcranGenere.Chercher': () => ({ mode: 'base', message: null, greffe: '3801', lignes: [trouvee], exemples: [], recherche: true, cherchees: ['Fond'] }),
+    })
+    const { container } = render(<EcranGenere descripteur={descripteur()} />)
+    const o = outils(container)
+    await waitFor(() => expect(o.noms()).toHaveLength(2))
+    expect(container.textContent).toContain('La recherche et les critères cherchent aussi dans la base du greffe.')
+    fireEvent.change(container.querySelector('.rig-lm-cherche__saisie')!, { target: { value: 'bunbon' } })
+    await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Chercher', 'ECRAN_TEST', 'bunbon', {}))
+    await waitFor(() => expect(o.noms()).toEqual(['SANS LE MOT']))
+  })
+
+  // Lot 8 (26/11/2026) : l'injonction de RIG v2 (PROC_ISURV) exige l'etape « Cabinet et decision » -- le cabinet, le juge, la date
+  // prevue. Les Parametres d'une file se saisissent a cote de la liste et partent avec le geste en lot, par leur libelle ; une file
+  // sans parametre n'a pas ce panneau.
+  // fix-ok: mesure le 26/11/2026 -- les lignes du test portent un Id (sans Id, un geste ne part pas a la base : Demonstration), et
+  // l'acces lignesDeLaBase[0]! satisfait TypeScript strict (compiler.ps1 : TS2532 sur aEnjoindre[0]) ; rouge sans la retouche de FormeFile.
+  it('les saisies de l’action (Parametres) partent avec le geste en lot ; une file sans parametre n’en montre aucune', async () => {
+    const aEnjoindre: LigneEcranVue[] = lignesDeLaBase.map((l, k) => ({ ...l, id: `dossier:${k + 1}` }))
+    const pont = installerFauxPont({
+      'EcranGenere.Lignes': () => ({ mode: 'base', message: null, greffe: '3801', lignes: aEnjoindre, exemples: [] }),
+      'EcranGenere.Geste': () => ({ fait: true, message: 'Traitements effectués : 1 injonction.', sansEcrivain: false, ids: ['9'] }),
+    })
+    const injonctions = descripteur({ valider: 'Générer les injonctions', parametres: [champ('Date du cabinet', 'Date'), champ('Cabinet')] })
+    const { container } = render(<EcranGenere descripteur={injonctions} />)
+    const o = outils(container)
+    await waitFor(() => expect(o.noms()).toHaveLength(2))
+    const panneau = container.querySelector('aside.rig-criteres')!
+    expect(panneau.textContent).toContain('Saisies de l’action')
+    fireEvent.change(panneau.querySelector('input[aria-label="Date du cabinet"]')!, { target: { value: '2099-01-15' } })
+    fireEvent.change(panneau.querySelector('input[aria-label="Cabinet"]')!, { target: { value: 'CB18' } })
+    fireEvent.click(o.ligne(lignesDeLaBase[0]!.nom).querySelector('input[type=checkbox]')!)
+    fireEvent.click(o.bouton('Générer les injonctions'))
+    await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Geste', 'ECRAN_TEST', 'Fond', 'Agir', 'Générer les injonctions',
+      ['dossier:1'], { 'Date du cabinet': '2099-01-15', Cabinet: 'CB18' }))
+    await waitFor(() => expect(o.annonce()).toBe('Traitements effectués : 1 injonction.'))
+    cleanup()
+    retirerFauxPont()
+    installerFauxPont({ 'EcranGenere.Lignes': () => ({ mode: 'base', message: null, greffe: '3801', lignes: lignesDeLaBase, exemples: [] }) })
+    const sans = render(<EcranGenere descripteur={descripteur()} />).container
+    await waitFor(() => expect(outils(sans).noms()).toHaveLength(2))
+    expect(sans.querySelector('aside.rig-criteres')).toBeNull()
+  })
 })
 
 describe('Forme Fiche : retrouver, corriger, Enregistrer', () => {

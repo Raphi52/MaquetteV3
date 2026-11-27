@@ -3,8 +3,11 @@
 ## Compiler : `.\compiler.ps1` — JAMAIS `dotnet build`
 
 Pour savoir si le code compile, lance **`.\compiler.ps1`** (c'est-à-dire
-`dotnet msbuild RigV3Desktop.csproj -t:Compile`). Exit 0 = ça compile, exit 1 =
-les `error CS` sont dans la sortie.
+`dotnet msbuild RigV3Desktop.csproj -t:Compile`, puis la même cible sur
+`Serveur\RigV3.Serveur.csproj`). Exit 0 = l'application ET le serveur compilent, exit 1 =
+les `error CS` sont dans la sortie. Le serveur n'y était pas avant le 2026-11-27 : un
+« compiler.ps1 = 0 » plus ancien ne prouve rien sur `Serveur\` (10 erreurs passées ainsi
+à la réunion des lots 7 et 8, vues par le seul banc EcransGeneresBaseCheck).
 
 `dotnet build` et `dotnet run` recopient `bin\Debug\net10.0-windows\RigV3Desktop.exe`.
 Quand l'application de l'utilisateur tourne, ce fichier est **verrouillé par Windows** :

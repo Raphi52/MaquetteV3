@@ -1,19 +1,42 @@
-# « Relances beneficiaires » (LecteurRelancesBeneficiaires) sur le jeu PROC_DBE_RELANCE.sql : une ligne par diligence
-# SDBE qui n'est ni passee a l'injonction ni restee sans effet. Ordre : a relancer, sans courrier, relancees en cours,
-# puis closes ; la derniere relance la plus recente en tete. Toutes « DBE non deposee » (« DBE incomplete » n'a pas de
-# source dans l'ancien RIG : en-tete du lecteur).
-# Etat : etat relance 1/3/5 -> AFaire [] ; aucune relance -> EnCours [0,1] ; relance envoyee -> Validee [0,1,2], + 3 si
-# la diligence est close (204 regularisee, 205 non regularisee).
+# « Relances beneficiaires » (LecteurRelancesBeneficiaires) sur le jeu PROC_DBE_RELANCE.sql : les dossiers A RELANCER (relance 1
+# du moteur PROC_RSURV, lot 8), puis une ligne par diligence SDBE qui n'est ni passee a l'injonction ni restee sans effet.
+# Ordre : a relancer (dossier croissant), sans courrier, relancees en cours, puis closes ; la derniere relance la plus recente
+# en tete. Toutes « DBE non deposee » (« DBE incomplete » n'a pas de source dans l'ancien RIG : en-tete du lecteur).
+# Etat : dossier a relancer -> AFaire [] ; diligence sans relance envoyee (etats relance 0, 1/3/5 compris : RIG v2 ne les
+# relance pas) -> EnCours [0,1] ; relance envoyee -> Validee [0,1,2], + 3 si la diligence est close (204 regularisee, 205 non
+# regularisee).
+# A relancer (lot 8) : 1800201 (B1) et 1800202 (C1) ; 1800207 (siege hors Union europeenne), jumeau de 1800206 (siege en
+# Belgique, ecarte) ; 1800209 (demande MC1 validee), jumeau de 1800208 (MC1 en attente « Q », ecarte) ; 1800212 (exclu de SDCA
+# seulement), jumeau de 1800211 (exclu de SDBE, ecarte) ; 1800214 (diligence SDBE d'etat relance 0), jumeau de 1800213 (etat
+# relance 1 : sa diligence en cours l'ecarte de la recherche). Ecartes, jumeau 1800201 : 1800203 (type A1), 1800204 (forme
+# juridique a ne pas traiter), 1800205 (cotee), 1800210 (dissoute), 1800215 (radie), 1800216 (EIRL), 1800217 (cessation).
 # Restent des relances (leurs jumeaux ecartes sont dans PROC_DBE_INJ.sql) : 206 (delai expirant AUJOURD'HUI, la V2
 # compare « avant le jour ») -- jumeau 1100101 (expire hier, a enjoindre) ; 207 (expire, mais dossier radie) -- jumeau
 # 1100101 ; 208 (relance IDBE sans instance) -- jumeau 1100103 (IDBE avec instance, injonction).
 # Ecarte : 209 (diligence SASSOSCI) -- jumeau retenu 201 (SDBE). 210 : etat relance 2 SANS ligne RELANCE_RCS, relancee
 # (l'etat fait foi), sans date : derniere des relancees en cours -- jumeau 203 (etat 0 : en cours).
-BENEF ALPHA SARL · SIREN 511 000 201 | 1re relance à faire | DBE non déposée | AFaire | []
+RBE UN SAS · SIREN 518 002 201 | Relance 1 due | DBE non déposée | AFaire | []
+RBE DEUX SARL · SIREN 518 002 202 | Relance 1 due | DBE non déposée | AFaire | []
+RBE SEPT SAS · SIREN 518 002 207 | Relance 1 due | DBE non déposée | AFaire | []
+RBE NEUF SAS · SIREN 518 002 209 | Relance 1 due | DBE non déposée | AFaire | []
+RBE DOUZE SAS · SIREN 518 002 212 | Relance 1 due | DBE non déposée | AFaire | []
+RBE QUATORZE SAS · SIREN 518 002 214 | Relance 1 due | DBE non déposée | AFaire | []
+RBE QUATORZE SAS · SIREN 518 002 214 | aucune relance envoyée | DBE non déposée | EnCours | [0,1]
+RBE TREIZE SAS · SIREN 518 002 213 | 1re relance à faire | DBE non déposée | EnCours | [0,1]
 BENEF GAMMA SARL · SIREN 511 000 203 | aucune relance envoyée | DBE non déposée | EnCours | [0,1]
+BENEF ALPHA SARL · SIREN 511 000 201 | 1re relance à faire | DBE non déposée | EnCours | [0,1]
 BENEF THETA SAS · SIREN 511 000 208 | Relance 2 du {J-5} | DBE non déposée | Validee | [0,1,2]
 BENEF BETA SAS · SIREN 511 000 202 | Relance 1 du {J-10} · limite {J+20} | DBE non déposée | Validee | [0,1,2]
 BENEF ZETA SAS · SIREN 511 000 206 | Relance 1 du {J-30} · limite {J+0} | DBE non déposée | Validee | [0,1,2]
+# Lot 8 (27/11/2026) : 1800102 et 1800103 (PROC_DBE_INJ.sql), relance echue mais ecartes de l'injonction (societe cotee, forme sans beneficiaires) : leur relance reste ici.
+# Lot 8 (27/11) : les dossiers 1800104-08 de PROC_DBE_INJ.sql, relance 1 echue, que l'injonction ecarte (une exclusion chacun) : Relancee ici.
+ENJOINDRE DEJA OPINJRBE · SIREN 518 000 108 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE DEMANDE MB1 · SIREN 518 000 107 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE FORMALITE BEN · SIREN 518 000 106 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE DEPOT BEN · SIREN 518 000 105 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE SIEGE UE · SIREN 518 000 104 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE SANS BEN · SIREN 518 000 103 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE COTEE SA · SIREN 518 000 102 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
 BENEF ETA SARL · SIREN 511 000 207 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
 BENEF KAPPA SAS · SIREN 511 000 210 | 1re relance faite | DBE non déposée | Validee | [0,1,2]
 BENEF DELTA SAS · SIREN 511 000 204 | Relance 1 du {J-40} · limite {J-10} · régularisée le {J-2} | DBE non déposée | Validee | [0,1,2,3]

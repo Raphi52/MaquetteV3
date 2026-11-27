@@ -1,18 +1,35 @@
-# « Injonctions comptes annuels » (LecteurInjonctionsComptesAnnuels) sur le jeu PROC_DCA_INJ.sql : les demandes de
-# depot DCA / DCADEMAT d'un dossier sous injonction DCA (relance IDCA avec instance sur une diligence SDCA), creees le
-# jour de l'injonction (J-30) ou apres, et au plus tard a la regularisation de sa diligence. Ordre : a traiter
-# (A, Q, R), en cours (I...), reclamation (N), puis closes (V, T, O) ; dans chaque bloc la plus recente en tete.
-# Groupe : N ou O -> Reclamations et refus ; sinon DCADEMAT -> Depots dematerialises, DCA -> Depots papier.
-# Etat : A/Q/R -> AFaire [] ; I -> EnCours [0] ; N -> EnCours [0,1,3] ; V/T -> Validee [0,1,2,4] ; O -> Rejetee [0,1,3].
-# Ecartes : 1100318 (depot la veille de l'injonction) -- jumeau retenu 1100317 (le jour meme) ; 1100319 (supprime, X)
-# -- jumeau retenu 1100312 (A) ; 1100320 (processus DAS) -- jumeau retenu 1100311 ; 1100321 (« injonction » sur une
-# diligence SASSOSCI) -- jumeau retenu 1100312 ; 1100458 de PROC_DCA_RELANCE.sql (relance IDCA SANS instance) --
-# jumeau retenu 1100312 (IDCA avec instance) ; 1100322 (depot apres la regularisation de l'injonction de 1100304) --
-# jumeau retenu 1100314 (cree avant).
-INJONCTION BETA SAS · SIREN 511 000 302 | Injonction du {J-30} · reçu le {J-1} | Dépôts papier | AFaire | []
-INJONCTION ALPHA SARL · SIREN 511 000 301 | Injonction du {J-30} · reçu le {J-2} | Dépôts dématérialisés | AFaire | []
-INJONCTION GAMMA SARL · SIREN 511 000 303 | Injonction du {J-30} · reçu le {J-5} | Dépôts papier | EnCours | [0]
-INJONCTION ZETA SAS · SIREN 511 000 306 | Injonction du {J-30} · réclamation du {J-14} | Réclamations et refus | EnCours | [0,1,3]
-INJONCTION DELTA SAS · SIREN 511 000 304 | Injonction du {J-30} · déposé le {J-8} | Dépôts dématérialisés | Validee | [0,1,2,4]
-INJONCTION EPSILON SARL · SIREN 511 000 305 | Injonction du {J-30} · déposé le {J-11} | Dépôts papier | Validee | [0,1,2,4]
-INJONCTION ETA SARL · SIREN 511 000 307 | Injonction du {J-30} · refusé le {J-30} | Réclamations et refus | Rejetee | [0,1,3]
+# « Injonctions comptes annuels » (LecteurInjonctionsComptesAnnuels), apres TOUS les jeux. Trois sortes de lignes (en tete du lecteur) :
+#   « Relance restee sans effet » (AFaire []) : les dossiers a enjoindre de PROC_DCA_RELANCE.sql (lot 8) -- la recherche SDCA de la
+#     relance 1, etat DCA « 2% », diligence en cours relance 1 faite et ECHUE, sans relance IDCA avec instance ; un dossier par ligne,
+#     ses exercices comptes (1800602 : deux, 2022 et 2023, la derniere cloture affichee). Ecarte : 1800603 (relance 1 echeant
+#     aujourd'hui) -- jumeau retenu 1800601 (echue hier). 1800604 est retenu (son geste est refuse : pas de representant legal) ;
+#   « Injonction a suivre » (EnCours [0,1,2]) : une relance IDCA avec instance sur une diligence SDCA encore en cours -- celles de
+#     PROC_DCA_INJ.sql (1100301 a 1100307, sauf 1100304 dont la diligence est close regularisee « 9 » : jumeau ecarte) et 1100411 de
+#     PROC_DCA_RELANCE.sql (son injonction de J-15) ; 1100310 (relance IDCA sur une diligence SASSOSCI) est ecarte. Instance absente
+#     du banc : pas de role affiche ;
+#   les DEPOTS (demandes DCA / DCADEMAT d'un dossier sous injonction, creees le jour de l'injonction (J-30) ou apres, et au plus tard a
+#     la regularisation de sa diligence) : groupe N ou O -> Reclamations et refus ; sinon DCADEMAT -> Depots dematerialises, DCA ->
+#     Depots papier. Etat : A/Q/R -> AFaire ; I -> EnCours ; N -> EnCours ; V/T -> Validee ; O -> Rejetee.
+#     Ecartes : 1100318 (depot la veille de l'injonction) -- jumeau retenu 1100317 (le jour meme) ; 1100319 (supprime, X) -- jumeau
+#     retenu 1100312 (A) ; 1100320 (processus DAS) -- jumeau retenu 1100311 ; 1100321 (« injonction » sur une diligence SASSOSCI) --
+#     jumeau retenu 1100312 ; 1100458 de PROC_DCA_RELANCE.sql (relance IDCA SANS instance) -- jumeau retenu 1100312 (IDCA avec
+#     instance) ; 1100322 (depot apres la regularisation de l'injonction de 1100304) -- jumeau retenu 1100314 (cree avant).
+# Ordre : a enjoindre (dossier croissant), depots a traiter, injonctions a suivre, depots en cours, reclamations, puis depots clos ;
+# la plus recente en tete.
+INJ ALPHA SAS · SIREN 518 006 601 | 1 exercice à enjoindre · clôture du 31/12/2023 · relance 1 échue | Relance restée sans effet | AFaire | []
+INJ BETA SAS · SIREN 518 006 602 | 2 exercices à enjoindre · clôture du 31/12/2023 · relance 1 échue | Relance restée sans effet | AFaire | []
+INJ DELTA SAS · SIREN 518 006 604 | 1 exercice à enjoindre · clôture du 31/12/2023 · relance 1 échue | Relance restée sans effet | AFaire | []
+INJONCTION BETA SAS · SIREN 511 000 302 | Injonction du {J-30} · reçu le {J-1} | Dépôts papier | AFaire | [0,1,2]
+INJONCTION ALPHA SARL · SIREN 511 000 301 | Injonction du {J-30} · reçu le {J-2} | Dépôts dématérialisés | AFaire | [0,1,2]
+RELANCE LAMBDA SARL · SIREN 511 000 411 | Injonction du {J-15} · non régularisée | Injonction à suivre | EnCours | [0,1,2]
+INJONCTION ETA SARL · SIREN 511 000 307 | Injonction du {J-30} · non régularisée | Injonction à suivre | EnCours | [0,1,2]
+INJONCTION ZETA SAS · SIREN 511 000 306 | Injonction du {J-30} · non régularisée | Injonction à suivre | EnCours | [0,1,2]
+INJONCTION EPSILON SARL · SIREN 511 000 305 | Injonction du {J-30} · non régularisée | Injonction à suivre | EnCours | [0,1,2]
+INJONCTION GAMMA SARL · SIREN 511 000 303 | Injonction du {J-30} · non régularisée | Injonction à suivre | EnCours | [0,1,2]
+INJONCTION BETA SAS · SIREN 511 000 302 | Injonction du {J-30} · non régularisée | Injonction à suivre | EnCours | [0,1,2]
+INJONCTION ALPHA SARL · SIREN 511 000 301 | Injonction du {J-30} · non régularisée | Injonction à suivre | EnCours | [0,1,2]
+INJONCTION GAMMA SARL · SIREN 511 000 303 | Injonction du {J-30} · reçu le {J-5} | Dépôts papier | EnCours | [0,1,2]
+INJONCTION ZETA SAS · SIREN 511 000 306 | Injonction du {J-30} · réclamation du {J-14} | Réclamations et refus | EnCours | [0,1,2,3]
+INJONCTION DELTA SAS · SIREN 511 000 304 | Injonction du {J-30} · déposé le {J-8} | Dépôts dématérialisés | Validee | [0,1,2,3]
+INJONCTION EPSILON SARL · SIREN 511 000 305 | Injonction du {J-30} · déposé le {J-11} | Dépôts papier | Validee | [0,1,2,3]
+INJONCTION ETA SARL · SIREN 511 000 307 | Injonction du {J-30} · refusé le {J-30} | Réclamations et refus | Rejetee | [0,1,2,3]

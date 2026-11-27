@@ -1,0 +1,22 @@
+# « Relances beneficiaires » (LecteurRelancesBeneficiaires) : la recherche de RIG v2 par numero de gestion ou SIREN
+# (NatureDiligence.parametre.cs:643-651), et le champ de recherche (nom, SIREN, numero de gestion). Lignes : PROC_DBE_RELANCE.sql.
+# Le numero de gestion de 1800214 : le dossier a relancer ET sa diligence d'etat relance 0.
+critere: Numéro de gestion ou SIREN = 2026B18214
+lignes:
+RBE QUATORZE SAS · SIREN 518 002 214 | Relance 1 due | DBE non déposée | AFaire | []
+RBE QUATORZE SAS · SIREN 518 002 214 | aucune relance envoyée | DBE non déposée | EnCours | [0,1]
+---
+# Le SIREN, blancs compris dans la saisie, trouve un dossier a relancer.
+critere: Numéro de gestion ou SIREN = 518 002 207
+lignes:
+RBE SEPT SAS · SIREN 518 002 207 | Relance 1 due | DBE non déposée | AFaire | []
+---
+# Le texte cherche le nom des dossiers a relancer et des diligences ; un dossier ecarte de la recherche (1800206, siege en
+# Belgique) ne sort pas, meme si son nom repond.
+texte: RBE S
+lignes:
+RBE SEPT SAS · SIREN 518 002 207 | Relance 1 due | DBE non déposée | AFaire | []
+---
+# Un SIREN d'un dossier ecarte (1800205, cote en bourse) : rien.
+critere: Numéro de gestion ou SIREN = 518002205
+lignes:

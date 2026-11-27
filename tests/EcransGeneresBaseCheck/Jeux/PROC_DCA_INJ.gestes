@@ -1,0 +1,88 @@
+# « Injonctions comptes annuels » (PROC_DCA_INJ) : « Générer les injonctions » (EcrivainInjonctionsComptesAnnuels, moteur
+# InjonctionsIsurv.cs = PROC_ISURV, nature SDCA). Les dossiers a enjoindre (1800601 a 1800604) : PROC_DCA_RELANCE.sql ; le cabinet
+# du 15/01/2099 chambre CB18, les codes (POP18, OPDCA18 sans parametre d'edition, chef INJ18) et les reglages SDCA / ISURV :
+# PROC_DBE_INJ.sql. Joue apres PROC_DBE_INJ.gestes (ordre des noms) : la serie JRO18 en est a son 3e numero. Lot 8 du plan
+# « RIG v3 100 % fonctionnel ».
+
+# 1. Refus : une ligne qui n'est pas un dossier a enjoindre (un depot, une injonction emise : sans Id « dossier: ») ne s'enjoint pas.
+#    Jumeau accepte : bloc 4.
+geste: Agir Générer les injonctions
+ids: 1100311
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: Seul un dossier à enjoindre s'enjoint : un dépôt ou une injonction déjà émise ne l'est pas (1100311).
+---
+# 2. Refus : 1800603 -- sa relance 1 echoit AUJOURD'HUI, elle n'est pas echue (RLCRC_DATE_LIMITE < aujourd'hui) : aucun exercice a
+#    enjoindre. Jumeau accepte : bloc 4 (1800601, echue hier).
+geste: Agir Générer les injonctions
+ids: dossier:1800603
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: INJ GAMMA SAS · SIREN 518 006 603 : aucun exercice à enjoindre (le dossier n'est plus dans la recherche des injonctions : relance 1 échue, sans dépôt ni injonction).
+---
+# 3. Refus : 1800604 n'a pas de representant legal (commissaire aux comptes seul) : RIEN n'est enjoint, meme 1800601. Jumeau accepte :
+#    bloc 4.
+geste: Agir Générer les injonctions
+ids: dossier:1800601,dossier:1800604
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: INJ DELTA SAS · SIREN 518 006 604 : aucun dirigeant représentant légal en fonction ; RIG v2 ne peut pas créer l'intervenant de l'injonction (rien n'est enjoint).
+---
+# 4. FAIT, en lot sur 2 lignes : 1800601 (un exercice) et 1800602 (deux exercices, 2022 puis 2023) -- TROIS injonctions, une par
+#    exercice. Le juge est saisi (JGB18, a la place de celui du cabinet) ; greffier et type de classement viennent du cabinet. Chef de
+#    demande INJ18, texte = la date de cloture de l'exercice. Relances IDCA : 1800661 n° 2 (etat relance 4, exercice « 44 ») ; 1800662
+#    n° 2 puis n° 3 (la V3 relit les relances avant chaque injonction : etat relance 6, exercices « 44 » et « 66 »). Pas d'ordonnance :
+#    le parametre d'edition INJDCA18 de OPDCA18 n'est pas dans la base. Les deux dossiers passent de « À traiter » (relance restee sans
+#    effet) a trois injonctions « En cours » (a suivre), et sortent des relances.
+geste: Agir Générer les injonctions
+ids: dossier:1800601,dossier:1800602
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Juge = JGB18
+valeur: Date prévue = 2099-01-15
+resultat: fait
+message: Traitements effectués : 3 injonctions pour 2 dossiers, rôles 2026OP00003, 2026OP00004, 2026OP00005 · Cabinet du 15/01/2099 à 09:30 - JUGEINJ Marc · aucune ordonnance, pas de paramètre d'édition pour ce type de décision dans la base du greffe. Non repris par la V3 : la facture, les mots directeurs et le récapitulatif Word des injonctions.
+lignes:
+INJ DELTA SAS · SIREN 518 006 604 | 1 exercice à enjoindre · clôture du 31/12/2023 · relance 1 échue | Relance restée sans effet | AFaire | []
+INJONCTION BETA SAS · SIREN 511 000 302 | Injonction du {J-30} · reçu le {J-1} | Dépôts papier | AFaire | [0,1,2]
+INJONCTION ALPHA SARL · SIREN 511 000 301 | Injonction du {J-30} · reçu le {J-2} | Dépôts dématérialisés | AFaire | [0,1,2]
+INJ BETA SAS · SIREN 518 006 602 | Injonction du {J+0} · rôle 2026OP00005 · clôture du 31/12/2023 · non régularisée | Injonction à suivre | EnCours | [0,1,2]
+INJ BETA SAS · SIREN 518 006 602 | Injonction du {J+0} · rôle 2026OP00004 · clôture du 31/12/2023 · non régularisée | Injonction à suivre | EnCours | [0,1,2]
+INJ ALPHA SAS · SIREN 518 006 601 | Injonction du {J+0} · rôle 2026OP00003 · clôture du 31/12/2023 · non régularisée | Injonction à suivre | EnCours | [0,1,2]
+RELANCE LAMBDA SARL · SIREN 511 000 411 | Injonction du {J-15} · non régularisée | Injonction à suivre | EnCours | [0,1,2]
+INJONCTION ETA SARL · SIREN 511 000 307 | Injonction du {J-30} · non régularisée | Injonction à suivre | EnCours | [0,1,2]
+INJONCTION ZETA SAS · SIREN 511 000 306 | Injonction du {J-30} · non régularisée | Injonction à suivre | EnCours | [0,1,2]
+INJONCTION EPSILON SARL · SIREN 511 000 305 | Injonction du {J-30} · non régularisée | Injonction à suivre | EnCours | [0,1,2]
+INJONCTION GAMMA SARL · SIREN 511 000 303 | Injonction du {J-30} · non régularisée | Injonction à suivre | EnCours | [0,1,2]
+INJONCTION BETA SAS · SIREN 511 000 302 | Injonction du {J-30} · non régularisée | Injonction à suivre | EnCours | [0,1,2]
+INJONCTION ALPHA SARL · SIREN 511 000 301 | Injonction du {J-30} · non régularisée | Injonction à suivre | EnCours | [0,1,2]
+INJONCTION GAMMA SARL · SIREN 511 000 303 | Injonction du {J-30} · reçu le {J-5} | Dépôts papier | EnCours | [0,1,2]
+INJONCTION ZETA SAS · SIREN 511 000 306 | Injonction du {J-30} · réclamation du {J-14} | Réclamations et refus | EnCours | [0,1,2,3]
+INJONCTION DELTA SAS · SIREN 511 000 304 | Injonction du {J-30} · déposé le {J-8} | Dépôts dématérialisés | Validee | [0,1,2,3]
+INJONCTION EPSILON SARL · SIREN 511 000 305 | Injonction du {J-30} · déposé le {J-11} | Dépôts papier | Validee | [0,1,2,3]
+INJONCTION ETA SARL · SIREN 511 000 307 | Injonction du {J-30} · refusé le {J-30} | Réclamations et refus | Rejetee | [0,1,2,3]
+controle: SELECT COUNT(*) FROM v2.INSTANCE WHERE INSTN_CODE_AFFAIRE = 'POP18' AND INSTN_NATURE_AFFAIRE = 'OPIDC18' AND INSTN_CODE_ACTE_PROCE = 'SO8' => 3
+controle: SELECT STRING_AGG(c.CHFDM_CODE_CHEF + ':' + c.CHFDM_TEXTE_LIBRE, ' / ') WITHIN GROUP (ORDER BY c.CHFDM_TEXTE_LIBRE) FROM v2.CHEF_DEMANDE AS c JOIN v2.RELANCE_RCS AS r ON r.RLCRC_ID_INSTN = c.CHFDM_ID_INSTN WHERE r.RLCRC_ID_DLGRC = 1800662 => INJ18:31/12/2022 / INJ18:31/12/2023
+controle: SELECT STRING_AGG(CAST(r.RLCRC_NUM_ORDRE AS varchar(3)) + ':' + r.RLCRC_TYPE_RELANCE, ',') WITHIN GROUP (ORDER BY r.RLCRC_NUM_ORDRE) FROM v2.RELANCE_RCS AS r WHERE r.RLCRC_ID_DLGRC = 1800662 => 1:S,2:IDCA,3:IDCA
+controle: SELECT (SELECT DLGRC_ETAT_RELANCE FROM v2.DILIGENCE_RCS WHERE DLGRC_ID_DLGRC = 1800661) + '|' + (SELECT DLGRC_ETAT_RELANCE FROM v2.DILIGENCE_RCS WHERE DLGRC_ID_DLGRC = 1800662) => 4|6
+controle: SELECT STRING_AGG(CAST(EXRCC_ID_EXRCC AS varchar(10)) + ':' + EXRCC_ETAT_DCA, ',') WITHIN GROUP (ORDER BY EXRCC_ID_EXRCC) FROM v2.EXERCICE WHERE EXRCC_ID_EXRCC IN (1800641, 1800642, 1800652) => 1800641:44,1800642:44,1800652:66
+controle: SELECT CAST(d.DCJDC_ID_JUG AS varchar(10)) + '|' + CAST(d.DCJDC_ID_GRASS AS varchar(10)) + '|' + d.DCJDC_TYPE_DECISION FROM v2.DECISION_JUDICIAIRE AS d JOIN v2.RELANCE_RCS AS r ON r.RLCRC_ID_INSTN = d.DCJDC_ID_INSTN WHERE r.RLCRC_ID_DLGRC = 1800661 AND r.RLCRC_TYPE_RELANCE = 'IDCA' => 1800062|1800071|OPDCA18
+controle: SELECT STRING_AGG(e.EVNPR_CODE_EVE_PRO, ',') FROM v2.EVENEMENT_PROCEDURE AS e JOIN v2.RELANCE_RCS AS r ON r.RLCRC_ID_INSTN = e.EVNPR_ID_INSTN WHERE r.RLCRC_ID_DLGRC = 1800661 AND r.RLCRC_TYPE_RELANCE = 'IDCA' => DCAI18
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION AS e JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = e.DMNED_ID_DMND WHERE d.DMND_ID_DSRCS IN (1800601, 1800602) => 0
+controle: SELECT COUNT(*) FROM v2.DEMANDE AS d WHERE d.DMND_CODE_PROSS = 'OPE' AND d.DMND_ETAT_DEMANDE = 'V' AND d.DMND_ID_DSRCS IN (1800601, 1800602) => 3
+---
+# 5. Refus : rejouer 1800601 -- son exercice porte l'injonction (relance IDCA avec instance) : aucun exercice a enjoindre. Jumeau
+#    accepte : bloc 4.
+geste: Agir Générer les injonctions
+ids: dossier:1800601
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: INJ ALPHA SAS · SIREN 518 006 601 : aucun exercice à enjoindre (le dossier n'est plus dans la recherche des injonctions : relance 1 échue, sans dépôt ni injonction).

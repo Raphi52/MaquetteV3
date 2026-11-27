@@ -76,6 +76,8 @@ geste: Agir Signer la sélection
 ids: 2000108
 resultat: fait
 lignes:
+# lot 8 (27/11/2026) : les ordonnances a signer que PROC_DCA_INJ, PROC_DBE_INJ et PROC_IPSUIVI.gestes (joues avant) creent -- injonctions, OP de caducite
+Juge # CREANCIER RHO | Rôle 2026OP00001 · Ordonnance de caducite · date prévue non renseignée | OP | AFaire | []
 ORDO A | Rôle 2026OS20101 · Ordonnance du banc lot 10 · prévue le {J+1} | OP | AFaire | []
 ORDO C | Rôle 2026OS20103 · Ordonnance sans minute du banc · prévue le {J+3} · Instance bloquée (26000200103), demande "En cours" : MJUD par BANC LOT10 | OP | EnAttente | []
 ORDO E | Rôle 2026OS20105 · Ordonnance sans minute du banc · signée le {J+0} | OP | Validee | []
@@ -87,7 +89,14 @@ ORDO H | Rôle 2026OS20108 · Ordonnance sans minute du banc · signée le {J+0}
 ORDO K | Rôle 2026OS20111 · Ordonnance sans minute du banc · prévue le {J+11} | JC | AFaire | []
 ORDO L | Rôle 2026OS20112 · Ordonnance sans minute du banc · prévue le {J+12} | Juge RCS | AFaire | []
 ORDO N | Rôle 2026OS20114 · Ordonnance sans minute du banc · prévue le {J+14} | Injonction DCA | AFaire | []
+# lot 8 (27/11/2026) : les ordonnances a signer que PROC_DCA_INJ, PROC_DBE_INJ et PROC_IPSUIVI.gestes (joues avant) creent -- injonctions, OP de caducite
+Le PRESIDENT DU TRIBUNAL DE COMMERCE DU BANC # INJ ALPHA SAS | Rôle 2026OP00003 · Ordonnance injonction DCA lot 8 · prévue le 15/01/2099 | Injonction DCA | AFaire | []
+Le PRESIDENT DU TRIBUNAL DE COMMERCE DU BANC # INJ BETA SAS | Rôle 2026OP00004 · Ordonnance injonction DCA lot 8 · prévue le 15/01/2099 | Injonction DCA | AFaire | []
+Le PRESIDENT DU TRIBUNAL DE COMMERCE DU BANC # INJ BETA SAS | Rôle 2026OP00005 · Ordonnance injonction DCA lot 8 · prévue le 15/01/2099 | Injonction DCA | AFaire | []
 ORDO O | Rôle 2026OS20115 · Ordonnance sans minute du banc · prévue le {J+15} | Injonction RBE | AFaire | []
+# lot 8 (27/11/2026) : les ordonnances a signer que PROC_DCA_INJ, PROC_DBE_INJ et PROC_IPSUIVI.gestes (joues avant) creent -- injonctions, OP de caducite
+Le PRESIDENT DU TRIBUNAL DE COMMERCE # ENJOINDRE ALPHA SARL | Rôle 2026OP00001 · Ordonnance injonction DBE lot 8 · prévue le 15/01/2099 | Injonction RBE | AFaire | []
+Le PRESIDENT DU TRIBUNAL DE COMMERCE # ENJOINDRE BETA SAS | Rôle 2026OP00002 · Ordonnance injonction DBE lot 8 · prévue le 15/01/2099 | Injonction RBE | AFaire | []
 ORDO P | Rôle 2026OS20116 · Ordonnance sans minute du banc · prévue le {J+16} | Injonctions juge commis | AFaire | []
 controle: SELECT CASE WHEN DCJDC_NUM_REPERTOIRE IS NULL AND CONVERT(date, DCJDC_DATE) = CONVERT(date, GETDATE()) THEN 'rendue sans minute' ELSE 'non' END FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_DCJDC = 2000108 => rendue sans minute
 controle: SELECT d.DMND_NOM + ' / ' + d.DMND_ETAT_DEMANDE + ' / ' + d.DMND_LES_NUMEROS + ' / ' + (SELECT x.DSSDM_VALEUR_SEQUENCEUR FROM v2.DOSSIER_DEMANDE AS x WHERE x.DSSDM_ID_DMND = d.DMND_ID_DMND AND x.DSSDM_CODE_SEQUENCEUR = '2R') + ' / ' + m.DMND_NOM + ' / ' + m.DMND_ETAT_DEMANDE FROM v2.DEMANDE AS d JOIN v2.DOSSIER_DEMANDE AS s ON s.DSSDM_ID_DMND = d.DMND_ID_DMND AND s.DSSDM_CODE_SEQUENCEUR = '2J' AND s.DSSDM_VALEUR_SEQUENCEUR = '2000108' JOIN v2.DEMANDE AS m ON m.DMND_ID_DMND = d.DMND_ID_DMND_MERE WHERE d.DMND_CODE_PROSS = 'ORDOSIGN' => ORDO H / V / 2026OS20108 / 2000801 / Décision rendue / V

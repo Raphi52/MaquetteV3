@@ -1,6 +1,9 @@
 # Les gestes de EcrivainPartiesInstance (« Parties d'une instance », PROC_PARTIES), joues dans l'ordre par la route POST, sur
 # les lignes de PROC_PARTIES.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). Un refus n'ecrit
 # rien ; chaque refus a son jumeau accepte (meme borne, autre cote).
+# PROC_PARTIES lit toutes les parties (sans filtre, comme la V2) : les lignes relues apres ses gestes comptent aussi les trois parties
+# (demandeur, defendeur, intervenant) de chaque injonction ecrite AVANT par PROC_DBE_INJ.gestes et PROC_DCA_INJ.gestes (lot 8 :
+# instances 2026OP00001 a 2026OP00005).
 
 # 1. Case AJ cochee sans choisir Partielle ni Totale : refuse (PROC_PARTIES.cs:189-200 ; OPE_PARTIE.cs:218-224).
 #    Jumeau accepte : bloc 5, la meme case avec Totale.
@@ -57,9 +60,41 @@ MU BOULANGERIE | Défendeur · instance 2026Y13202 | Défendeurs | AFaire | []
 # Les deux parties de l'ordonnance d'enrôlement que PROC_CORDJRCS.gestes (joue avant) cree, instance 2026RC00001 (lot 5).
 ORD NOUVEAU DEMANDEUR | Demandeur · instance 2026RC00001 | Demandeurs | AFaire | []
 ORD NOUVEAU DEFENDEUR | Défendeur · instance 2026RC00001 | Défendeurs | AFaire | []
+# Les trois parties de chaque injonction de PROC_DBE_INJ.gestes et PROC_DCA_INJ.gestes (lot 8), instances 2026OP00005 a 2026OP00001.
+ENJOINDRE DEJA OPINJRBE | Défendeur · instance 2026OP81808 | Défendeurs | AFaire | []
+MR Le PRESIDENT DU TRIBUNAL DE COMMERCE DU BANC | Demandeur · instance 2026OP00005 | Demandeurs | AFaire | []
+INJ BETA SAS | Défendeur · instance 2026OP00005 | Défendeurs | AFaire | []
+MME BETAGERANTE Ana | Intervenant · instance 2026OP00005 | Intervenants | AFaire | []
+MR Le PRESIDENT DU TRIBUNAL DE COMMERCE DU BANC | Demandeur · instance 2026OP00004 | Demandeurs | AFaire | []
+INJ BETA SAS | Défendeur · instance 2026OP00004 | Défendeurs | AFaire | []
+MME BETAGERANTE Ana | Intervenant · instance 2026OP00004 | Intervenants | AFaire | []
+MR Le PRESIDENT DU TRIBUNAL DE COMMERCE DU BANC | Demandeur · instance 2026OP00003 | Demandeurs | AFaire | []
+INJ ALPHA SAS | Défendeur · instance 2026OP00003 | Défendeurs | AFaire | []
+MR ALPHAGERANT Leo | Intervenant · instance 2026OP00003 | Intervenants | AFaire | []
+MR Le PRESIDENT DU TRIBUNAL DE COMMERCE | Demandeur · instance 2026OP00002 | Demandeurs | AFaire | []
+ENJOINDRE BETA SAS | Défendeur · instance 2026OP00002 | Défendeurs | AFaire | []
+MME BERNARD Julie | Intervenant · instance 2026OP00002 | Intervenants | AFaire | []
+# lot 8 (27/11/2026) : les IP 18019xx de PROC_IPSUIVI.sql et l'instance au fond ou l'OP que PROC_IPSUIVI.gestes cree (provision, caducite)
+Juge | Demandeur · instance 2026OP00001 | Demandeurs | AFaire | []
+CREANCIER RHO | Défendeur · instance 2026OP00001 | Défendeurs | AFaire | []
+DEBITEUR RHO | Intervenant · instance 2026OP00001 | Intervenants | AFaire | []
+MR Le PRESIDENT DU TRIBUNAL DE COMMERCE | Demandeur · instance 2026OP00001 | Demandeurs | AFaire | []
+ENJOINDRE ALPHA SARL | Défendeur · instance 2026OP00001 | Défendeurs | AFaire | []
+MR DURAND Paul Henri | Intervenant · instance 2026OP00001 | Intervenants | AFaire | []
+# lot 8 (27/11/2026) : les IP 18019xx de PROC_IPSUIVI.sql et l'instance au fond ou l'OP que PROC_IPSUIVI.gestes cree (provision, caducite)
+CREANCIER OMICRON | Demandeur · instance 2026J81901 | Demandeurs | AFaire | []
+DEBITEUR OMICRON | Défendeur · instance 2026J81901 | Défendeurs | AFaire | []
 ALPHA BANC SARL | Demandeur · instance 2026J12001 | Demandeurs | AFaire | []
 M. BETA Jean | Défendeur · instance 2026J12001 | Défendeurs | AFaire | []
 # Les deux parties de l'injonction de payer 2026IP81401 de PROC_SURVIP.sql (lot 8 : son demandeur et son defendeur).
+# lot 8 (27/11/2026) : les IP 18019xx de PROC_IPSUIVI.sql et l'instance au fond ou l'OP que PROC_IPSUIVI.gestes cree (provision, caducite)
+CREANCIER PHI | Demandeur · instance 2026IP81904 | Demandeurs | AFaire | []
+CREANCIER RHO | Demandeur · instance 2026IP81901 | Demandeurs | AFaire | []
+DEBITEUR RHO | Défendeur · instance 2026IP81901 | Défendeurs | AFaire | []
+CREANCIER OMICRON | Demandeur · instance 2026IP81702 | Demandeurs | AFaire | []
+DEBITEUR OMICRON | Défendeur · instance 2026IP81702 | Défendeurs | AFaire | []
+CREANCIER SIGMA | Demandeur · instance 2026IP81701 | Demandeurs | AFaire | []
+DEBITEUR SIGMA | Défendeur · instance 2026IP81701 | Défendeurs | AFaire | []
 CREANCIER ALPHA | Demandeur · instance 2026IP81401 | Demandeurs | AFaire | []
 DEBITEUR BETA | Défendeur · instance 2026IP81401 | Défendeurs | AFaire | []
 # Les deux parties de l'injonction de payer que PROC_IPE.gestes (joue avant) cree, instance 2026IP00001 (lot 5).
@@ -155,9 +190,41 @@ MU BOULANGERIE | Défendeur · instance 2026Y13202 | Défendeurs | AFaire | []
 # Les deux parties de l'ordonnance d'enrôlement que PROC_CORDJRCS.gestes (joue avant) cree, instance 2026RC00001 (lot 5).
 ORD NOUVEAU DEMANDEUR | Demandeur · instance 2026RC00001 | Demandeurs | AFaire | []
 ORD NOUVEAU DEFENDEUR | Défendeur · instance 2026RC00001 | Défendeurs | AFaire | []
+# Les trois parties de chaque injonction de PROC_DBE_INJ.gestes et PROC_DCA_INJ.gestes (lot 8), instances 2026OP00005 a 2026OP00001.
+ENJOINDRE DEJA OPINJRBE | Défendeur · instance 2026OP81808 | Défendeurs | AFaire | []
+MR Le PRESIDENT DU TRIBUNAL DE COMMERCE DU BANC | Demandeur · instance 2026OP00005 | Demandeurs | AFaire | []
+INJ BETA SAS | Défendeur · instance 2026OP00005 | Défendeurs | AFaire | []
+MME BETAGERANTE Ana | Intervenant · instance 2026OP00005 | Intervenants | AFaire | []
+MR Le PRESIDENT DU TRIBUNAL DE COMMERCE DU BANC | Demandeur · instance 2026OP00004 | Demandeurs | AFaire | []
+INJ BETA SAS | Défendeur · instance 2026OP00004 | Défendeurs | AFaire | []
+MME BETAGERANTE Ana | Intervenant · instance 2026OP00004 | Intervenants | AFaire | []
+MR Le PRESIDENT DU TRIBUNAL DE COMMERCE DU BANC | Demandeur · instance 2026OP00003 | Demandeurs | AFaire | []
+INJ ALPHA SAS | Défendeur · instance 2026OP00003 | Défendeurs | AFaire | []
+MR ALPHAGERANT Leo | Intervenant · instance 2026OP00003 | Intervenants | AFaire | []
+MR Le PRESIDENT DU TRIBUNAL DE COMMERCE | Demandeur · instance 2026OP00002 | Demandeurs | AFaire | []
+ENJOINDRE BETA SAS | Défendeur · instance 2026OP00002 | Défendeurs | AFaire | []
+MME BERNARD Julie | Intervenant · instance 2026OP00002 | Intervenants | AFaire | []
+# lot 8 (27/11/2026) : les IP 18019xx de PROC_IPSUIVI.sql et l'instance au fond ou l'OP que PROC_IPSUIVI.gestes cree (provision, caducite)
+Juge | Demandeur · instance 2026OP00001 | Demandeurs | AFaire | []
+CREANCIER RHO | Défendeur · instance 2026OP00001 | Défendeurs | AFaire | []
+DEBITEUR RHO | Intervenant · instance 2026OP00001 | Intervenants | AFaire | []
+MR Le PRESIDENT DU TRIBUNAL DE COMMERCE | Demandeur · instance 2026OP00001 | Demandeurs | AFaire | []
+ENJOINDRE ALPHA SARL | Défendeur · instance 2026OP00001 | Défendeurs | AFaire | []
+MR DURAND Paul Henri | Intervenant · instance 2026OP00001 | Intervenants | AFaire | []
+# lot 8 (27/11/2026) : les IP 18019xx de PROC_IPSUIVI.sql et l'instance au fond ou l'OP que PROC_IPSUIVI.gestes cree (provision, caducite)
+CREANCIER OMICRON | Demandeur · instance 2026J81901 | Demandeurs | AFaire | []
+DEBITEUR OMICRON | Défendeur · instance 2026J81901 | Défendeurs | AFaire | []
 ALPHA BANC SARL | Demandeur · instance 2026J12001 | Demandeurs | AFaire | []
 M. BETA Jean | Défendeur · instance 2026J12001 | Défendeurs | AFaire | []
 # Les deux parties de l'injonction de payer 2026IP81401 de PROC_SURVIP.sql (lot 8 : son demandeur et son defendeur).
+# lot 8 (27/11/2026) : les IP 18019xx de PROC_IPSUIVI.sql et l'instance au fond ou l'OP que PROC_IPSUIVI.gestes cree (provision, caducite)
+CREANCIER PHI | Demandeur · instance 2026IP81904 | Demandeurs | AFaire | []
+CREANCIER RHO | Demandeur · instance 2026IP81901 | Demandeurs | AFaire | []
+DEBITEUR RHO | Défendeur · instance 2026IP81901 | Défendeurs | AFaire | []
+CREANCIER OMICRON | Demandeur · instance 2026IP81702 | Demandeurs | AFaire | []
+DEBITEUR OMICRON | Défendeur · instance 2026IP81702 | Défendeurs | AFaire | []
+CREANCIER SIGMA | Demandeur · instance 2026IP81701 | Demandeurs | AFaire | []
+DEBITEUR SIGMA | Défendeur · instance 2026IP81701 | Défendeurs | AFaire | []
 CREANCIER ALPHA | Demandeur · instance 2026IP81401 | Demandeurs | AFaire | []
 DEBITEUR BETA | Défendeur · instance 2026IP81401 | Défendeurs | AFaire | []
 # Les deux parties de l'injonction de payer que PROC_IPE.gestes (joue avant) cree, instance 2026IP00001 (lot 5).
