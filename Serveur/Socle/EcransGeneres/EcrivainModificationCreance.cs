@@ -20,9 +20,11 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// « affaire », les montants avant et apres.
 /// NON REPRIS (nomme) : la SUPPRESSION d'une creance (bouton Supprimer de la grille, :586-627 : DELETE de la creance et de son
 /// creancier, Instance.DeleteCascade et numero de role reattribue s'il y a une instance, demande « Admission créance … supprimée »
-/// validee) -- la forme Fiche n'a que le geste Enregistrer (tests/EcransGeneresBaseCheck/Program.cs:770, FormeFiche.tsx) ; la DATE DE
-/// DEPOT (:310-320, :560-579 : EVNPR_DATE de l'evenement de procedure de l'instance qui porte un depot, et DPTPC_DATE de ce depot),
-/// saisissable seulement pour une creance qui a une instance -- reste a faire du lot 12.
+/// validee) -- l'ecran n'a pas de bouton pour ce geste : la forme Fiche n'envoie qu'Enregistrer (web/src/ecrans/formes/FormeFiche.tsx,
+/// jouer({ type: 'Enregistrer' … }), socle commun a toutes les fiches, hors des fichiers de ce lot), et la suppression de RIG v2 efface
+/// en cascade l'instance de la creance (Instance.DeleteCascade) ; la DATE DE DEPOT (:310-320, :560-579 : EVNPR_DATE de l'evenement de
+/// procedure de l'instance qui porte un depot, et DPTPC_DATE de ce depot), saisissable seulement pour une creance qui a une instance --
+/// la V3 n'ecrit pas encore les instances d'une creance PC (meme raison que la contestation, EcrivainAjoutCreance.cs) : non fait.
 /// </summary>
 internal sealed class EcrivainModificationCreance : IEcrivainEcran
 {

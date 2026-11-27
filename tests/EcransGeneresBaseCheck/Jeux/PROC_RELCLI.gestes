@@ -1,8 +1,9 @@
 # Les gestes de EcrivainRelevesClients (« Releve de compte », PROC_RELCLI) : « Valider les soldes », sur les comptes de PROC_RELCLI.sql.
 # Format : en tete de tests/EcransGeneresBaseCheck/Program.cs. Chaque refus a son jumeau accepte. Les soldes ecrits se relisent par
 # des SELECT exacts (decimal(19,2)) sur v2.CLIENT_SOLDE.
-# Le refus « Droits insuffisants » (PROC_RELCLI.cs:72-73) ne se joue pas ici : l'agent du banc a EXPCOMPTA par son role (PROC_RELCLI.sql),
-# pour tous les blocs ; il se joue a l'ecran avec un agent sans ce droit (compte rendu du lot 12).
+# Le refus « Droits insuffisants » (PROC_RELCLI.cs:72-73) ne se joue pas ici : l'agent du banc a EXPCOMPTA par son role (PROC_RELCLI.sql)
+# pour tous les blocs. Il se joue dans tests/EcransGeneresBaseCheck/Program.cs, juste AVANT la boucle des gestes : le droit retire, le
+# geste du bloc 3 refuse sans rien ecrire, puis le droit remis -- le bloc 3 est son jumeau accepte, dans le meme etat de base.
 
 # 1. Aucun compte coche (PROC_RELCLI.cs:75-76). Jumeau accepte : bloc 3 (un compte coche).
 geste: Agir Valider les soldes

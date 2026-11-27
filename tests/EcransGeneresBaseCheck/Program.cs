@@ -583,6 +583,25 @@ if (Environment.GetEnvironmentVariable("RIGV3_BANC_GARDER") is { Length: > 0 } g
     return 3;
 }
 
+// « Releve de compte » (PROC_RELCLI) SANS le droit comptable : le premier controle de RIG v2 (PROC_RELCLI.cs:72-73, la fonction
+// EXPCOMPTA par les roles de l'agent ; EcrivainRelevesClients.cs). Le droit que PROC_RELCLI.sql donne au role de l'agent du banc est
+// retire, le geste du bloc 3 de PROC_RELCLI.gestes est joue tel quel : refus au message de RIG v2, aucun solde ecrit, journal inchange.
+// Le droit est remis AVANT la boucle des gestes : le bloc 3 lui-meme, joue ensuite dans le meme etat de base, est le jumeau accepte.
+await Sql("DELETE FROM soc.RoleFonction WHERE Role = 'BANC' AND Fonction = 'EXPCOMPTA'");
+var soldesAvantDroit = await Valeur("SELECT COUNT(*) FROM v2.CLIENT_SOLDE");
+var journalAvantDroit = await Valeur("SELECT COUNT(*) FROM soc.Journal");
+var reponseSansDroit = await http.PostAsJsonAsync(RoutesEcransGeneres.GestesPour(Greffe, "PROC_RELCLI"),
+    new GesteEcran(TypeGeste.Agir, ["2207212"], new Dictionary<string, string> { ["Date de début"] = "01/01/2000", ["Date de fin"] = "31/12/2099" })
+    { Nom = "Valider les soldes" }, json);
+var sansDroit = await reponseSansDroit.Content.ReadFromJsonAsync<ResultatGeste>(json);
+Exiger(reponseSansDroit.StatusCode == HttpStatusCode.UnprocessableEntity && sansDroit is { Fait: false }
+       && sansDroit.Message == "Droits insuffisants : seul un utilisateur ayant les droits comptables peut effectuer cette opération. " +
+                               "Si la validation de cette période est nécessaire, demandez à votre comptable d'effectuer l'opération."
+       && await Valeur("SELECT COUNT(*) FROM v2.CLIENT_SOLDE") == soldesAvantDroit
+       && await Valeur("SELECT COUNT(*) FROM soc.Journal") == journalAvantDroit,
+    $"PROC_RELCLI, Valider les soldes SANS le droit EXPCOMPTA : refus de RIG v2, aucun solde ni trace ({(int)reponseSansDroit.StatusCode} « {sansDroit?.Message} »)");
+await Sql("INSERT INTO soc.RoleFonction (Role, Fonction) VALUES ('BANC', 'EXPCOMPTA')");
+
 // Les GESTES (<PROCEDURE>.gestes), joues par la route POST, dans l'ordre.
 foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(StringComparer.Ordinal))
 {
