@@ -70,7 +70,8 @@ internal sealed class EcrivainCodesChefsIp : IEcrivainEcran
         await using (var verrou = await geste.LireAsync("SELECT Code FROM soc.Reglage WITH (UPDLOCK) WHERE Code = @code", ct,
                          new SqlParameter("@code", Reglage)))
             if (!await verrou.ReadAsync(ct)) return IssueGeste.Refuser(ReglageAbsent);
-        var liste = (await ResolusAsync(lire, (await CodesRangesAsync(lire, ct))!, ct)).Select(l => l.Code).ToList();
+        if (await CodesRangesAsync(lire, ct) is not { } codes) return IssueGeste.Refuser(ReglageAbsent);
+        var liste = (await ResolusAsync(lire, codes, ct)).Select(l => l.Code).ToList();
         int Rang(string code) => liste.FindIndex(c => string.Equals(c, code.Trim(), StringComparison.OrdinalIgnoreCase));
 
         string message, vise;
