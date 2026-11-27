@@ -1,3 +1,4 @@
+using RigV3.Contrats.EcransGeneres;
 using RigV3.Contrats.EcransMain;
 
 namespace RigV3Desktop.Pont;
@@ -19,8 +20,12 @@ public sealed record MaquetteVue(string Code, string Libelle, string Process, st
     string[] Tables, bool EntetePlieuse, ParametreEditionVue[] Parametres);
 
 /// <summary>Ce que l'écran affiche, et d'où viennent les maquettes (Pont/LectureEcranMain.cs). Mode « demo » : aucune maquette, l'écran
-/// garde sa démonstration, marquée « exemple ».</summary>
-public sealed record VueMaquettes(MaquetteVue[] Maquettes, int Total, string Mode, string? Message);
+/// garde sa démonstration, marquée « exemple ». <see cref="AgentAmitel"/> : RIG v2 n'ouvre qu'à Amitel « Supprimer » un paramètre
+/// d'édition et la case « Garder edition lot 1 » (MaquettesLues.AgentAmitel).</summary>
+public sealed record VueMaquettes(MaquetteVue[] Maquettes, int Total, string Mode, string? Message)
+{
+    public bool AgentAmitel { get; init; }
+}
 
 /// <summary>
 /// L'entrée de l'écran « Edition des maquettes » (PROC_EDIT_MAQUETTE, web/src/ecrans/EcranMaquettesEdition.tsx). Plan « RIG v3 100 %
@@ -29,9 +34,9 @@ public sealed record VueMaquettes(MaquetteVue[] Maquettes, int Total, string Mod
 ///
 /// Branché au serveur, l'écran montre les maquettes du greffe (Serveur/Socle/EcransMain/LectureMaquettesEdition.cs : MAQUETTE, ses
 /// paramètres d'édition et leurs tables liées). SANS serveur : aucune maquette, mode « demo » -- la démonstration reste celle de
-/// l'écran, marquée « exemple ». En panne : le motif et aucune maquette. L'écran n'a aucun geste (ni Modifier, ni Dupliquer, ni
-/// Supprimer, ni Valider) : ceux de la maquette passent par son document Word en GED ; ceux d'un paramètre d'édition écrivent en
-/// base dans RIG v2 (OPE_PARAM_EDT_MAJ.cs:494-541) et restent à brancher (Serveur/Socle/EcransMain/LectureMaquettesEdition.cs).
+/// l'écran, marquée « exemple ». En panne : le motif et aucune maquette. Les gestes d'un PARAMÈTRE d'édition, Enregistrer et Supprimer,
+/// s'écrivent dans la base du greffe (<see cref="Parametre"/>, Serveur/Socle/EcransMain/EcritureParametresEdition.cs) ; ceux d'une
+/// MAQUETTE (Modifier, Dupliquer, Supprimer, Valider) passent par son document Word en GED dans RIG v2 et ne sont pas repris.
 /// </summary>
 public static class EcranMaquettesEdition
 {
@@ -44,7 +49,24 @@ public static class EcranMaquettesEdition
         var lu = await LectureEcransMain.LireAsync(serveur, greffe, "les maquettes", (s, g) =>
             s.LireAsync<MaquettesLues>(RoutesEcransMain.Pour(RoutesMaquettesEdition.Maquettes, g)));
         if (lu.Valeur is not { } v) return new VueMaquettes([], 0, lu.Mode, lu.Message);
-        return new VueMaquettes([.. v.Lignes.Select(Vue)], v.Total, lu.Mode, null);
+        return new VueMaquettes([.. v.Lignes.Select(Vue)], v.Total, lu.Mode, null) { AgentAmitel = v.AgentAmitel };
+    }
+
+    /// <summary>
+    /// Un geste sur le paramètre d'édition <paramref name="code"/> : Enregistrer ses <paramref name="valeurs"/> changées (clés = les titres
+    /// des champs de RIG v2, EcritureParametresEdition.Champ*) ou Supprimer. Sans serveur : rien n'est écrit, « Démonstration ».
+    /// </summary>
+    [JSInvokable("EcranMaquettesEdition.Parametre")]
+    public static Task<ResultatGeste> Parametre(TypeGeste type, string code, Dictionary<string, string> valeurs)
+        => ParametreAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, new GesteEcran(type, [code], valeurs));
+
+    public static async Task<ResultatGeste> ParametreAsync(ClientServeur? serveur, string? greffe, GesteEcran geste)
+    {
+        if (serveur is null || string.IsNullOrWhiteSpace(greffe))
+            return new ResultatGeste(false, $"{EcranGenere.Demonstration} : RIG n'est pas branché sur la base d'un greffe.") { SansEcrivain = true };
+        if (geste.Ids.Length != 1 || string.IsNullOrWhiteSpace(geste.Ids[0]))
+            return new ResultatGeste(false, $"{EcranGenere.Demonstration} : un paramètre d'exemple n'existe pas dans la base du greffe.") { SansEcrivain = true };
+        return await EcranGenere.EnvoyerGesteAsync(serveur, greffe, RoutesEcransMain.Pour(RoutesMaquettesEdition.Parametre, greffe), geste);
     }
 
     private static MaquetteVue Vue(MaquetteLue m) => new(m.Code, m.Libelle,

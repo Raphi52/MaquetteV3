@@ -284,23 +284,35 @@ public sealed class EcrivainsEcrans(IReadOnlyDictionary<string, IEcrivainEcran> 
     /// UNE transaction : refus -> annulee, rien d'ecrit ; ecrit -> les traces au journal des gestes au nom de
     /// <paramref name="agent"/>, puis validee. La route et le banc passent tous deux par ici.
     /// </summary>
-    public static async Task<ResultatGeste> JouerAsync(IEcrivainEcran ecrivain, SqlConnection baseGreffe, GesteEcran demande, Appelant agent,
-                                                       DateTime maintenant, DistributeurNumeros numeros, CancellationToken ct)
+    public static Task<ResultatGeste> JouerAsync(IEcrivainEcran ecrivain, SqlConnection baseGreffe, GesteEcran demande, Appelant agent,
+                                                 DateTime maintenant, DistributeurNumeros numeros, CancellationToken ct)
+        => JouerAsync(ecrivain.Ecran, ecrivain.GetType().Name, ecrivain.JouerAsync, baseGreffe, demande, agent, maintenant, numeros, ct);
+
+    /// <summary>
+    /// La meme chose pour le geste d'un ECRAN FAIT MAIN (Serveur/Socle/EcransMain/Ecriture&lt;Ecran&gt;.cs), qui n'a pas de
+    /// descripteur genere et n'est donc pas un <see cref="IEcrivainEcran"/> trouve par reflexion : <paramref name="jouer"/> recoit
+    /// le meme <see cref="GesteEnCours"/> (memes gardes d'ecriture), dans la meme transaction, et ses traces vont au meme journal des
+    /// gestes sous le nom d'ecran <paramref name="ecran"/> (plan « RIG v3 100 % fonctionnel », lot 15, 27/11/2026 : les parametres
+    /// d'edition de « Edition des maquettes »). <paramref name="auteur"/> nomme le code fautif dans une erreur du mode d'emploi.
+    /// </summary>
+    public static async Task<ResultatGeste> JouerAsync(string ecran, string auteur, Func<GesteEnCours, CancellationToken, Task<IssueGeste>> jouer,
+                                                       SqlConnection baseGreffe, GesteEcran demande, Appelant agent, DateTime maintenant,
+                                                       DistributeurNumeros numeros, CancellationToken ct)
     {
         await using var tx = (SqlTransaction)await baseGreffe.BeginTransactionAsync(ct);
         IssueGeste issue;
         try
         {
-            issue = await ecrivain.JouerAsync(new GesteEnCours(baseGreffe, tx, demande, agent, maintenant, numeros), ct);
+            issue = await jouer(new GesteEnCours(baseGreffe, tx, demande, agent, maintenant, numeros), ct);
             if (issue is IssueGeste.Fait fait)
             {
                 if (fait.Traces.Length == 0)
-                    throw new InvalidOperationException($"Ecrivain {ecrivain.GetType().Name} : un geste ecrit sans trace au journal des gestes (mode d'emploi, point 5).");
+                    throw new InvalidOperationException($"Ecrivain {auteur} : un geste ecrit sans trace au journal des gestes (mode d'emploi, point 5).");
                 foreach (var t in fait.Traces)
                 {
                     if (!JournalGestes.Verbes.ContainsKey(t.Verbe))
-                        throw new InvalidOperationException($"Ecrivain {ecrivain.GetType().Name} : verbe « {t.Verbe} » absent du journal des gestes ({string.Join(", ", JournalGestes.Verbes.Keys)}).");
-                    await JournalGestes.EcrireAsync(baseGreffe, tx, agent, ecrivain.Ecran, t.Famille, t.Objet, t.IdObjet, t.Verbe, t.Avant, t.Apres, ct);
+                        throw new InvalidOperationException($"Ecrivain {auteur} : verbe « {t.Verbe} » absent du journal des gestes ({string.Join(", ", JournalGestes.Verbes.Keys)}).");
+                    await JournalGestes.EcrireAsync(baseGreffe, tx, agent, ecran, t.Famille, t.Objet, t.IdObjet, t.Verbe, t.Avant, t.Apres, ct);
                 }
             }
         }
@@ -319,7 +331,7 @@ public sealed class EcrivainsEcrans(IReadOnlyDictionary<string, IEcrivainEcran> 
                 return new ResultatGeste(false, r.Motif);
             default:
                 await tx.RollbackAsync(CancellationToken.None);
-                throw new InvalidOperationException($"Ecrivain {ecrivain.GetType().Name} : issue inconnue {issue.GetType().Name}.");
+                throw new InvalidOperationException($"Ecrivain {auteur} : issue inconnue {issue.GetType().Name}.");
         }
     }
 }

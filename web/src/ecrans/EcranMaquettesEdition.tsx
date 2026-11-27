@@ -22,14 +22,22 @@
 // et leurs tables liees, les types que RIG v2 montre a l'agent). Sans serveur, la demonstration ci-dessous reste, marquee « exemple » ;
 // en panne, le motif et aucune maquette. Pour une maquette de la base : « Type de document » = le format de son document
 // (MQTT_EXTENSION), « Type de maquette » = la colonne Type de RIG v2 (RIG, CRYSTAL…), aucune date (MAQUETTE n'en porte pas) ; la choisir
-// remplit le panneau avec son PREMIER parametre d'edition (RIG v2 en ouvre un par etape). L'ecran n'a aucun geste : ceux d'un
-// parametre d'edition (enregistrer, supprimer, en base dans RIG v2) restent a brancher (Serveur/Socle/EcransMain/LectureMaquettesEdition.cs).
+// remplit le panneau avec son PREMIER parametre d'edition (RIG v2 en ouvre un par etape), et la liste « Parametre » montre les autres.
+//
+// LES GESTES D'UN PARAMETRE (lot 15, 27/11/2026) : « Enregistrer » et « Supprimer » d'OPE_PARAM_EDT_MAJ (Valider, Supprimer de RIG v2)
+// partent au pont (EcranMaquettesEdition.Parametre) puis a Serveur/Socle/EcransMain/EcritureParametresEdition.cs, qui applique les
+// controles de RIG v2 et ecrit la base ; ecrit, l'ecran relit les maquettes. Enregistrer envoie les champs CHANGES parmi ceux que la V3
+// ecrit (libelle, nombre d'exemplaires, cases ; « Garder edition lot 1 » pour Amitel et une fusion RIG seulement) ; les autres champs
+// d'un parametre de la base (listes de RIG v2 non reprises : imprimante, papier, lots, nature ; code, requete, autres parametres,
+// entete de la maquette) restent EN LECTURE. Supprimer n'est montre qu'a un agent d'Amitel, comme dans RIG v2. Une maquette REDA
+// (Amitel) : formulaire en lecture seule. Sans serveur : la demonstration, aucun bouton de geste.
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, dateCourte, distinctsTries, estBlanc } from '../criteres'
 import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { EnteteListe, ListeModerne, Pastille, PiedListe, VuesListe, type Teinte } from '../composants/ListeModerne'
+import { Annonce, type CompteRendu, type ResultatGesteVue } from './formes/commun'
 
 interface Maquette {
   code: string
@@ -74,7 +82,19 @@ export interface VueMaquettes {
   total: number
   mode?: ModeLecture
   message?: string | null
+  /** L'agent est d'Amitel : RIG v2 ne lui ouvre qu'a lui Supprimer un parametre et la case « Garder edition lot 1 ». */
+  agentAmitel?: boolean
 }
+
+/**
+ * Les champs qu'Enregistrer ecrit, sous le titre de leur controle dans RIG v2 (les cles des valeurs du geste,
+ * Serveur/Socle/EcransMain/EcritureParametresEdition.cs, Champ*).
+ */
+export const ChampsParametre = {
+  libelle: 'Libellé paramètre édition', nbExemplaires: 'Nb exemplaires', rectoVerso: 'Recto/Verso', agrafage: 'Agrafage',
+  afficherAvantImpression: 'Affichage avant impression', docNonModifiable: 'Doc non modifiable', impression: 'Impression',
+  garderEditionLot1: 'Garder edition lot 1',
+} as const satisfies Partial<Record<keyof ParametreEdition, string>>
 
 /** Les options d'une liste, plus la valeur lue en base si elle n'y est pas (sinon la liste montrerait une autre option). */
 function avecValeur(options: string[], valeur: string): string[] {
@@ -99,20 +119,20 @@ const LotsDisponibles = [
 const TeinteTypeDoc: Record<string, Teinte> = { Extrait: 'bleu', Courrier: 'orange', Facture: 'vert', Bordereau: 'ardoise' }
 
 /** Une case de parametre d'edition : la bascule v2 (CheckBox...). */
-function Bascule({ actif, basculer, libelle }: { actif: boolean; basculer: () => void; libelle: string }) {
+function Bascule({ actif, basculer, libelle, lecture = false }: { actif: boolean; basculer: () => void; libelle: string; lecture?: boolean }) {
   return (
-    <button className={`rig-bascule${actif ? ' rig-bascule--actif' : ''}`} onClick={basculer}>
+    <button className={`rig-bascule${actif ? ' rig-bascule--actif' : ''}`} onClick={basculer} disabled={lecture} aria-pressed={actif}>
       <span className="rig-bascule__temoin"></span><span>{libelle}</span>
     </button>
   )
 }
 
 /** Une des quatre listes de lot : meme catalogue, canal different. */
-function ListeLots({ libelle, valeur, choisir }: { libelle: string; valeur: string; choisir: (v: string) => void }) {
+function ListeLots({ libelle, valeur, choisir, lecture = false }: { libelle: string; valeur: string; choisir: (v: string) => void; lecture?: boolean }) {
   return (
     <label className="rig-saisie-champ">
       <span className="rig-saisie-champ__libelle">{libelle}</span>
-      <select className="rig-saisie-champ__saisie" value={valeur} onChange={(e) => choisir(e.target.value)}>
+      <select className="rig-saisie-champ__saisie" value={valeur} onChange={(e) => choisir(e.target.value)} disabled={lecture}>
         {avecValeur(LotsDisponibles, valeur).map((l) => <option key={l} value={l}>{l === '' ? '(non renseigné)' : l}</option>)}
       </select>
     </label>
@@ -147,13 +167,22 @@ export function EcranMaquettesEdition() {
   const [selection, setSelection] = useState<Maquette | null>(Maquettes[0]!)
   // null : la demonstration (pas encore de reponse du pont, ou mode « demo »).
   const [vueBase, setVueBase] = useState<VueMaquettes | null>(null)
+  // Le parametre de la base montre dans le panneau, tel que lu : Enregistrer n'envoie que ce qui en differe.
+  const [parametre, setParametre] = useState<ParametreEdition | null>(null)
+  const [annonce, annoncer] = useState<CompteRendu>(null)
+  const [envoi, setEnvoi] = useState(false)
 
-  /** Choisir une maquette ; une maquette de la base remplit le panneau avec son premier parametre d'edition. */
-  function choisir(m: Maquette | null) {
+  /** Choisir une maquette ; une maquette de la base remplit le panneau avec un parametre (le premier, ou celui de ce code). */
+  function choisir(m: Maquette | null, codeParametre?: string) {
     setSelection(m)
     if (!m || m.parametres === undefined) return
-    const p = m.parametres[0]
     setEntetePlieuse(m.entetePlieuse === true)
+    remplir(m.parametres.find((x) => x.code === codeParametre) ?? m.parametres[0])
+  }
+
+  /** Le panneau prend les champs du parametre <p> (aucun : vide). */
+  function remplir(p: ParametreEdition | undefined) {
+    setParametre(p ?? null)
     setCodeParamEdt(p?.code ?? '')
     setLibParamEdt(p?.libelle ?? '')
     setNatureEdition(p?.nature ?? '')
@@ -186,6 +215,54 @@ export function EcranMaquettesEdition() {
       .catch(() => { /* pas de pont (tests, page hors WebView2) : la demonstration reste */ })
     return () => { perime = true }
   }, [])
+
+  // Un parametre de la base : les champs que la V3 n'ecrit pas sont en lecture ; une maquette REDA l'est entierement (RIG v2,
+  // OPE_PARAM_EDT_MAJ.cs:210) ; « Garder edition lot 1 » ne se saisit que pour Amitel et une fusion RIG (:140-141).
+  const enBase = vueBase?.mode === 'serveur' && parametre !== null
+  const lectureSeule = enBase && selection?.typeMaquette === 'REDA'
+  const garderSaisissable = !enBase || (vueBase?.agentAmitel === true && parametre?.typeGeneration === 'FUSION_RIG')
+
+  /** Les champs changes, sous leurs titres de RIG v2 ; vide : rien a enregistrer. */
+  function changes(): Record<string, string> {
+    if (!parametre) return {}
+    const oui = (b: boolean) => (b ? 'Oui' : 'Non')
+    const saisis: Record<keyof typeof ChampsParametre, string> = {
+      libelle: libParamEdt, nbExemplaires, rectoVerso: oui(rectoVerso), agrafage: oui(agrafage),
+      afficherAvantImpression: oui(apercuAvantImpression), docNonModifiable: oui(docNonModifiable), impression: oui(impression),
+      garderEditionLot1: oui(garderEditionLot1),
+    }
+    const lus: Record<keyof typeof ChampsParametre, string> = {
+      libelle: parametre.libelle, nbExemplaires: parametre.nbExemplaires, rectoVerso: oui(parametre.rectoVerso),
+      agrafage: oui(parametre.agrafage), afficherAvantImpression: oui(parametre.afficherAvantImpression),
+      docNonModifiable: oui(parametre.docNonModifiable), impression: oui(parametre.impression),
+      garderEditionLot1: oui(parametre.garderEditionLot1),
+    }
+    const valeurs: Record<string, string> = {}
+    for (const cle of Object.keys(ChampsParametre) as (keyof typeof ChampsParametre)[])
+      if (saisis[cle] !== lus[cle]) valeurs[ChampsParametre[cle]] = saisis[cle]
+    return valeurs
+  }
+  const aEnregistrer = enBase && Object.keys(changes()).length > 0
+
+  /** Enregistrer ou Supprimer le parametre du panneau ; ecrit, la liste est relue et le meme parametre reste choisi (s'il existe). */
+  async function jouer(type: 'Enregistrer' | 'Supprimer') {
+    if (!parametre || !selection) return
+    const code = parametre.code, maquette = selection.code
+    setEnvoi(true)
+    try {
+      const r = await appeler<ResultatGesteVue>('EcranMaquettesEdition.Parametre', type, code, type === 'Enregistrer' ? changes() : {})
+      annoncer(r.fait || r.sansEcrivain ? r.message : { refus: r.message })
+      if (r.fait) {
+        const v = await appeler<VueMaquettes>('EcranMaquettesEdition.Maquettes')
+        setVueBase(v)
+        choisir(v.maquettes.find((m) => m.code === maquette) ?? v.maquettes[0] ?? null, code)
+      }
+    } catch {
+      annoncer({ refus: "Le pont n'a pas répondu : rien n'est enregistré." })
+    } finally {
+      setEnvoi(false)
+    }
+  }
 
   const source = vueBase ? vueBase.maquettes : Maquettes
 
@@ -232,16 +309,25 @@ export function EcranMaquettesEdition() {
 
         <div className="rig-criteres__bloc">
           <div className="rig-kicker">Parametres d'edition</div>
+          {s?.parametres !== undefined && s.parametres.length > 1 && (
+            <label className="rig-saisie-champ">
+              <span className="rig-saisie-champ__libelle">Parametre</span>
+              <select className="rig-saisie-champ__saisie" value={parametre?.code ?? ''}
+                      onChange={(e) => { annoncer(null); remplir(s.parametres!.find((x) => x.code === e.target.value)) }}>
+                {s.parametres.map((x) => <option key={x.code} value={x.code}>{x.code}</option>)}
+              </select>
+            </label>
+          )}
           <label className="rig-saisie-champ">
             <span className="rig-saisie-champ__libelle">Imprimante</span>
-            <select className="rig-saisie-champ__saisie" value={imprimante} onChange={(e) => setImprimante(e.target.value)}>
+            <select className="rig-saisie-champ__saisie" value={imprimante} onChange={(e) => setImprimante(e.target.value)} disabled={enBase}>
               {avecValeur(['Greffe - Accueil', 'Greffe - Etage 1', 'PDF (fichier)'], imprimante)
                 .map((o) => <option key={o} value={o}>{o === '' ? '(non renseignée)' : o}</option>)}
             </select>
           </label>
           <label className="rig-saisie-champ">
             <span className="rig-saisie-champ__libelle">Type de papier</span>
-            <select className="rig-saisie-champ__saisie" value={typePapier} onChange={(e) => setTypePapier(e.target.value)}>
+            <select className="rig-saisie-champ__saisie" value={typePapier} onChange={(e) => setTypePapier(e.target.value)} disabled={enBase}>
               {avecValeur(['A4 blanc', 'A4 en-tete', 'Enveloppe plieuse'], typePapier)
                 .map((o) => <option key={o} value={o}>{o === '' ? '(non renseigné)' : o}</option>)}
             </select>
@@ -250,42 +336,42 @@ export function EcranMaquettesEdition() {
               seule liste a quatre options : ComboBoxLot, ComboBoxLotLRAR,
               ComboBoxLotILRAR et ComboBoxLotSubstitution. Chacune choisit le
               lot a utiliser pour un canal d'envoi different. */}
-          <ListeLots libelle="Lot standard" valeur={lot} choisir={setLot} />
-          <ListeLots libelle="Lot LRAR" valeur={lotLrar} choisir={setLotLrar} />
-          <ListeLots libelle="Lot iLRAR" valeur={lotIlrar} choisir={setLotIlrar} />
-          <ListeLots libelle="Lot de substitution" valeur={lotSubstitution} choisir={setLotSubstitution} />
+          <ListeLots libelle="Lot standard" valeur={lot} choisir={setLot} lecture={enBase} />
+          <ListeLots libelle="Lot LRAR" valeur={lotLrar} choisir={setLotLrar} lecture={enBase} />
+          <ListeLots libelle="Lot iLRAR" valeur={lotIlrar} choisir={setLotIlrar} lecture={enBase} />
+          <ListeLots libelle="Lot de substitution" valeur={lotSubstitution} choisir={setLotSubstitution} lecture={enBase} />
 
           {/* v2 : TxtNbExemplaires. */}
           <label className="rig-saisie-champ">
             <span className="rig-saisie-champ__libelle">Nombre d'exemplaires</span>
             <input className="rig-saisie-champ__saisie" type="number" min="1" value={nbExemplaires}
-                   onChange={(e) => setNbExemplaires(e.target.value)} />
+                   onChange={(e) => setNbExemplaires(e.target.value)} disabled={lectureSeule} />
           </label>
 
-          <Bascule actif={rectoVerso} basculer={() => setRectoVerso(!rectoVerso)} libelle="Recto-verso" />
-          <Bascule actif={agrafage} basculer={() => setAgrafage(!agrafage)} libelle="Agrafage" />
+          <Bascule actif={rectoVerso} basculer={() => setRectoVerso(!rectoVerso)} libelle="Recto-verso" lecture={lectureSeule} />
+          <Bascule actif={agrafage} basculer={() => setAgrafage(!agrafage)} libelle="Agrafage" lecture={lectureSeule} />
           <Bascule actif={apercuAvantImpression} basculer={() => setApercuAvantImpression(!apercuAvantImpression)}
-                   libelle="Afficher avant impression" />
+                   libelle="Afficher avant impression" lecture={lectureSeule} />
           <Bascule actif={docNonModifiable} basculer={() => setDocNonModifiable(!docNonModifiable)}
-                   libelle="Document non modifiable" />
+                   libelle="Document non modifiable" lecture={lectureSeule} />
           <Bascule actif={entetePlieuse} basculer={() => setEntetePlieuse(!entetePlieuse)}
-                   libelle="Entete au format plieuse" />
+                   libelle="Entete au format plieuse" lecture={enBase} />
 
           {/* v2 : CheckBoxImpression et ult_chkGarderEditionLot1. */}
-          <Bascule actif={impression} basculer={() => setImpression(!impression)} libelle="Impression" />
+          <Bascule actif={impression} basculer={() => setImpression(!impression)} libelle="Impression" lecture={lectureSeule} />
           <Bascule actif={garderEditionLot1} basculer={() => setGarderEditionLot1(!garderEditionLot1)}
-                   libelle="Garder l'edition en lot 1" />
+                   libelle="Garder l'edition en lot 1" lecture={lectureSeule || !garderSaisissable} />
 
           {/* v2 : TxtBoxCodeParamEdt, TxtBoxLibParamEdt, ultComboNatureEdition,
               ult_txtRequeteSql, TextMultiLineAutresParam. */}
           <div className="rig-criteres__paire">
             <label className="rig-saisie-champ">
               <span className="rig-saisie-champ__libelle">Code parametre d'edition</span>
-              <input className="rig-saisie-champ__saisie" value={codeParamEdt} onChange={(e) => setCodeParamEdt(e.target.value)} />
+              <input className="rig-saisie-champ__saisie" value={codeParamEdt} onChange={(e) => setCodeParamEdt(e.target.value)} disabled={enBase} />
             </label>
             <label className="rig-saisie-champ">
               <span className="rig-saisie-champ__libelle">Nature d'edition</span>
-              <select className="rig-saisie-champ__saisie" value={natureEdition} onChange={(e) => setNatureEdition(e.target.value)}>
+              <select className="rig-saisie-champ__saisie" value={natureEdition} onChange={(e) => setNatureEdition(e.target.value)} disabled={enBase}>
                 {avecValeur(['Courrier', 'Acte', 'Bordereau', 'Etat'], natureEdition)
                   .map((o) => <option key={o} value={o}>{o === '' ? '(non renseignée)' : o}</option>)}
               </select>
@@ -293,16 +379,32 @@ export function EcranMaquettesEdition() {
           </div>
           <label className="rig-saisie-champ">
             <span className="rig-saisie-champ__libelle">Libelle du parametre</span>
-            <input className="rig-saisie-champ__saisie" value={libParamEdt} onChange={(e) => setLibParamEdt(e.target.value)} />
+            <input className="rig-saisie-champ__saisie" value={libParamEdt} onChange={(e) => setLibParamEdt(e.target.value)} disabled={lectureSeule} />
           </label>
           <label className="rig-saisie-champ">
             <span className="rig-saisie-champ__libelle">Requete SQL</span>
-            <textarea className="rig-saisie-champ__saisie" rows={2} value={requeteSql} onChange={(e) => setRequeteSql(e.target.value)} />
+            <textarea className="rig-saisie-champ__saisie" rows={2} value={requeteSql} onChange={(e) => setRequeteSql(e.target.value)} disabled={enBase} />
           </label>
           <label className="rig-saisie-champ">
             <span className="rig-saisie-champ__libelle">Autres parametres</span>
-            <textarea className="rig-saisie-champ__saisie" rows={2} value={autresParam} onChange={(e) => setAutresParam(e.target.value)} />
+            <textarea className="rig-saisie-champ__saisie" rows={2} value={autresParam} onChange={(e) => setAutresParam(e.target.value)} disabled={enBase} />
           </label>
+          {enBase && (
+            <div className="rig-maq-gestes">
+              <p className="rig-eg-note">
+                {lectureSeule ? 'Maquette REDA : ses paramètres se lisent sans se modifier, comme dans RIG v2.'
+                  : 'Enregistrer écrit le libellé, le nombre d’exemplaires et les cases. Imprimante, papier, lots, nature, code, requête '
+                    + 'et autres paramètres restent en lecture : leurs listes de RIG v2 ne sont pas encore reprises.'}
+              </p>
+              <button className="rig-bouton rig-bouton--fort" onClick={() => void jouer('Enregistrer')}
+                      disabled={envoi || lectureSeule || !aEnregistrer}
+                      title={aEnregistrer ? undefined : 'Aucun champ n’a changé.'}>Enregistrer</button>
+              {vueBase?.agentAmitel === true && (
+                <button className="rig-bouton" onClick={() => void jouer('Supprimer')} disabled={envoi}>Supprimer</button>
+              )}
+              <Annonce texte={annonce} />
+            </div>
+          )}
         </div>
       </aside>
 

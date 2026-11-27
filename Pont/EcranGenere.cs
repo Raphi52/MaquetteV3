@@ -168,9 +168,18 @@ public static class EcranGenere
         var creation = geste.Type is TypeGeste.Creer or TypeGeste.Ajouter;
         if (!creation && (geste.Ids.Length == 0 || geste.Ids.Any(string.IsNullOrWhiteSpace)))
             return new ResultatGeste(false, $"{Demonstration} : une ligne d'exemple n'existe pas dans la base du greffe.") { SansEcrivain = true };
+        return await EnvoyerGesteAsync(serveur, greffe, RoutesEcransGeneres.GestesPour(greffe, p.Code), geste);
+    }
+
+    /// <summary>
+    /// Envoie <paramref name="geste"/> à la route <paramref name="route"/> du serveur : ce qu'il rend, le refus de RIG v2 (422) tel quel,
+    /// ou le motif d'une panne, jamais un faux succès. Aussi pour un écran fait main qui écrit par le même socle (Pont/EcranMaquettesEdition.cs).
+    /// </summary>
+    internal static async Task<ResultatGeste> EnvoyerGesteAsync(ClientServeur serveur, string greffe, string route, GesteEcran geste)
+    {
         try
         {
-            return await serveur.EnvoyerAsync<GesteEcran, ResultatGeste>(RoutesEcransGeneres.GestesPour(greffe, p.Code), geste);
+            return await serveur.EnvoyerAsync<GesteEcran, ResultatGeste>(route, geste);
         }
         catch (ErreurServeur e) when (e.CodeHttp == 422 && Lire<ResultatGeste>(e.Corps) is { } refus)
         {

@@ -26,14 +26,9 @@ namespace RigV3.Serveur.Socle.EcransMain;
 ///     ADAPTATEUR_ULT « ADPUL_CODE = 'EDITPARAM' AND ADPUL_VALEUR_DEFAUT LIKE code » (AdaptateurUlt.cs:117-121),
 ///     COURRIER_JUDICIAIRE.COUJU_CODE_PRMED (CourrierJudiciaire.cs:30-32) ; dédoublonnées par code et libellé
 ///     (OPE_PARAM_EDT_TABLE_LIEE.cs:45-48).
-/// AUCUN GESTE : l'écran de la V3 n'a ni Modifier, ni Dupliquer, ni Supprimer, ni Valider. Deux familles dans la V2 :
-///   - la MAQUETTE : ses gestes ouvrent ou recopient son document Word en GED (OPE_MAQUETTE.cs:160-246, PROC_MAJ_MAQ) ou reportent
-///     ses demandes d'édition (:379-458) ;
-///   - le PARAMÈTRE D'ÉDITION : il s'enregistre et se supprime EN BASE, sans document (OPE_PARAM_EDT_MAJ.cs:494-541, Sauve et
-///     Delete de PARAMETRE_EDITION). Sa fiche compte une trentaine de champs et de listes (lots, imprimantes, papiers, types de
-///     document, paramètres CFE) et ses règles (code processus reporté sur tous les paramètres de la maquette, :505-507 ; code
-///     unique, :310 ; exemplaires, :318-324 ; suppression réservée à Amitel, :111). NON BRANCHÉ au lot 15 : reste à faire, pas une
-///     dépendance à la GED.
+/// LES GESTES : ceux d'un PARAMÈTRE d'édition, Enregistrer et Supprimer, s'écrivent en base (EcritureParametresEdition.cs). Ceux d'une
+/// MAQUETTE (Modifier, Dupliquer, Supprimer, Valider) ouvrent ou recopient son document Word en GED (OPE_MAQUETTE.cs:160-246,
+/// PROC_MAJ_MAQ) ou reportent ses demandes d'édition (:379-458) ; ils restent à brancher avec la GED (compte rendu du lot 15).
 /// </summary>
 public static class LectureMaquettesEdition
 {
@@ -146,6 +141,6 @@ public static class LectureMaquettesEdition
         }
 
         return new MaquettesLues([.. maquettes.Select(m => new MaquetteLue(m.Code, m.Libelle, m.Type, m.Extension, m.Plieuse,
-            parametres.TryGetValue(m.Code, out var p) ? [.. p] : []))], total);
+            parametres.TryGetValue(m.Code, out var p) ? [.. p] : []))], total) { AgentAmitel = agentAmitel };
     }
 }

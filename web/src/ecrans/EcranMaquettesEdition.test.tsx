@@ -133,3 +133,83 @@ describe('EcranMaquettesEdition : provenance des maquettes', () => {
     expect(screen.queryByText('MQ_KBIS')).toBeNull()
   })
 })
+
+// Les gestes d'un parametre d'edition (lot 15) : Enregistrer envoie les champs CHANGES sous les titres de RIG v2, puis relit les
+// maquettes ; un refus de RIG v2 porte le badge « Refus » ; les champs que la V3 n'ecrit pas sont en lecture ; Supprimer et « Garder
+// edition lot 1 » pour Amitel seul ; une maquette REDA en lecture seule (Pont/EcranMaquettesEdition.cs, EcritureParametresEdition.cs).
+describe('EcranMaquettesEdition : gestes d\'un parametre de la base', () => {
+  afterEach(retirerFauxPont)
+  const parametre = (code: string, nbExemplaires: string) => ({
+    code, libelle: `libelle ${code}`, processus: 'EDIT_INS', nature: '', imprimante: '', typePapier: '', lot: '', lotLrar: '', lotIlrar: '',
+    lotSubstitution: '', nbExemplaires, rectoVerso: true, agrafage: false, afficherAvantImpression: false, docNonModifiable: false,
+    impression: true, garderEditionLot1: false, typeGeneration: 'FUSION_RIG', requeteSql: '',
+  })
+  const vueBase = (agentAmitel: boolean, nb = '2'): VueMaquettes => ({
+    maquettes: [
+      { code: 'M_ACTE', libelle: 'Acte', process: 'EDIT_INS', typeDoc: 'html', typeMaquette: 'RIG', maj: '', tables: [], entetePlieuse: false,
+        parametres: [parametre('P_UN', nb), parametre('P_DEUX', '1')] },
+      { code: 'M_REDA', libelle: 'Decision', process: '', typeDoc: 'doc', typeMaquette: 'REDA', maj: '', tables: [], entetePlieuse: false,
+        parametres: [parametre('P_REDA', '1')] },
+    ],
+    total: 2, mode: 'serveur', message: null, agentAmitel,
+  })
+  const bouton = (nom: string) => screen.getByRole('button', { name: nom }) as HTMLButtonElement
+
+  it('Enregistrer envoie les champs changes, annonce le message et relit la base ; les listes non reprises sont en lecture', async () => {
+    let lectures = 0
+    const pont = installerFauxPont({
+      'EcranMaquettesEdition.Maquettes': () => vueBase(false, ++lectures > 1 ? '1' : '2'),
+      'EcranMaquettesEdition.Parametre': () => ({ fait: true, message: "Paramètre d'édition P_UN enregistré.", sansEcrivain: false, ids: ['P_UN'] }),
+    })
+    const { container } = render(<EcranMaquettesEdition />)
+    await screen.findByText('Tables liees a M_ACTE')
+    for (const l of ['Imprimante', 'Type de papier', 'Lot standard', 'Lot LRAR', 'Lot iLRAR', 'Lot de substitution', "Code parametre d'edition",
+                     "Nature d'edition", 'Requete SQL', 'Autres parametres'])
+      expect((screen.getByLabelText(l) as HTMLInputElement).disabled).toBe(true)
+    expect(bouton('Entete au format plieuse').disabled).toBe(true)
+    expect(bouton("Garder l'edition en lot 1").disabled).toBe(true)   // agent du greffe
+    expect(screen.queryByRole('button', { name: 'Supprimer' })).toBeNull()
+    expect(bouton('Enregistrer').disabled).toBe(true)                  // rien n'a change
+    fireEvent.change(screen.getByLabelText("Nombre d'exemplaires"), { target: { value: '1' } })
+    fireEvent.click(bouton('Agrafage'))
+    expect(bouton('Enregistrer').disabled).toBe(false)
+    fireEvent.click(bouton('Enregistrer'))
+    expect((await screen.findByRole('status')).textContent).toBe("Paramètre d'édition P_UN enregistré.")
+    expect(pont.appels).toHaveBeenCalledWith('EcranMaquettesEdition.Parametre', 'Enregistrer', 'P_UN', { 'Nb exemplaires': '1', Agrafage: 'Oui' })
+    expect(pont.appels.mock.calls.filter(([nom]) => nom === 'EcranMaquettesEdition.Maquettes')).toHaveLength(2)
+    expect((screen.getByLabelText("Nombre d'exemplaires") as HTMLInputElement).value).toBe('1')   // relu
+    expect(container.querySelector('.rig-maq-gestes')).not.toBeNull()
+  })
+
+  it('un refus de RIG v2 porte le badge « Refus » ; la liste « Parametre » ouvre un autre parametre', async () => {
+    installerFauxPont({
+      'EcranMaquettesEdition.Maquettes': () => vueBase(false),
+      'EcranMaquettesEdition.Parametre': () => ({ fait: false, message: "Le nombre d'exemplaires est obligatoire.", sansEcrivain: false, ids: [] }),
+    })
+    render(<EcranMaquettesEdition />)
+    await screen.findByText('Tables liees a M_ACTE')
+    fireEvent.change(screen.getByLabelText('Parametre'), { target: { value: 'P_DEUX' } })
+    expect((screen.getByLabelText("Libelle du parametre") as HTMLInputElement).value).toBe('libelle P_DEUX')
+    fireEvent.change(screen.getByLabelText("Nombre d'exemplaires"), { target: { value: '0' } })
+    fireEvent.click(bouton('Enregistrer'))
+    const alerte = await screen.findByRole('alert')
+    expect(alerte.textContent).toBe("Refus Le nombre d'exemplaires est obligatoire.")
+  })
+
+  it('agent d\'Amitel : Supprimer et « Garder edition lot 1 » ouverts ; une maquette REDA reste en lecture', async () => {
+    const pont = installerFauxPont({
+      'EcranMaquettesEdition.Maquettes': () => vueBase(true),
+      'EcranMaquettesEdition.Parametre': () => ({ fait: false, message: 'Le code param P_UN est utilisé dans les processus.', sansEcrivain: false, ids: [] }),
+    })
+    render(<EcranMaquettesEdition />)
+    await screen.findByText('Tables liees a M_ACTE')
+    expect(bouton("Garder l'edition en lot 1").disabled).toBe(false)
+    fireEvent.click(bouton('Supprimer'))
+    await screen.findByRole('alert')
+    expect(pont.appels).toHaveBeenCalledWith('EcranMaquettesEdition.Parametre', 'Supprimer', 'P_UN', {})
+    fireEvent.click(screen.getByText('M_REDA'))
+    expect((screen.getByLabelText("Libelle du parametre") as HTMLInputElement).disabled).toBe(true)
+    expect(bouton('Agrafage').disabled).toBe(true)
+    expect(bouton('Enregistrer').disabled).toBe(true)
+  })
+})

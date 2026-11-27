@@ -1,6 +1,9 @@
 using Microsoft.Data.SqlClient;
+using RigV3.Contrats.EcransGeneres;
 using RigV3.Contrats.EcransMain;
+using RigV3.Serveur.Numerotation.Compteur;
 using RigV3.Serveur.Socle.Comptes;
+using RigV3.Serveur.Socle.EcransGeneres;
 using RigV3.Serveur.Socle.Greffes;
 using RigV3.Serveur.Socle.Identite;
 
@@ -135,6 +138,23 @@ internal sealed class ModuleEcransMain : IModuleServeur
             => SurLaBase(c, greffe, ct, async cn => await droits.AppelantAsync(http, commune, cn, ct) is { } moi
                 ? Results.Ok(await LectureMaquettesEdition.LireAsync(cn, moi.EstAmitel, ct))
                 : Results.Json(new { motif = "Agent inconnu dans la base de ce greffe." }, statusCode: StatusCodes.Status403Forbidden)))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        // Lot 15 : Enregistrer / Supprimer un parametre d'edition (EcritureParametresEdition.cs), dans la transaction et le journal des
+        // gestes des ecrans generes ; un refus de RIG v2 = 422, comme la route des gestes generes (ModuleEcransGeneres).
+        // fix-ok: les deux branches rendent Task<IResult> (Task.FromResult) : un IResult nu d'un cote et le Task de SurLaBase de l'autre
+        // ne donnent pas de type au lambda, mesure par compiler.ps1 (error CS1593, RequestDelegate n'accepte pas 8 arguments).
+        routes.MapPost(RoutesMaquettesEdition.Parametre, (string greffe, GesteEcran geste, HttpContext http, CatalogueGreffes c, ServiceDroits droits,
+                                                          BaseRig commune, DistributeurNumeros numeros, CancellationToken ct)
+            => !EcritureParametresEdition.Gestes.Contains(geste.Type)
+                ? Task.FromResult(Results.Ok(new ResultatGeste(false, $"{EcritureParametresEdition.Ecran} n'écrit pas le geste {geste.Type} : rien n'est enregistré.") { SansEcrivain = true }))
+                : SurLaBase(c, greffe, ct, async cn =>
+                {
+                    if (await droits.AppelantAsync(http, commune, cn, ct) is not { } moi)
+                        return Results.Json(new { motif = "Agent inconnu dans la base de ce greffe." }, statusCode: StatusCodes.Status403Forbidden);
+                    var resultat = await EcrivainsEcrans.JouerAsync(EcritureParametresEdition.Ecran, nameof(EcritureParametresEdition),
+                        (g, t) => EcritureParametresEdition.JouerAsync(g, moi.EstAmitel, t), cn, geste, moi, DateTime.Now, numeros, ct);
+                    return resultat.Fait ? Results.Ok(resultat) : Results.Json(resultat, statusCode: StatusCodes.Status422UnprocessableEntity);
+                }))
             .RequireAuthorization(PolitiquesSocle.AgentAdmis);
         // Lot 14 : Acteurs, Experts, Clients et la fiche d'un client (LectureActeurs/Experts/Clients.cs).
         routes.MapGet(RoutesActeurs.Acteurs, (string greffe, CatalogueGreffes c, CancellationToken ct)

@@ -7,6 +7,13 @@ namespace RigV3.Contrats.EcransMain;
 public static class RoutesMaquettesEdition
 {
     public const string Maquettes = "/ecrans-main/{greffe}/maquettes-edition";
+
+    /// <summary>
+    /// POST un geste sur UN paramètre d'édition (<c>RigV3.Contrats.EcransGeneres.GesteEcran</c>, Ids = [son code]) : Enregistrer ses
+    /// champs changés ou le Supprimer, comme les boutons Valider et Supprimer d'OPE_PARAM_EDT_MAJ de RIG v2 ; rend un
+    /// <c>ResultatGeste</c> (422 : le refus de RIG v2). L'écriture : Serveur/Socle/EcransMain/EcritureParametresEdition.cs.
+    /// </summary>
+    public const string Parametre = "/ecrans-main/{greffe}/maquettes-edition/parametre";
 }
 
 /// <summary>
@@ -35,4 +42,9 @@ public sealed record MaquetteLue(string Code, string Libelle, string Type, strin
     ParametreEditionLu[] Parametres);
 
 /// <summary>Les maquettes lues, dans l'ordre du code, et leur total.</summary>
-public sealed record MaquettesLues(MaquetteLue[] Lignes, int Total);
+public sealed record MaquettesLues(MaquetteLue[] Lignes, int Total)
+{
+    /// <summary>Vrai : l'agent est d'Amitel. RIG v2 ne lui ouvre qu'à lui Supprimer un paramètre d'édition (enableSupp,
+    /// OPE_PARAM_EDT_MAJ.cs:111) et la case « Garder l'édition en lot 1 » d'une fusion RIG (:140-141).</summary>
+    public bool AgentAmitel { get; init; }
+}
