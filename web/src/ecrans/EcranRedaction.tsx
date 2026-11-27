@@ -6,10 +6,12 @@
 //     general (ultCBSensGeneral), Ressort (ultCBRessort).
 //     Dates : Date (ultDJDate), Date prevue (ultDJDatePrevue), « Mise en
 //     delibere le » et « Prononce le ».
-//     Cases a cocher : Avant dire droit (ultCBAvantDireDroit),
-//     Contradictoire (ultCBContradictoire), Execution provisoire
-//     (ultCBExecutionProvisoire), Debats publics, Decision publique,
-//     Mesure d'instruction.
+//     Avant dire droit (ultCBAvantDireDroit), Contradictoire
+//     (ultCBContradictoire) et Execution provisoire (ultCBExecutionProvisoire)
+//     sont aussi des LISTES (ULT_COMBO_*, Designer.cs:43-46) : leur libelle.
+//     Cases a cocher : Debats publics, Decision publique ; « Mesure
+//     d'instruction » est l'operation que RIG v2 montre quand le type de
+//     decision porte une mesure liee.
 //     Boutons de la barre : « Rechercher Delibere » (ultBtnDelibere),
 //     « Rechercher Prononce » (ultBtnPrononce), « Gestion Document GED »
 //     (OperationGestionDoc).
@@ -20,14 +22,21 @@
 //     fichier : c'est la GED rattachee, pas un decompte d'affaires.
 //
 // Porte depuis Components/Ecrans/EcranRedaction.razor (lot 5) : meme balisage,
-// memes classes CSS. L'ecran ne lisait rien dans Metier/ : ses decisions de
-// demonstration sont ici, sans pont.
+// memes classes CSS. Depuis le lot 10 du plan « RIG v3 100 % fonctionnel »
+// (27/11/2026), les decisions viennent du pont (Pont/EcranRedactionBase.cs) :
+// la base du greffe (Serveur/Socle/EcransMain/LectureRedaction.cs, regles de
+// RIG v2 citees), ou, sans serveur, la demonstration, marquee « exemple ».
+// L'ecran n'a aucun geste : il montre, il n'ecrit rien.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { appeler } from '../pont'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 
-interface Decision {
+export interface Decision {
+  id: number
   numero: string
   affaire: string
+  /** Sous l'onglet « Delibere » tant que la decision n'a pas d'appel d'affaire prononce. */
   delibere: boolean
   typeDecision: string
   sensGeneral: string
@@ -36,9 +45,9 @@ interface Decision {
   datePrevue: string
   miseEnDelibere: string
   prononce: string
-  avantDireDroit: boolean
-  contradictoire: boolean
-  executionProvisoire: boolean
+  avantDireDroit: string
+  contradictoire: string
+  executionProvisoire: string
   debatsPublics: boolean
   decisionPublique: boolean
   mesureInstruction: boolean
@@ -46,47 +55,16 @@ interface Decision {
   mesures: string[]
 }
 
-const Appels: Decision[] = [
-  {
-    numero: '2026J00121', affaire: 'AMITEL SAS - ouverture', delibere: true,
-    typeDecision: 'Jugement d\'ouverture', sensGeneral: 'Favorable', ressort: 'Premier ressort',
-    date: '06/03/2026', datePrevue: '05/03/2026', miseEnDelibere: '20/02/2026', prononce: '',
-    avantDireDroit: false, contradictoire: true, executionProvisoire: true, debatsPublics: true,
-    decisionPublique: true, mesureInstruction: true, documents: 4,
-    mesures: ['MES-2026-0114 — expertise comptable', 'MES-2026-0121 — inventaire'],
-  },
-  {
-    numero: '2026J00134', affaire: 'SCI DU PARC - designation', delibere: true,
-    typeDecision: 'Ordonnance de designation', sensGeneral: 'Favorable', ressort: 'Premier ressort',
-    date: '02/06/2026', datePrevue: '01/06/2026', miseEnDelibere: '18/05/2026', prononce: '',
-    avantDireDroit: true, contradictoire: true, executionProvisoire: false, debatsPublics: false,
-    decisionPublique: true, mesureInstruction: true, documents: 2,
-    mesures: ['MES-2026-0128 — evaluation immobiliere'],
-  },
-  {
-    numero: '2025J00088', affaire: 'MARTIN EURL - cloture', delibere: false,
-    typeDecision: 'Jugement de cloture', sensGeneral: 'Defavorable', ressort: 'Dernier ressort',
-    date: '20/09/2026', datePrevue: '20/09/2026', miseEnDelibere: '04/09/2026', prononce: '20/09/2026',
-    avantDireDroit: false, contradictoire: true, executionProvisoire: false, debatsPublics: true,
-    decisionPublique: true, mesureInstruction: false, documents: 0,
-    mesures: [],
-  },
-  {
-    numero: '2024J00507', affaire: 'DUPONT SARL - copie conforme', delibere: false,
-    typeDecision: 'Copie conforme', sensGeneral: 'Sans objet', ressort: 'Premier ressort',
-    date: '08/11/2024', datePrevue: '08/11/2024', miseEnDelibere: '', prononce: '08/11/2024',
-    avantDireDroit: false, contradictoire: false, executionProvisoire: false, debatsPublics: false,
-    decisionPublique: false, mesureInstruction: false, documents: 1,
-    mesures: [],
-  },
-]
+export interface VueRedaction {
+  decisions: Decision[]
+  /** D'ou viennent les decisions (Pont/LectureEcranMain.cs, lot 10) : la base du greffe, ou la demonstration (« exemple »). */
+  mode?: ModeLecture
+  message?: string | null
+}
 
 const ou = (valeur: string): string => (valeur === '' ? '—' : valeur)
 
 const caracteres = (d: Decision): Array<[string, boolean]> => [
-  ['Avant dire droit', d.avantDireDroit],
-  ['Contradictoire', d.contradictoire],
-  ['Execution provisoire', d.executionProvisoire],
   ['Debats publics', d.debatsPublics],
   ['Decision publique', d.decisionPublique],
   ['Mesure d\'instruction', d.mesureInstruction],
@@ -94,16 +72,31 @@ const caracteres = (d: Decision): Array<[string, boolean]> => [
 
 export function EcranRedaction() {
   const [surDelibere, setSurDelibere] = useState(true)
-  const [selection, setSelection] = useState<Decision | null>(Appels[0]!)
+  // null tant que le pont n'a pas repondu : ni decision ni « aucun appel », qui serait faux pendant ce court instant.
+  const [vue, setVue] = useState<VueRedaction | null>(null)
+  const [selection, setSelection] = useState<number | null>(null)
 
-  const appels = Appels.filter((a) => a.delibere === surDelibere)
-  const d = selection
+  useEffect(() => {
+    let perime = false
+    void appeler<VueRedaction>('EcranRedaction.Decisions').then((v) => {
+      if (perime) return
+      setVue(v)
+      // Comme avant le branchement : l'ecran s'ouvre sur la premiere decision deliberee.
+      setSelection(v.decisions.find((x) => x.delibere)?.id ?? v.decisions[0]?.id ?? null)
+    })
+    return () => { perime = true }
+  }, [])
+
+  const decisions = vue?.decisions ?? []
+  const appels = decisions.filter((a) => a.delibere === surDelibere)
+  const d = decisions.find((x) => x.id === selection) ?? null
 
   return (
     <div className="rig-proc__corps">
 
       <aside className="rig-criteres">
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Appels d'affaires</div>
+        {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Décisions" />}
 
         <div className="rig-onglets">
           <button className={`rig-onglet${surDelibere ? ' rig-onglet--actif' : ''}`}
@@ -114,13 +107,13 @@ export function EcranRedaction() {
 
         <div className="rig-criteres__bloc">
           {appels.map((ap) => (
-            <button key={ap.numero} className={`rig-bascule${selection?.numero === ap.numero ? ' rig-bascule--actif' : ''}`}
-                    onClick={() => setSelection(ap)}>
+            <button key={ap.id} className={`rig-bascule${selection === ap.id ? ' rig-bascule--actif' : ''}`}
+                    onClick={() => setSelection(ap.id)}>
               <span className="rig-bascule__temoin"></span>
               <span>{ap.numero} — {ap.affaire}</span>
             </button>
           ))}
-          {appels.length === 0 && (
+          {vue && appels.length === 0 && (
             // Messages repris mot pour mot de la v2.
             <div className="rig-table__vide" style={{ padding: 'var(--rig-esp-3)' }}>
               {surDelibere ? 'Aucun appel d\'affaire delibere' : 'Aucun appel d\'affaire prononce'}
@@ -151,10 +144,27 @@ export function EcranRedaction() {
                 </label>
               </div>
 
-              <label className="rig-saisie-champ">
-                <span className="rig-saisie-champ__libelle">Ressort</span>
-                <input className="rig-saisie-champ__saisie" value={d.ressort} readOnly />
-              </label>
+              <div className="rig-criteres__paire">
+                <label className="rig-saisie-champ">
+                  <span className="rig-saisie-champ__libelle">Ressort</span>
+                  <input className="rig-saisie-champ__saisie" value={d.ressort} readOnly />
+                </label>
+                <label className="rig-saisie-champ">
+                  <span className="rig-saisie-champ__libelle">Execution provisoire</span>
+                  <input className="rig-saisie-champ__saisie" value={ou(d.executionProvisoire)} readOnly />
+                </label>
+              </div>
+
+              <div className="rig-criteres__paire">
+                <label className="rig-saisie-champ">
+                  <span className="rig-saisie-champ__libelle">Avant dire droit</span>
+                  <input className="rig-saisie-champ__saisie" value={ou(d.avantDireDroit)} readOnly />
+                </label>
+                <label className="rig-saisie-champ">
+                  <span className="rig-saisie-champ__libelle">Contradictoire</span>
+                  <input className="rig-saisie-champ__saisie" value={ou(d.contradictoire)} readOnly />
+                </label>
+              </div>
 
               <div className="rig-criteres__paire">
                 <label className="rig-saisie-champ">
@@ -199,7 +209,7 @@ export function EcranRedaction() {
           </>
         ) : (
           <div className="rig-table__vide" style={{ padding: 'var(--rig-esp-4)' }}>
-            Choisissez un appel d'affaire dans la liste de gauche.
+            {vue === null ? 'Lecture des decisions…' : 'Choisissez un appel d\'affaire dans la liste de gauche.'}
           </div>
         )}
       </section>

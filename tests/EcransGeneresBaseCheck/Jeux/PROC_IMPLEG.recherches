@@ -1,0 +1,15 @@
+# Les recherches de LecteurImpressionLegale (IRechercheEcran) : la date et la chambre de l'audience (la recherche d'audience de RIG v2,
+# OPE_IMPLEG.OpenOcxRecherche). Dates fixes (juin 1990, PROC_IMPLEG.sql).
+
+# 1. L'audience du 11/06/1990 : 2000701 (minute editee) et 2000702 (impression legale faite, non diffusable : « ATTENTION - NON
+#    DIFFUSABLE », DCJDC_ETAT_DIFFUSION 1). Ecartees : 2000703 (etat 1 ; jumeau 2000701, etat 3) et 2000704 (sans appel du prononce ;
+#    jumeau 2000701).
+critere: Date de l'audience = 1990-06-11
+lignes:
+IMPLEG A | Rôle 2026IL20701 · Désignation d'expert du banc · minute 9016200001 · Minute éditée · Audience du 11/06/1990 à 10:00 | Décisions de l'audience | AFaire | []
+IMPLEG B | Rôle 2026IL20702 · Jugement du banc lot 10 · minute 9016200002 · Impression légale effectuée - ATTENTION - NON DIFFUSABLE · Audience du 11/06/1990 à 10:00 | Décisions de l'audience | EnCours | []
+---
+# 2. L'audience du lendemain seule.
+critere: Date de l'audience = 1990-06-12
+lignes:
+IMPLEG E | Rôle 2026IL20705 · Jugement du banc lot 10 · minute 9016300001 · Minute éditée · Audience du 12/06/1990 à 10:00 | Décisions de l'audience | AFaire | []

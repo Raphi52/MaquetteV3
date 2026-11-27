@@ -1,0 +1,27 @@
+# Les recherches de LecteurCourriersEnMasse (IRechercheEcran) : la date, la chambre et le mode de l'audience, comme la recherche par
+# audience de RIG v2 (OPE_RECHERCHE_COURRIERM_INSTANCE._PreRecherche, :147-185). Dates fixes (mai 1990, PROC_COURRIERM.sql).
+
+# 1. L'audience du 14/05/1990 : ses instances (COURRIER A, appelee deux fois, n'y est qu'une fois : ChargerDataGridView, :72), puis la
+#    procedure collective de COURRIER B (volet « Procédures »). Le cabinet du meme jour est ecarte (mode audience) ; jumeau : bloc 2.
+critere: Date de l'audience = 1990-05-14
+lignes:
+COURRIER A | Rôle 2026CM20201 · CM20 : Affaire du banc lot 10 · Audience du 14/05/1990 à 09:00 · appel 1 | Instances | AFaire | []
+COURRIER B | Rôle 2026CM20202 · Audience du 14/05/1990 à 09:00 · appel 2 | Instances | AFaire | []
+COURRIER PC | PC 2026PC2020 · ouverte le 02/02/2026 · Audience du 14/05/1990 à 09:00 · appel 2 | Procédures | AFaire | []
+---
+# 2. Le mode « Cabinet » (AUDNC_AUDIENCE = 0, :155) : le cabinet du meme jour.
+critere: Date de l'audience = 1990-05-14
+critere: Mode = Cabinet
+lignes:
+COURRIER E | Rôle 2026CM20205 · Cabinet du 14/05/1990 à 14:00 · appel 1 | Instances | AFaire | []
+---
+# 3. Un autre jour : l'audience du 13/05/1990 seule (jumeau du bloc 1 : celle du 14 n'y est pas).
+critere: Date de l'audience = 1990-05-13
+lignes:
+COURRIER D | Rôle 2026CM20204 · Audience du 13/05/1990 à 09:00 · appel 1 | Instances | AFaire | []
+---
+# 4. Le texte filtre les affaires de l'audience choisie (numero ou nom) : COURRIER B seule ; la procedure ne repond pas.
+texte: COURRIER B
+critere: Date de l'audience = 1990-05-14
+lignes:
+COURRIER B | Rôle 2026CM20202 · Audience du 14/05/1990 à 09:00 · appel 2 | Instances | AFaire | []

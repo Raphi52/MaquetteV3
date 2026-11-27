@@ -25,6 +25,11 @@ EDITION BETA SAS · 2020 B 40402 · demande 26000200422 | Certificat · à EDITI
 édition n° 1706413 | Convocation · à CONVOC NPAI SARL · émise le 02/07/2001 | Courrier | Validee | [0,1,2,3]
 édition n° 1706412 | Convocation · à CONVOC CITEE SAS · émise le 01/07/2001 | Courrier | Validee | [0,1,2,3]
 édition n° 1706411 | Convocation · à CONVOC A CITER SARL · émise le 01/07/2001 | Courrier | Validee | [0,1,2,3]
+# Lot 10 (PROC_SIGNJUD.sql) : l'edition du groupe BANC10-G01 (« Éditions différées ») et les editions des ordonnances de « Signature électronique ».
+édition n° 2000304 | Courrier différé du banc 10 · file « AMI_BANC9 » | File différée | Validee | [0,1,2,3]
+édition n° 2000303 | Ordonnance du banc 10 | Courrier | Validee | [0,1,2,3]
+édition n° 2000302 | Ordonnance du banc 10 | Courrier | Validee | [0,1,2,3]
+édition n° 2000301 | Ordonnance du banc 10 | Courrier | Validee | [0,1,2,3]
 # Les éditions des groupes d'impression de PROC_RELANCELOT.sql (1900401-1900405, lot 9), sans date de création : avant 200410,
 # par numéro décroissant.
 édition n° 1900405 | Courrier sans lot du banc 9 | Courrier | Validee | [0,1,2,3]

@@ -2,6 +2,8 @@
 # PROC_XXAFF.sql (sans type). Groupes : type EXP* = Expertise (OPE_MESURE.cs:149), sinon Autre mesure. Etats : tenue par une demande
 # sur le sequenceur 2F -> EnAttente (1500902) ; une demande MESIN validee sur 2F -> Validee (1500903) ; sinon AFaire -- jumeau 1500901.
 # 1500904 n'a pas d'instance : nommee par son numero.
+# Lot 10 (PROC_IMPLEG.sql) : la mesure de 2000701, liee a sa decision, sans numero (« Impression légale » la numerote : PROC_MESIN.gestes la relit numerotee).
+IMPLEG A | instance 2026IL20701 | Autre mesure | AFaire | []
 Mesure n° 2026M15904 | Mesure 2026M15904 · Autre mesure du banc lot 5 | Autre mesure | AFaire | []
 MESIN DELTA | Mesure 2026M15903 · Expertise du banc lot 5 · ouverte le 04/03/2026 · instance 2026IP15913 | Expertise | Validee | []
 MESIN GAMMA | Mesure 2026M15902 · Expertise du banc lot 5 · ouverte le 03/03/2026 · instance 2026IP15912 · bloquée par la demande D2615000941 | Expertise | EnAttente | []

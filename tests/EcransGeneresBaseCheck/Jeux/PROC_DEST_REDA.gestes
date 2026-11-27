@@ -1,0 +1,71 @@
+# « Destinataires » (EcrivainDestinatairesRedaction) : « Enregistrer » l'edition d'un destinataire et, sur le document REDA, la date de
+# delivrance des grosses et les supplements (OPE_DEST_REDA.Toolbar_ButtonClick, :217-280). Lignes du jeu : PROC_DEST_REDA.sql et .attendu.
+
+# Refus : un destinataire qu'aucune decision redigee ne porte. Jumeau accepte : bloc 4.
+geste: Enregistrer
+ids: D-999
+resultat: refuse
+message: Destinataire introuvable parmi ceux des décisions rédigées (D-999).
+---
+# Refus : une edition hors de la grammaire G, C, E, L (RedaDestinatairesDataGridView, :295-303). Jumeau accepte : bloc 4.
+geste: Enregistrer
+ids: P-2000603-2000602
+valeur: Édition du jugement › Édition = Z
+resultat: refuse
+message: Édition « Z » inconnue : G (grosse), C (copie), E (expédition), L (lettre de notification), X (aucune) ou D (par défaut).
+---
+# Refus : rien ne change (« Veuillez modifier des données. », :264). Jumeau accepte : bloc 4.
+geste: Enregistrer
+ids: P-2000603-2000602
+valeur: Édition du jugement › Édition = X
+resultat: refuse
+message: Veuillez modifier des données.
+---
+# Les cases recomposent l'edition dans l'ordre G, C, E, L (:282-308) : grosse et lettre de notification -> « GL » sur la partie. Le
+# document de 2000602 reste sans date de delivrance : l'avertissement de RIG v2, sans refus (:244-251).
+geste: Enregistrer
+ids: P-2000603-2000602
+valeur: Édition du jugement › Grosse = oui
+valeur: Édition du jugement › Lettre de notification = oui
+resultat: fait
+message: Destinataire PARTIE B SARL enregistré : grosse + lettre de notification. La date de délivrance des grosses est obligatoire pour continuer.
+lignes:
+PARTIE B SARL | Rôle 2026DR20602 · partie · grosse + lettre de notification · date de délivrance à saisir | Parties | AFaire | []
+DEMANDEUR DEST SARL | Rôle 2026DR20601 · partie · grosse + copie · grosses délivrées le 15/03/1990 | Parties | EnCours | []
+DEFENDEUR DEST SAS | Rôle 2026DR20601 · partie · édition par défaut · grosses délivrées le 15/03/1990 | Parties | EnCours | []
+CHANTELLE Olga | Rôle 2026DR20601 · mandataire plaidant · aucune édition · grosses délivrées le 15/03/1990 | Mandataires | EnCours | []
+ARDOISE Irène | Rôle 2026DR20601 · mandataire postulant · lettre de notification · grosses délivrées le 15/03/1990 | Mandataires | EnCours | []
+HUISSIER DIVERS BANC | Rôle 2026DR20601 · destinataire divers · expédition · grosses délivrées le 15/03/1990 | Destinataires divers | EnCours | []
+controle: SELECT PRT_EDITION_JUGEMENT FROM v2.PARTIE WHERE PRT_ID_PRT = 2000603 => GL
+fiche: P-2000603-2000602
+Édition du jugement › Édition = GL
+Édition du jugement › Grosse = oui
+Édition du jugement › Copie =
+---
+# Le mandataire postulant : « T » vaut « GC » (DestinataireREDA.EditionJugement, :193-197), sur la colonne de la PARTIE qu'il represente
+# (_EnregistrerMandataire, :468-487) ; la date de delivrance et un supplement de copie sur le document de 2000601 (:223-243) : toutes
+# les lignes de cette decision portent la nouvelle date.
+geste: Enregistrer
+ids: M-2000601-2000601
+valeur: Édition du jugement › Édition = T
+valeur: Date de délivrance des grosses › Date de délivrance des grosses = 1990-03-20
+valeur: Suppléments › Copies supplémentaires = 2
+resultat: fait
+message: Destinataire ARDOISE Irène enregistré : grosse + copie.
+lignes:
+PARTIE B SARL | Rôle 2026DR20602 · partie · grosse + lettre de notification · date de délivrance à saisir | Parties | AFaire | []
+DEMANDEUR DEST SARL | Rôle 2026DR20601 · partie · grosse + copie · grosses délivrées le 20/03/1990 | Parties | EnCours | []
+DEFENDEUR DEST SAS | Rôle 2026DR20601 · partie · édition par défaut · grosses délivrées le 20/03/1990 | Parties | EnCours | []
+CHANTELLE Olga | Rôle 2026DR20601 · mandataire plaidant · aucune édition · grosses délivrées le 20/03/1990 | Mandataires | EnCours | []
+ARDOISE Irène | Rôle 2026DR20601 · mandataire postulant · grosse + copie · grosses délivrées le 20/03/1990 | Mandataires | EnCours | []
+HUISSIER DIVERS BANC | Rôle 2026DR20601 · destinataire divers · expédition · grosses délivrées le 20/03/1990 | Destinataires divers | EnCours | []
+controle: SELECT PRT_MANDATAIRE_EDITION_JUGEMENT + ' / ' + PRT_EDITION_JUGEMENT FROM v2.PARTIE WHERE PRT_ID_PRT = 2000601 => GC / GC
+controle: SELECT DCMDS_SUPPLEMENT_COPIE + ' / ' + CONVERT(varchar(10), DCMDS_DATE_IMPRESSION_MINUTE, 103) FROM v2.DOCUMENT_DOSSIER WHERE DCMDS_ID_DCMDS = 2000601 => 2 / 20/03/1990
+---
+# Le destinataire divers : la copie s'ajoute a l'expedition, dans l'ordre (C avant E) -> « CE » sur DESTINATAIRE_DIVERS.
+geste: Enregistrer
+ids: D-2000601
+valeur: Édition du jugement › Copie = oui
+resultat: fait
+message: Destinataire HUISSIER DIVERS BANC enregistré : copie + expédition.
+controle: SELECT DTDIV_EDITION_JUGEMENT FROM v2.DESTINATAIRE_DIVERS WHERE DTDIV_ID_DTDIV = 2000601 => CE

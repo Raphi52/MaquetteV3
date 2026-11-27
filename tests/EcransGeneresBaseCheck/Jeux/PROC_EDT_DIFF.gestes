@@ -1,0 +1,32 @@
+# « Éditions différées » (EcrivainEditionsDifferees) : « Clôturer le lot » (OPE_EDT_DIFF.Toolbar_ButtonClick « CLOTURER », les lots coches
+# de la grille). Lignes : PROC_EDT_DIFF.attendu (posees par PROC_SIGNJUD.sql et PROC_RELANCELOT.sql).
+
+# Refus : aucun lot coche. Jumeau accepte : bloc 4.
+geste: Agir Clôturer le lot
+ids:
+resultat: refuse
+message: Aucun lot coché : rien n'est clôturé.
+---
+# Refus : BANC10-G01 n'a pas d'imprimante choisie (OPE_EDT_DIFF.cs, « Vous devez choisir une imprimante pour pouvoir clôturer »). Jumeau
+# accepte : bloc 4, BANC9-G07 et son imprimante.
+geste: Agir Clôturer le lot
+ids: BANC10-G01
+resultat: refuse
+message: Vous devez choisir une imprimante pour pouvoir clôturer
+---
+# Refus : BANC10-G02 n'a aucune edition (« having count(DMNED_ID_DMNED) > 0 », MetierEdtDiff.cs:19-24) : il n'est pas dans la liste.
+# Jumeau accepte : bloc 4.
+geste: Agir Clôturer le lot
+ids: BANC10-G02
+resultat: refuse
+message: Lot introuvable parmi les lots d'éditions différées ouverts (BANC10-G02).
+---
+# « Clôturer le lot » BANC9-G07 : phase P (pret a imprimer) et date de fin ; son imprimante est reservee a Amitel (IMPED_ONLY_AMITEL) :
+# l'avertissement de RIG v2, sans refus. Le groupe sort de la liste (GPIMP_DATE_FIN IS NULL).
+geste: Agir Clôturer le lot
+ids: BANC9-G07
+resultat: fait
+message: Lot AMI_BANC9 clôturé : prêt à imprimer, le service d'impression de RIG v2 le prend. Attention, l'imprimante choisie est l'imprimante d'Amitel (Imprimante Amitel).
+lignes:
+Lot AMI_BANC9 | 1 document · 1 à ne pas imprimer · ouvert le {J-2} · aucune imprimante choisie · groupe BANC10-G01 | Lots ouverts | EnAttente | []
+controle: SELECT GPIMP_PHASE_TRAITEMENT + ' / ' + CASE WHEN GPIMP_DATE_FIN IS NULL THEN 'ouvert' ELSE 'clos' END FROM v2.GROUPE_IMPRESSION WHERE GPIMP_NUM_GROUPE = 'BANC9-G07' => P / clos

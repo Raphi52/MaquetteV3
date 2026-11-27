@@ -1,0 +1,10 @@
+# « Destinataires » (PROC_DEST_REDA) sur PROC_DEST_REDA.sql : les destinataires des decisions qui ont un document REDA, la decision la plus
+# recente (le plus grand identifiant) en tete, puis parties, mandataires (plaidant L, postulant M), destinataires divers. Ecartee : la partie
+# de 2000603, dont la decision n'a pas de document REDA (ETP_DEST_REDA.GetDocumentReda) ; jumeau : la partie de 2000602.
+# Etat : la date de delivrance des grosses du document (celui de 2000601 la porte, celui de 2000602 non).
+PARTIE B SARL | Rôle 2026DR20602 · partie · aucune édition · date de délivrance à saisir | Parties | AFaire | []
+DEMANDEUR DEST SARL | Rôle 2026DR20601 · partie · grosse + copie · grosses délivrées le 15/03/1990 | Parties | EnCours | []
+DEFENDEUR DEST SAS | Rôle 2026DR20601 · partie · édition par défaut · grosses délivrées le 15/03/1990 | Parties | EnCours | []
+CHANTELLE Olga | Rôle 2026DR20601 · mandataire plaidant · aucune édition · grosses délivrées le 15/03/1990 | Mandataires | EnCours | []
+ARDOISE Irène | Rôle 2026DR20601 · mandataire postulant · lettre de notification · grosses délivrées le 15/03/1990 | Mandataires | EnCours | []
+HUISSIER DIVERS BANC | Rôle 2026DR20601 · destinataire divers · expédition · grosses délivrées le 15/03/1990 | Destinataires divers | EnCours | []

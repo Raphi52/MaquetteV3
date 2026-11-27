@@ -66,6 +66,10 @@ DEBITEUR BETA | Défendeur · instance 2026IP81401 | Défendeurs | AFaire | []
 IPE NOUVEAU DEMANDEUR | Demandeur · instance 2026IP00001 | Demandeurs | AFaire | []
 M. IPE NOUVEAU DEFENDEUR | Défendeur · instance 2026IP00001 | Défendeurs | AFaire | []
 KAPPA BANC SAS | Défendeur · instance 2026I12007 | Défendeurs | AFaire | []
+STE PARTIE SANS REDA | Demandeur · instance 2026DR20603 | Demandeurs | AFaire | []
+STE PARTIE B SARL | Demandeur · instance 2026DR20602 | Demandeurs | AFaire | []
+STE DEMANDEUR DEST SARL | Demandeur · instance 2026DR20601 | Demandeurs | AFaire | []
+STE DEFENDEUR DEST SAS | Défendeur · instance 2026DR20601 | Défendeurs | AFaire | []
 fiche: 1312101
 Aide juridictionnelle › Aide juridictionnelle = oui
 Aide juridictionnelle › Totale = oui
@@ -160,6 +164,10 @@ DEBITEUR BETA | Défendeur · instance 2026IP81401 | Défendeurs | AFaire | []
 IPE NOUVEAU DEMANDEUR | Demandeur · instance 2026IP00001 | Demandeurs | AFaire | []
 M. IPE NOUVEAU DEFENDEUR | Défendeur · instance 2026IP00001 | Défendeurs | AFaire | []
 KAPPA BANC SAS | Défendeur · instance 2026I12007 | Défendeurs | AFaire | []
+STE PARTIE SANS REDA | Demandeur · instance 2026DR20603 | Demandeurs | AFaire | []
+STE PARTIE B SARL | Demandeur · instance 2026DR20602 | Demandeurs | AFaire | []
+STE DEMANDEUR DEST SARL | Demandeur · instance 2026DR20601 | Demandeurs | AFaire | []
+STE DEFENDEUR DEST SAS | Défendeur · instance 2026DR20601 | Défendeurs | AFaire | []
 fiche: 1312101
 Identité › Nom = ALPHA PARTIES SAS
 controle: SELECT COUNT(*) FROM v2.PARTIE WHERE PRT_ID_PRT = 1312101 AND PRT_DESIGNATION = 'ALPHA PARTIES SAS' AND PRT_NOM = 'ALPHA PARTIES SAS' => 1

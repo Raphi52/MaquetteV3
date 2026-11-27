@@ -1,0 +1,15 @@
+# Les recherches de LecteurOccultations (IRechercheEcran) : le numero de role, et le texte (role ou nom de l'affaire). La recherche
+# retrouve TOUTE decision, avec ou sans consignes (la V3 n'a pas l'ecran de redaction qui donne la decision a RIG v2).
+
+# 1. Une decision sans consignes, par son role (absente de la liste sans recherche).
+critere: Numéro de rôle = 2026OC20503
+lignes:
+OCCULT C | Rôle 2026OC20503 · du 04/04/1990 · occultations non saisies | Jugements | AFaire | []
+---
+# 2. Le texte : les quatre decisions du jeu, le role le plus recent en tete ; 2000504 n'est pas rendue.
+texte: OCCULT
+lignes:
+OCCULT D | Rôle 2026OC20504 · non rendue · occultations non saisies | Ordonnances | AFaire | []
+OCCULT C | Rôle 2026OC20503 · du 04/04/1990 · occultations non saisies | Jugements | AFaire | []
+OCCULT B | Rôle 2026OC20502 · du 03/04/1990 · cases enregistrées, aucun mot | Ordonnances | EnCours | []
+OCCULT A | Rôle 2026OC20501 · du 02/04/1990 · 1 mot à masquer · 1 mot à conserver | Jugements | EnCours | []

@@ -1,0 +1,10 @@
+# Les recherches de LecteurDestinatairesRedaction (IRechercheEcran) : le numero de role, et le texte (role ou nom de l'affaire).
+
+# 1. Les destinataires de la decision du role 2026DR20602.
+critere: Numéro de rôle = 2026DR20602
+lignes:
+PARTIE B SARL | Rôle 2026DR20602 · partie · aucune édition · date de délivrance à saisir | Parties | AFaire | []
+---
+# 2. Une decision sans document REDA ne se trouve pas, meme par son role (ETP_DEST_REDA.GetDocumentReda) : aucune ligne ; jumeau : bloc 1.
+texte: 2026DR20603
+lignes:

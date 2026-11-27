@@ -1,0 +1,33 @@
+# « Impression légale » (EcrivainImpressionLegale) : « Imprimer la sélection » (OPE_IMPLEG, bouton « Imprimer » sur les decisions cochees
+# de l'audience). Lignes : PROC_IMPLEG.sql ; la liste sans recherche (PROC_IMPLEG.attendu) ne porte que 2000706, les autres se
+# controlent dans la base.
+
+# Refus : aucune decision cochee (« Veuillez sélectionner au moins une décision pour continuer »). Jumeau accepte : bloc 3.
+geste: Decider Imprimer la sélection
+ids:
+resultat: refuse
+message: Veuillez sélectionner au moins une décision pour continuer
+---
+# Refus : 2000703 est un brouillon (etat 1) : RIG v2 ne propose que les decisions a l'etat 3 ou 4. Jumeau accepte : bloc 3, 2000701 (etat 3).
+geste: Decider Imprimer la sélection
+ids: 2000703
+resultat: refuse
+message: Décision introuvable parmi celles à imprimer de l'audience (2000703).
+---
+# 2000701 (etat 3, type a mesure liee EXP, mesure sans numero) et 2000702 (deja a l'etat 4) : 2000701 passe a l'etat 4, diffusion 2,
+# stabilite 2, sa mesure recoit le numero JMEXP 1990 et la date d'ouverture de la decision ; 2000702 garde son etat.
+geste: Decider Imprimer la sélection
+ids: 2000701,2000702
+resultat: fait
+message: 2 décisions passées « Impression légale effectuée » ; 2026IL20701 : expertise 1990X00001. Rien n'est imprimé : la V3 n'a pas le moteur REDA de RIG v2 qui produit les documents.
+controle: SELECT DCJDC_ETAT_REDACTION + ' / ' + DCJDC_ETAT_DIFFUSION + ' / ' + DCJDC_ETAT_STABILITE FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_DCJDC = 2000701 => 4 / 2 / 2
+controle: SELECT DCJDC_ETAT_REDACTION + ' / ' + DCJDC_ETAT_DIFFUSION FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_DCJDC = 2000702 => 4 / 1
+controle: SELECT MSINS_NUM_MESURE + ' / ' + CONVERT(varchar(10), MSINS_DATE_OUVERTURE, 103) FROM v2.MESURE WHERE MSINS_ID_MSINS = 2000701 => 1990X00001 / 11/06/1990
+---
+# 2000706, la decision de la liste : elle passe « Impression légale effectuée », non diffusable (diffusion 2), a l'ecran.
+geste: Decider Imprimer la sélection
+ids: 2000706
+resultat: fait
+message: Décision passée « Impression légale effectuée ». Rien n'est imprimé : la V3 n'a pas le moteur REDA de RIG v2 qui produit les documents.
+lignes:
+IMPLEG F | Rôle 2026IL20706 · Jugement du banc lot 10 · minute 9016400001 · Impression légale effectuée - ATTENTION - NON DIFFUSABLE · Audience du {J-1} à 11:00 | Décisions de l'audience | EnCours | []
