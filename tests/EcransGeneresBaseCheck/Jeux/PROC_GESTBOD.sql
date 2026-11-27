@@ -35,3 +35,24 @@ INSERT INTO v2.BODACC (BDCCR_ID_BDCCR, BDCCR_ID_BDCRC, BDCCR_TYPE_BODACC, BDCCR_
     (2110204, 2110204, ''N1'', ''9'', ''20010402'', ''A2110204'', ''Adresse incomplète''),
     -- publiee a verifier (5) : un certificat, dont la liste exige une date -- ecartee, jumelle 2110201
     (2110205, 2110205, ''P1'', ''5'', ''20010402'', ''A2110205'', NULL);';
+
+-- Pour les CERTIFICATS DE PARUTION et les CONTROLES NON CONFORMES (lot 11, reprise : PROC_GESTBOD.recherches et .gestes) : des
+-- annonces de 2001 (PROC_SURVBOD ne lit que les parutions depuis 2008), dont deux sur l'evenement 2110251 (BANC11B, du 01/04/2001,
+-- sans instance, PC ni prevention). Colonnes ajoutees si un jeu precedent ne les a pas posees, aux types de RIG_DEV.
+IF COL_LENGTH('v2.BODACC', 'BDCCR_NUM_PARUTION') IS NULL ALTER TABLE v2.BODACC ADD BDCCR_NUM_PARUTION varchar(10) NULL;
+IF COL_LENGTH('v2.BODACC', 'BDCCR_CONTROLE_QUALITE') IS NULL ALTER TABLE v2.BODACC ADD BDCCR_CONTROLE_QUALITE nvarchar(max) NULL;
+IF COL_LENGTH('v2.BODACC', 'BDCCR_DATE_EP_SUPPR') IS NULL ALTER TABLE v2.BODACC ADD BDCCR_DATE_EP_SUPPR datetime NULL;
+EXEC sp_executesql N'
+INSERT INTO v2.EVENEMENT_PROCEDURE (EVNPR_ID_EVNPR, EVNPR_CODE_EVE_PRO, EVNPR_DATE, EVNPR_SURVENU, EVNPR_DELAI_EXPIRE) VALUES
+    (2110251, ''BANC11B'', ''20010401'', 1, 0);
+UPDATE v2.BODACC SET BDCCR_NUMERO_ANNONCE = ''A2110205'' WHERE BDCCR_ID_BDCRC = 2110205;
+INSERT INTO v2.BODACC (BDCCR_ID_BDCCR, BDCCR_ID_BDCRC, BDCCR_TYPE_BODACC, BDCCR_ETAT_BODACC, BDCCR_DATE_ENVOI, BDCCR_DATE_PUBLICITE,
+                       BDCCR_NUM_PARUTION, BDCCR_NUMERO_ANNONCE, BDCCR_ID_EVNPR, BDCCR_CONTROLE_QUALITE, BDCCR_DATE_EP_SUPPR) VALUES
+    -- parue le 10/04 (parution P2110) et deja verifiee (6)
+    (2110206, 2110206, ''P1'', ''6'', ''20010402'', ''20010410'', ''P2110'', ''A2110206'', NULL, NULL, NULL),
+    -- rectifiee, a verifier (10), sur l''evenement 2110251, avec un controle qualite : un certificat ET un controle non conforme
+    (2110207, 2110207, ''P2'', ''10'', ''20010406'', ''20010410'', ''P2110'', ''A2110207'', 2110251, N''Capital manquant'', NULL),
+    -- type N (hors P%) avec un controle qualite : un controle non conforme seulement (le controle ne filtre pas le type)
+    (2110208, 2110208, ''N1'', ''5'', ''20010406'', NULL, NULL, ''A2110208'', 2110251, N''Siège absent'', NULL),
+    -- a verifier, son evenement supprime le 01/04 (BDCCR_DATE_EP_SUPPR) : la date d''EP la trouve
+    (2110209, 2110209, ''P1'', ''5'', NULL, NULL, NULL, ''A2110209'', NULL, NULL, ''20010401'');';

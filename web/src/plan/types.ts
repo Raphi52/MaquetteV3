@@ -190,7 +190,8 @@ export interface DescripteurEcranVue {
   colonnes: ChampEcranVue[]
   /** La periode d'un Etat, la date et la chambre d'une Audience. */
   parametres: ChampEcranVue[]
-  /** Les gestes nommes par la fiche RIG v2 ; vide : le bouton « valider » seul. */
+  /** Les gestes nommes par la fiche RIG v2 (File, Audience, Etat, Document, Consultation ; boutons de confirmation d'une
+   * Operation ; menu de ligne d'un Referentiel, en plus de Modifier et Supprimer) ; vide : le bouton « valider » seul. */
   gestes: string[]
   lignes: LigneEcranVue[]
   /** Un ecran REUNI : les procedures qu'il reunit, une par groupe (titre = groupe). Chaque ligne

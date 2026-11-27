@@ -62,3 +62,45 @@ PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-7} · à 
 controle: SELECT BRDRJ_NUM_BORDEREAU + '|' + BRDRJ_ETAT_XML + '|' + BRDRJ_DESTINATAIRE + '|' + CAST(BRDRJ_NB_ANNONCES AS varchar(9)) + '|' + CASE WHEN BRDRJ_DONNEES_XML IS NULL THEN 'sans XML' ELSE 'XML' END FROM v2.BORDEREAU_JAL WHERE BRDRJ_NUM_BORDEREAU = 'BB/0001' => BB/0001|2|BANC11K|1|sans XML
 controle: SELECT PBLCT_ETAT_PUBLICITE + PBLCT_ETAT_XML + '|' + PBLCT_NUM_BORDEREAU + '|' + CASE WHEN PBLCT_ID_BRDRJ = (SELECT BRDRJ_ID_BRDRJ FROM v2.BORDEREAU_JAL WHERE BRDRJ_NUM_BORDEREAU = 'BB/0001') THEN 'lie' ELSE 'non lie' END + '|' + CASE WHEN PBLCT_DOC_ENVOI_ELECTRONIQUE LIKE 'Envoi BANC11K du % au %. Le % banc.ecrans BB-0001' THEN 'fichier' ELSE PBLCT_DOC_ENVOI_ELECTRONIQUE END FROM v2.PUBLICITE WHERE PBLCT_ID_PBLCT = 2110312 => 22|BB/0001|lie|fichier
 controle: SELECT CAST(COUNT(*) AS varchar(9)) FROM v2.PUBLICITE WHERE PBLCT_ID_PBLCT IN (2110311, 2110315, 2110316) AND PBLCT_DATE_ENVOI_ELECTRONIQUE IS NULL => 3
+---
+# « Supprimer le bordereau » (AnnulerBordereaux_JAL, OPE_DEJA_ENVOYER.cs:305-376), le second geste de la V2, offert au temps
+# Confirmer. Refus : 2110311 est a envoyer, sans bordereau ; la V2 n'active le bouton que pour un bordereau saisi dans la recherche
+# (OPE_RECH_ANNONCES.cs:170-201), son infobulle au mot pres (OPE_DEJA_ENVOYER.cs:75). Jumeau accepte : bloc 11, 2110321 sur B11J01.
+geste: Confirmer Supprimer le bordereau
+ids: 2110311
+resultat: refuse
+message: Pour supprimer un bordereau, saisir le n° bordereau dans la recherche
+---
+# Refus EDI : 2110322 est sur B11J02, transmis (etat XML 3) le 15/03/2001 a 10 h 30 (OPE_RECH_ANNONCES.cs:180-181). Jumeau
+# accepte : bloc 11, B11J01 genere mais pas transmis (etat XML 2).
+geste: Confirmer Supprimer le bordereau
+ids: 2110322
+resultat: refuse
+message: Le bordereau a déjà été transmis le 15/03/2001 10:30:00.
+---
+# Refus : 2110321 (B11J01) et 2110312 (BB/0001, genere au bloc 7) sont sur deux bordereaux ; la V2 n'annule que celui du numero
+# saisi (numBdxToCancel). Jumeau accepte : bloc 11, un seul bordereau.
+geste: Confirmer Supprimer le bordereau
+ids: 2110321,2110312
+resultat: refuse
+message: Un seul bordereau à la fois : RIG v2 n'annule que celui dont le numéro est saisi dans la recherche (annonces cochées sur B11J01, BB/0001).
+---
+# Annulation de B11J01 (:313-337) : sa publicite 2110321 perd bordereau, fichier et date d'envoi electronique, repasse a l'etat 1
+# (EDI) sans etat XML, et redevient a envoyer (envoi prevu a J-5, dans la periode par defaut) ; le bordereau est supprime. Le
+# courriel a la hotline et le deplacement des fichiers sont simules, dits dans le message. BB/0001 (bloc 7) reste.
+geste: Confirmer Supprimer le bordereau
+ids: 2110321
+resultat: fait
+message: Bordereau annulé avec succés. Bordereau B11J01 : 1 annonce de nouveau à envoyer. Courriel d'annulation à la hotline judiciaire et déplacement des fichiers d'envoi vers « Archives annulations » : non faits (simulés, RIG v3 n'envoie rien hors du poste et n'a produit aucun fichier).
+lignes:
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-2} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-10} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J+0} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-5} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PRV 1990V14201 · XLIEN PRV ALPHA | BANC11JAL du {J-15} · envoi prévu le {J-5} · à BANC11J · envoyée le {J-4} · bordereau B11J02 transmis | Préventions | Validee | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-6} · à BANC11J · envoyée le {J-5} · procédure extérieure | Procédures collectives | Validee | []
+PRV 1990V14201 · XLIEN PRV ALPHA | BANC11JAL du {J-15} · envoi prévu le {J-3} · à BANC11K · envoyée le {J+0} · bordereau BB/0001, annulable | Préventions | EnCours | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-7} · à BANC11J · envoyée le {J-6} · procédure extérieure · évènement de procédure supprimé | Procédures collectives | Validee | []
+controle: SELECT CAST(COUNT(*) AS varchar(9)) FROM v2.BORDEREAU_JAL WHERE BRDRJ_NUM_BORDEREAU IN ('B11J01', 'BB/0001') => 1
+controle: SELECT PBLCT_ETAT_PUBLICITE + '|' + COALESCE(PBLCT_ETAT_XML, 'sans XML') + '|' + COALESCE(PBLCT_NUM_BORDEREAU, 'sans bordereau') + '|' + CASE WHEN PBLCT_DATE_ENVOI_ELECTRONIQUE IS NULL AND PBLCT_ID_BRDRJ IS NULL AND PBLCT_DOC_ENVOI_ELECTRONIQUE IS NULL THEN 'libre' ELSE 'liee' END FROM v2.PUBLICITE WHERE PBLCT_ID_PBLCT = 2110321 => 1|sans XML|sans bordereau|libre
+controle: SELECT PBLCT_NUM_BORDEREAU FROM v2.PUBLICITE WHERE PBLCT_ID_PBLCT = 2110312 => BB/0001

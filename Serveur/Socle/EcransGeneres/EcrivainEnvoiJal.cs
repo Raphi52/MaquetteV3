@@ -51,8 +51,23 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   le journal des gestes remplace (decision du chef, plan-676a4b19) ; les deux questions oui/non (annonces sans activite :204-208,
 ///   annonces non editees avant la periode :250-264), dont la confirmation de l'operation tient lieu ; le choix d'une affectation du
 ///   patrimoine d'un EIRL (:272-302) ; l'ecriture des reglages JAL_DATE_DEBUT_ENVOI / JAL_DATE_FIN_ENVOI apres generation (:315-328 :
-///   des reglages du greffe, soc.Reglage, qu'un geste n'ecrit pas) ; l'edition recapitulative Word (:1175-1279) ; la suppression d'un
-///   bordereau (OPE_DEJA_ENVOYER.cs:297-376), un second geste qu'une Operation ne porte pas.
+///   des reglages du greffe, soc.Reglage, qu'un geste n'ecrit pas) ; l'edition recapitulative Word (:1175-1279).
+///
+/// « SUPPRIMER LE BORDEREAU » (le second bouton de la V2, Operations\OPE_DEJA_ENVOYER.cs, AnnulerBordereaux_JAL :305-376 ; la V3
+/// l'offre au temps Confirmer, descripteur.Gestes) annule le bordereau des annonces cochees. CONTROLES, avant toute ecriture :
+///   1. une annonce cochee sans bordereau, ou un bordereau absent de la base : la V2 n'active le bouton que pour un bordereau saisi
+///      dans la recherche et trouve (OPE_RECH_ANNONCES.cs:170-201, BordereauJal.GetBordereauJalByNum), son infobulle le dit au mot
+///      pres : « Pour supprimer un bordereau, saisir le n° bordereau dans la recherche » (OPE_DEJA_ENVOYER.cs:75) ;
+///   2. des annonces de plusieurs bordereaux : la V2 n'en annule qu'un, celui du numero saisi (numBdxToCancel, :41, :93) ;
+///   3. EDI, un bordereau deja transmis (BRDRJ_ETAT_XML = « 3 ») : « Le bordereau a déjà été transmis le <BRDRJ_DATE_CREA_XML>. »
+///      (OPE_RECH_ANNONCES.cs:180-181, la date et l'heure telles que la V2 les affiche).
+/// ECRIT, dans la transaction du geste (:313-337) : chaque publicite du bordereau (Publicite.GetListPubliciteByNumBdx, par
+///   PBLCT_NUM_BORDEREAU, Publicite.cs:258-264) perd son bordereau (PBLCT_ID_BRDRJ, PBLCT_NUM_BORDEREAU), son fichier d'envoi et sa
+///   date d'envoi electronique ; en EDI, elle repasse a l'etat « 1 » (a envoyer) et perd son etat XML ; puis le BORDEREAU_JAL est
+///   supprime. Message de la V2 : « Bordereau annulé avec succés. » (:338).
+/// SIMULE, ETIQUETE : le courriel d'annulation a la hotline judiciaire (:346-354) n'est pas envoye, et les fichiers d'envoi ne sont
+///   pas deplaces vers « Archives annulations » (:356-372) : RIG v3 n'envoie rien hors du poste et n'a produit aucun fichier. Le
+///   message le dit.
 /// </summary>
 internal sealed class EcrivainEnvoiJal : IEcrivainEcran
 {
@@ -63,7 +78,8 @@ internal sealed class EcrivainEnvoiJal : IEcrivainEcran
     public IReadOnlyCollection<TypeGeste> Gestes { get; } = [TypeGeste.Confirmer];
 
     /// <summary>Le bouton et la section du descripteur, au mot pres.</summary>
-    internal const string Generer = "Générer le bordereau", Section = "Période du bordereau", Debut = "Date de début", Fin = "Date de fin";
+    internal const string Generer = "Générer le bordereau", Supprimer = "Supprimer le bordereau", Section = "Période du bordereau",
+                          Debut = "Date de début", Fin = "Date de fin";
 
     /// <summary>Les messages de RIG v2, au mot pres (en tete du fichier).</summary>
     internal const string SansLigne = "Vous devez sélectionner au moins une ligne pour pouvoir générer.";
@@ -71,14 +87,18 @@ internal sealed class EcrivainEnvoiJal : IEcrivainEcran
                                               "Vous devez faire un envoi par destinataire JAL.";
     internal const string AucunElement = "Aucun élément à éditer. Veuillez modifier vos critères.";
     internal const string SansNumero = "Problème de création du numéro métier. Veuillez contacter AMITEL.";
+    internal const string SaisirBordereau = "Pour supprimer un bordereau, saisir le n° bordereau dans la recherche";
+    internal const string Annule = "Bordereau annulé avec succés.";
 
     private sealed record Publicite(int Id, int? Evenement, string Numero, string Journal, string Etat, DateTime? Envoyee);
 
     public async Task<IssueGeste> JouerAsync(GesteEnCours geste, CancellationToken ct)
     {
-        if (geste.Demande.Nom != Generer) return IssueGeste.Refuser($"Geste inconnu de l'écran « {Ecran} » : {geste.Demande.Nom}.");
+        if (geste.Demande.Nom != Generer && geste.Demande.Nom != Supprimer)
+            return IssueGeste.Refuser($"Geste inconnu de l'écran « {Ecran} » : {geste.Demande.Nom}.");
         var ids = geste.Demande.Ids.Select(i => int.TryParse(i, NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? n : 0)
                        .Where(n => n > 0).Distinct().ToArray();
+        if (geste.Demande.Nom == Supprimer) return await SupprimerAsync(geste, ids, ct);
         if (ids.Length == 0) return IssueGeste.Refuser(SansLigne);
 
         var reglages = await ReglagesAsync(geste, ct);
@@ -155,6 +175,61 @@ internal sealed class EcrivainEnvoiJal : IEcrivainEcran
             new TraceGeste("affaire", $"le bordereau JAL {numero}", bordereau.ToString(CultureInfo.InvariantCulture), "a cree", null,
                 new { Bordereau = numero, Journal = journal, Du = FormeLigne.Date(du), Au = FormeLigne.Date(au), Publicites = generees.Select(p => p.Id).ToArray(),
                       Fichier = fichier, Xml = "non produit (simulé)" }));
+    }
+
+    /// <summary>
+    /// « Supprimer le bordereau » des annonces cochees (en tete du fichier). fix-ok: mesure par le controle final du lot 11
+    /// (27/11/2026) -- JouerAsync refusait tout nom autre que « Générer le bordereau » et FormeOperation n'envoyait que son bouton
+    /// valider : le second geste de la V2 (AnnulerBordereaux_JAL, OPE_DEJA_ENVOYER.cs:305-376) n'ecrivait jamais rien.
+    /// </summary>
+    private static async Task<IssueGeste> SupprimerAsync(GesteEnCours geste, int[] ids, CancellationToken ct)
+    {
+        if (ids.Length == 0) return IssueGeste.Refuser(SaisirBordereau);
+        var numeros = new List<string>();
+        foreach (var id in ids)
+        {
+            await using var r = await geste.LireAsync("SELECT PBLCT_NUM_BORDEREAU FROM v2.PUBLICITE WHERE PBLCT_ID_PBLCT = @id", ct,
+                                                      new SqlParameter("@id", id));
+            if (!await r.ReadAsync(ct)) return IssueGeste.Refuser($"La publicité {id} n'est pas dans la base du greffe.");
+            numeros.Add(FormeLigne.Texte(r, "PBLCT_NUM_BORDEREAU").Trim());
+        }
+        if (numeros.Any(n => n.Length == 0)) return IssueGeste.Refuser(SaisirBordereau);
+        var distincts = numeros.Distinct(StringComparer.Ordinal).ToList();
+        if (distincts.Count > 1)
+            return IssueGeste.Refuser($"Un seul bordereau à la fois : RIG v2 n'annule que celui dont le numéro est saisi dans la recherche " +
+                                      $"(annonces cochées sur {string.Join(", ", distincts)}).");
+        var numero = distincts[0];
+
+        int? bordereau = null;
+        string etatXml = "";
+        DateTime? transmisLe = null;
+        await using (var r = await geste.LireAsync("""
+            SELECT BRDRJ_ID_BRDRJ, BRDRJ_ETAT_XML, BRDRJ_DATE_CREA_XML FROM v2.BORDEREAU_JAL WHERE BRDRJ_NUM_BORDEREAU = @n
+            """, ct, new SqlParameter("@n", numero)))
+            if (await r.ReadAsync(ct))
+            {
+                bordereau = r.GetInt32(0);
+                etatXml = FormeLigne.Texte(r, "BRDRJ_ETAT_XML").Trim();
+                transmisLe = r["BRDRJ_DATE_CREA_XML"] is DateTime d ? d : null;
+            }
+        if (bordereau is null) return IssueGeste.Refuser(SaisirBordereau);
+        var edi = (await ReglagesAsync(geste, ct)).GetValueOrDefault("JAL_ENVOIE_EDI") == "1";
+        if (edi && etatXml == "3")
+            return IssueGeste.Refuser($"Le bordereau a déjà été transmis le {transmisLe?.ToString(CultureInfo.GetCultureInfo("fr-FR")) ?? ""}.");
+
+        var liberees = await geste.EcrireAsync($"""
+            UPDATE v2.PUBLICITE SET PBLCT_ID_BRDRJ = NULL, PBLCT_NUM_BORDEREAU = NULL, PBLCT_DOC_ENVOI_ELECTRONIQUE = NULL,
+                   PBLCT_DATE_ENVOI_ELECTRONIQUE = NULL{(edi ? ", PBLCT_ETAT_PUBLICITE = '1', PBLCT_ETAT_XML = NULL" : "")}
+            WHERE PBLCT_NUM_BORDEREAU = @n
+            """, ct, new SqlParameter("@n", numero));
+        await geste.EcrireAsync("DELETE FROM v2.BORDEREAU_JAL WHERE BRDRJ_ID_BRDRJ = @b", ct, new SqlParameter("@b", bordereau.Value));
+        return IssueGeste.Ecrit(
+            $"{Annule} Bordereau {numero} : {liberees} annonce{(liberees > 1 ? "s" : "")} de nouveau à envoyer. Courriel d'annulation à la " +
+            "hotline judiciaire et déplacement des fichiers d'envoi vers « Archives annulations » : non faits (simulés, RIG v3 n'envoie rien " +
+            "hors du poste et n'a produit aucun fichier).",
+            [.. ids.Select(i => i.ToString(CultureInfo.InvariantCulture))],
+            new TraceGeste("affaire", $"le bordereau JAL {numero}", bordereau.Value.ToString(CultureInfo.InvariantCulture), "a supprime",
+                new { Bordereau = numero, EtatXml = etatXml, Annonces = liberees }, null));
     }
 
     /// <summary>Le nom du fichier d'envoi tel que la V2 l'ecrit dans PBLCT_DOC_ENVOI_ELECTRONIQUE (:345-349, puis :1112-1118).</summary>

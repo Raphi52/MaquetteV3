@@ -763,10 +763,12 @@ foreach (var (code, lecteur) in lecteurs.ParProcedure.OrderBy(p => p.Key, String
 }
 
 // Tout ECRIVAIN : un descripteur d'une procedure, un jeu .gestes, et des gestes de sa forme (en-tete, 7).
+// Un Referentiel joue aussi Agir : les gestes de ligne que sa fiche nomme, au menu de la ligne (« Dupliquer » un document
+// ocerise, FormeReferentiel.tsx, lot 11).
 var GestesDeLaForme = new Dictionary<FormeEcran, TypeGeste[]>
 {
     [FormeEcran.Fiche] = [TypeGeste.Enregistrer], [FormeEcran.Saisie] = [TypeGeste.Creer],
-    [FormeEcran.Referentiel] = [TypeGeste.Ajouter, TypeGeste.Modifier, TypeGeste.Supprimer], [FormeEcran.File] = [TypeGeste.Agir],
+    [FormeEcran.Referentiel] = [TypeGeste.Ajouter, TypeGeste.Modifier, TypeGeste.Supprimer, TypeGeste.Agir], [FormeEcran.File] = [TypeGeste.Agir],
     [FormeEcran.Consultation] = [TypeGeste.Agir], [FormeEcran.Etat] = [TypeGeste.Agir], [FormeEcran.Document] = [TypeGeste.Agir],
     [FormeEcran.Operation] = [TypeGeste.Confirmer], [FormeEcran.Audience] = [TypeGeste.Decider],
 };
@@ -778,6 +780,45 @@ foreach (var (code, ecrivain) in ecrivains.ParProcedure.OrderBy(p => p.Key, Stri
         $"{d?.Forme} ({string.Join(", ", ecrivain.Gestes)})");
     Exiger(File.Exists(Path.Combine(dossierJeux, code + ".gestes")),
         $"{code} : son ecrivain a son jeu tests/EcransGeneresBaseCheck/Jeux/{code}.gestes (en-tete, 6)");
+}
+
+// ============================================================ 5. EXPORT EXCEL : GROUPEMENT NON COMPTE ET PLAFOND DE 65 536 (lot 11)
+// Deux cas de LecteurListesExcel qu'un jeu .recherches ne peut pas poser sans fausser ses autres blocs (la base des jeux est
+// commune) : un reglage du greffe qui filtre le groupement par du texte SQL (LSTXLS_GIE_*_REQUETE, OPE_INSTANCE.cs:51-56 : le
+// groupement n'est plus compte) et plus de 65 536 lignes (TextNbOccurence_ChangementValeur, OPE_RECHERCHE.cs:466-472 : la liste
+// est bloquee). Poses ICI, apres tous les jeux et tous les lecteurs, puis retires. Chaque refus a son jumeau de l'autre cote.
+// Instances de 1966 (aucun jeu ne touche cette annee), identifiants du lot 11 : 2 120 001 a 2 185 537.
+{
+    var excel = (IRechercheEcran)lecteurs.ParProcedure["PROC_LISTEEXCEL"];
+    async Task<LigneLue[]> CompterExcel(string periode)
+    {
+        await using var cn = new SqlConnection(greffe.Connexion);
+        await cn.OpenAsync();
+        var criteres = new Dictionary<string, string> { ["Période"] = periode };
+        return [.. (await excel.ChercherAsync(cn, new RechercheEcran("", criteres), jour, 200, CancellationToken.None)).Lignes];
+    }
+    await Sql("INSERT INTO soc.Reglage (Code, Libelle, Valeur) VALUES ('LSTXLS_GIE_NATURE_AFFAIRE_REQUETE', 'Banc EcransGeneresBase lot 11', @v)",
+        ("@v", "AND INSTN_NATURE_AFFAIRE = 'X'"));
+    var gie = (await CompterExcel("1968-03-01|1968-03-31")).Single(l => l.Groupe == "Groupements");
+    await Sql("DELETE FROM soc.Reglage WHERE Code = 'LSTXLS_GIE_NATURE_AFFAIRE_REQUETE'");
+    var gieCompte = (await CompterExcel("1968-03-01|1968-03-31")).Single(l => l.Groupe == "Groupements");
+    Exiger(gie is { Etat: "AFaire", Valeurs: [_, "non compté : filtre SQL du paramétrage"] } && gie.Precisions.Contains("LSTXLS_GIE_NATURE_AFFAIRE_REQUETE", StringComparison.Ordinal)
+           && gieCompte is { Etat: "EnCours", Valeurs: [_, "2"] },
+        $"PROC_LISTEEXCEL : un reglage SQL du groupement -> « non compté », le reglage nomme ; jumeau sans reglage : compte, 2 ({Texte(gie)} / {Texte(gieCompte)})");
+
+    // 65 536 instances enrolees en mars 1966 : au seuil, comptees (« plus de 65 536 » seulement bloque) ; une de plus : bloquee.
+    await Sql("""
+        INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_NOM_COURANT, INSTN_DATE_ENROLEMENT)
+        SELECT TOP (65536) 2120000 + n, '1966RA' + RIGHT('00000' + CAST(n AS varchar(6)), 5), 'EXCEL PLAFOND BANC 11', '19660315'
+        FROM (SELECT ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n FROM sys.all_columns AS a CROSS JOIN sys.all_columns AS b) AS x;
+        """);
+    var auSeuil = (await CompterExcel("1966-03-01|1966-03-31")).Single(l => l.Nom == "Liste des instances");
+    await Sql("INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_NOM_COURANT, INSTN_DATE_ENROLEMENT) VALUES (2185537, '1966RB99999', 'EXCEL PLAFOND BANC 11', '19660316')");
+    var auDela = (await CompterExcel("1966-03-01|1966-03-31")).Single(l => l.Nom == "Liste des instances");
+    await Sql("DELETE FROM v2.INSTANCE WHERE INSTN_ID_INSTN BETWEEN 2120001 AND 2185537");
+    Exiger(auSeuil is { Etat: "EnCours", Valeurs: [_, "65536"] } && !auSeuil.Precisions.Contains("au-delà", StringComparison.Ordinal)
+           && auDela is { Etat: "EnAttente", Valeurs: [_, "65537"] } && auDela.Precisions.Contains("au-delà de 65 536 lignes", StringComparison.Ordinal),
+        $"PROC_LISTEEXCEL : 65 536 lignes comptees ; 65 537 -> « Bloquée : trop de lignes » (OPE_RECHERCHE.cs:467) ({Texte(auSeuil)} / {Texte(auDela)})");
 }
 
 await app.StopAsync();

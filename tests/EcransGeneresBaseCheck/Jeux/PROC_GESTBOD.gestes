@@ -1,21 +1,30 @@
-# « Publications BODACC » (EcrivainPublicationsBodacc) : « Renvoyer » (la mise a jour des rejets, OPE_LST_LISTE_REJ.DoSauver, :51-57) sur
-# les annonces rejetees cochees. Lignes : PROC_GESTBOD.attendu.
+# « Publications BODACC » (EcrivainPublicationsBodacc) : « Valider » (Confirmer de l'Operation) sur les annonces cochees, comme le VALIDER
+# de RIG v2 dans la liste de chacune -- un rejet passe a renvoyer (OPE_LST_LISTE_REJ.DoSauver, :51-57), un certificat est verifie
+# (OPE_LST_CERTIF_BOD, :57-59). Lignes : PROC_GESTBOD.attendu (les rejets, la liste ouverte sans critere) ; criteres :
+# PROC_GESTBOD.recherches. L'Id d'une ligne : sa liste et l'annonce (R- rejets, C- certificats, Q- controles).
 
-# Refus : aucune annonce cochee. Jumeau accepte : bloc 3.
-geste: Agir Renvoyer
+# Refus : aucune annonce cochee. Jumeau accepte : bloc 4.
+geste: Confirmer Valider
 ids:
 resultat: refuse
-message: Aucune annonce cochée : rien n'est renvoyé.
+message: Aucune annonce cochée : rien n'est enregistré.
 ---
-# Refus : 2110203 est deja a renvoyer (etat 3), elle n'est plus dans la liste des rejets de la V2. Jumeau accepte : bloc 3, 2110202 (9).
-geste: Agir Renvoyer
-ids: 2110203
+# Refus : 2110203 est deja a renvoyer (etat 3), elle n'est plus dans la liste des rejets de la V2. Jumeau accepte : bloc 4, 2110202 (9).
+geste: Confirmer Valider
+ids: R-2110203
 resultat: refuse
-message: Annonce introuvable parmi les rejets BODACC à rectifier (2110203) : relisez la liste.
+message: Annonce introuvable dans sa liste BODACC (R-2110203) : relisez la liste.
 ---
-# « Renvoyer » 2110202 : etat 3 (« rectif. (rejet) a envoyer ») ; la ligne passe « A renvoyer ».
-geste: Agir Renvoyer
-ids: 2110202
+# Refus : un controle non conforme ne s'ecrit pas, la V2 n'en edite que la liste (OPE_LST_CTRLNC_BOD, :85-95). Jumeau accepte : bloc 5,
+# la meme annonce 2110207 dans la liste des certificats.
+geste: Confirmer Valider
+ids: Q-2110207
+resultat: refuse
+message: Un contrôle non conforme ne s'enregistre pas : RIG v2 n'en édite que la liste. Décochez-le.
+---
+# Rejet 2110202 : etat 3 (« rectif. (rejet) a envoyer ») ; la ligne passe « A renvoyer ».
+geste: Confirmer Valider
+ids: R-2110202
 resultat: fait
 message: 1 annonce à renvoyer : le prochain envoi BODACC (« Envoi JAL / BODACC ») la reprend.
 lignes:
@@ -24,3 +33,23 @@ Annonce BODACC n° 2110201 | envoyée le 02/04/2001 · annonce n° A2110201 · r
 Annonce BODACC n° 2110202 | envoyée le 03/04/2001 · à renvoyer au prochain envoi | Rejets | EnAttente | []
 Annonce BODACC n° 2110203 | envoyée le 04/04/2001 · annonce n° A2110203 · rejet : Nom tronqué · à renvoyer au prochain envoi | Rejets | EnAttente | []
 controle: SELECT BDCCR_ETAT_BODACC FROM v2.BODACC WHERE BDCCR_ID_BDCRC = 2110202 => 3
+---
+# Certificats 2110205 (5) et 2110207 (10) verifies : etat 6 (« publicite faite et verifiee »).
+geste: Confirmer Valider
+ids: C-2110205,C-2110207
+resultat: fait
+message: 2 parutions vérifiées.
+controle: SELECT STRING_AGG(BDCCR_ETAT_BODACC, '/') WITHIN GROUP (ORDER BY BDCCR_ID_BDCRC) FROM v2.BODACC WHERE BDCCR_ID_BDCRC IN (2110205, 2110207) => 6/6
+---
+# Refus : 2110206 est deja verifiee (6), la V2 ne la reecrit pas (:57). Jumeau accepte : bloc 5 (5 et 10).
+geste: Confirmer Valider
+ids: C-2110206
+resultat: refuse
+message: L'annonce 2110206 est déjà vérifiée : rien n'est enregistré.
+---
+# Une deja verifiee parmi les cochees : les autres sont verifiees, elle est nommee.
+geste: Confirmer Valider
+ids: C-2110206,C-2110209
+resultat: fait
+message: 1 parution vérifiée. Déjà vérifiée, inchangée : 2110206.
+controle: SELECT STRING_AGG(BDCCR_ETAT_BODACC, '/') WITHIN GROUP (ORDER BY BDCCR_ID_BDCRC) FROM v2.BODACC WHERE BDCCR_ID_BDCRC IN (2110206, 2110209) => 6/6

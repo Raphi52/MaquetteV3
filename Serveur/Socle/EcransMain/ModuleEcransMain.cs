@@ -76,6 +76,13 @@ internal sealed class ModuleEcransMain : IModuleServeur
         routes.MapGet(RoutesVerrous.Verrous, (string greffe, CatalogueGreffes c, CancellationToken ct)
             => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureVerrous.LireAsync(cn, ct))))
             .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        // Lot 11 : « GED judiciaire » (LectureGedJud.cs) et « Documents dématérialisés » (LectureDocDemat.cs).
+        routes.MapGet(RoutesGedJud.Documents, (string greffe, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureGedJud.LireAsync(cn, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        routes.MapGet(RoutesDocDemat.Pieces, (string greffe, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureDocDemat.LireAsync(cn, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
         // Lot 9 : « Statistiques » (LectureStatistiques.cs), les volets de RIG v2 calcules dans la base.
         routes.MapPost(RoutesStatistiques.Statistiques, (string greffe, RechercheStatistiques recherche, CatalogueGreffes c, CancellationToken ct)
             => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureStatistiques.LireAsync(cn, recherche, ct))))

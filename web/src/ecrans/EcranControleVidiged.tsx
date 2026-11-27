@@ -14,8 +14,15 @@
 // la tete : meme etat, memes colonnes comparees, retire du panneau de gauche (decision du plan, lot 2). Comme le
 // champ de la Recherche d'affaires, il n'entre pas dans les vues. Criteres, pagination et surlignage des archives
 // sans CD ne changent pas. Les vues ajoutees vivent le temps de la SESSION (decision du lot 1).
+//
+// RESTE EN EXEMPLE, CAUSE DITE A L'ECRAN (plan « RIG v3 100 % fonctionnel », lot 11, 27/11/2026) : RIG v2 ne lit pas la
+// base du greffe pour ce controle. Il ecrit dans la base commune ([COMMUN_RIG].[dbo].[CONTROLE_VIDIGED] et
+// CONTROLE_VIDIGED_EN_COURS) et lit les bases Vidiged separees (DOCUMENT, FORMAT_DOCUMENT, INDEX, INDEX_DOCUMENT, CD) :
+// proc_controle_vidiged.md, Detail OPE. Aucune de ces tables n'est dans la base V3 du greffe ni dans RIG_DEV (lu le
+// 27/11/2026 : aucune table CONTROLE_VIDIGED*). Les archives ci-dessous sont donc la demonstration, et l'ecran le dit.
 
 import { Fragment, useState } from 'react'
+import { Exemple } from './formes/commun'
 import { contientSansCasse, dateCourte, distinctsTries, entierLisible, estBlanc } from '../criteres'
 import {
   CelluleChevron, EnteteListe, LigneDetail, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, useVuesDeSession, type Teinte, type VueEnregistree,
@@ -184,6 +191,10 @@ export function EcranControleVidiged() {
         <EnteteListe titre="Resultats"
                      synthese={<>{filtrees.length}{' archive(s) — '}{pageCourante.length}{' affichee(s) · '}<b>{sansSupport}</b>{' sans CD'}</>}
                      filtre={{ valeur: recherche, changer: setRecherche, indication: 'Aller a une archive…' }} />
+        <p className="rig-eg-note" role="note">
+          <Exemple /> Archives de démonstration : RIG v2 tient ce contrôle dans la base commune (table CONTROLE_VIDIGED de
+          COMMUN_RIG) et dans les bases Vidiged, absentes de la base du greffe.
+        </p>
 
         <VuesListe vues={vues.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer(v.criteres).length }))} active={vueActive}
                    choisir={(cle) => { const v = vues.find((x) => x.cle === cle); if (v) poserCriteres(v.criteres) }}

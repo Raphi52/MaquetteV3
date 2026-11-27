@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Data.SqlClient;
 using RigV3.Contrats.EcransGeneres;
+using RigV3.Serveur.Socle.Greffes;
 
 namespace RigV3.Serveur.Socle.EcransGeneres;
 
@@ -25,19 +26,92 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   - puis une ligne par liste parametree, sous son type : son libelle (son code s'il est vide), ses colonnes
 ///     (PARAMETRAGE_LISTE_XLS_COMPOSITION, GetSqlOfListe, :78).
 /// GROUPES (ceux du descripteur) : INS, IDJ, IEF, IEP, SDJ « Instances » ; GIE « Groupements » ; AFF « Affaires et citations ».
-/// ETAT : « A compter » (AFaire) pour toute ligne -- voir NON REPRIS.
-/// NON REPRIS (nomme) : le COMPTAGE sur une periode et l'EXPORT. La V2 compte en executant le texte SQL stocke dans la base
-///   (PARAMETRAGE_LISTE.PRMLS_REQUETE, sa partie FROM, plus la clause de ExcelInstance.cs:39-63) et l'export lance EXECUTE_EXCEL avec
-///   ce texte (OPE_RECHERCHE.cs:440-463), qui ouvre un classeur NON enregistre dans Excel (aucun dossier choisi). Ce texte nomme les
-///   tables de la V2 sans schema, alors qu'elles sont sous v2 dans la base V3, et la V3 n'execute pas de SQL lu dans la base : ni
-///   « Comptee », ni « Bloquee : trop de lignes » (plus de 65 536, OPE_RECHERCHE.cs:467-472), ni « Exportee » ne sont donc poses.
+/// ETAT : « A compter » (AFaire) pour toute ligne, sans periode.
+///
+/// LE COMPTAGE (ChercherAsync, « Periode » remplie, lot 11 reprise) -- ce que la V2 recompte a chaque critere change
+///   (OPE_RECHERCHE.cs:55-101 -> CountNbOccurencesInstance -> ExcelInstance.CountNbOccurence, ExcelInstance.cs:9-104) : une ligne par
+///   type (« Type de liste » rempli : ce type seul), « SELECT COUNT(*) » sur la partie FROM de sa requete (PARAMETRAGE_LISTE.PRMLS_REQUETE
+///   de LISTEXLS_<type>, la derniere clause FROM, :22-33) avec la clause WHERE du type (:38-66). Les sept FROM sont lus dans RIG_DEV
+///   (SQL-DEV\DEV, lecture seule, 27/11/2026) et recrits ici sous le schema v2 : la V3 n'execute aucun texte SQL lu dans la base.
+///   Les jointures de referentiel par valeur (NAT_AFF_PART, NATURE_AFFAIRE, CODE_ACTE_PROCE, CODE_AFFAIRE, CODE_EVE_PRO, RESSORT,
+///   CHAMBRE, CODE_CABINET : leur cle) et par identifiant (APPEL_AFFAIRE, AUDIENCE_CABINET, PROCEDURE_COLLECTIVE) ne changent pas le
+///   compte : seules restent celles qui le changent ou que la clause lit --
+///     INS : INSTANCE, INSTN_DATE_ENROLEMENT entre les deux dates ;
+///     IDJ : INSTANCE INNER JOIN DECISION_JUDICIAIRE DJPrincip LEFT JOIN TYPE_DECISION, ISNULL(DCJDC_DATE, DCJDC_DATE_PREVUE) entre ;
+///     IEF : INSTANCE INNER JOIN EVENEMENT_PROCEDURE, ISNULL(maxi, ISNULL(mini, fixe)) entre, non survenu, delai non expire ;
+///     IEP : INSTANCE INNER JOIN EVENEMENT_PROCEDURE LEFT JOIN DEPOT_PC (DPTPC_ID_EVNPR), EVNPR_DATE entre ;
+///     SDJ : INSTANCE LEFT JOIN DECISION_JUDICIAIRE, enrolement entre, DCJDC_DATE IS NULL ;
+///     GIE : INSTANCE, enrolement entre -- plus les fragments SQL des reglages LSTXLS_GIE_CODE_ACTE_PROCE_REQUETE et
+///           LSTXLS_GIE_NATURE_AFFAIRE_REQUETE (:51-56) : un greffe qui en a pose n'est pas compte (texte SQL du parametrage), la
+///           ligne le dit ;
+///     AFF : les instances enrolees AVANT la date de debut sans decision definitive avant elle (:57-65 ; la fin est ignoree, :91).
+///   Les bornes sont des JOURS, comme la V2 (ToShortDateString puis CONVERT(datetime, ..., 103) : BETWEEN de 00:00 a 00:00) ; une fin
+///   vide prend le debut (:36). Les autres criteres de la V2 :
+///     « Types d'instance » (OPE_TYPE_INSTANCE.GetSqlForTypeInstance, :15-40) : RA RC MD DD PP LS IP OP JC R F J, separes par des
+///       espaces, virgules ou points-virgules -> AND ((INSTN_NUM_ROLE LIKE '%[0-9]<type>[0-9]%') OR ...) ; un code inconnu est ignore et
+///       la ligne le nomme ;
+///     « Codes d'evenement » (IEF et IEP seuls, OPE_RECHERCHE.cs:99 ; OPE_CODE_EVE_PRO.GetSqlForCodeEvePro, :54-60, la saisie en texte)
+///       : debuts de code separes par « ; » -> AND (EVNPR_CODE_EVE_PRO LIKE '<code>%' OR ...) ;
+///     « Sans sursis a statuer », « Sans ADD expertise », « Sans ADD » (IDJ seul, OPE_RECHERCHE.cs:93-97 ; ExcelInstance.cs:68-85).
+///   ETAT : plus de 65 536 lignes -> EnAttente « Bloquee : trop de lignes » (TextNbOccurence_ChangementValeur, OPE_RECHERCHE.cs:466-472 :
+///   le bouton Excel est grise) ; sinon EnCours « Comptee ». Cellules : le type, son nombre de lignes.
+/// NON REPRIS (nomme) : l'EXPORT. La V2 lance EXECUTE_EXCEL avec la requete complete (OPE_RECHERCHE.cs:440-463 : les colonnes de la
+///   liste choisie, des expressions SQL stockees dans PARAMETRAGE_LISTE_XLS), qui ouvre un classeur NON enregistre dans Excel
+///   (AmiOffice2010\Excel.cs:551, aucun dossier choisi) ; « Lancer l'export Excel » reste en demonstration. « Exportee » n'est pas pose.
 /// </summary>
-internal sealed class LecteurListesExcel : ILecteurEcran
+internal sealed class LecteurListesExcel : IRechercheEcran
 {
     public string Procedure => "PROC_LISTEEXCEL";
 
     /// <summary>Les groupes du descripteur, au mot pres.</summary>
     internal const string Instances = "Instances", Groupements = "Groupements", Affaires = "Affaires et citations";
+
+    /// <summary>Les parametres du descripteur, au mot pres.</summary>
+    internal const string CritereType = "Type de liste", CriterePeriode = "Période", CritereTypes = "Types d'instance",
+                          CritereCodes = "Codes d'événement", CritereSansSursis = "Sans sursis à statuer",
+                          CritereSansAddExpertise = "Sans ADD expertise", CritereSansAdd = "Sans ADD";
+
+    public IReadOnlyCollection<string> Criteres { get; } =
+        [CritereType, CriterePeriode, CritereTypes, CritereCodes, CritereSansSursis, CritereSansAddExpertise, CritereSansAdd];
+
+    /// <summary>Au-dela, Excel n'affiche pas les lignes : la V2 grise l'export (OPE_RECHERCHE.cs:467-472).</summary>
+    internal const int PlafondExcel = 65536;
+
+    /// <summary>Les cases de OPE_TYPE_INSTANCE (:18-29), dans leur ordre.</summary>
+    internal static readonly string[] TypesInstance = ["RA", "RC", "MD", "DD", "PP", "LS", "IP", "OP", "JC", "R", "F", "J"];
+
+    /// <summary>La partie FROM de chaque type (voir l'en-tete) et sa clause WHERE ; « @du » / « @au » : les jours saisis.</summary>
+    private static readonly Dictionary<string, string> Comptages = new()
+    {
+        ["INS"] = "FROM v2.INSTANCE WHERE (INSTN_DATE_ENROLEMENT BETWEEN @du AND @au)",
+        ["IDJ"] = """
+            FROM v2.INSTANCE INNER JOIN v2.DECISION_JUDICIAIRE AS DJPrincip ON INSTN_ID_INSTN = DJPrincip.DCJDC_ID_INSTN
+            LEFT OUTER JOIN v2.TYPE_DECISION ON R_TYPEDECISI_VALEUR = DJPrincip.DCJDC_TYPE_DECISION
+            WHERE (ISNULL(DJPrincip.DCJDC_DATE, DJPrincip.DCJDC_DATE_PREVUE) BETWEEN @du AND @au)
+            """,
+        ["IEF"] = """
+            FROM v2.INSTANCE INNER JOIN v2.EVENEMENT_PROCEDURE ON EVNPR_ID_INSTN = INSTN_ID_INSTN
+            WHERE (ISNULL(EVNPR_DATE_MAXI, ISNULL(EVNPR_DATE_MINI, EVNPR_DATE_FIXE)) BETWEEN @du AND @au) AND EVNPR_SURVENU = 0 AND EVNPR_DELAI_EXPIRE = 0
+            """,
+        ["IEP"] = """
+            FROM v2.INSTANCE INNER JOIN v2.EVENEMENT_PROCEDURE ON EVNPR_ID_INSTN = INSTN_ID_INSTN
+            LEFT OUTER JOIN v2.DEPOT_PC ON DPTPC_ID_EVNPR = EVNPR_ID_EVNPR
+            WHERE (EVNPR_DATE BETWEEN @du AND @au)
+            """,
+        ["SDJ"] = """
+            FROM v2.INSTANCE LEFT OUTER JOIN v2.DECISION_JUDICIAIRE ON INSTN_ID_INSTN = DCJDC_ID_INSTN
+            WHERE (INSTN_DATE_ENROLEMENT BETWEEN @du AND @au) AND DCJDC_DATE IS NULL
+            """,
+        ["GIE"] = "FROM v2.INSTANCE WHERE (INSTN_DATE_ENROLEMENT BETWEEN @du AND @au)",
+        ["AFF"] = """
+            FROM v2.INSTANCE WHERE INSTN_ID_INSTN IN (SELECT DISTINCT INSTN_ID_INSTN FROM v2.INSTANCE
+                LEFT OUTER JOIN v2.DECISION_JUDICIAIRE ON DCJDC_ID_INSTN = INSTN_ID_INSTN
+                WHERE INSTN_DATE_ENROLEMENT < @du
+                  AND (SELECT COUNT(DCJDC_ID_DCJDC) FROM v2.DECISION_JUDICIAIRE INNER JOIN v2.TYPE_DECISION ON R_TYPEDECISI_VALEUR = DCJDC_TYPE_DECISION
+                       WHERE R_TYPEDECISI_ADD_EXPERTISE <> 1 AND R_TYPEDECISI_SURSIS_STATUER <> 1 AND (ISNULL(DCJDC_AVANT_DIRE_DROIT, 0) <> '1')
+                         AND DCJDC_ID_INSTN = INSTN_ID_INSTN AND ISNULL(DCJDC_DATE, DCJDC_DATE_PREVUE) < @du) = 0)
+            """,
+    };
 
     // Les types de l'ecran, dans leur ordre (une sous-requete : LectureV2 n'admet qu'un SELECT seul, sans WITH).
     // fix-ok: mesure au banc EcransGeneresBaseCheck (27/11/2026) -- InvalidOperationException « Lecture V2 refusee : seule une
@@ -80,13 +154,94 @@ internal sealed class LecteurListesExcel : ILecteurEcran
     public Task<LignesLues> LireAsync(SqlConnection baseGreffe, DateTime aujourdhui, int plafond, CancellationToken ct)
         => LectureEcran.LireAsync(baseGreffe, Requete, Ligne, ct, new SqlParameter("@plafond", plafond));
 
+    /// <summary>Le comptage de la V2 (en tete du fichier) ; sans date de debut, la liste des types et de leurs listes.</summary>
+    public async Task<LignesLues> ChercherAsync(SqlConnection baseGreffe, RechercheEcran recherche, DateTime aujourdhui, int plafond, CancellationToken ct)
+    {
+        var bornes = (recherche.Critere(CriterePeriode) ?? "").Split('|');
+        var du = CriteresConsultation.Date(bornes[0]);
+        if (du is null) return await LireAsync(baseGreffe, aujourdhui, plafond, ct);
+        var au = (bornes.Length > 1 ? CriteresConsultation.Date(bornes[1]) : null) ?? du.Value;
+
+        var mots = (recherche.Critere(CritereTypes) ?? "").Split([' ', ',', ';'], StringSplitOptions.RemoveEmptyEntries)
+                                                          .Select(m => m.ToUpperInvariant()).Distinct().ToList();
+        var types = TypesInstance.Where(mots.Contains).ToList();
+        var inconnus = mots.Where(m => !TypesInstance.Contains(m)).ToList();
+        var codes = (recherche.Critere(CritereCodes) ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var choisi = recherche.Critere(CritereType);
+
+        var reglages = new List<string>();
+        await using (var r = await LectureV2.LireAsync(baseGreffe,
+                         "SELECT Code, Valeur FROM soc.Reglage WHERE Code IN ('LSTXLS_GIE_CODE_ACTE_PROCE_REQUETE', 'LSTXLS_GIE_NATURE_AFFAIRE_REQUETE')", ct))
+            while (await r.ReadAsync(ct))
+                if (FormeLigne.Texte(r, "Valeur").Length > 0) reglages.Add(FormeLigne.Texte(r, "Code"));
+
+        var typesLus = new List<(string Type, string Libelle)>();
+        await using (var r = await LectureV2.LireAsync(baseGreffe, $"SELECT ty.Type, ty.LibelleType FROM {Types} AS ty ORDER BY ty.Rang", ct))
+            while (await r.ReadAsync(ct))
+            {
+                var (type, libelle) = (FormeLigne.Texte(r, "Type"), FormeLigne.Texte(r, "LibelleType"));
+                if (choisi is null || string.Equals(choisi, type, StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(choisi, libelle, StringComparison.OrdinalIgnoreCase)) typesLus.Add((type, libelle));
+            }
+
+        var lignes = new List<LigneLue>();
+        foreach (var (type, libelle) in typesLus)
+        {
+            var periode = type == "AFF" ? $"enrôlées avant le {FormeLigne.Date(du)}" : $"du {FormeLigne.Date(du)} au {FormeLigne.Date(au)}";
+            var filtres = new List<string?>
+            {
+                types.Count > 0 ? $"types {string.Join(", ", types)}" : null,
+                inconnus.Count > 0 ? $"type{(inconnus.Count > 1 ? "s" : "")} d'instance inconnu{(inconnus.Count > 1 ? "s" : "")}, ignoré{(inconnus.Count > 1 ? "s" : "")} : {string.Join(", ", inconnus)}" : null,
+            };
+            if (type == "GIE" && reglages.Count > 0)
+            {
+                lignes.Add(new LigneLue(libelle, FormeLigne.Joindre(periode, $"non compté : le greffe filtre ce type par le texte SQL de son paramétrage ({string.Join(", ", reglages)}), que RIG v3 n'exécute pas"),
+                                        Groupe(type), "AFaire", []) { Valeurs = [libelle, "non compté : filtre SQL du paramétrage"] });
+                continue;
+            }
+            var sql = new System.Text.StringBuilder("SELECT COUNT(*) AS Nombre ").Append(Comptages[type]);
+            var parametres = new List<SqlParameter> { new("@du", du.Value.Date), new("@au", au.Date) };
+            if (type == "IDJ")
+            {
+                if (Coche(recherche.Critere(CritereSansSursis))) { sql.Append(" AND (R_TYPEDECISI_SURSIS_STATUER = 0)"); filtres.Add("sans sursis à statuer"); }
+                if (Coche(recherche.Critere(CritereSansAddExpertise))) { sql.Append(" AND (R_TYPEDECISI_ADD_EXPERTISE = 0)"); filtres.Add("sans ADD expertise"); }
+                if (Coche(recherche.Critere(CritereSansAdd))) { sql.Append(" AND (ISNULL(DJPrincip.DCJDC_AVANT_DIRE_DROIT, '') <> 1)"); filtres.Add("sans ADD"); }
+            }
+            if (types.Count > 0)
+            {
+                sql.Append(" AND (").AppendJoin(" OR ", types.Select((_, k) => $"(INSTN_NUM_ROLE LIKE @t{k})")).Append(')');
+                parametres.AddRange(types.Select((t, k) => new SqlParameter($"@t{k}", $"%[0-9]{t}[0-9]%")));
+            }
+            if (type is "IEF" or "IEP" && codes.Length > 0)
+            {
+                sql.Append(" AND (").AppendJoin(" OR ", codes.Select((_, k) => $"EVNPR_CODE_EVE_PRO LIKE @c{k}")).Append(')');
+                parametres.AddRange(codes.Select((c, k) => new SqlParameter($"@c{k}", c.Replace("[", "[[]", StringComparison.Ordinal) + "%")));
+                filtres.Add($"codes {string.Join(", ", codes)}");
+            }
+            int nombre;
+            await using (var r = await LectureV2.LireAsync(baseGreffe, sql.ToString(), ct, [.. parametres]))
+                nombre = await r.ReadAsync(ct) ? Convert.ToInt32(r["Nombre"], CultureInfo.InvariantCulture) : 0;
+            var trop = nombre > PlafondExcel;
+            lignes.Add(new LigneLue(libelle,
+                FormeLigne.Joindre(Nombre(nombre, "ligne", "lignes", "aucune ligne"), periode, FormeLigne.Joindre([.. filtres]),
+                                   trop ? "au-delà de 65 536 lignes, Excel ne les affiche pas : changez vos critères" : null),
+                Groupe(type), trop ? "EnAttente" : "EnCours", []) { Valeurs = [libelle, nombre.ToString(CultureInfo.InvariantCulture)] });
+        }
+        return new LignesLues(lignes, lignes.Count);
+    }
+
+    private static string Groupe(string type) => type switch { "GIE" => Groupements, "AFF" => Affaires, _ => Instances };
+
+    /// <summary>Une case cochee de l'ecran (« oui », comme les autres lecteurs et ecrivains).</summary>
+    private static bool Coche(string? valeur) => valeur?.Trim().ToLowerInvariant() is "oui" or "true" or "1";
+
     private static string Nombre(int n, string un, string plusieurs, string aucun) =>
         n == 0 ? aucun : n == 1 ? $"1 {un}" : $"{n.ToString(CultureInfo.InvariantCulture)} {plusieurs}";
 
     private static LigneLue Ligne(SqlDataReader r)
     {
         var type = FormeLigne.Texte(r, "Type");
-        var groupe = type switch { "GIE" => Groupements, "AFF" => Affaires, _ => Instances };
+        var groupe = Groupe(type);
         var entier = (string colonne) => Convert.ToInt32(r[colonne], CultureInfo.InvariantCulture);
         string precisions;
         if (entier("Sorte") == 0)

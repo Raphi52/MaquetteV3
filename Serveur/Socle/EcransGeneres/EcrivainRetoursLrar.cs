@@ -28,9 +28,25 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   - dans les deux cas, une modalite « pas a gerer » (PARAM_LRAR_INFOS.PRMLI_A_GERER = 0) remet en emission les demandes d'edition
 ///     du pli (GetDemandeEditionDicoByNumLrar, l. 825-835 et 960-970) : DMNED_DATE_PRE_EMISSION = 01/01/1900, DMNED_NUM_GROUPE et
 ///     DMNED_LOT vides, DMNED_PHASE_TRAITEMENT = « E ».
-/// NON REPRIS (nomme) : le passage en survenu de l'evenement futur lie (case de l'arborescence, PasserEPlieEnSurvenu l. 986, avec le
-/// verrou de l'instance lockInstance l. 755-786) ; le pli dont l'evenement a ete supprime (ChangementDateEveProSupprime, l. 1087) suit
-/// la regle commune ; le controle des dates d'un AR d'opposition sur une IP (l. 243-258) ; le courriel a la hotline judiciaire quand
+/// L'EVENEMENT FUTUR LIE (lot 11, reprise) : une RECEPTION d'un pli emis par un evenement de procedure d'une INSTANCE (sa demande
+/// d'edition, EVT_PROC) dont le futur lie (GetEvenementProcedureFuturLie, EvenementProcedure.cs:1473-1490 : non survenu, non expire,
+/// EVNPR_NUMERO_SOURCE_EP_LIE = le numero source de l'evenement, le premier par numero d'ordre) est un accuse de reception d'opposition
+/// (IAROIP ou IPAROPOS, typeEvenementPro :610-627) passe ce futur en SURVENU quand tous les AUTRES plis LRAR du meme evenement sont deja
+/// recus (OPE_RETOURLRAR_TREEVIEW.CreerNoeudEP, :172-199 ; un pli coche dans le meme geste compte comme recu) :
+///   - un autre pli revenu autrement (NPAI, refuse...) : le retour s'ecrit, le futur reste, et la V2 dit « Impossible de mettre à jour
+///     l'évènement procédure futur lié <code> de l'instance <role>. Les recommandés liés à cette instance n'ont pas tous été
+///     réceptionnés. » (:189) ; un autre pli pas encore revenu : le futur reste, sans message (:192) ;
+///   - l'instance verrouillee par une demande (lockInstance, OPE_RETOURLRAR_RECEPTION.cs:759-790, CreateAndLockDemande) : la V2 ne
+///     saisit pas le retour et dit « Impossible de mettre à jour le recommandé sur l'instance ¤<role>¤ car il y a une demande en
+///     cours. » suivi du motif (:782) -- un refus, avant toute ecriture (VerrouDemandeV2) ;
+///   - sinon, apres le retour (PasserEPlieEnSurvenu, :986-1017) : un futur de reception de consignation deja la sur l'instance
+///     (ICONSOIP / IPCONSOPOS, :1007-1012) est relie au futur qui passe, et aucun autre futur n'est cree ; puis le futur passe en
+///     survenu a la date de reception (aujourd'hui avec « Date non renseignée », :1001), avec son propre futur lie sinon
+///     (PasserEnSurvenuEveProFutur, EvenementsProcedureV2.PasserEnSurvenuAsync) ; la V2 dit « Mise à jour de l'instance <role>.
+///     L'évènement procédure futur lié <code> est passé en survenu. » (:1019). La demande RETOURLRAR de lockInstance, creee puis
+///     validee dans le meme geste (_demande.Cloturer, :1020) : une trace, que le journal des gestes remplace (decision du chef,
+///     plan-676a4b19).
+/// NON REPRIS (nomme) : le pli dont l'evenement a ete supprime (ChangementDateEveProSupprime, l. 1087) suit la regle commune ; le controle des dates d'un AR d'opposition sur une IP (l. 243-258) ; le courriel a la hotline judiciaire quand
 /// une modalite « pas a gerer » change (l. 930-950) -- un envoi externe : NON envoye, la V3 le dit dans son message (simule).
 /// </summary>
 internal sealed class EcrivainRetoursLrar : IEcrivainEcran
@@ -65,6 +81,13 @@ internal sealed class EcrivainRetoursLrar : IEcrivainEcran
 
     private sealed record Pli(string Numero, string Modalite, DateTime? Date);
 
+    /// <summary>Le futur lie d'un pli (en tete) : son instance, son evenement futur, et s'il passe en survenu ou pourquoi il reste.</summary>
+    private sealed record Lie(int IdInstance, string Role, int IdFutur, string CodeFutur, string NumeroSourceFutur, bool Passe, string? Message);
+
+    /// <summary>Les accuses de reception d'opposition (EvenementProcedure.TypeEvenement.IPReceptionAROip, :593-594, :623-625) et les
+    /// receptions de consignation (IPReceptionConsignation, :587-588, :617-619).</summary>
+    private static readonly string[] AccusesOpposition = ["IAROIP", "IPAROPOS"], ReceptionsConsignation = ["ICONSOIP", "IPCONSOPOS"];
+
     public async Task<IssueGeste> JouerAsync(GesteEnCours geste, CancellationToken ct)
     {
         if (geste.Demande.Nom != Enregistrer) return IssueGeste.Refuser($"Geste inconnu de l'écran « {Ecran} » : {geste.Demande.Nom}.");
@@ -95,10 +118,23 @@ internal sealed class EcrivainRetoursLrar : IEcrivainEcran
             plis.Add(pli);
         }
 
+        // L'evenement futur lie de chaque pli, pour une RECEPTION (en tete) ; une instance verrouillee refuse avant toute ecriture.
+        var lies = new Dictionary<string, Lie>(StringComparer.Ordinal);
+        if (code == "RECEPTION")
+            foreach (var p in plis)
+                if (await LieAsync(geste, p.Numero, numeros, ct) is { } lie)
+                {
+                    if (lie.Passe && await VerrouDemandeV2.MotifAsync(geste.Base, geste.Transaction, "Instance", VerrouDemandeV2.SequenceurInstance,
+                                         lie.IdInstance.ToString(CultureInfo.InvariantCulture), ct) is { } verrou)
+                        return IssueGeste.Refuser($"Impossible de mettre à jour le recommandé sur l'instance ¤{lie.Role}¤ car il y a une demande en cours. {verrou}");
+                    lies[p.Numero] = lie;
+                }
+
         var parametres = await ParametresAsync(geste, ct);
         var (libelleNouveau, aGerer) = parametres.GetValueOrDefault(code, ("", true));
         var traces = new List<TraceGeste>();
         var dits = new List<string>();
+        var passes = new HashSet<int>();
         foreach (var p in plis)
         {
             await geste.EcrireAsync("UPDATE v2.LRAR_INFOS SET LRARI_TYPE_DATE = @c, LRARI_DATE_RECEPTION = @d WHERE LRARI_NUM_LRAR = @n", ct,
@@ -121,8 +157,87 @@ internal sealed class EcrivainRetoursLrar : IEcrivainEcran
             traces.Add(new TraceGeste("affaire", $"le retour du recommandé {p.Numero}", p.Numero, deja ? "a modifie" : "a cree",
                 deja ? new { Modalite = p.Modalite, Date = FormeLigne.Date(p.Date), Libelle = ancienLibelle } : null,
                 new { Modalite = code, Date = FormeLigne.Date(date), Libelle = lu, DemandesRemises = remises }));
+            if (!lies.TryGetValue(p.Numero, out var l)) continue;
+            if (!l.Passe)
+            {
+                if (l.Message is { } m) dits.Add(m);
+                continue;
+            }
+            if (!passes.Add(l.IdFutur)) continue;
+            var survenu = date ?? geste.Maintenant;
+            int? consignation = null;
+            await using (var r = await geste.LireAsync($"""
+                SELECT TOP (1) EVNPR_ID_EVNPR FROM v2.EVENEMENT_PROCEDURE
+                WHERE EVNPR_ID_INSTN = @i AND EVNPR_SURVENU = 0 AND EVNPR_DELAI_EXPIRE = 0
+                  AND EVNPR_CODE_EVE_PRO IN ('{string.Join("', '", ReceptionsConsignation)}')
+                ORDER BY EVNPR_NUM_ORDRE, EVNPR_ID_EVNPR
+                """, ct, new SqlParameter("@i", l.IdInstance)))
+                if (await r.ReadAsync(ct)) consignation = r.GetInt32(0);
+            if (consignation is { } dejaLa)
+                await geste.EcrireAsync("UPDATE v2.EVENEMENT_PROCEDURE SET EVNPR_NUMERO_SOURCE_EP_LIE = @s WHERE EVNPR_ID_EVNPR = @id", ct,
+                    new SqlParameter("@s", l.NumeroSourceFutur), new SqlParameter("@id", dejaLa));
+            var futur = await EvenementsProcedureV2.PasserEnSurvenuAsync(geste, l.IdFutur, l.IdInstance, l.CodeFutur, l.NumeroSourceFutur, survenu,
+                                                                         consignation is null, ct);
+            dits.Add($"Mise à jour de l'instance {l.Role}. L'évènement procédure futur lié {l.CodeFutur} est passé en survenu.");
+            traces.Add(new TraceGeste("affaire", $"l'évènement {l.CodeFutur} de l'instance {l.Role}", l.IdFutur.ToString(CultureInfo.InvariantCulture),
+                "a modifie", new { Survenu = false }, new { Survenu = true, Date = FormeLigne.Date(survenu), FuturCree = futur?.Code, FuturRelie = consignation }));
         }
         return IssueGeste.Ecrit(string.Join(" ", dits), [.. plis.Select(p => p.Numero)], [.. traces]);
+    }
+
+    /// <summary>
+    /// Le futur lie du pli <paramref name="numero"/> (en tete) : null si le pli n'a pas d'evenement d'instance, ou que son futur lie n'est
+    /// pas un accuse de reception d'opposition ; sinon s'il passe en survenu. Les plis <paramref name="duGeste"/> recoivent la meme
+    /// reception dans ce geste. Une base sans ces colonnes (un banc) n'a pas de futur lie.
+    /// </summary>
+    private static async Task<Lie?> LieAsync(GesteEnCours geste, string numero, IReadOnlyCollection<string> duGeste, CancellationToken ct)
+    {
+        var evenements = await EditionsV2.ColonnesAsync(geste, "v2.EVENEMENT_PROCEDURE", ct);
+        var editions = await EditionsV2.ColonnesAsync(geste, "v2.DEMANDE_EDITION", ct);
+        if (!new[] { "EVNPR_NUMERO_SOURCE", "EVNPR_ID_INSTN", "EVNPR_NUMERO_SOURCE_EP_LIE", "EVNPR_SURVENU", "EVNPR_DELAI_EXPIRE", "EVNPR_NUM_ORDRE" }.All(evenements.Contains)
+            || !editions.Contains("DMNED_CODE_ENTITE_SOURCE") || !editions.Contains("DMNED_VALEUR_ID_SOURCE")) return null;
+        int idFutur, idInstance;
+        string codeFutur, sourceFutur, source, role;
+        await using (var r = await geste.LireAsync("""
+            SELECT TOP (1) f.EVNPR_ID_EVNPR, f.EVNPR_CODE_EVE_PRO, f.EVNPR_NUMERO_SOURCE, f.EVNPR_ID_INSTN, ev.EVNPR_NUMERO_SOURCE AS SOURCE_EP,
+                   i.INSTN_NUM_ROLE
+            FROM v2.DEMANDE_EDITION AS de
+            INNER JOIN v2.EVENEMENT_PROCEDURE AS ev ON ev.EVNPR_NUMERO_SOURCE = de.DMNED_VALEUR_ID_SOURCE AND de.DMNED_CODE_ENTITE_SOURCE = 'EVT_PROC'
+            INNER JOIN v2.EVENEMENT_PROCEDURE AS f ON f.EVNPR_NUMERO_SOURCE_EP_LIE = ev.EVNPR_NUMERO_SOURCE AND f.EVNPR_ID_INSTN = ev.EVNPR_ID_INSTN
+                                                   AND f.EVNPR_SURVENU = 0 AND f.EVNPR_DELAI_EXPIRE = 0
+            INNER JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = f.EVNPR_ID_INSTN
+            WHERE de.DMNED_NUM_LRAR = @n
+            ORDER BY de.DMNED_ID_DMNED, f.EVNPR_NUM_ORDRE, f.EVNPR_ID_EVNPR
+            """, ct, new SqlParameter("@n", numero)))
+        {
+            if (!await r.ReadAsync(ct)) return null;
+            (idFutur, codeFutur, sourceFutur, idInstance) = (r.GetInt32(0), FormeLigne.Texte(r, "EVNPR_CODE_EVE_PRO").Trim(),
+                FormeLigne.Texte(r, "EVNPR_NUMERO_SOURCE"), Convert.ToInt32(r["EVNPR_ID_INSTN"], CultureInfo.InvariantCulture));
+            (source, role) = (FormeLigne.Texte(r, "SOURCE_EP"), FormeLigne.Texte(r, "INSTN_NUM_ROLE"));
+        }
+        if (!AccusesOpposition.Contains(codeFutur, StringComparer.Ordinal)) return null;
+
+        // Les AUTRES plis LRAR du meme evenement (GetDemandeEditionByValeurIdSource, EVT_PROC, numero de LRAR pose), dans l'ordre.
+        var autres = new List<(string Numero, string? Modalite)>();
+        await using (var r = await geste.LireAsync("""
+            SELECT de.DMNED_NUM_LRAR, l.LRARI_TYPE_DATE FROM v2.DEMANDE_EDITION AS de
+            LEFT JOIN v2.LRAR_INFOS AS l ON l.LRARI_NUM_LRAR = de.DMNED_NUM_LRAR
+            WHERE de.DMNED_VALEUR_ID_SOURCE = @s AND de.DMNED_CODE_ENTITE_SOURCE = 'EVT_PROC' AND de.DMNED_NUM_LRAR IS NOT NULL
+              AND de.DMNED_NUM_LRAR <> @n
+            ORDER BY de.DMNED_ID_DMNED
+            """, ct, new SqlParameter("@s", source), new SqlParameter("@n", numero)))
+            while (await r.ReadAsync(ct))
+                autres.Add((FormeLigne.Texte(r, "DMNED_NUM_LRAR"), r["LRARI_TYPE_DATE"] is DBNull ? null : FormeLigne.Texte(r, "LRARI_TYPE_DATE")));
+        foreach (var (autre, modalite) in autres)
+        {
+            if (duGeste.Contains(autre)) continue;
+            if (modalite is null) return new Lie(idInstance, role, idFutur, codeFutur, sourceFutur, false, null);
+            if (modalite != "RECEPTION")
+                return new Lie(idInstance, role, idFutur, codeFutur, sourceFutur, false,
+                    $"Impossible de mettre à jour l'évènement procédure futur lié {codeFutur} de l'instance {role}. Les recommandés liés à cette " +
+                    "instance n'ont pas tous été réceptionnés.");
+        }
+        return new Lie(idInstance, role, idFutur, codeFutur, sourceFutur, true, null);
     }
 
     /// <summary>Le libelle et le drapeau « a gerer » de chaque modalite (PARAM_LRAR_INFOS).</summary>

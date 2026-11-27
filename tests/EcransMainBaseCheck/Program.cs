@@ -1332,6 +1332,133 @@ Exiger((await EcranStatistiques.CalculerAsync(null, null, VoletsStatistiques.Int
 Exiger((await EcranStatistiques.CalculerAsync(client, GreffeAbsent, VoletsStatistiques.Internes, "1971-03-01", "1971-03-31", null)) is { Mode: "erreur", Tableaux.Length: 0, Message: not null },
     "pont Statistiques, greffe absent : le motif, AUCUN tableau");
 
+// ============================================================ 12. GED JUDICIAIRE ET DOCUMENTS DEMATERIALISES (lot 11)
+// « GED judiciaire » (PROC_GEDJUD, LectureGedJud.cs) et « Documents dématérialisés » (PROC_DOC_DEMAT, LectureDocDemat.cs),
+// branches au lot 11 du plan. Placee APRES les statistiques : ses instances n'entrent dans aucun de leurs comptes. Aucun
+// document VIDIGED_INDEX ni aucune piece DEMAT_CREFO_PJ avant cette section : toutes sont du jeu. Identifiants du lot 11 :
+// 2 150 000 a 2 159 999. Colonnes aux types de RIG_DEV (INFORMATION_SCHEMA.COLUMNS de SQL-DEV\DEV, lu le 27/11/2026).
+await Sql("""
+    IF OBJECT_ID(N'v2.VIDIGED_INDEX') IS NULL CREATE TABLE v2.VIDIGED_INDEX (VGIDX_ID_VGIDX int NOT NULL PRIMARY KEY, VGIDX_LIBELLE varchar(200) NULL,
+        VGIDX_DATE_RECEPTION datetime NOT NULL, VGIDX_NATURE_DOC varchar(50) NULL, VGIDX_ID_ENTITE int NULL, VGIDX_TYPE_ENTITE varchar(50) NULL,
+        VGIDX_COMMENTAIRE varchar(1000) NULL, VGIDX_GUID_DOCUMENT uniqueidentifier NOT NULL, VGIDX_ETAT varchar(3) NULL, VGIDX_MOTIF_REJET varchar(1000) NULL);
+    IF OBJECT_ID(N'v2.VIDIGED_PARAMETRAGE') IS NULL CREATE TABLE v2.VIDIGED_PARAMETRAGE (VGPRM_ID_VGPRM int NOT NULL PRIMARY KEY, VGPRM_CODE varchar(50) NULL,
+        VGPRM_LIBELLE varchar(1000) NULL, VGPRM_TYPE varchar(50) NULL);
+    IF COL_LENGTH('v2.VIDIGED_DJ', 'VGDDJ_GUID_DOCUMENT') IS NULL ALTER TABLE v2.VIDIGED_DJ ADD VGDDJ_GUID_DOCUMENT uniqueidentifier NULL;
+    IF COL_LENGTH('v2.VIDIGED_DJ', 'VGDDJ_NUM_ORDRE') IS NULL ALTER TABLE v2.VIDIGED_DJ ADD VGDDJ_NUM_ORDRE smallint NULL;
+    IF OBJECT_ID(N'v2.DEMAT_CREFO_PJ') IS NULL CREATE TABLE v2.DEMAT_CREFO_PJ (DMCOPJ_ID_DMCOPJ int NOT NULL PRIMARY KEY, DMCOPJ_ID_DMTLCF int NULL,
+        DMCOPJ_ID_DMTDAS int NULL, DMCOPJ_TYPE_PJ_CREFO varchar(50) NOT NULL, DMCOPJ_NUM_ORDRE smallint NOT NULL, DMCOPJ_NOM_FICHIER varchar(128) NOT NULL,
+        DMCOPJ_DATE_PIECE date NULL, DMCOPJ_SUPPRIME bit NOT NULL, DMCOPJ_ETAT_INFOGREFFE char(15) NULL);
+    IF OBJECT_ID(N'v2.TYPE_PJ_CREFO') IS NULL CREATE TABLE v2.TYPE_PJ_CREFO (R_TYPEPJCREF_VALEUR varchar(50) NOT NULL PRIMARY KEY,
+        R_TYPEPJCREF_LIBELLE_ECRAN varchar(100) NOT NULL, R_TYPEPJCREF_ABREGE_PIECE varchar(16) NULL);
+    IF COL_LENGTH('v2.DEMAT_LIASSE_CFE', 'DMTLCF_DATE_CREATION') IS NULL ALTER TABLE v2.DEMAT_LIASSE_CFE ADD DMTLCF_DATE_CREATION datetime NULL;
+    IF COL_LENGTH('v2.DEMAT_DAS', 'DMTDAS_DATE_CREATION') IS NULL ALTER TABLE v2.DEMAT_DAS ADD DMTDAS_DATE_CREATION datetime NULL;
+    """);
+// GED : l'instance 2150001, la PC 2150101, la prevention 2150201, la mesure 2150301 ; deux decisions de l'instance, 2150401
+// rendue le 02/06/2004 et 2150402 sans date (prevue le 10/06), liees au document 2150601 dans l'ordre 2 puis 1 (la premiere
+// liee est donc 2150402 : l'ordre VGDDJ_NUM_ORDRE, pas l'identifiant). Documents, du plus recent au plus ancien : 2150605
+// (audience : son identifiant), 2150603 rejete (lu : « Afficher tout » est un critere de l'ecran), 2150602 de nature sans
+// libelle (le code), 2150604 « VR » sans libelle (le code), 2150601, 2150607 (instance absente de la copie : son identifiant).
+// Jumeau ecarte : 2150606 sans entite (OPE_RECHERCHE_DOC.cs:375).
+await Sql("""
+    INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE) VALUES (2150001, '2004J00007');
+    INSERT INTO v2.PROCEDURE_COLLECTIVE (PRCLL_ID_PRCLL, PRCLL_NUM_PC) VALUES (2150101, '2004RJ0011');
+    INSERT INTO v2.PREVENTION (PREVE_ID_PREVE, PREVE_NUM_PRV) VALUES (2150201, '2004PRV011');
+    INSERT INTO v2.MESURE (MSINS_ID_MSINS, MSINS_NUM_MESURE) VALUES (2150301, '2004M00011');
+    INSERT INTO v2.DECISION_JUDICIAIRE (DCJDC_ID_DCJDC, DCJDC_ID_INSTN, DCJDC_DATE, DCJDC_DATE_PREVUE) VALUES
+        (2150401, 2150001, '20040602', '20040601'), (2150402, 2150001, NULL, '20040610');
+    INSERT INTO v2.VIDIGED_PARAMETRAGE (VGPRM_ID_VGPRM, VGPRM_CODE, VGPRM_LIBELLE, VGPRM_TYPE) VALUES
+        (2150501, 'ASS', 'Assignation', 'NATURE_DOC'), (2150502, 'V', 'Validé', 'ETAT'), (2150503, 'A', 'En attente', 'ETAT'),
+        (2150504, 'R', 'Rejeté', 'ETAT'), (2150505, 'V', 'Nature homonyme', 'NATURE_DOC');
+    INSERT INTO v2.VIDIGED_INDEX (VGIDX_ID_VGIDX, VGIDX_LIBELLE, VGIDX_DATE_RECEPTION, VGIDX_NATURE_DOC, VGIDX_ID_ENTITE, VGIDX_TYPE_ENTITE,
+        VGIDX_COMMENTAIRE, VGIDX_GUID_DOCUMENT, VGIDX_ETAT, VGIDX_MOTIF_REJET) VALUES
+        (2150601, 'Assignation banc', '20040601 10:00', 'ASS', 2150001, 'INSTANCE', 'piece originale', '00000000-0000-0000-0000-000002150601', 'V', NULL),
+        (2150602, 'Conclusions banc', '20040603 09:00', 'XX', 2150101, 'PROCEDURE_COLLECTIVE', NULL, '00000000-0000-0000-0000-000002150602', 'A', NULL),
+        (2150603, 'Rejet banc', '20040604 09:00', 'ASS', 2150201, 'PREVENTION', NULL, '00000000-0000-0000-0000-000002150603', 'R', 'Illisible'),
+        (2150604, 'Mesure banc', '20040602 09:00', 'ASS', 2150301, 'MESURE', NULL, '00000000-0000-0000-0000-000002150604', 'VR', NULL),
+        (2150605, 'Audience banc', '20040605 09:00', NULL, 2150999, 'AUDIENCE', NULL, '00000000-0000-0000-0000-000002150605', 'V', NULL),
+        (2150606, 'Sans entite banc', '20040606 09:00', 'ASS', NULL, 'INSTANCE', NULL, '00000000-0000-0000-0000-000002150606', 'V', NULL),
+        (2150607, 'Instance absente banc', '20040531 09:00', 'ASS', 2159999, 'INSTANCE', NULL, '00000000-0000-0000-0000-000002150607', 'V', NULL);
+    INSERT INTO v2.VIDIGED_DJ (VGDDJ_ID_VGDDJ, VGDDJ_ID_DCJDC, VGDDJ_GUID_DOCUMENT, VGDDJ_NUM_ORDRE) VALUES
+        (2150701, 2150401, '00000000-0000-0000-0000-000002150601', 2), (2150702, 2150402, '00000000-0000-0000-0000-000002150601', 1);
+    """);
+await using (var cn = new SqlConnection(greffe.Connexion))
+{
+    await cn.OpenAsync();
+    var ged = await LectureGedJud.LireAsync(cn, CancellationToken.None);
+    Exiger(ged.Lignes.Select(d => d.Id).SequenceEqual([2150605, 2150603, 2150602, 2150604, 2150601, 2150607]) && ged.Total == 6,
+        $"GED judiciaire : avec une entite seulement (2150606 ecarte), rejete compris, du plus recent au plus ancien ({string.Join(",", ged.Lignes.Select(d => d.Id))})");
+    var parId = ged.Lignes.ToDictionary(d => d.Id);
+    Exiger(parId[2150601] is { Entite: "2004J00007", TypeEntite: "Instance", Nature: "Assignation", Etat: "Validé", DecisionsLiees: 2, DateDecision: null }
+           && parId[2150601].DatePrevue == new DateTime(2004, 6, 10) && parId[2150601].Commentaire == "piece originale",
+        "GED : une instance, sa nature et son etat par leur libelle, deux decisions liees, la PREMIERE par VGDDJ_NUM_ORDRE (2150402, sans date)");
+    Exiger(parId[2150602] is { Entite: "2004RJ0011", TypeEntite: "Procédure collective", Nature: "XX", Etat: "En attente", DecisionsLiees: 0 }
+           && parId[2150603] is { Entite: "2004PRV011", Etat: "Rejeté", CodeEtat: "R", MotifRejet: "Illisible" }
+           && parId[2150604] is { Entite: "2004M00011", TypeEntite: "Mesure", Etat: "VR" },
+        "GED : PC, prevention, mesure par leur numero ; une nature ou un etat sans libelle garde son code ; le motif du rejet");
+    Exiger(parId[2150605] is { Entite: "Audience 2150999", Nature: "" } && parId[2150607] is { Entite: "Instance 2159999" },
+        "GED : une audience, ou une entite absente de la copie, garde son identifiant");
+    var gedDeux = await LectureGedJud.LireAsync(cn, CancellationToken.None, plafond: 2);
+    Exiger(gedDeux is { Lignes.Length: 2, Total: 6 }, "GED : au plus le plafond, et le total de la base");
+}
+var gedRoute = await http.GetFromJsonAsync<DocumentsGedLus>(RoutesEcransMain.Pour(RoutesGedJud.Documents, Greffe), json);
+Exiger(gedRoute is { Total: 6, Lignes: [{ Id: 2150605 }, ..] }, "route GED judiciaire par le serveur : les documents de la base");
+Exiger((await http.GetAsync(RoutesEcransMain.Pour(RoutesGedJud.Documents, GreffeAbsent))).StatusCode == HttpStatusCode.NotFound,
+    "route GED judiciaire, greffe absent du catalogue : 404");
+var gedPont = await EcranGedJud.DocumentsAsync(client, Greffe);
+Exiger(gedPont is { Mode: "serveur", Message: null, Total: 6 }
+       && gedPont.Lignes.Single(d => d.Id == "2150601") is { Decision: "Assignation banc", Instance: "2004J00007", NbLies: 2, DateDecision: null, DatePrevue: "2004-06-10", Reception: "2004-06-01", Statut: "ok" }
+       && gedPont.Lignes.Single(d => d.Id == "2150603") is { Statut: "alerte", CodeEtat: "R" }
+       && gedPont.Lignes.Single(d => d.Id == "2150602") is { Statut: "attente" },
+    "pont GED branche : les documents a la forme de l'ecran, dates aaaa-mm-jj, la teinte de l'etat V2 (rejete rouge, attente orange)");
+Exiger((await EcranGedJud.DocumentsAsync(null, null)) is { Mode: "demo", Lignes.Length: 0 },
+    "pont GED sans serveur : mode « demo », aucune ligne (l'ecran garde sa demonstration, marquee « exemple »)");
+Exiger((await EcranGedJud.DocumentsAsync(client, GreffeAbsent)) is { Mode: "erreur", Lignes.Length: 0, Message: not null },
+    "pont GED, greffe absent : le motif, AUCUNE ligne");
+
+// Demat : deux liasses CFE (2150901 de la demande 2150801, dossier « B11D01», creee le 01/06/2004 ; 2150902 de la demande
+// 2150802 sans numero indicatif, creee le 01/05/2004) et un DAS sans demande (2150951, cree le 01/07/2004). Pieces : 2151002
+// (ordre 1, supprimee : lue) et 2151001 (ordre 2) de 2150901 ; 2151003 d'un type absent de TYPE_PJ_CREFO (le code) ; 2151004
+// du DAS. Aucune piece avant cette section : les liasses des sections precedentes n'en ont pas.
+await Sql("""
+    INSERT INTO v2.DEMANDE (DMND_ID_DMND, DMND_NUM_DEMANDE, DMND_NOM, DMND_NUM_INDICATIF, DMND_ETAT_DEMANDE, DMND_EN_COURS, DMND_CODE_PROSS) VALUES
+        (2150801, 'D2150801', 'Demat - BANC ALPHA', 'B11D01', 'V', 0, 'DOC_DEMAT'), (2150802, 'D2150802', 'Demat - BANC BETA', NULL, 'V', 0, 'DOC_DEMAT');
+    INSERT INTO v2.DEMAT_LIASSE_CFE (DMTLCF_ID_DMTLCF, DMTLCF_ID_DMND, DMTLCF_DATE_CREATION) VALUES (2150901, 2150801, '20040601'), (2150902, 2150802, '20040501');
+    INSERT INTO v2.DEMAT_DAS (DMTDAS_ID_DMTDAS, DMTDAS_ID_DMND, DMTDAS_DATE_CREATION) VALUES (2150951, NULL, '20040701');
+    INSERT INTO v2.TYPE_PJ_CREFO (R_TYPEPJCREF_VALEUR, R_TYPEPJCREF_LIBELLE_ECRAN, R_TYPEPJCREF_ABREGE_PIECE) VALUES
+        ('PJ_KBIS_B11', 'Extrait Kbis', 'KBIS'), ('PJ_STAT_B11', 'Statuts', 'STAT');
+    INSERT INTO v2.DEMAT_CREFO_PJ (DMCOPJ_ID_DMCOPJ, DMCOPJ_ID_DMTLCF, DMCOPJ_ID_DMTDAS, DMCOPJ_TYPE_PJ_CREFO, DMCOPJ_NUM_ORDRE, DMCOPJ_NOM_FICHIER,
+        DMCOPJ_DATE_PIECE, DMCOPJ_SUPPRIME, DMCOPJ_ETAT_INFOGREFFE) VALUES
+        (2151001, 2150901, NULL, 'PJ_STAT_B11', 2, 'statuts.pdf', '20040528', 0, 'ACQ'),
+        (2151002, 2150901, NULL, 'PJ_KBIS_B11', 1, 'kbis.pdf', NULL, 1, NULL),
+        (2151003, 2150902, NULL, 'PJ_INCONNU_B11', 1, 'autre.pdf', '20040430', 0, NULL),
+        (2151004, NULL, 2150951, 'PJ_KBIS_B11', 1, 'das.pdf', '20040630', 0, NULL);
+    """);
+await using (var cn = new SqlConnection(greffe.Connexion))
+{
+    await cn.OpenAsync();
+    var demat = await LectureDocDemat.LireAsync(cn, CancellationToken.None);
+    Exiger(demat.Lignes.Select(p => p.Id).SequenceEqual([2151004, 2151002, 2151001, 2151003]) && demat.Total == 4,
+        $"pieces demat : de la demat la plus recemment creee a la plus ancienne, dans l'ordre DMCOPJ_NUM_ORDRE ({string.Join(",", demat.Lignes.Select(p => p.Id))})");
+    var parId = demat.Lignes.ToDictionary(p => p.Id);
+    Exiger(parId[2151002] is { Dossier: "B11D01", Demande: "Demat - BANC ALPHA", Demat: "Liasse CFE 2150901", Abrege: "KBIS", Libelle: "Extrait Kbis", Supprimee: true, DatePiece: null }
+           && parId[2151001] is { Abrege: "STAT", Fichier: "statuts.pdf", EtatInfogreffe: "ACQ", Supprimee: false }
+           && parId[2151001].DatePiece == new DateTime(2004, 5, 28),
+        "pieces demat : le dossier de la demande (numero indicatif), le type par TYPE_PJ_CREFO, une piece supprimee lue ; l'etat Infogreffe sans blancs");
+    Exiger(parId[2151003] is { Dossier: "D2150802", Abrege: "PJ_INCONNU_B11", Libelle: "PJ_INCONNU_B11" } && parId[2151004] is { Dossier: "DAS 2150951", Demat: "DAS 2150951" },
+        "pieces demat : sans numero indicatif, le numero de demande ; sans demande, la demat ; un type inconnu garde son code");
+}
+var dematPont = await EcranDocDemat.PiecesAsync(client, Greffe);
+Exiger(dematPont is { Mode: "serveur", Message: null, Total: 4 }
+       && dematPont.Pieces.Single(p => p.Id == "2151002") is { Etat: "Supprimée", Date: "" }
+       && dematPont.Pieces.Single(p => p.Id == "2151001") is { Etat: "En vigueur", Date: "2004-05-28", Dossier: "B11D01" },
+    "pont Documents dematerialises branche : les pieces a la forme de l'ecran (Supprimée / En vigueur, date aaaa-mm-jj)");
+Exiger((await http.GetFromJsonAsync<PiecesDematLues>(RoutesEcransMain.Pour(RoutesDocDemat.Pieces, Greffe), json)) is { Total: 4 },
+    "route Documents dematerialises par le serveur : les pieces de la base");
+Exiger((await EcranDocDemat.PiecesAsync(null, null)) is { Mode: "demo", Pieces.Length: 0 },
+    "pont Documents dematerialises sans serveur : mode « demo », aucune piece");
+Exiger((await EcranDocDemat.PiecesAsync(client, GreffeAbsent)) is { Mode: "erreur", Pieces.Length: 0, Message: not null },
+    "pont Documents dematerialises, greffe absent : le motif, AUCUNE piece");
+
 Console.WriteLine();
 if (echecs.Count == 0) { Console.WriteLine("Ecrans faits main branches sur la base : VERT."); return 0; }
 Console.WriteLine(echecs.Count + " echec(s) : " + string.Join(" | ", echecs));

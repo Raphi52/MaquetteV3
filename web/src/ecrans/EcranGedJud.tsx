@@ -25,9 +25,22 @@
 // « Aller a une decision… » EST l'ancien critere « Instance / decision » (meme etat, memes colonnes cherchees) :
 // la liste est filtree ici, sans pont, deux champs auraient fait le meme filtre (decision du plan, lot 7). Les
 // autres criteres, le clic qui montre les actions et l'historique : inchanges.
+//
+// BRANCHE SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 11, 27/11/2026, marche du lot 17) : le pont
+// Pont/EcranGedJud.cs rend les documents de la GED judiciaire du greffe (VIDIGED_INDEX, Serveur/Socle/EcransMain/
+// LectureGedJud.cs, la requete de OPE_RECHERCHE_DOC). Une ligne de la base : le libelle du document, le numero de l'entite
+// qui le porte (instance, PC, prevention, mesure), sa nature, la date de la premiere decision liee, le nombre de decisions
+// liees (VIDIGED_DJ) et l'etat de RIG v2 (Valide, Valide avec reserve, En attente, Rejete). Les criteres de RIG v2 s'y
+// appliquent ICI, sur les lignes lues : un rejete est cache sauf « Afficher tout » (OPE_RECHERCHE_DOC.cs:376), la date de
+// reception du jour seul ou de la plage, 0 h a 23:59:59 (:358-373), le commentaire contenu (:342-344). « Non lies a une
+// decision » = aucune decision liee (GetNbDecisionsJudiciairesLiees). Sans serveur, les documents de demonstration
+// ci-dessous, marques « exemple » (provenance.tsx) ; en panne, le motif et aucune ligne. Non repris : « Audience /
+// cabinet » (un ecran de recherche OCX de RIG v2) et les minutes non numerisees (elles viennent des decisions).
 
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
+import { appeler } from '../pont'
 import { contientSansCasse, dateCourte, distinctsTries, estBlanc } from '../criteres'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import {
   CartesChiffrees, CelluleChevron, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille, PiedListe,
   PointEtat, VuesListe, teinteStatut, type ActionLigne, type Teinte,
@@ -48,6 +61,22 @@ interface DocGed {
   statut: string
   dossier: string
   historiques: string[]
+  /** Un document de la base (Pont/EcranGedJud.cs) : son identifiant, le type de son entite, son etat V2 (V, VR, A, R),
+   *  sa date de reception (aaaa-mm-jj), son commentaire et son motif de rejet. */
+  id?: string
+  typeEntite?: string
+  codeEtat?: string
+  reception?: string | null
+  commentaire?: string
+  motifRejet?: string
+}
+
+/** Ce que rend Pont/EcranGedJud.cs : les documents, leur total et d'ou ils viennent. */
+export interface VueGedJud {
+  lignes: DocGed[]
+  total: number
+  mode?: ModeLecture
+  message?: string | null
 }
 
 const Docs: DocGed[] = [
@@ -72,24 +101,53 @@ interface CriteresGed {
   sansDecision: boolean
 }
 
-/** Le filtre des criteres : la liste, et le compte de chaque vue. */
-function filtrer(c: CriteresGed): DocGed[] {
-  let q = Docs
+/** Les criteres de RIG v2 qui ne valent que pour un document de la base (sa reception, son commentaire, son etat V2). */
+interface CriteresBase {
+  receptionDebut: string
+  receptionFin: string
+  commentaire: string
+  afficherTout: boolean
+}
+const SansCriteresBase: CriteresBase = { receptionDebut: '', receptionFin: '', commentaire: '', afficherTout: false }
+
+/**
+ * Le filtre des criteres : la liste, et le compte de chaque vue. « Non lies a une decision » : aucune decision liee. Les
+ * criteres de RIG v2 (CriteresBase) ne filtrent que les documents de la base : la demonstration n'a ni reception ni etat V2.
+ */
+function filtrer(docs: DocGed[], c: CriteresGed, b: CriteresBase = SansCriteresBase): DocGed[] {
+  let q = docs
   if (!estBlanc(c.recherche)) {
     const t = c.recherche.trim()
     q = q.filter((d) => contientSansCasse(d.instance, t) || contientSansCasse(d.decision, t))
   }
   if (c.critNature !== '') q = q.filter((d) => d.nature === c.critNature)
   if (c.critEtat !== '') q = q.filter((d) => d.etat === c.critEtat)
-  if (c.sansDecision) q = q.filter((d) => d.dateDecision === null)
+  if (c.sansDecision) q = q.filter((d) => d.nbLies === 0)
+  // OPE_RECHERCHE_DOC.cs:376 : « VGIDX_ETAT <> 'R' » sauf « Afficher tout ».
+  if (!b.afficherTout) q = q.filter((d) => d.codeEtat !== 'R')
+  // :358-373 : la date de debut seule vaut pour ce jour ; la fin, a 23:59:59 (une date aaaa-mm-jj se compare telle quelle).
+  if (b.receptionDebut !== '') {
+    const fin = b.receptionFin !== '' ? b.receptionFin : b.receptionDebut
+    q = q.filter((d) => d.reception === undefined || (d.reception !== null && d.reception >= b.receptionDebut && d.reception <= fin))
+  }
+  // :342-344 : « VGIDX_COMMENTAIRE like %...% ».
+  if (!estBlanc(b.commentaire)) q = q.filter((d) => d.commentaire === undefined || contientSansCasse(d.commentaire, b.commentaire.trim()))
   return q
+}
+
+/** Les etats de RIG v2, dans l'ordre de VIDIGED_PARAMETRAGE (ULT_COMBO_ETAT) : ceux des documents lus, dans cet ordre. */
+const OrdreEtatsV2 = ['V', 'VR', 'A', 'R']
+function etatsDeLaBase(docs: DocGed[]): string[] {
+  const rang = (d: DocGed) => { const i = OrdreEtatsV2.indexOf(d.codeEtat ?? ''); return i < 0 ? OrdreEtatsV2.length : i }
+  return [...new Map([...docs].sort((a, b) => rang(a) - rang(b)).map((d) => [d.etat, d.etat])).keys()]
 }
 
 /** Une vue pose les criteres d'ETAT (etat, « Non lies a une decision ») ; le texte et la nature restent. */
 type CriteresEtat = Pick<CriteresGed, 'critEtat' | 'sansDecision'>
 const SansEtat: CriteresEtat = { critEtat: '', sansDecision: false }
 
-export const VuesDocuments: ReadonlyArray<{ cle: string; libelle: string; criteres: CriteresEtat }> = [
+type VueDocuments = { cle: string; libelle: string; criteres: CriteresEtat }
+export const VuesDocuments: ReadonlyArray<VueDocuments> = [
   { cle: 'tous', libelle: 'Tous', criteres: SansEtat },
   { cle: 'brouillons', libelle: 'Brouillons', criteres: { ...SansEtat, critEtat: 'Brouillon' } },
   { cle: 'signes', libelle: 'Signes', criteres: { ...SansEtat, critEtat: 'Signe' } },
@@ -97,15 +155,39 @@ export const VuesDocuments: ReadonlyArray<{ cle: string; libelle: string; criter
   { cle: 'sans-decision', libelle: 'Non lies a une decision', criteres: { ...SansEtat, sansDecision: true } },
 ]
 
+/** Les vues d'un document de la base : une par etat de RIG v2 lu, et « Non lies a une decision ». */
+const vuesDeLaBase = (etats: string[]): VueDocuments[] => [
+  { cle: 'tous', libelle: 'Tous', criteres: SansEtat },
+  ...etats.map((e) => ({ cle: 'etat-' + e, libelle: e, criteres: { ...SansEtat, critEtat: e } })),
+  { cle: 'sans-decision', libelle: 'Non lies a une decision', criteres: { ...SansEtat, sansDecision: true } },
+]
+
 /** Les etats du critere, dans son ordre. Le point d'etat d'une ligne suit le statut du document (teinteStatut du socle). */
 const Etats = ['Brouillon', 'Signe', 'Notifie']
-const TeinteEtat: Record<string, Teinte> = { Brouillon: 'orange', Signe: 'bleu', Notifie: 'vert' }
+const TeinteEtat: Record<string, Teinte> = {
+  Brouillon: 'orange', Signe: 'bleu', Notifie: 'vert',
+  // Les etats de RIG v2 : un rejete en rouge (OPE_RESULTAT_TREEVIEW.cs:60-61), en attente en orange, valide en vert.
+  'Validé': 'vert', 'Validé avec réserve': 'bleu', 'En attente': 'orange', 'Rejeté': 'rouge',
+}
 const TeinteNature: Record<string, Teinte> = { Jugement: 'bleu', Ordonnance: 'violet', Copie: 'gris' }
 
 /** Les colonnes du tableau a une ligne : chevron, Decision, Instance, Nature, Date Decision, Docs lies, Etat, menu. */
 const NbColonnes = 8
 
 export function EcranGedJud({ ouvrirDossier, dossier = null }: ProprietesEcranGedJud) {
+  // Les documents du pont ; sans reponse (pas de pont) ou sans serveur, la demonstration reste.
+  const [vue, setVue] = useState<VueGedJud | null>(null)
+  useEffect(() => {
+    let perime = false
+    void appeler<VueGedJud>('EcranGedJud.Documents')
+      .then((v) => { if (!perime && v.mode !== undefined && v.mode !== 'demo') setVue(v) })
+      .catch(() => { /* pas de pont (tests, page hors WebView2) : la demonstration reste */ })
+    return () => { perime = true }
+  }, [])
+  const docs = vue ? vue.lignes : Docs
+  const etats = vue ? etatsDeLaBase(docs) : Etats
+  const vues = vue ? vuesDeLaBase(etats) : VuesDocuments
+
   // Criteres de OPE_RECHERCHE_DOC (RIG v2).
   const [receptionDebut, setReceptionDebut] = useState('')
   const [receptionFin, setReceptionFin] = useState('')
@@ -127,15 +209,16 @@ export function EcranGedJud({ ouvrirDossier, dossier = null }: ProprietesEcranGe
   const [ouverte, setOuverte] = useState<string | null>(null)
 
   const criteres: CriteresGed = { recherche, critNature, critEtat, sansDecision }
-  const trouves = filtrer(criteres)
+  const criteresBase: CriteresBase = { receptionDebut, receptionFin, commentaire: critCommentaire, afficherTout }
+  const trouves = filtrer(docs, criteres, criteresBase)
 
-  const vueActive = VuesDocuments.find((v) => v.criteres.critEtat === critEtat && v.criteres.sansDecision === sansDecision)?.cle ?? null
+  const vueActive = vues.find((v) => v.criteres.critEtat === critEtat && v.criteres.sansDecision === sansDecision)?.cle ?? null
 
   // Les chiffres de la tete, des cartes et du pied : sur la liste affichee.
   const parEtat = (e: string) => trouves.filter((d) => d.etat === e).length
   const parNature = (n: string) => trouves.filter((d) => d.nature === n).length
   const brouillons = parEtat('Brouillon')
-  const nonLies = trouves.filter((d) => d.dateDecision === null).length
+  const nonLies = trouves.filter((d) => d.nbLies === 0).length
   const lies = trouves.reduce((n, d) => n + d.nbLies, 0)
   const basculer = (actuel: string, valeur: string, poser: (v: string) => void) => () => poser(actuel === valeur ? '' : valeur)
 
@@ -163,7 +246,7 @@ export function EcranGedJud({ ouvrirDossier, dossier = null }: ProprietesEcranGe
           <span className="rig-saisie-champ__libelle">Nature du document</span>
           <select className="rig-saisie-champ__saisie" value={critNature} onChange={(e) => setCritNature(e.target.value)}>
             <option value="">Toutes</option>
-            {distinctsTries(Docs.map((d) => d.nature)).map((n) => <option key={n} value={n}>{n}</option>)}
+            {distinctsTries(docs.map((d) => d.nature)).map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </label>
 
@@ -171,9 +254,7 @@ export function EcranGedJud({ ouvrirDossier, dossier = null }: ProprietesEcranGe
           <span className="rig-saisie-champ__libelle">Etat</span>
           <select className="rig-saisie-champ__saisie" value={critEtat} onChange={(e) => setCritEtat(e.target.value)}>
             <option value="">Tous</option>
-            <option value="Brouillon">Brouillon</option>
-            <option value="Signe">Signe</option>
-            <option value="Notifie">Notifie</option>
+            {etats.map((e) => <option key={e} value={e}>{e}</option>)}
           </select>
         </label>
 
@@ -230,23 +311,24 @@ export function EcranGedJud({ ouvrirDossier, dossier = null }: ProprietesEcranGe
 
       <ListeModerne etiquette="Decisions judiciaires et documents lies">
         <EnteteListe titre="Decisions judiciaires et documents lies"
-                     synthese={<>{trouves.length}{trouves.length > 1 ? ' documents · ' : ' document · '}<b>{brouillons}</b>
-                       {brouillons > 1 ? ' brouillons · ' : ' brouillon · '}<b>{lies}</b>{' docs lies'}
+                     synthese={<>{trouves.length}{trouves.length > 1 ? ' documents · ' : ' document · '}
+                       {!vue && <><b>{brouillons}</b>{brouillons > 1 ? ' brouillons · ' : ' brouillon · '}</>}<b>{lies}</b>{' docs lies'}
                        {action === null ? '' : ' — ' + action}</>}
                      filtre={{ valeur: recherche, changer: setRecherche, indication: 'Aller a une decision…',
                                valider: () => { if (trouves.length === 1) setSelection(trouves[0]!) } }} />
+        {vue ? <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Documents" /> : <ProvenanceEcran mode="demo" quoi="Documents" />}
 
         <CartesChiffrees cartes={[
           { cle: 'etat', titre: 'Etat', valeur: trouves.length, complement: trouves.length > 1 ? 'documents' : 'document', legende: true,
             ...(critEtat !== '' ? { choisir: () => setCritEtat(''), indication: 'Tous les etats' } : {}),
-            segments: Etats.map((e) => ({
+            segments: etats.map((e) => ({
               cle: e, libelle: e, valeur: parEtat(e), texte: String(parEtat(e)), teinte: TeinteEtat[e] ?? 'gris',
               actif: critEtat === e, choisir: basculer(critEtat, e, setCritEtat),
             })) },
           { cle: 'nature', titre: 'Nature du document', valeur: distinctsTries(trouves.map((d) => d.nature)).length,
             complement: 'natures', legende: true,
             ...(critNature !== '' ? { choisir: () => setCritNature(''), indication: 'Toutes les natures' } : {}),
-            segments: distinctsTries(Docs.map((d) => d.nature)).map((n) => ({
+            segments: distinctsTries(docs.map((d) => d.nature)).map((n) => ({
               cle: n, libelle: n, valeur: parNature(n), texte: String(parNature(n)), teinte: TeinteNature[n] ?? 'gris',
               actif: critNature === n, choisir: basculer(critNature, n, setCritNature),
             })) },
@@ -256,10 +338,10 @@ export function EcranGedJud({ ouvrirDossier, dossier = null }: ProprietesEcranGe
             indication: sansDecision ? 'Tous les documents' : 'Seulement les documents non lies a une decision' },
         ]} />
 
-        <VuesListe vues={VuesDocuments.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer({ ...criteres, ...v.criteres }).length }))}
+        <VuesListe vues={vues.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer(docs, { ...criteres, ...v.criteres }, criteresBase).length }))}
                    active={vueActive}
                    choisir={(cle) => {
-                     const v = VuesDocuments.find((x) => x.cle === cle)
+                     const v = vues.find((x) => x.cle === cle)
                      if (v) { setCritEtat(v.criteres.critEtat); setSansDecision(v.criteres.sansDecision) }
                    }} />
 
@@ -283,7 +365,9 @@ export function EcranGedJud({ ouvrirDossier, dossier = null }: ProprietesEcranGe
             </thead>
             <tbody>
               {trouves.map((doc) => {
-                const estOuverte = ouverte === doc.instance
+                // Un document de la base a son identifiant : plusieurs documents d'une meme entite se distinguent.
+                const cle = doc.id ?? doc.instance
+                const estOuverte = ouverte === cle
                 const actions: ActionLigne[] = [
                   { libelle: 'Afficher le document', fort: true, agir: () => ouvrirDossier(doc.dossier) },
                   { libelle: 'Imprimer', agir: () => agirSur(doc, 'Imprimer') },
@@ -292,9 +376,9 @@ export function EcranGedJud({ ouvrirDossier, dossier = null }: ProprietesEcranGe
                   { libelle: 'Historique', agir: () => voirHistorique(doc) },
                 ]
                 return (
-                  <Fragment key={doc.instance}>
+                  <Fragment key={cle}>
                   <tr className={estOuverte ? 'rig-lm-ouverte' : undefined} onClick={() => setSelection(doc)}>
-                    <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : doc.instance)} />
+                    <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : cle)} />
                     <td title={doc.decision}>{doc.decision}</td>
                     <td className="rig-table__mono">{doc.instance}</td>
                     <td title={doc.nature}><Pastille teinte={TeinteNature[doc.nature] ?? 'gris'}>{doc.nature}</Pastille></td>
@@ -304,15 +388,21 @@ export function EcranGedJud({ ouvrirDossier, dossier = null }: ProprietesEcranGe
                     <td className="rig-lm-cellule-menu">
                       <MenuLigne libelle={`Actions du document ${doc.instance}`} actions={[
                         ...actions,
-                        { libelle: estOuverte ? 'Replier la ligne' : 'Deplier la ligne', agir: () => setOuverte(estOuverte ? null : doc.instance) },
+                        { libelle: estOuverte ? 'Replier la ligne' : 'Deplier la ligne', agir: () => setOuverte(estOuverte ? null : cle) },
                       ]} />
                     </td>
                   </tr>
                   {estOuverte && (
-                    <LigneDetail colonnes={NbColonnes} actions={actions} champs={[
+                    <LigneDetail colonnes={NbColonnes} actions={actions} champs={doc.id === undefined ? [
                       { libelle: 'Numero minute', valeur: doc.minute },
                       { libelle: 'Date prevue de la decision', valeur: dateCourte(doc.datePrevue) },
                       { libelle: 'Dossier', valeur: doc.dossier },
+                    ] : [
+                      { libelle: 'Entite', valeur: `${doc.typeEntite ?? ''} ${doc.instance}`.trim() },
+                      { libelle: 'Date de reception', valeur: doc.reception ? dateCourte(doc.reception) : '' },
+                      { libelle: 'Date prevue de la decision', valeur: doc.datePrevue ? dateCourte(doc.datePrevue) : '' },
+                      { libelle: 'Commentaire', valeur: doc.commentaire ?? '' },
+                      ...(doc.motifRejet ? [{ libelle: 'Motif du rejet', valeur: doc.motifRejet }] : []),
                     ]} />
                   )}
                   </Fragment>
@@ -327,7 +417,7 @@ export function EcranGedJud({ ouvrirDossier, dossier = null }: ProprietesEcranGe
 
         {s && (
           <div className="rig-criteres__bloc" style={{ padding: 'var(--rig-esp-3)' }}>
-            <div className="rig-kicker">{s.decision} — minute {s.minute}</div>
+            <div className="rig-kicker">{s.decision} — {s.id === undefined ? `minute ${s.minute}` : `${s.typeEntite ?? ''} ${s.instance}`.trim()}</div>
             <div className="rig-criteres__actions">
               <button className="rig-bouton" onClick={() => ouvrirDossier(s.dossier)}>Afficher le document</button>{' '}
               <button className="rig-bouton rig-bouton--plat" onClick={() => setAction('Imprimer')}>Imprimer</button>{' '}
@@ -335,10 +425,13 @@ export function EcranGedJud({ ouvrirDossier, dossier = null }: ProprietesEcranGe
               <button className="rig-bouton rig-bouton--plat" onClick={() => setAction('Envoyer par courrier')}>Envoyer par courrier</button>{' '}
               <button className="rig-bouton rig-bouton--plat" onClick={() => setHistorique(!historique)}>Historique</button>
             </div>
-            {historique && (
+            {historique && s.historiques.length > 0 && (
               <ul className="rig-historique__liste">
                 {s.historiques.map((h, i) => <li key={i}>{h}</li>)}
               </ul>
+            )}
+            {historique && s.historiques.length === 0 && (
+              <p className="rig-nonmaq__texte">L'historique du document (PROC_GED_HISTORIQUE de RIG v2) n'est pas relu dans la base.</p>
             )}
           </div>
         )}

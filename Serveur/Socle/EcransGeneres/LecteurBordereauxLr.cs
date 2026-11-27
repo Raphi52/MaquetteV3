@@ -31,8 +31,10 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   propose toujours (l'etape sans AR est masquee des que la numerotation LRN a demarre, PROC_BORDLR.cs:74-79).
 ///   Etat : demande non validee (Q, I, W...) -> AFaire « A editer » ; validee ou edition V3, edition emise (phase E) -> Validee
 ///   « Edite » ; edition pas encore emise, ou demande validee sans edition -> EnCours « En cours ».
-///   Le nombre de plis d'un bordereau edite n'est pas lu : RIG v2 ne le garde que dans la requete de l'edition (le XML
-///   DMNED_PARAMETRE_GENERATION, SQL), que le service d'edition execute ; la cellule reste vide.
+///   La periode et le nombre de plis d'un bordereau edite : RIG v2 ne les garde que dans la requete de l'edition (l'attribut SQL du
+///   XML DMNED_PARAMETRE_GENERATION, MetierProcBordlr.GenererEdition, :120 ; _CreeRequeteGenererEdition, :63-78), que le service
+///   d'edition execute. La lecture en reprend le type, les deux bornes et l'utilisateur (AEditer.DeRequete) et recompte les plis comme
+///   l'ecran (CompterAsync) ; une edition dont la requete ne se relit pas garde ces deux cellules vides.
 ///
 /// AVEC UNE PERIODE (ChercherAsync, « Periode » remplie) -- LE BORDEREAU A EDITER, une ligne par type, comme les deux etapes de la
 /// V2 : le nombre de demandes d'edition DEMANDE_EDITION INNER JOIN LRAR_INFOS (DMNED_NUM_LRAR = LRARI_NUM_LRAR) ou
@@ -74,7 +76,7 @@ internal sealed class LecteurBordereauxLr : IRechercheEcran
         SELECT TOP (@plafond) b.*, COUNT(*) OVER () AS Total
         FROM (
             SELECT d.DMND_ID_DMND, d.DMND_NUM_DEMANDE, d.DMND_ETAT_DEMANDE, d.DMND_NOM_UTILISATEUR,
-                   de.DMNED_ID_DMNED, de.DMNED_LIBELLE_DOCUMENT, de.DMNED_PHASE_TRAITEMENT,
+                   de.DMNED_ID_DMNED, de.DMNED_LIBELLE_DOCUMENT, de.DMNED_PHASE_TRAITEMENT, de.DMNED_PARAMETRE_GENERATION,
                    CASE WHEN d.DMND_ETAT_DEMANDE = 'V' THEN COALESCE(d.DMND_DATE_VALIDATION, d.DMND_DATE_CREATION) ELSE d.DMND_DATE_CREATION END AS Quand,
                    COALESCE(d.DMND_DATE_VALIDATION, d.DMND_DATE_CREATION) AS Ordre
             FROM v2.DEMANDE AS d
@@ -82,7 +84,7 @@ internal sealed class LecteurBordereauxLr : IRechercheEcran
             WHERE d.DMND_CODE_PROSS = 'BORDLR' AND d.DMND_ETAT_DEMANDE <> 'X'
             UNION ALL
             SELECT NULL, NULL, NULL, de.DMNED_UTILISATEUR, de.DMNED_ID_DMNED, de.DMNED_LIBELLE_DOCUMENT, de.DMNED_PHASE_TRAITEMENT,
-                   de.DMNED_DATE_CREATION, de.DMNED_DATE_CREATION
+                   de.DMNED_PARAMETRE_GENERATION, de.DMNED_DATE_CREATION, de.DMNED_DATE_CREATION
             FROM v2.DEMANDE_EDITION AS de
             WHERE de.DMNED_ID_DMND IS NULL
               AND (de.DMNED_LIBELLE_DOCUMENT LIKE 'bordereau LRAR-%' OR de.DMNED_LIBELLE_DOCUMENT LIKE 'bordereau LR-%')
@@ -105,8 +107,28 @@ internal sealed class LecteurBordereauxLr : IRechercheEcran
     internal const string RequeteLrn = "SELECT TOP 1 Debut FROM num.Compteur WHERE Type = 'LRN' ORDER BY Annee DESC, Jour DESC";
 
     public Task<LignesLues> LireAsync(SqlConnection baseGreffe, DateTime aujourdhui, int plafond, CancellationToken ct)
-        => LectureEcran.LireAsync(baseGreffe, RequeteEdites.Replace("/*texte*/", "", StringComparison.Ordinal), Ligne, ct,
-                                  new SqlParameter("@plafond", plafond));
+        => EditesAsync(baseGreffe, RequeteEdites.Replace("/*texte*/", "", StringComparison.Ordinal), ct, new SqlParameter("@plafond", plafond));
+
+    /// <summary>Les bordereaux edites, avec la periode et les plis que la requete de leur edition porte (en tete du fichier).</summary>
+    private static async Task<LignesLues> EditesAsync(SqlConnection baseGreffe, string sql, CancellationToken ct, params SqlParameter[] parametres)
+    {
+        var lues = new List<(LigneLue Ligne, AEditer? Objet)>();
+        var total = 0;
+        await using (var r = await LectureV2.LireAsync(baseGreffe, sql, ct, parametres))
+            while (await r.ReadAsync(ct))
+            {
+                total = Convert.ToInt32(r["Total"], CultureInfo.InvariantCulture);
+                lues.Add((Ligne(r), AEditer.DeRequete(FormeLigne.Texte(r, "DMNED_PARAMETRE_GENERATION"))));
+            }
+        var lignes = new List<LigneLue>();
+        foreach (var (l, o) in lues)
+            lignes.Add(o is null ? l : l with
+            {
+                Valeurs = [l.Valeurs[0], Periode(o), l.Valeurs[2], (await CompterAsync(baseGreffe, null, o, ct)).ToString(CultureInfo.InvariantCulture),
+                           l.Valeurs[4]],
+            });
+        return new LignesLues(lignes, total);
+    }
 
     public async Task<LignesLues> ChercherAsync(SqlConnection baseGreffe, RechercheEcran recherche, DateTime aujourdhui, int plafond, CancellationToken ct)
     {
@@ -114,10 +136,10 @@ internal sealed class LecteurBordereauxLr : IRechercheEcran
         {
             // Sans periode : les bordereaux edites, cherches par leur nom, leur utilisateur ou leur numero de demande.
             if (string.IsNullOrWhiteSpace(recherche.Texte)) return await LireAsync(baseGreffe, aujourdhui, plafond, ct);
-            return await LectureEcran.LireAsync(baseGreffe,
+            return await EditesAsync(baseGreffe,
                 RequeteEdites.Replace("/*texte*/", "AND (b.DMNED_LIBELLE_DOCUMENT LIKE @texte OR b.DMND_NUM_DEMANDE LIKE @texte OR b.DMND_NOM_UTILISATEUR LIKE @texte)",
                                       StringComparison.Ordinal),
-                Ligne, ct, new SqlParameter("@plafond", plafond), new SqlParameter("@texte", FormeLigne.Contient(recherche.Texte)));
+                ct, new SqlParameter("@plafond", plafond), new SqlParameter("@texte", FormeLigne.Contient(recherche.Texte)));
         }
         var aEditer = AEditer.Lire(periode, recherche.Critere(CritereHeureDebut), recherche.Critere(CritereHeureFin), recherche.Critere(CritereUtilisateur));
         if (aEditer is null) return new LignesLues([], 0);
@@ -156,7 +178,7 @@ internal sealed class LecteurBordereauxLr : IRechercheEcran
     internal static LigneLue LigneAEditer(AEditer objet, int plis, bool enConsultation)
     {
         var sansAr = objet.Type == AEditer.Lr;
-        var periode = $"du {FormeLigne.Date(objet.Du)}{Heure(objet.Du)} au {FormeLigne.Date(objet.Au)}{Heure(objet.Au)}";
+        var periode = Periode(objet);
         var qui = objet.Utilisateur ?? "tous les utilisateurs";
         var precisions = FormeLigne.Joindre(objet.Inversee ? PeriodeInversee : periode,
             plis > 1 ? $"{plis} plis" : $"{plis} pli", qui, enConsultation ? SansArEnConsultation : null);
@@ -168,6 +190,8 @@ internal sealed class LecteurBordereauxLr : IRechercheEcran
                        enConsultation ? "consultation seulement" : "à éditer"],
         };
     }
+
+    private static string Periode(AEditer o) => $"du {FormeLigne.Date(o.Du)}{Heure(o.Du)} au {FormeLigne.Date(o.Au)}{Heure(o.Au)}";
 
     // « 14:30 » saisie : « à 14 h 30 » ; une borne de journee entiere (00:00 ou 23:59:59.998) : rien.
     private static string Heure(DateTime d)
@@ -220,7 +244,7 @@ internal sealed class LecteurBordereauxLr : IRechercheEcran
 /// L'objet d'un bordereau a editer : son type (LRAR, LR), ses bornes et son utilisateur (null : tous). Il voyage dans l'Id de sa
 /// ligne (« A|LRAR|20260302000000000|20260302235959997|GESA ») jusqu'au geste, qui le recompte (LecteurBordereauxLr.cs, en tete).
 /// </summary>
-internal sealed record AEditer(string Type, DateTime Du, DateTime Au, string? Utilisateur)
+internal sealed partial record AEditer(string Type, DateTime Du, DateTime Au, string? Utilisateur)
 {
     internal const string Lrar = "LRAR", Lr = "LR";
     private const string Format = "yyyyMMddHHmmssfff";
@@ -229,6 +253,27 @@ internal sealed record AEditer(string Type, DateTime Du, DateTime Au, string? Ut
     internal bool Inversee => Du > Au;
 
     internal string Id => string.Join('|', "A", Type, Du.ToString(Format, CultureInfo.InvariantCulture), Au.ToString(Format, CultureInfo.InvariantCulture), Utilisateur ?? "");
+
+    /// <summary>
+    /// L'objet que la requete d'une edition de bordereau porte (EcrivainBordereauxLr.RequeteEdition, la requete de la V2 :
+    /// « Where LRARI_TYPE ='LRAR' AND DMNED_DATE_PRE_EMISSION &gt;=convert(DateTime2, '...', 121) AND ... &lt;= convert(...) AND
+    /// DMNED_UTILISATEUR IS NOT NULL | ='x' ») ; null si le XML de generation ne la porte pas.
+    /// </summary>
+    internal static AEditer? DeRequete(string? parametreGeneration)
+    {
+        if (string.IsNullOrEmpty(parametreGeneration)) return null;
+        var m = RequeteBordereau().Match(System.Net.WebUtility.HtmlDecode(parametreGeneration));
+        if (!m.Success
+            || !DateTime.TryParse(m.Groups["du"].Value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var du)
+            || !DateTime.TryParse(m.Groups["au"].Value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var au)) return null;
+        var qui = m.Groups["qui"].Success ? m.Groups["qui"].Value.Replace("''", "'", StringComparison.Ordinal) : null;
+        return new AEditer(m.Groups["type"].Value, du, au, qui);
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(
+        @"LRARI_TYPE\s*=\s*'(?<type>LRAR|LR)'\s+AND\s+DMNED_DATE_PRE_EMISSION\s*>=\s*convert\(DateTime2,\s*'(?<du>[^']+)',\s*121\)\s+AND\s+DMNED_DATE_PRE_EMISSION\s*<=\s*convert\(DateTime2,\s*'(?<au>[^']+)',\s*121\)\s+AND\s+DMNED_UTILISATEUR(?:\s+IS\s+NOT\s+NULL|='(?<qui>(?:[^']|'')*)')",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex RequeteBordereau();
 
     /// <summary>L'objet d'une ligne « a editer » ; null pour toute autre ligne (un bordereau deja edite).</summary>
     internal static AEditer? DeId(string id)

@@ -17,3 +17,5 @@ Pli 1A1200006 | Non envoyé le {J-5} · demandes d'édition remises en file d'é
 Pli 1A1200010 | modalité « INCONNU » de l'ancien RIG · le {J-6} | NPAI, refusés ou incomplets | Validee | []
 Pli 1A170600015 | Reçu le 09/07/2001 | Reçus | Validee | []
 Pli 1A170600013 | NPAI reçu le 09/07/2001 | NPAI, refusés ou incomplets | Validee | []
+# Lot 11, reprise : 1A2110122, l'autre pli de l'evenement futur lie de l'instance 2110701, deja recu (PROC_RETOURLRAR.sql).
+Pli 1A2110122 | Reçu le 22/03/2001 | Reçus | Validee | []

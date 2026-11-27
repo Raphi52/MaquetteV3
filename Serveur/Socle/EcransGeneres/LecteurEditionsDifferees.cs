@@ -25,11 +25,13 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///
 /// GROUPES : « Lots ouverts » (un lot clos disparait, GPIMP_DATE_FIN pose) et « Documents des lots » (le detail, lot par lot dans
 /// l'ordre des lots). Le plafond vaut pour chaque groupe (TotalParGroupe) : un detail long ne cache pas un lot.
-/// REGLE D'ETAT -- la cloture de RIG v2 exige une imprimante (OPE_EDT_DIFF_LOT.DoVerifier, :52-54) :
-///   - AFaire « À clôturer » : l'imprimante du groupe est choisie (un document : celle de son lot) ;
-///   - EnAttente « Imprimante à choisir » : aucune (« Vous devez choisir une imprimante pour pouvoir clôturer ») -- la forme File ne
-///     saisit pas l'imprimante : la choisir dans RIG v2 ;
-///   - Rejetee « Ne pas imprimer » : un document DMNED_IMPRESSION = 0, barre dans la grille de RIG v2 (:132-139).
+/// REGLE D'ETAT -- la cloture de RIG v2 exige une imprimante (OPE_EDT_DIFF_LOT.DoVerifier, :52-54), pas la case d'un document :
+///   - un LOT : AFaire « À clôturer » si l'imprimante du groupe est choisie ; sinon EnAttente « Imprimante à choisir » (« Vous devez
+///     choisir une imprimante pour pouvoir clôturer ») -- la forme File ne saisit pas l'imprimante : la choisir dans RIG v2 ;
+///   - un DOCUMENT n'est jamais fige : RIG v2 le barre ou le retablit dans tout lot ouvert, imprimante choisie ou non
+///     (OPE_LISTE_LOT._TraiterEditionsCochees, :53-78), et la forme File ote sa case a une ligne ni AFaire ni EnCours
+///     (web/src/ecrans/formes/commun.tsx:78). A imprimer : AFaire ; barre (DMNED_IMPRESSION = 0, :132-139) : EnCours « Ne pas imprimer ».
+///     (Avant le 27/11/2026 : Rejetee et EnAttente, figes : « Remettre à l'impression » etait injouable a l'ecran.)
 /// Id = GPIMP_NUM_GROUPE pour un lot, « E-&lt;DMNED_ID_DMNED&gt; » pour un document.
 ///
 /// Sans lot ouvert, RIG v2 affiche l'etape vide (ETP_EDT_DIFF_VIDE) : la liste est vide.
@@ -45,7 +47,7 @@ internal sealed class LecteurEditionsDifferees : ILecteurEcran
     internal const string LotsOuverts = "Lots ouverts", Documents = "Documents des lots";
 
     /// <summary>L'etat d'un document « Ne pas imprimer » (le descripteur, au mot pres).</summary>
-    internal const string EtatNePasImprimer = "Rejetee";
+    internal const string EtatNePasImprimer = "EnCours";
 
     /// <summary>Les lots ouverts de RIG v2 (MetierEdtDiff.cs:19-24), un lot ou tous ; « not LOT_DIRECT=1 » : un LOT_DIRECT NULL est
     /// ecarte, comme en SQL de RIG v2.</summary>
@@ -65,7 +67,7 @@ internal sealed class LecteurEditionsDifferees : ILecteurEcran
     /// <summary>Le detail des lots ouverts : leurs demandes d'edition (GroupeImpression._loadDemandeEdition, :102-107), un document ou
     /// tous (/*document*/). Un groupe ouvert d'un lot visible a forcement ses documents : le HAVING des lots n'a pas a etre repete.</summary>
     internal const string RequeteDocuments = """
-        SELECT TOP (@plafond) l.LOT_NOM, g.GPIMP_NOM_IMPRIMANTE, g.GPIMP_NUM_GROUPE, e.DMNED_ID_DMNED, e.DMNED_LIBELLE_DOCUMENT,
+        SELECT TOP (@plafond) l.LOT_NOM, g.GPIMP_NUM_GROUPE, e.DMNED_ID_DMNED, e.DMNED_LIBELLE_DOCUMENT,
                e.DMNED_DESIGNATION_DESTINATAIRE, e.DMNED_DATE_CREATION, e.DMNED_NOMBRE_EXEMPLAIRE, e.DMNED_CODE_MAQUETTE, e.DMNED_IMPRESSION,
                e.DMNED_PHASE_TRAITEMENT, d.DMND_NUM_INDICATIF, d.DMND_NOM_UTILISATEUR, COUNT(*) OVER () AS Total
         FROM v2.LOT AS l
@@ -122,7 +124,7 @@ internal sealed class LecteurEditionsDifferees : ILecteurEcran
             utilisateur.Length > 0 ? $"par {utilisateur}" : null, barre ? "ne pas imprimer" : null);
         var id = FormeLigne.Texte(r, "DMNED_ID_DMNED");
         var libelle = FormeLigne.Texte(r, "DMNED_LIBELLE_DOCUMENT");
-        var etat = barre ? EtatNePasImprimer : FormeLigne.Texte(r, "GPIMP_NOM_IMPRIMANTE").Length > 0 ? "AFaire" : "EnAttente";
+        var etat = barre ? EtatNePasImprimer : "AFaire";
         return new LigneLue(libelle.Length > 0 ? libelle : $"Document {id}", precisions, Documents, etat, []) { Id = "E-" + id };
     }
 }
