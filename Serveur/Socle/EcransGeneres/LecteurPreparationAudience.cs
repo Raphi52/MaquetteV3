@@ -21,14 +21,39 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// LE GESTE : « Valider » attribue les numeros d'appel (EcrivainPreparationAudience.cs). CE QUE LA V3 NE REPREND PAS : la
 /// generation du plumitif (un etat Crystal, LancerPlumitif), son impression et son envoi par courriel ou au coffre.
 /// </summary>
-internal sealed class LecteurPreparationAudience : IRechercheEcran
+internal sealed class LecteurPreparationAudience : IRechercheEcran, IFicheEcran
 {
     public string Procedure => "PROC_PREAUD";
+
+    /// <summary>La fiche de l'audience ou du cabinet deplie (FichesAudienceV2.cs : ses sections, ses sources V2, ce qu'elle ne lit pas).</summary>
+    public Task<FicheEcran?> LireFicheAsync(SqlConnection baseGreffe, string id, DateTime maintenant, CancellationToken ct)
+        => FichesAudienceV2.PreparationAsync(baseGreffe, Procedure, id, ct);
 
     /// <summary>Les groupes du descripteur (Surveiller.cs), au mot pres.</summary>
     internal const string Audiences = "Audiences", Cabinets = "Cabinets";
 
     internal const string CritereDate = "Date de l'audience", CritereChambre = "Chambre", CritereMode = "Mode";
+
+    /// <summary>Le mode P de la liste « Mode » du descripteur (Surveiller.cs), au mot pres.</summary>
+    internal const string ModeProceduresCollectives = "Procédures collectives";
+
+    /// <summary>
+    /// Ce que porte l'Id d'une ligne cherchee en mode P (PREAUDPC, PROC_PREAUD.cs:24) apres le numero de l'audience : la fiche depliee
+    /// ne recoit que l'Id (IFicheEcran), et c'est en mode PC que la liste d'ordre a ses deux colonnes d'organes
+    /// (OPE_ORDRE_INSTANCE.cs:57-59, FichesAudienceV2.PreparationAsync). « Valider » vise la meme audience (EcrivainPreparationAudience).
+    /// </summary>
+    // fix-ok: contrôle du lot 7 (27/11/2026) -- en mode P, la fiche dépliée n'avait pas les colonnes « Mandataire Judiciaire » et
+    // « Administrateur Judiciaire » de RIG v2 (OPE_ORDRE_INSTANCE.cs:57-59, :119-154) : l'Id de la ligne ne disait pas le mode ;
+    // mesure : PROC_PREAUD.gestes bloc 10, rouge sans ce suffixe, vert avec.
+    internal const string SuffixePc = "-PC";
+
+    /// <summary>L'Id d'une ligne est-il celui du mode P ? <paramref name="audience"/> : le numero de l'audience, sans le suffixe.</summary>
+    internal static bool ModePc(string id, out string audience)
+    {
+        var pc = id.EndsWith(SuffixePc, StringComparison.Ordinal);
+        audience = pc ? id[..^SuffixePc.Length] : id;
+        return pc;
+    }
 
     public IReadOnlyCollection<string> Criteres { get; } = [CritereDate, CritereChambre, CritereMode];
 
@@ -50,6 +75,7 @@ internal sealed class LecteurPreparationAudience : IRechercheEcran
     {
         // Mode C = cabinet ; A et P (« Procédures collectives ») = audience (ETP.cs:54-62).
         var cabinet = AudiencesV2.Mode(recherche.Critere(CritereMode)) == false;
+        var modePc = string.Equals(recherche.Critere(CritereMode)?.Trim(), ModeProceduresCollectives, StringComparison.OrdinalIgnoreCase);
         var (du, au) = cabinet
             ? await AudiencesV2.FenetreAsync(baseGreffe, aujourdhui, "INTERV_CAB_DATE_MIN_PREAUD", "INTERV_CAB_DATE_MAX_PREAUD", 3, 3, ct)
             : await AudiencesV2.FenetreAsync(baseGreffe, aujourdhui, "INTERV_AUD_DATE_MIN_PREAUD", "INTERV_AUD_DATE_MAX_PREAUD", 3, 3, ct);
@@ -60,16 +86,16 @@ internal sealed class LecteurPreparationAudience : IRechercheEcran
             filtre += $" AND ({AudiencesV2.Libelle}) LIKE @texte";
             parametres.Add(new SqlParameter("@texte", FormeLigne.Contient(recherche.Texte)));
         }
-        return await LectureEcran.LireAsync(baseGreffe, Requete.Replace("/*filtre*/", filtre), Ligne, ct, [.. parametres]);
+        return await LectureEcran.LireAsync(baseGreffe, Requete.Replace("/*filtre*/", filtre), r => Ligne(r, modePc), ct, [.. parametres]);
     }
 
-    private static LigneLue Ligne(SqlDataReader r)
+    private static LigneLue Ligne(SqlDataReader r, bool modePc)
     {
         var affaires = Convert.ToInt32(r["Affaires"], CultureInfo.InvariantCulture);
         var attribues = r["NumerosAttribues"] is true;
         var precisions = FormeLigne.Joindre($"{affaires} affaire{(affaires > 1 ? "s" : "")} au rôle",
                                             attribues ? "numéros d'appel attribués" : "numéros d'appel à attribuer");
         return new LigneLue(FormeLigne.Texte(r, "Audience"), precisions, r["EstAudience"] is true ? Audiences : Cabinets,
-                            attribues ? "EnCours" : "AFaire", []) { Id = FormeLigne.Texte(r, "Id") };
+                            attribues ? "EnCours" : "AFaire", []) { Id = FormeLigne.Texte(r, "Id") + (modePc ? SuffixePc : "") };
     }
 }

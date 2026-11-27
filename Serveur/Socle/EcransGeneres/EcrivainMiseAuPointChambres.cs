@@ -43,8 +43,25 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     que pour un type de decision qui porte une mesure liee (R_TYPEDECISI_TYPE_MESURE_LIE, OPE_DECISION_JUDICIAIRE_MJUDS.cs:487-494)
 ///     et n'en recopie en lot que le TYPE : une MESURE neuve sur l'instance et la decision, numero d'ordre 1, numero source neuf
 ///     (Mesure.CreateMesure, Mesure.cs:488-496 ; DecisionJudiciaire.Sauve, :1594-1598). Rien a saisir : le type de decision suffit ;
-///   - LA DEMANDE : creee par instance a l'ouverture et validee a la sauvegarde (ValidationSauver, PROC_MPCS.cs:769-772), sans
-///     facture en lot (MetierFacture = false, proc_mpcs.md:42) : le journal des gestes la remplace (decision du chef).
+///   - L'EDITION DE LA DECISION (DoGenererLesEditions hors VALIDATION_RESULTAT, PROC_MPCS.cs:757-762 ; GenererLesDemandesEdition,
+///     :1337-1346, instances dans l'ordre des roles) : chaque decision creee passe par DecisionJudiciaire.CreateDemandeEdition
+///     (DecisionJudiciaire.cs:1640-1705). Sans code-barre en lot (la case n'est visible qu'en affaire unique,
+///     OPE_DECISION_JUDICIAIRE_MJUDS.cs:640-646 : EditCodeBarreCoche faux), le reglage d'edition du type (R_TYPEDECISI_PARAMETRE_EDITION)
+///     donne la demande d'edition (CreateDemandeEditionByParametreGeneration, DemandeEdition.cs : null si le reglage n'existe pas) :
+///     source DECI_JUDICIAIRE et numero source de la decision, libelle du document (LIBELLE_DOCUMENT du reglage, sinon PRMED_LIBELLE :
+///     ParametreEdition.LibelleDocument), code CFE-CP et nature Tribunal digital du reglage, libelle source = le type de decision,
+///     LISTE_ENTITE_DESTINATION = les destinataires de l'instance (DestinatairesEditionsLot2.listeEntites = RecupDestEditLot2(true) :
+///     le document interne COCHE en tete, SetDocumentInterneVisibility(true), DestinatairesEditionsLot2.cs:147-156, puis les autres
+///     decoches), le courriel du premier coche (le document interne : aucun). Les parametres du reglage passent sur la colonne qu'ils
+///     nomment, le reste dans DMNED_PARAMETRE_GENERATION (CorrigeParametre, DemandeEditionPourServices.cs:514-540 : la regle de
+///     EditionsEvenementV2.DeposerAsync), puis CreateDemandeEdition repose le libelle et le groupage automatique (DemandeEdition.cs:
+///     554-558) : un reglage a GROUPAGE_AUTOMATIQUE="0" reste groupe. Elle entre dans la file des editions en phase « C », ecrite
+///     par DeposerAsync comme les editions du renvoi. Un type sans reglage n'a pas d'edition : 121 des 350 types utilisables en
+///     saisie de RIG_DEV en portent un (lu le 27/11/2026) ;
+///   - LA DEMANDE : creee par instance a l'ouverture et validee a la sauvegarde (LockInstances, :1019-1037 ; ValidationSauver,
+///     :769-772), sans facture en lot (MetierFacture = false, proc_mpcs.md:42). L'edition de la decision s'y rattache : pour une
+///     instance qui recoit une edition, la demande MPCS s'ecrit comme celle du renvoi (EcrivainRetourAudience.DemandeAsync) ; pour les
+///     autres, elle n'est qu'une trace et le journal des gestes la remplace (decision du chef).
 ///
 /// CE QUE LA V3 NE REPREND PAS (nomme, rien en silence, avec la raison) :
 ///   - le CALENDRIER de procedure (:1218-1229 ; AffectCalendrier, :1579-1610) : RIG v2 recopie sur chaque instance la LISTE des
@@ -53,6 +70,11 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     se lit avec l'objet, il ne se saisit pas) : sans cette saisie, il n'y a pas de calendrier a ecrire ;
 ///   - les details de la mesure (juge, expert, dates : OPE_LIEN_DJ_MESURE) : en lot, RIG v2 ne les recopie pas non plus (:1619-1625) ;
 ///   - la numerotation des minutes, reservee aux instances de juge-commissaire (EJC_GenererNumeroMinute, :830-870 : aucune PC) ;
+///   - pour l'edition de la decision : les destinataires PC, prevention, parties, avocats, juges et instances liees de la liste
+///     (RecupDestEditLot2FROMInstance, DestinatairesEditionsLot2.cs:1232-1519) -- la liste ne porte que le document interne coche et
+///     les destinataires institutionnels decoches, comme les editions du renvoi (EditionsEvenementV2.cs, en tete) ; le choix d'une
+///     maquette pour un type sans reglage d'edition (CodeMaquetteSaisi, OPE_DECISION_JUDICIAIRE_MJUDS.cs:120-126, :846-856 : en lot
+///     d'instances de juge-commissaire seulement) : sans champ a l'ecran, aucune edition, comme RIG v2 quand rien n'est choisi ;
 ///   - le brouillon REDA et le lancement de PROC_REDA (document genere, :918-983), les publicites de la « validation avec pub »
 ///     (BODACC, JAL) et la mise a jour RPVA (UpdateRPVA) : services externes, qu'un ecran de la V3 n'appelle jamais ;
 ///   - la validation d'UNE affaire (mode SingleInstance : parties, evenements, facturation), qui passe par les ecrans de l'affaire.
@@ -64,6 +86,9 @@ internal sealed class EcrivainMiseAuPointChambres : IEcrivainEcran
     public string Ecran => "Mise au point chambres";
 
     public IReadOnlyCollection<TypeGeste> Gestes { get; } = [TypeGeste.Decider];
+
+    /// <summary>Le code du processus (PROC_MPCS.cs:266), celui de ses demandes.</summary>
+    internal const string CodeProcessus = "MPCS";
 
     /// <summary>Le geste (le Valider du descripteur, Surveiller.cs) et ses parametres, au mot pres.</summary>
     internal const string Valider = "Valider la décision", ParametreResultat = "Résultat", ParametreType = "Type de décision",
@@ -161,10 +186,16 @@ internal sealed class EcrivainMiseAuPointChambres : IEcrivainEcran
             return IssueGeste.Refuser($"« {ParametreClassement} » se rapporte au prochain appel : saisissez aussi la « {ParametreProchaine} ».");
 
         // Les ecritures, appel par appel, dans l'ordre de ApplyModifications (mode multi, PROC_MPCS.cs:1204-1251).
+        // fix-ok: contrôle du lot 7 (27/11/2026) -- « Valider la décision » créait la décision sans son édition et ne le disait pas
+        // (DoGenererLesEditions, PROC_MPCS.cs:757-762 ; GenererLesDemandesEdition, :1337-1346) ; mesure : PROC_MPCS.gestes, bloc 27
+        // rouge sans EditionDecisionAsync (aucune ligne DECI_JUDICIAIRE, aucune demande MPCS), vert avec ; bloc 12 (T17 sans
+        // réglage) : aucune édition, aucune demande.
         var traces = new List<TraceGeste>();
         var ids = new List<string>();
         var decisions = 0;
         var appeles = 0;
+        var demandes = new Dictionary<int, (int Id, string Numero, string Role)>();
+        var editions = new List<(string Role, int IdDemande, EditionsEvenementV2.Edition Edition)>();
         foreach (var a in appels)
         {
             ids.Add(a.Id.ToString(CultureInfo.InvariantCulture));
@@ -177,10 +208,35 @@ internal sealed class EcrivainMiseAuPointChambres : IEcrivainEcran
             }
             if (saisiType.Length > 0 && a.Deliberees == 0)
             {
-                traces.AddRange(await CreerDecisionAsync(geste, a.IdInstance, a.Role, saisiType, datePrevue, mesureLiee, ct));
+                var decision = await CreerDecisionAsync(geste, a.IdInstance, a.Role, saisiType, datePrevue, mesureLiee, ct);
+                traces.AddRange(decision.Traces);
                 decisions++;
+                // L'edition de la decision, rattachee a la demande MPCS de l'instance (en tete : L'EDITION DE LA DECISION, LA DEMANDE).
+                if (await EditionDecisionAsync(geste, saisiType, decision.NumeroSource, ct) is { } edition)
+                {
+                    if (!demandes.TryGetValue(a.IdInstance, out var demande))
+                    {
+                        var (numero, refusNumero) = await CreationV2.NumeroAsync(geste, "DMD", geste.Maintenant.Year, ct);
+                        if (numero is null) return IssueGeste.Refuser(refusNumero!);
+                        var instance = await EcrivainRetourAudience.LireInstanceAsync(geste, a.IdInstance, ct);
+                        demandes[a.IdInstance] = demande =
+                            (await EcrivainRetourAudience.DemandeAsync(geste, CodeProcessus, a.IdInstance, a.Role, instance, numero, ct), numero, a.Role);
+                    }
+                    editions.Add((a.Role, demande.Id, edition));
+                }
             }
         }
+        // Les editions dans la file, instance par instance dans l'ordre des roles (GenererLesDemandesEdition, PROC_MPCS.cs:1339).
+        var deposees = new Dictionary<int, List<int>>();
+        foreach (var (_, idDemande, e) in editions.OrderBy(x => x.Role, StringComparer.Ordinal))
+        {
+            var depot = await EditionsEvenementV2.DeposerAsync(geste, idDemande, e, ct);
+            if (!deposees.TryGetValue(idDemande, out var liste)) deposees[idDemande] = liste = [];
+            liste.Add(depot.Id);
+        }
+        foreach (var demande in demandes.Values)
+            traces.Add(new TraceGeste("affaire", $"la demande {demande.Numero} du rôle {demande.Role}", demande.Id.ToString(CultureInfo.InvariantCulture),
+                "a cree", null, new { Demande = demande.Numero, Processus = CodeProcessus, Editions = deposees.GetValueOrDefault(demande.Id) ?? [] }));
         var n = appels.Count;
         if (traces.Count == 0)
         {
@@ -203,6 +259,8 @@ internal sealed class EcrivainMiseAuPointChambres : IEcrivainEcran
                 : $"{decisions} décision{(decisions > 1 ? "s" : "")} {saisiType} créée{(decisions > 1 ? "s" : "")}"
                   + (mesureLiee is null ? "" : $" avec sa mesure {mesureLiee}")
                   + (decisions < n ? $", {n - decisions} déjà délibérée{(n - decisions > 1 ? "s" : "")}" : ""));
+        if (editions.Count > 0)
+            morceaux.Add(editions.Count == 1 ? "1 édition placée dans la file des éditions" : $"{editions.Count} éditions placées dans la file des éditions");
         var message = string.Join(" ; ", morceaux);
         return IssueGeste.Ecrit(char.ToUpperInvariant(message[0]) + message[1..] + ".", [.. ids], [.. traces]);
     }
@@ -293,9 +351,10 @@ internal sealed class EcrivainMiseAuPointChambres : IEcrivainEcran
     // fix-ok: controle du lot 7 (26/11/2026) -- le renvoi du retour d'audience doit ecrire la meme decision (PROC_MJUDS.cs:1186-1193) :
     // cette ecriture est partagee plutot que recopiee. Second controle : la composition, le prochain appel et la mesure liee
     // s'ecrivent comme PROC_MPCS (:1204-1251, :1617-1627) ; seul le calendrier reste, raison mesuree (commun.tsx:374).
-    internal static async Task<IReadOnlyList<TraceGeste>> CreerDecisionAsync(GesteEnCours geste, int idInstance, string role, string type,
-                                                                             DateTime? datePrevue, string? mesureLiee, CancellationToken ct)
+    internal static async Task<DecisionCreee> CreerDecisionAsync(GesteEnCours geste, int idInstance, string role, string type,
+                                                                 DateTime? datePrevue, string? mesureLiee, CancellationToken ct)
     {
+        var numeroSource = Guid.NewGuid().ToString().ToUpperInvariant();
         int ordre;
         await using (var r = await geste.LireAsync("SELECT ISNULL(MAX(DCJDC_NUM_ORDRE), 0) + 1 FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_INSTN = @i", ct,
                          new SqlParameter("@i", idInstance)))
@@ -306,7 +365,7 @@ internal sealed class EcrivainMiseAuPointChambres : IEcrivainEcran
         var id = await geste.InsererAsync("v2.DECISION_JUDICIAIRE", "DCJDC_ID_DCJDC", new Dictionary<string, object?>
         {
             ["DCJDC_ID_INSTN"] = idInstance, ["DCJDC_NUM_ORDRE"] = (short)ordre, ["DCJDC_TYPE_DECISION"] = type, ["DCJDC_DATE_PREVUE"] = datePrevue,
-            ["DCJDC_NUMERO_SOURCE"] = Guid.NewGuid().ToString().ToUpperInvariant(),
+            ["DCJDC_NUMERO_SOURCE"] = numeroSource,
             // Le constructeur de DecisionJudiciaire (DecisionJudiciaire.cs:305-322).
             ["DCJDC_CAT_DECISION"] = "I", ["DCJDC_EXECUTION_PROVISOIRE"] = "0", ["DCJDC_RESSORT"] = "0", ["DCJDC_AVANT_DIRE_DROIT"] = "0",
             ["DCJDC_CONTRADICTOIRE"] = "0", ["DCJDC_ETAT_REDACTION"] = "0", ["DCJDC_ETAT_DIFFUSION"] = "0", ["DCJDC_ETAT_STABILITE"] = "0",
@@ -316,7 +375,7 @@ internal sealed class EcrivainMiseAuPointChambres : IEcrivainEcran
         }, ct);
         var decision = new TraceGeste("affaire", $"la décision du rôle {role}", id.ToString(CultureInfo.InvariantCulture), "a cree", null,
             new { Instance = role, Type = type, DatePrevue = datePrevue, NumOrdre = ordre });
-        if (mesureLiee is null) return [decision];
+        if (mesureLiee is null) return new DecisionCreee(id, numeroSource, [decision]);
         // La mesure du type lie (Mesure.CreateMesure, Mesure.cs:488-496 : numero source neuf, numero d'ordre 1, type) ; l'instance et
         // la decision lui sont posees a la sauvegarde de la decision (DecisionJudiciaire.Sauve, DecisionJudiciaire.cs:1594-1598).
         var idMesure = await geste.InsererAsync("v2.MESURE", "MSINS_ID_MSINS", new Dictionary<string, object?>
@@ -324,8 +383,47 @@ internal sealed class EcrivainMiseAuPointChambres : IEcrivainEcran
             ["MSINS_ID_INSTN"] = idInstance, ["MSINS_ID_DCJDC"] = id, ["MSINS_NUM_ORDRE"] = (short)1, ["MSINS_TYPE_MESURE"] = mesureLiee,
             ["MSINS_NUMERO_SOURCE"] = Guid.NewGuid().ToString().ToUpperInvariant(),
         }, ct);
-        return [decision, new TraceGeste("affaire", $"la mesure de la décision du rôle {role}", idMesure.ToString(CultureInfo.InvariantCulture),
-            "a cree", null, new { Instance = role, Decision = id, Type = mesureLiee })];
+        return new DecisionCreee(id, numeroSource, [decision, new TraceGeste("affaire", $"la mesure de la décision du rôle {role}",
+            idMesure.ToString(CultureInfo.InvariantCulture), "a cree", null, new { Instance = role, Decision = id, Type = mesureLiee })]);
+    }
+
+    /// <summary>La decision ecrite : son id, son numero source (la source de son edition) et ses traces.</summary>
+    internal sealed record DecisionCreee(int Id, string NumeroSource, IReadOnlyList<TraceGeste> Traces);
+
+    /// <summary>
+    /// L'edition de la decision du type <paramref name="type"/> (DecisionJudiciaire.CreateDemandeEdition sans code-barre,
+    /// DecisionJudiciaire.cs:1656-1678 ; en tete : L'EDITION DE LA DECISION) ; null si le type n'a pas de reglage d'edition ou si ce
+    /// reglage n'est pas dans la base (CreateDemandeEditionByParametreGeneration rend null), comme RIG v2 sans maquette choisie.
+    /// </summary>
+    internal static async Task<EditionsEvenementV2.Edition?> EditionDecisionAsync(GesteEnCours geste, string type, string numeroSource, CancellationToken ct)
+    {
+        string code;
+        await using (var r = await geste.LireAsync("SELECT R_TYPEDECISI_PARAMETRE_EDITION FROM v2.TYPE_DECISION WHERE R_TYPEDECISI_VALEUR = @t", ct,
+                         new SqlParameter("@t", type)))
+            code = await r.ReadAsync(ct) ? FormeLigne.Texte(r, "R_TYPEDECISI_PARAMETRE_EDITION") : "";
+        if (code.Length == 0) return null;                                                     // R_TYPEDECISI_PARAMETRE_EDITION != "" (:1661)
+        if (await EditionsV2.ParametreAsync(geste, code, ct) is not { } parametre) return null;
+        var reglage = await EditionsEvenementV2.ReglageEditionAsync(geste, code, ct);
+        var parametres = reglage?.Parametres ?? new SortedDictionary<string, string>(StringComparer.Ordinal);
+        // listeEntites (DestinatairesEditionsLot2.cs:59-63) : le document interne coche en tete, puis les destinataires decoches.
+        var destinataires = new List<EditionsEvenementV2.Destinataire> { new() { ParDefaut = "1" } };
+        destinataires.AddRange(await EditionsEvenementV2.DestinatairesInstanceAsync(geste, ct));
+        var edition = new EditionsEvenementV2.Edition
+        {
+            Parametres = parametres, Destinataires = destinataires, Impression = true, TypeGeneration = parametre.TypeGeneration,
+            // ParametreEdition.LibelleDocument : LIBELLE_DOCUMENT du reglage, sinon PRMED_LIBELLE.
+            LibelleImpose = parametres.TryGetValue("LIBELLE_DOCUMENT", out var libelle) && libelle.Length > 0 ? libelle : parametre.Libelle,
+            LibelleSource = type,                                                                // DMNED_LIBELLE_SOURCE (:1666)
+            Courriel = destinataires.First(x => x.ParDefaut == "1").Email,                       // :1672-1676
+        };
+        // Pose apres les parametres : le groupage de CreateDemandeEdition (DemandeEdition.cs:558), la source et le reglage
+        // (CreateDemandeEditionByParametreGeneration : DMNED_CODE_ENTITE_SOURCE, DMNED_VALEUR_ID_SOURCE, CFE-CP, Tribunal digital).
+        edition.Colonnes["DMNED_GROUPAGE_AUTOMATIQUE"] = true;
+        edition.Colonnes["DMNED_CODE_ENTITE_SOURCE"] = "DECI_JUDICIAIRE";
+        edition.Colonnes["DMNED_VALEUR_ID_SOURCE"] = numeroSource;
+        edition.Colonnes["DMNED_CODE_CFECP"] = parametre.Cfecp;
+        edition.Colonnes["DMNED_TRIBUNAL_DIGITAL_NATURE_DOC"] = parametre.NatureTribunalDigital;
+        return edition;
     }
 
     /// <summary>Le type de mesure lie au type de decision (R_TYPEDECISI_TYPE_MESURE_LIE) : RIG v2 montre et joint une mesure de ce type

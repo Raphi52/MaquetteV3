@@ -36,6 +36,23 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// avec la MESURE du type lie au type de decision quand il en porte un (AffectDecisionJudiciaire et GetMesureSaisie,
 /// PROC_MJUDS.cs:1499-1509, :1365-1373 ; R_TYPEDECISI_TYPE_MESURE_LIE, OPE_DECISION_JUDICIAIRE_MJUDS.cs:487-494).
 /// Mesure du 26/11/2026 (SQL-DEV\DEV, RIG_DEV) : aucun des 250 codes de renvoi n'y est prononce ni delibere, l'etape n'y est jamais ouverte.
+/// L'EVENEMENT DU CODE au renvoi : PROC_MJUDS cree l'evenement survenu du code a la date de l'audience (OPE_RESULTAT.cs:857-908) et,
+/// par lui, son evenement FUTUR lie (OPE_EVENEMENT.cs:1587-1608), puis les copie sur chaque instance (AffectEvenementProcedure,
+/// PROC_MJUDS.cs:1210, :1557-1576) : les deux sont ecrits par EvenementsProcedureV2.SurvenuAsync (calcul des dates en tete de
+/// EvenementsProcedureV2.cs). Mesure du 26/11/2026 (RIG_DEV) : 246 des 250 codes de renvoi portent un evenement, aucun de ces evenements n'a de code
+/// futur -- sur la copie de dev, un renvoi n'ecrit donc que le survenu ; le futur se prouve au banc (PROC_RETAUD.gestes).
+/// LA DEMANDE (« Renvoyer » seulement) : PROC_MJUDS cree une demande MJUDS par instance a son ouverture et la valide a la sauvegarde
+/// (LockInstances, PROC_MJUDS.cs:986-1004, :760) ; les editions s'y rattachent (DemandeAsync). « Marquer » n'en cree pas.
+/// LA FACTURE ET LES EDITIONS de chaque evenement ecrit, le survenu puis son futur (PROC_MJUDS.cs:744-747, :1273-1281) : un article a
+/// facturer refuse le renvoi avec son nom (EvenementsProcedureV2.FactureNonRepriseAsync : la V3 n'a pas de moteur de facturation) ;
+/// les editions se calculent par EditionsEvenementV2 (maquettes CEP_EDITION du code, destinataires, source « EP n° <rang> »), sans
+/// groupage automatique (:1278), et vont dans la file des editions, instance par instance dans l'ordre des roles (:1259). Une branche
+/// que EditionsEvenementV2 ne calcule pas refuse le renvoi avec son nom -- d'abord les destinataires PARTIES et AVOCATS de l'instance
+/// (D, F, I, AVx, POx, PLx : RecupDestEditLot2FROMInstance, DestinatairesEditionsLot2.cs:1232-1519), et les envois LRAR. Rien n'est
+/// enregistre a moitie : un renvoi sans ses convocations ne s'ecrit pas. Mesure du 27/11/2026 (RIG_DEV) : 180 des 250 codes de renvoi
+/// utilisables en saisie portent des editions, presque toutes vers les parties ou les avocats (AVF : 86 codes, AVD;AVF;AVI : 33,
+/// D;POD;F;POF : 22 dont RCAB, D,LRAR;POD;F,LRAR;POF : 11 ; aucun n'a que des destinataires repris) -- ceux-la se renvoient encore
+/// dans RIG v2 ; les 70 autres n'ont ni edition ni article : la V3 les renvoie.
 /// LE VERROU (« Renvoyer » seulement) : PROC_MJUDS verrouille chaque instance a son ouverture (PROC_MJUDS.cs:210, LockInstances
 /// :959-1034) ; une instance tenue par une autre demande est refusee aux messages de RIG v2 (:1014-1027), ceux de la mise au point
 /// des chambres (EcrivainMiseAuPointChambres.RefusVerrouAsync). « Marquer » ecrit sans PROC_MJUDS, depuis la grille
@@ -48,19 +65,20 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// (R_CHAMBRE_AVEC_COMPO).
 ///
 /// CE QUE LA V3 NE REPREND PAS (nomme, rien en silence, avec la raison) :
-///   - la demande V2 de PROC_MJUDS (creee et validee d'un coup, sans facture pour un renvoi) : le journal des gestes la remplace ;
-///   - au RENVOI, l'evenement FUTUR lie a l'evenement du code (creationEvenementFutur, EvenementProcedure.cs:1769-1806 : code
-///     R_CODEEVEPRO_CODE_EVE_PRO_FUTUR, dates en mois, jours ou semaines, Outils.cs:520-) que PROC_MJUDS enregistre
-///     (AffectEvenementProcedure, PROC_MJUDS.cs:1210) : aucun ecrivain V3 ne porte encore ce calcul. Pour « Marquer », RIG v2 ne
-///     l'enregistre pas : seuls l'appel et l'evenement survenu sont sauves (OPE_LIST_APPEL_AFFAIRE.cs:2254, :2263-2268), et
-///     EvenementProcedure.Sauve (:2218-) ne sauve pas les evenements lies. Le texte de l'evenement (ConstructionTexte) non plus ;
+///   - l'arrivee et la ligne du rapport general de la demande MJUDS (Demande.cs:480, :512) : la V3 ne les ecrit pour aucune demande
+///     (CreationV2.CreerDemandeAsync) ; ni le sequenceur « 2W » que portent les demandes MJUDS des instances d'injonction de RIG_DEV,
+///     absent du code de PROC_MJUDS (seuls 2J, 2P et 2R, :995-1002) ;
+///   - pour « Marquer », l'evenement FUTUR lie a l'evenement du code : RIG v2 le calcule en memoire (AddEvenementProcedureSurvenu,
+///     IEntiteJudiciaire.cs:132-151, :144) mais ne l'enregistre pas -- seuls l'appel et l'evenement survenu sont sauves
+///     (OPE_LIST_APPEL_AFFAIRE.cs:2254, :2263-2268), et EvenementProcedure.Sauve (:2218-) ne sauve pas les evenements lies. Le texte
+///     de l'evenement (ConstructionTexte) non plus (EvenementsProcedureV2.cs) ;
 ///   - le CALENDRIER de procedure (PROC_MJUDS.cs:1163-1174 ; AffectCalendrier, :1461-1497) : RIG v2 recopie la LISTE des etapes que
 ///     l'agent a saisies (GetEtapesCalendrierSaisies, :1313-), une operation par etape. Un ecran genere ne saisit pas de sous-liste
 ///     (web/src/ecrans/formes/commun.tsx:374) : sans cette saisie, il n'y a pas de calendrier a ecrire ;
-///   - les EDITIONS (GenererLesDemandesEdition, PROC_MJUDS.cs:1257-1284) : celle de la decision (DecisionJudiciaire.CreateDemandeEdition)
-///     et celles des evenements (EvenementProcedure.CreateDemandeEdition, EvenementProcedure.cs:2607, puis GetAllEditions, :2801 :
-///     maquettes CEP_EDITION du code et destinataires de l'instance). La V3 sait ecrire une demande d'edition a parametre connu
-///     (EcrivainRelancesComptesAnnuels), pas calculer les editions d'un evenement ou d'une decision ;
+///   - l'EDITION DE LA DECISION creee au renvoi (GenererLesDemandesEdition, PROC_MJUDS.cs:1261-1271 ; DecisionJudiciaire.
+///     CreateDemandeEdition, DecisionJudiciaire.cs:1640-) : son reglage vient du type de decision et ses destinataires sont tous ceux de
+///     l'instance, parties comprises, que la V3 ne reprend pas. Mesure du 26/11/2026 (RIG_DEV) : aucun code de renvoi n'ouvre la
+///     decision, ce cas n'y arrive pas ;
 ///   - la reponse RPVA aux demandes de renvoi (OPE_RESULTAT.cs:627-650) : service externe ; le controle des deliberes repousses et
 ///     son courriel a la hotline (:571-603) : courriel externe.
 /// </summary>
@@ -126,7 +144,7 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
         {
             var code = j.Compatibles.Contains(Traduit(a.TypeInstance)) ? j : o.Compatibles.Contains(Traduit(a.TypeInstance)) ? o : null;
             if (code is null) { ignores.Add(a.Role); continue; }
-            traces.Add(await PoserResultatAsync(geste, a, code, ct));
+            traces.Add((await PoserResultatAsync(geste, a, code, avecFutur: false, ct)).Trace);
             ids.Add(a.Id.ToString(CultureInfo.InvariantCulture));
         }
         if (traces.Count == 0)
@@ -159,6 +177,9 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
         // fix-ok: second controle du lot 7 (26/11/2026) -- « Renvoyer » sautait deux controles de PROC_MJUDS lus dans le code V2 : le
         // verrou des instances (:210, :959-1034) et l'appel deja a venir (:1176-1182) ; et la mesure liee au type de decision
         // (:1499-1509) ; une cause par remplacement (verrou, boucle d'ecriture, aides partagees avec la mise au point des chambres).
+        // fix-ok: relance du lot 7 (27/11/2026) -- « Renvoyer » n'ecrivait pas l'evenement FUTUR lie que PROC_MJUDS copie avec le
+        // survenu (PROC_MJUDS.cs:1557-1576) ; mesure : PROC_RETAUD.gestes, blocs R17E et R17D rouges (3 echecs) avec avecFutur: false,
+        // verts avec avecFutur: true. Calcul ecrit une fois dans EvenementsProcedureV2.cs (en-tete, appel, trace).
         var saisiType = geste.Demande.Valeurs.TryGetValue(ParametreType, out var t) ? t.Trim() : "";
         var saisiDatePrevue = geste.Demande.Valeurs.TryGetValue(ParametreDatePrevue, out var dp) ? dp.Trim() : "";
         DateTime? datePrevue = null;
@@ -195,14 +216,41 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
             (idProchaine, libelleProchaine) = trouvees[0];
         }
 
+        // fix-ok: troisieme controle du lot 7 (27/11/2026) -- « Renvoyer » n'ecrivait ni la demande de PROC_MJUDS ni les editions de
+        // l'evenement du code (GenererLesDemandesEdition, PROC_MJUDS.cs:1273-1281) et ne le disait pas ; mesure : PROC_RETAUD.gestes,
+        // blocs 27 a 30 rouges sans la demande, les editions et le refus de la facture, verts avec.
+        // La demande de chaque instance, a l'ouverture de PROC_MJUDS (LockInstances, PROC_MJUDS.cs:986-1004), avant toute ecriture.
         var traces = new List<TraceGeste>();
+        var demandes = new Dictionary<int, (int Id, string Numero, InstanceRenvoi Instance)>();
+        foreach (var a in appels)
+        {
+            if (demandes.ContainsKey(a.IdInstance)) continue;
+            var instance = await LireInstanceAsync(geste, a.IdInstance, ct);
+            var (numero, refusNumero) = await CreationV2.NumeroAsync(geste, "DMD", geste.Maintenant.Year, ct);
+            if (numero is null) return IssueGeste.Refuser(refusNumero!);
+            demandes[a.IdInstance] = (await DemandeAsync(geste, CodeProcessus, a.IdInstance, a.Role, instance, numero, ct), numero, instance);
+        }
+
         var ids = new List<string>();
         var decisions = 0;
         var dejaAppelees = new List<string>();
+        var editions = new List<(string Role, int IdDemande, EditionsEvenementV2.Edition Edition)>();
         foreach (var a in appels)
         {
-            traces.Add(await PoserResultatAsync(geste, a, code, ct));
+            var (trace, evenement) = await PoserResultatAsync(geste, a, code, avecFutur: true, ct);
+            traces.Add(trace);
             ids.Add(a.Id.ToString(CultureInfo.InvariantCulture));
+            // La facture puis les editions de chaque evenement ecrit, le survenu et son futur (EvenementProcedureAffected,
+            // PROC_MJUDS.cs:1557-1576 ; DoGenererLesArticles :744-747, GenererLesDemandesEdition :1273-1281). Un refus annule tout.
+            var demande = demandes[a.IdInstance];
+            foreach (var eve in evenement?.Evenements ?? [])
+            {
+                if (await EvenementsProcedureV2.FactureNonRepriseAsync(geste, demande.Instance.Editions, eve.Code, "le renvoi", ct) is { } facture)
+                    return IssueGeste.Refuser(facture);
+                var calcul = await EditionsEvenementV2.CalculerAsync(geste, demande.Instance.Editions, eve, "le renvoi", ct);
+                if (calcul.NonRepris is { } nonRepris) return IssueGeste.Refuser(nonRepris);
+                editions.AddRange(calcul.Editions.Select(e => (a.Role, demande.Id, e)));
+            }
             // Le prochain appel, sauf a une instance deja appelee a une audience a venir (PROC_MJUDS.cs:1176-1182).
             if (idProchaine is { } adnc)
             {
@@ -212,10 +260,25 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
             // Pas de seconde decision sur un appel deja delibere (DecisionsJudiciairesDeliberés, PROC_MJUDS.cs:1189).
             if (saisiType.Length > 0 && await DelibereesAsync(geste, a.Id, ct) == 0)
             {
-                traces.AddRange(await EcrivainMiseAuPointChambres.CreerDecisionAsync(geste, a.IdInstance, a.Role, saisiType, datePrevue, mesureLiee, ct));
+                traces.AddRange((await EcrivainMiseAuPointChambres.CreerDecisionAsync(geste, a.IdInstance, a.Role, saisiType, datePrevue, mesureLiee, ct)).Traces);
                 decisions++;
             }
         }
+        // Les editions dans la file, instance par instance dans l'ordre des roles (InstanceModifieurs.OrderBy(INSTN_NUM_ROLE),
+        // PROC_MJUDS.cs:1259), sans groupage automatique (:1278).
+        var deposees = new Dictionary<int, List<int>>();
+        foreach (var (_, idDemande, e) in editions.OrderBy(x => x.Role, StringComparer.Ordinal))
+        {
+            e.Colonnes["DMNED_GROUPAGE_AUTOMATIQUE"] = false;
+            var depot = await EditionsEvenementV2.DeposerAsync(geste, idDemande, e, ct);
+            if (!deposees.TryGetValue(idDemande, out var liste)) deposees[idDemande] = liste = [];
+            liste.Add(depot.Id);
+        }
+        foreach (var (idInstance, demande) in demandes)
+            traces.Add(new TraceGeste("affaire", $"la demande {demande.Numero} du rôle {demande.Instance.Editions.Role}",
+                demande.Id.ToString(CultureInfo.InvariantCulture), "a cree", null,
+                new { Demande = demande.Numero, Processus = CodeProcessus, Editions = deposees.GetValueOrDefault(demande.Id) ?? [] }));
+
         var n = appels.Count;
         var message = $"{n} affaire{(n > 1 ? "s" : "")} renvoyée{(n > 1 ? "s" : "")} ({code.Code})" + (libelleProchaine is null ? "" : $" à l'{libelleProchaine}");
         if (dejaAppelees.Count > 0)
@@ -225,7 +288,68 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
                 : $" ; {decisions} décision{(decisions > 1 ? "s" : "")} {saisiType} créée{(decisions > 1 ? "s" : "")}"
                   + (mesureLiee is null ? "" : $" avec sa mesure {mesureLiee}")
                   + (decisions < n ? $", {n - decisions} déjà délibérée{(n - decisions > 1 ? "s" : "")}" : "");
+        if (editions.Count > 0)
+            message += editions.Count == 1 ? " ; 1 édition placée dans la file des éditions" : $" ; {editions.Count} éditions placées dans la file des éditions";
         return IssueGeste.Ecrit(message + ".", [.. ids], [.. traces]);
+    }
+
+    /// <summary>Le code du processus du renvoi en masse (PROC_MJUDS.Designer.cs:242), celui de ses demandes.</summary>
+    internal const string CodeProcessus = "MJUDS";
+
+    /// <summary>L'instance telle que la demande et les editions du renvoi la lisent (et celles de la mise au point des chambres,
+    /// EcrivainMiseAuPointChambres.cs).</summary>
+    internal sealed record InstanceRenvoi(int? IdAffaire, string NomCourant, string RepGeneral, int? IdPc, int? IdPrevention,
+                                         EditionsEvenementV2.Instance Editions);
+
+    internal static async Task<InstanceRenvoi> LireInstanceAsync(GesteEnCours geste, int idInstance, CancellationToken ct)
+    {
+        await using var r = await geste.LireAsync("""
+            SELECT INSTN_NUM_ROLE, INSTN_ID_AFFRE, INSTN_NOM_COURANT, INSTN_NUM_REP_GENERAL, INSTN_ID_PRCLL, INSTN_ID_PREVE, INSTN_NUMERO_SOURCE,
+                   INSTN_NATURE_AFFAIRE, INSTN_NAT_AFF_PART, INSTN_CODE_ACTE_PROCE
+            FROM v2.INSTANCE WHERE INSTN_ID_INSTN = @i
+            """, ct, new SqlParameter("@i", idInstance));
+        await r.ReadAsync(ct);
+        string? Texte(string c) => FormeLigne.Texte(r, c) is { Length: > 0 } t ? t : null;
+        int? Id(string c) => r[c] is DBNull ? null : Convert.ToInt32(r[c], CultureInfo.InvariantCulture);
+        return new InstanceRenvoi(Id("INSTN_ID_AFFRE"), FormeLigne.Texte(r, "INSTN_NOM_COURANT"), FormeLigne.Texte(r, "INSTN_NUM_REP_GENERAL"),
+            Id("INSTN_ID_PRCLL"), Id("INSTN_ID_PREVE"),
+            new EditionsEvenementV2.Instance(idInstance, FormeLigne.Texte(r, "INSTN_NUM_ROLE"), Texte("INSTN_NUMERO_SOURCE"),
+                                             Texte("INSTN_NATURE_AFFAIRE"), Texte("INSTN_NAT_AFF_PART"), Texte("INSTN_CODE_ACTE_PROCE")));
+    }
+
+    /// <summary>
+    /// La demande de PROC_MJUDS pour une instance (LockInstances, PROC_MJUDS.cs:986-1004 ; Instance.CreateAndLockDemande ;
+    /// Demande.CreateDemande(idAffaire, nom, indicatif, code), Demande.cs:476-535) : l'affaire de l'instance, son nom courant, son role
+    /// en numero indicatif, « role repertoire » en numeros (string.Join(" ", ...), :993), au code MJUDS, numerotee dans la serie DMD,
+    /// validee a la sauvegarde (Cloturer(Validee), :760) donc ecrite a l'etat « V » ; ses dossiers : 2J = l'instance, puis 2P = sa PC,
+    /// sinon 2R = sa prevention (:995-1002). Lu dans RIG_DEV le 27/11/2026 : DMND_CODE_PROSS = 'MJUDS', etat V, DMND_ID_AFFRE pose ;
+    /// 15 563 des 34 948 demandes MJUDS portent des editions. La mise au point des chambres cree la sienne de meme, au code MPCS
+    /// (LockInstances, PROC_MPCS.cs:1019-1037 : CreateAndLockDemande, indicatif = role, numeros = role et repertoire, 2J puis 2P
+    /// sinon 2R), pour y rattacher l'edition de la decision (EcrivainMiseAuPointChambres.cs).
+    /// </summary>
+    // fix-ok: contrôle du lot 7 (27/11/2026) -- « Valider la décision » de PROC_MPCS créait la décision sans son édition, faute
+    // de demande MPCS où la rattacher (DecisionJudiciaire.CreateDemandeEdition(idDemande…), PROC_MPCS.cs:1337-1346) : cette demande
+    // est la même que celle du renvoi, d'où le code processus et l'instance en paramètres ; le renvoi garde « MJUDS ».
+    internal static async Task<int> DemandeAsync(GesteEnCours geste, string codeProcessus, int idInstance, string role, InstanceRenvoi instance,
+                                                 string numero, CancellationToken ct)
+    {
+        var id = await CreationV2.InsererAsync(geste, "v2.DEMANDE", "DMND_ID_DMND", new Dictionary<string, object?>
+        {
+            ["DMND_NUM_DEMANDE"] = numero, ["DMND_ETAT_DEMANDE"] = "V", ["DMND_CODE_PROSS"] = codeProcessus, ["DMND_DATE_CREATION"] = geste.Maintenant,
+            ["DMND_EN_COURS"] = false, ["DMND_NOM_UTILISATEUR"] = geste.Agent.NomAffiche, ["DMND_NOM"] = instance.NomCourant,
+            ["DMND_NUM_INDICATIF"] = role, ["DMND_LES_NUMEROS"] = string.Join(" ", role, instance.RepGeneral),
+            ["DMND_ID_AFFRE"] = instance.IdAffaire,
+        }, ct);
+        var dossiers = new List<(string Sequenceur, int Valeur)> { (VerrouDemandeV2.SequenceurInstance, idInstance) };
+        if (instance.IdPc is { } pc) dossiers.Add(("2P", pc));
+        else if (instance.IdPrevention is { } prevention) dossiers.Add(("2R", prevention));
+        foreach (var (sequenceur, valeur) in dossiers)
+            await geste.InsererAsync("v2.DOSSIER_DEMANDE", "DSSDM_ID_DSSDM", new Dictionary<string, object?>
+            {
+                ["DSSDM_ID_DMND"] = id, ["DSSDM_CODE_SEQUENCEUR"] = sequenceur,
+                ["DSSDM_VALEUR_SEQUENCEUR"] = valeur.ToString(CultureInfo.InvariantCulture),
+            }, ct);
+        return id;
     }
 
     /// <summary>Les decisions deja deliberees de l'appel (AppelAffaire.DecisionsJudiciairesDeliberés, AppelAffaire.cs:315-322 :
@@ -303,51 +427,20 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
 
     // ------------------------------------------------------------------ LE RESULTAT D'UN APPEL
 
-    /// <summary>Pose le resultat <paramref name="code"/> sur l'appel (code plumitif, etat de retour) et l'evenement du code.</summary>
-    private static async Task<TraceGeste> PoserResultatAsync(GesteEnCours geste, Appel a, CodePlumitif code, CancellationToken ct)
+    /// <summary>Pose le resultat <paramref name="code"/> sur l'appel (code plumitif, etat de retour) et l'evenement du code, date de
+    /// l'audience ; avec <paramref name="avecFutur"/> (le renvoi, PROC_MJUDS), aussi son evenement futur lie (EvenementsProcedureV2).</summary>
+    private static async Task<(TraceGeste Trace, EvenementsProcedureV2.Ecrits? Evenement)> PoserResultatAsync(GesteEnCours geste, Appel a,
+        CodePlumitif code, bool avecFutur, CancellationToken ct)
     {
         var etat = code.Prononce ? "P" : "M";
         await geste.EcrireAsync("UPDATE v2.APPEL_AFFAIRE SET APPAF_CODE_PLUMITIF = @code, APPAF_ETAT_RETOUR = @etat WHERE APPAF_ID_APPAF = @id", ct,
             new SqlParameter("@code", code.Code), new SqlParameter("@etat", etat), new SqlParameter("@id", a.Id));
-        int? evenement = null;
-        if (code.CodeEvePro is { } eve) evenement = await EvenementSurvenuAsync(geste, a.IdInstance, eve, a.DateAudience?.Date, ct);
-        return new TraceGeste("affaire", $"l'appel du rôle {a.Role}", a.Id.ToString(CultureInfo.InvariantCulture), "a modifie",
+        EvenementsProcedureV2.Ecrits? evenement = null;
+        if (code.CodeEvePro is { } eve) evenement = await EvenementsProcedureV2.SurvenuAsync(geste, a.IdInstance, eve, a.DateAudience?.Date, avecFutur, ct);
+        return (new TraceGeste("affaire", $"l'appel du rôle {a.Role}", a.Id.ToString(CultureInfo.InvariantCulture), "a modifie",
             new { Resultat = a.CodePlumitif, EtatRetour = a.EtatRetour },
-            new { Resultat = code.Code, EtatRetour = etat, Evenement = code.CodeEvePro, IdEvenement = evenement });
-    }
-
-    /// <summary>Un evenement de procedure SURVENU sur l'instance, a la date donnee : celui du code plumitif, date de l'audience
-    /// (OPE_LIST_APPEL_AFFAIRE.cs:2253-2270), ou la citation de PROC_GCONV, date du jour (OPE_CITATIONS.cs:245) --
-    /// EvenementProcedure.CreateEvenementProcedure (EvenementProcedure.cs:1721-1757).</summary>
-    internal static async Task<int> EvenementSurvenuAsync(GesteEnCours geste, int idInstance, string codeEve, DateTime? date, CancellationToken ct)
-    {
-        string? type = null, nature = null, deposant = null;
-        var piece = false;
-        await using (var r = await geste.LireAsync("""
-            SELECT R_CODEEVEPRO_TYPE_EVE_PRO, CONVERT(bit, ISNULL(R_CODEEVEPRO_AVEC_PIECE_NUMERISE_INSMES, 0)) AS Piece,
-                   R_CODEEVEPRO_NATURE_DOC_GED, R_CODEEVEPRO_TYPE_DEPOSANT_GED
-            FROM v2.CODE_EVE_PRO WHERE R_CODEEVEPRO_VALEUR = @c
-            """, ct, new SqlParameter("@c", codeEve)))
-            if (await r.ReadAsync(ct))
-            {
-                type = FormeLigne.Texte(r, "R_CODEEVEPRO_TYPE_EVE_PRO") is { Length: > 0 } t ? t[..1] : null;
-                piece = r["Piece"] is true;
-                nature = FormeLigne.Texte(r, "R_CODEEVEPRO_NATURE_DOC_GED") is { Length: > 0 } n ? n : null;
-                deposant = FormeLigne.Texte(r, "R_CODEEVEPRO_TYPE_DEPOSANT_GED") is { Length: > 0 } dp ? dp : null;
-            }
-        int rang;
-        await using (var r = await geste.LireAsync("SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = @i", ct, new SqlParameter("@i", idInstance)))
-        {
-            await r.ReadAsync(ct);
-            rang = r.GetInt32(0) + 1;
-        }
-        return await CreationV2.InsererAsync(geste, "v2.EVENEMENT_PROCEDURE", "EVNPR_ID_EVNPR", new Dictionary<string, object?>
-        {
-            ["EVNPR_ID_INSTN"] = idInstance, ["EVNPR_CODE_EVE_PRO"] = codeEve, ["EVNPR_DATE"] = date, ["EVNPR_SURVENU"] = true,
-            ["EVNPR_DELAI_EXPIRE"] = false, ["EVNPR_NUMERO_SOURCE"] = Guid.NewGuid().ToString().ToUpperInvariant(), ["EVNPR_TYPE_EVE_PRO"] = type,
-            ["EVNPR_NUM_ORDRE"] = (short)rang, ["EVNPR_AVEC_PIECE_NUMERISE"] = piece,
-            ["EVNPR_NATURE_DOC_GED"] = piece ? nature : null, ["EVNPR_TYPE_DEPOSANT_GED"] = piece ? deposant : null,
-        }, ct);
+            new { Resultat = code.Code, EtatRetour = etat, Evenement = code.CodeEvePro, IdEvenement = evenement?.IdSurvenu,
+                  EvenementFutur = evenement?.CodeFutur, IdEvenementFutur = evenement?.IdFutur }), evenement);
     }
 
     // ------------------------------------------------------------------ LECTURES

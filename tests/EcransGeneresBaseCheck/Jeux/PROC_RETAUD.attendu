@@ -6,10 +6,11 @@
 # Groupes (FiltreAffichage, OPE_LIST_APPEL_AFFAIRE.cs:553-598) : 1700501 non traité et prononcé (TC17P) -> « Prononcés à traiter » ;
 # 1700503 non traité -> « Affaires à traiter » ; 1700502 traité -> « Affaires traitées » ; 1700504 traité avec une publicité en
 # attente -> « Publicités en attente ». Le prochain appel de 1700501 : son appel à J+1 (OPE_LIST_APPEL_AFFAIRE.cs:582).
-ALPHA AUD c/ BETA AUD | Rôle 2026J17001 · appel n° TC17P 1 · Audience du {J-10} à 09:00 - Chambre Première du banc (C17) · résultat à saisir · prochain appel le {J+1} | Prononcés à traiter | AFaire | []
-GAMMA AUD | Rôle 2026J17002 · appel n° TC17 2 · Audience du {J-10} à 09:00 - Chambre Première du banc (C17) · résultat R17S | Affaires traitées | Validee | []
-DELTA AUD | Rôle 2026J17003 · appel n° TC17 3 · Audience du {J-10} à 09:00 - Chambre Première du banc (C17) · résultat à saisir | Affaires à traiter | AFaire | []
-EPSILON AUD | Rôle 2026J17004 · appel n° TC17P 4 · Audience du {J-10} à 09:00 - Chambre Première du banc (C17) · résultat J | Publicités en attente | EnAttente | []
+# La colonne « Compo. » de la grille de RIG v2 (OPE_LIST_APPEL_AFFAIRE.cs:583) : « composition n° 1 » pour les appels qui portent la composition 1700201 ; PC MPCS AUD et PC TRAITEE AUD n'en ont pas (jumeaux sans composition).
+ALPHA AUD c/ BETA AUD | Rôle 2026J17001 · appel n° TC17P 1 · Audience du {J-10} à 09:00 - Chambre Première du banc (C17) · résultat à saisir · prochain appel le {J+1} · composition n° 1 | Prononcés à traiter | AFaire | []
+GAMMA AUD | Rôle 2026J17002 · appel n° TC17 2 · Audience du {J-10} à 09:00 - Chambre Première du banc (C17) · résultat R17S · composition n° 1 | Affaires traitées | Validee | []
+DELTA AUD | Rôle 2026J17003 · appel n° TC17 3 · Audience du {J-10} à 09:00 - Chambre Première du banc (C17) · résultat à saisir · composition n° 1 | Affaires à traiter | AFaire | []
+EPSILON AUD | Rôle 2026J17004 · appel n° TC17P 4 · Audience du {J-10} à 09:00 - Chambre Première du banc (C17) · résultat J · composition n° 1 | Publicités en attente | EnAttente | []
 # Les deux affaires que le jeu PROC_MPCS pose sur cette audience (une PC à traiter, une PC traitée).
 PC MPCS AUD | Rôle 2026P17501 · appel n° TC17 5 · Audience du {J-10} à 09:00 - Chambre Première du banc (C17) · résultat à saisir | Affaires à traiter | AFaire | []
 PC TRAITEE AUD | Rôle 2026P17502 · appel n° TC17P 6 · Audience du {J-10} à 09:00 - Chambre Première du banc (C17) · résultat J | Affaires traitées | Validee | []

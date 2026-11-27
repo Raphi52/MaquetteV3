@@ -6,11 +6,11 @@
 #    mode audience par défaut ; jumeau retenu au bloc 2).
 critere: Date de l'audience = 2001-03-15
 lignes:
-OMEGA AUD c/ PSI AUD | Rôle 2026J17011 · appel n° TC17P 1 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat à saisir | Prononcés à traiter | AFaire | []
-PC AUD | Rôle 2026P17012 · appel n° TC17P 2 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat à saisir | Prononcés à traiter | AFaire | []
-INJONCTION AUD | Rôle 2026I17013 · appel n° TC17P 3 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat à saisir | Prononcés à traiter | AFaire | []
-RENVOI AUD | Rôle 2026J17014 · appel n° TC17 4 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat à saisir | Affaires à traiter | AFaire | []
-TRAITEE AUD | Rôle 2026J17015 · appel n° TC17 5 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat J | Affaires traitées | Validee | []
+OMEGA AUD c/ PSI AUD | Rôle 2026J17011 · appel n° TC17P 1 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat à saisir · composition n° 1 | Prononcés à traiter | AFaire | []
+PC AUD | Rôle 2026P17012 · appel n° TC17P 2 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat à saisir · composition n° 1 | Prononcés à traiter | AFaire | []
+INJONCTION AUD | Rôle 2026I17013 · appel n° TC17P 3 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat à saisir · composition n° 1 | Prononcés à traiter | AFaire | []
+RENVOI AUD | Rôle 2026J17014 · appel n° TC17 4 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat à saisir · composition n° 1 | Affaires à traiter | AFaire | []
+TRAITEE AUD | Rôle 2026J17015 · appel n° TC17 5 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat J · composition n° 1 | Affaires traitées | Validee | []
 ---
 # 2. Le mode « Cabinet » (« C », PROC_RETAUD.cs:85-87) : le cabinet du même jour, libellé au nom du juge (AudienceCabinet.cs:1108-1115).
 critere: Date de l'audience = 2001-03-15
@@ -40,7 +40,7 @@ SANS COMPO AUD | Rôle 2026J17016 · appel n° TC17P 1 · Audience du 16/03/2001
 texte: omega
 critere: Date de l'audience = 2001-03-15
 lignes:
-OMEGA AUD c/ PSI AUD | Rôle 2026J17011 · appel n° TC17P 1 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat à saisir | Prononcés à traiter | AFaire | []
+OMEGA AUD c/ PSI AUD | Rôle 2026J17011 · appel n° TC17P 1 · Audience du 15/03/2001 à 09:00 - Chambre Première du banc (C17) · résultat à saisir · composition n° 1 | Prononcés à traiter | AFaire | []
 ---
 # 7. Un jour sans audience : rien.
 critere: Date de l'audience = 2001-03-17

@@ -18,14 +18,14 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     facture (FACTJAL) ou de parution (JAL) est reçu en GED (Resultat\Control\DataGridViewSdematJud.cs:428-443), et cachées
 ///     sur l'onglet BODACC (ModifierColonneJalBodacc, :253-260). La V3 n'a qu'une case par ligne : cocher une ligne JAL coche
 ///     ses deux cases, celle d'un document reçu seulement. Une ligne sans document ou une annonce BODACC ne compte pas ;
-///   - LES CONTROLES (DoVerifier, :106-130), au mot près : aucune ligne retenue -> « Vous devez sélectionner au moins une ligne »
-///     (AUCUNE_SELECTION, :22) ; plus de 200 affaires -> « Veuillez sélectionner au maximum 200 lignes » (:124-126) ;
+///   - LES CONTROLES (DoVerifier, :106-130), au mot près : aucune case cochée -> « Vous devez sélectionner au moins une ligne »
+///     (AUCUNE_SELECTION, :22 ; NumberSdematJUD compte les lignes cochées, MetierSdematJud.cs:194-195) ; plus de 200 affaires ->
+///     « Veuillez sélectionner au maximum 200 lignes » (:124-126) ;
 ///   - CE QUI S'ECRIT (_GenererLesDemandesEditions, :133-200 ; DoSauver, :88-91 ; _Sauver, :284-288) :
 ///       la demande du traitement (code SDEMATJUD, PROCESSUS_ET_FONCTIONALITE de RIG_DEV), nommée « Génération d'édition pour
 ///       N instance(s) » (:89) et validée ;
 ///       UNE demande par affaire (le numéro de PC, sinon celui de la prévention), créée sur la PC ou la prévention
-///       (CreateDemande, :156-169), fille de la demande du traitement (DMND_ID_DMND_MERE, :171), validée (:286) -- une ligne
-///       dont l'événement n'a ni PC ni prévention n'a pas de demande : RIG v2 la passe sans rien écrire (:170), la V3 aussi ;
+///       (CreateDemande, :156-169), fille de la demande du traitement (DMND_ID_DMND_MERE, :171), validée (:286) ;
 ///       pour chaque document coché, sa demande d'édition (_NouvellePieceNumerisee, :301-317 ;
 ///       DemandeEdition.CreateDemandeEditionPieceNumerisee, Edition\DemandeEdition.cs:2608-2660) : d'abord la RÉFÉRENCE du
 ///       document en GED RIG (GedRig.CreateGedRigFromVidiged, Divers\GedRig.cs:231-239 -- une ligne GED_RIG qui pointe le
@@ -36,6 +36,14 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///       :316 -- dans la V3, sa préférence « Imprimante », reprise de cette colonne par ReprisePreferences.cs:29), phase « G »
 ///       portée à « P » (prête à imprimer) à l'enregistrement (RequeteSauve, :1124-1131 : ni affichage avant impression, et
 ///       impression demandée).
+/// ECART A RIG v2 (choix de la V3, nommé) : une ligne cochée dont l'affaire (PC ou prévention) est absente de la base.
+///   RIG v2 ne la refuse pas -- elle compte dans NumberSdematJUD (MetierSdematJud.cs:194-195) -- et GetPrevention /
+///   GetProcedureCollective rendent null (:157, :164) ; mais la variable « demande », déclarée hors de la boucle (:137 contre
+///   :152), n'est jamais remise à null : seule cochée, elle enregistre une demande du traitement vide, « Génération d'édition
+///   pour 0 instance » (:89) ; cochée après une autre affaire, ses pièces sont mises à imprimer sous la demande de cette
+///   affaire précédente (:170-172), qui est aussi comptée deux fois dans le nom (:172, :89). La V3 ne reprend ni l'un ni
+///   l'autre : la ligne ne donne ni demande ni édition ; si aucune ligne cochée n'a son affaire, le geste est refusé en le
+///   disant (AffaireAbsente), sans le message AUCUNE_SELECTION, qui dirait à tort qu'aucune ligne n'est cochée.
 /// CE QUI NE SORT PAS DU POSTE : l'impression. Dans RIG v2, une demande d'édition « P » est prise par le service d'impression,
 ///   absent de la V3 : rien n'est imprimé ni envoyé, le message le dit. Aucune publicité ne change d'état : RIG v2 n'en écrit pas.
 /// CE QUE LA V3 NE REPREND PAS (nommé) : les paramètres XML de la demande d'édition (DMNED_PARAMETRE_GENERATION, construits par
@@ -44,7 +52,10 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   référence GED (GDRG_APPLICATION_ARCHIVAGE, le nom de l'exécutable RIG v2) reste vide ; le tableau d'édition que RIG v2
 ///   montre avant d'enregistrer ; « Vérifier », qui ne fait que les contrôles ci-dessus sans rien écrire (« Valider » les fait).
 /// fix-ok: mesuré au contrôle final du lot 9 (27/11/2026) -- le passage précédent disait la pièce « copiée » de VIDIGED ; GedRig.cs:
-/// 231-239 n'écrit qu'une référence, que la V3 peut écrire : le geste est donc branché.
+/// 231-239 n'écrit qu'une référence, que la V3 peut écrire : le geste est donc branché. Puis le contrôle suivant : la ligne
+/// d'affaire absente était dite « passée sans rien écrire, comme RIG v2 » et refusée au message AUCUNE_SELECTION ; relu
+/// OPE_RESULTAT_JAL.cs:137-172 et MetierSdematJud.cs:194-195, RIG v2 ne la refuse pas et ne remet pas « demande » à null :
+/// c'est un écart de la V3, nommé ci-dessus, refusé à son propre message.
 /// </summary>
 internal sealed class EcrivainSuiviDematerialisation : IEcrivainEcran
 {
@@ -59,6 +70,10 @@ internal sealed class EcrivainSuiviDematerialisation : IEcrivainEcran
     internal const string CodeProcessus = "SDEMATJUD";
 
     private const string AucuneSelection = "Vous devez sélectionner au moins une ligne";
+
+    /// <summary>Refus de la V3, sans équivalent RIG v2 (l'écart, en tête de classe).</summary>
+    private const string AffaireAbsente = "Aucune ligne cochée n'a son affaire (procédure collective ou prévention) dans la base du greffe : "
+                                        + "aucune demande ne peut être créée, rien n'est mis à imprimer.";
     private const int MaxAffaires = 200;
 
     // Un document reçu d'une publicité, de la nature de sa case (JAL : parution, FACTJAL : facture), et l'affaire de son
@@ -88,6 +103,7 @@ internal sealed class EcrivainSuiviDematerialisation : IEcrivainEcran
 
         // 1. Les documents cochés : ceux qu'une ligne JAL a reçus (une case active, DataGridViewSdematJud.cs:428-443).
         var affaires = new Dictionary<string, Affaire>(StringComparer.Ordinal);
+        var documentsSansAffaire = 0;
         foreach (var id in geste.Demande.Ids.Distinct(StringComparer.Ordinal))
         {
             var parties = id.Split(':');
@@ -101,7 +117,7 @@ internal sealed class EcrivainSuiviDematerialisation : IEcrivainEcran
                     new SqlParameter("@nature", nature));
                 if (!await r.ReadAsync(ct)) continue; // le document n'est plus celui de la ligne : sa case n'existe plus
                 // L'affaire : la PC de l'evenement, sinon sa prevention (ProcedureCollective / Prevention.GetXxx, :156-169) -- une
-                // affaire absente de la base ne donne pas de demande, comme dans RIG v2 (GetXxx rend null).
+                // affaire absente de la base : ECART A RIG v2, en tete de classe.
                 var (numero, nomAffaire, sequenceur, idAffaire) = r["PRCLL_ID_PRCLL"] is int pc
                     ? (FormeLigne.Texte(r, "PRCLL_NUM_PC").Trim(), FormeLigne.Texte(r, "PRCLL_NOM_AFFAIRE"), LecteurProceduresCollectives.SequenceurPc, pc)
                     : r["PREVE_ID_PREVE"] is int pv
@@ -117,16 +133,16 @@ internal sealed class EcrivainSuiviDematerialisation : IEcrivainEcran
                 if (!Guid.TryParse(FormeLigne.Texte(r, "VGIDX_GUID_DOCUMENT"), out var guid))
                     return IssueGeste.Refuser($"Le document {doc} reçu en GED n'a pas de GUID VIDIGED : sa pièce numérisée ne peut pas être référencée, rien n'est mis à imprimer.");
                 var piece = new Piece(doc, guid, extension.Length > 0 ? extension : "pdf", libelle);
-                // Une ligne sans PC ni prevention : pas de demande, pas d'edition (:156-170).
-                if (idAffaire == 0) continue;
+                // Une ligne sans PC ni prevention : ni demande ni edition (l'ecart a RIG v2, en tete de classe).
+                if (idAffaire == 0) { documentsSansAffaire++; continue; }
                 var cle = $"{sequenceur}:{numero}";
                 if (!affaires.TryGetValue(cle, out var a)) affaires[cle] = a = new Affaire(numero, nomAffaire, sequenceur, idAffaire, []);
                 if (a.Pieces.All(p => p.Vidiged != doc)) a.Pieces.Add(piece);
             }
         }
 
-        // 2. Les controles de DoVerifier (:106-130).
-        if (affaires.Count == 0) return IssueGeste.Refuser(AucuneSelection);
+        // 2. Les controles de DoVerifier (:106-130), et le refus de la V3 pour une affaire absente (l'ecart, en tete de classe).
+        if (affaires.Count == 0) return IssueGeste.Refuser(documentsSansAffaire > 0 ? AffaireAbsente : AucuneSelection);
         if (affaires.Count > MaxAffaires) return IssueGeste.Refuser("Veuillez sélectionner au maximum 200 lignes");
 
         // 3. L'imprimante par defaut de l'agent (UTLST_IMPRIMANTE_DEFAUT, :316) : sa preference « Imprimante » dans la V3.
