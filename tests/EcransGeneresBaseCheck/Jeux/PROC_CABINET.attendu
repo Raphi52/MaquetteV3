@@ -1,0 +1,10 @@
+# « Cabinets » (LecteurCabinets) : AUDIENCE_CABINET hors audiences (AUDNC_AUDIENCE = 0, AudienceCabinet.cs:1280) qui ont un type
+# (NOT NULL dans RIG_DEV), du plus recent au plus ancien. Ecartees : 2400404 (une audience), jumelle de 2400401 ; les lignes de session
+# AUDNC_AUDIENCE = 0 des autres jeux (PROC_COURRIERM 2000204, PROC_GCONV, PROC_PREAUD...), sans type, jumelles de 2400402.
+# Groupe : date apres aujourd'hui -> « À venir » (2400401), sinon « Passés ». Etat : sans heure -> AFaire (2400403) ; sans juge -> EnCours
+# (2400402) ; sinon Validee. Nom : le code cabinet (son libelle), a defaut le type, puis la date et l'heure.
+# Cellules : Date d'audience, Heure d'audience, Type de cabinet, Code cabinet, Juge (abrege), Greffier (abrege).
+CABINET BANC UN · 10/03/2099 à 09:00 | TYPE BANC CODE EXIGE · juge JUN14 · greffier G17A | À venir | Validee | [] | valeurs: 2099-03-10 ; 09:00 ; L14T1 ; L14C1 ; JUN14 ; G17A
+CABINET BANC DEUX · 03/02/2020 à 09:30 | TYPE BANC CODE EXIGE · juge JDE14 | Passés | Validee | []
+TYPE BANC LIBRE · 07/01/2020 | TYPE BANC LIBRE · juge à renseigner | Passés | AFaire | []
+TYPE BANC LIBRE · 06/01/2020 à 14:00 | TYPE BANC LIBRE · juge à renseigner | Passés | EnCours | []

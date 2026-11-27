@@ -13,12 +13,13 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 // Les procedures sans « Detail OPE » dans leur fiche (PROC_GED_NATURE_DOC) sont decrites d'apres
 // leurs autres sections.
 //
-// Lot 14 du plan « RIG v3 100 % fonctionnel » (27/11/2026) : les descripteurs des acteurs et referentiels (Mandataires, Rapprocher
-// des acteurs, Tiers payeurs, Natures de document, Codes chefs IP, Dates de travail...) sont realignes sur le code V2 que lisent
-// leurs lecteurs et ecrivains (Serveur/Socle/EcransGeneres/). fix-ok: mesure le 27/11/2026 en lisant le code V2 -- ces descripteurs
-// portaient les criteres, colonnes et sections des exemples du lot 7 (FormRecherche_MANDATAIRE.cs:179-198 cherche par nom, CNBF,
-// CNBF de structure et SIREN, pas par abrege ; PROC_RAPPACTEUR n'a ni « Acteurs à supprimer » ni « Confirmation » saisis) : une
-// edition par descripteur, chacune citee la ou elle porte.
+// Lot 14 du plan « RIG v3 100 % fonctionnel » (27/11/2026) : chaque descripteur d'acteur ou de referentiel qui a son lecteur et son
+// ecrivain dans Serveur/Socle/EcransGeneres/ (Lecteur<Sujet>.cs, Ecrivain<Sujet>.cs, cites dans le descripteur) est realigne sur le
+// code V2 qu'ils lisent : colonnes, criteres, groupes, sections. Un descripteur sans lecteur garde ses lignes d'exemple. fix-ok: mesure
+// le 27/11/2026 en lisant le code V2, puis par le controle final du lot 14 -- ces descripteurs portaient les criteres, colonnes et
+// groupes des exemples du lot 7 (FormRecherche_MANDATAIRE.cs:179-198 cherche par nom, CNBF, CNBF de structure et SIREN, pas par abrege ;
+// OPE_GED_NATURE_DOC_READONLY.cs:44-46 montre code, libelle et type de document, pas des groupes « Décisions ») ; et cette note citait
+// des ecrans pas encore branches : elle ne nomme plus que la regle, chaque descripteur cite son lecteur.
 //
 // PROC_PARAM_LISTEEXCEL n'a PAS de descripteur : sa fiche RIG v2 ne decrit aucune fonction
 // (« Nature reelle du plugin : une coquille, pas une couche OPE »). Un ecran inventerait du
@@ -100,14 +101,14 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             ],
             Lignes =
             [
-                new LigneEcran("Juge Alpha → Juge Bêta", "Juges · liaisons reprises, audit fait", "Juges", "Validee", [0, 1, 2, 3, 4, 5]),
-                new LigneEcran("Juge Gamma → Juge Delta", "Juges · confirmation en attente", "Juges", "EnCours", [0, 1, 2]),
-                new LigneEcran("Juge Épsilon", "Juges · acteur à garder à choisir", "Juges", "EnCours", [0]),
-                new LigneEcran("Mandataire Zêta → Mandataire Êta", "Mandataires · fusion close", "Mandataires", "Validee", [0, 1, 2, 4]),
-                new LigneEcran("Mandataire Thêta", "Mandataires · aucun doublon", "Mandataires", "AFaire", []),
-                new LigneEcran("Mandataire Iota → Mandataire Kappa", "Mandataires · CNBF bloquant", "Mandataires", "EnCours", [0, 1]),
-                new LigneEcran("Mandataire PC Lambda → Mu", "Mandataires PC · doublon coché", "Mandataires PC", "EnCours", [0, 1, 2]),
-                new LigneEcran("Mandataire PC Nu", "Mandataires PC · à choisir", "Mandataires PC", "AFaire", []),
+                // Hors Saisie, Faites reste vide (decision du lot 1) : l'etat dit seul si l'acteur peut etre coche.
+                new LigneEcran("ALPHA Jean (JAL)", "Juges · actif", "Juges", "AFaire", []),
+                new LigneEcran("BETA Anne (JBE)", "Juges · inactif", "Juges", "EnCours", []),
+                new LigneEcran("Me Zêta (ZET)", "Mandataires · actif", "Mandataires", "AFaire", []),
+                new LigneEcran("Me Iota (IOT)", "Mandataires · actif, n° CNBF 12345", "Mandataires", "Validee", []),
+                new LigneEcran("Me Thêta", "Mandataires · inactif", "Mandataires", "EnCours", []),
+                new LigneEcran("SELARL Lambda (LAM)", "Mandataires PC · actif", "Mandataires PC", "AFaire", []),
+                new LigneEcran("SCP Nu", "Mandataires PC · inactif", "Mandataires PC", "EnCours", []),
             ],
         },
 
@@ -226,35 +227,33 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         {
             Code = "PROC_GESTDATE", Titre = "Dates de travail", Sujet = "dates de travail",
             Forme = FormeEcran.Referentiel,
-            // Colonnes : la categorie (critere) et les champs des sections ci-dessous.
-            Colonnes = ["Catégorie de date", "Date de travail", "Date de fraîcheur", Champ.Case("Mode automatique")],
-            Recherche = "Rechercher une catégorie de date…",
-            Criteres = ["Catégorie de date", "Date de travail", "Date de fraîcheur"],
+            // Les dates ACTIVES de DATE_TRAVAIL (DateTravail.cs:48) et les champs de leur bloc V2 (OPE_DATE_TRAVAIL.cs:40-44). Lignes :
+            // LecteurDatesTravail.cs ; gestes (Modifier seul, la V2 n'ajoute ni ne supprime) : EcrivainDatesTravail.cs. Groupes et etats :
+            // le controle de la V2, pour WINS et DATW seulement (DoVerifier, l. 49-70).
+            Colonnes = ["Code", "Libellé", Champ.Date("Date de travail"), Champ.Date("Date de fraîcheur"), Champ.Case("Date de travail automatique"),
+                        Champ.Case("Date de fraîcheur automatique"), Champ.Date("Ancienne date de travail")],
+            Recherche = "Rechercher une date de travail…",
+            Criteres = ["Code", "Libellé"],
             // Bouton final cite par la fiche v2 : bouton VALIDER (proc_gestdate.md, Detail OPE)
             Valider = "Valider",
             Rang = 7,
-            Etats = EtatsEcran.Trois("À vérifier", "Modifiée", "Enregistrée"),
-            Groupes = ["Dates d'endettement", "Autres catégories"],
+            Etats = EtatsEcran.Trois("Date à corriger", "Fraîcheur à vérifier", "À jour"),
+            Groupes = ["RCS et endettement", "Autres dates"],
             Sections =
             [
-                new MarcheEcran("Date de travail", "Une date postérieure à aujourd'hui est une erreur bloquante. Si la date change, l'ancienne est archivée.", true,
-                    ["Date de travail", "Mode automatique"]),
-                new MarcheEcran("Date de fraîcheur", "Une date postérieure à aujourd'hui donne un avertissement (« très dangereux ») : la saisie reste possible.", true,
-                    ["Date de fraîcheur", "Mode automatique"]),
-                new MarcheEcran("Commandes à éditer", "Pour l'état d'endettement seulement : visible s'il existe des commandes en attente. Le bouton Édition lance la génération des éditions.", false,
-                    ["Commandes en attente", "Éditer les commandes"]),
-                new MarcheEcran("Enregistrement", "Chaque changement est noté dans l'audit de la demande (« ancien => nouveau »). Une erreur de sauvegarde est signalée à l'utilisateur.", true,
-                    ["Audit"]),
+                new MarcheEcran("Date de travail", "Pour le RCS et l'endettement, une date postérieure à aujourd'hui est une erreur bloquante. Si la date change, l'ancienne est archivée. « Automatique » : la date suit chaque jour la date du jour.", true,
+                    ["Code", "Libellé", Champ.Date("Date de travail"), Champ.Case("Date de travail automatique"), Champ.Date("Ancienne date de travail")]),
+                new MarcheEcran("Date de fraîcheur", "Une date postérieure à aujourd'hui donne un avertissement (« très dangereux ») : l'enregistrement reste possible. « Automatique » : elle suit la date de travail.", true,
+                    [Champ.Date("Date de fraîcheur"), Champ.Case("Date de fraîcheur automatique")]),
             ],
             Lignes =
             [
-                new LigneEcran("État d'endettement", "Date de travail 12/03/2026 · 3 commandes à éditer", "Dates d'endettement", "Validee", [0, 1, 2, 3]),
-                new LigneEcran("Commandes d'endettement", "3 commandes en attente · fraîcheur à vérifier", "Dates d'endettement", "EnCours", [0]),
-                new LigneEcran("Calendrier judiciaire", "Date de travail 13/03/2026", "Autres catégories", "Validee", [0, 1, 3]),
-                new LigneEcran("Jours ouvrés", "Fraîcheur modifiée", "Autres catégories", "EnCours", [1]),
-                new LigneEcran("Jours fériés", "Pas encore saisie", "Autres catégories", "AFaire", []),
-                new LigneEcran("Éditions pluriannuelles", "Date de travail à saisir", "Autres catégories", "AFaire", []),
-                new LigneEcran("Ancienne date archivée", "Dates d'endettement · mode automatique", "Dates d'endettement", "EnCours", [0, 1]),
+                new LigneEcran("Inscriptions", "code WINS · travail 12/03/2026 · fraîcheur 11/03/2026", "RCS et endettement", "Validee", []),
+                new LigneEcran("RCS", "code DATW · travail 13/03/2026 · fraîcheur 20/03/2026", "RCS et endettement", "EnCours", []),
+                new LigneEcran("Judiciaire", "code DATJ · travail 13/03/2026 · fraîcheur non renseignée", "Autres dates", "Validee", []),
+                new LigneEcran("Bilans", "code DATB · travail 12/03/2026 · fraîcheur 11/03/2026 · automatique", "Autres dates", "Validee", []),
+                new LigneEcran("Registre des sûretés", "code DATS · travail 11/03/2026 · fraîcheur 10/03/2026", "Autres dates", "Validee", []),
+                new LigneEcran("RCS (saisie future)", "code DATW · travail 31/12/2026 · fraîcheur non renseignée", "RCS et endettement", "AFaire", []),
             ],
         },
 
@@ -366,31 +365,34 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         {
             Code = "PROC_GED_NATURE_DOC", Titre = "Natures de document", Sujet = "natures de document",
             Forme = FormeEcran.Referentiel,
-            Colonnes = ["Libellé", "Code"],
+            // Colonnes de la liste V2 (OPE_GED_NATURE_DOC_READONLY.cs:44-46). Lignes : LecteurNaturesDocument.cs ; gestes :
+            // EcrivainNaturesDocument.cs. Les groupes disent d'avance si la suppression sera refusee (OPE_GED_NATURE_DOC_EDIT.cs:116-119).
+            Colonnes = ["Code", "Libellé", "Type de document"],
             Recherche = "Rechercher une nature de document…",
-            Criteres = ["Libellé", "Code"],
+            Criteres = ["Code", "Libellé"],
             // Bouton final cite par la fiche v2 : post-validation (proc_ged_nature_doc.md, logique metier)
             Valider = "Valider",
             Rang = 7,
             Etats = EtatsEcran.Trois("À compléter", "En cours", "Enregistrée"),
-            Groupes = ["Décisions", "Pièces et actes"],
+            Groupes = ["Associées à un document", "Sans document"],
             Sections =
             [
-                new MarcheEcran("Libellé", "Le libellé est obligatoire : il sert à classer les documents de la GED.", true,
-                    ["Libellé"]),
-                new MarcheEcran("Code", "Le code identifie la nature dans le référentiel.", true,
-                    ["Code"]),
-                new MarcheEcran("Enregistrement", "Après validation, retour en lecture seule et rafraîchissement de la liste. Le bouton Nouveau ouvre la saisie.", true,
-                    ["Enregistrer", "Nouveau"]),
+                new MarcheEcran("Nature", "Le code et le libellé sont obligatoires ; le code est unique, sans quote, et ne se modifie plus une fois créé. Le type de document se choisit parmi les regroupements web.", true,
+                    ["Code", "Libellé", "Type de document"]),
+                new MarcheEcran("Paramétrage GED", "Les réglages de dépôt de la nature (Infogreffe, coffre-fort, GEIDE, copie conforme, Tribunal digital, type de déposant) : en lecture.", false,
+                    ["Nature Infogreffe", "Événement de dépôt (demande)", "Événement de dépôt (défaut)", "Dépôt au coffre-fort", "Centralisation GEIDE",
+                     "Copie conforme", "Édition supplémentaire au coffre-fort", "Nature Tribunal digital", "Type de déposant GED"]),
+                new MarcheEcran("Utilisations", "Une nature déjà associée à un document, ou utilisée comme valeur par défaut, ne se supprime pas.", false,
+                    ["Documents GED"]),
             ],
             Lignes =
             [
-                new LigneEcran("Jugement", "Décisions · enregistrée", "Décisions", "Validee", [0, 1, 2]),
-                new LigneEcran("Ordonnance", "Décisions · enregistrée", "Décisions", "Validee", [0, 1, 2]),
-                new LigneEcran("Jugement avant dire droit", "Décisions · code à saisir", "Décisions", "EnCours", [0]),
-                new LigneEcran("Pièce d'identité", "Pièces et actes · en cours", "Pièces et actes", "EnCours", [0, 1]),
-                new LigneEcran("Courrier reçu", "Pièces et actes · à compléter", "Pièces et actes", "AFaire", []),
-                new LigneEcran("Procès-verbal", "Pièces et actes · à compléter", "Pièces et actes", "AFaire", []),
+                new LigneEcran("Jugement", "code JUG · Décisions · 12 document(s)", "Associées à un document", "Validee", [0, 1, 2]),
+                new LigneEcran("Ordonnance", "code ORD · Décisions · 4 document(s)", "Associées à un document", "Validee", [0, 1, 2]),
+                new LigneEcran("Pièce d'identité", "code PID · Pièces · 1 document(s)", "Associées à un document", "Validee", [0, 1]),
+                new LigneEcran("Courrier reçu", "code COU · aucun document", "Sans document", "Validee", []),
+                new LigneEcran("PV", "code PV · aucun document", "Sans document", "AFaire", []),
+                new LigneEcran("Requête", "code REQ · Pièces · 7 document(s)", "Associées à un document", "Validee", []),
             ],
         },
 
@@ -398,37 +400,36 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         {
             Code = "PROC_CABINET", Titre = "Cabinets", Sujet = "cabinets",
             Forme = FormeEcran.Referentiel,
-            // Colonnes : le cabinet (la salle) et les champs des sections ci-dessous.
-            Colonnes = ["Cabinet", "Type de cabinet", "Code cabinet", "Date d'audience", "Heure d'audience", "Juge", "Greffier", Champ.Case("Classement admis")],
-            Recherche = "Rechercher un cabinet, une date d'audience…",
+            // Les cabinets : AUDIENCE_CABINET hors audiences (AUDNC_AUDIENCE = 0, AudienceCabinet.cs:1280) et les champs de la saisie V2
+            // (OPE_CREATION_CABINET.cs:25-30). Lignes : LecteurCabinets.cs ; gestes (Ajouter, Modifier ; la V2 ne supprime pas de cabinet) :
+            // EcrivainCabinets.cs. Groupes : la date du cabinet contre le jour (la frontiere des invitations, l. 148).
+            Colonnes = [Champ.Date("Date d'audience"), "Heure d'audience", "Type de cabinet", "Code cabinet", "Juge", "Greffier"],
+            Recherche = "Rechercher un cabinet, un type, un juge…",
             Criteres = ["Date d'audience", "Type de cabinet", "Juge"],
             // Bouton final cite par la fiche v2 : DoSauve(cnx, futurEtat) (proc_cabinet.md, Detail OPE)
             Valider = "Enregistrer le cabinet",
             Rang = 7,
             Etats = EtatsEcran.Trois("À saisir", "En saisie", "Enregistré"),
-            Groupes = ["Salles fixes", "Salles ponctuelles"],
+            Groupes = ["À venir", "Passés"],
             Sections =
             [
-                new MarcheEcran("Audience", "La date et l'heure d'audience sont obligatoires. Un doublon à la même date et à la même heure est refusé.", true,
-                    ["Date d'audience", "Heure d'audience"]),
-                new MarcheEcran("Type et code", "Le type de cabinet est obligatoire ; le code est exigé selon le type.", true,
-                    ["Type de cabinet", "Code cabinet"]),
-                new MarcheEcran("Juge et greffier", "Le juge et le greffier se choisissent dans les listes. En modification, le juge n'est plus modifiable quand il est renseigné.", false,
+                new MarcheEcran("Audience", "La date et l'heure d'audience (HH:MM) sont obligatoires. Un autre cabinet au même code, à la même date, à la même heure et au même juge est refusé.", true,
+                    [Champ.Date("Date d'audience"), "Heure d'audience"]),
+                new MarcheEcran("Type et code", "Le type de cabinet est obligatoire ; le code est exigé quand le type le demande. Un cabinet qui a des affaires appelées garde sa date, son type et son code.", true,
+                    ["Type de cabinet", "Libellé du type", "Code cabinet", "Libellé du code"]),
+                new MarcheEcran("Juge et greffier", "Le juge et le greffier se choisissent par leur abrégé. Un cabinet qui a des affaires appelées garde son juge s'il est actif.", false,
                     ["Juge", "Greffier"]),
-                new MarcheEcran("Classement", "Le type de classement admis est écrit à l'enregistrement.", false,
+                new MarcheEcran("Classement", "Le type de classement admis : en lecture.", false,
                     ["Classement admis"]),
-                new MarcheEcran("Enregistrement", "L'enregistrement met aussi à jour le nom de la demande.", true,
-                    ["Enregistrer"]),
             ],
             Lignes =
             [
-                new LigneEcran("Salle 1 · 14/03/2026 à 9 h", "Salles fixes · enregistrée", "Salles fixes", "Validee", [0, 1, 2, 4]),
-                new LigneEcran("Salle 2 · 14/03/2026 à 10 h", "Salles fixes · juge à renseigner", "Salles fixes", "EnCours", [0, 1]),
-                new LigneEcran("Salle 3 · 15/03/2026 à 9 h", "Salles fixes · à saisir", "Salles fixes", "AFaire", []),
-                new LigneEcran("Salle 4 · 19/03/2026 à 14 h", "Salles fixes · en saisie", "Salles fixes", "EnCours", [0, 1, 2]),
-                new LigneEcran("Salle temporaire A · 16/03/2026", "Salles ponctuelles · enregistrée", "Salles ponctuelles", "Validee", [0, 1, 2, 3, 4]),
-                new LigneEcran("Salle temporaire B · 17/03/2026", "Salles ponctuelles · type à choisir", "Salles ponctuelles", "EnCours", [0]),
-                new LigneEcran("Salle temporaire C · 18/03/2026", "Salles ponctuelles · à saisir", "Salles ponctuelles", "AFaire", []),
+                new LigneEcran("Cabinet 1 · 14/03/2026 à 09:00", "Cabinet de juge commissaire · juge JCA", "Passés", "Validee", []),
+                new LigneEcran("Cabinet 2 · 14/03/2026 à 10:00", "Cabinet de juge commissaire · juge à renseigner", "Passés", "EnCours", []),
+                new LigneEcran("Cabinet 3 · 15/12/2026 à 09:30", "Cabinet du président · juge PRE", "À venir", "Validee", []),
+                new LigneEcran("Cabinet 1 · 16/12/2026 à 14:00", "Cabinet de juge commissaire · juge JCA · greffier GRA", "À venir", "Validee", []),
+                new LigneEcran("Cabinet du président · 17/12/2026", "Cabinet du président · juge à renseigner", "À venir", "AFaire", []),
+                new LigneEcran("Cabinet 2 · 10/02/2026 à 09:00", "Cabinet de juge commissaire · juge JCB", "Passés", "Validee", []),
             ],
         },
 
@@ -436,10 +437,11 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         {
             Code = "PROC_PARAM_IP", Titre = "Codes chefs IP", Sujet = "codes chefs",
             Forme = FormeEcran.Referentiel,
-            // Colonnes : les criteres de la fiche (code chef, prefixe IP, ordre).
-            Colonnes = ["Code chef", "Préfixe IP", Champ.Nombre("Ordre")],
+            // Colonnes de la liste V2 (OPE_PARAM_IP.cs:11-18) et le rang du code (RigListViewUpDown). Lignes : LecteurCodesChefsIp.cs
+            // (le reglage PARAMETRAGE IP_CODE_CHEF) ; gestes : EcrivainCodesChefsIp.cs.
+            Colonnes = ["Code chef", "Libellé", Champ.Nombre("Ordre")],
             Recherche = "Rechercher un code chef…",
-            Criteres = ["Code chef", "Préfixe IP", "Ordre"],
+            Criteres = ["Code chef", "Libellé"],
             // Bouton final cite par la fiche v2 : DoSauveAfterOperation (proc_param_ip.md, Detail OPE)
             Valider = "Enregistrer la liste",
             Rang = 7,
@@ -447,22 +449,21 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Groupes = ["Codes IP proposables", "Autres codes"],
             Sections =
             [
-                new MarcheEcran("Ajout", "Seuls les codes chefs commençant par IP sont proposés. Un code déjà dans la liste est refusé ; un code qui ne se résout pas n'est pas ajouté.", true,
-                    ["Code chef"]),
-                new MarcheEcran("Ordre", "L'ordre choisi par l'utilisateur est conservé tel quel dans la liste.", false,
-                    ["Ordre des codes"]),
+                new MarcheEcran("Ajout", "Seuls les codes chefs commençant par IP sont proposés. Un code déjà dans la liste est refusé ; un code qui ne se résout pas n'est pas ajouté. Il va en fin de liste.", true,
+                    ["Code chef", "Libellé"]),
+                new MarcheEcran("Ordre", "L'ordre choisi par l'utilisateur est conservé tel quel dans la liste : modifiez le rang d'un code pour le déplacer.", false,
+                    ["Ordre", "Liste enregistrée"]),
                 new MarcheEcran("Enregistrement", "La liste est réécrite en entier. Une liste vide est refusée. Un code introuvable au rechargement disparaît à la prochaine sauvegarde.", true,
                     ["Enregistrer"]),
             ],
             Lignes =
             [
-                new LigneEcran("IP01", "Code proposable · premier de la liste", "Codes IP proposables", "Validee", [0, 1, 2]),
-                new LigneEcran("IP02", "Code proposable · deuxième de la liste", "Codes IP proposables", "Validee", [0, 1, 2]),
-                new LigneEcran("IP03", "Code proposable · à ajouter", "Codes IP proposables", "EnCours", [0]),
-                new LigneEcran("IP04", "Code proposable · en attente", "Codes IP proposables", "AFaire", []),
-                new LigneEcran("IP05", "Code proposable · à ajouter", "Codes IP proposables", "AFaire", []),
-                new LigneEcran("Code hors IP", "Autre code résolu · conservé à l'ouverture", "Autres codes", "EnCours", [0, 1]),
-                new LigneEcran("Code introuvable", "Ignoré au prochain enregistrement", "Autres codes", "EnCours", [0]),
+                new LigneEcran("IP01", "Injonction de payer · rang 1", "Codes IP proposables", "Validee", [0, 1, 2]),
+                new LigneEcran("IP02", "Injonction de payer européenne · rang 2", "Codes IP proposables", "Validee", [0, 1, 2]),
+                new LigneEcran("IP03", "Opposition · rang 3", "Codes IP proposables", "Validee", [0, 1, 2]),
+                new LigneEcran("RF01", "Code hors IP conservé à l'ouverture · rang 4", "Autres codes", "Validee", [0, 1, 2]),
+                new LigneEcran("IP04", "Injonction de payer (petits litiges) · rang 5", "Codes IP proposables", "Validee", [0, 1, 2]),
+                new LigneEcran("IP05", "Injonction de faire · rang 6", "Codes IP proposables", "Validee", [0, 1, 2]),
             ],
         },
 
