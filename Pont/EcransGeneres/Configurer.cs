@@ -92,7 +92,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             [
                 new MarcheEcran("Type d'acteur", "Un seul type à la fois : juges, mandataires ou mandataires PC. Les acteurs cochés sont ceux à supprimer ; cochez-les dans la grille, ils sont tous du même type.", false,
                     [Champ.Liste("Type d'acteur", "Juges", "Mandataires", "Mandataires PC")]),
-                new MarcheEcran("Acteur à garder", "Le numéro ou l'abrégé de l'acteur qui reprend les affaires : du même type, actif et répertorié (avec un abrégé), et non coché. Un mandataire actif qui a un numéro CNBF ne peut pas être supprimé.", true,
+                new MarcheEcran("Acteur à garder", "Le numéro ou l'abrégé de l'acteur qui reprend les affaires : du même type, répertorié (avec un abrégé), et non coché. Un mandataire actif qui a un numéro CNBF ne peut pas être supprimé, ni le juge par défaut des injonctions de payer.", true,
                     ["Acteur à garder"]),
                 new MarcheEcran("Liaisons reprises", "Ouvrez la ligne d'un acteur coché : ses liaisons et les affaires touchées passeront à l'acteur gardé, dans une seule transaction, puis il sera supprimé. ATTENTION CETTE OPERATION EST IRREVERSIBLE.", false,
                     [Champ.Tableau("Liaisons"), Champ.Tableau("Affaires touchées")]),
@@ -224,7 +224,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_GESTDATE", Titre = "Dates de travail", Sujet = "dates de travail",
-            Forme = FormeEcran.Referentiel,
+            Forme = FormeEcran.Referentiel, Ajout = false, Suppression = false,
             // Les dates ACTIVES de DATE_TRAVAIL (DateTravail.cs:48) et les champs de leur bloc V2 (OPE_DATE_TRAVAIL.cs:40-44). Lignes :
             // LecteurDatesTravail.cs ; gestes (Modifier seul, la V2 n'ajoute ni ne supprime) : EcrivainDatesTravail.cs. Groupes et etats :
             // le controle de la V2, pour WINS et DATW seulement (DoVerifier, l. 49-70).
@@ -397,7 +397,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_CABINET", Titre = "Cabinets", Sujet = "cabinets",
-            Forme = FormeEcran.Referentiel,
+            Forme = FormeEcran.Referentiel, Suppression = false,
             // Les cabinets : AUDIENCE_CABINET hors audiences (AUDNC_AUDIENCE = 0, AudienceCabinet.cs:1280) et les champs de la saisie V2
             // (OPE_CREATION_CABINET.cs:25-30). Lignes : LecteurCabinets.cs ; gestes (Ajouter, Modifier ; la V2 ne supprime pas de cabinet) :
             // EcrivainCabinets.cs. Groupes : la date du cabinet contre le jour (la frontiere des invitations, l. 148).
@@ -436,7 +436,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Code = "PROC_PARAM_IP", Titre = "Codes chefs IP", Sujet = "codes chefs",
             Forme = FormeEcran.Referentiel,
             // Colonnes de la liste V2 (OPE_PARAM_IP.cs:11-18) et le rang du code (RigListViewUpDown). Lignes : LecteurCodesChefsIp.cs
-            // (le reglage PARAMETRAGE IP_CODE_CHEF) ; gestes : EcrivainCodesChefsIp.cs.
+            // (le reglage IP_CODE_CHEF de PARAMETRAGE, repris dans soc.Reglage : ReprisesPhase1.cs:86). AUCUN ecrivain : les gestes
+            // des ecrans generes n'ecrivent que v2.* et rec.* (EcrivainEcran.cs, point 3), et soc.Reglage n'en est pas ; Ajouter,
+            // Modifier et Supprimer disent donc « Demonstration ». La raison est en tete de LecteurCodesChefsIp.cs.
             Colonnes = ["Code chef", "Libellé", Champ.Nombre("Ordre")],
             Recherche = "Rechercher un code chef…",
             Criteres = ["Code chef", "Libellé"],

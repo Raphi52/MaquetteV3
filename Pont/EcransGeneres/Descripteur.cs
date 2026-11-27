@@ -226,6 +226,15 @@ public sealed record DescripteurEcran
     /// jonction).</summary>
     public bool ObjetUnique { get; init; }
 
+    /// <summary>Un <see cref="FormeEcran.Referentiel"/> dont la fiche RIG v2 AJOUTE une ligne (vrai par defaut). Faux : la
+    /// grille n'offre pas « Ajouter » -- PROC_GESTDATE ne montre que des blocs de dates existantes (ETP_CATEGORIE.cs:10-12).
+    /// Un geste sans equivalent V2 ne s'invente pas (plan « RIG v3 100 % fonctionnel », lot 14).</summary>
+    public bool Ajout { get; init; } = true;
+
+    /// <summary>Un <see cref="FormeEcran.Referentiel"/> dont la fiche RIG v2 SUPPRIME une ligne (vrai par defaut). Faux : le
+    /// menu de ligne n'offre pas « Supprimer » -- PROC_GESTDATE et PROC_CABINET n'ont aucune suppression.</summary>
+    public bool Suppression { get; init; } = true;
+
     /// <summary>Le RESULTAT d'une operation sur un objet unique : les sections que le geste produit, montrees APRES lui
     /// (2e temps), et des l'ouverture d'un objet deja traite. PROC_IA : lancement puis restitution (proc_ia.md:151-156) ;
     /// une liasse deja analysee affiche son resultat sans relancer (PROC_IA.cs:60-64). Vide pour toute autre forme.</summary>

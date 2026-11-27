@@ -202,6 +202,10 @@ export interface DescripteurEcranVue {
   /** Une Operation qui vise UN seul objet, que la fiche RIG v2 RECOIT d'un autre ecran : aucune liste, il se designe par
    * son numero dans le seul critere. */
   objetUnique?: boolean
+  /** Un Referentiel dont la fiche RIG v2 n'ajoute pas de ligne (faux) : pas de bouton « Ajouter ». Absent = vrai. */
+  ajout?: boolean
+  /** Un Referentiel dont la fiche RIG v2 ne supprime pas de ligne (faux) : pas de « Supprimer » au menu de ligne. Absent = vrai. */
+  suppression?: boolean
   /** Le RESULTAT d'une operation sur un objet unique : montre apres le geste, et des l'ouverture d'un objet deja traite. */
   resultat?: MarcheEcranVue[]
   /** Le titre de la section dessinee en EXTRAIT KBIS (composants/ApercuKbis.tsx) au lieu de ses champs ; PROC_XEX seul. */

@@ -1,6 +1,11 @@
 # « Rapprocher des acteurs » (EcrivainRapprochementActeurs) : « Confirmer » la fusion des acteurs coches dans l'acteur garde
-# (_VerifierMandataires et _DeleteMandataires, OPE_SELECTION_ACTEUR.Mandataires.cs:188-372). Lignes : PROC_RAPPACTEUR.sql.
-# Joue APRES PROC_MANDATAIRE.gestes (« Rapprocher » trie apres « Mandataire ») : les mandataires 24001xx n'y sont pas touches.
+# (_VerifierMandataires et _DeleteMandataires, OPE_SELECTION_ACTEUR.Mandataires.cs:188-372 ; _VerifierJuges et _DeleteJuges,
+# .Juges.cs:174-460 ; _VerifierMandatairesPC et _DeleteMandatairesPC, .MandatairesPC.cs:170-345). Lignes : PROC_RAPPACTEUR.sql.
+# Joue APRES PROC_MANDATAIRE.gestes (« Rapprocher » trie apres « Mandataire ») : les mandataires 24001xx n'y sont pas touches ; AVANT
+# PROC_SUPP_ACTEUR_JUD.gestes, qui ne touche pas les juges 24002xx ni les mandataires PC 24003xx.
+# fix-ok: mesure le 27/11/2026 a la relecture du code V2 -- le bloc « fusion des juges non reprise » devient les controles V2 des juges
+# (IP_JUGE, un seul type, abrege du garde) et deux fusions (juge, mandataire PC) ; le refus « mandataire inactif a garder » devient « sans
+# abrege », la liste « a garder » de la V2 ayant un filtre « TOUS » (OPE_GARDER_MANDATAIRE.cs:71).
 
 # Refus : rien de coche (Res.TEXTE_SELECTIONNEZ_SVP, au mot pres). Jumeau accepte : bloc 7.
 geste: Confirmer Valider
@@ -8,12 +13,56 @@ valeur: Acteur à garder › Acteur à garder = DBG24
 resultat: refuse
 message: Il faut sélectionner au moins un mandataire à supprimer dans la grille
 ---
-# Refus : un juge -- la fusion des juges n'est pas reprise dans RIG v3 (nommee). Jumeau accepte : bloc 7 (un mandataire).
+# Refus : le juge par defaut des injonctions (reglage IP_JUGE = 2400203) ne se supprime pas (Res.TEXTE_JUGE_EN_PARAM_IP, au mot pres).
+# Jumeau accepte : la fusion du juge 2400202 (plus bas).
 geste: Confirmer Valider
-ids: J-1702301
-valeur: Acteur à garder › Acteur à garder = 1
+ids: J-2400203
+valeur: Acteur à garder › Acteur à garder = J14G
 resultat: refuse
-message: La fusion des juges (sièges, audiences, instances, décisions, mesures… : 12 tables, PROC_RAPPACTEUR) n'est pas encore reprise dans RIG v3.
+message: Le juge que vous voulez supprimer est paramétré comme juge par défaut dans le processus PARAMIP
+---
+# Refus : deux types a la fois (la V2 travaille sur le type choisi). Jumeau accepte : la fusion du juge 2400202, seul.
+geste: Confirmer Valider
+ids: J-2400202, P-2400302
+valeur: Acteur à garder › Acteur à garder = J14G
+resultat: refuse
+message: Un seul type d'acteur à la fois : juges, mandataires ou mandataires PC (RIG v2).
+---
+# Refus : un juge garde sans abrege (la liste « a garder » de la V2 exige l'abrege). Jumeau accepte : J14G, repertorie.
+geste: Confirmer Valider
+ids: J-2400202
+valeur: Acteur à garder › Acteur à garder = 2400204
+resultat: refuse
+message: FUSIONSANS Abel ne peut pas être gardé : RIG v2 ne garde qu'un juge répertorié (avec un abrégé).
+---
+# La fusion d'un juge : le doublon 2400202 est remplace par J14G (2400201) -- sa PC de juge-commissaire, son juge d'instance et son coffre
+# recu de type JUGE passent au garde (le coffre de type MANDATAIRE, meme numero, reste) ; l'entite JUGE de ses destinataires d'edition
+# designe le garde (l'entite MANDATAIRE_PC de meme numero reste) ; ACTEUR_SUPP porte la trace de la V2, dans l'ordre de _DeleteJuges ;
+# puis le doublon est supprime.
+geste: Confirmer Valider
+ids: J-2400202
+valeur: Acteur à garder › Acteur à garder = J14G
+resultat: fait
+message: FUSIONJUGE Rose a été remplacé par FUSIONJUGE Rose (J14G) : ses affaires lui sont reportées.
+controle: SELECT CONCAT((SELECT ETJCM_ID_JUG FROM v2.ETRE_JUGE_COMM WHERE ETJCM_ID_ETJCM = 2400802), '/', (SELECT JUGIN_ID_JUG FROM v2.INSTANCE_JUGE WHERE JUGIN_ID_JUGIN = 2400801), '/', (SELECT CFECAJV_ID_DEPOSANT FROM v2.DEMAT_CFEC_AJMJ_VIDIGED WHERE CFECAJV_ID_CFECAJV = 2400803), '/', (SELECT CFECAJV_ID_DEPOSANT FROM v2.DEMAT_CFEC_AJMJ_VIDIGED WHERE CFECAJV_ID_CFECAJV = 2400804)) => 2400201/2400201/2400201/2400202
+controle: SELECT COUNT(*) FROM v2.JUGE WHERE JUG_ID_JUG = 2400202 => 0
+controle: SELECT CONCAT(ACTSUP_TABLE_SUPP, '/', ACTSUP_ID_SUPP, '/', ACTSUP_ID_REMPL, '/', ACTSUP_SUPP_DESIGNATION, '/', ACTSUP_REMPL_DESIGNATION) FROM v2.ACTEUR_SUPP WHERE ACTSUP_ID_SUPP = 2400202 AND ACTSUP_TABLE_SUPP = 'JUGE' => JUGE/2400202/2400201/FUSIONJUGE Rose/FUSIONJUGE Rose (J14G)
+controle: SELECT RTRIM(REPLACE(ACTSUP_REQUETE, CHAR(13) + CHAR(10), ' | ')) FROM v2.ACTEUR_SUPP WHERE ACTSUP_ID_SUPP = 2400202 AND ACTSUP_TABLE_SUPP = 'JUGE' => update ETRE_JUGE_COMM set ETJCM_ID_JUG = 2400201 where ETJCM_ID_ETJCM in (2400802) | update INSTANCE_JUGE set JUGIN_ID_JUG = 2400201 where JUGIN_ID_JUGIN in (2400801) | update DEMAT_CFEC_AJMJ_VIDIGED set CFECAJV_ID_DEPOSANT = 2400201 where CFECAJV_ID_CFECAJV in (2400803) |
+controle: SELECT DESED_XML_DESTEDIT FROM v2.DESTINATAIRES_EDITIONS_LOT2 WHERE DESED_ID_DESED = 2400881 => <LISTE_ENTITES><ENTITE CODE="JUGE" VALEUR="2400201" /><ENTITE CODE="MANDATAIRE_PC" VALEUR="2400202" /></LISTE_ENTITES>
+---
+# La fusion d'un mandataire PC : le doublon 2400302 est remplace par M14G (2400301) -- sa gestion de PC, son depot CFEC et son coffre
+# recu de type ADMINISTRATEUR passent au garde (le coffre de type JUGE, meme numero, reste) ; l'entite MANDATAIRE_PC de ses destinataires
+# d'edition designe le garde (l'entite JUGE de meme numero reste) ; la trace dans l'ordre de _DeleteMandatairesPC ; puis il est supprime.
+geste: Confirmer Valider
+ids: P-2400302
+valeur: Acteur à garder › Acteur à garder = P-2400301
+resultat: fait
+message: FUSIONPC Selarl a été remplacé par FUSIONPC Selarl (M14G) : ses affaires lui sont reportées.
+controle: SELECT CONCAT((SELECT GRRPC_ID_MNDPC FROM v2.GERER_PC WHERE GRRPC_ID_GRRPC = 2400805), '/', (SELECT CFEC_ID_MANDATAIRE_PC FROM v2.DEMAT_CFEC WHERE CFEC_ID_CFEC = 2400806), '/', (SELECT CFECAJV_ID_DEPOSANT FROM v2.DEMAT_CFEC_AJMJ_VIDIGED WHERE CFECAJV_ID_CFECAJV = 2400807), '/', (SELECT CFECAJV_ID_DEPOSANT FROM v2.DEMAT_CFEC_AJMJ_VIDIGED WHERE CFECAJV_ID_CFECAJV = 2400808)) => 2400301/2400301/2400301/2400302
+controle: SELECT COUNT(*) FROM v2.MANDATAIRE_PC WHERE MNDPC_ID_MNDPC = 2400302 => 0
+controle: SELECT CONCAT(ACTSUP_TABLE_SUPP, '/', ACTSUP_ID_SUPP, '/', ACTSUP_ID_REMPL, '/', ACTSUP_SUPP_DESIGNATION, '/', ACTSUP_REMPL_DESIGNATION) FROM v2.ACTEUR_SUPP WHERE ACTSUP_ID_SUPP = 2400302 => MANDATAIRE_PC/2400302/2400301/FUSIONPC Selarl/FUSIONPC Selarl (M14G)
+controle: SELECT RTRIM(REPLACE(ACTSUP_REQUETE, CHAR(13) + CHAR(10), ' | ')) FROM v2.ACTEUR_SUPP WHERE ACTSUP_ID_SUPP = 2400302 => update GERER_PC set GRRPC_ID_MNDPC = 2400301 where GRRPC_ID_GRRPC in (2400805) | update DEMAT_CFEC set CFEC_ID_MANDATAIRE_PC = 2400301 where CFEC_ID_CFEC in (2400806) | update DEMAT_CFEC_AJMJ_VIDIGED set CFECAJV_ID_DEPOSANT = 2400301 where CFECAJV_ID_CFECAJV in (2400807) |
+controle: SELECT DESED_XML_DESTEDIT FROM v2.DESTINATAIRES_EDITIONS_LOT2 WHERE DESED_ID_DESED = 2400882 => <LISTE_ENTITES><ENTITE CODE="MANDATAIRE_PC" VALEUR="2400301" /><ENTITE CODE="JUGE" VALEUR="2400302" /></LISTE_ENTITES>
 ---
 # Refus : un mandataire actif a numero CNBF (Res.TEXTE_MANDATAIRE_ACTIF_AVEC_CNBF, au mot pres). Jumeau accepte : bloc 7 (sans CNBF).
 geste: Confirmer Valider
@@ -28,12 +77,13 @@ ids: M-2400102
 resultat: refuse
 message: « Acteur à garder » est obligatoire : le numéro ou l'abrégé du mandataire qui reprend les affaires.
 ---
-# Refus : un mandataire inactif a garder (la V2 ne propose a garder que les actifs repertories). Jumeau accepte : bloc 7 (DBG24, actif).
+# Refus : un mandataire sans abrege a garder (la liste « a garder » de la V2 exige l'abrege, avec le filtre « ACTIF » comme « TOUS »).
+# Jumeau accepte : la fusion des mandataires (DBG24, repertorie).
 geste: Confirmer Valider
 ids: M-2400102
 valeur: Acteur à garder › Acteur à garder = 2400104
 resultat: refuse
-message: M. INACTIF Garde ne peut pas être gardé : RIG v2 ne garde qu'un mandataire actif et répertorié (avec un abrégé).
+message: M. INACTIF Garde ne peut pas être gardé : RIG v2 ne garde qu'un mandataire répertorié (avec un abrégé).
 ---
 # Refus : l'acteur garde est aussi coche. Jumeau accepte : bloc 7.
 geste: Confirmer Valider

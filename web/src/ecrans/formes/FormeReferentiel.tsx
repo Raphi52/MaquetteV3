@@ -175,8 +175,11 @@ export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
         <VuesListe vues={[{ cle: Tous, libelle: 'Toutes', compte: lignes.length },
                           ...d.groupes.map((g) => ({ cle: g, libelle: g, compte: lignes.filter((l) => l.groupe === g).length }))]}
                    active={groupe} choisir={poserGroupe}>
-          <button type="button" className="rig-lm-outil rig-lm-outil--fort" disabled={edition?.cle === 'nouvelle'}
-                  onClick={() => { poserEdition({ cle: 'nouvelle', valeurs: d.colonnes.map(() => ''), ouvertes: d.colonnes.map(() => '') }); annoncer(null) }}>Ajouter</button>
+          {/* Sans « Ajouter » quand la fiche RIG v2 n'ajoute pas de ligne (descripteur.ajout faux : Dates de travail). */}
+          {d.ajout !== false && (
+            <button type="button" className="rig-lm-outil rig-lm-outil--fort" disabled={edition?.cle === 'nouvelle'}
+                    onClick={() => { poserEdition({ cle: 'nouvelle', valeurs: d.colonnes.map(() => ''), ouvertes: d.colonnes.map(() => '') }); annoncer(null) }}>Ajouter</button>
+          )}
         </VuesListe>
         <Annonce texte={annonce} />
         <div className="rig-table-cadre">
@@ -204,7 +207,8 @@ export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
                   <td className="rig-lm-cellule-menu">
                     <MenuLigne libelle={`Actions — ${l.nom}`} actions={[
                       { libelle: 'Modifier', agir: () => modifier(l) },
-                      { libelle: 'Supprimer', agir: () => supprimer(l) },
+                      // Sans « Supprimer » quand la fiche RIG v2 ne supprime pas (descripteur.suppression faux : Cabinets).
+                      ...(d.suppression !== false ? [{ libelle: 'Supprimer', agir: () => supprimer(l) }] : []),
                       ...parcoursDe(d, l.groupe).gestes.map((g) => ({ libelle: g, agir: () => agir(g, l) })),
                     ]} />
                   </td>

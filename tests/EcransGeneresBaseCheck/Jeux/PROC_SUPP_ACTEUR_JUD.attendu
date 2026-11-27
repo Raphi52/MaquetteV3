@@ -2,13 +2,14 @@
 # « Remplacer un acteur » (LecteurRemplacementActeur) : les acteurs des cinq types de la V2 qui ont AU MOINS UNE liaison
 # (HaveLiaisonEntite : la V2 n'ouvre cet ecran que pour eux, OPE_EDITION_GGREFFIER.cs:113-114), puis les remplacements faits (ACTEUR_SUPP).
 # Les juges, greffiers, parquetiers et mandataires PC lies viennent des jeux joues avant (PROC_CHM, PROC_COMPO, PROC_COURRIERM, PROC_DBE_INJ,
-# PROC_GCONV, PROC_LISTE_DELIBERES, PROC_PREAUD, PROC_RETAUD, PROC_SIGNJUD, PROC_SURVIP, PROC_TAXESETTOURS, PROC_CABINET...) : meme tables,
+# PROC_GCONV, PROC_LISTE_DELIBERES, PROC_PREAUD, PROC_RAPPACTEUR (FUSIONJUGE, FUSIONPC), PROC_RETAUD, PROC_SIGNJUD, PROC_SURVIP, PROC_TAXESETTOURS, PROC_CABINET...) : meme tables,
 # et la V2 les traite tous. Un jeu qui ajoute un acteur lie l'ajoute ici.
 # Ecartes, jumeaux de REMPLACE Jules (J14R, lie par deux juges d'instance) : GARDE Karine (J14K) et INACTIF Xavier (J14X), sans liaison ;
 # MANDA GARDE (M14K) et INTERV GARDE (I14K), sans liaison. JUGEDEUX (JDE14) est lie par le cabinet 2400405 de PROC_CABINET.sql.
 # Ordre : groupe (Magistrats et greffe, Mandataires PC, Intervenants PC), les acteurs a remplacer (AFaire) par nom, puis les remplacements
 # faits (Validee, du plus recent au plus ancien). Nom : « NOM Prénom (abrégé) ».
 COLLEGE | Juge · actif | Magistrats et greffe | AFaire | []
+FUSIONJUGE Rose | Juge · actif | Magistrats et greffe | AFaire | []
 GREFFAUTRE Ines (GAUTRE) | Greffier assermenté · actif | Magistrats et greffe | AFaire | []
 GREFFIERA (G17A) | Greffier assermenté · actif | Magistrats et greffe | AFaire | []
 GREFFIERZ (G17Z) | Greffier assermenté · actif | Magistrats et greffe | AFaire | []
@@ -40,6 +41,7 @@ ADMINISTRA | Mandataire PC · actif | Mandataires PC | AFaire | []
 ALPHA MANDATAIRE SELARL (MA17) | Mandataire PC · actif | Mandataires PC | AFaire | []
 BETA ADMINISTRATEUR SCP (AD17) | Mandataire PC · actif | Mandataires PC | AFaire | []
 FINI | Mandataire PC · actif | Mandataires PC | AFaire | []
+FUSIONPC Selarl | Mandataire PC · actif | Mandataires PC | AFaire | []
 LIQPREMIER | Mandataire PC · actif | Mandataires PC | AFaire | []
 LIQUI Paul | Mandataire PC · actif | Mandataires PC | AFaire | []
 MANDA | Mandataire PC · actif | Mandataires PC | AFaire | []

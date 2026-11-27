@@ -343,6 +343,21 @@ describe('Forme Referentiel : une grille editable', () => {
     fireEvent.click(bouton('Annuler'))
     expect(container.querySelector('tr.rig-eg-ligne--edition')).toBeNull()
   })
+  // Controle final du lot 14 (27/11/2026) : « Dates de travail » offrait « Ajouter » (une demonstration) alors que la V2
+  // n'ajoute ni ne supprime de date (ETP_CATEGORIE.cs:10-12), et « Cabinets » offrait « Supprimer », absent de PROC_CABINET.
+  it('sans ajout ni suppression V2 (descripteur.ajout / suppression faux), ni « Ajouter » ni « Supprimer » ; par defaut, les deux', async () => {
+    const actions = (container: HTMLElement) => {
+      fireEvent.click(container.querySelector('tbody tr .rig-lm-menu')!)
+      return [...container.querySelectorAll('[role=menuitem]')].map((b) => b.textContent)
+    }
+    const fige = await monter({ ...ref(), ajout: false, suppression: false })
+    expect(fige.bouton('Ajouter')).toBeUndefined()
+    expect(actions(fige.container)).toEqual(['Modifier'])
+    cleanup()
+    const libre = await monter(ref())
+    expect(libre.bouton('Ajouter')).toBeDefined()
+    expect(actions(libre.container)).toEqual(['Modifier', 'Supprimer'])
+  })
   it('un double-clic met la ligne en modification, avec ses valeurs', async () => {
     const { container } = await monter(ref())
     fireEvent.doubleClick(container.querySelector('tbody tr')!)

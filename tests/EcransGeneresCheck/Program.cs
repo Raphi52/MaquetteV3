@@ -443,6 +443,9 @@ foreach (var d in descripteurs)
         defauts.Add($"objet unique designe par {d.Criteres.Length} criteres : un seul, son numero (la fiche RIG v2 le recoit)");
     // Le resultat du geste (2e temps, apres lui) n'existe que pour une operation sur un objet unique.
     if (d.Resultat.Length > 0 && !d.ObjetUnique) defauts.Add("un resultat apres le geste hors d'une Operation sur un objet unique");
+    // Sans ajout ou sans suppression V2 (lot 14 : Dates de travail, Cabinets) : seule la grille d'un Referentiel les offre.
+    if ((!d.Ajout || !d.Suppression) && d.Forme != FormeEcran.Referentiel)
+        defauts.Add($"ajout ou suppression retire sur une forme {d.Forme} : seule la grille d'un Referentiel les offre");
     if (!reuni)
     {
         switch (d.Forme)
