@@ -287,13 +287,13 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             ],
             Lignes =
             [
-                new LigneEcran("Sauvegarde du poste", "Exploitation · publié", "Exploitation", "Validee", [0, 1, 3]),
-                new LigneEcran("Reprise après incident", "Exploitation · texte à relire", "Exploitation", "EnCours", [0, 1]),
-                new LigneEcran("Droits des utilisateurs", "Exploitation · titre saisi", "Exploitation", "EnCours", [0]),
-                new LigneEcran("Nouveautés de la version", "Développement · publié", "Développement", "Validee", [0, 1, 2, 3]),
-                new LigneEcran("Notes de version", "Développement · à rédiger", "Développement", "AFaire", []),
-                new LigneEcran("Comment ouvrir une affaire", "Foire aux questions · publié", "Foire aux questions", "Validee", [0, 1, 3]),
-                new LigneEcran("Imprimer une attestation", "Foire aux questions · en rédaction", "Foire aux questions", "EnCours", [0, 1]),
+                new LigneEcran("Sauvegarde du poste", "Exploitation · publié · exemple : articles de la base WIKI du support Amitel, absente de la base du greffe", "Exploitation", "Validee", [0, 1, 3]),
+                new LigneEcran("Reprise après incident", "Exploitation · texte à relire · exemple : articles de la base WIKI du support Amitel, absente de la base du greffe", "Exploitation", "EnCours", [0, 1]),
+                new LigneEcran("Droits des utilisateurs", "Exploitation · titre saisi · exemple : articles de la base WIKI du support Amitel, absente de la base du greffe", "Exploitation", "EnCours", [0]),
+                new LigneEcran("Nouveautés de la version", "Développement · publié · exemple : articles de la base WIKI du support Amitel, absente de la base du greffe", "Développement", "Validee", [0, 1, 2, 3]),
+                new LigneEcran("Notes de version", "Développement · à rédiger · exemple : articles de la base WIKI du support Amitel, absente de la base du greffe", "Développement", "AFaire", []),
+                new LigneEcran("Comment ouvrir une affaire", "Foire aux questions · publié · exemple : articles de la base WIKI du support Amitel, absente de la base du greffe", "Foire aux questions", "Validee", [0, 1, 3]),
+                new LigneEcran("Imprimer une attestation", "Foire aux questions · en rédaction · exemple : articles de la base WIKI du support Amitel, absente de la base du greffe", "Foire aux questions", "EnCours", [0, 1]),
             ],
         },
 
@@ -322,12 +322,12 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             ],
             Lignes =
             [
-                new LigneEcran("Portail d'exploitation du greffe", "Site interne · ouverte", "Sites internes", "Validee", [0, 1]),
-                new LigneEcran("Guide des procédures", "Site interne · ouverte en détaché", "Sites internes", "Validee", [0, 1, 2]),
-                new LigneEcran("Intranet du greffe", "Site interne · adresse à saisir", "Sites internes", "EnCours", [0]),
-                new LigneEcran("Tableau de bord de suivi", "Site interne · à ouvrir", "Sites internes", "AFaire", []),
-                new LigneEcran("Site d'un prestataire", "Site externe · ouvert", "Sites externes", "Validee", [0, 1]),
-                new LigneEcran("Page d'actualité externe", "Site externe · à ouvrir", "Sites externes", "AFaire", []),
+                new LigneEcran("Portail d'exploitation du greffe", "Site interne · ouverte · exemple : RIG v2 ouvre l'adresse reçue, sans table ; aucune page externe n'est ouverte ici", "Sites internes", "Validee", [0, 1]),
+                new LigneEcran("Guide des procédures", "Site interne · ouverte en détaché · exemple : RIG v2 ouvre l'adresse reçue, sans table ; aucune page externe n'est ouverte ici", "Sites internes", "Validee", [0, 1, 2]),
+                new LigneEcran("Intranet du greffe", "Site interne · adresse à saisir · exemple : RIG v2 ouvre l'adresse reçue, sans table ; aucune page externe n'est ouverte ici", "Sites internes", "EnCours", [0]),
+                new LigneEcran("Tableau de bord de suivi", "Site interne · à ouvrir · exemple : RIG v2 ouvre l'adresse reçue, sans table ; aucune page externe n'est ouverte ici", "Sites internes", "AFaire", []),
+                new LigneEcran("Site d'un prestataire", "Site externe · ouvert · exemple : RIG v2 ouvre l'adresse reçue, sans table ; aucune page externe n'est ouverte ici", "Sites externes", "Validee", [0, 1]),
+                new LigneEcran("Page d'actualité externe", "Site externe · à ouvrir · exemple : RIG v2 ouvre l'adresse reçue, sans table ; aucune page externe n'est ouverte ici", "Sites externes", "AFaire", []),
             ],
         },
 
@@ -556,12 +556,12 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             ],
             Lignes =
             [
-                new LigneEcran("Extrait Kbis · article 1", "Calcul de prix · terminé", "Calcul de prix", "Validee", [0, 2]),
-                new LigneEcran("Bilan · article 2", "Calcul de prix · à lancer", "Calcul de prix", "AFaire", []),
-                new LigneEcran("Scénario de commande A", "Commandes de test · terminé", "Commandes de test", "Validee", [0, 1, 2, 3]),
-                new LigneEcran("Scénario de commande B", "Commandes de test · en cours", "Commandes de test", "EnCours", [0, 1]),
-                new LigneEcran("Sonde de lecture C", "Commandes de test · à lancer", "Commandes de test", "AFaire", []),
-                new LigneEcran("Journal du 12/03/2026", "Journal · lecture seule", "Journal", "EnCours", [3]),
+                new LigneEcran("Extrait Kbis · article 1", "Calcul de prix · terminé · exemple : journal BORNE_LOG_PARAMETRE de COMMUN_RIG, absent de la base du greffe ; bornes pilotées par un service externe", "Calcul de prix", "Validee", [0, 2]),
+                new LigneEcran("Bilan · article 2", "Calcul de prix · à lancer · exemple : journal BORNE_LOG_PARAMETRE de COMMUN_RIG, absent de la base du greffe ; bornes pilotées par un service externe", "Calcul de prix", "AFaire", []),
+                new LigneEcran("Scénario de commande A", "Commandes de test · terminé · exemple : journal BORNE_LOG_PARAMETRE de COMMUN_RIG, absent de la base du greffe ; bornes pilotées par un service externe", "Commandes de test", "Validee", [0, 1, 2, 3]),
+                new LigneEcran("Scénario de commande B", "Commandes de test · en cours · exemple : journal BORNE_LOG_PARAMETRE de COMMUN_RIG, absent de la base du greffe ; bornes pilotées par un service externe", "Commandes de test", "EnCours", [0, 1]),
+                new LigneEcran("Sonde de lecture C", "Commandes de test · à lancer · exemple : journal BORNE_LOG_PARAMETRE de COMMUN_RIG, absent de la base du greffe ; bornes pilotées par un service externe", "Commandes de test", "AFaire", []),
+                new LigneEcran("Journal du 12/03/2026", "Journal · lecture seule · exemple : journal BORNE_LOG_PARAMETRE de COMMUN_RIG, absent de la base du greffe ; bornes pilotées par un service externe", "Journal", "EnCours", [3]),
             ],
         },
 
@@ -757,13 +757,13 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             ],
             Lignes =
             [
-                new LigneEcran("Dossiers ouverts par mois", "Requêtes préparées · exécutée", "Requêtes préparées", "Validee", [0, 2, 3]),
-                new LigneEcran("Mandataires actifs", "Requêtes préparées · à lancer", "Requêtes préparées", "AFaire", []),
-                new LigneEcran("Tiers payeurs actifs", "Requêtes préparées · critères à saisir", "Requêtes préparées", "EnCours", [0, 1]),
-                new LigneEcran("Instances du trimestre", "Requêtes à critères · critères à saisir", "Requêtes à critères", "EnCours", [0]),
-                new LigneEcran("Affaires par cabinet", "Requêtes à critères · exécution en cours", "Requêtes à critères", "EnCours", [0, 1]),
-                new LigneEcran("Relances de paiement", "Requêtes à critères · exécutée", "Requêtes à critères", "Validee", [0, 1, 2, 3]),
-                new LigneEcran("Décisions par juge", "Requêtes à critères · à lancer", "Requêtes à critères", "AFaire", []),
+                new LigneEcran("Dossiers ouverts par mois", "Requêtes préparées · exécutée · exemple : catalogue REQUETE de COMMUN_RIG, absent de la base du greffe", "Requêtes préparées", "Validee", [0, 2, 3]),
+                new LigneEcran("Mandataires actifs", "Requêtes préparées · à lancer · exemple : catalogue REQUETE de COMMUN_RIG, absent de la base du greffe", "Requêtes préparées", "AFaire", []),
+                new LigneEcran("Tiers payeurs actifs", "Requêtes préparées · critères à saisir · exemple : catalogue REQUETE de COMMUN_RIG, absent de la base du greffe", "Requêtes préparées", "EnCours", [0, 1]),
+                new LigneEcran("Instances du trimestre", "Requêtes à critères · critères à saisir · exemple : catalogue REQUETE de COMMUN_RIG, absent de la base du greffe", "Requêtes à critères", "EnCours", [0]),
+                new LigneEcran("Affaires par cabinet", "Requêtes à critères · exécution en cours · exemple : catalogue REQUETE de COMMUN_RIG, absent de la base du greffe", "Requêtes à critères", "EnCours", [0, 1]),
+                new LigneEcran("Relances de paiement", "Requêtes à critères · exécutée · exemple : catalogue REQUETE de COMMUN_RIG, absent de la base du greffe", "Requêtes à critères", "Validee", [0, 1, 2, 3]),
+                new LigneEcran("Décisions par juge", "Requêtes à critères · à lancer · exemple : catalogue REQUETE de COMMUN_RIG, absent de la base du greffe", "Requêtes à critères", "AFaire", []),
             ],
         },
 
