@@ -1,16 +1,24 @@
 # « Suivi dématérialisation » (LecteurSuiviDematerialisation) sur PROC_SDEMATJUD.sql : la liste JAL, puis la liste BODACC, chacune
 # par identifiant. Ecartes : 1908106, 1908107, 1908306 (hors de la plage par defaut), 1908305 (BODACC de type « A »). 1908103 : une
 # ligne (parution et facture recues le meme jour) ; 1908105 : deux (recues a deux dates). 1908108 : son document « AUTRE » ne compte
-# pas. 1908104 (deux parutions) et 1908109 (deux factures) : doublons. Les annonces de PROC_SURVBOD.sql et de PROC_FIBEN.sql n'ont pas d'evenement de procedure : RIG v2 ne les montre pas ici.
-Publicité 1908101 | Jugement du banc 9 du {J-10} · Chambre de commerce · non envoyée | JAL (journal d'annonces légales) | AFaire | []
+# pas. 1908104 (deux parutions) et 1908109 (deux factures) : doublons. ETAT : « à éditer » (AFaire) des qu'une parution ou une facture
+# est recue -- les cases de RIG v2 (DataGridViewSdematJud.cs:428-443), doublon compris ; sinon l'erreur, la parution, ou « en attente »
+# (EnCours), non envoyee ou envoyee. 1908110 a 1908114 : les lignes de « Valider » (PROC_SDEMATJUD.gestes) ; 1908112 est sur une
+# prevention absente de la base : ni numero ni nom d'affaire. Les annonces de PROC_SURVBOD.sql et de PROC_FIBEN.sql n'ont pas d'evenement de procedure : RIG v2 ne les montre pas ici.
+Publicité 1908101 | Jugement du banc 9 du {J-10} · Chambre de commerce · non envoyée | JAL (journal d'annonces légales) | EnCours | []
 Publicité 1908102 | Jugement du banc 9 · envoyée le {J-5} · envoi EDI le {J-5} | JAL (journal d'annonces légales) | EnCours | []
-Publicité 1908103 | Jugement du banc 9 du {M-1} · envoyée le {J-20} · parue le {J-15} (n° B9P103) · parution reçue · facture reçue | JAL (journal d'annonces légales) | Validee | []
-Publicité 1908104 | Jugement du banc 9 du {J-10} · envoyée le {J-12} · parue le {J-4} · parution reçue · Publicité déjà existante | JAL (journal d'annonces légales) | Rejetee | []
-Publicité 1908105 | Jugement du banc 9 du {J-10} · envoyée le {J-9} · parue le {J-7} · parution reçue | JAL (journal d'annonces légales) | Validee | []
-Publicité 1908105 | Jugement du banc 9 du {J-10} · envoyée le {J-9} · parue le {J-7} · facture reçue | JAL (journal d'annonces légales) | Validee | []
-Publicité 1908108 | Jugement du banc 9 du {J+0} · non envoyée | JAL (journal d'annonces légales) | AFaire | []
-Publicité 1908109 | Jugement du banc 9 du {J-10} · envoyée le {J-8} · facture reçue · Publicité déjà existante | JAL (journal d'annonces légales) | Rejetee | []
-Annonce 1908301 | Jugement du banc 9 du {J-10} · non envoyée | BODACC | AFaire | []
+Publicité 1908103 | Jugement du banc 9 du {M-1} · envoyée le {J-20} · parue le {J-15} (n° B9P103) · parution reçue · facture reçue | JAL (journal d'annonces légales) | AFaire | []
+Publicité 1908104 | Jugement du banc 9 du {J-10} · envoyée le {J-12} · parue le {J-4} · parution reçue · Publicité déjà existante | JAL (journal d'annonces légales) | AFaire | []
+Publicité 1908105 | Jugement du banc 9 du {J-10} · envoyée le {J-9} · parue le {J-7} · parution reçue | JAL (journal d'annonces légales) | AFaire | []
+Publicité 1908105 | Jugement du banc 9 du {J-10} · envoyée le {J-9} · parue le {J-7} · facture reçue | JAL (journal d'annonces légales) | AFaire | []
+Publicité 1908108 | Jugement du banc 9 du {J+0} · non envoyée | JAL (journal d'annonces légales) | EnCours | []
+Publicité 1908109 | Jugement du banc 9 du {J-10} · envoyée le {J-8} · facture reçue · Publicité déjà existante | JAL (journal d'annonces légales) | AFaire | []
+Publicité 1908110 · 1990P14103 · CHM GAMMA | Jugement du banc 9 du {J-3} · envoyée le {J-3} · parue le {J-2} · parution reçue · facture reçue | JAL (journal d'annonces légales) | AFaire | []
+Publicité 1908111 · 1990V14201 · XLIEN PRV ALPHA | Jugement du banc 9 du {J-3} · non envoyée · parue le {J-2} · parution reçue | JAL (journal d'annonces légales) | AFaire | []
+Publicité 1908112 | Jugement du banc 9 du {J-3} · non envoyée · parution reçue | JAL (journal d'annonces légales) | AFaire | []
+Publicité 1908113 · 1990P14103 · CHM GAMMA | Jugement du banc 9 du {J-3} · non envoyée · facture reçue | JAL (journal d'annonces légales) | AFaire | []
+Publicité 1908114 · 1990P14103 · CHM GAMMA | Jugement du banc 9 du {J-3} · non envoyée · parution reçue | JAL (journal d'annonces légales) | AFaire | []
+Annonce 1908301 | Jugement du banc 9 du {J-10} · non envoyée | BODACC | EnCours | []
 Annonce 1908302 | Jugement du banc 9 · envoyée le {J-5} · envoi EDI le {J-5} | BODACC | EnCours | []
 Annonce 1908303 | Jugement du banc 9 du {M-1} · envoyée le {J-20} · parue le {J-10} (n° B9N303) | BODACC | Validee | []
 Annonce 1908304 | Jugement du banc 9 du {J-10} · non envoyée · Le boddac a été rejeté | BODACC | Rejetee | []

@@ -65,6 +65,16 @@ internal static class CreationV2
             {
                 ["ACTDP_BD_NUM_TRANSFERE"] = false, ["ACTDP_COMMANDABLE"] = false, ["ACTDP_INPI_ETAT"] = "1", ["ACTDP_SANS_DOCUMENT"] = false,
             },
+            // Lot 9 (27/11/2026, « Valider » de Suivi dematerialisation) : les colonnes NOT NULL a DEFAULT de ces deux tables (lues
+            // dans sys.default_constraints de RIG_DEV ce jour), que la base V3 garde sans leur defaut (PROC_REGJUD.sql:47-50).
+            ["v2.DEMANDE_EDITION"] = new Dictionary<string, object>
+            {
+                ["DMNED_NOMBRE_EXEMPLAIRE"] = (short)1, ["DMNED_IMPRESSION"] = true, ["DMNED_PAPIER_TRAME"] = false, ["DMNED_AGRAFAGE"] = false,
+                ["DMNED_RECTO_VERSO"] = false, ["DMNED_AFF_AVANT_IMPRESSION"] = false, ["DMNED_GROUPAGE_AUTOMATIQUE"] = true,
+                ["DMNED_RESUME"] = false, ["DMNED_READ_ONLY"] = false, ["DMNED_ENVOI_PAR_MAIL"] = false, ["DMNED_HAS_NUMLRAR"] = false,
+                ["DMNED_IS_NON_SUPPRESSIBLE"] = false, ["DMNED_HAS_NUMLR"] = false, ["DMNED_MASQUER_COFFRE_FORT"] = false,
+            },
+            ["v2.GED_RIG"] = new Dictionary<string, object> { ["GDRG_VIDIGED_X"] = 0 },
         };
 
     /// <summary>
