@@ -215,6 +215,25 @@ describe('EcranCloture branche sur la base', () => {
     expect(container.querySelector('tbody tr')!.textContent).toContain('GAMMA BASE')
   })
 
+  it('en base, aucun montant de forfait invente : la tete, la carte et le pied comptent la case « au forfait »', async () => {
+    // La base ne porte que la case PRCLL_FORFAIT_FACTURE (EcranClotureBase.cs, Forfait vide) : « Forfaits 0,00 € » serait faux.
+    installerFauxPont({
+      'EcranCloture.Affaires': () => ({ mode: 'serveur', message: null, total: 2, aujourdhui: '2026-11-27',
+        lignes: [base, { ...base, role: 'P2700702', numPc: 'P2700702', dossier: '2019B27002', auForfait: false, aFacturer: true }] }),
+    })
+    const { container } = render(<EcranCloture ouvrirDossier={vi.fn()} />)
+    await vi.waitFor(() => expect(container.querySelector('.rig-lm-synthese')!.textContent).toContain('2 affaires sur 2'))
+    expect(container.textContent).not.toContain('0,00')
+    // Ni audience ni chambre en base (choisies a l'enrolement) : la cellule reste vide, pas « undefined/undefined/ ».
+    expect(container.textContent).not.toContain('undefined')
+    expect(container.querySelector('tbody .rig-lm-identite__objet')!.textContent).toBe('P2700701')
+    expect(container.querySelector('.rig-lm-synthese')!.textContent).toContain('1 au forfait')
+    const cartes = [...container.querySelectorAll('.rig-lm-carte')]
+    expect(cartes[0]!.textContent).toContain('Au forfait')
+    expect(cartes[0]!.querySelector('.rig-lm-carte__valeur')!.textContent).toBe('1 sur 2')
+    expect(container.querySelector('.rig-lm-pied')!.textContent).toContain('Au forfait 1')
+  })
+
   it('en panne : le motif, aucune ligne d exemple', async () => {
     installerFauxPont({
       'EcranCloture.Affaires': () => ({ mode: 'erreur', message: 'La base du greffe 3801 ne répond pas.', lignes: [], total: 0, aujourdhui: '2026-11-27' }),
