@@ -1,0 +1,143 @@
+# « Mandataires » (EcrivainMandataires), en grille (Referentiel) : « Ajouter », « Modifier », « Supprimer » un mandataire
+# (OPE_SAISIE_MANDATAIRE de PROC_MANDATAIRE ; la suppression de la V2 est celle de la fusion, PROC_RAPPACTEUR). Les cellules
+# arrivent par libelle de colonne. Lignes du jeu : PROC_MANDATAIRE.sql, PROC_RAPPACTEUR.sql et les jeux RPJC (PROC_MANDATAIRE.attendu).
+# Joue APRES PROC_DEST_REDA.gestes : la partie 2000601 de PROC_DEST_REDA.sql a 1500101 pour avocat postulant et 1500102 pour
+# avocat plaidant -- deux liaisons reelles.
+
+# Refus : la civilite est obligatoire (MetierObligatoire du combo civilite). Jumeau accepte : bloc 5.
+geste: Ajouter
+valeur: Désignation = NOUVEAU Banc
+resultat: refuse
+message: « Civilité » est obligatoire.
+---
+# Refus : une civilite hors de la table CIVILITE (ULT_COMBO_CIVILITE). Jumeau accepte : bloc 5 (« Me », l'abrege d'edition de ME).
+geste: Ajouter
+valeur: Civilité = XX
+valeur: Désignation = NOUVEAU Banc
+resultat: refuse
+message: « Civilité » : « XX » n'est pas une civilité de la table CIVILITE.
+---
+# Refus : un abrege deja porte (Mandataire.AbregeExiste, « Abrege existant » ; saisi en minuscules, compare en majuscules). Jumeau
+# accepte : bloc 5 (un abrege libre).
+geste: Ajouter
+valeur: Civilité = ME
+valeur: Désignation = NOUVEAU Banc
+valeur: Abrégé = ard15
+resultat: refuse
+message: Abrege existant
+---
+# Refus : un courriel hors de la regle de la V2 (RegEx.Email, « Email invalide »). Jumeau accepte : bloc 5.
+geste: Ajouter
+valeur: Civilité = ME
+valeur: Désignation = NOUVEAU Banc
+valeur: Courriel = pas-un-courriel
+resultat: refuse
+message: Email invalide
+---
+# Un mandataire repertorie : civilite saisie par son abrege d'edition (« Me » -> ME), abrege en majuscules, qualification controlee
+# (AV, QUALIF_PROFESSION) ; actif, un numero source neuf (Mandataire.CreateMandataire, Mandataire.cs:552).
+geste: Ajouter
+valeur: Civilité = Me
+valeur: Désignation = NOUVEAU Banc
+valeur: Abrégé = nou24
+valeur: Courriel = nouveau@exemple.test
+valeur: Qualification = av
+resultat: fait
+message: Mandataire Me NOUVEAU Banc créé, abrégé NOU24.
+lignes:
+ZZ15 | désignation à saisir · abrégé ZZ15 | Personne physique | EnCours | [2]
+ALPHA Irène | civilité à saisir · non répertorié · CNBF 300011 | Personne physique | AFaire | []
+Me ALPHA Irène | abrégé ALP13 · CNBF 130001 | Personne physique | Validee | [0,2]
+Me ANCIEN DELTA | abrégé DEL13A · CNBF 130004 | Personne physique | Validee | [0,2]
+Me ARDOISE Irène | abrégé ARD15 · SIREN 900 500 001 · CNBF 150001 | Personne physique | Validee | [0,1,2,3,4]
+BETA Simon | civilité à saisir · non répertorié · CNBF 300013 | Personne physique | AFaire | []
+Mme CHANTELLE Olga | non répertorié | Personne physique | Validee | [0]
+M. CNBF Actif | non répertorié · CNBF 240001 | Personne physique | Validee | [0]
+Mme DELTA Lina | abrégé DEL13B · CNBF 130004 | Personne physique | Validee | [0,2]
+DORVAL Théo | civilité à saisir · non répertorié | Personne physique | EnCours | [1]
+Me DOUBLON Garde | abrégé DBG24 | Personne physique | Validee | [0,2]
+Me DOUBLON Garde | non répertorié | Personne physique | Validee | [0]
+EPSILON Marc | civilité à saisir · non répertorié | Personne physique | AFaire | []
+Me GAMMA Olga | non répertorié · CNBF 130003 | Personne physique | Validee | [0]
+KAPPA AVOCATS SELARL | abrégé KAPPA15 · SIREN 900 500 002 | Personne morale | Validee | [0,2]
+LAMBDA CONSEIL | civilité non déterminée · non répertorié | Personne physique | Validee | [0,4]
+Me NOUVEAU Banc | abrégé NOU24 | Personne physique | Validee | [0,1,2,4] | valeurs: NOUVEAU Banc ; ME ; NOU24 ;  ; nouveau@exemple.test ; AV ; oui
+NU JURIS SAS | non répertorié | Personne morale | Validee | [0,1]
+M. AARON Paul | abrégé AAR15 · inactif | Personne physique | Validee | [0,2]
+ANCIEN BETA | civilité à saisir · non répertorié · CNBF 300013 · inactif | Personne physique | AFaire | []
+Me BETA Simon | abrégé BET13 · CNBF 130002 · inactif | Personne physique | Validee | [0,2]
+M. INACTIF Garde | non répertorié · inactif | Personne physique | Validee | [0]
+controle: SELECT CONCAT(MNDTR_CIVILITE, '/', MNDTR_ABREGE, '/', MNDTR_QUALIF_PROFESSION, '/', CAST(MNDTR_ACTIF AS int), '/', CASE WHEN LEN(MNDTR_NUMERO_SOURCE) = 36 THEN 'guid' ELSE 'sans' END) FROM v2.MANDATAIRE WHERE MNDTR_ABREGE = 'NOU24' => ME/NOU24/AV/1/guid
+---
+# Refus en modification : l'abrege d'un AUTRE mandataire (AbregeExiste, le mandataire lui-meme exclu). Jumeau accepte : bloc 9.
+geste: Modifier
+ids: 1500109
+valeur: Abrégé = ARD15
+resultat: refuse
+message: Abrege existant
+---
+# Refus : la designation videe (obligatoire). Jumeau accepte : bloc 9 (designation inchangee).
+geste: Modifier
+ids: 1500109
+valeur: Désignation =
+resultat: refuse
+message: « Désignation » est obligatoire.
+---
+# Refus : rien ne change. Jumeau accepte : bloc 9.
+geste: Modifier
+ids: 1500109
+valeur: Désignation = NU JURIS SAS
+resultat: refuse
+message: Rien à enregistrer : aucune valeur ne change.
+---
+# NU JURIS SAS repertorie (NUJ24, en majuscules), un courriel, et desactive (la case « Actif » de la modification) : il passe apres les
+# actifs. Le message est le bandeau de la V2 en modification (OPE_SAISIE_MANDATAIRE.Designer.cs:170-172).
+geste: Modifier
+ids: 1500109
+valeur: Abrégé = nuj24
+valeur: Courriel = contact@nujuris.test
+valeur: Actif =
+resultat: fait
+message: Mandataire NU JURIS SAS enregistré : les modifications se reportent dans toutes ses affaires.
+controle: SELECT CONCAT(MNDTR_ABREGE, '/', MNDTR_ADRESSE_MAIL, '/', CAST(MNDTR_ACTIF AS int)) FROM v2.MANDATAIRE WHERE MNDTR_ID_MNDTR = 1500109 => NUJ24/contact@nujuris.test/0
+---
+# Refus : un mandataire actif qui a un numero CNBF (PROC_RAPPACTEUR, Res.cs:35, au mot pres). Jumeau accepte : bloc 12 (sans CNBF).
+geste: Supprimer
+ids: 1500101
+resultat: refuse
+message: Impossible de supprimer un mandataire actif avec abrégé et n° CNBF. (Me ARDOISE Irène) Passer par le processus RPVAINS
+---
+# Refus : un mandataire utilise -- avocat plaidant de la partie 2000601 (PROC_DEST_REDA.sql). La V2 ne le supprime qu'apres avoir repris
+# ses liaisons sur un autre. Jumeau accepte : bloc 12 (aucune liaison).
+geste: Supprimer
+ids: 1500102
+resultat: refuse
+message: Suppression impossible : le mandataire Mme CHANTELLE Olga est utilisé (1 × parties (avocat plaidant)). RIG v2 ne supprime un mandataire qu'après avoir repris ses liaisons sur un autre : passez par « Rapprocher des acteurs ».
+---
+# EPSILON Marc, sans liaison ni CNBF : supprime ; il quitte la liste.
+geste: Supprimer
+ids: 1500104
+resultat: fait
+message: Mandataire EPSILON Marc supprimé.
+lignes:
+ZZ15 | désignation à saisir · abrégé ZZ15 | Personne physique | EnCours | [2]
+ALPHA Irène | civilité à saisir · non répertorié · CNBF 300011 | Personne physique | AFaire | []
+Me ALPHA Irène | abrégé ALP13 · CNBF 130001 | Personne physique | Validee | [0,2]
+Me ANCIEN DELTA | abrégé DEL13A · CNBF 130004 | Personne physique | Validee | [0,2]
+Me ARDOISE Irène | abrégé ARD15 · SIREN 900 500 001 · CNBF 150001 | Personne physique | Validee | [0,1,2,3,4]
+BETA Simon | civilité à saisir · non répertorié · CNBF 300013 | Personne physique | AFaire | []
+Mme CHANTELLE Olga | non répertorié | Personne physique | Validee | [0]
+M. CNBF Actif | non répertorié · CNBF 240001 | Personne physique | Validee | [0]
+Mme DELTA Lina | abrégé DEL13B · CNBF 130004 | Personne physique | Validee | [0,2]
+DORVAL Théo | civilité à saisir · non répertorié | Personne physique | EnCours | [1]
+Me DOUBLON Garde | abrégé DBG24 | Personne physique | Validee | [0,2]
+Me DOUBLON Garde | non répertorié | Personne physique | Validee | [0]
+Me GAMMA Olga | non répertorié · CNBF 130003 | Personne physique | Validee | [0]
+KAPPA AVOCATS SELARL | abrégé KAPPA15 · SIREN 900 500 002 | Personne morale | Validee | [0,2]
+LAMBDA CONSEIL | civilité non déterminée · non répertorié | Personne physique | Validee | [0,4]
+Me NOUVEAU Banc | abrégé NOU24 | Personne physique | Validee | [0,1,2,4]
+M. AARON Paul | abrégé AAR15 · inactif | Personne physique | Validee | [0,2]
+ANCIEN BETA | civilité à saisir · non répertorié · CNBF 300013 · inactif | Personne physique | AFaire | []
+Me BETA Simon | abrégé BET13 · CNBF 130002 · inactif | Personne physique | Validee | [0,2]
+M. INACTIF Garde | non répertorié · inactif | Personne physique | Validee | [0]
+NU JURIS SAS | abrégé NUJ24 · inactif | Personne morale | Validee | [0,1,2]

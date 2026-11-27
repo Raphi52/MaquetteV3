@@ -1,0 +1,56 @@
+# « Rapprocher des acteurs » (EcrivainRapprochementActeurs) : « Confirmer » la fusion des acteurs coches dans l'acteur garde
+# (_VerifierMandataires et _DeleteMandataires, OPE_SELECTION_ACTEUR.Mandataires.cs:188-372). Lignes : PROC_RAPPACTEUR.sql.
+# Joue APRES PROC_MANDATAIRE.gestes (« Rapprocher » trie apres « Mandataire ») : les mandataires 24001xx n'y sont pas touches.
+
+# Refus : rien de coche (Res.TEXTE_SELECTIONNEZ_SVP, au mot pres). Jumeau accepte : bloc 7.
+geste: Confirmer Valider
+valeur: Acteur à garder › Acteur à garder = DBG24
+resultat: refuse
+message: Il faut sélectionner au moins un mandataire à supprimer dans la grille
+---
+# Refus : un juge -- la fusion des juges n'est pas reprise dans RIG v3 (nommee). Jumeau accepte : bloc 7 (un mandataire).
+geste: Confirmer Valider
+ids: J-1702301
+valeur: Acteur à garder › Acteur à garder = 1
+resultat: refuse
+message: La fusion des juges (sièges, audiences, instances, décisions, mesures… : 12 tables, PROC_RAPPACTEUR) n'est pas encore reprise dans RIG v3.
+---
+# Refus : un mandataire actif a numero CNBF (Res.TEXTE_MANDATAIRE_ACTIF_AVEC_CNBF, au mot pres). Jumeau accepte : bloc 7 (sans CNBF).
+geste: Confirmer Valider
+ids: M-2400103
+valeur: Acteur à garder › Acteur à garder = DBG24
+resultat: refuse
+message: Impossible de supprimer un mandataire actif avec abrégé et n° CNBF. (M. CNBF Actif) Passer par le processus RPVAINS
+---
+# Refus : pas d'acteur a garder. Jumeau accepte : bloc 7.
+geste: Confirmer Valider
+ids: M-2400102
+resultat: refuse
+message: « Acteur à garder » est obligatoire : le numéro ou l'abrégé du mandataire qui reprend les affaires.
+---
+# Refus : un mandataire inactif a garder (la V2 ne propose a garder que les actifs repertories). Jumeau accepte : bloc 7 (DBG24, actif).
+geste: Confirmer Valider
+ids: M-2400102
+valeur: Acteur à garder › Acteur à garder = 2400104
+resultat: refuse
+message: M. INACTIF Garde ne peut pas être gardé : RIG v2 ne garde qu'un mandataire actif et répertorié (avec un abrégé).
+---
+# Refus : l'acteur garde est aussi coche. Jumeau accepte : bloc 7.
+geste: Confirmer Valider
+ids: M-2400102
+valeur: Acteur à garder › Acteur à garder = M-2400102
+resultat: refuse
+message: Me DOUBLON Garde ne peut pas être à la fois gardé et supprimé.
+---
+# La fusion : le doublon 2400102 est remplace par DBG24 (2400101) -- sa creance transitoire, son creancier de PC et son depot demat de
+# type MANDATAIRE passent au garde (le depot de type MANDATAIRE_PC, meme numero, reste) ; la piste d'audit ACTEUR_SUPP porte la trace
+# SQL de la V2 ; puis le doublon est supprime.
+geste: Confirmer Valider
+ids: M-2400102
+valeur: Acteur à garder › Acteur à garder = DBG24
+resultat: fait
+message: Me DOUBLON Garde a été remplacé par Me DOUBLON Garde (DBG24) : ses affaires lui sont reportées.
+controle: SELECT CONCAT((SELECT CRTRA_ID_MNDTR FROM v2.CREANCE_TRANSITOIRE WHERE CRTRA_ID_CRTRA = 2400901), '/', (SELECT CREPC_ID_MNDTR FROM v2.CREANCIER_PC WHERE CREPC_ID_CREPC = 2400911), '/', (SELECT CFECAJV_ID_DEPOSANT FROM v2.DEMAT_CFEC_AJMJ_VIDIGED WHERE CFECAJV_ID_CFECAJV = 2400921), '/', (SELECT CFECAJV_ID_DEPOSANT FROM v2.DEMAT_CFEC_AJMJ_VIDIGED WHERE CFECAJV_ID_CFECAJV = 2400922)) => 2400101/2400101/2400101/2400102
+controle: SELECT COUNT(*) FROM v2.MANDATAIRE WHERE MNDTR_ID_MNDTR = 2400102 => 0
+controle: SELECT CONCAT(ACTSUP_TABLE_SUPP, '/', ACTSUP_ID_SUPP, '/', ACTSUP_ID_REMPL, '/', ACTSUP_SUPP_DESIGNATION, '/', ACTSUP_REMPL_DESIGNATION) FROM v2.ACTEUR_SUPP WHERE ACTSUP_ID_SUPP = 2400102 => MANDATAIRE/2400102/2400101/Me DOUBLON Garde/Me DOUBLON Garde (DBG24)
+controle: SELECT RTRIM(REPLACE(ACTSUP_REQUETE, CHAR(13) + CHAR(10), ' | ')) FROM v2.ACTEUR_SUPP WHERE ACTSUP_ID_SUPP = 2400102 => update CREANCIER_PC set CREPC_ID_MNDTR = 2400101 where CREPC_ID_CREPC in (2400911) | update CREANCE_TRANSITOIRE set CRTRA_ID_MNDTR = 2400101 where CRTRA_ID_CRTRA in (2400901) | update DEMAT_CFEC_AJMJ_VIDIGED set CFECAJV_ID_DEPOSANT = 2400101 where CFECAJV_ID_CFECAJV in (2400921) |

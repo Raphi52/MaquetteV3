@@ -2,6 +2,9 @@
 # dossier (PROC_XEX.cs:21-40), avec son dossier, son numero de gestion et sa designation. Le numero de la demande vient de la
 # numerotation DMD : le message, qui le porte, n'est pas compare ; la demande ecrite l'est par SELECT.
 
+# fix-ok: mesure par le controle final du lot 13 (27/11/2026) -- l'ecran n'imprimait aucun extrait (ApercuKbis appele par
+# Pont/PlanTravailVue.cs:692 seul) : la fiche lit desormais la section « Extrait Kbis », controlee aux blocs 3 et 4.
+
 # Refus : aucun dossier (DoValider de RIG v2 refuse sans MetierBase). Jumeau accepte : bloc 3.
 geste: Confirmer Éditer le Kbis
 resultat: refuse
@@ -25,9 +28,37 @@ fiche: 2300602
 Dossier RCS › Numéro de gestion = 2013B60002
 Demande › Désignation = KBIS INTERNE BETA SAS
 Demande › Identifiant interne = 2300602
+# Sans inscription PM ni etablissement : la designation du dossier, le reste vide (jumeau de 2300601, bloc suivant).
+Extrait Kbis › SIREN = 523 006 020
+Extrait Kbis › Dénomination = KBIS INTERNE BETA SAS
+Extrait Kbis › Forme juridique =
+Extrait Kbis › Capital =
+Extrait Kbis › Adresse du siège =
+Extrait Kbis › Qualité du dirigeant =
 ---
 # Un dossier deja edite s'edite encore (RIG v2 valide une demande XEX par Kbis interne) : une deuxieme demande sur 2300601.
 geste: Confirmer Éditer le Kbis
 ids: 2300601
 resultat: fait
 controle: SELECT COUNT(*) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'XEX' AND DMND_ID_DSRCS = 2300601 => 2
+# L'extrait Kbis du dossier (PROC_XEX.sql) : la plus recente inscription PM, son capital le plus recent (decimal exact), le siege SPM non
+# supprime et son adresse, le premier dirigeant non supprime, la premiere activite non supprimee ; codes par leur libelle.
+fiche: 2300601
+Extrait Kbis › SIREN = 523 006 010
+Extrait Kbis › Code greffe = 3801
+Extrait Kbis › Date d'immatriculation = 2013-01-01
+Extrait Kbis › Dénomination = KBIS INTERNE ALPHA SARL (statuts)
+Extrait Kbis › Forme juridique = Société à responsabilité limitée
+Extrait Kbis › Capital = 15000.50
+Extrait Kbis › Capital variable = oui
+Extrait Kbis › Monnaie = EUR
+Extrait Kbis › Adresse du siège = 12 RUE DU BANC KBIS 38000 GRENOBLE
+Extrait Kbis › Date de début = 2013-01-02
+Extrait Kbis › Origine du fonds = Création
+Extrait Kbis › Mode d'exploitation = Exploitation directe
+Extrait Kbis › Qualité du dirigeant = Président
+Extrait Kbis › Entrée en fonction = 2013-01-01
+Extrait Kbis › SIREN du dirigeant = 123456789
+Extrait Kbis › Activité = Édition de logiciels
+Extrait Kbis › Début d'activité = 2013-01-02
+Extrait Kbis › Code NAF = 5829C

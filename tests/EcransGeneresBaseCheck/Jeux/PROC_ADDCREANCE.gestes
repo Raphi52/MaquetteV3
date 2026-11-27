@@ -50,7 +50,9 @@ valeur: Montants › Rejeté = 50
 resultat: refuse
 message: Une contestation de créance : RIG v2 crée alors une instance (numéro de rôle, parties, décision, événements), que la V3 ne crée pas encore. Rien n'est enregistré.
 ---
-# 6. L'admission : la transitoire 2202108 (MAX + 1), integree aussitot -- creancier PC 2202303, creance PC 2202203, numero d'ordre 2
+# 6. L'admission : une transitoire neuve (MAX + 1), integree aussitot -- un creancier PC neuf (MAX + 1), la creance PC 2202203, numero d'ordre 2
+# (la transitoire et le creancier se designent par leur nom : leur MAX + 1 depend des lignes des autres jeux, celles du lot 14 -- 2400901,
+# 2400911, PROC_RAPPACTEUR.sql -- les numerotent apres elles)
 # (la PC a deja la creance 2202201), montants copies au centime ; la PC sauvee (compteur 3 -> 4, etat info 4 -> 2).
 geste: Creer
 valeur: Procédure collective › Numéro de PC = L12PC0001
@@ -73,11 +75,12 @@ CREANCIER ATTENTE B | PC L12PC0001 · admis 250,75 € · saisie le {J-2} · à 
 CREANCIER ANCIEN E | PC L12PC0002 · admis 300,00 € · saisie le {J-2} · à intégrer | Admission | EnCours | [0,1,3]
 CREANCIER INTEGRE A | PC L12PC0001 · admis 1 000,00 € · saisie le {J-3} · intégrée le {J-3} | Admission | Validee | [0,1,3,6]
 Créance transitoire n° 2202107 | sans PC · aucun montant admis · saisie le {J-4} · à intégrer | Admission | AFaire | []
+Créance transitoire n° 2400901 | sans PC · aucun montant admis · saisie le 01/01/2000 · intégrée le 02/01/2000 | Admission | EnCours | [6]
 controle: SELECT CAST(CRNPC_ADMIS_PRIVI_ECHU AS decimal(19,2)) FROM v2.CREANCE_PC WHERE CRNPC_ID_CRNPC = 2202203 AND CRNPC_ID_PRCLL = 2202001 AND CRNPC_NUM_ORDRE = 2 => 1234.56
-controle: SELECT CAST(CRNPC_ADMIS_CHIRO_ECHU AS decimal(19,2)) FROM v2.CREANCE_PC WHERE CRNPC_ID_CRNPC = 2202203 AND CRNPC_ID_CREPC = 2202303 AND CRNPC_MONNAIE = 'EUR' AND CRNPC_NATURE_CREANCE = 'Nature' AND CRNPC_NATURE_CREANCE_ADM = 'Fournitures' AND CRNPC_ETAT_CREANCE = '0' => 100.10
-controle: SELECT COUNT(*) FROM v2.CREANCIER_PC WHERE CREPC_ID_CREPC = 2202303 AND CREPC_NOM = 'CREANCIER AJOUT G' AND CREPC_CIVILITE = 'SOCIETE' AND CREPC_SIREN = '912000007' AND CREPC_MODE_PRESENTATION = 'A' AND CREPC_SUBROGE = 0 => 1
+controle: SELECT CAST(CRNPC_ADMIS_CHIRO_ECHU AS decimal(19,2)) FROM v2.CREANCE_PC WHERE CRNPC_ID_CRNPC = 2202203 AND CRNPC_ID_CREPC = (SELECT CREPC_ID_CREPC FROM v2.CREANCIER_PC WHERE CREPC_NOM = 'CREANCIER AJOUT G') AND CRNPC_MONNAIE = 'EUR' AND CRNPC_NATURE_CREANCE = 'Nature' AND CRNPC_NATURE_CREANCE_ADM = 'Fournitures' AND CRNPC_ETAT_CREANCE = '0' => 100.10
+controle: SELECT COUNT(*) FROM v2.CREANCIER_PC WHERE CREPC_NOM = 'CREANCIER AJOUT G' AND CREPC_CIVILITE = 'SOCIETE' AND CREPC_SIREN = '912000007' AND CREPC_MODE_PRESENTATION = 'A' AND CREPC_SUBROGE = 0 => 1
 controle: SELECT CONVERT(varchar(10), PRCLL_COMPTEUR_MAJ) + ' ' + PRCLL_ETAT_INFO FROM v2.PROCEDURE_COLLECTIVE WHERE PRCLL_ID_PRCLL = 2202001 => 4 2
-controle: SELECT COUNT(*) FROM v2.CREANCE_TRANSITOIRE WHERE CRTRA_ID_CRTRA = 2202108 AND CRTRA_DATE_INSERTION_RIG IS NOT NULL AND CRTRA_NOM_FICHIER = 'AMITEL' AND CRTRA_LIGNE_ADRESSE_CR = '1 rue du Banc' AND CRTRA_CP_CR = '75001' => 1
+controle: SELECT COUNT(*) FROM v2.CREANCE_TRANSITOIRE WHERE CRTRA_NOM_CR = 'CREANCIER AJOUT G' AND CRTRA_DATE_INSERTION_RIG IS NOT NULL AND CRTRA_NOM_FICHIER = 'AMITEL' AND CRTRA_LIGNE_ADRESSE_CR = '1 rue du Banc' AND CRTRA_CP_CR = '75001' => 1
 controle: SELECT COUNT(*) FROM v2.DEMANDE AS d INNER JOIN v2.AFFAIRE AS a ON a.AFFRE_ID_AFFRE = d.DMND_ID_AFFRE WHERE d.DMND_CODE_PROSS = 'INTCREA' AND d.DMND_ETAT_DEMANDE = 'Q' AND d.DMND_NOM = 'Admission créance CREANCIER AJOUT G' AND d.DMND_LES_NUMEROS = 'L12PC0001' AND d.DMND_NUM_INDICATIF = 'L12PC0001' AND a.AFFRE_LIBELLE = 'Intégration auto de créances' => 1
 ---
 # 7. Une admission sur la PC ouverte en 2005 (avant le 15/02/2009, EditionAvisPC) : une instance dans RIG v2 -- refusee, rien d'ecrit.

@@ -121,7 +121,7 @@ public sealed record CoordonneesCw(bool LectureSeule, ChampAdresseCw[] Champs, s
 public sealed record VueCommandesWeb(string Session, TuileCw[] Tuiles, string Rapide, bool RechercheOuverte,
                                      bool RechercheAffinee, string ResumeCriteres, RechercheCw Recherche, MessageCw? Message,
                                      string Compteur, bool DirectsEnTete, GroupeCw[] Groupes, LigneCw[] Lignes, PanneauCw? Panneau,
-                                     CoordonneesCw? Coordonnees);
+                                     CoordonneesCw? Coordonnees, string Mode = "demo", string? Provenance = null);
 
 /// <summary>
 /// Pont de l'ecran PROC_COMMANDES_WEB (web/src/ecrans/EcranCommandesWeb.tsx) :
@@ -134,16 +134,13 @@ public sealed record VueCommandesWeb(string Session, TuileCw[] Tuiles, string Ra
 /// deplace TEL QUEL dans <see cref="SessionCommandesWeb"/> : l'ecran joue toujours
 /// les regles de TraitementCommandes, il n'en a pas de copie (tests/CommandesWebCheck).
 /// </summary>
-public static class EcranCommandesWeb
+public static partial class EcranCommandesWeb
 {
     internal static readonly SessionsEcran<SessionCommandesWeb> Sessions = new();
 
+    /// <summary>Ouvre l'ecran : les commandes de la base du greffe, ou la demonstration sans serveur (EcranCommandesWebBase.cs).</summary>
     [JSInvokable("EcranCommandesWeb.Ouvrir")]
-    public static VueCommandesWeb Ouvrir()
-    {
-        var session = new SessionCommandesWeb();
-        return session.Vue(Sessions.Ouvrir(session));
-    }
+    public static Task<VueCommandesWeb> Ouvrir() => OuvrirAsync(ClientServeur.Actif, SessionAgent.CodeGreffe);
 
     [JSInvokable("EcranCommandesWeb.Agir")]
     public static VueCommandesWeb Agir(string session, string geste, JsonElement valeur)
@@ -163,9 +160,15 @@ public static class EcranCommandesWeb
 /// (ZoneRapprochement, ZoneTypes...) sont devenus les methodes Vue* qui rendent
 /// ce qu'ils lisaient ; les gestes arrivent par <see cref="Agir"/>.
 /// </summary>
-public sealed class SessionCommandesWeb
+public sealed partial class SessionCommandesWeb
 {
-    private readonly List<CommandeRecue> Toutes = TraitementCommandes.JeuDemoCommandes();
+    private readonly List<CommandeRecue> Toutes;
+
+    /// <summary>« serveur » : les commandes viennent de la base du greffe et AUCUN geste ne les modifie ; « demo » sinon
+    /// (Pont/LectureEcranMain.cs). <see cref="Provenance"/> : le motif d'une panne, rien en base ni en demonstration.</summary>
+    private readonly string Mode = LectureEcransMain.Demo;
+    private readonly string? Provenance;
+    private bool EnBase => Mode == "serveur";
 
     // ------------------------------------------------------------ recherche
     // L'etat ne fait plus partie de la carte de recherche : c'est l'onglet.
@@ -268,7 +271,19 @@ public sealed class SessionCommandesWeb
     private enum DocumentConsulte { Kbis, EtatSynthese, KbisHorsRessort, SyntheseRne }
 
     // OnInitialized du .razor : la liste est lue a l'ouverture.
-    public SessionCommandesWeb() => Rafraichir();
+    public SessionCommandesWeb() : this(null, LectureEcransMain.Demo, null) { }
+
+    /// <summary>
+    /// Une session sur <paramref name="commandes"/> lues en base (mode « serveur »), ou sur la demonstration quand elles sont null
+    /// en mode « demo » ; dans un autre mode (panne), AUCUNE commande et le motif <paramref name="provenance"/>.
+    /// </summary>
+    public SessionCommandesWeb(List<CommandeRecue>? commandes, string mode, string? provenance)
+    {
+        Mode = mode;
+        Provenance = provenance;
+        Toutes = commandes ?? (mode == LectureEcransMain.Demo ? TraitementCommandes.JeuDemoCommandes() : []);
+        Rafraichir();
+    }
 
     // ================================================================ recherche
 
@@ -374,7 +389,7 @@ public sealed class SessionCommandesWeb
         TousDebiteurs = false;
         TousEtablissements = false;
         RechercheRapprochementOuverte = false;
-        Resultat = TraitementCommandes.RechercherPour(c);
+        Resultat = EnBase ? SansRapprochement : TraitementCommandes.RechercherPour(c);
 
         var choix = ChoixCommande.ParDefaut(c);
         TypesCoches.Clear();
@@ -447,7 +462,8 @@ public sealed class SessionCommandesWeb
             if (cocher) TypesCoches.Add(k.Code); else TypesCoches.Remove(k.Code);
     }
 
-    private void RelancerRapprochement() => Resultat = TraitementCommandes.Rechercher(RechSiren, RechRaison);
+    private void RelancerRapprochement()
+        => Resultat = EnBase ? SansRapprochement : TraitementCommandes.Rechercher(RechSiren, RechRaison);
 
     private void Retenir(EntiteRapprochee e)
     {
@@ -749,6 +765,11 @@ public sealed class SessionCommandesWeb
     /// </summary>
     internal void Agir(string geste, JsonElement valeur)
     {
+        if (EnBase && GestesQuiEcrivent.Contains(geste))
+        {
+            Message = (SansEcriture, "avertissement");
+            return;
+        }
         switch (geste)
         {
             // ---- onglets, recherche, liste
@@ -898,7 +919,7 @@ public sealed class SessionCommandesWeb
             Du?.ToString(FormatDate, CultureInfo.InvariantCulture) ?? string.Empty,
             Au?.ToString(FormatDate, CultureInfo.InvariantCulture) ?? string.Empty,
             SirenCherche, ReferenceCherchee, EnAttenteEnvoi,
-            TraitementCommandes.DateTravail.ToString("dd/MM/yyyy"));
+            DateDeTravail);
 
         return new VueCommandesWeb(session, tuiles, Appliques.Texte, RechercheOuverte,
             TraitementCommandes.RechercheAffinee(Appliques), TraitementCommandes.Resumer(Appliques), recherche,
@@ -907,7 +928,8 @@ public sealed class SessionCommandesWeb
             GroupesParEtat[OngletActif].Select(g => new GroupeCw(g.Rang, g.Titre, g.Commandes.Count)).ToArray(),
             Ordre.Select(VueLigne).ToArray(),
             Selection is { } c ? VuePanneau(c) : null,
-            CoordonneesOuvertes && Selection is not null ? VueCoordonnees(Selection) : null);
+            CoordonneesOuvertes && Selection is not null ? VueCoordonnees(Selection) : null,
+            Mode, Provenance);
     }
 
     private LigneCw VueLigne(CommandeRecue cmd)
@@ -1084,7 +1106,7 @@ public sealed class SessionCommandesWeb
     private TypesCw? VueTypes(CommandeRecue c)
     {
         var cases = TraitementCommandes.CasesCommandees(c);
-        var dt = TraitementCommandes.DateTravail.ToString("dd/MM/yyyy");
+        var dt = DateDeTravail;
         var items = new List<ItemTypeCw>();
         foreach (var k in cases)
         {
@@ -1105,7 +1127,8 @@ public sealed class SessionCommandesWeb
     /// <summary>Ce que lisait le RenderFragment ZoneNonOpposition du .razor.</summary>
     private NonOppositionCw VueNonOpposition(CommandeRecue c)
     {
-        var controle = SousTypes.Count > 0 ? TraitementCommandes.ControlerNonOpposition(c) : null;
+        // En base, le controle chercherait le dossier dans la demonstration (TraitementCommandes.Entites) : il ne s'affiche pas.
+        var controle = SousTypes.Count > 0 && !EnBase ? TraitementCommandes.ControlerNonOpposition(c) : null;
         var sousTypes = Enum.GetValues<SousTypeCno>().Select(st => new SousTypeCw(st.ToString(), TraitementCommandes.Libelle(st),
             st == SousTypeCno.InjonctionDePayer, SousTypes.Contains(st))).ToArray();
         var vueControle = controle is null ? null : new ControleCw(
@@ -1126,7 +1149,7 @@ public sealed class SessionCommandesWeb
             return new CertificatCw(cert.ToString(), TraitementCommandes.Libelle(cert), Certificats[cert],
                                     motif is null, motif is not null && !substitue, motif);
         }).ToArray();
-        return new CertificatsCw(TraitementCommandes.DateTravail.ToString("dd/MM/yyyy"), lignes,
+        return new CertificatsCw(DateDeTravail, lignes,
                                  TraitementCommandes.OuvreLaBasculeFaillite(motifNonFaillite), CertificatDeFaillite);
     }
 

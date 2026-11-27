@@ -1,0 +1,12 @@
+# « Natures de document » (LecteurNaturesDocument) : VIDIGED_PARAMETRAGE de type NATURE_DOC (OPE_GED_NATURE_DOC_READONLY.cs:101), par
+# code. Ecartees : 2400306 (NATURE_DOC_DEPOSANT) et 2400307 (PARAM_DEFAUT), jumeaux de L14S et L14D retenues. JAL et FACTJAL sont les
+# natures de PROC_SDEMATJUD.sql, avec ses documents (JAL : 8, FACTJAL : 6 ; « AUTRE » n'a pas de nature).
+# Groupe : nature citee par un document VIDIGED_INDEX -> « Associées à un document » (L14U, 1 document ; jumeau L14A sans document).
+# Etat : libelle vide -> AFaire (L14V, nom = le code) ; sinon Validee. Cellules : Code, Libellé, Type de document (le libelle ecran).
+Justificatif de facture journal d'annonces légales | code FACTJAL · 6 document(s) | Associées à un document | Validee | []
+Journal d'annonces légales | code JAL · 8 document(s) | Associées à un document | Validee | []
+NATURE BANC ALPHA | code L14A · Regroupement banc · aucun document | Sans document | Validee | [] | valeurs: L14A ; NATURE BANC ALPHA ; Regroupement banc
+NATURE BANC DEFAUT | code L14D · aucun document | Sans document | Validee | []
+NATURE BANC A SUPPRIMER | code L14S · aucun document | Sans document | Validee | []
+NATURE BANC UTILISEE | code L14U · 1 document(s) | Associées à un document | Validee | []
+L14V | code L14V · aucun document | Sans document | AFaire | []

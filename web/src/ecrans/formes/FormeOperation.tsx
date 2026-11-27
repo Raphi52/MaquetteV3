@@ -25,6 +25,7 @@ import {
   TableLignes, cleChamp, etatDe, figee, gestesDe, manquantes, parcoursDe, refus, useAnnonce, useFiche, useGeste, useLignes,
   useRecherche, type Saisies,
 } from './commun'
+import { ApercuKbisLu } from './ApercuKbisLu'
 
 const Temps = ['Choisir', 'Conséquences', 'Confirmer'] as const
 
@@ -226,7 +227,10 @@ function OperationSurUnObjet({ d }: { d: DescripteurEcranVue }) {
                   <p><b>{objet.nom}</b> — {objet.precisions}</p>
                 </div>
                 {fiche && fiche.mode !== 'base' && fiche.message && <p className="rig-eg-note" role="note">{fiche.message}</p>}
-                <Sections sections={d.sections} saisies={{}} changer={() => undefined} lecture fiche={fiche?.fiche ?? null} />
+                {/* La section que le descripteur nomme apercuKbis (PROC_XEX) se dessine en extrait Kbis, pas en champs (lot 13). */}
+                <Sections sections={d.sections.filter((s) => s.titre !== d.apercuKbis)} saisies={{}} changer={() => undefined} lecture
+                          fiche={fiche?.fiche ?? null} />
+                {d.apercuKbis && <ApercuKbisLu d={d} objet={objet} />}
                 {traite ? (
                   <p className="rig-eg-note" role="note">
                     {etat?.libelle ?? 'Déjà traité'} : le résultat se relit sans relancer « {d.valider} ».

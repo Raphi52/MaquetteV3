@@ -19,7 +19,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ToucheReact, ReactNode } from 'react'
 import { annonceRepond, Avatar, Picto, Surligne, Touche } from '../composants/Palette'
-import { AnnoncesBodacc } from './EcranBodacc'
+import { useAnnoncesCherchees } from './annoncesBodacc'
+import { Exemple } from './formes/commun'
 import type { DepotPaletteVue, GestePlan, PaletteVue, PiecePaletteVue } from '../plan/types'
 
 export interface ProprietesEcranRecherche {
@@ -69,8 +70,12 @@ export function EcranRecherche({ vue, plan }: ProprietesEcranRecherche) {
   const pieces = vue?.pieces ?? []
   const piece: PiecePaletteVue | undefined = pieces.find((p) => cleDe(p) === lue) ?? pieces[0]
   const cleLue = piece ? cleDe(piece) : ''
-  // Les annonces de l'ecran BODACC, filtrees comme dans la palette.
-  const annonces = useMemo(() => AnnoncesBodacc.filter((a) => annonceRepond(a, texte)), [texte])
+  // Les annonces BODACC de la base (l'exemple sans serveur, marque), filtrees comme dans la palette (plan « RIG v3 100 %
+  // fonctionnel », lot 20 : avant, l'exemple de l'ecran BODACC meme branchee au serveur).
+  // fix-ok: cause mesuree -- la page filtrait la constante AnnoncesBodacc (EcranBodacc.tsx:92, l'exemple) ; trois
+  //   remplacements cibles : l'import, la source (useAnnoncesCherchees) et la ligne (cle unique, mention « exemple »).
+  const cherchees = useAnnoncesCherchees(texte)
+  const annonces = useMemo(() => cherchees.annonces.filter((a) => annonceRepond(a, texte)), [cherchees, texte])
 
   // Une autre recherche, ou une autre piece : on repart du premier passage.
   useEffect(() => { lire(null); poserPassage(0) }, [texte])
@@ -206,11 +211,11 @@ export function EcranRecherche({ vue, plan }: ProprietesEcranRecherche) {
 
           {annonces.length > 0 && <>
             {titre('Annonces BODACC', annonces.length)}
-            {annonces.map((a) => (
-              <div key={a.numAnnonce} className="rig-palette__ligne" onClick={() => aller('ecran', 'BODACC')}>
+            {annonces.map((a, i) => (
+              <div key={`${a.numAnnonce}-${i}`} className="rig-palette__ligne" onClick={() => aller('ecran', 'BODACC')}>
                 <Picto nom="annonce" />
                 <span className="rig-palette__texte"><span className="rig-palette__t1"><span className="rig-palette__num">{a.numAnnonce}</span><Surligne texte={a.texte} saisie={texte} /></span>
-                  <span className="rig-palette__t2">{a.typeAnnonce} · dossier {a.dossier}</span></span>
+                  <span className="rig-palette__t2">{cherchees.exemple && <><Exemple />{' '}</>}{a.typeAnnonce} · dossier {a.dossier}</span></span>
               </div>
             ))}
           </>}

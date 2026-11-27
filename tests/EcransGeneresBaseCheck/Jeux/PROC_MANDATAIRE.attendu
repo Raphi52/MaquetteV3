@@ -4,21 +4,27 @@
 # avant : meme table, et la V2 liste tous les mandataires. Les premieres n'ont pas de civilite (colonne ajoutee apres
 # elles) : identite incomplete, AFaire. Les secondes ont « Me » et « Mme » pour civilite, qui retrouvent ME et MME dans
 # v2.CIVILITE (collation insensible a la casse du banc).
+# Lot 14 (plan-676a4b19) : les mandataires 2400101-2400104 de PROC_RAPPACTEUR.sql (meme table, lus apres tous les jeux) : les deux
+# DOUBLON Garde (le garde et son doublon, par id), CNBF Actif (actif a numero CNBF), INACTIF Garde (inactif, apres les actifs).
 # Etat : civilite ET designation -> Validee ; sinon une autre marche -> EnCours ; sinon AFaire. Marches : 0 identite,
 # 1 adresse ou contacts, 2 abrege, 3 client de facturation (different de -1), 4 qualification ou infos complementaires.
 # Groupe : civilite PM -> « Personne morale » ; toute autre (ND comprise) -> « Personne physique ».
 # Jumeaux : 1500103 (sans civilite, EnCours) et 1500102 (avec, Validee) ; 1500104 (rien, AFaire) et 1500103 ; client -1
 # (1500104, marche 3 non franchie) et 1500911 (1500101, franchie) ; 1500108 (designation vide, EnCours) et 1500102 ;
 # 1500107 (inactif, nom qui trie en premier, a la fin) et les actifs ; PM (1500105) et ME (1500101).
+# Les cellules (une par colonne : Désignation, Civilité, Abrégé, SIREN, Courriel, Qualification, Actif) : celles d'ARDOISE.
 ZZ15 | désignation à saisir · abrégé ZZ15 | Personne physique | EnCours | [2]
 ALPHA Irène | civilité à saisir · non répertorié · CNBF 300011 | Personne physique | AFaire | []
 Me ALPHA Irène | abrégé ALP13 · CNBF 130001 | Personne physique | Validee | [0,2]
 Me ANCIEN DELTA | abrégé DEL13A · CNBF 130004 | Personne physique | Validee | [0,2]
-Me ARDOISE Irène | abrégé ARD15 · SIREN 900 500 001 · CNBF 150001 | Personne physique | Validee | [0,1,2,3,4]
+Me ARDOISE Irène | abrégé ARD15 · SIREN 900 500 001 · CNBF 150001 | Personne physique | Validee | [0,1,2,3,4] | valeurs: ARDOISE Irène ; ME ; ARD15 ; 900500001 ; ardoise@exemple.test ; AV ; oui
 BETA Simon | civilité à saisir · non répertorié · CNBF 300013 | Personne physique | AFaire | []
 Mme CHANTELLE Olga | non répertorié | Personne physique | Validee | [0]
+M. CNBF Actif | non répertorié · CNBF 240001 | Personne physique | Validee | [0]
 Mme DELTA Lina | abrégé DEL13B · CNBF 130004 | Personne physique | Validee | [0,2]
 DORVAL Théo | civilité à saisir · non répertorié | Personne physique | EnCours | [1]
+Me DOUBLON Garde | abrégé DBG24 | Personne physique | Validee | [0,2]
+Me DOUBLON Garde | non répertorié | Personne physique | Validee | [0]
 EPSILON Marc | civilité à saisir · non répertorié | Personne physique | AFaire | []
 Me GAMMA Olga | non répertorié · CNBF 130003 | Personne physique | Validee | [0]
 KAPPA AVOCATS SELARL | abrégé KAPPA15 · SIREN 900 500 002 | Personne morale | Validee | [0,2]
@@ -27,3 +33,4 @@ NU JURIS SAS | non répertorié | Personne morale | Validee | [0,1]
 M. AARON Paul | abrégé AAR15 · inactif | Personne physique | Validee | [0,2]
 ANCIEN BETA | civilité à saisir · non répertorié · CNBF 300013 · inactif | Personne physique | AFaire | []
 Me BETA Simon | abrégé BET13 · CNBF 130002 · inactif | Personne physique | Validee | [0,2]
+M. INACTIF Garde | non répertorié · inactif | Personne physique | Validee | [0]

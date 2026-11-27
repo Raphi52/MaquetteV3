@@ -30,6 +30,13 @@
 // classement en pastille ; limite en point rouge si depassee ; forfait avec sa mini-barre), heures, courrier,
 // dirigeants, liquidateurs, huissier et ville dans la ligne depliee. « Enrolement / requete » : 6 colonnes, N Role
 // et N PC sous le defendeur. Criteres, clic qui ouvre le dossier et ligne en alerte ne changent pas.
+//
+// BRANCHE SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 20, 27/11/2026) : les affaires viennent du pont
+// (Pont/EcranClotureBase.cs) -- en base, les procedures dont l'examen de cloture approche (la grille « Selection PC » de
+// RIG v2, Serveur/Socle/EcransMain/LectureCloture.cs), les dates Du / Au portant, comme dans RIG v2, sur la LIMITE
+// d'examen (le serveur les applique) ; sans serveur, les affaires d'exemple ci-dessous, marquees ; en panne, le motif et
+// aucune ligne. Ce que la base ne porte pas (chambre, audience, classement, huissier : les choix de l'enrolement) reste
+// vide ; « Forfait » est alors la case de RIG v2 (au forfait : jamais facture), pas un montant.
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
@@ -39,6 +46,7 @@ import {
   PiedListe, PointEtat, VuesListe, montant, useVuesDeSession, type ActionLigne, type Teinte, type VueEnregistree,
 } from '../composants/ListeModerne'
 import type { ContexteDossierVue } from '../plan/types'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 
 interface LigneClot {
   role: string
@@ -66,6 +74,19 @@ interface LigneClot {
   /** aaaa-mm-jj */
   depot: string
   facturation: string
+  /** Lue en base : la PC est au forfait (PRCLL_FORFAIT_FACTURE) ; absent ou null en demonstration (le forfait est un montant). */
+  auForfait?: boolean | null
+}
+
+/** Ce que rend le pont (Pont/EcranClotureBase.cs, VueCloture). */
+export interface VueCloture {
+  mode: ModeLecture
+  message: string | null
+  /** Les affaires de la base (mode « serveur ») ; vide sinon. */
+  lignes: LigneClot[]
+  total: number
+  /** aaaa-mm-jj : la date qui dit si une limite d'examen est depassee. */
+  aujourdhui: string
 }
 
 const Classements = ['Insuffisance d\'actif', 'Extinction du passif', 'Conversion en liquidation', 'Report']
@@ -77,8 +98,6 @@ const Lignes: LigneClot[] = [
   { role: '2025/00044', affaire: 'SCI DU MOULIN', demandeur: 'Me PETIT', defendeur: 'SCI DU MOULIN', chambre: '3e', audience: '2026-09-29', heureAppel: '11:00', classement: 'Report', limiteExamen: '2026-10-02', aFacturer: false, dernierCourrier: '', dossier: '2025B00044', numPc: 'PC-2025-0044', heureDebut: '10:45', dirigeants: 'BERTIN Andre', liquidateurs: 'Me PETIT', forfait: '380,00', huissier: '', codePostalVille: '51200 Epernay', acteSaisine: 'Requete', depot: '2024-06-12', facturation: 'A facturer' },
   { role: '2022/00876', affaire: 'SARL PLOMBERIE NORD', demandeur: 'Me BLANC', defendeur: 'SARL PLOMBERIE NORD', chambre: '2e', audience: '2026-10-06', heureAppel: '14:00', classement: 'Insuffisance d\'actif', limiteExamen: '2026-09-30', aFacturer: true, dernierCourrier: '19/07/2026', dossier: '2022B00876', numPc: 'PC-2022-0876', heureDebut: '13:30', dirigeants: 'NOEL Patrick', liquidateurs: 'Me BLANC', forfait: '450,00', huissier: 'SCP HUISSIERS NORD', codePostalVille: '51100 Reims', acteSaisine: 'Assignation', depot: '2022-09-08', facturation: 'Facturee' },
 ]
-
-const Chambres = distinctsTries(Lignes.map((l) => l.chambre))
 
 const TeinteClassement: Record<string, Teinte> = {
   'Insuffisance d\'actif': 'orange', 'Extinction du passif': 'vert', 'Conversion en liquidation': 'rouge', Report: 'ardoise',
@@ -107,16 +126,19 @@ const SansCritere: CriteresCloture = {
 /** La limite d'examen est-elle depassee ? Jamais tant que la date du jour n'est pas connue. */
 const enRetardLe = (aujourdhui: string | null) => (l: LigneClot) => aujourdhui !== null && l.limiteExamen < aujourdhui
 
-/** Les affaires qui repondent aux criteres (le filtre de l'ecran, inchange). */
-function filtrer(c: CriteresCloture, aujourdhui: string | null): LigneClot[] {
-  let trouvees = Lignes
+/**
+ * Les affaires de <lignes> qui repondent aux criteres (le filtre de l'ecran, inchange). En base (<enBase>), Du / Au ont deja
+ * ete appliques par le serveur, sur la limite d'examen : ils ne filtrent pas une seconde fois sur l'audience (vide en base).
+ */
+function filtrer(c: CriteresCloture, aujourdhui: string | null, lignes: LigneClot[] = Lignes, enBase = false): LigneClot[] {
+  let trouvees = lignes
   if (!estBlanc(c.critAffaire)) {
     const t = c.critAffaire.trim()
     trouvees = trouvees.filter((l) => contientSansCasse(l.affaire, t) || contientSansCasse(l.role, t))
   }
   if (!estBlanc(c.critChambre)) trouvees = trouvees.filter((l) => l.chambre === c.critChambre)
-  if (c.critDu !== '') trouvees = trouvees.filter((l) => l.audience >= c.critDu)
-  if (c.critAu !== '') trouvees = trouvees.filter((l) => l.audience <= c.critAu)
+  if (!enBase && c.critDu !== '') trouvees = trouvees.filter((l) => l.audience >= c.critDu)
+  if (!enBase && c.critAu !== '') trouvees = trouvees.filter((l) => l.audience <= c.critAu)
   if (c.critTypes.size > 0) trouvees = trouvees.filter((l) => c.critTypes.has(l.classement))
   if (c.critAFacturer) trouvees = trouvees.filter((l) => l.aFacturer)
   if (c.critExamenDepasse) trouvees = trouvees.filter(enRetardLe(aujourdhui))
@@ -161,17 +183,22 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
   const [critAFacturer, setCritAFacturer] = useState(false)
   const [critExamenDepasse, setCritExamenDepasse] = useState(false)
   const [critTypes, setCritTypes] = useState<ReadonlySet<string>>(new Set())
-  // JeuDemo.Aujourdhui : null tant que le pont n'a pas repondu (aucune ligne
-  // n'est alors marquee en retard).
-  const [aujourdhui, setAujourdhui] = useState<string | null>(null)
+  // La vue du pont : null tant qu'il n'a pas repondu (aucune ligne, aucune n'est en retard).
+  const [vue, setVue] = useState<VueCloture | null>(null)
   // La ligne depliee par son chevron (etape « Selection PC »).
   const [ouverte, setOuverte] = useState<string | null>(null)
 
+  // Du / Au sont les dates de la recherche de RIG v2 : en base, chaque changement relit les procedures.
   useEffect(() => {
     let perime = false
-    void appeler<string>('EcranCloture.DateDuJour').then((d) => { if (!perime) setAujourdhui(d) })
+    void appeler<VueCloture>('EcranCloture.Affaires', critDu, critAu).then((v) => { if (!perime) setVue(v) })
     return () => { perime = true }
-  }, [])
+  }, [critDu, critAu])
+  const aujourdhui = vue?.aujourdhui ?? null
+  const enBase = vue?.mode === 'serveur'
+  // La base en mode « serveur », les exemples en demonstration ; rien quand la base n'a pas repondu.
+  const lignes: LigneClot[] = vue === null ? [] : enBase ? vue.lignes : vue.mode === 'demo' ? Lignes : []
+  const Chambres = distinctsTries(lignes.map((l) => l.chambre).filter((c) => c !== ''))
 
   const enRetard = enRetardLe(aujourdhui)
   const criteres: CriteresCloture = { critAffaire, critChambre, critDu, critAu, critAFacturer, critExamenDepasse, critTypes }
@@ -196,7 +223,7 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
     poserCriteres(SansCritere)
   }
 
-  const trouvees = filtrer(criteres, aujourdhui)
+  const trouvees = filtrer(criteres, aujourdhui, lignes, enBase)
 
   const { vues, active: vueActive, enregistrer: enregistrerVue } = useVuesDeSession('Cloture', VuesPrereglees, criteres, memesCriteres)
 
@@ -223,7 +250,7 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
         </label>
 
         <div className="rig-criteres__bloc">
-          <div className="rig-kicker">Date d'audience</div>
+          <div className="rig-kicker">{enBase ? "Limite d'examen" : "Date d'audience"}</div>
           <div className="rig-criteres__paire">
             <label className="rig-saisie-champ">
               <span className="rig-saisie-champ__libelle">Du</span>
@@ -266,6 +293,7 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
       </aside>
 
       <ListeModerne etiquette="Procedures collectives a cloturer">
+        <ProvenanceEcran mode={vue?.mode} message={vue?.message} quoi="Affaires" />
         <div className="rig-onglets" style={{ margin: 'var(--rig-esp-3) var(--rig-esp-4) 0' }}>
           <button className={`rig-onglet${etapeSelection ? ' rig-onglet--actif' : ''}`}
                   onClick={() => setEtapeSelection(true)}>Selection PC</button>
@@ -274,7 +302,7 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
         </div>
 
         <EnteteListe titre={etapeSelection ? 'Selection des procedures collectives' : 'Enrolement et requete'}
-                     synthese={<>{trouvees.length}{trouvees.length > 1 ? ' affaires' : ' affaire'}{` sur ${Lignes.length} · `}
+                     synthese={<>{trouvees.length}{trouvees.length > 1 ? ' affaires' : ' affaire'}{` sur ${enBase ? vue.total : lignes.length} · `}
                        <b>{aFacturer}</b>{' a facturer · forfaits '}<b>{montant(forfaits)}</b></>}
                      filtre={{ valeur: critAffaire, changer: setCritAffaire, indication: 'Aller a une affaire…',
                                valider: () => { if (trouvees.length === 1) ouvrirDossier(trouvees[0]!.dossier) } }} />
@@ -297,7 +325,7 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
             indication: critExamenDepasse ? 'Toutes les affaires' : 'Seulement les limites depassees' },
         ]} />
 
-        <VuesListe vues={vues.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer(v.criteres, aujourdhui).length }))}
+        <VuesListe vues={vues.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer(v.criteres, aujourdhui, lignes, enBase).length }))}
                    active={vueActive} enregistrer={enregistrerVue}
                    choisir={(cle) => { const v = vues.find((x) => x.cle === cle); if (v) poserCriteres(v.criteres) }} />
 
@@ -359,9 +387,15 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
                           <PointEtat teinte={aujourdhui === null ? 'gris' : retard ? 'rouge' : 'vert'}>{dateCourte(ligne.limiteExamen)}</PointEtat>
                         </td>
                         <td>{ligne.aFacturer && <PointEtat teinte="orange">oui</PointEtat>}</td>
-                        <td className="rig-lm-droite" title={`${ligne.forfait} €`}>
-                          <MontantBarre valeur={forfaitDe(ligne)} max={forfaitMax} texte={montant(forfaitDe(ligne))} />
-                        </td>
+                        {ligne.auForfait === undefined || ligne.auForfait === null ? (
+                          <td className="rig-lm-droite" title={`${ligne.forfait} €`}>
+                            <MontantBarre valeur={forfaitDe(ligne)} max={forfaitMax} texte={montant(forfaitDe(ligne))} />
+                          </td>
+                        ) : (
+                          <td className="rig-lm-droite" title="Case « Forfait » de RIG v2 (PRCLL_FORFAIT_FACTURE)">
+                            {ligne.auForfait && <PointEtat teinte="ardoise">au forfait</PointEtat>}
+                          </td>
+                        )}
                         <td className="rig-lm-cellule-menu">
                           <MenuLigne libelle={`Actions de l'affaire ${ligne.numPc}`} actions={[
                             ouvrir,

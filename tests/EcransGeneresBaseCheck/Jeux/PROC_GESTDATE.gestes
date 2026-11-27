@@ -1,0 +1,68 @@
+# « Dates de travail » (EcrivainDatesTravail), en grille : « Modifier » seul (OPE_DATE_TRAVAIL : DoVerifier, l. 48-72 ; DoSauve,
+# l. 77-101). La V2 n'ajoute ni ne supprime de date de travail. Lignes : PROC_GESTDATE.sql.
+
+# Refus : DATW (controle « RCS et Endett »), une date de travail encore future (l. 50-60). Jumeau accepte : bloc 2.
+geste: Modifier
+ids: DATW
+valeur: Date de travail = 2099-11-30
+resultat: refuse
+message: La date de travail ne peut pas être supérieure à la date du jour
+---
+# DATW revient a une date passee : l'ancienne date de travail est gardee (l. 80-82) ; le message reprend le nom de la demande V2
+# (« ancien => nouveau », l. 88-91).
+geste: Modifier
+ids: DATW
+valeur: Date de travail = 2026-02-01
+resultat: fait
+message: Mise à jour RCS : Date travail 31/12/2099 => 01/02/2026.
+controle: SELECT CONCAT(CONVERT(varchar(10), DTTRV_DATE_TRAVAIL, 23), '/', CONVERT(varchar(10), DTTRV_ANCIENNE_DATE_TRAVA, 23)) FROM v2.DATE_TRAVAIL WHERE DTTRV_CODE_DATE_TRAVAIL = 'DATW' => 2026-02-01/2099-12-31
+---
+# WINS : la fraicheur future n'est qu'un AVERTISSEMENT (Warning, l. 61-69) -- l'enregistrement passe et le dit.
+geste: Modifier
+ids: WINS
+valeur: Date de travail automatique = oui
+resultat: fait
+message: Mise à jour Inscriptions : Date de travail automatique 0 => 1. Attention : Il est très dangereux que la date de fraîcheur soit supérieure à la date de travail.
+controle: SELECT CONCAT(CAST(DTTRV_AUTOMATIQUE AS int), '/', ISNULL(CONVERT(varchar(10), DTTRV_ANCIENNE_DATE_TRAVA, 23), 'aucune')) FROM v2.DATE_TRAVAIL WHERE DTTRV_CODE_DATE_TRAVAIL = 'WINS' => 1/aucune
+---
+# L14F, hors WINS / DATW : une date future passe (jumeau du bloc 1).
+geste: Modifier
+ids: L14F
+valeur: Date de travail = 2099-07-15
+resultat: fait
+message: Mise à jour DATE BANC FUTURE : Date travail 30/06/2099 => 15/07/2099.
+---
+# Refus : le code ne se modifie pas (titre du bloc, l. 40). Jumeau accepte : bloc 3.
+geste: Modifier
+ids: WINS
+valeur: Code = XXXX
+resultat: refuse
+message: Le code et le libellé d'une date de travail ne se modifient pas (RIG v2 les montre en titre).
+---
+# Refus : la date de travail est obligatoire (colonne NOT NULL). Jumeau accepte : bloc 4.
+geste: Modifier
+ids: L14P
+valeur: Date de travail =
+resultat: refuse
+message: « Date de travail » est obligatoire.
+---
+# Refus : une date qui ne se lit pas. Jumeau accepte : bloc 4.
+geste: Modifier
+ids: L14P
+valeur: Date de travail = 31/02/2026
+resultat: refuse
+message: « Date de travail » : une date (jj/mm/aaaa) (31/02/2026).
+---
+# Refus : l'ancienne date ne se saisit pas (DoSauve l'ecrit, l. 80-82). Jumeau accepte : bloc 2.
+geste: Modifier
+ids: L14P
+valeur: Ancienne date de travail = 2025-01-01
+resultat: refuse
+message: L'ancienne date de travail ne se saisit pas : RIG v2 l'écrit quand la date de travail change.
+---
+# Refus : une date inactive n'est pas dans l'ecran (GetAllDateTravailActive). Jumeau accepte : bloc 4.
+geste: Modifier
+ids: L14I
+valeur: Date de travail = 2026-01-06
+resultat: refuse
+message: Date de travail introuvable dans la base du greffe (L14I).

@@ -1,0 +1,13 @@
+# La recherche des « Tiers payeurs » : le champ cherche l'abrege, la designation ou la ville ; les criteres « Abrégé », « Désignation »,
+# « Ville » (LIKE). « lyon » : la ville de L14C seul (jumeaux ecartes : Paris, Marseille).
+texte: lyon
+lignes:
+L14C | abrégé L14C · 69001 Lyon | Actifs | AFaire | []
+---
+# « Désignation » : les designations qui contiennent « banc » (L14C, sans designation, ecarte).
+critere: Désignation = banc
+lignes:
+TIERS BANC ALPHA | abrégé L14A · 75001 Paris · alpha@exemple.test | Actifs | Validee | []
+TIERS BANC BETA | abrégé L14B · adresse à compléter | Actifs | EnCours | []
+TIERS BANC INACTIF | abrégé L14D · 13001 Marseille · inactif | Inactifs | Validee | []
+TRESOR PUBLIC BANC | abrégé TPG · 75001 Paris | Actifs | Validee | []
