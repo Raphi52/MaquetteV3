@@ -96,43 +96,66 @@ internal sealed class LecteurPublicationsBodacc : IRechercheEcran
         => LectureEcran.LireAsync(baseGreffe, RequeteRejets.Replace("/*filtre*/", "", StringComparison.Ordinal), Ligne, ct,
                                   new SqlParameter("@plafond", plafond));
 
+    // fix-ok: mesure par le controle final du lot 11 (27/11/2026) -- « Editer » listait les annonces cochees (BDCCR_ID_BDCRC IN),
+    // alors que RIG v2 edite toute la liste de la periode (OPE_LST_LISTE_REJ.cs:73-94, OPE_LST_CTRLNC_BOD.cs:61-83) : le geste ne
+    // recevait pas les criteres. Le filtre de chaque liste sort de ChercherAsync (sans changer la recherche) pour que le geste edite
+    // exactement la liste a l'ecran.
+    /// <summary>Le bouton radio GestionBodacc de la V2 (OPE_BASE_BOD.cs:12, :44-47) que dit « Critère de date ».</summary>
+    internal enum ModeDate { Ep, Parution, Envoi }
+
+    /// <summary>Les criteres de la recherche, lus comme la V2 (en tete) : le numero de parution, ou le mode et les deux dates.</summary>
+    internal sealed record CriteresLus(string? Numero, ModeDate Mode, DateTime? Du, DateTime? Au)
+    {
+        /// <summary>Aucun critere : la liste que la V2 ouvre sans date (les rejets).</summary>
+        public bool Vide => Numero is null && Du is null && Au is null;
+    }
+
+    internal static CriteresLus Lire(RechercheEcran recherche)
+    {
+        var critere = (recherche.Critere(CritereDate) ?? "").ToLowerInvariant();
+        var mode = critere.Contains("parution", StringComparison.Ordinal) ? ModeDate.Parution
+                 : critere.Contains("envoi", StringComparison.Ordinal) ? ModeDate.Envoi : ModeDate.Ep;
+        return new CriteresLus(recherche.Critere(CritereNumero), mode, CriteresConsultation.Date(recherche.Critere(CritereDu)),
+                               CriteresConsultation.Date(recherche.Critere(CritereAu)));
+    }
+
+    /// <summary>Le filtre de la liste <paramref name="liste"/> (« R », « C », « Q ») sur ces criteres, tel que la V2 la cherche (en
+    /// tete) ; null : la V2 ne la cherche pas ainsi, elle n'est pas a l'ecran. La recherche et le geste « Editer » (qui edite cette
+    /// liste-la, EcrivainPublicationsBodacc) le partagent.</summary>
+    internal static (string Filtre, Func<SqlParameter[]> Parametres)? FiltreDe(char liste, CriteresLus c)
+    {
+        if (c.Vide) return liste == 'R' ? ("", () => []) : null;
+        // Le numero de parution : la liste des certificats seule (le seul mode qui l'offre).
+        if (c.Numero is { } numero) return liste == 'C' ? ("AND b.BDCCR_NUM_PARUTION = @numero", () => [new SqlParameter("@numero", numero)]) : null;
+        if (c.Du is not { } du || (c.Au is { } fin && fin < du)) return null;
+        var au = c.Au;
+        string Borne(string colonne) => au is null ? $"{colonne} = @du" : $"{colonne} BETWEEN @du AND @au";
+        SqlParameter[] Bornes() => au is { } a ? [new SqlParameter("@du", du), new SqlParameter("@au", a)] : [new SqlParameter("@du", du)];
+        var filtre = c.Mode switch
+        {
+            ModeDate.Parution => liste == 'R' ? null : $"AND {Borne("b.BDCCR_DATE_PUBLICITE")}",
+            ModeDate.Envoi => $"AND {Borne("b.BDCCR_DATE_ENVOI")}",
+            _ => liste == 'Q' ? $"AND {Borne("ev.EVNPR_DATE")}" : $"AND ({Borne("ev.EVNPR_DATE")} OR {Borne("b.BDCCR_DATE_EP_SUPPR")})",
+        };
+        return filtre is null ? null : (filtre, Bornes);
+    }
+
     /// <summary>Les trois listes de la V2 sur les criteres saisis (en tete du fichier).</summary>
     public async Task<LignesLues> ChercherAsync(SqlConnection baseGreffe, RechercheEcran recherche, DateTime aujourdhui, int plafond, CancellationToken ct)
     {
-        var numero = recherche.Critere(CritereNumero);
-        var du = CriteresConsultation.Date(recherche.Critere(CritereDu));
-        var au = CriteresConsultation.Date(recherche.Critere(CritereAu));
-        if (numero is null && du is null && au is null) return await LireAsync(baseGreffe, aujourdhui, plafond, ct);
+        var criteres = Lire(recherche);
+        if (criteres.Vide) return await LireAsync(baseGreffe, aujourdhui, plafond, ct);
 
         var lignes = new List<LigneLue>();
         var total = 0;
-        async Task Ajouter(string requete, string filtre, params SqlParameter[] p)
+        foreach (var liste in "CRQ")
         {
-            var lues = await LectureEcran.LireAsync(baseGreffe, requete.Replace("/*filtre*/", filtre, StringComparison.Ordinal), Ligne, ct,
-                                                    [new SqlParameter("@plafond", plafond), .. p]);
+            if (FiltreDe(liste, criteres) is not { } f) continue;
+            var lues = await LectureEcran.LireAsync(baseGreffe, RequeteDe(liste)!.Replace("/*filtre*/", f.Filtre, StringComparison.Ordinal), Ligne, ct,
+                                                    [new SqlParameter("@plafond", plafond), .. f.Parametres()]);
             lignes.AddRange(lues.Lignes);
             total += lues.Total;
         }
-        if (numero is not null)
-        {
-            // Le numero de parution : la liste des certificats seule (le seul mode qui l'offre).
-            await Ajouter(RequeteCertificats, "AND b.BDCCR_NUM_PARUTION = @numero", new SqlParameter("@numero", numero));
-            return new LignesLues(lignes, total);
-        }
-        if (du is null || (au is { } fin && fin < du)) return new LignesLues([], 0);
-
-        var critere = (recherche.Critere(CritereDate) ?? "").ToLowerInvariant();
-        var parution = critere.Contains("parution", StringComparison.Ordinal);
-        var envoi = critere.Contains("envoi", StringComparison.Ordinal);
-        string Borne(string colonne) => au is null ? $"{colonne} = @du" : $"{colonne} BETWEEN @du AND @au";
-        SqlParameter[] Bornes() => au is null ? [new SqlParameter("@du", du.Value.Date)]
-                                              : [new SqlParameter("@du", du.Value.Date), new SqlParameter("@au", au.Value.Date)];
-        var parEp = $"AND ({Borne("ev.EVNPR_DATE")} OR {Borne("b.BDCCR_DATE_EP_SUPPR")})";
-        var filtre = parution ? $"AND {Borne("b.BDCCR_DATE_PUBLICITE")}" : envoi ? $"AND {Borne("b.BDCCR_DATE_ENVOI")}" : parEp;
-
-        await Ajouter(RequeteCertificats, filtre, Bornes());
-        if (!parution) await Ajouter(RequeteRejets, filtre, Bornes());
-        await Ajouter(RequeteControles, parution || envoi ? filtre : $"AND {Borne("ev.EVNPR_DATE")}", Bornes());
         return new LignesLues(lignes, total);
     }
 

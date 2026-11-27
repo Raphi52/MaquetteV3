@@ -24,10 +24,15 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// 962-966, sans nom ; MetierFacture = false, PROC_GESTBOD.Designer.cs:100-101), creee validee par EditionsV2.DemandeProcessusValideeAsync :
 ///   - REJETS : UNE demande LISTE_REJETS_BODACC (OPE_LST_LISTE_REJ.cs:62-120, mode liste, _MajRejet = false) -- source « DEMANDE » =
 ///     la demande du processus, libelle source « », et dans le XML de generation TitreEtat (« Listes des N Bodaccs rejetés », « Bodacc
-///     rejeté » pour un seul), GreffeNom (TypeEtNomGreffeMaj) et SQL (la requete de l'etat : la selection et les jointures de la V2,
-///     plus l'UNION des annonces qui suivent un rejet sans evenement, :102-106) ;
+///     rejeté » pour un seul, puis la periode : « dont la date envoi est ... », :73-94), GreffeNom (TypeEtNomGreffeMaj) et SQL (la
+///     requete de l'etat : la selection, les jointures et la clause de date de la V2, plus l'UNION des annonces qui suivent un rejet
+///     sans evenement, :102-106) ;
 ///   - CONTROLES NON CONFORMES : UNE demande LISTE_BODACC_QUALITE (OPE_LST_CTRLNC_BOD.cs:49-103), de meme (« Listes des N Bodaccs en
-///     contrôle qualité non conforme », :90-96) ;
+///     contrôle qualité non conforme » et sa periode, :61-96) ;
+///   LES DEUX LISTES sont, comme dans RIG v2, TOUTE la liste de la recherche (la V2 n'y a pas de case) : les criteres que l'ecran envoie
+///   avec le geste (FormeOperation, sous leur libelle) donnent la clause de date et la periode du titre, N est le nombre d'annonces de
+///   cette liste (_listRejetsBod.Count, _listControlBod.Count ; le filtre du lecteur, LecteurPublicationsBodacc.FiltreDe). Cocher une
+///   annonce de la liste choisit la liste a editer ; une annonce cochee hors de la liste de ces criteres : refus « relisez la liste ».
 ///   - CERTIFICATS DE PARUTION : par annonce, UNE demande CERTIF_BOD (procedure collective) ou CERTIF_BODPR (prevention) PAR
 ///     DESTINATAIRE (OPE_LST_CERTIF_BOD.cs:61-101) -- libelle « Certificat de parution au Bodacc, <PC ou PRV> EP <code> du <date> »
 ///     (CertifBod.cs:61-73, la date au format de DBDateTime, « dd/MM/yyyy HH:mm:ss »), libelle source le libelle du type d'annonce
@@ -39,7 +44,9 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     Les destinataires d'une PC ou d'une prevention que la V3 calcule (RecupDestEditLot2FROMProcedureCollective / FROMPrevention,
 ///     JUDICIAIRE\DestinatairesEditionsLot2.cs:1628-1677, :1992-2018) : ses MANDATAIRES en mission (GERER_PC, MANDATAIRE_PC) -- code =
 ///     la fonction, valeur = le mandataire, libelle = Outils.FormerNomComplet (civilite abregee, nom, complement), adresse
-///     (EditionsEvenement.BlocAdresseAsync du lot 8, puis TransfoTexteEnXml), courriel, coffre ; et pour une PC, sans coffre, le meme sous le code « <fonction>SC » (:1655-1676).
+///     (EditionsEvenement.BlocAdresseAsync du lot 8, puis TransfoTexteEnXml), son pays (ADRBS_PAYS, :1643), courriel, coffre, et la
+///     reference du mandataire (REFERENCE_DESTINATAIRE = GRRPC_NUMERO_INTERNE, :1647, :2009) ; et pour une PC, sans coffre, le meme
+///     sous le code « <fonction>SC » (:1655-1676).
 ///   Annonce de la liste des certificats sans procedure ni prevention : la V2 la saute (« continue », :69-73) ; la V3 aussi, et le dit.
 /// CONTROLES : au moins une annonce cochee ; chaque annonce relue DANS la transaction, dans sa liste (la requete du lecteur) ; un
 /// reglage d'edition absent (CreateDemandeEditionByParametreGeneration rend null, DemandeEdition.cs:2580-2584, la V2 s'arrete alors
@@ -48,11 +55,13 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// un creancier : RIG v2 les ajoute aussi (:1532-1700), la V3 ne les calcule pas -- : refus nomme, a faire dans RIG v2.
 /// LA PARTIE EXTERNE (simulee, etiquetee) : l'impression et l'envoi au coffre-fort sont faits par le service d'edition de RIG v2, qui
 /// relit la file des editions ; RIG v3 ne l'appelle pas.
-/// NON REPRIS (nomme) : le titre des listes ne dit pas leur periode (« dont la date envoi est ... », :75-94) -- le geste recoit les
-/// annonces cochees, pas les criteres de la recherche (FormeOperation.tsx, confirmer) : la requete les vise par leur numero
-/// (BDCCR_ID_BDCRC IN) a la place de la date, et le titre est celui d'une liste sans date. EntiteMere (le tableau des editions, en
-/// memoire). La ligne de rapprochement de la demande (CreateLigneRappGene).
+/// NON REPRIS (nomme) : deux attributs de l'ENTITE d'un mandataire que RIG v2 pose aussi (:1644-1648) -- IS_ADRESSE_SPECIAL (adresse a
+/// type special) et TELEPHONE_DESTINATAIRE (MNDPC_TELEPHONE) : l'outil commun des editions (EditionsEvenementV2.ListeXml) ne les ecrit
+/// pas. EntiteMere (le tableau des editions, en memoire). La ligne de rapprochement de la demande (CreateLigneRappGene).
 /// </summary>
+// fix-ok: mesure par le controle final du lot 11 (27/11/2026) -- les listes visaient les annonces cochees (BDCCR_ID_BDCRC IN) avec un
+// titre sans date, et le certificat perdait REFERENCE_DESTINATAIRE et ADRBS_PAYS du mandataire ; relu contre OPE_LST_LISTE_REJ.cs:73-94,
+// OPE_LST_CTRLNC_BOD.cs:61-83 et DestinatairesEditionsLot2.cs:1643-1647.
 // fix-ok: ajout demande par le controle final (27/11/2026), pas un correctif a l'aveugle -- les editions de VALIDER de RIG v2
 // (OPE_LST_CERTIF_BOD.cs:61-101, OPE_LST_LISTE_REJ.cs:62-120, OPE_LST_CTRLNC_BOD.cs:49-103, relus) n'avaient pas d'ecrivain : « Editer » les ecrit.
 internal sealed class EcrivainPublicationsBodacc : IEcrivainEcran
@@ -154,11 +163,10 @@ internal sealed class EcrivainPublicationsBodacc : IEcrivainEcran
     private const string FromEdition = " From BODACC With (nolock) INNER JOIN EVENEMENT_PROCEDURE With (nolock) ON BDCCR_ID_EVNPR = EVNPR_ID_EVNPR "
         + "LEFT OUTER JOIN PROCEDURE_COLLECTIVE With (nolock) ON EVNPR_ID_PRCLL = PRCLL_ID_PRCLL LEFT OUTER JOIN PREVENTION With (nolock) ON EVNPR_ID_PREVE = PREVE_ID_PREVE ";
 
-    /// <summary>La requete de la liste des rejets (OPE_LST_LISTE_REJ.cs:96-106), les annonces cochees a la place de la date.</summary>
-    internal static string RequeteRejets(IEnumerable<int> ids)
+    /// <summary>La requete de la liste des rejets (OPE_LST_LISTE_REJ.cs:96-106) sur la clause de date de la V2 (<see cref="DateV2"/>).</summary>
+    internal static string RequeteRejets(string dateV2)
     {
-        var where = $" Where BDCCR_ID_BDCRC IN ({string.Join(", ", ids.Select(i => i.ToString(CultureInfo.InvariantCulture)))})"
-                  + " And (BDCCR_ETAT_BODACC = '9' AND BDCCR_TYPE_BODACC like 'P%')";
+        var where = (dateV2.Length == 0 ? " Where" : dateV2 + " And") + " (BDCCR_ETAT_BODACC = '9' AND BDCCR_TYPE_BODACC like 'P%')";
         const string select = " Select Isnull(PREVE_NUM_PRV,PRCLL_NUM_PC) as NUM_PC_OU_PRV , EVNPR_CODE_EVE_PRO, EVNPR_DATE, BDCCR_DATE_ENVOI, "
             + "isnull(BDCCR_MOTIF_REJET_BODACC_1,'') + ' ' + isnull(BDCCR_MOTIF_REJET_BODACC_2,'') + case isnull(BDCCR_COMMENTAIRE,'') when '' then '' "
             + "else ' Commentaire : ' + BDCCR_COMMENTAIRE end as BDCCR_MOTIF_REJET, convert(varchar(8000),BDCCR_TEXTE_BODACC) ";
@@ -166,19 +174,69 @@ internal sealed class EcrivainPublicationsBodacc : IEcrivainEcran
              + " WHERE BDCCR_ID_PREC_BOD in (Select BDCCR_ID_BDCRC From BODACC With (nolock) " + where + " AND BDCCR_ID_EVNPR is null)";
     }
 
-    /// <summary>La requete de la liste des controles non conformes (OPE_LST_CTRLNC_BOD.cs:88-90), les annonces cochees a la place de la date.</summary>
-    internal static string RequeteControles(IEnumerable<int> ids)
+    /// <summary>La requete de la liste des controles non conformes (OPE_LST_CTRLNC_BOD.cs:85-90) sur la clause de date de la V2.</summary>
+    internal static string RequeteControles(string dateV2)
         => "Select Isnull(PREVE_NUM_PRV,PRCLL_NUM_PC) as NUM_PC_OU_PRV , EVNPR_CODE_EVE_PRO, EVNPR_DATE, BDCCR_DATE_ENVOI, BDCCR_DATE_PUBLICITE, "
-         + "BDCCR_NUM_PARUTION, BDCCR_CONTROLE_QUALITE  " + FromEdition
-         + $" Where BDCCR_ID_BDCRC IN ({string.Join(", ", ids.Select(i => i.ToString(CultureInfo.InvariantCulture)))})"
+         + "BDCCR_NUM_PARUTION, BDCCR_CONTROLE_QUALITE  " + FromEdition + dateV2
          + " And (BDCCR_ETAT_BODACC = '5' or BDCCR_ETAT_BODACC = '6' or BDCCR_ETAT_BODACC = '10')"
          + " And BDCCR_CONTROLE_QUALITE is not null";
+
+    /// <summary>La clause de date de l'etat et la fin de son titre, au mot pres (rejets : OPE_LST_LISTE_REJ.cs:73-94 -- date d'EP, avec
+    /// l'evenement supprime, ou d'envoi ; controles : OPE_LST_CTRLNC_BOD.cs:61-83 -- date d'EP seule, de parution ou d'envoi), les dates
+    /// comme la V2 les tient (le texte du champ date, « dd/MM/yyyy », relu par convert 103). Vide sans date : la liste des rejets
+    /// ouverte sans critere.</summary>
+    internal static (string Where, string Titre) DateV2(char liste, LecteurPublicationsBodacc.CriteresLus c)
+    {
+        if (c.Du is not { } du) return ("", "");
+        var mini = du.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+        var maxi = c.Au?.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+        string Egal(string colonne) => $"{colonne} = convert(datetime, '{mini}',103)";
+        string Entre(string colonne) => $"{colonne} between convert(datetime, '{mini}',103) and convert(datetime, '{maxi}',103)";
+        string Titre(string quoi) => maxi is null ? $" dont la date {quoi} est {mini}" : $" dont la date {quoi} est comprise entre le {mini} et le {maxi}";
+        return c.Mode switch
+        {
+            LecteurPublicationsBodacc.ModeDate.Envoi => (" Where " + (maxi is null ? Egal("BDCCR_DATE_ENVOI") : Entre("BDCCR_DATE_ENVOI")), Titre("envoi")),
+            LecteurPublicationsBodacc.ModeDate.Parution => (" Where " + (maxi is null ? Egal("BDCCR_DATE_PUBLICITE") : Entre("BDCCR_DATE_PUBLICITE")), Titre("de parution")),
+            // « EVNPR_DATE= » sans espace : la V2 (OPE_LST_LISTE_REJ.cs:85).
+            _ when liste == 'R' => (maxi is null ? $" Where (EVNPR_DATE= convert(datetime, '{mini}',103) OR {Egal("BDCCR_DATE_EP_SUPPR")})"
+                                                 : $" Where ({Entre("EVNPR_DATE")} OR {Entre("BDCCR_DATE_EP_SUPPR")})", Titre("d'évènement")),
+            _ => (" Where " + (maxi is null ? Egal("EVNPR_DATE") : Entre("EVNPR_DATE")), Titre("d'évènement")),
+        };
+    }
+
+    /// <summary>Les criteres de la recherche que l'ecran envoie avec le geste (FormeOperation : leur libelle, comme les parametres d'une
+    /// audience, GesteEcran.Valeurs).</summary>
+    private static LecteurPublicationsBodacc.CriteresLus CriteresDe(GesteEcran demande)
+        => LecteurPublicationsBodacc.Lire(new RechercheEcran(null, new Dictionary<string, string>(
+               demande.Valeurs.Where(v => v.Key is LecteurPublicationsBodacc.CritereDate or LecteurPublicationsBodacc.CritereDu
+                                                 or LecteurPublicationsBodacc.CritereAu or LecteurPublicationsBodacc.CritereNumero), StringComparer.Ordinal)));
+
+    /// <summary>La liste de la V2 sur ces criteres (le filtre du lecteur) : combien d'annonces elle compte (_listRejetsBod.Count,
+    /// _listControlBod.Count : le titre), et lesquelles des cochees y sont. La liste des rejets de la V2 n'a que l'etat 9 (le lecteur y
+    /// garde aussi les etats 3, figes).</summary>
+    private static async Task<(int Total, HashSet<int> Presentes)> ListeAsync(GesteEnCours geste, char liste,
+        (string Filtre, Func<SqlParameter[]> Parametres) f, List<int> ids, CancellationToken ct)
+    {
+        var filtre = f.Filtre + (liste == 'R' ? " AND b.BDCCR_ETAT_BODACC = '9'" : "");
+        var requete = LecteurPublicationsBodacc.RequeteDe(liste)!;
+        var total = 0;
+        await using (var r = await geste.LireAsync(requete.Replace("/*filtre*/", filtre, StringComparison.Ordinal), ct,
+                         [new SqlParameter("@plafond", 1), .. f.Parametres()]))
+            if (await r.ReadAsync(ct)) total = Convert.ToInt32(r["Total"], CultureInfo.InvariantCulture);
+        var presentes = new HashSet<int>();
+        var dans = $" AND b.BDCCR_ID_BDCRC IN ({string.Join(", ", ids.Select(i => i.ToString(CultureInfo.InvariantCulture)))})";
+        await using (var r = await geste.LireAsync(requete.Replace("/*filtre*/", filtre + dans, StringComparison.Ordinal), ct,
+                         [new SqlParameter("@plafond", ids.Count), .. f.Parametres()]))
+            while (await r.ReadAsync(ct)) presentes.Add(Convert.ToInt32(r["BDCCR_ID_BDCRC"], CultureInfo.InvariantCulture));
+        return (total, presentes);
+    }
 
     private static async Task<IssueGeste> EditerAsync(GesteEnCours geste, List<Annonce> annonces, CancellationToken ct)
     {
         var calculees = new List<Calculee>();
         var sautees = new List<string>();
-        foreach (var (liste, code, titre, requete) in new (char, string, Func<int, string>, Func<IEnumerable<int>, string>)[]
+        var criteres = CriteresDe(geste.Demande);
+        foreach (var (liste, code, titre, requete) in new (char, string, Func<int, string>, Func<string, string>)[]
                  {
                      ('R', "LISTE_REJETS_BODACC", n => n > 1 ? $"Listes des {n} Bodaccs rejetés" : "Bodacc rejeté", RequeteRejets),
                      ('Q', "LISTE_BODACC_QUALITE", n => n > 1 ? $"Listes des {n} Bodaccs en contrôle qualité non conforme" : "Bodacc en contrôle qualité non conforme",
@@ -187,17 +245,23 @@ internal sealed class EcrivainPublicationsBodacc : IEcrivainEcran
         {
             var ids = annonces.Where(a => a.Liste == liste).Select(a => a.Id).ToList();
             if (ids.Count == 0) continue;
+            // RIG v2 edite TOUTE la liste de la recherche (DoGenererLesEditions, sans case : OPE_LST_LISTE_REJ.cs:62-120,
+            // OPE_LST_CTRLNC_BOD.cs:49-103) : une annonce cochee hors de la liste de ces criteres est une liste a relire.
+            if (LecteurPublicationsBodacc.FiltreDe(liste, criteres) is not { } f) return IssueGeste.Refuser(Introuvable($"{liste}-{ids[0]}"));
+            var (total, presentes) = await ListeAsync(geste, liste, f, ids, ct);
+            if (ids.FirstOrDefault(i => !presentes.Contains(i)) is var hors and > 0) return IssueGeste.Refuser(Introuvable($"{liste}-{hors}"));
             var (e, refus) = await NouvelleAsync(geste, code, sansListe: true, ct);
             if (refus is not null) return IssueGeste.Refuser(refus);
             if (await GreffeNomAsync(geste, ct) is not { } greffe)
                 return IssueGeste.Refuser("Rien n'est édité : le nom du greffe de l'état (v2.INFO_GREFFE, v2.CODE_GREFFE, v2.TYPE_GREFFE, v2.PARAM_EDITIONS) "
                                           + "manque à la base du greffe.");
-            e!.Parametres["TitreEtat"] = titre(ids.Count);
+            var (date, periode) = DateV2(liste, criteres);
+            e!.Parametres["TitreEtat"] = titre(total) + periode;
             e.Parametres["GreffeNom"] = greffe;
-            e.Parametres["SQL"] = requete(ids);
+            e.Parametres["SQL"] = requete(date);
             e.Colonnes["DMNED_CODE_ENTITE_SOURCE"] = "DEMANDE";
             e.LibelleSource = " ";
-            calculees.Add(new Calculee(e, $"{e.Libelle} ({ids.Count} annonce{(ids.Count > 1 ? "s" : "")})", null, true));
+            calculees.Add(new Calculee(e, $"{e.Libelle} ({total} annonce{(total > 1 ? "s" : "")}, toute la liste de la recherche{periode})", null, true));
         }
 
         var certificats = annonces.Where(a => a.Liste == 'C').ToList();
@@ -366,14 +430,17 @@ internal sealed class EcrivainPublicationsBodacc : IEcrivainEcran
         var retenus = new List<Retenu>();
         await using (var r = await geste.LireAsync($"""
             SELECT g.GRRPC_FONCTION_PC, g.GRRPC_ID_MNDPC, m.MNDPC_CIVILITE, c.R_CIVILITE_ABREGE_EDIT, m.MNDPC_NOM, m.MNDPC_COMPLEMENT_NOM,
-                   m.MNDPC_ID_ADRBS, m.MNDPC_ADRESSE_MAIL, m.MNDPC_NOM_COFFRE, m.MNDPC_DATE_DEMARRAGE_COFFRE
+                   m.MNDPC_ID_ADRBS, m.MNDPC_ADRESSE_MAIL, m.MNDPC_NOM_COFFRE, m.MNDPC_DATE_DEMARRAGE_COFFRE, g.GRRPC_NUMERO_INTERNE,
+                   a.Id AS AdresseLue, a.Pays
             FROM v2.GERER_PC AS g JOIN v2.MANDATAIRE_PC AS m ON m.MNDPC_ID_MNDPC = g.GRRPC_ID_MNDPC
             LEFT JOIN v2.CIVILITE AS c ON c.R_CIVILITE_VALEUR = m.MNDPC_CIVILITE
+            LEFT JOIN rec.Adresse AS a ON a.Id = m.MNDPC_ID_ADRBS
             WHERE {(pc ? "g.GRRPC_ID_PRCLL" : "g.GRRPC_ID_PREVE")} = @id AND g.GRRPC_FIN_MISSION = 0
             ORDER BY g.GRRPC_ID_GRRPC
             """, ct, new SqlParameter("@id", (object?)c.IdPc ?? c.IdPrv)))
         {
-            var lus = new List<(string Fonction, string Valeur, string Nom, int? IdAdresse, string Email, string NomCoffre, bool Coffre)>();
+            var lus = new List<(string Fonction, string Valeur, string Nom, int? IdAdresse, string Email, string NomCoffre, bool Coffre,
+                                string Reference, string Pays)>();
             while (await r.ReadAsync(ct))
             {
                 var civilite = FormeLigne.Texte(r, "MNDPC_CIVILITE");
@@ -384,7 +451,10 @@ internal sealed class EcrivainPublicationsBodacc : IEcrivainEcran
                 var nomCoffre = demarrage > geste.Maintenant.Date ? "" : FormeLigne.Texte(r, "MNDPC_NOM_COFFRE");
                 lus.Add((FormeLigne.Texte(r, "GRRPC_FONCTION_PC").Trim(), EditionsV2.Texte(Convert.ToInt32(r["GRRPC_ID_MNDPC"], CultureInfo.InvariantCulture)),
                          complet, r["MNDPC_ID_ADRBS"] is int a ? a : null, FormeLigne.Texte(r, "MNDPC_ADRESSE_MAIL"), nomCoffre,
-                         nomCoffre != "" && demarrage is { } dem && dem <= geste.Maintenant.Date));
+                         nomCoffre != "" && demarrage is { } dem && dem <= geste.Maintenant.Date,
+                         // REFERENCE_DESTINATAIRE = GRRPC_NUMERO_INTERNE (DBString.Valeur : « » si nul, :1647, :1670, :2009) ; PAYS =
+                         // ADRBS_PAYS de l'adresse lue (:1643, :1666), « FRA » (le defaut d'ENTITE) sans adresse.
+                         FormeLigne.Texte(r, "GRRPC_NUMERO_INTERNE"), r["AdresseLue"] is DBNull ? "FRA" : FormeLigne.Texte(r, "Pays")));
             }
             r.Close();
             foreach (var m in lus)
@@ -396,7 +466,7 @@ internal sealed class EcrivainPublicationsBodacc : IEcrivainEcran
                 EditionsEvenementV2.Destinataire Entite(string code, string coffre) => new()
                 {
                     Code = code, Valeur = m.Valeur, Libelle = m.Nom, Adresse = adresse, Email = m.Email, NomCoffre = coffre,
-                    Cle = $"GERER_PC_{m.Fonction}_{m.Valeur}",
+                    Cle = $"GERER_PC_{m.Fonction}_{m.Valeur}", Reference = m.Reference, Pays = m.Pays,
                 };
                 var codes = new List<(string Code, string Coffre)> { (m.Fonction, m.NomCoffre) };
                 if (pc && m.NomCoffre == "") codes.Add((m.Fonction + "SC", ""));            // « Sans coffre », PC seulement (:1655-1676)

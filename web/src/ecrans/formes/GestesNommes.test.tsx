@@ -57,6 +57,27 @@ describe('Operation : un bouton par geste nomme', () => {
     await waitFor(() => expect(container.querySelector('.rig-eg-annonce')?.textContent).toContain('Bordereau 2001/0001 supprimé.'))
   })
 
+  // Reprise 7 : RIG v2 edite TOUTE la liste de sa recherche (les listes BODACC, OPE_LST_LISTE_REJ.cs:73-94) ; le geste emporte
+  // donc les criteres remplis, sous leur libelle. Jumeau : les deux autres tests, sans critere, envoient {}.
+  it('les criteres de la recherche partent avec le geste, sous leur libelle', async () => {
+    const pont = installerFauxPont({
+      'EcranGenere.Lignes': () => ({ ...base([ligne]), recherche: true }),
+      'EcranGenere.Chercher': () => ({ ...base([ligne]), recherche: true, cherchees: ['Fond'] }),
+      'EcranGenere.Geste': fait('1 édition placée dans la file des éditions.'),
+    })
+    const d = descripteur({ criteres: ['Critère de date', 'Date du', 'Date au'], gestes: ['Valider', 'Éditer'], valider: 'Valider' })
+    const { container } = render(<EcranGenere descripteur={d} />)
+    await waitFor(() => expect(container.querySelector('input[aria-label="Date du"]')).not.toBeNull())
+    fireEvent.change(container.querySelector('input[aria-label="Critère de date"]')!, { target: { value: "Date d'envoi" } })
+    fireEvent.change(container.querySelector('input[aria-label="Date du"]')!, { target: { value: '2001-04-02' } })
+    await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Chercher', 'ECRAN_TEST', '',
+      { 'Critère de date': "Date d'envoi", 'Date du': '2001-04-02' }))
+    await auTempsConfirmer(container)
+    fireEvent.click([...container.querySelectorAll('button')].find((b) => b.textContent === 'Éditer')!)
+    await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Geste', 'ECRAN_TEST', 'Fond', 'Confirmer', 'Éditer', ['2110401'],
+      { 'Critère de date': "Date d'envoi", 'Date du': '2001-04-02' }))
+  })
+
   it('sans geste nomme : le bouton valider seul, envoye sous son nom (jumeau)', async () => {
     const pont = installerFauxPont({ 'EcranGenere.Lignes': () => base([ligne]), 'EcranGenere.Geste': fait('Bordereau généré.') })
     const { container } = render(<EcranGenere descripteur={descripteur({})} />)

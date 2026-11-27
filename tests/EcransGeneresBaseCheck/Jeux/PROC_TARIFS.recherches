@@ -9,9 +9,12 @@ Article L6TI05 · Recherche banc | 22,00 € HT · type TI · catégorie L6 RCS 
 ---
 # Le type d'article : les principaux, a leur prix unitaire. ART17B : l'article actif d'un renvoi facture, pose par PROC_RETAUD.sql
 # (lot 7 : « Renvoyer » refuse la facture que la V3 ne sait pas faire) ; son jumeau ART17C, en sommeil, n'entre pas.
+# Les principaux actifs de PROC_ARTICLE.sql (lot 13 : L13PR01, derniere version ; L13PR03, a venir) sont des principaux comme les autres.
 critere: Type d'article = PR
 lignes:
 Article ART17B · Renvoi facture du banc | 10,00 € HT · type PR · catégorie Aucune · codes événement EV17B, EV17C | Article de base | AFaire | []
+Article L13PR01 · Copie banc | 2,25 € HT · type PR · catégorie Aucune | Article de base | AFaire | []
+Article L13PR03 · Extrait banc futur | 3,10 € HT · type PR · catégorie Aucune | Article de base | AFaire | []
 Article L6PR01 · Principal un | 10,00 € HT · type PR · catégorie Aucune | Article de base | AFaire | []
 Article L6PR02 · Principal deux | 5,50 € HT · type PR · catégorie Aucune | Article de base | AFaire | []
 ---

@@ -1,0 +1,9 @@
+# Le numero de gestion, seul critere de l'ecran (ETP_RCS de RIG v2) : tout dossier, radie compris (MetierTestEntiteRadiee = false),
+# blancs retires.
+critere: Numéro de gestion du dossier RCS = 2013 B 60002
+lignes:
+2013B60002 | KBIS INTERNE BETA SAS · 523 006 020 · radié le 30/06/2020 · aucun Kbis interne édité | Dossiers RCS | AFaire | []
+---
+# Un numero qu'aucun dossier ne porte : rien.
+critere: Numéro de gestion du dossier RCS = 2013B69999
+lignes:

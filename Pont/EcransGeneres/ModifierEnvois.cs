@@ -618,7 +618,7 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             [
                 Marche("Renvoi des rejets", "Un rejet coché passe à renvoyer (état 3) : le prochain envoi BODACC le reprend.", false),
                 Marche("Vérification des parutions", "Un certificat de parution coché passe à l'état vérifié (6). Un contrôle non conforme ne se valide pas : RIG v2 n'en édite que la liste. Une validation sans ligne cochée est refusée.", false),
-                Marche("Éditions", "« Éditer » place dans la file des éditions la liste des rejets cochés, la liste des contrôles non conformes cochés, ou le certificat de parution de chaque annonce cochée, un par destinataire du réglage CERTIF_BOD_DEST (mandataires de la procédure, document interne). L'impression et l'envoi au coffre-fort sont faits par le service d'édition de RIG v2 (simulés ici).", false),
+                Marche("Éditions", "« Éditer » place dans la file des éditions la liste des rejets ou celle des contrôles non conformes — toute la liste de la recherche, sa période dans le titre, comme RIG v2 ; cocher une de ses annonces la choisit —, ou le certificat de parution de chaque annonce cochée, un par destinataire du réglage CERTIF_BOD_DEST (mandataires de la procédure, document interne). L'impression et l'envoi au coffre-fort sont faits par le service d'édition de RIG v2 (simulés ici).", false),
             ],
             Lignes =
             [

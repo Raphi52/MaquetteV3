@@ -62,6 +62,12 @@ internal static class EditionsEvenementV2
         public string Email { get; init; } = "";
         public string NomCoffre { get; init; } = "";
         public string Cle { get; init; } = "";
+        /// <summary>PAYS : « FRA » par defaut (le constructeur d'ENTITE, :308) ; ADRBS_PAYS de son adresse quand RIG v2 la lit (un
+        /// mandataire, :1643, vide si la colonne l'est).</summary>
+        public string Pays { get; init; } = "FRA";
+        /// <summary>REFERENCE_DESTINATAIRE (un mandataire : GRRPC_NUMERO_INTERNE, :1647, :2009) ; null : absent, comme le serialiseur de
+        /// RIG v2 omet un attribut nul.</summary>
+        public string? Reference { get; init; }
 
         /// <summary>Le document interne (CreateEntiteXMLDestinataireDocumentInterne, DestinatairesEditionsLot2.cs:136-153).</summary>
         public bool EstDocumentInterne => Code.Length == 0 && Valeur.Length == 0 && Libelle.Length == 0 && Adresse.Length == 0;
@@ -485,12 +491,16 @@ internal static class EditionsEvenementV2
     }
 
     /// <summary>La liste des destinataires au format de RIG v2 (LISTE_ENTITES serialisee : un element ENTITE par destinataire, les
-    /// attributs de DestinatairesEditionsLot2.ENTITE, TYPE « ENTITE » et PAYS « FRA » par defaut, :312-317).</summary>
+    /// attributs de DestinatairesEditionsLot2.ENTITE, TYPE « ENTITE » et PAYS « FRA » par defaut, :312-317).
+    /// fix-ok: mesure par le controle final du lot 11 (27/11/2026) -- PAYS etait toujours « FRA » et REFERENCE_DESTINATAIRE jamais
+    /// ecrit, alors que RIG v2 les pose pour un mandataire (DestinatairesEditionsLot2.cs:1643, :1647) : Pays et Reference du
+    /// destinataire, defauts inchanges pour les autres ecrans.</summary>
     internal static string ListeXml(IEnumerable<Destinataire> liste)
         => new XElement("LISTE_ENTITES", liste.Select(e => new XElement("ENTITE",
                 new XAttribute("PAR_DEFAUT", e.ParDefaut), new XAttribute("CODE", e.Code), new XAttribute("VALEUR", e.Valeur),
                 new XAttribute("LIBENTITE", ""), new XAttribute("LIBELLE", e.Libelle), new XAttribute("ADRESSE", e.Adresse),
-                new XAttribute("PAYS", "FRA"), new XAttribute("TYPE", "ENTITE"), new XAttribute("EMAIL", e.Email),
+                new XAttribute("PAYS", e.Pays), new XAttribute("TYPE", "ENTITE"), new XAttribute("EMAIL", e.Email),
+                e.Reference is null ? null : new XAttribute("REFERENCE_DESTINATAIRE", e.Reference),
                 new XAttribute("NOM_COFFRE", e.NomCoffre), new XAttribute("KEY_DESTINATAIRE", e.Cle))))
             .ToString(SaveOptions.DisableFormatting);
 }

@@ -1,0 +1,25 @@
+# La recherche des « Articles tarifaires » (LecteurArticles) : le code ou le libelle, le type et le statut.
+# Bloc 1 : « Statut = tous » (le parametre inclureSommeil de RIG v2) leve le filtre des actifs : L13PR04, en sommeil, revient
+# (« En sommeil ») -- jumeau du bloc par defaut, qui l'ecarte. Les cellules : la grille les ouvre en modification.
+texte: l13
+critere: Statut = tous
+lignes:
+Copie banc | Article L13PR01 · Article principal · 2,25 € HT · depuis le 01/01/2025 · en vigueur | Articles principaux | Validee | [] | valeurs: Copie banc ; L13PR01 ; Article principal ; depuis le 01/01/2025 ; 2.25
+Extrait banc futur | Article L13PR03 · Article principal · 3,10 € HT · depuis le {A+1} · à venir | Articles principaux | EnCours | []
+Ancien tarif banc | Article L13PR04 · Article principal · 4,00 € HT · depuis le 01/01/2020 · en sommeil | Articles principaux | AFaire | [] | valeurs: Ancien tarif banc ; L13PR04 ; Article principal ; depuis le 01/01/2020 ; 4.00
+---
+# Le type, par son libelle : les titres seuls -- jumeaux ecartes, les principaux.
+critere: Type d'article = Titre composé
+lignes:
+Inscription banc | Article L6TI01 · Titre composé · 25,50 € HT · depuis le 01/01/2025 · en vigueur | Titres composés | Validee | []
+Inscription derivee | Article L6TI04 · Titre composé · 0,00 € HT · depuis le 01/01/2025 · en vigueur | Titres composés | Validee | []
+Recherche banc | Article L6TI05 · Titre composé · 22,00 € HT · depuis le 01/01/2025 · en vigueur | Titres composés | Validee | []
+---
+# Le libelle : « copie » trouve L13PR01 (Copie banc, sa derniere version) ; L6TI03 (Copie banc, en sommeil) reste ecarte par le statut.
+texte: copie
+lignes:
+Copie banc | Article L13PR01 · Article principal · 2,25 € HT · depuis le 01/01/2025 · en vigueur | Articles principaux | Validee | []
+---
+# Un type que le formulaire ne connait pas : rien (jumeau : le bloc 2).
+critere: Type d'article = XX
+lignes:
