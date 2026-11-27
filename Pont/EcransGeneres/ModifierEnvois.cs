@@ -331,10 +331,11 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             // décochée puis TRAITER (OPE_LISTE_LOT._TraiterEditionsCochees, :53-78).
             Gestes = ["Clôturer le lot", "Ne pas imprimer", "Remettre à l'impression"],
             Rang = 2,
+            // Un document barré reste dans son lot ouvert et se rétablit (OPE_LISTE_LOT._TraiterEditionsCochees, :53-78) : « Ne pas
+            // imprimer » est donc EnCours, cochable, et non un état figé (commun.tsx:78) qui ôterait sa case à l'écran.
             Etats =
             [
-                .. EtatsEcran.Trois("À clôturer", "En préparation", "Clôturé"), new EtatEcran("EnAttente", "Imprimante à choisir", "en-attente"),
-                new EtatEcran("Rejetee", "Ne pas imprimer", "rejetee"),
+                .. EtatsEcran.Trois("À clôturer", "Ne pas imprimer", "Clôturé"), new EtatEcran("EnAttente", "Imprimante à choisir", "en-attente"),
             ],
             Groupes = ["Lots ouverts", "Documents des lots"],
             Sections =
@@ -354,7 +355,7 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
                 Ligne("Lot CONVOCATIONS", "8 documents · ouvert le 05/03/2026 · imprimante « Imprimante de l'accueil » · groupe 2026-0104", "Lots ouverts", "AFaire"),
                 Ligne("Lot COPIES", "2 documents · ouvert le 06/03/2026 · aucune imprimante choisie · groupe 2026-0105", "Lots ouverts", "EnAttente"),
                 Ligne("Lot GROSSES", "4 documents · ouvert le 06/03/2026 · imprimante « Imprimante du 1er étage » · groupe 2026-0106", "Lots ouverts", "AFaire"),
-                Ligne("Notification de jugement", "Lot NOTIFICATIONS · Alpha Services SARL · créé le 04/03/2026 · 1 exemplaire · dossier 2026F00101 · ne pas imprimer", "Documents des lots", "Rejetee"),
+                Ligne("Notification de jugement", "Lot NOTIFICATIONS · Alpha Services SARL · créé le 04/03/2026 · 1 exemplaire · dossier 2026F00101 · ne pas imprimer", "Documents des lots", "EnCours"),
                 Ligne("Convocation à l'audience", "Lot CONVOCATIONS · Bêta Industrie SAS · créé le 05/03/2026 · 2 exemplaires · dossier 2026F00102", "Documents des lots", "AFaire"),
             ],
         },
