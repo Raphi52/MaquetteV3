@@ -573,37 +573,34 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_GESTBOD", Titre = "Publications BODACC", Sujet = "annonces BODACC",
-            // Une ligne par annonce BODACC rejetée (état 9, rectifier) ou remise à renvoyer (état 3) : la liste que RIG v2 ouvre SANS date
-            // (OPE_LST_REJETS.MajSelectionBodacc, :55-90 ; proc_gestbod.md, Détail OPE). Les certificats et les contrôles non conformes
-            // exigent une date ou un numéro de parution (OPE_CERTIF_BOD.cs:80-117, OPE_LST_CTRLNC.cs:50-81), que la forme File ne saisit
-            // pas : leurs groupes restent vides, dit. Lecteur et geste : LecteurPublicationsBodacc.cs, EcrivainPublicationsBodacc.cs (lot 11).
-            Forme = FormeEcran.File,
-            Recherche = "Rechercher une annonce, une procédure, un motif de rejet…",
-            Criteres = ["Date d'EP", "Date de parution", "Numéro de parution"],
-            Valider = "Renvoyer",
-            // « Renvoyer » = la mise à jour des rejets (OPE_LST_LISTE_REJ.DoSauver, :51-57 : état 3). « Vérifier » et les éditions
-            // (certificat, liste des rejets, contrôles) ne sont pas repris : voir EcrivainPublicationsBodacc.cs.
-            Gestes = ["Renvoyer"],
+            // Une ligne par annonce BODACC. Sans critère : les rejets (état 9, rectifier) et ceux remis à renvoyer (état 3), la liste
+            // que RIG v2 ouvre sans date (OPE_LST_REJETS.MajSelectionBodacc, :55-90 ; proc_gestbod.md, Détail OPE). Avec une date (d'EP,
+            // de parution ou d'envoi) ou un numéro de parution : aussi les certificats de parution (OPE_CERTIF_BOD.cs:80-117) et les
+            // contrôles non conformes (OPE_LST_CTRLNC.cs:50-81). Forme Opération (lot 11, reprise), comme « Envoi JAL / BODACC » : la
+            // seule qui envoie des critères ET des lignes cochées. Lecteur et geste : LecteurPublicationsBodacc.cs,
+            // EcrivainPublicationsBodacc.cs.
+            Forme = FormeEcran.Operation,
+            Recherche = "Numéro de parution…",
+            // Les boutons radio GestionBodacc (OPE_BASE_BOD.cs:12, :44-47) et les deux dates « du » / « au » de la V2.
+            Criteres = ["Critère de date", "Date du", "Date au", "Numéro de parution"],
+            // VALIDER de RIG v2, dans la liste de chaque annonce : un rejet passe à renvoyer (état 3, OPE_LST_LISTE_REJ.DoSauver,
+            // :51-57), un certificat est vérifié (état 6, OPE_LST_CERTIF_BOD, :57-59). Les éditions ne sont pas reprises.
+            Valider = "Valider",
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À traiter", "Vérifiée", "Certifiée"), new EtatEcran("EnAttente", "À renvoyer", "en-attente")],
             Groupes = ["Certificats de parution", "Rejets", "Contrôles non conformes"],
             Sections =
             [
-                Marche("Mode et critère", "Mode : certificats, rejets, mise à jour des rejets ou contrôles non conformes. Critère de date : date d'EP, de parution ou d'envoi, ou numéro de parution. La date de fin ne peut pas précéder la date de début.", true,
-                    "Mode", "Critère", "Date du", "Date au"),
-                Marche("Vérification", "Cocher « vérifier » passe l'annonce à l'état vérifié. Une validation sans aucune ligne cochée est refusée.", true,
-                    "Vérifier"),
-                Marche("Édition", "Édition de la liste ou du certificat. Pour un certificat, l'annonce cochée passe à l'état certifié.", true,
-                    "Édition"),
-                Marche("Renvoi des rejets", "Pour la mise à jour des rejets : cocher « renvoyer » place l'annonce à renvoyer (état 3), que le prochain envoi BODACC reprend.", false,
-                    "Renvoyer"),
+                Marche("Renvoi des rejets", "Un rejet coché passe à renvoyer (état 3) : le prochain envoi BODACC le reprend.", false),
+                Marche("Vérification des parutions", "Un certificat de parution coché passe à l'état vérifié (6). Un contrôle non conforme ne s'enregistre pas : RIG v2 n'en édite que la liste. Une validation sans ligne cochée est refusée.", false),
+                Marche("Éditions", "Certificat par destinataire, liste des rejets, liste des contrôles : éditions de RIG v2, non reprises.", false),
             ],
             Lignes =
             [
                 Ligne("Alpha Services SARL", "Parution n° 2026-041 · EP du 02/03/2026", "Certificats de parution", "AFaire"),
-                Ligne("Gamma Conseil SARL", "Parution n° 2026-042 · certifiée", "Certificats de parution", "Validee"),
+                Ligne("Gamma Conseil SARL", "Parution n° 2026-042 · parution vérifiée", "Certificats de parution", "EnCours"),
                 Ligne("Epsilon Habitat SARL", "Rejet du 05/03/2026 · à traiter", "Rejets", "AFaire"),
-                Ligne("Zêta Commerce SAS", "Rejet du 06/03/2026 · renvoi coché", "Rejets", "EnAttente"),
+                Ligne("Zêta Commerce SAS", "Rejet du 06/03/2026 · à renvoyer au prochain envoi", "Rejets", "EnAttente"),
                 Ligne("Êta Boulangerie SARL", "Contrôle de qualité · à traiter", "Contrôles non conformes", "AFaire"),
                 Ligne("Thêta Import SAS", "Rejet du 07/03/2026 · à traiter", "Rejets", "AFaire"),
             ],
