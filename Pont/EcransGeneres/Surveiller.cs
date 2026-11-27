@@ -744,7 +744,8 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // La file des échéances de mesures (proc_survmes.md, Détail OPE) : lue dans la base par
             // Serveur/Socle/EcransGeneres/LecteurSurveillanceMesures.cs (lot 9). Les boutons de FORM_SURVMES.cs:20-29 :
             // VALIDER (l'expiration des événements, OPE_AFFICHAGE_MES.cs:83-136), « Editer les lignes cochées », « Editer tout ».
-            // Sans écrivain : le moteur des événements de procédure de RIG v2 n'est pas dans la V3 (LecteurSurveillanceMesures.cs).
+            // Joués par Serveur/Socle/EcransGeneres/EcrivainSurveillanceMesures.cs (lot 9, 27/11) : « Valider » fait expirer
+            // l'événement, crée le survenu de son code d'expiration et le futur de celui-ci ; les deux éditions Word sont refusées.
             Recherche = "Rechercher une mesure, un rôle, un code d'événement…",
             Criteres = ["Délai supplémentaire (jours)", "Événements expirables seulement"], // OPE_RECHERCHE_MES.cs:49-55.
             Valider = "Valider", // FORM_SURVMES.cs : le bouton VALIDER du processus (DoVerifier puis expiration, OPE_AFFICHAGE_MES.cs:83).
@@ -760,7 +761,7 @@ public sealed class DomaineSurveiller : IDomaineEcrans
                     "Code d'événement"),
                 Marche("Cochage", "Cocher une mesure la recharge ; une mesure déjà verrouillée par une autre demande se décoche.", true,
                     "Mesure cochée", "Compteur"),
-                Marche("Validation", "Valider fait expirer l'événement de chaque ligne cochée et crée l'événement survenu, sous une demande par mesure.", true,
+                Marche("Validation", "Valider fait expirer l'événement de chaque ligne cochée, crée l'événement survenu de son code d'expiration et le futur qui le suit. Une mesure tenue par une autre demande n'est pas traitée.", true,
                     "Valider"),
                 Marche("Éditions Word", "Un aperçu Word des lignes cochées, ou de toutes les lignes affichées.", false,
                     "Editer les lignes cochées", "Editer tout"),

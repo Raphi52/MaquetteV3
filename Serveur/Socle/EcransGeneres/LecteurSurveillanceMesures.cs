@@ -19,12 +19,10 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// (R_CODEEVEPRO_CODE_EVE_PRO_EXPIRE vide) est decoche, grise, en rouge : il ne peut pas expirer -- « Sans code d'expiration »,
 /// Rejetee ; les autres, coches d'office : « Mesures à traiter », AFaire.
 ///
-/// CE QUE LA V3 NE FAIT PAS ENCORE (nomme, aucun ecrivain) : « Valider » fait expirer l'evenement et CREE l'evenement survenu et
-/// ses futurs (EvenementProcedure.PasserEnExpirerEveProFuturWithParent -> creationEvenementSurvenuDepuisExpire, RigMetier), sous
-/// une Demande SURVMES verrouillee par mesure (CreateAndLockDemande, OPE_AFFICHAGE_MES.cs:83-121), avec son dossier « 2J » et les
-/// demandes d'edition Lot2 (:122-136) : le moteur des evenements de procedure de RIG v2 n'est pas dans la V3 ; « Editer tout » et
-/// « Editer les lignes cochées » ouvrent un apercu Word a l'ecran (EditerLigne, :157) : pas d'edition Word dans la V3. La grille
-/// des codes d'evenement (cocher un code coche ses mesures, :55-66) est un filtre de l'ecran, pas de la base.
+/// LES GESTES : EcrivainSurveillanceMesures.cs -- « Valider » fait expirer l'evenement et cree le survenu et son futur, comme
+/// PasserEnExpirerEveProFuturWithParent (lot 9, 27/11/2026) ; « Editer tout » et « Editer les lignes cochées » ouvrent un apercu
+/// Word a l'ecran (EditerLigne, :157) : refuses, pas d'edition Word dans la V3. La grille des codes d'evenement (cocher un code
+/// coche ses mesures, :55-66) est un filtre de l'ecran, pas de la base.
 /// </summary>
 internal sealed class LecteurSurveillanceMesures : ILecteurEcran
 {
