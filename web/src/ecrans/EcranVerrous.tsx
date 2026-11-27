@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import type { ContexteDossierVue } from '../plan/types'
 import { CelluleIdentite, EnteteListe, ListeModerne, PiedListe, PointEtat, normaliser, teinteStatut } from '../composants/ListeModerne'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 
 export interface LigneVerrou {
   dossier: string
@@ -33,6 +34,9 @@ export interface DetenteurVerrous {
 export interface VueVerrous {
   lignes: LigneVerrou[]
   detenteurs: DetenteurVerrous[]
+  /** D'ou viennent les lignes (Pont/LectureEcranMain.cs, lot 9) : la base du greffe, ou la demonstration (« exemple »). */
+  mode?: ModeLecture
+  message?: string | null
 }
 
 export interface ProprietesEcranVerrous {
@@ -124,6 +128,7 @@ export function EcranVerrous({ ouvrirDossier, dossier = null }: ProprietesEcranV
                      synthese={vue && <>{affiches.length}{' dossier(s)'}{affiches.length > 0 && <>{' · '}<b>{detenteurs}</b>{' detenteur(s) · plus ancien '}<b>{plusAncien} j</b></>}</>}
                      filtre={{ valeur: rapide, changer: setRapide, indication: 'Aller a un dossier…',
                                valider: () => { if (affiches.length === 1) ouvrirDossier(affiches[0]!.dossier) } }} />
+        {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Verrous" />}
 
         <div className="rig-table-cadre">
           <table className="rig-table rig-lm-table">

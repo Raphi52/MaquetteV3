@@ -1,0 +1,89 @@
+-- « Suivi dématérialisation » (LecteurSuiviDematerialisation) : des publicites JAL et des annonces BODACC d'evenements de
+-- procedure, aux colonnes de RIG_DEV (INFORMATION_SCHEMA lu le 27/11/2026). Les evenements du jeu ne sont rattaches a aucune
+-- affaire (PC ni prevention) : « Dossier judiciaire » compte les evenements d'une affaire (LecteurDossierJudiciaire), il ne doit
+-- pas les voir ; l'affaire d'une ligne (PC, sinon prevention, MetierSdematJud.cs:556-564) se voit sur la base de developpement.
+-- PROC_FIBEN.sql cree v2.BODACC sur la cle BDCCR_ID_BDCCR : la colonne de RIG_DEV, BDCCR_ID_BDCRC, est ajoutee et les deux
+-- recoivent l'identifiant (comme PROC_SURVBOD.sql). Ces annonces n'ont ni cout ni controle qualite : FIBEN et la surveillance
+-- BODACC ne les voient pas. PROC_XXAFF.sql cree v2.VIDIGED_INDEX APRES ce jeu : ses colonnes sont posees ici aussi.
+IF OBJECT_ID(N'v2.CODE_EVE_PRO') IS NULL
+    CREATE TABLE v2.CODE_EVE_PRO (R_CODEEVEPRO_VALEUR varchar(10) NOT NULL PRIMARY KEY, R_CODEEVEPRO_LIBELLE_ECRAN varchar(35) NOT NULL);
+IF OBJECT_ID(N'v2.EVENEMENT_PROCEDURE') IS NULL
+    CREATE TABLE v2.EVENEMENT_PROCEDURE (EVNPR_ID_EVNPR int NOT NULL PRIMARY KEY, EVNPR_ID_INSTN int NULL, EVNPR_NUM_ORDRE smallint NULL,
+        EVNPR_CODE_EVE_PRO varchar(10) NOT NULL, EVNPR_DATE datetime NULL);
+IF COL_LENGTH('v2.EVENEMENT_PROCEDURE', 'EVNPR_DATE') IS NULL ALTER TABLE v2.EVENEMENT_PROCEDURE ADD EVNPR_DATE datetime NULL;
+IF COL_LENGTH('v2.EVENEMENT_PROCEDURE', 'EVNPR_ID_PRCLL') IS NULL ALTER TABLE v2.EVENEMENT_PROCEDURE ADD EVNPR_ID_PRCLL int NULL;
+IF COL_LENGTH('v2.EVENEMENT_PROCEDURE', 'EVNPR_ID_PREVE') IS NULL ALTER TABLE v2.EVENEMENT_PROCEDURE ADD EVNPR_ID_PREVE int NULL;
+IF OBJECT_ID(N'v2.PROCEDURE_COLLECTIVE') IS NULL
+    CREATE TABLE v2.PROCEDURE_COLLECTIVE (PRCLL_ID_PRCLL int NOT NULL PRIMARY KEY, PRCLL_NUM_PC varchar(10) NULL, PRCLL_NOM_AFFAIRE varchar(max) NULL);
+IF OBJECT_ID(N'v2.PREVENTION') IS NULL
+    CREATE TABLE v2.PREVENTION (PREVE_ID_PREVE int NOT NULL PRIMARY KEY, PREVE_NUM_PRV varchar(10) NULL, PREVE_NOM_AFFAIRE varchar(250) NULL);
+IF OBJECT_ID(N'v2.DESTINATAIRE_INSTITUTIONNEL') IS NULL
+    CREATE TABLE v2.DESTINATAIRE_INSTITUTIONNEL (DTINS_CODE varchar(10) NOT NULL PRIMARY KEY, DTINS_LIBELLE varchar(100) NOT NULL);
+IF OBJECT_ID(N'v2.PUBLICITE') IS NULL
+    CREATE TABLE v2.PUBLICITE (PBLCT_ID_PBLCT int NOT NULL PRIMARY KEY, PBLCT_ID_EVNPR int NULL, PBLCT_DATE_REALISATION datetime NULL,
+        PBLCT_DATE_ENVOI_ELECTRONIQUE datetime NULL, PBLCT_NUM_PARUTION varchar(20) NULL, PBLCT_NUM_BORDEREAU varchar(10) NULL,
+        PBLCT_DESTINATAIRE varchar(35) NULL);
+IF OBJECT_ID(N'v2.BORDEREAU_JAL') IS NULL
+    CREATE TABLE v2.BORDEREAU_JAL (BRDRJ_ID_BRDRJ int NOT NULL PRIMARY KEY, BRDRJ_NUM_BORDEREAU varchar(10) NULL, BRDRJ_DATE_CREA_XML datetime NULL);
+IF OBJECT_ID(N'v2.BORDEREAU') IS NULL
+    CREATE TABLE v2.BORDEREAU (BRDRC_ID_BRDRC int NOT NULL PRIMARY KEY, BRDRC_NUMERO_BORDEREAU varchar(16) NULL, BRDRC_DATE_CREA_XML datetime NULL);
+IF OBJECT_ID(N'v2.VIDIGED_INDEX') IS NULL
+    CREATE TABLE v2.VIDIGED_INDEX (VGIDX_ID_VGIDX int NOT NULL PRIMARY KEY, VGIDX_ID_ENTITE int NULL, VGIDX_TYPE_ENTITE varchar(50) NULL,
+        VGIDX_ID_DCJDC int NULL, VGIDX_ID_PBLCT int NULL, VGIDX_NATURE_DOC varchar(50) NULL, VGIDX_DATE_RECEPTION datetime NULL);
+IF COL_LENGTH('v2.VIDIGED_INDEX', 'VGIDX_ID_PBLCT') IS NULL ALTER TABLE v2.VIDIGED_INDEX ADD VGIDX_ID_PBLCT int NULL;
+IF COL_LENGTH('v2.VIDIGED_INDEX', 'VGIDX_NATURE_DOC') IS NULL ALTER TABLE v2.VIDIGED_INDEX ADD VGIDX_NATURE_DOC varchar(50) NULL;
+IF COL_LENGTH('v2.VIDIGED_INDEX', 'VGIDX_DATE_RECEPTION') IS NULL ALTER TABLE v2.VIDIGED_INDEX ADD VGIDX_DATE_RECEPTION datetime NULL;
+IF OBJECT_ID(N'v2.BODACC') IS NULL
+    CREATE TABLE v2.BODACC (BDCCR_ID_BDCCR int NOT NULL PRIMARY KEY, BDCCR_TYPE_BODACC varchar(5) NULL, BDCCR_DATE_PUBLICITE datetime NULL);
+IF COL_LENGTH('v2.BODACC', 'BDCCR_ID_BDCRC') IS NULL ALTER TABLE v2.BODACC ADD BDCCR_ID_BDCRC int NULL;
+IF COL_LENGTH('v2.BODACC', 'BDCCR_ID_EVNPR') IS NULL ALTER TABLE v2.BODACC ADD BDCCR_ID_EVNPR int NULL;
+IF COL_LENGTH('v2.BODACC', 'BDCCR_DATE_ENVOI') IS NULL ALTER TABLE v2.BODACC ADD BDCCR_DATE_ENVOI datetime NULL;
+IF COL_LENGTH('v2.BODACC', 'BDCCR_ETAT_BODACC') IS NULL ALTER TABLE v2.BODACC ADD BDCCR_ETAT_BODACC varchar(2) NULL;
+IF COL_LENGTH('v2.BODACC', 'BDCCR_NUM_BORDEREAU') IS NULL ALTER TABLE v2.BODACC ADD BDCCR_NUM_BORDEREAU varchar(10) NULL;
+IF COL_LENGTH('v2.BODACC', 'BDCCR_NUM_PARUTION') IS NULL ALTER TABLE v2.BODACC ADD BDCCR_NUM_PARUTION varchar(8) NULL;
+
+-- Les evenements : la plage par defaut est la date de decision du jour moins un mois (0 h) a aujourd'hui (24 h), ou sans date
+-- (OPE_DATE_SDEMATJUD.cs:70-75, MetierSdematJud.cs:293-304). 1908001 il y a 10 jours, 1908002 sans date, 1908004 la borne basse
+-- (un mois tout juste), 1908006 aujourd'hui a 23 h : dans la plage ; jumeaux refuses : 1908003 il y a deux mois, 1908005 demain.
+-- Publicites JAL. 1908101 pas envoyee (« Non envoyée »), journal « Chambre de commerce » (PROC_GDEST_INST.sql) ; 1908102 envoyee,
+-- pas parue (« Sans retour de parution », :309-312), son bordereau EDI ; 1908103 parue, parution ET facture recues le meme jour :
+-- UNE ligne (:638-658) ; 1908104 deux documents de parution : doublon (:619-635), « Publicité déjà existante » ; 1908105 parution
+-- et facture recues a deux dates : DEUX lignes (le regroupement par date de reception, :641) ; 1908108 un document d'une autre
+-- nature, que la jointure de RIG v2 ne prend pas (JAL ou FACTJAL, :271) ; 1908109 deux documents de facture : doublon aussi (la
+-- seconde moitie de la regle, :628-635) ; 1908106 et 1908107 hors plage (jumeaux de 1908101).
+-- Annonces BODACC, de type « P… » seulement (:428-436) : 1908301 pas envoyee ; 1908302 envoyee, pas publiee, son bordereau ;
+-- 1908303 publiee ; 1908304 rejetee (etat « 9 », SdematJudDetail.cs:175). Jumeaux refuses : 1908305 de type « A » (jumeau de
+-- 1908301, meme evenement), 1908306 hors plage.
+EXEC sp_executesql N'
+INSERT INTO v2.CODE_EVE_PRO (R_CODEEVEPRO_VALEUR, R_CODEEVEPRO_LIBELLE_ECRAN) VALUES (''BANC9DMT'', N''Jugement du banc 9'');
+INSERT INTO v2.EVENEMENT_PROCEDURE (EVNPR_ID_EVNPR, EVNPR_CODE_EVE_PRO, EVNPR_DATE) VALUES
+    (1908001, ''BANC9DMT'', DATEADD(day, -10, @aujourdhui)), (1908002, ''BANC9DMT'', NULL),
+    (1908003, ''BANC9DMT'', DATEADD(month, -2, @aujourdhui)), (1908004, ''BANC9DMT'', DATEADD(month, -1, @aujourdhui)),
+    (1908005, ''BANC9DMT'', DATEADD(day, 1, @aujourdhui)), (1908006, ''BANC9DMT'', DATEADD(hour, 23, @aujourdhui));
+INSERT INTO v2.BORDEREAU_JAL (BRDRJ_ID_BRDRJ, BRDRJ_NUM_BORDEREAU, BRDRJ_DATE_CREA_XML) VALUES (1908401, ''B9BJ01'', DATEADD(day, -5, @aujourdhui));
+INSERT INTO v2.BORDEREAU (BRDRC_ID_BRDRC, BRDRC_NUMERO_BORDEREAU, BRDRC_DATE_CREA_XML) VALUES (1908402, ''B9BC01'', DATEADD(day, -5, @aujourdhui));
+INSERT INTO v2.PUBLICITE (PBLCT_ID_PBLCT, PBLCT_ID_EVNPR, PBLCT_DATE_REALISATION, PBLCT_DATE_ENVOI_ELECTRONIQUE, PBLCT_NUM_PARUTION,
+    PBLCT_NUM_BORDEREAU, PBLCT_DESTINATAIRE) VALUES
+    (1908101, 1908001, NULL, NULL, NULL, NULL, ''B3VIDE''),
+    (1908102, 1908002, NULL, DATEADD(day, -5, @aujourdhui), NULL, ''B9BJ01'', NULL),
+    (1908103, 1908004, DATEADD(day, -15, @aujourdhui), DATEADD(day, -20, @aujourdhui), ''B9P103'', NULL, NULL),
+    (1908104, 1908001, DATEADD(day, -4, @aujourdhui), DATEADD(day, -12, @aujourdhui), NULL, NULL, NULL),
+    (1908105, 1908001, DATEADD(day, -7, @aujourdhui), DATEADD(day, -9, @aujourdhui), NULL, NULL, NULL),
+    (1908106, 1908003, NULL, NULL, NULL, NULL, NULL),
+    (1908107, 1908005, NULL, NULL, NULL, NULL, NULL),
+    (1908108, 1908006, NULL, NULL, NULL, NULL, NULL),
+    (1908109, 1908001, NULL, DATEADD(day, -8, @aujourdhui), NULL, NULL, NULL);
+INSERT INTO v2.VIDIGED_INDEX (VGIDX_ID_VGIDX, VGIDX_ID_PBLCT, VGIDX_NATURE_DOC, VGIDX_DATE_RECEPTION) VALUES
+    (1908201, 1908103, ''JAL'', DATEADD(day, -14, @aujourdhui)), (1908202, 1908103, ''FACTJAL'', DATEADD(day, -14, @aujourdhui)),
+    (1908203, 1908104, ''JAL'', DATEADD(day, -3, @aujourdhui)), (1908204, 1908104, ''JAL'', DATEADD(day, -3, @aujourdhui)),
+    (1908206, 1908105, ''JAL'', DATEADD(day, -6, @aujourdhui)), (1908207, 1908105, ''FACTJAL'', DATEADD(day, -2, @aujourdhui)),
+    (1908205, 1908108, ''AUTRE'', DATEADD(day, -1, @aujourdhui)),
+    (1908208, 1908109, ''FACTJAL'', DATEADD(day, -1, @aujourdhui)), (1908209, 1908109, ''FACTJAL'', DATEADD(day, -1, @aujourdhui));
+INSERT INTO v2.BODACC (BDCCR_ID_BDCCR, BDCCR_ID_BDCRC, BDCCR_TYPE_BODACC, BDCCR_ID_EVNPR, BDCCR_DATE_ENVOI, BDCCR_DATE_PUBLICITE,
+    BDCCR_ETAT_BODACC, BDCCR_NUM_BORDEREAU, BDCCR_NUM_PARUTION) VALUES
+    (1908301, 1908301, ''P1'', 1908001, NULL, NULL, NULL, NULL, NULL),
+    (1908302, 1908302, ''PA'', 1908002, DATEADD(day, -5, @aujourdhui), NULL, NULL, ''B9BC01'', NULL),
+    (1908303, 1908303, ''P'', 1908004, DATEADD(day, -20, @aujourdhui), DATEADD(day, -10, @aujourdhui), NULL, NULL, ''B9N303''),
+    (1908304, 1908304, ''P2'', 1908001, NULL, NULL, ''9'', NULL, NULL),
+    (1908305, 1908305, ''A'', 1908001, NULL, NULL, NULL, NULL, NULL),
+    (1908306, 1908306, ''P1'', 1908003, NULL, NULL, NULL, NULL, NULL);', N'@aujourdhui datetime', @aujourdhui;

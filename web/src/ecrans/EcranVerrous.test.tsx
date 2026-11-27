@@ -168,3 +168,28 @@ describe('EcranVerrous, filtre rapide', () => {
     expect(societeEtObjet('TRANSNORD SA')).toEqual({ societe: 'TRANSNORD SA', objet: '' })
   })
 })
+
+// D'ou viennent les verrous (plan « RIG v3 100 % fonctionnel », lot 9) : la demonstration est marquee « exemple », la base ne
+// l'est pas, une panne montre son motif et AUCUNE ligne (Pont/EcranVerrousBase.cs).
+describe('EcranVerrous : provenance des verrous', () => {
+  it('sans serveur, les verrous de demonstration sont marques « exemple »', async () => {
+    installerFauxPont({ 'EcranVerrous.Verrouilles': (u: unknown, m: unknown) => ({ ...vue(u, m), mode: 'demo', message: null }) })
+    const { container } = render(<EcranVerrous ouvrirDossier={vi.fn()} />)
+    await screen.findByText('TRANSNORD SA')
+    expect(container.querySelector('[role="note"]')!.textContent).toContain('Verrous de démonstration')
+  })
+
+  it('branche au serveur, les verrous de la base, sans mention', async () => {
+    installerFauxPont({ 'EcranVerrous.Verrouilles': (u: unknown, m: unknown) => ({ ...vue(u, m), mode: 'serveur', message: null }) })
+    const { container } = render(<EcranVerrous ouvrirDossier={vi.fn()} />)
+    await screen.findByText('TRANSNORD SA')
+    expect(container.querySelector('[role="note"]')).toBeNull()
+  })
+
+  it('en panne, le motif et aucun verrou (jamais la demonstration a la place)', async () => {
+    installerFauxPont({ 'EcranVerrous.Verrouilles': () => ({ lignes: [], detenteurs: [], mode: 'erreur', message: 'La base du greffe 3801 ne répond pas.' }) })
+    const { container } = render(<EcranVerrous ouvrirDossier={vi.fn()} />)
+    expect((await screen.findByRole('alert')).textContent).toContain('La base du greffe 3801 ne répond pas.')
+    expect(container.querySelectorAll('tbody tr.rig-lm-ligne')).toHaveLength(0)
+  })
+})

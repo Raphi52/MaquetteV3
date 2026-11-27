@@ -883,32 +883,48 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         {
             Code = "PROC_SDEMATJUD", Titre = "Suivi dematerialisation", Sujet = "décisions transmises",
             Forme = FormeEcran.File,
+            // Les publicités JAL et les annonces BODACC des événements de procédure, les deux onglets de RIG v2 (proc_sdematjud.md,
+            // Détail OPE) : lues par Serveur/Socle/EcransGeneres/LecteurSuiviDematerialisation.cs (lot 9), critères par défaut de
+            // RIG v2 (décisions du dernier mois, OPE_DATE_SDEMATJUD.cs:70-75). Aucun écrivain : « Valider » génère des éditions de
+            // pièces numérisées (OPE_RESULTAT_JAL.cs:133-200) et « Éditer les détails » un classeur Excel, que la V3 ne produit pas ;
+            // « Vérifier » ne contrôle que la sélection avant cette génération. Les trois ne valent que pour l'onglet JAL
+            // (PROC_SDEMATJUD.cs:273-276). fix-ok: mesuré au contrôle final du lot 9 (27/11/2026) -- ce descripteur gardait les
+            // états inventés par le lot 1 (« À envoyer / En préparation / Envoyée ») et ses exemples ; ses états sont maintenant ceux
+            // que la base dit (envoi, parution, erreur de la grille V2), comme le lecteur.
             Recherche = "Rechercher une décision, un numéro d'affaire…",
-            Criteres = ["Type de date : décision, envoi EDI ou parution", "Dates du et au (par défaut : le dernier mois)", "Journal destinataire (JAL)", "Numéro d'affaire"],
+            Criteres = ["Type de date : décision, envoi EDI ou parution", "Dates du et au (par défaut : le dernier mois)", "Journal destinataire (JAL)", "Parution sans retour", "Numéro d'affaire"],
             Valider = "Valider", // proc_sdematjud.md, Etat des boutons par onglet : « VALIDER » (onglet JAL).
             Rang = 5,
-            Etats = [.. EtatsEcran.Trois("À envoyer", "En préparation", "Envoyée"), new EtatEcran("EnAttente", "En attente de parution", "en-attente")],
+            Etats =
+            [
+                new EtatEcran("AFaire", "Non envoyée", "a-traiter"),
+                new EtatEcran("EnCours", "Sans retour de parution", "saisie-manuelle"), // le critère « Parution sans retour » (MetierSdematJud.cs:309-312)
+                new EtatEcran("Validee", "Parue", "validee"),
+                new EtatEcran("Rejetee", "En erreur", "rejetee"),                     // la ligne rouge de RIG v2 (DataGridViewSdematJud.cs:477-480)
+            ],
             Groupes = ["JAL (journal d'annonces légales)", "BODACC"],
             Sections =
             [
-                Marche("Critères", "Type de date (décision, envoi EDI ou parution) et plage de dates. Par défaut : les décisions du dernier mois.", true,
+                Marche("Critères", "Type de date (décision, envoi EDI ou parution) et plage de dates. Par défaut : les décisions du dernier mois, et celles sans date.", true,
                     "Type de date", "Date du", "Date au"),
                 Marche("Journal", "Pour le JAL : le journal destinataire. Le BODACC n'a pas de journal.", false,
                     "Journal destinataire"),
-                Marche("Options avancées", "Parution sans retour, numéro d'affaire.", false,
+                Marche("Options avancées", "Parution sans retour (envoyée, pas encore parue), numéro d'affaire : une recherche par affaire ignore les dates.", false,
                     "Parution sans retour", "Numéro d'affaire"),
+                Marche("Ce que montre une ligne", "Une ligne par publicité JAL (parution et facture reçues en GED réunies) ; une annonce BODACC par ligne, de type P seulement. Une publicité en double ou un BODACC rejeté s'affiche en erreur.", true,
+                    "Journal", "Date envoi EDI", "Date parution", "Parution reçue", "Facture reçue"),
                 Marche("Validation", "Valider et vérifier la sélection, éditer les détails. Sur l'onglet BODACC, ces actions sont désactivées : la liste se consulte seulement.", true,
                     "Valider", "Vérifier", "Éditer les détails"),
             ],
             Lignes =
             [
-                Ligne("Décision 2026 J 0301 · Alpha Services SARL", "JAL · décision du 02/03/2026", "JAL (journal d'annonces légales)", "AFaire"),
-                Ligne("Décision 2026 J 0302 · Bêta Industrie SAS", "JAL · envoi EDI en préparation", "JAL (journal d'annonces légales)", "EnCours", 0, 1),
-                Ligne("Décision 2026 J 0303 · Gamma Conseil SARL", "JAL · envoyée le 05/03/2026", "JAL (journal d'annonces légales)", "Validee", 0, 1, 3),
-                Ligne("Décision 2026 J 0304 · Delta Transports SAS", "JAL · sans retour de parution", "JAL (journal d'annonces légales)", "EnCours", 0),
-                Ligne("Annonce 2026 B 0305 · Epsilon Habitat SARL", "BODACC · parution attendue", "BODACC", "EnAttente"),
-                Ligne("Annonce 2026 B 0306 · Zêta Commerce SAS", "BODACC · parution attendue", "BODACC", "EnAttente"),
-                Ligne("Décision 2026 J 0307 · Êta Boulangerie SARL", "JAL · décision du 09/03/2026", "JAL (journal d'annonces légales)", "AFaire"),
+                Ligne("Publicité 4101 · 2026 PC 0301 · Alpha Services SARL", "Jugement d'ouverture du 02/03/2026 · Les Affiches · non envoyée", "JAL (journal d'annonces légales)", "AFaire"),
+                Ligne("Publicité 4102 · 2026 PC 0302 · Bêta Industrie SAS", "Jugement d'ouverture du 03/03/2026 · Les Affiches · envoyée le 04/03/2026 · envoi EDI le 04/03/2026", "JAL (journal d'annonces légales)", "EnCours"),
+                Ligne("Publicité 4103 · 2026 PC 0303 · Gamma Conseil SARL", "Liquidation judiciaire du 01/03/2026 · Les Affiches · envoyée le 02/03/2026 · parue le 05/03/2026 (n° 1203) · parution reçue · facture reçue", "JAL (journal d'annonces légales)", "Validee"),
+                Ligne("Publicité 4104 · 2026 PC 0304 · Delta Transports SAS", "Plan de cession du 27/02/2026 · Les Affiches · envoyée le 28/02/2026 · parution reçue · Publicité déjà existante", "JAL (journal d'annonces légales)", "Rejetee"),
+                Ligne("Annonce 5105 · 2026 PC 0305 · Epsilon Habitat SARL", "Jugement d'ouverture du 02/03/2026 · envoyée le 03/03/2026", "BODACC", "EnCours"),
+                Ligne("Annonce 5106 · 2026 PC 0306 · Zêta Commerce SAS", "Clôture pour insuffisance d'actif du 26/02/2026 · envoyée le 27/02/2026 · parue le 04/03/2026 (n° 0047)", "BODACC", "Validee"),
+                Ligne("Annonce 5107 · 2026 PC 0307 · Êta Boulangerie SARL", "Jugement d'ouverture du 01/03/2026 · envoyée le 02/03/2026 · Le boddac a été rejeté", "BODACC", "Rejetee"),
             ],
         },
 
@@ -956,8 +972,9 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // Les groupes (traitements d'édition) des files d'édition (proc_relancefile.md, Détail OPE) : lus par
             // Serveur/Socle/EcransGeneres/LecteurTraitementsEdition.cs (lot 9). Les boutons d'OPE_EDITGRP.cs:44-48 : RELANCER
             // « Relancer via editrcs », FIGER « Cloturer le groupe », IMPRIMER_AUTRE « Tout réimprimer » : joués par
-            // EcrivainTraitementsEdition.cs -- « Tout réimprimer » remet les éditions du groupe à imprimer dans la base ; les deux
-            // autres sont refusés avec leur raison (programme externe ; clôture pas encore reprise).
+            // EcrivainTraitementsEdition.cs -- « Tout réimprimer » remet les éditions du groupe à imprimer dans la base,
+            // « Cloturer le groupe » clôt un groupe ouvert et ouvre le suivant de sa file (TraitementEdition.Cloturer) ;
+            // « Relancer via editrcs » est refusé (un programme externe, jamais lancé).
             Recherche = "Rechercher une file, un groupe, une date…",
             Criteres = ["File d'édition", "Date de début (par défaut : aujourd'hui à 7 h)", "Date de fin", "Numéro de groupe"],
             Valider = "Relancer via editrcs", // OPE_EDITGRP.cs:44-48, _relancer (:237-240).

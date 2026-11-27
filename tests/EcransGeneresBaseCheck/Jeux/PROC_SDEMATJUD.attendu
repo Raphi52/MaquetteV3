@@ -1,0 +1,16 @@
+# « Suivi dématérialisation » (LecteurSuiviDematerialisation) sur PROC_SDEMATJUD.sql : la liste JAL, puis la liste BODACC, chacune
+# par identifiant. Ecartes : 1908106, 1908107, 1908306 (hors de la plage par defaut), 1908305 (BODACC de type « A »). 1908103 : une
+# ligne (parution et facture recues le meme jour) ; 1908105 : deux (recues a deux dates). 1908108 : son document « AUTRE » ne compte
+# pas. 1908104 (deux parutions) et 1908109 (deux factures) : doublons. Les annonces de PROC_SURVBOD.sql et de PROC_FIBEN.sql n'ont pas d'evenement de procedure : RIG v2 ne les montre pas ici.
+Publicité 1908101 | Jugement du banc 9 du {J-10} · Chambre de commerce · non envoyée | JAL (journal d'annonces légales) | AFaire | []
+Publicité 1908102 | Jugement du banc 9 · envoyée le {J-5} · envoi EDI le {J-5} | JAL (journal d'annonces légales) | EnCours | []
+Publicité 1908103 | Jugement du banc 9 du {M-1} · envoyée le {J-20} · parue le {J-15} (n° B9P103) · parution reçue · facture reçue | JAL (journal d'annonces légales) | Validee | []
+Publicité 1908104 | Jugement du banc 9 du {J-10} · envoyée le {J-12} · parue le {J-4} · parution reçue · Publicité déjà existante | JAL (journal d'annonces légales) | Rejetee | []
+Publicité 1908105 | Jugement du banc 9 du {J-10} · envoyée le {J-9} · parue le {J-7} · parution reçue | JAL (journal d'annonces légales) | Validee | []
+Publicité 1908105 | Jugement du banc 9 du {J-10} · envoyée le {J-9} · parue le {J-7} · facture reçue | JAL (journal d'annonces légales) | Validee | []
+Publicité 1908108 | Jugement du banc 9 du {J+0} · non envoyée | JAL (journal d'annonces légales) | AFaire | []
+Publicité 1908109 | Jugement du banc 9 du {J-10} · envoyée le {J-8} · facture reçue · Publicité déjà existante | JAL (journal d'annonces légales) | Rejetee | []
+Annonce 1908301 | Jugement du banc 9 du {J-10} · non envoyée | BODACC | AFaire | []
+Annonce 1908302 | Jugement du banc 9 · envoyée le {J-5} · envoi EDI le {J-5} | BODACC | EnCours | []
+Annonce 1908303 | Jugement du banc 9 du {M-1} · envoyée le {J-20} · parue le {J-10} (n° B9N303) | BODACC | Validee | []
+Annonce 1908304 | Jugement du banc 9 du {J-10} · non envoyée · Le boddac a été rejeté | BODACC | Rejetee | []
