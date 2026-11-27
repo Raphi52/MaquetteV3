@@ -892,24 +892,25 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Forme = FormeEcran.File,
             // Les publicités JAL et les annonces BODACC des événements de procédure, les deux onglets de RIG v2 (proc_sdematjud.md,
             // Détail OPE) : lues par Serveur/Socle/EcransGeneres/LecteurSuiviDematerialisation.cs (lot 9), critères par défaut de
-            // RIG v2 (décisions du dernier mois, OPE_DATE_SDEMATJUD.cs:70-75). Aucun écrivain : « Valider » imprime les pièces
-            // numérisées cochées (OPE_RESULTAT_JAL.cs:133-200) -- chacune est d'abord COPIÉE de VIDIGED dans la GED RIG
-            // (GedRig.CreateGedRigFromVidiged, DemandeEdition.cs:2625) et sa demande d'édition pointe
-            // sur cette copie (DMNED_NUM_DOCUMENT_EDITION, :2643) ; aucune publicité ne change d'état et la demande par affaire est validée
-            // d'un coup (une trace). Sans copie de document, l'écrire serait une édition sans pièce : la V3 ne l'écrit pas (lot 9,
-            // 27/11). « Éditer les détails » produit un classeur Excel, que la V3 ne produit pas ;
-            // « Vérifier » ne contrôle que la sélection avant cette génération. Les trois ne valent que pour l'onglet JAL
-            // (PROC_SDEMATJUD.cs:273-276). fix-ok: mesuré au contrôle final du lot 9 (27/11/2026) -- ce descripteur gardait les
+            // RIG v2 (décisions du dernier mois, OPE_DATE_SDEMATJUD.cs:70-75). « Valider » : EcrivainSuiviDematerialisation.cs (lot
+            // 9) met à imprimer les pièces numérisées reçues des lignes JAL cochées, comme RIG v2 (OPE_RESULTAT_JAL.cs:133-200) --
+            // une demande par affaire, la référence GED du document VIDIGED (GedRig.CreateGedRigFromVidiged, GedRig.cs:231-239,
+            // aucun fichier copié) et sa demande d'édition prête à imprimer ; l'impression elle-même n'existe pas dans la V3.
+            // « Éditer les détails » produit un classeur Excel, que la V3 ne produit pas : refusé en le disant ; « Vérifier » ne fait
+            // que les contrôles de « Valider », sans rien écrire : pas de geste à part. Les trois ne valent que pour l'onglet JAL
+            // (PROC_SDEMATJUD.cs:273-276) : une annonce BODACC n'a pas de case. fix-ok: mesuré au contrôle final du lot 9 (27/11/2026) -- ce descripteur gardait les
             // états inventés par le lot 1 (« À envoyer / En préparation / Envoyée ») et ses exemples ; ses états sont maintenant ceux
             // que la base dit (envoi, parution, erreur de la grille V2), comme le lecteur.
             Recherche = "Rechercher une décision, un numéro d'affaire…",
             Criteres = ["Type de date : décision, envoi EDI ou parution", "Dates du et au (par défaut : le dernier mois)", "Journal destinataire (JAL)", "Parution sans retour", "Numéro d'affaire"],
             Valider = "Valider", // proc_sdematjud.md, Etat des boutons par onglet : « VALIDER » (onglet JAL).
+            Gestes = ["Valider", "Éditer les détails"],
             Rang = 5,
             Etats =
             [
-                new EtatEcran("AFaire", "Non envoyée", "a-traiter"),
-                new EtatEcran("EnCours", "Sans retour de parution", "saisie-manuelle"), // le critère « Parution sans retour » (MetierSdematJud.cs:309-312)
+                // Les cases « Editer facture / parution » de RIG v2 actives (DataGridViewSdematJud.cs:428-443) : la ligne que « Valider » vise.
+                new EtatEcran("AFaire", "Pièce reçue à éditer", "a-traiter"),
+                new EtatEcran("EnCours", "En attente de parution", "saisie-manuelle"), // non envoyée, ou « Parution sans retour » (MetierSdematJud.cs:309-312)
                 new EtatEcran("Validee", "Parue", "validee"),
                 new EtatEcran("Rejetee", "En erreur", "rejetee"),                     // la ligne rouge de RIG v2 (DataGridViewSdematJud.cs:477-480)
             ],
@@ -922,17 +923,17 @@ public sealed class DomaineSurveiller : IDomaineEcrans
                     "Journal destinataire"),
                 Marche("Options avancées", "Parution sans retour (envoyée, pas encore parue), numéro d'affaire : une recherche par affaire ignore les dates.", false,
                     "Parution sans retour", "Numéro d'affaire"),
-                Marche("Ce que montre une ligne", "Une ligne par publicité JAL (parution et facture reçues en GED réunies) ; une annonce BODACC par ligne, de type P seulement. Une publicité en double ou un BODACC rejeté s'affiche en erreur.", true,
+                Marche("Ce que montre une ligne", "Une ligne par publicité JAL (parution et facture reçues en GED réunies) ; une annonce BODACC par ligne, de type P seulement. Une publicité dont la parution ou la facture est reçue en GED est « à éditer » ; une publicité en double sans pièce, ou un BODACC rejeté, s'affiche en erreur.", true,
                     "Journal", "Date envoi EDI", "Date parution", "Parution reçue", "Facture reçue"),
-                Marche("Validation", "Valider et vérifier la sélection, éditer les détails. Sur l'onglet BODACC, ces actions sont désactivées : la liste se consulte seulement.", true,
+                Marche("Validation", "Valider met à imprimer les pièces reçues des lignes JAL cochées (parution et facture), une demande par affaire ; l'impression ne part pas du poste. Sur l'onglet BODACC, ces actions sont désactivées : la liste se consulte seulement.", true,
                     "Valider", "Vérifier", "Éditer les détails"),
             ],
             Lignes =
             [
-                Ligne("Publicité 4101 · 2026 PC 0301 · Alpha Services SARL", "Jugement d'ouverture du 02/03/2026 · Les Affiches · non envoyée", "JAL (journal d'annonces légales)", "AFaire"),
+                Ligne("Publicité 4101 · 2026 PC 0301 · Alpha Services SARL", "Jugement d'ouverture du 02/03/2026 · Les Affiches · non envoyée", "JAL (journal d'annonces légales)", "EnCours"),
                 Ligne("Publicité 4102 · 2026 PC 0302 · Bêta Industrie SAS", "Jugement d'ouverture du 03/03/2026 · Les Affiches · envoyée le 04/03/2026 · envoi EDI le 04/03/2026", "JAL (journal d'annonces légales)", "EnCours"),
-                Ligne("Publicité 4103 · 2026 PC 0303 · Gamma Conseil SARL", "Liquidation judiciaire du 01/03/2026 · Les Affiches · envoyée le 02/03/2026 · parue le 05/03/2026 (n° 1203) · parution reçue · facture reçue", "JAL (journal d'annonces légales)", "Validee"),
-                Ligne("Publicité 4104 · 2026 PC 0304 · Delta Transports SAS", "Plan de cession du 27/02/2026 · Les Affiches · envoyée le 28/02/2026 · parution reçue · Publicité déjà existante", "JAL (journal d'annonces légales)", "Rejetee"),
+                Ligne("Publicité 4103 · 2026 PC 0303 · Gamma Conseil SARL", "Liquidation judiciaire du 01/03/2026 · Les Affiches · envoyée le 02/03/2026 · parue le 05/03/2026 (n° 1203) · parution reçue · facture reçue", "JAL (journal d'annonces légales)", "AFaire"),
+                Ligne("Publicité 4104 · 2026 PC 0304 · Delta Transports SAS", "Plan de cession du 27/02/2026 · Les Affiches · envoyée le 28/02/2026 · parution reçue · Publicité déjà existante", "JAL (journal d'annonces légales)", "AFaire"),
                 Ligne("Annonce 5105 · 2026 PC 0305 · Epsilon Habitat SARL", "Jugement d'ouverture du 02/03/2026 · envoyée le 03/03/2026", "BODACC", "EnCours"),
                 Ligne("Annonce 5106 · 2026 PC 0306 · Zêta Commerce SAS", "Clôture pour insuffisance d'actif du 26/02/2026 · envoyée le 27/02/2026 · parue le 04/03/2026 (n° 0047)", "BODACC", "Validee"),
                 Ligne("Annonce 5107 · 2026 PC 0307 · Êta Boulangerie SARL", "Jugement d'ouverture du 01/03/2026 · envoyée le 02/03/2026 · Le boddac a été rejeté", "BODACC", "Rejetee"),

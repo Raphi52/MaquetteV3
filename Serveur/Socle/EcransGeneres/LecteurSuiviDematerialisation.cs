@@ -24,18 +24,24 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     (SdematJudDetail.cs:175 -- le texte de RIG v2, faute comprise) ;
 ///   - l'affaire : le numéro de PC s'il existe, sinon celui de la prévention (:556-564, :722-730).
 /// ORDRE : RIG v2 n'en a pas (orderBy = "", :327, :475) ; ici la publicité ou l'annonce, par identifiant.
-/// ETAT -- ce que RIG v2 sait de chaque ligne, sa grille n'ayant pas de colonne d'état : « En erreur » (Rejetee) pour une ligne que
-/// RIG v2 colore en rouge (HasVisibleError, DataGridViewSdematJud.cs:477-480 : doublon JAL, BODACC rejeté) ; « Parue » (Validee) avec
-/// une date de parution (PBLCT_DATE_REALISATION, BDCCR_DATE_PUBLICITE : la colonne « Date parution ») ; « Sans retour de parution »
-/// (EnCours) pour une ligne envoyée et pas encore parue -- le critère « Parution sans retour » de RIG v2 (JAL :309-312,
-/// PBLCT_DATE_ENVOI_ELECTRONIQUE ; BODACC :438-447, BDCCR_DATE_ENVOI) ; « Non envoyée » (AFaire) sinon.
+/// ETAT -- il suit ce que RIG v2 laisse faire sur la ligne (sa grille n'a pas de colonne d'état), car l'écran fige toute ligne
+/// hors « à faire » et « en cours » (web/src/ecrans/formes/commun.tsx:78) : « Pièce reçue à éditer » (AFaire) pour une ligne JAL
+/// dont un document de parution ou de facture est reçu en GED -- ses cases « Editer » sont actives (DataGridViewSdematJud.cs:
+/// 428-443), « Valider » la vise (EcrivainSuiviDematerialisation), doublon compris : RIG v2 la colore en rouge sans la bloquer, et
+/// « Publicité déjà existante » reste écrit sur la ligne ; sinon « En erreur » (Rejetee) pour une ligne rouge (HasVisibleError,
+/// :477-480 : doublon JAL, BODACC rejeté) ; « Parue » (Validee) avec une date de parution (PBLCT_DATE_REALISATION,
+/// BDCCR_DATE_PUBLICITE : la colonne « Date parution ») ; « En attente de parution » (EnCours) sinon, non envoyée ou envoyée
+/// (le critère « Parution sans retour » de RIG v2, JAL :309-312, BODACC :438-447) -- la ligne le précise.
+/// IDENTIFIANT : une ligne JAL porte « publicité:document de parution:document de facture » (0 sans document), ce que « Valider »
+/// relit dans la base ; une annonce BODACC n'en porte pas : ses cases sont cachées dans RIG v2 (ModifierColonneJalBodacc, :253-260).
 ///
 /// CE QUE LA V3 NE REPREND PAS (nommé) : les autres critères (type de date « Envoi EDI » ou « Parution », dates saisies, journal,
 /// parution sans retour, numéro d'affaire, :289-320) -- la forme File n'en transmet aucun ; les garde-fous de volume (500 / 5000,
 /// OPE_RECHERCHE_JAL.cs:104-115) -- le plafond des écrans les remplace ; le détail d'une ligne (OPE_DETAIL, une fiche modale en
-/// lecture) ; et les trois actions de l'onglet JAL : « Valider » GÉNÈRE des éditions de pièces numérisées (une demande par affaire
-/// et une DemandeEdition par document GED coché, OPE_RESULTAT_JAL.cs:133-200) et « Éditer les détails » un classeur Excel
-/// (ResultatRechercheRapport) -- la V3 n'a ni génération d'édition ni édition Excel : aucun écrivain, l'écran le dit.
+/// lecture). Les gestes de l'onglet JAL : EcrivainSuiviDematerialisation.cs.
+/// fix-ok: lu le 27/11/2026 (lot 9, « Valider » branché) -- commun.tsx:78 fige toute ligne hors AFaire / EnCours ; les publicités
+/// parues AVEC leurs documents (jeu 1908103, 1908105) étaient « Parue » (Validee), donc sans case : « Valider » ne pouvait viser
+/// aucune ligne qui a une pièce. L'état suit maintenant les cases de RIG v2 ; l'Id et la règle d'état sont les deux autres édits.
 /// </summary>
 internal sealed class LecteurSuiviDematerialisation : ILecteurEcran
 {
@@ -113,9 +119,10 @@ internal sealed class LecteurSuiviDematerialisation : ILecteurEcran
                 totaux[Jal] = Convert.ToInt32(r["Total"], System.Globalization.CultureInfo.InvariantCulture);
                 var erreur = Convert.ToInt32(r["Doublon"], System.Globalization.CultureInfo.InvariantCulture) == 1 ? "Publicité déjà existante" : null;
                 var id = Convert.ToInt32(r["PBLCT_ID_PBLCT"], System.Globalization.CultureInfo.InvariantCulture);
+                var idJal = Convert.ToInt32(r["IdJal"], System.Globalization.CultureInfo.InvariantCulture);
+                var idFacture = Convert.ToInt32(r["IdFacture"], System.Globalization.CultureInfo.InvariantCulture);
                 lignes.Add(Ligne(r, $"Publicité {id}", Jal, erreur, FormeLigne.Texte(r, "Journal"),
-                    Convert.ToInt32(r["IdJal"], System.Globalization.CultureInfo.InvariantCulture) != 0 ? "parution reçue" : null,
-                    Convert.ToInt32(r["IdFacture"], System.Globalization.CultureInfo.InvariantCulture) != 0 ? "facture reçue" : null));
+                    idJal != 0 ? "parution reçue" : null, idFacture != 0 ? "facture reçue" : null) with { Id = $"{id}:{idJal}:{idFacture}" });
             }
         await using (var r = await LectureV2.LireAsync(baseGreffe, RequeteBodacc, ct, Parametres()))
             while (await r.ReadAsync(ct))
@@ -144,8 +151,8 @@ internal sealed class LecteurSuiviDematerialisation : ILecteurEcran
             edi is null ? null : $"envoi EDI le {FormeLigne.Date(edi)}",
             paru is null ? null : numParution.Length > 0 ? $"parue le {FormeLigne.Date(paru)} (n° {numParution})" : $"parue le {FormeLigne.Date(paru)}",
             parution, facture, erreur);
-        // La règle d'état (en tête) : l'erreur, puis la parution, puis l'envoi.
-        var etat = erreur is not null ? "Rejetee" : paru is not null ? "Validee" : envoi is not null ? "EnCours" : "AFaire";
+        // La règle d'état (en tête) : un document reçu à éditer, puis l'erreur, puis la parution ; sinon en attente.
+        var etat = parution is not null || facture is not null ? "AFaire" : erreur is not null ? "Rejetee" : paru is not null ? "Validee" : "EnCours";
         return new LigneLue(FormeLigne.Joindre(objet, numero, nom), precisions, groupe, etat, []);
     }
 }

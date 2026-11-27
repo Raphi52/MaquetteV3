@@ -8,31 +8,26 @@
 //     chiffre d'affaire », « Ouverture par activites : par nombre de
 //     salaries ». D'ou les onglets ci-dessous : ce sont les volets de v2,
 //     pas un decoupage invente.
-//   - STATS_INTERNES/Commun/OPE_DATES.Designer.cs   : ultDateDebut, ultDateFin.
-//   - STATS_INTERNES/Commun/OPE_NIVEAU.Designer.cs  : « Niveau » (ult_Cbx_Niveau),
-//     filtre commun a tous les volets internes.
-//   - STATS_SEMESTRIELLES/OPE_STATS_SEMESTRIELLES.Designer.cs : deuxieme
-//     famille, avec ses propres dates et le champ « Nombre de PC ».
+//   - STATS_INTERNES/Commun/OPE_DATES.cs : la periode, par defaut le mois
+//     precedent complet (DoInitZoneSaisie, :8-14), refusee si le debut suit la fin.
+//   - STATS_INTERNES/Commun/OPE_NIVEAU.cs : « Niveau » NAF, 1 a 4 (1 par defaut),
+//     dans les deux volets d'activites seulement (OPE_OUVERTURE_ACTIVITES_*.Designer.cs).
+//   - STATS_SEMESTRIELLES/OPE_STATS_SEMESTRIELLES.cs : deuxieme famille ; « Nombre
+//     de PC » y est un libelle CALCULE (ult_LblNbPc, _MajNbPC :145-152), pas une saisie.
 //
-// Les valeurs sont des donnees de demonstration : en v2 elles viennent de
-// la base du greffe, la maquette ne s'y connecte pas. Lot 9 du plan « RIG v3
-// 100 % fonctionnel » (27/11/2026) : l'ecran le DIT (mention « exemple »), meme
-// branche au serveur -- il affichait ses chiffres comme ceux du greffe. Les
-// calculer demande les requetes de RIG v2
-// (Outils\DLLEdition\RigRapport\Jud\Stats\Internes\MetierStats.cs : 1 730
-// lignes, environ 150 requetes, qui remplissent un classeur Excel), pas encore
-// reprises.
-//
-// Porte depuis Components/Ecrans/EcranStatistiques.razor (lot 4) : meme
-// balisage, memes classes CSS. L'ecran ne lisait rien dans Metier/ : ses
-// periodes partent de la date du POSTE (DateTime.Today), comme avant.
+// Lot 9 du plan « RIG v3 100 % fonctionnel » (27/11/2026) : les chiffres sont CALCULES dans la base du greffe par le pont
+// (Pont/EcranStatistiques.cs -> Serveur/Socle/EcransMain/LectureStatistiques.cs), avec les requetes de RIG v2
+// (Outils\DLLEdition\RigRapport\Jud\Stats). RIG v2 les ecrit dans un classeur Excel ; la V3 les montre ici, tableau par
+// tableau. Sans serveur : la demonstration du pont, marquee « exemple ». Les anciens chiffres en dur de cet ecran (et ses
+// colonnes « periode precedente / ecart », ses niveaux Greffe / Chambre / Section) n'avaient pas de source V2 : retires.
 
-import { useState } from 'react'
-import { Exemple } from './formes/commun'
+import { useEffect, useState } from 'react'
+import { appeler } from '../pont'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 
 type VoletStat = 'Internes' | 'Web' | 'RepartitionsJcOp' | 'ActivitesCa' | 'ActivitesSalaries' | 'Semestrielles'
 
-// Dans l'ordre de declaration du dictionnaire C#.
+// Dans l'ordre des volets de v2.
 const Volets: ReadonlyArray<readonly [VoletStat, string]> = [
   ['Internes', 'Statistiques internes'],
   ['Web', 'Statistiques web'],
@@ -42,87 +37,61 @@ const Volets: ReadonlyArray<readonly [VoletStat, string]> = [
   ['Semestrielles', 'Statistiques semestrielles'],
 ]
 
-interface LigneStat {
+export interface LigneStatVue {
   libelle: string
-  courant: number
-  precedent: number
+  valeurs: string[]
 }
 
-const ligne = (libelle: string, courant: number, precedent: number): LigneStat => ({ libelle, courant, precedent })
-
-const Donnees: Record<VoletStat, LigneStat[]> = {
-  Internes: [
-    ligne('Immatriculations', 184, 171),
-    ligne('Modifications', 412, 438),
-    ligne('Radiations', 96, 102),
-    ligne('Depots d\'actes', 533, 489),
-    ligne('Comptes annuels', 267, 254),
-  ],
-  Web: [
-    ligne('Demandes deposees en ligne', 621, 547),
-    ligne('Comptes crees', 88, 74),
-    ligne('Documents telecharges', 1450, 1312),
-    ligne('Paiements aboutis', 598, 521),
-  ],
-  RepartitionsJcOp: [
-    ligne('Jugements de cloture', 58, 61),
-    ligne('Ordonnances du president', 143, 128),
-    ligne('Jugements d\'ouverture', 41, 37),
-    ligne('Ordonnances de designation', 77, 69),
-  ],
-  ActivitesCa: [
-    ligne('Moins de 100 k EUR', 92, 85),
-    ligne('100 a 500 k EUR', 64, 71),
-    ligne('500 k a 2 M EUR', 28, 24),
-    ligne('Plus de 2 M EUR', 11, 9),
-    ligne('Chiffre d\'affaire inconnu', 17, 22),
-  ],
-  ActivitesSalaries: [
-    ligne('Aucun salarie', 118, 104),
-    ligne('1 a 5 salaries', 63, 68),
-    ligne('6 a 20 salaries', 24, 21),
-    ligne('Plus de 20 salaries', 8, 7),
-  ],
-  Semestrielles: [
-    ligne('Dossiers traites au semestre', 1264, 1187),
-    ligne('Delai moyen en jours', 3, 4),
-    ligne('Procedures collectives', 102, 94),
-    ligne('Postes de travail declares', 46, 44),
-  ],
+export interface TableauStatVue {
+  titre: string
+  colonnes: string[]
+  lignes: LigneStatVue[]
+  cause?: string | null
 }
 
-function enteteLibelle(volet: VoletStat): string {
-  switch (volet) {
-    case 'ActivitesCa': return 'Tranche de chiffre d\'affaire'
-    case 'ActivitesSalaries': return 'Tranche d\'effectif'
-    case 'RepartitionsJcOp': return 'Nature de la decision'
-    default: return 'Indicateur'
-  }
-}
-
-function ecart(l: LigneStat): string {
-  const d = l.courant - l.precedent
-  return d > 0 ? `+${d}` : String(d)
+export interface VueStatistiques {
+  tableaux: TableauStatVue[]
+  /** Le message de RIG v2 quand la periode est refusee : rien n'est calcule. */
+  refus?: string | null
+  /** Le nombre de PC de la periode (volet semestriel). */
+  nombrePc?: string | null
+  mode?: ModeLecture
+  message?: string | null
 }
 
 /** Une date locale au format d'un <input type="date"> (aaaa-mm-jj). */
-function iso(annee: number, mois: number, jour: number): string {
-  return `${String(annee).padStart(4, '0')}-${String(mois).padStart(2, '0')}-${String(jour).padStart(2, '0')}`
+function iso(d: Date): string {
+  return `${String(d.getFullYear()).padStart(4, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+
+/** Le mois precedent complet (OPE_DATES.DoInitZoneSaisie) : du premier au dernier jour. */
+export function moisPrecedent(aujourdhui: Date): { debut: string; fin: string } {
+  const premier = new Date(aujourdhui.getFullYear(), aujourdhui.getMonth() - 1, 1)
+  const dernier = new Date(aujourdhui.getFullYear(), aujourdhui.getMonth(), 0)
+  return { debut: iso(premier), fin: iso(dernier) }
+}
+
+const avecNiveau = (v: VoletStat) => v === 'ActivitesCa' || v === 'ActivitesSalaries'
 
 export function EcranStatistiques() {
   const [volet, setVolet] = useState<VoletStat>('Internes')
-  // DateTime.Today : la date du poste, pas celle du jeu de demonstration.
-  const [dateDebut, setDateDebut] = useState(() => iso(new Date().getFullYear(), 1, 1))
-  const [dateFin, setDateFin] = useState(() => {
-    const d = new Date()
-    return iso(d.getFullYear(), d.getMonth() + 1, d.getDate())
-  })
-  const [niveau, setNiveau] = useState('Greffe')
-  // Le @bind d'un int : seul le texte saisi s'affiche.
-  const [nombrePc, setNombrePc] = useState('46')
+  const [periode] = useState(() => moisPrecedent(new Date()))
+  const [dateDebut, setDateDebut] = useState(periode.debut)
+  const [dateFin, setDateFin] = useState(periode.fin)
+  const [niveau, setNiveau] = useState('1')
+  // null tant que le pont n'a pas repondu : ni tableau ni « aucune ligne », qui seraient faux.
+  const [vue, setVue] = useState<VueStatistiques | null>(null)
 
-  const lignes = Donnees[volet]
+  useEffect(() => {
+    let perime = false
+    setVue(null)
+    void appeler<VueStatistiques>('EcranStatistiques.Calculer', volet, dateDebut, dateFin, avecNiveau(volet) ? niveau : null)
+      .then((v) => { if (!perime) setVue(v) })
+      .catch((e: unknown) => { if (!perime) setVue({ tableaux: [], mode: 'erreur', message: e instanceof Error ? e.message : String(e) }) })
+    // Seule la reponse du DERNIER volet / de la derniere periode compte.
+    return () => { perime = true }
+  }, [volet, dateDebut, dateFin, niveau])
+
   const titre = Volets.find(([cle]) => cle === volet)![1]
 
   return (
@@ -142,22 +111,21 @@ export function EcranStatistiques() {
           </label>
         </div>
 
-        {volet !== 'Semestrielles' ? (
+        {avecNiveau(volet) && (
           <label className="rig-saisie-champ">
             <span className="rig-saisie-champ__libelle">Niveau</span>
             <select className="rig-saisie-champ__saisie" value={niveau} onChange={(e) => setNiveau(e.target.value)}>
-              <option value="Greffe">Greffe</option>
-              <option value="Chambre">Chambre</option>
-              <option value="Section">Section</option>
+              {['1', '2', '3', '4'].map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
           </label>
-        ) : (
-          // « Nombre de PC » n'existe QUE dans les statistiques semestrielles
-          // (ult_LblNbPc).
-          <label className="rig-saisie-champ">
+        )}
+
+        {volet === 'Semestrielles' && (
+          // « Nombre de PC » : calcule sur la periode (ult_LblNbPc), pas saisi.
+          <div className="rig-saisie-champ">
             <span className="rig-saisie-champ__libelle">Nombre de PC</span>
-            <input className="rig-saisie-champ__saisie" type="number" min="0" value={nombrePc} onChange={(e) => setNombrePc(e.target.value)} />
-          </label>
+            <output className="rig-saisie-champ__saisie" aria-label="Nombre de PC">{vue?.nombrePc ?? '…'}</output>
+          </div>
         )}
 
         <div className="rig-criteres__bloc">
@@ -175,33 +143,40 @@ export function EcranStatistiques() {
       <section className="rig-resultats-proc">
         <div className="rig-resultats-proc__entete">
           <div className="rig-kicker">{titre}</div>
-          <span className="rig-resultats-proc__compte">{lignes.length} ligne(s)</span>
+          <span className="rig-resultats-proc__compte">{vue === null ? 'calcul…' : `${vue.tableaux.length} tableau(x)`}</span>
         </div>
-        <p className="rig-eg-note" role="note">
-          <Exemple /> Chiffres de démonstration : les statistiques de RIG v2 (classeur Excel de MetierStats.cs) ne sont pas encore calculées dans la base du greffe.
-        </p>
+        {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Statistiques" />}
+        {vue?.refus && <p className="rig-eg-note" role="alert">{vue.refus}</p>}
 
-        <div className="rig-table-cadre">
-          <table className="rig-table">
-            <thead>
-              <tr>
-                <th>{enteteLibelle(volet)}</th>
-                <th className="rig-table__centre">Periode en cours</th>
-                <th className="rig-table__centre">Periode precedente</th>
-                <th className="rig-table__centre">Ecart</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lignes.map((l) => (
-                <tr key={l.libelle}>
-                  <td>{l.libelle}</td>
-                  <td className="rig-table__mono rig-table__centre">{l.courant}</td>
-                  <td className="rig-table__mono rig-table__centre">{l.precedent}</td>
-                  <td className="rig-table__mono rig-table__centre">{ecart(l)}</td>
+        {/* Plusieurs tableaux : UN defilement pour tous. Chaque .rig-table-cadre (rig-accueil.css:1633, flex 1 1 auto,
+            overflow auto) retrecirait sinon a quelques lignes, chacun avec sa barre. fix-ok: mesure le 27/11/2026 sur le bureau
+            cache (capture y1, volet interne de 2000) -- « Statistiques judiciaires » montrait 4 lignes sur 10 et les clotures 1
+            sur 4, alors que le serveur rendait les 10 et les 4 (39 + 13 + 1 + 1 = 54, le total du volet web). */}
+        <div style={{ overflow: 'auto', flex: '1 1 auto', minHeight: 0 }}>
+        {vue?.tableaux.map((t, i) => (
+          <div key={`${t.titre}-${i}`} className="rig-table-cadre" style={{ flex: '0 0 auto', overflow: 'visible', marginBottom: 'var(--rig-esp-4)' }}>
+            <div className="rig-kicker">{t.titre}</div>
+            {t.cause && <p className="rig-eg-note" role="note">{t.cause}</p>}
+            <table className="rig-table">
+              <thead>
+                <tr>
+                  {t.colonnes.map((c, k) => <th key={k} className={k === 0 ? undefined : 'rig-table__centre'}>{c}</th>)}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {t.lignes.map((l, k) => (
+                  <tr key={k}>
+                    <td>{l.libelle}</td>
+                    {l.valeurs.length === 1 && t.colonnes.length > 2
+                      // Une ligne non calculee : sa cause s'etale sur les colonnes de chiffres.
+                      ? <td className="rig-table__centre" colSpan={t.colonnes.length - 1}>{l.valeurs[0]}</td>
+                      : l.valeurs.map((v, j) => <td key={j} className="rig-table__mono rig-table__centre">{v}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
         </div>
       </section>
     </div>

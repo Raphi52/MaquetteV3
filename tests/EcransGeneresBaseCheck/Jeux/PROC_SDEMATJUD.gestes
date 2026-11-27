@@ -1,0 +1,47 @@
+# « Suivi dématérialisation » (EcrivainSuiviDematerialisation) : « Valider » de l'onglet JAL (Resultat\OPE_RESULTAT_JAL.cs de RIG v2).
+# Lignes du jeu : PROC_SDEMATJUD.sql et .attendu ; l'Id d'une ligne JAL est « publicité:parution:facture » (0 sans document).
+
+# Refus : « Éditer les détails » produit un classeur Excel (ResultatRechercheRapport) -- jamais produit par la V3, donc sans jumeau.
+geste: Agir Éditer les détails
+ids: 1908110:1908210:1908211
+resultat: refuse
+message: « Éditer les détails » produit un classeur Excel du résultat (ResultatRechercheRapport de RIG v2) : la V3 ne produit pas de classeur, rien n'est édité.
+---
+# Refus de RIG v2 (AUCUNE_SELECTION, OPE_RESULTAT_JAL.cs:22, :108-110) : 1908101 n'a reçu aucun document, ses cases sont inactives
+# (DataGridViewSdematJud.cs:428-443). Jumeau accepte : bloc 5, 1908110 a ses deux documents.
+geste: Agir Valider
+ids: 1908101:0:0
+resultat: refuse
+message: Vous devez sélectionner au moins une ligne
+---
+# Refus de RIG v2 : 1908112 est sur une prevention absente de la base -- Prevention.GetPrevention rend null, aucune demande ni
+# edition (:156-170) : rien n'est retenu. Jumeau accepte : bloc 5, 1908111 sur la prevention 1400201.
+geste: Agir Valider
+ids: 1908112:1908213:0
+resultat: refuse
+message: Vous devez sélectionner au moins une ligne
+---
+# Refus : le document 1908215 de 1908114 n'a pas de GUID VIDIGED, sa reference GED ne peut pas s'ecrire (GedRig.cs:233) -- coche
+# avec 1908110 : rien n'est ecrit, pas meme pour 1908110. Jumeau accepte : bloc 5, les documents de 1908110 ont leur GUID.
+geste: Agir Valider
+ids: 1908110:1908210:1908211,1908114:1908215:0
+resultat: refuse
+message: Le document 1908215 reçu en GED n'a pas de GUID VIDIGED : sa pièce numérisée ne peut pas être référencée, rien n'est mis à imprimer.
+---
+# Accepte : 1908110 (parution et facture) et 1908113 (facture) sur la PC 1400103 -- UNE demande pour l'affaire (:152-153), trois
+# editions ; 1908111 (parution) sur la prevention 1400201 -- une demande, une edition ; 1908112 (prevention absente) et 1908101 (sans
+# document) passent sans rien ecrire, comme dans RIG v2. La demande du traitement : « Génération d'édition pour 2 instances »
+# (:89), validee, mere des deux demandes (:171). Chaque edition : sa reference GED vers le document VIDIGED (base JUDICIAIRE, son
+# extension ou « pdf », AUCUN fichier : GedRig.cs:231-239), prete a imprimer (« P », DemandeEdition.cs:1124-1131), un exemplaire,
+# l'imprimante par defaut de l'agent (sa preference, PROC_SDEMATJUD.sql), le libelle « <nature> numérisée » (:303-309).
+# La limite de 200 affaires (:124-126) n'a pas de bloc : 201 affaires dans le jeu n'apprendraient rien de plus que ce test.
+geste: Agir Valider
+ids: 1908110:1908210:1908211,1908113:0:1908214,1908111:1908212:0,1908112:1908213:0,1908101:0:0
+resultat: fait
+message: 4 pièces numérisées mises à imprimer pour 2 affaires. Rien n'est imprimé ni envoyé : le service d'impression de RIG v2 n'existe pas dans la V3, rien ne sort du poste.
+controle: SELECT m.DMND_NOM + '|' + m.DMND_ETAT_DEMANDE + '|' + m.DMND_CODE_PROSS FROM v2.DEMANDE AS m WHERE m.DMND_ID_DMND = (SELECT MAX(f.DMND_ID_DMND_MERE) FROM v2.DEMANDE AS f WHERE f.DMND_CODE_PROSS = 'SDEMATJUD') => Génération d'édition pour 2 instances|V|SDEMATJUD
+controle: SELECT STRING_AGG(dd.DSSDM_CODE_SEQUENCEUR + ':' + dd.DSSDM_VALEUR_SEQUENCEUR + ':' + f.DMND_ETAT_DEMANDE + ':' + f.DMND_NUM_INDICATIF + ':' + f.DMND_NOM, ';') WITHIN GROUP (ORDER BY dd.DSSDM_CODE_SEQUENCEUR) FROM v2.DEMANDE AS f JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_ID_DMND = f.DMND_ID_DMND WHERE f.DMND_CODE_PROSS = 'SDEMATJUD' AND f.DMND_ID_DMND_MERE IS NOT NULL => 2P:1400103:V:1990P14103:CHM GAMMA;2R:1400201:V:1990V14201:XLIEN PRV ALPHA
+controle: SELECT STRING_AGG(x, ';') WITHIN GROUP (ORDER BY x) FROM (SELECT f.DMND_NUM_INDICATIF + '=' + CAST(COUNT(*) AS varchar(3)) AS x FROM v2.DEMANDE_EDITION AS e JOIN v2.DEMANDE AS f ON f.DMND_ID_DMND = e.DMNED_ID_DMND WHERE f.DMND_CODE_PROSS = 'SDEMATJUD' GROUP BY f.DMND_NUM_INDICATIF) AS t => 1990P14103=3;1990V14201=1
+controle: SELECT STRING_AGG(e.DMNED_VALEUR_ID_SOURCE + '/' + e.DMNED_PHASE_TRAITEMENT + '/' + e.DMNED_MEDIA + '/' + CAST(e.DMNED_NOMBRE_EXEMPLAIRE AS varchar(5)) + '/' + CAST(e.DMNED_IMPRESSION AS varchar(1)) + '/' + CAST(e.DMNED_AFF_AVANT_IMPRESSION AS varchar(1)) + '/' + e.DMNED_TYPE_GENERATION + '/' + e.DMNED_LIBELLE_DOCUMENT + '/' + ISNULL(e.DMNED_IMPRIMANTE, '-'), ';') WITHIN GROUP (ORDER BY e.DMNED_VALEUR_ID_SOURCE) FROM v2.DEMANDE_EDITION AS e JOIN v2.DEMANDE AS f ON f.DMND_ID_DMND = e.DMNED_ID_DMND WHERE f.DMND_CODE_PROSS = 'SDEMATJUD' => 1908210/P/IMPR/1/1/0/EMISSION_SIMPLE/Journal d'annonces légales numérisée/Imprimante banc 9;1908211/P/IMPR/1/1/0/EMISSION_SIMPLE/Justificatif de facture journal d'annonces légales numérisée/Imprimante banc 9;1908212/P/IMPR/1/1/0/EMISSION_SIMPLE/Journal d'annonces légales numérisée/Imprimante banc 9;1908214/P/IMPR/1/1/0/EMISSION_SIMPLE/Justificatif de facture journal d'annonces légales numérisée/Imprimante banc 9
+controle: SELECT STRING_AGG(CAST(v.VGIDX_ID_VGIDX AS varchar(10)) + ':' + g.GDRG_EXTENSION + ':' + g.GDRG_BASE_VIDIGED + ':' + CASE WHEN g.GDRG_FICHIER IS NULL THEN 'sans fichier' ELSE 'fichier' END, ';') WITHIN GROUP (ORDER BY v.VGIDX_ID_VGIDX) FROM v2.DEMANDE_EDITION AS e JOIN v2.GED_RIG AS g ON g.GDRG_NUM_DOCUMENT = e.DMNED_NUM_DOCUMENT_EDITION JOIN v2.VIDIGED_INDEX AS v ON v.VGIDX_GUID_DOCUMENT = g.GDRG_GUID_VIDIGED AND CAST(v.VGIDX_ID_VGIDX AS varchar(40)) = e.DMNED_VALEUR_ID_SOURCE WHERE e.DMNED_CODE_ENTITE_SOURCE = 'VIDIGED_INDEX' => 1908210:TIF:JUDICIAIRE:sans fichier;1908211:pdf:JUDICIAIRE:sans fichier;1908212:pdf:JUDICIAIRE:sans fichier;1908214:pdf:JUDICIAIRE:sans fichier
+controle: SELECT COUNT(*) FROM v2.PUBLICITE WHERE PBLCT_ID_PBLCT BETWEEN 1908110 AND 1908114 AND PBLCT_DATE_REALISATION IS NULL => 3
