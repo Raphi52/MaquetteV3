@@ -20,7 +20,11 @@ namespace RigV3.Serveur.Socle.EcransMain;
 ///   - ORDRE : date, heure (strQueryOrder, :170).
 /// La V3 lit les deux modes d'un coup (l'ecran bascule de l'un a l'autre) ; les criteres de RIG v2 (dates, type, chambre, section,
 /// juge, code cabinet, type de classement, nombre maximum) filtrent a l'ecran. NON LUS : les compteurs d'appels et de lectures
-/// (NOMBRE_APPELS / NOMBRE_LECTURES, :288-289, que la liste n'affiche pas) et l'infobulle de la composition (:394-410).
+/// (NOMBRE_APPELS / NOMBRE_LECTURES, :288-289, que la liste n'affiche pas) et l'infobulle de la composition (:381-383, :393-432) :
+/// RIG v2 y joint COMPOSITION sur l'identifiant de la LIGNE SUPPRIMEE (CMPST_ID_ADNC = AUDNCS_ID_AUDNCS, :394-399), pas sur celui
+/// de l'audience (AUDNCS_ID_AUDNC) ; elle montre donc la composition d'une AUTRE audience dont l'identifiant tombe pareil. Mesure du
+/// 27/11/2026 (RIG_DEV) : 89 des 207 audiences supprimees ont ainsi une « composition » qui n'est pas la leur, et aucune (0 sur 207)
+/// n'a garde la sienne (COMPOSITION par AUDNCS_ID_AUDNC). La V3 ne recopie pas une valeur fausse ; la vraie serait toujours vide.
 /// </summary>
 public static class LectureGestionAudiences
 {

@@ -57,7 +57,8 @@ using RigV3Desktop.Pont.EcransGeneres;
 //          resultat: fait | refuse | sans-ecrivain
 //          message: <texte exact>                   ce que l'ecran affichera (le message de RIG v2 pour un refus)
 //          lignes:                                  facultatif (fait) : puis TOUTES les lignes relues, format .attendu
-//          fiche: <id>                              facultatif : puis des « Section › Libelle = valeur » que la fiche relue porte
+//          fiche: <id>                              facultatif : puis des « Section › Libelle = valeur » que la fiche relue porte ;
+//                                                   la ligne n d'une sous-liste (Tableau) : « Section › Libelle › n = cellule | cellule »
 //          controle: <SELECT d'une valeur> => <attendu>   facultatif : ce que RIG v2 ecrit en plus (dates, etats...)
 //        Un refus est verifie SANS ECRITURE : lignes relues identiques, journal des gestes inchange. Un geste fait ajoute au
 //        moins une ligne au journal des gestes. Chaque refus a son jumeau accepte, dit en commentaire ;
@@ -605,7 +606,9 @@ foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(String
             var fiche = lecteurs.ParProcedure.GetValueOrDefault(code) is IFicheEcran f ? await f.LireFicheAsync(cn, ficheId, DateTime.Now, CancellationToken.None) : null;
             foreach (var (cle, attendue) in bloc.ValeursFiche)
             {
-                var lue = fiche?.Sections.SelectMany(s => s.Champs.Select(c => (Cle: GesteEcran.Cle(s.Titre, c.Libelle), c.Valeur)))
+                var lue = fiche?.Sections.SelectMany(s => s.Champs.SelectMany(c => c.Lignes
+                        .Select((l, i) => (Cle: $"{GesteEcran.Cle(s.Titre, c.Libelle)} › {i + 1}", Valeur: string.Join(" | ", l)))
+                        .Prepend((Cle: GesteEcran.Cle(s.Titre, c.Libelle), c.Valeur))))
                     .FirstOrDefault(c => c.Cle == cle).Valeur;
                 Exiger(lue == attendue, $"{quoi} : la fiche {ficheId} relue porte « {cle} » = « {attendue} » (lue : « {lue ?? "absent"} »)");
             }

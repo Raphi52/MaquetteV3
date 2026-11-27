@@ -250,7 +250,7 @@ internal sealed class LecteurInstanceJudiciaire : IRechercheEcran, IFicheEcran
     // la recherche V2 l'ecrit : civilite (sauf PM et ND) puis designation (FormRechercheInstance.cs:318-333).
     private static readonly string[] ColonnesParties = ["Désignation", "SIREN", "Présentation"];
 
-    private static async Task<SectionFiche> PartiesAsync(SqlConnection cn, int id, CancellationToken ct)
+    internal static async Task<SectionFiche> PartiesAsync(SqlConnection cn, int id, CancellationToken ct)
     {
         var toutes = await LignesAsync(cn, """
             SELECT LEFT(p.PRT_QUALIF_PARTIE, 1) AS Qualite, p.PRT_CIVILITE, p.PRT_DESIGNATION, p.PRT_NOM, p.PRT_SIREN, p.PRT_MODE_PRESENTATION
@@ -301,7 +301,7 @@ internal sealed class LecteurInstanceJudiciaire : IRechercheEcran, IFicheEcran
     }
 
     // DECISIONS : la date rendue, sinon prevue, et le type avec son libelle (FormRechercheInstance.cs:336-337), par ordre.
-    private static async Task<SectionFiche> DecisionsAsync(SqlConnection cn, int id, CancellationToken ct)
+    internal static async Task<SectionFiche> DecisionsAsync(SqlConnection cn, int id, CancellationToken ct)
         => new(SectionDecision,
         [
             new("Décisions judiciaires", "")
@@ -318,7 +318,7 @@ internal sealed class LecteurInstanceJudiciaire : IRechercheEcran, IFicheEcran
 
     // EVENEMENTS : survenus (EVNPR_SURVENU = 1) ; futurs ET expires ensemble (survenu 0, PROC_MJUD.cs:259-260), par
     // EVNPR_NUM_ORDRE (Instance.cs:513-538) ; la date, l'evenement et son libelle (CODE_EVE_PRO).
-    private static async Task<SectionFiche> EvenementsAsync(SqlConnection cn, int id, CancellationToken ct)
+    internal static async Task<SectionFiche> EvenementsAsync(SqlConnection cn, int id, CancellationToken ct)
     {
         var tous = await LignesAsync(cn, """
             SELECT e.EVNPR_SURVENU, e.EVNPR_DELAI_EXPIRE, e.EVNPR_DATE, e.EVNPR_CODE_EVE_PRO, c.R_CODEEVEPRO_LIBELLE_ECRAN

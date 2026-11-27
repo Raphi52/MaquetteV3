@@ -9,12 +9,33 @@ geste: Decider Marquer les décisions comme rendues
 ids: 1700514
 resultat: refuse
 message: « Marquer les décisions comme rendues » ne s'applique qu'aux prononcés non encore traités : le rôle 2026J17014 n'est pas un prononcé.
+# La fiche d'une affaire dépliée (FichesAudienceV2.cs ; colonnes de la grille, OPE_LIST_APPEL_AFFAIRE.cs:581-598 ; données : fin de
+# PROC_RETAUD.sql) : 1700504 porte la décision prononcée avec son document (modèle, minute), un solde de 100 - 30 et une publicité en
+# attente. Jumeau : bloc 2 (1700502 : décision sans document, client en compte, aucune publicité).
+# fix-ok: contrôle final du lot 7 (27/11/2026) -- la fiche n'était lue par aucun écran d'audience (ModuleEcransGeneres.cs:55-56) ;
+# ces relectures (blocs 1, 2, 20 et 23) la tiennent, rouges sans IFicheEcran.
+fiche: 1700504
+Résultat par affaire › Résultat = J
+Résultat par affaire › Modèle de jugement = MOD17
+Résultat par affaire › Numéro de minute = 17M0001
+Facturation › Solde = 70.00
+Publicités › Publicité = en attente
+Décision › Procédure collective =
+Audience › Cabinet =
 ---
 # 2. ... ni sur un appel déjà traité (IsTraite, AppelAffaire.cs:736-739). Jumeau : bloc 5.
 geste: Decider Marquer les décisions comme rendues
 ids: 1700515
 resultat: refuse
 message: « Marquer les décisions comme rendues » ne s'applique qu'aux prononcés non encore traités : le rôle 2026J17015 a déjà le résultat J.
+# Jumeau du bloc 1 : la décision prononcée 1700703 sans document (INNER JOIN de :584-586 : ni modèle ni minute) ; un article d'un client
+# en compte (type C) sur l'affaire : pas de solde (:587-589) ; aucune publicité en attente.
+fiche: 1700502
+Résultat par affaire › Résultat = R17S
+Résultat par affaire › Modèle de jugement =
+Résultat par affaire › Numéro de minute =
+Facturation › Solde =
+Publicités › Publicité =
 ---
 # 3. Audience passée sans composition, chambre qui l'impose (CanDoActions, OPE_LIST_APPEL_AFFAIRE.cs:1356-1369, :1586). Jumeaux :
 #    bloc 5 (audience composée) et bloc 14 (chambre C17B, sans composition obligatoire).
@@ -173,6 +194,10 @@ controle: SELECT APPAF_CODE_PLUMITIF + '/' + APPAF_ETAT_RETOUR FROM v2.APPEL_AFF
 controle: SELECT COUNT(*) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_INSTN = 1700019 AND DCJDC_TYPE_DECISION = 'JGT17R' AND DCJDC_DATE_PREVUE = '20010419' AND DCJDC_NUM_ORDRE = 1 AND DCJDC_CAT_DECISION = 'I' AND LEN(DCJDC_NUMERO_SOURCE) = 36 AND DCJDC_ID_APPAF_DELIBERER IS NULL AND DCJDC_ETAT_VALIDITE = '0' AND DCJDC_REDIGEE_GREFFE = 1 => 1
 controle: SELECT COUNT(*) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_INSTN = 1700020 => 1
 controle: SELECT COUNT(*) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN IN (1700019, 1700020) => 2
+# Relu dans la fiche de l'affaire dépliée : le résultat posé ; pas de prochaine audience (R17P n'en crée pas).
+fiche: 1700519
+Résultat par affaire › Résultat = R17P
+Résultat par affaire › Prochaine audience =
 ---
 # SECOND CONTRÔLE DU LOT 7 : les contrôles de PROC_MJUDS que « Renvoyer » sautait. Données : fin de PROC_RETAUD.sql.
 
@@ -203,6 +228,11 @@ message: 2 affaires renvoyées (R17) à l'Audience du 16/03/2001 à 14:00 - Cham
 controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, ':', APPAF_CODE_PLUMITIF, ':', APPAF_ETAT_RETOUR), ',') WITHIN GROUP (ORDER BY APPAF_ID_APPAF) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF IN (1700522, 1700523) => 1700522:R17:M,1700523:R17:M
 controle: SELECT COUNT(*) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN = 1700023 AND APPAF_ID_ADNC = 1700113 AND APPAF_NUM_ORDRE = 2 AND APPAF_TYPE_CLASSEMENT = 'TC17' AND APPAF_ETAT_RETOUR = 'A' AND APPAF_ID_CMAUD IS NULL AND APPAF_CODE_PLUMITIF IS NULL => 1
 controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, ':', APPAF_ID_ADNC), ',') WITHIN GROUP (ORDER BY APPAF_ID_APPAF) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN = 1700022 => 1700522:1700117,1700525:1700118
+# Relu dans la fiche de l'affaire dépliée : le résultat R17 et la prochaine audience de la grille de RIG v2 (la première audience
+# POSTÉRIEURE où l'instance est appelée, OPE_LIST_APPEL_AFFAIRE.cs:581) -- le 15/01/2099.
+fiche: 1700522
+Résultat par affaire › Résultat = R17
+Résultat par affaire › Prochaine audience = 15/01/2099
 ---
 # 23. Le renvoi prononcé avec un type de décision qui porte une mesure liée (JGT17M -> EXR17) : la décision et sa MESURE
 #     (AffectDecisionJudiciaire et GetMesureSaisie, PROC_MJUDS.cs:1499-1509, :1365-1373). Jumeau : bloc 19 (JGT17R, sans mesure).
@@ -214,3 +244,89 @@ resultat: fait
 message: 1 affaire renvoyée (R17P) ; 1 décision JGT17M créée avec sa mesure EXR17.
 controle: SELECT STRING_AGG(CONCAT(m.MSINS_ID_INSTN, ':', m.MSINS_NUM_ORDRE, ':', m.MSINS_TYPE_MESURE, ':', CASE WHEN LEN(m.MSINS_NUMERO_SOURCE) = 36 THEN 'guid' ELSE '-' END, ':', d.DCJDC_TYPE_DECISION), ',') FROM v2.MESURE AS m JOIN v2.DECISION_JUDICIAIRE AS d ON d.DCJDC_ID_DCJDC = m.MSINS_ID_DCJDC WHERE m.MSINS_ID_INSTN = 1700024 => 1700024:1:EXR17:guid:JGT17M
 controle: SELECT COUNT(*) FROM v2.MESURE WHERE MSINS_ID_INSTN = 1700019 => 0
+---
+# L'ÉVÉNEMENT FUTUR DU RENVOI (relance du lot 7) : PROC_MJUDS écrit l'événement du code plumitif puis son événement futur lié
+# (OPE_EVENEMENT.cs:1587-1608, PROC_MJUDS.cs:1557-1576 ; EvenementsProcedureV2.cs). Données : fin de PROC_RETAUD.sql.
+
+# 24. R17E (événement EV17R, futur EV17F à 15 jours maxi) sur 2026J17025, qui a déjà un événement : le survenu EV17R au rang 2,
+#     daté de l'audience (22/03/2001), puis le futur EV17F au rang 3, non survenu, sans date, date maxi = 22/03/2001 + 15 jours,
+#     type du code futur (« 4 »), lié au survenu par son numéro source (EVNPR_NUMERO_SOURCE_EP_LIE). Jumeau : bloc 26 (sans délai).
+geste: Decider Renvoyer
+ids: 1700526
+valeur: Résultat = R17E
+resultat: fait
+message: 1 affaire renvoyée (R17E).
+controle: SELECT STRING_AGG(CONCAT(EVNPR_NUM_ORDRE, ':', EVNPR_CODE_EVE_PRO, ':', CAST(EVNPR_SURVENU AS int), ':', CAST(EVNPR_DELAI_EXPIRE AS int), ':', ISNULL(CONVERT(varchar(10), EVNPR_DATE, 23), '-'), ':', ISNULL(CONVERT(varchar(10), EVNPR_DATE_FIXE, 23), '-'), ':', ISNULL(CONVERT(varchar(10), EVNPR_DATE_MAXI, 23), '-'), ':', ISNULL(CONVERT(varchar(10), EVNPR_DATE_MINI, 23), '-'), ':', EVNPR_TYPE_EVE_PRO), ',') WITHIN GROUP (ORDER BY EVNPR_NUM_ORDRE) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 1700025 => 1:EV17J:1:0:2001-01-15:-:-:-:,2:EV17R:1:0:2001-03-22:-:-:-:1,3:EV17F:0:0:-:-:2001-04-06:-:4
+controle: SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE AS f JOIN v2.EVENEMENT_PROCEDURE AS s ON s.EVNPR_NUMERO_SOURCE = f.EVNPR_NUMERO_SOURCE_EP_LIE WHERE f.EVNPR_ID_INSTN = 1700025 AND f.EVNPR_CODE_EVE_PRO = 'EV17F' AND s.EVNPR_ID_INSTN = 1700025 AND s.EVNPR_CODE_EVE_PRO = 'EV17R' AND LEN(f.EVNPR_NUMERO_SOURCE) = 36 AND f.EVNPR_NUMERO_SOURCE <> s.EVNPR_NUMERO_SOURCE AND s.EVNPR_NUMERO_SOURCE_EP_LIE IS NULL => 1
+---
+# 25. R17D (événement EV17D : 1 mois fixe ET 10 jours maxi) : plusieurs délais, la date fixe l'emporte et seule elle est écrite
+#     (IEntiteJudiciaire.cs:185-190) -- 22/03/2001 + 1 mois. Jumeau : bloc 24 (un seul délai, maxi).
+geste: Decider Renvoyer
+ids: 1700527
+valeur: Résultat = R17D
+resultat: fait
+message: 1 affaire renvoyée (R17D).
+controle: SELECT STRING_AGG(CONCAT(EVNPR_NUM_ORDRE, ':', EVNPR_CODE_EVE_PRO, ':', CAST(EVNPR_SURVENU AS int), ':', ISNULL(CONVERT(varchar(10), EVNPR_DATE, 23), '-'), ':', ISNULL(CONVERT(varchar(10), EVNPR_DATE_FIXE, 23), '-'), ':', ISNULL(CONVERT(varchar(10), EVNPR_DATE_MAXI, 23), '-'), ':', ISNULL(CONVERT(varchar(10), EVNPR_DATE_MINI, 23), '-')), ',') WITHIN GROUP (ORDER BY EVNPR_NUM_ORDRE) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 1700026 => 1:EV17D:1:2001-03-22:-:-:-,2:EV17F:0:-:2001-04-22:-:-
+---
+# 26. R17N (événement EV17N : un code futur, aucun délai) : RIG v2 ne crée pas un futur sans date (IEntiteJudiciaire.cs:182-184),
+#     seul le survenu s'écrit. Jumeau : bloc 24 (avec délai).
+geste: Decider Renvoyer
+ids: 1700528
+valeur: Résultat = R17N
+resultat: fait
+message: 1 affaire renvoyée (R17N).
+controle: SELECT STRING_AGG(CONCAT(EVNPR_NUM_ORDRE, ':', EVNPR_CODE_EVE_PRO, ':', CAST(EVNPR_SURVENU AS int), ':', ISNULL(CONVERT(varchar(10), EVNPR_DATE, 23), '-')), ',') WITHIN GROUP (ORDER BY EVNPR_NUM_ORDRE) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 1700027 => 1:EV17N:1:2001-03-22
+---
+# LA DEMANDE, LA FACTURE ET LES ÉDITIONS DU RENVOI (troisième contrôle du lot 7) : PROC_MJUDS crée une demande MJUDS par instance
+# (LockInstances, PROC_MJUDS.cs:986-1004), facture les articles de l'événement (:744-747) et met dans la file les éditions du survenu
+# et de son futur (GenererLesDemandesEdition, :1273-1281 ; EditionsEvenementV2.cs). Données : fin de PROC_RETAUD.sql.
+
+# 27. R17A : l'édition ED17A de l'événement EV17A vise le demandeur et les parties (« D;POD;F;POF », les destinataires du renvoi RCAB
+#     de RIG_DEV), que RIG v3 ne reprend pas (RecupDestEditLot2FROMInstance) : le renvoi est refusé, rien n'est écrit -- ni l'appel,
+#     ni l'événement, ni la demande. Jumeau : bloc 29 (ED17X vise aussi « D », mais sa condition l'écarte ; ED17V, document interne).
+geste: Decider Renvoyer
+ids: 1700530
+valeur: Résultat = R17A
+resultat: refuse
+message: Le destinataire « D » de l'édition ED17A n'est pas repris par RIG v3 : rien n'est enregistré, faire le renvoi dans RIG v2.
+controle: SELECT CONCAT(ISNULL(APPAF_CODE_PLUMITIF, '-'), '/', APPAF_ETAT_RETOUR) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF = 1700530 => -/A
+controle: SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 1700029 => 0
+controle: SELECT COUNT(*) FROM v2.DOSSIER_DEMANDE WHERE DSSDM_CODE_SEQUENCEUR = '2J' AND DSSDM_VALEUR_SEQUENCEUR = '1700029' => 0
+---
+# 28. R17B : l'événement EV17B porte l'article actif ART17B ; RIG v2 le facture dans la même sauvegarde (tableau de facturation),
+#     RIG v3 n'a pas de moteur de facturation : refusé, rien n'est écrit. Jumeau : bloc 30 (R17C : article en sommeil, article de mesure).
+geste: Decider Renvoyer
+ids: 1700531
+valeur: Résultat = R17B
+resultat: refuse
+message: La facture de l'article ART17B de l'événement EV17B n'est pas reprise par RIG v3 : rien n'est enregistré, faire le renvoi dans RIG v2.
+controle: SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 1700030 => 0
+controle: SELECT COUNT(*) FROM v2.DOSSIER_DEMANDE WHERE DSSDM_CODE_SEQUENCEUR = '2J' AND DSSDM_VALEUR_SEQUENCEUR = '1700030' => 0
+---
+# 29. R17V sur 2026J17028 : la demande MJUDS validée (état V, pas en cours) au nom courant de l'instance, rôle en numéro indicatif,
+#     « rôle répertoire » en numéros, affaire de l'instance ; ses dossiers 2J (l'instance) et 2P (sa PC). Puis le survenu EV17V
+#     (rang 1) et son futur EV17W (rang 2, 10 jours maxi) ; leurs éditions dans la file, rattachées à la demande : ED17V (document
+#     interne seul) et ED17W (« DI »), source EVT_PROC = le numéro source de chaque événement, libellé source « <code> - <date>
+#     (EP n° <rang>) » -- le futur n'a pas de date --, sans groupage automatique (:1278), en phase « C ». ED17X (« D », condition
+#     « +NAZZ17 ») est écartée par sa condition (jumeau accepté du bloc 27).
+geste: Decider Renvoyer
+ids: 1700529
+valeur: Résultat = R17V
+resultat: fait
+message: 1 affaire renvoyée (R17V) ; 2 éditions placées dans la file des éditions.
+controle: SELECT CONCAT(d.DMND_CODE_PROSS, ':', d.DMND_ETAT_DEMANDE, ':', CAST(d.DMND_EN_COURS AS int), ':', d.DMND_NOM, ':', d.DMND_NUM_INDICATIF, ':', d.DMND_LES_NUMEROS, ':', d.DMND_ID_AFFRE) FROM v2.DEMANDE AS d WHERE d.DMND_ID_DMND = (SELECT DSSDM_ID_DMND FROM v2.DOSSIER_DEMANDE WHERE DSSDM_CODE_SEQUENCEUR = '2J' AND DSSDM_VALEUR_SEQUENCEUR = '1700028') => MJUDS:V:0:RENVOI EDITIONS AUD:2026J17028:2026J17028 2001000028:1700953
+controle: SELECT STRING_AGG(CONCAT(DSSDM_CODE_SEQUENCEUR, ':', DSSDM_VALEUR_SEQUENCEUR), ',') WITHIN GROUP (ORDER BY DSSDM_CODE_SEQUENCEUR) FROM v2.DOSSIER_DEMANDE WHERE DSSDM_ID_DMND = (SELECT DSSDM_ID_DMND FROM v2.DOSSIER_DEMANDE WHERE DSSDM_CODE_SEQUENCEUR = '2J' AND DSSDM_VALEUR_SEQUENCEUR = '1700028') => 2J:1700028,2P:1700041
+controle: SELECT STRING_AGG(CONCAT(EVNPR_NUM_ORDRE, ':', EVNPR_CODE_EVE_PRO, ':', CAST(EVNPR_SURVENU AS int), ':', ISNULL(CONVERT(varchar(10), EVNPR_DATE, 23), '-'), ':', ISNULL(CONVERT(varchar(10), EVNPR_DATE_MAXI, 23), '-')), ',') WITHIN GROUP (ORDER BY EVNPR_NUM_ORDRE) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 1700028 => 1:EV17V:1:2001-03-22:-,2:EV17W:0:-:2001-04-01
+controle: SELECT STRING_AGG(CONCAT(e.DMNED_LIBELLE_SOURCE, '|', e.DMNED_LIBELLE_DOCUMENT, '|', e.DMNED_CODE_ENTITE_SOURCE, '|', ev.EVNPR_CODE_EVE_PRO, '|', CAST(e.DMNED_GROUPAGE_AUTOMATIQUE AS int), '|', e.DMNED_PHASE_TRAITEMENT, '|', e.DMNED_TYPE_DOCUMENT), ',') WITHIN GROUP (ORDER BY e.DMNED_ID_DMNED) FROM v2.DEMANDE_EDITION AS e LEFT JOIN v2.EVENEMENT_PROCEDURE AS ev ON ev.EVNPR_ID_INSTN = 1700028 AND ev.EVNPR_NUMERO_SOURCE = e.DMNED_VALEUR_ID_SOURCE WHERE e.DMNED_ID_DMND = (SELECT DSSDM_ID_DMND FROM v2.DOSSIER_DEMANDE WHERE DSSDM_CODE_SEQUENCEUR = '2J' AND DSSDM_VALEUR_SEQUENCEUR = '1700028') => EV17V - 22/03/2001 (EP n° 1)|AVIS DE RENVOI 17V|EVT_PROC|EV17V|0|C|AVIS,EV17W (EP n° 2)|RAPPEL AVIS 17W|EVT_PROC|EV17W|0|C|AVIS
+---
+# 30. R17C sur 2026J17031 : son article ART17C est en sommeil (Article.GetArticle ne lit que les actifs) et ART17B n'y est qu'un
+#     article de MESURE (type « M », listTypeEP d'une instance : « I ») -- rien à facturer, le renvoi s'écrit (jumeau accepté du
+#     bloc 28), sans édition. Sa demande n'a que le dossier 2J ; sans répertoire général, ses numéros sont « rôle » suivi d'un
+#     blanc, comme string.Join(" ", rôle, "") de RIG v2 (11 caractères).
+geste: Decider Renvoyer
+ids: 1700532
+valeur: Résultat = R17C
+resultat: fait
+message: 1 affaire renvoyée (R17C).
+controle: SELECT STRING_AGG(CONCAT(EVNPR_NUM_ORDRE, ':', EVNPR_CODE_EVE_PRO), ',') FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 1700031 => 1:EV17C
+controle: SELECT CONCAT(d.DMND_CODE_PROSS, ':', d.DMND_ETAT_DEMANDE, ':', DATALENGTH(d.DMND_LES_NUMEROS), ':', ISNULL(CAST(d.DMND_ID_AFFRE AS varchar(10)), '-'), ':', (SELECT COUNT(*) FROM v2.DOSSIER_DEMANDE AS x WHERE x.DSSDM_ID_DMND = d.DMND_ID_DMND), ':', (SELECT COUNT(*) FROM v2.DEMANDE_EDITION AS e WHERE e.DMNED_ID_DMND = d.DMND_ID_DMND)) FROM v2.DEMANDE AS d WHERE d.DMND_ID_DMND = (SELECT DSSDM_ID_DMND FROM v2.DOSSIER_DEMANDE WHERE DSSDM_CODE_SEQUENCEUR = '2J' AND DSSDM_VALEUR_SEQUENCEUR = '1700031') => MJUDS:V:11:-:1:0

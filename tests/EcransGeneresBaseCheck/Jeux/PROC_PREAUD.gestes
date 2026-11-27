@@ -24,6 +24,12 @@ resultat: fait
 message: Numéros d'appel attribués : 4 affaires sur 1 audience. Le plumitif n'est pas généré : RIG v3 n'a pas l'état Crystal qui le produit dans RIG v2.
 controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, '=', APPAF_NUM_APPEL), ',') WITHIN GROUP (ORDER BY APPAF_NUM_APPEL) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_ADNC = 1703120 => 1703523=01_001,1703522=01_002,1703524=02_001,1703521=02_002
 controle: SELECT CAST(AUDNC_NUM_APPEL_ATTRIB AS int) FROM v2.AUDIENCE_CABINET WHERE AUDNC_ID_ADNC = 1703120 => 1
+# La fiche de l'audience dépliée (FichesAudienceV2.cs) : une audience, pas un cabinet. L'ordre des affaires y est une sous-liste
+# (N° rôle, Nom, Heure, Type, N° appel : OPE_ORDRE_INSTANCE.cs:50-59), que ce format ne compare pas : les numéros relus sont au
+# contrôle ci-dessus.
+fiche: 1703120
+Audience › Audience = Audience du 01/10/2001 à 09:00 - Chambre Numérotation par type (P17T)
+Audience › Cabinet =
 ---
 # 4. Une audience « sans type, rôles décroissants » et un cabinet (son code cabinet : sans type, croissant), ensemble. L'instance
 #    dont l'instance principale est au rôle de la même audience se range sous le rôle de celle-ci (Instance.cs:1033-1040).
@@ -48,3 +54,35 @@ ids: 1703123
 resultat: fait
 message: Numéros d'appel attribués : 3 affaires sur 1 audience. Le plumitif n'est pas généré : RIG v3 n'a pas l'état Crystal qui le produit dans RIG v2.
 controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, '=', APPAF_NUM_APPEL), ',') WITHIN GROUP (ORDER BY APPAF_NUM_APPEL) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_ADNC = 1703123 => 1703552=01_001,1703551=01_002,1703553=01_003
+---
+# 7. LA COLONNE « JUGE » de l'ordre des affaires (OPE_ORDRE_INSTANCE.cs:69-107 ; données : fin de PROC_PREAUD.sql). Les numéros
+#    de 1703130 sont attribués : sans recalcul, « Valider » refuse sans rien écrire (jumeau : bloc 5), puis la fiche se relit. Hors
+#    sanction : le juge-commissaire TITULAIRE en mission passe avant le JC de rang 1 (2026J17671), le JCT en fin de mission est
+#    écarté ; un JC seul de civilité ND, sans prénom : son nom (2026J17672) ; sans PC : vide (2026J17673).
+geste: Decider Valider
+ids: 1703130
+resultat: refuse
+message: Audience du 17/12/2001 à 09:00 - Chambre Numérotation simple (P17S) : Les numéros d'appel ont déjà été attribués. Vous pouvez cependant relancer le calcul en cochant la case appropriée.
+fiche: 1703130
+Ordre des affaires › Affaires dans l'ordre d'appel › 1 = 2026J17671 | M. TITULAIRE Luc | PREP JUGE T |  |  | 01_001
+Ordre des affaires › Affaires dans l'ordre d'appel › 2 = 2026J17672 | COLLEGE | PREP JUGE C |  |  | 01_002
+Ordre des affaires › Affaires dans l'ordre d'appel › 3 = 2026J17673 |  | PREP SANS PC |  |  | 01_003
+---
+# 8. En SECTION SANCTION (AUDNC_SECTION « CPC.S » d'une audience qui a une chambre, :69-73) : le premier mandataire en mission
+#    parmi LIQ, RDC, LQJ, MDJ, MJ -- l'administrateur ADJ et le MDJ en fin de mission sont écartés, le JCT de la PC aussi --, sa
+#    civilité PM collée à son nom, comme RIG v2 l'écrit (:96-100). Jumeau : bloc 9 (même PC, sans chambre : son JCT).
+geste: Decider Valider
+ids: 1703131
+resultat: refuse
+message: Audience du 18/12/2001 à 09:00 - Chambre Numérotation simple (P17S) : Les numéros d'appel ont déjà été attribués. Vous pouvez cependant relancer le calcul en cochant la case appropriée.
+fiche: 1703131
+Ordre des affaires › Affaires dans l'ordre d'appel › 1 = 2026J17674 | PMSELARL LIQUIDA | PREP SANCTION |  |  | 01_001
+---
+# 9. Section « CPC.S » mais SANS chambre : RIG v2 ne lit la section que si l'audience a une chambre (audienceCabinet.chambre !=
+#    null, :69-73) -- pas de sanction, le JCT de la même PC (jumeau du bloc 8).
+geste: Decider Valider
+ids: 1703132
+resultat: refuse
+message: Audience du 19/12/2001 à 09:00 - : Les numéros d'appel ont déjà été attribués. Vous pouvez cependant relancer le calcul en cochant la case appropriée.
+fiche: 1703132
+Ordre des affaires › Affaires dans l'ordre d'appel › 1 = 2026J17675 | MME JUGEPC Ana | PREP SANS CHAMBRE |  |  | 01_001

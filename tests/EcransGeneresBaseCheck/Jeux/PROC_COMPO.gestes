@@ -9,6 +9,16 @@ ids: 1702120
 valeur: Greffier = G17A
 resultat: refuse
 message: Un juge est requis au minimum
+# La fiche de l'audience dépliée (FichesAudienceV2.cs) : sans composition, juges, greffier et parquetier lus vides. Jumeau : bloc 13.
+# fix-ok: contrôle final du lot 7 (27/11/2026) -- la fiche n'était lue par aucun écran d'audience (ModuleEcransGeneres.cs:55-56) ;
+# ces relectures, ajoutées aux blocs 1, 2, 13 et 14, la tiennent (rouges sans IFicheEcran).
+fiche: 1702120
+Audience › Audience ou cabinet = Audience du 02/07/2001 à 09:00 - Chambre Composition du banc (C17C)
+Audience › Date de l'audience = 2001-07-02
+Juges › Juge 1 =
+Juges › Juges suivants =
+Greffier › Greffier =
+Parquetier › Parquetier =
 ---
 # 2. Le même juge deux fois (ETP_COMPO_AUDIENCE.cs:100-113). Jumeau : bloc 13 (deux juges distincts).
 geste: Decider Valider
@@ -17,6 +27,12 @@ valeur: Juges = J17A, J17A
 valeur: Greffier = G17A
 resultat: refuse
 message: Un juge a été sélectionné 2 fois pour une composition
+# La composition 1702204 de 1702121 avant le bloc 14 : trois siégeants par ordre (J17A préside), greffier G17A, parquetier P17A.
+fiche: 1702121
+Juges › Juge 1 = J17A
+Juges › Juges suivants = J17B, J17C
+Greffier › Greffier = G17A
+Parquetier › Parquetier = P17A
 ---
 # 3. Un juge inactif : la liste ULT_COMBO_JUGE ne le propose pas en saisie (JUG_ACTIF, Juge.cs:88). Jumeau : bloc 13 (J17A actif).
 geste: Decider Valider
@@ -110,6 +126,11 @@ message: Composition enregistrée : 2 juges, greffier G17A, parquetier P17A.
 controle: SELECT COUNT(*) FROM v2.COMPOSITION WHERE CMPST_ID_ADNC = 1702120 AND CMPST_NUM_ORDRE = 1 AND CMPST_PAR_DEFAUT = 1 AND CMPST_ID_GRASS = 1702511 AND CMPST_ID_PRQTR = 1702701 => 1
 controle: SELECT COUNT(*) FROM v2.COMPOSITION WHERE CMPST_ID_ADNC = 1702120 => 1
 controle: SELECT STRING_AGG(CONCAT(s.SGR_ID_JUG, ':', s.SGR_NUM_ORDRE, ':', s.SGR_TITRE_SIEGEANT), ',') WITHIN GROUP (ORDER BY s.SGR_NUM_ORDRE) FROM v2.SIEGER AS s JOIN v2.COMPOSITION AS c ON c.CMPST_ID_CMAUD = s.SGR_ID_CMAUD WHERE c.CMPST_ID_ADNC = 1702120 => 1702311:1:PAU,1702312:2:JAU
+fiche: 1702120
+Juges › Juge 1 = J17A
+Juges › Juges suivants = J17B
+Greffier › Greffier = G17A
+Parquetier › Parquetier = P17A
 ---
 # 14. Modifier la seule composition d'une audience : renumérotée 1 et par défaut, nouveau greffier, plus de parquetier ; les
 #     siégeants existants gardent leur ligne (ETP_COMPO_AUDIENCE.cs:314) dans le nouvel ordre, le troisième, de trop, est supprimé.
@@ -121,3 +142,8 @@ resultat: fait
 message: Composition enregistrée : 2 juges, greffier G17B.
 controle: SELECT CONCAT(CMPST_NUM_ORDRE, ':', CAST(CMPST_PAR_DEFAUT AS int), ':', CMPST_ID_GRASS, ':', ISNULL(CAST(CMPST_ID_PRQTR AS varchar(10)), '-')) FROM v2.COMPOSITION WHERE CMPST_ID_CMAUD = 1702204 => 1:1:1702512:-
 controle: SELECT STRING_AGG(CONCAT(SGR_ID_SGR, ':', SGR_ID_JUG, ':', SGR_NUM_ORDRE, ':', SGR_TITRE_SIEGEANT), ',') WITHIN GROUP (ORDER BY SGR_NUM_ORDRE) FROM v2.SIEGER WHERE SGR_ID_CMAUD = 1702204 => 1702601:1702313:1:PAU,1702602:1702311:2:JAU
+fiche: 1702121
+Juges › Juge 1 = J17C
+Juges › Juges suivants = J17A
+Greffier › Greffier = G17B
+Parquetier › Parquetier =
