@@ -196,7 +196,7 @@ internal sealed class LecteurListesExcel : IRechercheEcran
             if (type == "GIE" && reglages.Count > 0)
             {
                 lignes.Add(new LigneLue(libelle, FormeLigne.Joindre(periode, $"non compté : le greffe filtre ce type par le texte SQL de son paramétrage ({string.Join(", ", reglages)}), que RIG v3 n'exécute pas"),
-                                        Groupe(type), "AFaire", []) { Valeurs = [libelle, ""] });
+                                        Groupe(type), "AFaire", []) { Valeurs = [libelle, "non compté : filtre SQL du paramétrage"] });
                 continue;
             }
             var sql = new System.Text.StringBuilder("SELECT COUNT(*) AS Nombre ").Append(Comptages[type]);
