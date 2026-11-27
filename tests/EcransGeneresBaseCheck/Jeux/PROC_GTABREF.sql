@@ -4,6 +4,9 @@
 -- leurs cles etrangeres (la base V3 ne les a pas recopiees : l'ecrivain controle les citations avant d'ecrire). Les codes d'evenement
 -- G14EV1 / G14EV0 (avec / sans depot PC) servent a l'evenement de procedure d'un type AJMJ ; CODE_EVE_PRO et CATEGORIE_DEPOT aux
 -- colonnes de PROC_DEP.sql (DepotsPcV2.CodeAsync les lit).
+-- fix-ok: 3e reprise du lot 14 (27/11/2026) -- le controle final a releve qu'un etat de PC refusait tous ses champs hors libelle et
+-- case ; lu dans la copie de dev (v2.PC_ETAT) : 4 etats coches sur resolution du plan sans code cloture (RPRLJSF, RPRLJSO, RPSLJSF,
+-- RPSLJSO), que la V2 refuse d'enregistrer -- d'ou G14P et le code cloture G14CL, joues par PROC_GTABREF.gestes.
 IF OBJECT_ID(N'v2.PC_ETAT') IS NULL
     CREATE TABLE v2.PC_ETAT (R_PCETAT_VALEUR varchar(20) NOT NULL PRIMARY KEY, R_PCETAT_LIBELLE_ECRAN varchar(200) NOT NULL,
         R_PCETAT_OUVERTURE bit NOT NULL DEFAULT 0, R_PCETAT_CLOTURE bit NOT NULL, R_PCETAT_MODALITE_REGIME varchar(1) NULL,
@@ -49,6 +52,10 @@ IF COL_LENGTH('v2.CODE_EVE_PRO', 'R_CODEEVEPRO_NATURE_DOC_GED') IS NULL ALTER TA
 IF COL_LENGTH('v2.CODE_EVE_PRO', 'R_CODEEVEPRO_TYPE_DEPOSANT_GED') IS NULL ALTER TABLE v2.CODE_EVE_PRO ADD R_CODEEVEPRO_TYPE_DEPOSANT_GED varchar(50) NULL;
 IF OBJECT_ID(N'v2.CATEGORIE_DEPOT') IS NULL
     CREATE TABLE v2.CATEGORIE_DEPOT (R_CATEGORIED_VALEUR varchar(3) NOT NULL PRIMARY KEY, R_CATEGORIED_TYPE_NUM_DEPOT varchar(5) NULL);
+-- Le code cloture d'un etat sur resolution du plan : la liste de RIG v2 (ULT_COMBO_CODE_CLOTURE.cs:31-45, table CODE_CLOTURE ; la
+-- table du banc, Program.cs:143, si aucun jeu ne l'a creee avant).
+IF OBJECT_ID(N'v2.CODE_CLOTURE') IS NULL
+    CREATE TABLE v2.CODE_CLOTURE (R_CODECLOTUR_VALEUR varchar(5) NOT NULL PRIMARY KEY, R_CODECLOTUR_SURVEILLANCE_RCS bit NOT NULL);
 
 EXEC sp_executesql N'
 -- Les etats de PC : G14A (avec ses etats suivants, sa decision et sa saisie, supprimes avec lui), G14B (etat suivant de G14A : supprime
@@ -57,6 +64,12 @@ EXEC sp_executesql N'
 INSERT INTO v2.PC_ETAT (R_PCETAT_VALEUR, R_PCETAT_LIBELLE_ECRAN, R_PCETAT_OUVERTURE, R_PCETAT_CLOTURE, R_PCETAT_UTILISABLE_SAISIE, R_PCETAT_MODALITE_REGIME) VALUES
     (''G14A'', ''ETAT BANC ALPHA'', 1, 0, 1, ''R''), (''G14B'', ''ETAT BANC SUIVANT'', 0, 0, 1, NULL), (''G14H'', ''ETAT BANC HISTO'', 0, 1, 1, NULL),
     (''G14N'', ''ETAT BANC FIGE'', 0, 0, 0, NULL), (''G14V'', '''', 0, 0, 1, NULL);
+-- G14P : un etat d ouverture coche sur resolution du plan, SANS code cloture (comme RPRLJSF et trois autres dans RIG_DEV, lus le
+-- 27/11/2026) -- RIG v2 y montre le code cloture, obligatoire : tout enregistrement est refuse tant qu il est vide. G14CL : le code
+-- cloture saisi.
+INSERT INTO v2.PC_ETAT (R_PCETAT_VALEUR, R_PCETAT_LIBELLE_ECRAN, R_PCETAT_OUVERTURE, R_PCETAT_CLOTURE, R_PCETAT_RESOLUTION_PLAN, R_PCETAT_UTILISABLE_SAISIE)
+    VALUES (''G14P'', ''ETAT BANC PLAN'', 1, 0, 1, 1);
+INSERT INTO v2.CODE_CLOTURE (R_CODECLOTUR_VALEUR, R_CODECLOTUR_SURVEILLANCE_RCS) VALUES (''G14CL'', 1);
 INSERT INTO v2.PC_ETAT_SUIVANT (PETSV_ID_PETSV, PETSV_AVANT, PETSV_APRES) VALUES (2400971, ''G14A'', ''G14B'');
 INSERT INTO v2.PC_ETAT_DJ_EP (PETDJ_ID_PETDJ, PETDJ_ETAT, PETDJ_MODALITE_PA, PETDJ_MODALITE_AJ) VALUES (2400972, ''G14A'', ''A'', ''A'');
 INSERT INTO v2.PC_ETAT_SAISIE (PETSA_ID_PETSA, PETSA_ETAT, PETSA_NUM_ORDRE, PETSA_TYPE_SAISIE, PETSA_PC_ETAT_ZONE) VALUES

@@ -480,6 +480,21 @@ Exiger(vueRegistres.Mode == "base" && vueRegistres.Plafonnees.Length == 0 && vue
        && vueRegistres.Lignes.Length == registresComplets.Lignes.Count,
     $"pont, PROC_REGJUD par la route : registres complets, aucun registre coupe ({string.Join(", ", vueRegistres.Plafonnees)} ; {vueRegistres.Message})");
 
+// « Tables de référence » : UN PLAFOND PAR TABLE (LecteurTablesReference.Requete). fix-ok: controle final du lot 14 (3e reprise,
+// 27/11/2026) -- un plafond commun aux trois tables (TOP sur leur union) cachait 21 des 128 types de depot AJMJ de la copie de dev
+// sans le dire (89 + 4 + 107 = 200 « sur 221 », capture 05) ; RIG v2 ouvre chaque table a part, en entier (OPE_SELECTION_TABLE,
+// FactoryHelper.TEXTE_REQUETE_VALEUR sans TOP). Plafond 1 : le premier code de chaque table et le total de chacune.
+var groupesTabref = CatalogueGenere.Descripteur("PROC_GTABREF")!.Groupes;
+var tablesCompletes = await Lire("PROC_GTABREF");
+var tablesPlafond1 = await Lire("PROC_GTABREF", plafond: 1);
+var codesParTable = tablesCompletes.Lignes.GroupBy(l => l.Groupe).ToDictionary(g => g.Key, g => g.Count());
+Exiger(groupesTabref.All(codesParTable.ContainsKey) && codesParTable.Values.All(n => n > 1)
+       && tablesPlafond1.Lignes.Select(Texte).SequenceEqual(tablesCompletes.Lignes.GroupBy(l => l.Groupe).Select(g => Texte(g.First())))
+       && tablesPlafond1.Total == tablesCompletes.Total && tablesPlafond1.TotalParGroupe is { } totauxTabref
+       && groupesTabref.All(g => totauxTabref.GetValueOrDefault(g) == codesParTable[g]),
+    $"PROC_GTABREF, plafond 1 : le premier code de chaque table et le total de chacune ({string.Join(", ", tablesPlafond1.Lignes.Select(l => l.Groupe))} ; " +
+    $"totaux {string.Join(", ", tablesPlafond1.TotalParGroupe?.Select(t => $"{t.Key} {t.Value}") ?? [])})");
+
 // L'ecran reuni des radiations d'office (« Relances et injonctions ») a TOUS ses membres branches depuis le lot 1 du plan
 // plan-f7ba4de2 : lu APRES les jeux, parce que les lecteurs des relances et injonctions lisent des colonnes que seuls
 // leurs jeux ajoutent aux tables du banc. Le mode « mixte » reste controle plus haut par l'ecran reuni de PROC_DCA.

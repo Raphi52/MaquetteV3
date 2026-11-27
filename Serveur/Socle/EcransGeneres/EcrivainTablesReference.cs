@@ -16,7 +16,14 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     libelle d'un type AJMJ par un agent Amitel seul (MetierReadOnly, .Designer.cs:88, leve l. 54) ; TOUS les champs d'une zone
 ///     (_PC_ETAT_ZONE.cs:75-95 : ZoneAsync, memes controles qu'a sa creation, unicite table / attribut comprise : DoVerifier,
 ///     l. 123-137, joue a chaque enregistrement) ; l'evenement de procedure d'un type AJMJ (l. 46 ; facultatif, l. 27-28 ; un code avec
-///     depot PC : .Designer.cs:98, ULT_COMBO_CODE_EVE_PRO.cs:79).
+///     depot PC : .Designer.cs:98, ULT_COMBO_CODE_EVE_PRO.cs:79) ; les champs d'un ETAT DE PC (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:65-81),
+///     avec les regles de son formulaire, jouees a chaque enregistrement (EtatAsync) -- le regime dans la liste de la V2 ; ouverture,
+///     cloture, conversion en LJ et extension s'excluent (la case cochee decoche les autres, l. 89-108) ; « Sur resolution du plan » ne
+///     se coche que sur un etat d'ouverture, et se decoche avec elle (l. 135-142) ; le code cloture ne se saisit que sur resolution du
+///     plan, s'y vide sans elle (l. 149-156), y est obligatoire (.Designer.cs:198 ; un champ visible et modifiable : Ult.moteur.cs:512-517,
+///     controle par _Save, OPE_TABLE_REF_BUTTONS_BAR.cs:421-429) et pris dans CODE_CLOTURE (ULT_COMBO_CODE_CLOTURE.cs:31-45 ; cle
+///     etrangere de PC_ETAT.sql) ; « A sauver » est en lecture seule quand « Mise a jour de la PC » est cochee (l. 116-119) ; le regime
+///     des statistiques par l'equipe Amitel seule (l. 52-55), 10 caracteres (PC_ETAT.sql).
 ///     Pour PC_ETAT_ZONE et le type de depot AJMJ, la date et l'auteur de modification (« Nom Prénom » de l'utilisateur, sinon le
 ///     compte Windows : SousOPE_HISTORIQUE.MiseAJourChampsModification, l. 49-57). Le CODE ne se renomme pas : en changer, dans la V2,
 ///     ouvre l'enregistrement de ce code (ult_ComboBox_Valeur_ChangementValeur -> InvokeValeurChampPkModifiee,
@@ -39,13 +46,13 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     PC_ETAT_SAISIE.PETSA_PC_ETAT_ZONE -> PC_ETAT_ZONE),
 ///     et la V2 dit alors « La suppression de l'enregistrement courant a échoué. » (l. 506) : la V3 controle ces citations AVANT d'ecrire
 ///     (la base V3 n'a pas recopie les cles etrangeres), refuse avec ce message et nomme la citation.
-/// NON REPRIS (nommes) : les autres champs d'un ETAT DE PC (regime, modalites, cases, code cloture, statistiques) et ses collections
-/// (etats suivants, decisions, saisie), en lecture : changer une modalite AJ ou PA y recalcule les decisions et la saisie rattachees
-/// (Modalite_Changed, OPE_AFFICHE_SQLBASE_PC_ETAT.cs:111-114 -> _PC_ETAT_DJ_EP.cs:393-401, _PC_ETAT_SAISIE.cs:706-714), enregistrees
-/// avec l'etat par SQLBase_Handler_PC_Etat ; les quatre cases s'excluent et se montrent l'une par l'autre (l. 89-119, 135-161) ; le
-/// regime des statistiques est reserve a Amitel (l. 52-55) -- la grille V3 ne porte ni ces listes ni ces dependances. De meme leur
-/// saisie a la creation d'un etat (il prend ceux de CreateEtat, ou ceux de l'etat copie) ; le verrou SqlLock de l'enregistrement
-/// ouvert (_CheckLock).
+/// NON REPRIS (nommes) : d'un ETAT DE PC, les modalites AJ et PA et ses collections (etats suivants, decisions, saisie), en lecture :
+/// changer une modalite y recalcule les decisions et la saisie rattachees (Modalite_Changed, OPE_AFFICHE_SQLBASE_PC_ETAT.cs:111-114 ->
+/// _PC_ETAT_DJ_EP.cs:393-401, _PC_ETAT_SAISIE.cs:706-714), enregistrees avec l'etat par SQLBase_Handler_PC_Etat -- la grille V3 ne
+/// porte pas ces collections ; le code processus induit : sa liste (ULT_COMBO_CODE_PROC.cs:9-18 : PROCESSUS_ET_FONCTIONALITE, domaine 4,
+/// executable, avec un mode d'edition) n'est pas dans la base V3 (soc.Fonction, Base\migrations\SOC-002_droits.sql:22-31, n'a ni
+/// domaine, ni mode d'edition, ni executable). La saisie de ces champs a la creation d'un etat : il prend ceux de CreateEtat (ou de
+/// l'etat copie), puis se modifie. Le verrou SqlLock de l'enregistrement ouvert (_CheckLock).
 /// TRACE : famille « reglage », « a cree » / « a modifie » / « a supprime ».
 /// </summary>
 // fix-ok: mesure par le controle final du lot 14 (27/11/2026, reprise) -- AjouterAsync refusait toute zone (« RIG v3 ne la cree pas
@@ -72,8 +79,30 @@ internal sealed class EcrivainTablesReference : IEcrivainEcran
     /// <summary>Le libelle d'un type AJMJ hors equipe Amitel : la V2 le montre en lecture seule (.Designer.cs:88, l. 54), sans message.</summary>
     internal const string LibelleReserveAmitel = "Le libellé d'un type de dépôt AJMJ ne se modifie que par l'équipe Amitel : RIG v2 le montre en lecture seule.";
 
-    /// <summary>Un champ d'un etat de PC : la fiche le lit, la V3 ne l'enregistre pas (en-tete, NON REPRIS).</summary>
-    internal const string EtatEnLecture = "Les champs d'un état de procédure collective se règlent dans RIG v2 : changer une modalité y recalcule les décisions et la saisie rattachées à l'état.";
+    /// <summary>La section du formulaire d'un etat de PC (Configurer.cs).</summary>
+    internal const string SectionEtat = "Champs d'un état de PC";
+
+    /// <summary>Une modalite AJ ou PA : la fiche la lit, la V3 ne l'enregistre pas (en-tete, NON REPRIS).</summary>
+    private static string ModaliteEnLecture(string champ)
+        => $"« {champ} » se règle dans RIG v2 : changer une modalité y recalcule les décisions et la saisie rattachées à l'état.";
+
+    /// <summary>Le code processus induit : sa liste n'est pas dans la base V3 (en-tete, NON REPRIS).</summary>
+    internal const string CodeProcedureEnLecture = "« Code procédure » se choisit dans la liste des processus de RIG v2, que la base V3 du greffe ne porte pas : il se règle dans RIG v2.";
+
+    /// <summary>Le regime des statistiques hors equipe Amitel : la V2 le montre en lecture seule (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:52-55).</summary>
+    internal const string StatistiquesReserveesAmitel = "« Régime PC (statistiques) » ne se modifie que par l'équipe Amitel : RIG v2 le montre en lecture seule.";
+
+    /// <summary>Les cases qui s'excluent (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:89-108) : cocher l'une decoche les autres.</summary>
+    internal const string CasesExclusives = "Ouverture, clôture, conversion en LJ et extension s'excluent : une seule se coche à la fois (RIG v2 décoche les autres quand on en coche une).";
+
+    /// <summary>« Sur resolution du plan » hors etat d'ouverture : la V2 ne la montre pas (l. 135-137).</summary>
+    internal const string PlanSansOuverture = "« Résolution du plan » ne se coche que sur un état d'ouverture : RIG v2 ne la montre qu'avec « Ouverture » cochée.";
+
+    /// <summary>Un code cloture sans resolution du plan : la V2 ne le montre pas (l. 149-151).</summary>
+    internal const string ClotureSansPlan = "« Code clôture » ne se saisit que sur résolution du plan : RIG v2 ne le montre qu'avec « Résolution du plan » cochée.";
+
+    /// <summary>« A sauver » quand « Mise a jour de la PC » est cochee : la V2 le met en lecture seule (l. 116-119).</summary>
+    internal const string SauverSousMiseAJour = "« À sauver » ne se modifie pas quand « Mise à jour de la PC » est cochée : RIG v2 le met alors en lecture seule.";
 
     public Task<IssueGeste> JouerAsync(GesteEnCours geste, CancellationToken ct) => geste.Demande.Type switch
     {
@@ -124,10 +153,13 @@ internal sealed class EcrivainTablesReference : IEcrivainEcran
         {
             if (champ.StartsWith(GesteEcran.Cle(SectionZone, ""), StringComparison.Ordinal) && t.Nom != "PC_ETAT_ZONE")
                 return IssueGeste.Refuser($"Les champs d'une zone ne vont qu'à une zone (PC_ETAT_ZONE), pas à {t.Liste}.");
-            if (t.Nom == "PC_ETAT") return IssueGeste.Refuser(EtatEnLecture);
-            var permis = t.Nom == "PC_ETAT_ZONE"
-                ? ChampsZone.Any(z => champ == GesteEcran.Cle(SectionZone, z.Libelle)) || champ == GesteEcran.Cle(SectionZone, ChampDesactivation)
-                : champ == GesteEcran.Cle(SectionTypeDepot, ChampEvenement);
+            // Un etat de PC : tous les champs de son formulaire arrivent a EtatAsync, qui refuse ceux que la V3 n'enregistre pas en disant pourquoi.
+            var permis = t.Nom switch
+            {
+                "PC_ETAT_ZONE" => ChampsZone.Any(z => champ == GesteEcran.Cle(SectionZone, z.Libelle)) || champ == GesteEcran.Cle(SectionZone, ChampDesactivation),
+                "PC_ETAT" => ChampsEtat.Any(e => champ == GesteEcran.Cle(SectionEtat, e)),
+                _ => champ == GesteEcran.Cle(SectionTypeDepot, ChampEvenement),
+            };
             if (!permis) return IssueGeste.Refuser($"« {champ} » ne se modifie pas dans {t.Liste} : RIG v2 ne l'y modifie pas.");
         }
         var apres = avant with { Libelle = Cellule(geste, ColLibelle) ?? avant.Libelle, Saisie = Coche(Cellule(geste, ColSaisie)) ?? avant.Saisie };
@@ -138,7 +170,7 @@ internal sealed class EcrivainTablesReference : IEcrivainEcran
         if (t.Nom == "PC_ETAT_ZONE")
         {
             // Une zone : tout son formulaire, controle comme a sa creation ; ce qui n'est pas saisi garde sa valeur de la base.
-            var ligne = await LigneZoneAsync(geste, avant.Valeur, ct);
+            var ligne = await LigneAsync(geste, t, avant.Valeur, ct);
             var (zone, refusZone) = await ZoneAsync(geste, avant.Valeur, ligne, ct);
             if (zone is null) return IssueGeste.Refuser(refusZone!);
             DateTime? finAvant = ligne.TryGetValue("R_PCETATZONE_DATE_DESACTIVATION", out var fin) && fin is DateTime f ? f : null;
@@ -154,6 +186,22 @@ internal sealed class EcrivainTablesReference : IEcrivainEcran
             parametres.Add(new SqlParameter("@fin", (object?)zone.Desactivation ?? DBNull.Value));
             if (changes.Count > 0)
                 (propresAvant, propresApres) = (changes.ToDictionary(kv => kv.Key, kv => Texte(ligne, kv.Key)), changes);
+        }
+        else if (t.Nom == "PC_ETAT")
+        {
+            // Un etat : son formulaire, ses regles jouees a CHAQUE enregistrement (un code cloture manquant refuse aussi un libelle
+            // change, comme _Save) ; ce qui n'est pas saisi garde sa valeur de la base, sauf ce que ces regles decochent ou vident.
+            var ligne = await LigneAsync(geste, t, avant.Valeur, ct);
+            var (etat, refusEtat) = await EtatAsync(geste, ligne, ct);
+            if (etat is null) return IssueGeste.Refuser(refusEtat!);
+            foreach (var (colonne, valeur) in etat)
+            {
+                ensemble.Add($"{colonne} = @{colonne}");
+                parametres.Add(new SqlParameter($"@{colonne}", valeur ?? DBNull.Value));
+            }
+            var changes = etat.Where(kv => !Equals(Norme(kv.Value), Norme(ligne.GetValueOrDefault(kv.Key)))).ToDictionary(kv => kv.Key, kv => kv.Value);
+            if (changes.Count > 0)
+                (propresAvant, propresApres) = (changes.ToDictionary(kv => kv.Key, kv => ligne.GetValueOrDefault(kv.Key)), changes);
         }
         else if (t.Nom == "DEMAT_CFEC_AJMJ_TYPE_DEPOT")
         {
@@ -300,11 +348,11 @@ internal sealed class EcrivainTablesReference : IEcrivainEcran
     private static bool ChampsZoneSaisis(GesteEnCours geste)
         => geste.Demande.Valeurs.Any(kv => kv.Key.StartsWith(GesteEcran.Cle(SectionZone, ""), StringComparison.Ordinal) && kv.Value.Trim().Length > 0);
 
-    /// <summary>Une ligne de v2.PC_ETAT_ZONE telle quelle (colonne -> valeur) ; vide si le code n'y est pas.</summary>
-    private static async Task<Dictionary<string, object?>> LigneZoneAsync(GesteEnCours geste, string code, CancellationToken ct)
+    /// <summary>Une ligne de la table <paramref name="t"/> telle quelle (colonne -> valeur) ; vide si le code n'y est pas.</summary>
+    private static async Task<Dictionary<string, object?>> LigneAsync(GesteEnCours geste, TableRef t, string code, CancellationToken ct)
     {
         var ligne = new Dictionary<string, object?>(StringComparer.Ordinal);
-        await using var r = await geste.LireAsync("SELECT * FROM v2.PC_ETAT_ZONE WHERE R_PCETATZONE_VALEUR = @c", ct, new SqlParameter("@c", code));
+        await using var r = await geste.LireAsync($"SELECT * FROM v2.{t.Nom} WHERE {t.Valeur} = @c", ct, new SqlParameter("@c", code));
         if (await r.ReadAsync(ct))
             for (var i = 0; i < r.FieldCount; i++) ligne[r.GetName(i)] = r.IsDBNull(i) ? null : r.GetValue(i);
         return ligne;
@@ -312,6 +360,108 @@ internal sealed class EcrivainTablesReference : IEcrivainEcran
 
     private static string Texte(Dictionary<string, object?> ligne, string colonne)
         => ligne.TryGetValue(colonne, out var v) && v is not null ? Convert.ToString(v, CultureInfo.InvariantCulture)!.Trim() : "";
+
+    /// <summary>Une valeur comparee a celle de la base : un texte vide vaut NULL, sans blancs autour.</summary>
+    private static object? Norme(object? v) => v is string s ? (s.Trim().Length == 0 ? null : s.Trim()) : v;
+
+    /// <summary>Les champs du formulaire d'un etat de PC, au libelle de la fiche (LecteurTablesReference, Configurer.cs).</summary>
+    private static readonly string[] ChampsEtat =
+    [
+        "Régime", "Modalité PA", "Modalité AJ", "Ouverture", "Clôture", "Conversion LJ", "Extension", "Résolution du plan", "Code clôture",
+        "Mise à jour de la PC", "À sauver", "Audience future", "Régime PC (statistiques)", "Code procédure",
+    ];
+
+    /// <summary>Les cases qui s'excluent (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:89-108) : libelle et colonne.</summary>
+    private static readonly (string Libelle, string Colonne)[] Exclusives =
+        [("Ouverture", "R_PCETAT_OUVERTURE"), ("Clôture", "R_PCETAT_CLOTURE"), ("Conversion LJ", "R_PCETAT_CONVERSION_LJ"), ("Extension", "R_PCETAT_EXTENSION")];
+
+    /// <summary>
+    /// Les champs d'un etat de PC tels qu'ils s'enregistrent (colonne -> valeur, null = NULL) : ceux saisis, sinon ceux de la base
+    /// <paramref name="ligne"/>, passes par les regles du formulaire de RIG v2 (en-tete), sur l'etat FINAL de l'enregistrement. Rend
+    /// l'etat, ou le refus.
+    /// </summary>
+    private static async Task<(Dictionary<string, object?>? Etat, string? Refus)> EtatAsync(GesteEnCours geste, Dictionary<string, object?> ligne,
+                                                                                               CancellationToken ct)
+    {
+        string? Saisi(string libelle) => geste.Demande.Valeurs.TryGetValue(GesteEcran.Cle(SectionEtat, libelle), out var v) ? v.Trim() : null;
+        bool Lu(string colonne) => ligne.GetValueOrDefault(colonne) is true;
+        bool Case(string libelle, string colonne) => Saisi(libelle) is { } s ? Coche(s) == true : Lu(colonne);
+
+        // En lecture : les modalites (leur changement recalcule decisions et saisie, l. 111-114) et le code processus (liste absente).
+        foreach (var (libelle, colonne) in new[] { ("Modalité PA", "R_PCETAT_MODALITE_PA"), ("Modalité AJ", "R_PCETAT_MODALITE_AJ") })
+            if (Saisi(libelle) is { } m && m != Texte(ligne, colonne)) return (null, ModaliteEnLecture(libelle));
+        if (Saisi("Code procédure") is { } proc && proc != Texte(ligne, "R_PCETAT_CODE_PROC")) return (null, CodeProcedureEnLecture);
+
+        var etat = new Dictionary<string, object?>(StringComparer.Ordinal);
+        // Le regime : la liste de RIG v2 (eTableRefModaliteRegime), par sa description ou sa lettre ; vide = NULL (non obligatoire).
+        var regime = Texte(ligne, "R_PCETAT_MODALITE_REGIME");
+        if (Saisi("Régime") is { } r && r != regime && r != LecteurTablesReference.Regime(regime))
+        {
+            if (r.Length == 0) regime = "";
+            else if (Regimes.FirstOrDefault(x => string.Equals(x.Libelle, r, StringComparison.OrdinalIgnoreCase)
+                                                 || string.Equals(x.Lettre, r, StringComparison.OrdinalIgnoreCase)) is { Lettre: { } lettre })
+                regime = lettre;
+            else return (null, $"« Régime » : « {r} » n'est pas un régime de RIG v2 ({string.Join(", ", Regimes.Select(x => x.Libelle))}).");
+        }
+        etat["R_PCETAT_MODALITE_REGIME"] = regime.Length > 0 ? regime : null;
+
+        // Les cases qui s'excluent : celle qu'on coche decoche les autres (l. 89-108) ; deux cochees d'un coup, la V2 ne le permet pas.
+        var cochees = Exclusives.Where(x => Case(x.Libelle, x.Colonne) && !Lu(x.Colonne)).Select(x => x.Colonne).ToArray();
+        if (cochees.Length > 1) return (null, CasesExclusives);
+        foreach (var (libelle, colonne) in Exclusives) etat[colonne] = cochees.Length == 1 ? cochees[0] == colonne : Case(libelle, colonne);
+
+        // « Sur resolution du plan » : montree avec « Etat d'ouverture » seulement, decochee avec elle (l. 135-142).
+        var plan = Case("Résolution du plan", "R_PCETAT_RESOLUTION_PLAN");
+        if (etat["R_PCETAT_OUVERTURE"] is false)
+        {
+            if (plan && Saisi("Résolution du plan") is not null) return (null, PlanSansOuverture);
+            plan = false;
+        }
+        etat["R_PCETAT_RESOLUTION_PLAN"] = plan;
+
+        // Le code cloture : montre sur resolution du plan seulement, vide sans elle (l. 149-156) ; obligatoire quand il se montre
+        // (.Designer.cs:198 ; Ult.moteur.cs:512-517) ; un code SAISI est pris dans CODE_CLOTURE (ULT_COMBO_CODE_CLOTURE.cs:31-45), celui
+        // deja enregistre reste tel quel (MetierValeurInexistanteErreur = false, .Designer.cs:200).
+        var clotureAvant = Texte(ligne, "R_PCETAT_CODE_CLOTURE");
+        var cloture = Saisi("Code clôture") ?? clotureAvant;
+        if (!plan)
+        {
+            if (cloture.Length > 0 && cloture != clotureAvant) return (null, ClotureSansPlan);
+            cloture = "";
+        }
+        else if (cloture.Length == 0) return (null, CreationV2.Obligatoire("Code clôture"));
+        else if (cloture != clotureAvant)
+        {
+            await using var c = await geste.LireAsync("SELECT R_CODECLOTUR_VALEUR FROM v2.CODE_CLOTURE WHERE R_CODECLOTUR_VALEUR = @c", ct,
+                new SqlParameter("@c", cloture));
+            if (!await c.ReadAsync(ct))
+                return (null, $"« Code clôture » : « {cloture} » n'est pas un code clôture de la base du greffe (la liste de RIG v2 ne propose que ceux-là).");
+            cloture = c.GetString(0).Trim();
+        }
+        etat["R_PCETAT_CODE_CLOTURE"] = cloture.Length > 0 ? cloture : null;
+
+        // « A sauver » : en lecture seule quand « Mise a jour de la PC » est cochee (l. 116-119).
+        var maj = Case("Mise à jour de la PC", "R_PCETAT_MAJ_PC");
+        etat["R_PCETAT_MAJ_PC"] = maj;
+        etat["R_PCETAT_ASAUVER"] = ligne.GetValueOrDefault("R_PCETAT_ASAUVER");
+        if (Saisi("À sauver") is { } sauver && Coche(sauver) != Lu("R_PCETAT_ASAUVER"))
+        {
+            if (maj) return (null, SauverSousMiseAJour);
+            etat["R_PCETAT_ASAUVER"] = Coche(sauver);
+        }
+        etat["R_PCETAT_AUD_FUTURE"] = Case("Audience future", "R_PCETAT_AUD_FUTURE");
+
+        // Le regime des statistiques : l'equipe Amitel seule (l. 52-55), 10 caracteres (PC_ETAT.sql).
+        var stats = Texte(ligne, "R_PCETAT_REGIME_PC_STATS");
+        if (Saisi("Régime PC (statistiques)") is { } st && st != stats)
+        {
+            if (!geste.Agent.EstAmitel) return (null, StatistiquesReserveesAmitel);
+            if (st.Length > 10) return (null, "« Régime PC (statistiques) » : 10 caractères au plus.");
+            stats = st;
+        }
+        etat["R_PCETAT_REGIME_PC_STATS"] = stats.Length > 0 ? stats : null;
+        return (etat, null);
+    }
 
     /// <summary>Les champs d'une zone tels qu'ils s'enregistrent (colonne -> texte, vide = NULL) et sa date de desactivation.</summary>
     private sealed record ZoneSaisie(Dictionary<string, string> Champs, DateTime? Desactivation);
@@ -376,7 +526,7 @@ internal sealed class EcrivainTablesReference : IEcrivainEcran
     /// </summary>
     private static async Task<IssueGeste> AjouterZoneAsync(GesteEnCours geste, TableRef t, Code nouveau, Code? source, CancellationToken ct)
     {
-        var copie = source is null ? new Dictionary<string, object?>(StringComparer.Ordinal) : await LigneZoneAsync(geste, source.Valeur, ct);
+        var copie = source is null ? new Dictionary<string, object?>(StringComparer.Ordinal) : await LigneAsync(geste, t, source.Valeur, ct);
         var (zone, refus) = await ZoneAsync(geste, nouveau.Valeur, copie, ct);
         if (zone is null) return IssueGeste.Refuser(refus!);
         var champs = zone.Champs;

@@ -23,8 +23,10 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   - LA FICHE : les champs du formulaire de la table (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:64-82, OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:75-95,
 ///     OPE_AFFICHE_SQLBASE_DEMAT_CFEC_AJMJ_TYPE_DEPOT.cs:44-52). Se modifient : le libelle (sauf d'un type AJMJ, en lecture seule
 ///     dans RIG v2 hors equipe Amitel : .Designer.cs:88, l. 54) et « Utilisable en saisie » ; tous les champs d'une zone (l. 75-95) ;
-///     l'evenement de procedure d'un type AJMJ (l. 46). Le reste se lit : l'historique (SousOPE_HISTORIQUE.Designer.cs:80-108,
-///     MetierReadOnly) et les champs d'un etat de PC (Configurer.cs dit pourquoi).
+///     l'evenement de procedure d'un type AJMJ (l. 46) ; les champs d'un etat de PC hors modalites, regime des statistiques et code
+///     processus (l. 65-81 ; la fiche dit lesquels, Configurer.cs pourquoi). Le reste se lit : l'historique
+///     (SousOPE_HISTORIQUE.Designer.cs:80-108, MetierReadOnly).
+///   - LE PLAFOND : par table, chacune avec son total (Requete).
 /// L'id d'une ligne est « &lt;TABLE&gt;|&lt;code&gt; » : les trois tables ont chacune leurs codes.
 /// VALEURS : dans l'ordre des Colonnes (Code, Libellé, Table, Utilisable en saisie).
 /// </summary>
@@ -83,16 +85,25 @@ internal sealed class LecteurTablesReference : IRechercheEcran, IFicheEcran
 
     public IReadOnlyCollection<string> Criteres { get; } = [ColTable, ColCode, ColLibelle];
 
-    /// <summary>Les trois tables l'une sous l'autre : chaque partie, la requete de FactoryHelper (code, libelle, saisissable).</summary>
+    /// <summary>
+    /// Les trois tables l'une sous l'autre : chaque partie, la requete de FactoryHelper (code, libelle, saisissable). RIG v2 ouvre
+    /// chaque table A PART, en entier (OPE_SELECTION_TABLE : une table choisie dans CBO_TableRef, sa liste par TEXTE_REQUETE_VALEUR,
+    /// sans TOP) : le plafond vaut donc pour CHAQUE table, et chacune rend son total (LignesLues.TotalParGroupe, point 5 du mode
+    /// d'emploi) -- une table longue ne cache pas les codes d'une autre, et le pont dit laquelle est coupee.
+    /// </summary>
     private static string Requete(string filtres) => $"""
-        SELECT TOP (@plafond) l.TableRef, l.Rang, l.Valeur, l.Libelle, l.Saisie, COUNT(*) OVER () AS Total
-        FROM ({string.Join(" UNION ALL ", Tables.Select((t, i) => $"""
-            SELECT '{t.Nom}' AS TableRef, {i} AS Rang, CAST({t.Valeur} AS varchar(20)) AS Valeur, CAST({t.Libelle} AS varchar(500)) AS Libelle,
-                   CAST({t.Saisie} AS bit) AS Saisie
-            FROM v2.{t.Nom}
-            """))}) AS l
-        WHERE 1 = 1 {filtres}
-        ORDER BY l.Rang, l.Valeur
+        SELECT n.TableRef, n.Rang, n.Valeur, n.Libelle, n.Saisie, n.ParTable
+        FROM (
+            SELECT l.*, ROW_NUMBER() OVER (PARTITION BY l.Rang ORDER BY l.Valeur) AS Place, COUNT(*) OVER (PARTITION BY l.Rang) AS ParTable
+            FROM ({string.Join(" UNION ALL ", Tables.Select((t, i) => $"""
+                SELECT '{t.Nom}' AS TableRef, {i} AS Rang, CAST({t.Valeur} AS varchar(20)) AS Valeur, CAST({t.Libelle} AS varchar(500)) AS Libelle,
+                       CAST({t.Saisie} AS bit) AS Saisie
+                FROM v2.{t.Nom}
+                """))}) AS l
+            WHERE 1 = 1 {filtres}
+        ) AS n
+        WHERE n.Place <= @plafond
+        ORDER BY n.Rang, n.Valeur
         """;
 
     public Task<LignesLues> LireAsync(SqlConnection baseGreffe, DateTime aujourdhui, int plafond, CancellationToken ct)
@@ -115,8 +126,20 @@ internal sealed class LecteurTablesReference : IRechercheEcran, IFicheEcran
         return Lire(baseGreffe, f, plafond, ct);
     }
 
-    private static Task<LignesLues> Lire(SqlConnection baseGreffe, FiltresRecherche f, int plafond, CancellationToken ct)
-        => LectureEcran.LireAsync(baseGreffe, Requete(f.EnSuite), Ligne, ct, f.Parametres(new SqlParameter("@plafond", plafond)));
+    private static async Task<LignesLues> Lire(SqlConnection baseGreffe, FiltresRecherche f, int plafond, CancellationToken ct)
+    {
+        var lignes = new List<LigneLue>();
+        // Toutes les tables, meme vides ou ecartees par un filtre : leur total est 0, et le pont ne les dit pas coupees.
+        var parTable = Tables.ToDictionary(t => t.Groupe, _ => 0, StringComparer.Ordinal);
+        await using var r = await LectureV2.LireAsync(baseGreffe, Requete(f.EnSuite), ct, f.Parametres(new SqlParameter("@plafond", plafond)));
+        while (await r.ReadAsync(ct))
+        {
+            var ligne = Ligne(r);
+            parTable[ligne.Groupe] = Convert.ToInt32(r["ParTable"], CultureInfo.InvariantCulture);
+            lignes.Add(ligne);
+        }
+        return new LignesLues(lignes, parTable.Values.Sum()) { TotalParGroupe = parTable };
+    }
 
     private static LigneLue Ligne(SqlDataReader r)
     {
@@ -161,13 +184,16 @@ internal sealed class LecteurTablesReference : IRechercheEcran, IFicheEcran
         SectionFiche propre = t.Nom switch
         {
             // OPE_AFFICHE_SQLBASE_PC_ETAT.cs:64-82 : regime, cases exclusives (ouverture / cloture / conversion / extension), resolution du
-            // plan, code cloture, mise a jour de la PC, a sauver, audience future, regime des statistiques, code procedure.
+            // plan, code cloture, mise a jour de la PC, a sauver, audience future, regime des statistiques, code procedure. Se saisissent
+            // ceux que la V3 enregistre avec les regles de la V2 (EcrivainTablesReference.EtatAsync) ; se lisent : les modalites PA et AJ
+            // (leur changement recalcule decisions et saisie de l'etat), le regime des statistiques (equipe Amitel : la fiche ne connait
+            // pas l'agent, l'ecrivain accepte le changement d'un agent Amitel) et le code processus (sa liste n'est pas dans la base V3).
             "PC_ETAT" => new("Champs d'un état de PC",
             [
-                L("Régime", V("R_PCETAT_MODALITE_REGIME")), L("Modalité PA", V("R_PCETAT_MODALITE_PA")), L("Modalité AJ", V("R_PCETAT_MODALITE_AJ")),
-                L("Ouverture", V("R_PCETAT_OUVERTURE")), L("Clôture", V("R_PCETAT_CLOTURE")), L("Conversion LJ", V("R_PCETAT_CONVERSION_LJ")),
-                L("Extension", V("R_PCETAT_EXTENSION")), L("Résolution du plan", V("R_PCETAT_RESOLUTION_PLAN")), L("Code clôture", V("R_PCETAT_CODE_CLOTURE")),
-                L("Mise à jour de la PC", V("R_PCETAT_MAJ_PC")), L("À sauver", V("R_PCETAT_ASAUVER")), L("Audience future", V("R_PCETAT_AUD_FUTURE")),
+                M("Régime", Regime(V("R_PCETAT_MODALITE_REGIME"))), L("Modalité PA", V("R_PCETAT_MODALITE_PA")), L("Modalité AJ", V("R_PCETAT_MODALITE_AJ")),
+                M("Ouverture", V("R_PCETAT_OUVERTURE")), M("Clôture", V("R_PCETAT_CLOTURE")), M("Conversion LJ", V("R_PCETAT_CONVERSION_LJ")),
+                M("Extension", V("R_PCETAT_EXTENSION")), M("Résolution du plan", V("R_PCETAT_RESOLUTION_PLAN")), M("Code clôture", V("R_PCETAT_CODE_CLOTURE")),
+                M("Mise à jour de la PC", V("R_PCETAT_MAJ_PC")), M("À sauver", V("R_PCETAT_ASAUVER")), M("Audience future", V("R_PCETAT_AUD_FUTURE")),
                 L("Régime PC (statistiques)", V("R_PCETAT_REGIME_PC_STATS")), L("Code procédure", V("R_PCETAT_CODE_PROC")),
             ]),
             // OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:75-95 : enregistrement, edition, table / attribut / type, tous modifiables ; l'etat
@@ -208,4 +234,11 @@ internal sealed class LecteurTablesReference : IRechercheEcran, IFicheEcran
     /// <summary>Le libelle d'un etat enregistre (« 1 » -> « En vigueur pour tout ») ; une valeur hors liste reste telle quelle.</summary>
     internal static string EtatZone(string valeur)
         => int.TryParse(valeur, NumberStyles.None, CultureInfo.InvariantCulture, out var n) && n < EtatsZone.Length ? EtatsZone[n] : valeur;
+
+    /// <summary>Les regimes d'un etat de PC, la liste de RIG v2 : la lettre enregistree et sa description (eTableRefModaliteRegime,
+    /// RigMetier\TableRef\TableRefTypes.cs:18-25), triees par description (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:39-44).</summary>
+    internal static readonly (string Lettre, string Libelle)[] Regimes = [("G", "Général"), ("F", "Simplifié facultatif"), ("O", "Simplifié obligatoire")];
+
+    /// <summary>La description d'un regime enregistre (« G » -> « Général ») ; une lettre hors liste reste telle quelle.</summary>
+    internal static string Regime(string lettre) => Regimes.FirstOrDefault(r => r.Lettre == lettre).Libelle ?? lettre;
 }

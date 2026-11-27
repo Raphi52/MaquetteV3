@@ -6,6 +6,7 @@ ETAT BANC ALPHA | code G14A · PC_ETAT | État de la procédure collective | Val
 ETAT BANC SUIVANT | code G14B · PC_ETAT | État de la procédure collective | Validee | []
 ETAT BANC HISTO | code G14H · PC_ETAT | État de la procédure collective | Validee | []
 (! Non saisissable) ETAT BANC FIGE | code G14N · PC_ETAT · non saisissable | État de la procédure collective | EnCours | [] | valeurs: G14N ; ETAT BANC FIGE ; PC_ETAT ; non
+ETAT BANC PLAN | code G14P · PC_ETAT | État de la procédure collective | Validee | []
 G14V | code G14V · PC_ETAT | État de la procédure collective | AFaire | []
 ZONE BANC CITEE | code GZ1 · PC_ETAT_ZONE | Zones à afficher selon l’état de la procédure collective | Validee | []
 ZONE BANC LIBRE | code GZ2 · PC_ETAT_ZONE | Zones à afficher selon l’état de la procédure collective | Validee | []

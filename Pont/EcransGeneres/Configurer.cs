@@ -334,6 +334,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             // fix-ok: controle final du lot 14 (27/11/2026, 2e reprise) -- la fiche d'une zone montrait les sections des deux autres
             // tables « Non lu », Modifier d'une zone ne prenait que libelle et case, et un type AJMJ offrait Supprimer / Dupliquer :
             // SectionsParGroupe (le formulaire de chaque table) et GroupesModificationSeule (OPE_AFFICHE_REF_CFEC_AJMJ_TYPE_DEPOT.cs:31-33).
+            // fix-ok: controle final du lot 14 (27/11/2026, 3e reprise) -- un etat de PC refusait tous ses champs hors libelle et case,
+            // alors que seules les modalites AJ / PA recalculent (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:112-114) : section « Champs d'un état
+            // de PC » typee (liste, cases) et saisie, ses regles dans EcrivainTablesReference.EtatAsync (banc PROC_GTABREF.gestes).
             Colonnes = ["Code", "Libellé", "Table", Champ.Case("Utilisable en saisie")],
             Recherche = "Rechercher un code, un libellé, une table…",
             Criteres = ["Table", "Code", "Libellé"],
@@ -360,14 +363,16 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             [
                 new MarcheEcran("Enregistrement", "Le code ne se renomme pas (en saisir un autre ouvre son enregistrement dans RIG v2) ; le libellé et « Utilisable en saisie » se modifient (le libellé d'un type de dépôt AJMJ, par l'équipe Amitel seule). Un état de procédure collective se crée ici, une zone dans son onglet avec ses champs ; « Dupliquer » copie un état ou une zone sous un autre code ; un code cité ailleurs ne se supprime pas. Un type de dépôt AJMJ ne se crée, ne se copie ni ne se supprime : RIG v2 ne fait que le modifier.", true,
                     ["Table", "Code", "Libellé", Champ.Case("Utilisable en saisie")]),
-                // Les autres champs du formulaire de chaque table, en lecture (la fiche d'un code ne montre que la section de sa table).
-                // En lecture : changer une modalite AJ ou PA y recalcule les decisions et la saisie rattachees (Modalite_Changed,
-                // OPE_AFFICHE_SQLBASE_PC_ETAT.cs:111-114 -> _PC_ETAT_DJ_EP.cs:393-401, _PC_ETAT_SAISIE.cs:706-714), enregistrees avec
-                // l'etat (SQLBase_Handler_PC_Etat) ; les cases s'excluent et se montrent l'une par l'autre (:89-119, :135-161) ; le
-                // regime des statistiques est reserve a Amitel (:52-55). La grille V3 ne porte ni ces listes ni ces dependances.
-                new MarcheEcran("Champs d'un état de PC", "Le formulaire d'un état de procédure collective (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:64-82), en lecture : changer une modalité y recalcule les décisions et la saisie rattachées à l'état, que cet écran ne règle pas ; les cases ouverture, clôture, conversion et extension s'excluent. Ces champs se règlent dans RIG v2.", false,
-                    ["Régime", "Modalité PA", "Modalité AJ", "Ouverture", "Clôture", "Conversion LJ", "Extension", "Résolution du plan", "Code clôture",
-                     "Mise à jour de la PC", "À sauver", "Audience future", "Régime PC (statistiques)", "Code procédure"]),
+                // Le formulaire d'un etat de PC (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:64-82), sous sa ligne ouverte : la fiche dit quels champs se
+                // saisissent, EcrivainTablesReference.EtatAsync joue les regles de la V2 a chaque enregistrement (cases exclusives :89-108 ;
+                // resolution du plan et code cloture :135-161 ; « A sauver » :116-119 ; regime : la liste eTableRefModaliteRegime, :39-44).
+                // En lecture : les modalites AJ et PA (les changer recalcule les decisions et la saisie rattachees : Modalite_Changed,
+                // :111-114 -> _PC_ETAT_DJ_EP.cs:393-401, _PC_ETAT_SAISIE.cs:706-714, que la grille ne porte pas), le regime des statistiques
+                // (equipe Amitel, :52-55) et le code processus (liste PROCESSUS_ET_FONCTIONALITE absente de la base V3).
+                new MarcheEcran("Champs d'un état de PC", "Le formulaire d'un état de procédure collective (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:64-82), avec ses règles : ouverture, clôture, conversion et extension s'excluent (en cocher une décoche les autres) ; « Résolution du plan » ne se coche que sur un état d'ouverture et se décoche avec elle ; le code clôture se saisit sur résolution du plan, y est obligatoire et se vide sans elle ; « À sauver » ne change pas quand « Mise à jour de la PC » est cochée. En lecture : les modalités (les changer recalcule dans RIG v2 les décisions et la saisie rattachées à l'état), le régime des statistiques (équipe Amitel) et le code procédure (sa liste n'est pas dans la base V3).", false,
+                    [Champ.Liste("Régime", "Général", "Simplifié facultatif", "Simplifié obligatoire"), "Modalité PA", "Modalité AJ", Champ.Case("Ouverture"),
+                     Champ.Case("Clôture"), Champ.Case("Conversion LJ"), Champ.Case("Extension"), Champ.Case("Résolution du plan"), "Code clôture",
+                     Champ.Case("Mise à jour de la PC"), Champ.Case("À sauver"), Champ.Case("Audience future"), "Régime PC (statistiques)", "Code procédure"]),
                 // Saisis a la creation et a la copie d'une zone (SectionsAjout), lus ensuite : synonyme, ISO, simplifie et developpe,
                 // table, attribut, type et etat sont obligatoires ; le type et l'etat, les listes de RIG v2 (_ChargerComboTypes,
                 // OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:48-55 ; _ChargerComboEtats, SousOPE_HISTORIQUE.cs:39-47).

@@ -287,13 +287,147 @@ resultat: fait
 message: PC_ETAT G14N enregistré : ETAT BANC FIGE.
 controle: SELECT CAST(R_PCETAT_UTILISABLE_SAISIE AS varchar(1)) FROM v2.PC_ETAT WHERE R_PCETAT_VALEUR = 'G14N' => 1
 ---
-# 2e reprise. Refus : un champ d'un etat de PC (en lecture : changer une modalite y recalcule les decisions et la saisie rattachees,
-# OPE_AFFICHE_SQLBASE_PC_ETAT.cs:111-114). Jumeau accepte : « Utilisable en saisie » du meme etat (bloc precedent).
+# 3e reprise (controle final du lot 14). Les champs d'un etat de PC (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:65-81) se modifient, avec les
+# regles du formulaire jouees a chaque enregistrement (EcrivainTablesReference.EtatAsync). Refus : une modalite, en lecture (la changer
+# recalcule les decisions et la saisie rattachees, l. 111-114). Jumeau accepte : le regime et l'audience future du meme etat (plus bas).
 geste: Modifier
 ids: PC_ETAT|G14N
 valeur: Champs d'un état de PC › Modalité AJ = A
 resultat: refuse
-message: Les champs d'un état de procédure collective se règlent dans RIG v2 : changer une modalité y recalcule les décisions et la saisie rattachées à l'état.
+message: « Modalité AJ » se règle dans RIG v2 : changer une modalité y recalcule les décisions et la saisie rattachées à l'état.
+---
+# 3e reprise. Refus : le code processus induit, dont la liste (ULT_COMBO_CODE_PROC.cs:9-18, PROCESSUS_ET_FONCTIONALITE) n'est pas dans
+# la base V3. Jumeau accepte : le regime du meme etat (plus bas).
+geste: Modifier
+ids: PC_ETAT|G14N
+valeur: Champs d'un état de PC › Code procédure = EF
+resultat: refuse
+message: « Code procédure » se choisit dans la liste des processus de RIG v2, que la base V3 du greffe ne porte pas : il se règle dans RIG v2.
+---
+# 3e reprise. Refus : un regime hors de la liste RIG v2 (eTableRefModaliteRegime, TableRefTypes.cs:18-25). Jumeau accepte : « Simplifié
+# facultatif » (bloc suivant).
+geste: Modifier
+ids: PC_ETAT|G14N
+valeur: Champs d'un état de PC › Régime = Mixte
+resultat: refuse
+message: « Régime » : « Mixte » n'est pas un régime de RIG v2 (Général, Simplifié facultatif, Simplifié obligatoire).
+---
+# 3e reprise. Le regime par sa description (enregistre par sa lettre, F) et l'audience future cochee ; relus dans la fiche.
+geste: Modifier
+ids: PC_ETAT|G14N
+valeur: Champs d'un état de PC › Régime = Simplifié facultatif
+valeur: Champs d'un état de PC › Audience future = oui
+resultat: fait
+message: PC_ETAT G14N enregistré : ETAT BANC FIGE.
+controle: SELECT CONCAT(R_PCETAT_MODALITE_REGIME, '/', CAST(R_PCETAT_AUD_FUTURE AS int)) FROM v2.PC_ETAT WHERE R_PCETAT_VALEUR = 'G14N' => F/1
+fiche: PC_ETAT|G14N
+Champs d'un état de PC › Régime = Simplifié facultatif
+Champs d'un état de PC › Audience future = oui
+---
+# 3e reprise. Refus : « Sur resolution du plan » sur un etat qui n'est pas d'ouverture (RIG v2 ne la montre qu'avec elle, l. 135-137).
+# Jumeau accepte : sur G14D, etat d'ouverture (copie de G14A, plus bas).
+geste: Modifier
+ids: PC_ETAT|G14N
+valeur: Champs d'un état de PC › Résolution du plan = oui
+resultat: refuse
+message: « Résolution du plan » ne se coche que sur un état d'ouverture : RIG v2 ne la montre qu'avec « Ouverture » cochée.
+---
+# 3e reprise. Refus : un code cloture sans resolution du plan (RIG v2 ne le montre qu'avec elle, l. 149-151). Jumeau accepte : G14CL
+# sur G14D, coche sur resolution du plan (plus bas).
+geste: Modifier
+ids: PC_ETAT|G14N
+valeur: Champs d'un état de PC › Code clôture = G14CL
+resultat: refuse
+message: « Code clôture » ne se saisit que sur résolution du plan : RIG v2 ne le montre qu'avec « Résolution du plan » cochée.
+---
+# 3e reprise. Refus : « A sauver » change alors que « Mise a jour de la PC » est cochee (RIG v2 le met en lecture seule, l. 116-119).
+# Jumeau accepte : les deux decochees ensemble (bloc suivant).
+geste: Modifier
+ids: PC_ETAT|G14N
+valeur: Champs d'un état de PC › À sauver =
+resultat: refuse
+message: « À sauver » ne se modifie pas quand « Mise à jour de la PC » est cochée : RIG v2 le met alors en lecture seule.
+---
+# 3e reprise. « Mise a jour de la PC » decochee : « A sauver » redevient modifiable et se decoche dans le meme enregistrement.
+geste: Modifier
+ids: PC_ETAT|G14N
+valeur: Champs d'un état de PC › Mise à jour de la PC =
+valeur: Champs d'un état de PC › À sauver =
+resultat: fait
+message: PC_ETAT G14N enregistré : ETAT BANC FIGE.
+controle: SELECT CONCAT(CAST(R_PCETAT_MAJ_PC AS int), '/', CAST(R_PCETAT_ASAUVER AS int)) FROM v2.PC_ETAT WHERE R_PCETAT_VALEUR = 'G14N' => 0/0
+---
+# 3e reprise. Refus : le regime des statistiques, reserve a l'equipe Amitel (l. 52-55). Jumeau accepte : aucun sur ce banc -- son agent
+# n'est pas Amitel (comme le libelle d'un type AJMJ, plus haut) ; un champ permis du meme etat l'est (blocs precedents).
+geste: Modifier
+ids: PC_ETAT|G14N
+valeur: Champs d'un état de PC › Régime PC (statistiques) = STAT
+resultat: refuse
+message: « Régime PC (statistiques) » ne se modifie que par l'équipe Amitel : RIG v2 le montre en lecture seule.
+---
+# 3e reprise. Refus : resolution du plan cochee sans code cloture, obligatoire quand il se montre (.Designer.cs:198 ; Ult.moteur.cs:512-517).
+# Jumeau accepte : avec G14CL (plus bas).
+geste: Modifier
+ids: PC_ETAT|G14D
+valeur: Champs d'un état de PC › Résolution du plan = oui
+resultat: refuse
+message: « Code clôture » est obligatoire.
+---
+# 3e reprise. Refus : un code cloture absent de CODE_CLOTURE (la liste de RIG v2, ULT_COMBO_CODE_CLOTURE.cs:31-45). Jumeau accepte : G14CL.
+geste: Modifier
+ids: PC_ETAT|G14D
+valeur: Champs d'un état de PC › Résolution du plan = oui
+valeur: Champs d'un état de PC › Code clôture = ZZ9
+resultat: refuse
+message: « Code clôture » : « ZZ9 » n'est pas un code clôture de la base du greffe (la liste de RIG v2 ne propose que ceux-là).
+---
+# 3e reprise. Un etat d'ouverture coche sur resolution du plan, avec son code cloture ; relu dans la fiche.
+geste: Modifier
+ids: PC_ETAT|G14D
+valeur: Champs d'un état de PC › Résolution du plan = oui
+valeur: Champs d'un état de PC › Code clôture = G14CL
+resultat: fait
+message: PC_ETAT G14D enregistré : ETAT BANC ALPHA.
+controle: SELECT CONCAT(CAST(R_PCETAT_OUVERTURE AS int), '/', CAST(R_PCETAT_RESOLUTION_PLAN AS int), '/', R_PCETAT_CODE_CLOTURE) FROM v2.PC_ETAT WHERE R_PCETAT_VALEUR = 'G14D' => 1/1/G14CL
+fiche: PC_ETAT|G14D
+Champs d'un état de PC › Résolution du plan = oui
+Champs d'un état de PC › Code clôture = G14CL
+---
+# 3e reprise. Refus : deux cases exclusives cochees d'un coup (RIG v2 decoche les autres quand on en coche une, l. 89-108). Jumeau
+# accepte : la seule cloture cochee (bloc suivant).
+geste: Modifier
+ids: PC_ETAT|G14D
+valeur: Champs d'un état de PC › Clôture = oui
+valeur: Champs d'un état de PC › Extension = oui
+resultat: refuse
+message: Ouverture, clôture, conversion en LJ et extension s'excluent : une seule se coche à la fois (RIG v2 décoche les autres quand on en coche une).
+---
+# 3e reprise. La cloture cochee decoche l'ouverture (l. 95-98), qui decoche la resolution du plan (l. 139-142), qui vide le code
+# cloture (l. 153-156).
+geste: Modifier
+ids: PC_ETAT|G14D
+valeur: Champs d'un état de PC › Clôture = oui
+resultat: fait
+message: PC_ETAT G14D enregistré : ETAT BANC ALPHA.
+controle: SELECT CONCAT(CAST(R_PCETAT_OUVERTURE AS int), CAST(R_PCETAT_CLOTURE AS int), CAST(R_PCETAT_CONVERSION_LJ AS int), CAST(R_PCETAT_EXTENSION AS int), '/', CAST(R_PCETAT_RESOLUTION_PLAN AS int), '/', ISNULL(R_PCETAT_CODE_CLOTURE, 'null')) FROM v2.PC_ETAT WHERE R_PCETAT_VALEUR = 'G14D' => 0100/0/null
+---
+# 3e reprise. Refus : un etat coche sur resolution du plan SANS code cloture (G14P, comme quatre etats de RIG_DEV) ne s'enregistre pas,
+# meme pour son seul libelle (_Save controle tout le formulaire, OPE_TABLE_REF_BUTTONS_BAR.cs:421-429). Jumeau accepte : le meme
+# libelle avec G14CL (bloc suivant).
+geste: Modifier
+ids: PC_ETAT|G14P
+valeur: Libellé = ETAT BANC PLAN REVU
+resultat: refuse
+message: « Code clôture » est obligatoire.
+---
+# 3e reprise. Le libelle et le code cloture qui manquait.
+geste: Modifier
+ids: PC_ETAT|G14P
+valeur: Libellé = ETAT BANC PLAN REVU
+valeur: Champs d'un état de PC › Code clôture = G14CL
+resultat: fait
+message: PC_ETAT G14P enregistré : ETAT BANC PLAN REVU.
+controle: SELECT CONCAT(R_PCETAT_LIBELLE_ECRAN, '/', R_PCETAT_CODE_CLOTURE) FROM v2.PC_ETAT WHERE R_PCETAT_VALEUR = 'G14P' => ETAT BANC PLAN REVU/G14CL
 ---
 # 2e reprise. Refus : une zone dont on vide le synonyme (obligatoire, SousOPE_ENREGISTREMENT.Designer.cs:102). Jumeau accepte : GZ3
 # modifiee, synonyme saisi (plus bas).
@@ -398,6 +532,7 @@ ETAT BANC CREE | code G14C · PC_ETAT | État de la procédure collective | Vali
 ETAT BANC ALPHA | code G14D · PC_ETAT | État de la procédure collective | Validee | []
 ETAT BANC HISTO | code G14H · PC_ETAT | État de la procédure collective | Validee | []
 ETAT BANC FIGE | code G14N · PC_ETAT | État de la procédure collective | Validee | []
+ETAT BANC PLAN REVU | code G14P · PC_ETAT | État de la procédure collective | Validee | []
 G14V | code G14V · PC_ETAT | État de la procédure collective | AFaire | []
 ZONE BANC CITEE | code GZ1 · PC_ETAT_ZONE | Zones à afficher selon l’état de la procédure collective | Validee | []
 ZONE BANC MODIFIEE | code GZ3 · PC_ETAT_ZONE | Zones à afficher selon l’état de la procédure collective | Validee | []
