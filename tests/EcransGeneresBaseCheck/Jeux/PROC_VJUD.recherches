@@ -1,6 +1,6 @@
 # Les recherches de LecteurDossierJudiciaire (PROC_VJUD) dans la base : la recherche d'entite judiciaire de la V2. Format : en
 # tete de Program.cs du banc.
-# Le numero de role, avec ses blancs : une instance hors de la liste de depart.
+# Le numero de role, avec ses blancs : une instance enrolee un autre jour.
 critere: Numéro = 2026 V 01104
 lignes:
 Rôle 2026V01104 · VJUD QUATRE | Instance · code affaire VJ16 · enrôlée le 01/01/2025 · aucun événement | Instance | AFaire | []
@@ -20,3 +20,13 @@ PC 2026P00211 | Procédure collective · aucun événement | Procédure collecti
 critere: Nom = vjud cinq
 lignes:
 Rôle 2026V01105 · VJUD CINQ | Instance · code affaire VJ16 · aucun événement | Instance | AFaire | []
+---
+# Toutes les instances du jeu par leur nom : les trois regles d'etat (aucun evenement, un evenement a venir, tous survenus), par
+# numero decroissant. Elles ne sont plus a l'ouverture (PROC_VJUD.attendu) : la section 4 du banc controle le lecteur sur ces lignes.
+critere: Nom = vjud
+lignes:
+Rôle 2026V01105 · VJUD CINQ | Instance · code affaire VJ16 · aucun événement | Instance | AFaire | []
+Rôle 2026V01104 · VJUD QUATRE | Instance · code affaire VJ16 · enrôlée le 01/01/2025 · aucun événement | Instance | AFaire | []
+Rôle 2026V01103 · VJUD TROIS | Instance · code affaire VJ16 · enrôlée le {J+0} · 2 événements survenus | Instance | Validee | []
+Rôle 2026V01102 · VJUD DEUX | Instance · code affaire VJ16 · enrôlée le {J+0} · 1 événement à venir | Instance | EnCours | []
+Rôle 2026V01101 · VJUD UN | Instance · code affaire VJ16 · enrôlée le {J+0} · aucun événement | Instance | AFaire | []

@@ -16,10 +16,10 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// prevention PREVE_NUM_PRV, blancs retires) et « Nom » (INSTN_NOM_COURANT, PRCLL_NOM_AFFAIRE, PREVE_NOM_AFFAIRE). Une instance
 /// rattachee a une PC affiche aussi sa PC (la cascade de OnAutomateEvent, proc_vjud.md:121-131) : sa fiche nomme la PC.
 ///
-/// LA LISTE A L'OUVERTURE : RIG v2 ouvre sur la recherche, sans liste. L'ecran V3 montre les affaires DU JOUR -- les instances
-/// enrolees aujourd'hui (INSTN_DATE_ENROLEMENT), les PC et preventions ouvertes aujourd'hui (PRCLL_DATE_OUVERTURE,
-/// PREVE_DATE_OUVERTURE) : une liste de depart propre a la V3 ; la recherche est celle de la V2. La copie de developpement
-/// (les plus anciennes affaires) n'en a aucune du jour : l'ecran s'y ouvre vide, la recherche retrouve les affaires.
+/// LA LISTE A L'OUVERTURE : AUCUNE, comme RIG v2, qui ouvre sur la recherche d'entite judiciaire sans affaire passee en
+/// parametre (proc_vjud.md:111-119). fix-ok: controle final du lot 6 (27/11/2026) -- une liste « affaires du jour » s'y
+/// affichait, sans source V2 (regle du plan : sans source, ne pas l'ajouter) ; le banc l'exigeait (au moins une ligne a
+/// l'ouverture), il lit desormais les lignes des recherches d'un ecran qui s'ouvre vide. La recherche porte sur toutes les affaires.
 ///
 /// GROUPES : « Instance », « Procédure collective », « Prévention ».
 /// REGLE D'ETAT (les evenements de l'affaire, EVENEMENT_PROCEDURE ; les etapes « Événements survenus / futurs » de la V2) :
@@ -70,15 +70,9 @@ internal sealed class LecteurDossierJudiciaire : IRechercheEcran, IFicheEcran
         ORDER BY l.Bloc, l.Numero DESC, l.Id DESC
         """;
 
+    // Aucune liste a l'ouverture : RIG v2 ouvre sur la recherche (en tete du fichier).
     public Task<LignesLues> LireAsync(SqlConnection baseGreffe, DateTime aujourdhui, int plafond, CancellationToken ct)
-    {
-        // Les affaires du jour (en tete du fichier).
-        var sql = Requete.Replace("/*i*/", " AND i.INSTN_DATE_ENROLEMENT = @jour", StringComparison.Ordinal)
-                         .Replace("/*p*/", " AND p.PRCLL_DATE_OUVERTURE = @jour", StringComparison.Ordinal)
-                         .Replace("/*r*/", " AND r.PREVE_DATE_OUVERTURE = @jour", StringComparison.Ordinal);
-        return LectureEcran.LireAsync(baseGreffe, sql, Ligne, ct, new SqlParameter("@plafond", plafond),
-            new SqlParameter("@jour", System.Data.SqlDbType.Date) { Value = aujourdhui.Date });
-    }
+        => Task.FromResult(new LignesLues([], 0));
 
     public Task<LignesLues> ChercherAsync(SqlConnection baseGreffe, RechercheEcran recherche, DateTime aujourdhui, int plafond, CancellationToken ct)
     {

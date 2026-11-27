@@ -589,6 +589,25 @@ try
     // CA07 : modifier un reglage garde qui et quand, COMME LA V2 : l'auteur est le NOM de
     // l'agent (UTLST_NOM, Parametrage.cs:104-108), pas son compte Windows.
     var adresse = RoutesGreffes.Pour(RoutesGreffes.Reglage, "T001", "NUMERISE_LIASSE1");
+    // Lot 14 du plan « RIG v3 100 % fonctionnel » (27/11/2026, refus du chef) : une valeur de PLUS de 1 000 caracteres est REFUSEE,
+    // pas coupee. La V2 : PARAMETRAGE.Verifier (PARAMETRAGE.cs:242, PARAM_VALEUR varchar(1000)) leve TROPGRAND, « PARAMETRAGE.PARAM_VALEUR
+    // est limité à 1000 caractères » (DBObject.cs:993-994). Avant : le parametre varchar(1000) coupait la valeur sans rien dire (200).
+    // Jumeau accepte : 1 000 caracteres tout juste, relus ENTIERS. L'entree qui ferait tomber une borne fausse : 1 001 (« > 1000 »
+    // oublie : coupee et acceptee) ; 1 000 (« >= 1000 » : refusee a tort). Joue AVANT la mesure CA07, qui compte le journal, et la
+    // valeur d'origine remise.
+    var valeurOrigine = (await Lire<ReglageGreffe>(adresse)).Valeur;
+    var journalAvantTropLong = await Journaux("reglage");
+    var tropLong = await Envoyer(HttpMethod.Put, adresse, new SaisieReglage(new string('7', 1001), "Reglages du greffe"));
+    var motifTropLong = (await tropLong.Content.ReadFromJsonAsync<RefusGreffe>())?.Motif;
+    var apresTropLong = await Lire<ReglageGreffe>(adresse);
+    Exiger(tropLong.StatusCode == HttpStatusCode.BadRequest && motifTropLong == "PARAMETRAGE.PARAM_VALEUR est limité à 1000 caractères"
+           && apresTropLong.Valeur == valeurOrigine && await Journaux("reglage") == journalAvantTropLong,
+        $"Lot 14 : une valeur de 1 001 caracteres est refusee (400, message de la V2), ni coupee ni ecrite, journal inchange ({(int)tropLong.StatusCode} « {motifTropLong} », valeur {apresTropLong.Valeur?.Length} car.)");
+    var pile1000 = await Envoyer(HttpMethod.Put, adresse, new SaisieReglage(new string('7', 1000), "Reglages du greffe"));
+    var relu1000 = (await Lire<ReglageGreffe>(adresse)).Valeur;
+    Exiger(pile1000.StatusCode == HttpStatusCode.OK && relu1000 == new string('7', 1000),
+        $"Lot 14 (jumeau) : une valeur de 1 000 caracteres tout juste est ecrite et relue entiere ({(int)pile1000.StatusCode}, {relu1000?.Length} car.)");
+    await Envoyer(HttpMethod.Put, adresse, new SaisieReglage(valeurOrigine, "Reglages du greffe"));
     var maintenantSql = (DateTime)(await Scalaire(v3a, "SELECT GETDATE();"))!;
     var nomAgent = (string)(await Scalaire(v3a, "SELECT Nom FROM soc.Compte WHERE CompteWindows = 'banc.socle';"))!;
     var valeurAvant = (string?)await Scalaire(v3a, "SELECT Valeur FROM soc.Reglage WHERE Code = 'NUMERISE_LIASSE1';");

@@ -17,11 +17,3 @@ IF EXISTS (SELECT 1 FROM soc.Reglage WHERE Code = ''IP_CODE_CHEF'')
 ELSE
     INSERT INTO soc.Reglage (Code, Libelle, Valeur) VALUES (''IP_CODE_CHEF'', ''Banc EcransGeneresBase lot 14'', ''RFL14;IPL14A;IPL14Z;IPL14C'');
 ';
-
--- L'agent qui ECRIT le reglage (PROC_PARAM_IP.gestes, blocs « agent: banc.admin.l14 ») : l'ecriture d'un reglage exige le droit de
--- modifier le greffe (ServiceDroits.PeutModifierLeGreffe : administrateur = Amitel ET marque administrateur, OPE_EDITER_GREFFE.cs:30-38).
--- L'agent du banc (banc.ecrans) ne l'a pas -- son refus est le bloc 1 -- et le lui donner changerait l'agent de tous les autres jeux :
--- un second compte, administrateur, admis comme lui (meme service, role BANC). Sans IdV2 : aucun lecteur ne le montre.
-INSERT INTO soc.Compte (CompteWindows, Nom, Prenom, Abrege, Civilite, CodeGreffe, IdService, Desactive, EstAmitel, EstAdministrateur)
-SELECT 'banc.admin.l14', 'ADMINL14', 'Banc', 'BANCL14', 'M.', CodeGreffe, IdService, 0, 1, 1 FROM soc.Compte WHERE CompteWindows = 'banc.ecrans';
-INSERT INTO soc.CompteRole (IdCompte, Role) SELECT Id, 'BANC' FROM soc.Compte WHERE CompteWindows = 'banc.admin.l14';

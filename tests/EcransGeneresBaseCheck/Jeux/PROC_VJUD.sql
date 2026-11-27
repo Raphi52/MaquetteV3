@@ -54,7 +54,7 @@ INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_NOM_COURANT, INST
     (1601102, ''2026V01102'', ''VJUD DEUX'', ''VJ16'', @aujourdhui, NULL),
     -- enrolee le jour du banc, ses deux evenements survenus : Validee
     (1601103, ''2026V01103'', ''VJUD TROIS'', ''VJ16'', @aujourdhui, NULL),
-    -- ECARTEES de l''ouverture : enrolee un autre jour -- jumeau 1601101 ; jamais enrolee -- jumeau 1601101
+    -- enrolee un autre jour, jamais enrolee : retrouvees par leur numero ou leur nom (PROC_VJUD.recherches)
     (1601104, ''2026V01104'', ''VJUD QUATRE'', ''VJ16'', ''20250101'', NULL),
     (1601105, ''2026V01105'', ''VJUD CINQ'', ''VJ16'', NULL, NULL);
 INSERT INTO v2.EVENEMENT_PROCEDURE (EVNPR_ID_EVNPR, EVNPR_ID_INSTN, EVNPR_CODE_EVE_PRO, EVNPR_DATE, EVNPR_DATE_MINI, EVNPR_DATE_MAXI) VALUES

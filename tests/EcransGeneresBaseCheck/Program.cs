@@ -42,7 +42,8 @@ using RigV3Desktop.Pont.EcransGeneres;
 //     lignes vides et celles qui commencent par # sont ignorees : y dire pourquoi chaque refus est refuse. Chaque refus a
 //     son jumeau accepte (meme borne, autre cote). Les CELLULES d'une ligne (LigneLue.Valeurs, Referentiel et Etat) se
 //     controlent en ajoutant « | valeurs: a ; b ; c » a la ligne attendue ; sans ce champ, elles ne sont pas comparees.
-// Puis la section 4 controle tout lecteur contre son descripteur.
+//     Un ecran que RIG v2 ouvre sur sa recherche, sans liste, a un .attendu sans ligne (le refus) et un .recherches (le jumeau).
+// Puis la section 4 controle tout lecteur contre son descripteur (sur les lignes de ses recherches s'il s'ouvre vide).
 //
 // LE SOCLE FONCTIONNEL (plan « RIG v3 100 % fonctionnel », lot 2, 26/11/2026) : la recherche, la fiche et les GESTES. Le
 // banc trouve aussi les ECRIVAINS (EcrivainEcran.cs) et les joue par la route POST, au nom de l'agent du banc :
@@ -60,9 +61,6 @@ using RigV3Desktop.Pont.EcransGeneres;
 //          fiche: <id>                              facultatif : puis des « Section › Libelle = valeur » que la fiche relue porte ;
 //                                                   la ligne n d'une sous-liste (Tableau) : « Section › Libelle › n = cellule | cellule »
 //          controle: <SELECT d'une valeur> => <attendu>   facultatif : ce que RIG v2 ecrit en plus (dates, etats...)
-//          agent: <compte Windows>                  facultatif : le bloc est joue au nom de ce compte (cree par le .sql du jeu,
-//                                                   admis dans le greffe) au lieu de l'agent du banc -- un geste qui exige un
-//                                                   droit que l'agent du banc n'a pas (PROC_PARAM_IP : modifier le greffe, lot 14)
 //        Un refus est verifie SANS ECRITURE : lignes relues identiques, journal des gestes inchange. Un geste fait ajoute au
 //        moins une ligne au journal des gestes. Chaque refus a son jumeau accepte, dit en commentaire ;
 //      - <PROCEDURE>.recherches (pour un lecteur qui cherche, IRechercheEcran) : des blocs « texte: », « critere: <Libelle> =
@@ -620,21 +618,9 @@ Exiger(reponseSansDroit.StatusCode == HttpStatusCode.UnprocessableEntity && sans
     $"PROC_RELCLI, Valider les soldes SANS le droit EXPCOMPTA : refus de RIG v2, aucun solde ni trace ({(int)reponseSansDroit.StatusCode} « {sansDroit?.Message} »)");
 await Sql("INSERT INTO soc.RoleFonction (Role, Fonction) VALUES ('BANC', 'EXPCOMPTA')");
 
-// Les GESTES (<PROCEDURE>.gestes), joues par la route POST, dans l'ordre ; un bloc « agent: » au nom de son compte (en-tete, 6).
-// fix-ok: pas un correctif -- lot 14 (27/11/2026) : l'agent du banc est cree sans EstAmitel ni EstAdministrateur (section 0, defauts 0 de
-// SOC-001_comptes.sql:33-34), donc un geste qui exige le droit de modifier le greffe (EcritureReglage) n'aurait ici que des refus.
-var clientsParAgent = new Dictionary<string, HttpClient>(StringComparer.OrdinalIgnoreCase);
-HttpClient ClientDe(string? agent)
-{
-    if (agent is null) return http;
-    if (!clientsParAgent.TryGetValue(agent, out var client))
-    {
-        client = app.GetTestClient();
-        client.DefaultRequestHeaders.Add(RoutesIdentite.EnTeteCompte, agent);
-        clientsParAgent[agent] = client;
-    }
-    return client;
-}
+// Les GESTES (<PROCEDURE>.gestes), joues par la route POST, dans l'ordre, au nom de l'agent du banc : admis, ni Amitel ni administrateur
+// (section 0). Lot 14 (27/11/2026, refus du chef) : un geste n'exige que l'agent admis (EcrivainEcran.cs, « Le droit »), meme celui
+// qui ecrit un reglage ; le bloc « agent: » (un autre compte, administrateur) n'a donc plus d'usage et a ete retire.
 foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(StringComparer.Ordinal))
 {
     var code = Path.GetFileNameWithoutExtension(fichier);
@@ -647,7 +633,7 @@ foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(String
         if (bloc.Geste is null || bloc.Resultat is null) { Exiger(false, $"{quoi} : « geste: » et « resultat: » sont obligatoires"); continue; }
         var avant = (await Lire(code)).Lignes.Select(Texte).ToArray();
         var journalAvant = await Valeur("SELECT COUNT(*) FROM soc.Journal");
-        var reponse = await ClientDe(bloc.Agent).PostAsJsonAsync(RoutesEcransGeneres.GestesPour(Greffe, code), bloc.Geste, json);
+        var reponse = await http.PostAsJsonAsync(RoutesEcransGeneres.GestesPour(Greffe, code), bloc.Geste, json);
         var r = await reponse.Content.ReadFromJsonAsync<ResultatGeste>(json);
         var obtenu = r is null ? "illisible" : r.SansEcrivain ? "sans-ecrivain" : r.Fait ? "fait" : "refuse";
         var statut = obtenu == "refuse" ? HttpStatusCode.UnprocessableEntity : HttpStatusCode.OK;
@@ -801,6 +787,22 @@ foreach (var (code, lecteur) in lecteurs.ParProcedure.OrderBy(p => p.Key, String
         Exiger(false, $"{code} : le lecteur echoue sur le banc ({e.Message}) -- ajouter son jeu tests/EcransGeneresBaseCheck/Jeux/{code}.sql");
         continue;
     }
+    // Un ecran que RIG v2 ouvre sur sa recherche, sans liste (son .attendu n'a aucune ligne : PROC_VDOSSIER, PROC_VJUD,
+    // PROC_VCHIFFRES), s'essaie sur les lignes de ses recherches (<PROCEDURE>.recherches). fix-ok: controle final du lot 6
+    // (27/11/2026) -- exiger une ligne a l'ouverture avait fait inventer a trois lecteurs une liste de depart sans source V2.
+    var fichierRecherches = Path.Combine(dossierJeux, code + ".recherches");
+    if (lues.Lignes.Count == 0 && lecteur is IRechercheEcran ouvreSurRecherche && File.Exists(fichierRecherches))
+    {
+        var trouvees = new List<LigneLue>();
+        foreach (var bloc in Blocs.Lire(File.ReadAllLines(fichierRecherches)))
+        {
+            await using var cnRecherche = new SqlConnection(greffe.Connexion);
+            await cnRecherche.OpenAsync();
+            trouvees.AddRange((await ouvreSurRecherche.ChercherAsync(cnRecherche, new RechercheEcran(bloc.Texte, bloc.Criteres), jour, 200,
+                CancellationToken.None)).Lignes);
+        }
+        lues = new LignesLues([.. trouvees.DistinctBy(Texte)], trouvees.DistinctBy(Texte).Count());
+    }
     Exiger(lues.Lignes.Count > 0, $"{code} : au moins une ligne sur le banc ({lues.Lignes.Count}) -- sinon le lecteur n'est pas essaye");
     var etats = d.Etats.Select(e => e.Code).ToHashSet();
     // Les Faites ne comptent que les ETAPES d'une Saisie, seule forme qui en garde (lot 1 du plan « RIG v3 100 %
@@ -949,7 +951,6 @@ sealed class Bloc
     public string? Fiche { get; set; }
     public List<(string Cle, string Valeur)> ValeursFiche { get; } = [];
     public List<(string Sql, string Attendu)> Controles { get; } = [];
-    public string? Agent { get; set; }
     public string? Texte { get; set; }
     public Dictionary<string, string> Criteres { get; } = new(StringComparer.Ordinal);
 }
@@ -957,7 +958,7 @@ sealed class Bloc
 /// <summary>La lecture des jeux .gestes et .recherches : des blocs separes par « --- », des lignes « cle: valeur ».</summary>
 static class Blocs
 {
-    private static readonly string[] Cles = ["geste:", "ids:", "valeur:", "resultat:", "message:", "lignes:", "fiche:", "controle:", "agent:", "texte:", "critere:"];
+    private static readonly string[] Cles = ["geste:", "ids:", "valeur:", "resultat:", "message:", "lignes:", "fiche:", "controle:", "texte:", "critere:"];
 
     /// <summary>« cle = valeur » (le premier « = » precede d'un blanc ; une valeur vide est permise).</summary>
     private static (string, string) Paire(string texte)
@@ -1013,7 +1014,6 @@ static class Blocs
                     var i = v.LastIndexOf(" => ", StringComparison.Ordinal);
                     b.Controles.Add((v[..i].Trim(), v[(i + 4)..].Trim()));
                     break;
-                case "agent:": b.Agent = v; break;
                 case "texte:": b.Texte = v; break;
                 case "critere:": var (c, y) = Paire(v); b.Criteres[c] = y; break;
             }

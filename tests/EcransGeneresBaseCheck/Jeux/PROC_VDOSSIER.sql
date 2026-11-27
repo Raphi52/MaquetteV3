@@ -1,7 +1,7 @@
 -- Jeu de LecteurDossierRcs (« Dossier RCS », PROC_VDOSSIER), lot 6 du plan-676a4b19. Identifiants 16010xx. Ce qui est retenu ou
 -- ecarte, et pourquoi : PROC_VDOSSIER.attendu et .recherches.
--- La liste a l'ouverture : les dossiers mis a jour le jour du banc (DSSRC_DATE_MAJ). Les autres jeux posent leurs dossiers a des
--- dates passees (« 20160101 », « 20180101 »...) : ils n'y entrent pas. Ces dossiers n'ont ni relance, ni diligence, ni date
+-- Aucune liste a l'ouverture, comme RIG v2 : 1601001-1601003, mis a jour le jour du banc (DSSRC_DATE_MAJ), prouvent qu'elle reste
+-- vide (PROC_VDOSSIER.attendu) ; les recherches les retrouvent. Ces dossiers n'ont ni relance, ni diligence, ni date
 -- d'expiration de personne morale : aucune surveillance (LecteurRadiationsOffice) ne les retient.
 -- Tables : rec.* des migrations ; DEPOT_RCS, EXERCICE, ACTE_DEPOSE, NON_INSCRIT, INSCRIT_PM, DEMANDE du banc et des jeux
 -- precedents, leurs colonnes lues ajoutees si besoin ; DEBITEUR_END creee ici (SSDT, RigDatabase\dbo\Tables\DEBITEUR_END.sql).
@@ -25,7 +25,7 @@ IF OBJECT_ID(N'v2.ACTE_DEPOSE') IS NULL
 IF OBJECT_ID(N'v2.BENEFICIAIRE_EFFECTIF') IS NULL
     CREATE TABLE v2.BENEFICIAIRE_EFFECTIF (BENEF_ID_BENEF int NOT NULL PRIMARY KEY, BENEF_ID_DSRCS int NOT NULL, BENEF_SUPPRIME bit NOT NULL);
 
--- Les dossiers. 1601001-1601003 mis a jour le jour du banc ; 1601004 la veille a 23 h et 1601005 le lendemain a 0 h, ecartes.
+-- Les dossiers. 1601001-1601003 mis a jour le jour du banc, 1601004 la veille a 23 h, 1601005 le lendemain a 0 h : aucun a l'ouverture.
 SET IDENTITY_INSERT rec.Adresse ON;
 INSERT INTO rec.Adresse (Id, NumeroVoie, TypeVoie, NomVoie, CodePostal, Localite, EtatInfo) VALUES (1601081, '12', 'RUE', 'DU BANC', '75001', 'PARIS', 'C');
 SET IDENTITY_INSERT rec.Adresse OFF;
@@ -47,7 +47,7 @@ INSERT INTO rec.DossierRcs (Id, IdEntreprise, TypeRcs, NumeroGestion, Siren, Dat
     (1601002, 1601002, 'B1', '2016B61002', '516010002', '20160302', 'C', 1, 0, @aujourdhui, 'A', 'C', 0, 0, 0, 0, 0, 0, 0, NULL),
     -- radie : Validee « Radié »
     (1601003, 1601003, 'B1', '2016B61003', '516010003', '20160303', 'C', 0, 0, DATEADD(HOUR, 8, @aujourdhui), 'A', 'C', 0, 0, 0, 0, 0, 0, 0, '20260101'),
-    -- ECARTES de l'ouverture : la veille a 23 h -- jumeau 1601002 (le jour a 0 h) ; le lendemain a 0 h -- jumeau 1601001
+    -- la veille a 23 h et le lendemain a 0 h : retrouves par leur numero ou leur nom (PROC_VDOSSIER.recherches)
     (1601004, 1601004, 'B1', '2016B61004', '516010004', '20160304', 'C', 0, 0, DATEADD(HOUR, -1, @aujourdhui), 'A', 'C', 0, 0, 0, 0, 0, 0, 0, NULL),
     (1601005, 1601005, 'B1', '2016B61005', '516010005', '20160305', 'C', 0, 0, DATEADD(DAY, 1, @aujourdhui), 'A', 'C', 0, 0, 0, 0, 0, 0, 0, NULL);
 SET IDENTITY_INSERT rec.DossierRcs OFF;

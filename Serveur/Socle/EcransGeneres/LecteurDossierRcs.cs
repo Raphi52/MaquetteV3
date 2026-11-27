@@ -23,10 +23,10 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   Dans la base V3 : DOSSIER_RCS = rec.DossierRcs, ENTREPRISE = rec.Entreprise, ADRESSE_BASE = rec.Adresse, ACTION_RCS =
 ///   rec.ActionRegistre, INSCRIPTION = rec.Inscription (Serveur/Recopie/FichesV3.cs) ; les autres tables, v2.* telles quelles.
 ///
-/// LA LISTE A L'OUVERTURE : RIG v2 ouvre sur la saisie du numero, sans liste. L'ecran V3 montre les dossiers MIS A JOUR
-/// AUJOURD'HUI (DSSRC_DATE_MAJ, de 0 h a 24 h) : les dossiers que le greffe traite dans la journee. C'est une liste de depart de
-/// la V3, sans equivalent dans la V2 ; la recherche, elle, est celle de la V2. La copie de developpement (les plus anciens
-/// dossiers) n'en a aucun du jour : l'ecran s'y ouvre vide, la recherche par numero retrouve les dossiers.
+/// LA LISTE A L'OUVERTURE : AUCUNE, comme RIG v2, qui ouvre sur la saisie du numero (OPE_ENTREE_VGED_NUMERO, proc_vdossier.md:314).
+/// fix-ok: controle final du lot 6 (27/11/2026) -- une liste « mis a jour aujourd'hui » s'y affichait, sans source V2 (regle du
+/// plan : sans source, ne pas l'ajouter) ; le banc l'exigeait (au moins une ligne a l'ouverture), il lit desormais les lignes
+/// des recherches d'un ecran qui s'ouvre vide. La recherche porte sur tout le registre.
 ///
 /// GROUPES : « Dossier RCS » (trouve par son numero, son SIREN, un depot, une inscription ou son nom), « Non-inscrit »,
 /// « Demande » (trouve par le numero d'une demande : le dossier de la demande).
@@ -89,15 +89,9 @@ internal sealed class LecteurDossierRcs : IRechercheEcran, IFicheEcran
         ORDER BY l.Bloc, l.Numero, l.Id, l.Demande
         """;
 
+    // Aucune liste a l'ouverture : RIG v2 ouvre sur la saisie du numero (en tete du fichier).
     public Task<LignesLues> LireAsync(SqlConnection baseGreffe, DateTime aujourdhui, int plafond, CancellationToken ct)
-    {
-        // Les dossiers mis a jour aujourd'hui (en tete du fichier) ; ni non-inscrit ni demande.
-        var sql = Requete.Replace("/*dossier*/", " AND s.DateMaj >= @debut AND s.DateMaj < @finExclue", StringComparison.Ordinal)
-                         .Replace("/*noninscrit*/", " AND 1 = 0", StringComparison.Ordinal)
-                         .Replace("/*demande*/", " AND 1 = 0", StringComparison.Ordinal);
-        return LectureEcran.LireAsync(baseGreffe, sql, Ligne, ct, new SqlParameter("@plafond", plafond),
-            new SqlParameter("@debut", aujourdhui.Date), new SqlParameter("@finExclue", aujourdhui.Date.AddDays(1)));
-    }
+        => Task.FromResult(new LignesLues([], 0));
 
     public Task<LignesLues> ChercherAsync(SqlConnection baseGreffe, RechercheEcran recherche, DateTime aujourdhui, int plafond, CancellationToken ct)
     {

@@ -1,6 +1,6 @@
 # Les recherches de LecteurDossierRcs (PROC_VDOSSIER) dans la base : l'entree par numero de la V2 (OPE_ENTREE_VGED_NUMERO), la
 # recherche d'entreprise par nom, l'entree par inscription de privilege. Format : en tete de Program.cs du banc.
-# Le numero de gestion, saisi avec ses blancs : un dossier hors de la liste de depart (mis a jour la veille) se retrouve.
+# Le numero de gestion, saisi avec ses blancs : un dossier mis a jour la veille se retrouve.
 critere: Numéro = 2016 B 61004
 lignes:
 VDOSSIER VEILLE SARL | Dossier RCS 2016 B 61004 · SIREN 516 010 004 · immatriculé le 04/03/2016 | Dossier RCS | AFaire | []

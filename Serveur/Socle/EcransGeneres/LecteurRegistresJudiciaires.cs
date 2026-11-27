@@ -39,7 +39,7 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   - le texte (champ de recherche de la V3, sans equivalent V2) : le role ou le nom de l'affaire, colonnes de la grille V2.
 /// NON REPRIS, nommes : plusieurs types d'instance a la fois (la V2 coche ; la V3 en choisit un) ; les criteres propres a un
 /// registre (IP : date et type de decision, numeros d'IP et de minute, IP.cs:89-128 ; ordonnances : code affaire, numeros,
-/// de PC ou hors PC, ORDO.cs:94-118) ; la ventilation (compte par type, proc_regjud.md:198).
+/// de PC ou hors PC, ORDO.cs:94-118) ; la ventilation (compte par type, proc_regjud.md:19 ; VentilationLibelle, OPE_REGISTRE_ABSTRACT.cs:27).
 ///
 /// GROUPES : « Répertoire général », « Injonctions de payer », « Ordonnances du président ».
 /// REGLE D'ETAT (la decision de la ligne) : aucune -> AFaire « Sans décision » ; prevue seulement (DCJDC_DATE vide) -> EnCours

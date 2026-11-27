@@ -1,0 +1,27 @@
+# Les recherches de LecteurBilansRejetes (PROC_REJETS_BILANS) dans la base : le numero metier de OPE_SEARCH (OPE_REJETS_BILANS.cs:140-158),
+# SIREN, numero de gestion ou numero de depot, compare a EGALITE ; les filtres de la liste (codes de rejet, VDCAREJ_DATE_DEBUT) restent.
+# Format : en tete de Program.cs du banc. Lignes : celles de PROC_REJETS_BILANS.sql.
+# Le SIREN, saisi avec ses blancs : les deux bilans rejetes de REJ ALPHA (l'annexe 1600743, motif 1, reste ecartee).
+texte: 516 007 001
+lignes:
+Bilan 2024 · REJ ALPHA SAS | dossier 2016 B 60701 · SIREN 516 007 001 · dépôt L6D0721 du 02/04/2025 · clôture au 31/12/2024 · motif 3 · Bilan incomplet | Renvoi possible | AFaire | []
+Bilan 2023 · REJ ALPHA SAS | dossier 2016 B 60701 · SIREN 516 007 001 · dépôt L6D0723 du 01/03/2025 · clôture au 31/12/2023 · motif C7 · Pages illisibles | Renvoi possible | AFaire | []
+---
+# REFUS, jumeau du bloc 1 : un SIREN tronque ne retrouve rien -- la V2 compare a egalite, pas « contient ».
+texte: 51600700
+lignes:
+---
+# Le numero de gestion, en minuscules : REJ BETA.
+texte: 2016b60702
+lignes:
+Bilan 2024 · REJ BETA SAS | dossier 2016 B 60702 · SIREN 516 007 002 · dépôt L6D0722 du 05/04/2025 · clôture au 31/12/2024 · motif 10 · Actif nul · correction XDCA en cours | Rejet de fond | EnCours | []
+---
+# Le numero de depot.
+texte: L6D0723
+lignes:
+Bilan 2023 · REJ ALPHA SAS | dossier 2016 B 60701 · SIREN 516 007 001 · dépôt L6D0723 du 01/03/2025 · clôture au 31/12/2023 · motif C7 · Pages illisibles | Renvoi possible | AFaire | []
+---
+# REFUS, jumeau du bloc 4 : le depot L6D0724 existe, mais la saisie de son bilan s'est terminee le 28/02/2025, avant la date de
+# debut du greffe (01/03/2025) -- les filtres de la liste restent sous la recherche.
+texte: L6D0724
+lignes:

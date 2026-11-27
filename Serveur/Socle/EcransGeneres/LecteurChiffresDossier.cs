@@ -17,9 +17,11 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// pas lu : sa valeur par defaut (vrai) s'applique. Un bilan rejete (ACTE_DEPOSE.ACTDP_SAISIE_BILAN_CodeRejet) est signale sur sa
 /// ligne (proc_vchiffres.md:206). DOSSIER_RCS est la fiche rec.DossierRcs (Serveur/Recopie/FichesV3.cs).
 ///
-/// LA LISTE A L'OUVERTURE : sans dossier, la V2 s'ouvre en recherche manuelle (aucune ligne). L'ecran V3 montre la grille de
-/// chaque dossier qui a au moins un exercice chiffre -- une liste de depart de la V3 --, et la recherche par dossier (numero de
-/// gestion ou SIREN, ou denomination) rend la grille de CE dossier, exercices sans chiffres compris.
+/// LA LISTE A L'OUVERTURE : AUCUNE, comme RIG v2, qui s'ouvre sur UN dossier passe en parametre et, sans dossier, en recherche
+/// manuelle (aucune ligne). La recherche par dossier (numero de gestion ou SIREN, ou denomination) rend la grille de CE dossier,
+/// exercices sans chiffres compris. fix-ok: controle final du lot 6 (27/11/2026) -- la grille de tous les dossiers chiffres
+/// s'affichait a l'ouverture, sans source V2 (regle du plan : sans source, ne pas l'ajouter) ; le banc l'exigeait (au moins une
+/// ligne a l'ouverture), il lit desormais les lignes des recherches d'un ecran qui s'ouvre vide.
 ///
 /// GROUPES : « Bilans déposés » (l'exercice a ses chiffres seuils) / « Exercices sans chiffres ».
 /// REGLE D'ETAT :
@@ -65,14 +67,9 @@ internal sealed class LecteurChiffresDossier : IRechercheEcran, IFicheEcran
         ORDER BY s.NumeroGestion, x.EXRCC_DATE_CLOTURE DESC, x.EXRCC_ID_EXRCC DESC
         """;
 
+    // Aucune liste a l'ouverture : sans dossier, RIG v2 s'ouvre en recherche manuelle (en tete du fichier).
     public Task<LignesLues> LireAsync(SqlConnection baseGreffe, DateTime aujourdhui, int plafond, CancellationToken ct)
-    {
-        // Les dossiers qui ont au moins un exercice chiffre (en tete du fichier).
-        var f = new FiltresRecherche();
-        f.Ajouter("EXISTS (SELECT 1 FROM v2.EXERCICE AS o JOIN v2.CHIFFRES_SEUILS AS oc ON oc.CHPSL_ID_CHPSL = o.EXRCC_ID_CHPSL " +
-                  "WHERE o.EXRCC_ID_DSRCS = s.Id)");
-        return Lire(baseGreffe, f, plafond, ct);
-    }
+        => Task.FromResult(new LignesLues([], 0));
 
     public Task<LignesLues> ChercherAsync(SqlConnection baseGreffe, RechercheEcran recherche, DateTime aujourdhui, int plafond, CancellationToken ct)
     {
