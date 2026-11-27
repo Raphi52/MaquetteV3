@@ -30,7 +30,7 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// glossaire). FICHE : la section de sa nature, aux champs du formulaire de la V2, modifiables quand EcrivainModelesRedaction.cs les
 /// enregistre -- un modele (OPE_EDT_MODEL.cs:98-111 : libelle, type, actif, maquettes dans l'ordre), une section (OPE_EDT_SECTION.cs:107-115 :
 /// description, requete SQL, quatre niveaux ; l'ecrivain la reserve a l'equipe Amitel, l. 65-71), une entree du glossaire (texte associe,
-/// OPE_EDT_GLOSSAIRE.cs:125) ; une maquette REDA se lit seulement (son document Word en GED).
+/// OPE_EDT_GLOSSAIRE.cs:125), une maquette REDA (OPE_EDT_MAQ.cs:81-82 : le libelle, le code fige).
 /// </summary>
 internal sealed class LecteurModelesRedaction : IRechercheEcran, IFicheEcran
 {
@@ -111,8 +111,11 @@ internal sealed class LecteurModelesRedaction : IRechercheEcran, IFicheEcran
         return nature switch
         {
             1 => await FicheModeleAsync(baseGreffe, id, ligne.Nom, c, libelle, utilisation, ct),
+            // Le formulaire d'une maquette (OPE_EDT_MAQ.cs:81-82) : le code fige, le libelle modifiable.
+            // fix-ok: le libelle se lisait seulement, sur la cause fausse « document Word en GED » ; Valider l'ecrit en base
+            // (OPE_EDT_MAQ.cs:91-96, relu le 27/11/2026, objection du juge).
             2 => new FicheEcran(Procedure, id, ligne.Nom, [new SectionFiche(SectionMaquette,
-                [new ChampFiche(ChampCode, c), new ChampFiche(ChampLibelle, libelle), new ChampFiche(ChampUtilisation, utilisation)])]),
+                [new ChampFiche(ChampCode, c), new ChampFiche(ChampLibelle, libelle) { Modifiable = true }, new ChampFiche(ChampUtilisation, utilisation)])]),
             3 => await FicheSectionAsync(baseGreffe, id, ligne.Nom, c, ct),
             _ => await FicheGlossaireAsync(baseGreffe, id, ligne.Nom, c, libelle, ct),
         };

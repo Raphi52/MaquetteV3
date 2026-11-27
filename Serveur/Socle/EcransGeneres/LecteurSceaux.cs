@@ -7,7 +7,7 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 
 /// <summary>
 /// « Sceaux » (PROC_SCEAU) : les elements de fusion du greffe (sceaux, signatures, logos), ELEMENT_FUSION, et leur image en GED. Mode
-/// d'emploi : LecteurEcran.cs. Plan « RIG v3 100 % fonctionnel », lot 15, 27/11/2026. Supprimer : EcrivainSceaux.cs.
+/// d'emploi : LecteurEcran.cs. Plan « RIG v3 100 % fonctionnel », lot 15, 27/11/2026. Modifier et Supprimer : EcrivainSceaux.cs.
 ///
 /// SOURCE (ancien RIG) : PROC_SCEAU (D:\RigApplication\Source\RIG\DLL\Processus\PROC_SCEAU ; Detail OPE de proc_sceau.md, qui fait foi).
 /// La liste : ElementFusion.GetAllElementFusion (Recherche\OPE_RECHERCHE.cs LoadLstElementFusion ; ElementFusion.Cache.cs:40-46), TOUS
@@ -82,7 +82,7 @@ internal sealed class LecteurSceaux : IRechercheEcran, IFicheEcran
         if (CriteresConsultation.Entier(id) is not { } n) return null;
         await using var r = await LectureV2.LireAsync(baseGreffe, """
             SELECT e.ELMFS_REFERENCE, e.ELMFS_NUM_DOCUMENT, e.ELMFS_HAUTEUR_MAX_MM, e.ELMFS_LARGEUR_MAX_MM, e.ELMFS_ROGNER_MM,
-                   g.GDRG_NUM_DOCUMENT, g.GDRG_NOM_FICHIER, g.GDRG_DATE_ARCHIVAGE
+                   g.GDRG_NUM_DOCUMENT, g.GDRG_NOM_FICHIER, g.GDRG_DATE_ARCHIVAGE, g.GDRG_CHAINE_RECHERCHEE
             FROM v2.ELEMENT_FUSION AS e LEFT JOIN v2.GED_RIG AS g ON g.GDRG_NUM_DOCUMENT = e.ELMFS_NUM_DOCUMENT
             WHERE e.ELMFS_ID_ELMFS = @id
             """, ct, new SqlParameter("@id", n));
@@ -90,13 +90,18 @@ internal sealed class LecteurSceaux : IRechercheEcran, IFicheEcran
         var nom = FormeLigne.Texte(r, "ELMFS_REFERENCE");
         var hauteur = Mm(r, "ELMFS_HAUTEUR_MAX_MM");
         var numero = FormeLigne.Texte(r, "ELMFS_NUM_DOCUMENT");
+        // fix-ok: la fiche ne rendait aucun champ modifiable, alors que Valider enregistre le rognage et le texte de recherche en base
+        // (OPE_EDITION.cs:99-111, relu le 27/11/2026, objection du juge). Modifiables : ce qu'EcrivainSceaux.cs enregistre ;
+        // la hauteur se lit (la changer recalcule la largeur sur l'image), la largeur et la reference aussi (verrouillees en V2).
         return new FicheEcran(Procedure, id, nom,
         [
             new("Référence", [new ChampFiche(ColNom, nom)]),
             new("Dimensions", [new ChampFiche("Hauteur max", hauteur), new ChampFiche("Largeur max", Mm(r, "ELMFS_LARGEUR_MAX_MM")),
-                               new ChampFiche("Rogner", Mm(r, "ELMFS_ROGNER_MM")), new ChampFiche("Dimensions du lot 1", FormeLigne.Case(hauteur == "24"))]),
+                               new ChampFiche("Rogner", Mm(r, "ELMFS_ROGNER_MM")) { Modifiable = true },
+                               new ChampFiche("Dimensions du lot 1", FormeLigne.Case(hauteur == "24"))]),
             new("Image", [new ChampFiche(ColFichier, r["GDRG_NUM_DOCUMENT"] is DBNull ? (numero.Length == 0 ? "sans image" : $"document {numero} absent de la GED") : FormeLigne.Texte(r, "GDRG_NOM_FICHIER")),
-                          new ChampFiche("Date archivage", FormeLigne.Date(FormeLigne.DateDe(r, "GDRG_DATE_ARCHIVAGE")))]),
+                          new ChampFiche("Date archivage", FormeLigne.Date(FormeLigne.DateDe(r, "GDRG_DATE_ARCHIVAGE"))),
+                          new ChampFiche(EcrivainSceaux.ChampRecherche, FormeLigne.Texte(r, "GDRG_CHAINE_RECHERCHEE")) { Modifiable = true }]),
         ]);
     }
 }

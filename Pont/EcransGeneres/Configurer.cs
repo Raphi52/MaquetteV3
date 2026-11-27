@@ -576,8 +576,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             // ETP_SECTION et ETP_GLOSSAIRE), lus par LecteurModelesRedaction.cs, un plafond par groupe. EcrivainModelesRedaction.cs enregistre
             // ce que la V2 ecrit en base sans document Word : le MODELE se modifie, se duplique et se supprime (OPE_EDT_MODEL.cs:149-216 ;
             // la V2 n'en cree pas de vide), la SECTION s'ajoute, se modifie et se supprime par l'equipe Amitel (OPE_EDT_SECTION.cs:54-82,
-            // :64-72), le GLOSSAIRE s'ajoute, se modifie et se supprime (OPE_EDT_GLOSSAIRE.cs:66-91) ; une maquette REDA passe par son
-            // document Word en GED (OPE_EDT_MAQ.cs:103-192) : refus nomme.
+            // :64-72), le GLOSSAIRE s'ajoute, se modifie et se supprime (OPE_EDT_GLOSSAIRE.cs:66-91), la MAQUETTE REDA se modifie (son
+            // libelle) et se supprime avec sa ligne GED (OPE_EDT_MAQ.cs:91-96, :151-162) ; la dupliquer copie son document Word par le
+            // poste (l. 185-193) : refus nomme.
             Colonnes = ["Code", "Libellé", "Nature", "Utilisation"],
             Recherche = "Rechercher un modèle, une maquette, une section, un terme…",
             Criteres = ["Code", "Libellé"],
@@ -601,7 +602,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             [
                 new MarcheEcran("Modèle de document", "Un modèle compose des maquettes REDA, dans l'ordre : un code par ligne (ou séparés par des virgules) ; le code est fixé, le libellé et le type sont obligatoires. Il ne se supprime pas tant qu'il garde des maquettes. Un nouveau modèle se crée en dupliquant un modèle existant.", true,
                     ["Code", "Libellé", Champ.Texte("Type de modèle"), Champ.Case("Actif"), Champ.Zone("Maquettes, dans l'ordre"), "Utilisation"]),
-                new MarcheEcran("Maquette REDA", "Un document Word de la GED : elle se crée, se modifie et se supprime avec lui, dans RIG v2. Utilisée par un modèle, elle ne se supprime pas.", false,
+                new MarcheEcran("Maquette REDA", "Un document Word de la GED, nommé par un libellé : le libellé se modifie, le code est fixé. Supprimée, elle emporte son document de la GED ; utilisée par un modèle, elle ne se supprime pas. La dupliquer copie son document Word : non repris.", false,
                     ["Code", "Libellé", "Utilisation"]),
                 new MarcheEcran("Section", "Une section réutilisable de la décision : sa requête SQL et ses niveaux de fusion, de génération, d'occurrence et de persistance, tous obligatoires. Réservée à l'équipe Amitel, comme dans RIG v2.", false,
                     ["Code", "Libellé", Champ.Zone("Requête SQL"),
@@ -632,8 +633,11 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Code = "PROC_SCEAU", Titre = "Sceaux", Sujet = "sceaux",
             Forme = FormeEcran.Referentiel,
             // Lot 15 (27/11/2026) : les colonnes de la liste de la V2 (Recherche\OPE_RECHERCHE.cs InitColumn : fichier, nom externe, hauteur,
-            // largeur, rognage, date d'archivage), lues par LecteurSceaux.cs ; Supprimer seul est branche (EcrivainSceaux.cs) -- ajouter importe
-            // l'image en GED, modifier la hauteur recalcule la largeur sur l'image : non repris, nommes dans l'ecrivain.
+            // largeur, rognage, date d'archivage), lues par LecteurSceaux.cs. EcrivainSceaux.cs : Modifier enregistre le rognage et le texte
+            // de recherche comme Valider (OPE_EDITION.cs:91-111) et refuse la hauteur (la V2 recalcule la largeur sur l'image, l. 69, :281) ;
+            // Supprimer. Ajouter importe une image du poste (l. 93-96) : non repris, nomme dans l'ecrivain.
+            // fix-ok: causes fausses relevees par le juge le 27/11/2026, relues dans la V2 -- la modification d'un sceau (OPE_EDITION.cs:91-111)
+            // et d'une maquette REDA (OPE_EDT_MAQ.cs:91-96, :151-162) n'ecrivent qu'en base ; descripteurs PROC_SCEAU et PROC_REDAA realignes.
             Colonnes = ["Nom externe", "Fichier", Champ.Nombre("Hauteur max"), Champ.Nombre("Largeur max"), Champ.Nombre("Rogner"), Champ.Texte("Date archivage")],
             Recherche = "Rechercher un sceau, un fichier…",
             Criteres = ["Nom externe", "Fichier"],
@@ -642,14 +646,19 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Rang = 7,
             Etats = EtatsEcran.Trois("À compléter", "Image absente de la GED", "Enregistré"),
             Groupes = ["Hauteur de 24 mm", "Autre hauteur"],
+            // Sous une ligne ouverte, la fiche de la V2 (OPE_EDITION) : le rognage dans la ligne, le texte de recherche sous elle.
+            SectionsParGroupe = new Dictionary<string, string[]>
+            {
+                ["Hauteur de 24 mm"] = ["Référence", "Dimensions", "Image"], ["Autre hauteur"] = ["Référence", "Dimensions", "Image"],
+            },
             Sections =
             [
                 new MarcheEcran("Référence", "Le nom externe est la clé du sceau dans les maquettes : unique, il ne change plus une fois enregistré.", true,
                     ["Nom externe"]),
-                new MarcheEcran("Dimensions", "Hauteur maximale en mm ; la largeur se recalcule sur l'image. « Dimensions du lot 1 » vaut une hauteur de 24 mm.", true,
+                new MarcheEcran("Dimensions", "Hauteur maximale en mm ; la largeur se calcule sur l'image. « Dimensions du lot 1 » vaut une hauteur de 24 mm. Le rognage s'enregistre ici ; la hauteur, non : RIG v2 recalcule alors la largeur sur l'image.", true,
                     [Champ.Nombre("Hauteur max"), Champ.Nombre("Largeur max"), Champ.Nombre("Rogner"), Champ.Case("Dimensions du lot 1")]),
-                new MarcheEcran("Image", "L'image est un document de la GED du greffe ; supprimer le sceau la laisse dans la GED.", false,
-                    ["Fichier", Champ.Texte("Date archivage")]),
+                new MarcheEcran("Image", "L'image est un document de la GED du greffe ; supprimer le sceau la laisse dans la GED. Enregistrer la marque archivée par vous à cette date, comme dans RIG v2.", false,
+                    ["Fichier", Champ.Texte("Date archivage"), "Texte de recherche"]),
             ],
             // Les cellules, dans l'ordre des colonnes : des elements de RIG_DEV (reference, hauteur, largeur, rognage), anonymes.
             Lignes =

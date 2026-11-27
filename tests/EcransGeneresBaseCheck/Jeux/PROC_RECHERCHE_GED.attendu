@@ -6,13 +6,16 @@
 #   L6-GED-01 « Maquettes » (MAQUETTE le porte)            -- L6-GED-05 « Orphelins » (FACTURE ne le porte pas) ;
 #   L6-GED-03 « Orphelins » (aucune demande d'edition)    -- L6-GED-04 « Documents SIREN » (SIREN_EN_LIGNE le porte) ;
 #   les images et les PDF des deux autres jeux, sans reference -> « Sans référence » ; L6-GED-07 (ACTE_DEPOSE) -> « Autres
-#   documents ».
+#   documents ». Les jeux du lot 15 y ajoutent l'image d'un sceau (L15-TAMPON-01, PROC_SCEAU.sql) et le document Word d'une maquette
+#   REDA (L15-DOC-3, PROC_REDAA.sql), que leurs gestes modifient et suppriment.
 L6_LETTRE_RAPPEL | Document L6-GED-02 · DOCX · archivé le 01/03/2025 · extrait par ext2026 le 05/03/2025 | Éléments de fusion | EnCours | []
 courrier-scanne.png | Document L6-IMG-02 · PNG · archivé le 11/03/2025 · extrait par agent.banc le 12/03/2025 | Sans référence | EnCours | []
 attestation-depot.pdf | Document L6-GED-03 · PDF · archivé le 03/03/2025 · extrait par agent.banc le 04/03/2025 · référence supprimée (DEMANDE_EDITION.DMNED_NUM_DOCUMENT_EDITION) | Orphelins | AFaire | []
 jugement-annexe.pdf | Document L6-PDF-01 · PDF · archivé le 20/03/2025 | Sans référence | Validee | []
 statuts.pdf | Document L6-PDF-02 · PDF · archivé le 18/03/2025 | Sans référence | Validee | []
 pv-assemblee.pdf | Document L6-PDF-03 · PDF · archivé le 17/03/2025 | Sans référence | Validee | []
+L15_TAMPON | Document L15-TAMPON-01 · PNG · archivé le 15/03/2025 | Éléments de fusion | Validee | []
+L15_LIBRE (REDA) | Document L15-DOC-3 · DOC · archivé le 14/03/2025 | Maquettes | Validee | []
 lettre.doc | Document L6-IMG-04 · DOC · archivé le 13/03/2025 | Sans référence | Validee | []
 bilan-numerise.tif | Document L6-IMG-01 · TIF · archivé le 10/03/2025 | Sans référence | Validee | []
 Document L6-IMG-03 | Document L6-IMG-03 · JPEG · archivé le 09/03/2025 | Sans référence | Validee | []

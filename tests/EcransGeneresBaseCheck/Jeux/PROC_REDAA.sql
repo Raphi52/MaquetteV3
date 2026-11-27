@@ -44,6 +44,11 @@ INSERT INTO v2.MAQUETTE (MQTT_CODE_MAQUETTE, MQTT_NUM_DOCUMENT, MQTT_TYPE_MAQUET
     (''L15_LIBRE'', ''L15-DOC-3'', ''REDA'', ''Libre banc''),
     -- ECARTEE : maquette d''un autre usage (type RIG) -- jumeau L15_LIBRE
     (''L15_RIG'', ''L15-DOC-4'', ''RIG'', ''Courrier banc'');';
+-- Le document Word de L15_LIBRE dans GED_RIG (creee par PROC_IMAGE.sql, joue avant) : supprimer la maquette supprime aussi cette
+-- ligne (OPE_EDT_MAQ.cs:157-159), ce que le dernier bloc de PROC_REDAA.gestes controle. Il entre dans « Documents », categorie
+-- « Maquettes » (PROC_RECHERCHE_GED.attendu). Les autres maquettes du jeu n'ont pas de document en GED.
+INSERT INTO v2.GED_RIG (GDRG_NUM_DOCUMENT, GDRG_EXTENSION, GDRG_FICHIER, GDRG_LOGIN_NT_ARCHIVAGE, GDRG_DATE_ARCHIVAGE, GDRG_REFERENCE, GDRG_NOM_FICHIER)
+VALUES ('L15-DOC-3', 'doc', 0xD0CF11E0, 'banc', '20250314', 'MAQUETTE.MQTT_NUM_DOCUMENT', '$maq_L15_LIBRE.doc');
 INSERT INTO v2.SECTION_MAQUETTE (SCTMQ_CODE_SECTION_MAQUETTE, SCTMQ_LIBELLE, SCTMQ_REQUETE_SQL, SCTMQ_NIVEAU_OCCURRENCE, SCTMQ_NIVEAU_FUSION,
                                  SCTMQ_NIVEAU_GENERATION, SCTMQ_NIVEAU_PERSISTANCE) VALUES
     ('L15_MOTIFS', 'Motifs banc', 'SELECT 1 AS MOTIF', 1, 1, 0, 0);

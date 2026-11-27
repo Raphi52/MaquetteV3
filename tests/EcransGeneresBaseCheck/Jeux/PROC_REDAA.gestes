@@ -11,7 +11,7 @@ geste: Ajouter
 valeur: Code = L15_X
 valeur: Libellé = Autre banc
 resultat: refuse
-message: Un modèle de document ne se crée qu'en dupliquant un modèle existant (« Dupliquer » au menu de sa ligne), comme dans RIG v2. Une maquette REDA se crée avec son document Word en GED ; une section et une entrée du glossaire, dans leur onglet.
+message: Un modèle de document ne se crée qu'en dupliquant un modèle existant (« Dupliquer » au menu de sa ligne), comme dans RIG v2. Une maquette REDA ne se crée qu'en dupliquant une maquette avec son document Word, ce qui n'est pas repris ; une section et une entrée du glossaire s'ajoutent dans leur onglet.
 ---
 # ---- MODELE DE DOCUMENT : Valider (OPE_EDT_MODEL.cs:58, 149-169).
 # Refus : le code ne se modifie pas (TextCode.MetierReadOnly, l. 98). Jumeau accepte : le bloc « MODIFIE » (code inchange).
@@ -143,25 +143,90 @@ resultat: fait
 message: Modèle « L15_JGT2 » supprimé.
 controle: SELECT COUNT(*) FROM v2.MODELE_DOCUMENT WHERE MDDCM_CODE_MODELE_DOCUMENT = 'L15_JGT2' => 0
 ---
-# Refus : une maquette REDA se modifie avec son document Word en GED (OPE_EDT_MAQ). Jumeau accepte : le bloc « MODIFIE » (un modele).
+# ---- MAQUETTE REDA (OPE_EDT_MAQ.cs) : Valider (l. 91-96) enregistre son libelle ; Supprimer (l. 151-162) la ligne MAQUETTE et la
+# ligne GED_RIG de son document. L15_LIBRE est ici dans L15_JGT (bloc « MODIFIE » du modele).
+# Refus : le code ne se modifie pas (TextCode.MetierReadOnly, OPE_EDT_MAQ.Designer.cs:71). Jumeau accepte : le bloc « MAQUETTE MODIFIEE ».
 geste: Modifier
 ids: maquette:L15_LIBRE
-valeur: Libellé = Libre renommee
+valeur: Code = L15_AUTRE
 resultat: refuse
-message: Une maquette REDA se crée, se duplique, se modifie et se supprime avec son document Word en GED : RIG v2 le fait dans sa fiche (OPE_EDT_MAQ), pas dans cette grille.
+message: Le code ne se modifie pas : RIG v2 le fige une fois la ligne enregistrée.
 ---
-# Refus : ni supprimee. Jumeau accepte : la suppression de L15_JGT2 (un modele).
+# Refus : le libelle est obligatoire (TextLib.MetierObligatoire, .Designer.cs:80). Jumeau accepte : « MAQUETTE MODIFIEE ».
+geste: Modifier
+ids: maquette:L15_LIBRE
+valeur: Libellé =
+resultat: refuse
+message: « Libellé » est obligatoire.
+---
+# Refus : 33 caracteres (MQTT_LIBELLE : 32). Jumeau accepte : « MAQUETTE MODIFIEE » (14 caracteres).
+geste: Modifier
+ids: maquette:L15_LIBRE
+valeur: Libellé = Libelle de maquette trop long XYZ
+resultat: refuse
+message: « Libellé » : 32 caractères au plus.
+---
+# Refus : l'utilisation se lit (le nombre de modeles qui la nomment). Jumeau accepte : « MAQUETTE MODIFIEE », sans elle.
+geste: Modifier
+ids: maquette:L15_LIBRE
+valeur: Utilisation = aucune
+resultat: refuse
+message: « Utilisation » se lit, ne se saisit pas.
+---
+# Refus : rien ne change. Jumeau accepte : « MAQUETTE MODIFIEE ».
+geste: Modifier
+ids: maquette:L15_LIBRE
+valeur: Libellé = Libre banc
+resultat: refuse
+message: Rien à enregistrer : aucune valeur ne change.
+---
+# Refus : une maquette d'un autre usage (type RIG) n'est pas une maquette REDA de cet ecran. Jumeau accepte : L15_LIBRE (REDA).
+geste: Modifier
+ids: maquette:L15_RIG
+valeur: Libellé = Courrier renomme
+resultat: refuse
+message: Maquette REDA introuvable : « L15_RIG ».
+---
+# MAQUETTE MODIFIEE : le libelle seul, dans MAQUETTE (Maquette.Sauve).
+geste: Modifier
+ids: maquette:L15_LIBRE
+valeur: Libellé = Libre renommée
+resultat: fait
+message: Maquette « L15_LIBRE » enregistrée.
+lignes:
+L15_JGT - Jugement banc modifié | modèle · 2 maquette(s) | Modèles de document | Validee | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles de document | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Maquettes REDA | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par aucun modèle | Maquettes REDA | Validee | []
+L15_LIBRE - Libre renommée | maquette REDA · utilisée par 1 modèle(s) | Maquettes REDA | Validee | []
+L15_MOTIFS - Motifs banc | section | Sections | Validee | []
+L15_ART - Article banc | glossaire public | Glossaire | Validee | []
+fiche: maquette:L15_LIBRE
+Maquette REDA › Libellé = Libre renommée
+controle: SELECT CONCAT(MQTT_LIBELLE, '|', MQTT_NUM_DOCUMENT, '|', MQTT_TYPE_MAQUETTE) FROM v2.MAQUETTE WHERE MQTT_CODE_MAQUETTE = 'L15_LIBRE' => Libre renommée|L15-DOC-3|REDA
+---
+# MAQUETTE MODIFIEE (remise) : son libelle de PROC_REDAA.sql.
+geste: Modifier
+ids: maquette:L15_LIBRE
+valeur: Libellé = Libre banc
+resultat: fait
+message: Maquette « L15_LIBRE » enregistrée.
+controle: SELECT MQTT_LIBELLE FROM v2.MAQUETTE WHERE MQTT_CODE_MAQUETTE = 'L15_LIBRE' => Libre banc
+---
+# Refus : utilisee par un modele (L15_JGT), au message de la V2 (OPE_EDT_MAQ.cs:153-154) ; rien n'est supprime. Jumeau accepte : la
+# suppression de L15_LIBRE en fin de jeu, quand plus aucun modele ne la nomme.
 geste: Supprimer
 ids: maquette:L15_LIBRE
 resultat: refuse
-message: Une maquette REDA se crée, se duplique, se modifie et se supprime avec son document Word en GED : RIG v2 le fait dans sa fiche (OPE_EDT_MAQ), pas dans cette grille.
+message: Il est impossible de supprimer cette maquette car elle est utilisée par au moins un modèle !
 ---
-# Refus : ni dupliquee (OPE_EDT_MAQ.cs:40, avec son document). Jumeau accepte : le bloc « CREE » (un modele).
+# Refus : dupliquer une maquette copie son document Word par le poste (OPE_EDT_MAQ.cs:185-193), non repris. Jumeau accepte : le bloc
+# « CREE » (un modele, qui se duplique en base).
 geste: Ajouter
 ids: maquette:L15_LIBRE
 valeur: Code = L15_LIBRE2
 resultat: refuse
-message: Une maquette REDA se crée, se duplique, se modifie et se supprime avec son document Word en GED : RIG v2 le fait dans sa fiche (OPE_EDT_MAQ), pas dans cette grille.
+message: Dupliquer une maquette REDA n'est pas repris : RIG v2 copie son document Word, extrait sur le poste puis archivé dans la GED sous un nouveau numéro.
 ---
 # MODIFIE (remise) : L15_JGT redevient celui de PROC_REDAA.sql -- L15_ENTETE reprise en 1re (une composition neuve), L15_DISPO en 2e,
 # L15_LIBRE retiree.
@@ -536,3 +601,19 @@ L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Maquette
 L15_MOTIFS - Motifs banc | section | Sections | Validee | []
 L15_ART - Article banc | glossaire public | Glossaire | Validee | []
 controle: SELECT COUNT(*) FROM v2.GLOSSAIRE WHERE GLOSS_CODE_GLOSSAIRE IN ('L15_MIEN', 'L15_NEUF') => 0
+---
+# MAQUETTE SUPPRIMEE (jumeau du refus « utilisee par un modele ») : L15_LIBRE n'est plus dans aucun modele (remise de L15_JGT) ;
+# la ligne MAQUETTE part, puis la ligne GED_RIG de son document L15-DOC-3 (OPE_EDT_MAQ.cs:157-159). Dernier bloc du jeu.
+geste: Supprimer
+ids: maquette:L15_LIBRE
+resultat: fait
+message: Maquette « L15_LIBRE » supprimée, avec son document Word de la GED (L15-DOC-3).
+lignes:
+L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles de document | Validee | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles de document | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Maquettes REDA | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Maquettes REDA | Validee | []
+L15_MOTIFS - Motifs banc | section | Sections | Validee | []
+L15_ART - Article banc | glossaire public | Glossaire | Validee | []
+controle: SELECT COUNT(*) FROM v2.MAQUETTE WHERE MQTT_CODE_MAQUETTE = 'L15_LIBRE' => 0
+controle: SELECT COUNT(*) FROM v2.GED_RIG WHERE GDRG_NUM_DOCUMENT = 'L15-DOC-3' => 0

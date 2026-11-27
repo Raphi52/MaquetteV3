@@ -1,7 +1,10 @@
-# « Sceaux » (EcrivainSceaux) : « Supprimer » (Edition\OPE_EDITION.Supprimer, l. 174-179) ; la V2 ne refuse jamais, apres sa
-# confirmation. Ajouter et Modifier ne sont pas branches (image a importer et a decoder) : la grille dit « Démonstration ».
+# « Sceaux » (EcrivainSceaux) : « Modifier » = Valider d'un sceau existant (Edition\OPE_EDITION.cs:91-116) -- le rognage et le texte
+# de recherche s'enregistrent, la hauteur se refuse (la V2 recalcule la largeur sur l'image, l. 69, :281) ; « Supprimer »
+# (l. 176-181), que la V2 ne refuse jamais apres sa confirmation. Ajouter (une image du poste a importer) n'est pas branche : la grille
+# dit « Démonstration ». Lignes : PROC_SCEAU.sql. Les blocs remettent L15_TAMPON comme ils l'ont trouve, sauf ce que Valider date
+# (l'archivage de son document, marque du jour).
 
-# Refus : un element absent de la base. Jumeau accepte : bloc 2.
+# Refus : un element absent de la base. Jumeau accepte : bloc « Supprime ».
 geste: Supprimer
 ids: 2599999
 resultat: refuse
@@ -15,11 +18,122 @@ message: Sceau L15_SIGNATURE supprimé : les maquettes qui l'utilisent ne le tro
 lignes:
 L15_LOGO | 273 × 998 mm · image absente de la GED | Autre hauteur | EnCours | []
 L15_SCEAU | 24 × 41 mm · rogné de 2 mm · image absente de la GED | Hauteur de 24 mm | EnCours | []
+L15_TAMPON | 24 × 30 mm · tampon.png · archivé le 15/03/2025 | Hauteur de 24 mm | Validee | []
 L6_LETTRE_RAPPEL | 45 × 50 mm · lettre-rappel.docx · archivé le 01/03/2025 | Autre hauteur | Validee | []
 controle: SELECT COUNT(*) FROM v2.ELEMENT_FUSION WHERE ELMFS_ID_ELMFS = 2500503 => 0
 ---
-# Un geste que l'ecrivain ne porte pas (Modifier) : sans ecrivain, « Démonstration », rien d'ecrit.
+# Un geste que l'ecrivain ne porte pas (Ajouter : le fichier de l'image choisi sur le poste, OPE_EDITION.cs:93-96) : sans ecrivain,
+# « Démonstration », rien d'ecrit. Jumeau : Modifier, porte (bloc « MODIFIE »).
+geste: Ajouter
+valeur: Nom externe = L15_NOUVEAU
+valeur: Rogner = 0
+resultat: sans-ecrivain
+---
+# ---- MODIFIER (Valider, OPE_EDITION.cs:91-116).
+# Refus : la hauteur -- la V2 recalcule la largeur sur l'image (AmiImage.ZoomLargeur, l. 281). Jumeau accepte : le bloc « MODIFIE »,
+# qui renvoie la hauteur inchangee (24).
+geste: Modifier
+ids: 2500504
+valeur: Hauteur max = 30
+resultat: refuse
+message: La hauteur ne se modifie pas ici : RIG v2 recalcule alors la largeur sur l'image du sceau, que la V3 ne décode pas. Seuls le rognage et le texte de recherche s'enregistrent.
+---
+# Refus : « dimensions du lot 1 » met la hauteur a 24 mm et recalcule la largeur sur l'image (l. 60-70). Jumeau accepte : « MODIFIE ».
+geste: Modifier
+ids: 2500504
+valeur: Dimensions › Dimensions du lot 1 = oui
+resultat: refuse
+message: La hauteur ne se modifie pas ici : RIG v2 recalcule alors la largeur sur l'image du sceau, que la V3 ne décode pas. Seuls le rognage et le texte de recherche s'enregistrent.
+---
+# Refus : la largeur, verrouillee (IntLargeurMax.MetierReadOnly, OPE_EDITION.Designer.cs:170). Jumeau accepte : « MODIFIE » (30, inchangee).
+geste: Modifier
+ids: 2500504
+valeur: Largeur max = 35
+resultat: refuse
+message: La largeur se calcule sur l'image, elle ne se saisit pas : RIG v2 la verrouille.
+---
+# Refus : la reference, figee une fois le sceau cree (TextReference.MetierReadOnly = !add, l. 243). Jumeau accepte : « MODIFIE »
+# (la meme reference).
+geste: Modifier
+ids: 2500504
+valeur: Nom externe = L15_AUTRE
+resultat: refuse
+message: Le nom externe ne se modifie pas : RIG v2 le fige une fois le sceau enregistré.
+---
+# Refus : le fichier se lit (le document GED). Jumeau accepte : « MODIFIE », sans lui.
+geste: Modifier
+ids: 2500504
+valeur: Fichier = autre.gif
+resultat: refuse
+message: « Fichier » se lit, ne se saisit pas.
+---
+# Refus : le rognage est obligatoire (IntRogner.MetierObligatoire, .Designer.cs:192). Jumeau accepte : « MODIFIE » (3).
+geste: Modifier
+ids: 2500504
+valeur: Rogner =
+resultat: refuse
+message: « Rogner » est obligatoire.
+---
+# Refus : des chiffres seuls (MetierRegExSaisie « [0-9] », .Designer.cs:193) -- ni signe ni virgule. Jumeau accepte : « MODIFIE » (3).
+geste: Modifier
+ids: 2500504
+valeur: Rogner = -1
+resultat: refuse
+message: « Rogner » : des chiffres seuls, un nombre de millimètres.
+---
+geste: Modifier
+ids: 2500504
+valeur: Rogner = 2,5
+resultat: refuse
+message: « Rogner » : des chiffres seuls, un nombre de millimètres.
+---
+# Refus : l'image n'est pas dans la GED (gedRig null : « Le fichier est obligatoire », OPE_EDITION.cs:163-166). Jumeau accepte :
+# « MODIFIE » (L15_TAMPON, image en GED).
 geste: Modifier
 ids: 2500501
 valeur: Rogner = 3
-resultat: sans-ecrivain
+resultat: refuse
+message: Le fichier est obligatoire : l'image de ce sceau n'est pas dans la GED du greffe.
+---
+# Refus : rien ne change (Valider n'est actif que sur un changement, l. 54-58). Jumeau accepte : « MODIFIE ».
+geste: Modifier
+ids: 2500504
+valeur: Rogner = 0
+valeur: Image › Texte de recherche =
+resultat: refuse
+message: Rien à enregistrer : aucune valeur ne change.
+---
+# MODIFIE : le rognage et le texte de recherche ; la hauteur, la largeur et la reference renvoyees inchangees passent. Valider ecrit
+# l'element (rognage, version ' ', par defaut) et son document GED (chemin virtuel, agent et instant d'archivage, application,
+# reference, extension « gif » meme pour ce .png, texte de recherche : OPE_EDITION.cs:99-111).
+geste: Modifier
+ids: 2500504
+valeur: Nom externe = L15_TAMPON
+valeur: Hauteur max = 24
+valeur: Largeur max = 30
+valeur: Rogner = 3
+valeur: Image › Texte de recherche = Tampon du greffe
+resultat: fait
+message: Sceau L15_TAMPON enregistré : son image est marquée archivée par vous à cette date, comme dans RIG v2.
+lignes:
+L15_LOGO | 273 × 998 mm · image absente de la GED | Autre hauteur | EnCours | []
+L15_SCEAU | 24 × 41 mm · rogné de 2 mm · image absente de la GED | Hauteur de 24 mm | EnCours | []
+L15_TAMPON | 24 × 30 mm · rogné de 3 mm · tampon.png · archivé le {J+0} | Hauteur de 24 mm | Validee | []
+L6_LETTRE_RAPPEL | 45 × 50 mm · lettre-rappel.docx · archivé le 01/03/2025 | Autre hauteur | Validee | []
+fiche: 2500504
+Dimensions › Rogner = 3
+Image › Texte de recherche = Tampon du greffe
+controle: SELECT CONCAT(ELMFS_ROGNER_MM, '|[', ELMFS_VERSION, ']|', CAST(ELMFS_PAR_DEFAUT AS int), '|', ELMFS_HAUTEUR_MAX_MM, '|', ELMFS_LARGEUR_MAX_MM) FROM v2.ELEMENT_FUSION WHERE ELMFS_ID_ELMFS = 2500504 => 3|[ ]|1|24|30
+controle: SELECT CONCAT(GDRG_PATH_VIRTUEL, '|', GDRG_LOGIN_NT_ARCHIVAGE, '|', GDRG_APPLICATION_ARCHIVAGE, '|', GDRG_REFERENCE, '|', GDRG_EXTENSION, '|', GDRG_CHAINE_RECHERCHEE, '|', GDRG_NOM_FICHIER, '|', DATALENGTH(GDRG_FICHIER), '|', CASE WHEN CONVERT(date, GDRG_DATE_ARCHIVAGE) = CONVERT(date, GETDATE()) THEN 'jour' ELSE 'autre' END) FROM v2.GED_RIG WHERE GDRG_NUM_DOCUMENT = 'L15-TAMPON-01' => Element externe\|banc.ecrans|PROC_SCEAU|ELEMENT_FUSION.ELMFS_NUM_DOCUMENT|gif|Tampon du greffe|tampon.png|4|jour
+---
+# MODIFIE (remise) : rognage 0, texte de recherche vide (NULL, comme a la creation du jeu).
+geste: Modifier
+ids: 2500504
+valeur: Rogner = 0
+valeur: Image › Texte de recherche =
+resultat: fait
+message: Sceau L15_TAMPON enregistré : son image est marquée archivée par vous à cette date, comme dans RIG v2.
+fiche: 2500504
+Dimensions › Rogner = 0
+Image › Texte de recherche =
+controle: SELECT CONCAT(ELMFS_ROGNER_MM, '|', ISNULL(g.GDRG_CHAINE_RECHERCHEE, 'NULL')) FROM v2.ELEMENT_FUSION AS e JOIN v2.GED_RIG AS g ON g.GDRG_NUM_DOCUMENT = e.ELMFS_NUM_DOCUMENT WHERE e.ELMFS_ID_ELMFS = 2500504 => 0|NULL

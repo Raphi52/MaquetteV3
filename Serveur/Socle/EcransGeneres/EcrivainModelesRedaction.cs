@@ -6,8 +6,8 @@ using L = RigV3.Serveur.Socle.EcransGeneres.LecteurModelesRedaction;
 namespace RigV3.Serveur.Socle.EcransGeneres;
 
 /// <summary>
-/// « Modèles de rédaction » (PROC_REDAA), en grille : les fiches de la V2 qui s'enregistrent en base sans document Word -- le MODELE
-/// de document, la SECTION et l'entree du GLOSSAIRE. Mode d'emploi : EcrivainEcran.cs ; la liste et les fiches :
+/// « Modèles de rédaction » (PROC_REDAA), en grille : ce que les fiches de la V2 enregistrent en base -- le MODELE de document, la
+/// MAQUETTE REDA, la SECTION et l'entree du GLOSSAIRE. Mode d'emploi : EcrivainEcran.cs ; la liste et les fiches :
 /// LecteurModelesRedaction.cs. Plan « RIG v3 100 % fonctionnel », lot 15, 27/11/2026.
 ///
 /// SOURCE (ancien RIG) : D:\RigApplication\Source\RIG\DLL\Processus\PROC_REDAA.
@@ -42,12 +42,22 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   - la saisie (OPE_EDT_GLOSSAIRE.Designer.cs:79-100) : « Code » et « Texte associé » obligatoires, la description (ici la colonne
 ///     « Libellé ») facultative ; le code fige une fois cree (l. 117) ; une entree publique ne redevient pas privee (l. 118) ;
 ///   - Valider (l. 66-75) : GLOSS_PROPRIETAIRE = '*' (public) ou le login de l'agent (prive) ; Supprimer (l. 84-91) : Delete.
+///   MAQUETTE REDA (ETP_MODEL_MAQ\MAQUETTE\OPE_EDT_MAQ.cs) :
+///   - MODIFIER = Valider (l. 91-96) : Processus.Verifier -- le libelle obligatoire (OPE_EDT_MAQ.Designer.cs:80), le code fige
+///     (MetierReadOnly, :71) -- puis Maquette.Sauve : la ligne MAQUETTE seule, le libelle (TextLib, l. 82) ;
+///   - SUPPRIMER (l. 151-162) : « Il est impossible de supprimer cette maquette car elle est utilisée par au moins un modèle ! » si une
+///     composition la nomme (l. 153-154) ; sinon Maquette.Delete puis, s'il a supprime une ligne, GedRig.Delete de son document (l. 157-159 :
+///     la ligne GED_RIG seule, RigMetier\Divers\GedRig.cs:322-325 ; le fichier Word est la colonne GDRG_FICHIER de cette ligne).
 /// Largeurs : celles des colonnes de la base du greffe (COL_LENGTH). La V2 n'a pas de message de reussite (la liste se met a jour) :
 /// ceux d'ici disent ce qui est ecrit.
-/// NON REPRIS (nommes) : une MAQUETTE REDA se cree, se duplique, se modifie et se supprime avec son document Word en GED
-/// (OPE_EDT_MAQ.cs:103-147, :164-192) ; la « Génération du document » du glossaire (OPE_GEN_DOC_GLOSSAIRE) : un document Word.
+/// NON REPRIS (nommes) : DUPLIQUER une maquette REDA -- la V2 extrait son document Word sur le poste (FichierGedRig.GetFichier en zip)
+/// et l'archive en GED sous un nouveau numero (GedRig.CreateGedRig, SetFileZipOnly, OPE_EDT_MAQ.cs:185-193) ; c'est aussi le seul
+/// chemin de creation d'une maquette dans PROC_REDAA. « Afficher la maquette » l'ouvre dans Word (l. 103-149). La « Génération du
+/// document » du glossaire (OPE_GEN_DOC_GLOSSAIRE) : un document Word.
 /// TRACE : famille « reglage », « a cree / a modifie / a supprime », l'objet avant et apres.
 /// </summary>
+// fix-ok: la cause « une maquette REDA se modifie et se supprime avec son document Word en GED » etait fausse (objection du juge,
+// 27/11/2026) : Valider et Supprimer n'ecrivent que les lignes MAQUETTE et GED_RIG (OPE_EDT_MAQ.cs:91-96, :151-162, relus).
 internal sealed class EcrivainModelesRedaction : IEcrivainEcran
 {
     public string Procedure => "PROC_REDAA";
@@ -56,8 +66,9 @@ internal sealed class EcrivainModelesRedaction : IEcrivainEcran
 
     private static readonly string[] ColonnesLues = ["Nature", "Utilisation"];
 
-    internal const string PasDeCreation = "Un modèle de document ne se crée qu'en dupliquant un modèle existant (« Dupliquer » au menu de sa ligne), comme dans RIG v2. Une maquette REDA se crée avec son document Word en GED ; une section et une entrée du glossaire, dans leur onglet.";
-    internal const string MaquetteGed = "Une maquette REDA se crée, se duplique, se modifie et se supprime avec son document Word en GED : RIG v2 le fait dans sa fiche (OPE_EDT_MAQ), pas dans cette grille.";
+    internal const string PasDeCreation = "Un modèle de document ne se crée qu'en dupliquant un modèle existant (« Dupliquer » au menu de sa ligne), comme dans RIG v2. Une maquette REDA ne se crée qu'en dupliquant une maquette avec son document Word, ce qui n'est pas repris ; une section et une entrée du glossaire s'ajoutent dans leur onglet.";
+    internal const string MaquetteDupliquee = "Dupliquer une maquette REDA n'est pas repris : RIG v2 copie son document Word, extrait sur le poste puis archivé dans la GED sous un nouveau numéro.";
+    internal const string MaquetteUtilisee = "Il est impossible de supprimer cette maquette car elle est utilisée par au moins un modèle !";
     internal const string SectionAmitel = "Les sections ne se modifient que par l'équipe Amitel : RIG v2 cache leur barre d'édition aux autres agents.";
     internal const string CodeFige = "Le code ne se modifie pas : RIG v2 le fige une fois la ligne enregistrée.";
     internal const string PubliqueFigee = "Une entrée publique ne redevient pas privée : RIG v2 fige ce choix une fois l'entrée publique.";
@@ -83,7 +94,7 @@ internal sealed class EcrivainModelesRedaction : IEcrivainEcran
         return nature switch
         {
             1 => supprimer ? SupprimerModeleAsync(geste, code, ct) : ModifierModeleAsync(geste, code, ct),
-            2 => Task.FromResult(IssueGeste.Refuser(MaquetteGed)),
+            2 => supprimer ? SupprimerMaquetteAsync(geste, code, ct) : ModifierMaquetteAsync(geste, code, ct),
             3 => supprimer ? SupprimerSectionAsync(geste, code, ct) : ModifierSectionAsync(geste, code, ct),
             4 => supprimer ? SupprimerGlossaireAsync(geste, code, ct) : ModifierGlossaireAsync(geste, code, ct),
             _ => Task.FromResult(IssueGeste.Refuser($"Ligne introuvable dans les modèles de rédaction : « {ids[0]} »."))
@@ -158,7 +169,7 @@ internal sealed class EcrivainModelesRedaction : IEcrivainEcran
         var ids = geste.Demande.Ids.Distinct(StringComparer.Ordinal).ToArray();
         if (ids.Length != 1) return IssueGeste.Refuser("Choisissez une seule ligne.");
         var (nature, codeSource) = Nature(ids[0]);
-        if (nature == 2) return IssueGeste.Refuser(MaquetteGed);
+        if (nature == 2) return IssueGeste.Refuser(MaquetteDupliquee);
         if (nature == 3) return IssueGeste.Refuser("RIG v2 ne duplique pas une section (OPE_EDT_SECTION : duplication interdite).");
         if (nature == 4) return IssueGeste.Refuser("RIG v2 ne duplique pas une entrée du glossaire : sa fiche n'a pas de « Dupliquer ».");
         if (nature != 1 || await ModeleAsync(geste, codeSource, ct) is not { } source)
@@ -235,6 +246,61 @@ internal sealed class EcrivainModelesRedaction : IEcrivainEcran
     {
         ["Libellé"] = libelle, ["Type de modèle"] = type, ["Actif"] = actif ? "oui" : "non", ["Maquettes"] = string.Join(", ", maquettes),
     };
+
+    // ---------------------------------------------------------------- MAQUETTE REDA
+
+    private sealed record MaquetteRedaction(string Code, string Libelle, string Document);
+
+    /// <summary>Valider (OPE_EDT_MAQ.cs:91-96) : Processus.Verifier -- le libelle obligatoire (.Designer.cs:80), le code fige
+    /// (TextCode.MetierReadOnly, .Designer.cs:71) -- puis Maquette.Sauve, qui n'ecrit que la ligne MAQUETTE.</summary>
+    private static async Task<IssueGeste> ModifierMaquetteAsync(GesteEnCours geste, string code, CancellationToken ct)
+    {
+        if (await MaquetteAsync(geste, code, ct) is not { } e) return IssueGeste.Refuser($"Maquette REDA introuvable : « {code} ».");
+        if (Cellule(geste, L.ChampCode) is { } c && c != e.Code) return IssueGeste.Refuser(CodeFige);
+        if (ColonneLue(geste) is { } lue) return IssueGeste.Refuser(lue);
+        var libelle = Cellule(geste, L.ChampLibelle) ?? e.Libelle;
+        if (libelle.Length == 0) return IssueGeste.Refuser(CreationV2.Obligatoire(L.ChampLibelle));
+        if (libelle == e.Libelle) return IssueGeste.Refuser(RienAEnregistrer);
+        if (await TropLongAsync(geste, "v2.MAQUETTE", ct, ("MQTT_LIBELLE", L.ChampLibelle, libelle)) is { } long_) return IssueGeste.Refuser(long_);
+        await geste.EcrireAsync("UPDATE v2.MAQUETTE SET MQTT_LIBELLE = @l WHERE MQTT_CODE_MAQUETTE = @c", ct,
+            new SqlParameter("@l", libelle), new SqlParameter("@c", e.Code));
+        var id = L.Prefixes[1] + e.Code;
+        return IssueGeste.Ecrit($"Maquette « {e.Code} » enregistrée.", [id],
+            new TraceGeste("reglage", $"la maquette REDA {e.Code}", id, "a modifie",
+                new Dictionary<string, string> { ["Libellé"] = e.Libelle }, new Dictionary<string, string> { ["Libellé"] = libelle }));
+    }
+
+    /// <summary>_SupprimerMaquette (OPE_EDT_MAQ.cs:151-162) : refusee si une composition de modele la nomme
+    /// (CompositionModele.GetCompositionModeleByMaquette), sinon la ligne MAQUETTE puis, si elle est partie, la ligne GED_RIG de son
+    /// document (GedRig.Delete, RigMetier\Divers\GedRig.cs:322-325 : la ligne seule ; le fichier Word est dans GDRG_FICHIER). Un numero
+    /// sans document en GED : la V2 leve sur gedRig null apres avoir supprime la maquette ; ici la maquette part, rien d'autre.</summary>
+    private static async Task<IssueGeste> SupprimerMaquetteAsync(GesteEnCours geste, string code, CancellationToken ct)
+    {
+        if (await MaquetteAsync(geste, code, ct) is not { } e) return IssueGeste.Refuser($"Maquette REDA introuvable : « {code} ».");
+        await using (var r = await geste.LireAsync(
+                         "SELECT COUNT(*) FROM v2.COMPOSITION_MODELE WITH (UPDLOCK, HOLDLOCK) WHERE X_CMPMD_CODE_MAQUETTE = @c", ct, new SqlParameter("@c", e.Code)))
+            if (await r.ReadAsync(ct) && r.GetInt32(0) > 0) return IssueGeste.Refuser(MaquetteUtilisee);
+        var documentSupprime = false;
+        if (await geste.EcrireAsync("DELETE FROM v2.MAQUETTE WHERE MQTT_CODE_MAQUETTE = @c", ct, new SqlParameter("@c", e.Code)) == 1 && e.Document.Length > 0)
+            documentSupprime = await geste.EcrireAsync("DELETE FROM v2.GED_RIG WHERE GDRG_NUM_DOCUMENT = @d", ct, new SqlParameter("@d", e.Document)) > 0;
+        var id = L.Prefixes[1] + e.Code;
+        return IssueGeste.Ecrit(documentSupprime
+                ? $"Maquette « {e.Code} » supprimée, avec son document Word de la GED ({e.Document})."
+                : $"Maquette « {e.Code} » supprimée (aucun document Word dans la GED du greffe).", [id],
+            new TraceGeste("reglage", $"la maquette REDA {e.Code}", id, "a supprime",
+                new Dictionary<string, string> { ["Libellé"] = e.Libelle, ["Document GED"] = documentSupprime ? e.Document : "" }, null));
+    }
+
+    private static async Task<MaquetteRedaction?> MaquetteAsync(GesteEnCours geste, string code, CancellationToken ct)
+    {
+        await using var r = await geste.LireAsync("""
+            SELECT MQTT_CODE_MAQUETTE, MQTT_LIBELLE, MQTT_NUM_DOCUMENT FROM v2.MAQUETTE WITH (UPDLOCK)
+            WHERE MQTT_CODE_MAQUETTE = @c AND MQTT_TYPE_MAQUETTE = 'REDA'
+            """, ct, new SqlParameter("@c", code));
+        return await r.ReadAsync(ct)
+            ? new MaquetteRedaction(FormeLigne.Texte(r, "MQTT_CODE_MAQUETTE"), FormeLigne.Texte(r, "MQTT_LIBELLE"), FormeLigne.Texte(r, "MQTT_NUM_DOCUMENT").Trim())
+            : null;
+    }
 
     // ---------------------------------------------------------------- SECTION (equipe Amitel)
 
