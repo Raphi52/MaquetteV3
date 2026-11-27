@@ -68,11 +68,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_DEST_REDA", Titre = "Destinataires", Sujet = "destinataires",
-            // Une ligne par destinataire (partie, mandataire, destinataire divers) des décisions qui ont un document REDA ; la fiche porte
-            // son édition et, sur le document de la décision, la date de délivrance des grosses et les suppléments (proc_dest_reda.md,
-            // Détail OPE). Lecteur et geste : LecteurDestinatairesRedaction.cs, EcrivainDestinatairesRedaction.cs (lot 10). L'ajout et la
-            // suppression d'un destinataire divers (FormAjouterDestinataire, menu « Supprimer ») ne sont pas repris.
-            Forme = FormeEcran.Fiche,
+            // Forme Referentiel (lot 10) : RIG v2 tient les destinataires d'une décision rédigée dans une GRILLE (RedaDestinatairesDataGridView)
+            // dont l'édition se change ligne par ligne, avec « Ajouter » et « Supprimer » (OPE_DEST_REDA.cs:103-109 ; proc_dest_reda.md,
+            // Détail OPE). Une ligne par destinataire (partie, mandataire, destinataire divers) ; la date de délivrance des grosses et les
+            // suppléments sont ceux du document de la décision. Lecteur et gestes : LecteurDestinatairesRedaction.cs,
+            // EcrivainDestinatairesRedaction.cs (lot 10).
+            Forme = FormeEcran.Referentiel,
+            Colonnes = ["Destinataire", "Numéro de rôle", "Qualité", "Adresse", "Édition", Champ.Date("Date de délivrance des grosses"),
+                        Champ.Nombre("Grosses supplémentaires"), Champ.Nombre("Copies supplémentaires"), Champ.Nombre("Expéditions supplémentaires")],
             Recherche = "Rechercher un destinataire, un numéro de rôle, une affaire…",
             Criteres = ["Numéro de rôle"],
             Valider = "Enregistrer les destinataires",
@@ -81,12 +84,12 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             Groupes = ["Parties", "Mandataires", "Destinataires divers"],
             Sections =
             [
-                Marche("Décision", "La décision dont le destinataire reçoit une édition.", true,
-                    "Numéro de rôle", "Type de décision"),
+                Marche("Destinataire", "Les parties de l'instance (demandeur, défendeur, intervenant), leurs mandataires et les destinataires divers de la décision. « Ajouter » saisit un destinataire divers : son libellé, son adresse et le rôle de la décision ; seul un destinataire divers se supprime.", true,
+                    "Destinataire", "Numéro de rôle", "Qualité", "Type de décision", "Adresse"),
                 Marche("Édition du jugement", "Chaque destinataire reçoit une édition : grosse (G), copie (C), expédition (E) ou lettre de notification (L), dans cet ordre. Sans aucune, X ; D : l'édition par défaut de RIG v2.", true,
-                    "Édition", Champ.Case("Grosse"), Champ.Case("Copie"), Champ.Case("Expédition"), Champ.Case("Lettre de notification")),
-                Marche("Date de délivrance des grosses", "Obligatoire pour continuer : sans elle, l'enregistrement avertit, et les autres opérations du processus restent verrouillées.", true,
-                    "Date de délivrance des grosses"),
+                    "Édition"),
+                Marche("Date de délivrance des grosses", "Obligatoire pour continuer : sans elle, l'enregistrement avertit, et les autres opérations du processus restent verrouillées. Elle vaut pour toute la décision.", true,
+                    Champ.Date("Date de délivrance des grosses")),
                 Marche("Suppléments", "Nombre de grosses, de copies et d'expéditions en plus, saisi à la main, pour toute la décision.", false,
                     Champ.Nombre("Grosses supplémentaires"), Champ.Nombre("Copies supplémentaires"), Champ.Nombre("Expéditions supplémentaires")),
             ],
@@ -276,12 +279,13 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             // Forme Audience (lot 10) : RIG v2 part d'UNE audience ou d'un cabinet (date, chambre ou section), charge ses instances ou ses
             // procédures, coche « fiche » ou « seconde édition » et génère (proc_courrierm.md, Détail OPE). Lecteur et gestes :
             // LecteurCourriersEnMasse.cs, EcrivainCourriersEnMasse.cs -- la demande et la demande d'édition sont posées dans la file des
-            // éditions ; le service d'édition de RIG v2 les produit. Préventions et mesures : trouvées par leur seul numéro dans RIG v2,
-            // non reprises (groupes vides).
+            // éditions ; le service d'édition de RIG v2 les produit. Préventions et mesures : trouvées par leur numéro, comme la zone de
+            // numéro de leur volet dans RIG v2 (OPE_RECHERCHE_COURRIERM_PREVENTION.cs:74-85) ; une mesure n'a que la seconde édition.
             Forme = FormeEcran.Audience,
-            Parametres = [Champ.Date("Date de l'audience"), "Chambre", Champ.Liste("Mode", "Audience", "Cabinet"), "File différée ou imprimante", "Seconde édition"],
+            Parametres = [Champ.Date("Date de l'audience"), "Chambre", Champ.Liste("Mode", "Audience", "Cabinet"), "N° de prévention", "N° de mesure",
+                          "File différée ou imprimante", "Seconde édition"],
             Recherche = "Rechercher une instance, une procédure, un numéro…",
-            Criteres = ["Date de l'audience", "Chambre", "Mode"],
+            Criteres = ["Date de l'audience", "Chambre", "Mode", "N° de prévention", "N° de mesure"],
             Valider = "Générer la fiche",
             Gestes = ["Générer la fiche", "Générer la seconde édition"], // Les deux cases de la grille (OPE_RESULTAT_COURRIERM_INSTANCE.cs:153-190).
             Rang = 2,
@@ -289,9 +293,9 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             Groupes = ["Instances", "Procédures", "Préventions", "Mesures"],
             Sections =
             [
-                Marche("Volet", "Instances ou procédures collectives de l'audience choisie. Une entité déjà dans la liste n'y entre pas deux fois.", true,
+                Marche("Volet", "Instances ou procédures collectives de l'audience choisie ; une prévention ou une mesure par son numéro. Une entité déjà dans la liste n'y entre pas deux fois.", true,
                     "Volet"),
-                Marche("Fiche", "« Générer la fiche » : l'édition principale de l'entité (fiche instance, fiche procédure).", true,
+                Marche("Fiche", "« Générer la fiche » : l'édition principale de l'entité (fiche instance, fiche procédure, fiche prévention). Une mesure n'a pas de fiche.", true,
                     "Fiche"),
                 Marche("Deuxième édition", "« Générer la seconde édition » : le code choisi (par défaut celui du paramétrage du greffe), hors fiche.", false,
                     "Seconde édition"),
@@ -314,24 +318,32 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_EDT_DIFF", Titre = "Editions differees", Sujet = "lots d'éditions",
-            // Une ligne par lot d'éditions différées ouvert (MetierEdtDiff.GetLotEdtActifs, :19-24 ; proc_edt_diff.md, Détail OPE).
-            // Lecteur et geste : LecteurEditionsDifferees.cs, EcrivainEditionsDifferees.cs (lot 10) ; le détail d'un lot document par
-            // document et sa case « Ne pas imprimer » ne sont pas repris.
+            // fix-ok: constate par le chef du plan sur 8bc0a99 (27/11/2026) -- les descripteurs du lot 10 omettaient des fonctions de RIG v2 :
+            // le detail d'un lot ici, les volets Préventions et Mesures des courriers, l'ajout et la suppression d'un destinataire divers.
+            // Une ligne par lot d'éditions différées ouvert (MetierEdtDiff.GetLotEdtActifs, :19-24) et, dans « Documents des lots », le
+            // détail de chaque lot document par document avec sa case « Ne pas imprimer » (OPE_LISTE_LOT, DataGridViewListeLot ;
+            // proc_edt_diff.md, Détail OPE). Lecteur et gestes : LecteurEditionsDifferees.cs, EcrivainEditionsDifferees.cs (lot 10).
             Forme = FormeEcran.File,
-            Recherche = "Rechercher un lot, une imprimante…",
+            Recherche = "Rechercher un lot, un document, un destinataire…",
             Criteres = ["Date d'ouverture du lot", "Imprimante", "Nombre de documents"],
             Valider = "Clôturer le lot",
-            Gestes = ["Clôturer le lot"], // Le bouton VALIDER relibellé « Clôturer » (OPE_EDT_DIFF_LOT.cs:26-27).
+            // Le bouton VALIDER relibellé « Clôturer » (OPE_EDT_DIFF_LOT.cs:26-27) ; la case « Ne pas imprimer » de la grille, cochée ou
+            // décochée puis TRAITER (OPE_LISTE_LOT._TraiterEditionsCochees, :53-78).
+            Gestes = ["Clôturer le lot", "Ne pas imprimer", "Remettre à l'impression"],
             Rang = 2,
-            Etats = [.. EtatsEcran.Trois("À clôturer", "En préparation", "Clôturé"), new EtatEcran("EnAttente", "Imprimante à choisir", "en-attente")],
-            Groupes = ["Lots ouverts"],
+            Etats =
+            [
+                .. EtatsEcran.Trois("À clôturer", "En préparation", "Clôturé"), new EtatEcran("EnAttente", "Imprimante à choisir", "en-attente"),
+                new EtatEcran("Rejetee", "Ne pas imprimer", "rejetee"),
+            ],
+            Groupes = ["Lots ouverts", "Documents des lots"],
             Sections =
             [
                 Marche("Imprimante", "Imprimante obligatoire pour clôturer : sans elle, le lot ne se ferme pas. Une imprimante interne d'Amitel est signalée, sans blocage.", true,
                     "Imprimante"),
-                Marche("Documents du lot", "Les documents du lot et ceux marqués « Ne pas imprimer », barrés. Le détail se règle dans RIG v2.", false,
+                Marche("Documents du lot", "Chaque document du lot, avec son destinataire, ses exemplaires, son dossier et sa maquette. « Ne pas imprimer » le barre ; « Remettre à l'impression » le rétablit.", false,
                     "Ne pas imprimer", "Exemplaires"),
-                Marche("Clôture", "Ferme le lot : il passe prêt à imprimer et disparaît de la liste d'attente.", true,
+                Marche("Clôture", "Se joue sur la ligne du lot : les documents barrés quittent le lot, qui passe prêt à imprimer et disparaît de la liste d'attente.", true,
                     "Date de clôture"),
             ],
             Lignes =
@@ -342,6 +354,8 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
                 Ligne("Lot CONVOCATIONS", "8 documents · ouvert le 05/03/2026 · imprimante « Imprimante de l'accueil » · groupe 2026-0104", "Lots ouverts", "AFaire"),
                 Ligne("Lot COPIES", "2 documents · ouvert le 06/03/2026 · aucune imprimante choisie · groupe 2026-0105", "Lots ouverts", "EnAttente"),
                 Ligne("Lot GROSSES", "4 documents · ouvert le 06/03/2026 · imprimante « Imprimante du 1er étage » · groupe 2026-0106", "Lots ouverts", "AFaire"),
+                Ligne("Notification de jugement", "Lot NOTIFICATIONS · Alpha Services SARL · créé le 04/03/2026 · 1 exemplaire · dossier 2026F00101 · ne pas imprimer", "Documents des lots", "Rejetee"),
+                Ligne("Convocation à l'audience", "Lot CONVOCATIONS · Bêta Industrie SAS · créé le 05/03/2026 · 2 exemplaires · dossier 2026F00102", "Documents des lots", "AFaire"),
             ],
         },
 

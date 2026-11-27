@@ -1,40 +1,79 @@
 # « Ordonnances à signer » (EcrivainOrdonnancesASigner) : « Signer la sélection », les controles de OPE_LISTE_ORDONNANCES.cs dans l'ordre
-# de RIG v2. Lignes du jeu : PROC_ORDOSIGN.sql et .attendu. La date de la decision est celle du jour (le defaut de la cellule DATE_DJ).
+# de RIG v2, puis ce que la signature ecrit (la decision, l'evenement de procedure et ses editions, les mesures liees, la demande de
+# l'instance et sa mere). Lignes du jeu : PROC_ORDOSIGN.sql et .attendu. La date de la decision est celle du jour (le defaut de DATE_DJ).
 
-# Refus : l'instance 2000103 est tenue par une demande en cours de RIG v2 (_DemandeEnCours, :1597-1602). Jumeau accepte : bloc 6.
+# Refus : l'instance 2000103 est tenue par une demande en cours de RIG v2 (_DemandeEnCours, :1597-1602). Jumeau accepte : bloc 11.
 geste: Agir Signer la sélection
 ids: 2000103
 resultat: refuse
 message: Instance bloquée (26000200103), demande "En cours" : MJUD par BANC LOT10
 ---
-# Refus : la saisine du greffe de 2000117 est apres le jour (_DoVerifierDate, :1180-1184). Jumeau accepte : bloc 6 (saisie en 2020).
+# Refus : la saisine du greffe de 2000117 est apres le jour (_DoVerifierDate, :1180-1184). Jumeau accepte : bloc 11 (saisie en 2018).
 geste: Agir Signer la sélection
 ids: 2000117
 resultat: refuse
 message: La date de la décision judiciaire doit être comprise entre la date de saisine du greffe (01/01/2099) et la date du jour
 ---
 # Refus : 2000118 porte deja la minute 2501000001, du 10/01/2025 : la decision doit etre datee de ce jour-la (_VerifierNumMinute,
-# :1197-1214). Jumeau accepte : bloc 7 (sans minute, elle en recoit une).
+# :1197-1214). Jumeau accepte : bloc 12 (sans minute, elle en recoit une).
 geste: Agir Signer la sélection
 ids: 2000118
 resultat: refuse
 message: Liste des ordonnances à signer - attention, un numéro de minute (2501000001) est déjà attribué, la date de décision doit être le 10/01/2025
 ---
-# Refus : un « Juge RCS » (sa signature cree des depots RCS, _DoGenererLignesEditionJugeRCS, que la V3 ne reprend pas). Avec lui, 2000107
-# n'est pas signee non plus. Jumeau accepte : bloc 6, 2000107 seule.
+# Refus : un « Juge RCS » (sa signature cree des depots RCS, _DoGenererLignesEditionJugeRCS, que la V3 ne reprend pas). Avec lui, 2000108
+# n'est pas signee non plus. Jumeau accepte : bloc 11, 2000108 seule.
 geste: Agir Signer la sélection
-ids: 2000107,2000112
+ids: 2000108,2000112
 resultat: refuse
 message: L'ordonnance du rôle 2026OS20112 est un « Juge RCS » : sa signature crée des dépôts RCS que la V3 ne reprend pas, la signer dans RIG v2.
 ---
-# Refus : 2000105 est deja rendue (la liste a signer ne retient que DCJDC_DATE IS NULL). Jumeau accepte : bloc 6.
+# Refus : 2000105 est deja rendue (la liste a signer ne retient que DCJDC_DATE IS NULL). Jumeau accepte : bloc 11.
 geste: Agir Signer la sélection
 ids: 2000105
 resultat: refuse
 ---
-# « Signer la sélection » sur 2000107 (type sans serie de minute) : la date du jour posee, aucune minute ; la ligne passe « Signée ».
+# Refus : 2000107 est un changement de juge-commissaire (« OP (changement de juge) ») : RIG v2 remplace le juge de la PC a la signature
+# (EtreJugeCommEnAttente, :2786-2798, :3338-3345), ce que la V3 n'ecrit pas. Jumeau accepte : bloc 11, 2000108, du meme type OPSANS20.
 geste: Agir Signer la sélection
 ids: 2000107
+resultat: refuse
+message: Le changement de juge-commissaire de l'ordonnance du rôle 2026OS20107 (ETRE_JUGE_COMM_EN_ATTENTE) n'est pas repris par RIG v3 : rien n'est enregistré, faire la signature dans RIG v2.
+---
+# Refus : l'evenement OSPC20 du type de 2000106 porte l'evenement OSPCX20 de la PC liee (R_CODEEVEPRO_CODE_EVE_PRO_PC, :2554-2574), que la
+# V3 n'ecrit pas. Jumeau accepte : bloc 12, 2000101 dont l'evenement OSEVE20 n'en porte pas.
+geste: Agir Signer la sélection
+ids: 2000106
+resultat: refuse
+message: L'événement OSPCX20 de la procédure collective liée au rôle 2026OS20106 n'est pas repris par RIG v3 : rien n'est enregistré, faire la signature dans RIG v2.
+---
+# Refus : la maquette OS20LR de l'evenement OSLR20 (type de 2000114) va au demandeur par LRAR (« D,LRAR ») : EditionsEvenementV2 ne la
+# reprend pas, la signature est refusee APRES l'ecriture de l'evenement, que l'annulation du geste defait (lignes et journal inchanges).
+# Jumeau accepte : bloc 12, la maquette OS20NOTIF au document interne.
+geste: Agir Signer la sélection
+ids: 2000114
+resultat: refuse
+message: Le destinataire « D » de l'édition OS20LR n'est pas repris par RIG v3 : rien n'est enregistré, faire la signature dans RIG v2.
+---
+# Refus : l'affaire de 2000115 a une demande facturee (D2620011500) : RIG v2 reediterait sa facture (LOT2_FACTURE, :2773-2841). Jumeau
+# accepte : bloc 12, 2000101 sans affaire.
+geste: Agir Signer la sélection
+ids: 2000115
+resultat: refuse
+message: La réédition de la facture (LOT2_FACTURE) de l'affaire du rôle 2026OS20115 n'est pas reprise par RIG v3 : rien n'est enregistré, faire la signature dans RIG v2.
+---
+# Refus : l'ordonnance 2000111 a sa piece numerisee (VIDIGED_INDEX de la decision) : RIG v2 l'ajouterait aux editions
+# (_NouvellePieceNumerisee, :3567-3587). Jumeau accepte : bloc 12, 2000101 sans document.
+geste: Agir Signer la sélection
+ids: 2000111
+resultat: refuse
+message: La pièce numérisée de l'ordonnance du rôle 2026OS20111 (VIDIGED_INDEX) n'est pas reprise par RIG v3 : rien n'est enregistré, faire la signature dans RIG v2.
+---
+# « Signer la sélection » sur 2000108 (prevention, type sans serie ni evenement) : la date du jour, aucune minute ; la ligne passe
+# « Signée ». La demande ORDOSIGN de l'instance (Instance.CreateAndLockDemande, nommee du nom courant, :2681-2683), validee, porte le dossier
+# 2R de sa prevention (DossierDemandeAddSequenceurLie, Instance.cs:4761-4767) et sa mere « Décision rendue » (:3348-3349, :3390).
+geste: Agir Signer la sélection
+ids: 2000108
 resultat: fait
 lignes:
 ORDO A | Rôle 2026OS20101 · Ordonnance du banc lot 10 · prévue le {J+1} | OP | AFaire | []
@@ -43,19 +82,29 @@ ORDO E | Rôle 2026OS20105 · Ordonnance sans minute du banc · signée le {J+0}
 ORDO Q | Rôle 2026OS20117 · Ordonnance sans minute du banc · prévue le {J+17} | OP | AFaire | []
 ORDO R | Rôle 2026OS20118 · Ordonnance du banc lot 10 · prévue le {J+18} · minute 2501000001 | OP | AFaire | []
 ORDO F | Rôle 2026OS20106 · Ordonnance du banc lot 10 · prévue le {J+6} | OP (liée à une PC) | AFaire | []
-ORDO G | Rôle 2026OS20107 · Ordonnance sans minute du banc · signée le {J+0} | OP (changement de juge) | Validee | []
-ORDO H | Rôle 2026OS20108 · Ordonnance sans minute du banc · prévue le {J+8} | Prévention | AFaire | []
+ORDO G | Rôle 2026OS20107 · Ordonnance sans minute du banc · prévue le {J+7} | OP (changement de juge) | AFaire | []
+ORDO H | Rôle 2026OS20108 · Ordonnance sans minute du banc · signée le {J+0} | Prévention | Validee | []
 ORDO K | Rôle 2026OS20111 · Ordonnance sans minute du banc · prévue le {J+11} | JC | AFaire | []
 ORDO L | Rôle 2026OS20112 · Ordonnance sans minute du banc · prévue le {J+12} | Juge RCS | AFaire | []
 ORDO N | Rôle 2026OS20114 · Ordonnance sans minute du banc · prévue le {J+14} | Injonction DCA | AFaire | []
 ORDO O | Rôle 2026OS20115 · Ordonnance sans minute du banc · prévue le {J+15} | Injonction RBE | AFaire | []
 ORDO P | Rôle 2026OS20116 · Ordonnance sans minute du banc · prévue le {J+16} | Injonctions juge commis | AFaire | []
-controle: SELECT CASE WHEN DCJDC_NUM_REPERTOIRE IS NULL AND CONVERT(date, DCJDC_DATE) = CONVERT(date, GETDATE()) THEN 'rendue sans minute' ELSE 'non' END FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_DCJDC = 2000107 => rendue sans minute
+controle: SELECT CASE WHEN DCJDC_NUM_REPERTOIRE IS NULL AND CONVERT(date, DCJDC_DATE) = CONVERT(date, GETDATE()) THEN 'rendue sans minute' ELSE 'non' END FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_DCJDC = 2000108 => rendue sans minute
+controle: SELECT d.DMND_NOM + ' / ' + d.DMND_ETAT_DEMANDE + ' / ' + d.DMND_LES_NUMEROS + ' / ' + (SELECT x.DSSDM_VALEUR_SEQUENCEUR FROM v2.DOSSIER_DEMANDE AS x WHERE x.DSSDM_ID_DMND = d.DMND_ID_DMND AND x.DSSDM_CODE_SEQUENCEUR = '2R') + ' / ' + m.DMND_NOM + ' / ' + m.DMND_ETAT_DEMANDE FROM v2.DEMANDE AS d JOIN v2.DOSSIER_DEMANDE AS s ON s.DSSDM_ID_DMND = d.DMND_ID_DMND AND s.DSSDM_CODE_SEQUENCEUR = '2J' AND s.DSSDM_VALEUR_SEQUENCEUR = '2000108' JOIN v2.DEMANDE AS m ON m.DMND_ID_DMND = d.DMND_ID_DMND_MERE WHERE d.DMND_CODE_PROSS = 'ORDOSIGN' => ORDO H / V / 2026OS20108 / 2000801 / Décision rendue / V
+controle: SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 2000108 => 0
 ---
-# « Signer la sélection » sur 2000101 (type a serie JGOSX) : la date du jour et la minute du jour (_DoSauver, :3315-3327 : serie,
-# annee, quantieme ; num.Attribuer, le premier numero du jour : AAQQQ00001).
+# « Signer la sélection » sur 2000101 (type OPOS20 : serie JGOSX, evenement OSEVE20, expertise liee EXP20) : la date du jour et la minute
+# du jour (_DoSauver, :3315-3327 ; num.Attribuer, le premier numero du jour : AAQQQ00001) ; l'evenement OSEVE20 survenu ce jour
+# (_DoGenererEvenementsProcedure, :2546-2551) et son edition OS20NOTIF au document interne, phase C, sur la demande de l'instance
+# (evePRo.CreateDemandeEdition, :2849) ; l'expertise EXP20 creee (DecisionJudiciaire.AddMesure), ouverte ce jour et numerotee JMEXP
+# (:3365-3387) ; les numeros de la demande : le role, la minute, la mesure (:3361-3384).
 geste: Agir Signer la sélection
 ids: 2000101
 resultat: fait
 controle: SELECT CASE WHEN DCJDC_NUM_REPERTOIRE = RIGHT(CONVERT(varchar(4), YEAR(GETDATE())), 2) + RIGHT('00' + CONVERT(varchar(3), DATEPART(dayofyear, GETDATE())), 3) + '00001' AND CONVERT(date, DCJDC_DATE) = CONVERT(date, GETDATE()) THEN 'minute du jour' ELSE ISNULL(DCJDC_NUM_REPERTOIRE, 'sans minute') END FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_DCJDC = 2000101 => minute du jour
-controle: SELECT COUNT(*) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_DCJDC IN (2000103, 2000112, 2000117, 2000118) AND DCJDC_DATE IS NOT NULL => 0
+controle: SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 2000101 AND EVNPR_CODE_EVE_PRO = 'OSEVE20' AND EVNPR_SURVENU = 1 AND CONVERT(date, EVNPR_DATE) = CONVERT(date, GETDATE()) => 1
+controle: SELECT e.DMNED_LIBELLE_DOCUMENT + ' / ' + e.DMNED_PHASE_TRAITEMENT + ' / ' + d.DMND_CODE_PROSS + ' / ' + d.DMND_ETAT_DEMANDE FROM v2.DEMANDE_EDITION AS e JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = e.DMNED_ID_DMND JOIN v2.DOSSIER_DEMANDE AS s ON s.DSSDM_ID_DMND = d.DMND_ID_DMND AND s.DSSDM_CODE_SEQUENCEUR = '2J' AND s.DSSDM_VALEUR_SEQUENCEUR = '2000101' WHERE d.DMND_CODE_PROSS = 'ORDOSIGN' => Notification de l'ordonnance du banc 10 / C / ORDOSIGN / V
+controle: SELECT m.MSINS_TYPE_MESURE + ' / ' + CASE WHEN m.MSINS_NUM_MESURE LIKE CONVERT(varchar(4), YEAR(GETDATE())) + 'X%' THEN 'JMEXP' ELSE ISNULL(m.MSINS_NUM_MESURE, 'sans numéro') END + ' / ' + CASE WHEN CONVERT(date, m.MSINS_DATE_OUVERTURE) = CONVERT(date, GETDATE()) THEN 'ouverte ce jour' ELSE 'autre date' END + ' / ' + CONVERT(varchar(10), m.MSINS_ID_INSTN) FROM v2.MESURE AS m WHERE m.MSINS_ID_DCJDC = 2000101 => EXP20 / JMEXP / ouverte ce jour / 2000101
+controle: SELECT CASE WHEN d.DMND_LES_NUMEROS = '2026OS20101 ' + j.DCJDC_NUM_REPERTOIRE + ' ' + m.MSINS_NUM_MESURE THEN 'rôle, minute, mesure' ELSE d.DMND_LES_NUMEROS END + ' / ' + d.DMND_NOM + ' / ' + mere.DMND_NOM FROM v2.DEMANDE AS d JOIN v2.DOSSIER_DEMANDE AS s ON s.DSSDM_ID_DMND = d.DMND_ID_DMND AND s.DSSDM_CODE_SEQUENCEUR = '2J' AND s.DSSDM_VALEUR_SEQUENCEUR = '2000101' JOIN v2.DEMANDE AS mere ON mere.DMND_ID_DMND = d.DMND_ID_DMND_MERE JOIN v2.DECISION_JUDICIAIRE AS j ON j.DCJDC_ID_DCJDC = 2000101 JOIN v2.MESURE AS m ON m.MSINS_ID_DCJDC = 2000101 WHERE d.DMND_CODE_PROSS = 'ORDOSIGN' => rôle, minute, mesure / ORDO A / Décision rendue
+controle: SELECT COUNT(*) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_DCJDC IN (2000103, 2000106, 2000107, 2000111, 2000112, 2000114, 2000115, 2000117, 2000118) AND DCJDC_DATE IS NOT NULL => 0
+controle: SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN IN (2000106, 2000114) => 0

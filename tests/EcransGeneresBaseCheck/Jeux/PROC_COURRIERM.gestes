@@ -65,3 +65,57 @@ valeur: Seconde édition = LETTREPC20
 resultat: fait
 message: Courrier (« Lettre procédure du banc lot 10 ») créé dans la file des éditions. Le service d'édition de RIG v2 les produit : la V3 n'imprime rien.
 controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION AS e JOIN v2.DOSSIER_DEMANDE AS s ON s.DSSDM_ID_DMND = e.DMNED_ID_DMND WHERE s.DSSDM_CODE_SEQUENCEUR = '2P' AND s.DSSDM_VALEUR_SEQUENCEUR = '2000201' AND e.DMNED_CODE_ENTITE_SOURCE = 'PROC_COLL' => 1
+---
+# LES VOLETS PRÉVENTIONS ET MESURES. Refus : une mesure n'a pas de fiche -- le volet Mesures de RIG v2 ne lit que la colonne « seconde
+# édition » (OPE_RESULTAT_COURRIERM_MESURE.cs, DoVerifier :102-106, _GenererLesDemandesEditions :128-154). Jumeau accepte : bloc suivant
+# (la fiche d'une prevention) et le bloc de la seconde edition de la mesure.
+geste: Decider Générer la fiche
+ids: F-1500901
+resultat: refuse
+message: Une mesure n'a pas de fiche dans RIG v2 : seule « Générer la seconde édition » vaut pour le volet Mesures.
+---
+# « Générer la fiche » d'une prevention : Prevention.CreateDemande (Prevention.cs:1868-1871 : nom = nom de l'affaire, indicatif et numeros =
+# le numero de prevention, sequenceur 2R, sans affaire), validee ; sa demande d'edition FICHE_PRV « fiche prévention »
+# (OPE_RESULTAT_COURRIERM_PREVENTION.cs:144), entite source PROC_COLL (Prevention.CodeEntite, Prevention.cs:64).
+geste: Decider Générer la fiche
+ids: R-1311201
+valeur: File différée ou imprimante = BANC9_COURRIERS
+resultat: fait
+message: Courrier (fiche) créé dans la file des éditions (file différée « BANC9_COURRIERS »). Le service d'édition de RIG v2 les produit : la V3 n'imprime rien.
+controle: SELECT d.DMND_NOM + ' / ' + d.DMND_NUM_INDICATIF + ' / ' + d.DMND_LES_NUMEROS + ' / ' + d.DMND_ETAT_DEMANDE + ' / ' + COALESCE(CONVERT(varchar(12), d.DMND_ID_AFFRE), 'sans affaire') FROM v2.DEMANDE AS d JOIN v2.DOSSIER_DEMANDE AS s ON s.DSSDM_ID_DMND = d.DMND_ID_DMND WHERE d.DMND_CODE_PROSS = 'COURRIERM' AND s.DSSDM_CODE_SEQUENCEUR = '2R' AND s.DSSDM_VALEUR_SEQUENCEUR = '1311201' => PRV MD GAMMA / 2026V13121 / 2026V13121 / V / sans affaire
+controle: SELECT e.DMNED_LIBELLE_DOCUMENT + ' / ' + e.DMNED_CODE_ENTITE_SOURCE + ' / ' + e.DMNED_LOT + ' / ' + e.DMNED_PHASE_TRAITEMENT FROM v2.DEMANDE_EDITION AS e JOIN v2.DOSSIER_DEMANDE AS s ON s.DSSDM_ID_DMND = e.DMNED_ID_DMND WHERE s.DSSDM_CODE_SEQUENCEUR = '2R' AND s.DSSDM_VALEUR_SEQUENCEUR = '1311201' => fiche prévention / PROC_COLL / BANC9_COURRIERS / C
+---
+# Refus : la seconde edition d'une prevention est une edition EDIT_PRV (MetierProcPrevention.RequeteComboBoxEdition, :10), pas une
+# edition des instances. Jumeau accepte : bloc suivant, le reglage par defaut.
+geste: Decider Générer la seconde édition
+ids: R-1311201
+valeur: Seconde édition = CONVOC20
+resultat: refuse
+message: « CONVOC20 » n'est pas une seconde édition des préventions (EDIT_PRV) dans le paramétrage du greffe.
+---
+# « Générer la seconde édition » d'une prevention sans code choisi : le reglage LISTEPRV_2EDITION (LETTREPRV20) l'emporte sur
+# LISTEPR_2EDITION (AUTREPRV20), la premiere valeur trouvee (OPE_RESULTAT_COURRIERM_PREVENTION.cs:49-50 et :58 ;
+# GetSelectionEditionParDefaut, OPE_RESULTAT_COURRIERM_BASE.cs:40-50).
+geste: Decider Générer la seconde édition
+ids: R-1311201
+resultat: fait
+message: Courrier (« Lettre prévention du banc lot 10 ») créé dans la file des éditions. Le service d'édition de RIG v2 les produit : la V3 n'imprime rien.
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION AS e JOIN v2.DOSSIER_DEMANDE AS s ON s.DSSDM_ID_DMND = e.DMNED_ID_DMND WHERE s.DSSDM_CODE_SEQUENCEUR = '2R' AND s.DSSDM_VALEUR_SEQUENCEUR = '1311201' AND e.DMNED_LIBELLE_DOCUMENT = 'Lettre prévention du banc lot 10' => 1
+---
+# Refus : une mesure n'a pas d'edition par defaut (« pas d'édition pour mesure », OPE_RESULTAT_COURRIERM_MESURE.cs:50) : sans code choisi,
+# rien n'est genere. Jumeau accepte : bloc suivant, EXPMES20 choisi.
+geste: Decider Générer la seconde édition
+ids: F-1500901
+resultat: refuse
+message: Aucune seconde édition choisie : RIG v2 ne génère rien sans édition choisie dans la liste.
+---
+# « Générer la seconde édition » d'une mesure : Mesure.CreateDemande (Mesure.cs:912-915 : indicatif et numeros = le numero de mesure,
+# sequenceur 2F), son nom vide remplace par celui de l'instance (OPE_RESULTAT_COURRIERM_MESURE.cs:142-144) ; l'edition EDIT_MESUR choisie,
+# entite source MESURE (Mesure.cs:61), vers l'imprimante d'edition.
+geste: Decider Générer la seconde édition
+ids: F-1500901
+valeur: Seconde édition = EXPMES20
+valeur: File différée ou imprimante = Imprimante banc 10
+resultat: fait
+message: Courrier (« Courrier à l'expert du banc lot 10 ») créé dans la file des éditions (imprimante « Imprimante banc 10 »). Le service d'édition de RIG v2 les produit : la V3 n'imprime rien.
+controle: SELECT d.DMND_NOM + ' / ' + d.DMND_NUM_INDICATIF + ' / ' + e.DMNED_LIBELLE_DOCUMENT + ' / ' + e.DMNED_CODE_ENTITE_SOURCE + ' / ' + e.DMNED_IMPRIMANTE FROM v2.DEMANDE AS d JOIN v2.DOSSIER_DEMANDE AS s ON s.DSSDM_ID_DMND = d.DMND_ID_DMND JOIN v2.DEMANDE_EDITION AS e ON e.DMNED_ID_DMND = d.DMND_ID_DMND WHERE d.DMND_CODE_PROSS = 'COURRIERM' AND s.DSSDM_CODE_SEQUENCEUR = '2F' AND s.DSSDM_VALEUR_SEQUENCEUR = '1500901' => MESIN ALPHA # MESIN BETA / 2026M15901 / Courrier à l'expert du banc lot 10 / MESURE / Imprimante banc 10
