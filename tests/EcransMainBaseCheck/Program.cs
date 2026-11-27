@@ -1507,6 +1507,92 @@ Exiger((await EcranBanques.BanquesAsync(null, null)) is { Mode: "demo", Banques.
 Exiger((await EcranBanques.BanquesAsync(client, GreffeAbsent)) is { Mode: "erreur", Banques.Length: 0, Message: not null },
     "pont Banques, greffe absent : le motif, AUCUNE banque");
 
+// ============================================================ 14. ENCAISSEMENTS ET FACTURES D'UN DOSSIER (lot 12)
+// « Encaissements » (PROC_ENCAISS) et « Factures » (PROC_FACTURE) ouverts pour un dossier, branches au lot 12 : l'encaissement que
+// RIG v2 prepare pour les factures (PROC_ENCAISS.cs:89-111 : une ventilation par couple affaire et client, au montant
+// -Affaire.GetSolde(client), un couple au solde nul ecarte ; payeur = client de la premiere facture) et la demande que la facture
+// reprend (sa premiere, le client de sa facture, son solde Client.SoldeClient). Le dossier 2026B12001 par son numero de gestion RCS,
+// L12DOS02 par le numero indicatif de sa demande. Identifiants du lot 12 : 2 200 000 a 2 299 999.
+await Sql("""
+    ALTER TABLE v2.FACTURE ADD FACTU_MONTANT_TTC money NULL;
+    ALTER TABLE v2.ARTICLE_UTILISE ADD ARTUT_NUMERO_FACTURE varchar(25) NULL;
+    ALTER TABLE v2.VENTILATION ADD VENTI_ID_CLIEN int NULL, VENTI_DATE_VENTILATION datetime NULL;
+    IF OBJECT_ID(N'v2.CLIENT_SOLDE') IS NULL
+        CREATE TABLE v2.CLIENT_SOLDE (CLISO_ID_CLISO int IDENTITY PRIMARY KEY, CLISO_DATE_SOLDE datetime NOT NULL, CLISO_MONTANT money NOT NULL,
+            CLISO_ID_CLIEN int NOT NULL, CLISO_ID_UTLST int NOT NULL);
+    """);
+await Sql("""
+    SET IDENTITY_INSERT rec.Entreprise ON;
+    INSERT INTO rec.Entreprise (Id, Siren, Civilite, Denomination, EtatInfo, FicheSommaire) VALUES (2201201, '522012001', '', N'ENCAISSEMENT ALPHA SAS', 'C', 0);
+    SET IDENTITY_INSERT rec.Entreprise OFF;
+    SET IDENTITY_INSERT rec.DossierRcs ON;
+    INSERT INTO rec.DossierRcs (Id, IdEntreprise, TypeRcs, NumeroGestion, Siren, DateImmatriculation, MotifImmatriculation,
+        ProvisoirementSans, CompteurMaj, DateMaj, EtatDossier, EtatInfo, InscritRegistreMetiers, ModificationInterne,
+        SirenProvisoire, Accre, AutoEntrepreneur, Eirl, AutoEntrepreneurRegularise) VALUES
+        (2201201, 2201201, 'B1', '2026B12001', '522012001', '20260101', 'C', 0, 0, '20260101', 'A', 'C', 0, 0, 0, 0, 0, 0, 0);
+    SET IDENTITY_INSERT rec.DossierRcs OFF;
+    SET IDENTITY_INSERT rec.Client ON;
+    INSERT INTO rec.Client (Id, Abrege, NumeroCompte, Nom, Prenom, Type, Civilite, EstComptePc, EstCompteWeb) VALUES
+        (2201301, 'L12ENC', '411L12ENC', 'CLIENT ENC A', '', 'C', '', 0, 0), (2201302, 'L12ENB', '411L12ENB', 'CLIENT ENC B', '', 'C', '', 0, 0);
+    SET IDENTITY_INSERT rec.Client OFF;
+    -- l'adresse par defaut d'abord ; une seconde adresse, pas par defaut, n'est pas lue
+    INSERT INTO rec.ClientAdresse (IdClient, LigneAdresse, CodePostal, Localite, ParDefaut) VALUES
+        (2201301, '9 rue Secondaire', '80100', 'ABBEVILLE', 0), (2201301, '1 rue Enc', '80000', 'AMIENS', 1);
+    INSERT INTO v2.AFFAIRE (AFFRE_ID_AFFRE, AFFRE_LIBELLE, AFFRE_DATE_CREATION) VALUES (2201101, 'Affaire enc A', '20260101'), (2201102, 'Affaire enc B', '20260101');
+    INSERT INTO v2.DEMANDE (DMND_ID_DMND, DMND_ID_DSRCS, DMND_NUM_DEMANDE, DMND_NOM, DMND_NUM_INDICATIF, DMND_ETAT_DEMANDE, DMND_EN_COURS, DMND_ID_AFFRE) VALUES
+        (2201001, 2201201, 'D12E001', 'Encaissement - ALPHA', NULL, 'V', 0, 2201101),
+        (2201002, NULL, 'D12E002', 'Encaissement - BETA', 'L12DOS02', 'V', 0, 2201102);
+    INSERT INTO v2.FACTURE (FACTU_NUMERO_FACTURE, FACTU_NUM_DEMANDE, FACTU_ID_CLIEN, FACTU_DATE_CREATION, FACTU_MONTANT_TTC) VALUES
+        ('F12E101', 'D12E001', 2201301, DATEADD(DAY, -10, CAST(GETDATE() AS date)), 150.00),
+        ('F12E102', 'D12E001', 2201302, DATEADD(DAY, -10, CAST(GETDATE() AS date)), 40.00),
+        ('F12E103', 'D12E002', 2201302, DATEADD(DAY, -10, CAST(GETDATE() AS date)), 60.00);
+    -- deux articles sur F12E101 : sa facture ne compte qu'UNE fois dans Affaire.GetSolde(client) (« distinct », Affaire.cs:302)
+    INSERT INTO v2.ARTICLE_UTILISE (ARTUT_ID_ARTUT, ARTUT_ID_AFFRE, ARTUT_MONTANT_TTC, ARTUT_NUMERO_FACTURE) VALUES
+        (2201401, 2201101, 150.00, 'F12E101'), (2201404, 2201101, 0.00, 'F12E101'), (2201402, 2201101, 40.00, 'F12E102'), (2201403, 2201102, 60.00, 'F12E103');
+    -- 2201301 a deja paye 7,50 ; 2201302 a solde l'affaire A (son couple est a 0 : ecarte)
+    INSERT INTO v2.VENTILATION (VENTI_ID_VENTI, VENTI_ID_AFFRE, VENTI_MONTANT, VENTI_ID_CLIEN, VENTI_DATE_VENTILATION) VALUES
+        (2201501, 2201101, 7.50, 2201301, DATEADD(DAY, -5, CAST(GETDATE() AS date))), (2201502, 2201101, 40.00, 2201302, DATEADD(DAY, -5, CAST(GETDATE() AS date)));
+    -- 2201302 a un solde valide il y a 30 jours (-5,00) : Client.SoldeClient part de lui
+    INSERT INTO v2.CLIENT_SOLDE (CLISO_DATE_SOLDE, CLISO_MONTANT, CLISO_ID_CLIEN, CLISO_ID_UTLST) VALUES (DATEADD(DAY, -30, CAST(GETDATE() AS date)), -5.00, 2201302, 1);
+    """);
+await using (var cn = new SqlConnection(greffe.Connexion))
+{
+    await cn.OpenAsync();
+    var alpha = await LectureEncaissements.LireAsync(cn, "2026B12001", DateTime.Now, CancellationToken.None);
+    Exiger(alpha is { Payeur: "CLIENT ENC A", Montant: 142.50m } && alpha.Factures.SequenceEqual(["F12E101", "F12E102"]) && alpha.Ventilations.Length == 1
+           && alpha.Ventilations[0] is { IdAffaire: 2201101, Affaire: "Affaire enc A", IdClient: 2201301, Abrege: "L12ENC", Montant: 142.50m, SoldeAffaire: -142.50m, SoldeClient: -142.50m },
+        $"encaissement du dossier 2026B12001 (numero de gestion) : une ventilation de 142,50 (7,50 - 150,00, la facture comptee une fois) ; le couple de 2201302 a 0 ecarte ; payeur = client de la premiere facture ({alpha.Montant} ; {alpha.Ventilations.Length})");
+    var beta = await LectureEncaissements.LireAsync(cn, "L12DOS02", DateTime.Now, CancellationToken.None);
+    Exiger(beta is { Payeur: "CLIENT ENC B", Montant: 60.00m } && beta.Ventilations.Single() is { IdAffaire: 2201102, IdClient: 2201302, SoldeAffaire: -60.00m, SoldeClient: -65.00m },
+        $"encaissement du dossier L12DOS02 (numero indicatif) : 60,00 ; solde client depuis son solde valide : -5 + 40 - 100 = -65,00 ({beta.Ventilations.SingleOrDefault()?.SoldeClient})");
+    Exiger((await LectureEncaissements.LireAsync(cn, "L12AUCUN", DateTime.Now, CancellationToken.None)) is { Payeur: "", Montant: 0m, Ventilations.Length: 0 },
+        "encaissement d'un dossier sans facture : vide (le mode « libre » de RIG v2)");
+    var demandeAlpha = await LectureFactures.LireAsync(cn, "2026B12001", DateTime.Now, CancellationToken.None);
+    Exiger(demandeAlpha is { Numero: "D12E001", Abrege: "L12ENC", Nom: "CLIENT ENC A", Adresse: "1 rue Enc 80000 AMIENS", Solde: -142.50m },
+        $"demande du dossier 2026B12001 : la premiere, le client de sa premiere facture, son adresse PAR DEFAUT, son solde ({demandeAlpha?.Adresse} ; {demandeAlpha?.Solde})");
+    Exiger((await LectureFactures.LireAsync(cn, "L12DOS02", DateTime.Now, CancellationToken.None)) is { Numero: "D12E002", Abrege: "L12ENB", Adresse: "", Solde: -65.00m }
+           && await LectureFactures.LireAsync(cn, "L12AUCUN", DateTime.Now, CancellationToken.None) is null,
+        "demande du dossier L12DOS02 : son client sans adresse ; un dossier sans demande : aucune");
+}
+Exiger((await http.GetFromJsonAsync<EncaissementDeDepart>(RoutesEcransMain.Pour(RoutesEncaissements.Depart, Greffe).Replace("{dossier}", "2026B12001"), json)) is { Montant: 142.50m },
+    "route de l'encaissement d'un dossier : la lecture");
+Exiger((await http.GetFromJsonAsync<DemandeDuDossierLue>(RoutesEcransMain.Pour(RoutesFactures.Demande, Greffe).Replace("{dossier}", "L12AUCUN"), json)) is { Demande: null },
+    "route de la demande d'un dossier : sans demande, une reponse lisible (Demande vide), pas un corps vide");
+var encPont = await EcranEncaissements.DepartAsync(client, Greffe, "2026B12001");
+Exiger(encPont is { Mode: "serveur", Payeur: "CLIENT ENC A", Montant: 14250 }
+       && encPont.Ventilations.Single() is { Identifiant: "2201101", Affaire: "2201101 — Affaire enc A", Montant: 14250, SoldeAffaire: 14250, SoldeClient: 14250 },
+    "pont Encaissements branche : centimes, soldes DUS positifs (la convention de l'ecran)");
+Exiger((await EcranEncaissements.DepartAsync(client, Greffe, null)) is { Mode: "serveur", Ventilations.Length: 0, Montant: 0 }
+       && (await EcranEncaissements.DepartAsync(null, null, "2026B12001")) is { Mode: "demo", Ventilations.Length: 0 }
+       && (await EcranEncaissements.DepartAsync(client, GreffeAbsent, "2026B12001")) is { Mode: "erreur", Ventilations.Length: 0, Message: not null },
+    "pont Encaissements : depuis l'accueil, un encaissement vide ; sans serveur, la demonstration ; greffe absent, le motif et rien");
+Exiger((await EcranFactures.DemandeDeAsync(client, Greffe, "2026B12001")) is { Mode: "serveur", Numero: "D12E001", Client: "L12ENC", Solde: 142.50m }
+       && await EcranFactures.DemandeDeAsync(client, Greffe, "L12AUCUN") is null
+       && (await EcranFactures.DemandeDeAsync(client, GreffeAbsent, "2026B12001")) is { Mode: "erreur", Numero: "", Client: "", Message: not null },
+    "pont Factures branche : la demande et le client de la base, solde du positif ; sans demande, null ; greffe absent, le motif et rien");
+Exiger(EcranFactures.DateDuJour(client, new DateTime(2026, 11, 27)) == "2026-11-27" && EcranFactures.DateDuJour(null, new DateTime(2026, 11, 27)) != "2026-11-27",
+    "date du jour : celle du poste avec un serveur, celle de la demonstration sans");
+
 Console.WriteLine();
 if (echecs.Count == 0) { Console.WriteLine("Ecrans faits main branches sur la base : VERT."); return 0; }
 Console.WriteLine(echecs.Count + " echec(s) : " + string.Join(" | ", echecs));

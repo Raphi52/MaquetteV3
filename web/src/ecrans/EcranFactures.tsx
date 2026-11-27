@@ -31,6 +31,11 @@
 // gardait le mode « Facturer » (facture numerotee a 0 EUR), le total 0,00 et l'encaissement
 // « Facture soldee » : l'ecran supposait qu'il y a toujours quelque chose a facturer.
 //
+// BRANCHE SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 12, 27/11/2026 ; marche du lot 17) : ouverte pour une affaire avec un
+// serveur, la demande et le client de sa facture viennent de la base du greffe (Pont/EcranFactures.cs, DemandeDe ;
+// Serveur/Socle/EcransMain/LectureFactures.cs : nom, abrege, adresse, solde du) ; « Changer de client » ne propose alors plus les
+// fiches de demonstration. En panne, le motif, et aucun client. Depuis l'accueil, la facture de demonstration reste (non branchee).
+//
 // LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 4) : les articles prennent les
 // briques de composants/ListeModerne.tsx. Tete (nombre d'articles, total TTC, reste a encaisser), trois cartes :
 // Total TTC (retenus / retires, le clic filtre), Encaisse (anneau sur le total), BODACC · INPI · Autre (le clic
@@ -42,6 +47,7 @@
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { centimes, euros, nombre } from '../format'
 import {
   CartesChiffrees, CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MenuLigne, MontantBarre, PiedListe, PointEtat,
@@ -178,6 +184,12 @@ interface DemandeFacturee {
   numero: string
   /** L'abrege du client de la demande, vide si elle n'en nomme pas. */
   client: string
+  /** Lue dans la base (lot 12) : le nom, l'adresse et le solde du du client de sa facture, et d'ou vient la demande. */
+  nom?: string | null
+  adresse?: string | null
+  solde?: number | null
+  mode?: ModeLecture
+  message?: string | null
 }
 
 export interface ProprietesEcranFactures {
@@ -242,10 +254,14 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
   // Le client nomme par l'affaire : l'abrege de sa demande, la societe de l'affaire
   // (toutes les demandes du jeu de demonstration abregent la denomination de leur
   // dossier). Ni type, ni adresse, ni solde : l'affaire ne les dit pas.
+  // Lue dans la base : la fiche du client de sa facture, seule (les fiches de demonstration ne sont pas des clients du greffe).
+  const enBase = demande?.mode !== undefined && demande.mode !== 'demo'
   const ficheAffaire: FicheClient | null = dossier
-    ? (demande?.client ? { ...FicheVide, nom: nomAffaire, abrege: demande.client } : FicheVide)
+    ? (enBase && demande?.client
+        ? { ...FicheVide, nom: demande.nom || nomAffaire, abrege: demande.client, adresse: demande.adresse ?? '', solde: demande.solde ?? null }
+        : demande?.client ? { ...FicheVide, nom: nomAffaire, abrege: demande.client } : FicheVide)
     : null
-  const fiches: readonly FicheClient[] = ficheAffaire ? [ficheAffaire, ...Fiches] : Fiches
+  const fiches: readonly FicheClient[] = ficheAffaire ? (enBase ? [ficheAffaire] : [ficheAffaire, ...Fiches]) : Fiches
   const fiche = fiches.find((f) => f.nom === client) ?? fiches[0] ?? FicheVide
 
   // v2 : btn_Changer_client fait defiler les clients rattachables a la facture.
@@ -300,6 +316,9 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
 
       <aside className="rig-criteres">
         {dossier && <PourLeDossier dossier={dossier} />}
+        {dossier && demande?.mode !== undefined && demande.mode !== 'serveur' && demande.mode !== 'demo' && (
+          <ProvenanceEcran mode={demande.mode} message={demande.message} quoi="Demandes" />
+        )}
 
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Informations client</div>
 

@@ -322,3 +322,30 @@ describe('EcranFactures ouvert depuis une affaire', () => {
     expect(pont.appels.mock.calls.map(([nom]) => nom)).toEqual(['EcranFactures.DateDuJour'])
   })
 })
+
+// La demande et le client d'une affaire lus dans la base (plan « RIG v3 100 % fonctionnel », lot 12, Pont/EcranFactures.cs) : la fiche
+// du client de sa facture seule (aucune fiche de demonstration a cote) ; en panne, le motif et aucun client.
+describe('EcranFactures : demande du dossier lue dans la base', () => {
+  it('branche : numero de demande, client, adresse et solde du de la base ; Changer de client ne propose pas la demonstration', async () => {
+    installerFauxPont({
+      'EcranFactures.DateDuJour': () => '2026-11-27',
+      'EcranFactures.DemandeDe': () => ({ numero: 'D12FAC001', client: 'L12FAC', nom: 'CLIENT FACTURE BANC', adresse: '2 rue du Banc 80000 AMIENS',
+                                          solde: 42.5, mode: 'serveur', message: null }),
+    })
+    render(<EcranFactures dossier={contexteDossier({ numero: 'L12DOS01', nom: 'CLIENT FACTURE BANC' })} />)
+    await waitFor(() => expect(screen.getByDisplayValue('D12FAC001')).toBeTruthy())
+    expect(screen.getByDisplayValue('2 rue du Banc 80000 AMIENS')).toBeTruthy()
+    expect(screen.getByText('Solde client', { exact: false }).textContent).toContain('42,50')
+    expect(screen.queryByText('SELARL LEROY & ASSOCIES')).toBeNull()
+  })
+
+  it('en panne, le motif, et ni demande ni client de demonstration', async () => {
+    installerFauxPont({
+      'EcranFactures.DateDuJour': () => '2026-11-27',
+      'EcranFactures.DemandeDe': () => ({ numero: '', client: '', mode: 'erreur', message: 'La base du greffe 3801 ne répond pas.' }),
+    })
+    render(<EcranFactures dossier={contexteDossier({ numero: 'L12DOS01', nom: 'CLIENT FACTURE BANC' })} />)
+    expect((await screen.findByRole('alert')).textContent).toContain('La base du greffe 3801 ne répond pas.')
+    expect(screen.queryByText('SELARL LEROY & ASSOCIES')).toBeNull()
+  })
+})

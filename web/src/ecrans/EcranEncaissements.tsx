@@ -14,6 +14,12 @@
 // de demonstration etaient declarees dans l'ecran et l'ont suivi. Montants en
 // centimes entiers (le C# calculait en decimal, exact).
 //
+// BRANCHE SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 12, 27/11/2026 ; marche du lot 17) : avec un serveur, l'ecran part de
+// l'encaissement que RIG v2 prepare (Pont/EcranEncaissements.cs, Depart ; Serveur/Socle/EcransMain/LectureEncaissements.cs) --
+// ouvert pour un dossier, une ventilation par couple affaire et client de ses factures, au solde du, cochee ; depuis l'accueil,
+// un encaissement vide, sans ventilation (PROC_ENCAISS.cs:87). Les champs de demonstration (banque, titre, adresse du recu,
+// encaissement repris) restent vides. Sans serveur, la demonstration ci-dessous, marquee « exemple » ; en panne, le motif et rien.
+//
 // LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 4) : les ventilations prennent les
 // briques de composants/ListeModerne.tsx. Tete (choisies, ventile sur encaisse, reste, « Aller a une ventilation… »
 // Ctrl K, Entree coche ou decoche la ventilation restee seule), trois cartes : Ventile
@@ -26,6 +32,7 @@ import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { centimes, euros } from '../format'
 import { PourLeDossier } from '../composants/PourLeDossier'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import {
   CartesChiffrees, CelluleIdentite, EnteteListe, ListeModerne, MontantBarre, PiedListe, PointEtat, montant as texteMontant, normaliser, type Teinte,
 } from '../composants/ListeModerne'
@@ -61,6 +68,16 @@ const numeroAffaire = (l: Ventilation): string => l.affaire.split(' — ')[0] ??
 /** Les teintes de la carte « Montants par client », dans l'ordre d'apparition des clients. */
 const TeintesClients: readonly Teinte[] = ['bleu', 'violet', 'orange', 'vert', 'ardoise', 'rouge']
 
+/** Ce que rend le pont (Pont/EcranEncaissements.cs, VueEncaissement) : l'encaissement de depart lu dans la base. */
+export interface VueEncaissement {
+  payeur: string
+  /** centimes */
+  montant: number
+  ventilations: Ventilation[]
+  mode?: ModeLecture
+  message?: string | null
+}
+
 export interface ProprietesEcranEncaissements {
   /** L'affaire d'ou l'ecran a ete ouvert (page du dossier) : le reglement est pour elle
    *  (bloc « Pour le dossier », ses ventilations cochees). Absent ou null depuis l'accueil. */
@@ -83,9 +100,33 @@ export function EcranEncaissements({ dossier = null }: ProprietesEcranEncaisseme
   const [montant, setMontant] = useState(centimes(357.57))
   // Ouvert depuis une affaire : les ventilations cochees au depart sont les SIENNES
   // (aucune si elle n'en a pas), jamais celles d'autres affaires.
+  // null : la demonstration (pas encore de reponse du pont, ou mode « demo »).
+  const [vue, setVue] = useState<VueEncaissement | null>(null)
+  const lignes = vue ? vue.ventilations : Lignes
+  const repris = vue ? null : EncaissementRepris
   const [choisies, setChoisies] = useState<ReadonlySet<string>>(() => new Set(dossier
     ? Lignes.filter((l) => numeroAffaire(l) === dossier.numero).map((l) => l.identifiant)
     : ['V-2026-8801', 'V-2026-8802']))
+
+  const numeroDossier = dossier?.numero ?? null
+  useEffect(() => {
+    let perime = false
+    void appeler<VueEncaissement>('EcranEncaissements.Depart', numeroDossier)
+      .then((v) => {
+        if (perime || v.mode === 'demo' || v.mode === undefined) return
+        // La base remplace la demonstration : l'encaissement de depart de RIG v2, ses ventilations cochees.
+        setVue(v)
+        setPayeur(v.payeur)
+        setMontant(v.montant)
+        setMontantTexte((v.montant / 100).toFixed(2))
+        setBanque('')
+        setNumTitre('')
+        setAdresseRecu('')
+        setChoisies(new Set(v.ventilations.map((l) => l.identifiant)))
+      })
+      .catch(() => { /* pas de pont (tests, page hors WebView2) : la demonstration reste */ })
+    return () => { perime = true }
+  }, [numeroDossier])
 
   useEffect(() => {
     let perime = false
@@ -108,7 +149,7 @@ export function EcranEncaissements({ dossier = null }: ProprietesEcranEncaisseme
     })
   }
 
-  const ventile = Lignes.filter((l) => choisies.has(l.identifiant)).reduce((s, l) => s + l.montant, 0)
+  const ventile = lignes.filter((l) => choisies.has(l.identifiant)).reduce((s, l) => s + l.montant, 0)
   const nonVentile = montant - ventile
 
   // Les filtres des cartes : les ventilations choisies seulement, un client. Ils montrent, ils ne cochent rien.
@@ -117,12 +158,12 @@ export function EcranEncaissements({ dossier = null }: ProprietesEcranEncaisseme
   // « Aller a une ventilation… » (Ctrl K) : un payeur peut solder beaucoup d'affaires d'un coup.
   const [filtreRapide, setFiltreRapide] = useState('')
   const cherche = normaliser(filtreRapide.trim())
-  const affichees = Lignes.filter((l) => (!seulementChoisies || choisies.has(l.identifiant))
+  const affichees = lignes.filter((l) => (!seulementChoisies || choisies.has(l.identifiant))
                                         && (filtreClient === null || l.abrege === filtreClient)
                                         && (cherche === '' || normaliser([l.identifiant, l.affaire, l.client, l.abrege].join(' ')).includes(cherche)))
   const montantMax = affichees.reduce((m, l) => Math.max(m, l.montant), 0)
-  const clients = [...new Set(Lignes.map((l) => l.abrege))]
-  const parClient = (abrege: string) => Lignes.filter((l) => l.abrege === abrege).reduce((s, l) => s + l.montant, 0)
+  const clients = [...new Set(lignes.map((l) => l.abrege))]
+  const parClient = (abrege: string) => lignes.filter((l) => l.abrege === abrege).reduce((s, l) => s + l.montant, 0)
   const euro = (c: number) => texteMontant(c / 100)
 
   return (
@@ -190,24 +231,25 @@ export function EcranEncaissements({ dossier = null }: ProprietesEcranEncaisseme
                     value={commentaire} onChange={(e) => setCommentaire(e.target.value)}></textarea>
         </label>
 
-        {EncaissementRepris !== null && (
-          <span className="rig-etat rig-etat--attente">Encaissement repris : {EncaissementRepris}</span>
+        {repris !== null && (
+          <span className="rig-etat rig-etat--attente">Encaissement repris : {repris}</span>
         )}
       </aside>
 
       <ListeModerne etiquette="Ventilations">
         <EnteteListe titre="Ventilations"
-                     synthese={<>{choisies.size}{` choisie(s) sur ${Lignes.length} · `}<b>{euro(ventile)}</b>{' ventile(s) sur '}<b>{euro(montant)}</b>
+                     synthese={<>{choisies.size}{` choisie(s) sur ${lignes.length} · `}<b>{euro(ventile)}</b>{' ventile(s) sur '}<b>{euro(montant)}</b>
                        {' · '}{nonVentile === 0 ? 'solde nul' : <><b>{euro(nonVentile)}</b>{' a ventiler'}</>}</>}
                      filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a une ventilation…',
                                valider: () => { if (affichees.length === 1) basculer(affichees[0]!.identifiant) } }} />
+        {vue ? <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Ventilations" /> : <ProvenanceEcran mode="demo" quoi="Ventilations" />}
 
         <CartesChiffrees cartes={[
           { cle: 'ventile', titre: 'Ventile', valeur: euro(ventile), complement: `sur ${euro(montant)}`,
             anneau: { part: Math.min(ventile, montant), total: montant, teinte: 'vert' },
             actif: seulementChoisies, choisir: () => setSeulementChoisies(!seulementChoisies),
             indication: seulementChoisies ? 'Toutes les ventilations' : 'Seulement les ventilations choisies' },
-          { cle: 'clients', titre: 'Montants par client', valeur: euro(Lignes.reduce((s, l) => s + l.montant, 0)), legende: true,
+          { cle: 'clients', titre: 'Montants par client', valeur: euro(lignes.reduce((s, l) => s + l.montant, 0)), legende: true,
             ...(filtreClient !== null ? { choisir: () => setFiltreClient(null), indication: 'Tous les clients' } : {}),
             segments: clients.map((abrege, i) => ({
               cle: abrege, libelle: abrege, valeur: parClient(abrege), texte: euro(parClient(abrege)),
