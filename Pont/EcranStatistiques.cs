@@ -2,7 +2,7 @@ using RigV3.Contrats.EcransMain;
 
 namespace RigV3Desktop.Pont;
 
-/// <summary>Un tableau du volet, tel que l'ecran l'affiche (Contrats/EcransMain/VoletsStatistiques.cs).</summary>
+/// <summary>Un tableau du volet, tel que l'ecran l'affiche (Contrats/EcransMain/LectureStatistiques.cs).</summary>
 public sealed record TableauStatVue(string Titre, string[] Colonnes, LigneStatVue[] Lignes, string? Cause);
 
 /// <summary>Une ligne : son libelle et ses cellules, dans l'ordre des colonnes qui suivent la premiere.</summary>
@@ -13,7 +13,7 @@ public sealed record VueStatistiques(TableauStatVue[] Tableaux, string? Refus, s
 
 /// <summary>
 /// Pont de l'ecran PROC_STAT (web/src/ecrans/EcranStatistiques.tsx). Branche au serveur, il rend les volets de RIG v2 CALCULES
-/// dans la base du greffe (Serveur/Socle/EcransMain/VoletsStatistiques.cs, plan « RIG v3 100 % fonctionnel », lot 9,
+/// dans la base du greffe (Serveur/Socle/EcransMain/LectureStatistiques.cs, plan « RIG v3 100 % fonctionnel », lot 9,
 /// 27/11/2026) ; SANS serveur, la demonstration ci-dessous, marquee « exemple » par l'ecran -- les memes tableaux et libelles que
 /// le calcul, des chiffres d'exemple. En panne : le motif et aucun tableau (Pont/LectureEcranMain.cs).
 /// </summary>
