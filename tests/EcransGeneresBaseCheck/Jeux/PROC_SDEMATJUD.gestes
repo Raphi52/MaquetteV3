@@ -1,5 +1,7 @@
 # « Suivi dématérialisation » (EcrivainSuiviDematerialisation) : « Valider » de l'onglet JAL (Resultat\OPE_RESULTAT_JAL.cs de RIG v2).
 # Lignes du jeu : PROC_SDEMATJUD.sql et .attendu ; l'Id d'une ligne JAL est « publicité:parution:facture » (0 sans document).
+# fix-ok: mesure au controle du lot 9 (27/11/2026) -- les blocs 3 et 5 attribuaient a RIG v2 le sort de la prevention absente ;
+# OPE_RESULTAT_JAL.cs:137-172 et MetierSdematJud.cs:194-195 disent le contraire : ecart de la V3, nomme, refuse a son message.
 
 # Refus : « Éditer les détails » produit un classeur Excel (ResultatRechercheRapport) -- jamais produit par la V3, donc sans jumeau.
 geste: Agir Éditer les détails
@@ -14,12 +16,14 @@ ids: 1908101:0:0
 resultat: refuse
 message: Vous devez sélectionner au moins une ligne
 ---
-# Refus de RIG v2 : 1908112 est sur une prevention absente de la base -- Prevention.GetPrevention rend null, aucune demande ni
-# edition (:156-170) : rien n'est retenu. Jumeau accepte : bloc 5, 1908111 sur la prevention 1400201.
+# Refus de la V3, ECART A RIG v2 (en tete d'EcrivainSuiviDematerialisation.cs) : 1908112 est sur une prevention absente de la base.
+# RIG v2 ne refuse pas : la ligne cochee compte (MetierSdematJud.cs:194-195), GetPrevention rend null (:157) et, seule cochee,
+# elle enregistre une demande vide « Génération d'édition pour 0 instance » (:89). La V3 refuse en nommant la cause, sans le
+# message AUCUNE_SELECTION (bloc 2). Jumeau accepte : bloc 5, 1908111 sur la prevention 1400201.
 geste: Agir Valider
 ids: 1908112:1908213:0
 resultat: refuse
-message: Vous devez sélectionner au moins une ligne
+message: Aucune ligne cochée n'a son affaire (procédure collective ou prévention) dans la base du greffe : aucune demande ne peut être créée, rien n'est mis à imprimer.
 ---
 # Refus : le document 1908215 de 1908114 n'a pas de GUID VIDIGED, sa reference GED ne peut pas s'ecrire (GedRig.cs:233) -- coche
 # avec 1908110 : rien n'est ecrit, pas meme pour 1908110. Jumeau accepte : bloc 5, les documents de 1908110 ont leur GUID.
@@ -29,8 +33,11 @@ resultat: refuse
 message: Le document 1908215 reçu en GED n'a pas de GUID VIDIGED : sa pièce numérisée ne peut pas être référencée, rien n'est mis à imprimer.
 ---
 # Accepte : 1908110 (parution et facture) et 1908113 (facture) sur la PC 1400103 -- UNE demande pour l'affaire (:152-153), trois
-# editions ; 1908111 (parution) sur la prevention 1400201 -- une demande, une edition ; 1908112 (prevention absente) et 1908101 (sans
-# document) passent sans rien ecrire, comme dans RIG v2. La demande du traitement : « Génération d'édition pour 2 instances »
+# editions ; 1908111 (parution) sur la prevention 1400201 -- une demande, une edition ; 1908101 (sans document : cases inactives
+# dans RIG v2, DataGridViewSdematJud.cs:428-443) ne compte pas ; 1908112 (prevention absente) ne donne ni demande ni edition --
+# ECART A RIG v2 : cochee apres 1908111, sa parution 1908213 y serait mise a imprimer sous la demande de la prevention 1400201
+# (« demande » jamais remise a null, OPE_RESULTAT_JAL.cs:137, :170-172), comptee deux fois dans le nom (« pour 3 instances »).
+# La demande du traitement : « Génération d'édition pour 2 instances »
 # (:89), validee, mere des deux demandes (:171). Chaque edition : sa reference GED vers le document VIDIGED (base JUDICIAIRE, son
 # extension ou « pdf », AUCUN fichier : GedRig.cs:231-239), prete a imprimer (« P », DemandeEdition.cs:1124-1131), un exemplaire,
 # l'imprimante par defaut de l'agent (sa preference, PROC_SDEMATJUD.sql), le libelle « <nature> numérisée » (:303-309).
