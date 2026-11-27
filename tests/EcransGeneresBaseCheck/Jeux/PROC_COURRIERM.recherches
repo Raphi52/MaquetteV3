@@ -25,3 +25,28 @@ texte: COURRIER B
 critere: Date de l'audience = 1990-05-14
 lignes:
 COURRIER B | Rôle 2026CM20202 · Audience du 14/05/1990 à 09:00 · appel 2 | Instances | AFaire | []
+---
+# 5. Le volet « Préventions » par son numero (la zone de numero du volet, OPE_RECHERCHE_COURRIERM_PREVENTION.cs:74-85 ; « WHERE
+#    PREVE_NUM_PRV = », MetierProcPrevention.cs:38) : la prevention 2026V13121 de PROC_MDJUD.sql, apres les instances de l'audience
+#    choisie. Ni juge, ni mandataire, ni date dans ce jeu : les precisions n'en disent rien.
+critere: Date de l'audience = 1990-05-13
+critere: N° de prévention = 2026V13121
+lignes:
+COURRIER D | Rôle 2026CM20204 · Audience du 13/05/1990 à 09:00 · appel 1 | Instances | AFaire | []
+PRV MD GAMMA | PRV 2026V13121 | Préventions | AFaire | []
+---
+# 6. Refus : un numero de prevention qu'aucune prevention ne porte (le numero entier, pas un debut : « = », :38) -- le volet reste vide.
+#    Jumeau accepte : bloc 5.
+critere: Date de l'audience = 1990-05-13
+critere: N° de prévention = 2026V1312
+lignes:
+COURRIER D | Rôle 2026CM20204 · Audience du 13/05/1990 à 09:00 · appel 1 | Instances | AFaire | []
+---
+# 7. Le volet « Mesures » par son numero (« WHERE MSINS_NUM_MESURE = », MetierProcMesure.cs:30) : la mesure 2026M15901 de PROC_MESIN.sql,
+#    nommee par son instance (Mesure.NomDemande), son premier participant ACTIF (l'expert ; l'inactif de rang 0 est ecarte, :22) et sa date
+#    d'ouverture. Son type AUT15 n'a pas de synonyme dans ce jeu : RIG v2 concatene « synonyme : libelle » et n'affiche rien.
+critere: Date de l'audience = 1990-05-13
+critere: N° de mesure = 2026M15901
+lignes:
+COURRIER D | Rôle 2026CM20204 · Audience du 13/05/1990 à 09:00 · appel 1 | Instances | AFaire | []
+MESIN ALPHA # MESIN BETA | Mesure 2026M15901 · expert EXPERT COURRIER BANC · ouverte le 02/03/2026 | Mesures | AFaire | []

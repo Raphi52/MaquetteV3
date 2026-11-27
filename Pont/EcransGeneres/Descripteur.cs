@@ -201,7 +201,9 @@ public sealed record DescripteurEcran
     public ChampEcran[] Parametres { get; init; } = [];
 
     /// <summary>Les gestes nommes par la fiche : actions en lot d'une File, gestes par affaire d'une Audience, outils
-    /// d'un Document, d'un Etat ou d'une Consultation. Vide : le bouton <see cref="Valider"/> seul.</summary>
+    /// d'un Document, d'un Etat ou d'une Consultation, boutons de confirmation d'une Operation (« Générer » ou « Supprimer le
+    /// bordereau »), gestes du menu de ligne d'un Referentiel en plus de Modifier et Supprimer (« Dupliquer »). Vide : le
+    /// bouton <see cref="Valider"/> seul.</summary>
     public string[] Gestes { get; init; } = [];
 
     /// <summary>Les lignes de demonstration (6 a 15 ; un ecran reuni porte celles de ses membres).</summary>

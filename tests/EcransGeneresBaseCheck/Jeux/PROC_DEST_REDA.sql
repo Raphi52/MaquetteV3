@@ -27,7 +27,11 @@ IF OBJECT_ID(N'v2.DOCUMENT_DOSSIER') IS NULL
 -- 2000601 (jugement redige, grosses delivrees le 15/03/1990) : deux parties, l'une avec un mandataire postulant et un plaidant (ceux de
 -- PROC_MANDATAIRE.sql, 1500101 et 1500102, joue apres : la partie ne porte que leur numero ; un mandataire ajoute ici entrerait dans sa
 -- liste) ; un
--- destinataire divers. 2000602 (redige, sans date de delivrance) : une partie. 2000603 : une partie mais AUCUN document REDA (ecartee).
+-- fix-ok: lu dans le code du banc (27/11/2026) -- une ligne attendue est rognee (Program.cs:457-458) : une derniere cellule vide (le supplement
+-- d'expeditions) ne se compare jamais ; les deux documents en portent donc un (1 et 0).
+-- destinataire divers ; et une partie de qualite « T » (2000605), ni demandeur, ni defendeur, ni intervenant : RIG v2 ne la retient pas
+-- (ChargerDestinatairesParDefaut, DestinataireREDA.cs:735-737). 2000602 (redige, sans date de delivrance) : une partie ; « Ajouter » y
+-- rattache un destinataire divers (PROC_DEST_REDA.gestes). 2000603 : une partie mais AUCUN document REDA (ecartee).
 EXEC sp_executesql N'
 INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_NOM_COURANT, INSTN_TYPE_INSTANCE) VALUES
     (2000601, ''2026DR20601'', ''DEST A'', ''CX''), (2000602, ''2026DR20602'', ''DEST B'', ''CX''), (2000603, ''2026DR20603'', ''DEST C'', ''CX'');
@@ -38,7 +42,10 @@ INSERT INTO v2.PARTIE (PRT_ID_PRT, PRT_ID_INSTN, PRT_NUM_ORDRE, PRT_CIVILITE, PR
     (2000601, 2000601, 1, ''STE'', ''DEMANDEUR DEST SARL'', ''D'', 1500101, 1500102, ''GC'', ''L'', ''X''),
     (2000602, 2000601, 2, ''STE'', ''DEFENDEUR DEST SAS'', ''F'', NULL, NULL, ''D'', NULL, NULL),
     (2000603, 2000602, 1, ''STE'', ''PARTIE B SARL'', ''D'', NULL, NULL, ''X'', NULL, NULL),
-    (2000604, 2000603, 1, ''STE'', ''PARTIE SANS REDA'', ''D'', NULL, NULL, ''G'', NULL, NULL);
-INSERT INTO v2.DESTINATAIRE_DIVERS (DTDIV_ID_DTDIV, DTDIV_ID_DCJDC, DTDIV_TYPE, DTDIV_DESIGNATION, DTDIV_EDITION_JUGEMENT) VALUES (2000601, 2000601, ''AUTRE'', ''HUISSIER DIVERS BANC'', ''E'');
-INSERT INTO v2.DOCUMENT_DOSSIER (DCMDS_ID_DCMDS, DCMDS_CODE_ENTITE, DCMDS_VALEUR_ID_METIER, DCMDS_CODE_MODELE_DOCUMENT, DCMDS_DATE_IMPRESSION_MINUTE) VALUES
-    (2000601, ''REDA_DECI_JUD'', 2000601, ''MODDR20'', ''1990-03-15''), (2000602, ''REDA_DECI_JUD'', 2000602, ''MODDR20'', NULL);';
+    (2000604, 2000603, 1, ''STE'', ''PARTIE SANS REDA'', ''D'', NULL, NULL, ''G'', NULL, NULL),
+    (2000605, 2000601, 3, ''STE'', ''TIERS NON DESTINATAIRE'', ''T'', NULL, NULL, ''G'', NULL, NULL);
+INSERT INTO v2.DESTINATAIRE_DIVERS (DTDIV_ID_DTDIV, DTDIV_ID_DCJDC, DTDIV_TYPE, DTDIV_DESIGNATION, DTDIV_BLOC_ADRESSE, DTDIV_EDITION_JUGEMENT) VALUES
+    (2000601, 2000601, ''AUTRE'', ''HUISSIER DIVERS BANC'', ''12 rue du Banc 75000 PARIS'', ''E'');
+INSERT INTO v2.DOCUMENT_DOSSIER (DCMDS_ID_DCMDS, DCMDS_CODE_ENTITE, DCMDS_VALEUR_ID_METIER, DCMDS_CODE_MODELE_DOCUMENT, DCMDS_DATE_IMPRESSION_MINUTE,
+                                 DCMDS_SUPPLEMENT_EXPEDI) VALUES
+    (2000601, ''REDA_DECI_JUD'', 2000601, ''MODDR20'', ''1990-03-15'', ''1''), (2000602, ''REDA_DECI_JUD'', 2000602, ''MODDR20'', NULL, ''0'');';

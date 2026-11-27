@@ -1,0 +1,47 @@
+# Recherches de « Publications BODACC » (LecteurPublicationsBodacc.ChercherAsync), lot 11 du plan-676a4b19 (reprise) : les trois listes
+# de RIG v2 sur les criteres saisis -- certificats (OPE_CERTIF_BOD, :86-117), rejets (OPE_LST_REJETS, :63-85), controles non conformes
+# (OPE_LST_CTRLNC, :50-81) -- dans cet ordre. Sans « au », la date est une egalite. Chaque ecart a son jumeau retenu.
+#
+# Date d'envoi le 02/04/2001 : certificats 2110205 (5) et 2110206 (6, verifiee), par numero de parution (vide d'abord) ; rejet 2110201 --
+# ecarte 2110204 (type N, jumeau 2110201) ; aucun controle (2110207 et 2110208 envoyees le 06/04).
+critere: Critère de date = Date d'envoi
+critere: Date du = 2001-04-02
+lignes:
+Annonce BODACC n° 2110205 | envoyée le 02/04/2001 · annonce n° A2110205 · parution à vérifier | Certificats de parution | AFaire | []
+Annonce BODACC n° 2110206 | envoyée le 02/04/2001 · parue le 10/04/2001 · parution n° P2110 · annonce n° A2110206 · parution vérifiée | Certificats de parution | EnCours | []
+Annonce BODACC n° 2110201 | envoyée le 02/04/2001 · annonce n° A2110201 · rejet : Adresse incomplète · rejetée, à rectifier | Rejets | AFaire | []
+---
+# Date de parution le 10/04/2001 : certificats 2110206 et 2110207 ; la V2 n'offre pas ce critere aux rejets (aucun) ; controle 2110207
+# (P2, 10, controle qualite) -- ecartee 2110208, sans parution.
+critere: Critère de date = Date de parution
+critere: Date du = 2001-04-10
+lignes:
+Annonce BODACC n° 2110206 | envoyée le 02/04/2001 · parue le 10/04/2001 · parution n° P2110 · annonce n° A2110206 · parution vérifiée | Certificats de parution | EnCours | []
+Annonce BODACC n° 2110207 | EP BANC11B · du 01/04/2001 · envoyée le 06/04/2001 · parue le 10/04/2001 · parution n° P2110 · annonce n° A2110207 · parution à vérifier | Certificats de parution | AFaire | []
+Annonce BODACC n° 2110207 | EP BANC11B · du 01/04/2001 · envoyée le 06/04/2001 · parue le 10/04/2001 · parution n° P2110 · annonce n° A2110207 · contrôle qualité : Capital manquant | Contrôles non conformes | AFaire | []
+---
+# Date d'EP (le critere par defaut, rien n'est dit) du 01/04/2001 au 01/04/2001 : certificats 2110209 (evenement supprime ce jour,
+# BDCCR_DATE_EP_SUPPR) et 2110207 (EP BANC11B) ; aucun rejet ; controles 2110207 et 2110208 (type N : le controle ne filtre pas le
+# type) -- 2110209 n'est pas un controle (ni EP, ni controle qualite).
+critere: Date du = 2001-04-01
+critere: Date au = 2001-04-01
+lignes:
+Annonce BODACC n° 2110209 | annonce n° A2110209 · parution à vérifier | Certificats de parution | AFaire | []
+Annonce BODACC n° 2110207 | EP BANC11B · du 01/04/2001 · envoyée le 06/04/2001 · parue le 10/04/2001 · parution n° P2110 · annonce n° A2110207 · parution à vérifier | Certificats de parution | AFaire | []
+Annonce BODACC n° 2110207 | EP BANC11B · du 01/04/2001 · envoyée le 06/04/2001 · parue le 10/04/2001 · parution n° P2110 · annonce n° A2110207 · contrôle qualité : Capital manquant | Contrôles non conformes | AFaire | []
+Annonce BODACC n° 2110208 | EP BANC11B · du 01/04/2001 · envoyée le 06/04/2001 · annonce n° A2110208 · contrôle qualité : Siège absent | Contrôles non conformes | AFaire | []
+---
+# Numero de parution P2110 : la liste des certificats seule, le seul mode qui l'offre.
+critere: Numéro de parution = P2110
+lignes:
+Annonce BODACC n° 2110206 | envoyée le 02/04/2001 · parue le 10/04/2001 · parution n° P2110 · annonce n° A2110206 · parution vérifiée | Certificats de parution | EnCours | []
+Annonce BODACC n° 2110207 | EP BANC11B · du 01/04/2001 · envoyée le 06/04/2001 · parue le 10/04/2001 · parution n° P2110 · annonce n° A2110207 · parution à vérifier | Certificats de parution | AFaire | []
+---
+# Une date « au » sans « du » ne cherche rien (OPE_LST_REJETS :52-55, OPE_CERTIF_BOD :70-73). Jumeau : le bloc 3.
+critere: Date au = 2001-04-01
+lignes:
+---
+# « au » avant « du » ne cherche rien (OPE_CERTIF_BOD.cs:75-80). Jumeau : le bloc 3 (du = au).
+critere: Date du = 2001-04-02
+critere: Date au = 2001-04-01
+lignes:

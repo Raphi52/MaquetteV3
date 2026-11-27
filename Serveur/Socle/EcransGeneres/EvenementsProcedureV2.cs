@@ -26,6 +26,12 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// ses futurs lies, chacun avec un GUID neuf, le futur lie au GUID du survenu copie : c'est ce qu'ecrit cette classe, instance par
 /// instance.
 ///
+/// LE PASSAGE EN SURVENU D'UN FUTUR (EvenementProcedure.PasserEnSurvenuEveProFutur, EvenementProcedure.cs:1968-1996 ; lot 11, le
+/// retour d'un LRAR, PROC_RETOURLRAR) : l'evenement futur existant devient survenu a la date donnee, ses trois dates s'effacent, son
+/// texte aussi (reconstruit par la V2 a l'enregistrement), ses champs de piece numerisee se reprennent du code (GererPiecesNum,
+/// :2120-2149, branche instance : la piece si le code la demande, sa nature, son type et son nom de deposant GED) ; avec la creation
+/// du futur, son propre futur lie se cree comme ci-dessus (creationEvenementFutur), lie a SON numero source.
+///
 /// NON REPRIS (nomme) : le texte de l'evenement (EVNPR_TEXTE, EvenementProcedure.ConstructionTexte) ; le courriel a la hotline quand
 /// le code futur a plusieurs delais (IEntiteJudiciaire.cs:170-182 : service externe, la priorite fixe / maxi / mini est appliquee) ;
 /// les evenements inter-entites d'une instance liee a une PC ou une prevention (OPE_EVENEMENT.cs:1534-1584 : PROC_MJUDS les cree sur
@@ -51,13 +57,57 @@ internal static class EvenementsProcedureV2
             ["EVNPR_DATE"] = jour, ["EVNPR_SURVENU"] = true, ["EVNPR_NUMERO_SOURCE"] = numeroSource,
         }, ct);
         var survenu = new EditionsEvenementV2.Evenement(codeEve, numeroSource, jour, rang, piece);
-        if (!avecFutur || jour is not { } depuis || code?.CodeFutur is not { } codeFutur) return new Ecrits(idSurvenu, numeroSource, null, null, [survenu]);
+        if (!avecFutur || jour is not { } depuis) return new Ecrits(idSurvenu, numeroSource, null, null, [survenu]);
+        return await FuturLieAsync(geste, idInstance, code, depuis, numeroSource, ct) is { } futur
+            ? new Ecrits(idSurvenu, numeroSource, futur.Id, futur.Evenement.Code, [survenu, futur.Evenement])
+            : new Ecrits(idSurvenu, numeroSource, null, null, [survenu]);
+    }
 
+    /// <summary>Passe en SURVENU, a <paramref name="date"/>, l'evenement FUTUR existant <paramref name="idEvenement"/> de l'instance
+    /// (PasserEnSurvenuEveProFutur, en-tete) ; avec <paramref name="creerFutur"/>, cree aussi le futur lie que son code porte. Rend
+    /// l'id et le code de ce futur cree, null sans futur.</summary>
+    internal static async Task<(int Id, string Code)?> PasserEnSurvenuAsync(GesteEnCours geste, int idEvenement, int idInstance, string codeEve,
+                                                                           string numeroSource, DateTime date, bool creerFutur, CancellationToken ct)
+    {
+        var jour = date.Date;
+        var code = await LireCodeAsync(geste, codeEve, creerFutur, ct);
+        var colonnes = await EditionsV2.ColonnesAsync(geste, "v2.EVENEMENT_PROCEDURE", ct);
+        var parametres = new List<SqlParameter> { new("@id", idEvenement), new("@d", jour) };
+        var champs = new List<string> { "EVNPR_SURVENU = 1", "EVNPR_DATE = @d", "EVNPR_DATE_MAXI = NULL", "EVNPR_DATE_MINI = NULL", "EVNPR_DATE_FIXE = NULL" };
+        if (colonnes.Contains("EVNPR_TEXTE")) champs.Add("EVNPR_TEXTE = NULL");
+        // GererPiecesNum (:2120-2149) : rien sans le code ; la piece seulement si le code la demande ; nature, type et nom du deposant
+        // GED repris du code dans tous les cas.
+        if (code is not null)
+        {
+            if (code.Piece) champs.Add("EVNPR_AVEC_PIECE_NUMERISE = 1");
+            champs.Add("EVNPR_NATURE_DOC_GED = @nature");
+            champs.Add("EVNPR_TYPE_DEPOSANT_GED = @deposant");
+            parametres.Add(new SqlParameter("@nature", (object?)code.Nature ?? DBNull.Value));
+            parametres.Add(new SqlParameter("@deposant", (object?)code.Deposant ?? DBNull.Value));
+            if (colonnes.Contains("EVNPR_NOM_DEPOSANT_GED"))
+            {
+                champs.Add("EVNPR_NOM_DEPOSANT_GED = @nom");
+                parametres.Add(new SqlParameter("@nom", (object?)await NomDeposantAsync(geste, codeEve, ct) ?? DBNull.Value));
+            }
+        }
+        await geste.EcrireAsync($"UPDATE v2.EVENEMENT_PROCEDURE SET {string.Join(", ", champs)} WHERE EVNPR_ID_EVNPR = @id", ct, [.. parametres]);
+        if (!creerFutur) return null;
+        return await FuturLieAsync(geste, idInstance, code, jour, numeroSource, ct) is { } futur ? (futur.Id, futur.Evenement.Code) : null;
+    }
+
+    /// <summary>
+    /// L'evenement FUTUR LIE que le code <paramref name="code"/> d'un survenu porte (creationEvenementFutur, en-tete) : ses dates
+    /// depuis <paramref name="depuis"/>, lie au numero source du survenu ; null si le code n'en porte pas ou qu'aucune date ne se calcule.
+    /// </summary>
+    private static async Task<(int Id, EditionsEvenementV2.Evenement Evenement)?> FuturLieAsync(GesteEnCours geste, int idInstance, Code? code,
+                                                                                                DateTime depuis, string numeroSource, CancellationToken ct)
+    {
+        if (code?.CodeFutur is not { } codeFutur) return null;
         // AddEvenementProcedureFuturOuExpire : aucune date -> rien ; plusieurs -> fixe, sinon maxi, sinon mini.
         var fixe = Delai(depuis, code.MoisFixe, code.JoursFixe, code.SemainesFixe);
         var maxi = Delai(depuis, code.MoisMaxi, code.JoursMaxi, code.SemainesMaxi);
         var mini = Delai(depuis, code.MoisMini, code.JoursMini, code.SemainesMini);
-        if (fixe is null && maxi is null && mini is null) return new Ecrits(idSurvenu, numeroSource, null, null, [survenu]);
+        if (fixe is null && maxi is null && mini is null) return null;
         if (fixe is not null) (maxi, mini) = (null, null);
         else if (maxi is not null) mini = null;
         var numeroFutur = Guid.NewGuid().ToString().ToUpperInvariant();
@@ -68,7 +118,16 @@ internal static class EvenementsProcedureV2
                 ["EVNPR_DATE_FIXE"] = fixe, ["EVNPR_DATE_MAXI"] = maxi, ["EVNPR_DATE_MINI"] = mini, ["EVNPR_NUMERO_SOURCE_EP_LIE"] = numeroSource,
             }, ct);
         // Le futur n'a pas de date (EVNPR_DATE) : son libelle source n'en porte pas (EditionLibelleSource, EvenementProcedure.cs:468-475).
-        return new Ecrits(idSurvenu, numeroSource, idFutur, codeFutur, [survenu, new EditionsEvenementV2.Evenement(codeFutur, numeroFutur, null, rangFutur, pieceFutur)]);
+        return (idFutur, new EditionsEvenementV2.Evenement(codeFutur, numeroFutur, null, rangFutur, pieceFutur));
+    }
+
+    /// <summary>Le nom de deposant GED du code (R_CODEEVEPRO_NOM_DEPOSANT_GED, GererPiecesNum :2147) ; null sans la colonne.</summary>
+    private static async Task<string?> NomDeposantAsync(GesteEnCours geste, string codeEve, CancellationToken ct)
+    {
+        if (!(await EditionsV2.ColonnesAsync(geste, "v2.CODE_EVE_PRO", ct)).Contains("R_CODEEVEPRO_NOM_DEPOSANT_GED")) return null;
+        await using var r = await geste.LireAsync("SELECT R_CODEEVEPRO_NOM_DEPOSANT_GED FROM v2.CODE_EVE_PRO WHERE R_CODEEVEPRO_VALEUR = @c", ct,
+                                                  new SqlParameter("@c", codeEve));
+        return await r.ReadAsync(ct) && FormeLigne.Texte(r, "R_CODEEVEPRO_NOM_DEPOSANT_GED") is { Length: > 0 } nom ? nom : null;
     }
 
     /// <summary>

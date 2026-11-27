@@ -1,6 +1,8 @@
 # « Documents océrisés » (LecteurDocumentsOcerises) sur le jeu PROC_NUM.sql : les documents hors OCR differe, du plus recent au plus
 # ancien (date de creation ; sans date, en dernier). Groupe : TIF pour .tif / .tiff (toute casse), PDF sinon.
+# 2110305, « en cours de numerisation » (le nom que la V2 donne a un scan qui n'est pas fini), est un PDF sans pages.
 # Etat : tenu en cours par un processus (2110302) -> En cours ; sinon Disponible. Ecarte : 2110303, lie a l'OCR differe (jumeau 2110301).
 scan du banc 11.tif | TIF · 1 page · 1 Ko · créé le 03/05/2001 · en cours · processus NUM · depuis le 04/05/2001 | TIF | EnCours | []
 courrier du banc 11.pdf | PDF · 3 pages · 2 Ko · créé le 02/05/2001 · affaire 2001J00011 | PDF | AFaire | []
+en cours de numérisation | PDF · créé le 01/05/2001 | PDF | AFaire | []
 ancien du banc 11.TIFF | TIF | TIF | AFaire | []

@@ -4,6 +4,10 @@
 // de la procedure (types Ajouter, Modifier, Supprimer ; les cellules par libelle de colonne) ; ecrit, la table est relue
 // (plan « RIG v3 100 % fonctionnel », lot 2). Sans ecrivain, ils le disent et ne changent rien : la ligne en cours de
 // modification reste ouverte, marquee non enregistree.
+// LES AUTRES GESTES DE LIGNE (lot 11) : un menu de ligne RIG v2 qui offre plus que modifier et supprimer (« Dupliquer » un
+// document océrisé, PROC_NUM_PROC.Dupliquer) les nomme dans descripteur.gestes ; chacun s'ajoute au menu de la ligne et va a
+// l'ecrivain (type Agir, son nom, la ligne). fix-ok: mesure par le controle final du lot 11 (27/11/2026) -- le menu n'avait
+// que Modifier et Supprimer, si bien qu'un geste V2 de ligne n'atteignait jamais son ecrivain.
 // LA BASE (lot 2) : quand le lecteur sait chercher, la recherche part dans la base (useRecherche). Une ligne de la base
 // ouverte en modification lit SA fiche (useFiche) : chaque colonne prend la valeur du champ de meme libelle, seules
 // celles que l'ecrivain enregistre se saisissent, la fiche entiere se lit dessous, et une ligne que RIG v2 verrouille ne
@@ -117,6 +121,8 @@ export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
   }
   const supprimer = (l: LigneTenue) => void jouer({ type: 'Supprimer', groupe: l.groupe, ids: [l.id], valeurs: {} },
     refus('Supprimer', `: « ${l.nom} » reste dans la table`), relire)
+  const agir = (geste: string, l: LigneTenue) => void jouer({ type: 'Agir', nom: geste, groupe: l.groupe, ids: [l.id], valeurs: {} },
+    refus(geste, `: « ${l.nom} » n’est pas modifié dans la table`), relire)
   const annuler = () => { poserEdition(null); annoncer(null) }
 
   // fix-ok: modifier() ouvre une ligne sans cellules (sansValeurs) en cellules(d, l) = [nom, '', ...] ; rien ne se devine
@@ -199,6 +205,7 @@ export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
                     <MenuLigne libelle={`Actions — ${l.nom}`} actions={[
                       { libelle: 'Modifier', agir: () => modifier(l) },
                       { libelle: 'Supprimer', agir: () => supprimer(l) },
+                      ...parcoursDe(d, l.groupe).gestes.map((g) => ({ libelle: g, agir: () => agir(g, l) })),
                     ]} />
                   </td>
                 </tr>

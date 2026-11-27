@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { EcranGedJud } from './EcranGedJud'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { EcranGedJud, type VueGedJud } from './EcranGedJud'
 import { contexteDossier } from '../test/dossier'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 const espaces = (t: string | null | undefined) => (t ?? '').replace(/\s/g, ' ')
 /** La phrase de synthese sous le titre : le compte, les brouillons, les docs lies, puis l'action demandee. */
@@ -152,5 +153,63 @@ describe('EcranGedJud ouvert depuis une affaire', () => {
     const sans = render(<EcranGedJud ouvrirDossier={vi.fn()} dossier={null} />)
     expect(synthese(sans.container)).toBe('4 documents · 1 brouillon · 7 docs lies')
     expect((screen.getByLabelText('Aller a une decision…') as HTMLInputElement).value).toBe('')
+  })
+
+  // Lot 11 : branche, les documents de la GED judiciaire du greffe (Pont/EcranGedJud.cs), les criteres de RIG v2 appliques.
+  const doc = (id: string, libelle: string, codeEtat: string, etat: string, reception: string, nbLies: number, commentaire = '') => ({
+    id, decision: libelle, minute: '', instance: '2004J00007', typeEntite: 'Instance', nature: 'Assignation', dateDecision: nbLies > 0 ? '2004-06-02' : null,
+    datePrevue: '', nbLies, etat, codeEtat, statut: codeEtat === 'R' ? 'alerte' : 'ok', dossier: '2004J00007', reception, commentaire,
+    motifRejet: codeEtat === 'R' ? 'Illisible' : '', historiques: [],
+  })
+  const base: VueGedJud = {
+    mode: 'serveur', message: null, total: 3, lignes: [
+      doc('11', 'Assignation du 01/06', 'V', 'Validé', '2004-06-01', 1, 'piece originale'),
+      doc('12', 'Conclusions', 'A', 'En attente', '2004-06-03', 0),
+      doc('13', 'Scan illisible', 'R', 'Rejeté', '2004-06-03', 0),
+    ],
+  }
+
+  it('branche : les documents de la base, un rejete cache sauf « Afficher tout » (OPE_RECHERCHE_DOC.cs:376)', async () => {
+    const pont = installerFauxPont({ 'EcranGedJud.Documents': () => base })
+    const { container } = render(<EcranGedJud ouvrirDossier={vi.fn()} />)
+    await waitFor(() => expect(rangees(container).map((r) => r.cells[1]!.textContent)).toEqual(['Assignation du 01/06', 'Conclusions']))
+    expect(pont.appels).toHaveBeenCalledWith('EcranGedJud.Documents')
+    expect(screen.queryByText(/de démonstration/)).toBeNull()
+    // RIG v2 n'a pas de brouillon : la synthese de la base ne le compte pas.
+    expect(synthese(container)).toBe('2 documents · 1 docs lies')
+    // Les etats de RIG v2 lus deviennent les choix du critere et les vues, dans l'ordre V, VR, A, R.
+    expect([...(screen.getByLabelText('Etat') as HTMLSelectElement).options].map((o) => o.value)).toEqual(['', 'Validé', 'En attente', 'Rejeté'])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Afficher tout' }))
+    expect(rangees(container).map((r) => r.cells[1]!.textContent)).toEqual(['Assignation du 01/06', 'Conclusions', 'Scan illisible'])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Non lies a une decision' }))
+    expect(rangees(container).map((r) => r.cells[1]!.textContent)).toEqual(['Conclusions', 'Scan illisible'])
+  })
+
+  it('branche : la date de reception seule vaut pour ce jour, le commentaire est cherche (OPE_RECHERCHE_DOC.cs:342-373)', async () => {
+    installerFauxPont({ 'EcranGedJud.Documents': () => base })
+    const { container } = render(<EcranGedJud ouvrirDossier={vi.fn()} />)
+    await waitFor(() => expect(rangees(container)).toHaveLength(2))
+    fireEvent.change(screen.getByLabelText('Du'), { target: { value: '2004-06-03' } })
+    expect(rangees(container).map((r) => r.cells[1]!.textContent)).toEqual(['Conclusions'])
+    fireEvent.change(screen.getByLabelText('Du'), { target: { value: '2004-06-01' } })
+    fireEvent.change(screen.getByLabelText('Au'), { target: { value: '2004-06-03' } })
+    expect(rangees(container)).toHaveLength(2)
+    fireEvent.change(screen.getByLabelText('Commentaire'), { target: { value: 'ORIGINALE' } })
+    expect(rangees(container).map((r) => r.cells[1]!.textContent)).toEqual(['Assignation du 01/06'])
+  })
+
+  it('sans serveur : la demonstration, marquee « exemple » ; en panne : le motif et aucun document', async () => {
+    installerFauxPont({ 'EcranGedJud.Documents': () => ({ mode: 'demo', lignes: [], total: 0 }) })
+    const demo = render(<EcranGedJud ouvrirDossier={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText(/Documents de démonstration/)).toBeTruthy())
+    expect(rangees(demo.container)).toHaveLength(4)
+    demo.unmount(); retirerFauxPont()
+
+    installerFauxPont({ 'EcranGedJud.Documents': () => ({ mode: 'erreur', message: 'La base du greffe 3801 ne répond pas.', lignes: [], total: 0 }) })
+    const panne = render(<EcranGedJud ouvrirDossier={vi.fn()} />)
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('La base du greffe 3801 ne répond pas.'))
+    expect(rangees(panne.container).map((r) => r.textContent)).toEqual(['Aucun document ne repond a ces criteres.'])
   })
 })

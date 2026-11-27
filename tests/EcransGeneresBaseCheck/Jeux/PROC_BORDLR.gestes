@@ -28,7 +28,7 @@ ids: A|LRAR|20010315000000000|20010315235959998|
 resultat: fait
 message: Bordereau LRAR-1 (3 plis, du 15/03/2001 au 15/03/2001) : placé dans la file des éditions. Impression simulée : le service d'édition de RIG v2 imprime le bordereau, RIG v3 ne l'appelle pas.
 lignes:
-Bordereau LRAR-1 | créé le {J+0} · par banc.ecrans · édition en file (phase « C » de l'ancien RIG) | Avec accusé de réception | EnCours | [] | valeurs: Bordereau LRAR-1 ;  ; banc.ecrans ;  ; édition en file (phase « C » de l'ancien RIG)
+Bordereau LRAR-1 | créé le {J+0} · par banc.ecrans · édition en file (phase « C » de l'ancien RIG) | Avec accusé de réception | EnCours | [] | valeurs: Bordereau LRAR-1 ; du 15/03/2001 au 15/03/2001 ; banc.ecrans ; 3 ; édition en file (phase « C » de l'ancien RIG)
 Bordereau 26001200302 | commencé le {J-1} · par lesniewski · à valider | Avec accusé de réception | AFaire | []
 Bordereau 26001200307 | validé le {J-3} · par GESA · aucune édition retrouvée, avec ou sans AR inconnu | Avec accusé de réception | EnCours | []
 Bordereau 26001200301 | validé le {J-3} · par GESA · aucune édition retrouvée, avec ou sans AR inconnu | Avec accusé de réception | EnCours | []

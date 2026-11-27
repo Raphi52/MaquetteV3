@@ -68,11 +68,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_DEST_REDA", Titre = "Destinataires", Sujet = "destinataires",
-            // Une ligne par destinataire (partie, mandataire, destinataire divers) des décisions qui ont un document REDA ; la fiche porte
-            // son édition et, sur le document de la décision, la date de délivrance des grosses et les suppléments (proc_dest_reda.md,
-            // Détail OPE). Lecteur et geste : LecteurDestinatairesRedaction.cs, EcrivainDestinatairesRedaction.cs (lot 10). L'ajout et la
-            // suppression d'un destinataire divers (FormAjouterDestinataire, menu « Supprimer ») ne sont pas repris.
-            Forme = FormeEcran.Fiche,
+            // Forme Referentiel (lot 10) : RIG v2 tient les destinataires d'une décision rédigée dans une GRILLE (RedaDestinatairesDataGridView)
+            // dont l'édition se change ligne par ligne, avec « Ajouter » et « Supprimer » (OPE_DEST_REDA.cs:103-109 ; proc_dest_reda.md,
+            // Détail OPE). Une ligne par destinataire (partie, mandataire, destinataire divers) ; la date de délivrance des grosses et les
+            // suppléments sont ceux du document de la décision. Lecteur et gestes : LecteurDestinatairesRedaction.cs,
+            // EcrivainDestinatairesRedaction.cs (lot 10).
+            Forme = FormeEcran.Referentiel,
+            Colonnes = ["Destinataire", "Numéro de rôle", "Qualité", "Adresse", "Édition", Champ.Date("Date de délivrance des grosses"),
+                        Champ.Nombre("Grosses supplémentaires"), Champ.Nombre("Copies supplémentaires"), Champ.Nombre("Expéditions supplémentaires")],
             Recherche = "Rechercher un destinataire, un numéro de rôle, une affaire…",
             Criteres = ["Numéro de rôle"],
             Valider = "Enregistrer les destinataires",
@@ -81,12 +84,12 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             Groupes = ["Parties", "Mandataires", "Destinataires divers"],
             Sections =
             [
-                Marche("Décision", "La décision dont le destinataire reçoit une édition.", true,
-                    "Numéro de rôle", "Type de décision"),
+                Marche("Destinataire", "Les parties de l'instance (demandeur, défendeur, intervenant), leurs mandataires et les destinataires divers de la décision. « Ajouter » saisit un destinataire divers : son libellé, son adresse et le rôle de la décision ; seul un destinataire divers se supprime.", true,
+                    "Destinataire", "Numéro de rôle", "Qualité", "Type de décision", "Adresse"),
                 Marche("Édition du jugement", "Chaque destinataire reçoit une édition : grosse (G), copie (C), expédition (E) ou lettre de notification (L), dans cet ordre. Sans aucune, X ; D : l'édition par défaut de RIG v2.", true,
-                    "Édition", Champ.Case("Grosse"), Champ.Case("Copie"), Champ.Case("Expédition"), Champ.Case("Lettre de notification")),
-                Marche("Date de délivrance des grosses", "Obligatoire pour continuer : sans elle, l'enregistrement avertit, et les autres opérations du processus restent verrouillées.", true,
-                    "Date de délivrance des grosses"),
+                    "Édition"),
+                Marche("Date de délivrance des grosses", "Obligatoire pour continuer : sans elle, l'enregistrement avertit, et les autres opérations du processus restent verrouillées. Elle vaut pour toute la décision.", true,
+                    Champ.Date("Date de délivrance des grosses")),
                 Marche("Suppléments", "Nombre de grosses, de copies et d'expéditions en plus, saisi à la main, pour toute la décision.", false,
                     Champ.Nombre("Grosses supplémentaires"), Champ.Nombre("Copies supplémentaires"), Champ.Nombre("Expéditions supplémentaires")),
             ],
@@ -276,12 +279,13 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             // Forme Audience (lot 10) : RIG v2 part d'UNE audience ou d'un cabinet (date, chambre ou section), charge ses instances ou ses
             // procédures, coche « fiche » ou « seconde édition » et génère (proc_courrierm.md, Détail OPE). Lecteur et gestes :
             // LecteurCourriersEnMasse.cs, EcrivainCourriersEnMasse.cs -- la demande et la demande d'édition sont posées dans la file des
-            // éditions ; le service d'édition de RIG v2 les produit. Préventions et mesures : trouvées par leur seul numéro dans RIG v2,
-            // non reprises (groupes vides).
+            // éditions ; le service d'édition de RIG v2 les produit. Préventions et mesures : trouvées par leur numéro, comme la zone de
+            // numéro de leur volet dans RIG v2 (OPE_RECHERCHE_COURRIERM_PREVENTION.cs:74-85) ; une mesure n'a que la seconde édition.
             Forme = FormeEcran.Audience,
-            Parametres = [Champ.Date("Date de l'audience"), "Chambre", Champ.Liste("Mode", "Audience", "Cabinet"), "File différée ou imprimante", "Seconde édition"],
+            Parametres = [Champ.Date("Date de l'audience"), "Chambre", Champ.Liste("Mode", "Audience", "Cabinet"), "N° de prévention", "N° de mesure",
+                          "File différée ou imprimante", "Seconde édition"],
             Recherche = "Rechercher une instance, une procédure, un numéro…",
-            Criteres = ["Date de l'audience", "Chambre", "Mode"],
+            Criteres = ["Date de l'audience", "Chambre", "Mode", "N° de prévention", "N° de mesure"],
             Valider = "Générer la fiche",
             Gestes = ["Générer la fiche", "Générer la seconde édition"], // Les deux cases de la grille (OPE_RESULTAT_COURRIERM_INSTANCE.cs:153-190).
             Rang = 2,
@@ -289,9 +293,9 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             Groupes = ["Instances", "Procédures", "Préventions", "Mesures"],
             Sections =
             [
-                Marche("Volet", "Instances ou procédures collectives de l'audience choisie. Une entité déjà dans la liste n'y entre pas deux fois.", true,
+                Marche("Volet", "Instances ou procédures collectives de l'audience choisie ; une prévention ou une mesure par son numéro. Une entité déjà dans la liste n'y entre pas deux fois.", true,
                     "Volet"),
-                Marche("Fiche", "« Générer la fiche » : l'édition principale de l'entité (fiche instance, fiche procédure).", true,
+                Marche("Fiche", "« Générer la fiche » : l'édition principale de l'entité (fiche instance, fiche procédure, fiche prévention). Une mesure n'a pas de fiche.", true,
                     "Fiche"),
                 Marche("Deuxième édition", "« Générer la seconde édition » : le code choisi (par défaut celui du paramétrage du greffe), hors fiche.", false,
                     "Seconde édition"),
@@ -314,24 +318,33 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_EDT_DIFF", Titre = "Editions differees", Sujet = "lots d'éditions",
-            // Une ligne par lot d'éditions différées ouvert (MetierEdtDiff.GetLotEdtActifs, :19-24 ; proc_edt_diff.md, Détail OPE).
-            // Lecteur et geste : LecteurEditionsDifferees.cs, EcrivainEditionsDifferees.cs (lot 10) ; le détail d'un lot document par
-            // document et sa case « Ne pas imprimer » ne sont pas repris.
+            // fix-ok: constate par le chef du plan sur 8bc0a99 (27/11/2026) -- les descripteurs du lot 10 omettaient des fonctions de RIG v2 :
+            // le detail d'un lot ici, les volets Préventions et Mesures des courriers, l'ajout et la suppression d'un destinataire divers.
+            // Une ligne par lot d'éditions différées ouvert (MetierEdtDiff.GetLotEdtActifs, :19-24) et, dans « Documents des lots », le
+            // détail de chaque lot document par document avec sa case « Ne pas imprimer » (OPE_LISTE_LOT, DataGridViewListeLot ;
+            // proc_edt_diff.md, Détail OPE). Lecteur et gestes : LecteurEditionsDifferees.cs, EcrivainEditionsDifferees.cs (lot 10).
             Forme = FormeEcran.File,
-            Recherche = "Rechercher un lot, une imprimante…",
+            Recherche = "Rechercher un lot, un document, un destinataire…",
             Criteres = ["Date d'ouverture du lot", "Imprimante", "Nombre de documents"],
             Valider = "Clôturer le lot",
-            Gestes = ["Clôturer le lot"], // Le bouton VALIDER relibellé « Clôturer » (OPE_EDT_DIFF_LOT.cs:26-27).
+            // Le bouton VALIDER relibellé « Clôturer » (OPE_EDT_DIFF_LOT.cs:26-27) ; la case « Ne pas imprimer » de la grille, cochée ou
+            // décochée puis TRAITER (OPE_LISTE_LOT._TraiterEditionsCochees, :53-78).
+            Gestes = ["Clôturer le lot", "Ne pas imprimer", "Remettre à l'impression"],
             Rang = 2,
-            Etats = [.. EtatsEcran.Trois("À clôturer", "En préparation", "Clôturé"), new EtatEcran("EnAttente", "Imprimante à choisir", "en-attente")],
-            Groupes = ["Lots ouverts"],
+            // Un document barré reste dans son lot ouvert et se rétablit (OPE_LISTE_LOT._TraiterEditionsCochees, :53-78) : « Ne pas
+            // imprimer » est donc EnCours, cochable, et non un état figé (commun.tsx:78) qui ôterait sa case à l'écran.
+            Etats =
+            [
+                .. EtatsEcran.Trois("À clôturer", "Ne pas imprimer", "Clôturé"), new EtatEcran("EnAttente", "Imprimante à choisir", "en-attente"),
+            ],
+            Groupes = ["Lots ouverts", "Documents des lots"],
             Sections =
             [
                 Marche("Imprimante", "Imprimante obligatoire pour clôturer : sans elle, le lot ne se ferme pas. Une imprimante interne d'Amitel est signalée, sans blocage.", true,
                     "Imprimante"),
-                Marche("Documents du lot", "Les documents du lot et ceux marqués « Ne pas imprimer », barrés. Le détail se règle dans RIG v2.", false,
+                Marche("Documents du lot", "Chaque document du lot, avec son destinataire, ses exemplaires, son dossier et sa maquette. « Ne pas imprimer » le barre ; « Remettre à l'impression » le rétablit.", false,
                     "Ne pas imprimer", "Exemplaires"),
-                Marche("Clôture", "Ferme le lot : il passe prêt à imprimer et disparaît de la liste d'attente.", true,
+                Marche("Clôture", "Se joue sur la ligne du lot : les documents barrés quittent le lot, qui passe prêt à imprimer et disparaît de la liste d'attente.", true,
                     "Date de clôture"),
             ],
             Lignes =
@@ -342,6 +355,8 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
                 Ligne("Lot CONVOCATIONS", "8 documents · ouvert le 05/03/2026 · imprimante « Imprimante de l'accueil » · groupe 2026-0104", "Lots ouverts", "AFaire"),
                 Ligne("Lot COPIES", "2 documents · ouvert le 06/03/2026 · aucune imprimante choisie · groupe 2026-0105", "Lots ouverts", "EnAttente"),
                 Ligne("Lot GROSSES", "4 documents · ouvert le 06/03/2026 · imprimante « Imprimante du 1er étage » · groupe 2026-0106", "Lots ouverts", "AFaire"),
+                Ligne("Notification de jugement", "Lot NOTIFICATIONS · Alpha Services SARL · créé le 04/03/2026 · 1 exemplaire · dossier 2026F00101 · ne pas imprimer", "Documents des lots", "EnCours"),
+                Ligne("Convocation à l'audience", "Lot CONVOCATIONS · Bêta Industrie SAS · créé le 05/03/2026 · 2 exemplaires · dossier 2026F00102", "Documents des lots", "AFaire"),
             ],
         },
 
@@ -383,41 +398,40 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         {
             Code = "PROC_NUM", Titre = "Documents ocerises", Sujet = "documents océrisés",
             // Les documents numérisés du greffe (DOCUMENT_OCERISE, hors OCR différé : OPE_PIECENUM.cs:85-107), lus par
-            // LecteurDocumentsOcerises.cs (lot 11). Ses gestes sont des traitements de fichier (export sur disque, PDF_WRITER, pages
-            // blanches, fusion Aspose) que la forme Document ne fait pas : ils disent « Démonstration » (proc_num.md, Détail OPE).
-            Forme = FormeEcran.Document,
+            // LecteurDocumentsOcerises.cs (lot 11). Forme Référentiel, pas Document (lot 11, reprise) : la liste de RIG v2 est une
+            // grille dont le nom se saisit dans la ligne puis s'enregistre (TreeViewPiecesNum.NodeNom_ChangesApplied, :346-365 ;
+            // OPE_PIECENUM_1.Modifier, :341-377), et dont une ligne se supprime (menu Suppression, :269-283) : les deux gestes qui
+            // écrivent la table, EcrivainDocumentsOcerises.cs ; et « Dupliquer le document sélectionné » (FORM_NUM.cs:99-100,
+            // PROC_NUM_PROC.Dupliquer :388-423), une copie en base, au menu de la ligne (Gestes, lot 11). Ajouter (scanner ou importer
+            // un fichier) et les traitements de fichier (export sur disque, PDF_WRITER, pages blanches, fusion Aspose) ne sont pas
+            // repris (proc_num.md, Détail OPE).
+            Forme = FormeEcran.Referentiel,
+            // Le nom sans extension (OPE_PIECENUM_10.cs:105), le format de l'édition (PROC_NUM_PROC._Editer), pages, taille, date,
+            // affaire : ce que la ligne V2 montre (OPE_PIECENUM_1.cs:121-136).
+            Colonnes = ["Nom", "Format", Champ.Nombre("Pages"), "Taille", Champ.Date("Créé le"), "Affaire"],
             Recherche = "Rechercher un document, un titre, une date…",
             Criteres = ["Format (PDF ou TIF)", "Titre", "Nombre de pages"],
-            Valider = "Enregistrer une copie",
+            Valider = "Enregistrer les noms de fichiers",
+            Gestes = ["Dupliquer"],
             Rang = 2,
             // En cours : le document qu'un processus tient (DOCOC_ID_UTLST_EN_COURS) ; la V2 n'a pas d'état « enregistré ».
             Etats = EtatsEcran.Trois("Disponible", "En cours", "Enregistré"),
             Groupes = ["PDF", "TIF"],
             Sections =
             [
-                Marche("Document", "Le document est ouvert ; son format, PDF ou TIF, décide de l'éditeur utilisé.", true,
-                    "Format", "Nombre de pages"),
-                Marche("Pages blanches", "Supprime les pages blanches du document, en une passe.", false,
-                    "Pages blanches supprimées"),
-                Marche("Modification", "PDF : éditeur de pages. TIF : éditeur natif, ou éditeur PDF si le paramètre du greffe le prévoit.", false,
-                    "Éditeur"),
-                Marche("Paramétrage", "Titre, type de document, confidentialité et métadonnées OCR.", true,
-                    "Titre", "Type de document", "Confidentialité", "Métadonnées OCR"),
-                Marche("Réservation pour fusion", "Réserve le document à votre compte pour une fusion, avant d'ouvrir la sélection des documents à fusionner.", false,
-                    "Réservé pour fusion"),
-                Marche("Enregistrement", "Copie le document vers un fichier PDF ou TIF choisi.", true,
-                    "Fichier de sortie"),
+                Marche("Document", "Le document de la liste ; seul son nom se saisit, sans extension : RIG v2 remet celle du document.", true,
+                    "Nom", "Format", Champ.Nombre("Pages"), "Taille", Champ.Date("Créé le"), "Affaire"),
+                Marche("Traitements du fichier", "Ouvrir, modifier dans l'éditeur PDF ou TIF, supprimer les pages blanches, fusionner, enregistrer sous : des traitements du fichier lui-même, faits sur le poste par RIG v2. Dupliquer, au menu de la ligne, crée la copie « <nom>-copie » dans la liste.", false),
             ],
             Lignes =
             [
-                Ligne("Scan 2026-0301", "PDF · 12 pages · à vérifier", "PDF", "AFaire"),
-                Ligne("Scan 2026-0302", "PDF · 4 pages · pages blanches supprimées", "PDF", "EnCours", 0, 1),
-                Ligne("Scan 2026-0303", "PDF · 9 pages · titre saisi", "PDF", "EnCours", 0, 3),
-                Ligne("Scan 2026-0304", "PDF · 6 pages · enregistré", "PDF", "Validee", 0, 3, 5),
-                Ligne("Scan 2026-0305", "PDF · 2 pages · réservé pour fusion", "PDF", "EnCours", 0, 4),
-                Ligne("Scan 2026-0306", "TIF · 3 pages · à vérifier", "TIF", "AFaire"),
-                Ligne("Scan 2026-0307", "TIF · 5 pages · modifié, paramétrage à faire", "TIF", "EnCours", 0, 2),
-                Ligne("Scan 2026-0308", "TIF · 1 page · enregistré", "TIF", "Validee", 0, 3, 5),
+                Ligne("Scan 2026-0301", "PDF · 12 pages · créé le 02/03/2026", "PDF", "AFaire"),
+                Ligne("Scan 2026-0302", "PDF · 4 pages · en cours · processus NUM", "PDF", "EnCours"),
+                Ligne("Scan 2026-0303", "PDF · 9 pages · affaire 2026J00012", "PDF", "AFaire"),
+                Ligne("Scan 2026-0305", "PDF · 2 pages · en cours · processus FUSION", "PDF", "EnCours"),
+                Ligne("Scan 2026-0306", "TIF · 3 pages · créé le 06/03/2026", "TIF", "AFaire"),
+                Ligne("Scan 2026-0307", "TIF · 5 pages · en cours · processus NUM", "TIF", "EnCours"),
+                Ligne("Scan 2026-0308", "TIF · 1 page · créé le 09/03/2026", "TIF", "AFaire"),
             ],
         },
 
@@ -541,12 +555,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             // (PROC_ENV_JAL.cs:52-69). Lecteur : LecteurEnvoiJal.cs (lot 11), à envoyer puis déjà envoyées. « Générer le bordereau » :
             // EcrivainEnvoiJal.cs, le mode EDI de la V2 (JAL_ENVOIE_EDI = 1 dans RIG_DEV) en un geste -- Générer puis Envoyer
             // (OPE_A_ENVOYER.cs:189-334, :1071-1170) : bordereau RBOE, publicités envoyées ; le fichier XML n'est pas produit (simulé,
-            // dit à l'écran). Le document Word hors EDI (:493-597) n'est pas repris. « Supprimer le bordereau »
-            // (OPE_DEJA_ENVOYER.cs:297-376) est un second geste, qu'une Opération (un seul geste) ne porte pas.
+            // dit à l'écran). Le document Word hors EDI (:493-597) n'est pas repris. « Supprimer le bordereau », le bouton des
+            // annonces déjà envoyées (OPE_DEJA_ENVOYER.cs:69-84, AnnulerBordereaux_JAL :305-376) : le second geste, offert au temps
+            // Confirmer (Gestes, lot 11) -- les annonces du bordereau redeviennent à envoyer, le bordereau est supprimé.
             Forme = FormeEcran.Operation,
             Recherche = "Numéro de bordereau…",
             Criteres = ["Date de début", "Date de fin", "Destinataire (JAL)", "Numéro de PC ou PRV", "Numéro de bordereau"],
             Valider = "Générer le bordereau",
+            Gestes = ["Générer le bordereau", "Supprimer le bordereau"],
             Rang = 2,
             Etats = EtatsEcran.Trois("À envoyer", "Bordereau généré", "Envoyée"),
             Groupes = ["Procédures collectives", "Préventions"],
@@ -577,37 +593,35 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_GESTBOD", Titre = "Publications BODACC", Sujet = "annonces BODACC",
-            // Une ligne par annonce BODACC rejetée (état 9, rectifier) ou remise à renvoyer (état 3) : la liste que RIG v2 ouvre SANS date
-            // (OPE_LST_REJETS.MajSelectionBodacc, :55-90 ; proc_gestbod.md, Détail OPE). Les certificats et les contrôles non conformes
-            // exigent une date ou un numéro de parution (OPE_CERTIF_BOD.cs:80-117, OPE_LST_CTRLNC.cs:50-81), que la forme File ne saisit
-            // pas : leurs groupes restent vides, dit. Lecteur et geste : LecteurPublicationsBodacc.cs, EcrivainPublicationsBodacc.cs (lot 11).
-            Forme = FormeEcran.File,
-            Recherche = "Rechercher une annonce, une procédure, un motif de rejet…",
-            Criteres = ["Date d'EP", "Date de parution", "Numéro de parution"],
-            Valider = "Renvoyer",
-            // « Renvoyer » = la mise à jour des rejets (OPE_LST_LISTE_REJ.DoSauver, :51-57 : état 3). « Vérifier » et les éditions
-            // (certificat, liste des rejets, contrôles) ne sont pas repris : voir EcrivainPublicationsBodacc.cs.
-            Gestes = ["Renvoyer"],
+            // Une ligne par annonce BODACC. Sans critère : les rejets (état 9, rectifier) et ceux remis à renvoyer (état 3), la liste
+            // que RIG v2 ouvre sans date (OPE_LST_REJETS.MajSelectionBodacc, :55-90 ; proc_gestbod.md, Détail OPE). Avec une date (d'EP,
+            // de parution ou d'envoi) ou un numéro de parution : aussi les certificats de parution (OPE_CERTIF_BOD.cs:80-117) et les
+            // contrôles non conformes (OPE_LST_CTRLNC.cs:50-81). Forme Opération (lot 11, reprise), comme « Envoi JAL / BODACC » : la
+            // seule qui envoie des critères ET des lignes cochées. Lecteur et geste : LecteurPublicationsBodacc.cs,
+            // EcrivainPublicationsBodacc.cs.
+            Forme = FormeEcran.Operation,
+            Recherche = "Numéro de parution…",
+            // Les boutons radio GestionBodacc (OPE_BASE_BOD.cs:12, :44-47) et les deux dates « du » / « au » de la V2.
+            Criteres = ["Critère de date", "Date du", "Date au", "Numéro de parution"],
+            // VALIDER de RIG v2, dans la liste de chaque annonce : un rejet passe à renvoyer (état 3, OPE_LST_LISTE_REJ.DoSauver,
+            // :51-57), un certificat est vérifié (état 6, OPE_LST_CERTIF_BOD, :57-59). Les éditions ne sont pas reprises : le
+            // destinataire d'une PC (mandataire, CERTIF_BOD_DEST) et le XML d'un état Crystal manquent à RIG v3 (EcrivainPublicationsBodacc.cs).
+            Valider = "Valider",
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À traiter", "Vérifiée", "Certifiée"), new EtatEcran("EnAttente", "À renvoyer", "en-attente")],
             Groupes = ["Certificats de parution", "Rejets", "Contrôles non conformes"],
             Sections =
             [
-                Marche("Mode et critère", "Mode : certificats, rejets, mise à jour des rejets ou contrôles non conformes. Critère de date : date d'EP, de parution ou d'envoi, ou numéro de parution. La date de fin ne peut pas précéder la date de début.", true,
-                    "Mode", "Critère", "Date du", "Date au"),
-                Marche("Vérification", "Cocher « vérifier » passe l'annonce à l'état vérifié. Une validation sans aucune ligne cochée est refusée.", true,
-                    "Vérifier"),
-                Marche("Édition", "Édition de la liste ou du certificat. Pour un certificat, l'annonce cochée passe à l'état certifié.", true,
-                    "Édition"),
-                Marche("Renvoi des rejets", "Pour la mise à jour des rejets : cocher « renvoyer » place l'annonce à renvoyer (état 3), que le prochain envoi BODACC reprend.", false,
-                    "Renvoyer"),
+                Marche("Renvoi des rejets", "Un rejet coché passe à renvoyer (état 3) : le prochain envoi BODACC le reprend.", false),
+                Marche("Vérification des parutions", "Un certificat de parution coché passe à l'état vérifié (6). Un contrôle non conforme ne s'enregistre pas : RIG v2 n'en édite que la liste. Une validation sans ligne cochée est refusée.", false),
+                Marche("Éditions", "Certificat par destinataire, liste des rejets, liste des contrôles : éditions de RIG v2, non reprises — le certificat part vers le mandataire de la procédure, dont RIG v3 ne calcule pas encore la fiche destinataire, et les deux listes sont des états dont RIG v3 n'écrit pas la requête.", false),
             ],
             Lignes =
             [
                 Ligne("Alpha Services SARL", "Parution n° 2026-041 · EP du 02/03/2026", "Certificats de parution", "AFaire"),
-                Ligne("Gamma Conseil SARL", "Parution n° 2026-042 · certifiée", "Certificats de parution", "Validee"),
+                Ligne("Gamma Conseil SARL", "Parution n° 2026-042 · parution vérifiée", "Certificats de parution", "EnCours"),
                 Ligne("Epsilon Habitat SARL", "Rejet du 05/03/2026 · à traiter", "Rejets", "AFaire"),
-                Ligne("Zêta Commerce SAS", "Rejet du 06/03/2026 · renvoi coché", "Rejets", "EnAttente"),
+                Ligne("Zêta Commerce SAS", "Rejet du 06/03/2026 · à renvoyer au prochain envoi", "Rejets", "EnAttente"),
                 Ligne("Êta Boulangerie SARL", "Contrôle de qualité · à traiter", "Contrôles non conformes", "AFaire"),
                 Ligne("Thêta Import SAS", "Rejet du 07/03/2026 · à traiter", "Rejets", "AFaire"),
             ],
@@ -619,6 +633,8 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             // Reste en EXEMPLE (lot 11) : la file vit dans la table PAPERCUT de la base commune COMMUN_RIG
             // ([COMMUN_RIG].[dbo].[PAPERCUT], proc_papercut.md, Détail OPE : vue globale et vidage), absente de la base V3 du greffe
             // (et de RIG_DEV : aucune table PAPERCUT, lu le 27/11/2026) ; « Imprimer » appelle le service WCF d'impression PaperCut.
+            // L'écran le DIT : chaque ligne d'exemple nomme la table absente (le descripteur n'a pas d'autre texte affiché au-dessus
+            // de la liste, et la mention « exemple » seule ne disait pas pourquoi).
             Forme = FormeEcran.File,
             Recherche = "Rechercher une imprimante…",
             Criteres = ["Imprimante", "Utilisateur", "Nombre de feuilles"],
@@ -637,13 +653,13 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             ],
             Lignes =
             [
-                Ligne("Imprimante Greffe 1", "3 travaux · 14 feuilles · utilisateur 1", "Greffe", "AFaire"),
-                Ligne("Imprimante Greffe 2", "1 travail · 2 feuilles · utilisateur 1", "Greffe", "EnCours", 0),
-                Ligne("Imprimante Greffe 3", "5 travaux · 30 feuilles · en impression", "Greffe", "EnCours", 0, 1),
-                Ligne("Imprimante Accueil", "2 travaux · 6 feuilles · imprimée", "Accueil", "Validee", 0, 1),
-                Ligne("Imprimante Salle A", "4 travaux · 22 feuilles · utilisateur 2", "Accueil", "AFaire"),
-                Ligne("Imprimante Salle B", "1 travail · 1 feuille · imprimée", "Accueil", "Validee", 0, 1),
-                Ligne("Imprimante Salle C", "8 travaux · 40 feuilles · à vider", "Accueil", "EnCours", 0),
+                Ligne("Imprimante Greffe 1", "3 travaux · 14 feuilles · utilisateur 1 · exemple : table PAPERCUT de COMMUN_RIG, absente de la base du greffe", "Greffe", "AFaire"),
+                Ligne("Imprimante Greffe 2", "1 travail · 2 feuilles · utilisateur 1 · exemple : table PAPERCUT de COMMUN_RIG, absente de la base du greffe", "Greffe", "EnCours", 0),
+                Ligne("Imprimante Greffe 3", "5 travaux · 30 feuilles · en impression · exemple : table PAPERCUT de COMMUN_RIG, absente de la base du greffe", "Greffe", "EnCours", 0, 1),
+                Ligne("Imprimante Accueil", "2 travaux · 6 feuilles · imprimée · exemple : table PAPERCUT de COMMUN_RIG, absente de la base du greffe", "Accueil", "Validee", 0, 1),
+                Ligne("Imprimante Salle A", "4 travaux · 22 feuilles · utilisateur 2 · exemple : table PAPERCUT de COMMUN_RIG, absente de la base du greffe", "Accueil", "AFaire"),
+                Ligne("Imprimante Salle B", "1 travail · 1 feuille · imprimée · exemple : table PAPERCUT de COMMUN_RIG, absente de la base du greffe", "Accueil", "Validee", 0, 1),
+                Ligne("Imprimante Salle C", "8 travaux · 40 feuilles · à vider · exemple : table PAPERCUT de COMMUN_RIG, absente de la base du greffe", "Accueil", "EnCours", 0),
             ],
         },
 
@@ -651,15 +667,20 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         {
             Code = "PROC_LISTEEXCEL", Titre = "Export Excel", Sujet = "listes d'instances",
             // Lecteur : LecteurListesExcel.cs (lot 11) -- les types de liste d'instances du greffe, leurs colonnes et leurs listes
-            // paramétrées (PARAMETRAGE_LISTE_XLS*). Ni comptage ni export : la V2 exécute le SQL stocké dans PARAMETRAGE_LISTE
-            // (ExcelInstance.cs:39-63) et EXECUTE_EXCEL ouvre un classeur non enregistré (aucun dossier choisi) ; « Lancer l'export
-            // Excel » reste en démonstration.
+            // paramétrées (PARAMETRAGE_LISTE_XLS*) ; avec une date de début, le COMPTAGE de RIG v2 par type (ExcelInstance.cs:9-104,
+            // la requête de PARAMETRAGE_LISTE réécrite sous v2) et le blocage au-delà de 65 536 lignes (OPE_RECHERCHE.cs:466-472).
+            // L'export reste en démonstration : EXECUTE_EXCEL ouvre un classeur non enregistré, sans dossier choisi (Excel.cs:551),
+            // avec des colonnes qui sont des expressions SQL stockées dans la base.
             Forme = FormeEcran.Etat,
-            Parametres = ["Type de liste", Champ.Periode("Période"), "Code d'acte", "Nature d'affaire"],
+            // Les critères des listes d'instances (OPE_INSTANCE, OPE_TYPE_INSTANCE, OPE_CODE_EVE_PRO ; OPE_RECHERCHE.cs:78-99).
+            // Code d'acte et nature d'affaire du groupement ne se saisissent pas : ce sont deux réglages du greffe (OPE_INSTANCE.cs:78-79).
+            Parametres = ["Type de liste", Champ.Periode("Période"), "Types d'instance", "Codes d'événement",
+                          Champ.Case("Sans sursis à statuer"), Champ.Case("Sans ADD expertise"), Champ.Case("Sans ADD")],
             Colonnes = ["Liste", Champ.Nombre("Nombre de lignes")],
             Gestes = ["Lancer l'export Excel"],
             Recherche = "Rechercher un type de liste…",
-            Criteres = ["Type de liste", "Période", "Colonnes à exporter"],
+            // Les critères sont les Paramètres, au libellé près : c'est ce que l'État envoie à la base.
+            Criteres = ["Type de liste", "Période", "Types d'instance", "Codes d'événement", "Sans sursis à statuer", "Sans ADD expertise", "Sans ADD"],
             Valider = "Lancer l'export Excel",
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À compter", "Comptée", "Exportée"), new EtatEcran("EnAttente", "Bloquée : trop de lignes", "en-attente")],
@@ -668,8 +689,8 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             [
                 Marche("Type de liste", "Le type fixe les critères proposés : instances enrôlées, avec ou sans décision, avec événement passé ou futur, groupements, affaires sans décision définitive, citations signifiées.", true,
                     "Type de liste"),
-                Marche("Critères", "Période et critères du type choisi. Un groupement se règle par code d'acte et nature d'affaire.", true,
-                    "Période", "Code d'acte", "Nature d'affaire"),
+                Marche("Critères", "Période et critères du type choisi : types d'instance (RA, RC, MD…), débuts de codes d'événement séparés par « ; » pour les événements, cases sans sursis et sans ADD pour les décisions. Un groupement se règle par deux réglages du greffe.", true,
+                    "Période", "Types d'instance", "Codes d'événement"),
                 Marche("Comptage", "Le nombre de résultats est compté avant l'export. Au-delà de 65 536 lignes, l'export est bloqué : réduire la période ou affiner les critères.", true,
                     "Nombre de lignes"),
                 Marche("Colonnes", "Colonnes incluses et leur ordre, à glisser-déposer. Enregistré pour l'utilisateur ou pour le greffe.", false,

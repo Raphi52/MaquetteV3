@@ -7,7 +7,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// EDITER COMME RIG v2 : la demande d'une entite judiciaire et sa demande d'edition, telles que le moteur de RIG v2 les ecrit
 /// avant de passer la main au service d'edition (plan « RIG v3 100 % fonctionnel », lot 10, 27/11/2026). La V3 n'appelle aucun
 /// service : la demande d'edition est posee dans la file des editions (v2.DEMANDE_EDITION, phase C « creee »), que le service
-/// d'edition de RIG v2 relit. Utilise par EcrivainCourriersEnMasse.cs.
+/// d'edition de RIG v2 relit. Utilise par EcrivainCourriersEnMasse.cs ; la demande du processus et le rattachement d'une demande a sa
+/// mere, par EcrivainOrdonnancesASigner.cs (dont les editions viennent de l'evenement de procedure : EditionsEvenementV2.cs).
 ///
 /// SOURCE (ancien RIG) :
 ///   - la demande : Instance.CreateDemande(enCours, codeProcessus) (Outils\DLL\RigMetier\JUDICIAIRE\Instance.cs:4697-4716) --
@@ -81,6 +82,37 @@ internal static class EditionsV2
             ["DSSDM_ID_DMND"] = id, ["DSSDM_CODE_SEQUENCEUR"] = objet.Sequenceur, ["DSSDM_VALEUR_SEQUENCEUR"] = objet.Valeur,
         }, ct);
         return (id, numero, null);
+    }
+
+    /// <summary>La demande DU PROCESSUS (Processus.demande de RIG v2 : sans dossier ni affaire, nommee par le processus), validee : la
+    /// demande mere des demandes par entite (DMND_ID_DMND_MERE, OPE_LISTE_ORDONNANCES.cs:3348-3349, :3390). Rend son id et son numero, ou
+    /// le refus de la numerotation DMD.</summary>
+    internal static async Task<(int Id, string? Numero, string? Refus)> DemandeProcessusValideeAsync(GesteEnCours geste, string codeProcessus, string nom,
+        CancellationToken ct)
+    {
+        var (numero, refus) = await CreationV2.NumeroAsync(geste, "DMD", geste.Maintenant.Year, ct);
+        if (numero is null) return (0, null, refus);
+        var id = await CreationV2.InsererAsync(geste, "v2.DEMANDE", "DMND_ID_DMND", new Dictionary<string, object?>
+        {
+            ["DMND_NUM_DEMANDE"] = numero, ["DMND_ETAT_DEMANDE"] = "V", ["DMND_CODE_PROSS"] = codeProcessus, ["DMND_NOM"] = nom.Length > 255 ? nom[..255] : nom,
+            ["DMND_DATE_CREATION"] = geste.Maintenant, ["DMND_DATE_VALIDATION"] = geste.Maintenant, ["DMND_EN_COURS"] = false,
+            ["DMND_NOM_UTILISATEUR"] = geste.Agent.NomAffiche,
+        }, ct);
+        return (id, numero, null);
+    }
+
+    /// <summary>Rattache la demande <paramref name="idDemande"/> a sa demande mere (DMND_ID_DMND_MERE) et lui ajoute les dossiers
+    /// <paramref name="dossiers"/> (sequenceur, valeur) -- ceux que RIG v2 lie apres coup (Instance.DossierDemandeAddSequenceurLie,
+    /// Instance.cs:4761-4767). Une base sans la colonne de la mere (un banc) garde la demande sans mere.</summary>
+    internal static async Task LierAsync(GesteEnCours geste, int idDemande, int? idMere, IEnumerable<(string Sequenceur, string Valeur)> dossiers, CancellationToken ct)
+    {
+        if (idMere is { } mere && (await ColonnesAsync(geste, "v2.DEMANDE", ct)).Contains("DMND_ID_DMND_MERE"))
+            await geste.EcrireAsync("UPDATE v2.DEMANDE SET DMND_ID_DMND_MERE = @m WHERE DMND_ID_DMND = @d", ct, new SqlParameter("@m", mere), new SqlParameter("@d", idDemande));
+        foreach (var (sequenceur, valeur) in dossiers)
+            await geste.InsererAsync("v2.DOSSIER_DEMANDE", "DSSDM_ID_DSSDM", new Dictionary<string, object?>
+            {
+                ["DSSDM_ID_DMND"] = idDemande, ["DSSDM_CODE_SEQUENCEUR"] = sequenceur, ["DSSDM_VALEUR_SEQUENCEUR"] = valeur,
+            }, ct);
     }
 
     /// <summary>
