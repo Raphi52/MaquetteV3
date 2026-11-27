@@ -15,12 +15,12 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// 27/11/2026 -- la 1re version lisait v2.PARAMETRAGE, absente de la base V3 (ReprisesPhase1.cs:86 « PARAMETRAGE » -> « soc.Reglage » ;
 /// le lot 9 a vu la meme erreur « Invalid object name 'v2.PARAMETRAGE' » sur la copie de dev, PROC_REJETS_BILANS.sql:35-38) : lecture
 /// deplacee sur soc.Reglage, ecrivain retire (il aurait ecrit une table absente, et soc.* est hors du socle des gestes).
-/// LES GESTES NE SONT PAS BRANCHES (nomme) : ajouter, reordonner ou retirer un code reecrit soc.Reglage, et le socle des gestes des
-/// ecrans generes n'ecrit que v2.* et rec.* (EcrivainEcran.cs, point 3 ; ExigerEcritureV2). La V3 a deja la route qui ecrit un reglage du
-/// greffe, avec le droit « modifier le greffe » et le journal (PUT RoutesGreffes.Reglage, Serveur/Socle/Greffes/ModuleGreffes.cs:101-129) :
-/// la brancher sur cet ecran est une decision du socle, pas de ce lot. Les regles V2 a tenir alors : ajout d'un code CODE_CHEF commencant
-/// par IP, absent de la liste, en fin de liste (OPE_PARAM_IP.cs:26-42) ; liste vide refusee, « La liste ne contient aucun code chef »
-/// (ETP_PARAM_IP.cs:28-35) ; la liste jointe par « ; » sans « ; » final (l. 36-52).
+/// LES GESTES : EcrivainCodesChefsIp.cs -- ajouter un code (CODE_CHEF commencant par IP, absent de la liste, en fin : OPE_PARAM_IP.cs:43-60),
+/// le retirer, le monter ou le descendre d'un rang (RigListViewUpDown._MoveItem) ; liste vide refusee, « La liste ne contient aucun code
+/// chef » (ETP_PARAM_IP.cs:43-50) ; la liste jointe par « ; » sans « ; » final (l. 52-68). Ils ecrivent soc.Reglage par
+/// geste.ModifierReglageAsync, la meme ecriture que la route des reglages (Serveur/Socle/Greffes/EcritureReglage.cs ; decision du chef
+/// msg-cab1a60f, 27/11/2026), avec le droit « modifier le greffe ». Ils repartent de la liste que lit cet ecran (CodesRangesAsync,
+/// ResolusAsync) : ce que l'agent voit est ce qui est reecrit.
 ///
 /// SOURCE (ancien RIG) : D:\RigApplication\Source\RIG\DLL\Processus\PROC_PARAM_IP\ETP_PARAM_IP.
 ///   - LA LISTE : ETP_PARAM_IP.DoInitGraphique (l. 14-26) -- Parametrage.GetValeurParametrage("IP_CODE_CHEF") coupe sur « ; », chaque code

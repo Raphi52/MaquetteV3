@@ -1,5 +1,5 @@
--- Jeu de LecteurCodesChefsIp (« Codes chefs IP », PROC_PARAM_IP), lot 14 du plan-676a4b19 : lecture seule (les gestes ecriraient
--- soc.Reglage, hors du socle des gestes : LecteurCodesChefsIp.cs le dit). Codes « ...L14... ». Le reglage IP_CODE_CHEF est dans
+-- Jeu de LecteurCodesChefsIp et EcrivainCodesChefsIp (« Codes chefs IP », PROC_PARAM_IP), lot 14 du plan-676a4b19 : la lecture ici,
+-- les gestes dans PROC_PARAM_IP.gestes (ils reecrivent soc.Reglage par EcritureReglage.cs). Codes « ...L14... ». Le reglage IP_CODE_CHEF est dans
 -- soc.Reglage (la reprise de PARAMETRAGE, SOC-003) ; CODE_CHEF est creee par PROC_DBE_INJ.sql (joue avant) avec deux colonnes : ce jeu
 -- lui ajoute le libelle ecran (varchar(84) NOT NULL dans RIG_DEV, CODE_CHEF.cs de RigBaseGreffe : DEFAULT '' pour les lignes des autres).
 IF OBJECT_ID(N'v2.CODE_CHEF') IS NULL
@@ -17,3 +17,11 @@ IF EXISTS (SELECT 1 FROM soc.Reglage WHERE Code = ''IP_CODE_CHEF'')
 ELSE
     INSERT INTO soc.Reglage (Code, Libelle, Valeur) VALUES (''IP_CODE_CHEF'', ''Banc EcransGeneresBase lot 14'', ''RFL14;IPL14A;IPL14Z;IPL14C'');
 ';
+
+-- L'agent qui ECRIT le reglage (PROC_PARAM_IP.gestes, blocs « agent: banc.admin.l14 ») : l'ecriture d'un reglage exige le droit de
+-- modifier le greffe (ServiceDroits.PeutModifierLeGreffe : administrateur = Amitel ET marque administrateur, OPE_EDITER_GREFFE.cs:30-38).
+-- L'agent du banc (banc.ecrans) ne l'a pas -- son refus est le bloc 1 -- et le lui donner changerait l'agent de tous les autres jeux :
+-- un second compte, administrateur, admis comme lui (meme service, role BANC). Sans IdV2 : aucun lecteur ne le montre.
+INSERT INTO soc.Compte (CompteWindows, Nom, Prenom, Abrege, Civilite, CodeGreffe, IdService, Desactive, EstAmitel, EstAdministrateur)
+SELECT 'banc.admin.l14', 'ADMINL14', 'Banc', 'BANCL14', 'M.', CodeGreffe, IdService, 0, 1, 1 FROM soc.Compte WHERE CompteWindows = 'banc.ecrans';
+INSERT INTO soc.CompteRole (IdCompte, Role) SELECT Id, 'BANC' FROM soc.Compte WHERE CompteWindows = 'banc.admin.l14';
