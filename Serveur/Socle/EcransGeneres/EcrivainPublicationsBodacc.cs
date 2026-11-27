@@ -39,7 +39,7 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     Les destinataires d'une PC ou d'une prevention que la V3 calcule (RecupDestEditLot2FROMProcedureCollective / FROMPrevention,
 ///     JUDICIAIRE\DestinatairesEditionsLot2.cs:1628-1677, :1992-2018) : ses MANDATAIRES en mission (GERER_PC, MANDATAIRE_PC) -- code =
 ///     la fonction, valeur = le mandataire, libelle = Outils.FormerNomComplet (civilite abregee, nom, complement), adresse
-///     (AdresseV2.cs), courriel, coffre ; et pour une PC, sans coffre, le meme sous le code « <fonction>SC » (:1655-1676).
+///     (EditionsEvenement.BlocAdresseAsync du lot 8, puis TransfoTexteEnXml), courriel, coffre ; et pour une PC, sans coffre, le meme sous le code « <fonction>SC » (:1655-1676).
 ///   Annonce de la liste des certificats sans procedure ni prevention : la V2 la saute (« continue », :69-73) ; la V3 aussi, et le dit.
 /// CONTROLES : au moins une annonce cochee ; chaque annonce relue DANS la transaction, dans sa liste (la requete du lecteur) ; un
 /// reglage d'edition absent (CreateDemandeEditionByParametreGeneration rend null, DemandeEdition.cs:2580-2584, la V2 s'arrete alors
@@ -389,7 +389,10 @@ internal sealed class EcrivainPublicationsBodacc : IEcrivainEcran
             r.Close();
             foreach (var m in lus)
             {
-                var adresse = AdresseV2.TexteEnXml(await AdresseV2.MultiLignesAsync(geste, m.IdAdresse, ct));
+                // AdresseMultiLignesPourEcran : les lignes du bloc d'edition (EditionsEvenement.BlocAdresseAsync, separees par « | »,
+                // AdresseMultiLignesPourEdition) sur des sauts de ligne, puis TransfoTexteEnXml (DestinatairesEditionsLot2.cs:1637-1640).
+                var bloc = m.IdAdresse is { } ia ? await EditionsEvenement.BlocAdresseAsync(geste, ia, ct) : "";
+                var adresse = TexteEnXml(bloc.Replace("|", "\r\n", StringComparison.Ordinal));
                 EditionsEvenementV2.Destinataire Entite(string code, string coffre) => new()
                 {
                     Code = code, Valeur = m.Valeur, Libelle = m.Nom, Adresse = adresse, Email = m.Email, NomCoffre = coffre,
@@ -405,5 +408,16 @@ internal sealed class EcrivainPublicationsBodacc : IEcrivainEcran
         if (reglage.Contains("DI", StringComparison.Ordinal))
             retenus.Add(new Retenu(new EditionsEvenementV2.Destinataire(), false));              // CreateEntiteDocumentInterne (:113-124)
         return retenus;
+    }
+
+    /// <summary>TransfoTexteEnXml (DestinatairesEditionsLot2.cs:1091-1103) : le texte tel que RIG v2 le pose dans l'attribut ADRESSE
+    /// d'une ENTITE (la serialisation XML l'echappe ensuite encore une fois, comme XElement dans EditionsEvenementV2.ListeXml).</summary>
+    internal static string TexteEnXml(string texte)
+    {
+        if (string.IsNullOrEmpty(texte)) return texte;
+        return texte.Replace("&", "&amp;", StringComparison.Ordinal).Replace("'", "&apos;", StringComparison.Ordinal)
+                    .Replace("\"", "&quot;", StringComparison.Ordinal).Replace(">", "&gt;", StringComparison.Ordinal)
+                    .Replace("<", "&lt;", StringComparison.Ordinal).Replace("\r\n", "&amp;crlf;", StringComparison.Ordinal)
+                    .Replace("\r", "&amp;crlf;", StringComparison.Ordinal).Replace('\u001F', ' ');
     }
 }

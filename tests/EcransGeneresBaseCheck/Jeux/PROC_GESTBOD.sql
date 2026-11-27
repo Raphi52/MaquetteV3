@@ -60,7 +60,7 @@ INSERT INTO v2.BODACC (BDCCR_ID_BDCCR, BDCCR_ID_BDCRC, BDCCR_TYPE_BODACC, BDCCR_
 -- Pour « Éditer » (EcrivainPublicationsBodacc, lot 11, reprise 6 : PROC_GESTBOD.gestes). Deux certificats de parution a verifier (5),
 -- de mai 2001 (aucune recherche de ce jeu ne vise mai) : 2110210 sur l'evenement 2110261 de la PC 1400101 (PROC_CHM.sql, son mandataire
 -- MDJ 1400551 en mission), 2110211 sur l'evenement 2110262 de la prevention 1400201 (PROC_CHM.sql, sans mandataire). Le mandataire
--- recoit une adresse (rec.Adresse 2110281 : toque, pre-adresse, voie, BP, cedex -- AdresseV2.cs), un courriel et un coffre-fort
+-- recoit une adresse (rec.Adresse 2110281 : toque, pre-adresse, voie, BP, cedex -- EditionsEvenement.BlocAdresseAsync), un courriel et un coffre-fort
 -- demarre. Colonnes et tables ajoutees si un jeu precedent ne les a pas posees, aux types de RIG_DEV (SQL-DEV\DEV, lu le 27/11/2026).
 IF COL_LENGTH('v2.BODACC', 'BDCCR_NUMERO_SOURCE') IS NULL ALTER TABLE v2.BODACC ADD BDCCR_NUMERO_SOURCE varchar(36) NULL;
 IF COL_LENGTH('v2.BODACC', 'BDCCR_CODE_EP_SUPPR') IS NULL ALTER TABLE v2.BODACC ADD BDCCR_CODE_EP_SUPPR varchar(10) NULL;
