@@ -184,7 +184,7 @@ export function EcranDocDemat({ ouvrirDossier }: ProprietesEcranDocDemat) {
               </label>
               <label className="rig-saisie-champ">
                 <span className="rig-saisie-champ__libelle">Date de la piece</span>
-                <input className="rig-saisie-champ__saisie" value={dateCourte(s.date)} readOnly />
+                <input className="rig-saisie-champ__saisie" value={s.date ? dateCourte(s.date) : ''} readOnly />
               </label>
             </div>
             <label className="rig-saisie-champ">

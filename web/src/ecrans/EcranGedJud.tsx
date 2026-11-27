@@ -311,8 +311,8 @@ export function EcranGedJud({ ouvrirDossier, dossier = null }: ProprietesEcranGe
 
       <ListeModerne etiquette="Decisions judiciaires et documents lies">
         <EnteteListe titre="Decisions judiciaires et documents lies"
-                     synthese={<>{trouves.length}{trouves.length > 1 ? ' documents · ' : ' document · '}<b>{brouillons}</b>
-                       {brouillons > 1 ? ' brouillons · ' : ' brouillon · '}<b>{lies}</b>{' docs lies'}
+                     synthese={<>{trouves.length}{trouves.length > 1 ? ' documents · ' : ' document · '}
+                       {!vue && <><b>{brouillons}</b>{brouillons > 1 ? ' brouillons · ' : ' brouillon · '}</>}<b>{lies}</b>{' docs lies'}
                        {action === null ? '' : ' — ' + action}</>}
                      filtre={{ valeur: recherche, changer: setRecherche, indication: 'Aller a une decision…',
                                valider: () => { if (trouves.length === 1) setSelection(trouves[0]!) } }} />

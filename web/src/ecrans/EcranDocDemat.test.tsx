@@ -66,6 +66,8 @@ describe('EcranDocDemat', () => {
     expect(screen.queryByText(/de démonstration/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'STATStatuts' }))
     expect((screen.getByLabelText('Etat') as HTMLInputElement).value).toBe('Supprimée')
+    // Sans date de piece (DMCOPJ_DATE_PIECE NULL) : le champ reste vide (capture du 27/11/2026 : « undefined/undefined/ »).
+    expect((screen.getByLabelText('Date de la piece') as HTMLInputElement).value).toBe('')
   })
 
   it('sans serveur : la demonstration, marquee « exemple » ; en panne : le motif et aucune piece', async () => {

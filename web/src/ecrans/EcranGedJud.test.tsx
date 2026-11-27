@@ -175,6 +175,8 @@ describe('EcranGedJud ouvert depuis une affaire', () => {
     await waitFor(() => expect(rangees(container).map((r) => r.cells[1]!.textContent)).toEqual(['Assignation du 01/06', 'Conclusions']))
     expect(pont.appels).toHaveBeenCalledWith('EcranGedJud.Documents')
     expect(screen.queryByText(/de démonstration/)).toBeNull()
+    // RIG v2 n'a pas de brouillon : la synthese de la base ne le compte pas.
+    expect(synthese(container)).toBe('2 documents · 1 docs lies')
     // Les etats de RIG v2 lus deviennent les choix du critere et les vues, dans l'ordre V, VR, A, R.
     expect([...(screen.getByLabelText('Etat') as HTMLSelectElement).options].map((o) => o.value)).toEqual(['', 'Validé', 'En attente', 'Rejeté'])
 
