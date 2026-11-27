@@ -153,6 +153,12 @@ export function EcranClients({ selectionner }: ProprietesEcranClients) {
 
       <aside className="rig-criteres">
         <ProvenanceEcran mode={vue?.mode} message={vue?.message} quoi="Clients" />
+        {/* La liste lue est coupee au plafond du serveur (LectureClients.Plafond) : le dire, la recherche ne porte que sur elle. */}
+        {vue?.mode === 'serveur' && vue.total > vue.clients.length && (
+          <p className="rig-eg-note" role="note">
+            Les {vue.clients.length} premiers clients (par abrégé) sur {vue.total} dans la base du greffe : la recherche et les vues ne portent que sur eux.
+          </p>
+        )}
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Criteres de recherche</div>
 
         <div className="rig-criteres__bloc">

@@ -144,4 +144,11 @@ describe('EcranClients', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /^Actifs/ })[0]!)
     expect(abreges(container)).toEqual(['CLA'])
   })
+
+  // La liste lue est coupee (plafond du serveur) : l'ecran le dit au lieu de compter « 2 sur 2 ».
+  it('en base, une liste coupee au plafond le dit, avec le total de la base', async () => {
+    const client = (id: number, abrege: string) => ({ id, compte: 'C' + id, abrege, nom: abrege + ' SARL', groupe: 'Avocats', statut: 'Actif', type: 'En compte' })
+    await ouvrir(vi.fn(), { mode: 'serveur', message: null, total: 2568, clients: [client(7, 'CLA'), client(8, 'CLB')] })
+    expect(screen.getByRole('note').textContent).toContain('Les 2 premiers clients (par abrégé) sur 2568')
+  })
 })

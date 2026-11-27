@@ -25,7 +25,12 @@ namespace RigV3.Serveur.Socle.EcransMain;
 /// </summary>
 public static class LectureClients
 {
-    public const int Plafond = 2000;
+    /// <summary>
+    /// Le plafond de la liste. RIG v2 lit TOUS les clients qui repondent aux criteres (OPE_CRITERES, sans TOP) ; la V3 les filtre a
+    /// l'ecran, donc elle les lit tous jusqu'a ce plafond (mesure le 27/11/2026 : 2 568 clients en compte dans la base de dev, l'ancien
+    /// plafond de 2 000 en cachait 568). Au-dela, l'ecran le dit (EcranClients.tsx) : la recherche ne porte que sur les lignes lues.
+    /// </summary>
+    public const int Plafond = 20000;
 
     private static async Task<bool> TableAsync(SqlConnection baseGreffe, string table, CancellationToken ct)
     {
