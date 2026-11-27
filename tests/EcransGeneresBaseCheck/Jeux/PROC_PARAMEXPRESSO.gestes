@@ -1,0 +1,92 @@
+# Les gestes de EcrivainFacturationExpresso (« Facturation Expresso », PROC_PARAMEXPRESSO), joues dans l'ordre par la route POST,
+# sur les reglages de PROC_PARAMEXPRESSO.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). Un refus
+# n'ecrit rien ; chaque refus a son jumeau accepte (meme borne, autre cote). L'ecriture : l'ecriture partagee des reglages
+# (EcritureReglage.cs, lot 14), comme Parametrage.UpdateValeurParametrage (MetierParametrage.cs:42-47).
+
+# 1. Un montant illisible : le controle montant de la V2 ne le laisserait pas saisir (OPE_FACTURATION.cs:37-40). Jumeau : bloc 4.
+geste: Enregistrer
+ids: EXPRESSO_RELANCE
+valeur: Paramètre › Valeur = quinze
+resultat: refuse
+message: EXPRESSO_RELANCE est un montant (contrôle montant de RIG v2) : « quinze » n'en est pas un. Rien n'est enregistré.
+---
+# 2. Une colonne de GREFFE_PARAMETRE : la V3 n'ecrit par un ecran que la valeur d'un reglage (decision du chef, 27/11/2026).
+#    Jumeau : bloc 4 (une cle PARAMETRAGE).
+geste: Enregistrer
+ids: GRPAR_ROMPU
+valeur: Paramètre › Valeur = 2.00
+resultat: refuse
+message: GRPAR_ROMPU est une colonne de GREFFE_PARAMETRE (paramètre du greffe) : la V3 n'écrit par un écran que la valeur d'un réglage. Rien n'est enregistré.
+---
+# 3. La banque d'un mode : elle s'enregistre par « Modes de paiement » (meme table MODE_PAIEMENT_BANQUE). Jumeau : bloc 4.
+geste: Enregistrer
+ids: MODE:L15CH
+valeur: Banque du mode › Banque = L15CIC
+resultat: refuse
+message: La banque du mode L15CH s'enregistre dans « Modes de paiement » : rien n'est enregistré ici.
+---
+# 4. Le montant de relance : saisi « 20.5 », ecrit comme la V2 (« 20,50 », decimal du controle en culture francaise), auteur et
+#    date poses par l'ecriture partagee.
+geste: Enregistrer
+ids: EXPRESSO_RELANCE
+valeur: Paramètre › Valeur = 20.5
+resultat: fait
+message: Paramètre EXPRESSO_RELANCE enregistré : « 20,50 » (avant : « 15,00 »).
+fiche: EXPRESSO_RELANCE
+Paramètre › Valeur = 20,50
+Paramètre › Source = réglage
+controle: SELECT Valeur FROM soc.Reglage WHERE Code = 'EXPRESSO_RELANCE' => 20,50
+controle: SELECT CASE WHEN AuteurModif IS NOT NULL AND DateModif IS NOT NULL THEN 'auteur et date' ELSE 'manque' END FROM soc.Reglage WHERE Code = 'EXPRESSO_RELANCE' => auteur et date
+---
+# 5. La meme valeur, saisie autrement : rien ne change, rien n'est ecrit. Jumeau : bloc 4 (une autre valeur).
+geste: Enregistrer
+ids: EXPRESSO_RELANCE
+valeur: Paramètre › Valeur = 20,50
+resultat: refuse
+message: Rien à enregistrer : EXPRESSO_RELANCE vaut déjà « 20,50 ».
+---
+# 6. La valeur d'origine remise (le jeu rend la base comme il l'a trouvee).
+geste: Enregistrer
+ids: EXPRESSO_RELANCE
+valeur: Paramètre › Valeur = 15
+resultat: fait
+message: Paramètre EXPRESSO_RELANCE enregistré : « 15,00 » (avant : « 20,50 »).
+controle: SELECT Valeur FROM soc.Reglage WHERE Code = 'EXPRESSO_RELANCE' => 15,00
+---
+# 7. Un reglage absent de la base : la V3 ne cree pas de reglage (ni INSERT : EcritureReglage.cs, decision du chef). Le mode L15CH
+#    existe : seul le reglage manque. Jumeau : bloc 9 (EXPRESSO_MODE_PAIEMENT_PROFIT, present).
+geste: Enregistrer
+ids: EXPRESSO_MODE_PAIEMENT_PERTE
+valeur: Paramètre › Valeur = L15CH
+resultat: refuse
+message: Le réglage EXPRESSO_MODE_PAIEMENT_PERTE n'existe pas dans la base du greffe : la V3 ne crée pas de réglage. Rien n'est enregistré.
+---
+# 8. Un mode de paiement que le greffe n'a pas : la liste des modes de la V2 ne le propose pas (ComboBoxModePaiement). Jumeau : bloc 9.
+geste: Enregistrer
+ids: EXPRESSO_MODE_PAIEMENT_PROFIT
+valeur: Paramètre › Valeur = ZZZ15
+resultat: refuse
+message: EXPRESSO_MODE_PAIEMENT_PROFIT est un mode de paiement du greffe : « ZZZ15 » n'en est pas un. Rien n'est enregistré.
+---
+# 9. Le mode de profit : un mode du greffe (OPE_ASSOCIATION_BANQUES.cs:35-38).
+geste: Enregistrer
+ids: EXPRESSO_MODE_PAIEMENT_PROFIT
+valeur: Paramètre › Valeur = L15CH
+resultat: fait
+message: Paramètre EXPRESSO_MODE_PAIEMENT_PROFIT enregistré : « L15CH » (avant : vide).
+controle: SELECT Valeur FROM soc.Reglage WHERE Code = 'EXPRESSO_MODE_PAIEMENT_PROFIT' => L15CH
+---
+# 10. Une case : « oui » s'ecrit « 1 », comme la V2 (OPE_FACTURATION.cs:102). Jumeau du refus : bloc 11.
+geste: Enregistrer
+ids: EXPRESSO_EDITIONS_SYNTHETIQUES
+valeur: Paramètre › Valeur = oui
+resultat: fait
+message: Paramètre EXPRESSO_EDITIONS_SYNTHETIQUES enregistré : « 1 » (avant : « 0 »).
+controle: SELECT Valeur FROM soc.Reglage WHERE Code = 'EXPRESSO_EDITIONS_SYNTHETIQUES' => 1
+---
+# 11. Une case qui n'en est pas une. Jumeau : bloc 10.
+geste: Enregistrer
+ids: EXPRESSO_EDITIONS_SYNTHETIQUES
+valeur: Paramètre › Valeur = peut-être
+resultat: refuse
+message: EXPRESSO_EDITIONS_SYNTHETIQUES est une case (« 1 » ou « 0 » dans RIG v2) : « peut-être » n'en est pas une. Rien n'est enregistré.

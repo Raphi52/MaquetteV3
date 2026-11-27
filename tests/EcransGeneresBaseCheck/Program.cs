@@ -617,12 +617,31 @@ Exiger(reponseSansDroit.StatusCode == HttpStatusCode.UnprocessableEntity && sans
     $"PROC_RELCLI, Valider les soldes SANS le droit EXPCOMPTA : refus de RIG v2, aucun solde ni trace ({(int)reponseSansDroit.StatusCode} « {sansDroit?.Message} »)");
 await Sql("INSERT INTO soc.RoleFonction (Role, Fonction) VALUES ('BANC', 'EXPCOMPTA')");
 
+// « Facturation Expresso » (PROC_PARAMEXPRESSO, lot 15) SANS le droit de modifier le greffe : l'ecriture partagee d'un reglage
+// (EcritureReglage.cs, lot 14 ; Parametrage.UpdateValeurParametrage de RIG v2 sous le droit d'OPE_EDITER_GREFFE.cs:30-38) refuse
+// l'agent du banc, ni Amitel ni administrateur : son motif, rien d'ecrit. Le jumeau accepte : PROC_PARAMEXPRESSO.gestes, joue
+// ci-dessous avec ce droit, donne a l'agent le temps de ce seul jeu (CompteAdministrateurPour).
+string[] CompteAdministrateurPour = ["PROC_PARAMEXPRESSO"];
+var reglageAvantDroit = await Valeur("SELECT Valeur FROM soc.Reglage WHERE Code = 'EXPRESSO_RELANCE'");
+var journalAvantReglage = await Valeur("SELECT COUNT(*) FROM soc.Journal");
+var reponseReglage = await http.PostAsJsonAsync(RoutesEcransGeneres.GestesPour(Greffe, "PROC_PARAMEXPRESSO"),
+    new GesteEcran(TypeGeste.Enregistrer, ["EXPRESSO_RELANCE"], new Dictionary<string, string> { ["Paramètre › Valeur"] = "20" }), json);
+var reglageSansDroit = await reponseReglage.Content.ReadFromJsonAsync<ResultatGeste>(json);
+Exiger(reponseReglage.StatusCode == HttpStatusCode.UnprocessableEntity && reglageSansDroit is { Fait: false }
+       && reglageSansDroit.Message == $"Modification refusee : le compte {Agent} n'a pas le droit de modifier le greffe (il faut etre administrateur d'Amitel ou l'un des comptes nommes par la V2 : benier, jouguet, thevenon)."
+       && await Valeur("SELECT Valeur FROM soc.Reglage WHERE Code = 'EXPRESSO_RELANCE'") == reglageAvantDroit
+       && await Valeur("SELECT COUNT(*) FROM soc.Journal") == journalAvantReglage,
+    $"PROC_PARAMEXPRESSO, Enregistrer SANS le droit de modifier le greffe : refus, reglage et journal inchanges ({(int)reponseReglage.StatusCode} « {reglageSansDroit?.Message} »)");
+
 // Les GESTES (<PROCEDURE>.gestes), joues par la route POST, dans l'ordre.
 foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(StringComparer.Ordinal))
 {
     var code = Path.GetFileNameWithoutExtension(fichier);
     if (!ecrivains.ParProcedure.ContainsKey(code)) { Exiger(false, $"jeu {code}.gestes : aucun ecrivain pour cette procedure"); continue; }
     var rang = 0;
+    // Le droit de modifier le greffe, le temps du seul jeu qui ecrit un reglage (voir le refus SANS ce droit, juste au-dessus).
+    var droitReglage = CompteAdministrateurPour.Contains(code);
+    if (droitReglage) await Sql("UPDATE soc.Compte SET EstAmitel = 1, EstAdministrateur = 1 WHERE CompteWindows = @a", ("@a", Agent));
     foreach (var bloc in Blocs.Lire(File.ReadAllLines(fichier)))
     {
         rang++;
@@ -666,6 +685,7 @@ foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(String
             Exiger(lue == attendue, $"{quoi} : controle « {sql} » = {attendue} (lu : {lue})");
         }
     }
+    if (droitReglage) await Sql("UPDATE soc.Compte SET EstAmitel = 0, EstAdministrateur = 0 WHERE CompteWindows = @a", ("@a", Agent));
 }
 
 // « Registres judiciaires » SANS le reglage d'edition REP_GENERAL (EcrivainRegistresJudiciaires.cs, en tete) : la V2 ne cree alors

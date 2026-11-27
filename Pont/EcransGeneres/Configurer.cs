@@ -690,26 +690,28 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Code = "PROC_PARAMEXPRESSO", Titre = "Facturation Expresso", Sujet = "paramètres de facturation",
             Forme = FormeEcran.Fiche,
             // Lot 15 (27/11/2026) : un parametre par ligne, lu « PARAMETRAGE d'abord, sinon GREFFE_PARAMETRE » (MetierParametrage.cs:71-92,
-            // repris dans soc.Reglage et soc.ParametreGreffe), puis la banque de chaque mode actif (MetierBanques.cs:38-57) :
-            // LecteurFacturationExpresso.cs. Enregistrer n'est pas branche : il attend l'ecriture partagee d'un reglage (decision du chef,
-            // 27/11 : tiree par le lot 14 de PUT RoutesGreffes.Reglage, pas encore sur main) ; l'association mode / banque s'ecrit par
-            // « Modes de paiement ». La V2 ecrit tout d'un coup (PROC_PARAMEXPRESSO.cs:39-54, MetierParametrage.cs:42-58).
+            // repris dans soc.Reglage et soc.ParametreGreffe) -- les 37 cles que lisent les operations de la V2, un groupe par operation --,
+            // puis la banque de chaque mode actif (MetierBanques.cs:38-57) : LecteurFacturationExpresso.cs. La fiche d'un parametre ecrit
+            // sa valeur (EcrivainFacturationExpresso.cs, MetierParametrage.cs:42-47) pour les seules cles PARAMETRAGE que la V2 ecrit, par
+            // l'ecriture partagee d'un reglage (decision du chef, 27/11 ; lot 14, 5e8d50d). Les GRPAR_* (GREFFE_PARAMETRE) se lisent
+            // seulement ; l'association mode / banque s'ecrit par « Modes de paiement ».
             Recherche = "Rechercher un paramètre de facturation…",
             Criteres = ["Paramètre", "Banque", "Mode de paiement"],
             // Bouton final cite par la fiche v2 : DoValider (PROC_PARAMEXPRESSO.cs:39-54), VERIFIER masque (FORM_PARAMEXPRESSO.cs:10)
             Valider = "Valider",
             Rang = 7,
             Etats = EtatsEcran.Trois("À renseigner", "En cours", "Enregistré"),
-            Groupes = ["Paramètres généraux", "Banques et modes", "Pied de page", "Comptabilité"],
+            // Une operation de la V2 par groupe (OPE_FACTURATION, OPE_CORPS_FACTURE, OPE_PIED_PAGE, OPE_LETTRES_CHEQUES,
+            // OPE_SPECIFICITE_JUDICIAIRE, OPE_COMPTABILITE_PARAMETRES_GENERAUX, OPE_ASSOCIATION_BANQUES).
+            Groupes = ["Paramètres généraux", "Corps de facture", "Pied de page", "Lettres chèques", "Spécificités judiciaires", "Comptabilité", "Banques et modes"],
+            // La fiche d'une ligne (LecteurFacturationExpresso.LireFicheAsync) : un parametre, ou la banque d'un mode.
             Sections =
             [
-                new MarcheEcran("Paramètres généraux", "Rompu, seuils de relance et de remboursement, commentaires obligatoires, relevé client, éditions synthétiques, courriels des relevés.", true,
-                    ["Paramètre", "Valeur"]),
-                new MarcheEcran("Banques et modes", "Chaque mode de paiement actif est associé à sa banque, ou à aucune.", false,
-                    ["Banque", "Mode de paiement"]),
-                new MarcheEcran("Pied de page", "Le pied de page des factures : l'adresse vient du code greffe ou du paramètre GRPAR_GREFFE_ADR_COMPLETE.", false,
-                    ["Ligne du pied de page", "Source de l'adresse"]),
-                new MarcheEcran("Enregistrement", "Enregistrer écrit les seuls paramètres modifiés et laisse une trace.", true,
+                new MarcheEcran("Paramètre", "La clé, sa valeur et d'où elle vient : un réglage (PARAMETRAGE), que la valeur s'enregistre, ou un paramètre du greffe (GREFFE_PARAMETRE), lu seulement.", true,
+                    ["Paramètre", "Valeur", "Source"]),
+                new MarcheEcran("Banque du mode", "Chaque mode de paiement actif est associé à sa banque, ou à aucune ; l'association s'enregistre dans « Modes de paiement ».", false,
+                    ["Mode de paiement", "Banque"]),
+                new MarcheEcran("Enregistrement", "Enregistrer écrit la valeur modifiée, avec l'auteur et la date, et laisse une trace.", true,
                     []),
             ],
             // Des cles de la V2, aux valeurs anonymes.
