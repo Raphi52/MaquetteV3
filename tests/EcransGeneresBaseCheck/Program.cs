@@ -658,6 +658,47 @@ Exiger(reponseMixte.StatusCode == HttpStatusCode.OK && mixte is { Fait: true }
        && await Valeur("SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Répertoire général des 1 instances enrôlées'") == "0",
     $"PROC_REGJUD, jumeau : repertoire general et IP sans reglage -- seule la demande des IP est creee, le message le dit ({(int)reponseMixte.StatusCode} « {mixte?.Message} »)");
 
+// « Publications BODACC », « Éditer » le certificat 2110210 (EcrivainPublicationsBodacc.cs, en tete ; lot 11) : trois refus qui changent
+// un reglage que PROC_GESTBOD.gestes lit (la base des jeux est commune), poses ICI apres tous les gestes puis remis. Refus : le reglage
+// CERTIF_BOD_DEST vise « PC » (la PC elle-meme, un destinataire que RIG v2 ajoute et que la V3 ne calcule pas) ; CERTIF_BOD_DEST absent ;
+// le reglage d'edition CERTIF_BOD absent (CreateDemandeEditionByParametreGeneration rend null). Rien d'ecrit a chaque fois. Jumeau
+// accepte : CERTIF_BOD_DEST = « MDJ » seul -- le mandataire au coffre, sans document interne (PROC_GESTBOD.gestes bloc 9 : les deux).
+{
+    async Task<(HttpStatusCode Statut, ResultatGeste? R)> EditerCertificat()
+    {
+        var reponse = await http.PostAsJsonAsync(RoutesEcransGeneres.GestesPour(Greffe, "PROC_GESTBOD"),
+            new GesteEcran(TypeGeste.Confirmer, ["C-2110210"], new Dictionary<string, string>()) { Nom = "Éditer" }, json);
+        return (reponse.StatusCode, await reponse.Content.ReadFromJsonAsync<ResultatGeste>(json));
+    }
+    const string EditionsBodacc = "SELECT COUNT(*) FROM v2.DEMANDE_EDITION";
+    var avantBodacc = await Valeur(EditionsBodacc);
+    await Sql("UPDATE soc.Reglage SET Valeur = 'MDJ;PC', AuteurModif = 'banc', DateModif = SYSDATETIME() WHERE Code = 'CERTIF_BOD_DEST'");
+    var (statutPc, pc) = await EditerCertificat();
+    await Sql("DELETE FROM soc.Reglage WHERE Code = 'CERTIF_BOD_DEST'");
+    var (statutAbsent, sansDestinataires) = await EditerCertificat();
+    await Sql("INSERT INTO soc.Reglage (Code, Libelle, Valeur) VALUES ('CERTIF_BOD_DEST', 'Banc EcransGeneresBase lot 11', 'MDJ')");
+    await Sql("UPDATE v2.PARAMETRE_EDITION SET PRMED_CODE = 'CERTIF_BOD_BANC11' WHERE PRMED_CODE = 'CERTIF_BOD'");
+    var (statutSansEdition, sansEdition) = await EditerCertificat();
+    await Sql("UPDATE v2.PARAMETRE_EDITION SET PRMED_CODE = 'CERTIF_BOD' WHERE PRMED_CODE = 'CERTIF_BOD_BANC11'");
+    var refusBodacc = await Valeur(EditionsBodacc);
+    var (statutMdj, mdj) = await EditerCertificat();
+    var apresBodacc = await Valeur(EditionsBodacc);
+    await Sql("UPDATE soc.Reglage SET Valeur = 'MDJ;DI', AuteurModif = 'banc', DateModif = SYSDATETIME() WHERE Code = 'CERTIF_BOD_DEST'");
+    Exiger(statutPc == HttpStatusCode.UnprocessableEntity && pc?.Message == "Le réglage CERTIF_BOD_DEST vise « PC », un destinataire que RIG v3 ne calcule pas "
+               + "(seuls les mandataires de la procédure et le document interne le sont) : rien n'est édité, faire le certificat dans RIG v2."
+           && statutAbsent == HttpStatusCode.UnprocessableEntity
+           && sansDestinataires?.Message == "Rien n'est édité : le réglage CERTIF_BOD_DEST (destinataires du certificat) n'existe pas dans ce greffe."
+           && statutSansEdition == HttpStatusCode.UnprocessableEntity
+           && sansEdition?.Message == "Rien n'est édité : le réglage d'édition CERTIF_BOD n'existe pas dans ce greffe, et RIG v2 ne peut alors pas créer l'édition."
+           && refusBodacc == avantBodacc,
+        $"PROC_GESTBOD, Éditer sans destinataire calculable, sans CERTIF_BOD_DEST, sans reglage CERTIF_BOD : trois refus, aucune edition "
+        + $"({avantBodacc} -> {refusBodacc} ; « {pc?.Message} » / « {sansDestinataires?.Message} » / « {sansEdition?.Message} »)");
+    Exiger(statutMdj == HttpStatusCode.OK && mdj is { Fait: true } && int.Parse(apresBodacc) == int.Parse(refusBodacc) + 1
+           && mdj.Message == "1 édition placée dans la file des éditions : Certificat de parution au Bodacc, 1990P14101 EP BANC11C du 15/05/2001 00:00:00 "
+               + "→ Me MANDAUN Selarl (coffre-fort). Impression et envoi au coffre-fort simulés : le service d'édition de RIG v2 les fait, RIG v3 ne l'appelle pas.",
+        $"PROC_GESTBOD, jumeau : CERTIF_BOD_DEST = « MDJ » -- une seule edition, au mandataire ({refusBodacc} -> {apresBodacc} ; « {mdj?.Message} »)");
+}
+
 // Le PONT (Pont/EcranGenere.cs) : un geste sans serveur est une demonstration ; sur une ligne de l'ecran reuni
 // « Corriger une affaire judiciaire », la fiche, la recherche et un refus de RIG v2 passent par lui.
 var corriger = CatalogueGenere.Tous.First(d => d.Membres.Any(m => m.Code == "PROC_MJUD"));
