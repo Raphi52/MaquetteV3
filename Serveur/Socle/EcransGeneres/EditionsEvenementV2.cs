@@ -84,6 +84,9 @@ internal static class EditionsEvenementV2
         public string? TypeGeneration { get; init; }
         /// <summary>Le libelle pose APRES les parametres (le KBIS de la citation) ; null : LIBELLE_DOCUMENT.</summary>
         public string? LibelleImpose { get; init; }
+        /// <summary>Vrai : la demande n'a pas de liste LISTE_ENTITE_DESTINATION, comme une edition que RIG v2 cree sans destinataire
+        /// (les listes BODACC de PROC_GESTBOD, OPE_LST_LISTE_REJ.cs:114-119 : EcrivainPublicationsBodacc).</summary>
+        public bool SansListeDestinataires { get; init; }
         public Dictionary<string, object?> Colonnes { get; } = new(StringComparer.OrdinalIgnoreCase);
 
         public string Libelle => LibelleImpose ?? (Parametres.TryGetValue("LIBELLE_DOCUMENT", out var l) ? l : "");
@@ -400,10 +403,8 @@ internal static class EditionsEvenementV2
     internal static async Task<Depot> DeposerAsync(GesteEnCours geste, int idDemande, Edition e, CancellationToken ct)
     {
         var compte = geste.Agent.CompteWindows.Length > 32 ? geste.Agent.CompteWindows[..32] : geste.Agent.CompteWindows;
-        var p = new SortedDictionary<string, string>(e.Parametres, StringComparer.Ordinal)
-        {
-            ["LISTE_ENTITE_DESTINATION"] = ListeXml(e.Destinataires),
-        };
+        var p = new SortedDictionary<string, string>(e.Parametres, StringComparer.Ordinal);
+        if (!e.SansListeDestinataires) p["LISTE_ENTITE_DESTINATION"] = ListeXml(e.Destinataires);
         var valeurs = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
             ["DMNED_DATE_CREATION"] = geste.Maintenant, ["DMNED_TYPE_PAPIER"] = "NORMAL", ["DMNED_MEDIA"] = "IMPR", ["DMNED_ETAT_EMISSION"] = "N",

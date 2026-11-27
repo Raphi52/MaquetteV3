@@ -603,18 +603,22 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             Recherche = "Numéro de parution…",
             // Les boutons radio GestionBodacc (OPE_BASE_BOD.cs:12, :44-47) et les deux dates « du » / « au » de la V2.
             Criteres = ["Critère de date", "Date du", "Date au", "Numéro de parution"],
-            // VALIDER de RIG v2, dans la liste de chaque annonce : un rejet passe à renvoyer (état 3, OPE_LST_LISTE_REJ.DoSauver,
-            // :51-57), un certificat est vérifié (état 6, OPE_LST_CERTIF_BOD, :57-59). Les éditions ne sont pas reprises : le
-            // destinataire d'une PC (mandataire, CERTIF_BOD_DEST) et le XML d'un état Crystal manquent à RIG v3 (EcrivainPublicationsBodacc.cs).
+            // Les deux colonnes à cocher de RIG v2, offertes au temps Confirmer (gestes nommés, lot 11) : « Valider » -- un rejet
+            // passe à renvoyer (état 3, OPE_LST_LISTE_REJ.DoSauver, :51-57), un certificat est vérifié (état 6, OPE_LST_CERTIF_BOD,
+            // :57-59) ; « Éditer » -- les éditions de VALIDER (DoGenererLesEditions) : la liste des rejets (LISTE_REJETS_BODACC,
+            // OPE_LST_LISTE_REJ.cs:62-120), la liste des contrôles non conformes (LISTE_BODACC_QUALITE, OPE_LST_CTRLNC_BOD.cs:49-103),
+            // le certificat de parution par destinataire du réglage CERTIF_BOD_DEST (CERTIF_BOD / CERTIF_BODPR, OPE_LST_CERTIF_BOD.cs:61-101).
+            // Écrivain : EcrivainPublicationsBodacc.cs.
             Valider = "Valider",
+            Gestes = ["Valider", "Éditer"],
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À traiter", "Vérifiée", "Certifiée"), new EtatEcran("EnAttente", "À renvoyer", "en-attente")],
             Groupes = ["Certificats de parution", "Rejets", "Contrôles non conformes"],
             Sections =
             [
                 Marche("Renvoi des rejets", "Un rejet coché passe à renvoyer (état 3) : le prochain envoi BODACC le reprend.", false),
-                Marche("Vérification des parutions", "Un certificat de parution coché passe à l'état vérifié (6). Un contrôle non conforme ne s'enregistre pas : RIG v2 n'en édite que la liste. Une validation sans ligne cochée est refusée.", false),
-                Marche("Éditions", "Certificat par destinataire, liste des rejets, liste des contrôles : éditions de RIG v2, non reprises — le certificat part vers le mandataire de la procédure, dont RIG v3 ne calcule pas encore la fiche destinataire, et les deux listes sont des états dont RIG v3 n'écrit pas la requête.", false),
+                Marche("Vérification des parutions", "Un certificat de parution coché passe à l'état vérifié (6). Un contrôle non conforme ne se valide pas : RIG v2 n'en édite que la liste. Une validation sans ligne cochée est refusée.", false),
+                Marche("Éditions", "« Éditer » place dans la file des éditions la liste des rejets cochés, la liste des contrôles non conformes cochés, ou le certificat de parution de chaque annonce cochée, un par destinataire du réglage CERTIF_BOD_DEST (mandataires de la procédure, document interne). L'impression et l'envoi au coffre-fort sont faits par le service d'édition de RIG v2 (simulés ici).", false),
             ],
             Lignes =
             [
