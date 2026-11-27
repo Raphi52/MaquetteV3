@@ -1,0 +1,41 @@
+# Recherches de « Export Excel » (LecteurListesExcel.ChercherAsync), lot 11 du plan-676a4b19 : le COMPTAGE de RIG v2
+# (ExcelInstance.CountNbOccurence, ExcelInstance.cs:9-104) sur les instances et decisions de 1968 de PROC_LISTEEXCEL.sql. Une ligne par
+# type declare (INS, IDJ, GIE, AFF dans le jeu ; PC, d'un autre ecran, n'est pas compte), dans l'ordre de l'ecran. Bornes en jours,
+# BETWEEN comme la V2. Chaque ecart a son jumeau compte, de l'autre cote de la meme borne.
+#
+# Mars 1968 : INS et GIE comptent 2110601 (05/03) et 2110602 (20/03) -- ecarte 2110603 (02/04, jumeau 2110602) ; IDJ compte 2110611
+# (rendue le 10/03) et 2110612 (sans date, prevue le 25/03 : ISNULL) -- ecarte 2110613 (10/01) ; AFF : enrolees avant le 01/03 sans
+# decision definitive avant lui, 2110604 -- ecarte 2110605 (jugement BANC11F du 10/01/1968).
+critere: Période = 1968-03-01|1968-03-31
+lignes:
+Liste des instances | 2 lignes · du 01/03/1968 au 31/03/1968 | Instances | EnCours | [] | valeurs: Liste des instances ; 2
+Liste des instances par date DJ | 2 lignes · du 01/03/1968 au 31/03/1968 | Instances | EnCours | [] | valeurs: Liste des instances par date DJ ; 2
+Liste citations/affaires signifiées | 2 lignes · du 01/03/1968 au 31/03/1968 | Groupements | EnCours | [] | valeurs: Liste citations/affaires signifiées ; 2
+Liste affaires en cours | 1 ligne · enrôlées avant le 01/03/1968 | Affaires et citations | EnCours | [] | valeurs: Liste affaires en cours ; 1
+---
+# Types d'instance (OPE_TYPE_INSTANCE.GetSqlForTypeInstance) : RA seul -> 2110601 (1968RA00001) et, pour AFF, 2110604 (1967RA00004) ;
+# ecartes les RC (jumeaux). « XX » n'est pas une case de la V2 : ignore, et la ligne le nomme.
+critere: Période = 1968-03-01|1968-03-31
+critere: Types d'instance = ra XX
+lignes:
+Liste des instances | 1 ligne · du 01/03/1968 au 31/03/1968 · types RA · type d'instance inconnu, ignoré : XX | Instances | EnCours | []
+Liste des instances par date DJ | 1 ligne · du 01/03/1968 au 31/03/1968 · types RA · type d'instance inconnu, ignoré : XX | Instances | EnCours | []
+Liste citations/affaires signifiées | 1 ligne · du 01/03/1968 au 31/03/1968 · types RA · type d'instance inconnu, ignoré : XX | Groupements | EnCours | []
+Liste affaires en cours | 1 ligne · enrôlées avant le 01/03/1968 · types RA · type d'instance inconnu, ignoré : XX | Affaires et citations | EnCours | []
+---
+# Un type choisi (« Type de liste ») et la case « Sans sursis a statuer » (IDJ, ExcelInstance.cs:68-73) : 2110612 (BANC11S, sursis)
+# est ecarte -- jumeau, le bloc 1 (2 lignes sans la case).
+critere: Type de liste = IDJ
+critere: Période = 1968-03-01|1968-03-31
+critere: Sans sursis à statuer = oui
+lignes:
+Liste des instances par date DJ | 1 ligne · du 01/03/1968 au 31/03/1968 · sans sursis à statuer | Instances | EnCours | [] | valeurs: Liste des instances par date DJ ; 1
+---
+# Fin vide = le debut (ExcelInstance.cs:36) : le 02/04/1968, INS et GIE comptent 2110603 ; IDJ aucune decision. AFF au 02/04 :
+# 2110602 (seulement un sursis, BANC11S : pas definitif) et 2110604 ; ecartes 2110601 (jugement du 10/03) et 2110605.
+critere: Période = 1968-04-02|
+lignes:
+Liste des instances | 1 ligne · du 02/04/1968 au 02/04/1968 | Instances | EnCours | []
+Liste des instances par date DJ | aucune ligne · du 02/04/1968 au 02/04/1968 | Instances | EnCours | []
+Liste citations/affaires signifiées | 1 ligne · du 02/04/1968 au 02/04/1968 | Groupements | EnCours | []
+Liste affaires en cours | 2 lignes · enrôlées avant le 02/04/1968 | Affaires et citations | EnCours | []

@@ -383,41 +383,37 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         {
             Code = "PROC_NUM", Titre = "Documents ocerises", Sujet = "documents océrisés",
             // Les documents numérisés du greffe (DOCUMENT_OCERISE, hors OCR différé : OPE_PIECENUM.cs:85-107), lus par
-            // LecteurDocumentsOcerises.cs (lot 11). Ses gestes sont des traitements de fichier (export sur disque, PDF_WRITER, pages
-            // blanches, fusion Aspose) que la forme Document ne fait pas : ils disent « Démonstration » (proc_num.md, Détail OPE).
-            Forme = FormeEcran.Document,
+            // LecteurDocumentsOcerises.cs (lot 11). Forme Référentiel, pas Document (lot 11, reprise) : la liste de RIG v2 est une
+            // grille dont le nom se saisit dans la ligne puis s'enregistre (TreeViewPiecesNum.NodeNom_ChangesApplied, :346-365 ;
+            // OPE_PIECENUM_1.Modifier, :341-377), et dont une ligne se supprime (menu Suppression, :269-283) : les deux gestes qui
+            // écrivent la table, EcrivainDocumentsOcerises.cs. Ajouter (scanner ou importer un fichier), Dupliquer et les traitements
+            // de fichier (export sur disque, PDF_WRITER, pages blanches, fusion Aspose) ne sont pas repris (proc_num.md, Détail OPE).
+            Forme = FormeEcran.Referentiel,
+            // Le nom sans extension (OPE_PIECENUM_10.cs:105), le format de l'édition (PROC_NUM_PROC._Editer), pages, taille, date,
+            // affaire : ce que la ligne V2 montre (OPE_PIECENUM_1.cs:121-136).
+            Colonnes = ["Nom", "Format", Champ.Nombre("Pages"), "Taille", Champ.Date("Créé le"), "Affaire"],
             Recherche = "Rechercher un document, un titre, une date…",
             Criteres = ["Format (PDF ou TIF)", "Titre", "Nombre de pages"],
-            Valider = "Enregistrer une copie",
+            Valider = "Enregistrer les noms de fichiers",
             Rang = 2,
             // En cours : le document qu'un processus tient (DOCOC_ID_UTLST_EN_COURS) ; la V2 n'a pas d'état « enregistré ».
             Etats = EtatsEcran.Trois("Disponible", "En cours", "Enregistré"),
             Groupes = ["PDF", "TIF"],
             Sections =
             [
-                Marche("Document", "Le document est ouvert ; son format, PDF ou TIF, décide de l'éditeur utilisé.", true,
-                    "Format", "Nombre de pages"),
-                Marche("Pages blanches", "Supprime les pages blanches du document, en une passe.", false,
-                    "Pages blanches supprimées"),
-                Marche("Modification", "PDF : éditeur de pages. TIF : éditeur natif, ou éditeur PDF si le paramètre du greffe le prévoit.", false,
-                    "Éditeur"),
-                Marche("Paramétrage", "Titre, type de document, confidentialité et métadonnées OCR.", true,
-                    "Titre", "Type de document", "Confidentialité", "Métadonnées OCR"),
-                Marche("Réservation pour fusion", "Réserve le document à votre compte pour une fusion, avant d'ouvrir la sélection des documents à fusionner.", false,
-                    "Réservé pour fusion"),
-                Marche("Enregistrement", "Copie le document vers un fichier PDF ou TIF choisi.", true,
-                    "Fichier de sortie"),
+                Marche("Document", "Le document de la liste ; seul son nom se saisit, sans extension : RIG v2 remet celle du document.", true,
+                    "Nom", "Format", Champ.Nombre("Pages"), "Taille", Champ.Date("Créé le"), "Affaire"),
+                Marche("Traitements du fichier", "Ouvrir, modifier dans l'éditeur PDF ou TIF, supprimer les pages blanches, fusionner, dupliquer, enregistrer sous : des traitements du fichier lui-même, faits sur le poste par RIG v2.", false),
             ],
             Lignes =
             [
-                Ligne("Scan 2026-0301", "PDF · 12 pages · à vérifier", "PDF", "AFaire"),
-                Ligne("Scan 2026-0302", "PDF · 4 pages · pages blanches supprimées", "PDF", "EnCours", 0, 1),
-                Ligne("Scan 2026-0303", "PDF · 9 pages · titre saisi", "PDF", "EnCours", 0, 3),
-                Ligne("Scan 2026-0304", "PDF · 6 pages · enregistré", "PDF", "Validee", 0, 3, 5),
-                Ligne("Scan 2026-0305", "PDF · 2 pages · réservé pour fusion", "PDF", "EnCours", 0, 4),
-                Ligne("Scan 2026-0306", "TIF · 3 pages · à vérifier", "TIF", "AFaire"),
-                Ligne("Scan 2026-0307", "TIF · 5 pages · modifié, paramétrage à faire", "TIF", "EnCours", 0, 2),
-                Ligne("Scan 2026-0308", "TIF · 1 page · enregistré", "TIF", "Validee", 0, 3, 5),
+                Ligne("Scan 2026-0301", "PDF · 12 pages · créé le 02/03/2026", "PDF", "AFaire"),
+                Ligne("Scan 2026-0302", "PDF · 4 pages · en cours · processus NUM", "PDF", "EnCours"),
+                Ligne("Scan 2026-0303", "PDF · 9 pages · affaire 2026J00012", "PDF", "AFaire"),
+                Ligne("Scan 2026-0305", "PDF · 2 pages · en cours · processus FUSION", "PDF", "EnCours"),
+                Ligne("Scan 2026-0306", "TIF · 3 pages · créé le 06/03/2026", "TIF", "AFaire"),
+                Ligne("Scan 2026-0307", "TIF · 5 pages · en cours · processus NUM", "TIF", "EnCours"),
+                Ligne("Scan 2026-0308", "TIF · 1 page · créé le 09/03/2026", "TIF", "AFaire"),
             ],
         },
 
@@ -651,15 +647,20 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         {
             Code = "PROC_LISTEEXCEL", Titre = "Export Excel", Sujet = "listes d'instances",
             // Lecteur : LecteurListesExcel.cs (lot 11) -- les types de liste d'instances du greffe, leurs colonnes et leurs listes
-            // paramétrées (PARAMETRAGE_LISTE_XLS*). Ni comptage ni export : la V2 exécute le SQL stocké dans PARAMETRAGE_LISTE
-            // (ExcelInstance.cs:39-63) et EXECUTE_EXCEL ouvre un classeur non enregistré (aucun dossier choisi) ; « Lancer l'export
-            // Excel » reste en démonstration.
+            // paramétrées (PARAMETRAGE_LISTE_XLS*) ; avec une date de début, le COMPTAGE de RIG v2 par type (ExcelInstance.cs:9-104,
+            // la requête de PARAMETRAGE_LISTE réécrite sous v2) et le blocage au-delà de 65 536 lignes (OPE_RECHERCHE.cs:466-472).
+            // L'export reste en démonstration : EXECUTE_EXCEL ouvre un classeur non enregistré, sans dossier choisi (Excel.cs:551),
+            // avec des colonnes qui sont des expressions SQL stockées dans la base.
             Forme = FormeEcran.Etat,
-            Parametres = ["Type de liste", Champ.Periode("Période"), "Code d'acte", "Nature d'affaire"],
+            // Les critères des listes d'instances (OPE_INSTANCE, OPE_TYPE_INSTANCE, OPE_CODE_EVE_PRO ; OPE_RECHERCHE.cs:78-99).
+            // Code d'acte et nature d'affaire du groupement ne se saisissent pas : ce sont deux réglages du greffe (OPE_INSTANCE.cs:78-79).
+            Parametres = ["Type de liste", Champ.Periode("Période"), "Types d'instance", "Codes d'événement",
+                          Champ.Case("Sans sursis à statuer"), Champ.Case("Sans ADD expertise"), Champ.Case("Sans ADD")],
             Colonnes = ["Liste", Champ.Nombre("Nombre de lignes")],
             Gestes = ["Lancer l'export Excel"],
             Recherche = "Rechercher un type de liste…",
-            Criteres = ["Type de liste", "Période", "Colonnes à exporter"],
+            // Les critères sont les Paramètres, au libellé près : c'est ce que l'État envoie à la base.
+            Criteres = ["Type de liste", "Période", "Types d'instance", "Codes d'événement", "Sans sursis à statuer", "Sans ADD expertise", "Sans ADD"],
             Valider = "Lancer l'export Excel",
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À compter", "Comptée", "Exportée"), new EtatEcran("EnAttente", "Bloquée : trop de lignes", "en-attente")],
@@ -668,8 +669,8 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             [
                 Marche("Type de liste", "Le type fixe les critères proposés : instances enrôlées, avec ou sans décision, avec événement passé ou futur, groupements, affaires sans décision définitive, citations signifiées.", true,
                     "Type de liste"),
-                Marche("Critères", "Période et critères du type choisi. Un groupement se règle par code d'acte et nature d'affaire.", true,
-                    "Période", "Code d'acte", "Nature d'affaire"),
+                Marche("Critères", "Période et critères du type choisi : types d'instance (RA, RC, MD…), débuts de codes d'événement séparés par « ; » pour les événements, cases sans sursis et sans ADD pour les décisions. Un groupement se règle par deux réglages du greffe.", true,
+                    "Période", "Types d'instance", "Codes d'événement"),
                 Marche("Comptage", "Le nombre de résultats est compté avant l'export. Au-delà de 65 536 lignes, l'export est bloqué : réduire la période ou affiner les critères.", true,
                     "Nombre de lignes"),
                 Marche("Colonnes", "Colonnes incluses et leur ordre, à glisser-déposer. Enregistré pour l'utilisateur ou pour le greffe.", false,

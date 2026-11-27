@@ -1,0 +1,71 @@
+# « Documents océrisés » (EcrivainDocumentsOcerises) : « Modifier » une ligne de la grille enregistre son NOM (OPE_PIECENUM_1.Modifier,
+# :341-377), « Supprimer » la retire avec ses tags OCR (menu Suppression, :269-283 ; DocumentOcerise.Delete, :369-401).
+# Lignes : PROC_NUM.attendu.
+
+# Refus : seul le nom se saisit dans la V2 ; une autre colonne seule n'enregistre rien. Jumeau accepte : bloc 5.
+geste: Modifier
+ids: 2110301
+valeur: Format = TIF
+resultat: refuse
+message: Seul le nom du document s'enregistre : RIG v2 n'en laisse saisir aucune autre colonne.
+---
+# Refus : 2110305 est « en cours de numerisation », Modifier n'enregistre rien (:352-354). Jumeau accepte : bloc 5, 2110301.
+geste: Modifier
+ids: 2110305
+valeur: Nom = scan termine
+resultat: refuse
+message: Ce document est en cours de numérisation : RIG v2 n'enregistre pas son nom.
+---
+# Refus : un accent hors de RegEx.TexteSimpleAvecEspace (^[- _.0-9a-zA-Z]*$), message de :356-358. Jumeau accepte : bloc 5, des
+# lettres sans accent, une espace et un tiret.
+geste: Modifier
+ids: 2110301
+valeur: Nom = courrier réécrit
+resultat: refuse
+message: Des caractères spéciaux, accents ou espaces dans le nom du fichier empêchent la sauvegarde des modifications.
+---
+# Refus : un nom vide n'enregistre rien, le champ reprend l'ancien nom (:375). Jumeau accepte : bloc 5.
+geste: Modifier
+ids: 2110301
+valeur: Nom =
+resultat: refuse
+message: Nom vide : RIG v2 garde le nom du document.
+---
+# Nom enregistre sur 2110301 : le nom saisi plus l'extension du document (« .pdf », GetExtension, DocumentOcerise.cs:163-168).
+geste: Modifier
+ids: 2110301
+valeur: Nom = courrier relu-11
+resultat: fait
+message: Document renommé : « courrier du banc 11.pdf » devient « courrier relu-11.pdf ».
+lignes:
+scan du banc 11.tif | TIF · 1 page · 1 Ko · créé le 03/05/2001 · en cours · processus NUM · depuis le 04/05/2001 | TIF | EnCours | []
+courrier relu-11.pdf | PDF · 3 pages · 2 Ko · créé le 02/05/2001 · affaire 2001J00011 | PDF | AFaire | []
+en cours de numérisation | PDF · créé le 01/05/2001 | PDF | AFaire | []
+ancien du banc 11.TIFF | TIF | TIF | AFaire | []
+fiche: 2110301
+Document › Nom = courrier relu-11
+controle: SELECT DOCOC_NOM_FICHIER FROM v2.DOCUMENT_OCERISE WHERE DOCOC_ID_DOCOC = 2110301 => courrier relu-11.pdf
+---
+# Refus : 2110302 est dans VIDIGED_INDEX_TMP_OCR, l'OCR l'utilise (IsLieVidigedTmpOCR, :91-103 ; message de :271). Jumeau accepte :
+# bloc 7, 2110301.
+geste: Supprimer
+ids: 2110302
+resultat: refuse
+message: Ce document est en cours d'utilisation pour océrisation. Il sera supprimé de cette liste automatiquement une fois le traitement terminé.
+---
+# 2110301 supprime avec ses deux tags ; les tags de 2110302 restent.
+geste: Supprimer
+ids: 2110301
+resultat: fait
+message: Document « courrier relu-11.pdf » supprimé, avec ses 2 données océrisées.
+lignes:
+scan du banc 11.tif | TIF · 1 page · 1 Ko · créé le 03/05/2001 · en cours · processus NUM · depuis le 04/05/2001 | TIF | EnCours | []
+en cours de numérisation | PDF · créé le 01/05/2001 | PDF | AFaire | []
+ancien du banc 11.TIFF | TIF | TIF | AFaire | []
+controle: SELECT CAST((SELECT COUNT(*) FROM v2.DOCUMENT_OCERISE WHERE DOCOC_ID_DOCOC = 2110301) AS varchar(9)) + ' / ' + CAST((SELECT COUNT(*) FROM v2.DOCUMENT_OCERISE_TAGS WHERE DOCOT_ID_DOCOC = 2110301) AS varchar(9)) + ' / ' + CAST((SELECT COUNT(*) FROM v2.DOCUMENT_OCERISE_TAGS WHERE DOCOT_ID_DOCOC = 2110302) AS varchar(9)) => 0 / 0 / 1
+---
+# Refus : 2110303 est lie a l'OCR differe, il n'est pas dans la liste (OPE_PIECENUM.cs:93-96). Jumeau accepte : bloc 7, 2110301.
+geste: Supprimer
+ids: 2110303
+resultat: refuse
+message: Document introuvable parmi les documents océrisés : relisez la liste.
