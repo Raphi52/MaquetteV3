@@ -514,6 +514,18 @@ Exiger(parCode.GetValueOrDefault("PROC_IA") is { Forme: FormeEcran.Operation, Ob
        && ia.Sections.SelectMany(s => s.Champs).All(c => c.Type == TypeChamp.Tableau)
        && parCode.GetValueOrDefault("SYNTHESE_FORMALITES_DEMAT") is { EnOnglets: true },
     "« Analyse IA » est une Operation sur UNE liasse recue par son numero : lancement (rien a saisir), puis resultat ; son ecran reuni passe en onglets");
+// Lot 12 (27/11/2026) : a l'ecran, Creer exige un champ rempli dans chaque etape obligatoire (web/src/ecrans/formes/commun.tsx,
+// manquantes) -- le banc des gestes, qui poste au serveur, ne passe pas par ce controle. « Ajouter une creance » declarait
+// obligatoire l'etape « Integration » et son champ « Erreur d'integration » : Creer refusait toujours (mesure sur le bureau cache).
+// Les etapes obligatoires sont les controles d'OPE_CREANCE (PC, creancier, au moins un montant) ; l'integration se lit, sans champ.
+Exiger(parCode.GetValueOrDefault("PROC_ADDCREANCE") is { Forme: FormeEcran.Saisie } ajout
+       && ajout.Marches.Where(m => m.Obligatoire).Select(m => m.Titre).SequenceEqual(new[] { "Procédure collective", "Créancier", "Montants" })
+       && ajout.Marches.Any(m => m.Titre == "Intégration" && !m.Obligatoire && !m.Champs.Any()),
+    "« Ajouter une creance » : etapes obligatoires PC, creancier et montants (OPE_CREANCE) ; l'integration se lit, sans champ a saisir");
+// Le jumeau, une Operation : le rejet ne fait saisir que ce que son ecrivain lit (EcrivainRejetsEncaissement : Destinataire, Motif).
+Exiger(parCode.GetValueOrDefault("PROC_REJET") is { Forme: FormeEcran.Operation } rejet
+       && rejet.Sections.Where(s => s.Champs.Any()).Select(s => s.Titre).SequenceEqual(new[] { "Destinataire", "Motif" }),
+    "« Rejets d'encaissement » : seuls le destinataire et le motif se saisissent, le cheque choisi se lit sur sa ligne");
 // Une section est une PARTIE de l'objet ouvert, jamais la liste qui l'a trouve : chaque forme montre deja ses lignes (liste,
 // tableau, file). Une section titree « Resultat(s) » repetait cette liste dans la fiche, ou dans le detail d'une ligne
 // (controle final du lot 1, 25/11/2026 : Trouver.cs PROC_REGJUD, PROC_RECHENC, PROC_TARIFS, PROC_BEN, Surveiller.cs PROC_ACTREJ).
