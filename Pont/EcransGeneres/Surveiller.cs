@@ -859,8 +859,12 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Forme = FormeEcran.File,
             // Les publicités JAL et les annonces BODACC des événements de procédure, les deux onglets de RIG v2 (proc_sdematjud.md,
             // Détail OPE) : lues par Serveur/Socle/EcransGeneres/LecteurSuiviDematerialisation.cs (lot 9), critères par défaut de
-            // RIG v2 (décisions du dernier mois, OPE_DATE_SDEMATJUD.cs:70-75). Aucun écrivain : « Valider » génère des éditions de
-            // pièces numérisées (OPE_RESULTAT_JAL.cs:133-200) et « Éditer les détails » un classeur Excel, que la V3 ne produit pas ;
+            // RIG v2 (décisions du dernier mois, OPE_DATE_SDEMATJUD.cs:70-75). Aucun écrivain : « Valider » imprime les pièces
+            // numérisées cochées (OPE_RESULTAT_JAL.cs:133-200) -- chacune est d'abord COPIÉE de VIDIGED dans la GED RIG
+            // (GedRig.CreateGedRigFromVidiged, DemandeEdition.cs:2625) et sa demande d'édition pointe
+            // sur cette copie (DMNED_NUM_DOCUMENT_EDITION, :2643) ; aucune publicité ne change d'état et la demande par affaire est validée
+            // d'un coup (une trace). Sans copie de document, l'écrire serait une édition sans pièce : la V3 ne l'écrit pas (lot 9,
+            // 27/11). « Éditer les détails » produit un classeur Excel, que la V3 ne produit pas ;
             // « Vérifier » ne contrôle que la sélection avant cette génération. Les trois ne valent que pour l'onglet JAL
             // (PROC_SDEMATJUD.cs:273-276). fix-ok: mesuré au contrôle final du lot 9 (27/11/2026) -- ce descripteur gardait les
             // états inventés par le lot 1 (« À envoyer / En préparation / Envoyée ») et ses exemples ; ses états sont maintenant ceux
