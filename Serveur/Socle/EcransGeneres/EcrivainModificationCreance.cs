@@ -18,7 +18,11 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// une colonne CRNCE_MONTANT qui n'existe pas : non repris).
 /// CE QUI S'ECRIT : UPDATE v2.CREANCE_PC des seules colonnes changees (montants en decimal exact, 2 decimales). Trace : famille
 /// « affaire », les montants avant et apres.
-/// NON REPRIS (nomme) : la date de depot (l'evenement de l'instance, :561-579) et la suppression d'une creance (avec son instance).
+/// NON REPRIS (nomme) : la SUPPRESSION d'une creance (bouton Supprimer de la grille, :586-627 : DELETE de la creance et de son
+/// creancier, Instance.DeleteCascade et numero de role reattribue s'il y a une instance, demande « Admission créance … supprimée »
+/// validee) -- la forme Fiche n'a que le geste Enregistrer (tests/EcransGeneresBaseCheck/Program.cs:770, FormeFiche.tsx) ; la DATE DE
+/// DEPOT (:310-320, :560-579 : EVNPR_DATE de l'evenement de procedure de l'instance qui porte un depot, et DPTPC_DATE de ce depot),
+/// saisissable seulement pour une creance qui a une instance -- reste a faire du lot 12.
 /// </summary>
 internal sealed class EcrivainModificationCreance : IEcrivainEcran
 {

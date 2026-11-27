@@ -5,7 +5,7 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 
 /// <summary>
 /// « Refacturation » (PROC_FACTREEDIT) : les factures deja emises dont l'edition peut etre relancee. Mode d'emploi : LecteurEcran.cs.
-/// Plan « RIG v3 100 % fonctionnel », lot 12, 27/11/2026. Lecture seule : aucun geste n'est branche (en tete, NON REPRIS).
+/// Plan « RIG v3 100 % fonctionnel », lot 12, 27/11/2026. Lecture seule : la reedition n'est pas branchee (en tete, NON REPRIS).
 ///
 /// SOURCE (ancien RIG) : OPE_REVIEW.OnProcessusEventBeforeChild (D:\RigApplication\Source\RIG\DLL\Processus\PROC_FACTREEDIT ; le Detail
 /// OPE de proc_factreedit.md fait foi, OPE_REVIEW.cs:72-88) : FACTURE jointe a sa DEMANDE (FACTU_NUM_DEMANDE = DMND_NUM_DEMANDE) et a
@@ -17,8 +17,12 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// Dans la base V3, CLIENT est la fiche rec.Client. ORDRE : les plus recentes d'abord. ETAT : AFaire « À rééditer » (la V2 coche toutes
 /// les factures par defaut, :19 ; aucune trace de reedition n'est lue ici).
 /// CELLULES : les colonnes de la grille V2 (OPE_REVIEW.cs:43-57) -- numero, date (jj/mm/aaaa), montant TTC (decimal exact) -- et le client.
-/// NON REPRIS (nomme) : la REEDITION (DoGenererLesDemandesEditions, :91-94 : les DEMANDE_EDITION de la demande de chaque facture
-/// cochee, re-empilees pour le moteur d'edition) -- la V3 ne produit pas encore les editions.
+/// NON REPRIS (nomme, reste a faire du lot 12) : la REEDITION (DoGenererLesDemandesEditions, OPE_REVIEW.cs:236-241 : la derniere
+/// DEMANDE_EDITION facture de chaque demande cochee, confiee au tableau d'edition lot 2). Ce qu'elle ECRIT dans RIG v2, sans le
+/// document (le service d'impression le reprend) : la ligne resauvee avec son groupe d'impression -- un GROUPE_IMPRESSION neuf (GUID,
+/// phase I) par lot, imprimante et groupage, passe en P pour le lot direct (TableauEditionLot2Parametre.cs:347-425, _creerNumGroupe
+/// :447-505, GroupeImpression.cs:375-396) -- et une ligne DEMANDE_EDITION_HISTO « Validation » (DemandeEdition.SauveValidation,
+/// DemandeEdition.cs:1388-1408). Les choix du tableau (imprimante, lot, envoi) n'ont pas d'equivalent a l'ecran ; non ecrit ici.
 /// </summary>
 internal sealed class LecteurRefacturation : ILecteurEcran
 {
