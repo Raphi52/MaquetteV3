@@ -93,18 +93,27 @@ internal static class FichesAudienceV2
     // (ProcedureCollective.ListeJuges_PCFiltre(fonction, false), ProcedureCollective.cs:2227-2230) : « civilite nom prenom », sans
     // civilite pour ND et PM ; en section sanction (AUDNC_SECTION = « CPC.S » d'une audience qui a une chambre, :69-73), le premier
     // mandataire en mission de la PC dans les fonctions LIQ, RDC, LQJ, MDJ, MJ -- son nom, precede de sa civilite collee quand elle vaut
-    // ND ou PM : c'est le texte de RIG v2 tel quel (:96-100). NON RENDUS : les colonnes « Mandataire Judiciaire » et « Administrateur
-    // Judiciaire » (:57-59, :119-154) n'existent qu'en mode PC (PREAUDPC, PROC_PREAUD.cs:24) ; la fiche depliee ne recoit que l'audience
-    // (IFicheEcran : l'Id de la ligne), pas le mode de la recherche, et ne peut donc pas savoir qu'elle est ouverte en mode PC ;
-    // « Options », « Destinataires » et « Génération » sont des choix du plumitif, que la V3 ne genere pas.
+    // ND ou PM : c'est le texte de RIG v2 tel quel (:96-100). EN MODE PC (PREAUDPC : « Mode » = Procédures collectives,
+    // PROC_PREAUD.cs:24 ; l'Id de la ligne porte alors LecteurPreparationAudience.SuffixePc), deux colonnes de plus (:57-59, :119-154) :
+    // « Mandataire Judiciaire » = les organes en mission de la PC de l'instance dans les fonctions MDJ, MJ, LIQ, LQJ, RDC, et
+    // « Administrateur Judiciaire » = ceux de la fonction ADJ, dans l'ordre de la liste de la PC (GetListeMandataireFromPC,
+    // MandatairePC_PC.cs:257 : GRRPC_FONCTION_PC DESC, GRRPC_NUM_ORDRE, GRRPC_ID_GRRPC) ; chacun « nom complement/ » passe par Trim,
+    // le tout precede de « [n] » s'il y en a plusieurs, le dernier « / » retire (:131-149) ; vides sans PC. NON RENDUS : « Options »,
+    // « Destinataires » et « Génération » sont des choix du plumitif, que la V3 ne genere pas.
+    // fix-ok: contrôle du lot 7 (27/11/2026) -- les deux colonnes du mode PC manquaient : la fiche ne recevait que l'audience, pas le
+    // mode de la recherche ; mesure : PROC_PREAUD.gestes, bloc 10 rouge sans le suffixe (6 cellules au lieu de 8), vert avec.
     private static readonly string[] ColonnesOrdre = ["N° rôle", "Juge", "Nom", "Heure", "Type", "N° appel"];
+
+    private static readonly string[] ColonnesOrdrePc = [.. ColonnesOrdre, "Mandataire Judiciaire", "Administrateur Judiciaire"];
 
     internal static async Task<FicheEcran?> PreparationAsync(SqlConnection cn, string procedure, string id, CancellationToken ct)
     {
-        if (!Entier(id, out var n) || await AudienceAsync(cn, n, ct) is not { } a) return null;
+        var modePc = LecteurPreparationAudience.ModePc(id, out var idAudience);
+        if (!Entier(idAudience, out var n) || await AudienceAsync(cn, n, ct) is not { } a) return null;
         var lignes = new List<string[]>();
+        var pcs = new List<int?>();
         await using (var r = await LectureV2.LireAsync(cn, """
-            SELECT i.INSTN_NUM_ROLE, i.INSTN_NOM_COURANT, aa.APPAF_HEURE_APPEL, aa.APPAF_TYPE_CLASSEMENT, aa.APPAF_NUM_APPEL,
+            SELECT i.INSTN_NUM_ROLE, i.INSTN_NOM_COURANT, aa.APPAF_HEURE_APPEL, aa.APPAF_TYPE_CLASSEMENT, aa.APPAF_NUM_APPEL, i.INSTN_ID_PRCLL,
                    CASE WHEN ch.R_CHAMBRE_VALEUR IS NOT NULL AND a.AUDNC_SECTION = 'CPC.S'
                         THEN (SELECT TOP (1) CASE WHEN mp.MNDPC_CIVILITE IN ('ND', 'PM') THEN mp.MNDPC_CIVILITE ELSE '' END + ISNULL(mp.MNDPC_NOM, '')
                               FROM v2.GERER_PC AS g JOIN v2.MANDATAIRE_PC AS mp ON mp.MNDPC_ID_MNDPC = g.GRRPC_ID_MNDPC
@@ -124,13 +133,62 @@ internal static class FichesAudienceV2
             ORDER BY aa.APPAF_ID_APPAF
             """, ct, new SqlParameter("@id", n)))
             while (await r.ReadAsync(ct))
+            {
                 lignes.Add([FormeLigne.Texte(r, "INSTN_NUM_ROLE"), FormeLigne.Texte(r, "Juge"), FormeLigne.Texte(r, "INSTN_NOM_COURANT"),
                             FormeLigne.Texte(r, "APPAF_HEURE_APPEL"), FormeLigne.Texte(r, "APPAF_TYPE_CLASSEMENT"), FormeLigne.Texte(r, "APPAF_NUM_APPEL")]);
+                pcs.Add(r["INSTN_ID_PRCLL"] is DBNull ? null : Convert.ToInt32(r["INSTN_ID_PRCLL"], CultureInfo.InvariantCulture));
+            }
+        if (modePc)
+        {
+            var organes = await OrganesPcAsync(cn, n, ct);
+            for (var k = 0; k < lignes.Count; k++)
+            {
+                var liste = pcs[k] is { } pc && organes.TryGetValue(pc, out var o) ? o : [];
+                lignes[k] = [.. lignes[k], Organes(liste.Where(x => x.Fonction is "MDJ" or "MJ" or "LIQ" or "LQJ" or "RDC")),
+                             Organes(liste.Where(x => x.Fonction == "ADJ"))];
+            }
+        }
         return new FicheEcran(procedure, id, a.Libelle,
         [
             new SectionFiche("Audience", [new("Audience", a.EstAudience ? a.Libelle : ""), new("Cabinet", a.EstAudience ? "" : a.Libelle)]),
-            new SectionFiche("Ordre des affaires", [new("Affaires dans l'ordre d'appel", "") { Colonnes = ColonnesOrdre, Lignes = [.. lignes] }]),
+            new SectionFiche("Ordre des affaires",
+                [new("Affaires dans l'ordre d'appel", "") { Colonnes = modePc ? ColonnesOrdrePc : ColonnesOrdre, Lignes = [.. lignes] }]),
         ]);
+    }
+
+    /// <summary>Les organes en mission (GRRPC_FIN_MISSION faux) des PC des instances de l'audience, par PC, dans l'ordre de la liste de
+    /// RIG v2 (MandatairePC_PC.cs:257).</summary>
+    private static async Task<Dictionary<int, List<(string Fonction, string Nom, string Complement)>>> OrganesPcAsync(SqlConnection cn, int idAudience,
+                                                                                                                      CancellationToken ct)
+    {
+        var parPc = new Dictionary<int, List<(string, string, string)>>();
+        await using var r = await LectureV2.LireAsync(cn, """
+            SELECT g.GRRPC_ID_PRCLL, g.GRRPC_FONCTION_PC, mp.MNDPC_NOM, mp.MNDPC_COMPLEMENT_NOM
+            FROM v2.GERER_PC AS g JOIN v2.MANDATAIRE_PC AS mp ON mp.MNDPC_ID_MNDPC = g.GRRPC_ID_MNDPC
+            WHERE ISNULL(g.GRRPC_FIN_MISSION, 0) = 0
+              AND g.GRRPC_ID_PRCLL IN (SELECT i.INSTN_ID_PRCLL FROM v2.APPEL_AFFAIRE AS aa JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = aa.APPAF_ID_INSTN
+                                       WHERE aa.APPAF_ID_ADNC = @id)
+            ORDER BY g.GRRPC_ID_PRCLL, g.GRRPC_FONCTION_PC DESC, g.GRRPC_NUM_ORDRE, g.GRRPC_ID_GRRPC
+            """, ct, new SqlParameter("@id", idAudience));
+        while (await r.ReadAsync(ct))
+        {
+            var pc = Convert.ToInt32(r["GRRPC_ID_PRCLL"], CultureInfo.InvariantCulture);
+            if (!parPc.TryGetValue(pc, out var liste)) parPc[pc] = liste = [];
+            // DBString.Valeur : une chaine vide pour NULL, sans Trim (le Trim est celui de RIG v2, sur « nom complement/ »).
+            liste.Add((FormeLigne.Texte(r, "GRRPC_FONCTION_PC"), r["MNDPC_NOM"] as string ?? "", r["MNDPC_COMPLEMENT_NOM"] as string ?? ""));
+        }
+        return parPc;
+    }
+
+    /// <summary>Une cellule d'organes de la liste d'ordre (OPE_ORDRE_INSTANCE.cs:131-149), au texte de RIG v2 ; rognee a droite comme
+    /// toute cellule lue (FormeLigne.Texte).</summary>
+    private static string Organes(IEnumerable<(string Fonction, string Nom, string Complement)> organes)
+    {
+        var liste = organes.ToList();
+        if (liste.Count == 0) return "";
+        var texte = liste.Count > 1 ? "[" + liste.Count + "] " : "";
+        foreach (var o in liste) texte += (o.Nom + " " + o.Complement + "/").Trim();
+        return texte[..^1].TrimEnd();
     }
 
     // ------------------------------------------------------------------------------------------------------------------------------

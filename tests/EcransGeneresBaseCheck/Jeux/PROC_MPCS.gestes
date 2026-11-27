@@ -96,6 +96,9 @@ resultat: fait
 message: Résultat M17P posé sur 2 affaires ; 2 décisions T17 créées.
 controle: SELECT STRING_AGG(CONCAT(APPAF_ID_APPAF, ':', APPAF_CODE_PLUMITIF, ':', APPAF_ETAT_RETOUR), ',') WITHIN GROUP (ORDER BY APPAF_ID_APPAF) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_APPAF IN (1705521, 1705522) => 1705521:M17P:P,1705522:M17P:P
 controle: SELECT STRING_AGG(CONCAT(DCJDC_ID_INSTN, ':', DCJDC_NUM_ORDRE, ':', DCJDC_TYPE_DECISION, ':', CONVERT(varchar(10), DCJDC_DATE_PREVUE, 23), ':', DCJDC_CAT_DECISION, ':', CAST(DCJDC_REDIGEE_GREFFE AS int), ':', DCJDC_ETAT_REDACTION, ':', CASE WHEN LEN(DCJDC_NUMERO_SOURCE) = 36 THEN 'guid' ELSE '-' END), ',') WITHIN GROUP (ORDER BY DCJDC_ID_INSTN, DCJDC_NUM_ORDRE) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_INSTN IN (1705021, 1705022) AND DCJDC_ID_DCJDC <> 1705402 => 1705021:1:T17:2001-10-01:I:1:0:guid,1705022:4:T17:2001-10-01:I:1:0:guid
+# T17 n'a pas de réglage d'édition (R_TYPEDECISI_PARAMETRE_EDITION vide, DecisionJudiciaire.cs:1661) : aucune édition, donc aucune
+# demande MPCS (le journal des gestes la remplace). Jumeau : bloc 27 (T17E, réglage ED17DJ).
+controle: SELECT COUNT(*) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'MPCS' AND DMND_NUM_INDICATIF IN ('2026P17521', '2026P17522') => 0
 ---
 # 13. Une PC dont l'appel a déjà une décision délibérée, type de décision seul : RIG v2 n'en ajoute pas (PROC_MPCS.cs:1240), il
 #     n'y a alors rien à écrire. Jumeau : bloc 14 (avec un résultat).
@@ -241,3 +244,41 @@ resultat: fait
 message: Résultat M17P posé sur 1 affaire ; 1 décision T17M créée avec sa mesure EXP17.
 controle: SELECT STRING_AGG(CONCAT(m.MSINS_ID_INSTN, ':', m.MSINS_NUM_ORDRE, ':', m.MSINS_TYPE_MESURE, ':', CASE WHEN LEN(m.MSINS_NUMERO_SOURCE) = 36 THEN 'guid' ELSE '-' END, ':', d.DCJDC_TYPE_DECISION), ',') FROM v2.MESURE AS m JOIN v2.DECISION_JUDICIAIRE AS d ON d.DCJDC_ID_DCJDC = m.MSINS_ID_DCJDC WHERE m.MSINS_ID_INSTN = 1705034 => 1705034:1:EXP17:guid:T17M
 controle: SELECT COUNT(*) FROM v2.MESURE WHERE MSINS_ID_INSTN IN (1705021, 1705022) => 0
+---
+# CONTRÔLE DU LOT 7 (27/11/2026) : l'ÉDITION DE LA DÉCISION et la demande MPCS où elle se rattache (données : fin de PROC_MPCS.sql).
+
+# 27. Un type de décision qui a son réglage d'édition (T17E -> ED17DJ) : chaque décision créée passe par
+#     DecisionJudiciaire.CreateDemandeEdition (DecisionJudiciaire.cs:1656-1678 ; GenererLesDemandesEdition, PROC_MPCS.cs:1337-1346).
+#     Les affaires sont cochées dans le désordre : les éditions suivent l'ordre des rôles (:1339), les demandes celui des affaires
+#     cochées (la liste des instances, :1019).
+# fix-ok: premier passage du bloc 27 (27/11/2026) -- le contrôle des demandes attendait l'ordre des rôles ; lu : 2026P17542 puis
+# 2026P17541, l'ordre des ids cochés, celui de la création des demandes de RIG v2 (LockInstances, :1019-1037) : contrôle trié par rôle.
+#     Chaque instance reçoit sa
+#     demande MPCS validée (LockInstances, :1019-1037 : indicatif = rôle, numéros = rôle et répertoire, dossiers 2J puis 2P) ; l'édition
+#     y est rattachée en phase C : source DECI_JUDICIAIRE et numéro source de la décision, libellé du réglage, libellé source = le type,
+#     maquette et exemplaires du réglage, groupage reposé à vrai (DemandeEdition.cs:558) malgré GROUPAGE_AUTOMATIQUE="0", CFE-CP du
+#     réglage, aucun courriel (le premier destinataire coché est le document interne). Jumeaux : bloc 28 (réglage absent), bloc 12
+#     (T17 sans réglage : aucune demande, aucune édition).
+geste: Decider Valider la décision
+ids: 1705542,1705541
+valeur: Résultat = M17P
+valeur: Type de décision = T17E
+resultat: fait
+message: Résultat M17P posé sur 2 affaires ; 2 décisions T17E créées ; 2 éditions placées dans la file des éditions.
+controle: SELECT STRING_AGG(CONCAT(DMND_CODE_PROSS, ':', DMND_ETAT_DEMANDE, ':', DMND_NUM_INDICATIF, ':', DMND_LES_NUMEROS, ':', DMND_NOM), ',') WITHIN GROUP (ORDER BY DMND_NUM_INDICATIF) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'MPCS' AND DMND_NUM_INDICATIF IN ('2026P17541', '2026P17542') => MPCS:V:2026P17541:2026P17541 2001000041:PC EDITION UN,MPCS:V:2026P17542:2026P17542 2001000042:PC EDITION DEUX
+controle: SELECT STRING_AGG(CONCAT(dd.DSSDM_CODE_SEQUENCEUR, '=', dd.DSSDM_VALEUR_SEQUENCEUR), ',') WITHIN GROUP (ORDER BY dd.DSSDM_ID_DSSDM) FROM v2.DOSSIER_DEMANDE AS dd JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = dd.DSSDM_ID_DMND WHERE d.DMND_CODE_PROSS = 'MPCS' AND d.DMND_NUM_INDICATIF = '2026P17541' => 2J=1705041,2P=1705941
+controle: SELECT STRING_AGG(CONCAT(d.DMND_NUM_INDICATIF, '|', de.DMNED_LIBELLE_DOCUMENT, '|', de.DMNED_PHASE_TRAITEMENT, '|', de.DMNED_CODE_ENTITE_SOURCE, '|', CASE WHEN de.DMNED_VALEUR_ID_SOURCE = dj.DCJDC_NUMERO_SOURCE THEN 'decision' ELSE ISNULL(de.DMNED_VALEUR_ID_SOURCE, '-') END, '|', de.DMNED_LIBELLE_SOURCE, '|', de.DMNED_CODE_MAQUETTE, '|', de.DMNED_NOMBRE_EXEMPLAIRE, '|', CAST(de.DMNED_GROUPAGE_AUTOMATIQUE AS int), CAST(de.DMNED_IMPRESSION AS int), '|', de.DMNED_TYPE_GENERATION, '|', ISNULL(de.DMNED_CODE_CFECP, '-'), '|', ISNULL(de.DMNED_ADRESSE_MAIL_DESTINATAIRE, '-')), ',') WITHIN GROUP (ORDER BY de.DMNED_ID_DMNED) FROM v2.DEMANDE_EDITION AS de JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = de.DMNED_ID_DMND JOIN v2.INSTANCE AS i ON i.INSTN_NUM_ROLE = d.DMND_NUM_INDICATIF LEFT JOIN v2.DECISION_JUDICIAIRE AS dj ON dj.DCJDC_ID_INSTN = i.INSTN_ID_INSTN AND dj.DCJDC_TYPE_DECISION = 'T17E' WHERE d.DMND_CODE_PROSS = 'MPCS' AND d.DMND_NUM_INDICATIF IN ('2026P17541', '2026P17542') => 2026P17541|ORDONNANCE PC 17|C|DECI_JUDICIAIRE|decision|T17E|ORD17DJ|2|11|FUSION_RIG|CFE17|-,2026P17542|ORDONNANCE PC 17|C|DECI_JUDICIAIRE|decision|T17E|ORD17DJ|2|11|FUSION_RIG|CFE17|-
+# La liste des destinataires de l'édition (LISTE_ENTITE_DESTINATION dans DMNED_PARAMETRE_GENERATION) : le document interne en tête,
+# seul coché (SetDocumentInterneVisibility(true), DestinatairesEditionsLot2.cs:147-156), les autres décochés.
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION AS de JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = de.DMNED_ID_DMND CROSS APPLY (SELECT CONVERT(xml, CONVERT(xml, de.DMNED_PARAMETRE_GENERATION).value('(/PARAMETRES/@LISTE_ENTITE_DESTINATION)[1]', 'nvarchar(max)')) AS x) AS l WHERE d.DMND_CODE_PROSS = 'MPCS' AND d.DMND_NUM_INDICATIF IN ('2026P17541', '2026P17542') AND l.x.value('(/LISTE_ENTITES/ENTITE/@PAR_DEFAUT)[1]', 'varchar(1)') = '1' AND l.x.value('(/LISTE_ENTITES/ENTITE/@CODE)[1]', 'varchar(20)') = '' AND l.x.value('count(/LISTE_ENTITES/ENTITE[@PAR_DEFAUT="1"])', 'int') = 1 => 2
+---
+# 28. Un type dont le réglage d'édition n'est pas dans la base du greffe (T17R -> ED17ABS) : CreateDemandeEditionByParametreGeneration
+#     rend null, la décision n'a pas d'édition et l'instance pas de demande. Jumeau : bloc 27 (T17E, réglage présent).
+geste: Decider Valider la décision
+ids: 1705543
+valeur: Résultat = M17P
+valeur: Type de décision = T17R
+resultat: fait
+message: Résultat M17P posé sur 1 affaire ; 1 décision T17R créée.
+controle: SELECT COUNT(*) FROM v2.DECISION_JUDICIAIRE WHERE DCJDC_ID_INSTN = 1705043 AND DCJDC_TYPE_DECISION = 'T17R' => 1
+controle: SELECT COUNT(*) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'MPCS' AND DMND_NUM_INDICATIF = '2026P17543' => 0

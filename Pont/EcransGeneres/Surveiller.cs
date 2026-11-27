@@ -92,8 +92,9 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             [
                 Marche("Audience", "Une ou plusieurs audiences se choisissent. Une audience déjà chargée n'est pas ajoutée une seconde fois.", true,
                     "Audience", "Cabinet"),
-                // La liste d'ordre de RIG v2 (OPE_ORDRE_INSTANCE.cs:50-59 : n° rôle, nom, heure, type de classement, n° d'appel), lue
-                // avec l'audience dépliée (FichesAudienceV2.cs).
+                // La liste d'ordre de RIG v2 (OPE_ORDRE_INSTANCE.cs:50-59 : n° rôle, juge, nom, heure, type de classement, n° d'appel ;
+                // en mode « Procédures collectives », mandataire et administrateur judiciaires), lue avec l'audience dépliée
+                // (FichesAudienceV2.cs).
                 Marche("Ordre des affaires", "Les numéros d'appel se calculent par affaire ; ils se reconstruisent si l'un manque.", true,
                     Champ.Tableau("Affaires dans l'ordre d'appel")),
                 Marche("Options", "Plumitif simplifié, notes d'audience, composition : trois cases à cocher au besoin.", false,
@@ -167,7 +168,8 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // mêmes paramètres. Lecteur : Serveur/Socle/EcransGeneres/LecteurMiseAuPointChambres.cs (lot 7). « Valider la décision »
             // valide en lot (mode MultiInstance), dans l'ordre de ApplyModifications (PROC_MPCS.cs:1204-1251) : la composition (son
             // numéro dans l'audience), le résultat, le prochain appel (audience du jour saisi, type de classement), une décision du
-            // type saisi et sa mesure liée (EcrivainMiseAuPointChambres.cs).
+            // type saisi et sa mesure liée, puis l'édition de la décision dans la file des éditions si son type a un réglage d'édition
+            // (PROC_MPCS.cs:757-762, :1337-1346 ; EcrivainMiseAuPointChambres.cs).
             // fix-ok: second contrôle du lot 7 (26/11/2026) -- ces descripteurs n'avaient pas les paramètres des écritures et recherches
             // de RIG v2 désormais branchées (composition et prochain appel, PROC_MPCS.cs:1204-1238 ; cases des types, Designer :491-522) ;
             // une cause, portée par un remplacement par descripteur (MPCS, Délibérés, Taxes), aucun autre descripteur touché.

@@ -326,8 +326,9 @@ internal static class EditionsEvenementV2
         return p;
     }
 
-    /// <summary>Les destinataires institutionnels actifs, par type (RecupDestEditLot2DestinataireInstitutionnelForInstanceOrMesure).</summary>
-    private static async Task<List<Destinataire>> DestinatairesInstanceAsync(GesteEnCours geste, CancellationToken ct)
+    /// <summary>Les destinataires institutionnels actifs, par type (RecupDestEditLot2DestinataireInstitutionnelForInstanceOrMesure) ;
+    /// aussi la liste de l'edition d'une decision (EcrivainMiseAuPointChambres.EditionDecisionAsync).</summary>
+    internal static async Task<List<Destinataire>> DestinatairesInstanceAsync(GesteEnCours geste, CancellationToken ct)
     {
         var liste = new List<Destinataire>();
         await using var r = await geste.LireAsync("""

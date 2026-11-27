@@ -228,7 +228,7 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
             var instance = await LireInstanceAsync(geste, a.IdInstance, ct);
             var (numero, refusNumero) = await CreationV2.NumeroAsync(geste, "DMD", geste.Maintenant.Year, ct);
             if (numero is null) return IssueGeste.Refuser(refusNumero!);
-            demandes[a.IdInstance] = (await DemandeAsync(geste, a, instance, numero, ct), numero, instance);
+            demandes[a.IdInstance] = (await DemandeAsync(geste, CodeProcessus, a.IdInstance, a.Role, instance, numero, ct), numero, instance);
         }
 
         var ids = new List<string>();
@@ -260,7 +260,7 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
             // Pas de seconde decision sur un appel deja delibere (DecisionsJudiciairesDeliberés, PROC_MJUDS.cs:1189).
             if (saisiType.Length > 0 && await DelibereesAsync(geste, a.Id, ct) == 0)
             {
-                traces.AddRange(await EcrivainMiseAuPointChambres.CreerDecisionAsync(geste, a.IdInstance, a.Role, saisiType, datePrevue, mesureLiee, ct));
+                traces.AddRange((await EcrivainMiseAuPointChambres.CreerDecisionAsync(geste, a.IdInstance, a.Role, saisiType, datePrevue, mesureLiee, ct)).Traces);
                 decisions++;
             }
         }
@@ -296,11 +296,12 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
     /// <summary>Le code du processus du renvoi en masse (PROC_MJUDS.Designer.cs:242), celui de ses demandes.</summary>
     internal const string CodeProcessus = "MJUDS";
 
-    /// <summary>L'instance telle que la demande et les editions du renvoi la lisent.</summary>
-    private sealed record InstanceRenvoi(int? IdAffaire, string NomCourant, string RepGeneral, int? IdPc, int? IdPrevention,
+    /// <summary>L'instance telle que la demande et les editions du renvoi la lisent (et celles de la mise au point des chambres,
+    /// EcrivainMiseAuPointChambres.cs).</summary>
+    internal sealed record InstanceRenvoi(int? IdAffaire, string NomCourant, string RepGeneral, int? IdPc, int? IdPrevention,
                                          EditionsEvenementV2.Instance Editions);
 
-    private static async Task<InstanceRenvoi> LireInstanceAsync(GesteEnCours geste, int idInstance, CancellationToken ct)
+    internal static async Task<InstanceRenvoi> LireInstanceAsync(GesteEnCours geste, int idInstance, CancellationToken ct)
     {
         await using var r = await geste.LireAsync("""
             SELECT INSTN_NUM_ROLE, INSTN_ID_AFFRE, INSTN_NOM_COURANT, INSTN_NUM_REP_GENERAL, INSTN_ID_PRCLL, INSTN_ID_PREVE, INSTN_NUMERO_SOURCE,
@@ -322,18 +323,24 @@ internal sealed class EcrivainRetourAudience : IEcrivainEcran
     /// en numero indicatif, « role repertoire » en numeros (string.Join(" ", ...), :993), au code MJUDS, numerotee dans la serie DMD,
     /// validee a la sauvegarde (Cloturer(Validee), :760) donc ecrite a l'etat « V » ; ses dossiers : 2J = l'instance, puis 2P = sa PC,
     /// sinon 2R = sa prevention (:995-1002). Lu dans RIG_DEV le 27/11/2026 : DMND_CODE_PROSS = 'MJUDS', etat V, DMND_ID_AFFRE pose ;
-    /// 15 563 des 34 948 demandes MJUDS portent des editions.
+    /// 15 563 des 34 948 demandes MJUDS portent des editions. La mise au point des chambres cree la sienne de meme, au code MPCS
+    /// (LockInstances, PROC_MPCS.cs:1019-1037 : CreateAndLockDemande, indicatif = role, numeros = role et repertoire, 2J puis 2P
+    /// sinon 2R), pour y rattacher l'edition de la decision (EcrivainMiseAuPointChambres.cs).
     /// </summary>
-    private static async Task<int> DemandeAsync(GesteEnCours geste, Appel a, InstanceRenvoi instance, string numero, CancellationToken ct)
+    // fix-ok: contrôle du lot 7 (27/11/2026) -- « Valider la décision » de PROC_MPCS créait la décision sans son édition, faute
+    // de demande MPCS où la rattacher (DecisionJudiciaire.CreateDemandeEdition(idDemande…), PROC_MPCS.cs:1337-1346) : cette demande
+    // est la même que celle du renvoi, d'où le code processus et l'instance en paramètres ; le renvoi garde « MJUDS ».
+    internal static async Task<int> DemandeAsync(GesteEnCours geste, string codeProcessus, int idInstance, string role, InstanceRenvoi instance,
+                                                 string numero, CancellationToken ct)
     {
         var id = await CreationV2.InsererAsync(geste, "v2.DEMANDE", "DMND_ID_DMND", new Dictionary<string, object?>
         {
-            ["DMND_NUM_DEMANDE"] = numero, ["DMND_ETAT_DEMANDE"] = "V", ["DMND_CODE_PROSS"] = CodeProcessus, ["DMND_DATE_CREATION"] = geste.Maintenant,
+            ["DMND_NUM_DEMANDE"] = numero, ["DMND_ETAT_DEMANDE"] = "V", ["DMND_CODE_PROSS"] = codeProcessus, ["DMND_DATE_CREATION"] = geste.Maintenant,
             ["DMND_EN_COURS"] = false, ["DMND_NOM_UTILISATEUR"] = geste.Agent.NomAffiche, ["DMND_NOM"] = instance.NomCourant,
-            ["DMND_NUM_INDICATIF"] = a.Role, ["DMND_LES_NUMEROS"] = string.Join(" ", a.Role, instance.RepGeneral),
+            ["DMND_NUM_INDICATIF"] = role, ["DMND_LES_NUMEROS"] = string.Join(" ", role, instance.RepGeneral),
             ["DMND_ID_AFFRE"] = instance.IdAffaire,
         }, ct);
-        var dossiers = new List<(string Sequenceur, int Valeur)> { (VerrouDemandeV2.SequenceurInstance, a.IdInstance) };
+        var dossiers = new List<(string Sequenceur, int Valeur)> { (VerrouDemandeV2.SequenceurInstance, idInstance) };
         if (instance.IdPc is { } pc) dossiers.Add(("2P", pc));
         else if (instance.IdPrevention is { } prevention) dossiers.Add(("2R", prevention));
         foreach (var (sequenceur, valeur) in dossiers)
