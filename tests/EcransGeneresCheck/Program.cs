@@ -567,6 +567,14 @@ Exiger(parCode.GetValueOrDefault("PROC_ADDCREANCE") is { Forme: FormeEcran.Saisi
 Exiger(parCode.GetValueOrDefault("PROC_REJET") is { Forme: FormeEcran.Operation } rejet
        && rejet.Sections.Where(s => s.Champs.Any()).Select(s => s.Titre).SequenceEqual(new[] { "Destinataire", "Motif" }),
     "« Rejets d'encaissement » : seuls le destinataire et le motif se saisissent, le cheque choisi se lit sur sa ligne");
+// « Suivi des preventions » (PROC_IPSUIVI) saisit les dates des actes d'UNE injonction de payer, retrouvee par son « N° IP »
+// (OPE_IPSUIVI.Designer.cs:389) : le Detail OPE fait foi (proc_ipsuivi.md:161), role reel :173. Le haut de la fiche (dix
+// etats, prise en charge, cloture) n'existe pas dans le code : rangee en File d'apres lui, elle est une Fiche (controle
+// final du lot 1, 25/11/2026). Son ecran reuni, avec la file PROC_SURVIP, passe donc en onglets.
+Exiger(parCode.GetValueOrDefault("PROC_IPSUIVI") is { Forme: FormeEcran.Fiche, Marches.Length: 0, Criteres: ["N° IP"] } ipsuivi
+       && ipsuivi.Sections.SelectMany(s => s.Champs).Count(c => c.Type == TypeChamp.Date) >= 5
+       && parCode.GetValueOrDefault("SYNTHESE_IP") is { EnOnglets: true },
+    "« Suivi des preventions » est une Fiche sur UNE injonction de payer (son N° IP) : les dates des actes, aucune etape ; son ecran reuni passe en onglets");
 // Une section est une PARTIE de l'objet ouvert, jamais la liste qui l'a trouve : chaque forme montre deja ses lignes (liste,
 // tableau, file). Une section titree « Resultat(s) » repetait cette liste dans la fiche, ou dans le detail d'une ligne
 // (controle final du lot 1, 25/11/2026 : Trouver.cs PROC_REGJUD, PROC_RECHENC, PROC_TARIFS, PROC_BEN, Surveiller.cs PROC_ACTREJ).
