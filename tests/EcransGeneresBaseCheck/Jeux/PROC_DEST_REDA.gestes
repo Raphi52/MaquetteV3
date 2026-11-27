@@ -1,32 +1,34 @@
-# « Destinataires » (EcrivainDestinatairesRedaction) : « Enregistrer » l'edition d'un destinataire et, sur le document REDA, la date de
-# delivrance des grosses et les supplements (OPE_DEST_REDA.Toolbar_ButtonClick, :217-280). Lignes du jeu : PROC_DEST_REDA.sql et .attendu.
+# « Destinataires » (EcrivainDestinatairesRedaction), en grille (Referentiel) : « Modifier » l'edition d'un destinataire et, sur le document
+# REDA, la date de delivrance des grosses et les supplements (OPE_DEST_REDA.Toolbar_ButtonClick, :217-280) ; « Ajouter » un destinataire
+# divers (menu « Ajouter », FormAjouterDestinataire) ; « Supprimer » un destinataire divers (menu « Supprimer », :129-144). Les cellules
+# sont envoyees par libelle de colonne. Lignes du jeu : PROC_DEST_REDA.sql et .attendu.
 
 # Refus : un destinataire qu'aucune decision redigee ne porte. Jumeau accepte : bloc 4.
-geste: Enregistrer
+geste: Modifier
 ids: D-999
+valeur: Édition = G
 resultat: refuse
 message: Destinataire introuvable parmi ceux des décisions rédigées (D-999).
 ---
 # Refus : une edition hors de la grammaire G, C, E, L (RedaDestinatairesDataGridView, :295-303). Jumeau accepte : bloc 4.
-geste: Enregistrer
+geste: Modifier
 ids: P-2000603-2000602
-valeur: Édition du jugement › Édition = Z
+valeur: Édition = Z
 resultat: refuse
 message: Édition « Z » inconnue : G (grosse), C (copie), E (expédition), L (lettre de notification), X (aucune) ou D (par défaut).
 ---
 # Refus : rien ne change (« Veuillez modifier des données. », :264). Jumeau accepte : bloc 4.
-geste: Enregistrer
+geste: Modifier
 ids: P-2000603-2000602
-valeur: Édition du jugement › Édition = X
+valeur: Édition = X
 resultat: refuse
 message: Veuillez modifier des données.
 ---
-# Les cases recomposent l'edition dans l'ordre G, C, E, L (:282-308) : grosse et lettre de notification -> « GL » sur la partie. Le
-# document de 2000602 reste sans date de delivrance : l'avertissement de RIG v2, sans refus (:244-251).
-geste: Enregistrer
+# Le code s'ecrit dans l'ordre G, C, E, L que les cases de la grille recomposent (:282-308) : « LG » -> « GL » sur la partie. Le document de
+# 2000602 reste sans date de delivrance : l'avertissement de RIG v2, sans refus (:244-251). La fiche relue porte les libelles des colonnes.
+geste: Modifier
 ids: P-2000603-2000602
-valeur: Édition du jugement › Grosse = oui
-valeur: Édition du jugement › Lettre de notification = oui
+valeur: Édition = LG
 resultat: fait
 message: Destinataire PARTIE B SARL enregistré : grosse + lettre de notification. La date de délivrance des grosses est obligatoire pour continuer.
 lignes:
@@ -39,17 +41,17 @@ HUISSIER DIVERS BANC | Rôle 2026DR20601 · destinataire divers · expédition �
 controle: SELECT PRT_EDITION_JUGEMENT FROM v2.PARTIE WHERE PRT_ID_PRT = 2000603 => GL
 fiche: P-2000603-2000602
 Édition du jugement › Édition = GL
-Édition du jugement › Grosse = oui
-Édition du jugement › Copie =
+Destinataire › Qualité = partie
+Destinataire › Numéro de rôle = 2026DR20602
 ---
 # Le mandataire postulant : « T » vaut « GC » (DestinataireREDA.EditionJugement, :193-197), sur la colonne de la PARTIE qu'il represente
 # (_EnregistrerMandataire, :468-487) ; la date de delivrance et un supplement de copie sur le document de 2000601 (:223-243) : toutes
 # les lignes de cette decision portent la nouvelle date.
-geste: Enregistrer
+geste: Modifier
 ids: M-2000601-2000601
-valeur: Édition du jugement › Édition = T
-valeur: Date de délivrance des grosses › Date de délivrance des grosses = 1990-03-20
-valeur: Suppléments › Copies supplémentaires = 2
+valeur: Édition = T
+valeur: Date de délivrance des grosses = 1990-03-20
+valeur: Copies supplémentaires = 2
 resultat: fait
 message: Destinataire ARDOISE Irène enregistré : grosse + copie.
 lignes:
@@ -58,14 +60,79 @@ DEMANDEUR DEST SARL | Rôle 2026DR20601 · partie · grosse + copie · grosses d
 DEFENDEUR DEST SAS | Rôle 2026DR20601 · partie · édition par défaut · grosses délivrées le 20/03/1990 | Parties | EnCours | []
 CHANTELLE Olga | Rôle 2026DR20601 · mandataire plaidant · aucune édition · grosses délivrées le 20/03/1990 | Mandataires | EnCours | []
 ARDOISE Irène | Rôle 2026DR20601 · mandataire postulant · grosse + copie · grosses délivrées le 20/03/1990 | Mandataires | EnCours | []
-HUISSIER DIVERS BANC | Rôle 2026DR20601 · destinataire divers · expédition · grosses délivrées le 20/03/1990 | Destinataires divers | EnCours | []
+HUISSIER DIVERS BANC | Rôle 2026DR20601 · destinataire divers · expédition · grosses délivrées le 20/03/1990 | Destinataires divers | EnCours | [] | valeurs: HUISSIER DIVERS BANC ; 2026DR20601 ; destinataire divers ; 12 rue du Banc 75000 PARIS ; E ; 1990-03-20 ;  ; 2 ; 1
 controle: SELECT PRT_MANDATAIRE_EDITION_JUGEMENT + ' / ' + PRT_EDITION_JUGEMENT FROM v2.PARTIE WHERE PRT_ID_PRT = 2000601 => GC / GC
 controle: SELECT DCMDS_SUPPLEMENT_COPIE + ' / ' + CONVERT(varchar(10), DCMDS_DATE_IMPRESSION_MINUTE, 103) FROM v2.DOCUMENT_DOSSIER WHERE DCMDS_ID_DCMDS = 2000601 => 2 / 20/03/1990
 ---
 # Le destinataire divers : la copie s'ajoute a l'expedition, dans l'ordre (C avant E) -> « CE » sur DESTINATAIRE_DIVERS.
-geste: Enregistrer
+geste: Modifier
 ids: D-2000601
-valeur: Édition du jugement › Copie = oui
+valeur: Édition = EC
 resultat: fait
 message: Destinataire HUISSIER DIVERS BANC enregistré : copie + expédition.
 controle: SELECT DTDIV_EDITION_JUGEMENT FROM v2.DESTINATAIRE_DIVERS WHERE DTDIV_ID_DTDIV = 2000601 => CE
+---
+# AJOUTER. Refus : le libelle ET l'adresse sont obligatoires (FormAjouterDestinataire.rigBtnAjouter_Click, :119 : sans eux, rien n'est
+# ajoute). Jumeau accepte : bloc 9, les deux remplis.
+geste: Ajouter
+valeur: Destinataire = HUISSIER AJOUTE BANC
+valeur: Numéro de rôle = 2026DR20602
+resultat: refuse
+message: Le libellé et l'adresse du destinataire sont obligatoires : RIG v2 n'ajoute pas un destinataire sans eux.
+---
+# Refus : le role 2026DR20603 n'a pas de decision redigee (ETP_DEST_REDA.GetDocumentReda, :60-64 : RIG v2 n'ouvre pas ses destinataires).
+# Jumeau accepte : bloc 9, le role 2026DR20602 et sa decision redigee.
+geste: Ajouter
+valeur: Destinataire = HUISSIER AJOUTE BANC
+valeur: Adresse = 3 place du Palais|75001 PARIS
+valeur: Numéro de rôle = 2026DR20603
+resultat: refuse
+message: Aucune décision rédigée (document REDA) pour le rôle 2026DR20603 : RIG v2 n'ouvre les destinataires que d'une décision rédigée.
+---
+# « Ajouter » un destinataire divers saisi a la main a la decision 2000602 : DESTINATAIRE_DIVERS (DestinataireREDA.cs:390-399 : sans code,
+# l'adresse aux « | » changes en retours a la ligne), d'edition « X » (OPE_DEST_REDA.form_ShowModalClosed, :160), enregistre aussitot (:161).
+geste: Ajouter
+valeur: Destinataire = HUISSIER AJOUTE BANC
+valeur: Adresse = 3 place du Palais|75001 PARIS
+valeur: Numéro de rôle = 2026DR20602
+resultat: fait
+message: Destinataire HUISSIER AJOUTE BANC ajouté à la décision du rôle 2026DR20602 : aucune édition.
+lignes:
+PARTIE B SARL | Rôle 2026DR20602 · partie · grosse + lettre de notification · date de délivrance à saisir | Parties | AFaire | []
+HUISSIER AJOUTE BANC | Rôle 2026DR20602 · destinataire divers · aucune édition · date de délivrance à saisir | Destinataires divers | AFaire | []
+DEMANDEUR DEST SARL | Rôle 2026DR20601 · partie · grosse + copie · grosses délivrées le 20/03/1990 | Parties | EnCours | []
+DEFENDEUR DEST SAS | Rôle 2026DR20601 · partie · édition par défaut · grosses délivrées le 20/03/1990 | Parties | EnCours | []
+CHANTELLE Olga | Rôle 2026DR20601 · mandataire plaidant · aucune édition · grosses délivrées le 20/03/1990 | Mandataires | EnCours | []
+ARDOISE Irène | Rôle 2026DR20601 · mandataire postulant · grosse + copie · grosses délivrées le 20/03/1990 | Mandataires | EnCours | []
+HUISSIER DIVERS BANC | Rôle 2026DR20601 · destinataire divers · copie + expédition · grosses délivrées le 20/03/1990 | Destinataires divers | EnCours | []
+controle: SELECT ISNULL(DTDIV_TYPE, 'sans code') + ' / ' + DTDIV_EDITION_JUGEMENT + ' / ' + REPLACE(DTDIV_BLOC_ADRESSE, CHAR(13) + CHAR(10), ' + ') + ' / ' + CONVERT(varchar(10), DTDIV_ID_DCJDC) FROM v2.DESTINATAIRE_DIVERS WHERE DTDIV_DESIGNATION = 'HUISSIER AJOUTE BANC' => sans code / X / 3 place du Palais + 75001 PARIS / 2000602
+---
+# Refus : le meme destinataire (meme libelle et adresse) est deja dans la liste (FormAjouterDestinataire, :120-128). Jumeau accepte : bloc 9.
+geste: Ajouter
+valeur: Destinataire = HUISSIER AJOUTE BANC
+valeur: Adresse = 3 place du Palais|75001 PARIS
+valeur: Numéro de rôle = 2026DR20602
+resultat: refuse
+message: Ce destinataire est déjà dans la liste !
+---
+# SUPPRIMER. Refus : une partie de l'instance ne se supprime pas (« Impossible de supprimer les destinataires de l'instance »,
+# OPE_DEST_REDA._menuSupprimer, :134-135). Jumeau accepte : bloc suivant, un destinataire divers.
+geste: Supprimer
+ids: P-2000601-2000601
+resultat: refuse
+message: Impossible de supprimer les destinataires de l'instance
+---
+# « Supprimer » le destinataire divers ajoute au bloc 9 (DTDIV_ID_DTDIV 2000602 : la table du banc n'a pas d'IDENTITY, MAX + 1) : il sort de
+# DESTINATAIRE_DIVERS (DestinataireDiversReference.Delete, :138) et de la liste.
+geste: Supprimer
+ids: D-2000602
+resultat: fait
+message: Destinataire HUISSIER AJOUTE BANC supprimé de la décision du rôle 2026DR20602.
+lignes:
+PARTIE B SARL | Rôle 2026DR20602 · partie · grosse + lettre de notification · date de délivrance à saisir | Parties | AFaire | []
+DEMANDEUR DEST SARL | Rôle 2026DR20601 · partie · grosse + copie · grosses délivrées le 20/03/1990 | Parties | EnCours | []
+DEFENDEUR DEST SAS | Rôle 2026DR20601 · partie · édition par défaut · grosses délivrées le 20/03/1990 | Parties | EnCours | []
+CHANTELLE Olga | Rôle 2026DR20601 · mandataire plaidant · aucune édition · grosses délivrées le 20/03/1990 | Mandataires | EnCours | []
+ARDOISE Irène | Rôle 2026DR20601 · mandataire postulant · grosse + copie · grosses délivrées le 20/03/1990 | Mandataires | EnCours | []
+HUISSIER DIVERS BANC | Rôle 2026DR20601 · destinataire divers · copie + expédition · grosses délivrées le 20/03/1990 | Destinataires divers | EnCours | []
+controle: SELECT COUNT(*) FROM v2.DESTINATAIRE_DIVERS WHERE DTDIV_DESIGNATION = 'HUISSIER AJOUTE BANC' => 0

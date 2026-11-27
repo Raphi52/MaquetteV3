@@ -7,17 +7,24 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 
 /// <summary>
 /// « Destinataires » (PROC_DEST_REDA) : les destinataires des editions d'une decision redigee (parties, mandataires, destinataires
-/// divers) et l'edition que chacun recoit, avec la date de delivrance des grosses. Mode d'emploi : LecteurEcran.cs ; le geste :
+/// divers) et l'edition que chacun recoit, avec la date de delivrance des grosses. Mode d'emploi : LecteurEcran.cs ; les gestes :
 /// EcrivainDestinatairesRedaction.cs. Plan « RIG v3 100 % fonctionnel », lot 10, 27/11/2026.
+///
+/// FORME « Referentiel » (et non « Fiche ») : l'operation de RIG v2 est une GRILLE de destinataires (RedaDestinatairesDataGridView) dont
+/// l'edition se change ligne par ligne (MetierDataGridView_CellContentClick, OPE_DEST_REDA.cs:282-308), avec un menu « Ajouter » et
+/// « Supprimer » (_CreateContextMenuStrip, :103-109) -- la grille de reglage de la V3 (ajouter, modifier en ligne, supprimer). Les
+/// colonnes : le destinataire, son role, sa qualite, son adresse, son edition, et sur le document REDA de la decision la date de
+/// delivrance des grosses et les supplements (communs a tous les destinataires de la decision, :223-243).
 ///
 /// SOURCE (ancien RIG) : Source\RIG\DLL\Processus\PROC_DEST_REDA\ (proc_dest_reda.md, Detail OPE, qui fait foi). RIG v2 ouvre UNE
 /// decision (« idDecisonJudiciaire », PROC_DEST_REDA.cs:24-27) depuis l'impression legale (OPE_IMPLEG.cs:238-253) ou la redaction
 /// (OPE_DESTINATAIRES) ; il lui faut son document REDA (ETP_DEST_REDA.GetDocumentReda, :60-64 : sans document, l'ecran echoue) --
 /// DOCUMENT_DOSSIER de code entite REDA_DECI_JUD. Les destinataires (DestinataireREDA.cs:730-822) et la colonne qui porte leur
 /// edition (EditionJugement, :176-215) :
-///   - les parties de l'instance : PARTIE.PRT_EDITION_JUGEMENT ;
+///   - les parties de l'instance dont la qualite commence par D, F ou I (demandeur, defendeur, intervenant :
+///     ChargerDestinatairesParDefaut, Outils\DLL\RigReda\Public\DestinataireREDA.cs:735-737) : PARTIE.PRT_EDITION_JUGEMENT ;
 ///   - leur mandataire postulant et plaidant : PRT_MANDATAIRE_EDITION_JUGEMENT, PRT_MANDATAIRE_PLAI_EDITION_JUGEMENT (sur la PARTIE) ;
-///   - les destinataires divers de la decision : DESTINATAIRE_DIVERS.DTDIV_EDITION_JUGEMENT.
+///   - les destinataires divers de la decision : DESTINATAIRE_DIVERS.DTDIV_EDITION_JUGEMENT, et leur adresse DTDIV_BLOC_ADRESSE.
 /// Le greffe et le document interne ne sont jamais enregistres depuis cet ecran (_EnregistrerDestinataires, :428-429) : ils ne sont
 /// pas listes. L'edition : G grosse, C copie, E expedition, L lettre de notification (dans cet ordre), X aucune, D « par defaut »
 /// (calculee par RIG v2 d'apres le mode de presentation de la partie et le type de decision, RefreshEditions, :403-517).
@@ -30,8 +37,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// Id = « P-&lt;partie&gt;-&lt;decision&gt; », « M-... » (mandataire postulant), « L-... » (plaidant), « D-&lt;destinataire divers&gt; ».
 ///
 /// NON REPRIS (nomme) : le calcul de l'edition « par defaut » (D, RefreshEditions) : la V3 ecrit « D » tel quel et l'affiche ; les
-/// destinataires institutionnels et le greffe ; l'ajout et la suppression d'un destinataire divers (FormAjouterDestinataire, menu
-/// « Supprimer ») : la forme Fiche n'a ni Ajouter ni Supprimer.
+/// parties des instances filles (ChargerDestinatairesParDefaut, :741-746) ; l'adresse des parties et des mandataires (les fiches
+/// d'adresse rec.Adresse, que la grille de RIG v2 montre en info-bulle) ; les destinataires institutionnels et le greffe.
 /// </summary>
 internal sealed class LecteurDestinatairesRedaction : IRechercheEcran, IFicheEcran
 {
@@ -40,19 +47,20 @@ internal sealed class LecteurDestinatairesRedaction : IRechercheEcran, IFicheEcr
     /// <summary>Les groupes du descripteur (ModifierEnvois.cs), au mot pres.</summary>
     internal const string Parties = "Parties", Mandataires = "Mandataires", Divers = "Destinataires divers";
 
-    /// <summary>Les sections et champs du descripteur, au mot pres.</summary>
-    internal const string SectionEdition = "Édition du jugement", ChampEdition = "Édition", ChampGrosse = "Grosse", ChampCopie = "Copie",
-                          ChampExpedition = "Expédition", ChampLettre = "Lettre de notification",
-                          SectionDate = "Date de délivrance des grosses", ChampDate = "Date de délivrance des grosses",
-                          SectionSupplements = "Suppléments", ChampGrosses = "Grosses supplémentaires", ChampCopies = "Copies supplémentaires",
-                          ChampExpeditions = "Expéditions supplémentaires",
-                          SectionDecision = "Décision", ChampRole = "Numéro de rôle", ChampType = "Type de décision", CritereRole = "Numéro de rôle";
+    /// <summary>Les colonnes de la grille (et les champs de meme libelle de la fiche), au mot pres, dans l'ordre du descripteur.</summary>
+    internal const string ColDestinataire = "Destinataire", ColRole = "Numéro de rôle", ColQualite = "Qualité", ColAdresse = "Adresse",
+                          ColEdition = "Édition", ColDate = "Date de délivrance des grosses", ColGrosses = "Grosses supplémentaires",
+                          ColCopies = "Copies supplémentaires", ColExpeditions = "Expéditions supplémentaires";
+
+    /// <summary>Les sections de la fiche (le descripteur), au mot pres.</summary>
+    internal const string SectionDestinataire = "Destinataire", SectionEdition = "Édition du jugement", SectionDate = "Date de délivrance des grosses",
+                          SectionSupplements = "Suppléments", ChampType = "Type de décision", CritereRole = "Numéro de rôle";
 
     public IReadOnlyCollection<string> Criteres { get; } = [CritereRole];
 
     // Les decisions REDA (le filtre se pose a la place de /*filtre*/, dans chacune des quatre branches). Pas de WITH : la porte de lecture
     // V2 n'admet qu'une requete qui commence par SELECT (LectureV2.ExigerLecture).
-    private const string Decisions = """
+    internal const string Decisions = """
         (SELECT d.DCJDC_ID_DCJDC, d.DCJDC_ID_INSTN, i.INSTN_NUM_ROLE, ISNULL(td.R_TYPEDECISI_LIBELLE_ECRAN, ISNULL(d.DCJDC_TYPE_DECISION, '')) AS TypeDecision,
                 doc.DCMDS_ID_DCMDS, doc.DCMDS_DATE_IMPRESSION_MINUTE, doc.DCMDS_SUPPLEMENT_GROSSE, doc.DCMDS_SUPPLEMENT_COPIE, doc.DCMDS_SUPPLEMENT_EXPEDI
          FROM v2.DECISION_JUDICIAIRE AS d
@@ -64,19 +72,25 @@ internal sealed class LecteurDestinatairesRedaction : IRechercheEcran, IFicheEcr
          WHERE 1 = 1 /*filtre*/)
         """;
 
+    // Les parties retenues par RIG v2 (ChargerDestinatairesParDefaut, :735-737), et leurs mandataires.
+    private const string PartiesRetenues = "(p.PRT_QUALIF_PARTIE LIKE 'D%' OR p.PRT_QUALIF_PARTIE LIKE 'F%' OR p.PRT_QUALIF_PARTIE LIKE 'I%')";
+
     // Les destinataires : une ligne par partie, par mandataire (postulant, plaidant) et par destinataire divers des decisions REDA.
     private const string Destinataires = $$"""
         SELECT TOP (@plafond) dest.*, COUNT(*) OVER () AS Total FROM (
-            SELECT dj.*, 0 AS Rang, 'P' AS Sorte, p.PRT_ID_PRT AS IdDestinataire, ISNULL(NULLIF(p.PRT_DESIGNATION, ''), p.PRT_NOM) AS Nom, p.PRT_EDITION_JUGEMENT AS Edition
-            FROM {{Decisions}} AS dj JOIN v2.PARTIE AS p ON p.PRT_ID_INSTN = dj.DCJDC_ID_INSTN
+            SELECT dj.*, 0 AS Rang, 'P' AS Sorte, p.PRT_ID_PRT AS IdDestinataire, ISNULL(NULLIF(p.PRT_DESIGNATION, ''), p.PRT_NOM) AS Nom,
+                   p.PRT_EDITION_JUGEMENT AS Edition, CONVERT(varchar(max), NULL) AS Adresse
+            FROM {{Decisions}} AS dj JOIN v2.PARTIE AS p ON p.PRT_ID_INSTN = dj.DCJDC_ID_INSTN AND {{PartiesRetenues}}
             UNION ALL
-            SELECT dj.*, 1, 'M', p.PRT_ID_PRT, m.MNDTR_NOM, p.PRT_MANDATAIRE_EDITION_JUGEMENT
-            FROM {{Decisions}} AS dj JOIN v2.PARTIE AS p ON p.PRT_ID_INSTN = dj.DCJDC_ID_INSTN JOIN v2.MANDATAIRE AS m ON m.MNDTR_ID_MNDTR = p.PRT_ID_MNDTR_POS
+            SELECT dj.*, 1, 'M', p.PRT_ID_PRT, m.MNDTR_NOM, p.PRT_MANDATAIRE_EDITION_JUGEMENT, NULL
+            FROM {{Decisions}} AS dj JOIN v2.PARTIE AS p ON p.PRT_ID_INSTN = dj.DCJDC_ID_INSTN AND {{PartiesRetenues}}
+            JOIN v2.MANDATAIRE AS m ON m.MNDTR_ID_MNDTR = p.PRT_ID_MNDTR_POS
             UNION ALL
-            SELECT dj.*, 1, 'L', p.PRT_ID_PRT, m.MNDTR_NOM, p.PRT_MANDATAIRE_PLAI_EDITION_JUGEMENT
-            FROM {{Decisions}} AS dj JOIN v2.PARTIE AS p ON p.PRT_ID_INSTN = dj.DCJDC_ID_INSTN JOIN v2.MANDATAIRE AS m ON m.MNDTR_ID_MNDTR = p.PRT_ID_MNDTR_PLAI
+            SELECT dj.*, 1, 'L', p.PRT_ID_PRT, m.MNDTR_NOM, p.PRT_MANDATAIRE_PLAI_EDITION_JUGEMENT, NULL
+            FROM {{Decisions}} AS dj JOIN v2.PARTIE AS p ON p.PRT_ID_INSTN = dj.DCJDC_ID_INSTN AND {{PartiesRetenues}}
+            JOIN v2.MANDATAIRE AS m ON m.MNDTR_ID_MNDTR = p.PRT_ID_MNDTR_PLAI
             UNION ALL
-            SELECT dj.*, 2, 'D', dv.DTDIV_ID_DTDIV, dv.DTDIV_DESIGNATION, dv.DTDIV_EDITION_JUGEMENT
+            SELECT dj.*, 2, 'D', dv.DTDIV_ID_DTDIV, dv.DTDIV_DESIGNATION, dv.DTDIV_EDITION_JUGEMENT, dv.DTDIV_BLOC_ADRESSE
             FROM {{Decisions}} AS dj JOIN v2.DESTINATAIRE_DIVERS AS dv ON dv.DTDIV_ID_DCJDC = dj.DCJDC_ID_DCJDC
         ) AS dest /*id*/
         ORDER BY dest.DCJDC_ID_DCJDC DESC, dest.Rang, dest.Sorte, dest.IdDestinataire
@@ -84,8 +98,12 @@ internal sealed class LecteurDestinatairesRedaction : IRechercheEcran, IFicheEcr
 
     /// <summary>Un destinataire, avec le document REDA de sa decision.</summary>
     internal sealed record Destinataire(string Id, char Sorte, int IdDestinataire, int IdDecision, string Role, string TypeDecision, string Nom,
-                                        string Edition, int IdDocument, DateTime? Delivrance, string SupplementGrosse, string SupplementCopie,
-                                        string SupplementExpedition);
+                                        string Edition, string Adresse, int IdDocument, DateTime? Delivrance, string SupplementGrosse,
+                                        string SupplementCopie, string SupplementExpedition)
+    {
+        /// <summary>La qualite du destinataire, en mots (la colonne « Qualité »).</summary>
+        public string Qualite => Sorte switch { 'M' => "mandataire postulant", 'L' => "mandataire plaidant", 'D' => "destinataire divers", _ => "partie" };
+    }
 
     public async Task<LignesLues> LireAsync(SqlConnection baseGreffe, DateTime aujourdhui, int plafond, CancellationToken ct)
         => await ChercherAsync(baseGreffe, new RechercheEcran(null, new Dictionary<string, string>()), aujourdhui, plafond, ct);
@@ -111,11 +129,16 @@ internal sealed class LecteurDestinatairesRedaction : IRechercheEcran, IFicheEcr
 
     private static LigneLue Ligne(Destinataire d)
     {
-        var precisions = FormeLigne.Joindre($"Rôle {d.Role}", d.TypeDecision,
-            d.Sorte switch { 'M' => "mandataire postulant", 'L' => "mandataire plaidant", 'D' => "destinataire divers", _ => "partie" },
-            LibelleEdition(d.Edition), d.Delivrance is { } dt ? $"grosses délivrées le {FormeLigne.Date(dt)}" : "date de délivrance à saisir");
+        var precisions = FormeLigne.Joindre($"Rôle {d.Role}", d.TypeDecision, d.Qualite, LibelleEdition(d.Edition),
+            d.Delivrance is { } dt ? $"grosses délivrées le {FormeLigne.Date(dt)}" : "date de délivrance à saisir");
         var groupe = d.Sorte switch { 'P' => Parties, 'D' => Divers, _ => Mandataires };
-        return new LigneLue(d.Nom.Length > 0 ? d.Nom : d.Role, precisions, groupe, d.Delivrance is null ? "AFaire" : "EnCours", []) { Id = d.Id };
+        return new LigneLue(d.Nom.Length > 0 ? d.Nom : d.Role, precisions, groupe, d.Delivrance is null ? "AFaire" : "EnCours", [])
+        {
+            Id = d.Id,
+            // Les cellules de la grille, dans l'ordre des colonnes du descripteur ; une date au format de saisie (aaaa-mm-jj).
+            Valeurs = [d.Nom, d.Role, d.Qualite, d.Adresse, d.Edition, FormeLigne.DateFiche(d.Delivrance), d.SupplementGrosse, d.SupplementCopie,
+                       d.SupplementExpedition],
+        };
     }
 
     /// <summary>L'edition en mots (la grammaire G, C, E, L de RedaDestinatairesDataGridView, :295-303).</summary>
@@ -156,34 +179,41 @@ internal sealed class LecteurDestinatairesRedaction : IRechercheEcran, IFicheEcr
             var idDest = Convert.ToInt32(r["IdDestinataire"], CultureInfo.InvariantCulture);
             var idDj = Convert.ToInt32(r["DCJDC_ID_DCJDC"], CultureInfo.InvariantCulture);
             lignes.Add(new Destinataire(sorte == 'D' ? $"D-{idDest}" : $"{sorte}-{idDest}-{idDj}", sorte, idDest, idDj, FormeLigne.Texte(r, "INSTN_NUM_ROLE"),
-                FormeLigne.Texte(r, "TypeDecision"), FormeLigne.Texte(r, "Nom"), FormeLigne.Texte(r, "Edition"),
+                FormeLigne.Texte(r, "TypeDecision"), FormeLigne.Texte(r, "Nom"), FormeLigne.Texte(r, "Edition"), FormeLigne.Texte(r, "Adresse"),
                 Convert.ToInt32(r["DCMDS_ID_DCMDS"], CultureInfo.InvariantCulture), FormeLigne.DateDe(r, "DCMDS_DATE_IMPRESSION_MINUTE"),
                 FormeLigne.Texte(r, "DCMDS_SUPPLEMENT_GROSSE"), FormeLigne.Texte(r, "DCMDS_SUPPLEMENT_COPIE"), FormeLigne.Texte(r, "DCMDS_SUPPLEMENT_EXPEDI")));
         }
         return (lignes, total);
     }
 
+    /// <summary>Les decisions redigees (un document REDA) de l'instance du role <paramref name="role"/> : l'identifiant de chacune et de
+    /// son document, la plus recente en tete -- la decision a qui « Ajouter » rattache un destinataire divers.</summary>
+    internal static async Task<List<(int Decision, int Document)>> DecisionsDuRoleAsync(Func<string, SqlParameter[], Task<SqlDataReader>> lire, string role,
+                                                                                       CancellationToken ct)
+    {
+        var decisions = new List<(int, int)>();
+        await using var r = await lire($"SELECT dj.DCJDC_ID_DCJDC, dj.DCMDS_ID_DCMDS FROM {Decisions.Replace("/*filtre*/", " AND i.INSTN_NUM_ROLE = @role", StringComparison.Ordinal)} AS dj ORDER BY dj.DCJDC_ID_DCJDC DESC",
+                                       [new SqlParameter("@role", role)]);
+        while (await r.ReadAsync(ct))
+            decisions.Add((Convert.ToInt32(r["DCJDC_ID_DCJDC"], CultureInfo.InvariantCulture), Convert.ToInt32(r["DCMDS_ID_DCMDS"], CultureInfo.InvariantCulture)));
+        return decisions;
+    }
+
     public async Task<FicheEcran?> LireFicheAsync(SqlConnection baseGreffe, string id, DateTime maintenant, CancellationToken ct)
     {
         if (await DestinataireAsync((s, p) => LectureV2.LireAsync(baseGreffe, s, ct, p), id, ct) is not { } d) return null;
-        var code = d.Edition;
+        // Les champs portent le libelle des colonnes de la grille : seuls ceux que l'ecrivain enregistre se saisissent (Modifier).
         return new FicheEcran(Procedure, id, d.Nom.Length > 0 ? d.Nom : d.Role,
         [
-            new SectionFiche(SectionDecision, [new(ChampRole, d.Role), new(ChampType, d.TypeDecision)]),
-            new SectionFiche(SectionEdition,
-            [
-                new(ChampEdition, code) { Modifiable = true },
-                new(ChampGrosse, FormeLigne.Case(code.Contains('G'))) { Modifiable = true },
-                new(ChampCopie, FormeLigne.Case(code.Contains('C'))) { Modifiable = true },
-                new(ChampExpedition, FormeLigne.Case(code.Contains('E'))) { Modifiable = true },
-                new(ChampLettre, FormeLigne.Case(code.Contains('L'))) { Modifiable = true },
-            ]),
-            new SectionFiche(SectionDate, [new(ChampDate, FormeLigne.DateFiche(d.Delivrance)) { Modifiable = true }]),
+            new SectionFiche(SectionDestinataire,
+                [new(ColDestinataire, d.Nom), new(ColRole, d.Role), new(ColQualite, d.Qualite), new(ChampType, d.TypeDecision), new(ColAdresse, d.Adresse)]),
+            new SectionFiche(SectionEdition, [new(ColEdition, d.Edition) { Modifiable = true }]),
+            new SectionFiche(SectionDate, [new(ColDate, FormeLigne.DateFiche(d.Delivrance)) { Modifiable = true }]),
             new SectionFiche(SectionSupplements,
             [
-                new(ChampGrosses, d.SupplementGrosse) { Modifiable = true },
-                new(ChampCopies, d.SupplementCopie) { Modifiable = true },
-                new(ChampExpeditions, d.SupplementExpedition) { Modifiable = true },
+                new(ColGrosses, d.SupplementGrosse) { Modifiable = true },
+                new(ColCopies, d.SupplementCopie) { Modifiable = true },
+                new(ColExpeditions, d.SupplementExpedition) { Modifiable = true },
             ]),
         ]);
     }

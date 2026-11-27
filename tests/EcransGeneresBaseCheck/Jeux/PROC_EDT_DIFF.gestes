@@ -1,32 +1,82 @@
-# « Éditions différées » (EcrivainEditionsDifferees) : « Clôturer le lot » (OPE_EDT_DIFF.Toolbar_ButtonClick « CLOTURER », les lots coches
-# de la grille). Lignes : PROC_EDT_DIFF.attendu (posees par PROC_SIGNJUD.sql et PROC_RELANCELOT.sql).
+# « Éditions différées » (EcrivainEditionsDifferees) : la case « Ne pas imprimer » du detail d'un lot, cochee puis decochee (OPE_LISTE_LOT.
+# _TraiterEditionsCochees, :53-78), et « Clôturer le lot » (OPE_EDT_DIFF_LOT._Toolbar_ButtonClick, :64-73). Lignes : PROC_EDT_DIFF.attendu
+# (posees par PROC_SIGNJUD.sql et PROC_RELANCELOT.sql).
 
-# Refus : aucun lot coche. Jumeau accepte : bloc 4.
+# Refus : aucun lot coche. Jumeau accepte : bloc 10.
 geste: Agir Clôturer le lot
 ids:
 resultat: refuse
 message: Aucun lot coché : rien n'est clôturé.
 ---
-# Refus : BANC10-G01 n'a pas d'imprimante choisie (OPE_EDT_DIFF.cs, « Vous devez choisir une imprimante pour pouvoir clôturer »). Jumeau
-# accepte : bloc 4, BANC9-G07 et son imprimante.
+# Refus : BANC10-G01 n'a pas d'imprimante choisie (OPE_EDT_DIFF_LOT.DoVerifier, :52-54, « Vous devez choisir une imprimante pour pouvoir
+# clôturer »). Jumeau accepte : bloc 10, BANC9-G07 et son imprimante.
 geste: Agir Clôturer le lot
 ids: BANC10-G01
 resultat: refuse
 message: Vous devez choisir une imprimante pour pouvoir clôturer
 ---
 # Refus : BANC10-G02 n'a aucune edition (« having count(DMNED_ID_DMNED) > 0 », MetierEdtDiff.cs:19-24) : il n'est pas dans la liste.
-# Jumeau accepte : bloc 4.
+# Jumeau accepte : bloc 10.
 geste: Agir Clôturer le lot
 ids: BANC10-G02
 resultat: refuse
 message: Lot introuvable parmi les lots d'éditions différées ouverts (BANC10-G02).
 ---
-# « Clôturer le lot » BANC9-G07 : phase P (pret a imprimer) et date de fin ; son imprimante est reservee a Amitel (IMPED_ONLY_AMITEL) :
-# l'avertissement de RIG v2, sans refus. Le groupe sort de la liste (GPIMP_DATE_FIN IS NULL).
+# Refus : la cloture se joue sur la ligne du lot (le bouton de la synthese, OPE_EDT_DIFF_LOT), pas sur un de ses documents. Jumeau
+# accepte : bloc 10, la ligne du lot BANC9-G07.
+geste: Agir Clôturer le lot
+ids: E-1900404
+resultat: refuse
+message: « Clôturer le lot » se joue sur la ligne du lot (« Lots ouverts »), pas sur un de ses documents (E-1900404).
+---
+# Refus : « Ne pas imprimer » est la case d'un DOCUMENT de la grille (DataGridViewListeLot, :54-60), pas du lot. Jumeau accepte : bloc 6.
+geste: Agir Ne pas imprimer
+ids: BANC9-G07
+resultat: refuse
+message: « Ne pas imprimer » vaut pour un document du lot, pas pour le lot lui-même (BANC9-G07) : dépliez le lot dans « Documents des lots ».
+---
+# « Ne pas imprimer » sur 1900404 (case cochee puis TRAITER, :58-65) : DMNED_IMPRESSION = faux ; sa phase « E » reste « E » (seul « P »
+# redevient « E ») ; le document reste dans le groupe BANC9-G07, barre (_FillRow, :132-139) : il le quittera a la cloture (bloc 10).
+geste: Agir Ne pas imprimer
+ids: E-1900404
+resultat: fait
+message: Document « Courrier Amitel du banc 9 » marqué « Ne pas imprimer » : il quittera le lot à sa clôture.
+lignes:
+Lot AMI_BANC9 | 1 document · 1 à ne pas imprimer · ouvert le {J-2} · aucune imprimante choisie · groupe BANC10-G01 | Lots ouverts | EnAttente | []
+Lot AMI_BANC9 | 1 document · 1 à ne pas imprimer · ouvert le {J-1} · imprimante « Imprimante Amitel » · groupe BANC9-G07 | Lots ouverts | AFaire | []
+Courrier différé du banc 10 | Lot AMI_BANC9 · ne pas imprimer | Documents des lots | Rejetee | []
+Courrier Amitel du banc 9 | Lot AMI_BANC9 · ne pas imprimer | Documents des lots | Rejetee | []
+controle: SELECT CONVERT(varchar(1), DMNED_IMPRESSION) + ' / ' + DMNED_PHASE_TRAITEMENT + ' / ' + DMNED_NUM_GROUPE FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMNED = 1900404 => 0 / E / BANC9-G07
+---
+# Refus : 1900404 est deja barre (la case est deja cochee). Jumeau accepte : bloc 6, le meme document a imprimer.
+geste: Agir Ne pas imprimer
+ids: E-1900404
+resultat: refuse
+message: Le document « Courrier Amitel du banc 9 » du lot AMI_BANC9 est déjà marqué « Ne pas imprimer ».
+---
+# « Remettre à l'impression » 2000304 (case decochee sur un document non imprime, puis TRAITER, :66-73) : DMNED_IMPRESSION = vrai, le
+# document reste au groupe du lot, sa phase « E » devient « P » (pret a imprimer).
+geste: Agir Remettre à l'impression
+ids: E-2000304
+resultat: fait
+message: Document « Courrier différé du banc 10 » remis à l'impression.
+controle: SELECT CONVERT(varchar(1), DMNED_IMPRESSION) + ' / ' + DMNED_PHASE_TRAITEMENT + ' / ' + DMNED_NUM_GROUPE FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMNED = 2000304 => 1 / P / BANC10-G01
+---
+# Refus : 2000304 est deja a imprimer. Jumeau accepte : bloc 8, le meme document barre.
+geste: Agir Remettre à l'impression
+ids: E-2000304
+resultat: refuse
+message: Le document « Courrier différé du banc 10 » du lot AMI_BANC9 est déjà à imprimer.
+---
+# « Clôturer le lot » BANC9-G07 : SauvegardeFinale (:83-88) sort le document barre 1900404 du groupe (DMNED_NUM_GROUPE vide, :60), puis
+# MetierEdtDiff.Cloturer (:31-35) : phase P (pret a imprimer) et date de fin. Son imprimante est reservee a Amitel (IMPED_ONLY_AMITEL) :
+# l'avertissement de RIG v2, sans refus. Le groupe et son document sortent de la liste (GPIMP_DATE_FIN IS NULL).
 geste: Agir Clôturer le lot
 ids: BANC9-G07
 resultat: fait
-message: Lot AMI_BANC9 clôturé : prêt à imprimer, le service d'impression de RIG v2 le prend. Attention, l'imprimante choisie est l'imprimante d'Amitel (Imprimante Amitel).
+message: Lot AMI_BANC9 clôturé : prêt à imprimer, le service d'impression de RIG v2 le prend. 1 document marqué « Ne pas imprimer » quitte le lot. Attention, l'imprimante choisie est l'imprimante d'Amitel (Imprimante Amitel).
 lignes:
-Lot AMI_BANC9 | 1 document · 1 à ne pas imprimer · ouvert le {J-2} · aucune imprimante choisie · groupe BANC10-G01 | Lots ouverts | EnAttente | []
+Lot AMI_BANC9 | 1 document · ouvert le {J-2} · aucune imprimante choisie · groupe BANC10-G01 | Lots ouverts | EnAttente | []
+Courrier différé du banc 10 | Lot AMI_BANC9 | Documents des lots | EnAttente | []
 controle: SELECT GPIMP_PHASE_TRAITEMENT + ' / ' + CASE WHEN GPIMP_DATE_FIN IS NULL THEN 'ouvert' ELSE 'clos' END FROM v2.GROUPE_IMPRESSION WHERE GPIMP_NUM_GROUPE = 'BANC9-G07' => P / clos
+controle: SELECT ISNULL(DMNED_NUM_GROUPE, 'hors lot') + ' / ' + CONVERT(varchar(1), DMNED_IMPRESSION) FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMNED = 1900404 => hors lot / 0

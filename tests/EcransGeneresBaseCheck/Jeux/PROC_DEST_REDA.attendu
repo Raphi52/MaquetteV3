@@ -1,10 +1,13 @@
 # « Destinataires » (PROC_DEST_REDA) sur PROC_DEST_REDA.sql : les destinataires des decisions qui ont un document REDA, la decision la plus
-# recente (le plus grand identifiant) en tete, puis parties, mandataires (plaidant L, postulant M), destinataires divers. Ecartee : la partie
-# de 2000603, dont la decision n'a pas de document REDA (ETP_DEST_REDA.GetDocumentReda) ; jumeau : la partie de 2000602.
-# Etat : la date de delivrance des grosses du document (celui de 2000601 la porte, celui de 2000602 non).
-PARTIE B SARL | Rôle 2026DR20602 · partie · aucune édition · date de délivrance à saisir | Parties | AFaire | []
+# recente (le plus grand identifiant) en tete, puis parties, mandataires (plaidant L, postulant M), destinataires divers. Ecartees : la partie
+# de 2000603, dont la decision n'a pas de document REDA (ETP_DEST_REDA.GetDocumentReda) ; jumeau : la partie de 2000602. La partie « T »
+# 2000605 (ni D, ni F, ni I : ChargerDestinatairesParDefaut, DestinataireREDA.cs:735-737) ; jumeau : DEMANDEUR DEST SARL (D) et
+# DEFENDEUR DEST SAS (F), de la meme instance.
+# Etat : la date de delivrance des grosses du document (celui de 2000601 la porte, celui de 2000602 non). Les cellules de la grille, dans
+# l'ordre des colonnes (destinataire, role, qualite, adresse, edition, date, supplements) : celles d'une partie et du destinataire divers.
+PARTIE B SARL | Rôle 2026DR20602 · partie · aucune édition · date de délivrance à saisir | Parties | AFaire | [] | valeurs: PARTIE B SARL ; 2026DR20602 ; partie ;  ; X ;  ;  ;  ; 0
 DEMANDEUR DEST SARL | Rôle 2026DR20601 · partie · grosse + copie · grosses délivrées le 15/03/1990 | Parties | EnCours | []
 DEFENDEUR DEST SAS | Rôle 2026DR20601 · partie · édition par défaut · grosses délivrées le 15/03/1990 | Parties | EnCours | []
 CHANTELLE Olga | Rôle 2026DR20601 · mandataire plaidant · aucune édition · grosses délivrées le 15/03/1990 | Mandataires | EnCours | []
 ARDOISE Irène | Rôle 2026DR20601 · mandataire postulant · lettre de notification · grosses délivrées le 15/03/1990 | Mandataires | EnCours | []
-HUISSIER DIVERS BANC | Rôle 2026DR20601 · destinataire divers · expédition · grosses délivrées le 15/03/1990 | Destinataires divers | EnCours | []
+HUISSIER DIVERS BANC | Rôle 2026DR20601 · destinataire divers · expédition · grosses délivrées le 15/03/1990 | Destinataires divers | EnCours | [] | valeurs: HUISSIER DIVERS BANC ; 2026DR20601 ; destinataire divers ; 12 rue du Banc 75000 PARIS ; E ; 1990-03-15 ;  ;  ; 1
