@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { EcranRecherche, morceauxDeLaPage } from './EcranRecherche'
 import { paletteVue } from '../test/plan'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 import type { PaletteVue, PiecePaletteVue } from '../plan/types'
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 const TEXTE = 'DECLARATION SUR L\'HONNEUR\n\nJe soussigne DUPONT Jean, ne le 4 avril 1978. DUPONT declare n\'avoir fait l\'objet d\'aucune condamnation.'
 const premier = TEXTE.indexOf('DUPONT')
@@ -173,6 +174,28 @@ describe('EcranRecherche (la palette en page, liseuse des pieces)', () => {
     expect(r.container.querySelector('.rig-palette__ligne--choisie')!.textContent).toContain('Declaration de non-condamnation')
     expect(r.getAllByRole('option')[2]!.getAttribute('aria-selected')).toBe('true')
     expect(r.container.querySelector('.rig-rp__nav')!.textContent).toContain('passage 2 sur 2')
+  })
+
+  // Le garde-fou de la page, comme celui de la palette (Palette.test.tsx) : avant le lot 20 du plan « RIG v3 100 %
+  // fonctionnel », la page filtrait la constante d'exemple AnnoncesBodacc meme branchee au serveur.
+  it('annonces BODACC : celles de la base branchee au serveur, sans « exemple » ; sans serveur, l exemple marque (lot 20)', async () => {
+    const base = {
+      numAnnonce: '7', numPc: '2001RJ0004', typeAnnonce: 'Création', codeEvePro: '1RJ', dateEvePro: '2001-03-02', prevueEnvoi: '2001-03-05',
+      envoi: '2001-03-05', numParution: '', parution: null, numBord: 'B1', numFact: '', texte: 'Jugement d ouverture de redressement judiciaire',
+      dossier: '2001B00012', transmission: null,
+    }
+    const pont = installerFauxPont({ 'EcranBodacc.Chercher': () => ({ mode: 'serveur', message: null, annonces: [base], total: 1 }) })
+    const r = render(<EcranRecherche vue={paletteVue({ texte: 'redressement', pieces: [] })} plan={vi.fn()} />)
+    await waitFor(() => expect(r.container.textContent).toContain('Jugement d ouverture de redressement judiciaire'))
+    expect(pont.appels).toHaveBeenCalledWith('EcranBodacc.Chercher', 'redressement')
+    expect(r.container.textContent).not.toContain('A2026-1190')
+    expect(r.container.querySelector('.rig-tcw__exemple')).toBeNull()
+    cleanup()
+    // Sans serveur, le pont rend « demo » : l'annonce d'exemple de l'ecran BODACC, marquee.
+    installerFauxPont({ 'EcranBodacc.Chercher': () => ({ mode: 'demo', message: null, annonces: [], total: 0 }) })
+    const demo = render(<EcranRecherche vue={paletteVue({ texte: 'redressement', pieces: [] })} plan={vi.fn()} />)
+    await waitFor(() => expect(demo.container.textContent).toContain('A2026-1190'))
+    expect(demo.container.querySelector('.rig-tcw__exemple')!.textContent).toBe('exemple')
   })
 
   it('avant la reponse du plan de travail, le cadre seul', () => {
